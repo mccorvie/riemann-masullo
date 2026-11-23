@@ -2562,7 +2562,7 @@ def schwartzBergmanDivisible (g : Entire) : Submodule ℂ Aℂ :=
 
 /-- An entire function is divisible by `g` exactly when it vanishes to at least the order of
 `g` at every point. In that case the normalized quotient gives an entire factor. -/
-theorem entire_dvd_iff_analyticOrderAt_le (g f : Entire) :
+private theorem schwartzBergmanDivisible_isClosed_dvd (g f : Entire) :
     g ∣ f ↔ ∀ z, analyticOrderAt (g.val : ℂ → ℂ) z ≤ analyticOrderAt (f.val : ℂ → ℂ) z := by
   have ha (a : Entire) (z : ℂ) : AnalyticAt ℂ (a.val : ℂ → ℂ) z :=
     (show Differentiable ℂ a.val from a.property).analyticAt z
@@ -2611,7 +2611,7 @@ private theorem schwartzBergmanDivisible_isClosed_span (g : Entire) :
         (i : ℕ) (_ : i < n), ((entireJet z i).ker : Set Entire) := by
     ext f
     simp only [SetLike.mem_coe, Ideal.mem_span_singleton,
-      entire_dvd_iff_analyticOrderAt_le, mem_iInter, LinearMap.mem_ker,
+      schwartzBergmanDivisible_isClosed_dvd, mem_iInter, LinearMap.mem_ker,
       ContinuousLinearMap.coe_coe, entireJet_apply]
     apply forall_congr'
     intro z

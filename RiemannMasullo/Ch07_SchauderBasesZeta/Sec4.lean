@@ -1209,6 +1209,126 @@ a zero-moment theta class. -/
 def archNuclearityJet (j : ArchNuclearityJetIndex χ τ hτ) : StrongDual ℂ (Θ₀(χ)) :=
   ((entireJet j.val.1 j.val.2).comp schwartzBergmanEntireInclusion).comp (Z(χ, τ, hτ))
 
+section AdjustedJetRealization
+
+local notation "completedGenerator" => regularizedCompletedHeckeL χ τ hτ
+  (continuedCompletedHeckeL χ) (continuedCompletedHeckeL_spec χ).1 (continuedCompletedHeckeL_spec χ).2
+
+/-- Reflection preserves the meromorphic order. The inverse character has no zero
+at or to the right of the line of absolute convergence. -/
+private theorem archJet_completed_order_nonpos {s : ℂ} (hs : s.re ≤ 0) :
+    meromorphicOrderAt (continuedCompletedHeckeL χ) s ≤ 0 := by
+  obtain ⟨ε, hε, hne, he⟩ := completedHeckeL_continuation_functionalEquation χ
+    (continuedCompletedHeckeL χ) (continuedCompletedHeckeL χ⁻¹)
+    (continuedCompletedHeckeL_spec χ).1 (continuedCompletedHeckeL_spec χ).2
+    (continuedCompletedHeckeL_spec χ⁻¹).1 (continuedCompletedHeckeL_spec χ⁻¹).2
+  let r (z : ℂ) := 1 - z
+  have hr : HasDerivAt r (-1) s := by simpa [r] using (hasDerivAt_id s).const_sub 1
+  have e : continuedCompletedHeckeL χ⁻¹ ∘ r = fun z ↦ ε z * continuedCompletedHeckeL χ z :=
+    funext he
+  have ho := meromorphicOrderAt_comp_of_deriv_ne_zero (f := continuedCompletedHeckeL χ⁻¹)
+    (show AnalyticAt ℂ r s by dsimp [r]; fun_prop) (hr.deriv.trans_ne (by norm_num))
+  rw [e] at ho
+  change meromorphicOrderAt (ε * continuedCompletedHeckeL χ) s = _ at ho
+  rw [meromorphicOrderAt_mul_of_ne_zero (hε.analyticAt s) (hne s)] at ho
+  rw [ho]
+  have hright : 1 ≤ (r s).re := by change 1 ≤ 1 - s.re; linarith
+  exact le_of_not_gt (fun hz ↦ (completedHeckeL_continuation_zeros χ⁻¹ _
+    (continuedCompletedHeckeL_spec χ⁻¹).1 (continuedCompletedHeckeL_spec χ⁻¹).2
+    (zero_lt_one.trans_le hright) hz).not_ge hright)
+
+/-- The entire pole-removed factor is nonzero throughout the closed left half-plane. -/
+private theorem archJet_regularized_nonzero {s : ℂ} (hs : s.re ≤ 0) : (completedGenerator).val s ≠ 0 := by
+  classical
+  let L := continuedCompletedHeckeL χ
+  let b := (((existsUnique_ideleNormSection_character_phase χ τ hτ).exists.choose : ℝ) : ℂ) * Complex.I
+  let δ : ℕ := if χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1 then 1 else 0
+  let polePolynomial (z : ℂ) := (z + b) ^ δ * (1 - z - b) ^ δ
+  have hL := (continuedCompletedHeckeL_spec χ).1
+  by_cases hcan : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1 ∧ (s = -b ∨ s = 1 - b)
+  · have hp := regularizedCompletedHeckeL_ne_zero_at_canceled_poles χ τ hτ L hL
+      (continuedCompletedHeckeL_spec χ).2 hcan.1
+    rcases hcan.2 with rfl | rfl
+    · exact hp.1
+    · exact hp.2
+  have hP : polePolynomial s ≠ 0 := by
+    by_cases htriv : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1
+    · have h := not_or.mp (fun hh ↦ hcan ⟨htriv,hh⟩)
+      simp only [polePolynomial, δ, ite_eq_left htriv, pow_one]
+      refine mul_ne_zero (fun hz ↦ h.1 (eq_neg_of_add_eq_zero_left hz)) ?_
+      intro hz
+      apply h.2
+      linear_combination -hz
+    · simp [polePolynomial, δ, htriv]
+  have hPa (z : ℂ) : AnalyticAt ℂ polePolynomial z := by dsimp [polePolynomial]; fun_prop
+  have hPL : MeromorphicOn (polePolynomial * L) univ := fun z hz ↦
+    (hPa z).meromorphicAt.mul (hL hz).meromorphicAt
+  have he : ((completedGenerator).val : ℂ → ℂ) = toMeromorphicNFOn (polePolynomial * L) univ := rfl
+  have hor : meromorphicOrderAt ((completedGenerator).val : ℂ → ℂ) s = meromorphicOrderAt L s := by
+    rw [he, meromorphicOrderAt_toMeromorphicNFOn hPL (mem_univ _),
+      meromorphicOrderAt_mul_of_ne_zero (hPa s) hP]
+  have ha := (completedGenerator).property.analyticAt s
+  apply ha.meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mp
+  exact le_antisymm (hor.trans_le (archJet_completed_order_nonpos χ hs)) ha.meromorphicOrderAt_nonneg
+
+private theorem archJet_completed_nonzero (ρ : ℂ) (hρ : 0 < archNuclearityMultiplicity χ τ hτ ρ) :
+    (completedGenerator).val ρ ≠ 0 := by
+  apply archJet_regularized_nonzero χ τ hτ
+  by_contra! hpos
+  have hn := inv_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ hpos)
+  have hzero := ((differentiable_inv_heckeGammaFactor χ).analyticAt ρ).analyticOrderAt_eq_zero.mpr hn
+  simp [archNuclearityMultiplicity, hzero] at hρ
+
+/-- Only finitely many adjusted gamma pole centres lie to the right of a given line.
+The multiplicities are bounded by the number of infinite places. -/
+private theorem archJet_support_finite :
+    (∀ z, archNuclearityMultiplicity χ τ hτ z ≤ Fintype.card (InfinitePlace F)) ∧
+      ∀ a : ℝ, {z : ℂ | 0 < archNuclearityMultiplicity χ τ hτ z ∧ a ≤ z.re}.Finite := by
+  classical
+  obtain ⟨c, hc⟩ := archNuclearity_trace_gammaOrder χ
+  have hle (z : ℂ) : archNuclearityMultiplicity χ τ hτ z ≤ gammaOrder(χ, z) :=
+    Nat.sub_le _ _
+  refine ⟨fun z ↦ (hle z).trans (hc z).1, fun a ↦ ?_⟩
+  choose N hN using fun v : InfinitePlace F ↦ exists_nat_gt (-(c v).re - a)
+  let T (v : InfinitePlace F) := (fun k : ℕ ↦ -c v - (k : ℂ)) '' Iic (N v)
+  have hT (v : InfinitePlace F) : (T v).Finite :=
+    (finite_Iic (N v)).image (fun k : ℕ ↦ -c v - (k : ℂ))
+  refine (finite_iUnion hT).subset fun z hz ↦ ?_
+  obtain ⟨v, k, rfl⟩ := (hc z).2 (hz.1.trans_le (hle z))
+  have hz' : a ≤ -(c v).re - (k : ℝ) := by
+    simpa only [Complex.sub_re, Complex.neg_re, Complex.natCast_re] using hz.2
+  have hk : (k : ℝ) < (N v : ℝ) := by linarith [hN v]
+  exact mem_iUnion.mpr ⟨v, k, (by exact_mod_cast hk.le : k ≤ N v), rfl⟩
+
+private theorem archJet_surjective :
+    Function.Surjective (fun (x : Θ₀(χ)) j ↦ archNuclearityJet χ τ hτ j x) := by
+  intro c
+  obtain ⟨hord, hfin⟩ := archJet_support_finite χ τ hτ
+  let d := Fintype.card (InfinitePlace F) + 1
+  let L := continuedCompletedHeckeL χ
+  obtain ⟨hL, hEq⟩ := continuedCompletedHeckeL_spec χ
+  have hΛ : orbitalHeckeGenerator χ τ hτ L hL hEq ∅ = completedGenerator :=
+    orbitalHeckeGenerator_empty χ τ hτ L hL hEq
+  have hne (z : ℂ) (hz : 0 < archNuclearityMultiplicity χ τ hτ z) :
+      (orbitalHeckeGenerator χ τ hτ L hL hEq ∅).val z ≠ 0 := by
+    rw [hΛ]
+    exact archJet_completed_nonzero χ τ hτ z hz
+  obtain ⟨f, hf, hjet⟩ := orbitalSchwartzBergman_jetInterpolation χ τ hτ L hL hEq ∅
+    (archNuclearityMultiplicity χ τ hτ) d (Nat.succ_pos _) (fun z ↦ (hord z).trans (Nat.le_succ _))
+    hfin hne c
+  rw [hΛ] at hf
+  obtain ⟨x, hx⟩ := (specDenom_range_mem χ τ hτ f).2 ((specDenom_mem_div _ f).1 hf)
+  refine ⟨x, funext fun j ↦ ?_⟩
+  change archNuclearityJet χ τ hτ j x = c j
+  unfold archNuclearityJet
+  rw [ContinuousLinearMap.comp_apply, ContinuousLinearMap.comp_apply, entireJet_apply, hx]
+  have heq : ((schwartzBergmanEntireInclusion f).val : ℂ → ℂ) = f.val :=
+    funext (schwartzBergmanEntireInclusion_apply f)
+  rw [heq]
+  exact hjet j
+
+end AdjustedJetRealization
+
 /-- Paper: Equation (7.4.3.4), p. 368.
 On a representative the orbital jet is the derivative of the idelic zeta integral.
 Its inverse Mellin formula is the convergent logarithmic moment.
@@ -1512,281 +1632,12 @@ theorem archNuclearityMellin_range :
     let D := (Z(χ, τ, hτ)) '' (archNuclearityDenominator χ : Set (Θ₀(χ)))
     D = (schwartzBergmanDivisible (archRegularizedFiniteHeckeL χ τ hτ) : Set B) ∧ IsClosed D := by sorry
 
-section AdjustedJetEquivalence
-
-local notation "completedGenerator" => regularizedCompletedHeckeL χ τ hτ
-  (continuedCompletedHeckeL χ) (continuedCompletedHeckeL_spec χ).1 (continuedCompletedHeckeL_spec χ).2
-local notation "finiteGenerator" => archRegularizedFiniteHeckeL χ τ hτ
-local notation "leftPole" => atZeroPole(χ, τ, hτ)
-
-/-- Reflection preserves the meromorphic order. The inverse character has no zero
-at or to the right of the line of absolute convergence. -/
-private theorem archJet_completed_order_nonpos {s : ℂ} (hs : s.re ≤ 0) :
-    meromorphicOrderAt (continuedCompletedHeckeL χ) s ≤ 0 := by
-  obtain ⟨ε, hε, hne, he⟩ := completedHeckeL_continuation_functionalEquation χ
-    (continuedCompletedHeckeL χ) (continuedCompletedHeckeL χ⁻¹)
-    (continuedCompletedHeckeL_spec χ).1 (continuedCompletedHeckeL_spec χ).2
-    (continuedCompletedHeckeL_spec χ⁻¹).1 (continuedCompletedHeckeL_spec χ⁻¹).2
-  let r (z : ℂ) := 1 - z
-  have hr : HasDerivAt r (-1) s := by simpa [r] using (hasDerivAt_id s).const_sub 1
-  have e : continuedCompletedHeckeL χ⁻¹ ∘ r = fun z ↦ ε z * continuedCompletedHeckeL χ z :=
-    funext he
-  have ho := meromorphicOrderAt_comp_of_deriv_ne_zero (f := continuedCompletedHeckeL χ⁻¹)
-    (show AnalyticAt ℂ r s by dsimp [r]; fun_prop) (hr.deriv.trans_ne (by norm_num))
-  rw [e] at ho
-  change meromorphicOrderAt (ε * continuedCompletedHeckeL χ) s = _ at ho
-  rw [meromorphicOrderAt_mul_of_ne_zero (hε.analyticAt s) (hne s)] at ho
-  rw [ho]
-  have hright : 1 ≤ (r s).re := by change 1 ≤ 1 - s.re; linarith
-  exact le_of_not_gt (fun hz ↦ (completedHeckeL_continuation_zeros χ⁻¹ _
-    (continuedCompletedHeckeL_spec χ⁻¹).1 (continuedCompletedHeckeL_spec χ⁻¹).2
-    (zero_lt_one.trans_le hright) hz).not_ge hright)
-
-/-- The entire pole-removed factor is nonzero throughout the closed left half-plane. -/
-private theorem archJet_regularized_nonzero {s : ℂ} (hs : s.re ≤ 0) : (completedGenerator).val s ≠ 0 := by
-  classical
-  let L := continuedCompletedHeckeL χ
-  let b := (((existsUnique_ideleNormSection_character_phase χ τ hτ).exists.choose : ℝ) : ℂ) * Complex.I
-  let δ : ℕ := if χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1 then 1 else 0
-  let polePolynomial (z : ℂ) := (z + b) ^ δ * (1 - z - b) ^ δ
-  have hL := (continuedCompletedHeckeL_spec χ).1
-  by_cases hcan : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1 ∧ (s = -b ∨ s = 1 - b)
-  · have hp := regularizedCompletedHeckeL_ne_zero_at_canceled_poles χ τ hτ L hL
-      (continuedCompletedHeckeL_spec χ).2 hcan.1
-    rcases hcan.2 with rfl | rfl
-    · exact hp.1
-    · exact hp.2
-  have hP : polePolynomial s ≠ 0 := by
-    by_cases htriv : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1
-    · have h := not_or.mp (fun hh ↦ hcan ⟨htriv,hh⟩)
-      simp only [polePolynomial, δ, ite_eq_left htriv, pow_one]
-      refine mul_ne_zero (fun hz ↦ h.1 (eq_neg_of_add_eq_zero_left hz)) ?_
-      intro hz
-      apply h.2
-      linear_combination -hz
-    · simp [polePolynomial, δ, htriv]
-  have hPa (z : ℂ) : AnalyticAt ℂ polePolynomial z := by dsimp [polePolynomial]; fun_prop
-  have hPL : MeromorphicOn (polePolynomial * L) univ := fun z hz ↦
-    (hPa z).meromorphicAt.mul (hL hz).meromorphicAt
-  have he : ((completedGenerator).val : ℂ → ℂ) = toMeromorphicNFOn (polePolynomial * L) univ := rfl
-  have hor : meromorphicOrderAt ((completedGenerator).val : ℂ → ℂ) s = meromorphicOrderAt L s := by
-    rw [he, meromorphicOrderAt_toMeromorphicNFOn hPL (mem_univ _),
-      meromorphicOrderAt_mul_of_ne_zero (hPa s) hP]
-  have ha := (completedGenerator).property.analyticAt s
-  apply ha.meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mp
-  exact le_antisymm (hor.trans_le (archJet_completed_order_nonpos χ hs)) ha.meromorphicOrderAt_nonneg
-
-private theorem archJet_completed_nonzero (ρ : ℂ) (hρ : 0 < archNuclearityMultiplicity χ τ hτ ρ) :
-    (completedGenerator).val ρ ≠ 0 := by
-  apply archJet_regularized_nonzero χ τ hτ
-  by_contra! hpos
-  have hn := inv_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ hpos)
-  have hzero := ((differentiable_inv_heckeGammaFactor χ).analyticAt ρ).analyticOrderAt_eq_zero.mpr hn
-  simp [archNuclearityMultiplicity, hzero] at hρ
-
-local notation "reciprocalGamma" => (fun z : ℂ ↦ (heckeGammaFactor χ z)⁻¹)
-
-open Classical in
-private theorem archJet_generator_relation :
-    (reciprocalGamma * ((completedGenerator).val : ℂ → ℂ)) =
-      (fun z : ℂ ↦ (leftPole - z) ^ (if ω(χ) = 1 then 1 else 0 : ℕ)) *
-        ((finiteGenerator).val : ℂ → ℂ) := by
-  let b := (((existsUnique_ideleNormSection_character_phase χ τ hτ).exists.choose : ℝ) : ℂ) * Complex.I
-  let δ : ℕ := if χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1 then 1 else 0
-  have heqδ : δ = (if ω(χ) = 1 then (1 : ℕ) else 0) := by
-    by_cases h : ω(χ) = 1
-    · simp [δ, h, specDenom_hδ' χ h]
-    · simp [δ, h, specDenom_hδ χ h]
-  let P₀ (z : ℂ) := (z + b) ^ δ * (1 - z - b) ^ δ
-  let L := continuedCompletedHeckeL χ
-  have hraw : ⇑(completedGenerator).val = toMeromorphicNFOn (P₀ * L) univ := rfl
-  have hm : MeromorphicOn (P₀ * L) univ := fun z hz ↦
-    (show AnalyticAt ℂ P₀ z by dsimp [P₀]; fun_prop).meromorphicAt.mul
-      ((continuedCompletedHeckeL_spec χ).1 hz).meromorphicAt
-  have h₁ : Differentiable ℂ (reciprocalGamma * (⇑(completedGenerator).val)) :=
-    (differentiable_inv_heckeGammaFactor χ).mul (completedGenerator).property
-  have h₂ : Differentiable ℂ ((fun z : ℂ ↦ (leftPole - z) ^ (if ω(χ) = 1 then 1 else 0 : ℕ)) * (⇑(finiteGenerator).val)) :=
-    ((differentiable_const _).sub differentiable_id |>.pow _).mul (finiteGenerator).property
-  apply AnalyticOnNhd.eq_of_frequently_eq (z₀ := (2 : ℂ)) (fun z _ ↦ h₁.analyticAt z) (fun z _ ↦ h₂.analyticAt z)
-  apply Filter.Eventually.frequently
-  have hh : ∀ᶠ z in 𝓝[≠] (2 : ℂ), 1 < z.re :=
-    nhdsWithin_le_nhds ((isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num))
-  filter_upwards [hm.toMeromorphicNFOn_eq_self_on_nhdsNE (mem_univ (2 : ℂ)), hh] with z hz hpos
-  have hL : L z = heckeGammaFactor χ z * finiteHeckeL χ ⟨z, hpos⟩ := (continuedCompletedHeckeL_spec χ).2 ⟨z, hpos⟩
-  simp only [Pi.mul_apply, hraw, hz, P₀, hL]
-  rw [archRegularizedFiniteHeckeL_apply χ τ hτ ⟨z, hpos⟩]
-  have hb : leftPole = -b := by simp [b]
-  rw [← heqδ, hb]
-  have hp : heckeGammaFactor χ z ≠ 0 := heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans hpos)
-  by_cases ht : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1
-  · simp only [δ, ite_eq_left ht, pow_one]
-    field_simp
-    ring
-  · simp [δ, ht, hp]
-
-open Classical in
-private theorem archJet_generator_order (z : ℂ) :
-    analyticOrderAt (⇑(finiteGenerator).val) z =
-      analyticOrderAt (⇑(completedGenerator).val) z + (archNuclearityMultiplicity χ τ hτ z : ℕ∞) := by
-  let P₀ (w : ℂ) := (leftPole - w) ^ (if ω(χ) = 1 then (1 : ℕ) else 0)
-  have hp (w : ℂ) : AnalyticAt ℂ P₀ w := ((analyticAt_const.sub analyticAt_id).pow _)
-  have h := congrArg (fun f : ℂ → ℂ ↦ analyticOrderAt f z) (archJet_generator_relation χ τ hτ)
-  change analyticOrderAt (reciprocalGamma * (⇑(completedGenerator).val)) z = analyticOrderAt (P₀ * (⇑(finiteGenerator).val)) z at h
-  rw [analyticOrderAt_mul ((differentiable_inv_heckeGammaFactor χ).analyticAt z) ((completedGenerator).property.analyticAt z),
-    analyticOrderAt_mul (hp z) ((finiteGenerator).property.analyticAt z)] at h
-  have hR : AnalyticOnNhd ℂ reciprocalGamma univ := fun w _ ↦
-    (differentiable_inv_heckeGammaFactor χ).analyticAt w
-  have hR1 : reciprocalGamma (1 : ℂ) ≠ 0 :=
-    inv_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ (by norm_num))
-  have hn := hR.analyticOrderAt_ne_top_of_isPreconnected isPreconnected_univ
-    (mem_univ (1 : ℂ)) (mem_univ z) (by
-      rw [(hR 1 (mem_univ _)).analyticOrderAt_eq_zero.mpr hR1]
-      simp)
-  obtain ⟨n, hn⟩ := ENat.ne_top_iff_exists.mp hn
-  unfold archNuclearityMultiplicity
-  rw [← hn] at h ⊢
-  by_cases hc : ω(χ) = 1 ∧ z = leftPole
-  · have hp₀ : analyticOrderAt P₀ z = 1 := by
-      change analyticOrderAt (fun w : ℂ ↦ (leftPole - w) ^ _) z = 1
-      simp only [ite_eq_left hc.1, pow_one]
-      apply ((analyticAt_const.sub analyticAt_id) : AnalyticAt ℂ (fun w : ℂ ↦ atZeroPole(χ, τ, hτ) - w) z).analyticOrderAt_eq_one_of_zero_deriv_ne_zero
-      · change atZeroPole(χ, τ, hτ) - z = 0
-        exact sub_eq_zero.mpr hc.2.symm
-      · simp
-    have hr : z.re ≤ 0 := by rw [hc.2]; simp
-    have hl := ((completedGenerator).property.analyticAt z).analyticOrderAt_eq_zero.mpr (archJet_regularized_nonzero χ τ hτ hr)
-    rw [hp₀, hl, add_zero] at h
-    rw [hl, zero_add, ite_eq_left hc]
-    cases hd : analyticOrderAt (⇑(finiteGenerator).val) z with
-    | top => simp [hd] at h
-    | coe d =>
-      rw [hd] at h
-      have he : n = 1+d := by exact_mod_cast h
-      rw [ENat.toNat_natCast]
-      exact_mod_cast (by omega : d = n - 1)
-  · have hp₀ : analyticOrderAt P₀ z = 0 := (hp z).analyticOrderAt_eq_zero.mpr (by
-      by_cases hω : ω(χ) = 1
-      · have hz : z ≠ atZeroPole(χ, τ, hτ) := fun hz ↦ hc ⟨hω,hz⟩
-        simpa [P₀, hω] using sub_ne_zero.mpr hz.symm
-      · simp [P₀, hω])
-    rw [hp₀, zero_add] at h
-    rw [ite_eq_right hc, Nat.sub_zero, ← h, add_comm]
-    simp
-
-private theorem archJet_numerator_injective : Injective ((Z(χ, τ, hτ)) : Θ₀(χ) → _) := by
-  apply (injective_iff_map_eq_zero _).2
-  intro x hx
-  obtain ⟨f, rfl⟩ := Submodule.Quotient.mk_surjective Π(χ) x
-  have hz (s : ℂ) : globalIdelicZFunction f.val (ideleClassNormTwist χ s) = 0 :=
-    ((exists_globalPolarThetaMellin χ τ hτ).choose_spec f s).2.symm.trans
-      (congrArg (fun y : SchwartzBergman (univ : Set ℝ) ↦ y.val s) hx)
-  apply (Submodule.Quotient.mk_eq_zero _).mpr
-  by_cases hω : ω(χ) = 1
-  · obtain ⟨t, ht⟩ := (globalConverse_existsUnique_normTwist χ hω).exists
-    obtain ⟨A, _, _, ha, _, hker⟩ := globalConverse_normTwist χ t ht
-    have hf : f ∈ A.ker := (LinearMap.mem_ker).mpr <| specDenom_B_ext _ _ fun s ↦ (ha f s).trans (hz s)
-    rw [hker] at hf
-    change homogeneousAdelicThetaLinearMap F ω(χ) f.val = 0
-    rw [hω]
-    exact hf
-  · obtain ⟨A, hi, ha, _⟩ := globalConverse_nontrivial χ hω
-    let q := (LinearMap.ker (homogeneousAdelicThetaLinearMap F ω(χ))).mkQ
-    have hf : A (q f.val) = 0 := specDenom_B_ext _ _ fun s ↦ (ha f.val s).trans (hz s)
-    have hq := hi.injective (hf.trans (map_zero A).symm)
-    exact (Submodule.Quotient.mk_eq_zero (LinearMap.ker (homogeneousAdelicThetaLinearMap F ω(χ)))).mp hq
-
-private theorem archJet_mem_denominator_direct (x : Θ₀(χ)) :
-    x ∈ archNuclearityDenominator χ ↔ ∀ j, archNuclearityJet χ τ hτ j x = 0 := by
-  let y := (Z(χ, τ, hτ)) x
-  let f : ℂ → ℂ := (schwartzBergmanEntireInclusion y).val
-  have hf : Differentiable ℂ f := (schwartzBergmanEntireInclusion y).property
-  have heq : f = y.val := funext (schwartzBergmanEntireInclusion_apply y)
-  have hI : x ∈ archNuclearityDenominator χ ↔ ((Z(χ, τ, hτ)) x) ∈ schwartzBergmanDivisible finiteGenerator := by
-    change _ ↔ (Z(χ, τ, hτ)) x ∈ ((schwartzBergmanDivisible finiteGenerator) : Set _)
-    rw [← (archNuclearityMellin_range χ τ hτ).1]
-    exact ⟨fun h ↦ ⟨x, h, rfl⟩, fun ⟨v, hv, eq⟩ ↦ (archJet_numerator_injective χ τ hτ eq) ▸ hv⟩
-  rw [hI, schwartzBergmanDivisible, Submodule.mem_comap, Submodule.restrictScalars_mem,
-    Ideal.mem_span_singleton, entire_dvd_iff_analyticOrderAt_le]
-  change (∀ z, analyticOrderAt (⇑(finiteGenerator).val) z ≤ analyticOrderAt f z) ↔ _
-  have hjet (j : ArchNuclearityJetIndex χ τ hτ) : archNuclearityJet χ τ hτ j x =
-      iteratedDeriv j.val.2 f j.val.1 := by
-    unfold archNuclearityJet
-    rw [ContinuousLinearMap.comp_apply, ContinuousLinearMap.comp_apply, entireJet_apply]
-  have hl : ∀ z, analyticOrderAt (⇑(completedGenerator).val) z ≤ analyticOrderAt f z := by
-    obtain ⟨u, hu, hx⟩ := (specDenom_range_mem χ τ hτ y).mp ⟨x,rfl⟩
-    rw [heq, show y.val = (⇑(completedGenerator).val) * u from funext hx]
-    exact fun z ↦ (analyticOrderAt_mul ((completedGenerator).property.analyticAt z) (hu.analyticAt z)) ▸ le_self_add
-  constructor
-  · intro ho j
-    rw [hjet]
-    apply (natCast_le_analyticOrderAt_iff_iteratedDeriv_eq_zero (hf.analyticAt j.val.1)).mp _ _ j.property
-    exact le_trans le_add_self ((archJet_generator_order χ τ hτ _ ▸ ho j.val.1))
-  · intro hj z
-    rw [archJet_generator_order χ τ hτ z]
-    by_cases hm : archNuclearityMultiplicity χ τ hτ z = 0
-    · simpa [hm] using hl z
-    have hLambda := ((completedGenerator).property.analyticAt z).analyticOrderAt_eq_zero.mpr
-      (archJet_completed_nonzero χ τ hτ z (Nat.pos_of_ne_zero hm))
-    rw [hLambda, zero_add, natCast_le_analyticOrderAt_iff_iteratedDeriv_eq_zero (hf.analyticAt z)]
-    exact fun k hk ↦ (hjet ⟨(z,k),hk⟩).symm.trans (hj _)
-
-/-- Only finitely many adjusted gamma pole centres lie to the right of a given line.
-The multiplicities are bounded by the number of infinite places. -/
-private theorem archJet_support_finite :
-    (∀ z, archNuclearityMultiplicity χ τ hτ z ≤ Fintype.card (InfinitePlace F)) ∧
-      ∀ a : ℝ, {z : ℂ | 0 < archNuclearityMultiplicity χ τ hτ z ∧ a ≤ z.re}.Finite := by
-  classical
-  obtain ⟨c, hc⟩ := archNuclearity_trace_gammaOrder χ
-  have hle (z : ℂ) : archNuclearityMultiplicity χ τ hτ z ≤ gammaOrder(χ, z) :=
-    Nat.sub_le _ _
-  refine ⟨fun z ↦ (hle z).trans (hc z).1, fun a ↦ ?_⟩
-  choose N hN using fun v : InfinitePlace F ↦ exists_nat_gt (-(c v).re - a)
-  let T (v : InfinitePlace F) := (fun k : ℕ ↦ -c v - (k : ℂ)) '' Iic (N v)
-  have hT (v : InfinitePlace F) : (T v).Finite :=
-    (finite_Iic (N v)).image (fun k : ℕ ↦ -c v - (k : ℂ))
-  refine (finite_iUnion hT).subset fun z hz ↦ ?_
-  obtain ⟨v, k, rfl⟩ := (hc z).2 (hz.1.trans_le (hle z))
-  have hz' : a ≤ -(c v).re - (k : ℝ) := by
-    simpa only [Complex.sub_re, Complex.neg_re, Complex.natCast_re] using hz.2
-  have hk : (k : ℝ) < (N v : ℝ) := by linarith [hN v]
-  exact mem_iUnion.mpr ⟨v, k, (by exact_mod_cast hk.le : k ≤ N v), rfl⟩
-
-private theorem archJet_surjective :
-    Function.Surjective (fun (x : Θ₀(χ)) j ↦ archNuclearityJet χ τ hτ j x) := by
-  intro c
-  obtain ⟨hord, hfin⟩ := archJet_support_finite χ τ hτ
-  let d := Fintype.card (InfinitePlace F) + 1
-  let L := continuedCompletedHeckeL χ
-  obtain ⟨hL, hEq⟩ := continuedCompletedHeckeL_spec χ
-  have hΛ : orbitalHeckeGenerator χ τ hτ L hL hEq ∅ = completedGenerator :=
-    orbitalHeckeGenerator_empty χ τ hτ L hL hEq
-  have hne (z : ℂ) (hz : 0 < archNuclearityMultiplicity χ τ hτ z) :
-      (orbitalHeckeGenerator χ τ hτ L hL hEq ∅).val z ≠ 0 := by
-    rw [hΛ]
-    exact archJet_completed_nonzero χ τ hτ z hz
-  obtain ⟨f, hf, hjet⟩ := orbitalSchwartzBergman_jetInterpolation χ τ hτ L hL hEq ∅
-    (archNuclearityMultiplicity χ τ hτ) d (Nat.succ_pos _) (fun z ↦ (hord z).trans (Nat.le_succ _))
-    hfin hne c
-  rw [hΛ] at hf
-  obtain ⟨x, hx⟩ := (specDenom_range_mem χ τ hτ f).2 ((specDenom_mem_div _ f).1 hf)
-  refine ⟨x, funext fun j ↦ ?_⟩
-  change archNuclearityJet χ τ hτ j x = c j
-  unfold archNuclearityJet
-  rw [ContinuousLinearMap.comp_apply, ContinuousLinearMap.comp_apply, entireJet_apply, hx]
-  have heq : ((schwartzBergmanEntireInclusion f).val : ℂ → ℂ) = f.val :=
-    funext (schwartzBergmanEntireInclusion_apply f)
-  rw [heq]
-  exact hjet j
-
-end AdjustedJetEquivalence
-
 /-- Paper: Equation (7.4.3.13), p. 372.
 Each adjusted jet annihilates the archimedean orbital denominator, so the jets are
 well defined on the quotient by it. -/
 theorem archNuclearityQuotient_jetEquiv_annihilate (j : ArchNuclearityJetIndex χ τ hτ)
     (x : archNuclearityDenominator χ) :
-    archNuclearityJet χ τ hτ j x.val = 0 := by
-  exact (archJet_mem_denominator_direct χ τ hτ x.val).mp x.property j
+    archNuclearityJet χ τ hτ j x.val = 0 := by sorry
 
 /-- Paper: Equation (7.4.3.13), p. 372.
 The adjusted jets assemble into a single continuous linear map from the archimedean
@@ -1810,7 +1661,7 @@ on which every jet vanishes is the class of a flat test, that is, it lies in the
 denominator. -/
 theorem archNuclearityQuotient_jetEquiv_separating (x : Θ₀(χ))
     (hx : ∀ j, archNuclearityJet χ τ hτ j x = 0) : x ∈ archNuclearityDenominator χ := by
-  exact (archJet_mem_denominator_direct χ τ hτ x).mpr hx
+  sorry
 
 /-- Paper: Equation (7.4.3.13), p. 372.
 Every family of coefficient values is realized by a class of the archimedean
