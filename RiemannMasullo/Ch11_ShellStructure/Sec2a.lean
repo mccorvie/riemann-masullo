@@ -6,6 +6,7 @@ import Mathlib.Analysis.SpecialFunctions.Complex.Analytic
 
 import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
 public import RiemannMasullo.Ch11_ShellStructure.Sec1b
+import all RiemannMasullo.Ch11_ShellStructure.Sec1b
 
 /-! # Orbital Markushevich bases on the 0-line
 
@@ -70,13 +71,132 @@ dense in the full global Sobolev space on the 0-line. -/
 theorem denseRange_globalTheta_zeroLine {s : ℝ} (hs : 0 ≤ s) :
     DenseRange (fun u : GlobalPolarFreeThetaSpace F ↦ (j(0, hs) u : W(s))) := by sorry
 
+/-- Paper: Definition 5.3.1.2 and Lemma 5.3.1.3, p. 241, for the proof of
+Proposition 11.2.0.1(1), p. 484. The principal value at one finite place `v`, on theta
+functions: theta of `PV_v f` is theta of `f` minus the normalized average over the local
+integer units `u` of its translates by the idele class of `(π u)⁻¹` at `v`. On a test this is
+`finitePlacePrincipalValue_spec` at `v`. The sum over `Fˣ` and the integral over the compact
+unit group may be exchanged because the theta series converges absolutely and locally
+uniformly. -/
+private theorem globalThetaPrincipalValue_sobolevBound_formula (v : V)
+    (π : (v.adicCompletion F)ˣ) (_hπ : Valued.v.IsUniformizer π.val) (f : ℬ₀) (g : C𝔽) :
+    adelicTheta (adelePrincipalValue F {v} f.val) g =
+      adelicTheta f.val g - ((finiteLocalMultiplicativeTamagawaMeasure F v).real
+          ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ))⁻¹ *
+        ∫ u in ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ),
+          adelicTheta f.val (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹ * g)
+          ∂(finiteLocalMultiplicativeTamagawaMeasure F v) := by
+  sorry
+
+/-- Paper: for the proof of Proposition 11.2.0.1(1), p. 484. The normalized average over the
+local integer units at `v` of the translates by the classes of `(π u)⁻¹` is bounded on the
+weighted L² space of the 0-line, uniformly on continuous square-integrable functions. Each
+such translate moves the idelic norm by the fixed factor `q_v`, so it changes the Sobolev
+weight `(1 + log² ‖g‖)^{s/2}` by at most a constant factor (Peetre's inequality). The bound
+for the average then follows from Minkowski's integral inequality. -/
+private theorem globalThetaPrincipalValue_sobolevBound_average (v : V)
+    (π : (v.adicCompletion F)ˣ) {s : ℝ} (_hs : 0 ≤ s) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ φ : C𝔽 → ℂ, Continuous φ →
+      MemLp φ 2 ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))) →
+      let A : C𝔽 → ℂ := fun g ↦ ((finiteLocalMultiplicativeTamagawaMeasure F v).real
+          ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ))⁻¹ *
+        ∫ u in ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ),
+          φ (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹ * g)
+          ∂(finiteLocalMultiplicativeTamagawaMeasure F v)
+      MemLp A 2 ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))) ∧
+        eLpNorm A 2 ((μ𝔽).withDensity fun g ↦
+            ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))) ≤
+          ENNReal.ofReal C * eLpNorm φ 2 ((μ𝔽).withDensity fun g ↦
+            ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))) := by
+  sorry
+
+/-- The principal value at a single finite place is bounded in the norm of the unweighted
+global theta completion: by the formula on theta functions and the bound for the unit average. -/
+private theorem globalThetaPrincipalValue_sobolevBound_single (v : V) {s : ℝ} (hs : 0 ≤ s) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ f : ℬ₀,
+      ‖j(0, hs) (theta(pvTest({v}, f)))‖ ≤ C * ‖j(0, hs) (theta(f))‖ := by
+  obtain ⟨π₀, hπ₀⟩ := (Valued.v : Valuation (v.adicCompletion F)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π : (v.adicCompletion F)ˣ := Units.mk0 π₀ hπ₀.ne_zero
+  obtain ⟨C, hC, hA⟩ := globalThetaPrincipalValue_sobolevBound_average v π hs
+  -- The norm of an unweighted theta class is the weighted L² norm of its theta function.
+  have hθ (h : ℬ₀) : ((j(0, hs) (theta(h)) : W(s)) : C𝔽 → ℂ) =ᵐ[(μ𝔽).withDensity fun g ↦
+      ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))] (adelicTheta h.val : C𝔽 → ℂ) :=
+    (withDensity_absolutelyContinuous _ _).ae_le
+      (((existsUnique_globalThetaSobolevEmbedding (F := F) 0 0 0 s hI hs).exists.choose_spec.2
+        h).trans (Filter.EventuallyEq.of_eq (modulationWeight_zero m𝔽 _)))
+  have hmem (h : ℬ₀) : MemLp (adelicTheta h.val : C𝔽 → ℂ) 2 ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))) :=
+    (Lp.memLp _).ae_eq (hθ h)
+  have hnorm (h : ℬ₀) : ‖j(0, hs) (theta(h))‖ =
+      (eLpNorm (adelicTheta h.val : C𝔽 → ℂ) 2 ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g)))).toReal :=
+    (Lp.norm_def _).trans (congrArg ENNReal.toReal (eLpNorm_congr_ae (hθ h)))
+  refine ⟨1 + C, by linarith, fun f ↦ ?_⟩
+  have hA' := hA _ (adelicTheta f.val).continuous (hmem f)
+  let A : C𝔽 → ℂ := fun g ↦ ((finiteLocalMultiplicativeTamagawaMeasure F v).real
+          ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ))⁻¹ *
+        ∫ u in ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ),
+          adelicTheta f.val (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹ * g)
+          ∂(finiteLocalMultiplicativeTamagawaMeasure F v)
+  have hAm : MemLp A 2 ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))) := hA'.1
+  have hAle : eLpNorm A 2 ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))) ≤
+      ENNReal.ofReal C * eLpNorm (adelicTheta f.val : C𝔽 → ℂ) 2 ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))) := hA'.2
+  have hpv : (adelicTheta (pvTest({v}, f)).val : C𝔽 → ℂ) =
+      fun g ↦ adelicTheta f.val g - A g :=
+    funext fun g ↦ globalThetaPrincipalValue_sobolevBound_formula v π hπ₀ f g
+  have hfin := (hmem f).eLpNorm_ne_top
+  have hle : eLpNorm (fun g ↦ adelicTheta f.val g - A g) 2 ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))) ≤
+      eLpNorm (adelicTheta f.val : C𝔽 → ℂ) 2 ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))) +
+        ENNReal.ofReal C * eLpNorm (adelicTheta f.val : C𝔽 → ℂ) 2 ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))) :=
+    (eLpNorm_sub_le (by norm_num : (1 : ENNReal) ≤ 2)).trans
+      (add_le_add le_rfl hAle)
+  have hfin' : ENNReal.ofReal C * eLpNorm (adelicTheta f.val : C𝔽 → ℂ) 2 ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))) ≠ ⊤ :=
+    ENNReal.mul_ne_top ENNReal.ofReal_ne_top hfin
+  have hreal : (eLpNorm (adelicTheta f.val : C𝔽 → ℂ) 2 ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))) +
+      ENNReal.ofReal C * eLpNorm (adelicTheta f.val : C𝔽 → ℂ) 2 ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g)))).toReal =
+      (1 + C) * (eLpNorm (adelicTheta f.val : C𝔽 → ℂ) 2 ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g)))).toReal := by
+    rw [ENNReal.toReal_add hfin hfin', ENNReal.toReal_mul, ENNReal.toReal_ofReal hC]
+    ring
+  refine (hnorm _).trans_le ?_
+  refine (congrArg (fun φ : C𝔽 → ℂ ↦ (eLpNorm φ 2 ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g)))).toReal) hpv).trans_le ?_
+  refine (ENNReal.toReal_mono (ENNReal.add_ne_top.mpr ⟨hfin, hfin'⟩) hle).trans_eq ?_
+  exact hreal.trans (congrArg ((1 + C) * ·) (hnorm f).symm)
+
 /-- Paper: Proposition 11.2.0.1(1), p. 484. The principal-value operator
 is bounded in the norm induced on unweighted theta classes.
 Deviation: The operator uses finite places as in (11.2.0.2) and the global
 norm (10.1.1.6), since (10.1.1.5) is S-local. -/
 theorem globalThetaPrincipalValue_sobolevBound (S : Finset V) {s : ℝ} (hs : 0 ≤ s) :
     ∃ C : ℝ, 0 ≤ C ∧ ∀ f : ℬ₀,
-      ‖j(0, hs) (theta(pvTest(S, f)))‖ ≤ C * ‖j(0, hs) (theta(f))‖ := by sorry
+      ‖j(0, hs) (theta(pvTest(S, f)))‖ ≤ C * ‖j(0, hs) (theta(f))‖ := by
+  classical
+  induction S using Finset.induction_on with
+  | empty =>
+    refine ⟨1, zero_le_one, fun f ↦ ?_⟩
+    have h : pvTest(∅, f) = f := by
+      refine Subtype.ext ?_
+      change adelePrincipalValue F ∅ f.val = f.val
+      rw [sLocalUncutCarving_empty_PV]
+      rfl
+    rw [h, one_mul]
+  | insert v T hvT ih =>
+    obtain ⟨K₁, hK₁, h₁⟩ := ih
+    have hsingle := globalThetaPrincipalValue_sobolevBound_single (F := F) v hs
+    have hK₂ := hsingle.choose_spec.1
+    have h₂ := hsingle.choose_spec.2
+    refine ⟨K₁ * hsingle.choose, mul_nonneg hK₁ hK₂, fun f ↦ ?_⟩
+    have hcomp : pvTest(insert v T, f) = pvTest(T, pvTest({v}, f)) := by
+      refine Subtype.ext ?_
+      change adelePrincipalValue F (insert v T) f.val =
+        adelePrincipalValue F T (adelePrincipalValue F {v} f.val)
+      rw [sLocalCutoffCarving_antitone_PV (Finset.subset_insert v T),
+        Finset.insert_sdiff_cancel hvT]
+      rfl
+    calc ‖j(0, hs) (theta(pvTest(insert v T, f)))‖
+        = ‖j(0, hs) (theta(pvTest(T, pvTest({v}, f))))‖ :=
+          congrArg (fun h : ℬ₀ ↦ ‖j(0, hs) (theta(h))‖) hcomp
+      _ ≤ K₁ * ‖j(0, hs) (theta(pvTest({v}, f)))‖ := h₁ _
+      _ ≤ K₁ * (hsingle.choose * ‖j(0, hs) (theta(f))‖) := mul_le_mul_of_nonneg_left (h₂ f) hK₁
+      _ = K₁ * hsingle.choose * ‖j(0, hs) (theta(f))‖ := (mul_assoc _ _ _).symm
 
 /-- Paper: Proposition 11.2.0.1(2) and (11.2.0.4), pp. 484–485.
 The principal value has a unique bounded extension to the global theta completion.
