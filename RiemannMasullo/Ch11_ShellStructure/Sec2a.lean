@@ -371,7 +371,96 @@ private theorem globalThetaPrincipalValue_sobolevBound_formula (v : V)
         ∫ u in ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ),
           adelicTheta f.val (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹ * g)
           ∂(finiteLocalMultiplicativeTamagawaMeasure F v) := by
-  sorry
+  classical
+  letI : MeasurableSpace (v.adicCompletion F)ˣ := borel _
+  haveI : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+  haveI := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) v
+  haveI : Countable F := (Module.finBasis ℚ F).equivFun.injective.countable
+  haveI : Countable Fˣ := (show Function.Injective (Units.val : Fˣ → F) from
+    fun _ _ h ↦ Units.ext h).countable
+  let μ := finiteLocalMultiplicativeTamagawaMeasure F v
+  let U : Set (v.adicCompletion F)ˣ :=
+    ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ)
+  have hUo : IsOpen U := Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hUc : IsCompact U := Submonoid.units_isCompact
+    (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v))
+  have hUfin : μ U ≠ ⊤ := hUc.measure_ne_top
+  let ι : (v.adicCompletion F)ˣ → IdeleGroup (𝓞 F) F := fun u ↦
+    IdeleGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹
+  have hι : Continuous ι :=
+    (Continuous.units_map _ (globalThetaPrincipalValue_sobolevBound_formula_cont v)).comp
+      ((continuous_const.mul continuous_id).inv)
+  obtain ⟨g₀, rfl⟩ := QuotientGroup.mk_surjective g
+  have hθ (φ : SchwartzBruhat (Multiplicative 𝔸[F])) (h : IdeleGroup (𝓞 F) F) :
+      adelicTheta φ (QuotientGroup.mk h) = ∑' ξ : Fˣ, φ (Multiplicative.ofAdd
+        ((IdeleGroup.unitEmbedding (𝓞 F) F ξ * h : IdeleGroup (𝓞 F) F) : 𝔸[F])) :=
+    (ideleThetaSum_schwartzBruhat φ h).symm
+  let x : Fˣ → 𝔸[F] := fun ξ ↦
+    ((IdeleGroup.unitEmbedding (𝓞 F) F ξ * g₀ : IdeleGroup (𝓞 F) F) : 𝔸[F])
+  let Φ : Fˣ → (v.adicCompletion F)ˣ → ℂ := fun ξ u ↦
+    f.val (Multiplicative.ofAdd (x ξ * (ι u : 𝔸[F])))
+  have hcls (u : (v.adicCompletion F)ˣ) :
+      adelicTheta f.val (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹ *
+        QuotientGroup.mk g₀) = ∑' ξ : Fˣ, Φ ξ u := by
+    refine (hθ f.val (ι u * g₀)).trans (tsum_congr fun ξ ↦ congrArg f.val
+      (congrArg Multiplicative.ofAdd ?_))
+    change ((IdeleGroup.unitEmbedding (𝓞 F) F ξ : 𝔸[F]) * ((ι u : 𝔸[F]) * (g₀ : 𝔸[F]))) =
+      (IdeleGroup.unitEmbedding (𝓞 F) F ξ : 𝔸[F]) * (g₀ : 𝔸[F]) * (ι u : 𝔸[F])
+    ring
+  let K : Set (IdeleGroup (𝓞 F) F × 𝔸[F]) := (fun u ↦ (ι u * g₀, (0 : 𝔸[F]))) '' U
+  have hK : IsCompact K := hUc.image ((hι.mul continuous_const).prodMk continuous_const)
+  have hsu := adelicAverage_summableUniformlyOn f.val K hK
+  have hterm (ξ : Fˣ) (u : (v.adicCompletion F)ˣ) :
+      ‖f.val (Multiplicative.ofAdd ((ι u * g₀).val * (algebraMap F 𝔸[F] (ξ : F) + 0)))‖ =
+        ‖Φ ξ u‖ := by
+    refine congrArg (fun y ↦ ‖f.val (Multiplicative.ofAdd y)‖) ?_
+    change ((ι u : 𝔸[F]) * (g₀ : 𝔸[F])) * (algebraMap F 𝔸[F] (ξ : F) + 0) =
+      (algebraMap F 𝔸[F] (ξ : F) * (g₀ : 𝔸[F])) * (ι u : 𝔸[F])
+    ring
+  have hcontS : ContinuousOn (fun p : IdeleGroup (𝓞 F) F × 𝔸[F] ↦ ∑' ξ : Fˣ,
+      ‖f.val (Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2)))‖) K := by
+    refine (hasSumUniformlyOn_iff_tendstoUniformlyOn.mp hsu.hasSumUniformlyOn).continuousOn
+      (Filter.Eventually.of_forall fun I ↦
+        (continuous_finsetSum I fun ξ _ ↦ ?_).continuousOn).frequently
+    exact ((schwartzBruhat_continuous f.val).comp (continuous_ofAdd.comp
+      ((Units.continuous_val.comp continuous_fst).mul
+        (continuous_const.add continuous_snd)))).norm
+  obtain ⟨B, hB⟩ := hK.exists_bound_of_continuousOn hcontS
+  have hbound (u : (v.adicCompletion F)ˣ) (hu : u ∈ U) :
+      Summable (fun ξ ↦ ‖Φ ξ u‖) ∧ ∑' ξ, ‖Φ ξ u‖ ≤ B := by
+    have hp : (ι u * g₀, (0 : 𝔸[F])) ∈ K := ⟨u, hu, rfl⟩
+    have hs := (hsu.summable hp).congr (fun ξ ↦ hterm ξ u)
+    refine ⟨hs, ?_⟩
+    have h1 := hB _ hp
+    rw [Real.norm_of_nonneg (tsum_nonneg fun _ ↦ norm_nonneg _)] at h1
+    exact (tsum_congr fun ξ ↦ (hterm ξ u).symm).trans_le h1
+  have hΦc (ξ : Fˣ) : Continuous (Φ ξ) :=
+    (schwartzBruhat_continuous f.val).comp (continuous_ofAdd.comp
+      (continuous_const.mul (Units.continuous_val.comp hι)))
+  have hfin : ∑' ξ, ∫⁻ u in U, ‖Φ ξ u‖ₑ ∂μ ≠ ⊤ := by
+    rw [← lintegral_tsum fun ξ ↦ (hΦc ξ).measurable.eNorm.aemeasurable]
+    refine ne_top_of_le_ne_top (ENNReal.mul_ne_top (ENNReal.ofReal_ne_top (r := B)) hUfin)
+      ((setLIntegral_mono' hUo.measurableSet fun u hu ↦ ?_).trans_eq
+        (setLIntegral_const U (ENNReal.ofReal B)))
+    obtain ⟨hs, hle⟩ := hbound u hu
+    simp only [← ofReal_norm]
+    rw [← ENNReal.ofReal_tsum_of_nonneg (fun _ ↦ norm_nonneg _) hs]
+    exact ENNReal.ofReal_le_ofReal hle
+  have hs1 : Summable (fun ξ : Fˣ ↦ f.val (Multiplicative.ofAdd (x ξ))) := by
+    refine Summable.of_norm ((((adelicAverage_summableUniformlyOn f.val {(g₀, (0 : 𝔸[F]))}
+      isCompact_singleton).summable (Set.mem_singleton _))).congr fun ξ ↦ ?_)
+    refine congrArg (fun y ↦ ‖f.val (Multiplicative.ofAdd y)‖) ?_
+    change (g₀ : 𝔸[F]) * (algebraMap F 𝔸[F] (ξ : F) + 0) = algebraMap F 𝔸[F] (ξ : F) * (g₀ : 𝔸[F])
+    ring
+  have hs2 : Summable (fun ξ : Fˣ ↦ ∫ u in U, Φ ξ u ∂μ) := by
+    refine Summable.of_norm_bounded (ENNReal.summable_toReal hfin) fun ξ ↦ ?_
+    refine (norm_integral_le_lintegral_norm _).trans_eq ?_
+    simp only [ofReal_norm]
+  have hswap : ∫ u in U, ∑' ξ : Fˣ, Φ ξ u ∂μ = ∑' ξ : Fˣ, ∫ u in U, Φ ξ u ∂μ :=
+    integral_tsum (fun ξ ↦ (hΦc ξ).aestronglyMeasurable) hfin
+  rw [hθ, hθ, integral_congr_ae (Filter.Eventually.of_forall hcls), hswap,
+    ← tsum_mul_left, ← hs1.tsum_sub (hs2.mul_left _)]
+  exact tsum_congr fun ξ ↦ globalThetaPrincipalValue_sobolevBound_formula_global v π _hπ f.val (x ξ)
 
 /-- Cauchy–Schwarz for lower Lebesgue integrals: the square of the integral is at most the
 total mass times the integral of the square. -/
