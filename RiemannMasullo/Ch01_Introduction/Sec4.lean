@@ -734,6 +734,60 @@ theorem introTraceApprox_spectral_differentiable (χ : U𝔽) (h ρ : ℕ → �
     (_hA : IsIntroTraceApproximation h ρ) (n : ℕ) (a : ℝ) (_ha : 0 < a) :
     Differentiable ℂ (fun z ↦ introTraceSpectralSum χ approx(h, ρ, n, z) a) := by sorry
 
+/-- At parameter two the radial approximant is real and nonnegative. -/
+private theorem introTraceApprox_rat_spectral_tendsto_atBot_profile (h ρ : ℕ → ℝ → ℝ)
+    (hA : IsIntroTraceApproximation h ρ) (n : ℕ) :
+    ∃ g : ℝ → ℝ, (∀ t, 0 ≤ g t) ∧ approx(h, ρ, n, (2 : ℂ)) = fun t ↦ (g t : ℂ) := by
+  let P (x : ℝ) : ℝ := if 1 < x then (x ^ 2)⁻¹ else if x = 1 then 1 / 2 else 0
+  have hP (x : ℝ) : introTracePower 2 x = (P x : ℂ) := by
+    unfold introTracePower P
+    split_ifs <;> norm_num [Complex.cpow_neg]
+  obtain ⟨ε, _, hρ⟩ := hA.2.2.2
+  refine ⟨fun t ↦ h n t * ∫ u, ρ n u * P (t - u), fun t ↦ ?_, ?_⟩
+  · apply mul_nonneg ((hA.1 n).2.2.2 t).1
+    apply integral_nonneg
+    intro u
+    apply mul_nonneg ((hρ n).2.2.1 u)
+    unfold P
+    split_ifs <;> positivity
+  · funext t
+    simp only [introTraceApprox, hP, ← Complex.ofReal_mul, integral_complex_ofReal]
+
+/-- With a nonnegative real radial profile the real part of each trivial-character
+prime-power contribution is nonnegative. -/
+private theorem introTraceApprox_rat_spectral_tendsto_atBot_prime_nonneg (g : ℝ → ℝ)
+    (hg : ∀ t, 0 ≤ g t) (v : HeightOneSpectrum (𝓞 ℚ)) (k : ℕ) :
+    0 ≤ (introTracePrimePower (F := ℚ) 1 (fun t ↦ (g t : ℂ)) v k).re := by
+  classical
+  have htriv : ideleClassNormTwist (F := ℚ) 1 0 = 1 := by
+    ext1 x
+    change (1 : ℂ) * _ ^ (0 : ℂ) = 1
+    simp
+  have hunit (u : (v.adicCompletion ℚ)ˣ) :
+      (1 : HeckeCharacter (𝓞 ℚ) ℚ).restrict v u = 1 := by
+    rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    rfl
+  let val : Valuation (v.adicCompletion ℚ) (WithZero (Multiplicative ℤ)) := Valued.v
+  have hv : (1 : HeckeCharacter (𝓞 ℚ) ℚ).localValue v = 1 :=
+    hunit (Units.mk0 _ val.exists_isUniformizer_of_isCyclic_of_nontrivial.choose_spec.ne_zero)
+  let q : ℝ := v.asIdeal.absNorm
+  have hq : 1 ≤ q := by
+    dsimp only [q]
+    exact_mod_cast (NumberField.HeightOneSpectrum.one_lt_absNorm v).le
+  have hden : (q : ℂ) ^ (((k + 1 : ℕ) : ℂ) / 2) = ((q ^ ((k + 1 : ℝ) / 2) : ℝ) : ℂ) := by
+    rw [Complex.ofReal_cpow (zero_le_one.trans hq)]
+    push_cast
+    rfl
+  simp only [introTracePrimePower, htriv]
+  split_ifs
+  · simp only [hv, one_pow, star_one, one_mul]
+    change 0 ≤ ((Real.log q : ℂ) * ((g (q ^ (k + 1)) : ℂ) + (g ((q ^ (k + 1))⁻¹) : ℂ)) /
+      (q : ℂ) ^ (((k + 1 : ℕ) : ℂ) / 2)).re
+    rw [hden, ← Complex.ofReal_add, ← Complex.ofReal_mul, ← Complex.ofReal_div, Complex.ofReal_re]
+    exact div_nonneg (mul_nonneg (Real.log_nonneg hq) (add_nonneg (hg _) (hg _)))
+      (Real.rpow_nonneg (zero_le_one.trans hq) _)
+  · exact le_rfl
+
 /-- Paper: §1.4.3, p. 29. For the trivial rational character, the zero
 sum in the window of half-width one has real part tending to minus infinity
 at parameter two.
@@ -742,7 +796,44 @@ The full explicit formula suffices for this window because it contains all zeros
 theorem introTraceApprox_rat_spectral_tendsto_atBot (h ρ : ℕ → ℝ → ℝ)
     (_hA : IsIntroTraceApproximation h ρ) :
     Tendsto (fun n ↦ (introTraceSpectralSum (F := ℚ) 1 approx(h, ρ, n, (2 : ℂ)) 1).re)
-      atTop atBot := by sorry
+      atTop atBot := by
+  classical
+  let a (n : ℕ) := approx(h, ρ, n, (2 : ℂ))
+  let M (n : ℕ) := introTraceMellin (a n) (1 / 2) + introTraceMellin (a n) (-1 / 2)
+  let A (n : ℕ) := ∑ w : InfinitePlace ℚ, introTraceArchimedean (F := ℚ) 1 (a n) w
+  let m := (introTraceMellin (introTracePower 2) (1 / 2) +
+    introTraceMellin (introTracePower 2) (-1 / 2)).re
+  have hM := ((introTraceApprox_mellin_tendsto h ρ _hA (1 / 2)).tendsto_at
+    (a := (2 : ℂ)) (by norm_num)).add
+    ((introTraceApprox_mellin_tendsto h ρ _hA (-1 / 2)).tendsto_at (a := (2 : ℂ)) (by norm_num))
+  have hbound := ((Complex.continuous_re.tendsto _).comp hM).eventually
+    (eventually_lt_nhds (lt_add_one m))
+  have hArch := introTraceApprox_rat_archimedean_tendsto_atTop h ρ _hA
+  let τ : ℝ≥0ˣ →ₜ* IdeleClassGroup (𝓞 ℚ) ℚ :=
+    ⟨(QuotientGroup.mk' _).comp (canonicalIdeleNormSection ℚ),
+      continuous_quotient_mk'.comp (canonicalIdeleNormSection_continuous _)⟩
+  apply tendsto_atBot.2
+  intro b
+  filter_upwards [hbound, (tendsto_atTop.1 hArch) (m + 1 - b)] with n hn hAn
+  obtain ⟨φ, hφ⟩ := introTraceApprox_exists_bruhat (F := ℚ) 1 h ρ _hA n 2
+  have hzero : a n 1 = 0 := image_eq_zero_of_notMem_tsupport
+    (fun ht ↦ lt_irrefl _ (introTraceApprox_support h ρ _hA n 2 ht))
+  have ht := introTrace_characterTrace τ (canonicalIdeleNormSection_rightInverse ℚ) 1
+    (fun _ ↦ rfl) (a n) hzero φ hφ 1 one_pos
+  have he := ht.2.2.tsum_eq
+  simp only at he
+  change introTraceSpectralSum (F := ℚ) 1 (a n) 1 = M n - A n -
+    ∑' p : HeightOneSpectrum (𝓞 ℚ) × ℕ, introTracePrimePower (F := ℚ) 1 (a n) p.1 p.2 at he
+  change (introTraceSpectralSum (F := ℚ) 1 (a n) 1).re ≤ b
+  rw [he, Complex.sub_re, Complex.sub_re, Complex.re_tsum ht.2.1]
+  obtain ⟨g, hg, hag⟩ := introTraceApprox_rat_spectral_tendsto_atBot_profile h ρ _hA n
+  have hp : 0 ≤ ∑' p : HeightOneSpectrum (𝓞 ℚ) × ℕ,
+      (introTracePrimePower (F := ℚ) 1 (a n) p.1 p.2).re := by
+    rw [show a n = _ from hag]
+    exact tsum_nonneg fun p ↦ introTraceApprox_rat_spectral_tendsto_atBot_prime_nonneg g hg p.1 p.2
+  change (M n).re < _ at hn
+  change _ ≤ (A n).re at hAn
+  linarith
 
 /-- Paper: §1.4.4, p. 29. The negative prime-power norms lie below one,
 where every cutoff test vanishes. -/
