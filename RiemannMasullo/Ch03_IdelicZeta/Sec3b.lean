@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3
 public import RiemannMasullo.AppB_AnalyticNT.Sec2
 public import RiemannMasullo.AppC_LCTVS.Sec5b
+public import Mathlib.Analysis.Distribution.SchwartzSpace.Fourier
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2b
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
 import all RiemannMasullo.Ch02_AdelicTheta.Sec3
@@ -10,7 +11,6 @@ import all RiemannMasullo.Ch03_IdelicZeta.Sec3
 import all RiemannMasullo.AppB_AnalyticNT.Sec2
 import all RiemannMasullo.AppC_LCTVS.Sec5b
 import Mathlib.Analysis.Normed.Field.ProperSpace
-import Mathlib.Analysis.Distribution.SchwartzSpace.Fourier
 import Mathlib.Analysis.SpecialFunctions.Gaussian.FourierTransform
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gaussian.Schwartz
 import Mathlib.RingTheory.Complex
@@ -2573,8 +2573,12 @@ theorem infiniteLocalIdelicZFunction_real_poles (w : InfinitePlace F) (hw : w.Is
 
 /-- Paper: Lemma 3.3.2.1(2)(1), p. 138. At a real pole, the residue applied
 to a test function is twice the Taylor coefficient of the corresponding degree.
-Deviation: This evaluates the residue directly on the test function. In the
-paper's scaled differential notation the odd coefficient has phase +i. -/
+
+Deviation: The formula evaluates ordinary derivatives on the test function. With the printed
+scaling D = (2πi)⁻¹∂ₓ, the degree-one residue is +4πi times (Df)(0). For the
+distribution derivative defined by negative transpose it is −4πi times (Dδ₀)(f), as
+in (3.3.2.7). Equation (3.3.2.20) evaluates D on the test. The degree-one residue of
+the separate factor ρ for the library's Fourier convention is +4πi, as discussed in I91. -/
 theorem infiniteLocalIdelicZFunction_real_residue (w : InfinitePlace F) (hw : w.IsReal)
     (f : ℬ(w.Completion)) (χ : PontryaginDual w.Completionˣ) (a : Fin 2)
     (hχ : realShape[hw, ((circleToComplex).comp χ), 0, a]) (k : ℕ) :
@@ -5347,6 +5351,147 @@ private theorem complexTate_ratio_strip (w : InfinitePlace F) (hw : w.IsComplex)
   rw [Complex.Gammaℂ_def]
   exact mul_ne_zero (mul_ne_zero two_ne_zero (Complex.cpow_ne_zero_iff.mpr (Or.inl (by exact_mod_cast (mul_pos zero_lt_two Real.pi_pos).ne'))))
     (Complex.Gamma_ne_zero_of_re_pos hz')
+
+/-- Realize each sign parity as a unitary character in the real local field model. -/
+private theorem realLocalTate_signCharacter (w : InfinitePlace F) (hw : w.IsReal) (a : Fin 2) :
+    ∃ χ : PontryaginDual w.Completionˣ, ∀ x : ℝˣ,
+      ((χ (Units.map (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm.toMonoidHom x) :
+        Circle) : ℂ) = (if 0 < (x : ℝ) then 1 else (-1 : ℂ)) ^ a.val := by
+  let e := InfinitePlace.Completion.ringEquivRealOfIsReal hw
+  have hc : Continuous (fun x : ℝˣ ↦ (x : ℝ)) := Units.continuous_val
+  have hpos : IsClopen {x : ℝˣ | 0 < (x : ℝ)} := by
+    refine ⟨?_, isOpen_lt continuous_const hc⟩
+    have he : {x : ℝˣ | 0 < (x : ℝ)} = {x : ℝˣ | 0 ≤ (x : ℝ)} :=
+      Set.ext fun x ↦ by
+        change 0 < (x : ℝ) ↔ 0 ≤ (x : ℝ)
+        exact ⟨le_of_lt, fun hx ↦ lt_of_le_of_ne hx x.ne_zero.symm⟩
+    rw [he]
+    exact isClosed_le continuous_const hc
+  let sign : ℝˣ →ₜ* Circle :=
+    { toFun x := if 0 < (x : ℝ) then 1 else -1
+      map_one' := by simp
+      map_mul' x y := by
+        change (if 0 < (x : ℝ) * (y : ℝ) then _ else _) = _
+        rcases x.ne_zero.lt_or_gt with hx | hx <;> rcases y.ne_zero.lt_or_gt with hy | hy
+        · simp [hx.not_gt, hy.not_gt, mul_pos_of_neg_of_neg hx hy]
+        · simp [hx.not_gt, hy, (mul_neg_of_neg_of_pos hx hy).not_gt]
+        · simp [hx, hy.not_gt, (mul_neg_of_pos_of_neg hx hy).not_gt]
+        · simp [hx, hy, mul_pos hx hy]
+      continuous_toFun := Continuous.if (by simp [hpos.frontier_eq]) continuous_const continuous_const }
+  let i : w.Completionˣ →ₜ* ℝˣ := ⟨Units.map e.toMonoidHom,
+    (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).continuous.units_map _⟩
+  let power : Circle →ₜ* Circle := ⟨powMonoidHom a.val, continuous_pow a.val⟩
+  refine ⟨power.comp (sign.comp i), fun x ↦ ?_⟩
+  have he : i (Units.map e.symm.toMonoidHom x) = x := Units.ext (e.apply_symm_apply _)
+  change ((sign (i (Units.map e.symm.toMonoidHom x)) ^ a.val : Circle) : ℂ) = _
+  rw [he, Circle.coe_pow]
+  change (↑(if 0 < (x : ℝ) then (1 : Circle) else -1) : ℂ) ^ a.val = _
+  by_cases hx : 0 < (x : ℝ) <;> simp [hx]
+
+/-- Tate's equation at a real place, in Euclidean coordinates on the strip of convergence.
+The parity selects the sign character and its Fourier phase. -/
+theorem realLocalTate_mellin_fourier (w : InfinitePlace F) (hw : w.IsReal)
+    (f : SchwartzMap ℝ ℂ) (a : Fin 2) (z : ℂ) (hz : z.re ∈ Ioo (0 : ℝ) 1) :
+    mellin (fun t : ℝ ↦ f t + (-1 : ℂ) ^ a.val * f (-t)) z =
+      Complex.I ^ a.val * (Complex.Gammaℝ (z + a.val) / Complex.Gammaℝ (1 - z + a.val)) *
+        mellin (fun t : ℝ ↦ (𝓕 f) t + (-1 : ℂ) ^ a.val * (𝓕 f) (-t)) (1 - z) := by
+  let e := InfinitePlace.Completion.ringEquivRealOfIsReal hw
+  obtain ⟨χ, hχ⟩ := realLocalTate_signCharacter w hw a
+  let c := chart∞[w,χ] z
+  let d := dualQuasiCharacter m∞(w) h∞(w) c
+  have hc := realChart_shape w hw χ 0 a (fun x ↦ by
+    change (χ (Units.map e.symm.toMonoidHom x) : ℂ) = _
+    simpa only [Complex.cpow_zero, one_mul] using hχ x) z
+  simp only [add_zero] at hc
+  have hd := realDual_shape w hw c z a hc
+  have hdz : 0 < (1 - z).re := by simpa using sub_pos.mpr hz.2
+  obtain ⟨g, hg⟩ := exists_realModelTest w hw f
+  have hft : F∞(w) (fun x ↦ f (e x)) = fun y ↦ (𝓕 f) (e y) :=
+    funext (realModelFourier w hw (f : ℝ → ℂ))
+  have h := (infiniteLocalTateFactor_spec w).2 g χ z hz
+  change localIdelicZetaIntegral μ∞(w) (fun x ↦ g (Multiplicative.ofAdd x)) c =
+    infiniteLocalTateFactor w c * localIdelicZetaIntegral μ∞(w) (F∞(w) _) d at h
+  rw [hg, hft, realIntegral_shape w hw f c z a hc hz.1,
+    realIntegral_shape w hw (𝓕 f) d (1 - z) a hd hdz] at h
+  have hratio := realTate_ratio_strip w hw χ z hz
+  change infiniteLocalTateFactor w c = infiniteLocalEpsilonFactor w c *
+    (infiniteLocalEulerFactor w c / infiniteLocalEulerFactor w d) at hratio
+  have h₁ := realEuler_of_shape w hw c z a hc
+  have h₂ := realEuler_of_shape w hw d (1 - z) a hd
+  rw [h₁.1, h₁.2, h₂.1] at hratio
+  rwa [hratio] at h
+
+/-- Realize an integral angular weight by a unitary character on a complex completion. -/
+private theorem complexLocalTate_angularCharacter (w : InfinitePlace F) (hw : w.IsComplex) (k : ℤ) :
+    ∃ χ : PontryaginDual w.Completionˣ, ∀ x : ℂˣ,
+      ((χ (Units.map (InfinitePlace.Completion.ringEquivComplexOfIsComplex hw).symm.toMonoidHom x) :
+        Circle) : ℂ) = ((x : ℂ) / (‖(x : ℂ)‖ : ℂ)) ^ k := by
+  let e := InfinitePlace.Completion.ringEquivComplexOfIsComplex hw
+  let phase : ℂˣ →ₜ* Circle :=
+    { toFun x := ⟨(x : ℂ) / (‖(x : ℂ)‖ : ℂ), mem_sphere_zero_iff_norm.mpr (by
+        rw [norm_div, Complex.norm_of_nonneg (norm_nonneg _), div_self (norm_ne_zero_iff.mpr x.ne_zero)])⟩
+      map_one' := by ext; simp
+      map_mul' x y := by
+        apply Subtype.ext
+        change ((x : ℂ) * (y : ℂ)) / (‖(x : ℂ) * (y : ℂ)‖ : ℂ) = _
+        rw [norm_mul, Complex.ofReal_mul, mul_div_mul_comm]
+        rfl
+      continuous_toFun := (Units.continuous_val.div
+        (Complex.continuous_ofReal.comp (continuous_norm.comp Units.continuous_val))
+        (fun x ↦ Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr x.ne_zero))).subtype_mk _ }
+  let i : w.Completionˣ →ₜ* ℂˣ := ⟨Units.map e.toMonoidHom,
+    (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hw).continuous.units_map _⟩
+  let power : Circle →ₜ* Circle := ⟨zpowGroupHom k, continuous_zpow k⟩
+  refine ⟨power.comp (phase.comp i), fun x ↦ ?_⟩
+  have he : i (Units.map e.symm.toMonoidHom x) = x := Units.ext (e.apply_symm_apply _)
+  change ((phase (i (Units.map e.symm.toMonoidHom x)) ^ k : Circle) : ℂ) = _
+  rw [he, Circle.coe_zpow]
+  rfl
+
+/-- Tate's equation at a complex place in polar coordinates on the strip of convergence.
+The Fourier transform uses the trace pairing and reverses the angular exponent. -/
+theorem complexLocalTate_mellin_fourier (w : InfinitePlace F) (hw : w.IsComplex)
+    (f fHat : SchwartzMap ℂ ℂ) (hfHat : ∀ x : ℂ, fHat x = 2 * (𝓕 f) (2 * star x))
+    (k : ℤ) (z : ℂ) (hz : z.re ∈ Ioo (0 : ℝ) 1) :
+    let M (g : SchwartzMap ℂ ℂ) (j : ℤ) (s : ℂ) := 2 * mellin
+      (fun t : ℝ ↦ ∫ θ in Ioo (-Real.pi) Real.pi, Complex.exp ((j : ℂ) * (θ : ℂ) * Complex.I) *
+        g ((t : ℂ) * Complex.exp ((θ : ℂ) * Complex.I))) (2 * s)
+    M f k z = Complex.I ^ k.natAbs *
+      (Complex.Gammaℂ (z + (k.natAbs : ℂ) / 2) / Complex.Gammaℂ (1 - z + (k.natAbs : ℂ) / 2)) *
+      M fHat (-k) (1 - z) := by
+  let e := InfinitePlace.Completion.ringEquivComplexOfIsComplex hw
+  obtain ⟨χ, hχ⟩ := complexLocalTate_angularCharacter w hw k
+  let c := chart∞[w,χ] z
+  let d := dualQuasiCharacter m∞(w) h∞(w) c
+  have hc := complexChart_shape w hw χ 0 k (fun x ↦ by
+    change (χ (Units.map e.symm.toMonoidHom x) : ℂ) = _
+    simpa only [Complex.cpow_zero, one_mul] using hχ x) z
+  simp only [add_zero] at hc
+  have hd := complexDual_shape w hw c z k hc
+  have hdz : 0 < (1 - z).re := by simpa using sub_pos.mpr hz.2
+  let g : SchwartzBruhat (Multiplicative w.Completion) := ⟨fun x ↦ f (e x.toAdd),
+    (complexModelSchwartz_iff w hw f).mpr ⟨f, rfl⟩⟩
+  have hft : F∞(w) (fun x ↦ f (e x)) = fun y ↦ fHat (e y) := by
+    funext y
+    rw [hfHat, SchwartzMap.fourier_coe]
+    simpa only [Complex.real_smul, Complex.ofReal_ofNat] using complexModelFourier w hw (f : ℂ → ℂ) y
+  have h := (infiniteLocalTateFactor_spec w).2 g χ z hz
+  change localIdelicZetaIntegral μ∞(w) (fun x ↦ f (e x)) c =
+    infiniteLocalTateFactor w c * localIdelicZetaIntegral μ∞(w) (F∞(w) (fun x ↦ f (e x))) d at h
+  rw [hft, complexIntegral_shape w hw f c z k hc hz.1,
+    complexIntegral_shape w hw fHat d (1 - z) (-k) hd hdz] at h
+  have hratio := complexTate_ratio_strip w hw χ z hz
+  change infiniteLocalTateFactor w c = infiniteLocalEpsilonFactor w c *
+    (infiniteLocalEulerFactor w c / infiniteLocalEulerFactor w d) at hratio
+  have h₁ := complexEuler_of_shape w hw c z k hc
+  have h₂ := complexEuler_of_shape w hw d (1 - z) (-k) hd
+  rw [h₁.1, h₁.2, h₂.1, div_div_div_cancel_right₀ (by norm_num : (2 : ℂ) ≠ 0), Int.natAbs_neg] at hratio
+  have hp (g : SchwartzMap ℂ ℂ) (j : ℤ) : angularProfile g j =
+      fun t : ℝ ↦ ∫ θ in Ioo (-Real.pi) Real.pi, Complex.exp ((j : ℂ) * (θ : ℂ) * Complex.I) *
+        g ((t : ℂ) * Complex.exp ((θ : ℂ) * Complex.I)) := by
+    funext t
+    simp only [angularProfile, angularWeight, Int.cast_one, one_mul]
+  simpa only [hratio, hp] using h
 
 end ArchimedeanTateRatio
 

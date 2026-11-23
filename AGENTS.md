@@ -90,9 +90,12 @@ been extended.
 - **A new import or public declaration in a low file rebuilds everything above it.** Lake
   rebuilds a module when the public `.olean` changes in any module it reaches through
   `public import`, not only in its direct imports. That `.olean` changes when an `import` line
-  is added or removed, even a private one, or when a public declaration is added or restated. A
-  proof, a `private` declaration or a docstring leaves it unchanged. One `import` added with a
-  proof to `Ch05_ThetaZSpaces/Sec3b` rebuilt 58 modules instead of 5 (#6263), and 61 of the
+  is added or removed, even a private one, or when a public declaration is added or restated.
+  It also records which axioms each public theorem uses, so the proof that makes a public theorem
+  free of `sorry` changes it too, as does `simp [f]` or `unfold f` when it creates the equation
+  lemma `f.eq_1` in your file (prefer the existing `f_def`, `f_apply` lemmas). Changing a proof
+  that was already complete, a `private` helper or a docstring leaves it unchanged. One
+  `import` added with a proof to `Ch05_ThetaZSpaces/Sec3b` rebuilt 58 modules instead of 5 (#6263), and 61 of the
   107 section files have 30 or more modules above them. In a proof, use what the file already
   imports where you can, and keep helpers `private`. Put an unavoidable new import in the
   section's import file `Sec<N>_Imports.lean` when it has one: the section imports that file
