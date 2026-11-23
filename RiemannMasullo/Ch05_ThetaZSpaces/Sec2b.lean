@@ -1,6 +1,8 @@
 module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2
+
+import RiemannMasullo.Ch03_IdelicZeta.Sec2
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
@@ -2915,7 +2917,18 @@ theorem sLocalThetaFourier_toGlobal
     (x : Θₛ(S)) :
     let fourierS := (existsUnique_sLocalThetaFourier (F := F) (S := S)).exists.choose
     let fourier := (existsUnique_globalThetaFourier (F := F)).exists.choose
-    fourier (sLocalThetaToGlobal F S x) = sLocalThetaToGlobal F S (fourierS x) := by sorry
+    fourier (sLocalThetaToGlobal F S x) = sLocalThetaToGlobal F S (fourierS x) := by
+  intro fourierS fourier
+  induction x using Submodule.Quotient.induction_on with | _ f => ?_
+  have hS := (existsUnique_sLocalThetaFourier (F := F) (S := S)).exists.choose_spec.2 f
+  have hF := (existsUnique_globalThetaFourier (F := F)).exists.choose_spec.2
+    (sAdeleSchwartzToGlobal F S f)
+  calc
+    _ = (K𝔽).mkQ (adeleSchwartzFourier (sAdeleSchwartzToGlobal F S f)) := hF
+    _ = (K𝔽).mkQ (sAdeleSchwartzToGlobal F S (sAdeleSchwartzFourier f)) :=
+      congrArg (K𝔽).mkQ
+        (adeleSchwartzFourier_sAdeleSchwartzToGlobal_of_different F S hgood f (sAdeleSchwartzFourier f) rfl)
+    _ = _ := (congrArg (sLocalThetaToGlobal F S) hS).symm
 
 section
 
