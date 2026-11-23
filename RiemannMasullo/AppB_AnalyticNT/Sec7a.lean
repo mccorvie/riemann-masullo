@@ -171,7 +171,44 @@ theorem heckeLogDerivPolynomial_eq_sum_ideals (χ : U[F]) (x : ℝ) (s : ℂ) :
     heckeLogDerivPolynomial χ x s =
       ∑ᶠ I : {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ (I.absNorm : ℝ) ≤ x},
         heckeIdealVonMangoldt (ideleClassNormTwist χ 0) I.val / (I.val.absNorm : ℂ) ^ s := by
-  sorry
+  classical
+  let g : Ideal (𝓞 F) → ℂ := fun I ↦
+    heckeIdealVonMangoldt (ideleClassNormTwist χ 0) I / (I.absNorm : ℂ) ^ s
+  have hfin : {I : Ideal (𝓞 F) | I ≠ ⊥ ∧ (I.absNorm : ℝ) ≤ x}.Finite :=
+    (Ring.HasFiniteQuotients.finite_absNorm_le (S := 𝓞 F) ⌊x⌋₊).subset
+      fun I hI ↦ Nat.le_floor hI.2
+  let T := hfin.toFinset
+  have hfib (n : ℕ) (hn : n ∈ Finset.Icc 1 ⌊x⌋₊) :
+      LSeries.term (heckeLogDerivCoefficient (ideleClassNormTwist χ 0)) s n =
+        ∑ I ∈ T with I.absNorm = n, g I := by
+    have hn0 : n ≠ 0 := Nat.one_le_iff_ne_zero.mp (Finset.mem_Icc.mp hn).1
+    have hset : {I : Ideal (𝓞 F) | I ≠ ⊥ ∧ I.absNorm = n} =
+        ↑(T.filter fun I ↦ I.absNorm = n) := by
+      ext I
+      simp only [Set.mem_ofPred_eq, Finset.coe_filter, T, Set.Finite.mem_toFinset]
+      constructor
+      · rintro ⟨h0, h1⟩
+        refine ⟨⟨h0, ?_⟩, h1⟩
+        rw [h1]
+        exact (Nat.le_floor_iff' hn0).mp (Finset.mem_Icc.mp hn).2
+      · rintro ⟨⟨h0, -⟩, h1⟩
+        exact ⟨h0, h1⟩
+    rw [LSeries.term_of_ne_zero hn0, heckeLogDerivCoefficient]
+    change (∑ᶠ I : ↥{I : Ideal (𝓞 F) | I ≠ ⊥ ∧ I.absNorm = n},
+      heckeIdealVonMangoldt (ideleClassNormTwist χ 0) I) / (n : ℂ) ^ s = _
+    rw [hset, finsum_set_coe_eq_finsum_mem, finsum_mem_coe_finset, Finset.sum_div]
+    refine Finset.sum_congr rfl fun I hI ↦ ?_
+    change _ = heckeIdealVonMangoldt (ideleClassNormTwist χ 0) I / (I.absNorm : ℂ) ^ s
+    rw [(Finset.mem_filter.mp hI).2]
+  change ∑ n ∈ Finset.Icc 1 ⌊x⌋₊,
+      LSeries.term (heckeLogDerivCoefficient (ideleClassNormTwist χ 0)) s n =
+    ∑ᶠ I : ↥{I : Ideal (𝓞 F) | I ≠ ⊥ ∧ (I.absNorm : ℝ) ≤ x}, g I
+  rw [finsum_set_coe_eq_finsum_mem, finsum_mem_eq_finite_toFinset_sum _ hfin,
+    Finset.sum_congr rfl hfib]
+  refine Finset.sum_fiberwise_of_maps_to (fun I hI ↦ ?_) _
+  simp only [T, Set.Finite.mem_toFinset, Set.mem_ofPred_eq] at hI
+  exact Finset.mem_Icc.mpr
+    ⟨Nat.one_le_iff_ne_zero.mpr (Ideal.absNorm_eq_zero_iff.not.mpr hI.1), Nat.le_floor hI.2⟩
 
 /-- Paper: Theorem B.7.1.2(1), p. 645. The set `J_b` consists of the integer
 cuts and the real cuts at distance at least `b` from the integers. -/
