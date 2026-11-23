@@ -1861,6 +1861,108 @@ theorem sLocalGammaIndex_enumerable (ω : PontryaginDual J₁(S)) :
   let := Denumerable.ofEncodableOfInfinite (ΓIndex(ω, (Set.univ : Set Xₛ)))
   exact ⟨(Denumerable.eqv _).symm⟩
 
+/-- A continuous linear functional on a product of complex lines vanishes on every vector
+whose coordinates vanish on some finite set of indices. -/
+private theorem sLocalGammaOrbitalQuotient_dual_basis_finite {ι : Type*}
+    (L : (ι → ℂ) →L[ℂ] ℂ) : ∃ T : Finset ι, ∀ y : ι → ℂ, (∀ i ∈ T, y i = 0) → L y = 0 := by
+  have hU : L ⁻¹' Metric.ball 0 1 ∈ 𝓝 (0 : ι → ℂ) :=
+    L.continuous.continuousAt.preimage_mem_nhds (by
+      rw [map_zero]
+      exact Metric.ball_mem_nhds 0 one_pos)
+  rw [nhds_pi, Filter.mem_pi'] at hU
+  obtain ⟨T, t, ht, hsub⟩ := hU
+  refine ⟨T, fun y hy ↦ ?_⟩
+  by_contra hne
+  have h2 : L ((2 / L y) • y) = 2 := by
+    rw [map_smul, smul_eq_mul, div_mul_cancel₀ _ hne]
+  have hmem : (2 / L y) • y ∈ Set.pi (↑T) t := fun i hi ↦ by
+    rw [Pi.smul_apply, hy i hi, smul_zero]
+    exact mem_of_mem_nhds (ht i)
+  have h1 := hsub hmem
+  rw [Set.mem_preimage, h2, Metric.mem_ball, dist_zero_right] at h1
+  norm_num at h1
+
+/-- On a space identified with a product of complex lines indexed by an enumerated set, the
+coordinate functionals form a Schauder basis of the strong dual, with evaluation at the
+dual vectors as coefficient functionals. -/
+private theorem sLocalGammaOrbitalQuotient_dual_basis_pi {Q ι : Type*} [AddCommGroup Q]
+    [Module ℂ Q] [TopologicalSpace Q] [IsTopologicalAddGroup Q] [ContinuousSMul ℂ Q]
+    [DecidableEq ι] (Ψ : Q ≃L[ℂ] (ι → ℂ)) (σ : ℕ ≃ ι) :
+    IsSchauderBasis
+      (fun n ↦ (ContinuousLinearMap.proj (σ n) : (ι → ℂ) →L[ℂ] ℂ).comp (Ψ : Q →L[ℂ] (ι → ℂ)))
+      (fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (Ψ.symm (Pi.single (σ n) 1))) := by
+  refine ⟨fun m n ↦ ?_, fun ℓ ↦ ?_⟩
+  · change Ψ (Ψ.symm (Pi.single (σ m) 1)) (σ n) = if m = n then 1 else 0
+    rw [Ψ.apply_symm_apply, Pi.single_apply]
+    by_cases hmn : m = n
+    · subst hmn
+      simp
+    · have hne : σ n ≠ σ m := fun e ↦ hmn (σ.injective e).symm
+      simp [hmn, hne]
+  · obtain ⟨T, hT⟩ := sLocalGammaOrbitalQuotient_dual_basis_finite
+      (ℓ.comp (Ψ.symm : (ι → ℂ) →L[ℂ] Q))
+    have hzero (m : ℕ) (hm : σ m ∉ T) : ℓ (Ψ.symm (Pi.single (σ m) 1)) = 0 :=
+      hT _ fun i hi ↦ by
+        simp [show i ≠ σ m from fun e ↦ hm (e ▸ hi)]
+    have hrep : ℓ = ∑ i ∈ T, ℓ (Ψ.symm (Pi.single i 1)) •
+        (ContinuousLinearMap.proj i : (ι → ℂ) →L[ℂ] ℂ).comp (Ψ : Q →L[ℂ] (ι → ℂ)) := by
+      ext q
+      have hy := hT (Ψ q - ∑ i ∈ T, Ψ q i • Pi.single i (1 : ℂ)) fun i hi ↦ by
+        simp [Finset.sum_apply, Pi.single_apply, hi]
+      simp only [ContinuousLinearMap.comp_apply, map_sub, map_sum, map_smul,
+        ContinuousLinearEquiv.coe_coe, ContinuousLinearEquiv.symm_apply_apply,
+        sub_eq_zero] at hy
+      rw [hy]
+      simp [mul_comm]
+    let K := (T.image σ.symm).sup id + 1
+    unfold HasSum
+    rw [SummationFilter.conditional_filter_eq_map_range, Filter.tendsto_map'_iff]
+    refine tendsto_const_nhds.congr' ?_
+    filter_upwards [Filter.eventually_ge_atTop K] with k hk
+    have hsub : T.map σ.symm.toEmbedding ⊆ Finset.range k := by
+      intro m hm
+      obtain ⟨i, hi, rfl⟩ := Finset.mem_map.mp hm
+      have hle : σ.symm i ≤ (T.image σ.symm).sup id :=
+        Finset.le_sup (f := id) (Finset.mem_image_of_mem _ hi)
+      change σ.symm i ∈ Finset.range k
+      exact Finset.mem_range.mpr (by omega)
+    symm
+    change ∑ m ∈ Finset.range k, ℓ (Ψ.symm (Pi.single (σ m) 1)) •
+        (ContinuousLinearMap.proj (σ m) : (ι → ℂ) →L[ℂ] ℂ).comp (Ψ : Q →L[ℂ] (ι → ℂ)) = ℓ
+    rw [← Finset.sum_subset hsub fun m _ hm ↦ ?_, Finset.sum_map]
+    · conv_rhs => rw [hrep]
+      refine Finset.sum_congr rfl fun i _ ↦ ?_
+      simp
+    · have hσ : σ m ∉ T := fun h ↦ hm (Finset.mem_map.mpr ⟨σ m, h, by simp⟩)
+      rw [hzero m hσ, zero_smul]
+
+/-- On a quotient identified with a product of complex lines through coefficient
+functionals, the descended coefficients in any enumeration form a Schauder basis of the
+strong dual. -/
+private theorem sLocalGammaOrbitalQuotient_dual_basis_quot {E ι : Type*} {_ : AddCommGroup E}
+    {_ : Module ℂ E} {_ : TopologicalSpace E} (P : Submodule ℂ E)
+    [IsTopologicalAddGroup (E ⧸ P)] [ContinuousSMul ℂ (E ⧸ P)] [DecidableEq ι]
+    (φ : ι → StrongDual ℂ E) (Ψ : (E ⧸ P) ≃L[ℂ] (ι → ℂ))
+    (hΨ : ∀ (x : E) (j : ι), Ψ (P.mkQ x) j = φ j x) (σ : ℕ ≃ ι) :
+    ∃ (a : ℕ → StrongDual ℂ (E ⧸ P)) (d : ℕ → StrongDual ℂ (StrongDual ℂ (E ⧸ P))),
+      (∀ n (x : E), a n (P.mkQ x) = φ (σ n) x) ∧ IsSchauderBasis a d :=
+  ⟨_, _, fun n x ↦ hΨ x (σ n), sLocalGammaOrbitalQuotient_dual_basis_pi Ψ σ⟩
+
+/-- The statement of `sLocalGammaOrbitalQuotient_dual_basis` with its abbreviations
+expanded. -/
+private theorem sLocalGammaOrbitalQuotient_dual_basis_aux (ω : PontryaginDual J₁(S))
+    (σ : ℕ ≃ ΓIndex(ω, (Set.univ : Set Xₛ))) :
+    ∃ (a : ℕ → StrongDual ℂ (fullPV(ω) ⧸ Γker(ω)))
+      (d : ℕ → StrongDual ℂ (StrongDual ℂ (fullPV(ω) ⧸ Γker(ω)))),
+      (∀ n (x : fullPV(ω)), a n ((Γker(ω)).mkQ x) = ΓCoeff(ω, (σ n)) x) ∧
+      IsSchauderBasis a d := by
+  classical
+  have h := sLocalGammaOrbitalQuotient_coeff_equiv ω
+  exact sLocalGammaOrbitalQuotient_dual_basis_quot (ι := ΓIndex(ω, (Set.univ : Set Xₛ)))
+    (Γker(ω)) (fun j ↦ ΓCoeff(ω, j)) h.choose (fun x j ↦ by
+      have := h.choose_spec x j
+      rw [this]) σ
+
 /-- Paper: Theorem 7.3.4.1(5), p. 365.
 In every enumeration, the archimedean Laurent coefficients descend to a
 Schauder basis of the strong dual of the archimedean polar quotient.
@@ -1871,7 +1973,8 @@ theorem sLocalGammaOrbitalQuotient_dual_basis (ω : PontryaginDual J₁(S))
     let P := Γker(ω)
     ∃ (a : ℕ → StrongDual ℂ (E ⧸ P)) (d : ℕ → StrongDual ℂ (StrongDual ℂ (E ⧸ P))),
       (∀ n (x : E), a n (P.mkQ x) = ΓCoeff(ω, (σ n)) x) ∧
-      IsSchauderBasis a d := by sorry
+      IsSchauderBasis a d := by
+  exact sLocalGammaOrbitalQuotient_dual_basis_aux ω σ
 
 end ArchimedeanPoles
 
