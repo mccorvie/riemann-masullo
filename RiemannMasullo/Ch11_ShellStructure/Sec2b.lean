@@ -182,7 +182,8 @@ vector in the global level.
 Deviation: Use X = Λ and the direct integer-indicator insertion. -/
 theorem globalAbsolutePWSobolev_mem (a : ℝ) (ω : PontryaginDual C₁) (Λ : ℝ)
     (f : Zₛ) (_hf : f ∈ band(sLocalPWBox S Λ)) :
-    globalPWThetaSobolevMap (F := F) (S := S) (s := s) a ω f ∈ globalAbsolutePWSobolev (F := F) (S := S) hs a ω Λ := by sorry
+    globalPWThetaSobolevMap (F := F) (S := S) (s := s) a ω f ∈ globalAbsolutePWSobolev (F := F) (S := S) hs a ω Λ := by
+  exact Submodule.le_topologicalClosure _ (Submodule.subset_span ⟨⟨f, _hf⟩, rfl⟩)
 
 local notation "ambientGeom(" a ")" => geometricProjection (F := F) a h₀ hs
 local notation "onIsotype(" ω ", " T ")" =>
