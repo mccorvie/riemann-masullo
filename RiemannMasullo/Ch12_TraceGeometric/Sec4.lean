@@ -668,6 +668,29 @@ theorem sLocalTraceEta_zero_neg_one (f : BruhatCompactSupport Iₛ) (ξ : Hₛ) 
     rintro ⟨u, hu⟩
     exact not_isUnit_zero (hu ▸ u.isUnit)
 
+/-- The frequency translate of the Fourier transform of the lifted test is
+integrable, so a bounded measurable frequency symbol times it is integrable.
+This is the first obligation of `sLocalTraceCutoffKernel_skew`. -/
+private theorem sLocalTraceCutoffKernel_skew_integrable (f : BruhatCompactSupport Iₛ)
+    (ρ' : Aₛ → ℂ) (_hρ' : Measurable ρ') (_hBound : ∃ C : ℝ, ∀ u, ‖ρ' u‖ ≤ C)
+    (ξ : Hₛ) (x : Iₛ) :
+    Integrable (fun u ↦ ρ' u * fourierₛ (sLocalTraceEta f ξ) (x.val * u)) νₛ := by
+  sorry
+
+/-- Paper: (12.4.1.18)–(12.4.1.21), p. 518. The dilation average of the skew
+diagonal, integrated against the frequency symbol, is the measure factor of
+(12.4.1.17) times the Fourier transform of the lifted test at the printed
+frequency. The change of variable `z = g⁻¹ξ - 1` produces the frequency
+`-(x u)`; the substitution `u ↦ -u`, which additive Tamagawa measure allows and
+the evenness of the symbol permits, is what removes that reflection. -/
+private theorem sLocalTraceCutoffKernel_skew_dilation (f : BruhatCompactSupport Iₛ)
+    (ρ' : Aₛ → ℂ) (_hEven : ∀ u, ρ' (-u) = ρ' u) (ξ : Hₛ) (x : Iₛ) :
+    (∫ u, ρ' u * sLocalTraceDilationKernel f
+        (fun z ↦ (ψₛ ((z - x.val) * u) : ℂ)) (ξ.val * x).val ∂νₛ) =
+      (sLocalTraceMeasureFactor S : ℂ) *
+        ∫ u, ρ' u * fourierₛ (sLocalTraceEta f ξ) (x.val * u) ∂νₛ := by
+  sorry
+
 /-- Paper: (12.4.1.12)–(12.4.1.22), pp. 517–518. The skew diagonal of the
 composed kernel is the integral of the Fourier transform of the translated test,
 weighted by both cutoffs.
@@ -680,7 +703,11 @@ theorem sLocalTraceCutoffKernel_skew (f : BruhatCompactSupport Iₛ)
     Integrable (fun u ↦ ρ' u * fourierₛ (sLocalTraceEta f ξ) (x.val * u)) νₛ ∧
       sLocalTraceCutoffKernel f ρ ρ' (ξ.val * x) x.val =
         ρ (ξ.val * x) * (sLocalTraceMeasureFactor S : ℂ) *
-          ∫ u, ρ' u * fourierₛ (sLocalTraceEta f ξ) (x.val * u) ∂νₛ := by sorry
+          ∫ u, ρ' u * fourierₛ (sLocalTraceEta f ξ) (x.val * u) ∂νₛ := by
+  refine ⟨sLocalTraceCutoffKernel_skew_integrable f ρ' _hρ' _hBound ξ x, ?_⟩
+  unfold sLocalTraceCutoffKernel
+  rw [sLocalTraceCutoffKernel_skew_dilation f ρ' _hEven ξ x]
+  ring
 
 /-- Paper: (12.4.1.23)–(12.4.1.24), p. 518. One sharp orbital mass integrates
 the transformed test against the logarithmic width of the spatial norm interval.

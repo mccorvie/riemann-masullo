@@ -9,6 +9,7 @@ import all RiemannMasullo.Ch02_AdelicTheta.Sec3
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3
 import all RiemannMasullo.AppB_AnalyticNT.Sec2
 import all RiemannMasullo.AppC_LCTVS.Sec5b
+import Mathlib.Analysis.Normed.Field.ProperSpace
 import Mathlib.Analysis.Distribution.SchwartzSpace.Fourier
 import Mathlib.Analysis.SpecialFunctions.Gaussian.FourierTransform
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gaussian.Schwartz

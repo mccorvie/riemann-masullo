@@ -406,6 +406,77 @@ local notation "restrictsAtInfinity(" a ", " φ ")" =>
 local notation "restrictsAtFinite(" b ", " φ ")" =>
   (∀ v u, ((b : finiteTests) v).val u = (φ : D𝔽).val (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u))
 
+/-- Paper: Theorem 13.3.1.1, p. 522. Every test has local components at the
+archimedean and at the finite places restricting to it on the images of the local
+multiplicative groups; they are the ones supplied by the explicit formula. -/
+private theorem criticalTraceGeometric_converges_localData (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (φ : D𝔽) :
+    ∃ (a : archTests) (b : finiteTests),
+      restrictsAtInfinity(a, φ) ∧ restrictsAtFinite(b, φ) := by
+  obtain ⟨_, _, _, _, _, _, harch, hfin, _, _, _, _⟩ := idelicExplicitFormula τ hτ
+  choose a ha using fun w ↦ harch w φ
+  choose b hb using fun v ↦ hfin v φ
+  exact ⟨a, b, fun w u ↦ (ha w).1 u, fun v u ↦ (hb v).1 u⟩
+
+/-- Paper: Definition A.3.2.2(2), p. 560. The mass of the integer units at a
+finite place is nonzero. -/
+private theorem criticalTraceGeometric_converges_unitMass_ne_zero (v : V) :
+    finiteUnitMass(v) ≠ 0 := by
+  have h := finiteLocalMultiplicativeTamagawaMeasure_integerUnits (F := F) (v : V)
+  rw [h]
+  simp only [ne_eq, Complex.ofReal_eq_zero]
+  rw [ENNReal.toReal_inv, ENNReal.toReal_ofReal (Real.sqrt_nonneg _)]
+  refine inv_ne_zero (Real.sqrt_pos.mpr ?_).ne'
+  have h0 : Ideal.absNorm v.asIdeal ≠ 0 := by
+    rw [ne_eq, Ideal.absNorm_eq_zero_iff]
+    exact v.ne_bot
+  have hpos : (0 : ℝ) < (Ideal.absNorm v.asIdeal : ℝ) := by
+    exact_mod_cast Nat.pos_of_ne_zero h0
+  positivity
+
+/-- Paper: Theorem 13.3.1.1, (13.3.1.5), p. 522. For any test and any finite local
+data restricting to it, the finite-place series of the printed local principal values
+converges. The explicit formula gives a finite set of places outside which the local
+principal value vanishes, and the printed scale is the explicit formula's scale times
+the mass of the local integer units, which is nonzero. -/
+theorem criticalTraceGeometric_converges_summable (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (φ : D𝔽) (b : finiteTests)
+    (hb : restrictsAtFinite(b, φ)) :
+    Summable (fun v : V ↦ finiteTerm(v, b v)) := by
+  obtain ⟨_, _, _, fin, _, _, _, hfin, _, hsupp, _, _⟩ := idelicExplicitFormula τ hτ
+  choose b₀ hb₀ using fun v ↦ hfin v φ
+  have hbb : b = b₀ := by
+    funext v
+    exact Subtype.ext (funext fun u ↦ by rw [hb v u, (hb₀ v).1 u])
+  rw [hbb]
+  refine summable_of_ne_finset_zero (s := (hsupp φ).toFinset) fun v hv ↦ ?_
+  have hz : fin v φ = 0 := by
+    by_contra h
+    exact hv ((hsupp φ).mem_toFinset.mpr h)
+  rw [(hb₀ v).2] at hz
+  set W : ℝ := (finiteLocalMultiplicativeTamagawaMeasure F (v : V)
+    (HeightOneSpectrum.adicCompletionIntegers F v).units).toReal with hW
+  have hW0 : (W : ℂ) ≠ 0 := by
+    have hm := criticalTraceGeometric_converges_unitMass_ne_zero (F := F) v
+    rw [hW]
+    exact hm
+  have hcast : ((Real.log ((v : V).asIdeal.absNorm : ℝ) : ℝ) : ℂ) =
+      (W : ℂ) * (((Real.log ((v : V).asIdeal.absNorm : ℝ) / W : ℝ)) : ℂ) := by
+    rw [Complex.ofReal_div]
+    field_simp
+  rw [hcast, mul_assoc, hz, mul_zero]
+
+/-- Paper: Theorem 13.3.1.1, (13.3.1.4)–(13.3.1.5), p. 522. The polar terms minus
+the archimedean and finite local principal values are a continuous linear functional
+of the test, with the printed local scalings. -/
+theorem criticalTraceGeometric_converges_functional (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) :
+    ∃ L : D𝔽 →L[ℂ] ℂ, ∀ (φ : D𝔽) (a : archTests) (b : finiteTests),
+      restrictsAtInfinity(a, φ) → restrictsAtFinite(b, φ) →
+      L φ = mellinAt(φ, 1, -1 / 2) + mellinAt(φ, 1, 1 / 2) -
+        (∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) -
+        ∑' v : V, finiteTerm(v, b v) := by sorry
+
 /-- Paper: Theorem 13.3.1.1, (13.3.1.3)–(13.3.1.5), p. 522. The finite-place
 series converges, and the polar terms minus the local principal values form a
 continuous linear functional on the test subspace. The local tests are pulled back
@@ -418,7 +489,24 @@ theorem criticalTraceGeometric_converges (τ : ℝ≥0ˣ →ₜ* C𝔽)
           restrictsAtInfinity(a, φ.val) ∧ restrictsAtFinite(b, φ.val) ∧
           HasSum (fun v : V ↦ finiteTerm(v, b v))
             (mellinAt(φ.val, 1, -1 / 2) + mellinAt(φ.val, 1, 1 / 2) -
-              (∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) - L φ) := by sorry
+              (∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) - L φ) := by
+  obtain ⟨L, hL⟩ := criticalTraceGeometric_converges_functional τ _hτ
+  let L' : criticalTraceTestSubmodule τ →L[ℂ] ℂ :=
+    L.comp (criticalTraceTestSubmodule τ).subtypeL
+  refine ⟨L', fun φ ↦ ?_⟩
+  obtain ⟨a, b, ha, hb⟩ := criticalTraceGeometric_converges_localData τ _hτ φ.val
+  have hsum := criticalTraceGeometric_converges_summable τ _hτ φ.val b hb
+  have hval : L' φ = mellinAt(φ.val, 1, -1 / 2) + mellinAt(φ.val, 1, 1 / 2) -
+      (∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) -
+      ∑' v : V, finiteTerm(v, b v) :=
+    hL φ.val a b ha hb
+  refine ⟨a, b, ha, hb, ?_⟩
+  have h2 : (∑' v : V, finiteTerm(v, b v)) =
+      mellinAt(φ.val, 1, -1 / 2) + mellinAt(φ.val, 1, 1 / 2) -
+        (∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) - L' φ := by
+    rw [hval]
+    ring
+  exact h2 ▸ hsum.hasSum
 
 /-- Paper: Theorem 13.3.1.1, (13.3.1.3)–(13.3.1.5), p. 522. On the Mellin-jet
 test subspace the full zero divisor pairs against the test by the idelic explicit formula.

@@ -181,6 +181,185 @@ def Printed.epsilonBasisLift_schauder : Prop :=
             ∃! T : closedSpan(u) ≃L[ℂ] closedSpan(fun m ↦ u m + y m),
               ∀ (v : closedSpan(u)) (m : ℕ), v.val = u m → (T v).val = u m + y m
 
+private def epsilonBasisLift_schauder_unit (n : ℕ) : (lp (fun _ : ℕ ↦ ℂ) 2) := lp.single 2 n (1 : ℂ)
+
+private def epsilonBasisLift_schauder_scale (k : ℕ) : ℂ := ((k + 1 : ℕ) : ℂ)
+
+private def epsilonBasisLift_schauder_evaluation (n : ℕ) : (lp (fun _ : ℕ ↦ ℂ) 2) →L[ℂ] ℂ := lp.evalCLM ℂ (fun _ : ℕ ↦ ℂ) 2 n
+
+private def epsilonBasisLift_schauder_family (n : ℕ) : (lp (fun _ : ℕ ↦ ℂ) 2) :=
+  if n % 2 = 0 then epsilonBasisLift_schauder_unit n else epsilonBasisLift_schauder_unit (n - 1) + (epsilonBasisLift_schauder_scale (n / 2))⁻¹ • epsilonBasisLift_schauder_unit n
+
+private def epsilonBasisLift_schauder_coefficient (n : ℕ) : (lp (fun _ : ℕ ↦ ℂ) 2) →L[ℂ] ℂ :=
+  if n % 2 = 0 then epsilonBasisLift_schauder_evaluation n - epsilonBasisLift_schauder_scale (n / 2) • epsilonBasisLift_schauder_evaluation (n + 1) else epsilonBasisLift_schauder_scale (n / 2) • epsilonBasisLift_schauder_evaluation n
+
+private theorem epsilonBasisLift_schauder_parity (n : ℕ) : ∃ k : ℕ, n = 2 * k ∨ n = 2 * k + 1 := by
+  exact ⟨n / 2, by omega⟩
+
+private theorem epsilonBasisLift_schauder_scale_ne_zero (k : ℕ) : epsilonBasisLift_schauder_scale k ≠ 0 := by
+  change (((k + 1 : ℕ) : ℂ)) ≠ 0
+  exact_mod_cast Nat.succ_ne_zero k
+
+private theorem epsilonBasisLift_schauder_norm_scale (k : ℕ) : ‖epsilonBasisLift_schauder_scale k‖ = (k : ℝ) + 1 := by
+  rw [epsilonBasisLift_schauder_scale, Complex.norm_natCast]
+  simp
+
+private theorem epsilonBasisLift_schauder_norm_unit (n : ℕ) : ‖epsilonBasisLift_schauder_unit n‖ = 1 := by
+  simp [epsilonBasisLift_schauder_unit]
+
+private theorem epsilonBasisLift_schauder_evaluation_unit (i j : ℕ) : epsilonBasisLift_schauder_evaluation i (epsilonBasisLift_schauder_unit j) = if i = j then 1 else 0 := by
+  change (lp.single (E := fun _ : ℕ ↦ ℂ) 2 j (1 : ℂ)) i = _
+  simp [lp.single_apply, Pi.single_apply]
+
+private theorem epsilonBasisLift_schauder_family_even (k : ℕ) : epsilonBasisLift_schauder_family (2 * k) = epsilonBasisLift_schauder_unit (2 * k) := by
+  have hm : (2 * k) % 2 = 0 := by omega
+  simp [epsilonBasisLift_schauder_family, hm]
+
+private theorem epsilonBasisLift_schauder_family_odd (k : ℕ) :
+    epsilonBasisLift_schauder_family (2 * k + 1) = epsilonBasisLift_schauder_unit (2 * k) + (epsilonBasisLift_schauder_scale k)⁻¹ • epsilonBasisLift_schauder_unit (2 * k + 1) := by
+  have hm : (2 * k + 1) % 2 = 1 := by omega
+  have hd : (2 * k + 1) / 2 = k := by omega
+  have hs : 2 * k + 1 - 1 = 2 * k := by omega
+  simp [epsilonBasisLift_schauder_family, hm, hd, hs]
+
+private theorem epsilonBasisLift_schauder_coefficient_even (k : ℕ) : epsilonBasisLift_schauder_coefficient (2 * k) = epsilonBasisLift_schauder_evaluation (2 * k) - epsilonBasisLift_schauder_scale k • epsilonBasisLift_schauder_evaluation (2 * k + 1) := by
+  have hm : (2 * k) % 2 = 0 := by omega
+  have hd : (2 * k) / 2 = k := by omega
+  simp [epsilonBasisLift_schauder_coefficient, hm, hd]
+
+private theorem epsilonBasisLift_schauder_coefficient_odd (k : ℕ) : epsilonBasisLift_schauder_coefficient (2 * k + 1) = epsilonBasisLift_schauder_scale k • epsilonBasisLift_schauder_evaluation (2 * k + 1) := by
+  have hm : (2 * k + 1) % 2 = 1 := by omega
+  have hd : (2 * k + 1) / 2 = k := by omega
+  simp [epsilonBasisLift_schauder_coefficient, hm, hd]
+
+private theorem epsilonBasisLift_schauder_biorthogonal (m n : ℕ) : epsilonBasisLift_schauder_coefficient m (epsilonBasisLift_schauder_family n) = if m = n then 1 else 0 := by
+  obtain ⟨k, rfl | rfl⟩ := epsilonBasisLift_schauder_parity m
+  · obtain ⟨l, rfl | rfl⟩ := epsilonBasisLift_schauder_parity n
+    · by_cases h : k = l
+      · subst l
+        simp [epsilonBasisLift_schauder_coefficient_even, epsilonBasisLift_schauder_family_even, epsilonBasisLift_schauder_evaluation_unit]
+      · have hee : 2 * k ≠ 2 * l := by omega
+        have hoe : 2 * k + 1 ≠ 2 * l := by omega
+        simp [epsilonBasisLift_schauder_coefficient_even, epsilonBasisLift_schauder_family_even, epsilonBasisLift_schauder_evaluation_unit, hee, hoe]
+    · by_cases h : k = l
+      · subst l
+        simp [epsilonBasisLift_schauder_coefficient_even, epsilonBasisLift_schauder_family_odd, epsilonBasisLift_schauder_evaluation_unit, smul_eq_mul, epsilonBasisLift_schauder_scale_ne_zero]
+      · have hee : 2 * k ≠ 2 * l := by omega
+        have heo : 2 * k ≠ 2 * l + 1 := by omega
+        have hoe : 2 * k + 1 ≠ 2 * l := by omega
+        simp [epsilonBasisLift_schauder_coefficient_even, epsilonBasisLift_schauder_family_odd, epsilonBasisLift_schauder_evaluation_unit, hee, heo, hoe]
+  · obtain ⟨l, rfl | rfl⟩ := epsilonBasisLift_schauder_parity n
+    · have hoe : 2 * k + 1 ≠ 2 * l := by omega
+      simp [epsilonBasisLift_schauder_coefficient_odd, epsilonBasisLift_schauder_family_even, epsilonBasisLift_schauder_evaluation_unit, hoe]
+    · by_cases h : k = l
+      · subst l
+        simp [epsilonBasisLift_schauder_coefficient_odd, epsilonBasisLift_schauder_family_odd, epsilonBasisLift_schauder_evaluation_unit, smul_eq_mul, epsilonBasisLift_schauder_scale_ne_zero]
+      · have hoe : 2 * k + 1 ≠ 2 * l := by omega
+        simp [epsilonBasisLift_schauder_coefficient_odd, epsilonBasisLift_schauder_family_odd, epsilonBasisLift_schauder_evaluation_unit, hoe, h]
+
+private theorem epsilonBasisLift_schauder_norm_collar (n : ℕ) : ‖epsilonBasisLift_schauder_family n‖ ∈ Set.Icc (1 : ℝ) 2 := by
+  obtain ⟨k, rfl | rfl⟩ := epsilonBasisLift_schauder_parity n
+  · simp [epsilonBasisLift_schauder_family_even, epsilonBasisLift_schauder_norm_unit]
+  · have hev : epsilonBasisLift_schauder_evaluation (2 * k) (epsilonBasisLift_schauder_family (2 * k + 1)) = 1 := by
+      simp [epsilonBasisLift_schauder_family_odd, epsilonBasisLift_schauder_evaluation_unit]
+    have hl : 1 ≤ ‖epsilonBasisLift_schauder_family (2 * k + 1)‖ := by
+      have hh := lp.norm_apply_le_norm (by norm_num : (2 : ENNReal) ≠ 0)
+        (epsilonBasisLift_schauder_family (2 * k + 1)) (2 * k)
+      change ‖epsilonBasisLift_schauder_evaluation (2 * k) (epsilonBasisLift_schauder_family (2 * k + 1))‖ ≤ _ at hh
+      simpa [hev] using hh
+    have hc : 1 ≤ ‖epsilonBasisLift_schauder_scale k‖ := by
+      rw [epsilonBasisLift_schauder_norm_scale]
+      linarith [show (0 : ℝ) ≤ (k : ℝ) from Nat.cast_nonneg k]
+    have hi : ‖(epsilonBasisLift_schauder_scale k)⁻¹‖ ≤ 1 := by
+      rw [norm_inv]
+      exact inv_le_one_of_one_le₀ hc
+    refine ⟨hl, ?_⟩
+    rw [epsilonBasisLift_schauder_family_odd]
+    calc
+      ‖epsilonBasisLift_schauder_unit (2 * k) + (epsilonBasisLift_schauder_scale k)⁻¹ • epsilonBasisLift_schauder_unit (2 * k + 1)‖
+          ≤ ‖epsilonBasisLift_schauder_unit (2 * k)‖ + ‖(epsilonBasisLift_schauder_scale k)⁻¹ • epsilonBasisLift_schauder_unit (2 * k + 1)‖ := norm_add_le _ _
+      _ = 1 + ‖(epsilonBasisLift_schauder_scale k)⁻¹‖ := by rw [norm_smul, epsilonBasisLift_schauder_norm_unit, epsilonBasisLift_schauder_norm_unit, mul_one]
+      _ ≤ 2 := by linarith
+
+private theorem epsilonBasisLift_schauder_separates (v : (lp (fun _ : ℕ ↦ ℂ) 2)) (hv : ∀ m, epsilonBasisLift_schauder_coefficient m v = 0) : v = 0 := by
+  have ho (k : ℕ) : v (2 * k + 1) = 0 := by
+    have hh := hv (2 * k + 1)
+    rw [epsilonBasisLift_schauder_coefficient_odd] at hh
+    change epsilonBasisLift_schauder_scale k * v (2 * k + 1) = 0 at hh
+    exact (mul_eq_zero.mp hh).resolve_left (epsilonBasisLift_schauder_scale_ne_zero k)
+  have he (k : ℕ) : v (2 * k) = 0 := by
+    have hh := hv (2 * k)
+    rw [epsilonBasisLift_schauder_coefficient_even] at hh
+    change v (2 * k) - epsilonBasisLift_schauder_scale k * v (2 * k + 1) = 0 at hh
+    simpa [ho] using hh
+  apply lp.ext
+  funext n
+  obtain ⟨k, rfl | rfl⟩ := epsilonBasisLift_schauder_parity n
+  · exact he k
+  · exact ho k
+
+private theorem epsilonBasisLift_schauder_dense_span : Dense (Submodule.span ℂ (Set.range epsilonBasisLift_schauder_family) : Set (lp (fun _ : ℕ ↦ ℂ) 2)) := by
+  let S := Submodule.span ℂ (Set.range epsilonBasisLift_schauder_family)
+  have hx (n : ℕ) : epsilonBasisLift_schauder_family n ∈ S := Submodule.subset_span ⟨n, rfl⟩
+  have he (n : ℕ) : epsilonBasisLift_schauder_unit n ∈ S := by
+    obtain ⟨k, rfl | rfl⟩ := epsilonBasisLift_schauder_parity n
+    · simpa only [epsilonBasisLift_schauder_family_even] using hx (2 * k)
+    · have hh := S.smul_mem (epsilonBasisLift_schauder_scale k) (S.sub_mem (hx (2 * k + 1)) (hx (2 * k)))
+      simpa [epsilonBasisLift_schauder_family_odd, epsilonBasisLift_schauder_family_even, smul_smul, epsilonBasisLift_schauder_scale_ne_zero] using hh
+  have hstd : (Submodule.span ℂ (Set.range epsilonBasisLift_schauder_unit)).topologicalClosure = ⊤ := by
+    let B := HilbertBasis.ofRepr (LinearIsometryEquiv.refl ℂ (lp (fun _ : ℕ ↦ ℂ) 2))
+    have hB : (B : ℕ → (lp (fun _ : ℕ ↦ ℂ) 2)) = epsilonBasisLift_schauder_unit := by
+      funext n
+      rw [← B.repr_symm_single n]
+      rfl
+    rw [← hB]
+    exact B.dense_span
+  apply Submodule.dense_iff_topologicalClosure_eq_top.mpr
+  apply top_unique
+  rw [← hstd]
+  apply Submodule.topologicalClosure_minimal _ _ S.isClosed_topologicalClosure
+  exact Submodule.span_le.mpr (by rintro _ ⟨n, rfl⟩; exact S.le_topologicalClosure (he n))
+
+/-- The two-dimensional block projections would have norms at least k+1. -/
+private theorem epsilonBasisLift_schauder_no_schauder
+    (b : _root_.SchauderBasis ℂ (Submodule.span ℂ (Set.range epsilonBasisLift_schauder_family)).topologicalClosure)
+    (hb : ∀ n : ℕ, (b n).val = epsilonBasisLift_schauder_family n) : False := by
+  obtain ⟨C, hC⟩ := b.exists_norm_proj_le
+  obtain ⟨k, hk⟩ := exists_nat_gt C
+  have hb_even : ‖b (2 * k)‖ = 1 := by
+    change ‖(b (2 * k)).val‖ = 1
+    rw [hb, epsilonBasisLift_schauder_family_even, epsilonBasisLift_schauder_norm_unit]
+  have hdiff : ‖b (2 * k + 1) - b (2 * k)‖ = ‖epsilonBasisLift_schauder_scale k‖⁻¹ := by
+    change ‖((b (2 * k + 1)).val - (b (2 * k)).val : (lp (fun _ : ℕ ↦ ℂ) 2))‖ = _
+    rw [hb, hb, epsilonBasisLift_schauder_family_odd, epsilonBasisLift_schauder_family_even, add_sub_cancel_left, norm_smul, epsilonBasisLift_schauder_norm_unit,
+      mul_one, norm_inv]
+  have hproj : b.proj (2 * k + 1) (b (2 * k + 1) - b (2 * k)) = -b (2 * k) := by
+    rw [map_sub, b.proj_apply_basis_mem, b.proj_apply_basis_mem]
+    simp
+  have hh := (b.proj (2 * k + 1)).le_opNorm (b (2 * k + 1) - b (2 * k))
+  rw [hproj, norm_neg, hb_even, hdiff] at hh
+  have hbound : 1 ≤ C / ‖epsilonBasisLift_schauder_scale k‖ := by
+    rw [div_eq_mul_inv]
+    exact hh.trans (mul_le_mul_of_nonneg_right (hC (2 * k + 1))
+      (inv_nonneg.mpr (norm_nonneg _)))
+  have hcpos : 0 < ‖epsilonBasisLift_schauder_scale k‖ := norm_pos_iff.mpr (epsilonBasisLift_schauder_scale_ne_zero k)
+  have hle : ‖epsilonBasisLift_schauder_scale k‖ ≤ C := by
+    simpa only [one_mul] using (le_div_iff₀ hcpos).mp hbound
+  rw [epsilonBasisLift_schauder_norm_scale] at hle
+  linarith
+
+/-- A quotient by zero is isometric to the original normed space. -/
+private theorem epsilonBasisLift_schauder_quotientBot (E : Type) [NormedAddCommGroup E] [NormedSpace ℂ E] :
+    ∃ q : (E ⧸ (⊥ : Submodule ℂ E)) ≃ₗᵢ[ℂ] E,
+      ∀ v : E, q ((⊥ : Submodule ℂ E).mkQ v) = v := by
+  let q := (⊥ : Submodule ℂ E).quotEquivOfEqBot rfl
+  have hn (v : E ⧸ (⊥ : Submodule ℂ E)) : ‖q v‖ = ‖v‖ := by
+    induction v using Submodule.Quotient.induction_on with
+    | _ v =>
+      change ‖v‖ = ‖(QuotientAddGroup.mk v : E ⧸ (⊥ : AddSubgroup E))‖
+      simp [QuotientAddGroup.norm_mk]
+  exact ⟨{ toLinearEquiv := q, norm_map' := hn }, fun _ ↦ rfl⟩
+
 /-- Paper: Lemma 10.4.2.5, p. 461. In complex ℓ² take E₀ = 0 and V = E.
 With its standard unit vectors eⱼ, choose x₂ₖ = e₂ₖ and
 x₂ₖ₊₁ = (e₂ₖ + dₖ e₂ₖ₊₁)/sqrt(1 + dₖ²), where dₖ = 1/(k+1).
@@ -197,7 +376,52 @@ means of the cₙ converges to a nonzero c. The corresponding means of the 2eₙ
 tend to zero in sup norm, so c1 belongs to the closed span of the lifts. Every
 pulled-back coordinate vanishes on this constant. By density it would be the
 corresponding Schauder coordinate on that span, which is impossible. -/
-theorem Printed.epsilonBasisLift_schauder_false : ¬ Printed.epsilonBasisLift_schauder := by sorry
+theorem Printed.epsilonBasisLift_schauder_false : ¬ Printed.epsilonBasisLift_schauder := by
+  classical
+  have : IsClosed ((⊥ : Submodule ℂ (lp (fun _ : ℕ ↦ ℂ) 2)) : Set (lp (fun _ : ℕ ↦ ℂ) 2)) := by simp
+  obtain ⟨q, hq⟩ := epsilonBasisLift_schauder_quotientBot (lp (fun _ : ℕ ↦ ℂ) 2)
+  let xp : ℕ → (lp (fun _ : ℕ ↦ ℂ) 2) ⧸ (⊥ : Submodule ℂ (lp (fun _ : ℕ ↦ ℂ) 2)) := fun n ↦ q.symm (epsilonBasisLift_schauder_family n)
+  let fp : ℕ → StrongDual ℂ ((lp (fun _ : ℕ ↦ ℂ) 2) ⧸ (⊥ : Submodule ℂ (lp (fun _ : ℕ ↦ ℂ) 2))) :=
+    fun n ↦ (epsilonBasisLift_schauder_coefficient n).comp q.toContinuousLinearEquiv.toContinuousLinearMap
+  have hbio (m n : ℕ) : fp m (xp n) = if m = n then 1 else 0 := by
+    change epsilonBasisLift_schauder_coefficient m (q (q.symm (epsilonBasisLift_schauder_family n))) = _
+    rw [q.apply_symm_apply]
+    exact epsilonBasisLift_schauder_biorthogonal m n
+  have hdense : Dense (Submodule.span ℂ (Set.range xp) :
+      Set ((lp (fun _ : ℕ ↦ ℂ) 2) ⧸ (⊥ : Submodule ℂ (lp (fun _ : ℕ ↦ ℂ) 2)))) := by
+    have himg : (Submodule.span ℂ (Set.range epsilonBasisLift_schauder_family)).map q.symm.toLinearEquiv.toLinearMap =
+        Submodule.span ℂ (Set.range xp) := by
+      rw [Submodule.map_span, ← Set.range_comp]
+      rfl
+    rw [← himg]
+    change Dense (q.symm '' (Submodule.span ℂ (Set.range epsilonBasisLift_schauder_family) : Set (lp (fun _ : ℕ ↦ ℂ) 2)))
+    exact q.symm.surjective.denseRange.dense_image q.symm.continuous epsilonBasisLift_schauder_dense_span
+  have hsep (v : (lp (fun _ : ℕ ↦ ℂ) 2) ⧸ (⊥ : Submodule ℂ (lp (fun _ : ℕ ↦ ℂ) 2))) (hv : ∀ n, fp n v = 0) : v = 0 := by
+    apply q.injective
+    have hh : q v = 0 := epsilonBasisLift_schauder_separates (q v) (fun n ↦ hv n)
+    simpa only [map_zero] using hh
+  have hnorm (n : ℕ) : ‖xp n‖ = ‖epsilonBasisLift_schauder_family n‖ := q.symm.norm_map (epsilonBasisLift_schauder_family n)
+  have hcollar (n : ℕ) : ‖xp n‖ ∈ Set.Icc (1 : ℝ) 2 := by
+    rw [hnorm]
+    exact epsilonBasisLift_schauder_norm_collar n
+  have hnormalized : IsNormalizedSpectralFamily xp :=
+    ⟨⟨2, fun n ↦ (hcollar n).2⟩, 1, zero_lt_one, fun n ↦ (hcollar n).1⟩
+  have himage (n : ℕ) : xp n ∈ (⊤ : Submodule ℂ (lp (fun _ : ℕ ↦ ℂ) 2)).map (⊥ : Submodule ℂ (lp (fun _ : ℕ ↦ ℂ) 2)).mkQ := by
+    refine ⟨epsilonBasisLift_schauder_family n, Submodule.mem_top, ?_⟩
+    apply q.injective
+    rw [hq]
+    exact (q.apply_symm_apply (epsilonBasisLift_schauder_family n)).symm
+  intro h
+  obtain ⟨u, ε, hlift, _, ⟨b, hb⟩, _⟩ :=
+    h (lp (fun _ : ℕ ↦ ℂ) 2) ⊥ ⊤ xp fp (Or.inr ⟨hbio, hdense, hsep⟩) hnormalized
+      1 2 (by norm_num) (by norm_num) hcollar bot_le himage
+  have hu (n : ℕ) : u n = epsilonBasisLift_schauder_family n := by
+    have hh := congrArg q (hlift.2.2.1 n).2.1
+    rw [hq] at hh
+    simpa [xp] using hh
+  have hufun : u = epsilonBasisLift_schauder_family := funext hu
+  subst u
+  exact epsilonBasisLift_schauder_no_schauder b hb
 
 /-- Paper: Remark 10.4.2.7, p. 463. If V has dense image in the quotient and
 its intersection with the kernel is dense in the kernel, a normalized quotient

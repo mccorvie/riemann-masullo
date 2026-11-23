@@ -1,10 +1,13 @@
 module
 
 public import RiemannMasullo.Ch11_ShellStructure.Sec2b
+import RiemannMasullo.Ch03_IdelicZeta.RatEmptyFourier
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.Ch11_ShellStructure.Sec2a_PrimePVRefutation
 import all RiemannMasullo.Ch06_LocalGlobal.Sec2
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3
 import Mathlib.Analysis.Calculus.BumpFunction.Normed
+import Mathlib.Analysis.Normed.Operator.Banach
 
 /-! # §11.2.1–11.2.2 assertions that are false as printed -/
 
@@ -152,94 +155,6 @@ private theorem sec2bP_normOne_trivial (h : (sIdeleQuotientNorm ℚ ∅).ker) : 
     obtain rfl : w = Rat.infinitePlace := Subsingleton.elim _ _
     apply (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace).injective
     exact h1.trans ((map_neg _ _).trans (congrArg Neg.neg (map_one _))).symm
-
-private theorem sec2bP_single {ι : Type*} [Unique ι] {M : ι → Type*} [∀ i, Zero (M i)]
-    {d : DecidableEq ι} (v : M default) : @Pi.single ι M _ d (default : ι) v default = v := by
-  let := d
-  exact Pi.single_eq_same _ _
-
-open scoped FourierTransform in
-private theorem sec2bP_character (x y : SAdeleRing ℚ ∅) :
-    (sAdeleStandardCharacter ℚ ∅ (x * y) : ℂ) =
-      Real.fourierChar (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
-        (x.1 Rat.infinitePlace) *
-        InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
-          (y.1 Rat.infinitePlace)) := by
-  let : Unique (InfinitePlace ℚ) := ⟨⟨Rat.infinitePlace⟩, fun _ ↦ Subsingleton.elim _ _⟩
-  unfold sAdeleStandardCharacter
-  rw [Fintype.prod_unique, Finset.univ_eq_empty, Finset.prod_empty, mul_one,
-    adeleStandardCharacter_rat, ratAdeleStandardCharacter_real _ rfl]
-  rw [Real.fourierChar_apply']
-  congr 3
-  dsimp only
-  exact (congrArg (InfinitePlace.Completion.extensionEmbeddingOfIsReal Rat.isReal_infinitePlace)
-    (sec2bP_single (M := InfinitePlace.Completion) _)).trans
-    (map_mul (InfinitePlace.Completion.extensionEmbeddingOfIsReal Rat.isReal_infinitePlace) _ _)
-
-open scoped FourierTransform in
-private theorem sec2bP_integral (G : Rat.infinitePlace.Completion → ℂ) :
-    letI : MeasurableSpace Rat.infinitePlace.Completion := borel _
-    ∫ x : SAdeleRing ℚ ∅, G (x.1 Rat.infinitePlace) ∂sAdditiveTamagawaMeasure ℚ ∅ =
-      ∫ r : ℝ, G ((InfinitePlace.Completion.ringEquivRealOfIsReal
-        Rat.isReal_infinitePlace).symm r) := by
-  let (w : InfinitePlace ℚ) : MeasurableSpace w.Completion :=
-    instMeasurableSpaceCompletion_riemannMasullo ℚ w
-  let : MeasurableSpace (InfiniteAdeleRing ℚ) := instMeasurableSpaceInfiniteAdeleRing_riemannMasullo ℚ
-  let (v : V(ℚ)) : MeasurableSpace (v.adicCompletion ℚ) :=
-    instMeasurableSpaceAdicCompletionRingOfIntegers_riemannMasullo ℚ v
-  let : Unique (InfinitePlace ℚ) := ⟨⟨Rat.infinitePlace⟩, fun _ ↦ Subsingleton.elim _ _⟩
-  have : BorelSpace Rat.infinitePlace.Completion := ⟨rfl⟩
-  let e : ℝ ≃ᵐ Rat.infinitePlace.Completion :=
-    (InfinitePlace.Completion.isometryEquivRealOfIsReal
-      Rat.isReal_infinitePlace).symm.toHomeomorph.toMeasurableEquiv
-  have hν : infiniteLocalAdditiveTamagawaMeasure ℚ Rat.infinitePlace = (volume : Measure ℝ).map e := by
-    rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_left Rat.isReal_infinitePlace]
-    rfl
-  have hσ : ∀ w : InfinitePlace ℚ, SigmaFinite (infiniteLocalAdditiveTamagawaMeasure ℚ w) := by
-    intro w
-    obtain rfl : w = Rat.infinitePlace := Subsingleton.elim _ _
-    rw [hν]
-    exact e.sigmaFinite_map
-  have : @SFinite (InfiniteAdeleRing ℚ) (instMeasurableSpaceInfiniteAdeleRing_riemannMasullo ℚ)
-      (Measure.pi (infiniteLocalAdditiveTamagawaMeasure ℚ)) :=
-    (inferInstance : SFinite (Measure.pi (infiniteLocalAdditiveTamagawaMeasure ℚ)))
-  unfold sAdditiveTamagawaMeasure
-  rw [integral_fun_fst (f := fun a : InfiniteAdeleRing ℚ ↦ G (a Rat.infinitePlace))]
-  rw [Measure.pi_of_empty (x := isEmptyElim)]
-  simp only [measureReal_def, measure_univ, ENNReal.toReal_one, one_smul]
-  have hp := measurePreserving_piUnique (X := fun w : InfinitePlace ℚ ↦ w.Completion)
-    (infiniteLocalAdditiveTamagawaMeasure ℚ)
-  refine (hp.integral_comp' G).trans ?_
-  refine (congrArg (fun μ : Measure Rat.infinitePlace.Completion ↦ ∫ y, G y ∂μ) hν).trans ?_
-  rw [integral_map_equiv]
-  rfl
-
-open scoped FourierTransform in
-private theorem sec2bP_fourier (φ : SchwartzMap ℝ ℂ)
-    (f : SchwartzBruhat (Multiplicative (SAdeleRing ℚ ∅)))
-    (hf : ∀ x : SAdeleRing ℚ ∅, f (Multiplicative.ofAdd x) =
-      φ (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
-        (x.1 Rat.infinitePlace)))
-    (y : SAdeleRing ℚ ∅) :
-    sAdeleSchwartzFourier f (Multiplicative.ofAdd y) =
-      𝓕 φ (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
-        (y.1 Rat.infinitePlace)) := by
-  let : MeasurableSpace (SAdeleRing ℚ ∅) := instMeasurableSpaceSAdeleRing ℚ ∅
-  change tamagawaFourier (sAdditiveTamagawaMeasure ℚ ∅) (sAdeleStandardCharacter ℚ ∅)
-    (fun x ↦ f (Multiplicative.ofAdd x)) y = _
-  unfold tamagawaFourier
-  simp only [hf, sec2bP_character]
-  rw [sec2bP_integral (fun z ↦ φ (InfinitePlace.Completion.ringEquivRealOfIsReal
-    Rat.isReal_infinitePlace z) * star ((Real.fourierChar (InfinitePlace.Completion.ringEquivRealOfIsReal
-    Rat.isReal_infinitePlace z * InfinitePlace.Completion.ringEquivRealOfIsReal
-    Rat.isReal_infinitePlace (y.1 Rat.infinitePlace)) : ℂ)))]
-  rw [SchwartzMap.fourier_coe, Real.fourier_real_eq]
-  congr 1
-  funext r
-  rw [RingEquiv.apply_symm_apply, Circle.smul_def, smul_eq_mul, mul_comm]
-  congr 1
-  rw [AddChar.map_neg_eq_inv, Circle.coe_inv_eq_conj]
-  rfl
 
 open LineDeriv in
 private theorem sec2bP_lineDeriv_tsupport (f : SchwartzMap ℝ ℂ) :
@@ -559,7 +474,7 @@ private theorem sec2bP_inBand (φ : SchwartzMap ℝ ℂ)
     refine closure_minimal (fun y hy ↦ ?_) ((isClosed_tsupport _).preimage hr)
     refine subset_tsupport _ ?_
     rw [mem_support] at hy ⊢
-    rwa [← sec2bP_fourier φ f hf]
+    rwa [← sAdeleSchwartzFourier_ratEmpty_apply φ f hf]
   have hsub' : tsupport (sAdeleSchwartzFourier f).val ⊆
       Multiplicative.toAdd ⁻¹' {x : SAdeleRing ℚ ∅ | ‖x.1 Rat.infinitePlace‖ ≤ 1} := by
     intro y hy
@@ -582,7 +497,7 @@ private theorem sec2bP_polar (φ : SchwartzMap ℝ ℂ) (hφ0 : φ 0 = 0)
       φ (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
         (x.1 Rat.infinitePlace))) :
     sAdeleSchwartzTransition ℚ (le_refl (∅ : Finset V(ℚ))) f ∈ sAdelePolarSubspace ℚ ∅ := by
-  rw [sec2bP_transition, mem_sAdelePolarSubspace, sec2bP_fourier φ f hf, hf]
+  rw [sec2bP_transition, mem_sAdelePolarSubspace, sAdeleSchwartzFourier_ratEmpty_apply φ f hf, hf]
   exact ⟨by rw [show ((0 : SAdeleRing ℚ ∅).1 Rat.infinitePlace) = 0 from rfl, map_zero, hφ0],
     by rw [show ((0 : SAdeleRing ℚ ∅).1 Rat.infinitePlace) = 0 from rfl, map_zero]; exact hFφ0⟩
 
@@ -938,14 +853,111 @@ def Printed.primeOrbitalSobolevDenominator_closed : Prop :=
       IsClosed {x : Wω(F, hs, ω) | ∃ y : theta0(F, hs), y.val ∈ Wω(F, hs, ω) ∧
         (globalThetaSobolevPrincipalValue F (Sₚ(F, p)) 0 hs y).val = x.val}
 
+private theorem rat_placesAbove_eq_singleton (p : V(ℚ)) :
+    (finite_nuclearityPlacesAbove (F := ℚ) p).toFinset = {p} := by
+  classical
+  ext v
+  simp only [Set.Finite.mem_toFinset, mem_ofPred_eq, Finset.mem_singleton]
+  rfl
+
+/-- A closed range on a closed submodule gives a lower bound for an injective operator. -/
+private theorem norm_le_mul_of_closed_isotype_range {W : Type*} [NormedAddCommGroup W]
+    [NormedSpace ℂ W] [CompleteSpace W] (E H : Submodule ℂ W) (P : H →L[ℂ] H)
+    [CompleteSpace H] (hcE : IsClosed (E : Set W)) (hinj : Injective P)
+    (hPres : ∀ y : H, y.val ∈ E → (P y).val ∈ E)
+    (hclosed : IsClosed {x : E | ∃ y : H, y.val ∈ E ∧ (P y).val = x.val}) :
+    ∃ K : ℝ≥0, ∀ z : H, z.val ∈ E → ‖z‖ ≤ (K : ℝ) * ‖P z‖ := by
+  let D := E.comap H.subtype
+  have hD : IsClosed (D : Set H) := hcE.preimage continuous_subtype_val
+  let : CompleteSpace D := hD.completeSpace_coe
+  let A := H.subtypeL.comp (P.comp D.subtypeL)
+  have hA : range A = Subtype.val '' {x : E | ∃ y : H, y.val ∈ E ∧ (P y).val = x.val} := by
+    ext x
+    constructor
+    · rintro ⟨z, rfl⟩
+      exact ⟨⟨(P z.val).val, hPres z.val z.property⟩, ⟨z.val, z.property, rfl⟩, rfl⟩
+    · rintro ⟨w, ⟨y, hy, hEq⟩, rfl⟩
+      exact ⟨⟨y, hy⟩, hEq⟩
+  have hA_closed : IsClosed (range A) := by
+    rw [hA]
+    exact hcE.isClosedMap_subtype_val _ hclosed
+  have hA_inj : Injective A := Subtype.val_injective.comp (hinj.comp Subtype.val_injective)
+  obtain ⟨K, hK⟩ := (A.isClosed_range_iff_antilipschitz_of_injective hA_inj).mp hA_closed
+  refine ⟨K, fun z hz ↦ ?_⟩
+  have hb := hK.le_mul_dist (⟨z, hz⟩ : D) 0
+  rw [map_zero, dist_zero_right, dist_zero_right] at hb
+  change ‖z‖ ≤ (K : ℝ) * ‖P z‖ at hb
+  exact hb
+
+/-- A continuous linear map commuting with a group action that restricts an ambient
+action preserves every ambient isotype. -/
+private theorem primePV_mem_actionIsotype_of_commute {K E : Type*} [Monoid K] [TopologicalSpace K]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] (ρ : K →* (E →L[ℂ] E))
+    (ω : PontryaginDual K) (H : Submodule ℂ E) (R : K → H →L[ℂ] H)
+    (hR : ∀ k u, (R k u : E) = ρ k u) (P : H →L[ℂ] H) (hP : ∀ k u, P (R k u) = R k (P u))
+    (u : H) (hu : (u : E) ∈ actionIsotype ρ ω) : (P u : E) ∈ actionIsotype ρ ω := by
+  rw [mem_actionIsotype] at hu ⊢
+  intro k
+  have hRk : R k u = (ω k : ℂ) • u := Subtype.ext ((hR k u).trans (hu k))
+  rw [← hR, ← hP, hRk, map_smul]
+  rfl
+
+private theorem primePV_preserves_trivial_isotype
+    (S : Finset V(ℚ)) (hs : (0 : ℝ) ≤ 2) (y : theta0(ℚ, hs))
+    (hy : y.val ∈ Wω(ℚ, hs, (1 : PontryaginDual C₁(ℚ)))) :
+    (globalThetaSobolevPrincipalValue ℚ S 0 hs y).val ∈
+      Wω(ℚ, hs, (1 : PontryaginDual C₁(ℚ))) := by
+  let P := globalThetaSobolevPrincipalValue ℚ S 0 hs
+  let R := (exists_globalThetaSobolevAction (F := ℚ) 0 (le_rfl (a := (0 : ℝ))) hs).choose
+  have hR := (exists_globalThetaSobolevAction (F := ℚ) 0 (le_rfl (a := (0 : ℝ))) hs).choose_spec.1
+  exact primePV_mem_actionIsotype_of_commute _ _ _ (fun k ↦ R k.val)
+    (fun k ↦ hR k.val) P (fun k ↦ globalThetaSobolevPrincipalValue_equivariant (F := ℚ) S 0 hs k)
+    y hy
+
+private theorem rat_trivial_unramified (w : V(ℚ)) :
+    (ideleClassNormTwist (1 : PontryaginDual C𝔽(ℚ)) 0).IsUnramifiedAt w := by
+  have hone : ideleClassNormTwist (1 : PontryaginDual C𝔽(ℚ)) 0 = 1 := by
+    ext a
+    change (1 : ℂ) * _ ^ (0 : ℂ) = 1
+    simp
+  rw [hone, HeckeCharacter.isUnramifiedAt_iff]
+  simp
+
+private theorem rat_primeOrbital_range_closed (v : V(ℚ)) (hs : (0 : ℝ) ≤ 2)
+    (h : Printed.primeOrbitalSobolevDenominator_closed) :
+    let E := Wω(ℚ, hs, (1 : PontryaginDual C₁(ℚ)))
+    let H := theta0(ℚ, hs)
+    let P := globalThetaSobolevPrincipalValue ℚ {v} 0 hs
+    IsClosed {x : E | ∃ y : H, y.val ∈ E ∧ (P y).val = x.val} := by
+  classical
+  intro E H P
+  let χ : PontryaginDual C𝔽(ℚ) := 1
+  have hclosed := h ℚ χ v (fun w _ ↦ rat_trivial_unramified w) 2 hs
+  rw [rat_placesAbove_eq_singleton] at hclosed
+  exact hclosed
+
 /-- Paper: Paragraph before (11.2.2.1), p. 489.
-Take ℚ, the trivial character, p = 2 and s = 2. In log norm the principal
-value is the difference with a shift by log 2, up to translation sign.
-It is injective on weighted L² because every periodic vector there vanishes.
-For any nonzero smooth bump ψ supported in (1, 2), the normalized difference
-of ψ(x/R) tends to zero as R grows. The map is therefore not bounded below,
-so its range is not closed. -/
+Over ℚ, take the trivial norm-one isotype of degree two and the place over 2.
+Log-radial exponentials are approximate invariants under the uniformizer
+translation. Their prime principal values contradict the norm lower bound
+that closed range would imply on this isotype. -/
 theorem Printed.primeOrbitalSobolevDenominator_closed_false :
-    ¬ Printed.primeOrbitalSobolevDenominator_closed := by sorry
+    ¬ Printed.primeOrbitalSobolevDenominator_closed := by
+  intro h
+  let v : V(ℚ) := Rat.HeightOneSpectrum.primesEquiv.symm ⟨2, Nat.prime_two⟩
+  have hs : (0 : ℝ) ≤ 2 := by norm_num
+  let E := Wω(ℚ, hs, (1 : PontryaginDual C₁(ℚ)))
+  let H := theta0(ℚ, hs)
+  let P := globalThetaSobolevPrincipalValue ℚ {v} 0 hs
+  let : CompleteSpace H := (globalThetaSobolev_closed_complete_separable (F := ℚ) 0
+    (le_rfl (a := (0 : ℝ))) hs).2.1
+  have hcE := isClosed_actionIsotype
+    ((hardySobolevTranslation (ideleClassTamagawaMeasure ℚ) (m𝔽(ℚ))
+      0 0 2 (le_rfl (a := (0 : ℝ))) hs).comp (ideleClassNorm ℚ).ker.subtype) (1 : PontryaginDual C₁(ℚ))
+  have hinj : Injective P := globalThetaSobolevPrincipalValue_injective {v} 0 hs
+  obtain ⟨K, hK⟩ := norm_le_mul_of_closed_isotype_range E H P hcE hinj
+    (primePV_preserves_trivial_isotype {v} hs) (rat_primeOrbital_range_closed v hs h)
+  obtain ⟨z, hz, hc⟩ := exists_ratPrimePrincipalValue_small_norm v hs K
+  exact hc.not_ge (hK z hz)
 
 end RiemannMasullo
