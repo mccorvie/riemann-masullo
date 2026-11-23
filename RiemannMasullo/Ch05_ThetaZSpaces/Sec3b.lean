@@ -1506,7 +1506,26 @@ private theorem schwartzBruhat_archimedean_metrizable :
       (Topology.IsOpenEmbedding.piMap (fun _ : κ ↦ Units.isOpenEmbedding_val (R := ℂ)))
   have hloc : IsLocallyEuclidean G :=
     ⟨n, ⟨(e.toHomeomorph.isOpenEmbedding.comp hval).singletonChartedSpace⟩⟩
-  exact schwartzBruhat_metrizable_of_elementary hgen hloc
+  let top : G ≃ₜ* (⊤ : Subgroup G) :=
+    ⟨Subgroup.topEquiv.symm, continuous_id.subtype_mk _, continuous_subtype_val⟩
+  let a : BruhatStructuralPair G :=
+    ⟨(⊤, OrderDual.toDual (⊥ : Subgroup G)), isOpen_univ,
+      isCompactlyGeneratedGroup_of_continuousMulEquiv top hgen,
+      isBruhatGoodSubgroup_bot_iff.mpr hloc, le_top⟩
+  let d := Classical.choice a.elementary
+  let j : SchwartzBruhatStage d →ₗ[ℂ] SchwartzBruhat G := schwartzBruhatStageInclusion a d
+  have hj : Function.Surjective j := by
+    intro f
+    obtain ⟨b, e, s, hs⟩ := (mem_schwartzBruhatSubmodule_iff f.val).mp f.property
+    have hba : b ≤ a := ⟨le_top, le_top⟩
+    obtain ⟨L, hL⟩ := schwartzBruhatStage_transition hba e d
+    exact ⟨L s, Subtype.ext ((hL.1 s).trans hs)⟩
+  let _ := d.finiteGroup
+  let _ := d.finiteTopology
+  let _ := d.finiteDiscrete
+  let _ := d.finiteFintype
+  let : MetrizableSpace (SchwartzBruhatStage d) := elementarySchwartz_isFrechet.choose_spec.2.1
+  exact ((schwartzBruhatStage_isEmbedding a d).toHomeomorphOfSurjective hj).symm.isEmbedding.metrizableSpace
 
 /-- The product of all partial twists induces the weighted Schwartz topology. -/
 private theorem archimedeanSchwartzTwists_isEmbedding (I : Set ℝ) :
