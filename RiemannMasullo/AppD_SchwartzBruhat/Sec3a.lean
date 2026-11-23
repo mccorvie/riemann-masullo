@@ -3157,7 +3157,7 @@ private theorem stage_mul_logModulation (a : BruhatStructuralPair G)
 
 /-- Schwartz–Bruhat functions are stable under multiplication by `φ (log m)` when `φ`
 is smooth with bounded derivatives of all orders. -/
-private theorem logModulation_mul_mem_schwartzBruhat {φ : ℝ → ℂ} (hφ : ContDiff ℝ ∞ φ)
+theorem logModulation_mul_mem_schwartzBruhat {φ : ℝ → ℂ} (hφ : ContDiff ℝ ∞ φ)
     (hφb : ∀ k, ∃ C, ∀ t, ‖iteratedFDeriv ℝ k φ t‖ ≤ C) {F : G → ℂ}
     (hF : F ∈ schwartzBruhatSubmodule G) :
     (fun g ↦ φ (Real.log ((m g : ℝ≥0) : ℝ)) * F g) ∈ schwartzBruhatSubmodule G := by

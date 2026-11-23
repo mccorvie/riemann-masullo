@@ -3136,16 +3136,717 @@ theorem sAdelePolarFree_quasiCharacter_mul (r : RealModels) (c : ComplexModels) 
       ∀ f (g : Aₛˣ), (M f).val (Multiplicative.ofAdd g.val) =
         b (QuotientGroup.mk g) * f.val (Multiplicative.ofAdd g.val) := by sorry
 
+section PolarFreeConstruction
+
+variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+
+/-- A continuous section identifies the group with norm-one elements times positive reals. -/
+private def polarFree_logSplit (m : G →ₜ* ℝ≥0ˣ) (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m) :
+    m.toMonoidHom.ker × ℝ≥0ˣ ≃ₜ* G where
+  toFun p := p.1.val * τ p.2
+  invFun x := (⟨x / τ (m x), by
+    change m (x / τ (m x)) = 1
+    rw [map_div, hτ, div_self']⟩, m x)
+  left_inv p := by
+    have hk : m p.1.val = 1 := p.1.property
+    apply Prod.ext
+    · apply Subtype.ext
+      change p.1.val * τ p.2 / τ (m (p.1.val * τ p.2)) = p.1.val
+      rw [map_mul, hk, one_mul, hτ, mul_div_cancel_right]
+    · change m (p.1.val * τ p.2) = p.2
+      rw [map_mul, hk, one_mul, hτ]
+  right_inv x := by
+    change x / τ (m x) * τ (m x) = x
+    simp [div_eq_mul_inv, mul_assoc]
+  map_mul' p q := by
+    change (p.1.val * q.1.val) * τ (p.2 * q.2) = _
+    rw [map_mul]
+    ac_rfl
+  continuous_toFun := (continuous_subtype_val.comp continuous_fst).mul (τ.continuous.comp continuous_snd)
+  continuous_invFun := by
+    simp only [div_eq_mul_inv]
+    exact Continuous.prodMk
+      ((continuous_id.mul (continuous_inv.comp (τ.continuous.comp m.continuous))).subtype_mk _) m.continuous
+
+variable [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+
+/-- A nonnegative compact shape on a locally compact group can be made one at its unit. -/
+private theorem polarFree_compact_shape :
+    ∃ q : SchwartzBruhat G, HasCompactSupport q.val ∧ q 1 = 1 ∧
+      ∀ x, q x = ((q x).re : ℂ) ∧ 0 ≤ (q x).re := by
+  obtain ⟨q, hq, _, h1⟩ := schwartzBruhat_exists_local_unit (x := (1 : G)) isOpen_univ (mem_univ _)
+  have hnorm : ContDiff ℝ (∞ : ℕ∞ω) (fun z : ℂ ↦ Complex.normSq z) :=
+    (Complex.reCLM.contDiff.mul Complex.reCLM.contDiff).add
+      (Complex.imCLM.contDiff.mul Complex.imCLM.contDiff)
+  obtain ⟨Q, hQ⟩ := compact_schwartzBruhat_comp hq
+    (φ := fun z ↦ (Complex.normSq z : ℂ)) (Complex.ofRealCLM.contDiff.comp hnorm) (by simp)
+  have hQx (x : G) : Q x = (Complex.normSq (q x) : ℂ) := congrFun hQ x
+  have hq1 : q 1 = 1 := h1.self_of_nhds
+  refine ⟨Q, ?_, by simp [hQx, hq1], fun x ↦ ?_⟩
+  · rw [hQ]
+    exact hq.comp_left (by simp)
+  · simp [hQx, Complex.normSq_nonneg]
+
+/-- Decompose the log of a second positive character on a norm section. -/
+private theorem polarFree_section_weight (w : G →ₜ* ℝ≥0ˣ) (τ : ℝ≥0ˣ →ₜ* G) :
+    ∃ a : ℝ, ∀ t : ℝ≥0ˣ, ((w (τ t)).val : ℝ) = Real.exp (a * Real.log (t.val : ℝ)) := by
+  let inclusion : ℝ≥0ˣ →ₜ* ℂ :=
+    ⟨Complex.ofRealHom.toMonoidHom.comp
+      (NNReal.toRealHom.toMonoidHom.comp (Units.coeHom ℝ≥0)),
+      Complex.continuous_ofReal.comp (NNReal.continuous_coe.comp Units.continuous_val)⟩
+  let c := inclusion.comp (w.comp τ)
+  obtain ⟨a, ha, _⟩ := existsUnique_complexPower c
+  refine ⟨a.re, fun t ↦ ?_⟩
+  have ht : 0 < (t.val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt t)
+  have hwt : 0 < ((w (τ t)).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have h := congrArg norm (ha t)
+  change ‖(((w (τ t)).val : ℝ) : ℂ)‖ = ‖((t.val : ℝ) : ℂ) ^ a‖ at h
+  rw [Complex.norm_real, Real.norm_eq_abs, abs_of_pos hwt,
+    Complex.norm_cpow_eq_rpow_re_of_pos ht, Real.rpow_def_of_pos ht] at h
+  simpa only [mul_comm] using h
+
+/-- On a compactly supported shape, a positive weight is implemented by a
+compact smooth multiplier in logarithmic coordinates. -/
+private theorem polarFree_weight_shape (w : G →ₜ* ℝ≥0ˣ) (q : SchwartzBruhat G)
+    (hq : HasCompactSupport q.val) :
+    ∃ Q : SchwartzBruhat G, ∀ x, Q x = (((w x).val : ℝ) : ℂ) * q x := by
+  let L (x : G) := Real.log ((w x).val : ℝ)
+  have hp (x : G) : 0 < ((w x).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hL : Continuous L :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp w.continuous)).log fun x ↦ (hp x).ne'
+  obtain ⟨R, hR, hbound⟩ := (hq.image hL).isBounded.exists_pos_norm_le
+  let b : ContDiffBump (0 : ℝ) := ⟨R, R + 1, hR, lt_add_one R⟩
+  let θ (t : ℝ) : ℂ := (b t * Real.exp t : ℝ)
+  have hS : HasCompactSupport (fun t : ℝ ↦ b t * Real.exp t) := b.hasCompactSupport.mul_right
+  have hs : HasCompactSupport θ := hS.comp_left Complex.ofReal_zero
+  have hc : ContDiff ℝ (∞ : ℕ∞ω) θ :=
+    Complex.ofRealCLM.contDiff.comp (b.contDiff.mul Real.contDiff_exp)
+  have hb (j : ℕ) : ∃ D, ∀ t, ‖iteratedFDeriv ℝ j θ t‖ ≤ D :=
+    (hc.continuous_iteratedFDeriv (mod_cast le_top)).bounded_above_of_compact_support
+      (hs.iteratedFDeriv j)
+  let Q : SchwartzBruhat G := ⟨_, logModulation_mul_mem_schwartzBruhat w hc hb q.property⟩
+  refine ⟨Q, fun x ↦ ?_⟩
+  change θ (L x) * q x = _
+  by_cases hx : x ∈ tsupport q.val
+  · have hbx : b (L x) = 1 := b.one_of_mem_closedBall (by
+      simpa only [Metric.mem_closedBall, dist_zero_right] using hbound (L x) ⟨x, hx, rfl⟩)
+    simp only [θ, hbx, one_mul, L, Real.exp_log (hp x)]
+  · simp only [show q x = 0 from image_eq_zero_of_notMem_tsupport hx, mul_zero]
+
+/-- A tensor of a compact norm-one shape and an exponential-decay profile
+remains Schwartz after multiplying by any positive continuous character. -/
+private theorem polarFree_split_product (m w : G →ₜ* ℝ≥0ˣ)
+    (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
+    (q : SchwartzBruhat m.toMonoidHom.ker) (hq : HasCompactSupport q.val)
+    (φ : PositiveRealExponentialDecay univ) :
+    ∃ H : SchwartzBruhat G, ∀ (u : m.toMonoidHom.ker) (t : ℝ≥0ˣ),
+      H (u.val * τ t) = (((w (u.val * τ t)).val : ℝ) : ℂ) * (q u * φ.val (Real.log (t.val : ℝ))) := by
+  have hK : IsClosed (m.toMonoidHom.ker : Set G) := isClosed_singleton.preimage m.continuous
+  let : LocallyCompactSpace m.toMonoidHom.ker := hK.locallyCompactSpace
+  let : SecondCountableTopology m.toMonoidHom.ker :=
+    inferInstanceAs (SecondCountableTopology (m.toMonoidHom.ker : Set G))
+  let wk : m.toMonoidHom.ker →ₜ* ℝ≥0ˣ :=
+    w.comp ⟨m.toMonoidHom.ker.subtype, continuous_subtype_val⟩
+  obtain ⟨Q, hQ⟩ := polarFree_weight_shape wk q hq
+  obtain ⟨a, ha⟩ := polarFree_section_weight w τ
+  obtain ⟨P, hP⟩ := split_schwartz_product (polarFree_logSplit m τ hτ)
+  let v := logExponentialDecayTwist univ ⟨a, mem_univ _⟩ φ
+  refine ⟨P (Q ⊗ₜ[ℂ] v), fun u t ↦ ?_⟩
+  refine (hP Q v u t).trans ?_
+  have hwv : v (Real.log (t.val : ℝ)) =
+      (Real.exp (a * Real.log (t.val : ℝ)) : ℂ) * φ.val (Real.log (t.val : ℝ)) :=
+    logExponentialDecayTwist_apply univ ⟨a, mem_univ _⟩ φ _
+  have hwv' : v (Real.log (t.val : ℝ)) =
+      (((w (τ t)).val : ℝ) : ℂ) * φ.val (Real.log (t.val : ℝ)) :=
+    hwv.trans (congrArg (fun x : ℝ ↦ (x : ℂ) * φ.val (Real.log (t.val : ℝ))) (ha t).symm)
+  refine (congrArg₂ (· * ·) (hQ u) hwv').trans ?_
+  change ((((w u.val).val : ℝ) : ℂ) * q u) * ((((w (τ t)).val : ℝ) : ℂ) * φ.val _) = _
+  rw [map_mul, Units.val_mul, NNReal.coe_mul, Complex.ofReal_mul]
+  ring
+
+section ArchimedeanWeights
+
+variable {ι κ : Type*} [Fintype ι] [Fintype κ]
+
+local notation "ArchU" => ((ι → ℝˣ) × (κ → ℂˣ))
+
+private def polarFree_normWeight {R : Type*} [NormedField R] (d : ℕ) (a : ℝ) :
+    Rˣ →ₜ* ℝ≥0ˣ :=
+  let N : Rˣ →* ℝ≥0ˣ := Units.map nnNormHom.toMonoidHom
+  { toMonoidHom := (Units.map (NNReal.rpowMonoidHom a)).comp (N ^ d)
+    continuous_toFun := by
+      apply Units.isEmbedding_val₀.continuous_iff.mpr
+      change Continuous (fun x : Rˣ ↦ (‖x.val‖₊ ^ d) ^ a)
+      have hc : Continuous (fun u : Rˣ ↦ ‖u.val‖₊ ^ d) :=
+        (continuous_nnNorm.comp Units.continuous_val).pow d
+      refine continuous_iff_continuousAt.mpr fun x ↦ ?_
+      have hpow : ContinuousAt (fun x : ℝ≥0 ↦ x ^ a) (‖x.val‖₊ ^ d) :=
+        NNReal.continuousAt_rpow_const (Or.inl (pow_ne_zero d (nnNorm_ne_zero_iff.mpr x.ne_zero)))
+      exact hpow.comp (f := fun u : Rˣ ↦ ‖u.val‖₊ ^ d) (hc.continuousAt (x := x)) }
+
+private theorem polarFree_normWeight_apply {R : Type*} [NormedField R]
+    (d : ℕ) (a : ℝ) (u : Rˣ) :
+    ((polarFree_normWeight d a u).val : ℝ) = (‖u.val‖ ^ d) ^ a := by
+  change (((‖u.val‖₊ ^ d) ^ a : ℝ≥0) : ℝ) = _
+  rw [NNReal.coe_rpow, NNReal.coe_pow]
+  rfl
+
+private def polarFree_archWeight (a : (ι → ℝ) × (κ → ℝ)) : ArchU →ₜ* ℝ≥0ˣ :=
+  { toFun := fun u ↦ (∏ i, polarFree_normWeight 1 (a.1 i) (u.1 i)) *
+      ∏ j, polarFree_normWeight 2 (a.2 j) (u.2 j)
+    map_one' := by simp
+    map_mul' := fun x y ↦ by
+      simp only [Prod.fst_mul, Prod.snd_mul, Pi.mul_apply, map_mul, Finset.prod_mul_distrib]
+      ac_rfl
+    continuous_toFun :=
+      (continuous_finsetProd _ fun i _ ↦
+        (polarFree_normWeight 1 (a.1 i)).continuous.comp ((continuous_apply i).comp continuous_fst)).mul
+        (continuous_finsetProd _ fun j _ ↦
+          (polarFree_normWeight 2 (a.2 j)).continuous.comp ((continuous_apply j).comp continuous_snd)) }
+
+private theorem polarFree_archWeight_apply (a : (ι → ℝ) × (κ → ℝ)) (u : ArchU) :
+    ((polarFree_archWeight a u).val : ℝ) =
+      (∏ i, ‖(u.1 i).val‖ ^ a.1 i) * ∏ j, (‖(u.2 j).val‖ ^ (2 : ℕ)) ^ a.2 j := by
+  change (((∏ i, polarFree_normWeight 1 (a.1 i) (u.1 i)) *
+    ∏ j, polarFree_normWeight 2 (a.2 j) (u.2 j)).val : ℝ) = _
+  simp only [Units.val_mul, NNReal.coe_mul, Units.coe_prod, NNReal.coe_prod,
+    polarFree_normWeight_apply, pow_one]
+
+/-- Inserting a compact shape into all weighted twists gives an archimedean
+flat Schwartz extension. -/
+private theorem polarFree_arch_profile (m : ArchU →ₜ* ℝ≥0ˣ)
+    (τ : ℝ≥0ˣ →ₜ* ArchU) (hτ : RightInverse τ m)
+    (q : SchwartzBruhat m.toMonoidHom.ker) (hq : HasCompactSupport q.val)
+    (φ : PositiveRealExponentialDecay univ) :
+    ∃ f : archimedeanFlatSchwartz (ι := ι) (κ := κ),
+      ∀ (u : m.toMonoidHom.ker) (t : ℝ≥0ˣ),
+        f.val (fun i ↦ ((u.val * τ t).1 i).val, fun j ↦ ((u.val * τ t).2 j).val) =
+          q u * φ.val (Real.log (t.val : ℝ)) := by
+  let : LocallyCompactSpace ℝˣ := Units.isOpenEmbedding_val.locallyCompactSpace
+  let : LocallyCompactSpace ℂˣ := Units.isOpenEmbedding_val.locallyCompactSpace
+  let : SecondCountableTopology ℝˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SecondCountableTopology ℂˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let D := polarFree_logSplit m τ hτ
+  let H (x : ArchU) := q (D.symm x).1 * φ.val (Real.log (((D.symm x).2).val : ℝ))
+  have hH (u : m.toMonoidHom.ker) (t : ℝ≥0ˣ) :
+      H (u.val * τ t) = q u * φ.val (Real.log (t.val : ℝ)) := by
+    change q (D.symm (D (u,t))).1 * φ.val (Real.log (((D.symm (D (u,t))).2).val : ℝ)) = _
+    rw [D.symm_apply_apply]
+  have hw : H ∈ archimedeanWeightedSchwartzSubmodule (ι := ι) (κ := κ) univ := by
+    apply (Submodule.mem_iInf _).2
+    intro a
+    let w := polarFree_archWeight (fun i ↦ (a.1 i : ℝ), fun j ↦ (a.2 j : ℝ))
+    obtain ⟨h, hh⟩ := polarFree_split_product m w τ hτ q hq φ
+    apply Submodule.mem_comap.2
+    have heq (x : ArchU) : h x = ((w x).val : ℝ) • H x := by
+      obtain ⟨p, rfl⟩ := D.surjective x
+      rw [show D p = p.1.val * τ p.2 from rfl, hH, hh, Complex.real_smul]
+    convert h.property using 1
+    funext x
+    rw [heq, Complex.real_smul, show ((w x).val : ℝ) = _ from polarFree_archWeight_apply _ _]
+    push_cast
+    rfl
+  let X : ArchimedeanWeightedSchwartz (ι := ι) (κ := κ) univ := ⟨H, hw⟩
+  obtain ⟨E, hE⟩ := archimedeanFlatSchwartz_restrict_equiv (ι := ι) (κ := κ)
+  refine ⟨E.symm X, fun u t ↦ ?_⟩
+  exact ((hE (E.symm X) (u.val * τ t)).symm.trans
+    (congrArg (fun z : ArchimedeanWeightedSchwartz univ ↦ z.val (u.val * τ t))
+      (E.apply_symm_apply X))).trans (hH u t)
+
+end ArchimedeanWeights
+
+section PolarFreeArithmetic
+variable {F : Type*} [Field F] [NumberField F]
+variable {S : Finset (HeightOneSpectrum (𝓞 F))}
+local notation "I" => (SAdeleRing F S)ˣ
+local notation "finEval(" v ")" =>
+  Units.map ((Pi.evalRingHom _ v).comp (RingHom.snd _ _)).toMonoidHom
+
+/-- On finite integer units, the S-norm is the product of the real radii and squared complex radii. -/
+private theorem thetaFiber_norm_of_finiteUnits (g : I)
+    (hg : ∀ v : S, finEval(v) g ∈ (v.val.adicCompletionIntegers F).units) :
+    ((sIdeleNorm F S g).val : ℝ) =
+      (∏ i : {w : InfinitePlace F // w.IsReal}, ‖(InfiniteAdeleRing.ringEquiv_mixedSpace F g.val.1).1 i‖) *
+        ∏ j : {w : InfinitePlace F // w.IsComplex}, ‖(InfiniteAdeleRing.ringEquiv_mixedSpace F g.val.1).2 j‖ ^ 2 := by
+  classical
+  have hfin (v : S) : ‖g.val.2 v‖ = 1 :=
+    Valued.toNormedField.norm_eq_one_iff.mpr
+      ((HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one
+        (a := finEval(v) g)).mp (hg v))
+  let ev : (I →* ℝ≥0ˣ) →* ℝ := NNReal.toRealHom.toMonoidHom.comp
+    ((Units.coeHom ℝ≥0).comp (MonoidHom.eval g))
+  have hN : ((sIdeleNorm F S g).val : ℝ) =
+      (∏ w : InfinitePlace F, ‖g.val.1 w‖ ^ w.mult) * ∏ v : S, ‖g.val.2 v‖ := by
+    change ev (sIdeleNorm F S) = _
+    simp only [sIdeleNorm, map_mul, map_prod, map_pow]
+    rfl
+  rw [hN, Finset.prod_eq_one fun v _ ↦ hfin v, mul_one, InfinitePlace.prod_eq_prod_mul_prod]
+  congr 1
+  · apply Finset.prod_congr rfl
+    intro i _
+    rw [InfinitePlace.mult_isReal i, pow_one, InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+    exact ((InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal i.property).norm_map_of_map_zero
+      (map_zero _) _).symm
+  · apply Finset.prod_congr rfl
+    intro j _
+    rw [InfinitePlace.mult_isComplex j, InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+    exact congrArg (· ^ 2) ((InfinitePlace.Completion.isometry_extensionEmbedding j.val).norm_map_of_map_zero
+      (map_zero _) _).symm
+
+/-- The section through a single infinite place changes no finite coordinates. -/
+private theorem thetaFiber_exists_archSection (w : InfinitePlace F) :
+    ∃ σ : ℝ≥0ˣ →ₜ* (SAdeleRing F S)ˣ, RightInverse σ (sIdeleNorm F S) ∧
+      ∀ (t : ℝ≥0ˣ) (v : S), finEval(v) (σ t) = 1 := by
+  let s := singlePlaceIdeleNormSection F w
+  let p := Units.map (adeleProjection F S).toMonoidHom
+  have hp : Continuous p := (continuous_fst.prodMk (continuous_pi fun v : S ↦
+    (RestrictedProduct.continuous_eval v.val).comp continuous_snd)).units_map _
+  let σ : ℝ≥0ˣ →ₜ* I := ⟨p.comp s, hp.comp (singlePlaceIdeleNormSection_continuous F w)⟩
+  refine ⟨σ, fun t ↦ ?_, fun t v ↦ Units.ext rfl⟩
+  let A := integralAdelesOutside F S
+  have hmem (u : ℝ≥0ˣ) : (s u).val ∈ A := by
+    simp only [A, integralAdelesOutside, Subring.mem_iInf]
+    intro v _
+    exact (v.adicCompletionIntegers F).one_mem
+  have ht : s t ∈ A.toSubmonoid.units :=
+    ⟨hmem t, by
+      change ((s t)⁻¹).val ∈ A
+      rw [← map_inv]
+      exact hmem t⁻¹⟩
+  let g := A.toSubmonoid.unitsEquivUnitsType ⟨s t, ht⟩
+  exact ((sIdeleNorm_spec F S).1 g).symm.trans (singlePlaceIdeleNormSection_rightInverse F w t)
+
+local notation "NormRealPlaces" => {w : InfinitePlace F // w.IsReal}
+local notation "NormComplexPlaces" => {w : InfinitePlace F // w.IsComplex}
+local notation "MixedUnits" => ((NormRealPlaces → ℝˣ) × (NormComplexPlaces → ℂˣ))
+
+/-- Take the real and complex unit coordinates of the archimedean part. -/
+private def polarFree_archProjection : I →ₜ* MixedUnits := by
+  let ev (w : InfinitePlace F) := (Pi.evalRingHom _ w).comp
+    (RingHom.fst (InfiniteAdeleRing F) (∀ v : S, v.val.adicCompletion F))
+  let a (i : NormRealPlaces) := (InfinitePlace.Completion.extensionEmbeddingOfIsReal i.property).comp (ev i.val)
+  let b (j : NormComplexPlaces) := (InfinitePlace.Completion.extensionEmbedding j.val).comp (ev j.val)
+  let p := (MonoidHom.pi fun i ↦ Units.map (a i).toMonoidHom).prod
+    (MonoidHom.pi fun j ↦ Units.map (b j).toMonoidHom)
+  refine ⟨p, Continuous.prodMk (continuous_pi fun i ↦ ?_) (continuous_pi fun j ↦ ?_)⟩
+  · have hc : Continuous (a i) := (InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal i.property).continuous.comp
+      ((continuous_apply i.val).comp continuous_fst)
+    exact hc.units_map _
+  · have hc : Continuous (b j) := (InfinitePlace.Completion.isometry_extensionEmbedding j.val).continuous.comp
+      ((continuous_apply j.val).comp continuous_fst)
+    exact hc.units_map _
+
+/-- Forgetting the units gives exactly the canonical mixed coordinates. -/
+private theorem polarFree_archProjection_val (g : I) :
+    ((fun i ↦ ((polarFree_archProjection (F := F) (S := S) g).1 i).val),
+      fun j ↦ ((polarFree_archProjection (F := F) (S := S) g).2 j).val) =
+        InfiniteAdeleRing.ringEquiv_mixedSpace F g.val.1 := rfl
+
+private theorem polarFree_archProjection_norm (g : I)
+    (hg : ∀ v : S, finEval(v) g ∈ (v.val.adicCompletionIntegers F).units) :
+    ((sIdeleNorm F S g).val : ℝ) =
+      (∏ i, ‖((polarFree_archProjection (F := F) (S := S) g).1 i).val‖) *
+        ∏ j, ‖((polarFree_archProjection (F := F) (S := S) g).2 j).val‖ ^ 2 :=
+  thetaFiber_norm_of_finiteUnits g hg
+
+
+/-- On finite integer units the mixed archimedean weight of exponent one is the full S-norm. -/
+private theorem polarFree_archWeight_norm (g : I)
+    (hg : ∀ v : S, finEval(v) g ∈ (v.val.adicCompletionIntegers F).units) :
+    polarFree_archWeight ((fun _ : NormRealPlaces ↦ 1), (fun _ : NormComplexPlaces ↦ 1))
+      (polarFree_archProjection (F := F) (S := S) g) = sIdeleNorm F S g := by
+  apply Units.ext
+  apply NNReal.coe_injective
+  rw [polarFree_archWeight_apply, polarFree_archProjection_norm g hg]
+  simp only [Real.rpow_one]
+
+
+end PolarFreeArithmetic
+
+section PolarFreeFinite
+
+variable {F : Type*} [Field F] [NumberField F]
+variable {S : Finset (HeightOneSpectrum (𝓞 F))}
+
+local notation "PFR" => {w : InfinitePlace F // w.IsReal}
+local notation "PFC" => {w : InfinitePlace F // w.IsComplex}
+local notation "PFA" => ((PFR → ℝ) × (PFC → ℂ))
+local notation "PFV" => HeightOneSpectrum (𝓞 F)
+local notation "PFM" => InfiniteAdeleRing.ringEquiv_mixedSpace F
+local notation "PFI" => (SAdeleRing F S)ˣ
+local notation "pfEval(" v ")" =>
+  Units.map ((Pi.evalRingHom _ v).comp (RingHom.snd _ _)).toMonoidHom
+local notation "pfUnits(" g ")" => (∀ v : S, pfEval(v) g ∈ (v.val.adicCompletionIntegers F).units)
+
+private noncomputable def polarFree_realModel (w : PFR) :
+    {e : w.val.Completion ≃+* ℝ // IsHomeomorph (e : w.val.Completion → ℝ)} :=
+  ⟨InfinitePlace.Completion.ringEquivRealOfIsReal w.2,
+    (InfinitePlace.Completion.isometryEquivRealOfIsReal w.2).toHomeomorph.isHomeomorph⟩
+
+private noncomputable def polarFree_complexModel (w : PFC) :
+    {e : w.val.Completion ≃+* ℂ // IsHomeomorph (e : w.val.Completion → ℂ)} :=
+  ⟨InfinitePlace.Completion.ringEquivComplexOfIsComplex w.2,
+    (InfinitePlace.Completion.isometryEquivComplexOfIsComplex w.2).toHomeomorph.isHomeomorph⟩
+
+/-- The indicator of integer units has a zero extension at a finite place. -/
+private theorem polarFree_finite_indicator (v : PFV) :
+    ∃ f : SchwartzBruhat (Multiplicative (v.adicCompletion F)),
+      f (Multiplicative.ofAdd 0) = 0 ∧
+      ∀ u : (v.adicCompletion F)ˣ, f (Multiplicative.ofAdd u.val) =
+        if u ∈ (v.adicCompletionIntegers F).units then 1 else 0 := by
+  classical
+  let U : Set (v.adicCompletion F)ˣ := (v.adicCompletionIntegers F).units
+  have ho : IsOpen U := Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hc : IsCompact U :=
+    Submonoid.units_isCompact (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v))
+  let f (u : (v.adicCompletion F)ˣ) : ℂ := if u ∈ U then 1 else 0
+  have hl : IsLocallyConstant f := by
+    rw [IsLocallyConstant.iff_exists_open]
+    intro u
+    by_cases h : u ∈ U
+    · refine ⟨U, ho, h, fun w hw ↦ ?_⟩
+      simp only [f, ite_eq_left h, ite_eq_left hw]
+    · refine ⟨Uᶜ, hc.isClosed.isOpen_compl, h, fun w hw ↦ ?_⟩
+      simp only [f, ite_eq_right h, ite_eq_right (show w ∉ U from hw)]
+  have hs : HasCompactSupport f := HasCompactSupport.of_support_subset_isCompact hc (fun x hx ↦ by
+    by_contra h
+    exact hx (ite_eq_right h))
+  exact (exists_finitePlaceSchwartz_zeroExtension_iff v f).2 ⟨hl, hs⟩
+
+/-- A flat archimedean profile times the finite integer-unit indicators is polar-free. -/
+private theorem polarFree_lift_archimedean
+    (a : archimedeanFlatSchwartz (ι := PFR) (κ := PFC)) :
+    ∃ f : sAdelePolarFree S polarFree_realModel polarFree_complexModel, ∀ g : PFI,
+      f.val (Multiplicative.ofAdd g.val) = if pfUnits(g) then a.val (PFM g.val.1) else 0 := by
+  classical
+  let A : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) :=
+    ⟨_, (mem_archimedeanSchwartzBruhat_iff (fun x ↦ a.val (PFM x))).2 ⟨a.val, fun _ ↦ rfl⟩⟩
+  choose b hb0 hb using (fun v : S ↦ polarFree_finite_indicator v.val)
+  obtain ⟨e, he⟩ := sAdeleSchwartz_inductiveTensor_equiv F S
+  let f := e (A ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, b v))
+  have happly (x : SAdeleRing F S) :
+      f (Multiplicative.ofAdd x) = a.val (PFM x.1) * ∏ v : S, b v (Multiplicative.ofAdd (x.2 v)) :=
+    he A b x
+  have hmem : f ∈ sAdelePolarFree S polarFree_realModel polarFree_complexModel := by
+    refine Submodule.mem_inf.2 ⟨?_, ?_⟩
+    · apply (Submodule.mem_iInf _).2
+      intro x
+      obtain ⟨v, _, hv⟩ := x.property
+      change f (Multiplicative.ofAdd x.val) = 0
+      rw [happly, Finset.prod_eq_zero (Finset.mem_univ v) (by rw [hv, hb0]), mul_zero]
+    · apply (Submodule.mem_iInf _).2
+      intro y
+      apply Submodule.mem_comap.2
+      let c : ℂ := ∏ v : S, b v (Multiplicative.ofAdd (y v))
+      refine Submodule.mem_map.2 ⟨c • a.val, Submodule.smul_mem _ _ a.property, ?_⟩
+      funext x
+      let X : InfiniteAdeleRing F := fun w ↦ if h : w.IsReal then (polarFree_realModel ⟨w,h⟩).val.symm (x.1 ⟨w,h⟩)
+        else (polarFree_complexModel ⟨w, InfinitePlace.not_isReal_iff_isComplex.mp h⟩).val.symm
+          (x.2 ⟨w, InfinitePlace.not_isReal_iff_isComplex.mp h⟩)
+      change c * a.val x = f (Multiplicative.ofAdd (X,y))
+      have hx : PFM X = x := by
+        apply Prod.ext
+        · funext i
+          rw [InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+          change (polarFree_realModel i).val (X i.val) = _
+          simp only [X, i.property, ↓reduceDIte, RingEquiv.apply_symm_apply]
+        · funext j
+          rw [InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+          change (polarFree_complexModel j).val (X j.val) = _
+          have hj : ¬ j.val.IsReal := InfinitePlace.not_isReal_iff_isComplex.mpr j.property
+          simp only [X, hj, ↓reduceDIte, RingEquiv.apply_symm_apply]
+      rw [happly, show (X,y).1 = X from rfl, hx, mul_comm]
+  refine ⟨⟨f,hmem⟩, fun g ↦ ?_⟩
+  change f (Multiplicative.ofAdd g.val) = _
+  rw [happly]
+  have hval (v : S) :
+      b v (Multiplicative.ofAdd (g.val.2 v)) =
+        if pfEval(v) g ∈ (v.val.adicCompletionIntegers F).units then 1 else 0 := by
+    let x : (v.val.adicCompletion F)ˣ := pfEval(v) g
+    have hx : x.val = g.val.2 v := rfl
+    rw [← hx]
+    exact hb v x
+  by_cases hg : pfUnits(g)
+  · simp only [ite_eq_left hg, hval, ite_eq_left (hg _), Finset.prod_const_one, mul_one]
+  · obtain ⟨v,hv⟩ := not_forall.mp hg
+    rw [ite_eq_right hg, Finset.prod_eq_zero (Finset.mem_univ v) (by rw [hval, ite_eq_right hv]), mul_zero]
+
+end PolarFreeFinite
+
+
+section ThetaFiber4249
+variable {F : Type*} [Field F] [NumberField F]
+variable {S : Finset (HeightOneSpectrum (𝓞 F))}
+
+local notation "I" => (SAdeleRing F S)ˣ
+local notation "J" => SIdeleQuotient F S
+local notation "N" => (sIdeleNorm F S).ker
+local notation "K" => (sIdeleQuotientNorm F S).ker
+local notation "B" => SchwartzBruhat (Multiplicative (SAdeleRing F S))
+local notation "U" => ((S : Set (HeightOneSpectrum (𝓞 F))).integer F)ˣ
+local notation "D" => MonoidHom.comp (Units.map (RingHom.toMonoidHom (RingHom.comp (adeleProjection F S)
+  (Subring.subtype (integralAdelesOutside F S))))) (Units.map (RingHom.toMonoidHom (integralAdeleDiagonal F S)))
+local notation "Ev(" f ", " x ")" => (f : B) (Multiplicative.ofAdd (x : I).val)
+local notation "θ(" f ")" => sLocalAdelicThetaOnClasses F S f
+local notation "T(" f ")" => sLocalHomogeneousAdelicThetaLinearMap F S (1 : PontryaginDual K) f
+local notation "ell(" t ")" => Real.log (((t : ℝ≥0ˣ).val : ℝ))
+
+-- BEGIN THETA FIBER
+/-- The diagonal S-units preserve each norm fiber of the S-ideles. -/
+private theorem thetaFiber_unit_norm (ξ : U) : sIdeleNorm F S (D ξ) = 1 :=
+  (sIdeleNorm_spec F S).2 ⟨ξ, rfl⟩
+
+/-- Pull the radial factor through the S-unit sum. -/
+private theorem thetaFiber_local_factor (σ : ℝ≥0ˣ → I) (φ : ℝ → ℂ) (f b : B)
+    (hf : ∀ (t : ℝ≥0ˣ) (u : N), Ev(f, σ t * u.val) = φ ell(t) * Ev(b, u.val))
+    (t : ℝ≥0ˣ) (h : K) :
+    θ(f) (QuotientGroup.mk (σ t) * h.val) = φ ell(t) * θ(b) h.val := by
+  obtain ⟨v, hv⟩ := QuotientGroup.mk_surjective h.val
+  have hnv : sIdeleNorm F S v = 1 := by
+    rw [← sIdeleQuotientNorm_mk, hv]
+    exact h.property
+  rw [← hv, ← QuotientGroup.mk_mul, sLocalAdelicThetaOnClasses_mk,
+    sLocalAdelicThetaOnClasses_mk, sLocalAdelicTheta_apply, sLocalAdelicTheta_apply,
+    ← tsum_mul_left]
+  apply tsum_congr
+  intro ξ
+  have hu : D ξ * v ∈ N := by
+    change sIdeleNorm F S (D ξ * v) = 1
+    rw [map_mul, thetaFiber_unit_norm, hnv, one_mul]
+  exact (congrArg (fun x : I ↦ Ev(f, x)) (mul_left_comm (D ξ) (σ t) v)).trans
+    (hf t ⟨_, hu⟩)
+
+/-- Norm-one Haar averaging removes the dependence on the representative of the fiber. -/
+private theorem thetaFiber_average (σ : ℝ≥0ˣ → I) (hσ : RightInverse σ (sIdeleNorm F S))
+    (φ : ℝ → ℂ) (f b : B)
+    (hf : ∀ (t : ℝ≥0ˣ) (u : N), Ev(f, σ t * u.val) = φ ell(t) * Ev(b, u.val))
+    (g : J) : T(f) g = φ ell(sIdeleQuotientNorm F S g) * T(b) 1 := by
+  let t := sIdeleQuotientNorm F S g
+  let p : J := QuotientGroup.mk (σ t)
+  have hp : sIdeleQuotientNorm F S p = t := hσ t
+  let u : K := ⟨g / p, by change sIdeleQuotientNorm F S (g / p) = 1; rw [map_div, hp, div_self']⟩
+  let : MeasurableSpace K := borel _
+  let : BorelSpace K := ⟨rfl⟩
+  let μ := sLocalNormOneQuotientMeasure F S
+  let : μ.IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  have hval (h : K) : g * h.val = p * (u * h).val := by
+    change g * h.val = p * (g / p * h.val)
+    exact (congrArg (fun v : J ↦ v * h.val) (mul_div_cancel p g).symm).trans (mul_assoc p (g/p) h.val)
+  change T(f) g = φ ell(t) * T(b) 1
+  rw [sLocalHomogeneousAdelicThetaLinearMap_apply, sLocalHomogeneousAdelicThetaLinearMap_apply]
+  simp only [PontryaginDual.one_apply, Circle.coe_one, mul_one]
+  have h1 (v : K) : (1 : J) * v.val = v.val := one_mul (v.val : J)
+  simp_rw [h1]
+  calc
+    _ = ∫ h : K, φ ell(t) * θ(b) (u * h).val ∂μ := integral_congr_ae (.of_forall fun h ↦
+      (congrArg (θ(f)) (hval h)).trans (thetaFiber_local_factor σ φ f b hf t (u * h)))
+    _ = _ := by
+      rw [integral_const_mul]
+      exact congrArg (φ ell(t) * ·) (integral_mul_left_eq_self (μ := μ) (fun h : K ↦ θ(b) h.val) u)
+
+/-- A test nonnegative on the norm-one fiber and positive at its identity has
+strictly positive real homogeneous theta value at the identity. -/
+private theorem thetaFiber_positive (b : B)
+    (hn : ∀ x : N, 0 ≤ (Ev(b, x.val)).re) (hp : 0 < (Ev(b, (1 : I))).re) :
+    0 < (T(b) 1).re := by
+  classical
+  let : MeasurableSpace K := borel _
+  let : BorelSpace K := ⟨rfl⟩
+  let : CompactSpace K := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let μ := sLocalNormOneQuotientMeasure F S
+  let : μ.IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  let Z (h : K) := θ(b) h.val
+  have hc : Continuous Z := (θ(b)).continuous.comp continuous_subtype_val
+  have lower (v : I) (hv : v ∈ N) : (Ev(b, v)).re ≤ (θ(b) (QuotientGroup.mk v)).re := by
+    rw [sLocalAdelicThetaOnClasses_mk, sLocalAdelicTheta_apply]
+    let terms (ξ : U) := Ev(b, D ξ * v)
+    have hs : Summable terms := ((sLocalAdelicTheta_summableUniformlyOn_norm F S b {v}
+      isCompact_singleton).summable (by rfl)).of_norm
+    change _ ≤ (∑' ξ, terms ξ).re
+    rw [Complex.re_tsum hs]
+    have hnV (ξ : U) : 0 ≤ (terms ξ).re := hn ⟨D ξ * v, by
+      change sIdeleNorm F S (D ξ * v) = 1
+      rw [map_mul, thetaFiber_unit_norm, show sIdeleNorm F S v = 1 from hv, one_mul]⟩
+    have h := (Complex.hasSum_re hs.hasSum).summable.le_tsum (1 : U) (fun i _ ↦ hnV i)
+    simpa only [terms, map_one, one_mul] using h
+  have hZ (h : K) : 0 ≤ (Z h).re := by
+    obtain ⟨v, hv⟩ := QuotientGroup.mk_surjective h.val
+    have hnv : v ∈ N := by change sIdeleNorm F S v = 1; rw [← sIdeleQuotientNorm_mk, hv]; exact h.property
+    exact ((hn ⟨v, hnv⟩).trans (lower v hnv)).trans_eq (congrArg (fun x : J ↦ (θ(b) x).re) hv)
+  have h1 : 0 < (Z 1).re := hp.trans_le (lower 1 (Subgroup.one_mem _))
+  rw [sLocalHomogeneousAdelicThetaLinearMap_apply]
+  simp only [PontryaginDual.one_apply, Circle.coe_one, mul_one]
+  have hbase (v : K) : (1 : J) * v.val = v.val := one_mul (v.val : J)
+  simp_rw [hbase]
+  change 0 < (∫ h, Z h ∂μ).re
+  have hi : Integrable Z μ := hc.integrable_of_hasCompactSupport (HasCompactSupport.of_compactSpace _)
+  exact ((Complex.continuous_re.comp hc).integral_pos_of_hasCompactSupport_nonneg_ne_zero
+    (μ := μ) (HasCompactSupport.of_compactSpace _) hZ (x := 1) h1.ne').trans_eq (integral_re hi)
+
+/-- A common nonnegative fiber profile produces a positive normalization
+independent of the radial test. -/
+private theorem thetaFiber_normalize (σ : ℝ≥0ˣ →* I) (hσ : RightInverse σ (sIdeleNorm F S))
+    (φ β : ℝ → ℂ) (hβ : β 0 = 1) (q : N → ℝ) (hq : ∀ u, 0 ≤ q u) (hq₁ : 0 < q 1)
+    (f b : B) (hf : ∀ (t : ℝ≥0ˣ) (u : N), Ev(f, σ t * u.val) = φ ell(t) * (q u : ℂ))
+    (hb : ∀ (t : ℝ≥0ˣ) (u : N), Ev(b, σ t * u.val) = β ell(t) * (q u : ℂ)) :
+    (∀ g : J, T(f) g = φ ell(sIdeleQuotientNorm F S g) * T(b) 1) ∧ 0 < (T(b) 1).re := by
+  have hunit (u : N) : Ev(b, u.val) = (q u : ℂ) := by
+    simpa only [map_one, one_mul, Units.val_one, NNReal.coe_one, Real.log_one, hβ] using hb 1 u
+  exact ⟨thetaFiber_average σ hσ φ f b (fun t u ↦ (hf t u).trans (congrArg (φ ell(t) * ·) (hunit u).symm)),
+    thetaFiber_positive b (fun u ↦ by rw [hunit]; exact hq u)
+      (hq₁.trans_eq (congrArg Complex.re (hunit (1 : N))).symm)⟩
+
+end ThetaFiber4249
+
+section PolarFreeAssembly
+
+variable {F : Type*} [Field F] [NumberField F]
+variable {S : Finset (HeightOneSpectrum (𝓞 F))}
+
+local notation "AI" => (SAdeleRing F S)ˣ
+local notation "AM" => (InfiniteAdeleRing.ringEquiv_mixedSpace F)
+local notation "AR" => {w : InfinitePlace F // w.IsReal}
+local notation "AC" => {w : InfinitePlace F // w.IsComplex}
+local notation "AU" => ((AR → ℝˣ) × (AC → ℂˣ))
+local notation "RN" => sIdeleNorm F S
+local notation "EvS(" f ", " x ")" =>
+  (f : SchwartzBruhat (Multiplicative (SAdeleRing F S))) (Multiplicative.ofAdd (x : AI).val)
+local notation "ThetaS(" f ")" =>
+  sLocalHomogeneousAdelicThetaLinearMap F S (1 : PontryaginDual (sIdeleQuotientNorm F S).ker) f
+local notation "logPos(" t ")" => Real.log (((t : ℝ≥0ˣ).val : ℝ))
+local notation "fiEval(" v ")" =>
+  Units.map ((Pi.evalRingHom _ v).comp (RingHom.snd _ _)).toMonoidHom
+local notation "unitsSupport(" g ")" =>
+  (∀ v : S, fiEval(v) g ∈ (v.val.adicCompletionIntegers F).units)
+
+/-- Compactly supported unit factors separate the archimedean lift from the finite
+coordinates, which contribute norm one on the support. -/
+private theorem polarFree_assemble_profile
+    (r : (w : AR) → {e : w.val.Completion ≃+* ℝ // IsHomeomorph (e : w.val.Completion → ℝ)})
+    (c : (w : AC) → {e : w.val.Completion ≃+* ℂ // IsHomeomorph (e : w.val.Completion → ℂ)})
+    (m : AU →ₜ* ℝ≥0ˣ) (π : AI →ₜ* AU) (σ : ℝ≥0ˣ →ₜ* AI)
+    (hσ : RightInverse σ RN)
+    (hσfin : ∀ (t : ℝ≥0ˣ) (v : S), fiEval(v) (σ t) = 1)
+    (hπ : ∀ g : AI, (fun i ↦ ((π g).1 i).val, fun j ↦ ((π g).2 j).val) = AM g.val.1)
+    (hnorm : ∀ g : AI, unitsSupport(g) → m (π g) = RN g)
+    (lift : ∀ a : archimedeanFlatSchwartz (ι := AR) (κ := AC),
+      ∃ f : sAdelePolarFree S r c, ∀ g : AI,
+        EvS(f.val, g) = if unitsSupport(g) then a.val (AM g.val.1) else 0)
+    (φ : PositiveRealExponentialDecay univ) :
+    ∃ f : sAdelePolarFree S r c, ∀ g : SIdeleQuotient F S,
+      ThetaS(f.val) g = φ.val logPos(sIdeleQuotientNorm F S g) := by
+  classical
+  let τ := π.comp σ
+  have hτ : RightInverse τ m := fun t ↦
+    (hnorm (σ t) (fun v ↦ by rw [hσfin]; exact Submonoid.one_mem _)).trans (hσ t)
+  let : LocallyCompactSpace ℝˣ := Units.isOpenEmbedding_val.locallyCompactSpace
+  let : LocallyCompactSpace ℂˣ := Units.isOpenEmbedding_val.locallyCompactSpace
+  let : SecondCountableTopology ℝˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SecondCountableTopology ℂˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have hclosed : IsClosed (m.toMonoidHom.ker : Set AU) := isClosed_singleton.preimage m.continuous
+  let : LocallyCompactSpace m.toMonoidHom.ker := hclosed.locallyCompactSpace
+  let : SecondCountableTopology m.toMonoidHom.ker :=
+    inferInstanceAs (SecondCountableTopology (m.toMonoidHom.ker : Set AU))
+  with_reducible refine (polarFree_compact_shape (G := m.toMonoidHom.ker)).elim fun qA hshape ↦ ?_
+  obtain ⟨hqA, hqA1, hqApos⟩ := hshape
+  let ku (u : (RN).ker) (hu : unitsSupport(u.val)) : m.toMonoidHom.ker :=
+    ⟨π u.val, (hnorm u.val hu).trans u.property⟩
+  let q (u : (RN).ker) : ℝ := if hu : unitsSupport(u.val) then (qA (ku u hu)).re else 0
+  have hq (u : (RN).ker) : 0 ≤ q u := by
+    dsimp only [q]
+    split
+    · exact (hqApos _).2
+    · exact le_rfl
+  have hq₁ : 0 < q 1 := by
+    have hu : unitsSupport((1 : AI)) := fun v ↦ by rw [map_one]; exact Submonoid.one_mem _
+    have hku : ku (1 : (RN).ker) hu = 1 := Subtype.ext (map_one π)
+    dsimp only [q, Subgroup.coe_one]
+    rw [dite_eq_left hu, hku, hqA1, Complex.one_re]
+    exact zero_lt_one
+  have hfin (t : ℝ≥0ˣ) (g : AI) : unitsSupport(σ t * g) ↔ unitsSupport(g) := by
+    have he (v : S) : fiEval(v) (σ t * g) = fiEval(v) g := by rw [map_mul, hσfin, one_mul]
+    simp only [he]
+  have htest (ψ : PositiveRealExponentialDecay univ) :
+      ∃ f : sAdelePolarFree S r c, ∀ (t : ℝ≥0ˣ) (u : (RN).ker),
+        EvS(f.val, σ t * u.val) = ψ.val logPos(t) * (q u : ℂ) := by
+    with_reducible refine (polarFree_arch_profile m τ hτ qA hqA ψ).elim fun a ha ↦ ?_
+    with_reducible refine (lift a).elim fun f hf ↦ ?_
+    refine ⟨f, fun t u ↦ ?_⟩
+    rw [hf, if_congr (hfin t u.val) rfl rfl]
+    by_cases hu : unitsSupport(u.val)
+    · rw [ite_eq_left hu, show q u = (qA (ku u hu)).re from dite_eq_left hu]
+      have he : π (σ t * u.val) = (ku u hu).val * τ t := by
+        rw [map_mul, mul_comm]
+        rfl
+      rw [← hπ, he, ha]
+      exact (congrArg (· * ψ.val logPos(t)) (hqApos (ku u hu)).1).trans (mul_comm _ _)
+    · rw [ite_eq_right hu, show q u = 0 from dite_eq_right hu, Complex.ofReal_zero, mul_zero]
+  let b : ContDiffBump (0 : ℝ) := ⟨1, 2, by norm_num, by norm_num⟩
+  let β : PositiveRealExponentialDecay univ :=
+    ⟨fun t ↦ (b t : ℂ), mem_logExponentialDecaySubmodule_of_hasCompactSupport univ
+      (b.hasCompactSupport.comp_left Complex.ofReal_zero)
+      (Complex.ofRealCLM.contDiff.comp b.contDiff)⟩
+  have hβ : β.val 0 = 1 := by
+    change (b 0 : ℂ) = 1
+    rw [b.one_of_mem_closedBall (Metric.mem_closedBall_self b.rIn_pos.le), Complex.ofReal_one]
+  with_reducible refine (htest φ).elim fun f hf ↦ ?_
+  with_reducible refine (htest β).elim fun b₀ hb₀ ↦ ?_
+  obtain ⟨he, hpos⟩ :=
+    thetaFiber_normalize σ.toMonoidHom hσ φ.val β.val hβ q hq hq₁ f.val b₀.val hf hb₀
+  let z := ThetaS(b₀.val) 1
+  have hz : z ≠ 0 := fun h ↦ (ne_of_gt hpos) (by simpa only [Complex.zero_re] using congrArg Complex.re h)
+  refine ⟨z⁻¹ • f, fun g ↦ ?_⟩
+  change ThetaS(z⁻¹ • f.val) g = _
+  rw [map_smul, ContinuousMap.smul_apply, he]
+  change z⁻¹ * (φ.val logPos(sIdeleQuotientNorm F S g) * z) = _
+  rw [mul_left_comm, inv_mul_cancel₀ hz, mul_one]
+
+end PolarFreeAssembly
+
+section PolarFreeTarget
+
+variable {F : Type*} [Field F] [NumberField F]
+variable {S : Finset (HeightOneSpectrum (𝓞 F))}
+
+private theorem polarFree_section_lift
+    (r : (w : {w : InfinitePlace F // w.IsReal}) →
+      {e : w.val.Completion ≃+* ℝ // IsHomeomorph (e : w.val.Completion → ℝ)})
+    (c : (w : {w : InfinitePlace F // w.IsComplex}) →
+      {e : w.val.Completion ≃+* ℂ // IsHomeomorph (e : w.val.Completion → ℂ)})
+    (φ : PositiveRealExponentialDecay univ) :
+    ∃ f : sAdelePolarFree S r c, ∀ g : SIdeleQuotient F S,
+      sLocalHomogeneousAdelicThetaLinearMap F S 1 f.val g =
+        φ.val (Real.log ((sIdeleQuotientNorm F S g).val : ℝ)) := by
+  obtain ⟨w⟩ := (inferInstance : Nonempty (InfinitePlace F))
+  with_reducible refine (thetaFiber_exists_archSection (S := S) w).elim fun σ hσ ↦ ?_
+  have h := polarFree_assemble_profile (F := F) (S := S)
+    polarFree_realModel polarFree_complexModel
+    (polarFree_archWeight ((fun _ ↦ 1), (fun _ ↦ 1)))
+    polarFree_archProjection σ hσ.1 hσ.2 polarFree_archProjection_val polarFree_archWeight_norm
+    polarFree_lift_archimedean φ
+  with_reducible refine h.elim fun f hf ↦ ?_
+  refine ⟨⟨f.val, ?_⟩, hf⟩
+  rw [sAdelePolarFree_eq_of_models r polarFree_realModel c polarFree_complexModel]
+  exact f.property
+
+end PolarFreeTarget
+
+end PolarFreeConstruction
+
 -- TODO(paper-gap): In (5.3.4.9), the summation index m_v does not occur in the summand.
 -- Norm-one class representatives with archimedean component one need not exist.
 
 /-- Paper: Lemma 5.3.4.3, p. 261.
 Every log-Schwartz function decaying at all real exponents lifts to a polar-free test
-whose trivial homogeneous theta function is the given radial function. -/
+whose trivial homogeneous theta function is the given radial function.
+Deviation: Split the norm at a single archimedean place and average a compact
+norm-one shape with finite integer-unit factors. -/
 theorem sLocalHomogeneousTheta_trivial_exists_polarFree (r : RealModels) (c : ComplexModels)
     (φ : PositiveRealExponentialDecay univ) :
     ∃ f : sAdelePolarFree S r c, ∀ g : Jₛ,
-      thetaAt(1) f.val g = φ.val (Real.log ((mₛ g).val : ℝ)) := by sorry
+      thetaAt(1) f.val g = φ.val (Real.log ((mₛ g).val : ℝ)) := by
+  exact polarFree_section_lift (S := S) r c φ
 
 /-- Paper: Proposition 5.3.4.4(1)–(2), p. 264.
 On the component of χ, a zeta transform is entire exactly when it agrees there
