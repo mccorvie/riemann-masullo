@@ -6,6 +6,7 @@ public import RiemannMasullo.Ch06_LocalGlobal.Sec3
 public import RiemannMasullo.Ch09_HardySobolev.Sec3
 
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import all RiemannMasullo.Ch02_AdelicTheta.Sec3
 
 import Mathlib.MeasureTheory.Measure.SeparableMeasure
 
@@ -410,13 +411,108 @@ theorem globalThetaAmbient_equiv_canonical (hm : IsModulation m𝔽) (α β s : 
   exact globalThetaAmbient_equiv_canonical_aux μ𝔽 (canonicalModulatedHaar m𝔽 hm)
     (μ𝔽₁ univ) hc0 hct hμ _ hdm hd
 
+open scoped ENNReal in
+/-- The S-local quotient Tamagawa measure is the canonical modulated Haar measure times the
+mass of the norm-one quotient. Both measures give the band of norms in [1, e] the mass of
+the norm-one part. -/
+private theorem sLocalThetaAmbient_equiv_canonical_measure (hm : IsModulation mₛ) :
+    μₛ = μₛ₁ univ • canonicalModulatedHaar mₛ hm := by
+  have : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  have : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have : SFinite (positiveRealHaar : Measure ℝ≥0ˣ) := by unfold positiveRealHaar; infer_instance
+  have : CompactSpace J₁ := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage isCompact_singleton)
+  have : BorelSpace J₁ := ⟨rfl⟩
+  have : (μₛ₁).IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  -- A continuous section of the S-idelic norm and its image in the quotient.
+  let p := Units.map (adeleProjection F S).toMonoidHom
+  have hp : Continuous p := (continuous_fst.prodMk (continuous_pi fun v : S ↦
+    (RestrictedProduct.continuous_eval v.val).comp continuous_snd)).units_map _
+  let τ : ℝ≥0ˣ →ₜ* Iₛ := ⟨p.comp (canonicalIdeleNormSection F),
+    hp.comp (canonicalIdeleNormSection_continuous F)⟩
+  have hτ : RightInverse τ (sIdeleNorm F S) := thetaSection_rightInverse F S
+  let σ : ℝ≥0ˣ →ₜ* Jₛ :=
+    (⟨QuotientGroup.mk' _, QuotientGroup.continuous_mk⟩ : Iₛ →ₜ* Jₛ).comp τ
+  have hσ : RightInverse σ mₛ := fun t ↦ (sIdeleQuotientNorm_mk F S (τ t)).trans (hτ t)
+  -- The band of norms between 1 and e has `dt/t`-mass one.
+  let Sb : Set ℝ≥0ˣ := {t | ((t.val : ℝ≥0) : ℝ) ∈ Icc 1 (Real.exp 1)}
+  have hSm : MeasurableSet Sb :=
+    (NNReal.continuous_coe.comp Units.continuous_val).measurable measurableSet_Icc
+  have hPRS : positiveRealHaar Sb = 1 := by
+    let T : ℝ≥0ˣ := Units.mk0 (Real.exp 1).toNNReal (by positivity)
+    have hT : ((T.val : ℝ≥0) : ℝ) = Real.exp 1 := Real.coe_toNNReal _ (Real.exp_pos 1).le
+    have h := positiveRealHaar_interval T (by rw [hT]; exact Real.one_le_exp zero_le_one)
+    rw [hT, Real.log_exp, ENNReal.ofReal_one] at h
+    exact h
+  let B : Set Jₛ := mₛ ⁻¹' Sb
+  have hBm : MeasurableSet B := (mₛ).continuous.measurable hSm
+  have hnorm (k : Jₛ) (hk : mₛ k = 1) (t : ℝ≥0ˣ) : k * σ t ∈ B ↔ t ∈ Sb := by
+    change mₛ (k * σ t) ∈ Sb ↔ _
+    rw [map_mul, hk, one_mul, hσ t]
+  -- The canonical measure gives the band mass one.
+  have hcanB : canonicalModulatedHaar mₛ hm B = 1 := by
+    letI : MeasurableSpace (mₛ).toMonoidHom.ker := Subtype.instMeasurableSpace
+    have : CompactSpace (mₛ).toMonoidHom.ker := isCompact_iff_compactSpace.mp hm.isCompact_ker
+    let μ₀ : Measure (mₛ).toMonoidHom.ker := Measure.haarMeasure ⊤
+    have hcan := canonicalModulatedHaar_eq_map_prod mₛ hm σ hσ μ₀ Measure.haarMeasure_self
+    have hφ : Continuous fun z : (mₛ).toMonoidHom.ker × ℝ≥0ˣ ↦ (z.1 : Jₛ) * σ z.2 := by
+      fun_prop
+    rw [hcan, Measure.map_apply hφ.measurable hBm]
+    have hpre : (fun z : (mₛ).toMonoidHom.ker × ℝ≥0ˣ ↦ (z.1 : Jₛ) * σ z.2) ⁻¹' B =
+        univ ×ˢ Sb := by
+      ext ⟨k, t⟩
+      simp only [mem_preimage, mem_prod, mem_univ, true_and]
+      exact hnorm k k.property t
+    rw [hpre, Measure.prod_prod, show μ₀ univ = 1 from Measure.haarMeasure_self, one_mul, hPRS]
+  -- The quotient Tamagawa measure gives the band the mass of the norm-one part.
+  have hμB : μₛ B = μₛ₁ univ := by
+    have hJ := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).2 τ hτ
+    have hφ : Continuous fun x : J₁ × ℝ≥0ˣ ↦ (x.1 : Jₛ) * QuotientGroup.mk (τ x.2) := by
+      fun_prop
+    rw [← hJ, Measure.map_apply hφ.measurable hBm]
+    have hpre : (fun x : J₁ × ℝ≥0ˣ ↦ (x.1 : Jₛ) * QuotientGroup.mk (τ x.2)) ⁻¹' B =
+        univ ×ˢ Sb := by
+      ext ⟨k, t⟩
+      simp only [mem_preimage, mem_prod, mem_univ, true_and]
+      exact hnorm k k.property t
+    rw [hpre, Measure.prod_prod, hPRS, mul_one]
+  -- Compare the two Haar measures on the band.
+  have : (canonicalModulatedHaar mₛ hm).IsHaarMeasure :=
+    (Classical.choose_spec (existsUnique_canonicalModulatedHaar mₛ hm).exists).1
+  have hscale := Measure.isMulLeftInvariant_eq_smul μₛ (canonicalModulatedHaar mₛ hm)
+  set c := Measure.haarScalarFactor μₛ (canonicalModulatedHaar mₛ hm)
+  have hc : (c : ℝ≥0∞) = μₛ₁ univ := by
+    have h := congrArg (fun ν : Measure Jₛ ↦ ν B) hscale
+    simp only [Measure.smul_apply, ENNReal.smul_def, smul_eq_mul] at h
+    rw [← hμB, h, hcanB, mul_one]
+  exact hscale.trans (by rw [ENNReal.smul_def, hc])
+
 /-- Paper: Definition 10.1.1.1(2) and Lemma 10.1.1.4, pp. 434–436.
 The identity on S-local functions compares the norm in (10.1.1.5) with §9.2.
 Deviation: The Tamagawa squared norm includes the mass of the norm-one quotient. -/
 theorem sLocalThetaAmbient_equiv_canonical (hm : IsModulation mₛ) (α β s : ℝ) :
     ∃ e : Wₛ(α, β, s) ≃L[ℂ] ModulatedIntervalSobolev mₛ hm α β s,
       ∀ u, (e u : Jₛ → ℂ) =ᵐ[μₛ] u ∧
-        ‖u‖ = Real.sqrt (Measure.real μₛ₁ univ) * ‖e u‖ := by sorry
+        ‖u‖ = Real.sqrt (Measure.real μₛ₁ univ) * ‖e u‖ := by
+  have : CompactSpace J₁ := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage isCompact_singleton)
+  have : (μₛ₁).IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  have hc0 : μₛ₁ univ ≠ 0 := (isOpen_univ.measure_pos _ univ_nonempty).ne'
+  have hct : μₛ₁ univ ≠ ⊤ := measure_ne_top _ _
+  have hdm : Measurable fun g : Jₛ ↦
+      ENNReal.ofReal (intervalSobolevDensity α β s (Real.log (((mₛ g).val : ℝ)))) := by
+    have hLm : Measurable fun g : Jₛ ↦ Real.log (((mₛ g).val : ℝ)) :=
+      ((NNReal.continuous_coe.comp (Units.continuous_val.comp (mₛ).continuous)).log
+        fun g ↦ (NNReal.coe_pos.mpr (Units.zero_lt _)).ne').measurable
+    unfold intervalSobolevDensity
+    fun_prop
+  have hd (g : Jₛ) :
+      ENNReal.ofReal (intervalSobolevDensity α β s (Real.log (((mₛ g).val : ℝ)))) ≠ 0 := by
+    refine (ENNReal.ofReal_pos.mpr ?_).ne'
+    unfold intervalSobolevDensity
+    exact mul_pos ((Real.exp_pos _).trans_le (le_max_left _ _)) (by positivity)
+  exact globalThetaAmbient_equiv_canonical_aux μₛ (canonicalModulatedHaar mₛ hm)
+    (μₛ₁ univ) hc0 hct (sLocalThetaAmbient_equiv_canonical_measure hm) _ hdm hd
 
 /-- Paper: Lemma 10.1.1.3(2), p. 435. Ambient left translation preserves the
 global completion, acts jointly continuously there, and on weighted tests
