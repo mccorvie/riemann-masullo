@@ -4811,8 +4811,10 @@ theorem introTraceApprox_rat_spectral_tendsto_atBot (h ρ : ℕ → ℝ → ℝ)
   obtain ⟨φ, hφ⟩ := introTraceApprox_exists_bruhat (F := ℚ) 1 h ρ _hA n 2
   have hzero : a n 1 = 0 := image_eq_zero_of_notMem_tsupport
     (fun ht ↦ lt_irrefl _ (introTraceApprox_support h ρ _hA n 2 ht))
-  have ht := introTrace_characterTrace τ (canonicalIdeleNormSection_rightInverse ℚ) 1
-    (fun _ ↦ rfl) (a n) hzero φ hφ 1 one_pos
+  have ht := introTrace_characterTrace_of_exteriorZeros τ (canonicalIdeleNormSection_rightInverse ℚ) 1
+    (fun _ ↦ rfl) (a n) hzero φ hφ 1 (fun _ ↦ by
+      simpa only [modulatedFourierMellin, relativeVerticalStrip, Set.preimage_univ, Set.indicator_univ]
+        using traceFormula_exteriorZeros_of_half_le τ φ (by norm_num : (1 / 2 : ℝ) ≤ 1))
   have he := ht.2.2.tsum_eq
   simp only at he
   change introTraceSpectralSum (F := ℚ) 1 (a n) 1 = M n - A n -
@@ -4827,6 +4829,40 @@ theorem introTraceApprox_rat_spectral_tendsto_atBot (h ρ : ℕ → ℝ → ℝ)
   change (M n).re < _ at hn
   change _ ≤ (A n).re at hAn
   linarith
+
+/-- Paper: §1.4.3, p. 29. The completed L-function of the trivial rational character
+has infinitely many distinct positive-divisor zeros. Otherwise its smoothed spectral
+sum in the unit window would have a finite limit at parameter two, since each
+individual Mellin moment converges there. -/
+theorem introTrace_rat_positive_divisor_infinite :
+    Infinite {z : ℂ // 0 < MeromorphicOn.divisor (continuedCompletedHeckeL (F := ℚ) 1) univ z} := by
+  classical
+  let m := MeromorphicOn.divisor (continuedCompletedHeckeL (F := ℚ) 1) univ
+  let Z := {z : ℂ // 0 < m z ∧ |z.re - 1 / 2| < (1 : ℝ)}
+  by_contra hn
+  let : Finite {z : ℂ // 0 < m z} := not_infinite_iff_finite.mp hn
+  let i (r : Z) : {z : ℂ // 0 < m z} := ⟨r.val, r.property.1⟩
+  let : Finite Z := Finite.of_injective i fun r s h ↦
+    Subtype.ext (congrArg (fun z : {z : ℂ // 0 < m z} ↦ z.val) h)
+  let : Fintype Z := Fintype.ofFinite Z
+  obtain ⟨h, ρ, hA⟩ := exists_introTraceApproximation
+  let f (n : ℕ) := introTraceApprox (h n) (ρ n) 2
+  let s (r : Z) := r.val - 1 / 2
+  have hlim (r : Z) : Tendsto (fun n ↦ (m r.val : ℂ) * introTraceMellin (f n) (s r)) atTop
+      (𝓝 ((m r.val : ℂ) * introTraceMellin (introTracePower 2) (s r))) := by
+    apply Filter.Tendsto.const_mul
+    apply (introTraceApprox_mellin_tendsto h ρ hA (s r)).tendsto_at
+    change (s r).re < (2 : ℂ).re
+    have hs := (abs_lt.mp r.property.2).2
+    dsimp [s]
+    norm_num
+    linarith
+  have hsum := tendsto_finsetSum Finset.univ (fun r _ ↦ hlim r)
+  let q := ∑ r : Z, (m r.val : ℂ) * introTraceMellin (introTracePower 2) (s r)
+  apply not_tendsto_nhds_of_tendsto_atBot (introTraceApprox_rat_spectral_tendsto_atBot h ρ hA) q.re
+  have hspec : Tendsto (fun n ↦ introTraceSpectralSum (F := ℚ) 1 (f n) 1) atTop (𝓝 q) := by
+    simpa only [introTraceSpectralSum, tsum_fintype] using hsum
+  exact Complex.continuous_re.continuousAt.tendsto.comp hspec
 
 /-- Paper: §1.4.4, p. 29. The negative prime-power norms lie below one,
 where every cutoff test vanishes. -/
