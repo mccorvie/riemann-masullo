@@ -35,6 +35,10 @@ not.
 
 ## Get involved
 
+> **23 November 2026: this phase is closing.** No new claims are taken after 14:10 UTC. Pull
+> requests for work already claimed are welcome, and everything that is open is still checked
+> and merged. See [#6674](https://github.com/mccorvie/riemann-masullo/issues/6674).
+
 Several hundred proofs are open, and each one is a single Lean statement that is already
 written. You need no special access and no knowledge of the whole paper. Give your coding agent
 (Codex, Claude Code or any agent that can run shell commands) this instruction:
