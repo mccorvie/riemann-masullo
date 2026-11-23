@@ -1618,10 +1618,124 @@ private theorem exists_thetaAverage_single (χ : PontryaginDual Iₛ(S)) (a : I�
       rw [smul_apply, smul_mul_assoc])
   · exact ContinuousMap.continuous_of_continuous_uncurry A hcont
 
+section MixedCoordinates
+
+open Set
+open scoped ENNReal Uniformity
+
+/-- Separating point evaluations give a closed graph for a linear map of Fréchet spaces. -/
+private theorem thetaAverage_continuous_of_eval {X Y I : Type*}
+    [AddCommGroup X] [Module ℂ X] [UniformSpace X] [IsUniformAddGroup X]
+    [FirstCountableTopology X] [T2Space X] [BaireSpace X] [CompleteSpace X] [ContinuousSMul ℂ X]
+    [AddCommGroup Y] [Module ℂ Y] [UniformSpace Y] [IsUniformAddGroup Y]
+    [FirstCountableTopology Y] [CompleteSpace Y] [ContinuousSMul ℂ Y]
+    (f : X →ₗ[ℂ] Y) (u : I → X → ℂ) (v : I → Y → ℂ)
+    (hu : ∀ i, Continuous (u i)) (hv : ∀ i, Continuous (v i))
+    (hsep : ∀ y z, (∀ i, v i y = v i z) → y = z)
+    (he : ∀ i x, v i (f x) = u i x) : Continuous f := by
+  have hg : (f.graph : Set (X × Y)) = ⋂ i, {p | v i p.2 = u i p.1} := by
+    ext p
+    change p ∈ f.graph ↔ _
+    rw [f.mem_graph_iff, mem_iInter]
+    refine ⟨fun h i ↦ (congrArg (v i) h).trans (he i p.1), fun hp ↦ ?_⟩
+    exact hsep _ _ fun i ↦ (hp i).trans (he i p.1).symm
+  have hc : IsClosed (f.graph : Set (X × Y)) := hg ▸
+    isClosed_iInter (fun i ↦ isClosed_eq ((hv i).comp continuous_snd) ((hu i).comp continuous_fst))
+  have : FirstCountableTopology f.graph := Topology.IsInducing.subtypeVal.firstCountableTopology
+  let : IsUniformAddGroup f.graph := .comap f.graph.subtype.toAddMonoidHom
+  let : CompleteSpace f.graph := hc.isComplete.completeSpace_coe
+  let p : f.graph →L[ℂ] X :=
+    (ContinuousLinearMap.fst ℂ X Y).comp ⟨f.graph.subtype, continuous_subtype_val⟩
+  have hps : Surjective p := fun x ↦ ⟨⟨(x, f x), (f.mem_graph_iff _).mpr rfl⟩, rfl⟩
+  have hpi : Injective p := by
+    intro x y h
+    have hx := (f.mem_graph_iff x.val).mp x.property
+    have hy := (f.mem_graph_iff y.val).mp y.property
+    exact Subtype.ext (Prod.ext h (hx.trans ((congrArg f h).trans hy.symm)))
+  let e := Equiv.ofBijective p ⟨hpi, hps⟩
+  have ho : IsOpenMap p := isOpenMap_of_not_isMeagre_range p
+    (by rw [hps.range_eq]; exact not_isMeagre_of_isOpen isOpen_univ univ_nonempty)
+  exact (continuous_subtype_val.snd.comp (e.continuous_symm_iff.mpr ho)).congr fun x ↦
+    ((f.mem_graph_iff (e.symm x).val).mp (e.symm x).property).trans
+      (congrArg f (e.apply_symm_apply x))
+
+/-- The uniform seminorm controls evaluation on every realized elementary stage. -/
+private theorem thetaAverage_stage_eval {G : Type*} [CommGroup G] [TopologicalSpace G]
+    (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient) (x : G) :
+    Continuous (fun f : SchwartzBruhatStage e ↦ SchwartzBruhat.ofStage a e f x) := by
+  let L := (LinearMap.proj x).comp (schwartzBruhatStageRealization a e)
+  refine (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp L fun _ ↦ ?_
+  apply Seminorm.continuous_of_le (elementarySchwartz_withSeminorms.continuous_seminorm (0, 0, 0, 0))
+  intro f
+  change ‖schwartzBruhatStageRealization a e f x‖ ≤ elementarySchwartzSeminorm (0, 0, 0, 0) f
+  rw [schwartzBruhatStageRealization_apply]
+  split_ifs
+  · change (‖f _‖₊ : ENNReal).toReal ≤ (elementarySchwartzBound f.val (0, 0, 0, 0)).toReal
+    apply ENNReal.toReal_mono (f.property.2 _).ne
+    rw [elementarySchwartzBound_zero]
+    exact le_iSup (fun y ↦ (‖f y‖₊ : ENNReal)) _
+  · exact norm_zero.trans_le (apply_nonneg _ _)
+
+private theorem thetaAverage_coordinates_continuous {F : Type*} [Field F] [NumberField F]
+    (L : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) →ₗ[ℂ]
+      SchwartzMap (mixedEmbedding.mixedSpace F) ℂ)
+    (hL : ∀ f x, L f (InfiniteAdeleRing.ringEquiv_mixedSpace F x) = f (Multiplicative.ofAdd x)) :
+    Continuous L := by
+  let MixedSpace := mixedEmbedding.mixedSpace F
+  let M := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  let : PolynormableSpace ℂ (SchwartzMap MixedSpace ℂ) := (schwartz_withSeminorms ℂ MixedSpace ℂ).toPolynormableSpace
+  refine SchwartzBruhat.continuous_of_continuous_comp_ofStage L fun a e ↦ ?_
+  let X := SchwartzBruhatStage e
+  let Y := SchwartzMap MixedSpace ℂ
+  let P : X →ₗ[ℂ] Y := L.comp (SchwartzBruhat.ofStage a e)
+  obtain ⟨_, _, hm, hc⟩ := elementarySchwartz_isFrechet (m := e.realDim) (n := e.torusDim)
+    (r := e.latticeRank) (F := e.finiteFactor)
+  let : TopologicalSpace.MetrizableSpace X := hm
+  have : CompleteSpace X := by
+    rw [← IsUniformAddGroup.rightUniformSpace_eq (G := X)]
+    exact hc
+  have : (𝓤 X).IsCountablyGenerated := by
+    rw [uniformity_eq_comap_nhds_zero X]
+    infer_instance
+  let : CompleteSpace Y := completeSpace_schwartzMap
+  change Continuous P
+  refine thetaAverage_continuous_of_eval P
+    (fun x f ↦ SchwartzBruhat.ofStage a e f (Multiplicative.ofAdd x))
+    (fun x g ↦ g (M x)) (fun x ↦ thetaAverage_stage_eval a e _) (fun x ↦ ?_) ?_ (fun x f ↦ hL _ x)
+  · exact ((BoundedContinuousFunction.evalCLM ℂ (M x)).comp
+      (SchwartzMap.toBoundedContinuousFunctionCLM ℂ MixedSpace ℂ)).continuous
+  · intro u v h
+    exact SchwartzMap.ext fun y ↦ (M.surjective y).elim fun x hx ↦ hx ▸ h x
+
+/-- Pullback to mixed coordinates is continuous for the final Schwartz–Bruhat topology. -/
+private theorem exists_thetaAverage_coordinates {F : Type*} [Field F] [NumberField F] :
+    ∃ J : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) →L[ℂ]
+      SchwartzMap (mixedEmbedding.mixedSpace F) ℂ, ∀ f x,
+      J f (InfiniteAdeleRing.ringEquiv_mixedSpace F x) = f (Multiplicative.ofAdd x) := by
+  let A := SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))
+  let MixedSpace := mixedEmbedding.mixedSpace F
+  let M := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  have h (f : A) : ∃ g : SchwartzMap MixedSpace ℂ, ∀ x, g (M x) = f (Multiplicative.ofAdd x) :=
+    (mem_archimedeanSchwartzBruhat_iff _).mp f.property
+  let L : A →ₗ[ℂ] SchwartzMap MixedSpace ℂ :=
+    { toFun := fun f ↦ (h f).choose
+      map_add' := fun f g ↦ SchwartzMap.ext fun y ↦ by
+        obtain ⟨x, rfl⟩ := M.surjective y
+        exact ((h _).choose_spec x).trans (congrArg₂ (· + ·) ((h f).choose_spec x).symm
+          ((h g).choose_spec x).symm)
+      map_smul' := fun c f ↦ SchwartzMap.ext fun y ↦ by
+        obtain ⟨x, rfl⟩ := M.surjective y
+        exact ((h _).choose_spec x).trans (congrArg (c • ·) ((h f).choose_spec x).symm) }
+  have hL (f : A) (x : InfiniteAdeleRing F) : L f (M x) = f (Multiplicative.ofAdd x) :=
+    (h f).choose_spec x
+  exact ⟨⟨L, thetaAverage_coordinates_continuous L hL⟩, hL⟩
+
+end MixedCoordinates
+
 private theorem thetaAverage_assemble
-    (J : SchwartzMap M∞ ℂ ≃L[ℂ] ℬ∞)
-    (hJ : ∀ (f : SchwartzMap M∞ ℂ) (x : InfiniteAdeleRing F),
-      J f (Multiplicative.ofAdd x) = f (mix x))
+    (J : ℬ∞ →L[ℂ] SchwartzMap M∞ ℂ)
+    (hJ : ∀ (f : ℬ∞) (x : InfiniteAdeleRing F),
+      J f (mix x) = f (Multiplicative.ofAdd x))
     (χ : PontryaginDual Iₛ(S)) (r : Fin (classNumber F) → Nₛ(S)) :
     ∃ A : ℬ∞ →L[ℂ] C(I∞, ℂ), ∀ f x,
       A f x = ∑ k, ∫ g : N∞,
@@ -1629,12 +1743,11 @@ private theorem thetaAverage_assemble
         f (Multiplicative.ofAdd (a⁻¹ * x).val) * (χ (archInsert(S) a) : ℂ)
         ∂μ∞ := by
   choose B hB using fun k : Fin (classNumber F) ↦ exists_thetaAverage_single χ (archPart(S) (r k).val)
-  refine ⟨(∑ k, B k).comp J.symm.toContinuousLinearMap, fun f x ↦ ?_⟩
-  simp only [ContinuousLinearMap.comp_apply, ContinuousLinearEquiv.coe_coe,
-    sum_apply, ContinuousMap.sum_apply, hB]
+  refine ⟨(∑ k, B k).comp J, fun f x ↦ ?_⟩
+  simp only [ContinuousLinearMap.comp_apply, sum_apply, ContinuousMap.sum_apply, hB]
   refine Finset.sum_congr rfl fun k _ ↦ integral_congr_ae (.of_forall fun g ↦ ?_)
   dsimp only
-  rw [← hJ, J.apply_symm_apply]
+  rw [hJ]
 
 end ArchimedeanThetaAverageProof
 
@@ -1648,7 +1761,7 @@ theorem exists_infiniteStandardThetaAverage (χ : PontryaginDual Iₛ(S))
         let a := archPart(S) (r k).val * archPart((∅ : Finset V)) g.val
         f (Multiplicative.ofAdd (a⁻¹ * x).val) * (χ (archInsert(S) a) : ℂ)
         ∂sNormOneIdeleTamagawaMeasure F ∅ := by
-  obtain ⟨J, hJ⟩ := archimedeanSchwartzBruhat_equiv (F := F)
+  obtain ⟨J, hJ⟩ := exists_thetaAverage_coordinates (F := F)
   exact thetaAverage_assemble J hJ χ r
 
 /-- Paper: (6.2.2.3), p. 298.
