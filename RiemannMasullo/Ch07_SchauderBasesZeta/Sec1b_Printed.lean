@@ -3,6 +3,10 @@ module
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
 import Mathlib.Algebra.Field.ULift
+import Mathlib.NumberTheory.LSeries.DirichletContinuation
+import RiemannMasullo.External.ZetaLab.HardyFirstZero.FirstZero
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Basic
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-! # §7.1.3–7.1.4 Statements that are false as printed -/
 
@@ -382,6 +386,274 @@ def Printed.schwartzBergman_jet_eq_mellinInv_shifted_moment : Prop :=
       let moment := fun t : ℝ ↦ (Real.log t : ℂ) ^ m * mellinInv 0 φ t
       iteratedDeriv m φ ρ.val = mellin moment (ρ.val + (x₀ : ℂ) * Complex.I)
 
+/-- A universe lift of the rationals is a number field. -/
+private theorem schwartzBergman_jet_eq_mellinInv_shifted_moment_numberField :
+    NumberField (ULift.{u} ℚ) := by
+  let e : ULift.{u} ℚ ≃+* ℚ := ULift.ringEquiv
+  have : CharZero (ULift.{u} ℚ) :=
+    charZero_of_injective_ringHom (f := e.symm.toRingHom) e.symm.injective
+  have : FiniteDimensional ℚ (ULift.{u} ℚ) :=
+    Module.Finite.of_injective e.toRatAlgEquiv.toLinearMap e.injective
+  exact ⟨⟩
+
+/-- A universe lift of the rationals has the Dedekind zeta function of the rationals. -/
+private theorem schwartzBergman_jet_eq_mellinInv_shifted_moment_dedekindZeta
+    [NumberField (ULift.{u} ℚ)] (s : ℂ) :
+    dedekindZeta (ULift.{u} ℚ) s = dedekindZeta ℚ s := by
+  let e : 𝓞 (ULift.{u} ℚ) ≃+* 𝓞 ℚ := RingOfIntegers.mapRingEquiv ULift.ringEquiv
+  have hnorm (I : Ideal (𝓞 (ULift.{u} ℚ))) : Ideal.absNorm (I.map e) = Ideal.absNorm I := by
+    rw [Ideal.absNorm_eq_natCard, Ideal.absNorm_eq_natCard]
+    exact (Nat.card_congr (Ideal.quotientEquiv I (I.map e) e rfl).toEquiv).symm
+  have hc (n : ℕ) : Nat.card {I : Ideal (𝓞 (ULift.{u} ℚ)) // Ideal.absNorm I = n} =
+      Nat.card {I : Ideal (𝓞 ℚ) // Ideal.absNorm I = n} := by
+    refine Nat.card_congr (Equiv.subtypeEquiv e.idealComapOrderIso.symm.toEquiv fun I ↦ ?_)
+    change _ ↔ Ideal.absNorm (I.map e) = n
+    rw [hnorm]
+  change LSeries _ s = LSeries _ s
+  congr 1
+  funext n
+  rw [hc]
+
+/-- Over the rationals the Dedekind zeta series is the Riemann zeta function
+to the right of one. -/
+private theorem schwartzBergman_jet_eq_mellinInv_shifted_moment_rat {s : ℂ} (hs : 1 < s.re) :
+    dedekindZeta ℚ s = riemannZeta s := by
+  have hc (n : ℕ) : Nat.card {I : Ideal (𝓞 ℚ) // I.absNorm = n} = 1 := by
+    let : Unique {I : Ideal (𝓞 ℚ) // I.absNorm = n} :=
+      { default := ⟨_, RatRingOfIntegers.absNorm_span_natCast n⟩
+        uniq := fun I ↦ by
+          apply Subtype.ext
+          obtain ⟨m, hm⟩ := RatRingOfIntegers.exists_eq_span_natCast I.val
+          have hmn : m = n := by
+            simpa only [hm, RatRingOfIntegers.absNorm_span_natCast] using I.property
+          simpa only [hmn] using hm }
+    exact Nat.card_unique
+  simpa only [dedekindZeta, hc, Nat.cast_one, Pi.one_def] using LSeries_one_eq_riemannZeta hs
+
+/-- The Riemann zeta function is meromorphic on the plane. -/
+private theorem schwartzBergman_jet_eq_mellinInv_shifted_moment_meromorphic :
+    MeromorphicOn riemannZeta univ := by
+  intro s _
+  have ha := (DirichletCharacter.differentiable_LFunctionTrivChar₁ 1).analyticAt s
+  have hm : MeromorphicAt (fun z : ℂ ↦ DirichletCharacter.LFunctionTrivChar₁ 1 z / (z - 1)) s :=
+    ha.meromorphicAt.div (analyticAt_id.sub analyticAt_const).meromorphicAt
+  apply hm.congr
+  filter_upwards [(eventually_cofinite_ne (1 : ℂ)).filter_mono (nhdsNE_le_cofinite s)] with z hz
+  rw [DirichletCharacter.LFunctionTrivChar₁, Function.update_of_ne hz,
+    mul_div_cancel_left₀ _ (sub_ne_zero.mpr hz)]
+  simp [DirichletCharacter.LFunctionTrivChar]
+
+/-- The finite L-function of the trivial character is the Dedekind zeta series. -/
+private theorem schwartzBergman_jet_eq_mellinInv_shifted_moment_one (F : Type*) [Field F] [NumberField F]
+    (s : halfPlane) : finiteHeckeL (1 : U𝔽(F)) s = dedekindZeta F s := by
+  have he := completedHeckeL_one_eq_dedekindZeta (F := F) s
+  rw [← heckeGammaFactor_one] at he
+  exact mul_left_cancel₀ (heckeGammaFactor_ne_zero_of_re_pos (1 : U𝔽(F))
+    (zero_lt_one.trans s.property)) he
+
+/-- The norm twist evaluates to the character times a power of the idelic norm. -/
+private theorem schwartzBergman_jet_eq_mellinInv_shifted_moment_apply (F : Type*) [Field F] [NumberField F]
+    (χ : U𝔽(F)) (s : ℂ) (g : IdeleClassGroup (𝓞 F) F) :
+    ideleClassNormTwist χ s g = (χ g : ℂ) * (((ideleClassNorm F g : NNReal) : ℝ) : ℂ) ^ s :=
+  rfl
+
+/-- An imaginary translation of the Euler product is the Euler product of the translated
+unitary character. -/
+private theorem schwartzBergman_jet_eq_mellinInv_shifted_moment_twist (F : Type*) [Field F] [NumberField F]
+    (χ ψ : U𝔽(F)) (a : ℂ) (ha : a.re = 0)
+    (hψ : ideleClassNormTwist ψ 0 = ideleClassNormTwist χ a) (s : halfPlane) :
+    finiteHeckeL ψ s = finiteHeckeL χ ⟨(s : ℂ) + a, by
+      change 1 < (s : ℂ).re + a.re
+      rw [ha, add_zero]
+      exact s.property⟩ := by
+  let w : halfPlane := ⟨(s : ℂ) + a, by
+    change 1 < (s : ℂ).re + a.re
+    rw [ha, add_zero]
+    exact s.property⟩
+  apply (finiteHeckeL_hasProd ψ s).unique ((finiteHeckeL_hasProd χ w).congr_fun ?_)
+  intro v
+  have hval (t : (v.adicCompletion F)ˣ) :
+      (ideleClassNormTwist ψ 0).restrict v t =
+        (ideleClassNormTwist χ 0).restrict v t * (‖(t : v.adicCompletion F)‖ : ℂ) ^ a := by
+    rw [hψ, HeckeCharacter.restrict, HeckeCharacter.restrict,
+      MulChar.ofUnitHom_coe, MulChar.ofUnitHom_coe]
+    simp only [MonoidHom.comp_apply, MonoidHom.coe_toHomUnits, ContinuousMonoidHom.coe_toMonoidHom,
+      MonoidHom.coe_ofClass]
+    rw [schwartzBergman_jet_eq_mellinInv_shifted_moment_apply, schwartzBergman_jet_eq_mellinInv_shifted_moment_apply,
+      Complex.cpow_zero, mul_one, ideleClassNorm_ofAdicCompletion]
+    rfl
+  have hu : (ideleClassNormTwist ψ 0).IsUnramifiedAt v ↔
+      (ideleClassNormTwist χ 0).IsUnramifiedAt v := by
+    rw [HeckeCharacter.isUnramifiedAt_iff, HeckeCharacter.isUnramifiedAt_iff]
+    apply forall_congr'
+    intro t
+    let u := Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom t
+    have hn : ‖(u : v.adicCompletion F)‖ = 1 := by
+      apply Valued.toNormedField.norm_eq_one_iff.mpr
+      exact IsDedekindDomain.HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp
+        (show u ∈ (v.adicCompletionIntegers F).units from ⟨t.val.property, t.inv.property⟩)
+    change (ideleClassNormTwist ψ 0).restrict v u = 1 ↔
+      (ideleClassNormTwist χ 0).restrict v u = 1
+    rw [hval, hn, Complex.ofReal_one, Complex.one_cpow, mul_one]
+  by_cases hx : (ideleClassNormTwist χ 0).IsUnramifiedAt v
+  · let val : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+    obtain ⟨π, hπ⟩ := val.exists_isUniformizer_of_isCyclic_of_nontrivial
+    let u := Units.mk0 (π : v.adicCompletion F) hπ.ne_zero
+    have hn := norm_uniformizer_adicCompletion v _ hπ
+    have hq : (v.asIdeal.absNorm : ℂ) ≠ 0 := by
+      exact_mod_cast (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)).ne'
+    rw [finiteHeckeEulerFactor, finiteHeckeEulerFactor, ite_eq_left hx, ite_eq_left (hu.mpr hx),
+      hx.localValue_eq u hπ, (hu.mpr hx).localValue_eq u hπ, hval]
+    change (1 - (_ * (‖(π : v.adicCompletion F)‖ : ℂ) ^ a) * _)⁻¹ =
+      (1 - _ * _ ^ (-((s : ℂ) + a)))⁻¹
+    rw [hn, Complex.ofReal_inv, Complex.inv_cpow_ofReal_nonneg (Nat.cast_nonneg _) a,
+      ← Complex.cpow_neg, Complex.ofReal_natCast, mul_assoc, ← Complex.cpow_add _ _ hq]
+    rw [show -a + -(s : ℂ) = -((s : ℂ) + a) by ring]
+  · simp [finiteHeckeEulerFactor, hx, hu.not.mpr hx]
+
+/-- The imaginary power `|·|^i` of the idelic norm is a unitary character. -/
+private theorem schwartzBergman_jet_eq_mellinInv_shifted_moment_char (F : Type*) [Field F] [NumberField F] :
+    ∃ χ : U𝔽(F), (∀ g : C𝔽(F),
+      (χ g : ℂ) = (((↑(ideleClassNorm F g) : NNReal) : ℝ) : ℂ) ^ Complex.I) ∧
+      ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U𝔽(F)) Complex.I := by
+  let c := ideleClassNormTwist (1 : U𝔽(F)) Complex.I
+  have hnorm (g : C𝔽(F)) : ‖c g‖ = 1 := by
+    change ‖(1 : ℂ) * (((↑(ideleClassNorm F g) : NNReal) : ℝ) : ℂ) ^ Complex.I‖ = 1
+    rw [one_mul, Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _)),
+      Complex.I_re, Real.rpow_zero]
+  let χ : U𝔽(F) :=
+    { toFun := fun g ↦ ⟨c g, mem_sphere_zero_iff_norm.mpr (hnorm g)⟩
+      map_one' := Subtype.ext (map_one c)
+      map_mul' := fun x y ↦ Subtype.ext (map_mul c x y)
+      continuous_toFun := c.continuous.subtype_mk _ }
+  have hc (g : C𝔽(F)) :
+      (χ g : ℂ) = (((↑(ideleClassNorm F g) : NNReal) : ℝ) : ℂ) ^ Complex.I := by
+    change (1 : ℂ) * (((↑(ideleClassNorm F g) : NNReal) : ℝ) : ℂ) ^ Complex.I = _
+    rw [one_mul]
+  refine ⟨χ, hc, ?_⟩
+  ext g
+  rw [schwartzBergman_jet_eq_mellinInv_shifted_moment_apply, schwartzBergman_jet_eq_mellinInv_shifted_moment_apply, hc, Complex.cpow_zero, mul_one]
+  change _ = (1 : ℂ) * _
+  rw [one_mul]
+
+/-- The printed shifted moment fails over a universe lift of the rationals. -/
+private theorem schwartzBergman_jet_eq_mellinInv_shifted_moment_contra
+    (h : Printed.schwartzBergman_jet_eq_mellinInv_shifted_moment.{u}) : False := by
+  have : NumberField (ULift.{u} ℚ) := schwartzBergman_jet_eq_mellinInv_shifted_moment_numberField
+  obtain ⟨γ, hγ, hz⟩ := HardyFirstZero.first_zero_on_line
+  obtain ⟨χ, hχv, hχ⟩ := schwartzBergman_jet_eq_mellinInv_shifted_moment_char (ULift.{u} ℚ)
+  let τ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 (ULift.{u} ℚ)) (ULift.{u} ℚ) :=
+    ⟨canonicalIdeleNormSection _, canonicalIdeleNormSection_continuous _⟩
+  have hτ : Function.RightInverse τ (ideleNorm (ULift.{u} ℚ)) :=
+    canonicalIdeleNormSection_rightInverse _
+  let b : ℂ := Complex.I
+  have hb : b.re = 0 := Complex.I_re
+  let f : ℂ → ℂ := fun s ↦ riemannZeta (s + b)
+  have hfa (s : ℂ) (hs : s + b ≠ 1) : AnalyticAt ℂ f s := by
+    apply DifferentiableOn.analyticAt (s := {z : ℂ | z + b ≠ 1})
+      (fun z hz ↦ ((differentiableAt_riemannZeta hz).comp z
+        (differentiableAt_id.add_const b)).differentiableWithinAt)
+    exact (isOpen_ne_fun (continuous_id.add continuous_const) continuous_const).mem_nhds hs
+  have hf : MeromorphicOn f univ := fun s _ ↦
+    MeromorphicAt.comp_analyticAt (g := fun z : ℂ ↦ z + b) (x := s)
+      (schwartzBergman_jet_eq_mellinInv_shifted_moment_meromorphic (s + b) (mem_univ _)) (analyticAt_id.add analyticAt_const)
+  have hfeq : ∀ s : halfPlane, f s = finiteHeckeL χ s := by
+    intro s
+    have hre : 1 < ((s : ℂ) + b).re := by
+      rw [Complex.add_re, hb, add_zero]
+      exact s.property
+    rw [schwartzBergman_jet_eq_mellinInv_shifted_moment_twist (ULift.{u} ℚ) 1 χ b hb hχ s, schwartzBergman_jet_eq_mellinInv_shifted_moment_one]
+    change riemannZeta ((s : ℂ) + b) = dedekindZeta (ULift.{u} ℚ) ((s : ℂ) + b)
+    rw [schwartzBergman_jet_eq_mellinInv_shifted_moment_dedekindZeta, schwartzBergman_jet_eq_mellinInv_shifted_moment_rat hre]
+  have hΓa (s : ℂ) (hs : 0 < s.re) : AnalyticAt ℂ (heckeGammaFactor χ) s := by
+    apply DifferentiableOn.analyticAt (s := {z : ℂ | 0 < z.re})
+      (fun z hz ↦ (differentiableAt_heckeGammaFactor_of_re_pos χ hz).differentiableWithinAt)
+    exact (isOpen_lt continuous_const Complex.continuous_re).mem_nhds hs
+  let P : ℂ → ℂ := fun s ↦ heckeGammaFactor χ s * f s
+  have hP : MeromorphicOn P univ := fun s _ ↦
+    (meromorphic_heckeGammaFactor χ s).mul (hf s (mem_univ s))
+  let L := toMeromorphicNFOn P univ
+  have hL : MeromorphicNFOn L univ := meromorphicNFOn_toMeromorphicNFOn _ _
+  have hLe : ∀ s : halfPlane, L s = completedHeckeL χ s := by
+    intro s
+    have hs : 0 < (s : ℂ).re := zero_lt_one.trans s.property
+    have hre : 1 < ((s : ℂ) + b).re := by
+      rw [Complex.add_re, hb, add_zero]
+      exact s.property
+    have hne : (s : ℂ) + b ≠ 1 := fun h1 ↦ by
+      rw [h1] at hre
+      norm_num at hre
+    have hPa : AnalyticAt ℂ P s := (hΓa s hs).mul (hfa s hne)
+    change toMeromorphicNFOn P univ s = _
+    rw [toMeromorphicNFOn_eq_toMeromorphicNFAt hP (mem_univ _),
+      toMeromorphicNFAt_eq_self.mpr hPa.meromorphicNFAt]
+    change heckeGammaFactor χ s * f s = _
+    rw [hfeq s]
+    rfl
+  let ρ₀ : ℂ := 1 / 2 + γ * Complex.I - Complex.I
+  have hρre : ρ₀.re = 1 / 2 := by simp [ρ₀]
+  have hρne : ρ₀ + b ≠ 1 := fun h1 ↦ by
+    have := congrArg Complex.re h1
+    rw [Complex.add_re, hb, add_zero, hρre, Complex.one_re] at this
+    norm_num at this
+  have hord_f : 0 < meromorphicOrderAt f ρ₀ := by
+    apply (tendsto_zero_iff_meromorphicOrderAt_pos (hf _ (mem_univ _))).mp
+    have h0 : f ρ₀ = 0 := by
+      change riemannZeta (1 / 2 + γ * Complex.I - Complex.I + Complex.I) = 0
+      rw [sub_add_cancel]
+      exact hz
+    rw [← h0]
+    exact (hfa _ hρne).continuousAt.continuousWithinAt
+  have htwo : meromorphicOrderAt f 2 ≠ ⊤ := by
+    have hne2 : (2 : ℂ) + b ≠ 1 := fun h1 ↦ by
+      have := congrArg Complex.re h1
+      rw [Complex.add_re, hb, add_zero] at this
+      norm_num at this
+    have hv : f 2 ≠ 0 := riemannZeta_ne_zero_of_one_lt_re (by simp [b])
+    rw [(hfa 2 hne2).meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mpr hv]
+    exact WithTop.zero_ne_top
+  have hfin : meromorphicOrderAt f ρ₀ ≠ ⊤ := fun ht ↦ htwo
+    (hf.meromorphicOrderAt_eq_top_of_isPreconnected isPreconnected_univ (mem_univ _)
+      (mem_univ _) ht)
+  have hρpos : 0 < ρ₀.re := by
+    rw [hρre]
+    norm_num
+  have hordL : meromorphicOrderAt f ρ₀ = meromorphicOrderAt L ρ₀ := by
+    rw [meromorphicOrderAt_congr (hP.toMeromorphicNFOn_eq_self_on_nhdsNE (mem_univ ρ₀))]
+    exact (meromorphicOrderAt_mul_of_ne_zero (hΓa ρ₀ hρpos)
+      (heckeGammaFactor_ne_zero_of_re_pos χ hρpos)).symm
+  let ρ : {ρ : ℂ // 0 < meromorphicOrderAt L ρ} := ⟨ρ₀, hordL ▸ hord_f⟩
+  have hm : 0 < (meromorphicOrderAt L ρ.val).untop₀.toNat := by
+    change 0 < (meromorphicOrderAt L ρ₀).untop₀.toNat
+    rw [← hordL]
+    obtain ⟨n, hn⟩ := WithTop.ne_top_iff_exists.mp hfin
+    rw [← hn] at hord_f ⊢
+    rw [WithTop.untop₀_coe]
+    have : 0 < n := WithTop.coe_lt_coe.mp hord_f
+    omega
+  have hmem : (fun z : ℂ ↦ Complex.exp (z ^ 2)) ∈ schwartzBergmanSubmodule univ := by
+    simpa only [preimage_univ, indicator_univ] using
+      gaussian_mem_schwartzBergmanSubmodule univ isOpen_univ
+  let g : Bergman := ⟨_, hmem⟩
+  have key := h (ULift.{u} ℚ) χ τ hτ L hL hLe ρ 0 hm g
+  have hphase := existsUnique_ideleNormSection_character_phase χ τ hτ
+  have hx : hphase.exists.choose = 1 := by
+    refine hphase.unique hphase.exists.choose_spec fun t ↦ ?_
+    rw [hχv, Complex.ofReal_one, one_mul]
+    change (((↑(ideleNorm (ULift.{u} ℚ) (τ t)) : NNReal) : ℝ) : ℂ) ^ Complex.I = _
+    rw [hτ t]
+  have hmom := (schwartzBergman_jet_eq_mellinInv_moment g (ρ₀ + Complex.I) 0).2.2
+  simp only [] at key hmom
+  rw [hx, Complex.ofReal_one, one_mul, ← hmom] at key
+  simp only [iteratedDeriv_zero] at key
+  change Complex.exp (ρ₀ ^ 2) = Complex.exp ((ρ₀ + Complex.I) ^ 2) at key
+  have hn := congrArg (fun z : ℂ ↦ ‖z‖) key
+  simp only [Complex.norm_exp] at hn
+  have hre := Real.exp_injective hn
+  have hγ1 : 1 < γ := by linarith [hγ.1]
+  simp [ρ₀, sq, Complex.mul_re, Complex.mul_im] at hre
+  nlinarith
+
 /-- Paper: Theorem 7.1.4.2(2), equation (7.1.4.6), p. 327.
 Take ℚ, the pure norm character with exponent i and x₀ = 1. Use the meromorphic
 normal form of the shifted completed zeta, with a zero ρ obtained by shifting
@@ -389,7 +661,9 @@ a completed zeta zero by −i.
 At m = 0 take `φ(s) = (s - ρ) exp(s²)`. The derivative functional is zero, while
 the convergent shifted moment is `φ(ρ + i) = i exp((ρ + i)²) ≠ 0`. -/
 theorem Printed.schwartzBergman_jet_eq_mellinInv_shifted_moment_false :
-    ¬ Printed.schwartzBergman_jet_eq_mellinInv_shifted_moment := by sorry
+    ¬ Printed.schwartzBergman_jet_eq_mellinInv_shifted_moment := by
+  intro h
+  exact schwartzBergman_jet_eq_mellinInv_shifted_moment_contra h
 
 /-- Paper: Theorem 7.1.4.2(4), p. 327.
 As printed: The jet functionals are continuous on the ordinary Schwartz quotient.
