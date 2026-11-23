@@ -8,7 +8,7 @@ sources we expect to draw on.
 | [`PrimeNumberTheoremAnd/`](PrimeNumberTheoremAnd/) | <https://github.com/AlexKontorovich/PrimeNumberTheoremAnd> | Apache-2.0 | vendored at `a4fb698`: `StrongPNT.lean` (general part: Borel–Carathéodory, Blaschke products, Landau's bound for logarithmic derivatives) |
 | [`AlgebraicNumberTheoryLean/`](AlgebraicNumberTheoryLean/) | <https://github.com/jonhanke/algebraic-number-theory-lean> | Apache-2.0 | vendored at `5ea368e`: rational idelic Dirichlet character and its descent to idele classes |
 | [`Grh/`](Grh/) | <https://github.com/thatnealpatel/grh> | MIT | Vendored at `e55aab2` for good heights, zero-free disk estimates, weighted spectral jet kernels, and logarithmic derivative reflection |
-| [`TauCeti/`](TauCeti/) | <https://github.com/TauCetiProject/TauCeti> | Apache-2.0 | planned (selected modules) |
+| [`TauCeti/`](TauCeti/) | <https://github.com/TauCetiProject/TauCeti> | Apache-2.0 | vendored at `8794ab3` for Montel's subsequence theorem in §1.4.3 |
 | [`Stacks/`](Stacks/) | <https://github.com/AxiomMath/Stacks> | Apache-2.0 | under consideration |
 
 Further material found by scouting. The exact declarations and pinned commits are listed in
