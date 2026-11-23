@@ -176,7 +176,7 @@ private theorem rational_decay_moment_integrable (f : ModulatedExponentialDecay 
     exact (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).log
       fun x ↦ NNReal.coe_ne_zero.mpr (m x).ne_zero
   refine ((h₁.add h₂).const_mul (k.factorial : ℝ)).mono'
-    ((hf0.mul (c).continuous.aestronglyMeasurable).mul (hL.pow k).aestronglyMeasurable)
+    ((hf0.mul c.continuous.aestronglyMeasurable).mul (hL.pow k).aestronglyMeasurable)
     (ae_of_all _ fun x ↦ ?_)
   let r : ℝ := (m x).val
   have hr : 0 < r := NNReal.coe_pos.mpr (Units.zero_lt (m x))
@@ -276,11 +276,15 @@ theorem Printed.spectralSchwartzBiorthogonal_unique_false :
   let m := m𝔽(ℚ)
   let χ := ideleClassNormTwist (1 : PontryaginDual C𝔽(ℚ))
   let L (x : C𝔽(ℚ)) : ℂ := logNorm(ℚ) x
-  let N (w : ℂ) := (meromorphicOrderAt (continuedCompletedHeckeL (1 : PontryaginDual C𝔽(ℚ))) (0 + w)).untop₀.toNat
+  let N (w : ℂ) :=
+    (meromorphicOrderAt (continuedCompletedHeckeL (1 : PontryaginDual C𝔽(ℚ))) (0 + w)).untop₀.toNat
   let J := {j : ℂ × ℕ // j.2 < N j.1}
   let n := N z - 1
   have hzN : 0 < N z := by simpa [N] using hz
-  let j₀ : J := ⟨(z, n), by change n < N z; dsimp [n]; omega⟩
+  let j₀ : J := ⟨(z, n), by
+    change n < N z
+    dsimp [n]
+    omega⟩
   let ι : (ideleClassNorm ℚ).ker →ₜ* C𝔽(ℚ) := ⟨(ideleClassNorm ℚ).ker.subtype, continuous_subtype_val⟩
   let ω := (1 : PontryaginDual C𝔽(ℚ)).comp ι
   let E := ↥(modulatedDecayIsotype m univ (mem_univ 0) ω)
@@ -293,10 +297,11 @@ theorem Printed.spectralSchwartzBiorthogonal_unique_false :
   let f := (ψ j₀).val
   let c := χ z
   have hL (x y : C𝔽(ℚ)) : L (x * y) = L x + L y := by
-    change (Real.log ((m (x * y)).val : ℝ) : ℂ) = _
-    rw [map_mul, Units.val_mul, NNReal.coe_mul, Real.log_mul, Complex.ofReal_add]
-    · exact NNReal.coe_ne_zero.mpr (m x).ne_zero
-    · exact NNReal.coe_ne_zero.mpr (m y).ne_zero
+    change (Real.log ((m (x * y)).val : ℝ) : ℂ) =
+      (Real.log ((m x).val : ℝ) : ℂ) + (Real.log ((m y).val : ℝ) : ℂ)
+    rw [map_mul, Units.val_mul, NNReal.coe_mul,
+      Real.log_mul (NNReal.coe_ne_zero.mpr (m x).ne_zero)
+        (NNReal.coe_ne_zero.mpr (m y).ne_zero), Complex.ofReal_add]
   have hc (w : ℂ) (y : C𝔽(ℚ)) : χ w y ≠ 0 :=
     ((Group.isUnit y).map (χ w)).ne_zero
   have hMtrans (y : C𝔽(ℚ)) (j : J) :
