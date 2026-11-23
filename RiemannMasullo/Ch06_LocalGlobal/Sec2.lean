@@ -1041,6 +1041,31 @@ theorem sLocalThetaIsotypeSum_isLFSpace_nuclear :
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
     IsLFSpace D ∧ IsNuclearTVS D := by sorry
 
+/-- A complete nuclear LF-space is barrelled and Montel. -/
+private theorem thetaIsotypeSum_barrelled_montel_of_complete {Z : Type*} [AddCommGroup Z]
+    [Module ℂ Z] [TopologicalSpace Z] (hLF : IsLFSpace Z) (hN : IsNuclearTVS.{0} Z)
+    (hcomplete : ∀ (u : UniformSpace Z), u.toTopologicalSpace = (inferInstance : TopologicalSpace Z) →
+      @IsUniformAddGroup Z u _ → @CompleteSpace Z u) :
+    BarrelledSpace ℂ Z ∧ MontelSpace ℂ Z := by
+  let : T2Space Z := hN.1
+  let : PolynormableSpace ℂ Z := hN.2.1
+  let : IsTopologicalAddGroup Z := PolynormableSpace.isTopologicalAddGroup ℂ Z
+  let : ContinuousSMul ℂ Z := PolynormableSpace.continuousSMul ℂ Z
+  let u := IsTopologicalAddGroup.rightUniformSpace Z
+  let : IsUniformAddGroup Z := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace Z := hcomplete u rfl inferInstance
+  refine ⟨?_, ⟨fun B hc hb ↦ ?_⟩⟩
+  · obtain ⟨_, Y, _, _, _, hY, _, i, hi⟩ := hLF
+    refine ⟨fun p hp ↦ ?_⟩
+    have hP : WithSeminorms
+        (Subtype.val : {q : Seminorm ℂ Z // ∀ k, Continuous (q ∘ (i k).toLinearMap)} →
+          Seminorm ℂ Z) := ⟨hi.topology_eq⟩
+    apply hP.continuous_seminorm (i := ⟨p, ?_⟩)
+    intro k
+    let : BarrelledSpace ℂ (Y k) := isFrechetTVS_barrelled (hY k)
+    exact (p.comp (i k).toLinearMap).continuous_of_lowerSemicontinuous (hp.comp (i k).continuous)
+  · simpa only [hc.closure_eq] using isCompact_closure_of_isNuclearTVS Z hN hb
+
 /-- Paper: Remark 6.2.1.4(1), p. 297.
 The locally convex sum of the S-local isotypes is barrelled and Montel. This is the second
 half of the space part of Theorem 5.2.3.1(2) for that sum; together with the completeness
@@ -1097,7 +1122,13 @@ theorem globalThetaIsotypeSum_barrelled_montel :
     letI := Classical.decEq (PontryaginDual C₁)
     let D := ⨁ ω, X ω
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
-    BarrelledSpace ℂ D ∧ MontelSpace ℂ D := by sorry
+    BarrelledSpace ℂ D ∧ MontelSpace ℂ D := by
+  classical
+  intro X D
+  let : TopologicalSpace D := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
+  have h : IsLFSpace D ∧ IsNuclearTVS.{0} D := globalThetaIsotypeSum_isLFSpace_nuclear (F := F)
+  exact thetaIsotypeSum_barrelled_montel_of_complete h.1 h.2
+    (globalThetaIsotypeSum_complete (F := F)).2.2
 
 /-- Paper: Remark 6.2.1.4(1), p. 297.
 The strong dual of the locally convex sum of the global isotypes is complete, nuclear,
