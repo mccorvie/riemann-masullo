@@ -874,6 +874,54 @@ theorem existsUnique_globalPolarFreeThetaFourier :
 
 local notation "Fourier𝔽" => (existsUnique_globalPolarFreeThetaFourier (F := F)).exists.choose
 
+/-- A map that intertwines two maps through a surjection of their common domain sends the
+range of the first onto the range of the second. -/
+private theorem exists_globalThetaSobolevInversion_image {X W₁ W₂ : Type*} (k : W₁ → W₂)
+    (e₁ : X → W₁) (e₂ : X → W₂) (Fo : X → X) (hFo : Surjective Fo)
+    (h : ∀ x, k (e₁ x) = e₂ (Fo x)) : k '' range e₁ = range e₂ := by
+  rw [← range_comp]
+  ext y
+  constructor
+  · rintro ⟨x, rfl⟩
+    exact ⟨Fo x, (h x).symm⟩
+  · rintro ⟨x, rfl⟩
+    obtain ⟨z, rfl⟩ := hFo x
+    exact ⟨z, h z⟩
+
+/-- Inversion carries the weight-a theta embedding of a polar-free test to the weight-(1-a)
+theta embedding of its Fourier transform. -/
+private theorem exists_globalThetaSobolevInversion_mk (a : ℝ) {α β s : ℝ} (hI : α ≤ β)
+    (hs : 0 ≤ s) (f : ℬ₀) :
+    J𝔽(hI, hs) (E𝔽(a, hI, hs) (Submodule.Quotient.mk f)) =
+      E𝔽(1 - a, neg_le_neg hI, hs) (Submodule.Quotient.mk (fourier₀(f))) := by
+  have : (μ𝔽).Regular := (ideleClassTamagawaMeasure_isWeil F).2.1
+  have hinvMP : MeasurePreserving (fun g : C𝔽 ↦ g⁻¹) μ𝔽 μ𝔽 := Measure.measurePreserving_inv μ𝔽
+  have hK := (existsUnique_ideleClassSobolevInversion (F := F) α β s hI hs).exists.choose_spec
+  have hE₁ := (existsUnique_globalThetaSobolevEmbedding (F := F) a α β s hI hs).exists.choose_spec.2
+  have hE₂ := (existsUnique_globalThetaSobolevEmbedding (F := F) (1 - a) (-β) (-α) s
+    (neg_le_neg hI) hs).exists.choose_spec.2
+  apply Lp.ext
+  apply (withDensity_absolutelyContinuous μ𝔽 _).ae_eq
+  have h₂ := hinvMP.quasiMeasurePreserving.ae_eq_comp (hE₁ f)
+  filter_upwards [hK (E𝔽(a, hI, hs) (Submodule.Quotient.mk f)), h₂, hE₂ (fourier₀(f))]
+    with g hg h₂ h₃
+  rw [hg, h₃]
+  refine h₂.trans ?_
+  have hw := globalThetaSobolev_fourier_weight (F := F) (1 - a) f g
+  rw [sub_sub_cancel] at hw
+  exact hw.symm
+
+/-- Inversion intertwines the weight-a and weight-(1-a) theta embeddings with the Fourier
+automorphism of the polar-free theta space. -/
+private theorem exists_globalThetaSobolevInversion_key (a : ℝ) {α β s : ℝ} (hI : α ≤ β)
+    (hs : 0 ≤ s) (u : Θ₀) :
+    J𝔽(hI, hs) (E𝔽(a, hI, hs) u) = E𝔽(1 - a, neg_le_neg hI, hs) (Fourier𝔽 u) := by
+  have hFo := (existsUnique_globalPolarFreeThetaFourier (F := F)).exists.choose_spec
+  induction u using Quot.ind with
+  | mk f =>
+    exact (exists_globalThetaSobolevInversion_mk a hI hs f).trans
+      (congrArg (E𝔽(1 - a, neg_le_neg hI, hs)) (hFo f).symm)
+
 /-- Paper: Theorem 10.1.2.1, (10.1.2.1), and (10.1.2.5), pp. 437–438.
 Ambient inversion restricts to an isometric equivalence of the weighted theta
 completions and intertwines the weighted embeddings with Fourier transform.
@@ -883,7 +931,16 @@ theorem exists_globalThetaSobolevInversion (a : ℝ) {α β s : ℝ} (hI : α �
     ∃ J : H𝔽(a, hI, hs) ≃ₗᵢ[ℂ] H𝔽(1 - a, neg_le_neg hI, hs),
       (∀ u, (J u : W𝔽(-β, -α, s)) = J𝔽(hI, hs) u) ∧
       ∀ u : Θ₀, J (j𝔽(a, hI, hs) u) =
-        j𝔽(1 - a, neg_le_neg hI, hs) (Fourier𝔽 u) := by sorry
+        j𝔽(1 - a, neg_le_neg hI, hs) (Fourier𝔽 u) := by
+  refine ⟨((J𝔽(hI, hs)).submoduleMap _).trans (LinearIsometryEquiv.ofEq _ _ ?_),
+    fun _ ↦ rfl, fun u ↦ Subtype.ext (exists_globalThetaSobolevInversion_key a hI hs u)⟩
+  apply SetLike.coe_injective
+  rw [Submodule.map_coe, Submodule.topologicalClosure_coe, Submodule.topologicalClosure_coe]
+  change (J𝔽(hI, hs)).toHomeomorph '' closure (range (E𝔽(a, hI, hs))) =
+    closure (range (E𝔽(1 - a, neg_le_neg hI, hs)))
+  rw [Homeomorph.image_closure]
+  exact congrArg closure (exists_globalThetaSobolevInversion_image _ _ _ _ (Fourier𝔽).surjective
+    (exists_globalThetaSobolevInversion_key a hI hs))
 
 /-- Inversion intertwines left translation by `g` with left translation by `g⁻¹`, for
 closed subspaces of weighted L² spaces over an abstract commutative group. -/
