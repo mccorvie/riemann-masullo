@@ -2284,6 +2284,148 @@ theorem sLocalPWOrbital_biorthogonal_growth {S₀ : Finset V} (hST : S ⊆ T) (_
   change q (e.symm (e (ψ j))) ≤ _ at hb
   simpa only [e.symm_apply_apply] using hb
 
+section
+
+open scoped ENNReal
+
+/-- Sampling a vertically Schwartz function on an affine lattice preserves rapid decay. -/
+private theorem rapidLatticeSamples (G : ℂ → ℂ) (hG : UniformlySchwartzOnStrip G (1/2) (3/2))
+    (t d : ℝ) (hd : 0 < d) (N : ℕ) :
+    ∃ C > (0 : ℝ), ∀ n : ℤ, ‖G (1 + ((t - n * d : ℝ) : ℂ) * Complex.I)‖ ≤
+      C / (1 + |(n : ℝ)|) ^ N := by
+  obtain ⟨C, hC, ht⟩ := hG.2.2 (1/4) (by norm_num) (by norm_num) (N+1) (by omega)
+  obtain ⟨T, hT⟩ := eventually_atTop.mp (eventually_comap.mp ht)
+  let A := max 1 T
+  let g (y : ℝ) := G (1 + (y : ℂ) * Complex.I)
+  have hg : Continuous g := by
+    apply hG.2.1.continuousOn.comp_continuous (by fun_prop)
+    intro y
+    change 1 / 2 < (1 + (y : ℂ) * Complex.I).re ∧ (1 + (y : ℂ) * Complex.I).re < 3 / 2
+    norm_num
+  obtain ⟨B, hB⟩ := (isCompact_Icc (a := -A) (b := A)).bddAbove_image
+    (f := fun y : ℝ ↦ (1 + |y|)^N * ‖g y‖) (by fun_prop)
+  let K := max (max B (2 ^ N * C)) 1
+  have hK : 0 < K := zero_lt_one.trans_le (le_max_right _ _)
+  have bound (y : ℝ) : (1 + |y|)^N * ‖g y‖ ≤ K := by
+    by_cases hy : |y| ≤ A
+    · exact (hB ⟨y, abs_le.mp hy, rfl⟩).trans ((le_max_left _ _).trans (le_max_left _ _))
+    have h1 : 1 ≤ |y| := (le_max_left _ _).trans (le_of_not_ge hy)
+    have hp : 0 < |y| := zero_lt_one.trans_le h1
+    have hh := hT |y| ((le_max_right _ _).trans (le_of_not_ge hy)) y rfl 1 (by norm_num)
+    change ‖g y‖ ≤ C / |y| ^ (N+1) at hh
+    have hm := (le_div_iff₀ (pow_pos hp _)).mp hh
+    have hn : |y| ^ N ≤ |y| ^ (N+1) := pow_le_pow_right₀ h1 (by omega)
+    calc
+      (1 + |y|)^N * ‖g y‖ ≤ (2 * |y|)^N * ‖g y‖ :=
+        mul_le_mul_of_nonneg_right (pow_le_pow_left₀ (by positivity) (by linarith) _) (norm_nonneg _)
+      _ = 2^N * (|y| ^ N * ‖g y‖) := by rw [mul_pow]; ring
+      _ ≤ 2^N * C := by
+        apply mul_le_mul_of_nonneg_left _ (by positivity)
+        exact (mul_le_mul_of_nonneg_right hn (norm_nonneg _)).trans (by simpa only [mul_comm ‖g y‖] using hm)
+      _ ≤ K := (le_max_right _ _).trans (le_max_left _ _)
+  let M := (1 + |t| + d) / d
+  have hM : 0 < M := by dsimp [M]; positivity
+  refine ⟨M^N * K, mul_pos (pow_pos hM _) hK, fun n ↦ ?_⟩
+  let y := t - (n : ℝ) * d
+  have htri : |(n : ℝ)| * d ≤ |t| + |y| := by
+    rw [← abs_of_pos hd, ← abs_mul]
+    simpa [y] using (abs_sub t y)
+  have hscale : 1 + |(n : ℝ)| ≤ M * (1 + |y|) := by
+    dsimp [M]
+    rw [div_mul_eq_mul_div, le_div_iff₀ hd]
+    nlinarith [abs_nonneg t, abs_nonneg y, mul_nonneg (abs_nonneg t) (abs_nonneg y),
+      mul_nonneg hd.le (abs_nonneg y)]
+  apply (le_div_iff₀ (by positivity)).2
+  change ‖g y‖ * (1 + |(n : ℝ)|)^N ≤ _
+  calc
+    _ ≤ ‖g y‖ * (M * (1 + |y|))^N :=
+      mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (by positivity) hscale _) (norm_nonneg _)
+    _ = M^N * ((1 + |y|)^N * ‖g y‖) := by rw [mul_pow]; ring
+    _ ≤ _ := mul_le_mul_of_nonneg_left (bound y) (pow_pos hM _).le
+
+/-- A sequence with all inverse-power bounds defines an elementary Schwartz test on the integer lattice. -/
+private theorem orbitalIntegerRapid (g : ℤ → ℂ)
+    (hg : ∀ N : ℕ, ∃ C > (0 : ℝ), ∀ n : ℤ, ‖g n‖ ≤ C / (1 + |(n : ℝ)|)^N) :
+    ∃ s : RapidDecaySequence 1, ∀ n : ℤ, s (fun _ ↦ n) = g n := by
+  let e := (Equiv.funUnique (Fin 1) ℤ).symm
+  have hbase : Summable (fun n : ℤ ↦ 1 / (1 + |(n : ℝ)|)^2) := by
+    have hn := (summable_nat_add_iff 1).mpr (Real.summable_one_div_nat_pow.mpr (by decide : 1 < 2))
+    apply Summable.of_nat_of_neg
+    · simpa [abs_of_nonneg, add_comm] using hn
+    · simpa [abs_of_nonneg, add_comm] using hn
+  let f (a : Fin 1 → ℤ) := g (a 0)
+  have hs (j : ℕ) : Summable (fun n : ℤ ↦ (1 + |(n : ℝ)|)^j * ‖g n‖) := by
+    obtain ⟨C, hC, hb⟩ := hg (j+2)
+    apply (hbase.mul_left C).of_nonneg_of_le (fun _ ↦ by positivity)
+    intro n
+    have hn : 0 < 1 + |(n : ℝ)| := by positivity
+    calc
+      _ ≤ (1 + |(n : ℝ)|)^j * (C / (1 + |(n : ℝ)|)^(j+2)) :=
+        mul_le_mul_of_nonneg_left (hb _) (pow_pos hn _).le
+      _ = _ := by rw [pow_add]; field_simp
+  refine ⟨⟨f, fun j ↦ ?_⟩, fun _ ↦ rfl⟩
+  rw [rapidDecaySequenceBound, ← e.tsum_eq]
+  have he (n : ℤ) : ‖(WithLp.toLp 2 (fun i ↦ ((e n i : ℤ) : ℝ)) : EuclideanSpace ℝ (Fin 1))‖ =
+      |(n : ℝ)| := by simp [e, EuclideanSpace.norm_eq, Real.norm_eq_abs, Real.sqrt_sq_eq_abs]
+  calc
+    _ = ∑' n : ℤ, ENNReal.ofReal ((1 + |(n : ℝ)|)^j * ‖g n‖) := by
+      apply tsum_congr
+      intro n
+      rw [ENNReal.ofReal_mul (by positivity), ENNReal.ofReal_pow (by positivity),
+        ENNReal.ofReal_add zero_le_one (abs_nonneg _), ENNReal.ofReal_one, ofReal_norm]
+      congr 2
+      apply congrArg (fun q : ℝ≥0∞ ↦ 1 + q)
+      exact (ofReal_norm _).symm.trans (congrArg ENNReal.ofReal (he n))
+    _ < ⊤ := by
+      rw [← ENNReal.ofReal_tsum_of_nonneg (fun _ ↦ by positivity) (hs j)]
+      exact ENNReal.ofReal_lt_top
+
+/-- The maximal elementary stage of the discrete group ℤ realizes its rapidly decreasing sequences. -/
+private theorem orbitalIntegerSchwartz (g : ℤ → ℂ)
+    (hg : ∀ N : ℕ, ∃ C > (0 : ℝ), ∀ n : ℤ, ‖g n‖ ≤ C / (1 + |(n : ℝ)|)^N) :
+    ∃ a : SchwartzBruhat (Multiplicative ℤ), ∀ n : ℤ, a (Multiplicative.ofAdd n) = g n := by
+  obtain ⟨s, hs⟩ := orbitalIntegerRapid g hg
+
+  let H := Multiplicative ℤ
+  let E₀ := ElementaryLieGroup 0 0 1 PUnit
+  let c : H ≃ₜ* Multiplicative E₀ :=
+    { toFun := fun n ↦ Multiplicative.ofAdd (0, 0, fun _ ↦ n.toAdd, 0)
+      invFun := fun x ↦ Multiplicative.ofAdd (x.toAdd.2.2.1 0)
+      left_inv := fun _ ↦ rfl
+      right_inv := fun x ↦ by
+        apply Multiplicative.toAdd.injective
+        apply Prod.ext (Subsingleton.elim _ _)
+        apply Prod.ext (Subsingleton.elim _ _)
+        apply Prod.ext _ (Subsingleton.elim _ _)
+        exact funext fun i ↦ congrArg x.toAdd.2.2.1 (Subsingleton.elim 0 i)
+      map_mul' := fun _ _ ↦ by
+        apply Multiplicative.toAdd.injective
+        apply Prod.ext (Subsingleton.elim _ _)
+        apply Prod.ext (Subsingleton.elim _ _)
+        exact Prod.ext rfl (Subsingleton.elim _ _)
+      continuous_toFun := continuous_of_discreteTopology
+      continuous_invFun := continuous_of_discreteTopology }
+  let p : ElementaryLCAPresentation H := ⟨0, 0, 1, PUnit, c⟩
+  have hG := (lca_elementary_iff (G := H)).mpr ⟨p⟩
+  let top : (⊤ : Subgroup H) ≃ₜ* H := ⟨Subgroup.topEquiv, continuous_subtype_val, continuous_id.subtype_mk _⟩
+  let a : BruhatStructuralPair H := ⟨(⊤, OrderDual.toDual ⊥), isOpen_univ,
+    isCompactlyGeneratedGroup_of_continuousMulEquiv top.symm hG.1,
+    isBruhatGoodSubgroup_bot_iff.mpr hG.2, bot_le⟩
+  let q : a.quotient ≃* H :=
+    QuotientGroup.quotientKerEquivOfRightInverse a.val.1.subtype top.symm (fun _ ↦ rfl)
+  let q' : a.quotient ≃ₜ* H :=
+    { q with
+      continuous_toFun := (QuotientGroup.isQuotientMap_mk _).continuous_iff.mpr continuous_subtype_val
+      continuous_invFun := QuotientGroup.continuous_mk.comp top.symm.continuous }
+  let e : ElementaryLCAPresentation a.quotient := ⟨0, 0, 1, PUnit, q'.trans c⟩
+  obtain ⟨E, hE⟩ := rapidDecaySequence_equiv_elementarySchwartz (r := 1)
+  refine ⟨schwartzBruhatStageInclusion a e (E s), fun n ↦ ?_⟩
+  change schwartzBruhatStageRealization a e (E s) (Multiplicative.ofAdd n) = _
+  rw [schwartzBruhatStageRealization_apply, dite_eq_left (Subgroup.mem_top _)]
+  exact (hE s _).trans (hs n)
+
+end
+
 open Classical in
 /-- Paper: Theorem 7.3.3.4(3), p. 361.
 Fourier coefficients of each class in a PW orbital quotient decay as a Schwartz
@@ -2304,7 +2446,68 @@ theorem sLocalPWOrbital_fourier_decay (p : Vℚ) (ω : PontryaginDual J₁(T))
       (((n : ℝ) * (2 * Real.pi / Real.log (v.val.asIdeal.absNorm : ℝ)) : ℝ) * Complex.I)
     ∃ a : SchwartzBruhat (Multiplicative ℤ), ∀ n : ℤ,
       (∀ j : Iₚ(p, ω), j.val = (c n, k) → a (Multiplicative.ofAdd n) = d j x) ∧
-      ((¬ ∃ j : Iₚ(p, ω), j.val = (c n, k)) → a (Multiplicative.ofAdd n) = 0) := by sorry
+      ((¬ ∃ j : Iₚ(p, ω), j.val = (c n, k)) → a (Multiplicative.ofAdd n) = 0) := by
+  classical
+  let period := 2 * Real.pi / Real.log (v.val.asIdeal.absNorm : ℝ)
+  have hperiod : 0 < period := div_pos (by positivity) (Real.log_pos (by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val))
+  let twist := quasiCharacterNormTwist (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous
+  let unitary (χ : PontryaginDual J(T)) :=
+    (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ
+  let dual := dualQuasiCharacter (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous
+  let c (n : ℤ) := twist c₀ (((n : ℝ) * period : ℝ) * Complex.I)
+  obtain ⟨χ, s, hs⟩ := exists_sLocalNormTwist (F := F) (S := T) c₀
+  obtain ⟨π, hπ⟩ := (Valued.v : Valuation (v.val.adicCompletion F)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let u : (v.val.adicCompletion F)ˣ := Units.mk0 (π : v.val.adicCompletion F) hπ.ne_zero
+  have hu := norm_uniformizer_adicCompletion v.val (π : v.val.adicCompletion F) hπ
+  obtain ⟨t, ht⟩ := (existsUnique_sLocalOrbitalPhase χ v u hu).exists
+  obtain ⟨m, hm⟩ := (existsUnique_sLocalOrbitalLatticeIndex χ v u hu t ht c₀
+    ⟨s, hs.symm⟩ _hc₀.choose_spec.2).exists
+  let b := (m : ℝ) * period - t
+  have hbase : c₀ = twist (unitary χ) ((b : ℂ) * Complex.I) := hm
+  obtain ⟨w, rfl⟩ := ((Rₚ₀(p, ω)).comap W.subtype).mkQ_surjective x
+  obtain ⟨f, hf⟩ := (LinearMap.ker (sLocalHomogeneousAdelicThetaLinearMap F T ω)).mkQ_surjective w.val
+  let jet (n : ℤ) := iteratedDeriv k
+    (fun z : ℂ ↦ sLocalIdelicZFunction (sAdeleSchwartzFourier f) (dual (twist (c n) z))) 0
+  let g (n : ℤ) := if ∃ j : Iₚ(p, ω), j.val = (c n, k) then jet n else 0
+  let Z (s : ℂ) := sLocalIdelicZFunction (sAdeleSchwartzFourier f) (twist (unitary χ⁻¹) s)
+  have hZ : UniformlySchwartzOnStrip (iteratedDeriv k Z) (1/2) (3/2) :=
+    sLocalIdelicZFunction_schwartzOnStrip (sAdeleSchwartzFourier f) χ⁻¹ _ _
+      (by norm_num) (by norm_num) k
+  have hg (N : ℕ) : ∃ C > (0 : ℝ), ∀ n : ℤ, ‖g n‖ ≤ C / (1 + |(n : ℝ)|)^N := by
+    obtain ⟨C, hC, h⟩ := rapidLatticeSamples (iteratedDeriv k Z) hZ (-b) period hperiod N
+    refine ⟨C, hC, fun n ↦ ?_⟩
+    dsimp only [g]
+    split_ifs
+    · let a : ℂ := ((b + (n : ℝ) * period : ℝ) : ℂ) * Complex.I
+      have he : (fun z : ℂ ↦ sLocalIdelicZFunction (sAdeleSchwartzFourier f) (dual (twist (c n) z))) =
+          fun z ↦ Z ((1 - a) - z) := by
+        funext z
+        dsimp only [Z, dual, c, twist, unitary]
+        rw [hbase]
+        dsimp only [twist, unitary]
+        simp only [normTwist_normTwist, sLocal_dual_normTwist]
+        dsimp only [a]
+        congr 2
+        push_cast
+        ring
+      simp only [jet, he, iteratedDeriv_comp_const_sub, sub_zero, norm_smul, norm_pow, norm_neg,
+        norm_one, one_pow, one_mul]
+      convert h n using 3
+      dsimp only [a]
+      push_cast
+      ring
+    · simp only [norm_zero]
+      positivity
+  obtain ⟨a, ha⟩ := orbitalIntegerSchwartz g hg
+  refine ⟨a, fun n ↦ ⟨fun j hj ↦ ?_, fun hn ↦ ?_⟩⟩
+  · rw [ha, show g n = jet n from if_pos ⟨j, hj⟩, _hd, ← hf]
+    change jet n = sLocalOrbitalFourierJet j ((LinearMap.ker
+      (sLocalHomogeneousAdelicThetaLinearMap F T ω)).mkQL f)
+    rw [sLocalOrbitalFourierJet_mk, show j.val.1 = c n from congrArg Prod.fst hj,
+      show j.val.2 = k from congrArg Prod.snd hj]
+  · exact (ha n).trans (if_neg hn)
 
 private theorem sLocalZeroMomentTheta_eq_top_of_translate
     {E W : Type*} [AddCommGroup E] [Module ℂ E] [AddCommGroup W] [Module ℂ W]

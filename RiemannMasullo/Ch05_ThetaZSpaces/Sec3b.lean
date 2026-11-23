@@ -92,13 +92,6 @@ local notation "wirtinger(" conjugate ")" =>
   (if conjugate then wirtingerConjDeriv else wirtingerDeriv)
 
 /-- Paper: §5.3.3, p. 249.
-Restriction gives a continuous linear injection of additive real Schwartz functions into
-the space with all positive weights. -/
-theorem realSchwartz_restrict_positiveDecay :
-    ∃ R : 𝓢(ℝ, ℂ) →L[ℂ] 𝓔(ℝ, 1, Ioi 0), Injective R ∧
-      ∀ (f : 𝓢(ℝ, ℂ)) (u : ℝˣ), (R f).val u = f u.val := by sorry
-
-/-- Paper: §5.3.3, p. 249.
 Restriction of an additive complex Schwartz function to the units gives a continuous
 linear injection into the space with all positive squared-norm weights. -/
 theorem complexSchwartz_restrict_positiveDecay :
@@ -931,6 +924,151 @@ private theorem iteratedDeriv_exponentialDecay_inducing (I : Set ℝ) :
     IsInducing (fun (f : ModulatedExponentialDecay (archimedeanUnitModulation ℝ 1) I) (a : I) ↦
       modulatedExponentialDecayTwist (archimedeanUnitModulation ℝ 1) I a f) :=
   iteratedDeriv_exponentialDecay_inducing_of_bot _ _ iteratedDeriv_exponentialDecay_goodBot
+
+/-- A positive weight controls powers of the logarithmic coordinate near zero.
+At infinity one additional integer Schwartz weight controls the same powers. -/
+private theorem realSchwartz_logWeight_bound (b : ℝ) (hb : 0 < b) (k : ℕ) :
+    ∃ (N : ℕ) (C : ℝ≥0), ∀ (f : 𝓢(ℝ, ℂ)) (x : ℝ),
+      |x| ^ k * Real.exp (b * x) * ‖f (Real.exp x)‖ ≤
+        C * (SchwartzMap.seminorm ℂ 0 0 f + SchwartzMap.seminorm ℂ N 0 f) := by
+  let δ := min b 1
+  have hδ : 0 < δ := lt_min hb zero_lt_one
+  obtain ⟨N, hN⟩ := exists_nat_ge (b + δ)
+  let C : ℝ≥0 := ⟨(k.factorial : ℝ) / δ ^ k, by positivity⟩
+  have hpow (y : ℝ) (hy : 0 ≤ y) : y ^ k ≤ (C : ℝ) * Real.exp (δ * y) := by
+    have h := (div_le_iff₀ (show 0 < (k.factorial : ℝ) by positivity)).mp
+      (Real.pow_div_factorial_le_exp (δ * y) (mul_nonneg hδ.le hy) k)
+    change _ ≤ _ / _ * _
+    rw [div_mul_eq_mul_div, le_div_iff₀ (pow_pos hδ k)]
+    simpa only [mul_pow, mul_comm] using h
+  refine ⟨N, C, fun f x ↦ ?_⟩
+  have h := mul_le_mul_of_nonneg_right (hpow |x| (abs_nonneg _)) (Real.exp_pos (b*x)).le
+  rw [mul_assoc, ← Real.exp_add] at h
+  have hbnd (a d : ℝ) (ha : δ * |x| + b*x ≤ a)
+      (hd : Real.exp a * ‖f (Real.exp x)‖ ≤ d) :
+      |x| ^ k * Real.exp (b*x) * ‖f (Real.exp x)‖ ≤ C * d := by
+    refine (mul_le_mul_of_nonneg_right h (norm_nonneg _)).trans ?_
+    rw [mul_assoc]
+    exact mul_le_mul_of_nonneg_left
+      ((mul_le_mul_of_nonneg_right (Real.exp_le_exp.mpr ha) (norm_nonneg _)).trans hd) C.property
+  by_cases hx : 0 ≤ x
+  · apply hbnd ((N : ℝ) * x)
+    · rw [abs_of_nonneg hx]
+      simpa only [add_mul, add_comm] using mul_le_mul_of_nonneg_right hN hx
+    · rw [Real.exp_nat_mul]
+      have hf := SchwartzMap.norm_pow_mul_le_seminorm ℂ f N (Real.exp x)
+      rw [Real.norm_of_nonneg (Real.exp_pos _).le] at hf
+      exact hf.trans (le_add_of_nonneg_left (apply_nonneg _ _))
+  · apply hbnd 0
+    · rw [abs_of_nonpos (le_of_not_ge hx)]
+      have hδb : δ ≤ b := min_le_left _ _
+      nlinarith [mul_nonpos_of_nonneg_of_nonpos (sub_nonneg.mpr hδb) (le_of_not_ge hx)]
+    · rw [Real.exp_zero, one_mul]
+      exact (SchwartzMap.norm_le_seminorm ℂ f _).trans
+        (le_add_of_nonneg_right (apply_nonneg _ _))
+
+/-- In exponential coordinates the derivative of the weighted profile is the
+weighted profile of the Euler derivative plus the weight times the input. -/
+private theorem realSchwartz_weightedExpProfile (b : ℝ) (hb : 0 < b) :
+    ∃ L : 𝓢(ℝ, ℂ) →L[ℂ] 𝓢(ℝ, ℂ), ∀ f x,
+      L f x = (Real.exp (b*x) : ℂ) * f (Real.exp x) := by
+  let X := 𝓢(ℝ, ℂ)
+  let T : X →L[ℂ] X := (b : ℂ) • ContinuousLinearMap.id ℂ X +
+    (SchwartzMap.smulLeftCLM ℂ (fun y : ℝ ↦ (y : ℂ))).comp (SchwartzMap.derivCLM ℂ ℂ)
+  let g (f : X) (x : ℝ) := (Real.exp (b*x) : ℂ) * f (Real.exp x)
+  have hT (f : X) (y : ℝ) : T f y = (b : ℂ) * f y + (y : ℂ) * deriv f y := by
+    change (b : ℂ) * f y + SchwartzMap.smulLeftCLM ℂ (fun t : ℝ ↦ (t : ℂ))
+      (SchwartzMap.derivCLM ℂ ℂ f) y = _
+    rw [SchwartzMap.smulLeftCLM_apply_apply (by fun_prop)]
+    rfl
+  have hd (f : X) : deriv (g f) = g (T f) := by
+    funext x
+    have h1 := (((hasDerivAt_id x).const_mul b).exp).ofReal_comp
+    have h2 := f.differentiableAt.hasDerivAt.scomp x (Real.hasDerivAt_exp x)
+    rw [show deriv (g f) x = _ from (h1.fun_mul h2).deriv]
+    change _ = (Real.exp (b*x) : ℂ) * T f (Real.exp x)
+    rw [hT]
+    simp only [id_eq, Function.comp_apply, mul_one, Complex.ofReal_mul, Complex.real_smul]
+    ring
+  have hi (f : X) (n : ℕ) : iteratedDeriv n (g f) = g ((T ^ n) f) := by
+    induction n with
+    | zero => rfl
+    | succ n ih =>
+      rw [iteratedDeriv_succ, ih, hd, pow_succ', mul_apply_eq_comp]
+  choose N C hbnd using realSchwartz_logWeight_bound b hb
+  let q (k n : ℕ) : Seminorm ℂ X := C k •
+    ((SchwartzMap.seminorm ℂ 0 0 + SchwartzMap.seminorm ℂ (N k) 0).comp (T ^ n).toLinearMap)
+  have hbound (k n : ℕ) (f : X) (x : ℝ) : |x| ^ k * ‖iteratedDeriv n (g f) x‖ ≤ q k n f := by
+    rw [hi]
+    change |x| ^ k * ‖(Real.exp (b*x) : ℂ) * _‖ ≤ _
+    rw [norm_mul, Complex.norm_of_nonneg (Real.exp_pos _).le, ← mul_assoc]
+    exact hbnd k ((T ^ n) f) x
+  have hsmooth (f : X) : ContDiff ℝ (∞) (g f) :=
+    (Complex.ofRealCLM.contDiff.comp (Real.contDiff_exp.comp (contDiff_const.mul contDiff_id))).mul
+      ((f.smooth (⊤ : ℕ∞)).comp Real.contDiff_exp)
+  have hdec (f : X) (k n : ℕ) : ∃ c : ℝ, ∀ x : ℝ,
+      ‖x‖ ^ k * ‖iteratedFDeriv ℝ n (g f) x‖ ≤ c := by
+    refine ⟨q k n f, fun x ↦ ?_⟩
+    simpa only [Real.norm_eq_abs, norm_iteratedFDeriv_eq_norm_iteratedDeriv] using hbound k n f x
+  let L : X →ₗ[ℂ] X :=
+    { toFun := fun f ↦ ⟨g f, hsmooth f, hdec f⟩
+      map_add' := fun f h ↦ SchwartzMap.ext fun x ↦ mul_add _ _ _
+      map_smul' := fun c f ↦ SchwartzMap.ext fun x ↦ mul_left_comm _ _ _ }
+  refine ⟨⟨L, (schwartz_withSeminorms ℂ ℝ ℂ).continuous_of_continuous_comp L fun i ↦ ?_⟩,
+    fun _ _ ↦ rfl⟩
+  have hp (j : ℕ) : Continuous (SchwartzMap.seminorm ℂ j 0 : X → ℝ) :=
+    (schwartz_withSeminorms ℂ ℝ ℂ).continuous_seminorm (j, 0)
+  have hc : Continuous (q i.1 i.2) := continuous_const.mul
+    (((hp 0).add (hp (N i.1))).comp (T ^ i.2).continuous)
+  apply Seminorm.continuous_of_le hc
+  intro f
+  exact SchwartzMap.seminorm_le_bound' ℂ i.1 i.2 (L f) (apply_nonneg _ _) (hbound i.1 i.2 f)
+
+/-- Paper: §5.3.3, p. 249.
+Restriction gives a continuous linear injection of additive real Schwartz functions into
+the space with all positive weights. -/
+theorem realSchwartz_restrict_positiveDecay :
+    ∃ R : 𝓢(ℝ, ℂ) →L[ℂ] 𝓔(ℝ, 1, Ioi 0), Injective R ∧
+      ∀ (f : 𝓢(ℝ, ℂ)) (u : ℝˣ), (R f).val u = f u.val := by
+  let X := 𝓢(ℝ, ℂ)
+  let m := archimedeanUnitModulation ℝ 1
+  let I : Set ℝ := Ioi 0
+  let r : X →ₗ[ℂ] (ℝˣ → ℂ) :=
+    { toFun := fun f u ↦ f u.val
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  obtain ⟨J, hJ⟩ := iteratedDeriv_exponentialDecay_assemble
+  let negX : X →L[ℂ] X :=
+    SchwartzMap.compCLMOfContinuousLinearEquiv ℂ (ContinuousLinearEquiv.neg ℝ : ℝ ≃L[ℝ] ℝ)
+  have ht (b : I) : ∃ B : X →L[ℂ] SchwartzBruhat ℝˣ, ∀ f,
+      (B f).val = modulationWeight m b (r f) := by
+    obtain ⟨L, hL⟩ := realSchwartz_weightedExpProfile b.val b.property
+    refine ⟨J.comp (L.prod (L.comp negX)), fun f ↦ funext fun u ↦ ?_⟩
+    change J (L f, L (negX f)) u = _
+    rw [hJ]
+    have hu := abs_pos.mpr u.ne_zero
+    change _ = (((((m u).val : ℝ) ^ (b : ℝ) : ℝ)) : ℂ) * f u.val
+    rw [archimedeanUnitModulation_apply, pow_one, Real.norm_eq_abs, Real.rpow_def_of_pos hu,
+      Real.log_abs, mul_comm (Real.log u.val)]
+    by_cases hpos : 0 < u.val
+    · simp only [ite_eq_left hpos, hL, Real.exp_log hpos]
+    · simp only [ite_eq_right hpos, hL, Real.exp_log_eq_abs u.ne_zero,
+        abs_of_nonpos (le_of_not_gt hpos)]
+      change _ * f (- -u.val) = _
+      rw [neg_neg]
+  let R : X →ₗ[ℂ] 𝓔(ℝ, 1, I) := r.codRestrict (modulatedExponentialDecaySubmodule m I) fun f ↦
+    (Submodule.mem_iInf _).mpr fun b ↦ Submodule.mem_comap.mpr (by
+      rw [← (ht b).choose_spec f]
+      exact ((ht b).choose f).property)
+  have hR : Continuous (R : X → 𝓔(ℝ, 1, I)) := by
+    apply (iteratedDeriv_exponentialDecay_inducing I).continuous_iff.mpr
+    refine continuous_pi fun b ↦ (ht b).choose.continuous.congr fun f ↦ ?_
+    exact Subtype.ext ((ht b).choose_spec f)
+  refine ⟨⟨R, hR⟩, fun f g hfg ↦ ?_, fun _ _ ↦ rfl⟩
+  apply DFunLike.coe_injective
+  apply Continuous.ext_on (dense_compl_singleton (0 : ℝ)) f.continuous g.continuous
+  intro x hx
+  exact congrArg (fun v : 𝓔(ℝ, 1, Ioi 0) ↦ v.val (Units.mk0 x hx)) hfg
 
 private theorem iteratedDeriv_exponentialDecay_logDeriv (f : ℝ → ℂ) (g : 𝓢(ℝ, ℂ))
     (b x : ℝ) (hx : x ≠ 0) (hg : ∀ᶠ y in 𝓝 x,

@@ -311,14 +311,6 @@ theorem reciprocalEulerProduct_over_split_prime (χ : U𝔽) (S₀ : Finset Prim
   obtain ⟨he1, hf1⟩ := hp w (Finset.mem_filter.mp hw).2
   rw [hev, he1, hf1]
 
-/-- Paper: Remark 7.1.3.1, p. 323.
-There are infinitely many completely split rational primes at which the character
-is unramified at every place above the prime. -/
-theorem infinite_split_primes_unramified (χ : U𝔽) :
-    {p : RatPrimes | rationalPrimeSplitsCompletely F p ∧
-      ∀ v : Primes, v.under (𝓞 ℚ) = p → (ideleClassNormTwist χ 0).IsUnramifiedAt v}.Infinite :=
-  by sorry
-
 /-- Paper: Remark 7.1.3.1, p. 324.
 The completely split rational primes have positive density among the rational primes.
 Deviation: Uses Mathlib's Dirichlet density. -/
@@ -342,6 +334,26 @@ theorem infinite_split_primes_reciprocalEulerProduct_normTwist
         ∀ s : ℂ, reciprocalPartialHeckeEulerProduct χ overₚ(S₀, p) s =
           (1 - (p.asIdeal.absNorm : ℂ) ^ (-(s + (x : ℂ) * Complex.I))) ^ degree}.Infinite :=
   by sorry
+
+/-- Paper: Remark 7.1.3.1, p. 323.
+There are infinitely many completely split rational primes at which the character
+is unramified at every place above the prime. -/
+theorem infinite_split_primes_unramified (χ : U𝔽) :
+    {p : RatPrimes | rationalPrimeSplitsCompletely F p ∧
+      ∀ v : Primes, v.under (𝓞 ℚ) = p → (ideleClassNormTwist χ 0).IsUnramifiedAt v}.Infinite :=
+  by
+  have hsplit : {p : RatPrimes | rationalPrimeSplitsCompletely F p}.Infinite := by
+    have h := infinite_split_primes_reciprocalEulerProduct_normTwist (F := F) 1 1
+      IsOfFinOrder.one 0 (by simp)
+    apply Set.Infinite.mono _ h
+    intro p hp
+    exact hp.1
+  obtain ⟨T, hT⟩ : ∃ T : Finset Primes, ideleClassNormTwist χ 0 ∈ unramifiedOutside F T :=
+    Set.mem_iUnion.mp ((iUnion_unramifiedOutside F).symm ▸ Set.mem_univ _)
+  have hf := T.finite_toSet.image (fun v : Primes ↦ v.under (𝓞 ℚ))
+  apply (hsplit.sdiff hf).mono
+  rintro p ⟨hp, hgood⟩
+  exact ⟨hp, fun v hv ↦ hT v (fun hvT ↦ hgood ⟨v, hvT, hv⟩)⟩
 
 variable {S : Finset (HeightOneSpectrum (𝓞 F))}
 
@@ -655,12 +667,80 @@ theorem sLocalRhoPoleOrder_le_card (s : ℂ) :
     exact_mod_cast hb
   omega
 
+open Classical in
+/-- Paper: Theorem 7.1.3.2(2), p. 324. No finite place of `S` contributes a pole to the
+correcting factor at an abscissa in the open left half-plane: the restricted finite Tate
+factor at a place of `S` is holomorphic there, so the finite-place count in
+`sLocalRhoFactor_orderAt_pole` vanishes. -/
+private theorem sLocalRhoPoleOrder_le_archimedean_of_re_neg_finite
+    (c : QuasiCharacter Jₛ) (_hc : ∀ x : Jₛ, ‖c x‖ = 1) {s : ℂ} (_hs : s.re < 0) :
+    (Finset.univ.filter (fun v : S ↦ meromorphicOrderAt (fun z ↦ finiteLocalTateFactor v.val
+      (sLocalFiniteRestriction v (twistₛ c z))) s < 0)).card
+      = 0 := by sorry
+
 /-- Paper: Theorem 7.1.3.2(2), p. 324.
 In the open left half-plane the pole order is bounded by the number of infinite places.
 Deviation: Includes all negative abscissae, as in the local-factor argument, and implies
 the stated bounds for negative even abscissae and by the degree. -/
 theorem sLocalRhoPoleOrder_le_archimedean_of_re_neg {s : ℂ} (hs : s.re < 0) :
-    sLocalRhoPoleOrder (chartₛ(χ, hχ) s) ≤ archCount := by sorry
+    sLocalRhoPoleOrder (chartₛ(χ, hχ) s) ≤ archCount := by
+  classical
+  let c := sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩
+  have hc (x : Jₛ) : ‖c x‖ = 1 := by
+    obtain ⟨g, rfl⟩ := QuotientGroup.mk_surjective x
+    rw [show c (QuotientGroup.mk g) = ideleClassNormTwist χ 0
+      (QuotientGroup.mk (sIdeleInsertion F S g)) from sIdeleRestriction_mk F S _ g]
+    change ‖(χ _ : ℂ) * _ ^ (0 : ℂ)‖ = 1
+    simp
+  let ψ : PontryaginDual Jₛ :=
+    { toFun := fun x ↦ ⟨c x, mem_sphere_zero_iff_norm.mpr (hc x)⟩
+      map_one' := Subtype.ext (map_one c)
+      map_mul' := fun x y ↦ Subtype.ext (map_mul c x y)
+      continuous_toFun := c.continuous.subtype_mk _ }
+  have hψ : (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ψ = c := by
+    ext x
+    rfl
+  have hcomp : (fun z ↦ sLocalRhoFactor (F := F) (S := S)
+        (twistₛ (chartₛ(χ, hχ) s) z)) = rhoChart(χ, hχ) ∘ (· + s) := by
+    funext z
+    simp only [Function.comp]
+    congr 1
+    ext1 g
+    simp only [quasiCharacterNormTwist]
+    have hn : (((mₛ g : ℝ≥0ˣ) : ℝ≥0) : ℂ) ≠ 0 := by simp
+    change ((_ : ℂ) * _) * _ = (_ : ℂ) * _
+    rw [mul_assoc]
+    congr 1
+    change (((mₛ g : ℝ≥0ˣ) : ℝ≥0) : ℂ) ^ s * (((mₛ g : ℝ≥0ˣ) : ℝ≥0) : ℂ) ^ z = _
+    rw [← Complex.cpow_add _ _ hn, add_comm]
+    rfl
+  have key : sLocalIdelicOrderBound (chartₛ(χ, hχ) s) =
+      min 0 (meromorphicOrderAt rhoChart(χ, hχ) s) := by
+    unfold sLocalIdelicOrderBound
+    rw [hcomp, meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt, zero_add]
+  have hord := sLocalRhoFactor_orderAt_pole (F := F) (S := S) ψ s
+  dsimp only at hord
+  rw [hψ] at hord
+  change meromorphicOrderAt rhoChart(χ, hχ) s < 0 → _ at hord
+  have hbound : (-((archCount : ℕ) : ℤ) : WithTop ℤ) ≤
+      meromorphicOrderAt rhoChart(χ, hχ) s := by
+    by_cases h : meromorphicOrderAt rhoChart(χ, hχ) s < 0
+    · rw [hord h,
+        sLocalRhoPoleOrder_le_archimedean_of_re_neg_finite (F := F) (S := S) c hc hs, Nat.add_zero]
+      have ha : (Finset.univ.filter (fun w : InfinitePlace F ↦ meromorphicOrderAt (fun z ↦
+          infiniteLocalTateFactor w (sLocalInfiniteRestriction w (twistₛ c z))) s < 0)).card
+          ≤ archCount := Finset.card_le_univ _
+      exact_mod_cast (show -((archCount : ℕ) : ℤ) ≤ -((_ : ℕ) : ℤ) by omega)
+    · exact le_trans (by exact_mod_cast (show -((archCount : ℕ) : ℤ) ≤ 0 by omega))
+        (le_of_not_gt h)
+  have hb : (-((archCount : ℕ) : ℤ) : WithTop ℤ) ≤
+      sLocalIdelicOrderBound (chartₛ(χ, hχ) s) := by
+    rw [key]
+    exact le_min (by exact_mod_cast (show -((archCount : ℕ) : ℤ) ≤ 0 by omega)) hbound
+  rw [sLocalIdelicOrderBound_eq_neg_poleOrder] at hb
+  have : -((archCount : ℕ) : ℤ) ≤ -(sLocalRhoPoleOrder (chartₛ(χ, hχ) s) : ℤ) := by
+    exact_mod_cast hb
+  omega
 
 -- TODO(paper-gap): The bound by r₂ at negative odd abscissae in Theorem 7.1.3.2(2)
 -- omits real sign factors. The odd Dirichlet character modulo 4 gives a pole at -1
@@ -675,16 +755,6 @@ theorem sLocalRhoPoleOrder_le_of_re_neg_odd (n : ℕ) {s : ℂ}
     sLocalRhoPoleOrder (chartₛ(χ, hχ) s) ≤
       (Finset.univ.filter (fun w : InfinitePlace F ↦ w.IsComplex ∨
         w.IsReal ∧ sLocalInfiniteRestriction w (chartₛ(χ, hχ) 0) (-1) = -1)).card := by sorry
-
-open Classical in
-/-- Paper: Theorem 7.1.3.2(3), p. 324.
-Excess pole orders at finite-place poles can occur at at most the number of infinite
-places plus the number of unordered pairs of unramified finite places. -/
-theorem sLocalRhoPoleOrder_exceptions_encard_le :
-    let S₀ := S.filter (fun v ↦ (ideleClassNormTwist (F := F) χ 0).IsUnramifiedAt v)
-    {s : ℂ | degree < sLocalRhoPoleOrder (chartₛ(χ, hχ) s) ∧
-      ∃ v ∈ S₀, meromorphicOrderAt (finiteHeckeEulerFactor χ v) s < 0}.encard ≤
-        (archCount + S₀.card.choose 2 : ℕ) := by sorry
 
 -- On a radial subgroup, taking a power kills the finite-order part of the character.
 
@@ -1134,6 +1204,111 @@ private theorem excess_order_le_of_factors (s : ℂ)
   rw [hη]
   exact_mod_cast neg_le_neg_iff.mp (WithTop.coe_le_coe.mp hmin)
 
+/-- Outside the finitely many radial parameters, the archimedean product is
+holomorphic in the closed right half-plane. -/
+private theorem exists_excess_gamma_parameters (χ : U𝔽) :
+    ∃ A : InfinitePlace F → ℂ, ∀ s : ℂ, 0 ≤ s.re →
+      (∀ v, s ≠ A v) → AnalyticAt ℂ (heckeGammaFactor χ) s := by
+  classical
+  let a (v : InfinitePlace F) : ℂ := if hv : v.IsReal then
+    (realHeckeCharacter_parameters χ v hv).exists.choose.1 else
+    (complexHeckeCharacter_parameters χ v (InfinitePlace.not_isReal_iff_isComplex.mp hv)).exists.choose.1
+  refine ⟨fun v ↦ -a v, fun s hs hne ↦ ?_⟩
+  have hΓ : heckeGammaFactor χ s ≠ 0 := by
+    unfold heckeGammaFactor
+    apply Finset.prod_ne_zero_iff.mpr
+    intro v _
+    have hn : s + a v ≠ 0 := fun h ↦ hne v (eq_neg_of_add_eq_zero_left h)
+    have ha : (a v).re = 0 := by
+      dsimp only [a]
+      split_ifs with hv
+      · exact (realHeckeCharacter_parameters χ v hv).exists.choose_spec.1
+      · exact (complexHeckeCharacter_parameters χ v _).exists.choose_spec.1
+    have hz : 0 ≤ (s + a v).re := by simpa only [Complex.add_re, ha, add_zero] using hs
+    split_ifs with hv
+    · dsimp only
+      have hv' : a v = _ := dite_eq_left hv
+      rw [← hv']
+      exact_mod_cast excess_gamma_real_ne_zero (s + a v) hz hn _ (Nat.cast_nonneg _)
+    · dsimp only
+      have hc := InfinitePlace.not_isReal_iff_isComplex.mp hv
+      let k := (complexHeckeCharacter_parameters χ v hc).exists.choose.2.natAbs
+      change Complex.Gammaℂ (s + (complexHeckeCharacter_parameters χ v hc).exists.choose.1 + (k : ℂ) / 2) / 2 ≠ 0
+      rw [← show a v = _ from dite_eq_right hv]
+      apply (div_ne_zero · two_ne_zero)
+      rw [← Complex.Gammaℝ_mul_Gammaℝ_add_one]
+      refine mul_ne_zero ?_ (Complex.Gammaℝ_ne_zero_of_re_pos ?_)
+      · simpa only [Complex.ofReal_div, Complex.ofReal_ofNat, Complex.ofReal_natCast] using
+          excess_gamma_real_ne_zero (s + a v) hz hn ((k : ℝ) / 2) (by positivity)
+      · rw [Complex.add_re, Complex.add_re (s + a v), Complex.div_ofNat_re, Complex.natCast_re, Complex.one_re]
+        positivity
+  simpa only [inv_inv] using (((differentiable_inv_heckeGammaFactor χ).analyticAt s).fun_inv
+    (inv_ne_zero hΓ))
+
+open Classical in
+/-- Paper: Theorem 7.1.3.2(3), p. 324.
+Excess pole orders at finite-place poles can occur at at most the number of infinite
+places plus the number of unordered pairs of unramified finite places. -/
+theorem sLocalRhoPoleOrder_exceptions_encard_le :
+    let S₀ := S.filter (fun v ↦ (ideleClassNormTwist (F := F) χ 0).IsUnramifiedAt v)
+    {s : ℂ | degree < sLocalRhoPoleOrder (chartₛ(χ, hχ) s) ∧
+      ∃ v ∈ S₀, meromorphicOrderAt (finiteHeckeEulerFactor χ v) s < 0}.encard ≤
+        (archCount + S₀.card.choose 2 : ℕ) := by
+  classical
+  dsimp only
+  let S₀ := S.filter (fun v ↦ (ideleClassNormTwist (F := F) χ 0).IsUnramifiedAt v)
+  let pole (v : Primes) (s : ℂ) := meromorphicOrderAt (finiteHeckeEulerFactor χ v) s < 0
+  obtain ⟨A, hA⟩ := exists_excess_gamma_parameters χ
+  let common (P : Finset Primes) (s : ℂ) := ∀ v ∈ P, pole v s
+  let B (P : Finset Primes) : ℂ := if h : ∃ s, common P s then h.choose else 0
+  let E := Finset.univ.image A ∪ (S₀.powersetCard 2).image B
+  have hsub : {s : ℂ | degree < sLocalRhoPoleOrder (chartₛ(χ, hχ) s) ∧
+      ∃ v ∈ S₀, pole v s} ⊆ (E : Set ℂ) := by
+    intro s hs
+    obtain ⟨hex, v, hv, hp⟩ := hs
+    by_cases harch : ∃ w, s = A w
+    · obtain ⟨w, hw⟩ := harch
+      exact Finset.mem_union_left _ (Finset.mem_image.mpr ⟨w, Finset.mem_univ _, hw.symm⟩)
+    have hre : 0 ≤ s.re := by
+      by_contra! hn
+      have hi := sLocalRhoPoleOrder_le_archimedean_of_re_neg χ hχ hn
+      rw [InfinitePlace.card_eq_nrRealPlaces_add_nrComplexPlaces] at hi
+      have hdeg := InfinitePlace.card_add_two_mul_card_eq_rank (K := F)
+      omega
+    have hΓ := hA s hre (fun w he ↦ harch ⟨w, he⟩)
+    have hvS := (Finset.mem_filter.mp hv).1
+    have hw : ∃ w ∈ S, pole w s ∧ w.under (𝓞 ℚ) ≠ v.under (𝓞 ℚ) := by
+      by_contra! h
+      apply (not_le.mpr hex)
+      apply excess_order_le_of_factors χ hχ s hΓ (excess_finite_product_meromorphicAt χ S s)
+      rw [show (fun z ↦ ∏ w : S, finiteHeckeEulerFactor χ w.val z) =
+          (fun z ↦ ∏ w ∈ S, finiteHeckeEulerFactor χ w z) from
+          funext fun z ↦ Finset.prod_coe_sort S (fun w ↦ finiteHeckeEulerFactor χ w z)]
+      rw [meromorphicOrderAt_fun_prod (fun w (_ : w ∈ S) ↦ excess_finite_meromorphicAt χ w s)]
+      refine (excess_finite_order_over_prime χ S (v.under (𝓞 ℚ)) s).trans ?_
+      apply Finset.sum_le_sum_of_subset_of_nonneg (Finset.filter_subset _ _)
+      intro w hw hn
+      exact le_of_not_gt fun hpw ↦ hn (Finset.mem_filter.mpr ⟨hw, h w hw hpw⟩)
+    obtain ⟨w, hwS, hw, hdiff⟩ := hw
+    have hwU := ((excess_finite_pole χ w s).mp hw).1
+    let P : Finset Primes := {w, v}
+    have hne : w ≠ v := fun he ↦ hdiff (congrArg (fun u : Primes ↦ u.under (𝓞 ℚ)) he)
+    have hmem : P ∈ S₀.powersetCard 2 := Finset.mem_powersetCard.mpr
+      ⟨Finset.insert_subset (Finset.mem_filter.mpr ⟨hwS, hwU⟩) (Finset.singleton_subset_iff.mpr hv),
+        by simp [P, hne]⟩
+    have hcs : common P s := by simpa [common, P] using And.intro hw hp
+    have hexs : ∃ z, common P z := ⟨s, hcs⟩
+    have hB : common P (B P) := by simpa only [B, dite_eq_left hexs] using hexs.choose_spec
+    have he := finiteHeckeEulerFactors_common_pole_subsingleton χ hχ ⟨w, hwS⟩ ⟨v, hvS⟩
+      hwU (Finset.mem_filter.mp hv).2 hdiff
+    exact Finset.mem_union_right _ (Finset.mem_image.mpr ⟨P, hmem,
+      he ⟨hB w (by simp [P]), hB v (by simp [P])⟩ ⟨hw, hp⟩⟩)
+  refine (Set.encard_mono hsub).trans ?_
+  rw [Set.encard_coe_eq_coe_finsetCard]
+  exact_mod_cast (Finset.card_union_le _ _).trans
+    ((Nat.add_le_add (Finset.card_image_le) (Finset.card_image_le)).trans_eq
+      (by rw [Finset.card_univ, Finset.card_powersetCard]))
+
 /-- Paper: Theorem 7.1.3.2(3)(a), p. 324.
 For a finite-order character twisted by an imaginary norm power, an excess pole order
 can occur only at the negative of that twist parameter. -/
@@ -1163,6 +1338,139 @@ local instance instHaarSLocalNormOneSec1b :
     (sLocalNormOneQuotientMeasure F S).IsHaarMeasure :=
   (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
 
+/-- The pole order of a meromorphic germ is bounded by `K` as soon as the germ's order is at
+least `-K`. -/
+private theorem sLocalHomogeneousAdelicTheta_log_bound_poleOrder_le_aux {o : WithTop ℤ} {K : ℕ}
+    (h : ((-(K : ℤ) : ℤ) : WithTop ℤ) ≤ o) : (-(o.untop₀)).toNat ≤ K := by
+  induction o using WithTop.recTopCoe with
+  | top => rw [WithTop.untop₀_top]; simp
+  | coe n =>
+    rw [WithTop.untop₀_coe, ← Int.toNat_natCast K]
+    have h' : -(K : ℤ) ≤ n := by exact_mod_cast h
+    exact Int.toNat_le_toNat (by omega)
+
+/-- Paper: Corollary 7.1.3.3, p. 325 and Theorem 7.1.3.2(3), p. 324.
+On a unitary norm-twist chart the pole order of the continued zeta transform is at most
+the number of places whose local Tate factor has a pole at the abscissa, hence at most
+the number of infinite places plus the number of places of `S`. This is the bound that
+makes the set of pole orders in the corollary finite. -/
+private theorem sLocalHomogeneousAdelicTheta_log_bound_poleOrder_le
+    (ψ : PontryaginDual Jₛ) (f : SchwartzBruhat (Multiplicative (SAdeleRing F S))) (s : ℂ) :
+    sLocalPolarMultiplicity f
+      (twistₛ ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ψ) s) ≤
+      archCount + S.card := by
+  classical
+  set χ₀ : QuasiCharacter Jₛ :=
+    (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ψ with hχ₀
+  have hgerm : meromorphicOrderAt (fun z ↦ sLocalIdelicZFunction f (twistₛ (twistₛ χ₀ s) z)) 0
+      = meromorphicOrderAt (fun z ↦ sLocalIdelicZFunction f (twistₛ χ₀ z)) s := by
+    have hf : (fun z ↦ sLocalIdelicZFunction f (twistₛ (twistₛ χ₀ s) z))
+        = (fun z ↦ sLocalIdelicZFunction f (twistₛ χ₀ z)) ∘ (· + s) := by
+      funext z
+      simp only [Function.comp_apply, excess_center]
+    rw [hf, meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt, zero_add]
+  have hρ : (-( (archCount + S.card : ℕ) : ℤ) : WithTop ℤ) ≤
+      meromorphicOrderAt (fun z ↦ sLocalRhoFactor (twistₛ χ₀ z)) s := by
+    by_cases hlt : meromorphicOrderAt (fun z ↦ sLocalRhoFactor (twistₛ χ₀ z)) s < 0
+    · have hval := sLocalRhoFactor_orderAt_pole (F := F) (S := S) ψ s hlt
+      rw [hval]
+      have ha : (Finset.univ.filter (fun w : InfinitePlace F ↦ meromorphicOrderAt (fun z ↦
+          infiniteLocalTateFactor w (sLocalInfiniteRestriction w (twistₛ χ₀ z))) s < 0)).card
+          ≤ archCount := by
+        simpa using Finset.card_le_univ (s := Finset.univ.filter (fun w : InfinitePlace F ↦
+          meromorphicOrderAt (fun z ↦ infiniteLocalTateFactor w
+            (sLocalInfiniteRestriction w (twistₛ χ₀ z))) s < 0))
+      have hf : (Finset.univ.filter (fun v : S ↦ meromorphicOrderAt (fun z ↦
+          finiteLocalTateFactor v.val (sLocalFiniteRestriction v (twistₛ χ₀ z))) s < 0)).card
+          ≤ S.card := by
+        simpa using Finset.card_le_univ (s := Finset.univ.filter (fun v : S ↦
+          meromorphicOrderAt (fun z ↦ finiteLocalTateFactor v.val
+            (sLocalFiniteRestriction v (twistₛ χ₀ z))) s < 0))
+      exact_mod_cast (show -((archCount + S.card : ℕ) : ℤ) ≤
+        -((((Finset.univ.filter (fun w : InfinitePlace F ↦ meromorphicOrderAt (fun z ↦
+            infiniteLocalTateFactor w (sLocalInfiniteRestriction w (twistₛ χ₀ z))) s < 0)).card
+          + (Finset.univ.filter (fun v : S ↦ meromorphicOrderAt (fun z ↦
+              finiteLocalTateFactor v.val
+                (sLocalFiniteRestriction v (twistₛ χ₀ z))) s < 0)).card : ℕ)) : ℤ) by
+        omega)
+    · exact le_trans (by exact_mod_cast (show
+        -((archCount + S.card : ℕ) : ℤ) ≤ 0 by omega)) (le_of_not_gt hlt)
+  have hmin : (-( (archCount + S.card : ℕ) : ℤ) : WithTop ℤ) ≤
+      min 0 (meromorphicOrderAt (fun z ↦ sLocalRhoFactor (twistₛ χ₀ z)) s) :=
+    le_min (by exact_mod_cast (show -((archCount + S.card : ℕ) : ℤ) ≤ 0 by omega)) hρ
+  have horder : (-( (archCount + S.card : ℕ) : ℤ) : WithTop ℤ) ≤
+      meromorphicOrderAt (fun z ↦ sLocalIdelicZFunction f (twistₛ χ₀ z)) s := by
+    have hpoles := sLocalIdelicZFunction_poles (F := F) (S := S) f ψ s
+    exact hmin.trans (by simpa only [← hχ₀] using hpoles)
+  have hfin := sLocalHomogeneousAdelicTheta_log_bound_poleOrder_le_aux
+    (K := archCount + S.card) horder
+  unfold sLocalPolarMultiplicity
+  rw [hgerm]
+  exact hfin
+
+/-- Paper: Corollary 7.1.3.3, p. 325.
+A pole order that is bounded has a greatest value. -/
+private theorem sLocalHomogeneousAdelicTheta_log_bound_isGreatest (poleOrder : ℂ → ℕ) (N : ℕ)
+    (hN : ∀ s, poleOrder s ≤ N) : ∃ M : ℕ, IsGreatest (range poleOrder) M := by
+  classical
+  obtain ⟨M, hMS, hmax⟩ := Finset.exists_max_image
+    ((Finset.range (N + 1)).filter (fun k ↦ ∃ s, poleOrder s = k)) id
+    ⟨poleOrder 0, by
+      simp only [Finset.mem_filter, Finset.mem_range]
+      exact ⟨Nat.lt_succ_of_le (hN 0), 0, rfl⟩⟩
+  refine ⟨M, ?_, ?_⟩
+  · obtain ⟨-, s, hs⟩ := Finset.mem_filter.mp hMS
+    exact hs ▸ mem_range_self s
+  · intro b hb
+    obtain ⟨s, hs⟩ := hb
+    rw [← hs]
+    exact hmax _ (Finset.mem_filter.mpr
+      ⟨Finset.mem_range.mpr (Nat.lt_succ_of_le (hN s)), s, rfl⟩)
+
+/-- Paper: Corollary 7.1.3.3, p. 325.
+The pole orders strictly below the greatest one have a smallest upper bound. -/
+private theorem sLocalHomogeneousAdelicTheta_log_bound_isLeast (poleOrder : ℂ → ℕ) (M : ℕ) :
+    ∃ m : ℕ, IsLeast {k : ℕ | ∀ s, poleOrder s < M → poleOrder s ≤ k} m := by
+  classical
+  have hex : ∃ k : ℕ, ∀ s, poleOrder s < M → poleOrder s ≤ k := ⟨M, fun s hs ↦ hs.le⟩
+  exact ⟨Nat.find hex, Nat.find_spec hex, fun k hk ↦ Nat.find_min' hex hk⟩
+
+/-- Paper: Corollary 7.1.3.3, p. 325 and the proof on p. 326.
+The smallest upper bound for the pole orders below the greatest one is strictly less
+than the number of places, so the remainder exponent `m - 1` in (7.1.3.2) is below the
+leading exponent `archCount + S.card - 1`. -/
+private theorem sLocalHomogeneousAdelicTheta_log_bound_second_lt (poleOrder : ℂ → ℕ)
+    (N M m : ℕ) (hN0 : 0 < N) (hN : ∀ s, poleOrder s ≤ N)
+    (hM : IsGreatest (range poleOrder) M)
+    (hm : IsLeast {k : ℕ | ∀ s, poleOrder s < M → poleOrder s ≤ k} m) : m < N := by
+  obtain ⟨s₀, hs₀⟩ := hM.1
+  have hMN : M ≤ N := hs₀ ▸ hN s₀
+  have hm_min : ∀ k : ℕ, (∀ s, poleOrder s < M → poleOrder s ≤ k) → m ≤ k :=
+    fun k hk ↦ hm.2 hk
+  by_cases hex : ∃ s, poleOrder s < M
+  · have hle : m ≤ M - 1 := hm_min (M - 1) (fun s hs ↦ by omega)
+    omega
+  · have hle : m ≤ 0 := hm_min 0 (fun s hs ↦ absurd ⟨s, hs⟩ hex)
+    omega
+
+/-- Paper: Corollary 7.1.3.3, p. 325, estimate (7.1.3.2), and its proof on p. 326.
+The logarithmic bound near norm zero for the remainder exponent `m` coming from the
+largest smaller pole order. -/
+private theorem sLocalHomogeneousAdelicTheta_log_bound_estimate
+    (harch : archCount = 1) (ψ : PontryaginDual Jₛ)
+    (f : SchwartzBruhat (Multiplicative (SAdeleRing F S))) (m : ℕ) :
+    let ω := ψ.comp
+      (⟨Subgroup.subtype (MonoidHom.ker mₛ), continuous_subtype_val⟩ :
+        MonoidHom.ker mₛ →ₜ* Jₛ)
+    let normℝ (g : Jₛ) := ((mₛ g : ℝ≥0) : ℝ)
+    ∃ (C D : ℝ), 0 < C ∧ 0 ≤ D ∧
+      ∀ᶠ g in comap normℝ (𝓝[>] 0),
+        ‖sLocalHomogeneousAdelicTheta F S (sLocalNormOneQuotientMeasure F S) ω f g‖ ≤
+          C * |Real.log (normℝ g)| ^ (archCount + S.card - 1) +
+            D * |Real.log (normℝ g)| ^ ((m : ℤ) - 1) := by
+  intro ω normℝ
+  sorry
+
 /-- Paper: Corollary 7.1.3.3, p. 325.
 With a unique infinite place, the homogeneous theta function has the stated logarithmic
 upper bound near norm zero. The remainder exponent comes from the largest smaller order.
@@ -1182,7 +1490,16 @@ theorem sLocalHomogeneousAdelicTheta_log_bound (harch : archCount = 1) (ψ : Pon
       ∀ᶠ g in comap normℝ (𝓝[>] 0),
         ‖sLocalHomogeneousAdelicTheta F S (sLocalNormOneQuotientMeasure F S) ω f g‖ ≤
           C * |Real.log (normℝ g)| ^ (archCount + S.card - 1) +
-            D * |Real.log (normℝ g)| ^ ((m : ℤ) - 1) := by sorry
+            D * |Real.log (normℝ g)| ^ ((m : ℤ) - 1) := by
+  classical
+  intro ω normℝ poleOrder
+  obtain ⟨M, hM⟩ := sLocalHomogeneousAdelicTheta_log_bound_isGreatest poleOrder
+    (archCount + S.card) (fun s ↦ sLocalHomogeneousAdelicTheta_log_bound_poleOrder_le ψ f s)
+  obtain ⟨m, hm⟩ := sLocalHomogeneousAdelicTheta_log_bound_isLeast poleOrder M
+  have hlt := sLocalHomogeneousAdelicTheta_log_bound_second_lt poleOrder (archCount + S.card) M m
+    (by omega) (fun s ↦ sLocalHomogeneousAdelicTheta_log_bound_poleOrder_le ψ f s) hM hm
+  obtain ⟨C, D, hC, hD, hbound⟩ := sLocalHomogeneousAdelicTheta_log_bound_estimate harch ψ f m
+  exact ⟨M, m, C, D, hM, hm, hlt, hC, hD, hbound⟩
 
 end Polar
 

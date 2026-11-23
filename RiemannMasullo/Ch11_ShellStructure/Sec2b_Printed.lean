@@ -8,6 +8,7 @@ import all RiemannMasullo.Ch06_LocalGlobal.Sec2
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3
 import Mathlib.Analysis.Calculus.BumpFunction.Normed
 import Mathlib.Analysis.Normed.Operator.Banach
+import RiemannMasullo.External.ZetaLab.HardyFirstZero.FirstZero
 
 /-! # §11.2.1–11.2.2 assertions that are false as printed -/
 
@@ -981,8 +982,213 @@ private theorem rational_cutoffConv_of_projected_translate
     (P (bruhatRegularizedAction μ τ hτ φ u)) htest
   exact ⟨φ, hφ, R, ε, ρ, hρ, hcut⟩
 
+/-- For a commutative action, a vector of an isotype killed by a symmetric idempotent
+`P` whose translate is not killed satisfies the projected conditions. On the isotype,
+`P v` is orthogonal to it only if `⟪P v, v⟫ = ‖P v‖²` vanishes. -/
+private theorem rational_cutoffConv_positive_translate_of_projection
+    {G L E : Type*} [CommMonoid G] [Monoid L] [TopologicalSpace L]
+    [NormedAddCommGroup E] [InnerProductSpace ℂ E]
+    (τ : G →* (E →L[ℂ] E)) (i : L →* G) (ω : PontryaginDual L)
+    (hc : CompleteSpace ↥(actionIsotype (τ.comp i) ω))
+    (P : E →L[ℂ] E) (hsymm : ∀ x y, inner ℂ (P x) y = inner ℂ x (P y))
+    (hidem : ∀ x, P (P x) = P x) (r : G → ℝ)
+    (h : ∃ (u : E) (g : G), u ∈ actionIsotype (τ.comp i) ω ∧ 1 < r g ∧
+      P u = 0 ∧ P (τ g u) ≠ 0) :
+    ∃ (v : actionIsotype (τ.comp i) ω) (g : G), 1 < r g ∧
+      (actionIsotype (τ.comp i) ω).orthogonalProjectionOnto (P v.val) = 0 ∧
+      (actionIsotype (τ.comp i) ω).orthogonalProjectionOnto (P (τ g v.val)) ≠ 0 := by
+  obtain ⟨u, g, hu, hr, hPu, hPg⟩ := h
+  have hg : τ g u ∈ actionIsotype (τ.comp i) ω := by
+    refine (mem_actionIsotype (τ.comp i) ω _).mpr fun k ↦ ?_
+    have hk := (mem_actionIsotype (τ.comp i) ω u).mp hu k
+    change τ (i k) (τ g u) = (ω k : ℂ) • τ g u
+    change τ (i k) u = (ω k : ℂ) • u at hk
+    have e : τ (i k) * τ g = τ g * τ (i k) := by rw [← map_mul, ← map_mul, mul_comm]
+    calc τ (i k) (τ g u) = (τ (i k) * τ g) u := rfl
+      _ = τ g (τ (i k) u) := by rw [e]; rfl
+      _ = (ω k : ℂ) • τ g u := by rw [hk, map_smul]
+  refine ⟨⟨u, hu⟩, g, hr, ?_, fun h ↦ hPg ?_⟩
+  · change (actionIsotype (τ.comp i) ω).orthogonalProjectionOnto (P u) = 0
+    rw [hPu, map_zero]
+  · have h0 : inner ℂ ((actionIsotype (τ.comp i) ω).orthogonalProjectionOnto (P (τ g u)))
+        (⟨τ g u, hg⟩ : actionIsotype (τ.comp i) ω) = 0 := by
+      change inner ℂ ((actionIsotype (τ.comp i) ω).orthogonalProjectionOnto
+        (P (τ g (⟨u, hu⟩ : actionIsotype (τ.comp i) ω).val))) _ = 0
+      rw [h, inner_zero_left]
+    rw [Submodule.inner_orthogonalProjectionOnto_eq_of_mem_right] at h0
+    change inner ℂ (P (τ g u)) (τ g u) = 0 at h0
+    rw [← hidem (τ g u), hsymm] at h0
+    exact inner_self_eq_zero.mp h0
+
+/-- The Riesz vector `exp(-iγx)/(1+x²)` of the log norm `x` is square integrable
+for the weight `1+x²` of the compact-interval Sobolev space on `[-0, 0]` with `s = 2`. -/
+private theorem rational_cutoffConv_rieszVector_memLp
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+    [MeasurableSpace G] [BorelSpace G]
+    (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) (hsurj : Surjective m)
+    (μ : Measure G) [μ.IsHaarMeasure] (γ : ℝ) :
+    MemLp (fun g : G ↦ Complex.exp (-((γ * Real.log ((m g).val : ℝ) : ℝ) : ℂ) * Complex.I) /
+        ((1 + Real.log ((m g).val : ℝ) ^ 2 : ℝ) : ℂ)) 2
+      (μ.withDensity fun g ↦ ENNReal.ofReal
+        (intervalSobolevDensity (-(0 : ℝ)) 0 2 (Real.log ((m g).val : ℝ)))) := by
+  have hL : Continuous (fun g : G ↦ Real.log ((m g).val : ℝ)) :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).log
+      fun g ↦ (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+  have hint := (modulatedSobolev_reciprocal_integrable_iff m μ hm hsurj (s := 2)
+    (by norm_num)).mpr (by norm_num)
+  have hpos (g : G) : 0 < 1 + Real.log ((m g).val : ℝ) ^ 2 := by positivity
+  have hw (g : G) : intervalSobolevDensity (-(0 : ℝ)) 0 2 (Real.log ((m g).val : ℝ)) =
+      1 + Real.log ((m g).val : ℝ) ^ 2 := by
+    simp [intervalSobolevDensity]
+  have hcont : Continuous (fun g : G ↦
+      Complex.exp (-((γ * Real.log ((m g).val : ℝ) : ℝ) : ℂ) * Complex.I) /
+        ((1 + Real.log ((m g).val : ℝ) ^ 2 : ℝ) : ℂ)) := by
+    refine Continuous.div (by fun_prop) (by fun_prop) fun g ↦ ?_
+    exact Complex.ofReal_ne_zero.mpr (hpos g).ne'
+  rw [memLp_two_iff_integrable_sq_norm hcont.aestronglyMeasurable,
+    integrable_withDensity_iff (by
+      simp only [hw]
+      exact ((continuous_const.add (hL.pow 2)).measurable).ennreal_ofReal)
+      (ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top)]
+  refine hint.congr (ae_of_all _ fun g ↦ ?_)
+  dsimp only
+  rw [hw, ENNReal.toReal_ofReal (hpos g).le, norm_div, Complex.norm_real,
+    Real.norm_of_nonneg (hpos g).le, ← Complex.ofReal_neg, Complex.norm_exp_ofReal_mul_I, sq_abs]
+  rw [show (-2 / 2 : ℝ) = -1 by norm_num, Real.rpow_neg_one]
+  field_simp
+
+/-- A function of the log norm is fixed by the Hardy–Sobolev translation by any
+element of norm one. -/
+private theorem rational_cutoffConv_rieszVector_fixed
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+    [MeasurableSpace G] [BorelSpace G]
+    (μ : Measure G) [μ.IsHaarMeasure] (m : G →ₜ* ℝ≥0ˣ) (hs : (0 : ℝ) ≤ 2) (f : G → ℂ)
+    (hf : MemLp f 2 (μ.withDensity fun g ↦ ENNReal.ofReal
+        (intervalSobolevDensity (-(0 : ℝ)) 0 2 (Real.log ((m g).val : ℝ)))))
+    (hrad : ∀ k x : G, m k = 1 → f (k⁻¹ * x) = f x) (k : G) (hk : m k = 1) :
+    hardySobolevTranslation μ m (-(0 : ℝ)) 0 2 (neg_nonpos.mpr (le_rfl (a := (0 : ℝ)))) hs k
+      (hf.toLp f) = hf.toLp f := by
+  have hpos (x : G) : 0 < intervalSobolevDensity (-(0 : ℝ)) 0 2 (Real.log ((m x).val : ℝ)) := by
+    simp only [intervalSobolevDensity]
+    positivity
+  have hac : (μ.withDensity fun g ↦ ENNReal.ofReal
+      (intervalSobolevDensity (-(0 : ℝ)) 0 2 (Real.log ((m g).val : ℝ)))) ≪ μ :=
+    withDensity_absolutelyContinuous _ _
+  have hac' : μ ≪ μ.withDensity fun g ↦ ENNReal.ofReal
+      (intervalSobolevDensity (-(0 : ℝ)) 0 2 (Real.log ((m g).val : ℝ))) := by
+    refine withDensity_absolutelyContinuous' ?_ (ae_of_all _ fun x ↦ ?_)
+    · have hL : Continuous (fun g : G ↦ Real.log ((m g).val : ℝ)) :=
+        (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).log
+          fun g ↦ (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+      have hw (g : G) : intervalSobolevDensity (-(0 : ℝ)) 0 2 (Real.log ((m g).val : ℝ)) =
+          1 + Real.log ((m g).val : ℝ) ^ 2 := by
+        simp [intervalSobolevDensity]
+      simp only [hw]
+      exact ((continuous_const.add (hL.pow 2)).measurable).ennreal_ofReal.aemeasurable
+    · exact ENNReal.ofReal_ne_zero_iff.mpr (hpos x)
+  have h1 := hardySobolevTranslation_apply μ m (-(0 : ℝ)) 0 2
+    (neg_nonpos.mpr (le_rfl (a := (0 : ℝ)))) hs k (hf.toLp f)
+  have h2 : ((hf.toLp f : _) : G → ℂ) =ᵐ[μ] f := hac'.ae_le (MemLp.coeFn_toLp hf)
+  have h3 := (measurePreserving_mul_left μ k⁻¹).quasiMeasurePreserving.ae_eq_comp h2
+  apply Lp.ext
+  refine hac.ae_le ?_
+  filter_upwards [h1, h3, h2] with x e1 e3 e2
+  rw [e1]
+  change ((hf.toLp f : _) : G → ℂ) (k⁻¹ * x) = _
+  rw [show ((hf.toLp f : _) : G → ℂ) (k⁻¹ * x) = f (k⁻¹ * x) from e3, hrad k x hk, e2]
+
+/-- A function of the log norm lies in the trivial isotype of any subgroup of norm-one
+elements. -/
+private theorem rational_cutoffConv_rieszVector_mem
+    {G L : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+    [MeasurableSpace G] [BorelSpace G] [Monoid L] [TopologicalSpace L]
+    (μ : Measure G) [μ.IsHaarMeasure] (m : G →ₜ* ℝ≥0ˣ) (hs : (0 : ℝ) ≤ 2) (f : G → ℂ)
+    (hf : MemLp f 2 (μ.withDensity fun g ↦ ENNReal.ofReal
+        (intervalSobolevDensity (-(0 : ℝ)) 0 2 (Real.log ((m g).val : ℝ)))))
+    (hrad : ∀ k x : G, m k = 1 → f (k⁻¹ * x) = f x) (i : L →* G) (hi : ∀ k, m (i k) = 1)
+    (ω : PontryaginDual L) (hω : ∀ k, (ω k : ℂ) = 1) :
+    hf.toLp f ∈ actionIsotype ((hardySobolevTranslation μ m (-(0 : ℝ)) 0 2
+      (neg_nonpos.mpr (le_rfl (a := (0 : ℝ)))) hs).comp i) ω := by
+  refine (mem_actionIsotype _ _ _).mpr fun k ↦ ?_
+  rw [hω k, one_smul]
+  exact rational_cutoffConv_rieszVector_fixed μ m hs f hf hrad (i k) (hi k)
+
+/-- Paper: Theorem 11.2.1.2(2) and (11.2.1.4), p. 488 (step of the refutation).
+At an ordinate γ of a critical-line zeta zero, the Riesz vector `exp(-iγx)/(1+x²)` of the
+log norm `x` is orthogonal to the half-weighted theta closure: its inner product with
+`|g|^(1/2) θ_f(g)` is the conjugate of the Mellin transform of `θ_f` at `1/2 + iγ`, which
+is a multiple of the completed zeta function there. -/
+private theorem rational_cutoffConv_rieszVector_theta_orthogonal (hs : (0 : ℝ) ≤ 2) (γ : ℝ)
+    (hγ : riemannZeta (1 / 2 + γ * Complex.I) = 0) :
+    geometricProjection (F := ℚ) (1 / 2) (le_rfl (a := (0 : ℝ))) hs
+      ((rational_cutoffConv_rieszVector_memLp (m𝔽(ℚ))
+        ⟨isProperMap_ideleClassNorm ℚ, ideleClassNorm_ne_one (F := ℚ)⟩
+        ratIdeleNormSection_class_rightInverse.surjective (ideleClassTamagawaMeasure ℚ)
+        γ).toLp _) = 0 := by sorry
+
+/-- Paper: Theorem 11.2.1.2(2) and (11.2.1.4), p. 488 (step of the refutation).
+At an ordinate γ of a critical-line zeta zero, some translate of the Riesz vector
+`exp(-iγx)/(1+x²)` by an idele class of norm greater than one is not orthogonal to the
+half-weighted theta closure. Up to a phase, the inner products of the translates with a
+nonzero radial theta profile `G` are the convolution of `G(x) exp(iγx)(1+x²)` with the
+Cauchy kernel `1/(1+x²)`, which is real analytic with a nowhere-zero Fourier multiplier. -/
+private theorem rational_cutoffConv_rieszVector_translate (hs : (0 : ℝ) ≤ 2) (γ : ℝ)
+    (hγ : riemannZeta (1 / 2 + γ * Complex.I) = 0) :
+    ∃ g : C𝔽(ℚ), 1 < ((m𝔽(ℚ) g).val : ℝ) ∧
+      geometricProjection (F := ℚ) (1 / 2) (le_rfl (a := (0 : ℝ))) hs
+        (hardySobolevTranslation (ideleClassTamagawaMeasure ℚ) (m𝔽(ℚ))
+          (-(0 : ℝ)) 0 2 (neg_nonpos.mpr (le_rfl (a := (0 : ℝ)))) hs g
+          ((rational_cutoffConv_rieszVector_memLp (m𝔽(ℚ))
+            ⟨isProperMap_ideleClassNorm ℚ, ideleClassNorm_ne_one (F := ℚ)⟩
+            ratIdeleNormSection_class_rightInverse.surjective (ideleClassTamagawaMeasure ℚ)
+            γ).toLp _)) ≠ 0 := by sorry
+
+/-- Assemble the witness from a vector of the isotype, its orthogonality and a translate. -/
+private theorem rational_cutoffConv_theta_orthogonal_translate_of {E G : Type*} [Zero E]
+    (P : E → E) (τ : G → E → E) (K : Set E) (r : G → ℝ) (u : E) (hu : u ∈ K) (h0 : P u = 0)
+    (h : ∃ g, 1 < r g ∧ P (τ g u) ≠ 0) :
+    ∃ (v : E) (g : G), v ∈ K ∧ 1 < r g ∧ P v = 0 ∧ P (τ g v) ≠ 0 :=
+  h.elim fun g hg ↦ ⟨u, g, hu, hg.1, h0, hg.2⟩
+
+/-- Some vector of the rational trivial isotype is orthogonal to the half-weighted
+theta closure, while one of its translates by an idele class of norm greater
+than one is not: the Riesz vector at the first critical-line zeta zero. -/
+private theorem rational_cutoffConv_theta_orthogonal_translate (hs : (0 : ℝ) ≤ 2)
+    (ω : PontryaginDual C₁(ℚ))
+    (_hω : ω = (1 : PontryaginDual C𝔽(ℚ)).comp
+      (⟨(ideleClassNorm ℚ).ker.subtype, continuous_subtype_val⟩ : C₁(ℚ) →ₜ* C𝔽(ℚ))) :
+    ∃ (u : CompactIntervalSobolev (ideleClassTamagawaMeasure ℚ)
+        (fun g : C𝔽(ℚ) ↦ Real.log (((m𝔽(ℚ)) g).val : ℝ)) (-(0 : ℝ)) 0 2) (g : C𝔽(ℚ)),
+      u ∈ GeoIsotype(ℚ, hs, ω) ∧ 1 < ((m𝔽(ℚ) g).val : ℝ) ∧
+      geometricProjection (F := ℚ) (1 / 2) (le_rfl (a := (0 : ℝ))) hs u = 0 ∧
+      geometricProjection (F := ℚ) (1 / 2) (le_rfl (a := (0 : ℝ))) hs
+        (hardySobolevTranslation (ideleClassTamagawaMeasure ℚ) (m𝔽(ℚ))
+          (-(0 : ℝ)) 0 2 (neg_nonpos.mpr (le_rfl (a := (0 : ℝ)))) hs g u) ≠ 0 := by
+  subst _hω
+  obtain ⟨γ, -, hγ⟩ := HardyFirstZero.first_zero_on_line
+  have hf := rational_cutoffConv_rieszVector_memLp (m𝔽(ℚ))
+    ⟨isProperMap_ideleClassNorm ℚ, ideleClassNorm_ne_one (F := ℚ)⟩
+    ratIdeleNormSection_class_rightInverse.surjective (ideleClassTamagawaMeasure ℚ) γ
+  have hmem := rational_cutoffConv_rieszVector_mem (ideleClassTamagawaMeasure ℚ) (m𝔽(ℚ)) hs _ hf
+    (fun k x hk ↦ by simp only [map_mul, map_inv, hk, inv_one, one_mul])
+    (ideleClassNorm ℚ).ker.subtype (fun k ↦ k.property)
+    ((1 : PontryaginDual C𝔽(ℚ)).comp
+      (⟨(ideleClassNorm ℚ).ker.subtype, continuous_subtype_val⟩ : C₁(ℚ) →ₜ* C𝔽(ℚ)))
+    (fun _ ↦ rfl)
+  exact rational_cutoffConv_theta_orthogonal_translate_of
+    (geometricProjection (F := ℚ) (1 / 2) (le_rfl (a := (0 : ℝ))) hs)
+    (fun g ↦ hardySobolevTranslation (ideleClassTamagawaMeasure ℚ) (m𝔽(ℚ))
+          (-(0 : ℝ)) 0 2 (neg_nonpos.mpr (le_rfl (a := (0 : ℝ)))) hs g)
+    _ (fun g ↦ ((m𝔽(ℚ) g).val : ℝ)) (hf.toLp _) hmem
+    (rational_cutoffConv_rieszVector_theta_orthogonal hs γ hγ)
+    (rational_cutoffConv_rieszVector_translate hs γ hγ)
+
 /-- A theta-orthogonal vector in the rational trivial isotype has a translate with
-nonzero geometric projection at some norm greater than one. At an ordinate γ of a
+nonzero geometric projection at some norm greater than one."""
+ At an ordinate γ of a
 critical-line zero, use the Riesz vector `exp(-iγx)/(1+x²)` in log norm. Mellin
 factorization gives its orthogonality. The pairing with a nonzero radial theta
 profile is a Cauchy convolution with a nowhere-zero Fourier multiplier. Its
@@ -1001,7 +1207,21 @@ private theorem rational_cutoffConv_positive_translate (hs : (0 : ℝ) ≤ 2)
     let P := geometricProjection (F := ℚ) (1 / 2) (le_rfl (a := (0 : ℝ))) hs
     ∃ (u : K) (g : C𝔽(ℚ)), 1 < ((m𝔽(ℚ) g).val : ℝ) ∧
       K.orthogonalProjectionOnto (P u.val) = 0 ∧
-      K.orthogonalProjectionOnto (P (τ g u.val)) ≠ 0 := by sorry
+      K.orthogonalProjectionOnto (P (τ g u.val)) ≠ 0 :=
+  rational_cutoffConv_positive_translate_of_projection
+    (hardySobolevTranslation (ideleClassTamagawaMeasure ℚ) (m𝔽(ℚ))
+      (-(0 : ℝ)) 0 2 (neg_nonpos.mpr (le_rfl (a := (0 : ℝ)))) hs)
+    (ideleClassNorm ℚ).ker.subtype ω
+    (instClosedSpectralIsotypeSec2 (F := ℚ) (neg_nonpos.mpr (le_rfl (a := (0 : ℝ))))
+      hs ω).completeSpace_coe
+    (geometricProjection (F := ℚ) (1 / 2) (le_rfl (a := (0 : ℝ))) hs)
+    (globalThetaSobolev ℚ (1 / 2) (neg_nonpos.mpr (le_rfl (a := (0 : ℝ))) |>.trans le_rfl)
+      hs).inner_starProjection_left_eq_right
+    (fun x ↦ congrArg (fun T ↦ T x)
+      (globalThetaSobolev ℚ (1 / 2) (neg_nonpos.mpr (le_rfl (a := (0 : ℝ))) |>.trans le_rfl)
+        hs).isIdempotentElem_starProjection.eq)
+    (fun g ↦ ((m𝔽(ℚ) g).val : ℝ))
+    (rational_cutoffConv_theta_orthogonal_translate hs ω _hω)
 
 /-- A fixed-cutoff geometric convolution is nonzero on a vector orthogonal to theta
 in the trivial rational isotype. Use a critical-line ordinate γ and the log-norm

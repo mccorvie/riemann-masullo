@@ -917,7 +917,7 @@ variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
   [T2Space G] [LocallyCompactSpace G] [MeasurableSpace G] [BorelSpace G]
 
 /-- Testing a weighted continuous function against all characters recovers the function. -/
-private theorem eq_zero_of_weighted_integrals (μ : Measure G) [μ.IsHaarMeasure] [μ.Regular]
+theorem eq_zero_of_weighted_integrals (μ : Measure G) [μ.IsHaarMeasure] [μ.Regular]
     (θ : C(G, ℂ)) (w : QuasiCharacter G) (hi : Integrable (fun x ↦ θ x * w x) μ)
     (hz : ∀ χ : PontryaginDual G, ∫ x, θ x * w x * (χ x : ℂ) ∂μ = 0) : θ = 0 := by
   let ev (x : G) : PontryaginDual G →* Circle :=

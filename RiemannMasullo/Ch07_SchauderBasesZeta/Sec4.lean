@@ -1488,14 +1488,6 @@ theorem archNuclearityJet_apply (j : ArchNuclearityJetIndex χ τ hτ) (f : P) :
   exact ⟨hmoment.1, hmoment.2.1, hjet.trans (congrArg (fun g : ℂ → ℂ ↦
     iteratedDeriv j.val.2 g j.val.1) hz), hjet.trans hmoment.2.2⟩
 
-/-- Paper: Theorem 7.4.3.1(2), p. 368.
-The closure of the linear span of the jets in the strong dual is the annihilator
-of the archimedean-flat image. -/
-theorem archNuclearityJet_span :
-    ((Submodule.span ℂ (Set.range (archNuclearityJet χ τ hτ))).topologicalClosure :
-        Set (StrongDual ℂ (Θ₀(χ)))) =
-      {ℓ | ∀ x : archNuclearityDenominator χ, ℓ x.val = 0} := by sorry
-
 /-- At one infinite place the gamma factor vanishes, by Mathlib's convention at the poles
 of `Γ`, along an arithmetic progression. So the reciprocal gamma product has a zero of
 positive finite order at infinitely many points. -/
@@ -1844,6 +1836,93 @@ theorem archNuclearityQuotient_jetEquiv :
   refine ⟨⟨LinearEquiv.ofBijective L.toLinearMap ⟨hinj, hsurj⟩, L.continuous, ?_⟩, hL⟩
   exact archNuclearityQuotient_jetEquiv_inverse_continuous (χ := χ) (τ := τ) (hτ := hτ)
     L hL ⟨hinj, hsurj⟩
+
+/-- A continuous linear functional on a product of copies of `ℂ` depends on only finitely
+many coordinates: the preimage of the unit ball contains a box that is unrestricted outside a
+finite set of coordinates. -/
+private theorem archNuclearityJet_span_finiteCoordinates {J : Type*} [DecidableEq J]
+    (g : (J → ℂ) →L[ℂ] ℂ) :
+    ∃ I : Finset J, ∀ y : J → ℂ, g y = ∑ i ∈ I, y i * g (Pi.single i 1) := by
+  have h0 : (g : (J → ℂ) → ℂ) ⁻¹' Metric.ball 0 1 ∈ 𝓝 (0 : J → ℂ) :=
+    g.continuous.continuousAt.preimage_mem_nhds
+      (by simpa using Metric.ball_mem_nhds (0 : ℂ) one_pos)
+  rw [nhds_pi, Filter.mem_pi'] at h0
+  obtain ⟨I, t, ht, hsub⟩ := h0
+  refine ⟨I, fun y ↦ ?_⟩
+  set r : J → ℂ := y - ∑ i ∈ I, y i • Pi.single i 1 with hr
+  have hrI : ∀ i ∈ I, r i = 0 := by
+    intro i hi
+    simp [hr, Finset.sum_apply, Pi.single_apply, hi]
+  have hgr : g r = 0 := by
+    by_contra hne
+    have hmem : (2 / g r) • r ∈ (I : Set J).pi t := by
+      intro i hi
+      simp only [Pi.smul_apply, hrI i hi, smul_zero]
+      exact mem_of_mem_nhds (ht i)
+    have := hsub hmem
+    simp only [Set.mem_preimage, Metric.mem_ball, dist_zero_right, map_smul, smul_eq_mul] at this
+    rw [div_mul_cancel₀ _ hne] at this
+    norm_num at this
+  have hy : y = r + ∑ i ∈ I, y i • Pi.single i 1 := by simp [hr]
+  conv_lhs => rw [hy]
+  rw [map_add, hgr, zero_add, map_sum]
+  simp [map_smul]
+
+/-- If the quotient by `D` is identified with the product of copies of `ℂ` indexed by `J`,
+with coordinates the functionals `jet j`, then the closed span of the `jet j` in the strong
+dual is the annihilator of `D`. -/
+private theorem archNuclearityJet_span_of_equiv {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [TopologicalSpace E] [IsTopologicalAddGroup E] [ContinuousSMul ℂ E]
+    (D : Submodule ℂ E) {J : Type*} (jet : J → StrongDual ℂ E)
+    (e : (E ⧸ D) ≃L[ℂ] (J → ℂ)) (he : ∀ x j, e (D.mkQ x) j = jet j x) :
+    ((Submodule.span ℂ (Set.range jet)).topologicalClosure : Set (StrongDual ℂ E)) =
+      {ℓ | ∀ x : D, ℓ x.val = 0} := by
+  classical
+  apply Set.Subset.antisymm
+  · let A : Submodule ℂ (StrongDual ℂ E) :=
+      { carrier := {ℓ | ∀ x : D, ℓ x.val = 0}
+        add_mem' := fun ha hb x ↦ by simp [ha x, hb x]
+        zero_mem' := fun x ↦ rfl
+        smul_mem' := fun c ℓ hℓ x ↦ by simp [hℓ x] }
+    have hA : IsClosed (A : Set (StrongDual ℂ E)) := by
+      have : (A : Set (StrongDual ℂ E)) = ⋂ x : D, {ℓ | ℓ x.val = 0} := by
+        ext ℓ; simp [A]
+      rw [this]
+      exact isClosed_iInter fun x ↦ isClosed_eq (continuous_eval_const _) continuous_const
+    have hle : Submodule.span ℂ (Set.range jet) ≤ A := by
+      rw [Submodule.span_le]
+      rintro _ ⟨j, rfl⟩ x
+      rw [← he, Submodule.mkQ_apply, (Submodule.Quotient.mk_eq_zero D).mpr x.property, map_zero,
+        Pi.zero_apply]
+    exact Submodule.topologicalClosure_minimal _ hle hA
+  · intro ℓ hℓ
+    apply Submodule.le_topologicalClosure
+    have hker : D ≤ LinearMap.ker ℓ.toLinearMap := fun x hx ↦ hℓ ⟨x, hx⟩
+    let l₀ : (E ⧸ D) →ₗ[ℂ] ℂ := D.liftQ ℓ.toLinearMap hker
+    have hl₀ : Continuous l₀ :=
+      (Submodule.isQuotientMap_mkQ D).continuous_iff.mpr ℓ.continuous
+    let g : (J → ℂ) →L[ℂ] ℂ :=
+      (⟨l₀, hl₀⟩ : (E ⧸ D) →L[ℂ] ℂ).comp e.symm.toContinuousLinearMap
+    obtain ⟨I, hI⟩ := archNuclearityJet_span_finiteCoordinates g
+    have hℓeq : ℓ = ∑ i ∈ I, g (Pi.single i 1) • jet i := by
+      ext x
+      have h1 : ℓ x = g (e (D.mkQ x)) := by
+        simp [g, l₀]
+      rw [h1, hI]
+      simp only [he, FunLike.coe_sum, Finset.sum_apply, FunLike.coe_smul, Pi.smul_apply,
+        smul_eq_mul, mul_comm]
+    rw [hℓeq]
+    exact Submodule.sum_mem _ fun i _ ↦ Submodule.smul_mem _ _ (Submodule.subset_span ⟨i, rfl⟩)
+
+/-- Paper: Theorem 7.4.3.1(2), p. 368.
+The closure of the linear span of the jets in the strong dual is the annihilator
+of the archimedean-flat image. -/
+theorem archNuclearityJet_span :
+    ((Submodule.span ℂ (Set.range (archNuclearityJet χ τ hτ))).topologicalClosure :
+        Set (StrongDual ℂ (Θ₀(χ)))) =
+      {ℓ | ∀ x : archNuclearityDenominator χ, ℓ x.val = 0} :=
+  Exists.elim (archNuclearityQuotient_jetEquiv χ τ hτ) fun e he ↦
+    archNuclearityJet_span_of_equiv (archNuclearityDenominator χ) (archNuclearityJet χ τ hτ) e he
 
 /-- Transport the topology generated by all seminorms across a continuous linear equivalence. -/
 private theorem archNuclearityStrongDual_finest_of_equiv {A E : Type*}

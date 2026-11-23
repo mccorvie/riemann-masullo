@@ -1585,12 +1585,154 @@ local notation "Ẽ(" I ")" => ModulatedExponentialDecay (⟨mₛ, hmₛ⟩ : J�
 local notation "reflect(" I ")" => ((fun a : ℝ ↦ 1 - a) ⁻¹' I)
 
 /-- Paper: (5.4.2.1), p. 274.
+The theta test map is continuous into the weighted L² space, and its class is the
+almost-everywhere class of the theta function of the test.
+
+This is the missing half of (5.4.2.1): the weighted L² estimate on the whole test
+space. The paper derives it from Theorem 3.3.1.5 (the S-local functional equation
+and the unitarity of `ρ_S`), together with the decay of the theta function as the
+norm tends to zero. The decay estimate in the tree
+(`sLocalAdelicTheta_decay_bounded_threshold_one`, Ch02 §2.3) only covers norms
+at least one, so the small-norm bound is not available here. -/
+private theorem sLocalThetaWeightedL2_testMap_continuous :
+    ∃ L : ℬₛ →L[ℂ] L²ₛ, ∀ f : ℬₛ,
+      ((L f : Jₛ → ℂ)) =ᵐ[μweighted] sLocalAdelicThetaOnClasses F S f := by
+  sorry
+
+/-- The S-local theta kernel is exactly the kernel of the theta class function. -/
+private theorem sLocalThetaWeightedL2_theta_zero_iff (f : ℬₛ) :
+    (sLocalAdelicTheta F S) f = 0 ↔ sLocalAdelicThetaOnClasses F S f = 0 := by
+  constructor
+  · intro h
+    refine ContinuousMap.ext fun x ↦ ?_
+    induction x using QuotientGroup.induction_on with
+    | H g => rw [sLocalAdelicThetaOnClasses_mk, h]; rfl
+  · intro h
+    refine ContinuousMap.ext fun g ↦ ?_
+    have := DFunLike.congr_fun h (QuotientGroup.mk g)
+    rwa [sLocalAdelicThetaOnClasses_mk] at this
+
+/-- A continuous function on the S-idele class group that vanishes almost everywhere for the
+norm-weighted Tamagawa measure vanishes identically. -/
+private theorem sLocalThetaWeightedL2_ae_zero (θ : Jₛ → ℂ) (hθ : Continuous θ)
+    (h : θ =ᵐ[μweighted] 0) : θ = 0 := by
+  let : BorelSpace Jₛ := ⟨rfl⟩
+  have hμ : (μₛ).IsHaarMeasure := (sLocalQuotientTamagawaMeasure_isWeil (F := F) (S := S)).1
+  have hpos : (μₛ).IsOpenPosMeasure := hμ.toIsOpenPosMeasure
+  have hUopen : IsOpen {x : Jₛ | θ x ≠ 0} := isOpen_ne.preimage hθ
+  by_contra hne
+  have hUne : ({x : Jₛ | θ x ≠ 0} : Set Jₛ).Nonempty := by
+    by_contra hcon
+    rw [Set.not_nonempty_iff_eq_empty] at hcon
+    apply hne
+    funext x
+    have hx : x ∉ ({y : Jₛ | θ y ≠ 0} : Set Jₛ) := by rw [hcon]; exact Set.notMem_empty x
+    simpa using hx
+  have hzero : μweighted {x : Jₛ | θ x ≠ 0} = 0 := MeasureTheory.ae_iff.mp h
+  rw [withDensity_apply _ hUopen.measurableSet] at hzero
+  have hw : Continuous fun x : Jₛ ↦ normℝ(mₛ x) :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp hmₛ)
+  have hsupp : Function.support (fun x : Jₛ ↦ ENNReal.ofReal (normℝ(mₛ x))) = univ := by
+    refine eq_univ_of_forall fun x ↦ ?_
+    simp only [Function.mem_support, ne_eq, ENNReal.ofReal_eq_zero, not_le]
+    have h1 : (((mₛ x : ℝ≥0ˣ).val : ℝ≥0) : ℝ) ≠ 0 := by
+      rw [NNReal.coe_ne_zero]
+      exact (mₛ x).ne_zero
+    exact lt_of_le_of_ne (NNReal.coe_nonneg _) (Ne.symm h1)
+  have hpos' : 0 < ∫⁻ x in {x : Jₛ | θ x ≠ 0},
+      ENNReal.ofReal (normℝ(mₛ x)) ∂(μₛ) := by
+    refine (setLIntegral_pos_iff (f := fun x : Jₛ ↦ ENNReal.ofReal (normℝ(mₛ x)))
+      hw.measurable.ennreal_ofReal (s := {x : Jₛ | θ x ≠ 0})).mpr ?_
+    rw [hsupp, univ_inter]
+    exact lt_of_le_of_ne bot_le (Ne.symm (hpos.open_pos _ hUopen hUne))
+  rw [hzero] at hpos'
+  exact lt_irrefl _ hpos'
+
+/-- A continuous linear map into the weighted L² space that represents every theta class
+kills the theta kernel. -/
+private theorem sLocalThetaWeightedL2_ker_eq_zero (L : ℬₛ →L[ℂ] L²ₛ)
+    (hL : ∀ f : ℬₛ, ((L f : Jₛ → ℂ)) =ᵐ[μweighted] sLocalAdelicThetaOnClasses F S f)
+    {f : ℬₛ} (hf : sLocalAdelicThetaOnClasses F S f = 0) : L f = 0 := by
+  refine Lp.ext ?_
+  refine (hL f).trans ?_
+  rw [hf]
+  exact Lp.coeFn_zero (E := ℂ) (p := 2) (μ := μweighted) |>.symm
+
+/-- The continuous linear map induced on a quotient by a continuous linear map whose kernel
+contains the subspace. -/
+private def sLocalThetaWeightedL2_liftQCLM {M Y : Type*} [AddCommGroup M] [Module ℂ M]
+    [TopologicalSpace M] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (K : Submodule ℂ M) (T : M →L[ℂ] Y) (h : K ≤ LinearMap.ker T.toLinearMap) :
+    (M ⧸ K) →L[ℂ] Y :=
+  ⟨K.liftQ T.toLinearMap h, K.isQuotientMap_mkQ.continuous_iff.mpr T.continuous⟩
+
+/-- The induced map agrees with the original one on representatives. -/
+private theorem sLocalThetaWeightedL2_liftQCLM_apply {M Y : Type*} [AddCommGroup M] [Module ℂ M]
+    [TopologicalSpace M] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (K : Submodule ℂ M) (T : M →L[ℂ] Y) (h : K ≤ LinearMap.ker T.toLinearMap) (x : M) :
+    sLocalThetaWeightedL2_liftQCLM K T h (Submodule.Quotient.mk x) = T x :=
+  Submodule.liftQ_apply K T.toLinearMap x
+
+/-- A continuous linear map out of a quotient is determined by its values on representatives. -/
+private theorem sLocalThetaWeightedL2_liftQCLM_unique {M Y : Type*} [AddCommGroup M]
+    [Module ℂ M] [TopologicalSpace M] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (K : Submodule ℂ M) (T : M →L[ℂ] Y) (h : K ≤ LinearMap.ker T.toLinearMap)
+    (S' : (M ⧸ K) →L[ℂ] Y) (hS' : ∀ x : M, S' (Submodule.Quotient.mk x) = T x) :
+    S' = sLocalThetaWeightedL2_liftQCLM K T h := by
+  refine DFunLike.coe_injective (funext fun x ↦ ?_)
+  obtain ⟨m, rfl⟩ := K.mkQ_surjective x
+  rw [Submodule.mkQ_apply, hS' m, sLocalThetaWeightedL2_liftQCLM_apply]
+
+/-- Paper: (5.4.2.1), p. 274.
 The ordinary theta quotient injects continuously into L² for the norm-weighted
 quotient Tamagawa measure. The map keeps the almost-everywhere class of the theta
 function attached to a test representative. -/
 theorem existsUnique_sLocalThetaWeightedL2 :
     ∃! j : Θₛ →L[ℂ] L²ₛ, Injective j ∧ ∀ f : ℬₛ,
-      ((j (Submodule.Quotient.mk f)) : Jₛ → ℂ) =ᵐ[μweighted] sLocalAdelicThetaOnClasses F S f := by sorry
+      ((j (Submodule.Quotient.mk f)) : Jₛ → ℂ) =ᵐ[μweighted] sLocalAdelicThetaOnClasses F S f := by
+  classical
+  let L : ℬₛ →L[ℂ] L²ₛ :=
+    (show ℬₛ →L[ℂ] L²ₛ from
+      (sLocalThetaWeightedL2_testMap_continuous (F := F) (S := S)).choose)
+  have hL : ∀ f : ℬₛ,
+      ((L f : Jₛ → ℂ)) =ᵐ[μweighted] sLocalAdelicThetaOnClasses F S f :=
+    (sLocalThetaWeightedL2_testMap_continuous (F := F) (S := S)).choose_spec
+  have hker : LinearMap.ker (sLocalAdelicTheta F S) ≤ LinearMap.ker L.toLinearMap := by
+    intro f hf
+    rw [LinearMap.mem_ker] at hf ⊢
+    exact sLocalThetaWeightedL2_ker_eq_zero L hL ((sLocalThetaWeightedL2_theta_zero_iff f).mp hf)
+  have hker' : LinearMap.ker L.toLinearMap ≤ LinearMap.ker (sLocalAdelicTheta F S) := by
+    intro f hf
+    rw [LinearMap.mem_ker] at hf ⊢
+    refine (sLocalThetaWeightedL2_theta_zero_iff f).mpr (ContinuousMap.ext fun x => ?_)
+    have h1 : ((L f : Jₛ → ℂ)) =ᵐ[μweighted] ((0 : L²ₛ) : Jₛ → ℂ) := by
+      filter_upwards with y
+      exact congrArg (fun u : L²ₛ => (u : Jₛ → ℂ) y) hf
+    have h2 : ((L f : Jₛ → ℂ)) =ᵐ[μweighted] (0 : Jₛ → ℂ) :=
+      h1.trans (Lp.coeFn_zero (E := ℂ) (p := 2) (μ := μweighted))
+    have h3 : (⇑(sLocalAdelicThetaOnClasses F S f) : Jₛ → ℂ) =ᵐ[μweighted] 0 :=
+      (hL f).symm.trans h2
+    have hz : (⇑(sLocalAdelicThetaOnClasses F S f) : Jₛ → ℂ) = 0 :=
+      sLocalThetaWeightedL2_ae_zero (⇑(sLocalAdelicThetaOnClasses F S f))
+        (sLocalAdelicThetaOnClasses F S f).continuous h3
+    exact congrFun hz x
+  let j : Θₛ →L[ℂ] L²ₛ :=
+    { toLinearMap := (LinearMap.ker (sLocalAdelicTheta F S)).liftQ L.toLinearMap hker
+      cont := (LinearMap.ker (sLocalAdelicTheta F S)).isQuotientMap_mkQ.continuous_iff.mpr L.continuous }
+  have hj : ∀ f : ℬₛ, j (Submodule.Quotient.mk f) = L f := fun f ↦
+    Submodule.liftQ_apply (p := LinearMap.ker (sLocalAdelicTheta F S)) L.toLinearMap f
+  have hbot : LinearMap.ker j.toLinearMap = ⊥ :=
+    Submodule.ker_liftQ_eq_bot (p := LinearMap.ker (sLocalAdelicTheta F S)) L.toLinearMap hker hker'
+  refine ⟨j, ⟨?_, ?_⟩, ?_⟩
+  · exact LinearMap.ker_eq_bot.mp hbot
+  · intro f
+    rw [hj f]
+    exact hL f
+  · intro j' hj'
+    refine sLocalThetaWeightedL2_liftQCLM_unique (LinearMap.ker (sLocalAdelicTheta F S)) L hker j' fun f ↦ ?_
+    refine Lp.ext ?_
+    filter_upwards [hj'.2 f, hL f] with y h1 h2
+    rw [h1, h2]
 
 local notation "weightedTheta" =>
   (show Θₛ →L[ℂ] L²ₛ from (existsUnique_sLocalThetaWeightedL2 (F := F) (S := S)).exists.choose)

@@ -1070,6 +1070,448 @@ theorem sLocalThetaIsotypeSum_barrelled_montel :
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
     BarrelledSpace ℂ D ∧ MontelSpace ℂ D := by sorry
 
+/-- A von Neumann bounded set in a locally convex direct sum of Hausdorff locally convex
+spaces is supported on finitely many summands. -/
+private theorem thetaIsotypeSum_strongDual_isVonNBounded_finiteSupport
+    {K : Type*} [DecidableEq K] (Y : K → Type*)
+    [∀ i, AddCommGroup (Y i)] [∀ i, Module ℂ (Y i)] [∀ i, TopologicalSpace (Y i)]
+    [∀ i, PolynormableSpace ℂ (Y i)] [∀ i, T2Space (Y i)]
+    {B : Set (⨁ i, Y i)}
+    (hB : letI := locallyConvexFinalTopology (DirectSum.lof ℂ K Y)
+      Bornology.IsVonNBounded ℂ B) :
+    ∃ s : Finset K, ∀ x ∈ B, ∀ i ∉ s, x i = 0 := by
+  classical
+  let D := ⨁ i, Y i
+  let lof := DirectSum.lof ℂ K Y
+  let : TopologicalSpace D := locallyConvexFinalTopology lof
+  have hD := globalThetaIsotypeSum_finalTopology_withSeminorms lof
+  let : IsTopologicalAddGroup D := hD.isTopologicalAddGroup
+  let : PolynormableSpace ℂ D := hD.toPolynormableSpace
+  by_contra h
+  push Not at h
+  have hstep (s : Finset K) : ∃ p : D × K, p.1 ∈ B ∧ p.2 ∉ s ∧ p.1 p.2 ≠ 0 := by
+    obtain ⟨x, hxB, i, hi, hne⟩ := h s
+    exact ⟨(x, i), hxB, hi, hne⟩
+  let next (s : Finset K) : D × K := (hstep s).choose
+  let hist : ℕ → Finset K := Nat.rec ∅ (fun _ s ↦ insert (next s).2 s)
+  let x (n : ℕ) : D := (next (hist n)).1
+  let idx (n : ℕ) : K := (next (hist n)).2
+  have hxB (n : ℕ) : x n ∈ B := (hstep (hist n)).choose_spec.1
+  have hnotmem (n : ℕ) : idx n ∉ hist n := (hstep (hist n)).choose_spec.2.1
+  have hne (n : ℕ) : x n (idx n) ≠ 0 := (hstep (hist n)).choose_spec.2.2
+  have hmono : Monotone hist := monotone_nat_of_le_succ fun n ↦ Finset.subset_insert _ _
+  have hidx_inj : Function.Injective idx := by
+    intro m n hmn
+    rcases lt_trichotomy m n with hlt | rfl | hgt
+    · have hmem : idx m ∈ hist n :=
+        hmono (Nat.succ_le_of_lt hlt) (Finset.mem_insert_self (idx m) (hist m))
+      rw [hmn] at hmem
+      exact (hnotmem n hmem).elim
+    · rfl
+    · have hmem : idx n ∈ hist m :=
+        hmono (Nat.succ_le_of_lt hgt) (Finset.mem_insert_self (idx n) (hist n))
+      rw [← hmn] at hmem
+      exact (hnotmem m hmem).elim
+  have hq_ex (i : K) : ∃ q : Seminorm ℂ (Y i), Continuous q ∧
+      ∀ n, idx n = i → q (x n i) = (n : ℝ) + 1 := by
+    by_cases hi : ∃ n, idx n = i
+    · obtain ⟨n, rfl⟩ := hi
+      have := polynormableSpace_separatingDual ℂ (Y (idx n))
+      obtain ⟨φ, hφ⟩ := SeparatingDual.exists_eq_one (R := ℂ) (hne n)
+      refine ⟨((n : ℝ≥0) + 1) • ((normSeminorm ℂ ℂ).comp φ.toLinearMap),
+        (φ.continuous.norm).const_smul _, fun m hm ↦ ?_⟩
+      have hmn : m = n := hidx_inj hm
+      rw [hmn]
+      change (((n : ℝ≥0) + 1 : ℝ≥0) : ℝ) * ‖φ (x n (idx n))‖ = (n : ℝ) + 1
+      simp [hφ]
+    · exact ⟨0, continuous_zero, fun n hn ↦ (hi ⟨n, hn⟩).elim⟩
+  choose q hq hqval using hq_ex
+  let p : Seminorm ℂ D := directSumSeminorm q
+  have hp : Continuous p := hD.continuous_seminorm ⟨p, fun i ↦ by
+    change Continuous (fun a ↦ directSumSeminorm q (lof i a))
+    simpa only [lof, directSumSeminorm_lof] using hq i⟩
+  obtain ⟨C, _, hC⟩ :=
+    (PolynormableSpace.withSeminorms ℂ D).isVonNBounded_iff_seminorm_bounded.mp hB ⟨p, hp⟩
+  obtain ⟨n, hn⟩ := exists_nat_gt C
+  have hlt : p (x n) < C := hC (x n) (hxB n)
+  have hge : (n : ℝ) + 1 ≤ p (x n) := by
+    have := sum_le_directSumSeminorm q (x n) {idx n}
+    simpa [Finset.sum_singleton, hqval (idx n) n rfl, p] using this
+  linarith
+
+/-- The strong dual of a locally convex direct sum of Hausdorff locally convex spaces
+is topologically linearly equivalent to the product of their strong duals. -/
+private theorem thetaIsotypeSum_strongDual_directSumEquiv
+    {K : Type*} [DecidableEq K] (Y : K → Type*)
+    [∀ i, AddCommGroup (Y i)] [∀ i, Module ℂ (Y i)] [∀ i, TopologicalSpace (Y i)]
+    [∀ i, PolynormableSpace ℂ (Y i)] [∀ i, T2Space (Y i)] :
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ K Y)
+    Nonempty (StrongDual ℂ (⨁ i, Y i) ≃L[ℂ] (∀ i, StrongDual ℂ (Y i))) := by
+  classical
+  let D := ⨁ i, Y i
+  let lof := DirectSum.lof ℂ K Y
+  let : TopologicalSpace D := locallyConvexFinalTopology lof
+  have hD := globalThetaIsotypeSum_finalTopology_withSeminorms lof
+  let : IsTopologicalAddGroup D := hD.isTopologicalAddGroup
+  let : PolynormableSpace ℂ D := hD.toPolynormableSpace
+  let : ContinuousSMul ℂ D := hD.continuousSMul
+  let : ∀ i, IsTopologicalAddGroup (Y i) := fun i ↦ PolynormableSpace.isTopologicalAddGroup ℂ _
+  let : ∀ i, ContinuousSMul ℂ (Y i) := fun i ↦ PolynormableSpace.continuousSMul ℂ _
+  let lofL (i : K) : Y i →L[ℂ] D :=
+    ⟨lof i, globalThetaIsotypeSum_continuous_finalTopology_stage lof i⟩
+  let toFun : StrongDual ℂ D → (∀ i, StrongDual ℂ (Y i)) := fun φ i ↦ φ.comp (lofL i)
+  let invFun : (∀ i, StrongDual ℂ (Y i)) → StrongDual ℂ D := fun f ↦
+    ⟨DirectSum.toModule ℂ K ℂ (fun i ↦ (f i).toLinearMap),
+      globalThetaIsotypeSum_continuous_finalTopology_lift lof _ fun i ↦ by
+        change Continuous (fun y ↦ DirectSum.toModule ℂ K ℂ (fun j ↦ (f j).toLinearMap) (lof i y))
+        simpa only [lof, DirectSum.toModule_lof, ContinuousLinearMap.coe_coe]
+          using (f i).continuous⟩
+  let L : StrongDual ℂ D ≃ₗ[ℂ] (∀ i, StrongDual ℂ (Y i)) :=
+    { toFun := toFun
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl
+      invFun := invFun
+      left_inv := fun φ ↦ by
+        ext x
+        rw [← DirectSum.sum_support_of x, map_sum, map_sum]
+        refine Finset.sum_congr rfl fun i _ ↦ ?_
+        change DirectSum.toModule ℂ K ℂ (fun j ↦ (φ.comp (lofL j)).toLinearMap)
+          (DirectSum.lof ℂ K Y i (x i)) = φ (DirectSum.lof ℂ K Y i (x i))
+        rw [DirectSum.toModule_lof]
+        rfl
+      right_inv := fun f ↦ by
+        funext i
+        ext y
+        change DirectSum.toModule ℂ K ℂ (fun j ↦ (f j).toLinearMap)
+          (DirectSum.lof ℂ K Y i y) = f i y
+        rw [DirectSum.toModule_lof]
+        rfl }
+  have hcont_to : Continuous L :=
+    continuous_pi fun i ↦ (ContinuousLinearMap.precomp ℂ (lofL i)).continuous
+  have hcont_inv : Continuous L.symm := by
+    refine continuous_of_continuousAt_zero L.symm.toAddMonoidHom ?_
+    rw [ContinuousAt, map_zero, ContinuousLinearMap.hasBasis_nhds_zero.tendsto_right_iff]
+    rintro ⟨B, U⟩ ⟨hB, hU⟩
+    obtain ⟨ε, hε, hball⟩ := Metric.mem_nhds_iff.mp hU
+    obtain ⟨s, hs⟩ := thetaIsotypeSum_strongDual_isVonNBounded_finiteSupport Y hB
+    rcases s.eq_empty_or_nonempty with rfl | hsne
+    · refine Filter.Eventually.of_forall fun f x hxB ↦ ?_
+      have hx0 : x = 0 := DFinsupp.ext fun i ↦ hs x hxB i (Finset.notMem_empty i)
+      rw [hx0, map_zero]
+      exact hball (Metric.mem_ball_self hε)
+    · have hcard : (0 : ℝ) < s.card := Nat.cast_pos.mpr hsne.card_pos
+      let δ : ℝ := ε / s.card
+      have hδ : 0 < δ := div_pos hε hcard
+      let prL (i : K) : D →L[ℂ] Y i :=
+        ⟨DirectSum.component ℂ K Y i, globalThetaIsotypeSum_continuous_lcDirectSum_component Y i⟩
+      have hUi (i : K) : {g : StrongDual ℂ (Y i) |
+          ∀ y ∈ prL i '' B, g y ∈ Metric.ball (0 : ℂ) δ} ∈ 𝓝 (0 : StrongDual ℂ (Y i)) :=
+        ContinuousLinearMap.hasBasis_nhds_zero.mem_of_mem
+          (i := (prL i '' B, Metric.ball (0 : ℂ) δ))
+          ⟨hB.image (prL i), Metric.ball_mem_nhds 0 hδ⟩
+      have hW : (s : Set K).pi (fun i ↦ {g : StrongDual ℂ (Y i) |
+          ∀ y ∈ prL i '' B, g y ∈ Metric.ball (0 : ℂ) δ}) ∈
+          𝓝 (0 : ∀ i, StrongDual ℂ (Y i)) :=
+        set_pi_mem_nhds s.finite_toSet fun i _ ↦ hUi i
+      filter_upwards [hW] with f hf x hxB
+      apply hball
+      rw [Metric.mem_ball, dist_zero_right]
+      have hsupp : x.support ⊆ s := fun i hi ↦ by
+        by_contra hni
+        exact DFinsupp.mem_support_iff.mp hi (hs x hxB i hni)
+      have hxsum : x = ∑ i ∈ s, lof i (x i) := by
+        calc x = ∑ i ∈ x.support, lof i (x i) := (DirectSum.sum_support_of x).symm
+          _ = ∑ i ∈ s, lof i (x i) := Finset.sum_subset hsupp fun i _ hni ↦ by
+            rw [DFinsupp.notMem_support_iff.mp hni, map_zero]
+      have hval : L.symm f x = ∑ i ∈ s, f i (x i) := by
+        conv_lhs => rw [hxsum]
+        rw [map_sum]
+        refine Finset.sum_congr rfl fun i _ ↦ ?_
+        change DirectSum.toModule ℂ K ℂ (fun j ↦ (f j).toLinearMap)
+          (DirectSum.lof ℂ K Y i (x i)) = f i (x i)
+        rw [DirectSum.toModule_lof]
+        rfl
+      change ‖L.symm f x‖ < ε
+      rw [hval]
+      refine (norm_sum_le s _).trans_lt ?_
+      have hlt : ∑ i ∈ s, ‖f i (x i)‖ < ∑ _i ∈ s, δ :=
+        Finset.sum_lt_sum_of_nonempty hsne fun i hi ↦ by
+          have hmem := hf i hi (x i) ⟨x, hxB, (DirectSum.apply_eq_component (R := ℂ) x i).symm⟩
+          simpa only [Metric.mem_ball, dist_zero_right] using hmem
+      exact hlt.trans_eq (by simp [δ, mul_div_cancel₀ _ hcard.ne'])
+  exact ⟨{ L with continuous_toFun := hcont_to, continuous_invFun := hcont_inv }⟩
+
+/-- An arbitrary product of Hausdorff Montel spaces is Montel. -/
+private theorem thetaIsotypeSum_strongDual_montel_pi {K : Type*} (Z : K → Type*)
+    [∀ i, AddCommGroup (Z i)] [∀ i, Module ℂ (Z i)] [∀ i, TopologicalSpace (Z i)]
+    [∀ i, IsTopologicalAddGroup (Z i)] [∀ i, ContinuousSMul ℂ (Z i)]
+    [∀ i, T2Space (Z i)] [∀ i, MontelSpace ℂ (Z i)] :
+    MontelSpace ℂ (∀ i, Z i) := by
+  refine ⟨fun B hBclosed hBbd ↦ ?_⟩
+  let C (i : K) : Set (Z i) := closure ((fun z : ∀ j, Z j ↦ z i) '' B)
+  have hCcomp (i : K) : IsCompact (C i) :=
+    MontelSpace.isCompact_of_isClosed_of_isVonNBounded ℂ isClosed_closure
+      ((hBbd.image (ContinuousLinearMap.proj (R := ℂ) (φ := Z) i)).closure)
+  have hpi : IsCompact (Set.univ.pi C) := isCompact_univ_pi hCcomp
+  refine hpi.of_isClosed_subset hBclosed fun z hz i _ ↦ subset_closure ⟨z, hz, rfl⟩
+
+/-- An arbitrary product of barrelled spaces is barrelled. -/
+private theorem thetaIsotypeSum_strongDual_barrelled_pi {K : Type*} (Z : K → Type*)
+    [∀ i, AddCommGroup (Z i)] [∀ i, Module ℂ (Z i)] [∀ i, TopologicalSpace (Z i)]
+    [∀ i, IsTopologicalAddGroup (Z i)] [∀ i, ContinuousSMul ℂ (Z i)]
+    [∀ i, BarrelledSpace ℂ (Z i)] :
+    BarrelledSpace ℂ (∀ i, Z i) := by
+  classical
+  refine ⟨fun p hp ↦ ?_⟩
+  -- A lower semicontinuous seminorm on a product vanishes on all but finitely many factors.
+  have hfin : ∃ s : Finset K, ∀ i ∉ s, ∀ y : Z i, p (Pi.single i y) = 0 := by
+    by_contra h
+    push Not at h
+    have hstep (s : Finset K) : ∃ i : K, i ∉ s ∧ ∃ y : Z i, p (Pi.single i y) ≠ 0 := h s
+    let next (s : Finset K) : K := (hstep s).choose
+    let hist : ℕ → Finset K := Nat.rec ∅ (fun _ s ↦ insert (next s) s)
+    let idx (n : ℕ) : K := next (hist n)
+    have hnotmem (n : ℕ) : idx n ∉ hist n := (hstep (hist n)).choose_spec.1
+    have hmono : Monotone hist := monotone_nat_of_le_succ fun n ↦ Finset.subset_insert _ _
+    have hidx_inj : Function.Injective idx := by
+      intro m n hmn
+      rcases lt_trichotomy m n with hlt | rfl | hgt
+      · have hmem : idx m ∈ hist n :=
+          hmono (Nat.succ_le_of_lt hlt) (Finset.mem_insert_self (idx m) (hist m))
+        rw [hmn] at hmem
+        exact (hnotmem n hmem).elim
+      · rfl
+      · have hmem : idx n ∈ hist m :=
+          hmono (Nat.succ_le_of_lt hgt) (Finset.mem_insert_self (idx n) (hist n))
+        rw [← hmn] at hmem
+        exact (hnotmem m hmem).elim
+    have hy_ex (n : ℕ) : ∃ y : Z (idx n), p (Pi.single (idx n) y) = (n : ℝ) + 1 := by
+      obtain ⟨y₀, hy₀⟩ := (hstep (hist n)).choose_spec.2
+      have hpos : 0 < p (Pi.single (idx n) y₀) :=
+        lt_of_le_of_ne (apply_nonneg p _) (Ne.symm hy₀)
+      let c : ℝ := ((n : ℝ) + 1) / p (Pi.single (idx n) y₀)
+      have hc : 0 ≤ c := div_nonneg (by positivity) hpos.le
+      refine ⟨(c : ℂ) • y₀, ?_⟩
+      rw [Pi.single_smul, map_smul_eq_mul, Complex.norm_real, Real.norm_of_nonneg hc]
+      exact div_mul_cancel₀ _ hpos.ne'
+    choose y hy using hy_ex
+    let Ψ (c : ℕ → ℂ) (i : K) : Z i :=
+      if h : ∃ n, idx n = i then c h.choose • (h.choose_spec ▸ y h.choose) else 0
+    have hΨ_cont : Continuous Ψ := by
+      refine continuous_pi fun i ↦ ?_
+      change Continuous (fun c : ℕ → ℂ ↦
+        if h : ∃ n, idx n = i then c h.choose • (h.choose_spec ▸ y h.choose) else 0)
+      by_cases hi : ∃ n, idx n = i
+      · simp only [dite_eq_left hi]
+        exact (continuous_apply hi.choose).smul continuous_const
+      · simp only [dite_eq_right hi]
+        exact continuous_const
+    have hΨ_sub (c₁ c₂ : ℕ → ℂ) (n : ℕ)
+        (hagree : ∀ k, k ≠ n → c₁ k = c₂ k) (hdiff : c₁ n - c₂ n = 1) :
+        Ψ c₁ - Ψ c₂ = Pi.single (idx n) (y n) := by
+      have hcast (i : K) (m : ℕ) (hm : idx m = i) (hmn : m = n) :
+          (hm ▸ y m : Z i) = Pi.single (idx n) (y n) i := by
+        subst hmn
+        subst hm
+        simp
+      ext i
+      change Ψ c₁ i - Ψ c₂ i = Pi.single (idx n) (y n) i
+      by_cases hi : ∃ m, idx m = i
+      · simp only [Ψ, dite_eq_left hi, ← sub_smul]
+        by_cases hmn : hi.choose = n
+        · have hcoeff : c₁ hi.choose - c₂ hi.choose = 1 := by rw [hmn, hdiff]
+          rw [hcoeff, one_smul]
+          exact hcast i hi.choose hi.choose_spec hmn
+        · rw [hagree hi.choose hmn, sub_self, zero_smul]
+          have hne : i ≠ idx n := fun h' ↦ hmn (hidx_inj (hi.choose_spec.trans h'))
+          simp [Pi.single_eq_of_ne hne]
+      · simp only [Ψ, dite_eq_right hi, sub_self]
+        have hne : i ≠ idx n := fun h' ↦ hi ⟨n, h'.symm⟩
+        simp [Pi.single_eq_of_ne hne]
+    let Q := ℕ → Metric.closedBall (0 : ℂ) 1
+    let Φ : Q → (∀ i, Z i) := fun q ↦ Ψ (fun k ↦ (q k : ℂ))
+    have hΦ_cont : Continuous Φ :=
+      hΨ_cont.comp (continuous_pi fun k ↦ continuous_subtype_val.comp (continuous_apply k))
+    have hC_closed (m : ℕ) : IsClosed {q : Q | p (Φ q) ≤ (m : ℝ)} :=
+      (hp.comp hΦ_cont).isClosed_preimage (m : ℝ)
+    have hC_cover : (⋃ m : ℕ, {q : Q | p (Φ q) ≤ (m : ℝ)}) = Set.univ :=
+      Set.eq_univ_of_forall fun q ↦ Set.mem_iUnion.mpr (exists_nat_ge (p (Φ q)))
+    obtain ⟨m, ⟨q₀, hq₀⟩⟩ := nonempty_interior_of_iUnion_of_closed hC_closed hC_cover
+    have hnhds : {q : Q | p (Φ q) ≤ (m : ℝ)} ∈ 𝓝 q₀ := mem_interior_iff_mem_nhds.mp hq₀
+    rw [nhds_pi, Filter.mem_pi] at hnhds
+    obtain ⟨I, hIfin, t, ht, hsub⟩ := hnhds
+    let F : Finset ℕ := hIfin.toFinset
+    let n : ℕ := max (2 * m) (F.sup id + 1)
+    have hn_not_F : n ∉ F := by
+      intro hnF
+      have hle : n ≤ F.sup id := Finset.le_sup (f := id) hnF
+      have hgt : F.sup id + 1 ≤ n := le_max_right _ _
+      omega
+    have hn_not_I : n ∉ I := by simpa [F] using hn_not_F
+    let q₁ : Q := Function.update q₀ n ⟨1, by simp⟩
+    let q₂ : Q := Function.update q₀ n ⟨0, by simp⟩
+    have hq₁ : p (Φ q₁) ≤ (m : ℝ) := hsub fun k hk ↦ by
+      have hkn : k ≠ n := fun hkn ↦ hn_not_I (hkn ▸ hk)
+      simpa [q₁, Function.update_of_ne hkn] using mem_of_mem_nhds (ht k)
+    have hq₂ : p (Φ q₂) ≤ (m : ℝ) := hsub fun k hk ↦ by
+      have hkn : k ≠ n := fun hkn ↦ hn_not_I (hkn ▸ hk)
+      simpa [q₂, Function.update_of_ne hkn] using mem_of_mem_nhds (ht k)
+    have hsub_eq : Φ q₁ - Φ q₂ = Pi.single (idx n) (y n) :=
+      hΨ_sub (fun k ↦ (q₁ k : ℂ)) (fun k ↦ (q₂ k : ℂ)) n
+        (fun k hk ↦ by
+          change ((Function.update q₀ n ⟨1, by simp⟩ k : Metric.closedBall (0 : ℂ) 1) : ℂ) =
+            ((Function.update q₀ n ⟨0, by simp⟩ k : Metric.closedBall (0 : ℂ) 1) : ℂ)
+          simp [Function.update_of_ne hk])
+        (by
+          change ((Function.update q₀ n ⟨1, by simp⟩ n : Metric.closedBall (0 : ℂ) 1) : ℂ) -
+            ((Function.update q₀ n ⟨0, by simp⟩ n : Metric.closedBall (0 : ℂ) 1) : ℂ) = 1
+          simp)
+    have hle : (n : ℝ) + 1 ≤ (m : ℝ) + (m : ℝ) := by
+      calc (n : ℝ) + 1 = p (Pi.single (idx n) (y n)) := (hy n).symm
+        _ = p (Φ q₁ - Φ q₂) := by rw [hsub_eq]
+        _ ≤ p (Φ q₁) + p (Φ q₂) := map_sub_le_add p _ _
+        _ ≤ (m : ℝ) + (m : ℝ) := add_le_add hq₁ hq₂
+    have h2m : 2 * m ≤ n := le_max_left _ _
+    have h2mR : 2 * (m : ℝ) ≤ (n : ℝ) := by exact_mod_cast h2m
+    linarith
+  obtain ⟨s, hs⟩ := hfin
+  -- Lower semicontinuity extends vanishing on finite sums to the full product kernel.
+  have hvanish (z : ∀ i, Z i) (hz : ∀ i ∈ s, z i = 0) : p z = 0 := by
+    have htend : Tendsto (fun F : Finset K ↦ ∑ i ∈ F, Pi.single (M := Z) i (z i))
+        Filter.atTop (𝓝 z) := by
+      rw [tendsto_pi_nhds]
+      intro j
+      refine tendsto_const_nhds.congr' ?_
+      filter_upwards [Filter.eventually_ge_atTop ({j} : Finset K)] with F hF
+      rw [Finset.sum_apply, Finset.sum_eq_single j]
+      · simp
+      · intro i _ hij
+        simp [Pi.single_eq_of_ne hij.symm]
+      · intro hjF
+        exact (hjF (hF (Finset.mem_singleton_self j))).elim
+    have hzero (F : Finset K) : p (∑ i ∈ F, Pi.single (M := Z) i (z i)) ≤ 0 := by
+      refine (Finset.le_sum_of_subadditive p (map_zero p).le (map_add_le_add p) F _).trans_eq ?_
+      refine Finset.sum_eq_zero fun i _ ↦ ?_
+      by_cases his : i ∈ s
+      · simp [hz i his]
+      · exact hs i his (z i)
+    have hle : p z ≤ 0 :=
+      (hp.isClosed_preimage 0).mem_of_tendsto htend (Filter.Eventually.of_forall hzero)
+    exact le_antisymm hle (apply_nonneg p z)
+  -- Each retained factor seminorm is continuous by barrelledness of that factor.
+  let q (i : K) : Seminorm ℂ (Z i) := p.comp (LinearMap.single ℂ Z i)
+  have hq_cont (i : K) : Continuous (q i) :=
+    (q i).continuous_of_lowerSemicontinuous
+      (hp.comp (ContinuousLinearMap.single ℂ Z i).continuous)
+  let Q : Seminorm ℂ (∀ i, Z i) := ∑ i ∈ s, (q i).comp (LinearMap.proj i)
+  have hQ_eval : ∀ (t : Finset K) (z : ∀ i, Z i),
+      (∑ i ∈ t, (q i).comp (LinearMap.proj i)) z = ∑ i ∈ t, q i (z i) := by
+    intro t z
+    induction t using Finset.induction_on with
+    | empty => simp
+    | @insert a t ha ih =>
+      rw [Finset.sum_insert ha, Finset.sum_insert ha, add_apply, ih]
+      rfl
+  have hQ_cont : Continuous Q := by
+    have hsum_cont : ∀ t : Finset K, Continuous (fun z : ∀ i, Z i ↦ ∑ i ∈ t, q i (z i)) := by
+      intro t
+      induction t using Finset.induction_on with
+      | empty =>
+        simpa using (continuous_const : Continuous fun _ : ∀ i, Z i ↦ (0 : ℝ))
+      | @insert a t ha ih =>
+        simp_rw [Finset.sum_insert ha]
+        exact ((hq_cont a).comp (continuous_apply a)).add ih
+    exact (hsum_cont s).congr fun z ↦ (hQ_eval s z).symm
+  refine Seminorm.continuous_of_le hQ_cont fun z ↦ ?_
+  let w : ∀ i, Z i := z - ∑ i ∈ s, Pi.single (M := Z) i (z i)
+  have hw : p w = 0 := hvanish w fun i hi ↦ by
+    change z i - (∑ j ∈ s, Pi.single (M := Z) j (z j)) i = 0
+    rw [Finset.sum_apply, Finset.sum_eq_single i]
+    · simp
+    · intro j _ hji
+      simp [Pi.single_eq_of_ne hji.symm]
+    · intro hni
+      exact (hni hi).elim
+  calc p z = p ((∑ i ∈ s, Pi.single (M := Z) i (z i)) + w) := by simp [w]
+    _ ≤ p (∑ i ∈ s, Pi.single (M := Z) i (z i)) + p w := map_add_le_add p _ _
+    _ = p (∑ i ∈ s, Pi.single (M := Z) i (z i)) := by rw [hw, add_zero]
+    _ ≤ ∑ i ∈ s, p (Pi.single (M := Z) i (z i)) :=
+      Finset.le_sum_of_subadditive p (map_zero p).le (map_add_le_add p) s _
+    _ = Q z := (hQ_eval s z).symm
+
+/-- Completeness, nuclearity, barrelledness and the Montel property pass from the strong duals
+of a family of spaces to the strong dual of the locally convex direct sum of equivalent copies. -/
+private theorem thetaIsotypeSum_strongDual_of_equiv
+    {K : Type*} [DecidableEq K] (X Z : K → Type*)
+    [∀ i, AddCommGroup (X i)] [∀ i, Module ℂ (X i)] [∀ i, TopologicalSpace (X i)]
+    [∀ i, PolynormableSpace ℂ (X i)] [∀ i, T2Space (X i)]
+    [∀ i, AddCommGroup (Z i)] [∀ i, Module ℂ (Z i)] [∀ i, TopologicalSpace (Z i)]
+    (iso : ∀ i, Z i ≃L[ℂ] X i)
+    (hcomp : ∀ i, CompleteSpace (StrongDual ℂ (Z i)))
+    (hnuc : ∀ i, IsNuclearTVS.{0} (StrongDual ℂ (Z i)))
+    (hbar : ∀ i, BarrelledSpace ℂ (StrongDual ℂ (Z i)))
+    (hmont : ∀ i, MontelSpace ℂ (StrongDual ℂ (Z i))) :
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ K X)
+    CompleteSpace (StrongDual ℂ (⨁ i, X i)) ∧ IsNuclearTVS (StrongDual ℂ (⨁ i, X i)) ∧
+      BarrelledSpace ℂ (StrongDual ℂ (⨁ i, X i)) ∧ MontelSpace ℂ (StrongDual ℂ (⨁ i, X i)) := by
+  classical
+  let D := ⨁ i, X i
+  let lof := DirectSum.lof ℂ K X
+  let : TopologicalSpace D := locallyConvexFinalTopology lof
+  have hD := globalThetaIsotypeSum_finalTopology_withSeminorms lof
+  let : IsTopologicalAddGroup D := hD.isTopologicalAddGroup
+  let : ContinuousSMul ℂ D := hD.continuousSMul
+  obtain ⟨e₁⟩ := thetaIsotypeSum_strongDual_directSumEquiv X
+  let dualIso (i : K) : StrongDual ℂ (X i) ≃L[ℂ] StrongDual ℂ (Z i) :=
+    { toFun := ContinuousLinearMap.precomp ℂ (iso i).toContinuousLinearMap
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl
+      invFun := ContinuousLinearMap.precomp ℂ (iso i).symm.toContinuousLinearMap
+      left_inv := fun φ ↦ by ext x; exact congrArg φ ((iso i).apply_symm_apply x)
+      right_inv := fun ψ ↦ by ext x; exact congrArg ψ ((iso i).symm_apply_apply x)
+      continuous_toFun := (ContinuousLinearMap.precomp ℂ (iso i).toContinuousLinearMap).continuous
+      continuous_invFun :=
+        (ContinuousLinearMap.precomp ℂ (iso i).symm.toContinuousLinearMap).continuous }
+  let e : StrongDual ℂ D ≃L[ℂ] (∀ i : K, StrongDual ℂ (Z i)) :=
+    e₁.trans (ContinuousLinearEquiv.piCongrRight dualIso)
+  have hpiN : IsNuclearTVS (∀ i : K, StrongDual ℂ (Z i)) :=
+    isNuclearTVS_pi fun i ↦ nuclear_changeUniverse (hnuc i)
+  let : ∀ i : K, T2Space (StrongDual ℂ (Z i)) := fun i ↦ (hnuc i).1
+  let : ∀ i : K, PolynormableSpace ℂ (StrongDual ℂ (Z i)) := fun i ↦ (hnuc i).2.1
+  let : ∀ i : K, ContinuousSMul ℂ (StrongDual ℂ (Z i)) :=
+    fun i ↦ PolynormableSpace.continuousSMul ℂ _
+  let : PolynormableSpace ℂ (∀ i : K, StrongDual ℂ (Z i)) := hpiN.2.1
+  let : PolynormableSpace ℂ (StrongDual ℂ D) :=
+    (e.toHomeomorph.isInducing.withSeminorms
+      (PolynormableSpace.withSeminorms ℂ _)).toPolynormableSpace
+  have hcompD : CompleteSpace (StrongDual ℂ D) := by
+    let eu : StrongDual ℂ D ≃ᵤ (∀ i : K, StrongDual ℂ (Z i)) :=
+      { toEquiv := e.toEquiv
+        uniformContinuous_toFun :=
+          e.toAddMonoidHom.uniformContinuous_of_continuousAt_zero e.continuous.continuousAt
+        uniformContinuous_invFun :=
+          e.symm.toAddMonoidHom.uniformContinuous_of_continuousAt_zero
+            e.symm.continuous.continuousAt }
+    exact eu.completeSpace_iff.mpr inferInstance
+  have hbarD : BarrelledSpace ℂ (StrongDual ℂ D) := by
+    have : BarrelledSpace ℂ (∀ i : K, StrongDual ℂ (Z i)) :=
+      thetaIsotypeSum_strongDual_barrelled_pi (fun i ↦ StrongDual ℂ (Z i))
+    refine ⟨fun p hp ↦ ?_⟩
+    have hq : Continuous (p.comp e.symm.toLinearMap) :=
+      (p.comp e.symm.toLinearMap).continuous_of_lowerSemicontinuous (hp.comp e.symm.continuous)
+    exact (hq.comp e.continuous).congr fun φ ↦ by simp
+  have hmontD : MontelSpace ℂ (StrongDual ℂ D) := by
+    have : MontelSpace ℂ (∀ i : K, StrongDual ℂ (Z i)) :=
+      thetaIsotypeSum_strongDual_montel_pi (fun i ↦ StrongDual ℂ (Z i))
+    refine ⟨fun B hBclosed hBbd ↦ ?_⟩
+    have hK : IsCompact (e '' B) :=
+      MontelSpace.isCompact_of_isClosed_of_isVonNBounded ℂ
+        (e.toHomeomorph.isClosed_image.mpr hBclosed) (hBbd.image e.toContinuousLinearMap)
+    simpa only [Set.image_image, e.symm_apply_apply, Set.image_id'] using
+      hK.image e.symm.continuous
+  exact ⟨hcompD, nuclear_of_equiv e.symm hpiN, hbarD, hmontD⟩
+
+
 /-- Paper: Remark 6.2.1.4(1), p. 297.
 The strong dual of the locally convex sum of the S-local isotypes is complete, nuclear,
 barrelled and Montel: its strong dual identifies with the product of the strong duals of
@@ -1080,7 +1522,19 @@ theorem sLocalThetaIsotypeSum_strongDual_properties :
     let D := ⨁ χ, X χ
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
     CompleteSpace (StrongDual ℂ D) ∧ IsNuclearTVS (StrongDual ℂ D) ∧
-      BarrelledSpace ℂ (StrongDual ℂ D) ∧ MontelSpace ℂ (StrongDual ℂ D) := by sorry
+      BarrelledSpace ℂ (StrongDual ℂ D) ∧ MontelSpace ℂ (StrongDual ℂ D) := by
+  classical
+  let : T2Space (Θₛ(S)) := sLocalAdelicThetaSpace_t2_of_isClosed
+    (sLocalAdelicTheta_ker_isClosed (F := F) (S := S))
+  let : PolynormableSpace ℂ (Θₛ(S)) := sLocalAdelicThetaSpace_polynormable
+  with_reducible_and_instances
+    exact thetaIsotypeSum_strongDual_of_equiv
+      (fun χ : PontryaginDual J₁(S) ↦ ↥(Eₛ(χ))) (fun χ : PontryaginDual J₁(S) ↦ Θₛω(S, χ))
+      (fun χ ↦ (sLocalThetaIsotypicAverage_equiv (F := F) (S := S) χ).2.choose)
+      (fun χ ↦ sLocalHomogeneousThetaSpace_strongDual_complete (F := F) (S := S) χ)
+      (fun χ ↦ sLocalHomogeneousThetaSpace_strongDual_nuclear.{_, 0} (F := F) (S := S) χ)
+      (fun χ ↦ (sLocalHomogeneousThetaSpace_strongDual_montel (F := F) (S := S) χ).1)
+      (fun χ ↦ (sLocalHomogeneousThetaSpace_strongDual_montel (F := F) (S := S) χ).2)
 
 /-- Paper: Remark 6.2.1.4(1), p. 297.
 The locally convex sum of the local isotypes inherits the space and strong-dual properties
@@ -1127,7 +1581,18 @@ theorem globalThetaIsotypeSum_strongDual_properties :
     let D := ⨁ ω, X ω
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
     CompleteSpace (StrongDual ℂ D) ∧ IsNuclearTVS (StrongDual ℂ D) ∧
-      BarrelledSpace ℂ (StrongDual ℂ D) ∧ MontelSpace ℂ (StrongDual ℂ D) := by sorry
+      BarrelledSpace ℂ (StrongDual ℂ D) ∧ MontelSpace ℂ (StrongDual ℂ D) := by
+  classical
+  let : T2Space Θ𝔽 := globalAdelicThetaSpace_t2_of_isClosed (adelicTheta_ker_isClosed (F := F))
+  let : PolynormableSpace ℂ Θ𝔽 := globalAdelicThetaSpace_polynormable
+  with_reducible_and_instances
+    exact thetaIsotypeSum_strongDual_of_equiv
+      (fun ω : PontryaginDual C₁ ↦ ↥(E𝔽(ω))) (fun ω : PontryaginDual C₁ ↦ Θ𝔽ω(ω))
+      (fun ω ↦ (globalThetaIsotypicAverage_equiv (F := F) ω).2.choose)
+      (fun ω ↦ globalHomogeneousThetaSpace_strongDual_complete (F := F) (ω := ω))
+      (fun ω ↦ globalHomogeneousThetaSpace_strongDual_nuclear.{_, 0} (F := F) (ω := ω))
+      (fun ω ↦ (globalHomogeneousThetaSpace_strongDual_montel (F := F) (ω := ω)).1)
+      (fun ω ↦ (globalHomogeneousThetaSpace_strongDual_montel (F := F) (ω := ω)).2)
 
 /-- Paper: Remark 6.2.1.4(1), p. 297.
 The locally convex sum of the global isotypes inherits the space and strong-dual properties

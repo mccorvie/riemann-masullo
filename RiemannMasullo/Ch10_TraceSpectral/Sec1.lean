@@ -2778,6 +2778,28 @@ theorem sLocalThetaSobolevAverage_quotient_equiv (ω : PontryaginDual J₁) :
     exact thetaSobolevAverage_quotient_equiv_of_compact μₛ₁ ρ₁ hρ ω (P(ω))
       (existsUnique_sLocalThetaSobolevAverage (F := F) (S := S) ha hI hs hα ω).exists.choose_spec.1
 
+/-- The compact Hilbert-sum coordinates for a subgroup acting on a closed subspace of a
+compact-interval Sobolev space. The instances are spelled as the S-local statement elaborates
+them, so that the statement is matched syntactically. -/
+private theorem sLocalThetaSobolev_isotypeDecomposition_aux {A X : Type*}
+    [Group A] [TopologicalSpace A] [IsTopologicalGroup A] [T2Space A]
+    (hA : ∀ a b : A, a * b = b * a) (K : Subgroup A)
+    [CompactSpace K] [SecondCountableTopology K]
+    {mK : MeasurableSpace K} [BorelSpace K] (μ : Measure K) [μ.IsHaarMeasure]
+    (mX : MeasurableSpace X) {ν : Measure X} {f : X → ℝ} {α β s : ℝ}
+    (V : Submodule ℂ (CompactIntervalSobolev ν f α β s)) [CompleteSpace V]
+    (ρ : @MonoidHom K (V →L[ℂ] V) (@MulOneClass.toMulOne K Monoid.toMulOneClass) _)
+    (hc : Continuous fun p : K × V ↦ ρ p.1 p.2)
+    (hle : ∀ g x, ‖ρ g x‖ ≤ ‖x‖) (P : (ω : PontryaginDual K) → V →L[ℂ] actionIsotype ρ ω)
+    (hP : ∀ ω, IsPettisIsotypicAverageOn μ univ ρ ω ((actionIsotype ρ ω).subtypeL.comp (P ω))) :
+    ∃ (p : V →L[ℂ] (∀ ω : PontryaginDual K, actionIsotype ρ ω))
+      (T : V ≃ₗᵢ[ℂ] lp (fun ω : PontryaginDual K ↦ ↥(actionIsotype ρ ω)) 2),
+      Injective p ∧ ∀ (x : V) (ω : PontryaginDual K),
+        p x ω = T x ω ∧ T x ω = (μ.real univ)⁻¹ • P ω x := by
+  let : CommGroup K :=
+    { (inferInstance : Group K) with mul_comm := fun a b ↦ Subtype.ext (hA a.1 b.1) }
+  exact globalThetaSobolev_isotypeDecomposition_compact (E := V) μ ρ hc hle P hP
+
 /-- Paper: Proposition 10.1.1.5(2), p. 437. The S-local coordinate map is a
 continuous injection into the product and factors through the isometric Hilbert sum.
 Deviation: Divide each raw average by the mass of the norm-one quotient measure.
@@ -2786,7 +2808,30 @@ theorem sLocalThetaSobolev_isotypeDecomposition :
     ∃ (Pprod : H →L[ℂ] (∀ ω : PontryaginDual J₁, Hω(ω)))
       (T : H ≃ₗᵢ[ℂ] lp (fun ω : PontryaginDual J₁ ↦ ↥(Hω(ω))) 2),
       Injective Pprod ∧ ∀ (u : H) (ω : PontryaginDual J₁),
-        Pprod u ω = T u ω ∧ T u ω = (Measure.real μₛ₁ univ)⁻¹ • P(ω) u := by sorry
+        Pprod u ω = T u ω ∧ T u ω = (Measure.real μₛ₁ univ)⁻¹ • P(ω) u := by
+  let : BorelSpace J₁ := ⟨rfl⟩
+  let : CompactSpace J₁ := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let : (μₛ₁).IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  let : SecondCountableTopology J₁ := Topology.IsInducing.subtypeVal.secondCountableTopology
+  let : CompleteSpace H := (sLocalThetaSobolev_closed_complete_separable ha hI hs hp).2.1
+  have hR := (exists_sLocalThetaSobolevAction (F := F) (S := S) ha hI hs hp).choose_spec
+  have hc : Continuous (fun p : J₁ × H ↦ ρ₁ p.1 p.2) :=
+    hR.2.1.comp ((continuous_subtype_val.comp continuous_fst).prodMk continuous_snd)
+  have hn (g : J₁) (x : H) : ‖ρ₁ g x‖ ≤ ‖x‖ := by
+    have hg : mₛ g.val = 1 := Units.ext (congrArg Units.val g.property)
+    change ‖Rₛ(ha, hI, hs, hp) g.val x‖ ≤ ‖x‖
+    with_reducible_and_instances
+      exact globalThetaSobolev_isotypeDecomposition_bound μₛ mₛ α β s hI hs
+        Hₛ(ha, hI, hs, hp) (Rₛ(ha, hI, hs, hp)) hR.1 g.val hg x
+  have key := sLocalThetaSobolev_isotypeDecomposition_aux mul_comm (sIdeleQuotientNorm F S).ker μₛ₁
+    (borel _) (Hₛ(ha, hI, hs, hp)) ρ₁ hc hn (fun ω ↦ P(ω)) (fun ω ↦
+      (existsUnique_sLocalThetaSobolevAverage (F := F) (S := S) ha hI hs hα ω).exists.choose_spec.1)
+  -- The statement mixes this file's Borel structure with the one of the quotient measure: unfold
+  -- both, after which `key` is the statement verbatim (a defeq check on these terms never ends).
+  revert key
+  delta instSIdeleQuotientMeasurableSpaceSec1 instMeasurableSpaceSIdeleQuotient
+  exact fun h ↦ h
 
 end SLocalIsotypes
 

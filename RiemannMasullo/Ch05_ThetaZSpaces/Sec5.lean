@@ -50,6 +50,30 @@ local notation "restricts(" c ", " m ", " ω ")" =>
   (normOneRestriction m c = (circleToComplex).comp ω)
 local notation "zeroAdele" => Multiplicative.ofAdd (0 : 𝔸[F])
 
+/-- Point-separating functionals on a Montel space span its strong dual densely,
+since every separating strong-bidual functional is evaluation at a vector. -/
+private theorem dense_span_of_separating_strongDual
+    {E I : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E]
+    [IsUniformAddGroup E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E] [T2Space E]
+    [MontelSpace ℂ E] [PolynormableSpace ℂ (StrongDual ℂ E)] (T : I → StrongDual ℂ E)
+    (hsep : ∀ x : E, (∀ i, T i x = 0) → x = 0) :
+    Dense (Submodule.span ℂ (Set.range T) : Set (StrongDual ℂ E)) := by
+  let D := StrongDual ℂ E
+  let : Module ℝ D := Module.restrictScalars ℝ ℂ D
+  let : IsScalarTower ℝ ℂ D := IsScalarTower.restrictScalars ℝ ℂ D
+  let : LocallyConvexSpace ℝ D := (PolynormableSpace.withSeminorms ℂ D).toLocallyConvexSpace
+  let V := (Submodule.span ℂ (Set.range T)).topologicalClosure
+  rw [dense_iff_closure_eq]
+  apply Set.eq_univ_of_forall
+  intro l
+  by_contra hl
+  obtain ⟨φ, hφ, hv⟩ := exists_dual_eq_zero_on_submodule_of_notMem V
+    (Submodule.span ℂ (Set.range T)).isClosed_topologicalClosure hl
+  obtain ⟨x, rfl⟩ := surjective_strongBidual_eval φ
+  have hx : x = 0 := hsep x (fun i ↦ hv (T i)
+    ((Submodule.span ℂ (Set.range T)).le_topologicalClosure (Submodule.subset_span (Set.mem_range_self i))))
+  exact hφ (by change l x = 0; rw [hx, map_zero])
+
 section Eigendistributions
 
 /-- Paper: Definition 5.5.1.1(1), p. 277.
@@ -956,11 +980,77 @@ theorem globalThetaEigendistribution_holomorphic (χ : PontryaginDual C𝔽) :
   rw [he]
   exact adelicNormalizedEigendistribution_holomorphic χ
 
+/-- Vanishing normalized evaluations force the convergent Mellin integral to vanish
+at exponent one, using nonvanishing of the Euler product off a discrete set. -/
+private theorem sLocalThetaEigendistributions_dense_span_integral
+    (f : ℬ(Aₛ)) (hf : ∀ c, sLocalNormalizedEigendistribution (F := F) (S := S) c f = 0)
+    (χ : PontryaginDual Jₛ) : sLocalIdelicZetaIntegral f (chartₛ(χ) 1) = 0 := by
+  have hN (z : ℂ) : sLocalNormalizedZFunction f (chartₛ(χ) z) = 0 := by
+    have h := (existsUnique_sLocalNormalizedEigendistribution (chartₛ(χ) z)).exists.choose_spec f
+    rw [show (existsUnique_sLocalNormalizedEigendistribution (chartₛ(χ) z)).exists.choose f = 0
+      from hf _] at h
+    exact h.symm.trans (mul_zero _)
+  have hpos : ∀ᶠ z : ℂ in 𝓝[≠] (1 : ℂ), 0 < z.re := nhdsWithin_le_nhds
+    ((isOpen_Ioi.preimage Complex.continuous_re).mem_nhds (by norm_num))
+  have hzero : ∀ᶠ z : ℂ in 𝓝[≠] (1 : ℂ), sLocalIdelicZetaIntegral f (chartₛ(χ) z) = 0 := by
+    filter_upwards [hpos, nhdsNE_le_codiscrete _
+      (sLocalNormalizedEigendistribution_gaussian_heckeL_ne_zero χ)] with z hz hL
+    have h := hN z
+    rw [sLocalNormalizedZFunction_eq_div f χ hz, div_eq_zero_iff] at h
+    exact h.resolve_right hL
+  have hc := ((sLocalIdelicZetaIntegral_analyticOn f χ) (1 : ℂ) (by norm_num)).continuousAt
+  exact tendsto_nhds_unique (hc.tendsto.mono_left nhdsWithin_le_nhds)
+    (tendsto_const_nhds.congr' (hzero.mono fun z hz ↦ hz.symm))
+
+/-- Character uniqueness applied to the convergent radial line separates theta
+classes before any density theorem is used. -/
+private theorem sLocalThetaEigendistributions_dense_span_separating
+    (x : SLocalAdelicThetaSpace F S)
+    (hx : ∀ c, sLocalThetaEigendistribution (F := F) (S := S) c x = 0) : x = 0 := by
+  obtain ⟨f, rfl⟩ := (Kₛ).mkQ_surjective x
+  have hf (c : QuasiCharacter Jₛ) : sLocalNormalizedEigendistribution c f = 0 :=
+    (sLocalThetaEigendistribution_mk c f).symm.trans (hx c)
+  let : MeasurableSpace Jₛ := borel _
+  let : BorelSpace Jₛ := ⟨rfl⟩
+  let : LocallyCompactSpace Aₛˣ := (sIdeleGroup_description F S).2.2.1
+  have := isClosed_sProjectedDiagonal (F := F) (S := S)
+  let μ := sLocalQuotientTamagawaMeasure F S
+  let : μ.IsHaarMeasure := (sLocalQuotientTamagawaMeasure_isWeil (F := F) (S := S)).1
+  let : μ.Regular := (sLocalQuotientTamagawaMeasure_isWeil (F := F) (S := S)).2.1
+  let w := chartₛ((1 : PontryaginDual Jₛ)) 1
+  have hθ : sLocalAdelicThetaOnClasses F S f = 0 := by
+    refine eq_zero_of_weighted_integrals μ _ w
+      (sLocalThetaMellinIntegral_integrable f w ⟨1, 1, by norm_num, rfl⟩) fun χ ↦ ?_
+    have heval := sLocalThetaEigendistributions_dense_span_integral f hf χ
+    have hr : ∃ (ψ : PontryaginDual Jₛ) (z : ℂ), 0 < z.re ∧ chartₛ(χ) 1 = chartₛ(ψ) z :=
+      ⟨χ, 1, by norm_num, rfl⟩
+    rw [← sLocalThetaMellinIntegral_eq_zeta f hr] at heval
+    refine (MeasureTheory.integral_congr_ae (Filter.Eventually.of_forall fun g ↦ ?_)).trans heval
+    change sLocalAdelicThetaOnClasses F S f g * (1 * _ ^ (1 : ℂ)) * (χ g : ℂ) =
+      sLocalAdelicThetaOnClasses F S f g * ((χ g : ℂ) * _ ^ (1 : ℂ))
+    rw [one_mul, mul_right_comm, mul_assoc]
+  apply (Submodule.Quotient.mk_eq_zero _).mpr
+  exact LinearMap.mem_ker.mpr (ContinuousMap.ext fun g ↦
+    (sLocalAdelicThetaOnClasses_mk F S f g).symm.trans (DFunLike.congr_fun hθ _))
+
 /-- Paper: Remark 5.5.1.4, p. 280.
 The descended S-local eigendistributions span a strongly dense subspace of the theta dual. -/
 theorem sLocalThetaEigendistributions_dense_span :
     Dense (Submodule.span ℂ (Set.range (sLocalThetaEigendistribution (F := F) (S := S))) :
-      Set D(SLocalAdelicThetaSpace F S)) := by sorry
+      Set D(SLocalAdelicThetaSpace F S)) := by
+  let E := SLocalAdelicThetaSpace F S
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace _
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let : T2Space E := sLocalAdelicThetaSpace_t2_of_isClosed sLocalAdelicTheta_ker_isClosed
+  let : PolynormableSpace ℂ E := sLocalAdelicThetaSpace_polynormable
+  let : MontelSpace ℂ E := sLocalAdelicThetaSpace_montel
+  have hN : IsNuclearTVS.{0} (StrongDual ℂ E) :=
+    sLocalAdelicThetaSpace_strongDual_nuclear (F := F) (S := S)
+  let : PolynormableSpace ℂ (StrongDual ℂ E) := hN.2.1
+  with_reducible_and_instances
+    exact dense_span_of_separating_strongDual
+      (sLocalThetaEigendistribution (F := F) (S := S))
+      sLocalThetaEigendistributions_dense_span_separating
 
 end Global
 

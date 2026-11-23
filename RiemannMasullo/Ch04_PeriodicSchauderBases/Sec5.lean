@@ -1074,13 +1074,6 @@ local notation "Pχ" => modulatedIsotypicPeriodizationCLM m γ hm hms hγ μ₁ 
 -- with the actual difference range. Part (5) only identifies its closure.
 
 omit [MeasurableSpace G] [BorelSpace G] in
-include hγ in
-/-- Paper: Proposition 4.5.1.1(6), p. 198. The cyclic difference has closed range, for a
-generator of module greater than one as in Situation 4.4.2.3. Without that hypothesis the
-statement is false: a rotation by a Liouville number on ℝ_{>0} × S¹ has non-closed range. -/
-theorem modulatedCyclicDifference_isClosed_range : IsClosed (range Δ) := by sorry
-
-omit [MeasurableSpace G] [BorelSpace G] in
 private theorem mem_schwartzTranslationIsotype_iff (ω : PontryaginDual K) (f : SchwartzBruhat G) :
     f ∈ actionIsotype ((ρG).comp (K).subtype) ω ↔
       ∀ (u : K) (x : G), f (u.val⁻¹ * x) = (ω u : ℂ) * f x := by
@@ -3615,6 +3608,20 @@ private theorem fullPeriodization_ker_eq_range : (P).ker = (Δ).range := by
   have hmemb := Iff.of_eq (congrArg (fun N : Submodule ℂ E ↦ f ∈ N) hr)
   have hzero : (P f = 0) ↔ (Pu f = 0) := Iff.of_eq (congrArg (· = 0) (hs f))
   exact hzero.trans hmemb
+
+omit [MeasurableSpace G] [BorelSpace G] in
+include hγ in
+/-- Paper: Proposition 4.5.1.1(6), p. 198. The cyclic difference has closed range, for a
+generator of module greater than one as in Situation 4.4.2.3. Without that hypothesis the
+statement is false: a rotation by a Liouville number on ℝ_{>0} × S¹ has non-closed range. -/
+theorem modulatedCyclicDifference_isClosed_range : IsClosed (range Δ) := by
+  let : MeasurableSpace G := borel G
+  let : BorelSpace G := ⟨rfl⟩
+  let := modulatedCyclicSubgroup_closed m γ hγ
+  let : T2Space S := schwartzBruhat_t2
+  change IsClosed ((Δ).range : Set E)
+  rw [← fullPeriodization_ker_eq_range m γ hm hms hγ]
+  exact (P).isClosed_ker
 
 omit [MeasurableSpace G] [BorelSpace G] in
 /-- Paper: Proposition 4.5.1.1(5), p. 198. The ordinary periodization kernel

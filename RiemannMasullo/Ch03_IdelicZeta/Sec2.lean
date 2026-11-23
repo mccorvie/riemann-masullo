@@ -3135,7 +3135,8 @@ private theorem partialTensor_schwartz (S : Finset V) (A : Arch) (p : (v : S) �
   apply congrArg (fun z : SAdeleRing F ∅ ↦ A (Multiplicative.ofAdd z))
   exact Prod.ext rfl (Subsingleton.elim _ _)
 
-private theorem partialTensor_integrable (S : Finset V) (f : SchwartzBruhat (Multiplicative (SAdeleRing F S))) :
+/-- A Schwartz-Bruhat function on the `S`-adeles is integrable for the additive Tamagawa measure. -/
+theorem partialTensor_integrable (S : Finset V) (f : SchwartzBruhat (Multiplicative (SAdeleRing F S))) :
     Integrable (fun x ↦ f (Multiplicative.ofAdd x)) (sAdditiveTamagawaMeasure F S) := by
   let G := Multiplicative (SAdeleRing F S)
   let m : Measure G := sAdditiveTamagawaMeasure F S
@@ -3210,7 +3211,9 @@ private theorem finiteFT_continuous (v : V) (f : v.adicCompletion F → ℂ) (hf
   · exact (hf.integrable_of_hasCompactSupport (μ := μ) hc).norm
   · exact ae_of_all μ fun x ↦ continuous_const.mul (hcont.comp (continuous_const.mul continuous_id)).star
 
-private theorem integralTail_iff (S : Finset V) (x : AdeleRing (𝓞 F) F) :
+/-- An adele lies in `integralAdelesOutside F S` exactly when each of its components outside `S` is
+a local integer. -/
+theorem integralTail_iff (S : Finset V) (x : AdeleRing (𝓞 F) F) :
     x ∈ integralAdelesOutside F S ↔ ∀ v ∉ S, x.2 v ∈ v.adicCompletionIntegers F := by
   simp only [integralAdelesOutside, Subring.mem_iInf]
   rfl

@@ -1411,6 +1411,73 @@ theorem modulatedQuotientLogMoment_biorthogonal_growth (ψ : J → U)
       ∀ (n : ℤ) (j : J), j.val.1 = freq[k, n] →
         q (ψ j) ≤ C * (1 + |(n : ℝ)|) ^ d := by sorry
 
+/-- A logarithmic moment along a one-parameter family of characters is the Fourier
+transform of a single Schwartz function on the logarithmic coordinate. -/
+private theorem modulatedLogMoment_logFourier (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
+    (μ₁ : Measure m.toMonoidHom.ker) [μ₁.IsHaarMeasure] [CompactSpace m.toMonoidHom.ker]
+    (ν : Measure G) (hν : ν = (μ₁.prod positiveRealHaar).map
+      (fun z : m.toMonoidHom.ker × ℝ≥0ˣ ↦ z.1.val * τ z.2))
+    (χ₀ : PontryaginDual G) (b : ℝ) (hb : ∀ t : ℝ≥0ˣ, χ₀ (τ t) = Circle.exp (b * Real.log (t.val : ℝ)))
+    (φ : G → ℂ) (p : PositiveRealExponentialDecay univ)
+    (hp : ∀ t : ℝ≥0ˣ, p.val (Real.log (t.val : ℝ)) =
+      ∫ k : m.toMonoidHom.ker, (χ₀ k.val : ℂ) * φ (k.val * τ t) ∂μ₁) (r : ℕ) :
+    ∃ H : SchwartzMap ℝ ℂ, ∀ (q : ℝ) (ξ : PontryaginDual G),
+      (∀ x, ξ x = χ₀ x * Circle.exp (q * period x)) →
+      Integrable (fun x ↦ φ x * (ξ x : ℂ) * (period x : ℂ)^r) ν →
+      (∫ x, φ x * (ξ x : ℂ) * (period x : ℂ)^r ∂ν) = H (-(q+b)/(2*Real.pi)) := by
+  let s₀ := logExponentialDecayTwist univ ⟨0, mem_univ _⟩ p
+  have hs₀ (x : ℝ) : s₀ x = p.val x := by
+    change (logExponentialDecayTwist univ ⟨0, mem_univ _⟩ p) x = _
+    simpa only [zero_mul, Real.exp_zero, Complex.ofReal_one, one_mul] using
+      logExponentialDecayTwist_apply univ ⟨0, mem_univ _⟩ p x
+  let w (x : ℝ) := (x : ℂ)^r
+  have hw : w.HasTemperateGrowth := by dsimp [w]; fun_prop
+  let s := SchwartzMap.smulLeftCLM ℂ w s₀
+  have hs (x : ℝ) : s x = (x : ℂ)^r * p.val x := by
+    change (SchwartzMap.smulLeftCLM ℂ w s₀) x = _
+    rw [SchwartzMap.smulLeftCLM_apply hw]
+    exact congrArg ((x : ℂ)^r * ·) (hs₀ x)
+  refine ⟨FourierTransform.fourier s, fun q ξ hξ hi ↦ ?_⟩
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SFinite positiveRealHaar := by unfold positiveRealHaar; infer_instance
+  let split (z : K × ℝ≥0ˣ) := z.1.val * τ z.2
+  have hsplit : Continuous split :=
+    (continuous_subtype_val.comp continuous_fst).mul (τ.continuous.comp continuous_snd)
+  let F (x : G) := φ x * (ξ x : ℂ) * (period x : ℂ)^r
+  have hi' : Integrable F ((μ₁.prod positiveRealHaar).map split) := hν ▸ hi
+  have hprod := hi'.comp_measurable hsplit.measurable
+  have hfiber (t : ℝ≥0ˣ) : (∫ k : K, (F ∘ split) (k,t) ∂μ₁) =
+      (Circle.exp ((q+b)*Real.log (t.val : ℝ)) : ℂ) * (Real.log (t.val : ℝ) : ℂ)^r *
+        p.val (Real.log (t.val : ℝ)) := by
+    rw [hp, ← integral_const_mul]
+    apply integral_congr_ae (.of_forall fun k ↦ ?_)
+    change φ (k.val * τ t) * (ξ (k.val * τ t) : ℂ) * (period (k.val * τ t) : ℂ)^r = _
+    rw [hξ, map_mul χ₀, map_mul m, show m k.val = 1 from k.property, hτ t, one_mul, hb]
+    rw [add_mul, Circle.exp_add]
+    simp only [Circle.coe_mul]
+    ring
+  let ex : ℝ ≃ₜ ℝ≥0ˣ := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  have hval (x : ℝ) : ((ex x).val : ℝ) = Real.exp x := rfl
+  have hex : positiveRealHaar = Measure.map ex volume := by
+    unfold positiveRealHaar
+    congr 1
+    funext x
+    apply Units.ext
+    apply NNReal.eq
+    exact (Real.coe_toNNReal _ (Real.exp_pos x).le).trans (hval x).symm
+  change (∫ x, F x ∂ν) = _
+  rw [hν, integral_map hsplit.measurable.aemeasurable hi'.aestronglyMeasurable]
+  change (∫ z, (F ∘ split) z ∂μ₁.prod positiveRealHaar) = _
+  rw [integral_prod_symm (F ∘ split) hprod]
+  simp_rw [hfiber]
+  rw [hex, ex.measurableEmbedding.integral_map, SchwartzMap.fourier_coe, Real.fourier_eq]
+  apply integral_congr_ae (.of_forall fun x ↦ ?_)
+  rw [hval, Real.log_exp, Real.fourierChar_apply', Circle.smul_def, smul_eq_mul, hs, Real.inner_apply]
+  have hphase : 2 * Real.pi * -(x * (-(q+b) / (2*Real.pi))) = (q+b)*x := by
+    field_simp
+  rw [hphase, mul_assoc]
+
 include hχ in
 /-- Paper: Theorem 4.6.1.5(2), p. 212. At each fixed moment order, the
 coefficients on each cyclic lattice give a Schwartz sequence.
@@ -1423,7 +1490,46 @@ theorem modulatedLogMoment_lattice_schwartz (f : H₀[ω]) (r : Fin N) (k : Fin 
     ∃ v : SchwartzBruhat (Multiplicative ℤ), ∀ n : ℤ, v (Multiplicative.ofAdd n) =
       if r.val < modulatedPeriodicMultiplicity m ω γs (freq[k, n]) then
         modulatedLogMoment (m := m) (hm := hm) (hms := hms) (ω := ω) (μ := μ) (freq[k, n]) r.val f
-      else 0 := by sorry
+      else 0 := by
+  classical
+  obtain ⟨τ, hτ⟩ := exists_surjectiveModulation_section m hm hms
+  obtain ⟨b, hb⟩ := exists_circleExp_freq ((χ ω).comp τ)
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let μ₁ : Measure K := Measure.haarMeasure (⊤ : TopologicalSpace.PositiveCompacts K)
+  let ν := canonicalModulatedHaar m hm
+  let : ν.IsHaarMeasure := (Classical.choose_spec (existsUnique_canonicalModulatedHaar m hm).exists).1
+  have hν := canonicalModulatedHaar_eq_map_prod m hm τ hτ μ₁ Measure.haarMeasure_self
+  obtain ⟨A, _, _, _, hA, _⟩ := modulatedMellin_isotypicDiagram m hm hms univ
+    isOpen_univ ordConnected_univ univ_nonempty τ hτ μ₁ ν hν (χ ω) b hb
+  obtain ⟨H, hH⟩ := modulatedLogMoment_logFourier m τ hτ μ₁ ν hν (χ ω) b hb
+    f.val.val (A f.val) (hA f.val) r.val
+  let L := Real.log ((m (γs k)).val : ℝ)
+  have hL : 0 < L := Real.log_pos (by exact_mod_cast hγs k)
+  let q (n : ℤ) := -(t₀ k ω - 2 * Real.pi * (n : ℝ) / L)
+  have hξ (n : ℤ) (x : G) : freq[k, n] x = χ ω x * Circle.exp (q n * period x) := by
+    change (modulatedCyclicCharacter m (γs k) (hγs k) χ (t₀ k) (ht₀ k) (ω, n)
+      (QuotientGroup.mk x))⁻¹ = _
+    rw [modulatedCyclicCharacter_mk, show q n * (period x) =
+      -((t₀ k ω - 2 * Real.pi * (n : ℝ) / L) * period x) from neg_mul _ _, Circle.exp_neg, mul_inv, inv_inv]
+  let c := Measure.haarScalarFactor μ ν
+  have hscale : μ = c • ν := Measure.isMulLeftInvariant_eq_smul μ ν
+  let a : ℝ := -1 / L
+  let d := (t₀ k ω - b) / (2 * Real.pi)
+  have hsample (n : ℤ) : modulatedLogMoment (m := m) (hm := hm) (hms := hms)
+      (ω := ω) (μ := μ) (freq[k, n]) r.val f = (((c : ℝ) : ℂ) • H) (a*n+d) := by
+    change (∫ x, f.val.val x * (freq[k, n] x : ℂ) * (period x : ℂ)^r.val ∂μ) = _
+    rw [hscale, integral_smul_nnreal_measure, hH (q n) (freq[k, n]) (hξ n)
+      (integrable_logMoment m ω ν (freq[k, n]) r.val f)]
+    have heq : -(q n + b)/(2*Real.pi) = a*n+d := by
+      dsimp [q, a, d]
+      field_simp
+      ring
+    rw [heq]
+    rfl
+  let mask (n : ℤ) := r.val < modulatedPeriodicMultiplicity m ω γs (freq[k, n])
+  obtain ⟨v, hv⟩ := schwartzBruhat_of_affine_integer_samples (((c : ℝ) : ℂ) • H) a d
+    (div_ne_zero (by norm_num) hL.ne') mask
+  exact ⟨v, fun n ↦ (hv n).trans (by simp only [mask, hsample])⟩
 
 end Moments
 
