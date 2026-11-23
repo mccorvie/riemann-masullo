@@ -222,7 +222,7 @@ def NormOneCharacterUnramifiedOutside (ω : PontryaginDual C₁)
 /-- An idele class character unramified outside `S` takes the same value at an idele that is
 a unit outside `S` and at the reinsertion of its `S`-coordinates. The two differ by a family of
 local integer units outside `S`, on which the character is trivial by continuity. -/
-private theorem normOneCharacterUnramifiedOutside_iff_reinsert (c : unramifiedOutside F S)
+theorem normOneCharacterUnramifiedOutside_iff_reinsert (c : unramifiedOutside F S)
     (u : (integralAdelesOutside F S)ˣ) :
     c.val (QuotientGroup.mk (integralIdeleInsertion F S u)) =
       c.val (QuotientGroup.mk (sIdeleInsertion F S

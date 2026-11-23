@@ -194,7 +194,7 @@ private theorem sLocalPWTests_moments_surjective_zero_bump_modulate
 Every neighborhood of zero contains the support of a compact Schwartz–Bruhat
 bump vanishing at zero and having nonzero additive Tamagawa integral.
 One can place a nonnegative bump near a nonzero point in the neighborhood. -/
-private theorem sLocalPWTests_moments_surjective_zero_bump
+theorem sLocalPWTests_moments_surjective_zero_bump
     {F : Type*} [Field F] [NumberField F]
     (S : Finset (HeightOneSpectrum (𝓞 F))) (K : Set (SAdeleRing F S)) (hK : K ∈ 𝓝 0) :
     ∃ h : SchwartzBruhat (Multiplicative (SAdeleRing F S)),
