@@ -16,6 +16,7 @@ public import Mathlib.RingTheory.PowerSeries.PiTopology
 public import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Complete
 public import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import RiemannMasullo.ForMathlib.Topology.MetricSpace.CompactQuotient
 
 /-! # Non-archimedean principal values and distributions supported at the origin
 
@@ -3628,15 +3629,6 @@ theorem complexSchwartzFlatAtOrigin_isClosed :
   simp only [complexSchwartzFlatAtOrigin, Submodule.coe_iInf]
   exact isClosed_iInter fun k ↦ isClosed_iInter fun l ↦ (complexDiracDerivative k l).isClosed_ker
 
-/-- Paper: Theorem 5.3.2.5(1), p. 246.
-The quotient adjoint identifies the strong dual of the complex flat quotient with
-the annihilator in the strong dual of the complex Schwartz space. -/
-theorem complexSchwartzFlatQuotient_strongDual :
-    let pull := fun T : StrongDual ℂ (𝓢(ℂ, ℂ) ⧸ complexSchwartzFlatAtOrigin) ↦
-      T.comp complexSchwartzFlatAtOrigin.mkQL
-    IsEmbedding pull ∧ Set.range pull =
-      {T : StrongDual ℂ 𝓢(ℂ, ℂ) | ∀ f ∈ complexSchwartzFlatAtOrigin, T f = 0} := by sorry
-
 -- TODO(paper-gap): Under ordinary coefficient pairing the adjoint on p. 249
 -- has a sign for each odd total degree and includes all degrees. The positive
 -- Taylor map below differs from that adjoint by (X,Y) ↦ (-X,-Y).
@@ -4126,6 +4118,47 @@ theorem complexSchwartzTaylor_equiv :
   change MvPowerSeries.coeff d (TL f) = _
   rw [hTL, ha]
 
+
+/-- Paper: Theorem 5.3.2.5(1), p. 246.
+The quotient adjoint identifies the strong dual of the complex flat quotient with
+the annihilator in the strong dual of the complex Schwartz space. -/
+theorem complexSchwartzFlatQuotient_strongDual :
+    let pull := fun T : StrongDual ℂ (𝓢(ℂ, ℂ) ⧸ complexSchwartzFlatAtOrigin) ↦
+      T.comp complexSchwartzFlatAtOrigin.mkQL
+    IsEmbedding pull ∧ Set.range pull =
+      {T : StrongDual ℂ 𝓢(ℂ, ℂ) | ∀ f ∈ complexSchwartzFlatAtOrigin, T f = 0} := by
+  intro pull
+  refine ⟨realSchwartzFlatQuotient_strongDual_isEmbedding _ ?_, ?_⟩
+  · let K := complexSchwartzFlatAtOrigin
+    let I := Fin 2 →₀ ℕ
+    let e := complexSchwartzTaylor_equiv.choose
+    let coeff : MvPowerSeries (Fin 2) ℂ →L[ℂ] (I → ℂ) :=
+      ContinuousLinearMap.pi fun i ↦ ⟨MvPowerSeries.coeff i, MvPowerSeries.WithPiTopology.continuous_coeff ℂ i⟩
+    let T := coeff.comp e.toContinuousLinearMap
+    have hback : Continuous (fun p : I → ℂ ↦ e.symm p) := e.symm.continuous
+    have hN : IsNuclearTVS.{0} (I → ℂ) :=
+      isNuclearTVS_pi (X := fun _ : I ↦ ℂ) (fun _ ↦ isNuclearTVS_of_finiteDimensional ℂ)
+    let : PolynormableSpace ℂ (I → ℂ) := hN.2.1
+    have : IsClosed (K : Set 𝓢(ℂ, ℂ)) := complexSchwartzFlatAtOrigin_isClosed
+    let : CompleteSpace 𝓢(ℂ, ℂ) := completeSpace_schwartzMap
+    have : (uniformity 𝓢(ℂ, ℂ)).IsCountablyGenerated := by
+      rw [uniformity_eq_comap_nhds_zero]
+      infer_instance
+    let := UniformSpace.pseudoMetricSpace 𝓢(ℂ, ℂ)
+    intro B hB
+    have hc := isCompact_closure_of_isNuclearTVS (I → ℂ) hN (hB.image T)
+    obtain ⟨A, hA, heq⟩ := exists_isCompact_image_eq_of_isOpenQuotientMap K.isOpenQuotientMap_mkQL
+      (hc.image hback)
+    refine ⟨A, hA.isVonNBounded ℂ, ?_⟩
+    intro y hy
+    change y ∈ K.mkQL '' A
+    rw [heq]
+    exact ⟨T y, subset_closure ⟨y, hy, rfl⟩, e.symm_apply_apply y⟩
+  · change Set.range (fun T : StrongDual ℂ (𝓢(ℂ, ℂ) ⧸ complexSchwartzFlatAtOrigin) ↦
+      T.comp complexSchwartzFlatAtOrigin.mkQL) = _
+    rw [range_transpose_mkQL]
+    ext T
+    simp [Set.mem_iInter]
 
 section ComplexPolynomialDualHelpers
 
