@@ -7172,7 +7172,8 @@ private theorem stageProducts (χ : PontryaginDual C_F) (S : Finset V) :
     exact ContinuousLinearMap.ext fun f ↦ (congrArg U (k.symm_apply_apply f).symm).trans
       ((DFunLike.congr_fun eq (k f)).trans (congrArg W (k.symm_apply_apply f)))
 
-private theorem normalizedGaussian_ne_zero (χ : PontryaginDual C_F) (z : ℂ) (hz : 1 < z.re) :
+/-- The completed Gaussian zeta factor does not vanish in the half-plane of absolute convergence. -/
+theorem normalizedGaussian_ne_zero (χ : PontryaginDual C_F) (z : ℂ) (hz : 1 < z.re) :
     gaussianCompletedHeckeL χ z ≠ 0 := by
   rw [gaussianCompletedHeckeL_eq_completedHeckeL χ z hz]
   exact mul_ne_zero (Complex.ofReal_ne_zero.mpr (inv_ne_zero (Real.sqrt_ne_zero'.mpr
@@ -7729,7 +7730,8 @@ theorem adelicEigendistributions_rank (c : X) :
 
 local notation "DG(" χ ")" => (adelicEigendistribution_normalized (χ)).choose
 
-private theorem globalIntegral_normalized_ratio (χ : PontryaginDual C_F) {z : ℂ} (hz : 1 < z.re)
+/-- In the half-plane of convergence the global zeta integral is the Gaussian factor times the normalized eigendistribution. -/
+theorem globalIntegral_normalized_ratio (χ : PontryaginDual C_F) {z : ℂ} (hz : 1 < z.re)
     (f : ℬ(𝔸[F])) :
     globalIdelicZetaIntegral f (ideleClassNormTwist χ z) = gaussianCompletedHeckeL χ z * DG(χ) z f := by
   have ha := ideleClassNormTwist_abscissa χ z

@@ -890,13 +890,109 @@ def Printed.sLocalZLaurentCoeff_eigendistribution : Prop :=
     sLocalZLaurentCoeff (schwartzBruhatUnitTranslate g f) c (m : ℤ) =
       c (QuotientGroup.mk g) * sLocalZLaurentCoeff f c (m : ℤ)
 
+/-- At a regular center the Laurent coefficient of index one is the derivative. -/
+private theorem sLocalZLaurentCoeff_eigendistribution_false_deriv
+    {F : Type u} [Field F] [NumberField F] {S : Finset Places(F)}
+    (f : Tests(F, S)) (c : QuasiCharacter Jₛ(F, S))
+    (H : ℂ → ℂ) (hH : ∀ z, H z = sLocalIdelicZFunction f (twistₛ(F, S) c z))
+    (ha : AnalyticAt ℂ H 0) : sLocalZLaurentCoeff f c 1 = deriv H 0 := by
+  obtain ⟨R, hR, hA⟩ := ha.exists_ball_analyticOnNhd
+  unfold sLocalZLaurentCoeff complexResidue
+  refine (tendsto_const_nhds.congr' ?_).limUnder_eq
+  filter_upwards [Ioo_mem_nhdsGT hR] with r hr
+  have hd := (hA.differentiableOn.mono (Metric.closedBall_subset_ball hr.2)).deriv_eq_smul_circleIntegral hr.1
+  symm
+  apply (div_eq_iff (by simp [Real.pi_ne_zero, Complex.I_ne_zero])).mpr
+  rw [mul_comm]
+  simpa only [← hH, sub_zero, smul_eq_mul, one_div, div_eq_inv_mul, mul_one,
+    show (1 : ℤ) + 1 = (2 : ℕ) by decide, zpow_natCast] using hd
+
+private theorem sLocalZLaurentCoeff_eigendistribution_false_translate
+    {F : Type u} [Field F] [NumberField F] {S : Finset Places(F)}
+    (f : Tests(F, S)) (g : (SAdeleRing F S)ˣ) (c : QuasiCharacter Jₛ(F, S)) :
+    sLocalIdelicZetaIntegral (schwartzBruhatUnitTranslate g f) c =
+      c (QuotientGroup.mk g) * sLocalIdelicZetaIntegral f c := by
+  let : MeasurableSpace (SAdeleRing F S) := instMeasurableSpaceSAdeleRing F S
+  have := sIdeleGroup_borelSpace (F := F) (S := S)
+  have := sMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) (S := S)
+  let u (x : (SAdeleRing F S)ˣ) := f (Multiplicative.ofAdd x.val)
+  let χ := c.toMonoidHom.comp (QuotientGroup.mk' _)
+  change (∫ x, u (g⁻¹ * x) * χ x ∂sMultiplicativeTamagawaMeasure F S) =
+    χ g * ∫ x, u x * χ x ∂sMultiplicativeTamagawaMeasure F S
+  rw [← integral_mul_left_eq_self (μ := sMultiplicativeTamagawaMeasure F S)
+    (fun x ↦ u (g⁻¹ * x) * χ x) g, ← integral_const_mul]
+  exact integral_congr_ae (.of_forall fun x ↦ by simp only [mul_inv_cancel_left, map_mul, mul_left_comm])
+
+/-- Use index one at the regular character of exponent one. Translation by a
+norm-two idele differentiates the weight as well as the zeta integral. -/
+private theorem sLocalZLaurentCoeff_eigendistribution_false_field
+    (F : Type u) [Field F] [NumberField F]
+    (h : Printed.sLocalZLaurentCoeff_eigendistribution.{u}) : False := by
+  let S : Finset Places(F) := ∅
+  let χ : PontryaginDual Jₛ(F, S) := 1
+  let chart := twistₛ(F, S) ((circleToComplex).comp χ)
+  let c := chart 1
+  let Z (f : Tests(F, S)) (z : ℂ) := sLocalIdelicZFunction f (chart (1 + z))
+  have htw (z : ℂ) : twistₛ(F, S) c z = chart (1 + z) := by
+    ext1 x
+    let N : ℂ := (((normₛ(F, S) x : ℝ≥0) : ℝ) : ℂ)
+    have hn : N ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (normₛ(F, S) x).ne_zero)
+    change (((χ x : Circle) : ℂ) * N ^ (1 : ℂ)) * N ^ z = ((χ x : Circle) : ℂ) * N ^ (1 + z)
+    rw [mul_assoc, Complex.cpow_add _ _ hn]
+  have hpos : ∀ᶠ z : ℂ in 𝓝 0, 0 < (1 + z).re :=
+    (isOpen_lt continuous_const (Complex.continuous_re.comp (continuous_const.add continuous_id))).mem_nhds
+      (by simp)
+  have hZ (f : Tests(F, S)) : Z f =ᶠ[𝓝 0] (fun z ↦ sLocalIdelicZetaIntegral f (chart (1 + z))) := by
+    filter_upwards [hpos] with z hz
+    exact sLocalIdelicZFunction_eq_integral f ⟨χ, 1 + z, hz, rfl⟩
+  have ha (f : Tests(F, S)) : AnalyticAt ℂ (Z f) 0 := by
+    apply AnalyticAt.congr _ (hZ f).symm
+    exact (sLocalIdelicZetaIntegral_analyticOn f χ (1 + (0 : ℂ)) (by simp)).comp
+      (analyticAt_const.add analyticAt_id)
+  have hcoeff (f : Tests(F, S)) : sLocalZLaurentCoeff f c 1 = deriv (Z f) 0 :=
+    sLocalZLaurentCoeff_eigendistribution_false_deriv f c (Z f)
+      (fun z ↦ congrArg (sLocalIdelicZFunction f) (htw z).symm) (ha f)
+  obtain ⟨f, -, hf⟩ := sLocal_exists_real_test c ⟨χ, 1, by simp, rfl⟩
+  have hne : Z f 0 ≠ 0 := by
+    rw [(hZ f).eq_of_nhds, add_zero]
+    exact hf
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  let two := Units.mk0 (2 : ℝ≥0) (by norm_num)
+  obtain ⟨g, hg⟩ := QuotientGroup.mk_surjective (σ two)
+  let q : Jₛ(F, S) := QuotientGroup.mk g
+  have hn : (((normₛ(F, S) q : ℝ≥0) : ℝ) : ℂ) = 2 :=
+    congrArg (fun t : ℝ≥0ˣ ↦ ((t.val : ℝ) : ℂ)) ((congrArg normₛ(F, S) hg).trans (hσ two))
+  have hw (s : ℂ) : chart s q = (2 : ℂ) ^ s := by
+    change ((χ q : Circle) : ℂ) * (((normₛ(F, S) q : ℝ≥0) : ℝ) : ℂ) ^ s = _
+    simp [χ, hn]
+  have he : Z (schwartzBruhatUnitTranslate g f) =ᶠ[𝓝 0]
+      (fun z ↦ (2 : ℂ) ^ (1 + z) * Z f z) := by
+    filter_upwards [hZ (schwartzBruhatUnitTranslate g f), hZ f] with z hz hfz
+    rw [hz, hfz, sLocalZLaurentCoeff_eigendistribution_false_translate, ← hw]
+  have hd : HasDerivAt (fun z : ℂ ↦ (2 : ℂ) ^ (1 + z)) (2 * Complex.log 2) 0 := by
+    simpa using ((hasDerivAt_id' (0 : ℂ)).const_add 1).const_cpow (c := (2 : ℂ)) (Or.inl (by norm_num))
+  have h1 := h F S c 1 g f
+  change sLocalZLaurentCoeff _ c 1 = chart 1 q * sLocalZLaurentCoeff f c 1 at h1
+  rw [hcoeff, hcoeff, hw, Complex.cpow_one, he.deriv_eq,
+    (hd.fun_mul (ha f).differentiableAt.hasDerivAt).deriv] at h1
+  have hlog : Complex.log 2 ≠ 0 := by
+    intro h0
+    have := Complex.exp_log (by norm_num : (2 : ℂ) ≠ 0)
+    rw [h0, Complex.exp_zero] at this
+    norm_num at this
+  exact (mul_ne_zero (mul_ne_zero (by norm_num : (2 : ℂ) ≠ 0) hlog) hne) (by simpa using h1)
+
 /-- Paper: Discussion of Theorem 7.1.2.3, p. 320.
 Over ℚ with only the real place and the trivial center, use m = 0 and the
 Gaussian `exp(-πx²)`. Replacing it by `exp(-π(x/2)²)` multiplies its zeta
 transform by `2^s`. The residue is 2, so the constant coefficient changes
 by `2 log 2`, contrary to the trivial weight law. -/
 theorem Printed.sLocalZLaurentCoeff_eigendistribution_false :
-    ¬ Printed.sLocalZLaurentCoeff_eigendistribution := by sorry
+    ¬ Printed.sLocalZLaurentCoeff_eigendistribution := by
+  intro h
+  have : CharZero (ULift ℚ) := ⟨fun a b hab ↦ by simpa using congrArg ULift.down hab⟩
+  have : NumberField (ULift ℚ) := ⟨⟩
+  exact sLocalZLaurentCoeff_eigendistribution_false_field (ULift ℚ) h
 
 /-- Paper: Discussion of Theorem 7.1.2.3, p. 321.
 As printed: The coefficient whose Laurent index equals the finite-place lattice

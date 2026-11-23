@@ -379,10 +379,71 @@ The zeta pair is a topological embedding with closed range. -/
 theorem sLocalZetaPair_isClosedEmbedding (χ : PontryaginDual Jₛ) :
     IsClosedEmbedding (sLocalZetaPair (F := F) (S := S) χ) := by sorry
 
+/-- The zeta pair lands in the matching space: on the overlap strip the two components
+satisfy the local functional equation of (5.4.1.3), by the equation proved for the
+integral representation on test functions. -/
+private theorem sLocalZetaPair_range_le_matching (χ : PontryaginDual Jₛ) :
+    LinearMap.range (sLocalZetaPair (F := F) (S := S) χ) ≤
+      sLocalZetaMatching (F := F) (S := S) χ := by
+  rintro p ⟨x, rfl⟩
+  obtain ⟨f, rfl⟩ : ∃ f : ℬₛ, Submodule.Quotient.mk f = x := by
+    exact Submodule.Quotient.mk_surjective
+      (p := LinearMap.ker (φω(restrict₁(χ)))) x
+  rw [mem_sLocalZetaMatching]
+  obtain ⟨h₁, h₂⟩ := sLocalZetaPair_mk (F := F) (S := S) χ f
+  intro s hs
+  calc (sLocalZetaPair (F := F) (S := S) χ (Submodule.Quotient.mk f)).1.val s
+      = Zₛ f (normChart(χ) s) := h₁ hs.1
+    _ = ρₛ(χ, s) * Zₛ (Fourierₛ f) (normChart(χ⁻¹) (1 - s)) :=
+        existsUnique_sLocalZetaPair_equation χ f s hs
+    _ = ρₛ(χ, s) * (sLocalZetaPair (F := F) (S := S) χ (Submodule.Quotient.mk f)).2.val s :=
+        congrArg _ (h₂ hs.2).symm
+
+/-- Every matching pair has its first Bergman datum realized by an S-local test: this is
+the existence step of the range description, where the rapid decay estimates of (5.4.1.2)
+produce a test whose zeta transform has the prescribed values on the right half-plane. -/
+private theorem sLocalZetaPair_first_component_attained (χ : PontryaginDual Jₛ) (p : B⁺ × B⁻)
+    (_hp : p ∈ sLocalZetaMatching (F := F) (S := S) χ) :
+    ∃ f : ℬₛ, EqOn p.1.val (fun s ↦ Zₛ f (normChart(χ) s)) rightHalf := by sorry
+
+/-- Once the first Bergman datum of a matching pair is realized by a test, the pair is the
+zeta pair of that test's theta class: the second component agrees with the reflected Fourier
+datum on the overlap by the functional equation, hence on its whole half-plane. -/
+private theorem sLocalZetaPair_mem_range_of_first (χ : PontryaginDual Jₛ) (p : B⁺ × B⁻)
+    (hp : p ∈ sLocalZetaMatching (F := F) (S := S) χ)
+    (h : ∃ f : ℬₛ, EqOn p.1.val (fun s ↦ Zₛ f (normChart(χ) s)) rightHalf) :
+    p ∈ LinearMap.range (sLocalZetaPair (F := F) (S := S) χ) := by
+  obtain ⟨f, hf⟩ := h
+  refine ⟨Submodule.Quotient.mk f, ?_⟩
+  obtain ⟨h₁, h₂⟩ := sLocalZetaPair_mk (F := F) (S := S) χ f
+  have hmatch : EqOn p.1.val (fun s ↦ ρₛ(χ, s) * p.2.val s) overlap :=
+    (mem_sLocalZetaMatching (F := F) (S := S) χ p).mp hp
+  have hfirst : (sLocalZetaPair (F := F) (S := S) χ (Submodule.Quotient.mk f)).1 = p.1 :=
+    existsUnique_sLocalZetaPair_ext (I := rightInterval) (u := _) (v := p.1)
+      (fun z hz ↦ (h₁ hz).trans (hf hz).symm)
+  have hsecond : (sLocalZetaPair (F := F) (S := S) χ (Submodule.Quotient.mk f)).2 = p.2 :=
+    existsUnique_sLocalZetaPair_left_ext χ _ p.2 (fun z hz ↦ by
+      calc ρₛ(χ, z) * (sLocalZetaPair (F := F) (S := S) χ (Submodule.Quotient.mk f)).2.val z
+          = ρₛ(χ, z) * Zₛ (Fourierₛ f) (normChart(χ⁻¹) (1 - z)) := congrArg _ (h₂ hz.2)
+        _ = Zₛ f (normChart(χ) z) := (existsUnique_sLocalZetaPair_equation χ f z hz).symm
+        _ = p.1.val z := (hf hz.1).symm
+        _ = ρₛ(χ, z) * p.2.val z := hmatch hz)
+  exact Prod.ext hfirst hsecond
+
+/-- Conversely, every matching pair is the zeta pair of a homogeneous theta class. -/
+private theorem sLocalZetaPair_matching_le_range (χ : PontryaginDual Jₛ) :
+    sLocalZetaMatching (F := F) (S := S) χ ≤
+      LinearMap.range (sLocalZetaPair (F := F) (S := S) χ) :=
+  fun p hp ↦
+    sLocalZetaPair_mem_range_of_first (F := F) (S := S) χ p hp
+      (sLocalZetaPair_first_component_attained (F := F) (S := S) χ p hp)
+
 /-- Paper: Theorem 5.4.1.1(1), p. 266.
 Every matching pair, and only a matching pair, comes from a homogeneous theta class. -/
 theorem sLocalZetaPair_range (χ : PontryaginDual Jₛ) :
-    (sLocalZetaPair (F := F) (S := S) χ).range = sLocalZetaMatching (F := F) (S := S) χ := by sorry
+    (sLocalZetaPair (F := F) (S := S) χ).range = sLocalZetaMatching (F := F) (S := S) χ :=
+  le_antisymm (sLocalZetaPair_range_le_matching (F := F) (S := S) χ)
+    (sLocalZetaPair_matching_le_range (F := F) (S := S) χ)
 
 -- TODO(paper-gap): The two printed translation factors disagree on the overlap.
 -- The functional equation and Fourier scaling both give the first factor on both entries.

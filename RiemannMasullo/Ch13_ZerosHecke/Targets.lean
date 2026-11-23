@@ -3,7 +3,7 @@ module
 public import RiemannMasullo.Ch01_Introduction.Sec4
 public import Mathlib.NumberTheory.LSeries.Nonvanishing
 import Mathlib.NumberTheory.EulerProduct.DirichletLSeries
-import RiemannMasullo.External.AlgebraicNumberTheoryLean.Chebotarev.DirichletHecke
+public import RiemannMasullo.External.AlgebraicNumberTheoryLean.Chebotarev.DirichletHecke
 
 /-!
 # From the idelic zero statement to the Comparator targets
@@ -273,10 +273,12 @@ private theorem rationalDirichletLift_unramified {N : ℕ} [NeZero N] (χ : Diri
 
 open NumberFieldKB.Chebotarev.RatIdele in
 /-- A primitive Dirichlet character has a finite-order idelic character over
-the rationals whose finite Hecke L-function agrees with its Dirichlet series. -/
-theorem DirichletCharacter.IsPrimitive.exists_finiteHeckeL_eq {N : ℕ} [NeZero N]
+the rationals with the specified idelic values, whose finite Hecke L-function agrees
+with its Dirichlet series. -/
+theorem DirichletCharacter.IsPrimitive.exists_finiteHeckeL_eq_with_values {N : ℕ} [NeZero N]
     {χ : DirichletCharacter ℂ N} (_hχ : χ.IsPrimitive) :
     ∃ ψ : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ), IsOfFinOrder ψ ∧
+      (∀ x : IdQ, (ψ (QuotientGroup.mk x) : ℂ) = ((ideleChar N χ x : ℂˣ) : ℂ)) ∧
       ∀ s : ℂ, ∀ hs : 1 < s.re, finiteHeckeL ψ ⟨s, hs⟩ = LSeries (χ ·) s := by
   let η : HeckeCharacter (𝓞 ℚ) ℚ :=
     ⟨(Units.coeHom ℂ).comp (ratDirichletChar N χ).toMonoidHom,
@@ -290,7 +292,7 @@ theorem DirichletCharacter.IsPrimitive.exists_finiteHeckeL_eq {N : ℕ} [NeZero 
       Units.val_one] using h
   have hu (g) : ‖η g‖ = 1 := Complex.norm_eq_one_of_pow_eq_one (hpow g) χ.orderOf_pos.ne'
   let ψ := unitaryHeckeCharacterToPontryaginDual η hu
-  refine ⟨ψ, isOfFinOrder_iff_pow_eq_one.mpr ⟨orderOf χ, χ.orderOf_pos, ?_⟩, ?_⟩
+  refine ⟨ψ, isOfFinOrder_iff_pow_eq_one.mpr ⟨orderOf χ, χ.orderOf_pos, ?_⟩, (fun _ ↦ rfl), ?_⟩
   · ext1 g
     exact (ContinuousMonoidHom.pow_apply (ψ : IdeleClassGroup (𝓞 ℚ) ℚ →ₜ* Circle)
       (orderOf χ) g).trans (Circle.ext (hpow g))
@@ -314,6 +316,16 @@ theorem DirichletCharacter.IsPrimitive.exists_finiteHeckeL_eq {N : ℕ} [NeZero 
     rw [ite_eq_right (rationalDirichletLift_ramified _hχ η v hpN (hres v)),
       χ.map_nonunit (mt (ZMod.isUnit_iff_coprime _ _).mp hc)]
     simp
+
+open NumberFieldKB.Chebotarev.RatIdele in
+/-- A primitive Dirichlet character has a finite-order idelic character over
+the rationals whose finite Hecke L-function agrees with its Dirichlet series. -/
+theorem DirichletCharacter.IsPrimitive.exists_finiteHeckeL_eq {N : ℕ} [NeZero N]
+    {χ : DirichletCharacter ℂ N} (_hχ : χ.IsPrimitive) :
+    ∃ ψ : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ), IsOfFinOrder ψ ∧
+      ∀ s : ℂ, ∀ hs : 1 < s.re, finiteHeckeL ψ ⟨s, hs⟩ = LSeries (χ ·) s := by
+  obtain ⟨ψ, hψ, _, hL⟩ := DirichletCharacter.IsPrimitive.exists_finiteHeckeL_eq_with_values _hχ
+  exact ⟨ψ, hψ, hL⟩
 
 /-- For a primitive Dirichlet character, all zeros in the open critical strip
 lie on the critical line by comparison with its finite Hecke L-function. -/

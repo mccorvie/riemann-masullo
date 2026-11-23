@@ -1351,6 +1351,37 @@ theorem archimedeanWeightedSchwartz_empty_equiv (I : Set ℝ) :
 -- TODO(paper-gap): The proof's integer exponents need not meet I. Use a countable
 -- family of exponents in I bracketing each exponent in I, together with zero.
 
+/-- The product of all partial twists induces the weighted Schwartz topology. -/
+private theorem archimedeanSchwartzTwists_isEmbedding (I : Set ℝ) :
+    Topology.IsEmbedding (LinearMap.pi (archimedeanSchwartzTwist (ι := ι) (κ := κ) I) :
+      𝓦(I) →ₗ[ℂ] (weights(ι, κ, I) → SchwartzBruhat (archMul(ι, κ)))) := by
+  classical
+  let : SecondCountableTopology ℝˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SecondCountableTopology ℂˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let X := SchwartzBruhat (archMul(ι, κ))
+  let Z := weights(ι, κ, I)
+  let t : 𝓦(I) →ₗ[ℂ] (Z → X) := LinearMap.pi (archimedeanSchwartzTwist I)
+  let : PolynormableSpace ℂ X := (schwartzBruhat_nuclear.{0} (G := archMul(ι, κ))).2.1
+  have hp := withSeminorms_pi fun _ : Z ↦ PolynormableSpace.withSeminorms ℂ X
+  have hs := withGeneratingSeminorms_spec (archimedeanWeightedSchwartzSubmodule (ι := ι) (κ := κ) I)
+    (fun i : Z × {p : Seminorm ℂ X // Continuous p} ↦ i.2.val.comp (archimedeanSchwartzTwist I i.1))
+  constructor
+  · constructor
+    refine hs.topologicalSpace_eq_iInf.trans ?_
+    refine Eq.trans ?_ (WithSeminorms.topologicalSpace_eq_iInf
+      (t := TopologicalSpace.induced t inferInstance) (t.withSeminorms_induced hp)).symm
+    rw [iInf_sigma, iInf_prod]
+    rfl
+  · intro f g h
+    let a : Z := (fun _ ↦ ⟨0, Set.mem_insert _ _⟩, fun _ ↦ ⟨0, Set.mem_insert _ _⟩)
+    apply Subtype.ext
+    funext u
+    have hu := congrArg (fun v : X ↦ v u) (congrFun h a)
+    change archimedeanSchwartzTwist I a f u = archimedeanSchwartzTwist I a g u at hu
+    have hv := (archimedeanSchwartzTwist_apply I a f u).symm.trans
+      (hu.trans (archimedeanSchwartzTwist_apply I a g u))
+    simpa [a] using hv
+
 /-- Paper: Lemma 5.3.3.3(1), p. 252.
 Metrizability half of the lemma. A weight at an exponent between two exponents of `I`
 is bounded by the larger of the two weights, so countably many exponents in `I`
@@ -1366,7 +1397,38 @@ closed submodule of a product of complete Schwartz–Bruhat spaces, so every Cau
 filter of twists converges to the family of its pointwise limits. -/
 theorem archimedeanWeightedSchwartz_complete {I : Set ℝ} (ho : IsOpen I)
     (hi : OrdConnected I) (hne : I.Nonempty) : CompleteSpace 𝓦(I) := by
-  sorry
+  classical
+  let : SecondCountableTopology ℝˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SecondCountableTopology ℂˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let G := archMul(ι, κ)
+  let X := SchwartzBruhat G
+  let Z := weights(ι, κ, I)
+  let a₀ : Z := (fun _ ↦ ⟨0, Set.mem_insert _ _⟩, fun _ ↦ ⟨0, Set.mem_insert _ _⟩)
+  let w (a : Z) (u : G) : ℂ :=
+    (↑(∏ i, ‖(u.1 i).val‖ ^ (a.1 i : ℝ)) : ℂ) *
+      (↑(∏ j, (‖(u.2 j).val‖ ^ (2 : ℕ)) ^ (a.2 j : ℝ)) : ℂ)
+  let T : 𝓦(I) →ₗ[ℂ] (Z → X) := LinearMap.pi (archimedeanSchwartzTwist I)
+  have hr : Set.range T = ⋂ a : Z, ⋂ u : G, {p : Z → X | p a u = w a u * p a₀ u} := by
+    ext y
+    simp only [Set.mem_range, Set.mem_iInter, Set.mem_ofPred_eq]
+    constructor
+    · rintro ⟨x, rfl⟩ a u
+      change w a u * x.val u = w a u * (w a₀ u * x.val u)
+      simp [w, a₀]
+    · intro hy
+      have he (a : Z) : weightMap(a) (y a₀).val = (y a).val := funext fun u ↦ (hy a u).symm
+      let x : 𝓦(I) := ⟨(y a₀).val, (Submodule.mem_iInf _).mpr fun a ↦
+        Submodule.mem_comap.mpr ((he a).symm ▸ (y a).property)⟩
+      exact ⟨x, funext fun a ↦ Subtype.ext (he a)⟩
+  have ev (u : G) : Continuous (fun x : X ↦ x u) := continuous_schwartzBruhat_eval_forEndpoints u
+  have hcl : IsClosed (Set.range T) := by
+    rw [hr]
+    exact isClosed_iInter fun a ↦ isClosed_iInter fun u ↦ isClosed_eq
+      ((ev u).comp (continuous_apply a)) (continuous_const.mul ((ev u).comp (continuous_apply a₀)))
+  let : CompleteSpace X := schwartzBruhat_complete
+  have ht : Topology.IsEmbedding T := archimedeanSchwartzTwists_isEmbedding I
+  exact (AddMonoidHom.isUniformInducing_of_isInducing (f := T.toAddMonoidHom)
+    ht.isInducing).completeSpace hcl.isComplete
 
 /-- Paper: Lemma 5.3.3.3(1), p. 252.
 For an open nonempty interval the topology from the partial weight maps is Fréchet. -/
@@ -1422,26 +1484,7 @@ theorem archimedeanWeightedSchwartz_separable {I : Set ℝ} (_ho : IsOpen I)
   let Z := weights(ι, κ, I)
   let t : 𝓦(I) →ₗ[ℂ] (Z → X) := LinearMap.pi (archimedeanSchwartzTwist I)
   let : PolynormableSpace ℂ X := (schwartzBruhat_nuclear.{0} (G := archMul(ι, κ))).2.1
-  have hp := withSeminorms_pi fun _ : Z ↦ PolynormableSpace.withSeminorms ℂ X
-  have hs := withGeneratingSeminorms_spec (archimedeanWeightedSchwartzSubmodule (ι := ι) (κ := κ) I)
-    (fun i : Z × {p : Seminorm ℂ X // Continuous p} ↦ i.2.val.comp (archimedeanSchwartzTwist I i.1))
-  have ht : Topology.IsEmbedding t := by
-    constructor
-    · constructor
-      refine hs.topologicalSpace_eq_iInf.trans ?_
-      refine Eq.trans ?_ (WithSeminorms.topologicalSpace_eq_iInf
-        (t := TopologicalSpace.induced t inferInstance) (t.withSeminorms_induced hp)).symm
-      rw [iInf_sigma, iInf_prod]
-      rfl
-    · intro f g h
-      let a : Z := (fun _ ↦ ⟨0, Set.mem_insert _ _⟩, fun _ ↦ ⟨0, Set.mem_insert _ _⟩)
-      apply Subtype.ext
-      funext u
-      have hu := congrArg (fun v : X ↦ v u) (congrFun h a)
-      change archimedeanSchwartzTwist I a f u = archimedeanSchwartzTwist I a g u at hu
-      have hv := (archimedeanSchwartzTwist_apply I a f u).symm.trans
-        (hu.trans (archimedeanSchwartzTwist_apply I a g u))
-      simpa [a] using hv
+  have ht : Topology.IsEmbedding t := archimedeanSchwartzTwists_isEmbedding I
   have hn : IsNuclearTVS.{0} 𝓦(I) := isNuclearTVS_of_linearEmbedding t ht
     (isNuclearTVS_pi fun _ : Z ↦ schwartzBruhat_nuclear (G := archMul(ι, κ)))
   obtain ⟨_, -, _, -⟩ := archimedeanWeightedSchwartz_frechet (ι := ι) (κ := κ) _ho _hi _hne
