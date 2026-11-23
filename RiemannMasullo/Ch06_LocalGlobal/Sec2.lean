@@ -9,6 +9,8 @@ import all RiemannMasullo.AppC_LCTVS.Sec2b
 import RiemannMasullo.ForMathlib.Analysis.Fourier.CompactGroup
 import Mathlib.LinearAlgebra.Eigenspace.Basic
 
+import Mathlib.Topology.ContinuousMap.SecondCountableSpace
+
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Topology.Algebra.IsOpenUnits
 
@@ -1031,6 +1033,115 @@ local notation "sumProperties(" D ")" =>
     CompleteSpace (StrongDual ℂ D) ∧ IsNuclearTVS (StrongDual ℂ D) ∧
     BarrelledSpace ℂ (StrongDual ℂ D) ∧ MontelSpace ℂ (StrongDual ℂ D)
 
+/-- Finite partial sums present the locally convex direct sum of a countable
+family of Fréchet spaces as an LF-space. -/
+private theorem thetaIsotypeSum_isLFSpace_of_frechet {K : Type*} [Countable K]
+    [DecidableEq K] (X : K → Type*) [∀ k, AddCommGroup (X k)] [∀ k, Module ℂ (X k)]
+    [∀ k, TopologicalSpace (X k)] (hX : ∀ k, IsFrechetTVS (X k))
+    (hT : @T2Space (⨁ k, X k) (locallyConvexFinalTopology (DirectSum.lof ℂ K X))) :
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ K X)
+    IsLFSpace (⨁ k, X k) := by
+  classical
+  choose hadd hp hm hc using hX
+  let : ∀ k, IsTopologicalAddGroup (X k) := hadd
+  let : ∀ k, PolynormableSpace ℂ (X k) := hp
+  let : ∀ k, TopologicalSpace.MetrizableSpace (X k) := hm
+  let : ∀ k, UniformSpace (X k) := fun k ↦ IsTopologicalAddGroup.rightUniformSpace (X k)
+  let : ∀ k, IsUniformAddGroup (X k) := fun _ ↦ isUniformAddGroup_of_addCommGroup
+  let : ∀ k, CompleteSpace (X k) := hc
+  let D := ⨁ k, X k
+  let l := DirectSum.lof ℂ K X
+  let : TopologicalSpace D := locallyConvexFinalTopology l
+  have ht := globalThetaIsotypeSum_finalTopology_withSeminorms l
+  let : IsTopologicalAddGroup D := ht.isTopologicalAddGroup
+  let : ContinuousSMul ℂ D := ht.continuousSMul
+  let inc (k) : X k →L[ℂ] D := ⟨l k, globalThetaIsotypeSum_continuous_finalTopology_stage l k⟩
+  obtain ⟨code, hinj⟩ := exists_injective_nat K
+  let A (n : ℕ) := {k : K // code k < n}
+  let : ∀ n, Finite (A n) := fun n ↦ Finite.of_injective
+    (fun k : A n ↦ (⟨code k.val, k.property⟩ : Fin n))
+    (fun _ _ h ↦ Subtype.ext (hinj (congrArg Fin.val h)))
+  let : ∀ n, Fintype (A n) := fun n ↦ Fintype.ofFinite _
+  let stage (n : ℕ) := (k : A n) → X k.val
+  let put (n : ℕ) : stage n →L[ℂ] D := ∑ k : A n, (inc k.val).comp (ContinuousLinearMap.proj k)
+  have hval (n : ℕ) (y : stage n) (k : K) :
+      (put n y) k = if h : code k < n then y ⟨k,h⟩ else 0 := by
+    change DirectSum.component ℂ K X k ((∑ i : A n, (inc i.val).comp
+      (ContinuousLinearMap.proj i)) y) = _
+    simp only [sum_apply, map_sum, ContinuousLinearMap.comp_apply,
+      ContinuousLinearMap.proj_apply]
+    by_cases hk : code k < n
+    · rw [dite_eq_left hk, Finset.sum_eq_single (⟨k, hk⟩ : A n)]
+      · exact DirectSum.component.lof_self ℂ k _
+      · intro i _ hi
+        exact (DirectSum.component.of ℂ k i.val _).trans (dite_eq_right (fun e ↦ hi (Subtype.ext e)))
+      · simp
+    · rw [dite_eq_right hk]
+      apply Finset.sum_eq_zero
+      intro i _
+      exact (DirectSum.component.of ℂ k i.val _).trans (dite_eq_right (fun (e : i.val = k) ↦ hk (e ▸ i.property)))
+  let step (n : ℕ) : stage n →L[ℂ] stage (n+1) := ContinuousLinearMap.pi fun k ↦
+    if h : code k.val < n then ContinuousLinearMap.proj (⟨k.val, h⟩ : A n) else 0
+  have hstep (n : ℕ) (y : stage n) (k : A (n+1)) :
+      step n y k = if h : code k.val < n then y ⟨k.val,h⟩ else 0 := by
+    change ((if h : code k.val < n then ContinuousLinearMap.proj (⟨k.val,h⟩ : A n)
+      else (0 : stage n →L[ℂ] X k.val)) y) = _
+    split <;> rfl
+  have hV (n : ℕ) : IsFrechetTVS (stage n) := by
+    refine ⟨inferInstance, inferInstance, inferInstance, ?_⟩
+    rw [IsUniformAddGroup.rightUniformSpace_eq]
+    infer_instance
+  refine ⟨hT, stage, _, _, _, hV, step, put, ⟨?_, ?_, ?_, ?_⟩⟩
+  · intro n x y h
+    funext k
+    have he := congrArg (fun z : D ↦ z k.val) h
+    simpa only [hval, dite_eq_left k.property] using he
+  · intro n
+    apply ContinuousLinearMap.ext
+    intro y
+    apply DFinsupp.ext
+    intro k
+    change (put (n+1) (step n y)) k = (put n y) k
+    rw [hval, hval]
+    by_cases hk : code k < n
+    · simp [hstep, hk, Nat.lt_succ_of_lt hk]
+    · by_cases hk' : code k < n + 1 <;> simp [hstep, hk, hk']
+  · intro x
+    refine ⟨x.support.sup code + 1, fun k ↦ x k.val, ?_⟩
+    apply DFinsupp.ext
+    intro k
+    rw [hval]
+    split_ifs with hk
+    · rfl
+    · exact (DFinsupp.notMem_support_iff.mp (fun h ↦ hk (Nat.lt_succ_of_le (Finset.le_sup h)))).symm
+  · let gen (h : Seminorm ℂ D → Prop) :=
+      (SeminormFamily.moduleFilterBasis (Subtype.val : {p : Seminorm ℂ D // h p} → Seminorm ℂ D)).topology
+    change gen (fun p ↦ ∀ k, Continuous (p ∘ l k)) =
+      gen (fun p ↦ ∀ n, Continuous (p ∘ (put n).toLinearMap))
+    apply congrArg gen
+    funext p
+    apply propext
+    constructor
+    · intro hp n
+      exact (ht.continuous_seminorm ⟨p, hp⟩).comp (put n).continuous
+    · intro hp k
+      let w : A (code k + 1) := ⟨k, Nat.lt_succ_self _⟩
+      let j := ContinuousLinearMap.single ℂ (fun i : A (code k + 1) ↦ X i.val) w
+      apply ((hp (code k + 1)).comp j.continuous).congr
+      intro y
+      apply congrArg p
+      apply DFinsupp.ext
+      intro b
+      change (put (code k+1) (j y)) b = DirectSum.component ℂ K X b (l k y)
+      rw [hval, DirectSum.component.of]
+      by_cases he : k = b
+      · subst b
+        simp [j, w]
+      · by_cases hb : code b < code k + 1
+        · have hw : (⟨b,hb⟩ : A (code k+1)) ≠ w := fun eq ↦ he (congrArg Subtype.val eq).symm
+          simp [hb, he, j, Pi.single_eq_of_ne hw]
+        · simp [hb, he]
+
 /-- Paper: Remark 6.2.1.4(1), p. 297.
 The locally convex sum of the S-local isotypes is an LF-space and is nuclear. This is the
 first half of the space part of Theorem 5.2.3.1(2) for that sum. -/
@@ -1086,7 +1197,32 @@ theorem globalThetaIsotypeSum_isLFSpace_nuclear :
     letI := Classical.decEq (PontryaginDual C₁)
     let D := ⨁ ω, X ω
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
-    IsLFSpace D ∧ IsNuclearTVS D := by sorry
+    IsLFSpace D ∧ IsNuclearTVS D := by
+  classical
+  intro X D
+  let : TopologicalSpace D := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : T2Space C₁ := (ideleClassGroup_finiteness F).2.2.1
+  let : SecondCountableTopology 𝔸[F] := adeleGroupSecondCountable F
+  let : SecondCountableTopology 𝔸[F]ᵐᵒᵖ := MulOpposite.opHomeomorph.symm.isEmbedding.secondCountableTopology
+  let : SecondCountableTopology (IdeleGroup (𝓞 F) F) := Units.isEmbedding_embedProduct.secondCountableTopology
+  let : SecondCountableTopology (IdeleClassGroup (𝓞 F) F) :=
+    (ideleGroup_quotient.{_, 0} F).2.2.2.2.1.secondCountableTopology
+  let : SecondCountableTopology C₁ := TopologicalSpace.Subtype.secondCountableTopology _
+  let : LocallyCompactSpace C₁ := inferInstance
+  let : SecondCountableTopology Circle :=
+    inferInstanceAs (SecondCountableTopology (Metric.sphere (0 : ℂ) 1))
+  let : SecondCountableTopology (PontryaginDual C₁) :=
+    (ContinuousMonoidHom.isEmbedding_toContinuousMap C₁ Circle).secondCountableTopology
+  let : Countable (PontryaginDual C₁) := countable_of_Lindelof_of_discrete
+  let : PolynormableSpace ℂ Θ𝔽 := globalAdelicThetaSpace_polynormable
+  let : IsTopologicalAddGroup Θ𝔽 := PolynormableSpace.isTopologicalAddGroup ℂ _
+  have hX (χ : PontryaginDual C₁) : IsFrechetTVS (X χ) := by
+    obtain ⟨e, _⟩ := (globalThetaIsotypicAverage_equiv (F := F) χ).2
+    exact frechet_of_equiv e (globalHomogeneousThetaSpace_nuclearFrechet.{_, 0} χ).1
+  have hn : IsNuclearTVS D := isNuclearTVS_directSum (X := X) (fun χ ↦
+    isNuclearTVS_submodule (globalAdelicThetaSpace_nuclear (F := F)) (E𝔽(χ)))
+  exact ⟨thetaIsotypeSum_isLFSpace_of_frechet X hX hn.1, hn⟩
 
 /-- Paper: Remark 6.2.1.4(1), p. 297.
 The locally convex sum of the global isotypes is barrelled and Montel. This is the second
