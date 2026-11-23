@@ -1192,6 +1192,53 @@ theorem sLocalAbsolutePW_principalValue {S₀ : Finset (HeightOneSpectrum (𝓞 
     (X : ℝ) (_hX : 0 < X) :
     (absPW(hST, X, χ)).map (PV(hRT, χ)) ≤ absPW(hST, size(R) * X, χ) := by sorry
 
+/-- Paper: Proposition 7.3.3.2, p. 358.
+The principal value at the places of `R` keeps the Fourier support of a test inside
+the product region, up to the product of the residue sizes `size(R)`: at a selected
+place the operator subtracts a translate by a uniformizer, and a translate scales the
+Fourier coordinate at that place by the residue size. -/
+private theorem sLocalInvariantPW_principalValue_tests
+    (hST : S ⊆ T) (hRT : R ⊆ T) (χ : PontryaginDual J₁(T)) (Y : ℝ) (g : B(T))
+    (hg : g ∈ sLocalPWTests hST (sLocalPWProductRegion S Y)) :
+    sAdelePrincipalValue F hRT g ∈
+      sLocalPWTests hST (sLocalPWProductRegion S (size(R) * Y)) := by
+  sorry
+
+/-- Paper: Proposition 7.3.3.2, p. 358.
+The principal value keeps the zero-moment test space: the operator subtracts a translate,
+which has the same value at the origin and the same total mass, so it vanishes wherever
+the test and its Fourier transform vanish. -/
+private theorem sLocalInvariantPW_principalValue_polar
+    (hRT : R ⊆ T) (g : B(T)) (hg : g ∈ Z₀(T)) :
+    sAdelePrincipalValue F hRT g ∈ Z₀(T) := by
+  sorry
+
+/-- Paper: Proposition 7.3.3.2, p. 358.
+The principal value of a zero-moment test of the invariant level at `Y` represents a class
+of the invariant level at `size(R) * Y`. This is the test-level form of the statement,
+before passing to the closures that define the two levels. -/
+private theorem sLocalInvariantPW_principalValue_test_mem
+    (hST : S ⊆ T) (hRT : R ⊆ T) (χ : PontryaginDual J₁(T)) (Y : ℝ) (g : B(T))
+    (hg : g ∈ sLocalPWTests hST (sLocalPWProductRegion S Y)) (hg₀ : g ∈ Z₀(T)) :
+    PV(hRT, χ) (q(T, χ) g) ∈
+      sLocalInvariantPW hST (size(R) * Y) (sAdelePolarSubspace F T) χ := by
+  have hmk : PV(hRT, χ) (q(T, χ) g) =
+      q(T, χ) (sAdelePrincipalValue F hRT g) :=
+    sLocalHomogeneousThetaPrincipalValue_mk (S := T) hRT χ g
+  rw [hmk]
+  have hmem : sAdelePrincipalValue F hRT g ∈
+      (sLocalPWTests hST (sLocalPWProductRegion S (size(R) * Y)) ⊓
+        sAdelePolarSubspace F T) :=
+    Submodule.mem_inf.2
+      ⟨sLocalInvariantPW_principalValue_tests hST hRT χ Y g hg,
+        sLocalInvariantPW_principalValue_polar hRT g hg₀⟩
+  refine Submodule.le_topologicalClosure _ ?_
+  have h2 : q(T, χ) (sAdelePrincipalValue F hRT g) ∈
+      (sLocalPWTests hST (sLocalPWProductRegion S (size(R) * Y)) ⊓
+        sAdelePolarSubspace F T).map (q(T, χ)) :=
+    Submodule.mem_map_of_mem hmem
+  exact h2
+
 /-- Paper: Proposition 7.3.3.2, p. 357–358.
 The finite principal value maps the zero-moment invariant level at Y into the
 invariant level at the product of the residue sizes times Y. -/
@@ -1202,7 +1249,29 @@ theorem sLocalInvariantPW_principalValue {S₀ : Finset (HeightOneSpectrum (𝓞
     (ω : PontryaginDual C₁) (hu : NormOneCharacterUnramifiedOutside ω S)
     (χ : PontryaginDual J₁(T)) (_hχ : χ = descend(hST, ω, hu))
     (Y : ℝ) (_hY : 0 < Y) :
-    (invPW(hST, Y, χ)).map (PV(hRT, χ)) ≤ invPW(hST, size(R) * Y, χ) := by sorry
+    (invPW(hST, Y, χ)).map (PV(hRT, χ)) ≤ invPW(hST, size(R) * Y, χ) := by
+  have hcont : Continuous (PV(hRT, χ)) :=
+    (sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding (S := T) hRT χ).continuous
+  let P : Θ(T, χ) →L[ℂ] Θ(T, χ) :=
+    { toLinearMap := PV(hRT, χ), cont := hcont }
+  have hgen : ∀ z ∈ (sLocalPWTests hST (sLocalPWProductRegion S Y) ⊓
+      sAdelePolarSubspace F T).map (q(T, χ)),
+      PV(hRT, χ) z ∈
+        sLocalInvariantPW hST (size(R) * Y) (sAdelePolarSubspace F T) χ :=
+    fun z hz => by
+      obtain ⟨g, hg, rfl⟩ := Submodule.mem_map.1 hz
+      exact sLocalInvariantPW_principalValue_test_mem hST hRT χ Y g hg.1 hg.2
+  have hmap : ((sLocalPWTests hST (sLocalPWProductRegion S Y) ⊓
+      sAdelePolarSubspace F T).map (q(T, χ))).map P.toLinearMap ≤
+      sLocalInvariantPW hST (size(R) * Y) (sAdelePolarSubspace F T) χ :=
+    Submodule.map_le_iff_le_comap.2 hgen
+  have hstart : (sLocalInvariantPW hST Y (sAdelePolarSubspace F T) χ).map (PV(hRT, χ)) =
+      (((sLocalPWTests hST (sLocalPWProductRegion S Y) ⊓
+        sAdelePolarSubspace F T).map (q(T, χ))).topologicalClosure).map (PV(hRT, χ)) := rfl
+  rw [hstart]
+  refine (Submodule.topologicalClosure_map P _).trans ?_
+  refine (Submodule.topologicalClosure_mono hmap).trans_eq ?_
+  exact IsClosed.submodule_topologicalClosure_eq (Submodule.isClosed_topologicalClosure _)
 
 /-- Modulo an arbitrary subspace, the kernel of the two moments is still closed:
 its preimage is the inverse image of a subspace of the moment plane. -/

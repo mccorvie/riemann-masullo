@@ -5,6 +5,8 @@ import Mathlib.Analysis.Real.Pi.Bounds
 import Mathlib.NumberTheory.LSeries.Dirichlet
 import Mathlib.NumberTheory.LSeries.RiemannZeta
 import Mathlib.NumberTheory.ZetaValues
+import Mathlib.Analysis.Fourier.FiniteAbelian.PontryaginDuality
+import Mathlib.NumberTheory.Padics.HeightOneSpectrum
 
 /-! # Chapter 6.3: statements that are false as printed -/
 
@@ -56,11 +58,113 @@ def Printed.globalConverse_polarCoordinates_surjective : Prop :=
           printedEuler(χ, S, -1 + shift(t)) * mass(F) *
             adeleSchwartzFourier f (zeroAdele(F)) * δ)
 
+/-- Reduction modulo `p` on the `p`-adic integers is continuous. -/
+private theorem globalConverse_polarCoordinates_surjective_toZMod (p : ℕ) [Fact p.Prime] :
+    Continuous (PadicInt.toZMod : ℤ_[p] →+* ZMod p) := by
+  apply continuous_of_continuousAt_zero (PadicInt.toZMod : ℤ_[p] →+* ZMod p)
+  refine (tendsto_pure.mpr ?_).mono_right (pure_le_nhds _)
+  filter_upwards [Metric.ball_mem_nhds (0 : ℤ_[p]) one_pos] with x hx
+  rw [map_zero, ← RingHom.mem_ker, PadicInt.ker_toZMod, IsLocalRing.mem_maximalIdeal,
+    PadicInt.mem_nonunits]
+  simpa using hx
+
+/-- A character of `(ℤ/3)ˣ` that is nontrivial at `-1`. -/
+private theorem globalConverse_polarCoordinates_surjective_zmod3 :
+    ∃ ψ : (ZMod 3)ˣ →* Circle, ψ (-1) ≠ 1 := by
+  have h : (Additive.ofMul (-1 : (ZMod 3)ˣ)) ≠ 0 := by decide
+  obtain ⟨ψ, hψ⟩ := AddChar.exists_apply_ne_zero.mpr h
+  refine ⟨(AddChar.circleEquivComplex.symm ψ).toMonoidHom, fun h1 ↦ hψ ?_⟩
+  have h2 := congrArg (fun z : Circle ↦ (z : ℂ)) h1
+  exact h2
+
+
+/-- A unit of the local integers has norm one. -/
+private theorem globalConverse_polarCoordinates_surjective_normUnit (w : HeightOneSpectrum (𝓞 ℚ))
+    (u : (w.adicCompletionIntegers ℚ)ˣ) : ‖((u.val : w.adicCompletionIntegers ℚ) :
+      w.adicCompletion ℚ)‖ = 1 := by
+  have hle : ∀ y : w.adicCompletionIntegers ℚ, ‖(y : w.adicCompletion ℚ)‖ ≤ 1 := fun y ↦
+    Valued.toNormedField.norm_le_one_iff.mpr y.2
+  have hmul : ‖((u.val : w.adicCompletionIntegers ℚ) : w.adicCompletion ℚ)‖ *
+      ‖(((u⁻¹ : (w.adicCompletionIntegers ℚ)ˣ).val : w.adicCompletionIntegers ℚ) :
+        w.adicCompletion ℚ)‖ = 1 := by
+    rw [← norm_mul, ← Subring.coe_mul, Units.mul_inv]
+    simp
+  have h1 := hle u.val
+  have h2 := hle (u⁻¹).val
+  nlinarith [norm_nonneg ((u.val : w.adicCompletionIntegers ℚ) : w.adicCompletion ℚ),
+    norm_nonneg (((u⁻¹ : (w.adicCompletionIntegers ℚ)ˣ).val : w.adicCompletionIntegers ℚ) :
+        w.adicCompletion ℚ)]
+
+/-- The idele classes of `ℚ` carry a character that is nontrivial on the norm-one classes:
+the quadratic character of `(ℤ/3)ˣ` read off the unit at the place `3`. -/
+private theorem globalConverse_polarCoordinates_surjective_char :
+    ∃ χ : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ),
+      χ.toMonoidHom.comp (ideleClassNorm ℚ).ker.subtype ≠ 1 := by
+  classical
+  let p : Nat.Primes := ⟨3, Nat.prime_three⟩
+  let v : HeightOneSpectrum (𝓞 ℚ) := (Rat.HeightOneSpectrum.primesEquiv (R := 𝓞 ℚ)).symm p
+  let E := (PadicInt.adicCompletionIntegersEquiv (𝓞 ℚ) p).symm
+  let φ : v.adicCompletionIntegers ℚ →+* ZMod 3 :=
+    (PadicInt.toZMod : ℤ_[p] →+* ZMod p).comp E.toRingEquiv.toRingHom
+  have hφ : Continuous φ := (globalConverse_polarCoordinates_surjective_toZMod p).comp E.continuous
+  obtain ⟨ψ, hψ⟩ := globalConverse_polarCoordinates_surjective_zmod3
+  obtain ⟨e, he⟩ := ratIdeleClassGroup_decomposition
+  let χl : (v.adicCompletionIntegers ℚ)ˣ →* Circle := ψ.comp (Units.map φ.toMonoidHom)
+  have hχl : Continuous χl := (continuous_of_discreteTopology (f := (ψ : (ZMod 3)ˣ → Circle))).comp (hφ.units_map _)
+  let χh : IdeleClassGroup (𝓞 ℚ) ℚ →* Circle :=
+    χl.comp ((Pi.evalMonoidHom _ v).comp ((MonoidHom.snd _ _).comp e.symm.toMonoidHom))
+  have hχh : Continuous χh :=
+    hχl.comp ((continuous_apply v).comp (continuous_snd.comp e.symm.continuous))
+  let χ : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ) := ⟨χh, hχh⟩
+  refine ⟨χ, fun h ↦ ?_⟩
+  obtain ⟨g, hginf, hgfin, hge⟩ := he 1 (Pi.mulSingle v (-1))
+  have hker : e (1, Pi.mulSingle v (-1)) ∈ (ideleClassNorm ℚ).ker := by
+    rw [MonoidHom.mem_ker, hge]
+    apply Units.ext
+    apply NNReal.coe_injective
+    change ((ideleNorm ℚ g : NNReal) : ℝ) = 1
+    rw [((ideleNorm_spec ℚ).1 g).2]
+    have hfin : (∏ᶠ w : HeightOneSpectrum (𝓞 ℚ), ‖g.val.2 w‖) = 1 := by
+      apply finprod_eq_one_of_forall_eq_one
+      intro w
+      rw [hgfin w]
+      exact globalConverse_polarCoordinates_surjective_normUnit w _
+    have hinf : ∀ w : InfinitePlace ℚ, ‖g.val.1 w‖ ^ w.mult = 1 := by
+      intro w
+      obtain rfl : w = Rat.infinitePlace := Subsingleton.elim _ _
+      have hiso := (InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal
+        Rat.isReal_infinitePlace).norm_map_of_map_zero (map_zero _) (g.val.1 Rat.infinitePlace)
+      rw [← hiso, hginf]
+      simp
+    rw [hfin, mul_one]
+    exact Finset.prod_eq_one fun w _ ↦ hinf w
+  have h1 := DFunLike.congr_fun h ⟨_, hker⟩
+  change χh (e (1, Pi.mulSingle v (-1))) = 1 at h1
+  apply hψ
+  have h2 : χh (e (1, Pi.mulSingle v (-1))) = ψ (Units.map φ.toMonoidHom (-1)) := by
+    change χl ((e.symm (e (1, Pi.mulSingle v (-1)))).2 v) = _
+    rw [e.symm_apply_apply]
+    simp [χl]
+  rw [← h1, h2]
+  exact congrArg ψ (Units.ext (by simp)).symm
+
 /-- Paper: Theorems 6.3.2.1(2) and 6.3.2.2(2), p. 304 and p. 310. Take F = ℚ and the even
 quadratic idele class character modulo 5, which is nontrivial on the norm-one classes. The
 Kronecker delta is zero, so both coordinate maps are identically zero for every removal set. -/
 theorem Printed.globalConverse_polarCoordinates_surjective_false :
-    ¬ Printed.globalConverse_polarCoordinates_surjective := by sorry
+    ¬ Printed.globalConverse_polarCoordinates_surjective := by
+  intro h
+  obtain ⟨χ, hχ⟩ := globalConverse_polarCoordinates_surjective_char
+  have hω : ω(ℚ, χ) ≠ 1 := by
+    intro h1
+    apply hχ
+    exact MonoidHom.ext fun g ↦ DFunLike.congr_fun h1 g
+  have h2 := h ℚ χ
+  dsimp only at h2
+  simp only [hω, ↓reduceIte] at h2
+  obtain ⟨f, hf⟩ := h2.1 (1, 0)
+  simp only [mul_zero, neg_mul, Prod.mk.injEq] at hf
+  exact zero_ne_one hf.1
 
 -- F79: the full class-group Mellin integral is the class mass times Z.
 -- The sequence isomorphism on p. 304 leaves its terminal isomorphism unspecified.
@@ -359,12 +463,30 @@ def Printed.globalConverse_normTwist_bergmanMiddle_residues_surjective : Prop :=
       Surjective fun b : {b : B // EntireMultiple(b.val, G)} ↦
         (complexResidue b.val.val (-shift(t)), complexResidue b.val.val (1 - shift(t)))
 
+/-- An entire function has zero residue at every point. -/
+private theorem globalConverse_normTwist_bergmanMiddle_residues_surjective_residue
+    {f : ℂ → ℂ} (hf : Differentiable ℂ f) (ρ : ℂ) : complexResidue f ρ = 0 := by
+  show limUnder (nhdsWithin (0 : ℝ) (Ioi 0)) (fun r ↦ circleIntegral f ρ r / _) = 0
+  refine Tendsto.limUnder_eq ((tendsto_const_nhds (x := (0 : ℂ))).congr' ?_)
+  filter_upwards [self_mem_nhdsWithin] with r hr
+  rw [Complex.circleIntegral_eq_zero_of_differentiable_on_off_countable (le_of_lt hr)
+    countable_empty hf.continuous.continuousOn (fun z _ ↦ hf z), zero_div]
+
 /-- Paper: Theorems 6.3.2.1–2, (6.3.2.8), (6.3.2.25)–(26), p. 304 and p. 310.
 Take ℚ, the trivial character, t₀ = 0 and no removed primes. Every element of the printed
 middle term is entire and both of its residues are zero. In particular (1, 0) has no preimage.
 The standard Gaussian's Mellin transform has poles at 0 and 1. -/
 theorem Printed.globalConverse_normTwist_bergmanMiddle_residues_surjective_false :
-    ¬ Printed.globalConverse_normTwist_bergmanMiddle_residues_surjective := by sorry
+    ¬ Printed.globalConverse_normTwist_bergmanMiddle_residues_surjective := by
+  intro h
+  obtain ⟨b, hb⟩ := h ℚ 1 0 (by simp) ∅ (1, 0)
+  have hd : Differentiable ℂ b.val.val := by
+    have h2 := b.val.property.2.1
+    rw [preimage_univ] at h2
+    exact differentiableOn_univ.mp h2
+  have h1 := congrArg Prod.fst hb
+  simp only [globalConverse_normTwist_bergmanMiddle_residues_surjective_residue hd] at h1
+  exact zero_ne_one h1
 
 /-- Paper: Theorem 6.3.2.2(1), range after (6.3.2.20), p. 310. As printed: every entire
 multiple of the printed principal-value generator lies in the Schwartz–Bergman space.

@@ -1247,22 +1247,6 @@ theorem sLocalDecayIsotype_eq_actionIsotype (I : Set ℝ) (ω : PontryaginDual J
   have key := sLocalDecayIsotype_eq_actionIsotype_aux (mₛ).ker (fun φ : Ẽ(I) ↦ φ.val) hval hsmul
   with_reducible_and_instances exact key _ ω hP A hA
 
-/-- Paper: Proposition 5.4.2.1(1), p. 275.
-Fourier transform extends uniquely between the weighted isotype and the conjugate
-isotype for the reflected exponent interval. Its value on each embedded homogeneous
-theta function is the homogeneous theta function of the Fourier-transformed test.
-Deviation: The extension identity uses the two isotypes of the theta quotient. -/
-theorem existsUnique_sLocalDecayFourier (χ : PontryaginDual Jₛ) (I : Set ℝ) (_hOpen : IsOpen I)
-    (_hInt : OrdConnected I) (_hne : I.Nonempty) (_hsub : I ⊆ overlapInterval) :
-    let domain : Submodule ℂ Ẽ(I) := sLocalDecayIsotype (F := F) (S := S) I (restrict₁(χ))
-    let codomain : Submodule ℂ Ẽ(reflect(I)) :=
-      sLocalDecayIsotype (F := F) (S := S) (reflect(I)) (restrict₁(χ⁻¹))
-    ∃! e : domain ≃L[ℂ] codomain,
-      let transform : domain → codomain := e
-      ∀ f : ℬₛ, ∃ (u : domain) (v : codomain), transform u = v ∧
-        (∀ g : Jₛ, u.val.val g = φω(restrict₁(χ)) f g) ∧
-        (∀ g : Jₛ, v.val.val g = φω(restrict₁(χ⁻¹)) (Fourierₛ f) g) := by sorry
-
 /-- Paper: Proposition 5.4.2.1(2), p. 275.
 If the exponent interval contains one half, the weighted Schwartz–Bruhat space
 injects continuously into the theta completion by its almost-everywhere values. -/
@@ -1270,18 +1254,6 @@ theorem existsUnique_sLocalDecayToThetaL2 (I : Set ℝ) (_hOpen : IsOpen I)
     (_hInt : OrdConnected I) (_hsub : I ⊆ overlapInterval) (_hhalf : (1 / 2 : ℝ) ∈ I) :
     ∃! j : Ẽ(I) →L[ℂ] SLocalThetaL2 F S, Injective j ∧ ∀ f : Ẽ(I),
       (((j f).val : L²ₛ) : Jₛ → ℂ) =ᵐ[μweighted] f.val := by sorry
-
-/-- Paper: Proposition 5.4.2.1(2), p. 275.
-The unitary Fourier extension agrees on the weighted isotype with the Fourier map
-for the reflected interval, after embedding both functions by their L² classes. -/
-theorem sLocalDecayFourier_eq_weightedFourier (χ : PontryaginDual Jₛ) (I : Set ℝ) (hOpen : IsOpen I)
-    (hInt : OrdConnected I) (hsub : I ⊆ overlapInterval) (hhalf : (1 / 2 : ℝ) ∈ I) :
-    let j := (existsUnique_sLocalDecayToThetaL2 (F := F) (S := S)
-      I hOpen hInt hsub hhalf).exists.choose
-    let e := (existsUnique_sLocalDecayFourier (F := F) (S := S) χ I hOpen hInt ⟨_, hhalf⟩ hsub).exists.choose
-    ∀ f : Eω(I, restrict₁(χ)),
-      ((((weightedFourier (j f.val)).val : L²ₛ) : Jₛ → ℂ)) =ᵐ[μweighted] (e f).val.val :=
-  by sorry
 
 /-- A modulated decay space with a norm section maps continuously to the decay space of the
 positive reals by restriction to the section, and back by tensoring with the conjugate of a
@@ -2014,6 +1986,732 @@ theorem sLocalCech_left_commutes (χ : PontryaginDual Jₛ)
     let p : upperMiddle(χ) := cechThetaPair(χ) (Submodule.Quotient.mk f)
     EqOn (M₁ p.1).val (fun s ↦ Zₛ f (normChart(χ) s)) rightHalf ∧
     EqOn (M₂ p.2).val (fun s ↦ Zₛ (Fourierₛ f) (normChart(χ⁻¹) s)) rightHalf := by sorry
+
+/-- Evaluation is continuous by the Schwartz line description of Appendix D. -/
+private theorem decayFourier_bergman_eval (I : Set ℝ) (ho : IsOpen I)
+    (hi : OrdConnected I) (hn : I.Nonempty) (z : ℂ) :
+    Continuous (fun f : SchwartzBergman I ↦ f.val z) := by
+  by_cases hz : z.re ∈ I
+  · obtain ⟨T, hT, hE⟩ := schwartzBergman_schwartzLine_topology I ho hi hn
+    let a : I := ⟨z.re, hz⟩
+    have hz' : (a.val : ℂ) + (z.im : ℂ) * Complex.I = z := Complex.re_add_im z
+    have hc : Continuous (fun f : SchwartzBergman I ↦ T f a z.im) :=
+      (continuous_eval_const (F := BoundedContinuousFunction ℝ ℂ) z.im).comp
+        ((SchwartzMap.toBoundedContinuousFunctionCLM ℂ ℝ ℂ).continuous.comp
+          ((continuous_apply a).comp hE.continuous))
+    refine hc.congr fun f ↦ (hT f a z.im).trans ?_
+    simp only [weightedVerticalTrace, pow_zero, one_mul, hz']
+  · exact continuous_const.congr fun f ↦ (f.property.1 hz).symm
+
+/-- A holomorphic factor with polynomial growth on compact substrips acts continuously
+after reflection. Point evaluations give the closed graph. -/
+private theorem decayFourier_bergman_reflect_multiplier (I J : Set ℝ)
+    (hoI : IsOpen I) (hiI : OrdConnected I) (hnI : I.Nonempty)
+    (hoJ : IsOpen J) (hiJ : OrdConnected J) (hnJ : J.Nonempty)
+    (hJ : ∀ a ∈ J, 1 - a ∈ I)
+    (r : ℂ → ℂ) (hr : DifferentiableOn ℂ r (Complex.re ⁻¹' J))
+    (hbound : ∀ a b : ℝ, a ≤ b → Icc a b ⊆ J →
+      ∃ C ≥ (0 : ℝ), ∃ n : ℕ, ∀ z : ℂ, z.re ∈ Icc a b →
+        ‖r z‖ ≤ C * (1 + ‖z‖) ^ n) :
+    ∃ T : SchwartzBergman I →L[ℂ] SchwartzBergman J,
+      ∀ f z, z.re ∈ J → (T f).val z = r z * f.val (1 - z) := by
+  let G (f : SchwartzBergman I) : ℂ → ℂ :=
+    (Complex.re ⁻¹' J).indicator (fun z ↦ r z * f.val (1-z))
+  have hG (f : SchwartzBergman I) : G f ∈ schwartzBergmanSubmodule J := by
+    refine ⟨fun z hz ↦ indicator_of_notMem hz _, ?_, ?_⟩
+    · have hd : Differentiable ℂ (fun z : ℂ ↦ 1 - z) :=
+        (differentiable_const (1 : ℂ)).sub differentiable_id
+      apply DifferentiableOn.congr (hr.mul (f.property.2.1.comp hd.differentiableOn _))
+      · intro z hz
+        exact indicator_of_mem hz _
+      · intro z hz
+        change (1 - z).re ∈ I
+        simpa only [Complex.sub_re, Complex.one_re] using hJ z.re hz
+    · intro a b hab hj N
+      have hab' : 1-b ≤ 1-a := by linarith
+      have hI : Icc (1-b) (1-a) ⊆ I := by
+        intro s hs
+        have h : 1 - s ∈ Icc a b := ⟨by linarith [hs.2], by linarith [hs.1]⟩
+        simpa only [sub_sub_cancel] using hJ _ (hj h)
+      obtain ⟨C, hC, k, hk⟩ := hbound a b hab hj
+      obtain ⟨A, hA⟩ := f.property.2.2 _ _ hab' hI 0
+      obtain ⟨B, hB⟩ := f.property.2.2 _ _ hab' hI (N + k)
+      refine ⟨C * (3 ^ (N+k) : ℝ) * max A B, ?_⟩
+      rintro _ ⟨z, hz, rfl⟩
+      let w : ℂ := 1-z
+      have hw : w.re ∈ Icc (1-b) (1-a) := by
+        change (1-z).re ∈ Icc (1-b) (1-a)
+        rw [Complex.sub_re, Complex.one_re]
+        exact ⟨sub_le_sub_left hz.2 _, sub_le_sub_left hz.1 _⟩
+      have hN : ‖z‖ ≤ 1 + ‖w‖ := by simpa [w] using norm_sub_le (1 : ℂ) w
+      have hle : ‖z‖ ^ N * (1 + ‖z‖)^k * ‖f.val w‖ ≤
+          (3 ^ (N+k) : ℝ) * max A B := by
+        rcases le_total ‖w‖ 1 with h | h
+        · have hZ : ‖z‖ ≤ 3 := by linarith
+          have hZ' : 1 + ‖z‖ ≤ 3 := by linarith
+          have hf : ‖f.val w‖ ≤ max A B :=
+            (by simpa only [pow_zero, one_mul] using hA (mem_image_of_mem _ hw) : ‖f.val w‖ ≤ A).trans
+              (le_max_left _ _)
+          rw [pow_add]
+          gcongr
+        · have hZ : ‖z‖ ≤ 3 * ‖w‖ := by linarith
+          have hZ' : 1 + ‖z‖ ≤ 3 * ‖w‖ := by linarith
+          have hf := hB (mem_image_of_mem _ hw)
+          rw [norm_mul, norm_pow] at hf
+          calc
+            _ ≤ (3 * ‖w‖)^N * (3 * ‖w‖)^k * ‖f.val w‖ := by gcongr
+            _ = (3 ^ (N+k) : ℝ) * (‖w‖^(N+k) * ‖f.val w‖) := by
+              rw [← pow_add, mul_pow, mul_assoc]
+            _ ≤ _ := mul_le_mul_of_nonneg_left (hf.trans (le_max_right _ _)) (by positivity)
+      change ‖z ^ N * G f z‖ ≤ _
+      dsimp only [G]
+      rw [indicator_of_mem (show z ∈ Complex.re ⁻¹' J from hj hz), norm_mul, norm_pow, norm_mul]
+      calc
+        _ ≤ ‖z‖ ^ N * ((C * (1+‖z‖)^k) * ‖f.val w‖) := by gcongr; exact hk z hz
+        _ = C * (‖z‖ ^ N * (1+‖z‖)^k * ‖f.val w‖) := by ring
+        _ ≤ _ := by simpa only [mul_assoc] using mul_le_mul_of_nonneg_left hle hC
+  let X := SchwartzBergman I
+  let Y := SchwartzBergman J
+  let L : X →ₗ[ℂ] Y :=
+    { toFun := fun f ↦ ⟨G f, hG f⟩
+      map_add' := fun f g ↦ Subtype.ext (funext fun z ↦ by
+        change G (f + g) z = G f z + G g z
+        by_cases hz : z ∈ Complex.re ⁻¹' J
+        · simp only [G, indicator_of_mem hz]
+          exact mul_add _ _ _
+        · simp only [G, indicator_of_notMem hz, zero_add])
+      map_smul' := fun c f ↦ Subtype.ext (funext fun z ↦ by
+        change G (c • f) z = c * G f z
+        by_cases hz : z ∈ Complex.re ⁻¹' J
+        · simp only [G, indicator_of_mem hz]
+          exact mul_left_comm _ _ _
+        · simp only [G, indicator_of_notMem hz, mul_zero]) }
+  have hL (f : X) (z : ℂ) : (L f).val z = G f z := rfl
+  let V : Submodule ℂ (ℂ → ℂ) := schwartzBergmanSubmodule J
+  let i : Y →L[ℂ] V :=
+    ⟨LinearMap.id, Continuous.subtype_mk
+      (continuous_pi fun z ↦ decayFourier_bergman_eval J hoJ hiJ hnJ z) _⟩
+  let u : X →L[ℂ] V := ⟨L, Continuous.subtype_mk (continuous_pi fun z ↦ ?_) _⟩
+  · obtain ⟨_, T, hT⟩ := frechet_factorization (X := fun _ ↦ Y)
+      (fun _ ↦ schwartzBergman_frechet J hoJ hiJ hnJ) (fun _ ↦ i)
+      (fun _ _ _ h ↦ h) (fun _ ↦ Subset.rfl) (fun v ↦ ⟨0, v, rfl⟩)
+      (schwartzBergman_frechet I hoI hiI hnI) u
+    refine ⟨T, fun f z hz ↦ ?_⟩
+    have heq := congrArg (fun v : V ↦ v.val z) (DFunLike.congr_fun hT f)
+    change (T f).val z = G f z at heq
+    refine heq.trans ?_
+    exact indicator_of_mem (show z ∈ Complex.re ⁻¹' J from hz) _
+  · change Continuous (fun f : X ↦ G f z)
+    by_cases hz : z.re ∈ J
+    · simpa only [G, indicator_of_mem (show z ∈ Complex.re ⁻¹' J from hz)] using
+        (decayFourier_bergman_eval I hoI hiI hnI (1-z)).const_mul (r z)
+    · simpa only [G, indicator_of_notMem (show z ∉ Complex.re ⁻¹' J from hz)] using
+        (continuous_const (y := (0 : ℂ)) : Continuous (fun _ : X ↦ (0 : ℂ)))
+
+private theorem decayFourier_shift_norm (z : ℂ) (t : ℝ) (n : ℕ) :
+    ‖z‖ ^ n ≤ (2 * (1 + |t|)) ^ n * (1 + ‖z - (t : ℂ) * Complex.I‖ ^ n) := by
+  let w := z - (t : ℂ) * Complex.I
+  have hz : ‖z‖ ≤ ‖w‖ + |t| := by
+    calc
+      ‖z‖ = ‖w + (t : ℂ) * Complex.I‖ := by rw [sub_add_cancel]
+      _ ≤ ‖w‖ + ‖(t : ℂ) * Complex.I‖ := norm_add_le _ _
+      _ = _ := by simp [Real.norm_eq_abs]
+  have h₁ : ‖w‖ + |t| ≤ (1 + |t|) * (1 + ‖w‖) := by
+    nlinarith [mul_nonneg (abs_nonneg t) (norm_nonneg w)]
+  have h₂ : (1 + ‖w‖) ^ n ≤ (2 : ℝ) ^ n * (1 + ‖w‖ ^ n) := by
+    rcases le_total ‖w‖ 1 with hw | hw
+    · have h : 1 + ‖w‖ ≤ 2 := by linarith
+      exact (pow_le_pow_left₀ (by positivity) h n).trans
+        (le_mul_of_one_le_right (by positivity) (le_add_of_nonneg_right (by positivity)))
+    · have h : 1 + ‖w‖ ≤ 2 * ‖w‖ := by linarith
+      refine (pow_le_pow_left₀ (by positivity) h n).trans ?_
+      rw [mul_pow]
+      gcongr
+      exact le_add_of_nonneg_left zero_le_one
+  calc
+    _ ≤ ((1 + |t|) * (1 + ‖w‖)) ^ n := pow_le_pow_left₀ (norm_nonneg _) (hz.trans h₁) _
+    _ ≤ (1 + |t|) ^ n * (2 ^ n * (1 + ‖w‖ ^ n)) := by rw [mul_pow]; gcongr
+    _ = _ := by rw [mul_pow]; ring
+
+private theorem decayFourier_bergman_shift (I : Set ℝ) (f : SchwartzBergman I) (t : ℝ) :
+    ∃ g : SchwartzBergman I, (∀ z, g.val z = f.val (z - (t : ℂ) * Complex.I)) ∧
+      ∀ (a : I) (n : ℕ),
+        lpNorm (weightedVerticalTrace a n g.val) 2 volume ≤
+          (2 * (1 + |t|)) ^ n *
+          (lpNorm (weightedVerticalTrace a 0 f.val) 2 volume +
+            lpNorm (weightedVerticalTrace a n f.val) 2 volume) := by
+  let τ (z : ℂ) := z - (t : ℂ) * Complex.I
+  have hτ (z : ℂ) : (τ z).re = z.re := by simp [τ, Complex.mul_re]
+  have hτd : Differentiable ℂ τ := differentiable_id.sub (differentiable_const _)
+  have hg : f.val ∘ τ ∈ schwartzBergmanSubmodule I := by
+    refine ⟨fun z hz ↦ f.property.1 (show (τ z).re ∉ I from by rw [hτ]; exact hz),
+      f.property.2.1.comp hτd.differentiableOn
+        (fun z hz ↦ (show (τ z).re ∈ I from by rw [hτ]; exact hz)), ?_⟩
+    intro a b hab hsub n
+    obtain ⟨C, hC⟩ := f.property.2.2 a b hab hsub 0
+    obtain ⟨D, hD⟩ := f.property.2.2 a b hab hsub n
+    refine ⟨(2 * (1 + |t|)) ^ n * (C+D), ?_⟩
+    rintro _ ⟨z, hz, rfl⟩
+    have hw : τ z ∈ Complex.re ⁻¹' Icc a b := by
+      simpa only [mem_preimage, hτ] using hz
+    have hx : ‖f.val (τ z)‖ ≤ C := by simpa using hC (mem_image_of_mem _ hw)
+    have hy : ‖τ z‖ ^ n * ‖f.val (τ z)‖ ≤ D := by
+      simpa only [norm_mul, norm_pow] using hD (mem_image_of_mem _ hw)
+    change ‖z ^ n * f.val (τ z)‖ ≤ _
+    rw [norm_mul, norm_pow]
+    calc
+      _ ≤ ((2 * (1 + |t|)) ^ n * (1 + ‖τ z‖ ^ n)) * ‖f.val (τ z)‖ :=
+        mul_le_mul_of_nonneg_right (decayFourier_shift_norm z t n) (norm_nonneg _)
+      _ = (2 * (1 + |t|)) ^ n * (‖f.val (τ z)‖ + ‖τ z‖ ^ n * ‖f.val (τ z)‖) := by ring
+      _ ≤ _ := by gcongr
+  let g : SchwartzBergman I := ⟨f.val ∘ τ, hg⟩
+  refine ⟨g, fun _ ↦ rfl, fun a n ↦ ?_⟩
+  let B : ℝ := (2 * (1 + |t|)) ^ n
+  let P (k : ℕ) (x : ℝ) := ‖weightedVerticalTrace a k f.val x‖
+  let ρ (x : ℝ) := x - t
+  have hρ : MeasurePreserving ρ (volume : Measure ℝ) volume := measurePreserving_sub_right volume t
+  have hP (k : ℕ) : MemLp (P k) 2 volume :=
+    (schwartzBergman_trace_memLp I a 2 (by norm_num) (by norm_num) k f).norm
+  have hdom : MemLp (fun x ↦ B * (P 0 (ρ x) + P n (ρ x))) 2 volume :=
+    (((hP 0).comp_measurePreserving hρ).add ((hP n).comp_measurePreserving hρ)).const_mul B
+  have hbound (x : ℝ) :
+      ‖weightedVerticalTrace a n g.val x‖ ≤ B * (P 0 (ρ x) + P n (ρ x)) := by
+    let z : ℂ := (a.val : ℂ) + (x : ℂ) * Complex.I
+    have heq : τ z = (a.val : ℂ) + (ρ x : ℂ) * Complex.I := by
+      dsimp [τ,z,ρ]
+      push_cast
+      ring
+    change ‖z ^ n * f.val (τ z)‖ ≤ B * (_ + _)
+    rw [norm_mul, norm_pow]
+    calc
+      _ ≤ B * (1 + ‖τ z‖ ^ n) * ‖f.val (τ z)‖ :=
+        mul_le_mul_of_nonneg_right (decayFourier_shift_norm z t n) (norm_nonneg _)
+      _ = _ := by
+        simp only [P, weightedVerticalTrace, ← heq, pow_zero, one_mul, norm_mul, norm_pow]
+        ring
+  refine (lpNorm_mono_real hdom hbound).trans ?_
+  have hPρ (k : ℕ) : lpNorm (P k ∘ ρ) 2 volume = lpNorm (weightedVerticalTrace a k f.val) 2 volume := by
+    have h := eLpNorm_comp_measurePreserving (hP k).aestronglyMeasurable hρ (p := (2 : ENNReal))
+    change (eLpNorm (P k ∘ ρ) 2 volume).toReal = _
+    rw [h]
+    exact lpNorm_norm (schwartzBergman_trace_memLp I a 2 (by norm_num) (by norm_num) k f).aestronglyMeasurable _
+  change lpNorm (B • ((P 0 ∘ ρ) + (P n ∘ ρ))) 2 volume ≤ _
+  rw [lpNorm_const_smul]
+  change ‖B‖ * lpNorm (P 0 ∘ ρ + P n ∘ ρ) 2 volume ≤
+    B * (lpNorm (weightedVerticalTrace a 0 f.val) 2 volume +
+      lpNorm (weightedVerticalTrace a n f.val) 2 volume)
+  rw [Real.norm_of_nonneg (by dsimp [B]; positivity), ← hPρ 0, ← hPρ n]
+  apply mul_le_mul_of_nonneg_left
+    (lpNorm_add_le ((hP 0).comp_measurePreserving hρ) (by norm_num))
+  dsimp [B]
+  positivity
+
+
+/-- A multiplier from the left half-plane to the overlap has polynomial growth
+on compact substrips, by testing it on vertical translates of a Gaussian. -/
+private theorem decayFourier_bergman_multiplier_growth (r : ℂ → ℂ)
+    (T : SchwartzBergman (Iio 1) →L[ℂ] SchwartzBergman (Ioo 0 1))
+    (hT : ∀ (f : SchwartzBergman (Iio 1)) (z : ℂ), z.re ∈ Ioo 0 1 →
+      (T f).val z = r z * f.val z)
+    (a b : ℝ) (hab : a ≤ b) (hsub : Icc a b ⊆ Ioo 0 1) :
+    ∃ C ≥ (0 : ℝ), ∃ n : ℕ, ∀ z : ℂ, z.re ∈ Icc a b →
+      ‖r z‖ ≤ C * (1 + ‖z‖) ^ n := by
+  let I := Iio (1 : ℝ)
+  let J := Ioo (0 : ℝ) 1
+  have hnJ : J.Nonempty := ⟨1 / 2, by norm_num [J]⟩
+  let E := SchwartzBergman I
+  let V := SchwartzBergman J
+  let Z := Complex.re ⁻¹' Icc a b
+  let p (z : Z) : Seminorm ℂ V :=
+    (normSeminorm ℂ ℂ).comp ((LinearMap.proj z.val).comp (schwartzBergmanSubmodule J).subtype)
+  have hp (z : Z) : Continuous (p z) :=
+    (decayFourier_bergman_eval J isOpen_Ioo ordConnected_Ioo hnJ z.val).norm
+  have hbd : BddAbove (range p) := by
+    rw [Seminorm.bddAbove_range_iff]
+    intro f
+    obtain ⟨C, hC⟩ := f.property.2.2 a b hab hsub 0
+    exact ⟨C, by
+      rintro _ ⟨z, rfl⟩
+      change ‖f.val z.val‖ ≤ C
+      simpa only [pow_zero, one_mul] using hC (mem_image_of_mem _ z.property)⟩
+  let : BarrelledSpace ℂ V := isFrechetTVS_barrelled
+    (schwartzBergman_frechet J isOpen_Ioo ordConnected_Ioo hnJ)
+  let q : Seminorm ℂ E := (⨆ z : Z, p z).comp T.toLinearMap
+  have hq : Continuous q := by
+    change Continuous (((⨆ z : Z, p z) : Seminorm ℂ V) ∘ T)
+    rw [Seminorm.coe_iSup_eq hbd]
+    exact (Seminorm.continuous_iSup p hp hbd).comp T.continuous
+  let P : I × ℕ → Seminorm ℂ E := fun i ↦ Seminorm.of
+    (fun f : schwartzBergmanSubmodule I ↦ (eLpNorm (weightedVerticalTrace i.1 i.2 f.val) 2 volume).toReal)
+    (schwartzBergman_l2_seminorm I i).1 (schwartzBergman_l2_seminorm I i).2
+  have hP : WithSeminorms P := withGeneratingSeminorms_spec (schwartzBergmanSubmodule I) P
+  obtain ⟨s, D, _, hD⟩ := Seminorm.bound_of_continuous hP q hq
+  let n := s.sup Prod.snd
+  let g : E := ⟨_, gaussian_mem_schwartzBergmanSubmodule I isOpen_Iio⟩
+  let K (i : I × ℕ) := (2 : ℝ) ^ i.2 * (P (i.1, 0) g + P i g)
+  let C : ℝ := ∑ i ∈ s, K i
+  have hK (i : I × ℕ) : 0 ≤ K i := by dsimp [K]; positivity
+  have hC : 0 ≤ C := Finset.sum_nonneg fun i _ ↦ hK i
+  refine ⟨(D : ℝ) * C, mul_nonneg (NNReal.coe_nonneg _) hC, n, fun z hz ↦ ?_⟩
+  obtain ⟨f, hf, hnorm⟩ := decayFourier_bergman_shift I g z.im
+  have hPbound (i : I × ℕ) (hi : i ∈ s) : P i f ≤ C * (1 + ‖z‖) ^ n := by
+    have h := hnorm i.1 i.2
+    change P i f ≤ (2 * (1 + |z.im|)) ^ i.2 * (P (i.1, 0) g + P i g) at h
+    apply h.trans
+    have hi' : i.2 ≤ n := Finset.le_sup hi
+    have hre : 1 + |z.im| ≤ 1 + ‖z‖ := by linarith [Complex.abs_im_le_norm z]
+    have hpow := (pow_le_pow_left₀ (by positivity) hre i.2).trans
+      (pow_le_pow_right₀ (le_add_of_nonneg_right (norm_nonneg z)) hi')
+    rw [mul_pow, mul_right_comm _ _ (P (i.1, 0) g + P i g)]
+    refine mul_le_mul (Finset.single_le_sum (fun i _ ↦ hK i) hi) hpow (by positivity) hC
+  have hsup : (s.sup P) f ≤ C * (1 + ‖z‖) ^ n :=
+    Seminorm.finset_sup_apply_le (by positivity) hPbound
+  have hqz : ‖(T f).val z‖ ≤ q f :=
+    (le_ciSup hbd (⟨z, hz⟩ : Z)) (T f)
+  have hzg : z - (z.im : ℂ) * Complex.I = (z.re : ℂ) := by
+    exact sub_eq_iff_eq_add.mpr (Complex.re_add_im z).symm
+  have hf1 : 1 ≤ ‖f.val z‖ := by
+    rw [hf, hzg]
+    change 1 ≤ ‖(Complex.re ⁻¹' I).indicator (fun z ↦ Complex.exp (z ^ 2)) (z.re : ℂ)‖
+    have hzI : (z.re : ℂ) ∈ Complex.re ⁻¹' I := by
+      simpa only [mem_preimage, Complex.ofReal_re] using (show z.re ∈ I from (hsub hz).2)
+    rw [indicator_of_mem hzI, Complex.norm_exp, Real.one_le_exp_iff]
+    norm_cast
+    positivity
+  calc
+    ‖r z‖ ≤ ‖r z‖ * ‖f.val z‖ := le_mul_of_one_le_right (norm_nonneg _) hf1
+    _ = ‖(T f).val z‖ := by rw [hT f z (hsub hz), norm_mul]
+    _ ≤ q f := hqz
+    _ ≤ (D : ℝ) * (s.sup P) f := hD f
+    _ ≤ (D : ℝ) * (C * (1 + ‖z‖) ^ n) := mul_le_mul_of_nonneg_left hsup (by positivity)
+    _ = _ := by ring
+
+
+
+/-- The dual Tate factors are reciprocals throughout the overlap. Use the character chart
+calculation from the S-local zeta functional equation above. -/
+private theorem decayFourier_rho_mul_reflect (χ : PontryaginDual Jₛ) (z : ℂ)
+    (hz : z.re ∈ overlapInterval) :
+    ρₛ(χ, z) * ρₛ(χ⁻¹, 1-z) = 1 := by
+  have hneg : (QuotientGroup.mk (-1 : Aₛˣ) : Jₛ) = 1 := by
+    refine (sIdeleQuotient_mk_eq_one F S _).2 ⟨-1, ?_⟩
+    apply Units.ext
+    simp
+  have hdual (w : ℂ) :
+      dualQuasiCharacter mₛ hmₛ (normChart(χ) w) = normChart(χ⁻¹) (1-w) := by
+    ext1 g
+    let N : ℂ := (normℝ(mₛ g) : ℂ)
+    have hN : N ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (mₛ g).ne_zero)
+    change N * normChart(χ) w g⁻¹ = ((χ g : ℂ)⁻¹ * N ^ (1-w))
+    rw [map_inv]
+    change N * ((χ g : ℂ) * N ^ w)⁻¹ = (χ g : ℂ)⁻¹ * N ^ (1-w)
+    rw [Complex.cpow_sub _ _ hN, Complex.cpow_one, div_eq_mul_inv, mul_inv_rev]
+    ac_rfl
+  have hpos : 0 < (1-z).re := by simpa only [Complex.sub_re, Complex.one_re] using sub_pos.mpr hz.2
+  have h₁ : ContinuousAt (fun w ↦ ρₛ(χ, w)) z := by
+    have h := sLocalRhoFactor_iteratedDeriv_analyticOn (F := F) (S := S) χ 0 z hz.1
+    rw [iteratedDeriv_zero] at h
+    exact h.continuousAt
+  have h₂ : ContinuousAt (fun w ↦ ρₛ(χ⁻¹, w)) (1-z) := by
+    have h := sLocalRhoFactor_iteratedDeriv_analyticOn (F := F) (S := S) χ⁻¹ 0 (1-z) hpos
+    rw [iteratedDeriv_zero] at h
+    exact h.continuousAt
+  have he : (fun w ↦ ρₛ(χ,w) * ρₛ(χ⁻¹, 1-w)) =ᶠ[𝓝[≠] z] (fun _ ↦ 1 : ℂ → ℂ) := by
+    filter_upwards [nhdsNE_le_codiscrete z (sLocalRhoFactor_mul_dual χ)] with w hw
+    dsimp only at hw
+    rw [hdual w, hneg, map_one] at hw
+    exact hw
+  exact tendsto_nhds_unique_of_eventuallyEq
+    (h₁.mul (h₂.comp (continuousAt_const.sub continuousAt_id))).continuousWithinAt
+    tendsto_const_nhds he
+
+private theorem decayFourier_rho_growth (χ : PontryaginDual Jₛ)
+    (a b : ℝ) (hab : a ≤ b) (hsub : Icc a b ⊆ overlapInterval) :
+    ∃ C ≥ (0 : ℝ), ∃ n : ℕ, ∀ z : ℂ, z.re ∈ Icc a b →
+      ‖ρₛ(χ,z)‖ ≤ C * (1 + ‖z‖) ^ n := by
+  obtain ⟨D, hD, _⟩ := existsUnique_sLocalZetaMatchingDifference χ
+  let T : SchwartzBergman leftInterval →L[ℂ] SchwartzBergman overlapInterval :=
+    -(D.comp (ContinuousLinearMap.inr ℂ (SchwartzBergman rightInterval) (SchwartzBergman leftInterval)))
+  apply decayFourier_bergman_multiplier_growth (fun z ↦ ρₛ(χ,z)) T _ a b hab hsub
+  intro f z hz
+  have he := hD (0, f) (show z ∈ overlap from hz)
+  change -(D (0,f)).val z = _
+  rw [he]
+  change -(0 - ρₛ(χ,z) * f.val z) = _
+  simp
+
+private theorem decayFourier_reflected_interval (I : Set ℝ) (ho : IsOpen I)
+    (hi : OrdConnected I) (hn : I.Nonempty) (hsub : I ⊆ overlapInterval) :
+    IsOpen (reflect(I)) ∧ OrdConnected (reflect(I)) ∧ (reflect(I)).Nonempty ∧
+      reflect(I) ⊆ overlapInterval := by
+  refine ⟨ho.preimage (continuous_const.sub continuous_id),
+    hi.preimage_anti (fun x y hxy ↦ sub_le_sub_left hxy _), ?_, ?_⟩
+  · exact ⟨1 - hn.some, by simpa only [mem_preimage, sub_sub_cancel] using hn.some_mem⟩
+  · intro a ha
+    have h : 1-a ∈ overlapInterval := hsub ha
+    exact ⟨by linarith [h.2], by linarith [h.1]⟩
+
+private theorem decayFourier_bergman_equiv (χ : PontryaginDual Jₛ) (I : Set ℝ)
+    (ho : IsOpen I) (hi : OrdConnected I) (hn : I.Nonempty) (hsub : I ⊆ overlapInterval) :
+    ∃ T : SchwartzBergman I ≃L[ℂ] SchwartzBergman (reflect(I)),
+      ∀ f z, z.re ∈ reflect(I) → (T f).val z = ρₛ(χ⁻¹,z) * f.val (1-z) := by
+  let J := reflect(I)
+  obtain ⟨ho', hi', hn', hsub'⟩ := decayFourier_reflected_interval I ho hi hn hsub
+  have hρ (η : PontryaginDual Jₛ) : DifferentiableOn ℂ (fun z ↦ ρₛ(η,z)) rightHalf := by
+    have h := sLocalRhoFactor_iteratedDeriv_analyticOn (F := F) (S := S) η 0
+    rw [iteratedDeriv_zero] at h
+    exact h.differentiableOn
+  obtain ⟨A, hA⟩ := decayFourier_bergman_reflect_multiplier I J ho hi hn ho' hi' hn'
+    (fun _ h ↦ h) (fun z ↦ ρₛ(χ⁻¹,z)) ((hρ χ⁻¹).mono (fun _ h ↦ (hsub' h).1))
+    (fun a b hab h ↦ decayFourier_rho_growth χ⁻¹ a b hab (h.trans hsub'))
+  obtain ⟨B, hB⟩ := decayFourier_bergman_reflect_multiplier J I ho' hi' hn' ho hi hn
+    (fun a h ↦ show 1-(1-a) ∈ I by rwa [sub_sub_cancel])
+    (fun z ↦ ρₛ(χ,z)) ((hρ χ).mono (fun _ h ↦ (hsub h).1))
+    (fun a b hab h ↦ decayFourier_rho_growth χ a b hab (h.trans hsub))
+  have hfl (f : SchwartzBergman I) : B (A f) = f := by
+    apply existsUnique_sLocalZetaPair_ext
+    intro z hz
+    have hz' : (1-z).re ∈ J := by
+      change 1-(1-z).re ∈ I
+      simpa only [Complex.sub_re, Complex.one_re, sub_sub_cancel] using (show z.re ∈ I from hz)
+    rw [hB (A f) z hz, hA f (1-z) hz', sub_sub_cancel, ← mul_assoc,
+      decayFourier_rho_mul_reflect χ z (hsub hz), one_mul]
+  have hfr (f : SchwartzBergman J) : A (B f) = f := by
+    apply existsUnique_sLocalZetaPair_ext
+    intro z hz
+    have hz' : (1-z).re ∈ I := by
+      simpa only [Complex.sub_re, Complex.one_re] using (show 1-z.re ∈ I from hz)
+    have h := decayFourier_rho_mul_reflect χ (1-z) (hsub hz')
+    rw [sub_sub_cancel, mul_comm] at h
+    rw [hA (B f) z hz, hB f (1-z) hz', sub_sub_cancel, ← mul_assoc, h, one_mul]
+  let T : SchwartzBergman I ≃L[ℂ] SchwartzBergman J :=
+    { toLinearMap := A.toLinearMap
+      invFun := B
+      left_inv := hfl
+      right_inv := hfr
+      continuous_toFun := A.continuous
+      continuous_invFun := B.continuous }
+  exact ⟨T, hA⟩
+
+/-- Restrict the family of weighted Schwartz–Bruhat conditions to a smaller interval. -/
+private theorem decayFourier_restrict (I J : Set ℝ) (hIJ : I ⊆ J) (ω : PontryaginDual J₁)
+    (v : Eω(J, ω)) : ∃ u : Eω(I, ω), u.val.val = v.val.val := by
+  let w : Ẽ(I) := ⟨v.val.val, (Submodule.mem_iInf _).mpr fun a ↦
+    (Submodule.mem_iInf _).mp v.val.property ⟨a.val, hIJ a.property⟩⟩
+  have hw := (mem_sLocalDecayIsotype J ω v.val).mp v.property
+  exact ⟨⟨w, (mem_sLocalDecayIsotype I ω w).mpr hw⟩, rfl⟩
+
+/-- Construct the extension in the two shifted Mellin coordinates using the
+S-local Čech commutation and the zeta functional equation. -/
+private theorem decayFourier_extension (χ : PontryaginDual Jₛ) (I : Set ℝ)
+    (ho : IsOpen I) (hi : OrdConnected I) (hn : I.Nonempty) (hsub : I ⊆ overlapInterval) :
+    ∃ e : Eω(I, restrict₁(χ)) ≃L[ℂ] Eω(reflect(I), restrict₁(χ⁻¹)),
+      ∀ f : ℬₛ, ∃ (u : Eω(I, restrict₁(χ))) (v : Eω(reflect(I), restrict₁(χ⁻¹))), e u = v ∧
+        (∀ g : Jₛ, u.val.val g = φω(restrict₁(χ)) f g) ∧
+        (∀ g : Jₛ, v.val.val g = φω(restrict₁(χ⁻¹)) (Fourierₛ f) g) := by
+  let τ : ℝ≥0ˣ →ₜ* Jₛ := (sIdeleQuotientNorm_exists_section F S).choose
+  have hτ : RightInverse τ mₛ := (sIdeleQuotientNorm_exists_section F S).choose_spec
+  have hfreq := (existsUnique_sLocalCechFrequency (F := F) (S := S) χ τ).exists
+  let x := hfreq.choose
+  have hx := hfreq.choose_spec
+  have hreflect := decayFourier_reflected_interval I ho hi hn hsub
+  have hsub' := hreflect.2.2.2
+  have h₁ := (existsUnique_sLocalDecayMellin (F := F) (S := S)
+    τ hτ I ho hi hn restrict₁(χ) x).exists
+  have h₂ := (existsUnique_sLocalDecayMellin (F := F) (S := S)
+    τ hτ (reflect(I)) hreflect.1 hreflect.2.1 hreflect.2.2.1 restrict₁(χ⁻¹) (-x)).exists
+  let M := h₁.choose
+  let M' := h₂.choose
+  have hM := h₁.choose_spec
+  have hM' := h₂.choose_spec
+  have hT' := decayFourier_bergman_equiv (F := F) (S := S) χ I ho hi hn hsub
+  let T := hT'.choose
+  have hT := hT'.choose_spec
+  let e := M.trans (T.trans M'.symm)
+  refine ⟨e, fun f ↦ ?_⟩
+  let p := cechThetaPair(χ) (Submodule.Quotient.mk f)
+  have hp := (existsUnique_sLocalCechThetaPair χ).exists.choose_spec f
+  have hu' := decayFourier_restrict (F := F) (S := S) I rightInterval
+    (fun _ h ↦ (hsub h).1) restrict₁(χ) p.1
+  have hv' := decayFourier_restrict (F := F) (S := S) (reflect(I)) rightInterval
+    (fun _ h ↦ (hsub' h).1) restrict₁(χ⁻¹) p.2
+  let u := hu'.choose
+  let v := hv'.choose
+  have hu := hu'.choose_spec
+  have hv := hv'.choose_spec
+  refine ⟨u, v, ?_, fun g ↦ congrFun (hu.trans hp.1) g, fun g ↦ congrFun (hv.trans hp.2) g⟩
+  have hR₁ := (existsUnique_sLocalDecayMellin (F := F) (S := S) τ hτ rightInterval
+    isOpen_Ioi ordConnected_Ioi ⟨1, one_pos⟩ restrict₁(χ) x).exists
+  have hR₂ := (existsUnique_sLocalDecayMellin (F := F) (S := S) τ hτ rightInterval
+    isOpen_Ioi ordConnected_Ioi ⟨1, one_pos⟩ restrict₁(χ⁻¹) (-x)).exists
+  let R := hR₁.choose
+  let R' := hR₂.choose
+  have hR := hR₁.choose_spec
+  have hR' := hR₂.choose_spec
+  have hcomm := sLocalCech_left_commutes χ τ hτ x hx R R'
+    (fun w z hz ↦ (hR w z hz).2)
+    (fun w z hz ↦ by
+      simpa only [R', Complex.ofReal_neg, neg_mul, sub_eq_add_neg] using (hR' w z hz).2) f
+  have hMu (z : ℂ) (hz : z.re ∈ I) : (M u).val z = Zₛ f (normChart(χ) z) := by
+    have hz' : z ∈ rightHalf := (hsub hz).1
+    rw [(hM u z hz).2, hu, ← (hR p.1 z hz').2]
+    exact hcomm.1 hz'
+  have hMv (z : ℂ) (hz : z.re ∈ reflect(I)) :
+      (M' v).val z = Zₛ (Fourierₛ f) (normChart(χ⁻¹) z) := by
+    have hz' : z ∈ rightHalf := (hsub' hz).1
+    rw [(hM' v z hz).2, hv, ← (hR' p.2 z hz').2]
+    exact hcomm.2 hz'
+  have heq : T (M u) = M' v := by
+    apply existsUnique_sLocalZetaPair_ext
+    intro z hz
+    have hz' : (1-z).re ∈ I := by
+      simpa only [Complex.sub_re, Complex.one_re] using (show 1-z.re ∈ I from hz)
+    have hρ := decayFourier_rho_mul_reflect χ (1-z) (hsub hz')
+    rw [sub_sub_cancel, mul_comm] at hρ
+    have hFE := existsUnique_sLocalZetaPair_equation χ f (1-z) (hsub hz')
+    rw [sub_sub_cancel] at hFE
+    calc
+      (T (M u)).val z = ρₛ(χ⁻¹,z) * (M u).val (1-z) := hT _ z hz
+      _ = ρₛ(χ⁻¹,z) * Zₛ f (normChart(χ) (1-z)) := congrArg (ρₛ(χ⁻¹,z) * ·) (hMu _ hz')
+      _ = Zₛ (Fourierₛ f) (normChart(χ⁻¹) z) := by
+        rw [hFE, ← mul_assoc, hρ, one_mul]
+      _ = (M' v).val z := (hMv _ hz).symm
+  have hsymm : M'.symm (T (M u)) = M'.symm (M' v) := congrArg M'.symm heq
+  exact hsymm.trans (M'.symm_apply_apply v)
+
+-- The twisting calculation below is adapted from the zero pole-bound lift in Ch07 Sec2.
+/-- Multiplication of a test by a character of the idele quotient factors that character
+out of the S-unit sum, since every projected diagonal S-unit has class one. -/
+private theorem decayFourier_theta_twist_sum (b : QuasiCharacter Jₛ)
+    (f f' : ℬₛ) (h : ∀ z : Aₛˣ, f' (Multiplicative.ofAdd z.val) =
+      b (QuotientGroup.mk z) * f (Multiplicative.ofAdd z.val)) (x : Jₛ) :
+    sLocalAdelicThetaOnClasses F S f' x = b x * sLocalAdelicThetaOnClasses F S f x := by
+  obtain ⟨z, rfl⟩ := QuotientGroup.mk_surjective x
+  rw [sLocalAdelicThetaOnClasses_mk, sLocalAdelicThetaOnClasses_mk,
+    sLocalAdelicTheta_apply, sLocalAdelicTheta_apply, ← tsum_mul_left]
+  let d := (Units.map ((adeleProjection F S).comp (integralAdelesOutside F S).subtype).toMonoidHom).comp
+    (Units.map (integralAdeleDiagonal F S).toMonoidHom)
+  apply tsum_congr
+  intro u
+  have hu : (QuotientGroup.mk (d u) : Jₛ) = 1 := (sIdeleQuotient_mk_eq_one F S _).mpr ⟨u, rfl⟩
+  have hz : (QuotientGroup.mk (d u * z) : Jₛ) = QuotientGroup.mk z := by
+    rw [QuotientGroup.mk_mul, hu, one_mul]
+  exact (h (d u * z)).trans (congrArg (fun a : Jₛ ↦ b a * f (Multiplicative.ofAdd (d u * z).val)) hz)
+
+/-- Twisting a test by the inverse of a unitary character transports its trivial homogeneous
+theta function to the restricted character isotype. -/
+private theorem decayFourier_theta_twist (η : PontryaginDual J₁)
+    (χ : PontryaginDual Jₛ) (hχ : ∀ u : J₁, χ u.val = η u) (f f' : ℬₛ)
+    (h : ∀ z : Aₛˣ, f' (Multiplicative.ofAdd z.val) =
+      ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ⁻¹) (QuotientGroup.mk z) * f (Multiplicative.ofAdd z.val))
+    (g : Jₛ) : sLocalHomogeneousAdelicThetaLinearMap F S η f' g =
+      (χ g : ℂ)⁻¹ * sLocalHomogeneousAdelicThetaLinearMap F S 1 f g := by
+  let : MeasurableSpace J₁ := borel _
+  let μ := sLocalNormOneQuotientMeasure F S
+  let b := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ⁻¹
+  have hfactor (u : J₁) : b (g * u.val) * (η u : ℂ) = (χ g : ℂ)⁻¹ := by
+    change (((χ (g * u.val))⁻¹ : Circle) : ℂ) * (η u : ℂ) = _
+    rw [map_mul, Circle.coe_inv, Circle.coe_mul, hχ]
+    field_simp [Circle.coe_ne_zero]
+  have hint (u : J₁) :
+      sLocalAdelicThetaOnClasses F S f' (g * u.val) * (η u : ℂ) =
+      (χ g : ℂ)⁻¹ * (sLocalAdelicThetaOnClasses F S f (g * u.val) * ((1 : PontryaginDual J₁) u : ℂ)) := by
+    rw [decayFourier_theta_twist_sum b f f' h, mul_right_comm, hfactor]
+    change _ = _ * (_ * ((1 : Circle) : ℂ))
+    rw [Circle.coe_one, mul_one]
+  exact (sLocalHomogeneousAdelicThetaLinearMap_apply η f' g).trans
+    ((MeasureTheory.integral_congr_ae (μ := μ) (.of_forall hint)).trans
+      ((MeasureTheory.integral_const_mul _ _).trans
+        (congrArg ((χ g : ℂ)⁻¹ * ·) (sLocalHomogeneousAdelicThetaLinearMap_apply (F := F) (S := S) (1 : PontryaginDual J₁) f g).symm)))
+
+
+/-- Transport Appendix D's density of compactly supported profiles by logarithmic coordinates. -/
+private theorem decayFourier_dense_compact_profiles (I : Set ℝ) (hi : OrdConnected I)
+    (hn : I.Nonempty) :
+    Dense {f : PositiveRealExponentialDecay I | HasCompactSupport f.val} := by
+  let m := ContinuousMonoidHom.id ℝ≥0ˣ
+  let t₀ : ℝ≥0ˣ := Units.mk0 2 (by norm_num)
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have hm : IsModulation m := ⟨isProperMap_id, t₀, by
+    intro h
+    have he : (2 : ℝ≥0) = 1 := congrArg Units.val h
+    norm_num at he⟩
+  have hs : Surjective m := surjective_id
+  obtain ⟨L, hL⟩ := positiveRealExponentialDecay_log_equiv I hi hn
+  let j := bruhatCompactSupportToModulatedExponentialDecay m I hm hs
+  have hd : DenseRange j := bruhatCompactSupport_dense_modulatedExponentialDecay m I hm hs hi hn
+  apply (L.symm.surjective.denseRange.dense_image L.symm.continuous hd).mono
+  rintro _ ⟨_, ⟨φ, rfl⟩, rfl⟩
+  let v : ℝ ≃ₜ ℝ≥0ˣ :=
+    Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  have he : (L.symm (j φ)).val = fun x ↦ φ.val (v x) := by
+    funext x
+    have h := hL (L.symm (j φ)) (v x)
+    rw [L.apply_symm_apply] at h
+    change (j φ).val (v x) = (L.symm (j φ)).val (Real.log (Real.exp x)) at h
+    rw [Real.log_exp] at h
+    exact h.symm.trans (bruhatCompactSupportToModulatedExponentialDecay_apply m I hm hs φ _)
+  change HasCompactSupport (L.symm (j φ)).val
+  rw [he]
+  exact φ.property.2.comp_homeomorph v
+
+private theorem decayFourier_compact_profile_all_weights (I : Set ℝ) (hI : I.Nonempty)
+    (f : PositiveRealExponentialDecay I) (hf : HasCompactSupport f.val) :
+    ∃ p : PositiveRealExponentialDecay univ, p.val = f.val := by
+  let a : I := ⟨hI.some, hI.some_mem⟩
+  let T := logExponentialDecayTwist I a f
+  have hexp (b : ℝ) : ContDiff ℝ ((⊤ : ℕ∞) : WithTop ℕ∞) (fun t : ℝ ↦ (Real.exp (b * t) : ℂ)) :=
+    Complex.ofRealCLM.contDiff.comp (Real.contDiff_exp.comp (contDiff_const.mul contDiff_id))
+  have hφ : ContDiff ℝ ((⊤ : ℕ∞) : WithTop ℕ∞) f.val := by
+    have he : (fun x : ℝ ↦ T x * (Real.exp (-(a : ℝ) * x) : ℂ)) = f.val := by
+      funext x
+      show T x * (Real.exp (-(a : ℝ) * x) : ℂ) = f.val x
+      rw [show T x = _ from logExponentialDecayTwist_apply I a f x, mul_right_comm,
+        ← Complex.ofReal_mul, ← Real.exp_add, show (a : ℝ) * x + -(a : ℝ) * x = 0 by ring,
+        Real.exp_zero, Complex.ofReal_one, one_mul]
+    rw [← he]
+    exact (T.smooth ⊤).mul (hexp (-(a : ℝ)))
+  refine ⟨⟨f.val, (Submodule.mem_iInf _).2 fun b ↦ ?_⟩, rfl⟩
+  let ψ (x : ℝ) := (Real.exp ((b : ℝ) * x) : ℂ) * f.val x
+  have hψ : ContDiff ℝ ((⊤ : ℕ∞) : WithTop ℕ∞) ψ := (hexp (b : ℝ)).mul hφ
+  have hs : HasCompactSupport ψ := hf.mul_left
+  exact ⟨hs.toSchwartzMap hψ, rfl⟩
+
+/-- A compact log profile, transported to the chosen isotype, is represented
+by a polar-free theta test. This is the lift used for the zero pole bound in
+Chapter 7, with the compact profile supplied directly. -/
+private theorem decayFourier_compact_theta_lift (I : Set ℝ) (hn : I.Nonempty) (η : PontryaginDual J₁)
+    (τ : ℝ≥0ˣ →ₜ* Jₛ) (hτ : RightInverse τ mₛ)
+    (Φ : Eω(I, η) ≃L[ℂ] PositiveRealExponentialDecay I)
+    (hΦ : ∀ p t (k : J₁), (Φ.symm p).val.val (τ t * k.val) =
+      star (η k : ℂ) * p.val (Real.log normℝ(t)))
+    (p : PositiveRealExponentialDecay I) (hp : HasCompactSupport p.val) :
+    ∃ f : ℬₛ, ∀ g : Jₛ, φω(η) f g = (Φ.symm p).val.val g := by
+  let r (w : {w : InfinitePlace F // w.IsReal}) :
+      {e : w.val.Completion ≃+* ℝ // IsHomeomorph (e : w.val.Completion → ℝ)} :=
+    ⟨InfinitePlace.Completion.ringEquivRealOfIsReal w.property,
+      (InfinitePlace.Completion.isometryEquivRealOfIsReal w.property).toHomeomorph.isHomeomorph⟩
+  let c (w : {w : InfinitePlace F // w.IsComplex}) :
+      {e : w.val.Completion ≃+* ℂ // IsHomeomorph (e : w.val.Completion → ℂ)} :=
+    ⟨InfinitePlace.Completion.ringEquivComplexOfIsComplex w.property,
+      (InfinitePlace.Completion.isometryEquivComplexOfIsComplex w.property).toHomeomorph.isHomeomorph⟩
+  let rchar := existsUnique_sLocalNormSectionCharacter (F := F) (S := S) τ hτ η
+  let χ : PontryaginDual Jₛ := rchar.exists.choose
+  have hχ := rchar.exists.choose_spec
+  have ht (t : ℝ≥0ˣ) : χ (τ t) = 1 := hχ.2 t
+  have hres (u : J₁) : χ u.val = η u := DFunLike.congr_fun hχ.1 u
+  have hprofile := decayFourier_compact_profile_all_weights I hn p hp
+  let p' := hprofile.choose
+  have hp' := hprofile.choose_spec
+  have hlift := sLocalHomogeneousTheta_trivial_exists_polarFree (F := F) (S := S) r c p'
+  let f := hlift.choose
+  have hf := hlift.choose_spec
+  have hmul := sAdelePolarFree_quasiCharacter_mul (F := F) (S := S) r c
+    ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ⁻¹)
+  let M := hmul.choose
+  have hM := hmul.choose_spec
+  refine ⟨(M f).val, fun g ↦ ?_⟩
+  let t := mₛ g
+  let k : J₁ := ⟨g / τ t, by simp [MonoidHom.mem_ker, hτ t, t]⟩
+  have hg : τ t * k.val = g := by
+    change τ t * (g / τ t) = g
+    exact (mul_comm _ _).trans (div_mul_cancel _ _)
+  have hk : mₛ (τ t * k.val) = t := by rw [map_mul, k.property, hτ, mul_one]
+  have hθ : φω(η) (M f).val (τ t * k.val) =
+      (χ (τ t * k.val) : ℂ)⁻¹ * φω((1 : PontryaginDual J₁)) f.val (τ t * k.val) :=
+    decayFourier_theta_twist (F := F) (S := S) η χ hres f.val (M f).val (hM f) _
+  have hr : φω((1 : PontryaginDual J₁)) f.val (τ t * k.val) =
+      p.val (Real.log normℝ(t)) := by
+    refine (hf _).trans ?_
+    rw [hk, hp']
+  have hχk : (χ (τ t * k.val) : ℂ)⁻¹ = star (η k : ℂ) := by
+    rw [map_mul, ht, one_mul, hres]
+    exact (Circle.coe_inv (η k)).symm.trans (Circle.coe_inv_eq_conj (η k))
+  have htest : φω(η) (M f).val (τ t * k.val) = (Φ.symm p).val.val (τ t * k.val) :=
+    hθ.trans ((congrArg₂ (· * ·) hχk hr).trans (hΦ p t k).symm)
+  exact hg ▸ htest
+
+/-- Paper: Proposition 5.4.2.1(1), p. 275.
+Fourier transform extends uniquely between the weighted isotype and the conjugate
+isotype for the reflected exponent interval. Its value on each embedded homogeneous
+theta function is the homogeneous theta function of the Fourier-transformed test.
+Deviation: The extension identity uses the two isotypes of the theta quotient. -/
+theorem existsUnique_sLocalDecayFourier (χ : PontryaginDual Jₛ) (I : Set ℝ) (_hOpen : IsOpen I)
+    (_hInt : OrdConnected I) (_hne : I.Nonempty) (_hsub : I ⊆ overlapInterval) :
+    let domain : Submodule ℂ Ẽ(I) := sLocalDecayIsotype (F := F) (S := S) I (restrict₁(χ))
+    let codomain : Submodule ℂ Ẽ(reflect(I)) :=
+      sLocalDecayIsotype (F := F) (S := S) (reflect(I)) (restrict₁(χ⁻¹))
+    ∃! e : domain ≃L[ℂ] codomain,
+      let transform : domain → codomain := e
+      ∀ f : ℬₛ, ∃ (u : domain) (v : codomain), transform u = v ∧
+        (∀ g : Jₛ, u.val.val g = φω(restrict₁(χ)) f g) ∧
+        (∀ g : Jₛ, v.val.val g = φω(restrict₁(χ⁻¹)) (Fourierₛ f) g) := by
+  have hex := decayFourier_extension (F := F) (S := S) χ I _hOpen _hInt _hne _hsub
+  let e := hex.choose
+  have he := hex.choose_spec
+  refine ⟨e, he, fun e' he' ↦ ?_⟩
+  have hsection := sIdeleQuotientNorm_exists_section F S
+  let τ := hsection.choose
+  have hτ := hsection.choose_spec
+  have hcoordinates := existsUnique_sLocalCechRadialReflection_isotypeEquiv
+    (F := F) (S := S) τ hτ I _hInt _hne restrict₁(χ)
+  let Φ := hcoordinates.choose
+  have hΦ := hcoordinates.choose_spec.2
+  let D : Set Eω(I, restrict₁(χ)) :=
+    {u | ∃ f : ℬₛ, ∀ g, u.val.val g = φω(restrict₁(χ)) f g}
+  have hD : Dense D := by
+    apply (Φ.symm.surjective.denseRange.dense_image Φ.symm.continuous
+      (decayFourier_dense_compact_profiles I _hInt _hne)).mono
+    rintro _ ⟨p, hp, rfl⟩
+    have hlift := decayFourier_compact_theta_lift (F := F) (S := S) I _hne restrict₁(χ) τ hτ Φ hΦ p hp
+    exact ⟨hlift.choose, fun g ↦ (hlift.choose_spec g).symm⟩
+  have heq : EqOn e' e D := by
+    intro u hu
+    change ∃ f : ℬₛ, ∀ g, u.val.val g = φω(restrict₁(χ)) f g at hu
+    let f := hu.choose
+    have hf := hu.choose_spec
+    have h₁ := he' f
+    have h₂ := he f
+    let u₁ := h₁.choose
+    let u₂ := h₂.choose
+    let v₁ := h₁.choose_spec.choose
+    let v₂ := h₂.choose_spec.choose
+    have hw₁ := h₁.choose_spec.choose_spec
+    have hw₂ := h₂.choose_spec.choose_spec
+    have hu₁ : u₁ = u :=
+      Subtype.ext (Subtype.ext (funext fun g ↦ (hw₁.2.1 g).trans (hf g).symm))
+    have hu₂ : u₂ = u :=
+      Subtype.ext (Subtype.ext (funext fun g ↦ (hw₂.2.1 g).trans (hf g).symm))
+    have hv : v₁ = v₂ :=
+      Subtype.ext (Subtype.ext (funext fun g ↦ (hw₁.2.2 g).trans (hw₂.2.2 g).symm))
+    calc
+      e' u = e' u₁ := congrArg e' hu₁.symm
+      _ = v₁ := hw₁.1
+      _ = v₂ := hv
+      _ = e u₂ := hw₂.1.symm
+      _ = e u := congrArg e hu₂
+  have hJ := decayFourier_reflected_interval I _hOpen _hInt _hne _hsub
+  let Ψ := (existsUnique_sLocalCechRadialReflection_isotypeEquiv (F := F) (S := S)
+    τ hτ (reflect(I)) hJ.2.1 hJ.2.2.1 restrict₁(χ⁻¹)).choose
+  let : T2Space (PositiveRealExponentialDecay (reflect(I))) :=
+    (positiveRealExponentialDecay_isEmbedding (reflect(I)) hJ.2.2.1).t2Space
+  let : T2Space Eω(reflect(I), restrict₁(χ⁻¹)) :=
+    T2Space.of_injective_continuous Ψ.injective Ψ.continuous
+  refine ContinuousLinearEquiv.ext (funext fun u ↦ ?_)
+  exact closure_minimal (fun _ hv ↦ heq hv)
+    (isClosed_eq e'.continuous e.continuous) (hD u)
+
+/-- Paper: Proposition 5.4.2.1(2), p. 275.
+The unitary Fourier extension agrees on the weighted isotype with the Fourier map
+for the reflected interval, after embedding both functions by their L² classes. -/
+theorem sLocalDecayFourier_eq_weightedFourier (χ : PontryaginDual Jₛ) (I : Set ℝ) (hOpen : IsOpen I)
+    (hInt : OrdConnected I) (hsub : I ⊆ overlapInterval) (hhalf : (1 / 2 : ℝ) ∈ I) :
+    let j := (existsUnique_sLocalDecayToThetaL2 (F := F) (S := S)
+      I hOpen hInt hsub hhalf).exists.choose
+    let e := (existsUnique_sLocalDecayFourier (F := F) (S := S) χ I hOpen hInt ⟨_, hhalf⟩ hsub).exists.choose
+    ∀ f : Eω(I, restrict₁(χ)),
+      ((((weightedFourier (j f.val)).val : L²ₛ) : Jₛ → ℂ)) =ᵐ[μweighted] (e f).val.val :=
+  by sorry
 
 /-- Transport an exact pair through two linear homeomorphisms; separating observations ensure uniqueness. -/
 private theorem existsUnique_sLocalCechDifference_conjugate
