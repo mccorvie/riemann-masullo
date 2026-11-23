@@ -357,7 +357,6 @@ private theorem exists_ratLineEvaluation (a t : ℝ)
   refine ⟨L₂, fun v ↦ ?_⟩
   simpa only [j, χ, spectralZeroJet, pow_zero, mul_one, Complex.ofReal_zero, zero_add] using (hL₂ v).2
 
-set_option maxHeartbeats 400000 in
 private theorem spectralLineCompletion_descends_false_of_zero (t : ℝ) (ht : 0 < t)
     (hz : 0 < meromorphicOrderAt ΛC (shift((1 / 2 : ℝ), t))) :
     ¬ Printed.spectralLineCompletion_descends := by
