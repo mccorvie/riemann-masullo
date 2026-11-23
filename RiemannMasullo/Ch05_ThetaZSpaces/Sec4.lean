@@ -487,11 +487,13 @@ theorem sLocalHomogeneousThetaSpace_separable (ω : PontryaginDual J₁) :
 
 /-- Paper: Lemma 5.4.1.3, p. 266.
 The quotient-to-pair map is continuous. -/
-theorem continuous_sLocalZetaPair (χ : PontryaginDual Jₛ) : Continuous (sLocalZetaPair (F := F) (S := S) χ) := by sorry
+theorem continuous_sLocalZetaPair (χ : PontryaginDual Jₛ) : Continuous (sLocalZetaPair (F := F) (S := S) χ) := by
+  exact (sLocalZetaPair_isClosedEmbedding (F := F) (S := S) χ).continuous
 
 /-- Paper: Lemma 5.4.1.3, p. 266.
 The two zeta restrictions determine the homogeneous theta class. -/
-theorem injective_sLocalZetaPair (χ : PontryaginDual Jₛ) : Injective (sLocalZetaPair (F := F) (S := S) χ) := by sorry
+theorem injective_sLocalZetaPair (χ : PontryaginDual Jₛ) : Injective (sLocalZetaPair (F := F) (S := S) χ) := by
+  exact (sLocalZetaPair_isClosedEmbedding (F := F) (S := S) χ).injective
 
 -- Match the choice of archimedean coordinates in §5.3.4.
 local notation "RealModels" => ((w : {v : InfinitePlace F // v.IsReal}) →
@@ -505,7 +507,11 @@ local notation "polarKernel(" P ", " ω ")" => LinearMap.ker ((φω(ω)).comp (P
 
 /-- Paper: (5.4.1.7), p. 267.
 The polar-free homogeneous theta space is the quotient of the polar-free subspace
-by the kernel of its restricted homogeneous theta transform. -/
+by the kernel of its restricted homogeneous theta transform.
+
+Kept as an `abbrev` for now (#5398): as a `def` with its own instances it breaks proofs and
+statements that use it, see the issue. Do not copy this pattern: a new type synonym with
+structure is a `def` with its own instances (`AGENTS.md`). -/
 abbrev SLocalPolarFreeThetaSpace (r : RealModels) (c : ComplexModels) (ω : PontryaginDual J₁) :=
   ↥(polarTests(r, c)) ⧸ polarKernel(polarTests(r, c), ω)
 
@@ -644,7 +650,11 @@ theorem sLocalThetaWeightedL2_norm (f : ℬₛ) :
 variable (F S) in
 /-- Paper: (5.4.2.2), p. 274.
 The weighted Hilbert completion is realized as the closure of the theta image
-in the weighted L² space. -/
+in the weighted L² space.
+
+Kept as an `abbrev` for now (#5398): as a `def` with its own instances it breaks proofs and
+statements that use it, see the issue. Do not copy this pattern: a new type synonym with
+structure is a `def` with its own instances (`AGENTS.md`). -/
 abbrev SLocalThetaL2 :=
   ↥(LinearMap.range ((weightedTheta).toLinearMap)).topologicalClosure
 

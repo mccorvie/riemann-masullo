@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
 public import RiemannMasullo.Ch03_IdelicZeta.Sec4
 public import Mathlib.Analysis.Distribution.Support
+public import Mathlib.Analysis.Calculus.BumpFunction.FiniteDimension
 public import Mathlib.Algebra.MvPolynomial.Degrees
 public import Mathlib.RingTheory.MvPowerSeries.PiTopology
 public import Mathlib.RingTheory.PowerSeries.PiTopology
@@ -268,17 +269,86 @@ theorem finitePlaceDifference_integerIndicator (v : V) (π : Fᵥ(v)ˣ)
       indicator_of_notMem (show _ ∉ (v.adicCompletionIntegers F : Set Fᵥ(v)) from h1),
       indicator_of_notMem fun hx ↦ h.ne' ((hmem x).mp hx), sub_zero]
 
+private theorem finitePlaceDifference_injective_aux (v : V) (π : Fᵥ(v)ˣ)
+    (hπ : vval(v).IsUniformizer π.val) (g : Fᵥ(v) → ℂ) (hlc : IsLocallyConstant g)
+    (hcs : HasCompactSupport g) (hg : ∀ x, g x = g ((↑π⁻¹ : Fᵥ(v)) * x)) : g = 0 := by
+  have hval : vval(v) π.val = WithZero.exp (-1 : ℤ) := hπ.trans
+    (congrArg Units.val (Valuation.IsRankOneDiscrete.generator_eq_exp_neg_one_of_surjective
+      (v.valuedAdicCompletion_surjective F)))
+  have hv1 : vval(v) π.val < 1 := by
+    rw [hval, ← WithZero.exp_zero, WithZero.exp_lt_exp]; norm_num
+  have hpow (n : ℕ) (x : Fᵥ(v)) : g ((π : Fᵥ(v)) ^ n * x) = g x := by
+    induction n generalizing x with
+    | zero => simp
+    | succ n ih => rw [pow_succ, mul_assoc, ih, hg (π * x), Units.inv_mul_cancel_left]
+  let := Valued.toNontriviallyNormedField (Fᵥ(v)) _
+  have hn : ‖(π : Fᵥ(v))‖ < 1 := Valued.toNormedField.norm_lt_one_iff.mpr hv1
+  have hconst (x : Fᵥ(v)) : g x = g 0 := by
+    have ht : Tendsto (fun n : ℕ ↦ (π : Fᵥ(v)) ^ n * x) atTop (𝓝 0) := by
+      simpa using (tendsto_pow_atTop_nhds_zero_of_norm_lt_one hn).mul_const x
+    have h := (hlc.continuous.tendsto 0).comp ht
+    simp only [Function.comp_def, hpow] at h
+    exact tendsto_nhds_unique tendsto_const_nhds h
+  funext x
+  by_contra hx
+  have hc : support g = univ := eq_univ_of_forall fun y ↦ by
+    rw [mem_support, hconst y, ← hconst x]; exact hx
+  have hK : IsCompact (univ : Set Fᵥ(v)) := by
+    have := hcs.isCompact
+    rwa [tsupport, hc, closure_univ] at this
+  exact noncompact_univ _ hK
+
+private theorem finitePlaceDifference_injective (v : V) (π : Fᵥ(v)ˣ)
+    (hπ : vval(v).IsUniformizer π.val) : Function.Injective (finitePlaceDifference v π) := by
+  intro f f' hf
+  have hg (x : Fᵥ(v)) : f (Multiplicative.ofAdd x) - f' (Multiplicative.ofAdd x) =
+      f (Multiplicative.ofAdd ((↑π⁻¹ : Fᵥ(v)) * x)) -
+        f' (Multiplicative.ofAdd ((↑π⁻¹ : Fᵥ(v)) * x)) := by
+    have h := congrArg (fun k : ℬ(Fᵥ(v)) ↦ k (Multiplicative.ofAdd x)) hf
+    change f (Multiplicative.ofAdd x) - f (Multiplicative.ofAdd ((↑π⁻¹ : Fᵥ(v)) * x)) =
+      f' (Multiplicative.ofAdd x) - f' (Multiplicative.ofAdd ((↑π⁻¹ : Fᵥ(v)) * x)) at h
+    linear_combination h
+  obtain ⟨hlc, hcs⟩ := (mem_finitePlaceSchwartz_iff F v
+    (fun x ↦ f (Multiplicative.ofAdd x))).1 ⟨f, fun _ ↦ rfl⟩
+  obtain ⟨hlc', hcs'⟩ := (mem_finitePlaceSchwartz_iff F v
+    (fun x ↦ f' (Multiplicative.ofAdd x))).1 ⟨f', fun _ ↦ rfl⟩
+  have h0 := finitePlaceDifference_injective_aux v π hπ
+    (fun x ↦ f (Multiplicative.ofAdd x) - f' (Multiplicative.ofAdd x)) (hlc.sub hlc')
+    (hcs.sub hcs') hg
+  refine Subtype.ext (funext fun y ↦ ?_)
+  have hy := congrFun h0 (Multiplicative.toAdd y)
+  exact sub_eq_zero.mp hy
+
+private theorem finestLocallyConvex_isEmbedding_of_injective {E : Type*} [AddCommGroup E]
+    [Module ℂ E] (D : FinestLocallyConvex E →ₗ[ℂ] FinestLocallyConvex E)
+    (hD : Function.Injective D) : IsEmbedding D := by
+  have : T2Space (FinestLocallyConvex E) := finestLocallyConvex_t2 E
+  obtain ⟨L, hL⟩ := D.exists_leftInverse_of_injective (LinearMap.ker_eq_bot.mpr hD)
+  have hLD : Function.LeftInverse L D := fun f ↦ LinearMap.congr_fun hL f
+  exact Topology.IsEmbedding.of_leftInverse hLD
+    (continuous_of_finestLocallyConvex E L) (continuous_of_finestLocallyConvex E D)
+
 /-- Paper: Lemma 5.3.1.1, p. 240.
 For each fixed uniformizer the local difference is a topological embedding. -/
 theorem finitePlaceDifference_isEmbedding (v : V) (π : Fᵥ(v)ˣ)
     (hπ : vval(v).IsUniformizer π.val) :
-    IsEmbedding (finitePlaceDifference v π) := by sorry
+    IsEmbedding (finitePlaceDifference v π) := by
+  have heq := finitePlaceSchwartz_finestTopology F v
+  have h := finestLocallyConvex_isEmbedding_of_injective (E := ℬ(Fᵥ(v)))
+    (finitePlaceDifference v π) (finitePlaceDifference_injective v π hπ)
+  exact (congrArg (fun t ↦ @IsEmbedding ℬ(Fᵥ(v)) ℬ(Fᵥ(v)) t t
+    (fun f ↦ finitePlaceDifference v π f)) heq).mpr h
 
 /-- Paper: Lemma 5.3.1.1, pp. 240–241.
 The range of the difference for a fixed uniformizer is closed on the full test space. -/
 theorem finitePlaceDifference_isClosed_range (v : V) (π : Fᵥ(v)ˣ)
     (_hπ : vval(v).IsUniformizer π.val) :
-    IsClosed (Set.range (finitePlaceDifference v π)) := by sorry
+    IsClosed (Set.range (finitePlaceDifference v π)) := by
+  have heq := finitePlaceSchwartz_finestTopology F v
+  have h := finestLocallyConvex_submodule_isClosed (E := ℬ(Fᵥ(v)))
+    (LinearMap.range (finitePlaceDifference v π))
+  exact (congrArg (fun t ↦ @IsClosed ℬ(Fᵥ(v)) t (Set.range (finitePlaceDifference v π)))
+    heq).mpr h
 
 -- TODO(paper-gap): ERRATA R7 gives the failure of independence and range on the whole space.
 
@@ -1076,12 +1146,132 @@ theorem sLocalThetaPrincipalValue_isotypicAverage {S₀ S : Finset V}
     let A := (existsUnique_sLocalThetaIsotypicAverage (F := F) χ).exists.choose
     sLocalThetaPrincipalValue F h₀ (A x) = A (sLocalThetaPrincipalValue F h₀ x) := by sorry
 
+private theorem globalThetaPrincipalValue_isotypicAverage_tensor
+    {M N Y : Type*} [AddCommGroup M] [Module ℂ M] [TopologicalSpace M]
+    [AddCommGroup N] [Module ℂ N] [TopologicalSpace N]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] (e : InductiveTensor M N ≃L[ℂ] Y)
+    (f : M →ₗ[ℂ] M) (g : N →ₗ[ℂ] N) (hf : f = LinearMap.id) (hg : g = LinearMap.id) :
+    e.toLinearMap.comp ((TensorProduct.map f g).comp e.symm.toLinearMap) = LinearMap.id := by
+  subst f g
+  have H : TensorProduct.map (LinearMap.id (R := ℂ) (M := M)) (LinearMap.id (R := ℂ) (M := N)) =
+      LinearMap.id := TensorProduct.map_id
+  rw [H]
+  apply LinearMap.ext
+  exact e.apply_symm_apply
+
+private theorem globalThetaPrincipalValue_isotypicAverage_emptyTensor
+    {ι M Y : Type*} {N : ι → Type*} [IsEmpty ι]
+    [AddCommGroup M] [Module ℂ M] [TopologicalSpace M]
+    [∀ i, AddCommGroup (N i)] [∀ i, Module ℂ (N i)] [AddCommGroup Y] [Module ℂ Y]
+    [TopologicalSpace Y] (e : InductiveTensor M (FinestLocallyConvex (⨂[ℂ] i, N i)) ≃L[ℂ] Y)
+    (L : ∀ i, N i →ₗ[ℂ] N i) :
+    let W := FinestLocallyConvex (⨂[ℂ] i, N i)
+    let P : W →ₗ[ℂ] W := PiTensorProduct.map L
+    e.toLinearMap.comp ((TensorProduct.map (LinearMap.id (R := ℂ) (M := M)) P).comp
+      e.symm.toLinearMap) = LinearMap.id := by
+  intro W P
+  have hp : P = LinearMap.id := (congrArg (PiTensorProduct.map (R := ℂ))
+    (Subsingleton.elim L (fun i ↦ (LinearMap.id : N i →ₗ[ℂ] N i)))).trans PiTensorProduct.map_id
+  exact globalThetaPrincipalValue_isotypicAverage_tensor e LinearMap.id P rfl hp
+
+private theorem globalThetaPrincipalValue_isotypicAverage_emptyTest :
+    adelePrincipalValue F ∅ = LinearMap.id := by
+  unfold adelePrincipalValue
+  with_reducible_and_instances
+    refine globalThetaPrincipalValue_isotypicAverage_tensor _ _ _ ?_ rfl
+  unfold sAdelePrincipalValue
+  with_reducible_and_instances
+    exact globalThetaPrincipalValue_isotypicAverage_emptyTensor (ι := ↥(∅ : Finset V)) _ _
+
+private theorem globalThetaPrincipalValue_isotypicAverage_mapQ_id {E : Type*}
+    [AddCommGroup E] [Module ℂ E] (K : Submodule ℂ E) (P : E →ₗ[ℂ] E)
+    (hK : K ≤ K.comap P) (h : P = LinearMap.id) (x : E ⧸ K) : K.mapQ K P hK x = x := by
+  subst P
+  exact Submodule.Quotient.induction_on K x fun _ ↦ rfl
+
+private theorem globalThetaPrincipalValue_isotypicAverage_empty (x : Θ𝔽) :
+    globalThetaPrincipalValue F ∅ x = x := by
+  unfold globalThetaPrincipalValue
+  with_reducible_and_instances
+    exact globalThetaPrincipalValue_isotypicAverage_mapQ_id _ _ _
+      (globalThetaPrincipalValue_isotypicAverage_emptyTest (F := F)) x
+
+private theorem globalThetaPrincipalValue_isotypicAverage_onReps {G C E X : Type*}
+    (π : G → C) (m : E → X) (hπ : Surjective π) (hm : Surjective m)
+    (p : E → E) (t : G → E → E) (P : X → X) (ρ : C → X → X)
+    (hp : ∀ f, P (m f) = m (p f)) (ht : ∀ g f, ρ (π g) (m f) = m (t g f))
+    (h : ∀ g f, m (p (t g f)) = m (t g (p f))) (q : C) (y : X) :
+    P (ρ q y) = ρ q (P y) := by
+  obtain ⟨g, rfl⟩ := hπ q
+  obtain ⟨f, rfl⟩ := hm y
+  rw [ht, hp, hp, ht, h]
+
+private theorem globalThetaPrincipalValue_isotypicAverage_action {S₀ : Finset V} (hn : S₀.Nonempty)
+    (q : IdeleClassGroup (𝓞 F) F) (y : Θ𝔽) :
+    let ρ := (existsUnique_globalThetaAction (F := F)).exists.choose
+    globalThetaPrincipalValue F S₀ (ρ q y) = ρ q (globalThetaPrincipalValue F S₀ y) := by
+  intro ρ
+  with_reducible_and_instances
+    exact globalThetaPrincipalValue_isotypicAverage_onReps
+      (QuotientGroup.mk : IdeleGroup (𝓞 F) F → IdeleClassGroup (𝓞 F) F)
+      (Submodule.Quotient.mk (p := K𝔽)) QuotientGroup.mk_surjective
+      (Submodule.Quotient.mk_surjective _)
+      (adelePrincipalValue F S₀) schwartzBruhatUnitTranslate (globalThetaPrincipalValue F S₀)
+      (fun g y ↦ ρ g y) (globalThetaPrincipalValue_mk S₀)
+      (existsUnique_globalThetaAction (F := F)).exists.choose_spec.2
+      (globalThetaPrincipalValue_equivariant hn) q y
+
+private theorem globalThetaPrincipalValue_isotypicAverage_commutes
+    {G E : Type*} [Monoid G] [TopologicalSpace G] [MeasurableSpace G]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [PolynormableSpace ℂ E]
+    [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [T2Space E]
+    {μ : Measure G} {ρ : G →* (E →L[ℂ] E)} {χ : PontryaginDual G} {A : E →L[ℂ] E}
+    (hA : IsPettisIsotypicAverageOn μ univ ρ χ A) (P : E →L[ℂ] E)
+    (hP : ∀ g y, P (ρ g y) = ρ g (P y)) (x : E) : P (A x) = A (P x) := by
+  have h : HasPettisIntegral (.positive (μ.restrict univ))
+      (fun g ↦ P (star (χ g : ℂ) • ρ g x)) (P (A x)) := by
+    obtain ⟨hi, he⟩ := hA x
+    refine ⟨fun φ ↦ hi (φ.comp P), LinearMap.ext fun φ ↦ ?_⟩
+    exact LinearMap.congr_fun he (φ.comp P)
+  simp only [map_smul, hP] at h
+  exact h.unique (hA (P x))
+
+private theorem globalThetaPrincipalValue_isotypicAverage_nonempty (S₀ : Finset V) (hn : S₀.Nonempty)
+    (χ : PontryaginDual (ideleClassNorm F).ker) (x : Θ𝔽) :
+    let A := (existsUnique_globalThetaIsotypicAverage (F := F) χ).exists.choose
+    globalThetaPrincipalValue F S₀ (A x) = A (globalThetaPrincipalValue F S₀ x) := by
+  intro A
+  let P : Θ𝔽 →L[ℂ] Θ𝔽 := ⟨globalThetaPrincipalValue F S₀, globalThetaPrincipalValue_continuous S₀⟩
+  let : T2Space Θ𝔽 := globalAdelicThetaSpace_t2_of_isClosed adelicTheta_ker_isClosed
+  let : PolynormableSpace ℂ Θ𝔽 := globalAdelicThetaSpace_polynormable
+  let : IsTopologicalAddGroup Θ𝔽 := PolynormableSpace.isTopologicalAddGroup ℂ Θ𝔽
+  let : ContinuousSMul ℂ Θ𝔽 := (PolynormableSpace.withSeminorms ℂ Θ𝔽).continuousSMul
+  let : MeasurableSpace (IdeleClassGroup (𝓞 F) F) := borel _
+  refine globalThetaPrincipalValue_isotypicAverage_commutes
+    (existsUnique_globalThetaIsotypicAverage (F := F) χ).exists.choose_spec P ?_ x
+  intro g y
+  exact globalThetaPrincipalValue_isotypicAverage_action (F := F) hn g.val y
+
+private theorem globalThetaPrincipalValue_isotypicAverage_cases {ι E : Type*}
+    (P : Finset ι → E → E) (A : E → E) (he : ∀ y, P ∅ y = y)
+    (hn : ∀ t : Finset ι, t.Nonempty → ∀ y, P t (A y) = A (P t y))
+    (s : Finset ι) (x : E) : P s (A x) = A (P s x) := by
+  rcases s.eq_empty_or_nonempty with rfl | h
+  · rw [he, he]
+  · exact hn s h x
+
 /-- Paper: Lemma 5.3.1.5, p. 242.
 The global principal value commutes with the norm-one character average of §5.2.3. -/
 theorem globalThetaPrincipalValue_isotypicAverage (S₀ : Finset V)
     (χ : PontryaginDual (ideleClassNorm F).ker) (x : Θ𝔽) :
     let A := (existsUnique_globalThetaIsotypicAverage (F := F) χ).exists.choose
-    globalThetaPrincipalValue F S₀ (A x) = A (globalThetaPrincipalValue F S₀ x) := by sorry
+    globalThetaPrincipalValue F S₀ (A x) = A (globalThetaPrincipalValue F S₀ x) := by
+  intro A
+  with_reducible_and_instances
+    exact globalThetaPrincipalValue_isotypicAverage_cases
+      (fun S y ↦ globalThetaPrincipalValue F S y) A
+      (globalThetaPrincipalValue_isotypicAverage_empty (F := F))
+      (fun S hn y ↦ globalThetaPrincipalValue_isotypicAverage_nonempty (F := F) S hn χ y) S₀ x
 
 end AdelicPrincipalValue
 
@@ -1401,6 +1591,148 @@ theorem realDiracDerivatives_polynomialEquiv :
           (fun f : 𝒟ℝ ↦ e p (realSchwartzFlatAtOrigin.mkQ
             (f.hasCompactSupport.toSchwartzMap f.contDiff))) N ↔ p.natDegree ≤ N := by sorry
 
+/-- A Borel series `∑ bₙ φₙ` whose terms past `m` are dominated by a summable sequence converges
+in the Schwartz space. Its Dirac derivatives are those of the coefficients, and its seminorms of
+order at most `m` are bounded by the first `m + 1` terms plus the dominating sum. -/
+private theorem realSchwartzTaylor_equiv_series (m : ℕ) (φ : ℕ → 𝓢(ℝ, ℂ)) (b : ℕ → ℂ)
+    (w : ℕ → ℝ) (hw : Summable w) (hw0 : ∀ n, 0 ≤ w n)
+    (hφ : ∀ n k j, j < n → m < n → ‖b n‖ * SchwartzMap.seminorm ℂ k j (φ n) ≤ w n)
+    (hd : ∀ n j, realDiracDerivative j (φ n) =
+      (-1 : ℂ) ^ j * if j = n then (n.factorial : ℂ) else 0) :
+    ∃ f : 𝓢(ℝ, ℂ), (∀ j, realDiracDerivative j f = b j * (-1 : ℂ) ^ j * (j.factorial : ℂ)) ∧
+      ∀ k j, j ≤ m → SchwartzMap.seminorm ℂ k j f ≤
+        ∑ n ∈ Finset.range (m + 1), ‖b n‖ * SchwartzMap.seminorm ℂ k j (φ n) + ∑' n, w n := by
+  let v (i : ℕ × ℕ) (n : ℕ) : ℝ :=
+    if n ≤ max i.2 m then ‖b n‖ * SchwartzMap.seminorm ℂ i.1 i.2 (φ n) else 0
+  have hv (i : ℕ × ℕ) : Summable (v i) := by
+    refine summable_of_ne_finset_zero (s := Finset.range (max i.2 m + 1)) fun n hn ↦ ?_
+    rw [Finset.mem_range, not_lt] at hn
+    simp only [v, show ¬ n ≤ max i.2 m by omega, ↓reduceIte]
+  let u (i : ℕ × ℕ) (n : ℕ) : ℝ := w n + v i n
+  have hx (i : ℕ × ℕ) (n : ℕ) : schwartzSeminormFamily ℂ ℝ ℂ i (b n • φ n) ≤ u i n := by
+    rw [SchwartzMap.schwartzSeminormFamily_apply, map_smul_eq_mul]
+    by_cases hn : n ≤ max i.2 m
+    · simp only [u, v, hn, ↓reduceIte]
+      linarith [hw0 n]
+    · simp only [u, v, hn, ↓reduceIte, add_zero]
+      exact hφ n i.1 i.2 (by omega) (by omega)
+  have : CompleteSpace 𝓢(ℝ, ℂ) := completeSpace_schwartzMap
+  obtain ⟨hsum, hbound⟩ := realSchwartzFlatQuotient_strongDual_summable
+    (schwartz_withSeminorms ℂ ℝ ℂ) (fun n ↦ b n • φ n) u (fun i ↦ hw.add (hv i)) hx
+  refine ⟨∑' n, b n • φ n, fun j ↦ ?_, fun k j hj ↦ ?_⟩
+  · rw [ContinuousLinearMap.map_tsum _ hsum]
+    simp only [map_smul, smul_eq_mul, hd]
+    rw [tsum_eq_single j fun n hn ↦ by simp [Ne.symm hn]]
+    simp only [↓reduceIte]
+    ring
+  · have h := hbound (k, j)
+    rw [SchwartzMap.schwartzSeminormFamily_apply] at h
+    refine h.trans (le_of_eq ?_)
+    rw [Summable.tsum_add hw (hv (k, j)), add_comm]
+    congr 1
+    rw [tsum_eq_sum (s := Finset.range (m + 1)) fun n hn ↦ ?_]
+    · refine Finset.sum_congr rfl fun n hn ↦ ?_
+      rw [Finset.mem_range] at hn
+      simp only [v, show n ≤ max j m by omega, ↓reduceIte]
+    · rw [Finset.mem_range, not_lt] at hn
+      simp only [v, show ¬ n ≤ max j m by omega, ↓reduceIte]
+
+/-- A small Borel lemma: for finitely many Schwartz seminorms and `r > 0`, every sequence whose
+first `N` terms are below `δ` is the sequence of Taylor coefficients of a Schwartz function whose
+seminorms in the family are below `r`. -/
+private theorem realSchwartzTaylor_equiv_small (s : Finset (ℕ × ℕ)) (r : ℝ) (hr : 0 < r) :
+    ∃ N : ℕ, ∃ δ > 0, ∀ b : ℕ → ℂ, (∀ n ≤ N, ‖b n‖ < δ) → ∃ f : 𝓢(ℝ, ℂ),
+      (∀ n, realDiracDerivative n f = b n * (-1 : ℂ) ^ n * (n.factorial : ℂ)) ∧
+        (s.sup (schwartzSeminormFamily ℂ ℝ ℂ)) f < r := by
+  let χ : ContDiffBump (0 : ℝ) := ⟨1 / 2, 1, by norm_num, by norm_num⟩
+  have hχ : χ.rOut ≤ 1 := le_rfl
+  choose G hG using realSchwartzFlatQuotient_strongDual_exists_bump χ
+  have hGc (n : ℕ) : HasCompactSupport (G n : ℝ → ℂ) :=
+    (isCompact_closedBall (0 : ℝ) 1).of_isClosed_subset (isClosed_tsupport _)
+      (realSchwartzFlatQuotient_strongDual_bump_tsupport χ hχ n (G n) (hG n))
+  let m := s.sup Prod.snd
+  let K : ℝ := ∑ i ∈ s, ∑ n ∈ Finset.range (m + 1), SchwartzMap.seminorm ℂ i.1 i.2 (G n)
+  have hK : 0 ≤ K := Finset.sum_nonneg fun i _ ↦ Finset.sum_nonneg fun n _ ↦ apply_nonneg _ _
+  refine ⟨m, r / (2 * (K + 1)), by positivity, fun b hb ↦ ?_⟩
+  let C (n j : ℕ) : ℝ := SchwartzMap.seminorm ℂ 0 j (G n)
+  have hC (n j : ℕ) : 0 ≤ C n j := apply_nonneg _ _
+  let w (n : ℕ) : ℝ := r / 4 * (1 / 2) ^ n
+  have hw0 (n : ℕ) : 0 ≤ w n := by positivity
+  have hwsum : HasSum w (r / 2) := by
+    have := (hasSum_geometric_of_lt_one (r := (1 / 2 : ℝ)) (by norm_num) (by norm_num)).mul_left
+      (r / 4)
+    convert this using 1
+    norm_num
+    ring
+  have hsC (n : ℕ) : 0 < ∑ j ∈ Finset.range n, C n j + 1 := by
+    have : 0 ≤ ∑ j ∈ Finset.range n, C n j := Finset.sum_nonneg fun j _ ↦ hC n j
+    linarith
+  let ε (n : ℕ) : ℝ := min 1 (w n / (‖b n‖ + 1) / (∑ j ∈ Finset.range n, C n j + 1))
+  have hε (n : ℕ) : 0 < ε n := lt_min one_pos (by have := hsC n; positivity)
+  choose ψ hψ using fun n ↦
+    realSchwartzFlatQuotient_strongDual_exists_scaled (G n) (hGc n) n (ε n) (hε n).ne'
+  let φ (n : ℕ) : 𝓢(ℝ, ℂ) := if n ≤ m then G n else ψ n
+  have hd (n j : ℕ) : realDiracDerivative j (φ n) =
+      (-1 : ℂ) ^ j * if j = n then (n.factorial : ℂ) else 0 := by
+    by_cases hn : n ≤ m
+    · simp only [φ, hn, ↓reduceIte]
+      exact realSchwartzFlatQuotient_strongDual_scaled_dirac χ n (G n) (G n) (hG n) 1 one_pos
+        (fun x ↦ by simp) j
+    · simp only [φ, hn, ↓reduceIte]
+      exact realSchwartzFlatQuotient_strongDual_scaled_dirac χ n (G n) (ψ n) (hG n) (ε n) (hε n)
+        (hψ n) j
+  have hφ (n k j : ℕ) (hjn : j < n) (hmn : m < n) :
+      ‖b n‖ * SchwartzMap.seminorm ℂ k j (φ n) ≤ w n := by
+    simp only [φ, show ¬ n ≤ m by omega, ↓reduceIte]
+    have hS : C n j ≤ ∑ j ∈ Finset.range n, C n j + 1 := by
+      have := Finset.single_le_sum (fun j _ ↦ hC n j) (Finset.mem_range.mpr hjn)
+      linarith
+    have h1 : SchwartzMap.seminorm ℂ k j (ψ n) ≤ w n / (‖b n‖ + 1) :=
+      calc SchwartzMap.seminorm ℂ k j (ψ n) ≤ ε n * C n j :=
+            realSchwartzFlatQuotient_strongDual_scaled_seminorm χ hχ n j k hjn (G n) (ψ n) (hG n)
+              (ε n) (hε n) (min_le_left _ _) (hψ n)
+        _ ≤ w n / (‖b n‖ + 1) / (∑ j ∈ Finset.range n, C n j + 1) *
+              (∑ j ∈ Finset.range n, C n j + 1) := by
+            gcongr
+            · exact min_le_right _ _
+        _ = w n / (‖b n‖ + 1) := div_mul_cancel₀ _ (hsC n).ne'
+    calc ‖b n‖ * SchwartzMap.seminorm ℂ k j (ψ n) ≤ ‖b n‖ * (w n / (‖b n‖ + 1)) := by gcongr
+      _ = w n * (‖b n‖ / (‖b n‖ + 1)) := by ring
+      _ ≤ w n * 1 := by
+          gcongr
+          rw [div_le_one (by positivity)]
+          linarith
+      _ = w n := mul_one _
+  obtain ⟨f, hfd, hfb⟩ :=
+    realSchwartzTaylor_equiv_series m φ b w hwsum.summable hw0 hφ hd
+  refine ⟨f, hfd, Seminorm.finset_sup_apply_lt hr fun i hi ↦ ?_⟩
+  have him : i.2 ≤ m := Finset.le_sup (f := Prod.snd) hi
+  rw [SchwartzMap.schwartzSeminormFamily_apply]
+  have hlow : ∑ n ∈ Finset.range (m + 1), ‖b n‖ * SchwartzMap.seminorm ℂ i.1 i.2 (φ n) ≤
+      r / (2 * (K + 1)) * K := by
+    calc ∑ n ∈ Finset.range (m + 1), ‖b n‖ * SchwartzMap.seminorm ℂ i.1 i.2 (φ n)
+        ≤ ∑ n ∈ Finset.range (m + 1), r / (2 * (K + 1)) * SchwartzMap.seminorm ℂ i.1 i.2 (G n) := by
+          refine Finset.sum_le_sum fun n hn ↦ ?_
+          rw [Finset.mem_range] at hn
+          simp only [φ, show n ≤ m by omega, ↓reduceIte]
+          exact mul_le_mul_of_nonneg_right (hb n (by omega)).le (apply_nonneg _ _)
+      _ = r / (2 * (K + 1)) *
+            ∑ n ∈ Finset.range (m + 1), SchwartzMap.seminorm ℂ i.1 i.2 (G n) :=
+          (Finset.mul_sum _ _ _).symm
+      _ ≤ r / (2 * (K + 1)) * K := by
+          gcongr
+          exact Finset.single_le_sum (f := fun i : ℕ × ℕ ↦
+            ∑ n ∈ Finset.range (m + 1), SchwartzMap.seminorm ℂ i.1 i.2 (G n))
+            (fun i _ ↦ Finset.sum_nonneg fun n _ ↦ apply_nonneg _ _) hi
+  have hrK : r / (2 * (K + 1)) * K < r / 2 := by
+    rw [div_mul_eq_mul_div, div_lt_div_iff₀ (by positivity) (by norm_num)]
+    nlinarith
+  calc SchwartzMap.seminorm ℂ i.1 i.2 f
+      ≤ ∑ n ∈ Finset.range (m + 1), ‖b n‖ * SchwartzMap.seminorm ℂ i.1 i.2 (φ n) + ∑' n, w n :=
+        hfb i.1 i.2 him
+    _ < r / 2 + r / 2 := by rw [hwsum.tsum_eq]; linarith
+    _ = r := add_halves r
+
 /-- Paper: Theorem 5.3.2.1(2), p. 243.
 The real Schwartz quotient by flat functions is identified with formal power series by the
 Taylor map. The topology of coefficientwise convergence is generated by (5.3.2.3).
@@ -1409,7 +1741,101 @@ theorem realSchwartzTaylor_equiv :
     ∃ e : (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin) ≃L[ℂ] PowerSeries ℂ,
       ∀ (f : 𝓢(ℝ, ℂ)) (k : ℕ),
         PowerSeries.coeff k (e (realSchwartzFlatAtOrigin.mkQ f)) =
-          iteratedDeriv k (f : ℝ → ℂ) 0 / (k.factorial : ℂ) := by sorry
+          iteratedDeriv k (f : ℝ → ℂ) 0 / (k.factorial : ℂ) := by
+  let a (k : ℕ) : StrongDual ℂ 𝓢(ℝ, ℂ) :=
+    ((-1 : ℂ) ^ k / (k.factorial : ℂ)) • realDiracDerivative k
+  have hfact (k : ℕ) : (k.factorial : ℂ) ≠ 0 := mod_cast Nat.factorial_ne_zero k
+  have hsq (k : ℕ) : (-1 : ℂ) ^ k * (-1 : ℂ) ^ k = 1 := by rw [← mul_pow]; norm_num
+  have ha (k : ℕ) (f : 𝓢(ℝ, ℂ)) :
+      a k f = iteratedDeriv k (f : ℝ → ℂ) 0 / (k.factorial : ℂ) := by
+    simp only [a, FunLike.coe_smul, Pi.smul_apply, smul_eq_mul,
+      realSchwartzFlatQuotient_strongDual_dirac]
+    rw [div_mul_eq_mul_div, div_left_inj₀ (hfact k), ← mul_assoc, hsq, one_mul]
+  have hinv (k : ℕ) (z : ℂ) :
+      (-1 : ℂ) ^ k / (k.factorial : ℂ) * (z * (-1 : ℂ) ^ k * (k.factorial : ℂ)) = z := by
+    rw [div_mul_eq_mul_div, div_eq_iff (hfact k)]
+    linear_combination (z * (k.factorial : ℂ)) * hsq k
+  let T : 𝓢(ℝ, ℂ) →ₗ[ℂ] PowerSeries ℂ :=
+    { toFun := fun f ↦ PowerSeries.mk fun k ↦ a k f
+      map_add' := fun f g ↦ by ext k; simp
+      map_smul' := fun c f ↦ by ext k; simp }
+  have hT (f : 𝓢(ℝ, ℂ)) (k : ℕ) : PowerSeries.coeff k (T f) = a k f := by
+    change PowerSeries.coeff k (PowerSeries.mk fun k ↦ a k f) = _
+    exact PowerSeries.coeff_mk _ _
+  have hTc : Continuous T := by
+    refine continuous_iff_continuousAt.mpr fun f ↦ ?_
+    rw [ContinuousAt, PowerSeries.WithPiTopology.tendsto_iff_coeff_tendsto]
+    intro d
+    simp only [hT]
+    exact (a d).continuous.tendsto f
+  let TL : 𝓢(ℝ, ℂ) →L[ℂ] PowerSeries ℂ := ⟨T, hTc⟩
+  have hTL (f : 𝓢(ℝ, ℂ)) (k : ℕ) : PowerSeries.coeff k (TL f) = a k f := hT f k
+  have hmem (f : 𝓢(ℝ, ℂ)) : f ∈ realSchwartzFlatAtOrigin ↔ TL f = 0 := by
+    rw [realSchwartzFlatAtOrigin, Submodule.mem_iInf, PowerSeries.ext_iff]
+    refine forall_congr' fun k ↦ ?_
+    rw [LinearMap.mem_ker, hTL, map_zero]
+    simp only [a, FunLike.coe_smul, Pi.smul_apply, smul_eq_mul, ContinuousLinearMap.coe_coe]
+    have : (-1 : ℂ) ^ k / (k.factorial : ℂ) ≠ 0 :=
+      div_ne_zero (pow_ne_zero _ (by norm_num)) (hfact k)
+    rw [mul_eq_zero, or_iff_right this]
+  have hle : realSchwartzFlatAtOrigin ≤ TL.ker := fun f hf ↦ (hmem f).mp hf
+  let E := realSchwartzFlatAtOrigin.liftQL TL hle
+  have hE (f : 𝓢(ℝ, ℂ)) : E (realSchwartzFlatAtOrigin.mkQ f) = TL f := rfl
+  have hinj : Function.Injective E := by
+    refine (injective_iff_map_eq_zero E).mpr fun y hy ↦ ?_
+    obtain ⟨f, rfl⟩ := realSchwartzFlatAtOrigin.mkQ_surjective y
+    rw [hE] at hy
+    exact (Submodule.Quotient.mk_eq_zero _).mpr ((hmem f).mpr hy)
+  have hsurj : Function.Surjective E := by
+    intro p
+    let c (n : ℕ) : ℂ := PowerSeries.coeff n p * (-1 : ℂ) ^ n * (n.factorial : ℂ)
+    obtain ⟨S, -, hS⟩ := realSchwartzFlatQuotient_strongDual_borel (fun n ↦ ‖c n‖)
+    obtain ⟨f, -, hf⟩ := hS c fun n ↦ le_rfl
+    refine ⟨realSchwartzFlatAtOrigin.mkQ f, ?_⟩
+    rw [hE]
+    ext k
+    rw [hTL]
+    simp only [a, FunLike.coe_smul, Pi.smul_apply, smul_eq_mul, hf, c]
+    exact hinv k _
+  let e : (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin) ≃ₗ[ℂ] PowerSeries ℂ :=
+    LinearEquiv.ofBijective (E : (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin) →ₗ[ℂ] PowerSeries ℂ)
+      ⟨hinj, hsurj⟩
+  have he (y : 𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin) : e y = E y := rfl
+  have hsymm : Continuous e.symm := by
+    refine continuous_of_continuousAt_zero e.symm ?_
+    rw [ContinuousAt, map_zero]
+    intro V hV
+    have hq : realSchwartzFlatAtOrigin.mkQ ⁻¹' V ∈ 𝓝 (0 : 𝓢(ℝ, ℂ)) :=
+      realSchwartzFlatAtOrigin.mkQL.continuous.continuousAt.preimage_mem_nhds
+        (by simpa using hV)
+    obtain ⟨⟨s, r⟩, hr, hsub⟩ := (schwartz_withSeminorms ℂ ℝ ℂ).hasBasis_zero_ball.mem_iff.mp hq
+    obtain ⟨N, δ, hδ, hsmall⟩ := realSchwartzTaylor_equiv_small s r hr
+    have hW : ∀ᶠ p in 𝓝 (0 : PowerSeries ℂ),
+        ∀ n ∈ Finset.range (N + 1), ‖PowerSeries.coeff n p‖ < δ := by
+      rw [Filter.eventually_all_finset]
+      intro n _
+      have h := (PowerSeries.WithPiTopology.continuous_coeff ℂ n).tendsto 0
+      rw [map_zero] at h
+      exact (h.eventually (Metric.ball_mem_nhds 0 hδ)).mono fun p hp ↦ by simpa using hp
+    rw [Filter.mem_map]
+    filter_upwards [hW] with p hp
+    obtain ⟨f, hfd, hf⟩ := hsmall (fun n ↦ PowerSeries.coeff n p)
+      fun n hn ↦ hp n (Finset.mem_range.mpr (by omega))
+    have hp' : e.symm p = realSchwartzFlatAtOrigin.mkQ f := by
+      rw [LinearEquiv.symm_apply_eq, he, hE]
+      ext k
+      rw [hTL]
+      simp only [a, FunLike.coe_smul, Pi.smul_apply, smul_eq_mul, hfd]
+      exact (hinv k _).symm
+    rw [Set.mem_preimage, hp']
+    exact hsub ((Seminorm.mem_ball_zero _).mpr hf)
+  let eL : (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin) ≃L[ℂ] PowerSeries ℂ :=
+    { e with
+      continuous_toFun := E.continuous
+      continuous_invFun := hsymm }
+  refine ⟨eL, fun f k ↦ ?_⟩
+  change PowerSeries.coeff k (TL f) = _
+  rw [hTL, ha]
 
 /-- Paper: Remark 5.3.2.2, p. 243.
 Pullback from the strong dual of the real flat quotient embeds it in the strong dual of the
@@ -1710,6 +2136,365 @@ theorem testFunction_inductiveTensor_equiv :
         Tendsto (fun n ↦ e (s n : UniformSpace.Completion W))
           atTop (𝓝 h) := by sorry
 
+/-- Iterated line derivatives are iterated derivatives along the line. -/
+private theorem lineDerivPow_apply_eq_iteratedDeriv {E : Type*} [NormedAddCommGroup E]
+    [NormedSpace ℝ E] (v : E) (k : ℕ) (φ : 𝓓((⊤ : Opens E), ℂ)) (y : E) (s : ℝ) :
+    (((LineDeriv.lineDerivOpCLM ℂ 𝓓((⊤ : Opens E), ℂ) v : 𝓓((⊤ : Opens E), ℂ)
+        →L[ℂ] 𝓓((⊤ : Opens E), ℂ)) ^ k) φ) (y + s • v) =
+      iteratedDeriv k (fun t : ℝ ↦ φ (y + t • v)) s := by
+  induction k generalizing φ s with
+  | zero => simp
+  | succ k ih =>
+    rw [pow_succ, mul_apply_eq_comp, iteratedDeriv_succ', ih]
+    congr 1
+    funext t
+    rw [TestFunction.lineDerivOpCLM_eq_lineDerivCLM]
+    rw [TestFunction.lineDerivCLM_apply_of_le (𝕜 := ℂ) (n := ⊤) (k := ⊤) le_rfl, lineDeriv]
+    have h : (fun u : ℝ ↦ φ (y + t • v + u • v)) = fun u ↦ (fun w : ℝ ↦ φ (y + w • v)) (u + t) := by
+      funext u; congr 1; rw [add_smul, add_assoc, add_comm (u • v)]
+    rw [h]
+    exact (deriv_comp_add_const (f := fun w : ℝ ↦ φ (y + w • v)) (a := t)
+        (x := 0)).trans (by rw [zero_add])
+
+private theorem lineDerivPow_apply_eq_iteratedDeriv_zero {E : Type*} [NormedAddCommGroup E]
+    [NormedSpace ℝ E] (v : E) (k : ℕ) (φ : 𝓓((⊤ : Opens E), ℂ)) (y : E) :
+    (((LineDeriv.lineDerivOpCLM ℂ 𝓓((⊤ : Opens E), ℂ) v : 𝓓((⊤ : Opens E), ℂ)
+        →L[ℂ] 𝓓((⊤ : Opens E), ℂ)) ^ k) φ) y =
+      iteratedDeriv k (fun t : ℝ ↦ φ (y + t • v)) 0 := by
+  have h := lineDerivPow_apply_eq_iteratedDeriv v k φ y 0
+  rwa [zero_smul, add_zero] at h
+
+/-- `𝓓_K` is not normable: a zero neighbourhood of test functions only controls finitely many
+derivatives on the unit ball, so some `∂ₑⁿ δ₀` is unbounded on it. -/
+private theorem exists_lineDeriv_unbounded_on_nhds {E : Type*} [NormedAddCommGroup E]
+    [InnerProductSpace ℝ E] [FiniteDimensional ℝ E] (e : E) (he : e ≠ 0)
+    (U : Set 𝓓((⊤ : Opens E), ℂ)) (hU : U ∈ 𝓝 (0 : 𝓓((⊤ : Opens E), ℂ))) :
+    ∃ n : ℕ, ∀ M : ℝ, ∃ g ∈ U,
+      M ≤ ‖(((LineDeriv.lineDerivOpCLM ℂ 𝓓((⊤ : Opens E), ℂ) e : 𝓓((⊤ : Opens E), ℂ)
+          →L[ℂ] 𝓓((⊤ : Opens E), ℂ))) ^ n) g 0‖ := by
+  classical
+  let K : Compacts E := ⟨Metric.closedBall 0 1, isCompact_closedBall 0 1⟩
+  have hK : (K : Set E) ⊆ ((⊤ : Opens E) : Set E) := fun _ _ ↦ trivial
+  let ιK : 𝓓_{K}(E, ℂ) →L[ℝ] 𝓓((⊤ : Opens E), ℂ) := TestFunction.ofSupportedInCLM ℝ hK
+  have hU' : ιK ⁻¹' U ∈ 𝓝 (0 : 𝓓_{K}(E, ℂ)) := by
+    apply ιK.continuous.continuousAt.preimage_mem_nhds
+    rw [map_zero]; exact hU
+  obtain ⟨s, r, hr, hsub⟩ :=
+    ((ContDiffMapSupportedIn.withSeminorms' ℝ E ℂ ⊤ K).mem_nhds_iff 0 _).mp hU'
+  set N := s.sup id
+  have hmem : ∀ g : 𝓓_{K}(E, ℂ),
+      (∀ i ≤ N, ∀ y, ‖iteratedFDeriv ℝ i g y‖ ≤ r / 2) → ιK g ∈ U := by
+    intro g hg
+    apply hsub
+    rw [Seminorm.mem_ball, sub_zero]
+    refine lt_of_le_of_lt (Seminorm.finset_sup_apply_le (a := r / 2) (by positivity) fun j hj ↦ ?_)
+      (by linarith)
+    refine Seminorm.finset_sup_apply_le (by positivity) fun i hi ↦ ?_
+    rw [ContDiffMapSupportedIn.seminorm_top_le_iff ℝ (by positivity)]
+    intro x _
+    exact hg i ((Finset.mem_Iic.mp hi).trans (Finset.le_sup (f := id) hj)) x
+  -- the profile `g₀ y = χ y * ⟪e, y⟫ ^ (N + 1)`
+  let χ : ContDiffBump (0 : E) := ⟨1 / 2, 1, by norm_num, by norm_num⟩
+  let ψ : E → ℂ := fun y ↦ ((χ y * (inner ℝ e y) ^ (N + 1) : ℝ) : ℂ)
+  have hψ : ContDiff ℝ (∞) ψ :=
+    Complex.ofRealCLM.contDiff.comp (χ.contDiff.mul ((contDiff_const.inner ℝ contDiff_id).pow _))
+  have hψ0 : ∀ y : E, 1 ≤ ‖y‖ → ψ y = 0 := fun y hy ↦ by
+    have : χ y = 0 := χ.zero_of_le_dist (by simpa using hy)
+    simp [ψ, this]
+  have hψc : HasCompactSupport ψ :=
+    HasCompactSupport.intro (isCompact_closedBall (0 : E) 1) fun y hy ↦ by
+      have h1 : ¬ ‖y‖ ≤ 1 := by simpa using hy
+      exact hψ0 y (le_of_lt (not_le.mp h1))
+  have hb : ∀ i : ℕ, ∃ C, ∀ y, ‖iteratedFDeriv ℝ i ψ y‖ ≤ C := fun i ↦
+    Continuous.bounded_above_of_compact_support
+      (hψ.continuous_iteratedFDeriv (by exact_mod_cast le_top)) (hψc.iteratedFDeriv i)
+  choose C hC using hb
+  set B : ℝ := 1 + ∑ i ∈ Finset.range (N + 1), |C i| with hB
+  have hB0 : 0 < B := by positivity
+  have hCB : ∀ i ≤ N, ∀ y, ‖iteratedFDeriv ℝ i ψ y‖ ≤ B := fun i hi y ↦ by
+    refine (hC i y).trans ((le_abs_self _).trans ?_)
+    have := Finset.single_le_sum (f := fun i ↦ |C i|) (fun _ _ ↦ abs_nonneg _)
+      (Finset.mem_range.mpr (Nat.lt_succ_of_le hi))
+    linarith
+  -- its `(N+1)`-th derivative along `e` at `0`
+  set d : ℂ := iteratedDeriv (N + 1) (fun t : ℝ ↦ ψ (t • e)) 0 with hd
+  have hd0 : d ≠ 0 := by
+    have hev : (fun t : ℝ ↦ ψ (t • e)) =ᶠ[𝓝 0]
+        fun t : ℝ ↦ t ^ (N + 1) • ((‖e‖ ^ 2) ^ (N + 1) : ℂ) := by
+      have hc : Tendsto (fun t : ℝ ↦ t • e) (𝓝 0) (𝓝 0) := by
+        have := (tendsto_id (x := 𝓝 (0 : ℝ))).smul_const e
+        rwa [zero_smul] at this
+      filter_upwards [hc.eventually (χ.eventuallyEq_one)] with t ht
+      simp only [Pi.one_apply] at ht
+      simp only [ψ, ht, one_mul, real_inner_smul_right, real_inner_self_eq_norm_sq]
+      rw [Complex.real_smul]
+      push_cast
+      ring
+    rw [hd, hev.iteratedDeriv_eq, iteratedDeriv_smul_const (by fun_prop),
+      iteratedDeriv_fun_pow_zero]
+    have : ‖e‖ ≠ 0 := norm_ne_zero_iff.mpr he
+    simp [this, Nat.factorial_ne_zero]
+  refine ⟨N + 1, fun M ↦ ?_⟩
+  -- scaled copies `a • g₀ (λ • y)`
+  have hdn : 0 < ‖d‖ := norm_pos_iff.mpr hd0
+  set lam : ℝ := max 1 (M * B / (r / 2 * ‖d‖)) with hlam
+  have hlam1 : 1 ≤ lam := le_max_left _ _
+  have hlam0 : 0 < lam := by linarith
+  set a : ℝ := r / 2 / (B * lam ^ N) with ha
+  have ha0 : 0 < a := by positivity
+  let G : E → ℂ := fun y ↦ a • ψ (lam • y)
+  have hψl : ContDiff ℝ (∞) (fun y : E ↦ ψ (lam • y)) := hψ.comp (contDiff_const_smul lam)
+  have hG : ContDiff ℝ (∞) G := hψl.const_smul a
+  have hGs : support G ⊆ (K : Set E) := by
+    intro y hy
+    by_contra hyK
+    apply hy
+    have h1 : 1 < ‖y‖ := by simpa [K] using hyK
+    have : 1 ≤ ‖lam • y‖ := by
+      rw [norm_smul, Real.norm_of_nonneg hlam0.le]; nlinarith
+    simp [G, hψ0 _ this]
+  let gK : 𝓓_{K}(E, ℂ) := ContDiffMapSupportedIn.of_support_subset hG hGs
+  refine ⟨ιK gK, hmem gK fun i hi y ↦ ?_, ?_⟩
+  · change ‖iteratedFDeriv ℝ i G y‖ ≤ r / 2
+    rw [iteratedFDeriv_const_smul_apply' (f := fun y : E ↦ ψ (lam • y)) (hψl.contDiffAt.of_le
+      (by exact_mod_cast le_top)), iteratedFDeriv_comp_const_smul lam (hψ.of_le
+      (by exact_mod_cast le_top)), norm_smul, norm_smul, norm_pow, Real.norm_of_nonneg ha0.le,
+      Real.norm_of_nonneg hlam0.le]
+    calc a * (lam ^ i * ‖iteratedFDeriv ℝ i ψ (lam • y)‖) ≤ a * (lam ^ N * B) := by
+          gcongr
+          exact hCB i hi _
+      _ = r / 2 := by rw [ha]; field_simp
+  · have hl : ContDiff ℝ (N + 1 : ℕ) (fun t : ℝ ↦ ψ (t • e)) :=
+      (hψ.comp (contDiff_id.smul contDiff_const)).of_le (by exact_mod_cast le_top)
+    have hfun : (fun t : ℝ ↦ (ιK gK) (0 + t • e)) =
+        fun t : ℝ ↦ a • (fun s : ℝ ↦ ψ (s • e)) (lam * t) := by
+      funext t
+      change a • ψ (lam • (0 + t • e)) = a • ψ ((lam * t) • e)
+      rw [zero_add, smul_smul]
+    rw [lineDerivPow_apply_eq_iteratedDeriv_zero, hfun, iteratedDeriv_fun_const_smul_field,
+      iteratedDeriv_comp_const_smul hl lam]
+    beta_reduce
+    rw [mul_zero, ← hd, norm_smul, norm_smul, norm_pow,
+      Real.norm_of_nonneg ha0.le, Real.norm_of_nonneg hlam0.le]
+    have h1 : M * B / (r / 2 * ‖d‖) ≤ lam := le_max_right _ _
+    have h2 : M * B ≤ lam * (r / 2 * ‖d‖) := (div_le_iff₀ (by positivity)).mp h1
+    have h3 : a * (lam ^ (N + 1) * ‖d‖) = lam * (r / 2 * ‖d‖) / B := by
+      rw [ha]; field_simp; ring
+    rw [h3, le_div_iff₀ hB0]
+    linarith
+
+
+/-- Line derivatives preserve vanishing on an open set. -/
+private theorem lineDerivPow_apply_eq_zero_of_isOpen {E : Type*} [NormedAddCommGroup E]
+    [NormedSpace ℝ E] (v : E) (O : Set E) (hO : IsOpen O) (φ : 𝓓((⊤ : Opens E), ℂ))
+    (hφ : ∀ z ∈ O, φ z = 0) (k : ℕ) (z : E) (hz : z ∈ O) :
+    (((LineDeriv.lineDerivOpCLM ℂ 𝓓((⊤ : Opens E), ℂ) v : 𝓓((⊤ : Opens E), ℂ)
+        →L[ℂ] 𝓓((⊤ : Opens E), ℂ)) ^ k) φ) z = 0 := by
+  rw [lineDerivPow_apply_eq_iteratedDeriv_zero]
+  have hc : Tendsto (fun t : ℝ ↦ z + t • v) (𝓝 0) (𝓝 z) := by
+    have := ((tendsto_id (x := 𝓝 (0 : ℝ))).smul_const v).const_add z
+    rwa [zero_smul, add_zero] at this
+  have hev : (fun t : ℝ ↦ φ (z + t • v)) =ᶠ[𝓝 0] fun _ ↦ 0 :=
+    (hc.eventually (hO.mem_nhds hz)).mono fun t ht ↦ hφ _ ht
+  rw [hev.iteratedDeriv_eq]
+  simp
+
+
+/-- `h ↦ ∑ₖ (∂ᵥᵏ h)(pₖ)` is a continuous functional when `‖pₖ‖ ≥ k` (locally finite sum). -/
+private theorem exists_finsum_lineDerivPow_CLM {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (v : E) (p : ℕ → E) (hp : ∀ k : ℕ, (k : ℝ) ≤ ‖p k‖) :
+    ∃ T : 𝓓((⊤ : Opens E), ℂ) →L[ℂ] ℂ, ∀ h : 𝓓((⊤ : Opens E), ℂ),
+      T h = ∑ᶠ k, (((LineDeriv.lineDerivOpCLM ℂ 𝓓((⊤ : Opens E), ℂ) v : 𝓓((⊤ : Opens E), ℂ)
+          →L[ℂ] 𝓓((⊤ : Opens E), ℂ)) ^ k) h) (p k) := by
+  set D : 𝓓((⊤ : Opens E), ℂ) →L[ℂ] 𝓓((⊤ : Opens E), ℂ) :=
+    LineDeriv.lineDerivOpCLM ℂ 𝓓((⊤ : Opens E), ℂ) v with hD
+  let Tk : ℕ → 𝓓((⊤ : Opens E), ℂ) →L[ℂ] ℂ := fun k ↦
+    ((BoundedContinuousFunction.evalCLM ℂ (p k)).comp
+      (TestFunction.toBoundedContinuousFunctionCLM ℂ)).comp (D ^ k)
+  have hTk : ∀ k h, Tk k h = ((D ^ k) h) (p k) := fun _ _ ↦ rfl
+  have hvan : ∀ (h : 𝓓((⊤ : Opens E), ℂ)) (R : ℝ), (∀ z, R < ‖z‖ → h z = 0) → ∀ k : ℕ, R < k →
+      Tk k h = 0 := by
+    intro h R hR k hk
+    rw [hTk]
+    exact lineDerivPow_apply_eq_zero_of_isOpen v {z | R < ‖z‖}
+      (isOpen_lt continuous_const continuous_norm) h hR k (p k) (hk.trans_le (hp k))
+  have hsum : ∀ (h : 𝓓((⊤ : Opens E), ℂ)) (R : ℝ), (∀ z, R < ‖z‖ → h z = 0) → ∀ m : ℕ, R < m →
+      ∑ᶠ k, Tk k h = ∑ k ∈ Finset.range m, Tk k h := by
+    intro h R hR m hm
+    apply finsum_eq_sum_of_support_subset
+    intro k hk
+    simp only [Finset.coe_range, Set.mem_Iio]
+    by_contra hkm
+    push Not at hkm
+    exact hk (hvan h R hR k (hm.trans_le (by exact_mod_cast hkm)))
+  have hbd : ∀ h : 𝓓((⊤ : Opens E), ℂ), ∃ R : ℝ, ∀ z, R < ‖z‖ → h z = 0 := by
+    intro h
+    obtain ⟨R, hR⟩ := h.hasCompactSupport.isCompact.isBounded.subset_closedBall 0
+    refine ⟨R, fun z hz ↦ image_eq_zero_of_notMem_tsupport fun hz' ↦ ?_⟩
+    have := hR hz'
+    rw [Metric.mem_closedBall, dist_zero_right] at this
+    linarith
+  have hmax : ∀ (h : 𝓓((⊤ : Opens E), ℂ)) (R R' : ℝ), (∀ z, R < ‖z‖ → h z = 0) → R ≤ R' →
+      ∀ z, R' < ‖z‖ → h z = 0 := fun h R R' hR hle z hz ↦ hR z (hle.trans_lt hz)
+  let Tl : 𝓓((⊤ : Opens E), ℂ) →ₗ[ℂ] ℂ :=
+    { toFun := fun h ↦ ∑ᶠ k, Tk k h
+      map_add' := fun h₁ h₂ ↦ by
+        obtain ⟨R₁, h1⟩ := hbd h₁
+        obtain ⟨R₂, h2⟩ := hbd h₂
+        obtain ⟨m, hm⟩ := exists_nat_gt (max R₁ R₂)
+        have h1' := hmax h₁ R₁ (max R₁ R₂) h1 (le_max_left _ _)
+        have h2' := hmax h₂ R₂ (max R₁ R₂) h2 (le_max_right _ _)
+        have h12 : ∀ z, max R₁ R₂ < ‖z‖ → (h₁ + h₂) z = 0 := fun z hz ↦ by
+          rw [IsAddApply.add_apply, h1' z hz, h2' z hz, add_zero]
+        rw [hsum _ _ h12 m hm, hsum _ _ h1' m hm, hsum _ _ h2' m hm, ← Finset.sum_add_distrib]
+        simp only [map_add]
+      map_smul' := fun a h ↦ by
+        obtain ⟨R, hR⟩ := hbd h
+        obtain ⟨m, hm⟩ := exists_nat_gt R
+        have haR : ∀ z, R < ‖z‖ → (a • h) z = 0 := fun z hz ↦ by
+          rw [IsSMulApply.smul_apply, hR z hz, smul_zero]
+        rw [hsum _ _ haR m hm, hsum h R hR m hm, RingHom.id_apply, Finset.smul_sum]
+        simp only [map_smul] }
+  have hcont : Continuous Tl := by
+    refine (TestFunction.continuous_iff_continuous_comp Tl).mpr fun K hK ↦ ?_
+    obtain ⟨R, hR⟩ := K.isCompact.isBounded.subset_closedBall 0
+    obtain ⟨m, hm⟩ := exists_nat_gt R
+    have hK' : ∀ φ : 𝓓_{K}(E, ℂ), ∀ z, R < ‖z‖ → (TestFunction.ofSupportedIn hK φ) z = 0 := by
+      intro φ z hz
+      have hzK : z ∉ (K : Set E) := fun hzK ↦ by
+        have := hR hzK
+        rw [Metric.mem_closedBall, dist_zero_right] at this
+        linarith
+      exact φ.zero_on_compl hzK
+    have heq : (Tl ∘ TestFunction.ofSupportedIn hK) =
+        fun φ ↦ ∑ k ∈ Finset.range m, Tk k (TestFunction.ofSupportedIn hK φ) :=
+      funext fun φ ↦ hsum _ R (hK' φ) m hm
+    rw [heq]
+    exact continuous_finsetSum _ fun k _ ↦
+      (Tk k).continuous.comp (TestFunction.continuous_ofSupportedIn hK)
+  exact ⟨⟨Tl, hcont⟩, fun h ↦ rfl⟩
+
+/-- A smooth bump equal to `1` at `x` and vanishing off the ball of radius `1/2`. -/
+private theorem exists_bump_testFunction {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    [FiniteDimensional ℝ E] (x : E) :
+    ∃ f : 𝓓((⊤ : Opens E), ℂ), f x = 1 ∧ ∀ y, 1 / 2 ≤ dist y x → f y = 0 := by
+  let b : ContDiffBump x := ⟨1 / 4, 1 / 2, by norm_num, by norm_num⟩
+  refine ⟨⟨fun y ↦ ((b y : ℝ) : ℂ), Complex.ofRealCLM.contDiff.comp b.contDiff,
+    b.hasCompactSupport.comp_left Complex.ofReal_zero, by simp⟩, ?_, fun y hy ↦ ?_⟩
+  · change ((b x : ℝ) : ℂ) = 1
+    rw [b.one_of_mem_closedBall (Metric.mem_closedBall_self (by norm_num)), Complex.ofReal_one]
+  · change ((b y : ℝ) : ℂ) = 0
+    rw [b.zero_of_le_dist hy, Complex.ofReal_zero]
+
+/-- Pure tensors are jointly continuous at zero for the projective topology (copy of the private
+`continuousAt_projectiveTensor_tmul_zero` of AppC Sec2a_part2). -/
+private theorem continuousAt_projectiveTensor_tmul_zero' (X Y : Type*)
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] :
+    @ContinuousAt (X × Y) (ProjectiveTensor X Y) _ _ (fun v ↦ v.1 ⊗ₜ[ℂ] v.2) 0 := by
+  let tmul : X × Y → ProjectiveTensor X Y := fun v ↦ v.1 ⊗ₜ[ℂ] v.2
+  have hzero : tmul 0 = 0 := TensorProduct.zero_tmul _ _
+  have hws : WithSeminorms (E := ProjectiveTensor X Y) (fun p : {p : Seminorm ℂ (X ⊗[ℂ] Y) //
+      ContinuousAt (fun v : X × Y ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦ p.val) := ⟨rfl⟩
+  change Tendsto tmul (𝓝 0) (𝓝 (tmul 0))
+  rw [hzero, (SeminormFamily.withSeminorms_iff_nhds_eq_iInf _).mp hws, tendsto_iInf]
+  intro p
+  rw [tendsto_comap_iff]
+  have hp := p.property.tendsto
+  change Tendsto (p.val ∘ tmul) (𝓝 0) (𝓝 (p.val (tmul 0))) at hp
+  rwa [hzero, show p.val (0 : ProjectiveTensor X Y) = 0 from map_zero p.val] at hp
+
+/-- Soft part: a continuous `L` out of the projective tensor product, a functional `T` and
+"coefficient" maps `lam n` with `T (L ((c • fₙ) ⊗ g)) = c * lam n g` cannot coexist if every zero
+neighbourhood of `Y` leaves some `lam n` unbounded. -/
+private theorem false_of_projectiveTensor_unbounded {X Y Z : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [Module ℝ X] [ContinuousSMul ℝ X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z]
+    (L : ProjectiveTensor X Y →L[ℂ] Z) (T : Z →L[ℂ] ℂ) (lam : ℕ → Y → ℂ)
+    (hT : ∀ n : ℕ, ∃ f : X, ∀ (c : ℝ) (g : Y), T (L ((c • f) ⊗ₜ[ℂ] g)) = c * lam n g)
+    (hY : ∀ U ∈ 𝓝 (0 : Y), ∃ n : ℕ, ∀ M : ℝ, ∃ g ∈ U, M ≤ ‖lam n g‖) : False := by
+  have hβ : ContinuousAt (fun v : X × Y ↦ T (L (v.1 ⊗ₜ[ℂ] v.2))) 0 :=
+    (T.continuous.comp L.continuous).continuousAt.comp
+      (continuousAt_projectiveTensor_tmul_zero' X Y)
+  have hmem : {v : X × Y | ‖T (L (v.1 ⊗ₜ[ℂ] v.2))‖ < 1} ∈ 𝓝 ((0 : X), (0 : Y)) := by
+    refine hβ.preimage_mem_nhds (t := {w : ℂ | ‖w‖ < 1}) ?_
+    have hz : ((0 : X) ⊗ₜ[ℂ] (0 : Y) : ProjectiveTensor X Y) = (0 : ProjectiveTensor X Y) :=
+      TensorProduct.zero_tmul _ _
+    have hL0 : L (0 : ProjectiveTensor X Y) = 0 := map_zero L
+    have h0 : T (L ((0 : X × Y).1 ⊗ₜ[ℂ] (0 : X × Y).2)) = 0 := by
+      change T (L ((0 : X) ⊗ₜ[ℂ] (0 : Y))) = 0
+      rw [hz, hL0, map_zero]
+    rw [h0]
+    exact (isOpen_lt continuous_norm continuous_const).mem_nhds (by simp)
+  obtain ⟨U₁, hU₁, U₂, hU₂, hsub⟩ := mem_nhds_prod_iff.mp hmem
+  obtain ⟨n, hn⟩ := hY U₂ hU₂
+  obtain ⟨f, hf⟩ := hT n
+  have hcont : Continuous (fun c : ℝ ↦ c • f) := continuous_id.smul continuous_const
+  have hsmul : Tendsto (fun c : ℝ ↦ c • f) (𝓝 0) (𝓝 0) := by
+    have h := hcont.tendsto 0
+    rwa [zero_smul] at h
+  obtain ⟨c, hcU, hc⟩ := ((hsmul.eventually hU₁).filter_mono nhdsWithin_le_nhds |>.and
+    (self_mem_nhdsWithin (s := Ioi (0 : ℝ)))).exists
+  have hc0 : (0 : ℝ) < c := hc
+  obtain ⟨g, hgU, hg⟩ := hn (1 / c)
+  have hlt : ‖T (L ((c • f) ⊗ₜ[ℂ] g))‖ < 1 := hsub (Set.mk_mem_prod hcU hgU)
+  rw [hf c g, norm_mul, Complex.norm_real, Real.norm_of_nonneg hc0.le] at hlt
+  have := (div_le_iff₀' hc0).mp hg
+  linarith
+
+/-- Normal-direction-free product rule: differentiating a product in a tangential direction. -/
+private theorem lineDerivPow_factors [DecidableEq ι] [DecidableEq κ] (j₀ : κ) (f : 𝒟(ι)) (g : 𝒟(κ))
+    (h : 𝒟(ι ⊕ κ))
+    (hh : ∀ z, h z = factors(f, g, z)) (k : ℕ) (z : Eᵣ(ι ⊕ κ)) :
+    (((LineDeriv.lineDerivOpCLM ℂ 𝒟(ι ⊕ κ) (EuclideanSpace.single (Sum.inr j₀ : ι ⊕ κ) (1 : ℝ)) :
+      𝒟(ι ⊕ κ) →L[ℂ] 𝒟(ι ⊕ κ)) ^ k) h) z =
+      factors(f, ((LineDeriv.lineDerivOpCLM ℂ 𝒟(κ)
+          (EuclideanSpace.single j₀ (1 : ℝ) : Eᵣ(κ)) : 𝒟(κ) →L[ℂ] 𝒟(κ)) ^ k) g, z) := by
+  rw [lineDerivPow_apply_eq_iteratedDeriv_zero, lineDerivPow_apply_eq_iteratedDeriv_zero]
+  have hfun : (fun t : ℝ ↦ h (z + t • EuclideanSpace.single (Sum.inr j₀ : ι ⊕ κ) (1 : ℝ))) =
+      fun t : ℝ ↦ f (WithLp.toLp 2 (fun i : ι ↦ z (Sum.inl i))) *
+        g (WithLp.toLp 2 (fun j : κ ↦ z (Sum.inr j)) + t • EuclideanSpace.single j₀ (1 : ℝ)) := by
+    funext t
+    rw [hh]
+    congr 2
+    · ext i; simp
+    · ext j; simp [PiLp.single_apply]
+  rw [hfun, iteratedDeriv_const_mul_field]
+
+
+/-- An infinite-order distribution `T = ∑ₙ δ_{(xₙ, 0)} ∘ ∂_{(0,e)}ⁿ` (locally finite, `xₙ → ∞`), and
+bumps `fₙ` with `fₙ (x_k) = δ_{kn}`: on products `(c • fₙ) ⊗ g` it gives `c * (∂ₑⁿ g) 0`. -/
+private theorem exists_infiniteOrder_functional [Nonempty ι] [Nonempty κ] :
+    ∃ (T : 𝒟(ι ⊕ κ) →L[ℂ] ℂ) (e : Eᵣ(κ)), e ≠ 0 ∧ ∀ n : ℕ, ∃ f : 𝒟(ι),
+      ∀ (c : ℝ) (g : 𝒟(κ)) (h : 𝒟(ι ⊕ κ)), (∀ z, h z = factors(c • f, g, z)) →
+        T h = c * ((LineDeriv.lineDerivOpCLM ℂ 𝒟(κ) (e : Eᵣ(κ)) : 𝒟(κ) →L[ℂ] 𝒟(κ)) ^ n) g 0 := by
+  classical
+  obtain ⟨i₀⟩ := ‹Nonempty ι›
+  obtain ⟨j₀⟩ := ‹Nonempty κ›
+  let p : ℕ → Eᵣ(ι ⊕ κ) := fun k ↦ EuclideanSpace.single (Sum.inl i₀) (k : ℝ)
+  obtain ⟨T, hT⟩ := exists_finsum_lineDerivPow_CLM
+    (EuclideanSpace.single (Sum.inr j₀ : ι ⊕ κ) (1 : ℝ)) p (fun k ↦ by simp [p])
+  refine ⟨T, EuclideanSpace.single j₀ 1, by simp, fun n ↦ ?_⟩
+  obtain ⟨f, hf1, hf0⟩ := exists_bump_testFunction (EuclideanSpace.single i₀ (n : ℝ) : Eᵣ(ι))
+  refine ⟨f, fun c g h hh ↦ ?_⟩
+  have e1 : ∀ k : ℕ, (WithLp.toLp 2 (fun i : ι ↦ p k (Sum.inl i)) : Eᵣ(ι)) =
+      EuclideanSpace.single i₀ (k : ℝ) := fun k ↦ by
+    ext i; simp [p, PiLp.single_apply]
+  have e2 : ∀ k : ℕ, (WithLp.toLp 2 (fun j : κ ↦ p k (Sum.inr j)) : Eᵣ(κ)) = 0 := fun k ↦ by
+    ext j; simp [p]
+  rw [hT h, finsum_eq_single _ n]
+  · rw [lineDerivPow_factors j₀ (c • f) g h hh n (p n), e1, e2, IsSMulApply.smul_apply, hf1]
+    simp
+  · intro k hk
+    rw [lineDerivPow_factors j₀ (c • f) g h hh k (p k), e1, e2, IsSMulApply.smul_apply,
+      hf0 _ ?_]
+    · simp
+    rw [EuclideanSpace.single, EuclideanSpace.single, PiLp.dist_single_same, Real.dist_eq]
+    have : (1 : ℤ) ≤ |(k : ℤ) - n| := Int.one_le_abs (sub_ne_zero.mpr (by exact_mod_cast hk))
+    have h' : (1 : ℝ) ≤ |(k : ℝ) - n| := by exact_mod_cast this
+    linarith
+
 -- TODO(paper-gap): If the tangential dimension is zero, its test space is ℂ
 -- and the projective and inductive tensor products agree.
 
@@ -1720,7 +2505,13 @@ Deviation: The exception of a zero-dimensional factor is excluded explicitly. -/
 theorem testFunction_no_projectiveTensor_product [Nonempty ι] [Nonempty κ] :
     ¬ ∃ L : ProjectiveTensor 𝒟(ι) 𝒟(κ) →L[ℂ] 𝒟(ι ⊕ κ),
       ∀ (f : 𝒟(ι)) (g : 𝒟(κ)) (x : Eᵣ(ι ⊕ κ)),
-        L (f ⊗ₜ[ℂ] g) x = factors(f, g, x) := by sorry
+        L (f ⊗ₜ[ℂ] g) x = factors(f, g, x) := by
+  rintro ⟨L, hL⟩
+  obtain ⟨T, e, he, hT⟩ := exists_infiniteOrder_functional (ι := ι) (κ := κ)
+  exact false_of_projectiveTensor_unbounded L T
+    (fun n g ↦ (((LineDeriv.lineDerivOpCLM ℂ 𝒟(κ) e : 𝒟(κ) →L[ℂ] 𝒟(κ)) ^ n) g) 0)
+    (fun n ↦ (hT n).imp fun f hf c g ↦ hf c g _ (hL (c • f) g))
+    (fun U hU ↦ exists_lineDeriv_unbounded_on_nhds e he U hU)
 
 end CoordinatePlane
 

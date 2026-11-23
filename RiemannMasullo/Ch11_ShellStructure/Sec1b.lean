@@ -116,7 +116,22 @@ theorem sLocalCarvingBand_radius_two :
 /-- Paper: (11.1.2.3), p. 480. Homogeneous theta of an adelic test with both
 polar values zero is in weighted L² on the zero line. -/
 theorem memLp_homogeneousTheta_zeroLine (s : ℝ) (ω : PontryaginDual C₁) (f : ℬ₀) :
-    MemLp (homogeneousAdelicTheta ω f.val : C𝔽 → ℂ) 2 (ν(s)) := by sorry
+    MemLp (homogeneousAdelicTheta ω f.val : C𝔽 → ℂ) 2 (ν(s)) := by
+  have hs₀ : (0 : ℝ) ≤ max s 0 := le_max_right _ _
+  obtain ⟨j, -, -, hj⟩ :=
+    exists_globalHomogeneousThetaSobolevInclusion (F := F) (a := 0) (le_refl (0 : ℝ)) hs₀ ω
+  have hf := (mem_adelePolarSubspace f.val).mp f.property
+  let x : ↥(globalPolarFreeThetaSubmodule (F := F) ω) :=
+    ⟨Submodule.Quotient.mk f.val,
+      (mem_globalPolarFreeThetaSubmodule ω _).mpr ⟨f.val, hf.1, hf.2, rfl⟩⟩
+  have hx := (hj f x rfl).2.trans (Filter.EventuallyEq.of_eq (modulationWeight_zero m𝔽 _))
+  have hmem := (Lp.memLp (j x).val.val).ae_eq
+    ((withDensity_absolutelyContinuous _ _).ae_le hx)
+  refine hmem.mono_measure (withDensity_mono (.of_forall fun g ↦ ?_))
+  simp only [Bool.false_eq_true, ite_false]
+  refine ENNReal.ofReal_le_ofReal (mul_le_mul_of_nonneg_left ?_ (by positivity))
+  exact Real.rpow_le_rpow_of_exponent_le (by nlinarith [sq_nonneg (Real.log (norm𝔽 g))])
+    (by linarith [le_max_left s 0])
 
 /-- Paper: (11.1.2.3), p. 480. A global finite-place principal value preserves
 the two polar vanishing conditions. -/
@@ -199,12 +214,100 @@ theorem sLocalUncutCarving_empty (s : ℝ) (ω : PontryaginDual C₁) :
     LinearMap.ext_iff.mp sLocalUncutCarving_empty_PV f.val
   simp only [sLocalUncutCarving, hP]
 
+/-- The norm-one isotype of the ambient space is closed: it is an intersection of kernels of
+continuous operators. -/
+private theorem sLocalCutoffCarving_le_cutoffIsotype_closed (s : ℝ) (hs : 0 ≤ s)
+    (ω : PontryaginDual C₁) : IsClosed (Wω(s, hs, ω) : Set (W(s))) := by
+  simp only [actionIsotype, Submodule.coe_iInf]
+  refine isClosed_iInter fun g ↦ ?_
+  have hc : Continuous fun u : W(s) ↦ ((hardySobolevTranslation μ𝔽 m𝔽 0 0 s le_rfl hs).comp
+      (ideleClassNorm F).ker.subtype) g u - (ω g : ℂ) • u :=
+    (((hardySobolevTranslation μ𝔽 m𝔽 0 0 s le_rfl hs).comp
+      (ideleClassNorm F).ker.subtype) g).continuous.sub (continuous_const_smul (ω g : ℂ))
+  exact isClosed_eq hc continuous_const
+
+/-- Homogeneous theta of a polar-free test lies in the norm-one isotype of the ambient space:
+it is the inclusion of the homogeneous theta class of §10.1, on which norm-one translation acts
+by the character. -/
+private theorem sLocalCutoffCarving_le_cutoffIsotype_theta (s : ℝ) (hs : 0 ≤ s)
+    (ω : PontryaginDual C₁) (f : ℬ₀) : θ(s, ω, f) ∈ Wω(s, hs, ω) := by
+  obtain ⟨j, -, -, hj⟩ :=
+    exists_globalHomogeneousThetaSobolevInclusion (F := F) (a := 0) (le_refl (0 : ℝ)) hs ω
+  have hf := (mem_adelePolarSubspace f.val).mp f.property
+  let x : ↥(globalPolarFreeThetaSubmodule (F := F) ω) :=
+    ⟨Submodule.Quotient.mk f.val,
+      (mem_globalPolarFreeThetaSubmodule ω _).mpr ⟨f.val, hf.1, hf.2, rfl⟩⟩
+  have hx := (hj f x rfl).2.trans (Filter.EventuallyEq.of_eq (modulationWeight_zero m𝔽 _))
+  have hx' : ((j x).val.val : C𝔽 → ℂ) =ᵐ[ν(s)] (homogeneousAdelicTheta ω f.val : C𝔽 → ℂ) :=
+    (withDensity_absolutelyContinuous _ _).ae_le hx
+  have heq : θ(s, ω, f) = (j x).val.val := Lp.ext ((MemLp.coeFn_toLp _).trans hx'.symm)
+  have hiso := (mem_actionIsotype _ ω _).mp (j x).property
+  have hspec := (exists_globalThetaSobolevAction (F := F) 0 (le_refl (0 : ℝ)) hs).choose_spec.1
+  rw [mem_actionIsotype]
+  intro h
+  rw [heq]
+  exact (hspec h.val (j x).val).symm.trans (congrArg Subtype.val (hiso h))
+
 /-- Paper: (11.1.2.5), p. 480. Before any prime condition the uncut stage is the
 norm-one isotype of the global theta completion from Definition 10.1.1.1. -/
 theorem sLocalUncutCarving_empty_eq_globalThetaSobolev (s : ℝ) (hs : 0 ≤ s)
     (ω : PontryaginDual C₁) :
     sLocalUncutCarving s ω ∅ =
-      globalThetaSobolev F 0 (α := 0) (β := 0) le_rfl hs ⊓ Wω(s, hs, ω) := by sorry
+      globalThetaSobolev F 0 (α := 0) (β := 0) le_rfl hs ⊓ Wω(s, hs, ω) := by
+  obtain ⟨j, -, hdense, hj⟩ :=
+    exists_globalHomogeneousThetaSobolevInclusion (F := F) (a := 0) (le_refl (0 : ℝ)) hs ω
+  have hspec := (exists_globalThetaSobolevAction (F := F) 0 (le_refl (0 : ℝ)) hs).choose_spec.1
+  -- Every vector of the range of `j` is a homogeneous theta, and conversely.
+  have hθ (f : ℬ₀) (x : ↥(globalPolarFreeThetaSubmodule (F := F) ω))
+      (hx : x.val = Submodule.Quotient.mk f.val) : θ(s, ω, f) = (j x).val.val := by
+    have h := (hj f x hx).2.trans (Filter.EventuallyEq.of_eq (modulationWeight_zero m𝔽 _))
+    have h' : ((j x).val.val : C𝔽 → ℂ) =ᵐ[ν(s)] (homogeneousAdelicTheta ω f.val : C𝔽 → ℂ) :=
+      (withDensity_absolutelyContinuous _ _).ae_le h
+    exact Lp.ext ((MemLp.coeFn_toLp _).trans h'.symm)
+  rw [sLocalUncutCarving_empty]
+  apply le_antisymm
+  · refine Submodule.topologicalClosure_minimal _ ?_
+      ((Submodule.isClosed_topologicalClosure _).inter
+        (sLocalCutoffCarving_le_cutoffIsotype_closed s hs ω))
+    refine Submodule.span_le.mpr ?_
+    rintro _ ⟨f, rfl⟩
+    have hf := (mem_adelePolarSubspace f.val).mp f.property
+    let x : ↥(globalPolarFreeThetaSubmodule (F := F) ω) :=
+      ⟨Submodule.Quotient.mk f.val,
+        (mem_globalPolarFreeThetaSubmodule ω _).mpr ⟨f.val, hf.1, hf.2, rfl⟩⟩
+    refine ⟨?_, sLocalCutoffCarving_le_cutoffIsotype_theta s hs ω f⟩
+    have hm := (j x).val.property
+    rw [← hθ f x rfl] at hm
+    exact hm
+  · intro u hu
+    obtain ⟨huH, huW⟩ := Submodule.mem_inf.mp hu
+    let y₀ : ↥(globalThetaSobolev F 0 (α := 0) (β := 0) le_rfl hs) := ⟨u, huH⟩
+    have hy₀ : y₀ ∈ actionIsotype
+        ((exists_globalThetaSobolevAction (F := F) 0 (le_refl (0 : ℝ)) hs).choose.comp
+          (ideleClassNorm F).ker.subtype) ω := by
+      rw [mem_actionIsotype]
+      intro h
+      exact Subtype.ext ((hspec h.val y₀).trans ((mem_actionIsotype _ ω u).mp huW h))
+    have hι : Continuous fun z : ↥(actionIsotype
+        ((exists_globalThetaSobolevAction (F := F) 0 (le_refl (0 : ℝ)) hs).choose.comp
+          (ideleClassNorm F).ker.subtype) ω) ↦ (z.val.val : W(s)) :=
+      continuous_subtype_val.comp continuous_subtype_val
+    let Φ : ℬ₀ → ↥(globalPolarFreeThetaSubmodule (F := F) ω) := fun f ↦
+      ⟨Submodule.Quotient.mk f.val, (mem_globalPolarFreeThetaSubmodule ω _).mpr
+        ⟨f.val, ((mem_adelePolarSubspace f.val).mp f.property).1,
+          ((mem_adelePolarSubspace f.val).mp f.property).2, rfl⟩⟩
+    have hΦ : Function.Surjective Φ := by
+      intro x
+      obtain ⟨f', hf', hx⟩ := x.property
+      exact ⟨⟨f', hf'⟩, Subtype.ext hx⟩
+    have hd2 : DenseRange (j ∘ Φ) := hdense.comp hΦ.denseRange j.continuous
+    have hcl := image_closure_subset_closure_image hι ⟨⟨y₀, hy₀⟩, hd2 _, rfl⟩
+    rw [← SetLike.mem_coe, Submodule.topologicalClosure_coe]
+    refine closure_mono ?_ hcl
+    rintro _ ⟨_, ⟨f, rfl⟩, rfl⟩
+    change (j (Φ f)).val.val ∈ _
+    rw [← hθ f (Φ f) rfl]
+    exact Submodule.subset_span ⟨f, rfl⟩
 
 /-- Paper: (11.1.2.3), p. 480. The cutoff stage is the closure of the linear
 space obtained by applying the cutoff to the restricted theta tests.
@@ -214,11 +317,85 @@ def sLocalCutoffCarving (s : ℝ) (ω : PontryaginDual C₁) (T : Finset V)
     (J : Set ℝ) (hJ : MeasurableSet J) : Submodule ℂ (W(s)) :=
   (Submodule.span ℂ (range (fun f : ℬ₀ ↦ M(s, J, hJ) (θ(s, ω, P(T, f)))))).topologicalClosure
 
+/-- The absolute cutoff commutes with translation by a norm-one class, which does not move
+the idelic norm. -/
+private theorem sLocalCutoffCarving_le_cutoffIsotype_comm (s : ℝ) (hs : 0 ≤ s)
+    (J : Set ℝ) (hJ : MeasurableSet J) (h : C₁) (u : W(s)) :
+    M(s, J, hJ) (hardySobolevTranslation μ𝔽 m𝔽 0 0 s le_rfl hs h.val u) =
+      hardySobolevTranslation μ𝔽 m𝔽 0 0 s le_rfl hs h.val (M(s, J, hJ) u) := by
+  have hn : Continuous norm𝔽 :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)
+  have hdens : Continuous (intervalSobolevDensity 0 0 s) := by
+    unfold intervalSobolevDensity
+    exact ((Real.continuous_exp.comp (continuous_const.mul continuous_id)).max
+      (Real.continuous_exp.comp (continuous_const.mul continuous_id))).mul
+      (Continuous.rpow_const (f := fun x : ℝ ↦ 1 + x ^ 2) (by fun_prop)
+        fun x ↦ Or.inl (by positivity))
+  have hpos (g : C𝔽) : 0 < intervalSobolevDensity 0 0 s (Real.log (norm𝔽 g)) :=
+    mul_pos (lt_max_of_lt_left (Real.exp_pos _)) (Real.rpow_pos_of_pos (by positivity) _)
+  have hνμ : ν(s) ≪ μ𝔽 := withDensity_absolutelyContinuous _ _
+  have hμν : μ𝔽 ≪ ν(s) := withDensity_absolutelyContinuous'
+    ((hdens.measurable.comp (Real.measurable_log.comp hn.measurable)).ennreal_ofReal.aemeasurable)
+    (.of_forall fun g ↦ (ENNReal.ofReal_pos.mpr (hpos g)).ne')
+  let c : C𝔽 → ℂ := fun g ↦ (modulatedAbsoluteCutoff m𝔽 J g : ℂ)
+  have hc (g : C𝔽) : c (h.val⁻¹ * g) = c g := by
+    have hh : ideleClassNorm F h.val = 1 := h.property
+    have hng : ((m𝔽 (h.val⁻¹ * g)).val : ℝ) = ((m𝔽 g).val : ℝ) := by
+      change ((ideleClassNorm F (h.val⁻¹ * g)).val : ℝ) = ((ideleClassNorm F g).val : ℝ)
+      rw [map_mul, map_inv, hh, inv_one, one_mul]
+    simp only [c, modulatedAbsoluteCutoff, Set.indicator_apply, Set.mem_preimage, hng, Pi.one_apply]
+  have hq := (measurePreserving_mul_left μ𝔽 h.val⁻¹).quasiMeasurePreserving
+  have hT (v : W(s)) := hardySobolevTranslation_apply μ𝔽 m𝔽 0 0 s le_rfl hs h.val v
+  have hM (v : W(s)) := modulatedAbsoluteCutoffOperator_apply m𝔽 (ν(s)) J hJ v
+  refine Lp.ext ?_
+  have hL : (M(s, J, hJ) (hardySobolevTranslation μ𝔽 m𝔽 0 0 s le_rfl hs h.val u) : C𝔽 → ℂ)
+      =ᵐ[ν(s)] fun g ↦ c g * u (h.val⁻¹ * g) := by
+    filter_upwards [hM (hardySobolevTranslation μ𝔽 m𝔽 0 0 s le_rfl hs h.val u),
+      hνμ.ae_le (hT u)] with g h1 h2
+    rw [h1, h2]
+  have hR : (hardySobolevTranslation μ𝔽 m𝔽 0 0 s le_rfl hs h.val (M(s, J, hJ) u) : C𝔽 → ℂ)
+      =ᵐ[ν(s)] fun g ↦ c g * u (h.val⁻¹ * g) := by
+    have h3 := hq.ae_eq_comp (hμν.ae_le (hM u))
+    filter_upwards [hνμ.ae_le (hT (M(s, J, hJ) u)), hνμ.ae_le h3] with g h1 h2
+    rw [h1]
+    simp only [Function.comp_apply] at h2
+    rw [h2]
+    exact congrArg (· * u (h.val⁻¹ * g)) (hc g)
+  exact hL.trans hR.symm
+
 /-- Paper: (11.1.2.3), p. 480. Each finite cutoff stage belongs to the cutoff
 image of the ambient norm-one isotype. -/
 theorem sLocalCutoffCarving_le_cutoffIsotype (s : ℝ) (hs : 0 ≤ s) (ω : PontryaginDual C₁)
     (T : Finset V) (J : Set ℝ) (hJ : MeasurableSet J) :
-    sLocalCutoffCarving s ω T J hJ ≤ (Wω(s, hs, ω)).map (M(s, J, hJ)).toLinearMap := by sorry
+    sLocalCutoffCarving s ω T J hJ ≤ (Wω(s, hs, ω)).map (M(s, J, hJ)).toLinearMap := by
+  have hproj := modulatedAbsoluteCutoffOperator_projection m𝔽 (ν(s)) J hJ
+  have hidem : ∀ y, M(s, J, hJ) (M(s, J, hJ) y) = M(s, J, hJ) y := fun y ↦
+    congrArg (fun L : W(s) →L[ℂ] W(s) ↦ L y) hproj.1.isIdempotentElem.eq
+  -- The image of the isotype is the isotype intersected with the range, which is closed.
+  have himage : (((Wω(s, hs, ω)).map (M(s, J, hJ)).toLinearMap : Submodule ℂ (W(s))) :
+        Set (W(s))) = (Wω(s, hs, ω) : Set (W(s))) ∩ (range (M(s, J, hJ)) : Set (W(s))) := by
+    ext y
+    constructor
+    · rintro ⟨z, hz, rfl⟩
+      refine ⟨?_, z, rfl⟩
+      rw [SetLike.mem_coe, mem_actionIsotype] at hz ⊢
+      intro h
+      change hardySobolevTranslation μ𝔽 m𝔽 0 0 s le_rfl hs h.val (M(s, J, hJ) z) = _
+      rw [← sLocalCutoffCarving_le_cutoffIsotype_comm s hs J hJ h z]
+      have hz' := hz h
+      change hardySobolevTranslation μ𝔽 m𝔽 0 0 s le_rfl hs h.val z = _ at hz'
+      rw [hz', map_smul]
+      rfl
+    · rintro ⟨hy, z, rfl⟩
+      exact ⟨M(s, J, hJ) z, hy, hidem z⟩
+  have hclosed : IsClosed (((Wω(s, hs, ω)).map (M(s, J, hJ)).toLinearMap : Submodule ℂ (W(s))) :
+      Set (W(s))) := by
+    rw [himage]
+    exact (sLocalCutoffCarving_le_cutoffIsotype_closed s hs ω).inter hproj.2
+  refine Submodule.topologicalClosure_minimal _ ?_ hclosed
+  refine Submodule.span_le.mpr ?_
+  rintro _ ⟨f, rfl⟩
+  exact ⟨_, sLocalCutoffCarving_le_cutoffIsotype_theta s hs ω _, rfl⟩
 
 private theorem hardySobolevCutoff_univ_aux {A : Type*} [MeasurableSpace A] {μ : Measure A}
     (U : Set A) (hU : MeasurableSet U) (hUu : U = univ) (f : Lp ℂ 2 μ) :
@@ -536,17 +713,146 @@ test over nonzero principal multiples of an idele representing the class. -/
 def sLocalCarvingTheta (S : Finset V) (f : ℬₛ(S)) (g : C𝔽) : ℂ :=
   ideleThetaSum (sLocalCarvingIdeleTest S f) g.out
 
+/-- The raw theta value at a class is the orbit series at any representative: changing the
+representative by a principal idele reindexes the series over `Fˣ`. -/
+private theorem sLocalCarvingTheta_classOf (S : Finset V) (f : ℬₛ(S)) (g : I𝔽) :
+    sLocalCarvingTheta S f (classOf g) = ideleThetaSum (sLocalCarvingIdeleTest S f) g := by
+  unfold sLocalCarvingTheta
+  obtain ⟨⟨h, η, rfl⟩, he⟩ :=
+    QuotientGroup.mk_out_eq_mul (IdeleGroup.principalSubgroup (𝓞 F) F) g
+  change ideleThetaSum _ (QuotientGroup.mk g : C𝔽).out = _
+  rw [he]
+  unfold ideleThetaSum
+  refine Eq.trans ?_ ((Equiv.mulRight η).tsum_eq fun ξ ↦
+    sLocalCarvingIdeleTest S f (IdeleGroup.unitEmbedding (𝓞 F) F ξ * g))
+  refine tsum_congr fun ξ ↦ congrArg _ ?_
+  rw [Equiv.coe_mulRight, map_mul]
+  change IdeleGroup.unitEmbedding (𝓞 F) F ξ * (g * IdeleGroup.unitEmbedding (𝓞 F) F η) = _
+  rw [mul_comm g, mul_assoc]
+
+/-- Outside `S`, the valuation of a principal translate is the valuation of the field element
+times the valuation of the idele. -/
+private theorem sLocalCarvingTheta_spec_valuation (g : I𝔽) (ξ : Fˣ) (v : V) :
+    Valued.v ((IdeleGroup.unitEmbedding (𝓞 F) F ξ * g).val.2 v) =
+      v.valuation F (ξ : F) * Valued.v (g.val.2 v) := by
+  change Valued.v ((algebraMap F (FiniteAdeleRing (𝓞 F) F) (ξ : F)) v * g.val.2 v) = _
+  rw [Valuation.map_mul]
+  congr 1
+  exact HeightOneSpectrum.valuedAdicCompletion_eq_valuation' v (ξ : F)
+
+/-- If one principal translate of `g` is a unit outside `S`, then another one is exactly when
+the ratio of the field elements is an S-unit. -/
+private theorem sLocalCarvingTheta_spec_mem (S : Finset V) (g : I𝔽) (ξ₀ ξ : Fˣ)
+    (h₀ : IdeleGroup.unitEmbedding (𝓞 F) F ξ₀ * g ∈
+      {g' : I𝔽 | ∀ v ∉ S, Valued.v (g'.val.2 v) = 1}) :
+    IdeleGroup.unitEmbedding (𝓞 F) F ξ * g ∈ {g' : I𝔽 | ∀ v ∉ S, Valued.v (g'.val.2 v) = 1} ↔
+      ξ * ξ₀⁻¹ ∈ (S : Set V).unit F := by
+  refine forall₂_congr fun v hv ↦ ?_
+  have h0 := h₀ v hv
+  rw [sLocalCarvingTheta_spec_valuation] at h0 ⊢
+  have hξ₀ : v.valuation F (ξ₀ : F) ≠ 0 := by simp
+  change _ ↔ v.valuation F ((ξ : F) * ((ξ₀⁻¹ : Fˣ) : F)) = 1
+  rw [map_mul, Units.val_inv_eq_inv_val, map_inv₀]
+  constructor
+  · intro h
+    rw [← h0] at h
+    exact (mul_inv_eq_one₀ hξ₀).mpr (mul_right_cancel₀ (by
+      intro h'; rw [h', mul_zero] at h0; exact zero_ne_one h0) h)
+  · intro h
+    rw [(mul_inv_eq_one₀ hξ₀).mp h]
+    exact h0
+
+/-- The orbit series of the extended local test is absolutely summable: its nonzero terms lie on
+one coset of the S-units, where they form the S-local theta series at an S-idele. -/
+private theorem sLocalCarvingTheta_spec_summable (S : Finset V) (f : ℬₛ(S)) (g : I𝔽) :
+    Summable (fun ξ : Fˣ ↦ sLocalCarvingIdeleTest S f
+      (IdeleGroup.unitEmbedding (𝓞 F) F ξ * g)) := by
+  by_cases hex : ∃ ξ₀ : Fˣ, IdeleGroup.unitEmbedding (𝓞 F) F ξ₀ * g ∈
+      {g' : I𝔽 | ∀ v ∉ S, Valued.v (g'.val.2 v) = 1}
+  swap
+  · push Not at hex
+    refine summable_zero.congr fun ξ ↦ ?_
+    unfold sLocalCarvingIdeleTest
+    rw [Set.indicator_of_notMem (hex ξ)]
+  obtain ⟨ξ₀, h₀⟩ := hex
+  let P : Set Fˣ := ((S : Set V).unit F : Set Fˣ)
+  let h : Fˣ → ℂ := fun ξ ↦ f (Multiplicative.ofAdd (adeleProjection F S
+    (IdeleGroup.unitEmbedding (𝓞 F) F ξ * g).val))
+  have hterm (ξ : Fˣ) : sLocalCarvingIdeleTest S f (IdeleGroup.unitEmbedding (𝓞 F) F ξ * g) =
+      P.indicator (fun ξ ↦ h (ξ * ξ₀)) (ξ * ξ₀⁻¹) := by
+    unfold sLocalCarvingIdeleTest
+    by_cases hξ : ξ * ξ₀⁻¹ ∈ P
+    · rw [Set.indicator_of_mem ((sLocalCarvingTheta_spec_mem S g ξ₀ ξ h₀).mpr hξ),
+        Set.indicator_of_mem hξ, inv_mul_cancel_right]
+    · rw [Set.indicator_of_notMem (mt (sLocalCarvingTheta_spec_mem S g ξ₀ ξ h₀).mp hξ),
+        Set.indicator_of_notMem hξ]
+  refine (summable_congr hterm).mpr ?_
+  refine ((Equiv.mulRight ξ₀⁻¹).summable_iff (f := P.indicator fun ξ ↦ h (ξ * ξ₀))).mpr ?_
+  refine summable_subtype_iff_indicator.mp ?_
+  let g'' : (SAdeleRing F S)ˣ :=
+    Units.map (adeleProjection F S).toMonoidHom (IdeleGroup.unitEmbedding (𝓞 F) F ξ₀ * g)
+  have hS := ((sLocalAdelicTheta_hasSumUniformlyOn F S f {g''} isCompact_singleton).hasSum
+    (Set.mem_singleton g'')).summable
+  have hG : Summable (fun u : ((S : Set V).integer F)ˣ ↦
+      h (((Set.unitEquivUnitsInteger (S : Set V) F).symm u : Fˣ) * ξ₀)) := by
+    refine hS.congr fun u ↦ congrArg f (congrArg Multiplicative.ofAdd ?_)
+    simp only [map_mul, Units.val_mul]
+    rw [mul_assoc]
+    rfl
+  refine (((Set.unitEquivUnitsInteger (S : Set V) F).toEquiv.summable_iff).mpr hG).congr
+    fun x ↦ ?_
+  simp
+
 /-- Paper: (11.1.2.7), p. 480. At any representative of the class the displayed
 orbit series is absolutely convergent and gives the raw theta generator. -/
 theorem sLocalCarvingTheta_spec (S : Finset V) (f : ℬₛ(S)) (g : I𝔽) :
     Summable (fun ξ : Fˣ ↦ sLocalCarvingIdeleTest S f
       (IdeleGroup.unitEmbedding (𝓞 F) F ξ * g)) ∧
-    sLocalCarvingTheta S f (classOf g) = ideleThetaSum (sLocalCarvingIdeleTest S f) g := by sorry
+    sLocalCarvingTheta S f (classOf g) = ideleThetaSum (sLocalCarvingIdeleTest S f) g :=
+  ⟨sLocalCarvingTheta_spec_summable S f g, sLocalCarvingTheta_classOf S f g⟩
+
+/-- The S-component of an inserted S-idele is the S-idele itself. -/
+private theorem sLocalCarvingTheta_sIdeleInsertion_proj (S : Finset V) (g : (SAdeleRing F S)ˣ) :
+    adeleProjection F S (sIdeleInsertion F S g).val = g.val := by
+  obtain ⟨h1, h2, -⟩ := sIdeleInsertion_apply F S g
+  exact Prod.ext h1 (funext fun v ↦ h2 v)
+
+/-- At an inserted S-idele, the outside unit condition on a principal translate holds exactly
+for the S-units. -/
+private theorem sLocalCarvingTheta_sIdeleInsertion_mem (S : Finset V) (g : (SAdeleRing F S)ˣ)
+    (ξ : Fˣ) :
+    (IdeleGroup.unitEmbedding (𝓞 F) F ξ * sIdeleInsertion F S g ∈
+      {g' : I𝔽 | ∀ v ∉ S, Valued.v (g'.val.2 v) = 1}) ↔ ξ ∈ (S : Set V).unit F := by
+  refine forall₂_congr fun v hv ↦ ?_
+  have h1 : (IdeleGroup.unitEmbedding (𝓞 F) F ξ * sIdeleInsertion F S g).val.2 v =
+      ((ξ : F) : v.adicCompletion F) := by
+    change (algebraMap F (FiniteAdeleRing (𝓞 F) F) (ξ : F)) v * (sIdeleInsertion F S g).val.2 v = _
+    rw [(sIdeleInsertion_apply F S g).2.2 v (by exact_mod_cast hv), mul_one]
+    rfl
+  rw [h1, HeightOneSpectrum.valuedAdicCompletion_eq_valuation']
 
 /-- Paper: (11.1.2.7), p. 480. At an inserted S-idele the outside unit condition
 selects exactly the S-units, giving the S-local theta of Definition 2.3.1.1. -/
 theorem sLocalCarvingTheta_sIdeleInsertion (S : Finset V) (f : ℬₛ(S)) (g : (SAdeleRing F S)ˣ) :
-    sLocalCarvingTheta S f (classOf (sIdeleInsertion F S g)) = sLocalAdelicTheta F S f g := by sorry
+    sLocalCarvingTheta S f (classOf (sIdeleInsertion F S g)) = sLocalAdelicTheta F S f g := by
+  rw [sLocalCarvingTheta_classOf, sLocalAdelicTheta_apply]
+  unfold ideleThetaSum
+  let P : Set Fˣ := ((S : Set V).unit F : Set Fˣ)
+  let h : Fˣ → ℂ := fun ξ ↦ f (Multiplicative.ofAdd (adeleProjection F S
+    (IdeleGroup.unitEmbedding (𝓞 F) F ξ * sIdeleInsertion F S g).val))
+  have hterm (ξ : Fˣ) : sLocalCarvingIdeleTest S f
+      (IdeleGroup.unitEmbedding (𝓞 F) F ξ * sIdeleInsertion F S g) = P.indicator h ξ := by
+    unfold sLocalCarvingIdeleTest
+    by_cases hξ : ξ ∈ P
+    · rw [Set.indicator_of_mem ((sLocalCarvingTheta_sIdeleInsertion_mem S g ξ).mpr hξ),
+        Set.indicator_of_mem hξ]
+    · rw [Set.indicator_of_notMem (mt (sLocalCarvingTheta_sIdeleInsertion_mem S g ξ).mp hξ),
+        Set.indicator_of_notMem hξ]
+  rw [tsum_congr hterm, ← tsum_subtype P h]
+  refine Eq.trans ?_ ((Set.unitEquivUnitsInteger (S : Set V) F).toEquiv.tsum_eq _)
+  refine tsum_congr fun x ↦ congrArg f (congrArg Multiplicative.ofAdd ?_)
+  rw [Units.val_mul, Units.val_mul, map_mul, sLocalCarvingTheta_sIdeleInsertion_proj]
+  rfl
 
 /-- Paper: (11.1.2.7), p. 480. The raw theta is integrable on each norm-one
 coset against a continuous norm-one character.
@@ -604,6 +910,47 @@ theorem sLocalCarvingLimit_eq_closedSpan {S : Finset V} (χ : PontryaginDual C�
         u = (memLp_sLocalCarvingGenerator χ hχ hPic s hs twoSided Λ hΛ f hf hFf).toLp
           (sLocalCarvingGenerator S (ωOf(χ)) (J(twoSided, Λ)) f)}).topologicalClosure := by sorry
 
+/-- The L² norm of a vector of a weighted L² space that agrees almost everywhere with the
+restriction of another vector to a measurable set is the weighted integral of the square of
+the other vector over the set. -/
+private theorem sLocalCarving_cutoff_norm_aux {A : Type*} [MeasurableSpace A] (μ : Measure A)
+    (w : A → ℝ) (hw : Measurable w) (hw0 : ∀ x, 0 ≤ w x) (E : Set A) (hE : MeasurableSet E)
+    (u v : Lp ℂ 2 (μ.withDensity fun x ↦ ENNReal.ofReal (w x)))
+    (hv : (v : A → ℂ) =ᵐ[μ.withDensity fun x ↦ ENNReal.ofReal (w x)] E.indicator (u : A → ℂ)) :
+    IntegrableOn (fun x ↦ ‖u x‖ ^ 2 * w x) E μ ∧
+      ‖v‖ = Real.sqrt (∫ x in E, ‖u x‖ ^ 2 * w x ∂μ) := by
+  have hd : Measurable fun x ↦ ENNReal.ofReal (w x) := hw.ennreal_ofReal
+  have hfin : ∀ᵐ x ∂μ, ENNReal.ofReal (w x) < ⊤ := .of_forall fun _ ↦ ENNReal.ofReal_lt_top
+  have hreal (x : A) : (ENNReal.ofReal (w x)).toReal = w x := ENNReal.toReal_ofReal (hw0 x)
+  have hsq (f : Lp ℂ 2 (μ.withDensity fun x ↦ ENNReal.ofReal (w x))) : Integrable (fun x ↦ ‖f x‖ ^ 2) (μ.withDensity fun x ↦ ENNReal.ofReal (w x)) := by
+    have h := (Lp.memLp f).integrable_norm_rpow two_ne_zero ENNReal.ofNat_ne_top
+    simpa only [ENNReal.toReal_ofNat, Real.rpow_two] using h
+  have hu : Integrable (fun x ↦ ‖u x‖ ^ 2 * w x) μ := by
+    have h := (integrable_withDensity_iff_integrable_smul' hd hfin).mp (hsq u)
+    refine h.congr (.of_forall fun x ↦ ?_)
+    simp only [hreal, smul_eq_mul, mul_comm]
+  refine ⟨hu.integrableOn, ?_⟩
+  have hnorm : ‖v‖ ^ 2 = ∫ x, ‖v x‖ ^ 2 ∂(μ.withDensity fun x ↦ ENNReal.ofReal (w x)) := by
+    rw [norm_sq_eq_re_inner (𝕜 := ℂ), L2.inner_def, ← integral_re (L2.integrable_inner v v)]
+    congr 1
+    funext x
+    exact inner_self_eq_norm_sq (𝕜 := ℂ) (v x)
+  have hint : ∫ x, ‖v x‖ ^ 2 ∂(μ.withDensity fun x ↦ ENNReal.ofReal (w x)) = ∫ x in E, ‖u x‖ ^ 2 * w x ∂μ := by
+    calc ∫ x, ‖v x‖ ^ 2 ∂(μ.withDensity fun x ↦ ENNReal.ofReal (w x)) = ∫ x, E.indicator (fun x ↦ ‖u x‖ ^ 2) x ∂(μ.withDensity fun x ↦ ENNReal.ofReal (w x)) := by
+          refine integral_congr_ae (hv.mono fun x hx ↦ ?_)
+          change ‖v x‖ ^ 2 = _
+          rw [hx]
+          by_cases hxE : x ∈ E
+          · simp [hxE]
+          · simp [hxE]
+      _ = ∫ x in E, ‖u x‖ ^ 2 ∂(μ.withDensity fun x ↦ ENNReal.ofReal (w x)) := integral_indicator hE
+      _ = ∫ x in E, (ENNReal.ofReal (w x)).toReal • ‖u x‖ ^ 2 ∂μ :=
+          setIntegral_withDensity_eq_setIntegral_toReal_smul₀ hd.aemeasurable (ae_restrict_of_ae hfin) _ hE
+      _ = _ := by
+          refine setIntegral_congr_fun hE fun x _ ↦ ?_
+          simp only [hreal, smul_eq_mul, mul_comm]
+  rw [← hint, ← hnorm, Real.sqrt_sq (norm_nonneg v)]
+
 /-- Paper: (11.1.2.8)–(11.1.2.9), p. 481. The cutoff norm is the weighted
 L² norm restricted to the idelic norm band.
 Deviation: For the two-sided cutoff the integral is over the bounded band. -/
@@ -612,7 +959,35 @@ theorem sLocalCarving_cutoff_norm (s : ℝ) (twoSided : Bool) (Λ : ℝ) (u : W(
     let integrand := fun g : C𝔽 ↦ ‖u g‖ ^ 2 * (1 + Real.log (norm𝔽 g) ^ 2) ^ (s / 2)
     IntegrableOn integrand E μ𝔽 ∧
       ‖M(s, J(twoSided, Λ), hJ(twoSided, Λ)) u‖ =
-        Real.sqrt (∫ g in E, integrand g ∂μ𝔽) := by sorry
+        Real.sqrt (∫ g in E, integrand g ∂μ𝔽) := by
+  intro E integrand
+  have hn : Continuous norm𝔽 :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)
+  have hdens : Continuous (intervalSobolevDensity 0 0 s) := by
+    unfold intervalSobolevDensity
+    exact ((Real.continuous_exp.comp (continuous_const.mul continuous_id)).max
+      (Real.continuous_exp.comp (continuous_const.mul continuous_id))).mul
+      (Continuous.rpow_const (f := fun x : ℝ ↦ 1 + x ^ 2) (by fun_prop)
+        fun x ↦ Or.inl (by positivity))
+  have hm : Measurable fun g : C𝔽 ↦ intervalSobolevDensity 0 0 s (Real.log (norm𝔽 g)) :=
+    hdens.measurable.comp (Real.measurable_log.comp hn.measurable)
+  have hw0 (g : C𝔽) : 0 ≤ intervalSobolevDensity 0 0 s (Real.log (norm𝔽 g)) :=
+    mul_nonneg (le_max_of_le_left (Real.exp_pos _).le) (Real.rpow_nonneg (by positivity) _)
+  have hv : (M(s, J(twoSided, Λ), hJ(twoSided, Λ)) u : C𝔽 → ℂ) =ᵐ[ν(s)] E.indicator (u : C𝔽 → ℂ) := by
+    refine (modulatedAbsoluteCutoffOperator_apply m𝔽 (ν(s)) _ _ u).trans (.of_forall fun g ↦ ?_)
+    by_cases hg : g ∈ E
+    · have hg' : ((m𝔽 g).val : ℝ) ∈ J(twoSided, Λ) := hg
+      simp [modulatedAbsoluteCutoff, indicator, hg, hg']
+    · have hg' : ((m𝔽 g).val : ℝ) ∉ J(twoSided, Λ) := hg
+      simp [modulatedAbsoluteCutoff, indicator, hg, hg']
+  have h := sLocalCarving_cutoff_norm_aux μ𝔽
+    (fun g ↦ intervalSobolevDensity 0 0 s (Real.log (norm𝔽 g))) hm hw0 E
+    (hn.measurable (hJ(twoSided, Λ))) u _ hv
+  have hw (g : C𝔽) : intervalSobolevDensity 0 0 s (Real.log (norm𝔽 g)) =
+      (1 + Real.log (norm𝔽 g) ^ 2) ^ (s / 2) := by
+    simp [intervalSobolevDensity]
+  simp only [hw] at h
+  exact h
 
 /-- Paper: (11.1.2.10)–(11.1.2.11), p. 481. The image under the cutoff of the
 completed uncut stage lies in the cutoff stage, and its closure is the cutoff stage.

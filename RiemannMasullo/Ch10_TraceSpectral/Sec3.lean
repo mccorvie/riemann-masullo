@@ -361,6 +361,77 @@ theorem spectralRectanglesTraceCauchy_const (A : H →L[ℂ] H) :
     (0 : nuclearEndomorphisms H)).mpr rfl
   exact lt_of_eq_of_lt hz hε
 
+private theorem spectralConvolutionFiniteSum_limit_of_traceCauchy_nonneg
+    (T : H →L[ℂ] H) (n : ℕ) : 0 ≤ approximationNumber T n :=
+  Real.sInf_nonneg fun _ ⟨_, _, h⟩ ↦ h ▸ norm_nonneg _
+
+/-- Every finite sum of approximation numbers is bounded by the trace norm. -/
+private theorem spectralConvolutionFiniteSum_limit_of_traceCauchy_bound
+    (T : nuclearEndomorphisms H) (s : Finset ℕ) :
+    ∑ n ∈ s, approximationNumber T.val n ≤ traceNorm T := by
+  have hmem := (mem_traceClassOperators_iff_isNuclearOperator T.val).2 T.property
+  have hsum : Summable (approximationNumber T.val) := by simpa using hmem.2
+  have ht := schattenNorm_one_eq_traceNorm T
+  simp only [schattenNorm, Real.rpow_one, div_one] at ht
+  rw [← ht]
+  exact hsum.sum_le_tsum s (fun n _ ↦ spectralConvolutionFiniteSum_limit_of_traceCauchy_nonneg T.val n)
+
+/-- Once the rectangle includes a zero, its jets reproduce the corresponding
+coordinates of the image of the original operator. -/
+private theorem spectralConvolutionFiniteSum_limit_of_traceCauchy_coordinate {ι Z : Type*}
+    (A : H →L[ℂ] H) (x : ι → H) (Λ : ι → StrongDual ℂ H) (K : Finset Z)
+    (N : Z → ℕ) (jet : (z : Z) → Fin (N z) → ι) (hb : IsSpectralMarkushevichBasis x Λ)
+    (hj : Injective (fun j : (z : Z) × Fin (N z) ↦ jet j.1 j.2))
+    (z : Z) (hz : z ∈ K) (m : Fin (N z)) (v : H) :
+    Λ (jet z m) (spectralConvolutionFiniteSum A x Λ K N jet v) = Λ (jet z m) (A v) := by
+  classical
+  simp only [spectralConvolutionFiniteSum, sum_apply, map_sum, ContinuousLinearMap.smulRight_apply,
+    ContinuousLinearMap.comp_apply, map_smul, smul_eq_mul]
+  rw [Finset.sum_eq_single_of_mem z hz]
+  · rw [Finset.sum_eq_single m]
+    · rw [hb.1, mul_one]
+    · intro k _ hk
+      have hne : jet z k ≠ jet z m :=
+        fun h ↦ hk (eq_of_heq (Sigma.mk.inj_iff.mp (hj (a₁ := ⟨z, k⟩) (a₂ := ⟨z, m⟩) h)).2)
+      rw [hb.2.1 _ _ hne, mul_zero]
+    · simp
+  · intro w _ hw
+    apply Finset.sum_eq_zero
+    intro k _
+    have hne : jet w k ≠ jet z m :=
+      fun h ↦ hw (congrArg Sigma.fst (hj (a₁ := ⟨w, k⟩) (a₂ := ⟨z, m⟩) h))
+    rw [hb.2.1 _ _ hne, mul_zero]
+
+/-- Trace-norm Cauchy bounds pass to each finite sum of powers of approximation
+numbers at an operator-norm limit. Taking their supremum controls the Schatten tail. -/
+private theorem spectralConvolutionFiniteSum_limit_of_traceCauchy_tail
+    (B : ℕ × ℕ → H →L[ℂ] H) (C : H →L[ℂ] H) (hlim : Tendsto B atTop (𝓝 C))
+    (hc : SpectralRectanglesTraceCauchy B) (p : ℝ) (hp : 1 ≤ p) (ε : ℝ)
+    (hε : 0 < ε) (hε₁ : ε ≤ 1) :
+    ∀ᶠ j in atTop, Summable (fun n ↦ approximationNumber (B j - C) n ^ p) ∧
+      ∑' n, approximationNumber (B j - C) n ^ p ≤ ε := by
+  have nn := spectralConvolutionFiniteSum_limit_of_traceCauchy_nonneg (H := H)
+  have hcont (n : ℕ) : Continuous (fun D : H →L[ℂ] H ↦ approximationNumber D n) :=
+    (LipschitzWith.of_dist_le' (K := 1) (fun D E ↦ by
+      simpa only [dist_eq_norm, Real.norm_eq_abs, one_mul] using abs_approximationNumber_sub_le D E n)).continuous
+  obtain ⟨i, hi⟩ := hc ε hε
+  filter_upwards [eventually_ge_atTop i] with j hj
+  have hbound (s : Finset ℕ) : ∑ n ∈ s, approximationNumber (B j - C) n ^ p ≤ ε := by
+    apply le_of_tendsto (tendsto_finsetSum s fun n _ ↦
+      ((hcont n).continuousAt.tendsto.comp (tendsto_const_nhds.sub hlim)).rpow_const
+        (Or.inr (zero_le_one.trans hp)))
+    filter_upwards [eventually_ge_atTop i] with k hk
+    obtain ⟨T, hT, ht⟩ := hi j k hj hk
+    change ∑ n ∈ s, approximationNumber (B j - B k) n ^ p ≤ ε
+    rw [← hT]
+    refine (Finset.sum_le_sum fun n _ ↦ Real.rpow_le_self_of_le_one (nn _ n) ?_ hp).trans
+      ((spectralConvolutionFiniteSum_limit_of_traceCauchy_bound T s).trans ht.le)
+    have h := spectralConvolutionFiniteSum_limit_of_traceCauchy_bound T {n}
+    exact (by simpa using h : approximationNumber T.val n ≤ traceNorm T).trans (ht.le.trans hε₁)
+  have hnonneg : 0 ≤ fun n ↦ approximationNumber (B j - C) n ^ p :=
+    fun n ↦ Real.rpow_nonneg (nn _ n) _
+  exact ⟨summable_of_sum_le hnonneg hbound, Real.tsum_le_of_sum_le hnonneg hbound⟩
+
 /-- Paper: (10.3.1.23), p. 452. A trace-norm Cauchy family of biorthogonal
 finite sections converges to the given operator in every Schatten norm.
 Each coordinate of the image eventually agrees with the corresponding
@@ -377,7 +448,52 @@ theorem spectralConvolutionFiniteSum_limit_of_traceCauchy {ι Z : Type*}
     SpectralRectanglesTraceCauchy B →
       ∃ (hA : A ∈ S) (hB : ∀ ij, B ij ∈ S),
         Tendsto (fun ij ↦ schattenNorm (E := H) (F := H) (p := p) (hp := hp)
-          (⟨B ij, hB ij⟩ - ⟨A, hA⟩ : S)) atTop (𝓝 0) := by sorry
+          (⟨B ij, hB ij⟩ - ⟨A, hA⟩ : S)) atTop (𝓝 0) := by
+  classical
+  intro B S hc
+  have hB (j) : B j ∈ S := by
+    exact S.sum_mem fun z _ ↦ S.sum_mem fun m _ ↦ smulRight_mem_schattenClass hp _ _
+  have hCauchy : CauchySeq B := by
+    refine Metric.cauchySeq_iff.mpr fun ε hε ↦ ?_
+    obtain ⟨i, hi⟩ := hc ε hε
+    refine ⟨i, fun j hj k hk ↦ ?_⟩
+    obtain ⟨T, hT, ht⟩ := hi j k hj hk
+    rw [dist_eq_norm, ← hT, ← approximationNumber_zero_eq_opNorm T.val
+      (isCompactOperator_of_isNuclearOperator T.property)]
+    have h := spectralConvolutionFiniteSum_limit_of_traceCauchy_bound T {0}
+    exact lt_of_le_of_lt (by simpa using h) ht
+  obtain ⟨C, hlim⟩ := cauchySeq_tendsto_of_complete hCauchy
+  have hCA : C = A := by
+    ext v
+    apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr
+    have hev : ContinuousLinearMap.apply ℂ ℂ (C v) = ContinuousLinearMap.apply ℂ ℂ (A v) := by
+      apply ContinuousLinearMap.ext_on _hb.2.2.2
+      rintro _ ⟨i, rfl⟩
+      obtain ⟨⟨z, m⟩, rfl⟩ := _hj.2 i
+      change Λ (jet z m) (C v) = Λ (jet z m) (A v)
+      apply tendsto_nhds_unique ((Λ (jet z m)).continuous.continuousAt.tendsto.comp
+        (((ContinuousLinearMap.apply ℂ H v).continuous.continuousAt.tendsto).comp hlim))
+      apply tendsto_const_nhds.congr'
+      filter_upwards [eventually_ge_atTop (e z)] with j hj
+      exact (spectralConvolutionFiniteSum_limit_of_traceCauchy_coordinate A x Λ _ N jet _hb _hj.1
+        z (Finset.mem_preimage.mpr (Finset.mem_product.mpr
+          ⟨Finset.mem_Iic.mpr hj.1, Finset.mem_Iic.mpr hj.2⟩)) m v).symm
+    exact fun ℓ ↦ DFunLike.congr_fun hev ℓ
+  subst C
+  have hcompact := isCompactOperator_of_tendsto hlim (.of_forall fun j ↦ (hB j).1)
+  have tail := spectralConvolutionFiniteSum_limit_of_traceCauchy_tail B A hlim hc p hp
+  obtain ⟨j, hj, _⟩ := (tail 1 zero_lt_one le_rfl).exists
+  have hdiff : B j - A ∈ S := ⟨(hB j).1.sub hcompact, hj⟩
+  have hA : A ∈ S := by simpa only [sub_sub_cancel] using S.sub_mem (hB j) hdiff
+  refine ⟨hA, hB, ?_⟩
+  have hzero : Tendsto (fun j ↦ ∑' n, approximationNumber (B j - A) n ^ p) atTop (𝓝 0) := by
+    apply Metric.tendsto_nhds.mpr
+    intro ε hε
+    filter_upwards [tail _ (lt_min (half_pos hε) zero_lt_one) (min_le_right (ε / 2) 1)] with j hj
+    rw [Real.dist_eq, sub_zero, abs_of_nonneg (tsum_nonneg fun n ↦ Real.rpow_nonneg
+      (spectralConvolutionFiniteSum_limit_of_traceCauchy_nonneg (B j - A) n) p)]
+    exact hj.2.trans_lt ((min_le_left _ _).trans_lt (half_lt_self hε))
+  exact hzero.rpow_const_nhds_zero (one_div_pos.mpr (zero_lt_one.trans_le hp))
 
 /-- Paper: Theorem 10.3.1.1(3), p. 449. Rapid decay of the approximation
 numbers gives a strongly nuclear expansion by the singular-value decomposition. -/
@@ -502,11 +618,62 @@ theorem spectralLineConvolution_schatten_tendsto (χ : PontryaginDual C₁ → P
     _hb equiv.bijective p hp
     (spectralLineConvolution_traceCauchy (F := F) a χ _hχ hs φ eχ e _he x Λ _hb _hj)
 
+/-- Number the norm-one characters and, within each row, the selected zeros. -/
+private theorem spectralLineConvolution_nuclear_indices {Z : Type*}
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (row : Z → PontryaginDual C₁) (point : Z → ℂ)
+    (hinj : Injective (fun z ↦ (row z, point z))) (hz : ∀ z, 0 < order(χ (row z), point z)) :
+    ∃ (r : PontryaginDual C₁ ↪ ℕ) (e : Z ↪ ℕ × ℕ), ∀ z, (e z).1 = r (row z) := by
+  have hK := IsModulation.isCompact_ker (m := m𝔽) hm𝔽
+  let : CompactSpace C₁ := isCompact_iff_compactSpace.mp hK
+  let : LocallyCompactSpace C₁ := hK.isClosed.locallyCompactSpace
+  let : SecondCountableTopology C₁ := Topology.IsInducing.subtypeVal.secondCountableTopology
+  let : SecondCountableTopology Circle :=
+    inferInstanceAs (SecondCountableTopology (Metric.sphere (0 : ℂ) 1))
+  let : SecondCountableTopology (PontryaginDual C₁) :=
+    (ContinuousMonoidHom.isEmbedding_toContinuousMap C₁ Circle).secondCountableTopology
+  let : Countable (PontryaginDual C₁) := countable_of_Lindelof_of_discrete
+  let zeros (ω : PontryaginDual C₁) := {z : ℂ | 0 < order(χ ω, z)}
+  have hc (ω) : (zeros ω).Countable := by
+    obtain ⟨hL, heq⟩ := continuedCompletedHeckeL_spec (χ ω)
+    have hfinite : order(χ ω, (2 : ℂ)) ≠ ⊤ := by
+      intro h
+      have hp : 0 < order(χ ω, (2 : ℂ)) := by rw [h]; exact WithTop.coe_lt_top (0 : ℤ)
+      have := completedHeckeL_continuation_zeros (χ ω) _ hL heq (by norm_num : 0 < (2 : ℂ).re) hp
+      norm_num at this
+    have hd : (zeros ω)ᶜ ∈ codiscrete ℂ := by
+      filter_upwards [hL.meromorphicOn.codiscreteWithin_setOfPred_meromorphicOrderAt_eq_zero_or_top] with z hz'
+      rcases hz'.2 with h | h
+      · simp [zeros, h]
+      · exact (hL.meromorphicOn.meromorphicOrderAt_ne_top_of_isPreconnected
+          isPreconnected_univ (mem_univ _) (mem_univ z) hfinite h).elim
+    let : DiscreteTopology (zeros ω) := isDiscrete_iff_discreteTopology.mp
+      (compl_mem_codiscrete_iff.mp hd).2
+    exact Set.countable_coe_iff.mp countable_of_Lindelof_of_discrete
+  let : Countable (⋃ ω, zeros ω) := (Set.countable_iUnion hc).to_subtype
+  obtain ⟨r⟩ := nonempty_embedding_nat (PontryaginDual C₁)
+  obtain ⟨c⟩ := nonempty_embedding_nat (⋃ ω, zeros ω)
+  let pt (z : Z) : ⋃ ω, zeros ω := ⟨point z, mem_iUnion.mpr ⟨row z, hz z⟩⟩
+  refine ⟨r, ⟨fun z ↦ (r (row z), c (pt z)), ?_⟩, fun _ ↦ rfl⟩
+  intro i j hij
+  exact hinj (Prod.ext (r.injective (congrArg Prod.fst hij))
+    (congrArg Subtype.val (c.injective (congrArg Prod.snd hij))))
+
 /-- Paper: Theorem 10.3.1.1(2), p. 448. Convolution on the a-line spectral
 quotient is trace class for each test. -/
 theorem spectralLineConvolution_nuclear {s : ℝ} (hs : 1 < s) (φ : BruhatCompactSupport C𝔽) :
     let H := Q(a, h₀, hs₀(hs))
-    IsNuclearOperator (E := H) (F := H) (spectralConvolution (F := F) a h₀ hs₀(hs) φ) := by sorry
+    IsNuclearOperator (E := H) (F := H) (spectralConvolution (F := F) a h₀ hs₀(hs) φ) := by
+  obtain ⟨χ, hχ⟩ := exists_spectralBasepointChoice F
+  obtain ⟨_, x, Λ, hb, hj⟩ := spectralLineMarkushevichBasis (a := a) χ hχ hs
+  obtain ⟨r, e, he⟩ := spectralLineConvolution_nuclear_indices χ
+    (fun z : Z(χ) ↦ z.val.1) (fun z ↦ shift(a, z.val.2)) (by
+      intro i j h
+      have hrow := congrArg Prod.fst h
+      exact Subtype.ext (Prod.ext hrow
+        (by simpa using congrArg (fun p ↦ (p.2 : ℂ).im) h))) (fun z ↦ z.property)
+  obtain ⟨hA, _⟩ := spectralLineConvolution_schatten_tendsto (F := F) a χ hχ hs φ
+    r e he x Λ hb hj 1 le_rfl
+  exact (mem_traceClassOperators_iff_isNuclearOperator _).mp hA
 
 /-- Paper: Theorem 10.3.1.1(2) and (10.3.1.2), p. 448. The convolution
 action lifts to a linear map into the trace class, continuous at zero in trace norm. -/
@@ -687,7 +854,20 @@ quotient is trace class for each test. -/
 theorem spectralStripConvolution_nuclear {α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s)
     (φ : BruhatCompactSupport C𝔽) :
     let H := Q(a, hStrip(hα), hs₀(hs))
-    IsNuclearOperator (E := H) (F := H) (spectralConvolution (F := F) a hStrip(hα) hs₀(hs) φ) := by sorry
+    IsNuclearOperator (E := H) (F := H) (spectralConvolution (F := F) a hStrip(hα) hs₀(hs) φ) := by
+  obtain ⟨χ, hχ⟩ := exists_spectralBasepointChoice F
+  obtain ⟨_, x, Λ, hb, hj⟩ := spectralStripMarkushevichBasis (a := a) χ hχ hα hs₀(hs)
+  obtain ⟨r, e, he⟩ := spectralLineConvolution_nuclear_indices χ
+    (fun z : Z(χ, α) ↦ z.val.1) (fun z ↦ shift(a + z.val.2.1, z.val.2.2)) (by
+      intro i j h
+      have hrow := congrArg Prod.fst h
+      have hre := congrArg (fun p ↦ (p.2 : ℂ).re) h
+      have him := congrArg (fun p ↦ (p.2 : ℂ).im) h
+      exact Subtype.ext (Prod.ext hrow
+        (Prod.ext (by simpa using hre) (by simpa using him)))) (fun z ↦ z.property.2)
+  obtain ⟨hA, _⟩ := spectralStripConvolution_schatten_tendsto (F := F) a χ hχ hα hs φ
+    r e he x Λ hb hj 1 le_rfl
+  exact (mem_traceClassOperators_iff_isNuclearOperator _).mp hA
 
 /-- Paper: Theorem 10.3.2.1(2) and (10.3.2.2), p. 454. The convolution
 action lifts to a linear map into the trace class, continuous at zero in trace norm. -/

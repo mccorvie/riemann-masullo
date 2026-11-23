@@ -155,7 +155,36 @@ theorem mem_sLocalOrbitalPrincipalValue_iff {T : Finset V} (h₀ : T ⊆ S) (_hn
     (_hsat : IsSaturatedPlaceSet S) (_hclass : PicTrivial)
     (χ : PontryaginDual J₁) (x : Θₛ(χ)) :
     x ∈ PV(T, h₀, χ) ↔ ∀ j : I(T, χ),
-      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := T) (ω := χ) j x = 0 := by sorry
+      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := T) (ω := χ) j x = 0 := by
+  classical
+  have hb := sLocalThetaRemovedPrincipalParts_ker (F := F) (S := S) χ ∅ T
+  simp only [sLocalSelectedPoleMultiplicity_finite] at hb
+  rw [sLocalOrbitalPrincipalValue_eq_poleBound h₀ _hne _hsat _hclass χ, ← hb,
+    LinearMap.mem_ker]
+  have hle (c : Xₛ) : sLocalFinitePoleMultiplicity T c ≤ sLocalRhoPoleOrder c := by
+    rw [sLocalRhoPoleOrder_eq_card_polePlaces]
+    unfold sLocalFinitePoleMultiplicity
+    exact (Finset.card_filter_le _ _).trans (Nat.le_add_left _ _)
+  constructor
+  · intro h j
+    have hj := j.property.2
+    have hm := hle j.val.1
+    let k := sLocalRhoPoleOrder j.val.1 - j.val.2
+    exact congrFun h ⟨(j.val.1, k), j.property.1, by
+      rw [sLocalSelectedPoleMultiplicity_finite]; dsimp [k]; omega, Nat.sub_le _ _⟩
+  · intro h
+    funext i
+    have hi := i.property.2.1
+    rw [sLocalSelectedPoleMultiplicity_finite] at hi
+    have hk := i.property.2.2
+    let r := sLocalRhoPoleOrder i.val.1 - i.val.2
+    have hr : r < sLocalFinitePoleMultiplicity T i.val.1 := by
+      dsimp [r]; have := hle i.val.1; omega
+    have hj := h ⟨(i.val.1, r), i.property.1, hr⟩
+    change sLocalThetaPrincipalPartCoeff χ i.val.1 i.property.1
+      (sLocalRhoPoleOrder i.val.1 - r) x = 0 at hj
+    change sLocalThetaPrincipalPartCoeff χ i.val.1 i.property.1 i.val.2 x = 0
+    rwa [show sLocalRhoPoleOrder i.val.1 - r = i.val.2 by dsimp [r]; omega] at hj
 
 /-- Paper: Theorem 7.3.1.2(1), p. 341.
 The finite principal-value image is closed in the homogeneous theta space.
@@ -233,9 +262,36 @@ local notation "Rₚ(" p ", " ω ")" => sLocalPrimaryOrbitalSubmodule (F := F) (
 
 /-- Paper: Definition 7.3.1.3, p. 343.
 The p-primary orbital quotient is the homogeneous theta space modulo its primary
-principal-value image. It carries the quotient topology. -/
-abbrev SLocalPrimaryOrbitalQuotient (p : Vℚ) (ω : PontryaginDual J₁) :=
+principal-value image. It carries the quotient topology.
+
+This is a `def` with its own instances, not an `abbrev`, so that instance terms over it do
+not spell out its definition (#5398). -/
+def SLocalPrimaryOrbitalQuotient (p : Vℚ) (ω : PontryaginDual J₁) :=
   Θₛ(ω) ⧸ Rₚ(p, ω)
+
+namespace SLocalPrimaryOrbitalQuotient
+
+instance instAddCommGroup (p : Vℚ) (ω : PontryaginDual J₁) :
+    AddCommGroup (SLocalPrimaryOrbitalQuotient p ω) :=
+  inferInstanceAs (AddCommGroup (Θₛ(ω) ⧸ Rₚ(p, ω)))
+
+instance instModule (p : Vℚ) (ω : PontryaginDual J₁) :
+    Module ℂ (SLocalPrimaryOrbitalQuotient p ω) :=
+  inferInstanceAs (Module ℂ (Θₛ(ω) ⧸ Rₚ(p, ω)))
+
+instance instTopologicalSpace (p : Vℚ) (ω : PontryaginDual J₁) :
+    TopologicalSpace (SLocalPrimaryOrbitalQuotient p ω) :=
+  inferInstanceAs (TopologicalSpace (Θₛ(ω) ⧸ Rₚ(p, ω)))
+
+instance instIsTopologicalAddGroup (p : Vℚ) (ω : PontryaginDual J₁) :
+    IsTopologicalAddGroup (SLocalPrimaryOrbitalQuotient p ω) :=
+  inferInstanceAs (IsTopologicalAddGroup (Θₛ(ω) ⧸ Rₚ(p, ω)))
+
+instance instContinuousSMul (p : Vℚ) (ω : PontryaginDual J₁) :
+    ContinuousSMul ℂ (SLocalPrimaryOrbitalQuotient p ω) :=
+  inferInstanceAs (ContinuousSMul ℂ (Θₛ(ω) ⧸ Rₚ(p, ω)))
+
+end SLocalPrimaryOrbitalQuotient
 
 local notation "Q(" p ", " ω ")" => SLocalPrimaryOrbitalQuotient (F := F) (S := S) p ω
 local notation "π(" p ", " ω ")" => (Rₚ(p, ω)).mkQ
@@ -425,7 +481,178 @@ theorem existsUnique_sLocalOrbitalLatticeIndex (χ : PontryaginDual Jₛ) (v : S
     (u : (v.val.adicCompletion F)ˣ) (_hu : uniformizerNorm(v, u)) (t : ℝ)
     (_ht : phase(χ, v, u, t)) (c : Xₛ)
     (_hc : ∃ s, c = chart(χ) s) (_hv : v ∈ sLocalFinitePolePlaces c) :
-    ∃! n : ℤ, c = lattice(χ, v, t, n) := by sorry
+    ∃! n : ℤ, c = lattice(χ, v, t, n) := by
+  obtain ⟨s, rfl⟩ := _hc
+  have hq : (1 : ℝ) < (v.val.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val
+  have hq_pos : (0 : ℝ) < (v.val.asIdeal.absNorm : ℝ) := zero_lt_one.trans hq
+  have hlog : (0 : ℝ) < Real.log (v.val.asIdeal.absNorm : ℝ) := Real.log_pos hq
+  have hqinv_pos : (0 : ℝ) < ((v.val.asIdeal.absNorm : ℝ)⁻¹) := inv_pos.mpr hq_pos
+  let eProd := ContinuousMulEquiv.prodUnits
+    (InfiniteAdeleRing F) ((w : S) → HeightOneSpectrum.adicCompletion F (Subtype.val w))
+  let eFin := ContinuousMulEquiv.piUnits
+    (M := fun w : S ↦ HeightOneSpectrum.adicCompletion F (Subtype.val w))
+  let finAt : (v.val.adicCompletion F)ˣ → Jₛ := fun x ↦
+    (QuotientGroup.mk : (SAdeleRing F S)ˣ → Jₛ)
+      (eProd.symm (1, eFin.symm (@Pi.mulSingle _ _ _ (Classical.decEq _) v x)))
+  have hmod_val (x : (v.val.adicCompletion F)ˣ) :
+      (((mₛ (finAt x) : ℝ≥0) : ℝ) : ℂ) = ((‖(x : v.val.adicCompletion F)‖ : ℝ) : ℂ) := by
+    have h1 := sLocalFiniteRestriction_norm (F := F) (S := S) v x
+    change (((1 : PontryaginDual Jₛ) (finAt x) : Circle) : ℂ) *
+      (((mₛ (finAt x) : ℝ≥0) : ℝ) : ℂ) ^ (1 : ℂ) = _ at h1
+    simpa [Complex.cpow_one, Units.map, nnNormHom] using h1
+  have htwist_eval (z : ℂ) (x : (v.val.adicCompletion F)ˣ) :
+      sLocalFiniteRestriction v (twistₛ (chart(χ) s) z) x =
+        sLocalFiniteRestriction v (chart(χ) s) x * ((‖(x : v.val.adicCompletion F)‖ : ℝ) : ℂ) ^ z := by
+    change sLocalFiniteRestriction v (chart(χ) s) x * (((mₛ (finAt x) : ℝ≥0) : ℝ) : ℂ) ^ z = _
+    rw [hmod_val x]
+  have hunr_iff (z : ℂ) :
+      (∀ y : (HeightOneSpectrum.adicCompletionIntegers F v.val)ˣ,
+          sLocalFiniteRestriction v (twistₛ (chart(χ) s) z)
+            (Units.map (HeightOneSpectrum.adicCompletionIntegers F v.val).subtype.toMonoidHom y) = 1) ↔
+        (∀ y : (HeightOneSpectrum.adicCompletionIntegers F v.val)ˣ,
+          sLocalFiniteRestriction v (chart(χ) s)
+            (Units.map (HeightOneSpectrum.adicCompletionIntegers F v.val).subtype.toMonoidHom y) = 1) := by
+    have hunit_norm (y : (HeightOneSpectrum.adicCompletionIntegers F v.val)ˣ) :
+        ‖((Units.map (HeightOneSpectrum.adicCompletionIntegers F v.val).subtype.toMonoidHom y :
+            (v.val.adicCompletion F)ˣ) : v.val.adicCompletion F)‖ = 1 :=
+      Valued.toNormedField.norm_eq_one_iff.mpr
+        ((HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one
+          (a := Units.map (v.val.adicCompletionIntegers F).subtype.toMonoidHom y)).mp
+          ⟨y.val.property, y.inv.property⟩)
+    constructor <;> intro h y
+    · have hy := h y
+      rw [htwist_eval, hunit_norm y, Complex.ofReal_one, Complex.one_cpow, mul_one] at hy
+      exact hy
+    · rw [htwist_eval, hunit_norm y, Complex.ofReal_one, Complex.one_cpow, mul_one]
+      exact h y
+  have hlt : meromorphicOrderAt
+      (fun z : ℂ ↦ finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (twistₛ (chart(χ) s) z))) 0 < 0 :=
+    (Finset.mem_filter.mp _hv).2
+  have hunr : ∀ y : (HeightOneSpectrum.adicCompletionIntegers F v.val)ˣ,
+      sLocalFiniteRestriction v (chart(χ) s)
+        (Units.map (HeightOneSpectrum.adicCompletionIntegers F v.val).subtype.toMonoidHom y) = 1 := by
+    by_contra hnot
+    have hconst : (fun z : ℂ ↦ finiteLocalEulerFactor v.val
+        (sLocalFiniteRestriction v (twistₛ (chart(χ) s) z))) = fun _ ↦ (1 : ℂ) := by
+      funext z
+      unfold finiteLocalEulerFactor
+      rw [ite_eq_right (fun hz ↦ hnot ((hunr_iff z).mp hz))]
+    rw [hconst] at hlt
+    exact not_lt_of_ge (analyticAt_const.meromorphicOrderAt_nonneg) hlt
+  let hπ := (Valued.v : Valuation (v.val.adicCompletion F)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π : (v.val.adicCompletion F)ˣ := Units.mk0 hπ.choose hπ.choose_spec.ne_zero
+  have hπ_norm : ‖(π : v.val.adicCompletion F)‖ = ((v.val.asIdeal.absNorm : ℝ)⁻¹) := by
+    have hval : Valued.v (π : v.val.adicCompletion F) = WithZero.exp (-1 : ℤ) :=
+      hπ.choose_spec.trans (congrArg Units.val
+        (Valuation.IsRankOneDiscrete.generator_eq_exp_neg_one_of_surjective
+          (v.val.valuedAdicCompletion_surjective F)))
+    rw [FinitePlace.norm_def, hval, WithZeroMulInt.toNNReal_neg_apply _ (by simp)]
+    simp
+  have hratio_norm : ‖((u * π⁻¹ : (v.val.adicCompletion F)ˣ) : v.val.adicCompletion F)‖ = 1 := by
+    rw [Units.val_mul, norm_mul, Units.val_inv_eq_inv_val, norm_inv, _hu, hπ_norm]
+    exact mul_inv_cancel₀ hqinv_pos.ne'
+  have hratio_mem : (u * π⁻¹ : (v.val.adicCompletion F)ˣ).val ∈
+        HeightOneSpectrum.adicCompletionIntegers F v.val ∧
+      ((u * π⁻¹ : (v.val.adicCompletion F)ˣ)⁻¹).val ∈
+        HeightOneSpectrum.adicCompletionIntegers F v.val :=
+    (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one
+      (a := u * π⁻¹)).mpr (Valued.toNormedField.norm_eq_one_iff.mp hratio_norm)
+  let y : (HeightOneSpectrum.adicCompletionIntegers F v.val)ˣ :=
+    ⟨⟨(u * π⁻¹ : (v.val.adicCompletion F)ˣ).val, hratio_mem.1⟩,
+     ⟨((u * π⁻¹ : (v.val.adicCompletion F)ˣ)⁻¹).val, hratio_mem.2⟩,
+     Subtype.ext (Units.mul_inv (u * π⁻¹)),
+     Subtype.ext (Units.inv_mul (u * π⁻¹))⟩
+  have hy_eq : Units.map (HeightOneSpectrum.adicCompletionIntegers F v.val).subtype.toMonoidHom y =
+      u * π⁻¹ := by
+    ext
+    rfl
+  have hcu_eq_cπ : sLocalFiniteRestriction v (chart(χ) s) u = sLocalFiniteRestriction v (chart(χ) s) π := by
+    have h1 := hunr y
+    rw [hy_eq, map_mul, map_inv] at h1
+    exact eq_of_mul_inv_eq_one h1
+  have hcu : sLocalFiniteRestriction v (chart(χ) s) u = 1 := by
+    by_contra hne
+    have hfun : (fun z : ℂ ↦ finiteLocalEulerFactor v.val
+        (sLocalFiniteRestriction v (twistₛ (chart(χ) s) z))) =
+        fun z : ℂ ↦ (1 - sLocalFiniteRestriction v (chart(χ) s) u *
+          Complex.exp (-(Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ) * z))⁻¹ := by
+      funext z
+      unfold finiteLocalEulerFactor
+      rw [ite_eq_left ((hunr_iff z).mpr hunr)]
+      change (1 - sLocalFiniteRestriction v (twistₛ (chart(χ) s) z) π)⁻¹ = _
+      rw [htwist_eval, hπ_norm, ← hcu_eq_cπ,
+        Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hqinv_pos.ne'),
+        ← Complex.ofReal_log hqinv_pos.le, Real.log_inv]
+      push_cast
+      rfl
+    rw [hfun] at hlt
+    have hden_ne : 1 - sLocalFiniteRestriction v (chart(χ) s) u *
+        Complex.exp (-(Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ) * 0) ≠ 0 := by
+      simpa [sub_ne_zero] using Ne.symm hne
+    have hdiff : Differentiable ℂ (fun z : ℂ ↦ 1 - sLocalFiniteRestriction v (chart(χ) s) u *
+        Complex.exp (-(Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ) * z)) :=
+      (differentiable_const 1).sub
+        ((differentiable_const _).mul (((differentiable_const _).mul differentiable_id).cexp))
+    have han : AnalyticAt ℂ (fun z : ℂ ↦ (1 - sLocalFiniteRestriction v (chart(χ) s) u *
+        Complex.exp (-(Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ) * z))⁻¹) 0 :=
+      (hdiff.analyticAt 0).inv hden_ne
+    exact not_lt_of_ge han.meromorphicOrderAt_nonneg hlt
+  have hmod_u : (((mₛ (finAt u) : ℝ≥0) : ℝ) : ℂ) = (((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) : ℂ) := by
+    rw [hmod_val u, _hu]
+  have hcpow_eq : (((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) : ℂ) ^ s =
+      (((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) : ℂ) ^ (-(t : ℂ) * Complex.I) := by
+    have h1 : ((χ (finAt u) : Circle) : ℂ) * (((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) : ℂ) ^ s = 1 := by
+      rw [← hmod_u]
+      exact hcu
+    have h2 : ((χ (finAt u) : Circle) : ℂ) *
+        (((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) : ℂ) ^ (-(t : ℂ) * Complex.I) = 1 := by
+      rw [← hmod_u]
+      exact _ht.2
+    exact mul_left_cancel₀ (Circle.coe_ne_zero (χ (finAt u))) (h1.trans h2.symm)
+  rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hqinv_pos.ne'),
+    Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hqinv_pos.ne'),
+    ← Complex.ofReal_log hqinv_pos.le, Real.log_inv] at hcpow_eq
+  obtain ⟨k, hk⟩ := Complex.exp_eq_exp_iff_exists_int.mp hcpow_eq
+  have hlogC : (Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ) ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr hlog.ne'
+  have hs_eq : s = ((((-k : ℤ) : ℝ) * period(v) - t : ℝ) : ℂ) * Complex.I := by
+    have hmul : (-(Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ)) * s =
+        (-(Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ)) *
+          (((((-k : ℤ) : ℝ) * period(v) - t : ℝ) : ℂ) * Complex.I) := by
+      rw [show ((-(Real.log (v.val.asIdeal.absNorm : ℝ)) : ℝ) : ℂ) =
+          -(Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ) by rw [Complex.ofReal_neg]] at hk
+      rw [hk]
+      simp only [Complex.ofReal_sub, Complex.ofReal_mul, Complex.ofReal_div, Complex.ofReal_ofNat,
+        Int.cast_neg, Complex.ofReal_neg, Complex.ofReal_intCast]
+      have hdiv : (Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ) *
+          (2 * (Real.pi : ℂ) / (Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ)) = 2 * (Real.pi : ℂ) :=
+        mul_div_cancel₀ _ hlogC
+      linear_combination (k : ℂ) * Complex.I * hdiv.symm
+    exact mul_left_cancel₀ (neg_ne_zero.mpr hlogC) hmul
+  have hinj : Injective (chart(χ)) := by
+    intro s₁ s₂ he
+    obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+    let P := quasiCharacterNormTwist (MonoidHom.id ℝ≥0ˣ) continuous_id 1 s₁
+    have hs₁ (r : ℝ≥0ˣ) : P r = ((r.val : ℝ) : ℂ) ^ s₁ := one_mul _
+    apply (existsUnique_complexPower P).unique hs₁
+    intro r
+    have h := DFunLike.congr_fun he (σ r)
+    change (χ (σ r) : ℂ) * (((mₛ (σ r) : ℝ≥0) : ℝ) : ℂ) ^ s₁ =
+      (χ (σ r) : ℂ) * (((mₛ (σ r) : ℝ≥0) : ℝ) : ℂ) ^ s₂ at h
+    rw [hσ r] at h
+    exact (hs₁ r).trans (mul_left_cancel₀ (Circle.coe_ne_zero _) h)
+  refine ⟨-k, ?_, ?_⟩
+  · rw [hs_eq]
+  · intro n hn
+    have h1 := congrArg Complex.im (hinj hn)
+    rw [hs_eq] at h1
+    simp only [Complex.mul_I_im, Complex.ofReal_re] at h1
+    have hper_pos : (0 : ℝ) < period(v) := div_pos (by positivity) hlog
+    have hn_cast : (n : ℝ) = ((-k : ℤ) : ℝ) :=
+      mul_right_cancel₀ hper_pos.ne' (by linarith)
+    exact Int.cast_injective hn_cast
 
 /-- Paper: Discussion after (7.3.1.11), p. 344.
 At a common pole, the phase difference is an integer combination of the two local periods.

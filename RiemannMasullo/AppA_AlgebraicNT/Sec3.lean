@@ -6759,6 +6759,343 @@ theorem infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip :
     simp only [Finset.prod_const, ← Fintype.card_subtype, InfinitePlace.not_isReal_iff_isComplex]
   rw [← ENNReal.ofReal_coe_nnreal, hc, ← ENNReal.ofReal_mul (by positivity)]
 
+/-- An idele lies in the integral idele units exactly when it is a unit at every finite place. -/
+private theorem multiplicativeTamagawaMeasure_regulatorStrip_mem_integral (g : 𝕀[F]) :
+    g ∈ (Units.map (integralAdelesOutside F ∅).subtype.toMonoidHom).range ↔
+      ∀ v : Primes(F), (finiteUnitAt) v g ∈ (v.adicCompletionIntegers F).units := by
+  have hmem (a : 𝔸[F]) : a ∈ integralAdelesOutside F ∅ ↔
+      ∀ v : Primes(F), a.2 v ∈ v.adicCompletionIntegers F := by
+    simp only [integralAdelesOutside, Subring.mem_iInf, Finset.notMem_empty, not_false_eq_true,
+      true_implies]
+    rfl
+  constructor
+  · rintro ⟨u, rfl⟩ v
+    exact ⟨(hmem _).mp u.val.property v, (hmem _).mp u.inv.property v⟩
+  · intro h
+    exact ⟨⟨⟨g.val, (hmem _).mpr fun v ↦ (h v).1⟩, ⟨g.inv, (hmem _).mpr fun v ↦ (h v).2⟩,
+      Subtype.ext g.val_inv, Subtype.ext g.inv_val⟩, Units.ext rfl⟩
+
+/-- For an idele that is a unit at every finite place, the logarithm of its norm is the
+sum of the weighted archimedean logarithms. -/
+private theorem multiplicativeTamagawaMeasure_regulatorStrip_log_norm (g : 𝕀[F])
+    (hg : ∀ v : Primes(F), (finiteUnitAt) v g ∈ (v.adicCompletionIntegers F).units) :
+    Real.log ((ideleNorm F g : ℝ≥0) : ℝ) =
+      ∑ w : InfinitePlace F, (w.mult : ℝ) * Real.log ‖g.val.1 w‖ := by
+  have hfin (v : Primes(F)) : ‖g.val.2 v‖ = 1 := by
+    apply Valued.toNormedField.norm_eq_one_iff.mpr
+    exact (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one
+      (a := (finiteUnitAt) v g)).mp (hg v)
+  have hne (w : InfinitePlace F) : ‖g.val.1 w‖ ≠ 0 :=
+    norm_ne_zero_iff.mpr ((∞unitAt) w g).ne_zero
+  rw [((ideleNorm_spec F).1 g).2]
+  simp only [hfin, finprod_one, mul_one]
+  rw [Real.log_prod (fun w _ ↦ pow_ne_zero _ (hne w))]
+  simp only [Real.log_pow]
+
+/-- A principal idele that is a unit at every finite place comes from a global unit. -/
+private theorem multiplicativeTamagawaMeasure_regulatorStrip_unit (x : Fˣ)
+    (hx : ∀ v : Primes(F), (finiteUnitAt) v (IdeleGroup.unitEmbedding (𝓞 F) F x) ∈
+      (v.adicCompletionIntegers F).units) :
+    ∃ u : (𝓞 F)ˣ, Units.map (algebraMap (𝓞 F) F).toMonoidHom u = x := by
+  obtain ⟨a, ha⟩ :=
+    (multiplicativeTamagawaMeasure_regulatorStrip_mem_integral F _).mpr hx
+  have lift (y : F) (hy : algebraMap F (AdeleRing (𝓞 F) F) y ∈ integralAdelesOutside F ∅) :
+      y ∈ (algebraMap (𝓞 F) F).range := by
+    have h := (diagonal_mem_integralAdelesOutside F ∅ y).mp hy
+    rwa [Finset.coe_empty, integer_empty, Algebra.mem_bot] at h
+  have hval : a.val.val = algebraMap F (AdeleRing (𝓞 F) F) x.val := congrArg Units.val ha
+  have hinv : a.inv.val = algebraMap F (AdeleRing (𝓞 F) F) x.inv := congrArg Units.inv ha
+  obtain ⟨y, hy⟩ := lift x.val (hval ▸ a.val.property)
+  obtain ⟨z, hz⟩ := lift x.inv (hinv ▸ a.inv.property)
+  let u : (𝓞 F)ˣ := ⟨y, z,
+    (IsFractionRing.injective (𝓞 F) F) (by rw [map_mul, hy, hz, x.val_inv, map_one]),
+    (IsFractionRing.injective (𝓞 F) F) (by rw [map_mul, hy, hz, x.inv_val, map_one])⟩
+  exact ⟨u, Units.ext hy⟩
+
+/-- The principal idele of a global unit is a unit at every finite place, and its
+archimedean components have the absolute values of the unit. -/
+private theorem multiplicativeTamagawaMeasure_regulatorStrip_unit_spec (u : (𝓞 F)ˣ) :
+    (∀ v : Primes(F), (finiteUnitAt) v (IdeleGroup.unitEmbedding (𝓞 F) F
+      (Units.map (algebraMap (𝓞 F) F).toMonoidHom u)) ∈ (v.adicCompletionIntegers F).units) ∧
+    ∀ w : InfinitePlace F, ‖(IdeleGroup.unitEmbedding (𝓞 F) F
+      (Units.map (algebraMap (𝓞 F) F).toMonoidHom u)).val.1 w‖ = w (algebraMap (𝓞 F) F u) := by
+  constructor
+  · apply (multiplicativeTamagawaMeasure_regulatorStrip_mem_integral F _).mp
+    have hInt (y : F) :
+        algebraMap F (AdeleRing (𝓞 F) F) y ∈ integralAdelesOutside F ∅ ↔
+          y ∈ (algebraMap (𝓞 F) F).range := by
+      rw [diagonal_mem_integralAdelesOutside, Finset.coe_empty, integer_empty, Algebra.mem_bot]
+      rfl
+    let f := ((algebraMap F (AdeleRing (𝓞 F) F)).comp (algebraMap (𝓞 F) F)).codRestrict
+      (integralAdelesOutside F ∅) (fun y ↦ (hInt _).mpr ⟨y, rfl⟩)
+    exact ⟨Units.map f.toMonoidHom u, Units.ext rfl⟩
+  · intro w
+    change ‖algebraMap F (InfiniteAdeleRing F) (algebraMap (𝓞 F) F u.val) w‖ = _
+    rw [InfiniteAdeleRing.algebraMap_apply, AbsoluteValue.Completion.norm_coe]
+    rfl
+
+/-- Multiplying an idele by a principal idele adds the weighted archimedean logarithms. -/
+private theorem multiplicativeTamagawaMeasure_regulatorStrip_log_mul (a b : 𝕀[F])
+    (w : InfinitePlace F) :
+    (w.mult : ℝ) * Real.log ‖(a * b).val.1 w‖ =
+      (w.mult : ℝ) * Real.log ‖a.val.1 w‖ + (w.mult : ℝ) * Real.log ‖b.val.1 w‖ := by
+  have hne (g : 𝕀[F]) : ‖g.val.1 w‖ ≠ 0 := norm_ne_zero_iff.mpr ((∞unitAt) w g).ne_zero
+  rw [← mul_add, ← Real.log_mul (hne a) (hne b), ← norm_mul]
+  rfl
+
+/-- A point of the regulator strip with integral finite components stays there under a
+principal idele exactly when that idele comes from a torsion unit. -/
+private theorem multiplicativeTamagawaMeasure_regulatorStrip_translate (h : 𝕀[F])
+    (hh : (fun w ↦ (∞unitAt) w h) ∈ archimedeanRegulatorStrip F ∧
+      ∀ v : Primes(F), (finiteUnitAt) v h ∈ (v.adicCompletionIntegers F).units) (z : Fˣ) :
+    ((fun w ↦ (∞unitAt) w (h * IdeleGroup.unitEmbedding (𝓞 F) F z)) ∈
+        archimedeanRegulatorStrip F ∧ ∀ v : Primes(F),
+        (finiteUnitAt) v (h * IdeleGroup.unitEmbedding (𝓞 F) F z) ∈
+          (v.adicCompletionIntegers F).units) ↔
+      ∃ ζ ∈ Units.torsion F, Units.map (algebraMap (𝓞 F) F).toMonoidHom ζ = z := by
+  let d := IdeleGroup.unitEmbedding (𝓞 F) F
+  let ι := Units.map (algebraMap (𝓞 F) F).toMonoidHom
+  have hlog (u : (𝓞 F)ˣ) (w : InfinitePlace F) :
+      (w.mult : ℝ) * Real.log ‖(h * d (ι u)).val.1 w‖ =
+        (w.mult : ℝ) * Real.log ‖h.val.1 w‖ + (w.mult : ℝ) * Real.log (w (algebraMap (𝓞 F) F u)) := by
+    rw [multiplicativeTamagawaMeasure_regulatorStrip_log_mul,
+      (multiplicativeTamagawaMeasure_regulatorStrip_unit_spec F u).2 w]
+  constructor
+  · rintro ⟨⟨-, hpar⟩, hfin⟩
+    have hz : ∀ v : Primes(F), (finiteUnitAt) v (d z) ∈ (v.adicCompletionIntegers F).units := by
+      intro v
+      have h1 := (v.adicCompletionIntegers F).units.mul_mem
+        ((v.adicCompletionIntegers F).units.inv_mem (hh.2 v)) (hfin v)
+      rwa [← map_inv, ← map_mul, inv_mul_cancel_left] at h1
+    obtain ⟨u, rfl⟩ := multiplicativeTamagawaMeasure_regulatorStrip_unit F z hz
+    refine ⟨u, ?_, rfl⟩
+    rw [← Units.dirichletUnitTheorem.logEmbedding_eq_zero_iff]
+    by_contra hne
+    let x : (Units.logEmbedding F).range := ⟨_, Additive.ofMul u, rfl⟩
+    have hx : x ≠ 0 := fun h0 ↦ hne (congrArg Subtype.val h0)
+    refine Set.disjoint_left.mp
+      (regulatorParallelotope_disjoint F (Units.basisModTorsion F) x hx) ?_ hpar
+    refine Set.mem_vadd_set.mpr ⟨_, hh.1.2, ?_⟩
+    funext w
+    change Units.logEmbedding F (Additive.ofMul u) w + (w.val.mult : ℝ) * Real.log ‖h.val.1 w.val‖ = _
+    rw [Units.dirichletUnitTheorem.logEmbedding_component]
+    exact (add_comm _ _).trans (hlog u w.val).symm
+  · rintro ⟨ζ, hζ, rfl⟩
+    have hw (w : InfinitePlace F) := (Units.mem_torsion F).mp hζ w
+    have hlog' (w : InfinitePlace F) :
+        (w.mult : ℝ) * Real.log ‖(h * d (ι ζ)).val.1 w‖ = (w.mult : ℝ) * Real.log ‖h.val.1 w‖ := by
+      rw [hlog ζ w]
+      erw [hw w]
+      rw [Real.log_one, mul_zero, add_zero]
+    refine ⟨?_, fun v ↦ ?_⟩
+    · change (∑ w, (w.mult : ℝ) * Real.log ‖(h * d (ι ζ)).val.1 w‖) ∈ Icc 0 1 ∧
+        (fun w : {w : InfinitePlace F // w ≠ Units.dirichletUnitTheorem.w₀} ↦
+          (w.val.mult : ℝ) * Real.log ‖(h * d (ι ζ)).val.1 w.val‖) ∈
+          regulatorParallelotope F (Units.basisModTorsion F)
+      simp only [hlog']
+      exact hh.1
+    · rw [map_mul]
+      exact (v.adicCompletionIntegers F).units.mul_mem (hh.2 v)
+        ((multiplicativeTamagawaMeasure_regulatorStrip_unit_spec F ζ).1 v)
+
+/-- The class of an idele has a principal translate in the regulator strip with integral
+finite components exactly when it lies over the integral units and has norm in `[1, e]`. -/
+private theorem multiplicativeTamagawaMeasure_regulatorStrip_exists (g : 𝕀[F]) :
+    (∃ x : Fˣ, (fun w ↦ (∞unitAt) w (g * IdeleGroup.unitEmbedding (𝓞 F) F x)) ∈
+        archimedeanRegulatorStrip F ∧ ∀ v : Primes(F),
+        (finiteUnitAt) v (g * IdeleGroup.unitEmbedding (𝓞 F) F x) ∈
+          (v.adicCompletionIntegers F).units) ↔
+      QuotientGroup.mk' P[F] g ∈
+          (Units.map (integralAdelesOutside F ∅).subtype.toMonoidHom).range.map
+            (QuotientGroup.mk' P[F]) ∧
+        ((ideleClassNorm F (QuotientGroup.mk' P[F] g) : ℝ≥0) : ℝ) ∈ Icc 1 (Real.exp 1) := by
+  let d := IdeleGroup.unitEmbedding (𝓞 F) F
+  let ι := Units.map (algebraMap (𝓞 F) F).toMonoidHom
+  let q := QuotientGroup.mk' P[F]
+  have hnorm (x : Fˣ) : ideleNorm F (g * d x) = ideleNorm F g := by
+    rw [map_mul, MonoidHom.mem_ker.mp ((ideleNorm_spec F).2 ⟨x, rfl⟩), mul_one]
+  have hq (x : Fˣ) : q (g * d x) = q g := by
+    rw [map_mul, show q (d x) = 1 from (QuotientGroup.eq_one_iff (N := P[F]) (d x)).mpr ⟨x, rfl⟩,
+      mul_one]
+  have hcl : ideleClassNorm F (q g) = ideleNorm F g := rfl
+  have hpos : 0 < ((ideleNorm F g : ℝ≥0) : ℝ) :=
+    NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr (ideleNorm F g).ne_zero)
+  have hIcc : ((ideleNorm F g : ℝ≥0) : ℝ) ∈ Icc 1 (Real.exp 1) ↔
+      Real.log ((ideleNorm F g : ℝ≥0) : ℝ) ∈ Icc 0 1 := by
+    rw [mem_Icc, mem_Icc, Real.log_nonneg_iff hpos, Real.log_le_iff_le_exp hpos]
+  rw [hcl, hIcc]
+  constructor
+  · rintro ⟨x, ⟨⟨hsum, -⟩, hfin⟩⟩
+    refine ⟨⟨g * d x, (multiplicativeTamagawaMeasure_regulatorStrip_mem_integral F _).mpr hfin,
+      hq x⟩, ?_⟩
+    rw [← hnorm x, multiplicativeTamagawaMeasure_regulatorStrip_log_norm F _ hfin]
+    exact hsum
+  · rintro ⟨⟨u, hu, hqu⟩, hlogn⟩
+    obtain ⟨y, hy⟩ := ((ideleClassGroup_description F).2 u g).mp hqu
+    have hgy : g * d y = u := by
+      rw [hy, mul_comm]
+    let h := g * d y
+    have hh : ∀ v : Primes(F), (finiteUnitAt) v h ∈ (v.adicCompletionIntegers F).units :=
+      (multiplicativeTamagawaMeasure_regulatorStrip_mem_integral F h).mp
+        (by rw [show h = u from hgy]; exact hu)
+    have hcover : (fun w : {w : InfinitePlace F // w ≠ Units.dirichletUnitTheorem.w₀} ↦
+        (w.val.mult : ℝ) * Real.log ‖h.val.1 w.val‖) ∈
+        ⋃ x : (Units.logEmbedding F).range,
+          x.val +ᵥ regulatorParallelotope F (Units.basisModTorsion F) := by
+      rw [regulatorParallelotope_cover F (Units.basisModTorsion F)]
+      exact Set.mem_univ _
+    obtain ⟨lam, hmem⟩ := Set.mem_iUnion.mp hcover
+    obtain ⟨p, hp, hyp⟩ := Set.mem_vadd_set.mp hmem
+    obtain ⟨a, ha⟩ := AddMonoidHom.mem_range.mp lam.property
+    let u' : (𝓞 F)ˣ := Additive.toMul a
+    refine ⟨y * ι u'⁻¹, ?_⟩
+    have hx : g * d (y * ι u'⁻¹) = h * d (ι u'⁻¹) := by
+      rw [map_mul, ← mul_assoc]
+    rw [hx]
+    have hfin' := (multiplicativeTamagawaMeasure_regulatorStrip_unit_spec F u'⁻¹).1
+    have hall : ∀ v : Primes(F), (finiteUnitAt) v (h * d (ι u'⁻¹)) ∈
+        (v.adicCompletionIntegers F).units := by
+      intro v
+      beta_reduce
+      rw [map_mul]
+      exact (v.adicCompletionIntegers F).units.mul_mem (hh v) (hfin' v)
+    have hlog (w : InfinitePlace F) :
+        (w.mult : ℝ) * Real.log ‖(h * d (ι u'⁻¹)).val.1 w‖ =
+          (w.mult : ℝ) * Real.log ‖h.val.1 w‖ +
+            (w.mult : ℝ) * Real.log (w (algebraMap (𝓞 F) F ↑u'⁻¹)) := by
+      rw [multiplicativeTamagawaMeasure_regulatorStrip_log_mul,
+        (multiplicativeTamagawaMeasure_regulatorStrip_unit_spec F u'⁻¹).2 w]
+    refine ⟨⟨?_, ?_⟩, hall⟩
+    · change (∑ w, (w.mult : ℝ) * Real.log ‖(h * d (ι u'⁻¹)).val.1 w‖) ∈ Icc 0 1
+      rw [← multiplicativeTamagawaMeasure_regulatorStrip_log_norm F _ hall, ← hx, hnorm]
+      exact hlogn
+    · change (fun w : {w : InfinitePlace F // w ≠ Units.dirichletUnitTheorem.w₀} ↦
+        (w.val.mult : ℝ) * Real.log ‖(h * d (ι u'⁻¹)).val.1 w.val‖) ∈ _
+      convert hp using 1
+      funext w
+      rw [hlog w.val]
+      have h1 := congrFun hyp w
+      have h2 : Units.logEmbedding F (Additive.ofMul u'⁻¹) w = -lam.val w := by
+        rw [ofMul_inv, map_neg, Pi.neg_apply]
+        exact congrArg (fun f : Units.dirichletUnitTheorem.logSpace F ↦ -f w) ha
+      rw [Units.dirichletUnitTheorem.logEmbedding_component] at h2
+      change lam.val w + p w = (w.val.mult : ℝ) * Real.log ‖h.val.1 w.val‖ at h1
+      rw [h2, ← h1]
+      ring
+
+/-- The principal ideles moving a fixed idele into the regulator strip with integral finite
+components are either none or one coset of the torsion units. -/
+private theorem multiplicativeTamagawaMeasure_regulatorStrip_fiber (g : 𝕀[F]) :
+    (Measure.count : Measure P[F]) {k : P[F] | g * (k : 𝕀[F]) ∈
+        {h : 𝕀[F] | (fun w ↦ (∞unitAt) w h) ∈ archimedeanRegulatorStrip F ∧
+          ∀ v : Primes(F), (finiteUnitAt) v h ∈ (v.adicCompletionIntegers F).units}} =
+      (Units.torsionOrder F : ℝ≥0∞) *
+        {c : C[F] | c ∈ (Units.map (integralAdelesOutside F ∅).subtype.toMonoidHom).range.map
+            (QuotientGroup.mk' P[F]) ∧
+          ((ideleClassNorm F c : ℝ≥0) : ℝ) ∈ Icc 1 (Real.exp 1)}.indicator 1
+          (QuotientGroup.mk' P[F] g) := by
+  let d := IdeleGroup.unitEmbedding (𝓞 F) F
+  let ι := Units.map (algebraMap (𝓞 F) F).toMonoidHom
+  let : BorelSpace 𝕀[F] := ⟨rfl⟩
+  let : T2Space 𝕀[F] := (ideleGroup_topology F).1
+  by_cases hW : QuotientGroup.mk' P[F] g ∈
+      {c : C[F] | c ∈ (Units.map (integralAdelesOutside F ∅).subtype.toMonoidHom).range.map
+          (QuotientGroup.mk' P[F]) ∧
+        ((ideleClassNorm F c : ℝ≥0) : ℝ) ∈ Icc 1 (Real.exp 1)}
+  · rw [indicator_of_mem hW, Pi.one_apply, mul_one]
+    obtain ⟨x₀, hx₀⟩ := (multiplicativeTamagawaMeasure_regulatorStrip_exists F g).mpr hW
+    let φ : Units.torsion F → P[F] := fun ζ ↦ ⟨d (x₀ * ι ζ), x₀ * ι ζ, rfl⟩
+    have hφ : Injective φ := by
+      intro a b hab
+      have h1 : d (x₀ * ι a) = d (x₀ * ι b) := congrArg Subtype.val hab
+      have h2 := mul_left_cancel ((ideleGroup_quotient.{_, 0} F).1 h1)
+      exact Subtype.ext (Units.map_injective (IsFractionRing.injective (𝓞 F) F) h2)
+    have hset : {k : P[F] | g * (k : 𝕀[F]) ∈
+        {h : 𝕀[F] | (fun w ↦ (∞unitAt) w h) ∈ archimedeanRegulatorStrip F ∧
+          ∀ v : Primes(F), (finiteUnitAt) v h ∈ (v.adicCompletionIntegers F).units}} =
+        range φ := by
+      ext ⟨_, y, rfl⟩
+      have hy : g * d y = (g * d x₀) * d (x₀⁻¹ * y) := by
+        rw [map_mul, map_inv, mul_assoc, mul_inv_cancel_left]
+      change ((fun w ↦ (∞unitAt) w (g * d y)) ∈ archimedeanRegulatorStrip F ∧
+          ∀ v : Primes(F), (finiteUnitAt) v (g * d y) ∈ (v.adicCompletionIntegers F).units) ↔ _
+      rw [hy, multiplicativeTamagawaMeasure_regulatorStrip_translate F _ hx₀]
+      constructor
+      · rintro ⟨ζ, hζ, hζy⟩
+        refine ⟨⟨ζ, hζ⟩, Subtype.ext ?_⟩
+        change d (x₀ * ι ζ) = d y
+        rw [show ι ζ = x₀⁻¹ * y from hζy, mul_inv_cancel_left]
+      · rintro ⟨⟨ζ, hζ⟩, hζy⟩
+        have h1 : d (x₀ * ι ζ) = d y := congrArg Subtype.val hζy
+        refine ⟨ζ, hζ, ?_⟩
+        rw [← (ideleGroup_quotient.{_, 0} F).1 h1, inv_mul_cancel_left]
+    rw [hset, Measure.count_apply (Set.finite_range φ).measurableSet, hφ.encard_range,
+      ENat.card_eq_coe_natCard]
+    rfl
+  · rw [indicator_of_notMem hW, mul_zero, Measure.count_eq_zero_iff]
+    apply eq_empty_iff_forall_notMem.mpr
+    rintro ⟨_, y, rfl⟩ hy
+    exact hW ((multiplicativeTamagawaMeasure_regulatorStrip_exists F g).mp ⟨y, hy⟩)
+
+/-- The canonical section of the idelic norm is a unit at every finite place. -/
+private theorem multiplicativeTamagawaMeasure_regulatorStrip_section (t : ℝ≥0ˣ) :
+    canonicalIdeleNormSection F t ∈ (Units.map (integralAdelesOutside F ∅).subtype.toMonoidHom).range := by
+  apply (multiplicativeTamagawaMeasure_regulatorStrip_mem_integral F _).mpr
+  intro v
+  have h1 : (finiteUnitAt) v (canonicalIdeleNormSection F t) = 1 := by
+    apply Units.ext
+    change (canonicalIdeleNormSection F t).val.2 v = 1
+    rw [canonicalIdeleNormSection_finite]
+    rfl
+  rw [h1]
+  exact one_mem _
+
+/-- The norm-one idele classes over the integral idele units have index the class number. -/
+private theorem multiplicativeTamagawaMeasure_regulatorStrip_index :
+    (((Units.map (integralAdelesOutside F ∅).subtype.toMonoidHom).range.map
+      (QuotientGroup.mk' P[F])).comap C₁[F].subtype).index = NumberField.classNumber F := by
+  let : TopologicalSpace (CommRing.Pic (𝓞 F)) := ⊥
+  obtain ⟨p, -, -, hexact, hpq⟩ := idele_ideal_class_exact F
+  let U := (Units.map (integralAdelesOutside F ∅).subtype.toMonoidHom).range
+  let q := QuotientGroup.mk' P[F]
+  have hker (g : 𝕀[F]) : p g = 1 ↔ q g ∈ U.map q := by
+    rw [hexact g, ← Subgroup.mem_comap, Subgroup.comap_map_eq, QuotientGroup.ker_mk', sup_comm]
+    exact ⟨fun ⟨h, hh⟩ ↦ hh ▸ h.property, fun h ↦ ⟨⟨g, h⟩, rfl⟩⟩
+  have hP : P[F] ≤ p.ker := fun g hg ↦ (hker g).mpr ⟨1, U.one_mem, by
+    rw [map_one]
+    exact ((QuotientGroup.eq_one_iff g).mpr hg).symm⟩
+  let ψ := (QuotientGroup.lift P[F] p hP).comp C₁[F].subtype
+  have hψ : (U.map q).comap C₁[F].subtype = ψ.ker := by
+    ext ⟨c, hc⟩
+    obtain ⟨g, rfl⟩ := QuotientGroup.mk'_surjective P[F] c
+    exact (hker g).symm
+  have hsurj : Surjective ψ := by
+    intro π
+    obtain ⟨g, rfl⟩ := hpq.surjective π
+    let s := canonicalIdeleNormSection F
+    let g' := g * (s (ideleNorm F g))⁻¹
+    have hs : p (s (ideleNorm F g)) = 1 :=
+      (hker _).mpr ⟨_, multiplicativeTamagawaMeasure_regulatorStrip_section F _, rfl⟩
+    have hg' : q g' ∈ C₁[F] := by
+      change ideleNorm F g' = 1
+      rw [map_mul, map_inv, canonicalIdeleNormSection_rightInverse F, mul_inv_cancel]
+    refine ⟨⟨q g', hg'⟩, ?_⟩
+    change p g' = p g
+    rw [map_mul, map_inv, hs, inv_one, mul_one]
+  rw [hψ, Subgroup.index_ker, MonoidHom.range_eq_top.mpr hsurj, Subgroup.card_top,
+    NumberField.classNumber, ← Nat.card_eq_fintype_card]
+  exact Nat.card_congr (ClassGroup.equivPic (𝓞 F)).toEquiv.symm
+
+/-- The ideles are second countable, since the adeles are. -/
+private theorem multiplicativeTamagawaMeasure_regulatorStrip_secondCountable :
+    SecondCountableTopology 𝕀[F] := by
+  let := ratAdele_secondCountable
+  obtain ⟨u, _, _⟩ := exists_adeleTrace_dualCoordinates F
+  let : SecondCountableTopology 𝔸[F] := u.symm.toHomeomorph.isEmbedding.secondCountableTopology
+  let : SecondCountableTopology 𝔸[F]ᵐᵒᵖ :=
+    MulOpposite.opHomeomorph.symm.isEmbedding.secondCountableTopology
+  exact Units.isEmbedding_embedProduct.secondCountableTopology
+
 /-- The global idelic mass of the regulator strip with integral finite components.
 The strip lies over the principal ideal class and contains all torsion sectors.
 Under the two quotient normalizations its mass is the prescribed norm-one class
@@ -6768,7 +7105,176 @@ theorem multiplicativeTamagawaMeasure_regulatorStrip :
       {g | (fun w ↦ (∞unitAt) w g) ∈ archimedeanRegulatorStrip F ∧
         ∀ v : Primes(F), (finiteUnitAt) v g ∈ (v.adicCompletionIntegers F).units} =
       archRegulatorMass(F) * ∏ᶠ v : Primes(F), differentMass(F, v) := by
-  sorry
+  let G := 𝕀[F]
+  let P := P[F]
+  let C := C[F]
+  let K := C₁[F]
+  let q := QuotientGroup.mk' P
+  let U := (Units.map (integralAdelesOutside F ∅).subtype.toMonoidHom).range
+  let Ubar := U.map q
+  let V := Ubar.comap K.subtype
+  let s := canonicalIdeleNormSection F
+  let E := {g : G | (fun w ↦ (∞unitAt) w g) ∈ archimedeanRegulatorStrip F ∧
+    ∀ v : Primes(F), (finiteUnitAt) v g ∈ (v.adicCompletionIntegers F).units}
+  let W := {c : C | c ∈ Ubar ∧ ((ideleClassNorm F c : ℝ≥0) : ℝ) ∈ Icc 1 (Real.exp 1)}
+  let I := {t : ℝ≥0ˣ | (t.val : ℝ) ∈ Icc 1 (Real.exp 1)}
+  obtain ⟨h₂, hlc, _, _, -, -⟩ := ideleGroup_topology F
+  obtain ⟨-, hP, hPd, -, hq, hC₂, hClc, -, hcn, -, ⟨sc, hsc, hrc⟩, -⟩ :=
+    ideleGroup_quotient.{_, 0} F
+  obtain ⟨hK, hKc, hK₂, -⟩ := ideleClassGroup_finiteness F
+  let : BorelSpace G := ⟨rfl⟩
+  let : BorelSpace C := ⟨rfl⟩
+  let : BorelSpace (C ⧸ K) := ⟨rfl⟩
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ _
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let := multiplicativeTamagawaMeasure_regulatorStrip_secondCountable F
+  let : SecondCountableTopology C := inferInstanceAs (SecondCountableTopology (G ⧸ P))
+  let : DiscreteTopology P := isDiscrete_iff_discreteTopology.mp hPd
+  let : (Measure.count : Measure P).IsHaarMeasure :=
+    { lt_top_of_isCompact := fun _ h ↦ Measure.count_apply_lt_top.mpr h.finite_of_discrete
+      open_pos := fun _ _ h ↦ Measure.count_ne_zero h }
+  let : LocallyCompactSpace P := hP.locallyCompactSpace
+  let : (Measure.count : Measure P).Regular := inferInstance
+  let : CompactSpace K := hKc
+  let μ := multiplicativeTamagawaMeasure F
+  let η := ideleClassTamagawaMeasure F
+  let ν := normOneIdeleClassTamagawaMeasure F
+  obtain ⟨hm, hmreg, hw, hv, hvreg, hvol, hcweil⟩ :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec
+  let : μ.IsHaarMeasure := hm
+  let : μ.Regular := hmreg
+  let : η.IsHaarMeasure := hw.1
+  let : η.Regular := hw.2.1
+  let : ν.IsHaarMeasure := hv
+  let : ν.Regular := hvreg
+  -- Measurability of the sets involved.
+  have hUo : IsOpen (U : Set G) := (isOpenEmbedding_integralAdeleUnits F ∅).isOpen_range
+  have hUbaro : IsOpen (Ubar : Set C) := by
+    rw [Subgroup.coe_map]
+    exact hq.isOpenMap _ hUo
+  have hnormc : Continuous (fun c : C ↦ ((ideleClassNorm F c : ℝ≥0) : ℝ)) :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp hcn)
+  have hWm : MeasurableSet W :=
+    hUbaro.measurableSet.inter (measurableSet_Icc.preimage hnormc.measurable)
+  have hEm : MeasurableSet E := by
+    let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+    let (w : InfinitePlace F) : BorelSpace w.Completionˣ := borelSpace_units_of_continuousInv₀ _
+    let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+      (isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+    let (w : InfinitePlace F) : SecondCountableTopology w.Completionˣ :=
+      Units.isEmbedding_val₀.secondCountableTopology
+    have hcont : Continuous (fun g : G ↦ fun w ↦ (∞unitAt) w g) :=
+      continuous_pi fun w ↦ ((continuous_apply w).comp continuous_fst).units_map _
+    have hE : E = (fun g : G ↦ fun w ↦ (∞unitAt) w g) ⁻¹' archimedeanRegulatorStrip F ∩ U := by
+      ext g
+      exact and_congr Iff.rfl (multiplicativeTamagawaMeasure_regulatorStrip_mem_integral F g).symm
+    rw [hE]
+    exact ((archimedeanRegulatorStrip_measurableSet F).preimage hcont.measurable).inter
+      hUo.measurableSet
+  -- Weil's formula for the principal ideles counts the torsion sectors.
+  have hμE : μ E = (Units.torsionOrder F : ℝ≥0∞) * η W := by
+    obtain ⟨hκ, hμ⟩ := weilMeasure_eq_bind P hP μ Measure.count η hw
+    rw [← hμ, Measure.bind_apply hEm hκ.aemeasurable, ← lintegral_indicator_one hWm,
+      ← lintegral_const_mul _ (measurable_one.indicator hWm)]
+    apply lintegral_congr
+    intro c
+    have ht : Measurable (fun h : P ↦ c.out * (h : G)) :=
+      (continuous_const.mul continuous_subtype_val).measurable
+    rw [Measure.map_apply ht hEm]
+    have hc : q c.out = c := QuotientGroup.out_eq' c
+    have := multiplicativeTamagawaMeasure_regulatorStrip_fiber F c.out
+    rw [hc] at this
+    exact this
+  -- Weil's formula for the norm-one classes and `dt/t` reduces to the integral units.
+  have hηW : η W = ν V := by
+    obtain ⟨hκ, hη⟩ := weilMeasure_eq_bind K hK η ν
+      (positiveRealHaar.comap (QuotientGroup.kerLift (ideleClassNorm F))) hcweil
+    let L := QuotientGroup.kerLift (ideleClassNorm F)
+    let e₀ := QuotientGroup.quotientKerEquivOfRightInverse (ideleClassNorm F) sc hrc
+    let e : (C ⧸ K) ≃ₜ* ℝ≥0ˣ :=
+      { e₀ with
+        continuous_toFun := (QuotientGroup.isQuotientMap_mk K).continuous_iff.mpr hcn
+        continuous_invFun := QuotientGroup.continuous_mk.comp hsc }
+    have hemb : MeasurableEmbedding L := e.toHomeomorph.measurableEmbedding
+    have hLs : Surjective L := e.surjective
+    have hIm : MeasurableSet I :=
+      measurableSet_Icc.preimage (NNReal.continuous_coe.comp Units.continuous_val).measurable
+    have hsU (t : ℝ≥0ˣ) : q (s t) ∈ Ubar :=
+      ⟨s t, multiplicativeTamagawaMeasure_regulatorStrip_section F t, rfl⟩
+    have hpt (c : C ⧸ K) :
+        (ν.map (fun h : K ↦ c.out * (h : C))) W = (L ⁻¹' I).indicator (fun _ ↦ ν V) c := by
+      let x := c.out
+      have hm : Measurable (fun h : K ↦ x * (h : C)) :=
+        (continuous_const.mul continuous_subtype_val).measurable
+      rw [Measure.map_apply hm hWm]
+      have hLc : L c = ideleClassNorm F x := by
+        rw [← QuotientGroup.out_eq' c]
+        rfl
+      have hnx (h : K) : ideleClassNorm F (x * h) = ideleClassNorm F x := by
+        rw [map_mul, MonoidHom.mem_ker.mp h.property, mul_one]
+      by_cases hI : L c ∈ I
+      · rw [indicator_of_mem (show c ∈ L ⁻¹' I from hI)]
+        let n := ideleClassNorm F x
+        have hsn : ideleClassNorm F (q (s n)) = n := canonicalIdeleNormSection_rightInverse F n
+        let y : K := ⟨(q (s n))⁻¹ * x, by
+          change ideleClassNorm F ((q (s n))⁻¹ * x) = 1
+          rw [map_mul, map_inv, hsn, inv_mul_cancel]⟩
+        have hpre : (fun h : K ↦ x * (h : C)) ⁻¹' W = (fun h : K ↦ y * h) ⁻¹' V := by
+          ext h
+          change (x * h ∈ Ubar ∧ ((ideleClassNorm F (x * h) : ℝ≥0) : ℝ) ∈ Icc 1 (Real.exp 1)) ↔
+            (q (s n))⁻¹ * x * h ∈ Ubar
+          rw [hnx, mul_assoc, Subgroup.mul_mem_cancel_left _ (Ubar.inv_mem (hsU n))]
+          rw [hLc] at hI
+          exact and_iff_left hI
+        rw [hpre, measure_preimage_mul]
+      · rw [indicator_of_notMem (show c ∉ L ⁻¹' I from hI)]
+        have hpre : (fun h : K ↦ x * (h : C)) ⁻¹' W = ∅ := by
+          ext h
+          simp only [mem_preimage, mem_empty_iff_false, iff_false]
+          rintro ⟨-, hh⟩
+          rw [hnx, ← hLc] at hh
+          exact hI hh
+        rw [hpre, measure_empty]
+    rw [← hη, Measure.bind_apply hWm hκ.aemeasurable]
+    simp_rw [hpt]
+    rw [lintegral_indicator_const (hemb.measurable hIm), hemb.comap_apply,
+      image_preimage_eq _ hLs]
+    let T : ℝ≥0ˣ := Units.mk0 (Real.exp 1).toNNReal
+      (Real.toNNReal_pos.mpr (Real.exp_pos 1)).ne'
+    have hT : ((T.val : ℝ≥0) : ℝ) = Real.exp 1 := Real.coe_toNNReal _ (Real.exp_pos 1).le
+    have hTI := positiveRealHaar_interval T (hT ▸ Real.one_le_exp zero_le_one)
+    rw [hT, Real.log_exp, ENNReal.ofReal_one] at hTI
+    change ν V * positiveRealHaar {t : ℝ≥0ˣ | (t.val : ℝ) ∈ Icc 1 (Real.exp 1)} = ν V
+    rw [hTI, mul_one]
+  -- The integral classes have index the class number in the norm-one classes.
+  have hVm : MeasurableSet (V : Set K) := (hUbaro.preimage continuous_subtype_val).measurableSet
+  have hidx := multiplicativeTamagawaMeasure_regulatorStrip_index F
+  have : V.FiniteIndex := ⟨by
+    change (Ubar.comap K.subtype).index ≠ 0
+    rw [hidx]
+    exact (NumberField.classNumber_pos F).ne'⟩
+  have hνV := Subgroup.index_mul_measure V hVm ν
+  change ((Ubar.comap K.subtype).index : ℝ≥0∞) * ν V = ν univ at hνV
+  rw [hidx, show ν univ = _ from normOneIdeleClassTamagawaMeasure_volume F] at hνV
+  -- Collect the constants.
+  have hh := NumberField.classNumber_pos F
+  have hR := NumberField.Units.regulator_pos F
+  have hw := NumberField.Units.torsionOrder_pos F
+  have hD : 0 < Real.sqrt ((Int.natAbs (NumberField.discr F) : ℕ) : ℝ) :=
+    Real.sqrt_pos.mpr (Nat.cast_pos.mpr (Int.natAbs_pos.mpr (NumberField.discr_ne_zero F)))
+  have hνV' : ν V = ENNReal.ofReal ((2 : ℝ) ^ InfinitePlace.nrRealPlaces F *
+      (2 * Real.pi) ^ InfinitePlace.nrComplexPlaces F * Units.regulator F /
+        (Real.sqrt ((Int.natAbs (NumberField.discr F) : ℕ) : ℝ) * (Units.torsionOrder F : ℝ))) := by
+    apply (ENNReal.mul_right_inj (Nat.cast_ne_zero.mpr hh.ne') (ENNReal.natCast_ne_top _)).mp
+    rw [hνV, ← ENNReal.ofReal_natCast, ← ENNReal.ofReal_mul (Nat.cast_nonneg _)]
+    congr 1
+    ring
+  change μ E = _
+  rw [hμE, hηW, hνV', finiteLocalTamagawaMass_finprod, ← ENNReal.ofReal_natCast,
+    ← ENNReal.ofReal_mul (Nat.cast_nonneg _), ← ENNReal.ofReal_inv_of_pos hD,
+    ← ENNReal.ofReal_mul (by positivity)]
+  congr 1
+  field_simp
 
 /-- Paper: Lemma A.3.2.4, p. 560. The global multiplicative measure is the
 restricted product of the local measures, evaluated on rectangles with integer-unit tails. -/

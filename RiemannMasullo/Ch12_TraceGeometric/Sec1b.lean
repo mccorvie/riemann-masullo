@@ -413,7 +413,25 @@ theorem geometricProjection_convolution_not_hilbertSchmidt
     (_ha : 0 < a) (_hφ : φ.val 1 = 0) (_hne : φ ≠ 0) :
     (geometricProjection (F := F) a hline hs₀(hs)).comp
       (hardySobolevTestAction μ𝔽 m𝔽 _ _ _ hbase hs₀(hs) φ) ∉
-        hilbertSchmidtOperators (W(s)) (W(s)) := by sorry
+        hilbertSchmidtOperators (W(s)) (W(s)) := by
+  let A : W(s) →L[ℂ] W(s) := hardySobolevTestAction μ𝔽 m𝔽 (-(0 : ℝ)) 0 s hbase hs₀(hs) φ
+  let M := globalThetaSobolev F a (α := -(0 : ℝ)) (β := 0) hbase hs₀(hs)
+  have hspec : Tspec ∈ hilbertSchmidtOperators (W(s)) (W(s)) := by
+    let : IsLocallyFiniteMeasure νline := sobolevKernelWeight_locallyFinite (F := F) 0 s
+    let K : C𝔽 × C𝔽 → ℂ := fun p ↦ (wline p.2)⁻¹ • kspec p
+    have hK := spectralLineKernel_hilbertSchmidt (F := F) a hs₁(hs) φ _ha
+    let T := integralKernelOperator νline (hK.choose.toLp K)
+    have he : T.val = Tspec := hK.choose_spec
+    have hmem : T.val ∈ hilbertSchmidtOperators (W(s)) (W(s)) := T.property
+    exact (congrArg (fun L : W(s) →L[ℂ] W(s) ↦ L ∈ hilbertSchmidtOperators (W(s)) (W(s))) he).mp hmem
+  intro hgeom
+  have hsum : M.starProjection.comp A + M.orthogonal.starProjection.comp A = A := by
+    ext1 u
+    exact M.starProjection_add_starProjection_orthogonal (A u)
+  refine (hardySobolevTestAction_not_hilbertSchmidt (F := F) (hs := hs) (φ := φ) _hne :
+    A ∉ hilbertSchmidtOperators (W(s)) (W(s))) ?_
+  exact Eq.subst (motive := fun B ↦ B ∈ hilbertSchmidtOperators (W(s)) (W(s))) hsum
+    ((hilbertSchmidtOperators (W(s)) (W(s))).add_mem hgeom hspec)
 
 -- TODO(later): needs §12.5. The proof of Theorem 12.5.1.1, p. 520, integrates the
 -- smoothened strip kernel of Definition 10.4.3.7 along the diagonal. The paper

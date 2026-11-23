@@ -102,7 +102,10 @@ theorem heckeLFunction_zeros_re :
 zeta series on the convergence half-plane. -/
 theorem finiteHeckeL_one_eq_dedekindZeta (s : halfPlane) :
     finiteHeckeL (1 : U[K]) s = dedekindZeta K s := by
-  sorry
+  have he := completedHeckeL_one_eq_dedekindZeta (F := K) s
+  rw [← heckeGammaFactor_one] at he
+  exact mul_left_cancel₀ (heckeGammaFactor_ne_zero_of_re_pos (1 : U[K])
+    (zero_lt_one.trans s.property)) he
 
 /-- Specializing the idelic claim to the trivial character places the
 critical-strip zeros of any meromorphic continuation of Dedekind zeta on the critical line. -/

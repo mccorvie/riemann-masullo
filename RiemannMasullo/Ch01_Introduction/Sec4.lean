@@ -202,7 +202,24 @@ theorem introTracePower_two :
 /-- Paper: §1.4.2, p. 28. The radial power is smooth on the two real
 intervals separated by its jump at one. -/
 theorem introTracePower_contDiffOn (z : ℂ) :
-    ContDiffOn ℝ ⊤ (introTracePower z) ({1}ᶜ : Set ℝ) := by sorry
+    ContDiffOn ℝ ⊤ (introTracePower z) ({1}ᶜ : Set ℝ) := by
+  intro x hx
+  refine ContDiffAt.contDiffWithinAt ?_
+  rcases lt_or_gt_of_ne (show x ≠ 1 from hx) with h | h
+  · have : introTracePower z =ᶠ[nhds x] fun _ ↦ 0 := by
+      filter_upwards [eventually_lt_nhds h] with t ht
+      simp [introTracePower, ht.not_gt, ht.ne]
+    exact contDiffAt_const.congr_of_eventuallyEq this
+  · have : introTracePower z =ᶠ[nhds x]
+        fun t : ℝ ↦ Complex.exp ((Real.log t : ℂ) * (-z)) := by
+      filter_upwards [eventually_gt_nhds h] with t ht
+      have ht0 : (t : ℂ) ≠ 0 := Complex.ofReal_ne_zero.2 (by linarith)
+      simp only [introTracePower, ht, ↓reduceIte, Complex.cpow_def_of_ne_zero ht0,
+        Complex.ofReal_log (by linarith : (0 : ℝ) ≤ t)]
+    refine ContDiffAt.congr_of_eventuallyEq ?_ this
+    have hlog : ContDiffAt ℝ ⊤ Real.log x := Real.contDiffAt_log.2 (by linarith)
+    exact Complex.contDiff_exp.contDiffAt.comp x
+      ((Complex.ofRealCLM.contDiff.contDiffAt.comp x hlog).mul contDiffAt_const)
 
 /-- Paper: §1.4.2, p. 28. The limiting power depends holomorphically
 on the complex parameter at each fixed radial coordinate. -/
@@ -256,7 +273,94 @@ theorem introTraceApprox_tendsto (h ρ : ℕ → ℝ → ℝ)
 depends holomorphically on the complex parameter. -/
 theorem introTraceApprox_differentiable (h ρ : ℕ → ℝ → ℝ)
     (_hA : IsIntroTraceApproximation h ρ) (n : ℕ) (t : ℝ) :
-    Differentiable ℂ (fun z ↦ introTraceApprox (h n) (ρ n) z t) := by sorry
+    Differentiable ℂ (fun z ↦ introTraceApprox (h n) (ρ n) z t) := by
+  obtain ⟨-, -, -, ε, -, hε⟩ := _hA
+  obtain ⟨-, hρc, -, hρs, -⟩ := hε n
+  have hρint : Integrable (ρ n) := hρc.continuous.integrable_of_hasCompactSupport
+    (isCompact_Icc.of_isClosed_subset (isClosed_tsupport _) hρs)
+  have hρm : Measurable fun u ↦ (ρ n u : ℂ) :=
+    Complex.measurable_ofReal.comp hρc.continuous.measurable
+  have hPm : ∀ z : ℂ, Measurable (introTracePower z) := fun z ↦
+    Measurable.ite measurableSet_Ioi (by fun_prop)
+      (Measurable.ite (measurableSet_singleton 1) measurable_const measurable_const)
+  have hu : ∀ u, ρ n u ≠ 0 → t - u ≤ t + ε n := fun u hu ↦ by
+    have := hρs (subset_tsupport _ hu)
+    linarith [this.1]
+  intro z₀
+  set K : ℝ := |z₀.re| + 1
+  set C : ℝ := |Real.log (t + ε n)| * |t + ε n| ^ K
+  set M : ℝ := max 1 (|t + ε n| ^ K)
+  have hpow : ∀ u, ∀ z ∈ Metric.ball z₀ 1, ρ n u ≠ 0 → 1 < t - u →
+      (t - u) ^ (-z.re) ≤ |t + ε n| ^ K := by
+    intro u z hz hρ h1
+    have hz' : |z.re - z₀.re| < 1 :=
+      (Complex.abs_re_le_norm (z - z₀)).trans_lt (by simpa [dist_eq_norm] using hz)
+    calc (t - u) ^ (-z.re) ≤ (t - u) ^ K := Real.rpow_le_rpow_of_exponent_le h1.le
+          (by linarith [(abs_lt.1 hz').1, neg_abs_le z₀.re])
+      _ ≤ |t + ε n| ^ K := Real.rpow_le_rpow (by linarith)
+          ((hu u hρ).trans (le_abs_self _)) (by positivity)
+  have hF_int : Integrable (fun u ↦ (ρ n u : ℂ) * introTracePower z₀ (t - u)) := by
+    refine Integrable.mono' (hρint.norm.mul_const M)
+      (hρm.mul ((hPm z₀).comp (measurable_const.sub measurable_id))).aestronglyMeasurable
+      (Eventually.of_forall fun u ↦ ?_)
+    by_cases hρ : ρ n u = 0
+    · simp [hρ]
+    rw [norm_mul, Complex.norm_real]
+    refine mul_le_mul_of_nonneg_left ?_ (norm_nonneg _)
+    unfold introTracePower
+    split_ifs with h1 h2
+    · rw [Complex.norm_cpow_eq_rpow_re_of_pos (by linarith), Complex.neg_re]
+      exact (hpow u z₀ (Metric.mem_ball_self one_pos) hρ h1).trans (le_max_right _ _)
+    · exact le_trans (by norm_num) (le_max_left _ _)
+    · simpa using (zero_le_one.trans (le_max_left _ _) : (0 : ℝ) ≤ M)
+  have hF'_meas : AEStronglyMeasurable (fun u : ℝ ↦ (ρ n u : ℂ) *
+      if 1 < t - u then ((t - u : ℝ) : ℂ) ^ (-z₀) * Complex.log ((t - u : ℝ) : ℂ) * (-1)
+      else 0) volume :=
+    (hρm.mul (Measurable.ite (measurableSet_lt measurable_const
+      (measurable_const.sub measurable_id)) (by fun_prop) measurable_const)).aestronglyMeasurable
+  have h_bound : ∀ᵐ u ∂volume, ∀ z ∈ Metric.ball z₀ 1, ‖(ρ n u : ℂ) *
+      (if 1 < t - u then ((t - u : ℝ) : ℂ) ^ (-z) * Complex.log ((t - u : ℝ) : ℂ) * (-1)
+        else 0)‖ ≤ ‖ρ n u‖ * C := by
+    refine Eventually.of_forall fun u z hz ↦ ?_
+    rw [norm_mul, Complex.norm_real]
+    by_cases hρ : ρ n u = 0
+    · simp [hρ]
+    refine mul_le_mul_of_nonneg_left ?_ (norm_nonneg _)
+    split_ifs with h1
+    · have hc : 0 < t - u := by linarith
+      rw [norm_mul, norm_mul, norm_neg, norm_one, mul_one,
+        Complex.norm_cpow_eq_rpow_re_of_pos hc, Complex.neg_re, ← Complex.ofReal_log hc.le,
+        Complex.norm_real, Real.norm_eq_abs, mul_comm]
+      refine mul_le_mul ?_ (hpow u z hz hρ h1) (by positivity) (abs_nonneg _)
+      rw [abs_of_nonneg (Real.log_nonneg h1.le)]
+      exact (Real.log_le_log hc (hu u hρ)).trans (le_abs_self _)
+    · simp only [norm_zero]
+      positivity
+  have h_diff : ∀ᵐ u ∂volume, ∀ z ∈ Metric.ball z₀ 1,
+      HasDerivAt (fun z ↦ (ρ n u : ℂ) * introTracePower z (t - u)) ((ρ n u : ℂ) *
+        (if 1 < t - u then ((t - u : ℝ) : ℂ) ^ (-z) * Complex.log ((t - u : ℝ) : ℂ) * (-1)
+          else 0)) z := by
+    refine Eventually.of_forall fun u z _ ↦ ?_
+    split_ifs with h1
+    · have hfun : (fun z ↦ (ρ n u : ℂ) * introTracePower z (t - u)) =
+          fun z ↦ (ρ n u : ℂ) * ((t - u : ℝ) : ℂ) ^ (-z) := by
+        funext z
+        simp [introTracePower, h1]
+      rw [hfun]
+      exact ((hasDerivAt_neg z).const_cpow
+        (Or.inl (Complex.ofReal_ne_zero.2 (by linarith)))).const_mul _
+    · have hfun : (fun z ↦ (ρ n u : ℂ) * introTracePower z (t - u)) =
+          fun _ ↦ (ρ n u : ℂ) * introTracePower 0 (t - u) := by
+        funext z
+        simp [introTracePower, h1]
+      rw [hfun]
+      exact (hasDerivAt_const z _).const_mul _
+  have key := hasDerivAt_integral_of_dominated_loc_of_deriv_le
+    (Metric.ball_mem_nhds z₀ one_pos)
+    (Eventually.of_forall fun z ↦ (hρm.mul
+      ((hPm z).comp (measurable_const.sub measurable_id))).aestronglyMeasurable)
+    hF_int hF'_meas h_bound (hρint.norm.mul_const C) h_diff
+  exact (differentiableAt_const _).mul key.2.differentiableAt
 
 /-- Paper: §1.4.2, pp. 28–29. After twisting by the conjugate character
 the approximant is a compactly supported Bruhat test on the idele classes. -/
@@ -269,7 +373,137 @@ standing hypothesis of the trace identity, vanishing at every norm-one class. -/
 theorem introTraceApprox_zero_on_normOne (χ : U𝔽) (h ρ : ℕ → ℝ → ℝ)
     (_hA : IsIntroTraceApproximation h ρ) (n : ℕ) (z : ℂ) :
     ∀ g : (ideleClassNorm F).ker,
-      introTraceTest χ (introTraceApprox (h n) (ρ n) z) g.val = 0 := by sorry
+      introTraceTest χ (introTraceApprox (h n) (ρ n) z) g.val = 0 := by
+  intro g
+  have hzero : introTraceApprox (h n) (ρ n) z 1 = 0 := by
+    apply image_eq_zero_of_notMem_tsupport
+    exact fun ht ↦ lt_irrefl (1 : ℝ) (introTraceApprox_support h ρ _hA n z ht)
+  have hg : ideleClassNorm F g.val = 1 := g.property
+  simp [introTraceTest, hg, hzero]
+
+private theorem introTraceApprox_mellin_tendsto_power_measurable (z : ℂ) :
+    Measurable (introTracePower z) :=
+  Measurable.ite measurableSet_Ioi (by fun_prop)
+    (Measurable.ite (measurableSet_singleton 1) measurable_const measurable_const)
+
+private theorem introTraceApprox_mellin_tendsto_power_bound {a t x : ℝ} {z : ℂ}
+    (ht : 1 < t) (hx : |x - t| ≤ 1) (hz : a ≤ z.re) :
+    ‖introTracePower z x‖ ≤ ((1 / 2 : ℝ) ^ (-a) + 2 ^ (-a)) * t ^ (-a) := by
+  -- On the nonzero branch, the shifted radius lies between t/2 and 2t.
+  have hb (hx1 : 1 ≤ x) :
+      x ^ (-a) ≤ ((1 / 2 : ℝ) ^ (-a) + 2 ^ (-a)) * t ^ (-a) := by
+    obtain ⟨hl, hu⟩ := abs_le.mp hx
+    rcases le_total 0 a with ha | ha
+    · calc
+        x ^ (-a) ≤ ((1 / 2) * t) ^ (-a) :=
+          Real.rpow_le_rpow_of_nonpos (by positivity) (by linarith) (by linarith)
+        _ = (1 / 2 : ℝ) ^ (-a) * t ^ (-a) := Real.mul_rpow (by norm_num) (by linarith)
+        _ ≤ _ := mul_le_mul_of_nonneg_right (le_add_of_nonneg_right (by positivity)) (by positivity)
+    · calc
+        x ^ (-a) ≤ (2 * t) ^ (-a) :=
+          Real.rpow_le_rpow (by linarith) (by linarith) (by linarith)
+        _ = (2 : ℝ) ^ (-a) * t ^ (-a) := Real.mul_rpow (by norm_num) (by linarith)
+        _ ≤ _ := mul_le_mul_of_nonneg_right (le_add_of_nonneg_left (by positivity)) (by positivity)
+  unfold introTracePower
+  split_ifs with h h'
+  · rw [Complex.norm_cpow_eq_rpow_re_of_pos (by linarith), Complex.neg_re]
+    exact (Real.rpow_le_rpow_of_exponent_le h.le (neg_le_neg hz)).trans (hb h.le)
+  · subst x
+    exact le_trans (by norm_num : ‖(1 / 2 : ℂ)‖ ≤ (1 : ℝ) ^ (-a)) (hb le_rfl)
+  · rw [norm_zero]
+    positivity
+
+private theorem introTraceApprox_mellin_tendsto_radial {h ρ : ℕ → ℝ → ℝ}
+    (hA : IsIntroTraceApproximation h ρ) (z : ℂ) {t : ℝ} (ht : 1 < t) :
+    Tendsto (fun p : ℕ × ℂ ↦ introTraceApprox (h p.1) (ρ p.1) p.2 t)
+      (atTop ×ˢ 𝓝 z) (𝓝 (introTracePower z t)) := by
+  obtain ⟨_, _, hlim, ε, hε, hρ⟩ := hA
+  have hsmall : Tendsto (fun n ↦ support (ρ n)) atTop (𝓝 0).smallSets := by
+    rw [Metric.nhds_basis_ball.smallSets.tendsto_right_iff]
+    intro r hr
+    filter_upwards [hε.eventually_lt_const hr] with n hn
+    intro x hx
+    have hm := (hρ n).2.2.2.1 (subset_tsupport _ hx)
+    simpa only [Metric.mem_ball, Real.dist_0_eq_abs, abs_lt] using
+      (show -r < x ∧ x < r from ⟨by linarith [hm.1], by linarith [hm.2]⟩)
+  let l : Filter (ℕ × ℂ) := atTop ×ˢ 𝓝 z
+  have hcont : Tendsto (fun p : (ℕ × ℂ) × ℝ ↦ introTracePower p.1.2 p.2)
+      (l ×ˢ 𝓝 t) (𝓝 (introTracePower z t)) := by
+    have hx : Tendsto (fun p : (ℕ × ℂ) × ℝ ↦ (p.2 : ℂ)) (l ×ˢ 𝓝 t) (𝓝 (t : ℂ)) :=
+      Complex.continuous_ofReal.continuousAt.tendsto.comp tendsto_snd
+    have hz : Tendsto (fun p : (ℕ × ℂ) × ℝ ↦ -p.1.2) (l ×ˢ 𝓝 t) (𝓝 (-z)) :=
+      (tendsto_snd.comp tendsto_fst).neg
+    simp only [introTracePower, ht, ↓reduceIte]
+    apply (hx.cpow hz (Complex.ofReal_mem_slitPlane.mpr (by linarith))).congr'
+    filter_upwards [tendsto_snd.eventually (lt_mem_nhds ht)] with p hp
+    simp [hp]
+  have hconv := convolution_tendsto_right (μ := volume)
+    (φ := fun p : ℕ × ℂ ↦ ρ p.1) (g := fun p : ℕ × ℂ ↦ introTracePower p.2)
+    (k := fun _ ↦ t) (l := l)
+    (Eventually.of_forall fun p ↦ (hρ p.1).2.2.1)
+    (Eventually.of_forall fun p ↦ (hρ p.1).2.2.2.2) (hsmall.comp tendsto_fst)
+    (Eventually.of_forall fun p ↦ (introTraceApprox_mellin_tendsto_power_measurable p.2).aestronglyMeasurable)
+    hcont tendsto_const_nhds
+  have hcut := Complex.continuous_ofReal.continuousAt.tendsto.comp ((hlim t ht).comp
+    (show Tendsto Prod.fst l atTop from tendsto_fst))
+  simpa only [introTraceApprox, convolution, ContinuousLinearMap.lsmul_apply,
+    Complex.real_smul, Complex.ofReal_one, one_mul, Function.comp_def] using hcut.mul hconv
+
+private theorem introTraceApprox_mellin_tendsto_cutoff_bound {h ρ : ℕ → ℝ → ℝ}
+    (hA : IsIntroTraceApproximation h ρ) (a : ℝ) :
+    ∀ᶠ n in atTop, ∀ (z : ℂ) (t : ℝ), a ≤ z.re → 1 < t →
+      ‖introTraceApprox (h n) (ρ n) z t‖ ≤ ((1 / 2 : ℝ) ^ (-a) + 2 ^ (-a)) * t ^ (-a) := by
+  obtain ⟨hh, _, _, ε, hε, hρ⟩ := hA
+  filter_upwards [hε.eventually_le_const (zero_lt_one : (0 : ℝ) < 1)] with n hn
+  intro z t hz ht
+  let B := ((1 / 2 : ℝ) ^ (-a) + 2 ^ (-a)) * t ^ (-a)
+  obtain ⟨_, hsm, hpos, hs, hm⟩ := hρ n
+  have hi : Integrable (ρ n) volume := hsm.continuous.integrable_of_hasCompactSupport
+    (isCompact_Icc.of_isClosed_subset (isClosed_tsupport _) hs)
+  have hbound : ‖∫ u : ℝ, (ρ n u : ℂ) * introTracePower z (t - u)‖ ≤ B := by
+    calc
+      _ ≤ ∫ u, ρ n u * B := norm_integral_le_of_norm_le (hi.mul_const B) (by
+        apply Eventually.of_forall
+        intro u
+        by_cases hu : ρ n u = 0
+        · simp [hu]
+        obtain ⟨hl, hr⟩ := hs (subset_tsupport _ hu)
+        rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg (hpos u)]
+        apply mul_le_mul_of_nonneg_left _ (hpos u)
+        exact introTraceApprox_mellin_tendsto_power_bound ht (abs_le.mpr ⟨by linarith, by linarith⟩) hz)
+      _ = B := by rw [integral_mul_const, hm, one_mul]
+  rw [introTraceApprox, norm_mul, Complex.norm_real, Real.norm_of_nonneg ((hh n).2.2.2 t).1]
+  exact mul_le_of_le_one_left (norm_nonneg _) ((hh n).2.2.2 t).2 |>.trans hbound
+
+private theorem introTraceApprox_mellin_tendsto_integral {ι : Type} {l : Filter ι}
+    [l.IsCountablyGenerated] {f : ι → ℝ → ℂ} {g : ℝ → ℂ} (s : ℂ) {a C : ℝ}
+    (ha : s.re < a) (hf : ∀ i, Measurable (f i))
+    (hzero : ∀ i t, t < 1 → f i t = 0)
+    (hbound : ∀ᶠ i in l, ∀ t, 1 < t → ‖f i t‖ ≤ C * t ^ (-a))
+    (hlim : ∀ t, t ≠ 1 → Tendsto (fun i ↦ f i t) l (𝓝 (g t))) :
+    Tendsto (fun i ↦ introTraceMellin (f i) s) l (𝓝 (introTraceMellin g s)) := by
+  -- The Mellin weight lowers the decay exponent to s.re - 1 - a < -1.
+  let B := (Ioi (1 : ℝ)).indicator (fun t : ℝ ↦ C * t ^ (s.re - 1 - a))
+  have hi : Integrable B volume := (integrable_indicator_iff measurableSet_Ioi).2
+    ((integrableOn_Ioi_rpow_of_lt (by linarith : s.re - 1 - a < -1) zero_lt_one).const_mul C)
+  apply tendsto_integral_filter_of_dominated_convergence B _ _ hi.integrableOn _
+  · exact Eventually.of_forall fun i ↦
+      ((by fun_prop : Measurable (fun t : ℝ ↦ (t : ℂ) ^ (s - 1))).smul (hf i)).aestronglyMeasurable
+  · filter_upwards [hbound] with i hbi
+    filter_upwards [Measure.ae_ne _ (1 : ℝ)] with t hne
+    rcases lt_or_gt_of_ne hne with ht | ht
+    · simp [B, hzero i t ht, ht.not_gt, Set.indicator_of_notMem]
+    · rw [show B t = C * t ^ (s.re - 1 - a) from indicator_of_mem ht _, smul_eq_mul,
+          norm_mul, Complex.norm_cpow_eq_rpow_re_of_pos (by linarith)]
+      simp only [Complex.sub_re, Complex.one_re]
+      calc
+        _ ≤ t ^ (s.re - 1) * (C * t ^ (-a)) :=
+          mul_le_mul_of_nonneg_left (hbi t ht) (by positivity)
+        _ = C * t ^ (s.re - 1 - a) := by
+          rw [sub_eq_add_neg (s.re - 1), Real.rpow_add (by linarith : 0 < t)]
+          ring
+  · filter_upwards [Measure.ae_ne _ (1 : ℝ)] with t ht
+    exact (tendsto_const_nhds (x := (t : ℂ) ^ (s - 1))).smul (hlim t ht)
 
 /-- Paper: §§1.4.2–1.4.3, pp. 28–29. For a fixed Mellin exponent `s`,
 the approximant moments converge locally uniformly on `Re z > Re s`
@@ -278,13 +512,77 @@ theorem introTraceApprox_mellin_tendsto (h ρ : ℕ → ℝ → ℝ)
     (_hA : IsIntroTraceApproximation h ρ) (s : ℂ) :
     TendstoLocallyUniformlyOn
       (fun n z ↦ introTraceMellin (introTraceApprox (h n) (ρ n) z) s)
-      (fun z ↦ introTraceMellin (introTracePower z) s) atTop right(s.re) := by sorry
+      (fun z ↦ introTraceMellin (introTracePower z) s) atTop right(s.re) := by
+  apply (isOpen_Ioi.preimage Complex.continuous_re).tendstoLocallyUniformlyOn_iff_forall_tendsto.2
+  intro z hz
+  obtain ⟨a, hsa, haz⟩ := exists_between (show s.re < z.re from hz)
+  let l : Filter (ℕ × ℂ) := atTop ×ˢ 𝓝 z
+  let C := (1 / 2 : ℝ) ^ (-a) + 2 ^ (-a)
+  have hnear : ∀ᶠ p : ℕ × ℂ in l, a ≤ p.2.re :=
+    (Complex.continuous_re.continuousAt.tendsto.comp tendsto_snd).eventually (le_mem_nhds haz)
+  have hpow : Tendsto (fun p : ℕ × ℂ ↦ introTraceMellin (introTracePower p.2) s) l
+      (𝓝 (introTraceMellin (introTracePower z) s)) := by
+    apply introTraceApprox_mellin_tendsto_integral (a := a) (C := C) s hsa
+    · exact fun p ↦ introTraceApprox_mellin_tendsto_power_measurable p.2
+    · intro p t ht
+      simp [introTracePower, ht.not_gt, ht.ne]
+    · filter_upwards [hnear] with p hp
+      intro t ht
+      exact introTraceApprox_mellin_tendsto_power_bound ht (by simp) hp
+    · intro t _
+      exact (introTracePower_differentiable t).continuous.continuousAt.tendsto.comp tendsto_snd
+  have hzero (n : ℕ) (t : ℝ) (ht : t < 1) : h n t = 0 := by
+    by_contra hn
+    exact ht.asymm ((_hA.1 n).2.2.1 (subset_tsupport _ hn))
+  have happ : Tendsto (fun p : ℕ × ℂ ↦ introTraceMellin (introTraceApprox (h p.1) (ρ p.1) p.2) s) l
+      (𝓝 (introTraceMellin (introTracePower z) s)) := by
+    apply introTraceApprox_mellin_tendsto_integral (a := a) (C := C) s hsa
+    · intro p
+      obtain ⟨ε, _, hρ⟩ := _hA.2.2.2
+      have hm := (introTraceApprox_mellin_tendsto_power_measurable p.2).comp
+        (measurable_fst.sub measurable_snd : Measurable fun q : ℝ × ℝ ↦ q.1 - q.2)
+      have hk : Measurable (fun q : ℝ × ℝ ↦ (ρ p.1 q.2 : ℂ)) :=
+        Complex.measurable_ofReal.comp ((hρ p.1).2.1.continuous.measurable.comp measurable_snd)
+      exact (Complex.measurable_ofReal.comp (_hA.1 p.1).1.continuous.measurable).mul
+        ((hk.mul hm).stronglyMeasurable.integral_prod_right'.measurable)
+    · intro p t ht
+      simp [introTraceApprox, hzero p.1 t ht]
+    · filter_upwards [hnear, (show Tendsto Prod.fst l atTop from tendsto_fst).eventually
+          (introTraceApprox_mellin_tendsto_cutoff_bound _hA a)] with p hp hb
+      exact fun t ht ↦ hb p.2 t hp ht
+    · intro t ht
+      rcases lt_or_gt_of_ne ht with hlt | hgt
+      · simp [introTraceApprox, hzero _ _ hlt, introTracePower, hlt.not_gt, hlt.ne]
+      · exact introTraceApprox_mellin_tendsto_radial _hA z hgt
+  exact (hpow.prodMk_nhds happ).mono_right (nhds_le_uniformity _)
 
 /-- Paper: §§1.4.2, 1.4.5, pp. 28–29. The Mellin transform of the limiting
 radial power exists on the convergence half-plane and equals `1 / (z - s)`. -/
 theorem introTracePower_mellin (z s : ℂ) (_hs : s.re < z.re) :
     IntegrableOn (fun t : ℝ ↦ introTracePower z t * (t : ℂ) ^ (s - 1)) (Ioi 0) ∧
-      introTraceMellin (introTracePower z) s = 1 / (z - s) := by sorry
+      introTraceMellin (introTracePower z) s = 1 / (z - s) := by
+  let a := -z + (s - 1)
+  have ha : a.re < -1 := by
+    change -z.re + (s.re - 1) < -1
+    linarith
+  have he : (fun t : ℝ ↦ introTracePower z t * (t : ℂ) ^ (s - 1)) =ᵐ[volume]
+      (Ioi (1 : ℝ)).indicator (fun t : ℝ ↦ (t : ℂ) ^ a) := by
+    filter_upwards [Measure.ae_ne volume (1 : ℝ)] with t ht
+    by_cases hgt : 1 < t
+    · rw [indicator_of_mem hgt, introTracePower, ite_eq_left hgt]
+      exact (Complex.cpow_add _ _ (Complex.ofReal_ne_zero.mpr (zero_lt_one.trans hgt).ne')).symm
+    · simp [introTracePower, ht, hgt]
+  have hsub : Ioi (1 : ℝ) ⊆ Ioi 0 := Ioi_subset_Ioi zero_le_one
+  have hI : IntegrableOn ((Ioi (1 : ℝ)).indicator (fun t : ℝ ↦ (t : ℂ) ^ a)) (Ioi 0) := by
+    rw [integrableOn_indicator_iff measurableSet_Ioi.nullMeasurableSet, inter_eq_left.mpr hsub]
+    exact integrableOn_Ioi_cpow_of_lt ha zero_lt_one
+  refine ⟨hI.congr (ae_restrict_of_ae he.symm), ?_⟩
+  unfold introTraceMellin mellin
+  simp_rw [smul_eq_mul, mul_comm _ (introTracePower z _)]
+  rw [integral_congr_ae (ae_restrict_of_ae he), setIntegral_indicator measurableSet_Ioi,
+    inter_eq_right.mpr hsub, integral_Ioi_cpow_of_lt ha zero_lt_one]
+  rw [show a + 1 = -(z - s) by dsimp [a]; ring]
+  simp only [Complex.ofReal_one, Complex.one_cpow, neg_div_neg_eq]
 
 end Tests
 
@@ -359,7 +657,11 @@ theorem introTraceApprox_rat_spectral_tendsto_atBot (h ρ : ℕ → ℝ → ℝ)
 where every cutoff test vanishes. -/
 theorem introTraceApprox_primePower_inv_zero (h ρ : ℕ → ℝ → ℝ)
     (_hA : IsIntroTraceApproximation h ρ) (n : ℕ) (z : ℂ) (v : V) (m : ℕ) (_hm : 0 < m) :
-    approx(h, ρ, n, z) ((q(v) ^ m)⁻¹) = 0 := by sorry
+    approx(h, ρ, n, z) ((q(v) ^ m)⁻¹) = 0 := by
+  have hq : 1 ≤ q(v) := by exact_mod_cast (NumberField.HeightOneSpectrum.one_lt_absNorm v).le
+  have hle : (q(v) ^ m)⁻¹ ≤ 1 := inv_le_one_of_one_le₀ (one_le_pow₀ hq)
+  apply image_eq_zero_of_notMem_tsupport
+  exact fun ht ↦ hle.not_gt (introTraceApprox_support h ρ _hA n z ht)
 
 /-- Paper: §1.4.4, p. 29. The finite terms converge locally uniformly to
 the negative logarithmic derivative of the finite Hecke L-function.
@@ -505,7 +807,21 @@ theorem introTrace_transition_mellin (S : Finset V) (χ : U𝔽)
     (fun s ↦ globalIdelicZFunction (sAdeleSchwartzToGlobal F S f) (ideleClassNormTwist χ s))
       =ᶠ[codiscrete ℂ] (fun s ↦
         outsideMass(S) * sLocalIdelicZFunction f (twist s) * heckeEulerProductOutside S χ hχ s) :=
-  by sorry
+  by
+  let L := finiteL(χ)
+  obtain ⟨hL, hs⟩ := (finiteHeckeL_exists_continuation χ).choose_spec
+  have hraw := weilIdentity_unramifiedOutside_meromorphic (F := F) S f χ hχ L hL
+    (fun z hz ↦ hs ⟨z, hz⟩)
+  have hm : MeromorphicOn (fun z ↦ reciprocalPartialHeckeEulerProduct χ S z * L z) univ :=
+    fun z hz ↦ ((strongCoprimalityJetMatrix_det_ne_zero_euler χ S).1 z).meromorphicAt.mul
+      (hL hz).meromorphicAt
+  have he : (fun z ↦ reciprocalPartialHeckeEulerProduct χ S z * L z)
+      =ᶠ[codiscrete ℂ] heckeEulerProductOutside S χ hχ := by
+    rw [heckeEulerProductOutside_eq_finite S χ hχ L hL hs]
+    simpa only [Filter.codiscrete] using toMeromorphicNFOn_eqOn_codiscrete hm
+  filter_upwards [hraw, he] with z htrans heuler
+  rw [htrans, ← heuler]
+  simp only [reciprocalPartialHeckeEulerProduct, mul_assoc]
 
 -- On theta classes this is the representative formula for sLocalThetaToGlobal_mk,
 -- globalThetaMellin_mk and sLocalThetaMellin_mk from §§5.1–5.2.

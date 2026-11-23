@@ -4,6 +4,8 @@ public import RiemannMasullo.Ch10_TraceSpectral.Sec2
 
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
+import Mathlib.Analysis.InnerProductSpace.l2Space
+import Mathlib.Logic.Equiv.Nat
 
 /-! # §10.2 assertions that are false as printed -/
 
@@ -163,13 +165,104 @@ def Printed.spectralRegular_dual_bounded : Prop :=
     (∀ v : E, (∀ i, Λ i v = 0) → v = 0) → IsRegularSpectralFamily x →
     ∃ C : ℝ, ∀ n, ‖Λ n‖ ≤ C
 
+/-- Let `b` be a Hilbert basis indexed by `ℕ ⊕ ℕ`. Put `x (inl n) = b (inl n)` and
+`x (inr n) = b (inl n) + (n + 1)⁻¹ • b (inr n)`. Then `x` has a total biorthogonal family `Λ`
+with `‖Λ (inr n)‖ ≥ n + 1`. -/
+private theorem Printed.spectralRegular_dual_bounded_false_exists {E : Type} [NormedAddCommGroup E]
+    [InnerProductSpace ℂ E] [CompleteSpace E] (b : HilbertBasis (ℕ ⊕ ℕ) ℂ E) :
+    ∃ (x : ℕ ⊕ ℕ → E) (Λ : ℕ ⊕ ℕ → StrongDual ℂ E),
+      (∀ i, Λ i (x i) = 1) ∧ (∀ i j, i ≠ j → Λ j (x i) = 0) ∧
+      Dense (Submodule.span ℂ (Set.range x) : Set E) ∧
+      (∀ v : E, (∀ i, Λ i v = 0) → v = 0) ∧ (∀ i, 1 ≤ ‖x i‖) ∧
+      ∀ n : ℕ, (n : ℝ) + 1 ≤ ‖Λ (Sum.inr n)‖ := by
+  classical
+  have hb : ∀ i j, inner ℂ (b i) (b j) = if i = j then (1 : ℂ) else 0 :=
+    orthonormal_iff_ite.mp b.orthonormal
+  have hn1 : ∀ i, ‖b i‖ = 1 := b.orthonormal.1
+  have hne : ∀ n : ℕ, ((n : ℂ) + 1) ≠ 0 := fun n => Nat.cast_add_one_ne_zero n
+  refine ⟨Sum.elim (fun n => b (Sum.inl n))
+      (fun n => b (Sum.inl n) + ((n : ℂ) + 1)⁻¹ • b (Sum.inr n)),
+    Sum.elim
+      (fun n => innerSL ℂ (b (Sum.inl n)) - ((n : ℂ) + 1) • innerSL ℂ (b (Sum.inr n)))
+      (fun n => ((n : ℂ) + 1) • innerSL ℂ (b (Sum.inr n))), ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · rintro (n | n)
+    · simp [hb, hn1, innerSL_apply_apply]
+    · simp [hb, hn1, innerSL_apply_apply, inner_add_right, inner_smul_right, hne n]
+  · rintro (n | n) (m | m) hij
+    · have : m ≠ n := fun h => hij (by rw [h])
+      simp [hb, innerSL_apply_apply, this]
+    · simp [hb, innerSL_apply_apply]
+    · by_cases hmn : m = n
+      · subst hmn
+        simp [hb, hn1, innerSL_apply_apply, inner_add_right, inner_smul_right, hne m]
+      · simp [hb, innerSL_apply_apply, inner_add_right, inner_smul_right, hmn]
+    · have : m ≠ n := fun h => hij (by rw [h])
+      simp [hb, innerSL_apply_apply, inner_add_right, inner_smul_right, this]
+  · rw [Submodule.dense_iff_topologicalClosure_eq_top, eq_top_iff, ← b.dense_span]
+    refine Submodule.topologicalClosure_mono (Submodule.span_le.mpr ?_)
+    rintro _ ⟨(n | n), rfl⟩
+    · exact Submodule.subset_span ⟨Sum.inl n, rfl⟩
+    · have hx : b (Sum.inr n) = ((n : ℂ) + 1) •
+          ((b (Sum.inl n) + ((n : ℂ) + 1)⁻¹ • b (Sum.inr n)) - b (Sum.inl n)) := by
+        rw [add_sub_cancel_left, smul_smul, mul_inv_cancel₀ (hne n), one_smul]
+      rw [SetLike.mem_coe, hx]
+      exact Submodule.smul_mem _ _ (Submodule.sub_mem _ (Submodule.subset_span ⟨Sum.inr n, rfl⟩)
+        (Submodule.subset_span ⟨Sum.inl n, rfl⟩))
+  · intro v hv
+    have hr : ∀ n : ℕ, inner ℂ (b (Sum.inr n)) v = 0 := by
+      intro n
+      have := hv (Sum.inr n)
+      simpa [innerSL_apply_apply, hne n] using this
+    have hl : ∀ n : ℕ, inner ℂ (b (Sum.inl n)) v = 0 := by
+      intro n
+      have := hv (Sum.inl n)
+      simpa [innerSL_apply_apply, hr n] using this
+    have hall : ∀ k, b.repr v k = 0 := by
+      rintro (n | n)
+      · rw [b.repr_apply_apply, hl n]
+      · rw [b.repr_apply_apply, hr n]
+    have hs := b.hasSum_repr v
+    simp only [hall, zero_smul] at hs
+    exact hs.unique hasSum_zero
+  · rintro (n | n)
+    · simp [hn1]
+    · have h1 : inner ℂ (b (Sum.inl n))
+          (b (Sum.inl n) + ((n : ℂ) + 1)⁻¹ • b (Sum.inr n)) = 1 := by
+        rw [inner_add_right, inner_smul_right, hb, hb]
+        simp
+      have h2 := norm_inner_le_norm (𝕜 := ℂ) (b (Sum.inl n))
+        (b (Sum.inl n) + ((n : ℂ) + 1)⁻¹ • b (Sum.inr n))
+      rw [h1, hn1, one_mul, norm_one] at h2
+      simpa using h2
+  · intro n
+    have h := ContinuousLinearMap.le_opNorm (((n : ℂ) + 1) • innerSL ℂ (b (Sum.inr n)))
+      (b (Sum.inr n))
+    have hv : (((n : ℂ) + 1) • innerSL ℂ (b (Sum.inr n))) (b (Sum.inr n)) =
+        ((n : ℕ) + 1 : ℕ) := by
+      simp [hn1, innerSL_apply_apply]
+    rw [hv, hn1, mul_one, Complex.norm_natCast] at h
+    simpa using h
+
 /-- Paper: Terminology 10.2.1.2(2), p. 444. In complex ℓ² take
 x₂ₙ = e₂ₙ and x₂ₙ₊₁ = e₂ₙ + (n+1)⁻¹ e₂ₙ₊₁. If eⱼ* is coordinate evaluation,
 the dual pair is e₂ₙ* − (n+1)e₂ₙ₊₁* and (n+1)e₂ₙ₊₁*. Both spans contain
 the finite-support families, every x has norm at least one, and the dual
 norms are unbounded. -/
 theorem Printed.spectralRegular_dual_bounded_false :
-    ¬ Printed.spectralRegular_dual_bounded := by sorry
+    ¬ Printed.spectralRegular_dual_bounded := by
+  intro h
+  obtain ⟨x, Λ, h1, h2, h3, h4, h5, h6⟩ := Printed.spectralRegular_dual_bounded_false_exists
+    (HilbertBasis.ofRepr (LinearIsometryEquiv.refl ℂ (lp (fun _ : ℕ ⊕ ℕ => ℂ) 2)))
+  let σ : ℕ ≃ ℕ ⊕ ℕ := Equiv.natSumNatEquivNat.symm
+  obtain ⟨C, hC⟩ := h (lp (fun _ : ℕ ⊕ ℕ => ℂ) 2) (x ∘ σ) (Λ ∘ σ)
+    (fun i => h1 (σ i)) (fun i j hij => h2 (σ i) (σ j) (σ.injective.ne hij))
+    (by rwa [σ.surjective.range_comp])
+    (fun v hv => h4 v (fun k => by simpa using hv (σ.symm k)))
+    ⟨1, one_pos, fun i => h5 (σ i)⟩
+  obtain ⟨n, hn⟩ := exists_nat_gt C
+  have hCn := hC (σ.symm (Sum.inr n))
+  simp only [Function.comp_apply, Equiv.apply_symm_apply] at hCn
+  linarith [h6 n]
 
 /-- Paper: Corollary 10.2.1.4, p. 444. The printed floor-indexed
 line jets form a normalized basis in the image of the quotient dual. -/

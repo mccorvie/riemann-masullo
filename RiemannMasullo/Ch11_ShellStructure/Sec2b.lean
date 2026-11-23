@@ -82,7 +82,47 @@ local notation "LocalW" => Lp ℂ 2 localWMeasure
 Local polar-free tests yield Sobolev vectors at positive twist.
 Deviation: Use the positive range of the local Sobolev embedding from §10.1. -/
 theorem sLocalPWTheta_memLp {a : ℝ} (_ha : 0 < a) (ω : PontryaginDual J₁) (f : Zₛ) :
-    MemLp (localWeightedTheta(a, ω, f)) 2 localWMeasure := by sorry
+    MemLp (localWeightedTheta(a, ω, f)) 2 localWMeasure := by
+  let : BorelSpace (SIdeleQuotient F S) := ⟨rfl⟩
+  let μ := sLocalQuotientTamagawaMeasure F S
+  let r (g : SIdeleQuotient F S) : ℝ := (mₛ(S) g).val
+  let θ := sLocalHomogeneousAdelicThetaLinearMap F S ω f.val
+  let t := max s 0
+  let b := a / 2
+  have hb : 0 < b := half_pos _ha
+  have hbb : b + b = a := add_halves a
+  have hr (g) : 0 < r g := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hc : Continuous r := NNReal.continuous_coe.comp (Units.continuous_val.comp (mₛ(S)).continuous)
+  obtain ⟨j, -, -, hj⟩ := exists_sLocalHomogeneousThetaSobolevInclusion (F := F) (S := S)
+    hb (le_refl b) (show 0 ≤ t from le_max_right _ _) hb ω
+  let u := (j (Submodule.Quotient.mk f.val)).val.val
+  have hi := (globalThetaSobolev_norm_aux μ r hr hc.measurable b b b t θ u (hj f.val).2).1
+  rw [hbb] at hi
+  let d (g : SIdeleQuotient F S) := intervalSobolevDensity 0 0 t (Real.log (r g))
+  have hd (g) : 0 ≤ d g := by dsimp [d, intervalSobolevDensity]; positivity
+  have hm : Measurable d := by dsimp [d, intervalSobolevDensity]; fun_prop
+  let Z (g : SIdeleQuotient F S) : ℂ := ((r g ^ a : ℝ) : ℂ) * θ g
+  have hZ : Continuous Z := (Complex.continuous_ofReal.comp (hc.rpow_const fun g ↦ Or.inl (hr g).ne')).mul θ.continuous
+  have mem : MemLp Z 2 (μ.withDensity fun g ↦ ENNReal.ofReal (d g)) := by
+    apply (memLp_two_iff_integrable_sq_norm hZ.aestronglyMeasurable).2
+    apply (integrable_withDensity_iff_integrable_smul' (ENNReal.measurable_ofReal.comp hm)
+      (.of_forall fun _ ↦ ENNReal.ofReal_lt_top)).2
+    refine hi.congr (.of_forall fun g ↦ ?_)
+    change ‖θ g‖ ^ 2 * intervalSobolevDensity a a t (Real.log (r g)) =
+      (ENNReal.ofReal (d g)).toReal • ‖Z g‖ ^ 2
+    rw [ENNReal.toReal_ofReal (hd g), smul_eq_mul]
+    simp only [Z, d, norm_mul, mul_pow, Complex.norm_real,
+      Real.rpow_def_of_pos (hr g), Real.norm_of_nonneg (Real.exp_pos _).le]
+    have he := globalThetaSobolev_norm_density a 0 0 t (Real.log (r g))
+    simp only [add_zero] at he
+    rw [← he, mul_comm (Real.log (r g)) a]
+    ring
+  apply mem.mono_measure (withDensity_mono (.of_forall fun g ↦ ?_))
+  apply ENNReal.ofReal_le_ofReal
+  unfold d intervalSobolevDensity
+  apply mul_le_mul_of_nonneg_left _ (le_trans (Real.exp_pos _).le (le_max_left _ _))
+  exact Real.rpow_le_rpow_of_exponent_le (by nlinarith [sq_nonneg (Real.log (r g))])
+    (div_le_div_of_nonneg_right (le_max_left s 0) (by norm_num))
 
 /-- Paper: (11.2.1.1) and (11.2.1.6), pp. 487–488.
 Send a local polar-free test to its weighted homogeneous theta class.
@@ -125,7 +165,21 @@ theorem sLocalPWThetaSobolevMap_apply {a : ℝ} (ha : 0 < a) (ω : PontryaginDua
 Globalized polar-free tests yield weighted Sobolev vectors.
 Deviation: Use direct integer-indicator insertion as in the repaired §7.3.2. -/
 theorem globalPWTheta_memLp (a : ℝ) (ω : PontryaginDual C₁) (f : Zₛ) :
-    MemLp (globalWeightedTheta(a, ω, f)) 2 globalWMeasure := by sorry
+    MemLp (globalWeightedTheta(a, ω, f)) 2 globalWMeasure := by
+  let f₀ : adelePolarSubspace F := ⟨sAdeleSchwartzToGlobal F S f.val,
+    sAdeleSchwartzToGlobal_mem_polarSubspace f⟩
+  let x : globalPolarFreeThetaSubmodule (F := F) ω :=
+    ⟨Submodule.Quotient.mk f₀.val, ⟨f₀.val, f₀.property, rfl⟩⟩
+  obtain ⟨j, -, -, hj⟩ := exists_globalHomogeneousThetaSobolevInclusion
+    (F := F) (a := a) hGeo (le_max_right s 0) ω
+  have he := (hj f₀ x rfl).2
+  have hv := (Lp.memLp (j x).val.val).ae_eq ((withDensity_absolutelyContinuous _ _).ae_le he)
+  apply hv.mono_measure (withDensity_mono (Filter.Eventually.of_forall fun g ↦ ?_))
+  apply ENNReal.ofReal_le_ofReal
+  unfold intervalSobolevDensity
+  apply mul_le_mul_of_nonneg_left _ (le_trans (Real.exp_pos _).le (le_max_left _ _))
+  exact Real.rpow_le_rpow_of_exponent_le (by nlinarith [sq_nonneg (logNorm(m𝔽) g)])
+    (div_le_div_of_nonneg_right (le_max_left s 0) (by norm_num))
 
 /-- Paper: (11.2.1.2) and (11.2.1.7), pp. 487–488.
 Insert a local polar-free test and take its weighted global homogeneous theta class.
@@ -160,7 +214,8 @@ A box-limited polar-free test gives its weighted homogeneous theta vector in the
 Deviation: Use the positive local twist of the repaired definition. -/
 theorem sLocalAbsolutePWSobolev_mem {a : ℝ} (ha : 0 < a) (ω : PontryaginDual J₁) (Λ : ℝ)
     (f : Zₛ) (_hf : f ∈ band(sLocalPWBox S Λ)) :
-    sLocalPWThetaSobolevMap (F := F) (S := S) (s := s) ha ω f ∈ sLocalAbsolutePWSobolev (F := F) (S := S) hs ha ω Λ := by sorry
+    sLocalPWThetaSobolevMap (F := F) (S := S) (s := s) ha ω f ∈ sLocalAbsolutePWSobolev (F := F) (S := S) hs ha ω Λ := by
+  exact Submodule.le_topologicalClosure _ (Submodule.subset_span ⟨⟨f, _hf⟩, rfl⟩)
 
 -- TODO(paper-gap): (11.2.1.2) leaves X free. The box parameter here is Λ,
 -- as indicated by the comparison with Λ^|S| in the proof on p. 489.
@@ -182,7 +237,8 @@ vector in the global level.
 Deviation: Use X = Λ and the direct integer-indicator insertion. -/
 theorem globalAbsolutePWSobolev_mem (a : ℝ) (ω : PontryaginDual C₁) (Λ : ℝ)
     (f : Zₛ) (_hf : f ∈ band(sLocalPWBox S Λ)) :
-    globalPWThetaSobolevMap (F := F) (S := S) (s := s) a ω f ∈ globalAbsolutePWSobolev (F := F) (S := S) hs a ω Λ := by sorry
+    globalPWThetaSobolevMap (F := F) (S := S) (s := s) a ω f ∈ globalAbsolutePWSobolev (F := F) (S := S) hs a ω Λ := by
+  exact Submodule.le_topologicalClosure _ (Submodule.subset_span ⟨⟨f, _hf⟩, rfl⟩)
 
 local notation "ambientGeom(" a ")" => geometricProjection (F := F) a h₀ hs
 local notation "onIsotype(" ω ", " T ")" =>
@@ -342,7 +398,8 @@ homogeneous theta vector in the global invariant level.
 Deviation: Use the direct integer-indicator insertion. -/
 theorem globalInvariantPWSobolev_mem (a : ℝ) (ω : PontryaginDual C₁) (Λ : ℝ)
     (f : Zₛ) (_hf : f ∈ band(sLocalPWProductRegion S Λ)) :
-    globalPWThetaSobolevMap (F := F) (S := S) (s := s) a ω f ∈ globalInvariantPWSobolev (F := F) (S := S) hs a ω Λ := by sorry
+    globalPWThetaSobolevMap (F := F) (S := S) (s := s) a ω f ∈ globalInvariantPWSobolev (F := F) (S := S) hs a ω Λ := by
+  exact Submodule.le_topologicalClosure _ (Submodule.subset_span ⟨⟨f, _hf⟩, rfl⟩)
 
 local notation "invLevel(" a ", " ω ", " Λ ")" =>
   (globalInvariantPWSobolev (F := F) (S := S) hs a ω Λ).comap (GeoIsotype(ω)).subtype
@@ -443,7 +500,11 @@ variable (F) in
 /-- Paper: (11.2.2.1), p. 489. The prime-indexed Sobolev quotient divides the
 zero-line isotype by the closed principal-value subspace.
 Deviation: Use the closure of the principal-value image from §11.2.0.
-Zero-line theta density identifies the completed theta isotype with the ambient one. -/
+Zero-line theta density identifies the completed theta isotype with the ambient one.
+
+Kept as an `abbrev` for now (#5398): as a `def` with its own instances it breaks proofs and
+statements that use it, see the issue. Do not copy this pattern: a new type synonym with
+structure is a `def` with its own instances (`AGENTS.md`). -/
 abbrev PrimeOrbitalSobolevQuotient (p : HeightOneSpectrum (𝓞 ℚ)) {s : ℝ} (hs : 0 ≤ s)
     (ω : PontryaginDual C₁) :=
   ↥(Wω(hs, ω)) ⧸ N(p, hs, ω)
@@ -606,7 +667,31 @@ theorem primeOrbitalSobolevConvolution_trace_distribution :
     onClosedPrimeQuotient(hs₁, ω(χ),
       ∃ D : StrongDual ℂ (BruhatCompactSupport C𝔽),
         ∀ (φ : BruhatCompactSupport C𝔽) (T : nuclearEndomorphisms OrbQ),
-          T.val = OrbA(φ) → D φ = hilbertTrace T) := by sorry
+          T.val = OrbA(φ) → D φ = hilbertTrace T) := by
+  have traceDistribution {X : Type _} {H : Type _} [AddCommGroup X] [Module ℂ X]
+      [TopologicalSpace X] [IsTopologicalAddGroup X] [NormedAddCommGroup H]
+      [InnerProductSpace ℂ H] [CompleteSpace H] (A : X → H →L[ℂ] H)
+      (h : ∃ T : X →ₗ[ℂ] nuclearEndomorphisms H, (∀ x, (T x).val = A x) ∧
+        Tendsto (fun x : X ↦ traceNorm (H := H) (T x)) (𝓝 0) (𝓝 0)) :
+      ∃ D : StrongDual ℂ X, ∀ (x : X) (U : nuclearEndomorphisms H),
+        U.val = A x → D x = hilbertTrace U := by
+    obtain ⟨T, hT, ht⟩ := h
+    obtain ⟨L, hL⟩ := hilbertTrace_linear (H := H)
+    let D : X →ₗ[ℂ] ℂ := L.comp T
+    have hb (x : X) : ‖D x‖ ≤ traceNorm (T x) :=
+      (congrArg (fun c : ℂ ↦ ‖c‖) (hL (T x))).le.trans (norm_hilbertTrace_le (T x))
+    have hd : Continuous D := continuous_of_continuousAt_zero D <| by
+      change Tendsto D (𝓝 0) (𝓝 (D 0))
+      rw [D.map_zero]
+      exact squeeze_zero_norm hb ht
+    refine ⟨⟨D, hd⟩, fun x U hU ↦ ?_⟩
+    have heq : T x = U := Subtype.ext ((hT x).trans hU.symm)
+    exact (hL (T x)).trans (congrArg (hilbertTrace (H := H)) heq)
+  have hn := primeOrbitalSobolevConvolution_traceNorm_continuous (F := F) (p := p)
+    (χ := χ) (h₁ := h₁) (_hdeg := _hdeg) (_hχ := _hχ)
+  exact onClosedPrimeQuotient(hs₁, ω(χ), by
+    apply traceDistribution (X := BruhatCompactSupport C𝔽) (H := OrbQ) (fun φ ↦ OrbA(φ))
+    exact hn)
 
 local notation "zeros" => {z : ℂ // reciprocalPartialHeckeEulerProduct χ (Sₚ(p)) z = 0}
 local notation "mult(" z ")" => orbitalEulerMultiplicity χ (Sₚ(p)) z
@@ -642,7 +727,16 @@ theorem primeOrbitalSobolevConvolution_trace_eq_of_degree {s' : ℝ} (h₁' : 1 
         ∀ (T : nuclearEndomorphisms OrbQ) (T' : nuclearEndomorphisms Q(p, hs', ω(χ))),
           T.val = OrbA(φ) →
           T'.val = primeOrbitalSobolevConvolution (F := F) p hs' (ω(χ)) φ →
-          hilbertTrace T = hilbertTrace T')) := by sorry
+          hilbertTrace T = hilbertTrace T')) := by
+  dsimp only
+  intro T T' hT hT'
+  have hsum := (primeOrbitalSobolevConvolution_trace (F := F) p χ h₁ _hdeg _hχ φ T hT).2
+  have hsum' := (primeOrbitalSobolevConvolution_trace (F := F) p χ h₁' _hdeg' _hχ φ T' hT').2
+  apply hsum.unique
+  apply hsum'.congr_fun
+  intro z
+  rw [primeOrbitalMultiplicity_saturates (F := F) p χ h₁ _hdeg _hχ z,
+    primeOrbitalMultiplicity_saturates (F := F) p χ h₁' _hdeg' _hχ z]
 
 end Orbital
 

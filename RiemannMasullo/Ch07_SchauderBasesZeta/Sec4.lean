@@ -8,6 +8,8 @@ import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
+import all RiemannMasullo.Ch05_ThetaZSpaces.Sec3b
 
 /-! # §7.4 Nuclearity
 
@@ -493,9 +495,35 @@ def finiteNuclearityDenominator (p : HeightOneSpectrum (𝓞 ℚ)) : Submodule �
       nuclearityPrincipalValue_mem_polar (F := F) p f⟩ : Θ₀(χ))))
 
 /-- Paper: Equation (7.4.0.2), p. 366.
-The finite orbital quotient is taken by the principal-value image. -/
-abbrev FiniteNuclearityQuotient (p : HeightOneSpectrum (𝓞 ℚ)) :=
+The finite orbital quotient is taken by the principal-value image.
+
+This is a `def` with its own instances, not an `abbrev`, so that instance terms over it do
+not spell out its definition (#5398). -/
+def FiniteNuclearityQuotient (p : HeightOneSpectrum (𝓞 ℚ)) :=
   Θ₀(χ) ⧸ finiteNuclearityDenominator χ p
+
+namespace FiniteNuclearityQuotient
+
+instance instAddCommGroup (p : HeightOneSpectrum (𝓞 ℚ)) :
+    AddCommGroup (FiniteNuclearityQuotient χ p) :=
+  inferInstanceAs (AddCommGroup (Θ₀(χ) ⧸ finiteNuclearityDenominator χ p))
+
+instance instModule (p : HeightOneSpectrum (𝓞 ℚ)) : Module ℂ (FiniteNuclearityQuotient χ p) :=
+  inferInstanceAs (Module ℂ (Θ₀(χ) ⧸ finiteNuclearityDenominator χ p))
+
+instance instTopologicalSpace (p : HeightOneSpectrum (𝓞 ℚ)) :
+    TopologicalSpace (FiniteNuclearityQuotient χ p) :=
+  inferInstanceAs (TopologicalSpace (Θ₀(χ) ⧸ finiteNuclearityDenominator χ p))
+
+instance instIsTopologicalAddGroup (p : HeightOneSpectrum (𝓞 ℚ)) :
+    IsTopologicalAddGroup (FiniteNuclearityQuotient χ p) :=
+  inferInstanceAs (IsTopologicalAddGroup (Θ₀(χ) ⧸ finiteNuclearityDenominator χ p))
+
+instance instContinuousSMul (p : HeightOneSpectrum (𝓞 ℚ)) :
+    ContinuousSMul ℂ (FiniteNuclearityQuotient χ p) :=
+  inferInstanceAs (ContinuousSMul ℂ (Θ₀(χ) ⧸ finiteNuclearityDenominator χ p))
+
+end FiniteNuclearityQuotient
 
 private theorem mkQ_span_range_eq_zero {E M : Type*} [AddCommGroup E] [AddCommGroup M]
     [Module ℂ E] [Module ℂ M] (L : E →ₗ[ℂ] M) (x : M) :
@@ -663,8 +691,30 @@ theorem mem_archNuclearityDenominator_iff_flatPolarImage (x : Θ₀(χ)) :
       ∃ f : P, f.val ∈ globalArchimedeanFlatTests F ∧ x = mkΘ(χ, f) := by sorry
 
 /-- Paper: Equation (7.4.3.13), p. 372.
-The archimedean orbital quotient divides the zero-moment theta space by its flat image. -/
-abbrev ArchNuclearityQuotient := Θ₀(χ) ⧸ archNuclearityDenominator χ
+The archimedean orbital quotient divides the zero-moment theta space by its flat image.
+
+This is a `def` with its own instances, not an `abbrev`, so that instance terms over it do
+not spell out its definition (#5398). -/
+def ArchNuclearityQuotient := Θ₀(χ) ⧸ archNuclearityDenominator χ
+
+namespace ArchNuclearityQuotient
+
+instance instAddCommGroup : AddCommGroup (ArchNuclearityQuotient χ) :=
+  inferInstanceAs (AddCommGroup (Θ₀(χ) ⧸ archNuclearityDenominator χ))
+
+instance instModule : Module ℂ (ArchNuclearityQuotient χ) :=
+  inferInstanceAs (Module ℂ (Θ₀(χ) ⧸ archNuclearityDenominator χ))
+
+instance instTopologicalSpace : TopologicalSpace (ArchNuclearityQuotient χ) :=
+  inferInstanceAs (TopologicalSpace (Θ₀(χ) ⧸ archNuclearityDenominator χ))
+
+instance instIsTopologicalAddGroup : IsTopologicalAddGroup (ArchNuclearityQuotient χ) :=
+  inferInstanceAs (IsTopologicalAddGroup (Θ₀(χ) ⧸ archNuclearityDenominator χ))
+
+instance instContinuousSMul : ContinuousSMul ℂ (ArchNuclearityQuotient χ) :=
+  inferInstanceAs (ContinuousSMul ℂ (Θ₀(χ) ⧸ archNuclearityDenominator χ))
+
+end ArchNuclearityQuotient
 
 /-- Paper: Equation (7.4.3.13), p. 372.
 A test represents zero in the archimedean quotient exactly when its theta class
@@ -722,7 +772,110 @@ theorem archNuclearityGammaOrder_eq_sLocal (S : Finset V)
     (h : ideleClassNormTwist χ 0 ∈ unramifiedOutside F S)
     (_hη : sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, h⟩ =
       (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η) (s : ℂ) :
-    gammaOrder(χ, s) = sLocalArchimedeanPoleMultiplicity η s := by sorry
+    gammaOrder(χ, s) = sLocalArchimedeanPoleMultiplicity η s := by
+  classical
+  let c : ℂ → QuasiCharacter (SIdeleQuotient F S) := fun z ↦
+    quasiCharacterNormTwist (G := SIdeleQuotient F S) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous
+      ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η) z
+  let E : InfinitePlace F → ℂ → ℂ := fun w z ↦
+    infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (c z))
+  -- The chart through `η` evaluates the global twist on inserted S-ideles.
+  have htwist (z : ℂ) (g : (SAdeleRing F S)ˣ) :
+      c z (QuotientGroup.mk g) =
+        ideleClassNormTwist χ z (QuotientGroup.mk (sIdeleInsertion F S g)) := by
+    have hbase := DFunLike.congr_fun _hη (QuotientGroup.mk g)
+    rw [sIdeleRestriction_mk] at hbase
+    change (χ (QuotientGroup.mk (sIdeleInsertion F S g)) : ℂ) * _ ^ (0 : ℂ) =
+      (η (QuotientGroup.mk g) : ℂ) at hbase
+    simp only [Complex.cpow_zero, mul_one] at hbase
+    change (η (QuotientGroup.mk g) : ℂ) *
+        (((sIdeleQuotientNorm F S (QuotientGroup.mk g) : ℝ≥0) : ℝ) : ℂ) ^ z =
+      (χ (QuotientGroup.mk (sIdeleInsertion F S g)) : ℂ) * _ ^ z
+    rw [← hbase, sIdeleQuotientNorm_mk, ← ideleNorm_sIdeleInsertion]
+    rfl
+  have hinf (w : InfinitePlace F) (z : ℂ) : sLocalInfiniteRestriction w (c z) =
+      infinitePlaceRestriction F w (ideleClassNormTwist χ z) := by
+    ext1 x
+    refine (htwist z _).trans ?_
+    rw [sIdeleInsertion_infiniteUnit]
+    rfl
+  have hprod : (fun z ↦ heckeGammaFactor χ z) = ∏ w, E w := by
+    funext z
+    rw [Finset.prod_apply, ← prod_infiniteLocalEulerFactor_eq_heckeGammaFactor]
+    simp only [E, hinf]
+  -- Each local factor is a translate of a gamma factor, with entire reciprocal.
+  have hEinv (w : InfinitePlace F) : Differentiable ℂ fun z ↦ (E w z)⁻¹ := by
+    by_cases hw : w.IsReal
+    · obtain ⟨b, hb⟩ := infiniteLocalEulerFactor_chart_real η w hw
+      simp only [E, c, hb]
+      exact Complex.differentiable_Gammaℝ_inv.comp (differentiable_id.add_const b)
+    · obtain ⟨b, hb⟩ := infiniteLocalEulerFactor_chart_complex η w
+        (InfinitePlace.not_isReal_iff_isComplex.mp hw)
+      simp only [E, c, hb]
+      convert (Complex.differentiable_Gammaℂ_inv.comp (differentiable_id.add_const b)).const_mul
+        (2 : ℂ) using 1
+      funext z
+      rw [inv_div, div_eq_mul_inv]
+      rfl
+  have hEval (w : InfinitePlace F) : ∃ z₁, (E w z₁)⁻¹ ≠ 0 := by
+    by_cases hw : w.IsReal
+    · obtain ⟨b, hb⟩ := infiniteLocalEulerFactor_chart_real η w hw
+      refine ⟨1 - b, ?_⟩
+      simp only [E, c, hb, sub_add_cancel]
+      exact inv_ne_zero (Complex.Gammaℝ_ne_zero_of_re_pos (by norm_num))
+    · obtain ⟨b, hb⟩ := infiniteLocalEulerFactor_chart_complex η w
+        (InfinitePlace.not_isReal_iff_isComplex.mp hw)
+      refine ⟨1 - b, ?_⟩
+      simp only [E, c, hb, sub_add_cancel]
+      simp [Complex.Gammaℂ_def, Real.pi_ne_zero]
+  have hmer (w : InfinitePlace F) : MeromorphicAt (E w) s := by
+    convert ((hEinv w).analyticAt s).meromorphicAt.inv using 1
+    funext z
+    simp
+  have hntop (w : InfinitePlace F) : meromorphicOrderAt (E w) s ≠ ⊤ := by
+    intro htop
+    have h1 : meromorphicOrderAt (fun z ↦ (E w z)⁻¹) s = ⊤ := by
+      rw [show meromorphicOrderAt (fun z ↦ (E w z)⁻¹) s = -meromorphicOrderAt (E w) s from
+        meromorphicOrderAt_inv, htop]
+      rfl
+    rw [((hEinv w).analyticAt s).meromorphicOrderAt_eq] at h1
+    have h2 : analyticOrderAt (fun z ↦ (E w z)⁻¹) s = ⊤ := by
+      cases hn : analyticOrderAt (fun z ↦ (E w z)⁻¹) s with
+      | top => rfl
+      | coe n => rw [hn] at h1; simp at h1
+    have hA : AnalyticOnNhd ℂ (fun z ↦ (E w z)⁻¹) univ := fun z _ ↦ (hEinv w).analyticAt z
+    obtain ⟨z₁, hz₁⟩ := hEval w
+    exact hz₁ (hA.eqOn_zero_of_preconnected_of_eventuallyEq_zero isPreconnected_univ
+      (mem_univ s) (analyticOrderAt_eq_top.1 h2) (mem_univ z₁))
+  have hle (w : InfinitePlace F) : meromorphicOrderAt (E w) s ≤ 0 := by
+    have h0 := ((hEinv w).analyticAt s).meromorphicOrderAt_nonneg
+    rw [show meromorphicOrderAt (fun z ↦ (E w z)⁻¹) s = -meromorphicOrderAt (E w) s from
+      meromorphicOrderAt_inv] at h0
+    cases hn : meromorphicOrderAt (E w) s with
+    | top => exact absurd hn (hntop w)
+    | coe n =>
+      rw [hn] at h0
+      have h0' : (0 : ℤ) ≤ -n := by exact_mod_cast h0
+      exact_mod_cast (by omega : n ≤ 0)
+  have key := sLocalArchimedeanPoleMultiplicity_eq_sum η s
+  have hG : meromorphicOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) s =
+      ((sLocalArchimedeanPoleMultiplicity η s : ℤ) : WithTop ℤ) := by
+    rw [show meromorphicOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) s =
+        -meromorphicOrderAt (fun z ↦ heckeGammaFactor χ z) s from meromorphicOrderAt_inv,
+      hprod, meromorphicOrderAt_prod fun w _ ↦ hmer w,
+      Finset.sum_congr rfl fun w _ ↦ (min_eq_right (hle w)).symm]
+    change -(∑ w, min 0 (meromorphicOrderAt (fun z ↦ infiniteLocalEulerFactor w
+      (sLocalInfiniteRestriction w (c z))) s)) = _
+    rw [← key]
+    exact_mod_cast neg_neg (sLocalArchimedeanPoleMultiplicity η s : ℤ)
+  rw [((differentiable_inv_heckeGammaFactor χ).analyticAt s).meromorphicOrderAt_eq] at hG
+  cases hn : analyticOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) s with
+  | top => rw [hn] at hG; simp at hG
+  | coe n =>
+    rw [hn] at hG
+    have hn' : (n : ℤ) = (sLocalArchimedeanPoleMultiplicity η s : ℤ) := by simpa using hG
+    simpa using hn'
 
 /-- Paper: Theorem 7.4.3.1(2), p. 368.
 The raw total pole order is reduced by one at the trivial quasi-character,
@@ -958,6 +1111,98 @@ theorem archNuclearity_trace (φ : 𝒟)
         let diagonal := fun n ↦ b n ((d n).comp T)
         Summable (fun n ↦ ‖diagonal n‖) ∧ HasSum diagonal ((∑' z, term z) - correction) := by sorry
 
+/-- A von Neumann bounded set in a space carrying the finest locally convex topology
+spans a finite-dimensional subspace: otherwise a linear functional unbounded on it
+would be continuous. -/
+private theorem archNuclearityStrongDual_finiteRank_bounded {E : Type*} [AddCommGroup E]
+    [Module ℂ E] [TopologicalSpace E]
+    (h : (inferInstance : TopologicalSpace E) =
+      (inferInstance : TopologicalSpace (FinestLocallyConvex E)))
+    (S : Set E) (hS : Bornology.IsVonNBounded ℂ S) :
+    FiniteDimensional ℂ (Submodule.span ℂ S) := by
+  by_contra hfin
+  obtain ⟨b, hbS, hspan, hli⟩ := exists_linearIndependent ℂ S
+  have hinf : b.Infinite := by
+    intro hb
+    apply hfin
+    rw [← hspan]
+    exact FiniteDimensional.span_of_finite ℂ hb
+  let f := hinf.natEmbedding
+  let v : ℕ → E := fun n ↦ (f n).val
+  have hv : LinearIndependent ℂ v := hli.comp f f.injective
+  let ℓ₀ : Submodule.span ℂ (Set.range v) →ₗ[ℂ] ℂ :=
+    (Finsupp.linearCombination ℂ (fun n : ℕ ↦ (n : ℂ))).comp hv.repr
+  obtain ⟨ℓ, hℓ⟩ := LinearMap.exists_extend ℓ₀
+  have hℓv (n : ℕ) : ℓ (v n) = n := by
+    have h1 := congrArg (fun g ↦ g ⟨v n, Submodule.subset_span ⟨n, rfl⟩⟩) hℓ
+    simp only [LinearMap.coe_comp, Function.comp_apply, Submodule.coe_subtype] at h1
+    rw [h1]
+    simp [ℓ₀, hv.repr_eq_single n ⟨v n, Submodule.subset_span ⟨n, rfl⟩⟩ rfl]
+  have hcont' : Continuous (show FinestLocallyConvex E →ₗ[ℂ] ℂ from ℓ) := by
+    apply WithSeminorms.continuous_normedSpace_rng ℂ (finestLocallyConvex_withSeminorms (E := E))
+    refine ⟨{(normSeminorm ℂ ℂ).comp ℓ}, 1, ?_⟩
+    rw [one_smul]
+    exact Finset.le_sup (f := id) (Finset.mem_singleton_self _)
+  have hcont : Continuous ℓ := by
+    have : @Continuous E ℂ (inferInstance : TopologicalSpace (FinestLocallyConvex E)) _ ℓ :=
+      hcont'
+    rwa [← h] at this
+  let L : E →L[ℂ] ℂ := ⟨ℓ, hcont⟩
+  have hb := (hS.image L)
+  rw [NormedSpace.isVonNBounded_iff] at hb
+  obtain ⟨C, hC⟩ := isBounded_iff_forall_norm_le.mp hb
+  obtain ⟨n, hn⟩ := exists_nat_gt C
+  have := hC (L (v n)) ⟨v n, hbS (f n).property, rfl⟩
+  change ‖ℓ (v n)‖ ≤ C at this
+  rw [hℓv, Complex.norm_natCast] at this
+  linarith
+
+/-- In a Hausdorff space with the finest locally convex topology, an operator with a
+nuclear presentation has range inside the span of its Banach disc, which is
+finite-dimensional. -/
+private theorem archNuclearityStrongDual_finiteRank_gen {E : Type*} [AddCommGroup E]
+    [Module ℂ E] [UniformSpace E] [IsUniformAddGroup E] [T2Space E] [ContinuousSMul ℂ E]
+    (h : (inferInstance : TopologicalSpace E) =
+      (inferInstance : TopologicalSpace (FinestLocallyConvex E)))
+    (T : E →L[ℂ] E) (hT : Nonempty (NuclearPresentation T)) :
+    FiniteDimensional ℂ T.toLinearMap.range := by
+  obtain ⟨r⟩ := hT
+  let W := Submodule.span ℂ r.disc
+  have hW : FiniteDimensional ℂ W :=
+    archNuclearityStrongDual_finiteRank_bounded h r.disc r.isBanachDisc.bounded
+  have hWc : IsClosed (W : Set E) := W.isClosed_of_finiteDimensional
+  have hle : T.toLinearMap.range ≤ W := by
+    rintro _ ⟨x, rfl⟩
+    apply hWc.mem_of_tendsto (r.hasSum x)
+    filter_upwards with s
+    exact W.sum_mem fun n _ ↦ W.smul_mem _ (r.vector n).property
+  exact Submodule.finiteDimensional_of_le hle
+
+private theorem archNuclearityStrongDual_finiteRank_dual {Q : Type*} [AddCommGroup Q]
+    [Module ℂ Q] [TopologicalSpace Q] [IsTopologicalAddGroup Q] [ContinuousSMul ℂ Q]
+    (h : (inferInstance : TopologicalSpace (StrongDual ℂ Q)) =
+      (inferInstance : TopologicalSpace (FinestLocallyConvex (StrongDual ℂ Q))))
+    (T : StrongDual ℂ Q →L[ℂ] StrongDual ℂ Q) (hT : Nonempty (NuclearPresentation T)) :
+    FiniteDimensional ℂ T.toLinearMap.range :=
+  archNuclearityStrongDual_finiteRank_gen h T hT
+
+-- Stated over the same tower of quotients as `ArchNuclearityQuotient`, and concluding `FG`,
+-- so that applying it to the concrete space needs only syntactic unification (#5398).
+private theorem archNuclearityStrongDual_finiteRank_tower {X : Type*} {_ : AddCommGroup X}
+    {_ : Module ℂ X} {_ : TopologicalSpace X} [IsTopologicalAddGroup X] [ContinuousSMul ℂ X]
+    (P0 : Submodule ℂ X) (k : Submodule ℂ P0) (p : Submodule ℂ (P0 ⧸ k))
+    (h : let E := StrongDual ℂ ((P0 ⧸ k) ⧸ p)
+      (inferInstance : TopologicalSpace E) =
+      (inferInstance : TopologicalSpace (FinestLocallyConvex E)))
+    (T : StrongDual ℂ ((P0 ⧸ k) ⧸ p) →L[ℂ] StrongDual ℂ ((P0 ⧸ k) ⧸ p))
+    (hT : Nonempty (NuclearPresentation T)) :
+    (LinearMap.range T.toLinearMap).FG :=
+  Module.Finite.iff_fg.mp (archNuclearityStrongDual_finiteRank_dual h T hT)
+
+private theorem archNuclearityStrongDual_finiteRank_fd {E : Type*} {_ : AddCommGroup E}
+    {_ : Module ℂ E} {S : Submodule ℂ E} (h : S.FG) : FiniteDimensional ℂ S :=
+  Module.Finite.iff_fg.mpr h
+
 /-- Paper: Remark 7.4.3.3, p. 373.
 Nuclear endomorphisms of the strong dual of the archimedean quotient have finite rank.
 Deviation: The printed universal nonnuclearity conclusion needs infinite rank,
@@ -965,7 +1210,9 @@ which fails for the zero test. -/
 theorem archNuclearityStrongDual_finiteRank
     (T : StrongDual ℂ (ArchNuclearityQuotient χ) →L[ℂ] StrongDual ℂ (ArchNuclearityQuotient χ))
     (_hT : Nonempty (NuclearPresentation T)) :
-    FiniteDimensional ℂ T.toLinearMap.range := by sorry
+    FiniteDimensional ℂ T.toLinearMap.range :=
+  archNuclearityStrongDual_finiteRank_fd
+    (archNuclearityStrongDual_finiteRank_tower _ _ _ (archNuclearityStrongDual_finest χ) T _hT)
 
 /-- Paper: Remark 7.4.3.3, p. 373.
 A nuclear endomorphism of the archimedean quotient has finite-dimensional range,

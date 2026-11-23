@@ -1120,11 +1120,84 @@ theorem HasNuclearFrechetPresentation.isLFSpace {E : Type*} [AddCommGroup E] [Mo
   obtain ⟨hE, X, a, m, t, hX, hlim⟩ := h
   exact ⟨hE, X, a, m, t, fun k ↦ (hX k).1, hlim⟩
 
+private theorem nuclearFrechetPresentation_quotient_of_strictLF.{v,u}
+    {E : Type u} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (hs : IsStrictLFSpace E) (hn : IsNuclearTVS.{v} E)
+    (M : Submodule ℂ E) (hM : IsClosed (M : Set E)) :
+    HasNuclearFrechetPresentation.{v} (E ⧸ M) := by
+  obtain ⟨_, V, hV, hF, hex, ht⟩ := hs
+  have hN (k : ℕ) : IsNuclearTVS.{v} (V k) := isNuclearTVS_submodule hn (V k)
+  let j (k : ℕ) := (V k).subtypeL.codRestrict (V (k+1)) fun x ↦ hV k.le_succ x.property
+  let i (k : ℕ) := (V k).subtypeL
+  have h : IsInjectiveLCLimit j i := by
+    refine ⟨fun _ ↦ Subtype.val_injective, fun _ ↦ rfl, ?_, ht⟩
+    intro x
+    obtain ⟨k, hk⟩ := hex x
+    exact ⟨k, ⟨x, hk⟩, rfl⟩
+  have hP : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ E // ∀ k, Continuous (p ∘ (i k).toLinearMap)} →
+        Seminorm ℂ E) := ⟨h.topology_eq⟩
+  let : IsTopologicalAddGroup E := hP.isTopologicalAddGroup
+  let : T2Space (E ⧸ M) := inferInstance
+  let f (k : ℕ) := M.mkQL.comp (i k)
+  let K (k : ℕ) := (f k).ker
+  have hf (k : ℕ) (x : V k) : f (k+1) (j k x) = f k x :=
+    congrArg M.mkQ (DFunLike.congr_fun (h.compatible k) x)
+  let iQ (k : ℕ) : V k ⧸ K k →L[ℂ] E ⧸ M := (K k).liftQL (f k) le_rfl
+  let jQ (k : ℕ) : V k ⧸ K k →L[ℂ] V (k+1) ⧸ K (k+1) :=
+    (K k).liftQL ((K (k+1)).mkQL.comp (j k)) (by
+      intro x hx
+      change (K (k+1)).mkQ (j k x) = 0
+      rw [Submodule.mkQ_apply, Submodule.Quotient.mk_eq_zero]
+      change f (k+1) (j k x) = 0
+      rwa [hf])
+  have hiQ (k : ℕ) (x : V k) : iQ k ((K k).mkQ x) = f k x := rfl
+  have hjQ (k : ℕ) (x : V k) : jQ k ((K k).mkQ x) = (K (k+1)).mkQ (j k x) := rfl
+  refine ⟨inferInstance, fun k ↦ V k ⧸ K k, _, _, _, fun k ↦
+    ⟨isFrechetTVS_quotient (hF k) (K k) (f k).isClosed_ker, by
+      let : IsClosed (K k : Set (V k)) := (f k).isClosed_ker
+      exact isNuclearTVS_quotient (hN k) (K k)⟩, jQ, iQ, ⟨?_, ?_, ?_, ?_⟩⟩
+  · intro k
+    apply (LinearMap.ker_eq_bot (f := (iQ k).toLinearMap)).mp
+    exact (K k).ker_liftQ_eq_bot' (f k).toLinearMap rfl
+  · intro k
+    ext y
+    obtain ⟨x, rfl⟩ := (K k).mkQ_surjective y
+    change iQ (k+1) (jQ k ((K k).mkQ x)) = iQ k ((K k).mkQ x)
+    rw [hjQ, hiQ, hiQ, hf]
+  · intro y
+    obtain ⟨x, rfl⟩ := M.mkQ_surjective y
+    obtain ⟨k, z, rfl⟩ := h.exhaustive x
+    exact ⟨k, (K k).mkQ z, hiQ k z⟩
+  · let : PolynormableSpace ℂ E := hP.toPolynormableSpace
+    let : PolynormableSpace ℂ (E ⧸ M) := (isNuclearTVS_quotient hn M).2.1
+    have hseminorms : (fun p : Seminorm ℂ (E ⧸ M) ↦
+        ∀ k, Continuous (p ∘ (iQ k).toLinearMap)) =
+        (fun p : Seminorm ℂ (E ⧸ M) ↦ Continuous p) := by
+      funext p
+      apply propext
+      refine ⟨fun hp ↦ M.isQuotientMap_mkQL.continuous_iff.mpr ?_,
+        fun hp k ↦ hp.comp (iQ k).continuous⟩
+      apply hP.continuous_seminorm (⟨p.comp M.mkQ, fun k ↦ ?_⟩ : _)
+      change Continuous (fun x : V k ↦ p (f k x))
+      simpa only [Function.comp_def, ContinuousLinearMap.coe_coe, Submodule.coe_mkQL, hiQ] using
+        (hp k).comp (K k).mkQL.continuous
+    change (inferInstance : TopologicalSpace (E ⧸ M)) =
+      (SeminormFamily.moduleFilterBasis
+        (Subtype.val : {p : Seminorm ℂ (E ⧸ M) // ∀ k, Continuous (p ∘ (iQ k).toLinearMap)} →
+          Seminorm ℂ (E ⧸ M))).topology
+    rw [hseminorms]
+    exact (PolynormableSpace.withSeminorms ℂ (E ⧸ M)).withSeminorms_eq
+
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The global homogeneous theta quotient is a locally convex inductive limit of nuclear
 Fréchet spaces. The test-function stages can be quotiented by the restricted kernel. -/
 theorem globalHomogeneousThetaSpace_nuclearFrechetPresentation :
-    HasNuclearFrechetPresentation Θ𝔽ω(ω) := by sorry
+    HasNuclearFrechetPresentation Θ𝔽ω(ω) := by
+  apply nuclearFrechetPresentation_quotient_of_strictLF
+  · exact (adeleSchwartz_strictLF (F := F)).2
+  · exact (adeleSchwartz_nuclear (F := F)).2
+  · exact homogeneousAdelicTheta_ker_isClosed ω
 
 /-- A closed quotient of a nuclear strict LF-space has nuclear Fréchet quotient stages. -/
 private theorem sLocalHomogeneousThetaSpace_nuclearFrechetPresentation_quotient.{v}
@@ -1366,12 +1439,58 @@ local instance normOneSIdeleQuotientMeasurableSpaceSec2b (F : Type*) [Field F]
 -- equicontinuity. Use the jointly continuous action on the theta quotient and compactness.
 -- The Tamagawa averages act on their isotypes by Haar mass.
 
+/-- On a compact group the character twist is itself a jointly continuous action,
+and compactness makes its operators equicontinuous at zero. -/
+private theorem existsUnique_globalThetaIsotypicAverage_of_compact {H E : Type*}
+    [CommGroup H] [TopologicalSpace H] [IsTopologicalGroup H] (G : Subgroup H)
+    [T2Space G] [CompactSpace G] [MeasurableSpace G] [BorelSpace G]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [T2Space E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E]
+    (hc : @CompleteSpace E (IsTopologicalAddGroup.rightUniformSpace E))
+    (μ : Measure G) [μ.IsHaarMeasure] (ρ : H →* (E →L[ℂ] E))
+    (hρ : Continuous fun p : H × E ↦ ρ p.1 p.2) (ω : PontryaginDual G) :
+    ∃! P : E →L[ℂ] E, IsPettisIsotypicAverageOn μ Set.univ (ρ.comp G.subtype) ω P := by
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace E := hc
+  let : Module ℝ E := Module.restrictScalars ℝ ℂ E
+  let : IsScalarTower ℝ ℂ E := IsScalarTower.restrictScalars ℝ ℂ E
+  let : LocallyConvexSpace ℝ E := (PolynormableSpace.withSeminorms ℂ E).toLocallyConvexSpace
+  let τ : G →* (E →L[ℂ] E) :=
+    { toFun := fun g ↦ star (ω g : ℂ) • (ρ.comp G.subtype) g
+      map_one' := by simp
+      map_mul' := fun g h ↦ by simp only [map_mul, Circle.coe_mul, star_mul', smul_mul_smul_comm] }
+  have hτ : Continuous (fun p : G × E ↦ τ p.1 p.2) :=
+    (show Continuous (fun p : G × E ↦ star (ω p.1 : ℂ)) from by fun_prop).smul
+      (hρ.comp ((continuous_subtype_val.comp continuous_fst).prodMk continuous_snd))
+  have heq : EquicontinuousAt (fun g : G ↦ (τ g : E → E)) 0 := by
+    intro U hU
+    obtain ⟨W, hW, h⟩ := (isCompact_univ (X := G)).mem_uniformity_of_prod
+      (f := fun x g ↦ τ g x) (s := Set.univ) (q := (0 : E))
+      (hτ.comp continuous_swap).continuousOn (Set.mem_univ _) (symm_le_uniformity hU)
+    rw [nhdsWithin_univ] at hW
+    exact Filter.mem_of_superset hW fun x hx g ↦ h x hx g (Set.mem_univ g)
+  have hτ_apply (g : G) (x : E) : τ g x = star (ω g : ℂ) • (ρ.comp G.subtype) g x := rfl
+  simpa only [IsPettisIsotypicAverageOn, PontryaginDual.one_apply, Circle.coe_one,
+    star_one, one_smul, hτ_apply] using existsUnique_compactActionAverage μ τ hτ (Or.inl heq)
+
 /-- Paper: Proposition 5.2.3.2(1), p. 236.
 There is a unique continuous linear global Pettis average with the norm-one
 Tamagawa measure and the conjugate character weight. -/
 theorem existsUnique_globalThetaIsotypicAverage (ω : PontryaginDual C₁) :
     ∃! P : Θ𝔽 →L[ℂ] Θ𝔽,
-      IsPettisIsotypicAverageOn μ𝔽₁ Set.univ ρ𝔽₁ ω P := by sorry
+      IsPettisIsotypicAverageOn μ𝔽₁ Set.univ ρ𝔽₁ ω P := by
+  let : BorelSpace C𝔽 := ⟨rfl⟩
+  let : T2Space C₁ := (ideleClassGroup_finiteness F).2.2.1
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : (μ𝔽₁).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let : T2Space Θ𝔽 := globalAdelicThetaSpace_t2_of_isClosed (adelicTheta_ker_isClosed (F := F))
+  let : PolynormableSpace ℂ Θ𝔽 := globalAdelicThetaSpace_polynormable (F := F)
+  with_reducible_and_instances
+    exact existsUnique_globalThetaIsotypicAverage_of_compact (H := C𝔽) (E := Θ𝔽) (ideleClassNorm F).ker
+      (globalAdelicThetaSpace_complete (F := F)) μ𝔽₁ ρ𝔽
+      (existsUnique_globalThetaAction (F := F)).exists.choose_spec.1 ω
 
 /-- Paper: Proposition 5.2.3.2(1), p. 236.
 There is a unique continuous linear S-local Pettis average with the norm-one
@@ -1386,6 +1505,33 @@ local notation "P𝔽(" ω ")" => (existsUnique_globalThetaIsotypicAverage (F :=
 local notation "Pₛ(" S ", " χ ")" =>
   (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := S) χ).exists.choose
 
+/-- Compose the homogeneous-to-coinvariant identification with the compact average's
+identification of its kernel quotient with the isotype. -/
+private theorem globalThetaIsotypicAverage_equiv_of_coinvariants {G E T : Type*}
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] (N : Subgroup G)
+    [CompactSpace N] [T2Space N] [MeasurableSpace N] [BorelSpace N]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [T2Space E] [ContinuousSMul ℂ E] [LocallyConvexSpace ℝ E]
+    [AddCommGroup T] [Module ℂ T] [TopologicalSpace T] (H : Submodule ℂ T) (q : T → E)
+    (μ : Measure N) [μ.IsHaarMeasure] (ρ : G →* (E →L[ℂ] E))
+    (hρ : Continuous (fun p : G × E ↦ ρ p.1 p.2)) (ω : PontryaginDual N) (P : E →L[ℂ] E)
+    (hP : IsPettisIsotypicAverageOn μ Set.univ (ρ.comp N.subtype) ω P)
+    (h : let D := (Submodule.span ℂ (Set.range (fun p : N × E ↦
+      p.2 - star (ω p.1 : ℂ) • ρ p.1.val p.2))).topologicalClosure
+      ∃ e : (T ⧸ H) ≃L[ℂ] (E ⧸ D), ∀ f : T, e (Submodule.Quotient.mk f) = D.mkQ (q f)) :
+    IsClosed (actionIsotype (ρ.comp N.subtype) ω : Set E) ∧
+      ∃ e : (T ⧸ H) ≃L[ℂ] actionIsotype (ρ.comp N.subtype) ω, ∀ f, (e (H.mkQ f) : E) = P (q f) := by
+  have hc : Continuous (fun p : N × E ↦ (ρ.comp N.subtype) p.1 p.2) :=
+    hρ.comp ((continuous_subtype_val.comp continuous_fst).prodMk continuous_snd)
+  have hker := compactActionAverage_ker μ (ρ.comp N.subtype) hc ω P hP
+  simp only [MonoidHom.comp_apply, Subgroup.subtype_apply] at hker
+  dsimp only at h
+  rw [← hker] at h
+  obtain ⟨e, he⟩ := h
+  obtain ⟨a, ha⟩ := compactActionAverage_quotient_equiv μ (ρ.comp N.subtype) hc ω P hP
+  exact ⟨isClosed_actionIsotype _ ω, e.trans a, fun f ↦
+    (congrArg (fun v ↦ (a v : E)) (he f)).trans (ha (q f))⟩
+
 /-- Paper: Proposition 5.2.3.2(1), p. 236.
 The global average induces a topological linear equivalence from the homogeneous quotient
 to the closed isotype. Its map on ordinary theta classes is therefore open onto the isotype.
@@ -1393,7 +1539,23 @@ Deviation: The continuous coinvariant quotient is identified via Definition 5.2.
 theorem globalThetaIsotypicAverage_equiv (ω : PontryaginDual C₁) :
     IsClosed (E𝔽ω(ω) : Set Θ𝔽) ∧
       ∃ e : Θ𝔽ω(ω) ≃L[ℂ] E𝔽ω(ω), ∀ f : ℬ𝔽,
-        (e ((K𝔽ω(ω)).mkQ f) : Θ𝔽) = P𝔽(ω) ((K𝔽).mkQ f) := by sorry
+        (e ((K𝔽ω(ω)).mkQ f) : Θ𝔽) = P𝔽(ω) ((K𝔽).mkQ f) := by
+  let : MeasurableSpace C𝔽 := borel _
+  let : BorelSpace C𝔽 := ⟨rfl⟩
+  let : T2Space C₁ := (ideleClassGroup_finiteness F).2.2.1
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : (μ𝔽₁).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let : T2Space Θ𝔽 := globalAdelicThetaSpace_t2_of_isClosed (F := F) adelicTheta_ker_isClosed
+  let : PolynormableSpace ℂ Θ𝔽 := globalAdelicThetaSpace_polynormable (F := F)
+  let : Module ℝ Θ𝔽 := Module.restrictScalars ℝ ℂ _
+  let : IsScalarTower ℝ ℂ Θ𝔽 := IsScalarTower.restrictScalars ℝ ℂ _
+  let : LocallyConvexSpace ℝ Θ𝔽 := (PolynormableSpace.withSeminorms ℂ Θ𝔽).toLocallyConvexSpace
+  with_reducible_and_instances
+    exact globalThetaIsotypicAverage_equiv_of_coinvariants (G := C𝔽) (E := Θ𝔽) (T := ℬ𝔽)
+      C₁ (K𝔽ω(ω)) (K𝔽).mkQ μ𝔽₁ ρ𝔽 (existsUnique_globalThetaAction (F := F)).exists.choose_spec.1
+      ω (P𝔽(ω)) (existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose_spec
+      (globalHomogeneousThetaSpace_equiv_coinvariants (F := F) ω)
 
 /-- Paper: Proposition 5.2.3.2(1), p. 236.
 The S-local average induces a topological linear equivalence from the homogeneous quotient
@@ -1426,6 +1588,25 @@ local notation "M𝔽ω(" ω ")" => meromorphicNormOneComponent m𝔽
 local notation "Mₛω(" S ", " ω ")" => meromorphicNormOneComponent (mₛ(S))
   (isProperMap_sIdeleQuotientNorm F S).continuous ω (sLocalIdelicOrderBound (F := F) (S := S))
 
+/-- Restriction to a norm-one component is continuous for compact convergence, and
+restricting a continuation preserves its pole bound. -/
+private theorem exists_globalHomogeneousThetaMellin_restriction {G : Type*}
+    [CommGroup G] [TopologicalSpace G] (m : G →* ℝ≥0ˣ) (hm : Continuous m)
+    (ω : PontryaginDual m.ker) (b : QuasiCharacter G → WithTop ℤ) :
+    ∃ R : ↥(meromorphicWithPoleBound (quasiCharacterNormTwist m hm) b) →L[ℂ]
+        ↥(meromorphicNormOneComponent m hm ω b),
+      ∀ u c, (R u).val c = u.val ⟨c.val.val, c.property⟩ := by
+  let Ω := {c : QuasiCharacter G // ∀ h : m.ker, c h.val = (ω h : ℂ)}
+  let i : C({c : Ω // 0 ≤ b c.val}, {c : QuasiCharacter G // 0 ≤ b c}) :=
+    ⟨fun c ↦ ⟨c.val.val, c.property⟩,
+      (continuous_subtype_val.comp continuous_subtype_val).subtype_mk _⟩
+  let M := meromorphicWithPoleBound (quasiCharacterNormTwist m hm) b
+  let A := (ContinuousMap.compCLM ℂ ℂ i).comp M.subtypeL
+  refine ⟨A.codRestrict _ ?_, fun _ _ ↦ rfl⟩
+  intro u
+  obtain ⟨Z, hZ, hgerm⟩ := u.property
+  exact ⟨fun c ↦ Z c.val, fun c ↦ hZ (i c), fun c ↦ hgerm c.val⟩
+
 /-- Paper: (5.2.3.14), p. 236.
 The global Mellin transform on homogeneous classes is continuous and injective.
 On a representative it gives the component of the global Mellin transform in (5.2.2.2). -/
@@ -1433,7 +1614,78 @@ theorem exists_globalHomogeneousThetaMellin (ω : PontryaginDual C₁) :
     ∃ Z : Θ𝔽ω(ω) →L[ℂ] ↥(M𝔽ω(ω)), Injective Z ∧
       ∀ (f : ℬ𝔽) c,
         (Z ((K𝔽ω(ω)).mkQ f)).val c =
-          (globalIdelicMellin (F := F) f).val ⟨c.val.val, c.property⟩ := by sorry
+          (globalIdelicMellin (F := F) f).val ⟨c.val.val, c.property⟩ := by
+  refine (exists_globalHomogeneousThetaMellin_restriction m𝔽
+    (isProperMap_ideleClassNorm F).continuous ω (globalIdelicOrderBound (F := F))).elim fun R hR ↦ ?_
+  let L : ℬ𝔽 →L[ℂ] _ := ⟨globalIdelicMellin (F := F), globalIdelicMellin_continuous⟩
+  let T : ℬ𝔽 →L[ℂ] ↥(M𝔽ω(ω)) := R.comp L
+  have hT (f : ℬ𝔽) c : (T f).val c =
+      (globalIdelicMellin (F := F) f).val ⟨c.val.val, c.property⟩ := hR _ c
+  have hker : K𝔽ω(ω) = T.ker := by
+    apply SetLike.ext
+    intro f
+    constructor
+    · intro hf
+      apply LinearMap.mem_ker.mpr
+      apply Subtype.ext
+      exact ContinuousMap.ext fun c ↦ (hT f c).trans
+        ((mem_homogeneousAdelicTheta_ker_iff ω f).mp hf _ c.val.property)
+    · intro hf
+      apply (mem_homogeneousAdelicTheta_ker_iff ω f).mpr
+      intro c hc
+      exact (hT f ⟨⟨c.val, hc⟩, c.property⟩).symm.trans
+        (congrArg (fun v : ↥(M𝔽ω(ω)) ↦ v.val ⟨⟨c.val, hc⟩, c.property⟩)
+          (LinearMap.mem_ker.mp hf))
+  exact ⟨(K𝔽ω(ω)).liftQL T hker.le,
+    LinearMap.ker_eq_bot.mp ((K𝔽ω(ω)).ker_liftQ_eq_bot T.toLinearMap hker.le hker.ge), hT⟩
+
+/-- Restrict a bounded-pole continuation and its regular values along the component inclusion. -/
+private theorem exists_sLocalHomogeneousThetaMellin_restrict {G : Type*} [CommGroup G]
+    [TopologicalSpace G] (m : G →* ℝ≥0ˣ) (hm : Continuous m) (χ : PontryaginDual m.ker)
+    (b : QuasiCharacter G → WithTop ℤ) :
+    ∃ R : ↥(meromorphicWithPoleBound (quasiCharacterNormTwist m hm) b) →L[ℂ]
+        ↥(meromorphicNormOneComponent m hm χ b),
+      ∀ u c, (R u).val c = u.val ⟨c.val.val, c.property⟩ := by
+  let X := {c : QuasiCharacter G // ∀ h : m.ker, c h.val = (χ h : ℂ)}
+  let i : C({c : X // 0 ≤ b c.val}, {c // 0 ≤ b c}) :=
+    ⟨fun c ↦ ⟨c.val.val, c.property⟩,
+      (continuous_subtype_val.comp continuous_subtype_val).subtype_mk _⟩
+  have hmem (u : ↥(meromorphicWithPoleBound (quasiCharacterNormTwist m hm) b)) :
+      u.val.comp i ∈ meromorphicNormOneComponent m hm χ b := by
+    obtain ⟨Z, hZ, hgerm⟩ := u.property
+    exact ⟨fun c ↦ Z c.val, fun c ↦ hZ (i c), fun c ↦ hgerm c.val⟩
+  exact ⟨{ toFun := fun u ↦ ⟨u.val.comp i, hmem u⟩
+           map_add' := fun _ _ ↦ rfl
+           map_smul' := fun _ _ ↦ rfl
+           cont := ((ContinuousMap.continuous_precomp i).comp continuous_subtype_val).subtype_mk hmem },
+    fun _ _ ↦ rfl⟩
+
+/-- Descend the component restriction when vanishing on its regular locus characterizes the kernel. -/
+private theorem exists_sLocalHomogeneousThetaMellin_of_ker {G : Type*} [CommGroup G]
+    [TopologicalSpace G] (m : G →* ℝ≥0ˣ) (hm : Continuous m) (χ : PontryaginDual m.ker)
+    (b : QuasiCharacter G → WithTop ℤ) {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [TopologicalSpace E] (K : Submodule ℂ E)
+    (M : E →L[ℂ] ↥(meromorphicWithPoleBound (quasiCharacterNormTwist m hm) b))
+    (hK : ∀ f, f ∈ K ↔ ∀ c : {c // 0 ≤ b c},
+      (∀ h : m.ker, c.val h.val = (χ h : ℂ)) → (M f).val c = 0) :
+    ∃ Z : (E ⧸ K) →L[ℂ] ↥(meromorphicNormOneComponent m hm χ b), Injective Z ∧
+      ∀ f c, (Z (K.mkQ f)).val c = (M f).val ⟨c.val.val, c.property⟩ := by
+  obtain ⟨R, hR⟩ := exists_sLocalHomogeneousThetaMellin_restrict m hm χ b
+  let L := R.comp M
+  have hker : K = L.ker := by
+    refine Submodule.ext fun f ↦ (hK f).trans ?_
+    change _ ↔ R (M f) = 0
+    constructor
+    · intro hf
+      exact Subtype.ext (ContinuousMap.ext fun c ↦ (hR (M f) c).trans
+        (hf ⟨c.val.val, c.property⟩ c.val.property))
+    · intro hf c hc
+      let d : {x : {x : QuasiCharacter G // ∀ h : m.ker, x h.val = (χ h : ℂ)} //
+          0 ≤ b x.val} := ⟨⟨c.val, hc⟩, c.property⟩
+      exact (hR (M f) d).symm.trans
+        (congrArg (fun u : ↥(meromorphicNormOneComponent m hm χ b) ↦ u.val d) hf)
+  refine ⟨K.liftQL L hker.le, ?_, fun f c ↦ hR (M f) c⟩
+  exact LinearMap.ker_eq_bot.mp (Submodule.ker_liftQ_eq_bot' _ L.toLinearMap hker)
 
 /-- Paper: (5.2.3.14), p. 236.
 The S-local Mellin transform on homogeneous classes is continuous and injective.
@@ -1442,7 +1694,11 @@ theorem exists_sLocalHomogeneousThetaMellin (χ : PontryaginDual (J₁(S))) :
     ∃ Z : Θₛω(S, χ) →L[ℂ] ↥(Mₛω(S, χ)), Injective Z ∧
       ∀ (f : ℬₛ(S)) c,
         (Z ((Kₛω(S, χ)).mkQ f)).val c =
-          (sLocalIdelicMellin (F := F) (S := S) f).val ⟨c.val.val, c.property⟩ := by sorry
+          (sLocalIdelicMellin (F := F) (S := S) f).val ⟨c.val.val, c.property⟩ := by
+  exact exists_sLocalHomogeneousThetaMellin_of_ker (mₛ(S))
+    (isProperMap_sIdeleQuotientNorm F S).continuous χ (sLocalIdelicOrderBound (F := F) (S := S))
+    (Kₛω(S, χ)) ⟨sLocalIdelicMellin (F := F) (S := S), sLocalIdelicMellin_continuous⟩
+    (mem_sLocalHomogeneousAdelicTheta_ker_iff (F := F) (S := S) χ)
 
 -- TODO(paper-gap): Ordinary insertion does not in general intertwine isotype
 -- projections onto subspaces. Normalizing the averages does not fix this.
@@ -1715,6 +1971,53 @@ section IsotypicMellin
 
 attribute [local instance] ideleClassGroupMeasurableSpaceSec2b normOneSIdeleQuotientMeasurableSpaceSec2b
 
+/-- A Pettis isotypic average multiplies by the Haar mass at any evaluation of a continuous
+linear map into continuous functions on which the action is the character. -/
+private theorem globalThetaMellin_isotypicAverage_eval {G E X : Type*} [Monoid G]
+    [TopologicalSpace G] [MeasurableSpace G] [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [TopologicalSpace X] (M : Submodule ℂ C(X, ℂ)) (L : E →ₗ[ℂ] M) (hL : Continuous L) (x0 : X)
+    (μ : Measure G) (ρ : G →* (E →L[ℂ] E)) (ω : PontryaginDual G) (P : E →L[ℂ] E)
+    (hP : IsPettisIsotypicAverageOn μ Set.univ ρ ω P) (u : E)
+    (hu : ∀ g, (L (ρ g u)).val x0 = (ω g : ℂ) * (L u).val x0) :
+    (L (P u)).val x0 = (μ.real Set.univ : ℂ) * (L u).val x0 := by
+  let φ : StrongDual ℂ E :=
+    { toFun := fun y ↦ (L y).val x0
+      map_add' := fun a b ↦ by simp
+      map_smul' := fun a b ↦ by simp
+      cont := (continuous_eval_const x0).comp (continuous_subtype_val.comp hL) }
+  obtain ⟨_, he⟩ := hP u
+  have h := LinearMap.congr_fun he φ
+  change φ (P u) = ∫ g, φ (star (ω g : ℂ) • ρ g u) ∂(μ.restrict Set.univ) at h
+  refine h.trans ?_
+  have hg : ∀ g, φ (star (ω g : ℂ) • ρ g u) = φ u := fun g ↦ by
+    rw [map_smul, smul_eq_mul]
+    change star (ω g : ℂ) * (L (ρ g u)).val x0 = (L u).val x0
+    rw [hu g, ← mul_assoc]
+    have h1 : star (ω g : ℂ) * (ω g : ℂ) = 1 := by
+      rw [Complex.star_def, ← Complex.normSq_eq_conj_mul_self, Circle.normSq_coe,
+        Complex.ofReal_one]
+    rw [h1, one_mul]
+  simp only [hg, Measure.restrict_univ, integral_const]
+  rfl
+
+/-- A functional that scales translates of representatives by a character scales the
+induced action on the quotient by the same character. -/
+private theorem globalThetaMellin_isotypicAverage_translate {IG CG Q B : Type*} (q : B → Q)
+    (hq : Surjective q) (π : IG → CG) (hπ : Surjective π) (ρ : CG → Q → Q) (T : IG → B → B)
+    (hρ : ∀ g f, ρ (π g) (q f) = q (T g f)) (φ : Q → ℂ) (χ : CG → ℂ)
+    (hT : ∀ g f, φ (q (T g f)) = χ (π g) * φ (q f)) (g : CG) (x : Q) :
+    φ (ρ g x) = χ g * φ x := by
+  obtain ⟨f, rfl⟩ := hq x
+  obtain ⟨g, rfl⟩ := hπ g
+  rw [hρ, hT]
+
+/-- A map induced on a quotient by a continuous linear map is continuous. -/
+private theorem globalThetaMellin_isotypicAverage_continuous {E Y : Type*} [AddCommGroup E]
+    [Module ℂ E] [TopologicalSpace E] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (K : Submodule ℂ E) (L : E →ₗ[ℂ] Y) (h : K ≤ LinearMap.ker L) (hL : Continuous L) :
+    Continuous (K.liftQ L h) :=
+  K.isQuotientMap_mkQ.continuous_iff.mpr hL
+
 /-- Paper: Remark 5.2.3.5, p. 238.
 On each component the global Mellin transform of the Tamagawa average equals
 the Mellin transform of the original class times the norm-one Haar mass. -/
@@ -1722,7 +2025,20 @@ theorem globalThetaMellin_isotypicAverage (ω : PontryaginDual C₁) (x : Θ𝔽
     (c : {c : QuasiCharacter C𝔽 // 0 ≤ globalIdelicOrderBound c})
     (hc : ∀ g : C₁, c.val g.val = (ω g : ℂ)) :
     (globalThetaMellin (F := F) (P𝔽(ω) x)).val c =
-      ((μ𝔽₁).real Set.univ : ℂ) * (globalThetaMellin (F := F) x).val c := by sorry
+      ((μ𝔽₁).real Set.univ : ℂ) * (globalThetaMellin (F := F) x).val c :=
+  globalThetaMellin_isotypicAverage_eval _ (globalThetaMellin (F := F))
+    (globalThetaMellin_isotypicAverage_continuous _ _
+      (globalIdelicMellin_vanishes_on_theta_kernel (F := F))
+      (globalIdelicMellin_continuous (F := F))) c _ _ ω _
+    (existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose_spec x
+    (fun g ↦ (globalThetaMellin_isotypicAverage_translate Submodule.Quotient.mk
+      (Submodule.mkQ_surjective _) QuotientGroup.mk QuotientGroup.mk_surjective
+      (fun g y ↦ (existsUnique_globalThetaAction (F := F)).exists.choose g y)
+      schwartzBruhatUnitTranslate
+      (existsUnique_globalThetaAction (F := F)).exists.choose_spec.2
+      (fun y ↦ (globalThetaMellin (F := F) y).val c) (fun g ↦ c.val g)
+      (fun g f ↦ globalIdelicMellin_unitTranslate g f c) g.val x).trans
+      (congrArg (· * _) (hc g)))
 
 /-- Paper: Remark 5.2.3.5, p. 238.
 On each S-local component the Mellin transform of the Tamagawa average equals
@@ -1731,7 +2047,20 @@ theorem sLocalThetaMellin_isotypicAverage (χ : PontryaginDual (J₁(S))) (x : �
     (c : {c : QuasiCharacter (Jₛ(S)) // 0 ≤ sLocalIdelicOrderBound c})
     (hc : ∀ g : J₁(S), c.val g.val = (χ g : ℂ)) :
     (sLocalThetaMellin (F := F) (S := S) (Pₛ(S, χ) x)).val c =
-      ((μₛ₁(S)).real Set.univ : ℂ) * (sLocalThetaMellin (F := F) (S := S) x).val c := by sorry
+      ((μₛ₁(S)).real Set.univ : ℂ) * (sLocalThetaMellin (F := F) (S := S) x).val c :=
+  globalThetaMellin_isotypicAverage_eval _ (sLocalThetaMellin (F := F) (S := S))
+    (globalThetaMellin_isotypicAverage_continuous _ _
+      (sLocalIdelicMellin_vanishes_on_theta_kernel (F := F) (S := S))
+      (sLocalIdelicMellin_continuous (F := F) (S := S))) c _ _ χ _
+    (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := S) χ).exists.choose_spec x
+    (fun g ↦ (globalThetaMellin_isotypicAverage_translate Submodule.Quotient.mk
+      (Submodule.mkQ_surjective _) QuotientGroup.mk QuotientGroup.mk_surjective
+      (fun g y ↦ (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose g y)
+      schwartzBruhatUnitTranslate
+      (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose_spec.2
+      (fun y ↦ (sLocalThetaMellin (F := F) (S := S) y).val c) (fun g ↦ c.val g)
+      (fun g f ↦ sLocalIdelicMellin_unitTranslate g f c) g.val x).trans
+      (congrArg (· * _) (hc g)))
 
 end IsotypicMellin
 
@@ -1795,11 +2124,80 @@ theorem sLocalThetaFourier_mem_isotype (χ : PontryaginDual (J₁(S))) (x : Θ�
     let fourier := (existsUnique_sLocalThetaFourier (F := F) (S := S)).exists.choose
     fourier x ∈ Eₛω(S, χ⁻¹) ↔ x ∈ Eₛω(S, χ) := by sorry
 
+/-- Norm-one dilations preserve additive Tamagawa measure, so Fourier transform
+intertwines translation by such an idele with translation by its inverse. -/
+private theorem globalThetaFourier_mem_isotype_translate (g : IdeleGroup (𝓞 F) F)
+    (hg : ideleNorm F g = 1) (f : ℬ𝔽) :
+    adeleSchwartzFourier (schwartzBruhatUnitTranslate g f) =
+      schwartzBruhatUnitTranslate g⁻¹ (adeleSchwartzFourier f) := by
+  let : MeasurableSpace 𝔸[F] := borel _
+  let : BorelSpace 𝔸[F] := ⟨rfl⟩
+  let μ := additiveTamagawaMeasure F
+  let : μ.IsAddHaarMeasure := (additiveTamagawaMeasure_existsUnique F).exists.choose_spec.1
+  let d := Homeomorph.smul (α := 𝔸[F]) g⁻¹
+  have hd : MeasurePreserving d μ μ := by
+    refine ⟨d.continuous.measurable, Measure.ext fun s hs ↦ ?_⟩
+    rw [Measure.map_apply d.continuous.measurable hs]
+    change μ ((fun x : 𝔸[F] ↦ g⁻¹ • x) ⁻¹' s) = μ s
+    rw [Set.preimage_smul_inv]
+    change μ ((fun a : 𝔸[F] ↦ g.val * a) '' s) = μ s
+    simpa only [hg, Units.val_one, ENNReal.coe_one, one_mul] using adeleHaar_mul_image F μ g s hs
+  apply Subtype.ext
+  funext y
+  let k (z : 𝔸[F]) := f (Multiplicative.ofAdd z) *
+    star (adeleStandardCharacter F (z * (g.val * y.toAdd)) : ℂ)
+  refine Eq.trans ?_ (hd.integral_comp d.toMeasurableEquiv.measurableEmbedding k)
+  apply integral_congr_ae
+  refine Eventually.of_forall fun z ↦ ?_
+  change _ * star (adeleStandardCharacter F (z * y.toAdd) : ℂ) =
+    _ * star (adeleStandardCharacter F ((g⁻¹.val * z) * (g.val * y.toAdd)) : ℂ)
+  rw [mul_mul_mul_comm, show g⁻¹.val * g.val = (1 : 𝔸[F]) from g.inv_val, one_mul]
+  rfl
+
+/-- On theta classes, norm-one translation therefore passes through the Fourier
+involution as inverse translation. -/
+private theorem globalThetaFourier_mem_isotype_intertwine (g : C₁) (x : Θ𝔽) :
+    let e := (existsUnique_globalThetaFourier (F := F)).exists.choose
+    e (ρ𝔽₁ g x) = ρ𝔽₁ g⁻¹ (e x) := by
+  intro e
+  obtain ⟨a, ha⟩ := g
+  induction a using QuotientGroup.induction_on with | H u => ?_
+  induction x using Submodule.Quotient.induction_on with | _ f => ?_
+  have hρ := (existsUnique_globalThetaAction (F := F)).exists.choose_spec.2
+  have he := (existsUnique_globalThetaFourier (F := F)).exists.choose_spec.2
+  calc
+    _ = e ((K𝔽).mkQ (schwartzBruhatUnitTranslate u f)) := congrArg e (hρ u f)
+    _ = (K𝔽).mkQ (adeleSchwartzFourier (schwartzBruhatUnitTranslate u f)) := he _
+    _ = (K𝔽).mkQ (schwartzBruhatUnitTranslate u⁻¹ (adeleSchwartzFourier f)) :=
+      congrArg (K𝔽).mkQ (globalThetaFourier_mem_isotype_translate u ha f)
+    _ = ρ𝔽 (QuotientGroup.mk u⁻¹) ((K𝔽).mkQ (adeleSchwartzFourier f)) := (hρ u⁻¹ _).symm
+    _ = _ := congrArg (ρ𝔽 (QuotientGroup.mk u⁻¹)) (he f).symm
+
+/-- An invertible linear intertwiner for an action and the inverse action
+exchanges the eigenspaces for a character and its inverse. -/
+private theorem globalThetaFourier_mem_isotype_of_intertwine {G E : Type*}
+    [CommGroup G] [TopologicalSpace G] [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (ρ : G →* (E →L[ℂ] E)) (e : E ≃L[ℂ] E)
+    (he : ∀ g x, e (ρ g x) = ρ g⁻¹ (e x)) (ω : PontryaginDual G) (x : E) :
+    e x ∈ actionIsotype ρ ω⁻¹ ↔ x ∈ actionIsotype ρ ω := by
+  rw [mem_actionIsotype, mem_actionIsotype]
+  have hχ (g : G) : ω⁻¹ g = ω g⁻¹ := (map_inv ω g).symm
+  constructor
+  · intro h g
+    apply e.injective
+    rw [he, h, hχ, inv_inv, map_smul]
+  · intro h g
+    calc
+      ρ g (e x) = e (ρ g⁻¹ x) := by simpa only [inv_inv] using (he g⁻¹ x).symm
+      _ = _ := by rw [h, hχ, map_smul]
+
 /-- Paper: Theorem 5.2.4.1(2), p. 239.
 Global Fourier transform exchanges each norm-one isotype with its conjugate. -/
 theorem globalThetaFourier_mem_isotype (ω : PontryaginDual C₁) (x : Θ𝔽) :
     let fourier := (existsUnique_globalThetaFourier (F := F)).exists.choose
-    fourier x ∈ E𝔽ω(ω⁻¹) ↔ x ∈ E𝔽ω(ω) := by sorry
+    fourier x ∈ E𝔽ω(ω⁻¹) ↔ x ∈ E𝔽ω(ω) := by
+  exact globalThetaFourier_mem_isotype_of_intertwine ρ𝔽₁ _
+    globalThetaFourier_mem_isotype_intertwine ω x
 
 end Fourier
 

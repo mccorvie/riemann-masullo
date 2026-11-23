@@ -2,6 +2,8 @@ module
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec1
 
+import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+
 /-! # §10.1 assertions that are false as printed -/
 
 @[expose] public noncomputable section
@@ -257,11 +259,135 @@ def Printed.ideleClassSobolev_inversion_automorphism : Prop :=
     ∃ J : W ≃L[ℂ] W, ∀ u : W,
       (J u : IdeleClassGroup (𝓞 F) F → ℂ) =ᵐ[μ] fun g ↦ u g⁻¹
 
+open scoped ENNReal in
+/-- On the weighted L² space with weight |x|² (I = {1}, s = 0) over a commutative group with a
+module taking a value above one, inversion is not a bounded automorphism. It would conjugate
+translation by g⁻¹ into translation by g, so its norm would be at most |g|⁻² times itself. -/
+private theorem Printed.ideleClassSobolev_inversion_automorphism_false_aux {G : Type*}
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [SecondCountableTopology G] [MeasurableSpace G] [BorelSpace G]
+    (μ : Measure G) [μ.IsHaarMeasure] (m : G →ₜ* ℝ≥0ˣ) (g : G) (hg : 1 < ((m g).val : ℝ))
+    (J : CompactIntervalSobolev μ (fun x ↦ Real.log ((m x).val : ℝ)) 1 1 0 ≃L[ℂ]
+      CompactIntervalSobolev μ (fun x ↦ Real.log ((m x).val : ℝ)) 1 1 0)
+    (hJ : ∀ u, (J u : G → ℂ) =ᵐ[μ] fun x ↦ u x⁻¹) : False := by
+  set d : G → ℝ≥0∞ := fun x ↦ ENNReal.ofReal
+    (if (false : Bool) then (intervalSobolevDensity 1 1 0 (Real.log ((m x).val : ℝ)))⁻¹
+     else intervalSobolevDensity 1 1 0 (Real.log ((m x).val : ℝ))) with hd_def
+  have hνμ : μ.withDensity d ≪ μ := withDensity_absolutelyContinuous μ d
+  let T := hardySobolevTranslation μ m 1 1 0 le_rfl le_rfl
+  have hinv : QuasiMeasurePreserving (Inv.inv : G → G) μ μ :=
+    quasiMeasurePreserving_inv μ
+  have hmul : QuasiMeasurePreserving (fun x : G ↦ g * x) μ μ :=
+    (measurePreserving_mul_left μ g).quasiMeasurePreserving
+  -- Inversion turns translation by g⁻¹ into translation by g.
+  have hconj (u : CompactIntervalSobolev μ (fun x ↦ Real.log ((m x).val : ℝ)) 1 1 0) :
+      J u = T g⁻¹ (J (T g⁻¹ u)) := by
+    apply Lp.ext
+    apply hνμ.ae_eq
+    have h1 : (T g⁻¹ (J (T g⁻¹ u)) : G → ℂ) =ᵐ[μ] fun x ↦ (J (T g⁻¹ u) : G → ℂ) (g * x) := by
+      simpa only [inv_inv] using hardySobolevTranslation_apply μ m 1 1 0 le_rfl le_rfl g⁻¹ _
+    have h2 : (fun x ↦ (J (T g⁻¹ u) : G → ℂ) (g * x)) =ᵐ[μ]
+        fun x ↦ (T g⁻¹ u : G → ℂ) (g * x)⁻¹ :=
+      hmul.ae_eq_comp (hJ _)
+    have h3 : (fun x ↦ (T g⁻¹ u : G → ℂ) (g * x)⁻¹) =ᵐ[μ]
+        fun x ↦ (u : G → ℂ) (g * (g * x)⁻¹) := by
+      have h := hardySobolevTranslation_apply μ m 1 1 0 le_rfl le_rfl g⁻¹ u
+      simp only [inv_inv] at h
+      exact (hinv.comp hmul).ae_eq_comp h
+    filter_upwards [hJ u, h1, h2, h3] with x hx h1 h2 h3
+    rw [hx, h1, h2, h3, mul_inv, ← mul_assoc, mul_inv_cancel, one_mul]
+  -- Translation by g⁻¹ has norm at most |g|⁻¹ < 1.
+  set L := Real.log ((m g).val : ℝ)
+  have hL : 0 < L := Real.log_pos hg
+  have hTnorm : ‖T g⁻¹‖ ≤ Real.exp (-L) := by
+    have h := norm_hardySobolevTranslation_le μ m 1 1 0 le_rfl le_rfl g⁻¹
+    have hlog : Real.log ((m g⁻¹).val : ℝ) = -L := by
+      rw [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv, Real.log_inv]
+    simpa only [hlog, one_mul, max_self, zero_div, Real.rpow_zero, mul_one] using h
+  have hq : Real.exp (-L) < 1 := by
+    simpa only [Real.exp_zero] using Real.exp_lt_exp.mpr (neg_lt_zero.mpr hL)
+  have hq0 : 0 ≤ Real.exp (-L) := (Real.exp_pos _).le
+  have hJop : J.toContinuousLinearMap = (T g⁻¹).comp (J.toContinuousLinearMap.comp (T g⁻¹)) :=
+    ContinuousLinearMap.ext hconj
+  have hJn : ‖J.toContinuousLinearMap‖ ≤ Real.exp (-L) ^ 2 * ‖J.toContinuousLinearMap‖ := by
+    calc ‖J.toContinuousLinearMap‖ = ‖(T g⁻¹).comp (J.toContinuousLinearMap.comp (T g⁻¹))‖ :=
+          congrArg norm hJop
+      _ ≤ ‖T g⁻¹‖ * (‖J.toContinuousLinearMap‖ * ‖T g⁻¹‖) :=
+          (ContinuousLinearMap.opNorm_comp_le _ _).trans
+            (mul_le_mul_of_nonneg_left (ContinuousLinearMap.opNorm_comp_le _ _) (norm_nonneg _))
+      _ ≤ Real.exp (-L) * (‖J.toContinuousLinearMap‖ * Real.exp (-L)) := by
+          gcongr
+      _ = Real.exp (-L) ^ 2 * ‖J.toContinuousLinearMap‖ := by ring
+  have hJ0 : ‖J.toContinuousLinearMap‖ = 0 := by
+    have hq2 : Real.exp (-L) ^ 2 < 1 := by nlinarith
+    by_contra hne
+    have hpos := lt_of_le_of_ne (norm_nonneg J.toContinuousLinearMap) (Ne.symm hne)
+    nlinarith [mul_pos hpos (sub_pos.mpr hq2)]
+  -- The space is nonzero: the indicator of a compact neighbourhood of 1 has positive norm.
+  obtain ⟨K, hKc, hK1⟩ := exists_compact_mem_nhds (1 : G)
+  have hKm : MeasurableSet K := hKc.measurableSet
+  have hdc : Continuous fun x : G ↦ intervalSobolevDensity 1 1 0 (Real.log ((m x).val : ℝ)) := by
+    have hl : Continuous fun x : G ↦ Real.log ((m x).val : ℝ) :=
+      (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).log
+        fun x ↦ (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+    unfold intervalSobolevDensity
+    fun_prop
+  have hdpos (x : G) : 0 < intervalSobolevDensity 1 1 0 (Real.log ((m x).val : ℝ)) := by
+    unfold intervalSobolevDensity
+    exact mul_pos ((Real.exp_pos _).trans_le (le_max_left _ _)) (by positivity)
+  have : IsLocallyFiniteMeasure (μ.withDensity d) := by
+    simp only [hd_def, Bool.false_eq_true, ite_false]
+    exact IsLocallyFiniteMeasure.withDensity_ofReal hdc
+  have hfin : μ.withDensity d K ≠ ⊤ := hKc.measure_lt_top.ne
+  have hpos : μ.withDensity d K ≠ 0 := by
+    intro h0
+    have hμν : μ ≪ μ.withDensity d := by
+      refine withDensity_absolutelyContinuous' ?_ (.of_forall fun x ↦ ?_)
+      · simp only [hd_def, Bool.false_eq_true, ite_false]
+        exact hdc.measurable.ennreal_ofReal.aemeasurable
+      · simp only [hd_def, Bool.false_eq_true, ite_false]
+        exact (ENNReal.ofReal_pos.mpr (hdpos x)).ne'
+    exact (Measure.measure_pos_of_mem_nhds μ hK1).ne' (hμν h0)
+  let v : CompactIntervalSobolev μ (fun x ↦ Real.log ((m x).val : ℝ)) 1 1 0 :=
+    indicatorConstLp 2 hKm hfin (1 : ℂ)
+  have hv : v ≠ 0 := by
+    intro h
+    have hn := congrArg norm h
+    rw [norm_zero, norm_indicatorConstLp' (by norm_num) hpos, norm_one, one_mul] at hn
+    exact (Real.rpow_pos_of_pos (ENNReal.toReal_pos hpos hfin) _).ne' hn
+  apply hv
+  have hJv : J v = 0 := by
+    rw [← norm_eq_zero]
+    refine le_antisymm ?_ (norm_nonneg _)
+    calc ‖J v‖ = ‖J.toContinuousLinearMap v‖ := rfl
+      _ ≤ ‖J.toContinuousLinearMap‖ * ‖v‖ := ContinuousLinearMap.le_opNorm _ _
+      _ = 0 := by rw [hJ0, zero_mul]
+  have h := congrArg J.symm hJv
+  rwa [ContinuousLinearEquiv.symm_apply_apply, map_zero] at h
+
 /-- Paper: Theorem 10.1.2.1, p. 437. Take ℚ, I = {1} and s = 0. The indicator
 of |g| < 1 is square integrable for t² dt/t in the norm coordinate t, while its
 inverse pullback is the indicator of |g| > 1, which has infinite squared integral. -/
 theorem Printed.ideleClassSobolev_inversion_automorphism_false :
-    ¬ Printed.ideleClassSobolev_inversion_automorphism := by sorry
+    ¬ Printed.ideleClassSobolev_inversion_automorphism := by
+  intro h
+  obtain ⟨J, hJ⟩ := h ℚ 1 1 0 le_rfl le_rfl
+  let : BorelSpace (IdeleClassGroup (𝓞 ℚ) ℚ) := ⟨rfl⟩
+  let : T2Space (IdeleClassGroup (𝓞 ℚ) ℚ) := (ideleGroup_quotient.{_, 0} ℚ).2.2.2.2.2.1
+  let : LocallyCompactSpace (IdeleClassGroup (𝓞 ℚ) ℚ) :=
+    (ideleGroup_quotient.{_, 0} ℚ).2.2.2.2.2.2.1
+  let : SecondCountableTopology (IdeleClassGroup (𝓞 ℚ) ℚ) := by
+    let := idele_secondCountable ℚ
+    exact inferInstanceAs (SecondCountableTopology
+      (IdeleGroup (𝓞 ℚ) ℚ ⧸ IdeleGroup.principalSubgroup (𝓞 ℚ) ℚ))
+  let : (ideleClassTamagawaMeasure ℚ).IsHaarMeasure := (ideleClassTamagawaMeasure_isWeil ℚ).1
+  let m : IdeleClassGroup (𝓞 ℚ) ℚ →ₜ* ℝ≥0ˣ :=
+    ⟨ideleClassNorm ℚ, (isProperMap_ideleClassNorm ℚ).continuous⟩
+  let t : ℝ≥0ˣ := Units.mk0 2 two_ne_zero
+  let g : IdeleClassGroup (𝓞 ℚ) ℚ := QuotientGroup.mk (canonicalIdeleNormSection ℚ t)
+  have hg : m g = t := canonicalIdeleNormSection_rightInverse ℚ t
+  exact Printed.ideleClassSobolev_inversion_automorphism_false_aux
+    (ideleClassTamagawaMeasure ℚ) m g (by rw [hg]; norm_num [t]) J hJ
 
 /-- Paper: Announcement before Lemma 10.1.1.3, p. 435. In the a-line
 notation the local Fourier transform extends at precisely the half weight. -/

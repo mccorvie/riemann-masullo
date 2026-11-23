@@ -8,6 +8,8 @@ public import Mathlib.RingTheory.RamificationInertia.Inertia
 public import Mathlib.RingTheory.RamificationInertia.Ramification
 import RiemannMasullo.Ch06_LocalGlobal.Sec3
 import Mathlib.Analysis.Complex.LocallyUniformLimit
+import Mathlib.Analysis.Complex.PhragmenLindelof
+import Mathlib.Analysis.MellinInversion
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Barrelled
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Bounded
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
@@ -1548,11 +1550,104 @@ theorem spectralAnnihilator_directSum :
     ∃ e : (⨁ ρ : Zeros, ↥(J ρ)) ≃L[ℂ] entireIdealAnnihilator Λ,
       ∀ (ρ : Zeros) (a : ↥(J ρ)), (e (inclusion ρ a)).val = a.val := by sorry
 
+/-- On a strip, a Schwartz–Bergman function is bounded by its bounds on the two boundary
+lines (Phragmén–Lindelöf). -/
+private theorem exists_schwartzBergman_entireInclusion_strip_bound (f : SchwartzBergman (univ : Set ℝ)) (R : ℝ) (hR : 0 < R)
+    (C : ℝ) (hl : ∀ y : ℝ, ‖f.val ((-R : ℝ) + y * Complex.I)‖ ≤ C)
+    (hr : ∀ y : ℝ, ‖f.val ((R : ℝ) + y * Complex.I)‖ ≤ C) (z : ℂ) (hz : ‖z‖ ≤ R) :
+    ‖f.val z‖ ≤ C := by
+  have hd : Differentiable ℂ f.val := fun w ↦
+    (f.property.2.1 w (by simp)).differentiableAt (by simp)
+  obtain ⟨M, hM⟩ := f.property.2.2 (-R) R (by linarith) (subset_univ _) 0
+  have hre : |z.re| ≤ R := (Complex.abs_re_le_norm z).trans hz
+  refine PhragmenLindelof.vertical_strip (a := -R) (b := R) hd.diffContOnCl
+    ⟨0, by have : 0 < R - -R := by linarith
+           positivity, 0, ?_⟩ ?_ ?_ (by linarith [neg_abs_le z.re]) (le_of_abs_le hre)
+  · refine Asymptotics.IsBigO.of_bound M (eventually_inf_principal.2 (Eventually.of_forall ?_))
+    intro w hw
+    have := hM ⟨w, ⟨hw.1.le, hw.2.le⟩, rfl⟩
+    simpa using this
+  · intro w hw
+    have := hl w.im
+    rwa [← hw, Complex.re_add_im] at this
+  · intro w hw
+    have := hr w.im
+    rwa [← hw, Complex.re_add_im] at this
+
+
+private theorem exists_schwartzBergman_entireInclusion_tendsto_zero (R : ℝ) (hR : 0 < R) :
+    ∀ ε > 0, ∀ᶠ f : SchwartzBergman (univ : Set ℝ) in 𝓝 0, ∀ z : ℂ, ‖z‖ ≤ R → ‖f.val z‖ < ε := by
+  obtain ⟨T, hT, hTe⟩ := schwartzBergman_schwartzLine_topology (univ : Set ℝ) isOpen_univ
+    ordConnected_univ univ_nonempty
+  let a : (univ : Set ℝ) := ⟨-R, trivial⟩
+  let b : (univ : Set ℝ) := ⟨R, trivial⟩
+  let q : SchwartzBergman (univ : Set ℝ) → ℝ := fun f ↦
+    SchwartzMap.seminorm ℂ 0 0 (T f a) + SchwartzMap.seminorm ℂ 0 0 (T f b)
+  have hsc := (schwartz_withSeminorms ℂ ℝ ℂ).continuous_seminorm (0, 0)
+  have hq : Continuous q :=
+    (hsc.comp ((continuous_apply a).comp hTe.continuous)).add
+      (hsc.comp ((continuous_apply b).comp hTe.continuous))
+  have hT0 (c : (univ : Set ℝ)) : T 0 c = 0 := by
+    ext x
+    rw [hT]
+    simp [weightedVerticalTrace]
+    rfl
+  have hq0 : q 0 = 0 := by simp [q, hT0]
+  intro ε hε
+  have hev : ∀ᶠ f in 𝓝 (0 : SchwartzBergman (univ : Set ℝ)), q f < ε :=
+    (hq.tendsto 0) (by rw [hq0]; exact Iio_mem_nhds hε)
+  filter_upwards [hev] with f hf z hz
+  refine lt_of_le_of_lt (exists_schwartzBergman_entireInclusion_strip_bound f R hR (q f) (fun y ↦ ?_) (fun y ↦ ?_) z hz) hf
+  · have h1 := SchwartzMap.norm_le_seminorm ℂ (T f a) y
+    have h2 : 0 ≤ SchwartzMap.seminorm ℂ 0 0 (T f b) := apply_nonneg _ _
+    rw [hT] at h1
+    simp only [weightedVerticalTrace, pow_zero, one_mul] at h1
+    exact h1.trans (le_add_of_nonneg_right h2)
+  · have h1 := SchwartzMap.norm_le_seminorm ℂ (T f b) y
+    have h2 : 0 ≤ SchwartzMap.seminorm ℂ 0 0 (T f a) := apply_nonneg _ _
+    rw [hT] at h1
+    simp only [weightedVerticalTrace, pow_zero, one_mul] at h1
+    exact h1.trans (le_add_of_nonneg_left h2)
+
+private theorem exists_schwartzBergman_entireInclusion_continuousMap :
+    ∃ i : SchwartzBergman (univ : Set ℝ) →L[ℂ] C(ℂ, ℂ),
+      ∀ (f : SchwartzBergman (univ : Set ℝ)) (z : ℂ), i f z = f.val z := by
+  have hd (f : SchwartzBergman (univ : Set ℝ)) : Differentiable ℂ f.val := fun w ↦
+    (f.property.2.1 w (by simp)).differentiableAt (by simp)
+  let L : SchwartzBergman (univ : Set ℝ) →ₗ[ℂ] C(ℂ, ℂ) :=
+    { toFun f := ⟨f.val, (hd f).continuous⟩
+      map_add' _ _ := by ext; rfl
+      map_smul' _ _ := by ext; rfl }
+  have hL : Continuous L := by
+    refine continuous_of_continuousAt_zero L.toAddMonoidHom ?_
+    change Tendsto L (𝓝 0) (𝓝 (L 0))
+    rw [map_zero, ContinuousMap.tendsto_iff_forall_isCompact_tendstoUniformlyOn]
+    intro K hK
+    obtain ⟨R, hR, hKR⟩ := hK.isBounded.subset_closedBall_lt 0 0
+    rw [Metric.tendstoUniformlyOn_iff]
+    intro ε hε
+    filter_upwards [exists_schwartzBergman_entireInclusion_tendsto_zero R hR ε hε] with f hf z hz
+    have hz' : ‖z‖ ≤ R := by simpa using hKR hz
+    change dist 0 (f.val z) < ε
+    rw [dist_zero_left]
+    exact hf z hz'
+  exact ⟨⟨L, hL⟩, fun _ _ ↦ rfl⟩
+
 /-- Paper: Theorem 7.1.4.2(2), p. 326.
 An entire Schwartz–Bergman function includes continuously into the compact-open space
 by keeping its value at each point. -/
 theorem exists_schwartzBergman_entireInclusion :
-    ∃ i : Aℂ →L[ℂ] Entire, ∀ (f : Aℂ) (z : ℂ), (i f).val z = f.val z := by sorry
+    ∃ i : Aℂ →L[ℂ] Entire, ∀ (f : Aℂ) (z : ℂ), (i f).val z = f.val z := by
+  obtain ⟨i, hi⟩ := exists_schwartzBergman_entireInclusion_continuousMap
+  have hd (f : Aℂ) : i f ∈ entireContinuousMapSubalgebra := by
+    have h : (i f : ℂ → ℂ) = f.val := funext (hi f)
+    change Differentiable ℂ (i f : ℂ → ℂ)
+    rw [h]
+    exact fun w ↦ (f.property.2.1 w (by simp)).differentiableAt (by simp)
+  exact ⟨{ toFun := fun f ↦ ⟨i f, hd f⟩
+           map_add' := fun f g ↦ Subtype.ext (i.map_add f g)
+           map_smul' := fun c f ↦ Subtype.ext (i.map_smul c f)
+           cont := continuous_induced_rng.2 i.continuous }, hi⟩
 
 /-- Paper: Theorem 7.1.4.2(2), pp. 326–327. The canonical map includes entire
 Schwartz–Bergman functions into the compact-open space of entire functions. -/
@@ -1661,6 +1756,110 @@ theorem spectralTheta_jetRestriction_of_range_eq :
   rw [h]
   exact exists_schwartzBergman_jetRestriction g
 
+/-- Log-moment profiles of a decay profile are bounded by every power. -/
+private theorem schwartzBergman_jet_eq_mellinInv_moment_bound (g : logExponentialDecaySubmodule (univ : Set ℝ)) (a : ℝ) (k : ℕ) :
+    ∃ C : ℝ, ∀ t : ℝ, 0 < t →
+      ‖(Real.log t : ℂ) ^ k * g.val (Real.log t)‖ ≤ C * t ^ (-a) := by
+  let S := logExponentialDecayTwist (univ : Set ℝ) ⟨a, trivial⟩ g
+  refine ⟨SchwartzMap.seminorm ℂ k 0 S, fun t ht ↦ ?_⟩
+  have hS := SchwartzMap.norm_pow_mul_le_seminorm ℂ S k (Real.log t)
+  rw [logExponentialDecayTwist_apply] at hS
+  have he : Real.exp (a * Real.log t) = t ^ a := by
+    rw [Real.rpow_def_of_pos ht, mul_comm]
+  rw [norm_mul, Complex.norm_real, he, Real.norm_of_nonneg (Real.rpow_nonneg ht.le _)] at hS
+  have htp : 0 < t ^ a := Real.rpow_pos_of_pos ht a
+  rw [Real.rpow_neg ht.le, ← div_eq_mul_inv, le_div_iff₀ htp, norm_mul, norm_pow,
+    Complex.norm_real]
+  calc ‖Real.log t‖ ^ k * ‖g.val (Real.log t)‖ * t ^ a
+      = ‖Real.log t‖ ^ k * (t ^ a * ‖g.val (Real.log t)‖) := by ring
+    _ ≤ _ := hS
+
+private theorem schwartzBergman_jet_eq_mellinInv_moment_cont (g : logExponentialDecaySubmodule (univ : Set ℝ)) :
+    Continuous g.val := by
+  let S := logExponentialDecayTwist (univ : Set ℝ) ⟨0, trivial⟩ g
+  have : g.val = S := by
+    funext x
+    rw [logExponentialDecayTwist_apply]
+    simp
+  rw [this]
+  exact S.continuous
+
+private theorem schwartzBergman_jet_eq_mellinInv_moment_props (g : logExponentialDecaySubmodule (univ : Set ℝ)) (k : ℕ) (s : ℂ) :
+    let f := fun t : ℝ ↦ (Real.log t : ℂ) ^ k * g.val (Real.log t)
+    MellinConvergent f s ∧ HasDerivAt (mellin f)
+      (mellin (fun t : ℝ ↦ (Real.log t : ℂ) ^ (k + 1) * g.val (Real.log t)) s) s := by
+  intro f
+  have hc : ContinuousOn f (Ioi 0) := by
+    intro t ht
+    have hl : ContinuousAt Real.log t := Real.continuousAt_log (ne_of_gt ht)
+    exact (((Complex.continuous_ofReal.continuousAt.comp hl).pow k).mul
+      ((schwartzBergman_jet_eq_mellinInv_moment_cont g).continuousAt.comp hl)).continuousWithinAt
+  have hfc : LocallyIntegrableOn f (Ioi 0) := hc.locallyIntegrableOn measurableSet_Ioi
+  have hO (a : ℝ) (l : Filter ℝ) (hl : ∀ᶠ t in l, 0 < t) : Asymptotics.IsBigO l f (· ^ (-a)) := by
+    obtain ⟨C, hC⟩ := schwartzBergman_jet_eq_mellinInv_moment_bound g a k
+    refine Asymptotics.IsBigO.of_bound C ?_
+    filter_upwards [hl] with t ht
+    rw [Real.norm_of_nonneg (Real.rpow_nonneg ht.le _)]
+    exact hC t ht
+  have htop : ∀ᶠ t : ℝ in atTop, 0 < t := eventually_gt_atTop 0
+  have hbot : ∀ᶠ t : ℝ in 𝓝[>] 0, 0 < t := self_mem_nhdsWithin
+  have h1 := mellinConvergent_of_isBigO_rpow hfc (hO (s.re + 1) atTop htop) (by linarith)
+    (hO (s.re - 1) _ hbot) (by linarith)
+  have h2 := (mellin_hasDerivAt_of_isBigO_rpow hfc (hO (s.re + 1) atTop htop) (by linarith)
+    (hO (s.re - 1) _ hbot) (by linarith)).2
+  refine ⟨h1, ?_⟩
+  convert h2 using 2
+  funext t
+  simp only [f, Complex.real_smul, pow_succ]
+  ring
+
+private theorem schwartzBergman_jet_eq_mellinInv_moment_iter (g : logExponentialDecaySubmodule (univ : Set ℝ)) (m : ℕ) :
+    iteratedDeriv m (mellin fun t : ℝ ↦ g.val (Real.log t)) =
+      mellin (fun t : ℝ ↦ (Real.log t : ℂ) ^ m * g.val (Real.log t)) := by
+  induction m with
+  | zero => simp
+  | succ m ih =>
+    rw [iteratedDeriv_succ, ih]
+    funext s
+    exact (schwartzBergman_jet_eq_mellinInv_moment_props g m s).2.deriv
+
+private theorem schwartzBergman_jet_eq_mellinInv_moment_aux (f : SchwartzBergman (univ : Set ℝ)) (ρ : ℂ) (m : ℕ) :
+    let φ : ℂ → ℂ := f.val
+    let moment := fun t : ℝ ↦ (Real.log t : ℂ) ^ m * mellinInv 0 φ t
+    Complex.VerticalIntegrable φ 0 ∧ MellinConvergent moment ρ.re ∧
+      iteratedDeriv m φ ρ = mellin moment ρ := by
+  intro φ moment
+  let M := positiveRealFourierMellin (univ : Set ℝ) isOpen_univ ordConnected_univ univ_nonempty
+  let g : logExponentialDecaySubmodule (univ : Set ℝ) := M.symm f
+  have hφ : φ = mellin (fun t : ℝ ↦ g.val (Real.log t)) := by
+    funext s
+    have h := positiveRealFourierMellin_apply (univ : Set ℝ) isOpen_univ ordConnected_univ
+      univ_nonempty (M.symm f) s trivial
+    rw [M.apply_symm_apply] at h
+    exact h
+  obtain ⟨T, hT, -⟩ := schwartzBergman_schwartzLine_topology (univ : Set ℝ) isOpen_univ
+    ordConnected_univ univ_nonempty
+  have hvi : Complex.VerticalIntegrable φ 0 := by
+    refine (T f ⟨0, trivial⟩).integrable.congr (Eventually.of_forall fun y ↦ ?_)
+    rw [hT]
+    simp [weightedVerticalTrace, φ]
+  have hinv (t : ℝ) (ht : t ∈ Ioi 0) : mellinInv 0 φ t = g.val (Real.log t) := by
+    have hc : MellinConvergent (fun t : ℝ ↦ g.val (Real.log t)) ((0 : ℝ) : ℂ) := by
+      simpa using (schwartzBergman_jet_eq_mellinInv_moment_props g 0 0).1
+    have hcont : ContinuousAt (fun t : ℝ ↦ g.val (Real.log t)) t :=
+      (schwartzBergman_jet_eq_mellinInv_moment_cont g).continuousAt.comp (Real.continuousAt_log (ne_of_gt ht))
+    rw [hφ]
+    exact mellinInv_mellin_eq 0 _ ht hc (hφ ▸ hvi) hcont
+  have heq : EqOn moment (fun t : ℝ ↦ (Real.log t : ℂ) ^ m * g.val (Real.log t)) (Ioi 0) :=
+    fun t ht ↦ by simp only [moment, hinv t ht]
+  refine ⟨hvi, ?_, ?_⟩
+  · have h := (schwartzBergman_jet_eq_mellinInv_moment_props g m (ρ.re : ℂ)).1
+    refine IntegrableOn.congr_fun h (fun t ht ↦ ?_) measurableSet_Ioi
+    simp only [heq ht]
+  · rw [hφ, schwartzBergman_jet_eq_mellinInv_moment_iter]
+    refine (setIntegral_congr_fun measurableSet_Ioi fun t ht ↦ ?_)
+    simp only [heq ht]
+
 -- TODO(paper-gap): In (7.1.4.6), with φ already in the Mellin coordinate, the
 -- factor t^(ix₀) shifts the derivative to ρ + ix₀. The proof on p. 329 uses t^ρ.
 
@@ -1672,7 +1871,8 @@ theorem schwartzBergman_jet_eq_mellinInv_moment (f : Aℂ) (ρ : ℂ) (m : ℕ) 
     let φ : ℂ → ℂ := f.val
     let moment := fun t : ℝ ↦ (Real.log t : ℂ) ^ m * mellinInv 0 φ t
     Complex.VerticalIntegrable φ 0 ∧ MellinConvergent moment ρ.re ∧
-      iteratedDeriv m φ ρ = mellin moment ρ := by sorry
+      iteratedDeriv m φ ρ = mellin moment ρ :=
+  schwartzBergman_jet_eq_mellinInv_moment_aux f ρ m
 
 -- TODO(paper-gap): Theorem 7.1.4.2(4) names the ordinary Schwartz quotient, whereas
 -- the setup and argument use the exponentially decaying quotient. Theorem

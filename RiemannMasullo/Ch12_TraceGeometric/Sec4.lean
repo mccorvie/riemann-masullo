@@ -230,6 +230,24 @@ def sLocalTraceCutoffKernel (f : BruhatCompactSupport Iₛ) (ρ : Iₛ → ℂ) 
   ρ x * ∫ u, ρ' u *
     sLocalTraceDilationKernel f (fun z ↦ (ψₛ ((z - y) * u) : ℂ)) x.val ∂νₛ
 
+/-- An integrable product weight dominates the joint integrand of the two kernels. -/
+private theorem sLocalTraceCutoffKernel_eq_comp_fubini
+    {G A : Type*} [MeasurableSpace G] [MeasurableSpace A]
+    (μ : Measure G) (ν : Measure A) [SFinite μ] [SFinite ν]
+    (weight : G → ℂ) (symbol : A → ℂ) (phase : G → A → ℂ)
+    (hweight : Integrable weight μ) (hsymbol : Integrable symbol ν)
+    (hphase : AEStronglyMeasurable (fun p : A × G ↦ phase p.2 p.1) (ν.prod μ))
+    (hunit : ∀ g u, ‖phase g u‖ = 1) :
+    (∫ u, symbol u * (∫ g, weight g * phase g u ∂μ) ∂ν) =
+      ∫ g, weight g * (∫ u, symbol u * phase g u ∂ν) ∂μ := by
+  have hweightProd := hsymbol.mul_prod hweight
+  have hprod : Integrable (uncurry fun u g ↦ symbol u * weight g * phase g u)
+      (ν.prod μ) := by
+    refine hweightProd.mono (hweightProd.aestronglyMeasurable.mul hphase) ?_
+    exact ae_of_all _ fun p ↦ by simp [uncurry, hunit]
+  simp_rw [← integral_const_mul]
+  simpa only [mul_assoc, mul_left_comm] using integral_integral_swap hprod
+
 /-- Paper: Step II, p. 517. For an integrable symbol the composed kernel
 agrees with the dilation average of the inverse Fourier kernel, multiplied by the
 spatial cutoff. -/
@@ -237,7 +255,59 @@ theorem sLocalTraceCutoffKernel_eq_comp (f : BruhatCompactSupport Iₛ)
     (ρ : Iₛ → ℂ) (ρ' : Aₛ → ℂ) (hρ' : Integrable ρ' νₛ) (x : Iₛ) (y : Aₛ) :
     sLocalTraceCutoffKernel f ρ ρ' x y =
       ρ x * sLocalTraceDilationKernel f (fun z ↦ sLocalTraceFourierKernel ρ' hρ' z y) x.val :=
-  by sorry
+  by
+    have : BorelSpace Aₛ := sAdeleRing_borelSpace (F := F) (S := S)
+    have : BorelSpace Iₛ := sIdeleGroup_borelSpace (F := F) (S := S)
+    let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+    let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+      (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+    let : SecondCountableTopology Aₛ := inferInstanceAs (SecondCountableTopology
+      (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+    let : SecondCountableTopology Iₛ := (sIdeleGroup_description F S).1.secondCountableTopology
+    let : (μₛ).IsHaarMeasure := sMultiplicativeTamagawaMeasure_isHaarMeasure
+    let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+    let (v : S) : MeasurableSpace (v.val.adicCompletion F) := borel _
+    let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+    let (v : S) : BorelSpace (v.val.adicCompletion F) := ⟨rfl⟩
+    let (w : InfinitePlace F) : (infiniteLocalAdditiveTamagawaMeasure F w).IsAddHaarMeasure :=
+      infiniteLocalAdditiveTamagawaMeasure_haar F w
+    let (v : S) : (finiteLocalAdditiveTamagawaMeasure F v.val).IsAddHaarMeasure :=
+      finiteLocalAdditiveTamagawaMeasure_isAddHaar F v.val
+    let : (Measure.pi (infiniteLocalAdditiveTamagawaMeasure F)).IsAddHaarMeasure :=
+      Measure.pi.isAddHaarMeasure _
+    let : (Measure.pi (fun v : S ↦ finiteLocalAdditiveTamagawaMeasure F v.val)).IsAddHaarMeasure :=
+      Measure.pi.isAddHaarMeasure _
+    let : (νₛ).IsAddHaarMeasure := Measure.prod.instIsAddHaarMeasure _ _
+    let weight (g : Iₛ) := f.val g / (Real.sqrt (normS(g)) : ℂ)
+    have hweight : Integrable weight μₛ := (sLocalTraceDilationKernel_apply_zero f 0).1
+    obtain ⟨e, he, _⟩ := sAdditiveTamagawaMeasure_selfDual F S
+    let char := e (Multiplicative.ofAdd (1 : Aₛ))
+    have hchar (z : Aₛ) : char (Multiplicative.ofAdd z) = ψₛ z := by
+      simpa only [one_mul] using he 1 z
+    have hcontinuous : Continuous (fun z : Aₛ ↦ (ψₛ z : ℂ)) := by
+      simp_rw [← hchar]
+      exact continuous_subtype_val.comp ((map_continuous char).comp continuous_ofAdd)
+    have hneg (z : Aₛ) : star (ψₛ (-z) : ℂ) = (ψₛ z : ℂ) := by
+      rw [← hchar, ofAdd_neg, map_inv, Circle.coe_inv_eq_conj,
+        ← Complex.star_def, star_star, hchar]
+    let phase (g : Iₛ) (u : Aₛ) := (ψₛ (((g⁻¹).val * x.val - y) * u) : ℂ)
+    have hphase : Continuous (uncurry phase) := hcontinuous.comp
+      (((((Units.continuous_val.comp continuous_inv).comp continuous_fst).mul
+        continuous_const).sub continuous_const).mul continuous_snd)
+    have hfourier (g : Iₛ) :
+        sLocalTraceFourierKernel ρ' hρ' ((g⁻¹).val * x.val) y =
+          ∫ u, ρ' u * phase g u ∂νₛ := by
+      unfold sLocalTraceFourierKernel tamagawaFourier
+      apply integral_congr_ae
+      exact ae_of_all _ fun u ↦ by
+        change ρ' u * star (ψₛ (u * (y - (g⁻¹).val * x.val)) : ℂ) = ρ' u * phase g u
+        rw [show u * (y - (g⁻¹).val * x.val) = -(((g⁻¹).val * x.val - y) * u) by
+          rw [← neg_sub ((g⁻¹).val * x.val) y, mul_neg, mul_comm u], hneg]
+    unfold sLocalTraceCutoffKernel sLocalTraceDilationKernel
+    apply congrArg (fun z : ℂ ↦ ρ x * z)
+    simp_rw [hfourier]
+    exact sLocalTraceCutoffKernel_eq_comp_fubini μₛ νₛ weight ρ' phase hweight hρ'
+      (hphase.comp continuous_swap).aestronglyMeasurable (fun g u ↦ Circle.norm_coe _)
 
 -- TODO(paper-gap): The function on additive adeles constructed in Step II
 -- requires a measure conversion and a quotient kernel construction before

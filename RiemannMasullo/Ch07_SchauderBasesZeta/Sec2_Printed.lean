@@ -2,6 +2,8 @@ module
 
 public import Mathlib.Algebra.Field.ULift
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
+import all RiemannMasullo.Ch03_IdelicZeta.Sec4
+import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec1a
 
 /-! # §7.2 Claims that are false as printed -/
 
@@ -89,6 +91,253 @@ def sLocalPrincipalPartCoeff_eigendistribution : Prop :=
       Kₛ(F, S, ω) ≤ (sLocalNonnegativeLaurentCoeff c k).ker ∧
       sLocalNonnegativeLaurentCoeff c k ∈ sLocalEigendistributions c
 
+open scoped TensorProduct in
+/-- A product of local tests at the archimedean places and the places of `S` is a
+test on the S-adeles. -/
+private theorem sLocalPrincipalPartCoeff_eigendistribution_tensor {F : Type u} [Field F]
+    [NumberField F]
+    (S : Finset (HeightOneSpectrum (𝓞 F)))
+    (a : (w : InfinitePlace F) → SchwartzBruhat (Multiplicative w.Completion))
+    (b : (v : S) → SchwartzBruhat (Multiplicative (v.val.adicCompletion F))) :
+    ∃ f : SchwartzBruhat (Multiplicative (SAdeleRing F S)), ∀ x : SAdeleRing F S,
+      f (Multiplicative.ofAdd x) =
+        (∏ w, a w (Multiplicative.ofAdd (x.1 w))) * ∏ v, b v (Multiplicative.ofAdd (x.2 v)) := by
+  classical
+  let G (w : InfinitePlace F) := Multiplicative w.Completion
+  let (w : InfinitePlace F) : T2Space (G w) := (inferInstance : T2Space w.Completion)
+  let (w : InfinitePlace F) : LocallyCompactSpace (G w) :=
+    (inferInstance : LocallyCompactSpace w.Completion)
+  let (w : InfinitePlace F) : SecondCountableTopology (G w) :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  obtain ⟨a₀, ha⟩ := schwartzBruhat_pi_test G a
+  let e : Multiplicative (InfiniteAdeleRing F) ≃ₜ* ((w : InfinitePlace F) → G w) :=
+    { toFun := fun x w ↦ Multiplicative.ofAdd (x.toAdd w)
+      invFun := fun x ↦ Multiplicative.ofAdd (fun w ↦ (x w).toAdd)
+      left_inv := fun _ ↦ rfl
+      right_inv := fun _ ↦ rfl
+      map_mul' := fun _ _ ↦ rfl
+      continuous_toFun := continuous_id
+      continuous_invFun := continuous_id }
+  let : T2Space (Multiplicative (InfiniteAdeleRing F)) := e.toHomeomorph.isEmbedding.t2Space
+  let : LocallyCompactSpace (Multiplicative (InfiniteAdeleRing F)) :=
+    e.toHomeomorph.isOpenEmbedding.locallyCompactSpace
+  let arch : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) :=
+    ⟨a₀.val ∘ e, schwartzBruhat_mem_comp_equiv e a₀.property⟩
+  obtain ⟨t, ht⟩ := sAdeleSchwartz_inductiveTensor_equiv F S
+  refine ⟨t (arch ⊗ₜ[ℂ] (⨂ₜ[ℂ] v : S, b v)), fun x ↦ ?_⟩
+  rw [ht arch b x]
+  exact congrArg (· * _) (ha (e (Multiplicative.ofAdd x.1)))
+
+/-- For a function holomorphic on a closed disc, the residue formula of the Laurent
+coefficients gives its Taylor coefficients. -/
+private theorem sLocalPrincipalPartCoeff_eigendistribution_residue {h : ℂ → ℂ} {R : ℝ≥0}
+    (hR : 0 < R)
+    (hh : DifferentiableOn ℂ h (Metric.closedBall 0 R)) (k : ℕ) :
+    complexResidue (fun z ↦ h z / z ^ ((k : ℤ) + 1)) 0 =
+      cauchyPowerSeries h 0 R k (fun _ ↦ 1) := by
+  refine (tendsto_const_nhds.congr' ?_).limUnder_eq
+  filter_upwards [Ioo_mem_nhdsGT hR] with r hr
+  have := sLocalZLaurentCoeff_hasLaurentSeries_circleIntegral (g := h) (h := h) (N := 0) hR hh
+    (fun z _ ↦ by simp) k hr
+  simpa using this.symm
+
+/-- Two functions holomorphic on a closed disc whose residue coefficients are
+proportional agree up to that factor on the open disc. -/
+private theorem sLocalPrincipalPartCoeff_eigendistribution_eqOn {A B : ℂ → ℂ} {R : ℝ≥0}
+    (hR : 0 < R) (a : ℂ)
+    (hA : DifferentiableOn ℂ A (Metric.closedBall 0 R))
+    (hB : DifferentiableOn ℂ B (Metric.closedBall 0 R))
+    (hc : ∀ k : ℕ, complexResidue (fun z ↦ B z / z ^ ((k : ℤ) + 1)) 0 =
+      a * complexResidue (fun z ↦ A z / z ^ ((k : ℤ) + 1)) 0)
+    (z : ℂ) (hz : z ∈ Metric.ball (0 : ℂ) R) : B z = a * A z := by
+  simp only [sLocalPrincipalPartCoeff_eigendistribution_residue hR hA, sLocalPrincipalPartCoeff_eigendistribution_residue hR hB] at hc
+  have hz' : z ∈ Metric.eball (0 : ℂ) R := by
+    rw [Metric.mem_eball, edist_zero_right]
+    exact_mod_cast (mem_ball_zero_iff.mp hz)
+  have hsA := (hA.hasFPowerSeriesOnBall hR).hasSum hz'
+  have hsB := (hB.hasFPowerSeriesOnBall hR).hasSum hz'
+  have hterm (p : FormalMultilinearSeries ℂ ℂ ℂ) (n : ℕ) :
+      p n (fun _ ↦ z) = z ^ n * p n (fun _ ↦ 1) := by
+    have := (p n).map_smul_univ (fun _ ↦ z) (fun _ ↦ 1)
+    simp only [smul_eq_mul, mul_one, Finset.prod_const, Finset.card_univ, Fintype.card_fin] at this
+    exact this
+  simp only [zero_add, hterm, hc] at hsA hsB
+  have := hsA.mul_left a
+  refine hsB.unique (this.congr_fun fun n ↦ by ring)
+
+/-- Translating a test by an S-idele multiplies its zeta integral by the character
+at the class of that idele. -/
+private theorem sLocalPrincipalPartCoeff_eigendistribution_translate {F : Type u} [Field F]
+    [NumberField F] {S : Finset (HeightOneSpectrum (𝓞 F))}
+    (f : SchwartzBruhat (Multiplicative (SAdeleRing F S))) (u : (SAdeleRing F S)ˣ)
+    (c : QuasiCharacter (SIdeleQuotient F S)) :
+    sLocalIdelicZetaIntegral (schwartzBruhatUnitTranslate u f) c =
+      c (QuotientGroup.mk u) * sLocalIdelicZetaIntegral f c := by
+  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+  let (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+  let : MeasurableSpace (InfiniteAdeleRing F) :=
+    inferInstanceAs (MeasurableSpace ((w : InfinitePlace F) → w.Completion))
+  let : MeasurableSpace (SAdeleRing F S) :=
+    inferInstanceAs (MeasurableSpace (InfiniteAdeleRing F × ((v : S) → v.val.adicCompletion F)))
+  let : LocallyCompactSpace (SAdeleRing F S)ˣ := (sIdeleGroup_description F S).2.2.1
+  let : BorelSpace (SAdeleRing F S)ˣ := sIdeleGroup_borelSpace
+  let := sMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) (S := S)
+  unfold sLocalIdelicZetaIntegral
+  rw [← MeasureTheory.integral_const_mul,
+    ← MeasureTheory.integral_mul_left_eq_self _ u]
+  congr 1
+  funext g
+  rw [schwartzBruhatUnitTranslate_apply, Units.val_mul, ← mul_assoc, ← Units.val_mul,
+    inv_mul_cancel, Units.val_one, one_mul, QuotientGroup.mk_mul, map_mul]
+  ring
+
+/-- Over ℚ with only the real place, take the standard Gaussian, whose Z-function does not
+vanish at `1/2` on the trivial component, and translate it by an idele of norm different
+from one. If every coefficient there were an eigendistribution, the two Z-functions would
+have proportional Taylor series, which forces the Z-function to vanish near `1/2`. -/
+private theorem sLocalPrincipalPartCoeff_eigendistribution_false_aux :
+    ¬ sLocalPrincipalPartCoeff_eigendistribution.{u} := by
+  intro h
+  let := NumberField.of_ringEquiv ℚ (ULift.{u} ℚ) (ULift.ringEquiv.{0, u} (R := ℚ)).symm
+  let F := ULift.{u} ℚ
+  let S : Finset (HeightOneSpectrum (𝓞 F)) := ∅
+  let tw := quasiCharacterNormTwist (G := SIdeleQuotient F S) (sIdeleQuotientNorm F S)
+    (isProperMap_sIdeleQuotientNorm F S).continuous
+  let χ : PontryaginDual (SIdeleQuotient F S) := 1
+  let s₀ : ℂ := 1 / 2
+  let c := tw ((circleToComplex).comp χ) s₀
+  let χArch : (w : InfinitePlace F) → PontryaginDual w.Completionˣ := fun _ ↦ 1
+  have hχ : ∀ w, (circleToComplex).comp (χArch w) =
+      sLocalInfiniteRestriction w ((circleToComplex).comp χ) := fun w ↦ by
+    ext g; rfl
+  obtain ⟨f, hf⟩ := sLocalPrincipalPartCoeff_eigendistribution_tensor S
+    (fun w ↦ infiniteStandardGaussian w (χArch w))
+    (fun v ↦ finiteStandardGaussian v.val (sLocalFiniteRestriction v c))
+  have hE := sLocalNormalizedEigendistribution_gaussian χ s₀ χArch hχ f hf
+  have hspec := (existsUnique_sLocalNormalizedEigendistribution c).exists.choose_spec f
+  have hN : sLocalNormalizedZFunction f c = 1 := by
+    rw [← hspec]
+    change _ * sLocalNormalizedEigendistribution c f = 1
+    rw [hE]
+    simp [S]
+  have hpos : s₀ ∈ Complex.re ⁻¹' Ioi (0 : ℝ) := by
+    show (0 : ℝ) < (1 / 2 : ℂ).re
+    norm_num
+  have hdiv := sLocalNormalizedZFunction_eq_div f χ hpos
+  have hI : sLocalIdelicZetaIntegral f c ≠ 0 := by
+    intro h0
+    change sLocalNormalizedZFunction f c = _ at hdiv
+    rw [hdiv, h0, zero_div] at hN
+    exact zero_ne_one hN
+  have hZ : sLocalIdelicZFunction f c = sLocalIdelicZetaIntegral f c :=
+    sLocalIdelicZFunction_eq_integral f ⟨χ, s₀, hpos, rfl⟩
+  have htw (z : ℂ) : tw c z = tw ((circleToComplex).comp χ) (s₀ + z) := by
+    ext1 g
+    have hm : ((((sIdeleQuotientNorm F S g : ℝ≥0) : ℝ)) : ℂ) ≠ 0 :=
+      Complex.ofReal_ne_zero.mpr (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+    change ((circleToComplex).comp χ) g * (((sIdeleQuotientNorm F S g : ℝ≥0) : ℝ) : ℂ) ^ s₀ *
+        (((sIdeleQuotientNorm F S g : ℝ≥0) : ℝ) : ℂ) ^ z = ((circleToComplex).comp χ) g *
+        (((sIdeleQuotientNorm F S g : ℝ≥0) : ℝ) : ℂ) ^ (s₀ + z)
+    rw [mul_assoc, ← Complex.cpow_add _ _ hm]
+  have hopen : IsOpen (Complex.re ⁻¹' Ioi (0 : ℝ)) := isOpen_Ioi.preimage Complex.continuous_re
+  have hZa (g : SchwartzBruhat (Multiplicative (SAdeleRing F S))) (w : ℂ) (hw : 0 < w.re) :
+      AnalyticAt ℂ (fun z ↦ sLocalIdelicZFunction g (tw ((circleToComplex).comp χ) z)) w :=
+    ((sLocalIdelicZetaIntegral_analyticOn g χ) w hw).congr
+      (Filter.eventually_of_mem (hopen.mem_nhds hw) fun z hz ↦
+        (sLocalIdelicZFunction_eq_integral g ⟨χ, z, hz, rfl⟩).symm)
+  -- the component and a translation of nontrivial norm
+  have hon : normOneRestriction (sIdeleQuotientNorm F S) c =
+      (circleToComplex).comp (1 : PontryaginDual (sIdeleQuotientNorm F S).ker) := by
+    ext g
+    change ((circleToComplex).comp χ) g.val *
+      (((sIdeleQuotientNorm F S g.val : ℝ≥0) : ℝ) : ℂ) ^ s₀ = ((1 : Circle) : ℂ)
+    rw [MonoidHom.mem_ker.mp g.property]
+    simp only [Units.val_one, NNReal.coe_one, Complex.ofReal_one, Complex.one_cpow, mul_one]
+    rfl
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  obtain ⟨t, ht⟩ := exists_ne (1 : ℝ≥0ˣ)
+  obtain ⟨u, hu⟩ := QuotientGroup.mk_surjective (σ t)
+  have hmu : sIdeleQuotientNorm F S (QuotientGroup.mk u) ≠ 1 := by
+    rw [hu, hσ t]; exact ht
+  have hk (k : ℕ) := (mem_sLocalEigendistributions c _).mp (h F S 1 c hon k).2.2 u f
+  let τf := schwartzBruhatUnitTranslate u f
+  let A : ℂ → ℂ := fun z ↦ sLocalIdelicZFunction f (tw c z)
+  let B : ℂ → ℂ := fun z ↦ sLocalIdelicZFunction τf (tw c z)
+  let R : ℝ≥0 := 1 / 4
+  have hR : 0 < R := by norm_num [R]
+  have hball (z : ℂ) (hz : z ∈ Metric.closedBall (0 : ℂ) R) : 0 < (s₀ + z).re := by
+    have h1 := Complex.abs_re_le_norm z
+    rw [mem_closedBall_zero_iff] at hz
+    have h2 : ((R : ℝ)) = 1 / 4 := by norm_num [R]
+    simp only [Complex.add_re, s₀]
+    norm_num
+    have := (abs_le.mp (h1.trans (hz.trans h2.le))).1
+    linarith
+  have hdiff (g : SchwartzBruhat (Multiplicative (SAdeleRing F S))) :
+      DifferentiableOn ℂ (fun z ↦ sLocalIdelicZFunction g (tw c z)) (Metric.closedBall 0 R) := by
+    intro z hz
+    simp only [htw]
+    exact ((hZa g _ (hball z hz)).comp_of_eq (by fun_prop) rfl).differentiableAt.differentiableWithinAt
+  have hc (k : ℕ) : complexResidue (fun z ↦ B z / z ^ ((k : ℤ) + 1)) 0 =
+      c (QuotientGroup.mk u) * complexResidue (fun z ↦ A z / z ^ ((k : ℤ) + 1)) 0 := hk k
+  have hBA := sLocalPrincipalPartCoeff_eigendistribution_eqOn hR (c (QuotientGroup.mk u)) (hdiff f) (hdiff τf) hc
+  have hcu : c (QuotientGroup.mk u) ≠ 0 := by
+    intro h0
+    have := map_mul c (QuotientGroup.mk u) (QuotientGroup.mk u)⁻¹
+    rw [mul_inv_cancel, map_one, h0, zero_mul] at this
+    exact one_ne_zero this
+  have hmpos : 0 < (((sIdeleQuotientNorm F S (QuotientGroup.mk u) : ℝ≥0) : ℝ)) :=
+    NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hm1 : (((sIdeleQuotientNorm F S (QuotientGroup.mk u) : ℝ≥0) : ℝ)) ≠ 1 := by
+    intro h1
+    exact hmu (Units.val_eq_one.mp (NNReal.coe_eq_one.mp h1))
+  have hzero (x : ℝ) (hx : x ∈ Ioo (0 : ℝ) (1 / 4)) : A x = 0 := by
+    have hxb : (x : ℂ) ∈ Metric.ball (0 : ℂ) R := by
+      rw [mem_ball_zero_iff, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hx.1]
+      norm_num [R]
+      exact hx.2
+    have e1 := hBA x hxb
+    have e2 : B x = (tw c x) (QuotientGroup.mk u) * A x := by
+      have hp := hball x (Metric.ball_subset_closedBall hxb)
+      change sLocalIdelicZFunction τf (tw c x) = _ * sLocalIdelicZFunction f (tw c x)
+      rw [htw, sLocalIdelicZFunction_eq_integral τf ⟨χ, _, hp, rfl⟩,
+        sLocalIdelicZFunction_eq_integral f ⟨χ, _, hp, rfl⟩, sLocalPrincipalPartCoeff_eigendistribution_translate]
+    have e3 : (tw c x) (QuotientGroup.mk u) = c (QuotientGroup.mk u) *
+        ((((sIdeleQuotientNorm F S (QuotientGroup.mk u) : ℝ≥0) : ℝ) ^ x : ℝ) : ℂ) := by
+      change c _ * _ ^ (x : ℂ) = _
+      rw [Complex.ofReal_cpow hmpos.le]
+    rw [e3, mul_assoc] at e2
+    have e4 := mul_left_cancel₀ hcu (e2.symm.trans e1)
+    have hne : ((((sIdeleQuotientNorm F S (QuotientGroup.mk u) : ℝ≥0) : ℝ) ^ x : ℝ) : ℂ) ≠ 1 := by
+      rw [Ne, Complex.ofReal_eq_one]
+      intro h1
+      have := congrArg Real.log h1
+      rw [Real.log_rpow hmpos, Real.log_one, mul_eq_zero] at this
+      rcases this with h2 | h2
+      · exact hx.1.ne' h2
+      · exact hm1 (Real.eq_one_of_pos_of_log_eq_zero hmpos h2)
+    have e5 : (((((sIdeleQuotientNorm F S (QuotientGroup.mk u) : ℝ≥0) : ℝ) ^ x : ℝ) : ℂ) - 1) *
+        A x = 0 := by rw [sub_mul, e4, one_mul, sub_self]
+    exact (mul_eq_zero.mp e5).resolve_left (sub_ne_zero.mpr hne)
+  have hA0 : A 0 = 0 := by
+    have hcont : ContinuousAt A 0 := (hdiff f).continuousOn.continuousAt
+      (Metric.closedBall_mem_nhds 0 hR)
+    have ht1 : Tendsto (fun x : ℝ ↦ A x) (𝓝[>] 0) (𝓝 (A 0)) := by
+      have := (hcont.comp_of_eq (Complex.continuous_ofReal.continuousAt (x := (0 : ℝ)))
+        Complex.ofReal_zero).tendsto
+      exact this.mono_left nhdsWithin_le_nhds
+    have ht2 : Tendsto (fun x : ℝ ↦ A x) (𝓝[>] 0) (𝓝 0) :=
+      tendsto_const_nhds.congr' (Filter.eventually_of_mem (Ioo_mem_nhdsGT (by norm_num))
+        fun x hx ↦ (hzero x hx).symm)
+    exact tendsto_nhds_unique ht1 ht2
+  have h4 : tw c 0 = c := by
+    ext1 g
+    change c g * _ ^ (0 : ℂ) = c g
+    rw [Complex.cpow_zero, mul_one]
+  change sLocalIdelicZFunction f (tw c 0) = 0 at hA0
+  rw [h4, hZ] at hA0
+  exact hI hA0
+
 /-- Paper: Theorem 7.2.1.1(2), p. 334.
 For ℚ at the real place, translate a nonzero nonnegative even bump supported in
 2 < |x| < 3 by dilation by 2. At the trivial center its first Mellin derivative
@@ -97,7 +346,8 @@ reading of (7.2.1.8), use the Gaussian times the integer indicator over ℚ at
 ∞ and p. The top coefficient is 2/log p, so translation by p changes the
 residue by −2 at the trivial character. -/
 theorem sLocalPrincipalPartCoeff_eigendistribution_false :
-    ¬ sLocalPrincipalPartCoeff_eigendistribution := by sorry
+    ¬ sLocalPrincipalPartCoeff_eigendistribution :=
+  sLocalPrincipalPartCoeff_eigendistribution_false_aux
 
 /-- Paper: Theorem 7.2.1.1(3), p. 334.
 A nonzero coefficient functional forces the corresponding pole-order bound on every test. -/
@@ -106,11 +356,94 @@ def sLocalPrincipalPartCoeff_universal_pole_bound : Prop :=
     sLocalNonnegativeLaurentCoeff c k ≠ 0 →
       c ∈ poleLocus(F, S) ∧ ∀ f : ℬₛ(F, S), k ≤ sLocalPolarMultiplicity f c
 
+/-- Over ℚ with only the real place, the standard Gaussian has Z-function equal to the
+Euler factor times its normalized value one, so it does not vanish at `1/2` on the trivial
+component. There the correcting factor is regular, so the constant coefficient is a nonzero
+functional at a character outside the pole locus. -/
+private theorem sLocalPrincipalPartCoeff_universal_pole_bound_false_aux :
+    ¬ sLocalPrincipalPartCoeff_universal_pole_bound.{u} := by
+  intro h
+  let := NumberField.of_ringEquiv ℚ (ULift.{u} ℚ) (ULift.ringEquiv.{0, u} (R := ℚ)).symm
+  let F := ULift.{u} ℚ
+  let S : Finset (HeightOneSpectrum (𝓞 F)) := ∅
+  let tw := quasiCharacterNormTwist (G := SIdeleQuotient F S) (sIdeleQuotientNorm F S)
+    (isProperMap_sIdeleQuotientNorm F S).continuous
+  let χ : PontryaginDual (SIdeleQuotient F S) := 1
+  let s₀ : ℂ := 1 / 2
+  let c := tw ((circleToComplex).comp χ) s₀
+  let χArch : (w : InfinitePlace F) → PontryaginDual w.Completionˣ := fun _ ↦ 1
+  have hχ : ∀ w, (circleToComplex).comp (χArch w) =
+      sLocalInfiniteRestriction w ((circleToComplex).comp χ) := fun w ↦ by
+    ext g; rfl
+  obtain ⟨f, hf⟩ := sLocalPrincipalPartCoeff_eigendistribution_tensor S (fun w ↦ infiniteStandardGaussian w (χArch w))
+    (fun v ↦ finiteStandardGaussian v.val (sLocalFiniteRestriction v c))
+  have hE := sLocalNormalizedEigendistribution_gaussian χ s₀ χArch hχ f hf
+  have hspec := (existsUnique_sLocalNormalizedEigendistribution c).exists.choose_spec f
+  have hN : sLocalNormalizedZFunction f c = 1 := by
+    rw [← hspec]
+    change _ * sLocalNormalizedEigendistribution c f = 1
+    rw [hE]
+    simp [S]
+  have hpos : s₀ ∈ Complex.re ⁻¹' Ioi (0 : ℝ) := by
+    show (0 : ℝ) < (1 / 2 : ℂ).re
+    norm_num
+  have hdiv := sLocalNormalizedZFunction_eq_div f χ hpos
+  have hI : sLocalIdelicZetaIntegral f c ≠ 0 := by
+    intro h0
+    change sLocalNormalizedZFunction f c = _ at hdiv
+    rw [hdiv, h0, zero_div] at hN
+    exact zero_ne_one hN
+  have hZ : sLocalIdelicZFunction f c = sLocalIdelicZetaIntegral f c :=
+    sLocalIdelicZFunction_eq_integral f ⟨χ, s₀, hpos, rfl⟩
+  have htw (z : ℂ) : tw c z = tw ((circleToComplex).comp χ) (s₀ + z) := by
+    ext1 g
+    have hm : ((((sIdeleQuotientNorm F S g : ℝ≥0) : ℝ)) : ℂ) ≠ 0 :=
+      Complex.ofReal_ne_zero.mpr (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+    change ((circleToComplex).comp χ) g * (((sIdeleQuotientNorm F S g : ℝ≥0) : ℝ) : ℂ) ^ s₀ *
+        (((sIdeleQuotientNorm F S g : ℝ≥0) : ℝ) : ℂ) ^ z = ((circleToComplex).comp χ) g *
+        (((sIdeleQuotientNorm F S g : ℝ≥0) : ℝ) : ℂ) ^ (s₀ + z)
+    rw [mul_assoc, ← Complex.cpow_add _ _ hm]
+  have hopen : IsOpen (Complex.re ⁻¹' Ioi (0 : ℝ)) := isOpen_Ioi.preimage Complex.continuous_re
+  have hZa : AnalyticAt ℂ (fun z ↦ sLocalIdelicZFunction f (tw ((circleToComplex).comp χ) z)) s₀ :=
+    ((sLocalIdelicZetaIntegral_analyticOn f χ) s₀ hpos).congr
+      (Filter.eventually_of_mem (hopen.mem_nhds hpos) fun z hz ↦
+        (sLocalIdelicZFunction_eq_integral f ⟨χ, z, hz, rfl⟩).symm)
+  have hg : AnalyticAt ℂ (fun z ↦ sLocalIdelicZFunction f (tw c z)) 0 := by
+    simp only [htw]
+    exact hZa.comp_of_eq (by fun_prop) (add_zero s₀)
+  have hR : AnalyticAt ℂ (fun z ↦ sLocalRhoFactor (tw c z)) 0 := by
+    simp only [htw]
+    exact (sLocalRhoFactor_analyticAt_criticalLine χ s₀ (by norm_num [s₀])).comp_of_eq
+      (by fun_prop) (add_zero s₀)
+  have hcoeff : sLocalNonnegativeLaurentCoeff c 0 ≠ 0 := by
+    intro h0
+    have h1 : sLocalZLaurentCoeff f c ((0 : ℕ) : ℤ) = 0 := DFunLike.congr_fun h0 f
+    unfold sLocalZLaurentCoeff at h1
+    have h2 : (fun z ↦ sLocalIdelicZFunction f (tw c z) / z ^ (((0 : ℕ) : ℤ) + 1)) =
+        fun z ↦ sLocalIdelicZFunction f (tw c z) / (z - 0) := by
+      funext z; simp
+    have h3 := complexResidue_div_sub hg
+    change complexResidue (fun z ↦ sLocalIdelicZFunction f (tw c z) / z ^ (((0 : ℕ) : ℤ) + 1)) 0
+      = 0 at h1
+    rw [h2, h3] at h1
+    have h4 : tw c 0 = c := by
+      ext1 g
+      change c g * _ ^ (0 : ℂ) = c g
+      rw [Complex.cpow_zero, mul_one]
+    rw [h4, hZ] at h1
+    exact hI h1
+  have hpole := (h F S c 0 hcoeff).1
+  change 0 < sLocalRhoPoleOrder c at hpole
+  unfold sLocalRhoPoleOrder sLocalIdelicOrderBound at hpole
+  rw [min_eq_left hR.meromorphicOrderAt_nonneg] at hpole
+  simp at hpole
+
 /-- Paper: Theorem 7.2.1.1(3), p. 334.
 At the trivial character over ℚ with only the real place, an even nonnegative
 nonzero bump on 2 < |x| < 3 has positive first Mellin derivative and no pole. -/
 theorem sLocalPrincipalPartCoeff_universal_pole_bound_false :
-    ¬ sLocalPrincipalPartCoeff_universal_pole_bound := by sorry
+    ¬ sLocalPrincipalPartCoeff_universal_pole_bound :=
+  sLocalPrincipalPartCoeff_universal_pole_bound_false_aux
 
 /-- Paper: Theorem 7.2.1.1(4), p. 334.
 For every supported pole bound, its annihilator is generated in the strong dual
@@ -331,12 +664,50 @@ def sLocalMellin_surjective_divisorBounded : Prop :=
     ∃ f : ℬₛ(F, S), (fun z : ℂ ↦ sLocalIdelicZFunction f (twistₛ(F, S) ((circleToComplex).comp χ) z))
       =ᶠ[codiscrete ℂ] Z
 
+/-- The constant function one meets every divisor bound. A test matching it off a
+discrete set would agree with it on the right half-plane, where its Z-function is
+holomorphic, against the decay in height of `sLocalIdelicZFunction_schwartzOnStrip`. -/
+private theorem sLocalMellin_surjective_divisorBounded_false_aux :
+    ¬ sLocalMellin_surjective_divisorBounded.{u} := by
+  intro h
+  let := ulift_rat_numberField.{u}
+  let F := ULift.{u} ℚ
+  let S : Finset Places(F) := ∅
+  obtain ⟨f, hf⟩ := h F S 1 (fun _ ↦ 1) (fun x ↦ analyticAt_const.meromorphicAt) (fun z ↦ by
+    classical
+    rw [meromorphicOrderAt_const, ite_eq_right_iff.mpr (fun h ↦ absurd h one_ne_zero)]
+    exact WithTop.coe_le_coe.mpr (by omega))
+  set Zf : ℂ → ℂ := fun z ↦
+    sLocalIdelicZFunction f (twistₛ(F, S) ((circleToComplex).comp 1) z) with hZf
+  have hs := sLocalIdelicZFunction_schwartzOnStrip f 1 1 3 one_pos (by norm_num) 0
+  simp only [iteratedDeriv_zero] at hs
+  obtain ⟨-, hdiff, hdec⟩ := hs
+  -- On the strip the Z-function is continuous, so it equals one there.
+  have hone (s : ℂ) (hs : s.re ∈ Ioo 1 3) : Zf s = 1 := by
+    have hc : ContinuousAt Zf s := (hdiff.differentiableAt
+      ((isOpen_Ioo.preimage Complex.continuous_re).mem_nhds hs)).continuousAt
+    have h1 : Tendsto Zf (𝓝[≠] s) (𝓝 1) :=
+      tendsto_const_nhds.congr' ((hf.filter_mono (nhdsNE_le_codiscrete s)).mono
+        fun z hz ↦ hz.symm)
+    exact tendsto_nhds_unique (hc.tendsto.mono_left nhdsWithin_le_nhds) h1
+  obtain ⟨C, hC, hev⟩ := hdec (1 / 2) (by norm_num) (by norm_num) 1 le_rfl
+  rw [Filter.eventually_comap, Filter.eventually_atTop] at hev
+  obtain ⟨N, hN⟩ := hev
+  set b : ℝ := max N (C + 1) with hb
+  have hb1 : C + 1 ≤ b := le_max_right _ _
+  have hbpos : 0 < b := by linarith
+  have key := hN b (le_max_left _ _) b (abs_of_pos hbpos) 2 ⟨by norm_num, by norm_num⟩
+  change ‖Zf (((2 : ℝ) : ℂ) + (b : ℂ) * Complex.I)‖ ≤ _ at key
+  rw [hone _ (by norm_num), norm_one, pow_one, abs_of_pos hbpos, le_div_iff₀ hbpos] at key
+  linarith
+
 /-- Paper: Remark 7.2.1.2, p. 335.
 For ℚ with only the real place and the trivial component, the constant entire
 function one satisfies the divisor bound but violates the vertical decay of
 every Schwartz–Bruhat Mellin transform on the line of real part one. -/
 theorem sLocalMellin_surjective_divisorBounded_false :
-    ¬ sLocalMellin_surjective_divisorBounded := by sorry
+    ¬ sLocalMellin_surjective_divisorBounded :=
+  sLocalMellin_surjective_divisorBounded_false_aux
 
 /-- Paper: Remark 7.2.1.3, p. 335.
 The full pole bound is identified with the closure of the homogeneous theta

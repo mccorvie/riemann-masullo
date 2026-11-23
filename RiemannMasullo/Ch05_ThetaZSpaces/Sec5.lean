@@ -3,6 +3,8 @@ module
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec4
 
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
+import Mathlib.Analysis.Calculus.FDeriv.Mul
 
 /-! # Third Structure Theorem: strong duals and eigendistributions
 
@@ -457,10 +459,48 @@ theorem sLocalEigendistributions_eq_span (c : QuasiCharacter Jₛ) :
     sLocalEigendistributions c =
       Submodule.span ℂ {sLocalNormalizedEigendistribution c} := by sorry
 
+/-- On a Montel space, pointwise holomorphy of a family in the complete strong dual
+implies strong holomorphy, since every bidual functional is an evaluation. -/
+private theorem sLocalNormalizedEigendistribution_holomorphic_pointwise
+    {E : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E]
+    [IsUniformAddGroup E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E] [T2Space E]
+    [MontelSpace ℂ E] [CompleteSpace (StrongDual ℂ E)]
+    [PolynormableSpace ℂ (StrongDual ℂ E)]
+    (T : ℂ → StrongDual ℂ E)
+    (hT : ∀ x : E, DifferentiableOn ℂ (fun z ↦ T z x) univ) :
+    VectorHolomorphicOn T univ := by
+  have : @QuasiCompleteSpace ℂ (StrongDual ℂ E) _
+      (IsTopologicalAddGroup.rightUniformSpace _) _ _ := by
+    convert (inferInstance : QuasiCompleteSpace ℂ (StrongDual ℂ E)) using 1
+    exact IsUniformAddGroup.rightUniformSpace_eq
+  apply WeaklyHolomorphicOn.vectorHolomorphicOn isOpen_univ isConnected_univ
+  intro φ
+  obtain ⟨x, rfl⟩ := surjective_strongBidual_eval (E := E) φ
+  exact hT x
+
 /-- Paper: Theorem 5.5.1.2(1), p. 278.
 The normalized S-local distributions form a holomorphic family on each norm chart. -/
 theorem sLocalNormalizedEigendistribution_holomorphic (χ : PontryaginDual Jₛ) :
-    VectorHolomorphicOn (fun s ↦ sLocalNormalizedEigendistribution (chartₛ(χ) s)) univ := by sorry
+    VectorHolomorphicOn (fun s ↦ sLocalNormalizedEigendistribution (chartₛ(χ) s)) univ := by
+  let : UniformSpace ℬ(Aₛ) := IsTopologicalAddGroup.rightUniformSpace _
+  let : IsUniformAddGroup ℬ(Aₛ) := isUniformAddGroup_of_addCommGroup
+  let : T2Space ℬ(Aₛ) := (sAdeleSchwartz_nuclear.{_, 0} F S).1
+  let : PolynormableSpace ℂ ℬ(Aₛ) := (sAdeleSchwartz_nuclear.{_, 0} F S).2.1
+  let : MontelSpace ℂ ℬ(Aₛ) := (sAdeleSchwartz_montel F S).2
+  let : CompleteSpace D(ℬ(Aₛ)) := sAdeleSchwartz_strongDual_complete F S
+  let : PolynormableSpace ℂ D(ℬ(Aₛ)) := (sAdeleSchwartz_strongDual_nuclear.{_, 0} F S).2.1
+  apply sLocalNormalizedEigendistribution_holomorphic_pointwise
+  intro f
+  let M : ℂ := ↑(∏ v : S, unitMass(v.val))
+  have hM : M ≠ 0 := sLocalNormalizedEigendistribution_mass_ne_zero
+  have he : (fun z ↦ sLocalNormalizedEigendistribution (chartₛ(χ) z) f) =
+      (fun z ↦ M⁻¹ * sLocalNormalizedZFunction f (chartₛ(χ) z)) := by
+    funext z
+    have h := (existsUnique_sLocalNormalizedEigendistribution (chartₛ(χ) z)).exists.choose_spec f
+    change M * sLocalNormalizedEigendistribution (chartₛ(χ) z) f = _ at h
+    rw [← h, ← mul_assoc, inv_mul_cancel₀ hM, one_mul]
+  rw [he]
+  exact (sLocalNormalizedZFunction_entire f χ).differentiableOn.const_mul M⁻¹
 
 /-- Paper: Theorem 5.5.1.2(2), pp. 278–279.
 Each S-local eigendistribution has a unique continuous descent to the theta space.
@@ -692,7 +732,46 @@ local notation "normℂ(" g ")" => (((m𝔽 g : ℝ≥0) : ℝ) : ℂ)
 The theta kernel is contained in the common polar kernel from §2.2.4, so both
 continuous polar functionals vanish on it. -/
 theorem globalThetaKernel_le_adelePolarSubspace :
-    K𝔽 ≤ LinearMap.ker (adelePolarValues (F := F)) := by sorry
+    K𝔽 ≤ LinearMap.ker (adelePolarValues (F := F)) := by
+  intro f hf
+  have hθ (g : C𝔽) : adelicTheta f g = 0 := DFunLike.congr_fun (LinearMap.mem_ker.1 hf) g
+  obtain ⟨C, T, -, hT, hsmall⟩ := adelicTheta_decay_small f 1
+  set a := adeleSchwartzFourier f zeroAdele
+  set b := f zeroAdele
+  -- Every positive real is the norm of an idele class.
+  have key (t : ℝ) (ht : 0 < t) (htT : t < T) : ‖b - t⁻¹ • a‖ ≤ C * t := by
+    let u : ℝ≥0ˣ := Units.mk0 ⟨t, ht.le⟩ fun h0 ↦ ht.ne' (congrArg Subtype.val h0)
+    let g : C𝔽 := QuotientGroup.mk (canonicalIdeleNormSection F u)
+    have hg : ((m𝔽 g : ℝ≥0) : ℝ) = t := by
+      change ((ideleNorm F (canonicalIdeleNormSection F u) : ℝ≥0) : ℝ) = t
+      rw [canonicalIdeleNormSection_rightInverse F u]
+      rfl
+    have h := hsmall g (by beta_reduce; rw [hg]; exact htT)
+    beta_reduce at h
+    rw [hθ, hg, pow_one] at h
+    rwa [zero_sub, neg_add_eq_sub] at h
+  have hid : Filter.Tendsto (fun t : ℝ ↦ t) (𝓝[>] 0) (𝓝 0) :=
+    (continuous_id.tendsto 0).mono_left nhdsWithin_le_nhds
+  have hlim : Filter.Tendsto (fun t : ℝ ↦ b - t⁻¹ • a) (𝓝[>] 0) (𝓝 0) := by
+    refine squeeze_zero_norm' ?_ (by simpa using hid.const_mul C)
+    filter_upwards [Ioo_mem_nhdsGT hT] with t ht
+    exact key t ht.1 ht.2
+  have h2 : Filter.Tendsto (fun t : ℝ ↦ t • (b - t⁻¹ • a)) (𝓝[>] 0) (𝓝 0) := by
+    simpa using hid.smul hlim
+  have h3 : Filter.Tendsto (fun t : ℝ ↦ t • (b - t⁻¹ • a)) (𝓝[>] 0) (𝓝 (-a)) := by
+    have he : (fun t : ℝ ↦ t • b - a) =ᶠ[𝓝[>] 0] fun t : ℝ ↦ t • (b - t⁻¹ • a) := by
+      filter_upwards [self_mem_nhdsWithin] with t ht
+      rw [smul_sub, smul_smul, mul_inv_cancel₀ (ne_of_gt ht), one_smul]
+    refine Filter.Tendsto.congr' he ?_
+    have hc : Filter.Tendsto (fun t : ℝ ↦ t • b - a) (𝓝 0) (𝓝 ((0 : ℝ) • b - a)) :=
+      ((continuous_id.smul continuous_const).sub continuous_const).tendsto 0
+    simpa using hc.mono_left nhdsWithin_le_nhds
+  have ha : a = 0 := neg_eq_zero.mp (tendsto_nhds_unique h2 h3).symm
+  have hb : b = 0 := by
+    simp only [ha, smul_zero, sub_zero] at hlim
+    exact tendsto_nhds_unique tendsto_const_nhds hlim
+  rw [LinearMap.mem_ker, adelePolarValues_apply]
+  exact Prod.ext hb ha
 
 /-- Paper: Lemma 5.5.2.1, p. 280.
 Evaluation at zero and Fourier evaluation at zero descend as a pair of
@@ -894,6 +973,15 @@ theorem globalThetaPolarValues_vanish_on_isotype_iff (ω : PontryaginDual (m𝔽
 -- TODO(paper-gap): In (5.5.2.3) each equality loses the value of the polar
 -- functional on the normalized Gaussian. For ℚ(i) the first value is 1/(2π).
 
+private theorem globalThetaPolarValues_eq_eigendistributions_scalar
+    {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (W : Submodule ℂ (StrongDual ℂ E)) (T U : StrongDual ℂ E)
+    (hW : W = Submodule.span ℂ {U}) (hT : T ∈ W) (f : E) (hf : U f = 1) (y : E) :
+    T y = T f * U y := by
+  rw [hW, Submodule.mem_span_singleton] at hT
+  obtain ⟨a, rfl⟩ := hT
+  simp [hf]
+
 /-- Paper: Equation (5.5.2.3), p. 280.
 The two polar functionals are multiples of the descended normalized generators.
 Deviation: The multipliers are the values of the polar functionals on the standard
@@ -902,7 +990,34 @@ theorem globalThetaPolarValues_eq_eigendistributions (x : Θ) :
     let f := adelicStandardGaussian unitaryOne
     globalThetaPolarValues (F := F) x =
       (f zeroAdele * globalThetaEigendistribution (F := F) (1 : QuasiCharacter C𝔽) x,
-        adeleSchwartzFourier f zeroAdele * globalThetaEigendistribution (F := F) normWeight x) := by sorry
+        adeleSchwartzFourier f zeroAdele * globalThetaEigendistribution (F := F) normWeight x) := by
+  let P := globalThetaPolarValues (F := F)
+  let T₁ : D(ℬ(𝔸[F])) := (ContinuousLinearMap.fst ℂ ℂ ℂ).comp (P.comp (K𝔽).mkQL)
+  let T₂ : D(ℬ(𝔸[F])) := (ContinuousLinearMap.snd ℂ ℂ ℂ).comp (P.comp (K𝔽).mkQL)
+  have h₁ : T₁ ∈ adelicEigendistributions (1 : QuasiCharacter C𝔽) := by
+    intro u f
+    exact globalThetaPolarValues_fst_translate_rep u f
+  have h₂ : T₂ ∈ adelicEigendistributions normWeight := by
+    intro u f
+    change T₂ (schwartzBruhatUnitTranslate u f) =
+      ((1 : ℂ) * normℂ((QuotientGroup.mk u : C𝔽)) ^ (1 : ℂ)) * T₂ f
+    rw [Complex.cpow_one, one_mul]
+    exact globalThetaPolarValues_snd_translate_rep u f
+  have hzero : ideleClassNormTwist (F := F) unitaryOne 0 = 1 := by
+    ext g
+    change (1 : ℂ) * normℂ(g) ^ (0 : ℂ) = 1
+    simp
+  have hn₁ : adelicNormalizedEigendistribution (F := F) (1 : QuasiCharacter C𝔽)
+      (adelicStandardGaussian unitaryOne) = 1 := by
+    rw [← hzero]
+    exact adelicNormalizedEigendistribution_gaussian unitaryOne 0
+  have hn₂ := adelicNormalizedEigendistribution_gaussian (F := F) unitaryOne 1
+  obtain ⟨y, rfl⟩ := (K𝔽).mkQ_surjective x
+  exact Prod.ext
+    (globalThetaPolarValues_eq_eigendistributions_scalar _ T₁ _
+      (adelicEigendistributions_eq_span _) h₁ _ hn₁ y)
+    (globalThetaPolarValues_eq_eigendistributions_scalar _ T₂ _
+      (adelicEigendistributions_eq_span _) h₂ _ hn₂ y)
 
 /-- Paper: Remark 5.5.2.2, p. 281.
 The putative orbit sum for evaluation at zero is summable exactly when the test
