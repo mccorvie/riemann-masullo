@@ -125,7 +125,21 @@ theorem sLocalPWThetaSobolevMap_apply {a : ℝ} (ha : 0 < a) (ω : PontryaginDua
 Globalized polar-free tests yield weighted Sobolev vectors.
 Deviation: Use direct integer-indicator insertion as in the repaired §7.3.2. -/
 theorem globalPWTheta_memLp (a : ℝ) (ω : PontryaginDual C₁) (f : Zₛ) :
-    MemLp (globalWeightedTheta(a, ω, f)) 2 globalWMeasure := by sorry
+    MemLp (globalWeightedTheta(a, ω, f)) 2 globalWMeasure := by
+  let f₀ : adelePolarSubspace F := ⟨sAdeleSchwartzToGlobal F S f.val,
+    sAdeleSchwartzToGlobal_mem_polarSubspace f⟩
+  let x : globalPolarFreeThetaSubmodule (F := F) ω :=
+    ⟨Submodule.Quotient.mk f₀.val, ⟨f₀.val, f₀.property, rfl⟩⟩
+  obtain ⟨j, -, -, hj⟩ := exists_globalHomogeneousThetaSobolevInclusion
+    (F := F) (a := a) hGeo (le_max_right s 0) ω
+  have he := (hj f₀ x rfl).2
+  have hv := (Lp.memLp (j x).val.val).ae_eq ((withDensity_absolutelyContinuous _ _).ae_le he)
+  apply hv.mono_measure (withDensity_mono (Filter.Eventually.of_forall fun g ↦ ?_))
+  apply ENNReal.ofReal_le_ofReal
+  unfold intervalSobolevDensity
+  apply mul_le_mul_of_nonneg_left _ (le_trans (Real.exp_pos _).le (le_max_left _ _))
+  exact Real.rpow_le_rpow_of_exponent_le (by nlinarith [sq_nonneg (logNorm(m𝔽) g)])
+    (div_le_div_of_nonneg_right (le_max_left s 0) (by norm_num))
 
 /-- Paper: (11.2.1.2) and (11.2.1.7), pp. 487–488.
 Insert a local polar-free test and take its weighted global homogeneous theta class.
