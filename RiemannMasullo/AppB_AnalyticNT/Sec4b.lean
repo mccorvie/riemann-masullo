@@ -273,7 +273,110 @@ private theorem hasSlowGrowthNearPoles_completedHeckeL_logDeriv_left (χ : U[F])
     Continuous (fun y : ℝ ↦ logDeriv L ((σ : ℂ) + (y : ℂ) * Complex.I)) ∧
       ∃ γ > (0 : ℝ), (fun y : ℝ ↦ logDeriv L ((σ : ℂ) + (y : ℂ) * Complex.I)) =O[comap abs atTop]
         (fun y : ℝ ↦ |y| ^ γ) := by
-  sorry
+  obtain ⟨Ldual, hLdual, hDualAgree⟩ := completedHeckeL_exists_continuation χ⁻¹
+  obtain ⟨fArch, fArchDual, c, hc, hFourier, hArch, hArchDual⟩ :=
+    exists_archimedeanHeckeTest_fourier χ
+  obtain ⟨f, a, b, q, ha, hb, hq, hf, hFourierIntegral⟩ :=
+    exists_globalHeckeTest_fourier χ fArch fArchDual c hc hFourier
+  let B (s : ℂ) := b * (q : ℂ) ^ s
+  have hq₀ : (q : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr hq.ne'
+  have hB : Differentiable ℂ B :=
+    (differentiable_id.const_cpow (Or.inl hq₀)).const_mul b
+  have hB₀ (s : ℂ) : B s ≠ 0 :=
+    mul_ne_zero hb (fun hz ↦ hq₀ ((Complex.cpow_eq_zero_iff _ _).mp hz).1)
+  have hZ := globalIdelicZFunction_eq_mul_completedHeckeL_of_integral f χ L (fun _ ↦ a)
+    hL hAgree (differentiable_const a) (fun _ ↦ ha) (fun s ↦ by
+      rw [hf s, hArch s]
+      rfl)
+  have hZdual := globalIdelicZFunction_eq_mul_completedHeckeL_of_integral
+    (adeleSchwartzFourier f) χ⁻¹ Ldual B hLdual hDualAgree hB hB₀ (fun s ↦ by
+      rw [hFourierIntegral s, hArchDual s]
+      rfl)
+  have hFE (s : ℂ) : L s = (a⁻¹ * B (1 - s)) * Ldual (1 - s) := by
+    have hEq := globalIdelicZFunction_functionalEquation f (ideleClassNormTwist χ s)
+    rw [dualQuasiCharacter_ideleClassNormTwist, hZ s, hZdual (1 - s)] at hEq
+    calc
+      L s = a⁻¹ * (a * L s) := by rw [← mul_assoc, inv_mul_cancel₀ ha, one_mul]
+      _ = a⁻¹ * (B (1 - s) * Ldual (1 - s)) := by rw [hEq]
+      _ = (a⁻¹ * B (1 - s)) * Ldual (1 - s) := by ring
+  let E (s : ℂ) : ℂ := a⁻¹ * B (1 - s)
+  have hE₀ (s : ℂ) : E s ≠ 0 := mul_ne_zero (inv_ne_zero ha) (hB₀ (1 - s))
+  have hEderiv (s : ℂ) : HasDerivAt E (E s * (-Complex.log (q : ℂ))) s := by
+    have hsub : HasDerivAt (fun z : ℂ ↦ 1 - z) (-1) s :=
+      (hasDerivAt_id s).const_sub (1 : ℂ)
+    have hpow : HasDerivAt (fun z : ℂ ↦ (q : ℂ) ^ (1 - z))
+        ((q : ℂ) ^ (1 - s) * Complex.log (q : ℂ) * (-1)) s :=
+      HasDerivAt.const_cpow (c := (q : ℂ)) hsub (Or.inl hq₀)
+    have hmul := (hpow.const_mul b).const_mul a⁻¹
+    refine hmul.congr_deriv ?_
+    dsimp only [E, B]
+    ring
+  have hlogE (s : ℂ) : logDeriv E s = -Complex.log (q : ℂ) := by
+    rw [logDeriv_apply, (hEderiv s).deriv, mul_div_cancel_left₀ _ (hE₀ s)]
+  have hDualAnalytic : ∀ w : ℂ, 1 < w.re → AnalyticAt ℂ Ldual w := by
+    intro w hw
+    by_cases hχ : (χ⁻¹).toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1
+    · obtain ⟨t, ht, -⟩ :=
+        completedHeckeL_continuation_simplePoles χ⁻¹ Ldual hLdual hDualAgree hχ
+      rcases ht with ⟨-, -, -, han⟩
+      refine han _ ?_
+      simp only [mem_compl_iff, mem_insert_iff, mem_singleton_iff, not_or]
+      refine ⟨fun he ↦ ?_, fun he ↦ ?_⟩
+      · have hre : w.re = 0 := by simp [he, Complex.mul_re]
+        linarith
+      · have hre : w.re = 1 := by simp [he, Complex.mul_re]
+        linarith
+    · exact (completedHeckeL_continuation_entire χ⁻¹ Ldual hLdual hDualAgree hχ).analyticAt w
+  have hDualNeZero : ∀ w : ℂ, 1 < w.re → Ldual w ≠ 0 := by
+    intro w hw
+    let w' : halfPlane := ⟨w, hw⟩
+    rw [show Ldual w = completedHeckeL χ⁻¹ w' from hDualAgree w', completedHeckeL]
+    exact mul_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ⁻¹ (zero_lt_one.trans hw))
+      (finiteHeckeL_ne_zero_of_one_lt_re χ⁻¹ w')
+  have hLogDeriv_eq : ∀ s : ℂ, s.re < 0 →
+      logDeriv L s = -Complex.log (q : ℂ) - logDeriv Ldual (1 - s) := by
+    intro s hs
+    have h1s : 1 < (1 - s).re := by simp [Complex.sub_re]; linarith
+    have han := hDualAnalytic (1 - s) h1s
+    have hne := hDualNeZero (1 - s) h1s
+    have hsub : HasDerivAt (fun z : ℂ ↦ 1 - z) (-1) s :=
+      (hasDerivAt_id s).const_sub (1 : ℂ)
+    have hcomp : HasDerivAt (fun z : ℂ ↦ Ldual (1 - z)) (deriv Ldual (1 - s) * (-1)) s :=
+      han.differentiableAt.hasDerivAt.comp s hsub
+    have hLfun : L = fun z : ℂ ↦ E z * Ldual (1 - z) := funext hFE
+    rw [hLfun, logDeriv_fun_mul (f := E) (g := fun z : ℂ ↦ Ldual (1 - z)) s
+      (hE₀ s) hne (hEderiv s).differentiableAt hcomp.differentiableAt,
+      hlogE s, logDeriv_apply, logDeriv_apply, hcomp.deriv]
+    ring
+  have hLine_eq (y : ℝ) :
+      logDeriv L ((σ : ℂ) + (y : ℂ) * Complex.I) =
+        -Complex.log (q : ℂ) - logDeriv Ldual (((1 - σ : ℝ) : ℂ) + ((-y : ℝ) : ℂ) * Complex.I) := by
+    have hs : ((σ : ℂ) + (y : ℂ) * Complex.I).re < 0 := by
+      simpa [Complex.add_re, Complex.mul_re] using hσ0
+    rw [hLogDeriv_eq _ hs]
+    congr 2
+    push_cast
+    ring
+  obtain ⟨hContR, γ, hγ, hBigOR⟩ := hasSlowGrowthNearPoles_completedHeckeL_logDeriv_right
+    χ⁻¹ Ldual hLdual hDualAgree (1 - σ) (by linarith) (by linarith)
+  refine ⟨?_, γ, hγ, ?_⟩
+  · simp_rw [hLine_eq]
+    exact continuous_const.sub (hContR.comp continuous_neg)
+  · simp_rw [hLine_eq]
+    have htend : Tendsto (fun y : ℝ ↦ -y) (comap abs atTop) (comap abs atTop) :=
+      Filter.tendsto_comap_iff.mpr <|
+        Filter.tendsto_comap.congr fun y ↦ (abs_neg y).symm
+    have h1 : (fun y : ℝ ↦ logDeriv Ldual (((1 - σ : ℝ) : ℂ) + ((-y : ℝ) : ℂ) * Complex.I))
+        =O[comap abs atTop] (fun y : ℝ ↦ |y| ^ γ) := by
+      simpa only [Function.comp_def, abs_neg] using hBigOR.comp_tendsto htend
+    have hconst : (fun _ : ℝ ↦ -Complex.log (q : ℂ)) =O[comap abs atTop] (fun y : ℝ ↦ |y| ^ γ) := by
+      refine Asymptotics.IsBigO.of_bound ‖Complex.log (q : ℂ)‖ ?_
+      filter_upwards [(atTop_basis.comap (abs : ℝ → ℝ)).eventually_iff.mpr ⟨1, trivial, fun y hy ↦ hy⟩]
+        with y hy
+      simp only [mem_preimage, mem_Ici] at hy
+      rw [norm_neg, Real.norm_of_nonneg (Real.rpow_nonneg (abs_nonneg y) _)]
+      exact le_mul_of_one_le_right (norm_nonneg _) (Real.one_le_rpow hy hγ.le)
+    exact hconst.sub h1
 
 /-- Paper: §B.4.2.1, p. 614. The logarithmic derivative of the completed
 function has slow growth near its poles on the strip used for the residue formula.
