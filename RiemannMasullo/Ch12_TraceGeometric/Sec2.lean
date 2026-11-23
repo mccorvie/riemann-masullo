@@ -1051,30 +1051,6 @@ theorem aemeasurable_diagonalIndentationLift_right :
   simpa only [hswap] using
     aemeasurable_diagonalIndentationLift_left H hH hν hS hb hu hdiag hi
 
-include hH hν hS hb hu hdiag hi in
-/-- Paper: (12.2.2.3), p. 508. The first skew-diagonal evaluation is absolutely
-integrable on the fundamental domain times the subgroup. -/
-theorem integrable_diagonalIndentationLift_left :
-    Integrable (fun p : G × H ↦ Ψ uSmooth ((p.2 : G)⁻¹ * p.1, p.1))
-      ((μ.restrict D).prod countH) := by sorry
-
-include hH hν hS hb hu hdiag hi in
-/-- Paper: Proposition 12.2.2.2(2), p. 508. The second skew-diagonal evaluation is
-absolutely integrable on the fundamental domain times the subgroup. -/
-theorem integrable_diagonalIndentationLift_right :
-    Integrable (fun p : G × H ↦ Ψ uSmooth (p.1, (p.2 : G)⁻¹ * p.1))
-      ((μ.restrict D).prod countH) := by
-  have hweight (x y : G) :
-      diagonalIndentationWeight H countH b (x, y) = diagonalIndentationWeight H countH b (y, x) :=
-    integral_congr_ae (ae_of_all _ fun k ↦ mul_comm _ _)
-  have hswap (h : H) (x : G) :
-      Ψ uSmooth ((h : G)⁻¹ * x, x) = Ψ uSmooth (x, (h : G)⁻¹ * x) := by
-    have h1 : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
-    have hπ : π ((h : G)⁻¹ * x) = π x := by rw [map_mul, map_inv, h1, inv_one, one_mul]
-    simp only [diagonalIndentationLift, Prod.map_apply, hπ, hweight ((h : G)⁻¹ * x) x]
-  simpa only [hswap] using
-    integrable_diagonalIndentationLift_left H hH hν hS hb hu hdiag hi
-
 /-- Summing the averaged indentation weight over the translates of the first coordinate gives
 one, since the indentation sums to one over each orbit. -/
 private theorem integral_diagonalIndentationLift_left_weight [Countable H]
@@ -1151,22 +1127,15 @@ private theorem integral_diagonalIndentationLift_left_orbit (x y : G) :
     change (x⁻¹ * y)⁻¹ * y = x
     rw [mul_inv_rev, inv_inv, mul_comm y⁻¹ x, mul_assoc, inv_mul_cancel, mul_one]
 
-include hH hν hS hb hu hdiag hi in
-/-- Paper: Proposition 12.2.2.2(2), p. 508. The integral of the smoothened quotient diagonal
-equals the integral of the first skew diagonal, integrating subgroup translates first. -/
-theorem integral_diagonalIndentationLift_left :
-    (∫ q, uSmooth (q, q) ∂ν) =
-      ∫ x in D, ∫ h : H, Ψ uSmooth ((h : G)⁻¹ * x, x) ∂countH ∂μ := by
+include hH hν hS in
+/-- A function integrable on the quotient pulls back to an integrable function on the
+fundamental domain with the same integral. The domain is only null-measurable, so a measurable
+part of it is extended to a Borel transversal, where Weil's formula applies. -/
+private theorem integrable_diagonalIndentationLift_left_transfer {Φ : G ⧸ H → ℂ}
+    (hΦ : Integrable Φ ν) :
+    IntegrableOn (fun x ↦ Φ (π x)) D μ ∧ (∫ q, Φ q ∂ν) = ∫ x in D, Φ (π x) ∂μ := by
   let : Countable H := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
   let : IsClosed (H : Set G) := hH
-  have hinner (x : G) : ∫ h : H, Ψ uSmooth ((h : G)⁻¹ * x, x) ∂countH = uSmooth (π x, π x) := by
-    have hπ (h : H) : q₂ ((h : G)⁻¹ * x, x) = (π x, π x) := by
-      have h1 : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
-      simp only [Prod.map_apply, map_mul, map_inv, h1, inv_one, one_mul]
-    simp only [diagonalIndentationLift, hπ]
-    rw [integral_mul_const, integral_complex_ofReal,
-      (integral_diagonalIndentationLift_left_weight H hb x).2, Complex.ofReal_one, one_mul]
-  simp_rw [hinner]
   obtain ⟨hD, -, -⟩ := hS
   have hFD : IsFundamentalDomain H D μ := hD.isFundamentalDomain
   obtain ⟨M, hMD, hMm, -⟩ := hFD.nullMeasurableSet.exists_measurable_subset_ae_eq
@@ -1198,11 +1167,80 @@ theorem integral_diagonalIndentationLift_left :
         ⟨h', rfl⟩).trans hy.symm)
     have hxy : (h' : G) * x = (h : G) * x := (congrArg Subtype.val hsame).trans hh'.symm
     exact Subtype.ext (mul_right_cancel hxy)
-  rw [weilFundamentalDomain_integral H hH μ hΔm hbij ν hν hi]
-  refine hΔFD.setIntegral_eq hFD fun h x ↦ ?_
-  have h1 : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
-  change uSmooth (π ((h : G) * x), π ((h : G) * x)) = uSmooth (π x, π x)
-  rw [map_mul, h1, one_mul]
+  have hinv (h : H) (x : G) : Φ (π (h • x)) = Φ (π x) := by
+    have h1 : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
+    change Φ (π ((h : G) * x)) = Φ (π x)
+    rw [map_mul, h1, one_mul]
+  have hΔint : IntegrableOn (fun x ↦ Φ (π x)) Δ μ :=
+    (integrable_indicator_iff hΔm).mp
+      ((weilFundamentalDomain_integrable_iff H hH μ hΔm hbij ν hν Φ).mp hΦ)
+  refine ⟨(hΔFD.integrableOn_iff hFD hinv).mp hΔint, ?_⟩
+  rw [weilFundamentalDomain_integral H hH μ hΔm hbij ν hν hΦ]
+  exact hΔFD.setIntegral_eq hFD hinv
+
+include hH hν hS hb hu hdiag hi in
+/-- Paper: (12.2.2.3), p. 508. The first skew-diagonal evaluation is absolutely
+integrable on the fundamental domain times the subgroup. -/
+theorem integrable_diagonalIndentationLift_left :
+    Integrable (fun p : G × H ↦ Ψ uSmooth ((p.2 : G)⁻¹ * p.1, p.1))
+      ((μ.restrict D).prod countH) := by
+  let : Countable H := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
+  have hπ (x : G) (h : H) : q₂ ((h : G)⁻¹ * x, x) = (π x, π x) := by
+    have h1 : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
+    simp only [Prod.map_apply, map_mul, map_inv, h1, inv_one, one_mul]
+  have hW0 (x : G) (h : H) :
+      0 ≤ diagonalIndentationWeight H countH b ((h : G)⁻¹ * x, x) :=
+    integral_nonneg fun k ↦ mul_nonneg (hb.2.1 _) (hb.2.1 _)
+  have hm : AEStronglyMeasurable (fun p : G × H ↦ Ψ uSmooth ((p.2 : G)⁻¹ * p.1, p.1))
+      ((μ.restrict D).prod countH) := by
+    rw [Measure.restrict_prod_eq_prod_univ]
+    exact (aemeasurable_diagonalIndentationLift_left H hH hν hS hb hu hdiag hi).restrict
+      |>.aestronglyMeasurable
+  refine (integrable_prod_iff hm).mpr ⟨ae_of_all _ fun x ↦ ?_, ?_⟩
+  · simp only [diagonalIndentationLift, hπ]
+    exact (integral_diagonalIndentationLift_left_weight H hb x).1.ofReal.mul_const _
+  · have hnorm (x : G) : ∫ h : H, ‖Ψ uSmooth ((h : G)⁻¹ * x, x)‖ ∂countH =
+        ‖uSmooth (π x, π x)‖ := by
+      simp only [diagonalIndentationLift, hπ, norm_mul, Complex.norm_real,
+        Real.norm_of_nonneg (hW0 x _)]
+      rw [integral_mul_const, (integral_diagonalIndentationLift_left_weight H hb x).2, one_mul]
+    simp only [hnorm]
+    exact (integrable_diagonalIndentationLift_left_transfer H hH hν hS hi).1.norm
+
+include hH hν hS hb hu hdiag hi in
+/-- Paper: Proposition 12.2.2.2(2), p. 508. The second skew-diagonal evaluation is
+absolutely integrable on the fundamental domain times the subgroup. -/
+theorem integrable_diagonalIndentationLift_right :
+    Integrable (fun p : G × H ↦ Ψ uSmooth (p.1, (p.2 : G)⁻¹ * p.1))
+      ((μ.restrict D).prod countH) := by
+  have hweight (x y : G) :
+      diagonalIndentationWeight H countH b (x, y) = diagonalIndentationWeight H countH b (y, x) :=
+    integral_congr_ae (ae_of_all _ fun k ↦ mul_comm _ _)
+  have hswap (h : H) (x : G) :
+      Ψ uSmooth ((h : G)⁻¹ * x, x) = Ψ uSmooth (x, (h : G)⁻¹ * x) := by
+    have h1 : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
+    have hπ : π ((h : G)⁻¹ * x) = π x := by rw [map_mul, map_inv, h1, inv_one, one_mul]
+    simp only [diagonalIndentationLift, Prod.map_apply, hπ, hweight ((h : G)⁻¹ * x) x]
+  simpa only [hswap] using
+    integrable_diagonalIndentationLift_left H hH hν hS hb hu hdiag hi
+
+include hH hν hS hb hu hdiag hi in
+/-- Paper: Proposition 12.2.2.2(2), p. 508. The integral of the smoothened quotient diagonal
+equals the integral of the first skew diagonal, integrating subgroup translates first. -/
+theorem integral_diagonalIndentationLift_left :
+    (∫ q, uSmooth (q, q) ∂ν) =
+      ∫ x in D, ∫ h : H, Ψ uSmooth ((h : G)⁻¹ * x, x) ∂countH ∂μ := by
+  let : Countable H := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
+  let : IsClosed (H : Set G) := hH
+  have hinner (x : G) : ∫ h : H, Ψ uSmooth ((h : G)⁻¹ * x, x) ∂countH = uSmooth (π x, π x) := by
+    have hπ (h : H) : q₂ ((h : G)⁻¹ * x, x) = (π x, π x) := by
+      have h1 : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
+      simp only [Prod.map_apply, map_mul, map_inv, h1, inv_one, one_mul]
+    simp only [diagonalIndentationLift, hπ]
+    rw [integral_mul_const, integral_complex_ofReal,
+      (integral_diagonalIndentationLift_left_weight H hb x).2, Complex.ofReal_one, one_mul]
+  simp_rw [hinner]
+  exact (integrable_diagonalIndentationLift_left_transfer H hH hν hS hi).2
 
 include hH hν hS hb hu hdiag hi in
 /-- Paper: (12.2.2.5), p. 508. The first skew-diagonal integral is unchanged by
