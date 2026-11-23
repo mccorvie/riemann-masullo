@@ -60,7 +60,8 @@ These are the restricted S-adelic tests, with the fibre or singleton entered as 
 The archimedean factor is flat and every finite factor outside T vanishes at zero.
 Deviation: The punctured factors are the zero extensions of compactly supported locally
 constant tests on the units, as in §5.3.4 and ERRATA R11. The subspace carries the inherited
-S-adelic Schwartz–Bruhat topology, using the tensor decomposition of §2.1.4. -/
+S-adelic Schwartz–Bruhat topology of §2.1.4. Even for the corrected factors, the
+printed projective tensor topology can be strictly coarser (ERRATA I156). -/
 def sLocalOrbitalSupportTests (S T : Finset V) : Submodule ℂ B(S) :=
   let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
   Submodule.span ℂ {f : B(S) |
@@ -147,8 +148,12 @@ theorem sLocalOrbitalSupportComparison_mk (hT : T ⊆ S) (η : PontryaginDual J�
 -- TODO(paper-gap): On p. 383 the identity Λ/L_out = L_S omits the factor regularizing
 -- the trivial norm-one component. Moreover the surjectivity argument on pp. 383–384
 -- passes from zero-moment to unrestricted tests, and from archimedean entire Mellin
--- transforms to tests with the required finite punctured factors. See the refutations
--- of both quotient comparisons in Sec1_Printed.
+-- transforms to tests with the required finite punctured factors. Already (8.1.0.5)
+-- gives the full pair space as the range for two-moment tests. For ℚ, S = {∞, 2},
+-- the Gaussian pair has a double pole at zero, whose coefficient detects f(0).
+-- In (8.1.0.9), L_S exp(s²) is nonzero at 1, whereas every left-hand member
+-- vanishes there since L_out has a pole. On p. 384 insertion also needs the outside
+-- Tamagawa masses (ERRATA I96). Both quotient comparisons fail in Sec1_Printed.
 
 /-- Paper: Theorem 8.1.0.1(1), p. 382.
 The range of the primary comparison consists of the orbital classes that admit
@@ -180,5 +185,11 @@ theorem sLocalPlaceOrbitalSupportComparison_range (v : S) (_hPic : PicTrivial(S)
 
 -- TODO(later): needs §§8.2–8.3 for the announced stack description and the
 -- support of the transposed dual basis elements (Theorem 8.3.0.1, p. 387).
+-- TODO(paper-gap): The support assertion for ambient test functions on pp. 387–388
+-- fails: the open set with every coordinate nonzero is dense, so an ambient
+-- continuous function supported on its complement vanishes. On ℚ with S = {∞, 2},
+-- the double-pole coefficient of the Gaussian at zero gives a nonzero orbital
+-- functional. The support of that distribution and the support of its test
+-- functions play different roles.
 
 end RiemannMasullo
