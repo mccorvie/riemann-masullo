@@ -783,7 +783,74 @@ theorem orbitalQuotient_lift_bases
     let ev : ℕ → StrongDual ℂ (StrongDual ℂ (E₁ ⧸ H₁)) :=
       fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (e n)
     IsSchauderBasis e a ∧ SchauderBasis.IsAbsolute e a ∧
-      IsSchauderBasis a ev ∧ SchauderBasis.IsUnconditional a ev := by sorry
+      IsSchauderBasis a ev ∧ SchauderBasis.IsUnconditional a ev := by
+  intro e a ev
+  let Q₁ := E₁ ⧸ H₁
+  let Q₂ := E₂ ⧸ H₂
+  have : IsTopologicalAddGroup E₂ := _hF₂.choose
+  have hFQ₁ : IsFrechetTVS Q₁ := isFrechetTVS_quotient _hF₁ H₁ _hH₁
+  have hFQ₂ : IsFrechetTVS Q₂ := isFrechetTVS_quotient _hF₂ H₂ _hH₂
+  have hcomm (v : E₁) : A₀ (H₁.mkQL v) = H₂.mkQL (A v) :=
+    DFunLike.congr_fun _hA₀ v
+  have hinj : Injective A₀ := by
+    intro u v huv
+    obtain ⟨u, rfl⟩ := H₁.mkQ_surjective u
+    obtain ⟨v, rfl⟩ := H₁.mkQ_surjective v
+    apply (Submodule.Quotient.eq H₁).mpr
+    rw [← _hpre]
+    change A (u - v) ∈ H₂
+    rw [map_sub]
+    apply (Submodule.Quotient.eq H₂).mp
+    exact (hcomm u).symm.trans (huv.trans (hcomm v))
+  have : TopologicalSpace.MetrizableSpace Q₁ := hFQ₁.choose_spec.2.1
+  have hOpen : IsOpenMap A₀ :=
+    isOpenMap_of_surjective_toLF (isLFSpace_of_isFrechetTVS hFQ₂)
+      (X := fun _ ↦ Q₁) (fun _ ↦ hFQ₁) (fun _ ↦ ContinuousLinearMap.id ℂ Q₁)
+      (fun _ ↦ Subset.rfl) (fun u ↦ ⟨0, u, rfl⟩) A₀ _hsurj
+  let T₀ := LinearEquiv.ofBijective A₀.toLinearMap ⟨hinj, _hsurj⟩
+  let T : Q₁ ≃L[ℂ] Q₂ :=
+    { T₀ with
+      continuous_toFun := A₀.continuous
+      continuous_invFun := T₀.toEquiv.continuous_symm_iff.mpr hOpen }
+  have hlift (n : ℕ) : T (e n) = H₂.mkQL (x n) := (hcomm (y n)).trans (congrArg H₂.mkQL (_hy n))
+  have hcoord (n : ℕ) (v : Q₁) : a n v = d n (T v) := rfl
+  have hterm (v : Q₁) (n : ℕ) :
+      T.symm (d n (T v) • H₂.mkQL (x n)) = a n v • e n := by
+    rw [map_smul, ← hlift, T.symm_apply_apply, hcoord]
+  have hb : IsSchauderBasis e a := by
+    refine ⟨fun m n ↦ ?_, fun v ↦ ?_⟩
+    · change a m (e n) = _
+      rw [hcoord, hlift]
+      exact _hb.1 m n
+    · have hs := (_hb.2 (T v)).mapL T.symm.toContinuousLinearMap
+      change HasSum (fun n ↦ T.symm (d n (T v) • H₂.mkQL (x n)))
+        (T.symm (T v)) (SummationFilter.conditional ℕ) at hs
+      rw [T.symm_apply_apply] at hs
+      simp_rw [hterm] at hs
+      exact hs
+  have ha : SchauderBasis.IsAbsolute e a := by
+    intro q hq
+    obtain ⟨p, hp, h⟩ := _habs (q.comp T.symm.toLinearMap) (hq.comp T.symm.continuous)
+    refine ⟨p.comp T.toLinearMap, hp.comp T.continuous, fun v ↦ ?_⟩
+    have hv := h (T v)
+    change Summable (fun n ↦ q (T.symm (d n (T v) • H₂.mkQL (x n)))) ∧
+      (∑' n, q (T.symm (d n (T v) • H₂.mkQL (x n)))) ≤ p (T v) at hv
+    change _ ∧ _ ≤ p (T v)
+    simpa only [hterm] using hv
+  let : BarrelledSpace ℂ Q₁ := isFrechetTVS_barrelled hFQ₁
+  let : PolynormableSpace ℂ Q₁ := hFQ₁.choose_spec.1
+  let : UniformSpace Q₁ := IsTopologicalAddGroup.rightUniformSpace Q₁
+  let : IsUniformAddGroup Q₁ := isUniformAddGroup_of_addCommGroup
+  let hComplete : CompleteSpace Q₁ := hFQ₁.choose_spec.2.2
+  let : CompleteSpace Q₁ := hComplete
+  have hNQ₁ : IsNuclearTVS Q₁ := isNuclearTVS_quotient _hN₁ H₁
+  let : MontelSpace ℂ Q₁ := ⟨fun K hK hbounded ↦ by
+    simpa only [hK.closure_eq] using isCompact_closure_of_isNuclearTVS Q₁ hNQ₁ hbounded⟩
+  have hReflexive : IsHomeomorph (ContinuousLinearMap.applyₗ (E := Q₁) ℂ (RingHom.id ℂ)) :=
+    isHomeomorph_iff_isEmbedding_surjective.mpr
+      ⟨isEmbedding_strongBidual_eval, surjective_strongBidual_eval⟩
+  exact ⟨hb, ha, SchauderBasis.isShrinking_of_isAbsolute hComplete hReflexive hb ha,
+    SchauderBasis.strongDual_isUnconditional_of_isAbsolute hComplete hReflexive hb ha⟩
 
 /-- Paper: Lemma 7.3.1.5(2), p. 344.
 The estimate for each seminorm on the first quotient uses the bound for that

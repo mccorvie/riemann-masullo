@@ -583,9 +583,12 @@ def IsAbsolutelySummingLocalBanachMap {p q : Seminorm ℂ E} (h : q ≤ p) : Pro
       ∑ i, ‖localBanachMap p q h (x i)‖ ≤ C * M
 
 omit [T2Space E] in
-/-- Paper: Theorem C.2.4.2(2), p. 686. In a nuclear space, each local Banach
-space admits a comparison from a smaller neighborhood with an absolute
-summability bound. -/
+/-- Paper: Theorem C.2.4.2(2), p. 686. In a nuclear space, for each balanced convex
+zero-neighborhood there is a smaller balanced convex zero-neighborhood whose local Banach space
+maps to that of the original neighborhood with an absolute summability bound.
+
+Deviation: This intermediate result establishes the absolute summability bound used to
+derive the nuclear comparison map. -/
 theorem exists_localBanachMap_absolutelySumming (h : IsNuclearTVS.{v, u} E)
     (U : Set E) (hU : U ∈ 𝓝 0) (bU : Balanced ℂ U) (cU : Convex ℝ U) :
     ∃ (V : Set E) (hV : V ∈ 𝓝 0) (bV : Balanced ℂ V) (cV : Convex ℝ V) (hVU : V ⊆ U),
