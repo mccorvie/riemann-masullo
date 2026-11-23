@@ -58,7 +58,9 @@ section SecondStructure
 The Mellin map on the S-local theta quotient is continuous for compact convergence
 on the regular locus of the meromorphic target. -/
 theorem continuous_sLocalThetaMellin :
-    Continuous (sLocalThetaMellin (F := F) (S := S)) := by sorry
+    Continuous (sLocalThetaMellin (F := F) (S := S)) := by
+  exact (LinearMap.ker (sLocalAdelicTheta F S)).isQuotientMap_mkQ.continuous_iff.mpr
+    (sLocalIdelicMellin_continuous (F := F) (S := S))
 
 /-- Paper: Theorem 5.4.1.1(1), p. 265.
 Every norm-one character has a unique unitary lift trivial on the chosen norm section.
