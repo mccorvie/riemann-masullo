@@ -2365,9 +2365,10 @@ private theorem sLocal_functionalEquation_of_tensor (χ : PontryaginDual Jₛ) (
   simp only [sLocalRhoFactor, Finset.prod_mul_distrib]
   ring
 
-/-- Self-duality carries the continuous Fourier map on the Pontryagin dual
-back to the S-adelic Schwartz space. -/
-private theorem sLocal_fourier_continuousLinear :
+/-- The S-adelic Fourier transform `sAdeleSchwartzFourier` is a continuous linear operator on
+the S-adelic Schwartz–Bruhat space. Self-duality carries the continuous Fourier map on the
+Pontryagin dual back to that space. -/
+theorem sLocal_fourier_continuousLinear :
     ∃ T : ℬ(Aₛ) →L[ℂ] ℬ(Aₛ), ∀ f, T f = sAdeleSchwartzFourier f := by
   let G := Multiplicative Aₛ
   let μ : Measure G := sAdditiveTamagawaMeasure F S
