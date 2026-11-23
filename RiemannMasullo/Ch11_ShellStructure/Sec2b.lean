@@ -160,7 +160,8 @@ A box-limited polar-free test gives its weighted homogeneous theta vector in the
 Deviation: Use the positive local twist of the repaired definition. -/
 theorem sLocalAbsolutePWSobolev_mem {a : ℝ} (ha : 0 < a) (ω : PontryaginDual J₁) (Λ : ℝ)
     (f : Zₛ) (_hf : f ∈ band(sLocalPWBox S Λ)) :
-    sLocalPWThetaSobolevMap (F := F) (S := S) (s := s) ha ω f ∈ sLocalAbsolutePWSobolev (F := F) (S := S) hs ha ω Λ := by sorry
+    sLocalPWThetaSobolevMap (F := F) (S := S) (s := s) ha ω f ∈ sLocalAbsolutePWSobolev (F := F) (S := S) hs ha ω Λ := by
+  exact Submodule.le_topologicalClosure _ (Submodule.subset_span ⟨⟨f, _hf⟩, rfl⟩)
 
 -- TODO(paper-gap): (11.2.1.2) leaves X free. The box parameter here is Λ,
 -- as indicated by the comparison with Λ^|S| in the proof on p. 489.
