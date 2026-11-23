@@ -3,6 +3,9 @@ module
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec6
 
+import all RiemannMasullo.AppC_LCTVS.Sec1
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
+
 /-! # §7.3.1 Orbital Schauder bases
 
 The set of places in the Lean notation lists the finite places. All archimedean places
@@ -383,7 +386,49 @@ theorem orbitalQuotient_lift_bases
     let ev : ℕ → StrongDual ℂ (StrongDual ℂ (E₁ ⧸ H₁)) :=
       fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (e n)
     IsSchauderBasis e a ∧ SchauderBasis.IsAbsolute e a ∧
-      IsSchauderBasis a ev ∧ SchauderBasis.IsUnconditional a ev := by sorry
+      IsSchauderBasis a ev ∧ SchauderBasis.IsUnconditional a ev := by
+  intro e a ev
+  obtain ⟨D, hD⟩ := orbitalQuotient_lift_equiv E₁ E₂ H₁ H₂ A A₀ _hF₁ _hF₂ _hH₁ _hH₂ _hpre _hA₀
+    _hsurj
+  have he (n : ℕ) : e n = D.symm (H₂.mkQL (x n)) := by
+    rw [ContinuousLinearEquiv.eq_symm_apply, ← _hy n]
+    change D.toContinuousLinearMap _ = _
+    rw [hD]
+    exact congrArg (fun L : (E₁ →L[ℂ] (E₂ ⧸ H₂)) ↦ L (y n)) _hA₀
+  have ha (n : ℕ) (u : E₁ ⧸ H₁) : a n u = d n (D u) := by
+    change d n (A₀ u) = _
+    rw [← hD]
+    rfl
+  have hterm (u : E₁ ⧸ H₁) (m : ℕ) :
+      a m u • e m = D.symm (d m (D u) • H₂.mkQL (x m)) := by
+    rw [ha, he, map_smul]
+  have hbasis : IsSchauderBasis e a := by
+    refine ⟨fun m n ↦ ?_, fun u ↦ ?_⟩
+    · change a m (e n) = _
+      rw [ha, he, ContinuousLinearEquiv.apply_symm_apply]
+      exact _hb.1 m n
+    · have h := (_hb.2 (D u)).map D.symm.toLinearMap.toAddMonoidHom D.symm.continuous
+      convert h using 2 with m
+      · exact hterm u m
+      · exact (D.symm_apply_apply u).symm
+  have habs : SchauderBasis.IsAbsolute e a := by
+    intro q hq
+    obtain ⟨q', hq', hsum⟩ := _habs (q.comp D.symm.toLinearMap) (hq.comp D.symm.continuous)
+    refine ⟨q'.comp D.toLinearMap, hq'.comp D.continuous, fun u ↦ ?_⟩
+    simp only [hterm]
+    exact hsum (D u)
+  have hQ₁ := isFrechetTVS_quotient _hF₁ H₁ _hH₁
+  have hbar := isFrechetTVS_barrelled hQ₁
+  have hmon := montelSpace_of_schwartz_frechet hQ₁
+    (isSchwartzTVS_of_isNuclearTVS (isNuclearTVS_quotient _hN₁ H₁ (E := E₁)))
+  obtain ⟨_, hpoly, hmet, hcomplete⟩ := hQ₁
+  let : UniformSpace (E₁ ⧸ H₁) := IsTopologicalAddGroup.rightUniformSpace (E₁ ⧸ H₁)
+  have : IsUniformAddGroup (E₁ ⧸ H₁) := isUniformAddGroup_of_addCommGroup
+  have hrefl : IsHomeomorph (ContinuousLinearMap.applyₗ (E := E₁ ⧸ H₁) ℂ (RingHom.id ℂ)) :=
+    isHomeomorph_iff_isEmbedding_surjective.mpr
+      ⟨isEmbedding_strongBidual_eval, surjective_strongBidual_eval⟩
+  exact ⟨hbasis, habs, SchauderBasis.isShrinking_of_isAbsolute hcomplete hrefl hbasis habs,
+    SchauderBasis.strongDual_isUnconditional_of_isAbsolute hcomplete hrefl hbasis habs⟩
 
 /-- Paper: Lemma 7.3.1.5(2), p. 344.
 The estimate for each seminorm on the first quotient uses the bound for that
