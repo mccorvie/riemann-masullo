@@ -883,28 +883,24 @@ private theorem globalThetaSobolevPrincipalValue_equivariant_aux
   dsimp only [Function.comp_apply]
   rw [h1, hc, hone, hPapp, hPapp, h2, hc, hone, hcomm x x₁ x₂ hx₁ hx₂]
 
-/-- Paper: Proposition 11.2.0.1(2), pp. 484–485. The extension commutes with
-norm-one translations and hence preserves all norm-one isotypes.
-Deviation: This compatibility is stated separately from closed range and holds
-without the lower bound on the degree. -/
-theorem globalThetaSobolevPrincipalValue_equivariant (S : Finset V) (a : ℝ)
-    {s : ℝ} (hs : 0 ≤ s) (k : C₁) (u : H(a, hs)) :
+/-- The completed principal value commutes with each idele class whose scalar weight is one. -/
+theorem globalThetaSobolevPrincipalValue_equivariant_of_weight_one (S : Finset V) (a : ℝ)
+    {s : ℝ} (hs : 0 ≤ s) (k : C𝔽)
+    (hk : ((m𝔽 k).val : ℝ) ^ (-a) = 1) (u : H(a, hs)) :
     let R := (exists_globalThetaSobolevAction (F := F) a hI hs).choose
-    P(S, a, hs) (R k.val u) = R k.val (P(S, a, hs) u) := by
+    P(S, a, hs) (R k u) = R k (P(S, a, hs) u) := by
   intro R
   have hq : Surjective (fun f : ℬ₀ ↦ theta(f)) := Submodule.mkQ_surjective
     ((LinearMap.ker (adelicThetaLinearMap F)).comap (adelePolarSubspace F).subtype)
   have hdense : DenseRange (fun f : ℬ₀ ↦ j(a, hs) (theta(f))) :=
     (globalThetaSobolev_dense (F := F) a hI hs).comp hq.denseRange (j(a, hs)).continuous
-  refine Exists.elim (QuotientGroup.mk_surjective k.val) fun g hg ↦ ?_
+  refine Exists.elim (QuotientGroup.mk_surjective k) fun g hg ↦ ?_
   have hc : (((m𝔽 (QuotientGroup.mk g)).val : ℝ) ^ (-a) : ℝ) = 1 := by
-    have hk : ideleClassNorm F k.val = 1 := k.property
-    change ((ideleClassNorm F (QuotientGroup.mk g)).val : ℝ) ^ (-a) = 1
-    rw [hg, hk]
-    simp
+    rw [hg]
+    exact hk
   exact globalThetaSobolevPrincipalValue_equivariant_aux Subtype.val (j(a, hs))
     (fun f : ℬ₀ ↦ theta(f)) hdense
-    (P(S, a, hs)) (fun c v ↦ R c v) (P(S, a, hs)).continuous k.val (QuotientGroup.mk g) hg
+    (P(S, a, hs)) (fun c v ↦ R c v) (P(S, a, hs)).continuous k (QuotientGroup.mk g) hg
     (R (QuotientGroup.mk g)).continuous
     (fun f ↦ pvTest(S, f)) (globalThetaSobolevPrincipalValue_apply S a hs)
     _ hc
@@ -916,6 +912,19 @@ theorem globalThetaSobolevPrincipalValue_equivariant (S : Finset V) (a : ℝ)
     else
       globalThetaSobolevPrincipalValue_equivariant_hcomm_empty S hn g)
     u
+
+/-- Paper: Proposition 11.2.0.1(2), pp. 484–485. The extension commutes with
+norm-one translations and hence preserves all norm-one isotypes.
+Deviation: This compatibility is stated separately from closed range and holds
+without the lower bound on the degree. -/
+theorem globalThetaSobolevPrincipalValue_equivariant (S : Finset V) (a : ℝ)
+    {s : ℝ} (hs : 0 ≤ s) (k : C₁) (u : H(a, hs)) :
+    let R := (exists_globalThetaSobolevAction (F := F) a hI hs).choose
+    P(S, a, hs) (R k.val u) = R k.val (P(S, a, hs) u) := by
+  refine globalThetaSobolevPrincipalValue_equivariant_of_weight_one S a hs k.val ?_ u
+  change ((ideleClassNorm F k.val).val : ℝ) ^ (-a) = 1
+  rw [show ideleClassNorm F k.val = 1 from k.property]
+  simp
 
 /-- Paper: Proof of Proposition 11.2.0.1, pp. 484–485. At an unramified
 singleton place, the 0-line extension is the difference with the uniformizer translate.
