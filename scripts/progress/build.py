@@ -1027,7 +1027,9 @@ def errata_model(groups, decls, notes):
         return int(m.group(1)) if m else None
 
     clean = lambda s: excerpt(re.sub(r"\*\*|`", "", s), 240)
-    cells_of = lambda line: [c.strip() for c in line.strip().strip("|").split("|")]
+    # A cell may contain a bar written `\|` (absolute values, norms): split only at the others.
+    cells_of = lambda line: [c.strip().replace("\\|", "|")
+                             for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
     entries, gaps, no_repair = [], [], set()
     for part in re.split(r"^## ", text, flags=re.M)[1:]:
         title, _, body = part.partition("\n")

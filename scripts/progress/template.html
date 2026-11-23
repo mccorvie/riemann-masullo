@@ -753,7 +753,7 @@ function gapList(gaps) {
 function problemsPanel() {
   const E = ER.entries;
   if (!E.length) return null;
-  // Entries that belong to a place with no known repair are counted there, in red, not as repaired.
+  // Entries that belong to a place with no known repair are counted there, in red, and not in the first two figures.
   const F = E.filter(e => e[E_KIND] === 'F' && !e[E_NOREP]);
   const I = E.filter(e => e[E_KIND] === 'I' && !e[E_NOREP]);
   const unrepaired = E.filter(e => e[E_NOREP]).length;
@@ -764,11 +764,11 @@ function problemsPanel() {
   return h('section', { class: 'probs' },
     h('div', { class: 'chart-head' }, h('h3', null, 'Problems found in the paper'), ext(errataUrl, 'ERRATA.md')),
     h('div', { class: 'stats' },
-      stat('False as stated \u2013 repaired', F.length, 'F', refuted + ' refuted in Lean' + (refOpen ? ', ' + refOpen + ' with the refutation still open' : '')),
-      stat('Imprecise or wrongly justified \u2013 repaired', I.length, 'I', 'a definition or a step of a proof that needed fixing'),
+      stat('False as stated', F.length, 'F', refuted + ' refuted in Lean' + (refOpen ? ', ' + refOpen + ' with the refutation still open' : '')),
+      stat('Imprecise or wrongly justified', I.length, 'I', 'a definition or a step of a proof that needed fixing'),
       stat('Missing material', probCount(E, 'M') + probCount(E, 'R'), 'M', 'placeholders, empty sections and missing references, and reports from reading'),
       stat('No repair known', ER.gaps.length, 'nr', plural(ER.gaps.length, 'place') + ' (' + plural(unrepaired, 'entry', 'entries') + ') that later results depend on')),
-    h('div', { class: 'since' }, 'From ERRATA.md, without the withdrawn entries. Most problems come with a repair: the Lean states a corrected form and the proof builds on that. A false statement is also kept as printed, as a proposition Printed.<name>, next to a theorem Printed.<name>_false that proves its negation; "refuted in Lean" counts those whose proof is finished. Switch the map below to "Problems in the paper" to see which sections they are in.'),
+    h('div', { class: 'since' }, 'From ERRATA.md, without the withdrawn entries. Most problems come with a repair: the Lean states a corrected form and the proof builds on that. Where it does not, the entry says what the Lean has instead (a part left out, or a marked gap). A false statement is also kept as printed, as a proposition Printed.<name>, next to a theorem Printed.<name>_false that proves its negation; "refuted in Lean" counts those whose proof is finished. Switch the map below to "Problems in the paper" to see which sections they are in.'),
     h('details', { class: 'block' }, h('summary', null, 'The ' + ER.gaps.length + ' places with no known repair'), gapList(ER.gaps)),
     outside.length ? h('details', { class: 'block' }, h('summary', null, 'Problems outside the stated sections (' + outside.length + ')'), probList(outside)) : null);
 }
