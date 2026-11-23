@@ -71,6 +71,344 @@ dense in the full global Sobolev space on the 0-line. -/
 theorem denseRange_globalTheta_zeroLine {s : ℝ} (hs : 0 ≤ s) :
     DenseRange (fun u : GlobalPolarFreeThetaSpace F ↦ (j(0, hs) u : W(s))) := by sorry
 
+section GlobalThetaPrincipalValueFormulaHelpers
+
+private theorem continuous_ideleGroup_ofAdicCompletion (v : V) :
+    Continuous (IdeleGroup.ofAdicCompletion (𝓞 F) F v) := by
+  classical
+  apply Continuous.units_map
+  apply continuous_const.prodMk
+  apply continuous_restrictedProduct_of_uniform
+  · intro w
+    exact (continuous_apply w).comp
+      (continuous_mulSingle (A := fun u : V ↦ u.adicCompletion F) v)
+  · filter_upwards [Filter.eventually_cofinite_ne v] with w hw x
+    change Pi.mulSingle v x w ∈ w.adicCompletionIntegers F
+    rw [Pi.mulSingle_eq_of_ne hw]
+    exact (w.adicCompletionIntegers F).one_mem
+
+private theorem ofAdicCompletion_mul_adeleProjection_fst (v : V)
+    (a : (v.adicCompletion F)ˣ) (x : 𝔸[F]) :
+    (adeleProjection F {v} ((IdeleGroup.ofAdicCompletion (𝓞 F) F v a).val * x)).1 = x.1 := by
+  change (1 : InfiniteAdeleRing F) * x.1 = x.1
+  exact one_mul x.1
+
+private theorem ofAdicCompletion_mul_adeleProjection_snd (v : V)
+    (a : (v.adicCompletion F)ˣ) (x : 𝔸[F]) :
+    (adeleProjection F {v} ((IdeleGroup.ofAdicCompletion (𝓞 F) F v a).val * x)).2
+      ⟨v, Finset.mem_singleton_self v⟩ = a.val * x.2 v := by
+  classical
+  change (Pi.mulSingle v a.val v) * x.2 v = a.val * x.2 v
+  rw [Pi.mulSingle_eq_same]
+
+private theorem ofAdicCompletion_mul_finiteAdeleTailProjection (v : V)
+    (a : (v.adicCompletion F)ˣ) (x : 𝔸[F]) :
+    finiteAdeleTailProjection F {v} ((IdeleGroup.ofAdicCompletion (𝓞 F) F v a).val * x).2 =
+      finiteAdeleTailProjection F {v} x.2 := by
+  classical
+  apply Subtype.ext
+  funext w
+  have hw : w.val ≠ v := Finset.notMem_singleton.mp w.property
+  change (Pi.mulSingle v a.val w.val) * x.2 w.val = x.2 w.val
+  rw [Pi.mulSingle_eq_of_ne hw, one_mul]
+
+private theorem globalThetaPrincipalValue_sobolevBound_inductive_ext {E G N M : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [AddCommGroup G] [Module ℂ G] [TopologicalSpace G]
+    [AddCommGroup N] [Module ℂ N] [TopologicalSpace N]
+    [AddCommGroup M] [Module ℂ M]
+    (e : InductiveTensor E G ≃L[ℂ] N) (L₁ L₂ : N →ₗ[ℂ] M)
+    (h : ∀ (a : E) (b : G), L₁ (e (a ⊗ₜ[ℂ] b)) = L₂ (e (a ⊗ₜ[ℂ] b))) :
+    L₁ = L₂ := by
+  have key : ∀ y : TensorProduct ℂ E G, L₁ (e y) = L₂ (e y) := by
+    intro y
+    induction y using TensorProduct.inductionOn with
+    | tmul a b => exact h a b
+    | add y z hy hz =>
+      exact (congrArg L₁ (map_add e y z)).trans ((map_add L₁ _ _).trans
+        ((congrArg₂ (· + ·) hy hz).trans ((map_add L₂ _ _).symm.trans
+          (congrArg L₂ (map_add e y z)).symm)))
+  refine LinearMap.ext fun x ↦ ?_
+  calc L₁ x = L₁ (e (e.symm x)) := by rw [e.apply_symm_apply]
+    _ = L₂ (e (e.symm x)) := key (e.symm x)
+    _ = L₂ x := by rw [e.apply_symm_apply]
+
+private theorem globalThetaPrincipalValue_sobolevBound_linear_ext (v : V)
+    (L R : SchwartzBruhat (Multiplicative 𝔸[F]) →ₗ[ℂ] ℂ)
+    (h : ∀ (a : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+      (b : (w : ({v} : Finset V)) → SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))
+      (t : SchwartzBruhat (Multiplicative (FiniteAdeleTail F {v}))),
+      let e := (sAdeleTailSchwartz_inductiveTensor_equiv F ({v} : Finset V)).choose
+      let e' := (sAdeleSchwartz_inductiveTensor_equiv F ({v} : Finset V)).choose
+      L (e (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)) ⊗ₜ[ℂ] t)) =
+        R (e (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)) ⊗ₜ[ℂ] t))) :
+    L = R := by
+  let e := (sAdeleTailSchwartz_inductiveTensor_equiv F ({v} : Finset V)).choose
+  let e' := (sAdeleSchwartz_inductiveTensor_equiv F ({v} : Finset V)).choose
+  refine globalThetaPrincipalValue_sobolevBound_inductive_ext e L R fun y t ↦ ?_
+  let mkT : SchwartzBruhat (Multiplicative (SAdeleRing F {v})) →ₗ[ℂ]
+      InductiveTensor (SchwartzBruhat (Multiplicative (SAdeleRing F {v})))
+        (SchwartzBruhat (Multiplicative (FiniteAdeleTail F {v}))) :=
+    { toFun := fun u ↦ u ⊗ₜ[ℂ] t
+      map_add' := fun u₁ u₂ ↦ TensorProduct.add_tmul u₁ u₂ t
+      map_smul' := fun r u ↦ TensorProduct.smul_tmul' r u t }
+  let L₁ : SchwartzBruhat (Multiplicative (SAdeleRing F {v})) →ₗ[ℂ] ℂ :=
+    L.comp (e.toLinearMap.comp mkT)
+  let R₁ : SchwartzBruhat (Multiplicative (SAdeleRing F {v})) →ₗ[ℂ] ℂ :=
+    R.comp (e.toLinearMap.comp mkT)
+  change L₁ y = R₁ y
+  refine LinearMap.congr_fun
+    (globalThetaPrincipalValue_sobolevBound_inductive_ext e' L₁ R₁ fun a z ↦ ?_) y
+  let ι₁ : PiTensorProduct ℂ (fun w : ({v} : Finset V) ↦
+      SchwartzBruhat (Multiplicative (w.val.adicCompletion F))) →ₗ[ℂ]
+      FinestLocallyConvex (PiTensorProduct ℂ (fun w : ({v} : Finset V) ↦
+        SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))) :=
+    { toFun := id
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  let mkA : FinestLocallyConvex (PiTensorProduct ℂ (fun w : ({v} : Finset V) ↦
+      SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))) →ₗ[ℂ]
+      InductiveTensor (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+        (FinestLocallyConvex (PiTensorProduct ℂ (fun w : ({v} : Finset V) ↦
+          SchwartzBruhat (Multiplicative (w.val.adicCompletion F))))) :=
+    { toFun := fun w ↦ a ⊗ₜ[ℂ] w
+      map_add' := fun w₁ w₂ ↦ TensorProduct.tmul_add a w₁ w₂
+      map_smul' := fun r w ↦ TensorProduct.tmul_smul r a w }
+  let L₂ : PiTensorProduct ℂ (fun w : ({v} : Finset V) ↦
+      SchwartzBruhat (Multiplicative (w.val.adicCompletion F))) →ₗ[ℂ] ℂ :=
+    L₁.comp (e'.toLinearMap.comp (mkA.comp ι₁))
+  let R₂ : PiTensorProduct ℂ (fun w : ({v} : Finset V) ↦
+      SchwartzBruhat (Multiplicative (w.val.adicCompletion F))) →ₗ[ℂ] ℂ :=
+    R₁.comp (e'.toLinearMap.comp (mkA.comp ι₁))
+  change L₂ z = R₂ z
+  refine PiTensorProduct.induction_on (motive := fun z' ↦ L₂ z' = R₂ z')
+    (show PiTensorProduct ℂ (fun w : ({v} : Finset V) ↦
+      SchwartzBruhat (Multiplicative (w.val.adicCompletion F))) from z)
+    (fun r b ↦ by
+      rw [L₂.map_smul, R₂.map_smul]
+      exact congrArg (r • ·) (h a b t))
+    (fun z₁ z₂ hz₁ hz₂ ↦ by
+      rw [L₂.map_add, R₂.map_add, hz₁, hz₂])
+
+open Classical in
+private theorem globalThetaPrincipalValue_sobolevBound_pointwise_pure_aux (v : V)
+    (π : (v.adicCompletion F)ˣ) (hπ : Valued.v.IsUniformizer π.val) (x : 𝔸[F])
+    (a : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+    (b : (w : ({v} : Finset V)) → SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))
+    (t : SchwartzBruhat (Multiplicative (FiniteAdeleTail F {v})))
+    (e : InductiveTensor (SchwartzBruhat (Multiplicative (SAdeleRing F {v})))
+      (SchwartzBruhat (Multiplicative (FiniteAdeleTail F {v}))) ≃L[ℂ]
+      SchwartzBruhat (Multiplicative 𝔸[F]))
+    (he : ∀ (f : SchwartzBruhat (Multiplicative (SAdeleRing F {v})))
+      (g : SchwartzBruhat (Multiplicative (FiniteAdeleTail F {v}))) (y : 𝔸[F]),
+      e (f ⊗ₜ[ℂ] g) (Multiplicative.ofAdd y) =
+        f (Multiplicative.ofAdd (adeleProjection F {v} y)) *
+          g (Multiplicative.ofAdd (finiteAdeleTailProjection F {v} y.2)))
+    (e' : InductiveTensor (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+      (FinestLocallyConvex (PiTensorProduct ℂ (fun w : ({v} : Finset V) ↦
+        SchwartzBruhat (Multiplicative (w.val.adicCompletion F))))) ≃L[ℂ]
+      SchwartzBruhat (Multiplicative (SAdeleRing F {v})))
+    (he' : ∀ (f : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+      (g : ∀ w : ({v} : Finset V), SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))
+      (y : SAdeleRing F {v}),
+      e' (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w)) (Multiplicative.ofAdd y) =
+        f (Multiplicative.ofAdd y.1) * ∏ w : ({v} : Finset V), g w (Multiplicative.ofAdd (y.2 w)))
+    (h1 : adelePrincipalValue F {v} (e (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)) ⊗ₜ[ℂ] t)) =
+      e (sAdelePrincipalValue F (Finset.Subset.refl {v}) (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w))) ⊗ₜ[ℂ] t))
+    (h2 : sAdelePrincipalValue F (Finset.Subset.refl {v}) (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w))) =
+      e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, if w.val ∈ ({v} : Finset V) then
+        finitePlacePrincipalValue w.val (b w) else b w))) :
+    adelePrincipalValue F {v} (e (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)) ⊗ₜ[ℂ] t))
+        (Multiplicative.ofAdd x) =
+      e (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)) ⊗ₜ[ℂ] t) (Multiplicative.ofAdd x) -
+        ((finiteLocalMultiplicativeTamagawaMeasure F v).real
+          ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ))⁻¹ *
+        ∫ u in ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ),
+          e (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)) ⊗ₜ[ℂ] t)
+            (Multiplicative.ofAdd ((IdeleGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹).val * x))
+          ∂(finiteLocalMultiplicativeTamagawaMeasure F v) := by
+  let : MeasurableSpace (v.adicCompletion F)ˣ := borel _
+  have : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+  have := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) v
+  let U : Set (v.adicCompletion F)ˣ :=
+    ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ)
+  let μ := finiteLocalMultiplicativeTamagawaMeasure F v
+  let w₀ : ({v} : Finset V) := ⟨v, Finset.mem_singleton_self v⟩
+  have hprod (g : ({v} : Finset V) → ℂ) : (∏ w : ({v} : Finset V), g w) = g w₀ :=
+    Fintype.prod_eq_single w₀ fun w hw ↦ absurd (Subtype.ext (Finset.mem_singleton.mp w.2)) hw
+  have hLHS : adelePrincipalValue F {v} (e (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)) ⊗ₜ[ℂ] t))
+      (Multiplicative.ofAdd x) =
+      a (Multiplicative.ofAdd x.1) *
+        finitePlacePrincipalValue v (b w₀) (Multiplicative.ofAdd (x.2 v)) *
+        t (Multiplicative.ofAdd (finiteAdeleTailProjection F {v} x.2)) := by
+    have h12 : adelePrincipalValue F {v} (e (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)) ⊗ₜ[ℂ] t)) =
+        e (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, if w.val ∈ ({v} : Finset V) then
+          finitePlacePrincipalValue w.val (b w) else b w)) ⊗ₜ[ℂ] t) :=
+      h1.trans (congrArg (fun y ↦ e (y ⊗ₜ[ℂ] t)) h2)
+    have hval := congrArg (fun φ : SchwartzBruhat (Multiplicative 𝔸[F]) ↦ φ (Multiplicative.ofAdd x)) h12
+    have heL := he (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, if w.val ∈ ({v} : Finset V) then
+      finitePlacePrincipalValue w.val (b w) else b w))) t x
+    have he'L := he' a (fun w ↦ if w.val ∈ ({v} : Finset V) then
+      finitePlacePrincipalValue w.val (b w) else b w) (adeleProjection F {v} x)
+    have he'L1 := he'L.trans (congrArg (a (Multiplicative.ofAdd (adeleProjection F {v} x).1) * ·)
+      (hprod _))
+    have hite : (if w₀.val ∈ ({v} : Finset V) then
+        finitePlacePrincipalValue w₀.val (b w₀) else b w₀)
+          (Multiplicative.ofAdd ((adeleProjection F {v} x).2 w₀)) =
+        finitePlacePrincipalValue v (b w₀) (Multiplicative.ofAdd (x.2 v)) := by
+      simp only [w₀, Finset.mem_singleton_self, ↓reduceIte]
+      rfl
+    have he'L2 : e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, if w.val ∈ ({v} : Finset V) then
+        finitePlacePrincipalValue w.val (b w) else b w))
+          (Multiplicative.ofAdd (adeleProjection F {v} x)) =
+        a (Multiplicative.ofAdd x.1) *
+          finitePlacePrincipalValue v (b w₀) (Multiplicative.ofAdd (x.2 v)) :=
+      he'L1.trans (congrArg (a (Multiplicative.ofAdd x.1) * ·) hite)
+    exact hval.trans (heL.trans (congrArg (· * t _) he'L2))
+  have hRHS0 : e (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)) ⊗ₜ[ℂ] t) (Multiplicative.ofAdd x) =
+      a (Multiplicative.ofAdd x.1) * b w₀ (Multiplicative.ofAdd (x.2 v)) *
+        t (Multiplicative.ofAdd (finiteAdeleTailProjection F {v} x.2)) := by
+    have heR := he (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w))) t x
+    have he'R := (he' a b (adeleProjection F {v} x)).trans
+      (congrArg (a (Multiplicative.ofAdd (adeleProjection F {v} x).1) * ·) (hprod _))
+    exact heR.trans (congrArg (· * t _) he'R)
+  have hpv := finitePlacePrincipalValue_spec v π hπ (b w₀) (Multiplicative.ofAdd (x.2 v))
+  have hRHS_eq : (∫ u in U,
+      e (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)) ⊗ₜ[ℂ] t) (Multiplicative.ofAdd
+        ((IdeleGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹).val * x)) ∂μ) =
+      a (Multiplicative.ofAdd x.1) *
+        (∫ u in U, b w₀ (Multiplicative.ofAdd ((↑u⁻¹ : v.adicCompletion F) *
+          ((↑π⁻¹ : v.adicCompletion F) * x.2 v))) ∂μ) *
+        t (Multiplicative.ofAdd (finiteAdeleTailProjection F {v} x.2)) := by
+    have hfun : (fun u : (v.adicCompletion F)ˣ ↦
+        e (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)) ⊗ₜ[ℂ] t) (Multiplicative.ofAdd
+          ((IdeleGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹).val * x))) =
+        fun (u : (v.adicCompletion F)ˣ) ↦ a (Multiplicative.ofAdd x.1) *
+          b w₀ (Multiplicative.ofAdd ((↑u⁻¹ : v.adicCompletion F) *
+            ((↑π⁻¹ : v.adicCompletion F) * x.2 v))) *
+          t (Multiplicative.ofAdd (finiteAdeleTailProjection F {v} x.2)) := by
+      funext u
+      have heu := he (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w))) t
+        ((IdeleGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹).val * x)
+      have he'u := he' a b (adeleProjection F {v}
+        ((IdeleGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹).val * x))
+      have hfst : a (Multiplicative.ofAdd (adeleProjection F {v}
+          ((IdeleGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹).val * x)).1) =
+          a (Multiplicative.ofAdd x.1) :=
+        congrArg (fun z ↦ a (Multiplicative.ofAdd z))
+          (ofAdicCompletion_mul_adeleProjection_fst v (π * u)⁻¹ x)
+      have hsnd : (∏ w : ({v} : Finset V), b w (Multiplicative.ofAdd ((adeleProjection F {v}
+          ((IdeleGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹).val * x)).2 w))) =
+          b w₀ (Multiplicative.ofAdd (((π * u)⁻¹ : (v.adicCompletion F)ˣ).val * x.2 v)) :=
+        (hprod _).trans (congrArg (fun z ↦ b w₀ (Multiplicative.ofAdd z))
+          (ofAdicCompletion_mul_adeleProjection_snd v (π * u)⁻¹ x))
+      have hpart1 := heu.trans (congrArg₂ (· * ·) (he'u.trans (congrArg₂ (· * ·) hfst hsnd))
+        (congrArg (fun z ↦ t (Multiplicative.ofAdd z))
+          (ofAdicCompletion_mul_finiteAdeleTailProjection v (π * u)⁻¹ x)))
+      refine hpart1.trans (congrArg₂ (· * ·) (congrArg₂ (· * ·) rfl (congrArg (b w₀) ?_)) rfl)
+      refine congrArg Multiplicative.ofAdd ?_
+      rw [mul_inv_rev, Units.val_mul, mul_assoc]
+    rw [hfun]
+    simp only [mul_assoc, integral_const_mul, integral_mul_const]
+  have hpv' : finitePlacePrincipalValue v (b w₀) (Multiplicative.ofAdd (x.2 v)) =
+      b w₀ (Multiplicative.ofAdd (x.2 v)) - (((μ.real U)⁻¹ : ℝ) : ℂ) *
+        ∫ u in U, b w₀ (Multiplicative.ofAdd ((↑u⁻¹ : v.adicCompletion F) *
+          ((↑π⁻¹ : v.adicCompletion F) * x.2 v))) ∂μ := by
+    refine hpv.trans ?_
+    change _ - (μ.real U : ℂ)⁻¹ * _ = _
+    rw [← Complex.ofReal_inv]
+    rfl
+  have halg (A B C I T : ℂ) : A * (B - C * I) * T = A * B * T - C * (A * I * T) := by ring
+  exact hLHS.trans ((congrArg (fun z ↦ _ * z * _) hpv').trans
+    ((halg _ _ _ _ _).trans (congrArg₂ (· - ·) hRHS0.symm
+      (congrArg ((((μ.real U)⁻¹ : ℝ) : ℂ) * ·) hRHS_eq.symm))))
+
+open Classical in
+private theorem globalThetaPrincipalValue_sobolevBound_pointwise_pure (v : V)
+    (π : (v.adicCompletion F)ˣ) (hπ : Valued.v.IsUniformizer π.val) (x : 𝔸[F])
+    (a : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+    (b : (w : ({v} : Finset V)) → SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))
+    (t : SchwartzBruhat (Multiplicative (FiniteAdeleTail F {v}))) :
+    let e := (sAdeleTailSchwartz_inductiveTensor_equiv F ({v} : Finset V)).choose
+    let e' := (sAdeleSchwartz_inductiveTensor_equiv F ({v} : Finset V)).choose
+    adelePrincipalValue F {v} (e (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)) ⊗ₜ[ℂ] t))
+        (Multiplicative.ofAdd x) =
+      e (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)) ⊗ₜ[ℂ] t) (Multiplicative.ofAdd x) -
+        ((finiteLocalMultiplicativeTamagawaMeasure F v).real
+          ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ))⁻¹ *
+        ∫ u in ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ),
+          e (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)) ⊗ₜ[ℂ] t)
+            (Multiplicative.ofAdd ((IdeleGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹).val * x))
+          ∂(finiteLocalMultiplicativeTamagawaMeasure F v) :=
+  globalThetaPrincipalValue_sobolevBound_pointwise_pure_aux v π hπ x a b t
+    (sAdeleTailSchwartz_inductiveTensor_equiv F ({v} : Finset V)).choose
+    (sAdeleTailSchwartz_inductiveTensor_equiv F ({v} : Finset V)).choose_spec
+    (sAdeleSchwartz_inductiveTensor_equiv F ({v} : Finset V)).choose
+    (sAdeleSchwartz_inductiveTensor_equiv F ({v} : Finset V)).choose_spec
+    (adelePrincipalValue_tmul (F := F) (Finset.Subset.refl ({v} : Finset V)) _ t)
+    (sAdelePrincipalValue_tmul (F := F) (Finset.Subset.refl ({v} : Finset V)) a b)
+
+private theorem globalThetaPrincipalValue_sobolevBound_pointwise (v : V)
+    (π : (v.adicCompletion F)ˣ) (hπ : Valued.v.IsUniformizer π.val)
+    (f : SchwartzBruhat (Multiplicative 𝔸[F])) (x : 𝔸[F]) :
+    adelePrincipalValue F {v} f (Multiplicative.ofAdd x) =
+      f (Multiplicative.ofAdd x) -
+        ((finiteLocalMultiplicativeTamagawaMeasure F v).real
+          ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ))⁻¹ *
+        ∫ u in ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ),
+          f (Multiplicative.ofAdd ((IdeleGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹).val * x))
+          ∂(finiteLocalMultiplicativeTamagawaMeasure F v) := by
+  let : MeasurableSpace (v.adicCompletion F)ˣ := borel _
+  have : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+  have := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) v
+  let U : Set (v.adicCompletion F)ˣ :=
+    ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ)
+  let μ := finiteLocalMultiplicativeTamagawaMeasure F v
+  have hUc : IsCompact U := Submonoid.units_isCompact
+    (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v))
+  have hint (h : SchwartzBruhat (Multiplicative 𝔸[F])) :
+      IntegrableOn (fun u : (v.adicCompletion F)ˣ ↦
+        h (Multiplicative.ofAdd ((IdeleGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹).val * x)))
+        U μ := by
+    refine ContinuousOn.integrableOn_compact hUc (Continuous.continuousOn ?_)
+    have hj := continuous_ideleGroup_ofAdicCompletion (F := F) v
+    have hinv : Continuous (fun u : (v.adicCompletion F)ˣ ↦
+        (IdeleGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹).val * x) :=
+      (Units.continuous_val.comp (hj.comp ((continuous_const.mul continuous_id).inv))).mul
+        continuous_const
+    exact (schwartzBruhat_continuous h).comp (continuous_ofAdd.comp hinv)
+  let L : SchwartzBruhat (Multiplicative 𝔸[F]) →ₗ[ℂ] ℂ :=
+    { toFun := fun h ↦ adelePrincipalValue F {v} h (Multiplicative.ofAdd x)
+      map_add' := fun h₁ h₂ ↦ by
+        rw [map_add]
+        rfl
+      map_smul' := fun c h ↦ by
+        rw [map_smul]
+        rfl }
+  let R : SchwartzBruhat (Multiplicative 𝔸[F]) →ₗ[ℂ] ℂ :=
+    { toFun := fun h ↦ h (Multiplicative.ofAdd x) - (((μ.real U)⁻¹ : ℝ) : ℂ) *
+        ∫ u in U, h (Multiplicative.ofAdd
+          ((IdeleGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹).val * x)) ∂μ
+      map_add' := fun h₁ h₂ ↦ by
+        change (h₁ (Multiplicative.ofAdd x) + h₂ (Multiplicative.ofAdd x)) -
+          (((μ.real U)⁻¹ : ℝ) : ℂ) * ∫ u in U, (h₁ (Multiplicative.ofAdd _) +
+            h₂ (Multiplicative.ofAdd _)) ∂μ = _
+        rw [integral_add (hint h₁) (hint h₂)]
+        ring
+      map_smul' := fun c h ↦ by
+        change (c • h) (Multiplicative.ofAdd x) - (((μ.real U)⁻¹ : ℝ) : ℂ) *
+          ∫ u in U, (c • h) (Multiplicative.ofAdd _) ∂μ =
+          c • (h (Multiplicative.ofAdd x) - (((μ.real U)⁻¹ : ℝ) : ℂ) *
+            ∫ u in U, h (Multiplicative.ofAdd _) ∂μ)
+        have hsmul : ∀ y, (c • h) y = c * h y := fun _ ↦ rfl
+        simp only [hsmul, integral_const_mul, smul_eq_mul]
+        ring }
+  exact LinearMap.congr_fun
+    (globalThetaPrincipalValue_sobolevBound_linear_ext v L R
+      (fun a b t ↦ globalThetaPrincipalValue_sobolevBound_pointwise_pure v π hπ x a b t)) f
+
+end GlobalThetaPrincipalValueFormulaHelpers
+
 /-- Paper: Definition 5.3.1.2 and Lemma 5.3.1.3, p. 241, for the proof of
 Proposition 11.2.0.1(1), p. 484. The principal value at one finite place `v`, on theta
 functions: theta of `PV_v f` is theta of `f` minus the normalized average over the local
@@ -86,7 +424,99 @@ private theorem globalThetaPrincipalValue_sobolevBound_formula (v : V)
         ∫ u in ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ),
           adelicTheta f.val (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹ * g)
           ∂(finiteLocalMultiplicativeTamagawaMeasure F v) := by
-  sorry
+  let : MeasurableSpace (v.adicCompletion F)ˣ := borel _
+  have : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+  have := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) v
+  let : Countable F := Countable.of_moduleFinite (R := ℚ)
+  let : Countable Fˣ := Units.val_injective.countable
+  let U : Set (v.adicCompletion F)ˣ :=
+    ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ)
+  let μ := finiteLocalMultiplicativeTamagawaMeasure F v
+  have hUc : IsCompact U := Submonoid.units_isCompact
+    (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v))
+  obtain ⟨a, rfl⟩ := QuotientGroup.mk_surjective g
+  let b : (v.adicCompletion F)ˣ → IdeleGroup (𝓞 F) F :=
+    fun u ↦ IdeleGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹ * a
+  have hb_cont : Continuous b :=
+    ((continuous_ideleGroup_ofAdicCompletion (F := F) v).comp
+      ((continuous_const.mul continuous_id).inv)).mul continuous_const
+  let K : Set (IdeleGroup (𝓞 F) F × 𝔸[F]) := (fun u ↦ (b u, (0 : 𝔸[F]))) '' U
+  have hK : IsCompact K := hUc.image (hb_cont.prodMk continuous_const)
+  have hs := adelicAverage_summableUniformlyOn f.val K hK
+  let term (ξ : Fˣ) (p : IdeleGroup (𝓞 F) F × 𝔸[F]) : ℝ :=
+    ‖f.val (Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2)))‖
+  have hterm (ξ : Fˣ) : Continuous (term ξ) :=
+    (continuous_norm.comp ((schwartzBruhat_continuous f.val).comp (continuous_ofAdd.comp
+      ((Units.continuous_val.comp continuous_fst).mul (continuous_const.add continuous_snd)))))
+  have hsum_cont : ContinuousOn (fun p ↦ ∑' ξ : Fˣ, term ξ p) K :=
+    hs.hasSumUniformlyOn.tendstoUniformlyOn.continuousOn
+      (Filter.Eventually.of_forall fun s ↦
+        (continuous_finsetSum s fun ξ _ ↦ hterm ξ).continuousOn).frequently
+  obtain ⟨C, hC⟩ := hK.exists_bound_of_continuousOn hsum_cont
+  let H : Fˣ → (v.adicCompletion F)ˣ → ℂ := fun ξ u ↦
+    f.val (Multiplicative.ofAdd (algebraMap F 𝔸[F] (ξ : F) * (b u).val))
+  have hH_cont (ξ : Fˣ) : Continuous (H ξ) :=
+    (schwartzBruhat_continuous f.val).comp (continuous_ofAdd.comp
+      (continuous_const.mul (Units.continuous_val.comp hb_cont)))
+  have hH_meas (ξ : Fˣ) : AEStronglyMeasurable (H ξ) (μ.restrict U) :=
+    (hH_cont ξ).aestronglyMeasurable
+  have hH_eq (ξ : Fˣ) (u : (v.adicCompletion F)ˣ) :
+      term ξ (b u, (0 : 𝔸[F])) = ‖H ξ u‖ := by
+    simp only [term, H, add_zero, mul_comm (b u).val]
+  have hH_sum (u : (v.adicCompletion F)ˣ) (hu : u ∈ U) :
+      Summable (fun ξ : Fˣ ↦ ‖H ξ u‖) := by
+    simpa only [term, H, add_zero, mul_comm (b u).val] using hs.summable (Set.mem_image_of_mem _ hu)
+  have hfin : (∑' ξ : Fˣ, ∫⁻ u in U, ‖H ξ u‖ₑ ∂μ) < ⊤ := by
+    calc (∑' ξ : Fˣ, ∫⁻ u in U, ‖H ξ u‖ₑ ∂μ)
+        = ∫⁻ u in U, ∑' ξ : Fˣ, ‖H ξ u‖ₑ ∂μ :=
+          (MeasureTheory.lintegral_tsum fun ξ ↦ (hH_meas ξ).eNorm).symm
+      _ ≤ ∫⁻ _ in U, ENNReal.ofReal C ∂μ := by
+          refine MeasureTheory.setLIntegral_mono_ae measurable_const.aemeasurable ?_
+          filter_upwards with u hu
+          have hbound : ∑' ξ : Fˣ, ‖H ξ u‖ ≤ C := by
+            refine (le_abs_self _).trans ?_
+            have := hC (b u, 0) (Set.mem_image_of_mem _ hu)
+            simpa only [Real.norm_eq_abs, hH_eq] using this
+          have hsum_u := hH_sum u hu
+          have htsum_enorm : (∑' ξ : Fˣ, ‖H ξ u‖ₑ) = ENNReal.ofReal (∑' ξ : Fˣ, ‖H ξ u‖) := by
+            simp_rw [← ofReal_norm]
+            exact (ENNReal.ofReal_tsum_of_nonneg (fun ξ ↦ norm_nonneg _) hsum_u).symm
+          rw [htsum_enorm]
+          exact ENNReal.ofReal_le_ofReal hbound
+      _ = ENNReal.ofReal C * μ U := by simp
+      _ < ⊤ := ENNReal.mul_lt_top ENNReal.ofReal_lt_top hUc.measure_lt_top
+  have hswap : (∫ u in U, ∑' ξ : Fˣ, H ξ u ∂μ) = ∑' ξ : Fˣ, ∫ u in U, H ξ u ∂μ :=
+    MeasureTheory.integral_tsum hH_meas hfin.ne
+  have hIsum : Summable (fun ξ : Fˣ ↦ ∫ u in U, H ξ u ∂μ) := by
+    apply Summable.of_eNorm
+    exact ne_top_of_le_ne_top hfin.ne
+      (tsum_le_tsum fun ξ ↦ MeasureTheory.eNorm_integral_le_lintegral_eNorm _)
+  have hA : Summable (fun ξ : Fˣ ↦
+      f.val (Multiplicative.ofAdd (algebraMap F 𝔸[F] (ξ : F) * a.val))) := by
+    have ha := (adelicAverage_summableUniformlyOn f.val {(a, (0 : 𝔸[F]))}
+      isCompact_singleton).summable (Set.mem_singleton (a, (0 : 𝔸[F])))
+    refine ha.of_norm.congr fun ξ ↦ ?_
+    simp [mul_comm a.val]
+  have hpt (ξ : Fˣ) :
+      adelePrincipalValue F {v} f.val (Multiplicative.ofAdd (algebraMap F 𝔸[F] (ξ : F) * a.val)) =
+        f.val (Multiplicative.ofAdd (algebraMap F 𝔸[F] (ξ : F) * a.val)) -
+          (((μ.real U)⁻¹ : ℝ) : ℂ) * ∫ u in U, H ξ u ∂μ := by
+    have hp := globalThetaPrincipalValue_sobolevBound_pointwise v π _hπ f.val
+      (algebraMap F 𝔸[F] (ξ : F) * a.val)
+    refine hp.trans (congrArg₂ (· - ·) rfl (congrArg₂ (· * ·) rfl ?_))
+    refine MeasureTheory.setIntegral_congr_fun hUc.measurableSet fun u _ ↦ ?_
+    simp only [H, b, Units.val_mul, mul_left_comm]
+  rw [adelicTheta_mk, adelicTheta_mk]
+  rw [tsum_congr hpt, hA.tsum_sub (hIsum.mul_left (((μ.real U)⁻¹ : ℝ) : ℂ))]
+  rw [tsum_mul_left, ← hswap]
+  refine congrArg₂ (· - ·) rfl (congrArg₂ (· * ·) rfl ?_)
+  refine MeasureTheory.setIntegral_congr_fun hUc.measurableSet fun u _ ↦ ?_
+  have hcls : IdeleClassGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹ * QuotientGroup.mk a =
+      (QuotientGroup.mk (b u) : C𝔽) := by
+    change QuotientGroup.mk (IdeleGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹) *
+      QuotientGroup.mk a = QuotientGroup.mk (b u)
+    rw [← QuotientGroup.mk_mul]
+  rw [hcls, adelicTheta_mk]
 
 /-- Cauchy–Schwarz for lower Lebesgue integrals: the square of the integral is at most the
 total mass times the integral of the square. -/
