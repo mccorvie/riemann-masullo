@@ -88,6 +88,117 @@ private theorem globalThetaPrincipalValue_sobolevBound_formula (v : V)
           ∂(finiteLocalMultiplicativeTamagawaMeasure F v) := by
   sorry
 
+/-- Cauchy–Schwarz for lower Lebesgue integrals: the square of the integral is at most the
+total mass times the integral of the square. -/
+private theorem globalThetaPrincipalValue_sobolevBound_average_cs {X : Type*}
+    [MeasurableSpace X] (ν : Measure X) (f : X → ENNReal) (hf : AEMeasurable f ν) :
+    (∫⁻ x, f x ∂ν) ^ 2 ≤ ν univ * ∫⁻ x, f x ^ 2 ∂ν := by
+  have h := ENNReal.lintegral_mul_le_Lp_mul_Lq ν Real.HolderConjugate.two_two hf
+    (aemeasurable_const (b := (1 : ENNReal)))
+  simp only [Pi.mul_apply, mul_one, ENNReal.one_rpow, lintegral_const, one_mul] at h
+  calc (∫⁻ x, f x ∂ν) ^ 2
+      ≤ ((∫⁻ x, f x ^ (2 : ℝ) ∂ν) ^ (1 / 2 : ℝ) * ν univ ^ (1 / 2 : ℝ)) ^ 2 :=
+        pow_le_pow_left₀ zero_le h 2
+    _ = ν univ * ∫⁻ x, f x ^ 2 ∂ν := by
+      rw [mul_pow, ← ENNReal.rpow_natCast, ← ENNReal.rpow_natCast (ν univ ^ (1 / 2 : ℝ)),
+        ← ENNReal.rpow_mul, ← ENNReal.rpow_mul]
+      norm_num
+      rw [mul_comm]
+
+/-- Abstract form of the bound for the unit average: on a group with a left-invariant measure
+and a weight that each translate by `τ u`, `u ∈ U`, changes by at most the factor `M`, the
+normalized average of the translates has weighted L² mass at most `M` times that of the
+function. -/
+private theorem globalThetaPrincipalValue_sobolevBound_average_abstract
+    {G X : Type*} [Group G] [TopologicalSpace G] [MeasurableSpace G] [BorelSpace G]
+    [IsTopologicalGroup G] [SecondCountableTopology G]
+    [TopologicalSpace X] [MeasurableSpace X] [OpensMeasurableSpace X]
+    (μ : Measure G) [μ.IsMulLeftInvariant] [SFinite μ] (w : G → ENNReal) (hw : Measurable w)
+    (μX : Measure X) (U : Set X) (hU : MeasurableSet U) (hUfin : μX U ≠ ⊤)
+    (τ : X → G) (hτ : Continuous τ) (M : ENNReal)
+    (hM : ∀ u ∈ U, ∀ g, w ((τ u)⁻¹ * g) ≤ M * w g)
+    (φ : G → ℂ) (hφ : Continuous φ) :
+    AEStronglyMeasurable (fun g ↦ (μX.real U)⁻¹ * ∫ u in U, φ (τ u * g) ∂μX)
+        (μ.withDensity w) ∧
+      ∫⁻ g, ‖(μX.real U)⁻¹ * ∫ u in U, φ (τ u * g) ∂μX‖ₑ ^ 2 ∂(μ.withDensity w) ≤
+        M * ∫⁻ g, ‖φ g‖ₑ ^ 2 ∂(μ.withDensity w) := by
+  haveI : IsFiniteMeasure (μX.restrict U) :=
+    ⟨by rw [Measure.restrict_apply_univ]; exact lt_top_iff_ne_top.mpr hUfin⟩
+  set c : ℝ := μX.real U with hcdef
+  have hc0 : 0 ≤ c := measureReal_nonneg
+  have hcU : μX U = ENNReal.ofReal c := (ENNReal.ofReal_toReal hUfin).symm
+  have hsm : StronglyMeasurable (fun p : G × X ↦ φ (τ p.2 * p.1)) :=
+    (hφ.comp ((hτ.comp continuous_snd).mul continuous_fst)).stronglyMeasurable
+  have hAsm : StronglyMeasurable (fun g ↦ ((c⁻¹ : ℝ) : ℂ) * ∫ u in U, φ (τ u * g) ∂μX) :=
+    (hsm.integral_prod_right' (ν := μX.restrict U)).const_mul _
+  refine ⟨hAsm.aestronglyMeasurable, ?_⟩
+  let F : X → G → ENNReal := fun u g ↦ ‖φ (τ u * g)‖ₑ ^ 2
+  have hF : Measurable (Function.uncurry F) :=
+    ((hφ.comp ((hτ.comp continuous_fst).mul continuous_snd)).measurable.eNorm).pow_const 2
+  -- Pointwise: the square of the average is at most the average of the squares.
+  have hpt (g : G) : ‖((c⁻¹ : ℝ) : ℂ) * ∫ u in U, φ (τ u * g) ∂μX‖ₑ ^ 2 ≤
+      ENNReal.ofReal c⁻¹ * ∫⁻ u in U, F u g ∂μX := by
+    have h1 : ‖((c⁻¹ : ℝ) : ℂ) * ∫ u in U, φ (τ u * g) ∂μX‖ₑ ≤
+        ENNReal.ofReal c⁻¹ * ∫⁻ u in U, ‖φ (τ u * g)‖ₑ ∂μX := by
+      rw [eNorm_mul]
+      refine mul_le_mul' (le_of_eq ?_) (eNorm_integral_le_lintegral_eNorm _)
+      rw [← ofReal_norm, Complex.norm_real, Real.norm_of_nonneg (inv_nonneg.mpr hc0)]
+    have h2 := globalThetaPrincipalValue_sobolevBound_average_cs (μX.restrict U)
+      (fun u ↦ ‖φ (τ u * g)‖ₑ)
+      ((hφ.comp (hτ.mul continuous_const)).measurable.eNorm.aemeasurable)
+    rw [Measure.restrict_apply_univ, hcU] at h2
+    have h3 : ENNReal.ofReal c⁻¹ ^ 2 * ENNReal.ofReal c ≤ ENNReal.ofReal c⁻¹ := by
+      rcases hc0.eq_or_lt with h | h
+      · rw [← h]; simp
+      · rw [← ENNReal.ofReal_pow (inv_nonneg.mpr hc0), ← ENNReal.ofReal_mul (by positivity)]
+        refine ENNReal.ofReal_le_ofReal (le_of_eq ?_)
+        field_simp
+    calc ‖((c⁻¹ : ℝ) : ℂ) * ∫ u in U, φ (τ u * g) ∂μX‖ₑ ^ 2
+        ≤ (ENNReal.ofReal c⁻¹ * ∫⁻ u in U, ‖φ (τ u * g)‖ₑ ∂μX) ^ 2 :=
+          pow_le_pow_left₀ zero_le h1 2
+      _ = ENNReal.ofReal c⁻¹ ^ 2 * (∫⁻ u in U, ‖φ (τ u * g)‖ₑ ∂μX) ^ 2 := mul_pow _ _ _
+      _ ≤ ENNReal.ofReal c⁻¹ ^ 2 * (ENNReal.ofReal c * ∫⁻ u in U, F u g ∂μX) :=
+          mul_le_mul' le_rfl h2
+      _ = (ENNReal.ofReal c⁻¹ ^ 2 * ENNReal.ofReal c) * ∫⁻ u in U, F u g ∂μX := by ring
+      _ ≤ ENNReal.ofReal c⁻¹ * ∫⁻ u in U, F u g ∂μX := mul_le_mul' h3 le_rfl
+  -- Each translate changes the weighted mass by at most `M`.
+  have htr (u : X) (hu : u ∈ U) : ∫⁻ g, w g * F u g ∂μ ≤ M * ∫⁻ g, w g * ‖φ g‖ₑ ^ 2 ∂μ := by
+    have he : ∫⁻ g, w g * F u g ∂μ = ∫⁻ g, w ((τ u)⁻¹ * g) * ‖φ g‖ₑ ^ 2 ∂μ := by
+      rw [← lintegral_mul_left_eq_self (fun g ↦ w ((τ u)⁻¹ * g) * ‖φ g‖ₑ ^ 2) (τ u)]
+      simp only [F, inv_mul_cancel_left]
+    rw [he, ← lintegral_const_mul M (f := fun g ↦ w g * ‖φ g‖ₑ ^ 2)
+      (hw.mul (hφ.measurable.eNorm.pow_const 2))]
+    exact lintegral_mono fun g ↦ (mul_le_mul' (hM u hu g) le_rfl).trans_eq (mul_assoc _ _ _)
+  have hwm : Measurable fun g ↦ ‖((c⁻¹ : ℝ) : ℂ) * ∫ u in U, φ (τ u * g) ∂μX‖ₑ ^ 2 :=
+    (hAsm.measurable.eNorm).pow_const 2
+  rw [lintegral_withDensity_eq_lintegral_mul _ hw hwm,
+    lintegral_withDensity_eq_lintegral_mul _ hw (hφ.measurable.eNorm.pow_const 2)]
+  calc ∫⁻ g, (w * fun g ↦ ‖((c⁻¹ : ℝ) : ℂ) * ∫ u in U, φ (τ u * g) ∂μX‖ₑ ^ 2) g ∂μ
+      ≤ ∫⁻ g, w g * (ENNReal.ofReal c⁻¹ * ∫⁻ u in U, F u g ∂μX) ∂μ :=
+        lintegral_mono fun g ↦ mul_le_mul' le_rfl (hpt g)
+    _ = ENNReal.ofReal c⁻¹ * ∫⁻ u in U, ∫⁻ g, w g * F u g ∂μ ∂μX := by
+        have hm2 : Measurable (Function.uncurry fun g u ↦ w g * F u g) :=
+          (hw.comp measurable_fst).mul (hF.comp measurable_swap)
+        have hin (g : G) : w g * (ENNReal.ofReal c⁻¹ * ∫⁻ u in U, F u g ∂μX) =
+            ENNReal.ofReal c⁻¹ * ∫⁻ u in U, w g * F u g ∂μX := by
+          rw [lintegral_const_mul (w g) (f := fun u ↦ F u g)
+            (hF.comp (measurable_id.prodMk measurable_const))]
+          ring
+        rw [lintegral_congr hin, lintegral_const_mul (ENNReal.ofReal c⁻¹)
+          (f := fun g ↦ ∫⁻ u in U, w g * F u g ∂μX) hm2.lintegral_prod_right',
+          lintegral_lintegral_swap (f := fun g u ↦ w g * F u g) (μ := μ) (ν := μX.restrict U)
+            hm2.aemeasurable]
+    _ ≤ ENNReal.ofReal c⁻¹ * ∫⁻ u in U, M * ∫⁻ g, w g * ‖φ g‖ₑ ^ 2 ∂μ ∂μX :=
+        mul_le_mul' le_rfl (setLIntegral_mono' hU htr)
+    _ = (ENNReal.ofReal c⁻¹ * ENNReal.ofReal c) * (M * ∫⁻ g, w g * ‖φ g‖ₑ ^ 2 ∂μ) := by
+        rw [setLIntegral_const, hcU]
+        ring
+    _ ≤ M * ∫⁻ g, (w * fun g ↦ ‖φ g‖ₑ ^ 2) g ∂μ := by
+        refine (mul_le_mul' ?_ le_rfl).trans_eq (one_mul _)
+        rcases hc0.eq_or_lt with h | h
+        · rw [← h]; simp
+        · rw [← ENNReal.ofReal_mul (by positivity), inv_mul_cancel₀ h.ne', ENNReal.ofReal_one]
+
 /-- Paper: for the proof of Proposition 11.2.0.1(1), p. 484. The normalized average over the
 local integer units at `v` of the translates by the classes of `(π u)⁻¹` is bounded on the
 weighted L² space of the 0-line, uniformly on continuous square-integrable functions. Each
@@ -108,7 +219,76 @@ private theorem globalThetaPrincipalValue_sobolevBound_average (v : V)
             ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))) ≤
           ENNReal.ofReal C * eLpNorm φ 2 ((μ𝔽).withDensity fun g ↦
             ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))) := by
-  sorry
+  letI : MeasurableSpace (v.adicCompletion F)ˣ := borel _
+  haveI : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+  let U : Set (v.adicCompletion F)ˣ :=
+    ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ)
+  have hUo : IsOpen U := Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hUc : IsCompact U := Submonoid.units_isCompact
+    (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v))
+  haveI := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) v
+  have hUfin : finiteLocalMultiplicativeTamagawaMeasure F v U ≠ ⊤ := hUc.measure_ne_top
+  let τ : (v.adicCompletion F)ˣ → C𝔽 := fun u ↦ IdeleClassGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹
+  have hτ : Continuous τ :=
+    (continuous_ideleClass_ofAdicCompletion F v).comp ((continuous_const.mul continuous_id).inv)
+  let w : C𝔽 → ENNReal := fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))
+  have hw : Measurable w := by
+    refine (Measurable.ennreal_ofReal ?_)
+    simp only [intervalSobolevDensity, mul_zero, zero_mul, Real.exp_zero, max_self, one_mul]
+    have hlog : Continuous (fun g : C𝔽 ↦ logNorm g) :=
+      Real.continuousOn_log.comp_continuous
+        (NNReal.continuous_coe.comp (Units.continuous_val.comp (m𝔽).continuous))
+        fun _ ↦ (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+    exact ((continuous_const.add (hlog.pow 2)).rpow_const fun g ↦ Or.inl (by
+      change (1 : ℝ) + (logNorm g) ^ 2 ≠ 0
+      positivity)).measurable
+  let c₀ : ℝ := Real.log ‖(π : v.adicCompletion F)‖
+  let M : ℝ := (2 * (1 + c₀ ^ 2)) ^ (s / 2)
+  have hnormu (u : (v.adicCompletion F)ˣ) (hu : u ∈ U) : ‖(u : v.adicCompletion F)‖ = 1 := by
+    have h1 : ‖(u : v.adicCompletion F)‖ ≤ 1 :=
+      (Valued.toNormedField.norm_le_one_iff).mpr hu.1
+    have h2 : ‖((u⁻¹ : (v.adicCompletion F)ˣ) : v.adicCompletion F)‖ ≤ 1 :=
+      (Valued.toNormedField.norm_le_one_iff).mpr hu.2
+    have h3 : ‖(u : v.adicCompletion F)‖ * ‖((u⁻¹ : (v.adicCompletion F)ˣ) : v.adicCompletion F)‖ = 1 := by
+      rw [← norm_mul, Units.mul_inv, norm_one]
+    nlinarith [norm_nonneg (u : v.adicCompletion F),
+      norm_nonneg ((u⁻¹ : (v.adicCompletion F)ˣ) : v.adicCompletion F)]
+  have hπ0 : 0 < ‖(π : v.adicCompletion F)‖ := norm_pos_iff.mpr π.ne_zero
+  have hM : ∀ u ∈ U, ∀ g, w ((τ u)⁻¹ * g) ≤ ENNReal.ofReal M * w g := by
+    intro u hu g
+    have hlog : logNorm ((τ u)⁻¹ * g) = c₀ + logNorm g := by
+      have hn : (((ideleClassNorm F ((τ u)⁻¹ * g)).val : ℝ≥0) : ℝ) =
+          ‖(π : v.adicCompletion F)‖ * (((ideleClassNorm F g).val : ℝ≥0) : ℝ) := by
+        simp only [τ, map_mul, map_inv, inv_inv, ideleClassNorm_ofAdicCompletion, Units.val_mul,
+          NNReal.coe_mul]
+        change ‖(π : v.adicCompletion F)‖ * ‖(u : v.adicCompletion F)‖ * _ = _
+        rw [hnormu u hu, mul_one]
+      change Real.log _ = Real.log ‖(π : v.adicCompletion F)‖ + Real.log _
+      rw [hn, Real.log_mul hπ0.ne' (NNReal.coe_pos.mpr (Units.zero_lt _)).ne']
+    simp only [w, hlog, intervalSobolevDensity, mul_zero, zero_mul, Real.exp_zero, max_self,
+      one_mul]
+    rw [← ENNReal.ofReal_mul (Real.rpow_nonneg (by positivity) _)]
+    refine ENNReal.ofReal_le_ofReal ?_
+    rw [← Real.mul_rpow (by positivity) (by positivity)]
+    refine Real.rpow_le_rpow (by positivity) ?_ (by linarith)
+    nlinarith [sq_nonneg (c₀ - logNorm g), sq_nonneg (c₀ * logNorm g)]
+  refine ⟨Real.sqrt M, Real.sqrt_nonneg _, fun φ hφ hφm ↦ ?_⟩
+  intro A
+  obtain ⟨hAsm, hAle⟩ := globalThetaPrincipalValue_sobolevBound_average_abstract μ𝔽 w hw
+    (finiteLocalMultiplicativeTamagawaMeasure F v) U hUo.measurableSet hUfin τ hτ
+    (ENNReal.ofReal M) hM φ hφ
+  have hrpow (f : C𝔽 → ℂ) (hf : AEStronglyMeasurable f ((μ𝔽).withDensity w)) :
+      eLpNorm f 2 ((μ𝔽).withDensity w) =
+      (∫⁻ g, ‖f g‖ₑ ^ 2 ∂((μ𝔽).withDensity w)) ^ (1 / 2 : ℝ) := by
+    rw [eLpNorm_eq_lintegral_rpow_eNorm_toReal two_ne_zero ENNReal.ofNat_ne_top hf]
+    simp only [ENNReal.toReal_ofNat, ENNReal.rpow_two]
+  have hbound : eLpNorm (fun g ↦ ((finiteLocalMultiplicativeTamagawaMeasure F v).real U)⁻¹ *
+        ∫ u in U, φ (τ u * g) ∂(finiteLocalMultiplicativeTamagawaMeasure F v)) 2
+        ((μ𝔽).withDensity w) ≤ ENNReal.ofReal (Real.sqrt M) * eLpNorm φ 2 ((μ𝔽).withDensity w) := by
+    rw [hrpow _ hAsm, hrpow _ hφm.aestronglyMeasurable, Real.sqrt_eq_rpow, ← ENNReal.ofReal_rpow_of_nonneg (by positivity)
+      (by norm_num), ← ENNReal.mul_rpow_of_nonneg _ _ (by norm_num)]
+    exact ENNReal.rpow_le_rpow hAle (by norm_num)
+  exact ⟨hbound.trans_lt (ENNReal.mul_lt_top ENNReal.ofReal_lt_top hφm), hbound⟩
 
 /-- The principal value at a single finite place is bounded in the norm of the unweighted
 global theta completion: by the formula on theta functions and the bound for the unit average. -/
