@@ -469,6 +469,66 @@ local notation "qLocal(" η ")" => (LinearMap.ker (sLocalHomogeneousAdelicThetaL
 local notation "qGlobal(" ω ")" => (LinearMap.ker (homogeneousAdelicThetaLinearMap F ω)).mkQ
 local notation "PolarH(" ω ")" => globalPolarFreeThetaSubmodule (F := F) ω
 
+section
+
+open scoped WithZero
+
+local notation "Cℓ(" v ")" => (v : V).adicCompletion F
+local notation "Qℓ(" v ")" => Cℓ(v)ˣ ⧸ ((v : V).adicCompletionIntegers F).units
+
+/-- The relative local presentation of a trivial Picard group clears every finite valuation
+outside the original stage by multiplying by the inverse of a single principal idele. -/
+private theorem absLevel_idele_unit_outside (S : Finset V)
+    (hPic : Subsingleton (CommRing.Pic ((S : Set V).integer F))) (g : IdeleGroup (𝓞 F) F) :
+    ∃ x : Fˣ, ∀ v : V, v ∉ S →
+      Valued.v ((g * IdeleGroup.unitEmbedding (𝓞 F) F x⁻¹).val.2 v) = (1 : ℤᵐ⁰) := by
+  classical
+  have hg : {v : V | Valued.v (g.val.2 v) ≠ (1 : ℤᵐ⁰)}.Finite :=
+    eventually_cofinite.mp (AdeleRing.isUnit_iff.mp g.isUnit).2.2
+  obtain ⟨T, hT, hPicT⟩ := (picard_uniformization F (S ∪ hg.toFinset)).1
+  have hST : S ⊆ T := Finset.subset_union_left.trans hT
+  let D := T \ S
+  let I (v : V) : IdeleGroup (𝓞 F) F →* Cℓ(v)ˣ :=
+    Units.map (((RestrictedProduct.evalRingHom (fun w : V ↦ Cℓ(w)) v).comp
+      (RingHom.snd (InfiniteAdeleRing F) (FiniteAdeleRing (𝓞 F) F))).toMonoidHom)
+  let u : (v : D) → Qℓ(v.val) := fun v ↦ QuotientGroup.mk (I v.val g)
+  obtain ⟨e, -⟩ := (picard_uniformization F S).2.1 T hST hPicT
+  have he : (QuotientGroup.mk u : _ ⧸ (sUnitLocalClasses F T D).range) = 1 :=
+    e.injective (hPic.elim _ _)
+  obtain ⟨x, hx⟩ := (QuotientGroup.eq_one_iff (N := (sUnitLocalClasses F T D).range) u).mp he
+  refine ⟨x.val, fun v hv ↦ ?_⟩
+  have hmul : I v (g * IdeleGroup.unitEmbedding (𝓞 F) F x.val⁻¹) =
+      I v g * (Units.map (algebraMap F Cℓ(v)).toMonoidHom x.val)⁻¹ := by
+    rw [map_mul, ← map_inv]
+    rfl
+  change Valued.v (I v (g * IdeleGroup.unitEmbedding (𝓞 F) F x.val⁻¹)).val = 1
+  rw [hmul]
+  by_cases hvT : v ∈ T
+  · let w : D := ⟨v, Finset.mem_sdiff.mpr ⟨hvT, hv⟩⟩
+    have h := congrFun hx w
+    change (QuotientGroup.mk (Units.map (algebraMap F Cℓ(v)).toMonoidHom x.val) : Qℓ(v)) =
+      QuotientGroup.mk (I v g) at h
+    have hmem : I v g * (Units.map (algebraMap F Cℓ(v)).toMonoidHom x.val)⁻¹ ∈
+        (v.adicCompletionIntegers F).units := by
+      apply (QuotientGroup.eq_one_iff _).mp
+      change (QuotientGroup.mk' (v.adicCompletionIntegers F).units)
+        (I v g * (Units.map (algebraMap F Cℓ(v)).toMonoidHom x.val)⁻¹) = 1
+      rw [map_mul, map_inv]
+      exact mul_inv_eq_one.mpr h.symm
+    exact HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp hmem
+  · have hg' : Valued.v (g.val.2 v) = (1 : ℤᵐ⁰) := by
+      by_contra h
+      exact hvT (hT (Finset.mem_union_right _ (hg.mem_toFinset.mpr h)))
+    have hx' : Valued.v ((x.val : F) : Cℓ(v)) = (1 : ℤᵐ⁰) := by
+      rw [HeightOneSpectrum.valuedAdicCompletion_eq_valuation']
+      exact x.property v hvT
+    rw [Units.val_mul, Units.val_inv_eq_inv_val]
+
+    change Valued.v (g.val.2 v * (((x.val : F) : Cℓ(v))⁻¹)) = 1
+    rw [map_mul, map_inv₀, hg', hx', inv_one, one_mul]
+
+end
+
 /-- A character unramified outside S is determined by its local restriction when
 the S-integer Picard group is trivial. -/
 private theorem absLevel_character_eq_one (ω : PontryaginDual C₁)
@@ -477,7 +537,7 @@ private theorem absLevel_character_eq_one (ω : PontryaginDual C₁)
   apply PontryaginDual.ext
   intro x
   obtain ⟨g, hg⟩ := QuotientGroup.mk_surjective x.val
-  obtain ⟨a, ha⟩ := exists_idele_unit_outside_of_trivial_sInteger_picard F S hPic g
+  obtain ⟨a, ha⟩ := absLevel_idele_unit_outside S hPic g
   let d := IdeleGroup.unitEmbedding (𝓞 F) F
   let t := g * d a⁻¹
   have ht : (QuotientGroup.mk t : C𝔽) = x.val := by
