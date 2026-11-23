@@ -734,12 +734,645 @@ def archNuclearityDenominator : Submodule ℂ (Θ₀(χ)) :=
   Submodule.span ℂ {x : Θ₀(χ) | ∃ f : P,
     f.val ∈ globalArchimedeanFlatTests F (ω(χ) = 1) ∧ x = Submodule.Quotient.mk f}
 
+section FlatPolarImage
+
+local notation "Coord" =>
+  ({v : InfinitePlace F // v.IsReal} → ℝ) × ({v : InfinitePlace F // v.IsComplex} → ℂ)
+local notation "Flat" =>
+  archimedeanFlatSchwartz (ι := {v : InfinitePlace F // v.IsReal}) (κ := {v : InfinitePlace F // v.IsComplex})
+local notation "coord" => InfiniteAdeleRing.ringEquiv_mixedSpace F
+
+/-- The archimedean Schwartz functions with flat coordinate realizations. -/
+private def archNuclearity_flatFactors : Submodule ℂ ℬ(InfiniteAdeleRing F) where
+  carrier := {a | ∃ h : Flat, ∀ x : InfiniteAdeleRing F, a (Multiplicative.ofAdd x) = h.val (coord x)}
+  zero_mem' := ⟨0, fun _ ↦ rfl⟩
+  add_mem' := by
+    rintro a b ⟨h, hh⟩ ⟨k, hk⟩
+    refine ⟨h + k, fun x ↦ ?_⟩
+    exact congrArg₂ (· + ·) (hh x) (hk x)
+  smul_mem' := by
+    rintro r a ⟨h, hh⟩
+    exact ⟨r • h, fun x ↦ congrArg (r • ·) (hh x)⟩
+
+/-- Coordinatewise multiplication by units preserves every archimedean wall
+and hence also the vanishing of every jet along those walls. -/
+private theorem archNuclearity_flatFactors_translate (u : (InfiniteAdeleRing F)ˣ)
+    (a : ℬ(InfiniteAdeleRing F)) (ha : a ∈ archNuclearity_flatFactors) :
+    schwartzBruhatUnitTranslate u a ∈ archNuclearity_flatFactors := by
+  obtain ⟨h, hh⟩ := ha
+  let d := Units.map (coord).toMonoidHom u⁻¹
+  let L₀ : Coord ≃ₗ[ℝ] Coord :=
+    { LinearMap.mulLeft ℝ (d : Coord) with
+      invFun := fun x ↦ (↑d⁻¹ : Coord) * x
+      left_inv := fun x ↦ by
+        change (↑d⁻¹ : Coord) * ((d : Coord) * x) = x
+        rw [← mul_assoc, Units.inv_mul, one_mul]
+      right_inv := fun x ↦ by
+        change (d : Coord) * ((↑d⁻¹ : Coord) * x) = x
+        rw [← mul_assoc, Units.mul_inv, one_mul] }
+  let L := L₀.toContinuousLinearEquiv
+  let k := SchwartzMap.compCLMOfContinuousLinearEquiv ℂ L h.val
+  have hk : k ∈ Flat := by
+    have hf := h.property
+    simp only [archimedeanFlatSchwartz, Submodule.mem_iInf, LinearMap.mem_ker, IsLinearMap.mk'_apply] at hf ⊢
+    rintro ⟨x, hx⟩ n v
+    have hx' : (∃ i, (L x).1 i = 0) ∨ ∃ j, (L x).2 j = 0 := by
+      rcases hx with ⟨i, hi⟩ | ⟨j, hj⟩
+      · exact Or.inl ⟨i, by change (d : Coord).1 i * x.1 i = 0; rw [hi, mul_zero]⟩
+      · exact Or.inr ⟨j, by change (d : Coord).2 j * x.2 j = 0; rw [hj, mul_zero]⟩
+    change iteratedFDeriv ℝ n ((h.val : Coord → ℂ) ∘ L) x v = 0
+    erw [L.toContinuousLinearMap.iteratedFDeriv_comp_right (h.val.smooth ⊤) x (i := n)
+      (mod_cast le_top)]
+    rw [ContinuousMultilinearMap.compContinuousLinearMap_apply]
+    exact hf ⟨L x, hx'⟩ n (fun i ↦ L (v i))
+  refine ⟨⟨k, hk⟩, fun x ↦ ?_⟩
+  rw [schwartzBruhatUnitTranslate_apply, hh]
+  change h.val (coord ((↑u⁻¹ : InfiniteAdeleRing F) * x)) = h.val ((d : Coord) * coord x)
+  rw [map_mul]
+  rfl
+
+
+/-- Once finite mass-zero factors may be discarded modulo a submodule, the total
+moment of a flat tensor sum can be imposed on one archimedean representative. -/
+private theorem tensor_mem_flat_moment_sup
+    {E W X : Type*} [AddCommGroup E] [AddCommGroup W] [AddCommGroup X]
+    [Module ℂ E] [Module ℂ W] [Module ℂ X]
+    (e : E ⊗[ℂ] W →ₗ[ℂ] X) (Uflat : Submodule ℂ E) (A K : Submodule ℂ X)
+    (i : E →ₗ[ℂ] ℂ) (j : W →ₗ[ℂ] ℂ) (L : X →ₗ[ℂ] ℂ)
+    (b₀ : W) (hb₀ : j b₀ = 1)
+    (hL : ∀ a b, L (e (a ⊗ₜ[ℂ] b)) = i a * j b)
+    (hA : ∀ a ∈ Uflat, i a = 0 → ∀ b, e (a ⊗ₜ[ℂ] b) ∈ A)
+    (hK : ∀ a ∈ Uflat, ∀ b, j b = 0 → e (a ⊗ₜ[ℂ] b) ∈ A ⊔ K)
+    {x : X} (hx : x ∈ Submodule.span ℂ {v | ∃ a ∈ Uflat, ∃ b, e (a ⊗ₜ[ℂ] b) = v})
+    (hx₀ : L x = 0) : x ∈ A ⊔ K := by
+  let u : E →ₗ[ℂ] X := e.comp ((TensorProduct.mk ℂ E W).flip b₀)
+  have hu (a : E) : u a = e (a ⊗ₜ[ℂ] b₀) := rfl
+  have H (x : X) (hx : x ∈ Submodule.span ℂ {v | ∃ a ∈ Uflat, ∃ b, e (a ⊗ₜ[ℂ] b) = v}) :
+      ∃ a ∈ Uflat, i a = L x ∧ x - u a ∈ A ⊔ K := by
+    refine Submodule.span_induction (p := fun x _ ↦ ∃ a ∈ Uflat, i a = L x ∧ x - u a ∈ A ⊔ K)
+      ?_ ?_ ?_ ?_ hx
+    · rintro _ ⟨a, ha, b, rfl⟩
+      refine ⟨j b • a, Uflat.smul_mem _ ha, ?_, ?_⟩
+      · rw [map_smul, smul_eq_mul, hL, mul_comm]
+      · have hj : j (b - j b • b₀) = 0 := by
+          rw [map_sub, map_smul, hb₀, smul_eq_mul, mul_one, sub_self]
+        have h := hK a ha (b - j b • b₀) hj
+        simpa only [TensorProduct.tmul_sub, TensorProduct.tmul_smul, TensorProduct.smul_tmul', map_sub, hu] using h
+    · exact ⟨0, Uflat.zero_mem, by rw [map_zero, map_zero], by simp⟩
+    · rintro x y _ _ ⟨a, ha, hia, hxa⟩ ⟨b, hb, hib, hyb⟩
+      refine ⟨a + b, Uflat.add_mem ha hb, by rw [map_add, map_add, hia, hib], ?_⟩
+      rw [map_add, add_sub_add_comm]
+      exact Submodule.add_mem _ hxa hyb
+    · rintro c x _ ⟨a, ha, hia, hxa⟩
+      refine ⟨c • a, Uflat.smul_mem c ha, by rw [map_smul, map_smul, hia], ?_⟩
+      rw [map_smul, ← smul_sub]
+      exact Submodule.smul_mem _ c hxa
+  obtain ⟨a, ha, hi, he⟩ := H x hx
+  have haux : u a ∈ A ⊔ K := (show A ≤ A ⊔ K from le_sup_left) (hA a ha (hi.trans hx₀) b₀)
+  have hsum := Submodule.add_mem _ he haux
+  rwa [sub_add_cancel] at hsum
+
+
+local notation "Aflat" => archNuclearity_flatFactors (F := F)
+local notation "A₀(" χ ")" => globalArchimedeanFlatTests F (ω(χ) = 1)
+local notation "A" => globalArchimedeanFlatTests F
+local notation "K(" χ ")" => (homogeneousAdelicThetaLinearMap F (ω(χ))).ker
+local notation "ArchTests" => ℬ(InfiniteAdeleRing F)
+local notation "FiniteTests" => ℬ(FiniteAdeleRing (𝓞 F) F)
+local notation "tensor" => (adeleSchwartz_inductiveTensor_equiv F).choose
+local notation "hatL" => (ContinuousLinearMap.snd ℂ ℂ ℂ).toLinearMap.comp
+  ((adelePolarValues_isLinear (F := F)).mk' adelePolarValues)
+
+private theorem archNuclearityDenominator_mem_restricted
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (x : Θ₀(χ)) :
+    x ∈ archNuclearityDenominator χ ↔
+      ∃ f : P, f.val ∈ A₀(χ) ∧ x = mkΘ(χ, f) := by
+  let D : Submodule ℂ P := (A₀(χ)).comap (P).subtype
+  let q : P →ₗ[ℂ] Θ₀(χ) := (Π(χ)).mkQ
+  have hEq : archNuclearityDenominator χ = D.map q := by
+    apply le_antisymm
+    · apply Submodule.span_le.mpr
+      rintro _ ⟨f, hf, rfl⟩
+      exact ⟨f, hf, rfl⟩
+    · rintro _ ⟨f, hf, rfl⟩
+      exact Submodule.subset_span ⟨f, hf, rfl⟩
+  rw [hEq]
+  exact exists_congr fun f ↦ and_congr_right fun _ ↦ eq_comm
+
+private theorem archNuclearity_flatTests_mono {Q R : Prop} (h : Q → R) :
+    globalArchimedeanFlatTests F R ≤ globalArchimedeanFlatTests F Q := by
+  apply Submodule.span_mono
+  rintro _ ⟨a, b, f, hf, hR, rfl⟩
+  exact ⟨a, b, f, hf, hR ∘ h, rfl⟩
+
+/-- Reduction to additive moment factorization and the vanishing of weighted finite
+coinvariants modulo the restricted flat space and the theta kernel. -/
+private theorem archNuclearity_of_finiteMassReduction
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (x : Θ₀(χ))
+    (H : ω(χ) = 1 → ∃ (i : ArchTests →ₗ[ℂ] ℂ) (j : FiniteTests →ₗ[ℂ] ℂ) (b₀ : FiniteTests),
+      j b₀ = 1 ∧
+      (∀ a b, hatL (tensor (a ⊗ₜ[ℂ] b)) = i a * j b) ∧
+      (∀ (a : ArchTests) (h : Flat), (∀ z, a (Multiplicative.ofAdd z) = h.val (coord z)) →
+        (i a = 0 ↔ (∫ y : Coord, h.val y) = 0)) ∧
+      (∀ a ∈ Aflat, ∀ b, j b = 0 → tensor (a ⊗ₜ[ℂ] b) ∈ A₀(χ) ⊔ K(χ))) :
+    x ∈ archNuclearityDenominator χ ↔
+      ∃ f : P, f.val ∈ A ∧ x = mkΘ(χ, f) := by
+  rw [archNuclearityDenominator_mem_restricted]
+  constructor
+  · rintro ⟨f, hf, rfl⟩
+    exact ⟨f, archNuclearity_flatTests_mono (False.elim : False → ω(χ) = 1) hf, rfl⟩
+  · rintro ⟨f, hf, rfl⟩
+    by_cases hω : ω(χ) = 1
+    swap
+    · exact ⟨f, archNuclearity_flatTests_mono hω hf, rfl⟩
+    obtain ⟨i, j, b₀, hb, hL, hi, hK⟩ := H hω
+    have hA (a : ArchTests) (ha : a ∈ Aflat) (h0 : i a = 0) (b : FiniteTests) :
+        tensor (a ⊗ₜ[ℂ] b) ∈ A₀(χ) := by
+      obtain ⟨h, hh⟩ := ha
+      exact Submodule.subset_span ⟨a, b, h, hh, fun _ ↦ (hi a h hh).mp h0, rfl⟩
+    have hspan : A ≤ Submodule.span ℂ {v | ∃ a ∈ Aflat, ∃ b, tensor (a ⊗ₜ[ℂ] b) = v} := by
+      apply Submodule.span_mono
+      rintro _ ⟨a, b, h, hh, _, rfl⟩
+      exact ⟨a, ⟨h, hh⟩, b, rfl⟩
+    have hsum := tensor_mem_flat_moment_sup (tensor).toLinearMap Aflat (A₀(χ)) (K(χ)) i j hatL b₀
+      hb hL hA hK (hspan hf) ((mem_adelePolarSubspace f.val).mp f.property).2
+    obtain ⟨g, hg, k, hk, hgf⟩ := Submodule.mem_sup.mp hsum
+    have hg0 : g ∈ P := by
+      have hgflat : g ∈ A := archNuclearity_flatTests_mono (False.elim : False → ω(χ) = 1) hg
+      apply (globalArchimedeanFlatTests_zero_moments g hgflat).2.mpr
+      suffices hatL g = 0 from this
+      refine Submodule.span_induction (p := fun y _ ↦ hatL y = 0) ?_ ?_ ?_ ?_ hg
+      · rintro _ ⟨a, b, h, hh, hM, rfl⟩
+        exact (hL a b).trans (mul_eq_zero_of_left ((hi a h hh).mpr (hM hω)) _)
+      · exact map_zero _
+      · intro a b _ _ ha hb'
+        rw [map_add, ha, hb', add_zero]
+      · intro c y _ hy
+        rw [map_smul, hy, smul_zero]
+    refine ⟨⟨g, hg0⟩, hg, (Submodule.Quotient.eq (Π(χ))).mpr ?_⟩
+    change f.val - g ∈ K(χ)
+    have he : f.val - g = k := by rw [← hgf, add_comm g k, add_sub_cancel_right]
+    rwa [he]
+
+open scoped RestrictedProduct
+local notation "AF" => FiniteAdeleRing (𝓞 F) F
+/-- In mixed archimedean coordinates the global Fourier value at zero factors
+as ordinary archimedean volume integration against a fixed finite functional. -/
+private theorem archNuclearity_productMoment :
+    ∃ J : FiniteTests → ℂ, ∀ (a : ℬ(InfiniteAdeleRing F)) (b : FiniteTests),
+      adeleSchwartzFourier (F := F) (tensor (a ⊗ₜ[ℂ] b)) (Multiplicative.ofAdd 0) =
+        (∫ y : Coord, a (Multiplicative.ofAdd ((coord).symm y))) * J b := by
+  let (v : V) : CompactSpace (v.adicCompletionIntegers F) := compactSpace_adicCompletionIntegers v
+  let (v : V) : LocallyCompactSpace (v.adicCompletion F) := locallyCompactSpace_adicCompletion v
+  let : Fact (∀ v : V, IsOpen (v.adicCompletionIntegers F : Set (v.adicCompletion F))) :=
+    ⟨fun v ↦ Valued.isOpen_valuationSubring _⟩
+  let : LocallyCompactSpace AF := inferInstanceAs
+    (LocallyCompactSpace (Πʳ v : V, [v.adicCompletion F, v.adicCompletionIntegers F]))
+  let : LocallyCompactSpace 𝔸[F] := inferInstanceAs
+    (LocallyCompactSpace (InfiniteAdeleRing F × AF))
+  let := ratAdele_secondCountable
+  obtain ⟨e, _, _⟩ := exists_adeleTrace_dualCoordinates F
+  let : SecondCountableTopology 𝔸[F] := e.symm.toHomeomorph.isEmbedding.secondCountableTopology
+  let : SecondCountableTopology (InfiniteAdeleRing F × AF) := inferInstanceAs (SecondCountableTopology 𝔸[F])
+  let : SecondCountableTopology AF :=
+    (isEmbedding_prodMkRight (X := InfiniteAdeleRing F) (Y := AF) 0).secondCountableTopology
+  let : IsTopologicalAddGroup AF := inferInstanceAs
+    (IsTopologicalAddGroup (Πʳ v : V, [v.adicCompletion F, v.adicCompletionIntegers F]))
+  let : IsTopologicalAddGroup 𝔸[F] := inferInstanceAs
+    (IsTopologicalAddGroup (InfiniteAdeleRing F × AF))
+  let : MeasurableSpace AF := borel _
+  let : BorelSpace AF := ⟨rfl⟩
+  let : MeasurableSpace 𝔸[F] := borel _
+  let : BorelSpace 𝔸[F] := ⟨rfl⟩
+  let d : (Coord × AF) ≃ₜ+ 𝔸[F] :=
+    { toAddEquiv := (coord).symm.toAddEquiv.prodCongr (AddEquiv.refl _)
+      continuous_toFun := ((continuous_infiniteAdeleRingEquivMixedSpace_symm F).comp continuous_fst).prodMk
+        continuous_snd
+      continuous_invFun := ((continuous_infiniteAdeleRingEquivMixedSpace F).comp continuous_fst).prodMk
+        continuous_snd }
+  let μf := Measure.addHaar (G := AF)
+  let μ : Measure (Coord × AF) := (volume : Measure Coord).prod μf
+  let : μ.IsAddHaarMeasure := Measure.prod.instIsAddHaarMeasure _ _
+  let ν : Measure 𝔸[F] := μ.map d
+  let : ν.IsAddHaarMeasure := d.isAddHaarMeasure_map μ
+  let m := additiveTamagawaMeasure F
+  let : m.IsAddHaarMeasure := (additiveTamagawaMeasure_existsUnique F).exists.choose_spec.1
+  let c := m.addHaarScalarFactor ν
+  have hc : m = c • ν := Measure.isAddLeftInvariant_eq_smul m ν
+  refine ⟨fun b ↦ (c : ℂ) * ∫ x, b (Multiplicative.ofAdd x) ∂μf, fun a b ↦ ?_⟩
+  rw [(adeleSchwartzFourier_apply_zero _).2]
+  change (∫ x : 𝔸[F], tensor (a ⊗ₜ[ℂ] b) (Multiplicative.ofAdd x) ∂m) = _
+  rw [hc, integral_smul_nnreal_measure]
+  change (c : ℂ) * ∫ x : 𝔸[F], tensor (a ⊗ₜ[ℂ] b) (Multiplicative.ofAdd x) ∂ν = _
+  rw [show ν = μ.map d.toHomeomorph.toMeasurableEquiv from rfl, integral_map_equiv]
+  have h (x : Coord × AF) :
+      tensor (a ⊗ₜ[ℂ] b) (Multiplicative.ofAdd (d.toHomeomorph.toMeasurableEquiv x)) =
+        a (Multiplicative.ofAdd ((coord).symm x.1)) * b (Multiplicative.ofAdd x.2) :=
+    (adeleSchwartz_inductiveTensor_equiv F).choose_spec a b (d x)
+  simp_rw [h]
+  exact (congrArg ((c : ℂ) * ·) (integral_prod_mul (μ := (volume : Measure Coord)) (ν := μf)
+    (fun y ↦ a (Multiplicative.ofAdd ((coord).symm y))) (fun y ↦ b (Multiplicative.ofAdd y)))).trans
+      (mul_left_comm _ _ _)
+
+local notation "hatC" => (ContinuousLinearMap.snd ℂ ℂ ℂ).comp
+  (⟨(adelePolarValues_isLinear (F := F)).mk' adelePolarValues,
+    adelePolarValues_continuous⟩ : ℬ(𝔸[F]) →L[ℂ] ℂ × ℂ)
+
+private theorem archNuclearity_nonzero_pure_moment :
+    ∃ (a : ArchTests) (b : FiniteTests), hatC (tensor (a ⊗ₜ[ℂ] b)) ≠ 0 := by
+  by_contra! h
+  have hz : (hatC).toLinearMap.comp (tensor).toLinearMap = 0 :=
+    TensorProduct.ext' fun a b ↦ h a b
+  obtain ⟨f, hf⟩ := adelePolarValues_surjective (F := F) ((0, 1) : ℂ × ℂ)
+  have hf' : hatC f = 1 := congrArg Prod.snd hf
+  have ht := LinearMap.congr_fun hz ((tensor).symm f)
+  change hatC (tensor ((tensor).symm f)) = 0 at ht
+  rw [(tensor).apply_symm_apply, hf'] at ht
+  exact one_ne_zero ht
+
+private theorem archNuclearity_normalized_moment :
+    ∃ (i : ArchTests →L[ℂ] ℂ) (j : FiniteTests →ₗ[ℂ] ℂ) (a₀ : ArchTests) (b₀ : FiniteTests),
+      i a₀ ≠ 0 ∧ j b₀ = 1 ∧
+      (∀ a b, hatC (tensor (a ⊗ₜ[ℂ] b)) = i a * j b) ∧
+      (∀ (a : ArchTests) (h : Flat), (∀ z, a (Multiplicative.ofAdd z) = h.val (coord z)) →
+        (i a = 0 ↔ (∫ y : Coord, h.val y) = 0)) := by
+  obtain ⟨a₀, b₀, hab₀⟩ := archNuclearity_nonzero_pure_moment (F := F)
+  obtain ⟨rawJ, hraw⟩ := archNuclearity_productMoment (F := F)
+  let rawI (a : ArchTests) := ∫ y : Coord, a (Multiplicative.ofAdd ((coord).symm y))
+  have hL (a : ArchTests) (b : FiniteTests) : hatC (tensor (a ⊗ₜ[ℂ] b)) = rawI a * rawJ b := hraw a b
+  have hj₀ : rawJ b₀ ≠ 0 := right_ne_zero_of_mul (fun hz ↦ hab₀ ((hL a₀ b₀).trans hz))
+  have hi₀ : rawI a₀ ≠ 0 := left_ne_zero_of_mul (fun hz ↦ hab₀ ((hL a₀ b₀).trans hz))
+  let T := InductiveTensor ArchTests FiniteTests
+  let eb : ArchTests →ₗ[ℂ] T := (TensorProduct.mk ℂ ArchTests FiniteTests).flip b₀
+  have heb : Continuous eb := by
+    let h := withGeneratingSeminorms_spec (ArchTests ⊗[ℂ] FiniteTests)
+      (fun p : {p : Seminorm ℂ (ArchTests ⊗[ℂ] FiniteTests) //
+        (∀ a : ArchTests, Continuous (fun b : FiniteTests ↦ p (a ⊗ₜ[ℂ] b))) ∧
+        (∀ b : FiniteTests, Continuous (fun a : ArchTests ↦ p (a ⊗ₜ[ℂ] b)))} ↦ p.val)
+    exact h.continuous_of_continuous_comp eb fun p ↦ p.property.2 b₀
+  let i : ArchTests →L[ℂ] ℂ := (hatC).comp ((tensor).toContinuousLinearMap.comp ⟨eb, heb⟩)
+  let j : FiniteTests →ₗ[ℂ] ℂ := (hatC (tensor (a₀ ⊗ₜ[ℂ] b₀)))⁻¹ •
+    ((hatC).toLinearMap.comp ((tensor).toLinearMap.comp (TensorProduct.mk ℂ ArchTests FiniteTests a₀)))
+  have hi (a : ArchTests) : i a = rawI a * rawJ b₀ := hL a b₀
+  have hj (b : FiniteTests) : j b = (rawI a₀ * rawJ b₀)⁻¹ * (rawI a₀ * rawJ b) := by
+    change (hatC (tensor (a₀ ⊗ₜ[ℂ] b₀)))⁻¹ * hatC (tensor (a₀ ⊗ₜ[ℂ] b)) = _
+    rw [hL, hL]
+  refine ⟨i, j, a₀, b₀, hab₀, ?_, ?_, ?_⟩
+  · rw [hj, inv_mul_cancel₀ (mul_ne_zero hi₀ hj₀)]
+  · intro a b
+    rw [hL, hi, hj]
+    field_simp
+  · intro a h hh
+    rw [hi, mul_eq_zero, or_iff_left hj₀]
+    have hh' (y : Coord) : a (Multiplicative.ofAdd ((coord).symm y)) = h.val y := by
+      rw [hh, RingEquiv.apply_symm_apply]
+    have hI : rawI a = ∫ y : Coord, h.val y :=
+      congrArg (fun f : Coord → ℂ ↦ ∫ y, f y) (funext hh')
+    rw [hI]
+
+local notation "A∞" => InfiniteAdeleRing F
+local notation "𝕀" => IdeleGroup (𝓞 F) F
+
+private def archNuclearity_archUnit (u : A∞ˣ) : 𝕀 where
+  val := (u.val, 1)
+  inv := (u.inv, 1)
+  val_inv := Prod.ext u.val_inv (one_mul 1)
+  inv_val := Prod.ext u.inv_val (one_mul 1)
+
+private def archNuclearity_finiteUnit (u : AFˣ) : 𝕀 where
+  val := (1, u.val)
+  inv := (1, u.inv)
+  val_inv := Prod.ext (one_mul 1) u.val_inv
+  inv_val := Prod.ext (one_mul 1) u.inv_val
+
+private def archNuclearity_translateLinear {R : Type*} [CommRing R] [TopologicalSpace R]
+    [IsTopologicalRing R] (u : Rˣ) : ℬ(R) →ₗ[ℂ] ℬ(R) where
+  toFun := schwartzBruhatUnitTranslate u
+  map_add' := fun _ _ ↦ Subtype.ext rfl
+  map_smul' := fun _ _ ↦ Subtype.ext rfl
+
+private theorem archNuclearity_translate_pure (u : A∞ˣ) (v : AFˣ) (a : ArchTests) (b : FiniteTests) :
+    schwartzBruhatUnitTranslate (archNuclearity_archUnit u * archNuclearity_finiteUnit v)
+      (tensor (a ⊗ₜ[ℂ] b)) =
+    tensor (schwartzBruhatUnitTranslate u a ⊗ₜ[ℂ] schwartzBruhatUnitTranslate v b) := by
+  apply Subtype.ext
+  funext x
+  change schwartzBruhatUnitTranslate (archNuclearity_archUnit u * archNuclearity_finiteUnit v)
+      (tensor (a ⊗ₜ[ℂ] b)) (Multiplicative.ofAdd x.toAdd) =
+    tensor (schwartzBruhatUnitTranslate u a ⊗ₜ[ℂ] schwartzBruhatUnitTranslate v b)
+      (Multiplicative.ofAdd x.toAdd)
+  rw [schwartzBruhatUnitTranslate_apply,
+    (adeleSchwartz_inductiveTensor_equiv F).choose_spec,
+    (adeleSchwartz_inductiveTensor_equiv F).choose_spec,
+    schwartzBruhatUnitTranslate_apply, schwartzBruhatUnitTranslate_apply]
+  change a (Multiplicative.ofAdd ((1 * (↑u⁻¹ : A∞)) * x.toAdd.1)) *
+    b (Multiplicative.ofAdd (((↑v⁻¹ : AF) * 1) * x.toAdd.2)) = _
+  rw [mul_one, one_mul]
+
+private theorem archNuclearity_translate_one {R : Type*} [CommRing R] [TopologicalSpace R]
+    [IsTopologicalRing R] (a : ℬ(R)) : schwartzBruhatUnitTranslate 1 a = a := by
+  apply Subtype.ext
+  funext x
+  change schwartzBruhatUnitTranslate 1 a (Multiplicative.ofAdd x.toAdd) = _
+  rw [schwartzBruhatUnitTranslate_apply, inv_one, Units.val_one, one_mul]
+  rfl
+
+private theorem archNuclearity_unit_arch_finite (w : 𝕀) :
+    ∃ u : A∞ˣ, ∃ v : AFˣ, w = archNuclearity_archUnit u * archNuclearity_finiteUnit v := by
+  refine ⟨Units.map (RingHom.fst A∞ AF).toMonoidHom w,
+    Units.map (RingHom.snd A∞ AF).toMonoidHom w, ?_⟩
+  apply Units.ext
+  exact Prod.ext (mul_one _).symm (one_mul _).symm
+
+local notation "absValue(" u ")" => ((((ideleNorm F u).val : ℝ) : ℂ))
+
+private theorem archNuclearity_hatC_translate (u : 𝕀) (f : ℬ(𝔸[F])) :
+    hatC (schwartzBruhatUnitTranslate u f) = absValue(u) * hatC f := by
+  have h := globalThetaPolarValues_snd_translate (QuotientGroup.mk u) (Submodule.Quotient.mk f)
+  rw [(existsUnique_globalThetaAction (F := F)).exists.choose_spec.2 u f] at h
+  exact h
+
+private theorem archNuclearity_moment_arch_translate (i : ArchTests →L[ℂ] ℂ) (j : FiniteTests →ₗ[ℂ] ℂ)
+    (b₀ : FiniteTests) (hb : j b₀ = 1) (hL : ∀ a b, hatC (tensor (a ⊗ₜ[ℂ] b)) = i a * j b)
+    (u : A∞ˣ) (a : ArchTests) :
+    i (schwartzBruhatUnitTranslate u a) = absValue(archNuclearity_archUnit u) * i a := by
+  have h := archNuclearity_hatC_translate
+    (archNuclearity_archUnit u * archNuclearity_finiteUnit (F := F) 1) (tensor (a ⊗ₜ[ℂ] b₀))
+  rw [archNuclearity_translate_pure, archNuclearity_translate_one, hL, hL, hb, mul_one, mul_one,
+    show archNuclearity_finiteUnit (F := F) 1 = 1 from Units.ext rfl, mul_one] at h
+  exact h
+
+private theorem archNuclearity_moment_finite_translate (i : ArchTests →L[ℂ] ℂ) (j : FiniteTests →ₗ[ℂ] ℂ)
+    (a₀ : ArchTests) (ha : i a₀ ≠ 0) (hL : ∀ a b, hatC (tensor (a ⊗ₜ[ℂ] b)) = i a * j b)
+    (v : AFˣ) (b : FiniteTests) :
+    j (schwartzBruhatUnitTranslate v b) = absValue(archNuclearity_finiteUnit v) * j b := by
+  have h := archNuclearity_hatC_translate
+    (archNuclearity_archUnit (F := F) 1 * archNuclearity_finiteUnit v) (tensor (a₀ ⊗ₜ[ℂ] b))
+  rw [archNuclearity_translate_pure, archNuclearity_translate_one, hL, hL,
+    show archNuclearity_archUnit (F := F) 1 = 1 from Units.ext rfl, one_mul,
+    mul_left_comm] at h
+  exact mul_left_cancel₀ ha h
+
+private theorem archNuclearity_translate_mul (u v : 𝕀) (f : ℬ(𝔸[F])) :
+    schwartzBruhatUnitTranslate u (schwartzBruhatUnitTranslate v f) =
+    schwartzBruhatUnitTranslate (u * v) f := by
+  apply Subtype.ext
+  funext x
+  change f (Multiplicative.ofAdd (v.inv * (u.inv * x.toAdd))) =
+    f (Multiplicative.ofAdd ((u * v).inv * x.toAdd))
+  exact congrArg (fun y ↦ f (Multiplicative.ofAdd y)) (mul_assoc v.inv u.inv x.toAdd).symm
+
+private theorem archNuclearity_archLift (v : AFˣ) :
+    ∃ u : A∞ˣ, ideleNorm F (archNuclearity_archUnit u) = ideleNorm F (archNuclearity_finiteUnit v) := by
+  obtain ⟨w⟩ := (inferInstance : Nonempty (InfinitePlace F))
+  let t := ideleNorm F (archNuclearity_finiteUnit v)
+  let g := singlePlaceIdeleNormSection F w t
+  let u := Units.map (RingHom.fst A∞ AF).toMonoidHom g
+  have hu : archNuclearity_archUnit u = g := Units.ext (Prod.ext rfl rfl)
+  exact ⟨u, hu ▸ singlePlaceIdeleNormSection_rightInverse F w t⟩
+
+private theorem archNuclearity_theta_translate_sameNorm
+    (χ : PontryaginDual C𝔽) (hω : ω(χ) = 1) (u v : 𝕀) (h : ideleNorm F u = ideleNorm F v)
+    (f : ℬ(𝔸[F])) :
+    homogeneousAdelicThetaLinearMap F (ω(χ)) (schwartzBruhatUnitTranslate u f) =
+    homogeneousAdelicThetaLinearMap F (ω(χ)) (schwartzBruhatUnitTranslate v f) := by
+  let g := u * v⁻¹
+  have hg : ideleNorm F g = 1 := by
+    change ideleNorm F (u * v⁻¹) = _
+    rw [map_mul, map_inv, h, mul_inv_cancel]
+  let k : (ideleClassNorm F).ker :=
+    ⟨QuotientGroup.mk g, MonoidHom.mem_ker.mpr (show ideleNorm F g = 1 from hg)⟩
+  have he := globalConverse_nontrivial_exact_theta_translate (ω(χ)) k g rfl
+    (schwartzBruhatUnitTranslate v f)
+  have hw : (ω(χ) k : ℂ) = 1 :=
+    (congrArg (fun χ' : PontryaginDual (ideleClassNorm F).ker ↦ (χ' k : ℂ)) hω).trans rfl
+  let M := homogeneousAdelicThetaLinearMap F (ω(χ))
+  have htrans : schwartzBruhatUnitTranslate g (schwartzBruhatUnitTranslate v f) =
+      schwartzBruhatUnitTranslate u f :=
+    (archNuclearity_translate_mul g v f).trans
+      (congrArg (fun s : 𝕀 ↦ schwartzBruhatUnitTranslate s f) (inv_mul_cancel_right u v))
+  exact ((congrArg M htrans).symm.trans he).trans
+    ((congrArg (fun c : ℂ ↦ c • M (schwartzBruhatUnitTranslate v f)) hw).trans (one_smul _ _))
+
+/-- A finite eigendistribution of additive weight extends by tensoring with the
+archimedean moment. Global rank one then determines it uniquely. -/
+private theorem archNuclearity_finiteEigen_unique
+    (hcont : ∀ L : FiniteTests →ₗ[ℂ] ℂ, Continuous L)
+    (i : ArchTests →L[ℂ] ℂ) (j : FiniteTests →ₗ[ℂ] ℂ) (a₀ : ArchTests) (b₀ : FiniteTests)
+    (ha : i a₀ ≠ 0) (hb : j b₀ = 1) (hL : ∀ a b, hatC (tensor (a ⊗ₜ[ℂ] b)) = i a * j b)
+    (L : FiniteTests →ₗ[ℂ] ℂ)
+    (hLcov : ∀ (u : AFˣ) b, L (schwartzBruhatUnitTranslate u b) = absValue(archNuclearity_finiteUnit u) * L b) :
+    ∃ c : ℂ, L = c • j := by
+  let T := InductiveTensor ArchTests FiniteTests
+  let Q : T →ₗ[ℂ] ℂ := (LinearMap.mul' ℂ ℂ).comp (TensorProduct.map i.toLinearMap L)
+  have hQ (a : ArchTests) (b : FiniteTests) : Q (a ⊗ₜ[ℂ] b) = i a * L b := by
+    change (LinearMap.mul' ℂ ℂ) (TensorProduct.map i.toLinearMap L (a ⊗ₜ[ℂ] b)) = _
+    rw [TensorProduct.map_tmul, LinearMap.mul'_apply]
+    rfl
+  have hcQ : Continuous Q := by
+    let hS := withGeneratingSeminorms_spec (ArchTests ⊗[ℂ] FiniteTests)
+      (fun p : {p : Seminorm ℂ (ArchTests ⊗[ℂ] FiniteTests) //
+        (∀ a : ArchTests, Continuous (fun b : FiniteTests ↦ p (a ⊗ₜ[ℂ] b))) ∧
+        (∀ b : FiniteTests, Continuous (fun a : ArchTests ↦ p (a ⊗ₜ[ℂ] b)))} ↦ p.val)
+    refine (PolynormableSpace.withSeminorms ℂ ℂ).continuous_of_continuous_comp Q fun q ↦ ?_
+    refine hS.continuous_seminorm ⟨q.val.comp Q, fun a ↦ q.property.comp ?_, fun b ↦ q.property.comp ?_⟩
+    · exact (continuous_const.mul (hcont L)).congr fun b ↦ (hQ a b).symm
+    · exact (i.continuous.mul continuous_const).congr fun a ↦ (hQ a b).symm
+  let D : StrongDual ℂ ℬ(𝔸[F]) := (⟨Q, hcQ⟩ : T →L[ℂ] ℂ).comp (tensor).symm.toContinuousLinearMap
+  have hD (a : ArchTests) (b : FiniteTests) : D (tensor (a ⊗ₜ[ℂ] b)) = i a * L b :=
+    (congrArg Q ((tensor).symm_apply_apply (a ⊗ₜ[ℂ] b))).trans (hQ a b)
+  let c := ideleClassNormTwist (1 : U) 1
+  have hDcov (w : 𝕀) (f : ℬ(𝔸[F])) :
+      D (schwartzBruhatUnitTranslate w f) = absValue(w) * D f := by
+    obtain ⟨u, v, rfl⟩ := archNuclearity_unit_arch_finite w
+    let w := archNuclearity_archUnit u * archNuclearity_finiteUnit v
+    let L₁ := (D.toLinearMap.comp (archNuclearity_translateLinear w)).comp (tensor).toLinearMap
+    let L₂ := absValue(w) • D.toLinearMap.comp (tensor).toLinearMap
+    have he : L₁ = L₂ := by
+      refine TensorProduct.ext' fun a b ↦ ?_
+      change D (schwartzBruhatUnitTranslate (archNuclearity_archUnit u * archNuclearity_finiteUnit v)
+        (tensor (a ⊗ₜ[ℂ] b))) = absValue(archNuclearity_archUnit u * archNuclearity_finiteUnit v) *
+          D (tensor (a ⊗ₜ[ℂ] b))
+      rw [archNuclearity_translate_pure, hD, hD, archNuclearity_moment_arch_translate i j b₀ hb hL,
+        hLcov, map_mul, Units.val_mul, NNReal.coe_mul, Complex.ofReal_mul, mul_mul_mul_comm]
+    obtain ⟨x, rfl⟩ := (tensor).surjective f
+    exact LinearMap.congr_fun he x
+  have hmem : D ∈ adelicEigendistributions c := by
+    intro w f
+    change _ = ((1 : ℂ) * absValue(w) ^ (1 : ℂ)) * D f
+    rw [Complex.cpow_one, one_mul]
+    exact hDcov w f
+  let H : StrongDual ℂ ℬ(𝔸[F]) := hatC
+  have hH : H ∈ adelicEigendistributions c := by
+    intro w f
+    change _ = ((1 : ℂ) * absValue(w) ^ (1 : ℂ)) * H f
+    rw [Complex.cpow_one, one_mul]
+    exact archNuclearity_hatC_translate w f
+  have hnH : H ≠ 0 := by
+    intro he
+    have hh := hL a₀ b₀
+    change H (tensor (a₀ ⊗ₜ[ℂ] b₀)) = _ at hh
+    rw [he, zero_apply, hb, mul_one] at hh
+    exact ha hh.symm
+  have hr := Module.rank_eq_one_iff_finrank_eq_one.mp (adelicEigendistributions_rank c)
+  rw [eq_span_singleton_of_mem_of_finrank_eq_one hr hH hnH, Submodule.mem_span_singleton] at hmem
+  obtain ⟨z, hz⟩ := hmem
+  refine ⟨z, LinearMap.ext fun b ↦ ?_⟩
+  have he := congrArg (fun d : StrongDual ℂ ℬ(𝔸[F]) ↦ d (tensor (a₀ ⊗ₜ[ℂ] b))) hz
+  change z * hatC (tensor (a₀ ⊗ₜ[ℂ] b)) = D (tensor (a₀ ⊗ₜ[ℂ] b)) at he
+  rw [hL, hD, mul_left_comm] at he
+  exact (mul_left_cancel₀ ha he).symm
+
+/-- If the additive-mass functional spans the algebraic eigenfunctionals,
+the weighted translation differences generate its kernel. -/
+private theorem span_weightedDifferences_eq_ker
+    {W G : Type*} [AddCommGroup W] [Module ℂ W] (T : G → W → W) (c : G → ℂ)
+    (J : W →ₗ[ℂ] ℂ) (hJ : ∀ u w, J (T u w) = c u * J w)
+    (huniq : ∀ L : W →ₗ[ℂ] ℂ, (∀ u w, L (T u w) = c u * L w) → ∃ z : ℂ, L = z • J) :
+    Submodule.span ℂ {x | ∃ u w, x = T u w - c u • w} = J.ker := by
+  let D := Submodule.span ℂ {x | ∃ u w, x = T u w - c u • w}
+  have hD : D ≤ J.ker := by
+    refine Submodule.span_le.mpr ?_
+    rintro _ ⟨u, w, rfl⟩
+    change J (T u w - c u • w) = 0
+    rw [map_sub, map_smul, smul_eq_mul, hJ, sub_self]
+  apply Subspace.dualAnnihilator_inj.mp
+  apply le_antisymm
+  · intro l hl
+    have hL (u : G) (w : W) : l (T u w) = c u * l w := by
+      have hm : T u w - c u • w ∈ D := Submodule.subset_span ⟨u, w, rfl⟩
+      have hz := (D.mem_dualAnnihilator l).mp hl _ hm
+      rw [map_sub, map_smul, smul_eq_mul] at hz
+      exact sub_eq_zero.mp hz
+    obtain ⟨z, rfl⟩ := huniq l hL
+    exact (J.ker.mem_dualAnnihilator _).mpr fun w hw ↦ by
+      change z * J w = 0
+      rw [LinearMap.mem_ker.mp hw, mul_zero]
+  · intro l hl
+    exact (D.mem_dualAnnihilator _).mpr fun w hw ↦ (J.ker.mem_dualAnnihilator _).mp hl _ (hD hw)
+
+
+private theorem archNuclearity_weightedDifference
+    (χ : PontryaginDual C𝔽) (hω : ω(χ) = 1)
+    (i : ArchTests →L[ℂ] ℂ) (j : FiniteTests →ₗ[ℂ] ℂ) (b₀ : FiniteTests)
+    (hb₀ : j b₀ = 1) (hL : ∀ a b, hatC (tensor (a ⊗ₜ[ℂ] b)) = i a * j b)
+    (hi : ∀ (a : ArchTests) (h : Flat), (∀ z, a (Multiplicative.ofAdd z) = h.val (coord z)) →
+      (i a = 0 ↔ (∫ y : Coord, h.val y) = 0))
+    (a : ArchTests) (ha : a ∈ Aflat) (b : FiniteTests) (v : AFˣ) :
+    tensor (a ⊗ₜ[ℂ] (schwartzBruhatUnitTranslate v b - absValue(archNuclearity_finiteUnit v) • b)) ∈
+      A₀(χ) ⊔ K(χ) := by
+  obtain ⟨u, hu⟩ := archNuclearity_archLift v
+  let c := absValue(archNuclearity_finiteUnit v)
+  let a' := schwartzBruhatUnitTranslate u a - c • a
+  have ha' : a' ∈ Aflat :=
+    Submodule.sub_mem _ (archNuclearity_flatFactors_translate u a ha) (Submodule.smul_mem _ _ ha)
+  have hia : i a' = 0 := by
+    change i (schwartzBruhatUnitTranslate u a - c • a) = 0
+    rw [map_sub, map_smul, archNuclearity_moment_arch_translate i j b₀ hb₀ hL, hu, smul_eq_mul, sub_self]
+  let p := tensor (a' ⊗ₜ[ℂ] b)
+  have hp : p ∈ A₀(χ) := by
+    obtain ⟨h, hh⟩ := ha'
+    exact Submodule.subset_span ⟨a', b, h, hh, fun _ ↦ (hi a' h hh).mp hia, rfl⟩
+  let q := tensor (a ⊗ₜ[ℂ] (schwartzBruhatUnitTranslate v b - c • b))
+  have hq : q - p ∈ K(χ) := by
+    let M := homogeneousAdelicThetaLinearMap F (ω(χ))
+    have htheta := archNuclearity_theta_translate_sameNorm χ hω
+      (archNuclearity_finiteUnit v) (archNuclearity_archUnit u) hu.symm
+      (tensor (a ⊗ₜ[ℂ] b))
+    have htF := archNuclearity_translate_pure (1 : A∞ˣ) v a b
+    have htA := archNuclearity_translate_pure u (1 : AFˣ) a b
+    rw [archNuclearity_translate_one, show archNuclearity_archUnit (F := F) 1 = 1 from Units.ext rfl,
+      one_mul] at htF
+    rw [archNuclearity_translate_one, show archNuclearity_finiteUnit (F := F) 1 = 1 from Units.ext rfl,
+      mul_one] at htA
+    let H := M.comp (tensor).toLinearMap
+    have he : H (a ⊗ₜ[ℂ] schwartzBruhatUnitTranslate v b) =
+        H (schwartzBruhatUnitTranslate u a ⊗ₜ[ℂ] b) :=
+      ((congrArg M htF).symm.trans htheta).trans (congrArg M htA)
+    have heq : M q = M p := by
+      change H (a ⊗ₜ[ℂ] (schwartzBruhatUnitTranslate v b - c • b)) =
+        H ((schwartzBruhatUnitTranslate u a - c • a) ⊗ₜ[ℂ] b)
+      rw [TensorProduct.tmul_sub, TensorProduct.sub_tmul, TensorProduct.tmul_smul, TensorProduct.smul_tmul']
+      exact (map_sub H _ _).trans ((congrArg (· - H ((c • a) ⊗ₜ[ℂ] b)) he).trans
+        (map_sub H _ _).symm)
+    exact (map_sub M q p).trans (sub_eq_zero.mpr heq)
+  refine Submodule.mem_sup.mpr ⟨p, hp, q - p, hq, ?_⟩
+  change p + (q - p) = q
+  rw [add_comm, sub_add_cancel]
+
+private theorem archNuclearity_discard_massZero
+    (χ : PontryaginDual C𝔽) (hω : ω(χ) = 1)
+    (hcont : ∀ L : FiniteTests →ₗ[ℂ] ℂ, Continuous L)
+    (i : ArchTests →L[ℂ] ℂ) (j : FiniteTests →ₗ[ℂ] ℂ) (a₀ : ArchTests) (b₀ : FiniteTests)
+    (ha₀ : i a₀ ≠ 0) (hb₀ : j b₀ = 1) (hL : ∀ a b, hatC (tensor (a ⊗ₜ[ℂ] b)) = i a * j b)
+    (hi : ∀ (a : ArchTests) (h : Flat), (∀ z, a (Multiplicative.ofAdd z) = h.val (coord z)) →
+      (i a = 0 ↔ (∫ y : Coord, h.val y) = 0))
+    (a : ArchTests) (ha : a ∈ Aflat) (b : FiniteTests) (hb : j b = 0) :
+    tensor (a ⊗ₜ[ℂ] b) ∈ A₀(χ) ⊔ K(χ) := by
+  let wt := fun v : AFˣ ↦ absValue(archNuclearity_finiteUnit v)
+  have heq := span_weightedDifferences_eq_ker (schwartzBruhatUnitTranslate (R := AF)) wt j
+    (archNuclearity_moment_finite_translate i j a₀ ha₀ hL)
+    (archNuclearity_finiteEigen_unique hcont i j a₀ b₀ ha₀ hb₀ hL)
+  let M : FiniteTests →ₗ[ℂ] ℬ(𝔸[F]) := (tensor).toLinearMap.comp (TensorProduct.mk ℂ ArchTests FiniteTests a)
+  have H : Submodule.span ℂ {x | ∃ u w, x = schwartzBruhatUnitTranslate u w - wt u • w} ≤
+      (A₀(χ) ⊔ K(χ)).comap M := by
+    apply Submodule.span_le.mpr
+    rintro _ ⟨u, w, rfl⟩
+    exact archNuclearity_weightedDifference χ hω i j b₀ hb₀ hL hi a ha w u
+  exact (heq ▸ H) hb
+
+/-- Transport the finest topology of the empty tail without changing the
+representation of the finite adelic test functions. -/
+private theorem archNuclearity_finiteFunctionals_continuous (L : FiniteTests →ₗ[ℂ] ℂ) :
+    Continuous L := by
+  obtain ⟨e, he, _⟩ := finiteAdeleTail_empty F
+  let : Fact (∀ w : {w : V // w ∉ (∅ : Finset V)},
+      IsOpen (w.val.adicCompletionIntegers F : Set (w.val.adicCompletion F))) :=
+    ⟨fun w ↦ Valued.isOpen_valuationSubring (w.val.adicCompletion F)⟩
+  let : IsTopologicalRing (FiniteAdeleTail F ∅) := RestrictedProduct.isTopologicalRing _
+  let : IsTopologicalGroup (Multiplicative (FiniteAdeleTail F ∅)) := inferInstance
+  let d : Multiplicative (FiniteAdeleTail F ∅) ≃ₜ* Multiplicative AF :=
+    ⟨e.toAddEquiv.toMultiplicative, he.continuous, he.homeomorph.symm.continuous.congr
+      fun x ↦ e.injective (he.homeomorph.apply_symm_apply x |>.trans (e.apply_symm_apply x).symm)⟩
+  let (v : V) : CompactSpace (v.adicCompletionIntegers F) := compactSpace_adicCompletionIntegers v
+  let (v : V) : LocallyCompactSpace (v.adicCompletion F) := locallyCompactSpace_adicCompletion v
+  let : Fact (∀ v : V, IsOpen (v.adicCompletionIntegers F : Set (v.adicCompletion F))) :=
+    ⟨fun v ↦ Valued.isOpen_valuationSubring _⟩
+  let : T2Space (Multiplicative AF) := inferInstanceAs
+    (T2Space (Πʳ w : V, [w.adicCompletion F, w.adicCompletionIntegers F]))
+  let : LocallyCompactSpace (Multiplicative AF) := inferInstanceAs
+    (LocallyCompactSpace (Πʳ w : V, [w.adicCompletion F, w.adicCompletionIntegers F]))
+  let : T2Space (Multiplicative (FiniteAdeleTail F ∅)) := d.toHomeomorph.isEmbedding.t2Space
+  let : LocallyCompactSpace (Multiplicative (FiniteAdeleTail F ∅)) :=
+    d.toHomeomorph.isOpenEmbedding.locallyCompactSpace
+  obtain ⟨T, hT⟩ := schwartzBruhat_transport d
+  obtain ⟨S, hS⟩ := schwartzBruhat_transport d.symm
+  let W := ℬ(FiniteAdeleTail F ∅)
+  let Q : W →ₗ[ℂ] ℂ := L.comp T.toLinearMap
+  have ht := (finiteProduct_tailSchwartz_finestTopology F ∅ ∅).2
+  have hQ : Continuous Q :=
+    Eq.mpr (congrArg (fun t : TopologicalSpace W ↦ @Continuous W ℂ t _ Q) ht)
+      (continuous_of_finestLocallyConvex W Q)
+  have hinv (f : FiniteTests) : T (S f) = f := by
+    apply Subtype.ext
+    funext x
+    change T (S f) x = f x
+    rw [hT, hS, ContinuousMulEquiv.symm_symm, d.apply_symm_apply]
+  exact (hQ.comp S.continuous).congr fun f ↦ congrArg L (hinv f)
+
 /-- Paper: Equations (7.4.3.1) and (7.4.3.12), pp. 368 and 371.
 In the homogeneous theta image the factorwise moment condition agrees with
 imposing the two global polar conditions on the unrestricted flat tensors. -/
 theorem mem_archNuclearityDenominator_iff_flatPolarImage (x : Θ₀(χ)) :
     x ∈ archNuclearityDenominator χ ↔
-      ∃ f : P, f.val ∈ globalArchimedeanFlatTests F ∧ x = mkΘ(χ, f) := by sorry
+      ∃ f : P, f.val ∈ globalArchimedeanFlatTests F ∧ x = mkΘ(χ, f) := by
+  refine archNuclearity_of_finiteMassReduction χ x fun hω ↦ ?_
+  obtain ⟨i, j, a₀, b₀, ha₀, hb₀, hL, hi⟩ := archNuclearity_normalized_moment (F := F)
+  exact ⟨i.toLinearMap, j, b₀, hb₀, hL, hi,
+    archNuclearity_discard_massZero χ hω archNuclearity_finiteFunctionals_continuous
+      i j a₀ b₀ ha₀ hb₀ hL hi⟩
+
+end FlatPolarImage
 
 /-- Paper: Equation (7.4.3.13), p. 372.
 The archimedean orbital quotient divides the zero-moment theta space by its flat image.
