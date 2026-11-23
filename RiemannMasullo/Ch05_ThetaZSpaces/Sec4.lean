@@ -487,7 +487,8 @@ theorem sLocalHomogeneousThetaSpace_separable (ω : PontryaginDual J₁) :
 
 /-- Paper: Lemma 5.4.1.3, p. 266.
 The quotient-to-pair map is continuous. -/
-theorem continuous_sLocalZetaPair (χ : PontryaginDual Jₛ) : Continuous (sLocalZetaPair (F := F) (S := S) χ) := by sorry
+theorem continuous_sLocalZetaPair (χ : PontryaginDual Jₛ) : Continuous (sLocalZetaPair (F := F) (S := S) χ) := by
+  exact (sLocalZetaPair_isClosedEmbedding (F := F) (S := S) χ).continuous
 
 /-- Paper: Lemma 5.4.1.3, p. 266.
 The two zeta restrictions determine the homogeneous theta class. -/
