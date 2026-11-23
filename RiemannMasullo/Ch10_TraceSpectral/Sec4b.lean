@@ -441,7 +441,60 @@ Hilbert-Schmidt representative of truncated geometric convolution. -/
 theorem geometricLineTruncatedKernel_hilbertSchmidt (_ha : 0 < a)
     (hρ : hcut) (_hband : innerBand) :
     IsSobolevHilbertSchmidtKernel (F := F) (geometricTruncatedConvolution (F := F) a hline hs₀(hs) hρ φ)
-      (cut(weightedLine(geomLine))) := by sorry
+      (cut(weightedLine(geomLine))) := by
+  have subKernel {X : Type _} [TopologicalSpace X] [T2Space X] [LocallyCompactSpace X]
+      [SecondCountableTopology X] [MeasurableSpace X] [BorelSpace X]
+      (ν : Measure X) [IsFiniteMeasureOnCompacts ν] [Measure.InnerRegular ν] [SFinite ν]
+      {k q g : X × X → ℂ} (hk : MemLp k 2 (ν.prod ν)) (hq : MemLp q 2 (ν.prod ν))
+      (he : ∀ p, k p - q p = g p) (T Q G : Lp ℂ 2 ν →L[ℂ] Lp ℂ 2 ν)
+      (ht : ∀ u : Lp ℂ 2 ν, ∀ᵐ x ∂ν, Integrable (fun y ↦ k (x,y) * u y) ν ∧
+        T u x = ∫ y, k (x,y) * u y ∂ν)
+      (hQ : (integralKernelOperator ν (hq.toLp q)).val = Q) (hsum : T = G + Q) :
+      ∃ hg : MemLp g 2 (ν.prod ν), (integralKernelOperator ν (hg.toLp g)).val = G := by
+    have hg : MemLp g 2 (ν.prod ν) := (hk.sub hq).ae_eq (.of_forall he)
+    refine ⟨hg, ?_⟩
+    ext1 u
+    apply Lp.ext
+    have hqs := integralKernelOperator_apply ν (hq.toLp q) u
+    rw [hQ] at hqs
+    have hd : (G u : X → ℂ) =ᵐ[ν] fun x ↦ T u x - Q u x := by
+      rw [eq_sub_of_add_eq hsum.symm]
+      exact Lp.coeFn_sub _ _
+    filter_upwards [integralKernelOperator_apply ν (hg.toLp g) u, ht u, hqs, hd,
+      Measure.ae_ae_of_ae_prod hg.coeFn_toLp, Measure.ae_ae_of_ae_prod hq.coeFn_toLp]
+      with x hx ht' hqs' hd' hGx hQx
+    rw [hx.2, hd', ht'.2, hqs'.2, ← integral_sub ht'.1 hqs'.1]
+    apply integral_congr_ae
+    filter_upwards [hGx, hQx] with y hy hz
+    rw [hy, hz, ← he, sub_mul]
+  let ν := ν(0, s)
+  let M := modulatedCutoffOperator m𝔽 ν hρ
+  let k : C𝔽 × C𝔽 → ℂ := fun p ↦ (ρ p.1 : ℂ) * φ.val (p.1 * p.2⁻¹) / (w(0, s) p.2 : ℂ)
+  let q := cut(weightedLine(kLine))
+  let g := cut(weightedLine(geomLine))
+  have hφs := (mem_bruhatSmoothSubmodule_iff _).mp φ.property.1
+  have hc := continuous_of_bruhatSmooth hφs
+  have hb := hc.bounded_above_of_compact_support (show HasCompactSupport φ.val from φ.property.2)
+  have hm : IsModulation m𝔽 := ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+  have hsur : Surjective m𝔽 := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.2.2.2.1
+  obtain ⟨-, hk, hrow⟩ := truncatedHardySobolevConvolution_hilbertSchmidt μ𝔽 m𝔽 (-0) 0 s
+    (hStrip(hline)) hs₀(hs) φ.val hc.aemeasurable φ.property.2 hb hm hsur hρ _hband
+  obtain ⟨hq, hQ⟩ := spectralLineTruncatedKernel_hilbertSchmidt (F := F) a hs φ _ha hρ _hband
+  have he (p : C𝔽 × C𝔽) : k p - q p = g p := by
+    have alg (r w : ℝ) (z t : ℂ) :
+        (r : ℂ) * z / (w : ℂ) - r • (w⁻¹ • t) = r • (w⁻¹ • (z - t)) := by
+      simp only [Complex.real_smul, Complex.ofReal_inv, div_eq_mul_inv]
+      ring
+    exact alg (ρ p.1) (w(0, s) p.2) (φ.val (p.1 * p.2⁻¹)) (kLine p)
+  let A := A(hline, hs₀(hs), φ)
+  let Q := spectralTruncatedConvolution (F := F) a hline hs₀(hs) hρ φ
+  let G := geometricTruncatedConvolution (F := F) a hline hs₀(hs) hρ φ
+  have hsum : M.comp A = G + Q := by
+    exact truncatedConvolution_eq_geometric_add_spectral (F := F) a hline hs₀(hs) hρ φ
+  have hconv := hardySobolevConvolution_eq_testAction μ𝔽 m𝔽 (-0) 0 s (hStrip(hline))
+    hs₀(hs) φ hc.aemeasurable hb
+  have hOp := congrArg (fun U : W(0, s) →L[ℂ] W(0, s) ↦ M.comp U) hconv
+  exact subKernel ν hk hq he _ Q G hrow hQ (hOp.trans hsum)
 
 /-- Paper: Definition 10.4.3.2, p. 470. The two line representatives are measurable. -/
 theorem globalLineKernels_measurable :
