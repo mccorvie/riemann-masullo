@@ -539,6 +539,456 @@ local notation "H𝔽(" a ", " hI ", " hs ")" => globalThetaSobolev F a hI hs
 -- TODO(paper-gap): (10.1.1.5) requires a + α > 0. For ℚ with only the real place,
 -- the Gaussian has theta value tending to 2 at norm zero, giving divergence at a + α = 0.
 
+/-- On a group with a modulation, exp(-δ |log |g||) is integrable for an inversion-invariant
+Haar measure. -/
+private theorem existsUnique_sLocalThetaSobolevEmbedding_integrable {G : Type*} [CommGroup G]
+    [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    [SecondCountableTopology G] [MeasurableSpace G] [BorelSpace G] (μ : Measure G)
+    [μ.IsHaarMeasure] [μ.Regular] (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) {δ : ℝ} (hδ : 0 < δ) :
+    Integrable (fun g ↦ Real.exp (-(δ * |Real.log ((m g).val : ℝ)|))) μ := by
+  let L : G → ℝ := fun g ↦ Real.log ((m g).val : ℝ)
+  have hLm : Measurable L :=
+    ((NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).log
+      fun g ↦ (NNReal.coe_pos.mpr (Units.zero_lt _)).ne').measurable
+  have hLinv (g : G) : L g⁻¹ = -L g := by
+    simp only [L, map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv, Real.log_inv]
+  have hS : MeasurableSet (L ⁻¹' Ici 0) := hLm measurableSet_Ici
+  have h₁ := integrableOn_exp_neg_logModule m hm μ hδ 0
+  have hpos : IntegrableOn (fun g ↦ Real.exp (-(δ * |L g|))) (L ⁻¹' Ici 0) μ := by
+    refine h₁.congr_fun (fun g hg ↦ ?_) hS
+    have hg' : 0 ≤ L g := hg
+    change Real.exp (-(δ * L g)) = Real.exp (-(δ * |L g|))
+    rw [abs_of_nonneg hg']
+  have hneg : IntegrableOn (fun g ↦ Real.exp (-(δ * |L g|))) (L ⁻¹' Iic 0) μ := by
+    have hinv : MeasurePreserving (Inv.inv : G → G) μ μ := Measure.measurePreserving_inv μ
+    have e := (hinv.integrableOn_comp_preimage (MeasurableEquiv.inv G).measurableEmbedding
+      (f := fun g ↦ Real.exp (-(δ * |L g|))) (s := L ⁻¹' Ici 0)).mpr hpos
+    have hset : (Inv.inv : G → G) ⁻¹' (L ⁻¹' Ici 0) = L ⁻¹' Iic 0 := by
+      ext g
+      simp only [mem_preimage, mem_Ici, mem_Iic, hLinv, Left.nonneg_neg_iff]
+    have hfun : (fun g ↦ Real.exp (-(δ * |L g|))) ∘ (Inv.inv : G → G) =
+        fun g ↦ Real.exp (-(δ * |L g|)) := by
+      funext g
+      simp only [comp_apply, hLinv, abs_neg]
+    rwa [hset, hfun] at e
+  have hU : L ⁻¹' Ici 0 ∪ L ⁻¹' Iic 0 = univ := by
+    ext g
+    simp only [mem_union, mem_preimage, mem_Ici, mem_Iic, mem_univ, iff_true]
+    exact le_total 0 (L g)
+  have := hpos.union hneg
+  rw [hU, integrableOn_univ] at this
+  exact this
+
+/-- The polynomial factor of the interval density grows more slowly than any exponential. -/
+private theorem existsUnique_sLocalThetaSobolevEmbedding_poly (s η x : ℝ) (hs : 0 ≤ s)
+    (hη : 0 < η) : (1 + x ^ 2) ^ (s / 2) ≤ (1 + η⁻¹) ^ s * Real.exp (s * η * |x|) := by
+  have hx := abs_nonneg x
+  have h1 : 1 + x ^ 2 ≤ (1 + |x|) ^ 2 := by nlinarith [sq_abs x]
+  have h2 : 1 + |x| ≤ (1 + η⁻¹) * Real.exp (η * |x|) := by
+    have he := Real.add_one_le_exp (η * |x|)
+    have hone : 1 ≤ Real.exp (η * |x|) := Real.one_le_exp (by positivity)
+    have hx' : |x| ≤ η⁻¹ * Real.exp (η * |x|) := by
+      rw [← div_eq_inv_mul, le_div_iff₀ hη]
+      linarith
+    nlinarith
+  calc (1 + x ^ 2) ^ (s / 2) ≤ ((1 + |x|) ^ 2) ^ (s / 2) :=
+        Real.rpow_le_rpow (by positivity) h1 (by positivity)
+    _ = (1 + |x|) ^ s := by
+        rw [← Real.rpow_natCast, ← Real.rpow_mul (by positivity)]
+        congr 1
+        push_cast
+        ring
+    _ ≤ ((1 + η⁻¹) * Real.exp (η * |x|)) ^ s :=
+        Real.rpow_le_rpow (by positivity) h2 hs
+    _ = (1 + η⁻¹) ^ s * Real.exp (s * η * |x|) := by
+        rw [Real.mul_rpow (by positivity) (Real.exp_pos _).le, ← Real.exp_mul]
+        ring_nf
+
+/-- With the S-local bound, decay at large norm and growth no faster than |g|^(-(a+α)/2) at small
+norm, the weight |g|^a and the interval density are dominated by exp(-δ|log |g||). -/
+private theorem existsUnique_sLocalThetaSobolevEmbedding_real (a α β s C x η : ℝ) (N : ℕ)
+    (hs : 0 ≤ s) (hI : α ≤ β) (hN : |a| + |α| + |β| + s + 1 ≤ N) (hη : 0 < η) (hη1 : η ≤ 1)
+    (hsη : s * η ≤ (a + α) / 2) (hp : 0 < a + α) :
+    Real.exp (a * x) ^ 2 *
+        (C * Real.exp (-(N : ℝ) * max x 0 - (a + α) / 2 * min x 0)) ^ 2 *
+          intervalSobolevDensity α β s x ≤
+      (1 + η⁻¹) ^ s * C ^ 2 * Real.exp (-(min 1 ((a + α) / 2) * |x|)) := by
+  have hpoly := existsUnique_sLocalThetaSobolevEmbedding_poly s η x hs hη
+  have hK : 0 ≤ (1 + η⁻¹) ^ s := by positivity
+  have hsη0 : 0 ≤ s * η := mul_nonneg hs hη.le
+  have hsη1 : s * η ≤ s := mul_le_of_le_one_right hs hη1
+  unfold intervalSobolevDensity
+  rcases le_total 0 x with hx | hx
+  · rw [max_eq_left hx, min_eq_right hx, abs_of_nonneg hx]
+    rw [abs_of_nonneg hx] at hpoly
+    have hmax : max (Real.exp (2 * α * x)) (Real.exp (2 * β * x)) ≤
+        Real.exp (2 * (|α| + |β|) * x) := by
+      refine max_le (Real.exp_le_exp.mpr ?_) (Real.exp_le_exp.mpr ?_) <;>
+        nlinarith [le_abs_self α, le_abs_self β, abs_nonneg α, abs_nonneg β]
+    calc _ ≤ Real.exp (a * x) ^ 2 * (C * Real.exp (-(N : ℝ) * x - (a + α) / 2 * 0)) ^ 2 *
+          (Real.exp (2 * (|α| + |β|) * x) * ((1 + η⁻¹) ^ s * Real.exp (s * η * x))) := by
+          gcongr
+      _ = (1 + η⁻¹) ^ s * C ^ 2 *
+          Real.exp ((2 * a - 2 * N + 2 * (|α| + |β|) + s * η) * x) := by
+          rw [show (2 * a - 2 * N + 2 * (|α| + |β|) + s * η) * x =
+            a * x + a * x + (-(N : ℝ) * x - (a + α) / 2 * 0) + (-(N : ℝ) * x - (a + α) / 2 * 0) +
+              2 * (|α| + |β|) * x + s * η * x by ring]
+          simp only [Real.exp_add]
+          ring
+      _ ≤ (1 + η⁻¹) ^ s * C ^ 2 * Real.exp (-(min 1 ((a + α) / 2) * x)) := by
+          gcongr
+          have hc : 2 * a - 2 * N + 2 * (|α| + |β|) + s * η ≤ -min 1 ((a + α) / 2) := by
+            linarith [min_le_left 1 ((a + α) / 2), le_abs_self a]
+          have := mul_le_mul_of_nonneg_right hc hx
+          linarith
+  · rw [max_eq_right hx, min_eq_left hx, abs_of_nonpos hx]
+    rw [abs_of_nonpos hx] at hpoly
+    have hmax : max (Real.exp (2 * α * x)) (Real.exp (2 * β * x)) = Real.exp (2 * α * x) :=
+      max_eq_left (Real.exp_le_exp.mpr (by nlinarith))
+    rw [hmax]
+    calc _ ≤ Real.exp (a * x) ^ 2 * (C * Real.exp (-(N : ℝ) * 0 - (a + α) / 2 * x)) ^ 2 *
+          (Real.exp (2 * α * x) * ((1 + η⁻¹) ^ s * Real.exp (s * η * -x))) := by
+          gcongr
+      _ = (1 + η⁻¹) ^ s * C ^ 2 * Real.exp ((a + α - s * η) * x) := by
+          rw [show (a + α - s * η) * x =
+            a * x + a * x + (-(N : ℝ) * 0 - (a + α) / 2 * x) + (-(N : ℝ) * 0 - (a + α) / 2 * x) +
+              2 * α * x + s * η * -x by ring]
+          simp only [Real.exp_add]
+          ring
+      _ ≤ (1 + η⁻¹) ^ s * C ^ 2 * Real.exp (-(min 1 ((a + α) / 2) * -x)) := by
+          gcongr
+          have := min_le_right 1 ((a + α) / 2)
+          nlinarith
+
+open Filter Topology in
+/-- On a bounded set of tests, S-local theta decays like any power of the norm above norm one and
+grows no faster than |g|^(-ε) below it, with a common constant, the unit circle included. -/
+private theorem existsUnique_sLocalThetaSobolevEmbedding_decay (B : Set ℬₛ)
+    (hB : Bornology.IsVonNBounded ℂ B) {ε : ℝ} (hε : 0 < ε) (N : ℕ) :
+    ∃ C : ℝ, 0 < C ∧ ∀ f ∈ B, ∀ g : Jₛ, ‖θₛ(f) g‖ ≤
+      C * Real.exp (-(N : ℝ) * max (logNorm(mₛ) g) 0 - ε * min (logNorm(mₛ) g) 0) := by
+  obtain ⟨K₁, hK₁, h₁⟩ := sLocalAdelicTheta_decay_bounded_threshold_one F S B hB N
+  obtain ⟨K₂, hK₂, h₂⟩ := sLocalAdelicTheta_norm_pow_bounded_threshold_one F S ε hε B hB
+  refine ⟨max K₁ K₂, lt_max_of_lt_left hK₁, fun f hf g ↦ ?_⟩
+  have hoff (g : Jₛ) (hg : logNorm(mₛ) g ≠ 0) : ‖θₛ(f) g‖ ≤
+      max K₁ K₂ * Real.exp (-(N : ℝ) * max (logNorm(mₛ) g) 0 - ε * min (logNorm(mₛ) g) 0) := by
+    obtain ⟨h, rfl⟩ := QuotientGroup.mk_surjective g
+    rw [sLocalAdelicThetaOnClasses_mk]
+    set n : ℝ := ((sIdeleNorm F S h).val : ℝ) with hn_def
+    have hn : 0 < n := NNReal.coe_pos.mpr (Units.zero_lt _)
+    have hL : logNorm(mₛ) (QuotientGroup.mk h : Jₛ) = Real.log n := rfl
+    rw [hL] at hg ⊢
+    rcases lt_or_gt_of_ne hg with hlt | hgt
+    · have hn1 : n < 1 := (Real.log_neg_iff hn).mp hlt
+      have h2 : ‖(n ^ ε) • sLocalAdelicTheta F S f h‖ ≤ K₂ := h₂ f hf h hn1
+      rw [norm_smul, Real.norm_of_nonneg (Real.rpow_nonneg hn.le ε)] at h2
+      rw [max_eq_right hlt.le, min_eq_left hlt.le]
+      have hnε : 0 < n ^ ε := Real.rpow_pos_of_pos hn ε
+      have he : Real.exp (-(N : ℝ) * 0 - ε * Real.log n) = (n ^ ε)⁻¹ := by
+        rw [Real.rpow_def_of_pos hn, ← Real.exp_neg]
+        ring_nf
+      rw [he]
+      calc ‖sLocalAdelicTheta F S f h‖ = (n ^ ε)⁻¹ * (n ^ ε * ‖sLocalAdelicTheta F S f h‖) := by
+            field_simp
+        _ ≤ (n ^ ε)⁻¹ * K₂ := by gcongr
+        _ ≤ (n ^ ε)⁻¹ * max K₁ K₂ := by gcongr; exact le_max_right _ _
+        _ = max K₁ K₂ * (n ^ ε)⁻¹ := mul_comm _ _
+    · have hn1 : 1 < n := (Real.log_pos_iff hn.le).mp hgt
+      have h1 : ‖sLocalAdelicTheta F S f h‖ ≤ K₁ * (n ^ N)⁻¹ := h₁ f hf h hn1
+      rw [max_eq_left hgt.le, min_eq_right hgt.le]
+      have he : Real.exp (-(N : ℝ) * Real.log n - ε * 0) = (n ^ N)⁻¹ := by
+        rw [mul_zero, sub_zero, neg_mul, Real.exp_neg, Real.exp_nat_mul, Real.exp_log hn]
+      rw [he]
+      exact h1.trans (by gcongr; exact le_max_left _ _)
+  by_cases hg : logNorm(mₛ) g = 0
+  · obtain ⟨σ₀, hσ₀⟩ := sIdeleQuotientNorm_exists_section (F := F) (S := S)
+    let σ : ℝ → Jₛ := fun t ↦ g * σ₀ (sobolevLogEquiv t)
+    have hσc : Continuous σ :=
+      continuous_const.mul (σ₀.continuous.comp sobolevLogEquiv.continuous)
+    have h1 : sobolevLogEquiv 0 = 1 := by
+      apply Units.ext; apply NNReal.coe_injective
+      have := sobolevLogEquiv_log 0
+      rw [Real.log_eq_zero] at this
+      rcases this with h0 | h1 | hm1
+      · exact absurd h0 (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+      · simpa using h1
+      · exact absurd hm1 (by linarith [NNReal.coe_nonneg ((sobolevLogEquiv 0).val)])
+    have hσ0 : σ 0 = g := by simp only [σ, h1, map_one, mul_one]
+    have hlog (t : ℝ) : logNorm(mₛ) (σ t) = logNorm(mₛ) g + t := by
+      change Real.log ((sIdeleQuotientNorm F S (g * σ₀ (sobolevLogEquiv t))).val : ℝ) = _
+      rw [map_mul, hσ₀, Units.val_mul, NNReal.coe_mul,
+        Real.log_mul (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+          (NNReal.coe_pos.mpr (Units.zero_lt _)).ne', sobolevLogEquiv_log]
+      rfl
+    have hb : Continuous fun t : ℝ ↦ max K₁ K₂ * Real.exp (-(N : ℝ) * max (logNorm(mₛ) g + t) 0 -
+        ε * min (logNorm(mₛ) g + t) 0) := by
+      have hc : Continuous fun t : ℝ ↦ logNorm(mₛ) g + t := continuous_const.add continuous_id
+      exact continuous_const.mul (Real.continuous_exp.comp
+        ((continuous_const.mul (hc.max continuous_const)).sub
+          (continuous_const.mul (hc.min continuous_const))))
+    have ht : Tendsto σ (𝓝[≠] 0) (𝓝 g) :=
+      hσ0 ▸ hσc.continuousAt.tendsto.mono_left nhdsWithin_le_nhds
+    have hlim := ((θₛ(f)).continuous.norm.tendsto g).comp ht
+    have hblim := (hb.tendsto 0).mono_left (nhdsWithin_le_nhds (s := {0}ᶜ))
+    simp only [add_zero] at hblim
+    refine le_of_tendsto_of_tendsto hlim hblim ?_
+    filter_upwards [self_mem_nhdsWithin] with t ht
+    have := hoff (σ t) (by rw [hlog, hg, zero_add]; exact ht)
+    rwa [hlog] at this
+  · exact hoff g hg
+
+/-- A continuous linear map that vanishes exactly where a linear map does descends to a unique
+injective continuous linear map of the quotient by its kernel with a prescribed value on each
+class. Stated for abstract modules, so that it elaborates without unfolding the Schwartz–Bruhat
+instances. -/
+private theorem existsUnique_sLocalThetaSobolevEmbedding_assemble {M N V : Type*}
+    [AddCommGroup M] [Module ℂ M] [TopologicalSpace M] [AddCommGroup N] [Module ℂ N]
+    [NormedAddCommGroup V] [NormedSpace ℂ V] (θ : M →ₗ[ℂ] N) (Λ : M →L[ℂ] V)
+    (P : M → V → Prop) (hP : ∀ f, P f (Λ f)) (huniq : ∀ f v w, P f v → P f w → v = w)
+    (hker : ∀ f, θ f = 0 → Λ f = 0) (hinj : ∀ f, Λ f = 0 → θ f = 0) :
+    ∃! E : (M ⧸ LinearMap.ker θ) →L[ℂ] V,
+      Injective E ∧ ∀ f, P f (E (Submodule.Quotient.mk f)) := by
+  let E := (LinearMap.ker θ).liftQL Λ fun f hf ↦ hker f hf
+  have hE (f : M) : E (Submodule.Quotient.mk f) = Λ f := rfl
+  refine ⟨E, ⟨?_, fun f ↦ (hE f).symm ▸ hP f⟩, fun E' hE' ↦ ?_⟩
+  · refine (injective_iff_map_eq_zero E).mpr fun x hx ↦ ?_
+    induction x using Submodule.Quotient.induction_on with
+    | H f => exact (Submodule.Quotient.mk_eq_zero _).mpr (hinj f ((hE f).symm.trans hx))
+  · refine ContinuousLinearMap.ext fun x ↦ ?_
+    induction x using Submodule.Quotient.induction_on with
+    | H f => exact huniq f _ _ (hE'.2 f) ((hE f).symm ▸ hP f)
+
+/-- The topological facts about the S-idele quotient that the Haar measure arguments need. -/
+private theorem existsUnique_sLocalThetaSobolevEmbedding_sinst :
+    T2Space Jₛ ∧ LocallyCompactSpace Jₛ ∧ SecondCountableTopology Jₛ := by
+  have : LocallyCompactSpace Iₛ := (sIdeleGroup_description F S).2.2.1
+  have : SecondCountableTopology Iₛ := by
+    let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+    let (v : S) : SecondCountableTopology (v.val.adicCompletion F) := secondCountable_of_proper
+    let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+      (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+    let : SecondCountableTopology (InfiniteAdeleRing F) := inferInstanceAs
+      (SecondCountableTopology ((w : InfinitePlace F) → w.Completion))
+    let : SecondCountableTopology ((v : S) → v.val.adicCompletion F) := inferInstance
+    let : SecondCountableTopology (SAdeleRing F S) := inferInstanceAs
+      (SecondCountableTopology (InfiniteAdeleRing F × ((v : S) → v.val.adicCompletion F)))
+    exact (sIdeleGroup_description F S).1.secondCountableTopology
+  have : IsClosed (_ : Set Iₛ) := isClosed_sProjectedDiagonal (F := F) (S := S)
+  exact ⟨inferInstance, inferInstanceAs (LocallyCompactSpace (Iₛ ⧸ _)),
+    inferInstanceAs (SecondCountableTopology (Iₛ ⧸ _))⟩
+
+/-- A linear map from the S-local tests into a normed space that is bounded on bounded sets is
+continuous: each elementary stage is metrizable. -/
+private theorem existsUnique_sLocalThetaSobolevEmbedding_continuous {V : Type*}
+    [NormedAddCommGroup V] [NormedSpace ℂ V] (Λ : ℬₛ →ₗ[ℂ] V)
+    (hΛ : ∀ B : Set ℬₛ, Bornology.IsVonNBounded ℂ B → ∃ r, ∀ f ∈ B, ‖Λ f‖ ≤ r) :
+    Continuous Λ := by
+  let (v : HeightOneSpectrum (𝓞 F)) : ProperSpace (v.adicCompletion F) :=
+    properSpace_adicCompletion v
+  let : LocallyCompactSpace (SAdeleRing F S) := inferInstanceAs
+    (LocallyCompactSpace (InfiniteAdeleRing F × ((v : S) → v.val.adicCompletion F)))
+  let : T2Space (SAdeleRing F S) := inferInstanceAs
+    (T2Space (((v : InfinitePlace F) → v.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let : LocallyCompactSpace (Multiplicative (SAdeleRing F S)) :=
+    inferInstanceAs (LocallyCompactSpace (SAdeleRing F S))
+  let : T2Space (Multiplicative (SAdeleRing F S)) := inferInstanceAs (T2Space (SAdeleRing F S))
+  apply SchwartzBruhat.continuous_of_continuous_comp_ofStage
+  intro a e
+  let : FirstCountableTopology (SchwartzBruhatStage e) :=
+    elementarySchwartz_withSeminorms.firstCountableTopology
+  let : ContinuousSMul ℂ (SchwartzBruhatStage e) := elementarySchwartz_withSeminorms.continuousSMul
+  exact existsUnique_globalThetaSobolevEmbedding_stage
+    ⟨SchwartzBruhat.ofStage a e, SchwartzBruhat.continuous_ofStage a e⟩ Λ hΛ
+
+/-- The S-idele quotient norm is a modulation. -/
+private theorem existsUnique_sLocalThetaSobolevEmbedding_smod : IsModulation mₛ := by
+  obtain ⟨σ₀, hσ₀⟩ := sIdeleQuotientNorm_exists_section (F := F) (S := S)
+  refine ⟨isProperMap_sIdeleQuotientNorm F S, σ₀ (Units.mk0 2 two_ne_zero), fun h ↦ ?_⟩
+  have h2 := (hσ₀ (Units.mk0 2 two_ne_zero)).symm.trans h
+  have := congrArg (fun t : ℝ≥0ˣ ↦ ((t : ℝ≥0) : ℝ)) h2
+  norm_num at this
+
+/-- S-local theta on classes is linear in the test. -/
+private theorem existsUnique_sLocalThetaSobolevEmbedding_slin :
+    ∃ L₀ : ℬₛ →ₗ[ℂ] (Jₛ → ℂ), ∀ f, L₀ f = θₛ(f) := by
+  refine ⟨{ toFun := fun f ↦ θₛ(f), map_add' := fun f f' ↦ ?_, map_smul' := fun c f ↦ ?_ },
+    fun _ ↦ rfl⟩
+  · funext x
+    obtain ⟨h, rfl⟩ := QuotientGroup.mk_surjective x
+    simp only [Pi.add_apply, sLocalAdelicThetaOnClasses_mk, map_add, ContinuousMap.add_apply]
+  · funext x
+    obtain ⟨h, rfl⟩ := QuotientGroup.mk_surjective x
+    simp only [Pi.smul_apply, sLocalAdelicThetaOnClasses_mk, map_smul, RingHom.id_apply,
+      ContinuousMap.smul_apply]
+
+/-- The weighted S-local theta function of a test with the S-local bound is dominated pointwise
+by exp(-δ |log |g||). -/
+private theorem existsUnique_sLocalThetaSobolevEmbedding_spointwise (a α β s C η : ℝ) (N : ℕ)
+    (hs : 0 ≤ s) (hI : α ≤ β) (hN : |a| + |α| + |β| + s + 1 ≤ N) (hη : 0 < η) (hη1 : η ≤ 1)
+    (hsη : s * η ≤ (a + α) / 2) (hp : 0 < a + α) (f : ℬₛ)
+    (hdec : ∀ g : Jₛ, ‖θₛ(f) g‖ ≤ C * Real.exp (-(N : ℝ) * max (logNorm(mₛ) g) 0 -
+      (a + α) / 2 * min (logNorm(mₛ) g) 0)) (g : Jₛ) :
+    ‖modulationWeight mₛ a (θₛ(f)) g‖ ^ 2 * intervalSobolevDensity α β s (logNorm(mₛ) g) ≤
+      (Real.sqrt ((1 + η⁻¹) ^ s) * C) ^ 2 *
+        Real.exp (-(min 1 ((a + α) / 2) * |logNorm(mₛ) g|)) := by
+  have hn : 0 < (((mₛ) g).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hw : ‖modulationWeight mₛ a (θₛ(f)) g‖ = Real.exp (a * logNorm(mₛ) g) * ‖θₛ(f) g‖ := by
+    change ‖(((((mₛ) g).val : ℝ) ^ a : ℝ) : ℂ) * θₛ(f) g‖ = _
+    rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg (Real.rpow_nonneg hn.le _),
+      Real.rpow_def_of_pos hn, mul_comm (Real.log _) a]
+  have hd : 0 ≤ intervalSobolevDensity α β s (logNorm(mₛ) g) := by
+    unfold intervalSobolevDensity
+    exact mul_nonneg ((Real.exp_pos _).le.trans (le_max_left _ _)) (by positivity)
+  rw [hw, mul_pow, mul_pow, Real.sq_sqrt (by positivity)]
+  refine le_trans ?_ (existsUnique_sLocalThetaSobolevEmbedding_real a α β s C
+    (logNorm(mₛ) g) η N hs hI hN hη hη1 hsη hp)
+  gcongr
+  exact hdec g
+
+/-- A linear family of functions dominated, uniformly on bounded sets, by an integrable majorant
+in the weighted L² sense gives a continuous linear map into the weighted L² space, once linear
+maps bounded on bounded sets are known to be continuous. -/
+private theorem existsUnique_sLocalThetaSobolevEmbedding_build {M X : Type*} [AddCommGroup M]
+    [Module ℂ M] [TopologicalSpace M] [MeasurableSpace X] (μ : Measure X) (ρ : X → ℝ)
+    (hρm : Measurable ρ) (hρpos : ∀ x, 0 < ρ x) (H : X → ℝ) (hH : Integrable H μ)
+    (Ψ : M →ₗ[ℂ] (X → ℂ)) (hΨm : ∀ f, AEStronglyMeasurable (Ψ f) μ)
+    (hsing : ∀ f : M, Bornology.IsVonNBounded ℂ {f})
+    (hbound : ∀ B : Set M, Bornology.IsVonNBounded ℂ B →
+      ∃ q : ℝ, 0 ≤ q ∧ ∀ f ∈ B, ∀ x, ‖Ψ f x‖ ^ 2 * ρ x ≤ q ^ 2 * H x)
+    (hcrit : ∀ Λ : M →ₗ[ℂ] Lp ℂ 2 (μ.withDensity fun x ↦ ENNReal.ofReal (ρ x)),
+      (∀ B : Set M, Bornology.IsVonNBounded ℂ B → ∃ r, ∀ f ∈ B, ‖Λ f‖ ≤ r) → Continuous Λ) :
+    ∃ Λ : M →L[ℂ] Lp ℂ 2 (μ.withDensity fun x ↦ ENNReal.ofReal (ρ x)),
+      ∀ f, (Λ f : X → ℂ) =ᵐ[μ] Ψ f := by
+  have hμν : μ ≪ μ.withDensity fun x ↦ ENNReal.ofReal (ρ x) :=
+    withDensity_absolutelyContinuous' hρm.ennreal_ofReal.aemeasurable
+      (ae_of_all _ fun x ↦ (ENNReal.ofReal_pos.mpr (hρpos x)).ne')
+  have hmem (f : M) : MemLp (Ψ f) 2 (μ.withDensity fun x ↦ ENNReal.ofReal (ρ x)) := by
+    obtain ⟨q, -, hq⟩ := hbound {f} (hsing f)
+    exact existsUnique_globalThetaSobolevEmbedding_memLp μ ρ hρm hρpos (Ψ f) (hΨm f) H hH q
+      (hq f rfl)
+  obtain ⟨L, hL⟩ := existsUnique_globalThetaSobolevEmbedding_toLp _ Ψ hmem
+  have hrep (f : M) : (L f : X → ℂ) =ᵐ[μ] Ψ f := hμν.ae_eq (hL f)
+  refine ⟨⟨L, hcrit L fun B hB ↦ ?_⟩, hrep⟩
+  obtain ⟨q, hq, hqb⟩ := hbound B hB
+  exact ⟨q * Real.sqrt (∫ x, H x ∂μ), fun f hf ↦
+    weightedL2_le_majorant hρm hρpos (L f) (Ψ f) (hrep f) H hH q hq (hqb f hf)⟩
+
+/-- The density of the weighted S-local space is measurable, positive, and the interval density
+of the log norm. -/
+private theorem existsUnique_sLocalThetaSobolevEmbedding_sdens (α β s : ℝ) :
+    Measurable (fun g : Jₛ ↦ if (false : Bool) then
+      (intervalSobolevDensity α β s (logNorm(mₛ) g))⁻¹
+        else intervalSobolevDensity α β s (logNorm(mₛ) g)) ∧
+    ∀ g : Jₛ, 0 < intervalSobolevDensity α β s (logNorm(mₛ) g) := by
+  have : BorelSpace Jₛ := ⟨rfl⟩
+  have hl : Continuous fun g : Jₛ ↦ logNorm(mₛ) g :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp (mₛ).continuous)).log
+      fun g ↦ (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+  simp only [Bool.false_eq_true, ite_false]
+  refine ⟨?_, fun g ↦ ?_⟩
+  · unfold intervalSobolevDensity
+    exact (((Real.continuous_exp.comp (continuous_const.mul hl)).max
+      (Real.continuous_exp.comp (continuous_const.mul hl))).mul
+      ((continuous_const.add (hl.pow 2)).rpow_const fun g ↦
+        Or.inl (add_pos_of_pos_of_nonneg one_pos (sq_nonneg _)).ne')).measurable
+  · unfold intervalSobolevDensity
+    exact mul_pos ((Real.exp_pos _).trans_le (le_max_left _ _)) (by positivity)
+
+/-- S-local weighted theta is a continuous linear map from the S-local tests into the weighted L²
+space. -/
+private theorem existsUnique_sLocalThetaSobolevEmbedding_clm (a α β s : ℝ) (hI : α ≤ β)
+    (hs : 0 ≤ s) (hp : 0 < a + α) :
+    ∃ Λ : ℬₛ →L[ℂ] Wₛ(α, β, s), ∀ f,
+      (Λ f : Jₛ → ℂ) =ᵐ[μₛ] modulationWeight mₛ a (θₛ(f)) := by
+  have hsi := existsUnique_sLocalThetaSobolevEmbedding_sinst (F := F) (S := S)
+  have : T2Space Jₛ := hsi.1
+  have : LocallyCompactSpace Jₛ := hsi.2.1
+  have : SecondCountableTopology Jₛ := hsi.2.2
+  have : BorelSpace Jₛ := ⟨rfl⟩
+  have hW := sLocalQuotientTamagawaMeasure_isWeil (F := F) (S := S)
+  have : (μₛ).IsHaarMeasure := hW.1
+  have : (μₛ).Regular := hW.2.1
+  have hm := existsUnique_sLocalThetaSobolevEmbedding_smod (F := F) (S := S)
+  have hden := existsUnique_sLocalThetaSobolevEmbedding_sdens (F := F) (S := S) α β s
+  have hslin := existsUnique_sLocalThetaSobolevEmbedding_slin (F := F) (S := S)
+  let Ψ : ℬₛ →ₗ[ℂ] (Jₛ → ℂ) := (modulationWeight mₛ a) ∘ₗ hslin.choose
+  have hΨ (f : ℬₛ) : Ψ f = modulationWeight mₛ a (θₛ(f)) := by
+    simp only [Ψ, LinearMap.comp_apply, hslin.choose_spec]
+  let N : ℕ := ⌈|a| + |α| + |β| + s + 1⌉₊
+  let η : ℝ := min 1 ((a + α) / (2 * (s + 1)))
+  have hη : 0 < η := lt_min one_pos (by positivity)
+  have hsη : s * η ≤ (a + α) / 2 := by
+    calc s * η ≤ s * ((a + α) / (2 * (s + 1))) := mul_le_mul_of_nonneg_left (min_le_right _ _) hs
+      _ = (a + α) / 2 * (s / (s + 1)) := by field_simp
+      _ ≤ (a + α) / 2 := mul_le_of_le_one_right (half_pos hp).le
+          ((div_le_one₀ (by linarith)).mpr (by linarith))
+  have hδ : 0 < min 1 ((a + α) / 2) := lt_min one_pos (half_pos hp)
+  have hcont (f : ℬₛ) : Continuous (Ψ f) := by
+    rw [hΨ]
+    exact (Complex.continuous_ofReal.comp ((NNReal.continuous_coe.comp
+      (Units.continuous_val.comp (mₛ).continuous)).rpow_const fun g ↦
+        Or.inl (NNReal.coe_pos.mpr (Units.zero_lt _)).ne')).mul (θₛ(f)).continuous
+  have hb := existsUnique_sLocalThetaSobolevEmbedding_build μₛ _ hden.1
+    (fun g ↦ by simpa only [Bool.false_eq_true, ite_false] using hden.2 g) _
+    (existsUnique_sLocalThetaSobolevEmbedding_integrable μₛ mₛ hm hδ) Ψ
+    (fun f ↦ (hcont f).aestronglyMeasurable) Bornology.isVonNBounded_singleton
+    (fun B hB ↦ by
+      obtain ⟨C, hC, hdec⟩ := existsUnique_sLocalThetaSobolevEmbedding_decay B hB (half_pos hp) N
+      refine ⟨Real.sqrt ((1 + η⁻¹) ^ s) * C, by positivity, fun f hf g ↦ ?_⟩
+      simp only [Bool.false_eq_true, ite_false, hΨ]
+      exact existsUnique_sLocalThetaSobolevEmbedding_spointwise a α β s C η N hs hI
+        (Nat.le_ceil _) hη (min_le_left _ _) hsη hp f (hdec f hf) g)
+    (fun Λ hΛ ↦ existsUnique_sLocalThetaSobolevEmbedding_continuous Λ hΛ)
+  exact ⟨hb.choose, fun f ↦ (hb.choose_spec f).trans (by rw [hΨ])⟩
+
+/-- The S-local Tamagawa measure is absolutely continuous with respect to the weighted measure,
+whose density is positive. -/
+private theorem existsUnique_sLocalThetaSobolevEmbedding_sac (α β s : ℝ) :
+    μₛ ≪ (μₛ).withDensity fun g ↦ ENNReal.ofReal
+      (if (false : Bool) then (intervalSobolevDensity α β s (logNorm(mₛ) g))⁻¹
+        else intervalSobolevDensity α β s (logNorm(mₛ) g)) := by
+  have hden := existsUnique_sLocalThetaSobolevEmbedding_sdens (F := F) (S := S) α β s
+  refine withDensity_absolutelyContinuous' hden.1.ennreal_ofReal.aemeasurable
+    (.of_forall fun g ↦ (ENNReal.ofReal_pos.mpr ?_).ne')
+  simpa only [Bool.false_eq_true, ite_false] using hden.2 g
+
+/-- The weighted S-local theta class of a test in the theta kernel is zero. -/
+private theorem existsUnique_sLocalThetaSobolevEmbedding_sker {a α β s : ℝ}
+    (Λ : ℬₛ →L[ℂ] Wₛ(α, β, s)) (f : ℬₛ)
+    (hΛ : (Λ f : Jₛ → ℂ) =ᵐ[μₛ] modulationWeight mₛ a (θₛ(f)))
+    (hf : sLocalAdelicTheta F S f = 0) : Λ f = 0 := by
+  have hθ : (θₛ(f) : Jₛ → ℂ) = 0 := funext fun x ↦ by
+    obtain ⟨h, rfl⟩ := QuotientGroup.mk_surjective x
+    rw [sLocalAdelicThetaOnClasses_mk, hf]
+    rfl
+  have hzero : modulationWeight mₛ a (θₛ(f)) = 0 := by
+    rw [hθ, map_zero]
+  have h0 : (Λ f : Jₛ → ℂ) =ᵐ[μₛ] (0 : Jₛ → ℂ) := hΛ.trans (Filter.EventuallyEq.of_eq hzero)
+  exact Lp.ext (((withDensity_absolutelyContinuous μₛ _).ae_eq h0).trans
+    (Lp.coeFn_zero _ _ _).symm)
+
+/-- A test whose weighted S-local theta class is zero lies in the theta kernel. -/
+private theorem existsUnique_sLocalThetaSobolevEmbedding_sinj {a α β s : ℝ}
+    (Λ : ℬₛ →L[ℂ] Wₛ(α, β, s)) (f : ℬₛ)
+    (hΛ : (Λ f : Jₛ → ℂ) =ᵐ[μₛ] modulationWeight mₛ a (θₛ(f))) (hf : Λ f = 0) :
+    sLocalAdelicTheta F S f = 0 := by
+  have hW := sLocalQuotientTamagawaMeasure_isWeil (F := F) (S := S)
+  have : (μₛ).IsHaarMeasure := hW.1
+  have h0 : (0 : Jₛ → ℂ) =ᵐ[μₛ] modulationWeight mₛ a (θₛ(f)) := by
+    rw [hf] at hΛ
+    exact ((existsUnique_sLocalThetaSobolevEmbedding_sac α β s).ae_eq
+      (Lp.coeFn_zero _ _ _)).symm.trans hΛ
+  have h1 : (0 : Jₛ → ℂ) =ᵐ[μₛ] θₛ(f) := by
+    filter_upwards [h0] with g hg
+    have hn : (((((mₛ) g).val : ℝ) ^ a : ℝ) : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr
+      (Real.rpow_pos_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _)) a).ne'
+    have hg' : (0 : ℂ) = (((((mₛ) g).val : ℝ) ^ a : ℝ) : ℂ) * θₛ(f) g := hg
+    exact ((mul_eq_zero.mp hg'.symm).resolve_left hn).symm
+  have h2 := (Continuous.ae_eq_iff_eq μₛ continuous_zero (θₛ(f)).continuous).mp h1
+  exact ContinuousMap.ext fun h ↦ by
+    rw [← sLocalAdelicThetaOnClasses_mk]
+    exact (congrFun h2 _).symm
+
 /-- Paper: Definition 10.1.1.1(2), p. 434. The weighted S-local theta embedding
 sends a class to the almost-everywhere class of its weighted theta function.
 Deviation: The smallest effective exponent a + α must be strictly positive. -/
@@ -546,7 +996,13 @@ theorem existsUnique_sLocalThetaSobolevEmbedding (a α β s : ℝ) (_ha : 0 < a)
     (_hI : α ≤ β) (_hs : 0 ≤ s) (_hpos : 0 < a + α) :
     ∃! E : Θₛ →L[ℂ] Wₛ(α, β, s), Injective E ∧
       ∀ f : ℬₛ, (E (Submodule.Quotient.mk f) : Jₛ → ℂ) =ᵐ[μₛ]
-        modulationWeight mₛ a (θₛ(f)) := by sorry
+        modulationWeight mₛ a (θₛ(f)) := by
+  have hΛ := existsUnique_sLocalThetaSobolevEmbedding_clm (F := F) (S := S) a α β s _hI _hs _hpos
+  exact existsUnique_sLocalThetaSobolevEmbedding_assemble (sLocalAdelicTheta F S) hΛ.choose
+    (fun f v ↦ (v : Jₛ → ℂ) =ᵐ[μₛ] modulationWeight mₛ a (θₛ(f))) hΛ.choose_spec
+    (fun f v w hv hw ↦ Lp.ext ((withDensity_absolutelyContinuous _ _).ae_eq (hv.trans hw.symm)))
+    (fun f hf ↦ existsUnique_sLocalThetaSobolevEmbedding_sker _ f (hΛ.choose_spec f) hf)
+    (fun f hf ↦ existsUnique_sLocalThetaSobolevEmbedding_sinj _ f (hΛ.choose_spec f) hf)
 
 local notation "Eₛ(" ha ", " hI ", " hs ", " hp ")" =>
   (existsUnique_sLocalThetaSobolevEmbedding (F := F) (S := S) _ _ _ _ ha hI hs hp).exists.choose
