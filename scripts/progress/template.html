@@ -722,7 +722,10 @@ const isRefutation = i => D.decls[i][KIND] === 't' && /_false$/.test(D.decls[i][
 function refState(e) {
   const r = e[E_REFS].filter(isRefutation);
   if (!r.length) return e[E_CHECK] === 'Lean' ? 'refuted' : null;
-  return r.every(i => D.decls[i][STATE] === 'proved') ? 'refuted' : 'open';
+  if (!r.every(i => D.decls[i][STATE] === 'proved')) return 'open';
+  // A proof with no sorry of its own may still use theorems that are unproved: that is not yet
+  // a checked refutation (ERRATA.md marks a row Lean only when nothing unproved lies below).
+  return r.every(i => !(D.decls[i][BELOW] > 0) && !(D.decls[i][FLAGS] & 4)) ? 'refuted' : 'resting';
 }
 function probBadges(list, gaps) {
   return [PROB_KINDS.map(k => { const n = probCount(list, k);
@@ -738,7 +741,7 @@ function probList(list) {
       h('td', null, e[E_TEXT], e[E_REFS].length ? h('div', { class: 'tags', style: 'margin-top:4px' },
         e[E_REFS].map(i => h('span', { class: 'tag' }, h('i', { class: glyphClass(D.decls[i]) }), declLink(i)))) : null),
       h('td', { class: 'st' + (rs === 'refuted' ? ' ok' : e[E_NOREP] ? ' bad' : '') },
-        rs === 'refuted' ? 'refuted in Lean' : rs === 'open' ? 'refutation open' : 'checked on the page',
+        rs === 'refuted' ? 'refuted in Lean' : rs === 'resting' ? 'proved from open statements' : rs === 'open' ? 'refutation open' : 'checked on the page',
         e[E_NOREP] ? h('div', null, 'no known repair') : null));
   }))));
 }
@@ -758,17 +761,18 @@ function problemsPanel() {
   const I = E.filter(e => e[E_KIND] === 'I' && !e[E_NOREP]);
   const unrepaired = E.filter(e => e[E_NOREP]).length;
   const refuted = F.filter(e => refState(e) === 'refuted').length, refOpen = F.filter(e => refState(e) === 'open').length;
+  const refResting = F.filter(e => refState(e) === 'resting').length;
   const stat = (k, v, cls, d) => h('div', { class: 'stat' }, h('span', { class: 'k' }, k),
     h('span', { class: 'v ' + cls }, v), d ? h('span', { class: 'd' }, d) : null);
   const outside = E.filter(e => e[E_GROUP] < 0);
   return h('section', { class: 'probs' },
     h('div', { class: 'chart-head' }, h('h3', null, 'Problems found in the paper'), ext(errataUrl, 'ERRATA.md')),
     h('div', { class: 'stats' },
-      stat('False as stated', F.length, 'F', refuted + ' refuted in Lean' + (refOpen ? ', ' + refOpen + ' with the refutation still open' : '')),
+      stat('False as stated', F.length, 'F', refuted + ' refuted in Lean' + (refResting ? ', ' + refResting + ' proved from statements still open' : '') + (refOpen ? ', ' + refOpen + ' with the refutation still open' : '')),
       stat('Imprecise or wrongly justified', I.length, 'I', 'a definition or a step of a proof that needed fixing'),
       stat('Missing material', probCount(E, 'M') + probCount(E, 'R'), 'M', 'placeholders, empty sections and missing references, and reports from reading'),
       stat('No repair known', ER.gaps.length, 'nr', plural(ER.gaps.length, 'place') + ' (' + plural(unrepaired, 'entry', 'entries') + ') that later results depend on')),
-    h('div', { class: 'since' }, 'From ERRATA.md, without the withdrawn entries. Most problems come with a repair: the Lean states a corrected form and the proof builds on that. Where it does not, the entry says what the Lean has instead (a part left out, or a marked gap). A false statement is also kept as printed, as a proposition Printed.<name>, next to a theorem Printed.<name>_false that proves its negation; "refuted in Lean" counts those whose proof is finished. Switch the map below to "Problems in the paper" to see which sections they are in.'),
+    h('div', { class: 'since' }, 'From ERRATA.md, without the withdrawn entries. Most problems come with a repair: the Lean states a corrected form and the proof builds on that. Where it does not, the entry says what the Lean has instead (a part left out, or a marked gap). A false statement is also kept as printed, as a proposition Printed.<name>, next to a theorem Printed.<name>_false that proves its negation; "refuted in Lean" counts those whose proof is finished and uses no theorem that is still unproved. Switch the map below to "Problems in the paper" to see which sections they are in.'),
     h('details', { class: 'block' }, h('summary', null, 'The ' + ER.gaps.length + ' places with no known repair'), gapList(ER.gaps)),
     outside.length ? h('details', { class: 'block' }, h('summary', null, 'Problems outside the stated sections (' + outside.length + ')'), probList(outside)) : null);
 }

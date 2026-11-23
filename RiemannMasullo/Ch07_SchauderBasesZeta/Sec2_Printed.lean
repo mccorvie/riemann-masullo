@@ -72,15 +72,6 @@ def sLocalPrincipalPartCoeff_any_contour : Prop :=
       IntervalIntegrable integrand MeasureTheory.volume 0 1 ∧
         sLocalNonnegativeLaurentCoeff c k f = (∫ t in (0 : ℝ)..1, integrand t) / (2 * (Real.pi : ℂ) * Complex.I)
 
-/-- Paper: Equation (7.2.1.8), p. 334.
-Over ℚ with only the real place, a nonnegative nonzero even bump on 2 < |x| < 3
-has positive first Mellin derivative at zero and zero integral in the formula for
-index one on a small circle. Independently of the subscript convention, at index
-zero the Gaussian on the positive circle of center −1 and radius 3/2 picks up the
-additional residue π of Γℝ(z)/z at −2. -/
-theorem sLocalPrincipalPartCoeff_any_contour_false :
-    ¬ sLocalPrincipalPartCoeff_any_contour := by sorry
-
 /-- Paper: Theorem 7.2.1.1(2), p. 334.
 Each coefficient descends to the homogeneous theta quotient and is an
 eigendistribution of weight equal to its center. -/
@@ -462,12 +453,373 @@ def sLocalThetaPoleBound_eigen_annihilator : Prop :=
     (∀ (c : Xₛ(F, S)), onComponent(F, S, c, ω) → c ∈ poleLocus(F, S) → ∀ k : ℕ, m c < k →
       sLocalNonnegativeLaurentCoeff c k ∈ sLocalEigendistributions c)
 
+/-- A germ of order at least `-1` is `z⁻¹` times an analytic germ. -/
+private theorem sLocalThetaPoleBound_eigen_annihilator_decomp {g : ℂ → ℂ}
+    (hg : MeromorphicAt g 0) (hord : (-(meromorphicOrderAt g 0).untop₀).toNat ≤ 1) :
+    ∃ h : ℂ → ℂ, AnalyticAt ℂ h 0 ∧ ∀ᶠ z in 𝓝[≠] (0 : ℂ), g z = z⁻¹ * h z := by
+  by_cases ho : meromorphicOrderAt g 0 = ⊤
+  · refine ⟨0, analyticAt_const, ?_⟩
+    filter_upwards [meromorphicOrderAt_eq_top_iff.mp ho] with z hz
+    simp [hz]
+  · obtain ⟨m, hm⟩ := WithTop.ne_top_iff_exists.mp ho
+    rw [← hm, WithTop.untop₀_coe] at hord
+    obtain ⟨φ, hφ, -, hgφ⟩ := (meromorphicOrderAt_eq_int_iff hg).mp hm.symm
+    refine ⟨fun z ↦ z ^ (m + 1).toNat * φ z, (analyticAt_id.pow _).mul hφ, ?_⟩
+    filter_upwards [hgφ, self_mem_nhdsWithin] with z hz hz0
+    have hz0' : z ≠ 0 := hz0
+    rw [hz, sub_zero, smul_eq_mul, ← mul_assoc]
+    congr 1
+    rw [← zpow_natCast, Int.toNat_of_nonneg (by omega), ← zpow_neg_one, ← zpow_add₀ hz0']
+    ring_nf
+
+open Metric in
+/-- If two germs `z⁻¹ h₁` and `z⁻¹ h₂` have the same coefficients of every positive
+power, then `h₂ - h₁` is affine near zero. -/
+private theorem sLocalThetaPoleBound_eigen_annihilator_affine {g₁ g₂ h₁ h₂ : ℂ → ℂ}
+    (hh₁ : AnalyticAt ℂ h₁ 0) (hh₂ : AnalyticAt ℂ h₂ 0)
+    (hg₁ : ∀ᶠ z in 𝓝[≠] (0 : ℂ), g₁ z = z⁻¹ * h₁ z)
+    (hg₂ : ∀ᶠ z in 𝓝[≠] (0 : ℂ), g₂ z = z⁻¹ * h₂ z)
+    (hc : ∀ k : ℕ, 0 < k → complexResidue (fun z ↦ g₂ z / z ^ ((k : ℤ) + 1)) 0 =
+      complexResidue (fun z ↦ g₁ z / z ^ ((k : ℤ) + 1)) 0) :
+    ∃ α β : ℂ, ∀ᶠ z in 𝓝 (0 : ℂ), h₂ z - h₁ z = α + β * z := by
+  obtain ⟨R₁, hR₁, hR₁h⟩ := hh₁.exists_ball_analyticOnNhd
+  obtain ⟨R₂, hR₂, hR₂h⟩ := hh₂.exists_ball_analyticOnNhd
+  obtain ⟨ε, hε, hεg⟩ := Metric.mem_nhdsWithin_iff.mp (hg₁.and hg₂)
+  let R : ℝ≥0 := ⟨min (min R₁ R₂) ε / 2, by positivity⟩
+  have hR : (0 : ℝ≥0) < R := by
+    change (0 : ℝ) < min (min R₁ R₂) ε / 2; positivity
+  have hm := lt_min (lt_min hR₁ hR₂) hε
+  have hRR₁ : (R : ℝ) < R₁ := by
+    change min (min R₁ R₂) ε / 2 < R₁
+    linarith [min_le_left (min R₁ R₂) ε, min_le_left R₁ R₂]
+  have hRR₂ : (R : ℝ) < R₂ := by
+    change min (min R₁ R₂) ε / 2 < R₂
+    linarith [min_le_left (min R₁ R₂) ε, min_le_right R₁ R₂]
+  have hRε : (R : ℝ) < ε := by
+    change min (min R₁ R₂) ε / 2 < ε
+    linarith [min_le_right (min R₁ R₂) ε]
+  have hd₁ : DifferentiableOn ℂ h₁ (closedBall 0 R) := fun z hz ↦
+    (hR₁h z (closedBall_subset_ball hRR₁ hz)).differentiableAt.differentiableWithinAt
+  have hd₂ : DifferentiableOn ℂ h₂ (closedBall 0 R) := fun z hz ↦
+    (hR₂h z (closedBall_subset_ball hRR₂ hz)).differentiableAt.differentiableWithinAt
+  have hcoef (g h : ℂ → ℂ) (hd : DifferentiableOn ℂ h (closedBall 0 R))
+      (hgh : ∀ z ∈ ball (0 : ℂ) ε ∩ {0}ᶜ, g z = z⁻¹ * h z) (k : ℕ) :
+      complexResidue (fun z ↦ g z / z ^ ((k : ℤ) + 1)) 0 =
+        cauchyPowerSeries h 0 R (k + 1) (fun _ ↦ 1) := by
+    refine (tendsto_const_nhds.congr' ?_).limUnder_eq
+    filter_upwards [Ioo_mem_nhdsGT hR] with r hr
+    have key := sLocalZLaurentCoeff_hasLaurentSeries_circleIntegral
+      (g := fun z ↦ z⁻¹ * h z) (h := h) (N := 1) hR hd
+      (fun z _ ↦ by simp) (k : ℤ) hr
+    rw [if_pos (by omega), show ((k : ℤ) + ((1 : ℕ) : ℤ)).toNat = k + 1 by omega] at key
+    have e : circleIntegral (fun z ↦ g z / z ^ ((k : ℤ) + 1)) 0 r =
+        circleIntegral (fun z ↦ (z⁻¹ * h z) / z ^ ((k : ℤ) + 1)) 0 r := by
+      refine circleIntegral.integral_congr hr.1.le fun z hz ↦ ?_
+      have hzr : ‖z‖ = r := mem_sphere_zero_iff_norm.mp hz
+      have hm : z ∈ ball (0 : ℂ) ε ∩ {0}ᶜ := by
+        refine ⟨mem_ball_zero_iff.mpr (lt_of_eq_of_lt hzr (hr.2.trans hRε)), ?_⟩
+        intro h0
+        rw [mem_singleton_iff.mp h0, norm_zero] at hzr
+        exact hr.1.ne hzr
+      change g z / _ = _
+      rw [hgh z hm]
+    rw [e]
+    simpa using key.symm
+  have hs (h : ℂ → ℂ) (hd : DifferentiableOn ℂ h (closedBall 0 R)) (z : ℂ)
+      (hz : z ∈ ball (0 : ℂ) R) :
+      HasSum (fun n : ℕ ↦ z ^ n * cauchyPowerSeries h 0 R n (fun _ ↦ 1)) (h z) := by
+    have hz' : z ∈ Metric.eball (0 : ℂ) R := by
+      rw [Metric.mem_eball, edist_zero_right]
+      exact_mod_cast (mem_ball_zero_iff.mp hz)
+    have hs := (hd.hasFPowerSeriesOnBall hR).hasSum hz'
+    have hterm (n : ℕ) : cauchyPowerSeries h 0 R n (fun _ ↦ z) =
+        z ^ n * cauchyPowerSeries h 0 R n (fun _ ↦ 1) := by
+      have := (cauchyPowerSeries h 0 R n).map_smul_univ (fun _ ↦ z) (fun _ ↦ 1)
+      simp only [smul_eq_mul, mul_one, Finset.prod_const, Finset.card_univ,
+        Fintype.card_fin] at this
+      exact this
+    simpa only [zero_add, hterm] using hs
+  refine ⟨cauchyPowerSeries h₂ 0 R 0 (fun _ ↦ 1) - cauchyPowerSeries h₁ 0 R 0 (fun _ ↦ 1),
+    cauchyPowerSeries h₂ 0 R 1 (fun _ ↦ 1) - cauchyPowerSeries h₁ 0 R 1 (fun _ ↦ 1), ?_⟩
+  filter_upwards [ball_mem_nhds (0 : ℂ) hR] with z hz
+  have hsum := (hs h₂ hd₂ z hz).sub (hs h₁ hd₁ z hz)
+  have hsupp : ∀ n ∉ Finset.range 2, z ^ n * cauchyPowerSeries h₂ 0 R n (fun _ ↦ 1) -
+      z ^ n * cauchyPowerSeries h₁ 0 R n (fun _ ↦ 1) = 0 := by
+    intro n hn
+    rw [Finset.mem_range, not_lt] at hn
+    obtain ⟨k, rfl⟩ : ∃ k, n = k + 1 := ⟨n - 1, by omega⟩
+    rw [← hcoef g₂ h₂ hd₂ (fun z hz ↦ (hεg hz).2) k,
+      ← hcoef g₁ h₁ hd₁ (fun z hz ↦ (hεg hz).1) k, hc k (by omega), sub_self]
+  rw [hsum.unique (hasSum_sum_of_ne_finset_zero hsupp), Finset.sum_range_succ,
+    Finset.sum_range_one]
+  ring
+
+/-- If `(m ^ x - 1) h` and `(m ^ (2x) - 1) h` are both affine for small positive `x`,
+with `m ≠ 1`, then `h` vanishes there. -/
+private theorem sLocalThetaPoleBound_eigen_annihilator_core {h₁ h₂ h₃ : ℂ → ℂ} {m : ℝ}
+    (hm : 0 < m) (hm1 : m ≠ 1) (hc : ContinuousAt h₁ 0)
+    (l₂ : ∃ α β : ℂ, ∀ᶠ z in 𝓝 (0 : ℂ), h₂ z - h₁ z = α + β * z)
+    (l₃ : ∃ α β : ℂ, ∀ᶠ z in 𝓝 (0 : ℂ), h₃ z - h₁ z = α + β * z)
+    (r₂ : ∀ᶠ x : ℝ in 𝓝[>] 0, h₂ x = ((m ^ x : ℝ) : ℂ) * h₁ x)
+    (r₃ : ∀ᶠ x : ℝ in 𝓝[>] 0, h₃ x = ((m ^ x : ℝ) : ℂ) ^ 2 * h₁ x) :
+    ∀ᶠ x : ℝ in 𝓝[>] 0, h₁ x = 0 := by
+  obtain ⟨α₂, β₂, e₂⟩ := l₂
+  obtain ⟨α₃, β₃, e₃⟩ := l₃
+  have hT : Tendsto (fun x : ℝ ↦ (x : ℂ)) (𝓝[>] 0) (𝓝 0) :=
+    (Complex.continuous_ofReal.tendsto' 0 0 (by simp)).mono_left nhdsWithin_le_nhds
+  let p : ℝ → ℂ := fun x ↦ ((m ^ x : ℝ) : ℂ)
+  have hp : Tendsto p (𝓝[>] 0) (𝓝 1) := by
+    have h1 : Tendsto (fun x : ℝ ↦ m ^ x) (𝓝 0) (𝓝 (m ^ (0 : ℝ))) :=
+      (Real.continuousAt_const_rpow hm.ne').tendsto
+    rw [Real.rpow_zero] at h1
+    have h2 := (Complex.continuous_ofReal.tendsto 1).comp h1
+    rw [Complex.ofReal_one] at h2
+    exact h2.mono_left nhdsWithin_le_nhds
+  have hh : Tendsto (fun x : ℝ ↦ h₁ x) (𝓝[>] 0) (𝓝 (h₁ 0)) := hc.tendsto.comp hT
+  have hα (q : ℝ → ℂ) (hq : Tendsto q (𝓝[>] 0) (𝓝 1)) (α β : ℂ)
+      (h : ∀ᶠ x : ℝ in 𝓝[>] 0, (q x - 1) * h₁ x = α + β * x) : α = 0 := by
+    have hl1 : Tendsto (fun x : ℝ ↦ (q x - 1) * h₁ x) (𝓝[>] 0) (𝓝 0) := by
+      simpa using (hq.sub_const 1).mul hh
+    have hl2 : Tendsto (fun x : ℝ ↦ α + β * (x : ℂ)) (𝓝[>] 0) (𝓝 α) := by
+      simpa using (tendsto_const_nhds (x := α)).add (hT.const_mul β)
+    exact tendsto_nhds_unique (hl2.congr' (h.mono fun x hx ↦ hx.symm)) hl1
+  have k₂ : ∀ᶠ x : ℝ in 𝓝[>] 0, (p x - 1) * h₁ x = α₂ + β₂ * x := by
+    filter_upwards [hT.eventually e₂, r₂] with x hx hr
+    rw [← hx, hr]; ring
+  have k₃ : ∀ᶠ x : ℝ in 𝓝[>] 0, (p x ^ 2 - 1) * h₁ x = α₃ + β₃ * x := by
+    filter_upwards [hT.eventually e₃, r₃] with x hx hr
+    rw [← hx, hr]; ring
+  have hα₂ := hα p hp α₂ β₂ k₂
+  have hα₃ := hα (fun x ↦ p x ^ 2) (by simpa using hp.pow 2) α₃ β₃ k₃
+  subst hα₂ hα₃
+  have hp1 (x : ℝ) (hx : 0 < x) : p x ≠ 1 := by
+    change ((m ^ x : ℝ) : ℂ) ≠ 1
+    rw [Ne, Complex.ofReal_eq_one]
+    intro h1
+    have := congrArg Real.log h1
+    rw [Real.log_rpow hm, Real.log_one, mul_eq_zero] at this
+    rcases this with h2 | h2
+    · exact hx.ne' h2
+    · exact hm1 (Real.eq_one_of_pos_of_log_eq_zero hm h2)
+  have k : ∀ᶠ x : ℝ in 𝓝[>] 0, (p x + 1) * β₂ = β₃ := by
+    filter_upwards [k₂, k₃, self_mem_nhdsWithin] with x a b (hx : 0 < x)
+    have hx0 : (x : ℂ) ≠ 0 := by exact_mod_cast hx.ne'
+    refine mul_right_cancel₀ hx0 ?_
+    linear_combination b - (p x + 1) * a
+  obtain ⟨δ, hδ, hδs⟩ := mem_nhdsGT_iff_exists_Ioo_subset.mp k
+  have hδ0 : (0 : ℝ) < δ := hδ
+  have hβ : β₂ = 0 := by
+    have p1 : (p (δ / 2) + 1) * β₂ = β₃ := hδs ⟨by positivity, by linarith⟩
+    have p2 : (p (δ / 3) + 1) * β₂ = β₃ := hδs ⟨by positivity, by linarith⟩
+    have hne : m ^ (δ / 2) ≠ m ^ (δ / 3) := by
+      intro he
+      have := congrArg Real.log he
+      rw [Real.log_rpow hm, Real.log_rpow hm] at this
+      have hl := Real.log_ne_zero_of_pos_of_ne_one hm hm1
+      have := mul_right_cancel₀ hl this
+      linarith
+    have hne' : p (δ / 2) - p (δ / 3) ≠ 0 := sub_ne_zero.mpr (by simp only [p]; exact_mod_cast hne)
+    have : (p (δ / 2) - p (δ / 3)) * β₂ = 0 := by linear_combination p1 - p2
+    exact (mul_eq_zero.mp this).resolve_left hne'
+  filter_upwards [k₂, self_mem_nhdsWithin] with x a (hx : 0 < x)
+  rw [hβ, zero_add, zero_mul] at a
+  exact (mul_eq_zero.mp a).resolve_left (sub_ne_zero.mpr (hp1 x hx))
+
+open Metric in
+/-- Over ℚ with no finite places, the standard Gaussian has a nonzero Z-function at `1/2`
+on the trivial component. -/
+private theorem sLocalThetaPoleBound_eigen_annihilator_gaussian [NumberField (ULift.{u} ℚ)] :
+    ∃ f : SchwartzBruhat (Multiplicative (SAdeleRing (ULift.{u} ℚ) ∅)),
+      sLocalIdelicZFunction f (quasiCharacterNormTwist (G := SIdeleQuotient (ULift.{u} ℚ) ∅)
+        (sIdeleQuotientNorm (ULift.{u} ℚ) ∅) (isProperMap_sIdeleQuotientNorm _ _).continuous
+        ((circleToComplex).comp (1 : PontryaginDual (SIdeleQuotient (ULift.{u} ℚ) ∅)))
+        (1 / 2)) ≠ 0 := by
+  let F := ULift.{u} ℚ
+  let S : Finset (HeightOneSpectrum (𝓞 F)) := ∅
+  let tw := quasiCharacterNormTwist (G := SIdeleQuotient F S) (sIdeleQuotientNorm F S)
+    (isProperMap_sIdeleQuotientNorm F S).continuous
+  let χ : PontryaginDual (SIdeleQuotient F S) := 1
+  let s₀ : ℂ := 1 / 2
+  let c := tw ((circleToComplex).comp χ) s₀
+  let χArch : (w : InfinitePlace F) → PontryaginDual w.Completionˣ := fun _ ↦ 1
+  have hχ : ∀ w, (circleToComplex).comp (χArch w) =
+      sLocalInfiniteRestriction w ((circleToComplex).comp χ) := fun w ↦ by
+    ext g; rfl
+  obtain ⟨f, hf⟩ := sLocalPrincipalPartCoeff_eigendistribution_tensor S
+    (fun w ↦ infiniteStandardGaussian w (χArch w))
+    (fun v ↦ finiteStandardGaussian v.val (sLocalFiniteRestriction v c))
+  have hE := sLocalNormalizedEigendistribution_gaussian χ s₀ χArch hχ f hf
+  have hspec := (existsUnique_sLocalNormalizedEigendistribution c).exists.choose_spec f
+  have hN : sLocalNormalizedZFunction f c = 1 := by
+    rw [← hspec]
+    change _ * sLocalNormalizedEigendistribution c f = 1
+    rw [hE]
+    simp [S]
+  have hpos : s₀ ∈ Complex.re ⁻¹' Ioi (0 : ℝ) := by
+    show (0 : ℝ) < (1 / 2 : ℂ).re
+    norm_num
+  have hdiv := sLocalNormalizedZFunction_eq_div f χ hpos
+  have hI : sLocalIdelicZetaIntegral f c ≠ 0 := by
+    intro h0
+    change sLocalNormalizedZFunction f c = _ at hdiv
+    rw [hdiv, h0, zero_div] at hN
+    exact zero_ne_one hN
+  have hZ : sLocalIdelicZFunction f c = sLocalIdelicZetaIntegral f c :=
+    sLocalIdelicZFunction_eq_integral f ⟨χ, s₀, hpos, rfl⟩
+  exact ⟨f, fun h0 ↦ hI (hZ.symm.trans h0)⟩
+
+/-- Over ℚ with no finite places, take the zero bound and the trivial character, a
+simple pole. Write `Z_f = z⁻¹ h` near the pole. If every positive coefficient were an
+eigendistribution, translating by ideles of norms `m` and `m ^ 2` would make
+`(m ^ x - 1) h(x)` and `(m ^ (2x) - 1) h(x)` affine, which forces `h = 0` and
+contradicts the Gaussian. -/
+private theorem sLocalThetaPoleBound_eigen_annihilator_false_aux :
+    ¬ sLocalThetaPoleBound_eigen_annihilator.{u} := by
+  intro h
+  let := NumberField.of_ringEquiv ℚ (ULift.{u} ℚ) (ULift.ringEquiv.{0, u} (R := ℚ)).symm
+  let F := ULift.{u} ℚ
+  let S : Finset (HeightOneSpectrum (𝓞 F)) := ∅
+  let tw := quasiCharacterNormTwist (G := SIdeleQuotient F S) (sIdeleQuotientNorm F S)
+    (isProperMap_sIdeleQuotientNorm F S).continuous
+  let χ : PontryaginDual (SIdeleQuotient F S) := 1
+  let c₁ : QuasiCharacter (SIdeleQuotient F S) := (circleToComplex).comp χ
+  have hone : c₁ = 1 := by ext g; rfl
+  -- the pole order of the trivial character is one
+  have hcard : Fintype.card (InfinitePlace F) = 1 := by
+    have h1 : Module.finrank ℚ F = 1 := by
+      rw [((ULift.ringEquiv.{0, u} (R := ℚ)).toRatAlgEquiv.toLinearEquiv).finrank_eq,
+        Module.finrank_self]
+    have h₁ := InfinitePlace.card_add_two_mul_card_eq_rank F
+    have h₂ := InfinitePlace.card_eq_nrRealPlaces_add_nrComplexPlaces (K := F)
+    have : 0 < Fintype.card (InfinitePlace F) := Fintype.card_pos
+    omega
+  have hpole : 0 < sLocalRhoPoleOrder c₁ := by
+    rw [hone, sLocalRhoPoleOrder_eq_card_polePlaces, sLocalPolePlaces_one.1, Finset.card_univ]
+    exact Nat.add_pos_left Fintype.card_pos _
+  have hle : sLocalRhoPoleOrder c₁ ≤ 1 := by
+    rw [hone, sLocalRhoPoleOrder_eq_card_polePlaces, sLocalPolePlaces_one.1, Finset.card_univ,
+      hcard]
+    have : (sLocalFinitePolePlaces (1 : QuasiCharacter (SIdeleQuotient F S))).card ≤ 0 :=
+      (Finset.card_le_univ _).trans (by simp [S])
+    omega
+  have hon : normOneRestriction (sIdeleQuotientNorm F S) c₁ =
+      (circleToComplex).comp (1 : PontryaginDual (sIdeleQuotientNorm F S).ker) := by
+    ext g; rfl
+  have hk (k : ℕ) (hk : 0 < k) := (mem_sLocalEigendistributions c₁ _).mp
+    ((h F S 1 ∅ (empty_subset _) (fun _ ↦ 0) (fun _ _ ↦ rfl)).2.2 c₁ hon hpole k hk)
+  let Zf : SchwartzBruhat (Multiplicative (SAdeleRing F S)) → ℂ → ℂ :=
+    fun g z ↦ sLocalIdelicZFunction g (tw c₁ z)
+  have hres (u : (SAdeleRing F S)ˣ) (g : SchwartzBruhat (Multiplicative (SAdeleRing F S)))
+      (k : ℕ) (hk0 : 0 < k) :
+      complexResidue (fun z ↦ Zf (schwartzBruhatUnitTranslate u g) z / z ^ ((k : ℤ) + 1)) 0 =
+        complexResidue (fun z ↦ Zf g z / z ^ ((k : ℤ) + 1)) 0 := by
+    have e := hk k hk0 u g
+    have h1 : c₁ (QuotientGroup.mk u) = 1 := Circle.coe_one
+    rw [h1, one_mul] at e
+    exact e
+  have hZm (g : SchwartzBruhat (Multiplicative (SAdeleRing F S))) :
+      MeromorphicOn (Zf g) univ :=
+    (sLocalIdelicZFunction_meromorphic g χ).meromorphicOn
+  have hord (g : SchwartzBruhat (Multiplicative (SAdeleRing F S))) :
+      (-(meromorphicOrderAt (Zf g) 0).untop₀).toNat ≤ 1 := by
+    have h3 : sLocalIdelicOrderBound c₁ ≤ meromorphicOrderAt (Zf g) 0 :=
+      sLocalIdelicZFunction_poles g χ 0
+    rw [sLocalIdelicOrderBound_eq_neg_poleOrder] at h3
+    generalize meromorphicOrderAt (Zf g) 0 = o at h3 ⊢
+    induction o using WithTop.recTopCoe with
+    | top => simp
+    | coe k =>
+      have := WithTop.coe_le_coe.mp h3
+      simp only [WithTop.untop₀_coe]
+      omega
+  have hdec (g : SchwartzBruhat (Multiplicative (SAdeleRing F S))) :=
+    sLocalThetaPoleBound_eigen_annihilator_decomp (hZm g 0 (mem_univ 0)) (hord g)
+  obtain ⟨f, hf⟩ := sLocalThetaPoleBound_eigen_annihilator_gaussian.{u}
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  obtain ⟨t, ht⟩ := exists_ne (1 : ℝ≥0ˣ)
+  obtain ⟨u, hu⟩ := QuotientGroup.mk_surjective (σ t)
+  have hmu : sIdeleQuotientNorm F S (QuotientGroup.mk u) ≠ 1 := by
+    rw [hu, hσ t]; exact ht
+  let m : ℝ := ((sIdeleQuotientNorm F S (QuotientGroup.mk u) : ℝ≥0) : ℝ)
+  have hmpos : 0 < m := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hm1 : m ≠ 1 := by
+    intro h1
+    exact hmu (Units.val_eq_one.mp (NNReal.coe_eq_one.mp h1))
+  have hm2 : ((sIdeleQuotientNorm F S (QuotientGroup.mk (u * u)) : ℝ≥0) : ℝ) = m * m := by
+    rw [QuotientGroup.mk_mul, map_mul, Units.val_mul, NNReal.coe_mul]
+  have hrel (v : (SAdeleRing F S)ˣ) (x : ℝ) (hx : 0 < x) :
+      Zf (schwartzBruhatUnitTranslate v f) x =
+        (((((sIdeleQuotientNorm F S (QuotientGroup.mk v) : ℝ≥0) : ℝ)) ^ x : ℝ) : ℂ) *
+          Zf f x := by
+    have hp : (x : ℂ) ∈ Complex.re ⁻¹' Ioi (0 : ℝ) := by simpa using hx
+    have hmv : 0 < (((sIdeleQuotientNorm F S (QuotientGroup.mk v) : ℝ≥0) : ℝ)) :=
+      NNReal.coe_pos.mpr (Units.zero_lt _)
+    change sLocalIdelicZFunction (schwartzBruhatUnitTranslate v f) (tw c₁ x) =
+      _ * sLocalIdelicZFunction f (tw c₁ x)
+    rw [sLocalIdelicZFunction_eq_integral (schwartzBruhatUnitTranslate v f) ⟨χ, _, hp, rfl⟩,
+      sLocalIdelicZFunction_eq_integral f ⟨χ, _, hp, rfl⟩,
+      sLocalPrincipalPartCoeff_eigendistribution_translate]
+    congr 1
+    change ((circleToComplex).comp χ) _ *
+      (((((sIdeleQuotientNorm F S (QuotientGroup.mk v) : ℝ≥0) : ℝ)) : ℝ) : ℂ) ^ (x : ℂ) = _
+    rw [Complex.ofReal_cpow hmv.le]
+    change ((1 : Circle) : ℂ) * _ = _
+    rw [Circle.coe_one, one_mul]
+  obtain ⟨h₁, ha₁, hg₁⟩ := hdec f
+  obtain ⟨h₂, ha₂, hg₂⟩ := hdec (schwartzBruhatUnitTranslate u f)
+  obtain ⟨h₃, ha₃, hg₃⟩ := hdec (schwartzBruhatUnitTranslate (u * u) f)
+  have l₂ := sLocalThetaPoleBound_eigen_annihilator_affine ha₁ ha₂ hg₁ hg₂
+    (fun k hk0 ↦ hres u f k hk0)
+  have l₃ := sLocalThetaPoleBound_eigen_annihilator_affine ha₁ ha₃ hg₁ hg₃
+    (fun k hk0 ↦ hres (u * u) f k hk0)
+  have hT : Tendsto (fun x : ℝ ↦ (x : ℂ)) (𝓝[>] 0) (𝓝[≠] 0) :=
+    tendsto_nhdsWithin_of_tendsto_nhds_of_eventually_within _
+      ((Complex.continuous_ofReal.tendsto' 0 0 (by simp)).mono_left nhdsWithin_le_nhds)
+      (eventually_nhdsWithin_of_forall fun x (hx : 0 < x) ↦ by
+        simpa using hx.ne')
+  have r₂ : ∀ᶠ x : ℝ in 𝓝[>] 0, h₂ x = ((m ^ x : ℝ) : ℂ) * h₁ x := by
+    filter_upwards [hT.eventually (hg₁.and hg₂), self_mem_nhdsWithin] with x e (hx : 0 < x)
+    have e' := hrel u x hx
+    rw [e.1, e.2] at e'
+    have hx0 : (x : ℂ) ≠ 0 := by exact_mod_cast hx.ne'
+    exact mul_left_cancel₀ (inv_ne_zero hx0) (e'.trans (by ring))
+  have r₃ : ∀ᶠ x : ℝ in 𝓝[>] 0, h₃ x = ((m ^ x : ℝ) : ℂ) ^ 2 * h₁ x := by
+    filter_upwards [hT.eventually (hg₁.and hg₃), self_mem_nhdsWithin] with x e (hx : 0 < x)
+    have e' := hrel (u * u) x hx
+    rw [e.1, e.2, hm2, Real.mul_rpow hmpos.le hmpos.le, Complex.ofReal_mul] at e'
+    have hx0 : (x : ℂ) ≠ 0 := by exact_mod_cast hx.ne'
+    exact mul_left_cancel₀ (inv_ne_zero hx0) (e'.trans (by ring))
+  have hz := sLocalThetaPoleBound_eigen_annihilator_core hmpos hm1 ha₁.continuousAt l₂ l₃ r₂ r₃
+  have hev : ∀ᶠ z in 𝓝 (0 : ℂ), h₁ z = 0 :=
+    ha₁.frequently_zero_iff_eventually_zero.mp (hT.frequently hz.frequently)
+  -- the identity theorem
+  have h0 : meromorphicOrderAt (Zf f) 0 = ⊤ := by
+    rw [meromorphicOrderAt_eq_top_iff]
+    filter_upwards [hg₁, nhdsWithin_le_nhds hev] with z hz1 hz2
+    rw [hz1, hz2, mul_zero]
+  have h12 := (hZm f).meromorphicOrderAt_eq_top_of_isPreconnected isPreconnected_univ
+    (mem_univ 0) (mem_univ (1 / 2)) h0
+  rw [meromorphicOrderAt_eq_top_iff] at h12
+  have hopen : IsOpen (Complex.re ⁻¹' Ioi (0 : ℝ)) := isOpen_Ioi.preimage Complex.continuous_re
+  have hhalf : (1 / 2 : ℂ) ∈ Complex.re ⁻¹' Ioi (0 : ℝ) := by
+    show (0 : ℝ) < (1 / 2 : ℂ).re
+    norm_num
+  have hcont : ContinuousAt (Zf f) (1 / 2) :=
+    (((sLocalIdelicZetaIntegral_analyticOn f χ) _ hhalf).congr
+      (Filter.eventually_of_mem (hopen.mem_nhds hhalf) fun z hz ↦
+        (sLocalIdelicZFunction_eq_integral f ⟨χ, z, hz, rfl⟩).symm)).continuousAt
+  have hv : Zf f (1 / 2) = 0 :=
+    tendsto_nhds_unique (hcont.tendsto.mono_left nhdsWithin_le_nhds)
+      (tendsto_const_nhds.congr' (h12.mono fun z hz ↦ hz.symm))
+  exact hf hv
+
 /-- Paper: Theorem 7.2.1.1(4), p. 334.
 For the zero bound over ℚ at the real place, the first positive coefficient
 is among the asserted eigendistributions. On a positive even bump supported in
 2 < |x| < 3, dilation by 2 changes it by log(2) times the nonzero constant term. -/
 theorem sLocalThetaPoleBound_eigen_annihilator_false :
-    ¬ sLocalThetaPoleBound_eigen_annihilator := by sorry
+    ¬ sLocalThetaPoleBound_eigen_annihilator :=
+  sLocalThetaPoleBound_eigen_annihilator_false_aux
 
 /-- Paper: Remark 7.2.1.2, p. 335, first sequence.
 The coefficient map on tests descends to the indicated quotient, has the printed
@@ -811,11 +1163,68 @@ def sLocalChangeOfChart_pureNormBase : Prop :=
       ∀ s : ℂ, twistₛ(F, S) ((circleToComplex).comp χ') (s - (t : ℂ) * Complex.I) =
         twistₛ(F, S) ((circleToComplex).comp χ) s
 
+section
+
+universe v
+
+/-- A surjective positive norm has a nontrivial unitary character, detected at norm exp(π). -/
+private theorem sLocalChangeOfChart_pureNormBase_nontrivial {G : Type v} [CommGroup G] [TopologicalSpace G]
+    (m : G →* ℝ≥0ˣ) (hm : Continuous m) (hs : Function.Surjective m) :
+    ∃ χ : PontryaginDual G, χ ≠ 1 := by
+  let χ : PontryaginDual G :=
+    { toFun := fun g ↦ Circle.exp (Real.log ((m g).val : ℝ))
+      map_one' := by simp
+      map_mul' := by
+        intro g h
+        simp only [map_mul, Units.val_mul, NNReal.coe_mul]
+        rw [Real.log_mul (NNReal.coe_ne_zero.mpr (m g).ne_zero) (NNReal.coe_ne_zero.mpr (m h).ne_zero), Circle.exp_add]
+      continuous_toFun := Circle.exp.continuous.comp
+        ((NNReal.continuous_coe.comp (Units.continuous_val.comp hm)).log (fun g ↦ by
+          exact NNReal.coe_ne_zero.mpr (m g).ne_zero)) }
+  refine ⟨χ, ?_⟩
+  intro hχ
+  let r : ℝ≥0ˣ := Units.mk0 ⟨Real.exp Real.pi, (Real.exp_pos _).le⟩ (by
+    exact Subtype.coe_ne_coe.mp (Real.exp_pos Real.pi).ne')
+  obtain ⟨g, hg⟩ := hs r
+  have h := DFunLike.congr_fun hχ g
+  change Circle.exp (Real.log ((m g).val : ℝ)) = 1 at h
+  rw [hg] at h
+  change Circle.exp (Real.log (Real.exp Real.pi)) = 1 at h
+  rw [Real.log_exp] at h
+  exact Circle.exp_pi_ne_one h
+
+/-- Equal nontrivial basepoints contradict the two printed chart identities. -/
+private theorem sLocalChangeOfChart_pureNormBase_false_aux : ¬ sLocalChangeOfChart_pureNormBase.{u} := by
+  intro h
+  let F := ULift.{u} ℚ
+  let := ulift_rat_numberField.{u}
+  let m := sIdeleQuotientNorm F ∅
+  have hm : Continuous m := (isProperMap_sIdeleQuotientNorm F ∅).continuous
+  have hs := (sIdeleQuotientNorm_exists_section (F := F) (S := ∅)).choose_spec.surjective
+  obtain ⟨χ, hχ⟩ := sLocalChangeOfChart_pureNormBase_nontrivial m hm hs
+  have ht := h F ∅ χ χ (fun _ ↦ rfl)
+  obtain ⟨t, ⟨hbase, hchange⟩, -⟩ := ht
+  apply hχ
+  ext g
+  have hb := DFunLike.congr_fun hbase g
+  have hc := DFunLike.congr_fun (hchange 0) g
+  change (χ g : ℂ) = 1 * ((m g).val : ℂ) ^ ((t : ℂ) * Complex.I) at hb
+  change (χ g : ℂ) * ((m g).val : ℂ) ^ (0 - (t : ℂ) * Complex.I) =
+    (χ g : ℂ) * ((m g).val : ℂ) ^ (0 : ℂ) at hc
+  rw [zero_sub, Complex.cpow_zero, mul_one, Complex.cpow_neg] at hc
+  rw [one_mul] at hb
+  rw [← hb, mul_inv_cancel₀ (Circle.coe_ne_zero _)] at hc
+  exact hc.symm
+end
+
 /-- Paper: Chart change before Theorem 7.2.1.4, p. 336.
-For ℚ with the real place and 5, take the quadratic character on the 5-adic units,
-trivial on 5 and on the real factor. It kills the S-units. Its twist by the norm
-to the power i still equals −1 on the 5-adic unit 2, where every pure norm twist is one. -/
-theorem sLocalChangeOfChart_pureNormBase_false : ¬ sLocalChangeOfChart_pureNormBase := by sorry
+Over a universe lift of ℚ with only the archimedean place, use the same
+nontrivial imaginary norm character as both basepoints. The first printed
+identity expresses this character as the pure norm twist. Substituting it
+into the second identity at exponent zero forces the character to be one.
+Its value at norm exp(π) is −1, giving a contradiction. -/
+theorem sLocalChangeOfChart_pureNormBase_false : ¬ sLocalChangeOfChart_pureNormBase :=
+  sLocalChangeOfChart_pureNormBase_false_aux
 
 open Classical in
 /-- Paper: Equation (7.2.1.13), p. 336. The unscaled formula with a specified Laurent exponent. -/
@@ -1067,6 +1476,407 @@ character, while the asserted order is one. -/
 theorem sLocalPolarPrincipalValue_tfae_exact_order_false :
     ¬ sLocalPolarPrincipalValue_tfae_exact_order :=
   sLocalPolarPrincipalValue_tfae_exact_order_false_aux
+
+open Metric in
+/-- The exterior of a closed disc is preconnected. -/
+private theorem sLocalPrincipalPartCoeff_any_contour_exterior (r : ℝ) (hr : 0 ≤ r) : IsPreconnected {z : ℂ | r < ‖z‖} := by
+  have hc : Continuous (fun p : ℝ × ℝ ↦ circleMap 0 p.1 p.2) := by
+    unfold circleMap; fun_prop
+  have him : (fun p : ℝ × ℝ ↦ circleMap 0 p.1 p.2) '' (Ioi r ×ˢ univ) = {z : ℂ | r < ‖z‖} := by
+    ext z
+    constructor
+    · rintro ⟨⟨ρ, θ⟩, ⟨hρ, -⟩, rfl⟩
+      simp only [mem_ofPred_eq, norm_circleMap_zero]
+      rw [abs_of_pos (hr.trans_lt hρ)]; exact hρ
+    · intro hz
+      refine ⟨⟨‖z‖, Complex.arg z⟩, ⟨hz, mem_univ _⟩, ?_⟩
+      simp only [circleMap, zero_add]
+      exact Complex.norm_mul_exp_arg_mul_I z
+  rw [← him]
+  exact (isPreconnected_Ioi.prod isPreconnected_univ).image _ hc.continuousOn
+
+open Metric in
+/-- A bounded connected open set whose frontier is a circle is the open disc. -/
+private theorem sLocalPrincipalPartCoeff_any_contour_unique (r : ℝ) (hr : 0 < r) (U : Set ℂ) (hU : IsOpen U) (hc : IsConnected U)
+    (hb : Bornology.IsBounded U) (hf : frontier U = sphere 0 r) : U = ball 0 r := by
+  have hdisj : U ∩ sphere 0 r = ∅ := hf ▸ hU.inter_frontier_eq
+  have hcl : closure U = U ∪ sphere 0 r := by
+    rw [← hf, ← closure_sdiff_interior, hU.interior_eq, union_sdiff_self, union_eq_right.mpr subset_closure]
+  have hsub : ∀ V : Set ℂ, IsPreconnected V → V ∩ sphere 0 r = ∅ → (V ∩ U).Nonempty → V ⊆ U := by
+    intro V hV hVs hne
+    refine hV.subset_of_closure_inter_subset hU hne ?_
+    rw [hcl]
+    rintro z ⟨hz | hz, hzV⟩
+    · exact hz
+    · exact absurd (show z ∈ V ∩ sphere 0 r from ⟨hzV, hz⟩) (by rw [hVs]; exact notMem_empty z)
+  have hext : ¬ ({z : ℂ | r < ‖z‖} ∩ U).Nonempty := by
+    intro hne
+    have h1 := hsub _ (sLocalPrincipalPartCoeff_any_contour_exterior r hr.le) (by
+      ext z; simp only [mem_inter_iff, mem_ofPred_eq, mem_sphere_zero_iff_norm, mem_empty_iff_false,
+        iff_false, not_and]; intro h h'; linarith) hne
+    have : Bornology.IsBounded (closedBall (0 : ℂ) r ∪ {z : ℂ | r < ‖z‖}) :=
+      isBounded_closedBall.union (hb.subset h1)
+    have huniv : closedBall (0 : ℂ) r ∪ {z : ℂ | r < ‖z‖} = univ := by
+      ext z; simp only [mem_union, mem_closedBall_zero_iff, mem_ofPred_eq, mem_univ, iff_true]
+      exact le_or_gt _ _
+    rw [huniv] at this
+    exact NormedSpace.unbounded_univ ℝ ℂ this
+  have hUb : U ⊆ ball 0 r := by
+    intro z hz
+    rw [mem_ball_zero_iff]
+    rcases lt_trichotomy ‖z‖ r with h | h | h
+    · exact h
+    · exact absurd (show z ∈ U ∩ sphere 0 r from ⟨hz, mem_sphere_zero_iff_norm.mpr h⟩)
+        (by rw [hdisj]; exact notMem_empty z)
+    · exact absurd ⟨z, h, hz⟩ hext
+  obtain ⟨z₀, hz₀⟩ := hc.nonempty
+  refine hUb.antisymm (hsub _ (convex_ball 0 r).isPreconnected ?_ ⟨z₀, hUb hz₀, hz₀⟩)
+  ext z; simp only [mem_inter_iff, mem_ball_zero_iff, mem_sphere_zero_iff_norm, mem_empty_iff_false,
+    iff_false, not_and]; intro h h'; linarith
+
+open Metric in
+/-- Reversing a path negates the line integral. -/
+private theorem sLocalPrincipalPartCoeff_any_contour_reverse (γ : ℝ → ℂ) (G : ℂ → ℂ) :
+    (∫ t in (0 : ℝ)..1, G (γ (1 - t)) * deriv (fun s ↦ γ (1 - s)) t) =
+      -∫ t in (0 : ℝ)..1, G (γ t) * deriv γ t := by
+  have h1 : (fun t ↦ G (γ (1 - t)) * deriv (fun s ↦ γ (1 - s)) t) =
+      fun t ↦ -(G (γ (1 - t)) * deriv γ (1 - t)) := by
+    funext t; rw [deriv_comp_const_sub]; ring
+  rw [h1, intervalIntegral.integral_neg, intervalIntegral.integral_comp_sub_left
+    (fun t ↦ G (γ t) * deriv γ t) 1]
+  norm_num
+
+open Metric in
+/-- The unit-time circle traces the whole circle on `[0, 1]`. -/
+private theorem sLocalPrincipalPartCoeff_any_contour_image (r : ℝ) (hr : 0 < r) :
+    (fun t : ℝ ↦ circleMap 0 r (2 * Real.pi * t)) '' Icc 0 1 = sphere 0 r := by
+  apply Subset.antisymm
+  · rintro _ ⟨t, -, rfl⟩
+    simp [abs_of_pos hr]
+  · intro z hz
+    rw [← abs_of_pos hr, ← image_circleMap_Ioc] at hz
+    obtain ⟨θ, hθ, rfl⟩ := hz
+    refine ⟨θ / (2 * Real.pi), ⟨div_nonneg hθ.1.le (by positivity), ?_⟩, ?_⟩
+    · rw [div_le_one (by positivity)]; exact hθ.2
+    · simp only; congr 1; field_simp
+
+
+open Metric in
+/-- A germ of order at least `-1` whose nonnegative Laurent coefficients vanish is `a / z`. -/
+private theorem sLocalPrincipalPartCoeff_any_contour_simplePole {g : ℂ → ℂ}
+    (hg : MeromorphicAt g 0) (hord : (-(meromorphicOrderAt g 0).untop₀).toNat ≤ 1)
+    (hc : ∀ k : ℕ, complexResidue (fun z ↦ g z / z ^ ((k : ℤ) + 1)) 0 = 0) :
+    ∃ a : ℂ, ∀ᶠ z in 𝓝[≠] (0 : ℂ), g z = a * z⁻¹ := by
+  obtain ⟨h, hh, hgh⟩ : ∃ h : ℂ → ℂ, AnalyticAt ℂ h 0 ∧
+      ∀ᶠ z in 𝓝[≠] (0 : ℂ), g z = z⁻¹ * h z := by
+    by_cases ho : meromorphicOrderAt g 0 = ⊤
+    · refine ⟨0, analyticAt_const, ?_⟩
+      filter_upwards [meromorphicOrderAt_eq_top_iff.mp ho] with z hz
+      simp [hz]
+    · obtain ⟨m, hm⟩ := WithTop.ne_top_iff_exists.mp ho
+      rw [← hm, WithTop.untop₀_coe] at hord
+      obtain ⟨φ, hφ, -, hgφ⟩ := (meromorphicOrderAt_eq_int_iff hg).mp hm.symm
+      refine ⟨fun z ↦ z ^ (m + 1).toNat * φ z, (analyticAt_id.pow _).mul hφ, ?_⟩
+      filter_upwards [hgφ, self_mem_nhdsWithin] with z hz hz0
+      have hz0' : z ≠ 0 := hz0
+      rw [hz, sub_zero, smul_eq_mul, ← mul_assoc]
+      congr 1
+      rw [← zpow_natCast, Int.toNat_of_nonneg (by omega), ← zpow_neg_one, ← zpow_add₀ hz0']
+      ring_nf
+  obtain ⟨R₀, hR₀, hR₀h⟩ := hh.exists_ball_analyticOnNhd
+  obtain ⟨ε, hε, hεg⟩ := Metric.mem_nhdsWithin_iff.mp hgh
+  let R : ℝ≥0 := ⟨min R₀ ε / 2, by positivity⟩
+  have hR : (0 : ℝ≥0) < R := by
+    change (0 : ℝ) < min R₀ ε / 2; positivity
+  have hRR₀ : (R : ℝ) < R₀ := by
+    change min R₀ ε / 2 < R₀; linarith [min_le_left R₀ ε, lt_min hR₀ hε]
+  have hRε : (R : ℝ) < ε := by
+    change min R₀ ε / 2 < ε; linarith [min_le_right R₀ ε, lt_min hR₀ hε]
+  have hhd : DifferentiableOn ℂ h (closedBall 0 R) := fun z hz ↦
+    (hR₀h z (closedBall_subset_ball hRR₀ hz)).differentiableAt.differentiableWithinAt
+  have hcoef (k : ℕ) : cauchyPowerSeries h 0 R (k + 1) (fun _ ↦ 1) = 0 := by
+    refine Eq.trans ?_ (hc k)
+    symm
+    refine (tendsto_const_nhds.congr' ?_).limUnder_eq
+    filter_upwards [Ioo_mem_nhdsGT hR] with r hr
+    have key := sLocalZLaurentCoeff_hasLaurentSeries_circleIntegral
+      (g := fun z ↦ z⁻¹ * h z) (h := h) (N := 1) hR hhd
+      (fun z _ ↦ by simp) (k : ℤ) hr
+    rw [if_pos (by omega), show ((k : ℤ) + ((1 : ℕ) : ℤ)).toNat = k + 1 by omega] at key
+    have e : circleIntegral (fun z ↦ g z / z ^ ((k : ℤ) + 1)) 0 r =
+        circleIntegral (fun z ↦ (z⁻¹ * h z) / z ^ ((k : ℤ) + 1)) 0 r := by
+      refine circleIntegral.integral_congr hr.1.le fun z hz ↦ ?_
+      have hzr : ‖z‖ = r := mem_sphere_zero_iff_norm.mp hz
+      have hm : z ∈ ball (0 : ℂ) ε ∩ {0}ᶜ := by
+        refine ⟨mem_ball_zero_iff.mpr (lt_of_eq_of_lt hzr (hr.2.trans hRε)), ?_⟩
+        intro h0
+        rw [mem_singleton_iff.mp h0, norm_zero] at hzr
+        exact hr.1.ne hzr
+      change g z / _ = _
+      rw [show g z = z⁻¹ * h z from hεg hm]
+    rw [e]
+    simpa using key.symm
+  have hp := hhd.hasFPowerSeriesOnBall hR
+  have hconst : ∀ z ∈ ball (0 : ℂ) R, h z = h 0 := by
+    intro z hz
+    have hz' : z ∈ Metric.eball (0 : ℂ) R := by
+      rw [Metric.mem_eball, edist_zero_right]
+      exact_mod_cast (mem_ball_zero_iff.mp hz)
+    have hs := hp.hasSum hz'
+    have hterm (n : ℕ) : cauchyPowerSeries h 0 R n (fun _ ↦ z) =
+        z ^ n * cauchyPowerSeries h 0 R n (fun _ ↦ 1) := by
+      have := (cauchyPowerSeries h 0 R n).map_smul_univ (fun _ ↦ z) (fun _ ↦ 1)
+      simp only [smul_eq_mul, mul_one, Finset.prod_const, Finset.card_univ,
+        Fintype.card_fin] at this
+      exact this
+    simp only [zero_add, hterm] at hs
+    have h1 : HasSum (fun n : ℕ ↦ z ^ n * cauchyPowerSeries h 0 R n (fun _ ↦ 1))
+        (z ^ 0 * cauchyPowerSeries h 0 R 0 (fun _ ↦ 1)) := by
+      refine hasSum_single 0 fun n hn ↦ ?_
+      obtain ⟨k, rfl⟩ := Nat.exists_eq_succ_of_ne_zero hn
+      rw [hcoef k, mul_zero]
+    rw [hs.unique h1, pow_zero, one_mul, hp.coeff_zero]
+  refine ⟨h 0, ?_⟩
+  filter_upwards [hgh, inter_mem_nhdsWithin _ (ball_mem_nhds (0 : ℂ) hR)] with z hz hzb
+  rw [hz, hconst z hzb.2, mul_comm]
+
+open Metric in
+/-- The unit circle run once in unit time is Lipschitz. -/
+private theorem sLocalPrincipalPartCoeff_any_contour_lipschitz : ∃ K : ℝ≥0, LipschitzWith K (fun t : ℝ ↦ circleMap 0 1 (2 * Real.pi * t)) := by
+  refine ⟨Real.nnabs 1 * ⟨2 * Real.pi, by positivity⟩, (lipschitzWith_circleMap 0 1).comp ?_⟩
+  refine LipschitzWith.of_dist_le_mul fun x y ↦ ?_
+  rw [Real.dist_eq, Real.dist_eq, ← mul_sub, abs_mul, abs_of_pos (by positivity : (0:ℝ) < 2 * Real.pi)]
+  rfl
+
+open Metric in
+/-- The reflection `t ↦ 1 - t` is an isometry. -/
+private theorem sLocalPrincipalPartCoeff_any_contour_lipschitz_rev : LipschitzWith 1 (fun t : ℝ ↦ 1 - t) :=
+  LipschitzWith.of_dist_le_mul fun x y ↦ by
+    simp only [Real.dist_eq, NNReal.coe_one, one_mul]
+    rw [abs_sub_comm]; ring_nf; rfl
+
+/-- Over ℚ with no finite places, the standard Gaussian has a nonzero Z-function at `1/2`
+on the trivial component. -/
+private theorem sLocalPrincipalPartCoeff_any_contour_gaussian [NumberField (ULift.{u} ℚ)] :
+    ∃ f : SchwartzBruhat (Multiplicative (SAdeleRing (ULift.{u} ℚ) ∅)),
+      sLocalIdelicZFunction f (quasiCharacterNormTwist (G := SIdeleQuotient (ULift.{u} ℚ) ∅)
+        (sIdeleQuotientNorm (ULift.{u} ℚ) ∅) (isProperMap_sIdeleQuotientNorm _ _).continuous
+        ((circleToComplex).comp (1 : PontryaginDual (SIdeleQuotient (ULift.{u} ℚ) ∅)))
+        (1 / 2)) ≠ 0 := by
+  let F := ULift.{u} ℚ
+  let S : Finset (HeightOneSpectrum (𝓞 F)) := ∅
+  let tw := quasiCharacterNormTwist (G := SIdeleQuotient F S) (sIdeleQuotientNorm F S)
+    (isProperMap_sIdeleQuotientNorm F S).continuous
+  let χ : PontryaginDual (SIdeleQuotient F S) := 1
+  let s₀ : ℂ := 1 / 2
+  let c := tw ((circleToComplex).comp χ) s₀
+  let χArch : (w : InfinitePlace F) → PontryaginDual w.Completionˣ := fun _ ↦ 1
+  have hχ : ∀ w, (circleToComplex).comp (χArch w) =
+      sLocalInfiniteRestriction w ((circleToComplex).comp χ) := fun w ↦ by
+    ext g; rfl
+  obtain ⟨f, hf⟩ := sLocalPrincipalPartCoeff_eigendistribution_tensor S
+    (fun w ↦ infiniteStandardGaussian w (χArch w))
+    (fun v ↦ finiteStandardGaussian v.val (sLocalFiniteRestriction v c))
+  have hE := sLocalNormalizedEigendistribution_gaussian χ s₀ χArch hχ f hf
+  have hspec := (existsUnique_sLocalNormalizedEigendistribution c).exists.choose_spec f
+  have hN : sLocalNormalizedZFunction f c = 1 := by
+    rw [← hspec]
+    change _ * sLocalNormalizedEigendistribution c f = 1
+    rw [hE]
+    simp [S]
+  have hpos : s₀ ∈ Complex.re ⁻¹' Ioi (0 : ℝ) := by
+    show (0 : ℝ) < (1 / 2 : ℂ).re
+    norm_num
+  have hdiv := sLocalNormalizedZFunction_eq_div f χ hpos
+  have hI : sLocalIdelicZetaIntegral f c ≠ 0 := by
+    intro h0
+    change sLocalNormalizedZFunction f c = _ at hdiv
+    rw [hdiv, h0, zero_div] at hN
+    exact zero_ne_one hN
+  have hZ : sLocalIdelicZFunction f c = sLocalIdelicZetaIntegral f c :=
+    sLocalIdelicZFunction_eq_integral f ⟨χ, s₀, hpos, rfl⟩
+  exact ⟨f, fun h0 ↦ hI (hZ.symm.trans h0)⟩
+
+/-- Over ℚ with no finite places, run the unit circle around the pole of the trivial
+character in both directions. Every coefficient is then its own negative, so all
+nonnegative coefficients vanish. With a pole of order at most one, the Z-function is
+`a / z` near the pole, translation by an idele of norm other than one forces `a = 0`,
+and the identity theorem then contradicts the Gaussian. -/
+private theorem sLocalPrincipalPartCoeff_any_contour_false_aux :
+    ¬ sLocalPrincipalPartCoeff_any_contour.{u} := by
+  intro h
+  let := NumberField.of_ringEquiv ℚ (ULift.{u} ℚ) (ULift.ringEquiv.{0, u} (R := ℚ)).symm
+  let F := ULift.{u} ℚ
+  let S : Finset (HeightOneSpectrum (𝓞 F)) := ∅
+  let tw := quasiCharacterNormTwist (G := SIdeleQuotient F S) (sIdeleQuotientNorm F S)
+    (isProperMap_sIdeleQuotientNorm F S).continuous
+  let χ : PontryaginDual (SIdeleQuotient F S) := 1
+  let c₁ : QuasiCharacter (SIdeleQuotient F S) := (circleToComplex).comp χ
+  have hone : c₁ = 1 := by ext g; rfl
+  -- the pole order of the trivial character is one
+  have hcard : Fintype.card (InfinitePlace F) = 1 := by
+    have h1 : Module.finrank ℚ F = 1 := by
+      rw [((ULift.ringEquiv.{0, u} (R := ℚ)).toRatAlgEquiv.toLinearEquiv).finrank_eq,
+        Module.finrank_self]
+    have := sLocalCoordinate_closedEmbedding_subsingleton F h1
+    exact le_antisymm (Fintype.card_le_one_iff_subsingleton.mpr this) Fintype.card_pos
+  have hpole : 0 < sLocalRhoPoleOrder c₁ := by
+    rw [hone, sLocalRhoPoleOrder_eq_card_polePlaces, sLocalPolePlaces_one.1, Finset.card_univ]
+    exact Nat.add_pos_left Fintype.card_pos _
+  have hle : sLocalRhoPoleOrder c₁ ≤ 1 := by
+    rw [hone, sLocalRhoPoleOrder_eq_card_polePlaces, sLocalPolePlaces_one.1, Finset.card_univ,
+      hcard]
+    have : (sLocalFinitePolePlaces (1 : QuasiCharacter (SIdeleQuotient F S))).card ≤ 0 :=
+      (Finset.card_le_univ _).trans (by simp [S])
+    omega
+  -- the unit circle in both directions
+  let γ : ℝ → ℂ := fun t ↦ circleMap 0 1 (2 * Real.pi * t)
+  let γ' : ℝ → ℂ := fun t ↦ γ (1 - t)
+  obtain ⟨K, hK⟩ := sLocalPrincipalPartCoeff_any_contour_lipschitz
+  have hγc : γ 0 = γ 1 := by
+    simp only [γ, circleMap, mul_zero, mul_one, Complex.ofReal_zero, zero_mul, Complex.exp_zero,
+      zero_add]
+    rw [Complex.ofReal_mul, Complex.ofReal_ofNat, Complex.exp_two_pi_mul_I]
+    simp
+  have himg : γ '' Icc 0 1 = Metric.sphere 0 1 :=
+    sLocalPrincipalPartCoeff_any_contour_image 1 one_pos
+  have himg' : γ' '' Icc 0 1 = Metric.sphere 0 1 := by
+    rw [← himg]
+    ext z
+    constructor
+    · rintro ⟨t, ht, rfl⟩
+      exact ⟨1 - t, ⟨by linarith [ht.2], by linarith [ht.1]⟩, rfl⟩
+    · rintro ⟨t, ht, rfl⟩
+      exact ⟨1 - t, ⟨by linarith [ht.2], by linarith [ht.1]⟩, by simp [γ']⟩
+  have hfr : frontier (Metric.ball (0 : ℂ) 1) = Metric.sphere 0 1 := frontier_ball 0 one_ne_zero
+  have hconn : IsConnected (Metric.ball (0 : ℂ) 1) :=
+    ⟨Metric.nonempty_ball.mpr one_pos, (convex_ball 0 1).isPreconnected⟩
+  have huniq (U : Set ℂ) (hU : IsOpen U ∧ IsConnected U ∧ Bornology.IsBounded U ∧
+      frontier U = Metric.sphere 0 1) : U = Metric.ball 0 1 :=
+    sLocalPrincipalPartCoeff_any_contour_unique 1 one_pos U hU.1 hU.2.1 hU.2.2.1 hU.2.2.2
+  have hzero (f : SchwartzBruhat (Multiplicative (SAdeleRing F S))) (k : ℕ) :
+      sLocalZLaurentCoeff f c₁ k = 0 := by
+    have e1 := (h F S c₁ hpole k f γ ⟨K, hK.lipschitzOnWith⟩ hγc (Metric.ball 0 1)
+      ⟨Metric.isOpen_ball, hconn, Metric.isBounded_ball, hfr.trans himg.symm⟩
+      (fun U hU ↦ huniq U ⟨hU.1, hU.2.1, hU.2.2.1, hU.2.2.2.trans himg⟩)
+      (Metric.mem_ball_self one_pos)).2
+    have e2 := (h F S c₁ hpole k f γ' ⟨K * 1, (hK.comp
+      sLocalPrincipalPartCoeff_any_contour_lipschitz_rev).lipschitzOnWith⟩
+      (show γ (1 - 0) = γ (1 - 1) by rw [sub_zero, sub_self]; exact hγc.symm) (Metric.ball 0 1)
+      ⟨Metric.isOpen_ball, hconn, Metric.isBounded_ball, hfr.trans himg'.symm⟩
+      (fun U hU ↦ huniq U ⟨hU.1, hU.2.1, hU.2.2.1, hU.2.2.2.trans himg'⟩)
+      (Metric.mem_ball_self one_pos)).2
+    have e3 : (∫ t in (0 : ℝ)..1, γ' t ^ ((k : ℤ) - 1) *
+        sLocalIdelicZFunction f (tw c₁ (γ' t)) * deriv γ' t) =
+        -∫ t in (0 : ℝ)..1, γ t ^ ((k : ℤ) - 1) *
+        sLocalIdelicZFunction f (tw c₁ (γ t)) * deriv γ t :=
+      sLocalPrincipalPartCoeff_any_contour_reverse γ
+        (fun w ↦ w ^ ((k : ℤ) - 1) * sLocalIdelicZFunction f (tw c₁ w))
+    have e1' : sLocalZLaurentCoeff f c₁ k = (∫ t in (0 : ℝ)..1, γ t ^ ((k : ℤ) - 1) *
+        sLocalIdelicZFunction f (tw c₁ (γ t)) * deriv γ t) /
+        (2 * (Real.pi : ℂ) * Complex.I) := e1
+    have e2' : sLocalZLaurentCoeff f c₁ k = (∫ t in (0 : ℝ)..1, γ' t ^ ((k : ℤ) - 1) *
+        sLocalIdelicZFunction f (tw c₁ (γ' t)) * deriv γ' t) /
+        (2 * (Real.pi : ℂ) * Complex.I) := e2
+    rw [e3, neg_div] at e2'
+    linear_combination (e1' + e2') / 2
+  -- the Z-functions on the trivial component
+  have hZm (f : SchwartzBruhat (Multiplicative (SAdeleRing F S))) :
+      MeromorphicOn (fun z ↦ sLocalIdelicZFunction f (tw c₁ z)) univ :=
+    (sLocalIdelicZFunction_meromorphic f χ).meromorphicOn
+  have hpoleF (f : SchwartzBruhat (Multiplicative (SAdeleRing F S))) :
+      ∃ a : ℂ, ∀ᶠ z in 𝓝[≠] (0 : ℂ), sLocalIdelicZFunction f (tw c₁ z) = a * z⁻¹ := by
+    have hord := sLocalThetaPoleBound_low_coefficients_exact_polar_le f c₁
+    unfold sLocalPolarMultiplicity at hord
+    exact sLocalPrincipalPartCoeff_any_contour_simplePole (hZm f 0 (mem_univ 0))
+      (hord.trans hle) (fun k ↦ hzero f k)
+  obtain ⟨f, hf⟩ := sLocalPrincipalPartCoeff_any_contour_gaussian.{u}
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  obtain ⟨t, ht⟩ := exists_ne (1 : ℝ≥0ˣ)
+  obtain ⟨u, hu⟩ := QuotientGroup.mk_surjective (σ t)
+  have hmu : sIdeleQuotientNorm F S (QuotientGroup.mk u) ≠ 1 := by
+    rw [hu, hσ t]; exact ht
+  let m : ℝ := ((sIdeleQuotientNorm F S (QuotientGroup.mk u) : ℝ≥0) : ℝ)
+  have hmpos : 0 < m := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hm1 : m ≠ 1 := by
+    intro h1
+    exact hmu (Units.val_eq_one.mp (NNReal.coe_eq_one.mp h1))
+  let τf := schwartzBruhatUnitTranslate u f
+  have hrel (x : ℝ) (hx : 0 < x) : sLocalIdelicZFunction τf (tw c₁ x) =
+      ((m ^ x : ℝ) : ℂ) * sLocalIdelicZFunction f (tw c₁ x) := by
+    have hp : (x : ℂ) ∈ Complex.re ⁻¹' Ioi (0 : ℝ) := by simpa using hx
+    rw [sLocalIdelicZFunction_eq_integral τf ⟨χ, _, hp, rfl⟩,
+      sLocalIdelicZFunction_eq_integral f ⟨χ, _, hp, rfl⟩,
+      sLocalPrincipalPartCoeff_eigendistribution_translate]
+    congr 1
+    change ((circleToComplex).comp χ) _ * ((m : ℝ) : ℂ) ^ (x : ℂ) = _
+    rw [Complex.ofReal_cpow hmpos.le]
+    change ((1 : Circle) : ℂ) * _ = _
+    rw [Circle.coe_one, one_mul]
+  obtain ⟨a, ha⟩ := hpoleF f
+  obtain ⟨b, hb⟩ := hpoleF τf
+  have hev : ∀ᶠ x : ℝ in 𝓝[>] (0 : ℝ), sLocalIdelicZFunction f (tw c₁ (x : ℂ)) = a * (x : ℂ)⁻¹ ∧
+      sLocalIdelicZFunction τf (tw c₁ (x : ℂ)) = b * (x : ℂ)⁻¹ := by
+    have hT : Tendsto (fun x : ℝ ↦ (x : ℂ)) (𝓝[>] 0) (𝓝[≠] 0) :=
+      tendsto_nhdsWithin_of_tendsto_nhds_of_eventually_within _
+        ((Complex.continuous_ofReal.tendsto' 0 0 (by simp)).mono_left nhdsWithin_le_nhds)
+        (eventually_nhdsWithin_of_forall fun x (hx : 0 < x) ↦ by
+          simpa using hx.ne')
+    exact hT.eventually (ha.and hb)
+  obtain ⟨δ, hδ, hδs⟩ := mem_nhdsGT_iff_exists_Ioo_subset.mp hev
+  have hpt (x : ℝ) (hx : x ∈ Ioo 0 δ) : b = ((m ^ x : ℝ) : ℂ) * a := by
+    obtain ⟨e1, e2⟩ := hδs hx
+    have e := hrel x hx.1
+    rw [e1, e2] at e
+    have hx0 : (x : ℂ) ≠ 0 := by exact_mod_cast hx.1.ne'
+    have e' : b * (x : ℂ)⁻¹ = ((m ^ x : ℝ) : ℂ) * a * (x : ℂ)⁻¹ := by rw [e]; ring
+    exact mul_right_cancel₀ (inv_ne_zero hx0) e'
+  have hδ0 : (0 : ℝ) < δ := hδ
+  have ha0 : a = 0 := by
+    have p1 := hpt (δ / 2) ⟨by positivity, by linarith⟩
+    have p2 := hpt (δ / 3) ⟨by positivity, by linarith⟩
+    have hne : m ^ (δ / 2) ≠ m ^ (δ / 3) := by
+      intro he
+      have := congrArg Real.log he
+      rw [Real.log_rpow hmpos, Real.log_rpow hmpos] at this
+      have hl := Real.log_ne_zero_of_pos_of_ne_one hmpos hm1
+      have := mul_right_cancel₀ hl this
+      linarith
+    have hne' : ((m ^ (δ / 2) : ℝ) : ℂ) - ((m ^ (δ / 3) : ℝ) : ℂ) ≠ 0 :=
+      sub_ne_zero.mpr (by exact_mod_cast hne)
+    have : (((m ^ (δ / 2) : ℝ) : ℂ) - ((m ^ (δ / 3) : ℝ) : ℂ)) * a = 0 := by
+      rw [sub_mul, ← p1, ← p2, sub_self]
+    exact (mul_eq_zero.mp this).resolve_left hne'
+  -- the identity theorem
+  have h0 : meromorphicOrderAt (fun z ↦ sLocalIdelicZFunction f (tw c₁ z)) 0 = ⊤ := by
+    rw [meromorphicOrderAt_eq_top_iff]
+    filter_upwards [ha] with z hz
+    rw [hz, ha0, zero_mul]
+  have h12 := (hZm f).meromorphicOrderAt_eq_top_of_isPreconnected isPreconnected_univ
+    (mem_univ 0) (mem_univ (1 / 2)) h0
+  rw [meromorphicOrderAt_eq_top_iff] at h12
+  have hopen : IsOpen (Complex.re ⁻¹' Ioi (0 : ℝ)) := isOpen_Ioi.preimage Complex.continuous_re
+  have hhalf : (1 / 2 : ℂ) ∈ Complex.re ⁻¹' Ioi (0 : ℝ) := by
+    show (0 : ℝ) < (1 / 2 : ℂ).re
+    norm_num
+  have hcont : ContinuousAt (fun z ↦ sLocalIdelicZFunction f (tw c₁ z)) (1 / 2) :=
+    (((sLocalIdelicZetaIntegral_analyticOn f χ) _ hhalf).congr
+      (Filter.eventually_of_mem (hopen.mem_nhds hhalf) fun z hz ↦
+        (sLocalIdelicZFunction_eq_integral f ⟨χ, z, hz, rfl⟩).symm)).continuousAt
+  have hv : sLocalIdelicZFunction f (tw c₁ (1 / 2)) = 0 :=
+    tendsto_nhds_unique (hcont.tendsto.mono_left nhdsWithin_le_nhds)
+      (tendsto_const_nhds.congr' (h12.mono fun z hz ↦ hz.symm))
+  exact hf hv
+
+/-- Paper: Equation (7.2.1.8), p. 334.
+Over ℚ with only the real place, a nonnegative nonzero even bump on 2 < |x| < 3
+has positive first Mellin derivative at zero and zero integral in the formula for
+index one on a small circle. Independently of the subscript convention, at index
+zero the Gaussian on the positive circle of center −1 and radius 3/2 picks up the
+additional residue π of Γℝ(z)/z at −2. -/
+theorem sLocalPrincipalPartCoeff_any_contour_false :
+    ¬ sLocalPrincipalPartCoeff_any_contour :=
+  sLocalPrincipalPartCoeff_any_contour_false_aux
 
 end Printed
 end RiemannMasullo

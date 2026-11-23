@@ -64,11 +64,139 @@ variable [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
   [SecondCountableTopology G] [BorelSpace G]
   (hH : IsClosed (H : Set G)) (μH : Measure H) [μH.IsHaarMeasure]
 
+/-- Fibre integrals of a compactly supported real function are the values of its
+pushforward to the quotient. -/
+private theorem exists_indentation_fibre {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [MeasurableSpace G] (H : Subgroup G) [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [SecondCountableTopology G] [BorelSpace G]
+    (hH : IsClosed (H : Set G)) (μH : Measure H) [μH.IsHaarMeasure] (f : C_c(G, ℝ)) (x : G) :
+    Integrable (fun h : H ↦ f ((h : G)⁻¹ * x)) μH ∧
+      (∫ h : H, f ((h : G)⁻¹ * x) ∂μH) =
+        (TopologicalGroup.IsSES.ofClosedSubgroup H hH).pushforward μH f
+          (QuotientGroup.mk' H x) := by
+  let : LocallyCompactSpace H := hH.locallyCompactSpace
+  let : TopologicalSpace.PseudoMetrizableSpace H :=
+    hH.isClosedEmbedding_subtypeVal.isInducing.pseudoMetrizableSpace
+  let e := TopologicalGroup.IsSES.ofClosedSubgroup H hH
+  have hinv (h : H) : e.pullback f x h⁻¹ = f ((h : G)⁻¹ * x) := by
+    rw [e.pullback_def]
+    simp [mul_comm]
+  constructor
+  · simpa only [hinv] using ((e.pullback f x).integrable (μ := μH)).comp_inv
+  · change _ = e.pushforward μH f (QuotientGroup.mk' H x)
+    rw [e.pushforward_apply_apply]
+    simpa only [hinv] using (integral_inv_eq_self (e.pullback f x) μH)
+
 include hH in
 /-- Paper: Lemma 12.2.1.1(1)–(3), p. 504. Every closed subgroup with a choice of
 Haar measure has an indentation. The fibre integral is identically one on the group,
 which entails continuity and invariance. -/
-theorem exists_indentation : ∃ b : G → ℝ, IsIndentation H μH b := by sorry
+theorem exists_indentation : ∃ b : G → ℝ, IsIndentation H μH b := by
+  classical
+  have : IsClosed (H : Set G) := hH
+  let e := TopologicalGroup.IsSES.ofClosedSubgroup H hH
+  have hπc : Continuous π := continuous_quot_mk
+  have hπ (x : G) (h : H) : π ((h : G)⁻¹ * x) = π x := by
+    have h1 : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
+    rw [map_mul, map_inv, h1, inv_one, one_mul]
+  have hbump : ∀ q : Q, ∃ g : C_c(G, ℝ), 0 ≤ (g : G → ℝ) ∧ g q.out ≠ 0 := by
+    intro q
+    obtain ⟨g, hgc, hg0, hgx⟩ := exists_continuous_nonneg_pos (q.out)
+    exact ⟨⟨g, hgc⟩, hg0, hgx⟩
+  choose g hg0 hgx using hbump
+  let U : Q → Set Q := fun q ↦ π '' Function.support (g q)
+  have hUo : ∀ q, IsOpen (U q) := fun q ↦
+    QuotientGroup.isOpenMap_coe _ (g q).continuous.isOpen_support
+  have hUc : (univ : Set Q) ⊆ ⋃ q, U q := fun q _ ↦
+    mem_iUnion.2 ⟨q, q.out, hgx q, by simp⟩
+  obtain ⟨ρ, hρ⟩ := PartitionOfUnity.exists_isSubordinate isClosed_univ U hUo hUc
+  let P : Q → Q → ℝ := fun q y ↦ e.pushforward μH (g q) y
+  let φ : G → ℝ := fun x ↦ ∑ᶠ q, ρ q (π x) * g q x
+  let A : G → ℝ := fun x ↦ ∑ᶠ q, ρ q (π x) * P q (π x)
+  have hφc : Continuous φ := by
+    refine continuous_finsum (fun q ↦ ((ρ q).continuous.comp hπc).mul (g q).continuous) ?_
+    exact (ρ.locallyFinite.preimage_continuous hπc).subset fun q ↦
+      Function.support_mul_subset_left _ _
+  have hAc : Continuous A := by
+    have := ρ.continuous_finsum_smul (g := P) (fun q x _ ↦ (e.pushforward μH (g q)).continuous.continuousAt)
+    exact this.comp hπc
+  have hφ0 : ∀ x, 0 ≤ φ x := fun x ↦
+    finsum_nonneg fun q ↦ mul_nonneg (ρ.nonneg _ _) (hg0 q x)
+  -- the fibre integral of φ is A
+  have hfib : ∀ x, Integrable (fun h : H ↦ φ ((h : G)⁻¹ * x)) μH ∧
+      (∫ h : H, φ ((h : G)⁻¹ * x) ∂μH) = A x := by
+    intro x
+    set S := (ρ.locallyFinite.point_finite (π x)).toFinset
+    have hS (y : G) (hy : π y = π x) (F : Q → ℝ) :
+        (∑ᶠ q, ρ q (π y) * F q) = ∑ q ∈ S, ρ q (π x) * F q := by
+      rw [hy]
+      refine finsum_eq_sum_of_support_subset _ fun q hq ↦ ?_
+      simp only [S, Set.Finite.coe_toFinset, mem_ofPred_eq]
+      exact left_ne_zero_of_mul hq
+    have hφS (h : H) : φ ((h : G)⁻¹ * x) = ∑ q ∈ S, ρ q (π x) * g q ((h : G)⁻¹ * x) :=
+      hS _ (hπ x h) fun q ↦ g q ((h : G)⁻¹ * x)
+    simp only [hφS]
+    refine ⟨integrable_finsetSum _ fun q _ ↦
+      ((exists_indentation_fibre H hH μH (g q) x).1.const_mul _), ?_⟩
+    rw [integral_finsetSum _ fun q _ ↦
+      ((exists_indentation_fibre H hH μH (g q) x).1.const_mul _)]
+    simp only [integral_const_mul, (exists_indentation_fibre H hH μH (g _) x).2]
+    exact (hS x rfl fun q ↦ P q (π x)).symm
+  have hP0 : ∀ q x, 0 ≤ P q (π x) := fun q x ↦ by
+    show 0 ≤ e.pushforward μH (g q) (π x)
+    rw [← (exists_indentation_fibre H hH μH (g q) x).2]
+    exact integral_nonneg fun h ↦ hg0 q _
+  have hApos : ∀ x, 0 < A x := by
+    intro x
+    obtain ⟨q, hq⟩ := ρ.exists_pos (mem_univ (π x))
+    obtain ⟨y, hy, hyx⟩ := hρ q (subset_tsupport _ hq.ne')
+    have hyx' : x * y⁻¹ ∈ H := by
+      have := QuotientGroup.eq.mp hyx
+      simpa [mul_comm] using this
+    have hP : 0 < P q (π x) := by
+      obtain ⟨hint, heq⟩ := exists_indentation_fibre H hH μH (g q) x
+      show 0 < e.pushforward μH (g q) (π x)
+      rw [← heq]
+      refine integral_pos_of_integrable_nonneg_ne_zero (x := ⟨x * y⁻¹, hyx'⟩) ?_ hint
+        (fun h ↦ hg0 q _) ?_
+      · exact (g q).continuous.comp ((continuous_subtype_val.inv).mul continuous_const)
+      · simpa using hy
+    have hfin : (Function.support fun q ↦ ρ q (π x) * P q (π x)).Finite :=
+      (ρ.locallyFinite.point_finite (π x)).subset fun q hq ↦ left_ne_zero_of_mul hq
+    refine lt_of_lt_of_le (mul_pos hq hP) ?_
+    exact single_le_finsum q hfin fun j ↦ mul_nonneg (ρ.nonneg _ _) (hP0 j x)
+  let b : G → ℝ := fun x ↦ φ x / A x
+  have hT : IsClosed (⋃ q, π ⁻¹' tsupport (ρ q) ∩ tsupport (g q)) :=
+    ((ρ.locallyFinite_tsupport.preimage_continuous hπc).subset
+      fun q ↦ inter_subset_left).isClosed_iUnion
+      fun q ↦ ((isClosed_tsupport _).preimage hπc).inter (isClosed_tsupport _)
+  have hsupp : tsupport b ⊆ ⋃ q, π ⁻¹' tsupport (ρ q) ∩ tsupport (g q) := by
+    refine closure_minimal (fun x hx ↦ ?_) hT
+    have hφx : φ x ≠ 0 := fun h ↦ hx (by simp [b, h])
+    by_contra hnot
+    apply hφx
+    have hzero : ∀ q, ρ q (π x) * g q x = 0 := by
+      intro q
+      by_contra hq
+      exact hnot (mem_iUnion.2 ⟨q, subset_tsupport _ (left_ne_zero_of_mul hq),
+        subset_tsupport _ (right_ne_zero_of_mul hq)⟩)
+    simp only [φ, hzero, finsum_zero]
+  refine ⟨b, hφc.div hAc fun x ↦ (hApos x).ne', fun x ↦ div_nonneg (hφ0 x) (hApos x).le,
+    ?_, ?_⟩
+  · intro K hK
+    have hL : IsCompact (π '' K) := hK.image hπc
+    have hF := ρ.locallyFinite_tsupport.finite_nonempty_inter_compact hL
+    refine (hF.isCompact_biUnion fun q _ ↦ (g q).hasCompactSupport).of_isClosed_subset
+      ((isClosed_tsupport _).inter (hL.isClosed.preimage hπc)) ?_
+    rintro x ⟨hx, hxK⟩
+    obtain ⟨q, hq1, hq2⟩ := mem_iUnion.1 (hsupp hx)
+    exact mem_biUnion ⟨π x, hq1, hxK⟩ hq2
+  · intro x
+    have hAx (h : H) : A ((h : G)⁻¹ * x) = A x := by simp only [A, hπ]
+    obtain ⟨hint, heq⟩ := hfib x
+    simp only [b, hAx]
+    refine ⟨hint.div_const _, ?_⟩
+    rw [integral_div, heq, div_self (hApos x).ne']
 
 /-- Paper: (12.2.1.8), p. 506. Lift a quotient function by pulling it back and
 multiplying by the indentation. -/
@@ -947,12 +1075,134 @@ theorem integrable_diagonalIndentationLift_right :
   simpa only [hswap] using
     integrable_diagonalIndentationLift_left H hH hν hS hb hu hdiag hi
 
+/-- Summing the averaged indentation weight over the translates of the first coordinate gives
+one, since the indentation sums to one over each orbit. -/
+private theorem integral_diagonalIndentationLift_left_weight [Countable H]
+    (hb₀ : IsIndentation H Measure.count b) (x : G) :
+    Integrable (fun h : H ↦ diagonalIndentationWeight H countH b ((h : G)⁻¹ * x, x)) countH ∧
+      ∫ h : H, diagonalIndentationWeight H countH b ((h : G)⁻¹ * x, x) ∂countH = 1 := by
+  obtain ⟨hβi, hβ1⟩ := hb₀.2.2.2 x
+  let β : H → ℝ := fun h ↦ b ((h : G)⁻¹ * x)
+  have hβ0 (h : H) : 0 ≤ β h := hb₀.2.1 _
+  have hcount (f : H → ℝ) (hf : Integrable f countH) : ∫ h, f h ∂countH = ∑' h, f h := by
+    rw [integral_countable hf]
+    simp
+  have hβs : Summable β := (integrable_count_iff.mp hβi).of_norm
+  have hβsum : ∑' h, β h = 1 := (hcount β hβi).symm.trans hβ1
+  have hβle (k : H) : β k ≤ 1 := hβsum ▸ hβs.le_tsum k fun j _ ↦ hβ0 j
+  have hts (h : H) : Summable fun k ↦ β (h * k) * β k :=
+    Summable.of_nonneg_of_le (fun k ↦ mul_nonneg (hβ0 _) (hβ0 _))
+      (fun k ↦ mul_le_of_le_one_left (hβ0 k) (hβle _)) hβs
+  have hW (h : H) : diagonalIndentationWeight H countH b ((h : G)⁻¹ * x, x) =
+      ∑' k, β (h * k) * β k := by
+    have hfun : (fun k : H ↦ b ((k : G)⁻¹ * ((h : G)⁻¹ * x)) * b ((k : G)⁻¹ * x)) =
+        fun k ↦ β (h * k) * β k := by
+      funext k
+      simp only [β, Subgroup.coe_mul, mul_inv_rev, mul_assoc]
+    change (∫ k : H, b ((k : G)⁻¹ * ((h : G)⁻¹ * x)) * b ((k : G)⁻¹ * x) ∂countH) = _
+    rw [hfun]
+    exact hcount _ (integrable_count_iff.mpr ((hts h).congr fun k ↦
+      (Real.norm_of_nonneg (mul_nonneg (hβ0 _) (hβ0 _))).symm))
+  have hW0 (h : H) : 0 ≤ ∑' k, β (h * k) * β k :=
+    tsum_nonneg fun k ↦ mul_nonneg (hβ0 _) (hβ0 _)
+  have hβE : ∑' k, ENNReal.ofReal (β k) = 1 := by
+    rw [← ENNReal.ofReal_tsum_of_nonneg hβ0 hβs, hβsum, ENNReal.ofReal_one]
+  have htot : ∑' h, ENNReal.ofReal (∑' k, β (h * k) * β k) = 1 := by
+    have hE (h : H) : ENNReal.ofReal (∑' k, β (h * k) * β k) =
+        ∑' k, ENNReal.ofReal (β (h * k)) * ENNReal.ofReal (β k) := by
+      rw [ENNReal.ofReal_tsum_of_nonneg (fun k ↦ mul_nonneg (hβ0 _) (hβ0 _)) (hts h)]
+      exact tsum_congr fun k ↦ ENNReal.ofReal_mul (hβ0 _)
+    have hshift (k : H) : ∑' h, ENNReal.ofReal (β (h * k)) = 1 :=
+      ((Equiv.mulRight k).tsum_eq fun h ↦ ENNReal.ofReal (β h)).trans hβE
+    simp_rw [hE]
+    rw [ENNReal.tsum_comm]
+    simp_rw [ENNReal.tsum_mul_right, hshift, one_mul]
+    exact hβE
+  have hne (h : H) : ENNReal.ofReal (∑' k, β (h * k) * β k) ≠ ⊤ := ENNReal.ofReal_ne_top
+  have hsum : Summable fun h ↦ ∑' k, β (h * k) * β k := by
+    simpa only [ENNReal.toReal_ofReal (hW0 _)] using
+      ENNReal.summable_toReal (htot.trans_ne ENNReal.one_ne_top)
+  have hint : Integrable (fun h : H ↦ diagonalIndentationWeight H countH b ((h : G)⁻¹ * x, x))
+      countH := by
+    simp only [hW]
+    exact integrable_count_iff.mpr (hsum.congr fun h ↦ (Real.norm_of_nonneg (hW0 _)).symm)
+  refine ⟨hint, ?_⟩
+  rw [hcount _ hint]
+  simp only [hW]
+  have := ENNReal.tsum_toReal_eq hne
+  rw [htot, ENNReal.toReal_one] at this
+  simpa only [ENNReal.toReal_ofReal (hW0 _)] using this.symm
+
+/-- Two elements lie in the same orbit of the subgroup acting by left multiplication exactly
+when they have the same coset. -/
+private theorem integral_diagonalIndentationLift_left_orbit (x y : G) :
+    Quotient.mk (MulAction.orbitRel H G) x = Quotient.mk (MulAction.orbitRel H G) y ↔
+      (QuotientGroup.mk x : G ⧸ H) = QuotientGroup.mk y := by
+  rw [Quotient.eq, MulAction.orbitRel_apply, QuotientGroup.eq]
+  constructor
+  · rintro ⟨h, hh⟩
+    have hx : (h : G) * y = x := hh
+    have e : ((h : G) * y)⁻¹ * y = (h : G)⁻¹ := by
+      rw [mul_inv_rev, mul_comm y⁻¹, mul_assoc, inv_mul_cancel, mul_one]
+    rw [← hx, e]
+    exact H.inv_mem h.property
+  · intro hxy
+    refine ⟨⟨(x⁻¹ * y)⁻¹, H.inv_mem hxy⟩, ?_⟩
+    change (x⁻¹ * y)⁻¹ * y = x
+    rw [mul_inv_rev, inv_inv, mul_comm y⁻¹ x, mul_assoc, inv_mul_cancel, mul_one]
+
 include hH hν hS hb hu hdiag hi in
 /-- Paper: Proposition 12.2.2.2(2), p. 508. The integral of the smoothened quotient diagonal
 equals the integral of the first skew diagonal, integrating subgroup translates first. -/
 theorem integral_diagonalIndentationLift_left :
     (∫ q, uSmooth (q, q) ∂ν) =
-      ∫ x in D, ∫ h : H, Ψ uSmooth ((h : G)⁻¹ * x, x) ∂countH ∂μ := by sorry
+      ∫ x in D, ∫ h : H, Ψ uSmooth ((h : G)⁻¹ * x, x) ∂countH ∂μ := by
+  let : Countable H := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
+  let : IsClosed (H : Set G) := hH
+  have hinner (x : G) : ∫ h : H, Ψ uSmooth ((h : G)⁻¹ * x, x) ∂countH = uSmooth (π x, π x) := by
+    have hπ (h : H) : q₂ ((h : G)⁻¹ * x, x) = (π x, π x) := by
+      have h1 : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
+      simp only [Prod.map_apply, map_mul, map_inv, h1, inv_one, one_mul]
+    simp only [diagonalIndentationLift, hπ]
+    rw [integral_mul_const, integral_complex_ofReal,
+      (integral_diagonalIndentationLift_left_weight H hb x).2, Complex.ofReal_one, one_mul]
+  simp_rw [hinner]
+  obtain ⟨hD, -, -⟩ := hS
+  have hFD : IsFundamentalDomain H D μ := hD.isFundamentalDomain
+  obtain ⟨M, hMD, hMm, -⟩ := hFD.nullMeasurableSet.exists_measurable_subset_ae_eq
+  have hinjM : Set.InjOn (Quotient.mk (MulAction.orbitRel H G)) M := by
+    intro x hx y hy hxy
+    obtain ⟨h, hh⟩ := Quotient.eq.mp hxy
+    have hx' : (h : G) * y = x := hh
+    obtain ⟨a, -, ha⟩ := hD.2.1 y
+    have h1 : h = 1 := (ha h (show h • y ∈ D by
+        rw [Subgroup.smul_def, smul_eq_mul, hx']; exact hMD hx)).trans
+      (ha 1 (show (1 : H) • y ∈ D by rw [one_smul]; exact hMD hy)).symm
+    rw [← hx', h1, OneMemClass.coe_one, one_mul]
+  obtain ⟨Δ, hΔm, -, hΔb⟩ := exists_borel_orbit_transversal hMm hinjM
+  have hbij : Function.Bijective (fun x : Δ ↦ (QuotientGroup.mk x.val : G ⧸ H)) := by
+    refine ⟨fun x y hxy ↦ hΔb.injective
+      ((integral_diagonalIndentationLift_left_orbit H _ _).mpr hxy), fun q ↦ ?_⟩
+    obtain ⟨g, rfl⟩ := QuotientGroup.mk_surjective q
+    obtain ⟨x, hx⟩ := hΔb.surjective (Quotient.mk (MulAction.orbitRel H G) g)
+    exact ⟨x, (integral_diagonalIndentationLift_left_orbit H _ _).mp hx⟩
+  have hΔFD : IsFundamentalDomain H Δ μ := by
+    refine IsFundamentalDomain.mk' hΔm.nullMeasurableSet fun x ↦ ?_
+    obtain ⟨y, hy⟩ := hΔb.surjective (Quotient.mk (MulAction.orbitRel H G) x)
+    obtain ⟨h, hh⟩ := Quotient.eq.mp hy
+    have hh' : h • x = y.val := hh
+    refine ⟨h, show h • x ∈ Δ by rw [hh']; exact y.property, fun h' hh₂ ↦ ?_⟩
+    have hh₂' : h' • x ∈ Δ := hh₂
+    have hsame : (⟨h' • x, hh₂'⟩ : Δ) = y :=
+      hΔb.injective ((Quotient.sound (s := MulAction.orbitRel H G) (a := h' • x) (b := x)
+        ⟨h', rfl⟩).trans hy.symm)
+    have hxy : (h' : G) * x = (h : G) * x := (congrArg Subtype.val hsame).trans hh'.symm
+    exact Subtype.ext (mul_right_cancel hxy)
+  rw [weilFundamentalDomain_integral H hH μ hΔm hbij ν hν hi]
+  refine hΔFD.setIntegral_eq hFD fun h x ↦ ?_
+  have h1 : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
+  change uSmooth (π ((h : G) * x), π ((h : G) * x)) = uSmooth (π x, π x)
+  rw [map_mul, h1, one_mul]
 
 include hH hν hS hb hu hdiag hi in
 /-- Paper: (12.2.2.5), p. 508. The first skew-diagonal integral is unchanged by
@@ -1222,6 +1472,113 @@ theorem diagonalIndentationTail_of_notMem (μH : Measure H) (b : G → ℝ) (v :
       diagonalIndentationLift H μH b v (x, y) := by
   simp [diagonalIndentationTail, hy]
 
+/-- Integrals for the counting measure transported along an injective map whose range
+contains the support. -/
+private theorem exists_indentation_tendsto_tail_count {A B : Type*} [MeasurableSpace A]
+    [MeasurableSpace B] [Countable A] [Countable B] [MeasurableSingletonClass A]
+    [MeasurableSingletonClass B] (j : A → B) (hj : Function.Injective j) (f : B → ℝ)
+    (hf : ∀ y ∉ range j, f y = 0) (hint : Integrable (fun x ↦ f (j x)) Measure.count) :
+    Integrable f Measure.count ∧ (∫ y, f y ∂Measure.count) = ∫ x, f (j x) ∂Measure.count := by
+  have hs : Summable fun y ↦ ‖f y‖ :=
+    (hj.summable_iff (f := fun y ↦ ‖f y‖) fun y hy ↦ by simp [hf y hy]).mp
+      (integrable_count_iff.mp hint)
+  have hI : Integrable f Measure.count := integrable_count_iff.mpr hs
+  refine ⟨hI, ?_⟩
+  rw [integral_countable hI, integral_countable hint]
+  simp only [count_real_singleton, one_smul]
+  exact (hj.tsum_eq fun y hy ↦ by_contra fun h ↦ hy (hf y h)).symm
+
+/-- Extension by zero of an indentation along an open embedding of groups whose range
+meets every coset of the subgroup. -/
+private theorem exists_indentation_tendsto_tail_extend {L A : Type*} [CommGroup L]
+    [TopologicalSpace L] [IsTopologicalGroup L] [MeasurableSpace L]
+    [CommGroup A] [TopologicalSpace A] [IsTopologicalGroup A] [MeasurableSpace A]
+    (HL : Subgroup L) (HA : Subgroup A) [Countable HL] [Countable HA]
+    [MeasurableSingletonClass HL] [MeasurableSingletonClass HA]
+    (hHL : IsClosed (HL : Set L)) (ι : A →* L) (hι : IsOpenEmbedding ι)
+    (hHA : ∀ a, a ∈ HA ↔ ι a ∈ HL) (c : L → ℝ) (u : A → ℝ) (hc : Continuous c)
+    (hcu : ∀ a, c (ι a) = u a) (hc0 : ∀ x ∉ range ι, c x = 0)
+    (hcover : ∀ x, ∃ h ∈ HL, h⁻¹ * x ∈ range ι) (hu : IsIndentation HA Measure.count u) :
+    IsIndentation HL Measure.count c := by
+  have : IsClosed (HL : Set L) := hHL
+  have hRc : IsClosed (range ι) := by
+    have h := Subgroup.isClosed_of_isOpen ι.range (by simpa using hι.isOpen_range)
+    simpa using h
+  have hsuppR : tsupport c ⊆ range ι :=
+    closure_minimal (fun x hx ↦ by_contra fun h ↦ hx (hc0 x h)) hRc
+  have htsupp : ι ⁻¹' tsupport c = tsupport u := by
+    rw [tsupport, hι.isOpenMap.preimage_closure_eq_closure_preimage hι.continuous]
+    congr 1
+    ext a
+    simp [hcu]
+  refine ⟨hc, fun x ↦ ?_, fun K hK ↦ ?_, fun x ↦ ?_⟩
+  · by_cases hx : x ∈ range ι
+    · obtain ⟨a, rfl⟩ := hx
+      rw [hcu]
+      exact hu.2.1 a
+    · rw [hc0 x hx]
+  · have hπ : Continuous (QuotientGroup.mk' HL) := continuous_quot_mk
+    have hcov : K ⊆ ⋃ k : L, (fun z ↦ k * z) '' range ι := fun k _ ↦
+      mem_iUnion.2 ⟨k, 1, ⟨1, map_one ι⟩, mul_one _⟩
+    obtain ⟨t, ht⟩ := hK.elim_finite_subcover _
+      (fun k ↦ isOpenMap_mul_left (k : L) _ hι.isOpen_range) hcov
+    choose hk hhk hk' using hcover
+    let Kk : L → Set A := fun k ↦
+      ι ⁻¹' ((fun z ↦ (hk k)⁻¹ * z) '' (K ∩ (fun z ↦ (k : L) * z) '' range ι))
+    have hKk : ∀ k, IsCompact (Kk k) := by
+      intro k
+      refine hι.isInducing.isCompact_preimage' ?_ ?_
+      · refine (hK.inter_right ?_).image (continuous_const.mul continuous_id)
+        exact (Homeomorph.mulLeft (k : L)).isClosedMap _ hRc
+      · rintro _ ⟨_, ⟨-, _, ⟨b', rfl⟩, rfl⟩, rfl⟩
+        obtain ⟨a', ha'⟩ := hk' k
+        exact ⟨a' * b', by rw [map_mul, ha', mul_assoc]⟩
+    have hsub : tsupport c ∩ QuotientGroup.mk' HL ⁻¹' (QuotientGroup.mk' HL '' K) ⊆
+        ⋃ k ∈ t, ι '' (tsupport u ∩ QuotientGroup.mk' HA ⁻¹' (QuotientGroup.mk' HA '' Kk k)) := by
+      rintro y ⟨hy, z, hzK, hzy⟩
+      obtain ⟨a, rfl⟩ := hsuppR hy
+      obtain ⟨k, hkt, hzk⟩ := mem_iUnion₂.1 (ht hzK)
+      obtain ⟨_, ⟨b', rfl⟩, rfl⟩ := hzk
+      obtain ⟨a', ha'⟩ := hk' k
+      refine mem_iUnion₂.2 ⟨k, hkt, a, ⟨?_, a' * b', ?_, ?_⟩, rfl⟩
+      · rw [← htsupp]
+        exact hy
+      · exact ⟨(k : L) * ι b', ⟨hzK, ι b', ⟨b', rfl⟩, rfl⟩, by rw [map_mul, ha', mul_assoc]⟩
+      · rw [QuotientGroup.mk'_apply, QuotientGroup.mk'_apply, QuotientGroup.eq, hHA]
+        have h1 := HL.mul_mem (hhk k) (QuotientGroup.eq.mp hzy)
+        convert h1 using 1
+        rw [map_mul, map_inv, map_mul, ha']
+        simp only [mul_inv_rev, inv_inv]
+        ac_rfl
+    refine (t.isCompact_biUnion fun k _ ↦ ((hu.2.2.1 _ (hKk k)).image hι.continuous))
+      |>.of_isClosed_subset ?_ hsub
+    exact (isClosed_tsupport c).inter
+      ((hK.image hπ).isClosed.preimage hπ)
+  · obtain ⟨h₀, hh₀, a₀, ha₀⟩ := hcover x
+    let j : HA → HL := fun a ↦ ⟨h₀ * ι a, HL.mul_mem hh₀ ((hHA a).1 a.2)⟩
+    have hj : Function.Injective j := fun a b hab ↦
+      Subtype.ext (hι.injective (mul_left_cancel (congrArg Subtype.val hab)))
+    have hval (a : HA) : c ((j a : L)⁻¹ * x) = u ((a : A)⁻¹ * a₀) := by
+      rw [← hcu, map_mul, map_inv, ha₀]
+      simp only [j, mul_inv_rev]
+      rw [mul_assoc]
+    have hf : ∀ h ∉ range j, c ((h : L)⁻¹ * x) = 0 := by
+      intro h hh
+      by_contra hne
+      obtain ⟨a, ha⟩ : (h : L)⁻¹ * x ∈ range ι := by_contra fun h' ↦ hne (hc0 _ h')
+      have hmem : a₀ * a⁻¹ ∈ HA := by
+        rw [hHA, map_mul, map_inv, ha₀, ha]
+        convert HL.mul_mem (HL.inv_mem hh₀) h.2 using 1
+        group
+      refine hh ⟨⟨_, hmem⟩, Subtype.ext ?_⟩
+      simp only [j, map_mul, map_inv, ha₀, ha]
+      group
+    obtain ⟨hint, heq⟩ := hu.2.2.2 a₀
+    have key := exists_indentation_tendsto_tail_count j hj (fun h : HL ↦ c ((h : L)⁻¹ * x)) hf
+      (by simpa only [hval] using hint)
+    simp only [hval] at key
+    exact ⟨key.1, key.2.trans heq⟩
+
 -- TODO(paper-gap): The closing citation on p. 513 refers to the tail definition
 -- (12.2.2.26); the convergence claim is (12.2.2.27).
 -- TODO(paper-gap): In (12.2.2.31), u₁ is only defined on G₀, but the inner integral
@@ -1246,7 +1603,112 @@ theorem exists_indentation_tendsto_tail (K : ℕ → Subgroup G)
           ((μ.restrict D).prod countH)) ∧
       Tendsto (fun n ↦ ∫ x in D, ∫ h : H,
         diagonalIndentationTail H countH c uSmooth (K n) (x, (h : G)⁻¹ * x) ∂countH ∂μ)
-          atTop (𝓝 0) := by sorry
+          atTop (𝓝 0) := by
+  -- the stage-wise fundamental domains and the rank condition are not needed
+  have _ := hDk
+  have _ := hKrank
+  classical
+  let : Countable H := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
+  have hK0c : IsClosed (K 0 : Set G) := Subgroup.isClosed_of_isOpen _ (hKopen 0)
+  have hcover : ∀ x : G, ∃ h ∈ H, h⁻¹ * x ∈ (K 0 : Set G) := by
+    intro x
+    obtain ⟨a, ha, -⟩ := hS.1.2.1 x
+    refine ⟨(a : G)⁻¹, H.inv_mem a.2, ?_⟩
+    rw [inv_inv]
+    exact hD₀ ha
+  let H₀ : Subgroup (K 0) := H.comap (K 0).subtype
+  let jH : H₀ → H := fun h ↦ ⟨h.1.1, h.2⟩
+  have hjH : Function.Injective jH := fun a b hab ↦
+    Subtype.ext (Subtype.ext (congrArg (fun h : H ↦ (h : G)) hab))
+  have : LocallyCompactSpace (K 0) := (hKopen 0).isOpenEmbedding_subtypeVal.locallyCompactSpace
+  have : SecondCountableTopology (K 0) :=
+    (hKopen 0).isOpenEmbedding_subtypeVal.isInducing.secondCountableTopology
+  have : DiscreteTopology H₀ := DiscreteTopology.of_continuous_injective
+    (f := jH) (by fun_prop) hjH
+  have : Countable H₀ := hjH.countable
+  have : (Measure.count : Measure H₀).IsHaarMeasure :=
+    { lt_top_of_isCompact := fun _ hs ↦ Measure.count_apply_lt_top.mpr hs.finite_of_discrete
+      open_pos := fun _ _ hs ↦ Measure.count_ne_zero hs }
+  obtain ⟨u₁, hu₁⟩ := exists_indentation H₀ (hH.preimage continuous_subtype_val)
+    (Measure.count : Measure H₀)
+  let c : G → ℝ := fun x ↦ if hx : x ∈ K 0 then u₁ ⟨x, hx⟩ else 0
+  have hcK (x : K 0) : c x = u₁ x := by simp [c]
+  have hc0 (x : G) (hx : x ∉ K 0) : c x = 0 := by simp [c, hx]
+  have hcont : Continuous c := by
+    refine continuous_iff_continuousAt.2 fun x ↦ ?_
+    by_cases hx : x ∈ K 0
+    · have h1 : ContinuousAt (c ∘ Subtype.val) (⟨x, hx⟩ : K 0) := by
+        have : c ∘ Subtype.val = u₁ := funext hcK
+        rw [this]
+        exact hu₁.1.continuousAt
+      exact (hKopen 0).isOpenEmbedding_subtypeVal.continuousAt_iff.1 h1
+    · refine continuousAt_const.congr (f := fun _ ↦ (0 : ℝ)) ?_
+      filter_upwards [hK0c.isOpen_compl.mem_nhds hx] with y hy
+      exact (hc0 y hy).symm
+  have hc : IsIndentation H countH c := by
+    refine exists_indentation_tendsto_tail_extend H H₀ hH (K 0).subtype
+      (hKopen 0).isOpenEmbedding_subtypeVal (fun a ↦ Iff.rfl) c u₁ hcont hcK
+      (fun x hx ↦ hc0 x fun hx0 ↦ hx ⟨⟨x, hx0⟩, rfl⟩) (fun x ↦ ?_) hu₁
+    obtain ⟨h, hh, hx⟩ := hcover x
+    exact ⟨h, hh, ⟨⟨_, hx⟩, rfl⟩⟩
+  have hrestrict : ∀ n, IsIndentation (H.comap (K n).subtype) Measure.count
+      (fun x : K n ↦ c x) := by
+    intro n
+    have hle : K 0 ≤ K n := hKmono (Nat.zero_le n)
+    let ι : K 0 →* K n := Subgroup.inclusion hle
+    have hι : IsOpenEmbedding ι := by
+      rw [← IsOpenEmbedding.of_comp_iff ι (hKopen n).isOpenEmbedding_subtypeVal]
+      exact (hKopen 0).isOpenEmbedding_subtypeVal
+    let jn : H.comap (K n).subtype → H := fun h ↦ ⟨h.1.1, h.2⟩
+    have hjn : Function.Injective jn := fun a b hab ↦
+      Subtype.ext (Subtype.ext (congrArg (fun h : H ↦ (h : G)) hab))
+    have : Countable (H.comap (K n).subtype) := hjn.countable
+    refine exists_indentation_tendsto_tail_extend (H.comap (K n).subtype) H₀
+      (hH.preimage continuous_subtype_val) ι hι (fun a ↦ Iff.rfl) _ u₁
+      (hcont.comp continuous_subtype_val) (fun a ↦ hcK a) ?_ ?_ hu₁
+    · intro x hx
+      exact hc0 x fun hx0 ↦ hx ⟨⟨x, hx0⟩, rfl⟩
+    · intro x
+      obtain ⟨h, hh, hx⟩ := hcover x
+      have hhn : h ∈ K n := by
+        have := (K n).mul_mem x.2 ((K n).inv_mem (hle hx))
+        simpa using this
+      exact ⟨⟨h, hhn⟩, hh, ⟨⟨_, hx⟩, rfl⟩⟩
+  have hF := integrable_diagonalIndentationLift_right H hH hν hS hc hu hdiag hi
+  have htail (n : ℕ) : (fun p : G × H ↦
+      diagonalIndentationTail H countH c uSmooth (K n) (p.1, (p.2 : G)⁻¹ * p.1)) =
+      ((fun p : G × H ↦ (p.2 : G)⁻¹ * p.1) ⁻¹' (K n : Set G)ᶜ).indicator
+        (fun p ↦ diagonalIndentationLift H countH c uSmooth (p.1, (p.2 : G)⁻¹ * p.1)) := by
+    funext p
+    simp only [diagonalIndentationTail, Set.indicator_apply, mem_preimage]
+  have hmeas (n : ℕ) :
+      MeasurableSet ((fun p : G × H ↦ (p.2 : G)⁻¹ * p.1) ⁻¹' (K n : Set G)ᶜ) :=
+    ((Subgroup.isClosed_of_isOpen _ (hKopen n)).isOpen_compl.preimage
+      (by fun_prop)).measurableSet
+  have hint (n : ℕ) : Integrable (fun p : G × H ↦
+      diagonalIndentationTail H countH c uSmooth (K n) (p.1, (p.2 : G)⁻¹ * p.1))
+        ((μ.restrict D).prod countH) := by
+    rw [htail n]
+    exact hF.indicator (hmeas n)
+  refine ⟨c, hc, hrestrict, hint, ?_⟩
+  have hlim := tendsto_integral_of_dominated_convergence
+    (F := fun n (p : G × H) ↦
+      diagonalIndentationTail H countH c uSmooth (K n) (p.1, (p.2 : G)⁻¹ * p.1))
+    (f := 0) (μ := (μ.restrict D).prod countH)
+    (fun p ↦ ‖diagonalIndentationLift H countH c uSmooth (p.1, (p.2 : G)⁻¹ * p.1)‖)
+    (fun n ↦ (hint n).aestronglyMeasurable) hF.norm
+    (fun n ↦ ae_of_all _ fun p ↦ by
+      simp only [diagonalIndentationTail]
+      exact norm_indicator_le_norm_self _ _)
+    (ae_of_all _ fun p ↦ by
+      obtain ⟨N, hN⟩ := mem_iUnion.1 (hKexhaust.symm ▸ mem_univ ((p.2 : G)⁻¹ * p.1))
+      refine tendsto_const_nhds.congr' ?_
+      filter_upwards [eventually_ge_atTop N] with n hn
+      have hpn : (p.2 : G)⁻¹ * p.1 ∈ K n := hKmono hn hN
+      simp [diagonalIndentationTail, hpn])
+  simp only [Pi.zero_apply, integral_zero] at hlim
+  refine hlim.congr fun n ↦ ?_
+  exact integral_prod _ (hint n)
 
 end Diagonal
 

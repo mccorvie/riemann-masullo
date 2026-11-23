@@ -4,7 +4,7 @@ public import RiemannMasullo.Ch10_TraceSpectral.Sec2
 public import RiemannMasullo.AppC_LCTVS.Sec3a_part2
 public import RiemannMasullo.Ch09_HardySobolev.Sec3
 public import Mathlib.Analysis.InnerProductSpace.ProdL2
-import all RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.Ch10_TraceSpectral.Sec1
 
 import all RiemannMasullo.Ch09_HardySobolev.Sec3
 
@@ -170,10 +170,42 @@ section Convolution
 
 variable (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (hs : 0 ≤ s)
 
+/-- A Pettis integral of translates of a vector in a closed invariant subspace of a
+Hilbert space stays in that subspace, since every vector orthogonal to it kills the integrand. -/
+private theorem hardySobolevTestAction_preserves_globalTheta_aux {X V : Type*}
+    [Group X] [MeasurableSpace X] (μ : Measure X) [NormedAddCommGroup V]
+    [InnerProductSpace ℂ V] [CompleteSpace V] (K : Submodule ℂ V) (hK : IsClosed (K : Set V))
+    (τ : X →* (V →L[ℂ] V)) (hτ : ∀ g, ∀ v ∈ K, τ g v ∈ K) {ψ : X → ℂ} {u b : V}
+    (hu : u ∈ K) (hb : HasPettisIntegral (.positive μ) (fun g ↦ ψ g • τ g u) b) : b ∈ K := by
+  have : CompleteSpace K := hK.completeSpace_coe
+  rw [← K.orthogonal_orthogonal]
+  intro w hw
+  have hδ := congrArg
+    (fun z : PettisWeakCompletion V ↦ (show Module.Dual ℂ (StrongDual ℂ V) from z)
+      (innerSL ℂ w)) hb.2
+  change innerSL ℂ w b = ∫ g, innerSL ℂ w (ψ g • τ g u) ∂μ at hδ
+  rw [innerSL_apply_apply] at hδ
+  rw [hδ]
+  refine integral_eq_zero_of_ae (.of_forall fun g ↦ ?_)
+  change innerSL ℂ w (ψ g • τ g u) = 0
+  rw [innerSL_apply_apply]
+  exact (K.mem_orthogonal' w).mp hw _ (K.smul_mem _ (hτ g u hu))
+
 /-- Paper: (10.3.1.2), p. 448, and (10.3.2.2), p. 454. Convolution with a
 test preserves the closed weighted theta subspace, so it descends to the quotient. -/
 theorem hardySobolevTestAction_preserves_globalTheta (φ : BruhatCompactSupport C𝔽) :
-    Θ(a, hI, hs) ≤ ((Θ(a, hI, hs)).mkQL.comp (testAction(l, r, s, hI, hs) φ)).ker := by sorry
+    Θ(a, hI, hs) ≤ ((Θ(a, hI, hs)).mkQL.comp (testAction(l, r, s, hI, hs) φ)).ker := by
+  intro v hv
+  obtain ⟨ρ, hρ, -, -⟩ := exists_globalThetaSobolevAction (F := F) a hI hs
+  have hinv : ∀ g, ∀ w ∈ Θ(a, hI, hs), hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs g w ∈
+      Θ(a, hI, hs) := fun g w hw ↦ by
+    rw [← hρ g ⟨w, hw⟩]
+    exact (ρ g ⟨w, hw⟩).property
+  have hmem := hardySobolevTestAction_preserves_globalTheta_aux μ𝔽 (Θ(a, hI, hs))
+    (Submodule.isClosed_topologicalClosure _) (hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs)
+    hinv hv (bruhatRegularizedAction_apply μ𝔽 (hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs)
+      (exists_hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs).choose_spec.2 φ v)
+  exact (Submodule.Quotient.mk_eq_zero (Θ(a, hI, hs))).mpr hmem
 
 /-- Paper: (10.3.1.2), p. 448, and (10.3.2.2), p. 454. The spectral convolution
 operator is the descended Hardy–Sobolev test action. -/
@@ -306,6 +338,40 @@ theorem spectralIsotypeConvolution_mkQ (ω : PontryaginDual C₁) (φ : BruhatCo
     (hardySobolevTestAction_preserves_spectralIsotypeTheta (F := F) a hI hs ω φ) v)
   with_reducible_and_instances exact h.trans (Submodule.mkQL_apply _ _)
 
+private theorem spectralConvolution_range_isotype_aux {X V : Type*}
+    [CommGroup X] [TopologicalSpace X] [IsTopologicalGroup X] [MeasurableSpace X]
+    [BorelSpace X] (μ : Measure X) [μ.IsHaarMeasure]
+    [AddCommGroup V] [Module ℂ V] [TopologicalSpace V] [IsTopologicalAddGroup V]
+    [ContinuousSMul ℂ V] [SeparatingDual ℂ V]
+    (τ : X →* (V →L[ℂ] V)) (ψ : X → ℂ) (k : X) (c : ℂ)
+    (hψ : ∀ g, ψ (k⁻¹ * g) = c * ψ g) (u a : V)
+    (ha : HasPettisIntegral (.positive μ) (fun g ↦ ψ g • τ g u) a) :
+    τ k a = c • a := by
+  have ev (δ : StrongDual ℂ V) : δ a = ∫ g, δ (ψ g • τ g u) ∂μ :=
+    congrArg (fun z : PettisWeakCompletion V ↦
+      (show Module.Dual ℂ (StrongDual ℂ V) from z) δ) ha.2
+  apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+  intro δ
+  have hδ := ev (δ.comp (τ k))
+  rw [ContinuousLinearMap.comp_apply] at hδ
+  calc
+    δ (τ k a) = ∫ g, δ (τ k (ψ g • τ g u)) ∂μ := hδ
+    _ = ∫ g, δ (ψ g • τ (k * g) u) ∂μ := by
+      apply integral_congr_ae (.of_forall fun g ↦ ?_)
+      rw [(τ k).map_smul, map_mul]
+      rfl
+    _ = ∫ g, δ (ψ (k⁻¹ * g) • τ g u) ∂μ := by
+      rw [← integral_mul_left_eq_self
+        (fun g ↦ δ (ψ (k⁻¹ * g) • τ g u)) k]
+      apply integral_congr_ae (.of_forall fun g ↦ ?_)
+      simp
+    _ = c * ∫ g, δ (ψ g • τ g u) ∂μ := by
+      rw [← integral_const_mul]
+      apply integral_congr_ae (.of_forall fun g ↦ ?_)
+      rw [hψ g, mul_smul, map_smul]
+      simp
+    _ = δ (c • a) := by rw [← ev δ, map_smul]; rfl
+
 /-- Paper: Theorems 10.3.1.1(3), p. 449, and 10.3.2.1(3), p. 454.
 The full quotient action of an isotypic test has range in the corresponding quotient isotype.
 Deviation: For left translation φ(x) ↦ φ(k⁻¹x), the weight is ω as an
@@ -313,7 +379,21 @@ eigencharacter. Equivalently the pointwise covariance is φ(kx) = ω⁻¹(k)φ(x
 theorem spectralConvolution_range_isotype (ω : PontryaginDual C₁) (φ : BruhatCompactSupport C𝔽)
     (_hφ : ∀ (k : C₁) (x : C𝔽), φ.val (k.val⁻¹ * x) = (ω k : ℂ) * φ.val x) :
     range (spectralConvolution (F := F) a hI hs φ) ⊆
-      range (fun v : Wω(hI, hs, ω) ↦ (Θ(a, hI, hs)).mkQ v.val) := by sorry
+      range (fun v : Wω(hI, hs, ω) ↦ (Θ(a, hI, hs)).mkQ v.val) := by
+  have hW (v : W(l, r, s)) :
+      testAction(l, r, s, hI, hs) φ v ∈ Wω(hI, hs, ω) := by
+    rw [mem_actionIsotype]
+    intro k
+    exact spectralConvolution_range_isotype_aux μ𝔽
+      (hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs) φ.val k.val (ω k : ℂ)
+      (_hφ k) v _ (bruhatRegularizedAction_apply μ𝔽
+        (hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs)
+        (exists_hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs).choose_spec.2 φ v)
+  intro y hy
+  obtain ⟨x, rfl⟩ := hy
+  obtain ⟨v, rfl⟩ := Submodule.mkQ_surjective (Θ(a, hI, hs)) x
+  exact ⟨⟨testAction(l, r, s, hI, hs) φ v, hW v⟩,
+    spectralConvolution_mkQ (F := F) a hI hs φ v⟩
 
 end Convolution
 
@@ -495,11 +575,218 @@ theorem spectralConvolutionFiniteSum_limit_of_traceCauchy {ι Z : Type*}
     exact hj.2.trans_lt ((min_le_left _ _).trans_lt (half_lt_self hε))
   exact hzero.rpow_const_nhds_zero (one_div_pos.mpr (zero_lt_one.trans_le hp))
 
+/-- An operator whose range lies in a subspace of dimension at most `r` is a sum of
+`r` rank-one operators whose functionals have norm at most that of the operator and
+whose vectors have norm at most one. -/
+private theorem isStronglyNuclearBanachOperator_of_rapid_approximationNumbers_rankOne
+    (V : Submodule ℂ H) [FiniteDimensional ℂ V] (D : H →L[ℂ] H) (hD : ∀ x, D x ∈ V)
+    (r : ℕ) (hr : Module.finrank ℂ V ≤ r) :
+    ∃ (Λ : ℕ → StrongDual ℂ H) (y : ℕ → H), (∀ i, ‖Λ i‖ ≤ ‖D‖ ∧ ‖y i‖ ≤ 1) ∧
+      ∑ i ∈ Finset.range r, (Λ i).smulRight (y i) = D := by
+  classical
+  let b := stdOrthonormalBasis ℂ V
+  let d := Module.finrank ℂ V
+  let y : ℕ → H := fun i ↦ if h : i < d then (b ⟨i, h⟩ : H) else 0
+  have hy (i : ℕ) : ‖y i‖ ≤ 1 := by
+    by_cases h : i < d
+    · simp only [y, h, ↓reduceDIte, Submodule.norm_coe]
+      exact (b.orthonormal.1 _).le
+    · simp [y, h]
+  refine ⟨fun i ↦ (innerSL ℂ (y i)).comp D, y, fun i ↦ ⟨?_, hy i⟩, ?_⟩
+  · calc ‖(innerSL ℂ (y i)).comp D‖ ≤ ‖innerSL ℂ (y i)‖ * ‖D‖ := ContinuousLinearMap.opNorm_comp_le _ _
+      _ ≤ 1 * ‖D‖ := by
+          rw [innerSL_apply_norm]
+          exact mul_le_mul_of_nonneg_right (hy i) (norm_nonneg _)
+      _ = ‖D‖ := one_mul _
+  · ext x
+    rw [ContinuousLinearMap.sum_apply]
+    simp only [ContinuousLinearMap.smulRight_apply, ContinuousLinearMap.comp_apply,
+      innerSL_apply_apply]
+    rw [← Finset.sum_subset (Finset.range_mono hr) (fun i _ hi ↦ by
+      have hi' : ¬ i < d := fun h ↦ hi (Finset.mem_range.mpr h)
+      simp only [y, hi', ↓reduceDIte, smul_zero]), Finset.sum_range]
+    have h := congrArg Subtype.val (b.sum_repr' ⟨D x, hD x⟩)
+    rw [Submodule.coe_sum] at h
+    simp only [Submodule.coe_smul, Submodule.coe_inner] at h
+    refine (Finset.sum_congr rfl fun j _ ↦ ?_).trans h
+    simp only [y, dif_pos (show (j : ℕ) < d from j.is_lt), Fin.eta]
+
+/-- Rapid decay against `n ^ k` for every `k` gives rapid decay against `(n + 1) ^ k`. -/
+private theorem isStronglyNuclearBanachOperator_of_rapid_approximationNumbers_succ
+    (f : ℕ → ℝ) (hf0 : ∀ n, 0 ≤ f n)
+    (hf : ∀ k : ℕ, Tendsto (fun n : ℕ ↦ (n : ℝ) ^ k * f n) atTop (𝓝 0)) (k : ℕ) :
+    Tendsto (fun n : ℕ ↦ ((n : ℝ) + 1) ^ k * f n) atTop (𝓝 0) := by
+  have h2 : Tendsto (fun n : ℕ ↦ 2 ^ k * ((n : ℝ) ^ k * f n)) atTop (𝓝 0) := by
+    simpa using (hf k).const_mul (2 ^ k)
+  refine squeeze_zero' (.of_forall fun n ↦ mul_nonneg (by positivity) (hf0 n)) ?_ h2
+  filter_upwards [eventually_ge_atTop 1] with n hn
+  have hn' : (1 : ℝ) ≤ n := by exact_mod_cast hn
+  rw [← mul_assoc, ← mul_pow]
+  exact mul_le_mul_of_nonneg_right (pow_le_pow_left₀ (by positivity) (by linarith) k) (hf0 n)
+
+/-- If `c n ≤ e (n + 1) + e n` and `e` decays rapidly, then `c (⌊√m⌋)` decays rapidly in `m`. -/
+private theorem isStronglyNuclearBanachOperator_of_rapid_approximationNumbers_sqrt
+    (e : ℕ → ℝ) (he0 : ∀ n, 0 ≤ e n)
+    (he : ∀ j : ℕ, Tendsto (fun n : ℕ ↦ ((n : ℝ) + 1) ^ j * e n) atTop (𝓝 0))
+    (c : ℕ → ℝ) (hc0 : ∀ n, 0 ≤ c n) (hc : ∀ n, c n ≤ e (n + 1) + e n) (k : ℕ) :
+    Tendsto (fun m : ℕ ↦ (m : ℝ) ^ k * c (Nat.sqrt m)) atTop (𝓝 0) := by
+  have hshift : Tendsto (fun n : ℕ ↦ ((n : ℝ) + 1) ^ (2 * k) * e (n + 1)) atTop (𝓝 0) := by
+    have h := (tendsto_add_atTop_iff_nat 1).mpr (he (2 * k))
+    refine squeeze_zero (fun n ↦ mul_nonneg (by positivity) (he0 _)) (fun n ↦ ?_) h
+    push_cast
+    exact mul_le_mul_of_nonneg_right
+      (pow_le_pow_left₀ (by positivity) (by linarith) _) (he0 _)
+  have hg : Tendsto (fun n : ℕ ↦ ((n : ℝ) + 1) ^ (2 * k) * c n) atTop (𝓝 0) := by
+    refine squeeze_zero (fun n ↦ mul_nonneg (by positivity) (hc0 n)) (fun n ↦ ?_)
+      (by simpa using hshift.add (he (2 * k)))
+    rw [← mul_add]
+    exact mul_le_mul_of_nonneg_left (hc n) (by positivity)
+  have hsqrt : Tendsto Nat.sqrt atTop atTop :=
+    tendsto_atTop_atTop.mpr fun b ↦ ⟨b * b, fun m hm ↦ Nat.le_sqrt.mpr hm⟩
+  refine squeeze_zero (fun m ↦ mul_nonneg (by positivity) (hc0 _)) (fun m ↦ ?_) (hg.comp hsqrt)
+  simp only [Function.comp_apply]
+  refine mul_le_mul_of_nonneg_right ?_ (hc0 _)
+  rw [pow_mul]
+  refine pow_le_pow_left₀ (by positivity) ?_ k
+  have h := Nat.lt_succ_sqrt' m
+  have h' : (m : ℝ) < ((Nat.sqrt m : ℝ) + 1) ^ 2 := by exact_mod_cast h
+  exact h'.le
+
+/-- Rescaling a rank-one term by the norm bound of its functional. -/
+private theorem isStronglyNuclearBanachOperator_of_rapid_approximationNumbers_smul
+    (c : ℝ) (Λ : StrongDual ℂ H) (hΛ : ‖Λ‖ ≤ c) (v : H) :
+    (c : ℂ) • (((c : ℂ)⁻¹ • Λ).smulRight v) = Λ.smulRight v ∧ ‖(c : ℂ)⁻¹ • Λ‖ ≤ 1 := by
+  by_cases hc : c = 0
+  · subst hc
+    have : Λ = 0 := norm_le_zero_iff.mp hΛ
+    subst this
+    simp
+  constructor
+  · ext x
+    rw [ContinuousLinearMap.smul_apply, ContinuousLinearMap.smulRight_apply,
+      ContinuousLinearMap.smulRight_apply, ContinuousLinearMap.smul_apply, smul_smul,
+      smul_eq_mul, ← mul_assoc, mul_inv_cancel₀ (Complex.ofReal_ne_zero.mpr hc), one_mul]
+  · rw [norm_smul, norm_inv, Complex.norm_real, Real.norm_eq_abs]
+    have hc' : 0 < c := lt_of_le_of_ne ((norm_nonneg _).trans hΛ) (Ne.symm hc)
+    rw [abs_of_pos hc', inv_mul_le_iff₀ hc', mul_one]
+    exact hΛ
+
+/-- An approximant of rank at most `n` within `2⁻ⁿ` of the `n`-th approximation number;
+the zeroth one is zero. -/
+private theorem isStronglyNuclearBanachOperator_of_rapid_approximationNumbers_approx
+    (A : H →L[ℂ] H) (n : ℕ) :
+    ∃ S : H →L[ℂ] H, FiniteDimensional ℂ (LinearMap.range S.toLinearMap) ∧
+      Module.finrank ℂ (LinearMap.range S.toLinearMap) ≤ n ∧
+      ‖S - A‖ ≤ approximationNumber A n + (1 / 2) ^ n ∧ (n = 0 → S = 0) := by
+  let X : Set ℝ := {r | ∃ S : H →L[ℂ] H,
+    Module.rank ℂ S.toLinearMap.range ≤ (n : Cardinal) ∧ r = ‖S - A‖}
+  have hX : X.Nonempty := ⟨_, 0, by simp, rfl⟩
+  have hlt : sInf X < sInf X + (1 / 2) ^ n := lt_add_of_pos_right _ (by positivity)
+  obtain ⟨r, ⟨S, hS, rfl⟩, hr⟩ := exists_lt_of_csInf_lt hX hlt
+  have hfin : FiniteDimensional ℂ (LinearMap.range S.toLinearMap) :=
+    Module.rank_lt_aleph0_iff.mp (lt_of_le_of_lt hS Cardinal.natCast_lt_aleph0)
+  have hrank : Module.finrank ℂ (LinearMap.range S.toLinearMap) ≤ n :=
+    Module.finrank_le_of_rank_le hS
+  refine ⟨S, hfin, hrank, hr.le, fun hn ↦ ?_⟩
+  subst hn
+  have h0 : LinearMap.range S.toLinearMap = ⊥ :=
+    Submodule.finrank_eq_zero.mp (Nat.le_zero.mp hrank)
+  ext x
+  have hx : S x ∈ LinearMap.range S.toLinearMap := ⟨x, rfl⟩
+  rw [h0, Submodule.mem_bot] at hx
+  simpa using hx
+
 /-- Paper: Theorem 10.3.1.1(3), p. 449. Rapid decay of the approximation
 numbers gives a strongly nuclear expansion by the singular-value decomposition. -/
 theorem isStronglyNuclearBanachOperator_of_rapid_approximationNumbers (A : H →L[ℂ] H)
     (_hA : ∀ k : ℕ, Tendsto (fun n : ℕ ↦ (n : ℝ) ^ k * approximationNumber A n)
-      atTop (𝓝 0)) : IsStronglyNuclearBanachOperator A := by sorry
+      atTop (𝓝 0)) : IsStronglyNuclearBanachOperator A := by
+  classical
+  choose S hSfin hSrank hSA hS0 using
+    isStronglyNuclearBanachOperator_of_rapid_approximationNumbers_approx A
+  have hdec (n : ℕ) : ∃ (Λ : ℕ → StrongDual ℂ H) (y : ℕ → H),
+      (∀ i, ‖Λ i‖ ≤ ‖S (n + 1) - S n‖ ∧ ‖y i‖ ≤ 1) ∧
+      ∑ i ∈ Finset.range (2 * n + 1), (Λ i).smulRight (y i) = S (n + 1) - S n := by
+    have := hSfin n
+    have := hSfin (n + 1)
+    refine isStronglyNuclearBanachOperator_of_rapid_approximationNumbers_rankOne
+      (LinearMap.range (S (n + 1)).toLinearMap ⊔ LinearMap.range (S n).toLinearMap)
+      (S (n + 1) - S n) (fun x ↦ ?_) (2 * n + 1) ?_
+    · exact Submodule.sub_mem _ (Submodule.mem_sup_left ⟨x, rfl⟩)
+        (Submodule.mem_sup_right ⟨x, rfl⟩)
+    · refine (Submodule.finrank_add_le_finrank_add_finrank _ _).trans ?_
+      have := hSrank n
+      have := hSrank (n + 1)
+      omega
+  choose Λ y hΛy hsum using hdec
+  let e : ℕ → ℝ := fun n ↦ ‖S n - A‖
+  let a : ℕ → ℝ := fun n ↦ approximationNumber A n
+  have ha0 (n : ℕ) : 0 ≤ a n :=
+    Real.sInf_nonneg (by rintro _ ⟨T, -, rfl⟩; exact norm_nonneg _)
+  have he (j : ℕ) : Tendsto (fun n : ℕ ↦ ((n : ℝ) + 1) ^ j * e n) atTop (𝓝 0) := by
+    have h1 := isStronglyNuclearBanachOperator_of_rapid_approximationNumbers_succ a ha0 _hA j
+    have h2 := isStronglyNuclearBanachOperator_of_rapid_approximationNumbers_succ
+      (fun n ↦ (1 / 2 : ℝ) ^ n) (fun n ↦ by positivity)
+      (fun k ↦ tendsto_pow_const_mul_const_pow_of_abs_lt_one k (by norm_num)) j
+    refine squeeze_zero (fun n ↦ mul_nonneg (by positivity) (norm_nonneg _)) (fun n ↦ ?_)
+      (by simpa using h1.add h2)
+    rw [← mul_add]
+    exact mul_le_mul_of_nonneg_left ((hSA n).trans_eq (by rw [one_div, inv_pow])) (by positivity)
+  let c : ℕ → ℝ := fun n ↦ ‖S (n + 1) - S n‖
+  have hc (n : ℕ) : c n ≤ e (n + 1) + e n := by
+    have : S (n + 1) - S n = (S (n + 1) - A) - (S n - A) := by abel
+    simp only [c, e, this]
+    exact norm_sub_le _ _
+  have hdecay := isStronglyNuclearBanachOperator_of_rapid_approximationNumbers_sqrt e
+    (fun n ↦ norm_nonneg _) he c (fun n ↦ norm_nonneg _) hc
+  let idx : ℕ → ℕ := fun m ↦ m - Nat.sqrt m * Nat.sqrt m
+  let term : ℕ → H →L[ℂ] H := fun m ↦ (c (Nat.sqrt m) : ℂ) •
+    (((c (Nat.sqrt m) : ℂ)⁻¹ • Λ (Nat.sqrt m) (idx m)).smulRight (y (Nat.sqrt m) (idx m)))
+  have hterm (m : ℕ) : term m = (Λ (Nat.sqrt m) (idx m)).smulRight (y (Nat.sqrt m) (idx m)) :=
+    (isStronglyNuclearBanachOperator_of_rapid_approximationNumbers_smul _ _
+      (hΛy _ _).1 _).1
+  have hblock (N : ℕ) : ∑ m ∈ Finset.range (N * N), term m = S N := by
+    induction N with
+    | zero => simp [hS0 0 rfl]
+    | succ N ih =>
+      rw [show (N + 1) * (N + 1) = N * N + (2 * N + 1) by ring, Finset.sum_range_add, ih,
+        show S (N + 1) = S N + (S (N + 1) - S N) by abel, ← hsum N]
+      congr 1
+      refine Finset.sum_congr rfl fun i hi ↦ ?_
+      have hi' : i ≤ N + N := by rw [Finset.mem_range] at hi; omega
+      rw [hterm]
+      simp only [idx, Nat.sqrt_add_eq N hi', Nat.add_sub_cancel_left]
+  have hS : Tendsto S atTop (𝓝 A) :=
+    tendsto_iff_norm_sub_tendsto_zero.mpr (by simpa [e] using he 0)
+  have hnorm (m : ℕ) : ‖term m‖ ≤ c (Nat.sqrt m) := by
+    rw [hterm, ContinuousLinearMap.norm_smulRight_apply]
+    exact (mul_le_mul (hΛy _ _).1 (hΛy _ _).2 (norm_nonneg _) (norm_nonneg _)).trans_eq
+      (mul_one _)
+  have hsumm : Summable term := by
+    refine Summable.of_norm_bounded_eventually_nat (g := fun m : ℕ ↦ 1 / (m : ℝ) ^ 2)
+      (Real.summable_one_div_nat_pow.mpr one_lt_two) ?_
+    filter_upwards [(hdecay 2).eventually (gt_mem_nhds zero_lt_one), eventually_ge_atTop 1]
+      with m h1 hm
+    have hm' : (0 : ℝ) < (m : ℝ) ^ 2 := by positivity
+    refine (hnorm m).trans ?_
+    rw [le_div_iff₀ hm', mul_comm]
+    exact h1.le
+  have hsq : Tendsto (fun N : ℕ ↦ N * N) atTop atTop :=
+    tendsto_atTop_atTop.mpr fun b ↦ ⟨b, fun N hN ↦ hN.trans (Nat.le_mul_self N)⟩
+  have hlim : ∑' m, term m = A := by
+    refine tendsto_nhds_unique ((hsumm.hasSum.tendsto_sum_nat).comp hsq) ?_
+    refine hS.congr fun N ↦ ?_
+    exact (hblock N).symm
+  refine ⟨fun m ↦ (c (Nat.sqrt m) : ℂ), fun m ↦ (c (Nat.sqrt m) : ℂ)⁻¹ • Λ (Nat.sqrt m) (idx m),
+    fun m ↦ y (Nat.sqrt m) (idx m), fun m ↦ ⟨?_, (hΛy _ _).2⟩, fun k ↦ ?_, ?_⟩
+  · exact (isStronglyNuclearBanachOperator_of_rapid_approximationNumbers_smul _ _
+      (hΛy _ _).1 (0 : H)).2
+  · rw [tendsto_zero_iff_norm_tendsto_zero]
+    refine (hdecay k).congr fun m ↦ ?_
+    rw [norm_mul, norm_pow, Complex.norm_natCast, Complex.norm_real, Real.norm_eq_abs,
+      abs_of_nonneg (norm_nonneg _)]
+  · exact hlim ▸ hsumm.hasSum
+
 
 end TraceNormLimits
 

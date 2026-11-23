@@ -4,7 +4,10 @@ public import RiemannMasullo.Ch11_ShellStructure.Sec2a
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4a
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec4
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
-import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
+import RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
+import all RiemannMasullo.AppC_LCTVS.Sec3a_part2
+
+import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
 
 /-! # Sobolev Paley–Wiener levels and orbital nuclearity
 
@@ -165,7 +168,21 @@ theorem sLocalPWThetaSobolevMap_apply {a : ℝ} (ha : 0 < a) (ω : PontryaginDua
 Globalized polar-free tests yield weighted Sobolev vectors.
 Deviation: Use direct integer-indicator insertion as in the repaired §7.3.2. -/
 theorem globalPWTheta_memLp (a : ℝ) (ω : PontryaginDual C₁) (f : Zₛ) :
-    MemLp (globalWeightedTheta(a, ω, f)) 2 globalWMeasure := by sorry
+    MemLp (globalWeightedTheta(a, ω, f)) 2 globalWMeasure := by
+  let f₀ : adelePolarSubspace F := ⟨sAdeleSchwartzToGlobal F S f.val,
+    sAdeleSchwartzToGlobal_mem_polarSubspace f⟩
+  let x : globalPolarFreeThetaSubmodule (F := F) ω :=
+    ⟨Submodule.Quotient.mk f₀.val, ⟨f₀.val, f₀.property, rfl⟩⟩
+  obtain ⟨j, -, -, hj⟩ := exists_globalHomogeneousThetaSobolevInclusion
+    (F := F) (a := a) hGeo (le_max_right s 0) ω
+  have he := (hj f₀ x rfl).2
+  have hv := (Lp.memLp (j x).val.val).ae_eq ((withDensity_absolutelyContinuous _ _).ae_le he)
+  apply hv.mono_measure (withDensity_mono (Filter.Eventually.of_forall fun g ↦ ?_))
+  apply ENNReal.ofReal_le_ofReal
+  unfold intervalSobolevDensity
+  apply mul_le_mul_of_nonneg_left _ (le_trans (Real.exp_pos _).le (le_max_left _ _))
+  exact Real.rpow_le_rpow_of_exponent_le (by nlinarith [sq_nonneg (logNorm(m𝔽) g)])
+    (div_le_div_of_nonneg_right (le_max_left s 0) (by norm_num))
 
 /-- Paper: (11.2.1.2) and (11.2.1.7), pp. 487–488.
 Insert a local polar-free test and take its weighted global homogeneous theta class.
@@ -311,6 +328,144 @@ theorem exists_nuclear_geometricPWRestriction (a : ℝ) (ω : PontryaginDual C�
 local notation "nuclearRestriction(" a ", " ω ", " hρ ", " φ ")" =>
   (exists_nuclear_geometricPWRestriction (F := F) hs a ω φ hρ).choose
 
+/-- Uniformly bounded self-adjoint strongly null families kill nuclear operators on the right in trace norm. -/
+private theorem absolutePWCondensation_traceNorm_tendsto_null
+    (H : Type*) [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (Q : ℝ → H →L[ℂ] H) (hQ : ∀ x, Tendsto (fun i ↦ Q i x) atTop (𝓝 0))
+    (hQa : ∀ i, (Q i).adjoint = Q i) (hQc : ∀ i x, ‖Q i x‖ ≤ 2 * ‖x‖)
+    (T : nuclearEndomorphisms H) :
+    Tendsto (fun i ↦ traceNorm ⟨T.val * Q i, mul_mem_nuclearEndomorphisms_right (Q i) T⟩)
+      atTop (𝓝 0) := by
+  obtain ⟨c, φ, y, hc, hφ, hy, hT⟩ := (isNuclearOperator_iff_isBanachNuclear T.val).mp T.property
+  let u (n : ℕ) := (InnerProductSpace.toDual ℂ H).symm (φ n)
+  have hu (n : ℕ) : ‖u n‖ = ‖φ n‖ := (InnerProductSpace.toDual ℂ H).symm.norm_map _
+  let cost (i : ℝ) (n : ℕ) := ‖c n‖ * (‖Q i (u n)‖ * ‖y n‖)
+  let bound (n : ℕ) := 2 * (‖c n‖ * (‖φ n‖ * ‖y n‖))
+  have hcost_nonneg (i : ℝ) (n : ℕ) : 0 ≤ cost i n := by dsimp [cost]; positivity
+  have hbound (i : ℝ) (n : ℕ) : ‖cost i n‖ ≤ bound n := by
+    rw [Real.norm_of_nonneg (hcost_nonneg i n)]
+    have hh := mul_le_mul_of_nonneg_left
+      (mul_le_mul_of_nonneg_right ((hQc i (u n)).trans_eq (congrArg (2 * ·) (hu n))) (norm_nonneg (y n)))
+      (norm_nonneg (c n))
+    dsimp only [cost, bound]
+    nlinarith
+  have hs : Summable bound := by
+    obtain ⟨C, hC, hφC⟩ := (Metric.isBounded_range_of_tendsto φ hφ).exists_pos_norm_le
+    obtain ⟨D, _, hyD⟩ := (Metric.isBounded_range_of_tendsto y hy).exists_pos_norm_le
+    apply Summable.mul_left 2
+    refine (hc.mul_right (C * D)).of_norm_bounded fun n ↦ ?_
+    rw [Real.norm_of_nonneg (by positivity)]
+    exact mul_le_mul_of_nonneg_left
+      (mul_le_mul (hφC _ (mem_range_self n)) (hyD _ (mem_range_self n))
+        (norm_nonneg _) hC.le) (norm_nonneg _)
+  have hlim : Tendsto (fun i ↦ ∑' n, cost i n) atTop (𝓝 0) := by
+    have hterm (n : ℕ) : Tendsto (fun i ↦ cost i n) atTop (𝓝 0) := by
+      simpa [cost] using ((hQ (u n)).norm.mul_const ‖y n‖).const_mul ‖c n‖
+    simpa only [tsum_zero] using
+      tendsto_tsum_of_dominated_convergence hs hterm (Eventually.of_forall hbound)
+  let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+  refine squeeze_zero (fun _ ↦ (traceNorm_normedSpaceCore (H := H)).toCore.norm_nonneg _)
+    ?_ hlim
+  intro i
+  let ψ (n : ℕ) : StrongDual ℂ H := c n • innerSL ℂ (Q i (u n))
+  have hψ (n : ℕ) : ‖ψ n‖ * ‖y n‖ = cost i n := by
+    simp only [ψ, cost, norm_smul, innerSL_apply_norm, mul_assoc]
+  simp_rw [← hψ]
+  refine traceNorm_le_of_rankOne_series _ ψ y
+    ((hs.of_norm_bounded (hbound i)).congr fun n ↦ (hψ n).symm) fun x ↦ ?_
+  have heval (n : ℕ) : ψ n x = c n * φ n (Q i x) := by
+    have hinner := (Q i).adjoint_inner_left x (u n)
+    rw [hQa] at hinner
+    simp only [ψ, smul_apply, smul_eq_mul, innerSL_apply_apply, hinner, u, InnerProductSpace.toDual_symm_apply]
+  simpa [heval, mul_apply_eq_comp] using hT (Q i x)
+/-- A compressed ambient projection preserves the compressing subspace if it is a strong limit of orthogonal projections. -/
+private theorem absolutePWCondensation_traceNorm_tendsto_preserves
+    (H : Type*) [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (I K : Submodule ℂ H) [CompleteSpace I] [CompleteSpace K]
+    (levels : ℝ → Submodule ℂ I) [∀ i, CompleteSpace (levels i)]
+    (hlim : ∀ u : I, Tendsto (fun i ↦ (levels i).starProjection u) atTop
+      (𝓝 (I.orthogonalProjectionOnto (K.starProjection u)))) (u : I) :
+    K.starProjection u ∈ I := by
+  let w := K.starProjection (u : H)
+  let z := I.orthogonalProjectionOnto w
+  have hiC : Tendsto (fun i ↦ inner ℂ ((levels i).starProjection u) u) atTop (𝓝 (inner ℂ z u)) :=
+    (hlim u).inner tendsto_const_nhds
+  have hi := (RCLike.continuous_re.tendsto _).comp hiC
+  have heq (i : ℝ) : RCLike.re (inner ℂ ((levels i).starProjection u) u) = ‖(levels i).starProjection u‖ ^ 2 := by
+    with_unfolding_all simpa only [Submodule.starProjection_apply, Submodule.norm_coe] using (levels i).re_inner_starProjection_eq_normSq u
+  have hn : Tendsto (fun i ↦ RCLike.re (inner ℂ ((levels i).starProjection u) u)) atTop (𝓝 (‖z‖ ^ 2)) := by
+    simpa only [heq] using (hlim u).norm.pow 2
+  have hz : RCLike.re (inner ℂ z u) = ‖z‖ ^ 2 := tendsto_nhds_unique hi hn
+  have hw : RCLike.re (inner ℂ w (u : H)) = ‖w‖ ^ 2 := by
+    with_unfolding_all simpa only [w, Submodule.starProjection_apply, Submodule.norm_coe] using K.re_inner_starProjection_eq_normSq (u : H)
+  have hnorm : ‖I.starProjection w‖ = ‖w‖ := by
+    have hh : RCLike.re (inner ℂ z u) = RCLike.re (inner ℂ w (u : H)) := by
+      rw [show z = I.orthogonalProjectionOnto w from rfl, Submodule.inner_orthogonalProjectionOnto_eq_of_mem_right]
+    have hsq : ‖I.starProjection w‖ ^ 2 = ‖w‖ ^ 2 := by
+      change ‖z‖ ^ 2 = ‖w‖ ^ 2
+      linarith
+    nlinarith [norm_nonneg (I.starProjection w), norm_nonneg w]
+  exact (I.mem_iff_norm_starProjection w).mpr hnorm
+/-- Strong convergence of orthogonal projections preserves a right-supported nuclear operator in trace norm. -/
+private theorem absolutePWCondensation_traceNorm_tendsto_projection
+    (H : Type*) [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (levels : ℝ → Submodule ℂ H) [∀ i, CompleteSpace (levels i)] (R : H →L[ℂ] H)
+    (hlim : ∀ u, Tendsto (fun i ↦ (levels i).starProjection u) atTop (𝓝 (R u)))
+    (T : nuclearEndomorphisms H) (hTR : T.val * R = T.val) :
+    Tendsto (fun i ↦ traceNorm
+      (⟨T.val * (levels i).starProjection, mul_mem_nuclearEndomorphisms_right (levels i).starProjection T⟩ - T))
+      atTop (𝓝 0) := by
+  have hRa : R.adjoint = R := by
+    apply ContinuousLinearMap.ext
+    intro x
+    apply ext_inner_right ℂ
+    intro y
+    rw [ContinuousLinearMap.adjoint_inner_left]
+    have hl : Tendsto (fun i ↦ inner ℂ x ((levels i).starProjection y)) atTop (𝓝 (inner ℂ x (R y))) := tendsto_const_nhds.inner (hlim y)
+    have hr : Tendsto (fun i ↦ inner ℂ ((levels i).starProjection x) y) atTop (𝓝 (inner ℂ (R x) y)) := (hlim x).inner tendsto_const_nhds
+    have heq : (fun i ↦ inner ℂ x ((levels i).starProjection y)) = (fun i ↦ inner ℂ ((levels i).starProjection x) y) := by
+      funext i
+      exact (Submodule.inner_starProjection_left_eq_right (levels i) x y).symm
+    rw [heq] at hl
+    exact tendsto_nhds_unique hl hr
+  have hR (x : H) : ‖R x‖ ≤ ‖x‖ :=
+    le_of_tendsto' ((hlim x).norm) (fun i ↦ (levels i).norm_starProjection_apply_le x)
+  let Q (i : ℝ) := (levels i).starProjection - R
+  have hQ (x : H) : Tendsto (fun i ↦ Q i x) atTop (𝓝 0) := by
+    simpa [Q] using (hlim x).sub (tendsto_const_nhds : Tendsto (fun _ : ℝ ↦ R x) atTop (𝓝 (R x)))
+  have hQa (i : ℝ) : (Q i).adjoint = Q i := by
+    simp only [Q, map_sub, (isSelfAdjoint_starProjection (levels i)).adjoint_eq, hRa]
+  have hQc (i : ℝ) (x : H) : ‖Q i x‖ ≤ 2 * ‖x‖ := by
+    exact (norm_sub_le ((levels i).starProjection x) (R x)).trans (by linarith [(levels i).norm_starProjection_apply_le x, hR x])
+  have hh := absolutePWCondensation_traceNorm_tendsto_null H Q hQ hQa hQc T
+  apply hh.congr'
+  filter_upwards with i
+  apply congrArg traceNorm
+  apply Subtype.ext
+  change T.val * ((levels i).starProjection - R) = T.val * (levels i).starProjection - T.val
+  rw [mul_sub, hTR]
+/-- The right-compressed nuclear operator is recovered by strongly convergent compressed projections. -/
+private theorem absolutePWCondensation_traceNorm_tendsto_compressed
+    (H : Type*) [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (I K : Submodule ℂ H) [CompleteSpace I] [CompleteSpace K]
+    (A : H →L[ℂ] H) (levels : ℝ → Submodule ℂ I) [∀ i, CompleteSpace (levels i)]
+    (hlim : ∀ u : I, Tendsto (fun i ↦ (levels i).starProjection u) atTop
+      (𝓝 (I.orthogonalProjectionOnto (K.starProjection u))))
+    (T : nuclearEndomorphisms I)
+    (hTval : T.val = I.orthogonalProjectionOnto.comp (A.comp (K.starProjection.comp I.subtypeL))) :
+    Tendsto (fun i ↦ traceNorm
+      (⟨T.val * (levels i).starProjection, mul_mem_nuclearEndomorphisms_right (levels i).starProjection T⟩ - T))
+      atTop (𝓝 0) := by
+  let R : I →L[ℂ] I := I.orthogonalProjectionOnto.comp (K.starProjection.comp I.subtypeL)
+  apply absolutePWCondensation_traceNorm_tendsto_projection I levels R hlim T
+  rw [hTval]
+  apply ContinuousLinearMap.ext
+  intro u
+  change I.orthogonalProjectionOnto (A (K.starProjection (I.starProjection (K.starProjection (u : H))))) = I.orthogonalProjectionOnto (A (K.starProjection (u : H)))
+  rw [I.starProjection_eq_self_iff.mpr (absolutePWCondensation_traceNorm_tendsto_preserves H I K levels hlim u),
+    K.starProjection_eq_self_iff.mpr (K.starProjection_apply_mem (u : H))]
+
+
 /-- Paper: Theorem 11.2.1.2(2) and (11.2.1.4), p. 488.
 Right multiplication of cutoff geometric convolution by the absolute projections
 converges in trace norm.
@@ -323,7 +478,23 @@ theorem absolutePWCondensation_traceNorm_tendsto (a : ℝ) (ω : PontryaginDual 
     let T := nuclearRestriction(a, ω, hρ, φ)
     Tendsto (fun Λ ↦ traceNorm
       (productTraceClass(T, absolutePWProjection (F := F) (S := S) hs a ω Λ) -
-        T)) atTop (𝓝 0) := by sorry
+        T)) atTop (𝓝 0) := by
+  intro T
+  let I : Submodule ℂ GeoW := GeoIsotype(ω)
+  let K : Submodule ℂ GeoW := globalThetaSobolev F a hGeo hs
+  let levels (Λ : ℝ) : Submodule ℂ I := (globalAbsolutePWSobolev (F := F) (S := S) hs a ω Λ).comap I.subtype
+  letI : CompleteSpace I := (instClosedSpectralIsotypeSec2 (F := F) hGeo hs ω).completeSpace_coe
+  letI : ∀ Λ, CompleteSpace (levels Λ) := fun Λ ↦
+    (show IsClosed (levels Λ : Set I) from (Submodule.isClosed_topologicalClosure _).preimage continuous_subtype_val).completeSpace_coe
+  have hlim (u : I) : Tendsto (fun Λ ↦ (levels Λ).starProjection u) atTop
+      (𝓝 (I.orthogonalProjectionOnto (K.starProjection u))) := by
+    with_unfolding_all exact absolutePWProjection_tendsto (F := F) (S := S) hs a ω _hω _hPic u
+  have hTval : T.val = I.orthogonalProjectionOnto.comp
+      (((modulatedCutoffOperator m𝔽 globalWMeasure hρ).comp (geoAction(φ))).comp (K.starProjection.comp I.subtypeL)) := by
+    with_unfolding_all exact (exists_nuclear_geometricPWRestriction (F := F) hs a ω φ hρ).choose_spec.1
+  with_unfolding_all
+    exact absolutePWCondensation_traceNorm_tendsto_compressed GeoW I K
+      ((modulatedCutoffOperator m𝔽 globalWMeasure hρ).comp (geoAction(φ))) levels hlim T hTval
 
 /-- Paper: Theorem 11.2.1.2(2) and (11.2.1.5), p. 488.
 The traces of the cutoff absolute condensations converge to the trace of the
@@ -447,7 +618,23 @@ theorem invariantPWCondensation_traceNorm_tendsto (a : ℝ) (ω : PontryaginDual
     let T := nuclearRestriction(a, ω, hρ, φ)
     Tendsto (fun Λ ↦ traceNorm
       (productTraceClass(T, invariantPWProjection (F := F) (S := S) hs a ω Λ) -
-        T)) atTop (𝓝 0) := by sorry
+        T)) atTop (𝓝 0) := by
+  intro T
+  let I : Submodule ℂ GeoW := GeoIsotype(ω)
+  let K : Submodule ℂ GeoW := globalThetaSobolev F a hGeo hs
+  let levels (Λ : ℝ) : Submodule ℂ I := (globalInvariantPWSobolev (F := F) (S := S) hs a ω Λ).comap I.subtype
+  letI : CompleteSpace I := (instClosedSpectralIsotypeSec2 (F := F) hGeo hs ω).completeSpace_coe
+  letI : ∀ Λ, CompleteSpace (levels Λ) := fun Λ ↦
+    (show IsClosed (levels Λ : Set I) from (Submodule.isClosed_topologicalClosure _).preimage continuous_subtype_val).completeSpace_coe
+  have hlim (u : I) : Tendsto (fun Λ ↦ (levels Λ).starProjection u) atTop
+      (𝓝 (I.orthogonalProjectionOnto (K.starProjection u))) := by
+    with_unfolding_all exact invariantPWProjection_tendsto (F := F) (S := S) hs a ω _hω _hPic u
+  have hTval : T.val = I.orthogonalProjectionOnto.comp
+      (((modulatedCutoffOperator m𝔽 globalWMeasure hρ).comp (geoAction(φ))).comp (K.starProjection.comp I.subtypeL)) := by
+    with_unfolding_all exact (exists_nuclear_geometricPWRestriction (F := F) hs a ω φ hρ).choose_spec.1
+  with_unfolding_all
+    exact absolutePWCondensation_traceNorm_tendsto_compressed GeoW I K
+      ((modulatedCutoffOperator m𝔽 globalWMeasure hρ).comp (geoAction(φ))) levels hlim T hTval
 
 /-- Paper: Theorem 11.2.1.4(2) and (11.2.1.10), p. 489.
 The traces of the cutoff invariant condensations converge to the trace of the
@@ -699,7 +886,27 @@ include h₁ in
 The degree bound admits all jet orders below the multiplicity of a prime Euler zero.
 The strict integrability cutoff then leaves that multiplicity unchanged. -/
 theorem primeOrbitalMultiplicity_saturates (z : zeros) :
-    spectralBoundaryMultiplicity s (mult(z.val)) = mult(z.val) := by sorry
+    spectralBoundaryMultiplicity s (mult(z.val)) = mult(z.val) := by
+  classical
+  let S := Sₚ(p)
+  have hcard : S.card ≤ Module.finrank ℚ F := by
+    let e (v : S) : p.asIdeal.primesOver (𝓞 F) :=
+      ⟨v.val.asIdeal, v.val.isPrime, ⟨(congrArg HeightOneSpectrum.asIdeal
+        (show v.val.under (𝓞 ℚ) = p from (finite_nuclearityPlacesAbove (F := F) p).mem_toFinset.mp v.property)).symm⟩⟩
+    have hi : Function.Injective e := fun v w h ↦
+      Subtype.ext (HeightOneSpectrum.ext (congrArg Subtype.val h))
+    simpa only [Fintype.card_coe] using (Fintype.card_le_of_injective e hi).trans
+      (reciprocalEulerProduct_over_prime_order_le_card_le (F := F) p)
+  have hm : mult(z.val) ≤ Module.finrank ℚ F := by
+    rw [orbitalEulerMultiplicity_eq_card]
+    exact (Finset.card_filter_le _ _).trans hcard
+  apply Nat.le_antisymm (min_le_left _ _)
+  by_contra! hlt
+  have hk : (spectralBoundaryMultiplicity s (mult(z.val)) : ℝ) + 1 ≤ Module.finrank ℚ F := by
+    exact_mod_cast (Nat.succ_le_of_lt hlt).trans hm
+  have himp := (lt_spectralBoundaryMultiplicity s (mult(z.val))
+    (spectralBoundaryMultiplicity s (mult(z.val)))).mpr ⟨hlt, by linarith only [hk, _hdeg]⟩
+  exact (lt_irrefl _ himp)
 
 /-- Paper: Remark 11.2.2.2 and (11.2.2.13), p. 491.
 The prime orbital convolution trace is independent of the Sobolev degree

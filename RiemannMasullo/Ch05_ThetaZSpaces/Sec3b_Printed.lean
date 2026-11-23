@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3b
+import Mathlib.Analysis.SpecialFunctions.Gaussian.PoissonSummation
 
 /-!
 # §5.3.3–5.3.4: statements that are false as printed
@@ -27,13 +28,88 @@ def Printed.positiveRealExponentialDecay_valueDecay : Prop :=
       ContDiff ℝ (∞) f ∧ ∀ a ∈ I, ∀ k : ℝ, 0 < k →
         Tendsto (fun x : ℝ ↦ ‖x‖ ^ k * ‖logExponentialWeight a f x‖) (cocompact ℝ) (𝓝 0)
 
+/-- The profile `exp(−x²) sin(exp(2x²))` has derivative `4x exp(x²)` wherever
+`exp(2x²)` is a multiple of `2π`. -/
+private theorem Printed.positiveRealExponentialDecay_valueDecay_hasDerivAt (x : ℝ) (n : ℕ)
+    (hx : Real.exp (2 * x ^ 2) = n * (2 * Real.pi)) :
+    HasDerivAt (fun x : ℝ ↦ Real.exp (-x ^ 2) * Real.sin (Real.exp (2 * x ^ 2)))
+      (4 * x * Real.exp (x ^ 2)) x := by
+  have ha : HasDerivAt (fun x : ℝ ↦ -x ^ 2) (-(2 * x)) x := by
+    convert (hasDerivAt_pow 2 x).neg using 1
+    simp
+  have hb : HasDerivAt (fun x : ℝ ↦ 2 * x ^ 2) (2 * (2 * x)) x := by
+    simpa using (hasDerivAt_pow 2 x).const_mul 2
+  convert ha.exp.mul hb.exp.sin using 1
+  have hsin : Real.sin (Real.exp (2 * x ^ 2)) = 0 := by
+    rw [hx, show (n : ℝ) * (2 * Real.pi) = ((2 * n : ℕ) : ℝ) * Real.pi by push_cast; ring]
+    exact Real.sin_nat_mul_pi _
+  have hcos : Real.cos (Real.exp (2 * x ^ 2)) = 1 := by
+    rw [hx]
+    exact Real.cos_nat_mul_two_pi n
+  rw [hsin, hcos, show Real.exp (x ^ 2) = Real.exp (-x ^ 2) * Real.exp (2 * x ^ 2) by
+    rw [← Real.exp_add]; ring_nf]
+  ring
+
+/-- For every bound there is a point beyond it where `exp(2x²)` is a multiple of `2π`. -/
+private theorem Printed.positiveRealExponentialDecay_valueDecay_points (C : ℝ) :
+    ∃ (x : ℝ) (n : ℕ), C < x ∧ 0 ≤ x ∧ Real.exp (2 * x ^ 2) = n * (2 * Real.pi) := by
+  set D := max C 0
+  obtain ⟨n, hn⟩ := exists_nat_gt (Real.exp (2 * D ^ 2))
+  have hpi : (1 : ℝ) < 2 * Real.pi := by linarith [Real.pi_gt_three]
+  have hn0 : (0 : ℝ) < n := lt_trans (Real.exp_pos _) hn
+  have hN : Real.exp (2 * D ^ 2) < n * (2 * Real.pi) := by nlinarith
+  have hNpos : (0 : ℝ) < n * (2 * Real.pi) := by positivity
+  refine ⟨Real.sqrt (Real.log (n * (2 * Real.pi)) / 2), n, ?_, Real.sqrt_nonneg _, ?_⟩
+  · have hlog : 2 * D ^ 2 < Real.log (n * (2 * Real.pi)) := by
+      rw [Real.lt_log_iff_exp_lt hNpos]
+      exact hN
+    have hD : D < Real.sqrt (Real.log (n * (2 * Real.pi)) / 2) :=
+      Real.lt_sqrt (le_max_right C 0) |>.mpr (by linarith)
+    exact lt_of_le_of_lt (le_max_left C 0) hD
+  · have hlog0 : 0 ≤ Real.log (n * (2 * Real.pi)) / 2 := by
+      have : 0 < Real.log (n * (2 * Real.pi)) := by
+        rw [Real.lt_log_iff_exp_lt hNpos, Real.exp_zero]
+        nlinarith [Real.one_lt_exp_iff.mpr (show (0 : ℝ) < 2 * D ^ 2 + 1 by positivity),
+          Real.add_one_le_exp (2 * D ^ 2)]
+      positivity
+    rw [Real.sq_sqrt hlog0, show 2 * (Real.log (n * (2 * Real.pi)) / 2) =
+      Real.log (n * (2 * Real.pi)) by ring, Real.exp_log hNpos]
+
 /-- Paper: Example 5.3.3.1, p. 249. Take I = ℝ and
 f(x) = exp(−x²) sin(exp(2x²)). The Gaussian bounds every twisted value, while at
 x = √(log(2πn)/2) for positive integers n the derivative is 4x exp(x²). Even the
 twist with exponent zero fails the Schwartz derivative bounds. -/
 theorem Printed.positiveRealExponentialDecay_valueDecay_false :
     ¬ Printed.positiveRealExponentialDecay_valueDecay := by
-  sorry
+  intro h
+  let r : ℝ → ℝ := fun x ↦ Real.exp (-x ^ 2) * Real.sin (Real.exp (2 * x ^ 2))
+  have hr : ContDiff ℝ (∞) r :=
+    ((contDiff_id.pow 2).neg.exp).mul ((contDiff_const.mul (contDiff_id.pow 2)).exp.sin)
+  have hf : ContDiff ℝ (∞) (fun x ↦ (r x : ℂ)) := Complex.ofRealCLM.contDiff.comp hr
+  have hdecay : ∀ a ∈ ({0} : Set ℝ), ∀ k : ℝ, 0 < k →
+      Tendsto (fun x : ℝ ↦ ‖x‖ ^ k * ‖logExponentialWeight a (fun x ↦ (r x : ℂ)) x‖)
+        (cocompact ℝ) (𝓝 0) := by
+    rintro a rfl k -
+    rw [logExponentialWeight_zero]
+    refine squeeze_zero (fun x ↦ by positivity) (fun x ↦ ?_)
+      (tendsto_rpow_abs_mul_exp_neg_mul_sq_cocompact one_pos k)
+    rw [Complex.norm_real, Real.norm_eq_abs, Real.norm_eq_abs, neg_one_mul]
+    refine mul_le_mul_of_nonneg_left ?_ (by positivity)
+    rw [abs_mul, Real.abs_exp]
+    exact mul_le_of_le_one_right (Real.exp_pos _).le (Real.abs_sin_le_one _)
+  have hmem := (h {0} ordConnected_singleton (singleton_nonempty 0) _).mpr ⟨hf, hdecay⟩
+  obtain ⟨g, hg⟩ := (Submodule.mem_iInf _).mp hmem ⟨0, rfl⟩
+  have hgf : (g : ℝ → ℂ) = fun x ↦ (r x : ℂ) := hg.trans (logExponentialWeight_zero _)
+  obtain ⟨C, -, hC⟩ := g.decay 0 1
+  obtain ⟨x, n, hxC, hx0, hx⟩ := Printed.positiveRealExponentialDecay_valueDecay_points C
+  have hd := (Printed.positiveRealExponentialDecay_valueDecay_hasDerivAt x n hx).ofReal_comp
+  have hb := hC x
+  rw [pow_zero, one_mul, norm_iteratedFDeriv_one, ← norm_deriv_eq_norm_fderiv, hgf,
+    hd.deriv, Complex.norm_real, Real.norm_eq_abs] at hb
+  have h4 : x ≤ 4 * x * Real.exp (x ^ 2) := by
+    nlinarith [Real.one_le_exp (sq_nonneg x)]
+  rw [abs_of_nonneg (by positivity)] at hb
+  linarith
 
 local notation "complexDecay(" I ")" => ModulatedExponentialDecay (archimedeanUnitModulation ℂ 2) I
 local notation "zeroExtension(" f ")" =>
@@ -91,12 +167,72 @@ def Printed.realArchimedeanMellin_monomial : Prop :=
     ∀ᶠ s : ℂ in codiscrete ℂ,
       realArchimedeanMellin f ε s = realArchimedeanMellin f (Fin.ofNat 2 (ε.val + n)) (s + n)
 
+open MeasureTheory in
 /-- Paper: Proposition 5.3.3.4(1), p. 258. Take n = 1, the trivial sign parity and
 f(x) = exp(−πx²). At s = 1 the even Mellin integral is strictly positive. The shifted
 odd profile vanishes identically. Both sides are analytic near s = 1. -/
 theorem Printed.realArchimedeanMellin_monomial_false :
     ¬ Printed.realArchimedeanMellin_monomial := by
-  sorry
+  intro h
+  let b : ContDiffBump (0 : ℝ) := ⟨1, 2, one_pos, one_lt_two⟩
+  have hc : HasCompactSupport (fun x ↦ (b x : ℂ)) :=
+    b.hasCompactSupport.comp_left Complex.ofReal_zero
+  let f : 𝓢(ℝ, ℂ) := hc.toSchwartzMap (Complex.ofRealCLM.contDiff.comp b.contDiff)
+  have hf (x : ℝ) : f x = (b x : ℂ) := rfl
+  have hev : ∀ᶠ s : ℂ in 𝓝[≠] 1, realArchimedeanMellin f 0 s =
+      realArchimedeanMellin f (Fin.ofNat 2 ((0 : Fin 2).val + 1)) (s + ((1 : ℕ) : ℂ)) :=
+    nhdsNE_le_codiscrete 1 (h 1 0 f)
+  obtain ⟨ε, hε, hball⟩ := Metric.eventually_nhds_iff.mp (eventually_nhdsWithin_iff.mp hev)
+  set σ : ℝ := 1 + ε / 2 with hσ_def
+  have hσ1 : 1 < σ := by rw [hσ_def]; linarith
+  have hmem : dist (σ : ℂ) 1 < ε := by
+    rw [Complex.dist_eq, show (σ : ℂ) - 1 = ((ε / 2 : ℝ) : ℂ) by rw [hσ_def]; push_cast; ring,
+      Complex.norm_real, Real.norm_eq_abs, abs_of_pos (by linarith)]
+    linarith
+  have hne : (σ : ℂ) ≠ 1 := by
+    intro h1
+    have := congrArg Complex.re h1
+    simp only [Complex.ofReal_re, Complex.one_re] at this
+    linarith
+  have heq := hball hmem hne
+  have hfin : Fin.ofNat 2 ((0 : Fin 2).val + 1) = 1 := rfl
+  rw [hfin, Nat.cast_one] at heq
+  -- the odd profile of the even bump vanishes
+  have hR : realArchimedeanMellin f 1 ((σ : ℂ) + 1) = 0 := by
+    rw [realArchimedeanMellin_eq_integral f 1 _ (by simp; linarith)]
+    have hz : (fun t : ℝ ↦ f t + (-1 : ℂ) ^ (1 : Fin 2).val * f (-t)) = fun _ ↦ 0 := by
+      funext t
+      rw [hf, hf, b.neg]
+      simp
+    rw [hz]
+    simp [mellin]
+  -- the even profile has a positive Mellin integral at σ
+  let r : ℝ → ℝ := fun t ↦ t ^ (σ - 1) * (2 * b t)
+  have hrc : Continuous r :=
+    (Real.continuous_rpow_const (by linarith)).mul (continuous_const.mul b.continuous)
+  have hrs : HasCompactSupport r := (b.hasCompactSupport.mul_left).mul_left
+  have hL : realArchimedeanMellin f 0 (σ : ℂ) = ((∫ t in Ioi (0 : ℝ), r t : ℝ) : ℂ) := by
+    rw [realArchimedeanMellin_eq_integral f 0 _ (by simp; linarith), mellin,
+      ← integral_complex_ofReal]
+    refine setIntegral_congr_fun measurableSet_Ioi fun t ht ↦ ?_
+    rw [hf, hf, b.neg]
+    simp only [r, Fin.val_zero, pow_zero, one_mul, smul_eq_mul]
+    rw [Complex.ofReal_mul, Complex.ofReal_cpow (le_of_lt ht)]
+    push_cast
+    ring
+  have hpos : 0 < ∫ t in Ioi (0 : ℝ), r t := by
+    rw [setIntegral_pos_iff_support_of_nonneg_ae]
+    · refine lt_of_lt_of_le (by simp : (0 : ENNReal) < MeasureTheory.volume (Ioo (0 : ℝ) 1))
+        (MeasureTheory.measure_mono fun t ht ↦ ⟨?_, ht.1⟩)
+      have hb : 0 < b t := b.pos_of_mem_ball (by
+        rw [Metric.mem_ball, Real.dist_eq, sub_zero, abs_of_pos ht.1]
+        exact ht.2.trans one_lt_two)
+      exact (mul_pos (Real.rpow_pos_of_pos ht.1 _) (mul_pos two_pos hb)).ne'
+    · filter_upwards [self_mem_ae_restrict measurableSet_Ioi] with t ht
+      exact mul_nonneg (Real.rpow_nonneg (le_of_lt ht) _) (mul_nonneg zero_le_two (b.nonneg' t))
+    · exact (hrc.integrable_of_hasCompactSupport hrs).integrableOn
+  rw [hL, hR] at heq
+  exact hpos.ne' (Complex.ofReal_eq_zero.mp heq)
 
 section SAdele
 
@@ -150,12 +286,62 @@ def Printed.sLocalRestriction_surjective : Prop :=
     (∀ w : InfinitePlace F, Function.Surjective (sLocalInfiniteRestriction (S := S) w)) ∧
     ∀ v : S, Function.Surjective (sLocalFiniteRestriction v)
 
+/-- A real place carries the sign quasi-character, which is `-1` at `-1`. -/
+private theorem Printed.sLocalRestriction_surjective_sign {F : Type} [Field F] [NumberField F]
+    (w : InfinitePlace F) (hw : w.IsReal) :
+    ∃ c : QuasiCharacter w.Completionˣ, c (-1) = -1 := by
+  let e := InfinitePlace.Completion.ringEquivRealOfIsReal hw
+  have he : Continuous (fun x : w.Completion ↦ e x) :=
+    (InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal hw).continuous
+  have hne (g : w.Completionˣ) : e (g : w.Completion) ≠ 0 := (map_ne_zero e).mpr g.ne_zero
+  let φ : w.Completionˣ → ℂ := fun g ↦ ((e g / abs (e g) : ℝ) : ℂ)
+  have hφ1 : φ 1 = 1 := by simp [φ]
+  have hφm : ∀ a b, φ (a * b) = φ a * φ b := by
+    intro a b
+    simp only [φ, Units.val_mul, map_mul, abs_mul, mul_div_mul_comm, Complex.ofReal_mul]
+  have hφc : Continuous φ := Complex.continuous_ofReal.comp ((he.comp Units.continuous_val).div
+      (he.comp Units.continuous_val).abs fun g ↦ abs_ne_zero.mpr (hne g))
+  refine ⟨⟨⟨⟨φ, hφ1⟩, hφm⟩, hφc⟩, ?_⟩
+  change φ (-1) = -1
+  simp [φ]
+
+/-- Over `ℚ` with no finite places, the local unit `-1` at the real place is the diagonal
+S-unit `-1`, so every S-local quasi-character restricts to `1` there. -/
+private theorem Printed.sLocalRestriction_surjective_neg_one
+    (c : QuasiCharacter (SIdeleQuotient ℚ ∅)) :
+    sLocalInfiniteRestriction (default : InfinitePlace ℚ) c (-1) = 1 := by
+  obtain ⟨g, hg, hgv⟩ : ∃ g : (SAdeleRing ℚ (∅ : Finset V(ℚ)))ˣ,
+      sLocalInfiniteRestriction (default : InfinitePlace ℚ) c (-1) = c (QuotientGroup.mk g) ∧
+      (g : SAdeleRing ℚ (∅ : Finset V(ℚ))) = -1 := by
+    refine ⟨_, rfl, Prod.ext (funext fun v ↦ ?_) (funext fun v ↦ ?_)⟩
+    · rw [Subsingleton.elim v default]
+      change ((@Pi.mulSingle (InfinitePlace ℚ) (fun v ↦ v.Completionˣ) _ (Classical.decEq _)
+        default (-1) default : (default : InfinitePlace ℚ).Completionˣ) :
+          (default : InfinitePlace ℚ).Completion) = _
+      simp only [Pi.mulSingle_eq_same, Units.val_neg, Units.val_one]
+      rfl
+    · exact absurd v.2 (Finset.notMem_empty _)
+  have hg1 : (QuotientGroup.mk g : SIdeleQuotient ℚ ∅) = 1 := by
+    rw [sIdeleQuotient_mk_eq_one]
+    refine ⟨-1, Units.ext ?_⟩
+    rw [hgv]
+    simp
+  rw [hg, hg1, map_one]
+
 /-- Paper: Lemma 5.3.4.2(2), proof, p. 260. For ℚ and the set consisting of the real place,
 the local unit −1 maps to the identity of the S-idele quotient because it is the diagonal
 S-unit −1. The local sign character takes value −1 there and so lies outside the image. -/
 theorem Printed.sLocalRestriction_surjective_false :
     ¬ Printed.sLocalRestriction_surjective := by
-  sorry
+  intro h
+  have hw : (default : InfinitePlace ℚ).IsReal := by
+    rw [Subsingleton.elim default Rat.infinitePlace]
+    exact Rat.isReal_infinitePlace
+  obtain ⟨σ, hσ⟩ := Printed.sLocalRestriction_surjective_sign _ hw
+  obtain ⟨c, hc⟩ := (h ℚ ∅).1 default σ
+  have h1 := DFunLike.congr_fun hc (-1)
+  rw [hσ, Printed.sLocalRestriction_surjective_neg_one c] at h1
+  norm_num at h1
 
 local notation "Jₛ(" F ", " S ")" => SIdeleQuotient F S
 local notation "chart(" F ", " S ", " χ ")" =>
@@ -175,13 +361,102 @@ def Printed.sLocalIdelicZFunction_principalValue_has_poles : Prop :=
       meromorphicOrderAt (fun z ↦ sLocalIdelicZFunction
         (sAdelePrincipalValue F (Finset.Subset.refl S) f) (chart(F, S, χ) z)) s < 0
 
+/-- At a real place the twisted trivial S-local character has Euler factor `Γℝ`. -/
+private theorem Printed.sLocalPoles_trivial_real (F : Type) [Field F] [NumberField F]
+    (S : Finset V(F)) (w : InfinitePlace F) (hw : w.IsReal) (z : ℂ) :
+    infiniteLocalEulerFactor w
+      (sLocalInfiniteRestriction w (chart(F, S, (1 : PontryaginDual Jₛ(F, S))) z)) =
+      Complex.Gammaℝ z := by
+  have hval (g : w.Completionˣ) :
+      sLocalInfiniteRestriction w (chart(F, S, (1 : PontryaginDual Jₛ(F, S))) z) g =
+      (((((Units.map nnNormHom.toMonoidHom) ^ InfinitePlace.mult w :
+        (InfinitePlace.Completion w)ˣ →* ℝ≥0ˣ) g : ℝ≥0) : ℝ) : ℂ) ^ z :=
+    sLocalInfiniteRestriction_normTwist w z g
+  have hshape : ∀ x : ℝˣ, sLocalInfiniteRestriction w
+      (chart(F, S, (1 : PontryaginDual Jₛ(F, S))) z)
+      (Units.map (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm.toMonoidHom x) =
+      (‖(x : ℝ)‖ : ℂ) ^ (z : ℂ) *
+        (if 0 < (x : ℝ) then 1 else (-1 : ℂ)) ^ ((0 : Fin 2) : Fin 2).val := by
+    intro x
+    have hn : ‖((InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm (x : ℝ) :
+        w.Completion)‖ = ‖(x : ℝ)‖ :=
+      (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).symm.isometry.norm_map_of_map_zero
+        (map_zero (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm) (x : ℝ)
+    rw [hval]
+    simp [InfinitePlace.mult, hw, hn]
+  have h := (realLocalEulerParameters w hw (sLocalInfiniteRestriction w
+    (chart(F, S, (1 : PontryaginDual Jₛ(F, S))) z))).unique
+    (realLocalEulerParameters w hw _).exists.choose_spec (y₂ := (z, 0)) hshape
+  simp only [infiniteLocalEulerFactor, hw, ↓reduceDIte, h, Fin.val_zero,
+    Nat.cast_zero, add_zero]
+
+/-- Over `ℚ` with no finite places, the Euler factor of the twisted trivial character at the
+real place has a pole at `0`. -/
+private theorem Printed.sLocalPoles_rat_order_neg :
+    meromorphicOrderAt (fun z ↦ infiniteLocalEulerFactor (default : InfinitePlace ℚ)
+      (sLocalInfiniteRestriction default
+        (chart(ℚ, (∅ : Finset V(ℚ)), (1 : PontryaginDual Jₛ(ℚ, ∅))) z))) 0 < 0 := by
+  have hw : (default : InfinitePlace ℚ).IsReal := by
+    rw [Subsingleton.elim default Rat.infinitePlace]
+    exact Rat.isReal_infinitePlace
+  have hfun : (fun z ↦ infiniteLocalEulerFactor (default : InfinitePlace ℚ)
+      (sLocalInfiniteRestriction default
+        (chart(ℚ, (∅ : Finset V(ℚ)), (1 : PontryaginDual Jₛ(ℚ, ∅))) z))) =
+      fun z ↦ ((Complex.Gammaℝ z)⁻¹)⁻¹ :=
+    funext fun z ↦ by rw [Printed.sLocalPoles_trivial_real ℚ ∅ default hw z, inv_inv]
+  rw [hfun]
+  set h : ℂ → ℂ := fun z ↦ (Complex.Gammaℝ z)⁻¹ with hh_def
+  have hh : AnalyticAt ℂ h 0 := Complex.differentiable_Gammaℝ_inv.analyticAt 0
+  have h0 : h 0 = 0 := by simp [hh_def, Complex.Gammaℝ]
+  have hpos : ∀ x : ℝ, 0 < x → h x ≠ 0 := fun x hx ↦
+    inv_ne_zero (Complex.Gammaℝ_ne_zero_of_re_pos (by simpa using hx))
+  have hne : ¬ ∀ᶠ z in 𝓝 (0 : ℂ), h z = 0 := by
+    intro hev
+    obtain ⟨ε, hε, hball⟩ := Metric.eventually_nhds_iff.mp hev
+    refine hpos (ε / 2) (by linarith) (hball ?_)
+    rw [dist_zero_right, Complex.norm_real, Real.norm_eq_abs, abs_of_pos (by linarith)]
+    linarith
+  rw [show meromorphicOrderAt (fun z ↦ (h z)⁻¹) 0 = -meromorphicOrderAt h 0 from
+      meromorphicOrderAt_inv, hh.meromorphicOrderAt_eq]
+  have h1 : analyticOrderAt h 0 ≠ 0 := by
+    rw [Ne, analyticOrderAt_eq_zero]
+    simp [hh, h0]
+  have h2 : analyticOrderAt h 0 ≠ ⊤ := by rwa [Ne, analyticOrderAt_eq_top]
+  obtain ⟨n, hn⟩ := ENat.ne_top_iff_exists.mp h2
+  rw [← hn] at h1 ⊢
+  have : (0 : ℕ) < n := Nat.pos_of_ne_zero (by exact_mod_cast h1)
+  simp only [ENat.map_natCast]
+  exact_mod_cast (by omega : -(n : ℤ) < 0)
+
+/-- Over `ℚ` with no finite places, the trivial norm-twist line has a positive archimedean
+pole multiplicity at `0`. -/
+private theorem Printed.sLocalPoles_rat_multiplicity_pos :
+    0 < sLocalArchimedeanPoleMultiplicity (F := ℚ) (S := ∅)
+      (1 : PontryaginDual Jₛ(ℚ, ∅)) 0 :=
+  (sLocalArchimedeanPoleMultiplicity_pos_iff _ _).mpr ⟨default, Printed.sLocalPoles_rat_order_neg⟩
+
+/-- The S-local Z-function of the zero test vanishes. -/
+private theorem Printed.sLocalIdelicZFunction_zero (F : Type) [Field F] [NumberField F]
+    (S : Finset V(F)) : sLocalIdelicZFunction (0 : ℬ(SAdeleRing F S)) = 0 := by
+  have hu := sLocalIdelicZetaIntegral_exists_continuation (F := F) (S := S) 0
+  refine hu.unique ⟨sLocalIdelicZFunction_meromorphic 0, sLocalIdelicZFunction_eq_integral 0⟩
+    ⟨fun χ ↦ ?_, fun c _ ↦ ?_⟩
+  · exact (analyticOnNhd_const (v := (0 : ℂ))).meromorphicNFOn
+  · simp [sLocalIdelicZetaIntegral]
+
 /-- Paper: Proposition 5.3.4.5(2), p. 264. For ℚ with only the real place, take the
 trivial character at s = 0 and a nonzero even, nonnegative smooth bump supported on
 1 < |x| < 2. There are no finite principal values to apply. The Mellin transform is entire,
 while the real Euler factor Γℝ(s) has a simple pole at zero. -/
 theorem Printed.sLocalIdelicZFunction_principalValue_has_poles_false :
     ¬ Printed.sLocalIdelicZFunction_principalValue_has_poles := by
-  sorry
+  intro h
+  have h1 := h ℚ ∅ 0 1 0 Printed.sLocalPoles_rat_multiplicity_pos
+  rw [map_zero, Printed.sLocalIdelicZFunction_zero] at h1
+  simp only [Pi.zero_apply] at h1
+  rw [show meromorphicOrderAt (fun _ : ℂ ↦ (0 : ℂ)) 0 = ⊤ from
+    meromorphicOrderAt_eq_top_iff.mpr (Eventually.of_forall fun _ ↦ rfl)] at h1
+  exact not_top_lt h1
 
 /-- Paper: Proposition 5.3.4.5(2), p. 264. As printed: At each point in the union of pulled-back
 archimedean pole sets, the sum of the signed orders of the local Euler factors is the value
@@ -200,7 +475,13 @@ norm-twist line at s = 0. Its Euler factor Γℝ(s) has a simple pole, so the so
 −1 in the divisor convention of (7.1.2.1). No natural multiplicity has this signed value. -/
 theorem Printed.sLocalArchimedeanPoleMultiplicity_eq_sum_false :
     ¬ Printed.sLocalArchimedeanPoleMultiplicity_eq_sum := by
-  sorry
+  intro h
+  obtain ⟨N, hN⟩ := h ℚ ∅ 1
+  have h1 := hN ⟨0, Printed.sLocalPoles_rat_multiplicity_pos⟩
+  rw [Fintype.sum_unique] at h1
+  have h2 := Printed.sLocalPoles_rat_order_neg
+  rw [← h1] at h2
+  exact absurd h2 (not_lt.mpr (by exact_mod_cast (N _).zero_le))
 
 end SAdele
 

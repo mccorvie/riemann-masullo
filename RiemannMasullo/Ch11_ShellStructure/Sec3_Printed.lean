@@ -3,9 +3,9 @@ module
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4b
 public import RiemannMasullo.Ch11_ShellStructure.Sec3
 
-import all RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
-import all RiemannMasullo.Ch10_TraceSpectral.Sec1
-import all RiemannMasullo.Ch11_ShellStructure.Sec1a
+import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
+import RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.Ch11_ShellStructure.Sec1a
 
 /-! # False printed claims from §11.3 -/
 

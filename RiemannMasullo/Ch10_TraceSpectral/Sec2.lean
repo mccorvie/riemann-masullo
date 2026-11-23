@@ -1,7 +1,6 @@
 module
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec1
-import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a_part2
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec1
 import all RiemannMasullo.Ch09_HardySobolev.Sec2
@@ -133,6 +132,51 @@ theorem spectralSobolevPairing_dual {l r s : ℝ} (hI : l ≤ r) (hs : 0 ≤ s)
     Integrable (fun g ↦ f g * T Λ g) μ𝔽 ∧ Λ f = pair(f, T Λ) := by
   exact (modulatedIntervalSobolev_dual m𝔽 hm𝔽 μ𝔽 l r s hI hs).exists.choose_spec Λ f
 
+/-- Conjugating a weighted L² vector and multiplying by the density gives a vector of the
+reciprocal-weight space whose product integral with the original is its squared norm. -/
+private theorem spectralSobolevPairing_isotype_conj {X : Type*} [MeasurableSpace X] (ν : Measure X)
+    {ρ ρ' : X → ℝ} (hρ : Measurable ρ) (hρ' : Measurable ρ') (hpos : ∀ x, 0 < ρ x)
+    (hpos' : ∀ x, 0 < ρ' x) (hr : ∀ x, ρ x * ρ' x = 1)
+    (f : Lp ℂ 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ x))) :
+    ∃ g : Lp ℂ 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ' x)),
+      (g : X → ℂ) =ᵐ[ν] (fun x ↦ (ρ x : ℂ) * star (f x)) ∧
+      ∫ x, f x * g x ∂ν = ((‖f‖ ^ 2 : ℝ) : ℂ) := by
+  have hbase {ρ : X → ℝ} (hρ : Measurable ρ) (hpos : ∀ x, 0 < ρ x) :
+      ν ≪ ν.withDensity fun x ↦ ENNReal.ofReal (ρ x) :=
+    withDensity_absolutelyContinuous' hρ.ennreal_ofReal.aemeasurable
+      (ae_of_all _ fun x ↦ (ENNReal.ofReal_pos.mpr (hpos x)).ne')
+  let u : X → ℂ := fun x ↦ (ρ x : ℂ) * star (f x)
+  have hsq (x : X) : ‖u x‖ ^ 2 * ρ' x = ‖f x‖ ^ 2 * ρ x := by
+    calc
+      _ = ‖f x‖ ^ 2 * (ρ x * (ρ x * ρ' x)) := by
+        dsimp only [u]
+        rw [norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos (hpos x), norm_star]
+        ring
+      _ = _ := by rw [hr, mul_one]
+  have hmeas : AEStronglyMeasurable u (ν.withDensity fun x ↦ ENNReal.ofReal (ρ' x)) :=
+    (Complex.measurable_ofReal.comp hρ).aestronglyMeasurable.mul
+      (((Lp.aestronglyMeasurable f).mono_ac (hbase hρ hpos)).mono_ac
+        (withDensity_absolutelyContinuous _ _)).star
+  have hmem : MemLp u 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ' x)) := by
+    apply (memLp_two_iff_integrable_sq_norm hmeas).2
+    apply (integrable_withDensity_iff hρ'.ennreal_ofReal
+      (ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top)).2
+    refine (weightedL2_norm_eq ν hρ hpos f).1.congr (ae_of_all _ fun x ↦ ?_)
+    change ‖f x‖ ^ 2 * ρ x = ‖u x‖ ^ 2 * (ENNReal.ofReal (ρ' x)).toReal
+    rw [ENNReal.toReal_ofReal (hpos' x).le, hsq]
+  have hcoe : (hmem.toLp u : X → ℂ) =ᵐ[ν] u := (hbase hρ' hpos').ae_eq hmem.coeFn_toLp
+  refine ⟨hmem.toLp u, hcoe, ?_⟩
+  obtain ⟨hint, hnorm⟩ := weightedL2_norm_eq ν hρ hpos f
+  have hI : ∫ x, ‖f x‖ ^ 2 * ρ x ∂ν = ‖f‖ ^ 2 := by
+    rw [hnorm, Real.sq_sqrt (integral_nonneg fun x ↦ mul_nonneg (sq_nonneg _) (hpos x).le)]
+  rw [← hI, ← integral_complex_ofReal]
+  refine integral_congr_ae ?_
+  filter_upwards [hcoe] with x hx
+  rw [hx]
+  dsimp only [u]
+  rw [Complex.star_def, Complex.ofReal_mul, Complex.ofReal_pow, ← Complex.mul_conj']
+  ring
+
 /-- Paper: (10.2.1.3), p. 440, and (10.2.2.3), p. 445. The pairing on a
 positive Sobolev isotype and the conjugate reciprocal-weight isotype is nondegenerate.
 The negative-space isotype is specified by left translation of its representatives. -/
@@ -143,7 +187,83 @@ theorem spectralSobolevPairing_isotype {l r s : ℝ} (hI : l ≤ r) (hs : 0 ≤ 
     (∀ f : Wω(hI, hs, ω), f ≠ 0 →
       ∃ u : W'(l, r, s), IsConjugate u ∧ pair(f.val, u) ≠ 0) ∧
     ∀ u : W'(l, r, s), IsConjugate u → u ≠ 0 →
-      ∃ f : Wω(hI, hs, ω), pair(f.val, u) ≠ 0 := by sorry
+      ∃ f : Wω(hI, hs, ω), pair(f.val, u) ≠ 0 := by
+  intro IsConjugate
+  let w : C𝔽 → ℝ := fun g ↦ intervalSobolevDensity l r s (logNorm g)
+  have hlog : Measurable logNorm :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp
+      (isProperMap_ideleClassNorm F).continuous)).measurable.log
+  have hw : Measurable w := (continuous_intervalSobolevDensity' l r s).measurable.comp hlog
+  have hwpos : ∀ x, 0 < w x := fun x ↦ intervalSobolevDensity_pos l r s _
+  have hwk : ∀ (k : C₁) g, w (k.val⁻¹ * g) = w g := by
+    intro k g
+    have hk : ideleClassNorm F k.val = 1 := k.2
+    simp only [w, map_mul, map_inv, hk, inv_one, one_mul]
+  have hbase : μ𝔽 ≪ (μ𝔽).withDensity (fun x ↦ ENNReal.ofReal (w x)) :=
+    withDensity_absolutelyContinuous' hw.ennreal_ofReal.aemeasurable
+      (ae_of_all _ fun x ↦ (ENNReal.ofReal_pos.mpr (hwpos x)).ne')
+  have hwd : ((μ𝔽).withDensity fun x ↦ ENNReal.ofReal (w x)) ≪ μ𝔽 :=
+    withDensity_absolutelyContinuous _ _
+  have hiso (f : W(l, r, s)) : f ∈ Wω(hI, hs, ω) ↔
+      ∀ k : C₁, (fun g ↦ f (k.val⁻¹ * g)) =ᵐ[μ𝔽] fun g ↦ (ω k : ℂ) * f g := by
+    rw [mem_actionIsotype]
+    refine forall_congr' fun k ↦ ?_
+    have htr := hardySobolevTranslation_apply μ𝔽 m𝔽 l r s hI hs k.val f
+    have hsm := hbase.ae_eq (Lp.coeFn_smul (ω k : ℂ) f)
+    change hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs k.val f = (ω k : ℂ) • f ↔ _
+    constructor
+    · intro h
+      rw [h] at htr
+      exact htr.symm.trans hsm
+    · intro h
+      exact Lp.ext (hwd.ae_eq (htr.trans (h.trans hsm.symm)))
+  have hωinv (k : C₁) : ((ω⁻¹ k : Circle) : ℂ) = star (ω k : ℂ) := by
+    rw [show ω⁻¹ k = (ω k)⁻¹ from rfl, Circle.coe_inv_eq_conj]
+    rfl
+  have hqmp (k : C₁) := (measurePreserving_mul_left μ𝔽 k.val⁻¹).quasiMeasurePreserving
+  refine ⟨fun f hf ↦ ?_, fun u hu hu0 ↦ ?_⟩
+  · obtain ⟨u, hu, hpair⟩ : ∃ u : W'(l, r, s),
+        (u : C𝔽 → ℂ) =ᵐ[μ𝔽] (fun x ↦ (w x : ℂ) * star (f.val x)) ∧
+        ∫ x, f.val x * u x ∂μ𝔽 = ((‖f.val‖ ^ 2 : ℝ) : ℂ) :=
+      spectralSobolevPairing_isotype_conj μ𝔽 (ρ := w) (ρ' := fun x ↦ (w x)⁻¹) hw hw.inv hwpos
+        (fun x ↦ inv_pos.2 (hwpos x)) (fun x ↦ mul_inv_cancel₀ (hwpos x).ne') f.val
+    refine ⟨u, fun k ↦ ?_, ?_⟩
+    · have hfk := (hiso f.val).1 f.2 k
+      have hu' := (hqmp k).ae_eq_comp hu
+      filter_upwards [hu', hfk, hu] with g h1 h2 h3
+      simp only [comp_apply] at h1
+      rw [h1, h2, h3, hwk, star_mul']
+      simp only [hωinv]
+      ring
+    · change ∫ g, f.val g * u g ∂μ𝔽 ≠ 0
+      rw [hpair]
+      exact_mod_cast pow_ne_zero 2 (norm_ne_zero_iff.2 fun h ↦ hf (Subtype.ext h))
+  · have key : ∃ f : W(l, r, s),
+        (f : C𝔽 → ℂ) =ᵐ[μ𝔽] (fun x ↦ ((w x)⁻¹ : ℂ) * star (u x)) ∧
+        ∫ x, u x * f x ∂μ𝔽 = ((‖u‖ ^ 2 : ℝ) : ℂ) := by
+      obtain ⟨f, hf, hpair⟩ := spectralSobolevPairing_isotype_conj μ𝔽
+        (ρ := fun x ↦ if true = true then (w x)⁻¹ else w x)
+        (ρ' := fun x ↦ if false = true then (w x)⁻¹ else w x)
+        (by simp only [↓reduceIte]; exact hw.inv)
+        (by simpa using hw) (by simpa using fun x ↦ inv_pos.2 (hwpos x)) (by simpa using hwpos)
+        (fun x ↦ by simpa using inv_mul_cancel₀ (hwpos x).ne') u
+      refine ⟨f, ?_, ?_⟩
+      · filter_upwards [hf] with x hx
+        rw [hx]
+        simp only [↓reduceIte, Complex.ofReal_inv]
+      · exact hpair
+    obtain ⟨f, hf, hpair⟩ := key
+    refine ⟨⟨f, (hiso f).2 fun k ↦ ?_⟩, ?_⟩
+    · have hf' := (hqmp k).ae_eq_comp hf
+      filter_upwards [hf', hu k, hf] with g h1 h2 h3
+      simp only [comp_apply] at h1
+      rw [h1, h2, h3, hwk, star_mul']
+      simp only [hωinv, star_star]
+      ring
+    · change ∫ g, f g * u g ∂μ𝔽 ≠ 0
+      simp_rw [mul_comm (f _)]
+      rw [hpair]
+      exact_mod_cast pow_ne_zero 2 (norm_ne_zero_iff.2 hu0)
 
 variable (F) in
 /-- Paper: (10.2.1.3), p. 440, and (10.2.2.3), p. 445. Pull a functional
@@ -671,9 +791,126 @@ theorem spectralLineIsotypeDual_pullback (a : ℝ) {s : ℝ} (hs : 0 ≤ s) (ω 
     let i := (existsUnique_spectralLineTestCompletion a hs ω).exists.choose
     let D : StrongDual ℂ (spectralSobolevIsotypeQuotient F a hI hs ω) →L[ℂ]
         StrongDual ℂ Eω(ω) := (N.mkQL.comp i).precomp ℂ
-    Injective D ∧ ∀ Λ (φ : Eω(ω)) (f : ℬ₀), φ.val.val = homogeneousAdelicTheta ω f.val → D Λ φ = 0 := by sorry
+    Injective D ∧ ∀ Λ (φ : Eω(ω)) (f : ℬ₀), φ.val.val = homogeneousAdelicTheta ω f.val → D Λ φ = 0 := by
+  intro hI N i D
+  have hi := (existsUnique_spectralLineTestCompletion (F := F) a hs ω).exists.choose_spec
+  constructor
+  · have hd : DenseRange (N.mkQL.comp i) :=
+      N.mkQ_surjective.denseRange.comp hi.2.1 N.mkQL.continuous
+    intro Λ₁ Λ₂ hΛ
+    apply DFunLike.coe_injective
+    exact hd.equalizer Λ₁.continuous Λ₂.continuous
+      (funext fun φ ↦ congrArg (fun T : StrongDual ℂ Eω(ω) ↦ T φ) hΛ)
+  · intro Λ φ f hφ
+    let x : globalPolarFreeThetaSubmodule (F := F) ω :=
+      ⟨Submodule.Quotient.mk f.val, Submodule.mem_map.mpr ⟨f.val, f.property, rfl⟩⟩
+    let j := (exists_globalHomogeneousThetaSobolevInclusion
+      (F := F) (a := a) hI hs ω).choose
+    have hj := (exists_globalHomogeneousThetaSobolevInclusion
+      (F := F) (a := a) hI hs ω).choose_spec.2.2
+    have he : (i φ).val = (j x).val.val := by
+      apply Lp.ext
+      apply (withDensity_absolutelyContinuous μ𝔽 _).ae_eq
+      have hw : modulationWeight m𝔽 a φ.val.val =ᵐ[μ𝔽]
+          modulationWeight m𝔽 a (homogeneousAdelicTheta ω f.val) :=
+        Filter.Eventually.of_forall (congrFun (congrArg (modulationWeight m𝔽 a) hφ))
+      exact (hi.1 φ).trans (hw.trans (hj f x rfl).2.symm)
+    have hn : i φ ∈ N := by
+      change (i φ).val ∈ Θ(a, hI, hs)
+      rw [he]
+      exact (j x).val.property
+    change Λ (N.mkQ (i φ)) = 0
+    exact (congrArg Λ ((Submodule.Quotient.mk_eq_zero N).mpr hn)).trans (map_zero Λ)
 
 end TestDuality
+
+/-- Every logarithmic moment of a function integrable against all quasi-characters is
+integrable against every real norm twist. -/
+private theorem spectralLineJet_functional_moment
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [MeasurableSpace G] [BorelSpace G]
+    (m : G →ₜ* ℝ≥0ˣ) (μ : Measure G) (χ : QuasiCharacter G) (u : G → ℂ)
+    (hu : ∀ c : QuasiCharacter G, Integrable (fun g ↦ u g * c g) μ) (σ : ℝ) (n : ℕ) :
+    Integrable (fun g ↦ u g * (Real.log ((m g).val : ℝ) : ℂ) ^ n *
+      quasiCharacterNormTwist m.toMonoidHom m.continuous χ (σ : ℂ) g) μ := by
+  have hlog : Measurable (fun g ↦ Real.log ((m g).val : ℝ)) :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).measurable.log
+  let tw (w : ℝ) := quasiCharacterNormTwist m.toMonoidHom m.continuous χ (w : ℂ)
+  have h1 := (hu (tw (σ + 1))).norm
+  have h2 := (hu (tw (σ - 1))).norm
+  have hmeas : AEStronglyMeasurable (fun g ↦ u g * (Real.log ((m g).val : ℝ) : ℂ) ^ n *
+      quasiCharacterNormTwist m.toMonoidHom m.continuous χ (σ : ℂ) g) μ := by
+    have hL : AEStronglyMeasurable (fun g ↦ (Real.log ((m g).val : ℝ) : ℂ) ^ n) μ :=
+      ((Complex.measurable_ofReal.comp hlog).pow_const n).aestronglyMeasurable
+    refine ((hu (tw σ)).aestronglyMeasurable.mul hL).congr (ae_of_all _ fun g ↦ ?_)
+    simp only [Pi.mul_apply, tw]
+    ring
+  refine ((h1.add h2).const_mul (n.factorial : ℝ)).mono' hmeas (ae_of_all _ fun g ↦ ?_)
+  set L := Real.log ((m g).val : ℝ) with hLdef
+  have hnorm (w : ℝ) : ‖quasiCharacterNormTwist m.toMonoidHom m.continuous χ (w : ℂ) g‖ =
+      ‖χ g‖ * Real.exp (w * L) := by
+    rw [quasiCharacterNormTwist_eq_exp, norm_mul, ← Complex.ofReal_mul, Complex.norm_exp_ofReal]
+  have hpow : |L| ^ n ≤ n.factorial * (Real.exp L + Real.exp (-L)) := by
+    have h := Real.pow_div_factorial_le_exp |L| (abs_nonneg L) n
+    have hf : (0 : ℝ) < n.factorial := by exact_mod_cast Nat.factorial_pos n
+    have habs : Real.exp |L| ≤ Real.exp L + Real.exp (-L) := by
+      rcases abs_cases L with ⟨h', _⟩ | ⟨h', _⟩ <;> rw [h'] <;>
+        linarith [Real.exp_pos L, Real.exp_pos (-L)]
+    rw [div_le_iff₀ hf] at h
+    nlinarith
+  change ‖u g * (L : ℂ) ^ n * tw σ g‖ ≤
+    (n.factorial : ℝ) * (‖u g * tw (σ + 1) g‖ + ‖u g * tw (σ - 1) g‖)
+  simp only [tw, norm_mul, norm_pow, Complex.norm_real, Real.norm_eq_abs, hnorm]
+  have hA : 0 ≤ ‖u g‖ * (‖χ g‖ * Real.exp (σ * L)) := by positivity
+  have e1 : Real.exp ((σ + 1) * L) = Real.exp (σ * L) * Real.exp L := by
+    rw [← Real.exp_add]; ring_nf
+  have e2 : Real.exp ((σ - 1) * L) = Real.exp (σ * L) * Real.exp (-L) := by
+    rw [← Real.exp_add]; ring_nf
+  rw [e1, e2]
+  calc ‖u g‖ * |L| ^ n * (‖χ g‖ * Real.exp (σ * L))
+      = (‖u g‖ * (‖χ g‖ * Real.exp (σ * L))) * |L| ^ n := by ring
+    _ ≤ (‖u g‖ * (‖χ g‖ * Real.exp (σ * L))) * (n.factorial * (Real.exp L + Real.exp (-L))) :=
+        mul_le_mul_of_nonneg_left hpow hA
+    _ = _ := by ring
+
+/-- The pairing of a weighted function with a line jet is the derivative of its
+norm-twisted Mellin integral at the shifted point. -/
+private theorem spectralLineJet_functional_deriv
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [MeasurableSpace G] [BorelSpace G]
+    (m : G →ₜ* ℝ≥0ˣ) (μ : Measure G) (χ : QuasiCharacter G) (u : G → ℂ)
+    (hu : ∀ c : QuasiCharacter G, Integrable (fun g ↦ u g * c g) μ) (a t : ℝ) (k : ℕ) :
+    ∫ g, modulationWeight m a u g *
+        (quasiCharacterNormTwist m.toMonoidHom m.continuous χ (((0 : ℝ) : ℂ) + (t : ℂ) * Complex.I) g *
+          (Real.log ((m g).val : ℝ) : ℂ) ^ k) ∂μ =
+      iteratedDeriv k (fun w ↦ ∫ g, u g *
+        quasiCharacterNormTwist m.toMonoidHom m.continuous χ w g ∂μ)
+        ((a : ℂ) + (t : ℂ) * Complex.I) := by
+  obtain ⟨_, _, hderiv⟩ := iteratedDeriv_normTwist_moment m μ χ
+    (α := a - 1) (β := a + 1) (fun σ _ n ↦ spectralLineJet_functional_moment m μ χ u hu σ n) k
+    (z := (a : ℂ) + (t : ℂ) * Complex.I) (by simp)
+  rw [hderiv]
+  refine integral_congr_ae (ae_of_all _ fun g ↦ ?_)
+  have hpos : 0 < ((m g).val : ℝ) := NNReal.coe_pos.mpr (pos_of_ne_zero (m g).ne_zero)
+  change (((((m g).val : ℝ) ^ a : ℝ)) : ℂ) * u g * _ = _
+  dsimp only
+  rw [quasiCharacterNormTwist_eq_exp, quasiCharacterNormTwist_eq_exp,
+    Real.rpow_def_of_pos hpos, Complex.ofReal_exp, Complex.ofReal_mul]
+  have e : Complex.exp (((a : ℂ) + (t : ℂ) * Complex.I) * (Real.log ((m g).val : ℝ) : ℂ)) =
+      Complex.exp ((Real.log ((m g).val : ℝ) : ℂ) * (a : ℂ)) *
+        Complex.exp ((((0 : ℝ) : ℂ) + (t : ℂ) * Complex.I) * (Real.log ((m g).val : ℝ) : ℂ)) := by
+    rw [← Complex.exp_add]; congr 1; push_cast; ring
+  rw [e]
+  ring
+
+
+/-- Every function in the two-sided decay space is integrable against every quasi-character. -/
+private theorem spectralLineJet_functional_integrable
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [SecondCountableTopology G] [MeasurableSpace G] [BorelSpace G]
+    (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) (hms : Surjective m)
+    (μ : Measure G) [μ.IsHaarMeasure] (φ : ModulatedExponentialDecay m univ)
+    (c : QuasiCharacter G) : Integrable (fun g ↦ φ.val g * c g) μ :=
+  modulatedFourierMellin_integrable m univ hm ordConnected_univ univ_nonempty μ isOpen_univ hms φ
+    ⟨c, mem_univ _⟩
 
 /-- Paper: (10.2.1.9), p. 442. A surviving line jet acts on the Sobolev
 space by the integral of the input against that jet. On a weighted exponential-
@@ -686,7 +923,73 @@ theorem spectralLineJet_functional (χ : PontryaginDual C₁ → PontryaginDual 
       ∀ (φ : ModulatedExponentialDecay m𝔽 univ) (f : W(0, 0, s)),
         (f : C𝔽 → ℂ) =ᵐ[μ𝔽] modulationWeight m𝔽 a φ.val →
         Λ f = iteratedDeriv j.val.2.2 (fun z ↦ modulatedFourierMellin m𝔽 univ hm𝔽 μ𝔽
-          φ.val (ideleClassNormTwist (χ j.val.1) z)) (shift(a, j.val.2.1)) := by sorry
+          φ.val (ideleClassNormTwist (χ j.val.1) z)) (shift(a, j.val.2.1)) := by
+  have hs0 : (0 : ℝ) ≤ s := by linarith
+  let Td := (modulatedIntervalSobolev_dual m𝔽 hm𝔽 μ𝔽 0 0 s le_rfl hs0).exists.choose
+  let u : W'(0, 0, s) := (spectralLineJet_memLp χ hs j).toLp (lineJet(χ, j))
+  have hac : μ𝔽 ≪ L2μ'(0, 0, s) := by
+    refine withDensity_absolutelyContinuous' ?_ (ae_of_all _ fun g ↦ ?_)
+    · exact ((continuous_intervalSobolevDensity' 0 0 s).measurable.comp
+        (NNReal.continuous_coe.comp (Units.continuous_val.comp
+          (isProperMap_ideleClassNorm F).continuous)).measurable.log).inv.ennreal_ofReal.aemeasurable
+    · exact ENNReal.ofReal_ne_zero_iff.mpr (inv_pos.mpr (intervalSobolevDensity_pos 0 0 s _))
+  have hae : (u : C𝔽 → ℂ) =ᵐ[μ𝔽] lineJet(χ, j) := hac.ae_le (MemLp.coeFn_toLp _)
+  have hpair (f : W(0, 0, s)) : Integrable (fun g ↦ f g * lineJet(χ, j) g) μ𝔽 ∧
+      Td.symm u f = ∫ g, f g * lineJet(χ, j) g ∂μ𝔽 := by
+    have h := spectralSobolevPairing_dual le_rfl hs0 (Td.symm u) f
+    have hTu : Td (Td.symm u) = u := Td.apply_symm_apply u
+    have hc : (fun g ↦ f g * Td (Td.symm u) g) =ᵐ[μ𝔽] fun g ↦ f g * lineJet(χ, j) g := by
+      rw [hTu]
+      exact hae.mono fun g hg ↦ congrArg (f g * ·) hg
+    exact ⟨h.1.congr hc, h.2.trans (integral_congr_ae hc)⟩
+  refine ⟨Td.symm u, hpair, fun φ f hf ↦ ?_⟩
+  let χq : QuasiCharacter C𝔽 :=
+    (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp (χ j.val.1)
+  have hc : (fun g ↦ f g * lineJet(χ, j) g) =ᵐ[μ𝔽]
+      fun g ↦ modulationWeight m𝔽 a φ.val g *
+        (quasiCharacterNormTwist (m𝔽).toMonoidHom (m𝔽).continuous χq (shift(0, j.val.2.1)) g *
+          (Real.log ((m𝔽 g).val : ℝ) : ℂ) ^ j.val.2.2) :=
+    hf.mono fun g hg ↦ by dsimp only; rw [hg]; rfl
+  have key := spectralLineJet_functional_deriv m𝔽 μ𝔽 χq φ.val
+    (spectralLineJet_functional_integrable m𝔽 hm𝔽 hms𝔽 μ𝔽 φ) a j.val.2.1 j.val.2.2
+  have hF : (fun z ↦ modulatedFourierMellin m𝔽 univ hm𝔽 μ𝔽 φ.val
+      (ideleClassNormTwist (χ j.val.1) z)) = fun w ↦ ∫ g, φ.val g *
+        quasiCharacterNormTwist (m𝔽).toMonoidHom (m𝔽).continuous χq w g ∂μ𝔽 :=
+    funext fun z ↦ modulatedFourierMellin_univ m𝔽 hm𝔽 μ𝔽 _ _
+  rw [(hpair f).2, integral_congr_ae hc, hF]
+  exact key
+
+section
+
+universe u v
+
+/-- Integrating scalar multiples of a commutative action preserves every eigenspace. -/
+private theorem spectral_integrated_action_eigenvector
+    {G : Type u} [CommGroup G] [MeasurableSpace G] (μ : Measure G)
+    {V : Type v} [NormedAddCommGroup V] [NormedSpace ℂ V]
+    (ρ : G →* (V →L[ℂ] V)) (f : G → ℂ) (u v : V)
+    (hv : HasPettisIntegral (.positive μ) (fun g ↦ f g • ρ g u) v)
+    (k : G) (c : ℂ) (hu : ρ k u = c • u) : ρ k v = c • v := by
+  have hev (δ : StrongDual ℂ V) : δ v = ∫ g, δ (f g • ρ g u) ∂μ :=
+    congrArg (fun z : PettisWeakCompletion V ↦
+      (show Module.Dual ℂ (StrongDual ℂ V) from z) δ) hv.2
+  apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+  intro δ
+  have he (g : G) : ρ k (f g • ρ g u) = c • (f g • ρ g u) := by
+    rw [map_smul]
+    have hc : ρ k (ρ g u) = ρ g (ρ k u) := by
+      change (ρ k * ρ g) u = (ρ g * ρ k) u
+      rw [← map_mul, ← map_mul, mul_comm k g]
+    rw [hc, hu, map_smul, smul_comm]
+  calc
+    δ (ρ k v) = ∫ g, δ (ρ k (f g • ρ g u)) ∂μ :=
+      hev (δ.comp (ρ k))
+    _ = ∫ g, c • δ (f g • ρ g u) ∂μ :=
+      integral_congr_ae (.of_forall fun g ↦ (congrArg δ (he g)).trans (map_smul δ c _))
+    _ = c • δ v := by rw [integral_smul, ← hev δ]
+    _ = δ (c • v) := (map_smul δ c v).symm
+
+end
 
 /-- Paper: (10.2.1.10), pp. 442–443. The band-limited approximate unit acts
 by convolution on the fixed norm-one isotype and converges there strongly.
@@ -702,7 +1005,58 @@ theorem exists_spectralLineIsotypeConvolution (χ : PontryaginDual C𝔽) {s : �
       (∀ n, tsupport (lcaFourier μ𝔽 (φ n)) ⊆
         modulatedFrequencyBand m𝔽 χ⁻¹ (-(n : ℝ)) n) ∧
       (∀ n (f : E), (P n f).val = A (φ n) f.val) ∧
-      ∀ f : E, Tendsto (fun n ↦ P n f) atTop (𝓝 f) := by sorry
+      ∀ f : E, Tendsto (fun n ↦ P n f) atTop (𝓝 f) := by
+  intro hI E A
+  let τ := hardySobolevTranslation μ𝔽 m𝔽 0 0 s hI hs
+  let B := (existsUnique_singletonDecay_lineAction μ𝔽 m𝔽 hm𝔽 hms𝔽 0 s hs).exists.choose
+  have hB := (existsUnique_singletonDecay_lineAction μ𝔽 m𝔽 hm𝔽 hms𝔽 0 s hs).exists.choose_spec.1
+  have hA := (existsUnique_schwartzBruhat_zeroLineAction μ𝔽 m𝔽 s hs).exists.choose_spec
+  let e := (modulatedExponentialDecay_singleton_schwartz m𝔽 hm𝔽 hms𝔽 0).choose
+  have he (f : ModulatedExponentialDecay m𝔽 {0}) : (e f : C𝔽 → ℂ) = f.val := by
+    exact ((modulatedExponentialDecay_singleton_schwartz m𝔽 hm𝔽 hms𝔽 0).choose_spec f).trans
+      (modulationWeight_zero m𝔽 f.val)
+  have hAB (f : ModulatedExponentialDecay m𝔽 {0}) : A (e f) = B f := by
+    apply ContinuousLinearMap.ext
+    intro u
+    have hp : (fun g ↦ (e f).val g • τ g u) = (fun g ↦ f.val g • τ g u) :=
+      funext fun g ↦ congrArg (fun z : ℂ ↦ z • τ g u) (congrFun (he f) g)
+    have hP : HasPettisIntegral (.positive μ𝔽) (fun g ↦ f.val g • τ g u) (A (e f) u) :=
+      hp ▸ hA (e f) u
+    exact hP.unique (hB f u)
+  let φ := (exists_singletonDecay_isotype_approximation μ𝔽 m𝔽 hm𝔽 hms𝔽 0 s hs χ⁻¹).choose
+  have hφ := (exists_singletonDecay_isotype_approximation μ𝔽 m𝔽 hm𝔽 hms𝔽 0 s hs χ⁻¹).choose_spec
+  have hmem (n : ℕ) (u : E) : A (e (φ n)) u.val ∈ E := by
+    apply (mem_actionIsotype _ _ _).mpr
+    intro k
+    exact spectral_integrated_action_eigenvector μ𝔽 τ (e (φ n)).val u.val
+      (A (e (φ n)) u.val) (hA (e (φ n)) u.val) k.val (χ k.val : ℂ)
+      ((mem_actionIsotype _ _ _).mp u.property k)
+  let P (n : ℕ) : E →L[ℂ] E :=
+    ((A (e (φ n))).comp E.subtypeL).codRestrict E (hmem n)
+  refine ⟨fun n ↦ e (φ n), P, ?_, ?_, ?_, ?_, ?_⟩
+  · intro n
+    rw [hAB]
+    exact hφ.1 n
+  · intro n k g
+    have hchar : star ((χ⁻¹) k.val : ℂ) = (χ k.val : ℂ) := by
+      change star (((χ k.val)⁻¹ : Circle) : ℂ) = _
+      rw [Circle.coe_inv_eq_conj]
+      exact star_star _
+    calc
+      e (φ n) (k.val⁻¹ * g) = (φ n).val (k.val⁻¹ * g) := congrFun (he (φ n)) _
+      _ = star ((χ⁻¹) k.val : ℂ) * (φ n).val g := hφ.2.1 n k g
+      _ = (χ k.val : ℂ) * e (φ n) g := congrArg₂ (· * ·) hchar (congrFun (he (φ n)) g).symm
+  · intro n
+    simpa only [he, modulationWeight_zero] using hφ.2.2.1 n
+  · intro n f
+    rfl
+  · intro f
+    apply tendsto_subtype_rng.mpr
+    change Tendsto (fun n ↦ A (e (φ n)) f.val) atTop (𝓝 f.val)
+    have h : Tendsto (fun n ↦ B (φ n) f.val) atTop (𝓝 f.val) :=
+      hφ.2.2.2 ⟨f.val, by simpa only [inv_inv] using f.property⟩
+    exact h.congr' (Filter.Eventually.of_forall fun n ↦
+      congrArg (fun T : W(0, 0, s) →L[ℂ] W(0, 0, s) ↦ T f.val) (hAB (φ n)).symm)
 
 private theorem spectralJet_lp_norm_sq {μ : Measure C𝔽} (u : Lp ℂ 2 μ) :
     ‖u‖ ^ 2 = ∫ g : C𝔽, ‖u g‖ ^ 2 ∂μ := by

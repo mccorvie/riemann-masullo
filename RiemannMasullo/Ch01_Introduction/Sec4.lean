@@ -2,10 +2,13 @@ module
 
 public import RiemannMasullo.Ch13_ZerosHecke.Sec3
 public import RiemannMasullo.AppB_AnalyticNT.Sec6
-import all RiemannMasullo.Ch10_TraceSpectral.Sec1
-import all RiemannMasullo.AppB_AnalyticNT.Sec4b
+import RiemannMasullo.External.TauCeti.Analysis.Complex.Conformal.Montel.Basic
+import RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.AppB_AnalyticNT.Sec4b
 
 import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec5
+import all RiemannMasullo.Ch03_IdelicZeta.Sec2
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 
 /-! # From the trace formula to GRH
 
@@ -78,7 +81,49 @@ theorem introTraceTest_mellin (χ : U𝔽) (h : ℝ → ℂ) (φ : D𝔽)
     (_hφ : ∀ g, φ.val g = introTraceTest χ h g) (s : ℂ) :
     let f := fun g : C𝔽 ↦ φ.val g * ideleClassNormTwist χ s g
     Integrable f (ideleClassTamagawaMeasure F) ∧
-      (∫ g, f g ∂ideleClassTamagawaMeasure F) = τVolume * introTraceMellin h s := by sorry
+      (∫ g, f g ∂ideleClassTamagawaMeasure F) = τVolume * introTraceMellin h s := by
+  let W (g : C𝔽) := φ.val g * ideleClassNormTwist χ s g
+  have hc : Continuous φ.val := schwartzBruhat_continuous
+    (⟨φ.val, bruhatCompactSupport_mem_schwartz φ.property⟩ : SchwartzBruhat C𝔽)
+  have hW : Continuous W := hc.mul (ideleClassNormTwist χ s).continuous
+  refine ⟨hW.integrable_of_hasCompactSupport
+    (show HasCompactSupport φ.val from φ.property.2).mul_right, ?_⟩
+  have hrad (g : C𝔽) : W g = h (N(g)) * (N(g) : ℂ) ^ s := by
+    change φ.val g * ((χ g : ℂ) * (N(g) : ℂ) ^ s) = _
+    rw [_hφ, introTraceTest]
+    have hu : star (χ g : ℂ) * (χ g : ℂ) = 1 := by simp [← Circle.coe_inv_eq_conj]
+    linear_combination h (N(g)) * (N(g) : ℂ) ^ s * hu
+  let E : ℝ ≃ₜ ℝ≥0ˣ := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  let σ (x : ℝ) : C𝔽 := QuotientGroup.mk (canonicalIdeleNormSection F (E x))
+  have hσ : Continuous σ :=
+    continuous_quotient_mk'.comp ((canonicalIdeleNormSection_continuous F).comp E.continuous)
+  have hnorm (x : ℝ) : N(σ x) = Real.exp x :=
+    congrArg (fun t : ℝ≥0ˣ ↦ (t.val : ℝ)) (canonicalIdeleNormSection_rightInverse F (E x))
+  let l (g : C𝔽) := Real.log (N(g))
+  have hl : Measurable l := Real.measurable_log.comp
+    ((NNReal.continuous_coe.comp Units.continuous_val).comp
+      (isProperMap_ideleClassNorm F).continuous).measurable
+  have hsec (g : C𝔽) : W (σ (l g)) = W g := by
+    have he : Real.exp (l g) = N(g) := Real.exp_log (Units.zero_lt (ideleClassNorm F g))
+    rw [hrad, hrad, hnorm, he]
+  have hmellin : (∫ x : ℝ, W (σ x)) = introTraceMellin h s := by
+    rw [introTraceMellin, mellin, ← integral_comp_exp]
+    refine integral_congr_ae (.of_forall fun x ↦ ?_)
+    beta_reduce
+    rw [hrad, hnorm, Complex.real_smul, smul_eq_mul]
+    have he : (Real.exp x : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (Real.exp_pos x).ne'
+    rw [show (s : ℂ) = (s - 1) + 1 by ring, Complex.cpow_add _ _ he,
+      Complex.cpow_one, add_sub_cancel_right]
+    ring
+  change (∫ g, W g ∂ideleClassTamagawaMeasure F) = _
+  calc
+    _ = ∫ x, W (σ x) ∂(ideleClassTamagawaMeasure F).map l := by
+      rw [integral_map (f := fun x ↦ W (σ x)) hl.aemeasurable (hW.comp hσ).aestronglyMeasurable]
+      exact integral_congr_ae (.of_forall fun g ↦ (hsec g).symm)
+    _ = _ := by
+      rw [show (ideleClassTamagawaMeasure F).map l = _ from classTamagawa_map_log_norm (F := F),
+        integral_smul_nnreal_measure, hmellin]
+      rfl
 
 local notation "archClass(" w ")" => IdeleClassGroup.ofCompletion (𝓞 F) F w
 local notation "archIntegrand(" χ ", " h ", " w ")" =>
@@ -261,13 +306,47 @@ Deviation: The support statement uses topological support, so each individual
 cutoff vanishes in an open neighborhood of one. -/
 theorem introTraceApprox_support (h ρ : ℕ → ℝ → ℝ)
     (_hA : IsIntroTraceApproximation h ρ) (n : ℕ) (z : ℂ) :
-    tsupport (introTraceApprox (h n) (ρ n) z) ⊆ Ioi 1 := by sorry
+    tsupport (introTraceApprox (h n) (ρ n) z) ⊆ Ioi 1 := by
+  refine (closure_mono (s := Function.support (introTraceApprox (h n) (ρ n) z))
+    (t := Function.support (h n)) ?_).trans (_hA.1 n).2.2.1
+  intro t ht he
+  exact ht (by simp [introTraceApprox, he])
 
 /-- Paper: §1.4.2, p. 29. Every fixed positive norm other than one has
 the printed pointwise limit. -/
 theorem introTraceApprox_tendsto (h ρ : ℕ → ℝ → ℝ)
     (_hA : IsIntroTraceApproximation h ρ) (z : ℂ) (t : ℝ) (_ht : 0 < t) (_ht₁ : t ≠ 1) :
-    Tendsto (fun n ↦ introTraceApprox (h n) (ρ n) z t) atTop (𝓝 (introTracePower z t)) := by sorry
+    Tendsto (fun n ↦ introTraceApprox (h n) (ρ n) z t) atTop (𝓝 (introTracePower z t)) := by
+  obtain ⟨hh, -, hhlim, ε, hε, hρ⟩ := _hA
+  rcases lt_or_gt_of_ne _ht₁ with ht | ht
+  · have hzero (n : ℕ) : h n t = 0 := by
+      by_contra hn
+      exact (not_lt.mpr ht.le) ((hh n).2.2.1 (subset_tsupport _ hn))
+    simp [introTraceApprox, hzero, introTracePower, ht.not_gt, ht.ne]
+  · have hcont : ContinuousAt (introTracePower z) t := by
+      apply (Complex.continuousAt_ofReal_cpow_const t (-z) (Or.inr _ht.ne')).congr_of_eventuallyEq
+      filter_upwards [lt_mem_nhds ht] with x hx
+      simp [introTracePower, hx]
+    have hmeas : Measurable (introTracePower z) :=
+      Measurable.ite measurableSet_Ioi (by fun_prop)
+        (Measurable.ite (measurableSet_singleton 1) measurable_const measurable_const)
+    have hsmall : Tendsto (fun n ↦ support (ρ n)) atTop (𝓝 0).smallSets := by
+      rw [Metric.nhds_basis_ball.smallSets.tendsto_right_iff]
+      intro r hr
+      filter_upwards [hε.eventually_lt_const hr] with n hn
+      intro x hx
+      have hmem := (hρ n).2.2.2.1 (subset_tsupport _ hx)
+      simpa only [Metric.mem_ball, Real.dist_0_eq_abs, abs_lt] using
+        (show -r < x ∧ x < r from ⟨lt_of_lt_of_le (neg_lt_neg hn) hmem.1, hmem.2.trans_lt hn⟩)
+    have hconv := convolution_tendsto_right (μ := volume)
+      (g := fun _ : ℕ ↦ introTracePower z) (k := fun _ ↦ t)
+      (Eventually.of_forall fun n ↦ (hρ n).2.2.1)
+      (Eventually.of_forall fun n ↦ (hρ n).2.2.2.2) hsmall
+      (Eventually.of_forall fun _ ↦ hmeas.aestronglyMeasurable)
+      (hcont.tendsto.comp tendsto_snd) tendsto_const_nhds
+    have hcut := Complex.continuous_ofReal.continuousAt.tendsto.comp (hhlim t ht)
+    simpa only [introTraceApprox, convolution, ContinuousLinearMap.lsmul_apply,
+      Complex.real_smul, Complex.ofReal_one, one_mul, Function.comp_def] using hcut.mul hconv
 
 /-- Paper: §1.4.2, pp. 28–29. At any fixed norm, the mollified cutoff
 depends holomorphically on the complex parameter. -/
@@ -560,7 +639,29 @@ theorem introTraceApprox_mellin_tendsto (h ρ : ℕ → ℝ → ℝ)
 radial power exists on the convergence half-plane and equals `1 / (z - s)`. -/
 theorem introTracePower_mellin (z s : ℂ) (_hs : s.re < z.re) :
     IntegrableOn (fun t : ℝ ↦ introTracePower z t * (t : ℂ) ^ (s - 1)) (Ioi 0) ∧
-      introTraceMellin (introTracePower z) s = 1 / (z - s) := by sorry
+      introTraceMellin (introTracePower z) s = 1 / (z - s) := by
+  let a := -z + (s - 1)
+  have ha : a.re < -1 := by
+    change -z.re + (s.re - 1) < -1
+    linarith
+  have he : (fun t : ℝ ↦ introTracePower z t * (t : ℂ) ^ (s - 1)) =ᵐ[volume]
+      (Ioi (1 : ℝ)).indicator (fun t : ℝ ↦ (t : ℂ) ^ a) := by
+    filter_upwards [Measure.ae_ne volume (1 : ℝ)] with t ht
+    by_cases hgt : 1 < t
+    · rw [indicator_of_mem hgt, introTracePower, ite_eq_left hgt]
+      exact (Complex.cpow_add _ _ (Complex.ofReal_ne_zero.mpr (zero_lt_one.trans hgt).ne')).symm
+    · simp [introTracePower, ht, hgt]
+  have hsub : Ioi (1 : ℝ) ⊆ Ioi 0 := Ioi_subset_Ioi zero_le_one
+  have hI : IntegrableOn ((Ioi (1 : ℝ)).indicator (fun t : ℝ ↦ (t : ℂ) ^ a)) (Ioi 0) := by
+    rw [integrableOn_indicator_iff measurableSet_Ioi.nullMeasurableSet, inter_eq_left.mpr hsub]
+    exact integrableOn_Ioi_cpow_of_lt ha zero_lt_one
+  refine ⟨hI.congr (ae_restrict_of_ae he.symm), ?_⟩
+  unfold introTraceMellin mellin
+  simp_rw [smul_eq_mul, mul_comm _ (introTracePower z _)]
+  rw [integral_congr_ae (ae_restrict_of_ae he), setIntegral_indicator measurableSet_Ioi,
+    inter_eq_right.mpr hsub, integral_Ioi_cpow_of_lt ha zero_lt_one]
+  rw [show a + 1 = -(z - s) by dsimp [a]; ring]
+  simp only [Complex.ofReal_one, Complex.one_cpow, neg_div_neg_eq]
 
 end Tests
 
@@ -600,7 +701,19 @@ theorem introTrace_montel_of_bounded (K : Set ℂ) (_hK : IsCompact K)
     ∃ (k : ℕ → ℕ) (L₁ L₂ : ℂ → ℂ), StrictMono k ∧
       TendstoLocallyUniformlyOn (A ∘ k) L₁ atTop (interior K) ∧
       TendstoLocallyUniformlyOn (B ∘ k) L₂ atTop (interior K) ∧
-      AnalyticOnNhd ℂ L₁ (interior K) ∧ AnalyticOnNhd ℂ L₂ (interior K) := by sorry
+      AnalyticOnNhd ℂ L₁ (interior K) ∧ AnalyticOnNhd ℂ L₂ (interior K) := by
+  rcases _hbound with ⟨C, _, hC⟩
+  have hdiff : ∀ n, DifferentiableOn ℂ (fun z ↦ (A n z, B n z)) (interior K) :=
+    fun n ↦ (_hA n).prodMk (_hB n)
+  have hbounded : External.TauCeti.IsLocallyBoundedOn
+      (fun n z ↦ (A n z, B n z)) (interior K) :=
+    External.TauCeti.isLocallyBoundedOn_of_forall_norm_le fun n z hz ↦
+      norm_prod_le_iff.mpr (hC n z (interior_subset hz))
+  obtain ⟨k, L, hk, hL, hconv⟩ := External.TauCeti.montel isOpen_interior hdiff hbounded
+  exact ⟨k, Prod.fst ∘ L, Prod.snd ∘ L, hk,
+    uniformContinuous_fst.comp_tendstoLocallyUniformlyOn hconv,
+    uniformContinuous_snd.comp_tendstoLocallyUniformlyOn hconv,
+    hL.fst.analyticOnNhd isOpen_interior, hL.snd.analyticOnNhd isOpen_interior⟩
 
 -- TODO(paper-gap): Pointwise convergence of the individual Mellin terms
 -- leaves the infinite zero sum uncontrolled. At the trivial rational character and
@@ -671,7 +784,39 @@ theorem introTrace_logDeriv_extension_of_limit (τ : ℝ≥0ˣ →ₜ* C𝔽)
       (fun n z ↦ archSum(χ, approx(h, ρ, n, z)) + introTraceSpectralSum χ approx(h, ρ, n, z) a)
       H atTop right(max a 1)) :
     EqOn H (fun z ↦ logDeriv finiteL(χ) (z + 1 / 2) +
-      if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) right(max a 1) := by sorry
+      if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) right(max a 1) := by
+  classical
+  intro z hz
+  have hz₁ : 1 < z.re := (le_max_right a 1).trans_lt hz
+  have hp : (1 / 2 : ℂ).re < z.re := by norm_num; linarith
+  have hm : (-1 / 2 : ℂ).re < z.re := by norm_num; linarith
+  have hprime := (introTraceApprox_primeSum_tendsto χ h ρ _hA).tendsto_at
+    (a := z) (show 1 / 2 < z.re by linarith)
+  let P (n : ℕ) := if χ = 1 then introTraceMellin approx(h, ρ, n, z) (1 / 2) +
+    introTraceMellin approx(h, ρ, n, z) (-1 / 2) else 0
+  have he (n : ℕ) : archSum(χ, approx(h, ρ, n, z)) +
+      introTraceSpectralSum χ approx(h, ρ, n, z) a = P n - primeSum(χ, approx(h, ρ, n, z)) := by
+    obtain ⟨φ, hφ⟩ := introTraceApprox_exists_bruhat χ h ρ _hA n z
+    have hzero : approx(h, ρ, n, z) 1 = 0 :=
+      image_eq_zero_of_notMem_tsupport (fun hu ↦ lt_irrefl _ (introTraceApprox_support h ρ _hA n z hu))
+    have hsum := (introTrace_characterTrace τ _hτ χ _hχ _ hzero φ hφ a _ha).2.2.tsum_eq
+    change introTraceSpectralSum χ approx(h, ρ, n, z) a =
+      P n - archSum(χ, approx(h, ρ, n, z)) - primeSum(χ, approx(h, ρ, n, z)) at hsum
+    rw [hsum]
+    ring
+  have hpolar : Tendsto P atTop
+      (𝓝 (if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0)) := by
+    by_cases htriv : χ = 1
+    · simp only [P, ite_eq_left htriv]
+      have h₁ := (introTraceApprox_mellin_tendsto h ρ _hA (1 / 2)).tendsto_at hp
+      have h₂ := (introTraceApprox_mellin_tendsto h ρ _hA (-1 / 2)).tendsto_at hm
+      rw [(introTracePower_mellin z _ hp).2] at h₁
+      rw [(introTracePower_mellin z _ hm).2] at h₂
+      simpa [sub_neg_eq_add, neg_div, add_comm] using h₁.add h₂
+    · simp [P, htriv]
+  have hlim := _hlim.tendsto_at hz
+  simp_rw [he] at hlim
+  simpa only [sub_neg_eq_add, add_comm] using tendsto_nhds_unique hlim (hpolar.sub hprime)
 
 -- TODO(paper-gap): The reference to §5.1 on p. 29 (also p. 55) supplies no
 -- continuation argument. The corrected cutoff identity does not itself bound
@@ -704,7 +849,80 @@ theorem introTrace_logDeriv_analytic_of_extensions (χ : U𝔽)
       EqOn H (fun z ↦ logDeriv finiteL(χ) (z + 1 / 2) +
         if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) right(max a 1)) :
     AnalyticOnNhd ℂ (fun z ↦ logDeriv finiteL(χ) (z + 1 / 2))
-      {z : ℂ | 0 < z.re ∧ (χ ≠ 1 ∨ z ≠ 1 / 2)} := by sorry
+      {z : ℂ | 0 < z.re ∧ (χ ≠ 1 ∨ z ≠ 1 / 2)} := by
+  let L := finiteL(χ)
+  have hL : MeromorphicNFOn L univ := (finiteHeckeL_exists_continuation χ).choose_spec.1
+  have hfinite (w : ℂ) : meromorphicOrderAt L w ≠ ⊤ := by
+    apply hL.meromorphicOn.meromorphicOrderAt_ne_top_of_isPreconnected
+      isPreconnected_univ (x := 2) (mem_univ _) (mem_univ w)
+    have htwo : L 2 ≠ 0 := by
+      rw [show L 2 = finiteHeckeL χ ⟨2, by norm_num⟩ from
+        (finiteHeckeL_exists_continuation χ).choose_spec.2 ⟨2, by norm_num⟩]
+      exact finiteHeckeL_ne_zero_of_one_lt_re χ ⟨2, by norm_num⟩
+    rw [(hL (mem_univ (2 : ℂ))).meromorphicOrderAt_eq_zero_iff.mpr htwo]
+    exact WithTop.zero_ne_top
+  intro z hz
+  obtain ⟨H, hH, hEq⟩ := _h (z.re / 2) (half_pos hz.1)
+  let R : ℂ → ℂ := fun w ↦
+    if χ = 1 then 1 / (w + 1 / 2) + 1 / (w - 1 / 2) else 0
+  let D : ℂ → ℂ := fun w ↦ logDeriv L (w + 1 / 2)
+  have hD : Meromorphic D := by
+    intro w
+    exact meromorphicAt_comp_add_const_iff_meromorphicAt.mpr
+      (hL (mem_univ (w + 1 / 2))).meromorphicAt.logDeriv
+  have hR : Meromorphic R := by
+    intro w
+    dsimp only [R]
+    split_ifs <;> fun_prop
+  let A := H - R
+  have hA : MeromorphicOn A right(z.re / 2) :=
+    hH.meromorphicOn.sub (fun w _ ↦ hR w)
+  -- Continue equality of punctured germs, without assuming regularity at zeros or poles.
+  let q : ℂ := (max (z.re / 2) 1 + 1 : ℝ)
+  have hq : max (z.re / 2) 1 < q.re := by simp [q]
+  have hbase : meromorphicOrderAt (D - A) q = ⊤ := by
+    apply meromorphicOrderAt_eq_top_iff.mpr
+    have hnear : ∀ᶠ w : ℂ in 𝓝 q, max (z.re / 2) 1 < w.re :=
+      Complex.continuous_re.continuousAt.eventually (eventually_gt_nhds hq)
+    filter_upwards [hnear.filter_mono nhdsWithin_le_nhds] with w hw
+    have he : H w = D w + R w := hEq hw
+    change D w - (H w - R w) = 0
+    rw [he]
+    ring
+  have hzhalf : z ∈ right(z.re / 2) := by change z.re / 2 < z.re; linarith [hz.1]
+  have hqhalf : q ∈ right(z.re / 2) := (le_max_left _ _).trans_lt hq
+  have hDm : MeromorphicOn D right(z.re / 2) := fun w _ ↦ hD w
+  have horder := (hDm.sub hA).meromorphicOrderAt_eq_top_of_isPreconnected
+    (convex_halfSpace_re_gt _).isPreconnected hqhalf hzhalf hbase
+  have hnear : D =ᶠ[𝓝[≠] z] A :=
+    (meromorphicOrderAt_eq_top_iff.mp horder).mono fun w hw ↦ sub_eq_zero.mp hw
+  have hRz : AnalyticAt ℂ R z := by
+    dsimp only [R]
+    split_ifs with hχ
+    · have hp : z + 1 / 2 ≠ 0 := by
+        intro hzero
+        have hre := congrArg Complex.re hzero
+        norm_num at hre
+        linarith [hz.1]
+      have hm : z - 1 / 2 ≠ 0 := sub_ne_zero.mpr (hz.2.resolve_left (not_not.mpr hχ))
+      have hpa : AnalyticAt ℂ (fun w : ℂ ↦ w + 1 / 2) z := by fun_prop
+      have hma : AnalyticAt ℂ (fun w : ℂ ↦ w - 1 / 2) z := by fun_prop
+      exact (analyticAt_const.div hpa hp).add (analyticAt_const.div hma hm)
+    · exact analyticAt_const
+  have hnonneg : 0 ≤ meromorphicOrderAt D z := by
+    rw [meromorphicOrderAt_congr hnear]
+    exact ((hH z hzhalf).sub hRz).meromorphicOrderAt_nonneg
+  change 0 ≤ meromorphicOrderAt (logDeriv L ∘ (· + (1 / 2 : ℂ))) z at hnonneg
+  rw [meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt] at hnonneg
+  -- A zero or pole of L would give its logarithmic derivative a simple pole.
+  have hzero : meromorphicOrderAt L (z + 1 / 2) = 0 := by
+    by_contra hzero
+    rw [meromorphicOrderAt_logDeriv_eq_neg_one hzero (hfinite _)] at hnonneg
+    exact (by decide : ¬ (0 : WithTop ℤ) ≤ -1) hnonneg
+  have hnormal := hL (mem_univ (z + 1 / 2))
+  have ha := hnormal.meromorphicOrderAt_nonneg_iff_analyticAt.mp (le_of_eq hzero.symm)
+  exact (ha.deriv.div ha (hnormal.meromorphicOrderAt_eq_zero_iff.mp hzero)).comp
+    (f := fun w : ℂ ↦ w + 1 / 2) (x := z) (by fun_prop)
 
 /-- Paper: §1.4.5, p. 30. A holomorphic shifted logarithmic derivative
 excludes finite Hecke zeros to the right of one half. The exceptional point
@@ -712,7 +930,34 @@ for the trivial character is a pole of the finite L-function. -/
 theorem introTrace_finiteL_no_right_zeros (χ : U𝔽)
     (_h : AnalyticOnNhd ℂ (fun z ↦ logDeriv finiteL(χ) (z + 1 / 2))
       {z : ℂ | 0 < z.re ∧ (χ ≠ 1 ∨ z ≠ 1 / 2)}) (s : ℂ) (_hs : 1 / 2 < s.re) :
-    meromorphicOrderAt finiteL(χ) s ≤ 0 := by sorry
+    meromorphicOrderAt finiteL(χ) s ≤ 0 := by
+  let L := finiteL(χ)
+  have hL := (finiteHeckeL_exists_continuation χ).choose_spec
+  have hr (z : ℂ) (hz : 1 ≤ z.re) : meromorphicOrderAt L z ≤ 0 := by
+    obtain ⟨A, hA, h⟩ := finiteHeckeL_zeroFreeRegion
+    obtain ⟨B, hB, hzero⟩ := h F χ
+    have hl : 0 ≤ Real.log (B * (|z.im| + 3)) := Real.log_nonneg (by
+      have := mul_nonneg (show 0 ≤ B by linarith) (abs_nonneg z.im)
+      nlinarith)
+    exact hzero L hL.1 hL.2 z ((sub_le_self _ (div_nonneg hA.le
+      (mul_nonneg (by positivity) hl))).trans hz)
+  by_cases he : s = 1
+  · exact hr s (by simp [he])
+  have hne : meromorphicOrderAt L s ≠ ⊤ := hL.1.meromorphicOn.meromorphicOrderAt_ne_top_of_isPreconnected
+    isPreconnected_univ (mem_univ (2 : ℂ)) (mem_univ s)
+    ((hr 2 (by norm_num)).trans_lt (show (0 : WithTop ℤ) < ⊤ by simp)).ne
+  have hs : 0 < (s - 1 / 2).re := by
+    simp only [Complex.sub_re, Complex.div_ofNat_re, Complex.one_re]
+    linarith
+  have hx : s - 1 / 2 ≠ 1 / 2 := fun h ↦ he (by linear_combination h)
+  have han := (_h (s - 1 / 2) ⟨hs, Or.inr hx⟩).comp (f := fun z : ℂ ↦ z - 1 / 2)
+    (analyticAt_id.sub analyticAt_const)
+  have ha : AnalyticAt ℂ (logDeriv L) s := by simpa [Function.comp_def, L] using han
+  by_contra! hp
+  have hn := ha.meromorphicOrderAt_nonneg
+  rw [meromorphicOrderAt_logDeriv_eq_neg_one hp.ne' hne] at hn
+  have hi : (0 : ℤ) ≤ -1 := WithTop.coe_le_coe.mp hn
+  omega
 
 /-- Paper: §1.4.5, p. 30. Right-hand nonvanishing for the finite continuations
 in the section-normalized characters implies right-hand nonvanishing for every
@@ -723,7 +968,62 @@ theorem introTrace_completedL_no_right_zeros (τ : ℝ≥0ˣ →ₜ* C𝔽)
     (_h : ∀ (ψ : U𝔽), (∀ t, ψ (τ t) = 1) →
       ∀ s : ℂ, 1 / 2 < s.re → meromorphicOrderAt finiteL(ψ) s ≤ 0)
     (χ : U𝔽) (s : ℂ) (_hs : 1 / 2 < s.re) :
-    meromorphicOrderAt (continuedCompletedHeckeL χ) s ≤ 0 := by sorry
+    meromorphicOrderAt (continuedCompletedHeckeL χ) s ≤ 0 := by
+  let n : C𝔽 →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+  let j : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  obtain ⟨a, ⟨ha, hpower⟩, -⟩ :=
+    existsUnique_unitaryComplexPower (j.comp (χ.comp τ)) (fun t ↦ Circle.norm_coe _)
+  let η : U𝔽 := χ.comp (τ.comp n)
+  let ψ : U𝔽 := χ / η
+  have hnorm (t : ℝ≥0ˣ) : ψ (τ t) = 1 := by
+    change χ (τ t) / χ (τ (ideleClassNorm F (τ t))) = 1
+    rw [_hτ t, div_self']
+  have htwist : ideleClassNormTwist ψ 0 = ideleClassNormTwist χ (-a) := by
+    ext1 g
+    change ((χ g : ℂ) / (χ (τ (ideleClassNorm F g)) : ℂ)) *
+      (N(g) : ℂ) ^ (0 : ℂ) = (χ g : ℂ) * (N(g) : ℂ) ^ (-a)
+    rw [Complex.cpow_zero, mul_one, Complex.cpow_neg, div_eq_mul_inv]
+    exact congrArg (fun w : ℂ ↦ (χ g : ℂ) * w⁻¹) (hpower (ideleClassNorm F g))
+  let G (z : ℂ) := (heckeGammaFactor χ z)⁻¹
+  let L := continuedCompletedHeckeL χ
+  let H (z : ℂ) := finiteL(ψ) (z + a)
+  have hG : Differentiable ℂ G := differentiable_inv_heckeGammaFactor χ
+  have hL := continuedCompletedHeckeL_spec χ
+  have hF := (finiteHeckeL_exists_continuation ψ).choose_spec
+  have hH : MeromorphicOn H univ := fun z _ ↦
+    ((hF.1 (mem_univ (z + a))).meromorphicAt).comp_analyticAt (g := fun w : ℂ ↦ w + a) (by fun_prop)
+  have hGL : MeromorphicOn (fun z ↦ G z * L z) univ :=
+    fun z hz ↦ (hG.analyticAt z).meromorphicAt.mul (hL.1 hz).meromorphicAt
+  have hEq (z : ℂ) (hz : 1 < z.re) : H z = G z * L z := by
+    have hw : 1 < (z + a).re := by rwa [Complex.add_re, ha, add_zero]
+    let w : {z : ℂ // 1 < z.re} := ⟨z, hz⟩
+    have ht : finiteHeckeL ψ ⟨z + a, hw⟩ = finiteHeckeL χ w := by
+      simpa [w, add_assoc] using
+        finiteHeckeL_imaginary_twist χ ψ (-a) (by simp [ha]) htwist ⟨z + a, hw⟩
+    calc
+      H z = finiteHeckeL ψ ⟨z + a, hw⟩ := hF.2 ⟨z + a, hw⟩
+      _ = finiteHeckeL χ w := ht
+      _ = G z * completedHeckeL χ w :=
+        (inv_mul_cancel_left₀ (heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans hz)) _).symm
+      _ = G z * L z := congrArg (G z * ·) (hL.2 w).symm
+  have hnear : ∀ᶠ z in 𝓝 (2 : ℂ), 1 < z.re :=
+    (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+  have htop : meromorphicOrderAt (H - fun z ↦ G z * L z) 2 = ⊤ :=
+    meromorphicOrderAt_eq_top_iff.mpr (eventuallyEq_iff_sub.mp
+      ((hnear.mono hEq).filter_mono nhdsWithin_le_nhds))
+  have ho := (hH.sub hGL).meromorphicOrderAt_eq_top_of_isPreconnected
+    isPreconnected_univ (mem_univ (2 : ℂ)) (mem_univ s) htop
+  have hlocal : H =ᶠ[𝓝[≠] s] (fun z ↦ G z * L z) :=
+    eventuallyEq_iff_sub.mpr (meromorphicOrderAt_eq_top_iff.mp ho)
+  have hord : meromorphicOrderAt H s = meromorphicOrderAt L s := by
+    rw [meromorphicOrderAt_congr hlocal]
+    exact meromorphicOrderAt_mul_of_ne_zero (hG.analyticAt s)
+      (inv_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ (by linarith)))
+  change meromorphicOrderAt L s ≤ 0
+  rw [← hord]
+  change meromorphicOrderAt (fun z ↦ finiteL(ψ) (z + a)) s ≤ 0
+  rw [meromorphicOrderAt_fun_comp_add_const_eq_meromorphicOrderAt]
+  exact _h ψ hnorm (s + a) (by rwa [Complex.add_re, ha, add_zero])
 
 /-- Paper: §1.4.5, p. 30. The completed functional equation reflects the
 zero-free region for the inverse character to the left of one half for the

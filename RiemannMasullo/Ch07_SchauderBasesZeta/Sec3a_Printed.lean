@@ -2,6 +2,9 @@ module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3a
 
+import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
+import Mathlib.GroupTheory.MonoidLocalization.UniqueFactorization
+
 /-! # §7.3.1 Statements that are false as printed -/
 
 @[expose] public noncomputable section
@@ -75,6 +78,46 @@ With T = 2π/log 5 and χ = |·|^(3iT/4), take the common pole c = 1.
 The local phases are 3T/4 and T/4, so their difference is T/2. -/
 theorem Printed.sLocalOrbitalPhase_sub_false : ¬ Printed.sLocalOrbitalPhase_sub := by sorry
 
+/-- At the trivial quasi-character every restricted finite Tate factor has a pole at `0`. -/
+private theorem sLocalPrimaryPoleMultiplicity_eq_sum_orders_false_order_neg
+    {F : Type*} [Field F] [NumberField F] {S : Finset (HeightOneSpectrum (𝓞 F))} (v : S) :
+    meromorphicOrderAt (fun z ↦ finiteLocalTateFactor v.val (sLocalFiniteRestriction v
+      (quasiCharacterNormTwist (sIdeleQuotientNorm F S)
+        (isProperMap_sIdeleQuotientNorm F S).continuous (1 : QuasiCharacter (SIdeleQuotient F S))
+        z))) 0 < 0 := by
+  have h1 : (1 : QuasiCharacter (SIdeleQuotient F S)) =
+      (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp
+        (1 : PontryaginDual (SIdeleQuotient F S)) := by
+    ext x
+    change (1 : ℂ) = (((1 : PontryaginDual (SIdeleQuotient F S)) x : Circle) : ℂ)
+    rw [PontryaginDual.one_apply, Circle.coe_one]
+  have hv : v ∈ sLocalFinitePolePlaces (1 : QuasiCharacter (SIdeleQuotient F S)) := by
+    rw [(sLocalPolePlaces_one (F := F) (S := S)).2]
+    exact Finset.mem_univ v
+  have hv' := (Finset.mem_filter.mp hv).2
+  rw [h1] at hv' ⊢
+  exact (sLocalRhoPoleOrder_eq_card_polePlaces_finite _ v 0).mp hv'
+
+/-- Over `ℚ` the place below a finite place is the place itself. -/
+private theorem sLocalPrimaryPoleMultiplicity_eq_sum_orders_false_under
+    (w : HeightOneSpectrum (𝓞 ℚ)) : w.under (𝓞 ℚ) = w := by
+  ext x
+  change x ∈ Ideal.comap (algebraMap (𝓞 ℚ) (𝓞 ℚ)) w.asIdeal ↔ x ∈ w.asIdeal
+  rw [Algebra.algebraMap_self, Ideal.comap_id]
+
+/-- The `S`-integers of `ℚ` have trivial Picard group. -/
+private theorem sLocalPrimaryPoleMultiplicity_eq_sum_orders_false_pic
+    (S : Set (HeightOneSpectrum (𝓞 ℚ))) : Subsingleton (CommRing.Pic (S.integer ℚ)) := by
+  have hpid : IsPrincipalIdealRing (𝓞 ℚ) :=
+    NumberField.classNumber_eq_one_iff.mp Rat.classNumber_eq
+  have : Subsingleton (ClassGroup (𝓞 ℚ)) := inferInstance
+  have : Fact (IsMulTorsion (ClassGroup (𝓞 ℚ))) :=
+    ⟨fun x ↦ by rw [Subsingleton.elim x 1]; exact IsOfFinOrder.one⟩
+  have : UniqueFactorizationMonoid (S.integer ℚ) :=
+    UniqueFactorizationMonoid.of_isLocalization (Localization.submonoid S) _
+  let : GCDMonoid (S.integer ℚ) := UniqueFactorizationMonoid.toGCDMonoid _
+  infer_instance
+
 open Classical in
 /-- Paper: Definition 7.3.1.4, equations (7.3.1.6)–(7.3.1.7), p. 343.
 As printed: on the primary pole locus, the natural-number count of contributing
@@ -94,11 +137,43 @@ def Printed.sLocalPrimaryPoleMultiplicity_eq_sum_orders : Prop :=
           meromorphicOrderAt
             (fun z ↦ finiteLocalTateFactor v.val (sLocalFiniteRestriction v (twist z))) 0
 
+open Classical in
 /-- Paper: Definition 7.3.1.4, equations (7.3.1.6)–(7.3.1.7), p. 343.
 Take F = ℚ, S with just the finite place over 2, p = 2, and c = 1.
 The local numerator has a simple pole and the reflected denominator is
 regular and nonzero at c, giving signed order −1. The primary count is 1. -/
 theorem Printed.sLocalPrimaryPoleMultiplicity_eq_sum_orders_false :
-    ¬ Printed.sLocalPrimaryPoleMultiplicity_eq_sum_orders := by sorry
+    ¬ Printed.sLocalPrimaryPoleMultiplicity_eq_sum_orders := by
+  intro h
+  let p : HeightOneSpectrum (𝓞 ℚ) :=
+    Rat.HeightOneSpectrum.primesEquiv.symm ⟨2, Nat.prime_two⟩
+  have hunder := sLocalPrimaryPoleMultiplicity_eq_sum_orders_false_under
+  have hP : sLocalPrimaryPlaces ({p} : Finset (HeightOneSpectrum (𝓞 ℚ))) p = {p} := by
+    ext w
+    rw [mem_sLocalPrimaryPlaces]
+    exact ⟨And.left, fun hw ↦ ⟨hw, (hunder w).trans (Finset.mem_singleton.mp hw)⟩⟩
+  have hsat : IsSaturatedPlaceSet ({p} : Finset (HeightOneSpectrum (𝓞 ℚ))) := by
+    intro v w hv hw
+    have hwv : w = v := (hunder w).symm.trans (hw.trans (hunder v))
+    rwa [hwv]
+  have hne : (sLocalPrimaryPlaces ({p} : Finset (HeightOneSpectrum (𝓞 ℚ))) p).Nonempty := by
+    rw [hP]
+    exact Finset.singleton_nonempty p
+  have hmult : sLocalPrimaryPoleMultiplicity (S := {p}) p 1 = 1 := by
+    rw [sLocalPrimaryPoleMultiplicity_one, hP, Finset.card_singleton]
+  have H := h ℚ {p} p hsat hne
+    (sLocalPrimaryPoleMultiplicity_eq_sum_orders_false_pic _) 1 (by rw [hmult]; exact one_pos)
+  dsimp only at H
+  rw [hmult] at H
+  have hle : (∑ v ∈ ({p} : Finset (HeightOneSpectrum (𝓞 ℚ))).attach.filter
+      (fun v ↦ v.val ∈ sLocalPrimaryPlaces {p} p),
+        meromorphicOrderAt (fun z ↦ finiteLocalTateFactor v.val (sLocalFiniteRestriction v
+          (quasiCharacterNormTwist (sIdeleQuotientNorm ℚ {p})
+            (isProperMap_sIdeleQuotientNorm ℚ {p}).continuous 1 z))) 0) ≤ 0 :=
+    Finset.sum_nonpos fun v _ ↦
+      (sLocalPrimaryPoleMultiplicity_eq_sum_orders_false_order_neg v).le
+  rw [← H] at hle
+  have h0 : ((((1 : ℕ) : ℤ)) : WithTop ℤ) ≤ ((0 : ℤ) : WithTop ℤ) := hle
+  exact absurd (WithTop.coe_le_coe.mp h0) (by norm_num)
 
 end RiemannMasullo

@@ -4,6 +4,7 @@ public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3b
 public import Mathlib.Algebra.Exact.Basic
 public import Mathlib.MeasureTheory.Function.L2Space
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
+import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
 
 /-! # Second Structure Theorem and the S-local Čech sequence
 
@@ -58,7 +59,9 @@ section SecondStructure
 The Mellin map on the S-local theta quotient is continuous for compact convergence
 on the regular locus of the meromorphic target. -/
 theorem continuous_sLocalThetaMellin :
-    Continuous (sLocalThetaMellin (F := F) (S := S)) := by sorry
+    Continuous (sLocalThetaMellin (F := F) (S := S)) := by
+  exact (LinearMap.ker (sLocalAdelicTheta F S)).isQuotientMap_mkQ.continuous_iff.mpr
+    (sLocalIdelicMellin_continuous (F := F) (S := S))
 
 /-- Paper: Theorem 5.4.1.1(1), p. 265.
 Every norm-one character has a unique unitary lift trivial on the chosen norm section.
@@ -395,7 +398,55 @@ theorem sLocalZetaPair_translate (χ : PontryaginDual Jₛ) (u : Aₛˣ) (f : �
       (Submodule.Quotient.mk (schwartzBruhatUnitTranslate (R := Aₛ) u f))
     EqOn q.1.val (fun s ↦ normChart(χ) s (QuotientGroup.mk u) * p.1.val s) rightHalf ∧
     EqOn q.2.val (fun s ↦ normChart(χ) s (QuotientGroup.mk u) * p.2.val s) leftHalf :=
-  by sorry
+  by
+  let p := sLocalZetaPair (F := F) (S := S) χ (Submodule.Quotient.mk f)
+  let q := sLocalZetaPair (F := F) (S := S) χ
+    (Submodule.Quotient.mk (schwartzBruhatUnitTranslate u f))
+  let L := fun s ↦ normChart(χ) s (QuotientGroup.mk u)
+  have hp := sLocalZetaPair_mk χ f
+  have hq := sLocalZetaPair_mk χ (schwartzBruhatUnitTranslate u f)
+  have hright : EqOn q.1.val (fun s ↦ L s * p.1.val s) rightHalf := by
+    intro s hs
+    change q.1.val s = L s * p.1.val s
+    refine (hq.1 hs).trans ?_
+    refine Eq.trans (b := L s * Zₛ f (normChart(χ) s)) ?_
+      (congrArg (L s * ·) (hp.1 hs).symm)
+    have hr : ∃ (ψ : PontryaginDual Jₛ) (t : ℂ),
+        0 < t.re ∧ normChart(χ) s = normChart(ψ) t := ⟨χ, s, hs, rfl⟩
+    change Zₛ (schwartzBruhatUnitTranslate u f) (normChart(χ) s) =
+      L s * Zₛ f (normChart(χ) s)
+    rw [sLocalIdelicZFunction_eq_integral _ hr, sLocalIdelicZFunction_eq_integral _ hr]
+    have := sIdeleGroup_borelSpace (F := F) (S := S)
+    have := sMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) (S := S)
+    exact integral_translate_character (sMultiplicativeTamagawaMeasure F S)
+      (fun x ↦ f (Multiplicative.ofAdd x.val))
+      ((normChart(χ) s).toMonoidHom.comp (QuotientGroup.mk' _)) u
+  refine ⟨hright, ?_⟩
+  have hol (w : B⁻) : AnalyticOnNhd ℂ w.val leftHalf :=
+    w.property.2.1.analyticOnNhd (isOpen_Iio.preimage Complex.continuous_re)
+  have hL : AnalyticOnNhd ℂ L leftHalf := fun s _ ↦
+    normTwist_eval_analytic mₛ hmₛ _ _ s
+  apply (hol q.2).eqOn_of_preconnected_of_frequently_eq (hL.mul (hol p.2))
+    (convex_halfSpace_re_lt 1).isPreconnected (z₀ := 1/2) (by norm_num [mem_preimage])
+  have hband : ∀ᶠ s : ℂ in 𝓝[≠] (1 / 2 : ℂ), s ∈ overlap :=
+    nhdsWithin_le_nhds ((isOpen_Ioo.preimage Complex.continuous_re).mem_nhds (by
+      norm_num [mem_preimage, mem_Ioo]))
+  apply Filter.Eventually.frequently
+  filter_upwards [hband, nhdsNE_le_codiscrete _ (sLocalRhoFactor_mul_dual χ)] with s hs hprod
+  have hne : ρₛ(χ, s) ≠ 0 := left_ne_zero_of_mul
+    (hprod.trans_ne ((Group.isUnit (QuotientGroup.mk (-1 : Aₛˣ) : Jₛ)).map (normChart(χ) s)).ne_zero)
+  apply mul_left_cancel₀ hne
+  calc
+    ρₛ(χ, s) * q.2.val s = q.1.val s := by
+      rw [hq.1 hs.1, hq.2 hs.2]
+      exact (existsUnique_sLocalZetaPair_equation χ _ s hs).symm
+    _ = L s * p.1.val s := hright hs.1
+    _ = ρₛ(χ, s) * (L s * p.2.val s) := by
+      calc
+        _ = L s * (ρₛ(χ, s) * p.2.val s) := congrArg (L s * ·)
+          ((hp.1 hs.1).trans ((existsUnique_sLocalZetaPair_equation χ f s hs).trans
+            (congrArg (ρₛ(χ, s) * ·) (hp.2 hs.2).symm)))
+        _ = _ := by ring
 
 /-- Paper: Theorem 5.4.1.1(1), pp. 265–266.
 The componentwise multipliers give a jointly continuous action on the ambient pair.
@@ -410,7 +461,27 @@ theorem exists_sLocalZetaPair_action (χ : PontryaginDual Jₛ) :
 /-- Paper: Theorem 5.4.1.1(2), p. 266.
 The quotient topology on every homogeneous S-local theta space is Fréchet. -/
 theorem sLocalHomogeneousThetaSpace_frechet (ω : PontryaginDual J₁) :
-    IsFrechetTVS (Θω(ω)) := by sorry
+    IsFrechetTVS (Θω(ω)) := by
+  obtain ⟨τ, hτ⟩ := sIdeleQuotientNorm_exists_section F S
+  obtain ⟨χ, hχ, _⟩ := existsUnique_sLocalNormSectionCharacter τ hτ ω
+  rw [← hχ.1]
+  obtain ⟨_, _, hMp, hCp⟩ := schwartzBergman_frechet rightInterval isOpen_Ioi
+    ordConnected_Ioi ⟨1, by norm_num⟩
+  obtain ⟨_, _, hMm, hCm⟩ := schwartzBergman_frechet leftInterval isOpen_Iio
+    ordConnected_Iio ⟨0, by norm_num⟩
+  let : MetrizableSpace B⁺ := hMp
+  let : MetrizableSpace B⁻ := hMm
+  let : CompleteSpace B⁺ := hCp
+  let : CompleteSpace B⁻ := hCm
+  let T := sLocalZetaPair (F := F) (S := S) χ
+  have hT : IsClosedEmbedding T := sLocalZetaPair_isClosedEmbedding χ
+  let : UniformSpace Θω(restrict₁(χ)) :=
+    IsTopologicalAddGroup.rightUniformSpace Θω(restrict₁(χ))
+  have : IsUniformAddGroup Θω(restrict₁(χ)) := isUniformAddGroup_of_addCommGroup
+  have hU : IsUniformInducing T :=
+    AddMonoidHom.isUniformInducing_of_isInducing (f := T.toAddMonoidHom) hT.isInducing
+  exact ⟨inferInstance, hT.isInducing.polynormableSpace (f := T),
+    hT.isEmbedding.metrizableSpace, hU.completeSpace hT.isClosed_range.isComplete⟩
 
 /-- A nuclear space is separable for each of its continuous seminorms (as in the private
 `seminorm_separable_of_nuclear` of Appendix D §1b): a totally bounded zero-neighbourhood
@@ -542,12 +613,91 @@ def sLocalPolarFreeMatching (χ : PontryaginDual Jₛ) : Set (B⁺ × B⁻) :=
   {p | p ∈ sLocalZetaMatching (F := F) (S := S) χ ∧
     ∃ H : ℂ → ℂ, AnalyticOnNhd ℂ H univ ∧ EqOn H p.1.val rightHalf}
 
+private theorem mem_sLocalPolarFreeMatching_iff_aux (ρ a b : ℂ → ℂ) (hρ : Meromorphic ρ)
+    (ha : AnalyticOnNhd ℂ a (Complex.re ⁻¹' Ioi (0 : ℝ)))
+    (hb : AnalyticOnNhd ℂ b (Complex.re ⁻¹' Iio (1 : ℝ)))
+    (hab : EqOn a (fun s ↦ ρ s * b s) (Complex.re ⁻¹' Ioo (0 : ℝ) 1)) :
+    (∃ H : ℂ → ℂ, AnalyticOnNhd ℂ H univ ∧ EqOn H a (Complex.re ⁻¹' Ioi (0 : ℝ))) ↔
+      ∀ s ∈ Complex.re ⁻¹' Iio (1 : ℝ), 0 ≤ meromorphicOrderAt (fun z ↦ ρ z * b z) s := by
+  have hoL : IsOpen (Complex.re ⁻¹' Iio (1 : ℝ)) := isOpen_Iio.preimage Complex.continuous_re
+  have hoR : IsOpen (Complex.re ⁻¹' Ioi (0 : ℝ)) := isOpen_Ioi.preimage Complex.continuous_re
+  have hoO : IsOpen (Complex.re ⁻¹' Ioo (0 : ℝ) 1) := isOpen_Ioo.preimage Complex.continuous_re
+  have hmg : MeromorphicOn (fun z ↦ ρ z * b z) (Complex.re ⁻¹' Iio (1 : ℝ)) :=
+    fun z hz => (hρ z).mul (hb z hz).meromorphicAt
+  have hmid : (1 / 2 : ℂ) ∈ Complex.re ⁻¹' Ioo (0 : ℝ) 1 := by
+    norm_num [mem_preimage, mem_Ioo]
+  have hmidL : (1 / 2 : ℂ) ∈ Complex.re ⁻¹' Iio (1 : ℝ) := by
+    norm_num [mem_preimage, mem_Iio]
+  have hconn : IsConnected (Complex.re ⁻¹' Iio (1 : ℝ)) :=
+    ⟨⟨_, hmidL⟩, (convex_halfSpace_re_lt 1).isPreconnected⟩
+  constructor
+  · rintro ⟨H, hH, hHa⟩ s hs
+    have hdiff : MeromorphicOn (fun z ↦ ρ z * b z - H z) (Complex.re ⁻¹' Iio (1 : ℝ)) :=
+      hmg.sub (fun z _ => (hH z (mem_univ _)).meromorphicAt)
+    have htop : meromorphicOrderAt (fun z ↦ ρ z * b z - H z) (1 / 2 : ℂ) = ⊤ := by
+      rw [meromorphicOrderAt_eq_top_iff]
+      filter_upwards [hoO.mem_nhds hmid |> fun h => nhdsWithin_le_nhds h] with z hz
+      have h1 := hab hz
+      have h2 := hHa (show z ∈ Complex.re ⁻¹' Ioi (0 : ℝ) from hz.1)
+      change ρ z * b z - H z = 0
+      have h1' : a z = ρ z * b z := h1
+      rw [← h1', h2]; ring
+    have hall : meromorphicOrderAt (fun z ↦ ρ z * b z - H z) s = ⊤ := by
+      by_contra hne
+      have := (hdiff.exists_meromorphicOrderAt_ne_top_iff_forall_mem hconn).mp ⟨s, hs, hne⟩
+        (1 / 2) hmidL
+      exact this htop
+    rw [meromorphicOrderAt_eq_top_iff] at hall
+    have hev : (fun z ↦ ρ z * b z) =ᶠ[𝓝[≠] s] H := by
+      filter_upwards [hall] with z hz
+      simpa [sub_eq_zero] using hz
+    rw [meromorphicOrderAt_congr hev]
+    exact (hH s (mem_univ _)).meromorphicOrderAt_nonneg
+  · intro hord
+    set G := toMeromorphicNFOn (fun z ↦ ρ z * b z) (Complex.re ⁻¹' Iio (1 : ℝ)) with hG
+    have hGan : ∀ z ∈ Complex.re ⁻¹' Iio (1 : ℝ), AnalyticAt ℂ G z := by
+      intro z hz
+      have hnf : MeromorphicNFAt G z := meromorphicNFOn_toMeromorphicNFOn _ _ hz
+      refine hnf.meromorphicOrderAt_nonneg_iff_analyticAt.mp ?_
+      rw [hG, meromorphicOrderAt_toMeromorphicNFOn hmg hz]
+      exact hord z hz
+    have hGa : ∀ z ∈ Complex.re ⁻¹' Ioo (0 : ℝ) 1, G z = a z := by
+      intro z hz
+      have hzL : z ∈ Complex.re ⁻¹' Iio (1 : ℝ) := hz.2
+      have hev : G =ᶠ[𝓝[≠] z] a := by
+        have h1 := hmg.toMeromorphicNFOn_eq_self_on_nhdsNE hzL
+        have h2 : (fun z ↦ ρ z * b z) =ᶠ[𝓝[≠] z] a := by
+          filter_upwards [nhdsWithin_le_nhds (hoO.mem_nhds hz)] with w hw using (hab hw).symm
+        exact h1.trans h2
+      have hca : ContinuousAt a z := (ha z hz.1).continuousAt
+      have hcG : ContinuousAt G z := (hGan z hzL).continuousAt
+      exact ((hcG.eventuallyEq_nhds_iff_eventuallyEq_nhdsNE hca).mp hev).self_of_nhds
+    let H : ℂ → ℂ := fun z ↦ if 0 < z.re then a z else G z
+    have hHa : EqOn H a (Complex.re ⁻¹' Ioi (0 : ℝ)) := fun z hz => if_pos hz
+    have hHG : EqOn H G (Complex.re ⁻¹' Iio (1 : ℝ)) := by
+      intro z hz
+      by_cases h0 : 0 < z.re
+      · exact (if_pos h0).trans (hGa z ⟨h0, hz⟩).symm
+      · exact if_neg h0
+    refine ⟨H, fun z _ => ?_, hHa⟩
+    by_cases hz : z.re < 1
+    · exact (hGan z hz).congr (Filter.eventuallyEq_of_mem (hoL.mem_nhds hz) hHG.symm)
+    · have hz1 : z ∈ Complex.re ⁻¹' Ioi (0 : ℝ) := by
+        change 0 < z.re; linarith [not_lt.mp hz]
+      exact (ha z hz1).congr (Filter.eventuallyEq_of_mem (hoR.mem_nhds hz1) hHa.symm)
+
 /-- Paper: (5.4.1.8), p. 267.
 In a matching pair the first component has an entire extension exactly when the
 continued second component has no poles in the left half-plane. -/
 theorem mem_sLocalPolarFreeMatching_iff (χ : PontryaginDual Jₛ) (p : B⁺ × B⁻) :
     p ∈ sLocalPolarFreeMatching (F := F) (S := S) χ ↔ p ∈ sLocalZetaMatching (F := F) (S := S) χ ∧
-      ∀ s ∈ leftHalf, 0 ≤ meromorphicOrderAt (fun z ↦ ρₛ(χ, z) * p.2.val z) s := by sorry
+      ∀ s ∈ leftHalf, 0 ≤ meromorphicOrderAt (fun z ↦ ρₛ(χ, z) * p.2.val z) s := by
+  refine and_congr_right fun hp => ?_
+  exact mem_sLocalPolarFreeMatching_iff_aux (fun z ↦ ρₛ(χ, z)) p.1.val p.2.val
+    (sLocalRhoFactor_meromorphic χ)
+    (p.1.property.2.1.analyticOnNhd (isOpen_Ioi.preimage Complex.continuous_re))
+    (p.2.property.2.1.analyticOnNhd (isOpen_Iio.preimage Complex.continuous_re))
+    ((mem_sLocalZetaMatching χ p).mp hp)
 
 /-- Paper: Proposition 5.4.1.4, p. 267.
 The zeta pair on the polar-free quotient is a topological embedding with closed range. -/
@@ -881,7 +1031,100 @@ translation of the spectral argument by the section's imaginary frequency. -/
 theorem existsUnique_sLocalCechStripMellin (x : ℝ) :
     ∃! M : PositiveRealExponentialDecay overlapInterval ≃L[ℂ] B⁰,
       ∀ f s, s ∈ overlap → (M f).val s =
-        mellin (fun t ↦ f.val (Real.log t)) (s + (x : ℂ) * Complex.I) := by sorry
+        mellin (fun t ↦ f.val (Real.log t)) (s + (x : ℂ) * Complex.I) := by
+  let I : Set ℝ := Ioo 0 1
+  have hne : I.Nonempty := ⟨1 / 2, by norm_num [I]⟩
+  -- The unimodular multiplier u ↦ exp(i y u), as a Schwartz multiplier.
+  let g (y : ℝ) (u : ℝ) : ℂ := Complex.exp (((y * u : ℝ) : ℂ) * Complex.I)
+  have hg (y : ℝ) : (g y).HasTemperateGrowth := by
+    have h1 : (fun u : ℝ ↦ y * u).HasTemperateGrowth :=
+      (y • ContinuousLinearMap.id ℝ ℝ).hasTemperateGrowth
+    exact Complex.hasTemperateGrowth_exp_mul_I.comp h1
+  have hmem (y : ℝ) (f : logExponentialDecaySubmodule I) :
+      (fun u ↦ g y u * f.val u) ∈ logExponentialDecaySubmodule I := by
+    apply (Submodule.mem_iInf _).2
+    intro a
+    refine ⟨SchwartzMap.smulLeftCLM ℂ (g y) (logExponentialDecayTwist I a f), ?_⟩
+    funext u
+    change SchwartzMap.smulLeftCLM ℂ (g y) (logExponentialDecayTwist I a f) u =
+      (Real.exp ((a : ℝ) * u) : ℂ) * (g y u * f.val u)
+    rw [SchwartzMap.smulLeftCLM_apply_apply (hg y), logExponentialDecayTwist_apply, smul_eq_mul]
+    ring
+  let mod (y : ℝ) : PositiveRealExponentialDecay I →ₗ[ℂ] PositiveRealExponentialDecay I :=
+    { toFun := fun f ↦ (⟨_, hmem y f⟩ : logExponentialDecaySubmodule I)
+      map_add' := fun f h ↦ Subtype.ext (funext fun u ↦ by
+        change g y u * (f.val u + h.val u) = g y u * f.val u + g y u * h.val u
+        ring)
+      map_smul' := fun c f ↦ Subtype.ext (funext fun u ↦ by
+        change g y u * (c * f.val u) = c * (g y u * f.val u)
+        ring) }
+  have hmod (y : ℝ) (f : PositiveRealExponentialDecay I) (u : ℝ) :
+      (mod y f).val u = g y u * f.val u := rfl
+  have hE := positiveRealExponentialDecay_isEmbedding I hne
+  have htw (y : ℝ) (a : I) (f : PositiveRealExponentialDecay I) :
+      logExponentialDecayTwist I a (mod y f) =
+        SchwartzMap.smulLeftCLM ℂ (g y) (logExponentialDecayTwist I a f) := by
+    ext u
+    rw [SchwartzMap.smulLeftCLM_apply_apply (hg y), smul_eq_mul]
+    refine (logExponentialDecayTwist_apply I a (mod y f) u).trans ?_
+    refine Eq.trans ?_ (congrArg (g y u * ·) (logExponentialDecayTwist_apply I a f u)).symm
+    change (Real.exp ((a : ℝ) * u) : ℂ) * (g y u * f.val u) = _
+    ring
+  have hcont (y : ℝ) : Continuous (mod y) := by
+    apply hE.continuous_iff.mpr
+    apply continuous_pi
+    intro a
+    exact ((SchwartzMap.smulLeftCLM ℂ (g y)).continuous.comp
+      ((continuous_apply a).comp hE.continuous)).congr fun f ↦ (htw y a f).symm
+  have hinv (y : ℝ) (f : PositiveRealExponentialDecay I) : mod (-y) (mod y f) = f := by
+    apply Subtype.ext
+    funext u
+    change g (-y) u * (g y u * f.val u) = f.val u
+    simp only [g]
+    rw [← mul_assoc, ← Complex.exp_add]
+    push_cast
+    ring_nf
+    simp
+  let P : PositiveRealExponentialDecay I ≃L[ℂ] PositiveRealExponentialDecay I :=
+    { toLinearMap := mod x
+      invFun := mod (-x)
+      left_inv := hinv x
+      right_inv := fun f ↦ by simpa using hinv (-x) f
+      continuous_toFun := hcont x
+      continuous_invFun := hcont (-x) }
+  have hOpen : IsOpen I := isOpen_Ioo
+  have hInt : OrdConnected I := ordConnected_Ioo
+  have hspec := (existsUnique_positiveRealFourierMellin I hOpen hInt hne).exists.choose_spec
+  let A := (existsUnique_positiveRealFourierMellin I hOpen hInt hne).exists.choose
+  have hform : ∀ (f : PositiveRealExponentialDecay I) (s : ℂ), s ∈ Complex.re ⁻¹' I →
+      ((P.trans A) f).val s = mellin (fun t ↦ f.val (Real.log t)) (s + (x : ℂ) * Complex.I) := by
+    intro f s hs
+    change (A (mod x f)).val s = _
+    rw [hspec (mod x f) s hs]
+    unfold mellin
+    refine setIntegral_congr_fun measurableSet_Ioi fun t (ht : 0 < t) ↦ ?_
+    have ht0 : (t : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr ht.ne'
+    change (t : ℂ) ^ (s - 1) • (g x (Real.log t) * f.val (Real.log t)) =
+      (t : ℂ) ^ (s + x * Complex.I - 1) • f.val (Real.log t)
+    have hpow : (t : ℂ) ^ (s + x * Complex.I - 1) = (t : ℂ) ^ (s - 1) * g x (Real.log t) := by
+      rw [show s + x * Complex.I - 1 = (s - 1) + x * Complex.I by ring,
+        Complex.cpow_add _ _ ht0]
+      congr 1
+      rw [Complex.cpow_def_of_ne_zero ht0, ← Complex.ofReal_log ht.le]
+      simp only [g]
+      push_cast
+      ring_nf
+    rw [hpow, smul_eq_mul, smul_eq_mul]
+    ring
+  refine ⟨P.trans A, hform, ?_⟩
+  intro M hM
+  apply ContinuousLinearEquiv.ext
+  funext f
+  apply Subtype.ext
+  funext s
+  by_cases hs : s ∈ Complex.re ⁻¹' I
+  · exact (hM f s hs).trans (hform f s hs).symm
+  · exact ((M f).property.1 hs).trans (((P.trans A) f).property.1 hs).symm
 
 /-- Paper: (5.4.2.6), p. 276.
 Applying the two shifted Mellin transforms to the upper left arrow gives the
@@ -903,6 +1146,39 @@ theorem sLocalCech_left_commutes (χ : PontryaginDual Jₛ)
     EqOn (M₁ p.1).val (fun s ↦ Zₛ f (normChart(χ) s)) rightHalf ∧
     EqOn (M₂ p.2).val (fun s ↦ Zₛ (Fourierₛ f) (normChart(χ⁻¹) s)) rightHalf := by sorry
 
+/-- Transport an exact pair through two linear homeomorphisms; separating observations ensure uniqueness. -/
+private theorem existsUnique_sLocalCechDifference_conjugate
+    {X Y Z W V : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z]
+    [AddCommGroup W] [Module ℂ W] [TopologicalSpace W]
+    [AddCommGroup V] [Module ℂ V] [TopologicalSpace V]
+    (e : Y ≃L[ℂ] Z) (m : W ≃L[ℂ] V)
+    (u : X →L[ℂ] Y) (v : X →L[ℂ] Z) (d : Z →L[ℂ] V)
+    (hleft : ∀ q, e (u q) = v q) (hexact : Function.Exact v d)
+    (R : Y → V → Prop) (hR : ∀ p, R p (d (e p)))
+    (huniq : ∀ p a b, R p a → R p b → a = b) :
+    ∃! A : Y →L[ℂ] W, (∀ p, R p (m (A p))) ∧ Function.Exact u A := by
+  let A := m.symm.toContinuousLinearMap.comp (d.comp e.toContinuousLinearMap)
+  have hA (p : Y) : m (A p) = d (e p) := m.apply_symm_apply _
+  have hform (p : Y) : R p (m (A p)) := (hA p).symm ▸ hR p
+  refine ⟨A, ⟨hform, ?_⟩, ?_⟩
+  · intro p
+    constructor
+    · intro hp
+      have hd : d (e p) = 0 := (hA p).symm.trans ((congrArg m hp).trans (map_zero m))
+      obtain ⟨q,hq⟩ := (hexact (e p)).mp hd
+      exact ⟨q, e.injective ((hleft q).trans hq)⟩
+    · rintro ⟨q,rfl⟩
+      apply m.injective
+      exact (hA _).trans ((congrArg d (hleft q)).trans
+        ((hexact.apply_apply_eq_zero q).trans (map_zero m).symm))
+  · intro A' hA'
+    apply ContinuousLinearMap.ext
+    intro p
+    exact m.injective (huniq p _ _ (hA'.1 p) (hform p))
+
 /-- Paper: Theorem 5.4.2.2(3)–(6) and (5.4.2.6), pp. 276–277.
 The upper difference is the unique continuous map whose shifted Mellin transform
 is the lower difference. The upper row is exact at the pair of decay spaces.
@@ -922,12 +1198,55 @@ theorem existsUnique_sLocalCechDifference (χ : PontryaginDual Jₛ)
     ∃! D : upperMiddle(χ) →L[ℂ] PositiveRealExponentialDecay overlapInterval,
       (∀ p : upperMiddle(χ), EqOn (M₀ (D p)).val
         (fun s ↦ (M₁ p.1).val s - ρₛ(χ, s) * (M₂ p.2).val (1 - s)) overlap) ∧
-      Function.Exact cechThetaPair(χ) D := by sorry
+      Function.Exact cechThetaPair(χ) D := by
+  intro M₁ M₂ M₀ h₁ h₂ _h₀
+  let lower := sLocalCechBergman_exact (F := F) (S := S) χ
+  let U : Θω(restrict₁(χ)) →L[ℂ] B⁺ × B⁺ := lower.choose
+  let D : B⁺ × B⁺ →L[ℂ] B⁰ := lower.choose_spec.choose
+  have hU := lower.choose_spec.choose_spec.1
+  have hD := lower.choose_spec.choose_spec.2.1
+  have hExact : Function.Exact U D := lower.choose_spec.choose_spec.2.2
+  let e : upperMiddle(χ) ≃L[ℂ] B⁺ × B⁺ := M₁.prodCongr M₂
+  have hleft (q : Θω(restrict₁(χ))) : e (cechThetaPair(χ) q) = U q := by
+    refine Submodule.Quotient.induction_on _ q (fun f ↦ ?_)
+    have h := sLocalCech_left_commutes χ τ hτ x _hx M₁ M₂ h₁ h₂ f
+    exact Prod.ext (existsUnique_sLocalZetaPair_ext (h.1.trans (hU f).1.symm))
+      (existsUnique_sLocalZetaPair_ext (h.2.trans (hU f).2.symm))
+  exact existsUnique_sLocalCechDifference_conjugate e M₀ cechThetaPair(χ) U D hleft hExact
+    (fun p f ↦ EqOn f.val
+      (fun s ↦ (M₁ p.1).val s - ρₛ(χ,s) * (M₂ p.2).val (1-s)) overlap)
+    (fun p ↦ hD (e p))
+    (fun _ _ _ hf hg ↦ existsUnique_sLocalZetaPair_ext (hf.trans hg.symm))
 
 /-- Paper: Remark 5.4.2.3 and (5.4.2.7), p. 277.
 The pair of homogeneous theta functions of a test and its Fourier transform
 embeds the homogeneous quotient as a closed subspace of the two weighted isotypes. -/
-theorem sLocalCechThetaPair_isClosedEmbedding (χ : PontryaginDual Jₛ) : IsClosedEmbedding cechThetaPair(χ) := by sorry
+theorem sLocalCechThetaPair_isClosedEmbedding (χ : PontryaginDual Jₛ) : IsClosedEmbedding cechThetaPair(χ) := by
+  let τ := (sIdeleQuotientNorm_exists_section F S).choose
+  have hτ := (sIdeleQuotientNorm_exists_section F S).choose_spec
+  let x := (existsUnique_sLocalCechFrequency χ τ).exists.choose
+  have hx := (existsUnique_sLocalCechFrequency χ τ).exists.choose_spec
+  have hM₁ := existsUnique_sLocalDecayMellin τ hτ rightInterval
+    isOpen_Ioi ordConnected_Ioi ⟨1, by norm_num⟩ restrict₁(χ) x
+  have hM₂ := existsUnique_sLocalDecayMellin τ hτ rightInterval
+    isOpen_Ioi ordConnected_Ioi ⟨1, by norm_num⟩ restrict₁(χ⁻¹) (-x)
+  let M₁ : Eω(rightInterval, restrict₁(χ)) ≃L[ℂ] B⁺ := hM₁.exists.choose
+  let M₂ : Eω(rightInterval, restrict₁(χ⁻¹)) ≃L[ℂ] B⁺ := hM₂.exists.choose
+  have h₁ := hM₁.exists.choose_spec
+  have h₂ := hM₂.exists.choose_spec
+  let e : upperMiddle(χ) ≃L[ℂ] B⁺ × B⁺ := M₁.prodCongr M₂
+  let U : Θω(restrict₁(χ)) →L[ℂ] B⁺ × B⁺ := e.toContinuousLinearMap.comp cechThetaPair(χ)
+  have hU : IsClosedEmbedding U := sLocalCechBergman_isClosedEmbedding χ U (by
+    intro f
+    exact sLocalCech_left_commutes χ τ hτ x hx M₁ M₂
+      (fun g s hs ↦ (h₁ g s hs).2)
+      (fun g s hs ↦ by simpa only [M₂, neg_mul, Complex.ofReal_neg, sub_eq_add_neg] using
+        (h₂ g s hs).2) f)
+  have heq : e.symm ∘ U = ⇑cechThetaPair(χ) := by
+    funext z
+    exact e.symm_apply_apply _
+  have h := e.symm.toHomeomorph.isClosedEmbedding.comp hU
+  exact heq ▸ h
 
 end Cech
 

@@ -2,10 +2,10 @@ module
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4a
 public import RiemannMasullo.AppC_LCTVS.Sec3b
-import all RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.Ch10_TraceSpectral.Sec1
 
 import all RiemannMasullo.Ch09_HardySobolev.Sec3
-import all RiemannMasullo.AppC_LCTVS.Sec2a_part2
+import RiemannMasullo.AppC_LCTVS.Sec2a_part2
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 public import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Completion
@@ -135,7 +135,39 @@ theorem sobolevProjectiveKernelOperator_tmul
 
 /-- Paper: Theorem 10.4.3.1(3), p. 467, and Theorem 10.4.3.5(3), p. 473.
 The canonical map from completed projective kernels to operators is injective. -/
-theorem sobolevProjectiveKernelOperator_injective : Injective ξ := by sorry
+theorem sobolevProjectiveKernelOperator_injective : Injective ξ := by
+  have (V : Type _) [NormedAddCommGroup V] [NormedSpace ℂ V] :
+      PolynormableSpace ℂ (StrongDual ℂ V) :=
+    (norm_withSeminorms ℂ (StrongDual ℂ V)).toPolynormableSpace
+  have (V : Type _) [UniformSpace V] : T2Space (Completion V) := inferInstance
+  have inj {X E : Type _} [NormedAddCommGroup X] [NormedSpace ℂ X]
+      [NormedAddCommGroup E] [InnerProductSpace ℂ E] [CompleteSpace E]
+      (e : StrongDual ℂ E ≃ₗᵢ[ℂ] X) :
+      let f := e.symm.toContinuousLinearEquiv.toContinuousLinearMap
+      let i : ProjectiveTensor X E →L[ℂ] ProjectiveTensor (StrongDual ℂ E) E :=
+        ⟨projectiveTensorMap f.toLinearMap (LinearMap.id : E →ₗ[ℂ] E),
+          projectiveTensorMap_continuous f (ContinuousLinearMap.id ℂ E)⟩
+      Injective ((completedProjectiveTensorToOperators (E := E) (F := E)).comp i.completion) := by
+    intro f i
+    let g := e.toContinuousLinearEquiv.toContinuousLinearMap
+    let j : ProjectiveTensor (StrongDual ℂ E) E →L[ℂ] ProjectiveTensor X E :=
+      ⟨projectiveTensorMap g.toLinearMap (LinearMap.id : E →ₗ[ℂ] E),
+        projectiveTensorMap_continuous g (ContinuousLinearMap.id ℂ E)⟩
+    have hi (z : ProjectiveTensor X E) : j (i z) = z := by
+      induction z using TensorProduct.inductionOn with
+      | tmul v x => exact congrArg (fun w : X ↦ w ⊗ₜ[ℂ] x) (e.apply_symm_apply v)
+      | add x y hx hy =>
+        exact (congrArg j (i.map_add x y)).trans
+          ((j.map_add (i x) (i y)).trans (congrArg₂ (fun a b : ProjectiveTensor X E ↦ a + b) hx hy))
+    have hji (z : Completion (ProjectiveTensor X E)) : j.completion (i.completion z) = z := by
+      refine Completion.induction_on z (isClosed_eq (j.completion.continuous.comp i.completion.continuous)
+        continuous_id) fun w ↦ ?_
+      rw [i.completion_apply_coe, j.completion_apply_coe, hi]
+    obtain ⟨t, ht, -⟩ := (exists_projectiveTensorCompletion_traceClassIsometry (E := E) (F := E)).2
+    intro v w he
+    have hh := t.injective (Subtype.ext ((ht (i.completion v)).trans (he.trans (ht (i.completion w)).symm)))
+    exact (hji v).symm.trans ((congrArg j.completion hh).trans (hji w))
+  exact inj (T)
 
 end ProjectiveKernels
 
@@ -238,7 +270,36 @@ theorem spectralLineAmbientKernel_tendsto (_ha : 0 < a)
     (_hχ : IsSpectralBasepointChoice χ) (_he : ∀ z, (e z).1 = eχ z.val.1)
     (_horder : Order₀(χ, e)) (_hb : Bases₀(χ, x, f)) (φ : BruhatCompactSupport C𝔽) :
     ∃ K, Tendsto (spectralKernelRectangle e (fun z ↦ N(χ, z)) jet
-      (fun j ↦ D₀ ((f j).comp (Aq₀(φ)))) (fun j ↦ S₀ (x j))) atTop (𝓝 K) := by sorry
+      (fun j ↦ D₀ ((f j).comp (Aq₀(φ)))) (fun j ↦ S₀ (x j))) atTop (𝓝 K) := by
+  have lift {Z J E G X Y : Type _} [NormedAddCommGroup E] [NormedSpace ℂ E]
+      [NormedAddCommGroup G] [NormedSpace ℂ G] [NormedAddCommGroup X] [NormedSpace ℂ X]
+      [NormedAddCommGroup Y] [NormedSpace ℂ Y]
+      (d : E →L[ℂ] X) (j : G →L[ℂ] Y) (e : Z ↪ ℕ × ℕ) (N : Z → ℕ)
+      (i : (z : Z) → Fin (N z) → J) (u : J → E) (v : J → G)
+      (h : ∃ K, Tendsto (spectralKernelRectangle e N i u v) atTop (𝓝 K)) :
+      ∃ K, Tendsto (spectralKernelRectangle e N i (fun z ↦ d (u z)) (fun z ↦ j (v z))) atTop (𝓝 K) := by
+    let L : ProjectiveTensor E G →L[ℂ] ProjectiveTensor X Y :=
+      ⟨projectiveTensorMap d.toLinearMap j.toLinearMap, projectiveTensorMap_continuous d j⟩
+    obtain ⟨K, hK⟩ := h
+    refine ⟨L.completion K, (L.completion.continuous.continuousAt.tendsto.comp hK).congr ?_⟩
+    intro ij
+    unfold Function.comp spectralKernelRectangle
+    rw [ContinuousLinearMap.completion_apply_coe]
+    apply congrArg ((↑) : ProjectiveTensor X Y → Π(X, Y))
+    change projectiveTensorMap d.toLinearMap j.toLinearMap _ = _
+    rw [map_sum]
+    apply Finset.sum_congr rfl
+    intro z _
+    exact (map_sum (TensorProduct.map d.toLinearMap j.toLinearMap)
+      (fun m : Fin (N z) ↦ u (i z m) ⊗ₜ[ℂ] v (i z m)) Finset.univ).trans
+      (Finset.sum_congr rfl fun m _ ↦ TensorProduct.map_tmul _ _ _ _)
+  let E := H(a, (le_refl (0 : ℝ)), hs₀(hs))
+  let θ := Θ(a, (le_refl (0 : ℝ)), hs₀(hs))
+  let d : StrongDual ℂ E →L[ℂ] W'(0, s) := ⟨D₀,
+    (spectralSobolevDualEmbedding_isometry_range (F := F) a (hStrip((le_refl (0 : ℝ)))) hs₀(hs)).1.continuous⟩
+  let j : E →L[ℂ] W(0, s) := θ.orthogonal.subtypeL.comp
+    θ.quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
+  exact lift d j e _ _ _ _ (spectralLineQuotientKernel_tendsto (F := F) a hs _ha χ eχ e x f _hχ _he _horder _hb φ)
 
 /-- Paper: Theorem 10.4.3.1(3), p. 467. The limit of the ambient kernels
 represents spectral projection after convolution. -/
@@ -278,6 +339,109 @@ theorem sobolevProjectiveKernel_existsUnique_l2 (hα : 0 ≤ α) (hs : 0 ≤ s)
     ∃! k : L²mixed, integrates(μ𝔽, sobolevProjectiveKernelOperator (F := F) hα hs K, k) :=
   by sorry
 
+/-- Paper: (10.4.3.23)–(10.4.3.25), p. 470.
+The product of two weighted square-integrable functions lies in the mixed product space. -/
+private theorem sobolevProjectiveKernel_l2_tmul_memLp
+    {F : Type*} [Field F] [NumberField F]
+    {α s : ℝ}
+    (v : (CompactIntervalSobolev (ideleClassTamagawaMeasure F) (fun g : IdeleClassGroup (𝓞 F) F ↦
+        Real.log ((ideleClassNorm F g).val : ℝ)) (-α) α s true)) (u : (CompactIntervalSobolev
+        (ideleClassTamagawaMeasure F) (fun g : IdeleClassGroup (𝓞 F) F ↦ Real.log ((ideleClassNorm F
+        g).val : ℝ)) (-α) α s)) :
+    MemLp (fun p : (IdeleClassGroup (𝓞 F) F) × (IdeleClassGroup (𝓞 F) F) ↦ v p.2 * u p.1) 2
+      ((((ideleClassTamagawaMeasure F).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity
+          (-α) α s (Real.log ((ideleClassNorm F g).val : ℝ))))).prod (((ideleClassTamagawaMeasure
+          F).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity (-α) α s (Real.log
+          ((ideleClassNorm F g).val : ℝ)))⁻¹))) := by
+  have hu := Lp.memLp u
+  have hv := Lp.memLp v
+  have hm : AEStronglyMeasurable (fun p : (IdeleClassGroup (𝓞 F) F) × (IdeleClassGroup (𝓞 F) F) ↦ v
+      p.2 * u p.1)
+      ((((ideleClassTamagawaMeasure F).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity
+          (-α) α s (Real.log ((ideleClassNorm F g).val : ℝ))))).prod (((ideleClassTamagawaMeasure
+          F).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity (-α) α s (Real.log
+          ((ideleClassNorm F g).val : ℝ)))⁻¹))) :=
+    hv.aestronglyMeasurable.comp_snd.mul hu.aestronglyMeasurable.comp_fst
+  refine (eLpNorm_lt_top_iff_lintegral_rpow_eNorm_lt_top (by norm_num)
+    (by norm_num) hm).mpr ?_
+  simp only [eNorm_mul, ENNReal.mul_rpow_of_nonneg _ _ (by positivity : 0 ≤ (2 : ENNReal).toReal)]
+  simp_rw [mul_comm (‖v _‖ₑ ^ (2 : ENNReal).toReal)]
+  rw [lintegral_prod_mul (f := fun x ↦ ‖u x‖ₑ ^ (2 : ENNReal).toReal)
+    (g := fun y ↦ ‖v y‖ₑ ^ (2 : ENNReal).toReal)
+    (by fun_prop) (by fun_prop)]
+  exact ENNReal.mul_lt_top
+    (lintegral_rpow_eNorm_lt_top_of_eLpNorm_lt_top (by norm_num) (by norm_num) hu.eLpNorm_lt_top)
+    (lintegral_rpow_eNorm_lt_top_of_eLpNorm_lt_top (by norm_num) (by norm_num) hv.eLpNorm_lt_top)
+
+/-- Paper: (10.4.3.23)–(10.4.3.25), p. 470.
+An almost-everywhere product representative integrates to the elementary tensor operator. -/
+private theorem sobolevProjectiveKernel_l2_tmul_integrates
+    {F : Type*} [Field F] [NumberField F] {α s : ℝ}
+    (hα : 0 ≤ α) (hs : 0 ≤ s) (v : (CompactIntervalSobolev (ideleClassTamagawaMeasure F) (fun g :
+        IdeleClassGroup (𝓞 F) F ↦ Real.log ((ideleClassNorm F g).val : ℝ)) (-α) α s true)) (u :
+        (CompactIntervalSobolev (ideleClassTamagawaMeasure F) (fun g : IdeleClassGroup (𝓞 F) F ↦
+        Real.log ((ideleClassNorm F g).val : ℝ)) (-α) α s))
+    (k : Lp ℂ 2 ((((ideleClassTamagawaMeasure F).withDensity fun g ↦ ENNReal.ofReal
+        (intervalSobolevDensity (-α) α s (Real.log ((ideleClassNorm F g).val : ℝ))))).prod
+        (((ideleClassTamagawaMeasure F).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity
+        (-α) α s (Real.log ((ideleClassNorm F g).val : ℝ)))⁻¹))))
+    (hk : (k : (IdeleClassGroup (𝓞 F) F) × (IdeleClassGroup (𝓞 F) F) → ℂ)
+        =ᵐ[(((ideleClassTamagawaMeasure F).withDensity fun g ↦ ENNReal.ofReal
+        (intervalSobolevDensity (-α) α s (Real.log ((ideleClassNorm F g).val : ℝ))))).prod
+        (((ideleClassTamagawaMeasure F).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity
+        (-α) α s (Real.log ((ideleClassNorm F g).val : ℝ)))⁻¹))]
+      (fun p ↦ v p.2 * u p.1)) :
+    ∀ f : (CompactIntervalSobolev (ideleClassTamagawaMeasure F) (fun g : IdeleClassGroup (𝓞 F) F ↦
+        Real.log ((ideleClassNorm F g).val : ℝ)) (-α) α s), ∀ᵐ x ∂(ideleClassTamagawaMeasure F),
+      Integrable (fun y ↦ k (x, y) * f y) (ideleClassTamagawaMeasure F) ∧
+      (sobolevProjectiveKernelOperator (F := F) hα hs
+      ((show ProjectiveTensor (CompactIntervalSobolev (ideleClassTamagawaMeasure F) (fun g :
+          IdeleClassGroup (𝓞 F) F ↦ Real.log ((ideleClassNorm F g).val : ℝ)) (-α) α s true)
+          (CompactIntervalSobolev (ideleClassTamagawaMeasure F) (fun g : IdeleClassGroup (𝓞 F) F ↦
+          Real.log ((ideleClassNorm F g).val : ℝ)) (-α) α s) from v ⊗ₜ[ℂ] u) :
+        Completion (ProjectiveTensor (CompactIntervalSobolev (ideleClassTamagawaMeasure F) (fun g :
+            IdeleClassGroup (𝓞 F) F ↦ Real.log ((ideleClassNorm F g).val : ℝ)) (-α) α s true)
+            (CompactIntervalSobolev (ideleClassTamagawaMeasure F) (fun g : IdeleClassGroup (𝓞 F) F ↦
+            Real.log ((ideleClassNorm F g).val : ℝ)) (-α) α s))) f : (IdeleClassGroup (𝓞 F) F) → ℂ)
+            x = ∫ y, k (x, y) * f y ∂(ideleClassTamagawaMeasure F) := by
+  have hw : Measurable ((fun g : IdeleClassGroup (𝓞 F) F ↦ intervalSobolevDensity (-α) α s (Real.log
+      ((ideleClassNorm F g).val : ℝ)))) :=
+    ((continuous_intervalSobolevDensity (-α) α s).comp
+      (continuous_logModule' (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ :
+          IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ))).measurable
+  have hp (x : (IdeleClassGroup (𝓞 F) F)) : 0 < (fun g : IdeleClassGroup (𝓞 F) F ↦
+      intervalSobolevDensity (-α) α s (Real.log ((ideleClassNorm F g).val : ℝ))) x :=
+      intervalSobolevDensity_pos' _ _ _ _
+  have ha (p : (IdeleClassGroup (𝓞 F) F) → Prop) (h : ∀ᵐ x ∂((ideleClassTamagawaMeasure
+      F).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity (-α) α s (Real.log
+      ((ideleClassNorm F g).val : ℝ)))), p x) : ∀ᵐ x ∂(ideleClassTamagawaMeasure F), p x := by
+    exact ((ae_withDensity_iff hw.ennreal_ofReal).mp h).mono
+      (fun x hx ↦ hx (ne_of_gt (ENNReal.ofReal_pos.mpr (hp x))))
+  have ha' (p : (IdeleClassGroup (𝓞 F) F) → Prop) (h : ∀ᵐ x ∂((ideleClassTamagawaMeasure
+      F).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity (-α) α s (Real.log
+      ((ideleClassNorm F g).val : ℝ)))⁻¹), p x) : ∀ᵐ x ∂(ideleClassTamagawaMeasure F), p x := by
+    exact ((ae_withDensity_iff hw.inv.ennreal_ofReal).mp h).mono
+      (fun x hx ↦ hx (ne_of_gt (ENNReal.ofReal_pos.mpr (inv_pos.mpr (hp x)))))
+  have hk' := ha _ (Measure.ae_ae_of_ae_prod hk)
+  intro f
+  let T := (modulatedIntervalSobolev_dual (⟨ideleClassNorm F, (isProperMap_ideleClassNorm
+      F).continuous⟩ : IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ)
+    ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+    (ideleClassTamagawaMeasure F) (-α) α s ((neg_nonpos.mpr hα).trans hα) hs).exists.choose
+  have hi : Integrable (fun y ↦ f y * v y) (ideleClassTamagawaMeasure F) := by
+    have hh := (spectralSobolevPairing_dual ((neg_nonpos.mpr hα).trans hα) hs (T.symm v) f).1
+    simpa only [T, LinearIsometryEquiv.apply_symm_apply] using hh
+  have hu := ha _ (Lp.coeFn_smul (spectralSobolevPairing (F := F) f v) u)
+  filter_upwards [hk', hu] with x hx hux
+  have he : (fun y ↦ k (x, y) * f y) =ᵐ[(ideleClassTamagawaMeasure F)] (fun y ↦ (f y * v y) * u x)
+      := by
+    filter_upwards [ha' _ hx] with y hy
+    rw [hy]
+    ring
+  refine ⟨(hi.mul_const (u x)).congr he.symm, ?_⟩
+  rw [sobolevProjectiveKernelOperator_tmul, hux, integral_congr_ae he, integral_mul_const]
+  rfl
+
 /-- Paper: (10.4.3.23)–(10.4.3.25), p. 470. An elementary tensor has
 mixed-weight representative given by the product of its factors.
 Deviation: The reciprocal-weight factor is evaluated at the input coordinate. -/
@@ -287,7 +451,12 @@ theorem sobolevProjectiveKernel_l2_tmul (hα : 0 ≤ α) (hs : 0 ≤ s)
       (k : C𝔽 × C𝔽 → ℂ) =ᵐ[(ν(α, s)).prod (ν'(α, s))] (fun p ↦ v p.2 * u p.1) ∧
       integrates(μ𝔽, sobolevProjectiveKernelOperator (F := F) hα hs
         ((show ProjectiveTensor W'(α, s) W(α, s) from v ⊗ₜ[ℂ] u) : Π(W'(α, s), W(α, s))), k) :=
-  by sorry
+  by
+    let h := sobolevProjectiveKernel_l2_tmul_memLp (F := F) v u
+    let k : L²mixed := h.toLp (fun p ↦ v p.2 * u p.1)
+    refine ⟨k, ?_, ?_⟩
+    · exact h.coeFn_toLp
+    · exact sobolevProjectiveKernel_l2_tmul_integrates (F := F) hα hs v u k h.coeFn_toLp
 
 /-- Paper: (10.4.3.23)–(10.4.3.25), p. 470. A projective tensor has
 a mixed-weight kernel class giving its operator under Haar integration.
@@ -388,7 +557,39 @@ operator has a unique mixed-weight kernel. Existence also follows from the
 nuclearity and factorization of quotient convolution in §§10.3–10.4.2.
 Deviation: That factorization applies to every real twist. -/
 theorem spectralLineKernel_existsUnique :
-    ∃! k : L²line, lineKernelFor(k) := by sorry
+    ∃! k : L²line, lineKernelFor(k) := by
+  have hasTensor {E : Type _} [NormedAddCommGroup E] [InnerProductSpace ℂ E] [CompleteSpace E]
+      (op : E →L[ℂ] E) (hn : IsNuclearOperator (E := E) (F := E) op) :
+      ∃ w : Completion (ProjectiveTensor (StrongDual ℂ E) E),
+        completedProjectiveTensorToOperators (E := E) (F := E) w = op :=
+    (isBanachNuclear_iff_mem_range (E := E) (F := E) op).mp
+      ((isNuclearOperator_iff_isBanachNuclear (E := E) (F := E) op).mp hn)
+  have transport {Y X E : Type _} [NormedAddCommGroup Y] [NormedSpace ℂ Y] [NormedAddCommGroup X] [NormedSpace ℂ X]
+      [NormedAddCommGroup E] [NormedSpace ℂ E]
+      (e : Y ≃ₗᵢ[ℂ] X) :
+      let f := e.symm.toContinuousLinearEquiv.toContinuousLinearMap
+      let i : ProjectiveTensor X E →L[ℂ] ProjectiveTensor Y E :=
+        ⟨projectiveTensorMap f.toLinearMap (LinearMap.id : E →ₗ[ℂ] E),
+          projectiveTensorMap_continuous f (ContinuousLinearMap.id ℂ E)⟩
+      Surjective i.completion := by
+    intro f i
+    exact completedProjectiveTensorMap_surjective f (ContinuousLinearMap.id ℂ E)
+      e.symm.toHomeomorph.isQuotientMap Topology.IsQuotientMap.id
+  let lineOp : W(0, s) →L[ℂ] W(0, s) := Bline
+  have hB : IsNuclearOperator (E := W(0, s)) (F := W(0, s)) lineOp := spectralProjection_convolution_nuclear (F := F) a hline hs₀(hs) φ
+    (spectralStripConvolution_nuclear (F := F) a hline hs φ)
+  let e : StrongDual ℂ W(0, s) ≃ₗᵢ[ℂ] W'(0, s) := (modulatedIntervalSobolev_dual m𝔽
+    ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+    μ𝔽 (-(0 : ℝ)) 0 s (hStrip(hline)) hs₀(hs)).exists.choose
+  have hrep := hasTensor (E := W(0, s)) lineOp hB
+  have hlift := transport (Y := StrongDual ℂ W(0, s)) (E := W(0, s)) (X := W'(0, s)) e hrep.choose
+  let K := hlift.choose
+  have hEq : sobolevProjectiveKernelOperator (F := F) hline hs₀(hs) K = Bline :=
+    (congrArg (completedProjectiveTensorToOperators (E := W(0, s)) (F := W(0, s))) hlift.choose_spec).trans hrep.choose_spec
+  let property (op : W(0, s) →L[ℂ] W(0, s)) := ∃! k : L²line,
+    ∀ u : W(0, s), ∀ᵐ x ∂μ𝔽, Integrable (fun y ↦ k (x, y) * u y) μ𝔽 ∧
+      op u x = ∫ y, k (x, y) * u y ∂μ𝔽
+  exact (congrArg property hEq).mp (sobolevProjectiveKernel_existsUnique_l2 (F := F) hline hs₀(hs) K)
 
 /-- Paper: Definition 10.4.3.2(1), p. 470. The global line spectral kernel
 is the representative of the unique kernel of projection after convolution.
@@ -411,6 +612,67 @@ def globalLineGeometricKernel (p : C𝔽 × C𝔽) : ℂ :=
 
 local notation "geomLine" => globalLineGeometricKernel (F := F) a hs φ
 
+/-- Evaluate the two projection identities on a vector fixed by the geometric projection. -/
+private theorem geometricLineKernel_apply_projections {E : Type*} [NormedAddCommGroup E]
+    [NormedSpace ℂ E] (P Q A : E →L[ℂ] E) (u : E) (hu : P u = u)
+    (hP : P.comp (A.comp P) = A.comp P) (hQ : Q.comp (A.comp P) = 0) :
+    P (A u) = A u ∧ Q (A u) = 0 := by
+  have hp := DFunLike.congr_fun hP u
+  have hq := DFunLike.congr_fun hQ u
+  simpa only [ContinuousLinearMap.comp_apply, hu, zero_apply] using And.intro hp hq
+
+/-- Subtracting a spectral row of integral zero leaves the Haar convolution on the
+given input. Inversion followed by translation gives the output-first kernel. -/
+private theorem geometricLineKernel_apply_sub {G : Type*} [CommGroup G]
+    [MeasurableSpace G] [MeasurableMul₂ G] [MeasurableInv G] (μ : Measure G)
+    [μ.IsMulLeftInvariant] [μ.IsInvInvariant] (φ u A : G → ℂ) (k : G × G → ℂ)
+    (hi : ∀ᵐ x ∂μ, Integrable (fun y ↦ φ y * u (y⁻¹ * x)) μ)
+    (hA : ∀ᵐ x ∂μ, A x = ∫ y, φ y * u (y⁻¹ * x) ∂μ)
+    (hk : ∀ᵐ x ∂μ, Integrable (fun y ↦ k (x, y) * u y) μ ∧
+      (∫ y, k (x, y) * u y ∂μ) = 0) :
+    ∀ᵐ x ∂μ, Integrable (fun y ↦ (φ (x * y⁻¹) - k (x, y)) * u y) μ ∧
+      A x = ∫ y, (φ (x * y⁻¹) - k (x, y)) * u y ∂μ := by
+  filter_upwards [hi, hA, hk] with x hx hAx ⟨hkx, hzero⟩
+  let f (g : G) := φ g * u (g⁻¹ * x)
+  have hsub (y : G) : f (x / y) = φ (x * y⁻¹) * u y := by simp [f, div_eq_mul_inv]
+  have hint : Integrable (fun y ↦ φ (x * y⁻¹) * u y) μ := by
+    have hy := ((Measure.measurePreserving_div_left μ x).integrable_comp_emb
+      (MeasurableEquiv.divLeft x).measurableEmbedding).mpr hx
+    exact hy.congr (.of_forall hsub)
+  simp only [sub_mul]
+  refine ⟨hint.sub hkx, ?_⟩
+  rw [integral_sub hint hkx, hzero, sub_zero, hAx, ← integral_div_left_eq_self f μ x]
+  simp_rw [hsub]
+
+/-- On a weighted Sobolev space, subtract the kernel of a vanishing projection block
+from the convolution kernel. The positive weight transfers the zero representative to Haar measure. -/
+private theorem geometricLineKernel_apply_rows {G : Type*} [CommGroup G]
+    [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    [MeasurableSpace G] [BorelSpace G] [SecondCountableTopology G] (μ : Measure G)
+    [μ.IsHaarMeasure] (m : G →ₜ* ℝ≥0ˣ) (a b s : ℝ) (hab : a ≤ b) (hs : 0 ≤ s)
+    (φ : BruhatCompactSupport G)
+    (u : CompactIntervalSobolev μ (fun g ↦ Real.log ((m g).val : ℝ)) a b s)
+    (k : G × G → ℂ)
+    (hk : ∀ᵐ x ∂μ, Integrable (fun y ↦ k (x, y) * u y) μ ∧
+      (0 : CompactIntervalSobolev μ (fun g ↦ Real.log ((m g).val : ℝ)) a b s) x =
+        ∫ y, k (x, y) * u y ∂μ) :
+    ∀ᵐ x ∂μ, Integrable (fun y ↦ (φ.val (x * y⁻¹) - k (x, y)) * u y) μ ∧
+      hardySobolevTestAction μ m a b s hab hs φ u x =
+        ∫ y, (φ.val (x * y⁻¹) - k (x, y)) * u y ∂μ := by
+  have hc : Continuous φ.val :=
+    continuous_of_bruhatSmooth ((mem_bruhatSmoothSubmodule_iff _).1 φ.property.1)
+  have hi := hc.integrable_of_hasCompactSupport (μ := μ) φ.property.2
+  have horbit := hardySobolev_orbit_integral μ m a b s hab hs (φ := φ.val) hi φ.property.2 u
+  let w (g : G) := intervalSobolevDensity a b s (Real.log ((m g).val : ℝ))
+  have hw : Continuous w := (continuous_intervalSobolevDensity a b s).comp (continuous_logModule' m)
+  let ν := μ.withDensity (fun g ↦ ENNReal.ofReal (w g))
+  have hμ : μ ≪ ν := withDensity_absolutelyContinuous' hw.measurable.ennreal_ofReal.aemeasurable
+    (.of_forall fun g ↦ (ENNReal.ofReal_pos.mpr (intervalSobolevDensity_pos' a b s _)).ne')
+  apply geometricLineKernel_apply_sub μ φ.val u _ k (horbit.mono fun _ h ↦ h.1)
+    (hardySobolevTestAction_apply μ m a b s hab hs φ u)
+  filter_upwards [hk, hμ.ae_le (Lp.coeFn_zero ℂ 2 ν)] with x hx hx₀
+  exact ⟨hx.1, hx.2.symm.trans hx₀⟩
+
 /-- Paper: Theorem 10.4.3.4(1), p. 470. On a theta vector the global
 geometric kernel represents convolution and geometric projection after convolution.
 The tested row is Haar integrable almost everywhere. -/
@@ -418,7 +680,22 @@ theorem geometricLineKernel_apply (_ha : 0 < a)
     (u : W(0, s)) (_hu : u ∈ Θline) :
     ∀ᵐ x ∂μ𝔽, Integrable (fun y ↦ geomLine (x, y) * u y) μ𝔽 ∧
       Aline u x = (Pgeom(a, hline, hs₀(hs))).comp Aline u x ∧
-      Aline u x = ∫ y, geomLine (x, y) * u y ∂μ𝔽 := by sorry
+      Aline u x = ∫ y, geomLine (x, y) * u y ∂μ𝔽 := by
+  obtain ⟨hgeom, hspec⟩ := geometricLineKernel_apply_projections
+    (Pgeom(a, hline, hs₀(hs))) (Pspec(a, hline, hs₀(hs))) Aline u
+    (geometricProjection_apply_of_mem (F := F) a hline hs₀(hs) _hu)
+    (geometricProjection_convolution_geometricProjection (F := F) a hline hs₀(hs) φ)
+    (spectralProjection_convolution_geometricProjection (F := F) a hline hs₀(hs) φ)
+  have hk := spectralLineKernel_apply (F := F) a hs φ u
+  let row (v : W(0, s)) := ∀ᵐ x ∂μ𝔽, Integrable (fun y ↦ kLine (x, y) * u y) μ𝔽 ∧
+    v x = ∫ y, kLine (x, y) * u y ∂μ𝔽
+  have hk₀ : row 0 := Eq.mp (congrArg row hspec) hk
+  -- Specialize the Haar identity before inserting the Sobolev vector and kernel.
+  let haarRows := geometricLineKernel_apply_rows (G := C𝔽) μ𝔽 m𝔽 (-0) 0 s
+    (hStrip(hline)) hs₀(hs) φ
+  have hrows := haarRows u (kLine : C𝔽 × C𝔽 → ℂ) hk₀
+  filter_upwards [hrows] with x hx
+  exact ⟨hx.1, congrArg (fun v : W(0, s) ↦ v x) hgeom.symm, hx.2⟩
 
 /-- Paper: Theorem 10.4.3.4(2), pp. 470–471, first formula. Divide the
 global spectral kernel by the input weight to obtain the Hilbert-Schmidt
@@ -593,7 +870,36 @@ theorem spectralStripTransposedKernel_tendsto (_ha : 0 < a)
     (_horder : Order(χ, e)) (_hb : Bases(χ, x, f)) :
     ∃ K : Π(W'(α, s), W(α, s)),
       Tendsto (rectangle(χ, e) (fun j ↦ D ((f j).comp (Aq(a, hα, hs₀(hs), φ))))
-      (fun j ↦ S(a, hα, hs₀(hs)) (x j))) atTop (𝓝 K) := by sorry
+      (fun j ↦ S(a, hα, hs₀(hs)) (x j))) atTop (𝓝 K) := by
+  have lift {Z J E G X Y : Type _} [NormedAddCommGroup E] [NormedSpace ℂ E]
+      [NormedAddCommGroup G] [NormedSpace ℂ G] [NormedAddCommGroup X] [NormedSpace ℂ X]
+      [NormedAddCommGroup Y] [NormedSpace ℂ Y]
+      (d : E →L[ℂ] X) (j : G →L[ℂ] Y) (e : Z ↪ ℕ × ℕ) (N : Z → ℕ)
+      (i : (z : Z) → Fin (N z) → J) (u : J → E) (v : J → G)
+      (h : ∃ K, Tendsto (spectralKernelRectangle e N i u v) atTop (𝓝 K)) :
+      ∃ K, Tendsto (spectralKernelRectangle e N i (fun z ↦ d (u z)) (fun z ↦ j (v z))) atTop (𝓝 K) := by
+    let L : ProjectiveTensor E G →L[ℂ] ProjectiveTensor X Y :=
+      ⟨projectiveTensorMap d.toLinearMap j.toLinearMap, projectiveTensorMap_continuous d j⟩
+    obtain ⟨K, hK⟩ := h
+    refine ⟨L.completion K, (L.completion.continuous.continuousAt.tendsto.comp hK).congr ?_⟩
+    intro ij
+    unfold Function.comp spectralKernelRectangle
+    rw [ContinuousLinearMap.completion_apply_coe]
+    apply congrArg ((↑) : ProjectiveTensor X Y → Π(X, Y))
+    change projectiveTensorMap d.toLinearMap j.toLinearMap _ = _
+    rw [map_sum]
+    apply Finset.sum_congr rfl
+    intro z _
+    exact (map_sum (TensorProduct.map d.toLinearMap j.toLinearMap)
+      (fun m : Fin (N z) ↦ u (i z m) ⊗ₜ[ℂ] v (i z m)) Finset.univ).trans
+      (Finset.sum_congr rfl fun m _ ↦ TensorProduct.map_tmul _ _ _ _)
+  let E := H(a, hα, hs₀(hs))
+  let θ := Θ(a, hα, hs₀(hs))
+  let d : StrongDual ℂ E →L[ℂ] W'(α, s) := ⟨D,
+    (spectralSobolevDualEmbedding_isometry_range (F := F) a (hStrip(hα)) hs₀(hs)).1.continuous⟩
+  let j : E →L[ℂ] W(α, s) := θ.orthogonal.subtypeL.comp
+    θ.quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
+  exact lift d j e _ _ _ _ (spectralStripQuotientKernel_tendsto (F := F) a hα hs φ _ha χ eχ e x f _hχ _he _horder _hb)
 
 -- TODO(paper-gap): The estimate at the end of §10.4.2 does not prove convergence
 -- of the ambient net with convolution on the output factor. The quotient net

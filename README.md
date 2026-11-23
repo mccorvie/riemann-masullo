@@ -101,7 +101,7 @@ chapters' accounts of standard material are repaired where they occur: the Lean 
 corrected form and says so.
 
 The second wave has reached the paper's own constructions in Chapters 5–7, and the findings
-there weigh more. Most still come with a repair. Twenty-two steps have none so far, and later
+there weigh more. Most still come with a repair. Twenty-three steps have none so far, and later
 results use them; `ERRATA.md` lists them first. The main one in Chapter 5 is the structure
 theorem for the spaces of adelic θ-functions (Theorem 5.2.1.1): its printed proof does not
 work. One of its two central claims, that each finite stage embeds in the global space, has
@@ -109,7 +109,7 @@ since been proved in Lean by a different route. The other, strictness, is neithe
 refuted, and the rest of §5.2 is proved from it. The explicit formulas of §B.4, which
 Chapter 12 quotes, need their local terms and normalizations recomputed.
 
-The third wave has reached the trace formula. Sixteen of the twenty-two steps are in Chapters
+The third wave has reached the trace formula. Seventeen of the twenty-three steps are in Chapters
 10–12 or in the later sections of Chapter 7: the bases and nuclear presentations from which the
 spectral and orbital traces are computed (§7.3–7.4, §10.2–10.4, §11.1–11.2) are not established by the
 printed arguments, and the section that should compare the global trace with the S-local one

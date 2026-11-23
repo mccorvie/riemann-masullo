@@ -966,11 +966,62 @@ theorem iteratedWirtinger_exponentialDecay (conjugate : Bool) (m : ℕ) {a : ℝ
     ∃ D : 𝓔(ℂ, 2, Ioi a) →L[ℂ] 𝓔(ℂ, 2, Ioi (a + m)),
       ∀ f z, (D f).val z = ((wirtinger(conjugate))^[m] zeroExtension(f.val)) z.val := by sorry
 
+/-- Every output weight of the derivative comes from the input weight one lower;
+the initial topology of all twists makes this a continuous endomorphism. -/
+private theorem iteratedDeriv_allExponentialDecay_step :
+    ∃ D : 𝓔(ℝ, 1, univ) →L[ℂ] 𝓔(ℝ, 1, univ),
+      ∀ f x, (D f).val x = deriv zeroExtension(f.val) x.val := by
+  let n := archimedeanUnitModulation ℝ 1
+  let I : Set ℝ := univ
+  let J : Set ℝ := univ
+  let E := ModulatedExponentialDecay n I
+  let d (f : E) (x : ℝˣ) := deriv zeroExtension(f.val) x.val
+  have htwist (c : J) : ∃ U : E →L[ℂ] SchwartzBruhat ℝˣ,
+      ∀ f, (U f).val = modulationWeight n c (d f) := by
+    let b : I := ⟨c.val - 1, mem_univ _⟩
+    let W : E →L[ℂ] SchwartzBruhat ℝˣ := ⟨modulatedExponentialDecayTwist n I b,
+      (continuous_apply b).comp (iteratedDeriv_exponentialDecay_inducing I).continuous⟩
+    refine (iteratedDeriv_exponentialDecay_onTwist b).elim fun T hT ↦ ?_
+    refine ⟨T.comp W, fun f ↦ funext fun x ↦ ?_⟩
+    have h := hT f.val (W f) (fun y ↦ iteratedDeriv_exponentialDecay_weight b f.val y) x
+    refine h.trans ?_
+    rw [show (b : ℝ) + 1 = c.val from sub_add_cancel _ _, iteratedDeriv_exponentialDecay_weight]
+  let c₀ : J := ⟨0, mem_univ _⟩
+  let U := (htwist c₀).choose
+  let L : E →ₗ[ℂ] (ℝˣ → ℂ) := (modulationWeight n (-c₀.val)).comp
+    ((schwartzBruhatSubmodule ℝˣ).subtype.comp U.toLinearMap)
+  have hL (f : E) : L f = d f := by
+    funext x
+    change modulationWeight n (-c₀.val) (U f).val x = _
+    rw [(htwist c₀).choose_spec f, iteratedDeriv_exponentialDecay_weight,
+      iteratedDeriv_exponentialDecay_weight, ← mul_assoc, ← Complex.ofReal_mul,
+      ← Real.rpow_add (abs_pos.mpr x.ne_zero), neg_add_cancel, Real.rpow_zero, Complex.ofReal_one, one_mul]
+  let D := L.codRestrict (modulatedExponentialDecaySubmodule n J) fun f ↦
+    (Submodule.mem_iInf _).mpr fun c ↦ Submodule.mem_comap.mpr (by
+      change modulationWeight n c (L f) ∈ schwartzBruhatSubmodule ℝˣ
+      rw [hL f, ← (htwist c).choose_spec f]
+      exact ((htwist c).choose f).property)
+  refine ⟨⟨D, (iteratedDeriv_exponentialDecay_inducing J).continuous_iff.mpr (continuous_pi fun c ↦ ?_)⟩, fun f ↦ congrFun (hL f)⟩
+  exact (htwist c).choose.continuous.congr fun f ↦ Subtype.ext
+    (((htwist c).choose_spec f).trans (congrArg (modulationWeight n c) (hL f).symm))
+
 /-- Paper: Proposition 5.3.3.2(2)(1), p. 249.
 Ordinary derivatives act continuously on the punctured real space with decay at all exponents. -/
 theorem iteratedDeriv_allExponentialDecay (m : ℕ) :
     ∃ D : 𝓔(ℝ, 1, univ) →L[ℂ] 𝓔(ℝ, 1, univ),
-      ∀ f x, (D f).val x = iteratedDeriv m zeroExtension(f.val) x.val := by sorry
+      ∀ f x, (D f).val x = iteratedDeriv m zeroExtension(f.val) x.val := by
+  induction m with
+  | zero =>
+    refine ⟨ContinuousLinearMap.id ℂ _, fun f x ↦ ?_⟩
+    change f.val x = iteratedDeriv 0 _ x.val
+    simp only [iteratedDeriv_zero, dite_eq_left x.ne_zero]
+    exact congrArg f.val (Units.ext rfl)
+  | succ m ih =>
+    obtain ⟨A, hA⟩ := ih
+    obtain ⟨B, hB⟩ := iteratedDeriv_allExponentialDecay_step
+    refine ⟨B.comp A, fun f x ↦ ?_⟩
+    exact (hB (A f) x).trans
+      (iteratedDeriv_exponentialDecay_succ m (A f).val zeroExtension(f.val) (hA f) x)
 
 /-- Paper: Proposition 5.3.3.2(2)(2), p. 250.
 Both iterated Wirtinger operators preserve the punctured complex space with decay at all
@@ -1247,7 +1298,54 @@ local notation "𝓦(" I ")" => ArchimedeanWeightedSchwartz (ι := ι) (κ := κ
 When there are no coordinates, the weighted Schwartz space is the scalar field. -/
 theorem archimedeanWeightedSchwartz_empty_equiv (I : Set ℝ) :
     ∃ e : ArchimedeanWeightedSchwartz (ι := Empty) (κ := Empty) I ≃L[ℂ] ℂ,
-      ∀ f, e f = f.val (1 : archMul(Empty, Empty)) := by sorry
+      ∀ f, e f = f.val (1 : archMul(Empty, Empty)) := by
+  classical
+  let G := archMul(Empty, Empty)
+  let W := weights(Empty, Empty, I)
+  let E := archimedeanWeightedSchwartzSubmodule (ι := Empty) (κ := Empty) I
+  let P : SeminormFamily ℂ E (W × {p : Seminorm ℂ (SchwartzBruhat G) // Continuous p}) :=
+    fun i ↦ i.2.val.comp (archimedeanSchwartzTwist I i.1)
+  let X := WithGeneratingSeminorms E P
+  let a : W := (Empty.elim, Empty.elim)
+  have htwist (b : W) (f : E) (u : G) : archimedeanSchwartzTwist I b f u = f.val u := by
+    simp [archimedeanSchwartzTwist_apply]
+  obtain ⟨f, hf, _⟩ := schwartzBruhat_exists_test (1 : G) 1
+  let f₀ : E := ⟨f.val, by
+    apply (Submodule.mem_iInf _).mpr
+    intro b
+    change (fun u : G ↦ _ * _ * f.val u) ∈ schwartzBruhatSubmodule G
+    simpa using f.property⟩
+  let L : X →ₗ[ℂ] ℂ := (LinearMap.proj (1 : G)).comp E.subtype
+  have hL : Bijective L := by
+    constructor
+    · intro f g h
+      apply Subtype.ext
+      funext u
+      exact (congrArg f.val (Subsingleton.elim u 1)).trans
+        (h.trans (congrArg g.val (Subsingleton.elim 1 u)))
+    · intro c
+      refine ⟨(c / f 1) • f₀, ?_⟩
+      change (c / f 1) * f 1 = c
+      exact div_mul_cancel₀ c hf
+  let e : X ≃ₗ[ℂ] ℂ := LinearEquiv.ofBijective L hL
+  have hP := withGeneratingSeminorms_spec E P
+  let : ContinuousSMul ℂ X := hP.continuousSMul
+  have he : Continuous e := by
+    let ev : SchwartzBruhat G →ₗ[ℂ] ℂ := (LinearMap.proj (1 : G)).comp (schwartzBruhatSubmodule G).subtype
+    let q : Seminorm ℂ (SchwartzBruhat G) := (normSeminorm ℂ ℂ).comp ev
+    have hq : Continuous q := (continuous_schwartzBruhat_eval_forEndpoints (1 : G)).norm
+    apply (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp e.toLinearMap
+    intro _
+    exact (hP.continuous_seminorm (a, ⟨q, hq⟩)).congr (fun f ↦ by
+      change ‖archimedeanSchwartzTwist I a f 1‖ = ‖f.val 1‖
+      exact congrArg norm (htwist a f 1))
+  have he' : Continuous e.symm := by
+    have h : (e.symm : ℂ → X) = fun c ↦ c • e.symm 1 := by
+      funext c
+      rw [← map_smul, smul_eq_mul, mul_one]
+    rw [h]
+    fun_prop
+  exact ⟨⟨e, he, he'⟩, fun _ ↦ rfl⟩
 
 -- TODO(paper-gap): The proof's integer exponents need not meet I. Use a countable
 -- family of exponents in I bracketing each exponent in I, together with zero.
@@ -1260,7 +1358,72 @@ theorem archimedeanWeightedSchwartz_frechet {I : Set ℝ} (_ho : IsOpen I)
 /-- Paper: Lemma 5.3.3.3(1), p. 252.
 For an open nonempty interval the weighted Schwartz–Bruhat space is separable. -/
 theorem archimedeanWeightedSchwartz_separable {I : Set ℝ} (_ho : IsOpen I)
-    (_hi : OrdConnected I) (_hne : I.Nonempty) : SeparableSpace 𝓦(I) := by sorry
+    (_hi : OrdConnected I) (_hne : I.Nonempty) : SeparableSpace 𝓦(I) := by
+  classical
+  have sep {E : Type _} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+      [FirstCountableTopology E] (h : IsNuclearTVS.{0} E) : SeparableSpace E := by
+    let := h.1
+    let := h.2.1
+    let := PolynormableSpace.isTopologicalAddGroup ℂ E
+    have hw := PolynormableSpace.withSeminorms ℂ E
+    let : ContinuousSMul ℂ E := hw.continuousSMul
+    obtain ⟨U, hU⟩ := (𝓝 (0 : E)).exists_antitone_basis
+    have hex (n : ℕ) : ∃ q : Seminorm ℂ E, Continuous q ∧ ∃ r > 0, q.ball 0 r ⊆ U n := by
+      obtain ⟨s, r, hr, hsub⟩ := (hw.mem_nhds_iff 0 (U n)).mp (hU.mem n)
+      refine ⟨s.sup fun p : {p : Seminorm ℂ E // Continuous p} ↦ p.1, ?_, r, hr, hsub⟩
+      exact hw.continuous_finsetSup_seminorm s
+    choose q hq r hr hsub using hex
+    have hsep (n : ℕ) : SeparableSpace (WithLocalSeminorm (q n)) :=
+      seminorm_separable_of_nuclear h (q n) (hq n)
+    have hd (n : ℕ) : ∃ d : ℕ → E, ∀ x : E, ∃ m, q n (x - d m) < r n := by
+      obtain ⟨d, hd⟩ := exists_dense_seq (WithLocalSeminorm (q n))
+      refine ⟨d, fun x ↦ ?_⟩
+      let x' : WithLocalSeminorm (q n) := x
+      obtain ⟨m, hm⟩ := hd.exists_dist_lt x' (hr n)
+      rw [dist_eq_norm] at hm
+      exact ⟨m, hm⟩
+    choose d hd using hd
+    refine ⟨range fun m : ℕ × ℕ ↦ d m.1 m.2, countable_range _, ?_⟩
+    intro x
+    rw [mem_closure_iff_nhds]
+    intro W hW
+    have hW0 : (fun y ↦ x + y) ⁻¹' W ∈ 𝓝 (0 : E) :=
+      (continuous_const.add continuous_id).continuousAt.preimage_mem_nhds (by simpa using hW)
+    obtain ⟨n, -, hn⟩ := hU.1.mem_iff.mp hW0
+    obtain ⟨m, hm⟩ := hd n x
+    refine ⟨d n m, ?_, ⟨(n, m), rfl⟩⟩
+    have : d n m - x ∈ U n := hsub n (by rw [Seminorm.mem_ball, sub_zero, map_sub_rev]; exact hm)
+    simpa using hn this
+  let : SecondCountableTopology ℝˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SecondCountableTopology ℂˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let X := SchwartzBruhat (archMul(ι, κ))
+  let Z := weights(ι, κ, I)
+  let t : 𝓦(I) →ₗ[ℂ] (Z → X) := LinearMap.pi (archimedeanSchwartzTwist I)
+  let : PolynormableSpace ℂ X := (schwartzBruhat_nuclear.{0} (G := archMul(ι, κ))).2.1
+  have hp := withSeminorms_pi fun _ : Z ↦ PolynormableSpace.withSeminorms ℂ X
+  have hs := withGeneratingSeminorms_spec (archimedeanWeightedSchwartzSubmodule (ι := ι) (κ := κ) I)
+    (fun i : Z × {p : Seminorm ℂ X // Continuous p} ↦ i.2.val.comp (archimedeanSchwartzTwist I i.1))
+  have ht : Topology.IsEmbedding t := by
+    constructor
+    · constructor
+      refine hs.topologicalSpace_eq_iInf.trans ?_
+      refine Eq.trans ?_ (WithSeminorms.topologicalSpace_eq_iInf
+        (t := TopologicalSpace.induced t inferInstance) (t.withSeminorms_induced hp)).symm
+      rw [iInf_sigma, iInf_prod]
+      rfl
+    · intro f g h
+      let a : Z := (fun _ ↦ ⟨0, Set.mem_insert _ _⟩, fun _ ↦ ⟨0, Set.mem_insert _ _⟩)
+      apply Subtype.ext
+      funext u
+      have hu := congrArg (fun v : X ↦ v u) (congrFun h a)
+      change archimedeanSchwartzTwist I a f u = archimedeanSchwartzTwist I a g u at hu
+      have hv := (archimedeanSchwartzTwist_apply I a f u).symm.trans
+        (hu.trans (archimedeanSchwartzTwist_apply I a g u))
+      simpa [a] using hv
+  have hn : IsNuclearTVS.{0} 𝓦(I) := isNuclearTVS_of_linearEmbedding t ht
+    (isNuclearTVS_pi fun _ : Z ↦ schwartzBruhat_nuclear (G := archMul(ι, κ)))
+  obtain ⟨_, -, _, -⟩ := archimedeanWeightedSchwartz_frechet (ι := ι) (κ := κ) _ho _hi _hne
+  exact sep hn
 
 /-- Paper: Lemma 5.3.3.3(1), p. 252.
 For an open nonempty interval the weighted Schwartz–Bruhat space is nuclear. -/
@@ -1909,7 +2072,70 @@ theorem sAdelePolarFree_isClosed (r : RealModels) (c : ComplexModels) :
 Inverse left translation by an S-idele preserves the polar-free subspace. -/
 theorem sAdelePolarFree_translate (r : RealModels) (c : ComplexModels)
     (g : Aₛˣ) (f : ℬₛ) (_hf : f ∈ sAdelePolarFree S r c) :
-    schwartzBruhatUnitTranslate g f ∈ sAdelePolarFree S r c := by sorry
+    schwartzBruhatUnitTranslate g f ∈ sAdelePolarFree S r c := by
+  classical
+  obtain ⟨hz, hflat⟩ := Submodule.mem_inf.1 _hf
+  let u : Aₛ := (g⁻¹ : Aₛˣ).val
+  have hu (w : InfinitePlace F) : u.1 w ≠ 0 := by
+    have h1 : u.1 w * (g : Aₛ).1 w = 1 := by
+      change (u * (g : Aₛ)).1 w = 1
+      simp only [u, Units.inv_mul]
+      rfl
+    exact left_ne_zero_of_mul_eq_one h1
+  refine Submodule.mem_inf.2 ⟨?_, ?_⟩
+  · -- Multiplying by a unit keeps a zero finite coordinate.
+    simp only [sAdeleFiniteZeroSchwartz, Submodule.mem_iInf, LinearMap.mem_ker] at hz ⊢
+    rintro ⟨x, v, hv, hx⟩
+    exact hz ⟨u * x, v, hv, by simp [hx]⟩
+  · -- The archimedean part of the unit dilates the coordinates of every slice.
+    let a : RealPlaces → ℝ := fun w ↦ (r w).val (u.1 w.val)
+    let b : ComplexPlaces → ℂ := fun w ↦ (c w).val (u.1 w.val)
+    have ha (w : RealPlaces) : a w ≠ 0 := (map_ne_zero_iff _ (r w).val.injective).2 (hu w.val)
+    have hb (w : ComplexPlaces) : b w ≠ 0 := (map_ne_zero_iff _ (c w).val.injective).2 (hu w.val)
+    let L : ArchCoordinates ≃ₗ[ℝ] ArchCoordinates :=
+      { toFun := fun x ↦ (fun w ↦ a w * x.1 w, fun w ↦ b w * x.2 w)
+        invFun := fun x ↦ (fun w ↦ (a w)⁻¹ * x.1 w, fun w ↦ (b w)⁻¹ * x.2 w)
+        map_add' := fun x y ↦ Prod.ext (funext fun w ↦ mul_add _ _ _)
+          (funext fun w ↦ mul_add _ _ _)
+        map_smul' := fun t x ↦ Prod.ext (funext fun w ↦ by simp [mul_left_comm])
+          (funext fun w ↦ by simp [Complex.real_smul, mul_left_comm])
+        left_inv := fun x ↦ Prod.ext (funext fun w ↦ inv_mul_cancel_left₀ (ha w) _)
+          (funext fun w ↦ inv_mul_cancel_left₀ (hb w) _)
+        right_inv := fun x ↦ Prod.ext (funext fun w ↦ mul_inv_cancel_left₀ (ha w) _)
+          (funext fun w ↦ mul_inv_cancel_left₀ (hb w) _) }
+    let D : ArchCoordinates ≃L[ℝ] ArchCoordinates := L.toContinuousLinearEquiv
+    have hD (x : ArchCoordinates) : D x = (fun w ↦ a w * x.1 w, fun w ↦ b w * x.2 w) := rfl
+    have hasm (x : ArchCoordinates) : u.1 * assemble(r, c, x) = assemble(r, c, D x) := by
+      funext w
+      change u.1 w * _ = _
+      by_cases hw : w.IsReal
+      · simp only [hw, ↓reduceDIte, hD, a, map_mul, RingEquiv.symm_apply_apply]
+      · simp only [hw, ↓reduceDIte, hD, b, map_mul, RingEquiv.symm_apply_apply]
+    simp only [Submodule.mem_iInf] at hflat ⊢
+    intro y
+    have hy := hflat (u.2 * y)
+    simp only [Submodule.mem_comap, Submodule.mem_map] at hy ⊢
+    obtain ⟨h, hh, hfun⟩ := hy
+    refine ⟨SchwartzMap.compCLMOfContinuousLinearEquiv ℂ D h, ?_, ?_⟩
+    · simp only [archimedeanFlatSchwartz, Submodule.mem_iInf, LinearMap.mem_ker,
+        IsLinearMap.mk'_apply] at hh ⊢
+      rintro ⟨x, hx⟩ n v
+      have hwall : (∃ i, (D x).1 i = 0) ∨ (∃ j, (D x).2 j = 0) := by
+        rcases hx with ⟨i, hi⟩ | ⟨j, hj⟩
+        · exact Or.inl ⟨i, by simp [hD, hi]⟩
+        · exact Or.inr ⟨j, by simp [hD, hj]⟩
+      have hcomp := D.toContinuousLinearMap.iteratedFDeriv_comp_right (h.smooth ⊤) x
+        (i := n) (mod_cast le_top)
+      change iteratedFDeriv ℝ n ((h : ArchCoordinates → ℂ) ∘ D) x v = 0
+      erw [hcomp]
+      exact hh ⟨D x, hwall⟩ n (fun i ↦ D (v i))
+    · funext x
+      have e := congrFun hfun (D x)
+      refine e.trans ?_
+      change f (Multiplicative.ofAdd (assemble(r, c, D x), u.2 * y)) =
+        f (Multiplicative.ofAdd (u * (assemble(r, c, x), y)))
+      rw [← hasm]
+      rfl
 
 /-- Composing a flat Schwartz function with a real-linear automorphism of the
 archimedean coordinates that keeps the coordinate walls keeps it flat. -/
@@ -2400,7 +2626,21 @@ The principal value preserves the kernel of each homogeneous theta transform. -/
 theorem sAdelePrincipalValue_preserves_homogeneousThetaKernel {T : Finset V} (hT : T ⊆ S)
     (ψ : PontryaginDual J₁) :
     LinearMap.ker (thetaAt(ψ)) ≤
-      (LinearMap.ker (thetaAt(ψ))).comap (sAdelePrincipalValue F hT) := by sorry
+      (LinearMap.ker (thetaAt(ψ))).comap (sAdelePrincipalValue F hT) := by
+  let K := LinearMap.ker (thetaAt(ψ))
+  let A := (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := S) ψ).exists.choose
+  obtain ⟨e, he⟩ := (sLocalThetaIsotypicAverage_equiv (F := F) (S := S) ψ).2
+  intro f hf
+  have hz : K.mkQ f = 0 := (Submodule.Quotient.mk_eq_zero K).mpr hf
+  have hA : A (Submodule.Quotient.mk f) = 0 := (he f).symm.trans
+    (congrArg Subtype.val ((congrArg e hz).trans e.map_zero))
+  have hcomm := sLocalThetaPrincipalValue_isotypicAverage (F := F) hT ψ (Submodule.Quotient.mk f)
+  have hzero : A (Submodule.Quotient.mk (sAdelePrincipalValue F hT f)) = 0 :=
+    hcomm.symm.trans ((congrArg (sLocalThetaPrincipalValue F hT) hA).trans (map_zero _))
+  apply (Submodule.Quotient.mk_eq_zero K).mp
+  apply e.injective
+  apply Subtype.ext
+  exact ((he _).trans hzero).trans (congrArg Subtype.val e.map_zero).symm
 
 /-- Paper: Proposition 5.3.4.5(3), p. 264.
 Weil's operator on homogeneous theta classes is induced by its action on tests. -/
@@ -2421,14 +2661,107 @@ The closed embedding of Lemma 5.3.1.5 restricts to the homogeneous theta quotien
 identified with its isotype by §5.2. -/
 theorem sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding {T : Finset V} (hT : T ⊆ S)
     (ψ : PontryaginDual J₁) : IsClosedEmbedding (sLocalHomogeneousThetaPrincipalValue hT ψ) :=
-  by sorry
+  by
+  classical
+  let K := LinearMap.ker (thetaAt(ψ))
+  rcases T.eq_empty_or_nonempty with rfl | hn
+  · have conjugate {E G Y : Type _} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+        [AddCommGroup G] [Module ℂ G] [TopologicalSpace G]
+        [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+        (e : InductiveTensor E G ≃L[ℂ] Y) (P : G →ₗ[ℂ] G) (hp : ∀ x, P x = x) :
+        e.toLinearMap.comp ((TensorProduct.map (LinearMap.id : E →ₗ[ℂ] E) P).comp e.symm.toLinearMap)
+          = LinearMap.id := by
+      have he : P = LinearMap.id := LinearMap.ext hp
+      subst he
+      refine LinearMap.ext fun x ↦ ?_
+      have h := LinearMap.congr_fun (TensorProduct.map_id (R := ℂ) (M := E) (N := G)) (e.symm x)
+      exact (congrArg e h).trans (e.apply_symm_apply x)
+    have hP : sAdelePrincipalValue F hT = LinearMap.id := by
+      unfold sAdelePrincipalValue
+      refine conjugate _ _ fun x ↦ ?_
+      simp only [Finset.notMem_empty, ite_false, PiTensorProduct.map_id]
+      rfl
+    have hU : ⇑(sLocalHomogeneousThetaPrincipalValue hT ψ) = id := by
+      funext y
+      obtain ⟨f, rfl⟩ := K.mkQ_surjective y
+      exact congrArg K.mkQ (LinearMap.congr_fun hP f)
+    rw [hU]
+    exact IsClosedEmbedding.id
+  · obtain ⟨hs, e, he⟩ := sLocalThetaIsotypicAverage_equiv (F := F) (S := S) ψ
+    let j := Subtype.val ∘ e
+    have hj : IsClosedEmbedding j := hs.isClosedEmbedding_subtypeVal.comp e.toHomeomorph.isClosedEmbedding
+    have hcomp : j ∘ sLocalHomogeneousThetaPrincipalValue hT ψ = sLocalThetaPrincipalValue F hT ∘ j := by
+      funext y
+      obtain ⟨f, rfl⟩ := K.mkQ_surjective y
+      exact (he (sAdelePrincipalValue F hT f)).trans
+        ((sLocalThetaPrincipalValue_isotypicAverage (F := F) hT ψ (Submodule.Quotient.mk f)).symm.trans
+          (congrArg (sLocalThetaPrincipalValue F hT) (he f).symm))
+    apply hj.of_comp_iff.mp
+    rw [hcomp]
+    exact (sLocalThetaPrincipalValue_isClosedEmbedding (F := F) hT hn).comp hj
 
 /-- Paper: Proposition 5.3.4.5(3), p. 264.
 The principal value range in the homogeneous theta quotient is the image of tests
 vanishing at the finite zero-coordinate hyperplanes. -/
 theorem sLocalPrincipalValue_homogeneousTheta_range (χ : PontryaginDual Jₛ) :
     LinearMap.range (sLocalHomogeneousThetaPrincipalValue (Finset.Subset.refl S) χ₁(χ)) =
-      (sAdeleFiniteZeroSchwartz S S).map (thetaQuotient(χ₁(χ))) := by sorry
+      (sAdeleFiniteZeroSchwartz S S).map (thetaQuotient(χ₁(χ))) := by
+  classical
+  let pv := sAdelePrincipalValue F (Finset.Subset.refl S)
+  let Z := sAdeleFiniteZeroSchwartz S S
+  let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+  have ht (f : ℬ(A∞)) (g : ∀ v : S, ℬ(v.val.adicCompletion F)) :
+      pv (e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, g v))) =
+        e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, finitePlacePrincipalValue v.val (g v))) := by
+    simpa [pv, e] using
+      sAdelePrincipalValue_tmul (F := F) (Finset.Subset.refl S) f g
+  let pack (a : ℬ(A∞)) (b : ∀ v : S, ℬ(v.val.adicCompletion F)) := e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, b v))
+  let act (b : ∀ v : S, ℬ(v.val.adicCompletion F)) := fun v ↦ finitePlacePrincipalValue v.val (b v)
+  let D (T : Finset V) (b : ∀ v : S, ℬ(v.val.adicCompletion F)) :=
+    ∀ v : S, v.val ∈ T → b v (Multiplicative.ofAdd 0) = 0
+  have rangeSpan {X A B : Type _} [AddCommGroup X] [Module ℂ X] (P : X →ₗ[ℂ] X)
+      (w : A → B → X) (l : B → B) (p q : B → Prop)
+      (hw : ∀ a b, P (w a b) = w a (l b))
+      (hgen : ∀ x, x ∈ Submodule.span ℂ {y | ∃ a b, p b ∧ w a b = y})
+      (hm : ∀ b, q (l b)) (hs : ∀ b, q b → ∃ c, l c = b) :
+      LinearMap.range P = Submodule.span ℂ {y | ∃ a b, q b ∧ w a b = y} := by
+    apply le_antisymm
+    · rintro _ ⟨x, rfl⟩
+      have incl : Submodule.span ℂ {y | ∃ a b, p b ∧ w a b = y} ≤
+          (Submodule.span ℂ {y | ∃ a b, q b ∧ w a b = y}).comap P := by
+        apply Submodule.span_le.mpr
+        rintro _ ⟨a, b, -, rfl⟩
+        exact Submodule.subset_span ⟨a, l b, hm b, (hw a b).symm⟩
+      exact incl (hgen x)
+    · apply Submodule.span_le.mpr
+      rintro _ ⟨a, b, hb, rfl⟩
+      obtain ⟨c, rfl⟩ := hs b hb
+      exact ⟨w a c, hw a c⟩
+  have hgen (f : ℬₛ) : f ∈ Submodule.span ℂ {y | ∃ a b, D ∅ b ∧ pack a b = y} := by
+    apply (sAdeleFiniteZeroSchwartz_eq_span_tmul (F := F) (S := S) ∅).le
+    exact (Submodule.mem_iInf _).2 fun x ↦ by
+      obtain ⟨v, hv, -⟩ := x.property
+      exact False.elim (Finset.notMem_empty _ hv)
+  have hm (b) : D S (act b) := by
+    intro v _
+    have hmem := Set.mem_range_self (f := finitePlacePrincipalValue v.val) (b v)
+    rwa [finitePlacePrincipalValue_range] at hmem
+  have hs (b) (hb : D S b) : ∃ c, act c = b := by
+    have hmem (v : S) : b v ∈ Set.range (finitePlacePrincipalValue v.val) := by
+      rw [finitePlacePrincipalValue_range]
+      exact hb v v.property
+    choose c hc using hmem
+    exact ⟨c, funext hc⟩
+  have hr : LinearMap.range pv = Z :=
+    (rangeSpan pv pack act (D ∅) (D S) ht hgen hm hs).trans
+      (sAdeleFiniteZeroSchwartz_eq_span_tmul (F := F) (S := S) S).symm
+  apply le_antisymm
+  · rintro _ ⟨y, rfl⟩
+    induction y using Submodule.Quotient.induction_on with
+    | _ f => exact ⟨pv f, hr.le ⟨f, rfl⟩, rfl⟩
+  · rintro _ ⟨f, hf, rfl⟩
+    obtain ⟨g, hg⟩ := hr.ge hf
+    exact ⟨Submodule.Quotient.mk g, congrArg (thetaQuotient(χ₁(χ))) hg⟩
 
 /-- Paper: Proposition 5.3.4.5(3), p. 264.
 The same homogeneous theta image is obtained by imposing finite zero-coordinate
