@@ -359,12 +359,30 @@ def Printed.globalConverse_normTwist_bergmanMiddle_residues_surjective : Prop :=
       Surjective fun b : {b : B // EntireMultiple(b.val, G)} ↦
         (complexResidue b.val.val (-shift(t)), complexResidue b.val.val (1 - shift(t)))
 
+/-- An entire function has zero residue at every point. -/
+private theorem globalConverse_normTwist_bergmanMiddle_residues_surjective_residue
+    {f : ℂ → ℂ} (hf : Differentiable ℂ f) (ρ : ℂ) : complexResidue f ρ = 0 := by
+  show limUnder (nhdsWithin (0 : ℝ) (Ioi 0)) (fun r ↦ circleIntegral f ρ r / _) = 0
+  refine Tendsto.limUnder_eq ((tendsto_const_nhds (x := (0 : ℂ))).congr' ?_)
+  filter_upwards [self_mem_nhdsWithin] with r hr
+  rw [Complex.circleIntegral_eq_zero_of_differentiable_on_off_countable (le_of_lt hr)
+    countable_empty hf.continuous.continuousOn (fun z _ ↦ hf z), zero_div]
+
 /-- Paper: Theorems 6.3.2.1–2, (6.3.2.8), (6.3.2.25)–(26), p. 304 and p. 310.
 Take ℚ, the trivial character, t₀ = 0 and no removed primes. Every element of the printed
 middle term is entire and both of its residues are zero. In particular (1, 0) has no preimage.
 The standard Gaussian's Mellin transform has poles at 0 and 1. -/
 theorem Printed.globalConverse_normTwist_bergmanMiddle_residues_surjective_false :
-    ¬ Printed.globalConverse_normTwist_bergmanMiddle_residues_surjective := by sorry
+    ¬ Printed.globalConverse_normTwist_bergmanMiddle_residues_surjective := by
+  intro h
+  obtain ⟨b, hb⟩ := h ℚ 1 0 (by simp) ∅ (1, 0)
+  have hd : Differentiable ℂ b.val.val := by
+    have h2 := b.val.property.2.1
+    rw [preimage_univ] at h2
+    exact differentiableOn_univ.mp h2
+  have h1 := congrArg Prod.fst hb
+  simp only [globalConverse_normTwist_bergmanMiddle_residues_surjective_residue hd] at h1
+  exact zero_ne_one h1
 
 /-- Paper: Theorem 6.3.2.2(1), range after (6.3.2.20), p. 310. As printed: every entire
 multiple of the printed principal-value generator lies in the Schwartz–Bergman space.
