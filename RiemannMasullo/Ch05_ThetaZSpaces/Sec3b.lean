@@ -12,6 +12,7 @@ import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a_part2
 import all RiemannMasullo.Ch02_AdelicTheta.Sec1
 import Mathlib.Analysis.Calculus.InverseFunctionTheorem.ContDiff
+import Mathlib.Analysis.Meromorphic.RCLike
 import Mathlib.Analysis.SpecialFunctions.Exponential
 import Mathlib.Geometry.Manifold.PartitionOfUnity
 import Mathlib.Topology.Algebra.IsOpenUnits
@@ -2498,7 +2499,75 @@ theorem sLocalIdelicZFunction_principalValue_pole_bound (f : ℬₛ)
     (χ : PontryaginDual Jₛ) (s : ℂ) :
     (↑(-(sLocalArchimedeanPoleMultiplicity χ s : ℤ)) : WithTop ℤ) ≤
       meromorphicOrderAt (fun z ↦ sLocalIdelicZFunction
-        (sAdelePrincipalValue F (Finset.Subset.refl S) f) (chartₛ(χ) z)) s := by sorry
+        (sAdelePrincipalValue F (Finset.Subset.refl S) f) (chartₛ(χ) z)) s := by
+  classical
+  let E (w : InfinitePlace F) (z : ℂ) := infiniteLocalEulerFactor w
+    (sLocalInfiniteRestriction w (chartₛ(χ) z))
+  let A (z : ℂ) := ∏ w : InfinitePlace F, E w z
+  let G (z : ℂ) := sLocalNormalizedZFunction f (chartₛ(χ) z)
+  let Z (z : ℂ) := sLocalIdelicZFunction (sAdelePrincipalValue F (Finset.Subset.refl S) f) (chartₛ(χ) z)
+  have hw (w : InfinitePlace F) : Meromorphic (E w) ∧
+      ∃ d : ℝ, ∀ z : ℂ, d < z.re → E w z ≠ 0 := by
+    by_cases hr : w.IsReal
+    · obtain ⟨b, hb⟩ := infiniteLocalEulerFactor_chart_real χ w hr
+      have hi : (E w)⁻¹ = fun z : ℂ ↦ (Complex.Gammaℝ (z + b))⁻¹ :=
+        funext fun z ↦ congrArg Inv.inv (hb z)
+      have hd : Differentiable ℂ ((E w)⁻¹) := hi ▸
+        (Complex.differentiable_Gammaℝ_inv.comp (show Differentiable ℂ (fun z : ℂ ↦ z + b) by fun_prop))
+      refine ⟨fun z ↦ by simpa only [inv_inv] using (hd.analyticAt z).meromorphicAt.inv, -b.re, ?_⟩
+      intro z hz
+      rw [show E w z = _ from hb z]
+      exact Complex.Gammaℝ_ne_zero_of_re_pos (by simpa only [Complex.add_re] using
+        (show 0 < z.re + b.re by linarith))
+    · obtain ⟨b, hb⟩ := infiniteLocalEulerFactor_chart_complex χ w (InfinitePlace.not_isReal_iff_isComplex.mp hr)
+      have hi : (E w)⁻¹ = fun z : ℂ ↦ 2 * (Complex.Gammaℂ (z + b))⁻¹ := by
+        funext z
+        rw [Pi.inv_apply, show E w z = _ from hb z, inv_div, div_eq_mul_inv]
+      have hd : Differentiable ℂ ((E w)⁻¹) := by
+        rw [hi]
+        exact (Complex.differentiable_Gammaℂ_inv.comp
+          (show Differentiable ℂ (fun z : ℂ ↦ z + b) by fun_prop)).const_mul 2
+      refine ⟨fun z ↦ by simpa only [inv_inv] using (hd.analyticAt z).meromorphicAt.inv, -b.re, ?_⟩
+      intro z hz
+      rw [show E w z = _ from hb z]
+      apply div_ne_zero _ two_ne_zero
+      rw [Complex.Gammaℂ_def]
+      have hpi : (2 * (Real.pi : ℂ)) ≠ 0 := mul_ne_zero two_ne_zero (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero)
+      exact mul_ne_zero (mul_ne_zero two_ne_zero (fun h ↦ hpi ((Complex.cpow_eq_zero_iff _ _).mp h).1))
+        (Complex.Gamma_ne_zero_of_re_pos (by simp only [Complex.add_re]; linarith))
+  choose d hd using fun w ↦ (hw w).2
+  let R := ∑ w : InfinitePlace F, |d w|
+  have hR : 0 ≤ R := Finset.sum_nonneg fun _ _ ↦ abs_nonneg _
+  have hA : Meromorphic A := fun z ↦ MeromorphicAt.fun_prod fun w _ ↦ (hw w).1 z
+  have hG : ∀ z, AnalyticAt ℂ G z := fun z ↦ (sLocalNormalizedZFunction_entire f χ) z (mem_univ z)
+  have hZ : Meromorphic Z := fun z ↦ (sLocalIdelicZFunction_meromorphic _ χ).meromorphicOn z (mem_univ z)
+  have hloc : Z =ᶠ[𝓝[≠] ((R + 1 : ℝ) : ℂ)] G * A := by
+    have hs' : ∀ᶠ z : ℂ in 𝓝[≠] ((R + 1 : ℝ) : ℂ), R < z.re := nhdsWithin_le_nhds
+      ((isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by simp))
+    filter_upwards [hs', nhdsNE_le_codiscrete _ (sLocalIdelicZFunction_principalValue S (Finset.Subset.refl S) f χ)]
+      with z hz hpv
+    have ha : A z ≠ 0 := Finset.prod_ne_zero_iff.mpr fun w _ ↦ hd w z <|
+      ((le_abs_self _).trans (Finset.single_le_sum (fun v _ ↦ abs_nonneg (d v)) (Finset.mem_univ w))).trans_lt hz
+    have hpos := hR.trans_lt hz
+    change sLocalIdelicZFunction _ _ = sLocalNormalizedZFunction f _ * A z
+    rw [hpv, sLocalNormalizedZFunction_eq_div f χ hpos, ← sLocalIdelicZFunction_eq_integral f ⟨χ, z, hpos, rfl⟩]
+    have hmem (v : S) : v.val ∈ S := v.property
+    simp only [hmem, ite_true, sLocalHeckeL]
+    change _ / _ = _ / (A z * _) * A z
+    simp only [div_eq_mul_inv, mul_inv]
+    field_simp [ha]
+  have hdiff : Meromorphic (Z - G * A) := fun z ↦ (hZ z).sub ((hG z).meromorphicAt.mul (hA z))
+  have hall := hdiff.exists_meromorphicOrderAt_eq_top_iff_eventually_zero.mp
+    ⟨_, meromorphicOrderAt_eq_top_iff.mpr (hloc.mono fun _ hz ↦ sub_eq_zero.mpr hz)⟩
+  have he : Z =ᶠ[𝓝[≠] s] G * A := nhdsNE_le_codiscrete s
+    (hall.mono fun _ hz ↦ sub_eq_zero.mp hz)
+  change _ ≤ meromorphicOrderAt Z s
+  rw [sLocalArchimedeanPoleMultiplicity_eq_sum, meromorphicOrderAt_congr he,
+    meromorphicOrderAt_mul (hG s).meromorphicAt (hA s)]
+  apply le_trans _ (le_add_of_nonneg_left (hG s).meromorphicOrderAt_nonneg)
+  change _ ≤ meromorphicOrderAt (fun z ↦ ∏ w : InfinitePlace F, E w z) s
+  rw [meromorphicOrderAt_fun_prod fun w _ ↦ (hw w).1 s]
+  exact Finset.sum_le_sum fun w _ ↦ min_le_right _ _
 
 /-- Paper: Proposition 5.3.4.5(2), p. 264.
 On each component a choice of test realizes the full allowed archimedean pole divisor.
