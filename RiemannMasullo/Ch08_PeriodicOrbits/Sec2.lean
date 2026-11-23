@@ -122,6 +122,9 @@ theorem mem_adeleFullOrbitUnion_iff (x : 𝔸[F]) :
       ∃ (g : 𝔸[F]ˣ) (z : adeleOrbitBasepoints F), g • z.val = x := by
   sorry
 
+-- Read the full-group stability sentence on p. 385 with (8.2.0.3)–(8.2.0.5).
+-- The norm-one orbits in (8.2.0.6)–(8.2.0.8) are stable under the norm kernel.
+
 /-- Paper: Definition 8.2.0.2(1), p. 385. The family in (8.2.0.6) consists of the
 S-local norm-one orbits with their adelic subspace topologies. -/
 def sAdeleNormOneOrbit (i : Option (InfinitePlace F ⊕ S)) : Set Aₛ :=
@@ -375,38 +378,40 @@ theorem adeleNormOneOrbit_infinite_eq_full (v : InfinitePlace F) :
     adeleNormOneOrbit F (some (.inl v)) = adeleFullOrbit F (some (.inl v)) := by
   sorry
 
-/-- Paper: Proposition 8.2.0.5(1), p. 386. At a real place the two local signs,
-inserted at that place, fix every point of the S-local orbit. -/
-theorem sAdeleFullOrbit_real_sign_smul (v : InfinitePlace F) (hv : v.IsReal)
-    (x : Aₛ) (hx : x ∈ sAdeleFullOrbit F S (some (.inl v)))
-    (u : v.Completionˣ) (hu : (u.val : v.Completion) = 1 ∨ u.val = -1) :
-    (Units.map (adeleProjection F S).toMonoidHom (IdeleGroup.ofCompletion (𝓞 F) F v u)) • x =
-      x := by
+/-- Paper: Proposition 8.2.0.5(1), p. 386. At a real place the norm-one
+stabilizer of every point of the S-local orbit is the image of the two local signs. -/
+theorem sAdeleFullOrbit_real_normOne_stabilizer_iff (v : InfinitePlace F) (hv : v.IsReal)
+    (x : Aₛ) (hx : x ∈ sAdeleFullOrbit F S (some (.inl v))) (g : 𝕀ₛ) :
+    (sIdeleNorm F S g = 1 ∧ g • x = x) ↔
+      ∃ u : v.Completionˣ, (u.val = 1 ∨ u.val = -1) ∧
+        g = Units.map (adeleProjection F S).toMonoidHom (IdeleGroup.ofCompletion (𝓞 F) F v u) := by
   sorry
 
-/-- Paper: Proposition 8.2.0.5(1), p. 386. At a real place the two local signs,
-inserted at that place, fix every point of the global orbit. -/
-theorem adeleFullOrbit_real_sign_smul (v : InfinitePlace F) (hv : v.IsReal)
-    (x : 𝔸[F]) (hx : x ∈ adeleFullOrbit F (some (.inl v)))
-    (u : v.Completionˣ) (hu : (u.val : v.Completion) = 1 ∨ u.val = -1) :
-    (IdeleGroup.ofCompletion (𝓞 F) F v u) • x = x := by
+/-- Paper: Proposition 8.2.0.5(1), p. 386. At a real place the norm-one
+stabilizer of every point of the global orbit is the image of the two local signs. -/
+theorem adeleFullOrbit_real_normOne_stabilizer_iff (v : InfinitePlace F) (hv : v.IsReal)
+    (x : 𝔸[F]) (hx : x ∈ adeleFullOrbit F (some (.inl v))) (g : 𝔸[F]ˣ) :
+    (ideleNorm F g = 1 ∧ g • x = x) ↔
+      ∃ u : v.Completionˣ, (u.val = 1 ∨ u.val = -1) ∧
+        g = IdeleGroup.ofCompletion (𝓞 F) F v u := by
   sorry
 
-/-- Paper: Proposition 8.2.0.5(2), p. 387. At a complex place the local unit circle,
-inserted at that place, fixes every point of the S-local orbit. -/
-theorem sAdeleFullOrbit_complex_circle_smul (v : InfinitePlace F) (hv : v.IsComplex)
-    (x : Aₛ) (hx : x ∈ sAdeleFullOrbit F S (some (.inl v)))
-    (u : v.Completionˣ) (hu : ‖u.val‖ = 1) :
-    (Units.map (adeleProjection F S).toMonoidHom (IdeleGroup.ofCompletion (𝓞 F) F v u)) • x =
-      x := by
+/-- Paper: Proposition 8.2.0.5(2), p. 387. At a complex place the norm-one
+stabilizer of every point of the S-local orbit is the image of the local unit circle. -/
+theorem sAdeleFullOrbit_complex_normOne_stabilizer_iff (v : InfinitePlace F) (hv : v.IsComplex)
+    (x : Aₛ) (hx : x ∈ sAdeleFullOrbit F S (some (.inl v))) (g : 𝕀ₛ) :
+    (sIdeleNorm F S g = 1 ∧ g • x = x) ↔
+      ∃ u : v.Completionˣ, ‖u.val‖ = 1 ∧
+        g = Units.map (adeleProjection F S).toMonoidHom (IdeleGroup.ofCompletion (𝓞 F) F v u) := by
   sorry
 
-/-- Paper: Proposition 8.2.0.5(2), p. 387. At a complex place the local unit circle,
-inserted at that place, fixes every point of the global orbit. -/
-theorem adeleFullOrbit_complex_circle_smul (v : InfinitePlace F) (hv : v.IsComplex)
-    (x : 𝔸[F]) (hx : x ∈ adeleFullOrbit F (some (.inl v)))
-    (u : v.Completionˣ) (hu : ‖u.val‖ = 1) :
-    (IdeleGroup.ofCompletion (𝓞 F) F v u) • x = x := by
+/-- Paper: Proposition 8.2.0.5(2), p. 387. At a complex place the norm-one
+stabilizer of every point of the global orbit is the image of the local unit circle. -/
+theorem adeleFullOrbit_complex_normOne_stabilizer_iff (v : InfinitePlace F) (hv : v.IsComplex)
+    (x : 𝔸[F]) (hx : x ∈ adeleFullOrbit F (some (.inl v))) (g : 𝔸[F]ˣ) :
+    (ideleNorm F g = 1 ∧ g • x = x) ↔
+      ∃ u : v.Completionˣ, ‖u.val‖ = 1 ∧
+        g = IdeleGroup.ofCompletion (𝓞 F) F v u := by
   sorry
 
 /-- Paper: Proposition 8.2.0.6(1), p. 387. The closure of the positive section ray
