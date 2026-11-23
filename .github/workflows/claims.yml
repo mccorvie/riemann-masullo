@@ -57,6 +57,7 @@ jobs:
       WHO: ${{ github.event.comment.user.login }}
       ASSOC: ${{ github.event.comment.author_association }}
       BODY: ${{ github.event.comment.body }}
+      COMMENT_AT: ${{ github.event.comment.created_at }}
       LABELS: ${{ join(github.event.issue.labels.*.name, ' ') }}
       ASSIGNEES: ${{ join(github.event.issue.assignees.*.login, ' ') }}
     steps:
@@ -66,8 +67,10 @@ jobs:
           claimed=0; [[ " $LABELS " == *" claimed "* ]] && claimed=1
           mine=0; [[ " $ASSIGNEES " == *" $WHO "* ]] && mine=1
           member=0; [[ "$ASSOC" =~ ^(OWNER|MEMBER|COLLABORATOR)$ ]] && member=1
+          # The time of the COMMENT decides, not the time this job runs: the job can wait a long
+          # time for a runner (on 23 November, more than half an hour).
           closed=0
-          if [ -n "$CLAIMS_CLOSE" ] && [ "$(date -u +%s)" -ge "$(date -u -d "$CLAIMS_CLOSE" +%s)" ]; then closed=1; fi
+          if [ -n "$CLAIMS_CLOSE" ] && [ "$(date -u -d "${COMMENT_AT:-now}" +%s)" -ge "$(date -u -d "$CLAIMS_CLOSE" +%s)" ]; then closed=1; fi
           if [[ "$first" =~ ^claim(ing|ed)?([^a-z]|$) ]]; then
             if [ $closed = 1 ] && [ $mine = 0 ]; then
               gh issue comment "$ISSUE" --body "New claims closed at $CLAIMS_CLOSE: this phase of the project is being finished and the open pull requests are being worked off, so this claim was not recorded and the issue stays open for the next phase. Details: $CLAIMS_NOTICE"
