@@ -2,6 +2,8 @@ module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3b
+import Mathlib.Analysis.Normed.Module.PiTensorProduct.ProjectiveSeminorm
+import all RiemannMasullo.AppC_LCTVS.Sec2a_part2
 import Mathlib.Algebra.Order.Archimedean.Real.Hom
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
@@ -2328,14 +2330,548 @@ local notation "productTensor(" I ")" => ProjectiveTensor (FiniteProjectiveTenso
 local notation "separateValue(" f ", " g ", " u ")" =>
   (∏ i, (f i).val ((u : archMul(ι, κ)).1 i)) * ∏ j, (g j).val (u.2 j)
 
-/-- The remaining topology estimate in Lemma 5.3.3.3(2), p. 252: the projective
+/-- Joint continuity on pure tensors gives a product bound by continuous seminorms on the factors. -/
+private theorem archimedeanWeightedSchwartz_tensor_pure_bound
+    {ι A : Type*} [Fintype ι] [Nonempty ι] [AddCommGroup A] [Module ℂ A]
+    [TopologicalSpace A] [PolynormableSpace ℂ A]
+    (p : Seminorm ℂ (⨂[ℂ] _ : ι, A))
+    (hp : Continuous (fun f : ι → A ↦ p (PiTensorProduct.tprod ℂ f))) :
+    ∃ q : ι → Seminorm ℂ A, (∀ i, Continuous (q i)) ∧
+      ∀ f, p (PiTensorProduct.tprod ℂ f) ≤ ∏ i, q i (f i) := by
+  classical
+  have h0 : p ((PiTensorProduct.tprod ℂ) (0 : ι → A)) = 0 := by simp
+  have hn := hp.continuousAt (x := (0 : ι → A)) |>.preimage_mem_nhds
+    (h0 ▸ Iio_mem_nhds (show (0 : ℝ) < 1 from one_pos))
+  rw [nhds_pi, Filter.mem_pi'] at hn
+  obtain ⟨s, U, hU, h⟩ := hn
+  choose q hq hqU using fun i ↦ (PolynormableSpace.hasBasis_zero_ball ℂ A).mem_iff.mp (hU i)
+  refine ⟨q, hq, fun f ↦ ?_⟩
+  have hE (ε : ℝ) (hε : 0 < ε) : p (PiTensorProduct.tprod ℂ f) ≤ ∏ i, (q i (f i) + ε) := by
+    let r (i : ι) := q i (f i) + ε
+    have hr (i : ι) : 0 < r i := add_pos_of_nonneg_of_pos (apply_nonneg _ _) hε
+    let g (i : ι) := ((r i : ℂ)⁻¹) • f i
+    have hg (i : ι) : g i ∈ U i := by
+      apply hqU i
+      rw [Seminorm.mem_ball_zero]
+      change q i ((r i : ℂ)⁻¹ • f i) < 1
+      rw [map_smul_eq_mul, norm_inv, Complex.norm_real, Real.norm_of_nonneg (hr i).le,
+        inv_mul_lt_iff₀ (hr i), mul_one]
+      exact lt_add_of_pos_right _ hε
+    have hg' : p (PiTensorProduct.tprod ℂ g) < 1 := h (fun i _ ↦ hg i)
+    have hf : f = fun i ↦ (r i : ℂ) • g i := by
+      funext i
+      exact (smul_inv_smul₀ (Complex.ofReal_ne_zero.mpr (hr i).ne') _).symm
+    calc
+      p (PiTensorProduct.tprod ℂ f) =
+          (∏ i, r i) * p (PiTensorProduct.tprod ℂ g) := by
+        conv_lhs => rw [hf, MultilinearMap.map_smul_univ, map_smul_eq_mul, norm_prod]
+        congr 1
+        exact Finset.prod_congr rfl fun i _ ↦ (Complex.norm_real _).trans (Real.norm_of_nonneg (hr i).le)
+      _ ≤ _ := by simpa [r] using mul_le_mul_of_nonneg_left hg'.le (Finset.prod_nonneg fun i _ ↦ (hr i).le)
+  have hT : Continuous (fun ε : ℝ ↦ ∏ i, (q i (f i) + ε)) :=
+    continuous_finsetProd _ fun _ _ ↦ continuous_const.add continuous_id
+  have ht : Tendsto (fun ε : ℝ ↦ ∏ i, (q i (f i) + ε)) (𝓝[>] 0) (𝓝 (∏ i, (q i (f i) + 0))) :=
+    hT.continuousAt.mono_left inf_le_left
+  exact (show p (PiTensorProduct.tprod ℂ f) ≤ ∏ i, (q i (f i) + 0) from
+    ge_of_tendsto ht (by filter_upwards [self_mem_nhdsWithin (a := (0 : ℝ)) (s := Ioi 0)] with ε hε using hE ε hε)) |>.trans_eq (by simp)
+/-- A bound on the pure tensors of seminormed spaces extends to their projective tensor seminorm. -/
+private theorem archimedeanWeightedSchwartz_tensor_normed_bound
+    {ι : Type*} [Fintype ι] {B : ι → Type*} [∀ i, SeminormedAddCommGroup (B i)] [∀ i, NormedSpace ℂ (B i)]
+    (p : Seminorm ℂ (⨂[ℂ] i, B i)) {C : ℝ} (hC : 0 ≤ C)
+    (hp : ∀ f : ∀ i, B i, p (PiTensorProduct.tprod ℂ f) ≤ C * ∏ i, ‖f i‖) (x : ⨂[ℂ] i, B i) :
+    p x ≤ C * ‖x‖ := by
+  rw [PiTensorProduct.norm_def, Real.mul_iInf_of_nonneg hC]
+  refine le_ciInf fun ⟨l, hl⟩ ↦ ?_
+  change p x ≤ C * PiTensorProduct.projectiveSeminormAux l
+  rw [← (PiTensorProduct.mem_lifts_iff x l).mp hl]
+  unfold PiTensorProduct.projectiveSeminormAux
+  induction l.toList with
+  | nil => simp
+  | cons a l ih =>
+    simp only [List.map_cons, List.sum_cons, mul_add]
+    refine (map_add_le_add p _ _).trans (add_le_add ?_ ih)
+    rw [map_smul_eq_mul]
+    exact (mul_le_mul_of_nonneg_left (hp a.2) (norm_nonneg a.1)).trans_eq (by ring)
+
+/-- Continuous seminorms on the individual factors define a continuous projective seminorm on the
+finite tensor. -/
+private theorem archimedeanWeightedSchwartz_tensor_finite_bound
+    {ι : Type*} [Fintype ι] {A : ι → Type*} [∀ i, AddCommGroup (A i)] [∀ i, Module ℂ (A i)] [∀ i, TopologicalSpace (A i)] [∀ i, IsTopologicalAddGroup (A i)]
+    (q : ∀ i, Seminorm ℂ (A i)) (hq : ∀ i, Continuous (q i)) :
+    ∃ r : Seminorm ℂ (FiniteProjectiveTensor A), Continuous r ∧
+      ∀ (p : Seminorm ℂ (⨂[ℂ] i, A i)) {C : ℝ} (_ : 0 ≤ C),
+        (∀ f, p (PiTensorProduct.tprod ℂ f) ≤ C * ∏ i, q i (f i)) → ∀ z, p z ≤ C * r z := by
+  let B (i : ι) := ULift.{0} (A i)
+  let e (i : ι) : B i ≃ₗ[ℂ] A i := ULift.moduleEquiv
+  let q' (i : ι) := (q i).comp (e i).toLinearMap
+  let (i : ι) : SeminormedAddCommGroup (B i) := (q' i).toAddGroupSeminorm.toSeminormedAddCommGroup
+  let (i : ι) : TopologicalSpace (B i) := PseudoMetricSpace.toUniformSpace.toTopologicalSpace
+  let (i : ι) : NormedSpace ℂ (B i) := ⟨fun c w ↦ (map_smul_eq_mul (q' i) c w).le⟩
+  let E := PiTensorProduct.congr fun i ↦ (e i).symm
+  let r := (normSeminorm ℂ (⨂[ℂ] i, B i)).comp E.toLinearMap
+  have he (i : ι) : Continuous (e i).symm := by
+    exact (norm_withSeminorms ℂ (B i)).continuous_of_continuous_comp (e i).symm.toLinearMap fun _ ↦ hq i
+  have hc : Continuous (fun f : ∀ i, A i ↦ r (PiTensorProduct.tprod ℂ f)) := by
+    have ht := (PiTensorProduct.tprodL ℂ (E := B)).cont.comp (continuous_pi fun i ↦ (he i).comp (continuous_apply i))
+    exact ht.norm.congr fun f ↦ (congrArg norm (PiTensorProduct.congr_tprod _ f)).symm
+  let fam := (fun p : {p : Seminorm ℂ (⨂[ℂ] i, A i) //
+    Continuous (fun f : ∀ i, A i ↦ p (PiTensorProduct.tprod ℂ f))} ↦ p.val)
+  refine ⟨r, (withGeneratingSeminorms_spec _ fam).continuous_seminorm ⟨r, hc⟩, ?_⟩
+  intro p C hC hp z
+  let p' := p.comp E.symm.toLinearMap
+  have h (f : ∀ i, B i) : p' (PiTensorProduct.tprod ℂ f) ≤ C * ∏ i, ‖f i‖ := by
+    change p (E.symm (PiTensorProduct.tprod ℂ f)) ≤ _
+    rw [PiTensorProduct.congr_symm_tprod]
+    exact hp _
+  have hbound := archimedeanWeightedSchwartz_tensor_normed_bound p' hC h (E z)
+  exact (show p' (E z) = p z from congrArg p (E.symm_apply_apply z)) ▸ hbound
+
+/-- Splitting off one coordinate preserves the projective topology. To bound the inverse, apply the
+finite projective seminorm to the remaining coordinates. -/
+private theorem archimedeanWeightedSchwartz_tensor_split_coordinate.{uS}
+    {ι : Type uS} {A : Type*} [Fintype ι] [DecidableEq ι] [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
+    [PolynormableSpace ℂ A] (i : ι)
+    (hrest : @Continuous ({j : ι // j ≠ i} → A) (FiniteProjectiveTensor (fun _ : {j : ι // j ≠ i} ↦ A)) _ _ (PiTensorProduct.tprod ℂ)) :
+    ∃ e : FiniteProjectiveTensor (fun _ : ι ↦ A) ≃L[ℂ]
+        ProjectiveTensor (FiniteProjectiveTensor (fun _ : {j : ι // j ≠ i} ↦ A)) A,
+      ∀ f : ι → A, e (PiTensorProduct.tprod ℂ f) = (PiTensorProduct.tprod ℂ fun j : {j : ι // j ≠ i} ↦ f j.val) ⊗ₜ[ℂ] f i := by
+  classical
+  let J := {j : ι // j ≠ i}
+  let T (I : Type uS) [Fintype I] := FiniteProjectiveTensor (fun _ : I ↦ A)
+  let fam (I : Type uS) [Fintype I] := fun p : {p : Seminorm ℂ (⨂[ℂ] _ : I, A) //
+    Continuous (fun f : I → A ↦ p (PiTensorProduct.tprod ℂ f))} ↦ p.val
+  let split : J ⊕ Unit ≃ ι := Equiv.subtypeNeSumPUnit i
+  let e₀ : (⨂[ℂ] _ : ι, A) ≃ₗ[ℂ] (⨂[ℂ] _ : J, A) ⊗[ℂ] A :=
+    ((PiTensorProduct.reindex ℂ (s := fun _ : ι ↦ A) split.symm).trans
+      (PiTensorProduct.tmulEquiv ℂ A).symm).trans
+        (LinearEquiv.lTensor _ (PiTensorProduct.subsingletonEquiv ()))
+  have he₀ (f : ι → A) : e₀ (PiTensorProduct.tprod ℂ f) =
+      (PiTensorProduct.tprod ℂ fun j : J ↦ f j.val) ⊗ₜ[ℂ] f i := by
+    simp [e₀, PiTensorProduct.reindex_tprod, PiTensorProduct.tmulEquiv_symm_apply,
+      PiTensorProduct.subsingletonEquiv_apply_tprod, split, Equiv.subtypeNeSumPUnit]
+  let e : T ι ≃ₗ[ℂ] ProjectiveTensor (T J) A := e₀
+  have he (f : ι → A) : e (PiTensorProduct.tprod ℂ f) =
+      (PiTensorProduct.tprod ℂ fun j : J ↦ f j.val) ⊗ₜ[ℂ] f i := he₀ f
+  let : PolynormableSpace ℂ (T J) := (withGeneratingSeminorms_spec _ (fam J)).toPolynormableSpace
+  have hpure : Continuous (fun f : ι → A ↦ e (PiTensorProduct.tprod ℂ f)) := by
+    refine ((continuous_projectiveTensor_tmul (E := T J) (F := A)).comp ((hrest.comp (continuous_pi fun j ↦ continuous_apply j.val)).prodMk
+      (continuous_apply i))).congr fun f ↦ (he f).symm
+  have hc : Continuous e := (projectiveTensor_withSeminorms (T J) A).continuous_of_continuous_comp
+    e.toLinearMap fun p ↦ (withGeneratingSeminorms_spec _ (fam ι)).continuous_seminorm
+      ⟨p.val.comp e.toLinearMap, ((projectiveTensor_withSeminorms (T J) A).continuous_seminorm p).comp hpure⟩
+  have : Nonempty ι := ⟨i⟩
+  have : IsTopologicalAddGroup A := PolynormableSpace.isTopologicalAddGroup ℂ A
+  have hd : Continuous e.symm := by
+    refine (withGeneratingSeminorms_spec _ (fam ι)).continuous_of_continuous_comp e.symm.toLinearMap fun p ↦ ?_
+    obtain ⟨q,hq,hpq⟩ := archimedeanWeightedSchwartz_tensor_pure_bound p.val p.property
+    obtain ⟨r,hr,hpr⟩ := archimedeanWeightedSchwartz_tensor_finite_bound (fun j : J ↦ q j.val) (fun j ↦ hq j.val)
+    have hbound (x : T J) (y : A) : p.val (e.symm (x ⊗ₜ[ℂ] y)) ≤ q i y * r x := by
+      let u := e.symm.toLinearMap.comp ((TensorProduct.mk ℂ (T J) A).flip y)
+      refine hpr (p.val.comp u) (apply_nonneg _ _) (fun f ↦ ?_) x
+      let g := (Homeomorph.piSplitAt i (fun _ ↦ A)).symm (y, f)
+      have hs := (Homeomorph.piSplitAt i (fun _ ↦ A)).apply_symm_apply (y,f)
+      change (g i, fun j : J ↦ g j.val) = (y,f) at hs
+      have he' := (e₀.symm_apply_apply (PiTensorProduct.tprod ℂ g)).symm.trans (congrArg e₀.symm (he₀ g))
+      have hi : g i = y := congrArg Prod.fst hs
+      have hj : (fun j : J ↦ g j.val) = f := congrArg Prod.snd hs
+      rw [hi, hj] at he'
+      change p.val (e.symm (PiTensorProduct.tprod ℂ f ⊗ₜ[ℂ] y)) ≤ _
+      refine ((congrArg p.val he').symm.trans_le (hpq g)).trans_eq ?_
+      rw [Fintype.prod_eq_mul_prod_compl i, hi]
+      congr 1
+      exact (Finset.prod_subtype ({i}ᶜ : Finset ι) (p := fun j ↦ j ≠ i) (fun j ↦ by simp) (fun j ↦ q j (g j))).trans (Finset.prod_congr rfl (fun j _ ↦ congrArg (q j.val) (congrFun hj j)))
+    refine (projectiveTensor_withSeminorms (T J) A).continuous_seminorm ⟨p.val.comp e.symm.toLinearMap, ?_⟩
+    change ContinuousAt (fun z : T J × A ↦ p.val (e.symm (z.1 ⊗ₜ[ℂ] z.2))) 0
+    have hz : p.val (e.symm (((0 : T J × A).1) ⊗ₜ[ℂ] (0 : T J × A).2)) = 0 :=
+      ((congrArg (fun z ↦ p.val (e.symm z)) (TensorProduct.zero_tmul (T J) (0 : A))).trans
+        (congrArg p.val e.symm.map_zero)).trans (map_zero p.val)
+    rw [ContinuousAt, hz]
+    apply tendsto_of_tendsto_of_tendsto_of_le_of_le' (g := fun _ ↦ 0)
+      (h := fun z ↦ q i z.2 * r z.1)
+    · exact tendsto_const_nhds
+    · have hT : Continuous (fun z : T J × A ↦ q i z.2 * r z.1) :=
+        ((hq i).comp continuous_snd).mul (hr.comp continuous_fst)
+      simpa [ContinuousAt, Function.comp_def] using hT.continuousAt (x := (0 : T J × A))
+    · exact Eventually.of_forall fun z ↦ apply_nonneg _ _
+    · exact Eventually.of_forall fun z ↦ hbound z.1 z.2
+  exact ⟨⟨e,hc,hd⟩,he⟩
+
+/-- For nuclear factors embedded by families of Schwartz tests, tensoring their coordinates and
+applying the ordinary Schwartz kernel theorem yields an embedding on the product. -/
+private theorem archimedeanWeightedSchwartz_tensor_kernel_coordinates
+    {G H A B I J : Type*}
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+    [CommGroup H] [TopologicalSpace H] [IsTopologicalGroup H] [T2Space H] [LocallyCompactSpace H] [SecondCountableTopology H]
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] [PolynormableSpace ℂ A] [T2Space A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] [PolynormableSpace ℂ B] [T2Space B]
+    (hN : @IsHomeomorph (ProjectiveTensor A B) (InjectiveTensor A B) _ _ id)
+    (hG : IsFrechetTVS (SchwartzBruhat G)) (hH : IsFrechetTVS (SchwartzBruhat H))
+    (t : A →L[ℂ] (I → SchwartzBruhat G)) (u : B →L[ℂ] (J → SchwartzBruhat H))
+    (ht : IsEmbedding t) (hu : IsEmbedding u) :
+    ∃ L : ProjectiveTensor A B →L[ℂ] (I × J → SchwartzBruhat (G × H)), IsEmbedding L ∧
+      ∀ a b i j x y, L (a ⊗ₜ[ℂ] b) (i,j) (x,y) = (t a i x) * (u b j y) := by
+  let X := SchwartzBruhat G
+  let Y := SchwartzBruhat H
+  let Z := SchwartzBruhat (G × H)
+  let : PolynormableSpace ℂ X := (schwartzBruhat_nuclear.{0} (G := G)).2.1
+  let : PolynormableSpace ℂ Y := (schwartzBruhat_nuclear.{0} (G := H)).2.1
+  let : T2Space X := schwartzBruhat_t2
+  let : T2Space Y := schwartzBruhat_t2
+  let E₁ := InjectiveTensor (I → X) (J → Y)
+  let E₂ := InjectiveTensor X Y
+  let D := InductiveTensor X Y
+  have hp := (schwartzBruhat_nuclear (G := G)).tensorComparison (Y := Y)
+  have hd := inductiveTensor_to_projectiveTensor_of_frechet hG hH
+  have hi : @IsInducing E₂ D _ _ id := by
+    let ex : D ≃ E₂ := Equiv.refl _
+    let hx : D ≃ₜ E₂ := ex.toHomeomorphOfIsInducing (hp.isInducing.comp hd.isInducing)
+    exact hx.symm.isInducing
+  obtain ⟨K,hK⟩ := schwartzBruhat_kernel_equiv (G := G) (H := H)
+  let : ContinuousSMul ℂ D := (withGeneratingSeminorms_spec _ _).continuousSMul
+  let : UniformContinuousConstSMul ℂ D := uniformContinuousConstSMul_of_continuousConstSMul ℂ D
+  let incl : D →L[ℂ] UniformSpace.Completion D := UniformSpace.Completion.toComplL
+  let k : E₂ →ₗ[ℂ] Z := K.toLinearMap.comp (show E₂ →ₗ[ℂ] UniformSpace.Completion D from incl.toLinearMap)
+  have hk : IsInducing k := K.toHomeomorph.isInducing.comp
+    ((UniformSpace.Completion.isUniformInducing_coe D).isInducing.comp hi)
+  let T : InjectiveTensor A B →ₗ[ℂ] E₁ := injectiveTensorMap t.toLinearMap u.toLinearMap
+  let V (p : I × J) : E₁ →ₗ[ℂ] E₂ := injectiveTensorMap (LinearMap.proj p.1) (LinearMap.proj p.2)
+  have hT := injectiveTensorMap_isEmbedding t u ht hu
+  have hV := (injectiveTensor_products_isUniformInducing (fun _ : I ↦ X) (fun _ : J ↦ Y)).isInducing
+  let L : ProjectiveTensor A B →ₗ[ℂ] (I × J → Z) := LinearMap.pi fun p ↦
+    (k.comp (V p)).comp (show ProjectiveTensor A B →ₗ[ℂ] E₁ from T)
+  have hL : IsInducing L := (IsInducing.piMap (fun _ : I × J ↦ hk)).comp
+    (hV.comp (hT.isInducing.comp hN.isInducing))
+  let : T2Space (ProjectiveTensor A B) := hN.isEmbedding.t2Space
+  refine ⟨⟨L,hL.continuous⟩,hL.isEmbedding,fun a b i j x y ↦ ?_⟩
+  exact hK (t a i) (u b j) x y
+
+/-- When the trivial subgroup is a Bruhat stage, the one-place twists induce the topology for any
+nonempty set of weights. The inverse on their image reconstructs that stage. -/
+private theorem archimedeanWeightedSchwartz_tensor_one_place_embedding
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [T2Space G] [LocallyCompactSpace G] (m : G →ₜ* ℝ≥0ˣ) (I : Set ℝ)
+    (hne : I.Nonempty) (hgood : IsBruhatGoodSubgroup (⊥ : Subgroup G)) :
+    IsEmbedding (fun (f : ModulatedExponentialDecay m I) (a : I) ↦
+      modulatedExponentialDecayTwist m I a f) := by
+  let E := ModulatedExponentialDecay m I
+  let X := SchwartzBruhat G
+  let Y := I → X
+  let t : E →ₗ[ℂ] Y := LinearMap.pi (modulatedExponentialDecayTwist m I)
+  have ht : Continuous t := continuous_pi fun a ↦ continuous_decay_twist m I a
+  obtain ⟨a, ha⟩ := hne
+  have hti : Injective t := fun f g h ↦ decay_twist_injective m I ⟨a, ha⟩ (congrFun h ⟨a, ha⟩)
+  let k : {k : Subgroup G // IsCompact (k : Set G) ∧ IsCompactlyGeneratedGroup (lcaAnnihilator k)} :=
+    ⟨⊥, by simpa only [Subgroup.coe_bot] using isCompact_singleton (x := (1 : G)), hgood.2.2⟩
+  let P := ModulatedExponentialDecayStage m I k
+  let j : P →ₗ[ℂ] E := modulatedExponentialDecayStageInclusion m I k
+  have hj : Continuous j := (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp j (fun p ↦ p.property k)
+  have hjs : Surjective j := by
+    intro f
+    apply ((modulatedExponentialDecayStageInclusion_range m I k).2 f).mpr
+    intro g u
+    have h : (u : G) = 1 := u.property
+    rw [h, mul_one]
+  let ej := LinearEquiv.ofBijective j ⟨(modulatedExponentialDecayStageInclusion_range m I k).1, hjs⟩
+  let et := LinearEquiv.ofInjective t hti
+  let v : (G ⧸ k.val) ≃ₜ* G :=
+    { QuotientGroup.quotientBot with
+      continuous_toFun := (QuotientGroup.isQuotientMap_mk _).continuous_iff.mpr continuous_id
+      continuous_invFun := QuotientGroup.continuous_mk }
+  obtain ⟨pull, hp⟩ := exists_schwartzBruhat_pullback v
+  let R (y : t.range) := ej.symm (et.symm y)
+  have hR : Continuous R := by
+    refine (modulatedExponentialDecayStage_twists_isInducing m I k).continuous_iff.mpr (continuous_pi fun b ↦ ?_)
+    apply (pull.continuous.comp ((continuous_apply b).comp continuous_subtype_val)).congr
+    intro y
+    apply Subtype.ext
+    funext q
+    refine QuotientGroup.induction_on q fun g ↦ ?_
+    have h : t (j (R y)) = y.val := (congrArg t (ej.apply_symm_apply (et.symm y))).trans
+      (congrArg Subtype.val (et.apply_symm_apply y))
+    have hy := congrArg (fun w : Y ↦ w b g) h
+    exact (hp (y.val b) _).trans hy.symm
+  have hi : IsEmbedding (fun f : E ↦ et f) := Function.LeftInverse.isEmbedding
+    (g := fun f : E ↦ et f) (f := j ∘ R) (fun f ↦ (ej.apply_symm_apply _).trans (et.symm_apply_apply f))
+    (hj.comp hR) (ht.subtype_mk _)
+  exact IsEmbedding.subtypeVal.comp hi
+
+/-- Over the empty set of factors the pure tensor is one and the projective topology is the scalar
+topology. -/
+private theorem archimedeanWeightedSchwartz_tensor_empty
+    {ι A : Type*} [Fintype ι] [IsEmpty ι] [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] :
+    ∃ e : FiniteProjectiveTensor (fun _ : ι ↦ A) ≃L[ℂ] ℂ, ∀ f, e (PiTensorProduct.tprod ℂ f) = 1 := by
+  let X := ⨂[ℂ] _ : ι, A
+  let P := fun p : {p : Seminorm ℂ X // Continuous (fun f : ι → A ↦ p (PiTensorProduct.tprod ℂ f))} ↦ p.val
+  let l : WithGeneratingSeminorms X P ≃ₗ[ℂ] ℂ := PiTensorProduct.isEmptyEquiv ι
+  have hP := withGeneratingSeminorms_spec X P
+  have : ContinuousSMul ℂ (WithGeneratingSeminorms X P) := hP.continuousSMul
+  have hl : Continuous l := by
+    let q : Seminorm ℂ X := (normSeminorm ℂ ℂ).comp (PiTensorProduct.isEmptyEquiv ι).toLinearMap
+    have hq : Continuous (fun f : ι → A ↦ q (PiTensorProduct.tprod ℂ f)) := continuous_of_discreteTopology
+    refine WithSeminorms.continuous_normedSpace_rng ℂ hP l.toLinearMap
+      ⟨{⟨q, hq⟩}, 1, Seminorm.le_def.mpr fun x ↦ ?_⟩
+    have hx : (({⟨q, hq⟩} : Finset _).sup P) x = q x :=
+      congrArg (fun p : Seminorm ℂ X ↦ p x) Finset.sup_singleton
+    exact le_of_eq (hx.symm.trans (one_smul ℝ≥0 _).symm)
+  have hl' : Continuous l.symm := by
+    have eqn : (l.symm : ℂ → WithGeneratingSeminorms X P) = fun c ↦ c • l.symm 1 := by
+      funext c
+      rw [← map_smul, smul_eq_mul, mul_one]
+    rw [eqn]
+    fun_prop
+  exact ⟨⟨l, hl, hl'⟩, PiTensorProduct.isEmptyEquiv_apply_tprod ι⟩
+
+/-- Iterating the binary coordinate embedding realizes the finite projective tensor in the Schwartz
+spaces on the product group. -/
+private theorem archimedeanWeightedSchwartz_tensor_finite_coordinates.{uS}
+    {G A W : Type} [TopologicalSpace W] [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] [PolynormableSpace ℂ A] [T2Space A]
+    (t : A →L[ℂ] (W → SchwartzBruhat G)) (ht : IsEmbedding t)
+    (hG : IsFrechetTVS (SchwartzBruhat G))
+    (hprod : ∀ (K : Type uS) [Fintype K], IsFrechetTVS (SchwartzBruhat (K → G)))
+    (hempty : ∀ (K : Type uS) [IsEmpty K], ∃ L : ℂ →L[ℂ] SchwartzBruhat (K → G),
+      IsEmbedding L ∧ ∀ c u, L c u = c)
+    (ι : Type uS) [Fintype ι] :
+    @Continuous (ι → A) (FiniteProjectiveTensor (fun _ : ι ↦ A)) _ _ (PiTensorProduct.tprod ℂ) ∧
+      ∃ L : FiniteProjectiveTensor (fun _ : ι ↦ A) →L[ℂ] ((ι → W) → SchwartzBruhat (ι → G)),
+        IsEmbedding L ∧ ∀ f w u, L (PiTensorProduct.tprod ℂ f) w u = ∏ i, t (f i) (w i) (u i) := by
+  classical
+  cases isEmpty_or_nonempty ι with
+  | inl h =>
+    obtain ⟨e,he⟩ := archimedeanWeightedSchwartz_tensor_empty (ι := ι) (A := A)
+    obtain ⟨k,hk,hv⟩ := hempty ι
+    let L := ContinuousLinearMap.pi fun _ : ι → W ↦ k.comp e.toContinuousLinearMap
+    have hc : Continuous L := L.continuous
+    let w₀ : ι → W := isEmptyElim
+    have hi : IsInducing L := IsInducing.of_comp hc (continuous_apply w₀) (hk.isInducing.comp e.toHomeomorph.isInducing)
+    have hli : Injective L := fun _ _ hxy ↦ e.injective (hk.injective (congrFun hxy w₀))
+    refine ⟨continuous_of_discreteTopology, L, ⟨hi,hli⟩, fun f w u ↦ ?_⟩
+    exact (hv _ _).trans ((he f).trans (by simp))
+  | inr h =>
+    obtain ⟨i⟩ := h
+    let J := {j : ι // j ≠ i}
+    obtain ⟨hc,L,hL,hv⟩ := archimedeanWeightedSchwartz_tensor_finite_coordinates t ht hG hprod hempty J
+    obtain ⟨e,he⟩ := archimedeanWeightedSchwartz_tensor_split_coordinate i hc
+    let T := FiniteProjectiveTensor (fun _ : J ↦ A)
+    let : PolynormableSpace ℂ T := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+    let : T2Space (SchwartzBruhat (J → G)) := schwartzBruhat_t2
+    let : T2Space T := hL.t2Space
+    have hN : IsNuclearTVS.{0} T := isNuclearTVS_of_linearEmbedding L.toLinearMap hL
+      (isNuclearTVS_pi fun _ : J → W ↦ schwartzBruhat_nuclear (G := J → G))
+    obtain ⟨K,hK,hKv⟩ := archimedeanWeightedSchwartz_tensor_kernel_coordinates hN.tensorComparison (hprod J) hG L t hL ht
+    let d : (ι → G) ≃ₜ* ((J → G) × G) :=
+      { (Homeomorph.piSplitAt i (fun _ ↦ G)).trans (Homeomorph.prodComm _ _) with map_mul' := fun _ _ ↦ rfl }
+    let l := schwartzBruhatPullbackEquiv d
+    let w : (ι → W) ≃ₜ ((J → W) × W) := (Homeomorph.piSplitAt i (fun _ ↦ W)).trans (Homeomorph.prodComm _ _)
+    let D := ContinuousLinearMap.pi fun a : ι → W ↦ l.toContinuousLinearMap.comp
+      ((ContinuousLinearMap.proj (R := ℂ) (w a)).comp (K.comp e.toContinuousLinearMap))
+    have hik : IsInducing (fun f : ((J → W) × W → SchwartzBruhat (ι → G)) ↦ f ∘ w) :=
+      (Function.LeftInverse.isEmbedding (f := fun f : (ι → W) → SchwartzBruhat (ι → G) ↦ f ∘ w.symm)
+        (g := fun f : ((J → W) × W) → SchwartzBruhat (ι → G) ↦ f ∘ w)
+        (fun f ↦ funext fun p ↦ congrArg f (w.apply_symm_apply p))
+        (continuous_pi fun p ↦ continuous_apply (w.symm p))
+        (continuous_pi fun a ↦ continuous_apply (w a))).isInducing
+    have hpi := (IsInducing.piMap fun _ : (J → W) × W ↦ l.toHomeomorph.isInducing)
+    have hi : IsInducing D := hik.comp (hpi.comp (hK.isInducing.comp e.toHomeomorph.isInducing))
+    let : T2Space (SchwartzBruhat ((J → G) × G)) := schwartzBruhat_t2
+    let : T2Space (FiniteProjectiveTensor (fun _ : ι ↦ A)) := (hK.comp e.toHomeomorph.isEmbedding).t2Space
+    have hcp : @Continuous (ι → A) (ProjectiveTensor T A) _ _ (fun f ↦ e (PiTensorProduct.tprod ℂ f)) := by
+      exact ((continuous_projectiveTensor_tmul (E := T) (F := A)).comp
+        ((hc.comp (continuous_pi fun j ↦ continuous_apply j.val)).prodMk (continuous_apply i))).congr fun f ↦ (he f).symm
+    refine ⟨e.toHomeomorph.isInducing.continuous_iff.mpr hcp, D, hi.isEmbedding, fun f a u ↦ ?_⟩
+    change K (e (PiTensorProduct.tprod ℂ f)) (w a) (d u) = _
+    rw [he]
+    refine (hKv (PiTensorProduct.tprod ℂ fun j : J ↦ f j.val) (f i)
+      (fun j : J ↦ a j.val) (a i) (fun j : J ↦ u j.val) (u i)).trans ?_
+    rw [hv, Fintype.prod_eq_mul_prod_compl i, mul_comm]
+    congr 1
+    exact (Finset.prod_subtype ({i}ᶜ : Finset ι) (p := fun j ↦ j ≠ i)
+      (fun j ↦ by simp) (fun j ↦ t (f j) (a j) (u j))).symm
+termination_by Fintype.card ι
+decreasing_by
+  classical
+  exact Fintype.card_subtype_lt (x := i) (not_not_intro rfl)
+
+/-- A finite power of a compactly generated group with an open Euclidean chart
+is again elementary: compact generating neighborhoods and charts both multiply. -/
+private theorem archimedeanWeightedSchwartz_finite_unweighted_frechet {ι G V : Type*}
+    [Fintype ι] [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    [NormedAddCommGroup V] [NormedSpace ℝ V] [FiniteDimensional ℝ V]
+    (hG : IsCompactlyGeneratedGroup G) (v : G → V) (hv : IsOpenEmbedding v) :
+    IsFrechetTVS (SchwartzBruhat (ι → G)) := by
+  classical
+  obtain ⟨U,hU,hc,hg⟩ := hG
+  have hpi : IsCompactlyGeneratedGroup (ι → G) := by
+    refine ⟨univ.pi (fun _ ↦ U), ?_, isCompact_univ_pi (fun _ ↦ hc), ?_⟩
+    · apply set_pi_mem_nhds finite_univ
+      exact fun i _ ↦ hU
+    · rw [Subgroup.closure_pi (fun _ ↦ mem_of_mem_nhds hU)]
+      simp only [hg, Subgroup.pi_top]
+  let n := Module.finrank ℝ (ι → V)
+  let e : (ι → V) ≃L[ℝ] (Fin n → ℝ) := ContinuousLinearEquiv.ofFinrankEq (Module.finrank_fin_fun ℝ).symm
+  let q := (PiLp.continuousLinearEquiv 2 ℝ (fun _ : Fin n ↦ ℝ)).symm
+  exact schwartzBruhat_frechet_of_elementary hpi ⟨n,
+    ⟨((e.trans q).toHomeomorph.isOpenEmbedding.comp (IsOpenEmbedding.piMap (fun _ : ι ↦ hv))).singletonChartedSpace⟩⟩
+
+private theorem archimedeanWeightedSchwartz_real_unweighted_frechet (ι : Type*) [Fintype ι] :
+    IsFrechetTVS (SchwartzBruhat (ι → ℝˣ)) := by
+  let : SecondCountableTopology ℝˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have h := realCoordinate_mul_allExponentialDecay_modulation
+  exact archimedeanWeightedSchwartz_finite_unweighted_frechet
+    (compactlyGenerated_of_surjective_modulation _ h.1 h.2) _ (Units.isOpenEmbedding_val (R := ℝ))
+
+private theorem archimedeanWeightedSchwartz_complex_unweighted_frechet (ι : Type*) [Fintype ι] :
+    IsFrechetTVS (SchwartzBruhat (ι → ℂˣ)) := by
+  let : SecondCountableTopology ℂˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have h := complexCoordinate_mul_allExponentialDecay_modulation
+  exact archimedeanWeightedSchwartz_finite_unweighted_frechet
+    (compactlyGenerated_of_surjective_modulation _ h.1 h.2) _ (Units.isOpenEmbedding_val (R := ℂ))
+
+/-- On a one-point group, the constant functions identify Schwartz space with the scalars. -/
+private theorem archimedeanWeightedSchwartz_subsingleton_equiv {G : Type*} [CommGroup G]
+    [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [Subsingleton G] :
+    ∃ e : ℂ ≃L[ℂ] SchwartzBruhat G, ∀ c x, e c x = c := by
+  let : CompactSpace G := Finite.compactSpace
+  obtain ⟨u,hu⟩ := compact_schwartzBruhat_one (H := G)
+  let M : ℂ →L[ℂ] SchwartzBruhat G := (ContinuousLinearMap.id ℂ ℂ).smulRight u
+  let E : SchwartzBruhat G →L[ℂ] ℂ :=
+    ⟨(LinearMap.proj 1).comp (schwartzBruhatSubmodule G).subtype, continuous_schwartzBruhat_eval_forEndpoints 1⟩
+  have hv (c : ℂ) (x : G) : M c x = c := by
+    change c * u x = c
+    rw [hu, mul_one]
+  have hEM (c : ℂ) : E (M c) = c := hv c 1
+  have hME (g : SchwartzBruhat G) : M (E g) = g :=
+    Subtype.ext (funext fun x ↦ (hv (E g) x).trans (congrArg g (Subsingleton.elim 1 x)))
+  exact ⟨ContinuousLinearEquiv.equivOfInverse M E hEM hME, hv⟩
+
+/-- The punctured complex plane is an open real Euclidean chart. -/
+private theorem archimedeanWeightedSchwartz_complex_trivial_good :
+    IsBruhatGoodSubgroup (⊥ : Subgroup ℂˣ) := by
+  let e := (stdOrthonormalBasis ℝ ℂ).repr
+  exact isBruhatGoodSubgroup_bot_iff.mpr ⟨_, ⟨(e.toHomeomorph.isOpenEmbedding.comp
+    (Units.isOpenEmbedding_val (R := ℂ))).singletonChartedSpace⟩⟩
+
+private theorem archimedeanWeightedSchwartz_real_factor_unweighted_frechet :
+    IsFrechetTVS (SchwartzBruhat ℝˣ) := by
+  let : SecondCountableTopology ℝˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have h := realCoordinate_mul_allExponentialDecay_modulation
+  exact schwartzBruhat_frechet_of_elementary (compactlyGenerated_of_surjective_modulation _ h.1 h.2)
+    (isBruhatGoodSubgroup_bot_iff.mp realCoordinate_mul_exponentialDecay_good)
+
+private theorem archimedeanWeightedSchwartz_complex_factor_unweighted_frechet :
+    IsFrechetTVS (SchwartzBruhat ℂˣ) := by
+  let : SecondCountableTopology ℂˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have h := complexCoordinate_mul_allExponentialDecay_modulation
+  exact schwartzBruhat_frechet_of_elementary (compactlyGenerated_of_surjective_modulation _ h.1 h.2)
+    (isBruhatGoodSubgroup_bot_iff.mp archimedeanWeightedSchwartz_complex_trivial_good)
+
+/-- Two linear maps on the tensor product agree if they agree on the separate products. -/
+private theorem archimedeanWeightedSchwartz_tensor_ext {ι κ R C Z : Type*}
+    [Fintype ι] [Fintype κ] [AddCommGroup R] [Module ℂ R] [AddCommGroup C] [Module ℂ C]
+    [AddCommGroup Z] [Module ℂ Z]
+    (V P : (⨂[ℂ] _ : ι, R) ⊗[ℂ] (⨂[ℂ] _ : κ, C) →ₗ[ℂ] Z)
+    (h : ∀ f g, V ((PiTensorProduct.tprod ℂ f) ⊗ₜ[ℂ] (PiTensorProduct.tprod ℂ g)) =
+      P ((PiTensorProduct.tprod ℂ f) ⊗ₜ[ℂ] (PiTensorProduct.tprod ℂ g))) : V = P := by
+  have hright (f : ι → R) (y : ⨂[ℂ] _ : κ, C) : V ((PiTensorProduct.tprod ℂ f) ⊗ₜ[ℂ] y) = P ((PiTensorProduct.tprod ℂ f) ⊗ₜ[ℂ] y) := by
+    induction y using PiTensorProduct.induction_on with
+    | smul_tprod b g => simp only [TensorProduct.tmul_smul, map_smul, h]
+    | add y z hy hz => simp only [TensorProduct.tmul_add, map_add, hy, hz]
+  apply TensorProduct.ext'
+  intro x y
+  induction x using PiTensorProduct.induction_on with
+  | smul_tprod b f => simp only [← TensorProduct.smul_tmul', map_smul, hright]
+  | add x z hx hz => simp only [TensorProduct.add_tmul, map_add, hx, hz]
+
+set_option maxHeartbeats 600000 in
+/-- The topology estimate in Lemma 5.3.3.3(2), p. 252: the projective
 tensor topology is induced by its maps to the unweighted Schwartz space, one for
 each tuple of exponents. This is an estimate on the algebraic tensor only. -/
 private theorem archimedeanWeightedSchwartz_tensor_twists {I : Set ℝ} (ho : IsOpen I)
     (hi : OrdConnected I) (hne : I.Nonempty) (L : productTensor(I) →ₗ[ℂ] 𝓦(I))
     (hL : ∀ (f : ι → realFactors(I)) (g : κ → complexFactors(I)) (u : archMul(ι, κ)),
       (L ((⨂ₜ[ℂ] i, f i) ⊗ₜ[ℂ] (⨂ₜ[ℂ] j, g j))).val u = separateValue(f, g, u)) :
-    IsInducing (fun z a ↦ archimedeanSchwartzTwist I a (L z)) := by sorry
+    IsInducing (fun z a ↦ archimedeanSchwartzTwist I a (L z)) := by
+  classical
+  let : SecondCountableTopology ℝˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SecondCountableTopology ℂˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let J := insert 0 I
+  let R := ModulatedExponentialDecay (archimedeanUnitModulation ℝ 1) J
+  let C := ModulatedExponentialDecay (archimedeanUnitModulation ℂ 2) J
+  let A := FiniteProjectiveTensor (fun _ : ι ↦ R)
+  let B := FiniteProjectiveTensor (fun _ : κ ↦ C)
+  let W := ((ι → J) × (κ → J))
+  let S := SchwartzBruhat ((ι → ℝˣ) × (κ → ℂˣ))
+  have hne : J.Nonempty := ⟨0, Set.mem_insert _ _⟩
+  let r : R →L[ℂ] (J → SchwartzBruhat ℝˣ) := ContinuousLinearMap.pi fun a ↦
+    ⟨modulatedExponentialDecayTwist (archimedeanUnitModulation ℝ 1) J a, continuous_decay_twist _ J a⟩
+  let c : C →L[ℂ] (J → SchwartzBruhat ℂˣ) := ContinuousLinearMap.pi fun a ↦
+    ⟨modulatedExponentialDecayTwist (archimedeanUnitModulation ℂ 2) J a, continuous_decay_twist _ J a⟩
+  have hr : IsEmbedding r := archimedeanWeightedSchwartz_tensor_one_place_embedding _ J hne realCoordinate_mul_exponentialDecay_good
+  have hc : IsEmbedding c := archimedeanWeightedSchwartz_tensor_one_place_embedding _ J hne archimedeanWeightedSchwartz_complex_trivial_good
+  let : T2Space (SchwartzBruhat ℝˣ) := schwartzBruhat_t2
+  let : T2Space (SchwartzBruhat ℂˣ) := schwartzBruhat_t2
+  let : T2Space R := hr.t2Space
+  let : T2Space C := hc.t2Space
+  let : PolynormableSpace ℂ R := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  let : PolynormableSpace ℂ C := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  have realCoordinates := archimedeanWeightedSchwartz_tensor_finite_coordinates (G := ℝˣ) (A := R) (W := J) r hr archimedeanWeightedSchwartz_real_factor_unweighted_frechet
+    archimedeanWeightedSchwartz_real_unweighted_frechet
+    (fun K _ ↦ (archimedeanWeightedSchwartz_subsingleton_equiv (G := K → ℝˣ)).elim
+      fun e he ↦ ⟨e.toContinuousLinearMap, e.toHomeomorph.isEmbedding, he⟩) ι
+  let F := realCoordinates.2.choose
+  have hF := realCoordinates.2.choose_spec.1
+  have hFv := realCoordinates.2.choose_spec.2
+  have complexCoordinates := archimedeanWeightedSchwartz_tensor_finite_coordinates (G := ℂˣ) (A := C) (W := J) c hc archimedeanWeightedSchwartz_complex_factor_unweighted_frechet
+    archimedeanWeightedSchwartz_complex_unweighted_frechet
+    (fun K _ ↦ (archimedeanWeightedSchwartz_subsingleton_equiv (G := K → ℂˣ)).elim
+      fun e he ↦ ⟨e.toContinuousLinearMap, e.toHomeomorph.isEmbedding, he⟩) κ
+  let D := complexCoordinates.2.choose
+  have hD := complexCoordinates.2.choose_spec.1
+  have hDv := complexCoordinates.2.choose_spec.2
+  let : T2Space (SchwartzBruhat (ι → ℝˣ)) := schwartzBruhat_t2
+  let : T2Space (SchwartzBruhat (κ → ℂˣ)) := schwartzBruhat_t2
+  let : PolynormableSpace ℂ A := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  let : PolynormableSpace ℂ B := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  let : T2Space A := hF.t2Space
+  let : T2Space B := hD.t2Space
+  have hComparison : @IsHomeomorph (ProjectiveTensor A B) (InjectiveTensor A B) _ _ id :=
+    (isNuclearTVS_of_linearEmbedding F.toLinearMap hF
+      (isNuclearTVS_pi fun _ : ι → J ↦ schwartzBruhat_nuclear (G := ι → ℝˣ))).tensorComparison
+  have bothCoordinates := archimedeanWeightedSchwartz_tensor_kernel_coordinates (A := A) (B := B) (G := ι → ℝˣ) (H := κ → ℂˣ)
+    (I := ι → J) (J := κ → J) hComparison
+    (archimedeanWeightedSchwartz_real_unweighted_frechet ι)
+    (archimedeanWeightedSchwartz_complex_unweighted_frechet κ) F D hF hD
+  let P := bothCoordinates.choose
+  have hP := bothCoordinates.choose_spec.1
+  have hPv := bothCoordinates.choose_spec.2
+  let V : ProjectiveTensor A B →ₗ[ℂ] (W → S) := LinearMap.pi fun a ↦ (archimedeanSchwartzTwist I a).comp L
+  have h0 (f : ι → R) (g : κ → C) :
+      V ((PiTensorProduct.tprod ℂ f) ⊗ₜ[ℂ] (PiTensorProduct.tprod ℂ g)) =
+        P ((PiTensorProduct.tprod ℂ f) ⊗ₜ[ℂ] (PiTensorProduct.tprod ℂ g)) := by
+    funext a
+    apply Subtype.ext
+    funext u
+    refine ((archimedeanSchwartzTwist_apply I a _ u).trans ?_).trans
+      (hPv (PiTensorProduct.tprod ℂ f) (PiTensorProduct.tprod ℂ g) a.1 a.2 u.1 u.2).symm
+    refine (congrArg (fun z : ℂ ↦ ((∏ i, ‖(u.1 i).val‖ ^ (a.1 i : ℝ) : ℝ) : ℂ) *
+      ((∏ j, (‖(u.2 j).val‖ ^ (2 : ℕ)) ^ (a.2 j : ℝ) : ℝ) : ℂ) * z) (hL f g u)).trans ?_
+    refine Eq.trans ?_ (congrArg₂ (· * ·) (hFv f a.1 u.1) (hDv g a.2 u.2)).symm
+    have hR (i : ι) : r (f i) (a.1 i) (u.1 i) =
+        ((‖(u.1 i).val‖ ^ (a.1 i : ℝ) : ℝ) : ℂ) * (f i).val (u.1 i) := by
+      change (modulatedExponentialDecayTwist (archimedeanUnitModulation ℝ 1) J (a.1 i) (f i)).val (u.1 i) = _
+      simpa only [archimedeanUnitModulation_apply, pow_one] using
+        modulatedExponentialDecayTwist_apply (archimedeanUnitModulation ℝ 1) J (a.1 i) (f i) (u.1 i)
+    have hC (j : κ) : c (g j) (a.2 j) (u.2 j) =
+        (((‖(u.2 j).val‖ ^ (2 : ℕ)) ^ (a.2 j : ℝ) : ℝ) : ℂ) * (g j).val (u.2 j) := by
+      change (modulatedExponentialDecayTwist (archimedeanUnitModulation ℂ 2) J (a.2 j) (g j)).val (u.2 j) = _
+      simpa only [archimedeanUnitModulation_apply] using
+        modulatedExponentialDecayTwist_apply (archimedeanUnitModulation ℂ 2) J (a.2 j) (g j) (u.2 j)
+    simp only [hR,hC,Finset.prod_mul_distrib,Complex.ofReal_prod]
+    ring
+  have he : V = P.toLinearMap := archimedeanWeightedSchwartz_tensor_ext V P.toLinearMap h0
+  exact (show IsInducing V from he ▸ hP.isInducing)
+
 
 /-- The sum of two twists of a decay function has dense range in the unweighted
 Schwartz space, even when the allowed exponents are disconnected. In logarithmic
