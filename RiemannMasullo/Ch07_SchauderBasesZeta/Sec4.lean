@@ -487,7 +487,55 @@ local notation "Sₚ(" p ")" => (finite_nuclearityPlacesAbove (F := F) p).toFins
 /-- Paper: Equation (7.4.0.2), p. 366.
 Principal value preserves the common kernel of the two global polar evaluations. -/
 theorem nuclearityPrincipalValue_mem_polar (p : HeightOneSpectrum (𝓞 ℚ)) (f : P) :
-    adelePrincipalValue F (Sₚ(p)) f.val ∈ P := by sorry
+    adelePrincipalValue F (Sₚ(p)) f.val ∈ P := by
+  classical
+  have hn : (Sₚ(p)).Nonempty := by
+    have := p.isMaximal
+    obtain ⟨q, hq, hqp⟩ := Ideal.exists_maximal_ideal_liesOver_of_isIntegral (S := 𝓞 F) p.asIdeal
+    let v : V := ⟨q, hq.isPrime, Ideal.ne_bot_of_liesOver_of_ne_bot p.ne_bot q⟩
+    exact ⟨v, (finite_nuclearityPlacesAbove p).mem_toFinset.mpr (HeightOneSpectrum.ext hqp.over.symm)⟩
+  let E := SchwartzBruhat (Multiplicative 𝔸[F])
+  let pv : E →L[ℂ] E :=
+    ⟨adelePrincipalValue F (Sₚ(p)), (adelePrincipalValue_isClosedEmbedding (Sₚ(p))).continuous⟩
+  let vals : E →L[ℂ] ℂ × ℂ := ⟨adelePolarValues, adelePolarValues_continuous⟩
+  obtain ⟨y, hy⟩ := adelePolarValues_surjective (F := F) ((1, 1) : ℂ × ℂ)
+  change vals y = (1, 1) at hy
+  have hx : vals f.val = 0 := f.property
+  -- Pullback by principal value preserves the eigenspace of each polar functional.
+  have coord (L : ℂ × ℂ →L[ℂ] ℂ) (c : QuasiCharacter C𝔽)
+      (hL : L.comp vals ∈ adelicEigendistributions c) (h1 : L (1, 1) = 1) :
+      L (vals (pv f.val)) = 0 := by
+    let l := L.comp vals
+    have hk : l.comp pv ∈ adelicEigendistributions c := by
+      intro u t
+      have he := congrArg (fun q : GlobalAdelicThetaSpace F ↦ L (globalThetaPolarValues q))
+        (globalThetaPrincipalValue_equivariant hn u t)
+      exact he.trans (hL u (pv t))
+    have hl : l ≠ 0 := by
+      intro hz
+      have hy' : l y = 1 := (congrArg L hy).trans h1
+      rw [hz] at hy'
+      exact zero_ne_one hy'
+    have hdim := Module.rank_eq_one_iff_finrank_eq_one.mp (adelicEigendistributions_rank c)
+    rw [eq_span_singleton_of_mem_of_finrank_eq_one hdim hL hl, Submodule.mem_span_singleton] at hk
+    obtain ⟨a, ha⟩ := hk
+    have he := congrArg (fun k : E →L[ℂ] ℂ ↦ k f.val) ha.symm
+    change L (vals (pv f.val)) = a * L (vals f.val) at he
+    simpa only [hx, map_zero, mul_zero] using he
+  apply (mem_adelePolarSubspace _).2
+  constructor
+  · apply coord (ContinuousLinearMap.fst ℂ ℂ ℂ) 1 _ rfl
+    intro u t
+    change t (Multiplicative.ofAdd ((↑u⁻¹ : 𝔸[F]) * 0)) = 1 * t (Multiplicative.ofAdd 0)
+    rw [mul_zero, one_mul]
+  · apply coord (ContinuousLinearMap.snd ℂ ℂ ℂ) (ideleClassNormTwist (1 : U) 1) _ rfl
+    intro u t
+    have h := globalThetaPolarValues_snd_translate (QuotientGroup.mk u) (Submodule.Quotient.mk t)
+    rw [(existsUnique_globalThetaAction (F := F)).exists.choose_spec.2 u t] at h
+    change (adelePolarValues (schwartzBruhatUnitTranslate u t)).2 =
+      ((1 : ℂ) * (((ideleNorm F u).val : ℝ) : ℂ) ^ (1 : ℂ)) * (adelePolarValues t).2
+    rw [Complex.cpow_one, one_mul]
+    exact h
 
 /-- Paper: Equation (7.4.0.2), p. 366.
 The finite-place denominator is the theta image of principal values of zero-moment
