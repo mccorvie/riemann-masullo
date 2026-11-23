@@ -3,7 +3,13 @@ import RiemannMasullo.ForMathlib.Analysis.Fourier.CompactGroup
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec4
 public import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Count
+import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec2
+import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec4
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 public import RiemannMasullo.ForMathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1a
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
+import Mathlib.Topology.Algebra.Group.SubmonoidClosure
 import Mathlib.Analysis.Calculus.SmoothSeries
 import Mathlib.Analysis.Calculus.ParametricIntegral
 import Mathlib.Analysis.SpecialFunctions.SmoothTransition
@@ -1982,6 +1988,222 @@ local notation "D[" B "]" => modulatedCompactSupportSubmodule m B
 -- with interior. Already G = ℝ_{>0}, χ = 1, B = [1, γ] misses the constant
 -- periodization, since a smooth function supported there vanishes at both endpoints.
 
+private theorem modulatedCompactSupport_isotypicQuotient_equiv_log (r t : ℝ≥0ˣ) (n : ℤ) :
+    Real.log (((r ^ n * t).val : ℝ≥0) : ℝ) = Real.log (t.val : ℝ) + n * Real.log (r.val : ℝ) := by
+  have hpos (s : ℝ≥0ˣ) : 0 < (s.val : ℝ) := NNReal.coe_pos.mpr s.zero_lt
+  rw [Units.val_mul, Units.val_zpow_eq_zpow_val, NNReal.coe_mul, NNReal.coe_zpow,
+    Real.log_mul (zpow_ne_zero _ (hpos r).ne') (hpos t).ne', Real.log_zpow, add_comm]
+
+include hB hms in
+private theorem modulatedCompactSupport_isotypicQuotient_equiv_window
+    (hcover : (QuotientGroup.mk' (Subgroup.zpowers γ)) '' (m ⁻¹' interior B) =
+      (univ : Set (G ⧸ Subgroup.zpowers γ))) :
+    ∃ C : TopologicalSpace.Compacts ℝ, (∀ t : ℝ≥0ˣ, Real.log (t.val : ℝ) ∈ C ↔ t ∈ B) ∧
+      ∀ x : ℝ, ∃ n : ℤ, x + n * L ∈ interior (C : Set ℝ) := by
+  let e : ℝ≥0ˣ ≃ₜ ℝ := (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.symm.toHomeomorph
+  have he (t : ℝ≥0ˣ) : e t = Real.log (t.val : ℝ) :=
+    (Real.log_of_pos (NNReal.coe_pos.mpr t.zero_lt)).symm
+  let C : TopologicalSpace.Compacts ℝ := ⟨e.symm ⁻¹' B, e.symm.isCompact_preimage.mpr hB⟩
+  refine ⟨C, fun t ↦ ?_, fun x ↦ ?_⟩
+  · change e.symm (Real.log (t.val : ℝ)) ∈ B ↔ t ∈ B
+    rw [← he, e.symm_apply_apply]
+  · obtain ⟨g, hg⟩ := hms (e.symm x)
+    have hmem : q g ∈ q '' (m ⁻¹' interior B) := hcover.symm ▸ mem_univ _
+    obtain ⟨y, hy, heq⟩ := hmem
+    obtain ⟨n, hn⟩ := Subgroup.mem_zpowers_iff.mp (QuotientGroup.eq_iff_div_mem.mp heq)
+    have hmy : m y = (m γ) ^ n * m g := by
+      rw [← map_zpow, ← map_mul, hn, div_mul_cancel]
+    refine ⟨n, ?_⟩
+    have hlog : Real.log ((m g).val : ℝ) = x := (he _).symm.trans (hg ▸ e.apply_symm_apply x)
+    have hx : e (m y) = x + n * L := by
+      rw [he, hmy, modulatedCompactSupport_isotypicQuotient_equiv_log, hlog]
+    change _ ∈ interior (e.symm ⁻¹' B)
+    rwa [← e.symm.preimage_interior, ← hx, mem_preimage, e.symm_apply_apply]
+
+private theorem modulatedCompactSupport_isotypicQuotient_equiv_phase (r : ℝ≥0ˣ) (hr : 1 < r.val)
+    (c : Circle) : ∃ η : PontryaginDual ℝ≥0ˣ, η r = c := by
+  obtain ⟨a, ha⟩ := Circle.exp_surjective c
+  let b := a / Real.log (r.val : ℝ)
+  have hn (t : ℝ≥0ˣ) : (t.val : ℝ) ≠ 0 := NNReal.coe_ne_zero.mpr t.ne_zero
+  let η : PontryaginDual ℝ≥0ˣ :=
+    { toFun := fun t ↦ Circle.exp (b * Real.log (t.val : ℝ))
+      map_one' := by simp
+      map_mul' := fun u v ↦ by
+        simp only [Units.val_mul, NNReal.coe_mul, Real.log_mul (hn u) (hn v), mul_add,
+          Circle.exp_add]
+      continuous_toFun := Circle.exp.continuous.comp (continuous_const.mul
+        ((NNReal.continuous_coe.comp Units.continuous_val).log hn)) }
+  exact ⟨η, (congrArg Circle.exp (div_mul_cancel₀ a (Real.log_pos (by exact_mod_cast hr)).ne')).trans ha⟩
+
+include hm in
+/-- Tensor a scalar profile with the normalized conjugate character of the compact kernel.
+Compact averaging recovers the profile, and the lift preserves its radial support. -/
+private theorem modulatedCompactSupport_isotypicQuotient_equiv_profileLift
+    (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m) (ξ : PontryaginDual G) :
+    ∃ J : PositiveRealExponentialDecay univ →L[ℂ] E,
+      (∀ p t, ∫ k : K, (ξ k.val : ℂ) * (J p).val (k.val * τ t) ∂μ₁ =
+        p.val (Real.log (t.val : ℝ))) ∧
+      ∀ p (x : G), p.val (Real.log ((m x).val : ℝ)) = 0 → (J p).val x = 0 := by
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  have : SecondCountableTopology K := TopologicalSpace.Subtype.secondCountableTopology _
+  let ω : PontryaginDual K := ξ.comp ⟨(K).subtype, continuous_subtype_val⟩
+  let oneK := (compact_schwartzBruhat_one (H := K)).choose
+  have honeK := (compact_schwartzBruhat_one (H := K)).choose_spec
+  let M := (schwartzBruhat_mul_unitaryCharacter (A := K) ω⁻¹).choose
+  have hM := (schwartzBruhat_mul_unitaryCharacter (A := K) ω⁻¹).choose_spec
+  let u := (μ₁.real univ : ℂ)⁻¹ • M oneK
+  have hu (k : K) : (ξ k.val : ℂ) * u k = (μ₁.real univ : ℂ)⁻¹ := by
+    change (ω k : ℂ) * ((μ₁.real univ : ℂ)⁻¹ * M oneK k) = _
+    have hc : M oneK k = (ω⁻¹ k : ℂ) :=
+      (hM oneK k).trans ((congrArg ((ω⁻¹ k : ℂ) * ·) (honeK k)).trans (mul_one _))
+    have hw : (ω k : ℂ) * (ω⁻¹ k : ℂ) = 1 :=
+      (Circle.coe_mul _ _).symm.trans (congrArg ((↑) : Circle → ℂ) (mul_inv_cancel (ω k)))
+    exact (congrArg (fun z : ℂ ↦ (ω k : ℂ) * ((μ₁.real univ : ℂ)⁻¹ * z)) hc).trans
+      ((mul_left_comm _ _ _).trans ((congrArg ((μ₁.real univ : ℂ)⁻¹ * ·) hw).trans (mul_one _)))
+  let P₁ := PositiveRealExponentialDecay univ
+  have hTensor := modulatedExponentialDecay_tensor_equiv m univ hm ordConnected_univ univ_nonempty τ hτ
+  let J : P₁ →L[ℂ] E := by
+    with_reducible_and_instances exact completedTensor_right (X := SchwartzBruhat K) (Y := P₁) (Z := E) hTensor.choose u
+  let ev (k : K) (t : ℝ≥0ˣ) (w : E) := w.val (k.val * τ t)
+  have hJ (p : P₁) (k : K) (t : ℝ≥0ˣ) : (J p).val (k.val * τ t) = u k * p.val (Real.log (t.val : ℝ)) := by
+    with_reducible_and_instances exact (congrArg (ev k t) (completedTensor_right_apply (X := SchwartzBruhat K)
+      (Y := P₁) hTensor.choose u p)).trans (hTensor.choose_spec u p k t)
+  refine ⟨J, fun p t ↦ ?_, fun p x hx ↦ ?_⟩
+  · have heq (k : K) : (ξ k.val : ℂ) * (J p).val (k.val * τ t) =
+        (μ₁.real univ : ℂ)⁻¹ * p.val (Real.log (t.val : ℝ)) := by
+      exact (congrArg ((ξ k.val : ℂ) * ·) (hJ p k t)).trans
+        ((mul_assoc _ _ _).symm.trans (congrArg (· * p.val _) (hu k)))
+    exact (integral_congr_ae (.of_forall heq)).trans ((integral_const _).trans
+      (Complex.real_smul.trans (mul_inv_cancel_left₀ (Complex.ofReal_ne_zero.mpr measureReal_univ_pos.ne') _)))
+  · let k : K := ⟨x / τ (m x), by change m (x / τ (m x)) = 1; rw [map_div, hτ _, div_self']⟩
+    have hk : k.val * τ (m x) = x := div_mul_cancel _ _
+    exact (congrArg (J p).val hk.symm).trans ((hJ p k (m x)).trans ((congrArg (u k * ·) hx).trans (mul_zero _)))
+
+open scoped ContDiff in
+/-- Localize a logarithmic profile without changing its orbit sums: divide a positive
+bump on the window by its periodization, then multiply by the periodic lift. -/
+private theorem modulatedCompactSupport_isotypicQuotient_equiv_localize (r : ℝ) (hr : 1 < r)
+    (C : TopologicalSpace.Compacts ℝ)
+    (hc : ∀ x : ℝ, ∃ n : ℤ, x + n * Real.log r ∈ interior (C : Set ℝ)) :
+    ∃ T : PositiveRealExponentialDecay univ →L[ℂ] PositiveRealExponentialDecay univ,
+      (∀ p x, x ∉ (C : Set ℝ) → (T p).val x = 0) ∧
+      ∀ p x, ∑' n : ℤ, (T p).val (x + n * Real.log r) =
+        ∑' n : ℤ, p.val (x + n * Real.log r) := by
+  obtain ⟨v, hv, hvd, hvr⟩ := isOpen_interior.exists_contDiff_support_eq (n := ⊤)
+    (s := interior (C : Set ℝ))
+  have hv0 {x : ℝ} (hx : x ∉ (C : Set ℝ)) : v x = 0 :=
+    notMem_support.mp fun h ↦ hx (interior_subset (hv ▸ h))
+  let w : ContDiffMapSupportedIn ℝ ℂ ⊤ C :=
+    ⟨fun x ↦ (v x : ℂ), Complex.ofRealCLM.contDiff.comp hvd, fun x hx ↦ by simp [hv0 hx]⟩
+  let P₁ := cyclicPeriodizationCLM r hr
+  let l := Real.log r
+  have hl : l ≠ 0 := (Real.log_pos hr).ne'
+  let lift (p : PositiveRealExponentialDecay univ) (x : ℝ) := cyclicLift (P₁ p) (l⁻¹ * x)
+  have hsum (p : PositiveRealExponentialDecay univ) (x : ℝ) :
+      HasSum (fun n : ℤ ↦ p.val (x + n * l)) (lift p x) := by
+    unfold lift
+    rw [inv_mul_eq_div]
+    change HasSum _ (cyclicLift (P₁ p) (x / l))
+    unfold cyclicLift P₁ cyclicPeriodizationCLM
+    exact cyclicPeriodization_hasSum r hr p x
+  have hper (p : PositiveRealExponentialDecay univ) (x : ℝ) (n : ℤ) :
+      lift p (x + n * l) = lift p x := by
+    have he : l⁻¹ * (x + n * l) = l⁻¹ * x + n * 1 := by field_simp
+    exact (congrArg (cyclicLift (P₁ p)) he).trans ((cyclicLift_periodic _).int_mul n _)
+  let v₀ := compactLogProfileInclusion C w
+  have hd (x : ℝ) : (lift v₀ x).re ≠ 0 := by
+    have hs : HasSum (fun n : ℤ ↦ v (x + n * l)) (lift v₀ x).re :=
+      Complex.reCLM.hasSum (hsum v₀ x)
+    obtain ⟨n, hn⟩ := hc x
+    have hnn (y : ℝ) : 0 ≤ v y := (hvr (mem_range_self y)).1
+    have hp : 0 < v (x + n * l) := lt_of_le_of_ne (hnn _) (mem_support.mp (hv.symm ▸ hn)).symm
+    exact ((hs.summable.tsum_pos (fun i ↦ hnn _) n hp).trans_eq hs.tsum_eq).ne'
+  have hdc : ContDiff ℝ ∞ (fun x ↦ (lift v₀ x).re) :=
+    Complex.reCLM.contDiff.comp ((cyclicLift_contDiff _).comp (contDiff_const.mul contDiff_id))
+  let u : ContDiffMapSupportedIn ℝ ℂ ⊤ C := ⟨fun x ↦ (v x / (lift v₀ x).re : ℝ),
+    Complex.ofRealCLM.contDiff.comp (hvd.div hdc hd), fun x hx ↦ by simp [hv0 hx]⟩
+  let T := (compactLogProfileInclusion C).comp ((windowedCyclicLift C u l⁻¹).comp P₁)
+  refine ⟨T, fun p x hx ↦ ((windowedCyclicLift C u l⁻¹) (P₁ p)).zero_on_compl hx, fun p x ↦ ?_⟩
+  have hs : HasSum (fun n : ℤ ↦ v (x + n * l)) (lift v₀ x).re := Complex.reCLM.hasSum (hsum v₀ x)
+  have he (n : ℤ) : (T p).val (x + n * l) = (v (x + n * l) : ℂ) *
+      (((lift v₀ x).re : ℂ)⁻¹ * lift p x) := by
+    change ((v _ / (lift v₀ _).re : ℝ) : ℂ) * lift p _ = _
+    rw [hper, hper, Complex.ofReal_div, div_eq_mul_inv, mul_assoc]
+  have hz : ∑' n : ℤ, (v (x + n * l) : ℂ) = ((lift v₀ x).re : ℂ) :=
+    (Complex.ofRealCLM.hasSum hs).tsum_eq
+  rw [tsum_congr he, tsum_mul_right, hz, (hsum p x).tsum_eq]
+  exact mul_inv_cancel_left₀ (Complex.ofReal_ne_zero.mpr (hd x)) _
+
+/-- After twisting by the compact component of the generator, the homogeneous orbit
+sum is a scalar multiple of the ordinary orbit sum of the compact average profile. -/
+private theorem modulatedCompactSupport_isotypicQuotient_equiv_orbit
+    (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m) (ξ : PontryaginDual G)
+    (A : E →L[ℂ] PositiveRealExponentialDecay univ)
+    (hA : ∀ f t, (A f).val (Real.log (t.val : ℝ)) =
+      ∫ k : K, (ξ k.val : ℂ) * f.val (k.val * τ t) ∂μ₁)
+    (η : PontryaginDual ℝ≥0ˣ) (hη : η (m γ) = ξ (τ (m γ) * γ⁻¹))
+    (U : PositiveRealExponentialDecay univ ≃L[ℂ] PositiveRealExponentialDecay univ)
+    (hU : ∀ (p : PositiveRealExponentialDecay univ) (t : ℝ≥0ˣ),
+      (U p).val (Real.log (t.val : ℝ)) = (η t : ℂ) * p.val (Real.log (t.val : ℝ)))
+    (f : E) (x : G) :
+    modulatedIsotypicPeriodization m γ hm hms hγ μ₁ ξ f (q x) =
+      ((ξ (τ (m x) * x⁻¹) : ℂ) / (η (m x) : ℂ)) *
+        ∑' n : ℤ, (U (A f)).val (Real.log ((m x).val : ℝ) + n * L) := by
+  let d : G →* Circle := ξ.toMonoidHom.comp ((τ.toMonoidHom.comp m.toMonoidHom) * (MonoidHom.id G)⁻¹)
+  have hd (y : G) : d y = ξ (τ (m y) * y⁻¹) := rfl
+  let b : G →* Circle := d / (η.toMonoidHom.comp m.toMonoidHom)
+  have hb (y : G) : b y = d y / η (m y) := rfl
+  have hbγ : b γ = 1 := (congrArg (· / η (m γ)) ((hd γ).trans hη.symm)).trans (div_self' _)
+  have hbpow (n : ℤ) : b (γ ^ n * x) = b x := by rw [map_mul, map_zpow, hbγ, one_zpow, one_mul]
+  have havg (g : G) : (∫ k : K, (ξ k.val : ℂ) * f.val (g * (k.val * τ 1)) ∂μ₁) =
+      (d g : ℂ) * (A f).val (Real.log ((m g).val : ℝ)) := by
+    have h := modulatedMellin_average_translate m g univ τ hτ μ₁ ξ f 1
+    rw [mul_one] at h
+    exact h.trans (congrArg ((d g : ℂ) * ·) (hA f (m g)).symm)
+  have hterm (n : ℤ) : (∫ k : K, (ξ k.val : ℂ) * f.val (γ ^ n * (k.val * x)) ∂μ₁) =
+      (b x : ℂ) * (U (A f)).val (Real.log ((m x).val : ℝ) + n * L) := by
+    let g := γ ^ n * x
+    have hlog : Real.log ((m g).val : ℝ) = Real.log ((m x).val : ℝ) + n * L := by
+      change Real.log ((m (γ ^ n * x)).val : ℝ) = _
+      rw [map_mul, map_zpow, modulatedCompactSupport_isotypicQuotient_equiv_log]
+    have hpt (k : K) : γ ^ n * (k.val * x) = g * (k.val * τ 1) := by
+      rw [map_one, mul_one]; dsimp only [g]; ac_rfl
+    have hchar : (d g : ℂ) = (b x : ℂ) * (η (m g) : ℂ) := by
+      rw [← hbpow n, hb, Circle.coe_div]
+      exact (div_mul_cancel₀ _ (Circle.coe_ne_zero _)).symm
+    calc
+      _ = ∫ k : K, (ξ k.val : ℂ) * f.val (g * (k.val * τ 1)) ∂μ₁ :=
+        integral_congr_ae (.of_forall fun k ↦ congrArg (fun y ↦ (ξ k.val : ℂ) * f.val y) (hpt k))
+      _ = (d g : ℂ) * (A f).val (Real.log ((m g).val : ℝ)) := havg g
+      _ = _ := (congrArg (· * (A f).val _) hchar).trans ((mul_assoc _ _ _).trans
+        (congrArg ((b x : ℂ) * ·) ((hU (A f) (m g)).symm.trans (congrArg (U (A f)).val hlog))))
+  have hs := (modulatedIsotypicPeriodization_hasSum m γ hm hms hγ μ₁ ξ f x).tsum_eq
+  refine hs.symm.trans ((tsum_congr hterm).trans ((tsum_mul_left).trans ?_))
+  exact congrArg (· * _) (Circle.coe_div _ _)
+
+/-- Inclusion and a continuous choice of supported representative descend to inverse maps. -/
+private theorem modulatedCompactSupport_isotypicQuotient_equiv_of_lift
+    {X Y : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (P₁ : X →L[ℂ] Y) (D : Submodule ℂ X) (R : X →L[ℂ] D) (hR : ∀ f, P₁ (R f).val = P₁ f) :
+    let N := P₁.ker.comap D.subtype
+    ∃ F : (D ⧸ N) ≃L[ℂ] (X ⧸ P₁.ker), ∀ f : D, F (N.mkQ f) = P₁.ker.mkQ f.val := by
+  intro N
+  let i := N.liftQL (P₁.ker.mkQL.comp D.subtypeL) (fun f hf ↦ (Submodule.Quotient.mk_eq_zero _).mpr hf)
+  let j := P₁.ker.liftQL (N.mkQL.comp R) (fun f hf ↦ (Submodule.Quotient.mk_eq_zero _).mpr
+    (show P₁ (R f).val = 0 from (hR f).trans hf))
+  refine ⟨ContinuousLinearEquiv.equivOfInverse i j ?_ ?_, fun _ ↦ rfl⟩
+  · intro z
+    obtain ⟨f, rfl⟩ := N.mkQ_surjective z
+    apply (Submodule.Quotient.eq N).mpr
+    change P₁ ((R f.val).val - f.val) = 0
+    rw [map_sub, hR, sub_self]
+  · intro z
+    obtain ⟨f, rfl⟩ := P₁.ker.mkQ_surjective z
+    apply (Submodule.Quotient.eq P₁.ker).mpr
+    change P₁ ((R f).val - f) = 0
+    rw [map_sub, hR, sub_self]
+
 include hB in
 /-- Paper: Theorem 4.5.2.3 and Equation (4.5.2.2), p. 207. The supported
 homogeneous quotient is identified with the full quotient by inclusion.
@@ -1993,7 +2215,69 @@ theorem modulatedCompactSupport_isotypicQuotient_equiv
     (ω : PontryaginDual K) :
     let N := (Pχ[ω]).ker.comap (D[B]).subtype
     ∃ F : ((D[B]) ⧸ N) ≃L[ℂ] V[ω],
-      ∀ f : D[B], F (N.mkQ f) = (Pχ[ω]).ker.mkQ f.val := by sorry
+      ∀ f : D[B], F (N.mkQ f) = (Pχ[ω]).ker.mkQ f.val := by
+  let hsec := exists_section_of_surjective hm.1 hms
+  let τ := hsec.choose
+  have hτ := hsec.choose_spec
+  let ξ := χ ω
+  let hphase := modulatedCompactSupport_isotypicQuotient_equiv_phase (m γ) hγ (ξ (τ (m γ) * γ⁻¹))
+  let η := hphase.choose
+  have hη := hphase.choose_spec
+  -- Average on the compact fibers, then twist away the phase of a generator step.
+  let hA₀ := compactAverage_split m hm univ ordConnected_univ univ_nonempty τ hτ μ₁ ξ
+  let A := hA₀.choose
+  have hA := hA₀.choose_spec.choose_spec.2
+  let hU₀ := scalarProfile_unitary univ ordConnected_univ univ_nonempty η
+  let U := hU₀.choose
+  have hU := hU₀.choose_spec
+  let hwin := modulatedCompactSupport_isotypicQuotient_equiv_window m γ hms B hB hcover
+  let C := hwin.choose
+  have hC := hwin.choose_spec.1
+  have hc := hwin.choose_spec.2
+  let hloc := modulatedCompactSupport_isotypicQuotient_equiv_localize
+    ((m γ).val : ℝ) (by exact_mod_cast hγ) C hc
+  let T := hloc.choose
+  have hT₀ := hloc.choose_spec.1
+  have hT := hloc.choose_spec.2
+  let hJ₀ := modulatedCompactSupport_isotypicQuotient_equiv_profileLift m hm μ₁ τ hτ ξ
+  let J := hJ₀.choose
+  have hJ := hJ₀.choose_spec
+  -- Localize the twisted profile, untwist it, and lift it back to the group.
+  let M := U.toContinuousLinearMap.comp A
+  let V := U.symm.toContinuousLinearMap.comp (T.comp M)
+  let R := J.comp V
+  have hUV (f : E) : U (V f) = T (M f) := U.apply_symm_apply _
+  have hRJ (f : E) : A (R f) = V f := by
+    apply scalarProfile_ext_log univ
+    exact fun t ↦ (hA (R f) t).trans (hJ.1 (V f) t)
+  have hMR (f : E) : M (R f) = T (M f) := (congrArg U (hRJ f)).trans (hUV f)
+  have hmem (f : E) : R f ∈ D[B] := by
+    have hsup : support (R f).val ⊆ m ⁻¹' B := by
+      apply support_subset_iff'.mpr
+      intro x hx
+      apply hJ.2 (V f) x
+      let t := m x
+      let z := Real.log (t.val : ℝ)
+      have h0 : (T (M f)).val z = 0 := hT₀ _ z (fun hz ↦ hx ((hC t).mp hz))
+      have h1 : (η t : ℂ) * (V f).val z = 0 := (hU (V f) t).symm.trans
+        ((congrArg (fun p : PositiveRealExponentialDecay univ ↦ p.val z) (hUV f)).trans h0)
+      exact (mul_eq_zero.mp h1).resolve_left (Circle.coe_ne_zero _)
+    have hZ := hm.1.isCompact_preimage hB
+    exact (mem_modulatedCompactSupportSubmodule_iff m B hB.isClosed _).mpr
+      ⟨HasCompactSupport.of_support_subset_isCompact hZ hsup, closure_minimal hsup hZ.isClosed⟩
+  let R' := R.codRestrict (D[B]) hmem
+  have he (f : E) (x : G) : modulatedIsotypicPeriodization m γ hm hms hγ μ₁ ξ (R f) (q x) =
+      modulatedIsotypicPeriodization m γ hm hms hγ μ₁ ξ f (q x) := by
+    let y := Real.log ((m x).val : ℝ)
+    let s (p : PositiveRealExponentialDecay univ) := ∑' n : ℤ, p.val (y + n * L)
+    have hs : s (M (R f)) = s (M f) := (congrArg s (hMR f)).trans (hT _ y)
+    have horb := modulatedCompactSupport_isotypicQuotient_equiv_orbit m γ hm hms hγ μ₁ τ hτ
+      ξ A hA η hη U hU
+    exact (horb (R f) x).trans
+      ((congrArg (((ξ (τ (m x) * x⁻¹) : ℂ) / (η (m x) : ℂ)) * ·) hs).trans (horb f x).symm)
+  have hR (f : E) : (Pχ[ω]) (R' f).val = (Pχ[ω]) f :=
+    Subtype.ext (funext (QuotientGroup.forall_mk.mpr (he f)))
+  exact modulatedCompactSupport_isotypicQuotient_equiv_of_lift (Pχ[ω]) (D[B]) R' hR
 
 /-- Restrict a quotient equivalence induced by inclusion, using a continuous map into `J`
 which preserves the supported subspace and acts as the identity on `J` modulo `N`. -/
@@ -2967,11 +3251,387 @@ theorem schwartzBruhatCyclicDifference_apply (f : S₀) (x : G) :
   change f x - ρG γ⁻¹ f x = _
   rw [schwartzBruhatTranslationAction_apply, inv_inv]
 
+open scoped ContDiff in
+/-- Local uniform summability of all jets gives a smooth sum with termwise jets. -/
+private theorem cyclicTail_smoothSeries {X : Type*} [NormedAddCommGroup X] [NormedSpace ℝ X]
+    (f : ℕ → X → ℂ) (hf : ∀ i, ContDiff ℝ ∞ (f i))
+    (hb : ∀ (x : X) (k : ℕ), ∃ u : ℕ → ℝ, Summable u ∧ ∀ i y, y ∈ Metric.ball x 1 →
+      ‖iteratedFDeriv ℝ k (f i) y‖ ≤ u i) :
+    ContDiff ℝ ∞ (fun x ↦ ∑' i, f i x) ∧ ∀ k x,
+      iteratedFDeriv ℝ k (fun y ↦ ∑' i, f i y) x = ∑' i, iteratedFDeriv ℝ k (f i) x := by
+  let jet (k i : ℕ) := iteratedFDeriv ℝ k (f i)
+  have hs (x : X) (k : ℕ) : Summable (fun i ↦ jet k i x) :=
+    (hb x k).elim fun u hu ↦ .of_norm_bounded hu.1 fun i ↦ hu.2 i x (Metric.mem_ball_self one_pos)
+  let p (x : X) (k : ℕ) := ∑' i, jet k i x
+  have h : HasFTaylorSeriesUpTo ∞ (fun x ↦ ∑' i, f i x) p := by
+    refine ⟨fun x ↦ ?_, fun k hk x ↦ ?_, fun k hk ↦ ?_⟩
+    · change (continuousMultilinearCurryFin0 ℝ X ℂ) (∑' i, jet 0 i x) = _
+      exact ((continuousMultilinearCurryFin0 ℝ X ℂ).toContinuousLinearEquiv.map_tsum).trans
+        (tsum_congr fun i ↦ (hf i).ftaylorSeries.zero_eq x)
+    · let c := continuousMultilinearCurryLeftEquiv ℝ (fun _ : Fin (k+1) ↦ X) ℂ
+      obtain ⟨u, hu, hle⟩ := hb x (k+1)
+      have he := c.toContinuousLinearEquiv.map_tsum (f := fun i ↦ jet (k+1) i x) («L» := SummationFilter.unconditional ℕ)
+      change HasFDerivAt _ (c.toContinuousLinearEquiv (∑' i, jet (k+1) i x)) x
+      rw [he]
+      exact hasFDerivAt_tsum_of_isPreconnected hu Metric.isOpen_ball (convex_ball x 1).isPreconnected
+        (fun i y _ ↦ (hf i).ftaylorSeries.fderiv k hk y) (fun i y hy ↦ (c.norm_map _).le.trans (hle i y hy))
+        (Metric.mem_ball_self one_pos) (hs x k) (Metric.mem_ball_self one_pos)
+    · rw [continuous_iff_continuousAt]
+      intro x
+      obtain ⟨u, hu, hle⟩ := hb x k
+      have hU := tendstoUniformlyOn_tsum (f := jet k) hu hle
+      exact (hU.continuousOn (Frequently.of_forall fun _ ↦ (continuous_finsetSum _ fun i _ ↦
+        (hf i).ftaylorSeries.cont k hk).continuousOn)).continuousAt (Metric.ball_mem_nhds x one_pos)
+  exact ⟨h.contDiff, fun k x ↦ (h.eq_iteratedFDeriv (by simp) x).symm⟩
+
+/-- Bound the full multilinear derivative on the cover by the weighted coordinate partials. -/
+private theorem elementaryJetBound {m n r : ℕ} {F : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    (f : ElementarySchwartz m n r F) (k l : ℕ) :
+    ∃ C : ℝ, ∀ (x : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) a b,
+      (1 + ‖((x.1, WithLp.toLp 2 (fun i ↦ (a i : ℝ))) : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin r))‖)^l *
+        ‖iteratedFDeriv ℝ k (fun z ↦ f (elementaryCover z a b)) x‖ ≤ C := by
+  classical
+  let X := EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)
+  let Y := ElementaryLieGroup m n r F
+  let Z := EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin r)
+  let πZ (y : Y) : Z := (y.1, WithLp.toLp 2 (fun i ↦ (y.2.2.1 i : ℝ)))
+  let J := Fin m ⊕ Fin n
+  let e : J → X := Sum.elim
+    (fun i ↦ ((EuclideanSpace.single i 1 : EuclideanSpace ℝ (Fin m)), 0))
+    (fun i ↦ (0, (EuclideanSpace.single i 1 : EuclideanSpace ℝ (Fin n))))
+  let c (v : X) : J → ℝ := Sum.elim (fun j ↦ v.1 j) (fun j ↦ v.2 j)
+  have hrepr (v : X) : ∑ j, c v j • e j = v := elementary_coord_repr v
+  have hc (v : X) (j : J) : ‖c v j‖ ≤ ‖v‖ := by
+    cases j with
+    | inl j => exact (PiLp.norm_apply_le v.1 j).trans (norm_fst_le v)
+    | inr j => exact (PiLp.norm_apply_le v.2 j).trans (norm_snd_le v)
+  choose β γ hβ using fun t : Fin k → J ↦ elementary_iteratedFDeriv_coord_eq (r := r) (F := F) k t
+  obtain ⟨p, _, hp⟩ := elementarySchwartz_withSeminorms_P1 (F := F) (m := m) (n := n) (r := r)
+  refine ⟨(2:ℝ)^l * ∑ t, p (l,l,β t,γ t) f, fun x a b ↦ ?_⟩
+  let y := πZ (elementaryCover x a b)
+  change (1 + ‖y‖)^l * _ ≤ _
+  let T := iteratedFDeriv ℝ k (fun z ↦ f (elementaryCover z a b)) x
+  have hT := norm_multilinear_le_sum_of_repr e c hrepr hc T
+  refine (mul_le_mul_of_nonneg_left hT (by positivity : 0 ≤ (1 + ‖y‖)^l)).trans ?_
+  rw [Finset.mul_sum, Finset.mul_sum]
+  refine Finset.sum_le_sum fun t _ ↦ ?_
+  have h := le_iSup_of_le x (le_iSup_of_le a (le_iSup_of_le b le_rfl))
+    (f := fun (x : X) ↦ ⨆ (a : Fin r → ℤ) (b : F), ENNReal.ofReal ((1 + ‖x.1‖^l) *
+      (1 + ‖(WithLp.toLp 2 (fun i ↦ (a i : ℝ)) : EuclideanSpace ℝ (Fin r))‖^l) *
+      ‖elementaryPartial f (β t) (γ t) x a b‖))
+  rw [← hp (l,l,β t,γ t) f] at h
+  have hb := (ENNReal.ofReal_le_ofReal_iff (apply_nonneg _ _)).mp h
+  change (1 + ‖y.1‖^l) * (1 + ‖y.2‖^l) * _ ≤ _ at hb
+  rw [show T (fun i ↦ e (t i)) = _ from hβ t f.val a b (f.property.1 a b) x]
+  refine le_trans ?_ (mul_le_mul_of_nonneg_left hb (by positivity : 0 ≤ (2:ℝ)^l))
+  rw [← mul_assoc ((2:ℝ)^l)]
+  gcongr
+  let s := max 1 ‖y‖
+  have hs : 1 + ‖y‖ ≤ 2*s := by dsimp [s]; grind
+  refine (pow_le_pow_left₀ (by positivity) hs l).trans ?_
+  rw [mul_pow]
+  gcongr
+  change max 1 (max ‖y.1‖ ‖y.2‖) ^ l ≤ _
+  rcases le_total ‖y.1‖ ‖y.2‖ with h | h
+  all_goals first | rw [max_eq_right h] | rw [max_eq_left h]
+  all_goals rw [max_def]; split <;> try rw [one_pow]
+  all_goals
+    nlinarith [pow_nonneg (norm_nonneg y.1) l, pow_nonneg (norm_nonneg y.2) l,
+      mul_nonneg (pow_nonneg (norm_nonneg y.1) l) (pow_nonneg (norm_nonneg y.2) l)]
+
+private theorem elementaryTranslatedJetBound {m n r : ℕ} {F : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    (f : ElementarySchwartz m n r F) (k l : ℕ) :
+    ∃ C : ℝ, ∀ (d : ElementaryLieGroup m n r F) (x : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) a b,
+      (1 + ‖(((elementaryCover x a b + d).1, WithLp.toLp 2
+          (fun i ↦ ((elementaryCover x a b + d).2.2.1 i : ℝ))) : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin r))‖)^l *
+        ‖iteratedFDeriv ℝ k (fun z ↦ f (elementaryCover z a b + d)) x‖ ≤ C := by
+  let X := EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)
+  obtain ⟨C, hC⟩ := elementaryJetBound f k l
+  refine ⟨C, fun d x a b ↦ ?_⟩
+  obtain ⟨t, ht⟩ := elementaryCover_surjective d.2.2.1 d.2.2.2 d.1 d.2.1
+  have he (z : X) : elementaryCover z a b + d =
+      elementaryCover (z+(d.1,t)) (a+d.2.2.1) (b+d.2.2.2) :=
+    (congrArg (elementaryCover z a b + ·) ht.symm).trans (elementaryCover_add ..)
+  simp_rw [he]
+  rw [iteratedFDeriv_comp_add_right (f := fun y ↦ f (elementaryCover y (a+d.2.2.1) (b+d.2.2.2)))]
+  exact hC (x+(d.1,t)) (a+d.2.2.1) (b+d.2.2.2)
+
+open scoped ContDiff in
+/-- The two tails agree up to sign. Each supplies rapid decay in one half-space. -/
+private theorem elementaryCyclicPrimitive {m n r : ℕ} {F : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    (f : ElementarySchwartz m n r F) (v : ElementaryLieGroup m n r F)
+    (hf : ∀ y : ElementaryLieGroup m n r F, HasSum (fun i : ℤ ↦ f (y + i • v)) 0) :
+    (fun y ↦ ∑' i : ℕ, f (y + i • v)) ∈ elementarySchwartzSubmodule m n r F := by
+  classical
+  let X := EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)
+  let Y := ElementaryLieGroup m n r F
+  let Z := EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin r)
+  let πZ (y : Y) : Z := (y.1, WithLp.toLp 2 (fun i ↦ (y.2.2.1 i : ℝ)))
+  let A : Y →+ Z := {
+    toFun := πZ
+    map_zero' := by refine Prod.ext rfl ?_; ext i; exact Int.cast_zero
+    map_add' := fun y z ↦ by refine Prod.ext rfl ?_; ext i; exact Int.cast_add .. }
+  let d := A v
+  let g (y : Y) := ∑' i : ℕ, f (y + i • v)
+  by_cases hd : d = 0
+  · -- All translated points lie on a compact orbit closure; summability forces f to vanish.
+    have hv : v.1 = 0 := congrArg Prod.fst hd
+    have ha : v.2.2.1 = 0 := by
+      ext j
+      have hh := congrArg (fun w : Z ↦ w.2 j) hd
+      exact_mod_cast (show (v.2.2.1 j : ℝ) = 0 from hh)
+    let H := (Fin n → AddCircle (1:ℝ)) × F
+    let h : H := (v.2.1,v.2.2.2)
+    let e : H →+ Y := {
+      toFun := fun u ↦ (0,u.1,0,u.2)
+      map_zero' := rfl
+      map_add' := fun _ _ ↦ Prod.ext (zero_add _).symm (Prod.ext rfl (Prod.ext (zero_add _).symm rfl)) }
+    have hev : e h = v := Prod.ext hv.symm (Prod.ext rfl (Prod.ext ha.symm rfl))
+    have h0 (y : Y) : f y = 0 := by
+      have hs : Summable fun i : ℕ ↦ f (y + i • v) := by
+        simpa only [Function.comp_def, natCast_zsmul] using
+          (hf y).summable.comp_injective (Nat.cast_injective (R := ℤ))
+      have hc : Continuous (fun z : H ↦ f (y + e z)) := (elementarySchwartz_continuous f).comp
+        (continuous_const.add (continuous_const.prodMk (continuous_fst.prodMk (continuous_const.prodMk continuous_snd))))
+      let : Fact (0 < (1:ℝ)) := ⟨one_pos⟩
+      have hcl := (mapClusterPt_zero_atTop_nsmul h).continuousAt_comp hc.continuousAt
+      have ht : Tendsto (fun i : ℕ ↦ f (y + e (i • h))) atTop (𝓝 0) := by
+        simpa only [map_nsmul, hev] using hs.tendsto_atTop_zero
+      obtain ⟨s, hs, hs'⟩ := MapClusterPt.tendsto_subseq hcl
+      simpa only [map_zero, add_zero] using tendsto_nhds_unique hs' (ht.comp hs.tendsto_atTop)
+    simp only [h0, tsum_zero]
+    exact (elementarySchwartzSubmodule m n r F).zero_mem
+  have hpos : 0 < ‖d‖ := norm_pos_iff.mpr hd
+  let w (i : ℕ) := (((i:ℝ)+1)^2)⁻¹
+  have hw : Summable w := by
+    simpa only [Function.comp_def, Nat.cast_succ] using
+      (Real.summable_nat_pow_inv.mpr (by decide : 1 < 2)).comp_injective Nat.succ_injective
+  let Fp (j : ℕ → ℤ) (a : Fin r → ℤ) (b : F) (i : ℕ) (z : X) := f (elementaryCover z a b + j i • v)
+  let J (j : ℕ → ℤ) (k i : ℕ) (x : X) (a : Fin r → ℤ) (b : F) := iteratedFDeriv ℝ k (Fp j a b i) x
+  have hshift (y : Y) (z : ℤ) : A (y + z • v) = A y + z • d := by simp only [map_add, map_zsmul, d]
+  have hjet (j : ℕ → ℤ) (k l : ℕ) : ∃ C : ℝ, ∀ i (x : X) a b,
+      (1 + ‖A (elementaryCover x a b) + j i • d‖)^l * ‖J j k i x a b‖ ≤ C := by
+    obtain ⟨C,hC⟩ := elementaryTranslatedJetBound f k l
+    exact ⟨C, fun i x a b ↦ hshift (elementaryCover x a b) (j i) ▸ hC (j i • v) x a b⟩
+  have hsm (j : ℕ → ℤ) (a : Fin r → ℤ) (b : F) :=
+    cyclicTail_smoothSeries (Fp j a b) (fun i ↦ by
+      obtain ⟨T, hT⟩ := elementarySchwartz_translate_jointly (m := m) (n := n) (r := r) (F := F)
+      have h := (T (j i • v, f)).property.1 a b
+      change ContDiff ℝ ∞ (fun z : X ↦ T (j i • v,f) (elementaryCover z a b)) at h
+      simpa only [Fp, hT, add_comm (j i • v)] using h)
+  have hi_norm (z : ℤ) : ‖z • d‖ = ‖(z : ℝ)‖ * ‖d‖ := by rw [← Int.cast_smul_eq_zsmul ℝ z, norm_smul]
+  -- Two extra powers pay for summation over the orbit.
+  have hbound (j : ℕ → ℤ) (k l : ℕ) (B R : ℝ) (hR : 0 ≤ R) : ∃ C : ℝ,
+      ∀ i (x : X) a b, let y := A (elementaryCover x a b); let s := ‖y + j i • d‖
+        (i : ℝ)*‖d‖ ≤ s + R → 1 + ‖y‖ ≤ B*(1+s) →
+          (1+‖y‖)^l * ‖J j k i x a b‖ ≤ w i * C := by
+    obtain ⟨C, hC⟩ := hjet j k (l+2)
+    let scale := (‖d‖ + R + 1)/‖d‖
+    refine ⟨B^l * scale^2 * C, ?_⟩
+    intro i x a b y s hi hy
+    have hs : 0 ≤ s := norm_nonneg _
+    have hi' : (i:ℝ) + 1 ≤ scale*(1+s) := by
+      dsimp only [scale]; rw [div_mul_eq_mul_div, le_div_iff₀ hpos]; nlinarith
+    rw [show w i = (((i:ℝ)+1)^2)⁻¹ from rfl, ← div_eq_inv_mul, le_div_iff₀ (by positivity)]
+    have hB : 0 ≤ B := by
+      by_contra! hh
+      linarith [mul_neg_of_neg_of_pos hh (show 0 < 1+s by positivity), norm_nonneg y]
+    calc
+      _ = ((1+‖y‖)^l * ((i:ℝ)+1)^2) * ‖J j k i x a b‖ := by ring
+      _ ≤ ((B*(1+s))^l * (scale*(1+s))^2) * ‖J j k i x a b‖ := by gcongr
+      _ = (B^l * scale^2) * ((1+s)^(l+2) * ‖J j k i x a b‖) := by rw [mul_pow, mul_pow, pow_add]; ring
+      _ ≤ _ := mul_le_mul_of_nonneg_left (hC ..) (by positivity)
+  -- On each unit ball, triangle inequalities give a locally uniform summable bound.
+  have hseries (j : ℕ → ℤ) (hj : ∀ i : ℕ, (i:ℝ) ≤ ‖(j i : ℝ)‖) (a : Fin r → ℤ) (b : F) := by
+    apply hsm j a b
+    intro x k
+    let R := 1 + ‖x.1‖ + ‖(WithLp.toLp 2 (fun i ↦ (a i : ℝ)) : EuclideanSpace ℝ (Fin r))‖
+    have hR : 0 ≤ R := by dsimp [R]; positivity
+    obtain ⟨C,hC⟩ := hbound j k 0 (1+R) R hR
+    refine ⟨_, hw.mul_right C, fun i z hz ↦ ?_⟩
+    let y := A (elementaryCover z a b)
+    have hy : ‖y‖ ≤ R := by
+      have h₁ : ‖z.1‖ ≤ ‖x.1‖ + 1 := calc
+        _ ≤ ‖z.1-x.1‖ + ‖x.1‖ := by simpa using norm_add_le (z.1-x.1) x.1
+        _ ≤ _ := by
+          have hh : ‖z.1 - x.1‖ ≤ ‖z - x‖ := norm_fst_le (z - x)
+          rw [Metric.mem_ball, dist_eq_norm] at hz
+          linarith
+      let a' : EuclideanSpace ℝ (Fin r) := WithLp.toLp 2 (fun i ↦ (a i : ℝ))
+      change max ‖z.1‖ ‖a'‖ ≤ 1 + ‖x.1‖ + ‖a'‖
+      rw [max_le_iff]; constructor <;> linarith [norm_nonneg x.1, norm_nonneg a']
+    have hi : (i:ℝ)*‖d‖ ≤ ‖y + j i • d‖ + R := calc
+      _ ≤ ‖j i • d‖ := hi_norm (j i) ▸ mul_le_mul_of_nonneg_right (hj i) hpos.le
+      _ ≤ ‖y + j i • d‖ + ‖y‖ := by simpa using norm_sub_le (y + j i • d) y
+      _ ≤ _ := by linarith
+    have h₁ : 1+‖y‖ ≤ (1+R)*(1+‖y+j i • d‖) := by nlinarith [norm_nonneg (y+j i • d)]
+    simpa only [pow_zero, one_mul] using hC i z a b hi h₁
+  let pos (i : ℕ) : ℤ := i
+  let neg (i : ℕ) : ℤ := -(i+1)
+  have hp (i : ℕ) : (i:ℝ) ≤ ‖(pos i : ℝ)‖ := by simp [pos]
+  have hn (i : ℕ) : (i:ℝ) ≤ ‖(neg i : ℝ)‖ := by
+    simp [neg]; linarith [neg_le_abs (-1 + -(i:ℝ))]
+  let T (j : ℕ → ℤ) a b (x : X) := ∑' i, Fp j a b i x
+  have hpT (a : Fin r → ℤ) (b : F) : (fun x : X ↦ g (elementaryCover x a b)) = T pos a b := by
+    simp only [g, T, pos, Fp, natCast_zsmul]
+  have hpn (a : Fin r → ℤ) (b : F) : T pos a b = -T neg a b := by
+    funext x
+    let y := elementaryCover x a b
+    let h (i : ℤ) := f (y + i • v)
+    have H : HasSum h 0 := hf y
+    have h₁ := H.summable.comp_injective (Nat.cast_injective (R := ℤ))
+    have h₂ := H.summable.comp_injective (show Injective neg from fun i j eq ↦ by dsimp [neg] at eq; omega)
+    exact eq_neg_of_add_eq_zero_left ((h₁.hasSum.of_nat_of_neg_add_one h₂.hasSum).unique H)
+  have hdec (j : ℕ → ℤ) (hj : ∀ i : ℕ, (i:ℝ) ≤ ‖(j i : ℝ)‖) (k l : ℕ) : ∃ C : ℝ, ∀ (x : X) a b,
+      let y := A (elementaryCover x a b)
+      (∀ i, ‖j i • d‖ ≤ ‖y + j i • d‖) → (1+‖y‖)^l * ‖iteratedFDeriv ℝ k (T j a b) x‖ ≤ C := by
+    obtain ⟨C, hC⟩ := hbound j k l 2 0 le_rfl
+    refine ⟨∑' i, w i*C, ?_⟩
+    intro x a b y hy
+    let W := (1+‖y‖)^l
+    have hW : 0 < W := by dsimp [W]; positivity
+    have hle (i : ℕ) : ‖J j k i x a b‖ ≤ w i*C/W := by
+      apply (le_div_iff₀ hW).mpr
+      rw [mul_comm]
+      apply hC
+      · rw [add_zero]; exact ((mul_le_mul_of_nonneg_right (hj i) hpos.le).trans_eq (hi_norm _).symm).trans (hy i)
+      · have h₀ : ‖y‖ ≤ ‖y+j i • d‖ + ‖j i • d‖ := by simpa using norm_sub_le (y+j i • d) (j i • d)
+        linarith [hy i]
+    rw [(hseries j hj a b).2 k x]
+    change W * ‖∑' i, J j k i x a b‖ ≤ _
+    rw [mul_comm, ← le_div_iff₀ hW]
+    exact tsum_of_norm_bounded ((hw.mul_right C).hasSum.div_const W) hle
+  -- A norming functional selects the tail that travels away from the origin.
+  obtain ⟨ell, hL, hLd⟩ := exists_dual_vector ℝ d hpos.ne'
+  have hLle (y : Z) : ‖ell y‖ ≤ ‖y‖ := (ell.le_opNorm y).trans_eq (by rw [hL,one_mul])
+  have hfinal (k l : ℕ) : ∃ C : ℝ, ∀ (x : X) a b, (1 + ‖A (elementaryCover x a b)‖)^l *
+      ‖iteratedFDeriv ℝ k (fun z ↦ g (elementaryCover z a b)) x‖ ≤ C := by
+    obtain ⟨C,hC⟩ := hdec pos hp k l
+    obtain ⟨C', hD⟩ := hdec neg hn k l
+    refine ⟨max C C', fun x a b ↦ ?_⟩
+    let y := A (elementaryCover x a b)
+    rw [hpT]
+    by_cases h : 0 ≤ ell y
+    · refine (hC x a b fun i ↦ ?_).trans (le_max_left ..)
+      refine le_trans ?_ (hLle (y + pos i • d))
+      rw [hi_norm, map_add, map_zsmul, hLd, Real.norm_eq_abs,
+        abs_of_nonneg (by simp [pos] : 0 ≤ (pos i : ℝ)), zsmul_eq_mul, Real.norm_eq_abs]
+      exact (le_add_of_nonneg_left h).trans (le_abs_self _)
+    · rw [hpn, iteratedFDeriv_neg, Pi.neg_apply, norm_neg]
+      refine (hD x a b fun i ↦ ?_).trans (le_max_right ..)
+      refine le_trans ?_ (hLle (y + neg i • d))
+      have hz : (neg i : ℝ) ≤ 0 := by dsimp [neg]; push_cast; linarith
+      rw [hi_norm, map_add, map_zsmul, hLd, Real.norm_eq_abs, abs_of_nonpos hz, zsmul_eq_mul, Real.norm_eq_abs, neg_mul]
+      change -((neg i:ℝ)*‖d‖) ≤ |ell y + (neg i:ℝ)*‖d‖|
+      exact (by linarith : -((neg i:ℝ)*‖d‖) ≤ -(ell y + (neg i:ℝ)*‖d‖)).trans (neg_le_abs _)
+  refine ⟨fun a b ↦ ?_, fun ⟨α,β,δ,ε⟩ ↦ ?_⟩
+  · change ContDiff ℝ ∞ (fun z ↦ g (elementaryCover z a b))
+    rw [hpT]; exact (hseries pos hp a b).1
+  let dirs : List X := (List.ofFn fun i ↦ List.replicate (β i) (EuclideanSpace.single i 1, 0)).flatten ++
+    (List.ofFn fun i ↦ List.replicate (δ i) (0, EuclideanSpace.single i 1)).flatten
+  obtain ⟨C, hC⟩ := hfinal dirs.length ((∑ i, α i) + ∑ i, ε i)
+  let dirWeight := ∏ i : Fin dirs.length, ‖dirs.get i‖
+  refine lt_of_le_of_lt (b := ENNReal.ofReal (C * dirWeight))
+    (iSup_le fun x ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_) ENNReal.ofReal_lt_top
+  rw [ENNReal.coe_nnreal_eq, coe_nnNorm]; apply ENNReal.ofReal_le_ofReal
+  let y := A (elementaryCover x a b)
+  let M := 1+‖y‖
+  let Jk := iteratedFDeriv ℝ dirs.length (fun z ↦ g (elementaryCover z a b)) x
+  change ‖((∏ i, (x.1 i : ℂ)^α i) * (∏ i, (a i : ℂ)^ε i)) * Jk dirs.get‖ ≤ _
+  have hx (i : Fin m) : ‖(x.1 i : ℂ)‖ ≤ M := by
+    rw [Complex.norm_real]; exact (PiLp.norm_apply_le x.1 i).trans ((norm_fst_le y).trans (le_add_of_nonneg_left zero_le_one))
+  have ha (i : Fin r) : ‖(a i : ℂ)‖ ≤ M := by
+    rw [← Complex.ofReal_intCast, Complex.norm_real]; exact (PiLp.norm_apply_le y.2 i).trans ((norm_snd_le y).trans (le_add_of_nonneg_left zero_le_one))
+  have hM : 0 ≤ M := by dsimp [M]; positivity
+  simp only [norm_mul, norm_prod, norm_pow]
+  calc
+    _ ≤ ((∏ i, M^α i)*(∏ i, M^ε i)) * (‖Jk‖ * dirWeight) := by
+      apply mul_le_mul _ (Jk.le_opNorm _) (norm_nonneg _) (by positivity)
+      exact mul_le_mul
+        (Finset.prod_le_prod₀ (by intros; positivity) fun i _ ↦ pow_le_pow_left₀ (norm_nonneg _) (hx i) _)
+        (Finset.prod_le_prod₀ (by intros; positivity) fun i _ ↦ pow_le_pow_left₀ (norm_nonneg _) (ha i) _)
+        (by positivity) (by positivity)
+    _ = M^((∑ i,α i)+∑ i, ε i)*‖Jk‖ * dirWeight := by rw [Finset.prod_pow_eq_pow_sum, Finset.prod_pow_eq_pow_sum, pow_add]; ring
+    _ ≤ _ := mul_le_mul_of_nonneg_right (hC x a b) (Finset.prod_nonneg fun _ _ ↦ norm_nonneg _)
+
+/-- Realize the tail in a single elementary stage containing the translating element. -/
+private theorem cyclicSchwartzTail_mem {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] (γ : G) (f : SchwartzBruhat G)
+    (h0 : ∀ x : G, HasSum (fun n : ℤ ↦ f (γ^n*x)) 0) :
+    (fun x ↦ ∑' n : ℕ, f (γ^n*x)) ∈ schwartzBruhatSubmodule G := by
+  classical
+  obtain ⟨b,e,t,ht⟩ := (mem_schwartzBruhatSubmodule_iff _).mp f.property
+  obtain ⟨p,hp,hγ⟩ := exists_bruhatStructuralPair_le_mem b γ
+  obtain ⟨u⟩ := p.elementary
+  obtain ⟨j,hj,-⟩ := schwartzBruhatStage_transition hp e u
+  let s := j t
+  let R := schwartzBruhatStageRealization p u
+  have hs : R s = f.val := (hj t).trans ht
+  let a : p.val.1 := ⟨γ,hγ⟩
+  let Y := ElementaryLieGroup u.realDim u.torusDim u.latticeRank u.finiteFactor
+  let π : p.val.1 →* Multiplicative Y := u.equiv.toMulEquiv.toMonoidHom.comp (QuotientGroup.mk' _)
+  have hval (z : SchwartzBruhatStage u) (x : p.val.1) : R z x.val = z (π x).toAdd := by
+    rw [schwartzBruhatStageRealization_apply, dite_eq_left x.property]
+    rfl
+  have hrep (x : p.val.1) : s (π x).toAdd = f x.val := (hval s x).symm.trans (congrFun hs x.val)
+  have he (x : p.val.1) (n : ℤ) : s ((π x).toAdd + n • (π a).toAdd) = f (γ^n*x.val) := by
+    have h : π (a^n*x) = π x * (π a)^n := by rw [map_mul, map_zpow, mul_comm]
+    exact (congrArg (fun y : Multiplicative Y ↦ s y.toAdd) h.symm).trans (hrep (a^n*x))
+  have hπ : Surjective π := u.equiv.surjective.comp QuotientGroup.mk_surjective
+  have horbit (y : Y) : HasSum (fun n : ℤ ↦ s (y+n • (π a).toAdd)) 0 := by
+    obtain ⟨x,hx⟩ := hπ (Multiplicative.ofAdd y)
+    exact (h0 x.val).congr_fun fun n ↦ (congrArg (fun z : Multiplicative Y ↦ s (z.toAdd+n • (π a).toAdd)) hx.symm).trans (he x n)
+  let g : SchwartzBruhatStage u := ⟨_, elementaryCyclicPrimitive s (π a).toAdd horbit⟩
+  apply (mem_schwartzBruhatSubmodule_iff _).mpr
+  refine ⟨p,u,g, funext fun x ↦ ?_⟩
+  by_cases hx : x ∈ p.val.1
+  · refine (hval g ⟨x,hx⟩).trans (tsum_congr fun n ↦ ?_)
+    simpa only [natCast_zsmul, zpow_natCast] using he ⟨x,hx⟩ (n:ℤ)
+  · have hz (n : ℕ) : f (γ^n*x) = 0 := by
+      rw [← show R s (γ^n*x) = f (γ^n*x) from congrFun hs _, schwartzBruhatStageRealization_apply, dite_eq_right]
+      exact fun h ↦ hx ((p.val.1.mul_mem_cancel_left (p.val.1.pow_mem hγ n)).mp h)
+    rw [schwartzBruhatStageRealization_apply, dite_eq_right hx, funext hz, tsum_zero]
+
+include hγ in
+private theorem cyclic_tail_eq (f : SchwartzBruhat G) (x : G) :
+    (∑' n : ℕ, f (γ ^ n * x)) - (∑' n : ℕ, f (γ ^ n * (γ * x))) = f x := by
+  have h : Summable (fun n : ℕ ↦ f (γ ^ n * x)) := by
+    simpa only [Function.comp_def, zpow_natCast] using
+      (schwartzBruhatCyclicPeriodization_hasSum m γ hγ f x).summable.comp_injective
+        (Nat.cast_injective (R := ℤ))
+  rw [h.tsum_eq_zero_add]
+  simp only [pow_zero, one_mul, pow_succ, mul_assoc, add_sub_cancel_right]
+
+private theorem cyclicTail_range_le : (Δ₀).range ≤ (P₀).ker := by
+  rintro _ ⟨g, rfl⟩
+  apply Subtype.ext
+  funext z
+  refine QuotientGroup.induction_on z fun x ↦ ?_
+  have hg := schwartzBruhatCyclicPeriodization_hasSum m γ hγ g x
+  have hs := (Equiv.addRight (1 : ℤ)).hasSum_iff.mpr hg
+  have hd := hg.sub hs
+  apply (schwartzBruhatCyclicPeriodization_hasSum m γ hγ (Δ₀ g) x).unique
+  change HasSum (fun n : ℤ ↦ Δ₀ g (γ ^ n * x)) 0
+  simpa only [schwartzBruhatCyclicDifference_apply, Function.comp_def, Equiv.coe_addRight,
+    zpow_add_one, mul_assoc, mul_left_comm γ, sub_self] using hd
+
 include hm hms in
 /-- Paper: Corollary 4.5.3.1(2), pp. 208–209. On ordinary Schwartz–Bruhat
 functions the periodization kernel is exactly the range of the cyclic difference. -/
 theorem schwartzBruhatCyclicPeriodization_ker_eq_range :
-    (P₀).ker = (Δ₀).range := by sorry
+    (P₀).ker = (Δ₀).range := by
+  refine le_antisymm (fun f hf ↦ ?_) (cyclicTail_range_le m γ hγ)
+  have h0 : P₀ f = 0 := hf
+  have hs (x : G) : HasSum (fun n : ℤ ↦ f (γ ^ n * x)) 0 := by
+    have h := schwartzBruhatCyclicPeriodization_hasSum m γ hγ f x
+    rw [h0] at h
+    exact h
+  let g : SchwartzBruhat G := ⟨_, cyclicSchwartzTail_mem γ f hs⟩
+  exact ⟨g, Subtype.ext (funext fun x ↦ (schwartzBruhatCyclicDifference_apply γ g x).trans
+    (cyclic_tail_eq m γ hγ f x))⟩
 
 include hm hms in
 /-- Paper: Corollary 4.5.3.1(2), pp. 208–209. On each ordinary

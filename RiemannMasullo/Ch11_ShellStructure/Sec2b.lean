@@ -311,7 +311,8 @@ theta vector in the local invariant level.
 Deviation: Use the positive local twist of the repaired definition. -/
 theorem sLocalInvariantPWSobolev_mem {a : ℝ} (ha : 0 < a) (ω : PontryaginDual J₁) (Λ : ℝ)
     (f : Zₛ) (_hf : f ∈ band(sLocalPWProductRegion S Λ)) :
-    sLocalPWThetaSobolevMap (F := F) (S := S) (s := s) ha ω f ∈ sLocalInvariantPWSobolev (F := F) (S := S) hs ha ω Λ := by sorry
+    sLocalPWThetaSobolevMap (F := F) (S := S) (s := s) ha ω f ∈ sLocalInvariantPWSobolev (F := F) (S := S) hs ha ω Λ := by
+  exact Submodule.le_topologicalClosure _ (Submodule.subset_span ⟨⟨f, _hf⟩, rfl⟩)
 
 /-- Paper: Definition 11.2.1.3(1) and (11.2.1.7), p. 488.
 The global invariant level completes the weighted homogeneous theta image
@@ -403,7 +404,20 @@ theorem invariantPWCondensation_trace_tendsto (a : ℝ) (ω : PontryaginDual C�
     let T := nuclearRestriction(a, ω, hρ, φ)
     Tendsto (fun Λ ↦ hilbertTrace
       (productTraceClass(T, invariantPWProjection (F := F) (S := S) hs a ω Λ))) atTop
-      (𝓝 (hilbertTrace T)) := by sorry
+      (𝓝 (hilbertTrace T)) := by
+  have limit {H : Type _} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+      (T : nuclearEndomorphisms H) (A : ℝ → nuclearEndomorphisms H)
+      (h : Tendsto (fun r ↦ traceNorm (A r - T)) atTop (𝓝 0)) :
+      Tendsto (fun r ↦ hilbertTrace (A r)) atTop (𝓝 (hilbertTrace T)) := by
+    obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := H)
+    apply tendsto_iff_norm_sub_tendsto_zero.mpr
+    simp only [← htr, ← map_sub]
+    simp only [htr]
+    exact squeeze_zero (fun _ ↦ norm_nonneg _) (fun _ ↦ norm_hilbertTrace_le _) h
+  let T := nuclearRestriction(a, ω, hρ, φ)
+  exact limit (H := ↥(GeoIsotype(ω))) T
+    (fun r ↦ productTraceClass(T, invariantPWProjection (F := F) (S := S) hs a ω r))
+    (invariantPWCondensation_traceNorm_tendsto (F := F) (S := S) hs a ω _hω _hPic φ _hφ hρ)
 
 end Levels
 
@@ -435,13 +449,19 @@ theorem primeOrbitalSobolevQuotient_mk_eq_zero (p : HeightOneSpectrum (𝓞 ℚ)
 Deviation: Use the closed principal-value denominator. -/
 theorem primeOrbitalSobolevQuotient_separable (p : HeightOneSpectrum (𝓞 ℚ))
     {s : ℝ} (hs : 0 ≤ s) (ω : PontryaginDual C₁) :
-    TopologicalSpace.SeparableSpace Q(p, hs, ω) := by sorry
+    TopologicalSpace.SeparableSpace Q(p, hs, ω) := by
+  let : Fact ((2 : ENNReal) ≠ ⊤) := ⟨by norm_num⟩
+  let : SecondCountableTopology W(s) := Lp.SecondCountableTopology
+  exact (N(p, hs, ω)).isQuotientMap_mkQL.separableSpace
 
 /-- Paper: (11.2.2.1), p. 489. The prime quotient is complete in the quotient norm.
 Deviation: Use the closed principal-value denominator. -/
 theorem primeOrbitalSobolevQuotient_complete (p : HeightOneSpectrum (𝓞 ℚ))
     {s : ℝ} (hs : 0 ≤ s) (ω : PontryaginDual C₁) :
-    CompleteSpace Q(p, hs, ω) := by sorry
+    CompleteSpace Q(p, hs, ω) := by
+  let : CompleteSpace ↥(Wω(hs, ω)) :=
+    (instClosedSpectralIsotypeSec2 (F := F) h₀ hs ω).completeSpace_coe
+  exact Submodule.Quotient.completeSpace (N(p, hs, ω))
 
 local notation "P" => adelePolarSubspace F
 local notation "testQuot(" χ ")" =>
@@ -478,12 +498,30 @@ Deviation: Use the closure of the principal-value image. -/
 theorem primeOrbitalSobolevSubmodule_convolution_invariant (φ : BruhatCompactSupport C𝔽) :
     N(p, hs, ω) ≤ ((N(p, hs, ω)).mkQL.comp (Aω(φ))).ker := by sorry
 
+/-- An operator whose composite with the quotient map kills the denominator descends uniquely. -/
+private theorem existsUnique_primeOrbitalSobolevConvolution_lift
+    {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (N : Submodule ℂ E) (A : E →L[ℂ] E)
+    (hN : N ≤ (N.mkQL.comp A).ker) :
+    ∃! C : (E ⧸ N) →L[ℂ] (E ⧸ N),
+      ∀ u : E, C (N.mkQ u) = N.mkQ (A u) := by
+  let C : (E ⧸ N) →L[ℂ] (E ⧸ N) := N.liftQL (N.mkQL.comp A) hN
+  refine ⟨C, fun u ↦ rfl, ?_⟩
+  intro D hD
+  apply ContinuousLinearMap.ext
+  intro q
+  obtain ⟨u, rfl⟩ := N.mkQ_surjective q
+  exact hD u
+
 /-- Paper: (11.2.2.3), p. 490.
 The action on representatives determines a unique continuous linear map on the prime quotient.
 Deviation: Use the closed principal-value denominator. -/
 theorem existsUnique_primeOrbitalSobolevConvolution (φ : BruhatCompactSupport C𝔽) :
     ∃! C : Q(p, hs, ω) →L[ℂ] Q(p, hs, ω), ∀ u : Wω(hs, ω),
-      C ((N(p, hs, ω)).mkQ u) = (N(p, hs, ω)).mkQ (Aω(φ) u) := by sorry
+      C ((N(p, hs, ω)).mkQ u) = (N(p, hs, ω)).mkQ (Aω(φ) u) := by
+  exact existsUnique_primeOrbitalSobolevConvolution_lift
+    (N(p, hs, ω)) (Aω(φ))
+    (primeOrbitalSobolevSubmodule_convolution_invariant (F := F) p hs ω φ)
 
 /-- Paper: (11.2.2.3), p. 490.
 The prime orbital action is the convolution operator descended to the zero-line quotient.
@@ -495,7 +533,8 @@ def primeOrbitalSobolevConvolution (φ : BruhatCompactSupport C𝔽) :=
 The orbital convolution of a quotient class is the class of the representative's convolution. -/
 theorem primeOrbitalSobolevConvolution_mkQ (φ : BruhatCompactSupport C𝔽) (u : Wω(hs, ω)) :
     primeOrbitalSobolevConvolution (F := F) p hs ω φ ((N(p, hs, ω)).mkQ u) =
-      (N(p, hs, ω)).mkQ (Aω(φ) u) := by sorry
+      (N(p, hs, ω)).mkQ (Aω(φ) u) := by
+  exact (existsUnique_primeOrbitalSobolevConvolution (F := F) p hs ω φ).exists.choose_spec u
 
 -- TODO(paper-gap): Corollary 11.2.0.5 bounds the jets but gives no upper
 -- bound on their biorthogonals. The single-prime trace proof needs its own

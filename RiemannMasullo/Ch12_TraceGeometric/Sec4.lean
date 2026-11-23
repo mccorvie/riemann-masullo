@@ -80,12 +80,72 @@ Deviation: The definition gives the scalar pairing of the distributional kernel.
 def sLocalTraceDilationKernel (f : BruhatCompactSupport Iₛ) (b : Aₛ → ℂ) (x : Aₛ) : ℂ :=
   ∫ g : Iₛ, f.val g / (Real.sqrt (normS(g)) : ℂ) * b ((g⁻¹).val * x) ∂μₛ
 
+/-- Continuity of a Bruhat-smooth function follows already from order zero
+(ported from the private `continuous_of_bruhatSmooth` in Ch09 Sec3). -/
+private theorem sLocalTraceDilationKernel_apply_zero_continuous {G : Type*} [CommGroup G]
+    [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    {f : G → ℂ} (hf : IsBruhatSmooth f) : Continuous f := by
+  classical
+  obtain ⟨k, hk, _, hdesc⟩ := hf 0
+  have hkc := hk.isCompact
+  rw [continuous_iff_continuousAt]
+  intro x
+  obtain ⟨U, hU, hU₁⟩ := exists_compact_mem_nhds (1 : G)
+  let K := insert x (U ∪ (k : Set G))
+  let H := Subgroup.closure K
+  have hK : K ⊆ (H : Set G) := Subgroup.subset_closure
+  have hK₁ : K ∈ 𝓝 (1 : G) := mem_of_superset hU₁ (subset_union_left.trans (subset_insert ..))
+  have hH : IsOpen (H : Set G) := H.isOpen_of_mem_nhds (mem_of_superset hK₁ hK)
+  let a : BruhatStructuralPair G :=
+    ⟨(H, OrderDual.toDual k), hH,
+      ⟨Subtype.val ⁻¹' K, continuous_subtype_val.continuousAt.preimage_mem_nhds hK₁,
+        (H.isClosed_of_isOpen hH).isClosedEmbedding_subtypeVal.isCompact_preimage
+          ((hU.union hkc).insert x), Subgroup.closure_preimage_eq_top K⟩,
+      hk, subset_union_right.trans ((subset_insert ..).trans hK)⟩
+  let e := Classical.choice a.elementary
+  obtain ⟨f₀, hval, hsm⟩ := hdesc a rfl
+  let q : EuclideanSpace ℝ (Fin e.torusDim) → (Fin e.torusDim → AddCircle (1 : ℝ)) :=
+    fun t i ↦ (t i : AddCircle (1 : ℝ))
+  have hq : IsOpenQuotientMap q :=
+    (IsOpenQuotientMap.piMap (fun _ ↦ QuotientAddGroup.isOpenQuotientMap_mk)).comp
+      (PiLp.continuousLinearEquiv 2 ℝ (fun _ : Fin e.torusDim ↦ ℝ)).toHomeomorph.isOpenQuotientMap
+  have hmodel : Continuous (fun y : ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor ↦
+      f₀ (e.equiv.symm (Multiplicative.ofAdd y))) := by
+    rw [← (Homeomorph.prodAssoc _ _ _).isOpenQuotientMap.continuous_comp_iff]
+    refine continuous_prod_of_discrete_right.mpr fun zd ↦ ?_
+    rw [← ((IsOpenQuotientMap.id (X := EuclideanSpace ℝ (Fin e.realDim))).prodMap hq).continuous_comp_iff]
+    exact (hsm e zd.1 zd.2).continuous
+  have hf₀ : Continuous f₀ := by
+    simpa only [Function.comp_def, ofAdd_toAdd, ContinuousMulEquiv.symm_apply_apply]
+      using hmodel.comp (show Continuous (fun z : a.quotient ↦ (e.equiv z).toAdd) from e.equiv.continuous)
+  have hcont : Continuous (fun z : H ↦ f (z : G)) :=
+    (hf₀.comp (QuotientGroup.continuous_mk (N := (OrderDual.ofDual a.val.2).comap a.val.1.subtype))).congr hval
+  exact hH.isOpenEmbedding_subtypeVal.continuousAt_iff.mp (hcont.continuousAt (x := ⟨x, hK (mem_insert ..)⟩))
+
 /-- Paper: (12.4.1.5) and (12.4.1.7), p. 516. At the origin each translated
 evaluation is the test value at zero, and the kernel has the corresponding weighted mass. -/
 theorem sLocalTraceDilationKernel_apply_zero (f : BruhatCompactSupport Iₛ) (b : testₛ) :
     Integrable (fun g ↦ f.val g / (Real.sqrt (normS(g)) : ℂ)) μₛ ∧
       sLocalTraceDilationKernel f (fun y ↦ testAt(b, y)) 0 =
-        (∫ g : Iₛ, f.val g / (Real.sqrt (normS(g)) : ℂ) ∂μₛ) * testAt(b, 0) := by sorry
+        (∫ g : Iₛ, f.val g / (Real.sqrt (normS(g)) : ℂ) ∂μₛ) * testAt(b, 0) := by
+  have : BorelSpace Iₛ := sIdeleGroup_borelSpace (F := F) (S := S)
+  have : (sMultiplicativeTamagawaMeasure F S).IsHaarMeasure :=
+    sMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) (S := S)
+  have hc : Continuous f.val := sLocalTraceDilationKernel_apply_zero_continuous
+    ((mem_bruhatSmoothSubmodule_iff _).1 f.property.1)
+  have hn : Continuous fun g : Iₛ ↦ normS(g) := by
+    have h : Continuous fun g : Iₛ ↦ sIdeleQuotientNorm F S (QuotientGroup.mk g) :=
+      (isProperMap_sIdeleQuotientNorm F S).continuous.comp continuous_quot_mk
+    exact NNReal.continuous_coe.comp (Units.continuous_val.comp h)
+  have hpos (g : Iₛ) : 0 < normS(g) := NNReal.coe_pos.mpr (Units.zero_lt (sIdeleNorm F S g))
+  have hsq : Continuous fun g : Iₛ ↦ (Real.sqrt (normS(g)) : ℂ) :=
+    Complex.continuous_ofReal.comp hn.sqrt
+  have hne (g : Iₛ) : (Real.sqrt (normS(g)) : ℂ) ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (Real.sqrt_pos.mpr (hpos g)).ne'
+  have hcs : HasCompactSupport fun g ↦ f.val g / (Real.sqrt (normS(g)) : ℂ) :=
+    HasCompactSupport.mono f.property.2 fun g hg h0 ↦ hg (by simp [h0])
+  refine ⟨(hc.div hsq hne).integrable_of_hasCompactSupport hcs, ?_⟩
+  simp [sLocalTraceDilationKernel, integral_mul_const]
 
 /-- Paper: (12.4.1.5)–(12.4.1.7), p. 516. At each output point the scalar
 pairing with the test defines a continuous linear functional on additive
@@ -111,7 +171,18 @@ theorem realSpatialCutoff_flat_of_eventually_zero (ρ : ℝ → ℝ)
     (_hSmooth : ContDiff ℝ (∞ : ℕ∞ω) ρ) (_hCompact : HasCompactSupport ρ)
     (_hZero : ∀ᶠ x in 𝓝 (0 : ℝ), ρ x = 0) (f : 𝓢(ℝ, ℂ)) :
     ∃ h : 𝓢(ℝ, ℂ), h ∈ realSchwartzFlatAtOrigin ∧
-      ∀ x : ℝ, h x = (ρ x : ℂ) * f x := by sorry
+      ∀ x : ℝ, h x = (ρ x : ℂ) * f x := by
+  have hg : (fun x : ℝ ↦ (ρ x : ℂ)).HasTemperateGrowth :=
+    (_hCompact.comp_left Complex.ofReal_zero).hasTemperateGrowth
+      (Complex.ofRealCLM.contDiff.comp _hSmooth)
+  refine ⟨SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (ρ x : ℂ)) f,
+    (mem_realSchwartzFlatAtOrigin_iff _).2 fun k ↦ ?_, fun x ↦ ?_⟩
+  · have h0 : (SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (ρ x : ℂ)) f : ℝ → ℂ) =ᶠ[𝓝 0]
+        fun _ ↦ 0 :=
+      _hZero.mono fun x hx ↦ by simp [SchwartzMap.smulLeftCLM_apply_apply hg, hx]
+    rw [h0.iteratedDeriv_eq]
+    simp
+  · simp [SchwartzMap.smulLeftCLM_apply_apply hg]
 
 /-- Paper: Step II and (12.4.1.8)–(12.4.1.10), pp. 516–517. The Fourier cutoff
 multiplies the Fourier transform by a symbol, then applies the inverse transform.
@@ -123,7 +194,13 @@ def sLocalTraceFourierCutoff (ρ' : Aₛ → ℂ) (b : testₛ) (x : Aₛ) : ℂ
 /-- Paper: (12.4.1.8), p. 517. The constant-one Fourier symbol recovers the test
 by inversion. -/
 theorem sLocalTraceFourierCutoff_one (b : testₛ) (x : Aₛ) :
-    sLocalTraceFourierCutoff (fun _ ↦ 1) b x = testAt(b, x) := by sorry
+    sLocalTraceFourierCutoff (fun _ ↦ 1) b x = testAt(b, x) := by
+  have h := sLocal_fourier_inversion b (-x)
+  rw [neg_neg] at h
+  unfold sLocalTraceFourierCutoff
+  simp only [one_mul]
+  unfold sAdeleSchwartzFourier at h
+  exact h
 
 /-- Paper: Step II, p. 517. For an integrable symbol the inverse Fourier transform
 of the symbol, evaluated at output minus input, is the Fourier cutoff kernel.

@@ -53,12 +53,125 @@ def Printed.infinite_split_primes_reciprocalEulerProduct_normTwist : Prop :=
         ∀ s : ℂ, reciprocalPartialHeckeEulerProduct χ overₚ(S₀, p) s =
           (1 - (p.asIdeal.absNorm : ℂ) ^ (-s)) ^ Module.finrank ℚ F}.Infinite
 
+private theorem infinite_split_primes_reciprocalEulerProduct_normTwist_char (F : Type*) [Field F] [NumberField F] (x : ℝ) : ∃ χ : PontryaginDual (IdeleClassGroup (𝓞 F) F),
+    ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 F) F)) ((x : ℂ) * Complex.I) := by
+  let c := ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 F) F)) ((x : ℂ) * Complex.I)
+  have hn (g : IdeleClassGroup (𝓞 F) F) : ‖c g‖ = 1 := by
+    change ‖(1 : ℂ) * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ ((x : ℂ) * Complex.I)‖ = 1
+    rw [one_mul, Complex.norm_cpow_eq_rpow_re_of_pos
+      (NNReal.coe_pos.mpr (Units.zero_lt _))]
+    simp
+  let χ : PontryaginDual (IdeleClassGroup (𝓞 F) F) :=
+    { toFun := fun g ↦ ⟨c g, mem_sphere_zero_iff_norm.mpr (hn g)⟩
+      map_one' := Subtype.ext (map_one c)
+      map_mul' := fun a b ↦ Subtype.ext (map_mul c a b)
+      continuous_toFun := c.continuous.subtype_mk _ }
+  refine ⟨χ, ?_⟩
+  ext1 g
+  change c g * _ ^ (0 : ℂ) = c g
+  simp
+
+private theorem infinite_split_primes_reciprocalEulerProduct_normTwist_local (F : Type*) [Field F] [NumberField F] (x : ℝ) (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F))
+    (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 F) F)) ((x : ℂ) * Complex.I))
+    (p : HeightOneSpectrum (𝓞 F)) (hu : (ideleClassNormTwist χ 0).IsUnramifiedAt p) :
+    (ideleClassNormTwist χ 0).localValue p = (p.asIdeal.absNorm : ℂ) ^ (-((x : ℂ) * Complex.I)) := by
+  let val : Valuation (p.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+  obtain ⟨π, hπ⟩ := val.exists_isUniformizer_of_isCyclic_of_nontrivial
+  let u := Units.mk0 (π : p.adicCompletion F) hπ.ne_zero
+  rw [hu.localValue_eq u hπ, HeckeCharacter.restrict, MulChar.ofUnitHom_coe, hχ]
+  change (1 : ℂ) * (((ideleClassNorm F (IdeleClassGroup.ofAdicCompletion (𝓞 F) F p u) : ℝ≥0) : ℝ) : ℂ) ^ ((x : ℂ) * Complex.I) = _
+  rw [one_mul, ideleClassNorm_ofAdicCompletion]
+  change (‖(π : p.adicCompletion F)‖ : ℂ) ^ _ = _
+  have hn : ‖(π : p.adicCompletion F)‖ = (p.asIdeal.absNorm : ℝ)⁻¹ := by
+    have hval : Valued.v (π : p.adicCompletion F) = WithZero.exp (-1 : ℤ) := hπ.trans
+      (congrArg Units.val (Valuation.IsRankOneDiscrete.generator_eq_exp_neg_one_of_surjective
+        (p.valuedAdicCompletion_surjective F)))
+    rw [FinitePlace.norm_def, hval, WithZeroMulInt.toNNReal_neg_apply _ (by simp)]
+    simp
+  rw [hn,
+      Complex.ofReal_inv, Complex.inv_cpow_ofReal_nonneg (Nat.cast_nonneg _) , ← Complex.cpow_neg, Complex.ofReal_natCast]
+
+private theorem infinite_split_primes_reciprocalEulerProduct_normTwist_generic : ∃ x : ℝ, ∀ n : ℕ, 1 < n → (n : ℂ) ^ (-((x : ℂ) * Complex.I)) ≠ 1 := by
+  -- A generic twist avoids even the exceptional prime in the explicit example:
+  -- for each possible norm n > 1, only countably many x give n^(-ix) = 1.
+  let bad : ℕ → Set ℝ := fun n ↦ {x | 1 < n ∧ (n : ℂ) ^ (-((x : ℂ) * Complex.I)) = 1}
+  have hc (n : ℕ) : (bad n).Countable := by
+    by_cases hn : 1 < n
+    · have hn0 : (n : ℂ) ≠ 0 := by exact_mod_cast (show n ≠ 0 by omega)
+      have hlog : Complex.log (n : ℂ) ≠ 0 := by
+        rw [← Complex.natCast_log]
+        apply Complex.ofReal_ne_zero.mpr
+        exact (Real.log_pos (by exact_mod_cast hn)).ne'
+      have hi : Function.Injective (fun x : ℝ ↦ Complex.log (n : ℂ) * (-((x : ℂ) * Complex.I))) := by
+        intro a b h
+        apply Complex.ofReal_injective
+        have h' := mul_left_cancel₀ hlog h
+        have h'' : (a : ℂ) * Complex.I = (b : ℂ) * Complex.I := neg_injective h'
+        exact mul_right_cancel₀ Complex.I_ne_zero h''
+      have he : (Complex.exp ⁻¹' ({1} : Set ℂ)).Countable := (Set.countable_singleton 1).preimage_cexp
+      apply (he.preimage hi).mono
+      intro x hx
+      change Complex.exp (Complex.log (n : ℂ) * (-((x : ℂ) * Complex.I))) = 1
+      exact (Complex.cpow_def_of_ne_zero hn0 _).symm.trans hx.2
+    · have : bad n = ∅ := by ext x; simp [bad, hn]
+      simp [this]
+  have hall := Set.countable_iUnion hc
+  have hne : (⋃ n, bad n) ≠ Set.univ := fun h ↦ Set.not_countable_univ (h ▸ hall)
+  obtain ⟨x, hx⟩ : ∃ x, x ∉ ⋃ n, bad n := by simpa [Set.eq_univ_iff_forall] using hne
+  refine ⟨x, ?_⟩
+  intro n hn he
+  exact hx (Set.mem_iUnion.mpr ⟨n, ⟨hn, he⟩⟩)
+
+open Classical in
+private theorem infinite_split_primes_reciprocalEulerProduct_normTwist_aux (F : Type*) [Field F] [NumberField F]
+    (h : ∀ (χ χ₀ : PontryaginDual (IdeleClassGroup (𝓞 F) F)),
+      IsOfFinOrder χ₀ → ∀ x : ℝ,
+        ideleClassNormTwist χ 0 = ideleClassNormTwist χ₀ ((x : ℂ) * Complex.I) →
+        {p : HeightOneSpectrum (𝓞 ℚ) | ∀ S₀ : Finset (HeightOneSpectrum (𝓞 F)),
+          (∀ v, v.under (𝓞 ℚ) = p → v ∈ S₀) → ∀ s : ℂ,
+          reciprocalPartialHeckeEulerProduct χ (S₀.filter (fun v ↦ v.under (𝓞 ℚ) = p)) s =
+            (1 - (p.asIdeal.absNorm : ℂ) ^ (-s)) ^ Module.finrank ℚ F}.Infinite) : False := by
+  classical
+  obtain ⟨x, hx⟩ := infinite_split_primes_reciprocalEulerProduct_normTwist_generic
+  obtain ⟨χ, hχ⟩ := infinite_split_primes_reciprocalEulerProduct_normTwist_char F x
+  have hi := h χ 1 IsOfFinOrder.one x hχ
+  obtain ⟨p, hp⟩ := hi.nonempty
+  let A : Set (HeightOneSpectrum (𝓞 F)) := {v | v.under (𝓞 ℚ) = p}
+  have hf : A.Finite := by
+    let f : A → p.asIdeal.primesOver (𝓞 F) := fun v ↦ ⟨v.1.asIdeal, v.1.isPrime,
+      ⟨(congrArg HeightOneSpectrum.asIdeal v.2).symm⟩⟩
+    have hfi : Function.Injective f := by
+      intro a b hab
+      exact Subtype.ext (HeightOneSpectrum.ext (congrArg Subtype.val hab))
+    let : Finite A := Finite.of_injective f hfi
+    exact Set.toFinite A
+  let S := hf.toFinset
+  have hs := hp S (fun v hv ↦ hf.mem_toFinset.mpr hv) 0
+  have hd : Module.finrank ℚ F ≠ 0 := (Module.finrank_pos (R := ℚ) (M := F)).ne'
+  simp only [neg_zero, Complex.cpow_zero, sub_self, zero_pow hd] at hs
+  change (∏ v ∈ S.filter (fun v ↦ v.under (𝓞 ℚ) = p), (finiteHeckeEulerFactor χ v 0)⁻¹) = 0 at hs
+  obtain ⟨v, hv, hz⟩ := Finset.prod_eq_zero_iff.mp hs
+  by_cases hu : (ideleClassNormTwist χ 0).IsUnramifiedAt v
+  · rw [finiteHeckeEulerFactor, ite_eq_left hu, inv_inv] at hz
+    simp only [neg_zero, Complex.cpow_zero, mul_one, sub_eq_zero] at hz
+    have he := infinite_split_primes_reciprocalEulerProduct_normTwist_local F x χ hχ v hu
+    exact hx v.asIdeal.absNorm (HeightOneSpectrum.one_lt_absNorm v) (he.symm.trans hz.symm)
+  · simp [finiteHeckeEulerFactor, hu] at hz
+
 /-- Paper: Remark 7.1.3.1, equation (7.1.3.1), p. 324.
 Use ℚ, the trivial finite-order character, and x = 2π/log 2. At s = 0 the
 identity requires p^(-ix) = 1, so the rational prime p is an integral power
 of 2. Only the prime 2 can satisfy the identity. -/
 theorem Printed.infinite_split_primes_reciprocalEulerProduct_normTwist_false :
-    ¬ Printed.infinite_split_primes_reciprocalEulerProduct_normTwist := by sorry
+    ¬ Printed.infinite_split_primes_reciprocalEulerProduct_normTwist := by
+  intro h
+  -- Lift ℚ to the universe quantified over by the printed claim.
+  let : Field (ULift ℚ) := { ULift.ring, ULift.groupWithZero, Equiv.ulift.field with }
+  have : CharZero (ULift ℚ) := ⟨fun a b hab ↦ by simpa using congrArg ULift.down hab⟩
+  have : NumberField (ULift ℚ) :=
+    { to_finiteDimensional := Module.Finite.ulift (R := ℚ) (M := ℚ) }
+  exact infinite_split_primes_reciprocalEulerProduct_normTwist_aux (ULift ℚ) (h (ULift ℚ))
+
 
 open Classical in
 /-- Paper: Theorem 7.1.3.2(2), p. 324.
@@ -190,12 +303,45 @@ def Printed.sLocalPolarMultiplicity_greatest_smaller : Prop :=
       let orders : Set ℕ := {m | 0 < m ∧ ∃ s : ℂ, sLocalPolarMultiplicity f (chart s) = m}
       ∃ M m : ℕ, IsGreatest orders M ∧ IsGreatest (orders ∩ Iio M) m
 
+/-- The S-local Z-function of the zero test is identically zero: the zero function is
+meromorphic in normal form and agrees with the zero integral, and the continuation is unique. -/
+private theorem Printed.sLocalPolarMultiplicity_greatest_smaller_false_zFunction_zero
+    (F : Type u) [Field F] [NumberField F] (S : Finset Places(F)) :
+    sLocalIdelicZFunction (F := F) (S := S) 0 = 0 :=
+  (sLocalIdelicZetaIntegral_exists_continuation (F := F) (S := S) 0).unique
+    (sLocalIdelicZetaIntegral_exists_continuation (F := F) (S := S) 0).exists.choose_spec
+    ⟨fun _ ↦ analyticOnNhd_const.meromorphicNFOn, fun c _ ↦ by
+      simp only [Pi.zero_apply, sLocalIdelicZetaIntegral]
+      exact (integral_eq_zero_of_ae (Eventually.of_forall fun _ ↦ zero_mul _)).symm⟩
+
+/-- The zero test has polar multiplicity zero at every quasi-character. -/
+private theorem Printed.sLocalPolarMultiplicity_greatest_smaller_false_zero
+    (F : Type u) [Field F] [NumberField F] (S : Finset Places(F))
+    (c : QuasiCharacter Jₛ(F, S)) :
+    sLocalPolarMultiplicity (0 : SchwartzBruhat (Multiplicative (SAdeleRing F S))) c = 0 := by
+  rw [sLocalPolarMultiplicity_eq_zero_iff]
+  refine le_top.trans_eq (meromorphicOrderAt_eq_top_iff.mpr (Eventually.of_forall fun z ↦ ?_)).symm
+  rw [Printed.sLocalPolarMultiplicity_greatest_smaller_false_zFunction_zero F S]
+  rfl
+
 /-- Paper: Corollary 7.1.3.3, p. 326.
 Use ℚ with only the real place, the trivial character and the zero test, for which
 the set of pole orders is empty. The Gaussian `exp(-πx²)` gives a second example:
 Γℝ(s) has only simple poles, so there is no positive order below one. -/
 theorem Printed.sLocalPolarMultiplicity_greatest_smaller_false :
-    ¬ Printed.sLocalPolarMultiplicity_greatest_smaller := by sorry
+    ¬ Printed.sLocalPolarMultiplicity_greatest_smaller := by
+  intro h
+  have : CharZero (ULift ℚ) := ⟨fun a b hab ↦ by simpa using congrArg ULift.down hab⟩
+  have : NumberField (ULift ℚ) := ⟨⟩
+  have hd : Module.finrank ℚ (ULift ℚ) = 1 := by simp
+  have hcard : Fintype.card (InfinitePlace (ULift ℚ)) = 1 := by
+    rw [InfinitePlace.card_eq_nrRealPlaces_add_nrComplexPlaces,
+      InfinitePlace.nrRealPlaces_eq_one_of_finrank_eq_one hd,
+      InfinitePlace.nrComplexPlaces_eq_zero_of_finrank_eq_one hd]
+  obtain ⟨M, m, hM, -⟩ := h (ULift ℚ) ∅ hcard 1 0
+  obtain ⟨hpos, s, hs⟩ := hM.1
+  rw [Printed.sLocalPolarMultiplicity_greatest_smaller_false_zero] at hs
+  omega
 
 /-- Paper: Theorem 7.1.4.2(1), equation (7.1.4.2), p. 326.
 As printed: The strong annihilator of the regularized completed Hecke ideal is linearly
@@ -335,7 +481,19 @@ At the origin the regularized completed zeta is nonzero, and each prime block
 contributes the same value functional. Their difference vanishes under the jet
 identification, and the first derivative at the resulting double zero is missing. -/
 theorem Printed.orbitalAnnihilator_prime_products_false :
-    ¬ Printed.orbitalAnnihilator_prime_products := by sorry
+    ¬ Printed.orbitalAnnihilator_prime_products := by
+  intro h
+  apply Printed.spectralAnnihilator_product_false
+  intro F _ _ χ τ hτ L hL hEq
+  let P := {p : RatPrimes // ∃ v ∈ (∅ : Finset Places(F)),
+    HeightOneSpectrum.under (𝓞 ℚ) v = p}
+  let A := ∀ p : P, ↥(Printed.orbitalPrimeJetSpace χ ∅ p.val)
+  let B := ∀ ρ : Zeros(L), ↥(Jet(L, ρ.val))
+  have : IsEmpty P := ⟨fun p => by obtain ⟨v, hv, _⟩ := p.property; simp at hv⟩
+  let : Unique A := { default := 0, uniq := fun a => Subsingleton.elim _ _ }
+  obtain ⟨e⟩ := h F χ ∅ τ hτ L hL hEq
+  rw [orbitalHeckeGenerator_empty] at e
+  exact ⟨(ContinuousLinearEquiv.uniqueProd ℂ B A).symm.trans e⟩
 
 /-- Paper: Theorem 7.1.4.3(1), equation (7.1.4.24), p. 331.
 As printed: The space of all jets associated with a rational prime block is

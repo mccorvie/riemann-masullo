@@ -27,7 +27,27 @@ def Printed.sLocalSpatialCutoff_realFlatRange : Prop :=
 a smooth even cutoff equal to one on [−1,1], and the Gaussian exp(−x²).
 The product has value one at zero, so it fails even the zeroth flatness condition. -/
 theorem Printed.sLocalSpatialCutoff_realFlatRange_false :
-    ¬ Printed.sLocalSpatialCutoff_realFlatRange := by sorry
+    ¬ Printed.sLocalSpatialCutoff_realFlatRange := by
+  intro hall
+  let B : ContDiffBump (0 : ℝ) := ⟨1, 2, by norm_num, by norm_num⟩
+  let f : 𝓢(ℝ, ℂ) := (B.hasCompactSupport.comp_left Complex.ofReal_zero).toSchwartzMap
+    (Complex.ofRealCLM.contDiff.comp B.contDiff)
+  have hout : tsupport B ⊆ Icc (-2 : ℝ) 2 := by
+    rw [B.tsupport_eq, Real.closedBall_eq_Icc]
+    simp [B]
+  have hin : EqOn (B : ℝ → ℝ) 1 (Icc (-(2 - 1)) (2 - 1)) := by
+    intro x hx
+    apply B.one_of_mem_closedBall
+    rw [Real.closedBall_eq_Icc]
+    change 0 - 1 ≤ x ∧ x ≤ 0 + 1
+    obtain ⟨hl, hr⟩ := hx
+    constructor <;> linarith
+  obtain ⟨g, hg, he⟩ := hall 2 1 (by norm_num) (by norm_num) B B.contDiff B.neg
+    (fun _ ↦ ⟨B.nonneg, B.le_one⟩) hout hin f
+  have h0 := (mem_realSchwartzFlatAtOrigin_iff g).mp hg 0
+  have hb : B 0 = 1 := B.one_of_mem_closedBall (Metric.mem_closedBall_self B.rIn_pos.le)
+  have hf : f 0 = 1 := by change (B 0 : ℂ) = 1; rw [hb, Complex.ofReal_one]
+  simp [iteratedDeriv_zero, he 0, hb, hf] at h0
 
 local notation "adelicModel" => Multiplicative (ℝ × ℚ_[2])
 

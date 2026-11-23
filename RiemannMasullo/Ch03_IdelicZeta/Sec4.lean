@@ -5846,49 +5846,265 @@ theorem infiniteEigendistribution_eq_zero_of_gaussian (w : InfinitePlace F)
     (hG : T (infiniteStandardGaussian w χ) = 0) : T = 0 := by
   exact infiniteEigendistribution_eq_zero_of_gaussian_proof w χ s T hT hG
 
-private theorem infiniteLocalEulerFactor_inv_differentiable (w : InfinitePlace F)
-    (χ : PontryaginDual w.Completionˣ) :
-    Differentiable ℂ (fun s ↦ (infiniteLocalEulerFactor w
-      (quasiCharacterNormTwist (infiniteNorm(w)) (continuous_infiniteLocalModule w)
-        ((circleToComplex).comp χ) s))⁻¹) := by
-  by_cases hw : w.IsReal
-  · obtain ⟨t, a, -, hbase⟩ := realPlaceUnitary_shape w hw χ
-    have he (s : ℂ) : (infiniteLocalEulerFactor w (quasiCharacterNormTwist (infiniteNorm(w))
-        (continuous_infiniteLocalModule w) ((circleToComplex).comp χ) s))⁻¹ =
-        (Complex.Gammaℝ (s + t + (a.val : ℂ)))⁻¹ :=
-      congrArg Inv.inv (realEuler_of_shape w hw _ (s + t) a (realChart_shape w hw χ t a hbase s)).1
-    rw [funext he]
-    exact Complex.differentiable_Gammaℝ_inv.comp (by fun_prop)
-  · have hc := InfinitePlace.not_isReal_iff_isComplex.mp hw
-    obtain ⟨t, r, -, hbase⟩ := complexPlaceUnitary_shape w hc χ
-    have he (s : ℂ) : (infiniteLocalEulerFactor w (quasiCharacterNormTwist (infiniteNorm(w))
-        (continuous_infiniteLocalModule w) ((circleToComplex).comp χ) s))⁻¹ =
-        2 * (Complex.Gammaℂ (s + t + (r.natAbs : ℂ) / 2))⁻¹ := by
-      rw [(complexEuler_of_shape w hc _ (s + t) r (complexChart_shape w hc χ t r hbase s)).1,
-        inv_div, div_eq_mul_inv, mul_comm]
-    rw [funext he]
-    exact (Complex.differentiable_Gammaℂ_inv.comp (by fun_prop)).const_mul 2
+/-- Abstract form of the entire family: a meromorphic family of distributions whose scalar
+poles are at most simple and lie in the zero set of an entire function `h` becomes entire after
+multiplication by `h`, and the product is a family of continuous functionals by
+`distribution_of_local_clearings`. -/
+private theorem infiniteEigendistribution_entire_family_assembly {E : Type*} [AddCommGroup E]
+    [Module ℂ E] [UniformSpace E] [IsUniformAddGroup E] [ContinuousSMul ℂ E] [BarrelledSpace ℂ E]
+    (hol : ∀ {U : Set ℂ}, IsOpen U → ∀ Z : ℂ → StrongDual ℂ E,
+      (∀ f, DifferentiableOn ℂ (fun z ↦ Z z f) U) → VectorHolomorphicOn Z U)
+    (Zc : E → ℂ → ℂ) (hNF : ∀ f, MeromorphicNFOn (Zc f) univ)
+    (D : ℂ → StrongDual ℂ E) (P : Set ℂ) (hD : IsVectorMeromorphicOn D univ P)
+    (hDZ : ∀ s ∉ P, ∀ f, D s f = Zc f s)
+    (h L : ℂ → ℂ) (hh : AnalyticOnNhd ℂ h univ) (hh0 : ∃ s, h s ≠ 0)
+    (hL : ∀ s, h s ≠ 0 → L s * h s = 1)
+    (h1 : ∀ f s, (-1 : WithTop ℤ) ≤ meromorphicOrderAt (Zc f) s)
+    (h2 : ∀ f s, meromorphicOrderAt (Zc f) s < 0 → h s = 0) :
+    ∃ Ent : ℂ → StrongDual ℂ E, (∀ f, AnalyticOnNhd ℂ (fun s ↦ Ent s f) univ) ∧
+      ∀ᶠ s : ℂ in codiscrete ℂ, ∀ f, Zc f s = L s * Ent s f := by
+  classical
+  obtain ⟨-, -, hopen, hhol, hloc⟩ := hD
+  let ev (f : E) : StrongDual ℂ E →L[ℂ] ℂ :=
+    ⟨⟨⟨fun T ↦ T f, fun _ _ ↦ rfl⟩, fun _ _ ↦ rfl⟩, continuous_eval_const f⟩
+  have hev (G : ℂ → StrongDual ℂ E) (U : Set ℂ) (hV : IsOpen U) (hG : VectorHolomorphicOn G U)
+      (f : E) (t : ℂ) (ht : t ∈ U) : AnalyticAt ℂ (fun z ↦ G z f) t := by
+    have hd : DifferentiableOn ℂ (fun z ↦ G z f) U := fun z hz ↦ by
+      have hGz := ((hG z hz).differentiableAt (hV.mem_nhds hz)).hasFDerivAt
+      have hj : HasFDerivAt ((ev f) ∘ G) ((ev f).comp (fderiv ℂ G z)) z := by
+        apply HasFDerivAt.of_isLittleOTVS
+        simpa only [Function.comp_def, ContinuousLinearMap.comp_apply, map_sub]
+          using (ev f).isBigOTVS_comp.trans_isLittleOTVS hGz.isLittleOTVS
+      exact hj.differentiableAt.differentiableWithinAt
+    exact hd.analyticAt (hV.mem_nhds ht)
+  have hmer (f : E) : MeromorphicOn (h * Zc f) univ := fun s _ ↦
+    (hh s trivial).meromorphicAt.mul ((hNF f).meromorphicOn s trivial)
+  have hord (f : E) (s : ℂ) : 0 ≤ meromorphicOrderAt (h * Zc f) s := by
+    rw [meromorphicOrderAt_mul (hh s trivial).meromorphicAt ((hNF f).meromorphicOn s trivial)]
+    by_cases hz : meromorphicOrderAt (Zc f) s < 0
+    · have hs0 := h2 f s hz
+      have hz1 : meromorphicOrderAt (Zc f) s = -1 := by
+        refine le_antisymm ?_ (h1 f s)
+        revert hz
+        induction meromorphicOrderAt (Zc f) s with
+        | top => simp
+        | coe m =>
+          intro hm
+          have : m < 0 := by exact_mod_cast hm
+          show (m : WithTop ℤ) ≤ ((-1 : ℤ) : WithTop ℤ)
+          exact WithTop.coe_le_coe.mpr (by omega)
+      have ha : analyticOrderAt h s ≠ 0 := by
+        rw [Ne, (hh s trivial).analyticOrderAt_eq_zero, not_not]
+        exact hs0
+      rw [hz1, (hh s trivial).meromorphicOrderAt_eq]
+      revert ha
+      induction analyticOrderAt h s with
+      | top => simp
+      | coe n =>
+        intro hn
+        have hn' : n ≠ 0 := fun h0 ↦ hn (by simp [h0])
+        simp only [ENat.map_natCast]
+        show ((0 : ℤ) : WithTop ℤ) ≤ ((n : ℤ) : WithTop ℤ) + ((-1 : ℤ) : WithTop ℤ)
+        rw [← WithTop.coe_add]
+        exact WithTop.coe_le_coe.mpr (by omega)
+    · push Not at hz
+      exact add_nonneg (hh s trivial).meromorphicOrderAt_nonneg hz
+  let T (f : E) : ℂ → ℂ := toMeromorphicNFOn (h * Zc f) univ
+  have hTnf (f : E) : MeromorphicNFOn (T f) univ := meromorphicNFOn_toMeromorphicNFOn _ _
+  have hTan (f : E) (s : ℂ) : AnalyticAt ℂ (T f) s := by
+    apply (hTnf f (mem_univ s)).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+    rw [meromorphicOrderAt_toMeromorphicNFOn (hmer f) (mem_univ s)]
+    exact hord f s
+  have hTeq (f : E) (t : ℂ) : T f =ᶠ[𝓝[≠] t] (h * Zc f) :=
+    (hmer f).toMeromorphicNFOn_eq_self_on_nhdsNE (mem_univ t)
+  have hclear : ∀ s : ℂ, ∃ (n : ℕ) (U : Set ℂ) (A : ℂ → StrongDual ℂ E),
+      IsOpen U ∧ s ∈ U ∧ ∀ f t, t ∈ U → AnalyticAt ℂ (fun z ↦ A z f) t ∧
+        (fun z ↦ (z - s) ^ n * T f z) =ᶠ[𝓝[≠] t] fun z ↦ A z f := by
+    intro s
+    by_cases hs : s ∈ P
+    · obtain ⟨n, r, g, hr, hsub, hg, hgeq⟩ := hloc s hs
+      refine ⟨n, Metric.ball s r, fun z ↦ h z • g z, Metric.isOpen_ball, Metric.mem_ball_self hr,
+        fun f t ht ↦ ⟨(hh t trivial).mul (hev g _ Metric.isOpen_ball hg f t ht), ?_⟩⟩
+      have hball : ∀ᶠ z in 𝓝[≠] t, z ∈ Metric.ball s r :=
+        eventually_nhdsWithin_of_eventually_nhds (Metric.isOpen_ball.mem_nhds ht)
+      have hne : ∀ᶠ z in 𝓝[≠] t, z ≠ s := by
+        by_cases hts : t = s
+        · subst hts
+          exact self_mem_nhdsWithin
+        · exact eventually_nhdsWithin_of_eventually_nhds (isOpen_ne.mem_nhds hts)
+      filter_upwards [hTeq f t, hball, hne] with z hz hzb hzs
+      have hzP : z ∈ univ \ P := hsub ⟨hzb, hzs⟩
+      have hgz : g z f = (z - s) ^ n * Zc f z := by
+        rw [hgeq ⟨hzb, hzs⟩]
+        change (z - s) ^ n * D z f = _
+        rw [hDZ z hzP.2]
+      change (z - s) ^ n * T f z = h z * g z f
+      rw [hz, hgz, Pi.mul_apply]
+      ring
+    · refine ⟨0, univ \ P, fun z ↦ h z • D z, hopen, ⟨mem_univ s, hs⟩,
+        fun f t ht ↦ ⟨(hh t trivial).mul (hev D _ hopen hhol f t ht), ?_⟩⟩
+      filter_upwards [hTeq f t, eventually_nhdsWithin_of_eventually_nhds (hopen.mem_nhds ht)]
+        with z hz hzP
+      change (z - s) ^ 0 * T f z = h z * D z f
+      rw [hz, hDZ z hzP.2, pow_zero, one_mul, Pi.mul_apply]
+  obtain ⟨Ent, -, hEnt⟩ := distribution_of_local_clearings hol T hTnf hclear
+  have hEntT (f : E) (s : ℂ) : Ent s f = T f s := by
+    refine hEnt s ?_ f
+    rintro ⟨g, hg⟩
+    have := hord g s
+    rw [← meromorphicOrderAt_toMeromorphicNFOn (hmer g) (mem_univ s)] at this
+    exact absurd hg (not_lt.mpr this)
+  refine ⟨Ent, fun f s _ ↦ (hTan f s).congr (Eventually.of_forall fun z ↦ (hEntT f z).symm), ?_⟩
+  obtain ⟨s₀, hs₀⟩ := hh0
+  have hcod : ∀ᶠ s in codiscrete ℂ, h s ≠ 0 :=
+    (hh.eqOn_zero_or_eventually_ne_zero_of_preconnected isPreconnected_univ).resolve_left
+      fun h0 ↦ hs₀ (h0 (mem_univ s₀))
+  filter_upwards [hcod] with s hs f
+  have hZs : AnalyticAt ℂ (Zc f) s := by
+    apply (hNF f (mem_univ s)).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+    exact not_lt.mp fun hlt ↦ hs (h2 f s hlt)
+  have hprod : AnalyticAt ℂ (h * Zc f) s := (hh s trivial).mul hZs
+  have hval : T f s = h s * Zc f s := by
+    have he := ((hTan f s).meromorphicNFAt.eventuallyEq_nhdsNE_iff_eventuallyEq_nhds
+      hprod.meromorphicNFAt).mp (hTeq f s)
+    exact he.eq_of_nhds
+  rw [hEntT, hval, ← mul_assoc, hL s hs, one_mul]
 
-private theorem infiniteLocalEulerFactor_ne_zero_of_re_pos (w : InfinitePlace F)
-    (χ : PontryaginDual w.Completionˣ) {s : ℂ} (hs : 0 < s.re) :
-    infiniteLocalEulerFactor w (quasiCharacterNormTwist (infiniteNorm(w))
-      (continuous_infiniteLocalModule w) ((circleToComplex).comp χ) s) ≠ 0 := by
-  by_cases hw : w.IsReal
-  · obtain ⟨t, a, ht, hbase⟩ := realPlaceUnitary_shape w hw χ
-    rw [(realEuler_of_shape w hw _ (s + t) a (realChart_shape w hw χ t a hbase s)).1]
-    apply Complex.Gammaℝ_ne_zero_of_re_pos
-    simp only [Complex.add_re, Complex.natCast_re, ht, add_zero]
-    positivity
-  · have hc := InfinitePlace.not_isReal_iff_isComplex.mp hw
-    obtain ⟨t, r, ht, hbase⟩ := complexPlaceUnitary_shape w hc χ
-    rw [(complexEuler_of_shape w hc _ (s + t) r (complexChart_shape w hc χ t r hbase s)).1]
-    refine div_ne_zero ?_ two_ne_zero
-    rw [← Complex.Gammaℝ_mul_Gammaℝ_add_one]
-    have hre : 0 < (s + t + (r.natAbs : ℂ) / 2).re := by
-      simp only [Complex.add_re, Complex.div_ofNat_re, Complex.natCast_re, ht, add_zero]
-      positivity
-    exact mul_ne_zero (Complex.Gammaℝ_ne_zero_of_re_pos hre)
-      (Complex.Gammaℝ_ne_zero_of_re_pos (by simpa only [Complex.add_re, Complex.one_re] using add_pos hre zero_lt_one))
+/-- Moving a purely imaginary exponent `t` from the chart parameter into the unitary
+character: the chart of `χ` at `s` is the chart of another unitary character at `s + t`. -/
+private theorem infiniteEigendistribution_entire_family_shift (w : InfinitePlace F)
+    (χ : PontryaginDual w.Completionˣ) (t : ℂ) (ht : t.re = 0) :
+    ∃ χ₀ : PontryaginDual w.Completionˣ,
+      (∀ g, (χ₀ g : ℂ) = quasiCharacterNormTwist (infiniteNorm(w)) (continuous_infiniteLocalModule w)
+        ((circleToComplex).comp χ) (-t) g) ∧
+      ∀ s, quasiCharacterNormTwist (infiniteNorm(w)) (continuous_infiniteLocalModule w)
+          ((circleToComplex).comp χ) s =
+        quasiCharacterNormTwist (infiniteNorm(w)) (continuous_infiniteLocalModule w)
+          ((circleToComplex).comp χ₀) (s + t) := by
+  let d := quasiCharacterNormTwist (infiniteNorm(w)) (continuous_infiniteLocalModule w)
+    ((circleToComplex).comp χ) (-t)
+  have hN (g : w.Completionˣ) : (0 : ℝ) < (((infiniteNorm(w) g : ℝ≥0) : ℝ)) :=
+    NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr (Units.ne_zero _))
+  have hd (g : w.Completionˣ) : ‖d g‖ = 1 := by
+    change ‖(χ g : ℂ) * ((((infiniteNorm(w) g : ℝ≥0) : ℝ) : ℂ)) ^ (-t)‖ = 1
+    rw [norm_mul, Circle.norm_coe, one_mul, Complex.norm_cpow_eq_rpow_re_of_pos (hN g),
+      Complex.neg_re, ht, neg_zero, Real.rpow_zero]
+  let χ₀ : PontryaginDual w.Completionˣ :=
+    { toFun := fun g ↦ ⟨d g, mem_sphere_zero_iff_norm.mpr (hd g)⟩
+      map_one' := Subtype.ext d.map_one
+      map_mul' x y := Subtype.ext (d.map_mul x y)
+      continuous_toFun := d.continuous.subtype_mk _ }
+  refine ⟨χ₀, fun g ↦ rfl, fun s ↦ ContinuousMonoidHom.ext fun g ↦ ?_⟩
+  have hN0 : ((((infiniteNorm(w) g : ℝ≥0) : ℝ) : ℂ)) ≠ 0 := Complex.ofReal_ne_zero.mpr (hN g).ne'
+  change (χ g : ℂ) * ((((infiniteNorm(w) g : ℝ≥0) : ℝ) : ℂ)) ^ s =
+    ((χ g : ℂ) * ((((infiniteNorm(w) g : ℝ≥0) : ℝ) : ℂ)) ^ (-t)) *
+      ((((infiniteNorm(w) g : ℝ≥0) : ℝ) : ℂ)) ^ (s + t)
+  rw [mul_assoc, ← Complex.cpow_add _ _ hN0, neg_add_cancel_comm_assoc]
+
+/-- An extended integer that is at least `-1` and negative is `-1`. -/
+private theorem infiniteEigendistribution_entire_family_neg_one {x : WithTop ℤ}
+    (h1 : (-1 : WithTop ℤ) ≤ x) (h2 : x < 0) : x = -1 := by
+  refine le_antisymm ?_ h1
+  revert h2
+  induction x with
+  | top => simp
+  | coe m =>
+    intro hm
+    have : m < 0 := by exact_mod_cast hm
+    show (m : WithTop ℤ) ≤ ((-1 : ℤ) : WithTop ℤ)
+    exact WithTop.coe_le_coe.mpr (by omega)
+
+/-- At a real place: the reciprocal Euler factor is entire and not identically zero, the
+zeta function has at most simple poles, and they lie among the zeros of the reciprocal Euler
+factor. -/
+private theorem infiniteEigendistribution_entire_family_real (w : InfinitePlace F)
+    (hw : w.IsReal) (χ : PontryaginDual w.Completionˣ) :
+    let twist := quasiCharacterNormTwist (infiniteNorm(w)) (continuous_infiniteLocalModule w)
+      ((circleToComplex).comp χ)
+    AnalyticOnNhd ℂ (fun s ↦ (infiniteLocalEulerFactor w (twist s))⁻¹) univ ∧
+      (∃ s, (infiniteLocalEulerFactor w (twist s))⁻¹ ≠ 0) ∧
+      (∀ f s, (-1 : WithTop ℤ) ≤ meromorphicOrderAt (infiniteLocalIdelicZFunction w f ∘ twist) s) ∧
+      (∀ f s, meromorphicOrderAt (infiniteLocalIdelicZFunction w f ∘ twist) s < 0 →
+        (infiniteLocalEulerFactor w (twist s))⁻¹ = 0) := by
+  intro twist
+  obtain ⟨t, a, ht, hχ⟩ := realPlaceUnitary_shape w hw χ
+  obtain ⟨χ₀, hg₀, hχ₀⟩ := infiniteEigendistribution_entire_family_shift w χ t ht
+  have hs0 := realChart_shape w hw χ t a hχ (-t)
+  simp only [neg_add_cancel] at hs0
+  have hL (s : ℂ) : infiniteLocalEulerFactor w (twist s) = Complex.Gammaℝ (s + t + (a.val : ℂ)) := by
+    have hp := (realLocalEulerParameters w hw (twist s)).unique
+      (realLocalEulerParameters w hw (twist s)).exists.choose_spec (y₂ := (s + t, a))
+      (realChart_shape w hw χ t a hχ s)
+    simp only [infiniteLocalEulerFactor, hw, dite_true]
+    rw [hp]
+  have hcomp (f : ℬ(w.Completion)) : infiniteLocalIdelicZFunction w f ∘ twist =
+      (infiniteLocalIdelicZFunction w f ∘ quasiCharacterNormTwist (infiniteNorm(w))
+        (continuous_infiniteLocalModule w) ((circleToComplex).comp χ₀)) ∘ (· + t) :=
+    funext fun s ↦ congrArg (infiniteLocalIdelicZFunction w f) (hχ₀ s)
+  refine ⟨fun s _ ↦ ?_, ⟨1 - t - (a.val : ℂ), ?_⟩, fun f s ↦ ?_, fun f s hlt ↦ ?_⟩
+  · simp only [hL]
+    exact (Complex.differentiable_Gammaℝ_inv.comp
+      ((differentiable_id.add_const t).add_const _)).analyticAt s
+  · rw [hL, show 1 - t - (a.val : ℂ) + t + (a.val : ℂ) = 1 by ring]
+    exact inv_ne_zero (Complex.Gammaℝ_ne_zero_of_re_pos (by norm_num))
+  · rw [hcomp, meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt]
+    exact (infiniteLocalIdelicZFunction_real_poles w hw χ₀ a (fun x ↦ (hg₀ _).trans (hs0 x)) (s + t)).1 f
+  · rw [hcomp, meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt] at hlt
+    have hP := infiniteLocalIdelicZFunction_real_poles w hw χ₀ a (fun x ↦ (hg₀ _).trans (hs0 x)) (s + t)
+    obtain ⟨k, hk⟩ := hP.2.mp
+      ⟨f, infiniteEigendistribution_entire_family_neg_one (hP.1 f) hlt⟩
+    rw [hL, inv_eq_zero, Complex.Gammaℝ_eq_zero_iff]
+    refine ⟨k, ?_⟩
+    push_cast at hk
+    linear_combination hk
+
+/-- At a complex place: the reciprocal Euler factor is entire and not identically zero, the
+zeta function has at most simple poles, and they lie among the zeros of the reciprocal Euler
+factor. -/
+private theorem infiniteEigendistribution_entire_family_complex (w : InfinitePlace F)
+    (hw : w.IsComplex) (χ : PontryaginDual w.Completionˣ) :
+    let twist := quasiCharacterNormTwist (infiniteNorm(w)) (continuous_infiniteLocalModule w)
+      ((circleToComplex).comp χ)
+    AnalyticOnNhd ℂ (fun s ↦ (infiniteLocalEulerFactor w (twist s))⁻¹) univ ∧
+      (∃ s, (infiniteLocalEulerFactor w (twist s))⁻¹ ≠ 0) ∧
+      (∀ f s, (-1 : WithTop ℤ) ≤ meromorphicOrderAt (infiniteLocalIdelicZFunction w f ∘ twist) s) ∧
+      (∀ f s, meromorphicOrderAt (infiniteLocalIdelicZFunction w f ∘ twist) s < 0 →
+        (infiniteLocalEulerFactor w (twist s))⁻¹ = 0) := by
+  intro twist
+  have hnr : ¬ w.IsReal := InfinitePlace.not_isReal_iff_isComplex.mpr hw
+  obtain ⟨t, r, ht, hχ⟩ := complexPlaceUnitary_shape w hw χ
+  obtain ⟨χ₀, hg₀, hχ₀⟩ := infiniteEigendistribution_entire_family_shift w χ t ht
+  have hs0 := complexChart_shape w hw χ t r hχ (-t)
+  simp only [neg_add_cancel] at hs0
+  have hL (s : ℂ) : infiniteLocalEulerFactor w (twist s) =
+      Complex.Gammaℂ (s + t + (r.natAbs : ℂ) / 2) / 2 := by
+    have hp := (complexLocalEulerParameters w hw (twist s)).unique
+      (complexLocalEulerParameters w hw (twist s)).exists.choose_spec (y₂ := (s + t, r))
+      (complexChart_shape w hw χ t r hχ s)
+    simp only [infiniteLocalEulerFactor, hnr, dite_false]
+    rw [hp]
+  have hcomp (f : ℬ(w.Completion)) : infiniteLocalIdelicZFunction w f ∘ twist =
+      (infiniteLocalIdelicZFunction w f ∘ quasiCharacterNormTwist (infiniteNorm(w))
+        (continuous_infiniteLocalModule w) ((circleToComplex).comp χ₀)) ∘ (· + t) :=
+    funext fun s ↦ congrArg (infiniteLocalIdelicZFunction w f) (hχ₀ s)
+  refine ⟨fun s _ ↦ ?_, ⟨1 - t - (r.natAbs : ℂ) / 2, ?_⟩, fun f s ↦ ?_, fun f s hlt ↦ ?_⟩
+  · simp only [hL, inv_div]
+    exact ((Complex.differentiable_Gammaℂ_inv.comp
+      ((differentiable_id.add_const t).add_const _)).const_mul (2 : ℂ)).analyticAt s
+  · rw [hL, show 1 - t - (r.natAbs : ℂ) / 2 + t + (r.natAbs : ℂ) / 2 = 1 by ring]
+    refine inv_ne_zero (div_ne_zero ?_ two_ne_zero)
+    have hpi : (2 * (Real.pi : ℂ)) ≠ 0 :=
+      mul_ne_zero two_ne_zero (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero)
+    simp [Complex.Gammaℂ_def, hpi]
+  · rw [hcomp, meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt]
+    exact (infiniteLocalIdelicZFunction_complex_poles w hw χ₀ r (fun x ↦ (hg₀ _).trans (hs0 x)) (s + t)).1 f
+  · rw [hcomp, meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt] at hlt
+    have hP := infiniteLocalIdelicZFunction_complex_poles w hw χ₀ r (fun x ↦ (hg₀ _).trans (hs0 x)) (s + t)
+    obtain ⟨m, hm⟩ := hP.2.mp
+      ⟨f, infiniteEigendistribution_entire_family_neg_one (hP.1 f) hlt⟩
+    rw [hL, show s + t + (r.natAbs : ℂ) / 2 = -(m : ℂ) by linear_combination hm,
+      Complex.Gammaℂ_def, Complex.Gamma_neg_nat_eq_zero]
+    simp
 
 /-- Paper: Theorem 3.4.3.3(1), (3.4.3.13), p. 153, with Lemma 3.3.2.1, p. 138. At an
 infinite place the quotient of the local zeta function by the local Euler factor extends to an
@@ -5903,163 +6119,222 @@ theorem infiniteEigendistribution_entire_family (w : InfinitePlace F)
       ∀ᶠ s : ℂ in codiscrete ℂ, ∀ f : ℬ(w.Completion),
         infiniteLocalIdelicZFunction w f (twist s) = infiniteLocalEulerFactor w (twist s) * E s f := by
   intro twist
-  let : MeasurableSpace w.Completion := borel _
-  let : BorelSpace w.Completion := ⟨rfl⟩
-  let : BorelSpace w.Completionˣ := borelSpace_units_of_continuousInv₀ _
-  let : SecondCountableTopology w.Completion :=
-    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
-  let : LocallyCompactSpace w.Completionˣ :=
-    (IsOpenUnits.isOpenEmbedding_unitsVal (M := w.Completion)).locallyCompactSpace
-  let : (infiniteLocalAdditiveTamagawaMeasure F w).IsAddHaarMeasure :=
-    infiniteLocalAdditiveTamagawaMeasure_haar F w
-  let : (infiniteLocalMultiplicativeTamagawaMeasure F w).IsHaarMeasure :=
-    infiniteLocalMultiplicativeTamagawaMeasure_haar F w
-  let twist' := quasiCharacterNormTwist (infiniteNorm(w)) (continuous_infiniteLocalModule w)
-    ((circleToComplex).comp χ⁻¹)
-  obtain ⟨FT, hFT⟩ := exists_localSchwartzFourierMap (infiniteLocalAdditiveTamagawaMeasure F w)
-    (fun x ↦ adeleStandardCharacter F (@Pi.single _ _ _ (Classical.decEq _) w x, 0))
-    (infiniteLocalAdditiveTamagawaMeasure_selfDual w)
-  obtain ⟨I, hI⟩ := exists_localIntegralFamily (infiniteNorm(w)) (continuous_infiniteLocalModule w)
-    (infiniteLocalMultiplicativeTamagawaMeasure F w)
-    (fun f η z hz ↦ infiniteLocalIdelicZetaIntegral_integrable w f η hz)
-  let L (s : ℂ) := infiniteLocalEulerFactor w (twist s)
-  let L' (s : ℂ) := infiniteLocalEulerFactor w (twist' s)
-  let ε (s : ℂ) := infiniteLocalEpsilonFactor w (twist s)
-  let E_plus (s : ℂ) : StrongDual ℂ ℬ(w.Completion) := (L s)⁻¹ • I χ s
-  let E_minus (s : ℂ) : StrongDual ℂ ℬ(w.Completion) :=
-    (ε s * (L' (1 - s))⁻¹) • ((I χ⁻¹ (1 - s)).comp FT)
-  let E (s : ℂ) : StrongDual ℂ ℬ(w.Completion) := if 0 < s.re then E_plus s else E_minus s
-  have hoverlap {s : ℂ} (hs0 : 0 < s.re) (hs1 : s.re < 1) (f : ℬ(w.Completion)) :
-      E_plus s f = E_minus s f := by
-    have hL0 : L s ≠ 0 := infiniteLocalEulerFactor_ne_zero_of_re_pos w χ hs0
-    have h1 : 0 < (1 - s).re := by simpa using sub_pos.mpr hs1
-    have hL'0 : L' (1 - s) ≠ 0 := infiniteLocalEulerFactor_ne_zero_of_re_pos w χ⁻¹ h1
-    have hI1 : I χ s f = localIdelicZetaIntegral (infiniteLocalMultiplicativeTamagawaMeasure F w)
-        (fun x ↦ f (Multiplicative.ofAdd x)) (twist s) := hI χ s hs0 f
-    have hI2 : I χ⁻¹ (1 - s) (FT f) =
-        localIdelicZetaIntegral (infiniteLocalMultiplicativeTamagawaMeasure F w)
-          (fun x ↦ FT f (Multiplicative.ofAdd x)) (twist' (1 - s)) := hI χ⁻¹ (1 - s) h1 (FT f)
-    have hTate := (infiniteLocalTateFactor_spec w).2 f χ s ⟨hs0, hs1⟩
-    have hdual : dualQuasiCharacter (infiniteNorm(w)) (continuous_infiniteLocalModule w) (twist s) =
-        twist' (1 - s) := by
-      simpa [twist, twist'] using dual_norm_chart (infiniteNorm(w)) (continuous_infiniteLocalModule w) χ s
-    have hratio : infiniteLocalTateFactor w (twist s) = ε s * (L s / L' (1 - s)) := by
-      by_cases hw : w.IsReal
-      · have hr := realTate_ratio_strip w hw χ s ⟨hs0, hs1⟩
-        change infiniteLocalTateFactor w (twist s) = ε s * (L s / infiniteLocalEulerFactor w
-          (dualQuasiCharacter (infiniteNorm(w)) (continuous_infiniteLocalModule w) (twist s))) at hr
-        rw [hdual] at hr
-        exact hr
-      · have hr := complexTate_ratio_strip w (InfinitePlace.not_isReal_iff_isComplex.mp hw) χ s ⟨hs0, hs1⟩
-        change infiniteLocalTateFactor w (twist s) = ε s * (L s / infiniteLocalEulerFactor w
-          (dualQuasiCharacter (infiniteNorm(w)) (continuous_infiniteLocalModule w) (twist s))) at hr
-        rw [hdual] at hr
-        exact hr
-    have hFT' : (fun x ↦ FT f (Multiplicative.ofAdd x)) =
-        tamagawaFourier (infiniteLocalAdditiveTamagawaMeasure F w)
-          (fun x ↦ adeleStandardCharacter F (@Pi.single _ _ _ (Classical.decEq _) w x, 0))
-          (fun x ↦ f (Multiplicative.ofAdd x)) := hFT f
-    change (L s)⁻¹ * I χ s f = (ε s * (L' (1 - s))⁻¹) * I χ⁻¹ (1 - s) (FT f)
-    rw [hI1, hTate, hdual, ← hFT', ← hI2, hratio]
-    field_simp [hL0, hL'0]
-  have hE_plus_an (f : ℬ(w.Completion)) :
-      AnalyticOnNhd ℂ (fun s ↦ E_plus s f) (Complex.re ⁻¹' Ioi (0 : ℝ)) := by
-    have hinv : AnalyticOnNhd ℂ (fun s ↦ (L s)⁻¹) univ :=
-      (infiniteLocalEulerFactor_inv_differentiable w χ).differentiableOn.analyticOnNhd isOpen_univ
-    have hInt : AnalyticOnNhd ℂ (fun s ↦ localIdelicZetaIntegral
-        (infiniteLocalMultiplicativeTamagawaMeasure F w)
-        (fun x ↦ f (Multiplicative.ofAdd x)) (twist s)) (Complex.re ⁻¹' Ioi (0 : ℝ)) :=
-      localIdelicZetaIntegral_analyticAt _ _ _ _ χ 0
-        (fun _ hz ↦ infiniteLocalIdelicZetaIntegral_integrable w f χ hz)
-    have hI_an : AnalyticOnNhd ℂ (fun s ↦ I χ s f) (Complex.re ⁻¹' Ioi (0 : ℝ)) := by
-      intro s hs
-      have hopen : IsOpen (Complex.re ⁻¹' Ioi (0 : ℝ)) := isOpen_Ioi.preimage Complex.continuous_re
-      exact (hInt s hs).congr (eventually_of_mem (hopen.mem_nhds hs) fun z hz ↦ (hI χ z hz f).symm)
-    intro s hs
-    exact (hinv s (mem_univ s)).mul (hI_an s hs)
-  have hE_minus_an (f : ℬ(w.Completion)) :
-      AnalyticOnNhd ℂ (fun s ↦ E_minus s f) (Complex.re ⁻¹' Iio (1 : ℝ)) := by
-    have hε : AnalyticOnNhd ℂ ε univ := infiniteLocalEpsilonFactor_entire w χ
-    have hinv : AnalyticOnNhd ℂ (fun s ↦ (L' (1 - s))⁻¹) univ :=
-      ((infiniteLocalEulerFactor_inv_differentiable w χ⁻¹).comp
-        (differentiable_const (1 : ℂ) |>.sub differentiable_id)).differentiableOn.analyticOnNhd isOpen_univ
-    have hInt : AnalyticOnNhd ℂ (fun s ↦ localIdelicZetaIntegral
-        (infiniteLocalMultiplicativeTamagawaMeasure F w)
-        (fun x ↦ FT f (Multiplicative.ofAdd x)) (twist' s)) (Complex.re ⁻¹' Ioi (0 : ℝ)) :=
-      localIdelicZetaIntegral_analyticAt _ _ _ _ χ⁻¹ 0
-        (fun _ hz ↦ infiniteLocalIdelicZetaIntegral_integrable w (FT f) χ⁻¹ hz)
-    have hI_an : AnalyticOnNhd ℂ (fun s ↦ I χ⁻¹ (1 - s) (FT f)) (Complex.re ⁻¹' Iio (1 : ℝ)) := by
-      intro s hs
-      have h1 : (1 - s) ∈ Complex.re ⁻¹' Ioi (0 : ℝ) := by simpa using sub_pos.mpr hs
-      have hopen : IsOpen (Complex.re ⁻¹' Iio (1 : ℝ)) := isOpen_Iio.preimage Complex.continuous_re
-      refine ((hInt (1 - s) h1).comp (f := fun z : ℂ ↦ 1 - z) (by fun_prop)).congr ?_
-      filter_upwards [hopen.mem_nhds hs] with z hz
-      exact (hI χ⁻¹ (1 - z) (by simpa using sub_pos.mpr hz) (FT f)).symm
-    intro s hs
-    exact ((hε s (mem_univ s)).mul (hinv s (mem_univ s))).mul (hI_an s hs)
-  have hE_an (f : ℬ(w.Completion)) : AnalyticOnNhd ℂ (fun s ↦ E s f) univ := by
-    intro s _
-    by_cases hs : 0 < s.re
-    · have hopen : IsOpen (Complex.re ⁻¹' Ioi (0 : ℝ)) := isOpen_Ioi.preimage Complex.continuous_re
-      exact (hE_plus_an f s hs).congr
-        (eventually_of_mem (hopen.mem_nhds hs) fun z hz ↦ congrArg (fun D : StrongDual ℂ ℬ(w.Completion) ↦ D f) (ite_eq_left hz).symm)
-    · have hs1 : s.re < 1 := (le_of_not_gt hs).trans_lt zero_lt_one
-      have hopen : IsOpen (Complex.re ⁻¹' Iio (1 : ℝ)) := isOpen_Iio.preimage Complex.continuous_re
-      refine (hE_minus_an f s hs1).congr (eventually_of_mem (hopen.mem_nhds hs1) fun z hz ↦ ?_)
-      change E_minus z f = E z f
-      by_cases hz0 : 0 < z.re
-      · exact (hoverlap hz0 hz f).symm.trans (congrArg (fun D : StrongDual ℂ ℬ(w.Completion) ↦ D f) (ite_eq_left hz0).symm)
-      · exact congrArg (fun D : StrongDual ℂ ℬ(w.Completion) ↦ D f) (ite_eq_right hz0).symm
-  refine ⟨E, hE_an, ?_⟩
-  · let q (s : ℂ) := (L s)⁻¹
-    have hq_an : AnalyticOnNhd ℂ q univ :=
-      (infiniteLocalEulerFactor_inv_differentiable w χ).differentiableOn.analyticOnNhd isOpen_univ
-    have hq2 : q 2 ≠ 0 := inv_ne_zero (infiniteLocalEulerFactor_ne_zero_of_re_pos w χ (by norm_num))
-    have hq_mer : MeromorphicOn q univ := fun s hs ↦ (hq_an s hs).meromorphicAt
-    have hq_ne : ∀ᶠ s in codiscrete ℂ, q s ≠ 0 := by
-      change ∀ᶠ s in codiscreteWithin (univ : Set ℂ), q s ≠ 0
-      apply mem_codiscreteWithin_iff_forall_mem_nhdsNE.mpr
-      intro z _
-      rcases (hq_an z trivial).eventually_eq_zero_or_eventually_ne_zero with hzero | hne
-      · exfalso
-        have hzero' : q =ᶠ[𝓝[≠] z] 0 := hzero.filter_mono nhdsWithin_le_nhds
-        have hcod : q =ᶠ[codiscrete ℂ] 0 :=
-          meromorphic_eq_of_germ (fun t ↦ hq_mer t trivial) (fun _ ↦ MeromorphicAt.const _ _) hzero'
-        have h2 : q =ᶠ[𝓝[≠] 2] 0 := hcod.filter_mono (nhdsNE_le_codiscrete 2)
-        exact hq2 ((((hq_an 2 trivial).meromorphicNFAt.eventuallyEq_nhdsNE_iff_eventuallyEq_nhds
-          (analyticAt_const.meromorphicNFAt)).mp h2).eq_of_nhds)
-      · simp only [compl_univ, union_empty]
-        exact hne
-    filter_upwards [hq_ne] with s hs f
-    have hZ_nf : MeromorphicNFOn (fun z ↦ infiniteLocalIdelicZFunction w f (twist z)) univ :=
-      ((infiniteLocalIdelicZFunction_existsUnique w f).exists.choose_spec χ).1
-    have hL_mer : Meromorphic L := fun z ↦
-      (hq_mer z trivial).inv.congr (Eventually.of_forall fun t ↦ inv_inv (L t))
-    have hR_mer : Meromorphic (fun z ↦ L z * E z f) := fun z ↦
-      (hL_mer z).mul (hE_an f z trivial).meromorphicAt
-    have hright : (fun z ↦ infiniteLocalIdelicZFunction w f (twist z)) =ᶠ[𝓝[≠] 2]
-        fun z ↦ L z * E z f := by
-      have hopen : IsOpen (Complex.re ⁻¹' Ioi (0 : ℝ)) := isOpen_Ioi.preimage Complex.continuous_re
-      filter_upwards [eventually_nhdsWithin_of_eventually_nhds
-        (hopen.mem_nhds (by norm_num : (0 : ℝ) < (2 : ℂ).re))] with z hz
-      have hz' : 0 < z.re := mem_Ioi.mp hz
-      have hL0 : L z ≠ 0 := infiniteLocalEulerFactor_ne_zero_of_re_pos w χ hz'
-      rw [infiniteLocalIdelicZFunction_eq_integral w f χ hz, ← hI χ z hz f]
-      dsimp only [E]
-      rw [ite_eq_left hz']
-      change I χ z f = L z * ((L z)⁻¹ * I χ z f)
-      field_simp [hL0]
-    have hcod : (fun z ↦ infiniteLocalIdelicZFunction w f (twist z)) =ᶠ[codiscrete ℂ]
-        fun z ↦ L z * E z f :=
-      meromorphic_eq_of_germ (fun z ↦ (hZ_nf (mem_univ z)).meromorphicAt) hR_mer hright
-    have hnear : (fun z ↦ infiniteLocalIdelicZFunction w f (twist z)) =ᶠ[𝓝[≠] s]
-        fun z ↦ L z * E z f := hcod.filter_mono (nhdsNE_le_codiscrete s)
-    have hR_an : AnalyticAt ℂ (fun z ↦ L z * E z f) s := by
-      have hL_an : AnalyticAt ℂ L s :=
-        ((hq_an s trivial).inv hs).congr (Eventually.of_forall fun t ↦ inv_inv (L t))
-      exact hL_an.mul (hE_an f s trivial)
-    exact ((hZ_nf (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds hR_an.meromorphicNFAt).mp
-      hnear |>.eq_of_nhds
+  have hi := InfinitePlace.Completion.isometry_extensionEmbedding w
+  let : ProperSpace w.Completion :=
+    LipschitzWith.properSpace hi.isClosedEmbedding.isProperMap hi.lipschitzWith
+  let : SecondCountableTopology (Multiplicative w.Completion) :=
+    (hi.isEmbedding.secondCountableTopology : SecondCountableTopology w.Completion)
+  let : LocallyCompactSpace (Multiplicative w.Completion) :=
+    (inferInstance : LocallyCompactSpace w.Completion)
+  have : BarrelledSpace ℂ (ℬ(w.Completion)) := schwartzBruhat_barrelled
+  obtain ⟨D, hD, hDZ⟩ := infiniteLocalIdelicZFunction_distribution w χ
+  have hpoles : AnalyticOnNhd ℂ (fun s ↦ (infiniteLocalEulerFactor w (twist s))⁻¹) univ ∧
+      (∃ s, (infiniteLocalEulerFactor w (twist s))⁻¹ ≠ 0) ∧
+      (∀ f s, (-1 : WithTop ℤ) ≤ meromorphicOrderAt (infiniteLocalIdelicZFunction w f ∘ twist) s) ∧
+      (∀ f s, meromorphicOrderAt (infiniteLocalIdelicZFunction w f ∘ twist) s < 0 →
+        (infiniteLocalEulerFactor w (twist s))⁻¹ = 0) := by
+    by_cases hw : w.IsReal
+    · exact infiniteEigendistribution_entire_family_real w hw χ
+    · exact infiniteEigendistribution_entire_family_complex w
+        (InfinitePlace.not_isReal_iff_isComplex.mp hw) χ
+  obtain ⟨hh, hh0, h1, h2⟩ := hpoles
+  exact infiniteEigendistribution_entire_family_assembly
+    (fun hU Z hZ ↦ schwartzDistribution_holomorphic (G := Multiplicative w.Completion) hU Z hZ)
+    (fun f ↦ infiniteLocalIdelicZFunction w f ∘ twist)
+    (fun f ↦ ((infiniteLocalIdelicZFunction_existsUnique w f).exists.choose_spec χ).1)
+    D _ hD hDZ _ (fun s ↦ infiniteLocalEulerFactor w (twist s)) hh hh0
+    (fun s hs ↦ mul_inv_cancel₀ fun h0 ↦ hs (by rw [h0, inv_zero])) h1 h2
+
+private theorem infiniteLocalIdelicZFunction_standardGaussian_real (w : InfinitePlace F)
+    (hw : w.IsReal) (χ : PontryaginDual w.Completionˣ) (s : ℂ) (hs : 0 < s.re) :
+    infiniteLocalIdelicZFunction w (infiniteStandardGaussian w χ)
+        (quasiCharacterNormTwist (infiniteNorm(w)) (continuous_infiniteLocalModule w)
+          ((circleToComplex).comp χ) s) =
+      infiniteLocalEulerFactor w (quasiCharacterNormTwist (infiniteNorm(w))
+        (continuous_infiniteLocalModule w) ((circleToComplex).comp χ) s) := by
+  classical
+  let e := InfinitePlace.Completion.ringEquivRealOfIsReal hw
+  let c := quasiCharacterNormTwist (infiniteNorm(w)) (continuous_infiniteLocalModule w)
+    ((circleToComplex).comp χ) s
+  obtain ⟨t, a, ht, hχ⟩ := realPlaceUnitary_shape w hw χ
+  have hc := realChart_shape w hw χ t a hχ s
+  have hz : 0 < (s + t).re := by rw [Complex.add_re, ht, add_zero]; exact hs
+  have hE : infiniteLocalEulerFactor w c = Complex.Gammaℝ (s + t + (a.val : ℂ)) := by
+    have hp := (realLocalEulerParameters w hw c).unique
+      (realLocalEulerParameters w hw c).exists.choose_spec (y₂ := (s + t, a)) hc
+    simp only [infiniteLocalEulerFactor, hw, dite_true]
+    rw [hp]
+  have hm1 : ((χ (-1) : Circle) : ℂ) = (-1 : ℂ) ^ a.val := by
+    have h := hχ (-1)
+    have hu : Units.map e.symm.toMonoidHom (-1 : ℝˣ) = -1 := Units.ext (by simp [e])
+    rw [hu] at h
+    change ((χ (-1) : Circle) : ℂ) = _ at h
+    rw [h]
+    norm_num
+  obtain ⟨g, hg⟩ := realModelSchwartz w hw (infiniteStandardGaussian w χ)
+  have hgv (x : ℝ) : g x =
+      (((if χ (-1) = 1 then (1 : ℝ) else x) * Real.exp (-Real.pi * x ^ 2) : ℝ) : ℂ) := by
+    rw [hg x]
+    simp only [infiniteStandardGaussian, infiniteStandardGaussianValue, hw, dite_true]
+    change (((if χ (-1) = 1 then (1 : ℝ) else e (e.symm x)) *
+      Real.exp (-Real.pi * (e (e.symm x)) ^ 2) : ℝ) : ℂ) = _
+    rw [e.apply_symm_apply]
+  rw [infiniteLocalIdelicZFunction_eq_integral w _ χ (show s ∈ Complex.re ⁻¹' Ioi 0 from hs)]
+  have he : (fun x : w.Completion ↦ infiniteStandardGaussian w χ (Multiplicative.ofAdd x)) =
+      fun x ↦ g (e x) := by
+    funext x
+    simpa only [e, RingEquiv.symm_apply_apply] using (hg (e x)).symm
+  rw [he, realIntegral_shape w hw g c (s + t) a hc hz, hE]
+  have hgauss := mellin_gaussian Real.pi_pos hz
+  obtain rfl | rfl : a = 0 ∨ a = 1 := by fin_cases a <;> simp
+  · have h1 : χ (-1) = 1 := by
+      apply Circle.coe_injective
+      simpa using hm1
+    have hfun : (fun x : ℝ ↦ g x + (-1 : ℂ) ^ (0 : Fin 2).val * g (-x)) =
+        fun x : ℝ ↦ (2 : ℂ) • (Real.exp (-Real.pi * x ^ 2) : ℂ) := by
+      funext x
+      simp only [hgv, h1, ite_true, one_mul, neg_sq, Fin.val_zero, pow_zero, smul_eq_mul]
+      ring
+    rw [hfun, mellin_const_smul, hgauss, Complex.Gammaℝ_def]
+    simp only [Fin.val_zero, Nat.cast_zero, add_zero, smul_eq_mul, neg_div]
+    ring
+  · have h1 : χ (-1) ≠ 1 := by
+      intro h
+      rw [h] at hm1
+      norm_num at hm1
+    have hfun : (fun x : ℝ ↦ g x + (-1 : ℂ) ^ (1 : Fin 2).val * g (-x)) =
+        fun x : ℝ ↦ (x : ℂ) ^ (1 : ℂ) • ((2 : ℂ) • (Real.exp (-Real.pi * x ^ 2) : ℂ)) := by
+      funext x
+      simp only [hgv, h1, ite_false, neg_sq, Fin.val_one, pow_one, smul_eq_mul, Complex.cpow_one]
+      push_cast
+      ring
+    have hz1 : 0 < (s + t + 1).re := by simp only [Complex.add_re, Complex.one_re]; linarith
+    rw [hfun, mellin_cpow_smul, mellin_const_smul, mellin_gaussian Real.pi_pos hz1,
+      Complex.Gammaℝ_def]
+    simp only [Fin.val_one, Nat.cast_one, smul_eq_mul, neg_div]
+    ring
+
+private theorem infiniteLocalIdelicZFunction_standardGaussian_angular (r : ℤ) (u θ : ℝ) :
+    Complex.exp ((r : ℂ) * (θ : ℂ) * Complex.I) *
+      ((if 0 ≤ r then star ((u : ℂ) * Complex.exp (((1 : ℤ) : ℂ) * (θ : ℂ) * Complex.I)) ^ r.natAbs
+        else ((u : ℂ) * Complex.exp (((1 : ℤ) : ℂ) * (θ : ℂ) * Complex.I)) ^ r.natAbs) *
+        Complex.exp (-2 * (Real.pi : ℂ) * ((u : ℂ) * Complex.exp (((1 : ℤ) : ℂ) * (θ : ℂ) * Complex.I)) *
+          star ((u : ℂ) * Complex.exp (((1 : ℤ) : ℂ) * (θ : ℂ) * Complex.I))) / (2 * (Real.pi : ℂ))) =
+      (u : ℂ) ^ r.natAbs * (Real.exp (-(2 * Real.pi) * u ^ 2) : ℂ) / (2 * (Real.pi : ℂ)) := by
+  set E := Complex.exp ((θ : ℂ) * Complex.I) with hEdef
+  have hE1 : ((1 : ℤ) : ℂ) * (θ : ℂ) * Complex.I = (θ : ℂ) * Complex.I := by push_cast; ring
+  have hstar : star E = Complex.exp (-((θ : ℂ) * Complex.I)) := by
+    rw [hEdef, Complex.star_def, ← Complex.exp_conj]
+    congr 1
+    simp [Complex.conj_ofReal]
+  have hEE : E * star E = 1 := by
+    rw [hstar, hEdef, ← Complex.exp_add, add_neg_cancel, Complex.exp_zero]
+  have hsq : (u : ℂ) * E * star ((u : ℂ) * E) = ((u ^ 2 : ℝ) : ℂ) := by
+    rw [star_mul', Complex.star_def, Complex.conj_ofReal]
+    calc (u : ℂ) * E * ((u : ℂ) * star E) = (u : ℂ) ^ 2 * (E * star E) := by ring
+      _ = _ := by rw [hEE]; push_cast; ring
+  have hexp : Complex.exp (-2 * (Real.pi : ℂ) * ((u : ℂ) * E) * star ((u : ℂ) * E)) =
+      (Real.exp (-(2 * Real.pi) * u ^ 2) : ℂ) := by
+    rw [mul_assoc (-2 * (Real.pi : ℂ)), hsq, Complex.ofReal_exp]
+    push_cast
+    ring_nf
+  rw [hE1, ← hEdef, hexp]
+  rcases Int.eq_nat_or_neg r with ⟨n, rfl | rfl⟩
+  · have hr : Complex.exp (((n : ℤ) : ℂ) * (θ : ℂ) * Complex.I) = E ^ n := by
+      rw [hEdef, ← Complex.exp_nat_mul]
+      push_cast
+      ring_nf
+    rw [hr, ite_eq_left (Int.natCast_nonneg n), Int.natAbs_natCast, star_mul', Complex.star_def,
+      Complex.conj_ofReal, mul_pow]
+    calc E ^ n * ((u : ℂ) ^ n * star E ^ n * (Real.exp (-(2 * Real.pi) * u ^ 2) : ℂ) /
+          (2 * (Real.pi : ℂ))) =
+        (E * star E) ^ n * ((u : ℂ) ^ n * (Real.exp (-(2 * Real.pi) * u ^ 2) : ℂ) /
+          (2 * (Real.pi : ℂ))) := by rw [mul_pow]; ring
+      _ = _ := by rw [hEE, one_pow, one_mul]
+  · rcases Nat.eq_zero_or_pos n with rfl | hn
+    · simp
+    have hr : Complex.exp (((-(n : ℤ)) : ℤ) * (θ : ℂ) * Complex.I) = star E ^ n := by
+      rw [hstar, ← Complex.exp_nat_mul]
+      push_cast
+      ring_nf
+    have hneg : ¬ (0 ≤ -(n : ℤ)) := by omega
+    rw [hr, ite_eq_right hneg, Int.natAbs_neg, Int.natAbs_natCast, mul_pow]
+    calc star E ^ n * ((u : ℂ) ^ n * E ^ n * (Real.exp (-(2 * Real.pi) * u ^ 2) : ℂ) /
+          (2 * (Real.pi : ℂ))) =
+        (E * star E) ^ n * ((u : ℂ) ^ n * (Real.exp (-(2 * Real.pi) * u ^ 2) : ℂ) /
+          (2 * (Real.pi : ℂ))) := by rw [mul_pow]; ring
+      _ = _ := by rw [hEE, one_pow, one_mul]
+
+private theorem infiniteLocalIdelicZFunction_standardGaussian_complex (w : InfinitePlace F)
+    (hw : w.IsComplex) (χ : PontryaginDual w.Completionˣ) (s : ℂ) (hs : 0 < s.re) :
+    infiniteLocalIdelicZFunction w (infiniteStandardGaussian w χ)
+        (quasiCharacterNormTwist (infiniteNorm(w)) (continuous_infiniteLocalModule w)
+          ((circleToComplex).comp χ) s) =
+      infiniteLocalEulerFactor w (quasiCharacterNormTwist (infiniteNorm(w))
+        (continuous_infiniteLocalModule w) ((circleToComplex).comp χ) s) := by
+  have hnr : ¬ w.IsReal := InfinitePlace.not_isReal_iff_isComplex.mpr hw
+  let e := InfinitePlace.Completion.ringEquivComplexOfIsComplex hw
+  let c := quasiCharacterNormTwist (infiniteNorm(w)) (continuous_infiniteLocalModule w)
+    ((circleToComplex).comp χ) s
+  obtain ⟨t, r, ht, hχ⟩ := complexPlaceUnitary_shape w hw χ
+  have hc := complexChart_shape w hw χ t r hχ s
+  have hz : 0 < (s + t).re := by rw [Complex.add_re, ht, add_zero]; exact hs
+  have hE : infiniteLocalEulerFactor w c = Complex.Gammaℂ (s + t + (r.natAbs : ℂ) / 2) / 2 := by
+    have hp := (complexLocalEulerParameters w hw c).unique
+      (complexLocalEulerParameters w hw c).exists.choose_spec (y₂ := (s + t, r)) hc
+    simp only [infiniteLocalEulerFactor, hnr, dite_false]
+    rw [hp]
+  have hm (c' : ℂˣ →ₜ* ℂ) (hc' : ∀ x, ‖c' x‖ = 1)
+      (hcc : ∀ x, c' x = ((circleToComplex).comp χ) (Units.map e.symm.toMonoidHom x)) :
+      (existsUnique_complexUnits_character_parameters c' hc').exists.choose.2 = r := by
+    have h := (existsUnique_complexUnits_character_parameters c' hc').unique
+      (existsUnique_complexUnits_character_parameters c' hc').exists.choose_spec
+      (y₂ := (t, r)) ⟨ht, fun x ↦ (hcc x).trans (hχ x)⟩
+    rw [h]
+  obtain ⟨g, hg⟩ := complexModelSchwartz w hw (infiniteStandardGaussian w χ)
+  have hgv (x : ℂ) : g x = (if 0 ≤ r then (star x) ^ r.natAbs else x ^ r.natAbs) *
+      Complex.exp (-2 * (Real.pi : ℂ) * x * star x) / (2 * (Real.pi : ℂ)) := by
+    rw [congrFun hg x]
+    simp only [infiniteStandardGaussian, infiniteStandardGaussianValue, hnr, dite_false]
+    rw [hm]
+    · change (if 0 ≤ r then (star (e (e.symm x))) ^ r.natAbs else (e (e.symm x)) ^ r.natAbs) *
+        Complex.exp (-2 * (Real.pi : ℂ) * e (e.symm x) * star (e (e.symm x))) /
+          (2 * (Real.pi : ℂ)) = _
+      rw [e.apply_symm_apply]
+    · intro x
+      exact Circle.norm_coe _
+    · intro x
+      rfl
+  rw [infiniteLocalIdelicZFunction_eq_integral w _ χ (show s ∈ Complex.re ⁻¹' Ioi 0 from hs)]
+  have he : (fun x : w.Completion ↦ infiniteStandardGaussian w χ (Multiplicative.ofAdd x)) =
+      fun x ↦ g (e x) := by
+    funext x
+    simpa only [e, RingEquiv.symm_apply_apply] using (congrFun hg (e x)).symm
+  rw [he, complexIntegral_shape w hw g c (s + t) r hc hz, hE]
+  have hprof : angularProfile g r = fun u : ℝ ↦
+      (u : ℂ) ^ ((r.natAbs : ℕ) : ℂ) • (Real.exp (-(2 * Real.pi) * u ^ 2) : ℂ) := by
+    funext u
+    have hpt (θ : ℝ) : angularWeight r θ * g ((u : ℂ) * angularWeight 1 θ) =
+        (u : ℂ) ^ r.natAbs * (Real.exp (-(2 * Real.pi) * u ^ 2) : ℂ) / (2 * (Real.pi : ℂ)) := by
+      rw [hgv]
+      exact infiniteLocalIdelicZFunction_standardGaussian_angular r u θ
+    simp only [angularProfile, hpt, setIntegral_const, Complex.cpow_natCast, smul_eq_mul,
+      Real.volume_real_Ioo_of_le (by linarith [Real.pi_pos] : -Real.pi ≤ Real.pi)]
+    rw [Complex.real_smul]
+    have hpi : (Real.pi : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr Real.pi_ne_zero
+    push_cast
+    field_simp
+    ring
+  have h2pi : (0 : ℝ) < 2 * Real.pi := by positivity
+  have hv : 0 < (2 * (s + t) + ((r.natAbs : ℕ) : ℂ)).re := by
+    simp only [Complex.add_re, Complex.mul_re, Complex.natCast_re]
+    norm_num
+    positivity
+  rw [hprof, mellin_cpow_smul, mellin_gaussian h2pi hv, Complex.Gammaℂ_def]
+  have hw2 : (2 * (s + t) + ((r.natAbs : ℕ) : ℂ)) / 2 = s + t + (r.natAbs : ℂ) / 2 := by ring
+  rw [hw2]
+  push_cast
+  ring
 
 /-- Paper: Definition 3.4.3.2 and the line after (3.4.3.9), p. 152. On the half-plane
 `0 < re s`, the local zeta function of the standard Gaussian of `χ` at `χ‖·‖^s` is the local
@@ -6071,80 +6346,10 @@ theorem infiniteLocalIdelicZFunction_standardGaussian (w : InfinitePlace F)
       ((circleToComplex).comp χ)
     infiniteLocalIdelicZFunction w (infiniteStandardGaussian w χ) (twist s) =
       infiniteLocalEulerFactor w (twist s) := by
-  intro twist
-  let : MeasurableSpace w.Completion := borel _
-  have hs' : s ∈ Complex.re ⁻¹' Ioi (0 : ℝ) := hs
-  rw [infiniteLocalIdelicZFunction_eq_integral w (infiniteStandardGaussian w χ) χ hs']
   by_cases hw : w.IsReal
-  · obtain ⟨t, a, ht, hbase⟩ := realPlaceUnitary_shape w hw χ
-    have hshape := realChart_shape w hw χ t a hbase s
-    have hE := realEuler_of_shape w hw (twist s) (s + t) a hshape
-    rw [hE.1]
-    have hm1 := hbase (-1 : ℝˣ)
-    have hneg : Units.map (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm.toMonoidHom
-        (-1 : ℝˣ) = (-1 : w.Completionˣ) := Units.ext (by simp)
-    rw [hneg] at hm1
-    have hsign : (χ (-1) : ℂ) = (-1 : ℂ) ^ a.val := by
-      change (χ (-1) : ℂ) = _ at hm1
-      simpa [show ¬ (0 : ℝ) < (-1 : ℝ) by norm_num] using hm1
-    obtain ⟨g, hg, -⟩ := realGaussian_fourier a
-    have hgval (y : ℝ) : g y = (y : ℂ) ^ a.val * (Real.exp (-Real.pi * y ^ 2) : ℂ) := by
-      simpa [modelGaussian, Real.norm_eq_abs, sq_abs] using hg y
-    have htest : (fun x ↦ infiniteStandardGaussian w χ (Multiplicative.ofAdd x)) =
-        fun x ↦ g (InfinitePlace.Completion.ringEquivRealOfIsReal hw x) := by
-      funext x
-      change infiniteStandardGaussianValue w χ x = _
-      simp only [infiniteStandardGaussianValue, hw, ↓reduceDIte, hgval, Complex.ofReal_mul]
-      fin_cases a
-      · have hχ : χ (-1) = 1 := Circle.coe_injective (by simpa using hsign)
-        simp [hχ]
-      · have hχ : χ (-1) ≠ 1 := fun h ↦ by norm_num [h] at hsign
-        simp [hχ]
-    rw [htest]
-    exact realGaussian_integral w hw g (twist s) (s + t) a hshape (by simpa [ht] using hs) hgval
-  · have hc := InfinitePlace.not_isReal_iff_isComplex.mp hw
-    obtain ⟨t, r, ht, hbase⟩ := complexPlaceUnitary_shape w hc χ
-    have hshape := complexChart_shape w hc χ t r hbase s
-    have hE := complexEuler_of_shape w hc (twist s) (s + t) r hshape
-    rw [hE.1]
-    let e := InfinitePlace.Completion.ringEquivComplexOfIsComplex hc
-    let c : ℂˣ →ₜ* ℂ :=
-      (circleToComplex).comp (χ.comp ⟨Units.map e.symm.toMonoidHom,
-        (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hc).symm.continuous.units_map _⟩)
-    have hex := existsUnique_complexUnits_character_parameters c (fun _ ↦ Circle.norm_coe _)
-    have heq : hex.exists.choose = (t, r) := by
-      apply hex.unique hex.exists.choose_spec
-      refine ⟨ht, fun x ↦ ?_⟩
-      exact hbase x
-    have hm : hex.exists.choose.2 = r := congrArg Prod.snd heq
-    obtain ⟨g, -, hg, -, -⟩ := complexGaussian_fourier r
-    have hgval (z : ℂ) : g z = (orientedCoord (decide (0 ≤ r)) z) ^ r.natAbs *
-        (Real.exp (-(2 * Real.pi) * ‖z‖ ^ 2) : ℂ) := hg z
-    have htest : (fun x ↦ infiniteStandardGaussian w χ (Multiplicative.ofAdd x)) =
-        fun x ↦ (2 * (Real.pi : ℂ))⁻¹ * g (e x) := by
-      funext x
-      change infiniteStandardGaussianValue w χ x = _
-      simp only [infiniteStandardGaussianValue, hw, ↓reduceDIte]
-      change (if 0 ≤ hex.exists.choose.2 then (star (e x)) ^ hex.exists.choose.2.natAbs
-          else (e x) ^ hex.exists.choose.2.natAbs) *
-          Complex.exp (-2 * (Real.pi : ℂ) * e x * star (e x)) / (2 * (Real.pi : ℂ)) =
-        (2 * (Real.pi : ℂ))⁻¹ * g (e x)
-      rw [hm, hgval]
-      have hsq : -2 * (Real.pi : ℂ) * e x * star (e x) =
-          ((-(2 * Real.pi) * ‖e x‖ ^ 2 : ℝ) : ℂ) := by
-        rw [mul_assoc, show e x * star (e x) = (‖e x‖ : ℂ) ^ 2 from Complex.mul_conj' _]
-        push_cast
-        ring
-      rw [hsq, ← Complex.ofReal_exp]
-      have hor : orientedCoord (decide (0 ≤ r)) (e x) =
-          if 0 ≤ r then star (e x) else e x := by
-        by_cases hr : 0 ≤ r <;> simp [orientedCoord, hr]
-      rw [hor]
-      split_ifs <;> ring
-    rw [htest, zetaIntegral_const_mul,
-      complexGaussian_integral w hc g (twist s) (s + t) r hshape (by simpa [ht] using hs) hgval]
-    have hpi : (Real.pi : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr Real.pi_ne_zero
-    field_simp [hpi]
+  · exact infiniteLocalIdelicZFunction_standardGaussian_real w hw χ s hs
+  · exact infiniteLocalIdelicZFunction_standardGaussian_complex w
+      (InfinitePlace.not_isReal_iff_isComplex.mp hw) χ s hs
 
 /-- Paper: Definition 3.4.3.1, p. 151, for the local zeta integral (3.3.2.1), p. 137. On the
 half-plane `0 < re s`, translating the test function by a unit `g` (`f ↦ f(g⁻¹ ·)`)

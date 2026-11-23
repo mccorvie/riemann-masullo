@@ -3260,7 +3260,7 @@ private theorem sLocal_classOf_neg_one : classOf (-1 : Iₛ) = 1 := by
 
 /-- Plancherel inversion for the self-dual S-adelic measure identifies the
 second Fourier transform of a Schwartz test with reflection. -/
-private theorem sLocal_fourier_inversion (f : ℬ(Aₛ)) (y : Aₛ) :
+theorem sLocal_fourier_inversion (f : ℬ(Aₛ)) (y : Aₛ) :
     sAdeleSchwartzFourier (sAdeleSchwartzFourier f) (Multiplicative.ofAdd y) =
       f (Multiplicative.ofAdd (-y)) := by
   let G := Multiplicative Aₛ

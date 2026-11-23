@@ -3,6 +3,9 @@ module
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
+import RiemannMasullo.ForMathlib.Topology.ContinuousMap.Sigma
+
+import all RiemannMasullo.AppC_LCTVS.Sec1
 
 import all RiemannMasullo.AppC_LCTVS.Sec1
 
@@ -47,6 +50,93 @@ def meromorphicNormOneComponent (orderBound : QuasiCharacter G → WithTop ℤ) 
       quasiCharacterNormTwist_mem_component m hm ω c z⟩)
     (fun c ↦ orderBound c.val)
 
+/-- Restriction and gluing for meromorphic functions on a disjoint open partition
+preserved by the charts. The pole bound need not make the regular locus open. -/
+private theorem meromorphicWithPoleBound_equiv_openPartition {X I : Type*} [TopologicalSpace X]
+    (chart : X → ℂ → X) (b : X → WithTop ℤ) (U : I → Set X)
+    (ho : ∀ i, IsOpen (U i)) (hu : ∀ x, ∃! i, x ∈ U i)
+    (ht : ∀ i (x : U i) z, chart x z ∈ U i) :
+    let V := fun i ↦ meromorphicWithPoleBound (X := U i)
+      (fun x z ↦ ⟨chart x z, ht i x z⟩) (fun x ↦ b x.val)
+    ∃ e : ↥(meromorphicWithPoleBound chart b) ≃L[ℂ] (∀ i, ↥(V i)),
+      ∀ f i x, (e f i).val x = f.val ⟨x.val.val, x.property⟩ := by
+  classical
+  intro V
+  let M := meromorphicWithPoleBound chart b
+  let R := {x : X // 0 ≤ b x}
+  let S := fun i ↦ {x : U i // 0 ≤ b x.val}
+  let inc (i) : C(S i, R) := ⟨fun x ↦ ⟨x.val.val, x.property⟩,
+    (continuous_subtype_val.comp continuous_subtype_val).subtype_mk _⟩
+  let idx (x : X) := (hu x).exists.choose
+  have hidx (x : X) : x ∈ U (idx x) := (hu x).exists.choose_spec
+  -- The regular locus itself is the topological sum of its pieces.
+  let forget (p : Σ i, S i) : R := inc p.1 p.2
+  have bij : Bijective forget := by
+    constructor
+    · rintro ⟨i, x⟩ ⟨j, y⟩ h
+      have he : x.val.val = y.val.val := congrArg Subtype.val h
+      have hij := (hu x.val.val).unique x.val.property (he ▸ y.val.property)
+      subst j
+      exact congrArg (Sigma.mk i) (Subtype.ext (Subtype.ext he))
+    · intro x
+      exact ⟨⟨idx x, ⟨⟨x, hidx x⟩, x.property⟩⟩, rfl⟩
+  let D : (Σ i, S i) ≃ₜ R := (Equiv.ofBijective forget bij).toHomeomorphOfContinuousOpen
+    (continuous_sigma fun i ↦ (inc i).continuous)
+    (isOpenMap_sigma.mpr fun i ↦ (ho i).isOpenMap_subtype_val.restrictPreimage {x | 0 ≤ b x})
+  let res (f : M) (i : I) : V i := ⟨f.val.comp (inc i), by
+    obtain ⟨Z, hreg, hchart⟩ := f.property
+    exact ⟨fun x ↦ Z x.val, fun x ↦ hreg (inc i x), fun x ↦ hchart x.val⟩⟩
+  let onSum (f : ∀ i, V i) : C((Σ i, S i), ℂ) :=
+    ⟨fun p ↦ (f p.1).val p.2, continuous_sigma fun i ↦ (f i).val.continuous⟩
+  let assemble (f : ∀ i, V i) := (onSum f).comp (D.symm : C(R, (Σ i, S i)))
+  have hpart (f : ∀ i, V i) (i : I) (x : S i) : assemble f (inc i x) = (f i).val x := by
+    change onSum f (D.symm (D ⟨i, x⟩)) = _
+    rw [D.symm_apply_apply]
+    rfl
+  let inv (f : ∀ i, V i) : M := ⟨assemble f, by
+    -- Choose one continuation per piece. At any center, the entire germ stays
+    -- in that piece, so the glued continuation inherits exactly the same order.
+    choose Z hreg hchart using fun i ↦ (f i).property
+    let glue (x : X) := Z (idx x) ⟨x, hidx x⟩
+    have hg (i : I) (x : U i) : glue x.val = Z i x := by
+      rcases x with ⟨x, hx⟩
+      obtain rfl : i = idx x := (hu x).unique hx (hidx x)
+      rfl
+    refine ⟨glue, fun x ↦ ?_, fun x ↦ ?_⟩
+    · let y : S (idx x.val) := ⟨⟨x.val, hidx x.val⟩, x.property⟩
+      exact (hg _ y.val).trans ((hreg _ y).trans (hpart f _ y).symm)
+    · let i := idx x
+      let y : U i := ⟨x, hidx x⟩
+      have he : (fun z ↦ glue (chart x z)) = fun z ↦ Z i ⟨chart x z, ht i y z⟩ :=
+        funext fun z ↦ hg i ⟨chart x z, ht i y z⟩
+      dsimp only
+      rw [he]
+      exact hchart i y⟩
+  refine ⟨{ toFun := res
+            invFun := inv
+            map_add' := fun _ _ ↦ rfl
+            map_smul' := fun _ _ ↦ rfl
+            left_inv := ?_
+            right_inv := ?_
+            continuous_toFun := ?_
+            continuous_invFun := ?_ }, fun _ _ _ ↦ rfl⟩
+  · intro f
+    apply Subtype.ext
+    apply ContinuousMap.ext
+    intro x
+    obtain ⟨⟨i, y⟩, rfl⟩ := bij.surjective x
+    exact hpart (res f) i y
+  · intro f
+    funext i
+    exact Subtype.ext (ContinuousMap.ext (hpart f i))
+  · exact continuous_pi fun i ↦ ((ContinuousMap.continuous_precomp (inc i)).comp
+      continuous_subtype_val).subtype_mk _
+  · have hsum : Continuous onSum := continuous_continuousMap_sigma_of_components _ fun i ↦
+      show Continuous (fun f : ∀ i, V i ↦ (f i).val) from
+        continuous_subtype_val.comp (continuous_apply i)
+    exact ((ContinuousMap.continuous_precomp _).comp hsum).subtype_mk _
+
+
 /-- Paper: (5.2.2.2), p. 232.
 Restriction to the norm-one components identifies the meromorphic space with the product
 of its component spaces, with their compact-convergence topologies.
@@ -57,7 +147,28 @@ theorem meromorphicWithPoleBound_equiv_components [IsTopologicalGroup G]
     (orderBound : QuasiCharacter G → WithTop ℤ) :
     ∃ e : ↥(meromorphicWithPoleBound (quasiCharacterNormTwist m hm) orderBound) ≃L[ℂ]
         (∀ χ : PontryaginDual m.ker, ↥(meromorphicNormOneComponent m hm χ orderBound)),
-      ∀ f χ c, (e f χ).val c = f.val ⟨c.val.val, c.property⟩ := by sorry
+      ∀ f χ c, (e f χ).val c = f.val ⟨c.val.val, c.property⟩ := by
+  let U (χ : PontryaginDual m.ker) : Set (QuasiCharacter G) :=
+    {c | ∀ g : m.ker, c g.val = (χ g : ℂ)}
+  apply meromorphicWithPoleBound_equiv_openPartition (quasiCharacterNormTwist m hm) orderBound U
+    _ _ (quasiCharacterNormTwist_mem_component m hm)
+  · intro χ
+    apply isOpen_iff_mem_nhds.mpr
+    intro c hc
+    obtain ⟨e, he, -, htwist⟩ := hasNormTwistCharts_of_proper m hproper hn c
+    filter_upwards [e.open_source.mem_nhds he] with d hd
+    intro g
+    have h := htwist (e d) (e.map_source hd) g.val
+    simp only [e.left_inv hd, show m g.val = 1 from g.property, Units.val_one, NNReal.coe_one,
+      Complex.ofReal_one, Complex.one_cpow, mul_one] at h
+    exact h.trans (hc g)
+  · intro c
+    obtain ⟨χ, hχ⟩ := (range_normOneRestriction m hproper hn ▸
+      (Set.mem_range_self c : normOneRestriction m c ∈ Set.range (normOneRestriction m)))
+    refine ⟨χ, fun g ↦ (DFunLike.congr_fun hχ g).symm, ?_⟩
+    intro ψ hψ
+    exact ContinuousMonoidHom.ext fun g ↦
+      Circle.ext ((hψ g).symm.trans (DFunLike.congr_fun hχ g).symm)
 
 end MeromorphicComponents
 
@@ -167,13 +278,128 @@ variable {ω : PontryaginDual (ideleClassNorm F).ker}
 
 local notation "ωₛ(" S ", " h ")" => sLocalNormOneCharacter (F := F) S ω h
 
+/-- Extend a representative of a norm-one S-class by one. Its projections to S and T
+represent classes on which the two descended characters agree. -/
+private theorem sLocalHomogeneousThetaTransition_preserves_kernel_lift
+    (hω : NormOneCharacterUnramifiedOutside (F := F) ω S) (hST : S ⊆ T) (a : J₁(S)) :
+    ∃ (u : (integralAdelesOutside F S)ˣ) (b : J₁(T)),
+      a.val = QuotientGroup.mk (Units.map (adeleProjection F S).toMonoidHom
+        (integralIdeleInsertion F S u)) ∧
+      b.val = QuotientGroup.mk (Units.map (adeleProjection F T).toMonoidHom
+        (integralIdeleInsertion F S u)) ∧
+      ωₛ(S, hω) a = ωₛ(T, hω.mono hST) b := by
+  obtain ⟨g, hg⟩ := QuotientGroup.mk_surjective a.val
+  let j := sIdeleInsertion F S g
+  let gT := Units.map (adeleProjection F T).toMonoidHom j
+  obtain ⟨hinf, hin, hout⟩ := sIdeleInsertion_apply F S g
+  have hS : Units.map (adeleProjection F S).toMonoidHom j = g :=
+    Units.ext (Prod.ext hinf (funext hin))
+  have hTj : sIdeleInsertion F T gT = j := by
+    obtain ⟨hinf', hin', hout'⟩ := sIdeleInsertion_apply F T gT
+    apply Units.ext
+    refine Prod.ext hinf' ?_
+    apply RestrictedProduct.ext
+    intro v
+    by_cases hv : v ∈ T
+    · exact hin' ⟨v, hv⟩
+    · exact (hout' v hv).trans (hout v (fun h ↦ hv (hST h))).symm
+  have hn : ideleNorm F j = 1 := by
+    rw [ideleNorm_sIdeleInsertion, ← sIdeleQuotientNorm_mk, hg]
+    exact a.property
+  let x : C₁ := ⟨QuotientGroup.mk j, hn⟩
+  let b : J₁(T) := ⟨QuotientGroup.mk gT, (ideleNorm_sIdeleInsertion F T gT).symm.trans
+    ((congrArg (ideleNorm F) hTj).trans hn)⟩
+  have hj : j ∈ Set.range (integralIdeleInsertion F S) := by
+    apply (mem_range_integralIdeleInsertion F S j).2
+    intro v hv
+    have hi : j⁻¹.val.2 v = 1 := by
+      change ((sIdeleInsertion F S g)⁻¹).val.2 v = 1
+      rw [← map_inv]
+      exact (sIdeleInsertion_apply F S g⁻¹).2.2 v hv
+    exact ⟨(hout v hv) ▸ (v.adicCompletionIntegers F).one_mem,
+      hi ▸ (v.adicCompletionIntegers F).one_mem⟩
+  obtain ⟨uT, huT⟩ := (integralIdeleInsertion_exhaustive F).1 hST hj
+  obtain ⟨u, hu⟩ := hj
+  have ha : a.val = QuotientGroup.mk (Units.map (adeleProjection F S).toMonoidHom j) := by
+    rw [hS, hg]
+  refine ⟨u, b, ?_, ?_, ?_⟩
+  · simpa only [hu] using ha
+  · simp only [hu]; rfl
+  · exact (sLocalNormOneCharacter_apply ω hω u x a (by rw [hu]) (by simpa only [hu] using ha)).trans
+      (sLocalNormOneCharacter_apply ω (hω.mono hST) uT x b (by rw [huT]) (by rw [huT])).symm
+
 /-- Paper: (5.2.3.1), p. 233.
 The stage map of test functions preserves the homogeneous theta kernels. -/
 theorem sLocalHomogeneousThetaTransition_preserves_kernel
     (hω : NormOneCharacterUnramifiedOutside (F := F) ω S) (hST : S ⊆ T) :
     let hT := NormOneCharacterUnramifiedOutside.mono (F := F) (ω := ω) hω hST
     Kₛω(S, ωₛ(S, hω)) ≤ (Kₛω(T, ωₛ(T, hT))).comap
-      (sAdeleSchwartzTransition F hST) := by sorry
+      (sAdeleSchwartzTransition F hST) := by
+  intro hT
+  let ρ (U : Finset (HeightOneSpectrum (𝓞 F))) :=
+    (existsUnique_sLocalThetaAction (F := F) (S := U)).exists.choose
+  have action (U : Finset (HeightOneSpectrum (𝓞 F))) (g : (SAdeleRing F U)ˣ) (k : ℬₛ(U))
+      (a : SIdeleQuotient F U) (ha : a = QuotientGroup.mk g) :
+      ρ U a (Submodule.Quotient.mk k) = Submodule.Quotient.mk (schwartzBruhatUnitTranslate g k) := by
+    subst a
+    unfold ρ
+    with_reducible exact (existsUnique_sLocalThetaAction (F := F) (S := U)).exists.choose_spec.2 g k
+  let rel (U : Finset (HeightOneSpectrum (𝓞 F))) (χ : PontryaginDual (J₁(U)))
+      (p : J₁(U) × Θₛ(U)) := p.2 - star (χ p.1 : ℂ) • ρ U p.1.val p.2
+  let D (U : Finset (HeightOneSpectrum (𝓞 F))) (χ : PontryaginDual (J₁(U))) :=
+    (Submodule.span ℂ (Set.range (rel U χ))).topologicalClosure
+  -- In the coinvariant description, the kernel is the preimage of the closed relation span.
+  have hmem (U : Finset (HeightOneSpectrum (𝓞 F))) (χ : PontryaginDual (J₁(U))) (f : ℬₛ(U)) :
+      f ∈ Kₛω(U, χ) ↔ (Kₛ(U)).mkQ f ∈ D U χ := by
+    have h : ∃ e : SLocalHomogeneousThetaSpace F U χ ≃L[ℂ] (Θₛ(U) ⧸ D U χ),
+        ∀ k : ℬₛ(U), e (Submodule.Quotient.mk k) = (D U χ).mkQ ((Kₛ(U)).mkQ k) := by
+      unfold D rel ρ
+      with_reducible exact sLocalHomogeneousThetaSpace_equiv_coinvariants (F := F) (S := U) χ
+    refine h.elim fun e he ↦ ?_
+    have he' := congrArg (fun z : Θₛ(U) ⧸ D U χ ↦ z = 0) (he f)
+    have hz := ContinuousLinearEquiv.map_eq_zero_iff e (x := Submodule.Quotient.mk f)
+    exact (Submodule.Quotient.mk_eq_zero (Kₛω(U, χ))).symm.trans
+      (hz.symm.trans (he'.to_iff.trans (Submodule.Quotient.mk_eq_zero (D U χ))))
+  let π := sLocalThetaTransition (F := F) hST
+  have hmap : D S (ωₛ(S, hω)) ≤ (D T (ωₛ(T, hT))).comap π := by
+    apply Submodule.topologicalClosure_minimal
+    · apply Submodule.span_le.mpr
+      rintro _ ⟨⟨a, y⟩, rfl⟩
+      refine (Submodule.Quotient.mk_surjective (Kₛ(S)) y).elim fun f hy ↦ ?_
+      rw [← hy]
+      have lift := sLocalHomogeneousThetaTransition_preserves_kernel_lift
+        (F := F) (ω := ω) (S := S) (T := T) hω hST a
+      refine lift.elim fun u hu ↦ hu.elim fun b hb ↦ ?_
+      let j := integralIdeleInsertion F S u
+      let gS := Units.map (adeleProjection F S).toMonoidHom j
+      let gT := Units.map (adeleProjection F T).toMonoidHom j
+      let fT := sAdeleSchwartzTransition F hST f
+      have hρS := action S gS f a.val hb.1
+      have hρT := action T gT fT b.val hb.2.1
+      let yS : Θₛ(S) := Submodule.Quotient.mk f
+      let yT : Θₛ(T) := Submodule.Quotient.mk fT
+      -- The ordinary transition intertwines translations by this common representative.
+      have heq : π (ρ S a.val yS) = ρ T b.val yT :=
+        (congrArg π hρS).trans ((sLocalThetaTransition_equivariant hST u f).trans hρT.symm)
+      have hπ : π yS = yT := by
+        unfold π yS yT fT sLocalThetaTransition
+        exact Submodule.mapQ_apply _ _ _ f
+      have hχ := congrArg (fun z : Circle ↦ star (z : ℂ)) hb.2.2
+      have hs := congrArg₂ (fun (c : ℂ) (z : Θₛ(T)) ↦ c • z) hχ heq
+      have hrel := (map_sub π yS (star (ωₛ(S, hω) a : ℂ) • ρ S a.val yS)).trans
+        (congrArg₂ (fun v w : Θₛ(T) ↦ v - w) hπ ((map_smul π _ _).trans hs))
+      have he : π (rel S (ωₛ(S, hω)) (a, yS)) = rel T (ωₛ(T, hT)) (b, yT) := by
+        with_reducible exact hrel
+      have hm : rel T (ωₛ(T, hT)) (b, yT) ∈ D T (ωₛ(T, hT)) :=
+        Submodule.le_topologicalClosure _ (Submodule.subset_span (Set.mem_range_self (b, yT)))
+      have h := (congrArg (fun z ↦ z ∈ D T (ωₛ(T, hT))) he).mpr hm
+      apply Submodule.mem_comap.mpr
+      with_reducible exact h
+    · have hc : IsClosed (D T (ωₛ(T, hT)) : Set Θₛ(T)) :=
+        (Submodule.span ℂ (Set.range (rel T (ωₛ(T, hT))))).isClosed_topologicalClosure
+      exact hc.preimage (sLocalThetaTransition_isClosedEmbedding (F := F) hST).continuous
+  intro f hf
+  exact (hmem T (ωₛ(T, hT)) _).mpr (hmap ((hmem S (ωₛ(S, hω)) f).mp hf))
 
 /-- Paper: (5.2.3.1), p. 233.
 The homogeneous theta transition is induced by adjoining integer indicators. -/
@@ -291,11 +517,89 @@ Fréchet spaces. The test-function stages can be quotiented by the restricted ke
 theorem globalHomogeneousThetaSpace_nuclearFrechetPresentation :
     HasNuclearFrechetPresentation Θ𝔽ω(ω) := by sorry
 
+/-- A closed quotient of a nuclear strict LF-space has nuclear Fréchet quotient stages. -/
+private theorem sLocalHomogeneousThetaSpace_nuclearFrechetPresentation_quotient.{v}
+    {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] (M : Submodule ℂ E)
+    (hM : IsClosed (M : Set E)) (hE : IsStrictLFSpace E) (hN : IsNuclearTVS.{v} E) :
+    HasNuclearFrechetPresentation.{v} (E ⧸ M) := by
+  obtain ⟨_, X, hmono, hFrechet, hcover, htop⟩ := hE
+  let : T2Space (E ⧸ M) := inferInstance
+  let i (k : ℕ) : X k →L[ℂ] E := (X k).subtypeL
+  let j (k : ℕ) : X k →L[ℂ] X (k+1) :=
+    (X k).subtypeL.codRestrict (X (k+1)) fun x ↦ hmono k.le_succ x.property
+  have h : IsInjectiveLCLimit j i :=
+    ⟨fun _ ↦ Subtype.val_injective, fun _ ↦ rfl, fun x ↦ by
+      obtain ⟨k, hk⟩ := hcover x
+      exact ⟨k, ⟨⟨x, hk⟩, rfl⟩⟩, htop⟩
+  have hNstage (k : ℕ) : IsNuclearTVS (X k) := isNuclearTVS_submodule hN (X k)
+  let f (k : ℕ) := M.mkQL.comp (i k)
+  let K (k : ℕ) := (f k).ker
+  have hf (k : ℕ) (x : X k) : f (k+1) (j k x) = f k x :=
+    congrArg M.mkQ (DFunLike.congr_fun (h.compatible k) x)
+  let iQ (k : ℕ) : X k ⧸ K k →L[ℂ] E ⧸ M := (K k).liftQL (f k) le_rfl
+  let jQ (k : ℕ) : X k ⧸ K k →L[ℂ] X (k+1) ⧸ K (k+1) :=
+    (K k).liftQL ((K (k+1)).mkQL.comp (j k)) (by
+      intro x hx
+      change (K (k+1)).mkQ (j k x) = 0
+      rw [Submodule.mkQ_apply, Submodule.Quotient.mk_eq_zero]
+      change f (k+1) (j k x) = 0
+      rwa [hf])
+  have hiQ (k : ℕ) (x : X k) : iQ k ((K k).mkQ x) = f k x := rfl
+  have hjQ (k : ℕ) (x : X k) : jQ k ((K k).mkQ x) = (K (k+1)).mkQ (j k x) := rfl
+  have hP : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ E // ∀ k, Continuous (p ∘ (i k).toLinearMap)} →
+        Seminorm ℂ E) := ⟨h.topology_eq⟩
+  have hlim : IsInjectiveLCLimit jQ iQ := by
+    refine ⟨?_, ?_, ?_, ?_⟩
+    · intro k
+      apply (LinearMap.ker_eq_bot (f := (iQ k).toLinearMap)).mp
+      exact (K k).ker_liftQ_eq_bot' (f k).toLinearMap rfl
+    · intro k
+      ext y
+      obtain ⟨x, rfl⟩ := (K k).mkQ_surjective y
+      change iQ (k+1) (jQ k ((K k).mkQ x)) = iQ k ((K k).mkQ x)
+      rw [hjQ, hiQ, hiQ, hf]
+    · intro y
+      obtain ⟨x, rfl⟩ := M.mkQ_surjective y
+      obtain ⟨k, z, rfl⟩ := h.exhaustive x
+      exact ⟨k, (K k).mkQ z, hiQ k z⟩
+    · let : PolynormableSpace ℂ E := hP.toPolynormableSpace
+      let : PolynormableSpace ℂ (E ⧸ M) := (isNuclearTVS_quotient hN M).2.1
+      have hseminorms : (fun p : Seminorm ℂ (E ⧸ M) ↦
+          ∀ k, Continuous (p ∘ (iQ k).toLinearMap)) =
+          (fun p : Seminorm ℂ (E ⧸ M) ↦ Continuous p) := by
+        funext p
+        apply propext
+        refine ⟨fun hp ↦ M.isQuotientMap_mkQL.continuous_iff.mpr ?_,
+          fun hp k ↦ hp.comp (iQ k).continuous⟩
+        apply hP.continuous_seminorm (⟨p.comp M.mkQ, fun k ↦ ?_⟩ : _)
+        change Continuous (fun x : X k ↦ p (f k x))
+        simpa only [Function.comp_def, ContinuousLinearMap.coe_coe, Submodule.coe_mkQL, hiQ] using
+          (hp k).comp (K k).mkQL.continuous
+      change (inferInstance : TopologicalSpace (E ⧸ M)) =
+        (SeminormFamily.moduleFilterBasis
+          (Subtype.val : {p : Seminorm ℂ (E ⧸ M) // ∀ k, Continuous (p ∘ (iQ k).toLinearMap)} →
+            Seminorm ℂ (E ⧸ M))).topology
+      rw [hseminorms]
+      exact (PolynormableSpace.withSeminorms ℂ (E ⧸ M)).withSeminorms_eq
+  have : T2Space (E ⧸ M) := inferInstance
+  refine ⟨inferInstance, fun k ↦ X k ⧸ K k, _, _, _, ?_, jQ, iQ, hlim⟩
+  intro k
+  have : IsClosed (K k : Set (X k)) := (f k).isClosed_ker
+  let : IsTopologicalAddGroup (X k) := (hFrechet k).1
+  let : T2Space (X k ⧸ K k) := inferInstance
+  exact ⟨isFrechetTVS_quotient (hFrechet k) (K k) (f k).isClosed_ker,
+    isNuclearTVS_quotient (hNstage k) (K k)⟩
+
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The S-local homogeneous theta quotient is a locally convex inductive limit of nuclear
 Fréchet spaces. The test-function stages can be quotiented by the restricted kernel. -/
 theorem sLocalHomogeneousThetaSpace_nuclearFrechetPresentation (χ : PontryaginDual (J₁(S))) :
-    HasNuclearFrechetPresentation (Θₛω(S, χ)) := by sorry
+    HasNuclearFrechetPresentation (Θₛω(S, χ)) := by
+  exact sLocalHomogeneousThetaSpace_nuclearFrechetPresentation_quotient _
+    (sLocalHomogeneousAdelicTheta_ker_isClosed χ) (sAdeleSchwartz_strictLF F S)
+    (sAdeleSchwartz_nuclear F S)
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The global homogeneous theta space is an LF-space. -/
@@ -341,7 +645,15 @@ theorem sLocalHomogeneousThetaSpace_nuclear (χ : PontryaginDual (J₁(S))) :
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The global homogeneous quotient is Montel. -/
 theorem globalHomogeneousThetaSpace_montel :
-    BarrelledSpace ℂ Θ𝔽ω(ω) ∧ MontelSpace ℂ Θ𝔽ω(ω) := by sorry
+    BarrelledSpace ℂ Θ𝔽ω(ω) ∧ MontelSpace ℂ Θ𝔽ω(ω) := by
+  have hN : IsNuclearTVS.{0} Θ𝔽ω(ω) := globalHomogeneousThetaSpace_nuclear (F := F) (ω := ω)
+  let : T2Space Θ𝔽ω(ω) := hN.1
+  let : PolynormableSpace ℂ Θ𝔽ω(ω) := hN.2.1
+  let : UniformSpace Θ𝔽ω(ω) := IsTopologicalAddGroup.rightUniformSpace _
+  let : IsUniformAddGroup Θ𝔽ω(ω) := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace Θ𝔽ω(ω) := globalHomogeneousThetaSpace_complete (F := F) (ω := ω)
+  refine ⟨IsLFSpace.barrelled (E := Θ𝔽ω(ω)) (globalHomogeneousThetaSpace_lf (F := F) (ω := ω)), ⟨fun B hc hb ↦ ?_⟩⟩
+  simpa only [hc.closure_eq] using isCompact_closure_of_isNuclearTVS Θ𝔽ω(ω) hN hb
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The S-local homogeneous quotient is Montel. -/

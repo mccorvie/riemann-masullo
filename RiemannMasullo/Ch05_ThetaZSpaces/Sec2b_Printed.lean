@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Separation
 
 /-!
 # Chapter 5.2.3–5.2.4: statements that are false as printed
@@ -135,7 +136,56 @@ is asymptotic to t as t tends to infinity. Every global theta function decays th
 -/
 theorem Printed.globalTheta_inversionAutomorphism_false :
     ¬ Printed.globalTheta_inversionAutomorphism := by
-  sorry
+  classical
+  intro h
+  obtain ⟨f, hf⟩ := (adelePolarValues_surjective (F := ℚ)) (0, 1)
+  have hf0 : f (Multiplicative.ofAdd (0 : 𝔸[ℚ])) = 0 := congrArg Prod.fst hf
+  have hf1 : adeleSchwartzFourier f (Multiplicative.ofAdd (0 : 𝔸[ℚ])) = 1 := congrArg Prod.snd hf
+  obtain ⟨J, hJ⟩ := h ℚ
+  let K := LinearMap.ker (adelicThetaLinearMap ℚ)
+  obtain ⟨d, hd⟩ := Submodule.mkQ_surjective K (J (K.mkQ f))
+  have heq (g : IdeleClassGroup (𝓞 ℚ) ℚ) : adelicTheta d g = adelicTheta f g⁻¹ := by
+    have hh := hJ f g
+    change (K.liftQ (adelicThetaLinearMap ℚ) le_rfl) (J (K.mkQ f)) g = _ at hh
+    have hd' := congrArg (fun x => (K.liftQ (adelicThetaLinearMap ℚ) le_rfl) x g) hd
+    exact hd'.trans hh
+  obtain ⟨C, T, hC, hT, hsmall⟩ := adelicTheta_decay_small f 0
+  obtain ⟨D, U, hD, hU, hlarge⟩ := adelicTheta_decay_large d 0
+  let r : ℝ := max (max (C + D + 1) U) (T⁻¹) + 1
+  have hr : 0 < r := by dsimp [r]; positivity
+  have hrU : U < r := by
+    dsimp [r]
+    linarith [le_max_right (C + D + 1) U, le_max_left (max (C + D + 1) U) T⁻¹]
+  have hrT : T⁻¹ < r := by
+    dsimp [r]
+    linarith [le_max_right (max (C + D + 1) U) T⁻¹]
+  have hrCD : C + D < r := by
+    dsimp [r]
+    linarith [le_max_left (C + D + 1) U, le_max_left (max (C + D + 1) U) T⁻¹]
+  let t : Units NNReal := Units.mk0 (⟨r, hr.le⟩ : NNReal)
+    (by intro h; exact hr.ne' (congrArg NNReal.toReal h))
+  let g : IdeleClassGroup (𝓞 ℚ) ℚ := QuotientGroup.mk (canonicalIdeleNormSection ℚ t)
+  have hn : ((ideleClassNorm ℚ g : NNReal) : ℝ) = r := by
+    change ((ideleNorm ℚ (canonicalIdeleNormSection ℚ t) : NNReal) : ℝ) = r
+    rw [canonicalIdeleNormSection_rightInverse]
+    rfl
+  have hni : ((ideleClassNorm ℚ g⁻¹ : NNReal) : ℝ) = r⁻¹ := by
+    simp only [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv, hn]
+  have hsm : ((ideleClassNorm ℚ g⁻¹ : NNReal) : ℝ) < T := by
+    rw [hni]
+    exact (inv_lt_comm₀ hr hT).2 hrT
+  have hs := hsmall g⁻¹ hsm
+  have hl := hlarge g (by change U < ((ideleClassNorm ℚ g : NNReal) : ℝ); rw [hn]; exact hrU)
+  dsimp only at hs
+  rw [hni, inv_inv, hf0, hf1] at hs
+  simp only [Complex.real_smul, mul_one, add_zero, pow_zero] at hs
+  simp only [pow_zero, inv_one, mul_one] at hl
+  rw [heq] at hl
+  have hb : r ≤ ‖adelicTheta f g⁻¹‖ + C := by
+    have hh := norm_le_norm_add_norm_sub (adelicTheta f g⁻¹) (r : ℂ)
+    simp only [Complex.norm_real, Real.norm_of_nonneg hr.le] at hh
+    linarith
+  linarith
 
 /-- Paper: Theorem 5.2.4.1(1)–(2), (5.2.4.2) and (5.2.4.4), p. 239.
 As printed: for every number field and every pair of nested finite stages containing the
@@ -191,6 +241,61 @@ one. Its S-projection is the identity, while the global character takes value �
 -/
 theorem Printed.exists_sLocalNormOneCharacter_false :
     ¬ Printed.exists_sLocalNormOneCharacter := by
-  sorry
+  classical
+  let S : Finset (HeightOneSpectrum (𝓞 ℚ)) := ∅
+  -- The single nontrivial finite component can be placed at any finite place.
+  obtain ⟨m, hm⟩ := Ideal.exists_maximal (𝓞 ℚ)
+  let v : HeightOneSpectrum (𝓞 ℚ) := ⟨m, hm.isPrime, NeZero.ne m⟩
+  let g := IdeleGroup.ofAdicCompletion (𝓞 ℚ) ℚ v (-1)
+  have hself : g.val.2 v = -1 := RestrictedProduct.mulSingle_eq_same _ _ _
+  have hoff (w : HeightOneSpectrum (𝓞 ℚ)) (hw : w ≠ v) : g.val.2 w = 1 :=
+    RestrictedProduct.mulSingle_eq_of_ne _ _ hw
+  have hinv : g⁻¹ = g := by simp [g, ← map_inv]
+  have hmem : g ∈ (integralIdeleInsertion ℚ S).range := by
+    apply (mem_range_integralIdeleInsertion ℚ S g).2
+    intro w _
+    have hw : g.val.2 w ∈ w.adicCompletionIntegers ℚ := by
+      rcases eq_or_ne w v with rfl | h
+      · rw [hself]
+        exact neg_mem (one_mem _)
+      · rw [hoff _ h]
+        exact one_mem _
+    exact ⟨hw, by change (g⁻¹).val.2 w ∈ _; rwa [hinv]⟩
+  obtain ⟨u, hu⟩ := hmem
+  have hproj : Units.map (adeleProjection ℚ S).toMonoidHom g = 1 := by
+    apply Units.ext
+    exact Prod.ext rfl (funext fun w ↦ (Finset.notMem_empty w.val w.property).elim)
+  let c := IdeleClassGroup.ofAdicCompletion (𝓞 ℚ) ℚ v (-1)
+  have hc : c ∈ (ideleClassNorm ℚ).ker := by
+    change ideleClassNorm ℚ (IdeleClassGroup.ofAdicCompletion (𝓞 ℚ) ℚ v (-1)) = 1
+    rw [ideleClassNorm_ofAdicCompletion]
+    apply Units.ext
+    change ‖(-1 : v.adicCompletion ℚ)‖₊ = 1
+    simp
+  let x : (ideleClassNorm ℚ).ker := ⟨c, hc⟩
+  have hne : x ≠ 1 := by
+    intro hx
+    have he : QuotientGroup.mk g = (1 : IdeleClassGroup (𝓞 ℚ) ℚ) := congrArg Subtype.val hx
+    obtain ⟨q, hq⟩ := (QuotientGroup.eq_one_iff g).mp he
+    -- A principal representative with infinite component 1 must come from 1.
+    have hreal : algebraMap ℚ (InfiniteAdeleRing ℚ) q.val = 1 :=
+      congrArg (fun a : 𝔸[ℚ]ˣ ↦ a.val.1) hq
+    have hq1 : q = 1 := Units.ext ((algebraMap ℚ (InfiniteAdeleRing ℚ)).injective
+      (hreal.trans (map_one _).symm))
+    rw [hq1, map_one] at hq
+    have hcontra : (1 : v.adicCompletion ℚ) = -1 :=
+      (congrArg (fun a : 𝔸[ℚ]ˣ ↦ a.val.2 v) hq).trans hself
+    have : (1 : ℚ) = -1 := (algebraMap ℚ (v.adicCompletion ℚ)).injective
+      (by simpa only [map_one, map_neg] using hcontra)
+    norm_num at this
+  -- Separate the global class from 1; no local character can do so after projection.
+  let : T2Space (ideleClassNorm ℚ).ker := (ideleClassGroup_finiteness ℚ).2.2.1
+  let : CompactSpace (ideleClassNorm ℚ).ker := (ideleClassGroup_finiteness ℚ).2.1
+  obtain ⟨ω, hω⟩ := exists_pontryaginDual_apply_ne_one (G := (ideleClassNorm ℚ).ker) hne
+  intro h
+  obtain ⟨χ, hχ⟩ := h ℚ S ω
+  apply hω
+  have h := hχ u x 1 (by rw [hu]; rfl) (by rw [hu, hproj]; rfl)
+  simpa using h.symm
 
 end RiemannMasullo
