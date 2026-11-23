@@ -5,7 +5,9 @@ public import RiemannMasullo.AppB_AnalyticNT.Sec6
 import RiemannMasullo.External.TauCeti.Analysis.Complex.Conformal.Montel.Basic
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.AppB_AnalyticNT.Sec4b
+import RiemannMasullo.Ch12_TraceGeometric.Sec5
 import Mathlib.Analysis.Calculus.BumpFunction.Normed
+import Mathlib.Analysis.Calculus.ContDiff.Convolution
 
 import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec5
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
@@ -501,11 +503,60 @@ theorem introTraceApprox_differentiable (h ρ : ℕ → ℝ → ℝ)
     hF_int hF'_meas h_bound (hρint.norm.mul_const C) h_diff
   exact (differentiableAt_const _).mul key.2.differentiableAt
 
+private theorem introTracePower_locallyIntegrable (z : ℂ) :
+    LocallyIntegrable (introTracePower z) volume := by
+  let P (t : ℝ) := ((max t 1 : ℝ) : ℂ) ^ (-z)
+  have hP : Continuous P := continuous_iff_continuousAt.mpr fun t ↦
+    (Complex.continuousAt_ofReal_cpow_const (max t 1) (-z)
+      (Or.inr (zero_lt_one.trans_le (le_max_right t 1)).ne')).comp
+        (f := fun u : ℝ ↦ max u 1) (x := t) (continuous_id.max continuous_const).continuousAt
+  have hI : LocallyIntegrable ((Ioi (1 : ℝ)).indicator P) volume :=
+    hP.locallyIntegrable.indicator measurableSet_Ioi
+  apply hI.congr
+  have he : ∀ᵐ x : ℝ ∂volume, x ≠ 1 := by
+    simp [ae_iff]
+  filter_upwards [he] with x hx
+  by_cases h : 1 < x
+  · rw [indicator_of_mem h]
+    simp [P, introTracePower, h, max_eq_left h.le]
+  · rw [indicator_of_notMem h]
+    simp [introTracePower, h, hx]
+
+private theorem introTraceApprox_logProfile (h ρ : ℕ → ℝ → ℝ)
+    (hA : IsIntroTraceApproximation h ρ) (n : ℕ) (z : ℂ) :
+    let f := fun x ↦ introTraceApprox (h n) (ρ n) z (Real.exp x)
+    ContDiff ℝ (⊤ : ℕ∞) f ∧ HasCompactSupport f := by
+  intro f
+  obtain ⟨hh, _, _, _, _, hρ⟩ := hA
+  have hc : HasCompactSupport (fun u ↦ (ρ n u : ℂ)) := by
+    apply HasCompactSupport.comp_left (g := Complex.ofReal) _ (by simp)
+    exact isCompact_Icc.of_isClosed_subset (isClosed_tsupport _) (hρ n).2.2.2.1
+  have hm : ContDiff ℝ (⊤ : ℕ∞) (fun u ↦ (ρ n u : ℂ)) :=
+    Complex.ofRealCLM.contDiff.comp (hρ n).2.1
+  have hs : ContDiff ℝ (⊤ : ℕ∞) (introTraceApprox (h n) (ρ n) z) := by
+    exact (Complex.ofRealCLM.contDiff.comp (hh n).1).mul <|
+      hc.contDiff_convolution_left (ContinuousLinearMap.mul ℝ ℂ) hm (introTracePower_locallyIntegrable z)
+  refine ⟨hs.comp Real.contDiff_exp, ?_⟩
+  have hl : ContinuousOn Real.log (tsupport (h n)) :=
+    Real.continuousOn_log.mono fun x hx ↦ (zero_lt_one.trans ((hh n).2.2.1 hx)).ne'
+  refine exists_compact_iff_hasCompactSupport.mp
+    ⟨Real.log '' tsupport (h n), ((hh n).2.1.image_of_continuousOn hl), fun x hx ↦ ?_⟩
+  have hz : h n (Real.exp x) = 0 := by
+    by_contra hn
+    exact hx ⟨Real.exp x, subset_tsupport _ hn, Real.log_exp x⟩
+  simp [f, introTraceApprox, hz]
+
 /-- Paper: §1.4.2, pp. 28–29. After twisting by the conjugate character
 the approximant is a compactly supported Bruhat test on the idele classes. -/
 theorem introTraceApprox_exists_bruhat (χ : U𝔽) (h ρ : ℕ → ℝ → ℝ)
     (_hA : IsIntroTraceApproximation h ρ) (n : ℕ) (z : ℂ) :
-    ∃ φ : D𝔽, ∀ g, φ.val g = introTraceTest χ (introTraceApprox (h n) (ρ n) z) g := by sorry
+    ∃ φ : D𝔽, ∀ g, φ.val g = introTraceTest χ (introTraceApprox (h n) (ρ n) z) g := by
+  obtain ⟨hs, hc⟩ := introTraceApprox_logProfile h ρ _hA n z
+  obtain ⟨φ, hφ⟩ := exists_characterNormTest (F := F) χ⁻¹ _ hs hc
+  refine ⟨φ, fun g ↦ ?_⟩
+  rw [hφ, introTraceTest]
+  have hg : 0 < N(g) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  simp [Real.exp_log hg, ← Circle.coe_inv_eq_conj, show χ⁻¹ g = (χ g)⁻¹ from rfl]
 
 /-- Paper: §1.4.2, pp. 28–29. The twisted approximant satisfies the second
 standing hypothesis of the trace identity, vanishing at every norm-one class. -/
