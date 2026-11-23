@@ -1011,13 +1011,69 @@ theorem introTraceApprox_spectral_summable (χ : U𝔽) (h ρ : ℕ → ℝ → 
     Summable (fun r : windowZeros(χ, a) ↦
       (zeroOrder(χ, r.val) : ℂ) * introTraceMellin approx(h, ρ, n, z) (r.val - 1 / 2)) := by sorry
 
+/-- Paper: §1.4.3, p. 29, for the proof that the zero sum is entire. Weighted zero count:
+for every unitary character `χ` and every half-width `a`, the zeros of the completed Hecke
+L-function in the open window `|Re s - 1/2| < a`, counted with their orders, satisfy
+`∑ ord(ρ) / (1 + |Im ρ|)² < ∞`. This is the classical consequence of the zero count
+`N(T + 1) - N(T) = O(log T)` for Hecke L-functions. -/
+private theorem introTraceApprox_spectral_differentiable_zeroCount (χ : U𝔽) (a : ℝ) :
+    Summable (fun r : windowZeros(χ, a) ↦ (zeroOrder(χ, r.val) : ℝ) / (1 + |r.val.im|) ^ 2) := by
+  sorry
+
+/-- Paper: §§1.4.2–1.4.3, pp. 28–29. At a fixed cutoff and a fixed Mellin variable `s`, the
+Mellin transform of the approximant is entire in the parameter `z`. The approximant is
+supported in a fixed compact subset of `(1, ∞)` and is entire in `z` at each radius
+(`introTraceApprox_differentiable`), with bounds locally uniform in `z`. -/
+private theorem introTraceApprox_spectral_differentiable_mellin_entire (h ρ : ℕ → ℝ → ℝ)
+    (_hA : IsIntroTraceApproximation h ρ) (n : ℕ) (s : ℂ) :
+    Differentiable ℂ (fun z ↦ introTraceMellin approx(h, ρ, n, z) s) := by
+  sorry
+
+/-- Paper: §§1.4.2–1.4.3, pp. 28–29. At a fixed cutoff the Mellin transforms of the approximants
+decay like `(1 + |Im s|)⁻²` on vertical strips, uniformly for `z` in a compact set. The approximant
+is the cutoff times the mollified power, a smooth function supported in a fixed compact subset
+of `(1, ∞)` whose radial derivatives are bounded locally uniformly in `z`. Two integrations by
+parts in the logarithmic coordinate give the bound. -/
+private theorem introTraceApprox_spectral_differentiable_mellin_decay (h ρ : ℕ → ℝ → ℝ)
+    (_hA : IsIntroTraceApproximation h ρ) (n : ℕ) (K : Set ℂ) (_hK : IsCompact K) (b : ℝ) :
+    ∃ C : ℝ, ∀ z ∈ K, ∀ s : ℂ, |s.re| ≤ b →
+      ‖introTraceMellin approx(h, ρ, n, z) s‖ ≤ C / (1 + |s.im|) ^ 2 := by
+  sorry
+
 /-- Paper: §1.4.3, p. 29. Each fixed-cutoff zero sum is entire in the
 test parameter.
 Deviation: The sum uses full zero orders and the corrected centered window.
 Passing to a holomorphic limit needs a further estimate on the zero sum. -/
 theorem introTraceApprox_spectral_differentiable (χ : U𝔽) (h ρ : ℕ → ℝ → ℝ)
     (_hA : IsIntroTraceApproximation h ρ) (n : ℕ) (a : ℝ) (_ha : 0 < a) :
-    Differentiable ℂ (fun z ↦ introTraceSpectralSum χ approx(h, ρ, n, z) a) := by sorry
+    Differentiable ℂ (fun z ↦ introTraceSpectralSum χ approx(h, ρ, n, z) a) := by
+  intro z₀
+  have hU : IsOpen (Metric.ball z₀ 1) := Metric.isOpen_ball
+  obtain ⟨C, hC⟩ := introTraceApprox_spectral_differentiable_mellin_decay h ρ _hA n
+    (Metric.closedBall z₀ 1) (isCompact_closedBall z₀ 1) a
+  have hsum := (introTraceApprox_spectral_differentiable_zeroCount χ a).mul_left (max C 0)
+  have hdiff : DifferentiableOn ℂ (fun z ↦ ∑' r : windowZeros(χ, a),
+      (zeroOrder(χ, r.val) : ℂ) * introTraceMellin approx(h, ρ, n, z) (r.val - 1 / 2))
+      (Metric.ball z₀ 1) := by
+    refine Complex.differentiableOn_tsum_of_summable_norm hsum (fun r ↦
+      ((introTraceApprox_spectral_differentiable_mellin_entire h ρ _hA n _).const_mul _).differentiableOn)
+      hU (fun r z hz ↦ ?_)
+    have hpos : (0 : ℝ) < (zeroOrder(χ, r.val) : ℝ) := Int.cast_pos.mpr r.property.1
+    have hre : |(r.val - 1 / 2).re| ≤ a := by
+      simpa using r.property.2.le
+    have hb := hC z (Metric.ball_subset_closedBall hz) _ hre
+    have him : (r.val - 1 / 2).im = r.val.im := by simp
+    rw [him] at hb
+    have hd : 0 < (1 + |r.val.im|) ^ 2 := by positivity
+    rw [norm_mul, Complex.norm_intCast, abs_of_pos hpos]
+    calc (zeroOrder(χ, r.val) : ℝ) * ‖introTraceMellin approx(h, ρ, n, z) (r.val - 1 / 2)‖
+        ≤ (zeroOrder(χ, r.val) : ℝ) * (max C 0 / (1 + |r.val.im|) ^ 2) := by
+          refine mul_le_mul_of_nonneg_left (hb.trans ?_) hpos.le
+          exact div_le_div_of_nonneg_right (le_max_left _ _) hd.le
+      _ = max C 0 * ((zeroOrder(χ, r.val) : ℝ) / (1 + |r.val.im|) ^ 2) := by ring
+  unfold introTraceSpectralSum
+  exact (hdiff z₀ (Metric.mem_ball_self one_pos)).differentiableAt
+    (hU.mem_nhds (Metric.mem_ball_self one_pos))
 
 /-- At parameter two the radial approximant is real and nonnegative. -/
 private theorem introTraceApprox_rat_spectral_tendsto_atBot_profile (h ρ : ℕ → ℝ → ℝ)
