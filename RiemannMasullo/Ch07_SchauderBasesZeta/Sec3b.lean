@@ -1020,6 +1020,794 @@ open Classical
 local notation "absPW(" h ", " b ", " ω ")" => sLocalAbsolutePW h b (Z₀(_)) ω
 local notation "invPW(" h ", " b ", " ω ")" => sLocalInvariantPW h b (Z₀(_)) ω
 
+section SLocalAbsolutePWPrincipalValue
+
+private theorem sLocalAbsolutePW_picTrivial_uniformizer
+    (hPic : PicTrivial) (v : V) (hv : v ∉ S) :
+    ∃ ξ : Fˣ, v.valuation F ξ = WithZero.exp (-1 : ℤ) ∧
+      ∀ w ∉ S, w ≠ v → w.valuation F ξ = 1 := by
+  let O_S := (S : Set V).integer F
+  have : Fact (IsMulTorsion (ClassGroup (𝓞 F))) := ⟨fun x ↦ isOfFinOrder_of_finite x⟩
+  have : Subsingleton (ClassGroup O_S) := (ClassGroup.equivPic O_S).toEquiv.subsingleton
+  let I : Ideal O_S :=
+    { carrier := {x : O_S | v.valuation F (x : F) < 1}
+      zero_mem' := by simp
+      add_mem' := fun {x y} hx hy ↦
+        lt_of_le_of_lt (ValuationClass.map_add_le_max (v.valuation F) (x : F) (y : F)) (max_lt hx hy)
+      smul_mem' := fun c {x} hx ↦ by
+        change v.valuation F ((c : F) * (x : F)) < 1
+        rw [map_mul]
+        calc
+          v.valuation F (c : F) * v.valuation F (x : F)
+              ≤ 1 * v.valuation F (x : F) :=
+            mul_le_mul_of_nonneg_right (Set.integer_valuation_le_one (S : Set V) F c hv) zero_le
+          _ = v.valuation F (x : F) := one_mul _
+          _ < 1 := hx }
+  have hI_prime : I.IsPrime := by
+    refine ⟨?_, fun {x y} hxy ↦ ?_⟩
+    · intro h1
+      have h1' : (1 : O_S) ∈ I := h1.symm ▸ trivial
+      have h1_lt : v.valuation F (1 : F) < 1 := h1'
+      simp at h1_lt
+    · change v.valuation F ((x : F) * (y : F)) < 1 at hxy
+      rw [map_mul] at hxy
+      by_contra hnot
+      rw [not_or] at hnot
+      have hx : (1 : WithZero (Multiplicative ℤ)) ≤ v.valuation F (x : F) :=
+        not_lt.mp hnot.1
+      have hy : (1 : WithZero (Multiplicative ℤ)) ≤ v.valuation F (y : F) :=
+        not_lt.mp hnot.2
+      exact (lt_self_iff_false (1 : WithZero (Multiplicative ℤ))).mp
+        (lt_of_le_of_lt (by simpa using mul_le_mul' hx hy) hxy)
+  obtain ⟨π₀, hπ₀⟩ := v.intValuation_exists_uniformizer
+  have hπ₀_val : v.valuation F (π₀ : F) = WithZero.exp (-1 : ℤ) := by
+    simpa [HeightOneSpectrum.valuation_of_algebraMap] using hπ₀
+  have hπ₀_ne : (π₀ : F) ≠ 0 := by
+    intro h0
+    rw [h0, map_zero] at hπ₀_val
+    exact absurd hπ₀_val WithZero.zero_ne_coe
+  have hπ₀_mem : (π₀ : F) ∈ O_S := fun w _ ↦ HeightOneSpectrum.valuation_le_one w π₀
+  have hI_ne_bot : I ≠ ⊥ := by
+    intro hbot
+    have hmem : (⟨(π₀ : F), hπ₀_mem⟩ : O_S) ∈ I := by
+      change v.valuation F (π₀ : F) < 1
+      rw [hπ₀_val]
+      decide
+    rw [hbot, Ideal.mem_bot] at hmem
+    exact hπ₀_ne (congrArg Subtype.val hmem)
+  have hprinc : Submodule.IsPrincipal (I : Submodule O_S O_S) :=
+    (ClassGroup.mk0_eq_one_iff (mem_nonZeroDivisors_iff_ne_zero.mpr hI_ne_bot)).mp
+      (Subsingleton.elim _ _)
+  obtain ⟨ξ, hξ⟩ := hprinc
+  have hξ_eq : I = Ideal.span ({ξ} : Set O_S) := hξ
+  have hξ_mem : ξ ∈ I := by
+    rw [hξ_eq]
+    exact Ideal.subset_span (Set.mem_singleton ξ)
+  have hπ₀_in_I : (⟨(π₀ : F), hπ₀_mem⟩ : O_S) ∈ I := by
+    change v.valuation F (π₀ : F) < 1
+    rw [hπ₀_val]
+    decide
+  rw [hξ_eq] at hπ₀_in_I
+  obtain ⟨c, hc⟩ := Ideal.mem_span_singleton.mp hπ₀_in_I
+  have hval_v : v.valuation F (ξ : F) = WithZero.exp (-1 : ℤ) := by
+    have hle : v.valuation F (ξ : F) ≤ WithZero.exp (-1 : ℤ) := by
+      have hlt : v.valuation F (ξ : F) < 1 := hξ_mem
+      rcases eq_or_ne (v.valuation F (ξ : F)) 0 with h0 | hne
+      · simp [h0]
+      · obtain ⟨m, hm⟩ := WithZero.ne_zero_iff_exists.mp hne
+        rw [← hm] at hlt ⊢
+        exact WithZero.coe_le_coe.mpr (Int.le_sub_one_of_lt (WithZero.coe_lt_coe.mp hlt))
+    have hge : WithZero.exp (-1 : ℤ) ≤ v.valuation F (ξ : F) := by
+      calc
+        WithZero.exp (-1 : ℤ) = v.valuation F (π₀ : F) := hπ₀_val.symm
+        _ = v.valuation F ((ξ : F) * (c : F)) := congrArg (v.valuation F) (congrArg Subtype.val hc)
+        _ = v.valuation F (ξ : F) * v.valuation F (c : F) := map_mul _ _ _
+        _ ≤ v.valuation F (ξ : F) * 1 :=
+          mul_le_mul_of_nonneg_left (Set.integer_valuation_le_one (S : Set V) F c hv) zero_le
+        _ = v.valuation F (ξ : F) := mul_one _
+    exact le_antisymm hle hge
+  have hξ_ne : (ξ : F) ≠ 0 := by
+    intro h0
+    rw [h0, map_zero] at hval_v
+    exact absurd hval_v WithZero.zero_ne_coe
+  refine ⟨Units.mk0 (ξ : F) hξ_ne, hval_v, fun w hw hwv ↦ ?_⟩
+  refine le_antisymm (Set.integer_valuation_le_one (S : Set V) F ξ hw) ?_
+  by_contra hlt
+  push Not at hlt
+  have hcop : w.asIdeal ⊔ v.asIdeal = ⊤ :=
+    w.isMaximal.coprime_of_ne v.isMaximal (fun hvw ↦ hwv (HeightOneSpectrum.ext hvw))
+  obtain ⟨a, ha, b, hb, hab⟩ :=
+    Submodule.mem_sup.mp (hcop.symm ▸ (Submodule.mem_top : (1 : 𝓞 F) ∈ (⊤ : Ideal (𝓞 F))))
+  have ha_mem : ((a : 𝓞 F) : F) ∈ O_S := fun u _ ↦ HeightOneSpectrum.valuation_le_one u a
+  have hb_mem : ((b : 𝓞 F) : F) ∈ O_S := fun u _ ↦ HeightOneSpectrum.valuation_le_one u b
+  have hb_in_I : (⟨((b : 𝓞 F) : F), hb_mem⟩ : O_S) ∈ I := by
+    change v.valuation F (b : F) < 1
+    simpa [HeightOneSpectrum.valuation_of_algebraMap] using
+      (v.intValuation_lt_one_iff_mem b).mpr hb
+  rw [hξ_eq] at hb_in_I
+  obtain ⟨d, hd⟩ := Ideal.mem_span_singleton.mp hb_in_I
+  have hsum : (1 : F) = (a : F) + (ξ : F) * (d : F) := by
+    have h1 := congrArg (algebraMap (𝓞 F) F) hab
+    have h2 := congrArg Subtype.val hd
+    simpa using h1.symm.trans (congrArg ((a : F) + ·) h2)
+  have ha_lt : w.valuation F (a : F) < 1 := by
+    simpa [HeightOneSpectrum.valuation_of_algebraMap] using
+      (w.intValuation_lt_one_iff_mem a).mpr ha
+  have hxd_lt : w.valuation F ((ξ : F) * (d : F)) < 1 := by
+    rw [map_mul]
+    calc
+      w.valuation F (ξ : F) * w.valuation F (d : F)
+          ≤ w.valuation F (ξ : F) * 1 :=
+        mul_le_mul_of_nonneg_left (Set.integer_valuation_le_one (S : Set V) F d hw) zero_le
+      _ = w.valuation F (ξ : F) := mul_one _
+      _ < 1 := hlt
+  have h1_lt : w.valuation F (1 : F) < 1 := by
+    rw [hsum]
+    exact lt_of_le_of_lt (ValuationClass.map_add_le_max (w.valuation F) _ _) (max_lt ha_lt hxd_lt)
+  simp at h1_lt
+
+private theorem sLocalAbsolutePW_pv_gaussian (v : V) (π : (v.adicCompletion F)ˣ)
+    (hπ : (Valued.v : Valuation (v.adicCompletion F) _).IsUniformizer π.val) :
+    finitePlacePrincipalValue v (finiteStandardGaussian v 1) =
+      finiteStandardGaussian v 1 - schwartzBruhatUnitTranslate π (finiteStandardGaussian v 1) := by
+  let : MeasurableSpace (v.adicCompletion F)ˣ := borel _
+  have : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+  ext x
+  rw [finitePlacePrincipalValue_spec v π hπ]
+  change finitePlacePrincipalValueFun v π (finiteStandardGaussian v 1) x =
+    finiteStandardGaussian v 1 x - schwartzBruhatUnitTranslate π (finiteStandardGaussian v 1) x
+  unfold finitePlacePrincipalValueFun
+  have hpos := (finitePlacePrincipalValue_integrable v π (finiteStandardGaussian v 1) x).1
+  have hcongr :
+      ∫ u in (HeightOneSpectrum.adicCompletionIntegers F v).units,
+          finiteStandardGaussian v 1
+            (Multiplicative.ofAdd ((↑u⁻¹ : v.adicCompletion F) * ((↑π⁻¹ : v.adicCompletion F) * x.toAdd)))
+        ∂(finiteLocalMultiplicativeTamagawaMeasure F v) =
+      ∫ _u in (HeightOneSpectrum.adicCompletionIntegers F v).units,
+          finiteStandardGaussian v 1 (Multiplicative.ofAdd ((↑π⁻¹ : v.adicCompletion F) * x.toAdd))
+        ∂(finiteLocalMultiplicativeTamagawaMeasure F v) := by
+    refine MeasureTheory.setIntegral_congr_fun
+      (Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)).measurableSet fun u hu ↦ ?_
+    change finiteStandardGaussianValue v 1 ((↑u⁻¹ : v.adicCompletion F) * ((↑π⁻¹ : v.adicCompletion F) * x.toAdd)) =
+      finiteStandardGaussianValue v 1 ((↑π⁻¹ : v.adicCompletion F) * x.toAdd)
+    unfold finiteStandardGaussianValue
+    have hu_val : Valued.v ((↑u : v.adicCompletion F)⁻¹) = 1 := by
+      have hu1 := HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp hu
+      rw [map_inv₀, hu1, inv_one]
+    have hmem_iff :
+        ((↑u : v.adicCompletion F)⁻¹ * ((↑π : v.adicCompletion F)⁻¹ * x.toAdd) ∈
+          (HeightOneSpectrum.adicCompletionIntegers F v : Set (v.adicCompletion F))) ↔
+        ((↑π : v.adicCompletion F)⁻¹ * x.toAdd ∈
+          (HeightOneSpectrum.adicCompletionIntegers F v : Set (v.adicCompletion F))) := by
+      simp only [SetLike.mem_coe, HeightOneSpectrum.mem_adicCompletionIntegers,
+        map_mul, hu_val, one_mul]
+    simp [Set.indicator_apply, hmem_iff]
+  rw [hcongr, MeasureTheory.setIntegral_const, Complex.real_smul]
+  have hne : (finiteLocalMultiplicativeTamagawaMeasure F v).real
+      (HeightOneSpectrum.adicCompletionIntegers F v).units ≠ 0 := hpos.ne'
+  have htrans : schwartzBruhatUnitTranslate π (finiteStandardGaussian v 1) x =
+      finiteStandardGaussian v 1 (Multiplicative.ofAdd ((↑π⁻¹ : v.adicCompletion F) * x.toAdd)) := by
+    rw [show x = Multiplicative.ofAdd x.toAdd from rfl, schwartzBruhatUnitTranslate_apply]
+    rfl
+  rw [htrans, ← mul_assoc, inv_mul_cancel₀ (Complex.ofReal_ne_zero.mpr hne), one_mul]
+
+private def singleFinitePlaceIdele (T : Finset V) {v : V} (_hv : v ∈ T)
+    (π : (v.adicCompletion F)ˣ) : (SAdeleRing F T)ˣ where
+  val := (1, fun w : T ↦ if h : w.1 = v then h ▸ (π : v.adicCompletion F) else 1)
+  inv := (1, fun w : T ↦ if h : w.1 = v then h ▸ ((π⁻¹ : (v.adicCompletion F)ˣ) : v.adicCompletion F) else 1)
+  val_inv := Prod.ext (one_mul _) (funext fun w ↦ by
+    rw [Prod.snd_mul, Pi.mul_apply, Prod.snd_one, Pi.one_apply]
+    dsimp only
+    split_ifs with h
+    · subst h; simp
+    · exact mul_one 1)
+  inv_val := Prod.ext (one_mul _) (funext fun w ↦ by
+    rw [Prod.snd_mul, Pi.mul_apply, Prod.snd_one, Pi.one_apply]
+    dsimp only
+    split_ifs with h
+    · subst h; simp
+    · exact mul_one 1)
+
+private theorem sLocalAbsolutePW_tensor_ext {ι : Type*} [Fintype ι] {E X Y : Type*} {W : ι → Type*}
+    [AddCommGroup E] [Module ℂ E] [∀ i, AddCommGroup (W i)] [∀ i, Module ℂ (W i)]
+    [AddCommGroup X] [Module ℂ X] [AddCommGroup Y] [Module ℂ Y]
+    (e : TensorProduct ℂ E (PiTensorProduct ℂ W) →ₗ[ℂ] X) (he : Function.Surjective e)
+    (L₁ L₂ : X →ₗ[ℂ] Y)
+    (h : ∀ a g, L₁ (e (TensorProduct.tmul ℂ a (PiTensorProduct.tprod ℂ g))) =
+      L₂ (e (TensorProduct.tmul ℂ a (PiTensorProduct.tprod ℂ g)))) :
+    L₁ = L₂ := by
+  apply LinearMap.ext
+  intro x
+  obtain ⟨t, rfl⟩ := he x
+  have key : L₁ ∘ₗ e = L₂ ∘ₗ e :=
+    TensorProduct.ext (LinearMap.ext fun a ↦ PiTensorProduct.ext (MultilinearMap.ext fun g ↦ h a g))
+  exact LinearMap.congr_fun key t
+
+private theorem sLocalAbsolutePW_pv_singleton_transition (hST : S ⊆ T) {v : V}
+    (hvS : v ∉ S) (hvT : v ∈ T) (π : (v.adicCompletion F)ˣ)
+    (hπ : (Valued.v : Valuation (v.adicCompletion F) _).IsUniformizer π.val) (f₀ : B(S)) :
+    sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr hvT) (Π(hST) f₀) =
+      Π(hST) f₀ -
+        schwartzBruhatUnitTranslate (singleFinitePlaceIdele T hvT π) (Π(hST) f₀) := by
+  let eS := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+  have heS := (sAdeleSchwartz_inductiveTensor_equiv F S).choose_spec
+  let eT := (sAdeleSchwartz_inductiveTensor_equiv F T).choose
+  have heT := (sAdeleSchwartz_inductiveTensor_equiv F T).choose_spec
+  let translateLin : B(T) →ₗ[ℂ] B(T) :=
+    { toFun := schwartzBruhatUnitTranslate (singleFinitePlaceIdele T hvT π)
+      map_add' := fun _ _ ↦ by ext x; rfl
+      map_smul' := fun _ _ ↦ by ext x; rfl }
+  let L₁ : B(S) →ₗ[ℂ] B(T) :=
+    (sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr hvT)).comp (Π(hST))
+  let L₂ : B(S) →ₗ[ℂ] B(T) := Π(hST) - translateLin.comp (Π(hST))
+  suffices hL : L₁ = L₂ from DFunLike.congr_fun hL f₀
+  refine sLocalAbsolutePW_tensor_ext eS.toLinearEquiv.toLinearMap eS.surjective L₁ L₂ fun a b ↦ ?_
+  let extend : ∀ w : T, SchwartzBruhat (Multiplicative (w.1.adicCompletion F)) :=
+    fun w ↦ if hw : w.1 ∈ S then b ⟨w.1, hw⟩ else finiteStandardGaussian w.1 1
+  have hExt : ∀ (w : T), w.1 ∉ S → ∀ y : w.1.adicCompletion F,
+      extend w (Multiplicative.ofAdd y) =
+        (HeightOneSpectrum.adicCompletionIntegers F w.1 : Set (w.1.adicCompletion F)).indicator
+          (fun _ ↦ 1) y := by
+    intro w hw y
+    change (dite (w.1 ∈ S) (fun hw' ↦ b ⟨w.1, hw'⟩)
+      (fun _ ↦ finiteStandardGaussian w.1 1)) (Multiplicative.ofAdd y) = _
+    split_ifs
+    change finiteStandardGaussianValue w.1 1 y = _
+    unfold finiteStandardGaussianValue
+    simp
+  have heS_ext : ∀ x : SAdeleRing F S,
+      eS (TensorProduct.tmul ℂ a (PiTensorProduct.tprod ℂ b)) (Multiplicative.ofAdd x) =
+        a (Multiplicative.ofAdd x.1) *
+          ∏ w : S, extend ⟨w.1, hST w.2⟩ (Multiplicative.ofAdd (x.2 w)) := by
+    intro x
+    refine (heS a b x).trans (congrArg _ (Finset.prod_congr rfl fun w _ ↦ ?_))
+    have hbw : extend ⟨w.1, hST w.2⟩ = b w := by
+      change (dite (w.1 ∈ S) (fun hw' ↦ b ⟨w.1, hw'⟩) (fun _ ↦ finiteStandardGaussian w.1 1)) = b w
+      split_ifs with h
+      · rfl
+      · exact False.elim (h w.2)
+    rw [hbw]
+  have hPi : Π(hST) (eS (TensorProduct.tmul ℂ a (PiTensorProduct.tprod ℂ b))) =
+      eT (TensorProduct.tmul ℂ a (PiTensorProduct.tprod ℂ extend)) := by
+    ext x
+    change (Π(hST) (eS (TensorProduct.tmul ℂ a (PiTensorProduct.tprod ℂ b)))) (Multiplicative.ofAdd x.toAdd) =
+      (eT (TensorProduct.tmul ℂ a (PiTensorProduct.tprod ℂ extend))) (Multiplicative.ofAdd x.toAdd)
+    exact (sAdeleSchwartzTransition_pure F hST a extend hExt _ heS_ext x.toAdd).trans
+      (heT a extend x.toAdd).symm
+  refine Eq.trans (congrArg (sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr hvT)) hPi) ?_
+  refine Eq.trans (sAdelePrincipalValue_tmul (Finset.singleton_subset_iff.mpr hvT) a extend) ?_
+  refine Eq.trans ?_ (congrArg (fun z ↦ z - schwartzBruhatUnitTranslate (singleFinitePlaceIdele T hvT π) z) hPi).symm
+  ext x
+  have heL := heT a (fun w : T ↦
+    if w.1 ∈ ({v} : Finset V) then finitePlacePrincipalValue w.1 (extend w) else extend w) x.toAdd
+  have heR := heT a extend x.toAdd
+  have heR_shift := heT a extend
+    ((↑((singleFinitePlaceIdele T hvT π)⁻¹) : SAdeleRing F T) * x.toAdd)
+  change eT (TensorProduct.tmul ℂ a (PiTensorProduct.tprod ℂ fun w ↦
+      if w.1 ∈ ({v} : Finset V) then finitePlacePrincipalValue w.1 (extend w) else extend w))
+      (Multiplicative.ofAdd x.toAdd) =
+    eT (TensorProduct.tmul ℂ a (PiTensorProduct.tprod ℂ extend)) (Multiplicative.ofAdd x.toAdd) -
+      (schwartzBruhatUnitTranslate (singleFinitePlaceIdele T hvT π)
+        (eT (TensorProduct.tmul ℂ a (PiTensorProduct.tprod ℂ extend)))) (Multiplicative.ofAdd x.toAdd)
+  have hshift_eval :
+      (schwartzBruhatUnitTranslate (singleFinitePlaceIdele T hvT π)
+        (eT (TensorProduct.tmul ℂ a (PiTensorProduct.tprod ℂ extend))))
+        (Multiplicative.ofAdd x.toAdd) =
+      a (Multiplicative.ofAdd x.toAdd.1) *
+        ∏ w : T, extend w (Multiplicative.ofAdd
+          (((↑((singleFinitePlaceIdele T hvT π)⁻¹) : SAdeleRing F T) * x.toAdd).2 w)) := by
+    rw [schwartzBruhatUnitTranslate_apply]
+    change eT (TensorProduct.tmul ℂ a (PiTensorProduct.tprod ℂ extend))
+      (Multiplicative.ofAdd ((↑((singleFinitePlaceIdele T hvT π)⁻¹) : SAdeleRing F T) * x.toAdd)) = _
+    refine heR_shift.trans ?_
+    simp [singleFinitePlaceIdele]
+  refine heL.trans (Eq.trans ?_ (congrArg₂ (· - ·) heR hshift_eval).symm)
+  let vT : T := ⟨v, hvT⟩
+  have hv_eq : extend vT = finiteStandardGaussian v 1 := by
+    change (dite (vT.1 ∈ S) (fun hw' ↦ b ⟨vT.1, hw'⟩)
+      (fun _ ↦ finiteStandardGaussian vT.1 1)) = finiteStandardGaussian v 1
+    split_ifs with h
+    · exact False.elim (hvS h)
+    · rfl
+  have hprodL :
+      (∏ w : T, (if w.1 ∈ ({v} : Finset V) then finitePlacePrincipalValue w.1 (extend w) else extend w)
+          (Multiplicative.ofAdd (x.toAdd.2 w))) =
+      (finitePlacePrincipalValue v (finiteStandardGaussian v 1) (Multiplicative.ofAdd (x.toAdd.2 vT))) *
+        ∏ w ∈ Finset.univ.erase vT, extend w (Multiplicative.ofAdd (x.toAdd.2 w)) := by
+    rw [← Finset.mul_prod_erase Finset.univ _ (Finset.mem_univ vT)]
+    refine congrArg₂ (· * ·) ?_ (Finset.prod_congr rfl fun w hw ↦ ?_)
+    · simp [vT, hv_eq]
+    · have hw_ne : w.1 ≠ v := fun h ↦ (Finset.mem_erase.mp hw).1 (Subtype.ext h)
+      simp [hw_ne]
+  have hprodR1 :
+      (∏ w : T, extend w (Multiplicative.ofAdd (x.toAdd.2 w))) =
+      finiteStandardGaussian v 1 (Multiplicative.ofAdd (x.toAdd.2 vT)) *
+        ∏ w ∈ Finset.univ.erase vT, extend w (Multiplicative.ofAdd (x.toAdd.2 w)) := by
+    rw [← Finset.mul_prod_erase Finset.univ _ (Finset.mem_univ vT), hv_eq]
+  have hprodR2 :
+      (∏ w : T, extend w (Multiplicative.ofAdd
+          (((↑((singleFinitePlaceIdele T hvT π)⁻¹) : SAdeleRing F T) * x.toAdd).2 w))) =
+      finiteStandardGaussian v 1 (Multiplicative.ofAdd ((↑π⁻¹ : v.adicCompletion F) * x.toAdd.2 vT)) *
+        ∏ w ∈ Finset.univ.erase vT, extend w (Multiplicative.ofAdd (x.toAdd.2 w)) := by
+    rw [← Finset.mul_prod_erase Finset.univ _ (Finset.mem_univ vT)]
+    refine congrArg₂ (· * ·) ?_ (Finset.prod_congr rfl fun w hw ↦ ?_)
+    · simp [vT, hv_eq, singleFinitePlaceIdele]
+    · have hw_ne : w.1 ≠ v := fun h ↦ (Finset.mem_erase.mp hw).1 (Subtype.ext h)
+      simp [singleFinitePlaceIdele, hw_ne]
+  have hpv := congrArg
+    (fun g : SchwartzBruhat (Multiplicative (v.adicCompletion F)) ↦
+      g (Multiplicative.ofAdd (x.toAdd.2 vT)))
+    (sLocalAbsolutePW_pv_gaussian v π hπ)
+  have hpv_shift :
+      (schwartzBruhatUnitTranslate π (finiteStandardGaussian v 1)) (Multiplicative.ofAdd (x.toAdd.2 vT)) =
+      finiteStandardGaussian v 1 (Multiplicative.ofAdd ((↑π⁻¹ : v.adicCompletion F) * x.toAdd.2 vT)) := by
+    rw [schwartzBruhatUnitTranslate_apply]
+  change finitePlacePrincipalValue v (finiteStandardGaussian v 1) (Multiplicative.ofAdd (x.toAdd.2 vT)) =
+    finiteStandardGaussian v 1 (Multiplicative.ofAdd (x.toAdd.2 vT)) -
+      (schwartzBruhatUnitTranslate π (finiteStandardGaussian v 1)) (Multiplicative.ofAdd (x.toAdd.2 vT)) at hpv
+  rw [hpv_shift] at hpv
+  rw [hprodL, hprodR1, hprodR2]
+  change a (Multiplicative.ofAdd x.toAdd.1) *
+      (finitePlacePrincipalValue v (finiteStandardGaussian v 1) (Multiplicative.ofAdd (x.toAdd.2 vT)) * _) =
+    a (Multiplicative.ofAdd x.toAdd.1) *
+      (finiteStandardGaussian v 1 (Multiplicative.ofAdd (x.toAdd.2 vT)) * _) -
+    a (Multiplicative.ofAdd x.toAdd.1) *
+      (finiteStandardGaussian v 1 (Multiplicative.ofAdd ((↑π⁻¹ : v.adicCompletion F) * x.toAdd.2 vT)) * _)
+  rw [hpv]
+  ring
+
+private theorem sLocalAbsolutePW_pv_empty (h : (∅ : Finset V) ⊆ T) (χ : PontryaginDual J₁(T)) :
+    PV(h, χ) = LinearMap.id := by
+  apply LinearMap.ext
+  intro g
+  obtain ⟨f, rfl⟩ := Submodule.Quotient.mk_surjective _ g
+  change PV(h, χ) (Submodule.Quotient.mk f) = Submodule.Quotient.mk f
+  rw [sLocalHomogeneousThetaPrincipalValue_mk]
+  congr 1
+  suffices hlin : sAdelePrincipalValue F h = LinearMap.id from DFunLike.congr_fun hlin f
+  let eT := (sAdeleSchwartz_inductiveTensor_equiv F T).choose
+  refine sLocalAbsolutePW_tensor_ext eT.toLinearEquiv.toLinearMap eT.surjective
+    (sAdelePrincipalValue F h) LinearMap.id fun a b ↦ ?_
+  refine (sAdelePrincipalValue_tmul h a b).trans ?_
+  simp only [Finset.notMem_empty, ↓reduceIte]
+  rfl
+
+private theorem sLocalAbsolutePW_pv_insert (R' : Finset V) (v : V) (hv : v ∉ R')
+    (hRT : insert v R' ⊆ T) (χ : PontryaginDual J₁(T)) :
+    PV(hRT, χ) =
+      (PV(Finset.singleton_subset_iff.mpr (hRT (Finset.mem_insert_self v R')), χ)).comp
+        (PV((Finset.subset_insert v R').trans hRT, χ)) := by
+  apply LinearMap.ext
+  intro g
+  obtain ⟨f, rfl⟩ := Submodule.Quotient.mk_surjective _ g
+  change PV(hRT, χ) (Submodule.Quotient.mk f) =
+    PV(Finset.singleton_subset_iff.mpr (hRT (Finset.mem_insert_self v R')), χ)
+      (PV((Finset.subset_insert v R').trans hRT, χ) (Submodule.Quotient.mk f))
+  rw [sLocalHomogeneousThetaPrincipalValue_mk, sLocalHomogeneousThetaPrincipalValue_mk,
+    sLocalHomogeneousThetaPrincipalValue_mk]
+  congr 1
+  let hvSub : ({v} : Finset V) ⊆ T := Finset.singleton_subset_iff.mpr (hRT (Finset.mem_insert_self v R'))
+  let hR₀T : R' ⊆ T := (Finset.subset_insert v R').trans hRT
+  suffices hlin : sAdelePrincipalValue F hRT =
+      (sAdelePrincipalValue F hvSub).comp (sAdelePrincipalValue F hR₀T) from
+    DFunLike.congr_fun hlin f
+  let eT := (sAdeleSchwartz_inductiveTensor_equiv F T).choose
+  refine sLocalAbsolutePW_tensor_ext eT.toLinearEquiv.toLinearMap eT.surjective
+    (sAdelePrincipalValue F hRT) ((sAdelePrincipalValue F hvSub).comp (sAdelePrincipalValue F hR₀T))
+    fun a b ↦ ?_
+  refine (sAdelePrincipalValue_tmul hRT a b).trans ?_
+  refine Eq.trans ?_ (congrArg (sAdelePrincipalValue F hvSub) (sAdelePrincipalValue_tmul hR₀T a b)).symm
+  refine Eq.trans ?_ (sAdelePrincipalValue_tmul hvSub a _).symm
+  congr 2
+  refine congrArg (PiTensorProduct.tprod ℂ) (funext fun w ↦ ?_)
+  by_cases hwv : w.1 = v
+  · simp [hwv, hv]
+  · simp [hwv]
+
+private theorem sLocalAbsolutePW_unitTranslate_polar (u : (SAdeleRing F T)ˣ) (g : B(T))
+    (hg : g ∈ Z₀(T)) : schwartzBruhatUnitTranslate u g ∈ Z₀(T) := by
+  obtain ⟨h0, h1⟩ := (mem_sAdelePolarSubspace _).mp hg
+  obtain ⟨b, hb⟩ := sLocalAbsolutePW_translate_fourier (F := F) u
+  refine (mem_sAdelePolarSubspace _).mpr ⟨?_, ?_⟩
+  · change schwartzBruhatUnitTranslate u g (Multiplicative.ofAdd 0) = 0
+    rw [schwartzBruhatUnitTranslate_apply, mul_zero]
+    exact h0
+  · rw [hb g 0, mul_zero]
+    exact mul_eq_zero_of_right _ h1
+
+private theorem sLocalAbsolutePW_quotient_unitTranslate (χ : PontryaginDual J₁(T))
+    (u : (SAdeleRing F T)ˣ) (hu : (QuotientGroup.mk u : J(T)) ∈ J₁(T)) (f : B(T)) :
+    q(T, χ) (schwartzBruhatUnitTranslate u f) =
+      (χ ⟨QuotientGroup.mk u, hu⟩ : ℂ) • q(T, χ) f := by
+  let g₀ : J₁(T) := ⟨QuotientGroup.mk u, hu⟩
+  let c : ℂ := ((χ g₀ : Circle) : ℂ)
+  change (LinearMap.ker (sLocalHomogeneousAdelicThetaLinearMap F T χ)).mkQ
+      (schwartzBruhatUnitTranslate u f) =
+    c • (LinearMap.ker (sLocalHomogeneousAdelicThetaLinearMap F T χ)).mkQ f
+  refine Eq.trans ?_ (Submodule.Quotient.mk_smul (LinearMap.ker (sLocalHomogeneousAdelicThetaLinearMap F T χ)) c f)
+  change Submodule.Quotient.mk (schwartzBruhatUnitTranslate u f) = Submodule.Quotient.mk (c • f)
+  rw [Submodule.Quotient.eq, LinearMap.mem_ker, map_sub, map_smul,
+    sLocalHomogeneousTheta_unitTranslate χ g₀ u rfl f, sub_self]
+
+private theorem sLocalAbsolutePW_principalValue_singleton
+    (hST : S ⊆ T) (hPic : PicTrivial) (v : V) (hvS : v ∉ S) (hvT : v ∈ T)
+    (χ : PontryaginDual J₁(T)) (Y : ℝ) (hY : 0 < Y) :
+    (absPW(hST, Y, χ)).map (PV(Finset.singleton_subset_iff.mpr hvT, χ)) ≤
+      absPW(hST, (v.asIdeal.absNorm : ℝ) * Y, χ) := by
+  have hcl : IsClosed (absPW(hST, (v.asIdeal.absNorm : ℝ) * Y, χ) : Set Θ(T, χ)) := by
+    unfold sLocalAbsolutePW
+    exact Submodule.isClosed_topologicalClosure _
+  refine Submodule.map_le_iff_le_comap.mpr (Submodule.topologicalClosure_minimal _ ?_
+    (hcl.preimage (sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding _ χ).continuous))
+  rintro _ ⟨f, ⟨hf_test, hf_Z⟩, rfl⟩
+  obtain ⟨f₀, rfl, hf₀⟩ := (mem_sLocalPWTests hST (sLocalPWBox S Y) f).mp hf_test
+  change PV(Finset.singleton_subset_iff.mpr hvT, χ) (Submodule.Quotient.mk (Π(hST) f₀)) ∈
+    absPW(hST, (v.asIdeal.absNorm : ℝ) * Y, χ)
+  rw [sLocalHomogeneousThetaPrincipalValue_mk]
+  obtain ⟨ξ, hξ_v, hξ_other⟩ := sLocalAbsolutePW_picTrivial_uniformizer hPic v hvS
+  let πv : (v.adicCompletion F)ˣ := Units.map (algebraMap F (v.adicCompletion F)).toMonoidHom ξ
+  have hπv : (Valued.v : Valuation (v.adicCompletion F) _).IsUniformizer πv.val := by
+    rw [Valuation.IsUniformizer.iff,
+      congrArg Units.val (Valuation.IsRankOneDiscrete.generator_eq_exp_neg_one_of_surjective
+        (v.valuedAdicCompletion_surjective F))]
+    exact (HeightOneSpectrum.valuedAdicCompletion_eq_valuation' v (ξ : F)).trans hξ_v
+  let πT := singleFinitePlaceIdele T hvT πv
+  rw [sLocalAbsolutePW_pv_singleton_transition hST hvS hvT πv hπv f₀]
+  change q(T, χ) (Π(hST) f₀ - schwartzBruhatUnitTranslate πT (Π(hST) f₀)) ∈
+    absPW(hST, (v.asIdeal.absNorm : ℝ) * Y, χ)
+  rw [map_sub]
+  refine Submodule.sub_mem _ ?_ ?_
+  · have h1le : (1 : ℝ) ≤ (v.asIdeal.absNorm : ℝ) := by
+      exact_mod_cast Nat.pos_of_ne_zero (mt Ideal.absNorm_eq_zero_iff.mp v.ne_bot)
+    have hY_le : Y ≤ (v.asIdeal.absNorm : ℝ) * Y := le_mul_of_one_le_left hY.le h1le
+    exact sLocalAbsolutePW_mono hST hY_le _ _ (sLocalAbsolutePW_mk_mem hST Y _ χ f₀ hf₀ hf_Z)
+  · have hξ_memT : (ξ : F) ∈ (T : Set V).integer F := by
+      intro w hw
+      have hwS : w ∉ S := fun h ↦ hw (hST h)
+      have hwv : w ≠ v := fun h ↦ hw (h ▸ hvT)
+      rw [hξ_other w hwS hwv]
+    have hξinv_memT : (ξ⁻¹ : F) ∈ (T : Set V).integer F := by
+      intro w hw
+      have hwS : w ∉ S := fun h ↦ hw (hST h)
+      have hwv : w ≠ v := fun h ↦ hw (h ▸ hvT)
+      change w.valuation F (ξ : F)⁻¹ ≤ 1
+      rw [map_inv₀, hξ_other w hwS hwv, inv_one]
+    let u₀ : ((T : Set V).integer F)ˣ :=
+      { val := ⟨ξ, hξ_memT⟩
+        inv := ⟨ξ⁻¹, hξinv_memT⟩
+        val_inv := Subtype.ext (mul_inv_cancel₀ ξ.ne_zero)
+        inv_val := Subtype.ext (inv_mul_cancel₀ ξ.ne_zero) }
+    let ξ₀_T : (SAdeleRing F T)ˣ :=
+      Units.map ((adeleProjection F T).comp (integralAdelesOutside F T).subtype).toMonoidHom
+        (Units.map (integralAdeleDiagonal F T).toMonoidHom u₀)
+    have hξ₀_norm : sIdeleNorm F T ξ₀_T = 1 :=
+      (sIdeleNorm_spec (F := F) (S := T)).2 ⟨u₀, rfl⟩
+    have hξ₀_quot : (QuotientGroup.mk ξ₀_T : J(T)) = 1 :=
+      (sIdeleQuotient_mk_eq_one (F := F) (S := T) ξ₀_T).mpr ⟨u₀, rfl⟩
+    let w₀ : InfinitePlace F := Classical.arbitrary (InfinitePlace F)
+    have hq_pos : 0 < v.asIdeal.absNorm :=
+      Nat.pos_of_ne_zero (mt Ideal.absNorm_eq_zero_iff.mp v.ne_bot)
+    let qNN : ℝ≥0ˣ := Units.mk0 (v.asIdeal.absNorm : ℝ≥0) (Nat.cast_ne_zero.mpr hq_pos.ne')
+    let x₀ : w₀.Completionˣ := infinitePlaceRealPower F w₀ (w₀.mult : ℝ)⁻¹ qNN
+    have hx₀_norm : ‖(x₀ : w₀.Completion)‖ ^ w₀.mult = (v.asIdeal.absNorm : ℝ) := by
+      have hx : ‖(x₀ : w₀.Completion)‖ = (v.asIdeal.absNorm : ℝ) ^ (w₀.mult : ℝ)⁻¹ := by
+        rw [← (InfinitePlace.Completion.isometry_extensionEmbedding w₀).norm_map_of_map_zero
+          (map_zero _) (x₀ : w₀.Completion)]
+        change ‖InfinitePlace.Completion.extensionEmbedding w₀
+          (infinitePlaceRealPower F w₀ (w₀.mult : ℝ)⁻¹ qNN).val‖ = _
+        rw [infinitePlaceRealPower_apply, Complex.norm_real,
+          Real.norm_of_nonneg (Real.rpow_nonneg qNN.val.coe_nonneg _)]
+        simp [qNN]
+      rw [hx, ← Real.rpow_mul_natCast (Nat.cast_nonneg _), inv_mul_cancel₀ w₀.mult_coe_ne_zero,
+        Real.rpow_one]
+    let tInf : (InfiniteAdeleRing F)ˣ :=
+      { val := fun w ↦ if h : w = w₀ then h ▸ (x₀ : w₀.Completion) else 1
+        inv := fun w ↦ if h : w = w₀ then h ▸ ((x₀⁻¹ : w₀.Completionˣ) : w₀.Completion) else 1
+        val_inv := funext fun w ↦ by
+          rw [Pi.mul_apply, Pi.one_apply]
+          split_ifs with h
+          · subst h; simp
+          · exact mul_one 1
+        inv_val := funext fun w ↦ by
+          rw [Pi.mul_apply, Pi.one_apply]
+          split_ifs with h
+          · subst h; simp
+          · exact mul_one 1 }
+    let tS : (SAdeleRing F S)ˣ :=
+      { val := (tInf.val, 1)
+        inv := (tInf.inv, 1)
+        val_inv := Prod.ext tInf.val_inv (one_mul _)
+        inv_val := Prod.ext tInf.inv_val (one_mul _) }
+    let tT : (SAdeleRing F T)ˣ :=
+      { val := (tInf.val, 1)
+        inv := (tInf.inv, 1)
+        val_inv := Prod.ext tInf.val_inv (one_mul _)
+        inv_val := Prod.ext tInf.inv_val (one_mul _) }
+    let f₂ : B(S) := schwartzBruhatUnitTranslate (tS⁻¹) f₀
+    have hf₂_band : inBand(sLocalPWBox S ((v.asIdeal.absNorm : ℝ) * Y), f₂) := by
+      obtain ⟨b, hb⟩ := sLocalAbsolutePW_translate_fourier (F := F) (tS⁻¹)
+      let e : Multiplicative (SAdeleRing F S) ≃ₜ Multiplicative (SAdeleRing F S) :=
+        { toFun := fun z ↦ Multiplicative.ofAdd ((↑(tS⁻¹) : SAdeleRing F S) * z.toAdd)
+          invFun := fun z ↦ Multiplicative.ofAdd ((↑tS : SAdeleRing F S) * z.toAdd)
+          left_inv := fun z ↦ by
+            change Multiplicative.ofAdd ((↑tS : SAdeleRing F S) * ((↑(tS⁻¹) : SAdeleRing F S) * z.toAdd)) = z
+            rw [← mul_assoc, ← Units.val_mul, mul_inv_cancel, Units.val_one, one_mul]
+            rfl
+          right_inv := fun z ↦ by
+            change Multiplicative.ofAdd ((↑(tS⁻¹) : SAdeleRing F S) * ((↑tS : SAdeleRing F S) * z.toAdd)) = z
+            rw [← mul_assoc, ← Units.val_mul, inv_mul_cancel, Units.val_one, one_mul]
+            rfl
+          continuous_toFun := continuous_const_mul (M := SAdeleRing F S) _
+          continuous_invFun := continuous_const_mul (M := SAdeleRing F S) _ }
+      let ψ : Multiplicative (SAdeleRing F S) → ℂ := sAdeleSchwartzFourier f₂
+      let φ : Multiplicative (SAdeleRing F S) → ℂ := sAdeleSchwartzFourier f₀
+      have hψ : ∀ x, ψ x = ((b : ℝ) : ℂ) * φ (e x) := fun x ↦ by
+        change sAdeleSchwartzFourier (schwartzBruhatUnitTranslate (tS⁻¹) f₀)
+          (Multiplicative.ofAdd x.toAdd) = _
+        rw [hb f₀ x.toAdd]
+        rfl
+      have htsup : tsupport ψ ⊆ e ⁻¹' tsupport φ := by
+        refine closure_minimal (fun x hx ↦ subset_tsupport φ ?_)
+          ((isClosed_tsupport φ).preimage e.continuous)
+        intro h0
+        apply hx
+        rw [hψ x, h0, mul_zero]
+      have hcomp_pre : IsCompact (e ⁻¹' tsupport φ) := by
+        have himg : e ⁻¹' tsupport φ = e.symm '' tsupport φ := by
+          ext z
+          simp [e.symm_apply_eq]
+        rw [himg]
+        exact hf₀.1.isCompact.image e.symm.continuous
+      have hcomp_ψ : HasCompactSupport ψ :=
+        hcomp_pre.of_isClosed_subset (isClosed_tsupport ψ) htsup
+      refine ⟨hcomp_ψ, htsup.trans ?_⟩
+      intro x hx
+      have hy : (e x).toAdd ∈ sLocalPWBox S Y := hf₀.2 hx
+      have hx_eq : x.toAdd = (↑tS : SAdeleRing F S) * (e x).toAdd := by
+        change x.toAdd = (↑tS : SAdeleRing F S) * ((↑(tS⁻¹) : SAdeleRing F S) * x.toAdd)
+        rw [← mul_assoc, ← Units.val_mul, mul_inv_cancel, Units.val_one, one_mul]
+      rw [Set.mem_preimage, hx_eq]
+      refine ⟨fun w ↦ ?_, fun u ↦ ?_⟩
+      · change ‖tS.val.1 w * (e x).toAdd.1 w‖ ^ w.mult ≤ (v.asIdeal.absNorm : ℝ) * Y
+        rw [norm_mul, mul_pow]
+        by_cases hw : w = w₀
+        · subst hw
+          have ht_w : ‖tS.val.1 w₀‖ ^ w₀.mult = (v.asIdeal.absNorm : ℝ) := by
+            have heq : tInf.val w₀ = (x₀ : w₀.Completion) := by
+              change (if h : w₀ = w₀ then _ else 1) = _
+              simp
+            change ‖tInf.val w₀‖ ^ w₀.mult = _
+            rw [heq]
+            exact hx₀_norm
+          rw [ht_w]
+          exact mul_le_mul_of_nonneg_left (hy.1 w₀) (Nat.cast_nonneg _)
+        · have ht_w : ‖tS.val.1 w‖ ^ w.mult = 1 := by
+            have heq : tInf.val w = 1 := by
+              change (if h : w = w₀ then _ else 1) = 1
+              simp [hw]
+            change ‖tInf.val w‖ ^ w.mult = 1
+            rw [heq, norm_one, one_pow]
+          rw [ht_w, one_mul]
+          have h1le : (1 : ℝ) ≤ (v.asIdeal.absNorm : ℝ) := by exact_mod_cast hq_pos
+          exact (hy.1 w).trans (le_mul_of_one_le_left hY.le h1le)
+      · change ‖(tS.val.2 u) * (e x).toAdd.2 u‖ ≤ (v.asIdeal.absNorm : ℝ) * Y
+        have ht_u : tS.val.2 u = 1 := rfl
+        rw [ht_u, one_mul]
+        have h1le : (1 : ℝ) ≤ (v.asIdeal.absNorm : ℝ) := by exact_mod_cast hq_pos
+        exact (hy.2 u).trans (le_mul_of_one_le_left hY.le h1le)
+    have hPi_f₂ : Π(hST) f₂ = schwartzBruhatUnitTranslate (tT⁻¹) (Π(hST) f₀) := by
+      ext x
+      rw [show x = Multiplicative.ofAdd x.toAdd from rfl, sAdeleSchwartzTransition_apply,
+        schwartzBruhatUnitTranslate_apply]
+      change (if ∀ w : T, w.1 ∉ S → x.toAdd.2 w ∈ w.1.adicCompletionIntegers F then
+          f₂ (Multiplicative.ofAdd (x.toAdd.1, fun w : S ↦ x.toAdd.2 ⟨w.1, hST w.2⟩)) else 0) =
+        (Π(hST) f₀) (Multiplicative.ofAdd ((↑(tT⁻¹)⁻¹ : SAdeleRing F T) * x.toAdd))
+      rw [inv_inv, sAdeleSchwartzTransition_apply]
+      have hfin : ((↑tT : SAdeleRing F T) * x.toAdd).2 = x.toAdd.2 := by
+        ext w
+        simp [tT]
+      have hmem_iff :
+          (∀ w : T, w.1 ∉ S → x.toAdd.2 w ∈ w.1.adicCompletionIntegers F) ↔
+          (∀ w : T, w.1 ∉ S → ((↑tT : SAdeleRing F T) * x.toAdd).2 w ∈ w.1.adicCompletionIntegers F) := by
+        simp [hfin]
+      by_cases hcond : ∀ w : T, w.1 ∉ S → x.toAdd.2 w ∈ w.1.adicCompletionIntegers F
+      · rw [ite_eq_left hcond, ite_eq_left (hmem_iff.mp hcond), schwartzBruhatUnitTranslate_apply]
+        change f₀ (Multiplicative.ofAdd ((↑(tS⁻¹)⁻¹ : SAdeleRing F S) * (x.toAdd.1, fun w : S ↦ x.toAdd.2 ⟨w.1, hST w.2⟩))) =
+          f₀ (Multiplicative.ofAdd (((↑tT : SAdeleRing F T) * x.toAdd).1, fun w : S ↦ ((↑tT : SAdeleRing F T) * x.toAdd).2 ⟨w.1, hST w.2⟩))
+        rw [inv_inv]
+        congr 2
+      · rw [ite_eq_right hcond, ite_eq_right (mt hmem_iff.mpr hcond)]
+    have hf₂_Z : Π(hST) f₂ ∈ Z₀(T) := by
+      rw [hPi_f₂]
+      exact sLocalAbsolutePW_unitTranslate_polar (tT⁻¹) (Π(hST) f₀) hf_Z
+    let aT : (SAdeleRing F T)ˣ :=
+      { val := (tInf.inv * ξ₀_T.val.1,
+          fun w : T ↦ if w.1 = v then 1 else ξ₀_T.val.2 w)
+        inv := (tInf.val * ξ₀_T.inv.1,
+          fun w : T ↦ if w.1 = v then 1 else ξ₀_T.inv.2 w)
+        val_inv := Prod.ext (funext fun w ↦ by
+          have hξ := congrFun (Prod.ext_iff.mp ξ₀_T.val_inv).1 w
+          have ht := congrFun tInf.inv_val w
+          rw [Prod.fst_mul, Pi.mul_apply, Prod.fst_one, Pi.one_apply] at hξ
+          rw [Pi.mul_apply, Pi.one_apply] at ht
+          change (tInf.inv w * ξ₀_T.val.1 w) * (tInf.val w * ξ₀_T.inv.1 w) = 1
+          calc
+            tInf.inv w * ξ₀_T.val.1 w * (tInf.val w * ξ₀_T.inv.1 w)
+                = (tInf.inv w * tInf.val w) * (ξ₀_T.val.1 w * ξ₀_T.inv.1 w) := by ring
+            _ = 1 * 1 := by rw [ht, hξ]
+            _ = 1 := one_mul 1) (funext fun w ↦ by
+          have hξ := congrFun (Prod.ext_iff.mp ξ₀_T.val_inv).2 w
+          rw [Prod.snd_mul, Pi.mul_apply, Prod.snd_one, Pi.one_apply] at hξ ⊢
+          change (if w.1 = v then 1 else ξ₀_T.val.2 w) *
+              (if w.1 = v then 1 else ξ₀_T.inv.2 w) = 1
+          split_ifs
+          · exact one_mul 1
+          · exact hξ)
+        inv_val := Prod.ext (funext fun w ↦ by
+          have hξ := congrFun (Prod.ext_iff.mp ξ₀_T.inv_val).1 w
+          have ht := congrFun tInf.val_inv w
+          rw [Prod.fst_mul, Pi.mul_apply, Prod.fst_one, Pi.one_apply] at hξ
+          rw [Pi.mul_apply, Pi.one_apply] at ht
+          change (tInf.val w * ξ₀_T.inv.1 w) * (tInf.inv w * ξ₀_T.val.1 w) = 1
+          calc
+            tInf.val w * ξ₀_T.inv.1 w * (tInf.inv w * ξ₀_T.val.1 w)
+                = (tInf.val w * tInf.inv w) * (ξ₀_T.inv.1 w * ξ₀_T.val.1 w) := by ring
+            _ = 1 * 1 := by rw [ht, hξ]
+            _ = 1 := one_mul 1) (funext fun w ↦ by
+          have hξ := congrFun (Prod.ext_iff.mp ξ₀_T.inv_val).2 w
+          rw [Prod.snd_mul, Pi.mul_apply, Prod.snd_one, Pi.one_apply] at hξ ⊢
+          change (if w.1 = v then 1 else ξ₀_T.inv.2 w) *
+              (if w.1 = v then 1 else ξ₀_T.val.2 w) = 1
+          split_ifs
+          · exact one_mul 1
+          · exact hξ) }
+    have haT_mul : aT * πT = ξ₀_T * tT⁻¹ := by
+      apply Units.ext
+      apply Prod.ext
+      · funext w
+        change tInf.inv w * ξ₀_T.val.1 w * 1 = ξ₀_T.val.1 w * tInf.inv w
+        ring
+      · funext w
+        change (if w.1 = v then 1 else ξ₀_T.val.2 w) *
+            (if h : w.1 = v then h ▸ (πv : v.adicCompletion F) else 1) =
+          ξ₀_T.val.2 w * 1
+        by_cases hwv : w.1 = v
+        · simp only [hwv, ↓reduceIte, one_mul, mul_one]
+          rcases w with ⟨wval, hwT⟩
+          dsimp at hwv
+          subst hwv
+          rfl
+        · simp [hwv]
+    have haT_norm : sIdeleNorm F T aT = 1 := by
+      apply Units.ext
+      apply NNReal.eq
+      have hξ_eq : (sIdeleNorm F T ξ₀_T : ℝ) = 1 := by
+        rw [hξ₀_norm]
+        rfl
+      have hnorm_formula (u : (SAdeleRing F T)ˣ) :
+          ((sIdeleNorm F T u : ℝ≥0) : ℝ) =
+            (∏ w : InfinitePlace F, ‖u.val.1 w‖ ^ w.mult) * ∏ w : T, ‖u.val.2 w‖ := by
+        simp [sIdeleNorm]
+      have hprod_inf :
+          (∏ w : InfinitePlace F, ‖aT.val.1 w‖ ^ w.mult) =
+            (v.asIdeal.absNorm : ℝ)⁻¹ * ∏ w : InfinitePlace F, ‖ξ₀_T.val.1 w‖ ^ w.mult := by
+        have heq : (∏ w : InfinitePlace F, ‖aT.val.1 w‖ ^ w.mult) =
+            ∏ w : InfinitePlace F, (‖tInf.inv w‖ ^ w.mult * ‖ξ₀_T.val.1 w‖ ^ w.mult) := by
+          refine Finset.prod_congr rfl fun w _ ↦ ?_
+          change ‖tInf.inv w * ξ₀_T.val.1 w‖ ^ w.mult = _
+          rw [norm_mul, mul_pow]
+        rw [heq, Finset.prod_mul_distrib]
+        congr 1
+        rw [Finset.prod_eq_single_of_mem w₀ (Finset.mem_univ _)]
+        · have hxinv : ‖tInf.inv w₀‖ ^ w₀.mult = (v.asIdeal.absNorm : ℝ)⁻¹ := by
+            have hmul : ‖tInf.val w₀‖ ^ w₀.mult * ‖tInf.inv w₀‖ ^ w₀.mult = 1 := by
+              rw [← mul_pow, ← norm_mul]
+              have hv := congrFun tInf.val_inv w₀
+              rw [Pi.mul_apply, Pi.one_apply] at hv
+              rw [hv, norm_one, one_pow]
+            have hval : ‖tInf.val w₀‖ ^ w₀.mult = (v.asIdeal.absNorm : ℝ) := by
+              have heq : tInf.val w₀ = (x₀ : w₀.Completion) := by
+                change (if h : w₀ = w₀ then _ else 1) = _
+                simp
+              change ‖tInf.val w₀‖ ^ w₀.mult = _
+              rw [heq]
+              exact hx₀_norm
+            rw [hval] at hmul
+            exact eq_inv_of_mul_eq_one_right hmul
+          exact hxinv
+        · intro w _ hw
+          have heq : tInf.inv w = 1 := by
+            change (if h : w = w₀ then _ else 1) = 1
+            split_ifs with h
+            · exact absurd h hw
+            · rfl
+          change ‖tInf.inv w‖ ^ w.mult = 1
+          rw [heq, norm_one, one_pow]
+      have hprod_fin :
+          (∏ w : T, ‖aT.val.2 w‖) * (v.asIdeal.absNorm : ℝ)⁻¹ = ∏ w : T, ‖ξ₀_T.val.2 w‖ := by
+        let vT : T := ⟨v, hvT⟩
+        rw [← Finset.mul_prod_erase Finset.univ (fun w : T ↦ ‖aT.val.2 w‖) (Finset.mem_univ vT),
+          ← Finset.mul_prod_erase Finset.univ (fun w : T ↦ ‖ξ₀_T.val.2 w‖) (Finset.mem_univ vT)]
+        have ha_v : ‖aT.val.2 vT‖ = 1 := by simp [aT, vT]
+        have hξ_vnorm : ‖ξ₀_T.val.2 vT‖ = (v.asIdeal.absNorm : ℝ)⁻¹ := by
+          change ‖(πv : v.adicCompletion F)‖ = _
+          exact norm_uniformizer_adicCompletion v πv.val hπv
+        have hrest : (∏ w ∈ Finset.univ.erase vT, ‖aT.val.2 w‖) =
+            ∏ w ∈ Finset.univ.erase vT, ‖ξ₀_T.val.2 w‖ := by
+          refine Finset.prod_congr rfl fun w hw ↦ ?_
+          have hwv : w.1 ≠ v := fun h ↦ (Finset.mem_erase.mp hw).1 (Subtype.ext h)
+          simp [aT, hwv]
+        rw [ha_v, one_mul, hξ_vnorm, hrest, mul_comm]
+      rw [hnorm_formula aT, hprod_inf]
+      calc
+        ((v.asIdeal.absNorm : ℝ)⁻¹ * ∏ w : InfinitePlace F, ‖ξ₀_T.val.1 w‖ ^ w.mult) *
+            ∏ w : T, ‖aT.val.2 w‖
+            = (∏ w : InfinitePlace F, ‖ξ₀_T.val.1 w‖ ^ w.mult) *
+              ((∏ w : T, ‖aT.val.2 w‖) * (v.asIdeal.absNorm : ℝ)⁻¹) := by ring
+        _ = (∏ w : InfinitePlace F, ‖ξ₀_T.val.1 w‖ ^ w.mult) * ∏ w : T, ‖ξ₀_T.val.2 w‖ := by
+          rw [hprod_fin]
+        _ = ((sIdeleNorm F T ξ₀_T : ℝ≥0) : ℝ) := (hnorm_formula ξ₀_T).symm
+        _ = 1 := hξ_eq
+    have hshift_eq :
+        schwartzBruhatUnitTranslate πT (Π(hST) f₀) =
+          schwartzBruhatUnitTranslate (aT⁻¹) (schwartzBruhatUnitTranslate ξ₀_T (Π(hST) f₂)) := by
+      ext x
+      rw [show x = Multiplicative.ofAdd x.toAdd from rfl, schwartzBruhatUnitTranslate_apply,
+        schwartzBruhatUnitTranslate_apply, schwartzBruhatUnitTranslate_apply, hPi_f₂,
+        schwartzBruhatUnitTranslate_apply]
+      refine congrArg (fun z ↦ (Π(hST) f₀) (Multiplicative.ofAdd z)) ?_
+      have hunit_eq : πT⁻¹ = tT * ξ₀_T⁻¹ * aT := by
+        refine inv_eq_iff_mul_eq_one.mpr ?_
+        calc
+          πT * (tT * ξ₀_T⁻¹ * aT) = (aT * πT) * (tT * ξ₀_T⁻¹) := by ac_rfl
+          _ = (ξ₀_T * tT⁻¹) * (tT * ξ₀_T⁻¹) := by rw [haT_mul]
+          _ = (ξ₀_T * ξ₀_T⁻¹) * (tT⁻¹ * tT) := by ac_rfl
+          _ = 1 := by simp
+      calc
+        (↑(πT⁻¹) : SAdeleRing F T) * x.toAdd
+            = (↑(tT * ξ₀_T⁻¹ * aT) : SAdeleRing F T) * x.toAdd := by rw [hunit_eq]
+        _ = (↑(tT⁻¹)⁻¹ : SAdeleRing F T) *
+              ((↑(ξ₀_T⁻¹) : SAdeleRing F T) * ((↑(aT⁻¹)⁻¹ : SAdeleRing F T) * x.toAdd)) := by
+          simp only [inv_inv, Units.val_mul, mul_assoc]
+    rw [hshift_eq]
+    have haTinv_mem : (QuotientGroup.mk (aT⁻¹) : J(T)) ∈ J₁(T) := by
+      change sIdeleQuotientNorm F T (QuotientGroup.mk (aT⁻¹)) = 1
+      rw [sIdeleQuotientNorm_mk, map_inv, haT_norm, inv_one]
+    have hξ₀_mem : (QuotientGroup.mk ξ₀_T : J(T)) ∈ J₁(T) := by
+      change sIdeleQuotientNorm F T (QuotientGroup.mk ξ₀_T) = 1
+      rw [sIdeleQuotientNorm_mk, hξ₀_norm]
+    rw [sLocalAbsolutePW_quotient_unitTranslate χ (aT⁻¹) haTinv_mem,
+      sLocalAbsolutePW_quotient_unitTranslate χ ξ₀_T hξ₀_mem]
+    have hξ₁ : (⟨QuotientGroup.mk ξ₀_T, hξ₀_mem⟩ : J₁(T)) = 1 := Subtype.ext hξ₀_quot
+    rw [hξ₁, map_one]
+    simp only [Circle.coe_one, one_smul]
+    exact Submodule.smul_mem _ _
+      (sLocalAbsolutePW_mk_mem hST ((v.asIdeal.absNorm : ℝ) * Y) _ χ f₂ hf₂_band hf₂_Z)
+
+private theorem sLocalAbsolutePW_principalValue_aux
+    (hST : S ⊆ T) (hPic : PicTrivial) (R' : Finset V) :
+    ∀ (hRT : R' ⊆ T), Disjoint S R' → ∀ (χ : PontryaginDual J₁(T)) (Y : ℝ), 0 < Y →
+      (absPW(hST, Y, χ)).map (PV(hRT, χ)) ≤ absPW(hST, size(R') * Y, χ) := by
+  induction R' using Finset.induction_on with
+  | empty =>
+    intro hRT _ χ Y _
+    rw [sLocalAbsolutePW_pv_empty hRT χ, Submodule.map_id, Finset.prod_empty, one_mul]
+  | @insert v R₀ hv ih =>
+    intro hRT hRdis χ Y hY
+    have hR₀T : R₀ ⊆ T := (Finset.subset_insert v R₀).trans hRT
+    have hvT : v ∈ T := hRT (Finset.mem_insert_self v R₀)
+    have hvS : v ∉ S := Finset.disjoint_right.mp hRdis (Finset.mem_insert_self v R₀)
+    have hR₀dis : Disjoint S R₀ := hRdis.mono_right (Finset.subset_insert v R₀)
+    have hR₀pos : 0 < size(R₀) := Finset.prod_pos fun w _ ↦ Nat.cast_pos.mpr
+      (Nat.pos_of_ne_zero (mt Ideal.absNorm_eq_zero_iff.mp w.ne_bot))
+    rw [sLocalAbsolutePW_pv_insert R₀ v hv hRT χ, Submodule.map_comp]
+    refine (Submodule.map_mono (ih hR₀T hR₀dis χ Y hY)).trans ?_
+    rw [Finset.prod_insert hv, mul_assoc]
+    exact sLocalAbsolutePW_principalValue_singleton hST hPic v hvS hvT χ
+      (size(R₀) * Y) (mul_pos hR₀pos hY)
+
+end SLocalAbsolutePWPrincipalValue
+
 /-- Paper: Proposition 7.3.3.2, p. 357–358.
 The finite principal value maps the zero-moment absolute level at X into the
 absolute level at the product of the residue sizes times X. -/
@@ -1030,7 +1818,8 @@ theorem sLocalAbsolutePW_principalValue {S₀ : Finset (HeightOneSpectrum (𝓞 
     (ω : PontryaginDual C₁) (hu : NormOneCharacterUnramifiedOutside ω S)
     (χ : PontryaginDual J₁(T)) (_hχ : χ = descend(hST, ω, hu))
     (X : ℝ) (_hX : 0 < X) :
-    (absPW(hST, X, χ)).map (PV(hRT, χ)) ≤ absPW(hST, size(R) * X, χ) := by sorry
+    (absPW(hST, X, χ)).map (PV(hRT, χ)) ≤ absPW(hST, size(R) * X, χ) :=
+  sLocalAbsolutePW_principalValue_aux hST _hPic R hRT (_hdis.mono_right _hR) χ X _hX
 
 /-- Paper: Proposition 7.3.3.2, p. 357–358.
 The finite principal value maps the zero-moment invariant level at Y into the
