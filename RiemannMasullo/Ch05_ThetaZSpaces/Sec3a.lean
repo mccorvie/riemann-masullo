@@ -1094,6 +1094,50 @@ private theorem sAdelePrincipalValue_preserves_thetaKernel_singleton {S : Finset
   rw [hfun, integral_zero, mul_zero, sub_zero]
   exact hf0
 
+private theorem sAdelePrincipalValue_list_comp {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] {ι : Type*} {D : ι → Type*}
+    [∀ i, AddCommGroup (D i)] [∀ i, Module ℂ (D i)] [∀ i, TopologicalSpace (D i)]
+    (e : InductiveTensor A (FinestLocallyConvex (⨂[ℂ] i, D i)) ≃L[ℂ] B)
+    (φ ψ : ∀ i, D i →ₗ[ℂ] D i) :
+    let W := FinestLocallyConvex (⨂[ℂ] i, D i)
+    let I : A →ₗ[ℂ] A := LinearMap.id
+    let Q : (∀ i, D i →ₗ[ℂ] D i) → (B →ₗ[ℂ] B) := fun χ ↦
+      e.toLinearMap.comp ((TensorProduct.map I (PiTensorProduct.map χ : W →ₗ[ℂ] W)).comp
+        e.symm.toLinearMap)
+    Q φ * Q ψ = Q (fun i ↦ φ i ∘ₗ ψ i) := by
+  intro W I Q
+  apply LinearMap.ext
+  intro x
+  change e (TensorProduct.map I _ (e.symm (e _))) = e _
+  erw [e.symm_apply_apply]
+  apply congrArg e
+  have h : (TensorProduct.map I (PiTensorProduct.map φ : W →ₗ[ℂ] W)) ∘ₗ
+      (TensorProduct.map I (PiTensorProduct.map ψ : W →ₗ[ℂ] W)) =
+        TensorProduct.map I (PiTensorProduct.map (fun i ↦ φ i ∘ₗ ψ i) : W →ₗ[ℂ] W) := by
+    rw [← TensorProduct.map_comp, PiTensorProduct.map_comp]
+    rfl
+  exact LinearMap.congr_fun h (e.symm x)
+
+private theorem sAdelePrincipalValue_list_one {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] {ι : Type*} {D : ι → Type*}
+    [∀ i, AddCommGroup (D i)] [∀ i, Module ℂ (D i)] [∀ i, TopologicalSpace (D i)]
+    (e : InductiveTensor A (FinestLocallyConvex (⨂[ℂ] i, D i)) ≃L[ℂ] B) :
+    let W := FinestLocallyConvex (⨂[ℂ] i, D i)
+    let I : A →ₗ[ℂ] A := LinearMap.id
+    e.toLinearMap.comp ((TensorProduct.map I
+      (PiTensorProduct.map (fun i ↦ (LinearMap.id : D i →ₗ[ℂ] D i)) : W →ₗ[ℂ] W)).comp
+        e.symm.toLinearMap) = (1 : B →ₗ[ℂ] B) := by
+  intro W I
+  apply LinearMap.ext
+  intro x
+  show e (TensorProduct.map I
+    (PiTensorProduct.map (fun i ↦ (LinearMap.id : D i →ₗ[ℂ] D i)) : W →ₗ[ℂ] W) (e.symm x)) = x
+  rw [PiTensorProduct.map_id]
+  erw [TensorProduct.map_id]
+  exact e.apply_symm_apply x
+
 open Classical in
 /-- Paper: (5.3.1.9), p. 242.
 The S-local principal value is the composition, over the selected places, of its single-place
@@ -1104,7 +1148,62 @@ private theorem sAdelePrincipalValue_preserves_thetaKernel_list {S S₀ : Finset
     (f : ℬₛ(S)) :
     sAdelePrincipalValue F h₀ f =
       (S₀.val.toList.map fun v => if h : v ∈ S then
-        sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr h) else 1).prod f := by sorry
+        sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr h) else 1).prod f := by
+  let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+  let W := FinestLocallyConvex (⨂[ℂ] w : S, ℬ(w.val.adicCompletion F))
+  let I : ℬ(InfiniteAdeleRing F) →ₗ[ℂ] ℬ(InfiniteAdeleRing F) := LinearMap.id
+  let Q : (∀ w : S, ℬ(w.val.adicCompletion F) →ₗ[ℂ] ℬ(w.val.adicCompletion F)) →
+      (ℬₛ(S) →ₗ[ℂ] ℬₛ(S)) := fun χ ↦
+    e.toLinearMap.comp ((TensorProduct.map I (PiTensorProduct.map χ : W →ₗ[ℂ] W)).comp
+      e.symm.toLinearMap)
+  let T : ∀ w : S, ℬ(w.val.adicCompletion F) →ₗ[ℂ] ℬ(w.val.adicCompletion F) :=
+    fun w ↦ (finitePlacePrincipalValue w.val).toLinearMap
+  have hcomp : ∀ φ ψ, Q φ * Q ψ = Q (fun i ↦ φ i ∘ₗ ψ i) := fun φ ψ ↦
+    sAdelePrincipalValue_list_comp e φ ψ
+  have hone : Q (fun _ ↦ LinearMap.id) = 1 := sAdelePrincipalValue_list_one e
+  have hPV : ∀ {S₁ : Finset V} (h : S₁ ⊆ S),
+      sAdelePrincipalValue F h = Q (fun w ↦ if w.val ∈ S₁ then T w else LinearMap.id) :=
+    fun _ ↦ rfl
+  have hg : ∀ v : V, (if h : v ∈ S then
+      sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr h) else 1) =
+        Q (fun w ↦ if w.val = v then T w else LinearMap.id) := by
+    intro v
+    by_cases hv : v ∈ S
+    · rw [dite_eq_left_of_eq_true (eq_true hv), hPV]
+      congr 1
+      funext w
+      simp only [Finset.mem_singleton]
+    · rw [dite_eq_right_of_eq_false (eq_false hv), ← hone]
+      congr 1
+      funext w
+      have hw : ¬(w.val = v) := fun hw ↦ hv (hw ▸ w.property)
+      simp [hw]
+  have hL : ∀ L : List V, L.Nodup → (L.map fun v ↦ if h : v ∈ S then
+      sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr h) else 1).prod =
+        Q (fun w ↦ if w.val ∈ L then T w else LinearMap.id) := by
+    intro L
+    induction L with
+    | nil =>
+      intro _
+      rw [List.map_nil, List.prod_nil, ← hone]
+      congr 1
+    | cons a L ih =>
+      intro hnd
+      have ha : a ∉ L := (List.nodup_cons.mp hnd).1
+      rw [List.map_cons, List.prod_cons, hg a, ih (List.nodup_cons.mp hnd).2, hcomp]
+      congr 1
+      funext w
+      by_cases hw : w.val = a
+      · simp [hw, ha]
+      · simp [hw]
+  refine LinearMap.congr_fun ?_ f
+  have hnd : S₀.val.toList.Nodup := by
+    rw [← Multiset.coe_nodup, Multiset.coe_toList]
+    exact S₀.nodup
+  rw [hL _ hnd, hPV h₀]
+  congr 1
+  funext w
+  simp only [Multiset.mem_toList, Finset.mem_val]
 
 /-- Paper: (5.3.1.9), p. 242.
 The S-local principal value preserves the kernel of theta averaging. -/
