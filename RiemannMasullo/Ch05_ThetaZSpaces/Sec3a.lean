@@ -1117,12 +1117,108 @@ theorem sLocalThetaPrincipalValue_transition {S₀ S T : Finset V}
   apply sLocalThetaPrincipalValue_transition_mapQ
   exact sLocalThetaPrincipalValue_transition_tests h₀ hST
 
+open Classical in
+/-- Through a stage containing the selected places, the global principal value of an
+inserted test is the insertion of the S-local principal value. The integer tail indicator
+is obtained by slicing the inserted test `k₀` at a point `p` where its value is one. -/
+private theorem sLocalThetaPrincipalValue_toGlobal_slice {S₀ S : Finset V}
+    (h₀ : S₀ ⊆ S) (k₀ : ℬₛ(S)) (p : SAdeleRing F S)
+    (hk₀ : k₀ (Multiplicative.ofAdd p) = 1) (k : ℬₛ(S)) :
+    adelePrincipalValue F S₀ (sAdeleSchwartzToGlobal F S k) =
+      sAdeleSchwartzToGlobal F S (sAdelePrincipalValue F h₀ k) := by
+  let Tl := ℬ(FiniteAdeleTail F S)
+  let e := (sAdeleTailSchwartz_inductiveTensor_equiv F S).choose
+  have he := (sAdeleTailSchwartz_inductiveTensor_equiv F S).choose_spec
+  let ev : ℬₛ(S) →ₗ[ℂ] ℂ :=
+    { toFun := fun a ↦ a (Multiplicative.ofAdd p)
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  let L : ℬₛ(S) ⊗[ℂ] Tl →ₗ[ℂ] Tl := TensorProduct.lift ((LinearMap.lsmul ℂ Tl).comp ev)
+  let c : Tl := L (e.symm (sAdeleSchwartzToGlobal F S k₀))
+  have hc (y : FiniteAdeleTail F S) : c (Multiplicative.ofAdd y) =
+      if ∀ w, y w ∈ w.val.adicCompletionIntegers F then 1 else 0 := by
+    let f : ∀ w : V, w.adicCompletion F := fun w ↦ if h : w ∈ S then p.2 ⟨w, h⟩ else y ⟨w, h⟩
+    have hf : ∀ᶠ w in Filter.cofinite, f w ∈ w.adicCompletionIntegers F := by
+      filter_upwards [S.eventually_cofinite_notMem, Filter.eventually_comap.mp
+        (y.2.filter_mono (Filter.comap_cofinite_le Subtype.val))] with w hw h
+      simp only [f, dite_eq_right hw]
+      exact h ⟨w, hw⟩ rfl
+    let z : FiniteAdeleRing (𝓞 F) F := ⟨f, hf⟩
+    let x : AdeleRing (𝓞 F) F := (p.1, z)
+    have hx (w : V) (hw : w ∉ S) : x.2 w = y ⟨w, hw⟩ := dite_eq_right hw
+    have hp : adeleProjection F S x = p :=
+      Prod.ext rfl (funext fun w ↦ (dite_eq_left w.2 : f w.val = p.2 w))
+    have ht : finiteAdeleTailProjection F S x.2 = y := by
+      apply RestrictedProduct.ext
+      intro w
+      exact dite_eq_right w.2
+    let evy : Tl →ₗ[ℂ] ℂ :=
+      { toFun := fun b ↦ b (Multiplicative.ofAdd y)
+        map_add' := fun _ _ ↦ rfl
+        map_smul' := fun _ _ ↦ rfl }
+    let evx : ℬ(AdeleRing (𝓞 F) F) →ₗ[ℂ] ℂ :=
+      { toFun := fun b ↦ b (Multiplicative.ofAdd x)
+        map_add' := fun _ _ ↦ rfl
+        map_smul' := fun _ _ ↦ rfl }
+    have key : evy ∘ₗ L = evx ∘ₗ (e.toLinearMap : InductiveTensor ℬₛ(S) Tl →ₗ[ℂ] _) := by
+      refine TensorProduct.ext' fun a b ↦ ?_
+      change (a (Multiplicative.ofAdd p) • b) (Multiplicative.ofAdd y) =
+        e (a ⊗ₜ[ℂ] b) (Multiplicative.ofAdd x)
+      rw [he a b x, hp, ht]
+      rfl
+    have h2 : c (Multiplicative.ofAdd y) =
+        sAdeleSchwartzToGlobal F S k₀ (Multiplicative.ofAdd x) :=
+      (LinearMap.congr_fun key (e.symm (sAdeleSchwartzToGlobal F S k₀))).trans
+        (congrArg (fun φ : ℬ(AdeleRing (𝓞 F) F) ↦
+          φ (Multiplicative.ofAdd x)) (e.apply_symm_apply _))
+    rw [h2, sAdeleSchwartzToGlobal_apply, hp, hk₀]
+    by_cases hy : ∀ w, y w ∈ w.val.adicCompletionIntegers F
+    · rw [ite_eq_left hy, ite_eq_left fun w hw ↦ by rw [hx w hw]; exact hy ⟨w, hw⟩]
+    · rw [ite_eq_right hy, ite_eq_right fun h ↦ hy fun w ↦ by rw [← hx w.val w.2]; exact h w.val w.2]
+  have hslice (a : ℬₛ(S)) : e (a ⊗ₜ[ℂ] c) = sAdeleSchwartzToGlobal F S a := by
+    apply Subtype.ext
+    funext x
+    change e (a ⊗ₜ[ℂ] c) (Multiplicative.ofAdd x.toAdd) =
+      sAdeleSchwartzToGlobal F S a (Multiplicative.ofAdd x.toAdd)
+    rw [he a c x.toAdd, hc, sAdeleSchwartzToGlobal_apply]
+    by_cases hx : ∀ w : V, w ∉ S → x.toAdd.2 w ∈ w.adicCompletionIntegers F
+    · rw [ite_eq_left hx, ite_eq_left (show ∀ w : {w : V // w ∉ S},
+        finiteAdeleTailProjection F S x.toAdd.2 w ∈ w.val.adicCompletionIntegers F from
+          fun w ↦ hx w.val w.2), mul_one]
+    · rw [ite_eq_right hx, ite_eq_right (show ¬ ∀ w : {w : V // w ∉ S},
+        finiteAdeleTailProjection F S x.toAdd.2 w ∈ w.val.adicCompletionIntegers F from
+          fun h ↦ hx fun w hw ↦ h ⟨w, hw⟩), mul_zero]
+  rw [← hslice k, ← hslice (sAdelePrincipalValue F h₀ k)]
+  exact adelePrincipalValue_tmul h₀ k c
+
+/-- On test functions, insertion of an S-local stage intertwines the S-local and the
+global principal values. A nonzero test, normalized at a point where it does not vanish,
+supplies the slice that identifies the integer tail indicator. -/
+private theorem sLocalThetaPrincipalValue_toGlobal_tests {S₀ S : Finset V} (h₀ : S₀ ⊆ S) :
+    (sAdeleSchwartzToGlobal F S).comp (sAdelePrincipalValue F h₀) =
+      (adelePrincipalValue F S₀).comp (sAdeleSchwartzToGlobal F S) := by
+  apply LinearMap.ext
+  intro k
+  by_cases hk : k = 0
+  · rw [hk, map_zero, map_zero]
+  · obtain ⟨x, hx⟩ : ∃ x : Multiplicative (SAdeleRing F S), k x ≠ 0 := by
+      by_contra h
+      apply hk
+      apply Subtype.ext
+      funext x
+      exact not_not.mp fun hx ↦ h ⟨x, hx⟩
+    have hk₀ : ((k x)⁻¹ • k) (Multiplicative.ofAdd x.toAdd) = 1 := inv_mul_cancel₀ hx
+    exact (sLocalThetaPrincipalValue_toGlobal_slice h₀ _ x.toAdd hk₀ k).symm
+
 /-- Paper: Lemma 5.3.1.5, p. 242.
 The local and global principal value operators commute with insertion of an S-local theta stage. -/
 theorem sLocalThetaPrincipalValue_toGlobal {S₀ S : Finset V}
     (h₀ : S₀ ⊆ S) (hn : S₀.Nonempty) :
     (sLocalThetaToGlobal F S).comp (sLocalThetaPrincipalValue F h₀) =
-      (globalThetaPrincipalValue F S₀).comp (sLocalThetaToGlobal F S) := by sorry
+      (globalThetaPrincipalValue F S₀).comp (sLocalThetaToGlobal F S) := by
+  unfold sLocalThetaToGlobal sLocalThetaPrincipalValue globalThetaPrincipalValue
+  apply sLocalThetaPrincipalValue_transition_mapQ
+  exact sLocalThetaPrincipalValue_toGlobal_tests h₀
 
 /-- Paper: Lemma 5.3.1.5, p. 242.
 The S-local principal value commutes with each S-idele translation on theta classes. -/

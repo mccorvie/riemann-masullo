@@ -4,6 +4,8 @@ public import RiemannMasullo.Ch10_TraceSpectral.Sec2
 
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.Ch13_ZerosHecke.Targets
+import RiemannMasullo.External.ZetaLab.HardyFirstZero.FirstZero
 import Mathlib.Analysis.InnerProductSpace.l2Space
 import Mathlib.Logic.Equiv.Nat
 
@@ -11,8 +13,8 @@ import Mathlib.Logic.Equiv.Nat
 
 @[expose] public noncomputable section
 
-open MeasureTheory NumberField Set
-open scoped NNReal
+open MeasureTheory NumberField Set Filter Function Topology
+open scoped NNReal ENNReal Topology
 
 namespace RiemannMasullo
 
@@ -588,16 +590,337 @@ def Printed.spectralLineIsotype_bandAdjoint_contains_jets : Prop :=
               let integrand := fun g ↦ f.val g * spectralZeroJet χ 0 t k g
               Integrable integrand μ ∧ d (N.mkQ f) = ∫ g, integrand g ∂μ
 
+local notation "C" => C𝔽(ℚ)
+local notation "logNorm" => (fun g : C ↦ Real.log ((ideleClassNorm ℚ g).val : ℝ))
+local notation "μQ" => ideleClassTamagawaMeasure ℚ
+local notation "mQ" =>
+  (⟨ideleClassNorm ℚ, (isProperMap_ideleClassNorm ℚ).continuous⟩ : C →ₜ* ℝ≥0ˣ)
+
+-- The radial chart also appears in the §10.3 selected-evaluation counterexample (#6231).
+private theorem continuous_ratLogNorm : Continuous logNorm :=
+  Real.continuousOn_log.comp_continuous
+    ((NNReal.continuous_coe.comp Units.continuous_val).comp (isProperMap_ideleClassNorm ℚ).continuous)
+    (fun g ↦ (NNReal.coe_pos.mpr (Units.zero_lt (ideleClassNorm ℚ g))).ne')
+
+private def radialCharacter (r : ℝ) : PontryaginDual C where
+  toFun g := Circle.exp (r * logNorm g)
+  map_one' := by simp
+  map_mul' g h := by
+    change Circle.exp (r * Real.log (((ideleClassNorm ℚ (g * h)).val : ℝ≥0) : ℝ)) = _
+    rw [map_mul (ideleClassNorm ℚ), Units.val_mul, NNReal.coe_mul, Real.log_mul
+      (NNReal.coe_pos.mpr (Units.zero_lt (ideleClassNorm ℚ g))).ne'
+      (NNReal.coe_pos.mpr (Units.zero_lt (ideleClassNorm ℚ h))).ne', mul_add, Circle.exp_add]
+  continuous_toFun := Circle.exp.continuous.comp (continuous_const.mul continuous_ratLogNorm)
+
+private theorem radialCharacter_injective : Injective radialCharacter := by
+  intro r s h
+  by_contra hrs
+  let x := Real.pi / (r - s)
+  let a : ℝ≥0 := ⟨Real.exp x, (Real.exp_pos x).le⟩
+  let a' : ℝ≥0ˣ := Units.mk0 a (by exact ne_of_gt (Real.exp_pos x))
+  obtain ⟨g, hg⟩ := (ideleGroup_quotient.{_, 0} ℚ).2.2.2.2.2.2.2.2.2.1 a'
+  have hlog : logNorm g = x := by
+    change Real.log ((ideleClassNorm ℚ g).val : ℝ) = x
+    rw [hg]
+    exact Real.log_exp x
+  have heq : Circle.exp (r * logNorm g) = Circle.exp (s * logNorm g) :=
+    DFunLike.congr_fun h g
+  rw [hlog] at heq
+  apply Circle.exp_pi_ne_one
+  calc
+    Circle.exp Real.pi = Circle.exp ((r - s) * x) := by
+      change Circle.exp Real.pi = Circle.exp ((r - s) * (Real.pi / (r - s)))
+      rw [mul_div_cancel₀ _ (sub_ne_zero.mpr hrs)]
+    _ = Circle.exp (r * x) * (Circle.exp (s * x))⁻¹ := by
+      rw [sub_mul, sub_eq_add_neg, Circle.exp_add, Circle.exp_neg]
+    _ = 1 := by rw [heq, mul_inv_cancel]
+
+private theorem continuous_radialCharacter : Continuous radialCharacter :=
+  ContinuousMonoidHom.continuous_of_continuous_uncurry _ <|
+    Circle.exp.continuous.comp (continuous_fst.mul (continuous_ratLogNorm.comp continuous_snd))
+
+private theorem ratDual_singleton_null (ν : Measure (PontryaginDual C))
+    (hν : ν.IsHaarMeasure) (χ : PontryaginDual C) : ν {χ} = 0 := by
+  let : ν.IsHaarMeasure := hν
+  let : BorelSpace (PontryaginDual C) := ⟨rfl⟩
+  let K := radialCharacter '' Icc (0 : ℝ) 1
+  have hc : IsCompact K := isCompact_Icc.image continuous_radialCharacter
+  have hi : K.Infinite := (Set.Icc_infinite zero_lt_one).image radialCharacter_injective.injOn
+  by_contra hn
+  have hv : ν K = ⊤ := hi.meas_eq_top ⟨ν {χ}, hn, fun ψ _ ↦ by
+    rw [Measure.haar_singleton ν ψ, Measure.haar_singleton ν χ]⟩
+  exact hc.measure_lt_top.ne hv
+
+private theorem ratLogNorm_proper : IsProperMap logNorm := by
+  let e : ℝ≥0ˣ ≃ₜ ℝ := (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.symm.toHomeomorph
+  have he : (e ∘ mQ) = logNorm := funext fun g ↦
+    (Real.log_of_pos (NNReal.coe_pos.mpr (Units.zero_lt (ideleClassNorm ℚ g)))).symm
+  exact he ▸ e.isProperMap.comp (isProperMap_ideleClassNorm ℚ)
+
+private theorem ratJet_nonzero_trivial_isotype (χ : PontryaginDual C)
+    (hχ : ∀ k : C₁(ℚ), χ k.val = 1) :
+    ∃ f : actionIsotype ((hardySobolevTranslation μQ mQ 0 0 2 le_rfl
+      (by norm_num)).comp (ideleClassNorm ℚ).ker.subtype) 1,
+      (∫ g, f.val g * spectralZeroJet χ 0 0 0 g ∂μQ) ≠ 0 := by
+  let L := logNorm ⁻¹' Icc (-1 : ℝ) 1
+  have hL : IsCompact L := ratLogNorm_proper.isCompact_preimage isCompact_Icc
+  have hLm := hL.isClosed.measurableSet
+  have hLfin := (hL.measure_lt_top (μ := μQ)).ne
+  have hLpos : 0 < μQ L := by
+    have hO : IsOpen (logNorm ⁻¹' Ioo (-1 : ℝ) 1) := isOpen_Ioo.preimage continuous_ratLogNorm
+    exact (hO.measure_pos μQ ⟨1, by simp⟩).trans_le (measure_mono (preimage_mono Ioo_subset_Icc_self))
+  let ρ (g : C) := ENNReal.ofReal (intervalSobolevDensity 0 0 2 (logNorm g))
+  have hρ (g : C) : intervalSobolevDensity 0 0 2 (logNorm g) = 1 + (logNorm g) ^ 2 := by
+    norm_num [intervalSobolevDensity]
+  have hρm : Measurable ρ := by
+    simp_rw [ρ, hρ]
+    exact ENNReal.continuous_ofReal.comp
+      (continuous_const.add (continuous_ratLogNorm.pow 2)) |>.measurable
+  let μW := (μQ).withDensity ρ
+  have hac : μQ ≪ μW :=
+    withDensity_absolutelyContinuous' hρm.aemeasurable (.of_forall fun g ↦ by
+      dsimp [ρ]
+      rw [hρ]
+      exact ENNReal.ofReal_ne_zero_iff.mpr (by positivity))
+  have hca : μW ≪ μQ := withDensity_absolutelyContinuous _ _
+  have hWfin : μW L ≠ ⊤ := by
+    change (μQ).withDensity ρ L ≠ ⊤
+    rw [withDensity_apply _ hLm]
+    refine (lt_of_le_of_lt (lintegral_mono_ae (g := fun _ ↦ 2) ?_) ?_).ne
+    · filter_upwards [ae_restrict_mem hLm] with g hg
+      have hx : logNorm g ∈ Icc (-1 : ℝ) 1 := hg
+      change ENNReal.ofReal (intervalSobolevDensity 0 0 2 (logNorm g)) ≤ 2
+      rw [hρ, ← ENNReal.ofReal_ofNat]
+      have hleft : 0 ≤ 1 + logNorm g := by linarith [hx.1]
+      have hright : 0 ≤ 1 - logNorm g := by linarith [hx.2]
+      exact ENNReal.ofReal_le_ofReal (by nlinarith [mul_nonneg hleft hright])
+    · rw [lintegral_const, Measure.restrict_apply_univ]
+      exact ENNReal.mul_lt_top (by norm_num) hLfin.lt_top
+  let : IsFiniteMeasure (μW.restrict L) := isFiniteMeasure_restrict.mpr hWfin
+  let w : C → ℂ := L.indicator fun g ↦ star (χ g : ℂ)
+  have hw : MemLp w 2 μW :=
+    (memLp_indicator_iff_restrict hLm.nullMeasurableSet).mpr <|
+      MemLp.of_bound (continuous_star.comp (continuous_subtype_val.comp χ.continuous)).aestronglyMeasurable
+        1 (.of_forall fun g ↦ by simp)
+  let f := hw.toLp w
+  refine ⟨⟨f, ?_⟩, ?_⟩
+  · rw [mem_actionIsotype]
+    intro k
+    simp only [PontryaginDual.one_apply, Circle.coe_one, one_smul]
+    apply Lp.ext
+    apply hca.ae_eq
+    have h₁ := hardySobolevTranslation_apply μQ mQ 0 0 2 le_rfl (by norm_num) k.val f
+    have h₂ : (f : C → ℂ) =ᵐ[μQ] w := hac.ae_eq hw.coeFn_toLp
+    have h₃ := (measurePreserving_mul_left μQ k.val⁻¹).quasiMeasurePreserving.ae_eq_comp h₂
+    filter_upwards [h₁, h₂, h₃] with g hg hg' hg''
+    refine hg.trans ((hg'').trans (?_ : w (k.val⁻¹ * g) = f g))
+    rw [hg']
+    have hk : ideleClassNorm ℚ k.val = 1 := k.property
+    have hlog : logNorm (k.val⁻¹ * g) = logNorm g := by
+      change Real.log ((ideleClassNorm ℚ (k.val⁻¹ * g)).val : ℝ) = _
+      rw [map_mul, map_inv, hk, inv_one, one_mul]
+    have hL' : k.val⁻¹ * g ∈ L ↔ g ∈ L := by simp only [L, mem_preimage, hlog]
+    have hchar : χ (k.val⁻¹ * g) = χ g := by rw [map_mul, map_inv, hχ k, inv_one, one_mul]
+    by_cases hm : g ∈ L
+    · simp [w, indicator_of_mem hm, indicator_of_mem (hL'.mpr hm), hchar]
+    · simp [w, indicator_of_notMem hm, indicator_of_notMem (mt hL'.mp hm)]
+  · change (∫ g, f g * spectralZeroJet χ 0 0 0 g ∂μQ) ≠ 0
+    rw [integral_congr_ae ((hac.ae_eq hw.coeFn_toLp).mono fun g hg ↦
+      congrArg (· * spectralZeroJet χ 0 0 0 g) hg)]
+    rw [show (fun g ↦ w g * spectralZeroJet χ 0 0 0 g) = L.indicator (fun _ ↦ (1 : ℂ)) by
+      funext g
+      by_cases hg : g ∈ L
+      · rw [spectralZeroJet_zero, show w g = star (χ g : ℂ) from indicator_of_mem hg _,
+          indicator_of_mem hg, mul_comm]
+        simp only [Complex.star_def, Complex.mul_conj, Complex.normSq_eq_norm_sq,
+          Circle.norm_coe, one_pow, Complex.ofReal_one]
+      · simp [w, hg]]
+    rw [integral_indicator hLm, integral_const, Measure.real, Measure.restrict_apply_univ,
+      Complex.real_smul, mul_one]
+    exact Complex.ofReal_ne_zero.mpr (ENNReal.toReal_pos hLpos.ne' hLfin).ne'
+/-- A frequency set of Plancherel measure zero yields only the zero class. -/
+private theorem singleFrequency_quotientBand_eq_singleton
+    {G D E Q : Type*} [MeasurableSpace G] [MeasurableSpace D]
+    [AddCommGroup E] [Module ℂ E] [AddCommGroup Q] [Module ℂ Q]
+    {μ σ : Measure G} {ν : Measure D} {U : Lp ℂ 2 μ ≃ₗᵢ[ℂ] Lp ℂ 2 ν}
+    {i : E →ₗ[ℂ] Lp ℂ 2 σ} {p : E →ₗ[ℂ] Q} {band : Set D}
+    (hi : Injective i) (hσ : σ ≪ μ) (hμ : μ ≪ σ) (hband : ν band = 0) :
+    {q | ∃ f : E, q = p f ∧ ∃ u : Lp ℂ 2 μ,
+        (u : G → ℂ) =ᵐ[μ] (i f : G → ℂ) ∧ ∀ᵐ ψ ∂ν, ψ ∉ band → U u ψ = 0}
+      = ({0} : Set Q) := by
+  ext q
+  constructor
+  · rintro ⟨f, rfl, u, hu, hsupp⟩
+    have houtside : ∀ᵐ ψ ∂ν, ψ ∉ band := ae_iff.mpr (by simpa only [not_not, ofPred_mem_eq] using hband)
+    have hfu : U u = 0 := by
+      apply Lp.ext
+      filter_upwards [hsupp, houtside, Lp.coeFn_zero ℂ 2 ν] with ψ hs hh h0
+      rw [h0]
+      exact hs hh
+    have hu₀ : u = 0 := U.injective (hfu.trans (map_zero U).symm)
+    have hu' : (u : G → ℂ) =ᵐ[μ] (0 : G → ℂ) := by
+      rw [hu₀]
+      exact Lp.coeFn_zero ℂ 2 μ
+    have hf : f = 0 := by
+      apply hi
+      rw [map_zero]
+      exact Lp.ext ((hσ.ae_eq (hu.symm.trans hu')).trans (Lp.coeFn_zero ℂ 2 σ).symm)
+    simp [hf]
+  · rintro rfl
+    refine ⟨0, (map_zero p).symm, 0, ?_, ?_⟩
+    · rw [map_zero]
+      exact (Lp.coeFn_zero ℂ 2 μ).trans (hμ.ae_eq (Lp.coeFn_zero ℂ 2 σ)).symm
+    · rw [map_zero]
+      exact (Lp.coeFn_zero ℂ 2 ν).mono (fun _ hψ _ ↦ hψ)
+
+private theorem zeroBand_projection_of_singleton {Q : Type*} [NormedAddCommGroup Q]
+    [NormedSpace ℂ Q] (B : Set Q) (hB : B = {0}) :
+    range (0 : Q →L[ℂ] Q) = closure B ∧
+      ∀ q y, y ∈ closure B → ‖q - (0 : Q →L[ℂ] Q) q‖ ≤ ‖q-y‖ := by
+  rw [hB, isClosed_singleton.closure_eq]
+  refine ⟨range_const, ?_⟩
+  rintro q _ rfl
+  rfl
+
+private theorem ratBand_zero_refutation
+    (basepoint : PontryaginDual C₁(ℚ) → PontryaginDual C)
+    (hbasepoint : IsSpectralBasepointChoice basepoint)
+    (horder : 0 < order(basepoint 1, (1 / 2 : ℂ)))
+    (h : Printed.spectralLineIsotype_bandAdjoint_contains_jets) : False := by
+  classical
+  let χ := basepoint 1
+  have hχ (k : C₁(ℚ)) : χ k.val = 1 := DFunLike.congr_fun (hbasepoint 1) k
+  have hs : (1 : ℝ) < 2 := by norm_num
+  let hs₀ : (0 : ℝ) ≤ 2 := le_of_lt (zero_lt_one.trans hs)
+  let E := actionIsotype ((hardySobolevTranslation μQ mQ 0 0 2 le_rfl hs₀).comp
+    (ideleClassNorm ℚ).ker.subtype) 1
+  let N := (globalThetaSobolev ℚ (1 / 2) (le_rfl (a := (0 : ℝ))) hs₀).comap E.subtype
+  let Q := spectralSobolevIsotypeQuotient ℚ (1 / 2) (le_rfl (a := (0 : ℝ))) hs₀ 1
+  let : BorelSpace (PontryaginDual C) := ⟨rfl⟩
+  obtain ⟨ν, hν, -⟩ := lcaPlancherelMeasure_existsUnique μQ
+  let U := (lcaFourier_unitary μQ ν hν).exists.choose
+  let B : Set Q := {q | ∃ f : E, q = N.mkQ f ∧ ∃ u : Lp ℂ 2 μQ,
+    (u : C → ℂ) =ᵐ[μQ] (f.val : C → ℂ) ∧
+    ∀ᵐ ψ ∂ν, ψ ∉ modulatedFrequencyBand mQ χ 0 0 → U u ψ = 0}
+  let ρ (g : C) := ENNReal.ofReal (intervalSobolevDensity 0 0 2 (logNorm g))
+  let σ := (μQ).withDensity ρ
+  have hρ (g : C) : intervalSobolevDensity 0 0 2 (logNorm g) = 1 + (logNorm g) ^ 2 := by
+    norm_num [intervalSobolevDensity]
+  have hρm : Measurable ρ := by
+    simp_rw [ρ, hρ]
+    exact ENNReal.continuous_ofReal.comp
+      (continuous_const.add (continuous_ratLogNorm.pow 2)) |>.measurable
+  have hac : μQ ≪ σ :=
+    withDensity_absolutelyContinuous' hρm.aemeasurable (.of_forall fun g ↦ by
+      dsimp [ρ]
+      rw [hρ]
+      exact ENNReal.ofReal_ne_zero_iff.mpr (by positivity))
+  have hb : ν (modulatedFrequencyBand mQ χ 0 0) = 0 := by
+    rw [modulatedFrequencyBand_zero]
+    exact ratDual_singleton_null ν hν.1 χ
+  have hB : B = {0} := singleFrequency_quotientBand_eq_singleton
+    (i := (E.subtype : E →ₗ[ℂ] Lp ℂ 2 σ)) (p := N.mkQ) (U := U)
+    Subtype.val_injective (withDensity_absolutelyContinuous _ _) hac hb
+  obtain ⟨hrange, hclosest⟩ := zeroBand_projection_of_singleton B hB
+  have hidx : 0 < floorCut((2 : ℝ), order(χ, shift((1 / 2 : ℝ), (0 : ℝ)))) := by
+    have he : shift((1 / 2 : ℝ), (0 : ℝ)) = (1 / 2 : ℂ) := by push_cast; norm_num
+    rw [he]
+    exact lt_min horder (by norm_num [Nat.floor_pos])
+  obtain ⟨d, hd, hpair⟩ := h ℚ basepoint hbasepoint 1 (1 / 2) 2 hs 0 ν hν 0
+    (by simpa only [Nat.cast_zero, neg_zero] using hrange)
+    (by simpa only [Nat.cast_zero, neg_zero] using hclosest) 0 0 (by simp) hidx
+  have hd₀ : d = 0 := by
+    obtain ⟨l, hl⟩ := hd
+    ext q
+    rw [← hl]
+    simp
+  obtain ⟨f, hf⟩ := ratJet_nonzero_trivial_isotype χ hχ
+  apply hf
+  rw [← (hpair f).2, hd₀]
+  rfl
+
+
+local notation "CQ" => IdeleClassGroup (𝓞 ℚ) ℚ
+local notation "UQ" => PontryaginDual CQ
+local notation "U₁Q" => PontryaginDual (ideleClassNorm ℚ).ker
+
+/-- A norm twist moves a critical-line zero of rational zeta to frequency zero
+in the trivial norm-one isotype. -/
+private theorem exists_spectralBasepoint_zero_at_half :
+    ∃ χ : U₁Q → UQ, IsSpectralBasepointChoice χ ∧
+      0 < (meromorphicOrderAt (continuedCompletedHeckeL (χ 1)) (1/2)).untop₀.toNat := by
+  classical
+  obtain ⟨t, -, hzero⟩ := HardyFirstZero.first_zero_on_line
+  let b := (t : ℂ) * Complex.I
+  have hb : b.re = 0 := by simp [b, Complex.mul_re]
+  let z : ℂ := 1 / 2 + b
+  have hre : z.re = 1/2 := by simp [z, hb]
+  have hne : z ≠ 1 := fun h ↦ by norm_num [h] at hre
+  have hm : MeromorphicOn riemannZeta univ := by
+    simpa only [DirichletCharacter.LFunction_modOne_eq] using
+      meromorphic_dirichletLFunction (1 : DirichletCharacter ℂ 1)
+  have hz : 0 < meromorphicOrderAt riemannZeta z := by
+    apply (tendsto_zero_iff_meromorphicOrderAt_pos (hm z (mem_univ z))).mp
+    change riemannZeta z = 0 at hzero
+    rw [← hzero]
+    exact (differentiableAt_riemannZeta hne).continuousAt.continuousWithinAt
+  have htwo : meromorphicOrderAt riemannZeta (2 : ℂ) = 0 :=
+    (analyticOn_riemannZeta _ (by norm_num : (2 : ℂ) ≠ 1)).meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mpr
+      (riemannZeta_ne_zero_of_one_lt_re (by norm_num))
+  have hfin := hm.meromorphicOrderAt_ne_top_of_isPreconnected isPreconnected_univ
+    (mem_univ (2 : ℂ)) (mem_univ z) (by rw [htwo]; simp)
+  have hnat : 0 < (meromorphicOrderAt riemannZeta z).untop₀.toNat := by
+    rw [← WithTop.coe_untop₀_of_ne_top hfin] at hz
+    have hint : 0 < (meromorphicOrderAt riemannZeta z).untop₀ := WithTop.coe_lt_coe.mp hz
+    omega
+  let η := ideleClassNormTwist (1 : UQ) b
+  have hu (g : CQ) : ‖η g‖ = 1 := by
+    change ‖(1 : ℂ) * (((ideleClassNorm ℚ g).val : ℝ) : ℂ) ^ b‖ = 1
+    rw [one_mul, Complex.norm_cpow_eq_rpow_re_of_pos
+      (NNReal.coe_pos.mpr (Units.zero_lt (ideleClassNorm ℚ g))), hb, Real.rpow_zero]
+  let ψ := unitaryHeckeCharacterToPontryaginDual η hu
+  obtain ⟨χ₀, hχ₀⟩ := exists_spectralBasepointChoice ℚ
+  let χ := Function.update χ₀ 1 ψ
+  refine ⟨χ, ?_, ?_⟩
+  · intro ω
+    by_cases h : ω = 1
+    · subst ω
+      rw [show χ 1 = ψ from Function.update_self ..]
+      ext g : 1
+      apply Circle.ext
+      change (1 : ℂ) * (((ideleClassNorm ℚ g.val).val : ℝ) : ℂ) ^ b = 1
+      rw [show ideleClassNorm ℚ g.val = 1 from g.property]
+      simp
+    · simpa [χ, Function.update_of_ne h] using hχ₀ ω
+  · rw [show χ 1 = ψ from Function.update_self ..]
+    let L := continuedCompletedHeckeL (1 : UQ)
+    have hL := (continuedCompletedHeckeL_spec (1 : UQ)).1
+    have hshift : MeromorphicOn (fun w ↦ L (w + b)) univ :=
+      fun _ _ ↦ (meromorphicNFAt_fun_comp_add_const_iff_meromorphicNFAt.mpr
+        (hL (mem_univ _))).meromorphicAt
+    have heq := meromorphicContinuation_eventuallyEq (continuedCompletedHeckeL_spec ψ).1.meromorphicOn
+      hshift (fun w hw ↦ by
+        rw [show continuedCompletedHeckeL ψ w = completedHeckeL ψ ⟨w, hw⟩ from
+          (continuedCompletedHeckeL_spec ψ).2 ⟨w, hw⟩,
+          completedHeckeL_of_normTwist ψ b hb
+            (ideleClassNormTwist_unitaryHeckeCharacter_zero η hu)]
+        exact ((continuedCompletedHeckeL_spec (1 : UQ)).2 _).symm) (1/2)
+    rw [meromorphicOrderAt_congr heq, meromorphicOrderAt_fun_comp_add_const_eq_meromorphicOrderAt]
+    change 0 < (meromorphicOrderAt (continuedCompletedHeckeL (1 : UQ)) z).untop₀.toNat
+    rwa [← meromorphicOrderAt_finiteHeckeL_continuation _ hm (fun s ↦
+      (dedekindZeta_rat_eq_riemannZeta s.property).symm.trans
+        (finiteHeckeL_one_eq_dedekindZeta (K := ℚ) s).symm) (by rw [hre]; norm_num)]
+
 /-- Paper: Theorem 10.2.1.1, proof following (10.2.1.10), p. 443.
-For F = ℚ and the trivial character, take a = 1/2, s = 2, m = 15, and
-the zeroth evaluations at the zeta ordinates t = 14.1347… and u = 21.0220….
-Both vanish on the weighted theta image by forward Mellin factorization.
-The evaluation at u annihilates the band image, so it is in the kernel of
-the adjoint. Its dual inner product with the evaluation at t is
-Mπ exp(−|t − u|) ≠ 0, where M is the norm-one mass. This excludes the
-evaluation at t from the adjoint range of the orthogonal projection. -/
+Over ℚ a norm twist of the first certified zeta zero gives a zero at the
+center of a singleton band. This band is Plancherel-null, so the projection
+and its adjoint are zero. The zeroth jet still has a nonzero pairing with
+a compactly supported test in the trivial norm-one isotype. -/
 theorem Printed.spectralLineIsotype_bandAdjoint_contains_jets_false :
-    ¬ Printed.spectralLineIsotype_bandAdjoint_contains_jets := by sorry
+    ¬ Printed.spectralLineIsotype_bandAdjoint_contains_jets := by
+  intro h
+  obtain ⟨basepoint, hbasepoint, horder⟩ := exists_spectralBasepoint_zero_at_half
+  exact ratBand_zero_refutation basepoint hbasepoint horder h
 
 end BandProjection
 

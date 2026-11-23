@@ -1005,12 +1005,272 @@ theorem introTrace_montel_of_bounded (K : Set ℂ) (_hK : IsCompact K)
 -- leaves the infinite zero sum uncontrolled. At the trivial rational character and
 -- a window containing the full divisor the zero sum itself diverges at z = 2.
 
+/-- Twisting a unitary character by `|·|^{iy}` shifts its norm twists by `iy`. -/
+private theorem introTraceApprox_spectral_summable_twist (χ χ' : U𝔽) (y : ℝ)
+    (hχ' : ∀ g, (χ' g : ℂ) = χ g * (N(g) : ℂ) ^ ((y : ℂ) * Complex.I)) (w : ℂ) (g : C𝔽) :
+    ideleClassNormTwist χ' w g = ideleClassNormTwist χ (w + y * Complex.I) g := by
+  have hN : (N(g) : ℂ) ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+  change (χ' g : ℂ) * (N(g) : ℂ) ^ w = (χ g : ℂ) * (N(g) : ℂ) ^ (w + y * Complex.I)
+  rw [hχ', Complex.cpow_add _ _ hN]
+  ring
+
+/-- The gamma factor of a twist by `|·|^{iy}` is the shifted gamma factor. -/
+private theorem introTraceApprox_spectral_summable_gamma (χ χ' : U𝔽) (y : ℝ)
+    (hχ' : ∀ g, (χ' g : ℂ) = χ g * (N(g) : ℂ) ^ ((y : ℂ) * Complex.I)) (w : ℂ) :
+    heckeGammaFactor χ' w = heckeGammaFactor χ (w + y * Complex.I) := by
+  classical
+  have htw := introTraceApprox_spectral_summable_twist χ χ' y hχ'
+  have hsplit (g : C𝔽) : ideleClassNormTwist χ' 0 g =
+      ideleClassNormTwist χ 0 g * (N(g) : ℂ) ^ ((y : ℂ) * Complex.I) := by
+    rw [htw, zero_add]
+    change (χ g : ℂ) * (N(g) : ℂ) ^ ((y : ℂ) * Complex.I) =
+      ((χ g : ℂ) * (N(g) : ℂ) ^ (0 : ℂ)) * (N(g) : ℂ) ^ ((y : ℂ) * Complex.I)
+    rw [Complex.cpow_zero, mul_one]
+  unfold heckeGammaFactor
+  refine Finset.prod_congr rfl fun v _ ↦ ?_
+  by_cases hv : v.IsReal
+  · simp only [dif_pos hv]
+    let a := (realHeckeCharacter_parameters χ v hv).exists.choose
+    have ha := (realHeckeCharacter_parameters χ v hv).exists.choose_spec
+    have hr : (realHeckeCharacter_parameters χ' v hv).exists.choose = (a.1 + y * Complex.I, a.2) := by
+      refine (realHeckeCharacter_parameters χ' v hv).unique
+        (realHeckeCharacter_parameters χ' v hv).exists.choose_spec ⟨by have ha1 : a.1.re = 0 := ha.1; simp [ha1], fun x ↦ ?_⟩
+      let e := (InfinitePlace.Completion.ringEquivRealOfIsReal hv).symm
+      let g := IdeleClassGroup.ofCompletion (𝓞 F) F v (Units.map e.toMonoidHom x)
+      have hx := ha.2 x
+      change ideleClassNormTwist χ' 0 g = _
+      change ideleClassNormTwist χ 0 g = _ at hx
+      have hn : N(g) = ‖(x : ℝ)‖ := by
+        change ((ideleClassNorm F (IdeleClassGroup.ofCompletion (𝓞 F) F v _)).val : ℝ) = _
+        rw [ideleClassNorm_ofCompletion, hv.mult_eq_one, pow_one]
+        exact (InfinitePlace.Completion.isometryEquivRealOfIsReal hv).symm.isometry.norm_map_of_map_zero
+          (map_zero e) (x : ℝ)
+      have hx0 : ((‖(x : ℝ)‖ : ℝ) : ℂ) ≠ 0 :=
+        Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr x.ne_zero)
+      rw [hsplit, hx, hn, Complex.cpow_add _ _ hx0]
+      ring
+    rw [hr]
+    congr 1
+    ring
+  · simp only [dif_neg hv]
+    have hc := InfinitePlace.not_isReal_iff_isComplex.mp hv
+    let a := (complexHeckeCharacter_parameters χ v hc).exists.choose
+    have ha := (complexHeckeCharacter_parameters χ v hc).exists.choose_spec
+    have hr : (complexHeckeCharacter_parameters χ' v hc).exists.choose =
+        (a.1 + y * Complex.I, a.2) := by
+      refine (complexHeckeCharacter_parameters χ' v hc).unique
+        (complexHeckeCharacter_parameters χ' v hc).exists.choose_spec ⟨by have ha1 : a.1.re = 0 := ha.1; simp [ha1], fun x ↦ ?_⟩
+      let e := (InfinitePlace.Completion.ringEquivComplexOfIsComplex hc).symm
+      let g := IdeleClassGroup.ofCompletion (𝓞 F) F v (Units.map e.toMonoidHom x)
+      have hx := ha.2 x
+      change ideleClassNormTwist χ' 0 g = _
+      change ideleClassNormTwist χ 0 g = _ at hx
+      have hn : N(g) = ‖(x : ℂ)‖ ^ 2 := by
+        change ((ideleClassNorm F (IdeleClassGroup.ofCompletion (𝓞 F) F v _)).val : ℝ) = _
+        rw [ideleClassNorm_ofCompletion, hc.mult_eq_two]
+        have := (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hc).symm.isometry.norm_map_of_map_zero
+          (map_zero e) (x : ℂ)
+        have h2 : ‖e (x : ℂ)‖ = ‖(x : ℂ)‖ := this
+        simpa using h2
+      have hx0 : ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ≠ 0 :=
+        Complex.ofReal_ne_zero.mpr (pow_ne_zero _ (norm_ne_zero_iff.mpr x.ne_zero))
+      rw [hsplit, hx, hn, Complex.cpow_add _ _ hx0]
+      ring
+    rw [hr]
+    congr 2
+    ring
+
+/-- The zero divisor of a twist by `|·|^{iy}` is the divisor shifted by `iy`. -/
+private theorem introTraceApprox_spectral_summable_shift (χ χ' : U𝔽) (y : ℝ)
+    (hχ' : ∀ g, (χ' g : ℂ) = χ g * (N(g) : ℂ) ^ ((y : ℂ) * Complex.I)) (s : ℂ) :
+    zeroOrder(χ', s) = zeroOrder(χ, s + y * Complex.I) := by
+  classical
+  have htw := introTraceApprox_spectral_summable_twist χ χ' y hχ'
+  have hre (w : ℂ) : (w + y * Complex.I).re = w.re := by simp
+  have hsplit (g : C𝔽) : ideleClassNormTwist χ' 0 g =
+      ideleClassNormTwist χ 0 g * (N(g) : ℂ) ^ ((y : ℂ) * Complex.I) := by
+    rw [htw, zero_add]
+    change (χ g : ℂ) * (N(g) : ℂ) ^ ((y : ℂ) * Complex.I) =
+      ((χ g : ℂ) * (N(g) : ℂ) ^ (0 : ℂ)) * (N(g) : ℂ) ^ ((y : ℂ) * Complex.I)
+    rw [Complex.cpow_zero, mul_one]
+  -- Ramification is unchanged since integer units have norm one.
+  have hunit (v : V) (x : (v.adicCompletionIntegers F)ˣ) :
+      (ideleClassNormTwist χ' 0).restrict v x = (ideleClassNormTwist χ 0).restrict v x := by
+    let u := Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom x
+    have hn : ‖(u : v.adicCompletion F)‖ = 1 :=
+      Valued.toNormedField.norm_eq_one_iff.mpr
+        ((HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one (a := u)).mp
+          ⟨x.val.property, x.inv.property⟩)
+    have hN : N(IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u) = 1 := by
+      change ((ideleClassNorm F (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u)).val : ℝ) = 1
+      rw [ideleClassNorm_ofAdicCompletion]
+      exact hn
+    change (ideleClassNormTwist χ' 0).restrict v (u : v.adicCompletion F) =
+      (ideleClassNormTwist χ 0).restrict v (u : v.adicCompletion F)
+    rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe, HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    change ideleClassNormTwist χ' 0 (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u) =
+      ideleClassNormTwist χ 0 (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u)
+    rw [hsplit, hN]
+    simp
+  have hram (v : V) : (ideleClassNormTwist χ' 0).IsUnramifiedAt v ↔
+      (ideleClassNormTwist χ 0).IsUnramifiedAt v := by
+    simp only [HeckeCharacter.isUnramifiedAt_iff, hunit]
+  -- The Euler factors and finite L-functions agree after the shift.
+  have hfac (w : ℂ) (hw : 1 < w.re) (v : V) :
+      finiteHeckeEulerFactor χ' v w = finiteHeckeEulerFactor χ v (w + y * Complex.I) := by
+    by_cases hu : (ideleClassNormTwist χ 0).IsUnramifiedAt v
+    · let val : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+      have hπ := val.exists_isUniformizer_of_isCyclic_of_nontrivial.choose_spec
+      let π : (v.adicCompletion F)ˣ := Units.mk0 _ hπ.ne_zero
+      have h1 := finiteHeckeEulerFactor_inv_uniformizer χ' v π hπ ((hram v).mpr hu)
+        (show w ∈ Complex.re ⁻¹' Ioi (1 : ℝ) from hw)
+      have h2 := finiteHeckeEulerFactor_inv_uniformizer χ v π hπ hu
+        (show w + y * Complex.I ∈ Complex.re ⁻¹' Ioi (1 : ℝ) from by
+          change 1 < (w + y * Complex.I).re; rw [hre]; exact hw)
+      have h3 : finitePlaceRestriction F v (ideleClassNormTwist χ' w) π =
+          finitePlaceRestriction F v (ideleClassNormTwist χ (w + y * Complex.I)) π := htw w _
+      rw [← inv_inj, h1, h2, h3]
+    · unfold finiteHeckeEulerFactor
+      rw [if_neg (mt (hram v).mp hu), if_neg hu]
+  have hcomp (w : ℂ) (hw : 1 < w.re) :
+      completedHeckeL χ' ⟨w, hw⟩ = completedHeckeL χ ⟨w + y * Complex.I, by
+        change 1 < (w + y * Complex.I).re; rw [hre]; exact hw⟩ := by
+    have hw' : 1 < (w + y * Complex.I).re := by rw [hre]; exact hw
+    have h1 := finiteHeckeL_hasProd χ' ⟨w, hw⟩
+    have h2 := finiteHeckeL_hasProd χ ⟨w + y * Complex.I, hw'⟩
+    change HasProd (fun v ↦ finiteHeckeEulerFactor χ' v w) _ at h1
+    change HasProd (fun v ↦ finiteHeckeEulerFactor χ v (w + y * Complex.I)) _ at h2
+    rw [show (fun v ↦ finiteHeckeEulerFactor χ' v w) =
+      fun v ↦ finiteHeckeEulerFactor χ v (w + y * Complex.I) from funext (hfac w hw)] at h1
+    unfold completedHeckeL
+    change heckeGammaFactor χ' w * finiteHeckeL χ' ⟨w, hw⟩ =
+      heckeGammaFactor χ (w + y * Complex.I) * finiteHeckeL χ ⟨w + y * Complex.I, hw'⟩
+    rw [introTraceApprox_spectral_summable_gamma χ χ' y hχ', h1.unique h2]
+  -- The continuations agree near every point.
+  have hL' := continuedCompletedHeckeL_spec χ'
+  have hL := continuedCompletedHeckeL_spec χ
+  let g : ℂ → ℂ := fun w ↦ continuedCompletedHeckeL χ (w + y * Complex.I)
+  have hg : MeromorphicOn g univ := fun w _ ↦
+    (hL.1 (mem_univ _)).meromorphicAt.comp_analyticAt (analyticAt_id.add analyticAt_const)
+  have hTwo : meromorphicOrderAt (continuedCompletedHeckeL χ' - g) (2 : ℂ) = ⊤ := by
+    apply meromorphicOrderAt_eq_top_iff.mpr
+    have hn : ∀ᶠ z : ℂ in 𝓝 (2 : ℂ), 1 < z.re :=
+      (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+    filter_upwards [hn.filter_mono nhdsWithin_le_nhds] with w hw
+    have hw' : 1 < (w + y * Complex.I).re := by rw [hre]; exact hw
+    refine sub_eq_zero.mpr ?_
+    change continuedCompletedHeckeL χ' w = continuedCompletedHeckeL χ (w + y * Complex.I)
+    rw [show w = ((⟨w, hw⟩ : Complex.re ⁻¹' Ioi (1 : ℝ)) : ℂ) from rfl, hL'.2 ⟨w, hw⟩, hcomp w hw]
+    exact (hL.2 ⟨w + y * Complex.I, hw'⟩).symm
+  have hev : continuedCompletedHeckeL χ' =ᶠ[𝓝[≠] s] g :=
+    (meromorphicOrderAt_eq_top_iff.mp
+      ((hL'.1.meromorphicOn.sub hg).meromorphicOrderAt_eq_top_of_isPreconnected isPreconnected_univ
+        (mem_univ (2 : ℂ)) (mem_univ s) hTwo)).mono fun _ hz ↦ sub_eq_zero.mp hz
+  rw [MeromorphicOn.divisor_apply hL'.1.meromorphicOn (mem_univ s),
+    MeromorphicOn.divisor_apply hL.1.meromorphicOn (mem_univ _), meromorphicOrderAt_congr hev,
+    ← meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt]
+  rfl
+
 /-- Paper: §1.4.3, p. 29. At each fixed cutoff the zero sum converges at every
 parameter. This gives the totalized spectral sum its intended value in every chart. -/
 theorem introTraceApprox_spectral_summable (χ : U𝔽) (h ρ : ℕ → ℝ → ℝ)
     (_hA : IsIntroTraceApproximation h ρ) (n : ℕ) (a : ℝ) (_ha : 0 < a) (z : ℂ) :
     Summable (fun r : windowZeros(χ, a) ↦
-      (zeroOrder(χ, r.val) : ℂ) * introTraceMellin approx(h, ρ, n, z) (r.val - 1 / 2)) := by sorry
+      (zeroOrder(χ, r.val) : ℂ) * introTraceMellin approx(h, ρ, n, z) (r.val - 1 / 2)) := by
+  classical
+  -- A norm section and the frequency of `χ` along it.
+  have hsec := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.2.2.2.2.1
+  let τ : ℝ≥0ˣ →ₜ* C𝔽 := ⟨hsec.choose, hsec.choose_spec.1⟩
+  have hτ : RightInverse τ (ideleClassNorm F) := hsec.choose_spec.2
+  let c : ℝ≥0ˣ →ₜ* ℂ := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp (χ.comp τ)
+  obtain ⟨w, ⟨hw0, hw⟩, -⟩ := existsUnique_unitaryComplexPower c (fun t ↦ Circle.norm_coe _)
+  let y : ℝ := w.im
+  have hwy : w = (y : ℂ) * Complex.I := Complex.ext (by simp [hw0]) (by simp [y])
+  have hNpos (g : C𝔽) : 0 < N(g) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hN0 (g : C𝔽) : (N(g) : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (hNpos g).ne'
+  -- The unitary character `|·|^{-iy}` and `χ₀ = χ |·|^{-iy}`.
+  let H : HeckeCharacter (𝓞 F) F := ideleClassNormTwist (1 : U𝔽) (-(y : ℂ) * Complex.I)
+  have hHv (g : C𝔽) : H g = (N(g) : ℂ) ^ (-(y : ℂ) * Complex.I) := by
+    change ((1 : U𝔽) g : ℂ) * (N(g) : ℂ) ^ (-(y : ℂ) * Complex.I) = _
+    simp
+  have hHn (g : C𝔽) : ‖H g‖ = 1 := by
+    rw [hHv, Complex.norm_cpow_eq_rpow_re_of_pos (hNpos g)]
+    simp
+  let ν : U𝔽 :=
+    ⟨{ toFun := fun g ↦ ⟨H g, mem_sphere_zero_iff_norm.2 (hHn g)⟩
+       map_one' := Circle.ext H.map_one
+       map_mul' := fun a b ↦ Circle.ext (H.map_mul a b) }, H.continuous.subtype_mk _⟩
+  let χ₀ : U𝔽 := χ * ν
+  have hχ₀ (g : C𝔽) : (χ₀ g : ℂ) = χ g * (N(g) : ℂ) ^ (-(y : ℂ) * Complex.I) := by
+    change ((χ g * ν g : Circle) : ℂ) = _
+    rw [Circle.coe_mul]
+    exact congrArg _ (hHv g)
+  have hχ (g : C𝔽) : (χ g : ℂ) = χ₀ g * (N(g) : ℂ) ^ ((y : ℂ) * Complex.I) := by
+    rw [hχ₀, mul_assoc, ← Complex.cpow_add _ _ (hN0 g), show -(y : ℂ) * Complex.I + y * Complex.I = 0
+      by ring, Complex.cpow_zero, mul_one]
+  have hχ₀τ (t : ℝ≥0ˣ) : χ₀ (τ t) = 1 := by
+    apply Circle.ext
+    have hNt : N(τ t) = ((t : ℝ≥0) : ℝ) := by
+      change ((ideleClassNorm F (τ t)).val : ℝ) = _
+      rw [hτ t]
+    have hct : (χ (τ t) : ℂ) = (((t : ℝ≥0) : ℝ) : ℂ) ^ w := hw t
+    have ht0 : (((t : ℝ≥0) : ℝ) : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+    rw [hχ₀, hct, hNt, ← Complex.cpow_add _ _ ht0, hwy,
+      show (y : ℂ) * Complex.I + -(y : ℂ) * Complex.I = 0 by ring, Complex.cpow_zero, Circle.coe_one]
+  -- The Bruhat test of the approximant and the library summability.
+  obtain ⟨φ, hφ⟩ := introTraceApprox_exists_bruhat χ h ρ _hA n z
+  have hS := summable_ideleClassMellin_completedHeckeZeros τ hτ univ φ (-1 / 2)
+  let ι : windowZeros(χ, a) →
+      {p : {χ : U𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ //
+        0 < MeromorphicOn.divisor (explicitFormulaCompletedHeckeL p.1.val) univ p.2} := fun r ↦
+    ⟨(⟨χ₀, hχ₀τ⟩, r.val + y * Complex.I), by
+      have := introTraceApprox_spectral_summable_shift χ₀ χ y hχ r.val
+      change 0 < zeroOrder(χ₀, r.val + y * Complex.I)
+      rw [← this]
+      exact r.property.1⟩
+  have hι : Injective (fun r ↦ (⟨ι r, mem_univ _⟩ : (univ : Set _))) := by
+    intro r r' hr
+    have := congrArg (fun p ↦ p.val.val.2) hr
+    simp only [ι, add_left_inj] at this
+    exact Subtype.ext this
+  have hV : (τVolume) ≠ 0 := by
+    have hvol : 0 < ((normOneIdeleClassTamagawaMeasure F univ).toReal) := by
+      rw [normOneIdeleClassTamagawaMeasure_volume]
+      have := NumberField.classNumber_pos F
+      have := NumberField.Units.regulator_pos F
+      have := NumberField.Units.torsionOrder_pos F
+      have := Int.natAbs_pos.mpr (NumberField.discr_ne_zero F)
+      rw [ENNReal.toReal_ofReal (by positivity)]
+      positivity
+    exact Complex.ofReal_ne_zero.mpr hvol.ne'
+  -- Compare the summands.
+  have hterm (r : windowZeros(χ, a)) :
+      (zeroOrder(χ, r.val) : ℂ) * introTraceMellin approx(h, ρ, n, z) (r.val - 1 / 2) =
+        ((MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ₀) univ (r.val + y * Complex.I) : ℂ) *
+          ∫ g, φ.val g * ideleClassNormTwist χ₀ (r.val + y * Complex.I) g *
+            (N(g) : ℂ) ^ ((-1 / 2 : ℝ) : ℂ) ∂ideleClassTamagawaMeasure F) / τVolume := by
+    have hdiv := introTraceApprox_spectral_summable_shift χ₀ χ y hχ r.val
+    have hint : (∫ g, φ.val g * ideleClassNormTwist χ₀ (r.val + y * Complex.I) g *
+        (N(g) : ℂ) ^ ((-1 / 2 : ℝ) : ℂ) ∂ideleClassTamagawaMeasure F) =
+        τVolume * introTraceMellin approx(h, ρ, n, z) (r.val - 1 / 2) := by
+      rw [← (introTraceTest_mellin χ approx(h, ρ, n, z) φ hφ (r.val - 1 / 2)).2]
+      refine integral_congr_ae (Eventually.of_forall fun g ↦ ?_)
+      simp only
+      rw [introTraceApprox_spectral_summable_twist χ₀ χ y hχ, mul_assoc]
+      congr 1
+      change (χ₀ g : ℂ) * (N(g) : ℂ) ^ (r.val + y * Complex.I) * _ =
+        (χ₀ g : ℂ) * (N(g) : ℂ) ^ (r.val - 1 / 2 + y * Complex.I)
+      rw [mul_assoc, ← Complex.cpow_add _ _ (hN0 g)]
+      congr 2
+      push_cast
+      ring
+    rw [hint, hdiv]
+    change _ = ((zeroOrder(χ₀, r.val + y * Complex.I) : ℂ) * (τVolume * _)) / τVolume
+    field_simp
+  refine Summable.of_norm_bounded ((hS.comp_injective hι).div_const ‖τVolume‖) fun r ↦ ?_
+  rw [hterm, norm_div]
+  rfl
 
 /-- Paper: §1.4.3, p. 29. Each fixed-cutoff zero sum is entire in the
 test parameter.

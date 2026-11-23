@@ -538,10 +538,86 @@ theorem sLocalOrbitalPrincipalValue_annihilator {T : Finset V} (hT : T ⊆ S) (_
   rintro _ ⟨i, rfl⟩ x hx
   exact sLocalOrbitalPrincipalValue_annihilator_ker hT ω i hx
 
--- TODO(paper-gap): For ℚ and T = {p}, dividing an entire zeta transform by
--- 1 - p⁻ˢ produces at most a simple pole at zero. The leading orbital coefficient
--- at the trivial character has order two. Page 342 needs an interpolant starting
--- with a test attaining the full allowed order at the selected center.
+open Classical in
+/-- Normalize a triangular witness and correct its later offsets at the same center. -/
+private theorem sLocalOrbitalPrincipalPart_triangular_dual {E A C : Type*}
+    [AddCommGroup E] [Module ℂ E] (center : A → C) (offset : A → ℕ)
+    (cutoff : C → ℕ) (φ : A → E →ₗ[ℂ] ℂ)
+    (hcut : ∀ i, offset i < cutoff (center i))
+    (hinj : ∀ i j, center i = center j → offset i = offset j → i = j)
+    (hwitness : ∀ j, ∃ x, φ j x ≠ 0 ∧
+      ∀ i, center i ≠ center j ∨ offset i < offset j → φ i x = 0) :
+    ∀ j, ∃ x, ∀ i, φ i x = if i = j then 1 else 0 := by
+  classical
+  let rank (i : A) := cutoff (center i) - offset i
+  suffices h : ∀ n : ℕ, ∀ j, rank j = n → ∃ x, ∀ i, φ i x = if i = j then 1 else 0 by
+    exact fun j ↦ h (rank j) j rfl
+  intro n
+  induction n using Nat.strong_induction_on with
+  | ind n ih =>
+    intro j hj
+    obtain ⟨x, hx, hzero⟩ := hwitness j
+    let y := (φ j x)⁻¹ • x
+    have hyj : φ j y = 1 := by simp [y, hx]
+    let B := {i : A // center i = center j ∧ offset j < offset i}
+    let index (i : B) : Fin (cutoff (center j)) :=
+      ⟨offset i.val, by simpa only [i.property.1] using hcut i.val⟩
+    let : Fintype B := Fintype.ofInjective index (fun i k h ↦ Subtype.ext
+      (hinj i.val k.val (i.property.1.trans k.property.1.symm) (congrArg Fin.val h)))
+    have hsmaller (i : B) : rank i.val < n := by
+      have hlt := i.property.2
+      have hc := hcut i.val
+      rw [i.property.1] at hc
+      rw [← hj]
+      dsimp [rank]
+      rw [i.property.1]
+      omega
+    choose z hz using fun i : B ↦ ih _ (hsmaller i) i.val rfl
+    refine ⟨y - ∑ i : B, φ i.val y • z i, fun i ↦ ?_⟩
+    simp only [map_sub, map_sum, map_smul, smul_eq_mul, hz, mul_ite, mul_one, mul_zero]
+    have hsum : (∑ k : B, if i = k.val then φ k.val y else 0) =
+        if center i = center j ∧ offset j < offset i then φ i y else 0 := by
+      split_ifs with hi
+      · let k : B := ⟨i, hi⟩
+        rw [Finset.sum_eq_single k]
+        · simp [k]
+        · intro b _ hb
+          exact ite_eq_right (fun h ↦ hb (Subtype.ext h.symm))
+        · exact fun h ↦ (h (Finset.mem_univ k)).elim
+      · apply Finset.sum_eq_zero
+        intro k _
+        apply ite_eq_right
+        intro h
+        exact hi (by simpa only [h] using k.property)
+    rw [hsum]
+    by_cases h : i = j
+    · subst i
+      simp [hyj]
+    · rw [ite_eq_right h]
+      by_cases hi : center i = center j ∧ offset j < offset i
+      · simp [hi]
+      · rw [ite_eq_right hi, sub_zero]
+        have hz' : center i ≠ center j ∨ offset i < offset j := by
+          by_cases hc : center i = center j
+          · right
+            have he : offset i ≠ offset j := fun h' ↦ h (hinj i j hc h')
+            exact lt_of_le_of_ne (le_of_not_gt (fun h' ↦ hi ⟨hc, h'⟩)) he
+          · exact Or.inl hc
+        simp [y, hzero i hz']
+
+/-- Realize a nonzero selected coefficient while killing selected coefficients at other
+centers and higher selected orders at this center. Lower orders at this center and
+unselected coefficients are unrestricted. For `ℚ` and `T = {p}`, undoing the finite
+principal value on an entire transform gives at most a simple pole at the trivial
+character, where the highest selected order is two. -/
+private theorem exists_sLocalOrbitalPrincipalPart_triangular_test {T : Finset V}
+    (_hT : T ⊆ S) (_hTne : T.Nonempty) (_hS : IsSaturatedPlaceSet S) (_hPic : PicTrivial)
+    (ω : PontryaginDual J₁) (j : I(T, ω)) :
+    ∃ f : ℬₛ,
+      sLocalOrbitalPrincipalPart j ((Kₛ(ω)).mkQ f) ≠ 0 ∧
+      ∀ i : I(T, ω), i.val.1 ≠ j.val.1 ∨ i.val.2 < j.val.2 →
+        sLocalOrbitalPrincipalPart i ((Kₛ(ω)).mkQ f) = 0 := by sorry
+
 open Classical in
 /-- Paper: Theorem 7.3.1.2(2), p. 342.
 For each selected coefficient there is a homogeneous theta class on which it takes the
@@ -553,7 +629,15 @@ theorem exists_sLocalOrbitalPrincipalPart_dual {T : Finset V} (_hT : T ⊆ S)
     (ω : PontryaginDual J₁) (j : I(T, ω)) :
     ∃ x : Θₛ(ω), ∀ i : I(T, ω),
       sLocalOrbitalPrincipalPart (F := F) (S := S) (T := T) (ω := ω) i x =
-        if i = j then 1 else 0 := by sorry
+        if i = j then 1 else 0 := by
+  refine sLocalOrbitalPrincipalPart_triangular_dual
+    (fun i : I(T, ω) ↦ i.val.1) (fun i ↦ i.val.2) (sLocalFinitePoleMultiplicity T)
+    (fun i ↦ (sLocalOrbitalPrincipalPart i).toLinearMap) (fun i ↦ i.property.2) ?_ ?_ j
+  · intro i k hc hr
+    exact Subtype.ext (Prod.ext hc hr)
+  · intro i
+    obtain ⟨f, hf, hzero⟩ := exists_sLocalOrbitalPrincipalPart_triangular_test _hT _hTne _hS _hPic ω i
+    exact ⟨(Kₛ(ω)).mkQ f, hf, hzero⟩
 
 open Classical in
 /-- Paper: Theorem 7.3.1.2(2), p. 341.

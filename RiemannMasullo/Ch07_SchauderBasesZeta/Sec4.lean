@@ -1045,6 +1045,121 @@ theorem archNuclearityJet_span :
         Set (StrongDual ℂ (Θ₀(χ)))) =
       {ℓ | ∀ x : archNuclearityDenominator χ, ℓ x.val = 0} := by sorry
 
+/-- At one infinite place the gamma factor vanishes, by Mathlib's convention at the poles
+of `Γ`, along an arithmetic progression. So the reciprocal gamma product has a zero of
+positive finite order at infinitely many points. -/
+private theorem archNuclearityJet_basis_poles_infinite
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) :
+    {s : ℂ | 0 < gammaOrder(χ, s)}.Infinite := by
+  classical
+  obtain ⟨v⟩ := (inferInstance : Nonempty (InfinitePlace F))
+  let c : ℂ := if hv : v.IsReal then
+      (realHeckeCharacter_parameters χ v hv).exists.choose.1 +
+        ((realHeckeCharacter_parameters χ v hv).exists.choose.2.val : ℂ)
+    else
+      (complexHeckeCharacter_parameters χ v
+          (InfinitePlace.not_isReal_iff_isComplex.mp hv)).exists.choose.1 +
+        ((complexHeckeCharacter_parameters χ v
+          (InfinitePlace.not_isReal_iff_isComplex.mp hv)).exists.choose.2.natAbs : ℂ) / 2
+  let s : ℕ → ℂ := fun n ↦ -c - 2 * n
+  have hzero (n : ℕ) : heckeGammaFactor χ (s n) = 0 := by
+    unfold heckeGammaFactor
+    apply Finset.prod_eq_zero (Finset.mem_univ v)
+    by_cases hv : v.IsReal
+    · simp only [s, c, hv, ↓reduceDIte]
+      rw [Complex.Gammaℝ_eq_zero_iff]
+      exact ⟨n, by ring⟩
+    · simp only [s, c, hv, ↓reduceDIte]
+      rw [div_eq_zero_iff]
+      left
+      rw [show -(_ + _) - 2 * (n : ℂ) + _ + _ = -((2 * n : ℕ) : ℂ) by push_cast; ring,
+        Complex.Gammaℂ_def, Complex.Gamma_neg_nat_eq_zero, mul_zero]
+  let f := fun z ↦ (heckeGammaFactor χ z)⁻¹
+  have hA : AnalyticOnNhd ℂ f univ :=
+    fun z _ ↦ (differentiable_inv_heckeGammaFactor χ).analyticAt z
+  have hpos (n : ℕ) : s n ∈ {s : ℂ | 0 < gammaOrder(χ, s)} := by
+    have h0 : analyticOrderAt f (s n) ≠ 0 :=
+      analyticOrderAt_ne_zero.mpr ⟨hA _ (mem_univ _), by simp [f, hzero n]⟩
+    have htop : analyticOrderAt f (s n) ≠ ⊤ := by
+      intro htop
+      have h1 := hA.eqOn_zero_of_preconnected_of_eventuallyEq_zero isPreconnected_univ
+        (mem_univ (s n)) (analyticOrderAt_eq_top.1 htop) (mem_univ 1)
+      exact inv_ne_zero
+        (heckeGammaFactor_ne_zero_of_re_pos χ (by norm_num : (0 : ℝ) < (1 : ℂ).re)) h1
+    change 0 < (analyticOrderAt f (s n)).toNat
+    cases hn : analyticOrderAt f (s n) with
+    | top => exact absurd hn htop
+    | coe m =>
+      rw [hn] at h0
+      simpa [Nat.pos_iff_ne_zero] using h0
+  refine Set.infinite_of_injective_forall_mem (fun n m h ↦ ?_) hpos
+  have := congrArg Complex.re h
+  simp only [s, Complex.sub_re, Complex.neg_re, Complex.mul_re, Complex.natCast_re,
+    Complex.natCast_im] at this
+  norm_num at this
+  exact_mod_cast this
+
+/-- The adjusted jet indices are countably infinite: they lie over the closed discrete
+pole set, and the adjustment removes at most one index from an infinite pole set. -/
+private theorem archNuclearityJet_basis_index_equiv
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F))
+    (τ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 F) F) (hτ : RightInverse τ (ideleNorm F)) :
+    Nonempty (ℕ ≃ ArchNuclearityJetIndex χ τ hτ) := by
+  let S := {s : ℂ | 0 < gammaOrder(χ, s)}
+  have hS : S.Countable := by
+    have hd := (archNuclearityPoleSet_discrete χ).2
+    have : DiscreteTopology S := hd.to_subtype
+    exact Set.countable_coe_iff.mp
+      (TopologicalSpace.separableSpace_iff_countable.mp inferInstance)
+  have hmem (j : ArchNuclearityJetIndex χ τ hτ) : j.val.1 ∈ S := by
+    have h := j.property
+    unfold archNuclearityMultiplicity at h
+    show 0 < gammaOrder(χ, j.val.1)
+    omega
+  have : Countable (ArchNuclearityJetIndex χ τ hτ) := by
+    have := hS.to_subtype
+    refine Function.Injective.countable
+      (f := fun j : ArchNuclearityJetIndex χ τ hτ ↦ ((⟨j.val.1, hmem j⟩ : S), j.val.2)) ?_
+    intro a b h
+    simp only [Prod.mk.injEq, Subtype.mk.injEq] at h
+    exact Subtype.ext (Prod.ext h.1 h.2)
+  have : Infinite (ArchNuclearityJetIndex χ τ hτ) := by
+    have := ((archNuclearityJet_basis_poles_infinite χ).sdiff
+      (Set.finite_singleton (atZeroPole(χ, τ, hτ)))).to_subtype
+    refine Infinite.of_injective
+      (fun s : ↥(S \ {atZeroPole(χ, τ, hτ)}) ↦
+        (⟨(s.val, 0), ?_⟩ : ArchNuclearityJetIndex χ τ hτ)) ?_
+    · have hs := s.property
+      simp only [Set.mem_sdiff, Set.mem_singleton_iff] at hs
+      change 0 < archNuclearityMultiplicity χ τ hτ s.val
+      unfold archNuclearityMultiplicity
+      have hne : ¬(ω(χ) = 1 ∧ s.val = atZeroPole(χ, τ, hτ)) := fun h ↦ hs.2 h.2
+      simp only [hne, ↓reduceIte, Nat.sub_zero]
+      simpa [S] using hs.1
+    · intro a b h
+      exact Subtype.ext (congrArg (fun j : ArchNuclearityJetIndex χ τ hτ ↦ j.val.1) h)
+  exact ⟨(nonempty_equiv_of_countable (α := ArchNuclearityJetIndex χ τ hτ)).some.symm⟩
+
+/-- Paper: Theorem 7.4.3.1(3), p. 368.
+For a fixed enumeration of the adjusted jets, the descended jets form a Schauder basis
+of the strong dual of the archimedean quotient, with continuous coefficient functionals
+on that strong dual. Pullback along the quotient map recovers the original jets.
+This is the second half of `archNuclearityJet_basis`; the first half, that the adjusted
+jet indices are countably infinite, is proved above. Given the jet-coordinate isomorphism
+of the quotient with `ArchNuclearityJetIndex χ τ hτ → ℂ` (the statement of
+`archNuclearityQuotient_jetEquiv`, which comes later in this file and so cannot be used
+here), take `d n` to be the coordinate at `σ n`, take `b m` to be evaluation at the vector
+with coordinate one at `σ m` and zero elsewhere, and use that a continuous functional on a
+product of copies of `ℂ` depends on finitely many coordinates. -/
+private theorem archNuclearityJet_basis_schauder
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F))
+    (τ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 F) F) (hτ : RightInverse τ (ideleNorm F))
+    (σ : ℕ ≃ ArchNuclearityJetIndex χ τ hτ) :
+    ∃ (d : ℕ → StrongDual ℂ (ArchNuclearityQuotient χ))
+      (b : ℕ → StrongDual ℂ (StrongDual ℂ (ArchNuclearityQuotient χ))),
+      (∀ n x, d n ((archNuclearityDenominator χ).mkQ x) = archNuclearityJet χ τ hτ (σ n) x) ∧
+        IsSchauderBasis d b := by sorry
+
 /-- Paper: Theorem 7.4.3.1(3), p. 368.
 Every enumeration of the adjusted jets gives a Schauder basis on the quotient strong
 dual. Pullback along the quotient map recovers the original jets. -/
@@ -1054,7 +1169,8 @@ theorem archNuclearityJet_basis :
     Nonempty (ℕ ≃ J) ∧
       ∀ σ : ℕ ≃ J, ∃ (d : ℕ → StrongDual ℂ Q) (b : ℕ → StrongDual ℂ (StrongDual ℂ Q)),
         (∀ n x, d n ((archNuclearityDenominator χ).mkQ x) = archNuclearityJet χ τ hτ (σ n) x) ∧
-        IsSchauderBasis d b := by sorry
+        IsSchauderBasis d b :=
+  ⟨archNuclearityJet_basis_index_equiv χ τ hτ, archNuclearityJet_basis_schauder χ τ hτ⟩
 
 local notation "finiteL(" χ ")" => (finiteHeckeL_exists_continuation χ).choose
 local notation "poleFactor(" χ ", " τ ", " hτ ", " s ")" =>
@@ -1570,6 +1686,130 @@ theorem archNuclearityQuotient_nuclear_iff_finiteRank :
   obtain ⟨e⟩ := archNuclearityStrongDual_finest_sequenceEquiv χ
   exact archNuclearityQuotient_nuclear_iff_finiteRank_sequence (E := ArchNuclearityQuotient χ) e
 
+/-- In block coordinates, an operator acting on each block by a lower-triangular
+Toeplitz matrix with entries `d i z` has values zero on the blocks where all those
+entries vanish. -/
+private theorem archNuclearityAction_nuclear_iff_vanish {Q : Type*} [AddCommGroup Q]
+    [Module ℂ Q] (m : ℂ → ℕ) (d : ℕ → ℂ → ℂ)
+    (e : Q ≃ₗ[ℂ] ({j : ℂ × ℕ // j.2 < m j.1} → ℂ)) (T : Q →ₗ[ℂ] Q)
+    (hT : ∀ q (j : {j : ℂ × ℕ // j.2 < m j.1}), e (T q) j = ∑ i ∈ Finset.range (j.val.2 + 1),
+      (j.val.2.choose i : ℂ) * d i j.val.1 *
+        e q ⟨(j.val.1, j.val.2 - i), (Nat.sub_le _ _).trans_lt j.property⟩)
+    (q : Q) (j : {j : ℂ × ℕ // j.2 < m j.1})
+    (hj : j.val.1 ∉ {z : ℂ | ∃ k : Fin (m z), d k.val z ≠ 0}) :
+    e (T q) j = 0 := by
+  rw [hT]
+  refine Finset.sum_eq_zero fun i hi ↦ ?_
+  have hi' : i < m j.val.1 :=
+    (Nat.lt_succ_iff.mp (Finset.mem_range.mp hi)).trans_lt j.property
+  have h0 : d i j.val.1 = 0 := by
+    by_contra h
+    exact hj ⟨⟨i, hi'⟩, h⟩
+  rw [h0, mul_zero, zero_mul]
+
+/-- Applying the operator to the first basis vector of the block at `z` gives the
+column of entries `d k z` in that block, and zero in the other blocks. -/
+private theorem archNuclearityAction_nuclear_iff_column {Q : Type*} [AddCommGroup Q]
+    [Module ℂ Q] (m : ℂ → ℕ) (d : ℕ → ℂ → ℂ)
+    (e : Q ≃ₗ[ℂ] ({j : ℂ × ℕ // j.2 < m j.1} → ℂ)) (T : Q →ₗ[ℂ] Q)
+    (hT : ∀ q (j : {j : ℂ × ℕ // j.2 < m j.1}), e (T q) j = ∑ i ∈ Finset.range (j.val.2 + 1),
+      (j.val.2.choose i : ℂ) * d i j.val.1 *
+        e q ⟨(j.val.1, j.val.2 - i), (Nat.sub_le _ _).trans_lt j.property⟩)
+    (z : ℂ) (hz : 0 < m z) (j : {j : ℂ × ℕ // j.2 < m j.1}) :
+    e (T (e.symm (Pi.single ⟨(z, 0), hz⟩ 1))) j = if j.val.1 = z then d j.val.2 z else 0 := by
+  classical
+  rw [hT]
+  simp only [LinearEquiv.apply_symm_apply]
+  split_ifs with hjz
+  · rw [Finset.sum_eq_single j.val.2]
+    · have : (⟨(j.val.1, j.val.2 - j.val.2), (Nat.sub_le _ _).trans_lt j.property⟩ :
+          {j : ℂ × ℕ // j.2 < m j.1}) = ⟨(z, 0), hz⟩ := Subtype.ext (by simp [hjz])
+      rw [this, Pi.single_eq_same, mul_one, Nat.choose_self, Nat.cast_one, one_mul, hjz]
+    · intro i hi hne
+      have hlt : i < j.val.2 :=
+        lt_of_le_of_ne (Nat.lt_succ_iff.mp (Finset.mem_range.mp hi)) hne
+      rw [Pi.single_eq_of_ne, mul_zero]
+      intro h
+      have := congrArg (fun x : {j : ℂ × ℕ // j.2 < m j.1} ↦ x.val.2) h
+      simp only at this
+      omega
+    · intro h
+      exact absurd (Finset.mem_range.mpr (Nat.lt_succ_self _)) h
+  · refine Finset.sum_eq_zero fun i _ ↦ ?_
+    rw [Pi.single_eq_of_ne, mul_zero]
+    intro h
+    exact hjz (congrArg (fun x : {j : ℂ × ℕ // j.2 < m j.1} ↦ x.val.1) h)
+
+/-- Linear-algebra core of Remark 7.4.3.3: a block lower-triangular operator on the
+product of the jet blocks has finite rank exactly when only finitely many blocks
+carry a nonzero entry. -/
+private theorem archNuclearityAction_nuclear_iff_blocks {Q : Type*} [AddCommGroup Q]
+    [Module ℂ Q] (m : ℂ → ℕ) (d : ℕ → ℂ → ℂ)
+    (e : Q ≃ₗ[ℂ] ({j : ℂ × ℕ // j.2 < m j.1} → ℂ)) (T : Q →ₗ[ℂ] Q)
+    (hT : ∀ q (j : {j : ℂ × ℕ // j.2 < m j.1}), e (T q) j = ∑ i ∈ Finset.range (j.val.2 + 1),
+      (j.val.2.choose i : ℂ) * d i j.val.1 *
+        e q ⟨(j.val.1, j.val.2 - i), (Nat.sub_le _ _).trans_lt j.property⟩) :
+    FiniteDimensional ℂ (LinearMap.range T) ↔
+      {z : ℂ | ∃ k : Fin (m z), d k.val z ≠ 0}.Finite := by
+  classical
+  let J := {j : ℂ × ℕ // j.2 < m j.1}
+  let Z := {z : ℂ | ∃ k : Fin (m z), d k.val z ≠ 0}
+  constructor
+  · intro hfin
+    choose k hk using fun z : Z ↦ z.property
+    have hpos (z : Z) : 0 < m z.val := (Nat.zero_le _).trans_lt (k z).isLt
+    let w (z : Z) : LinearMap.range T :=
+      ⟨T (e.symm (Pi.single ⟨(z.val, 0), hpos z⟩ 1)), LinearMap.mem_range_self _ _⟩
+    let Φ : (J → ℂ) →ₗ[ℂ] (Z → ℂ) :=
+      LinearMap.pi fun z ↦ LinearMap.proj (⟨(z.val, (k z).val), (k z).isLt⟩ : J)
+    let L : LinearMap.range T →ₗ[ℂ] (Z → ℂ) :=
+      Φ.comp (e.toLinearMap.comp (LinearMap.range T).subtype)
+    have hL (z : Z) : L (w z) = Pi.single z (d (k z).val z.val) := by
+      funext z'
+      change e (T (e.symm (Pi.single ⟨(z.val, 0), hpos z⟩ 1)))
+        ⟨(z'.val, (k z').val), (k z').isLt⟩ = _
+      rw [archNuclearityAction_nuclear_iff_column m d e T hT z.val (hpos z)]
+      by_cases h : z' = z
+      · subst h
+        simp
+      · have h' : z'.val ≠ z.val := fun he ↦ h (Subtype.ext he)
+        simp [h', Pi.single_eq_of_ne h]
+    have hli : LinearIndependent ℂ (L ∘ w) := by
+      have : L ∘ w = fun z ↦ Pi.single z (d (k z).val z.val) := funext hL
+      rw [this]
+      exact Pi.linearIndependent_single_of_ne_zero hk
+    have := (LinearIndependent.of_comp L hli).finite_of_isNoetherian
+    exact Set.toFinite Z
+  · intro hZ
+    have : Finite Z := hZ.to_subtype
+    let JZ := {j : J // j.val.1 ∈ Z}
+    have : Finite JZ := by
+      refine Finite.of_injective (β := Σ z : Z, Fin (m z.val))
+        (fun j ↦ ⟨⟨j.val.val.1, j.property⟩, ⟨j.val.val.2, j.val.property⟩⟩) ?_
+      intro a b h
+      simp only [Sigma.mk.inj_iff] at h
+      obtain ⟨h1, h2⟩ := h
+      have h1' : a.val.val.1 = b.val.val.1 := congrArg Subtype.val h1
+      apply Subtype.ext
+      apply Subtype.ext
+      refine Prod.ext h1' ?_
+      have := (Fin.heq_ext_iff (by rw [h1'])).mp h2
+      exact this
+    let R : LinearMap.range T →ₗ[ℂ] (JZ → ℂ) :=
+      (LinearMap.pi fun j : JZ ↦ LinearMap.proj (R := ℂ) (φ := fun _ : J ↦ ℂ) j.val).comp
+        (e.toLinearMap.comp (LinearMap.range T).subtype)
+    refine Module.Finite.of_injective R ?_
+    rw [← LinearMap.ker_eq_bot, LinearMap.ker_eq_bot']
+    rintro ⟨_, q, rfl⟩ hx
+    apply Subtype.ext
+    change T q = 0
+    apply e.injective
+    funext j
+    rw [map_zero, Pi.zero_apply]
+    by_cases hj : j.val.1 ∈ Z
+    · exact congrFun hx ⟨j, hj⟩
+    · exact archNuclearityAction_nuclear_iff_vanish m d e T hT q j hj
+
 /-- Paper: Remark 7.4.3.3, p. 373.
 The quotient action is nuclear exactly when it is nonzero on finitely many jet blocks.
 Deviation: A block of length m vanishes when all multiplier derivatives of orders
@@ -1581,7 +1821,33 @@ theorem archNuclearityAction_nuclear_iff (φ : 𝒟) :
     ∀ T : Q →L[ℂ] Q, (∀ x : Θ₀(χ), T (D.mkQ x) = D.mkQ (Aθ(φ) x)) →
       (Nonempty (NuclearPresentation T) ↔
         {z : ℂ | ∃ k : Fin (archNuclearityMultiplicity χ τ hτ z),
-          iteratedDeriv k.val (nuclearityTestMellin χ φ) z ≠ 0}.Finite) := by sorry
+          iteratedDeriv k.val (nuclearityTestMellin χ φ) z ≠ 0}.Finite) := by
+  intro D Q T hT
+  obtain ⟨e, he⟩ := archNuclearityQuotient_jetEquiv χ τ hτ
+  have hjet (x : Θ₀(χ)) (j : ArchNuclearityJetIndex χ τ hτ) :
+      archNuclearityJet χ τ hτ j x = iteratedDeriv j.val.2 ((Z(χ, τ, hτ)) x).val j.val.1 := by
+    unfold archNuclearityJet
+    rw [ContinuousLinearMap.comp_apply, ContinuousLinearMap.comp_apply, entireJet_apply]
+    exact congrArg (fun g : ℂ → ℂ ↦ iteratedDeriv j.val.2 g j.val.1)
+      (funext (schwartzBergmanEntireInclusion_apply _))
+  have hblock (q : Q) (j : ArchNuclearityJetIndex χ τ hτ) :
+      e (T q) j = ∑ i ∈ Finset.range (j.val.2 + 1),
+        (j.val.2.choose i : ℂ) * iteratedDeriv i (nuclearityTestMellin χ φ) j.val.1 *
+          e q ⟨(j.val.1, j.val.2 - i), (Nat.sub_le _ _).trans_lt j.property⟩ := by
+    obtain ⟨x, rfl⟩ := D.mkQ_surjective q
+    let v := (Z(χ, τ, hτ)) x
+    have hv : Differentiable ℂ v.val := fun z ↦
+      (v.property.2.1 z (mem_univ _)).differentiableAt (Filter.univ_mem' fun _ ↦ mem_univ _)
+    have hprod : ((Z(χ, τ, hτ)) (Aθ(φ) x)).val = nuclearityTestMellin χ φ * v.val :=
+      funext ((exists_polarThetaNuclearityAction χ τ hτ φ).choose_spec.1 x)
+    rw [hT x, he, hjet, hprod, iteratedDeriv_mul
+      ((archNuclearityDenominator_closed_invariant_multiplier χ φ).contDiff.contDiffAt)
+      hv.contDiff.contDiffAt]
+    refine Finset.sum_congr rfl fun i _ ↦ ?_
+    rw [he, hjet]
+  rw [archNuclearityQuotient_nuclear_iff_finiteRank χ T]
+  exact archNuclearityAction_nuclear_iff_blocks (archNuclearityMultiplicity χ τ hτ)
+    (fun i z ↦ iteratedDeriv i (nuclearityTestMellin χ φ) z) e.toLinearEquiv T.toLinearMap hblock
 
 end Archimedean
 

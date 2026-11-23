@@ -512,13 +512,507 @@ def Printed.archNuclearityJet_span : Prop :=
     (τ : ℝ≥0ˣ →ₜ* I[F]) (hτ : RightInverse τ (ideleNorm F)),
     Printed.JetsSpanAnnihilator (archNuclearityDenominator χ) (Printed.archNuclearityJet χ τ hτ)
 
+/-- The test combination `φ - (3/2) φ(a⁻¹ ·) + (1/2) φ(a⁻² ·)` for the rational idele `a`
+of norm two. -/
+private def archNuclearityJet_span_false_comb
+    (φ : SchwartzBruhat (Multiplicative 𝔸[ℚ])) : SchwartzBruhat (Multiplicative 𝔸[ℚ]) :=
+  φ - (3 / 2 : ℂ) • schwartzBruhatUnitTranslate (ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero)) φ +
+    (1 / 2 : ℂ) • schwartzBruhatUnitTranslate (ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero))
+      (schwartzBruhatUnitTranslate (ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero)) φ)
+
+/-- Away from the two pole characters, the zeta function of the combination is the multiplier
+`(1 - 2^w)(1 - 2^w/2)` times that of `φ`. -/
+private theorem archNuclearityJet_span_false_mul (φ : SchwartzBruhat (Multiplicative 𝔸[ℚ])) (w : ℂ)
+    (h1 : (2 : ℂ) ^ w ≠ 1) (h2 : (2 : ℂ) ^ w ≠ 2) :
+    globalIdelicZFunction (archNuclearityJet_span_false_comb φ) (ideleClassNormTwist (1 : U[ℚ]) w) =
+      (1 - 3 / 2 * (2 : ℂ) ^ w + 1 / 2 * ((2 : ℂ) ^ w) ^ 2) *
+        globalIdelicZFunction φ (ideleClassNormTwist (1 : U[ℚ]) w) := by
+  have hval (s : ℂ) : ideleClassNormTwist (1 : U[ℚ]) s (QuotientGroup.mk (ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero))) = (2 : ℂ) ^ s := by
+    change (((1 : U[ℚ]) (QuotientGroup.mk (ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero))) : Circle) : ℂ) *
+      (((ideleClassNorm ℚ (QuotientGroup.mk (ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero))) : ℝ≥0) : ℝ) : ℂ) ^ s = _
+    have hn : ideleClassNorm ℚ (QuotientGroup.mk (ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero))) = Units.mk0 (2 : ℝ≥0) two_ne_zero :=
+      ratIdeleNormSection_rightInverse _
+    rw [hn]
+    simp
+  have hreg : 0 ≤ globalIdelicOrderBound (ideleClassNormTwist (1 : U[ℚ]) w) := by
+    unfold globalIdelicOrderBound
+    rw [ite_eq_right]
+    rintro (h | h)
+    · have := DFunLike.congr_fun h (QuotientGroup.mk (ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero)))
+      rw [hval] at this
+      exact h1 (by simpa using this)
+    · have := DFunLike.congr_fun h (QuotientGroup.mk (ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero)))
+      rw [hval, hval] at this
+      exact h2 (by simpa using this)
+  let c : {c : QuasiCharacter C[ℚ] // 0 ≤ globalIdelicOrderBound c} := ⟨ideleClassNormTwist (1 : U[ℚ]) w, hreg⟩
+  have hT (f : SchwartzBruhat (Multiplicative 𝔸[ℚ])) : globalIdelicZFunction (schwartzBruhatUnitTranslate (ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero)) f) (ideleClassNormTwist (1 : U[ℚ]) w) =
+      (2 : ℂ) ^ w * globalIdelicZFunction f (ideleClassNormTwist (1 : U[ℚ]) w) := by
+    have := globalIdelicMellin_unitTranslate (ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero)) f c
+    rw [globalIdelicMellin_apply, globalIdelicMellin_apply] at this
+    rw [← hval w]
+    exact this
+  have hlin : globalIdelicZFunction (archNuclearityJet_span_false_comb φ) (ideleClassNormTwist (1 : U[ℚ]) w) =
+      globalIdelicZFunction φ (ideleClassNormTwist (1 : U[ℚ]) w) -
+        (3 / 2 : ℂ) * globalIdelicZFunction (schwartzBruhatUnitTranslate (ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero)) φ) (ideleClassNormTwist (1 : U[ℚ]) w) +
+        (1 / 2 : ℂ) * globalIdelicZFunction
+          (schwartzBruhatUnitTranslate (ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero)) (schwartzBruhatUnitTranslate (ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero)) φ)) (ideleClassNormTwist (1 : U[ℚ]) w) := by
+    have hmap : globalIdelicMellin (F := ℚ) (archNuclearityJet_span_false_comb φ) = globalIdelicMellin (F := ℚ) φ -
+        (3 / 2 : ℂ) • globalIdelicMellin (F := ℚ) (schwartzBruhatUnitTranslate (ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero)) φ) +
+        (1 / 2 : ℂ) • globalIdelicMellin (F := ℚ)
+          (schwartzBruhatUnitTranslate (ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero)) (schwartzBruhatUnitTranslate (ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero)) φ)) := by
+      simp [archNuclearityJet_span_false_comb, map_add, map_sub, map_smul]
+    have := congrArg (fun m ↦ m.val c) hmap
+    simp at this
+    rw [one_div]
+    exact this
+  rw [hlin, hT, hT, hT]
+  ring
+
+
+/-- The multiplier `m w = 1 - (3/2) 2^w + (1/2) 4^w` has derivative `-(log 2)/2` at `0`. -/
+private theorem archNuclearityJet_span_false_hasDerivAt_mul :
+    HasDerivAt (fun w : ℂ ↦ 1 - 3 / 2 * (2 : ℂ) ^ w + 1 / 2 * ((2 : ℂ) ^ w) ^ 2)
+      (-(Real.log 2 / 2 : ℂ)) 0 := by
+  have hg : HasDerivAt (fun w : ℂ ↦ (2 : ℂ) ^ w) ((2 : ℂ) ^ (0 : ℂ) * Complex.log 2) 0 :=
+    (Complex.hasStrictDerivAt_const_cpow (Or.inl two_ne_zero)).hasDerivAt
+  have h := ((hg.const_mul (3 / 2 : ℂ)).const_sub 1).add ((hg.pow 2).const_mul (1 / 2 : ℂ))
+  convert h using 1
+  rw [Complex.cpow_zero, ← Complex.ofReal_ofNat, ← Complex.ofReal_log (by norm_num)]
+  push_cast
+  ring
+
+open Filter in
+/-- `2^w ≠ 1` near `0`, off `0`. -/
+private theorem archNuclearityJet_span_false_eventually_ne_one :
+    ∀ᶠ w in 𝓝[≠] (0 : ℂ), (2 : ℂ) ^ w ≠ 1 := by
+  have hg : HasDerivAt (fun w : ℂ ↦ (2 : ℂ) ^ w) ((2 : ℂ) ^ (0 : ℂ) * Complex.log 2) 0 :=
+    (Complex.hasStrictDerivAt_const_cpow (Or.inl two_ne_zero)).hasDerivAt
+  exact hg.eventually_ne (c := 1) (by
+    rw [Complex.cpow_zero, one_mul, ← Complex.ofReal_ofNat, ← Complex.ofReal_log (by norm_num)]
+    exact Complex.ofReal_ne_zero.mpr (Real.log_pos one_lt_two).ne')
+
+open Filter in
+/-- `2^w ≠ 2` near `1`, off `1`. -/
+private theorem archNuclearityJet_span_false_eventually_ne_two :
+    ∀ᶠ w in 𝓝[≠] (1 : ℂ), (2 : ℂ) ^ w ≠ 2 := by
+  have hg : HasDerivAt (fun w : ℂ ↦ (2 : ℂ) ^ w) ((2 : ℂ) ^ (1 : ℂ) * Complex.log 2) 1 :=
+    (Complex.hasStrictDerivAt_const_cpow (Or.inl two_ne_zero)).hasDerivAt
+  exact hg.eventually_ne (c := 2) (by
+    rw [Complex.cpow_one, ← Complex.ofReal_ofNat, ← Complex.ofReal_log (by norm_num)]
+    exact mul_ne_zero two_ne_zero (Complex.ofReal_ne_zero.mpr (Real.log_pos one_lt_two).ne'))
+
+open Filter in
+/-- Residue at `1`: the Fourier value of the combination at zero vanishes. -/
+private theorem archNuclearityJet_span_false_fourier (φ : SchwartzBruhat (Multiplicative 𝔸[ℚ])) :
+    adeleSchwartzFourier (archNuclearityJet_span_false_comb φ) (Multiplicative.ofAdd 0) = 0 := by
+  have hc : Continuous (fun w : ℂ ↦ (2 : ℂ) ^ w) :=
+    continuous_iff_continuousAt.2 fun _ ↦ continuousAt_const_cpow two_ne_zero
+  have hne1 : ∀ᶠ w in 𝓝[≠] (1 : ℂ), (2 : ℂ) ^ w ≠ 1 := by
+    have : ∀ᶠ w in 𝓝 (1 : ℂ), (2 : ℂ) ^ w ≠ 1 :=
+      hc.continuousAt.eventually_ne (by rw [Complex.cpow_one]; norm_num)
+    exact this.filter_mono nhdsWithin_le_nhds
+  have hR := globalIdelicZFunction_residue_one (F := ℚ) (archNuclearityJet_span_false_comb φ)
+  have hRφ := globalIdelicZFunction_residue_one (F := ℚ) φ
+  have hm : Tendsto (fun w : ℂ ↦ 1 - 3 / 2 * (2 : ℂ) ^ w + 1 / 2 * ((2 : ℂ) ^ w) ^ 2) (𝓝[≠] 1)
+      (𝓝 0) := by
+    have : Tendsto (fun w : ℂ ↦ 1 - 3 / 2 * (2 : ℂ) ^ w + 1 / 2 * ((2 : ℂ) ^ w) ^ 2) (𝓝 1)
+        (𝓝 (1 - 3 / 2 * (2 : ℂ) ^ (1 : ℂ) + 1 / 2 * ((2 : ℂ) ^ (1 : ℂ)) ^ 2)) :=
+      ((continuous_const.sub (continuous_const.mul hc)).add
+        (continuous_const.mul (hc.pow 2))).tendsto 1
+    rw [Complex.cpow_one] at this
+    convert this.mono_left nhdsWithin_le_nhds using 2
+    norm_num
+  have h2 := hm.mul hRφ
+  rw [zero_mul] at h2
+  have h3 : Tendsto (fun s : ℂ ↦ (s - 1) * globalIdelicZFunction (archNuclearityJet_span_false_comb φ)
+      (ideleClassNormTwist (1 : U[ℚ]) s)) (𝓝[≠] 1) (𝓝 0) := by
+    refine h2.congr' ?_
+    filter_upwards [hne1, archNuclearityJet_span_false_eventually_ne_two] with w hw1 hw2
+    rw [archNuclearityJet_span_false_mul φ w hw1 hw2]
+    ring
+  have hu := tendsto_nhds_unique hR h3
+  have hmass := archNuclearityDenominator_volume_pos ℚ
+  exact (mul_eq_zero.mp hu).resolve_left (Complex.ofReal_ne_zero.mpr hmass.ne')
+
+open Filter in
+/-- Residue at `0`: the combination has a finite limit at the trivial quasi-character. -/
+private theorem archNuclearityJet_span_false_tendsto (φ : SchwartzBruhat (Multiplicative 𝔸[ℚ])) :
+    Tendsto (fun w : ℂ ↦ globalIdelicZFunction (archNuclearityJet_span_false_comb φ)
+        (ideleClassNormTwist (1 : U[ℚ]) w)) (𝓝[≠] 0)
+      (𝓝 ((Real.log 2 / 2 : ℂ) * ((normOneIdeleClassTamagawaMeasure ℚ univ).toReal : ℂ) *
+        φ (Multiplicative.ofAdd 0))) := by
+  have hc : Continuous (fun w : ℂ ↦ (2 : ℂ) ^ w) :=
+    continuous_iff_continuousAt.2 fun _ ↦ continuousAt_const_cpow two_ne_zero
+  have hne2 : ∀ᶠ w in 𝓝[≠] (0 : ℂ), (2 : ℂ) ^ w ≠ 2 := by
+    have : ∀ᶠ w in 𝓝 (0 : ℂ), (2 : ℂ) ^ w ≠ 2 :=
+      hc.continuousAt.eventually_ne (by rw [Complex.cpow_zero]; norm_num)
+    exact this.filter_mono nhdsWithin_le_nhds
+  have hslope := hasDerivAt_iff_tendsto_slope.mp archNuclearityJet_span_false_hasDerivAt_mul
+  have hRφ := globalIdelicZFunction_residue_zero (F := ℚ) φ
+  have h2 := hslope.mul hRφ
+  have h3 : Tendsto (fun w : ℂ ↦ globalIdelicZFunction (archNuclearityJet_span_false_comb φ)
+      (ideleClassNormTwist (1 : U[ℚ]) w)) (𝓝[≠] 0)
+      (𝓝 (-(Real.log 2 / 2 : ℂ) * (-((normOneIdeleClassTamagawaMeasure ℚ univ).toReal : ℂ) *
+        φ (Multiplicative.ofAdd 0)))) := by
+    refine h2.congr' ?_
+    filter_upwards [archNuclearityJet_span_false_eventually_ne_one, hne2, self_mem_nhdsWithin]
+      with w hw1 hw2 hw0
+    rw [archNuclearityJet_span_false_mul φ w hw1 hw2, slope_def_field]
+    simp only [Complex.cpow_zero, sub_zero]
+    have hw0' : w ≠ 0 := hw0
+    field_simp
+    ring
+  convert h3 using 2
+  ring
+
+/-- The rational section acts on the real coordinate by multiplication. -/
+private theorem archNuclearityJet_span_false_section_fst (t : ℝ≥0ˣ) (x : InfiniteAdeleRing ℚ) :
+    InfiniteAdeleRing.ringEquiv_mixedSpace ℚ ((ratIdeleNormSection t : 𝔸[ℚ]).1 * x) =
+      ((t : ℝ≥0) : ℝ) • InfiniteAdeleRing.ringEquiv_mixedSpace ℚ x := by
+  have hc (v : {v : InfinitePlace ℚ // v.IsComplex}) : False :=
+    InfinitePlace.not_isComplex_iff_isReal.mpr
+      ((Subsingleton.elim v.val Rat.infinitePlace) ▸ Rat.isReal_infinitePlace) v.property
+  refine Prod.ext (funext fun v ↦ ?_) (funext fun v ↦ (hc v).elim)
+  obtain ⟨v, hv⟩ := v
+  obtain rfl : v = Rat.infinitePlace := Subsingleton.elim _ _
+  change InfinitePlace.Completion.ringEquivRealOfIsReal hv
+      ((ratIdeleNormSection t : 𝔸[ℚ]).1 Rat.infinitePlace * x Rat.infinitePlace) =
+    ((t : ℝ≥0) : ℝ) * InfinitePlace.Completion.ringEquivRealOfIsReal hv (x Rat.infinitePlace)
+  rw [map_mul]
+  congr 1
+  change InfinitePlace.Completion.ringEquivRealOfIsReal hv
+      (MonoidHom.mulSingle InfinitePlace.Completion Rat.infinitePlace
+        ((InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace).symm
+          ((t : ℝ≥0) : ℝ)) Rat.infinitePlace) = _
+  rw [MonoidHom.mulSingle_apply, Pi.mulSingle_eq_same]
+  exact RingEquiv.apply_symm_apply _ _
+
+/-- Translating by `a₂` halves the real coordinate and fixes the finite part. -/
+private theorem archNuclearityJet_span_false_translate (x : 𝔸[ℚ]) :
+    InfiniteAdeleRing.ringEquiv_mixedSpace ℚ
+        (((ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero))⁻¹ : (IdeleGroup (𝓞 ℚ) ℚ)) * x).1 =
+      (1 / 2 : ℝ) • InfiniteAdeleRing.ringEquiv_mixedSpace ℚ x.1 ∧
+    (((ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero))⁻¹ : (IdeleGroup (𝓞 ℚ) ℚ)) * x).2 =
+      x.2 := by
+  rw [← map_inv]
+  refine ⟨?_, ?_⟩
+  · rw [Prod.fst_mul, archNuclearityJet_span_false_section_fst]
+    congr 1
+    simp
+  · rw [Prod.snd_mul]
+    exact one_mul _
+
+open scoped TensorProduct in
+/-- For any finite factor `g` with `g 0 = 1`, the tensor of a bump equal to one near zero with `g`
+gives a combination that is a flat zero-moment tensor. -/
+private theorem archNuclearityJet_span_false_test_of
+    (g : SchwartzBruhat (Multiplicative (FiniteAdeleRing (𝓞 ℚ) ℚ)))
+    (hg : g (Multiplicative.ofAdd 0) = 1) :
+    ∃ φ : SchwartzBruhat (Multiplicative 𝔸[ℚ]), φ (Multiplicative.ofAdd 0) = 1 ∧
+      archNuclearityJet_span_false_comb φ ∈ globalArchimedeanFlatTests ℚ True := by
+  let Coord := ({v : InfinitePlace ℚ // v.IsReal} → ℝ) × ({v : InfinitePlace ℚ // v.IsComplex} → ℂ)
+  have hc (v : {v : InfinitePlace ℚ // v.IsComplex}) : False :=
+    InfinitePlace.not_isComplex_iff_isReal.mpr
+      ((Subsingleton.elim v.val Rat.infinitePlace) ▸ Rat.isReal_infinitePlace) v.property
+  let b : ContDiffBump (0 : Coord) := ⟨1, 2, one_pos, one_lt_two⟩
+  let F0 : Coord → ℂ := fun u ↦ ((b u : ℝ) : ℂ)
+  have hF0 : ContDiff ℝ (⊤ : ℕ∞) F0 := Complex.ofRealCLM.contDiff.comp b.contDiff
+  have hF0s : HasCompactSupport F0 := b.hasCompactSupport.comp_left Complex.ofReal_zero
+  have hF01 (u : Coord) (hu : ‖u‖ ≤ 1) : F0 u = 1 := by
+    have : b u = 1 := b.one_of_mem_closedBall (by simpa using hu)
+    simp [F0, this]
+  have h2 : HasCompactSupport fun u : Coord ↦ F0 ((1 / 2 : ℝ) • u) :=
+    hF0s.comp_smul (by norm_num)
+  have h4 : HasCompactSupport fun u : Coord ↦ F0 ((1 / 4 : ℝ) • u) :=
+    hF0s.comp_smul (by norm_num)
+  let H : Coord → ℂ := fun u ↦ F0 u - (3 / 2 : ℂ) * F0 ((1 / 2 : ℝ) • u) +
+    (1 / 2 : ℂ) * F0 ((1 / 4 : ℝ) • u)
+  have hH : ContDiff ℝ (⊤ : ℕ∞) H :=
+    (hF0.sub (contDiff_const.mul (hF0.comp (contDiff_const_smul _)))).add
+      (contDiff_const.mul (hF0.comp (contDiff_const_smul _)))
+  have hHs : HasCompactSupport H := (hF0s.sub h2.mul_left).add h4.mul_left
+  have hH0 (u : Coord) (hu : ‖u‖ < 1) : H u = 0 := by
+    have h1 : ‖(1 / 2 : ℝ) • u‖ ≤ 1 := by
+      rw [norm_smul]; norm_num; linarith [norm_nonneg u]
+    have h2 : ‖(1 / 4 : ℝ) • u‖ ≤ 1 := by
+      rw [norm_smul]; norm_num; linarith [norm_nonneg u]
+    simp only [H, hF01 u hu.le, hF01 _ h1, hF01 _ h2]
+    norm_num
+  let hS : SchwartzMap Coord ℂ := hHs.toSchwartzMap hH
+  let h0 : SchwartzMap Coord ℂ := hF0s.toSchwartzMap hF0
+  have hhS (u : Coord) : hS u = H u := rfl
+  have hh0 (u : Coord) : h0 u = F0 u := rfl
+  have hflat : hS ∈ archimedeanFlatSchwartz (ι := {v : InfinitePlace ℚ // v.IsReal})
+      (κ := {v : InfinitePlace ℚ // v.IsComplex}) := by
+    apply mem_archimedeanFlatSchwartz_of_tsupport
+    rw [Set.disjoint_left]
+    intro u hu hw
+    have hu0 : u = 0 := by
+      rcases hw with ⟨i, hi⟩ | ⟨j, -⟩
+      · refine Prod.ext (funext fun k ↦ ?_) (funext fun k ↦ (hc k).elim)
+        rw [Subsingleton.elim k i]; exact hi
+      · exact (hc j).elim
+    subst hu0
+    refine notMem_tsupport_iff_eventuallyEq.mpr ?_ hu
+    filter_upwards [Metric.ball_mem_nhds (0 : Coord) one_pos] with u hu
+    exact hH0 u (by simpa using hu)
+  have hd : Module.finrank ℝ Coord = 1 := by
+    have : Subsingleton ({v : InfinitePlace ℚ // v.IsComplex} → ℂ) :=
+      ⟨fun f g ↦ funext fun k ↦ (hc k).elim⟩
+    rw [Module.finrank_prod, Module.finrank_fintype_fun_eq_card,
+      Module.finrank_zero_of_subsingleton, add_zero]
+    exact Fintype.card_eq_one_iff.mpr ⟨⟨Rat.infinitePlace, Rat.isReal_infinitePlace⟩,
+      fun v ↦ Subtype.ext (Subsingleton.elim _ _)⟩
+  have hmom : (∫ u : Coord, hS u) = 0 := by
+    have hi0 : MeasureTheory.Integrable F0 :=
+      hF0.continuous.integrable_of_hasCompactSupport hF0s
+    have hi2 : MeasureTheory.Integrable fun u : Coord ↦ F0 ((1 / 2 : ℝ) • u) :=
+      (hF0.continuous.comp (continuous_const_smul _)).integrable_of_hasCompactSupport h2
+    have hi4 : MeasureTheory.Integrable fun u : Coord ↦ F0 ((1 / 4 : ℝ) • u) :=
+      (hF0.continuous.comp (continuous_const_smul _)).integrable_of_hasCompactSupport h4
+    simp only [hhS, H]
+    rw [MeasureTheory.integral_add (f := fun u ↦ F0 u - 3 / 2 * F0 ((1 / 2 : ℝ) • u))
+        (g := fun u ↦ 1 / 2 * F0 ((1 / 4 : ℝ) • u)) (hi0.sub (hi2.const_mul _)) (hi4.const_mul _),
+      MeasureTheory.integral_sub (f := F0) (g := fun u ↦ 3 / 2 * F0 ((1 / 2 : ℝ) • u))
+        hi0 (hi2.const_mul _), MeasureTheory.integral_const_mul,
+      MeasureTheory.integral_const_mul, MeasureTheory.Measure.integral_comp_smul,
+      MeasureTheory.Measure.integral_comp_smul, hd, Complex.real_smul, Complex.real_smul]
+    norm_num
+    ring
+  have hinf (h : SchwartzMap Coord ℂ) := (mem_archimedeanSchwartzBruhat_iff (F := ℚ)
+    (fun x ↦ h (InfiniteAdeleRing.ringEquiv_mixedSpace ℚ x))).mpr ⟨h, fun _ ↦ rfl⟩
+  let fI (h : SchwartzMap Coord ℂ) : SchwartzBruhat (Multiplicative (InfiniteAdeleRing ℚ)) :=
+    ⟨_, hinf h⟩
+  let tensor := (adeleSchwartz_inductiveTensor_equiv ℚ).choose
+  have hval (h : SchwartzMap Coord ℂ) (x : 𝔸[ℚ]) : tensor (fI h ⊗ₜ[ℂ] g) (Multiplicative.ofAdd x) =
+      h (InfiniteAdeleRing.ringEquiv_mixedSpace ℚ x.1) * g (Multiplicative.ofAdd x.2) :=
+    (adeleSchwartz_inductiveTensor_equiv ℚ).choose_spec (fI h) g x
+  refine ⟨tensor (fI h0 ⊗ₜ[ℂ] g), ?_, ?_⟩
+  · rw [hval, hh0, Prod.fst_zero, Prod.snd_zero, map_zero, hF01 0 (by rw [norm_zero]; exact zero_le_one),
+      one_mul]
+    exact hg
+  · have heq : archNuclearityJet_span_false_comb (tensor (fI h0 ⊗ₜ[ℂ] g)) =
+        tensor (fI hS ⊗ₜ[ℂ] g) := by
+      refine SchwartzBruhat.ext fun y ↦ ?_
+      obtain ⟨x, rfl⟩ : ∃ x, Multiplicative.ofAdd x = y := ⟨Multiplicative.toAdd y, rfl⟩
+      let a := ratIdeleNormSection (Units.mk0 (2 : ℝ≥0) two_ne_zero)
+      have e1 := archNuclearityJet_span_false_translate x
+      have e2 := archNuclearityJet_span_false_translate (((a⁻¹ : IdeleGroup (𝓞 ℚ) ℚ) : 𝔸[ℚ]) * x)
+      change tensor (fI h0 ⊗ₜ[ℂ] g) (Multiplicative.ofAdd x) -
+          (3 / 2 : ℂ) * tensor (fI h0 ⊗ₜ[ℂ] g)
+            (Multiplicative.ofAdd (((a⁻¹ : IdeleGroup (𝓞 ℚ) ℚ) : 𝔸[ℚ]) * x)) +
+          (1 / 2 : ℂ) * tensor (fI h0 ⊗ₜ[ℂ] g)
+            (Multiplicative.ofAdd (((a⁻¹ : IdeleGroup (𝓞 ℚ) ℚ) : 𝔸[ℚ]) *
+              (((a⁻¹ : IdeleGroup (𝓞 ℚ) ℚ) : 𝔸[ℚ]) * x))) =
+        tensor (fI hS ⊗ₜ[ℂ] g) (Multiplicative.ofAdd x)
+      rw [hval, hval, hval, hval, e2.1, e2.2, e1.1, e1.2, hh0, hh0, hh0, hhS, smul_smul,
+        show (1 / 2 : ℝ) * (1 / 2) = 1 / 4 by norm_num]
+      simp only [H]
+      ring
+    rw [heq]
+    exact Submodule.subset_span ⟨fI hS, g, ⟨hS, hflat⟩, fun _ ↦ rfl, fun _ ↦ hmom, rfl⟩
+
+open scoped TensorProduct in
+/-- A bump equal to one near zero, tensored with the indicator of the integral finite adeles. -/
+private theorem archNuclearityJet_span_false_test :
+    ∃ φ : SchwartzBruhat (Multiplicative 𝔸[ℚ]), φ (Multiplicative.ofAdd 0) = 1 ∧
+      archNuclearityJet_span_false_comb φ ∈ globalArchimedeanFlatTests ℚ True :=
+  archNuclearityJet_span_false_test_of ⟨_, archNuclearityDenominator_finiteIndicator_mem ℚ⟩
+    (ite_eq_left_iff.mpr fun h ↦ (h (archNuclearityDenominator_integralSubgroup ℚ).one_mem).elim)
+
+open Filter in
+/-- A flat zero-moment polar test whose zeta function at the trivial quasi-character is
+nonzero. -/
+private theorem archNuclearityJet_span_false_key :
+    ∃ f : adelePolarSubspace ℚ, f.val ∈ globalArchimedeanFlatTests ℚ True ∧
+      globalIdelicZFunction f.val (ideleClassNormTwist (1 : U[ℚ]) 0) ≠ 0 := by
+  obtain ⟨φ, hφ0, hflat⟩ := archNuclearityJet_span_false_test
+  have hpolar : archNuclearityJet_span_false_comb φ ∈ adelePolarSubspace ℚ :=
+    ((globalArchimedeanFlatTests_zero_moments (archNuclearityJet_span_false_comb φ)
+      (Submodule.span_mono (by rintro _ ⟨f, g, h, h1, -, h3⟩; exact ⟨f, g, h, h1, fun h ↦ h.elim, h3⟩) hflat)).2).mpr
+      (archNuclearityJet_span_false_fourier φ)
+  refine ⟨⟨archNuclearityJet_span_false_comb φ, hpolar⟩, hflat, ?_⟩
+  let τ : ℝ≥0ˣ →ₜ* I[ℚ] := ⟨ratIdeleNormSection, ratIdeleNormSection_continuous⟩
+  have hτ : RightInverse τ (ideleNorm ℚ) := ratIdeleNormSection_rightInverse
+  have hspec := (exists_globalPolarThetaMellin (1 : U[ℚ]) τ hτ).choose_spec ⟨archNuclearityJet_span_false_comb φ, hpolar⟩
+  let v := (Z((1 : U[ℚ]), τ, hτ)) (Submodule.Quotient.mk ⟨archNuclearityJet_span_false_comb φ, hpolar⟩)
+  have hcont : Continuous (fun w : ℂ ↦ globalIdelicZFunction (archNuclearityJet_span_false_comb φ) (ideleClassNormTwist (1 : U[ℚ]) w)) := by
+    have : (fun w : ℂ ↦ globalIdelicZFunction (archNuclearityJet_span_false_comb φ) (ideleClassNormTwist (1 : U[ℚ]) w)) =
+        fun w ↦ (schwartzBergmanEntireInclusion v).val w :=
+      funext fun w ↦ ((hspec w).2).symm.trans (schwartzBergmanEntireInclusion_apply v w).symm
+    rw [this]
+    exact (schwartzBergmanEntireInclusion v).val.continuous
+  have hlim := tendsto_nhds_unique
+    ((hcont.tendsto 0).mono_left nhdsWithin_le_nhds) (archNuclearityJet_span_false_tendsto φ)
+  rw [hlim, hφ0, mul_one]
+  have hm := archNuclearityDenominator_volume_pos ℚ
+  have hl : (0 : ℝ) < Real.log 2 := Real.log_pos one_lt_two
+  refine mul_ne_zero (div_ne_zero ?_ two_ne_zero) (Complex.ofReal_ne_zero.mpr hm.ne')
+  exact_mod_cast hl.ne'
+
+/-- The unitary character `|·|^i` of the rational idele class group. -/
+private theorem archNuclearityJet_span_false_char :
+    ∃ χ : U[ℚ], ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[ℚ]) Complex.I := by
+  let c := ideleClassNormTwist (1 : U[ℚ]) Complex.I
+  have hn (g : C[ℚ]) : ‖c g‖ = 1 := by
+    change ‖(1 : ℂ) * (((ideleClassNorm ℚ g : ℝ≥0) : ℝ) : ℂ) ^ Complex.I‖ = 1
+    rw [one_mul, Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _))]
+    simp
+  let χ : U[ℚ] :=
+    { toFun := fun g ↦ ⟨c g, mem_sphere_zero_iff_norm.mpr (hn g)⟩
+      map_one' := Subtype.ext (map_one c)
+      map_mul' := fun a b ↦ Subtype.ext (map_mul c a b)
+      continuous_toFun := c.continuous.subtype_mk _ }
+  refine ⟨χ, ?_⟩
+  ext1 g
+  change c g * _ ^ (0 : ℂ) = c g
+  simp
+
+/-- The value of `χ` on an idele class, for `χ = |·|^i`. -/
+private theorem archNuclearityJet_span_false_char_apply (χ : U[ℚ])
+    (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[ℚ]) Complex.I) (g : C[ℚ]) :
+    (χ g : ℂ) = (((ideleClassNorm ℚ g : ℝ≥0) : ℝ) : ℂ) ^ Complex.I := by
+  have h := DFunLike.congr_fun hχ g
+  change (χ g : ℂ) * (((ideleClassNorm ℚ g : ℝ≥0) : ℝ) : ℂ) ^ (0 : ℂ) =
+    (1 : ℂ) * (((ideleClassNorm ℚ g : ℝ≥0) : ℝ) : ℂ) ^ Complex.I at h
+  rwa [Complex.cpow_zero, mul_one, one_mul] at h
+
+/-- `|·|^i` is trivial on norm-one classes. -/
+private theorem archNuclearityJet_span_false_omega (χ : U[ℚ])
+    (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[ℚ]) Complex.I) :
+    ω[ℚ, χ] = 1 := by
+  ext1 g
+  apply Circle.ext
+  change (χ g.val : ℂ) = 1
+  rw [archNuclearityJet_span_false_char_apply χ hχ, MonoidHom.mem_ker.mp g.property]
+  simp
+
+/-- The archimedean parameters of `|·|^i` are `(i, 0)`. -/
+private theorem archNuclearityJet_span_false_params (χ : U[ℚ])
+    (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[ℚ]) Complex.I)
+    (v : InfinitePlace ℚ) (hv : v.IsReal) :
+    (realHeckeCharacter_parameters χ v hv).exists.choose = (Complex.I, 0) := by
+  apply (realHeckeCharacter_parameters χ v hv).unique
+    (realHeckeCharacter_parameters χ v hv).exists.choose_spec
+  refine ⟨Complex.I_re, fun x ↦ ?_⟩
+  rw [hχ]
+  let u := Units.map (InfinitePlace.Completion.ringEquivRealOfIsReal hv).symm.toMonoidHom x
+  change (1 : ℂ) * (((ideleClassNorm ℚ (IdeleClassGroup.ofCompletion (𝓞 ℚ) ℚ v u) : ℝ≥0) : ℝ) : ℂ) ^
+      Complex.I = (‖(x : ℝ)‖ : ℂ) ^ Complex.I * _ ^ ((0 : Fin 2).val)
+  rw [ideleClassNorm_ofCompletion, hv.mult_eq_one, pow_one]
+  have hn : ((↑(Units.map nnNormHom.toMonoidHom u) : ℝ≥0) : ℝ) = ‖(x : ℝ)‖ := by
+    let e := (InfinitePlace.Completion.ringEquivRealOfIsReal hv).symm
+    change ‖e (x : ℝ)‖ = ‖(x : ℝ)‖
+    exact (InfinitePlace.Completion.isometryEquivRealOfIsReal hv).symm.isometry.norm_map_of_map_zero
+      (map_zero e) (x : ℝ)
+  rw [hn, one_mul, Fin.val_zero, pow_zero, mul_one]
+
+/-- The gamma factor of `|·|^i` vanishes at `-i`. -/
+private theorem archNuclearityJet_span_false_gamma_zero (χ : U[ℚ])
+    (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[ℚ]) Complex.I) :
+    heckeGammaFactor χ (-Complex.I) = 0 := by
+  unfold heckeGammaFactor
+  apply Finset.prod_eq_zero (Finset.mem_univ Rat.infinitePlace)
+  rw [dite_eq_left_of_eq_true (eq_true Rat.isReal_infinitePlace)]
+  dsimp only
+  rw [archNuclearityJet_span_false_params χ hχ]
+  simp [Complex.Gammaℝ]
+
+/-- The reciprocal gamma factor of `|·|^i` has positive finite order at `-i`. -/
+private theorem archNuclearityJet_span_false_gammaOrder_pos (χ : U[ℚ])
+    (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[ℚ]) Complex.I) :
+    0 < (analyticOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) (-Complex.I)).toNat := by
+  have han : AnalyticOnNhd ℂ (fun z ↦ (heckeGammaFactor χ z)⁻¹) univ :=
+    fun z _ ↦ (differentiable_inv_heckeGammaFactor χ).analyticAt z
+  have h0 : analyticOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) (-Complex.I) ≠ 0 := by
+    rw [Ne, (han _ trivial).analyticOrderAt_eq_zero, archNuclearityJet_span_false_gamma_zero χ hχ]
+    simp
+  have h1 : analyticOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) 1 ≠ ⊤ := by
+    rw [(han _ trivial).analyticOrderAt_eq_zero.mpr
+      (inv_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ (by simp)))]
+    exact ENat.zero_ne_top
+  have htop := han.analyticOrderAt_ne_top_of_isPreconnected (y := -Complex.I) isPreconnected_univ trivial trivial h1
+  generalize analyticOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) (-Complex.I) = n at h0 htop ⊢
+  induction n using ENat.recTopCoe with
+  | top => exact absurd rfl htop
+  | coe n => simpa [Nat.pos_iff_ne_zero] using h0
+
+/-- `(e^π)^(-i) = -1`. -/
+private theorem archNuclearityJet_span_false_exp_pi :
+    ((Real.exp Real.pi : ℝ) : ℂ) ^ (-Complex.I) = -1 := by
+  rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (Real.exp_pos _).ne'),
+    ← Complex.ofReal_log (Real.exp_pos _).le, Real.log_exp, mul_neg, Complex.exp_neg,
+    Complex.exp_pi_mul_I]
+  norm_num
+
+/-- `(e^π)^i = -1`. -/
+private theorem archNuclearityJet_span_false_exp_pi' :
+    ((Real.exp Real.pi : ℝ) : ℂ) ^ Complex.I = -1 := by
+  rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (Real.exp_pos _).ne'),
+    ← Complex.ofReal_log (Real.exp_pos _).le, Real.log_exp, Complex.exp_pi_mul_I]
+
+/-- The printed index contains `(-i, 0)` for `|·|^i`. -/
+private theorem archNuclearityJet_span_false_mult (χ : U[ℚ])
+    (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[ℚ]) Complex.I)
+    (τ : ℝ≥0ˣ →ₜ* I[ℚ]) (hτ : RightInverse τ (ideleNorm ℚ)) :
+    0 < Printed.archNuclearityMultiplicity χ τ hτ (-Complex.I) := by
+  have hph := existsUnique_ideleNormSection_character_phase χ τ hτ
+  have hnorm (t : ℝ≥0ˣ) : ideleClassNorm ℚ (QuotientGroup.mk (τ t)) = t := hτ t
+  have h1 : ∀ t : ℝ≥0ˣ, (χ (QuotientGroup.mk (τ t)) : ℂ) =
+      (((t : ℝ≥0) : ℝ) : ℂ) ^ (((1 : ℝ) : ℂ) * Complex.I) := by
+    intro t
+    rw [archNuclearityJet_span_false_char_apply χ hχ, hnorm, Complex.ofReal_one, one_mul]
+  have hx1 : hph.exists.choose = 1 := hph.unique hph.exists.choose_spec h1
+  have hif : ¬ (ω[ℚ, χ] = 1 ∧ ideleClassNormTwist χ (-Complex.I) =
+      ideleClassNormTwist (1 : U[ℚ]) (-((hph.exists.choose : ℂ) * Complex.I))) := by
+    rintro ⟨-, h⟩
+    rw [hx1, Complex.ofReal_one, one_mul] at h
+    let t : ℝ≥0ˣ := Units.mk0 ⟨Real.exp Real.pi, (Real.exp_pos _).le⟩
+      (fun h ↦ (Real.exp_pos Real.pi).ne' (congrArg Subtype.val h))
+    have he := DFunLike.congr_fun h (QuotientGroup.mk (τ t))
+    change (χ (QuotientGroup.mk (τ t)) : ℂ) *
+        (((ideleClassNorm ℚ (QuotientGroup.mk (τ t)) : ℝ≥0) : ℝ) : ℂ) ^ (-Complex.I) =
+      (1 : ℂ) * (((ideleClassNorm ℚ (QuotientGroup.mk (τ t)) : ℝ≥0) : ℝ) : ℂ) ^ (-Complex.I) at he
+    rw [archNuclearityJet_span_false_char_apply χ hχ, hnorm] at he
+    have ht : (((t : ℝ≥0) : ℝ) : ℂ) = ((Real.exp Real.pi : ℝ) : ℂ) := rfl
+    rw [ht, archNuclearityJet_span_false_exp_pi, archNuclearityJet_span_false_exp_pi'] at he
+    norm_num at he
+  unfold Printed.archNuclearityMultiplicity
+  dsimp only
+  rw [ite_eq_right_iff.mpr fun h ↦ absurd h hif, Nat.sub_zero]
+  exact archNuclearityJet_span_false_gammaOrder_pos χ hχ
+
 /-- Paper: Theorem 7.4.3.1(2), p. 368.
 For χ = |·|^i over ℚ the printed index includes evaluation at s = −i. Let h be
 a nonzero nonnegative bump in (2,3). The real test h(x) − 2 h(2x) is flat with
 integral zero. With finite integer indicators its zeta value at the trivial
 quasi-character is proportional to (1 − 2) ζ(0) times the nonzero Mellin moment
 of h at zero. This jet is nonzero on the flat denominator. -/
-theorem Printed.archNuclearityJet_span_false : ¬ Printed.archNuclearityJet_span := by sorry
+theorem Printed.archNuclearityJet_span_false : ¬ Printed.archNuclearityJet_span := by
+  intro h
+  obtain ⟨χ, hχ⟩ := archNuclearityJet_span_false_char
+  let τ : ℝ≥0ˣ →ₜ* I[ℚ] := ⟨ratIdeleNormSection, ratIdeleNormSection_continuous⟩
+  have hτ : RightInverse τ (ideleNorm ℚ) := ratIdeleNormSection_rightInverse
+  have hspan := h ℚ χ τ hτ
+  have hω := archNuclearityJet_span_false_omega χ hχ
+  obtain ⟨f, hfD, hne⟩ := archNuclearityJet_span_false_key
+  let j : Printed.ArchNuclearityJetIndex χ τ hτ := ⟨(-Complex.I, 0), archNuclearityJet_span_false_mult χ hχ τ hτ⟩
+  have hmem : Printed.archNuclearityJet χ τ hτ j ∈
+      {ℓ : StrongDual ℂ (Θ₀[ℚ, χ]) | ∀ x : archNuclearityDenominator χ, ℓ x.val = 0} := by
+    rw [← hspan]
+    exact subset_closure (Submodule.subset_span ⟨j, rfl⟩)
+  have hD : (Submodule.Quotient.mk f : Θ₀[ℚ, χ]) ∈ archNuclearityDenominator χ :=
+    Submodule.subset_span ⟨f, by rw [eq_true hω]; exact hfD, rfl⟩
+  have hz := hmem ⟨_, hD⟩
+  apply hne
+  have htw : ideleClassNormTwist χ (-Complex.I) = ideleClassNormTwist (1 : U[ℚ]) 0 := by
+    have := ideleClassNormTwist_add_of_eq hχ (-Complex.I)
+    simpa using this
+  rw [← htw, ← ((exists_globalPolarThetaMellin χ τ hτ).choose_spec f (-Complex.I)).2]
+  unfold Printed.archNuclearityJet at hz
+  rw [ContinuousLinearMap.comp_apply, ContinuousLinearMap.comp_apply, entireJet_apply,
+    iteratedDeriv_zero, schwartzBergmanEntireInclusion_apply] at hz
+  exact hz
 
 /-- Paper: Theorem 7.4.3.1(3), p. 368.
 Every enumeration of the printed derivatives gives a basis of the strong quotient dual. -/
