@@ -2747,10 +2747,6 @@ private theorem sLocalOrbital_shiftedFourierJet (p : Vℚ) (ω : PontryaginDual 
       rw [heq, show i.val.2 = j.val.2 from congrArg Prod.snd hi]
       exact h
 
-local notation "rhoCoeff(" c ", " r ")" =>
-  complexResidue (fun z : ℂ ↦ sLocalRhoFactor (twistₛ (c) z) *
-    z ^ ((sLocalRhoPoleOrder (c) : ℤ) - ((r : ℕ) : ℤ) - 1)) 0
-
 open Classical in
 /-- Paper: Theorem 7.3.1.6(1), p. 345.
 Each primary polar functional vanishes on the primary principal-value image, so it descends
@@ -2830,160 +2826,6 @@ private theorem sLocalPolarOrbital_bases_of_laurent_bounds_primal_of_summable
     exact Tendsto.mono_left h (SummationFilter.conditional ℕ).le_atTop⟩
   exact ⟨hb, (SchauderBasis.isAbsolute_iff_summable_of_frechet hF hb).mpr hsum⟩
 
-
-open Classical in
-/-- Paper: Theorem 7.3.1.6(3), p. 345, with its proof on pp. 346–349.
-For every quotient vector, its polar coordinate terms are summable under each continuous
-seminorm. This isolates the analytic estimate: combine rapid decay of the Laurent
-coefficients on the finitely many local pole lattices with polynomial growth of their
-biorthogonal vectors, accounting for multiplicities and overlapping lattices. -/
-private theorem sLocalPolarOrbital_bases_of_laurent_bounds_primal_summable
-    (p : Vℚ) (ω : PontryaginDual J₁)
-    (_hS : IsSaturatedPlaceSet S) (_hp : (Sₚ(p)).Nonempty) (_hPic : PicTrivial)
-    (_hcoeff : ∀ χ : PontryaginDual Jₛ, ∃ d : ℕ, ∃ C : ℝ, 0 < C ∧
-      ∀ (j : Idx(p, ω)) (s : ℂ), j.val.2 ≠ 0 → j.val.1 = chart(χ) s →
-        ‖rhoCoeff(j.val.1, j.val.2)‖ ≤ C * (1 + ‖s‖) ^ d * ‖rhoCoeff(j.val.1, 0)‖)
-    (D : Idx(p, ω) → StrongDual ℂ (Q(p, ω)))
-    (_hD : ∀ (j : Idx(p, ω)) (x : Θₛ(ω)), D j (π(p, ω) x) =
-      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j x)
-    (ψ : Idx(p, ω) → Q(p, ω))
-    (_hψ : ∀ (i j : Idx(p, ω)) (x : Θₛ(ω)), π(p, ω) x = ψ j →
-      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) i x =
-        if i = j then 1 else 0)
-    (q : Seminorm ℂ Q(p, ω)) (_hq : Continuous q) (x : Q(p, ω)) :
-    Summable (fun j : Idx(p, ω) ↦ q (D j x • ψ j)) := by
-  sorry
-
-open Classical in
-/-- Paper: Theorem 7.3.1.6(3), p. 345.
-With a biorthogonal family in the primary quotient, the enumeration of that family is an
-absolute Schauder basis of the quotient. This is the absolute-basis clause of Theorem
-7.3.1.6(3) for the polar system; it is the half of that theorem which rests on the
-identification (7.3.1.19) with the modulated quotient of Theorem 4.6.1.5.
-Deviation: Keeps the Laurent-ratio bound of Theorem 7.3.1.6 as stated on p. 345. -/
-theorem sLocalPolarOrbital_bases_of_laurent_bounds_primal
-    (p : Vℚ) (ω : PontryaginDual J₁) (σ : ℕ ≃ Idx(p, ω))
-    (_hS : IsSaturatedPlaceSet S) (_hp : (Sₚ(p)).Nonempty) (_hPic : PicTrivial)
-    (_hcoeff : ∀ χ : PontryaginDual Jₛ, ∃ d : ℕ, ∃ C : ℝ, 0 < C ∧
-      ∀ (j : Idx(p, ω)) (s : ℂ), j.val.2 ≠ 0 → j.val.1 = chart(χ) s →
-        ‖rhoCoeff(j.val.1, j.val.2)‖ ≤ C * (1 + ‖s‖) ^ d * ‖rhoCoeff(j.val.1, 0)‖)
-    (D : Idx(p, ω) → StrongDual ℂ (Q(p, ω)))
-    (_hD : ∀ (j : Idx(p, ω)) (x : Θₛ(ω)), D j (π(p, ω) x) =
-      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j x)
-    (ψ : Idx(p, ω) → Q(p, ω))
-    (_hψ : ∀ (i j : Idx(p, ω)) (x : Θₛ(ω)), π(p, ω) x = ψ j →
-      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) i x =
-        if i = j then 1 else 0) :
-    let e := ψ ∘ σ
-    let d := D ∘ σ
-    IsSchauderBasis e d ∧ SchauderBasis.IsAbsolute e d := by
-  have hR : IsClosed (Rₚ(p, ω) : Set (Θₛ(ω))) :=
-    (sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding
-      (F := F) (S := S) hₚ(p) ω).isClosed_range
-  have hF : IsFrechetTVS (Q(p, ω)) :=
-    isFrechetTVS_quotient (sLocalHomogeneousThetaSpace_frechet ω) _ hR
-  apply sLocalPolarOrbital_bases_of_laurent_bounds_primal_of_summable p ω (ψ ∘ σ) (D ∘ σ) hF
-  · intro m n
-    obtain ⟨x, hx⟩ := Submodule.mkQ_surjective (Rₚ(p, ω)) (ψ (σ n))
-    have he := (_hD (σ m) x).trans (_hψ (σ m) (σ n) x hx)
-    rw [hx] at he
-    simpa only [Function.comp_apply, σ.injective.eq_iff] using he
-  · intro x hx
-    obtain ⟨y, rfl⟩ := Submodule.mkQ_surjective (Rₚ(p, ω)) x
-    apply (sLocalPrimaryOrbitalQuotient_mk_eq_zero p _hS _hp _hPic ω y).mpr
-    intro j
-    obtain ⟨n, rfl⟩ := σ.surjective j
-    exact (_hD (σ n) y).symm.trans (hx n)
-  · intro q hq x
-    exact σ.summable_iff.mpr
-      (sLocalPolarOrbital_bases_of_laurent_bounds_primal_summable
-        p ω _hS _hp _hPic _hcoeff D _hD ψ _hψ q hq x)
-
-open Classical in
-/-- Paper: Theorem 7.3.1.6(2), p. 345.
-With a biorthogonal family in the primary quotient, the enumeration of the polar
-functionals is an unconditional Schauder basis of the strong dual. This is the
-strong-dual clause of Theorem 7.3.1.6(2) for the polar system.
-Deviation: Keeps the Laurent-ratio bound of Theorem 7.3.1.6 as stated on p. 345. -/
-theorem sLocalPolarOrbital_bases_of_laurent_bounds_dual
-    (p : Vℚ) (ω : PontryaginDual J₁) (σ : ℕ ≃ Idx(p, ω))
-    (_hS : IsSaturatedPlaceSet S) (_hp : (Sₚ(p)).Nonempty) (_hPic : PicTrivial)
-    (_hcoeff : ∀ χ : PontryaginDual Jₛ, ∃ d : ℕ, ∃ C : ℝ, 0 < C ∧
-      ∀ (j : Idx(p, ω)) (s : ℂ), j.val.2 ≠ 0 → j.val.1 = chart(χ) s →
-        ‖rhoCoeff(j.val.1, j.val.2)‖ ≤ C * (1 + ‖s‖) ^ d * ‖rhoCoeff(j.val.1, 0)‖)
-    (D : Idx(p, ω) → StrongDual ℂ (Q(p, ω)))
-    (_hD : ∀ (j : Idx(p, ω)) (x : Θₛ(ω)), D j (π(p, ω) x) =
-      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j x)
-    (ψ : Idx(p, ω) → Q(p, ω))
-    (_hψ : ∀ (i j : Idx(p, ω)) (x : Θₛ(ω)), π(p, ω) x = ψ j →
-      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) i x =
-        if i = j then 1 else 0) :
-    let d := D ∘ σ
-    let ev : ℕ → StrongDual ℂ (StrongDual ℂ (Q(p, ω))) :=
-      fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (ψ (σ n))
-    IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev := by
-  have hprimal := sLocalPolarOrbital_bases_of_laurent_bounds_primal
-    p ω σ _hS _hp _hPic _hcoeff D _hD ψ _hψ
-  have hR : IsClosed (Rₚ(p, ω) : Set (Θₛ(ω))) :=
-    (sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding
-      (F := F) (S := S) hₚ(p) ω).isClosed_range
-  have hF : IsFrechetTVS (Q(p, ω)) :=
-    isFrechetTVS_quotient (sLocalHomogeneousThetaSpace_frechet ω) _ hR
-  have hFcopy := hF
-  obtain ⟨_, hpoly, hmet, hcomp⟩ := hFcopy
-  have hN : IsNuclearTVS.{0} (Q(p, ω)) :=
-    isNuclearTVS_quotient (sLocalHomogeneousThetaSpace_nuclear ω) _
-  let : UniformSpace (Q(p, ω)) := IsTopologicalAddGroup.rightUniformSpace _
-  let : IsUniformAddGroup (Q(p, ω)) := isUniformAddGroup_of_addCommGroup
-  let : MontelSpace ℂ (Q(p, ω)) :=
-    montelSpace_of_schwartz_frechet hF (isSchwartzTVS_of_isNuclearTVS hN)
-  let : BarrelledSpace ℂ (Q(p, ω)) := isFrechetTVS_barrelled hF
-  have hrefl : IsHomeomorph (ContinuousLinearMap.applyₗ
-      (E := Q(p, ω)) ℂ (RingHom.id ℂ)) :=
-    isHomeomorph_iff_isEmbedding_surjective.mpr
-      ⟨isEmbedding_strongBidual_eval, surjective_strongBidual_eval⟩
-  exact ⟨SchauderBasis.isShrinking_of_isAbsolute hcomp hrefl hprimal.1 hprimal.2,
-    SchauderBasis.strongDual_isUnconditional_of_isAbsolute
-      hcomp hrefl hprimal.1 hprimal.2⟩
-
-/-- Paper: Theorem 7.3.1.6(2)–(3), p. 345.
-Any enumeration of the polar functionals gives an unconditional basis of the strong dual.
-With the same enumeration, its biorthogonal vectors are an absolute basis of the quotient.
-Deviation: Assumes polynomial bounds on the ratios of lower to leading Laurent coefficients
-of the correcting factor within each selected block. The hypothesis is vacuous at a
-primary pole of multiplicity one. The general assertion on p. 349 needs uniform control
-of the changes of basis across the different centers. -/
-theorem sLocalPolarOrbital_bases_of_laurent_bounds
-    (p : Vℚ) (ω : PontryaginDual J₁)
-    (_hS : IsSaturatedPlaceSet S) (_hp : (Sₚ(p)).Nonempty) (_hPic : PicTrivial) (σ : ℕ ≃ Idx(p, ω))
-    (_hcoeff : ∀ χ : PontryaginDual Jₛ, ∃ d : ℕ, ∃ C : ℝ, 0 < C ∧
-      ∀ (j : Idx(p, ω)) (s : ℂ), j.val.2 ≠ 0 → j.val.1 = chart(χ) s →
-        ‖rhoCoeff(j.val.1, j.val.2)‖ ≤ C * (1 + ‖s‖) ^ d * ‖rhoCoeff(j.val.1, 0)‖) :
-    ∃ (D : Idx(p, ω) → StrongDual ℂ (Q(p, ω))) (ψ : Idx(p, ω) → Q(p, ω))
-      (ev : ℕ → StrongDual ℂ (StrongDual ℂ (Q(p, ω)))),
-      (∀ (n : ℕ) (ℓ : StrongDual ℂ (Q(p, ω))), ev n ℓ = ℓ (ψ (σ n))) ∧
-      (∀ (j : Idx(p, ω)) (x : Θₛ(ω)), D j (π(p, ω) x) =
-        sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j x) ∧
-      let e := ψ ∘ σ
-      let d := D ∘ σ
-      IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev ∧
-        IsSchauderBasis e d ∧ SchauderBasis.IsAbsolute e d := by
-  classical
-  obtain ⟨D, hD⟩ : ∃ D : Idx(p, ω) → StrongDual ℂ (Q(p, ω)),
-      ∀ (j : Idx(p, ω)) (x : Θₛ(ω)), D j (π(p, ω) x) =
-        sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j x :=
-    sLocalPolarOrbital_bases_of_laurent_bounds_descend (F := F) (S := S) p ω
-  obtain ⟨ψ, hψ⟩ : ∃ ψ : Idx(p, ω) → Q(p, ω),
-      ∀ (i j : Idx(p, ω)) (x : Θₛ(ω)), π(p, ω) x = ψ j →
-        sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) i x =
-          if i = j then 1 else 0 :=
-    sLocalPolarOrbital_bases_of_laurent_bounds_biorthogonal (F := F) (S := S) p ω _hS _hp _hPic
-  have hprimal := sLocalPolarOrbital_bases_of_laurent_bounds_primal (F := F) (S := S)
-    p ω σ _hS _hp _hPic _hcoeff D hD ψ hψ
-  have hdual := sLocalPolarOrbital_bases_of_laurent_bounds_dual (F := F) (S := S)
-    p ω σ _hS _hp _hPic _hcoeff D hD ψ hψ
-  exact ⟨D, ψ, fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (ψ (σ n)),
-    fun n ℓ ↦ rfl, hD, hdual.1, hdual.2, hprimal.1, hprimal.2⟩
 
 /-- Transport an absolute basis through a linear homeomorphism and rescale each
 coordinate by a nonzero scalar, with the inverse rescaling on its dual vector. -/
@@ -3334,6 +3176,780 @@ theorem sLocalOrbitalFourierJet_lattice_schwartz
   exact ⟨a, fun n ↦ ha n⟩
 
 end LatticeEstimates
+
+section PolarLaurentBases
+
+local notation "rhoCoeff(" c ", " r ")" =>
+  complexResidue (fun z : ℂ ↦ sLocalRhoFactor (twistₛ (c) z) *
+    z ^ ((sLocalRhoPoleOrder (c) : ℤ) - ((r : ℕ) : ℤ) - 1)) 0
+
+/-- The union of the pole lattices has finite multiplicity. An inverse-square bound on
+each lattice therefore implies summability over all the selected centers and jet orders. -/
+private theorem sLocalPolarOrbital_bases_of_laurent_bounds_lattices
+    (p : Vℚ) (ω : PontryaginDual J₁) (a : Idx(p, ω) → ℝ)
+    (ha : ∀ j, 0 ≤ a j)
+    (hlattice : ∀ (χ : PontryaginDual Jₛ) (v : S) (u : (v.val.adicCompletion F)ˣ) (t : ℝ),
+      uniformizerNorm(v, u) → phase(χ, v, u, t) → ∃ C : ℝ, 0 ≤ C ∧
+        ∀ (j : Idx(p, ω)) (n : ℤ), j.val.1 = lattice(χ, v, t, n) →
+          v ∈ sLocalFinitePolePlaces (F := F) (S := S) j.val.1 → v.val ∈ Sₚ(p) →
+            a j ≤ C / (1 + |(n : ℝ)|) ^ 2) : Summable a := by
+  classical
+  obtain ⟨χ, -, hcover⟩ := sLocalOrbitalIndex_enumerable_or_empty_chart ω
+  choose u hu using (sLocalOrbitalIndex_enumerable_or_empty_uniformizer (F := F) (S := S))
+  choose t ht using fun v : S ↦ (existsUnique_sLocalOrbitalPhase χ v (u v) (hu v)).exists
+  choose C hC hbound using fun v : S ↦ hlattice χ v (u v) (t v) (hu v) (ht v)
+  have locate (j : Idx(p, ω)) : ∃ (v : S) (n : ℤ), j.val.1 = lattice(χ, v, t v, n) ∧
+      v ∈ sLocalFinitePolePlaces (F := F) (S := S) j.val.1 ∧ v.val ∈ Sₚ(p) := by
+    obtain ⟨v, hv⟩ := Finset.card_pos.mp (lt_of_le_of_lt (Nat.zero_le _) j.property.2)
+    obtain ⟨s, hs⟩ := hcover j.val.1 j.property.1
+    obtain ⟨n, hn⟩ := (existsUnique_sLocalOrbitalLatticeIndex χ v (u v) (hu v)
+      (t v) (ht v) j.val.1 ⟨s, hs.symm⟩ (Finset.mem_filter.mp hv).1).exists
+    exact ⟨v, n, hn, Finset.mem_filter.mp hv⟩
+  choose v n hcenter hplace hprimary using locate
+  let order (j : Idx(p, ω)) : Fin (Fintype.card S) :=
+    ⟨j.val.2, j.property.2.trans_le (Finset.card_le_univ _)⟩
+  let ι (j : Idx(p, ω)) : (S × Fin (Fintype.card S)) × ℤ := ((v j, order j), n j)
+  have hinj : Injective ι := by
+    intro j k hjk
+    have hv : v j = v k := congrArg (fun i ↦ i.1.1) hjk
+    have ho : order j = order k := congrArg (fun i ↦ i.1.2) hjk
+    have hn : n j = n k := congrArg Prod.snd hjk
+    apply Subtype.ext
+    apply Prod.ext _ (congrArg Fin.val ho)
+    rw [hcenter j, hcenter k, hv, hn]
+  let g (i : (S × Fin (Fintype.card S)) × ℤ) := C i.1.1 / (1 + |(i.2 : ℝ)|) ^ 2
+  have hz : Summable (fun n : ℤ ↦ 1 / (1 + |(n : ℝ)|) ^ 2) := by
+    apply Summable.of_nat_of_neg
+    all_goals
+      simpa only [Int.cast_neg, abs_neg, Int.cast_natCast, Nat.abs_cast, add_comm (1 : ℝ), Nat.cast_add_one]
+        using (summable_nat_add_iff 1).mpr (Real.summable_one_div_nat_pow.mpr (by decide : 1 < 2))
+  have hg : Summable g := by
+    refine (summable_prod_of_nonneg (f := g) (fun i ↦ div_nonneg (hC i.1.1) (sq_nonneg _))).mpr
+      ⟨fun i ↦ ?_, Summable.of_finite⟩
+    simpa only [g, mul_one_div] using hz.mul_left (C i.1)
+  exact (hg.comp_injective hinj).of_nonneg_of_le ha (fun j ↦
+    hbound (v j) j (n j) (hcenter j) (hplace j) (hprimary j))
+
+/-- Residues only depend on the germ on a punctured neighbourhood. -/
+private theorem orbitalPolar_residue_congr {g h : ℂ → ℂ}
+    (he : g =ᶠ[𝓝[≠] (0 : ℂ)] h) : complexResidue g 0 = complexResidue h 0 := by
+  obtain ⟨δ, hδ, hEq⟩ := Metric.nhdsWithin_basis_ball.eventually_iff.mp he
+  unfold complexResidue limUnder
+  refine congrArg lim (Filter.map_congr ?_)
+  filter_upwards [Ioo_mem_nhdsGT hδ] with r hr
+  rw [circleIntegral.integral_congr hr.1.le fun z hz ↦ hEq ⟨?_, ?_⟩]
+  · rw [Metric.mem_ball, Metric.mem_sphere.mp hz]
+    exact hr.2
+  · rintro rfl
+    exact hr.1.ne (by simpa using hz)
+
+/-- Unnormalized functional equation in a unitary norm chart. -/
+private theorem orbitalPolar_fourier_eq (χ : PontryaginDual Jₛ) (f : ℬₛ) :
+    (fun z ↦ sLocalIdelicZFunction f (chart(χ) z)) =ᶠ[codiscrete ℂ]
+      (fun z ↦ sLocalRhoFactor (chart(χ) z) * sLocalIdelicZFunction (sAdeleSchwartzFourier f) (dualₛ (chart(χ) z))) := by
+  let Z (g : ℬₛ) (η : PontryaginDual Jₛ) (z : ℂ) := sLocalIdelicZFunction g (chart(η) z)
+  let R (z : ℂ) := sLocalRhoFactor (chart(χ) z)
+  let D (z : ℂ) := Z (sAdeleSchwartzFourier f) χ⁻¹ (1 - z)
+  have hZ (g : ℬₛ) (η : PontryaginDual Jₛ) (z : ℂ) : MeromorphicAt (Z g η) z :=
+    ((sLocalIdelicZFunction_meromorphic g η) (mem_univ z)).meromorphicAt
+  have hEq : Z f χ =ᶠ[codiscrete ℂ] R * D := by
+    apply sLocal_meromorphic_identity (hZ f χ) (fun z ↦ (sLocalRhoFactor_meromorphic χ z).mul
+      ((hZ _ _ (1 - z)).comp_analyticAt (analyticAt_const.sub analyticAt_id)))
+    intro z hz
+    have hd : 0 < (1 - z).re := by simp; linarith [hz.2]
+    change sLocalIdelicZFunction f (chart(χ) z) =
+      R z * sLocalIdelicZFunction (sAdeleSchwartzFourier f) (chart(χ⁻¹) (1 - z))
+    refine (sLocalIdelicZFunction_eq_integral f ⟨χ, z, hz.1, rfl⟩).trans ?_
+    refine (sLocalIdelicZetaIntegral_functionalEquation f χ z hz).trans ?_
+    refine (congrArg (fun c ↦ R z * sLocalIdelicZetaIntegral (sAdeleSchwartzFourier f) c)
+      (sLocal_dual_normTwist χ z)).trans ?_
+    exact congrArg (R z * ·)
+      (sLocalIdelicZFunction_eq_integral (sAdeleSchwartzFourier f) ⟨χ⁻¹, 1 - z, hd, rfl⟩).symm
+  filter_upwards [hEq] with z hz
+  change Z f χ z = R z * D z at hz
+  rw [sLocal_dual_normTwist]
+  exact hz
+
+/-- The top polar coefficient uses the same centered Laurent scale as all the other rows. -/
+private theorem orbitalPolar_leading {T : Finset V} {ω : PontryaginDual J₁}
+    (j : I(T, ω)) (f : ℬₛ) :
+    rhoCoeff(j.val.1, 0) ≠ 0 ∧
+    sLocalPrincipalPartCoeff j.val.1 (sLocalRhoPoleOrder j.val.1) f =
+      rhoCoeff(j.val.1, 0) * fourierZeta(j.val.1) f 0 := by
+  classical
+  let c := j.val.1
+  let m := sLocalRhoPoleOrder c
+  let ρ (z : ℂ) := sLocalRhoFactor (twistₛ c z)
+  let H := fourierZeta(c) f
+  have hm : 0 < m := by
+    have hb : sLocalFinitePoleMultiplicity T c ≤ m := by
+      dsimp [m]
+      rw [sLocalRhoPoleOrder_eq_card_polePlaces]
+      exact (Finset.card_filter_le _ _).trans (Nat.le_add_left _ _)
+    exact (Nat.zero_le _).trans_lt (j.property.2.trans_le hb)
+  have hord : meromorphicOrderAt ρ 0 = ((-(m : ℤ) : ℤ) : WithTop ℤ) := by
+    have ht := sLocalIdelicOrderBound_eq_neg_poleOrder c
+    change min 0 (meromorphicOrderAt ρ 0) = _ at ht
+    have hn : ((-(m : ℤ) : ℤ) : WithTop ℤ) < 0 := by exact_mod_cast (show -(m : ℤ) < 0 by omega)
+    have hlt := (min_lt_iff.mp (ht.trans_lt hn)).resolve_left (lt_irrefl _)
+    exact (min_eq_right hlt.le).symm.trans ht
+  obtain ⟨χ, a, hc⟩ := exists_sLocalNormTwist (F := F) (S := S) c
+  have shift (z : ℂ) : twistₛ c z = chart(χ) (z + a) := by
+    rw [← hc, normTwist_normTwist]
+  have hρ : MeromorphicAt ρ 0 := by
+    have heq : ρ = (fun u ↦ sLocalRhoFactor (chart(χ) u)) ∘ (fun z ↦ z+a) :=
+      funext fun z ↦ congrArg sLocalRhoFactor (shift z)
+    rw [heq]
+    exact (sLocalRhoFactor_meromorphic χ _).comp_analyticAt (by fun_prop)
+  obtain ⟨A, hA, hA0, hrep⟩ := (meromorphicOrderAt_eq_int_iff hρ).mp hord
+  have hr (z : ℂ) (hz : z ≠ 0) (h : ρ z = (z - 0) ^ (-(m : ℤ)) • A z) :
+      ρ z * z ^ ((m : ℤ) - 0 - 1) = A z / (z - 0) := by
+    simp only [h, sub_zero, smul_eq_mul]
+    rw [mul_right_comm, ← zpow_add₀ hz, show -(m : ℤ) + ((m : ℤ) - 1) = -1 by ring]
+    simp [div_eq_mul_inv, mul_comm]
+  have hc0 : rhoCoeff(c, 0) = A 0 := by
+    apply Eq.trans (orbitalPolar_residue_congr (h := fun z ↦ A z / (z - 0)) ?_) (complexResidue_div_sub hA)
+    filter_upwards [hrep, self_mem_nhdsWithin] with z hz hn
+    exact hr z hn hz
+  refine ⟨hc0.trans_ne hA0, ?_⟩
+  change complexResidue (fun z ↦ sLocalIdelicZFunction f (twistₛ c z) / z ^ (-(m : ℤ)+1)) 0 = _
+  have ht : Tendsto (fun z : ℂ ↦ z+a) (𝓝[≠] 0) (𝓝[≠] (0+a)) :=
+    ((Homeomorph.addRight a).map_punctured_nhds_eq 0).le
+  have hH : AnalyticAt ℂ H 0 := sLocalOrbitalFourierZeta_analyticAt j f
+  refine (orbitalPolar_residue_congr (h := fun z ↦ (A z * H z) / (z - 0)) ?_).trans
+    ((complexResidue_div_sub (g := fun z ↦ A z * H z) (hA.mul hH)).trans (congrArg (· * H 0) hc0.symm))
+  filter_upwards [ht.eventually (nhdsNE_le_codiscrete _ (orbitalPolar_fourier_eq χ f)), hrep,
+    self_mem_nhdsWithin] with z he ha hn
+  have hn' : z ≠ 0 := hn
+  have heq : sLocalIdelicZFunction f (twistₛ c z) = ρ z * H z := by
+    simpa only [ρ, H, shift] using he
+  rw [heq, ha]
+  simp only [sub_zero, smul_eq_mul, zpow_add₀ hn', zpow_one, zpow_neg, zpow_natCast]
+  field_simp [hn']
+
+
+/-- At offset r, the polar coordinate is the convolution of the correcting Laurent
+coefficients with the first r Taylor coefficients of the reflected Fourier test. -/
+private theorem orbitalPolar_row {T : Finset V} {ω : PontryaginDual J₁}
+    (j : I(T, ω)) (f : ℬₛ) :
+    sLocalOrbitalPrincipalPart j ((Kₛ(ω)).mkQ f) =
+      ∑ k ∈ Finset.range (j.val.2 + 1), rhoCoeff(j.val.1, k) *
+        (iteratedDeriv (j.val.2 - k) (fourierZeta(j.val.1) f) 0 / ((j.val.2 - k).factorial : ℂ)) := by
+  classical
+  have hmult : sLocalFinitePoleMultiplicity T j.val.1 ≤ sLocalRhoPoleOrder j.val.1 := by
+    rw [sLocalRhoPoleOrder_eq_card_polePlaces]
+    exact (Finset.card_filter_le _ _).trans (Nat.le_add_left _ _)
+  have hbound := j.property.2.trans_le hmult
+  change sLocalThetaPrincipalPartCoeff ω j.val.1 j.property.1 _ ((Kₛ(ω)).mkQL f) = _
+  rw [sLocalThetaPrincipalPartCoeff_mk, ← sLocalPrincipalPartCoeff_apply]
+  by_cases hj : j.val.2 = 0
+  · simpa [hj] using (orbitalPolar_leading j f).2
+  · have he := sLocalPrincipalPartCoeff_lower_formula j.val.1 f (sLocalRhoPoleOrder j.val.1 - j.val.2)
+      (by omega)
+    simpa only [show sLocalRhoPoleOrder j.val.1 - (sLocalRhoPoleOrder j.val.1 - j.val.2) = j.val.2
+      by omega] using he
+
+section
+
+open Finset
+
+/-- Back substitution in a finite triangular block with a common leading scale. -/
+private theorem finiteBlock_inverse_bound
+    (m : ℕ) (w : ℕ → ℝ) (A H : ℝ) (hA : 0 ≤ A) (hH : 0 ≤ H)
+    (h : ∀ r < m, w r ≤ A + H * ∑ s ∈ (range m).filter (r < ·), w s) :
+    ∀ r < m, w r ≤ A * (1 + m * H) ^ (m - 1 - r) := by
+  let B : ℝ := 1 + m * H
+  have hB : 1 ≤ B := by dsimp [B]; exact le_add_of_nonneg_right (mul_nonneg (Nat.cast_nonneg _) hH)
+  have step (k : ℕ) : ∀ r < m, m - 1 - r = k → w r ≤ A * B ^ k := by
+    induction k using Nat.strong_induction_on with
+    | ind k ih =>
+      intro r hr he
+      by_cases hk : k = 0
+      · rw [hk]
+        have hempty : (range m).filter (r < ·) = ∅ := by
+          ext s
+          simp only [mem_filter, Finset.mem_range, Finset.notMem_empty, iff_false]
+          omega
+        simpa [hempty] using h r hr
+      have hk' : k - 1 < k := by omega
+      have hP : 1 ≤ B ^ (k - 1) := one_le_pow₀ hB
+      have hAP : A ≤ A * B ^ (k - 1) := by nlinarith
+      have hsum : ∑ s ∈ (range m).filter (r < ·), w s ≤ (m : ℝ) * (A * B ^ (k - 1)) := by
+        calc
+          _ ≤ ∑ _s ∈ (range m).filter (r < ·), A * B ^ (k - 1) := by
+            refine sum_le_sum fun s hs ↦ ?_
+            obtain ⟨hs', hrs⟩ := mem_filter.mp hs
+            have hsm := Finset.mem_range.mp hs'
+            exact (ih (m - 1 - s) (by omega) s hsm rfl).trans
+              (mul_le_mul_of_nonneg_left (pow_le_pow_right₀ hB (by omega)) hA)
+          _ ≤ _ := by
+            simp only [sum_const, nsmul_eq_mul]
+            exact mul_le_mul_of_nonneg_right (by exact_mod_cast (card_filter_le (range m) (r < ·)).trans_eq (card_range m)) (by positivity)
+      calc
+        w r ≤ _ := h r hr
+        _ ≤ A * B ^ (k - 1) + H * ((m : ℝ) * (A * B ^ (k - 1))) :=
+          add_le_add hAP (mul_le_mul_of_nonneg_left hsum hH)
+        _ = A * B ^ k := by
+          conv_rhs => rw [show k = (k - 1) + 1 by omega, pow_succ]
+          dsimp [B]
+          ring
+  exact fun r hr ↦ step (m - 1 - r) r hr rfl
+
+/-- The common leading coefficient remains on the left, so the inverse requires bounds
+only on the off-diagonal ratios, even when the leading coefficient varies with the center. -/
+private theorem finiteBlock_biorthogonal_bound {E : Type*} [AddCommGroup E] [Module ℂ E]
+    (q : Seminorm ℂ E) (m : ℕ) (a : ℕ → ℂ) (ψ η : ℕ → E)
+    (A H : ℝ) (hA : 0 ≤ A) (hH : 0 ≤ H)
+    (hη : ∀ r < m, q (η r) ≤ A)
+    (ha : ∀ k < m, k ≠ 0 → ‖a k‖ ≤ H * ‖a 0‖)
+    (hrep : ∀ r < m, a 0 • ψ r + ∑ s ∈ (range m).filter (r < ·), a (s - r) • ψ s =
+      (r.factorial : ℂ) • η r) :
+    ∀ r < m, ‖a 0‖ * q (ψ r) ≤ m.factorial * A * (1 + m * H) ^ (m - 1 - r) := by
+  refine finiteBlock_inverse_bound m (fun r ↦ ‖a 0‖ * q (ψ r)) (m.factorial * A) H
+    (by positivity) hH fun r hr ↦ ?_
+  let t := (range m).filter (r < ·)
+  have he : a 0 • ψ r = (r.factorial : ℂ) • η r - ∑ s ∈ t, a (s - r) • ψ s :=
+    eq_sub_of_add_eq (hrep r hr)
+  calc
+    ‖a 0‖ * q (ψ r) = q (a 0 • ψ r) := (map_smul_eq_mul _ _ _).symm
+    _ ≤ q ((r.factorial : ℂ) • η r) + q (∑ s ∈ t, a (s - r) • ψ s) := he ▸ map_sub_le_add _ _ _
+    _ ≤ m.factorial * A + ∑ s ∈ t, q (a (s - r) • ψ s) := by
+      apply add_le_add _ (Finset.le_sum_of_subadditive q (map_zero q).le (map_add_le_add q) _ _)
+      rw [map_smul_eq_mul, Complex.norm_natCast]
+      exact mul_le_mul (by exact_mod_cast Nat.factorial_le hr.le) (hη _ hr) (apply_nonneg _ _) (by positivity)
+    _ ≤ m.factorial * A + H * ∑ s ∈ t, ‖a 0‖ * q (ψ s) := by
+      rw [Finset.mul_sum]
+      apply add_le_add_right
+      apply sum_le_sum
+      intro s hs
+      obtain ⟨hsm, hrs⟩ := mem_filter.mp hs
+      have hsm' := Finset.mem_range.mp hsm
+      rw [map_smul_eq_mul, ← mul_assoc]
+      exact mul_le_mul_of_nonneg_right (ha _ (by omega) (by omega)) (apply_nonneg _ _)
+
+/-- A finite triangular Taylor convolution is injective when its constant term is nonzero. -/
+private theorem finiteBlock_convolution_injective (a g h : ℕ → ℂ) (m : ℕ) (ha : a 0 ≠ 0)
+    (he : ∀ r < m, ∑ k ∈ range (r + 1), a k * g (r - k) =
+      ∑ k ∈ range (r + 1), a k * h (r - k)) : ∀ r < m, g r = h r := by
+  intro r
+  induction r using Nat.strong_induction_on with
+  | ind r ih =>
+    intro hr
+    have hr0 : 0 ∈ range (r + 1) := by simp
+    have ht : ∑ k ∈ (range (r + 1)).erase 0, a k * g (r - k) =
+        ∑ k ∈ (range (r + 1)).erase 0, a k * h (r - k) := by
+      refine sum_congr rfl fun k hk ↦ congrArg (a k * ·) (ih _ ?_ ?_)
+      · obtain ⟨hk0, hkr⟩ := mem_erase.mp hk
+        have := Finset.mem_range.mp hkr
+        omega
+      · omega
+    have he' := he r hr
+    rw [← sum_erase_add _ _ hr0, ← sum_erase_add _ _ hr0, ht, add_right_inj, Nat.sub_zero] at he'
+    exact mul_left_cancel₀ ha he'
+
+/-- Convolution of a Taylor row with a single coordinate vector. -/
+private theorem finiteBlock_delta (a : ℕ → ℂ) (r j : ℕ) (z : ℂ) :
+    ∑ k ∈ range (r + 1), a k * (if r - k=j then z else 0) =
+      if j ≤ r then a (r - j) * z else 0 := by
+  split_ifs with hj
+  · rw [sum_eq_single (r - j)]
+    · simp [Nat.sub_sub_self hj]
+    · intro k hk hneq
+      have hkr := Finset.mem_range.mp hk
+      rw [ite_eq_right (show r - k ≠ j by omega), mul_zero]
+    · intro h
+      exact (h (Finset.mem_range.mpr (by omega))).elim
+  · refine sum_eq_zero fun k _ ↦ ?_
+    rw [ite_eq_right (show r - k ≠ j by omega), mul_zero]
+
+/-- Form the Fourier-biorthogonal family by transposing the finite Laurent rows.
+The resulting identities give the backward recurrence for the polar vectors. -/
+private theorem finiteBlock_fourier_family {C E : Type*} [AddCommGroup E] [Module ℂ E]
+    [DecidableEq C] (m : C → ℕ) (a : C → ℕ → ℂ)
+    (P D : C → ℕ → E →ₗ[ℂ] ℂ) (ψ : C → ℕ → E)
+    (ha : ∀ c, 0 < m c → a c 0 ≠ 0)
+    (hψ : ∀ c r, r < m c → ∀ b j, j < m b →
+      P c r (ψ b j) = if c = b ∧ r = j then 1 else 0)
+    (hrow : ∀ c r, r < m c → ∀ x,
+      P c r x = ∑ k ∈ range (r + 1), a c k * (D c (r - k) x / ((r - k).factorial : ℂ))) :
+    ∃ η : C → ℕ → E,
+      (∀ c r, r < m c → ∀ b j, j < m b →
+        D c r (η b j) = if c = b ∧ r = j then 1 else 0) ∧
+      ∀ b j, j < m b → a b 0 • ψ b j +
+        ∑ s ∈ (range (m b)).filter (j < ·), a b (s - j) • ψ b s =
+        (j.factorial : ℂ) • η b j := by
+  classical
+  let η (b : C) (j : ℕ) :=
+    ((j.factorial : ℂ)⁻¹) • ∑ s ∈ range (m b), (if j ≤ s then a b (s - j) else 0) • ψ b s
+  refine ⟨η, ?_, ?_⟩
+  · intro c r hr b j hj
+    let g (s : ℕ) := D c s (η b j) / (s.factorial : ℂ)
+    let h (s : ℕ) := if c = b ∧ s = j then (j.factorial : ℂ)⁻¹ else 0
+    have hx (s : ℕ) (hs : s < m c) : P c s (η b j) =
+        if c = b ∧ j ≤ s then a c (s - j) * (j.factorial : ℂ)⁻¹ else 0 := by
+      simp only [η, map_smul, map_sum, smul_eq_mul]
+      by_cases hcb : c = b
+      · subst b
+        rw [sum_eq_single s]
+        · rw [hψ c s hs c s hs]
+          simp only [and_self, ↓reduceIte, true_and, mul_one]
+          split_ifs <;> ring
+        · intro k hk hks
+          simp [hψ c s hs c k (Finset.mem_range.mp hk), Ne.symm hks]
+        · exact fun he ↦ (he (Finset.mem_range.mpr hs)).elim
+      · rw [sum_eq_zero (fun k hk ↦ ?_)]
+        · simp [hcb]
+        · simp [hψ c s hs b k (Finset.mem_range.mp hk), hcb]
+    have he := finiteBlock_convolution_injective (a c) g h (m c) (ha c (by omega)) (by
+      intro s hs
+      change ∑ k ∈ range (s+1), a c k * (D c (s - k) (η b j) / ((s - k).factorial : ℂ)) = _
+      rw [← hrow c s hs, hx s hs]
+      by_cases hcb : c = b
+      · simpa only [h, hcb, true_and] using
+          (finiteBlock_delta (a c) s j (j.factorial : ℂ)⁻¹).symm
+      · simp [h, hcb]) r hr
+    change D c r (η b j) / (r.factorial : ℂ) = _ at he
+    rw [div_eq_iff (by exact_mod_cast r.factorial_ne_zero)] at he
+    rw [he]
+    by_cases hcr : c = b ∧ r = j
+    · obtain ⟨hc, rfl⟩ := hcr
+      simp [h, hc, Nat.factorial_ne_zero]
+    · simp [h, hcr]
+  · intro b j hj
+    dsimp only [η]
+    rw [smul_smul, mul_inv_cancel₀ (by exact_mod_cast j.factorial_ne_zero), one_smul]
+    rw [← sum_erase_add _ _ (Finset.mem_range.mpr hj)]
+    rw [ite_eq_left (le_refl _), Nat.sub_self, add_comm]
+    congr 1
+    simp only [ite_smul, zero_smul, ← Finset.sum_filter]
+    apply Finset.sum_congr _ (fun _ _ ↦ rfl)
+    ext s
+    simp only [mem_filter, mem_erase, Finset.mem_range]
+    omega
+
+/-- The forward row needs only the common Laurent scale and the largest Fourier sample. -/
+private theorem finiteBlock_row_bound (a g : ℕ → ℂ) (r m : ℕ) (hr : r < m) (H B : ℝ)
+    (hH : 0 ≤ H) (hB : 0 ≤ B)
+    (ha : ∀ k < m, ‖a k‖ ≤ H * ‖a 0‖) (hg : ∀ k < m, ‖g k‖ ≤ B) :
+    ‖∑ k ∈ Finset.range (r + 1), a k * (g (r - k) / ((r - k).factorial : ℂ))‖ ≤
+      m * H * ‖a 0‖ * B := by
+  calc
+    _ ≤ ∑ k ∈ Finset.range (r + 1), ‖a k * (g (r - k) / ((r - k).factorial : ℂ))‖ := norm_sum_le _ _
+    _ ≤ ∑ _k ∈ Finset.range (r + 1), (H * ‖a 0‖) * B := by
+      refine Finset.sum_le_sum fun k hk ↦ ?_
+      rw [norm_mul, norm_div, Complex.norm_natCast]
+      have klt := Finset.mem_range.mp hk
+      have hden : (1 : ℝ) ≤ (r - k).factorial := by exact_mod_cast Nat.factorial_pos _
+      exact mul_le_mul (ha k (by omega))
+        ((div_le_self (norm_nonneg _) hden).trans (hg _ (by omega)))
+        (by positivity) (by positivity)
+    _ ≤ _ := by
+      simp only [Finset.sum_const, Finset.card_range, nsmul_eq_mul]
+      rw [mul_assoc (m : ℝ) H, mul_assoc (m : ℝ)]
+      exact mul_le_mul_of_nonneg_right (by exact_mod_cast hr) (by positivity)
+
+/-- Combine the polynomial matrix estimates with a sufficiently high inverse-power
+bound on each Fourier sample. All exponents are uniform in the row of the block. -/
+private theorem finiteBlock_weight_bound (m M r d e : ℕ) (hm : m ≤ M)
+    (L A H B : ℝ) (hL : 1 ≤ L) (hA : 0 ≤ A) (hH : 0 ≤ H) (hB : 0 ≤ B) :
+    ((m : ℝ) * (H * L ^ d) * (B / L ^ (d + e + d * M + 2))) *
+        ((m.factorial : ℝ) * (A * L ^ e) * (1 + m * (H * L ^ d)) ^ (m - 1 - r)) ≤
+      (M * H * B * M.factorial * A * (1 + M * H) ^ M) / L ^ 2 := by
+  have hLpos := zero_lt_one.trans_le hL
+  have hrat : (m : ℝ) ≤ M := by exact_mod_cast hm
+  have hfac : (m.factorial : ℝ) ≤ M.factorial := by exact_mod_cast Nat.factorial_le hm
+  have hp : 1 ≤ L ^ d := one_le_pow₀ hL
+  have hpow : (1 + m * (H * L ^ d)) ^ (m - 1 - r) ≤ (1 + M * H) ^ M * L ^ (d * M) := by
+    rw [pow_mul, ← mul_pow]
+    refine (pow_le_pow_left₀ (by positivity) ?_ _).trans (pow_le_pow_right₀ ?_ (by omega))
+    · calc
+        _ ≤ 1 + (M : ℝ) * (H * L ^ d) := by gcongr
+        _ ≤ _ := by nlinarith
+    · exact one_le_mul_of_one_le_of_one_le (le_add_of_nonneg_right (by positivity)) hp
+  calc
+    _ ≤ ((M : ℝ) * (H * L ^ d) * (B / L ^ (d + e + d * M + 2))) *
+        ((M.factorial : ℝ) * (A * L ^ e) * ((1 + M * H)^M * L^(d * M))) := by gcongr
+    _ = _ := by
+      rw [pow_add, pow_add, pow_add]
+      field_simp
+
+end
+
+open Classical in
+/-- The transpose of the actual centered Laurent rows produces the Fourier-biorthogonal
+vectors. Back substitution bounds the scaled polar vectors in every quotient seminorm. -/
+private theorem orbitalPolar_family (p : Vℚ) (ω : PontryaginDual J₁)
+    (ψ : Idx(p, ω) → Q(p, ω))
+    (hψ : ∀ (i j : Idx(p, ω)) (x : Θₛ(ω)), π(p, ω) x = ψ j →
+      sLocalOrbitalPrincipalPart i x = if i = j then 1 else 0) :
+    ∃ η : Idx(p, ω) → Q(p, ω),
+      (∀ (i j : Idx(p, ω)) (x : Θₛ(ω)), π(p, ω) x = η j →
+        sLocalOrbitalFourierJet i x = if i = j then 1 else 0) ∧
+      ∀ (j : Idx(p, ω)) (q : Seminorm ℂ Q(p, ω)) (A H : ℝ), 0 ≤ A → 0 ≤ H →
+        (∀ i : Idx(p, ω), i.val.1 = j.val.1 → q (η i) ≤ A) →
+        (∀ i : Idx(p, ω), i.val.1 = j.val.1 → i.val.2 ≠ 0 →
+          ‖rhoCoeff(j.val.1, i.val.2)‖ ≤ H * ‖rhoCoeff(j.val.1, 0)‖) →
+        let m := sLocalPrimaryPoleMultiplicity p j.val.1
+        ‖rhoCoeff(j.val.1, 0)‖ * q (ψ j) ≤ m.factorial * A * (1 + m * H) ^ (m - 1 - j.val.2) := by
+  classical
+  let C := {c : QuasiCharacter (SIdeleQuotient F S) // ∃ i : Idx(p, ω), i.val.1 = c}
+  let m (c : C) := sLocalPrimaryPoleMultiplicity (F := F) (S := S) p c.val
+  let center (i : Idx(p, ω)) : C := ⟨i.val.1, i, rfl⟩
+  let jof (c : C) (s : ℕ) (hs : s < m c) : Idx(p, ω) :=
+    ⟨(c.val, s), c.property.choose_spec ▸ c.property.choose.property.1, hs⟩
+  let a (c : C) (s : ℕ) := rhoCoeff(c.val, s)
+  have hpolarKer (i : Idx(p, ω)) : Rₚ(p, ω) ≤ (sLocalOrbitalPrincipalPart i).ker := by
+    intro z hz
+    obtain ⟨y, hy⟩ := (Rₚ(p, ω)).mkQ_surjective (ψ i)
+    have hz' : π(p, ω) z = 0 := (Submodule.Quotient.mk_eq_zero _).mpr hz
+    have he := hψ i i (y + z) (by rw [map_add, hz', add_zero, hy])
+    rw [map_add, hψ i i y hy, ite_eq_left rfl] at he
+    exact add_left_cancel (he.trans (add_zero (1 : ℂ)).symm)
+  have hfourKer (i : Idx(p, ω)) : Rₚ(p, ω) ≤ (sLocalOrbitalFourierJet i).ker := by
+    intro z hz
+    obtain ⟨f, hf⟩ := (Kₛ(ω)).mkQ_surjective z
+    let b := center i
+    let g (k : ℕ) := iteratedDeriv k (fourierZeta(i.val.1) f) 0 / (k.factorial : ℂ)
+    have hzero (r : ℕ) (hr : r < m b) : ∑ k ∈ Finset.range (r + 1), a b k * g (r - k) = 0 := by
+      have he := orbitalPolar_row (jof b r hr) f
+      rw [hf] at he
+      exact he.symm.trans (hpolarKer (jof b r hr) hz)
+    have hi : i.val.2 < m b := i.property.2
+    have h := finiteBlock_convolution_injective (a b) g (fun _ ↦ 0) (m b)
+      (orbitalPolar_leading i 0).1 (fun r hr ↦ by simpa only [mul_zero, Finset.sum_const_zero] using hzero r hr)
+      i.val.2 hi
+    have hf0 : iteratedDeriv i.val.2 (fourierZeta(i.val.1) f) 0 = 0 :=
+      (div_eq_zero_iff.mp h).resolve_right (by exact_mod_cast i.val.2.factorial_ne_zero)
+    change sLocalOrbitalFourierJet i z = 0
+    rw [← hf]
+    exact hf0
+  let pol (i : Idx(p, ω)) : Q(p, ω) →ₗ[ℂ] ℂ :=
+    ((Rₚ(p, ω)).liftQL (sLocalOrbitalPrincipalPart i)
+      (hpolarKer i)).toLinearMap
+  let four (i : Idx(p, ω)) : Q(p, ω) →ₗ[ℂ] ℂ :=
+    ((Rₚ(p, ω)).liftQL (sLocalOrbitalFourierJet i)
+      (hfourKer i)).toLinearMap
+  let P (c : C) (s : ℕ) := if hs : s < m c then pol (jof c s hs) else 0
+  let D (c : C) (s : ℕ) := if hs : s < m c then four (jof c s hs) else 0
+  let ψ₀ (c : C) (s : ℕ) := if hs : s < m c then ψ (jof c s hs) else 0
+  have hij (b c : C) (r s : ℕ) (hr : r < m b) (hs : s < m c) :
+      jof b r hr = jof c s hs ↔ b = c ∧ r = s := by
+    change (⟨_,_⟩ : Idx(p, ω)) = ⟨_,_⟩ ↔ _
+    simp only [Subtype.ext_iff, Prod.mk.injEq]
+    exact and_congr_left' Subtype.val_inj
+  have ha (c : C) (hc : 0 < m c) : a c 0 ≠ 0 :=
+    (orbitalPolar_leading (jof c 0 hc) 0).1
+  have hp (c : C) (r : ℕ) (hr : r < m c) (b : C) (s : ℕ) (hs : s < m b) :
+      P c r (ψ₀ b s) = if c = b ∧ r = s then 1 else 0 := by
+    simp only [P, ψ₀,dite_eq_left hr, dite_eq_left hs]
+    obtain ⟨y, hy⟩ := (Rₚ(p, ω)).mkQ_surjective (ψ (jof b s hs))
+    rw [← hy]
+    change sLocalOrbitalPrincipalPart (jof c r hr) y = _
+    rw [hψ _ _ y hy, hij c b r s hr hs]
+    split_ifs <;> rfl
+  have hrow (c : C) (r : ℕ) (hr : r < m c) (x : Q(p, ω)) :
+      P c r x = ∑ k ∈ Finset.range (r + 1), a c k * (D c (r - k) x / ((r - k).factorial : ℂ)) := by
+    obtain ⟨y, rfl⟩ := (Rₚ(p, ω)).mkQ_surjective x
+    obtain ⟨f, rfl⟩ := (Kₛ(ω)).mkQ_surjective y
+    rw [show P c r = pol (jof c r hr) by simp [P, hr]]
+    refine (orbitalPolar_row (jof c r hr) f).trans (Finset.sum_congr rfl fun k _ ↦ ?_)
+    dsimp only [jof, a, D]
+    rw [dite_eq_left (show r - k < m c by omega)]
+    rfl
+  obtain ⟨E, hE, hcol⟩ := finiteBlock_fourier_family m a P D ψ₀ ha hp hrow
+  refine ⟨fun i ↦ E (center i) i.val.2, ?_, ?_⟩
+  · intro i j x hx
+    have hi : i.val.2 < m (center i) := i.property.2
+    have hj : j.val.2 < m (center j) := j.property.2
+    have he := hE (center i) _ hi (center j) _ hj
+    change π(p, ω) x = E (center j) j.val.2 at hx
+    rw [← hx] at he
+    simp only [D, dite_eq_left hi] at he
+    change sLocalOrbitalFourierJet i x = _ at he
+    by_cases h : i = j
+    · subst j
+      simpa using he
+    · have hne : ¬ (center i = center j ∧ i.val.2 = j.val.2) :=
+        fun hh ↦ h ((hij _ _ _ _ hi hj).2 hh)
+      simpa only [ite_eq_right hne, ite_eq_right h] using he
+  · intro j q A H hA hH hE' ha'
+    let c := center j
+    have hj : j.val.2 < m c := j.property.2
+    have hE'' (r : ℕ) (hr : r < m c) : q (E c r) ≤ A := hE' (jof c r hr) rfl
+    have ha'' (r : ℕ) (hr : r < m c) (hr' : r ≠ 0) : ‖a c r‖ ≤ H * ‖a c 0‖ :=
+      ha' (jof c r hr) rfl hr'
+    have h := finiteBlock_biorthogonal_bound q (m c) (a c) (ψ₀ c) (E c) A H hA hH
+      hE'' ha'' (hcol c) j.val.2 hj
+    rw [show ψ₀ c j.val.2 = ψ j by
+      rw [show ψ₀ c j.val.2 = ψ (jof c j.val.2 hj) by simp [ψ₀, hj]]
+      exact congrArg ψ (Subtype.ext rfl)] at h
+    exact h
+
+/-- A lattice point determines the restriction of its unitary chart to the norm-one group. -/
+private theorem orbitalPolar_chart_restriction {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] (m : G →* ℝ≥0ˣ) (hm : Continuous m)
+    (χ : PontryaginDual G) (z : ℂ) (ω : PontryaginDual m.ker)
+    (he : normOneRestriction m (quasiCharacterNormTwist m hm ((circleToComplex).comp χ) z) =
+      (circleToComplex).comp ω) :
+    ω = χ.comp (⟨m.ker.subtype, continuous_subtype_val⟩ : m.ker →ₜ* G) := by
+  ext x
+  have h := congrArg (fun a : QuasiCharacter m.ker ↦ a x) he
+  exact h.symm.trans (normOneRestriction_unitaryChart m hm χ z x)
+
+open Classical in
+/-- The Laurent row and its transposed biorthogonal column share their leading scale.
+Polynomial bounds for the normalized row and column therefore combine with rapid
+decay of the Fourier samples to give inverse-square decay of each polar basis term. -/
+private theorem sLocalPolarOrbital_bases_of_laurent_bounds_local
+    (p : Vℚ) (ω : PontryaginDual J₁)
+    (hS : IsSaturatedPlaceSet S) (hp : (Sₚ(p)).Nonempty) (hPic : PicTrivial)
+    (hcoeff : ∀ χ : PontryaginDual Jₛ, ∃ d : ℕ, ∃ C : ℝ, 0 < C ∧
+      ∀ (j : Idx(p, ω)) (s : ℂ), j.val.2 ≠ 0 → j.val.1 = chart(χ) s →
+        ‖rhoCoeff(j.val.1, j.val.2)‖ ≤ C * (1 + ‖s‖) ^ d * ‖rhoCoeff(j.val.1, 0)‖)
+    (ψ : Idx(p, ω) → Q(p, ω))
+    (hψ : ∀ (i j : Idx(p, ω)) (x : Θₛ(ω)), π(p, ω) x = ψ j →
+      sLocalOrbitalPrincipalPart i x = if i = j then 1 else 0)
+    (f : ℬₛ) (q : Seminorm ℂ Q(p, ω)) (hq : Continuous q) :
+    ∀ (χ : PontryaginDual Jₛ) (v : S) (u : (v.val.adicCompletion F)ˣ) (t : ℝ),
+      uniformizerNorm(v, u) → phase(χ, v, u, t) → ∃ C : ℝ, 0 ≤ C ∧
+        ∀ (j : Idx(p, ω)) (n : ℤ), j.val.1 = lattice(χ, v, t, n) →
+          v ∈ sLocalFinitePolePlaces (F := F) (S := S) j.val.1 → v.val ∈ Sₚ(p) →
+            ‖sLocalOrbitalPrincipalPart j ((Kₛ(ω)).mkQ f)‖ * q (ψ j) ≤ C / (1 + |(n : ℝ)|) ^ 2 := by
+  classical
+  obtain ⟨η, hη, hscaled⟩ := orbitalPolar_family p ω ψ hψ
+  intro χ v u t hu ht
+  let s (n : ℤ) : ℂ := (((n : ℝ) * period(v) - t : ℝ) : ℂ) * Complex.I
+  let L (n : ℤ) : ℝ := 1 + |(n : ℝ)|
+  have hL (n : ℤ) : 1 ≤ L n := le_add_of_nonneg_right (abs_nonneg _)
+  by_cases hv : v.val ∈ Sₚ(p)
+  case neg => exact ⟨0, le_rfl, fun j n hc hplace hprimary ↦ (hv hprimary).elim⟩
+  by_cases hω : ω = restrict₁(χ)
+  case neg =>
+    refine ⟨0, le_rfl, fun j n hc _ _ ↦ (hω ?_).elim⟩
+    have he := @orbitalPolar_chart_restriction (SIdeleQuotient F S) _ _ _ (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous χ (s n) ω
+    rw [show chart(χ) (s n) = j.val.1 from hc.symm] at he
+    exact he j.property.1
+  obtain ⟨e, A, hA, hboundη⟩ := sLocalFourierOrbital_biorthogonal_growth p χ ω v u t
+    hS hp hPic hω hv hu ht η hη q hq
+  obtain ⟨d, C, hC, hratio⟩ := hcoeff χ
+  let M := Fintype.card S
+  let K := 1 + |t| + |period(v)|
+  let H := 1 + C * K ^ d
+  have hK : 0 < K := by dsimp [K]; positivity
+  have hH : 1 ≤ H := le_add_of_nonneg_right (mul_nonneg hC.le (pow_pos hK _).le)
+  have hs (n : ℤ) : 1 + ‖s n‖ ≤ K * L n := by
+    simp only [s, norm_mul, Complex.norm_real, Complex.norm_I, mul_one, Real.norm_eq_abs]
+    have htri := abs_sub ((n : ℝ) * period(v)) t
+    rw [abs_mul] at htri
+    dsimp [K, L]
+    nlinarith [mul_nonneg (abs_nonneg t) (abs_nonneg (n : ℝ)), abs_nonneg (period(v)), abs_nonneg (n : ℝ)]
+  let N := d + e + d * M + 2
+  choose B hB hdec using fun k ↦ sLocalOrbitalFourierJet_lattice_schwartz_valueDecay p χ v u t hS hp hPic hv hu ht f k N
+  let B' := 1 + ∑ k ∈ Finset.range M, B k
+  have hB' : 0 ≤ B' := add_nonneg zero_le_one (Finset.sum_nonneg fun k _ ↦ (hB k).le)
+  refine ⟨(M * H * B' * M.factorial * A * (1 + M * H) ^ M), by positivity, ?_⟩
+  intro j n hc hplace _
+  let m := sLocalPrimaryPoleMultiplicity p j.val.1
+  have hr : j.val.2 < m := j.property.2
+  have hm : m ≤ M := Finset.card_le_univ _
+  let iof (k : ℕ) (hk : k < m) : Idx(p, ω) := ⟨(j.val.1, k), j.property.1, hk⟩
+  have hcenter : j.val.1 = chart(χ) (s n) := hc
+  have hrho (k : ℕ) (hk : k < m) :
+      ‖rhoCoeff(j.val.1, k)‖ ≤ (H * L n ^ d) * ‖rhoCoeff(j.val.1, 0)‖ := by
+    by_cases hk0 : k = 0
+    · rw [hk0]
+      exact le_mul_of_one_le_left (norm_nonneg _) (one_le_mul_of_one_le_of_one_le hH (one_le_pow₀ (hL _)))
+    refine (hratio (iof k hk) (s n) hk0 hcenter).trans (mul_le_mul_of_nonneg_right ?_ (norm_nonneg _))
+    calc
+      C * (1 + ‖s n‖)^d ≤ C * (K * L n)^d :=
+        mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (by positivity) (hs n) _) hC.le
+      _ ≤ H * L n ^ d := by
+        rw [mul_pow, ← mul_assoc]
+        exact mul_le_mul_of_nonneg_right (le_add_of_nonneg_left zero_le_one) (by positivity)
+  have hjet (k : ℕ) (hk : k < m) :
+      ‖iteratedDeriv k (fourierZeta(j.val.1) f) 0‖ ≤ B' / L n ^ N := by
+    have he := hdec k n
+    rw [← hc, ite_eq_left ⟨hplace, hk⟩] at he
+    have hBk : B k ≤ B' := by
+      refine (Finset.single_le_sum (f := B) (fun i _ ↦ (hB i).le) (Finset.mem_range.mpr (hk.trans_le hm))).trans ?_
+      exact le_add_of_nonneg_left zero_le_one
+    exact he.trans (div_le_div_of_nonneg_right hBk (by positivity))
+  have hpolar := finiteBlock_row_bound (fun k ↦ rhoCoeff(j.val.1, k))
+    (fun k ↦ iteratedDeriv k (fourierZeta(j.val.1) f) 0) j.val.2 m hr
+    (H * L n ^ d) (B' / L n ^ N) (by positivity) (by positivity) hrho hjet
+  rw [← orbitalPolar_row j f] at hpolar
+  have hscaled' := hscaled j q (A * L n ^ e) (H * L n ^ d) (by positivity) (by positivity)
+    (fun i hi ↦ hboundη n i (hi.trans hc) (hi ▸ hplace))
+    (fun i hi _ ↦ hrho i.val.2 (by simpa only [m, ← hi, sLocalPrimaryPoleMultiplicity] using i.property.2))
+  calc
+    _ ≤ (m * (H * L n ^ d) * (B' / L n ^ N)) * (‖rhoCoeff(j.val.1, 0)‖ * q (ψ j)) := by
+      refine (mul_le_mul_of_nonneg_right hpolar (apply_nonneg _ _)).trans_eq ?_
+      ring
+    _ ≤ _ := (mul_le_mul_of_nonneg_left hscaled' (by positivity)).trans
+      (finiteBlock_weight_bound m M j.val.2 d e hm (L n) A H B' (hL _) hA.le (zero_le_one.trans hH) hB')
+
+open Classical in
+/-- Paper: Theorem 7.3.1.6(3), p. 345, with its proof on pp. 346–349.
+For every quotient vector, its polar coordinate terms are summable under each continuous
+seminorm. This isolates the analytic estimate: combine rapid decay of the Laurent
+coefficients on the finitely many local pole lattices with polynomial growth of their
+biorthogonal vectors, accounting for multiplicities and overlapping lattices. -/
+private theorem sLocalPolarOrbital_bases_of_laurent_bounds_primal_summable
+    (p : Vℚ) (ω : PontryaginDual J₁)
+    (_hS : IsSaturatedPlaceSet S) (_hp : (Sₚ(p)).Nonempty) (_hPic : PicTrivial)
+    (_hcoeff : ∀ χ : PontryaginDual Jₛ, ∃ d : ℕ, ∃ C : ℝ, 0 < C ∧
+      ∀ (j : Idx(p, ω)) (s : ℂ), j.val.2 ≠ 0 → j.val.1 = chart(χ) s →
+        ‖rhoCoeff(j.val.1, j.val.2)‖ ≤ C * (1 + ‖s‖) ^ d * ‖rhoCoeff(j.val.1, 0)‖)
+    (D : Idx(p, ω) → StrongDual ℂ (Q(p, ω)))
+    (_hD : ∀ (j : Idx(p, ω)) (x : Θₛ(ω)), D j (π(p, ω) x) =
+      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j x)
+    (ψ : Idx(p, ω) → Q(p, ω))
+    (_hψ : ∀ (i j : Idx(p, ω)) (x : Θₛ(ω)), π(p, ω) x = ψ j →
+      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) i x =
+        if i = j then 1 else 0)
+    (q : Seminorm ℂ Q(p, ω)) (_hq : Continuous q) (x : Q(p, ω)) :
+    Summable (fun j : Idx(p, ω) ↦ q (D j x • ψ j)) := by
+  classical
+  obtain ⟨y, rfl⟩ := (Rₚ(p, ω)).mkQ_surjective x
+  obtain ⟨f, rfl⟩ := (Kₛ(ω)).mkQ_surjective y
+  have hs := sLocalPolarOrbital_bases_of_laurent_bounds_lattices p ω _
+    (fun j ↦ mul_nonneg (norm_nonneg _) (apply_nonneg q (ψ j)))
+    (sLocalPolarOrbital_bases_of_laurent_bounds_local p ω _hS _hp _hPic _hcoeff ψ _hψ f q _hq)
+  simpa only [map_smul_eq_mul, _hD] using hs
+
+open Classical in
+/-- Paper: Theorem 7.3.1.6(3), p. 345.
+With a biorthogonal family in the primary quotient, the enumeration of that family is an
+absolute Schauder basis of the quotient. This is the absolute-basis clause of Theorem
+7.3.1.6(3) for the polar system; it is the half of that theorem which rests on the
+identification (7.3.1.19) with the modulated quotient of Theorem 4.6.1.5.
+Deviation: Keeps the Laurent-ratio bound of Theorem 7.3.1.6 as stated on p. 345. -/
+theorem sLocalPolarOrbital_bases_of_laurent_bounds_primal
+    (p : Vℚ) (ω : PontryaginDual J₁) (σ : ℕ ≃ Idx(p, ω))
+    (_hS : IsSaturatedPlaceSet S) (_hp : (Sₚ(p)).Nonempty) (_hPic : PicTrivial)
+    (_hcoeff : ∀ χ : PontryaginDual Jₛ, ∃ d : ℕ, ∃ C : ℝ, 0 < C ∧
+      ∀ (j : Idx(p, ω)) (s : ℂ), j.val.2 ≠ 0 → j.val.1 = chart(χ) s →
+        ‖rhoCoeff(j.val.1, j.val.2)‖ ≤ C * (1 + ‖s‖) ^ d * ‖rhoCoeff(j.val.1, 0)‖)
+    (D : Idx(p, ω) → StrongDual ℂ (Q(p, ω)))
+    (_hD : ∀ (j : Idx(p, ω)) (x : Θₛ(ω)), D j (π(p, ω) x) =
+      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j x)
+    (ψ : Idx(p, ω) → Q(p, ω))
+    (_hψ : ∀ (i j : Idx(p, ω)) (x : Θₛ(ω)), π(p, ω) x = ψ j →
+      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) i x =
+        if i = j then 1 else 0) :
+    let e := ψ ∘ σ
+    let d := D ∘ σ
+    IsSchauderBasis e d ∧ SchauderBasis.IsAbsolute e d := by
+  have hR : IsClosed (Rₚ(p, ω) : Set (Θₛ(ω))) :=
+    (sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding
+      (F := F) (S := S) hₚ(p) ω).isClosed_range
+  have hF : IsFrechetTVS (Q(p, ω)) :=
+    isFrechetTVS_quotient (sLocalHomogeneousThetaSpace_frechet ω) _ hR
+  apply sLocalPolarOrbital_bases_of_laurent_bounds_primal_of_summable p ω (ψ ∘ σ) (D ∘ σ) hF
+  · intro m n
+    obtain ⟨x, hx⟩ := Submodule.mkQ_surjective (Rₚ(p, ω)) (ψ (σ n))
+    have he := (_hD (σ m) x).trans (_hψ (σ m) (σ n) x hx)
+    rw [hx] at he
+    simpa only [Function.comp_apply, σ.injective.eq_iff] using he
+  · intro x hx
+    obtain ⟨y, rfl⟩ := Submodule.mkQ_surjective (Rₚ(p, ω)) x
+    apply (sLocalPrimaryOrbitalQuotient_mk_eq_zero p _hS _hp _hPic ω y).mpr
+    intro j
+    obtain ⟨n, rfl⟩ := σ.surjective j
+    exact (_hD (σ n) y).symm.trans (hx n)
+  · intro q hq x
+    exact σ.summable_iff.mpr
+      (sLocalPolarOrbital_bases_of_laurent_bounds_primal_summable
+        p ω _hS _hp _hPic _hcoeff D _hD ψ _hψ q hq x)
+
+open Classical in
+/-- Paper: Theorem 7.3.1.6(2), p. 345.
+With a biorthogonal family in the primary quotient, the enumeration of the polar
+functionals is an unconditional Schauder basis of the strong dual. This is the
+strong-dual clause of Theorem 7.3.1.6(2) for the polar system.
+Deviation: Keeps the Laurent-ratio bound of Theorem 7.3.1.6 as stated on p. 345. -/
+theorem sLocalPolarOrbital_bases_of_laurent_bounds_dual
+    (p : Vℚ) (ω : PontryaginDual J₁) (σ : ℕ ≃ Idx(p, ω))
+    (_hS : IsSaturatedPlaceSet S) (_hp : (Sₚ(p)).Nonempty) (_hPic : PicTrivial)
+    (_hcoeff : ∀ χ : PontryaginDual Jₛ, ∃ d : ℕ, ∃ C : ℝ, 0 < C ∧
+      ∀ (j : Idx(p, ω)) (s : ℂ), j.val.2 ≠ 0 → j.val.1 = chart(χ) s →
+        ‖rhoCoeff(j.val.1, j.val.2)‖ ≤ C * (1 + ‖s‖) ^ d * ‖rhoCoeff(j.val.1, 0)‖)
+    (D : Idx(p, ω) → StrongDual ℂ (Q(p, ω)))
+    (_hD : ∀ (j : Idx(p, ω)) (x : Θₛ(ω)), D j (π(p, ω) x) =
+      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j x)
+    (ψ : Idx(p, ω) → Q(p, ω))
+    (_hψ : ∀ (i j : Idx(p, ω)) (x : Θₛ(ω)), π(p, ω) x = ψ j →
+      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) i x =
+        if i = j then 1 else 0) :
+    let d := D ∘ σ
+    let ev : ℕ → StrongDual ℂ (StrongDual ℂ (Q(p, ω))) :=
+      fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (ψ (σ n))
+    IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev := by
+  have hprimal := sLocalPolarOrbital_bases_of_laurent_bounds_primal
+    p ω σ _hS _hp _hPic _hcoeff D _hD ψ _hψ
+  have hR : IsClosed (Rₚ(p, ω) : Set (Θₛ(ω))) :=
+    (sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding
+      (F := F) (S := S) hₚ(p) ω).isClosed_range
+  have hF : IsFrechetTVS (Q(p, ω)) :=
+    isFrechetTVS_quotient (sLocalHomogeneousThetaSpace_frechet ω) _ hR
+  have hFcopy := hF
+  obtain ⟨_, hpoly, hmet, hcomp⟩ := hFcopy
+  have hN : IsNuclearTVS.{0} (Q(p, ω)) :=
+    isNuclearTVS_quotient (sLocalHomogeneousThetaSpace_nuclear ω) _
+  let : UniformSpace (Q(p, ω)) := IsTopologicalAddGroup.rightUniformSpace _
+  let : IsUniformAddGroup (Q(p, ω)) := isUniformAddGroup_of_addCommGroup
+  let : MontelSpace ℂ (Q(p, ω)) :=
+    montelSpace_of_schwartz_frechet hF (isSchwartzTVS_of_isNuclearTVS hN)
+  let : BarrelledSpace ℂ (Q(p, ω)) := isFrechetTVS_barrelled hF
+  have hrefl : IsHomeomorph (ContinuousLinearMap.applyₗ
+      (E := Q(p, ω)) ℂ (RingHom.id ℂ)) :=
+    isHomeomorph_iff_isEmbedding_surjective.mpr
+      ⟨isEmbedding_strongBidual_eval, surjective_strongBidual_eval⟩
+  exact ⟨SchauderBasis.isShrinking_of_isAbsolute hcomp hrefl hprimal.1 hprimal.2,
+    SchauderBasis.strongDual_isUnconditional_of_isAbsolute
+      hcomp hrefl hprimal.1 hprimal.2⟩
+
+/-- Paper: Theorem 7.3.1.6(2)–(3), p. 345.
+Any enumeration of the polar functionals gives an unconditional basis of the strong dual.
+With the same enumeration, its biorthogonal vectors are an absolute basis of the quotient.
+Deviation: Assumes polynomial bounds on the ratios of lower to leading Laurent coefficients
+of the correcting factor within each selected block. The hypothesis is vacuous at a
+primary pole of multiplicity one. The general assertion on p. 349 needs uniform control
+of the changes of basis across the different centers. -/
+theorem sLocalPolarOrbital_bases_of_laurent_bounds
+    (p : Vℚ) (ω : PontryaginDual J₁)
+    (_hS : IsSaturatedPlaceSet S) (_hp : (Sₚ(p)).Nonempty) (_hPic : PicTrivial) (σ : ℕ ≃ Idx(p, ω))
+    (_hcoeff : ∀ χ : PontryaginDual Jₛ, ∃ d : ℕ, ∃ C : ℝ, 0 < C ∧
+      ∀ (j : Idx(p, ω)) (s : ℂ), j.val.2 ≠ 0 → j.val.1 = chart(χ) s →
+        ‖rhoCoeff(j.val.1, j.val.2)‖ ≤ C * (1 + ‖s‖) ^ d * ‖rhoCoeff(j.val.1, 0)‖) :
+    ∃ (D : Idx(p, ω) → StrongDual ℂ (Q(p, ω))) (ψ : Idx(p, ω) → Q(p, ω))
+      (ev : ℕ → StrongDual ℂ (StrongDual ℂ (Q(p, ω)))),
+      (∀ (n : ℕ) (ℓ : StrongDual ℂ (Q(p, ω))), ev n ℓ = ℓ (ψ (σ n))) ∧
+      (∀ (j : Idx(p, ω)) (x : Θₛ(ω)), D j (π(p, ω) x) =
+        sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j x) ∧
+      let e := ψ ∘ σ
+      let d := D ∘ σ
+      IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev ∧
+        IsSchauderBasis e d ∧ SchauderBasis.IsAbsolute e d := by
+  classical
+  obtain ⟨D, hD⟩ : ∃ D : Idx(p, ω) → StrongDual ℂ (Q(p, ω)),
+      ∀ (j : Idx(p, ω)) (x : Θₛ(ω)), D j (π(p, ω) x) =
+        sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j x :=
+    sLocalPolarOrbital_bases_of_laurent_bounds_descend (F := F) (S := S) p ω
+  obtain ⟨ψ, hψ⟩ : ∃ ψ : Idx(p, ω) → Q(p, ω),
+      ∀ (i j : Idx(p, ω)) (x : Θₛ(ω)), π(p, ω) x = ψ j →
+        sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) i x =
+          if i = j then 1 else 0 :=
+    sLocalPolarOrbital_bases_of_laurent_bounds_biorthogonal (F := F) (S := S) p ω _hS _hp _hPic
+  have hprimal := sLocalPolarOrbital_bases_of_laurent_bounds_primal (F := F) (S := S)
+    p ω σ _hS _hp _hPic _hcoeff D hD ψ hψ
+  have hdual := sLocalPolarOrbital_bases_of_laurent_bounds_dual (F := F) (S := S)
+    p ω σ _hS _hp _hPic _hcoeff D hD ψ hψ
+  exact ⟨D, ψ, fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (ψ (σ n)),
+    fun n ℓ ↦ rfl, hD, hdual.1, hdual.2, hprimal.1, hprimal.2⟩
+
+end PolarLaurentBases
 
 -- TODO(paper-gap): The proof of Theorem 7.3.1.6 alternates between 1+s and 1-s in
 -- (7.3.1.24)–(7.3.1.25). For the displayed 1+s coordinate the multiplier is P(-s)
