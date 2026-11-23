@@ -5690,6 +5690,59 @@ theorem introTrace_shiftTwo_resolvent_eqOn_iff_no_exterior_zeros (χ : U𝔽) (a
   · exact fun h s hs ↦ h ⟨s, hs, introTrace_positive_divisor_in_critical_strip χ s hs⟩
   · exact fun h r ↦ h r.val r.property.1
 
+/-- Paper: §§1.4.3–1.4.5, pp. 29–30. The difference between the full and narrow
+resolvents is the sum over the omitted zeros on the Euler half-plane. Its meromorphic
+continuation has residue equal to the omitted multiplicity at each point, including
+zeros on the boundary of the open window. -/
+theorem introTrace_shiftTwo_exterior_resolvent (χ : U𝔽) (a : ℝ) (ha : a ≤ 1 / 2) :
+    let E := fun z : ℂ ↦ resolvent(χ, 1 / 2) z - resolvent(χ, a) z
+    (∀ z : ℂ, 1 < z.re → HasSum
+      (fun r : {r : windowZeros(χ, 1 / 2) // ¬ |r.val.re - 1 / 2| < a} ↦
+        (zeroOrder(χ, r.val.val) : ℂ) * poleKernel(r.val.val - 1 / 2, z)) (E z)) ∧
+    MeromorphicOn E right(-1) ∧
+    ∀ p : ℂ, -1 < p.re → Tendsto (fun z ↦ (z - p) * E z) (𝓝[≠] p)
+      (𝓝 (if 0 < zeroOrder(χ, p + 1 / 2) ∧ ¬ |(p + 1 / 2).re - 1 / 2| < a
+        then (zeroOrder(χ, p + 1 / 2) : ℂ) else 0)) := by
+  intro E
+  refine ⟨?_, (introTrace_window_resolvent_meromorphic χ (1 / 2) le_rfl).sub
+    (introTrace_window_resolvent_meromorphic χ a ha), ?_⟩
+  · intro z hz
+    let t (r : windowZeros(χ, 1 / 2)) := (zeroOrder(χ, r.val) : ℂ) * poleKernel(r.val - 1 / 2, z)
+    let I := {r : windowZeros(χ, 1 / 2) | |r.val.re - 1 / 2| < a}
+    let e : I ≃ windowZeros(χ, a) :=
+      { toFun := fun r ↦ ⟨r.val.val, r.val.property.1, r.property⟩
+        invFun := fun r ↦ ⟨⟨r.val, r.property.1, r.property.2.trans_le ha⟩, r.property.2⟩
+        left_inv := fun _ ↦ rfl
+        right_inv := fun _ ↦ rfl }
+    have hshift : MapsTo (fun w : ℂ ↦ w + 2) right(1 / 2) right(1 / 2) := by
+      intro w hw
+      change (1 / 2 : ℝ) < (w + 2).re
+      simpa using (show (1 / 2 : ℝ) < w.re + 2 by linarith [show (1 / 2 : ℝ) < w.re from hw])
+    have ht : HasSum t (resolvent(χ, 1 / 2) z) :=
+      (introTrace_spectral_referenceSub χ (1 / 2) _ hshift (by fun_prop)).2.2.1.tendsto_at
+        (show z ∈ right(1 / 2) by change (1 / 2 : ℝ) < z.re; linarith)
+    have hinner : (∑' r : I, t r.val) = resolvent(χ, a) z :=
+      e.tsum_eq (fun r ↦ (zeroOrder(χ, r.val) : ℂ) * poleKernel(r.val - 1 / 2, z))
+    have hsum := ht.summable.tsum_subtype_add_tsum_subtype_compl I
+    rw [hinner, ht.tsum_eq] at hsum
+    have he : (∑' r : {r : windowZeros(χ, 1 / 2) // r ∉ I}, t r.val) = E z := eq_sub_of_add_eq' hsum
+    rw [← he]
+    exact (ht.summable.subtype (fun r ↦ r ∉ I)).hasSum
+  · intro p hp
+    have h := (introTrace_window_resolvent_residue χ (1 / 2) le_rfl p hp).sub
+      (introTrace_window_resolvent_residue χ a ha p hp)
+    have hres : windowOrder(χ, 1 / 2, p) - windowOrder(χ, a, p) =
+        if 0 < zeroOrder(χ, p + 1 / 2) ∧ ¬ |(p + 1 / 2).re - 1 / 2| < a
+          then (zeroOrder(χ, p + 1 / 2) : ℂ) else 0 := by
+      by_cases hpos : 0 < zeroOrder(χ, p + 1 / 2)
+      · have hfull := introTrace_positive_divisor_in_critical_strip χ (p + 1 / 2) hpos
+        by_cases hi : |(p + 1 / 2).re - 1 / 2| < a <;>
+          simp only [hpos, hfull, hi, true_and, not_true_eq_false, not_false_eq_true,
+            ite_true, ite_false, sub_self, sub_zero]
+      · simp only [hpos, false_and, ite_false, sub_self]
+    rw [← hres]
+    simpa only [E, mul_sub] using h
+
 /-- Paper: §1.4.5, p. 30. Agreement with the full shift-by-two resolvent on the Euler
 half-plane for every positive half-width below one half is equivalent to the critical-line
 condition for this character. -/
@@ -5767,16 +5820,17 @@ private theorem introTrace_archimedean_sub_shiftTwo_analytic (χ : U𝔽) (v : I
   rw [he]
   exact analyticAt_const.mul h
 
-private theorem introTrace_narrow_continuation_of_shiftTwo_comparison (χ : U𝔽) (a : ℝ) (ha : 0 ≤ a) :
+/-- The narrow resolvent, the regularized archimedean integrals, and the translated
+Euler logarithmic derivative are analytic on the entire open chart. -/
+private theorem introTrace_regularized_chart_analytic (χ : U𝔽) (a : ℝ) (ha : 0 ≤ a) :
     let L := fun z : ℂ ↦ logDeriv finiteL(χ) (z + 1 / 2) +
       if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0
     let R := resolvent(χ, a)
     let J := fun z : ℂ ↦ ∑ v : InfinitePlace F,
       introTraceArchimedean χ (fun t ↦ introTracePower z t - introTracePower (z + 2) t) v
-    (∀ z ∈ right(max a 1), R z = L z - L (z + 2) - J z) →
-    ∃ H : ℂ → ℂ, AnalyticOnNhd ℂ H right(a) ∧ EqOn H L right(max a 1) := by
+    AnalyticOnNhd ℂ (fun z ↦ R z + J z + L (z + 2)) right(a) := by
   classical
-  intro L R J hcmp
+  intro L R J
   let f := (finiteHeckeL_exists_continuation (F := F) χ).choose
   have hshift : MapsTo (fun w : ℂ ↦ w + 2) right(a) right(a) := by
     intro w hw
@@ -5807,7 +5861,83 @@ private theorem introTrace_narrow_continuation_of_shiftTwo_comparison (χ : U�
     have hm : z + 2 - 1 / 2 ≠ 0 := by intro e; have h := congrArg Complex.re e; norm_num at h; linarith
     apply hD.add
     split_ifs <;> fun_prop (disch := first | exact hp | exact hm)
-  refine ⟨fun z ↦ R z + J z + L (z + 2), (hR.add hJ).add hL, ?_⟩
+  exact (hR.add hJ).add hL
+
+
+/-- Paper: §§1.4.3–1.4.5, pp. 29–30. One matched cutoff family gives an analytic
+regularization on every normalized narrow chart. On the Euler overlap the difference
+between the polar-corrected logarithmic derivative and this analytic function is
+exactly the exterior-zero resolvent. Its residues are given by
+`introTrace_shiftTwo_exterior_resolvent`. -/
+theorem introTrace_regularized_chart_with_exterior_zeros :
+    ∃ (h ρ : ℕ → ℝ → ℝ), IsIntroTraceApproximation h ρ ∧
+    ∀ (τ : ℝ≥0ˣ →ₜ* C𝔽), RightInverse τ (ideleClassNorm F) →
+      ∀ (χ : U𝔽), (∀ t, χ (τ t) = 1) → ∀ a : ℝ, 0 ≤ a → a ≤ 1 / 2 →
+      let L := fun z : ℂ ↦ logDeriv finiteL(χ) (z + 1 / 2) +
+        if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0
+      let J := fun z : ℂ ↦ ∑ v : InfinitePlace F,
+        introTraceArchimedean χ (fun t ↦ introTracePower z t - introTracePower (z + 2) t) v
+      let H := fun z : ℂ ↦ resolvent(χ, a) z + J z + L (z + 2)
+      let E := fun z : ℂ ↦ resolvent(χ, 1 / 2) z - resolvent(χ, a) z
+      AnalyticOnNhd ℂ H right(a) ∧
+      TendstoLocallyUniformlyOn (fun n z ↦
+        introTraceSpectralSum χ approx(h, ρ, n, z) a - introTraceSpectralSum χ approx(h, ρ, n, (z + 2)) a +
+        ((∑ v : InfinitePlace F, introTraceArchimedean χ approx(h, ρ, n, z) v) -
+          ∑ v : InfinitePlace F, introTraceArchimedean χ approx(h, ρ, n, (z + 2)) v))
+        (fun z ↦ resolvent(χ, a) z + J z) atTop right(a) ∧
+      MeromorphicOn (H + E) right(a) ∧ EqOn (H + E) L right(1) ∧
+      ∀ p ∈ right(a), Tendsto (fun z ↦ (z - p) * (H z + E z)) (𝓝[≠] p)
+        (𝓝 (if 0 < zeroOrder(χ, p + 1 / 2) then (zeroOrder(χ, p + 1 / 2) : ℂ) else 0)) := by
+  obtain ⟨h, ρ, hA, hmatch, hs⟩ := introTraceApprox_exists_reference_spectral_matched (F := F)
+  refine ⟨h, ρ, hA, ?_⟩
+  intro τ hτ χ hχ a ha ha' L J H E
+  have hH : AnalyticOnNhd ℂ H right(a) := introTrace_regularized_chart_analytic χ a ha
+  obtain ⟨_, hE, hres⟩ := introTrace_shiftTwo_exterior_resolvent χ a ha'
+  have hsub : right(a) ⊆ right(-1) := fun z hz ↦ by
+    change -1 < z.re
+    linarith [show a < z.re from hz]
+  refine ⟨hH, ?_, hH.meromorphicOn.add (hE.mono_set hsub), ?_, ?_⟩
+  · have hshift : MapsTo (fun w : ℂ ↦ w + 2) right(a) right(a) := by
+      intro w hw
+      change a < (w + 2).re
+      simpa using (show a < w.re + 2 by linarith [show a < w.re from hw])
+    have harch := (introTraceApprox_archimedean_sub_shiftTwo_matched_sum χ h ρ hA hmatch).mono
+      (show right(a) ⊆ right(-(1 / 2 : ℝ)) from fun w hw ↦ by
+        change -(1 / 2 : ℝ) < w.re
+        linarith [show a < w.re from hw])
+    exact (hs χ a ha _ hshift (by fun_prop)).add harch
+  · intro z hz
+    have hz' : 1 < z.re := hz
+    have hf := introTrace_shiftTwo_resolvent_eq_logDeriv_sub_archimedean τ hτ χ hχ
+      (1 / 2) le_rfl z (max_lt (by linarith) hz')
+    change resolvent(χ, 1 / 2) z = L z - L (z + 2) - J z at hf
+    change (resolvent(χ, a) z + J z + L (z + 2)) + (resolvent(χ, 1 / 2) z - resolvent(χ, a) z) = L z
+    rw [hf]
+    ring
+  · intro p hp
+    have hlim : Tendsto (fun z ↦ (z - p) * H z) (𝓝[≠] p) (𝓝 0) := by
+      have hc : ContinuousAt (fun z ↦ (z - p) * H z) p :=
+        (continuousAt_id.sub continuousAt_const).mul (hH p hp).continuousAt
+      simpa only [sub_self, zero_mul] using hc.tendsto.mono_left nhdsWithin_le_nhds
+    have hext : ¬ |(p + 1 / 2).re - 1 / 2| < a := by
+      have hpr : a < p.re := hp
+      rw [Complex.add_re]
+      norm_num
+      linarith [le_abs_self p.re]
+    simpa only [mul_add, zero_add, hext, not_false_eq_true, and_true] using
+      hlim.add (hres p (hsub hp))
+
+private theorem introTrace_narrow_continuation_of_shiftTwo_comparison (χ : U𝔽) (a : ℝ) (ha : 0 ≤ a) :
+    let L := fun z : ℂ ↦ logDeriv finiteL(χ) (z + 1 / 2) +
+      if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0
+    let R := resolvent(χ, a)
+    let J := fun z : ℂ ↦ ∑ v : InfinitePlace F,
+      introTraceArchimedean χ (fun t ↦ introTracePower z t - introTracePower (z + 2) t) v
+    (∀ z ∈ right(max a 1), R z = L z - L (z + 2) - J z) →
+    ∃ H : ℂ → ℂ, AnalyticOnNhd ℂ H right(a) ∧ EqOn H L right(max a 1) := by
+  classical
+  intro L R J hcmp
+  refine ⟨fun z ↦ R z + J z + L (z + 2), introTrace_regularized_chart_analytic χ a ha, ?_⟩
   intro z hz
   change R z + J z + L (z + 2) = L z
   rw [hcmp z hz]
