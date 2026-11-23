@@ -1859,7 +1859,23 @@ There is a unique continuous linear S-local Pettis average with the norm-one
 quotient measure and the conjugate character weight. -/
 theorem existsUnique_sLocalThetaIsotypicAverage (χ : PontryaginDual (J₁(S))) :
     ∃! P : Θₛ(S) →L[ℂ] Θₛ(S),
-      IsPettisIsotypicAverageOn (μₛ₁(S)) Set.univ (ρₛ₁(S)) χ P := by sorry
+      IsPettisIsotypicAverageOn (μₛ₁(S)) Set.univ (ρₛ₁(S)) χ P := by
+  let E := SLocalAdelicThetaSpace F S
+  let G := J₁(S)
+  have := isClosed_sProjectedDiagonal (F := F) (S := S)
+  let : T2Space (Jₛ(S)) := inferInstanceAs (T2Space (_ ⧸ _))
+  let : T2Space G := inferInstanceAs (T2Space ((sIdeleQuotientNorm F S).ker : Set (Jₛ(S))))
+  let : BorelSpace G := ⟨rfl⟩
+  let : CompactSpace G := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let : T2Space E := sLocalAdelicThetaSpace_t2_of_isClosed (F := F) (S := S)
+    (sLocalAdelicTheta_ker_isClosed (F := F) (S := S))
+  let : PolynormableSpace ℂ E := sLocalAdelicThetaSpace_polynormable (F := F) (S := S)
+  let : (μₛ₁(S)).IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  with_reducible_and_instances
+    exact existsUnique_globalThetaIsotypicAverage_of_compact (H := Jₛ(S)) (E := E) G
+      (sLocalAdelicThetaSpace_complete (F := F) (S := S)) (μₛ₁(S)) (ρₛ(S))
+      (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose_spec.1 χ
 
 end IsotypicAverages
 
