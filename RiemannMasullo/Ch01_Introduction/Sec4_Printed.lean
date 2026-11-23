@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch01_Introduction.Sec4
+import RiemannMasullo.Ch13_ZerosHecke.Targets
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 import all RiemannMasullo.AppB_AnalyticNT.Sec4b
 
@@ -223,11 +224,87 @@ def Printed.introTraceApprox_primeSum_tendsto : Prop :=
         (fun n z ↦ ∑' p : V[F] × ℕ, printedPrime[F](χ, approx(h, ρ, n, z), π, p))
         (fun z ↦ logDeriv finiteL[F](χ) (z + 1 / 2)) atTop right(1)
 
+open scoped ComplexOrder in
+private theorem introTraceApprox_primeSum_logDeriv_neg (x : ℝ) (hx : 1 < x) :
+    (logDeriv (finiteHeckeL_exists_continuation (1 : U[ℚ])).choose x).re < 0 := by
+  let L := (finiteHeckeL_exists_continuation (1 : U[ℚ])).choose
+  have hnear : L =ᶠ[𝓝 (x : ℂ)] riemannZeta := by
+    filter_upwards [(isOpen_lt continuous_const Complex.continuous_re).mem_nhds hx] with z hz
+    calc
+      L z = finiteHeckeL (1 : U[ℚ]) ⟨z, hz⟩ :=
+        (finiteHeckeL_exists_continuation (1 : U[ℚ])).choose_spec.2 ⟨z, hz⟩
+      _ = dedekindZeta ℚ z := finiteHeckeL_one_eq_dedekindZeta ⟨z, hz⟩
+      _ = riemannZeta z := dedekindZeta_rat_eq_riemannZeta hz
+  let a (n : ℕ) : ℂ := ArithmeticFunction.vonMangoldt n
+  have hpos : 0 < LSeries a (x : ℂ) := by
+    have hterm (n : ℕ) : 0 ≤ LSeries.term a x n :=
+      LSeries.term_nonneg (Complex.zero_le_real.mpr ArithmeticFunction.vonMangoldt_nonneg) x
+    apply (ArithmeticFunction.LSeriesSummable_vonMangoldt hx).tsum_pos hterm 2
+    apply LSeries.term_pos (by decide)
+    apply Complex.zero_lt_real.mpr
+    rw [ArithmeticFunction.vonMangoldt_apply_prime Nat.prime_two]
+    exact Real.log_pos one_lt_two
+  change (logDeriv L x).re < 0
+  rw [(logDeriv_congr_nhds hnear).eq_of_nhds]
+  rw [show LSeries a (x : ℂ) = -logDeriv riemannZeta x by
+    simpa only [logDeriv_apply, neg_div] using
+      ArithmeticFunction.LSeries_vonMangoldt_eq_deriv_riemannZeta_div hx] at hpos
+  exact (Complex.lt_def.mp (neg_pos.mp hpos)).1
+
+open scoped ComplexOrder in
+private theorem introTraceApprox_primeSum_approx_nonneg (h ρ : ℕ → ℝ → ℝ)
+    (hA : IsIntroTraceApproximation h ρ) (n : ℕ) (t : ℝ) :
+    0 ≤ approx(h, ρ, n, (2 : ℂ)) t := by
+  obtain ⟨ε, _, hρ⟩ := hA.2.2.2
+  apply mul_nonneg (Complex.zero_le_real.mpr ((hA.1 n).2.2.2 t).1)
+  apply integral_nonneg
+  intro u
+  apply mul_nonneg (Complex.zero_le_real.mpr ((hρ n).2.2.1 u))
+  unfold introTracePower
+  split_ifs with ht
+  · rw [Complex.cpow_neg, Complex.cpow_ofNat]
+    simpa only [Complex.ofReal_inv, Complex.ofReal_pow] using
+      (Complex.zero_le_real.mpr (inv_nonneg.mpr (sq_nonneg (t - u))))
+  · simpa only [Complex.ofReal_div, Complex.ofReal_one, Complex.ofReal_ofNat] using
+      (Complex.zero_le_real.mpr (show 0 ≤ (1 / 2 : ℝ) by norm_num))
+  · exact le_rfl
+
+open scoped ComplexOrder in
 /-- Paper: §1.4.4, p. 29. At parameter two the trivial rational character's
 prime-power limit is strictly positive, with the prime two contributing a
 positive term. The printed target `ζ'(5/2)/ζ(5/2)` is strictly negative. -/
 theorem Printed.introTraceApprox_primeSum_tendsto_false :
-    ¬ Printed.introTraceApprox_primeSum_tendsto := by sorry
+    ¬ Printed.introTraceApprox_primeSum_tendsto := by
+  classical
+  intro hall
+  obtain ⟨h, ρ, hA⟩ := exists_introTraceApproximation
+  have hunif (v : V[ℚ]) : ∃ π : (v.adicCompletion ℚ)ˣ, isUniformizer[ℚ](v, π) := by
+    obtain ⟨p, hp⟩ :=
+      (Valued.v (R := v.adicCompletion ℚ)).exists_isUniformizer_of_isCyclic_of_nontrivial
+    exact ⟨Units.mk0 _ hp.ne_zero, hp⟩
+  choose π hπ using hunif
+  have hlim := (hall ℚ 1 π (fun _ ↦ rfl) hπ h ρ hA).tendsto_at
+    (show (2 : ℂ) ∈ right(1) by norm_num)
+  have hsum : 0 ≤ logDeriv (finiteHeckeL_exists_continuation (1 : U[ℚ])).choose (2 + 1 / 2) := by
+    apply ge_of_tendsto hlim
+    filter_upwards with n
+    apply tsum_nonneg
+    rintro ⟨v, k⟩
+    simp only [PontryaginDual.one_apply, Circle.coe_one, one_pow, star_one, one_mul]
+    have hq : 1 < q(v) := by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+    rw [div_eq_mul_inv]
+    apply mul_nonneg
+    · exact mul_nonneg (Complex.zero_le_real.mpr (Real.log_nonneg hq.le))
+        (add_nonneg (introTraceApprox_primeSum_approx_nonneg h ρ hA n _)
+          (introTraceApprox_primeSum_approx_nonneg h ρ hA n _))
+    · have hnorm := (Complex.inv_natCast_cpow_ofReal_pos
+          (zero_lt_one.trans (NumberField.HeightOneSpectrum.one_lt_absNorm v)).ne'
+          (((k + 1 : ℕ) : ℝ) / 2)).le
+      push_cast at hnorm ⊢
+      exact hnorm
+  have hneg := introTraceApprox_primeSum_logDeriv_neg (2 + 1 / 2) (by norm_num)
+  push_cast at hneg
+  exact hneg.not_ge (Complex.le_def.mp hsum).1
 
 open Classical in
 /-- Paper: §1.4.5, pp. 29–30. Subtracting the two polar terms when the
@@ -245,7 +322,45 @@ half-width one quarter, the shifted log derivative has residue minus one
 at one half because zeta has a simple pole at one. Subtracting the
 printed correction gives residue minus two there. -/
 theorem Printed.introTrace_regularized_logDeriv_analytic_false :
-    ¬ Printed.introTrace_regularized_logDeriv_analytic := by sorry
+    ¬ Printed.introTrace_regularized_logDeriv_analytic := by
+  intro hall
+  obtain ⟨H, han, heq⟩ := hall ℚ 1 (1 / 4) (fun _ ↦ rfl) (by norm_num)
+  have hhalf := (han _ (show (1 / 2 : ℂ) ∈ right(1 / 4) by norm_num)).continuousAt
+  have hcont : ContinuousAt (fun t : ℝ ↦ (t - 1) * (H ((t : ℂ) - 1 / 2)).re) 1 := by
+    apply (continuousAt_id.sub continuousAt_const).mul
+    apply Complex.continuous_re.continuousAt.comp
+    apply ContinuousAt.comp (g := H) _ (Complex.continuous_ofReal.continuousAt.sub_const _)
+    convert hhalf using 1
+    norm_num
+  have hlim : Tendsto (fun t : ℝ ↦ (t - 1) * (H ((t : ℂ) - 1 / 2)).re)
+      (𝓝[>] 1) (𝓝 0) := by
+    simpa using hcont.tendsto.mono_left nhdsWithin_le_nhds
+  -- The logarithmic derivative is negative to the right of one. The printed
+  -- correction subtracts a further 1/(t-1), even arbitrarily close to one.
+  have hbound : (0 : ℝ) ≤ -1 := by
+    apply le_of_tendsto hlim
+    filter_upwards [self_mem_nhdsWithin] with t (ht : 1 < t)
+    have hz : (t : ℂ) - 1 / 2 ∈ right(1 / 4) \ {(1 / 2 : ℂ)} := by
+      constructor
+      · change 1 / 4 < ((t : ℂ) - 1 / 2).re
+        norm_num
+        linarith
+      · intro h
+        have := congrArg Complex.re (mem_singleton_iff.mp h)
+        norm_num at this
+        linarith
+    have he := heq hz
+    have htriv : ∀ u : (ideleClassNorm ℚ).ker, (1 : U[ℚ]) u.val = 1 := fun _ ↦ rfl
+    simp only [ite_eq_left htriv, sub_add_cancel, show (t : ℂ) - 1 / 2 - 1 / 2 = t - 1 by ring] at he
+    have hreal : (H ((t : ℂ) - 1 / 2)).re =
+        (logDeriv (finiteHeckeL_exists_continuation (1 : U[ℚ])).choose t).re - (1 / t + 1 / (t - 1)) := by
+      simpa only [← Complex.ofReal_one, ← Complex.ofReal_sub, ← Complex.ofReal_div,
+        ← Complex.ofReal_add, Complex.sub_re, Complex.ofReal_re] using congrArg Complex.re he
+    rw [hreal, mul_sub, mul_add, mul_one_div_cancel (sub_ne_zero.mpr ht.ne')]
+    have hneg := introTraceApprox_primeSum_logDeriv_neg t ht
+    nlinarith [mul_nonpos_of_nonneg_of_nonpos (sub_nonneg.mpr ht.le) hneg.le,
+      mul_nonneg (sub_nonneg.mpr ht.le) (show 0 ≤ 1 / t by positivity)]
+  linarith
 
 -- Section 1.1.4 (p. 12) chooses χ = 1 on the pure-norm component. In that
 -- coordinate the possible pole of the shifted logarithmic derivative is at 1/2.
