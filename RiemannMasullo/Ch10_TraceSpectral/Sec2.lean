@@ -3717,25 +3717,387 @@ theorem spectralLineJet_commonKernel (χ : PontryaginDual C₁ → PontryaginDua
   exact ⟨fun hy ↦ spectralLineJet_commonKernel_forward_proved χ hs y hy,
     spectralLineJet_commonKernel_reverse_proved χ _hχ hs y⟩
 
+section LineJetInterpolation
+
+open scoped SchwartzMap ContDiff Classical
+
+local notation "pair(" f ", " u ")" => spectralSobolevPairing (F := F) f u
+
+/-- A Schwartz profile on one Mellin line gives exactly the corresponding
+Sobolev jet moments. The inverse character in the chart accounts for the
+conjugation in the Fourier transform. -/
+private theorem spectralLineJet_realize_profile
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    {a s : ℝ} (hs : 1 < s) (ξ : PontryaginDual C₁) (p : 𝓢(ℝ, ℂ)) :
+    ∃ f : W(0, 0, s), ∀ j : SpectralLineJetIndex χ a s,
+      Complex.I ^ j.val.2.2 * pair(f, (lineU(χ, hs)) j) =
+        if j.val.1 = ξ then iteratedDeriv j.val.2.2 p j.val.2.1 else 0 := by
+  classical
+  obtain ⟨P, γ, hγ, hP, hzero, _, _⟩ :=
+    exists_schwartzBruhat_mellinFrequencyChart m𝔽 hm𝔽 hms𝔽 μ𝔽 (χ ξ)
+  obtain ⟨e, he⟩ := exists_modulatedFrequencyLine m𝔽 hm𝔽 hms𝔽
+  let ν := (μ𝔽).withDensity (fun x ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm x)))
+  have hν : ν = sobolevMeasure μ𝔽 (modulatedSobolevWeight m𝔽) s :=
+    intervalSobolev_zero_eq_sobolevMeasure m𝔽 μ𝔽 s
+  have hmem : MemLp (P p : C𝔽 → ℂ) 2 ν :=
+    hν.symm ▸ SchwartzBruhat.memLp_modulatedSobolev μ𝔽 m𝔽 (P p) s (zero_lt_one.trans hs).le
+  let f : W(0, 0, s) := hmem.toLp (P p)
+  have hle : μ𝔽 ≤ ν := by
+    calc
+      μ𝔽 = (μ𝔽).withDensity 1 := withDensity_one.symm
+      _ ≤ ν := withDensity_mono (.of_forall fun x ↦ by
+        change 1 ≤ ENNReal.ofReal (intervalSobolevDensity 0 0 s _)
+        rw [ENNReal.one_le_ofReal]
+        simpa [intervalSobolevDensity] using Real.one_le_rpow
+          (le_add_of_nonneg_right (sq_nonneg _)) (by linarith : 0 ≤ s / 2))
+  have hrep : (f : C𝔽 → ℂ) =ᵐ[μ𝔽] (P p : C𝔽 → ℂ) := hle.absolutelyContinuous.ae_eq hmem.coeFn_toLp
+  have hFourier (ψ : PontryaginDual C𝔽) : lcaFourier μ𝔽 f ψ = lcaFourier μ𝔽 (P p) ψ :=
+    integral_congr_ae (hrep.mul Filter.EventuallyEq.rfl)
+  refine ⟨f, fun j ↦ ?_⟩
+  let Ψ (t : ℝ) := (χ j.val.1 * (e (Multiplicative.ofAdd t)).val)⁻¹
+  have hΨ (t : ℝ) (g : C𝔽) : star (Ψ t g : ℂ) = (χ j.val.1 g : ℂ) *
+      Complex.exp (((t * logNorm g : ℝ) : ℂ) * Complex.I) := by
+    change star (((χ j.val.1 g * (e (Multiplicative.ofAdd t)).val g)⁻¹ : Circle) : ℂ) = _
+    rw [Circle.coe_inv_eq_conj, ← Complex.star_def, star_star, Circle.coe_mul, he, Circle.coe_exp]
+    rfl
+  rw [← spectralLineJet_fourier_profile_derivative χ hs j f Ψ hΨ]
+  by_cases hj : j.val.1 = ξ
+  · have hval (t : ℝ) : lcaFourier μ𝔽 f (Ψ t) = p t := by
+      have hline : Ψ t = γ t := PontryaginDual.ext fun g ↦ by
+        change (χ j.val.1 g * (e (Multiplicative.ofAdd t)).val g)⁻¹ = γ t g
+        rw [hγ, hj, he, neg_mul, Circle.exp_neg, mul_inv]
+      rw [hFourier, hline, hP]
+    rw [ite_eq_left hj, show (fun t ↦ lcaFourier μ𝔽 f (Ψ t)) = (p : ℝ → ℂ) from funext hval]
+  · have hval (t : ℝ) : lcaFourier μ𝔽 f (Ψ t) = 0 := by
+      rw [hFourier]
+      apply hzero
+      rintro ⟨u, hu⟩
+      apply hj
+      apply PontryaginDual.ext
+      intro k
+      have h := DFunLike.congr_fun hu k.val
+      have hk := (mem_lcaAnnihilator_iff _ _).mp (e (Multiplicative.ofAdd t)).property k
+      have hjk : χ j.val.1 k = j.val.1 k := DFunLike.congr_fun (hχ j.val.1) k
+      have hξk : χ ξ k = ξ k := DFunLike.congr_fun (hχ ξ) k
+      change γ u k.val = (χ j.val.1 k.val * (e (Multiplicative.ofAdd t)).val k.val)⁻¹ at h
+      rw [hγ] at h
+      change (χ ξ k.val)⁻¹ * Circle.exp (-u * logNorm k.val) = _ at h
+      rw [show logNorm k.val = 0 by change Real.log ((ideleClassNorm F k.val).val : ℝ) = 0; rw [k.property]; simp,
+        mul_zero, Circle.exp_zero, mul_one, hξk, hk, mul_one, hjk] at h
+      exact (inv_injective h).symm
+    rw [ite_eq_right hj, show (fun t ↦ lcaFourier μ𝔽 f (Ψ t)) = (0 : ℝ → ℂ) from funext hval]
+    simp
+
+/-- A smooth compactly supported frequency profile can prescribe a single
+Taylor coefficient on a locally finite real set. All remaining jets vanish. -/
+private theorem exists_isolated_line_profile {Z : Set ℝ}
+    (hZ : ∀ K : Set ℝ, IsCompact K → {x ∈ K | x ∈ Z}.Finite) (c : ℝ) (m : ℕ) :
+    ∃ p : 𝓢(ℝ, ℂ), HasCompactSupport (p : ℝ → ℂ) ∧
+      (∀ n, iteratedDeriv n p c = if n = m then Complex.I ^ m else 0) ∧
+      ∀ x ∈ Z, x ≠ c → (p : ℝ → ℂ) =ᶠ[𝓝 x] 0 := by
+  let bad := {x ∈ Metric.closedBall c 1 | x ∈ Z} \ {c}
+  let U := Metric.ball c 1 ∩ badᶜ
+  have hU : IsOpen U := Metric.isOpen_ball.inter
+    ((hZ _ (isCompact_closedBall c 1)).sdiff (t := {c})).isClosed.isOpen_compl
+  have hc : c ∈ U := ⟨Metric.mem_ball_self zero_lt_one, fun h ↦ h.2 rfl⟩
+  obtain ⟨r, hr, hball⟩ := Metric.mem_nhds_iff.mp (hU.mem_nhds hc)
+  let B : ContDiffBump c := ⟨r / 4, r / 2, by positivity, by linarith⟩
+  let A := Complex.I ^ m / (m.factorial : ℂ)
+  let P (x : ℝ) := (x - c) ^ m • A
+  let f (x : ℝ) := B x • P x
+  have hsupport : HasCompactSupport f := B.hasCompactSupport.smul_right
+  have hf : ContDiff ℝ (∞) f := B.contDiff.smul (((contDiff_id.sub contDiff_const).pow m).smul contDiff_const)
+  refine ⟨hsupport.toSchwartzMap hf, hsupport, ?_, ?_⟩
+  · intro n
+    have heq : f =ᶠ[𝓝 c] P := B.eventuallyEq_one.mono fun x hx ↦ by
+      change B x • P x = P x
+      rw [show B x = 1 from hx, one_smul]
+    change iteratedDeriv n f c = _
+    rw [heq.iteratedDeriv_eq n]
+    have hder : iteratedDeriv n (fun x : ℝ ↦ (x-c)^m) c = if n = m then (m.factorial : ℝ) else 0 := by
+      rw [iteratedDeriv_comp_sub_const n (fun x : ℝ ↦ x^m) c]
+      simpa using (iteratedDeriv_fun_pow_zero (𝕜 := ℝ) (m := m) (n := n))
+    rw [show iteratedDeriv n P c = _ from iteratedDeriv_smul_const (f := fun x : ℝ ↦ (x-c)^m)
+      (by fun_prop) A, hder]
+    split_ifs with h
+    · rw [Complex.real_smul]
+      push_cast
+      dsimp [A]
+      field_simp [Nat.factorial_ne_zero]
+    · exact zero_smul _ _
+  · intro x hx hxc
+    change f =ᶠ[𝓝 x] 0
+    apply notMem_tsupport_iff_eventuallyEq.mp
+    intro h
+    have hB : x ∈ tsupport B := tsupport_smul_subset_left _ _ h
+    rw [B.tsupport_eq] at hB
+    have hu := hball (Metric.closedBall_subset_ball (by dsimp [B]; linarith : B.rOut < r) hB)
+    exact hu.2 ⟨⟨Metric.ball_subset_closedBall hu.1, hx⟩, hxc⟩
+
+/-- Paper: Theorem 10.2.1.1, pp. 440–443. Each surviving zero jet on the
+a-line has a Sobolev vector pairing to one with it and to zero with every other jet.
+The construction prescribes a compact smooth frequency profile on one character. -/
+private theorem exists_lineJet_single_interpolant
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    {a s : ℝ} (hs : 1 < s) (i : SpectralLineJetIndex χ a s) :
+    ∃ f : W(0, 0, s), ∀ j : SpectralLineJetIndex χ a s,
+      pair(f, (lineU(χ, hs)) j) = if j = i then 1 else 0 := by
+  classical
+  let Z := {t : ℝ | 0 < (meromorphicOrderAt (continuedCompletedHeckeL (χ i.val.1))
+    (shift(a,t))).untop₀.toNat}
+  have hZ (K : Set ℝ) (hK : IsCompact K) : {t ∈ K | t ∈ Z}.Finite :=
+    continuedCompletedHeckeL_finite_vertical_zeros_on_compact (χ i.val.1) a K hK
+  obtain ⟨p, _, hp, hother⟩ := exists_isolated_line_profile hZ i.val.2.1 i.val.2.2
+  obtain ⟨f, hf⟩ := spectralLineJet_realize_profile χ hχ hs i.val.1 p
+  refine ⟨f, fun j ↦ ?_⟩
+  apply mul_left_cancel₀ (pow_ne_zero j.val.2.2 Complex.I_ne_zero)
+  rw [hf]
+  by_cases hij : j = i
+  · subst j
+    simp [hp]
+  · rw [ite_eq_right hij, mul_zero]
+    by_cases hξ : j.val.1 = i.val.1
+    · rw [ite_eq_left hξ]
+      by_cases ht : j.val.2.1 = i.val.2.1
+      · rw [ht, hp]
+        have hdeg : j.val.2.2 ≠ i.val.2.2 := fun h ↦ hij (Subtype.ext (Prod.ext hξ (Prod.ext ht h)))
+        simp [hdeg]
+      · have hjZ : j.val.2.1 ∈ Z := by
+          have hm : 0 < (meromorphicOrderAt (continuedCompletedHeckeL (χ j.val.1))
+              (shift(a,j.val.2.1))).untop₀.toNat :=
+            Nat.zero_lt_of_lt (lt_of_lt_of_le j.property (min_le_left _ _))
+          change 0 < (meromorphicOrderAt (continuedCompletedHeckeL (χ i.val.1)) (shift(a,j.val.2.1))).untop₀.toNat
+          simpa only [hξ] using hm
+        simpa using (hother _ hjZ ht).iteratedDeriv_eq j.val.2.2
+    · simp [hξ]
+
+/-- Compact Fourier support meets only finitely many surviving line jets. The
+restriction to the compact norm-one subgroup is discrete, each real chart is
+closed, and the positive Hecke divisor has finite support on every compact set. -/
+private theorem lineJet_compact_frequencies
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    (e : Multiplicative ℝ ≃ₜ* lcaAnnihilator (ideleClassNorm F).ker)
+    (a s : ℝ) (K : Set (PontryaginDual C𝔽)) (hK : IsCompact K) :
+    {j : SpectralLineJetIndex χ a s |
+      ((χ j.val.1) * (e (Multiplicative.ofAdd j.val.2.1)).val)⁻¹ ∈ K}.Finite := by
+  classical
+  let H := (ideleClassNorm F).ker
+  have hHH : IsCompact (H : Set C𝔽) := IsModulation.isCompact_ker (m := m𝔽) hm𝔽
+  let : CompactSpace C₁ := isCompact_iff_compactSpace.mp hHH
+  let r := PontryaginDual.map (⟨H.subtype, continuous_subtype_val⟩ : H →ₜ* C𝔽)
+  let A := (fun ψ ↦ (r ψ)⁻¹) '' K
+  have hA : A.Finite := (hK.image r.continuous.inv).finite_of_discrete
+  let Ψ (ξ : PontryaginDual C₁) (t : ℝ) := (χ ξ * (e (Multiplicative.ofAdd t)).val)⁻¹
+  have hΨ (ξ : PontryaginDual C₁) : Topology.IsClosedEmbedding (Ψ ξ) :=
+    (Homeomorph.inv (PontryaginDual C𝔽)).isClosedEmbedding.comp
+      ((Homeomorph.mulLeft (χ ξ)).isClosedEmbedding.comp
+        (((lcaAnnihilator H).isClosed_of_isOpen (isOpen_lcaAnnihilator _ hHH)).isClosedEmbedding_subtypeVal.comp
+          e.toHomeomorph.isClosedEmbedding))
+  have hr (ξ : PontryaginDual C₁) (t : ℝ) : (r (Ψ ξ t))⁻¹ = ξ := by
+    apply PontryaginDual.ext
+    intro k
+    have hfk := (mem_lcaAnnihilator_iff _ _).mp (e (Multiplicative.ofAdd t)).property k
+    change ((χ ξ k * (e (Multiplicative.ofAdd t)).val k)⁻¹)⁻¹ = ξ k
+    rw [hfk, mul_one, inv_inv]
+    exact DFunLike.congr_fun (hχ ξ) k
+  let N (ξ : PontryaginDual C₁) (t : ℝ) :=
+    (meromorphicOrderAt (continuedCompletedHeckeL (χ ξ)) (shift(a,t))).untop₀.toNat
+  let T (ξ : PontryaginDual C₁) := {t ∈ (Ψ ξ) ⁻¹' K | 0 < N ξ t}
+  have hT (ξ) : (T ξ).Finite :=
+    continuedCompletedHeckeL_finite_vertical_zeros_on_compact (χ ξ) a _ ((hΨ ξ).isCompact_preimage hK)
+  let J := SpectralLineJetIndex χ a s
+  let S : Set J := {j | Ψ j.val.1 j.val.2.1 ∈ K}
+  let π (j : J) := (j.val.1, j.val.2.1)
+  change S.Finite
+  apply Set.Finite.of_finite_fibers π
+  · apply (hA.biUnion (fun ξ _ ↦ (hT ξ).image (Prod.mk ξ))).subset
+    rintro _ ⟨j, hj, rfl⟩
+    have hξ : j.val.1 ∈ A := ⟨Ψ j.val.1 j.val.2.1, hj, hr _ _⟩
+    exact Set.mem_iUnion₂.mpr ⟨_, hξ, j.val.2.1, ⟨hj,
+      Nat.zero_lt_of_lt (lt_of_lt_of_le j.property (min_le_left _ _))⟩, rfl⟩
+  · rintro ⟨ξ,t⟩ _
+    apply (Set.finite_lt_nat (spectralBoundaryMultiplicity s (N ξ t))).of_injOn (f := fun j : J ↦ j.val.2.2)
+    · intro j hj
+      have eq : π j = (ξ,t) := hj.2
+      exact (congrArg (fun v : PontryaginDual C₁ × ℝ ↦
+        j.val.2.2 < spectralBoundaryMultiplicity s (N v.1 v.2)) eq).mp j.property
+    · rintro i hi j hj heq
+      have eij : π i = π j := (show π i = (ξ,t) from hi.2).trans (show π j = (ξ,t) from hj.2).symm
+      have hξ : i.val.1 = j.val.1 := congrArg (fun x : PontryaginDual C₁ × ℝ ↦ x.1) eij
+      have ht : i.val.2.1 = j.val.2.1 := congrArg (fun x : PontryaginDual C₁ × ℝ ↦ x.2) eij
+      exact Subtype.ext (Prod.ext hξ (Prod.ext ht heq))
+
+private theorem lineJet_test_integrable
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) {a s : ℝ} (hs : 1 < s)
+    (i : SpectralLineJetIndex χ a s) (f : W(0, 0, s)) : Integrable (f : C𝔽 → ℂ) μ𝔽 := by
+  let j : SpectralLineJetIndex χ a s := ⟨(i.val.1, i.val.2.1, 0), Nat.zero_lt_of_lt i.property⟩
+  have h := ((spectralLineJet_functional χ hs j).choose_spec.1 f).1
+  refine h.norm.mono' (Lp.stronglyMeasurable f).aestronglyMeasurable (.of_forall fun x ↦ ?_)
+  change ‖f x‖ ≤ ‖f x * spectralZeroJet (χ i.val.1) 0 i.val.2.1 0 x‖
+  rw [lineJet_as_phase]
+  simp only [norm_mul, pow_zero, mul_one, Circle.norm_coe, Complex.norm_exp_ofReal_mul_I, le_refl]
+
+/-- A representative with compact Fourier support can have only finitely many
+nonzero line jet moments. -/
+private theorem lineJet_finite_moments_of_compact_fourier
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    {a s : ℝ} (hs : 1 < s) (f : W(0, 0, s)) (K : Set (PontryaginDual C𝔽)) (hK : IsCompact K)
+    (hz : ∀ ψ ∉ K, lcaFourier μ𝔽 f ψ = 0) :
+    (support (fun j : SpectralLineJetIndex χ a s ↦ pair(f, (lineU(χ, hs)) j))).Finite := by
+  obtain ⟨e, he⟩ := exists_modulatedFrequencyLine m𝔽 hm𝔽 hms𝔽
+  apply (lineJet_compact_frequencies χ hχ e a s K hK).subset
+  intro j hj
+  by_contra h
+  let Ψ (t : ℝ) := (χ j.val.1 * (e (Multiplicative.ofAdd t)).val)⁻¹
+  have hΨ (t : ℝ) (g : C𝔽) : star (Ψ t g : ℂ) = (χ j.val.1 g : ℂ) *
+      Complex.exp (((t * logNorm g : ℝ) : ℂ) * Complex.I) := by
+    change star (((χ j.val.1 g * (e (Multiplicative.ofAdd t)).val g)⁻¹ : Circle) : ℂ) = _
+    rw [Circle.coe_inv_eq_conj, ← Complex.star_def, star_star, Circle.coe_mul, he, Circle.coe_exp]
+    rfl
+  have hc : Continuous Ψ :=
+    (continuous_const.mul (continuous_subtype_val.comp e.continuous)).inv
+  have hmem : ∀ᶠ t in 𝓝 j.val.2.1, Ψ t ∈ Kᶜ := (hK.isClosed.isOpen_compl.preimage hc).mem_nhds h
+  have hzero : (fun t ↦ lcaFourier μ𝔽 f (Ψ t)) =ᶠ[𝓝 j.val.2.1] 0 :=
+    hmem.mono fun t ht ↦ hz _ ht
+  have heval := (spectralLineJet_fourier_profile_derivative χ hs j f Ψ hΨ).symm.trans
+    (hzero.iteratedDeriv_eq j.val.2.2)
+  have hprod : Complex.I ^ j.val.2.2 * pair(f, (lineU(χ, hs)) j) = 0 := by simpa using heval
+  exact hj ((mul_eq_zero.mp hprod).resolve_left (pow_ne_zero _ Complex.I_ne_zero))
+
+/-- A continuous representative of a Fourier transform vanishes off the
+topological support of any almost-everywhere equal representative. -/
+private theorem lineJet_zero_off_rep {X : Type*} [TopologicalSpace X] [MeasurableSpace X]
+    [OpensMeasurableSpace X] (ν : Measure X) [ν.IsOpenPosMeasure] {f g : X → ℂ}
+    (hf : Continuous f) (heq : f =ᵐ[ν] g) :
+    ∀ x ∉ tsupport g, f x = 0 := by
+  let U := (tsupport g)ᶜ
+  have hU : IsOpen U := (isClosed_tsupport g).isOpen_compl
+  have hae : f =ᵐ[ν.restrict U] 0 := by
+    filter_upwards [ae_restrict_of_ae heq, ae_restrict_mem hU.measurableSet] with x hx hxin
+    exact hx.trans (image_eq_zero_of_notMem_tsupport hxin)
+  exact fun x hx ↦ Measure.eqOn_open_of_ae_eq hae hU hf.continuousOn continuousOn_const hx
+
+private theorem lineJet_dense_compact_moments
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    (a : ℝ) {s : ℝ} (hs : 1 < s) :
+    Dense {f : W(0, 0, s) | (support (fun j : SpectralLineJetIndex χ a s ↦ pair(f, (lineU(χ, hs)) j))).Finite} := by
+  classical
+  let J := SpectralLineJetIndex χ a s
+  by_cases hJ : Nonempty J
+  swap
+  · have : IsEmpty J := not_nonempty_iff.mp hJ
+    exact dense_univ.mono fun f _ ↦ Set.toFinite _
+  let : MeasurableSpace (PontryaginDual C𝔽) := borel _
+  let : BorelSpace (PontryaginDual C𝔽) := ⟨rfl⟩
+  obtain ⟨ν,hν,-⟩ := lcaPlancherelMeasure_existsUnique μ𝔽
+  let : ν.IsHaarMeasure := hν.1
+  let U := (lcaFourier_unitary μ𝔽 ν hν).exists.choose
+  let D (w : Measure C𝔽) := {f : Lp ℂ 2 w | ∃ (u : Lp ℂ 2 μ𝔽) (v : PontryaginDual C𝔽 → ℂ),
+    (u : C𝔽 → ℂ) =ᵐ[μ𝔽] (f : C𝔽 → ℂ) ∧ (U u : PontryaginDual C𝔽 → ℂ) =ᵐ[ν] v ∧ HasCompactSupport v}
+  let w := (μ𝔽).withDensity (fun x ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm x)))
+  have hw : w = sobolevMeasure μ𝔽 (modulatedSobolevWeight m𝔽) s :=
+    intervalSobolev_zero_eq_sobolevMeasure m𝔽 μ𝔽 s
+  have hd : Dense (D w) := (congrArg (fun v ↦ Dense (D v)) hw).mpr
+    (dense_modulatedSobolev_fourierCompactSupport μ𝔽 m𝔽 ν hν hm𝔽 hms𝔽 s (by linarith))
+  apply hd.mono
+  rintro f ⟨u,v,hu,huv,hv⟩
+  have hi := lineJet_test_integrable χ hs hJ.some f
+  have hpl := (lcaFourier_unitary μ𝔽 ν hν).exists.choose_spec u (hi.congr hu.symm) (Lp.memLp u)
+  rw [Lp.toLp_coeFn] at hpl
+  have hFu : lcaFourier μ𝔽 f = lcaFourier μ𝔽 u :=
+    funext fun ψ ↦ integral_congr_ae (hu.symm.mul Filter.EventuallyEq.rfl)
+  have hae : lcaFourier μ𝔽 f =ᵐ[ν] v := hFu ▸ hpl.symm.trans huv
+  obtain ⟨f₀,hf₀⟩ := lcaFourier_zeroAtInfty μ𝔽 hi
+  have hc : Continuous (lcaFourier μ𝔽 f) := (funext hf₀) ▸ f₀.continuous
+  exact lineJet_finite_moments_of_compact_fourier χ hχ hs f _ hv (lineJet_zero_off_rep ν hc hae)
+
+/-- Finite moment support gives a finite interpolant modulo the joint kernel.
+When such inputs are dense, the quotient images of single-coordinate
+interpolants have dense span. -/
+private theorem dense_span_biorthogonal_of_finite_support
+    {J E Q : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E]
+    [NormedAddCommGroup Q] [NormedSpace ℂ Q] (q : E →L[ℂ] Q) (hq : Surjective q)
+    (v : J → E) (l : J → E →ₗ[ℂ] ℂ)
+    (hv : ∀ i j, l j (v i) = if i = j then 1 else 0)
+    (hk : ∀ x, (∀ j, l j x = 0) → q x = 0)
+    (hd : Dense {x : E | (Function.support (fun j ↦ l j x)).Finite}) :
+    Dense (Submodule.span ℂ (range (fun i ↦ q (v i))) : Set Q) := by
+  classical
+  apply hq.denseRange.dense_of_mapsTo q.continuous hd
+  intro x hx
+  let S := hx.toFinset
+  let y := ∑ i ∈ S, l i x • v i
+  have hly (j : J) : l j y = l j x := by
+    change l j (∑ i ∈ S, _) = _
+    simp only [map_sum, map_smul, hv, smul_eq_mul, mul_ite, mul_one, mul_zero,
+      Finset.sum_ite_eq']
+    by_cases hj : j ∈ S
+    · simp [hj]
+    · have hz : l j x = 0 := by
+        by_contra hn
+        exact hj (hx.mem_toFinset.mpr hn)
+      simp [hj, hz]
+  have hxy : q x = q y := sub_eq_zero.mp (by
+    rw [← map_sub]
+    exact hk _ fun j ↦ by rw [map_sub, hly, sub_self])
+  rw [hxy]
+  change q (∑ i ∈ S, l i x • v i) ∈ Submodule.span ℂ _
+  rw [map_sum]
+  exact Submodule.sum_mem _ fun i hi ↦ (q.map_smul _ _).symm ▸
+    (Submodule.smul_mem _ _ (Submodule.subset_span (mem_range_self i)))
+
+private theorem lineJet_dense_interpolants_of_reverse
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    {a s : ℝ} (hs : 1 < s)
+    (hk : ∀ f : W(0, 0, s), (∀ j : SpectralLineJetIndex χ a s, pair(f, (lineU(χ, hs)) j) = 0) →
+      f ∈ globalThetaSobolev F a (le_rfl : (0 : ℝ) ≤ 0) (zero_lt_one.trans hs).le) :
+    let J := SpectralLineJetIndex χ a s
+    let Θ := globalThetaSobolev F a (le_rfl : (0 : ℝ) ≤ 0) (zero_lt_one.trans hs).le
+    ∃ v : J → W(0, 0, s), (∀ i, pair(v i, (lineU(χ, hs)) i) = 1) ∧
+      (∀ i j, i ≠ j → pair(v i, (lineU(χ, hs)) j) = 0) ∧
+      Dense (Submodule.span ℂ (range (fun i ↦ Θ.mkQ (v i))) : Set (W(0, 0, s) ⧸ Θ)) := by
+  intro J Θ
+  classical
+  choose v hv using exists_lineJet_single_interpolant χ hχ (a := a) hs
+  refine ⟨v, fun i ↦ by simpa using hv i i, fun i j h ↦ by simpa [Ne.symm h] using hv i j, ?_⟩
+  let hs0 := (zero_lt_one.trans hs).le
+  let T := (modulatedIntervalSobolev_dual m𝔽 hm𝔽 μ𝔽 0 0 s le_rfl hs0).exists.choose
+  let u (j : J) := (spectralLineJet_memLp χ hs j).toLp (spectralZeroJet (χ j.val.1) 0 j.val.2.1 j.val.2.2)
+  let l (j : J) := (T.symm (u j)).toLinearMap
+  have hl (j : J) (f : W(0, 0, s)) : l j f = pair(f, (lineU(χ, hs)) j) := by
+    have h := (spectralSobolevPairing_dual le_rfl hs0 (T.symm (u j)) f).2
+    exact h.trans (congrArg (spectralSobolevPairing f) (T.apply_symm_apply _))
+  apply dense_span_biorthogonal_of_finite_support Θ.mkQL Θ.mkQ_surjective v l
+  · intro i j
+    rw [hl, hv]
+    by_cases he : i = j
+    · subst j
+      simp
+    · simp [he, Ne.symm he]
+  · intro f hf
+    exact (spectralSobolevQuotient_eq_zero a le_rfl hs0 f).mpr (hk f (fun j ↦ (hl j f).symm.trans (hf j)))
+  · apply (lineJet_dense_compact_moments χ hχ a hs).mono
+    intro f hf
+    change (support (fun j : J ↦ l j f)).Finite
+    have hfun : (fun j : J ↦ l j f) = (fun j : J ↦ pair(f, (lineU(χ, hs)) j)) :=
+      funext fun j ↦ hl j f
+    rw [hfun]
+    exact hf
+
+end LineJetInterpolation
+
 /-- Paper: Theorem 10.2.1.1, pp. 440–443. Single-jet interpolants have
 representatives whose images span a dense subspace of the line quotient.
-Gap: The interpolation and density asserted on p. 443 follow from the corresponding
-strip assertion at width zero. -/
+Deviation: Use the strict Sobolev cutoff. Smooth profiles on one real
+frequency line give the individual interpolants. Compact Fourier support
+and the line common-kernel identity give norm density in the quotient. -/
 theorem spectralLineJet_denseInterpolants (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
     (_hχ : IsSpectralBasepointChoice χ) {a s : ℝ} (hs : 1 < s) :
     let J := SpectralLineJetIndex χ a s
     let u : J → W'(0, 0, s) := lineU(χ, hs)
     JetInterpolation(J, a, le_rfl (a := (0 : ℝ)), lineHs(hs), u) := by
-  apply spectralLineJet_zeroWidth_transport χ a hs
-    (fun hl u ↦ JetInterpolation(SpectralLineJetIndex χ a s, a, hl, lineHs(hs), u))
-  intro e
-  obtain ⟨v, hv, hc, hd⟩ :=
-    spectralStripJet_denseInterpolants (a := a) χ _hχ (le_refl (0 : ℝ)) (lineHs(hs))
-  refine ⟨v ∘ e, fun i ↦ hv (e i), fun i j hij ↦ hc (e i) (e j) (e.injective.ne hij), ?_⟩
-  let q := (Θ(a, stripI(le_refl (0 : ℝ)), lineHs(hs))).mkQ
-  change Dense (Submodule.span ℂ (range ((fun j ↦ q (v j)) ∘ e)) :
-    Set (spectralSobolevQuotient F a (stripI(le_refl (0 : ℝ))) (lineHs(hs))))
-  rwa [e.surjective.range_comp]
+  exact lineJet_dense_interpolants_of_reverse χ _hχ hs
+    (fun f ↦ (spectralLineJet_commonKernel (a := a) χ _hχ hs f).mpr)
 
 /-- Paper: Theorem 10.2.1.1 and Terminology 10.2.1.1, p. 440. The a-line
 jets represent quotient functionals and admit a Markushevich biorthogonal family.
