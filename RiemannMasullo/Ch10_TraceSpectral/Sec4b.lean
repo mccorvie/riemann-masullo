@@ -2,7 +2,6 @@ module
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4a
 public import RiemannMasullo.AppC_LCTVS.Sec3b
-import all RiemannMasullo.AppC_LCTVS.Sec3b
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 
 import all RiemannMasullo.Ch09_HardySobolev.Sec3
