@@ -135,7 +135,39 @@ theorem sobolevProjectiveKernelOperator_tmul
 
 /-- Paper: Theorem 10.4.3.1(3), p. 467, and Theorem 10.4.3.5(3), p. 473.
 The canonical map from completed projective kernels to operators is injective. -/
-theorem sobolevProjectiveKernelOperator_injective : Injective ξ := by sorry
+theorem sobolevProjectiveKernelOperator_injective : Injective ξ := by
+  have (V : Type _) [NormedAddCommGroup V] [NormedSpace ℂ V] :
+      PolynormableSpace ℂ (StrongDual ℂ V) :=
+    (norm_withSeminorms ℂ (StrongDual ℂ V)).toPolynormableSpace
+  have (V : Type _) [UniformSpace V] : T2Space (Completion V) := inferInstance
+  have inj {X E : Type _} [NormedAddCommGroup X] [NormedSpace ℂ X]
+      [NormedAddCommGroup E] [InnerProductSpace ℂ E] [CompleteSpace E]
+      (e : StrongDual ℂ E ≃ₗᵢ[ℂ] X) :
+      let f := e.symm.toContinuousLinearEquiv.toContinuousLinearMap
+      let i : ProjectiveTensor X E →L[ℂ] ProjectiveTensor (StrongDual ℂ E) E :=
+        ⟨projectiveTensorMap f.toLinearMap (LinearMap.id : E →ₗ[ℂ] E),
+          projectiveTensorMap_continuous f (ContinuousLinearMap.id ℂ E)⟩
+      Injective ((completedProjectiveTensorToOperators (E := E) (F := E)).comp i.completion) := by
+    intro f i
+    let g := e.toContinuousLinearEquiv.toContinuousLinearMap
+    let j : ProjectiveTensor (StrongDual ℂ E) E →L[ℂ] ProjectiveTensor X E :=
+      ⟨projectiveTensorMap g.toLinearMap (LinearMap.id : E →ₗ[ℂ] E),
+        projectiveTensorMap_continuous g (ContinuousLinearMap.id ℂ E)⟩
+    have hi (z : ProjectiveTensor X E) : j (i z) = z := by
+      induction z using TensorProduct.inductionOn with
+      | tmul v x => exact congrArg (fun w : X ↦ w ⊗ₜ[ℂ] x) (e.apply_symm_apply v)
+      | add x y hx hy =>
+        exact (congrArg j (i.map_add x y)).trans
+          ((j.map_add (i x) (i y)).trans (congrArg₂ (fun a b : ProjectiveTensor X E ↦ a + b) hx hy))
+    have hji (z : Completion (ProjectiveTensor X E)) : j.completion (i.completion z) = z := by
+      refine Completion.induction_on z (isClosed_eq (j.completion.continuous.comp i.completion.continuous)
+        continuous_id) fun w ↦ ?_
+      rw [i.completion_apply_coe, j.completion_apply_coe, hi]
+    obtain ⟨t, ht, -⟩ := (exists_projectiveTensorCompletion_traceClassIsometry (E := E) (F := E)).2
+    intro v w he
+    have hh := t.injective (Subtype.ext ((ht (i.completion v)).trans (he.trans (ht (i.completion w)).symm)))
+    exact (hji v).symm.trans ((congrArg j.completion hh).trans (hji w))
+  exact inj (T)
 
 end ProjectiveKernels
 
