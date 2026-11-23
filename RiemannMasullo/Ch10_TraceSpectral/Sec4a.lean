@@ -4336,6 +4336,614 @@ end CutoffActualLimit
 
 end CutoffConvolutionLimits
 
+namespace CutoffSplit
+
+section
+open Function Filter MeasureTheory Set
+open scoped NNReal ENNReal Topology
+variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+  [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G] [MeasurableSpace G] [BorelSpace G]
+  (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) (ν : Measure G) [hν : ν.IsHaarMeasure]
+  (ν₁ : Measure m.toMonoidHom.ker) [hν₁ : ν₁.IsHaarMeasure] (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
+local notation "K" => m.toMonoidHom.ker
+
+include hm hν hν₁ hτ in
+/-- With the product Haar normalization, dividing the compact-character transform by the
+square root of the compact kernel's mass gives a surjective Hilbert-space isometry. -/
+private theorem normalized_regularIsotypicTransform
+    (hprod : (ν₁.prod positiveRealHaar).map (fun z : K × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2) = ν) :
+    ∃ (r : ℝ) (_ : 0 < r) (U : RegularL2 ν ≃ₗᵢ[ℂ]
+        lp (fun _ : PontryaginDual K ↦ RegularL2 positiveRealHaar) 2),
+      ∀ v, U v = (r : ℂ) • regularIsotypicTransform m hm ν ν₁ τ hτ v := by
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let d := Real.sqrt (ν₁.real univ)
+  have hd : 0 < d := Real.sqrt_pos.mpr measureReal_univ_pos
+  have hd' : (d : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr hd.ne'
+  obtain ⟨T, hT⟩ := regularIsotypicTransform_continuousLinear m hm ν ν₁ τ hτ
+  have hn (v : RegularL2 ν) : ‖T v‖ = d * ‖v‖ := by
+    apply (sq_eq_sq₀ (norm_nonneg _) (mul_nonneg hd.le (norm_nonneg _))).mp
+    rw [hT, mul_pow, Real.sq_sqrt measureReal_nonneg]
+    have hmap : (ν₁.prod positiveRealHaar).map (fun z : K × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2) = (1 : ℝ≥0∞) • ν := by
+      simpa only [one_smul] using hprod
+    simpa only [ENNReal.toReal_one, mul_one] using regularIsotypicTransform_norm_sq m hm ν ν₁ τ hτ 1 hmap v
+  let A : RegularL2 ν →ₗᵢ[ℂ] lp (fun _ : PontryaginDual K ↦ RegularL2 positiveRealHaar) 2 :=
+    { toLinearMap := (d : ℂ)⁻¹ • T.toLinearMap
+      norm_map' v := by
+        change ‖(d : ℂ)⁻¹ • T v‖ = ‖v‖
+        rw [norm_smul, norm_inv, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hd, hn,
+          inv_mul_cancel_left₀ hd.ne'] }
+  have ha : Surjective A := by
+    intro y
+    obtain ⟨v, hv⟩ := regularIsotypicTransform_surjective m hm ν ν₁ τ hτ ((d : ℂ) • y)
+    refine ⟨v, ?_⟩
+    change (d : ℂ)⁻¹ • T v = y
+    rw [hT, hv, smul_smul, inv_mul_cancel₀ hd', one_smul]
+  refine ⟨d⁻¹, inv_pos.mpr hd, LinearIsometryEquiv.ofSurjective A ha, fun v ↦ ?_⟩
+  change (d : ℂ)⁻¹ • T v = _
+  rw [hT, Complex.ofReal_inv]
+
+include hm hν₁ in
+/-- The inverse compact coordinate used by the Section 4.3 transform also preserves
+product Haar measure. -/
+private theorem split_inverted_measure
+    (hprod : (ν₁.prod positiveRealHaar).map (fun z : K × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2) = ν) :
+    MeasurePreserving (fun z : K × ℝ≥0ˣ ↦ (z.1 : G)⁻¹ * τ z.2) (ν₁.prod positiveRealHaar) ν := by
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SFinite positiveRealHaar := by unfold positiveRealHaar; infer_instance
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  have h : MeasurePreserving (fun z : K × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2) (ν₁.prod positiveRealHaar) ν :=
+    ⟨(continuous_subtype_val.comp continuous_fst).measurable.mul (τ.continuous.comp continuous_snd).measurable, hprod⟩
+  exact h.comp ((Measure.measurePreserving_inv ν₁).prod (MeasurePreserving.id positiveRealHaar))
+
+include hm hν hν₁ hτ in
+/-- Multiplying by any bounded radial symbol multiplies each compact-character
+component by the very same radial symbol. -/
+private theorem regularIsotypicTransform_radial
+    (hprod : (ν₁.prod positiveRealHaar).map (fun z : K × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2) = ν)
+    (p : ℝ≥0ˣ → ℂ) (P : RegularL2 ν →L[ℂ] RegularL2 ν)
+    (hP : ∀ v, (P v : G → ℂ) =ᵐ[ν] fun x ↦ p (m x) * v x) (v : RegularL2 ν) (ω : PontryaginDual K) :
+    (regularIsotypicTransform m hm ν ν₁ τ hτ (P v) ω : ℝ≥0ˣ → ℂ) =ᵐ[positiveRealHaar] fun t ↦
+      p t * regularIsotypicTransform m hm ν ν₁ τ hτ v ω t := by
+  let : SFinite positiveRealHaar := by unfold positiveRealHaar; infer_instance
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  have h := split_inverted_measure m hm ν ν₁ τ hprod
+  have hpull := Measure.ae_ae_of_ae_prod (Measure.measurePreserving_swap.quasiMeasurePreserving.ae_eq_comp
+    (h.quasiMeasurePreserving.ae_eq_comp (hP v)))
+  filter_upwards [regularIsotypicTransform_ae_eq m hm ν ν₁ τ hτ ω (P v),
+    regularIsotypicTransform_ae_eq m hm ν ν₁ τ hτ ω v, hpull]
+    with t hPv hv hp
+  rw [hPv, hv, ← integral_const_mul]
+  apply integral_congr_ae
+  filter_upwards [hp] with k hk
+  change P v ((k : G)⁻¹ * τ t) = p (m ((k : G)⁻¹ * τ t)) * v ((k : G)⁻¹ * τ t) at hk
+  rw [hk, map_mul, map_inv, show m k.val = 1 from k.property, inv_one, one_mul, hτ]
+  ring
+
+include hτ in
+/-- The section gives an extension trivial on its image, with exactly the chosen
+character on the norm-one subgroup. -/
+private theorem exists_regularIsotypic_sectionCharacters :
+    ∃ γ : PontryaginDual K → PontryaginDual G,
+      (∀ ω (k : K), γ ω k = ω k) ∧ ∀ ω t, γ ω (τ t) = 1 := by
+  let P : G →ₜ* G := ContinuousMonoidHom.id G / τ.comp m
+  have hP (g : G) : P g ∈ K := by
+    change m (g / τ (m g)) = 1
+    rw [map_div, hτ, div_self']
+  let r : G →ₜ* K := ⟨P.toMonoidHom.codRestrict _ hP, P.continuous.subtype_mk _⟩
+  refine ⟨fun ω ↦ ω.comp r, fun ω k ↦ congrArg ω (Subtype.ext ?_), fun ω t ↦ ?_⟩
+  · change (k : G) / τ (m k.val) = k.val
+    rw [show m k.val = 1 from k.property, map_one, div_one]
+  · change ω (r (τ t)) = 1
+    rw [show r (τ t) = 1 from Subtype.ext (by
+      change τ t / τ (m (τ t)) = 1
+      rw [hτ, div_self']), map_one]
+
+include hm hν hν₁ hτ in
+/-- The radial Fourier transform of the inverse-indexed compact coordinate is the full
+group Fourier transform at the product character, under the product Haar normalization. -/
+private theorem regularIsotypicTransform_fourier
+    (hprod : (ν₁.prod positiveRealHaar).map (fun z : K × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2) = ν)
+    (γ : PontryaginDual G) (ω : PontryaginDual K)
+    (hγω : ∀ k : K, γ k = ω k) (hγτ : ∀ t, γ (τ t) = 1) (v : RegularL2 ν)
+    (hv : Integrable (v : G → ℂ) ν) :
+      let u := regularIsotypicTransform m hm ν ν₁ τ hτ v ω⁻¹
+      Integrable (u : ℝ≥0ˣ → ℂ) positiveRealHaar ∧ ∀ θ : PontryaginDual ℝ≥0ˣ,
+        lcaFourier positiveRealHaar u θ = lcaFourier ν v (γ * (show PontryaginDual G from θ.comp m)) := by
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SFinite positiveRealHaar := by unfold positiveRealHaar; infer_instance
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let η := ν₁.prod positiveRealHaar
+  let j (z : K × ℝ≥0ˣ) := (z.1 : G)⁻¹ * τ z.2
+  have hpres : MeasurePreserving j η ν := split_inverted_measure m hm ν ν₁ τ hprod
+  have hjm : Measurable j := hpres.measurable
+  intro u
+  let g (z : K × ℝ≥0ˣ) := star ((ω⁻¹ z.1 : Circle) : ℂ) * v (j z)
+  have hvj := hpres.integrable_comp_of_integrable hv
+  have hg : Integrable g η := by
+    refine hvj.norm.mono' ?_ (.of_forall fun z ↦ ?_)
+    · exact (continuous_subtype_val.comp ((ω⁻¹).continuous.comp continuous_fst)).star.aestronglyMeasurable.mul
+        ((Lp.stronglyMeasurable v).comp_measurable hjm).aestronglyMeasurable
+    · simp [g, Function.comp_apply]
+  have hu : (u : ℝ≥0ˣ → ℂ) =ᵐ[positiveRealHaar] fun t ↦ ∫ k : K, g (k, t) ∂ν₁ := by
+    simpa only [u, g, j] using regularIsotypicTransform_ae_eq m hm ν ν₁ τ hτ ω⁻¹ v
+  refine ⟨hg.integral_prod_right.congr hu.symm, fun θ ↦ ?_⟩
+  let w (z : K × ℝ≥0ˣ) := g z * star (θ z.2 : ℂ)
+  have hw : Integrable w η := by
+    refine hg.norm.mono' (hg.aestronglyMeasurable.mul
+      ((continuous_subtype_val.comp (θ.continuous.comp continuous_snd)).star.aestronglyMeasurable)) ?_
+    exact .of_forall fun z ↦ by simp [w]
+  let χ : PontryaginDual G := γ * (show PontryaginDual G from θ.comp m)
+  have hχ (k : K) (t : ℝ≥0ˣ) : χ (j (k, t)) = (ω k)⁻¹ * θ t := by
+    change γ (j (k, t)) * θ (m (j (k, t))) = _
+    rw [show j (k, t) = (k : G)⁻¹ * τ t from rfl, map_mul, map_inv, hγω, hγτ, mul_one, map_mul, map_inv,
+      show m k.val = 1 from k.property, inv_one, one_mul, hτ]
+  calc
+    lcaFourier positiveRealHaar u θ = ∫ t, ∫ k, w (k, t) ∂ν₁ ∂positiveRealHaar := by
+      refine integral_congr_ae (hu.mono fun t ht ↦ ?_)
+      change u t * star (θ t : ℂ) = ∫ k, g (k, t) * star (θ t : ℂ) ∂ν₁
+      rw [ht, integral_mul_const]
+    _ = ∫ z, w z ∂η := (integral_prod_symm _ hw).symm
+    _ = ∫ x : G, v x * star (χ x : ℂ) ∂η.map j := by
+      have hi : AEStronglyMeasurable (fun x : G ↦ v x * star (χ x : ℂ)) (η.map j) :=
+        (Lp.stronglyMeasurable v).aestronglyMeasurable.mul
+          (continuous_subtype_val.comp χ.continuous).star.aestronglyMeasurable
+      rw [integral_map hjm.aemeasurable hi]
+      refine integral_congr_ae (.of_forall fun ⟨k, t⟩ ↦ ?_)
+      change star ((ω⁻¹ k : Circle) : ℂ) * v (j (k, t)) * star (θ t : ℂ) =
+        v (j (k, t)) * star (χ (j (k, t)) : ℂ)
+      rw [hχ, Circle.coe_mul, star_mul', show ω⁻¹ k = (ω k)⁻¹ from rfl]
+      ring
+    _ = _ := by rw [hpres.map_eq]; rfl
+end
+
+section
+open Function Filter MeasureTheory Set
+open scoped NNReal ENNReal Topology
+
+/-- The angular log-coordinate reparametrizes the entire dual of the positive reals. -/
+private theorem radial_characters :
+    ∃ e : Multiplicative ℝ ≃ₜ* PontryaginDual ℝ≥0ˣ, ∀ (t : ℝ) (x : ℝ≥0ˣ),
+      e (Multiplicative.ofAdd t) x = Circle.exp (t * Real.log (x.val : ℝ)) := by
+  let h : ℝ≥0ˣ ≃ₜ Multiplicative ℝ := (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.symm.toHomeomorph
+  have hh (x : ℝ≥0ˣ) : (h x).toAdd = Real.log (x.val : ℝ) :=
+    (Real.log_of_pos (NNReal.coe_pos.mpr (Units.zero_lt x))).symm
+  let logE : ℝ≥0ˣ ≃ₜ* Multiplicative ℝ := ContinuousMulEquiv.mk' h (fun x y ↦ by
+    change (h (x*y)).toAdd = (h x).toAdd + (h y).toAdd
+    rw [hh, hh, hh, Units.val_mul, NNReal.coe_mul, Real.log_mul
+      (NNReal.coe_pos.mpr (Units.zero_lt x)).ne' (NNReal.coe_pos.mpr (Units.zero_lt y)).ne'])
+  let q : PontryaginDual (Multiplicative ℝ) ≃ₜ* PontryaginDual ℝ≥0ˣ :=
+    { toFun := PontryaginDual.map (logE : ℝ≥0ˣ →ₜ* Multiplicative ℝ)
+      invFun := PontryaginDual.map (logE.symm : Multiplicative ℝ →ₜ* ℝ≥0ˣ)
+      map_mul' := (PontryaginDual.map (logE : ℝ≥0ˣ →ₜ* Multiplicative ℝ)).map_mul
+      left_inv := fun χ ↦ PontryaginDual.ext fun x ↦ congrArg χ (logE.apply_symm_apply x)
+      right_inv := fun χ ↦ PontryaginDual.ext fun x ↦ congrArg χ (logE.symm_apply_apply x)
+      continuous_toFun := (PontryaginDual.map (logE : ℝ≥0ˣ →ₜ* Multiplicative ℝ)).continuous
+      continuous_invFun := (PontryaginDual.map (logE.symm : Multiplicative ℝ →ₜ* ℝ≥0ˣ)).continuous }
+  obtain ⟨R, hR⟩ := exists_realPontryaginDualEquiv
+  let c : ℝ := 2 * Real.pi
+  have hc : c ≠ 0 := mul_ne_zero two_ne_zero Real.pi_ne_zero
+  let scale : Multiplicative ℝ ≃ₜ* Multiplicative ℝ :=
+    ContinuousMulEquiv.mk' (show ℝ ≃ₜ ℝ from Homeomorph.mulLeft₀ c⁻¹ (inv_ne_zero hc))
+      fun x y ↦ mul_add _ x.toAdd y.toAdd
+  refine ⟨scale.trans (R.trans q), fun t x ↦ ?_⟩
+  change R (Multiplicative.ofAdd (c⁻¹ * t)) (Multiplicative.ofAdd (h x).toAdd) = _
+  rw [hh, hR]
+  congr 1
+  change c * (c⁻¹ * t * _) = _
+  rw [mul_assoc c⁻¹, mul_inv_cancel_left₀ hc]
+
+/-- In angular frequency the Plancherel unitary differs from the unnormalized log
+Fourier integral by a single positive constant. -/
+private theorem radial_plancherel :
+    ∃ (θ : ℝ → PontryaginDual ℝ≥0ˣ) (a : ℝ) (_ : 0 < a)
+      (W : Lp ℂ 2 positiveRealHaar ≃ₗᵢ[ℂ] Lp ℂ 2 (volume : Measure ℝ)),
+      Continuous θ ∧ (∀ (t : ℝ) (x : ℝ≥0ˣ), θ t x = Circle.exp (t * Real.log (x.val : ℝ))) ∧
+      ∀ (f : Lp ℂ 2 positiveRealHaar), Integrable (f : ℝ≥0ˣ → ℂ) positiveRealHaar →
+        (W f : ℝ → ℂ) =ᵐ[volume] fun t ↦ (a : ℂ) * lcaFourier positiveRealHaar f (θ t) := by
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  let : MeasurableSpace (PontryaginDual ℝ≥0ˣ) := borel _
+  let : BorelSpace (PontryaginDual ℝ≥0ˣ) := ⟨rfl⟩
+  let : positiveRealHaar.IsHaarMeasure := positiveRealHaar_isHaarMeasure
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let h := (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.toHomeomorph.symm
+  let : LocallyCompactSpace ℝ≥0ˣ := h.isOpenEmbedding.locallyCompactSpace
+  let μ : Measure (Multiplicative ℝ) := (volume : Measure ℝ)
+  let hv : (volume : Measure ℝ).IsAddHaarMeasure := inferInstance
+  let : μ.IsHaarMeasure :=
+    { toIsFiniteMeasureOnCompacts := hv.toIsFiniteMeasureOnCompacts
+      toIsOpenPosMeasure := hv.toIsOpenPosMeasure
+      map_mul_left_eq_self := fun x ↦ hv.map_add_left_eq_self x.toAdd }
+  obtain ⟨e, he⟩ := radial_characters
+  obtain ⟨ν, hν, _⟩ := lcaPlancherelMeasure_existsUnique positiveRealHaar
+  let : ν.IsHaarMeasure := hν.1
+  let ρ := ν.map (e.symm : PontryaginDual ℝ≥0ˣ → Multiplicative ℝ)
+  let : ρ.IsHaarMeasure := e.symm.isHaarMeasure_map ν
+  let c := Measure.haarScalarFactor ρ μ
+  have hc : 0 < c := Measure.haarScalarFactor_pos_of_isHaarMeasure _ _
+  have hρ : ρ = c • μ := Measure.isMulLeftInvariant_eq_smul _ _
+  have hρ' : μ.withDensity (fun _ ↦ (c : ℝ≥0∞)) = ρ := (withDensity_const _).trans hρ.symm
+  have hμ : μ ≪ ρ := Measure.absolutelyContinuous_isHaarMeasure μ ρ
+  obtain ⟨F, hF, _⟩ := lcaFourier_unitary positiveRealHaar ν hν
+  have hsm : MeasurePreserving (e.symm : PontryaginDual ℝ≥0ˣ → Multiplicative ℝ) ν ρ :=
+    ⟨e.symm.continuous.measurable, rfl⟩
+  have hf : MeasurePreserving (e : Multiplicative ℝ → PontryaginDual ℝ≥0ˣ) ρ ν :=
+    hsm.symm e.symm.toHomeomorph.toMeasurableEquiv
+  let L : Lp ℂ 2 ν →ₗᵢ[ℂ] Lp ℂ 2 ρ := Lp.compMeasurePreservingₗᵢ ℂ e hf
+  have hsur : Surjective L := by
+    intro y
+    refine ⟨Lp.compMeasurePreserving e.symm hsm y, Lp.ext ?_⟩
+    filter_upwards [Lp.coeFn_compMeasurePreserving (Lp.compMeasurePreserving e.symm hsm y) hf,
+      hf.quasiMeasurePreserving.ae_eq_comp (Lp.coeFn_compMeasurePreserving y hsm)] with t ha hb
+    exact ha.trans (hb.trans (congrArg (fun q ↦ y q) (e.symm_apply_apply t)))
+  let J := LinearIsometryEquiv.ofSurjective L hsur
+  have hJ (f : Lp ℂ 2 ν) : (J f : Multiplicative ℝ → ℂ) =ᵐ[ρ] (f : _ → ℂ) ∘ e :=
+    Lp.coeFn_compMeasurePreserving f hf
+  obtain ⟨S, hS⟩ : ∃ S : Lp ℂ 2 ρ ≃ₗᵢ[ℂ] Lp ℂ 2 μ, ∀ v, (S v : Multiplicative ℝ → ℂ) =ᵐ[μ]
+      fun t ↦ (Real.sqrt (c : ℝ) : ℂ) * v t := by
+    rw [← hρ']
+    exact CutoffWindow.exists_unweight_L2 μ (fun _ ↦ c) measurable_const (fun _ ↦ hc)
+  refine ⟨fun t ↦ e (Multiplicative.ofAdd t), Real.sqrt (c : ℝ), Real.sqrt_pos.mpr hc,
+    F.trans (J.trans S), e.continuous, he, fun f hi ↦ ?_⟩
+  have hfp : (F f : PontryaginDual ℝ≥0ˣ → ℂ) =ᵐ[ν] lcaFourier positiveRealHaar f := by
+    simpa only [Lp.toLp_coeFn] using hF f hi (Lp.memLp f)
+  filter_upwards [hS (J (F f)), hμ.ae_eq (hJ (F f)), hμ.ae_eq (hf.quasiMeasurePreserving.ae_eq_comp hfp)]
+    with t hs hj hfu
+  change S (J (F f)) t = _
+  rw [hs, hj]
+  exact congrArg ((Real.sqrt (c : ℝ) : ℂ) * ·) hfu
+end
+
+section
+open Function Filter MeasureTheory Set
+open scoped Topology ENNReal ComplexInnerProductSpace
+
+private theorem coordinate_summable {ι A B : Type*} [NormedAddCommGroup A] [NormedSpace ℂ A]
+    [NormedAddCommGroup B] [NormedSpace ℂ B] (e : ι ≃ ι) (w : A ≃ₗᵢ[ℂ] B)
+    (v : lp (fun _ : ι ↦ A) 2) : Memℓp (fun i ↦ w (v (e i))) 2 := by
+  apply memℓp_gen
+  simp only [w.norm_map]
+  exact e.summable_iff.mpr ((lp.memℓp v).summable (by norm_num))
+
+/-- Reindexing a Hilbert sum and applying the same unitary at each index is unitary. -/
+private theorem sum_coordinates {ι E H : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E]
+    [NormedAddCommGroup H] [NormedSpace ℂ H] (σ : ι ≃ ι) (W : E ≃ₗᵢ[ℂ] H) :
+    ∃ V : lp (fun _ : ι ↦ E) 2 ≃ₗᵢ[ℂ] lp (fun _ : ι ↦ H) 2, ∀ v i, V v i = W (v (σ i)) := by
+  let V (v : lp (fun _ : ι ↦ E) 2) : lp (fun _ : ι ↦ H) 2 := ⟨_, coordinate_summable σ W v⟩
+  let L : lp (fun _ : ι ↦ E) 2 →ₗ[ℂ] lp (fun _ : ι ↦ H) 2 :=
+    { toFun := V
+      map_add' v w := lp.ext (funext fun i ↦ W.map_add _ _)
+      map_smul' z v := lp.ext (funext fun i ↦ W.map_smul z _) }
+  let A : lp (fun _ : ι ↦ E) 2 →ₗᵢ[ℂ] lp (fun _ : ι ↦ H) 2 :=
+    { toLinearMap := L
+      norm_map' v := by
+        apply (sq_eq_sq₀ (norm_nonneg _) (norm_nonneg _)).mp
+        have hv : HasSum (fun i ↦ ‖v i‖ ^ 2) (‖v‖ ^ 2) := by simpa using lp.hasSum_norm (by norm_num) v
+        have hw : HasSum (fun i ↦ ‖V v i‖ ^ 2) (‖V v‖ ^ 2) := by simpa using lp.hasSum_norm (by norm_num) (V v)
+        have hs : HasSum (fun i ↦ ‖v (σ i)‖ ^ 2) (‖v‖ ^ 2) := σ.hasSum_iff.mpr hv
+        exact hw.unique (hs.congr_fun fun i ↦ congrArg (fun x : ℝ ↦ x ^ 2) (W.norm_map _)) }
+  have hA : Surjective A := by
+    intro v
+    refine ⟨⟨_, coordinate_summable σ.symm W.symm v⟩, lp.ext (funext fun i ↦ ?_)⟩
+    change W (W.symm (v (σ.symm (σ i)))) = v i
+    rw [σ.symm_apply_apply, W.apply_symm_apply]
+  exact ⟨LinearIsometryEquiv.ofSurjective A hA, fun _ _ ↦ rfl⟩
+
+section
+variable {ι H Y : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+  [NormedAddCommGroup Y] [InnerProductSpace ℂ Y] [CompleteSpace Y]
+/-- Testing the adjoint against vectors supported in one coordinate gives the adjoint
+of that coordinate operator. -/
+private theorem adjoint_coordinates (U : H ≃ₗᵢ[ℂ] lp (fun _ : ι ↦ Y) 2) (A : H →L[ℂ] H)
+    (M : ι → Y →L[ℂ] Y) (hA : ∀ v i, U (A v) i = M i (U v i)) :
+    ∀ v i, U (A.adjoint v) i = (M i).adjoint (U v i) := by
+  classical
+  intro v i
+  apply ext_inner_left ℂ
+  intro z
+  let y := U.symm (lp.single 2 i z)
+  have hy : U y = lp.single 2 i z := U.apply_symm_apply _
+  have hAy : U (A y) = lp.single 2 i (M i z) := by
+    apply lp.ext
+    funext j
+    change U (A y) j = _
+    rw [hA, hy]
+    by_cases h : j = i
+    · subst j; simp
+    · simp [h]
+  calc
+    inner ℂ z (U (A.adjoint v) i) = inner ℂ (lp.single 2 i z) (U (A.adjoint v)) :=
+      (lp.inner_single_left i z (U (A.adjoint v))).symm
+    _ = inner ℂ y (A.adjoint v) := by rw [← hy, U.inner_map_map]
+    _ = inner ℂ (A y) v := A.adjoint_inner_right _ _
+    _ = inner ℂ (U (A y)) (U v) := (U.inner_map_map _ _).symm
+    _ = inner ℂ z ((M i).adjoint (U v i)) := by
+      rw [hAy, lp.inner_single_left, ContinuousLinearMap.adjoint_inner_right]
+end
+
+/-- Both a bounded scalar multiplier and its adjoint have their pointwise
+representatives on L² for arbitrary input classes. -/
+private theorem scalar_multipliers {X : Type*} [MeasurableSpace X] (ν : Measure X) (b : X → ℂ)
+    (hb : MemLp b ⊤ ν) : ∃ M : Lp ℂ 2 ν →L[ℂ] Lp ℂ 2 ν,
+      (∀ v, (M v : X → ℂ) =ᵐ[ν] fun t ↦ b t * v t) ∧
+      (∀ v, (M.adjoint v : X → ℂ) =ᵐ[ν] fun t ↦ star (b t) * v t) := by
+  let mult := ContinuousLinearMap.mul ℂ ℂ
+  let M := mult.holderL ν (⊤ : ENNReal) 2 2 (hb.toLp _)
+  let N := mult.holderL ν (⊤ : ENNReal) 2 2 (hb.star.toLp _)
+  have hM (v : Lp ℂ 2 ν) : (M v : X → ℂ) =ᵐ[ν] fun t ↦ b t * v t :=
+    (mult.coeFn_holder (r := 2) (hb.toLp _) v).trans (hb.coeFn_toLp.mono fun t ht ↦ congrArg (· * v t) ht)
+  have hN (v : Lp ℂ 2 ν) : (N v : X → ℂ) =ᵐ[ν] fun t ↦ star (b t) * v t :=
+    (mult.coeFn_holder (r := 2) (hb.star.toLp _) v).trans (hb.star.coeFn_toLp.mono fun t ht ↦ congrArg (· * v t) ht)
+  have hn : N = M.adjoint := (ContinuousLinearMap.eq_adjoint_iff N M).mpr fun v u ↦ by
+    rw [L2.inner_def, L2.inner_def]
+    apply integral_congr_ae
+    filter_upwards [hN v, hM u] with t hn hm
+    change inner ℂ (N v t) (u t) = inner ℂ (v t) (M u t)
+    rw [hn, hm]
+    simp [RCLike.inner_apply, mul_left_comm, mul_assoc]
+  exact ⟨M, hM, fun v ↦ hn ▸ hN v⟩
+
+section
+variable {G ι : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+  [T2Space G] [LocallyCompactSpace G] [MeasurableSpace G] [BorelSpace G]
+local notation "Y" => Lp ℂ 2 (volume : Measure ℝ)
+variable (μ : Measure G) [μ.IsHaarMeasure] [μ.Regular]
+/-- If a unitary agrees with the full Fourier transform at the split characters on
+L¹ ∩ L², bounded Haar convolution is a multiplication operator on every component. -/
+private theorem adjoint_convolution_coordinates (U : Lp ℂ 2 μ ≃ₗᵢ[ℂ] lp (fun _ : ι ↦ Y) 2)
+    (e : ι → ℝ → PontryaginDual G) (he : ∀ i, Continuous (e i)) (c : ℂ)
+    (hU : ∀ (v : Lp ℂ 2 μ), Integrable (v : G → ℂ) μ → ∀ i,
+      (U v i : ℝ → ℂ) =ᵐ[volume] fun t ↦ c * lcaFourier μ v (e i t))
+    (ψ : G → ℂ) (hψ : Integrable ψ μ) (A : Lp ℂ 2 μ →L[ℂ] Lp ℂ 2 μ)
+    (hA : ∀ v, (A v : G → ℂ) =ᵐ[μ] lcaConvolution μ ψ v) :
+    ∀ v i, (U (A.adjoint v) i : ℝ → ℂ) =ᵐ[volume] fun t ↦ star (lcaFourier μ ψ (e i t)) * U v i t := by
+  obtain ⟨f, hf⟩ := lcaFourier_zeroAtInfty μ hψ
+  have htop (i : ι) : MemLp (fun t ↦ lcaFourier μ ψ (e i t)) ⊤ (volume : Measure ℝ) := by
+    have hm : Continuous (fun t ↦ lcaFourier μ ψ (e i t)) := by
+      rw [show (fun t ↦ lcaFourier μ ψ (e i t)) = f.toContinuousMap ∘ e i from
+        funext fun t ↦ (hf (e i t)).symm]
+      exact f.continuous.comp (he i)
+    exact memLp_top_of_bound hm.aestronglyMeasurable ‖f.toBCF‖
+      (.of_forall fun t ↦ (hf (e i t)) ▸ f.toBCF.norm_coe_le_norm _)
+  choose M hM hMa using fun i ↦ scalar_multipliers (volume : Measure ℝ) _ (htop i)
+  let D := {v : Lp ℂ 2 μ | Integrable (v : G → ℂ) μ}
+  have hd : Dense D := by
+    apply (Lp.simpleFunc.dense (E := ℂ) (p := 2) (μ := μ) ENNReal.ofNat_ne_top).mono
+    intro v hv
+    let g : Lp.simpleFunc ℂ 2 μ := ⟨v, hv⟩
+    have hh : Integrable (Lp.simpleFunc.toSimpleFunc g) μ :=
+      (SimpleFunc.memLp_iff_integrable two_ne_zero ENNReal.ofNat_ne_top).mp (Lp.simpleFunc.memLp g)
+    exact hh.congr (Lp.simpleFunc.toSimpleFunc_eq_toFun g)
+  have hdg (v : Lp ℂ 2 μ) (i : ι) : U (A v) i = M i (U v i) := by
+    let p := lp.evalCLM ℂ (fun _ : ι ↦ Y) 2 i
+    apply ((isClosed_eq (p.continuous.comp (U.continuous.comp A.continuous))
+      ((M i).continuous.comp (p.continuous.comp U.continuous))).closure_subset_iff.mpr ?_) (hd v)
+    intro g hg
+    have hi : Integrable (A g : G → ℂ) μ := (lcaConvolution_integrable μ hψ hg).2.1.congr (hA g).symm
+    apply Lp.ext
+    have hv (χ : PontryaginDual G) : lcaFourier μ (A g) χ = lcaFourier μ (lcaConvolution μ ψ g) χ :=
+      integral_congr_ae ((hA g).mono fun x hx ↦ congrArg (· * star (χ x : ℂ)) hx)
+    filter_upwards [hU (A g) hi i, hU g hg i, hM i (U g i)] with t h₁ h₂ h₃
+    change U (A g) i t = M i (U g i) t
+    rw [h₁, h₃, h₂, hv, lcaFourier_convolution μ hψ hg, Pi.mul_apply]
+    ring
+  intro v i
+  rw [adjoint_coordinates U A M hdg]
+  exact hMa i _
+end
+end
+
+section
+open Function Filter MeasureTheory Set
+open scoped NNReal ENNReal Topology
+variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+  [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G] [MeasurableSpace G] [BorelSpace G]
+variable (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) (μ : Measure G) [hμ : μ.IsHaarMeasure]
+    (κ : Measure m.toMonoidHom.ker) [hκ : κ.IsHaarMeasure] (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
+include hμ hκ hm hτ
+local notation "X" => Lp ℂ 2 μ
+local notation "Iκ" => PontryaginDual m.toMonoidHom.ker
+local notation "Hκ" => lp (fun _ : Iκ ↦ Lp ℂ 2 (volume : Measure ℝ)) 2
+local notation "logM(" x ")" => Real.log ((Units.val (m x) : ℝ≥0) : ℝ)
+local notation "phase(" t ", " x ")" => Complex.exp (((t : ℝ) : ℂ) * (-Complex.I * (logM(x) : ℂ)))
+
+/-- In angular log frequency, the compact-character and positive-real Plancherel
+unitaries jointly diagonalize the adjoint of any bounded Haar convolution by an L¹
+kernel. Every bounded radial multiplier preserves the vanishing of a whole component. -/
+private theorem haar_fourier_model
+    (hprod : (κ.prod positiveRealHaar).map (fun z : m.toMonoidHom.ker × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2) = μ)
+    (ψ : G → ℂ) (hψ : Integrable ψ μ) (B : X →L[ℂ] X)
+    (hB : ∀ v, (B v : G → ℂ) =ᵐ[μ] lcaConvolution μ ψ v) :
+    ∃ (γ : Iκ → PontryaginDual G) (U : X ≃ₗᵢ[ℂ] Hκ),
+      (∀ ω (k : m.toMonoidHom.ker), γ ω k = ω k) ∧
+      (∀ v ω, (U (B.adjoint v) ω : ℝ → ℂ) =ᵐ[volume] fun t ↦
+        star (∫ x, (ψ x * star (γ ω x : ℂ)) * phase(t, x) ∂μ) * U v ω t) ∧
+      ∀ (p : ℝ≥0ˣ → ℂ) (P : X →L[ℂ] X), (∀ v, (P v : G → ℂ) =ᵐ[μ] fun x ↦ p (m x) * v x) →
+        ∀ v ω, U v ω = 0 → U (P v) ω = 0 := by
+  obtain ⟨γ, hγ, hγτ⟩ := exists_regularIsotypic_sectionCharacters m τ hτ
+  obtain ⟨a, ha, V, hV⟩ := normalized_regularIsotypicTransform m hm μ κ τ hτ hprod
+  obtain ⟨θ, b, hb, W, hθc, hθ, hW⟩ := radial_plancherel
+  obtain ⟨E, hE⟩ := sum_coordinates (Equiv.inv Iκ) W
+  let U : X ≃ₗᵢ[ℂ] Hκ := V.trans E
+  let T := regularIsotypicTransform m hm μ κ τ hτ
+  have hcoord (v : X) (ω : Iκ) : U v ω = (a : ℂ) • W (T v ω⁻¹) := by
+    change E (V v) ω = _
+    rw [hE, hV]
+    exact W.map_smul _ _
+  let e (ω : Iκ) (t : ℝ) : PontryaginDual G := γ ω * PontryaginDual.map m (θ t)
+  have he (ω : Iκ) : Continuous (e ω) := continuous_const.mul ((PontryaginDual.map m).continuous.comp hθc)
+  let c : ℂ := (a : ℂ) * (b : ℂ)
+  have huv (v : X) (hi : Integrable (v : G → ℂ) μ) (ω : Iκ) :
+      (U v ω : ℝ → ℂ) =ᵐ[volume] fun t ↦ c * lcaFourier μ v (e ω t) := by
+    have hF := regularIsotypicTransform_fourier m hm μ κ τ hτ hprod (γ ω) ω (hγ ω) (hγτ ω) v hi
+    rw [hcoord]
+    filter_upwards [Lp.coeFn_smul (a : ℂ) (W (T v ω⁻¹)), hW (T v ω⁻¹) hF.1] with t hx hy
+    change ((a : ℂ) • W (T v ω⁻¹)) t = _
+    rw [hx, Pi.smul_apply, smul_eq_mul, hy, hF.2 (θ t)]
+    change (a : ℂ) * ((b : ℂ) * lcaFourier μ v (e ω t)) = c * _
+    ring
+  have hsymbol (ω : Iκ) (t : ℝ) : lcaFourier μ ψ (e ω t) =
+      ∫ x, (ψ x * star (γ ω x : ℂ)) * phase(t, x) ∂μ := by
+    apply integral_congr_ae
+    filter_upwards with x
+    change ψ x * star ((γ ω x * θ t (m x) : Circle) : ℂ) = _
+    have hc : star (θ t (m x) : ℂ) = phase(t, x) := by
+      change (starRingEnd ℂ) (θ t (m x) : ℂ) = _
+      rw [hθ, Circle.coe_exp, ← Complex.exp_conj]
+      congr 1
+      push_cast
+      simp [mul_comm, mul_left_comm]
+    rw [Circle.coe_mul, star_mul', hc]
+    ring
+  refine ⟨γ, U, hγ, fun v ω ↦ ?_, fun p P hP v ω hv ↦ ?_⟩
+  · have h := adjoint_convolution_coordinates μ U e he c huv ψ hψ B hB v ω
+    simpa only [hsymbol] using h
+  · have ha' : (a : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr ha.ne'
+    have hzero : T v ω⁻¹ = 0 := by
+      rw [hcoord] at hv
+      exact W.injective ((smul_eq_zero.mp hv).resolve_left ha' |>.trans W.map_zero.symm)
+    have hPzero : T (P v) ω⁻¹ = 0 := by
+      apply Lp.ext
+      filter_upwards [regularIsotypicTransform_radial m hm μ κ τ hτ hprod p P hP v ω⁻¹,
+        Lp.coeFn_zero ℂ 2 positiveRealHaar] with r hr hz
+      change T (P v) ω⁻¹ r = _
+      change T (P v) ω⁻¹ r = p r * T v ω⁻¹ r at hr
+      rw [hr, hzero, hz, Pi.zero_apply, mul_zero]
+    rw [hcoord, hPzero, map_zero, smul_zero]
+end
+
+section
+open Function Filter MeasureTheory Set
+open scoped NNReal ENNReal Topology
+
+variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+  [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G] [MeasurableSpace G] [BorelSpace G]
+variable (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) (μ : Measure G) [hμ : μ.IsHaarMeasure]
+    (κ : Measure m.toMonoidHom.ker) [hκ : κ.IsHaarMeasure] (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
+variable (w : G → ℝ) (hw : Measurable w) (hp : ∀ x, 0 < w x)
+include hμ hκ hm hτ hw hp
+local notation "X" => Lp ℂ 2 μ
+local notation "H" => Lp ℂ 2 (μ.withDensity fun x ↦ ENNReal.ofReal (w x))
+local notation "Iκ" => PontryaginDual m.toMonoidHom.ker
+local notation "Hκ" => lp (fun _ : Iκ ↦ Lp ℂ 2 (volume : Measure ℝ)) 2
+local notation "d(" x ")" => (Real.sqrt (w x) : ℂ)
+local notation "CL(" U ")" =>
+  ContinuousLinearEquiv.toContinuousLinearMap (LinearIsometryEquiv.toContinuousLinearEquiv (U))
+local notation "phase(" t ", " x ")" => Complex.exp (((t : ℝ) : ℂ) *
+  (-Complex.I * (Real.log ((Units.val (m x) : ℝ≥0) : ℝ) : ℂ)))
+
+/-- Multiplication by the square root of the weight restores the Haar Fourier model
+for the transported convolution, with the same radial component preservation. -/
+private theorem weighted_fourier_model
+    (hprod : (κ.prod positiveRealHaar).map (fun z : m.toMonoidHom.ker × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2) = μ)
+    (ψ : G → ℂ) (hψ : Integrable ψ μ) (C : H →L[ℂ] H)
+    (hC : ∀ v : H, (C v : G → ℂ) =ᵐ[μ] fun x ↦ (d(x))⁻¹ *
+      ∫ g, ψ g * (d(g⁻¹ * x) * v (g⁻¹ * x)) ∂μ) :
+    ∃ (γ : Iκ → PontryaginDual G) (U : H ≃ₗᵢ[ℂ] Hκ),
+      (∀ ω (k : m.toMonoidHom.ker), γ ω k = ω k) ∧
+      (∀ v ω, (U (C.adjoint v) ω : ℝ → ℂ) =ᵐ[volume] fun t ↦
+        star (∫ x, (ψ x * star (γ ω x : ℂ)) * phase(t, x) ∂μ) * U v ω t) ∧
+      ∀ (p : ℝ≥0ˣ → ℂ) (P : H →L[ℂ] H), (∀ v, (P v : G → ℂ) =ᵐ[μ] fun x ↦ p (m x) * v x) →
+        ∀ v ω, U v ω = 0 → U (P v) ω = 0 := by
+  obtain ⟨J, hJ⟩ : ∃ J : H ≃ₗᵢ[ℂ] X, ∀ v, (J v : G → ℂ) =ᵐ[μ] fun x ↦ d(x) * v x := by
+    obtain ⟨J, hJ'⟩ := CutoffWindow.exists_unweight_L2 μ (fun x ↦ (w x).toNNReal) hw.real_toNNReal
+      (fun x ↦ Real.toNNReal_pos.mpr (hp x))
+    refine ⟨J, fun v ↦ (hJ' v).mono fun x hx ↦ hx.trans ?_⟩
+    exact congrArg (fun r : ℝ ↦ (Real.sqrt r : ℂ) * v x) (Real.coe_toNNReal _ (hp x).le)
+  let B := CL(J).comp (C.comp CL(J.symm))
+  have hB (z : X) : (B z : G → ℂ) =ᵐ[μ] lcaConvolution μ ψ z := by
+    let u := J.symm z
+    have hzu : (z : G → ℂ) =ᵐ[μ] fun x ↦ d(x) * u x := (J.apply_symm_apply z) ▸ hJ u
+    filter_upwards [hJ (C u), hC u] with x hx hc
+    change J (C u) x = ∫ g, ψ g * z (g⁻¹ * x) ∂μ
+    rw [hx, hc, mul_inv_cancel_left₀ (Complex.ofReal_ne_zero.mpr (Real.sqrt_pos.mpr (hp x)).ne')]
+    have hpres : MeasurePreserving (fun g : G ↦ g⁻¹ * x) μ μ :=
+      (measurePreserving_mul_right μ x).comp (Measure.measurePreserving_inv μ)
+    refine integral_congr_ae ((hpres.quasiMeasurePreserving.ae_eq_comp hzu).mono fun g hg ↦ ?_)
+    exact congrArg (ψ g * ·) hg.symm
+  have hconj (v : H) : B (J v) = J (C v) := by
+    change J (C (J.symm (J v))) = _
+    rw [J.symm_apply_apply]
+  have hadj (v : H) : J (C.adjoint v) = B.adjoint (J v) := by
+    apply ext_inner_left ℂ
+    intro y
+    obtain ⟨z, rfl⟩ := J.surjective y
+    rw [J.inner_map_map, ContinuousLinearMap.adjoint_inner_right, ContinuousLinearMap.adjoint_inner_right,
+      hconj, J.inner_map_map]
+  obtain ⟨γ, V, hγ, hV, hmask⟩ := haar_fourier_model m hm μ κ τ hτ hprod ψ hψ B hB
+  refine ⟨γ, J.trans V, hγ, fun v ω ↦ ?_, fun p P hP v ω hv ↦ ?_⟩
+  · change (V (J (C.adjoint v)) ω : ℝ → ℂ) =ᵐ[volume] _
+    rw [hadj]
+    exact hV (J v) ω
+  · let Q := CL(J).comp (P.comp CL(J.symm))
+    have hQ (z : X) : (Q z : G → ℂ) =ᵐ[μ] fun x ↦ p (m x) * z x := by
+      let u := J.symm z
+      have hzu : (z : G → ℂ) =ᵐ[μ] fun x ↦ d(x) * u x := (J.apply_symm_apply z) ▸ hJ u
+      filter_upwards [hJ (P u), hP u, hzu] with x hx hp hz
+      change J (P u) x = _
+      rw [hx, hp, hz]
+      ring
+    have h := hmask p Q hQ (J v) ω hv
+    change V (J (P (J.symm (J v)))) ω = 0 at h
+    rwa [J.symm_apply_apply] at h
+end
+
+section
+open Function Filter MeasureTheory Set
+open scoped NNReal ENNReal Topology
+variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+  [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G] [MeasurableSpace G] [BorelSpace G]
+variable (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) (μ : Measure G) [hμ : μ.IsHaarMeasure]
+  (κ : Measure m.toMonoidHom.ker) [hκ : κ.IsHaarMeasure] (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
+include hm hμ hκ hτ
+local notation "ell(" x ")" => Real.log ((Units.val (m x) : ℝ≥0) : ℝ)
+local notation "den(" a ", " s ", " x ")" => intervalSobolevDensity (-(a)) (a) (s) (ell(x))
+local notation "H(" a ", " s ")" => Lp ℂ 2 (μ.withDensity fun x ↦ ENNReal.ofReal (den(a,s,x)))
+local notation "d(" a ", " s ", " x ")" => (Real.sqrt (den(a,s,x)) : ℂ)
+local notation "Iκ" => PontryaginDual m.toMonoidHom.ker
+local notation "Hκ" => lp (fun _ : Iκ ↦ Lp ℂ 2 (volume : Measure ℝ)) 2
+
+/-- Applying the split Fourier model to the interval Sobolev density and an exponentially
+tilted compact test gives the weighted symbol and every radial interval mask. -/
+private theorem tilted_interval_model
+    (hprod : (κ.prod positiveRealHaar).map (fun z : m.toMonoidHom.ker × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2) = μ)
+    (α s β : ℝ) (φ : G → ℂ) (hφ : Continuous φ) (hk : HasCompactSupport φ)
+    (C : H(α, s) →L[ℂ] H(α, s)) (hC : ∀ v, (C v : G → ℂ) =ᵐ[μ] fun x ↦ d(α, s, x)⁻¹ *
+      ∫ g, ((Real.exp (β * ell(g)) : ℂ) * φ g) * (d(α, s, g⁻¹ * x) * v (g⁻¹ * x)) ∂μ) :
+    ∃ (γ : Iκ → PontryaginDual G) (U : H(α, s) ≃ₗᵢ[ℂ] Hκ),
+      (∀ ω (k : m.toMonoidHom.ker), γ ω k = ω k) ∧
+      (∀ v ω, (U (C.adjoint v) ω : ℝ → ℂ) =ᵐ[volume] fun t ↦
+        (starRingEnd ℂ) (∫ g, (φ g * (starRingEnd ℂ) (γ ω g : ℂ) * (Real.exp (β * ell(g)) : ℂ)) *
+          Complex.exp ((t : ℂ) * (-Complex.I * (ell(g) : ℂ))) ∂μ) * U v ω t) ∧
+      ∀ (I : Set ℝ) [DecidablePred (· ∈ I)], MeasurableSet I → OrdConnected I →
+        ∀ (P : H(α, s) →L[ℂ] H(α, s)), (∀ v, (P v : G → ℂ) =ᵐ[μ] fun x ↦
+          ((if ell(x) ∈ I then 1 else 0 : ℝ) : ℂ) * v x) → ∀ v ω, U v ω = 0 → U (P v) ω = 0 := by
+  have hl : Continuous (fun x : G ↦ ell(x)) :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).log fun x ↦
+      NNReal.coe_ne_zero.mpr (m x).ne_zero
+  have hw : Measurable (fun x : G ↦ den(α, s, x)) := by
+    have h : Measurable (intervalSobolevDensity (-α) α s) := by unfold intervalSobolevDensity; fun_prop
+    exact h.comp hl.measurable
+  have hp (x : G) : 0 < den(α, s, x) :=
+    mul_pos (lt_max_of_lt_left (Real.exp_pos _)) (Real.rpow_pos_of_pos (by positivity) _)
+  let ψ (x : G) : ℂ := (Real.exp (β * ell(x)) : ℂ) * φ x
+  have hψ : Continuous ψ := (Complex.continuous_ofReal.comp (Real.continuous_exp.comp (continuous_const.mul hl))).mul hφ
+  have hψk : HasCompactSupport ψ := hk.mul_left
+  obtain ⟨γ, U, hγ, hU, hP⟩ := weighted_fourier_model m hm μ κ τ hτ (fun x ↦ den(α, s, x)) hw hp hprod
+    ψ (hψ.integrable_of_hasCompactSupport hψk) C hC
+  refine ⟨γ, U, hγ, fun v ω ↦ ?_, fun I _ _ _ P hPv ↦ ?_⟩
+  · refine (hU v ω).mono fun t ht ↦ ht.trans (congrArg (fun z : ℂ ↦ (starRingEnd ℂ) z * U v ω t) ?_)
+    apply integral_congr_ae
+    filter_upwards with x
+    dsimp only [ψ]
+    change ((Real.exp (β * ell(x)) : ℂ) * φ x) * (starRingEnd ℂ) (γ ω x : ℂ) * _ = _
+    ring
+  · exact hP (fun a ↦ ((if Real.log (a.val : ℝ) ∈ I then 1 else 0 : ℝ) : ℂ)) P hPv
+end
+
+end CutoffSplit
+
 section CutoffWindowLimits
 
 local notation "WOp" => W₀ →L[ℂ] W₀
@@ -4442,7 +5050,17 @@ private theorem spectralRestriction_tiltedConvolution_fourier_model (φ : Bruhat
       ∀ (I : Set ℝ) [DecidablePred (· ∈ I)], MeasurableSet I → OrdConnected I →
         ∀ (P : WOp), (∀ y, (P y : C𝔽 → ℂ) =ᵐ[μ𝔽] fun x ↦
           ((if logNorm x ∈ I then 1 else 0 : ℝ) : ℂ) * y x) →
-        ∀ v ω, U v ω = 0 → U (P v) ω = 0 := by sorry
+        ∀ v ω, U v ω = 0 → U (P v) ω = 0 := by
+  let q : (AdeleRing (𝓞 F) F)ˣ →ₜ* C𝔽 := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
+  let τ : ℝ≥0ˣ →ₜ* C𝔽 := q.comp ⟨canonicalIdeleNormSection F, canonicalIdeleNormSection_continuous F⟩
+  have hτ : RightInverse τ (ideleClassNorm F) := canonicalIdeleNormSection_rightInverse F
+  let : (normOneIdeleClassTamagawaMeasure F).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have hm : IsModulation m𝔽 := ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+  have hφ := continuous_of_bruhatSmooth ((mem_bruhatSmoothSubmodule_iff _).mp φ.property.1)
+  exact CutoffSplit.tilted_interval_model m𝔽 hm μ𝔽 (normOneIdeleClassTamagawaMeasure F) τ hτ
+    (geometricTruncatedConvolution_trace_remainder_tendsto_normProduct F τ hτ).symm
+    α s (signed(j, α)) φ.val hφ φ.property.2 C hC
 
 /-- The logarithmic Fourier symbol of the actual tilted test is real analytic. -/
 private theorem spectralRestriction_tiltedConvolution_symbol_analytic (φ : BruhatCompactSupport C𝔽)
