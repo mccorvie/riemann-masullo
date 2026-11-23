@@ -3,6 +3,8 @@ module
 public import RiemannMasullo.AppB_AnalyticNT.Sec7a
 public import RiemannMasullo.AppB_AnalyticNT.Sec5
 public import Mathlib.NumberTheory.Harmonic.EulerMascheroni
+import Mathlib.Analysis.Normed.Group.Tannery
+import Mathlib.Topology.Algebra.InfiniteSum.TsumUniformlyOn
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-!
@@ -363,6 +365,25 @@ theorem summable_heckeHigherPrimePowerWeights (F : Type*) [Field F] [NumberField
     _ = (v.asIdeal.absNorm : ℝ) ^ (-(2 * σ)) * ((2 : ℝ) ^ (-σ)) ^ k := by
         rw [Real.rpow_neg hN0.le, Real.rpow_neg (by norm_num), inv_pow, one_div, mul_inv]
 
+/-- Each term of the correction is bounded by the positive majorant, because the
+character values have norm at most one. -/
+private theorem heckeEulerProductLogCorrection_hasSumUniformlyOn_term_le (χ : U[F]) (v : V[F])
+    (k : ℕ) (s : ℂ) :
+    ‖heckePrimePowerLogTerm χ v (k + 1) s‖ ≤
+      (1 : ℝ) / ((k + 2 : ℕ) * (((v.asIdeal.absNorm ^ (k + 2) : ℕ) : ℝ) ^ s.re)) := by
+  classical
+  have h1 := HeightOneSpectrum.one_lt_absNorm v
+  have hval : ‖heckeIdealValue (ideleClassNormTwist χ 0) (v.asIdeal ^ (k + 2))‖ ≤ 1 := by
+    rw [heckeIdealValue_prime_pow _ v (Nat.succ_pos _)]
+    split_ifs
+    · rw [norm_pow, norm_ideleClassNormTwist_zero_localValue, one_pow]
+    · simp
+  show ‖heckeIdealValue (ideleClassNormTwist χ 0) (v.asIdeal ^ (k + 2)) /
+      (((k + 2 : ℕ) : ℂ) * ((v.asIdeal ^ (k + 2)).absNorm : ℂ) ^ s)‖ ≤ _
+  rw [map_pow, norm_div, norm_mul, Complex.norm_natCast,
+    Complex.norm_natCast_cpow_of_pos (by positivity)]
+  gcongr
+
 /-- Paper: Theorem B.7.2.4(1), p. 652. The series defining the correction
 converges absolutely and uniformly on half-planes strictly to the right of one half.
 Its sum is the negative of `H_x`. -/
@@ -373,7 +394,27 @@ theorem heckeEulerProductLogCorrection_hasSumUniformlyOn (χ : U[F]) (x : ℝ)
         x ≤ ((a.1.asIdeal.absNorm ^ (a.2 + 2) : ℕ) : ℝ)}) s ↦
         heckePrimePowerLogTerm χ a.val.1 (a.val.2 + 1) s)
       (fun s ↦ -heckeEulerProductLogCorrection χ x s) {s : ℂ | σ ≤ s.re} := by
-  sorry
+  have hu := (summable_heckeHigherPrimePowerWeights F hσ).comp_injective
+    (Subtype.val_injective (p := fun a : V[F] × ℕ ↦ (a.1.asIdeal.absNorm : ℝ) < x ∧
+      x ≤ ((a.1.asIdeal.absNorm ^ (a.2 + 2) : ℕ) : ℝ)))
+  have hb : ∀ (a : {a : V[F] × ℕ // (a.1.asIdeal.absNorm : ℝ) < x ∧
+      x ≤ ((a.1.asIdeal.absNorm ^ (a.2 + 2) : ℕ) : ℝ)}) (s : ℂ), s ∈ {s : ℂ | σ ≤ s.re} →
+      ‖heckePrimePowerLogTerm χ a.val.1 (a.val.2 + 1) s‖ ≤
+        (1 : ℝ) / ((a.val.2 + 2 : ℕ) *
+          (((a.val.1.asIdeal.absNorm ^ (a.val.2 + 2) : ℕ) : ℝ) ^ σ)) := by
+    intro a s hs
+    have h1 : (1 : ℝ) ≤ ((a.val.1.asIdeal.absNorm ^ (a.val.2 + 2) : ℕ) : ℝ) := by
+      have := HeightOneSpectrum.one_lt_absNorm a.val.1
+      exact_mod_cast Nat.one_le_pow _ _ (by omega)
+    refine (heckeEulerProductLogCorrection_hasSumUniformlyOn_term_le χ a.val.1 a.val.2 s).trans ?_
+    have hp : (0 : ℝ) < ((a.val.1.asIdeal.absNorm ^ (a.val.2 + 2) : ℕ) : ℝ) ^ σ :=
+      Real.rpow_pos_of_pos (by linarith) _
+    apply one_div_le_one_div_of_le (by positivity)
+    exact mul_le_mul_of_nonneg_left (Real.rpow_le_rpow_of_exponent_le h1 hs) (by positivity)
+  convert HasSumUniformlyOn.of_norm_le_summable hu hb using 1
+  funext s
+  delta heckeEulerProductLogCorrection
+  rw [neg_neg]
 
 /-- Paper: Theorem B.7.2.4(1), p. 652. The correction has norm at most
 the tail of the positive majorant with prime-power norm at least `x`.
@@ -384,14 +425,55 @@ theorem heckeEulerProductLogCorrection_norm_le (χ : U[F]) (x : ℝ) (s : ℂ)
       ∑' a : {a : V[F] × ℕ // x ≤ ((a.1.asIdeal.absNorm ^ (a.2 + 2) : ℕ) : ℝ)},
         (1 : ℝ) / ((a.val.2 + 2 : ℕ) *
           (((a.val.1.asIdeal.absNorm ^ (a.val.2 + 2) : ℕ) : ℝ) ^ s.re)) := by
-  sorry
+  let w : V[F] × ℕ → ℝ := fun a ↦
+    (1 : ℝ) / ((a.2 + 2 : ℕ) * (((a.1.asIdeal.absNorm ^ (a.2 + 2) : ℕ) : ℝ) ^ s.re))
+  have hW : Summable w := summable_heckeHigherPrimePowerWeights F hs
+  have hw0 : ∀ a, 0 ≤ w a := fun a ↦ by simp only [w]; positivity
+  let S1 : Set (V[F] × ℕ) := {a | (a.1.asIdeal.absNorm : ℝ) < x ∧
+    x ≤ ((a.1.asIdeal.absNorm ^ (a.2 + 2) : ℕ) : ℝ)}
+  let S2 : Set (V[F] × ℕ) := {a | x ≤ ((a.1.asIdeal.absNorm ^ (a.2 + 2) : ℕ) : ℝ)}
+  have hsub : S1 ⊆ S2 := fun a ha ↦ ha.2
+  have hs1 : Summable (fun a : S1 ↦ w a) := hW.comp_injective Subtype.val_injective
+  delta heckeEulerProductLogCorrection
+  rw [norm_neg]
+  calc ‖∑' a : S1, heckePrimePowerLogTerm χ a.val.1 (a.val.2 + 1) s‖
+      ≤ ∑' a : S1, w a :=
+        tsum_of_norm_bounded hs1.hasSum fun a ↦
+          heckeEulerProductLogCorrection_hasSumUniformlyOn_term_le χ a.val.1 a.val.2 s
+    _ = ∑' a, S1.indicator w a := tsum_subtype S1 w
+    _ ≤ ∑' a, S2.indicator w a :=
+        Summable.tsum_le_tsum (fun a ↦ Set.indicator_le_indicator_of_subset hsub hw0 a)
+          (hW.indicator _) (hW.indicator _)
+    _ = ∑' a : S2, w a := (tsum_subtype S2 w).symm
 
 /-- Paper: Theorem B.7.2.4(1), p. 652. The correction tends to zero
 uniformly on the whole 1-line. -/
 theorem heckeEulerProductLogCorrection_tendstoUniformly (χ : U[F]) :
     TendstoUniformly (fun x : ℝ ↦ fun t : ℝ ↦ heckeEulerProductLogCorrection χ x ⟨1, t⟩)
       (fun _ ↦ 0) atTop := by
-  sorry
+  let w : V[F] × ℕ → ℝ := fun a ↦
+    (1 : ℝ) / ((a.2 + 2 : ℕ) * (((a.1.asIdeal.absNorm ^ (a.2 + 2) : ℕ) : ℝ) ^ (1 : ℝ)))
+  have hW : Summable w := summable_heckeHigherPrimePowerWeights F (by norm_num)
+  have hw0 : ∀ a, 0 ≤ w a := fun a ↦ by simp only [w]; positivity
+  let S (x : ℝ) : Set (V[F] × ℕ) := {a | x ≤ ((a.1.asIdeal.absNorm ^ (a.2 + 2) : ℕ) : ℝ)}
+  have hT : Tendsto (fun x ↦ ∑' a, (S x).indicator w a) atTop (𝓝 0) := by
+    have h := tendsto_tsum_of_dominated_convergence (𝓕 := atTop)
+      (f := fun x a ↦ (S x).indicator w a) (g := fun _ ↦ (0 : ℝ)) hW (fun a ↦ ?_)
+      (Eventually.of_forall fun x a ↦ ?_)
+    · simpa using h
+    · apply tendsto_const_nhds.congr'
+      filter_upwards [eventually_gt_atTop
+        ((a.1.asIdeal.absNorm ^ (a.2 + 2) : ℕ) : ℝ)] with x hx
+      exact (Set.indicator_of_notMem (fun h : x ≤ _ ↦ absurd h (not_le.mpr hx)) w).symm
+    · rw [Real.norm_of_nonneg (Set.indicator_nonneg (fun a _ ↦ hw0 a) a)]
+      exact Set.indicator_le_self' (fun a _ ↦ hw0 a) a
+  rw [Metric.tendstoUniformly_iff]
+  intro ε hε
+  filter_upwards [hT.eventually (gt_mem_nhds hε)] with x hx t
+  rw [dist_zero_left]
+  refine lt_of_le_of_lt ?_ hx
+  exact (heckeEulerProductLogCorrection_norm_le χ x ⟨1, t⟩ (by norm_num)).trans_eq
+    (tsum_subtype (S x) w)
 
 /-- Paper: Theorem B.7.2.4(1), p. 652. Off the pole, multiplying the
 reciprocal partial product by the continued finite L-function gives the
