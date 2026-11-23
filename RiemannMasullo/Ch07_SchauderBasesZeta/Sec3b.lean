@@ -1582,35 +1582,8 @@ theorem sLocalGamma_all_coeff_surjective (ω : PontryaginDual J₁(S)) :
     Function.Surjective (fun (x : fullPV(ω)) (j : ΓIndex(ω, (Set.univ : Set Xₛ))) ↦
       ΓCoeff(ω, j) x) := by sorry
 
-/-- Paper: Theorem 7.3.4.1(4), p. 365.
-The quotient topology is induced by the family of canonical finite-cutoff quotient maps. -/
-theorem sLocalGammaOrbitalQuotient_projectiveTopology (ω : PontryaginDual J₁(S)) :
-    let E := ↥(fullPV(ω))
-    let P := Γker(ω)
-    let stage := sLocalGammaFiltration (F := F) (S := S) ω
-    ∃ qN : (N : depths) → (E ⧸ P) →ₗ[ℂ] (E ⧸ stage N),
-      (∀ N (x : E), qN N (P.mkQ x) = (stage N).mkQ x) ∧
-      IsInducing (fun (x : E ⧸ P) (N : depths) ↦ qN N x) := by sorry
-
-/-- Paper: Theorem 7.3.4.1(4), p. 365.
-The quotient is topologically linearly isomorphic to the product of complex
-lines indexed by cutoff tuples. -/
-theorem sLocalGammaOrbitalQuotient_product (ω : PontryaginDual J₁(S)) :
-    let E := ↥(fullPV(ω))
-    let P := Γker(ω)
-    Nonempty ((E ⧸ P) ≃L[ℂ] (depths → ℂ)) := by sorry
-
-/-- Paper: Theorem 7.3.4.1(4), p. 365.
-The strong dual of the quotient is topologically linearly isomorphic to the
-direct sum of complex lines with its finest locally convex topology.
-The quotient dual represents the annihilator via pullback along the quotient map. -/
-theorem sLocalGammaOrbitalQuotient_dual_directSum (ω : PontryaginDual J₁(S)) :
-    let E := ↥(fullPV(ω))
-    let P := Γker(ω)
-    Nonempty (StrongDual ℂ (E ⧸ P) ≃L[ℂ] FinestLocallyConvex (depths →₀ ℂ)) := by sorry
-
 /-- Every unitary character of the norm-one group is the restriction of a quasi-character. -/
-private theorem sLocalGammaIndex_enumerable_exists (ω : PontryaginDual J₁(S)) :
+private theorem sLocalGammaOrbitalQuotient_coeff_exists (ω : PontryaginDual J₁(S)) :
     ∃ c₀ : Xₛ, onComponent(c₀, ω) := by
   let : LocallyCompactSpace (SAdeleRing F S)ˣ := (sIdeleGroup_description F S).2.2.1
   have := isClosed_sProjectedDiagonal (F := F) (S := S)
@@ -1623,7 +1596,7 @@ private theorem sLocalGammaIndex_enumerable_exists (ω : PontryaginDual J₁(S))
   exact ⟨c₀, hc₀⟩
 
 /-- A norm twist stays on the component of the quasi-character it twists. -/
-private theorem sLocalGammaIndex_enumerable_onComponent (ω : PontryaginDual J₁(S)) (c₀ : Xₛ)
+private theorem sLocalGammaOrbitalQuotient_coeff_onComponent (ω : PontryaginDual J₁(S)) (c₀ : Xₛ)
     (h₀ : onComponent(c₀, ω)) (s : ℂ) : onComponent(shift(c₀, s), ω) := by
   refine Eq.trans ?_ h₀
   ext u
@@ -1632,7 +1605,7 @@ private theorem sLocalGammaIndex_enumerable_onComponent (ω : PontryaginDual J�
   simp
 
 /-- Two quasi-characters on one component differ by a norm twist. -/
-private theorem sLocalGammaIndex_enumerable_shift (ω : PontryaginDual J₁(S)) (c₀ c : Xₛ)
+private theorem sLocalGammaOrbitalQuotient_coeff_shift (ω : PontryaginDual J₁(S)) (c₀ c : Xₛ)
     (h₀ : onComponent(c₀, ω)) (hc : onComponent(c, ω)) : ∃ s : ℂ, c = shift(c₀, s) := by
   obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
   let c₀inv := c₀.comp (ContinuousMonoidHom.inv J(S))
@@ -1663,54 +1636,227 @@ private theorem sLocalGammaIndex_enumerable_shift (ω : PontryaginDual J₁(S)) 
   rw [hcg, hc₀g, hu_eq, ← hP]
   field_simp [hc₀σ_ne]
 
-/-- Paper: Theorem 7.3.4.1(5), pp. 365–366.
-The set of archimedean centers with their admissible Laurent orders admits an enumeration. -/
-theorem sLocalGammaIndex_enumerable (ω : PontryaginDual J₁(S)) :
-    Nonempty (ℕ ≃ ΓIndex(ω, (Set.univ : Set Xₛ))) := by
-  obtain ⟨c₀, h₀⟩ := sLocalGammaIndex_enumerable_exists ω
+/-- The pairs of an archimedean center on the component and an admissible Laurent order
+form a countable set. -/
+private theorem sLocalGammaOrbitalQuotient_coeff_countable (ω : PontryaginDual J₁(S)) :
+    Countable (ΓIndex(ω, (Set.univ : Set Xₛ))) := by
+  obtain ⟨c₀, h₀⟩ := sLocalGammaOrbitalQuotient_coeff_exists ω
+  let P (w : InfinitePlace F) := sLocalGammaFiltration_iInf_placePoles c₀ w
+  let pole (w : InfinitePlace F) (m : ℕ) : Xₛ :=
+    shift(c₀, -((P w).choose_spec.choose * (m : ℝ) : ℂ) - (P w).choose)
+  let U := ⋃ w : InfinitePlace F, Set.range (pole w)
+  have hU : U.Countable := Set.countable_iUnion fun w ↦ Set.countable_range _
+  have hmem (j : ΓIndex(ω, (Set.univ : Set Xₛ))) : j.val.1 ∈ U := by
+    obtain ⟨s, hs⟩ := sLocalGammaOrbitalQuotient_coeff_shift ω c₀ j.val.1 h₀ j.property.1
+    obtain ⟨w, hw⟩ := Finset.card_pos.mp (j.property.2.2.1.trans_le j.property.2.2.2)
+    rw [hs] at hw
+    obtain ⟨m, hm⟩ := ((P w).choose_spec.choose_spec.2 s).mp hw
+    exact Set.mem_iUnion.mpr ⟨w, m, by rw [hs, hm]⟩
+  have : Countable U := hU.to_subtype
+  refine Function.Injective.countable
+    (f := fun j : ΓIndex(ω, (Set.univ : Set Xₛ)) ↦ ((⟨j.val.1, hmem j⟩ : U), j.val.2)) ?_
+  intro j₁ j₂ h
+  have h1 : j₁.val.1 = j₂.val.1 := congrArg (fun p ↦ p.1.val) h
+  have h2 : j₁.val.2 = j₂.val.2 := congrArg (fun p ↦ p.2) h
+  exact Subtype.ext (Prod.ext h1 h2)
+
+/-- There are infinitely many pairs of an archimedean center on the component and an
+admissible Laurent order. -/
+private theorem sLocalGammaOrbitalQuotient_coeff_infinite (ω : PontryaginDual J₁(S)) :
+    Infinite (ΓIndex(ω, (Set.univ : Set Xₛ))) := by
+  obtain ⟨c₀, h₀⟩ := sLocalGammaOrbitalQuotient_coeff_exists ω
   let P (w : InfinitePlace F) := sLocalGammaFiltration_iInf_placePoles c₀ w
   let pole (w : InfinitePlace F) (m : ℕ) : Xₛ :=
     shift(c₀, -((P w).choose_spec.choose * (m : ℝ) : ℂ) - (P w).choose)
   have hpole (w : InfinitePlace F) (m : ℕ) : w ∈ arch(pole w m) :=
     ((P w).choose_spec.choose_spec.2 _).mpr ⟨m, rfl⟩
-  have hcount : Countable (ΓIndex(ω, (Set.univ : Set Xₛ))) := by
-    let U := ⋃ w : InfinitePlace F, Set.range (pole w)
-    have hU : U.Countable := Set.countable_iUnion fun w ↦ Set.countable_range _
-    have hmem (j : ΓIndex(ω, (Set.univ : Set Xₛ))) : j.val.1 ∈ U := by
-      obtain ⟨s, hs⟩ := sLocalGammaIndex_enumerable_shift ω c₀ j.val.1 h₀ j.property.1
-      obtain ⟨w, hw⟩ := Finset.card_pos.mp (j.property.2.2.1.trans_le j.property.2.2.2)
-      rw [hs] at hw
-      obtain ⟨m, hm⟩ := ((P w).choose_spec.choose_spec.2 s).mp hw
-      exact Set.mem_iUnion.mpr ⟨w, m, by rw [hs, hm]⟩
-    have : Countable U := hU.to_subtype
-    refine Function.Injective.countable
-      (f := fun j : ΓIndex(ω, (Set.univ : Set Xₛ)) ↦ ((⟨j.val.1, hmem j⟩ : U), j.val.2)) ?_
-    intro j₁ j₂ h
-    have h1 : j₁.val.1 = j₂.val.1 := congrArg (fun p ↦ p.1.val) h
-    have h2 : j₁.val.2 = j₂.val.2 := congrArg (fun p ↦ p.2) h
-    exact Subtype.ext (Prod.ext h1 h2)
-  have hinf : Infinite (ΓIndex(ω, (Set.univ : Set Xₛ))) := by
-    obtain ⟨w⟩ := (inferInstance : Nonempty (InfinitePlace F))
-    obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
-    let t : ℝ≥0ˣ := Units.mk0 2 two_ne_zero
-    let f : ℕ → ΓIndex(ω, (Set.univ : Set Xₛ)) := fun m ↦
-      ⟨(pole w m, 1), sLocalGammaIndex_enumerable_onComponent ω c₀ h₀ _, Set.mem_univ _,
-        one_pos, Finset.card_pos.mpr ⟨w, hpole w m⟩⟩
-    refine Infinite.of_injective f fun m₁ m₂ h ↦ ?_
-    have hc : pole w m₁ = pole w m₂ := congrArg (fun j ↦ j.val.1) h
-    have hg := DFunLike.congr_fun hc (σ t)
-    change c₀ (σ t) * (((m(S) (σ t) : ℝ≥0) : ℝ) : ℂ) ^ (_ : ℂ) =
-      c₀ (σ t) * (((m(S) (σ t) : ℝ≥0) : ℝ) : ℂ) ^ (_ : ℂ) at hg
-    have hne : c₀ (σ t) ≠ 0 := ((Group.isUnit _).map c₀).ne_zero
-    have hpow := congrArg norm (mul_left_cancel₀ hne hg)
-    rw [hσ t] at hpow
-    have h2 : (0 : ℝ) < ((t : ℝ≥0) : ℝ) := by norm_num [t]
-    rw [Complex.norm_cpow_eq_rpow_re_of_pos h2, Complex.norm_cpow_eq_rpow_re_of_pos h2] at hpow
-    have hre := (Real.rpow_right_inj h2 (by norm_num [t])).mp hpow
-    have hstep := (P w).choose_spec.choose_spec.1
-    have hm : (P w).choose_spec.choose * (m₁ : ℝ) = (P w).choose_spec.choose * (m₂ : ℝ) := by
-      simpa [Complex.mul_re] using hre
-    exact_mod_cast mul_left_cancel₀ hstep.ne' hm
+  obtain ⟨w⟩ := (inferInstance : Nonempty (InfinitePlace F))
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  let t : ℝ≥0ˣ := Units.mk0 2 two_ne_zero
+  let f : ℕ → ΓIndex(ω, (Set.univ : Set Xₛ)) := fun m ↦
+    ⟨(pole w m, 1), sLocalGammaOrbitalQuotient_coeff_onComponent ω c₀ h₀ _, Set.mem_univ _,
+      one_pos, Finset.card_pos.mpr ⟨w, hpole w m⟩⟩
+  refine Infinite.of_injective f fun m₁ m₂ h ↦ ?_
+  have hc : pole w m₁ = pole w m₂ := congrArg (fun j ↦ j.val.1) h
+  have hg := DFunLike.congr_fun hc (σ t)
+  change c₀ (σ t) * (((m(S) (σ t) : ℝ≥0) : ℝ) : ℂ) ^ (_ : ℂ) =
+    c₀ (σ t) * (((m(S) (σ t) : ℝ≥0) : ℝ) : ℂ) ^ (_ : ℂ) at hg
+  have hne : c₀ (σ t) ≠ 0 := ((Group.isUnit _).map c₀).ne_zero
+  have hpow := congrArg norm (mul_left_cancel₀ hne hg)
+  rw [hσ t] at hpow
+  have h2 : (0 : ℝ) < ((t : ℝ≥0) : ℝ) := by norm_num [t]
+  rw [Complex.norm_cpow_eq_rpow_re_of_pos h2, Complex.norm_cpow_eq_rpow_re_of_pos h2] at hpow
+  have hre := (Real.rpow_right_inj h2 (by norm_num [t])).mp hpow
+  have hstep := (P w).choose_spec.choose_spec.1
+  have hm : (P w).choose_spec.choose * (m₁ : ℝ) = (P w).choose_spec.choose * (m₂ : ℝ) := by
+    simpa [Complex.mul_re] using hre
+  exact_mod_cast mul_left_cancel₀ hstep.ne' hm
+
+/-- A class lies in the entire-Mellin subspace exactly when all of its archimedean
+Laurent coefficients on the component vanish. -/
+private theorem sLocalGammaOrbitalQuotient_coeff_ker (ω : PontryaginDual J₁(S))
+    (x : fullPV(ω)) :
+    x ∈ Γker(ω) ↔ ∀ j : ΓIndex(ω, (Set.univ : Set Xₛ)), ΓCoeff(ω, j) x = 0 := by
+  rw [← sLocalGammaFiltration_iInf, Submodule.mem_iInf]
+  constructor
+  · intro h j
+    obtain ⟨N, hN⟩ := sLocalGammaFiltration_iInf_mem_cutoff ω j.val.1 j.property.1
+      (Finset.card_pos.mp (j.property.2.2.1.trans_le j.property.2.2.2))
+    exact (Submodule.mem_iInf _).mp (h N) ⟨j.val, j.property.1, hN, j.property.2.2⟩
+  · intro h N
+    exact (Submodule.mem_iInf _).mpr fun j ↦
+      h ⟨j.val, j.property.1, Set.mem_univ _, j.property.2.2⟩
+
+/-- A surjective continuous linear map from a Fréchet space onto a countable product of
+complex lines is open. -/
+private theorem sLocalGammaOrbitalQuotient_coeff_isOpenMap {Q ι : Type*} [AddCommGroup Q]
+    [Module ℂ Q] [TopologicalSpace Q] [IsTopologicalAddGroup Q] [ContinuousSMul ℂ Q]
+    [Countable ι] (hQ : IsFrechetTVS Q) (L : Q →L[ℂ] (ι → ℂ))
+    (hL : Function.Surjective L) : IsOpenMap L := by
+  obtain ⟨_, _, hmet, hcomplete⟩ := hQ
+  let : UniformSpace Q := IsTopologicalAddGroup.rightUniformSpace Q
+  have : IsUniformAddGroup Q := isUniformAddGroup_of_addCommGroup
+  have : CompleteSpace Q := hcomplete
+  have := hmet
+  refine isOpenMap_of_not_isMeagre_range L ?_
+  rw [hL.range_eq]
+  exact not_isMeagre_of_isOpen isOpen_univ Set.univ_nonempty
+
+/-- The archimedean Laurent coefficients identify the archimedean polar quotient with the
+product of complex lines indexed by centers and orders. -/
+private theorem sLocalGammaOrbitalQuotient_coeff_equiv (ω : PontryaginDual J₁(S)) :
+    ∃ Ψ : (fullPV(ω) ⧸ Γker(ω)) ≃L[ℂ] (ΓIndex(ω, (Set.univ : Set Xₛ)) → ℂ),
+      ∀ (x : fullPV(ω)) (j : ΓIndex(ω, (Set.univ : Set Xₛ))),
+        Ψ ((Γker(ω)).mkQ x) j = ΓCoeff(ω, j) x := by
+  have := sLocalGammaOrbitalQuotient_coeff_countable ω
+  let Φ : fullPV(ω) →L[ℂ] (ΓIndex(ω, (Set.univ : Set Xₛ)) → ℂ) :=
+    ContinuousLinearMap.pi fun j ↦ ΓCoeff(ω, j)
+  have hker : Γker(ω) ≤ LinearMap.ker Φ.toLinearMap := fun x hx ↦
+    funext fun j ↦ (sLocalGammaOrbitalQuotient_coeff_ker ω x).mp hx j
+  let L := (Γker(ω)).liftQ Φ.toLinearMap hker
+  have hcont : Continuous L :=
+    (QuotientAddGroup.isQuotientMap_mk _).continuous_iff.mpr Φ.continuous
+  have hinj : Function.Injective L := by
+    rw [← LinearMap.ker_eq_bot]
+    refine Submodule.ker_liftQ_eq_bot _ _ _ fun x hx ↦ ?_
+    exact (sLocalGammaOrbitalQuotient_coeff_ker ω x).mpr fun j ↦ congrFun hx j
+  have hsurj : Function.Surjective L := fun v ↦ by
+    obtain ⟨x, hx⟩ := sLocalGamma_all_coeff_surjective ω v
+    exact ⟨(Γker(ω)).mkQ x, hx⟩
+  let e := LinearEquiv.ofBijective L ⟨hinj, hsurj⟩
+  have hopen : IsOpenMap L :=
+    sLocalGammaOrbitalQuotient_coeff_isOpenMap (sLocalGammaOrbitalQuotient_frechet ω)
+      ⟨L, hcont⟩ hsurj
+  let h := e.toEquiv.toHomeomorphOfContinuousOpen hcont hopen
+  exact ⟨{ e with continuous_toFun := hcont, continuous_invFun := h.symm.continuous },
+    fun x j ↦ rfl⟩
+
+/-- If a product of lines is identified with a quotient by coefficient functionals, each of
+which already vanishes on one of a family of larger subspaces, then the maps to the quotients by
+that family induce the topology of the quotient. -/
+private theorem sLocalGammaOrbitalQuotient_projectiveTopology_inducing {E ι κ : Type*}
+    {_ : AddCommGroup E} {_ : Module ℂ E} {_ : TopologicalSpace E}
+    (P : Submodule ℂ E) (stage : κ → Submodule ℂ E) (hle : ∀ N, P ≤ stage N)
+    (φ : ι → StrongDual ℂ E) (Ψ : E ⧸ P → ι → ℂ) (hΨi : IsInducing Ψ)
+    (hΨ : ∀ (x : E) (j : ι), Ψ (P.mkQ x) j = φ j x)
+    (hN : ∀ j, ∃ N, ∀ x ∈ stage N, φ j x = 0) :
+    IsInducing (fun (x : E ⧸ P) (N : κ) ↦ P.mapQ (stage N) LinearMap.id (hle N) x) := by
+  let ℓ (j : ι) : (E ⧸ stage (hN j).choose) →ₗ[ℂ] ℂ :=
+    (stage (hN j).choose).liftQ (φ j).toLinearMap fun x hx ↦ (hN j).choose_spec x hx
+  have hℓ (j : ι) : Continuous (ℓ j) :=
+    (QuotientAddGroup.isQuotientMap_mk _).continuous_iff.mpr (φ j).continuous
+  let H : ((N : κ) → E ⧸ stage N) → (ι → ℂ) := fun y j ↦ ℓ j (y (hN j).choose)
+  have hH : Continuous H := continuous_pi fun j ↦ (hℓ j).comp (continuous_apply _)
+  have hF : Continuous (fun (x : E ⧸ P) (N : κ) ↦ P.mapQ (stage N) LinearMap.id (hle N) x) :=
+    continuous_pi fun N ↦ (QuotientAddGroup.isQuotientMap_mk P.toAddSubgroup).continuous_iff.mpr
+      (QuotientAddGroup.isQuotientMap_mk (stage N).toAddSubgroup).continuous
+  have hcomp : H ∘ (fun (x : E ⧸ P) (N : κ) ↦ P.mapQ (stage N) LinearMap.id (hle N) x) =
+      fun x ↦ Ψ x := by
+    funext x j
+    obtain ⟨x, rfl⟩ := P.mkQ_surjective x
+    exact (hΨ x j).symm
+  refine IsInducing.of_comp hF hH ?_
+  rw [hcomp]
+  exact hΨi
+
+/-- Each archimedean Laurent coefficient vanishes on some stage of the filtration. -/
+private theorem sLocalGammaOrbitalQuotient_projectiveTopology_cutoff (ω : PontryaginDual J₁(S))
+    (j : ΓIndex(ω, (Set.univ : Set Xₛ))) : ∃ N : depths,
+      ∀ x ∈ sLocalGammaFiltration (F := F) (S := S) ω N, ΓCoeff(ω, j) x = 0 := by
+  obtain ⟨N, hN⟩ := sLocalGammaFiltration_iInf_mem_cutoff ω j.val.1 j.property.1
+    (Finset.card_pos.mp (j.property.2.2.1.trans_le j.property.2.2.2))
+  exact ⟨N, fun x hx ↦
+    (Submodule.mem_iInf _).mp hx ⟨j.val, j.property.1, hN, j.property.2.2⟩⟩
+
+/-- The statement of `sLocalGammaOrbitalQuotient_projectiveTopology` with its abbreviations
+expanded. -/
+private theorem sLocalGammaOrbitalQuotient_projectiveTopology_aux (ω : PontryaginDual J₁(S)) :
+    ∃ qN : (N : depths) → (fullPV(ω) ⧸ Γker(ω)) →ₗ[ℂ]
+        (fullPV(ω) ⧸ sLocalGammaFiltration (F := F) (S := S) ω N),
+      (∀ N (x : fullPV(ω)), qN N ((Γker(ω)).mkQ x) = (sLocalGammaFiltration ω N).mkQ x) ∧
+      IsInducing (fun (x : fullPV(ω) ⧸ Γker(ω)) (N : depths) ↦ qN N x) := by
+  have hle (N : depths) : Γker(ω) ≤ sLocalGammaFiltration (F := F) (S := S) ω N := by
+    rw [← sLocalGammaFiltration_iInf]
+    exact iInf_le _ N
+  have h := sLocalGammaOrbitalQuotient_coeff_equiv ω
+  have k := sLocalGammaOrbitalQuotient_projectiveTopology_inducing (Γker(ω))
+      (sLocalGammaFiltration (F := F) (S := S) ω) hle (fun j ↦ ΓCoeff(ω, j)) h.choose
+      h.choose.toHomeomorph.isInducing (fun x j ↦ by
+        have := h.choose_spec x j
+        rw [this])
+      (fun j ↦ by
+        obtain ⟨N, hN⟩ := sLocalGammaOrbitalQuotient_projectiveTopology_cutoff ω j
+        refine ⟨N, fun x hx ↦ ?_⟩
+        have := hN x hx
+        rw [this])
+  exact ⟨fun N ↦ (Γker(ω)).mapQ (sLocalGammaFiltration (F := F) (S := S) ω N) LinearMap.id (hle N),
+    fun N x ↦ rfl, k⟩
+
+/-- Paper: Theorem 7.3.4.1(4), p. 365.
+The quotient topology is induced by the family of canonical finite-cutoff quotient maps. -/
+theorem sLocalGammaOrbitalQuotient_projectiveTopology (ω : PontryaginDual J₁(S)) :
+    let E := ↥(fullPV(ω))
+    let P := Γker(ω)
+    let stage := sLocalGammaFiltration (F := F) (S := S) ω
+    ∃ qN : (N : depths) → (E ⧸ P) →ₗ[ℂ] (E ⧸ stage N),
+      (∀ N (x : E), qN N (P.mkQ x) = (stage N).mkQ x) ∧
+      IsInducing (fun (x : E ⧸ P) (N : depths) ↦ qN N x) := by
+  exact sLocalGammaOrbitalQuotient_projectiveTopology_aux ω
+
+/-- Paper: Theorem 7.3.4.1(4), p. 365.
+The quotient is topologically linearly isomorphic to the product of complex
+lines indexed by cutoff tuples. -/
+theorem sLocalGammaOrbitalQuotient_product (ω : PontryaginDual J₁(S)) :
+    let E := ↥(fullPV(ω))
+    let P := Γker(ω)
+    Nonempty ((E ⧸ P) ≃L[ℂ] (depths → ℂ)) := by
+  intro E P
+  obtain ⟨Ψ, -⟩ := sLocalGammaOrbitalQuotient_coeff_equiv ω
+  have := sLocalGammaOrbitalQuotient_coeff_countable ω
+  have := sLocalGammaOrbitalQuotient_coeff_infinite ω
+  let := Encodable.ofCountable (ΓIndex(ω, (Set.univ : Set Xₛ)))
+  let := Denumerable.ofEncodableOfInfinite (ΓIndex(ω, (Set.univ : Set Xₛ)))
+  let := Encodable.ofCountable depths
+  let := Denumerable.ofEncodableOfInfinite depths
+  let e : ΓIndex(ω, (Set.univ : Set Xₛ)) ≃ depths :=
+    (Denumerable.eqv _).trans (Denumerable.eqv depths).symm
+  exact ⟨Ψ.trans (ContinuousLinearEquiv.piCongrLeft ℂ (fun _ : depths ↦ ℂ) e)⟩
+
+/-- Paper: Theorem 7.3.4.1(4), p. 365.
+The strong dual of the quotient is topologically linearly isomorphic to the
+direct sum of complex lines with its finest locally convex topology.
+The quotient dual represents the annihilator via pullback along the quotient map. -/
+theorem sLocalGammaOrbitalQuotient_dual_directSum (ω : PontryaginDual J₁(S)) :
+    let E := ↥(fullPV(ω))
+    let P := Γker(ω)
+    Nonempty (StrongDual ℂ (E ⧸ P) ≃L[ℂ] FinestLocallyConvex (depths →₀ ℂ)) := by sorry
+
+/-- Paper: Theorem 7.3.4.1(5), pp. 365–366.
+The set of archimedean centers with their admissible Laurent orders admits an enumeration. -/
+theorem sLocalGammaIndex_enumerable (ω : PontryaginDual J₁(S)) :
+    Nonempty (ℕ ≃ ΓIndex(ω, (Set.univ : Set Xₛ))) := by
+  have := sLocalGammaOrbitalQuotient_coeff_countable ω
+  have := sLocalGammaOrbitalQuotient_coeff_infinite ω
   let := Encodable.ofCountable (ΓIndex(ω, (Set.univ : Set Xₛ)))
   let := Denumerable.ofEncodableOfInfinite (ΓIndex(ω, (Set.univ : Set Xₛ)))
   exact ⟨(Denumerable.eqv _).symm⟩
