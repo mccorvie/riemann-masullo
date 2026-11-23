@@ -1052,6 +1052,208 @@ theorem globalThetaSobolevPrincipalValue_equivariant (S : Finset V) (a : ℝ)
       globalThetaSobolevPrincipalValue_equivariant_hcomm_empty S hn g)
     u
 
+/-- Banach–Steinhaus on a compact parameter set: a strongly continuous family of operators on
+a Banach space is uniformly bounded there. -/
+private theorem globalThetaSobolevPrincipalValue_singleton_bound {X W : Type*}
+    [TopologicalSpace X] [NormedAddCommGroup W] [NormedSpace ℂ W] [CompleteSpace W]
+    (T : X → W →L[ℂ] W) (hT : ∀ w, Continuous fun k ↦ T k w) (U : Set X) (hU : IsCompact U) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ k ∈ U, ‖T k‖ ≤ C := by
+  obtain ⟨C, hC⟩ := banach_steinhaus (g := fun k : U ↦ T k.val) fun w ↦ by
+    obtain ⟨C, hC⟩ := hU.exists_bound_of_continuousOn (hT w).continuousOn
+    exact ⟨C, fun k ↦ hC k.val k.property⟩
+  exact ⟨max C 0, le_max_right _ _, fun k hk ↦ (hC ⟨k, hk⟩).trans (le_max_left _ _)⟩
+
+/-- A continuous linear map that is bounded by a multiple of the distance to `u` on a dense set
+vanishes at `u`. -/
+private theorem globalThetaSobolevPrincipalValue_singleton_dense {Y E W : Type*}
+    [SeminormedAddCommGroup E] [NormedAddCommGroup W] [NormedSpace ℂ E] [NormedSpace ℂ W]
+    (L : E →L[ℂ] W) (D : Y → E) (hD : DenseRange D) (u : E) (K : ℝ)
+    (hK : ∀ y, ‖L (D y)‖ ≤ K * ‖D y - u‖) : L u = 0 := by
+  refine norm_le_zero_iff.mp (le_of_forall_pos_le_add fun ε hε ↦ ?_)
+  set M := ‖L‖ + |K| + 1 with hMdef
+  have hM : 0 < M := by positivity
+  obtain ⟨y, hy⟩ := Metric.denseRange_iff.mp hD u (ε / M) (div_pos hε hM)
+  rw [dist_eq_norm] at hy
+  have h1 : ‖L u‖ ≤ ‖L (D y)‖ + ‖L (u - D y)‖ := by
+    rw [map_sub]; exact norm_le_norm_add_norm_sub' _ _
+  have h2 : ‖L (u - D y)‖ ≤ ‖L‖ * ‖u - D y‖ := L.le_opNorm _
+  have h3 : ‖L (D y)‖ ≤ |K| * ‖u - D y‖ := by
+    rw [norm_sub_rev]
+    exact (hK y).trans (mul_le_mul_of_nonneg_right (le_abs_self K) (norm_nonneg _))
+  have h4 : M * ‖u - D y‖ ≤ ε := by
+    have := (lt_div_iff₀ hM).mp hy; linarith [mul_comm M ‖u - D y‖]
+  nlinarith [norm_nonneg (u - D y), norm_nonneg L, abs_nonneg K]
+
+/-- The density step for the singleton formula: if `P x = x - R x` holds up to a multiple of the
+distance to `u` on a dense set, it holds at `u`. -/
+private theorem globalThetaSobolevPrincipalValue_singleton_eq {Y W : Type*}
+    [NormedAddCommGroup W] [NormedSpace ℂ W] (H : Submodule ℂ W) (P : H →L[ℂ] H)
+    (R : W →L[ℂ] W) (D : Y → H) (hD : DenseRange D) (u : H) (K : ℝ)
+    (hK : ∀ y, ‖(P (D y) : W) - ((D y : W) - R (D y))‖ ≤ K * ‖(D y : W) - u‖) :
+    (P u : W) = u - R u := by
+  have h := globalThetaSobolevPrincipalValue_singleton_dense
+    (H.subtypeL.comp P - (H.subtypeL - R.comp H.subtypeL)) D hD u K hK
+  exact sub_eq_zero.mp h
+
+/-- The squared weighted L² mass of the normalized average of a measurable family over `U` is
+at most a common bound for the squared masses of its members (pointwise Cauchy–Schwarz and
+Tonelli). -/
+private theorem globalThetaSobolevPrincipalValue_singleton_avg {G X : Type*}
+    [MeasurableSpace G] [MeasurableSpace X] (ν : Measure G) [SFinite ν] (μX : Measure X)
+    (U : Set X) (hU : MeasurableSet U) (hUfin : μX U ≠ ⊤)
+    (F : X → G → ℂ) (hF : StronglyMeasurable (Function.uncurry F)) (B : ENNReal)
+    (hB : ∀ k ∈ U, ∫⁻ x, ‖F k x‖ₑ ^ 2 ∂ν ≤ B) :
+    ∫⁻ x, ‖(((μX.real U)⁻¹ : ℝ) : ℂ) * ∫ k in U, F k x ∂μX‖ₑ ^ 2 ∂ν ≤ B := by
+  have : IsFiniteMeasure (μX.restrict U) :=
+    ⟨by rw [Measure.restrict_apply_univ]; exact lt_top_iff_ne_top.mpr hUfin⟩
+  set c : ℝ := μX.real U with hcdef
+  have hc0 : 0 ≤ c := measureReal_nonneg
+  have hcU : μX U = ENNReal.ofReal c := (ENNReal.ofReal_toReal hUfin).symm
+  have hFm : Measurable (Function.uncurry fun x k ↦ ‖F k x‖ₑ ^ 2) :=
+    ((hF.measurable.comp measurable_swap).eNorm).pow_const 2
+  have hpt (x : G) : ‖((c⁻¹ : ℝ) : ℂ) * ∫ k in U, F k x ∂μX‖ₑ ^ 2 ≤
+      ENNReal.ofReal c⁻¹ * ∫⁻ k in U, ‖F k x‖ₑ ^ 2 ∂μX := by
+    have h1 : ‖((c⁻¹ : ℝ) : ℂ) * ∫ k in U, F k x ∂μX‖ₑ ≤
+        ENNReal.ofReal c⁻¹ * ∫⁻ k in U, ‖F k x‖ₑ ∂μX := by
+      rw [eNorm_mul]
+      refine mul_le_mul' (le_of_eq ?_) (eNorm_integral_le_lintegral_eNorm _)
+      rw [← ofReal_norm, Complex.norm_real, Real.norm_of_nonneg (inv_nonneg.mpr hc0)]
+    have h2 := globalThetaPrincipalValue_sobolevBound_average_cs (μX.restrict U)
+      (fun k ↦ ‖F k x‖ₑ)
+      ((hF.measurable.comp (measurable_id.prodMk measurable_const)).eNorm.aemeasurable)
+    rw [Measure.restrict_apply_univ, hcU] at h2
+    have h3 : ENNReal.ofReal c⁻¹ ^ 2 * ENNReal.ofReal c ≤ ENNReal.ofReal c⁻¹ := by
+      rcases hc0.eq_or_lt with h | h
+      · rw [← h]; simp
+      · rw [← ENNReal.ofReal_pow (inv_nonneg.mpr hc0), ← ENNReal.ofReal_mul (by positivity)]
+        refine ENNReal.ofReal_le_ofReal (le_of_eq ?_)
+        field_simp
+    calc ‖((c⁻¹ : ℝ) : ℂ) * ∫ k in U, F k x ∂μX‖ₑ ^ 2
+        ≤ (ENNReal.ofReal c⁻¹ * ∫⁻ k in U, ‖F k x‖ₑ ∂μX) ^ 2 :=
+          pow_le_pow_left₀ zero_le h1 2
+      _ = ENNReal.ofReal c⁻¹ ^ 2 * (∫⁻ k in U, ‖F k x‖ₑ ∂μX) ^ 2 := mul_pow _ _ _
+      _ ≤ ENNReal.ofReal c⁻¹ ^ 2 * (ENNReal.ofReal c * ∫⁻ k in U, ‖F k x‖ₑ ^ 2 ∂μX) :=
+          mul_le_mul' le_rfl h2
+      _ = (ENNReal.ofReal c⁻¹ ^ 2 * ENNReal.ofReal c) * ∫⁻ k in U, ‖F k x‖ₑ ^ 2 ∂μX := by ring
+      _ ≤ ENNReal.ofReal c⁻¹ * ∫⁻ k in U, ‖F k x‖ₑ ^ 2 ∂μX := mul_le_mul' h3 le_rfl
+  calc ∫⁻ x, ‖((c⁻¹ : ℝ) : ℂ) * ∫ k in U, F k x ∂μX‖ₑ ^ 2 ∂ν
+      ≤ ∫⁻ x, ENNReal.ofReal c⁻¹ * ∫⁻ k in U, ‖F k x‖ₑ ^ 2 ∂μX ∂ν := lintegral_mono hpt
+    _ = ENNReal.ofReal c⁻¹ * ∫⁻ k in U, ∫⁻ x, ‖F k x‖ₑ ^ 2 ∂ν ∂μX := by
+        rw [lintegral_const_mul _ (f := fun x ↦ ∫⁻ k in U, ‖F k x‖ₑ ^ 2 ∂μX)
+          hFm.lintegral_prod_right', lintegral_lintegral_swap hFm.aemeasurable]
+    _ ≤ ENNReal.ofReal c⁻¹ * ∫⁻ k in U, B ∂μX := mul_le_mul' le_rfl (setLIntegral_mono' hU hB)
+    _ = (ENNReal.ofReal c⁻¹ * ENNReal.ofReal c) * B := by rw [setLIntegral_const, hcU]; ring
+    _ ≤ B := by
+        refine (mul_le_mul' ?_ le_rfl).trans_eq (one_mul _)
+        rcases hc0.eq_or_lt with h | h
+        · rw [← h]; simp
+        · rw [← ENNReal.ofReal_mul (by positivity), inv_mul_cancel₀ h.ne', ENNReal.ofReal_one]
+
+/-- An L² class represented by the normalized average over `U` of a measurable family has norm
+at most a common bound for L² classes representing the members. -/
+private theorem globalThetaSobolevPrincipalValue_singleton_est {G X : Type*}
+    [MeasurableSpace G] [MeasurableSpace X] {ν : Measure G} [SFinite ν] (μX : Measure X)
+    (U : Set X) (hU : MeasurableSet U) (hUfin : μX U ≠ ⊤)
+    (F : X → G → ℂ) (hF : StronglyMeasurable (Function.uncurry F))
+    (z : Lp ℂ 2 ν) (Y : X → Lp ℂ 2 ν) (B : ℝ) (hB0 : 0 ≤ B)
+    (hz : (z : G → ℂ) =ᵐ[ν] fun x ↦ (((μX.real U)⁻¹ : ℝ) : ℂ) * ∫ k in U, F k x ∂μX)
+    (hV : ∀ k ∈ U, (Y k : G → ℂ) =ᵐ[ν] F k) (hVB : ∀ k ∈ U, ‖Y k‖ ≤ B) : ‖z‖ ≤ B := by
+  have hsq (g : Lp ℂ 2 ν) : ‖g‖ₑ ^ 2 = ∫⁻ x, ‖(g : G → ℂ) x‖ₑ ^ 2 ∂ν := by
+    have h := eLpNorm_nnreal_pow_eq_lintegral (f := (g : G → ℂ)) (μ := ν) (p := 2) two_ne_zero
+      (Lp.aestronglyMeasurable g)
+    rw [Lp.eNorm_def]
+    simpa using h
+  have hle : ‖z‖ₑ ^ 2 ≤ ENNReal.ofReal B ^ 2 := by
+    rw [hsq]
+    refine (lintegral_congr_ae (hz.fun_comp fun y ↦ ‖y‖ₑ ^ 2)).trans_le ?_
+    refine globalThetaSobolevPrincipalValue_singleton_avg ν μX U hU hUfin F hF _ fun k hk ↦ ?_
+    refine (lintegral_congr_ae ((hV k hk).fun_comp fun y ↦ ‖y‖ₑ ^ 2)).symm.trans_le ?_
+    refine (hsq (Y k)).symm.trans_le ?_
+    rw [← ofReal_norm]
+    exact pow_le_pow_left₀ zero_le (ENNReal.ofReal_le_ofReal (hVB k hk)) 2
+  have hle' : ‖z‖ₑ ≤ ENNReal.ofReal B := by
+    by_contra h
+    exact absurd hle (not_le.mpr (ENNReal.pow_lt_pow_left two_ne_zero (not_le.mp h)))
+  rw [← ofReal_norm] at hle'
+  exact (ENNReal.ofReal_le_ofReal_iff hB0).mp hle'
+
+/-- The pointwise identity behind the singleton formula: the theta function of `PV_v f`, minus
+the difference of `θ f` with its translate by `a`, is the normalized unit average of the
+differences of the translates by `a` and by `τ k`. -/
+private theorem globalThetaSobolevPrincipalValue_singleton_pt {G X : Type*} [Group G]
+    [MeasurableSpace X] (μX : Measure X) (U : Set X) (hUfin : μX U ≠ ⊤) (hUpos : 0 < μX.real U)
+    (φ ψ : G → ℂ) (a : G) (τ : X → G) (x : G)
+    (hint : IntegrableOn (fun k ↦ φ (τ k * x)) U μX)
+    (hψ : ψ x = φ x - (((μX.real U)⁻¹ : ℝ) : ℂ) * ∫ k in U, φ (τ k * x) ∂μX) :
+    ψ x - (φ x - φ (a⁻¹ * x)) =
+      (((μX.real U)⁻¹ : ℝ) : ℂ) * ∫ k in U, (φ (a⁻¹ * x) - φ (τ k * x)) ∂μX := by
+  rw [integral_sub (integrableOn_const hUfin) hint, setIntegral_const, hψ, Complex.real_smul,
+    Complex.ofReal_inv]
+  have hc : ((μX.real U : ℝ) : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr hUpos.ne'
+  field_simp
+  ring
+
+/-- The estimate behind the singleton formula, for one test. Let `w` and `z` be the classes of
+`θ f` and `θ (PV_v f)`, where `θ (PV_v f) = θ f - avg_k θ f (τ k * ·)` with `τ k = (a * ι k)⁻¹`.
+If the units `ι k` fix `u` and act with norm at most `C`, then the defect `z - (w - ρ a w)` has
+norm at most `‖ρ a‖ (1 + C) ‖w - u‖`. -/
+private theorem globalThetaSobolevPrincipalValue_singleton_step {G X : Type*} [Group G]
+    [TopologicalSpace G] [IsTopologicalGroup G] [MeasurableSpace G] [BorelSpace G]
+    [SecondCountableTopology G] [TopologicalSpace X] [T2Space X] [MeasurableSpace X]
+    [OpensMeasurableSpace X] {ν μ : Measure G} (hνμ : ν ≪ μ) [SFinite ν]
+    (ρ : G →* (Lp ℂ 2 ν →L[ℂ] Lp ℂ 2 ν))
+    (htr : ∀ (g : G) (w : Lp ℂ 2 ν) (φ : G → ℂ), (w : G → ℂ) =ᵐ[μ] φ →
+      (ρ g w : G → ℂ) =ᵐ[μ] fun x ↦ φ (g⁻¹ * x))
+    (μX : Measure X) [IsFiniteMeasureOnCompacts μX] (U : Set X) (hUc : IsCompact U)
+    (hUm : MeasurableSet U) (hUpos : 0 < μX.real U)
+    (ι' : X → G) (a : G) (τ : X → G) (hτc : Continuous τ) (hτ : ∀ k, τ k = (a * ι' k)⁻¹)
+    (C : ℝ) (hC0 : 0 ≤ C) (hC : ∀ k ∈ U, ‖ρ (ι' k)‖ ≤ C)
+    (u w z : Lp ℂ 2 ν) (hinv : ∀ k ∈ U, ρ (ι' k) u = u)
+    (φ ψ : G → ℂ) (hφ : Continuous φ) (hw : (w : G → ℂ) =ᵐ[μ] φ) (hz : (z : G → ℂ) =ᵐ[μ] ψ)
+    (hψ : ∀ x, ψ x = φ x - (((μX.real U)⁻¹ : ℝ) : ℂ) * ∫ k in U, φ (τ k * x) ∂μX) :
+    ‖z - (w - ρ a w)‖ ≤ ‖ρ a‖ * (1 + C) * ‖w - u‖ := by
+  have hUfin : μX U ≠ ⊤ := hUc.measure_ne_top
+  let Fk : X → G → ℂ := fun k x ↦ φ (a⁻¹ * x) - φ (τ k * x)
+  have hFc : Continuous (Function.uncurry Fk) :=
+    (hφ.comp (continuous_const.mul continuous_snd)).sub
+      (hφ.comp ((hτc.comp continuous_fst).mul continuous_snd))
+  have hint (x : G) : IntegrableOn (fun k ↦ φ (τ k * x)) U μX :=
+    (hφ.comp (hτc.mul continuous_const)).continuousOn.integrableOn_compact hUc
+  let Dk : X → Lp ℂ 2 ν := fun k ↦ ρ a (w - ρ (ι' k) w)
+  have hV (k : X) (_hk : k ∈ U) : (Dk k : G → ℂ) =ᵐ[ν] Fk k := by
+    have e : Dk k = ρ a w - ρ (a * ι' k) w := by
+      change ρ a (w - ρ (ι' k) w) = ρ a w - ρ (a * ι' k) w
+      rw [map_mul ρ]
+      exact map_sub (ρ a) w (ρ (ι' k) w)
+    rw [e]
+    refine (Lp.coeFn_sub _ _).trans ((hνμ.ae_eq (htr a w φ hw)).sub (hνμ.ae_eq
+      ((htr _ w φ hw).trans (Filter.Eventually.of_forall fun x ↦ ?_))))
+    change φ ((a * ι' k)⁻¹ * x) = φ (τ k * x)
+    rw [hτ k]
+  have hVB (k : X) (hk : k ∈ U) : ‖Dk k‖ ≤ ‖ρ a‖ * (1 + C) * ‖w - u‖ := by
+    have e : w - ρ (ι' k) w = (w - u) - ρ (ι' k) (w - u) := by
+      rw [map_sub (ρ (ι' k)), hinv k hk, sub_sub_sub_cancel_right]
+    have h1 : ‖(w - u) - ρ (ι' k) (w - u)‖ ≤ (1 + C) * ‖w - u‖ := by
+      refine (norm_sub_le _ _).trans ?_
+      have := ((ρ (ι' k)).le_opNorm (w - u)).trans
+        (mul_le_mul_of_nonneg_right (hC k hk) (norm_nonneg _))
+      linarith
+    calc ‖Dk k‖ = ‖ρ a ((w - u) - ρ (ι' k) (w - u))‖ := by
+          change ‖ρ a (w - ρ (ι' k) w)‖ = _
+          rw [e]
+      _ ≤ ‖ρ a‖ * ‖(w - u) - ρ (ι' k) (w - u)‖ := (ρ a).le_opNorm _
+      _ ≤ ‖ρ a‖ * ((1 + C) * ‖w - u‖) := mul_le_mul_of_nonneg_left h1 (norm_nonneg _)
+      _ = ‖ρ a‖ * (1 + C) * ‖w - u‖ := (mul_assoc _ _ _).symm
+  have hz' : ((z - (w - ρ a w) : Lp ℂ 2 ν) : G → ℂ) =ᵐ[ν]
+      fun x ↦ (((μX.real U)⁻¹ : ℝ) : ℂ) * ∫ k in U, Fk k x ∂μX := by
+    refine ((Lp.coeFn_sub _ _).trans ((hνμ.ae_eq hz).sub ((Lp.coeFn_sub _ _).trans
+      ((hνμ.ae_eq hw).sub (hνμ.ae_eq (htr a w φ hw)))))).trans
+      (Filter.Eventually.of_forall fun x ↦ ?_)
+    exact globalThetaSobolevPrincipalValue_singleton_pt μX U hUfin hUpos φ ψ a τ x (hint x)
+      (hψ x)
+  exact globalThetaSobolevPrincipalValue_singleton_est μX U hUm hUfin Fk hFc.stronglyMeasurable
+    _ Dk _ (by positivity) hz' hV hVB
+
 /-- Paper: Proof of Proposition 11.2.0.1, pp. 484–485. At an unramified
 singleton place, the 0-line extension is the difference with the uniformizer translate.
 Deviation: The difference formula applies on the local-unit-invariant summand.
@@ -1061,7 +1263,96 @@ theorem globalThetaSobolevPrincipalValue_singleton (v : V) (π : (v.adicCompleti
     (_hχ : (ideleClassNormTwist χ 0).IsUnramifiedAt v) {s : ℝ} (hs : 0 ≤ s)
     (u : H(0, hs)) (_hu : (u : W(s)) ∈ Wω(hs, χ.comp restriction)) :
     (P({v}, 0, hs) u : W(s)) =
-      (u : W(s)) - ρ(hs) (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v π) u.val := by sorry
+      (u : W(s)) - ρ(hs) (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v π) u.val := by
+  classical
+  letI : MeasurableSpace (v.adicCompletion F)ˣ := borel _
+  have : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+  have := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) v
+  let μX := finiteLocalMultiplicativeTamagawaMeasure F v
+  let U : Set (v.adicCompletion F)ˣ :=
+    ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ)
+  have hUo : IsOpen U := Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hUc : IsCompact U := Submonoid.units_isCompact
+    (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v))
+  have hUfin : μX U ≠ ⊤ := hUc.measure_ne_top
+  have hUpos : 0 < μX.real U :=
+    ENNReal.toReal_pos (hUo.measure_pos μX ⟨1, Subgroup.one_mem _⟩).ne' hUfin
+  let ι := IdeleClassGroup.ofAdicCompletion (𝓞 F) F v
+  have hι : Continuous ι := continuous_ideleClass_ofAdicCompletion F v
+  let a : C𝔽 := ι π
+  -- The regular representation is strongly continuous and acts by `x ↦ φ (g⁻¹ * x)`.
+  have hρc (w : W(s)) : Continuous fun g : C𝔽 ↦ ρ(hs) g w :=
+    (exists_hardySobolevTranslation μ𝔽 m𝔽 0 0 s hI hs).choose_spec.2.comp
+      (continuous_id.prodMk continuous_const)
+  have htr (g : C𝔽) (w : W(s)) (φ : C𝔽 → ℂ) (hw : (w : C𝔽 → ℂ) =ᵐ[μ𝔽] φ) :
+      ((ρ(hs) g w : W(s)) : C𝔽 → ℂ) =ᵐ[μ𝔽] fun x ↦ φ (g⁻¹ * x) :=
+    (hardySobolevTranslation_apply μ𝔽 m𝔽 0 0 s hI hs g w).trans
+      ((measurePreserving_mul_left μ𝔽 g⁻¹).quasiMeasurePreserving.ae_eq_comp hw)
+  have hθ (h : ℬ₀) : ((j(0, hs) (theta(h)) : W(s)) : C𝔽 → ℂ) =ᵐ[μ𝔽]
+      (adelicTheta h.val : C𝔽 → ℂ) :=
+    ((existsUnique_globalThetaSobolevEmbedding (F := F) 0 0 0 s hI hs).exists.choose_spec.2
+      h).trans (Filter.EventuallyEq.of_eq (modulationWeight_zero m𝔽 _))
+  -- Local integer units act trivially on the isotype.
+  have hnormk (k : (v.adicCompletion F)ˣ) (hk : k ∈ U) : ‖(k : v.adicCompletion F)‖ = 1 := by
+    have h1 : ‖(k : v.adicCompletion F)‖ ≤ 1 :=
+      (Valued.toNormedField.norm_le_one_iff).mpr hk.1
+    have h2 : ‖((k⁻¹ : (v.adicCompletion F)ˣ) : v.adicCompletion F)‖ ≤ 1 :=
+      (Valued.toNormedField.norm_le_one_iff).mpr hk.2
+    have h3 : ‖(k : v.adicCompletion F)‖ *
+        ‖((k⁻¹ : (v.adicCompletion F)ˣ) : v.adicCompletion F)‖ = 1 := by
+      rw [← norm_mul, Units.mul_inv, norm_one]
+    nlinarith [norm_nonneg (k : v.adicCompletion F),
+      norm_nonneg ((k⁻¹ : (v.adicCompletion F)ˣ) : v.adicCompletion F)]
+  have hker (k : (v.adicCompletion F)ˣ) (hk : k ∈ U) : ι k ∈ (ideleClassNorm F).ker := by
+    rw [MonoidHom.mem_ker, ideleClassNorm_ofAdicCompletion]
+    apply Units.ext
+    apply NNReal.coe_injective
+    change ‖(k : v.adicCompletion F)‖ = ((1 : ℝ≥0) : ℝ)
+    rw [hnormk k hk, NNReal.coe_one]
+  have hχk (k : (v.adicCompletion F)ˣ) (hk : k ∈ U) : (χ (ι k) : ℂ) = 1 := by
+    let z : (v.adicCompletionIntegers F)ˣ :=
+      ⟨⟨k.val, hk.1⟩, ⟨(k⁻¹ : (v.adicCompletion F)ˣ).val, hk.2⟩, Subtype.ext k.mul_inv,
+        Subtype.ext k.inv_mul⟩
+    have h := HeckeCharacter.isUnramifiedAt_iff.mp _hχ z
+    let x := Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom z
+    change (ideleClassNormTwist χ 0).restrict v x.val = 1 at h
+    rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe] at h
+    change (χ (ι x) : ℂ) * (((ideleClassNorm F (ι x) : ℝ≥0) : ℝ) : ℂ) ^ (0 : ℂ) = 1 at h
+    rw [Complex.cpow_zero, mul_one] at h
+    have hx : x = k := Units.ext rfl
+    rw [← hx]
+    exact h
+  have hinv (k : (v.adicCompletion F)ˣ) (hk : k ∈ U) : ρ(hs) (ι k) (u : W(s)) = u := by
+    have h := (mem_actionIsotype _ _ _).mp _hu ⟨ι k, hker k hk⟩
+    change ρ(hs) (ι k) (u : W(s)) = (χ (ι k) : ℂ) • (u : W(s)) at h
+    rw [h, hχk k hk, one_smul]
+  have hρι (w : W(s)) : Continuous fun k : (v.adicCompletion F)ˣ ↦ ρ(hs) (ι k) w :=
+    (hρc w).comp hι
+  have hbd : ∃ C : ℝ, 0 ≤ C ∧ ∀ k ∈ U, ‖ρ(hs) (ι k)‖ ≤ C :=
+    globalThetaSobolevPrincipalValue_singleton_bound (W := W(s)) (fun k ↦ ρ(hs) (ι k)) hρι U hUc
+  obtain ⟨C, hC0, hC⟩ := hbd
+  have hq : Surjective (fun f : ℬ₀ ↦ theta(f)) := Submodule.mkQ_surjective
+    ((LinearMap.ker (adelicThetaLinearMap F)).comap (adelePolarSubspace F).subtype)
+  have hdense : DenseRange (fun f : ℬ₀ ↦ j(0, hs) (theta(f))) :=
+    (globalThetaSobolev_dense (F := F) 0 hI hs).comp hq.denseRange (j(0, hs)).continuous
+  have hK (f : ℬ₀) : ‖(P({v}, 0, hs) (j(0, hs) (theta(f))) : W(s)) -
+      ((j(0, hs) (theta(f)) : W(s)) - ρ(hs) a (j(0, hs) (theta(f)) : W(s)))‖ ≤
+      (‖ρ(hs) a‖ * (1 + C)) * ‖(j(0, hs) (theta(f)) : W(s)) - (u : W(s))‖ := by
+    have hzf : ((P({v}, 0, hs) (j(0, hs) (theta(f))) : W(s)) : C𝔽 → ℂ) =ᵐ[μ𝔽]
+        (adelicTheta (pvTest({v}, f)).val : C𝔽 → ℂ) :=
+      (Filter.EventuallyEq.of_eq (congrArg (fun y : H(0, hs) ↦ ((y : W(s)) : C𝔽 → ℂ))
+        (globalThetaSobolevPrincipalValue_apply {v} 0 hs f))).trans (hθ (pvTest({v}, f)))
+    have hτ (k : (v.adicCompletion F)ˣ) : ι ((π * k)⁻¹) = (a * ι k)⁻¹ := by
+      rw [map_inv, map_mul]
+    exact globalThetaSobolevPrincipalValue_singleton_step
+      (withDensity_absolutelyContinuous _ _) ρ(hs) htr μX U hUc hUo.measurableSet hUpos
+      (fun k ↦ ι k) a (fun k ↦ ι ((π * k)⁻¹))
+      (hι.comp ((continuous_const.mul continuous_id).inv)) hτ C hC0 hC
+      (u : W(s)) (j(0, hs) (theta(f)) : W(s)) (P({v}, 0, hs) (j(0, hs) (theta(f))) : W(s)) hinv
+      (adelicTheta f.val) (adelicTheta (pvTest({v}, f)).val) (adelicTheta f.val).continuous
+      (hθ f) hzf (fun x ↦ globalThetaPrincipalValue_sobolevBound_formula v π _hπ f x)
+  exact globalThetaSobolevPrincipalValue_singleton_eq H(0, hs) P({v}, 0, hs) (ρ(hs) a)
+    _ hdense u _ hK
 
 -- TODO(paper-gap): Proposition 11.2.0.1(2) identifies the raw range with a
 -- closed subspace. The singleton prime difference over ℚ has nonclosed range.
