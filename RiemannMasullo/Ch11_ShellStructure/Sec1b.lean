@@ -214,20 +214,17 @@ theorem sLocalUncutCarving_empty (s : ℝ) (ω : PontryaginDual C₁) :
     LinearMap.ext_iff.mp sLocalUncutCarving_empty_PV f.val
   simp only [sLocalUncutCarving, hP]
 
-/-- Paper: (11.1.2.5), p. 480. Before any prime condition the uncut stage is the
-norm-one isotype of the global theta completion from Definition 10.1.1.1. -/
-theorem sLocalUncutCarving_empty_eq_globalThetaSobolev (s : ℝ) (hs : 0 ≤ s)
-    (ω : PontryaginDual C₁) :
-    sLocalUncutCarving s ω ∅ =
-      globalThetaSobolev F 0 (α := 0) (β := 0) le_rfl hs ⊓ Wω(s, hs, ω) := by sorry
-
-/-- Paper: (11.1.2.3), p. 480. The cutoff stage is the closure of the linear
-space obtained by applying the cutoff to the restricted theta tests.
-Deviation: Read the printed P as the principal value PV used on p. 481. The
-definition accepts any measurable norm band, including both in `sLocalCarvingBand`. -/
-def sLocalCutoffCarving (s : ℝ) (ω : PontryaginDual C₁) (T : Finset V)
-    (J : Set ℝ) (hJ : MeasurableSet J) : Submodule ℂ (W(s)) :=
-  (Submodule.span ℂ (range (fun f : ℬ₀ ↦ M(s, J, hJ) (θ(s, ω, P(T, f)))))).topologicalClosure
+/-- The norm-one isotype of the ambient space is closed: it is an intersection of kernels of
+continuous operators. -/
+private theorem sLocalCutoffCarving_le_cutoffIsotype_closed (s : ℝ) (hs : 0 ≤ s)
+    (ω : PontryaginDual C₁) : IsClosed (Wω(s, hs, ω) : Set (W(s))) := by
+  simp only [actionIsotype, Submodule.coe_iInf]
+  refine isClosed_iInter fun g ↦ ?_
+  have hc : Continuous fun u : W(s) ↦ ((hardySobolevTranslation μ𝔽 m𝔽 0 0 s le_rfl hs).comp
+      (ideleClassNorm F).ker.subtype) g u - (ω g : ℂ) • u :=
+    (((hardySobolevTranslation μ𝔽 m𝔽 0 0 s le_rfl hs).comp
+      (ideleClassNorm F).ker.subtype) g).continuous.sub (continuous_const_smul (ω g : ℂ))
+  exact isClosed_eq hc continuous_const
 
 /-- Homogeneous theta of a polar-free test lies in the norm-one isotype of the ambient space:
 it is the inclusion of the homogeneous theta class of §10.1, on which norm-one translation acts
@@ -250,6 +247,75 @@ private theorem sLocalCutoffCarving_le_cutoffIsotype_theta (s : ℝ) (hs : 0 ≤
   intro h
   rw [heq]
   exact (hspec h.val (j x).val).symm.trans (congrArg Subtype.val (hiso h))
+
+/-- Paper: (11.1.2.5), p. 480. Before any prime condition the uncut stage is the
+norm-one isotype of the global theta completion from Definition 10.1.1.1. -/
+theorem sLocalUncutCarving_empty_eq_globalThetaSobolev (s : ℝ) (hs : 0 ≤ s)
+    (ω : PontryaginDual C₁) :
+    sLocalUncutCarving s ω ∅ =
+      globalThetaSobolev F 0 (α := 0) (β := 0) le_rfl hs ⊓ Wω(s, hs, ω) := by
+  obtain ⟨j, -, hdense, hj⟩ :=
+    exists_globalHomogeneousThetaSobolevInclusion (F := F) (a := 0) (le_refl (0 : ℝ)) hs ω
+  have hspec := (exists_globalThetaSobolevAction (F := F) 0 (le_refl (0 : ℝ)) hs).choose_spec.1
+  -- Every vector of the range of `j` is a homogeneous theta, and conversely.
+  have hθ (f : ℬ₀) (x : ↥(globalPolarFreeThetaSubmodule (F := F) ω))
+      (hx : x.val = Submodule.Quotient.mk f.val) : θ(s, ω, f) = (j x).val.val := by
+    have h := (hj f x hx).2.trans (Filter.EventuallyEq.of_eq (modulationWeight_zero m𝔽 _))
+    have h' : ((j x).val.val : C𝔽 → ℂ) =ᵐ[ν(s)] (homogeneousAdelicTheta ω f.val : C𝔽 → ℂ) :=
+      (withDensity_absolutelyContinuous _ _).ae_le h
+    exact Lp.ext ((MemLp.coeFn_toLp _).trans h'.symm)
+  rw [sLocalUncutCarving_empty]
+  apply le_antisymm
+  · refine Submodule.topologicalClosure_minimal _ ?_
+      ((Submodule.isClosed_topologicalClosure _).inter
+        (sLocalCutoffCarving_le_cutoffIsotype_closed s hs ω))
+    refine Submodule.span_le.mpr ?_
+    rintro _ ⟨f, rfl⟩
+    have hf := (mem_adelePolarSubspace f.val).mp f.property
+    let x : ↥(globalPolarFreeThetaSubmodule (F := F) ω) :=
+      ⟨Submodule.Quotient.mk f.val,
+        (mem_globalPolarFreeThetaSubmodule ω _).mpr ⟨f.val, hf.1, hf.2, rfl⟩⟩
+    refine ⟨?_, sLocalCutoffCarving_le_cutoffIsotype_theta s hs ω f⟩
+    have hm := (j x).val.property
+    rw [← hθ f x rfl] at hm
+    exact hm
+  · intro u hu
+    obtain ⟨huH, huW⟩ := Submodule.mem_inf.mp hu
+    let y₀ : ↥(globalThetaSobolev F 0 (α := 0) (β := 0) le_rfl hs) := ⟨u, huH⟩
+    have hy₀ : y₀ ∈ actionIsotype
+        ((exists_globalThetaSobolevAction (F := F) 0 (le_refl (0 : ℝ)) hs).choose.comp
+          (ideleClassNorm F).ker.subtype) ω := by
+      rw [mem_actionIsotype]
+      intro h
+      exact Subtype.ext ((hspec h.val y₀).trans ((mem_actionIsotype _ ω u).mp huW h))
+    have hι : Continuous fun z : ↥(actionIsotype
+        ((exists_globalThetaSobolevAction (F := F) 0 (le_refl (0 : ℝ)) hs).choose.comp
+          (ideleClassNorm F).ker.subtype) ω) ↦ (z.val.val : W(s)) :=
+      continuous_subtype_val.comp continuous_subtype_val
+    let Φ : ℬ₀ → ↥(globalPolarFreeThetaSubmodule (F := F) ω) := fun f ↦
+      ⟨Submodule.Quotient.mk f.val, (mem_globalPolarFreeThetaSubmodule ω _).mpr
+        ⟨f.val, ((mem_adelePolarSubspace f.val).mp f.property).1,
+          ((mem_adelePolarSubspace f.val).mp f.property).2, rfl⟩⟩
+    have hΦ : Function.Surjective Φ := by
+      intro x
+      obtain ⟨f', hf', hx⟩ := x.property
+      exact ⟨⟨f', hf'⟩, Subtype.ext hx⟩
+    have hd2 : DenseRange (j ∘ Φ) := hdense.comp hΦ.denseRange j.continuous
+    have hcl := image_closure_subset_closure_image hι ⟨⟨y₀, hy₀⟩, hd2 _, rfl⟩
+    rw [← SetLike.mem_coe, Submodule.topologicalClosure_coe]
+    refine closure_mono ?_ hcl
+    rintro _ ⟨_, ⟨f, rfl⟩, rfl⟩
+    change (j (Φ f)).val.val ∈ _
+    rw [← hθ f (Φ f) rfl]
+    exact Submodule.subset_span ⟨f, rfl⟩
+
+/-- Paper: (11.1.2.3), p. 480. The cutoff stage is the closure of the linear
+space obtained by applying the cutoff to the restricted theta tests.
+Deviation: Read the printed P as the principal value PV used on p. 481. The
+definition accepts any measurable norm band, including both in `sLocalCarvingBand`. -/
+def sLocalCutoffCarving (s : ℝ) (ω : PontryaginDual C₁) (T : Finset V)
+    (J : Set ℝ) (hJ : MeasurableSet J) : Submodule ℂ (W(s)) :=
+  (Submodule.span ℂ (range (fun f : ℬ₀ ↦ M(s, J, hJ) (θ(s, ω, P(T, f)))))).topologicalClosure
 
 /-- The absolute cutoff commutes with translation by a norm-one class, which does not move
 the idelic norm. -/
@@ -325,14 +391,7 @@ theorem sLocalCutoffCarving_le_cutoffIsotype (s : ℝ) (hs : 0 ≤ s) (ω : Pont
   have hclosed : IsClosed (((Wω(s, hs, ω)).map (M(s, J, hJ)).toLinearMap : Submodule ℂ (W(s))) :
       Set (W(s))) := by
     rw [himage]
-    refine IsClosed.inter ?_ hproj.2
-    simp only [actionIsotype, Submodule.coe_iInf]
-    refine isClosed_iInter fun g ↦ ?_
-    have hc : Continuous fun u : W(s) ↦ ((hardySobolevTranslation μ𝔽 m𝔽 0 0 s le_rfl hs).comp
-        (ideleClassNorm F).ker.subtype) g u - (ω g : ℂ) • u :=
-      (((hardySobolevTranslation μ𝔽 m𝔽 0 0 s le_rfl hs).comp
-        (ideleClassNorm F).ker.subtype) g).continuous.sub (continuous_const_smul (ω g : ℂ))
-    exact isClosed_eq hc continuous_const
+    exact (sLocalCutoffCarving_le_cutoffIsotype_closed s hs ω).inter hproj.2
   refine Submodule.topologicalClosure_minimal _ ?_ hclosed
   refine Submodule.span_le.mpr ?_
   rintro _ ⟨f, rfl⟩
