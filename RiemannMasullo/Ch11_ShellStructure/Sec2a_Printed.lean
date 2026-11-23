@@ -171,9 +171,100 @@ private theorem pvApprox_radial (hs : (0 : ℝ) ≤ 2) (ε : ℝ) (he : 0 < ε) 
     rw [Complex.norm_real, Real.norm_of_nonneg (Real.exp_pos _).le]
     exact pvApprox_exp_translate ε (l a) (l x) he.le
 
+/-- The zero-line ambient vectors all belong to the global theta completion. -/
+private theorem pvApprox_global_eq_top (hs : (0 : ℝ) ≤ 2) :
+    globalThetaSobolev ℚ 0 hI hs = ⊤ := by
+  apply (Submodule.dense_iff_topologicalClosure_eq_top).mp
+  refine (denseRange_globalTheta_zeroLine (F := ℚ) hs).mono ?_
+  rintro _ ⟨u, rfl⟩
+  exact ⟨u, rfl⟩
+
+
 open Filter in
 open scoped Topology in
-set_option maxHeartbeats 800000 in
+/-- Choose a positive exponent so that the relative norm error is small. -/
+private theorem pvApprox_choose_exponent (K L : ℝ) :
+    ∃ ε : ℝ, 0 < ε ∧ K * (Real.exp (ε * |L|) - 1) < 1 := by
+  let c (ε : ℝ) := Real.exp (ε * |L|) - 1
+  have hc_lim : Tendsto (fun ε : ℝ ↦ K * c ε) (𝓝[>] (0 : ℝ)) (𝓝 0) := by
+    have hcont : Continuous (fun ε : ℝ ↦ K * c ε) := by
+      unfold c
+      fun_prop
+    apply (hcont.tendsto' 0 0 ?_).mono_left nhdsWithin_le_nhds
+    simp [c]
+  have hpos : ∀ᶠ ε : ℝ in 𝓝[>] (0 : ℝ), 0 < ε := self_mem_nhdsWithin
+  have hsmall_eventually : ∀ᶠ ε : ℝ in 𝓝[>] (0 : ℝ), K * c ε < 1 :=
+    hc_lim.eventually (gt_mem_nhds (by norm_num : (0 : ℝ) < 1))
+  exact (hpos.and hsmall_eventually).exists
+
+
+/-- The trivial rational Hecke character is unramified at every finite place. -/
+private theorem pvApprox_trivial_unramified (v : V(ℚ)) :
+    (ideleClassNormTwist (1 : PontryaginDual C𝔽(ℚ)) 0).IsUnramifiedAt v := by
+  let χ : PontryaginDual C𝔽(ℚ) := 1
+  have hχ₀ : ideleClassNormTwist χ 0 = 1 := by
+    ext a
+    change (1 : ℂ) * _ ^ (0 : ℂ) = 1
+    simp
+  have hχ : (ideleClassNormTwist χ 0).IsUnramifiedAt v := by
+    rw [hχ₀, HeckeCharacter.isUnramifiedAt_iff]
+    simp
+  exact hχ
+
+/-- Lift a radial approximate invariant to the global theta completion and use
+the singleton principal-value formula on the trivial isotype. -/
+private theorem pvApprox_singleton_bound (v : V(ℚ)) (hs : (0 : ℝ) ≤ 2)
+    (π : (v.adicCompletion ℚ)ˣ) (hπ : Valued.v.IsUniformizer π.val)
+    (ε : ℝ) (hε : 0 < ε) :
+    let P := globalThetaSobolevPrincipalValue ℚ {v} 0 hs
+    let g := IdeleClassGroup.ofAdicCompletion (𝓞 ℚ) ℚ v π
+    ∃ z : H(ℚ, hs), 0 < ‖z‖ ∧ ‖P z‖ ≤ (Real.exp (ε * |logNorm(ℚ) g|) - 1) * ‖z‖ := by
+  intro P g
+  let χ : PontryaginDual C𝔽(ℚ) := 1
+  have hc : χ.comp (restriction(ℚ)) = 1 := by
+    ext k
+    rfl
+  let c (ε : ℝ) := Real.exp (ε * |logNorm(ℚ) g|) - 1
+  obtain ⟨u, hu, hω, happrox⟩ := pvApprox_radial hs ε hε g
+  let z : H(ℚ, hs) := ⟨u, by rw [pvApprox_global_eq_top hs]; trivial⟩
+  have hz : 0 < ‖z‖ := norm_pos_iff.mpr fun hz ↦ hu (congrArg Subtype.val hz)
+  have hP : ‖P z‖ ≤ c ε * ‖z‖ := by
+    change ‖(P z : W(ℚ, 2))‖ ≤ c ε * ‖u‖
+    have hωz : (z : W(ℚ, 2)) ∈ Wω(ℚ, hs, χ.comp (restriction(ℚ))) := by
+      rw [hc]
+      exact hω
+    rw [globalThetaSobolevPrincipalValue_singleton v π hπ χ (pvApprox_trivial_unramified v) hs z hωz]
+    exact happrox
+  exact ⟨z, hz, hP⟩
+
+/-- An antilipschitz linear map cannot have a nonzero vector with a relative bound
+strictly below the inverse of its antilipschitz constant. -/
+private theorem pvApprox_antilipschitz_contradiction
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E]
+    (P : E →L[ℂ] E) (K : ℝ≥0) (hK : AntilipschitzWith K P)
+    (z : E) (hz : 0 < ‖z‖) (c : ℝ) (hc : (K : ℝ) * c < 1)
+    (hP : ‖P z‖ ≤ c * ‖z‖) : False := by
+  have hb := hK.le_mul_dist z 0
+  rw [map_zero, dist_zero_right, dist_zero_right] at hb
+  have hineq := hb.trans (mul_le_mul_of_nonneg_left hP K.coe_nonneg)
+  rw [← mul_assoc] at hineq
+  exact ((mul_lt_mul_of_pos_right hc hz).trans_le' (by simpa using hineq)).false
+
+/-- Singleton principal value has vectors with arbitrarily small relative norm. -/
+private theorem pvApprox_singleton_not_antilipschitz (v : V(ℚ)) (hs : (0 : ℝ) ≤ 2)
+    (K : ℝ≥0) :
+    ¬ AntilipschitzWith K (globalThetaSobolevPrincipalValue ℚ {v} 0 hs) := by
+  intro hK
+  let P := globalThetaSobolevPrincipalValue ℚ {v} 0 hs
+  obtain ⟨π₀, hπ⟩ := (Valued.v : Valuation (v.adicCompletion ℚ)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π : (v.adicCompletion ℚ)ˣ := Units.mk0 π₀ hπ.ne_zero
+  let g := IdeleClassGroup.ofAdicCompletion (𝓞 ℚ) ℚ v π
+  let c (ε : ℝ) := Real.exp (ε * |logNorm(ℚ) g|) - 1
+  obtain ⟨ε, hε, hsmall⟩ := pvApprox_choose_exponent (K : ℝ) (logNorm(ℚ) g)
+  obtain ⟨z, hz, hP⟩ := pvApprox_singleton_bound v hs π hπ ε hε
+  exact pvApprox_antilipschitz_contradiction P K hK z hz (c ε) hsmall hP
+
 /-- Paper: Proposition 11.2.0.1(2), pp. 484–485. Take ℚ, S₀ = {2}, degree 2
 and the trivial isotype. The functions `exp (-ε * |log ‖g‖|)` are nonzero
 approximate invariants for the uniformizer translation. The resulting
@@ -191,52 +282,7 @@ theorem Printed.globalThetaSobolevPrincipalValue_closedRange_false :
     (globalThetaSobolev_closed_complete_separable (F := ℚ) 0 hI hs).2.1
   have hinj : Injective P := globalThetaSobolevPrincipalValue_injective {v} 0 hs
   obtain ⟨K, hK⟩ := P.isClosed_range_iff_antilipschitz_of_injective hinj |>.mp hclosed
-  obtain ⟨π₀, hπ⟩ := (Valued.v : Valuation (v.adicCompletion ℚ)
-    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
-  let π : (v.adicCompletion ℚ)ˣ := Units.mk0 π₀ hπ.ne_zero
-  let g := IdeleClassGroup.ofAdicCompletion (𝓞 ℚ) ℚ v π
-  let χ : PontryaginDual C𝔽(ℚ) := 1
-  have hχ₀ : ideleClassNormTwist χ 0 = 1 := by
-    ext a
-    change (1 : ℂ) * _ ^ (0 : ℂ) = 1
-    simp
-  have hχ : (ideleClassNormTwist χ 0).IsUnramifiedAt v := by
-    rw [hχ₀, HeckeCharacter.isUnramifiedAt_iff]
-    simp
-  have hc : χ.comp (restriction(ℚ)) = 1 := by
-    ext k
-    rfl
-  have hH : globalThetaSobolev ℚ 0 hI hs = ⊤ := by
-    apply (Submodule.dense_iff_topologicalClosure_eq_top).mp
-    refine (denseRange_globalTheta_zeroLine (F := ℚ) hs).mono ?_
-    rintro _ ⟨u, rfl⟩
-    exact ⟨u, rfl⟩
-  let c (ε : ℝ) := Real.exp (ε * |logNorm(ℚ) g|) - 1
-  have hc_lim : Tendsto (fun ε : ℝ ↦ (K : ℝ) * c ε) (𝓝[>] (0 : ℝ)) (𝓝 0) := by
-    have hcont : Continuous (fun ε : ℝ ↦ (K : ℝ) * c ε) := by
-      unfold c
-      fun_prop
-    apply (hcont.tendsto' 0 0 ?_).mono_left nhdsWithin_le_nhds
-    simp [c]
-  have hpos : ∀ᶠ ε : ℝ in 𝓝[>] (0 : ℝ), 0 < ε := self_mem_nhdsWithin
-  have hsmall_eventually : ∀ᶠ ε : ℝ in 𝓝[>] (0 : ℝ), (K : ℝ) * c ε < 1 :=
-    hc_lim.eventually (gt_mem_nhds (by norm_num : (0 : ℝ) < 1))
-  obtain ⟨ε, hε, hsmall⟩ := (hpos.and hsmall_eventually).exists
-  obtain ⟨u, hu, hω, happrox⟩ := pvApprox_radial hs ε hε g
-  let z : H(ℚ, hs) := ⟨u, by rw [hH]; trivial⟩
-  have hz : 0 < ‖z‖ := norm_pos_iff.mpr fun hz ↦ hu (congrArg Subtype.val hz)
-  have hP : ‖P z‖ ≤ c ε * ‖z‖ := by
-    change ‖(P z : W(ℚ, 2))‖ ≤ c ε * ‖u‖
-    have hωz : (z : W(ℚ, 2)) ∈ Wω(ℚ, hs, χ.comp (restriction(ℚ))) := by
-      rw [hc]
-      exact hω
-    rw [globalThetaSobolevPrincipalValue_singleton v π hπ χ hχ hs z hωz]
-    exact happrox
-  have hb := hK.le_mul_dist z 0
-  rw [map_zero, dist_zero_right, dist_zero_right] at hb
-  have hineq := hb.trans (mul_le_mul_of_nonneg_left hP K.coe_nonneg)
-  rw [← mul_assoc] at hineq
-  exact ((mul_lt_mul_of_pos_right hsmall hz).trans_le' (by simpa using hineq)).false
+  exact pvApprox_singleton_not_antilipschitz v hs K hK
 
 /-- Paper: Lead-in to (11.2.0.3), p. 484. At every twist and nonnegative
 degree the completed PV map is a closed embedding whose image equals the
