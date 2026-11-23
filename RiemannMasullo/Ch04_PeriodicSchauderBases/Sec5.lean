@@ -468,20 +468,38 @@ private theorem modulatedPeriodization_surjective_window {C : Set ℝ} (hC : IsC
   rw [this]
   exact hm.1.isCompact_preimage hc
 
-/-- Paper: Proposition 4.5.1.1(1), pp. 197–198. Every Schwartz–Bruhat function
-on the compact cyclic quotient is a periodization. -/
-theorem modulatedPeriodization_surjective : Surjective P := by
-  intro φ
+/-- Every test on the cyclic quotient lifts by multiplication with a fixed radial
+cutoff supported in a compact window strictly below module one. -/
+theorem modulatedPeriodization_compact_lift :
+    ∃ (B : Set ℝ≥0ˣ) (c : ℝ≥0ˣ → ℂ), IsCompact B ∧ (∀ t ∈ B, t.val < 1) ∧
+      (∀ t ∉ B, c t = 0) ∧ ∀ φ : S, ∃ f : E, P f = φ ∧
+        ∀ x, f.val x = c (m x) * φ (q x) := by
   have hL : 0 < Real.log ((m γ).val : ℝ) := Real.log_pos (by exact_mod_cast hγ)
-  have hT := modulatedPeriodization_surjective_profile hL
-  let ρ := Classical.choose hT
-  have hρs : ContDiff ℝ ((⊤ : ℕ∞) : WithTop ℕ∞) ρ := (Classical.choose_spec hT).1
-  have hρc : HasCompactSupport ρ := (Classical.choose_spec hT).2.1
-  have hρsum : ∀ t, HasSum (fun n : ℤ ↦ ρ (t + n * Real.log ((m γ).val : ℝ))) 1 :=
-    (Classical.choose_spec hT).2.2
+  obtain ⟨v, hv, hs, hsum⟩ := modulatedPeriodization_surjective_profile hL
+  obtain ⟨R, hR⟩ := hs.isBounded.exists_norm_le
+  let e := (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.symm.toHomeomorph
+  have he (t : ℝ≥0ˣ) : e t = Real.log (t.val : ℝ) :=
+    (Real.log_of_pos (NNReal.coe_pos.mpr t.zero_lt)).symm
+  let tr := Homeomorph.addRight (R + 1)
+  let B := (e.trans tr) ⁻¹' tsupport v
+  let ρ (s : ℝ) := v (s + (R + 1))
+  have hρs : ContDiff ℝ ((⊤ : ℕ∞) : WithTop ℕ∞) ρ := hv.comp (contDiff_id.add contDiff_const)
+  have hρc : HasCompactSupport ρ :=
+    HasCompactSupport.intro (tr.isCompact_preimage.mpr hs) fun t hx ↦
+      (image_eq_zero_of_notMem_tsupport (f := v) (x := tr t) hx)
+  have hρsum (t : ℝ) : HasSum (fun n : ℤ ↦ ρ (t + n * Real.log ((m γ).val : ℝ))) 1 :=
+    (hsum (t + (R+1))).congr_fun fun n ↦ congrArg v (by ring)
   let ρc : ℝ → ℂ := fun t ↦ (ρ t : ℂ)
   have hρs' : ContDiff ℝ ((⊤ : ℕ∞) : WithTop ℕ∞) ρc := Complex.ofRealCLM.contDiff.comp hρs
   have hcs : HasCompactSupport ρc := hρc.comp_left Complex.ofReal_zero
+  refine ⟨B, fun t ↦ ρc (e t), (e.trans tr).isCompact_preimage.mpr hs, ?_, ?_, fun φ ↦ ?_⟩
+  · intro t ht
+    have h := (le_abs_self (e t + (R + 1))).trans (hR _ ht)
+    have hlog : Real.log (t.val : ℝ) < 0 := by rw [← he]; linarith
+    exact_mod_cast (Real.log_neg_iff (NNReal.coe_pos.mpr t.zero_lt)).mp hlog
+  · intro t ht
+    change ((v (e t + (R + 1)) : ℝ) : ℂ) = 0
+    exact_mod_cast (image_eq_zero_of_notMem_tsupport (f := v) (x := e t + (R + 1)) ht)
   let f₀ : G → ℂ := fun x ↦ ρc (Real.log ((m x).val : ℝ)) * φ (q x)
   have hsupp : HasCompactSupport f₀ := by
     refine HasCompactSupport.intro (modulatedPeriodization_surjective_window m hm hcs) fun x hx ↦ ?_
@@ -490,7 +508,8 @@ theorem modulatedPeriodization_surjective : Surjective P := by
   have hmem : f₀ ∈ bruhatCompactSupportSubmodule G :=
     ⟨(mem_bruhatSmoothSubmodule_iff f₀).mpr (modulatedPeriodization_surjective_cutoff m γ hγ hρs' φ), hsupp⟩
   let f : E := ⟨f₀, bruhatCompactSupport_le_modulatedExponentialDecay m univ hm hms hmem⟩
-  refine ⟨f, Subtype.ext (funext fun z ↦ QuotientGroup.induction_on z fun x ↦ ?_)⟩
+  refine ⟨f, Subtype.ext (funext fun z ↦ QuotientGroup.induction_on z fun x ↦ ?_),
+    fun x ↦ congrArg (fun z ↦ ρc z * φ (q x)) (he (m x)).symm⟩
   have hpos (u : ℝ≥0ˣ) : 0 < ((u.val : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt u)
   have hℓ (n : ℤ) : Real.log ((m (γ ^ n * x)).val : ℝ) =
       Real.log ((m x).val : ℝ) + n * Real.log ((m γ).val : ℝ) := by
@@ -508,6 +527,14 @@ theorem modulatedPeriodization_surjective : Surjective P := by
     change ρc _ * φ (q (γ ^ n * x)) = _
     rw [hℓ, hqx]
   exact (modulatedPeriodization_hasSum m γ hm hms hγ f x).unique h2
+
+/-- Paper: Proposition 4.5.1.1(1), pp. 197–198. Every Schwartz–Bruhat function
+on the compact cyclic quotient is a periodization. -/
+theorem modulatedPeriodization_surjective : Surjective P := by
+  intro φ
+  obtain ⟨_, _, _, _, _, hlift⟩ := modulatedPeriodization_compact_lift m γ hm hms hγ
+  obtain ⟨f, hf, _⟩ := hlift φ
+  exact ⟨f, hf⟩
 
 
 -- TODO(paper-gap): Remarks 4.5.1.2 and 4.5.1.4 use arbitrary I for
