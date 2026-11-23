@@ -1296,7 +1296,37 @@ theorem sLocalOrbitalSystem_strongDual_basis_properties
     let ev : ℕ → StrongDual ℂ (StrongDual ℂ (Q(p, ω))) :=
       fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (e n)
     SchauderBasis.IsEquicontinuous d ev ∧ SchauderBasis.IsShrinking d ev ∧
-      SchauderBasis.IsBoundedlyComplete d := by sorry
+      SchauderBasis.IsBoundedlyComplete d := by
+  intro ev
+  obtain ⟨hF, hN, hrefl⟩ := sLocalOrbitalSystem_quotient_nuclearFrechet (F := F) (S := S) p ω
+  have habs := SchauderBasis.isAbsolute_of_nuclear_frechet hN hF _he
+  have hbar := isFrechetTVS_barrelled hF
+  obtain ⟨_, hpoly, _, hcomp⟩ := hF
+  have hdb : IsSchauderBasis d ev := SchauderBasis.isShrinking_of_isAbsolute hcomp hrefl _he habs
+  have heq : SchauderBasis.IsEquicontinuous d ev := by
+    let D := StrongDual ℂ (Q(p, ω))
+    let : UniformSpace (Q(p, ω)) := IsTopologicalAddGroup.rightUniformSpace (Q(p, ω))
+    have : IsUniformAddGroup (Q(p, ω)) := isUniformAddGroup_of_addCommGroup
+    let : PolynormableSpace ℂ D :=
+      uniformConvergenceCLM_polynormable (F := ℂ) {B : Set (Q(p, ω)) | Bornology.IsVonNBounded ℂ B}
+        (fun _ h ↦ h) (by rw [Bornology.sUnion_isVonNBounded_eq_univ, Submodule.span_univ]; simp)
+    have : BarrelledSpace ℂ D := barrelled_of_barrel_nbhd fun B hB hBabs hBabsorb ↦
+      strongDual_barrel_nbhd (fun l ↦ (hrefl.surjective l).elim fun z hz ↦ ⟨z, fun φ ↦ hz ▸ rfl⟩)
+        B hB hBabs hBabsorb
+    let : UniformSpace D := IsTopologicalAddGroup.rightUniformSpace D
+    have : IsUniformAddGroup D := isUniformAddGroup_of_addCommGroup
+    have htend (z : D) :
+        Tendsto (fun k ↦ SchauderBasis.partialProjection d ev k z) atTop (𝓝 z) := by
+      have hsum := hdb.2 z
+      rw [HasSum, SummationFilter.conditional_filter_eq_map_range, tendsto_map'_iff] at hsum
+      simpa only [Function.comp_def, ContinuousLinearMap.coe_coe,
+        SchauderBasis.partialProjection, ← Nat.range_succ_eq_Iic,
+        sum_apply, ContinuousLinearMap.smulRight_apply]
+        using hsum.comp (tendsto_add_atTop_nat 1)
+    exact (PolynormableSpace.banach_steinhaus (𝓕 := SchauderBasis.partialProjection d ev)
+      (fun z ↦ (htend z).isVonNBounded_range ℂ)).equicontinuous 0
+  exact ⟨heq, SchauderBasis.strongDual_isShrinking_of_isAbsolute hcomp hrefl _he habs hN,
+    SchauderBasis.strongDual_isBoundedlyComplete_of_isAbsolute hcomp hrefl _he habs⟩
 
 /-- Paper: Corollary 7.3.1.8(2), p. 350.
 The corresponding biorthogonal bases of the primary quotient are equicontinuous,
