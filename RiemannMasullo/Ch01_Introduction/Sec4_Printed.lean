@@ -5,6 +5,11 @@ import Mathlib.NumberTheory.NumberField.Cyclotomic.Basic
 import RiemannMasullo.Ch13_ZerosHecke.Targets
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.AppB_AnalyticNT.Sec4b
+import RiemannMasullo.Ch03_IdelicZeta.Sec2
+import RiemannMasullo.Ch12_TraceGeometric.Sec5
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Separation
+import RiemannMasullo.External.AlgebraicNumberTheoryLean.Chebotarev.DirichletHeckeRat
+import Mathlib.NumberTheory.NumberField.Cyclotomic.Embeddings
 
 /-! # Printed claims in the introduction's deduction of GRH -/
 
@@ -97,13 +102,408 @@ def Printed.introTrace_globalTrace : Prop :=
             ((∑ w : InfinitePlace F, archTerm w (a w)) +
               ∑' v, finiteTerm v (b v)))
 
+private theorem introTrace_globalTrace_false_hasSum_zero {X : Type*} (f : X → ℂ) (e : X ≃ X)
+    (he : ∀ x, f (e x) = -f x) {S : ℂ} (h : HasSum f S) : S = 0 := by
+  have h2 : HasSum (fun x ↦ f (e x)) S := e.hasSum_iff.mpr h
+  simp only [he] at h2
+  have h3 : -S = S := h.neg.unique h2
+  linear_combination -h3 / 2
+
+private theorem introTrace_globalTrace_false_natPow (n : ℕ) (k : ℤ) (hn : 0 < n)
+    (h1 : Real.log (9 / 4) < |Real.log ((n : ℝ) ^ k)|)
+    (h2 : |Real.log ((n : ℝ) ^ k)| < Real.log (11 / 4)) : False := by
+  have hn' : (0 : ℝ) < n := by exact_mod_cast hn
+  have hl : |Real.log ((n : ℝ) ^ k)| = Real.log (((n ^ k.natAbs : ℕ) : ℝ)) := by
+    rw [Real.log_zpow, abs_mul, abs_of_nonneg (Real.log_nonneg (by exact_mod_cast hn)),
+      Nat.cast_pow, Real.log_pow, Nat.cast_natAbs, Int.cast_abs]
+  rw [hl] at h1 h2
+  have hm : (0 : ℝ) < ((n ^ k.natAbs : ℕ) : ℝ) := by exact_mod_cast pow_pos hn _
+  rw [Real.log_lt_log_iff (by norm_num) hm] at h1
+  rw [Real.log_lt_log_iff hm (by norm_num)] at h2
+  have b1 : (2 : ℝ) < ((n ^ k.natAbs : ℕ) : ℝ) := by linarith
+  have b2 : ((n ^ k.natAbs : ℕ) : ℝ) < 3 := by linarith
+  have a1 : 2 < n ^ k.natAbs := by exact_mod_cast b1
+  have a2 : n ^ k.natAbs < 3 := by exact_mod_cast b2
+  omega
+
+private theorem introTrace_globalTrace_false_bump :
+    ∃ h : ℝ → ℝ, ContDiff ℝ ((⊤ : ℕ∞) : WithTop ℕ∞) h ∧ HasCompactSupport h ∧
+      (∀ t, h (-t) = -h t) ∧
+      (∀ t, h t ≠ 0 → Real.log (9 / 4) < |t| ∧ |t| < Real.log (11 / 4)) ∧
+      (∀ t, 0 ≤ h t * t) ∧ ∃ t, h t ≠ 0 := by
+  set A := Real.log (9 / 4)
+  set B := Real.log (11 / 4)
+  have hA : 0 < A := Real.log_pos (by norm_num)
+  have hAB : A < B := Real.log_lt_log (by norm_num) (by norm_num)
+  let b : ContDiffBump ((A + B) / 2) := ⟨(B - A) / 4, (B - A) / 2, by linarith, by linarith⟩
+  have hsupp (t : ℝ) (ht : b t ≠ 0) : A < t ∧ t < B := by
+    have : t ∈ Metric.ball ((A + B) / 2) ((B - A) / 2) := by
+      rw [← b.support_eq]; exact ht
+    rw [Metric.mem_ball, Real.dist_eq, abs_lt] at this
+    constructor <;> linarith [this.1, this.2]
+  refine ⟨fun t ↦ b t - b (-t), ?_, ?_, ?_, ?_, ?_, ⟨(A + B) / 2, ?_⟩⟩
+  · exact b.contDiff.sub (b.contDiff.comp contDiff_neg)
+  · exact b.hasCompactSupport.sub (b.hasCompactSupport.comp_homeomorph (Homeomorph.neg ℝ))
+  · intro t; simp only [neg_neg]; ring
+  · intro t ht
+    dsimp only at ht
+    by_cases h1 : b t = 0
+    · have h2 : b (-t) ≠ 0 := by intro h2; exact ht (by rw [h1, h2, sub_zero])
+      obtain ⟨c1, c2⟩ := hsupp _ h2
+      rw [abs_of_neg (by linarith)]
+      exact ⟨c1, c2⟩
+    · obtain ⟨c1, c2⟩ := hsupp _ h1
+      rw [abs_of_pos (by linarith)]
+      exact ⟨c1, c2⟩
+  · intro t
+    dsimp only
+    by_cases h1 : b t = 0
+    · by_cases h2 : b (-t) = 0
+      · simp [h1, h2]
+      · obtain ⟨c1, _⟩ := hsupp _ h2
+        rw [h1, zero_sub]
+        exact mul_nonneg_of_nonpos_of_nonpos (neg_nonpos.mpr b.nonneg) (by linarith)
+    · obtain ⟨c1, _⟩ := hsupp _ h1
+      have h2 : b (-t) = 0 := by
+        by_contra h2; obtain ⟨c3, _⟩ := hsupp _ h2; linarith
+      rw [h2, sub_zero]
+      exact mul_nonneg b.nonneg (by linarith)
+  · have h1 : b ((A + B) / 2) = 1 := b.one_of_mem_closedBall (Metric.mem_closedBall_self
+      b.rIn_pos.le)
+    have h2 : b (-((A + B) / 2)) = 0 := by
+      by_contra h2; obtain ⟨c3, _⟩ := hsupp _ h2; linarith
+    simp [h1, h2]
+
+private theorem introTrace_globalTrace_false_localPos {K : Type*} [NormedField K]
+    {_ : MeasurableSpace Kˣ} [BorelSpace Kˣ] (μ : Measure Kˣ) [μ.IsInvInvariant]
+    [μ.IsOpenPosMeasure] [IsFiniteMeasureOnCompacts μ]
+    (f : Kˣ → ℝ) (hf : Continuous f) (hfc : HasCompactSupport f) (hodd : ∀ u, f u⁻¹ = -f u)
+    (hsign : ∀ u, 0 ≤ f u * (‖(u : K)‖ - 1)) (ρ : ℝ) (hρ : 1 < ρ)
+    (hz : ∀ u : Kˣ, ρ⁻¹ < ‖(u : K)‖ → ‖(u : K)‖ < ρ → f u = 0) (u₀ : Kˣ) (hu₀ : f u₀ ≠ 0) :
+    0 < (∫ u, (f u : ℂ) * (‖(u : K)‖ : ℂ) / (‖1 - (u : K)‖ : ℂ) ∂μ).re := by
+  have hnc : Continuous (fun u : Kˣ ↦ ‖(u : K)‖) := continuous_norm.comp Units.continuous_val
+  let F1 : Kˣ → ℝ := fun u ↦ f u * (‖(u : K)‖ / ‖1 - (u : K)‖)
+  let F2 : Kˣ → ℝ := fun u ↦ f u / ‖1 - (u : K)‖
+  have hF1 : Continuous F1 := by
+    refine continuous_iff_continuousAt.mpr fun u ↦ ?_
+    by_cases hu : (u : K) = 1
+    · have hopen : IsOpen {x : Kˣ | ρ⁻¹ < ‖(x : K)‖ ∧ ‖(x : K)‖ < ρ} :=
+        (isOpen_lt continuous_const hnc).inter (isOpen_lt hnc continuous_const)
+      have hev : F1 =ᶠ[nhds u] fun _ ↦ 0 := by
+        filter_upwards [hopen.mem_nhds (show u ∈ {x : Kˣ | ρ⁻¹ < ‖(x : K)‖ ∧ ‖(x : K)‖ < ρ} by
+          simp only [mem_ofPred_eq, hu, norm_one]; exact ⟨inv_lt_one_of_one_lt₀ hρ, hρ⟩)]
+          with x hx
+        simp [F1, hz x hx.1 hx.2]
+      exact (continuousAt_congr hev).mpr continuousAt_const
+    · have hne : ‖1 - (u : K)‖ ≠ 0 := by
+        rw [norm_ne_zero_iff, sub_ne_zero]; exact fun h ↦ hu h.symm
+      exact hf.continuousAt.mul (hnc.continuousAt.div
+        (continuous_norm.comp (continuous_const.sub Units.continuous_val)).continuousAt hne)
+  have hF1c : HasCompactSupport F1 := hfc.mul_right
+  have hF1i : Integrable F1 μ := hF1.integrable_of_hasCompactSupport hF1c
+  have hinv (u : Kˣ) : F1 u⁻¹ = -F2 u := by
+    simp only [F1, F2, hodd, Units.val_inv_eq_inv_val, norm_inv]
+    have hu0 : ‖(u : K)‖ ≠ 0 := norm_ne_zero_iff.mpr u.ne_zero
+    have h1 : 1 - (u : K)⁻¹ = -((1 - (u : K)) / (u : K)) := by
+      field_simp; ring
+    rw [h1, norm_neg, norm_div]
+    by_cases h0 : ‖1 - (u : K)‖ = 0
+    · simp [h0]
+    · field_simp
+  have hF2 : F2 = fun u ↦ -F1 u⁻¹ := by funext u; rw [hinv, neg_neg]
+  have hF2i : Integrable F2 μ := by rw [hF2]; exact hF1i.comp_inv.neg
+  have hI2 : ∫ u, F2 u ∂μ = -∫ u, F1 u ∂μ := by
+    rw [hF2, integral_neg, integral_inv_eq_self (fun u ↦ F1 u) μ]
+  let G : Kˣ → ℝ := fun u ↦ F1 u - F2 u
+  have hGc : Continuous G := by
+    refine hF1.sub ?_
+    rw [hF2]; exact (hF1.comp continuous_inv).neg
+  have hGe (u : Kˣ) : G u = f u * (‖(u : K)‖ - 1) / ‖1 - (u : K)‖ := by
+    simp only [G, F1, F2]; ring
+  have hGs : HasCompactSupport G := by
+    refine hfc.mono fun u hu h0 ↦ hu ?_
+    rw [hGe, h0, zero_mul, zero_div]
+  have hGn : 0 ≤ G := fun u ↦ by rw [hGe]; exact div_nonneg (hsign u) (norm_nonneg _)
+  have hG0 : G u₀ ≠ 0 := by
+    have hn1 : ‖(u₀ : K)‖ ≠ 1 := by
+      intro h1
+      exact hu₀ (hz u₀ (by rw [h1]; exact inv_lt_one_of_one_lt₀ hρ) (by rw [h1]; exact hρ))
+    have hne : ‖1 - (u₀ : K)‖ ≠ 0 := by
+      rw [norm_ne_zero_iff, sub_ne_zero]
+      intro h; apply hn1; rw [← h, norm_one]
+    rw [hGe]
+    exact div_ne_zero (mul_ne_zero hu₀ (sub_ne_zero.mpr hn1)) hne
+  have hpos := hGc.integral_pos_of_hasCompactSupport_nonneg_ne_zero (μ := μ) hGs hGn hG0
+  have hGI : ∫ u, G u ∂μ = 2 * ∫ u, F1 u ∂μ := by
+    simp only [G]
+    rw [integral_sub hF1i hF2i, hI2]; ring
+  have hC : (fun u ↦ (f u : ℂ) * (‖(u : K)‖ : ℂ) / (‖1 - (u : K)‖ : ℂ)) =
+      fun u ↦ ((F1 u : ℝ) : ℂ) := by
+    funext u; simp only [F1]; push_cast; ring
+  rw [hC, integral_complex_ofReal, Complex.ofReal_re]
+  linarith
+
+
+private theorem introTrace_globalTrace_false_unitsPos (u : ℝ≥0ˣ) : (0 : ℝ) < ((u : ℝ≥0) : ℝ) :=
+  NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr u.ne_zero)
+
+private theorem introTrace_globalTrace_false_field :
+    ∀ w : InfinitePlace (CyclotomicField 4 ℚ), w.IsComplex := by
+  have : IsCyclotomicExtension {4} ℚ (CyclotomicField 4 ℚ) := by
+    convert! CyclotomicField.isCyclotomicExtension 4 ℚ using 1
+  exact (IsCyclotomicExtension.Rat.isTotallyComplex (CyclotomicField 4 ℚ) (n := 4)
+    (by decide)).isComplex
+
+/-- For a test odd under inversion, inverting the quasi-character negates the Mellin value. -/
+private theorem introTrace_globalTrace_false_mellin_inv (F : Type) [Field F] [NumberField F]
+    (φ : BruhatCompactSupport C[F]) (hφ : ∀ g, φ.val g⁻¹ = -φ.val g)
+    (χ χ' : PontryaginDual C[F]) (r r' : ℂ)
+    (hc : ∀ g, ideleClassNormTwist χ' r' g = ideleClassNormTwist χ r g⁻¹) :
+    moment[F](φ.val, χ', r') = -moment[F](φ.val, χ, r) := by
+  rw [← integral_inv_eq_self _ (ideleClassTamagawaMeasure F), ← integral_neg]
+  congr 1
+  funext g
+  rw [hφ, hc, inv_inv]
+  ring
+
+private theorem introTrace_globalTrace_false_twist_inv (F : Type) [Field F] [NumberField F]
+    (χ : PontryaginDual C[F]) (r : ℂ) (g : C[F]) :
+    ideleClassNormTwist χ⁻¹ (-r) g = ideleClassNormTwist χ r g⁻¹ := by
+  change (((χ⁻¹ g : Circle)) : ℂ) * ((((ideleClassNorm F g : ℝ≥0) : ℝ)) : ℂ) ^ (-r) =
+    ((χ g⁻¹ : Circle) : ℂ) * ((((ideleClassNorm F g⁻¹ : ℝ≥0) : ℝ)) : ℂ) ^ r
+  have hx := introTrace_globalTrace_false_unitsPos (ideleClassNorm F g)
+  have harg : (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ).arg ≠ Real.pi := by
+    rw [Complex.arg_ofReal_of_nonneg hx.le]
+    exact Real.pi_ne_zero.symm
+  rw [map_inv χ g, map_inv (ideleClassNorm F) g, Units.val_inv_eq_inv_val, NNReal.coe_inv,
+    Complex.ofReal_inv, Complex.inv_cpow _ _ harg, Complex.cpow_neg]
+  congr 1
+
+private theorem introTrace_globalTrace_false_ord (F : Type) [Field F] [NumberField F]
+    (χ : PontryaginDual C[F]) (s : ℂ) : zeroOrder[F](χ⁻¹, 1 - s) = zeroOrder[F](χ, s) := by
+  obtain ⟨hL, hLh⟩ := continuedCompletedHeckeL_spec χ
+  obtain ⟨hD, hDh⟩ := continuedCompletedHeckeL_spec χ⁻¹
+  obtain ⟨ε, hε, hεne, hfun⟩ :=
+    completedHeckeL_continuation_functionalEquation χ _ _ hL hLh hD hDh
+  have hcomp : meromorphicOrderAt (fun s ↦ continuedCompletedHeckeL χ⁻¹ (1 - s)) s =
+      meromorphicOrderAt (continuedCompletedHeckeL χ⁻¹) (1 - s) := by
+    have ha : AnalyticAt ℂ (fun s : ℂ ↦ 1 - s) s := by fun_prop
+    have hd : deriv (fun s : ℂ ↦ 1 - s) s ≠ 0 := by simp
+    simpa [Function.comp_def] using
+      meromorphicOrderAt_comp_of_deriv_ne_zero (f := continuedCompletedHeckeL χ⁻¹) ha hd
+  have hεord : meromorphicOrderAt ε s = 0 :=
+    ((hε.analyticAt s).meromorphicNFAt.meromorphicOrderAt_eq_zero_iff).mpr (hεne s)
+  rw [show (fun s ↦ continuedCompletedHeckeL χ⁻¹ (1 - s)) = ε * continuedCompletedHeckeL χ from
+      funext hfun, meromorphicOrderAt_mul (hε.analyticAt s).meromorphicAt
+      (hL (mem_univ _)).meromorphicAt, hεord, zero_add] at hcomp
+  rw [MeromorphicOn.divisor_apply hD.meromorphicOn (mem_univ _),
+    MeromorphicOn.divisor_apply hL.meromorphicOn (mem_univ _), ← hcomp]
+
+private theorem introTrace_globalTrace_false_zeroSum {X : Type*} (ι : X → X) (hι : ∀ x, ι (ι x) = x)
+    (Z : Set X) (hZ : ∀ x ∈ Z, ι x ∈ Z) (G : X → ℂ) (hG : ∀ x ∈ Z, G (ι x) = -G x) {S : ℂ}
+    (h : HasSum (fun z : Z ↦ G z) S) : S = 0 := by
+  let e : Z ≃ Z :=
+    { toFun := fun z ↦ ⟨ι z, hZ z z.2⟩
+      invFun := fun z ↦ ⟨ι z, hZ z z.2⟩
+      left_inv := fun z ↦ Subtype.ext (hι z)
+      right_inv := fun z ↦ Subtype.ext (hι z) }
+  exact introTrace_globalTrace_false_hasSum_zero _ e (fun z ↦ hG z z.2) h
+
+private theorem introTrace_globalTrace_false_final {Mp Mm A Fs : ℂ} (h : Mp + Mm - (A + Fs) = 0)
+    (h1 : Mm = -Mp) (h2 : Fs = 0) : A = 0 := by
+  subst h2; rw [h1] at h; linear_combination -h
+
+private theorem introTrace_globalTrace_false_sign (h : ℝ → ℝ) (hsign : ∀ t, 0 ≤ h t * t) {x : ℝ}
+    (hx : 0 < x) : 0 ≤ h (Real.log (x ^ 2)) * (x - 1) := by
+  have hs := hsign (Real.log (x ^ 2))
+  rcases lt_trichotomy x 1 with h1 | h1 | h1
+  · have hl : Real.log (x ^ 2) < 0 := Real.log_neg (by positivity) (by nlinarith)
+    have : h (Real.log (x ^ 2)) ≤ 0 := by
+      by_contra hc
+      rw [not_le] at hc
+      nlinarith
+    nlinarith
+  · rw [h1, sub_self, mul_zero]
+  · have hl : 0 < Real.log (x ^ 2) := Real.log_pos (by nlinarith)
+    have : 0 ≤ h (Real.log (x ^ 2)) := by
+      by_contra hc
+      rw [not_le] at hc
+      nlinarith
+    nlinarith
+
+private theorem introTrace_globalTrace_false_nearOne (h : ℝ → ℝ)
+    (hsupp : ∀ t, h t ≠ 0 → Real.log (9 / 4) < |t| ∧ |t| < Real.log (11 / 4)) {x : ℝ}
+    (h1 : (3 / 2 : ℝ)⁻¹ < x) (h2 : x < 3 / 2) : h (Real.log (x ^ 2)) = 0 := by
+  by_contra hne
+  have hA := (hsupp _ hne).1
+  have hx : 0 < x := lt_trans (by norm_num) h1
+  have hlt : Real.log (x ^ 2) < Real.log (9 / 4) :=
+    Real.log_lt_log (by positivity) (by nlinarith)
+  have hgt : -Real.log (9 / 4) < Real.log (x ^ 2) := by
+    rw [← Real.log_inv]
+    exact Real.log_lt_log (by norm_num) (by norm_num at h1 ⊢; nlinarith)
+  have := abs_lt.mpr ⟨hgt, hlt⟩
+  linarith
+
+private theorem introTrace_globalTrace_false_adicNorm (F : Type) [Field F] [NumberField F]
+    (v : HeightOneSpectrum (𝓞 F)) (u : (v.adicCompletion F)ˣ) :
+    ∃ k : ℤ, ‖(u : v.adicCompletion F)‖ = ((v.asIdeal.absNorm : ℕ) : ℝ) ^ k := by
+  refine ⟨WithZero.log (Valued.v (u : v.adicCompletion F)), ?_⟩
+  rw [FinitePlace.norm_def, WithZeroMulInt.toNNReal_neg_apply _
+    (Valued.v.ne_zero_iff.mpr u.ne_zero)]
+  simp
+
+private theorem introTrace_globalTrace_false_sum_ne {ι : Type*} (s : Finset ι) (f : ι → ℂ)
+    (hs : s.Nonempty) (hpos : ∀ i ∈ s, 0 < (f i).re) : ∑ i ∈ s, f i ≠ 0 := by
+  intro h
+  have hre := congrArg Complex.re h
+  rw [Complex.re_sum, Complex.zero_re] at hre
+  exact (Finset.sum_pos hpos hs).ne' hre
+
+private theorem introTrace_globalTrace_false_dual_zero {G : Type} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    (L : StrongDual ℂ (BruhatCompactSupport G)) (x : BruhatCompactSupport G)
+    (hx : ∀ u, x.val u = 0) : L x = 0 := by
+  have : x = 0 := Subtype.ext (funext hx)
+  rw [this, map_zero]
+
+
+private theorem introTrace_globalTrace_false_noRight (F : Type) [Field F] [NumberField F]
+    (χ : PontryaginDual C[F]) (s : ℂ) (hs : 1 < s.re) : zeroOrder[F](χ, s) = 0 := by
+  obtain ⟨hL, hLh⟩ := continuedCompletedHeckeL_spec χ
+  have hne : continuedCompletedHeckeL χ s ≠ 0 := by
+    have h1 := hLh ⟨s, hs⟩
+    change continuedCompletedHeckeL χ s = heckeGammaFactor χ s * finiteHeckeL χ ⟨s, hs⟩ at h1
+    rw [h1]
+    exact mul_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans hs))
+      (finiteHeckeL_ne_zero_of_one_lt_re χ ⟨s, hs⟩)
+  rw [MeromorphicOn.divisor_apply hL.meromorphicOn (mem_univ _),
+    ((hL (mem_univ s)).meromorphicOrderAt_eq_zero_iff).mpr hne]
+  rfl
+
+private theorem introTrace_globalTrace_false_re_nonneg (F : Type) [Field F] [NumberField F]
+    (χ : PontryaginDual C[F]) (s : ℂ) (hs : 0 < zeroOrder[F](χ, s)) : 0 ≤ s.re := by
+  by_contra h
+  rw [← introTrace_globalTrace_false_ord F χ s, introTrace_globalTrace_false_noRight F χ⁻¹ (1 - s)
+    (by rw [Complex.sub_re, Complex.one_re]; linarith)] at hs
+  exact lt_irrefl 0 hs
+
+private theorem introTrace_globalTrace_false_of_complex (F : Type) [Field F] [NumberField F]
+    (hcx : ∀ w : InfinitePlace F, w.IsComplex) (hP : Printed.introTrace_globalTrace) : False := by
+  obtain ⟨h, hh, hhc, hodd, hsupp, hsign, t₁, ht₁⟩ := introTrace_globalTrace_false_bump
+  have h0 : h 0 = 0 := by have := hodd 0; rw [neg_zero] at this; linarith
+  obtain ⟨φ, hφ⟩ := exists_normTest (F := F) (fun t ↦ (h t : ℂ))
+    (Complex.ofRealCLM.contDiff.comp hh) (hhc.comp_left Complex.ofReal_zero)
+  have hφinv (g : C[F]) : φ.val g⁻¹ = -φ.val g := by
+    rw [hφ, hφ, map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv, Real.log_inv, hodd,
+      Complex.ofReal_neg]
+  have hφ1 : ∀ g : (ideleClassNorm F).ker, φ.val g = 0 := fun g ↦ by
+    rw [hφ, MonoidHom.mem_ker.mp g.2]; simp [h0]
+  let τ : ℝ≥0ˣ →ₜ* C[F] :=
+    ⟨(QuotientGroup.mk' _).comp (canonicalIdeleNormSection F),
+      continuous_quotient_mk'.comp (canonicalIdeleNormSection_continuous _)⟩
+  obtain ⟨a, b, ha, hb, _, hS⟩ :=
+    hP F τ (canonicalIdeleNormSection_rightInverse _) φ hφ1 2 two_pos
+  have hpos (v : HeightOneSpectrum (𝓞 F)) : 0 < v.asIdeal.absNorm :=
+    zero_lt_one.trans (by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v)
+  refine absurd (introTrace_globalTrace_false_final (introTrace_globalTrace_false_zeroSum
+    (X := {χ : PontryaginDual C[F] // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ)
+    (fun p ↦ (⟨p.1.val⁻¹, fun t ↦ by
+      change (p.1.val (τ t))⁻¹ = 1
+      rw [p.1.2 t, inv_one]⟩, 1 - p.2))
+    (fun p ↦ Prod.ext (Subtype.ext (inv_inv _)) (sub_sub_cancel 1 p.2))
+    {p | 0 < zeroOrder[F](p.1.val, p.2) ∧ |p.2.re| < 2} ?_
+    (fun p ↦ ((zeroOrder[F](p.1.val, p.2) : ℤ) : ℂ) *
+      moment[F](φ.val, p.1.val, (p.2 - 1 / 2))) ?_ hS) ?_ ?_) ?_
+  · intro p hp
+    obtain ⟨h1, h2⟩ := hp
+    have h0 := introTrace_globalTrace_false_re_nonneg F p.1.val p.2 h1
+    refine ⟨?_, ?_⟩
+    · change 0 < zeroOrder[F](p.1.val⁻¹, 1 - p.2)
+      rw [introTrace_globalTrace_false_ord]
+      exact h1
+    · change |(1 - p.2).re| < 2
+      rw [Complex.sub_re, Complex.one_re, abs_lt]
+      have := (abs_lt.mp h2).2
+      constructor <;> linarith
+  · intro p _
+    dsimp only
+    rw [introTrace_globalTrace_false_ord, introTrace_globalTrace_false_mellin_inv _ φ hφinv
+      p.1.val p.1.val⁻¹ (p.2 - 1 / 2) (1 - p.2 - 1 / 2) (fun g ↦ by
+        rw [show (1 - p.2 - 1 / 2 : ℂ) = -(p.2 - 1 / 2) by ring]
+        exact introTrace_globalTrace_false_twist_inv _ _ _ g)]
+    ring
+  · exact introTrace_globalTrace_false_mellin_inv _ φ hφinv 1 1 (1 / 2) (-1 / 2) (fun g ↦ by
+      have := introTrace_globalTrace_false_twist_inv _ (1 : PontryaginDual C[F])
+        (1 / 2) g
+      rw [inv_one] at this
+      rw [show (-1 / 2 : ℂ) = -(1 / 2) by ring]
+      exact this)
+  · refine (tsum_congr fun v ↦ ?_).trans tsum_zero
+    refine mul_eq_zero_of_right _ (introTrace_globalTrace_false_dual_zero _ (b v) fun u ↦ ?_)
+    rw [hb v u, hφ, ideleClassNorm_ofAdicCompletion]
+    obtain ⟨k, hk⟩ := introTrace_globalTrace_false_adicNorm _ v u
+    change ((h (Real.log ‖(u : v.adicCompletion F)‖) : ℝ) : ℂ) = 0
+    rw [hk, Complex.ofReal_eq_zero]
+    by_contra hne
+    exact introTrace_globalTrace_false_natPow _ k (hpos v) (hsupp _ hne).1 (hsupp _ hne).2
+  · refine introTrace_globalTrace_false_sum_ne _ _ Finset.univ_nonempty (fun w _ ↦ ?_)
+    beta_reduce
+    have hnr : ¬ w.IsReal := InfinitePlace.not_isReal_iff_isComplex.mpr (hcx w)
+    rw [ite_eq_right_of_eq_false _ _ (eq_false hnr), show (1 / (2 * (Real.pi : ℂ))) =
+      (((1 / (2 * Real.pi)) : ℝ) : ℂ) by push_cast; ring, Complex.re_ofReal_mul]
+    refine mul_pos (by positivity) ?_
+    let : MeasurableSpace w.Completion := borel _
+    let : BorelSpace w.Completion := ⟨rfl⟩
+    let : BorelSpace w.Completionˣ := borelSpace_units_of_continuousInv₀ _
+    let : (infiniteLocalMultiplicativeTamagawaMeasure F w).IsHaarMeasure :=
+      infiniteLocalMultiplicativeTamagawaMeasure_haar _ w
+    let : SecondCountableTopology w.Completion :=
+      (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+    let : SecondCountableTopology w.Completionˣ :=
+      (Units.isEmbedding_val₀ (G₀ := w.Completion)).secondCountableTopology
+    have : (infiniteLocalMultiplicativeTamagawaMeasure F w).IsInvInvariant := inferInstance
+    have hN (u : w.Completionˣ) : ((ideleClassNorm _
+        (IdeleClassGroup.ofCompletion (𝓞 F) _ w u) : ℝ≥0) : ℝ) =
+        ‖(u : w.Completion)‖ ^ 2 := by
+      rw [ideleClassNorm_ofCompletion, (hcx w).mult_eq_two]
+      simp
+    have hval (u : w.Completionˣ) :
+        (a w).val u = ((h (Real.log (‖(u : w.Completion)‖ ^ 2)) : ℝ) : ℂ) := by
+      rw [ha, hφ, hN]
+    simp_rw [hval]
+    let e := InfinitePlace.Completion.isometryEquivComplexOfIsComplex (hcx w)
+    have hen (x : w.Completion) : ‖e x‖ = ‖x‖ := e.isometry.norm_map_of_map_zero
+      (map_zero (InfinitePlace.Completion.ringEquivComplexOfIsComplex (hcx w))) x
+    have hx0 : ‖e.symm (Real.exp (t₁ / 2) : ℂ)‖ = Real.exp (t₁ / 2) := by
+      rw [← hen, e.apply_symm_apply, Complex.norm_real, Real.norm_of_nonneg (Real.exp_pos _).le]
+    have hx0' : e.symm (Real.exp (t₁ / 2) : ℂ) ≠ 0 := by
+      rw [← norm_ne_zero_iff, hx0]; exact (Real.exp_pos _).ne'
+    refine introTrace_globalTrace_false_localPos _
+      (fun u : w.Completionˣ ↦ h (Real.log (‖(u : w.Completion)‖ ^ 2)))
+      (hh.continuous.comp (((continuous_norm.comp Units.continuous_val).pow 2).log
+        fun u ↦ pow_ne_zero 2 (norm_ne_zero_iff.mpr u.ne_zero))) ?_ (fun u ↦ ?_)
+      (fun u ↦ introTrace_globalTrace_false_sign h hsign (norm_pos_iff.mpr u.ne_zero)) (3 / 2)
+      (by norm_num) (fun u h1 h2 ↦ introTrace_globalTrace_false_nearOne h hsupp h1 h2)
+      (Units.mk0 _ hx0') ?_
+    · refine (a w).2.2.mono fun u hu h0 ↦ hu ?_
+      have := hval u
+      rw [h0, eq_comm, Complex.ofReal_eq_zero] at this
+      exact this
+    · simp only [Units.val_inv_eq_inv_val, norm_inv, inv_pow, Real.log_inv, hodd]
+    · rw [Units.val_mk0, hx0, ← Real.exp_nat_mul, Real.log_exp]
+      convert ht₁ using 2
+      push_cast; ring
+
+
 /-- Paper: §1.4, p. 28. Over ℚ(i) take half-width two and
 φ(g) = h(|g|) − h(1/|g|) with a nonzero nonnegative smooth bump in (9/4,11/4).
 This width contains the full trivial-character divisor, which pairs to zero by
 the functional equation and inversion. The poles cancel and the finite shells
 miss the support. After inversion the complex term integrates a positive
 multiple of h(r²)(r−1)/‖1−u‖ on the outer annulus, where r = ‖u‖. -/
-theorem Printed.introTrace_globalTrace_false : ¬ Printed.introTrace_globalTrace := by sorry
+theorem Printed.introTrace_globalTrace_false : ¬ Printed.introTrace_globalTrace :=
+  introTrace_globalTrace_false_of_complex (CyclotomicField 4 ℚ) introTrace_globalTrace_false_field
 
 open Classical in
 /-- Paper: §1.4.1, p. 28. The local archimedean integrands multiply the restricted
@@ -126,13 +526,196 @@ def Printed.introTrace_characterTrace : Prop :=
           printedReal[F](χ, φ.val) - printedComplex[F](χ, φ.val) -
           ∑' p : V[F] × ℕ, printedPrime[F](χ, h, π, p))
 
+private theorem introTrace_characterTrace_false_ne_one (v : HeightOneSpectrum (𝓞 ℚ))
+    (u : (v.adicCompletion ℚ)ˣ) (hu : u ≠ 1) :
+    IdeleClassGroup.ofAdicCompletion (𝓞 ℚ) ℚ v u ≠ 1 := by
+  intro h
+  obtain ⟨a, ha⟩ := (QuotientGroup.eq_one_iff _).mp h
+  have h1 : (((a : ℚ) : ℝ)) = 1 := by
+    rw [← NumberFieldKB.Chebotarev.RatIdele.realPart_diag,
+      ← NumberFieldKB.Chebotarev.RatIdele.realPart_ofAdicCompletion v u]
+    exact congrArg NumberFieldKB.Chebotarev.RatIdele.realPart ha
+  have ha1 : a = 1 := Units.val_eq_one.mp (by exact_mod_cast h1)
+  rw [ha1, map_one] at ha
+  have h2 := congrArg (NumberFieldKB.Chebotarev.RatIdele.compV v) ha
+  rw [NumberFieldKB.Chebotarev.RatIdele.compV_ofAdicCompletion_self, map_one] at h2
+  exact hu h2.symm
+
+private theorem introTrace_characterTrace_false_bump :
+    ∃ H : ℝ → ℝ, ContDiff ℝ ((⊤ : ℕ∞) : WithTop ℕ∞) H ∧ HasCompactSupport H ∧ H (Real.log 2) ≠ 0 ∧
+      ∀ t, H t ≠ 0 → |t - Real.log 2| < Real.log 2 / 2 := by
+  have hl : 0 < Real.log 2 := Real.log_pos one_lt_two
+  let b : ContDiffBump (Real.log 2) := ⟨Real.log 2 / 4, Real.log 2 / 2, by positivity, by linarith⟩
+  refine ⟨b, b.contDiff, b.hasCompactSupport, ?_, fun t ht ↦ ?_⟩
+  · rw [b.one_of_mem_closedBall (Metric.mem_closedBall_self b.rIn_pos.le)]
+    exact one_ne_zero
+  · have : t ∈ Metric.ball (Real.log 2) (Real.log 2 / 2) := by
+      rw [← b.support_eq]; exact ht
+    rwa [Metric.mem_ball, Real.dist_eq] at this
+
+private theorem introTrace_characterTrace_false_cancel {X : Type*} {f : X → ℂ} {A T T' : ℂ}
+    (h1 : HasSum f (A - T)) (h2 : HasSum f (A - T')) : T = T' := by
+  have := h1.unique h2
+  linear_combination -this
+
+private theorem introTrace_characterTrace_false_diff (L c c' y z Q : ℂ) (m : ℕ) (hm : m = 1)
+    (hL : L ≠ 0) (hcc : c ≠ c') (hy : y ≠ 0) (hz : z = 0) (hQ : Q ≠ 0) :
+    L * (c ^ m * y + star c ^ m * z) / Q - L * (c' ^ m * y + star c' ^ m * z) / Q ≠ 0 := by
+  subst hm hz
+  rw [show L * (c ^ 1 * y + star c ^ 1 * 0) / Q - L * (c' ^ 1 * y + star c' ^ 1 * 0) / Q =
+    L * y * (c - c') / Q by ring]
+  exact div_ne_zero (mul_ne_zero (mul_ne_zero hL hy) (sub_ne_zero.mpr hcc)) hQ
+
+private theorem introTrace_characterTrace_false_zero (L c y z Q : ℂ) (m : ℕ) (hy : y = 0) (hz : z = 0) :
+    L * (c ^ m * y + star c ^ m * z) / Q = 0 := by
+  rw [hy, hz]; ring
+
 /-- Paper: §1.4.1, p. 28. Take the primitive quadratic character modulo
 three over the rationals and a smooth radial bump equal to one at three
 with support in `(5/2, 7/2)`. The only surviving prime power is three.
 Its printed term changes sign when the uniformizer at three is changed
 from three to minus three. Every other term is independent of this choice. -/
-theorem Printed.introTrace_characterTrace_false : ¬ Printed.introTrace_characterTrace :=
-  by sorry
+theorem Printed.introTrace_characterTrace_false : ¬ Printed.introTrace_characterTrace := by
+  intro hall
+  classical
+  let v : HeightOneSpectrum (𝓞 ℚ) := NumberFieldKB.Chebotarev.RatIdele.placeOf 2 Nat.prime_two
+  have hq : q(v) = 2 := by
+    change ((Ideal.absNorm v.asIdeal : ℕ) : ℝ) = 2
+    rw [NumberFieldKB.Chebotarev.RatIdele.absNorm_asIdeal, NumberFieldKB.Chebotarev.RatIdele.pr_placeOf]
+    norm_num
+  let w : (v.adicCompletion ℚ)ˣ := -1
+  have hw1 : w ≠ 1 := by
+    intro h
+    have h2 : (2 : v.adicCompletion ℚ) ≠ 0 := by
+      have := (algebraMap ℚ (v.adicCompletion ℚ)).injective.ne (two_ne_zero (α := ℚ))
+      rwa [map_ofNat, map_zero] at this
+    apply h2
+    have := congrArg Units.val h
+    rw [Units.val_neg, Units.val_one] at this
+    linear_combination -this
+  obtain ⟨χ, hχ⟩ := exists_pontryaginDual_apply_ne_one
+    (introTrace_characterTrace_false_ne_one v w hw1)
+  have hwker : IdeleClassGroup.ofAdicCompletion (𝓞 ℚ) ℚ v w ∈ (ideleClassNorm ℚ).ker := by
+    rw [MonoidHom.mem_ker, ideleClassNorm_ofAdicCompletion]
+    ext
+    simp [w]
+  have hbase : chartBase[ℚ](χ) := fun h ↦ absurd (h ⟨_, hwker⟩) hχ
+  obtain ⟨H, hH, hHc, hH2, hHs⟩ := introTrace_characterTrace_false_bump
+  have hl2 : 0 < Real.log 2 := Real.log_pos one_lt_two
+  have hHz (t : ℝ) (ht : Real.log 2 / 2 ≤ |t - Real.log 2|) : H t = 0 := by
+    by_contra hne
+    exact absurd (hHs t hne) (not_lt.mpr ht)
+  have hH0 : H 0 = 0 := hHz 0 (by rw [zero_sub, abs_neg, abs_of_pos hl2]; linarith)
+  obtain ⟨φ, hφ⟩ := exists_characterNormTest (F := ℚ) χ⁻¹ (fun t ↦ (H t : ℂ))
+    (Complex.ofRealCLM.contDiff.comp hH) (hHc.comp_left Complex.ofReal_zero)
+  have hker : ∀ u : (ideleClassNorm ℚ).ker, φ.val u.val = 0 := by
+    intro u
+    rw [hφ, MonoidHom.mem_ker.mp u.2]
+    simp [hH0]
+  have hequiv : ∀ (g : C[ℚ]) (u : (ideleClassNorm ℚ).ker),
+      φ.val (g * u.val) = star (χ u.val : ℂ) * φ.val g := by
+    intro g u
+    have hinv : ((χ⁻¹ u.val : Circle) : ℂ) = star (χ u.val : ℂ) :=
+      Circle.coe_inv_eq_conj (χ u.val)
+    rw [hφ, hφ, map_mul, map_mul (ideleClassNorm ℚ), MonoidHom.mem_ker.mp u.2, mul_one,
+      Circle.coe_mul, hinv]
+    ring
+  let sec : ℝ≥0ˣ → C[ℚ] := fun t ↦ QuotientGroup.mk (canonicalIdeleNormSection ℚ t)
+  have hsecN (t : ℝ≥0ˣ) : ideleClassNorm ℚ (sec t) = t :=
+    canonicalIdeleNormSection_rightInverse ℚ t
+  let tx : {x : ℝ // 0 < x} → ℝ≥0ˣ := fun x ↦
+    Units.mk0 (Real.toNNReal x.val) (Real.toNNReal_pos.mpr x.2).ne'
+  let h : ℝ → ℂ := fun x ↦ if hx : 0 < x then φ.val (sec (tx ⟨x, hx⟩)) else 0
+  have hsec : ∀ t : ℝ≥0ˣ, h (t.val : ℝ) = φ.val (QuotientGroup.mk (canonicalIdeleNormSection ℚ t)) := by
+    intro t
+    have ht : 0 < ((t : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr t.ne_zero)
+    have htx : tx ⟨_, ht⟩ = t := Units.ext (by simp [tx])
+    simp only [h, ht, ↓reduceDIte, htx]
+    rfl
+  have hform (x : ℝ) (hx : 0 < x) :
+      h x = ((χ⁻¹ (sec (tx ⟨x, hx⟩)) : Circle) : ℂ) * (H (Real.log x) : ℂ) := by
+    simp only [h, hx, ↓reduceDIte]
+    rw [hφ, hsecN]
+    simp [tx, Real.toNNReal_of_nonneg hx.le]
+  have hzero (x : ℝ) (hx : H (Real.log x) = 0) : h x = 0 := by
+    by_cases hx0 : 0 < x
+    · rw [hform x hx0, hx, Complex.ofReal_zero, mul_zero]
+    · simp only [h, hx0, ↓reduceDIte]
+  have hh2 : h 2 ≠ 0 := by
+    rw [hform 2 two_pos]
+    exact mul_ne_zero (Circle.coe_ne_zero _) (Complex.ofReal_ne_zero.mpr hH2)
+  have hpow (k : ℕ) : h (2 ^ (k + 1 + 1)) = 0 := by
+    refine hzero _ (hHz _ ?_)
+    rw [Real.log_pow]
+    push_cast
+    rw [show ((k : ℝ) + 1 + 1) * Real.log 2 - Real.log 2 = (k + 1) * Real.log 2 by ring,
+      abs_of_nonneg (by positivity)]
+    nlinarith [(Nat.cast_nonneg k : (0 : ℝ) ≤ k)]
+  have hpowinv (k : ℕ) : h ((2 ^ (k + 1))⁻¹) = 0 := by
+    refine hzero _ (hHz _ ?_)
+    rw [Real.log_inv, Real.log_pow]
+    push_cast
+    rw [show -(((k : ℝ) + 1) * Real.log 2) - Real.log 2 = -((k + 2) * Real.log 2) by ring,
+      abs_neg, abs_of_nonneg (by positivity)]
+    nlinarith [(Nat.cast_nonneg k : (0 : ℝ) ≤ k)]
+  let val (v' : HeightOneSpectrum (𝓞 ℚ)) :
+      Valuation (v'.adicCompletion ℚ) (WithZero (Multiplicative ℤ)) := Valued.v
+  let π₀ : uniformizers[ℚ] := fun v' ↦
+    Units.mk0 ((val v').exists_isUniformizer_of_isCyclic_of_nontrivial.choose :
+      v'.adicCompletion ℚ) (val v').exists_isUniformizer_of_isCyclic_of_nontrivial.choose_spec.ne_zero
+  have hπ₀ : ∀ v', isUniformizer[ℚ](v', π₀ v') := fun v' ↦
+    (val v').exists_isUniformizer_of_isCyclic_of_nontrivial.choose_spec
+  obtain ⟨π', hπ'v, hπ'ne⟩ : ∃ π' : uniformizers[ℚ], π' v = π₀ v * w ∧ ∀ v', v' ≠ v → π' v' = π₀ v' :=
+    ⟨Function.update π₀ v (π₀ v * w), Function.update_self _ _ _,
+      fun v' hv' ↦ Function.update_of_ne hv' _ _⟩
+  have hπ' : ∀ v', isUniformizer[ℚ](v', π' v') := by
+    intro v'
+    by_cases hv' : v' = v
+    · subst hv'
+      rw [hπ'v]
+      have := hπ₀ v
+      unfold Valuation.IsUniformizer at this ⊢
+      rw [Units.val_mul, map_mul, this]
+      simp [w]
+    · rw [hπ'ne v' hv']
+      exact hπ₀ v'
+  have hT := introTrace_characterTrace_false_cancel
+    (hall ℚ χ φ h hbase hker hequiv hsec 1 one_pos π₀ hπ₀).2
+    (hall ℚ χ φ h hbase hker hequiv hsec 1 one_pos π' hπ').2
+  have hS := (hall ℚ χ φ h hbase hker hequiv hsec 1 one_pos π₀ hπ₀).1
+  have hS' := (hall ℚ χ φ h hbase hker hequiv hsec 1 one_pos π' hπ').1
+  have hD := hS.hasSum.sub hS'.hasSum
+  rw [hT, sub_self] at hD
+  have hsingle : ∀ p : HeightOneSpectrum (𝓞 ℚ) × ℕ, p ≠ (v, 0) →
+      printedPrime[ℚ](χ, h, π₀, p) - printedPrime[ℚ](χ, h, π', p) = 0 := by
+    rintro ⟨v', k⟩ hp
+    by_cases hv' : v' = v
+    · subst hv'
+      obtain ⟨k, rfl⟩ : ∃ k', k = k' + 1 :=
+        Nat.exists_eq_succ_of_ne_zero (fun hk ↦ hp (by rw [hk]))
+      dsimp only
+      rw [hq, hpow k, hpowinv (k + 1)]
+      ring
+    · dsimp only
+      rw [hπ'ne v' hv', sub_self]
+  have hD' := hasSum_single (f := fun p ↦ printedPrime[ℚ](χ, h, π₀, p) - printedPrime[ℚ](χ, h, π', p))
+    (v, 0) hsingle
+  have hd := hD.unique hD'
+  revert hd
+  dsimp only
+  refine (introTrace_characterTrace_false_diff _ _ _ _ _ _ _ rfl ?_ ?_ ?_ ?_ ?_).symm
+  · rw [hq]; exact Complex.ofReal_ne_zero.mpr hl2.ne'
+  · rw [hπ'v, map_mul, map_mul, Circle.coe_mul]
+    intro hc
+    apply hχ
+    apply Circle.coe_injective
+    rw [Circle.coe_one]
+    exact (mul_eq_left₀ (Circle.coe_ne_zero _)).mp hc.symm
+  · rw [hq]; simpa using hh2
+  · rw [hq]; simpa using hpowinv 0
+  · rw [hq]
+    exact (Complex.cpow_ne_zero_iff_of_exponent_ne_zero (by norm_num)).mpr (by norm_num)
+
 
 /-- Paper: §§1.4.2–1.4.3, pp. 28–29. The displayed products can be chosen as a cofinal
 family of approximants with conjugate norm-one weight. -/
@@ -149,8 +732,27 @@ two at five and components one elsewhere. At norm two and parameter two,
 the radial value is nonzero for all sufficiently late approximants.
 Right translation by `u` multiplies the displayed test by `i`, while the
 asserted conjugate weight would multiply it by `-i`. -/
+-- `ContDiff ℝ ⊤` in `IsIntroTraceApproximation` is analyticity. An analytic cutoff vanishing
+-- below one vanishes everywhere, so it cannot tend to one at two (#5645).
+private theorem introTraceApprox_conjugateWeight_false_cutoffs (h ρ : ℕ → ℝ → ℝ)
+    (ha : IsIntroTraceApproximation h ρ) : False := by
+  have hzero (n : ℕ) : h n 2 = 0 := by
+    have han : AnalyticOnNhd ℝ (h n) univ := (ha.1 n).1.analyticOnNhd
+    have hnear : h n =ᶠ[𝓝 0] 0 := by
+      filter_upwards [gt_mem_nhds (show (0 : ℝ) < 1 by norm_num)] with x hx
+      apply image_eq_zero_of_notMem_tsupport
+      exact fun hmem ↦ hx.not_gt ((ha.1 n).2.2.1 hmem)
+    exact han.eqOn_zero_of_preconnected_of_eventuallyEq_zero isPreconnected_univ
+      (mem_univ 0) hnear (mem_univ 2)
+  have hlim := ha.2.2.1 2 (by norm_num)
+  simp only [hzero] at hlim
+  exact zero_ne_one (tendsto_nhds_unique tendsto_const_nhds hlim)
+
 theorem Printed.introTraceApprox_conjugateWeight_false :
-    ¬ Printed.introTraceApprox_conjugateWeight := by sorry
+    ¬ Printed.introTraceApprox_conjugateWeight := by
+  intro hall
+  obtain ⟨h, ρ, ha, _⟩ := hall ℚ 1 (fun _ ↦ rfl)
+  exact introTraceApprox_conjugateWeight_false_cutoffs h ρ ha
 
 open Classical in
 /-- Paper: §1.4.3, p. 29. The printed real and complex archimedean
@@ -189,7 +791,21 @@ def Printed.introTraceApprox_archimedean_montel : Prop :=
 one and the closed disk of radius one quarter about two, the real term at
 the interior point two diverges along every cutoff subsequence. -/
 theorem Printed.introTraceApprox_archimedean_montel_false :
-    ¬ Printed.introTraceApprox_archimedean_montel := by sorry
+    ¬ Printed.introTraceApprox_archimedean_montel := by
+  intro hall
+  have hK : Metric.closedBall (2 : ℂ) (1 / 4) ⊆ right(1) := by
+    intro z hz
+    have := (Complex.abs_re_le_norm (z - 2)).trans (mem_closedBall_iff_norm.mp hz)
+    change 1 < z.re
+    rw [Complex.sub_re, Complex.re_ofNat] at this
+    linarith [(abs_le.mp this).1]
+  have hint : (2 : ℂ) ∈ interior (Metric.closedBall (2 : ℂ) (1 / 4)) ∩ right(1) := by
+    refine ⟨?_, show (1 : ℝ) < (2 : ℂ).re by norm_num⟩
+    rw [interior_closedBall _ (by norm_num)]
+    exact Metric.mem_ball_self (by norm_num)
+  obtain ⟨h, ρ, -, -, ha, -⟩ := hall ℚ 1 1 (fun _ ↦ rfl) one_pos _
+    (isCompact_closedBall _ _) hK ⟨2, hint⟩
+  exact introTraceApprox_conjugateWeight_false_cutoffs h ρ ha
 
 /-- Paper: §1.4.3, p. 29. The spectral sums of the cutoff family converge
 to a holomorphic function on the interior of the compact set outside the

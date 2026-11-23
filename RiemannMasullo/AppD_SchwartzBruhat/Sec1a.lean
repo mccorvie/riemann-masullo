@@ -2905,7 +2905,11 @@ variable (ν : Measure (G ⧸ H)) (hν : IsWeilQuotientMeasure H μ Measure.coun
 set_option linter.unusedSectionVars false in
 include hH hΔ hbij hν in
 /-- Paper: Proposition D.1.2.4, p. 748. Borel measurability on the quotient
-can be tested on the pullback restricted to a Borel fundamental domain. -/
+can be tested on the pullback restricted to a Borel fundamental domain.
+Deviation: The page states the equivalence for measurability with respect to the quotient
+measure and the Haar measure of the group. This is the form for Borel measurability, which
+is what the printed proof establishes; the form for the two completed measures is not
+stated here. -/
 theorem weilFundamentalDomain_measurable_iff (f : G ⧸ H → ℂ) :
     Measurable f ↔ Measurable (Δ.indicator (fun x ↦ f (QuotientGroup.mk x))) := by
   let : BorelSpace (G ⧸ H) := ⟨rfl⟩
@@ -5467,8 +5471,9 @@ theorem rapidDecaySequenceSeminorm_zero (s : RapidDecaySequence r) :
   rw [rapidDecaySequenceBound, ENNReal.tsum_toReal_eq (fun a ↦ by simp)]
   simp
 
-/-- Paper: Remark D.1.3.6, p. 753. The weighted sums generate the topology
-and give a Fréchet space. -/
+/-- Paper: Remark D.1.3.6 and its sequel, pp. 752–753. The weighted sum seminorms
+generate the topology of the rapidly decaying sequence space. Its Fréchet property is stated
+separately in `rapidDecaySequence_isFrechet`. -/
 theorem rapidDecaySequence_withSeminorms :
     WithSeminorms (E := RapidDecaySequence r) rapidDecaySequenceSeminorm :=
   withGeneratingSeminorms_spec _ _
