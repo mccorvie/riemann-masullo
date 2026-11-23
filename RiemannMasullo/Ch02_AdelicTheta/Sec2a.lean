@@ -1824,8 +1824,9 @@ private theorem exists_adeleSchwartzFourierCLM :
       rw [mul_comm x y.toAdd]
       exact he.1 y.toAdd x)).symm
 
-/-- Paper: Theorem 2.2.3.2, p. 82. The Fourier integral for the standard adelic
-character and the additive Tamagawa measure gives a Schwartz–Bruhat function. -/
+/-- Paper: Lemma D.1.6.19(2), p. 773. The Fourier integral for the standard adelic
+character and the additive Tamagawa measure gives a Schwartz–Bruhat function. This Fourier
+stability is used in Theorem 2.2.3.2, p. 82. -/
 theorem adeleSchwartzFourier_mem (f : ℬ[F]) :
     (fun y : Multiplicative 𝔸[F] ↦ tamagawaFourier (additiveTamagawaMeasure F)
       (adeleStandardCharacter F) (fun x ↦ f (Multiplicative.ofAdd x)) y.toAdd) ∈
@@ -2020,8 +2021,9 @@ private theorem schwartzBruhat_integrable {G : Type*} [CommGroup G] [Topological
     (integrable_zero _ _ _) (fun _ _ hg hh ↦ hg.add hh)
 
 open scoped IsDedekindDomain.FiniteAdeleRing RestrictedProduct in
-/-- Paper: Theorem 2.2.3.2, p. 82. The value of the Fourier transform at zero
-is the integral of the Schwartz–Bruhat function, which is integrable. -/
+/-- Paper: (D.1.1.4), p. 746. At zero the standard adelic character in the Fourier
+integrand is trivial. The Schwartz–Bruhat function is integrable, and its Fourier transform
+at zero equals its integral, as used in Theorem 2.2.3.2, p. 82. -/
 theorem adeleSchwartzFourier_apply_zero (f : ℬ[F]) :
     Integrable (fun x ↦ f (Multiplicative.ofAdd x)) (additiveTamagawaMeasure F) ∧
     adeleSchwartzFourier f zeroAdele =
