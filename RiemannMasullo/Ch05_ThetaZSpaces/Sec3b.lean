@@ -98,12 +98,70 @@ theorem realSchwartz_restrict_positiveDecay :
     ∃ R : 𝓢(ℝ, ℂ) →L[ℂ] 𝓔(ℝ, 1, Ioi 0), Injective R ∧
       ∀ (f : 𝓢(ℝ, ℂ)) (u : ℝˣ), (R f).val u = f u.val := by sorry
 
+/-- The restriction at a single positive exponent is a continuous linear map
+to the ordinary Schwartz–Bruhat space. In logarithmic polar coordinates, its
+profile is `exp (2 * b * t) * f (exp t * ζ)` for `|ζ| = 1`. -/
+private theorem complexSchwartz_restrict_positiveDecay_twist (b : ℝ) (hb : 0 < b) :
+    ∃ T : 𝓢(ℂ, ℂ) →L[ℂ] SchwartzBruhat ℂˣ,
+      ∀ f, (T f).val = modulationWeight (archimedeanUnitModulation ℂ 2) b
+        (fun z : ℂˣ ↦ f z.val) := by
+  sorry
+
 /-- Paper: §5.3.3, p. 249.
 Restriction of an additive complex Schwartz function to the units gives a continuous
 linear injection into the space with all positive squared-norm weights. -/
 theorem complexSchwartz_restrict_positiveDecay :
     ∃ R : 𝓢(ℂ, ℂ) →L[ℂ] 𝓔(ℂ, 2, Ioi 0), Injective R ∧
-      ∀ (f : 𝓢(ℂ, ℂ)) (u : ℂˣ), (R f).val u = f u.val := by sorry
+      ∀ (f : 𝓢(ℂ, ℂ)) (u : ℂˣ), (R f).val u = f u.val := by
+  let n := archimedeanUnitModulation ℂ 2
+  let I := Ioi (0 : ℝ)
+  let iso := (stdOrthonormalBasis ℝ ℂ).repr
+  have hk : IsBruhatGoodSubgroup (⊥ : Subgroup ℂˣ) :=
+    isBruhatGoodSubgroup_bot_iff.mpr ⟨_, ⟨(iso.toHomeomorph.isOpenEmbedding.comp
+      (Units.isOpenEmbedding_val (R := ℂ))).singletonChartedSpace⟩⟩
+  let k : {k : Subgroup ℂˣ // IsCompact (k : Set ℂˣ) ∧
+      IsCompactlyGeneratedGroup (lcaAnnihilator k)} :=
+    ⟨⊥, isCompact_of_isBruhatGoodSubgroup_aux _ hk, hk.2.2⟩
+  let Q := ℂˣ ⧸ k.val
+  let e : Q ≃ₜ* ℂˣ := QuotientGroup.quotientBot.toContinuousMulEquiv fun _ ↦
+    (QuotientGroup.isQuotientMap_mk k.val).isOpen_preimage.symm
+  let m := quotientModulation n k.val k.property.1
+  let L : 𝓢(ℂ, ℂ) →ₗ[ℂ] (Q → ℂ) :=
+    { toFun := fun f q ↦ f (e q).val
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  have htwist (b : I) : ∃ T : 𝓢(ℂ, ℂ) →L[ℂ] SchwartzBruhat Q,
+      ∀ f, (T f).val = modulationWeight m b (L f) := by
+    obtain ⟨T, hT⟩ := complexSchwartz_restrict_positiveDecay_twist b b.property
+    refine ⟨(schwartzBruhatPullbackEquiv e).toContinuousLinearMap.comp T, fun f ↦ ?_⟩
+    funext q
+    refine QuotientGroup.induction_on q fun z ↦ ?_
+    change (T f).val z = modulationWeight n b (fun u : ℂˣ ↦ f u.val) z
+    exact congrFun (hT f) z
+  choose T hT using htwist
+  let A : 𝓢(ℂ, ℂ) →ₗ[ℂ] ModulatedExponentialDecayStage n I k :=
+    L.codRestrict (modulatedExponentialDecaySubmodule m I) fun f ↦
+      (Submodule.mem_iInf _).mpr fun b ↦ Submodule.mem_comap.mpr (by
+        rw [← hT b f]
+        exact (T b f).property)
+  have hA : Continuous A := by
+    apply (modulatedExponentialDecayStage_twists_isInducing n I k).continuous_iff.mpr
+    exact continuous_pi fun b ↦
+      (T b).continuous.congr fun f ↦ Subtype.ext (hT b f)
+  let j : ModulatedExponentialDecayStage n I k →ₗ[ℂ] 𝓔(ℂ, 2, Ioi 0) :=
+    modulatedExponentialDecayStageInclusion n I k
+  have hj : Continuous j := (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp
+    j fun p ↦ p.property k
+  let R : 𝓢(ℂ, ℂ) →L[ℂ] 𝓔(ℂ, 2, Ioi 0) := ⟨j.comp A, hj.comp hA⟩
+  have hR (f : 𝓢(ℂ, ℂ)) (u : ℂˣ) : (R f).val u = f u.val := rfl
+  refine ⟨R, fun f g h ↦ ?_, hR⟩
+  have hd : DenseRange (Units.val : ℂˣ → ℂ) := by
+    rw [DenseRange, show range (Units.val : ℂˣ → ℂ) = {0}ᶜ from Set.ext fun z ↦
+      ⟨fun ⟨u, hu⟩ ↦ hu ▸ u.ne_zero, fun hz ↦ ⟨Units.mk0 z hz, rfl⟩⟩]
+    exact dense_compl_singleton 0
+  have he := hd.equalizer f.continuous g.continuous (funext fun u ↦
+    (hR f u).symm.trans ((congrArg (fun y : 𝓔(ℂ, 2, Ioi 0) ↦ y.val u) h).trans (hR g u)))
+  exact SchwartzMap.ext (congrFun he)
 
 open scoped Manifold in
 private theorem puncturedTest_mul_equiv {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
