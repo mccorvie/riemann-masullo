@@ -2,6 +2,10 @@ module
 
 public import Mathlib.Algebra.Field.ULift
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
+import RiemannMasullo.Ch05_ThetaZSpaces.Sec5
+import Mathlib.NumberTheory.NumberField.Cyclotomic.Basic
+import Mathlib.NumberTheory.NumberField.Discriminant.Different
+import Mathlib.Analysis.SpecialFunctions.ExpDeriv
 import all RiemannMasullo.Ch03_IdelicZeta.Sec4
 import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec1a
 
@@ -1438,13 +1442,349 @@ product still omits the factor from Fourier and Gaussian normalization. -/
 def sLocalPrincipalPartCoeff_leading_unscaled : Prop :=
   sLocalUnscaledLeadingIdentity.{u} (fun m ↦ -(m : ℤ))
 
+section
+
+/-- The standard Gaussian tensor has nonzero normalized value at every chosen center. -/
+private theorem sLocalPrincipalPartCoeff_leading_unscaled_false_gaussian_normalized_nonzero
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))) (z : ℂ) :
+    ∃ f : SchwartzBruhat (Multiplicative (SAdeleRing F S)), sLocalNormalizedZFunction f (quasiCharacterNormTwist (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous 1 z) ≠ 0 := by
+  let χ : PontryaginDual (SIdeleQuotient F S) := 1
+  let q : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  let b := quasiCharacterNormTwist (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous (q.comp χ) z
+  let χArch : (w : InfinitePlace F) → PontryaginDual w.Completionˣ := fun _ ↦ 1
+  have hχ : ∀ w, q.comp (χArch w) = sLocalInfiniteRestriction w (q.comp χ) := fun w ↦ by
+    ext g
+    rfl
+  obtain ⟨f, hf⟩ := Printed.sLocalPrincipalPartCoeff_eigendistribution_tensor S
+    (fun w ↦ infiniteStandardGaussian w (χArch w))
+    (fun v ↦ finiteStandardGaussian v.val (sLocalFiniteRestriction v b))
+  have hE := sLocalNormalizedEigendistribution_gaussian χ z χArch hχ f hf
+  have hspec := (existsUnique_sLocalNormalizedEigendistribution b).exists.choose_spec f
+  have hM : (↑(∏ v : S, (finiteLocalMultiplicativeTamagawaMeasure F v.val (v.val.adicCompletionIntegers F).units).toReal) : ℂ) ≠ 0 := by
+    apply Complex.ofReal_ne_zero.mpr
+    refine Finset.prod_ne_zero_iff.mpr fun v _ ↦ ?_
+    rw [finiteLocalMultiplicativeTamagawaMeasure_integerUnits, ENNReal.toReal_inv,
+      ENNReal.toReal_ofReal (Real.sqrt_nonneg _)]
+    apply inv_ne_zero
+    refine (Real.sqrt_pos.mpr (pow_pos ?_ _)).ne'
+    exact_mod_cast (NumberField.HeightOneSpectrum.one_lt_absNorm v.val).trans' zero_lt_one
+  refine ⟨f, ?_⟩
+  change sLocalNormalizedZFunction f b ≠ 0
+  rw [← hspec]
+  change (↑(∏ v : S, (finiteLocalMultiplicativeTamagawaMeasure F v.val (v.val.adicCompletionIntegers F).units).toReal) : ℂ) * sLocalNormalizedEigendistribution b f ≠ 0
+  rw [show sLocalNormalizedEigendistribution b f = 1 from hE, mul_one]
+  exact hM
+
+/-- The reciprocal trivial-component Euler product is entire. -/
+private theorem sLocalPrincipalPartCoeff_leading_unscaled_false_trivial_euler_inverse_entire
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    Differentiable ℂ (fun z ↦ (sLocalHeckeL (quasiCharacterNormTwist (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous 1 z))⁻¹) := by
+  classical
+  let q : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  let χ : PontryaginDual (SIdeleQuotient F S) := 1
+  have hz0 : ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 F) F)) 0 = 1 := by
+    ext g
+    change (1 : ℂ) * (_ : ℂ) ^ (0 : ℂ) = (1 : ℂ)
+    simp
+  have hS : ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 F) F)) 0 ∈ unramifiedOutside F S := by
+    rw [hz0, mem_unramifiedOutside_iff]
+    intro v hv u
+    rfl
+  have hr : sIdeleRestriction F S ⟨ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 F) F)) 0, hS⟩ =
+      quasiCharacterNormTwist (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous (q.comp χ) 0 := by
+    simp only [hz0]
+    ext g
+    obtain ⟨u, rfl⟩ := QuotientGroup.mk_surjective g
+    rw [sIdeleRestriction_mk]
+    change (1 : ℂ) = 1 * (_ : ℂ) ^ (0 : ℂ)
+    simp
+  have he (z : ℂ) : sLocalHeckeL (quasiCharacterNormTwist (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous 1 z) =
+      heckeGammaFactor (1 : PontryaginDual (IdeleClassGroup (𝓞 F) F)) z * ∏ v : S, finiteHeckeEulerFactor 1 v.val z :=
+    sLocalHeckeL_eq_partialEulerProduct χ 1 hS hr z
+  simp_rw [he, mul_inv, ← Finset.prod_inv_distrib]
+  refine (differentiable_inv_heckeGammaFactor 1).mul (Differentiable.fun_finsetProd fun v _ ↦ ?_)
+  unfold finiteHeckeEulerFactor
+  split_ifs
+  · simp_rw [inv_inv]
+    have hq : (v.val.asIdeal.absNorm : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr
+      ((Ideal.absNorm_eq_zero_iff).not.mpr v.val.ne_bot)
+    exact (differentiable_const _).sub ((differentiable_const _).mul ((differentiable_neg).const_cpow (Or.inl hq)))
+  · simp_rw [inv_one]
+    exact differentiable_const _
+
+private theorem sLocalPrincipalPartCoeff_leading_unscaled_false_trivial_euler_one_nonzero
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    sLocalHeckeL (quasiCharacterNormTwist (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous 1 1) ≠ 0 := by
+  obtain ⟨f, hf⟩ := sLocalPrincipalPartCoeff_leading_unscaled_false_gaussian_normalized_nonzero F S 1
+  have he := sLocalNormalizedZFunction_eq_div f (1 : PontryaginDual (SIdeleQuotient F S)) (s := 1) (by simp)
+  change sLocalNormalizedZFunction f (quasiCharacterNormTwist (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous 1 1) =
+    sLocalIdelicZetaIntegral f (quasiCharacterNormTwist (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous 1 1) /
+      sLocalHeckeL (quasiCharacterNormTwist (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous 1 1) at he
+  intro h
+  apply hf
+  rw [he, h, div_zero]
+
+private theorem sLocalPrincipalPartCoeff_leading_unscaled_false_trivial_dual_norm
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))) (z : ℂ) :
+    dualQuasiCharacter (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous
+      (quasiCharacterNormTwist (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous 1 z) =
+    quasiCharacterNormTwist (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous 1 (1-z) := by
+  ext g
+  let N : ℂ := (((sIdeleQuotientNorm F S g : ℝ≥0) : ℝ) : ℂ)
+  have hn : N ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (Units.ne_zero _))
+  change N * (quasiCharacterNormTwist (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous 1 z) g⁻¹ =
+    1 * N ^ (1-z)
+  rw [map_inv]
+  change N * (1 * N ^ z)⁻¹ = 1 * N ^ (1-z)
+  rw [Complex.cpow_sub _ _ hn, Complex.cpow_one, one_mul, one_mul, div_eq_mul_inv]
+
+/-- The trivial Euler product has the full pole order counted by the correcting factor. -/
+private theorem sLocalPrincipalPartCoeff_leading_unscaled_false_trivial_euler_order_zero
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    meromorphicOrderAt (fun z ↦ sLocalHeckeL (quasiCharacterNormTwist (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous 1 z)) 0 = -(sLocalRhoPoleOrder (1 : QuasiCharacter (SIdeleQuotient F S)) : ℤ) := by
+  let b := quasiCharacterNormTwist (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous (1 : QuasiCharacter (SIdeleQuotient F S))
+  let L (z : ℂ) := sLocalHeckeL (b z)
+  let E (z : ℂ) := sLocalEpsilonFactor (b z)
+  let ρ (z : ℂ) := sLocalRhoFactor (b z)
+  let U (z : ℂ) := E z * (L (1-z))⁻¹
+  let m := sLocalRhoPoleOrder (1 : QuasiCharacter (SIdeleQuotient F S))
+  have hm : 0 < m := by
+    dsimp only [m]
+    rw [sLocalRhoPoleOrder_eq_card_polePlaces, sLocalPolePlaces_one.1, Finset.card_univ]
+    exact Nat.add_pos_left Fintype.card_pos _
+  have hb := sLocalIdelicOrderBound_eq_neg_poleOrder (1 : QuasiCharacter (SIdeleQuotient F S))
+  change min 0 (meromorphicOrderAt ρ 0) = (-(m : ℤ) : WithTop ℤ) at hb
+  have hneg : (-(m : ℤ) : WithTop ℤ) < 0 := by exact_mod_cast (show -(m : ℤ) < 0 by omega)
+  have hlt := (min_lt_iff.mp (hb.trans_lt hneg)).resolve_left (lt_irrefl _)
+  rw [min_eq_right hlt.le] at hb
+  have hInv : Differentiable ℂ L⁻¹ := sLocalPrincipalPartCoeff_leading_unscaled_false_trivial_euler_inverse_entire F S
+  have hLM : MeromorphicAt L 0 := by simpa only [Pi.inv_apply, inv_inv] using (hInv.analyticAt 0).meromorphicAt.inv
+  have hEa : AnalyticAt ℂ E 0 := (sLocalEpsilonFactor_entire (1 : PontryaginDual (SIdeleQuotient F S))) 0 (mem_univ _)
+  have hIa : AnalyticAt ℂ (fun z ↦ (L (1-z))⁻¹) 0 :=
+    (hInv.analyticAt 1).comp_of_eq (f := fun z : ℂ ↦ 1-z) (x := 0) (by fun_prop) (sub_zero 1)
+  have hUa : AnalyticAt ℂ U 0 := hEa.mul hIa
+  have hUne : U 0 ≠ 0 := by
+    change E 0 * (L (1-0))⁻¹ ≠ 0
+    exact mul_ne_zero (sLocalEpsilonFactor_ne_zero _) (inv_ne_zero (by simpa only [sub_zero] using sLocalPrincipalPartCoeff_leading_unscaled_false_trivial_euler_one_nonzero F S))
+  have hUord := hUa.meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mpr hUne
+  have heq : ρ =ᶠ[𝓝[≠] (0 : ℂ)] (fun z ↦ U z * L z) := by
+    filter_upwards [nhdsNE_le_codiscrete (0 : ℂ) (sLocalRhoFactor_eq_epsilon_mul (1 : PontryaginDual (SIdeleQuotient F S)))] with z hz
+    change ρ z = E z * (L z / sLocalHeckeL (dualQuasiCharacter (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous (b z))) at hz
+    rw [sLocalPrincipalPartCoeff_leading_unscaled_false_trivial_dual_norm F S z] at hz
+    change ρ z = E z * (L z / L (1-z)) at hz
+    rw [hz]
+    dsimp only [U]
+    ring
+  have hh := meromorphicOrderAt_congr heq
+  change meromorphicOrderAt ρ 0 = meromorphicOrderAt (U * L) 0 at hh
+  rw [meromorphicOrderAt_mul hUa.meromorphicAt hLM, hUord, zero_add] at hh
+  exact hh.symm.trans hb
+
+/-- Nonzero normalized value forces a Gaussian to attain the full allowed pole order. -/
+private theorem sLocalPrincipalPartCoeff_leading_unscaled_false_gaussian_full_pole
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    ∃ f : SchwartzBruhat (Multiplicative (SAdeleRing F S)),
+      meromorphicOrderAt (fun z ↦ sLocalIdelicZFunction f (quasiCharacterNormTwist (sIdeleQuotientNorm F S)
+        (isProperMap_sIdeleQuotientNorm F S).continuous 1 z)) 0 =
+        -(sLocalRhoPoleOrder (1 : QuasiCharacter (SIdeleQuotient F S)) : ℤ) := by
+  obtain ⟨f, hN⟩ := sLocalPrincipalPartCoeff_leading_unscaled_false_gaussian_normalized_nonzero F S 0
+  let b := quasiCharacterNormTwist (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous (1 : QuasiCharacter (SIdeleQuotient F S))
+  let Z (z : ℂ) := sLocalIdelicZFunction f (b z)
+  let L (z : ℂ) := sLocalHeckeL (b z)
+  let Q := Z / L
+  let m := sLocalRhoPoleOrder (1 : QuasiCharacter (SIdeleQuotient F S))
+  have hb : b 0 = 1 := by
+    ext g
+    change (1 : ℂ) * (_ : ℂ) ^ (0 : ℂ) = 1
+    simp
+  change sLocalNormalizedZFunction f (b 0) ≠ 0 at hN
+  rw [hb] at hN
+  change toMeromorphicNFOn Q univ 0 ≠ 0 at hN
+  have hZ : MeromorphicNFOn Z univ := sLocalIdelicZFunction_meromorphic f (1 : PontryaginDual (SIdeleQuotient F S))
+  have hInv : Differentiable ℂ L⁻¹ := sLocalPrincipalPartCoeff_leading_unscaled_false_trivial_euler_inverse_entire F S
+  have hLM (z : ℂ) : MeromorphicAt L z := by simpa only [inv_inv] using (hInv.analyticAt z).meromorphicAt.inv
+  have hQM : MeromorphicOn Q univ := fun z hz ↦ (hZ.meromorphicOn z hz).div (hLM z)
+  have hq := (meromorphicNFOn_toMeromorphicNFOn Q univ (mem_univ 0)).meromorphicOrderAt_eq_zero_iff.mpr hN
+  rw [meromorphicOrderAt_toMeromorphicNFOn hQM (mem_univ 0)] at hq
+  change meromorphicOrderAt (Z / L) 0 = 0 at hq
+  have hLo : meromorphicOrderAt L 0 = (-(m : ℤ) : WithTop ℤ) := sLocalPrincipalPartCoeff_leading_unscaled_false_trivial_euler_order_zero F S
+  rw [meromorphicOrderAt_div (hZ.meromorphicOn 0 (mem_univ 0)) (hLM 0), hLo] at hq
+  refine ⟨f, ?_⟩
+  change meromorphicOrderAt Z 0 = (-(m : ℤ) : WithTop ℤ)
+  by_cases ht : meromorphicOrderAt Z 0 = ⊤
+  · simp [ht] at hq
+  · generalize hn : meromorphicOrderAt Z 0 = n at hq ht ⊢
+    lift n to ℤ using ht
+    change ((n - -(m : ℤ) : ℤ) : WithTop ℤ) = 0 at hq
+    have hi : n - -(m : ℤ) = 0 := by exact_mod_cast hq
+    have hn : n = -(m : ℤ) := by omega
+    exact_mod_cast hn
+
+/-- Hermite–Minkowski supplies a place dividing the different in every nontrivial number field. -/
+private theorem sLocalPrincipalPartCoeff_leading_unscaled_false_ramified_place (F : Type*) [Field F] [NumberField F]
+    (hdegree : 1 < Module.finrank ℚ F) :
+    ∃ v : HeightOneSpectrum (𝓞 F), v.asIdeal ∣ differentIdeal ℤ (𝓞 F) := by
+  have hd : 2 < (discr F).natAbs := by
+    have hh := abs_discr_gt_two hdegree
+    rw [← Int.natCast_natAbs] at hh
+    exact_mod_cast hh
+  have hJ : differentIdeal ℤ (𝓞 F) ≠ ⊤ := by
+    intro he
+    have hh := absNorm_differentIdeal F (𝓞 F)
+    rw [he, Ideal.absNorm_top] at hh
+    omega
+  obtain ⟨M, hM, hJM⟩ := Ideal.exists_le_maximal (differentIdeal ℤ (𝓞 F)) hJ
+  have hn : M ≠ ⊥ := by
+    intro he
+    have hh : differentIdeal ℤ (𝓞 F) = ⊥ := le_bot_iff.mp (he ▸ hJM)
+    exact differentIdeal_ne_bot hh
+  exact ⟨⟨M, hM.isPrime, hn⟩, Ideal.dvd_iff_le.mpr hJM⟩
+
+private theorem sLocalPrincipalPartCoeff_leading_unscaled_false_quadratic_field : ∃ (F : Type u) (_ : Field F) (_ : NumberField F), 1 < Module.finrank ℚ F := by
+  have hK : Module.finrank ℚ (CyclotomicField 3 ℚ) = 2 := by
+    letI : IsCyclotomicExtension {(3 : ℕ)} ℚ (CyclotomicField 3 ℚ) := CyclotomicField.isCyclotomicExtension 3 ℚ
+    with_unfolding_all
+      rw [IsCyclotomicExtension.Rat.finrank 3 (CyclotomicField 3 ℚ)]
+      decide
+  let K := CyclotomicField 3 ℚ
+  let F := ULift.{u} K
+  let := NumberField.of_ringEquiv K F (ULift.ringEquiv.{0, u} (R := K)).symm
+  refine ⟨F, inferInstance, inferInstance, ?_⟩
+  rw [((ULift.ringEquiv.{0, u} (R := K)).toRatAlgEquiv.toLinearEquiv).finrank_eq, hK]
+  decide
+
+private theorem sLocalPrincipalPartCoeff_leading_unscaled_false_residue_germ {f g : ℂ → ℂ} (he : f =ᶠ[𝓝[≠] (0 : ℂ)] g) :
+    complexResidue f 0 = complexResidue g 0 := by
+  obtain ⟨δ, hδ, hEq⟩ := Metric.nhdsWithin_basis_ball.eventually_iff.mp he
+  unfold complexResidue limUnder
+  refine congrArg lim (Filter.map_congr ?_)
+  filter_upwards [Ioo_mem_nhdsGT hδ] with r hr
+  rw [circleIntegral.integral_congr hr.1.le fun z hz ↦ hEq ⟨?_, ?_⟩]
+  · rw [Metric.mem_ball, Metric.mem_sphere.mp hz]
+    exact hr.2
+  · rintro rfl
+    exact hr.1.ne (by simpa using hz)
+
+private theorem sLocalPrincipalPartCoeff_leading_unscaled_false_twist_zero (G : Type*) [CommGroup G] [TopologicalSpace G]
+    (m : G →* ℝ≥0ˣ) (hm : Continuous m) (c : QuasiCharacter G) : quasiCharacterNormTwist m hm c 0 = c := by
+  ext g
+  change c g * (_ : ℂ) ^ (0 : ℂ) = c g
+  simp
+private theorem sLocalPrincipalPartCoeff_leading_unscaled_false_finite_mass_power
+    (F : Type*) [Field F] [NumberField F] (v : HeightOneSpectrum (𝓞 F)) :
+    (↑((finiteLocalMultiplicativeTamagawaMeasure F v) (v.adicCompletionIntegers F).units).toReal : ℂ) =
+      ((v.asIdeal.absNorm : ℂ) ^ multiplicity v.asIdeal (differentIdeal ℤ (𝓞 F))) ^ (-(1/2 : ℂ)) := by
+  rw [finiteLocalMultiplicativeTamagawaMeasure_integerUnits, ENNReal.toReal_inv,
+    ENNReal.toReal_ofReal (Real.sqrt_nonneg _), Complex.ofReal_inv, Real.sqrt_eq_rpow,
+    Complex.ofReal_cpow (by positivity), Complex.ofReal_pow, Complex.ofReal_natCast, Complex.cpow_neg]
+  norm_num
+/-- At the trivial center, one finite epsilon factor equals its integer-unit mass. -/
+private theorem sLocalPrincipalPartCoeff_leading_unscaled_false_epsilon_singleton
+    (F : Type*) [Field F] [NumberField F] (v : HeightOneSpectrum (𝓞 F)) :
+    sLocalEpsilonFactor (1 : QuasiCharacter (SIdeleQuotient F {v})) =
+      (↑((finiteLocalMultiplicativeTamagawaMeasure F v) (v.adicCompletionIntegers F).units).toReal : ℂ) := by
+  classical
+  have ha := sLocalEpsilonFactor_archimedean_trivial (F := F) 0
+  rw [sLocalPrincipalPartCoeff_leading_unscaled_false_twist_zero] at ha
+  simp only [sLocalEpsilonFactor, Finset.univ_eq_attach, Finset.attach_empty, Finset.prod_empty, mul_one] at ha
+  have hf := finiteLocalEpsilonFactor_norm v 0
+  rw [sLocalPrincipalPartCoeff_leading_unscaled_false_twist_zero] at hf
+  have hfin : finiteLocalEpsilonFactor v 1 =
+      (↑((finiteLocalMultiplicativeTamagawaMeasure F v) (v.adicCompletionIntegers F).units).toReal : ℂ) := by
+    simp only [zero_sub] at hf
+    exact hf.trans (sLocalPrincipalPartCoeff_leading_unscaled_false_finite_mass_power F v).symm
+  change (∏ w : InfinitePlace F, infiniteLocalEpsilonFactor w 1) *
+    (∏ t : ({v} : Finset (HeightOneSpectrum (𝓞 F))), finiteLocalEpsilonFactor t.val 1) = _
+  change (∏ w : InfinitePlace F, infiniteLocalEpsilonFactor w 1) = 1 at ha
+  rw [ha, one_mul]
+  have hh := Finset.prod_subtype (F := inferInstance) ({v} : Finset (HeightOneSpectrum (𝓞 F))) (fun _ ↦ Iff.rfl)
+    (fun w ↦ finiteLocalEpsilonFactor w (1 : QuasiCharacter (w.adicCompletion F)ˣ))
+  simp only [Finset.prod_singleton] at hh
+  exact hh.symm.trans hfin
+
+/-- A place dividing the different has integer-unit mass strictly between zero and one. -/
+private theorem sLocalPrincipalPartCoeff_leading_unscaled_false_ramified_mass_bounds
+    (F : Type*) [Field F] [NumberField F] (v : HeightOneSpectrum (𝓞 F))
+    (hv : v.asIdeal ∣ differentIdeal ℤ (𝓞 F)) :
+    let M := ((finiteLocalMultiplicativeTamagawaMeasure F v) (v.adicCompletionIntegers F).units).toReal
+    0 < M ∧ M < 1 := by
+  intro M
+  have hd := multiplicity_pos_of_dvd hv (Ideal.finiteMultiplicity v.isPrime.ne_top differentIdeal_ne_bot)
+  have hq : 1 < (v.asIdeal.absNorm : ℝ) := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have hp := one_lt_pow₀ hq hd.ne'
+  have hr : 1 < Real.sqrt ((v.asIdeal.absNorm : ℝ) ^ multiplicity v.asIdeal (differentIdeal ℤ (𝓞 F))) := by
+    simpa using Real.sqrt_lt_sqrt (by norm_num : (0 : ℝ) ≤ 1) hp
+  have he : M = (Real.sqrt ((v.asIdeal.absNorm : ℝ) ^ multiplicity v.asIdeal (differentIdeal ℤ (𝓞 F))))⁻¹ := by
+    dsimp only [M]
+    rw [finiteLocalMultiplicativeTamagawaMeasure_integerUnits, ENNReal.toReal_inv,
+      ENNReal.toReal_ofReal (Real.sqrt_nonneg _)]
+  rw [he]
+  exact ⟨inv_pos.mpr (zero_lt_one.trans hr), inv_lt_one_of_one_lt₀ hr⟩
+/-- The highest polar coefficient of a meromorphic germ of known finite order is nonzero. -/
+private theorem sLocalPrincipalPartCoeff_leading_unscaled_false_leading_coefficient_ne_zero (Z : ℂ → ℂ) (m : ℕ) (hZ : MeromorphicAt Z 0)
+    (ho : meromorphicOrderAt Z 0 = (-(m : ℤ) : WithTop ℤ)) :
+    complexResidue (fun z ↦ Z z / z ^ (-(m : ℤ) + 1)) 0 ≠ 0 := by
+  obtain ⟨h, hh, hne, he⟩ := (meromorphicOrderAt_eq_int_iff hZ).mp ho
+  have hq : (fun z ↦ Z z / z ^ (-(m : ℤ) + 1)) =ᶠ[𝓝[≠] (0 : ℂ)] (fun z ↦ h z / (z-0)) := by
+    filter_upwards [he, self_mem_nhdsWithin] with z hz hz0
+    simp only [sub_zero, smul_eq_mul] at hz
+    rw [hz, sub_zero]
+    calc
+      z ^ (-(m : ℤ)) * h z / z ^ (-(m : ℤ) + 1) = (z ^ (-(m : ℤ)) / z ^ (-(m : ℤ) + 1)) * h z := by ring
+      _ = z ^ (-1 : ℤ) * h z := by rw [← zpow_sub₀ hz0]; congr 2; ring
+      _ = h z / z := by rw [zpow_neg_one]; ring
+  rw [sLocalPrincipalPartCoeff_leading_unscaled_false_residue_germ hq, complexResidue_div_sub hh]
+  exact hne
+private theorem sLocalPrincipalPartCoeff_leading_unscaled_false_leading_false_aux : ¬ Printed.sLocalPrincipalPartCoeff_leading_unscaled.{u} := by
+  classical
+  intro hall
+  obtain ⟨F, _, _, hdeg⟩ := sLocalPrincipalPartCoeff_leading_unscaled_false_quadratic_field.{u}
+  obtain ⟨v, hv⟩ := sLocalPrincipalPartCoeff_leading_unscaled_false_ramified_place F hdeg
+  let S : Finset (HeightOneSpectrum (𝓞 F)) := {v}
+  let m := sLocalRhoPoleOrder (1 : QuasiCharacter (SIdeleQuotient F S))
+  have hm : 0 < m := by
+    dsimp only [m]
+    rw [sLocalRhoPoleOrder_eq_card_polePlaces, sLocalPolePlaces_one.1, Finset.card_univ]
+    exact Nat.add_pos_left Fintype.card_pos _
+  obtain ⟨f, hfo⟩ := sLocalPrincipalPartCoeff_leading_unscaled_false_gaussian_full_pole F S
+  have hZ := (sLocalIdelicZFunction_meromorphic f (1 : PontryaginDual (SIdeleQuotient F S))).meromorphicOn 0 (mem_univ 0)
+  have hn : sLocalZLaurentCoeff f (1 : QuasiCharacter (SIdeleQuotient F S)) (-(m : ℤ)) ≠ 0 :=
+    sLocalPrincipalPartCoeff_leading_unscaled_false_leading_coefficient_ne_zero _ m hZ hfo
+  have hl := hall F S 1 hm f
+  have hc := sLocalPrincipalPartCoeff_leading_formula (1 : QuasiCharacter (SIdeleQuotient F S)) hm f
+  dsimp only at hl hc
+  change sLocalZLaurentCoeff f (1 : QuasiCharacter (SIdeleQuotient F S)) (-(m : ℤ)) = _ at hc
+  let M := ((finiteLocalMultiplicativeTamagawaMeasure F v) (v.adicCompletionIntegers F).units).toReal
+  have hprod : (↑(∏ t : S, ((finiteLocalMultiplicativeTamagawaMeasure F t.val) (t.val.adicCompletionIntegers F).units).toReal) : ℂ) = (M : ℂ) := by
+    have hh := Finset.prod_subtype (F := inferInstance) S (fun _ ↦ Iff.rfl)
+      (fun w ↦ ((finiteLocalMultiplicativeTamagawaMeasure F w) (w.adicCompletionIntegers F).units).toReal)
+    simp only [S, Finset.prod_singleton] at hh
+    exact congrArg (fun x : ℝ ↦ (x : ℂ)) hh.symm
+  have heps : sLocalEpsilonFactor (1 : QuasiCharacter (SIdeleQuotient F S)) = (M : ℂ) := sLocalPrincipalPartCoeff_leading_unscaled_false_epsilon_singleton F v
+  rw [← Complex.ofReal_prod, hprod, heps] at hc
+  have hscale : sLocalZLaurentCoeff f (1 : QuasiCharacter (SIdeleQuotient F S)) (-(m : ℤ)) =
+      ((M : ℂ) * (M : ℂ)) * sLocalZLaurentCoeff f (1 : QuasiCharacter (SIdeleQuotient F S)) (-(m : ℤ)) := by
+    linear_combination hc - ((M : ℂ) * (M : ℂ)) * hl
+  have hMM : (M : ℂ) * (M : ℂ) = 1 := mul_right_cancel₀ hn (hscale.symm.trans (one_mul _).symm)
+  have hreal : M * M = 1 := by exact_mod_cast hMM
+  have hbounds : 0 < M ∧ M < 1 := sLocalPrincipalPartCoeff_leading_unscaled_false_ramified_mass_bounds F v hv
+  nlinarith [hbounds.1, hbounds.2]
+
+end
+
 /-- Paper: Equation (7.2.1.13), p. 336.
-Take ℚ(i) with the complex place and the place over 2, the trivial character, and
-the standard complex Gaussian times the local integer indicator. The leading
-coefficient is nonzero. The finite unit mass and epsilon at the center are each
-1/2, so the printed right-hand side is four times the left-hand side. -/
+At a place dividing the different, the trivial-character epsilon factor equals the
+integer-unit mass M, with 0 < M < 1. A Gaussian attains the full pole order, so the
+omitted normalization M² changes its nonzero leading coefficient.
+Deviation: Use a lift of the third cyclotomic field to cover every universe. -/
 theorem sLocalPrincipalPartCoeff_leading_unscaled_false :
-    ¬ sLocalPrincipalPartCoeff_leading_unscaled := by sorry
+    ¬ sLocalPrincipalPartCoeff_leading_unscaled :=
+  sLocalPrincipalPartCoeff_leading_unscaled_false_leading_false_aux
 
 /-- Paper: Equation (7.2.1.14), p. 337.
 The test coefficient on the left is read with Definition 7.1.2.1. The sentence
@@ -1461,13 +1801,182 @@ def sLocalPrincipalPartCoeff_lower_literal : Prop :=
           (sAdeleSchwartzFourier f) (dualₛ(F, S) (twistₛ(F, S) c z))) 0 /
           ((m - k - j).factorial : ℂ))
 
+section
+
+private theorem sLocalPrincipalPartCoeff_lower_literal_false_norm_log_one_unit
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    ∃ u : (SAdeleRing F S)ˣ, Real.log (((sIdeleQuotientNorm F S (QuotientGroup.mk u) : ℝ≥0) : ℝ)) = 1 := by
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  let t : ℝ≥0ˣ := Units.mk0 (Real.toNNReal (Real.exp 1))
+    (Real.toNNReal_eq_zero.not.mpr (not_le_of_gt (Real.exp_pos 1)))
+  obtain ⟨u, hu⟩ := QuotientGroup.mk_surjective (σ t)
+  refine ⟨u, ?_⟩
+  rw [hu, hσ]
+  change Real.log ((Real.toNNReal (Real.exp 1) : ℝ)) = 1
+  rw [Real.coe_toNNReal, Real.log_exp]
+  positivity
+
+private theorem sLocalPrincipalPartCoeff_lower_literal_false_zeta_integral_sub
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F)))
+    (f g : SchwartzBruhat (Multiplicative (SAdeleRing F S))) (z : ℂ) (hz : 0 < z.re) :
+    let b := quasiCharacterNormTwist (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous (1 : QuasiCharacter (SIdeleQuotient F S)) z
+    sLocalIdelicZetaIntegral (f-g) b = sLocalIdelicZetaIntegral f b - sLocalIdelicZetaIntegral g b := by
+  intro b
+  have hf := sLocalIdelicZetaIntegral_integrable f b ⟨(1 : PontryaginDual (SIdeleQuotient F S)), z, hz, rfl⟩
+  have hg := sLocalIdelicZetaIntegral_integrable g b ⟨(1 : PontryaginDual (SIdeleQuotient F S)), z, hz, rfl⟩
+  unfold sLocalIdelicZetaIntegral
+  change (∫ x : (SAdeleRing F S)ˣ, (f (Multiplicative.ofAdd x.val) - g (Multiplicative.ofAdd x.val)) * b (QuotientGroup.mk x) ∂sMultiplicativeTamagawaMeasure F S) = _
+  simp_rw [sub_mul]
+  exact MeasureTheory.integral_sub hf hg
+
+private theorem sLocalPrincipalPartCoeff_lower_literal_false_norm_twist_exp
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F)))
+    (u : (SAdeleRing F S)ˣ)
+    (hu : Real.log (((sIdeleQuotientNorm F S (QuotientGroup.mk u) : ℝ≥0) : ℝ)) = 1) (z : ℂ) :
+    quasiCharacterNormTwist (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous
+      (1 : QuasiCharacter (SIdeleQuotient F S)) z (QuotientGroup.mk u) = Complex.exp z := by
+  change 1 * (((sIdeleQuotientNorm F S (QuotientGroup.mk u) : ℝ≥0) : ℝ) : ℂ) ^ z = _
+  have hn : ((((sIdeleQuotientNorm F S (QuotientGroup.mk u) : ℝ≥0) : ℝ) : ℂ)) ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (Units.ne_zero _))
+  rw [one_mul, Complex.cpow_def_of_ne_zero hn, ← Complex.ofReal_log (NNReal.coe_nonneg _), hu]
+  simp
+
+private theorem sLocalPrincipalPartCoeff_lower_literal_false_difference_integral
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F)))
+    (u : (SAdeleRing F S)ˣ)
+    (hu : Real.log (((sIdeleQuotientNorm F S (QuotientGroup.mk u) : ℝ≥0) : ℝ)) = 1)
+    (f : SchwartzBruhat (Multiplicative (SAdeleRing F S))) (n : ℕ) (z : ℂ) (hz : 0 < z.re) :
+    let b := quasiCharacterNormTwist (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous (1 : QuasiCharacter (SIdeleQuotient F S)) z
+    sLocalIdelicZetaIntegral ((fun h ↦ schwartzBruhatUnitTranslate u h - h)^[n] f) b =
+      (Complex.exp z - 1) ^ n * sLocalIdelicZetaIntegral f b := by
+  intro b
+  have hstep (h : SchwartzBruhat (Multiplicative (SAdeleRing F S))) :
+      sLocalIdelicZetaIntegral (schwartzBruhatUnitTranslate u h - h) b =
+        (Complex.exp z - 1) * sLocalIdelicZetaIntegral h b := by
+    rw [sLocalPrincipalPartCoeff_lower_literal_false_zeta_integral_sub F S _ _ z hz, Printed.sLocalPrincipalPartCoeff_eigendistribution_translate,
+      sLocalPrincipalPartCoeff_lower_literal_false_norm_twist_exp F S u hu z]
+    ring
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    rw [Function.iterate_succ_apply', hstep, ih, pow_succ]
+    ring
+
+private theorem sLocalPrincipalPartCoeff_lower_literal_false_positive_germ (f g : ℂ → ℂ) (hf : MeromorphicOn f univ) (hg : MeromorphicOn g univ)
+    (he : ∀ z : ℂ, 0 < z.re → f z = g z) : f =ᶠ[𝓝[≠] (0 : ℂ)] g := by
+  have hn : ∀ᶠ z : ℂ in 𝓝[≠] (1 : ℂ), 0 < z.re := nhdsWithin_le_nhds
+    ((isOpen_Ioi.preimage Complex.continuous_re).mem_nhds (by norm_num))
+  have ho : meromorphicOrderAt (f-g) 1 = ⊤ := meromorphicOrderAt_eq_top_iff.mpr
+    (hn.mono (fun z hz ↦ sub_eq_zero.mpr (he z hz)))
+  have hh := (hf.sub hg).meromorphicOrderAt_eq_top_of_isPreconnected isPreconnected_univ
+    (mem_univ (1 : ℂ)) (mem_univ (0 : ℂ)) ho
+  exact (meromorphicOrderAt_eq_top_iff.mp hh).mono (fun z hz ↦ sub_eq_zero.mp hz)
+
+/-- Translation differences multiply the meromorphic zeta germ by powers of exp(z) − 1. -/
+private theorem sLocalPrincipalPartCoeff_lower_literal_false_difference_zeta_germ
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F)))
+    (u : (SAdeleRing F S)ˣ)
+    (hu : Real.log (((sIdeleQuotientNorm F S (QuotientGroup.mk u) : ℝ≥0) : ℝ)) = 1)
+    (f : SchwartzBruhat (Multiplicative (SAdeleRing F S))) (n : ℕ) :
+    let b := quasiCharacterNormTwist (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous (1 : QuasiCharacter (SIdeleQuotient F S))
+    (fun z ↦ sLocalIdelicZFunction ((fun h ↦ schwartzBruhatUnitTranslate u h - h)^[n] f) (b z)) =ᶠ[𝓝[≠] (0 : ℂ)]
+      (fun z ↦ (Complex.exp z - 1)^n * sLocalIdelicZFunction f (b z)) := by
+  intro b
+  let g := (fun h ↦ schwartzBruhatUnitTranslate u h - h)^[n] f
+  have hf : MeromorphicOn (fun z ↦ sLocalIdelicZFunction f (b z)) univ :=
+    (sLocalIdelicZFunction_meromorphic f (1 : PontryaginDual (SIdeleQuotient F S))).meromorphicOn
+  have hg : MeromorphicOn (fun z ↦ sLocalIdelicZFunction g (b z)) univ :=
+    (sLocalIdelicZFunction_meromorphic g (1 : PontryaginDual (SIdeleQuotient F S))).meromorphicOn
+  apply sLocalPrincipalPartCoeff_lower_literal_false_positive_germ _ _ hg (fun z hz ↦
+    (by fun_prop : AnalyticAt ℂ (fun w : ℂ ↦ (Complex.exp w - 1)^n) z).meromorphicAt.mul (hf z hz))
+  intro z hz
+  change sLocalIdelicZFunction g (b z) = (Complex.exp z - 1)^n * sLocalIdelicZFunction f (b z)
+  calc
+    sLocalIdelicZFunction g (b z) = sLocalIdelicZetaIntegral g (b z) :=
+      sLocalIdelicZFunction_eq_integral g ⟨(1 : PontryaginDual (SIdeleQuotient F S)), z, hz, rfl⟩
+    _ = (Complex.exp z - 1)^n * sLocalIdelicZetaIntegral f (b z) := sLocalPrincipalPartCoeff_lower_literal_false_difference_integral F S u hu f n z hz
+    _ = (Complex.exp z - 1)^n * sLocalIdelicZFunction f (b z) := congrArg ((Complex.exp z - 1)^n * ·)
+      (sLocalIdelicZFunction_eq_integral f ⟨(1 : PontryaginDual (SIdeleQuotient F S)), z, hz, rfl⟩).symm
+
+private theorem sLocalPrincipalPartCoeff_lower_literal_false_analytic_residue_zero {f : ℂ → ℂ} (hf : AnalyticAt ℂ f 0) : complexResidue f 0 = 0 := by
+  have hh : f =ᶠ[𝓝[≠] (0 : ℂ)] (fun z ↦ z * f z / (z - 0)) := by
+    filter_upwards [self_mem_nhdsWithin] with z hz
+    simp only [sub_zero]
+    exact (mul_div_cancel_left₀ (f z) hz).symm
+  rw [sLocalPrincipalPartCoeff_leading_unscaled_false_residue_germ hh, complexResidue_div_sub (g := fun z : ℂ ↦ z * f z) (by fun_prop), zero_mul]
+
+private theorem sLocalPrincipalPartCoeff_lower_literal_false_simple_zero_coefficient {f : ℂ → ℂ} (hf : MeromorphicNFAt f 0)
+    (ho : meromorphicOrderAt f 0 = 1) :
+    complexResidue (fun z ↦ f z / z ^ (2 : ℤ)) 0 ≠ complexResidue f 0 := by
+  have ha : AnalyticAt ℂ f 0 := hf.meromorphicOrderAt_nonneg_iff_analyticAt.mp (by rw [ho]; decide)
+  obtain ⟨h, hh, hne, he⟩ := (meromorphicOrderAt_eq_int_iff hf.meromorphicAt).mp ho
+  have hq : (fun z ↦ f z / z ^ (2 : ℤ)) =ᶠ[𝓝[≠] (0 : ℂ)] (fun z ↦ h z / (z - 0)) := by
+    filter_upwards [he, self_mem_nhdsWithin] with z hz hz0
+    simp only [sub_zero, zpow_one, smul_eq_mul] at hz
+    rw [hz]
+    simp only [sub_zero, zpow_ofNat]
+    field_simp
+  rw [sLocalPrincipalPartCoeff_leading_unscaled_false_residue_germ hq, complexResidue_div_sub hh, sLocalPrincipalPartCoeff_lower_literal_false_analytic_residue_zero ha]
+  exact hne
+
+private theorem sLocalPrincipalPartCoeff_lower_literal_false_difference_simple_zero (Z : ℂ → ℂ) (m : ℕ)
+    (hZ : MeromorphicOn Z univ) (ho : meromorphicOrderAt Z 0 = -(m : ℤ)) :
+    meromorphicOrderAt (fun z ↦ (Complex.exp z - 1) ^ (m + 1) * Z z) 0 = 1 := by
+  have ha : AnalyticAt ℂ (fun z : ℂ ↦ Complex.exp z - 1) 0 := by fun_prop
+  have hd : meromorphicOrderAt (fun z : ℂ ↦ Complex.exp z - 1) 0 = 1 := by
+    rw [ha.meromorphicOrderAt_eq,
+      ha.analyticOrderAt_eq_one_of_zero_deriv_ne_zero (by simp) (by simp)]
+    rfl
+  change meromorphicOrderAt (((fun z : ℂ ↦ Complex.exp z - 1) ^ (m + 1)) * Z) 0 = 1
+  rw [meromorphicOrderAt_mul (ha.pow _).meromorphicAt (hZ 0 (mem_univ 0)), meromorphicOrderAt_pow ha.meromorphicAt, hd, ho]
+  simp only [mul_one]
+  change (((m + 1 : ℕ) : ℤ) : WithTop ℤ) + ((-(m : ℤ)) : WithTop ℤ) = 1
+  norm_cast
+  omega
+
+private theorem sLocalPrincipalPartCoeff_lower_literal_false_lower_false_aux : ¬ Printed.sLocalPrincipalPartCoeff_lower_literal.{u} := by
+  classical
+  intro hall
+  obtain ⟨F, _, _, hdeg⟩ := sLocalPrincipalPartCoeff_leading_unscaled_false_quadratic_field.{u}
+  obtain ⟨v, hv⟩ := sLocalPrincipalPartCoeff_leading_unscaled_false_ramified_place F hdeg
+  let S : Finset (HeightOneSpectrum (𝓞 F)) := {v}
+  let b := quasiCharacterNormTwist (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous (1 : QuasiCharacter (SIdeleQuotient F S))
+  let m := sLocalRhoPoleOrder (1 : QuasiCharacter (SIdeleQuotient F S))
+  have hm : 1 < m := by
+    dsimp only [m]
+    rw [sLocalRhoPoleOrder_eq_card_polePlaces, sLocalPolePlaces_one.1, sLocalPolePlaces_one.2]
+    simp only [Finset.card_univ, Fintype.card_coe, S, Finset.card_singleton]
+    exact Nat.lt_add_of_pos_left Fintype.card_pos
+  obtain ⟨f, hfo⟩ := sLocalPrincipalPartCoeff_leading_unscaled_false_gaussian_full_pole F S
+  obtain ⟨u, hu⟩ := sLocalPrincipalPartCoeff_lower_literal_false_norm_log_one_unit F S
+  let g := (fun h ↦ schwartzBruhatUnitTranslate u h - h)^[m+1] f
+  let Z (z : ℂ) := sLocalIdelicZFunction f (b z)
+  let G (z : ℂ) := sLocalIdelicZFunction g (b z)
+  have hZ : MeromorphicOn Z univ := (sLocalIdelicZFunction_meromorphic f (1 : PontryaginDual (SIdeleQuotient F S))).meromorphicOn
+  have hG : MeromorphicNFAt G 0 := sLocalIdelicZFunction_meromorphic g (1 : PontryaginDual (SIdeleQuotient F S)) (mem_univ 0)
+  have he := sLocalPrincipalPartCoeff_lower_literal_false_difference_zeta_germ F S u hu f (m+1)
+  have hgo : meromorphicOrderAt G 0 = 1 := (meromorphicOrderAt_congr he).trans (sLocalPrincipalPartCoeff_lower_literal_false_difference_simple_zero Z m hZ hfo)
+  have hbad := sLocalPrincipalPartCoeff_lower_literal_false_simple_zero_coefficient hG hgo
+  have hl := hall F S 1 g 1 hm
+  have hc := sLocalPrincipalPartCoeff_lower_formula (1 : QuasiCharacter (SIdeleQuotient F S)) g 1 hm
+  have hh : Printed.sLocalNonnegativeLaurentCoeff (1 : QuasiCharacter (SIdeleQuotient F S)) 1 g =
+      sLocalPrincipalPartCoeff (1 : QuasiCharacter (SIdeleQuotient F S)) 1 g := hl.trans hc.symm
+  change complexResidue (fun z ↦ G z / z ^ ((1 : ℤ) + 1)) 0 =
+    complexResidue (fun z ↦ G z / z ^ (-(1 : ℤ) + 1)) 0 at hh
+  norm_num only [Int.reduceNeg, Int.reduceAdd, zpow_zero, div_one] at hh
+  exact hbad hh
+
+end
+
 /-- Paper: Equation (7.2.1.14), p. 337.
-Over ℚ with the real place and p, at the trivial center m = 2. Take index one,
-a nonzero nonnegative even bump supported on 2 < |x| < 3 and the finite unit
-indicator. Its zeta function is entire. The convolution on the right gives its
-zero residue, while its first Taylor coefficient on the left is positive. -/
+Start with a Gaussian attaining a pole of order m ≥ 2. A translation of norm exp(1)
+multiplies its zeta function by exp(z); applying m + 1 translation differences
+leaves a simple zero. Its first positive Laurent coefficient is nonzero, whereas
+its residue is zero. The printed identity equates these two coefficients.
+Deviation: Use a lifted third cyclotomic field and a ramified finite place. -/
 theorem sLocalPrincipalPartCoeff_lower_literal_false :
-    ¬ sLocalPrincipalPartCoeff_lower_literal := by sorry
+    ¬ sLocalPrincipalPartCoeff_lower_literal :=
+  sLocalPrincipalPartCoeff_lower_literal_false_lower_false_aux
 
 /-- Paper: Equation (7.2.1.17), p. 337.
 The printed functional equation inserts an additional epsilon factor in the
