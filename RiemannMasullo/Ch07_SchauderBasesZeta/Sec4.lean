@@ -1321,7 +1321,12 @@ Each adjusted jet annihilates the archimedean orbital denominator, so the jets a
 well defined on the quotient by it. -/
 theorem archNuclearityQuotient_jetEquiv_annihilate (j : ArchNuclearityJetIndex χ τ hτ)
     (x : archNuclearityDenominator χ) :
-    archNuclearityJet χ τ hτ j x.val = 0 := by sorry
+    archNuclearityJet χ τ hτ j x.val = 0 := by
+  have hm : archNuclearityJet χ τ hτ j ∈
+      (Submodule.span ℂ (Set.range (archNuclearityJet χ τ hτ))).topologicalClosure :=
+    Submodule.le_topologicalClosure _ (Submodule.subset_span ⟨j, rfl⟩)
+  exact ((Set.ext_iff.mp (archNuclearityJet_span χ τ hτ)
+    (archNuclearityJet χ τ hτ j)).mp hm) x
 
 /-- Paper: Equation (7.4.3.13), p. 372.
 The adjusted jets assemble into a single continuous linear map from the archimedean
