@@ -4829,6 +4829,25 @@ private theorem introTrace_combined_limit_extension_overlap (τ : ℝ≥0ˣ →�
   simpa only [modulatedFourierMellin, relativeVerticalStrip, Set.preimage_univ, Set.indicator_univ] using
     traceFormula_exteriorZeros τ _hτ φ hz _ha
 
+/-- On a full rational window the exterior sum vanishes by the critical strip, so
+the combined real-place and spectral term has a finite limit for every family. -/
+private theorem introTraceApprox_rat_combined_limit (h ρ : ℕ → ℝ → ℝ)
+    (hA : IsIntroTraceApproximation h ρ) (a : ℝ) (ha : 1 / 2 ≤ a) :
+    TendstoLocallyUniformlyOn (fun n z ↦
+      introTraceArchimedean (F := ℚ) 1 (introTraceApprox (h n) (ρ n) z) Rat.infinitePlace +
+      introTraceSpectralSum (F := ℚ) 1 (introTraceApprox (h n) (ρ n) z) a)
+      (fun z ↦ logDeriv (finiteHeckeL_exists_continuation (F := ℚ) 1).choose (z + 1 / 2) +
+        (1 / (z + 1 / 2) + 1 / (z - 1 / 2))) atTop right(max a 1) := by
+  classical
+  let τ : ℝ≥0ˣ →ₜ* IdeleClassGroup (𝓞 ℚ) ℚ :=
+    ⟨(QuotientGroup.mk' _).comp (canonicalIdeleNormSection ℚ),
+      continuous_quotient_mk'.comp (canonicalIdeleNormSection_continuous _)⟩
+  have hcomb := introTrace_combined_limit_of_exteriorZeros τ (canonicalIdeleNormSection_rightInverse ℚ)
+    1 (fun _ ↦ rfl) (a := a) (fun φ _ ↦ by
+      simpa only [modulatedFourierMellin, relativeVerticalStrip, Set.preimage_univ, Set.indicator_univ] using
+        traceFormula_exteriorZeros_of_half_le τ φ ha) h ρ hA
+  simpa only [Fintype.sum_subsingleton _ Rat.infinitePlace, ite_true] using hcomb
+
 /-- A limit for the rational real-place difference fixes the full spectral limit
 on the trace overlap by the explicit formula. -/
 private theorem introTraceApprox_rat_spectral_shiftTwo_of_arch (h ρ : ℕ → ℝ → ℝ)
@@ -4844,13 +4863,7 @@ private theorem introTraceApprox_rat_spectral_shiftTwo_of_arch (h ρ : ℕ → �
       introTraceSpectralSum (F := ℚ) 1 (introTraceApprox (h n) (ρ n) (z+2)) a)
       (fun z ↦ L z - L (z+2) - 1/(z+1/2)) atTop right(max a 1) := by
   classical
-  let τ : ℝ≥0ˣ →ₜ* IdeleClassGroup (𝓞 ℚ) ℚ :=
-    ⟨(QuotientGroup.mk' _).comp (canonicalIdeleNormSection ℚ),
-      continuous_quotient_mk'.comp (canonicalIdeleNormSection_continuous _)⟩
-  have hcomb := introTrace_combined_limit_of_exteriorZeros τ (canonicalIdeleNormSection_rightInverse ℚ)
-    1 (fun _ ↦ rfl) (a := a) (fun φ _ ↦ by
-      simpa only [modulatedFourierMellin, relativeVerticalStrip, Set.preimage_univ, Set.indicator_univ] using
-        traceFormula_exteriorZeros_of_half_le τ φ ha) h ρ hA
+  have hcomb := introTraceApprox_rat_combined_limit h ρ hA a ha
   have hshift : MapsTo (fun z : ℂ ↦ z + 2) right(max a 1) right(max a 1) := by
     intro z hz
     change max a 1 < z.re at hz
@@ -4860,9 +4873,9 @@ private theorem introTraceApprox_rat_spectral_shiftTwo_of_arch (h ρ : ℕ → �
     (show -(1 / 2 : ℝ) < 1 by norm_num).trans ((le_max_right a 1).trans_lt hz)
   have hlim := (hcomb.sub (hcomb.comp (fun z : ℂ ↦ z + 2) hshift (by fun_prop))).sub (harch.mono hsub)
   refine (hlim.congr (fun n z _ ↦ ?_)).congr_right (fun z _ ↦ ?_)
-  · simp only [Pi.sub_apply, Function.comp_apply, Fintype.sum_subsingleton _ Rat.infinitePlace]
+  · simp only [Pi.sub_apply, Function.comp_apply]
     ring
-  · simp only [Pi.sub_apply, Function.comp_apply, ite_true]
+  · rfl
 
 /-- Paper: §§1.4.3–1.4.5, pp. 29–30. For the trivial rational character and
 any full window, the same matched cutoffs give a locally uniform limit of the
@@ -4887,6 +4900,46 @@ theorem introTraceApprox_rat_spectral_sub_shiftTwo_tendsto (h ρ : ℕ → ℝ �
   classical
   obtain ⟨k, hk, hAk, harch⟩ := introTraceApprox_rat_sub_shiftTwo_tendsto h ρ hA
   exact ⟨k, hk, hAk, harch, introTraceApprox_rat_spectral_shiftTwo_of_arch h (ρ ∘ k) hAk harch⟩
+
+/-- Paper: §§1.4.3–1.4.5, pp. 29–30. For one admissible family the rational
+real-place difference at two and four tends to positive infinity in real part, and the
+difference of the full smoothed spectral sums tends to negative infinity in real part
+for every half-width `1/2 ≤ a < 2`.
+Deviation: Summing over zeros before removing these cutoffs makes the spectral sum
+and real-place term diverge with opposite signs. Removing the cutoffs for each finite set first
+gives the convergent resolvent series by `introTrace_spectral_referenceSub`. -/
+theorem introTraceApprox_exists_rat_spectral_sub_shiftTwo_atBot :
+    ∃ (h ρ : ℕ → ℝ → ℝ), IsIntroTraceApproximation h ρ ∧
+      Tendsto (fun n ↦ (introTraceArchimedean (F := ℚ) 1 (introTraceApprox (h n) (ρ n) 2) Rat.infinitePlace -
+        introTraceArchimedean (F := ℚ) 1 (introTraceApprox (h n) (ρ n) 4) Rat.infinitePlace).re) atTop atTop ∧
+      ∀ a : ℝ, 1 / 2 ≤ a → a < 2 →
+        Tendsto (fun n ↦ (introTraceSpectralSum (F := ℚ) 1 (introTraceApprox (h n) (ρ n) 2) a -
+          introTraceSpectralSum (F := ℚ) 1 (introTraceApprox (h n) (ρ n) 4) a).re) atTop atBot := by
+  classical
+  obtain ⟨h, ρ, hA, hdiv⟩ := introTraceApprox_exists_rat_sub_shiftTwo_unmatched
+  refine ⟨h, ρ, hA, hdiv, ?_⟩
+  intro a ha ha₂
+  have hcomb := introTraceApprox_rat_combined_limit h ρ hA a ha
+  have hmax : max a 1 < 2 := max_lt ha₂ (by norm_num)
+  have h₂ := hcomb.tendsto_at (a := (2 : ℂ)) (by simpa using hmax)
+  have h₄ := hcomb.tendsto_at (a := (4 : ℂ)) (by simpa using hmax.trans (by norm_num : (2 : ℝ) < 4))
+  let A (n : ℕ) (z : ℂ) := introTraceArchimedean (F := ℚ) 1 (introTraceApprox (h n) (ρ n) z) Rat.infinitePlace
+  let S (n : ℕ) (z : ℂ) := introTraceSpectralSum (F := ℚ) 1 (introTraceApprox (h n) (ρ n) z) a
+  let L (z : ℂ) := logDeriv (finiteHeckeL_exists_continuation (F := ℚ) 1).choose (z + 1 / 2) +
+    (1 / (z + 1 / 2) + 1 / (z - 1 / 2))
+  -- The finite limit of the combined differences gives an eventual upper bound.
+  obtain ⟨C, hC⟩ : ∃ C : ℝ, Tendsto (fun n ↦ (A n 2 + S n 2 - (A n 4 + S n 4)).re) atTop (𝓝 C) := by
+    refine ⟨(L 2 - L 4).re, ?_⟩
+    simpa only [Function.comp_def, A, S, L, Pi.sub_apply] using
+      Complex.continuous_re.continuousAt.tendsto.comp (h₂.sub h₄)
+  change Tendsto (fun n ↦ (A n 2 - A n 4).re) atTop atTop at hdiv
+  apply tendsto_atBot.2
+  intro M
+  filter_upwards [hC.eventually_le_const (show C < C + 1 by linarith),
+    hdiv.eventually_ge_atTop (C + 1 - M)] with n hn ha'
+  change (S n 2 - S n 4).re ≤ M
+  simp only [Complex.sub_re, Complex.add_re] at hn ha' ⊢
+  linarith
 
 /-- Paper: §§1.4.3–1.4.5, pp. 29–30. In every full window for the trivial rational
 character, the multiplicity-weighted shift-two resolvent series agrees on the
