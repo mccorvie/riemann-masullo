@@ -65,12 +65,99 @@ def Printed.spectralLineJet_memLp : Prop :=
     k < min (order(χ ω, shift(a, t))) (Nat.floor ((s - 1) / 2 + 1)) →
     MemLp (spectralZeroJet (χ ω) 0 t k) 2 (weight(F, 0, s))
 
+/-- The critical first-jet density has a divergent harmonic tail. -/
+private theorem spectralLineJet_memLp_false_tail :
+    ¬ Integrable (fun x : ℝ ↦ x ^ 2 * ((1 + x ^ 2) ^ ((3 : ℝ) / 2))⁻¹) := by
+  intro h
+  apply not_integrableOn_Ioi_inv (a := 1)
+  refine (h.integrableOn.const_mul 8).mono' (measurable_id.inv.aestronglyMeasurable)
+    ((ae_restrict_iff' measurableSet_Ioi).2 (.of_forall fun x hx ↦ ?_))
+  have hx : 1 < x := hx
+  have hx₀ : 0 < x := by linarith
+  have hp : 0 < (1 + x ^ 2) ^ ((3 : ℝ) / 2) := Real.rpow_pos_of_pos (by positivity) _
+  have hbound : (1 + x ^ 2) ^ ((3 : ℝ) / 2) ≤ (2 * x) ^ 3 := by
+    calc
+      _ ≤ ((2 * x) ^ 2) ^ ((3 : ℝ) / 2) :=
+        Real.rpow_le_rpow (by positivity) (by nlinarith) (by norm_num)
+      _ = (2 * x) ^ 3 := by
+        rw [← Real.rpow_natCast (2 * x) 2, ← Real.rpow_mul (by positivity)]
+        norm_num
+  rw [Real.norm_of_nonneg (inv_pos.mpr hx₀).le, ← div_eq_mul_inv, ← mul_div_assoc,
+    le_div_iff₀ hp, ← div_eq_inv_mul, div_le_iff₀ hx₀]
+  linarith only [hbound, show (2 * x) ^ 3 = 8 * x ^ 2 * x by ring]
+
+/-- At Sobolev degree three, the first logarithmic jet fails to be square integrable. -/
+private theorem spectralLineJet_memLp_false_firstJet (F : Type) [Field F] [NumberField F]
+    (χ : PontryaginDual C𝔽(F)) (t : ℝ) :
+    ¬ MemLp (spectralZeroJet χ 0 t 1) 2 (weight(F, 0, 3)) := by
+  let : BorelSpace C𝔽(F) := ⟨rfl⟩
+  let μ := ideleClassTamagawaMeasure F
+  let l (g : C𝔽(F)) := Real.log ((ideleClassNorm F g).val : ℝ)
+  let w (x : ℝ) := ((1 + x ^ 2) ^ ((3 : ℝ) / 2))⁻¹
+  have hpos (x : ℝ) : 0 < (1 + x ^ 2) ^ ((3 : ℝ) / 2) :=
+    Real.rpow_pos_of_pos (by positivity) _
+  have hw : Continuous w := ((continuous_const.add (continuous_id.pow 2)).rpow_const
+    (fun x : ℝ ↦ Or.inl (by change (1 : ℝ) + x ^ 2 ≠ 0; positivity))).inv₀ fun x ↦ (hpos x).ne'
+  have hl : Continuous l := tate_continuous_classNormReal.log fun g ↦ (tate_classNormReal_pos g).ne'
+  intro h
+  have hm : MemLp (spectralZeroJet χ 0 t 1) 2 (μ.withDensity fun g ↦ ENNReal.ofReal (w (l g))) := by
+    simpa only [intervalSobolevDensity, neg_zero, mul_zero, zero_mul, Real.exp_zero, max_self, one_mul]
+      using h
+  have hnorm (g : C𝔽(F)) : ‖spectralZeroJet χ 0 t 1 g‖ ^ 2 = (l g) ^ 2 := by
+    change ‖((χ g : ℂ) * (((ideleClassNorm F g).val : ℝ) : ℂ) ^ (0 + (t : ℂ) * Complex.I)) *
+      (l g : ℂ) ^ 1‖ ^ 2 = _
+    rw [norm_mul, norm_mul, Circle.norm_coe, one_mul,
+      Complex.norm_cpow_eq_rpow_re_of_pos (tate_classNormReal_pos g)]
+    simp [Complex.norm_real, Real.norm_eq_abs]
+  have hg := (memLp_two_iff_integrable_sq_norm hm.aestronglyMeasurable).mp hm
+  have hμ : Integrable (fun g ↦ (l g) ^ 2 * w (l g)) μ := by
+    apply ((integrable_withDensity_iff (hw.comp hl).measurable.ennreal_ofReal
+      (.of_forall fun _ ↦ ENNReal.ofReal_lt_top)).mp hg).congr
+    exact .of_forall fun g ↦ by
+      change ‖spectralZeroJet χ 0 t 1 g‖ ^ 2 * (ENNReal.ofReal (w (l g))).toReal = _
+      rw [hnorm, ENNReal.toReal_ofReal (inv_pos.mpr (hpos (l g))).le]
+  have hmap := (integrable_map_measure
+    (g := fun x : ℝ ↦ x ^ 2 * w x) ((continuous_id.pow 2).mul hw).aestronglyMeasurable
+    hl.measurable.aemeasurable).mpr hμ
+  rw [show μ.map l = _ from classTamagawa_map_log_norm (F := F)] at hmap
+  let ν := normOneIdeleClassTamagawaMeasure F
+  let : CompactSpace (ideleClassNorm F).ker := (ideleClassGroup_finiteness F).2.1
+  let : ν.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have hc : (ν univ).toNNReal ≠ 0 := (ENNReal.toNNReal_pos (NeZero.ne (ν univ)) (measure_ne_top ν univ)).ne'
+  exact spectralLineJet_memLp_false_tail ((integrable_smul_measure
+    (by exact_mod_cast hc) ENNReal.coe_ne_top).mp hmap)
+
+/-- Paper: Theorem 10.2.1.1, p. 440. The trivial Hecke character of some
+number field has a completed L-function with a zero of multiplicity at least two.
+The intended witness is the splitting field of X³ − 2, whose Dedekind zeta
+function contains the square of the two-dimensional Artin factor. -/
+private theorem spectralLineJet_memLp_false_multipleZero :
+    ∃ (F : Type) (_ : Field F) (_ : NumberField F) (a t : ℝ),
+      1 < order((1 : PontryaginDual C𝔽(F)), shift(a, t)) := by sorry
+
 /-- Paper: Theorem 10.2.1.1 and (10.2.1.6), p. 440. Take the splitting
 field of X³−2, the trivial character, s = 3, and a+it a nontrivial zero of the
 two-dimensional Artin factor. That factor occurs squared in the Dedekind
 zeta function. The cutoff includes k = 1, whose squared norm has a 1/|x|
 tail in the log norm coordinate x. -/
-theorem Printed.spectralLineJet_memLp_false : ¬ Printed.spectralLineJet_memLp := by sorry
+theorem Printed.spectralLineJet_memLp_false : ¬ Printed.spectralLineJet_memLp := by
+  classical
+  intro h
+  obtain ⟨F, _, _, a, t, hz⟩ := spectralLineJet_memLp_false_multipleZero
+  obtain ⟨χ, hχ⟩ := exists_spectralBasepointChoice F
+  let χ' := Function.update χ 1 (1 : PontryaginDual C𝔽(F))
+  have htriv : χ' 1 = 1 := Function.update_self ..
+  have hχ' : IsSpectralBasepointChoice χ' := by
+    intro ω
+    by_cases hω : ω = 1
+    · subst ω
+      rw [htriv]
+      rfl
+    · simpa [χ', Function.update_of_ne hω] using hχ ω
+  apply spectralLineJet_memLp_false_firstJet F (χ' 1) t
+  apply h F χ' hχ' a 3 (by norm_num) 1 t 1
+  exact lt_min (htriv.symm ▸ hz) (by norm_num)
+
 
 /-- Paper: Theorem 10.2.1.1, p. 440. The squared Artin factor of the
 splitting field of X³−2 supplies a double zero. At s = 3 its first

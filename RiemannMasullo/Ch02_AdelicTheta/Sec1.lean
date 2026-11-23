@@ -81,7 +81,7 @@ theorem realTestFunction_stage_isEmbedding (K : Compacts ℝ) :
         𝓓_{K}(ℝ, ℂ) →L[ℂ] 𝓓(⊤, ℂ)) := by
   exact isEmbedding_testFunction_ofSupportedIn (Set.subset_univ _)
 
-/-- Paper: (2.1.1.1)–(2.1.1.4), p. 60. The weighted magnitude is the norm
+/-- Paper: (2.1.1.1)–(2.1.1.4), pp. 60–61. The weighted magnitude is the norm
 of the mixed partial derivative times one plus the absolute coordinate monomial.
 Deviation: On smooth functions the mixed partial is evaluated by applying
 the iterated Fréchet derivative to the corresponding coordinate vectors. -/
@@ -1464,9 +1464,9 @@ section StrongDualMontel
 open Bornology Metric Set Topology Filter
 open scoped Pointwise ComplexOrder
 
-/-- Paper: Proposition 2.1.1.6, p. 61 (first half). By Banach-Steinhaus, every strongly bounded
-family of continuous linear functionals on a polynormable space is dominated by a fixed continuous
-seminorm. -/
+/-- Paper: Proof of Proposition 2.1.1.6, pp. 61–62. This helper for the strong-dual
+Montel assertion applies to barrelled Hausdorff polynormable spaces. A strongly bounded family
+of continuous linear functionals is bounded by a fixed multiple of a continuous seminorm. -/
 theorem strongDual_bounded_in_polar {E : Type*} [AddCommGroup E] [Module ℂ E]
     [UniformSpace E] [IsUniformAddGroup E] [ContinuousSMul ℂ E]
     [PolynormableSpace ℂ E] [T2Space E] [BarrelledSpace ℂ E] {S : Set (StrongDual ℂ E)}
@@ -1888,9 +1888,10 @@ private theorem strongDual_barrel_nbhd_aux
 
 end DualMontelHelpers
 
-/-- Paper: Proposition 2.1.1.6, p. 61 (first half). In a polynormable Montel space, each fixed
-seminorm bound on the strong dual is compact: on such equicontinuous families the strong topology
-agrees with the topology of pointwise convergence, and Tychonoff gives compactness. -/
+/-- Paper: Proof of Proposition 2.1.1.6, pp. 61–62. This helper for the strong-dual
+Montel assertion applies to Hausdorff polynormable spaces in which closed bounded sets
+are compact. The set of strong-dual functionals satisfying a fixed continuous seminorm
+bound is compact in the strong topology. -/
 
 theorem strongDual_polar_isCompact {E : Type*} [AddCommGroup E] [Module ℂ E]
     [UniformSpace E] [IsUniformAddGroup E] [ContinuousSMul ℂ E]
@@ -1899,8 +1900,10 @@ theorem strongDual_polar_isCompact {E : Type*} [AddCommGroup E] [Module ℂ E]
     IsCompact {φ : StrongDual ℂ E | ∀ x, ‖φ x‖ ≤ C * p x} :=
   strongDual_polar_isCompact_aux p hp C hC
 
-/-- Paper: Proposition 2.1.1.6, p. 61 (first half). The strong dual of a Montel polynormable
-space has the Heine-Borel property: closed bounded sets are compact. -/
+/-- Paper: Proof of Proposition 2.1.1.6, pp. 61–62. This helper for the strong-dual
+Montel assertion makes the Heine–Borel step for Hausdorff polynormable barrelled spaces
+with the Heine–Borel property. Every strongly closed, strongly bounded subset of the
+dual is compact. -/
 theorem strongDual_montel_heineBorel {E : Type*} [AddCommGroup E] [Module ℂ E]
     [UniformSpace E] [IsUniformAddGroup E] [ContinuousSMul ℂ E]
     [PolynormableSpace ℂ E] [T2Space E] [MontelSpace ℂ E] [BarrelledSpace ℂ E] :
@@ -1911,10 +1914,10 @@ theorem strongDual_montel_heineBorel {E : Type*} [AddCommGroup E] [Module ℂ E]
   have hsub : S ⊆ {φ : StrongDual ℂ E | ∀ x, ‖φ x‖ ≤ C * p x} := fun φ hφ x ↦ hbound φ hφ x
   exact (strongDual_polar_isCompact p hp C hC).of_isClosed_subset hclosed hsub
 
-/-- Paper: Proposition 2.1.1.6, p. 61 (second half). Every barrel in the strong dual is a
-neighborhood of zero: its polar in the base space is weakly closed, absolutely convex and
-bounded (each functional is bounded on it by definition of the polar), hence its bipolar,
-which contains the barrel by Hahn-Banach separation, is the polar of a bounded set. -/
+/-- Paper: Proof of Proposition 2.1.1.6, pp. 61–62. This helper for barrelledness
+assumes a Hausdorff polynormable base space and that every element of its strong bidual
+is evaluation at a point of the base space. Every barrel in the strong dual is then a
+neighborhood of zero. -/
 theorem strongDual_barrel_nbhd {E : Type*} [AddCommGroup E] [Module ℂ E]
     [UniformSpace E] [IsUniformAddGroup E] [ContinuousSMul ℂ E]
     [PolynormableSpace ℂ E] [T2Space E]
@@ -1924,9 +1927,9 @@ theorem strongDual_barrel_nbhd {E : Type*} [AddCommGroup E] [Module ℂ E]
     B ∈ 𝓝 (0 : StrongDual ℂ E) :=
   strongDual_barrel_nbhd_aux hE B hBclosed hBabs hBabsorb
 
-/-- Paper: Proposition 2.1.1.6, p. 61 (second half). If every barrel in a locally convex space
-is a neighborhood of zero, the space is barrelled: the unit closed ball of a lower semicontinuous
-seminorm is a closed absolutely convex absorbing set. -/
+/-- Paper: Proof of Proposition 2.1.1.6, pp. 61–62. This general helper shows that
+a topological complex vector space is barrelled if every closed, absolutely convex,
+absorbing set is a neighborhood of zero. -/
 theorem barrelled_of_barrel_nbhd {E : Type*} [AddCommGroup E] [Module ℂ E]
     [TopologicalSpace E] [IsTopologicalAddGroup E] [ContinuousSMul ℂ E]
     (h : ∀ B : Set E, IsClosed B → AbsConvex ℂ B →
@@ -2626,8 +2629,9 @@ private theorem finitePlace_mem_of_locallyConstant_compactSupport
 
 end
 
-/-- Paper: §2.1.2.2, p. 63. The additive Schwartz–Bruhat space of a finite completion
-consists exactly of the locally constant, compactly supported functions. -/
+/-- Paper: §2.1.2.1, p. 63. The additive Schwartz–Bruhat space of a finite completion
+consists exactly of the locally constant, compactly supported functions. See also
+Example 2.1.2.6, p. 65. -/
 theorem mem_finitePlaceSchwartz_iff (w : Places(F)) (f : w.adicCompletion F → ℂ) :
     (∃ g : ℬ(w.adicCompletion F), ∀ x, g (Multiplicative.ofAdd x) = f x) ↔
       IsLocallyConstant f ∧ HasCompactSupport f := by
@@ -5249,7 +5253,10 @@ private theorem span_of_tensor_factors {X V E : Type*} [AddCommGroup X] [Module 
 /-- Paper: Lemma 2.1.3.2(3), p. 68. Every adelic Schwartz–Bruhat function is a
 finite linear combination of Archimedean Schwartz functions times finite adelic
 rectangle indicators. The rectangle is integral at all but finitely many places.
-Deviation: The local sets are compact open subsets, as in the proof on p. 70. -/
+
+Deviation: The statement says compact subgroups, and the proof on p. 70 uses compact subsets.
+Local constancy permits a decomposition using compact open cosets, as in Example 2.1.3.1.
+The local sets here are compact and open. -/
 theorem adeleSchwartz_eq_sum_compactOpen_rectangles (f : ℬ(𝔸[F])) :
     ∃ (r : ℕ) (c : Fin r → ℂ) (arch : Fin r → ℬ(InfiniteAdeleRing F))
         (K : Fin r → (v : Places(F)) → Set (v.adicCompletion F)) (φ : Fin r → ℬ(𝔸[F])),
@@ -5540,9 +5547,10 @@ private theorem arch_projects_to_real :
     change q (Pi.single v (s x.toAdd) v) = x.toAdd
     rw [Pi.single_eq_same, hqs]⟩
 
-/-- Paper: Remark 2.1.3.3, p. 69. The identity from the inductive to the
-projective tensor product of the adelic factors is a continuous bijection
-whose topology is strictly weakened. -/
+/-- Paper: Remark 2.1.3.3, pp. 68–69. The identity from the inductive to the
+projective tensor product of the adelic factors fails to be a topological embedding.
+This identity is a linear bijection, and `continuous_inductiveTensor_to_projectiveTensor`
+gives its continuity. -/
 theorem adeleSchwartz_inductiveTensor_not_isEmbedding :
     ¬ @IsEmbedding (InductiveTensor ℬ(InfiniteAdeleRing F) ℬ(𝔸ᶠ[F]))
       (ProjectiveTensor ℬ(InfiniteAdeleRing F) ℬ(𝔸ᶠ[F])) _ _ id := by
@@ -5590,14 +5598,14 @@ variable (F : Type u) [Field F] [NumberField F]
 
 local notation "𝒮(" S ")" => ℬ(SAdeleRing F S)
 
-/-- Paper: (2.1.4.5), p. 71. The complementary projection keeps exactly the
-finite coordinates outside the chosen set of places. -/
+/-- Paper: (2.1.4.5), p. 71. This coordinate helper for `sAdeleSchwartzToGlobal`
+restricts a finite adele to the coordinates outside the chosen set of places. -/
 def finiteAdeleTailProjection (S : Finset (Places(F))) (x : 𝔸ᶠ[F]) : FiniteAdeleTail F S :=
   RestrictedProduct.mk (fun w ↦ x w.val)
     (Subtype.val_injective.tendsto_cofinite.eventually x.cofinite_mem_adicCompletionIntegers)
 
-/-- Paper: (2.1.4.5), p. 71. The complementary projection evaluates to the
-original coordinate at every omitted place. -/
+/-- Paper: (2.1.4.5), p. 71. In the complementary coordinate projection used by
+`sAdeleSchwartzToGlobal`, each omitted place retains its original coordinate. -/
 theorem finiteAdeleTailProjection_apply (S : Finset (Places(F))) (x : 𝔸ᶠ[F])
     (w : {w : Places(F) // w ∉ S}) :
     finiteAdeleTailProjection F S x w = x w.val := by
