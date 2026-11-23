@@ -1003,10 +1003,137 @@ The global principal value is a topological embedding with closed range. -/
 theorem adelePrincipalValue_isClosedEmbedding (S₀ : Finset V) :
     IsClosedEmbedding (adelePrincipalValue F S₀) := by sorry
 
+local instance instMeasurableSpaceAdicUnitsSec3aKernel (v : V) :
+    MeasurableSpace (v.adicCompletion F)ˣ := borel _
+
+/-- The unit of the S-local adele ring that is the given local unit at `v` and `1` at every
+other place of `S`; translating by it rescales only the `v`-coordinate of the argument. -/
+private def adelicPrincipalValueLocalUnit {S : Finset V} (v : S)
+    (c : (v.val.adicCompletion F)ˣ) : (SAdeleRing F S)ˣ := by
+  classical
+  refine Units.mk (1, Function.update (fun w : S => (1 : w.val.adicCompletion F)) v c.val)
+    (1, Function.update (fun w : S => (1 : w.val.adicCompletion F)) v c.inv) ?_ ?_
+  · refine Prod.ext (by simp) (funext fun w => ?_)
+    by_cases h : w = v
+    · subst h
+      simp [Function.update_apply, Units.mul_inv]
+    · simp [Function.update_apply, h]
+  · refine Prod.ext (by simp) (funext fun w => ?_)
+    by_cases h : w = v
+    · subst h
+      simp [Function.update_apply, Units.inv_mul]
+    · simp [Function.update_apply, h]
+
+/-- S-local theta of a translate is S-local theta evaluated at the inverse-translated idele. -/
+private theorem sAdelePrincipalValue_preserves_thetaKernel_translate
+    {S : Finset V} (g x : (SAdeleRing F S)ˣ) (f : ℬₛ(S)) :
+    sLocalAdelicTheta F S (schwartzBruhatUnitTranslate g f) x =
+      sLocalAdelicTheta F S f (g⁻¹ * x) := by
+  let d := (Units.map ((adeleProjection F S).comp
+    (integralAdelesOutside F S).subtype).toMonoidHom).comp
+      (Units.map (integralAdeleDiagonal F S).toMonoidHom)
+  refine (sLocalAdelicTheta_apply F S (schwartzBruhatUnitTranslate g f) x).trans
+    (Eq.trans ?_ (sLocalAdelicTheta_apply F S f (g⁻¹ * x)).symm)
+  exact tsum_congr fun t => congrArg (fun y => f (Multiplicative.ofAdd y))
+    (mul_left_comm g.inv (d t).val x.val)
+
+/-- Paper: (5.3.1.9), p. 242.
+The single-place operator at `v` is `1` minus the normalized average over the integer units at
+`v` of the translates by the reciprocal uniformizer times the unit, and S-local theta turns this
+into the same recipe on the theta function: theta of the principal value at one place is theta of
+the test minus the normalized average, over the integer units at that place, of theta of its
+translates. This is the analytic content of (5.3.1.9): the theta sum over the S-units is exchanged
+with the integral over the compact group of integer units, as in the proof of the formula for the
+global theta function in one place in `Ch11_ShellStructure.Sec2a`. -/
+private theorem sLocalAdelicTheta_sAdelePrincipalValue_singleton {S : Finset V} (v : S)
+    (π : (v.val.adicCompletion F)ˣ)
+    (hπ : (Valued.v : Valuation (v.val.adicCompletion F) (WithZero (Multiplicative ℤ))).IsUniformizer
+      (π : v.val.adicCompletion F))
+    (f : ℬₛ(S)) (x : (SAdeleRing F S)ˣ) :
+    sLocalAdelicTheta F S
+        (sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.property) f) x =
+      sLocalAdelicTheta F S f x -
+        ((finiteLocalMultiplicativeTamagawaMeasure F v.val).real
+          ((HeightOneSpectrum.adicCompletionIntegers F v.val).units :
+            Set (v.val.adicCompletion F)ˣ) : ℂ)⁻¹ *
+          ∫ u in ((HeightOneSpectrum.adicCompletionIntegers F v.val).units :
+              Set (v.val.adicCompletion F)ˣ),
+            sLocalAdelicTheta F S
+              (schwartzBruhatUnitTranslate
+                (adelicPrincipalValueLocalUnit v (π * (u : (v.val.adicCompletion F)ˣ))) f) x
+            ∂(finiteLocalMultiplicativeTamagawaMeasure F v.val) := by sorry
+
+/-- Paper: (5.3.1.9), p. 242.
+The single-place principal value at `v` maps the theta kernel into itself: theta of the average
+of the translates vanishes because theta of every translate is theta of the test at another
+idele, and theta of the test is zero. -/
+private theorem sAdelePrincipalValue_preserves_thetaKernel_singleton {S : Finset V} (v : S)
+    (f : ℬₛ(S)) (hf : sLocalAdelicTheta F S f = 0) :
+    sLocalAdelicTheta F S
+      (sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.property) f) = 0 := by
+  let hunif := (Valued.v :
+    Valuation (v.val.adicCompletion F) (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π : (v.val.adicCompletion F)ˣ :=
+    Units.mk0 (hunif.choose : v.val.adicCompletion F) hunif.choose_spec.ne_zero
+  have hπ : (Valued.v :
+      Valuation (v.val.adicCompletion F) (WithZero (Multiplicative ℤ))).IsUniformizer
+        (π : v.val.adicCompletion F) := hunif.choose_spec
+  refine ContinuousMap.ext fun y => ?_
+  refine (sLocalAdelicTheta_sAdelePrincipalValue_singleton v π hπ f y).trans ?_
+  have hzero : ∀ (u : (v.val.adicCompletion F)ˣ) (z : (SAdeleRing F S)ˣ), sLocalAdelicTheta F S
+        (schwartzBruhatUnitTranslate (R := SAdeleRing F S)
+          (adelicPrincipalValueLocalUnit v (π * u)) f) z = 0 := by
+    intro u z
+    rw [sAdelePrincipalValue_preserves_thetaKernel_translate]
+    exact DFunLike.congr_fun hf _
+  have hfun : (fun u : (v.val.adicCompletion F)ˣ => sLocalAdelicTheta F S
+        (schwartzBruhatUnitTranslate (R := SAdeleRing F S)
+          (adelicPrincipalValueLocalUnit v (π * u)) f) y) = fun _ => 0 :=
+    funext fun u => hzero u y
+  have hf0 : sLocalAdelicTheta F S f y = 0 := DFunLike.congr_fun hf y
+  rw [hfun, integral_zero, mul_zero, sub_zero]
+  exact hf0
+
+open Classical in
+/-- Paper: (5.3.1.9), p. 242.
+The S-local principal value is the composition, over the selected places, of its single-place
+versions: each factor acts in its own coordinate of the tensor decomposition of the S-local test
+space, so the operators commute and compose to the operator attached to the whole set. The
+composite is written as a product over a list so that it can be peeled one place at a time. -/
+private theorem sAdelePrincipalValue_preserves_thetaKernel_list {S S₀ : Finset V} (h₀ : S₀ ⊆ S)
+    (f : ℬₛ(S)) :
+    sAdelePrincipalValue F h₀ f =
+      (S₀.val.toList.map fun v => if h : v ∈ S then
+        sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr h) else 1).prod f := by sorry
+
 /-- Paper: (5.3.1.9), p. 242.
 The S-local principal value preserves the kernel of theta averaging. -/
 theorem sAdelePrincipalValue_preserves_thetaKernel {S S₀ : Finset V} (h₀ : S₀ ⊆ S) :
-    Kₛ(S) ≤ (Kₛ(S)).comap (sAdelePrincipalValue F h₀) := by sorry
+    Kₛ(S) ≤ (Kₛ(S)).comap (sAdelePrincipalValue F h₀) := by
+  classical
+  have key : ∀ (l : List V), (∀ v ∈ l, v ∈ S) → ∀ g : ℬₛ(S), sLocalAdelicTheta F S g = 0 →
+      sLocalAdelicTheta F S ((l.map fun v => if h : v ∈ S then
+        sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr h) else 1).prod g) = 0 := by
+    intro l
+    induction l with
+    | nil =>
+      intro _ g hg
+      simpa using hg
+    | cons a l ih =>
+      intro hmem g hg
+      have ha : a ∈ S := hmem a List.mem_cons_self
+      have hta : ∀ v ∈ l, v ∈ S := fun v hv => hmem v (List.mem_cons_of_mem a hv)
+      have htail := ih hta g hg
+      have hQa : (if h : a ∈ S then
+          sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr h) else 1) =
+          sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr ha) := dif_pos ha
+      rw [List.map_cons, List.prod_cons, hQa]
+      exact sAdelePrincipalValue_preserves_thetaKernel_singleton ⟨a, ha⟩ _ htail
+  intro f hf
+  rw [LinearMap.mem_ker] at hf
+  rw [Submodule.mem_comap]
+  rw [sAdelePrincipalValue_preserves_thetaKernel_list h₀]
+  exact key S₀.val.toList (fun v hv => h₀ (Multiset.mem_toList.mp hv)) f hf
 
 /-- Paper: (5.3.1.10), p. 242.
 The global principal value preserves the kernel of theta averaging. -/
@@ -2768,6 +2895,63 @@ theorem coordinateDerivative_testFunction_toSchwartz {ι : Type*} [Fintype ι]
     simp only [List.map_cons, List.prod_cons, mul_apply_eq_comp]
     rw [← ih, ← hpow]
 
+/-- Paper: Theorem 5.3.2.3(5), p. 245.
+A compactly supported distribution has a tempered extension. Cutting a Schwartz test off by a
+test function that equals one on a neighbourhood of the distribution's support does not change
+the value of the distribution, and the resulting functional is continuous on the Schwartz space. -/
+private theorem distribution_coordinatePlane_decomposition_tempered_extension {E : Type*}
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [FiniteDimensional ℝ E]
+    (A : StrongDual ℂ 𝓓((⊤ : Opens E), ℂ))
+    (hA : IsCompact (Distribution.dsupport (⇑A))) :
+    ∃ B : StrongDual ℂ 𝓢(E, ℂ),
+      ∀ g : 𝓓((⊤ : Opens E), ℂ), B (g.hasCompactSupport.toSchwartzMap g.contDiff) = A g := by
+  sorry
+
+/-- Restriction to the coordinate plane commutes with passing a compactly supported test to
+its Schwartz function: both restrictions are given by inserting zeros in the normal
+coordinates. -/
+private theorem distribution_coordinatePlane_decomposition_tempered_restriction_toSchwartz
+    (f : 𝒟(ι ⊕ κ)) :
+    let g := R𝒟 f
+    R𝒮 (f.hasCompactSupport.toSchwartzMap f.contDiff) =
+      g.hasCompactSupport.toSchwartzMap g.contDiff := by
+  intro g
+  ext y
+  rw [(exists_schwartz_coordinatePlaneRestriction (ι := ι) (κ := κ)).choose_spec _ y]
+  simp only [HasCompactSupport.toSchwartzMap_toFun]
+  exact ((exists_testFunction_coordinatePlaneRestriction (ι := ι) (κ := κ)).choose_spec f y).symm
+
+open Classical in
+/-- Passing from a compactly supported test on the product to its Schwartz function commutes
+with coordinate derivatives, at the product type itself. -/
+private theorem distribution_coordinatePlane_decomposition_tempered_toSchwartz
+    (β : (ι ⊕ κ) → ℕ) (f : 𝒟(ι ⊕ κ)) :
+    let g := ∂𝒟[ι ⊕ κ, β] f
+    g.hasCompactSupport.toSchwartzMap g.contDiff =
+      ∂𝒮[ι ⊕ κ, β] (f.hasCompactSupport.toSchwartzMap f.contDiff) := by
+  intro g
+  have hpow : ∀ i (k : ℕ) (f : 𝒟(ι ⊕ κ)),
+      ((LineDeriv.lineDerivOpCLM ℂ 𝒟(ι ⊕ κ) (eᵣ i : Eᵣ(ι ⊕ κ)) ^ k)
+          f).hasCompactSupport.toSchwartzMap
+          ((LineDeriv.lineDerivOpCLM ℂ 𝒟(ι ⊕ κ) (eᵣ i : Eᵣ(ι ⊕ κ)) ^ k) f).contDiff =
+        (LineDeriv.lineDerivOpCLM ℂ 𝒮(ι ⊕ κ) (eᵣ i : Eᵣ(ι ⊕ κ)) ^ k)
+          (f.hasCompactSupport.toSchwartzMap f.contDiff) := by
+    intro i k
+    induction k with
+    | zero => intro f; rfl
+    | succ k ih =>
+      intro f
+      rw [pow_succ, pow_succ, mul_apply_eq_comp, mul_apply_eq_comp, ih]
+      congr 1
+  show (∂𝒟[ι ⊕ κ, β] f).hasCompactSupport.toSchwartzMap (∂𝒟[ι ⊕ κ, β] f).contDiff = _
+  unfold coordinateDerivative
+  generalize (Finset.univ.toList : List (ι ⊕ κ)) = l
+  induction l generalizing f with
+  | nil => rfl
+  | cons a t ih =>
+    simp only [List.map_cons, List.prod_cons, mul_apply_eq_comp]
+    rw [← ih, ← hpow]
+
 open Classical in
 /-- Paper: Theorem 5.3.2.3(5), p. 245.
 The coefficient distributions and the ambient distribution have tempered extensions.
@@ -2781,7 +2965,22 @@ theorem distribution_coordinatePlane_decomposition_tempered {N : ℕ} (T : 𝒟'
     ∃ (U : 𝒮'(ι ⊕ κ)) (B : index(N) → 𝒮'(κ)),
       (∀ f : 𝒟(ι ⊕ κ), U (f.hasCompactSupport.toSchwartzMap f.contDiff) = T f) ∧
       (∀ α, ∀ g : 𝒟(κ), B α (g.hasCompactSupport.toSchwartzMap g.contDiff) = A α g) ∧
-      ∀ f : 𝒮(ι ⊕ κ), U f = ∑ α : index(N), B α (R𝒮 (∂𝒮[ι ⊕ κ, multi(α)] f)) := by sorry
+      ∀ f : 𝒮(ι ⊕ κ), U f = ∑ α : index(N), B α (R𝒮 (∂𝒮[ι ⊕ κ, multi(α)] f)) := by
+  choose B hB using fun α : index(N) =>
+    distribution_coordinatePlane_decomposition_tempered_extension (A α) (hK α)
+  refine ⟨∑ α : index(N), (B α).comp ((R𝒮).comp ∂𝒮[ι ⊕ κ, multi(α)]), B, ?_, fun α => hB α, ?_⟩
+  · intro f
+    simp only [sum_apply, ContinuousLinearMap.comp_apply]
+    rw [hA f]
+    refine Finset.sum_congr rfl fun α _ => ?_
+    have hder : ∂𝒮[ι ⊕ κ, multi(α)] (f.hasCompactSupport.toSchwartzMap f.contDiff) =
+        (∂𝒟[ι ⊕ κ, multi(α)] f).hasCompactSupport.toSchwartzMap
+          (∂𝒟[ι ⊕ κ, multi(α)] f).contDiff :=
+      (distribution_coordinatePlane_decomposition_tempered_toSchwartz (multi(α)) f).symm
+    rw [← hB α, ← distribution_coordinatePlane_decomposition_tempered_restriction_toSchwartz
+      (∂𝒟[ι ⊕ κ, multi(α)] f), hder]
+  · intro f
+    simp only [sum_apply, ContinuousLinearMap.comp_apply]
 
 /-- Paper: Remark 5.3.2.4, p. 246.
 Products of test functions define a map from the inductive tensor product with
