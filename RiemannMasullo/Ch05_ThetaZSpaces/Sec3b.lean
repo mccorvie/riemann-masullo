@@ -18,6 +18,7 @@ import Mathlib.Analysis.SpecialFunctions.Exponential
 import Mathlib.Geometry.Manifold.PartitionOfUnity
 import Mathlib.Topology.Algebra.IsOpenUnits
 import RiemannMasullo.ForMathlib.Analysis.Normed.Field.ProperSpace
+import RiemannMasullo.External.TauCeti.Analysis.SpecialFunctions.Exp.Deriv
 
 /-! # Extensions by zero and holomorphic S-idelic zeta functions
 
@@ -98,6 +99,302 @@ theorem realSchwartz_restrict_positiveDecay :
     ∃ R : 𝓢(ℝ, ℂ) →L[ℂ] 𝓔(ℝ, 1, Ioi 0), Injective R ∧
       ∀ (f : 𝓢(ℝ, ℂ)) (u : ℝˣ), (R f).val u = f u.val := by sorry
 
+/-- The complex units have an elementary presentation with logarithmic radius and angle. -/
+private theorem complexSchwartz_restrict_positiveDecay_chart :
+    ∃ w : Multiplicative (ElementaryLieGroup 1 1 0 PUnit.{1}) ≃ₜ* ℂˣ, ∀ y,
+      (w (Multiplicative.ofAdd y)).val =
+        (Real.exp (realBruhatCoordinate y.1) : ℂ) * (AddCircle.toCircle (y.2.1 0) : ℂ) := by
+  let X := ElementaryLieGroup 1 1 0 PUnit.{1}
+  let a := AddCircle.homeomorphCircle (one_ne_zero : (1 : ℝ) ≠ 0)
+  let v (p : X) : ℂ :=
+    (Real.exp (realBruhatCoordinate p.1) : ℂ) * (a (p.2.1 0) : ℂ)
+  have hv (p : X) : ‖v p‖ = Real.exp (realBruhatCoordinate p.1) := by
+    rw [show v p = _ from rfl, norm_mul, Complex.norm_real, Circle.norm_coe, mul_one,
+      Real.norm_of_nonneg (Real.exp_pos _).le]
+  let V (p : Multiplicative X) : ℂˣ := Units.mk0 (v p.toAdd) (by
+    exact norm_ne_zero_iff.mp ((hv p.toAdd).trans_ne (Real.exp_ne_zero _)))
+  let phase (z : ℂˣ) : Circle := ⟨z.val / (‖z.val‖ : ℂ), by
+    change z.val / (‖z.val‖ : ℂ) ∈ Metric.sphere (0 : ℂ) 1
+    apply mem_sphere_zero_iff_norm.mpr
+    rw [norm_div, Complex.norm_real, Real.norm_of_nonneg (norm_nonneg _),
+      div_self (norm_ne_zero_iff.mpr z.ne_zero)]⟩
+  let U (z : ℂˣ) : Multiplicative X := Multiplicative.ofAdd
+    (realBruhatCoordinate.symm (Real.log ‖z.val‖), fun _ ↦ a.symm (phase z), 0, PUnit.unit)
+  let w : Multiplicative X ≃ₜ* ℂˣ :=
+    { toFun := V
+      invFun := U
+      left_inv := fun p ↦ by
+        change (realBruhatCoordinate.symm (Real.log ‖v p.toAdd‖),
+          fun _ ↦ a.symm (phase (V p)), 0, PUnit.unit) = p.toAdd
+        refine Prod.ext ?_ (Prod.ext ?_ (Subsingleton.elim _ _))
+        · rw [hv, Real.log_exp, realBruhatCoordinate.symm_apply_apply]
+        · funext i
+          fin_cases i
+          apply a.injective
+          rw [a.apply_symm_apply]
+          apply Circle.coe_injective
+          change v p.toAdd / (‖v p.toAdd‖ : ℂ) = _
+          rw [hv]
+          change (Real.exp (realBruhatCoordinate p.toAdd.1) : ℂ) * _ / _ = _
+          exact mul_div_cancel_left₀ _ (Complex.ofReal_ne_zero.mpr (Real.exp_ne_zero _))
+      right_inv := fun z ↦ by
+        apply Units.ext
+        change (Real.exp (realBruhatCoordinate (realBruhatCoordinate.symm (Real.log ‖z.val‖))) : ℂ)
+          * (a (a.symm (phase z)) : ℂ) = z.val
+        rw [realBruhatCoordinate.apply_symm_apply, a.apply_symm_apply,
+          Real.exp_log (norm_pos_iff.mpr z.ne_zero)]
+        change (‖z.val‖ : ℂ) * (z.val / (‖z.val‖ : ℂ)) = _
+        rw [← mul_div_assoc]
+        exact mul_div_cancel_left₀ _ (Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr z.ne_zero))
+      map_mul' := fun x y ↦ by
+        apply Units.ext
+        have ha (s t : AddCircle (1 : ℝ)) : a (s + t) = a s * a t := by
+          dsimp only [a]
+          simp only [AddCircle.homeomorphCircle_apply, AddCircle.toCircle_add]
+        change (Real.exp (realBruhatCoordinate (x.toAdd.1 + y.toAdd.1)) : ℂ) *
+          (a (x.toAdd.2.1 0 + y.toAdd.2.1 0) : ℂ) = v x.toAdd * v y.toAdd
+        simp only [v, map_add, Real.exp_add, Complex.ofReal_mul, ha, Circle.coe_mul]
+        ring
+      continuous_toFun := by
+        apply Units.isOpenEmbedding_val.isInducing.continuous_iff.mpr
+        change Continuous v
+        dsimp only [v]
+        exact (Complex.continuous_ofReal.comp
+          (Real.continuous_exp.comp (realBruhatCoordinate.continuous.comp continuous_fst))).mul
+          (continuous_subtype_val.comp (a.continuous.comp
+            ((continuous_apply 0).comp (continuous_fst.comp continuous_snd))))
+      continuous_invFun := by
+        have hr : Continuous (fun z : ℂˣ ↦ ‖z.val‖) := Units.continuous_val.norm
+        have hp : Continuous phase := by
+          exact (Units.continuous_val.div (Complex.continuous_ofReal.comp hr)
+            fun z ↦ Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr z.ne_zero)).subtype_mk _
+        exact (realBruhatCoordinate.symm.continuous.comp
+          (hr.log fun z ↦ norm_ne_zero_iff.mpr z.ne_zero)).prodMk
+          ((continuous_pi fun _ ↦ a.symm.continuous.comp hp).prodMk continuous_const) }
+  exact ⟨w, fun p ↦ by
+    change (Real.exp (realBruhatCoordinate p.1) : ℂ) * (a (p.2.1 0) : ℂ) = _
+    exact congrArg (fun c : Circle ↦ (Real.exp (realBruhatCoordinate p.1) : ℂ) * (c : ℂ))
+      (AddCircle.homeomorphCircle_apply _ _)⟩
+
+/-- The exponential at a positive rate dominates every monomial on the positive ray. -/
+private theorem complexSchwartz_restrict_positiveDecay_expBound (k : ℕ) {c : ℝ}
+    (hc : 0 < c) {t : ℝ} (ht : 0 ≤ t) :
+    t ^ k * Real.exp (-(c * t)) ≤ (k.factorial : ℝ) / c ^ k := by
+  have hf : (0 : ℝ) < k.factorial := by positivity
+  have he : 0 < Real.exp (c * t) := Real.exp_pos _
+  have hp := (div_le_iff₀ hf).mp (Real.pow_div_factorial_le_exp (c * t) (mul_nonneg hc.le ht) k)
+  rw [Real.exp_neg, ← div_eq_mul_inv, div_le_div_iff₀ he (pow_pos hc _)]
+  calc
+    t ^ k * c ^ k = (c * t) ^ k := by rw [mul_pow, mul_comm]
+    _ ≤ Real.exp (c * t) * (k.factorial : ℝ) := hp
+    _ = _ := mul_comm _ _
+
+/-- A single positive radial weight makes the lifted profile rapidly decreasing in the
+logarithmic radius, uniformly in the angular coordinate and through every derivative order. -/
+private theorem complexSchwartz_restrict_positiveDecay_profile {E : Type}
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (r : E →L[ℝ] ℝ) (z w : E →L[ℝ] ℂ) (c : ℝ) (hc : 0 < c)
+    (hz : ∀ x, (z x).re = r x) (hw : ∀ x, (w x).re = c * r x)
+    (f : 𝓢(ℂ, ℂ)) (k n : ℕ) :
+    ∃ C : ℝ, ∀ x : E, |r x| ^ k *
+      ‖iteratedFDeriv ℝ n (fun y ↦ Complex.exp (w y) * f (Complex.exp (z y))) x‖ ≤ C := by
+  obtain ⟨N, hN⟩ := exists_nat_gt (c + 1)
+  let a := max 1 ‖z‖
+  let b := max 1 ‖w‖
+  let M := ∑ i ∈ Finset.range (n + 1),
+    (SchwartzMap.seminorm ℂ 0 i f + SchwartzMap.seminorm ℂ (n + N) i f)
+  have ha : 1 ≤ a := le_max_left _ _
+  have hb : 1 ≤ b := le_max_left _ _
+  have hM : 0 ≤ M := Finset.sum_nonneg fun _ _ ↦ add_nonneg (apply_nonneg ..) (apply_nonneg ..)
+  let A : ℝ := (n.factorial : ℝ) * M * a ^ n
+  have hA : 0 ≤ A := by positivity
+  let B : ℝ := (∑ i ∈ Finset.range (n + 1), (n.choose i : ℝ)) * b ^ n * A
+  have hB : 0 ≤ B := by positivity
+  let C : ℝ := (k.factorial : ℝ) / c ^ k + k.factorial
+  refine ⟨B * C, fun x ↦ ?_⟩
+  let t := r x
+  let R := max 1 (Real.exp t)
+  have hR : 1 ≤ R := le_max_left _ _
+  have hRp : 0 < R := zero_lt_one.trans_le hR
+  let u : E → ℂ := fun y ↦ Complex.exp (z y)
+  let v : E → ℂ := fun y ↦ Complex.exp (w y)
+  have hux : ‖u x‖ = Real.exp t := (Complex.norm_exp _).trans (congrArg Real.exp (hz x))
+  have hvx : ‖v x‖ = Real.exp (c * t) := (Complex.norm_exp _).trans (congrArg Real.exp (hw x))
+  have hu : ContDiff ℝ (∞) u :=
+    ((Complex.contDiff_exp (𝕜 := ℂ)).restrict_scalars ℝ).comp z.contDiff
+  have hv : ContDiff ℝ (∞) v :=
+    ((Complex.contDiff_exp (𝕜 := ℂ)).restrict_scalars ℝ).comp w.contDiff
+  have hf (i : ℕ) (hi : i ≤ n) :
+      ‖iteratedFDeriv ℝ i (f : ℂ → ℂ) (u x)‖ ≤ M / R ^ (n + N) := by
+    have hsum : SchwartzMap.seminorm ℂ 0 i f + SchwartzMap.seminorm ℂ (n + N) i f ≤ M :=
+      Finset.single_le_sum (fun _ _ ↦ add_nonneg (apply_nonneg ..) (apply_nonneg ..))
+        (Finset.mem_range.mpr (Nat.lt_succ_of_le hi))
+    by_cases ht : Real.exp t ≤ 1
+    · rw [show R = 1 from max_eq_left ht, one_pow, div_one]
+      have h0 : ‖iteratedFDeriv ℝ i (f : ℂ → ℂ) (u x)‖ ≤ SchwartzMap.seminorm ℂ 0 i f := by
+        simpa only [pow_zero, one_mul] using SchwartzMap.le_seminorm ℂ 0 i f (u x)
+      exact h0.trans
+        ((le_add_of_nonneg_right (apply_nonneg ..)).trans hsum)
+    · rw [show R = Real.exp t from max_eq_right (le_of_not_ge ht), ← hux]
+      refine (le_div_iff₀ (pow_pos ((Real.exp_pos t).trans_eq hux.symm) _)).mpr ?_
+      rw [mul_comm]
+      exact (SchwartzMap.le_seminorm ℂ (n + N) i f (u x)).trans
+        ((le_add_of_nonneg_left (apply_nonneg ..)).trans hsum)
+  have huz (i : ℕ) (hi : 1 ≤ i) : ‖iteratedFDeriv ℝ i u x‖ ≤ (a * R) ^ i := by
+    calc
+      _ ≤ ‖u x‖ * ‖z‖ ^ i := z.norm_iteratedFDeriv_cexp_comp_le i x
+      _ ≤ R ^ i * a ^ i := by
+        rw [hux]
+        gcongr
+        · exact (le_max_right _ _).trans (le_self_pow₀ hR (by omega))
+        · exact le_max_right _ _
+      _ = _ := by rw [mul_pow, mul_comm]
+  have hfu (j : ℕ) (hj : j ≤ n) :
+      ‖iteratedFDeriv ℝ j ((f : ℂ → ℂ) ∘ u) x‖ ≤ A / R ^ N := by
+    refine (norm_iteratedFDeriv_comp_le f.smooth' hu (by simp) x
+      (fun i hi ↦ hf i (hi.trans hj)) (fun i hi _ ↦ huz i hi)).trans ?_
+    calc
+      _ ≤ (n.factorial : ℝ) * (M / R ^ (n + N)) * (a * R) ^ n := by
+        have : 1 ≤ a * R := one_le_mul_of_one_le_of_one_le ha hR
+        gcongr
+      _ = A / R ^ N := by
+        rw [pow_add, mul_pow]
+        dsimp [A]
+        field_simp
+  have hvw (i : ℕ) (hi : i ≤ n) :
+      ‖iteratedFDeriv ℝ i v x‖ ≤ Real.exp (c * t) * b ^ n := by
+    refine (w.norm_iteratedFDeriv_cexp_comp_le i x).trans ?_
+    rw [hvx]
+    gcongr
+    exact (pow_le_pow_left₀ (norm_nonneg _) (le_max_right 1 ‖w‖) i).trans
+      (pow_le_pow_right₀ hb hi)
+  have hprod : ‖iteratedFDeriv ℝ n (fun y ↦ v y * f (u y)) x‖ ≤
+      B * (Real.exp (c * t) / R ^ N) := by
+    refine (norm_iteratedFDeriv_mul_le hv (f.smooth'.comp hu) x (by simp)).trans ?_
+    calc
+      _ ≤ ∑ i ∈ Finset.range (n + 1), (n.choose i : ℝ) *
+          (Real.exp (c * t) * b ^ n) * (A / R ^ N) := by
+        apply Finset.sum_le_sum
+        intro i hi
+        gcongr
+        · exact hvw i (Nat.le_of_lt_succ (Finset.mem_range.mp hi))
+        · exact hfu (n - i) (Nat.sub_le _ _)
+      _ = _ := by
+        simp only [B, Finset.sum_mul]
+        apply Finset.sum_congr rfl
+        intro i hi
+        ring
+  have hdecay : |t| ^ k * (Real.exp (c * t) / R ^ N) ≤ C := by
+    by_cases ht : t ≤ 0
+    · rw [show R = 1 from max_eq_left (Real.exp_le_one_iff.mpr ht), one_pow, div_one,
+        abs_of_nonpos ht, show c * t = -(c * -t) by ring]
+      exact (complexSchwartz_restrict_positiveDecay_expBound k hc (neg_nonneg.mpr ht)).trans
+        (le_add_of_nonneg_right (by positivity))
+    · have ht' := le_of_not_ge ht
+      rw [show R = Real.exp t from max_eq_right (Real.one_le_exp_iff.mpr ht'),
+        ← Real.exp_nat_mul, ← Real.exp_sub, abs_of_nonneg ht']
+      calc
+        _ ≤ t ^ k * Real.exp (-(1 * t)) := by
+          gcongr
+          nlinarith [mul_nonneg (sub_nonneg.mpr hN.le) ht']
+        _ ≤ (k.factorial : ℝ) := by
+          simpa only [one_pow, div_one] using
+            (complexSchwartz_restrict_positiveDecay_expBound k zero_lt_one ht')
+        _ ≤ C := le_add_of_nonneg_left (by positivity)
+  calc
+    _ ≤ |t| ^ k * (B * (Real.exp (c * t) / R ^ N)) :=
+      mul_le_mul_of_nonneg_left hprod (by positivity)
+    _ = B * (|t| ^ k * (Real.exp (c * t) / R ^ N)) := by ring
+    _ ≤ B * C := mul_le_mul_of_nonneg_left hdecay hB
+
+/-- In logarithmic polar coordinates the weighted restriction belongs to the
+elementary Schwartz space with one real coordinate and one torus coordinate. -/
+private theorem complexSchwartz_restrict_positiveDecay_elementary
+    (w : Multiplicative (ElementaryLieGroup 1 1 0 PUnit.{1}) ≃ₜ* ℂˣ)
+    (hw : ∀ y, (w (Multiplicative.ofAdd y)).val =
+      (Real.exp (realBruhatCoordinate y.1) : ℂ) * (AddCircle.toCircle (y.2.1 0) : ℂ))
+    (b : ℝ) (hb : 0 < b) (f : 𝓢(ℂ, ℂ)) :
+    (fun y ↦ modulationWeight (archimedeanUnitModulation ℂ 2) b
+      (fun z : ℂˣ ↦ f z.val) (w (Multiplicative.ofAdd y))) ∈
+        elementarySchwartzSubmodule 1 1 0 PUnit.{1} := by
+  let D := EuclideanSpace ℝ (Fin 1)
+  let E := D × D
+  let r : E →L[ℝ] ℝ := realBruhatCoordinate.toContinuousLinearMap.comp (ContinuousLinearMap.fst ℝ D D)
+  let s : E →L[ℝ] ℝ := realBruhatCoordinate.toContinuousLinearMap.comp (ContinuousLinearMap.snd ℝ D D)
+  let z : E →L[ℝ] ℂ := Complex.ofRealCLM.comp r +
+    (((2 * Real.pi : ℝ) : ℂ) * Complex.I) • Complex.ofRealCLM.comp s
+  let a : E →L[ℝ] ℂ := Complex.ofRealCLM.comp ((2 * b) • r)
+  have hz (x : E) : (z x).re = r x := by
+    change ((r x : ℂ) + (((2 * Real.pi : ℝ) : ℂ) * Complex.I) * (s x : ℂ)).re = _
+    simp [Complex.add_re, Complex.mul_re, Complex.mul_im]
+  have ha (x : E) : (a x).re = (2 * b) * r x := Complex.ofReal_re _
+  let h (y : ElementaryLieGroup 1 1 0 PUnit.{1}) :=
+    modulationWeight (archimedeanUnitModulation ℂ 2) b (fun z : ℂˣ ↦ f z.val)
+      (w (Multiplicative.ofAdd y))
+  let g (x : E) := Complex.exp (a x) * f (Complex.exp (z x))
+  have hlift (j : Fin 0 → ℤ) (p : PUnit.{1}) :
+      (fun x : E ↦ h (elementaryCover x j p)) = g := by
+    funext x
+    let u := w (Multiplicative.ofAdd (elementaryCover x j p))
+    have hu : u.val = Complex.exp (z x) := by
+      change (w (Multiplicative.ofAdd (elementaryCover x j p))).val = _
+      rw [hw]
+      change (Real.exp (r x) : ℂ) * (AddCircle.toCircle (s x : AddCircle (1 : ℝ)) : ℂ) = _
+      rw [AddCircle.toCircle_apply_mk, div_one, Circle.coe_exp]
+      change (Real.exp (r x) : ℂ) * Complex.exp (((2 * Real.pi * s x : ℝ) : ℂ) * Complex.I) =
+        Complex.exp ((r x : ℂ) + (((2 * Real.pi : ℝ) : ℂ) * Complex.I) * (s x : ℂ))
+      rw [Complex.exp_add, Complex.ofReal_exp]
+      congr 2
+      push_cast
+      ring
+    change (((((archimedeanUnitModulation ℂ 2 u).val : ℝ) ^ b : ℝ) : ℂ) * f u.val) = g x
+    rw [archimedeanUnitModulation_apply, hu, Complex.norm_exp, hz,
+      Real.rpow_def_of_pos (pow_pos (Real.exp_pos _) _), Real.log_pow, Real.log_exp]
+    change (Real.exp (2 * r x * b) : ℂ) * f (Complex.exp (z x)) =
+      Complex.exp (((2 * b * r x : ℝ) : ℂ)) * f (Complex.exp (z x))
+    rw [Complex.ofReal_exp, show 2 * r x * b = 2 * b * r x by ring]
+  refine ⟨fun j p ↦ ?_, fun i ↦ ?_⟩
+  · rw [hlift]
+    have he := (Complex.contDiff_exp (𝕜 := ℂ) (n := (∞))).restrict_scalars ℝ
+    exact (he.comp a.contDiff).mul (f.smooth'.comp (he.comp z.contDiff))
+  let directions : List E :=
+    ((List.ofFn fun j : Fin 1 ↦ List.replicate (i.2.1 j) (EuclideanSpace.single j 1, 0)).flatten ++
+      (List.ofFn fun j : Fin 1 ↦ List.replicate (i.2.2.1 j) (0, EuclideanSpace.single j 1)).flatten)
+  have hn (j : Fin directions.length) : ‖directions.get j‖ ≤ 1 := by
+    have hj := List.get_mem directions j
+    have hmem : directions.get j ∈
+        List.replicate (i.2.1 0) ((EuclideanSpace.single 0 1, 0) : E) ++
+          List.replicate (i.2.2.1 0) ((0, EuclideanSpace.single 0 1) : E) := by
+      simpa only [directions, List.ofFn_succ, List.ofFn_zero, List.flatten_cons, List.flatten_nil,
+        List.append_nil] using hj
+    rw [List.mem_append] at hmem
+    rcases hmem with hmem | hmem
+    · rw [(List.mem_replicate.mp hmem).2]
+      change max ‖(PiLp.single 2 (0 : Fin 1) (1 : ℝ) : D)‖ ‖(0 : D)‖ ≤ 1
+      rw [PiLp.norm_single]
+      simp
+    · rw [(List.mem_replicate.mp hmem).2]
+      change max ‖(0 : D)‖ ‖(PiLp.single 2 (0 : Fin 1) (1 : ℝ) : D)‖ ≤ 1
+      rw [PiLp.norm_single]
+      simp
+  obtain ⟨C, hC⟩ := complexSchwartz_restrict_positiveDecay_profile r z a (2 * b)
+    (by positivity) hz ha f (i.1 0) directions.length
+  refine (iSup_le fun x ↦ iSup_le fun j ↦ iSup_le fun p ↦ ?_).trans_lt
+    (ENNReal.coe_lt_top (r := C.toNNReal))
+  apply ENNReal.coe_le_coe.mpr
+  change ‖((∏ k, (x.1 k : ℂ) ^ i.1 k) * (∏ k, (j k : ℂ) ^ i.2.2.2 k)) *
+    elementaryPartial h i.2.1 i.2.2.1 x j p‖ ≤ (C.toNNReal : ℝ)
+  rw [Fin.prod_univ_one, Fin.prod_univ_zero, mul_one, norm_mul, norm_pow, Complex.norm_real,
+    Real.norm_eq_abs]
+  have hpartial : ‖elementaryPartial h i.2.1 i.2.2.1 x j p‖ ≤
+      ‖iteratedFDeriv ℝ directions.length g x‖ := by
+    change ‖(iteratedFDeriv ℝ directions.length (fun v ↦ h (elementaryCover v j p)) x)
+      directions.get‖ ≤ _
+    rw [hlift]
+    simpa using (iteratedFDeriv ℝ directions.length g x).le_opNorm_mul_prod_of_le hn
+  exact (mul_le_mul_of_nonneg_left hpartial (by positivity)).trans
+    ((hC x).trans (Real.le_coe_toNNReal C))
+
 /-- The restriction at a single positive exponent is a continuous linear map
 to the ordinary Schwartz–Bruhat space. In logarithmic polar coordinates, its
 profile is `exp (2 * b * t) * f (exp t * ζ)` for `|ζ| = 1`. -/
@@ -105,7 +402,50 @@ private theorem complexSchwartz_restrict_positiveDecay_twist (b : ℝ) (hb : 0 <
     ∃ T : 𝓢(ℂ, ℂ) →L[ℂ] SchwartzBruhat ℂˣ,
       ∀ f, (T f).val = modulationWeight (archimedeanUnitModulation ℂ 2) b
         (fun z : ℂˣ ↦ f z.val) := by
-  sorry
+  obtain ⟨w, hw⟩ := complexSchwartz_restrict_positiveDecay_chart
+  let e : ElementaryLCAPresentation ℂˣ := ⟨1, 1, 0, PUnit.{1}, w.symm⟩
+  let X := SchwartzBruhatStage e
+  let weight (z : ℂˣ) : ℂ := ((((archimedeanUnitModulation ℂ 2 z).val : ℝ) ^ b : ℝ) : ℂ)
+  let L : 𝓢(ℂ, ℂ) →ₗ[ℂ] X :=
+    { toFun := fun f ↦ ⟨_, complexSchwartz_restrict_positiveDecay_elementary w hw b hb f⟩
+      map_add' := fun f g ↦ Subtype.ext (funext fun y ↦ mul_add _ _ _)
+      map_smul' := fun c f ↦ Subtype.ext (funext fun y ↦ mul_left_comm _ _ _) }
+  let Y := 𝓢(EuclideanSpace ℝ (Fin (Module.finrank ℝ ℂ)), ℂ)
+  let q := (stdOrthonormalBasis ℝ ℂ).repr.toContinuousLinearEquiv
+  let U : Y →L[ℂ] 𝓢(ℂ, ℂ) := SchwartzMap.compCLMOfContinuousLinearEquiv ℂ q
+  let V : 𝓢(ℂ, ℂ) →L[ℂ] Y := SchwartzMap.compCLMOfContinuousLinearEquiv ℂ q.symm
+  let : BarrelledSpace ℂ Y := isFrechetTVS_barrelled (euclideanSchwartz_frechet _)
+  have hLU : Continuous (L.comp U.toLinearMap) := by
+    apply continuous_toElementarySchwartz_of_eval
+    intro p
+    let z := w (Multiplicative.ofAdd p)
+    let ev := (BoundedContinuousFunction.evalCLM ℂ z.val).comp
+      (SchwartzMap.toBoundedContinuousFunctionCLM ℂ ℂ ℂ)
+    exact ⟨weight z • ev.comp U, fun _ ↦ rfl⟩
+  have hL : Continuous L :=
+    (hLU.comp V.continuous).congr fun f ↦ congrArg L (SchwartzMap.ext fun z ↦ by
+      change f (q.symm (q z)) = f z
+      rw [q.symm_apply_apply])
+  have he := (lca_elementary_iff (G := ℂˣ)).mpr ⟨e⟩
+  let hk := (isBruhatGoodSubgroup_bot_iff (G := ℂˣ)).mpr he.2
+  let p := fullBruhatStage he.1 hk
+  obtain ⟨v, hv⟩ := fullBruhatStage_quotientEquiv he.1 hk (MonoidHom.id ℂˣ)
+    IsOpenQuotientMap.id (by simp)
+  let d : ElementaryLCAPresentation p.quotient := {e with equiv := v.trans e.equiv}
+  let J : X →L[ℂ] SchwartzBruhat ℂˣ :=
+    ⟨schwartzBruhatStageInclusion p d, (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp _
+      fun s ↦ s.property p d⟩
+  refine ⟨J.comp ⟨L, hL⟩, fun f ↦ funext fun z ↦ ?_⟩
+  change schwartzBruhatStageRealization p d (L f) z = _
+  have hz : z ∈ p.val.1 := Subgroup.mem_top z
+  rw [schwartzBruhatStageRealization_apply, dite_eq_left hz]
+  have hq : w (d.equiv (QuotientGroup.mk ⟨z, hz⟩)) = z := by
+    change w (w.symm (v (QuotientGroup.mk ⟨z, hz⟩))) = z
+    rw [w.apply_symm_apply]
+    exact hv z
+  change weight (w (d.equiv (QuotientGroup.mk ⟨z, hz⟩))) *
+    f (w (d.equiv (QuotientGroup.mk ⟨z, hz⟩))).val = weight z * f z.val
+  rw [hq]
 
 /-- Paper: §5.3.3, p. 249.
 Restriction of an additive complex Schwartz function to the units gives a continuous
