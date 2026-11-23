@@ -178,13 +178,227 @@ def Printed.spectralLineTruncatedKernel_geometric : Prop :=
           IsSobolevHilbertSchmidtKernel (geometricTruncatedConvolution a h₀ hs₀(hs) hρ φ)
             (printedWeight(F, 0, s, ρ, printedClass(F, 0, s, h₀, hs₀(hs), K)))
 
-/-- Paper: Theorem 10.4.3.4(2), pp. 470–471. For F = ℚ, a = 2 and s = 4
-there are no line zeros, so the spectral projector and its kernel vanish.
-Use Λ = 2, ε = 1/8 and the indicator of the outer norm band as cutoff.
-An even nonnegative bump in the log-norm band (−1/8, 1/8) convolved with
-itself is positive near the identity, where the cutoff equals one. -/
+section GeometricKernelCounterexample
+
+local notation "C" => C𝔽(ℚ)
+local notation "m" => m𝔽(ℚ)
+local notation "μC" => μ(ℚ)
+local notation "L" => logNorm(ℚ)
+local notation "d(" α ")" => w(ℚ, α, 2)
+local notation "νp(" α ")" => ν(ℚ, α, 2)
+local notation "νm(" α ")" => ν'(ℚ, α, 2)
+local notation "W₂(" α ")" => W(ℚ, α, 2)
+local notation "hs₂" => (show (0 : ℝ) ≤ 2 by norm_num)
+
+/-- To the right of the line of real part one, the strip jet family is
+empty and its common kernel is the entire Sobolev space. -/
+private theorem geometricKernel_theta_top {a α : ℝ} (hα : 0 ≤ α) (ha : 1 < a - α) :
+    globalThetaSobolev ℚ a (hStrip(hα)) hs₂ = ⊤ := by
+  obtain ⟨χ, hχ⟩ := exists_spectralBasepointChoice ℚ
+  have hn (j : SpectralStripJetIndex χ a α 2) : False := by
+    let z : ℂ := (a + j.val.2.1 : ℝ) + (j.val.2.2.1 : ℂ) * Complex.I
+    let θ := χ j.val.1
+    obtain ⟨hj, hp⟩ := j.mem_strip_order_pos hα
+    have hz : 1 < z.re := by
+      have hleft := hj.1
+      simp only [z, Complex.add_re, Complex.ofReal_re, Complex.mul_re, Complex.I_re,
+        Complex.ofReal_im, Complex.I_im, mul_zero, zero_mul, sub_zero, add_zero]
+      linarith
+    obtain ⟨hL, hEq⟩ := continuedCompletedHeckeL_spec θ
+    change 0 < meromorphicOrderAt (continuedCompletedHeckeL θ) z at hp
+    exact hz.not_gt (completedHeckeL_continuation_zeros θ _ hL hEq (zero_lt_one.trans hz) hp)
+  apply top_unique
+  intro u _
+  exact (spectralStripJet_commonKernel (a := a) χ hχ hα hs₂ u).2 (fun j ↦ (hn j).elim)
+
+/-- The spectral projection vanishes when the strip lies to the right of one. -/
+private theorem geometricKernel_projection_zero {a α : ℝ} (hα : 0 ≤ α) (ha : 1 < a - α) :
+    spectralProjection (F := ℚ) a hα hs₂ = 0 := by
+  apply ContinuousLinearMap.ext
+  intro u
+  let N := globalThetaSobolev ℚ a (hStrip(hα)) hs₂
+  let v := spectralProjection (F := ℚ) a hα hs₂ u
+  have hv : v ∈ N.orthogonal := N.orthogonal.starProjection_apply_mem u
+  have hbot : N.orthogonal = ⊥ := by
+    change (globalThetaSobolev ℚ a (hStrip(hα)) hs₂).orthogonal = ⊥
+    rw [geometricKernel_theta_top hα ha, Submodule.top_orthogonal_eq_bot]
+  rw [hbot] at hv
+  change v = 0
+  rwa [Submodule.mem_bot] at hv
+
+private theorem geometricKernel_density (α : ℝ) (g : C) :
+    d(α) g = max (Real.exp (2 * -α * L g)) (Real.exp (2 * α * L g)) * (1 + L g ^ 2) := by
+  norm_num [intervalSobolevDensity]
+
+private theorem geometricKernel_density_continuous (α : ℝ) : Continuous d(α) := by
+  rw [funext (geometricKernel_density α)]
+  have hn : Continuous (fun g : C ↦ (((ideleClassNorm ℚ g).val : ℝ≥0) : ℝ)) :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp (m).continuous)
+  have hlog : Continuous L := hn.log fun _ ↦ (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+  exact ((Real.continuous_exp.comp (continuous_const.mul hlog)).max
+    (Real.continuous_exp.comp (continuous_const.mul hlog))).mul
+    (continuous_const.add (hlog.pow 2))
+
+private theorem geometricKernel_haar_ac (α : ℝ) :
+    μC ≪ νp(α) ∧ μC ≪ νm(α) := by
+  have hp (g : C) : 0 < d(α) g := by rw [geometricKernel_density]; positivity
+  refine ⟨?_, ?_⟩
+  · exact withDensity_absolutelyContinuous'
+      (geometricKernel_density_continuous α).measurable.ennreal_ofReal.aemeasurable
+      (ae_of_all _ fun g ↦ (ENNReal.ofReal_pos.mpr (hp g)).ne')
+  · exact withDensity_absolutelyContinuous'
+      (geometricKernel_density_continuous α).measurable.inv.ennreal_ofReal.aemeasurable
+      (ae_of_all _ fun g ↦ (ENNReal.ofReal_pos.mpr (inv_pos.mpr (hp g))).ne')
+
+/-- A smooth cutoff is a compact Bruhat test. Using its own Sobolev vector
+as input exhibits a nonzero cutoff of its convolution action. -/
+private theorem geometricKernel_cutoff_convolution_nonzero {α : ℝ} (hα : 0 ≤ α) :
+    ∃ (ρ : C → ℝ) (hρ : IsModulatedCutoff m 2 (1 / 4) ρ)
+      (φ : BruhatCompactSupport C),
+      (modulatedCutoffOperator m νp(α) hρ).comp (A(ℚ, hα, hs₂, φ)) ≠ 0 := by
+  let hm : IsModulation m := ⟨isProperMap_ideleClassNorm ℚ, ideleClassNorm_ne_one (F := ℚ)⟩
+  have hsurj : Surjective m := by
+    intro q
+    exact ⟨QuotientGroup.mk (canonicalIdeleNormSection ℚ q),
+      canonicalIdeleNormSection_rightInverse ℚ q⟩
+  obtain ⟨ρ, hρ⟩ := exists_smoothModulatedCutoff_radius_two m hm hsurj
+  -- The proper-norm compactness calculation follows the conjugate-weight refutation in §10.3.
+  have hK : HasCompactSupport ρ := by
+    let e := Nonneg.unitsHomeomorphPos ℝ
+    have hc : IsCompact ((Subtype.val : Ioi (0 : ℝ) → ℝ) ⁻¹' Icc (2⁻¹ : ℝ) 2) := by
+      rw [Subtype.isCompact_iff, Subtype.image_preimage_coe, inter_eq_right.mpr]
+      · exact isCompact_Icc
+      · intro r hr
+        exact (by norm_num : (0 : ℝ) < 2⁻¹).trans_le hr.1
+    exact (hm.1.isCompact_preimage (e.isCompact_preimage.mpr hc)).of_isClosed_subset
+      (isClosed_tsupport ρ) hρ.1.support_subset
+  let b (g : C) : ℂ := ρ g
+  have hbc : Continuous b := Complex.continuous_ofReal.comp hρ.continuous
+  have hbK : HasCompactSupport b := hK.comp_left Complex.ofReal_zero
+  let φ : BruhatCompactSupport C := ⟨b, (mem_bruhatSmoothSubmodule_iff _).mpr hρ.2, hbK⟩
+  have h1 : ρ 1 = 1 := IsModulatedCutoff.apply_one m hρ.1 (by norm_num) (by norm_num)
+  let : IsLocallyFiniteMeasure νp(α) := sobolevKernelWeight_locallyFinite (F := ℚ) α 2
+  have hb : MemLp b 2 νp(α) := hbc.memLp_of_hasCompactSupport hbK
+  let u : W₂(α) := hb.toLp b
+  let Aφ := A(ℚ, hα, hs₂, φ)
+  let G := (modulatedCutoffOperator m νp(α) hρ.1).comp Aφ
+  refine ⟨ρ, hρ.1, φ, fun hG ↦ ?_⟩
+  have hu : (u : C → ℂ) =ᵐ[μC] b := (geometricKernel_haar_ac α).1.ae_le hb.coeFn_toLp
+  have hconv (x : C) :
+      lcaConvolution μC φ.val u x = (∫ g, ρ g * ρ (g⁻¹ * x) ∂μC : ℝ) := by
+    unfold lcaConvolution
+    rw [← integral_complex_ofReal]
+    apply integral_congr_ae
+    have he (g : C) : x / g = g⁻¹ * x := by rw [div_eq_mul_inv, mul_comm]
+    have hh := (Measure.measurePreserving_div_left μC x).quasiMeasurePreserving.ae_eq_comp hu
+    filter_upwards [hh] with g hg
+    change u (x / g) = b (x / g) at hg
+    rw [he] at hg
+    rw [hg, Complex.ofReal_mul]
+  have hAe : (Aφ u : C → ℂ) =ᵐ[μC] fun x ↦
+      ((∫ g, ρ g * ρ (g⁻¹ * x) ∂μC : ℝ) : ℂ) :=
+    (hardySobolevTestAction_apply μC m (-α) α 2 (hStrip(hα)) hs₂ φ u).trans (ae_of_all μC hconv)
+  have hmulAe := (geometricKernel_haar_ac α).1.ae_le
+    (modulatedCutoffOperator_apply m νp(α) hρ.1 (Aφ u))
+  have hzero : (G u : C → ℂ) =ᵐ[μC] 0 := by
+    change G = 0 at hG
+    rw [hG, zero_apply]
+    exact (geometricKernel_haar_ac α).1.ae_le (Lp.coeFn_zero ℂ 2 νp(α))
+  have hvanish : ∀ᵐ x ∂μC, ρ x * (∫ g, ρ g * ρ (g⁻¹ * x) ∂μC) = 0 := by
+    filter_upwards [hAe, hmulAe, hzero] with x hAx hMx hZx
+    change (modulatedCutoffOperator m νp(α) hρ.1 (Aφ u) : C → ℂ) x = 0 at hZx
+    rw [hMx, hAx, ← Complex.ofReal_mul] at hZx
+    exact Complex.ofReal_eq_zero.mp hZx
+  let U := {x : C | 0 < ρ x}
+  have hU : IsOpen U := isOpen_lt continuous_const hρ.continuous
+  have hU1 : (1 : C) ∈ U := by change 0 < ρ 1; rw [h1]; norm_num
+  have hpos (x : C) (hx : x ∈ U) : 0 < ∫ g, ρ g * ρ (g⁻¹ * x) ∂μC := by
+    have hc : Continuous (fun g : C ↦ ρ g * ρ (g⁻¹ * x)) :=
+      hρ.continuous.mul (hρ.continuous.comp (continuous_inv.mul continuous_const))
+    apply hc.integral_pos_of_hasCompactSupport_nonneg_ne_zero hK.mul_right
+      (fun g ↦ mul_nonneg (hρ.1.nonneg g) (hρ.1.nonneg _)) (x := 1)
+    simpa only [h1, inv_one, one_mul] using (ne_of_gt hx)
+  have hnot : ∀ᵐ x ∂μC, x ∉ U := hvanish.mono fun x hz hx ↦ (mul_pos hx (hpos x hx)).ne' hz
+  have hnull : μC U = 0 := by simpa only [ae_iff, not_not, ofPred_mem_eq] using hnot
+  exact (hU.measure_pos μC ⟨1, hU1⟩).ne' hnull
+
+local notation "printedK(" α ", " hα ", " K ")" =>
+  Lp.compMeasurePreserving Prod.swap
+    (Measure.measurePreserving_swap (μ := νm(α)) (ν := νp(α)))
+    (sobolevProjectiveKernelClass (F := ℚ) hα hs₂ K)
+
+/-- The mixed Sobolev kernel of the zero spectral operator is zero. The
+positive densities allow this to be read in the positive product measure. -/
+private theorem geometricKernel_printed_zero {α : ℝ} (hα : 0 ≤ α)
+    (K : tensor(ℚ, α, 2))
+    (hK : sobolevProjectiveKernelOperator (F := ℚ) hα hs₂ K = 0)
+    (r : C → ℝ) :
+    printedWeight(ℚ, α, 2, r, printedK(α, hα, K))
+      =ᵐ[(νp(α)).prod (νp(α))] 0 := by
+  have hZero : (0 : Lp ℂ 2 ((νp(α)).prod (νm(α)))) =
+      sobolevProjectiveKernelClass (F := ℚ) hα hs₂ K := by
+    apply (sobolevProjectiveKernelClass_spec (F := ℚ) hα hs₂ K 0).1
+    rw [hK]
+    intro u
+    have h0 := Lp.coeFn_zero ℂ 2 ((νp(α)).prod (νm(α)))
+    have hAc : (μC).prod (μC) ≪ (νp(α)).prod (νm(α)) :=
+      (geometricKernel_haar_ac α).1.prod (geometricKernel_haar_ac α).2
+    have hrow := Measure.ae_ae_of_ae_prod (hAc.ae_le h0)
+    have hzero := (geometricKernel_haar_ac α).1.ae_le (Lp.coeFn_zero ℂ 2 νp(α))
+    filter_upwards [hrow, hzero] with x hx hzx
+    have hh : (fun y ↦ (0 : Lp ℂ 2 ((νp(α)).prod (νm(α)))) (x, y) * u y) =ᵐ[μC] (0 : C → ℂ) := by
+      filter_upwards [hx] with y hy
+      simp only [hy, Pi.zero_apply, zero_mul]
+    exact ⟨(integrable_zero C ℂ μC).congr hh.symm, hzx.trans (by rw [integral_congr_ae hh]; simp)⟩
+  have hk : printedK(α, hα, K) = 0 := by
+    rw [← hZero, map_zero]
+  have hAc : (νp(α)).prod (νp(α)) ≪ (νm(α)).prod (νp(α)) :=
+    ((withDensity_absolutelyContinuous μC _).trans (geometricKernel_haar_ac α).2).prod
+      (Measure.AbsolutelyContinuous.refl _)
+  rw [hk]
+  filter_upwards [hAc.ae_le (Lp.coeFn_zero ℂ 2 ((νm(α)).prod (νp(α))))] with x hx
+  rw [hx]
+  simp
+
+/-- A representative vanishing almost everywhere gives the zero operator. -/
+private theorem geometricKernel_operator_zero {α : ℝ}
+    (B : W₂(α) →L[ℂ] W₂(α)) (k : C × C → ℂ)
+    (hk : k =ᵐ[(νp(α)).prod (νp(α))] 0)
+    (hB : IsSobolevHilbertSchmidtKernel B k) : B = 0 := by
+  obtain ⟨hm, hrep⟩ := hB
+  obtain ⟨h0, hzero⟩ := isSobolevHilbertSchmidtKernel_zero (F := ℚ) (α := α) (s := 2)
+  have he : hm.toLp k = h0.toLp 0 := MemLp.toLp_congr _ _ hk
+  rw [he] at hrep
+  exact hrep.symm.trans hzero
+
+private theorem geometricKernel_line_eq {r : C → ℝ}
+    (hr : IsModulatedCutoff m 2 (1 / 4) r) (φ : BruhatCompactSupport C) :
+    (modulatedCutoffOperator m νp(0) hr).comp (A(ℚ, h₀, hs₂, φ)) =
+      geometricTruncatedConvolution (F := ℚ) 2 h₀ hs₂ hr φ := by
+  apply ContinuousLinearMap.ext
+  intro u
+  symm
+  apply geometricTruncatedConvolution_apply_of_mem
+  rw [geometricKernel_theta_top h₀ (by norm_num : (1 : ℝ) < 2 - 0)]
+  exact Submodule.mem_top
+
+/-- Paper: Theorem 10.4.3.4(2), pp. 470–471. Over the rationals on the
+zero-free line a = 2, take s = 2 and the smooth cutoff of radius two and
+width one quarter. The spectral kernel vanishes. The cutoff's
+self-convolution gives a nonzero geometric truncation. -/
 theorem Printed.spectralLineTruncatedKernel_geometric_false :
-    ¬ Printed.spectralLineTruncatedKernel_geometric := by sorry
+    ¬ Printed.spectralLineTruncatedKernel_geometric := by
+  intro hall
+  obtain ⟨r, hr, φ, hne⟩ := geometricKernel_cutoff_convolution_nonzero h₀
+  obtain ⟨K, hK, hrep⟩ := hall ℚ 2 2 (by norm_num) (by norm_num)
+    2 (1 / 4) r hr (by norm_num) (by norm_num) φ
+  have hspec := geometricKernel_projection_zero h₀ (a := 2) (by norm_num)
+  have hk : sobolevProjectiveKernelOperator (F := ℚ) h₀ hs₂ K = 0 := by
+    rw [hK, hspec]
+    exact ContinuousLinearMap.zero_comp _
+  have hG := geometricKernel_operator_zero _ _ (geometricKernel_printed_zero h₀ K hk r) hrep
+  exact hne ((geometricKernel_line_eq hr φ).trans hG)
+
 
 -- TODO(paper-gap): (10.4.3.45) applies the ambient kernel map to the
 -- quotient tensor from (10.4.3.42). The bounds in (10.4.3.40) and in
@@ -235,12 +449,31 @@ def Printed.spectralStripRestrictionKernel_geometric : Prop :=
           IsSobolevHilbertSchmidtKernel (geometricRestriction a hα hs₀(hs) hρ φ)
             (printedWeight(F, α, s, ρ, printedClass(F, α, s, hα, hs₀(hs), K)))
 
-/-- Paper: Theorem 10.4.3.6(2), p. 473. For F = ℚ, a = 3, α = 1
-and s = 4 the strip lies in the zero-free half-plane. The spectral
-kernel vanishes. With Λ = 2, ε = 1/8 and the outer-band indicator,
-geometric restriction is nonzero on the same even log-norm bump used
-for the line counterexample. -/
+/-- Paper: Theorem 10.4.3.6(2), p. 473. Over the rationals, take a = 3,
+α = 1 and s = 2. The strip lies to the right of one, so its spectral kernel
+vanishes. The self-convolution of the smooth cutoff of radius two and
+width one quarter gives a nonzero geometric restriction. -/
 theorem Printed.spectralStripRestrictionKernel_geometric_false :
-    ¬ Printed.spectralStripRestrictionKernel_geometric := by sorry
+    ¬ Printed.spectralStripRestrictionKernel_geometric := by
+  intro hall
+  have hα : (0 : ℝ) ≤ 1 := by norm_num
+  obtain ⟨r, hr, φ, hne⟩ := geometricKernel_cutoff_convolution_nonzero hα
+  obtain ⟨K, hK, hrep⟩ := hall ℚ 3 1 2 (by norm_num) hα (by norm_num)
+    2 (1 / 4) r hr (by norm_num) (by norm_num) φ
+  have ha : (1 : ℝ) < 3 - 1 := by norm_num
+  have hk : sobolevProjectiveKernelOperator (F := ℚ) hα hs₂ K = 0 := by
+    rw [hK, geometricKernel_projection_zero hα ha]
+    exact ContinuousLinearMap.comp_zero _
+  have hG := geometricKernel_operator_zero _ _ (geometricKernel_printed_zero hα K hk r) hrep
+  apply hne
+  refine Eq.trans ?_ hG
+  apply ContinuousLinearMap.ext
+  intro u
+  symm
+  apply geometricRestriction_apply_of_mem
+  rw [geometricKernel_theta_top hα ha]
+  exact Submodule.mem_top
+
+end GeometricKernelCounterexample
 
 end RiemannMasullo

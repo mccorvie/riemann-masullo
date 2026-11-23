@@ -4,6 +4,9 @@ public import Mathlib.Algebra.Field.ULift
 public import Mathlib.NumberTheory.Cyclotomic.PrimitiveRoots
 public import Mathlib.NumberTheory.NumberField.Discriminant.Different
 public import RiemannMasullo.AppB_AnalyticNT.Sec6
+import Mathlib.NumberTheory.LSeries.DirichletContinuation
+import RiemannMasullo.External.ZetaLab.HardyFirstZero.FirstZero
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-!
 # Appendix B.6: statements that are false as printed
@@ -32,6 +35,236 @@ def Printed.finiteHeckeL_quadratic_of_real_zero : Prop :=
     MeromorphicNFOn L univ → (∀ s : halfPlane, L s = finiteHeckeL χ s) →
       ∀ σ ∈ Icc (1 / 2 : ℝ) 1, 0 < meromorphicOrderAt L (σ : ℂ) → χ ^ 2 = 1
 
+/-- A universe lift of the rationals is a number field. -/
+private theorem finiteHeckeL_quadratic_of_real_zero_numberField.{u} :
+    NumberField (ULift.{u} ℚ) := by
+  let e : ULift.{u} ℚ ≃+* ℚ := ULift.ringEquiv
+  have : CharZero (ULift.{u} ℚ) :=
+    charZero_of_injective_ringHom (f := e.symm.toRingHom) e.symm.injective
+  have : FiniteDimensional ℚ (ULift.{u} ℚ) :=
+    Module.Finite.of_injective e.toRatAlgEquiv.toLinearMap e.injective
+  exact ⟨⟩
+
+/-- A universe lift of the rationals has the Dedekind zeta function of the rationals. -/
+private theorem finiteHeckeL_quadratic_of_real_zero_dedekindZeta.{u}
+    [NumberField (ULift.{u} ℚ)] (s : ℂ) :
+    dedekindZeta (ULift.{u} ℚ) s = dedekindZeta ℚ s := by
+  let e : 𝓞 (ULift.{u} ℚ) ≃+* 𝓞 ℚ := RingOfIntegers.mapRingEquiv ULift.ringEquiv
+  have hnorm (I : Ideal (𝓞 (ULift.{u} ℚ))) : Ideal.absNorm (I.map e) = Ideal.absNorm I := by
+    rw [Ideal.absNorm_eq_natCard, Ideal.absNorm_eq_natCard]
+    exact (Nat.card_congr (Ideal.quotientEquiv I (I.map e) e rfl).toEquiv).symm
+  have hc (n : ℕ) : Nat.card {I : Ideal (𝓞 (ULift.{u} ℚ)) // Ideal.absNorm I = n} =
+      Nat.card {I : Ideal (𝓞 ℚ) // Ideal.absNorm I = n} := by
+    refine Nat.card_congr (Equiv.subtypeEquiv e.idealComapOrderIso.symm.toEquiv fun I ↦ ?_)
+    change _ ↔ Ideal.absNorm (I.map e) = n
+    rw [hnorm]
+  change LSeries _ s = LSeries _ s
+  congr 1
+  funext n
+  rw [hc]
+
+/-- Over the rationals the Dedekind zeta series is the Riemann zeta function
+to the right of one. -/
+private theorem finiteHeckeL_quadratic_of_real_zero_rat {s : ℂ} (hs : 1 < s.re) :
+    dedekindZeta ℚ s = riemannZeta s := by
+  have hc (n : ℕ) : Nat.card {I : Ideal (𝓞 ℚ) // I.absNorm = n} = 1 := by
+    let : Unique {I : Ideal (𝓞 ℚ) // I.absNorm = n} :=
+      { default := ⟨_, RatRingOfIntegers.absNorm_span_natCast n⟩
+        uniq := fun I ↦ by
+          apply Subtype.ext
+          obtain ⟨m, hm⟩ := RatRingOfIntegers.exists_eq_span_natCast I.val
+          have hmn : m = n := by
+            simpa only [hm, RatRingOfIntegers.absNorm_span_natCast] using I.property
+          simpa only [hmn] using hm }
+    exact Nat.card_unique
+  simpa only [dedekindZeta, hc, Nat.cast_one, Pi.one_def] using LSeries_one_eq_riemannZeta hs
+
+/-- The Riemann zeta function is meromorphic on the plane. -/
+private theorem finiteHeckeL_quadratic_of_real_zero_meromorphic :
+    MeromorphicOn riemannZeta univ := by
+  intro s _
+  have ha := (DirichletCharacter.differentiable_LFunctionTrivChar₁ 1).analyticAt s
+  have hm : MeromorphicAt (fun z : ℂ ↦ DirichletCharacter.LFunctionTrivChar₁ 1 z / (z - 1)) s :=
+    ha.meromorphicAt.div (analyticAt_id.sub analyticAt_const).meromorphicAt
+  apply hm.congr
+  filter_upwards [(eventually_cofinite_ne (1 : ℂ)).filter_mono (nhdsNE_le_cofinite s)] with z hz
+  rw [DirichletCharacter.LFunctionTrivChar₁, Function.update_of_ne hz,
+    mul_div_cancel_left₀ _ (sub_ne_zero.mpr hz)]
+  simp [DirichletCharacter.LFunctionTrivChar]
+
+/-- The finite L-function of the trivial character is the Dedekind zeta series. -/
+private theorem finiteHeckeL_quadratic_of_real_zero_one (F : Type*) [Field F] [NumberField F]
+    (s : halfPlane) : finiteHeckeL (1 : U[F]) s = dedekindZeta F s := by
+  have he := completedHeckeL_one_eq_dedekindZeta (F := F) s
+  rw [← heckeGammaFactor_one] at he
+  exact mul_left_cancel₀ (heckeGammaFactor_ne_zero_of_re_pos (1 : U[F])
+    (zero_lt_one.trans s.property)) he
+
+/-- The norm twist evaluates to the character times a power of the idelic norm. -/
+private theorem finiteHeckeL_quadratic_of_real_zero_apply (F : Type*) [Field F] [NumberField F]
+    (χ : U[F]) (s : ℂ) (g : IdeleClassGroup (𝓞 F) F) :
+    ideleClassNormTwist χ s g = (χ g : ℂ) * (((ideleClassNorm F g : NNReal) : ℝ) : ℂ) ^ s :=
+  rfl
+
+/-- An imaginary translation of the Euler product is the Euler product of the translated
+unitary character. -/
+private theorem finiteHeckeL_quadratic_of_real_zero_twist (F : Type*) [Field F] [NumberField F]
+    (χ ψ : U[F]) (a : ℂ) (ha : a.re = 0)
+    (hψ : ideleClassNormTwist ψ 0 = ideleClassNormTwist χ a) (s : halfPlane) :
+    finiteHeckeL ψ s = finiteHeckeL χ ⟨(s : ℂ) + a, by
+      change 1 < (s : ℂ).re + a.re
+      rw [ha, add_zero]
+      exact s.property⟩ := by
+  let w : halfPlane := ⟨(s : ℂ) + a, by
+    change 1 < (s : ℂ).re + a.re
+    rw [ha, add_zero]
+    exact s.property⟩
+  apply (finiteHeckeL_hasProd ψ s).unique ((finiteHeckeL_hasProd χ w).congr_fun ?_)
+  intro v
+  have hval (t : (v.adicCompletion F)ˣ) :
+      (ideleClassNormTwist ψ 0).restrict v t =
+        (ideleClassNormTwist χ 0).restrict v t * (‖(t : v.adicCompletion F)‖ : ℂ) ^ a := by
+    rw [hψ, HeckeCharacter.restrict, HeckeCharacter.restrict,
+      MulChar.ofUnitHom_coe, MulChar.ofUnitHom_coe]
+    simp only [MonoidHom.comp_apply, MonoidHom.coe_toHomUnits, ContinuousMonoidHom.coe_toMonoidHom,
+      MonoidHom.coe_ofClass]
+    rw [finiteHeckeL_quadratic_of_real_zero_apply, finiteHeckeL_quadratic_of_real_zero_apply,
+      Complex.cpow_zero, mul_one, ideleClassNorm_ofAdicCompletion]
+    rfl
+  have hu : (ideleClassNormTwist ψ 0).IsUnramifiedAt v ↔
+      (ideleClassNormTwist χ 0).IsUnramifiedAt v := by
+    rw [HeckeCharacter.isUnramifiedAt_iff, HeckeCharacter.isUnramifiedAt_iff]
+    apply forall_congr'
+    intro t
+    let u := Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom t
+    have hn : ‖(u : v.adicCompletion F)‖ = 1 := by
+      apply Valued.toNormedField.norm_eq_one_iff.mpr
+      exact IsDedekindDomain.HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp
+        (show u ∈ (v.adicCompletionIntegers F).units from ⟨t.val.property, t.inv.property⟩)
+    change (ideleClassNormTwist ψ 0).restrict v u = 1 ↔
+      (ideleClassNormTwist χ 0).restrict v u = 1
+    rw [hval, hn, Complex.ofReal_one, Complex.one_cpow, mul_one]
+  by_cases hx : (ideleClassNormTwist χ 0).IsUnramifiedAt v
+  · let val : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+    obtain ⟨π, hπ⟩ := val.exists_isUniformizer_of_isCyclic_of_nontrivial
+    let u := Units.mk0 (π : v.adicCompletion F) hπ.ne_zero
+    have hn := norm_uniformizer_adicCompletion v _ hπ
+    have hq : (v.asIdeal.absNorm : ℂ) ≠ 0 := by
+      exact_mod_cast (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)).ne'
+    rw [finiteHeckeEulerFactor, finiteHeckeEulerFactor, ite_eq_left hx, ite_eq_left (hu.mpr hx),
+      hx.localValue_eq u hπ, (hu.mpr hx).localValue_eq u hπ, hval]
+    change (1 - (_ * (‖(π : v.adicCompletion F)‖ : ℂ) ^ a) * _)⁻¹ =
+      (1 - _ * _ ^ (-((s : ℂ) + a)))⁻¹
+    rw [hn, Complex.ofReal_inv, Complex.inv_cpow_ofReal_nonneg (Nat.cast_nonneg _) a,
+      ← Complex.cpow_neg, Complex.ofReal_natCast, mul_assoc, ← Complex.cpow_add _ _ hq]
+    rw [show -a + -(s : ℂ) = -((s : ℂ) + a) by ring]
+  · simp [finiteHeckeEulerFactor, hx, hu.not.mpr hx]
+
+/-- An imaginary power of the idelic norm with nonzero exponent is a unitary
+character whose square is nontrivial. -/
+private theorem finiteHeckeL_quadratic_of_real_zero_char (F : Type*) [Field F] [NumberField F]
+    (γ : ℝ) (hγ : γ ≠ 0) :
+    ∃ ψ : U[F], ψ ^ 2 ≠ 1 ∧
+      ideleClassNormTwist ψ 0 = ideleClassNormTwist (1 : U[F]) (γ * Complex.I) := by
+  let c := ideleClassNormTwist (1 : U[F]) (γ * Complex.I)
+  have hnorm (g : IdeleClassGroup (𝓞 F) F) : ‖c g‖ = 1 := by
+    change ‖(1 : ℂ) * (((↑(ideleClassNorm F g) : NNReal) : ℝ) : ℂ) ^ ((γ : ℂ) * Complex.I)‖ = 1
+    rw [one_mul, Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _))]
+    simp
+  let ψ : U[F] :=
+    { toFun := fun g ↦ ⟨c g, mem_sphere_zero_iff_norm.mpr (hnorm g)⟩
+      map_one' := Subtype.ext (map_one c)
+      map_mul' := fun x y ↦ Subtype.ext (map_mul c x y)
+      continuous_toFun := c.continuous.subtype_mk _ }
+  have hc (g : IdeleClassGroup (𝓞 F) F) :
+      (ψ g : ℂ) = (((↑(ideleClassNorm F g) : NNReal) : ℝ) : ℂ) ^ ((γ : ℂ) * Complex.I) := by
+    change (1 : ℂ) * (((↑(ideleClassNorm F g) : NNReal) : ℝ) : ℂ) ^ ((γ : ℂ) * Complex.I) = _
+    simp
+  refine ⟨ψ, ?_, ?_⟩
+  · intro h
+    obtain ⟨_, _, _, _, _, _, _, _, _, hsurj, _⟩ := ideleGroup_quotient.{_, 0} F
+    let u : Units NNReal := Units.mk0 ⟨Real.exp (Real.pi / (2 * γ)), (Real.exp_pos _).le⟩
+      (by intro h; exact (Real.exp_ne_zero _) (congrArg (fun x : NNReal ↦ (x : ℝ)) h))
+    obtain ⟨g, hg⟩ := hsurj u
+    have hval := DFunLike.congr_fun h g
+    have he : (ψ g : ℂ) ^ 2 = 1 := by
+      have hv := congrArg (fun x : Circle ↦ (x : ℂ)) hval
+      change ((ψ g ^ 2 : Circle) : ℂ) = ((1 : Circle) : ℂ) at hv
+      simpa using hv
+    rw [hc, ← Complex.cpow_nat_mul, hg] at he
+    change ((Real.exp (Real.pi / (2 * γ)) : ℝ) : ℂ) ^ (2 * ((γ : ℂ) * Complex.I)) = 1 at he
+    rw [Complex.cpow_def_of_ne_zero (by exact_mod_cast (Real.exp_ne_zero _)),
+      ← Complex.ofReal_log (Real.exp_pos _).le, Real.log_exp] at he
+    have hγc : (γ : ℂ) ≠ 0 := by exact_mod_cast hγ
+    have hx : ((Real.pi / (2 * γ) : ℝ) : ℂ) * (2 * ((γ : ℂ) * Complex.I)) =
+        Real.pi * Complex.I := by
+      push_cast
+      field_simp
+    rw [hx, Complex.exp_pi_mul_I] at he
+    norm_num at he
+  · ext g
+    change (c g) * (((↑(ideleClassNorm F g) : NNReal) : ℝ) : ℂ) ^ (0 : ℂ) = c g
+    rw [Complex.cpow_zero, mul_one]
+
+/-- The printed clause fails over a universe lift of the rationals. -/
+private theorem finiteHeckeL_quadratic_of_real_zero_contra.{u}
+    (h : Printed.finiteHeckeL_quadratic_of_real_zero.{u}) : False := by
+  have : NumberField (ULift.{u} ℚ) := finiteHeckeL_quadratic_of_real_zero_numberField
+  obtain ⟨γ, hγ, hz⟩ := HardyFirstZero.first_zero_on_line
+  have hγ0 : γ ≠ 0 := by
+    intro h0
+    have := hγ.1
+    rw [h0] at this
+    norm_num at this
+  obtain ⟨ψ, hψ2, hψ⟩ := finiteHeckeL_quadratic_of_real_zero_char (ULift.{u} ℚ) γ hγ0
+  let b : ℂ := γ * Complex.I
+  have hb : b.re = 0 := by simp [b]
+  let f : ℂ → ℂ := fun s ↦ riemannZeta (s + b)
+  have hfa (s : ℂ) (hs : s + b ≠ 1) : AnalyticAt ℂ f s := by
+    apply DifferentiableOn.analyticAt (s := {z : ℂ | z + b ≠ 1})
+      (fun z hz ↦ ((differentiableAt_riemannZeta hz).comp z
+        (differentiableAt_id.add_const b)).differentiableWithinAt)
+    exact (isOpen_ne_fun (continuous_id.add continuous_const) continuous_const).mem_nhds hs
+  have hf : MeromorphicOn f univ := fun s _ ↦
+    MeromorphicAt.comp_analyticAt (g := fun z : ℂ ↦ z + b) (x := s)
+      (finiteHeckeL_quadratic_of_real_zero_meromorphic (s + b) (mem_univ _))
+      (analyticAt_id.add analyticAt_const)
+  let L := toMeromorphicNFOn f univ
+  have hL : MeromorphicNFOn L univ := meromorphicNFOn_toMeromorphicNFOn _ _
+  have heq : ∀ s : halfPlane, L s = finiteHeckeL ψ s := by
+    intro s
+    have hre : 1 < ((s : ℂ) + b).re := by
+      rw [Complex.add_re, hb, add_zero]
+      exact s.property
+    have hne : (s : ℂ) + b ≠ 1 := fun h1 ↦ by
+      rw [h1] at hre
+      norm_num at hre
+    change toMeromorphicNFOn f univ s = _
+    rw [toMeromorphicNFOn_eq_toMeromorphicNFAt hf (mem_univ _),
+      toMeromorphicNFAt_eq_self.mpr (hfa s hne).meromorphicNFAt,
+      finiteHeckeL_quadratic_of_real_zero_twist (ULift.{u} ℚ) 1 ψ b hb hψ s,
+      finiteHeckeL_quadratic_of_real_zero_one]
+    change riemannZeta ((s : ℂ) + b) = dedekindZeta (ULift.{u} ℚ) ((s : ℂ) + b)
+    rw [finiteHeckeL_quadratic_of_real_zero_dedekindZeta,
+      finiteHeckeL_quadratic_of_real_zero_rat hre]
+  have hord : 0 < meromorphicOrderAt L ((1 / 2 : ℝ) : ℂ) := by
+    have hne : ((1 / 2 : ℝ) : ℂ) + b ≠ 1 := fun h1 ↦ by
+      have := congrArg Complex.re h1
+      rw [Complex.add_re, hb, add_zero, Complex.ofReal_re, Complex.one_re] at this
+      norm_num at this
+    have hcongr : meromorphicOrderAt L ((1 / 2 : ℝ) : ℂ) =
+        meromorphicOrderAt f ((1 / 2 : ℝ) : ℂ) :=
+      meromorphicOrderAt_congr (hf.toMeromorphicNFOn_eq_self_on_nhdsNE (mem_univ _))
+    rw [hcongr]
+    apply (tendsto_zero_iff_meromorphicOrderAt_pos (hf _ (mem_univ _))).mp
+    have h0 : f ((1 / 2 : ℝ) : ℂ) = 0 := by
+      change riemannZeta (((1 / 2 : ℝ) : ℂ) + γ * Complex.I) = 0
+      push_cast
+      exact hz
+    rw [← h0]
+    exact (hfa _ hne).continuousAt.continuousWithinAt
+  exact hψ2 (h (ULift.{u} ℚ) ψ L hL heq (1 / 2) ⟨le_rfl, by norm_num⟩ hord)
+
 /-- Paper: Proposition B.6.1.1, real-zero clause, p. 636. Choose a nonreal critical-line
 zero `1/2 + iγ` of the Riemann zeta function by Hardy's theorem. Over the rational
 field, the unitary character `χ = |·|^(iγ)` has finite L-function `ζ(s + iγ)` on `Re s > 1`.
@@ -40,7 +273,8 @@ At `σ = 1/2` it has positive order. The idelic norm is onto the positive reals,
 implies `χ ^ 2 ≠ 1`. -/
 theorem Printed.finiteHeckeL_quadratic_of_real_zero_false :
     ¬ Printed.finiteHeckeL_quadratic_of_real_zero := by
-  sorry
+  intro h
+  exact finiteHeckeL_quadratic_of_real_zero_contra h
 
 /-- Paper: Paragraph following Proposition B.6.1.1, p. 636. As printed: for every
 number field and every continuous character whose square is nontrivial, the finite Hecke

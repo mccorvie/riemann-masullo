@@ -159,9 +159,9 @@ def schwartzBergmanSubmodule (I : Set ℝ) : Submodule ℂ (ℂ → ℂ) where
   add_mem' := (schwartzBergman_closure I).2.1
   smul_mem' := (schwartzBergman_closure I).2.2
 
-/-- Paper: Definition D.3.1.3, p. 800. The Gaussian restricted to a strip
-gives a nonzero example whenever the strip is nonempty.
-Deviation: Sanity check in the zero-extension representation. -/
+/-- Paper: Definition D.3.1.3, p. 800. The zero extension of the Gaussian restricted
+to an open strip belongs to its Schwartz–Bergman space. This is an example of membership
+in the space defined in the paper. -/
 theorem gaussian_mem_schwartzBergmanSubmodule (I : Set ℝ) (hI : IsOpen I) :
     (Complex.re ⁻¹' I).indicator (fun z : ℂ ↦ Complex.exp (z ^ 2)) ∈
       schwartzBergmanSubmodule I := by
@@ -801,7 +801,7 @@ private theorem isClosed_range_logExponentialDecayTwist (I : Set ℝ) (a : I) :
 
 /-- Paper: Lemma D.3.2.3(1), p. 802. The closed embedding into the product of complete
 Schwartz spaces gives completeness for the additive uniformity. -/
-private theorem positiveRealExponentialDecay_complete (I : Set ℝ) (hne : I.Nonempty) :
+theorem positiveRealExponentialDecay_complete (I : Set ℝ) (hne : I.Nonempty) :
     CompleteSpace (PositiveRealExponentialDecay I) := by
   have : CompleteSpace 𝓢(ℝ, ℂ) := completeSpace_schwartzMap
   let T : PositiveRealExponentialDecay I →ₗ[ℂ] (I → 𝓢(ℝ, ℂ)) :=

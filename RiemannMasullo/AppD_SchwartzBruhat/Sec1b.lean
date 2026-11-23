@@ -285,9 +285,8 @@ some fixed finite real dimension. -/
 def IsLocallyEuclidean (X : Type*) [TopologicalSpace X] : Prop :=
   ∃ n : ℕ, Nonempty (ChartedSpace (EuclideanSpace ℝ (Fin n)) X)
 
-/-- Paper: Theorem D.1.4.2, p. 757. A discrete space is locally Euclidean in
-dimension zero.
-Deviation: Sanity check for the locally Euclidean condition. -/
+/-- Paper: Theorem D.1.4.2, p. 757. A discrete space is locally Euclidean. The proof
+uses zero-dimensional charts to verify the local Euclideanness hypothesis from the paper. -/
 theorem isLocallyEuclidean_of_discrete (X : Type*) [TopologicalSpace X]
     [DiscreteTopology X] : IsLocallyEuclidean X :=
   ⟨0, ⟨ChartedSpace.ofDiscreteTopology⟩⟩
@@ -386,9 +385,10 @@ private theorem elementary_torus_two_torsion_card (n : ℕ) :
       (Equiv.subtypePiEquivPi.trans (Equiv.piCongrRight fun _ ↦ (Equiv.ofBijective f hf).symm))
   rw [Nat.card_congr coords, Nat.card_fun, Nat.card_fin, Nat.card_fin]
 
-/-- Paper: (D.1.4.2), p. 757. Two elementary presentations have the same real
-dimension, torus dimension and free lattice rank, and isomorphic finite factors.
-Deviation: The finite factors are compared up to group isomorphism. -/
+/-- Paper: (D.1.5.3), p. 762. Two elementary presentations have the same real
+dimension, torus dimension and free lattice rank, as stated for the product in (D.1.4.2), p. 757.
+
+Deviation: The conclusion also gives uniqueness of the finite factor up to group isomorphism. -/
 theorem ElementaryLCAPresentation.invariants (e e' : ElementaryLCAPresentation G) :
     e.realDim = e'.realDim ∧ e.torusDim = e'.torusDim ∧ e.latticeRank = e'.latticeRank ∧
       Nonempty (e.finiteFactor ≃+ e'.finiteFactor) := by
@@ -6131,9 +6131,9 @@ theorem schwartzBruhat_acyclic [SecondCountableTopology G]
   rw [image_image]
   exact (congrArg (fun l : SchwartzBruhatStage e →L[ℂ] SchwartzBruhat G ↦ l '' C) hg).trans hC.2
 
-/-- Paper: Theorem D.1.5.10, p. 765. A cofinal increasing sequence of structural
-stages gives a short topologically exact sequence. The difference map embeds
-as the closed kernel of the quotient map given by summing the stage inclusions.
+/-- Paper: Theorem D.1.5.10, p. 765. There exists a cofinal increasing sequence of
+structural stages giving a short topologically exact sequence. The difference map is a closed
+embedding onto the kernel of the quotient map given by summing the stage inclusions.
 Deviation: Each stage is expressed in an elementary presentation and the difference
 map uses the induced maps between successive presentations. -/
 theorem schwartzBruhat_exists_topologicallyExact [SecondCountableTopology G] :
