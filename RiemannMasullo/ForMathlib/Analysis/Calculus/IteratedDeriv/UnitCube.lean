@@ -2,6 +2,7 @@ module
 
 public import Mathlib.Analysis.Calculus.ContDiff.Operations
 public import Mathlib.Analysis.Complex.Basic
+import Mathlib.Analysis.Calculus.FDeriv.Mul
 import Mathlib.Analysis.Calculus.Deriv.Pi
 import Mathlib.MeasureTheory.Integral.IntervalIntegral.FundThmCalculus
 
@@ -92,6 +93,80 @@ private theorem sum_norm_cube {J : Type*} [DecidableEq J] {N : ℕ} (I : Finset 
 /-- A list records the directions used to evaluate one iterated derivative. -/
 def listDerivative {X : Type*} [NormedAddCommGroup X] [NormedSpace ℝ X]
     (f : X → ℂ) (v : List X) (x : X) : ℂ := iteratedFDeriv ℝ v.length f x v.get
+
+private theorem listDerivative_smooth {X : Type*} [NormedAddCommGroup X] [NormedSpace ℝ X]
+    {f : X → ℂ} (hf : ContDiff ℝ ∞ f) (v : List X) : ContDiff ℝ ∞ (listDerivative f v) :=
+  (ContinuousMultilinearMap.apply ℝ (fun _ : Fin v.length ↦ X) ℂ v.get).contDiff.comp
+    (hf.iteratedFDeriv_right (by simp))
+
+private theorem listDerivative_cons {X : Type*} [NormedAddCommGroup X] [NormedSpace ℝ X]
+    {f : X → ℂ} (hf : ContDiff ℝ ∞ f) (v : List X) (d x : X) :
+    listDerivative f (d :: v) x = fderiv ℝ (listDerivative f v) x d := by
+  have hd := (hf.iteratedFDeriv_right (m := (⊤ : ℕ∞)) (i := v.length) (by simp)).differentiable
+    (by simp) x
+  let L := ContinuousMultilinearMap.apply ℝ (fun _ : Fin v.length ↦ X) ℂ v.get
+  have hl := L.hasFDerivAt.comp x hd.hasFDerivAt
+  rw [show listDerivative f v = L ∘ iteratedFDeriv ℝ v.length f from rfl, hl.fderiv]
+  rfl
+
+/-- Mixed directional derivatives of a product in independent coordinates factor. -/
+theorem listDerivative_prod {X Y : Type*}
+    [NormedAddCommGroup X] [NormedSpace ℝ X] [NormedAddCommGroup Y] [NormedSpace ℝ Y]
+    {f : X → ℂ} {g : Y → ℂ} (hf : ContDiff ℝ ∞ f) (hg : ContDiff ℝ ∞ g)
+    (v : List X) (w : List Y) (x : X) (y : Y) :
+    listDerivative (fun z : X × Y ↦ f z.1 * g z.2)
+      (v.map (fun d ↦ (d, 0)) ++ w.map (fun d ↦ (0, d))) (x, y) =
+      listDerivative f v x * listDerivative g w y := by
+  have hp : ContDiff ℝ ∞ (fun z : X × Y ↦ f z.1 * g z.2) :=
+    (hf.comp contDiff_fst).mul (hg.comp contDiff_snd)
+  have step (v : List X) (w : List Y) (d : X × Y) (z : X × Y) :
+      fderiv ℝ (fun z : X × Y ↦ listDerivative f v z.1 * listDerivative g w z.2) z d =
+        listDerivative f (d.1 :: v) z.1 * listDerivative g w z.2 +
+          listDerivative f v z.1 * listDerivative g (d.2 :: w) z.2 := by
+    have hd₁ := ((listDerivative_smooth hf v).differentiable (by simp) z.1).hasFDerivAt
+    have hd₂ := ((listDerivative_smooth hg w).differentiable (by simp) z.2).hasFDerivAt
+    rw [listDerivative_cons hf, listDerivative_cons hg]
+    have h := ((hd₁.comp z (hasFDerivAt_fst (𝕜 := ℝ))).mul
+      (hd₂.comp z (hasFDerivAt_snd (𝕜 := ℝ)))).fderiv
+    change fderiv ℝ (fun q : X × Y ↦ listDerivative f v q.1 * listDerivative g w q.2) z = _ at h
+    rw [h]
+    simp [mul_comm, add_comm]
+  induction v generalizing x y with
+  | nil =>
+    induction w generalizing x y with
+    | nil =>
+      change listDerivative (fun z : X × Y ↦ f z.1 * g z.2) [] (x, y) = _
+      simp [listDerivative]
+    | cons d w ih =>
+      simp only [List.map_nil, List.nil_append, List.map_cons]
+      rw [listDerivative_cons hp]
+      have he : listDerivative (fun z : X × Y ↦ f z.1 * g z.2) (w.map (fun d ↦ (0, d))) =
+          fun z ↦ listDerivative f [] z.1 * listDerivative g w z.2 :=
+        funext fun z ↦ ih z.1 z.2
+      rw [he, step, listDerivative_cons hf]
+      simp
+  | cons d v ih =>
+    simp only [List.map_cons, List.cons_append]
+    rw [listDerivative_cons hp]
+    have he : listDerivative (fun z : X × Y ↦ f z.1 * g z.2)
+        (v.map (fun d ↦ (d, 0)) ++ w.map (fun d ↦ (0, d))) =
+        fun z ↦ listDerivative f v z.1 * listDerivative g w z.2 := funext fun z ↦ ih z.1 z.2
+    rw [he, step, listDerivative_cons hg]
+    simp
+
+/-- Composing with a continuous linear map sends the derivative directions
+through that map. -/
+theorem listDerivative_comp_linear {X Y : Type*}
+    [NormedAddCommGroup X] [NormedSpace ℝ X] [NormedAddCommGroup Y] [NormedSpace ℝ Y]
+    (L : X →L[ℝ] Y) {f : Y → ℂ} (hf : ContDiff ℝ ∞ f) (v : List X) (x : X) :
+    listDerivative (f ∘ L) v x = listDerivative f (v.map L) (L x) := by
+  unfold listDerivative
+  rw [L.iteratedFDeriv_comp_right hf x (by simp), ContinuousMultilinearMap.compContinuousLinearMap_apply]
+  let ev (t : Σ d, Fin d → Y) := iteratedFDeriv ℝ t.1 f (L x) t.2
+  let eval (t : List Y) := iteratedFDeriv ℝ t.length f (L x) t.get
+  have hmap : List.ofFn (fun j ↦ L (v.get j)) = v.map L := List.ofFn_getElem_eq_map v L
+  exact (congrArg ev (List.equivSigmaTuple.apply_symm_apply ⟨v.length, fun j ↦ L (v.get j)⟩)).symm.trans
+    (congrArg eval hmap)
 
 private theorem listDerivative_continuous {X : Type*} [NormedAddCommGroup X] [NormedSpace ℝ X]
     {f : X → ℂ} (hf : ContDiff ℝ ∞ f) (v : List X) : Continuous (listDerivative f v) :=
