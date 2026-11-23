@@ -4,6 +4,7 @@ public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3b
 public import Mathlib.Algebra.Exact.Basic
 public import Mathlib.MeasureTheory.Function.L2Space
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
+import RiemannMasullo.Ch02_AdelicTheta.Sec3
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
 
 /-! # Second Structure Theorem and the S-local Čech sequence
@@ -146,16 +147,20 @@ private theorem existsUnique_sLocalZetaPair_right (χ : PontryaginDual Jₛ) (f 
         (div_le_div_of_nonneg_left hC.le (pow_pos hy0 _) hpow)) (norm_nonneg _) (by positivity)
     _ = 2 ^ N * C := by rw [mul_pow]; field_simp
 
-private theorem existsUnique_sLocalZetaPair_reflect (u : B⁺) :
-    ∃ v : B⁻, ∀ z, v.val z = u.val (1 - z) := by
-  have hpos (z : ℂ) : 1 - z ∈ rightHalf ↔ z ∈ leftHalf := by
-    change 0 < (1 - z).re ↔ z.re < 1
-    simp
-  refine ⟨⟨fun z ↦ u.val (1-z), fun z hz ↦ u.property.1 (mt (hpos z).mp hz),
-    u.property.2.1.comp (by fun_prop) (fun z hz ↦ (hpos z).mpr hz), ?_⟩, fun z ↦ rfl⟩
+/-- Reflecting a closed substrip preserves rapid decay since the polynomial weights at
+`z` and `1 - z` bound each other up to a constant and a weight of degree zero. -/
+private theorem existsUnique_sLocalZetaPair_reflect_mem {I J : Set ℝ}
+    (hIJ : ∀ x : ℝ, 1 - x ∈ I ↔ x ∈ J) (u : SchwartzBergman I) :
+    (fun z ↦ u.val (1 - z)) ∈ schwartzBergmanSubmodule J := by
+  have href (z : ℂ) : 1 - z ∈ Complex.re ⁻¹' I ↔ z ∈ Complex.re ⁻¹' J := by
+    simpa only [mem_preimage, Complex.sub_re, Complex.one_re] using hIJ z.re
+  refine ⟨fun z hz ↦ u.property.1 (mt (href z).mp hz),
+    u.property.2.1.comp (by fun_prop) (fun z hz ↦ (href z).mpr hz), ?_⟩
   intro a b hab hsub N
-  have hb : b < 1 := hsub (right_mem_Icc.mpr hab)
-  have hi : Icc (1-b) (1-a) ⊆ rightInterval := fun _ hw ↦ (sub_pos.mpr hb).trans_le hw.1
+  have hi : Icc (1-b) (1-a) ⊆ I := by
+    intro x hx
+    have h : 1 - x ∈ J := hsub ⟨by linarith [hx.2], by linarith [hx.1]⟩
+    simpa only [sub_sub_cancel] using (hIJ (1-x)).mpr h
   obtain ⟨A, hA⟩ := u.property.2.2 (1-b) (1-a) (by linarith) hi 0
   obtain ⟨B, hB⟩ := u.property.2.2 (1-b) (1-a) (by linarith) hi N
   refine ⟨2 ^ N * max A B, ?_⟩
@@ -178,6 +183,11 @@ private theorem existsUnique_sLocalZetaPair_reflect (u : B⁺) :
       _ ≤ (2 * ‖w‖) ^ N * ‖u.val w‖ := by gcongr; linarith
       _ = 2 ^ N * (‖w‖ ^ N * ‖u.val w‖) := by rw [mul_pow, mul_assoc]
       _ ≤ _ := mul_le_mul_of_nonneg_left (hB'.trans (le_max_right _ _)) (by positivity)
+
+private theorem existsUnique_sLocalZetaPair_reflect (u : B⁺) :
+    ∃ v : B⁻, ∀ z, v.val z = u.val (1 - z) := by
+  exact ⟨⟨_, existsUnique_sLocalZetaPair_reflect_mem (I := rightInterval) (J := leftInterval)
+    (fun x ↦ by simp [mem_Ioi, mem_Iio]) u⟩, fun _ ↦ rfl⟩
 
 private theorem existsUnique_sLocalZetaPair_eval (χ : PontryaginDual Jₛ) (s : ℂ)
     (hs : s ∈ rightHalf) : ∃ E : Θω(restrict₁(χ)) →ₗ[ℂ] ℂ,
@@ -1940,6 +1950,63 @@ theorem existsUnique_sLocalCechThetaPair (χ : PontryaginDual Jₛ) :
 local notation "cechThetaPair(" χ ")" => (show Θω(restrict₁(χ)) →L[ℂ] upperMiddle(χ) from
   (existsUnique_sLocalCechThetaPair (F := F) (S := S) χ).exists.choose)
 
+/-- On each vertical trace the strip reflection is the continuous Schwartz pullback by negation. -/
+private theorem sLocalCechBergman_exact_reflect_continuous {I J : Set ℝ}
+    (hI : IsOpen I) (hJ : IsOpen J) (cI : OrdConnected I) (cJ : OrdConnected J)
+    (nI : I.Nonempty) (nJ : J.Nonempty) (hIJ : ∀ x ∈ J, 1 - x ∈ I)
+    (R : SchwartzBergman I → SchwartzBergman J)
+    (hR : ∀ f z, (R f).val z = f.val (1 - z)) : Continuous R := by
+  obtain ⟨T, hT, eT⟩ := schwartzBergman_schwartzLine_topology I hI cI nI
+  obtain ⟨V, hV, eV⟩ := schwartzBergman_schwartzLine_topology J hJ cJ nJ
+  let N := SchwartzMap.compCLMOfContinuousLinearEquiv ℂ (ContinuousLinearEquiv.neg ℝ : ℝ ≃L[ℝ] ℝ) (F := ℂ)
+  apply eV.continuous_iff.mpr
+  apply continuous_pi
+  intro a
+  let b : I := ⟨1 - a.val, hIJ a.val a.property⟩
+  have heq (f : SchwartzBergman I) : V (R f) a = N (T f b) := by
+    ext x
+    change V (R f) a x = T f b (-x)
+    rw [hV, hT]
+    simp only [weightedVerticalTrace, pow_zero, one_mul, hR, b, Complex.ofReal_sub,
+      Complex.ofReal_one, Complex.ofReal_neg, neg_mul]
+    apply congrArg f.val
+    ring
+  exact (N.continuous.comp ((continuous_apply b).comp eT.continuous)).congr fun f ↦ (heq f).symm
+
+/-- Reflection exchanges the two half-plane spaces, including their vertical-trace topologies. -/
+private theorem sLocalCechBergman_exact_reflection :
+    ∃ e : B⁻ ≃L[ℂ] B⁺, (∀ (v : B⁻) z, (e v).val z = v.val (1 - z)) ∧
+      ∀ (u : B⁺) z, (e.symm u).val z = u.val (1 - z) := by
+  have hl (x : ℝ) : 1 - x ∈ leftInterval ↔ x ∈ rightInterval := by
+    simp [mem_Iio, mem_Ioi]
+  have hr (x : ℝ) : 1 - x ∈ rightInterval ↔ x ∈ leftInterval := by
+    simp [mem_Iio, mem_Ioi]
+  let R (v : B⁻) : B⁺ := ⟨_, existsUnique_sLocalZetaPair_reflect_mem hl v⟩
+  let L (u : B⁺) : B⁻ := ⟨_, existsUnique_sLocalZetaPair_reflect_mem hr u⟩
+  let e : B⁻ ≃ₗ[ℂ] B⁺ :=
+    { toFun := R
+      invFun := L
+      left_inv := fun v ↦ Subtype.ext (funext fun z ↦ congrArg v.val (sub_sub_cancel 1 z))
+      right_inv := fun u ↦ Subtype.ext (funext fun z ↦ congrArg u.val (sub_sub_cancel 1 z))
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  have cp := sLocalCechBergman_exact_reflect_continuous isOpen_Iio isOpen_Ioi
+    ordConnected_Iio ordConnected_Ioi ⟨0, by norm_num⟩ ⟨1, by norm_num⟩
+    (fun x ↦ (hl x).mpr) R (fun _ _ ↦ rfl)
+  have cm := sLocalCechBergman_exact_reflect_continuous isOpen_Ioi isOpen_Iio
+    ordConnected_Ioi ordConnected_Iio ⟨1, by norm_num⟩ ⟨0, by norm_num⟩
+    (fun x ↦ (hr x).mpr) L (fun _ _ ↦ rfl)
+  exact ⟨⟨e, cp, cm⟩, fun _ _ ↦ rfl, fun _ _ ↦ rfl⟩
+
+private theorem sLocalCechBergman_exact_fourier (χ : PontryaginDual Jₛ) (e : B⁻ ≃L[ℂ] B⁺)
+    (he : ∀ (v : B⁻) z, (e v).val z = v.val (1 - z)) (f : ℬₛ) :
+    EqOn (e ((sLocalZetaPair χ (Submodule.Quotient.mk f)).2)).val
+      (fun s ↦ Zₛ (Fourierₛ f) (normChart(χ⁻¹) s)) rightHalf := by
+  intro s hs
+  rw [he]
+  have hs' : 1 - s ∈ leftHalf := by simpa [mem_preimage, mem_Iio] using hs
+  simpa only [sub_sub_cancel] using (sLocalZetaPair_mk χ f).2 hs'
+
 /-- Paper: (5.4.2.6), p. 276.
 On the lower row the right half-plane zeta pair maps to the difference of the
 first entry and the reflected second entry multiplied on the overlap by the
@@ -1953,7 +2020,32 @@ theorem sLocalCechBergman_exact (χ : PontryaginDual Jₛ) :
           (fun s ↦ Zₛ (Fourierₛ f) (normChart(χ⁻¹) s)) rightHalf) ∧
       (∀ p : B⁺ × B⁺,
         EqOn (D p).val (fun s ↦ p.1.val s - ρₛ(χ, s) * p.2.val (1 - s)) overlap) ∧
-      Function.Exact U D := by sorry
+      Function.Exact U D := by
+  let e : B⁻ ≃L[ℂ] B⁺ := sLocalCechBergman_exact_reflection.choose
+  have he := sLocalCechBergman_exact_reflection.choose_spec.1
+  have hi := sLocalCechBergman_exact_reflection.choose_spec.2
+  let E : (B⁺ × B⁻) ≃L[ℂ] (B⁺ × B⁺) := (ContinuousLinearEquiv.refl ℂ B⁺).prodCongr e
+  let Z : Θω(restrict₁(χ)) →L[ℂ] B⁺ × B⁻ := ⟨sLocalZetaPair χ, continuous_sLocalZetaPair χ⟩
+  let D : B⁺ × B⁻ →L[ℂ] B⁰ :=
+    (existsUnique_sLocalZetaMatchingDifference (F := F) (S := S) χ).exists.choose
+  refine ⟨E.toContinuousLinearMap.comp Z, D.comp E.symm.toContinuousLinearMap, ?_, ?_, ?_⟩
+  · intro f
+    exact ⟨(sLocalZetaPair_mk χ f).1, sLocalCechBergman_exact_fourier χ e he f⟩
+  · intro p s hs
+    have h := (existsUnique_sLocalZetaMatchingDifference (F := F) (S := S) χ).exists.choose_spec
+    change (D (E.symm p)).val s = _
+    exact (h (E.symm p) hs).trans (congrArg (fun w ↦ p.1.val s - ρₛ(χ, s) * w) (hi p.2 s))
+  · intro p
+    change D (E.symm p) = 0 ↔ ∃ x, E (Z x) = p
+    have hker : D (E.symm p) = 0 ↔ E.symm p ∈ (sLocalZetaPair (F := F) (S := S) χ).range := by
+      rw [sLocalZetaPair_range]
+      rfl
+    rw [hker]
+    constructor
+    · rintro ⟨x, hx⟩
+      exact ⟨x, (congrArg E hx).trans (E.apply_symm_apply p)⟩
+    · rintro ⟨x, rfl⟩
+      exact ⟨x, (E.symm_apply_apply (Z x)).symm⟩
 
 /-- Paper: (5.4.2.6), p. 276.
 In the lower row the zeta pair of the test and its Fourier transform is a
@@ -1963,7 +2055,18 @@ theorem sLocalCechBergman_isClosedEmbedding (χ : PontryaginDual Jₛ) (U : Θω
       EqOn (U (Submodule.Quotient.mk f)).1.val (fun s ↦ Zₛ f (normChart(χ) s)) rightHalf ∧
       EqOn (U (Submodule.Quotient.mk f)).2.val
         (fun s ↦ Zₛ (Fourierₛ f) (normChart(χ⁻¹) s)) rightHalf) :
-    IsClosedEmbedding U := by sorry
+    IsClosedEmbedding U := by
+  let e : B⁻ ≃L[ℂ] B⁺ := sLocalCechBergman_exact_reflection.choose
+  have he := sLocalCechBergman_exact_reflection.choose_spec.1
+  let E : (B⁺ × B⁻) ≃L[ℂ] (B⁺ × B⁺) := (ContinuousLinearEquiv.refl ℂ B⁺).prodCongr e
+  have h : E ∘ sLocalZetaPair (F := F) (S := S) χ = ⇑U := by
+    funext x
+    obtain ⟨f, rfl⟩ := Submodule.Quotient.mk_surjective _ x
+    apply Prod.ext
+    · exact existsUnique_sLocalZetaPair_ext ((sLocalZetaPair_mk χ f).1.trans (_hU f).1.symm)
+    · exact existsUnique_sLocalZetaPair_ext
+        ((sLocalCechBergman_exact_fourier χ e he f).trans (_hU f).2.symm)
+  exact h ▸ E.toHomeomorph.isClosedEmbedding.comp (sLocalZetaPair_isClosedEmbedding χ)
 
 /-- Paper: Theorem 5.4.2.2, p. 276.
 Restriction of a unitary character to the norm section defines a unique real
@@ -2286,6 +2389,62 @@ theorem existsUnique_sLocalCechStripMellin (x : ℝ) :
   · exact (hM f s hs).trans (hform f s hs).symm
   · exact ((M f).property.1 hs).trans (((P.trans A) f).property.1 hs).symm
 
+/-- A homogeneous function times its character is constant on norm fibers. -/
+private theorem sLocalCech_left_commutes_invariant {G H : Type*} [CommGroup G] [Group H]
+    (m : G →* H) (χ : G →* ℂ) (θ : G → ℂ)
+    (hθ : ∀ (k : m.ker) g, θ (k.val⁻¹ * g) = χ k.val * θ g)
+    (a b : G) (hab : m a = m b) : θ a * χ a = θ b * χ b := by
+  let k : m.ker := ⟨b * a⁻¹, by simp only [MonoidHom.mem_ker, map_mul, map_inv, hab, mul_inv_cancel]⟩
+  have harg : k.val⁻¹ * b = a := by dsimp [k]; simp [mul_comm]
+  have hc : χ k.val * χ a = χ b := by rw [← map_mul]; congr 1; dsimp [k]; simp
+  calc
+    θ a * χ a = (χ k.val * θ b) * χ a := congrArg (· * χ a) ((congrArg θ harg).symm.trans (hθ k b))
+    _ = θ b * (χ k.val * χ a) := by ring
+    _ = θ b * χ b := congrArg (θ b * ·) hc
+
+/-- Compare an arbitrary quotient norm section with the canonical idelic section. -/
+private theorem sLocalCech_left_commutes_mellin (χ : PontryaginDual Jₛ)
+    (τ : ℝ≥0ˣ →ₜ* Jₛ) (hτ : RightInverse τ mₛ)
+    (x : ℝ) (hx : ∀ t : ℝ≥0ˣ, (χ (τ t) : ℂ) = (normℝ(t) : ℂ) ^ ((x : ℂ) * Complex.I))
+    (f : ℬₛ) (s : ℂ) (hs : 0 < s.re) :
+    (∫ t : ℝ≥0ˣ, (φω(restrict₁(χ)) f) (τ t) *
+      (normℝ(t) : ℂ) ^ (s + (x : ℂ) * Complex.I) ∂positiveRealHaar) =
+        Zₛ f (normChart(χ) s) := by
+  let : MeasurableSpace J₁ := borel J₁
+  let μ := sLocalNormOneQuotientMeasure F S
+  let : μ.IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  let p := Units.map (adeleProjection F S).toMonoidHom
+  have hp : Continuous p := (continuous_fst.prodMk (continuous_pi fun v : S ↦
+    (RestrictedProduct.continuous_eval v.val).comp continuous_snd)).units_map _
+  let σ : ℝ≥0ˣ →ₜ* (SAdeleRing F S)ˣ := ⟨p.comp (canonicalIdeleNormSection F),
+    hp.comp (canonicalIdeleNormSection_continuous F)⟩
+  have hσ : RightInverse σ (sIdeleNorm F S) := thetaSection_rightInverse F S
+  let q : (SAdeleRing F S)ˣ →ₜ* Jₛ := ⟨QuotientGroup.mk' _, QuotientGroup.continuous_mk⟩
+  have hq (t : ℝ≥0ˣ) : mₛ (q (σ t)) = t := hσ t
+  have hi : (∫ t : ℝ≥0ˣ, (φω(restrict₁(χ)) f) (τ t) *
+      (normℝ(t) : ℂ) ^ (s + (x : ℂ) * Complex.I) ∂positiveRealHaar) =
+      sLocalRadialMellinIntegral σ f χ s := by
+    apply integral_congr_ae
+    filter_upwards [] with t
+    have hn : (normℝ(t) : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr t.ne_zero)
+    have heq := sLocalCech_left_commutes_invariant mₛ (Circle.coeHom.comp χ.toMonoidHom)
+      (φω(restrict₁(χ)) f) (fun k g ↦
+        sLocalHomogeneousAdelicTheta_homogeneous F S μ restrict₁(χ) f k g)
+      (τ t) (q (σ t)) ((hτ t).trans (hq t).symm)
+    change (φω(restrict₁(χ)) f) (τ t) * (normℝ(t) : ℂ) ^ (s + (x : ℂ) * Complex.I) =
+      (φω(restrict₁(χ)) f) (q (σ t)) * normChart(χ) s (q (σ t))
+    rw [Complex.cpow_add _ _ hn]
+    change _ = (φω(restrict₁(χ)) f) (q (σ t)) *
+      ((χ (q (σ t)) : ℂ) * ((((mₛ (q (σ t))).val : ℝ) : ℂ) ^ s))
+    rw [hq]
+    calc
+      _ = ((φω(restrict₁(χ)) f) (τ t) * (χ (τ t) : ℂ)) * (normℝ(t) : ℂ) ^ s := by rw [hx]; ring
+      _ = ((φω(restrict₁(χ)) f) (q (σ t)) * (χ (q (σ t)) : ℂ)) * (normℝ(t) : ℂ) ^ s := congrArg (· * (normℝ(t) : ℂ) ^ s) heq
+      _ = _ := by ring
+  have hr : ∃ (ψ : PontryaginDual Jₛ) (z : ℂ), 0 < z.re ∧ normChart(χ) s = normChart(ψ) z := ⟨χ, s, hs, rfl⟩
+  exact hi.trans ((sLocalRadialMellinIntegral_eq_theta σ hσ f χ s hs).trans
+    ((sLocalThetaMellinIntegral_eq_zeta f hr).trans (sLocalIdelicZFunction_eq_integral f hr).symm))
+
 /-- Paper: (5.4.2.6), p. 276.
 Applying the two shifted Mellin transforms to the upper left arrow gives the
 lower zeta pair on every theta class.
@@ -2304,7 +2463,28 @@ theorem sLocalCech_left_commutes (χ : PontryaginDual Jₛ)
     (f : ℬₛ) :
     let p : upperMiddle(χ) := cechThetaPair(χ) (Submodule.Quotient.mk f)
     EqOn (M₁ p.1).val (fun s ↦ Zₛ f (normChart(χ) s)) rightHalf ∧
-    EqOn (M₂ p.2).val (fun s ↦ Zₛ (Fourierₛ f) (normChart(χ⁻¹) s)) rightHalf := by sorry
+    EqOn (M₂ p.2).val (fun s ↦ Zₛ (Fourierₛ f) (normChart(χ⁻¹) s)) rightHalf := by
+  let p : upperMiddle(χ) := cechThetaPair(χ) (Submodule.Quotient.mk f)
+  have hp := (existsUnique_sLocalCechThetaPair (F := F) (S := S) χ).exists.choose_spec f
+  have hx' (t : ℝ≥0ˣ) : (χ⁻¹ (τ t) : ℂ) =
+      (normℝ(t) : ℂ) ^ (((-x : ℝ) : ℂ) * Complex.I) := by
+    change (χ (τ t) : ℂ)⁻¹ = _
+    rw [_hx, Complex.ofReal_neg, neg_mul, Complex.cpow_neg]
+  constructor
+  · intro s hs
+    refine (_h₁ p.1 s hs).trans ?_
+    refine Eq.trans (integral_congr_ae (.of_forall fun t ↦ ?_))
+      (sLocalCech_left_commutes_mellin χ τ _hτ x _hx f s hs)
+    exact congrArg (· * (normℝ(t) : ℂ) ^ (s + (x : ℂ) * Complex.I))
+      (congrFun hp.1 (τ t))
+  · intro s hs
+    refine (_h₂ p.2 s hs).trans ?_
+    have h := sLocalCech_left_commutes_mellin χ⁻¹ τ _hτ (-x) hx' (Fourierₛ f) s hs
+    simp only [Complex.ofReal_neg, neg_mul, ← sub_eq_add_neg] at h
+    refine Eq.trans (integral_congr_ae (.of_forall fun t ↦ ?_)) h
+    exact congrArg (· * (normℝ(t) : ℂ) ^ (s - (x : ℂ) * Complex.I))
+      (congrFun hp.2 (τ t))
+
 
 /-- Evaluation is continuous by the Schwartz line description of Appendix D. -/
 private theorem decayFourier_bergman_eval (I : Set ℝ) (ho : IsOpen I)

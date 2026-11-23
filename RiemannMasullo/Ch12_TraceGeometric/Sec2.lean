@@ -556,6 +556,190 @@ local instance instOrbitQuotientMeasurableSpaceSec2 : MeasurableSpace Ω := bore
 
 -- Mathlib supplies the Hausdorff orbit quotient of a proper action, the open quotient map,
 -- and second countability of the quotient of a second countable space.
+/-- For a compactly supported continuous function, the orbit integrand has compact support,
+its integral is invariant along orbits, and the orbit integral is continuous. -/
+private theorem existsUnique_properActionQuotientMeasure_fibre (μA : Measure A)
+    [μA.IsHaarMeasure] {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    [SecondCountableTopology E]
+    (f : C_c(X, E)) :
+    (∀ x : X, Continuous (fun a : A ↦ f (a • x)) ∧ HasCompactSupport (fun a : A ↦ f (a • x))) ∧
+      (∀ (c : A) (x : X), ∫ a : A, f (a • c • x) ∂μA = ∫ a : A, f (a • x) ∂μA) ∧
+      Continuous (fun x : X ↦ ∫ a : A, f (a • x) ∂μA) := by
+  have hcomp (K : Set X) (hK : IsCompact K) :
+      IsCompact {a : A | (a • K ∩ tsupport f).Nonempty} :=
+    ProperSMul.isCompact_setOfPred_inter_nonempty hK f.hasCompactSupport
+  have hvan (K : Set X) (y : X) (hy : y ∈ K) (a : A)
+      (ha : a ∉ {a : A | (a • K ∩ tsupport f).Nonempty}) : f (a • y) = 0 := by
+    by_contra hne
+    exact ha ⟨a • y, smul_mem_smul_set hy, subset_tsupport _ hne⟩
+  refine ⟨fun x ↦ ⟨f.continuous.comp (continuous_id.smul continuous_const),
+    HasCompactSupport.intro (hcomp {x} isCompact_singleton) fun a ha ↦
+      hvan {x} x (mem_singleton x) a ha⟩, fun c x ↦ ?_, ?_⟩
+  · simp_rw [smul_smul]
+    exact integral_mul_right_eq_self (fun a ↦ f (a • x)) c
+  · rw [continuous_iff_continuousAt]
+    intro x₀
+    obtain ⟨K, hK, hKn⟩ := exists_compact_mem_nhds x₀
+    let C := {a : A | (a • K ∩ tsupport f).Nonempty}
+    have hcont : Continuous (fun p : X × A ↦ f (p.2 • p.1)) :=
+      f.continuous.comp (continuous_snd.smul continuous_fst)
+    have hg := continuous_parametric_integral_of_continuous (μ := μA)
+      (f := fun (y : X) (a : A) ↦ f (a • y)) hcont (hcomp K hK)
+    refine hg.continuousAt.congr ?_
+    filter_upwards [hKn] with y hy
+    exact setIntegral_eq_integral_of_forall_compl_eq_zero fun a ha ↦ hvan K y hy a ha
+
+/-- A proper action admits a Bruhat function: a continuous nonnegative function whose support
+meets the preimage of each compact set of orbits in a compact set, and whose integral along
+every orbit is one. -/
+private theorem existsUnique_properActionQuotientMeasure_bruhat (μA : Measure A)
+    [μA.IsHaarMeasure] :
+    ∃ b : X → ℝ, Continuous b ∧ (∀ x, 0 ≤ b x) ∧
+      (∀ K : Set Ω, IsCompact K →
+        IsCompact (tsupport b ∩ Quotient.mk (MulAction.orbitRel A X) ⁻¹' K)) ∧
+      ∀ x : X, HasCompactSupport (fun a : A ↦ b (a • x)) ∧ ∫ a : A, b (a • x) ∂μA = 1 := by
+  classical
+  let π : X → Ω := Quotient.mk (MulAction.orbitRel A X)
+  have hπq : IsOpenQuotientMap π := MulAction.isOpenQuotientMap_quotientMk
+  have hπc : Continuous π := hπq.continuous
+  have : LocallyCompactSpace Ω := hπq.locallyCompactSpace
+  have : SigmaCompactSpace Ω := isSigmaCompact_univ_iff.mp (by
+    rw [← hπq.surjective.range_eq]
+    exact isSigmaCompact_range hπc)
+  have hπ (a : A) (x : X) : π (a • x) = π x := Quotient.sound (MulAction.mem_orbit x a)
+  have hbump : ∀ q : Ω, ∃ g : C_c(X, ℝ), 0 ≤ (g : X → ℝ) ∧ g q.out ≠ 0 := by
+    intro q
+    obtain ⟨g, hgc, hg0, hgx⟩ := exists_continuous_nonneg_pos (q.out)
+    exact ⟨⟨g, hgc⟩, hg0, hgx⟩
+  choose g hg0 hgx using hbump
+  let U : Ω → Set Ω := fun q ↦ π '' Function.support (g q)
+  have hUo (q : Ω) : IsOpen (U q) := hπq.isOpenMap _ (g q).continuous.isOpen_support
+  have hUc : (univ : Set Ω) ⊆ ⋃ q, U q := fun q _ ↦
+    mem_iUnion.2 ⟨q, q.out, hgx q, Quotient.out_eq q⟩
+  obtain ⟨ρ, hρ⟩ := PartitionOfUnity.exists_isSubordinate isClosed_univ U hUo hUc
+  have hfib (q : Ω) := existsUnique_properActionQuotientMeasure_fibre μA (g q)
+  let P : Ω → X → ℝ := fun q x ↦ ∫ a : A, g q (a • x) ∂μA
+  let φ : X → ℝ := fun x ↦ ∑ᶠ q, ρ q (π x) * g q x
+  let Av : X → ℝ := fun x ↦ ∑ᶠ q, ρ q (π x) * P q x
+  have hlf : LocallyFinite fun q ↦ Function.support fun x ↦ ρ q (π x) :=
+    ρ.locallyFinite.preimage_continuous hπc
+  have hφc : Continuous φ :=
+    continuous_finsum (fun q ↦ ((ρ q).continuous.comp hπc).mul (g q).continuous)
+      (hlf.subset fun q ↦ Function.support_mul_subset_left _ _)
+  have hAc : Continuous Av :=
+    continuous_finsum (fun q ↦ ((ρ q).continuous.comp hπc).mul (hfib q).2.2)
+      (hlf.subset fun q ↦ Function.support_mul_subset_left _ _)
+  have hφ0 (x : X) : 0 ≤ φ x := finsum_nonneg fun q ↦ mul_nonneg (ρ.nonneg _ _) (hg0 q x)
+  have hP0 (q : Ω) (x : X) : 0 ≤ P q x := integral_nonneg fun a ↦ hg0 q _
+  have hfibφ (x : X) : HasCompactSupport (fun a : A ↦ φ (a • x)) ∧
+      ∫ a : A, φ (a • x) ∂μA = Av x := by
+    set S := (ρ.locallyFinite.point_finite (π x)).toFinset
+    have hS (y : X) (hy : π y = π x) (F : Ω → ℝ) :
+        (∑ᶠ q, ρ q (π y) * F q) = ∑ q ∈ S, ρ q (π x) * F q := by
+      rw [hy]
+      refine finsum_eq_sum_of_support_subset _ fun q hq ↦ ?_
+      simp only [S, Set.Finite.coe_toFinset, mem_ofPred_eq]
+      exact left_ne_zero_of_mul hq
+    have hφS (a : A) : φ (a • x) = ∑ q ∈ S, ρ q (π x) * g q (a • x) :=
+      hS _ (hπ a x) fun q ↦ g q (a • x)
+    simp only [hφS]
+    have hint (q : Ω) : Integrable (fun a : A ↦ g q (a • x)) μA :=
+      ((hfib q).1 x).1.integrable_of_hasCompactSupport ((hfib q).1 x).2
+    refine ⟨HasCompactSupport.intro (S.isCompact_biUnion fun q _ ↦ ((hfib q).1 x).2)
+      fun a ha ↦ Finset.sum_eq_zero fun q hq ↦ ?_, ?_⟩
+    · have : g q (a • x) = 0 := image_eq_zero_of_notMem_tsupport (f := fun a : A ↦ g q (a • x))
+        fun h ↦ ha (mem_biUnion hq h)
+      rw [this, mul_zero]
+    · rw [integral_finsetSum _ fun q _ ↦ (hint q).const_mul _]
+      simp only [integral_const_mul]
+      exact (hS x rfl fun q ↦ P q x).symm
+  have hApos (x : X) : 0 < Av x := by
+    obtain ⟨q, hq⟩ := ρ.exists_pos (mem_univ (π x))
+    obtain ⟨y, hy, hyx⟩ := hρ q (subset_tsupport _ hq.ne')
+    obtain ⟨c, hc⟩ := Quotient.exact hyx
+    have hP : 0 < P q x :=
+      Continuous.integral_pos_of_hasCompactSupport_nonneg_ne_zero ((hfib q).1 x).1
+        ((hfib q).1 x).2 (fun a ↦ hg0 q _) (x := c) (by
+          change g q (c • x) ≠ 0
+          rw [show c • x = y from hc]
+          exact hy)
+    have hfin : (Function.support fun q ↦ ρ q (π x) * P q x).Finite :=
+      (ρ.locallyFinite.point_finite (π x)).subset fun q hq ↦ left_ne_zero_of_mul hq
+    refine lt_of_lt_of_le (mul_pos hq hP) ?_
+    exact single_le_finsum q hfin fun j ↦ mul_nonneg (ρ.nonneg _ _) (hP0 j x)
+  have hAinv (a : A) (x : X) : Av (a • x) = Av x := by
+    simp only [Av, P, hπ, (hfib _).2.1]
+  let b : X → ℝ := fun x ↦ φ x / Av x
+  have hT : IsClosed (⋃ q, π ⁻¹' tsupport (ρ q) ∩ tsupport (g q)) :=
+    ((ρ.locallyFinite_tsupport.preimage_continuous hπc).subset
+      fun q ↦ inter_subset_left).isClosed_iUnion
+      fun q ↦ ((isClosed_tsupport _).preimage hπc).inter (isClosed_tsupport _)
+  have hsupp : tsupport b ⊆ ⋃ q, π ⁻¹' tsupport (ρ q) ∩ tsupport (g q) := by
+    refine closure_minimal (fun x hx ↦ ?_) hT
+    have hφx : φ x ≠ 0 := fun h ↦ hx (by simp [b, h])
+    by_contra hnot
+    apply hφx
+    have hzero : ∀ q, ρ q (π x) * g q x = 0 := by
+      intro q
+      by_contra hq
+      exact hnot (mem_iUnion.2 ⟨q, subset_tsupport _ (left_ne_zero_of_mul hq),
+        subset_tsupport _ (right_ne_zero_of_mul hq)⟩)
+    simp only [φ, hzero, finsum_zero]
+  refine ⟨b, hφc.div hAc fun x ↦ (hApos x).ne', fun x ↦ div_nonneg (hφ0 x) (hApos x).le,
+    fun K hK ↦ ?_, fun x ↦ ?_⟩
+  · have hF := ρ.locallyFinite_tsupport.finite_nonempty_inter_compact hK
+    refine (hF.isCompact_biUnion fun q _ ↦ (g q).hasCompactSupport).of_isClosed_subset
+      ((isClosed_tsupport _).inter (hK.isClosed.preimage hπc)) ?_
+    rintro x ⟨hx, hxK⟩
+    obtain ⟨q, hq1, hq2⟩ := mem_iUnion.1 (hsupp hx)
+    exact mem_biUnion ⟨π x, hq1, hxK⟩ hq2
+  · have hb (a : A) : b (a • x) = φ (a • x) * (Av x)⁻¹ := by
+      simp only [b, hAinv, div_eq_mul_inv]
+    simp only [hb]
+    refine ⟨(hfibφ x).1.mul_right, ?_⟩
+    rw [integral_mul_const, (hfibφ x).2, mul_inv_cancel₀ (hApos x).ne']
+
+/-- The orbit integral of a compactly supported test, evaluated at a representative of each
+orbit, is the orbit integral at every point of the orbit, and is a continuous compactly
+supported function on the orbit space. -/
+private theorem existsUnique_properActionQuotientMeasure_descent (μA : Measure A)
+    [μA.IsHaarMeasure] {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    [SecondCountableTopology E] (f : C_c(X, E)) :
+    (∀ x : X, ∫ a : A, f (a • (Quotient.mk (MulAction.orbitRel A X) x).out) ∂μA =
+      ∫ a : A, f (a • x) ∂μA) ∧
+      Continuous (fun q : Ω ↦ ∫ a : A, f (a • q.out) ∂μA) ∧
+      HasCompactSupport (fun q : Ω ↦ ∫ a : A, f (a • q.out) ∂μA) := by
+  let π : X → Ω := Quotient.mk (MulAction.orbitRel A X)
+  have hπq : IsOpenQuotientMap π := MulAction.isOpenQuotientMap_quotientMk
+  obtain ⟨-, hinv, hcont⟩ := existsUnique_properActionQuotientMeasure_fibre μA f
+  have h1 (x : X) : ∫ a : A, f (a • (π x).out) ∂μA = ∫ a : A, f (a • x) ∂μA := by
+    obtain ⟨c, hc⟩ := Quotient.exact (Quotient.out_eq (π x))
+    rw [← show c • x = (π x).out from hc, hinv]
+  refine ⟨h1, ?_, ?_⟩
+  · refine hπq.isQuotientMap.continuous_iff.mpr ?_
+    exact hcont.congr fun x ↦ (h1 x).symm
+  · refine HasCompactSupport.intro (f.hasCompactSupport.image hπq.continuous) fun q hq ↦ ?_
+    refine integral_eq_zero_of_ae (.of_forall fun a ↦ ?_)
+    by_contra hne
+    refine hq ⟨a • q.out, subset_tsupport _ hne, ?_⟩
+    exact (Quotient.sound (MulAction.mem_orbit q.out a)).trans (Quotient.out_eq q)
+
+/-- Multiplying the pullback of a compactly supported continuous function on the orbit space
+by a Bruhat function gives a compactly supported continuous function. -/
+private theorem existsUnique_properActionQuotientMeasure_weighted {E : Type*}
+    [NormedAddCommGroup E] [NormedSpace ℝ E] {b : X → ℝ} (hbc : Continuous b)
+    (hbK : ∀ K : Set Ω, IsCompact K →
+      IsCompact (tsupport b ∩ Quotient.mk (MulAction.orbitRel A X) ⁻¹' K))
+    {ψ : Ω → E} (hψ : Continuous ψ) (hψs : HasCompactSupport ψ) :
+    Continuous (fun x ↦ b x • ψ (Quotient.mk (MulAction.orbitRel A X) x)) ∧
+      HasCompactSupport (fun x ↦ b x • ψ (Quotient.mk (MulAction.orbitRel A X) x)) := by
+  have hπc : Continuous (Quotient.mk (MulAction.orbitRel A X)) :=
+    (MulAction.isOpenQuotientMap_quotientMk (Γ := A) (T := X)).continuous
+  refine ⟨hbc.smul (hψ.comp hπc), HasCompactSupport.intro (hbK _ hψs) fun x hx ↦ ?_⟩
+  by_contra hne
+  refine hx ⟨subset_tsupport _ (left_ne_zero_of_smul hne), ?_⟩
+  exact subset_tsupport _ (right_ne_zero_of_smul hne)
+
 /-- Paper: Remark 12.2.1.4, p. 507. For a free proper action, an invariant Radon measure
 and a choice of Haar measure determine a unique Radon measure on the orbit space.
 Deviation: The normalization formula is tested on compactly supported continuous functions. -/
@@ -564,7 +748,144 @@ theorem existsUnique_properActionQuotientMeasure (μA : Measure A) [μA.IsHaarMe
     ∃! ν : Measure Ω, ν.Regular ∧
       ∀ f : C_c(X, ℂ),
         Integrable (fun q : Ω ↦ ∫ a : A, f (a • q.out) ∂μA) ν ∧
-          (∫ x, f x ∂μX) = ∫ q : Ω, ∫ a : A, f (a • q.out) ∂μA ∂ν := by sorry
+          (∫ x, f x ∂μX) = ∫ q : Ω, ∫ a : A, f (a • q.out) ∂μA ∂ν := by
+  classical
+  let π : X → Ω := Quotient.mk (MulAction.orbitRel A X)
+  have hπq : IsOpenQuotientMap π := MulAction.isOpenQuotientMap_quotientMk
+  have hπc : Continuous π := hπq.continuous
+  have : LocallyCompactSpace Ω := hπq.locallyCompactSpace
+  have : BorelSpace Ω := ⟨rfl⟩
+  have hπ (a : A) (x : X) : π (a • x) = π x := Quotient.sound (MulAction.mem_orbit x a)
+  obtain ⟨b, hbc, hb0, hbK, hbfib⟩ := existsUnique_properActionQuotientMeasure_bruhat (X := X) μA
+  -- the positive functional on the orbit space and its Riesz measure
+  have hw (φ : C_c(Ω, ℝ)) :=
+    existsUnique_properActionQuotientMeasure_weighted hbc hbK φ.continuous φ.hasCompactSupport
+  have hwi (φ : C_c(Ω, ℝ)) : Integrable (fun x ↦ b x * φ (π x)) μX :=
+    (hw φ).1.integrable_of_hasCompactSupport (hw φ).2
+  let L : C_c(Ω, ℝ) →ₚ[ℝ] ℝ :=
+    ⟨{ toFun := fun φ ↦ ∫ x, b x * φ (π x) ∂μX
+       map_add' := fun φ ψ ↦ by
+         simp only [CompactlySupportedContinuousMap.coe_add, Pi.add_apply, mul_add]
+         exact integral_add (hwi φ) (hwi ψ)
+       map_smul' := fun c φ ↦ by
+         simp only [CompactlySupportedContinuousMap.coe_smul, Pi.smul_apply, smul_eq_mul,
+           RingHom.id_apply, mul_left_comm (b _) c]
+         exact integral_const_mul c _ },
+      fun φ ψ h ↦ integral_mono (hwi φ) (hwi ψ) fun x ↦
+        mul_le_mul_of_nonneg_left (h (π x)) (hb0 x)⟩
+  let ν := RealRMK.rieszMeasure L
+  have hreal (φ : C_c(Ω, ℝ)) : ∫ q, φ q ∂ν = ∫ x, b x * φ (π x) ∂μX :=
+    RealRMK.integral_rieszMeasure L φ
+  -- the complex form of the defining identity
+  have hcplx (ψ : Ω → ℂ) (hψ : Continuous ψ) (hψs : HasCompactSupport ψ) :
+      ∫ q, ψ q ∂ν = ∫ x, (b x : ℂ) * ψ (π x) ∂μX := by
+    have hwψ := existsUnique_properActionQuotientMeasure_weighted hbc hbK hψ hψs
+    have hiψ : Integrable (fun x ↦ (b x : ℂ) * ψ (π x)) μX := by
+      refine (hwψ.1.integrable_of_hasCompactSupport hwψ.2).congr (.of_forall fun x ↦ ?_)
+      exact Complex.real_smul
+    let ψr : C_c(Ω, ℝ) := ⟨⟨fun q ↦ (ψ q).re, Complex.continuous_re.comp hψ⟩,
+      hψs.comp_left (g := Complex.re) (by simp)⟩
+    let ψi : C_c(Ω, ℝ) := ⟨⟨fun q ↦ (ψ q).im, Complex.continuous_im.comp hψ⟩,
+      hψs.comp_left (g := Complex.im) (by simp)⟩
+    have hiν : Integrable ψ ν := hψ.integrable_of_hasCompactSupport hψs
+    apply Complex.ext
+    · change RCLike.re (∫ q, ψ q ∂ν) = RCLike.re (∫ x, (b x : ℂ) * ψ (π x) ∂μX)
+      rw [← integral_re hiν, ← integral_re hiψ]
+      refine (hreal ψr).trans (integral_congr_ae (.of_forall fun x ↦ ?_))
+      change b x * (ψ (π x)).re = ((b x : ℂ) * ψ (π x)).re
+      rw [Complex.re_ofReal_mul]
+    · change RCLike.im (∫ q, ψ q ∂ν) = RCLike.im (∫ x, (b x : ℂ) * ψ (π x) ∂μX)
+      rw [← integral_im hiν, ← integral_im hiψ]
+      refine (hreal ψi).trans (integral_congr_ae (.of_forall fun x ↦ ?_))
+      change b x * (ψ (π x)).im = ((b x : ℂ) * ψ (π x)).im
+      rw [Complex.im_ofReal_mul]
+  -- unfolding: the weighted pullback of the orbit integral integrates to the original test
+  have hunfold (f : C_c(X, ℂ)) :
+      ∫ x, (b x : ℂ) * ∫ a : A, f (a • x) ∂μA ∂μX = ∫ x, f x ∂μX := by
+    have hK1 := hbK _ (f.hasCompactSupport.image hπc)
+    let K1 := tsupport b ∩ π ⁻¹' (π '' tsupport f)
+    have hC1 := ProperSMul.isCompact_setOfPred_inter_nonempty (G := A) hK1 f.hasCompactSupport
+    have hC2 := ProperSMul.isCompact_setOfPred_inter_nonempty (G := A) f.hasCompactSupport hK1
+    have hbf (x : X) (a : A) (hb : b x ≠ 0) (hf : f (a • x) ≠ 0) : x ∈ K1 :=
+      ⟨subset_tsupport _ hb, a • x, subset_tsupport _ hf, hπ a x⟩
+    have hs1 : HasCompactSupport (Function.uncurry fun (x : X) (a : A) ↦ (b x : ℂ) * f (a • x)) := by
+      refine HasCompactSupport.intro (hK1.prod hC1) fun p hp ↦ ?_
+      by_contra hne
+      have hb : b p.1 ≠ 0 := fun h ↦ hne (by simp [Function.uncurry, h])
+      have hf : f (p.2 • p.1) ≠ 0 := fun h ↦ hne (by simp [Function.uncurry, h])
+      exact hp ⟨hbf p.1 p.2 hb hf, p.2 • p.1, smul_mem_smul_set (hbf p.1 p.2 hb hf),
+        subset_tsupport _ hf⟩
+    have hs2 : HasCompactSupport
+        (Function.uncurry fun (a : A) (y : X) ↦ (b (a⁻¹ • y) : ℂ) * f y) := by
+      refine HasCompactSupport.intro (hC2.inv.prod f.hasCompactSupport) fun p hp ↦ ?_
+      by_contra hne
+      have hb : b (p.1⁻¹ • p.2) ≠ 0 := fun h ↦ hne (by simp [Function.uncurry, h])
+      have hf : f p.2 ≠ 0 := fun h ↦ hne (by simp [Function.uncurry, h])
+      have hK : p.1⁻¹ • p.2 ∈ K1 := hbf _ p.1 hb (by rwa [smul_inv_smul])
+      exact hp ⟨Set.mem_inv.mpr ⟨p.1⁻¹ • p.2, smul_mem_smul_set (subset_tsupport _ hf), hK⟩,
+        subset_tsupport _ hf⟩
+    have hc1 : Continuous (Function.uncurry fun (x : X) (a : A) ↦ (b x : ℂ) * f (a • x)) :=
+      (Complex.continuous_ofReal.comp (hbc.comp continuous_fst)).mul
+        (f.continuous.comp (continuous_snd.smul continuous_fst))
+    have hc2 : Continuous
+        (Function.uncurry fun (a : A) (y : X) ↦ (b (a⁻¹ • y) : ℂ) * f y) :=
+      (Complex.continuous_ofReal.comp (hbc.comp (continuous_fst.inv.smul continuous_snd))).mul
+        (f.continuous.comp continuous_snd)
+    calc ∫ x, (b x : ℂ) * ∫ a : A, f (a • x) ∂μA ∂μX
+        = ∫ x, ∫ a : A, (b x : ℂ) * f (a • x) ∂μA ∂μX := by
+          simp_rw [integral_const_mul]
+      _ = ∫ a : A, ∫ x, (b x : ℂ) * f (a • x) ∂μX ∂μA :=
+          integral_integral_swap_of_hasCompactSupport hc1 hs1
+      _ = ∫ a : A, ∫ y, (b (a⁻¹ • y) : ℂ) * f y ∂μX ∂μA := by
+          refine integral_congr_ae (.of_forall fun a ↦ ?_)
+          refine Eq.trans ?_
+            (integral_smul_eq_self (μ := μX) (fun y ↦ (b (a⁻¹ • y) : ℂ) * f y) (g := a))
+          simp only [inv_smul_smul]
+      _ = ∫ y, ∫ a : A, (b (a⁻¹ • y) : ℂ) * f y ∂μA ∂μX :=
+          integral_integral_swap_of_hasCompactSupport hc2 hs2
+      _ = ∫ y, f y ∂μX := by
+          refine integral_congr_ae (.of_forall fun y ↦ ?_)
+          have : SecondCountableTopology A := by
+            have hcl : IsClosedMap (fun a : A ↦ a • y) := by
+              refine (isProperMap_iff_isCompact_preimage.mpr
+                ⟨continuous_id.smul continuous_const, fun K hK ↦ ?_⟩).isClosedMap
+              change IsCompact ((fun a : A ↦ a • y) ⁻¹' K)
+              have he : (fun a : A ↦ a • y) ⁻¹' K = {a : A | (a • {y} ∩ K).Nonempty} := by
+                ext a
+                simp [Set.smul_set_singleton]
+              rw [he]
+              exact ProperSMul.isCompact_setOfPred_inter_nonempty isCompact_singleton hK
+            exact (Topology.IsClosedEmbedding.of_continuous_injective_isClosedMap
+              (continuous_id.smul continuous_const)
+              (fun a c h ↦ IsCancelSMul.right_cancel' a c y h) hcl).isEmbedding.secondCountableTopology
+          simp only
+          rw [integral_mul_const, integral_complex_ofReal,
+            integral_inv_eq_self (fun a ↦ b (a • y)) μA, (hbfib y).2, Complex.ofReal_one,
+            one_mul]
+  -- the formula for ν
+  have hform (f : C_c(X, ℂ)) :
+      Integrable (fun q : Ω ↦ ∫ a : A, f (a • q.out) ∂μA) ν ∧
+        (∫ x, f x ∂μX) = ∫ q : Ω, ∫ a : A, f (a • q.out) ∂μA ∂ν := by
+    obtain ⟨hd, hdc, hds⟩ := existsUnique_properActionQuotientMeasure_descent μA f
+    refine ⟨hdc.integrable_of_hasCompactSupport hds, ?_⟩
+    rw [hcplx _ hdc hds, ← hunfold f]
+    exact integral_congr_ae (.of_forall fun x ↦ congrArg _ (hd x).symm)
+  refine ⟨ν, ⟨inferInstance, hform⟩, fun ν' ⟨hreg, hform'⟩ ↦ ?_⟩
+  apply Measure.ext_of_integral_eq_on_compactlySupported
+  intro φ
+  obtain ⟨hwc, hws⟩ := hw φ
+  let f : C_c(X, ℂ) := ⟨⟨fun x ↦ ((b x * φ (π x) : ℝ) : ℂ),
+    Complex.continuous_ofReal.comp hwc⟩, hws.comp_left Complex.ofReal_zero⟩
+  have hF (q : Ω) : ∫ a : A, f (a • q.out) ∂μA = (φ q : ℂ) := by
+    change ∫ a : A, ((b (a • q.out) * φ (π (a • q.out)) : ℝ) : ℂ) ∂μA = _
+    simp only [hπ]
+    rw [integral_complex_ofReal, integral_mul_const, (hbfib q.out).2, one_mul]
+    exact congrArg (fun z ↦ ((φ z : ℝ) : ℂ)) (Quotient.out_eq q)
+  apply Complex.ofReal_injective
+  rw [← integral_complex_ofReal, ← integral_complex_ofReal]
+  refine (integral_congr_ae (.of_forall fun q ↦ (hF q).symm)).trans
+    (((hform' f).2.symm).trans ((hform f).2.trans
+      (integral_congr_ae (.of_forall fun q ↦ hF q))))
 
 end ProperActions
 

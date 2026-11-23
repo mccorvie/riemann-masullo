@@ -735,10 +735,86 @@ theorem finitePlacePrincipalValue_unique (v : V) (π : Fᵥ(v)ˣ)
     obeys (finitePlacePrincipalValue v) ∧
       ∀ P, obeys P → P = finitePlacePrincipalValue v := by sorry
 
+/-- The principal value is injective: a test in its kernel is invariant under the integer
+units and under the uniformizer, so it vanishes. -/
+private theorem finitePlacePrincipalValue_isClosedEmbedding_injective (v : V) :
+    Function.Injective (finitePlacePrincipalValue v) := by
+  let h := vval(v).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π := Units.mk0 (h.choose : Fᵥ(v)) h.choose_spec.ne_zero
+  have hπ : vval(v).IsUniformizer π.val := h.choose_spec
+  have : BorelSpace Fᵥ(v)ˣ := ⟨rfl⟩
+  have : μᵥ(v).IsMulLeftInvariant := by
+    unfold finiteLocalMultiplicativeTamagawaMeasure
+    infer_instance
+  have hU : MeasurableSet (Uᵥ(v) : Set Fᵥ(v)ˣ) :=
+    (Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)).measurableSet
+  intro f f' hff'
+  set k := f - f' with hk
+  have hP : ∀ x, k x = (μᵥ(v).real Uᵥ(v) : ℂ)⁻¹ *
+      ∫ u in Uᵥ(v), k (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) * ((↑π⁻¹ : Fᵥ(v)) * x.toAdd)))
+        ∂μᵥ(v) := by
+    intro x
+    have h0 : finitePlacePrincipalValue v k = 0 := by rw [hk, map_sub, hff', sub_self]
+    have h1 := finitePlacePrincipalValue_spec v π hπ k x
+    rw [h0] at h1
+    unfold finitePlacePrincipalValueFun at h1
+    exact (sub_eq_zero.mp h1.symm)
+  have hpos := (finitePlacePrincipalValue_integrable v π k 1).1
+  have hm : (μᵥ(v).real Uᵥ(v) : ℂ) ≠ 0 := by exact_mod_cast hpos.ne'
+  -- invariance of the average
+  have hI : ∀ (w : Fᵥ(v)ˣ), w ∈ Uᵥ(v) → ∀ y : Fᵥ(v),
+      ∫ u in Uᵥ(v), k (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) * ((w : Fᵥ(v)) * y))) ∂μᵥ(v) =
+      ∫ u in Uᵥ(v), k (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) * y)) ∂μᵥ(v) := by
+    intro w hw y
+    have hw' : w⁻¹ ∈ Uᵥ(v) := Subgroup.inv_mem _ hw
+    rw [← finitePlacePrincipalValue_spec_setIntegral_mul_left μᵥ(v) _ hU
+      (fun u : Fᵥ(v)ˣ ↦ k (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) * y))) w⁻¹
+      (fun u ↦ Subgroup.mul_mem_cancel_left _ hw')]
+    congr 1
+    funext u
+    simp only [mul_inv_rev, inv_inv, Units.val_mul]
+    ring_nf
+  have hinv : ∀ (w : Fᵥ(v)ˣ), w ∈ Uᵥ(v) → ∀ y : Fᵥ(v),
+      k (Multiplicative.ofAdd ((w : Fᵥ(v)) * y)) = k (Multiplicative.ofAdd y) := by
+    intro w hw y
+    rw [hP, hP]
+    congr 1
+    change ∫ u in Uᵥ(v), k (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) *
+      ((↑π⁻¹ : Fᵥ(v)) * ((w : Fᵥ(v)) * y)))) ∂μᵥ(v) =
+      ∫ u in Uᵥ(v), k (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) * ((↑π⁻¹ : Fᵥ(v)) * y))) ∂μᵥ(v)
+    rw [mul_left_comm, hI w hw]
+  have hstep : ∀ x : Fᵥ(v), k (Multiplicative.ofAdd x) =
+      k (Multiplicative.ofAdd ((↑π⁻¹ : Fᵥ(v)) * x)) := by
+    intro x
+    rw [hP]
+    change (μᵥ(v).real Uᵥ(v) : ℂ)⁻¹ * ∫ u in Uᵥ(v), k (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) *
+      ((↑π⁻¹ : Fᵥ(v)) * x))) ∂μᵥ(v) = _
+    rw [setIntegral_congr_fun hU (g := fun _ ↦ k (Multiplicative.ofAdd ((↑π⁻¹ : Fᵥ(v)) * x)))
+      fun u hu ↦ hinv u⁻¹ (Subgroup.inv_mem _ hu) _, setIntegral_const, Complex.real_smul]
+    field_simp
+  obtain ⟨hlc, hcs⟩ := (mem_finitePlaceSchwartz_iff F v
+    (fun x ↦ k (Multiplicative.ofAdd x))).1 ⟨k, fun _ ↦ rfl⟩
+  have h0 := finitePlaceDifference_injective_aux v π hπ _ hlc hcs hstep
+  refine sub_eq_zero.mp (SchwartzBruhat.ext fun y ↦ ?_)
+  exact congrFun h0 (Multiplicative.toAdd y)
+
 /-- Paper: Lemma 5.3.1.3, p. 241.
 Weil's local principal value is a topological embedding with closed range. -/
 theorem finitePlacePrincipalValue_isClosedEmbedding (v : V) :
-    IsClosedEmbedding (finitePlacePrincipalValue v) := by sorry
+    IsClosedEmbedding (finitePlacePrincipalValue v) := by
+  have heq := finitePlaceSchwartz_finestTopology F v
+  have h := finestLocallyConvex_isEmbedding_of_injective (E := ℬ(Fᵥ(v)))
+    (finitePlacePrincipalValue v).toLinearMap
+    (finitePlacePrincipalValue_isClosedEmbedding_injective v)
+  have hemb : IsEmbedding (finitePlacePrincipalValue v) :=
+    (congrArg (fun t ↦ @IsEmbedding ℬ(Fᵥ(v)) ℬ(Fᵥ(v)) t t
+      (fun f ↦ finitePlacePrincipalValue v f)) heq).mpr h
+  have hc := finestLocallyConvex_submodule_isClosed (E := ℬ(Fᵥ(v)))
+    (LinearMap.range (finitePlacePrincipalValue v).toLinearMap)
+  have hcl : IsClosed (Set.range (finitePlacePrincipalValue v)) :=
+    (congrArg (fun t ↦ @IsClosed ℬ(Fᵥ(v)) t (Set.range (finitePlacePrincipalValue v)))
+      heq).mpr hc
+  exact ⟨hemb, hcl⟩
 
 private theorem finitePlacePrincipalValue_range_integral {G : Type*} [CommGroup G]
     [MeasurableSpace G] [MeasurableMul G] (μ : Measure G) [μ.IsMulLeftInvariant]
@@ -927,10 +1003,137 @@ The global principal value is a topological embedding with closed range. -/
 theorem adelePrincipalValue_isClosedEmbedding (S₀ : Finset V) :
     IsClosedEmbedding (adelePrincipalValue F S₀) := by sorry
 
+local instance instMeasurableSpaceAdicUnitsSec3aKernel (v : V) :
+    MeasurableSpace (v.adicCompletion F)ˣ := borel _
+
+/-- The unit of the S-local adele ring that is the given local unit at `v` and `1` at every
+other place of `S`; translating by it rescales only the `v`-coordinate of the argument. -/
+private def adelicPrincipalValueLocalUnit {S : Finset V} (v : S)
+    (c : (v.val.adicCompletion F)ˣ) : (SAdeleRing F S)ˣ := by
+  classical
+  refine Units.mk (1, Function.update (fun w : S => (1 : w.val.adicCompletion F)) v c.val)
+    (1, Function.update (fun w : S => (1 : w.val.adicCompletion F)) v c.inv) ?_ ?_
+  · refine Prod.ext (by simp) (funext fun w => ?_)
+    by_cases h : w = v
+    · subst h
+      simp [Function.update_apply, Units.mul_inv]
+    · simp [Function.update_apply, h]
+  · refine Prod.ext (by simp) (funext fun w => ?_)
+    by_cases h : w = v
+    · subst h
+      simp [Function.update_apply, Units.inv_mul]
+    · simp [Function.update_apply, h]
+
+/-- S-local theta of a translate is S-local theta evaluated at the inverse-translated idele. -/
+private theorem sAdelePrincipalValue_preserves_thetaKernel_translate
+    {S : Finset V} (g x : (SAdeleRing F S)ˣ) (f : ℬₛ(S)) :
+    sLocalAdelicTheta F S (schwartzBruhatUnitTranslate g f) x =
+      sLocalAdelicTheta F S f (g⁻¹ * x) := by
+  let d := (Units.map ((adeleProjection F S).comp
+    (integralAdelesOutside F S).subtype).toMonoidHom).comp
+      (Units.map (integralAdeleDiagonal F S).toMonoidHom)
+  refine (sLocalAdelicTheta_apply F S (schwartzBruhatUnitTranslate g f) x).trans
+    (Eq.trans ?_ (sLocalAdelicTheta_apply F S f (g⁻¹ * x)).symm)
+  exact tsum_congr fun t => congrArg (fun y => f (Multiplicative.ofAdd y))
+    (mul_left_comm g.inv (d t).val x.val)
+
+/-- Paper: (5.3.1.9), p. 242.
+The single-place operator at `v` is `1` minus the normalized average over the integer units at
+`v` of the translates by the reciprocal uniformizer times the unit, and S-local theta turns this
+into the same recipe on the theta function: theta of the principal value at one place is theta of
+the test minus the normalized average, over the integer units at that place, of theta of its
+translates. This is the analytic content of (5.3.1.9): the theta sum over the S-units is exchanged
+with the integral over the compact group of integer units, as in the proof of the formula for the
+global theta function in one place in `Ch11_ShellStructure.Sec2a`. -/
+private theorem sLocalAdelicTheta_sAdelePrincipalValue_singleton {S : Finset V} (v : S)
+    (π : (v.val.adicCompletion F)ˣ)
+    (hπ : (Valued.v : Valuation (v.val.adicCompletion F) (WithZero (Multiplicative ℤ))).IsUniformizer
+      (π : v.val.adicCompletion F))
+    (f : ℬₛ(S)) (x : (SAdeleRing F S)ˣ) :
+    sLocalAdelicTheta F S
+        (sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.property) f) x =
+      sLocalAdelicTheta F S f x -
+        ((finiteLocalMultiplicativeTamagawaMeasure F v.val).real
+          ((HeightOneSpectrum.adicCompletionIntegers F v.val).units :
+            Set (v.val.adicCompletion F)ˣ) : ℂ)⁻¹ *
+          ∫ u in ((HeightOneSpectrum.adicCompletionIntegers F v.val).units :
+              Set (v.val.adicCompletion F)ˣ),
+            sLocalAdelicTheta F S
+              (schwartzBruhatUnitTranslate
+                (adelicPrincipalValueLocalUnit v (π * (u : (v.val.adicCompletion F)ˣ))) f) x
+            ∂(finiteLocalMultiplicativeTamagawaMeasure F v.val) := by sorry
+
+/-- Paper: (5.3.1.9), p. 242.
+The single-place principal value at `v` maps the theta kernel into itself: theta of the average
+of the translates vanishes because theta of every translate is theta of the test at another
+idele, and theta of the test is zero. -/
+private theorem sAdelePrincipalValue_preserves_thetaKernel_singleton {S : Finset V} (v : S)
+    (f : ℬₛ(S)) (hf : sLocalAdelicTheta F S f = 0) :
+    sLocalAdelicTheta F S
+      (sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.property) f) = 0 := by
+  let hunif := (Valued.v :
+    Valuation (v.val.adicCompletion F) (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π : (v.val.adicCompletion F)ˣ :=
+    Units.mk0 (hunif.choose : v.val.adicCompletion F) hunif.choose_spec.ne_zero
+  have hπ : (Valued.v :
+      Valuation (v.val.adicCompletion F) (WithZero (Multiplicative ℤ))).IsUniformizer
+        (π : v.val.adicCompletion F) := hunif.choose_spec
+  refine ContinuousMap.ext fun y => ?_
+  refine (sLocalAdelicTheta_sAdelePrincipalValue_singleton v π hπ f y).trans ?_
+  have hzero : ∀ (u : (v.val.adicCompletion F)ˣ) (z : (SAdeleRing F S)ˣ), sLocalAdelicTheta F S
+        (schwartzBruhatUnitTranslate (R := SAdeleRing F S)
+          (adelicPrincipalValueLocalUnit v (π * u)) f) z = 0 := by
+    intro u z
+    rw [sAdelePrincipalValue_preserves_thetaKernel_translate]
+    exact DFunLike.congr_fun hf _
+  have hfun : (fun u : (v.val.adicCompletion F)ˣ => sLocalAdelicTheta F S
+        (schwartzBruhatUnitTranslate (R := SAdeleRing F S)
+          (adelicPrincipalValueLocalUnit v (π * u)) f) y) = fun _ => 0 :=
+    funext fun u => hzero u y
+  have hf0 : sLocalAdelicTheta F S f y = 0 := DFunLike.congr_fun hf y
+  rw [hfun, integral_zero, mul_zero, sub_zero]
+  exact hf0
+
+open Classical in
+/-- Paper: (5.3.1.9), p. 242.
+The S-local principal value is the composition, over the selected places, of its single-place
+versions: each factor acts in its own coordinate of the tensor decomposition of the S-local test
+space, so the operators commute and compose to the operator attached to the whole set. The
+composite is written as a product over a list so that it can be peeled one place at a time. -/
+private theorem sAdelePrincipalValue_preserves_thetaKernel_list {S S₀ : Finset V} (h₀ : S₀ ⊆ S)
+    (f : ℬₛ(S)) :
+    sAdelePrincipalValue F h₀ f =
+      (S₀.val.toList.map fun v => if h : v ∈ S then
+        sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr h) else 1).prod f := by sorry
+
 /-- Paper: (5.3.1.9), p. 242.
 The S-local principal value preserves the kernel of theta averaging. -/
 theorem sAdelePrincipalValue_preserves_thetaKernel {S S₀ : Finset V} (h₀ : S₀ ⊆ S) :
-    Kₛ(S) ≤ (Kₛ(S)).comap (sAdelePrincipalValue F h₀) := by sorry
+    Kₛ(S) ≤ (Kₛ(S)).comap (sAdelePrincipalValue F h₀) := by
+  classical
+  have key : ∀ (l : List V), (∀ v ∈ l, v ∈ S) → ∀ g : ℬₛ(S), sLocalAdelicTheta F S g = 0 →
+      sLocalAdelicTheta F S ((l.map fun v => if h : v ∈ S then
+        sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr h) else 1).prod g) = 0 := by
+    intro l
+    induction l with
+    | nil =>
+      intro _ g hg
+      simpa using hg
+    | cons a l ih =>
+      intro hmem g hg
+      have ha : a ∈ S := hmem a List.mem_cons_self
+      have hta : ∀ v ∈ l, v ∈ S := fun v hv => hmem v (List.mem_cons_of_mem a hv)
+      have htail := ih hta g hg
+      have hQa : (if h : a ∈ S then
+          sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr h) else 1) =
+          sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr ha) := dif_pos ha
+      rw [List.map_cons, List.prod_cons, hQa]
+      exact sAdelePrincipalValue_preserves_thetaKernel_singleton ⟨a, ha⟩ _ htail
+  intro f hf
+  rw [LinearMap.mem_ker] at hf
+  rw [Submodule.mem_comap]
+  rw [sAdelePrincipalValue_preserves_thetaKernel_list h₀]
+  exact key S₀.val.toList (fun v hv => h₀ (Multiset.mem_toList.mp hv)) f hf
 
 /-- Paper: (5.3.1.10), p. 242.
 The global principal value preserves the kernel of theta averaging. -/

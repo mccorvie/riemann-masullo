@@ -2541,6 +2541,57 @@ theorem modulatedCyclicPairing_int_unconditionalBasis (ω : PontryaginDual K) :
   exact unconditionalBasis_int_of_nat (X := E) (Pχ[ω]).ker bχ[ω] σ
     (modulatedCyclicPairing_unconditionalBasis m γ hm hms hγ μ₁ χ t₀ ht₀ hχ ν τ hτ μ hμ hν ω σ)
 
+private theorem isCompact_unit_interval (l r : ℝ≥0ˣ) : IsCompact (Icc l r) := by
+  let e := (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.symm.toHomeomorph
+  have hmon (a b : ℝ≥0ˣ) : e a ≤ e b ↔ a ≤ b := by
+    change Real.expOrderIso.symm _ ≤ Real.expOrderIso.symm _ ↔ _
+    exact Real.expOrderIso.symm.le_iff_le
+  have he : Icc l r = e ⁻¹' Icc (e l) (e r) :=
+    Set.ext fun x ↦ and_congr (hmon l x).symm (hmon x r).symm
+  exact he ▸ e.isProperMap.isCompact_preimage isCompact_Icc
+
+/-- Transport a primal and dual Schauder basis along a quotient equivalence.
+Biorthogonality recovers each dual coordinate by evaluating on its primal basis vector. -/
+private theorem modulatedCompactSupport_isotypicQuotient_bases_transport
+    {Y₀ X : Type*} [AddCommGroup Y₀] [Module ℂ Y₀] [TopologicalSpace Y₀]
+    [IsTopologicalAddGroup Y₀] [ContinuousSMul ℂ Y₀]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [IsTopologicalAddGroup X] [ContinuousSMul ℂ X]
+    (N : Submodule ℂ Y₀) (e : (Y₀ ⧸ N) ≃L[ℂ] X) (v : ℕ → X) (c : ℕ → StrongDual ℂ X)
+    (d : ℕ → StrongDual ℂ (StrongDual ℂ X)) (hb : IsSchauderBasis v c) (ha : SchauderBasis.IsAbsolute v c)
+    (hd : IsSchauderBasis c d) (hu : SchauderBasis.IsUnconditional c d) :
+    ∃ f : ℕ → Y₀, (∀ n, N.mkQ (f n) = e.symm (v n)) ∧
+      let c' := fun n ↦ (c n).comp e.toContinuousLinearMap
+      let ev := fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (N.mkQ (f n))
+      IsSchauderBasis (N.mkQ ∘ f) c' ∧ SchauderBasis.IsAbsolute (N.mkQ ∘ f) c' ∧
+        IsSchauderBasis c' ev ∧ SchauderBasis.IsUnconditional c' ev := by
+  choose f hf using fun n ↦ N.mkQ_surjective (e.symm (v n))
+  refine ⟨f, hf, ?_⟩
+  have hfun : N.mkQ ∘ f = e.symm ∘ v := funext hf
+  have hcoeff (n : ℕ) (ℓ : StrongDual ℂ X) : d n ℓ = ℓ (v n) := by
+    let ev := ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (v n)
+    have heval (j : ℕ) : ev (d j ℓ • c j) = if j = n then d n ℓ else 0 := by
+      change d j ℓ • c j (v n) = _
+      have hpair : c j (v n) = if j = n then 1 else 0 := hb.1 j n
+      rw [hpair]
+      by_cases h : j = n
+      · subst j; simp
+      · simp [h]
+    have hsum := (hu ℓ).mapL ev
+    have hs : HasSum (fun j : ℕ ↦ if j = n then d n ℓ else 0) (ℓ (v n)) :=
+      hsum.congr_fun fun j ↦ (heval j).symm
+    exact (hasSum_ite_eq n _).unique hs
+  let D := e.symm.arrowCongr (ContinuousLinearEquiv.refl ℂ ℂ)
+  have hev : (fun n ↦ (d n).comp D.symm.toContinuousLinearMap) =
+      fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (N.mkQ (f n)) := by
+    funext n
+    apply ContinuousLinearMap.ext
+    intro ℓ
+    change d n (D.symm ℓ) = ℓ (N.mkQ (f n))
+    rw [hcoeff, hf]
+    rfl
+  refine ⟨hfun ▸ transportSchauderBasis e.symm hb, hfun ▸ transportAbsoluteBasis e.symm ha, ?_⟩
+  exact hev ▸ And.intro (transportSchauderBasis D hd) (transportUnconditionalBasis D hu)
+
 include hχ hτ hμ hν hwidth in
 /-- Paper: Theorem 4.5.2.3(2), pp. 207–208. Biorthogonal representatives can
 be chosen with support in the wide module window. Their classes give an
@@ -2557,7 +2608,17 @@ theorem modulatedCompactSupport_isotypicQuotient_bases (ω : PontryaginDual K) (
       SchauderBasis.IsAbsolute (N.mkQ ∘ f) c ∧
       let d : ℕ → StrongDual ℂ (StrongDual ℂ U) :=
         fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (N.mkQ (f n))
-      IsSchauderBasis c d ∧ SchauderBasis.IsUnconditional c d := by sorry
+      IsSchauderBasis c d ∧ SchauderBasis.IsUnconditional c d := by
+  intro N U
+  have hcover := modulatedCompactSupport_quotient_image_interior m γ hγ a b hwidth
+  obtain ⟨e, he⟩ := modulatedCompactSupport_isotypicQuotient_equiv m γ hm hms hγ window
+    (isCompact_unit_interval _ _) μ₁ χ hcover ω
+  obtain ⟨v, hb, ha, _, d, hd, hu⟩ :=
+    quotient_isotype_bases m γ hm hms hγ μ₁ χ t₀ ht₀ hχ ν τ hτ μ hμ hν ω σ
+  obtain ⟨f, _, h⟩ :=
+    modulatedCompactSupport_isotypicQuotient_bases_transport N e v (bχ[ω] ∘ σ) d hb ha hd hu
+  refine ⟨f, fun n ↦ (bχ[ω] (σ n)).comp e.toContinuousLinearMap, ?_, h⟩
+  exact fun n g ↦ congrArg (bχ[ω] (σ n)) (he g)
 
 end Support
 
@@ -3821,15 +3882,6 @@ section SupportedPrimitive
 variable (k : Subgroup G) (a b : ℝ≥0ˣ)
 local notation "window" => Icc (b / a) (b * a)
 local notation "W" => modulatedCompactSupportStage m window k
-
-private theorem isCompact_unit_interval (l r : ℝ≥0ˣ) : IsCompact (Icc l r) := by
-  let e := (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.symm.toHomeomorph
-  have hmon (a b : ℝ≥0ˣ) : e a ≤ e b ↔ a ≤ b := by
-    change Real.expOrderIso.symm _ ≤ Real.expOrderIso.symm _ ↔ _
-    exact Real.expOrderIso.symm.le_iff_le
-  have he : Icc l r = e ⁻¹' Icc (e l) (e r) :=
-    Set.ext fun x ↦ and_congr (hmon l x).symm (hmon x r).symm
-  exact he ▸ e.isProperMap.isCompact_preimage isCompact_Icc
 
 private theorem cyclicPrimitive_vanishes_outside {A : Type*} [CommGroup A]
     (w : A →* ℝ≥0ˣ) (t : A) (ht : 1 ≤ w t) (lo hi : ℝ≥0ˣ) (g : A → ℂ)
