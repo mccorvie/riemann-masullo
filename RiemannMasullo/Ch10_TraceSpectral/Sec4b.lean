@@ -508,7 +508,36 @@ theorem spectralStripTransposedKernel_tendsto (_ha : 0 < a)
     (_horder : Order(χ, e)) (_hb : Bases(χ, x, f)) :
     ∃ K : Π(W'(α, s), W(α, s)),
       Tendsto (rectangle(χ, e) (fun j ↦ D ((f j).comp (Aq(a, hα, hs₀(hs), φ))))
-      (fun j ↦ S(a, hα, hs₀(hs)) (x j))) atTop (𝓝 K) := by sorry
+      (fun j ↦ S(a, hα, hs₀(hs)) (x j))) atTop (𝓝 K) := by
+  have lift {Z J E G X Y : Type _} [NormedAddCommGroup E] [NormedSpace ℂ E]
+      [NormedAddCommGroup G] [NormedSpace ℂ G] [NormedAddCommGroup X] [NormedSpace ℂ X]
+      [NormedAddCommGroup Y] [NormedSpace ℂ Y]
+      (d : E →L[ℂ] X) (j : G →L[ℂ] Y) (e : Z ↪ ℕ × ℕ) (N : Z → ℕ)
+      (i : (z : Z) → Fin (N z) → J) (u : J → E) (v : J → G)
+      (h : ∃ K, Tendsto (spectralKernelRectangle e N i u v) atTop (𝓝 K)) :
+      ∃ K, Tendsto (spectralKernelRectangle e N i (fun z ↦ d (u z)) (fun z ↦ j (v z))) atTop (𝓝 K) := by
+    let L : ProjectiveTensor E G →L[ℂ] ProjectiveTensor X Y :=
+      ⟨projectiveTensorMap d.toLinearMap j.toLinearMap, projectiveTensorMap_continuous d j⟩
+    obtain ⟨K, hK⟩ := h
+    refine ⟨L.completion K, (L.completion.continuous.continuousAt.tendsto.comp hK).congr ?_⟩
+    intro ij
+    unfold Function.comp spectralKernelRectangle
+    rw [ContinuousLinearMap.completion_apply_coe]
+    apply congrArg ((↑) : ProjectiveTensor X Y → Π(X, Y))
+    change projectiveTensorMap d.toLinearMap j.toLinearMap _ = _
+    rw [map_sum]
+    apply Finset.sum_congr rfl
+    intro z _
+    exact (map_sum (TensorProduct.map d.toLinearMap j.toLinearMap)
+      (fun m : Fin (N z) ↦ u (i z m) ⊗ₜ[ℂ] v (i z m)) Finset.univ).trans
+      (Finset.sum_congr rfl fun m _ ↦ TensorProduct.map_tmul _ _ _ _)
+  let E := H(a, hα, hs₀(hs))
+  let θ := Θ(a, hα, hs₀(hs))
+  let d : StrongDual ℂ E →L[ℂ] W'(α, s) := ⟨D,
+    (spectralSobolevDualEmbedding_isometry_range (F := F) a (hStrip(hα)) hs₀(hs)).1.continuous⟩
+  let j : E →L[ℂ] W(α, s) := θ.orthogonal.subtypeL.comp
+    θ.quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
+  exact lift d j e _ _ _ _ (spectralStripQuotientKernel_tendsto (F := F) a hα hs φ _ha χ eχ e x f _hχ _he _horder _hb)
 
 -- TODO(paper-gap): The estimate at the end of §10.4.2 does not prove convergence
 -- of the ambient net with convolution on the output factor. The quotient net
