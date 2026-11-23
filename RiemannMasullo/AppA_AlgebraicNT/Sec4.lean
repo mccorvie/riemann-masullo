@@ -408,6 +408,55 @@ local notation "PicKernel" => MonoidHom.ker (CommRing.Pic.mapAlgebra (𝓞 F) O�
 local notation "OutsideNormOne" => MonoidHom.ker (MonoidHom.comp (ideleNorm F) outsideInclusion)
 local notation "Nₛ" => MonoidHom.ker (sIdeleNorm F S)
 
+/-- At an infinite place the diagonal section has S-logarithm `log t` divided by the
+number of infinite places. -/
+private theorem sIdeleLog_basic_slice_subset_closedBall_diagonal_inl (t : ℝ≥0ˣ)
+    (w : InfinitePlace F) :
+    sIdeleLog F S (projectS (diagonalIdeleNormSection F t)) (Sum.inl w) =
+      Real.log (t.val : ℝ) / Fintype.card (InfinitePlace F) := by
+  classical
+  have hcomp : (diagonalIdeleNormSection F t).val.1 w =
+      (infinitePlaceRealPower F w ((w.mult : ℝ) * Fintype.card (InfinitePlace F))⁻¹ t).val := by
+    let ψ : IdeleGroup (𝓞 F) F →* w.Completion :=
+      (Pi.evalMonoidHom (fun v : InfinitePlace F ↦ v.Completion) w).comp
+        ((MonoidHom.fst (InfiniteAdeleRing F) (FiniteAdeleRing (𝓞 F) F)).comp
+          (Units.coeHom (AdeleRing (𝓞 F) F)))
+    change ψ (diagonalIdeleNormSection F t) = _
+    simp only [diagonalIdeleNormSection, MonoidHom.finsetProd_apply, MonoidHom.comp_apply,
+      map_prod]
+    rw [Finset.prod_eq_single w]
+    · exact Pi.mulSingle_eq_same _ _
+    · intro v _ hv
+      exact Pi.mulSingle_eq_of_ne' hv _
+    · simp
+  have ht : 0 < (t.val : ℝ) := NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr t.ne_zero)
+  have hnorm : ‖(diagonalIdeleNormSection F t).val.1 w‖ =
+      (t.val : ℝ) ^ ((w.mult : ℝ) * Fintype.card (InfinitePlace F))⁻¹ := by
+    rw [hcomp, ← (InfinitePlace.Completion.isometry_extensionEmbedding w).norm_map_of_map_zero
+      (map_zero _), infinitePlaceRealPower_apply, Complex.norm_real,
+      Real.norm_of_nonneg (Real.rpow_nonneg ht.le _)]
+  change (w.mult : ℝ) * Real.log ‖(diagonalIdeleNormSection F t).val.1 w‖ = _
+  rw [hnorm, Real.log_rpow ht]
+  have hm : (w.mult : ℝ) ≠ 0 := w.mult_coe_ne_zero
+  have hc : (Fintype.card (InfinitePlace F) : ℝ) ≠ 0 := Nat.cast_ne_zero.mpr Fintype.card_ne_zero
+  field_simp
+
+/-- At a finite place of S the diagonal section has S-logarithm zero. -/
+private theorem sIdeleLog_basic_slice_subset_closedBall_diagonal_inr (t : ℝ≥0ˣ) (v : S) :
+    sIdeleLog F S (projectS (diagonalIdeleNormSection F t)) (Sum.inr v) = 0 := by
+  have h1 : (diagonalIdeleNormSection F t).val.2 v.val = 1 := by
+    let ψ : IdeleGroup (𝓞 F) F →* v.val.adicCompletion F :=
+      (RestrictedProduct.evalRingHom (fun w : HeightOneSpectrum (𝓞 F) ↦ w.adicCompletion F)
+        v.val).toMonoidHom.comp
+        ((MonoidHom.snd (InfiniteAdeleRing F) (FiniteAdeleRing (𝓞 F) F)).comp
+          (Units.coeHom (AdeleRing (𝓞 F) F)))
+    change ψ (diagonalIdeleNormSection F t) = 1
+    simp only [diagonalIdeleNormSection, MonoidHom.finsetProd_apply, MonoidHom.comp_apply,
+      map_prod]
+    exact Finset.prod_eq_one fun w _ ↦ rfl
+  change Real.log ‖(diagonalIdeleNormSection F t).val.2 v.val‖ = 0
+  rw [h1, norm_one, Real.log_one]
+
 /-- Paper: Claim A.4.1.2, p. 564. For fixed F and S there is a common radius multiplier
 for every choice of fundamental domains and class representatives. For sufficiently
 small basic ideles the translated slice lies in the ball of that radius times the
@@ -435,6 +484,149 @@ theorem sIdeleLog_basic_slice_subset_closedBall :
           {x : EuclideanSpace ℝ Vₛ | (∑ v, x v) = 0 ∧
             ∀ v, x v + sIdeleLog F S (gᵢ * g) v ≤ 0} ⊆
             Metric.closedBall 0 (C₀ * |Real.log (normℝ[g])|) := by
-  sorry
+  classical
+  let n : ℕ := Fintype.card Vₛ
+  have : Nonempty Vₛ := ⟨Sum.inl (Classical.arbitrary (InfinitePlace F))⟩
+  have hn : 0 < n := Fintype.card_pos
+  refine ⟨3 * n, by positivity, ?_⟩
+  intro b v₀ σ bₛ r hr
+  -- The S-logarithms of the class representatives lie in a bounded parallelotope.
+  let B₁ : ℝ := ∑ k, ‖sIdeleLog F S (unitAtS (bₛ k).toMul.out)‖
+  have hB₁ (i : PicKernel) :
+      (∀ v, |sIdeleLog F S (projectS (outsideInclusion (r i).val)) v| ≤ B₁) ∧
+      ∑ v, sIdeleLog F S (projectS (outsideInclusion (r i).val)) v = 0 := by
+    obtain ⟨h, hmem, hh⟩ := (hr i).2
+    have hh' : (h : Iₛ) = projectS (outsideInclusion (r i).val) := hh
+    rw [← hh']
+    obtain ⟨hpar, -⟩ := hmem
+    refine ⟨fun v ↦ ?_, sRegulatorParallelotope_sum_zero F S bₛ _ hpar⟩
+    obtain ⟨c, hc, hy⟩ := hpar
+    rw [hy, ← Real.norm_eq_abs]
+    refine (norm_le_pi_norm _ v).trans ((norm_sum_le _ _).trans (Finset.sum_le_sum fun k _ ↦ ?_))
+    rw [norm_smul, Real.norm_eq_abs, abs_of_nonneg (hc k).1]
+    exact mul_le_of_le_one_left (norm_nonneg _) (hc k).2.le
+  have hB₁nn : 0 ≤ B₁ := Finset.sum_nonneg fun _ _ ↦ norm_nonneg _
+  -- The archimedean fundamental domain has bounded logarithms.
+  obtain ⟨B₂, hB₂⟩ : ∃ B₂ : ℝ, ∀ h ∈ closure (infiniteIdeleFundamentalDomain F b v₀ σ),
+      ‖infiniteIdeleLog F h.val‖ ≤ B₂ := by
+    have hcont : Continuous fun h : (infiniteIdeleNorm F).ker ↦ ‖infiniteIdeleLog F h.val‖ :=
+      ((infiniteIdeleLog_continuous F).comp continuous_subtype_val).norm
+    obtain ⟨B, hB⟩ := (infiniteIdeleFundamentalDomain_precompact F b v₀ σ).bddAbove_image
+      hcont.continuousOn
+    exact ⟨B, fun h hh ↦ hB ⟨h, hh, rfl⟩⟩
+  let B : ℝ := B₁ + max B₂ 0
+  have hBnn : 0 ≤ B := add_nonneg hB₁nn (le_max_right _ _)
+  refine ⟨Real.exp (-(B + 1)), Real.exp_pos _, ?_⟩
+  intro t g₀ hg₀ hint g hg i gᵢ x hx
+  -- The basic idele `g₀` has bounded logarithm with coordinate sum zero.
+  obtain ⟨h₀, hh₀, hh₀'⟩ := hg₀
+  have hh₀'' : h₀.val = Units.map (RingHom.fst _ _).toMonoidHom g₀ := hh₀'
+  have hg₀fin (v : S) : sIdeleLog F S g₀ (Sum.inr v) = 0 := by
+    have h1 : ‖g₀.val.2 v‖ ≤ 1 := by
+      have h := (hint v).1
+      rwa [HeightOneSpectrum.mem_adicCompletionIntegers,
+        ← Valued.toNormedField.norm_le_one_iff] at h
+    have h2 : ‖g₀.inv.2 v‖ ≤ 1 := by
+      have h := (hint v).2
+      rwa [HeightOneSpectrum.mem_adicCompletionIntegers,
+        ← Valued.toNormedField.norm_le_one_iff] at h
+    have h3 : ‖g₀.val.2 v‖ * ‖g₀.inv.2 v‖ = 1 := by
+      rw [← norm_mul]
+      have h := congrArg (fun z : SAdeleRing F S ↦ z.2 v) g₀.val_inv
+      simp only [Prod.snd_mul, Pi.mul_apply, Prod.snd_one, Pi.one_apply] at h
+      rw [h, norm_one]
+    have h4 : ‖g₀.val.2 v‖ = 1 :=
+      le_antisymm h1 (by nlinarith [norm_nonneg (g₀.val.2 v), norm_nonneg (g₀.inv.2 v)])
+    change Real.log ‖g₀.val.2 v‖ = 0
+    rw [h4, Real.log_one]
+  have hg₀log (v : Vₛ) : |sIdeleLog F S g₀ v| ≤ max B₂ 0 := by
+    rcases v with w | v
+    · change |infiniteIdeleLog F (Units.map (RingHom.fst _ _).toMonoidHom g₀) w| ≤ _
+      rw [← hh₀'', ← Real.norm_eq_abs]
+      exact ((norm_le_pi_norm _ w).trans (hB₂ h₀ (subset_closure hh₀))).trans
+        (le_max_left _ _)
+    · rw [hg₀fin, abs_zero]
+      exact le_max_right _ _
+  have hg₀sum : ∑ v, sIdeleLog F S g₀ v = 0 := by
+    rw [Fintype.sum_sum_type, Finset.sum_eq_zero fun v _ ↦ hg₀fin v, add_zero]
+    have h := infiniteIdeleLog_sum_zero F h₀
+    rw [hh₀''] at h
+    exact h
+  -- The diagonal factor has logarithm `log t` spread over the infinite places.
+  let lt : ℝ := Real.log (t.val : ℝ)
+  let d := sIdeleLog F S (projectS (diagonalIdeleNormSection F t))
+  have hcard : (1 : ℝ) ≤ Fintype.card (InfinitePlace F) := by
+    exact_mod_cast Fintype.card_pos
+  have hdlog (v : Vₛ) : |d v| ≤ |lt| := by
+    rcases v with w | v
+    · change |sIdeleLog F S (projectS (diagonalIdeleNormSection F t)) (Sum.inl w)| ≤ _
+      rw [sIdeleLog_basic_slice_subset_closedBall_diagonal_inl, abs_div, Nat.abs_cast]
+      exact div_le_self (abs_nonneg _) hcard
+    · change |sIdeleLog F S (projectS (diagonalIdeleNormSection F t)) (Sum.inr v)| ≤ _
+      rw [sIdeleLog_basic_slice_subset_closedBall_diagonal_inr, abs_zero]
+      exact abs_nonneg _
+  have hdsum : ∑ v, d v = lt := by
+    change ∑ v, sIdeleLog F S (projectS (diagonalIdeleNormSection F t)) v = Real.log (t.val : ℝ)
+    rw [Fintype.sum_sum_type]
+    simp only [sIdeleLog_basic_slice_subset_closedBall_diagonal_inl,
+      sIdeleLog_basic_slice_subset_closedBall_diagonal_inr, Finset.sum_const_zero, add_zero,
+      Finset.sum_const, Finset.card_univ, nsmul_eq_mul]
+    field_simp
+  -- Logarithms of `g` and of `gᵢ * g`.
+  have hglog : sIdeleLog F S g = d + sIdeleLog F S g₀ :=
+    sUnit_unitBox_count_bound_log_mul F S _ _
+  have hlogg : Real.log normℝ[g] = lt := by
+    rw [← sIdeleLog_sum, hglog]
+    simp only [Pi.add_apply, Finset.sum_add_distrib, hdsum, hg₀sum, add_zero]
+  have hnorm : 0 < normℝ[g] := NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr (Units.ne_zero _))
+  have hlt : lt < -(B + 1) := by
+    have h := Real.log_lt_log hnorm hg
+    rwa [Real.log_exp, hlogg] at h
+  obtain ⟨L, hL⟩ : ∃ L : ℝ, L = -lt := ⟨_, rfl⟩
+  have hLB : B + 1 < L := by linarith
+  have habs : |Real.log normℝ[g]| = L := by rw [hlogg, abs_of_neg (by linarith), hL]
+  have hlog_lt : |lt| = L := by rw [abs_of_neg (by linarith), hL]
+  obtain ⟨hci, hcsum⟩ := hB₁ i
+  have hℓ : sIdeleLog F S (gᵢ * g) = sIdeleLog F S gᵢ + (d + sIdeleLog F S g₀) := by
+    rw [sUnit_unitBox_count_bound_log_mul, hglog]
+  have hℓv (v : Vₛ) : |sIdeleLog F S (gᵢ * g) v| ≤ B + L := by
+    rw [hℓ, Pi.add_apply, Pi.add_apply]
+    have h1 := hci v
+    have h2 := hdlog v
+    have h3 := hg₀log v
+    rw [hlog_lt] at h2
+    calc |sIdeleLog F S gᵢ v + (d v + sIdeleLog F S g₀ v)|
+        ≤ |sIdeleLog F S gᵢ v| + (|d v| + |sIdeleLog F S g₀ v|) :=
+          (abs_add_le _ _).trans (add_le_add_right (abs_add_le _ _) _)
+      _ ≤ B₁ + (L + max B₂ 0) := add_le_add h1 (add_le_add h2 h3)
+      _ = B + L := by ring
+  have hℓsum : ∑ v, sIdeleLog F S (gᵢ * g) v = -L := by
+    rw [hℓ]
+    simp only [Pi.add_apply, Finset.sum_add_distrib, hdsum, hg₀sum, add_zero]
+    rw [show ∑ v, sIdeleLog F S gᵢ v = 0 from hcsum, zero_add, hL, neg_neg]
+  -- Every coordinate of a point of the slice is at most `3 L` in absolute value.
+  obtain ⟨hx0, hxle⟩ := hx
+  have hxv (v : Vₛ) : |x v| ≤ 3 * L := by
+    have hs : ∑ u, (x u + sIdeleLog F S (gᵢ * g) u) = -L := by
+      rw [Finset.sum_add_distrib, hx0, hℓsum, zero_add]
+    rw [Fintype.sum_eq_add_sum_subtype_ne _ v] at hs
+    have hrest : ∑ u : {u : Vₛ // u ≠ v}, (x u + sIdeleLog F S (gᵢ * g) u) ≤ 0 :=
+      Finset.sum_nonpos fun u _ ↦ hxle u
+    have h1 := hxle v
+    have h2 := abs_le.mp (hℓv v)
+    rw [abs_le]
+    constructor <;> linarith
+  rw [mem_closedBall_zero_iff, EuclideanSpace.norm_eq, habs]
+  have hL0 : 0 ≤ L := by linarith
+  have hsq : ∑ v, ‖x v‖ ^ 2 ≤ (3 * n * L) ^ 2 := by
+    have hn1 : (1 : ℝ) ≤ n := by exact_mod_cast hn
+    calc ∑ v, ‖x v‖ ^ 2 ≤ ∑ _v : Vₛ, (3 * L) ^ 2 := Finset.sum_le_sum fun v _ ↦
+          pow_le_pow_left₀ (norm_nonneg _) ((Real.norm_eq_abs _).trans_le (hxv v)) 2
+      _ = n * (3 * L) ^ 2 := by rw [Finset.sum_const, Finset.card_univ, nsmul_eq_mul]
+      _ ≤ (n : ℝ) ^ 2 * (3 * L) ^ 2 :=
+          mul_le_mul_of_nonneg_right (by nlinarith) (sq_nonneg _)
+      _ = (3 * n * L) ^ 2 := by ring
+  calc √(∑ v, ‖x v‖ ^ 2) ≤ √((3 * n * L) ^ 2) := Real.sqrt_le_sqrt hsq
+    _ = 3 * n * L := Real.sqrt_sq (by positivity)
 
 end RiemannMasullo
