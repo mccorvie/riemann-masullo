@@ -838,6 +838,74 @@ theorem spectralConvolution_mellin_integrable (φ : BruhatCompactSupport C𝔽)
       (show HasCompactSupport φ.val from φ.property.2).mul_right
   · exact Set.indicator_of_mem (Set.mem_univ _) _
 
+section
+
+variable (a : ℝ)
+
+local notation "Z(" χ ", " α ")" => {z : PontryaginDual C₁ × ℝ × ℝ //
+  z.2.1 ∈ Icc (-α) α ∧ 0 < order(χ z.1, shift(a + z.2.1, z.2.2))}
+local notation "N(" χ ", " α ", " s ", " z ")" => spectralStripMultiplicity α s (z).val.2.1
+  (mult(χ (z).val.1, shift(a + (z).val.2.1, (z).val.2.2)))
+
+/-- Paper: Theorem 10.3.2.1(1), p. 453. The rectangular sums have Cauchy tails in trace norm.
+Gap: Trace-norm tails must control close zeros and high jet orders in the strip norm.
+A strip component with bounded central-line frequency support vanishes by holomorphy. -/
+theorem spectralStripConvolution_traceCauchy (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (_hχ : IsSpectralBasepointChoice (F := F) (fun ω ↦ χ ω))
+    {α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s) (φ : BruhatCompactSupport C𝔽)
+    (eχ : PontryaginDual C₁ ↪ ℕ) (e : Z(χ, α) ↪ ℕ × ℕ) (_he : ∀ z, (e z).1 = eχ z.val.1)
+    (x : SpectralStripJetIndex (F := F) (fun ω ↦ χ ω) a α s → Q(a, hStrip(hα), hs₀(hs)))
+    (Λ : SpectralStripJetIndex (F := F) (fun ω ↦ χ ω) a α s → StrongDual ℂ Q(a, hStrip(hα), hs₀(hs)))
+    (_hb : IsSpectralMarkushevichBasis x Λ)
+    (_hj : ∀ j, spectralSobolevDualEmbedding F a hStrip(hα) hs₀(hs) (Λ j) =
+      (spectralStripJet_memLp (F := F) (fun ω ↦ χ ω) hα hs₀(hs) j).toLp
+        (spectralZeroJet (F := F) (χ j.val.1) j.val.2.1 j.val.2.2.1 j.val.2.2.2)) :
+    let H := Q(a, hStrip(hα), hs₀(hs))
+    let A : H →L[ℂ] H := spectralConvolution (F := F) a hStrip(hα) hs₀(hs) φ
+    let B (ij : ℕ × ℕ) : H →L[ℂ] H :=
+      spectralConvolutionFiniteSum A x Λ
+        (((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn)
+        (fun z ↦ N(χ, α, s, z))
+        (fun z m ↦ ⟨(z.val.1, z.val.2.1, z.val.2.2, m.val), m.isLt⟩)
+    SpectralRectanglesTraceCauchy B := by sorry
+
+end
+
+/-- Relabeling a biorthogonal system by a bijection preserves its two dense spans. -/
+private theorem spectralLineConvolution_traceCauchy_reindexBasis
+    {I J E : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E] (r : J ≃ I)
+    (x : I → E) (f : I → StrongDual ℂ E) (h : IsSpectralMarkushevichBasis x f) :
+    IsSpectralMarkushevichBasis (x ∘ r) (f ∘ r) := by
+  refine ⟨fun j ↦ h.1 _, fun i j hij ↦ h.2.1 _ _ (fun he ↦ hij (r.injective he)), ?_, ?_⟩
+  · simpa only [Set.range_comp, r.surjective.range_eq, Set.image_univ] using h.2.2.1
+  · simpa only [Set.range_comp, r.surjective.range_eq, Set.image_univ] using h.2.2.2
+
+/-- Relabeling both zeros and their derivative indices leaves each finite rectangle unchanged. -/
+private theorem spectralLineConvolution_traceCauchy_reindexSum
+    {I J Z W E : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E]
+    (r : J ≃ I) (u : W ≃ Z) (e : Z ↪ ℕ × ℕ) (A : E →L[ℂ] E)
+    (x : I → E) (f : I → StrongDual ℂ E) (N : Z → ℕ) (M : W → ℕ)
+    (i : (z : Z) → Fin (N z) → I) (j : (w : W) → Fin (M w) → J)
+    (hN : ∀ w, M w = N (u w)) (hj : ∀ w m, r (j w m) = i (u w) (Fin.cast (hN w) m))
+    (k : Finset (ℕ × ℕ)) :
+    spectralConvolutionFiniteSum A (x ∘ r) (f ∘ r)
+      (k.preimage (u.toEmbedding.trans e) (u.toEmbedding.trans e).injective.injOn) M j =
+    spectralConvolutionFiniteSum A x f (k.preimage e e.injective.injOn) N i := by
+  classical
+  unfold spectralConvolutionFiniteSum
+  refine Finset.sum_bij (fun w _ ↦ u w) (fun w hw ↦ ?_) (fun _ _ _ _ he ↦ u.injective he) ?_ ?_
+  · rw [Finset.mem_preimage] at hw ⊢
+    exact hw
+  · intro z hz
+    refine ⟨u.symm z, Finset.mem_preimage.mpr ?_, u.apply_symm_apply z⟩
+    change e (u (u.symm z)) ∈ k
+    rw [u.apply_symm_apply]
+    exact Finset.mem_preimage.mp hz
+  · intro w _
+    apply Fintype.sum_equiv (finCongr (hN w))
+    intro m
+    simp only [Function.comp_apply, hj, finCongr_apply]
+
 section Line
 
 variable (a : ℝ)
@@ -865,7 +933,66 @@ theorem spectralLineConvolution_traceCauchy (χ : PontryaginDual C₁ → Pontry
         (((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn)
         (fun z ↦ N(χ, s, z))
         (fun z m ↦ ⟨(z.val.1, z.val.2, m.val), m.isLt⟩)
-    SpectralRectanglesTraceCauchy B := by sorry
+    SpectralRectanglesTraceCauchy B := by
+  classical
+  let Z₀ := {z : PontryaginDual C₁ × ℝ × ℝ //
+    z.2.1 ∈ Icc (-(0 : ℝ)) 0 ∧ 0 < order(χ z.1, shift(a + z.2.1, z.2.2))}
+  have hz (z : Z₀) : z.val.2.1 = 0 := by simpa using z.property.1
+  let u : Z₀ ≃ Z(χ) :=
+    { toFun := fun z ↦ ⟨(z.val.1, z.val.2.2), by simpa only [hz z, add_zero] using z.property.2⟩
+      invFun := fun z ↦ ⟨(z.val.1, 0, z.val.2), by simp, by simpa only [add_zero] using z.property⟩
+      left_inv := fun z ↦ Subtype.ext (Prod.ext rfl (Prod.ext (hz z).symm rfl))
+      right_inv := fun _ ↦ Subtype.ext rfl }
+  let J := SpectralStripJetIndex (F := F) χ a 0 s
+  have hzero (j : J) : j.val.2.1 = 0 := by
+    simpa using (j.mem_strip_order_pos (le_refl (0 : ℝ))).1
+  have hbound (k : ℕ) : spectralStripMultiplicity 0 s 0 k = spectralBoundaryMultiplicity s k :=
+    spectralStripMultiplicity_boundary le_rfl (Or.inr rfl) s k
+  let r : J ≃ SpectralLineJetIndex (F := F) χ a s :=
+    (spectralLineJet_zeroWidthEquiv (F := F) χ a s).symm
+  let N (z : Z(χ)) := N(χ, s, z)
+  let M (w : Z₀) := spectralStripMultiplicity 0 s w.val.2.1 (mult(χ w.val.1,
+    shift(a + w.val.2.1, w.val.2.2)))
+  have hm (w : Z₀) : M w = N (u w) := by
+    simp only [M, N, u, Equiv.coe_fn_mk, hz w, add_zero, hbound]
+  let i (z : Z(χ)) (m : Fin (N z)) : SpectralLineJetIndex (F := F) χ a s :=
+    ⟨(z.val.1,z.val.2,m.val),m.isLt⟩
+  let j (w : Z₀) (m : Fin (M w)) : J := ⟨(w.val.1,w.val.2.1,w.val.2.2,m.val),m.isLt⟩
+  let rect (q : ℕ × ℕ) := (Finset.Iic q.1).product (Finset.Iic q.2)
+  let v (k : SpectralLineJetIndex (F := F) χ a s) :=
+    spectralZeroJet (F := F) (χ k.val.1) 0 k.val.2.1 k.val.2.2
+  let μ (l : ℝ) := (μ𝔽).withDensity fun g ↦ ENNReal.ofReal
+    (intervalSobolevDensity l 0 s (Real.log ((ideleClassNorm F g).val : ℝ)))⁻¹
+  let P (l : ℝ) (hl : l ≤ 0) :=
+    ∀ (X : SpectralLineJetIndex (F := F) χ a s → Q(a, hl, hs₀(hs)))
+      (L : SpectralLineJetIndex (F := F) χ a s → StrongDual ℂ Q(a, hl, hs₀(hs))),
+      IsSpectralMarkushevichBasis X L →
+      ∀ (hv : ∀ k, MemLp (v k) 2 (μ l)),
+      (∀ k, spectralSobolevDualEmbedding F a hl hs₀(hs) (L k) = (hv k).toLp (v k)) →
+      SpectralRectanglesTraceCauchy (fun q ↦ spectralConvolutionFiniteSum
+        (spectralConvolution (F := F) a hl hs₀(hs) φ) X L
+        ((rect q).preimage e e.injective.injOn) N i)
+  have fromStrip : P (-0) hStrip(le_refl (0 : ℝ)) := by
+    intro X L hb hv hj
+    have strip := spectralStripConvolution_traceCauchy (F := F) a χ _hχ (le_refl (0 : ℝ)) hs φ
+      eχ (u.toEmbedding.trans e) (fun w ↦ _he (u w)) (X ∘ r) (L ∘ r)
+      (spectralLineConvolution_traceCauchy_reindexBasis r X L hb)
+    have h := strip (by
+      intro k
+      rcases k with ⟨⟨ω,b,t,k⟩, hk⟩
+      have he : b = 0 := hzero ⟨(ω,b,t,k), hk⟩
+      subst b
+      exact hj (r ⟨(ω,0,t,k), hk⟩))
+    let A := spectralConvolution (F := F) a hStrip(le_refl (0 : ℝ)) hs₀(hs) φ
+    have he (q : ℕ × ℕ) := spectralLineConvolution_traceCauchy_reindexSum r u e A X L N M i j hm
+      (fun _ _ ↦ Subtype.ext rfl) (rect q)
+    change SpectralRectanglesTraceCauchy (fun q ↦ spectralConvolutionFiniteSum A (X ∘ r) (L ∘ r)
+      ((rect q).preimage (u.toEmbedding.trans e) (u.toEmbedding.trans e).injective.injOn) M j) at h
+    simpa only [he] using h
+  have move (l : ℝ) (hl : l ≤ 0) (hl0 : l = 0) : P l hl → P 0 h₀ := by
+    subst l
+    exact id
+  exact move (-0) _ neg_zero fromStrip x Λ _hb (spectralLineJet_memLp (F := F) χ hs) _hj
 
 /-- Paper: Theorem 10.3.1.1(1) and (10.3.1.1), p. 448. The rectangular
 finite-rank sums over any enumeration converge to convolution in each Schatten class.
@@ -1345,27 +1472,6 @@ local notation "N(" χ ", " α ", " s ", " z ")" => spectralStripMultiplicity α
 -- p. 455 also replaces log powers of unbounded order by a fixed Sobolev
 -- weight and concludes only p > 1 for the displayed scalar sum.
 
-/-- Paper: Theorem 10.3.2.1(1), p. 453. The rectangular sums have Cauchy tails in trace norm.
-Gap: Trace-norm tails must control close zeros and high jet orders in the strip norm.
-A strip component with bounded central-line frequency support vanishes by holomorphy. -/
-theorem spectralStripConvolution_traceCauchy (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
-    (_hχ : IsSpectralBasepointChoice (F := F) (fun ω ↦ χ ω))
-    {α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s) (φ : BruhatCompactSupport C𝔽)
-    (eχ : PontryaginDual C₁ ↪ ℕ) (e : Z(χ, α) ↪ ℕ × ℕ) (_he : ∀ z, (e z).1 = eχ z.val.1)
-    (x : SpectralStripJetIndex (F := F) (fun ω ↦ χ ω) a α s → Q(a, hStrip(hα), hs₀(hs)))
-    (Λ : SpectralStripJetIndex (F := F) (fun ω ↦ χ ω) a α s → StrongDual ℂ Q(a, hStrip(hα), hs₀(hs)))
-    (_hb : IsSpectralMarkushevichBasis x Λ)
-    (_hj : ∀ j, spectralSobolevDualEmbedding F a hStrip(hα) hs₀(hs) (Λ j) =
-      (spectralStripJet_memLp (F := F) (fun ω ↦ χ ω) hα hs₀(hs) j).toLp
-        (spectralZeroJet (F := F) (χ j.val.1) j.val.2.1 j.val.2.2.1 j.val.2.2.2)) :
-    let H := Q(a, hStrip(hα), hs₀(hs))
-    let A : H →L[ℂ] H := spectralConvolution (F := F) a hStrip(hα) hs₀(hs) φ
-    let B (ij : ℕ × ℕ) : H →L[ℂ] H :=
-      spectralConvolutionFiniteSum A x Λ
-        (((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn)
-        (fun z ↦ N(χ, α, s, z))
-        (fun z m ↦ ⟨(z.val.1, z.val.2.1, z.val.2.2, m.val), m.isLt⟩)
-    SpectralRectanglesTraceCauchy B := by sorry
 
 /-- Paper: Theorem 10.3.2.1(1) and (10.3.2.1), p. 453. The rectangular
 finite-rank sums over any enumeration of the strip zeros converge to convolution

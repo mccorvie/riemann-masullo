@@ -2040,16 +2040,15 @@ theorem spectralStripJet_denseInterpolants (χ : PontryaginDual C₁ → Pontrya
     let u : J → W'(-α, α, s) := stripU(χ, hα, hs)
     JetInterpolation(J, a, stripI(hα), hs, u) := by sorry
 
-/-- At width zero the real offset of each strip jet is zero, and its remaining
-indices give exactly one line jet with the same function representative. -/
-private theorem spectralLineJet_zeroWidth_indices (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
-    (a s : ℝ) :
-    ∃ e : SpectralLineJetIndex χ a s ≃ SpectralStripJetIndex χ a 0 s,
-      ∀ i, stripJet(χ, e i) = lineJet(χ, i) := by
+/-- The canonical identification of line jets with the jets of the strip of width zero.
+The inverse forgets the zero real offset. -/
+def spectralLineJet_zeroWidthEquiv (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (a s : ℝ) :
+    SpectralLineJetIndex χ a s ≃ SpectralStripJetIndex χ a 0 s := by
   let L := SpectralLineJetIndex χ a s
   let Z := SpectralStripJetIndex χ a 0 s
   have hoff (j : Z) : j.val.2.1 = 0 := by
-    simpa using (SpectralStripJetIndex.mem_strip_order_pos (le_refl (0 : ℝ)) j).1
+    obtain ⟨lo, hi⟩ := (SpectralStripJetIndex.mem_strip_order_pos (le_refl (0 : ℝ)) j).1
+    exact le_antisymm hi (by simpa only [neg_zero] using lo)
   have hmult (n : ℕ) : spectralStripMultiplicity 0 s 0 n = spectralBoundaryMultiplicity s n :=
     spectralStripMultiplicity_boundary le_rfl (Or.inr rfl) s n
   let e : L ≃ Z :=
@@ -2059,7 +2058,15 @@ private theorem spectralLineJet_zeroWidth_indices (χ : PontryaginDual C₁ → 
         simpa only [hoff j, add_zero, hmult] using j.property⟩
       left_inv := fun _ ↦ Subtype.ext rfl
       right_inv := fun j ↦ Subtype.ext (Prod.ext rfl (Prod.ext (hoff j).symm rfl)) }
-  exact ⟨e, fun _ ↦ rfl⟩
+  exact e
+
+/-- At width zero the real offset of each strip jet is zero, and its remaining
+indices give exactly one line jet with the same function representative. -/
+private theorem spectralLineJet_zeroWidth_indices (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (a s : ℝ) :
+    ∃ e : SpectralLineJetIndex χ a s ≃ SpectralStripJetIndex χ a 0 s,
+      ∀ i, stripJet(χ, e i) = lineJet(χ, i) := by
+  exact ⟨spectralLineJet_zeroWidthEquiv χ a s, fun _ ↦ rfl⟩
 
 /-- Transport a statement about the reindexed reciprocal-weight vectors from
 the interval [−0, 0] to the identical line Sobolev space. -/
