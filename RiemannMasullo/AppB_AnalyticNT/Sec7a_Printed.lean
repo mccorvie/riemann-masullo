@@ -20,14 +20,18 @@ local notation "oneLine" => Complex.re ⁻¹' ({1} : Set ℝ)
 /-- Paper: Lemma B.7.1.1, Equations (B.7.1.4)–(B.7.1.5), p. 644.
 The two printed simplified bounds are uniform in the unrestricted range
 `σ > 1 - c`. A common constant majorizes the three big-O constants.
+The bound in (B.7.1.3) is supplied as one law of the exponent and the
+coefficient bound in (1), fixed for all the sequences under consideration.
 The natural floor extends the integer majorant to positive real arguments. -/
 def Printed.truncatedPerron_error_of_isBigO : Prop :=
-  ∀ (α A B : ℝ), 0 < α → 0 < A → 0 < B →
-    ∃ C : ℝ, 0 < C ∧ ∀ (a : ℕ → ℂ) (ψ : ℕ → ℝ),
+  ∀ (α A : ℝ), 0 < α → 0 < A →
+    ∃ C : ℝ, 0 < C ∧ ∀ (absBound : ℝ → ℝ → ℝ),
+      (∀ α' A', 0 < α' → 0 < A' → 0 < absBound α' A') →
+      ∀ (a : ℕ → ℂ) (ψ : ℕ → ℝ),
       (∀ n, 0 < ψ n) → Monotone ψ →
       (∀ s : ℂ, 1 < s.re → LSeriesSummable a s) →
       (∀ᶠ n : ℕ in atTop, ‖a n‖ ≤ A * ψ n) →
-      Asymptotics.IsBigOWith B (𝓝[>] (1 : ℝ))
+      Asymptotics.IsBigOWith (absBound α A) (𝓝[>] (1 : ℝ))
         (fun σ : ℝ ↦ ∑' n : ℕ, ‖LSeries.term a (σ : ℂ) n‖)
         (fun σ : ℝ ↦ ((σ - 1) ^ α)⁻¹) →
       ∀ (c σ T : ℝ), 0 < c → 1 - c < σ → 1 ≤ T →
@@ -78,10 +82,14 @@ theorem Printed.heckeLogDerivPolynomial_perron_error_false :
 `δ = α η(|T - t₀|)` is claimed to place the entire contour inside the
 region specified by the width `η`. -/
 def Printed.dedekindZeta_perron_contour_in_zeroFreeRegion : Prop :=
-  ∀ (A B : ℝ), 0 < A → 1 / 3 < B →
+  ∀ (F : Type*) [Field F] [NumberField F] (χ : U[F]) (t₀ : ℝ),
+    ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[F]) (-Complex.I * t₀) →
+    ∀ (Z : ℂ → ℂ), MeromorphicNFOn Z univ → (∀ s : halfPlane, Z s = dedekindZeta F s) →
+    ∀ (A B : ℝ), 0 < A → 1 / 3 < B →
     let η := fun v : ℝ ↦ A / Real.log (B * (|v| + 3))
     MapsTo η (Ici 0) (Ioc 0 (1 / 2)) →
-    ∀ (α t t₀ T c : ℝ), α ∈ Ioo 0 1 → 2 + |t₀| + |t| ≤ T → 0 < c →
+    (∀ z : ℂ, 1 - η |z.im| < z.re → meromorphicOrderAt Z z ≤ 0) →
+    ∀ (α t T c : ℝ), α ∈ Ioo 0 1 → t ≠ t₀ → 2 + |t₀| + |t| ≤ T → 0 < c →
       let δ := α * η |T - t₀|
       ∀ u ∈ Icc (-δ) c, ∀ y ∈ Icc (-T) T,
         (u = -δ ∨ u = c ∨ y = -T ∨ y = T) →
@@ -89,8 +97,10 @@ def Printed.dedekindZeta_perron_contour_in_zeroFreeRegion : Prop :=
 
 /-- Paper: Contour preceding Equation (B.7.1.12), p. 647. Take `t₀ = 0`,
 `t = 2`, `T = 4`, and `c = 1`. At the top left corner the shifted
-height is 6. Choosing `η(6) / η(4) < α < 1` puts that corner outside
-the stated region, for instance with `A = 1/2` and `B = 1`. -/
+height is 6. Take the trivial character over the rationals and any genuine
+logarithmic zero-free width from Proposition B.6.1.1, shrinking its numerator
+to ensure the range condition. For every such width, `η(6) / η(4) < 1`.
+Choose `α` strictly between that ratio and one. -/
 theorem Printed.dedekindZeta_perron_contour_in_zeroFreeRegion_false :
     ¬ Printed.dedekindZeta_perron_contour_in_zeroFreeRegion := by
   sorry

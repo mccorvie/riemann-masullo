@@ -164,7 +164,9 @@ theorem heckeLogDerivPolynomial_normTwist (χ : U[F]) (t₀ : ℝ)
 
 /-- Paper: Theorem B.7.1.2(1), Equation (B.7.1.9), p. 645. At the pole
 ordinate, the cutoff polynomial differs from the logarithm of the cutoff by
-a bounded quantity as the real cutoff tends to infinity. -/
+a bounded quantity as the real cutoff tends to infinity.
+Deviation: The implied constant is for the fixed number field. The double-pole
+residue on p. 648 involves the field's Euler–Kronecker constant. -/
 theorem heckeLogDerivPolynomial_at_pole (χ : U[F]) (t₀ : ℝ)
     (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[F]) (-Complex.I * t₀)) :
     (fun x : ℝ ↦ heckeLogDerivPolynomial χ x (1 + Complex.I * t₀) - (Real.log x : ℂ))
@@ -189,14 +191,14 @@ theorem heckeLogDerivPolynomial_of_nontrivial_on_normOne (χ : U[F])
 /-- Paper: Equation (B.7.1.11), p. 646. Perron's estimate for the full Hecke
 cutoff includes a correction for the remaining half of the last coefficient
 at an integer cutoff.
-Deviation: Adds the half-endpoint correction and uses the range
-`0 < c ≤ 1` of the simplified Perron bound. The initial contour lies
+Deviation: Adds the half-endpoint correction. For `c ≥ 1` the absence of
+a norm-one coefficient gives exponential decay to the right. The initial contour lies
 strictly to the right of the pole, so the estimate also holds at the pole ordinate. -/
 theorem heckeLogDerivPolynomial_perron_error (χ : U[F]) (t₀ : ℝ)
     (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[F]) (-Complex.I * t₀))
     (Z : ℂ → ℂ) (hZ : MeromorphicNFOn Z univ)
     (hSeries : ∀ s : halfPlane, Z s = dedekindZeta F s) :
-    ∃ C : ℝ, 0 < C ∧ ∀ (s : ℂ) (x c T : ℝ), s ∈ oneLine → 1 < x → c ∈ Ioc 0 1 → 1 ≤ T →
+    ∃ C : ℝ, 0 < C ∧ ∀ (s : ℂ) (x c T : ℝ), s ∈ oneLine → 1 < x → 0 < c → 1 ≤ T →
       ‖heckeLogDerivPolynomial χ x s -
         truncatedPerronIntegral (fun w ↦ -logDeriv Z (w - Complex.I * t₀)) s x c T -
         (if (⌊x⌋₊ : ℝ) = x then
@@ -215,12 +217,14 @@ theorem heckeLogDerivPolynomial_perron_error (χ : U[F]) (t₀ : ℝ)
 bounded by the cutoff to the power `-δ` times a cubed logarithm.
 Deviation: The width `δ` uses the maximum absolute shifted height. The
 estimate allows the unregularized logarithmic derivative to contribute a
-term of order `1 / δ` near its pole. -/
+term of order `1 / δ` near its pole. The punctured disc is the hypothesis
+on `α` in Theorem B.6.1.3. Both constants may depend on the chosen width. -/
 theorem dedekindZeta_perron_left_bound (Z : ℂ → ℂ) (hZ : MeromorphicNFOn Z univ)
     (hSeries : ∀ s : halfPlane, Z s = dedekindZeta F s)
-    {A B α : ℝ} (hA : 0 < A) (hB : 1 ≤ B) (hα : α ∈ Ioo 0 1)
+    {A B α : ℝ} (hA : 0 < A) (hB : 1 / 3 < B) (hα : α ∈ Ioo 0 1)
     (hwidth : A ≤ Real.log (B * 3) / 2)
-    (hzero : ∀ z : ℂ, 1 - A / Real.log (B * (|z.im| + 3)) ≤ z.re →
+    (hdisc : ∀ z : ℂ, 0 < ‖z - 1‖ → ‖z - 1‖ < α → meromorphicOrderAt Z z ≤ 0)
+    (hzero : ∀ z : ℂ, 1 - A / Real.log (B * (|z.im| + 3)) < z.re →
       meromorphicOrderAt Z z ≤ 0) :
     ∃ C T₀ : ℝ, 0 < C ∧ 2 ≤ T₀ ∧ ∀ (s : ℂ) (t₀ x T : ℝ),
       s ∈ oneLine → 1 ≤ x → T₀ + |s.im - t₀| ≤ T →
@@ -235,12 +239,14 @@ theorem dedekindZeta_perron_left_bound (Z : ℂ → ℂ) (hZ : MeromorphicNFOn Z
 edge the squared logarithm of its shifted height controls the integral.
 Deviation: Each edge uses its own absolute shifted height. The contour
 width uses the maximum of both heights, and the estimate starts at a
-sufficiently large height for the logarithmic-derivative estimate of §B.6. -/
+sufficiently large height for the logarithmic-derivative estimate of §B.6.
+The punctured disc is its hypothesis on `α`. Both constants may depend on the width. -/
 theorem dedekindZeta_perron_horizontal_bound (Z : ℂ → ℂ) (hZ : MeromorphicNFOn Z univ)
     (hSeries : ∀ s : halfPlane, Z s = dedekindZeta F s)
-    {A B α : ℝ} (hA : 0 < A) (hB : 1 ≤ B) (hα : α ∈ Ioo 0 1)
+    {A B α : ℝ} (hA : 0 < A) (hB : 1 / 3 < B) (hα : α ∈ Ioo 0 1)
     (hwidth : A ≤ Real.log (B * 3) / 2)
-    (hzero : ∀ z : ℂ, 1 - A / Real.log (B * (|z.im| + 3)) ≤ z.re →
+    (hdisc : ∀ z : ℂ, 0 < ‖z - 1‖ → ‖z - 1‖ < α → meromorphicOrderAt Z z ≤ 0)
+    (hzero : ∀ z : ℂ, 1 - A / Real.log (B * (|z.im| + 3)) < z.re →
       meromorphicOrderAt Z z ≤ 0) :
     ∃ C T₀ : ℝ, 0 < C ∧ 2 ≤ T₀ ∧ ∀ (s : ℂ) (t₀ x c T y : ℝ),
       s ∈ oneLine → 1 < x → 0 < c → T₀ + |s.im - t₀| ≤ T → (y = -T ∨ y = T) →
