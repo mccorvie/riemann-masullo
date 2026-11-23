@@ -2468,6 +2468,8 @@ private theorem carving_archProfile_idele_eval (S : Finset V) (r : ℝ) (hr : r 
     rw [Set.indicator_of_notMem hOutside', Set.indicator_of_notMem hOutside, mul_zero]
 
 
+/-- Construct a compact pure local test from an archimedean factor and finite
+ball indicators, as in the real test construction in Ch03 §3.3 (Sec3.lean). -/
 private theorem exists_carvingPureTest {S : Finset V} (b : SchwartzMap archSpace ℂ)
     (hb : HasCompactSupport (b : archSpace → ℂ)) (r : ℝ) (hr : 0 < r) :
     ∃ f : Bₛ[S], HasCompactSupport f.val ∧ ∀ x : Aₛ[S],
