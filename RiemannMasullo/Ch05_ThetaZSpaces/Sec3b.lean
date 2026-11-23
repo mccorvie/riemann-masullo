@@ -2117,7 +2117,44 @@ The closed embedding of Lemma 5.3.1.5 restricts to the homogeneous theta quotien
 identified with its isotype by §5.2. -/
 theorem sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding {T : Finset V} (hT : T ⊆ S)
     (ψ : PontryaginDual J₁) : IsClosedEmbedding (sLocalHomogeneousThetaPrincipalValue hT ψ) :=
-  by sorry
+  by
+  classical
+  let K := LinearMap.ker (thetaAt(ψ))
+  rcases T.eq_empty_or_nonempty with rfl | hn
+  · have conjugate {E G Y : Type _} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+        [AddCommGroup G] [Module ℂ G] [TopologicalSpace G]
+        [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+        (e : InductiveTensor E G ≃L[ℂ] Y) (P : G →ₗ[ℂ] G) (hp : ∀ x, P x = x) :
+        e.toLinearMap.comp ((TensorProduct.map (LinearMap.id : E →ₗ[ℂ] E) P).comp e.symm.toLinearMap)
+          = LinearMap.id := by
+      have he : P = LinearMap.id := LinearMap.ext hp
+      subst he
+      refine LinearMap.ext fun x ↦ ?_
+      have h := LinearMap.congr_fun (TensorProduct.map_id (R := ℂ) (M := E) (N := G)) (e.symm x)
+      exact (congrArg e h).trans (e.apply_symm_apply x)
+    have hP : sAdelePrincipalValue F hT = LinearMap.id := by
+      unfold sAdelePrincipalValue
+      refine conjugate _ _ fun x ↦ ?_
+      simp only [Finset.notMem_empty, ite_false, PiTensorProduct.map_id]
+      rfl
+    have hU : ⇑(sLocalHomogeneousThetaPrincipalValue hT ψ) = id := by
+      funext y
+      obtain ⟨f, rfl⟩ := K.mkQ_surjective y
+      exact congrArg K.mkQ (LinearMap.congr_fun hP f)
+    rw [hU]
+    exact IsClosedEmbedding.id
+  · obtain ⟨hs, e, he⟩ := sLocalThetaIsotypicAverage_equiv (F := F) (S := S) ψ
+    let j := Subtype.val ∘ e
+    have hj : IsClosedEmbedding j := hs.isClosedEmbedding_subtypeVal.comp e.toHomeomorph.isClosedEmbedding
+    have hcomp : j ∘ sLocalHomogeneousThetaPrincipalValue hT ψ = sLocalThetaPrincipalValue F hT ∘ j := by
+      funext y
+      obtain ⟨f, rfl⟩ := K.mkQ_surjective y
+      exact (he (sAdelePrincipalValue F hT f)).trans
+        ((sLocalThetaPrincipalValue_isotypicAverage (F := F) hT ψ (Submodule.Quotient.mk f)).symm.trans
+          (congrArg (sLocalThetaPrincipalValue F hT) (he f).symm))
+    apply hj.of_comp_iff.mp
+    rw [hcomp]
+    exact (sLocalThetaPrincipalValue_isClosedEmbedding (F := F) hT hn).comp hj
 
 /-- Paper: Proposition 5.3.4.5(3), p. 264.
 The principal value range in the homogeneous theta quotient is the image of tests
