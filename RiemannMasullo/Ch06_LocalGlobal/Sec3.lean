@@ -843,6 +843,50 @@ theorem globalPrincipalValueConverse_nontrivial (S : Finset V) (χ : U) (_hχ : 
 -- the entire multiple with multiplier exp(s^4) is not Schwartz on a vertical line.
 
 /-- Paper: Theorem 6.3.2.2(1), pp. 309–310, equation (6.3.2.20).
+The Mellin transform of the principal value of a polar test is a continuous linear function of
+that principal value: there is a continuous linear chart of `pvPolar(S)` in the
+Schwartz–Bergman space taking `PV(S) f` to `Z(PV(S) f, χ, ·)`. Granting that the principal
+value of a polar test is itself polar -- the content of Theorem 7.5.0.1, proved in this library
+as `strongCoprimalityPrincipalValue_mem_polar`, which this chapter cannot import -- this is the
+restriction to the principal-value image of the norm-twist chart of (6.3.2.4). -/
+theorem globalPrincipalValueConverse_normTwist_mellin_map (S : Finset V) (χ : U) (t : ℝ)
+    (_hχ : χ₀(χ) = ideleClassNormTwist (1 : U) (shift(t))) :
+    ∃ ZB : pvPolar(S) →L[ℂ] B, ∀ (f : pvPolar(S)) s, (ZB f).val s = Z(f.val, χ, s) := by
+  sorry
+
+/-- Paper: Theorem 6.3.2.2(1), pp. 309–310, equation (6.3.2.20).
+A continuous linear chart of the principal-value polar image that computes the transforms of
+its elements has as its range exactly the Schwartz–Bergman functions divisible by the
+reciprocal partial Euler product and the shifted, pole-cancelled completed Hecke function. The
+hard inclusion is the division by the reciprocal Euler factors, which have zeros on the
+critical line; the `TODO(paper-gap)` above this section and ERRATA I200 record the gap, and
+`Sec3_Printed.lean` refutes the printed unshifted generator. -/
+theorem globalPrincipalValueConverse_normTwist_range (S : Finset V) (χ : U) (t : ℝ)
+    (_hχ : χ₀(χ) = ideleClassNormTwist (1 : U) (shift(t))) (ZB : pvPolar(S) →L[ℂ] B)
+    (hZB : ∀ (f : pvPolar(S)) s, (ZB f).val s = Z(f.val, χ, s)) :
+    Set.range ZB = bergmanIdeal(fun s ↦ removal(χ, S) s * regularizedL(χ, t) s) := by
+  sorry
+
+/-- Paper: Theorem 6.3.2.2(1), pp. 309–310, equation (6.3.2.20).
+The Mellin chart of the principal-value polar image is open onto a closed subspace of the
+Schwartz–Bergman space. Closedness is the completeness of the image; openness is the open
+mapping theorem for the nuclear Fréchet structure of the two spaces. -/
+theorem globalPrincipalValueConverse_normTwist_openMap (S : Finset V) (χ : U) (t : ℝ)
+    (_hχ : χ₀(χ) = ideleClassNormTwist (1 : U) (shift(t))) (ZB : pvPolar(S) →L[ℂ] B)
+    (hZB : ∀ (f : pvPolar(S)) s, (ZB f).val s = Z(f.val, χ, s)) :
+    IsOpenMap ZB.rangeRestrict ∧ IsClosed (Set.range ZB) := by
+  sorry
+
+/-- Paper: Theorem 6.3.2.2(1), pp. 309–310, equation (6.3.2.20).
+The kernel of the Mellin chart of the principal-value polar image is the principal-value image
+of those polar tests that also lie in the kernel of the trivial homogeneous theta map. -/
+theorem globalPrincipalValueConverse_normTwist_ker (S : Finset V) (χ : U) (t : ℝ)
+    (_hχ : χ₀(χ) = ideleClassNormTwist (1 : U) (shift(t))) (ZB : pvPolar(S) →L[ℂ] B)
+    (hZB : ∀ (f : pvPolar(S)) s, (ZB f).val s = Z(f.val, χ, s)) :
+    ZB.ker = (((K(1) ⊓ (P)).map (PV(S))).comap (pvPolar(S)).subtype) := by
+  sorry
+
+/-- Paper: Theorem 6.3.2.2(1), pp. 309–310, equation (6.3.2.20).
 On the principal-value image of the polar test space the Mellin map is open
 onto a closed range. Its kernel is the principal-value image of the restricted
 trivial homogeneous theta kernel.
@@ -855,7 +899,11 @@ theorem globalPrincipalValueConverse_normTwist (S : Finset V) (χ : U) (t : ℝ)
       (∀ (f : pvPolar(S)) s, (ZB f).val s = Z(f.val, χ, s)) ∧
       Set.range ZB = bergmanIdeal(fun s ↦ removal(χ, S) s * regularizedL(χ, t) s) ∧
       ZB.ker = (((K(1) ⊓ (P)).map (PV(S))).comap (pvPolar(S)).subtype) := by
-  sorry
+  obtain ⟨ZB, hZB⟩ := globalPrincipalValueConverse_normTwist_mellin_map S χ t _hχ
+  obtain ⟨hopen, hclosed⟩ := globalPrincipalValueConverse_normTwist_openMap S χ t _hχ ZB hZB
+  exact ⟨ZB, hopen, hclosed, hZB,
+    globalPrincipalValueConverse_normTwist_range S χ t _hχ ZB hZB,
+    globalPrincipalValueConverse_normTwist_ker S χ t _hχ ZB hZB⟩
 
 -- TODO(paper-gap): In (6.3.2.21) the terminal space must be zero on a nontrivial
 -- component, as in (6.3.2.23). In a pure norm-twist component with a nonempty

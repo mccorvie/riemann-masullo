@@ -1,9 +1,12 @@
 module
 
+public import Mathlib.NumberTheory.Cyclotomic.Basic
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4b
 public import RiemannMasullo.Ch11_ShellStructure.Sec3
 
+import Mathlib.NumberTheory.NumberField.Cyclotomic.Ideal
 import Mathlib.NumberTheory.NumberField.Discriminant.Different
+import RiemannMasullo.AppA_AlgebraicNT.Sec2
 import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.Ch11_ShellStructure.Sec1a
@@ -39,15 +42,6 @@ def Printed.primaryDivisorialStratum_eq_norm_preimage : Prop :=
       divisorialStratum F (T.biUnion fun p ↦ (finite_nuclearityPlacesAbove (F := F) p).toFinset) =
         (relativeIdeleNormRat F) ⁻¹' divisorialStratum ℚ T
 
-/-- Paper: §11.3.1.1, p. 493. Take F = ℚ(√−7), the trivial character and the
-finite base above 7. The field has discriminant −7 and class number one.
-At k = 1 the sole rational prime is 2, outside the base. The integral generator
-(1+√−7)/2 has polynomial X²−X+2, with two distinct roots modulo 2.
-At the two places over 2 take components 2 and 2⁻¹ and put one elsewhere.
-Their local norms multiply to one, although neither component is a unit. -/
-theorem Printed.primaryDivisorialStratum_eq_norm_preimage_false :
-    ¬ Printed.primaryDivisorialStratum_eq_norm_preimage := by sorry
-
 local notation "V(" F ")" => HeightOneSpectrum (𝓞 F)
 local notation "Vℚ" => HeightOneSpectrum (𝓞 ℚ)
 local notation "I(" F ")" => IdeleGroup (𝓞 F) F
@@ -59,6 +53,238 @@ local notation "πclass(" F ", " v ", " π ")" => IdeleClassGroup.ofAdicCompleti
 local notation "unitMass(" F ", " v ")" =>
   (finiteLocalMultiplicativeTamagawaMeasure F v).real ((v).adicCompletionIntegers F).units
 local notation "ramificationIndex(" v ")" => (v).asIdeal.ramificationIdx (𝓞 ℚ)
+
+private theorem uniformizerExists {F : Type} [Field F] [NumberField F] (v : V(F)) :
+    ∃ π : (v.adicCompletion F)ˣ, Valued.v.IsUniformizer (π : v.adicCompletion F) := by
+  let val : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+  obtain ⟨π, hπ⟩ : ∃ π : v.adicCompletionIntegers F, val.IsUniformizer (π : v.adicCompletion F) :=
+    val.exists_isUniformizer_of_isCyclic_of_nontrivial
+  exact ⟨Units.mk0 π.val hπ.ne_zero, hπ⟩
+
+private theorem finitePlaceNorm_eq_one {F : Type} [Field F] [NumberField F]
+    (v : V(F)) (x : v.adicCompletion F) : ‖x‖ = 1 ↔ Valued.v x = 1 := by
+  rw [FinitePlace.norm_def, NNReal.coe_eq_one,
+    WithZeroMulInt.toNNReal_eq_one_iff _ _ (HeightOneSpectrum.one_lt_absNorm_nnreal v).ne']
+
+private theorem splitPrime_norm_cancellation {F : Type} [Field F] [NumberField F]
+    {p : Vℚ} {v w : V(F)} (hvw : v ≠ w) (hv : v.under (𝓞 ℚ) = p)
+    (hw : w.under (𝓞 ℚ) = p) (hNorm : v.asIdeal.absNorm = w.asIdeal.absNorm)
+    (T : Finset Vℚ) (hp : p ∈ T) :
+    ∃ g ∈ (relativeIdeleNormRat F) ⁻¹' divisorialStratum ℚ T,
+      g ∉ divisorialStratum F (T.biUnion fun q ↦ above(F, q)) := by
+  obtain ⟨πv, hπv⟩ := uniformizerExists v
+  obtain ⟨πw, hπw⟩ := uniformizerExists w
+  let g := IdeleGroup.ofAdicCompletion (𝓞 F) F v πv *
+    IdeleGroup.ofAdicCompletion (𝓞 F) F w πw⁻¹
+  have hcoord (z : V(F)) :
+      g.val.2 z =
+        Pi.mulSingle (M := fun u : V(F) ↦ u.adicCompletion F) v πv.val z *
+        Pi.mulSingle (M := fun u : V(F) ↦ u.adicCompletion F) w (πw⁻¹).val z := rfl
+  have hgv : g.val.2 v = πv.val := by
+    rw [hcoord, Pi.mulSingle_eq_same, Pi.mulSingle_eq_of_ne hvw, mul_one]
+  have hgw : g.val.2 w = (πw⁻¹).val := by
+    rw [hcoord, Pi.mulSingle_eq_of_ne hvw.symm, Pi.mulSingle_eq_same, one_mul]
+  have hgo (z : V(F)) (hzv : z ≠ v) (hzw : z ≠ w) : g.val.2 z = 1 := by
+    rw [hcoord, Pi.mulSingle_eq_of_ne hzv, Pi.mulSingle_eq_of_ne hzw, mul_one]
+  have hlt : (1 : ℝ) < w.asIdeal.absNorm := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm_nnreal w
+  refine ⟨g, ?_, ?_⟩
+  · intro q _
+    apply (finitePlaceNorm_eq_one q _).mp
+    refine (rationalAdeleNorm_finitePlace F q g.val).trans ?_
+    by_cases hqp : q = p
+    · subst q
+      simp only [finprod_eq_if]
+      rw [finprod_eq_finsetProd_of_mulSupport_subset _ (s := {v, w})]
+      · rw [Finset.prod_pair hvw, ite_eq_left hv, ite_eq_left hw, hgv, hgw,
+          Units.val_inv_eq_inv_val, norm_inv, norm_uniformizer_adicCompletion v _ hπv,
+          norm_uniformizer_adicCompletion w _ hπw, hNorm]
+        exact mul_inv_cancel₀ (inv_ne_zero (ne_of_gt (lt_trans zero_lt_one hlt)))
+      · intro z hz
+        by_contra h
+        have hzv : z ≠ v := fun h' ↦ h (by simp [h'])
+        have hzw : z ≠ w := fun h' ↦ h (by simp [h'])
+        have he : (if z.under (𝓞 ℚ) = p then ‖g.val.2 z‖ else 1) = 1 := by
+          rw [hgo z hzv hzw, norm_one]
+          split_ifs <;> rfl
+        exact hz he
+    · apply finprod_eq_one_of_forall_eq_one
+      intro z
+      rw [finprod_eq_if]
+      split_ifs with hz
+      · rw [hgo z (by rintro rfl; exact hqp (hz.symm.trans hv))
+          (by rintro rfl; exact hqp (hz.symm.trans hw)), norm_one]
+      · rfl
+  · intro hg
+    have hmem : v ∈ T.biUnion (fun q ↦ above(F, q)) := Finset.mem_biUnion.mpr
+      ⟨p, hp, (finite_nuclearityPlacesAbove p).mem_toFinset.mpr hv⟩
+    have hvval := hg v hmem
+    change Valued.v (g.val.2 v) = 1 at hvval
+    rw [hgv] at hvval
+    have he : ‖πv.val‖ = 1 := (finitePlaceNorm_eq_one v _).mpr hvval
+    rw [norm_uniformizer_adicCompletion v _ hπv, hNorm] at he
+    exact (ne_of_lt (inv_lt_one_of_one_lt₀ hlt)) he
+
+private theorem trivialNormTwist (F : Type) [Field F] [NumberField F] :
+    ideleClassNormTwist (1 : PontryaginDual C(F)) 0 = 1 := by
+  ext g
+  change (1 : ℂ) * _ ^ (0 : ℂ) = 1
+  simp
+
+private theorem trivialUnramified {F : Type} [Field F] [NumberField F] (v : V(F)) :
+    (ideleClassNormTwist (1 : PontryaginDual C(F)) 0).IsUnramifiedAt v := by
+  rw [trivialNormTwist, HeckeCharacter.isUnramifiedAt_iff]
+  intro x
+  simp
+
+section CyclotomicWitness
+
+local notation "K₃" => CyclotomicField 3 ℚ
+local instance instCyclotomicThreeDivisorialStratum : IsCyclotomicExtension ({3} : Set ℕ) ℚ K₃ :=
+  CyclotomicField.isCyclotomicExtension 3 ℚ
+
+private theorem rationalPrimeBelow (v : HeightOneSpectrum (𝓞 K₃)) :
+    ∃ p : ℕ, p.Prime ∧ v.asIdeal.under ℤ = Ideal.span {(p : ℤ)} := by
+  let P := v.asIdeal.under ℤ
+  have hP : P.IsPrime := Ideal.IsPrime.under ℤ v.asIdeal
+  have hP0 : P ≠ ⊥ := mt Ideal.eq_bot_of_under_eq_bot v.ne_bot
+  obtain ⟨g, hg⟩ := (IsPrincipalIdealRing.principal P).principal
+  have hg' : P = Ideal.span {g} := hg
+  have hg0 : g ≠ 0 := by rintro rfl; exact hP0 (by rw [hg']; simp)
+  have hgp : Prime g := (Ideal.span_singleton_prime hg0).mp (hg' ▸ hP)
+  exact ⟨g.natAbs, Int.prime_iff_natAbs_prime.mp hgp, by change P = _; rw [hg', Int.span_natAbs]⟩
+
+private theorem ramificationOutsideThree (v : HeightOneSpectrum (𝓞 K₃))
+    (hv : (3 : 𝓞 K₃) ∉ v.asIdeal) : v.asIdeal.ramificationIdx (𝓞 ℚ) = 1 := by
+  obtain ⟨p, hp, hP⟩ := rationalPrimeBelow v
+  have : Fact p.Prime := ⟨hp⟩
+  have : v.asIdeal.LiesOver (Ideal.span {(p : ℤ)}) := ⟨hP.symm⟩
+  have hnd : ¬ p ∣ 3 := by
+    intro hd
+    have he := (Nat.prime_dvd_prime_iff_eq hp Nat.prime_three).mp hd
+    subst p
+    apply hv
+    change algebraMap ℤ (𝓞 K₃) 3 ∈ v.asIdeal
+    change (3 : ℤ) ∈ v.asIdeal.under ℤ
+    rw [hP]
+    exact Ideal.subset_span rfl
+  have he := IsCyclotomicExtension.Rat.ramificationIdx_eq_of_not_dvd p K₃ v.asIdeal hnd
+  have : v.asIdeal.LiesOver (v.under (𝓞 ℚ)).asIdeal := ⟨rfl⟩
+  rw [Ideal.ramificationIdx_tower (R := ℤ) (v.under (𝓞 ℚ)).asIdeal v.asIdeal] at he
+  exact Nat.dvd_one.mp ⟨_, he.symm.trans (Nat.mul_comm _ _)⟩
+
+private theorem twoPlacesAboveSeven :
+    ∃ v w : HeightOneSpectrum (𝓞 K₃),
+      v ≠ w ∧ v.under (𝓞 ℚ) = w.under (𝓞 ℚ) ∧ v.asIdeal.absNorm = w.asIdeal.absNorm := by
+  let P : Ideal ℤ := Ideal.span {(7 : ℤ)}
+  have : Fact (Nat.Prime 7) := ⟨by decide⟩
+  have hP0 : P ≠ ⊥ := by simp [P]
+  have : P.IsPrime := (Ideal.span_singleton_prime (by decide : (7 : ℤ) ≠ 0)).2 (by decide)
+  have : P.IsMaximal := Ideal.IsPrime.isMaximal inferInstance hP0
+  let : Fintype (P.primesOver (𝓞 K₃)) := (IsDedekindDomain.primesOver_finite P (𝓞 K₃)).fintype
+  have hinertia (Q : P.primesOver (𝓞 K₃)) : Q.val.inertiaDeg ℤ = 1 := by
+    have := Q.property.1
+    have := Q.property.2
+    rw [IsCyclotomicExtension.Rat.inertiaDeg_eq_of_not_dvd 7 K₃ Q.val (show ¬ 7 ∣ 3 by decide)]
+    change orderOf ((7 : ℕ) : ZMod 3) = 1
+    rw [show ((7 : ℕ) : ZMod 3) = 1 by decide, orderOf_one]
+  have hram (Q : P.primesOver (𝓞 K₃)) : Q.val.ramificationIdx ℤ = 1 := by
+    have := Q.property.1
+    have := Q.property.2
+    exact IsCyclotomicExtension.Rat.ramificationIdx_eq_of_not_dvd 7 K₃ Q.val (show ¬ 7 ∣ 3 by decide)
+  have hs := Ideal.sum_ramification_inertia_eq_finrank P (𝓞 K₃)
+  simp only [hinertia, hram, mul_one, Finset.sum_const, Finset.card_univ, smul_eq_mul,
+    RingOfIntegers.rank] at hs
+  have hrank : Module.finrank ℚ K₃ = 2 := by
+    rw [IsCyclotomicExtension.Rat.finrank 3 K₃]
+    decide
+  rw [hrank] at hs
+  have hnon : 1 < (P.primesOver (𝓞 K₃)).ncard := by
+    rw [← Set.fintypeCard_eq_ncard, hs]
+    decide
+  obtain ⟨V, W, hV, hW, hVW⟩ :=
+    (Set.one_lt_ncard_iff (IsDedekindDomain.primesOver_finite P (𝓞 K₃))).mp hnon
+  let v : HeightOneSpectrum (𝓞 K₃) := ⟨V, hV.1, Ideal.ne_bot_of_mem_primesOver hP0 hV⟩
+  let w : HeightOneSpectrum (𝓞 K₃) := ⟨W, hW.1, Ideal.ne_bot_of_mem_primesOver hP0 hW⟩
+  have : V.IsPrime := hV.1
+  have : W.IsPrime := hW.1
+  have : V.LiesOver P := hV.2
+  have : W.LiesOver P := hW.2
+  have hVunder : V.under ℤ = P := (Ideal.over_def V P).symm
+  have hWunder : W.under ℤ = P := (Ideal.over_def W P).symm
+  refine ⟨v, w, fun h ↦ hVW (congrArg HeightOneSpectrum.asIdeal h), ?_, ?_⟩
+  · apply HeightOneSpectrum.ext
+    apply Ideal.comap_injective_of_surjective (algebraMap ℤ (𝓞 ℚ))
+    · intro x
+      obtain ⟨n, rfl⟩ := Rat.ringOfIntegersEquiv.symm.surjective x
+      exact ⟨n, by simp⟩
+    · change (V.under (𝓞 ℚ)).under ℤ = (W.under (𝓞 ℚ)).under ℤ
+      rw [Ideal.under_under, Ideal.under_under, hVunder, hWunder]
+  · change V.absNorm = W.absNorm
+    rw [← Ideal.absNorm_pow_inertiaDeg P V, ← Ideal.absNorm_pow_inertiaDeg P W,
+      hinertia ⟨V, hV⟩, hinertia ⟨W, hW⟩]
+
+private theorem counterexampleBase :
+    ∃ S : Finset (HeightOneSpectrum (𝓞 K₃)),
+      (∀ v ∈ S, ∀ w : HeightOneSpectrum (𝓞 K₃), w.under (𝓞 ℚ) = v.under (𝓞 ℚ) → w ∈ S) ∧
+      (∀ v ∉ S, v.asIdeal.ramificationIdx (𝓞 ℚ) = 1) ∧
+      Subsingleton (CommRing.Pic ((S : Set (HeightOneSpectrum (𝓞 K₃))).integer K₃)) := by
+  obtain ⟨U, hU⟩ := eventually_trivial_sIdealClassGroup K₃
+  let p : HeightOneSpectrum (𝓞 ℚ) :=
+    Rat.HeightOneSpectrum.primesEquiv.symm ⟨3, Nat.prime_three⟩
+  let T := insert p (U.image (HeightOneSpectrum.under (𝓞 ℚ)))
+  let S := T.biUnion fun q ↦ (finite_nuclearityPlacesAbove (F := K₃) q).toFinset
+  have hmem (v : HeightOneSpectrum (𝓞 K₃)) : v ∈ S ↔ v.under (𝓞 ℚ) ∈ T := by
+    change v ∈ T.biUnion _ ↔ _
+    simp only [Finset.mem_biUnion, Set.Finite.mem_toFinset,
+      Set.mem_ofPred_eq]
+    exact ⟨fun ⟨q, hq, hv⟩ ↦ hv.symm ▸ hq, fun hv ↦ ⟨_, hv, rfl⟩⟩
+  refine ⟨S, fun v hv w hw ↦ (hmem w).2 (hw.symm ▸ (hmem v).1 hv), ?_, hU S ?_⟩
+  · intro v hv
+    apply ramificationOutsideThree v
+    intro h3
+    have hg : Rat.HeightOneSpectrum.natGenerator p = 3 := congrArg Subtype.val
+      (Rat.HeightOneSpectrum.primesEquiv.apply_symm_apply ⟨3, Nat.prime_three⟩)
+    let e := Rat.IsIntegralClosure.intEquiv (𝓞 ℚ)
+    have hi : p.asIdeal = Ideal.span {(3 : 𝓞 ℚ)} := by
+      apply (Ideal.relIsoOfBijective (f := e.toRingHom) e.bijective).symm.injective
+      change Ideal.map e _ = Ideal.map e _
+      rw [Ideal.map_span, Set.image_singleton, map_ofNat]
+      simpa [hg] using (Rat.HeightOneSpectrum.span_natGenerator p).symm
+    have hle : p.asIdeal ≤ (v.under (𝓞 ℚ)).asIdeal := by
+      rw [hi, Ideal.span_singleton_le_iff_mem]
+      simpa only [HeightOneSpectrum.under, Ideal.mem_comap, map_ofNat] using h3
+    have he := HeightOneSpectrum.ext
+      (p.isMaximal.eq_of_le (v.under (𝓞 ℚ)).isPrime.ne_top hle).symm
+    exact hv ((hmem v).2 (he ▸ Finset.mem_insert_self p _))
+  · intro v hv
+    exact (hmem v).2 (Finset.mem_insert_of_mem (Finset.mem_image_of_mem _ hv))
+
+/-- Paper: §11.3.1.1, p. 493. In the third cyclotomic field, choose two places over
+7 with equal residue-field cardinalities. Insert a uniformizer at one and an inverse
+uniformizer at the other. The relative norm has unit components at every finite
+place of ℚ, while the two selected components upstairs are nonunits. -/
+theorem Printed.primaryDivisorialStratum_eq_norm_preimage_false :
+    ¬ Printed.primaryDivisorialStratum_eq_norm_preimage := by
+  intro printed
+  obtain ⟨S, hSat, hRam, hPic⟩ := counterexampleBase
+  obtain ⟨v, w, hvw, huv, hNorm⟩ := twoPlacesAboveSeven
+  let p := w.under (𝓞 ℚ)
+  let e : Vℚ ≃ Nat.Primes := Rat.HeightOneSpectrum.primesEquiv
+  let n := e p
+  obtain ⟨j, hj⟩ := Nat.subset_range_nth
+    (show n.val ∈ {a : ℕ | Nat.Prime a} from n.property)
+  let T : Finset Vℚ := (Finset.range (j + 1)).image fun i ↦
+    Rat.HeightOneSpectrum.primesEquiv.symm ⟨Nat.nth Nat.Prime i, Nat.prime_nth_prime i⟩
+  have hp : p ∈ T := by
+    refine Finset.mem_image.mpr ⟨j, Finset.mem_range.mpr (Nat.lt_succ_self j), ?_⟩
+    change e.symm ⟨Nat.nth Nat.Prime j, Nat.prime_nth_prime j⟩ = p
+    exact (congrArg e.symm (Subtype.ext hj)).trans (e.symm_apply_apply p)
+  obtain ⟨g, hNormG, hg⟩ := splitPrime_norm_cancellation hvw huv rfl hNorm T hp
+  have he := printed K₃ 1 S hSat hRam (fun z _ ↦ trivialUnramified z) hPic (j + 1)
+  exact hg (he.symm ▸ hNormG)
+
+end CyclotomicWitness
 
 /-- Paper: §11.3.1.1(2), p. 494. As printed, the Poisson evaluation of
 the half-shifted Euler-zero sum uses unweighted point evaluations at powers
@@ -176,13 +402,6 @@ private theorem orbitNorm (v : Vℚ) (π : (v.adicCompletion ℚ)ˣ)
   change ‖π.val‖ ^ n = _
   rw [norm_uniformizer_adicCompletion v _ hπ, inv_zpow', zpow_neg]
 
-private theorem uniformizerExists (v : Vℚ) :
-    ∃ π : (v.adicCompletion ℚ)ˣ, Valued.v.IsUniformizer (π : v.adicCompletion ℚ) := by
-  let val : Valuation (v.adicCompletion ℚ) (WithZero (Multiplicative ℤ)) := Valued.v
-  obtain ⟨π, hπ⟩ : ∃ π : v.adicCompletionIntegers ℚ, val.IsUniformizer (π : v.adicCompletion ℚ) :=
-    val.exists_isUniformizer_of_isCyclic_of_nontrivial
-  exact ⟨Units.mk0 π.val hπ.ne_zero, hπ⟩
-
 private theorem orbitOff (φ : BruhatCompactSupport C(ℚ))
     (hs : tsupport φ.val ⊆ {x | ratNorm(x) ∈ Icc (7 / 4 : ℝ) (9 / 4)})
     (π : (twoPlace.adicCompletion ℚ)ˣ)
@@ -224,17 +443,6 @@ private theorem twoPlaceOrbitSum (φ : BruhatCompactSupport C(ℚ))
     norm_num
   · exact orbitOff φ hs π hπ
 
-private theorem ratTrivialNormTwist : ideleClassNormTwist (1 : PontryaginDual C(ℚ)) 0 = 1 := by
-  ext g
-  change (1 : ℂ) * _ ^ (0 : ℂ) = 1
-  simp
-
-private theorem ratTrivialUnramified (v : Vℚ) :
-    (ideleClassNormTwist (1 : PontryaginDual C(ℚ)) 0).IsUnramifiedAt v := by
-  rw [ratTrivialNormTwist, HeckeCharacter.isUnramifiedAt_iff]
-  intro x
-  simp
-
 /-- Paper: §11.3.1.1(2), p. 494. Over ℚ take the trivial character, the
 prime 2 and a radial bump supported at norms in (3/2, 5/2) with value one
 at 2. There is just one point evaluation, at the inverse uniformizer.
@@ -275,10 +483,10 @@ theorem Printed.orbitalEulerSum_eq_poisson_false :
   have hm (z : Z) : (2 : ℂ) ^ z.val = 1 := by
     let s : ℂ := z.val
     have h : reciprocalPartialHeckeEulerProduct (1 : PontryaginDual C(ℚ)) fibre s = 0 := z.2
-    have hu := ratTrivialUnramified v
+    have hu := trivialUnramified v
     rw [hf, reciprocalPartialHeckeEulerProduct_singleton _ v hu, placeNorm,
       hu.localValue_eq (π v) (hπ v)] at h
-    rw [ratTrivialNormTwist, HeckeCharacter.restrict, MulChar.ofUnitHom_coe] at h
+    rw [trivialNormTwist ℚ, HeckeCharacter.restrict, MulChar.ofUnitHom_coe] at h
     change 1 - 1 * (↑(2 : ℕ) : ℂ) ^ (-s) = 0 at h
     simpa [Complex.cpow_neg] using (sub_eq_zero.mp h).symm
   let c := (2 : ℂ) ^ (-(1 / 2 : ℂ))
@@ -303,7 +511,7 @@ theorem Printed.orbitalEulerSum_eq_poisson_false :
   have H (g : BruhatCompactSupport C(ℚ)) (h : (∑' n : ℤ, g.val (a ^ n)) = 1) :
       HasSum (term g) (Real.log 2 : ℂ) := by
     have hp := printed ℚ 1 g v (fun w _ ↦ Ideal.ramificationIdx_eq_one w.asIdeal (𝓞 ℚ))
-      (fun w _ ↦ ratTrivialUnramified w) π (fun w _ ↦ hπ w)
+      (fun w _ ↦ trivialUnramified w) π (fun w _ ↦ hπ w)
     change HasSum (term g) (∑ w ∈ fibre, (Real.log (w.asIdeal.absNorm : ℝ) /
       (finiteLocalMultiplicativeTamagawaMeasure ℚ w).real (w.adicCompletionIntegers ℚ).units : ℂ) *
       ∑' n : ℤ, g.val (πclass(ℚ, w, π w) ^ n)) at hp
@@ -467,7 +675,7 @@ theorem Printed.orbitalTracesOnPaleyWienerLevels_false :
     Rat.ringOfIntegersEquiv.symm Rat.ringOfIntegersEquiv.symm.surjective
   have hex := claim ℚ 1 φ ∅ (by simp)
     (fun w _ ↦ Ideal.ramificationIdx_eq_one w.asIdeal (𝓞 ℚ))
-    (fun w _ ↦ ratTrivialUnramified w) hu hpic hs 2 0 (by norm_num) (by norm_num)
+    (fun w _ ↦ trivialUnramified w) hu hpic hs 2 0 (by norm_num) (by norm_num)
     (canonicalIdeleNormSection ℚ) (canonicalIdeleNormSection_continuous ℚ)
     (canonicalIdeleNormSection_rightInverse ℚ) (Units.basisModTorsion ℚ)
     Rat.infinitePlace (AlgEquiv.refl : ℂ ≃ₐ[ℝ] ℂ) (fun _ ↦ 1) rfl

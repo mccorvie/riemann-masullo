@@ -3,8 +3,11 @@ module
 public import RiemannMasullo.Ch11_ShellStructure.Sec2a
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3a
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.Ch11_ShellStructure.Sec2a_PrimePVRefutation
 import all RiemannMasullo.Ch11_ShellStructure.Sec2a
 import RiemannMasullo.External.AlgebraicNumberTheoryLean.Chebotarev.DirichletHecke
+import Mathlib.Analysis.Normed.Operator.Banach
+import Mathlib.Analysis.SpecialFunctions.Gaussian.GaussianIntegral
 import Mathlib.NumberTheory.MulChar.Duality
 import Mathlib.NumberTheory.DirichletCharacter.Bounds
 
@@ -52,15 +55,38 @@ def Printed.globalThetaSobolevPrincipalValue_closedRange : Prop :=
     2 * (S.card : ℝ) ≤ s →
     IsClosed (range (globalThetaSobolevPrincipalValue F S 0 hs))
 
+private theorem small_norm_negates_antilipschitz {E : Type*} [NormedAddCommGroup E]
+    [NormedSpace ℂ E] (P : E →L[ℂ] E) (K : ℝ≥0) (hK : AntilipschitzWith K P)
+    (z : E) (hz : (K : ℝ) * ‖P z‖ < ‖z‖) : False := by
+  have hb := hK.le_mul_dist z 0
+  rw [map_zero, dist_zero_right, dist_zero_right] at hb
+  exact hz.not_ge hb
+
+private theorem rat_singleton_pv_not_antilipschitz (v : V(ℚ)) (hs : (0 : ℝ) ≤ 2)
+    (K : ℝ≥0) :
+    ¬ AntilipschitzWith K (globalThetaSobolevPrincipalValue ℚ {v} 0 hs) := by
+  intro hK
+  obtain ⟨z, -, hsmall⟩ := exists_ratPrimePrincipalValue_small_norm v hs K
+  exact small_norm_negates_antilipschitz _ K hK z hsmall
+
 /-- Paper: Proposition 11.2.0.1(2), pp. 484–485. Take ℚ, S₀ = {2}, degree 2
-and the trivial isotype, identified with the log-line space by zero-line density.
-The prime difference is injective there since a nonzero
-periodic function cannot be in weighted L². For any nonzero smooth ψ supported
-in (1,2), the ratio of the norms of the difference of ψ(x/R) and of ψ(x/R)
-tends to zero. The isotype projection commutes with the operator, so its
-nonclosed range on this isotype also rules out closed range on the full space. -/
+and the trivial isotype. The functions `exp (-ε * |log ‖g‖|)` are nonzero
+approximate invariants for the uniformizer translation. The resulting
+principal-value differences contradict the closed-range bound for the injective
+extension. See ERRATA.md F162 for the obstruction reported by Refine and Naslund. -/
 theorem Printed.globalThetaSobolevPrincipalValue_closedRange_false :
-    ¬ Printed.globalThetaSobolevPrincipalValue_closedRange := by sorry
+    ¬ Printed.globalThetaSobolevPrincipalValue_closedRange := by
+  classical
+  intro h
+  have hs : (0 : ℝ) ≤ 2 := by norm_num
+  let v : V(ℚ) := Rat.HeightOneSpectrum.primesEquiv.symm ⟨2, Nat.prime_two⟩
+  let P := globalThetaSobolevPrincipalValue ℚ {v} 0 hs
+  have hclosed : IsClosed (range P) := h ℚ {v} 2 hs (by simp)
+  let : CompleteSpace H(ℚ, hs) :=
+    (globalThetaSobolev_closed_complete_separable (F := ℚ) 0 hI hs).2.1
+  have hinj : Injective P := globalThetaSobolevPrincipalValue_injective {v} 0 hs
+  obtain ⟨K, hK⟩ := P.isClosed_range_iff_antilipschitz_of_injective hinj |>.mp hclosed
+  exact rat_singleton_pv_not_antilipschitz v hs K hK
 
 /-- Paper: Lead-in to (11.2.0.3), p. 484. At every twist and nonnegative
 degree the completed PV map is a closed embedding whose image equals the

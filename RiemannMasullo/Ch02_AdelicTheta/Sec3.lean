@@ -282,9 +282,10 @@ private theorem schwartzBruhat_exists_coordinate_bounds {G T : Type*} [CommGroup
   refine ⟨C, hC, fun x hx ↦ ?_, hdecay a e s⟩
   rw [schwartzBruhatStageRealization_apply, dite_eq_right (fun hy ↦ hx (hCa x hy))]
 
-/-- Paper: Proposition 2.3.1.2(1), p. 100. An S-adelic Schwartz–Bruhat function
-vanishes outside a compact set of finite coordinates. Its absolute value times
-any power of the archimedean norm is bounded on the whole S-adele ring. -/
+/-- Paper: Proof of Proposition 2.3.1.2(1), pp. 100–102. This bound for the
+S-unit series applies to an individual S-adelic Schwartz–Bruhat function. The function vanishes
+outside a compact set of finite coordinates, and its absolute value times any nonnegative
+integer power of the archimedean norm is bounded on the whole S-adele ring. -/
 theorem sAdeleSchwartz_exists_decay_bound (f : ℬₛ) :
     ∃ C : Set Aᶠₛ, IsCompact C ∧
       (∀ x : Aₛ, x.2 ∉ C → f (Multiplicative.ofAdd x) = 0) ∧
@@ -1362,10 +1363,10 @@ private theorem sAdeleSchwartz_exists_zeroTailRestriction_aux {G H K : Type*}
   exact (LinearMap.congr_fun hL (e.symm g)).trans (congrArg q (e.apply_symm_apply g))
 
 open scoped NumberField.AdeleRing in
-/-- Paper: Corollary 2.1.4.2, p. 72. Restricting a global Schwartz–Bruhat function to
-adeles whose omitted coordinates are zero gives an S-local Schwartz–Bruhat function.
-On a pure tensor, the restriction scales the S-local factor by the value of the
-complementary factor at zero. -/
+/-- Paper: Corollary 2.1.4.2, p. 72. As a consequence of the first map in (2.1.4.7),
+every global Schwartz–Bruhat function agrees with an S-local test function on the slice where
+the omitted coordinates are zero. For a pure tensor this restriction evaluates the complementary
+factor at zero and multiplies the S-local factor by that value. -/
 theorem sAdeleSchwartz_exists_zeroTailRestriction
     (g : SchwartzBruhat (Multiplicative 𝔸[F])) :
     ∃ h : ℬₛ, ∀ x : 𝔸[F], finiteAdeleTailProjection F S x.2 = 0 →
