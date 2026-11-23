@@ -1,6 +1,8 @@
 module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
+
+import RiemannMasullo.Ch02_AdelicTheta.Sec2b
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 import Mathlib.Algebra.Order.Archimedean.Real.Hom
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
@@ -2063,10 +2065,162 @@ theorem sAdelePolarFree_eq_span_tmul (r : RealModels) (c : ComplexModels) :
         (∀ v : S, g v (Multiplicative.ofAdd 0) = 0) ∧
         e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, g v)) = h} := by sorry
 
+/-- In archimedean coordinates the chosen models differ from the mixed-space coordinates
+by a continuous real-linear equivalence. -/
+private theorem sAdelePolarFree_mixedCoordinates (r : RealModels) (c : ComplexModels) :
+    ∃ D : ArchCoordinates ≃L[ℝ] mixedEmbedding.mixedSpace F,
+      ∀ x, D x = InfiniteAdeleRing.ringEquiv_mixedSpace F (assemble(r, c, x)) := by
+  have hcontR (w : RealPlaces) : Continuous (r w).val.symm := by
+    convert (IsHomeomorph.homeomorph _ (r w).property).symm.continuous using 1
+    funext z
+    apply (r w).property.injective
+    rw [RingEquiv.apply_symm_apply]
+    exact ((IsHomeomorph.homeomorph _ (r w).property).apply_symm_apply z).symm
+  have hR (w : RealPlaces) (t : ℝ) :
+      InfinitePlace.Completion.extensionEmbeddingOfIsReal w.2 ((r w).val.symm t) = t := by
+    let φ : ℝ →+ ℝ := ((InfinitePlace.Completion.ringEquivRealOfIsReal w.2).toRingHom.comp
+      (r w).val.symm.toRingHom).toAddMonoidHom
+    have hφ : Continuous φ :=
+      (InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal w.2).continuous.comp (hcontR w)
+    have h1 : φ 1 = 1 := map_one ((InfinitePlace.Completion.ringEquivRealOfIsReal w.2).toRingHom.comp
+      (r w).val.symm.toRingHom)
+    have h := map_real_smul φ hφ t 1
+    rw [smul_eq_mul, mul_one, h1, smul_eq_mul, mul_one] at h
+    exact h
+  have hcont (w : ComplexPlaces) : Continuous (c w).val.symm := by
+    convert (IsHomeomorph.homeomorph _ (c w).property).symm.continuous using 1
+    funext z
+    apply (c w).property.injective
+    rw [RingEquiv.apply_symm_apply]
+    exact ((IsHomeomorph.homeomorph _ (c w).property).apply_symm_apply z).symm
+  let ψ (w : ComplexPlaces) : ℂ ≃+* ℂ :=
+    (c w).val.symm.trans (InfinitePlace.Completion.ringEquivComplexOfIsComplex w.2)
+  have hreal (w : ComplexPlaces) (t : ℝ) : ψ w t = t := by
+    rcases Complex.ringHom_eq_id_or_conj_of_continuous (f := (ψ w).toRingHom)
+      ((InfinitePlace.Completion.isometry_extensionEmbedding w.1).continuous.comp
+        (hcont w)) with h | h
+    · exact RingHom.congr_fun h t
+    · exact (RingHom.congr_fun h t).trans (Complex.conj_ofReal t)
+  let L : ArchCoordinates ≃ₗ[ℝ] mixedEmbedding.mixedSpace F :=
+    { toFun := fun x ↦ (x.1, fun w ↦ ψ w (x.2 w))
+      invFun := fun x ↦ (x.1, fun w ↦ (ψ w).symm (x.2 w))
+      map_add' := fun x y ↦ Prod.ext rfl (funext fun w ↦ map_add _ _ _)
+      map_smul' := fun t x ↦ Prod.ext rfl (funext fun w ↦ by
+        change ψ w (t • x.2 w) = t • ψ w (x.2 w)
+        rw [Complex.real_smul, Complex.real_smul, map_mul, hreal])
+      left_inv := fun x ↦ Prod.ext rfl (funext fun w ↦ (ψ w).symm_apply_apply _)
+      right_inv := fun x ↦ Prod.ext rfl (funext fun w ↦ (ψ w).apply_symm_apply _) }
+  refine ⟨L.toContinuousLinearEquiv, fun x ↦ ?_⟩
+  rw [InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+  refine Prod.ext (funext fun w ↦ ?_) (funext fun w ↦ ?_)
+  · change x.1 w = _
+    have hw : w.1.IsReal := w.2
+    simp only [hw, ↓reduceDIte]
+    exact (hR w _).symm
+  · change ψ w (x.2 w) = _
+    have hw : ¬ w.1.IsReal := InfinitePlace.not_isReal_iff_isComplex.mpr w.2
+    simp only [hw, ↓reduceDIte]
+    rfl
+
+/-- Restricting an S-adelic Schwartz–Bruhat function to an archimedean slice gives a
+classical Schwartz function, continuously in the S-adelic topology. -/
+private theorem sAdelePolarFree_slice (r : RealModels) (c : ComplexModels)
+    (y : (v : S) → v.val.adicCompletion F) :
+    ∃ Φ : ℬₛ →L[ℂ] 𝓢(ArchCoordinates, ℂ),
+      ∀ f x, Φ f x = f (Multiplicative.ofAdd (assemble(r, c, x), y)) := by
+  obtain ⟨D, hD⟩ := sAdelePolarFree_mixedCoordinates r c
+  obtain ⟨J, hJ⟩ := archimedeanSchwartzBruhat_equiv (F := F)
+  obtain ⟨e, he⟩ := sAdeleSchwartz_inductiveTensor_equiv F S
+  let W := FinestLocallyConvex (⨂[ℂ] v : S, ℬ(v.val.adicCompletion F))
+  let Q : ℬ(A∞) →L[ℂ] 𝓢(ArchCoordinates, ℂ) :=
+    (SchwartzMap.compCLMOfContinuousLinearEquiv ℂ D).comp J.symm.toContinuousLinearMap
+  have hQ (f : ℬ(A∞)) (x : ArchCoordinates) :
+      Q f x = f (Multiplicative.ofAdd (assemble(r, c, x))) := by
+    change J.symm f (D x) = _
+    rw [hD, ← hJ, J.apply_symm_apply]
+  let ev (v : S) : ℬ(v.val.adicCompletion F) →ₗ[ℂ] ℂ :=
+    (LinearMap.proj (Multiplicative.ofAdd (y v))).comp (schwartzBruhatSubmodule _).subtype
+  let E : W →ₗ[ℂ] ℂ := PiTensorProduct.lift ((MultilinearMap.mkPiAlgebra ℂ S ℂ).compLinearMap ev)
+  let B : ℬ(A∞) →ₗ[ℂ] W →ₗ[ℂ] 𝓢(ArchCoordinates, ℂ) :=
+    LinearMap.mk₂ ℂ (fun f w ↦ E w • Q f)
+      (fun f f' w ↦ by simp only [map_add, smul_add])
+      (fun a f w ↦ by simp only [map_smul, smul_comm a (E w)])
+      (fun f w w' ↦ by simp only [map_add, add_smul])
+      (fun a f w ↦ by simp only [map_smul, smul_eq_mul, mul_smul])
+  let T : InductiveTensor ℬ(A∞) W →ₗ[ℂ] 𝓢(ArchCoordinates, ℂ) := TensorProduct.lift B
+  let : PolynormableSpace ℂ 𝓢(ArchCoordinates, ℂ) :=
+    (schwartz_withSeminorms ℂ ArchCoordinates ℂ).toPolynormableSpace
+  let : T2Space ℬ(A∞) := schwartzBruhat_eval_t2
+  let : T2Space W := finestLocallyConvex_t2 _
+  have hT : Continuous T := by
+    rw [continuous_inductiveTensor_iff]
+    refine ⟨fun f ↦ ?_, fun w ↦ ?_⟩
+    · change Continuous fun w : W ↦ E w • Q f
+      exact (continuous_of_finestLocallyConvex _ E).smul continuous_const
+    · change Continuous fun f ↦ E w • Q f
+      exact (continuous_const (y := E w)).smul Q.continuous
+  have hTe (t : InductiveTensor ℬ(A∞) W) (x : ArchCoordinates) :
+      T t x = e t (Multiplicative.ofAdd (assemble(r, c, x), y)) := by
+    let p : Multiplicative Aₛ := Multiplicative.ofAdd (assemble(r, c, x), y)
+    let evx : 𝓢(ArchCoordinates, ℂ) →ₗ[ℂ] ℂ :=
+      { toFun := fun g ↦ g x, map_add' := fun _ _ ↦ rfl, map_smul' := fun _ _ ↦ rfl }
+    let evp : ℬₛ →ₗ[ℂ] ℂ := (LinearMap.proj p).comp (schwartzBruhatSubmodule _).subtype
+    let L₁ : InductiveTensor ℬ(A∞) W →ₗ[ℂ] ℂ := evx.comp T
+    let L₂ : InductiveTensor ℬ(A∞) W →ₗ[ℂ] ℂ := evp.comp e.toLinearMap
+    have key : L₁ = L₂ := by
+      refine TensorProduct.ext' fun f w ↦ ?_
+      let M₁ : (⨂[ℂ] v : S, ℬ(v.val.adicCompletion F)) →ₗ[ℂ] ℂ :=
+        L₁.comp (TensorProduct.mk ℂ ℬ(A∞) W f)
+      let M₂ : (⨂[ℂ] v : S, ℬ(v.val.adicCompletion F)) →ₗ[ℂ] ℂ :=
+        L₂.comp (TensorProduct.mk ℂ ℬ(A∞) W f)
+      have hM : M₁ = M₂ := by
+        refine PiTensorProduct.ext (MultilinearMap.ext fun g ↦ ?_)
+        have hE : E (PiTensorProduct.tprod ℂ g) = ∏ v, g v (Multiplicative.ofAdd (y v)) := by
+          erw [PiTensorProduct.lift.tprod]
+          rfl
+        have h1 : M₁ (PiTensorProduct.tprod ℂ g) = E (PiTensorProduct.tprod ℂ g) * Q f x := rfl
+        have h2 : M₂ (PiTensorProduct.tprod ℂ g) =
+            e (f ⊗ₜ[ℂ] PiTensorProduct.tprod ℂ g) p := rfl
+        refine h1.trans (Eq.trans ?_ h2.symm)
+        exact (congrArg₂ (· * ·) hE (hQ f x)).trans
+          ((mul_comm _ _).trans (he f g (assemble(r, c, x), y)).symm)
+      exact LinearMap.congr_fun hM w
+    exact LinearMap.congr_fun key t
+  refine ⟨⟨T.comp e.symm.toLinearMap, hT.comp e.symm.continuous⟩, fun f x ↦ ?_⟩
+  change T (e.symm f) x = _
+  rw [hTe, e.apply_symm_apply]
 /-- Paper: Lemma 5.3.4.2(1), p. 260.
 The polar-free functions form a closed subspace in the S-adelic Schwartz–Bruhat topology. -/
 theorem sAdelePolarFree_isClosed (r : RealModels) (c : ComplexModels) :
-    IsClosed (↑(sAdelePolarFree S r c) : Set ℬₛ) := by sorry
+    IsClosed (↑(sAdelePolarFree S r c) : Set ℬₛ) := by
+  obtain ⟨D, hD⟩ := sAdelePolarFree_mixedCoordinates r c
+  choose Φ hΦ using sAdelePolarFree_slice (S := S) r c
+  have hset : (↑(sAdelePolarFree S r c) : Set ℬₛ) =
+      (⋂ x : {x : Aₛ // ∃ v : S, v.val ∈ S ∧ x.2 v = 0},
+        {f : ℬₛ | f (Multiplicative.ofAdd x.val) = 0}) ∩
+        ⋂ y, Φ y ⁻¹' (archimedeanFlatSchwartz (ι := RealPlaces) (κ := ComplexPlaces) : Set _) := by
+    ext f
+    simp only [SetLike.mem_coe, sAdelePolarFree, sAdeleFiniteZeroSchwartz, Submodule.mem_inf,
+      Submodule.mem_iInf, Submodule.mem_comap, Submodule.mem_map, LinearMap.mem_ker,
+      Set.mem_inter_iff, Set.mem_iInter, Set.mem_preimage, Set.mem_ofPred_eq]
+    refine and_congr Iff.rfl (forall_congr' fun y ↦ ⟨?_, fun hf ↦ ⟨Φ y f, hf, ?_⟩⟩)
+    · rintro ⟨h, hh, hfun⟩
+      have : Φ y f = h := SchwartzMap.ext fun x ↦ (hΦ y f x).trans (congrFun hfun x).symm
+      rwa [this]
+    · exact funext fun x ↦ hΦ y f x
+  rw [hset]
+  refine (isClosed_iInter fun x ↦ ?_).inter (isClosed_iInter fun y ↦
+    (archimedeanFlatSchwartz_isClosed).preimage (Φ y).continuous)
+  let z := D.symm (InfiniteAdeleRing.ringEquiv_mixedSpace F x.val.1)
+  have hz : assemble(r, c, z) = x.val.1 := (InfiniteAdeleRing.ringEquiv_mixedSpace F).injective
+    ((hD z).symm.trans (D.apply_symm_apply _))
+  have hev : Continuous fun f : ℬₛ ↦ Φ x.val.2 f z :=
+    ((BoundedContinuousFunction.evalCLM ℂ z).comp
+      (SchwartzMap.toBoundedContinuousFunctionCLM ℂ ArchCoordinates ℂ)).continuous.comp
+      (Φ x.val.2).continuous
+  have heq : (fun f : ℬₛ ↦ Φ x.val.2 f z) = fun f ↦ f (Multiplicative.ofAdd x.val) :=
+    funext fun f ↦ by rw [hΦ, hz]
+  exact isClosed_eq (heq ▸ hev) continuous_const
 
 /-- Paper: Lemma 5.3.4.2(1), p. 260.
 Inverse left translation by an S-idele preserves the polar-free subspace. -/
