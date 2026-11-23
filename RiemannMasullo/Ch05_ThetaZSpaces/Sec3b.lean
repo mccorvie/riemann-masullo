@@ -1358,7 +1358,72 @@ theorem archimedeanWeightedSchwartz_frechet {I : Set ℝ} (_ho : IsOpen I)
 /-- Paper: Lemma 5.3.3.3(1), p. 252.
 For an open nonempty interval the weighted Schwartz–Bruhat space is separable. -/
 theorem archimedeanWeightedSchwartz_separable {I : Set ℝ} (_ho : IsOpen I)
-    (_hi : OrdConnected I) (_hne : I.Nonempty) : SeparableSpace 𝓦(I) := by sorry
+    (_hi : OrdConnected I) (_hne : I.Nonempty) : SeparableSpace 𝓦(I) := by
+  classical
+  have sep {E : Type _} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+      [FirstCountableTopology E] (h : IsNuclearTVS.{0} E) : SeparableSpace E := by
+    let := h.1
+    let := h.2.1
+    let := PolynormableSpace.isTopologicalAddGroup ℂ E
+    have hw := PolynormableSpace.withSeminorms ℂ E
+    let : ContinuousSMul ℂ E := hw.continuousSMul
+    obtain ⟨U, hU⟩ := (𝓝 (0 : E)).exists_antitone_basis
+    have hex (n : ℕ) : ∃ q : Seminorm ℂ E, Continuous q ∧ ∃ r > 0, q.ball 0 r ⊆ U n := by
+      obtain ⟨s, r, hr, hsub⟩ := (hw.mem_nhds_iff 0 (U n)).mp (hU.mem n)
+      refine ⟨s.sup fun p : {p : Seminorm ℂ E // Continuous p} ↦ p.1, ?_, r, hr, hsub⟩
+      exact hw.continuous_finsetSup_seminorm s
+    choose q hq r hr hsub using hex
+    have hsep (n : ℕ) : SeparableSpace (WithLocalSeminorm (q n)) :=
+      seminorm_separable_of_nuclear h (q n) (hq n)
+    have hd (n : ℕ) : ∃ d : ℕ → E, ∀ x : E, ∃ m, q n (x - d m) < r n := by
+      obtain ⟨d, hd⟩ := exists_dense_seq (WithLocalSeminorm (q n))
+      refine ⟨d, fun x ↦ ?_⟩
+      let x' : WithLocalSeminorm (q n) := x
+      obtain ⟨m, hm⟩ := hd.exists_dist_lt x' (hr n)
+      rw [dist_eq_norm] at hm
+      exact ⟨m, hm⟩
+    choose d hd using hd
+    refine ⟨range fun m : ℕ × ℕ ↦ d m.1 m.2, countable_range _, ?_⟩
+    intro x
+    rw [mem_closure_iff_nhds]
+    intro W hW
+    have hW0 : (fun y ↦ x + y) ⁻¹' W ∈ 𝓝 (0 : E) :=
+      (continuous_const.add continuous_id).continuousAt.preimage_mem_nhds (by simpa using hW)
+    obtain ⟨n, -, hn⟩ := hU.1.mem_iff.mp hW0
+    obtain ⟨m, hm⟩ := hd n x
+    refine ⟨d n m, ?_, ⟨(n, m), rfl⟩⟩
+    have : d n m - x ∈ U n := hsub n (by rw [Seminorm.mem_ball, sub_zero, map_sub_rev]; exact hm)
+    simpa using hn this
+  let : SecondCountableTopology ℝˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SecondCountableTopology ℂˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let X := SchwartzBruhat (archMul(ι, κ))
+  let Z := weights(ι, κ, I)
+  let t : 𝓦(I) →ₗ[ℂ] (Z → X) := LinearMap.pi (archimedeanSchwartzTwist I)
+  let : PolynormableSpace ℂ X := (schwartzBruhat_nuclear.{0} (G := archMul(ι, κ))).2.1
+  have hp := withSeminorms_pi fun _ : Z ↦ PolynormableSpace.withSeminorms ℂ X
+  have hs := withGeneratingSeminorms_spec (archimedeanWeightedSchwartzSubmodule (ι := ι) (κ := κ) I)
+    (fun i : Z × {p : Seminorm ℂ X // Continuous p} ↦ i.2.val.comp (archimedeanSchwartzTwist I i.1))
+  have ht : Topology.IsEmbedding t := by
+    constructor
+    · constructor
+      refine hs.topologicalSpace_eq_iInf.trans ?_
+      refine Eq.trans ?_ (WithSeminorms.topologicalSpace_eq_iInf
+        (t := TopologicalSpace.induced t inferInstance) (t.withSeminorms_induced hp)).symm
+      rw [iInf_sigma, iInf_prod]
+      rfl
+    · intro f g h
+      let a : Z := (fun _ ↦ ⟨0, Set.mem_insert _ _⟩, fun _ ↦ ⟨0, Set.mem_insert _ _⟩)
+      apply Subtype.ext
+      funext u
+      have hu := congrArg (fun v : X ↦ v u) (congrFun h a)
+      change archimedeanSchwartzTwist I a f u = archimedeanSchwartzTwist I a g u at hu
+      have hv := (archimedeanSchwartzTwist_apply I a f u).symm.trans
+        (hu.trans (archimedeanSchwartzTwist_apply I a g u))
+      simpa [a] using hv
+  have hn : IsNuclearTVS.{0} 𝓦(I) := isNuclearTVS_of_linearEmbedding t ht
+    (isNuclearTVS_pi fun _ : Z ↦ schwartzBruhat_nuclear (G := archMul(ι, κ)))
+  obtain ⟨_, -, _, -⟩ := archimedeanWeightedSchwartz_frechet (ι := ι) (κ := κ) _ho _hi _hne
+  exact sep hn
 
 /-- Paper: Lemma 5.3.3.3(1), p. 252.
 For an open nonempty interval the weighted Schwartz–Bruhat space is nuclear. -/
