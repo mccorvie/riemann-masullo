@@ -296,7 +296,6 @@ private theorem exists_nonzero_lcaFourier_weighted (ψ : PontryaginDual C) :
     Complex.real_smul, mul_one]
   exact Complex.ofReal_ne_zero.mpr (ENNReal.toReal_pos hLpos.ne' hLfin).ne'
 
-set_option maxHeartbeats 400000 in
 private theorem spectralLineBandAdjoint_false_of_isolated_zero
     (t ε : ℝ) (hε : 0 < ε) (hεt : ε < t)
     (hiso : Icc (t - ε) (t + ε) ∩
