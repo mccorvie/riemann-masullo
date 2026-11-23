@@ -235,6 +235,64 @@ theorem traceFormula (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (idel
     traceIdentity(τ, φ, α) :=
   traceFormula_of_exteriorZeros τ hτ φ α (traceFormula_exteriorZeros τ hτ φ hφ hα)
 
+/-- A completed Hecke zero has real part strictly less than one, including in the left half-plane. -/
+private theorem exteriorZero_re_lt_one (χ : PontryaginDual C𝔽) {z : ℂ}
+    (hz : 0 < meromorphicOrderAt (continuedCompletedHeckeL χ) z) : z.re < 1 := by
+  rcases le_or_gt z.re 0 with h | h
+  · exact h.trans_lt zero_lt_one
+  · obtain ⟨hL, heq⟩ := continuedCompletedHeckeL_spec χ
+    exact completedHeckeL_continuation_zeros χ _ hL heq h hz
+
+/-- Proposition 3.2.1.3(3)–(4), p. 123, excludes zeros on both edges and in the
+exterior when the strip has half-width at least one half. -/
+private theorem exteriorZeros_isEmpty_of_half_le (τ : ℝ≥0ˣ →ₜ* C𝔽) {α : ℝ} (hα : 1 / 2 ≤ α) :
+    IsEmpty exteriorZeros(τ, α) := by
+  constructor
+  rintro ⟨⟨χ, z⟩, hz, hbound⟩
+  obtain ⟨hL, hLh⟩ := continuedCompletedHeckeL_spec χ.val
+  have hp : 0 < meromorphicOrderAt (continuedCompletedHeckeL χ.val) z := by
+    rw [MeromorphicOn.divisor_apply hL.meromorphicOn (mem_univ _)] at hz
+    cases he : meromorphicOrderAt (continuedCompletedHeckeL χ.val) z with
+    | top => simp
+    | coe k =>
+      rw [he, WithTop.untop₀_coe] at hz
+      exact_mod_cast hz
+  have hu := exteriorZero_re_lt_one χ.val hp
+  obtain ⟨hD, hDh⟩ := continuedCompletedHeckeL_spec χ.val⁻¹
+  obtain ⟨ε, hε, hne, hfe⟩ :=
+    completedHeckeL_continuation_functionalEquation χ.val _ _ hL hLh hD hDh
+  have hcomp : meromorphicOrderAt (fun s ↦ continuedCompletedHeckeL χ.val⁻¹ (1 - s)) z =
+      meromorphicOrderAt (continuedCompletedHeckeL χ.val⁻¹) (1 - z) := by
+    simpa [Function.comp_def] using
+      meromorphicOrderAt_comp_of_deriv_ne_zero (f := continuedCompletedHeckeL χ.val⁻¹)
+        (show AnalyticAt ℂ (fun s : ℂ ↦ 1 - s) z by fun_prop)
+        (show deriv (fun s : ℂ ↦ 1 - s) z ≠ 0 by simp)
+  rw [show (fun s ↦ continuedCompletedHeckeL χ.val⁻¹ (1 - s)) =
+      ε * continuedCompletedHeckeL χ.val from funext hfe,
+    meromorphicOrderAt_mul_of_ne_zero (hε.analyticAt z) (hne z)] at hcomp
+  have hl := exteriorZero_re_lt_one χ.val⁻¹ (hcomp ▸ hp)
+  rw [Complex.sub_re, Complex.one_re] at hl
+  exact (not_le.mpr (abs_lt.mpr ⟨by linarith, by linarith⟩)) (hα.trans hbound)
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The exterior-zero sum vanishes for every
+test when the open strip contains the entire critical strip.
+Deviation: The half-width is at least one half. The exterior is empty, so the test
+may take arbitrary values on the norm-one classes. -/
+theorem traceFormula_exteriorZeros_of_half_le (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (φ : BruhatCompactSupport C𝔽) {α : ℝ} (hα : 1 / 2 ≤ α) :
+    HasSum (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z)) 0 := by
+  letI := exteriorZeros_isEmpty_of_half_le τ hα
+  exact hasSum_empty
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The normalized open-strip trace identity
+for half-widths at least one half is the full idelic explicit formula.
+Deviation: The half-width is at least one half and the test may be arbitrary. The
+global volume and the local coefficients follow Theorem B.4.4.7, p. 623. -/
+theorem traceFormula_of_half_le (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (φ : BruhatCompactSupport C𝔽) {α : ℝ} (hα : 1 / 2 ≤ α) :
+    traceIdentity(τ, φ, α) :=
+  traceFormula_of_exteriorZeros τ hτ φ α (traceFormula_exteriorZeros_of_half_le τ φ hα)
+
 section StripDiagonalProof
 
 open Topology
