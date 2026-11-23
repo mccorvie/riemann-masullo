@@ -1140,38 +1140,6 @@ private theorem archNuclearityJet_basis_index_equiv
       exact Subtype.ext (congrArg (fun j : ArchNuclearityJetIndex χ τ hτ ↦ j.val.1) h)
   exact ⟨(nonempty_equiv_of_countable (α := ArchNuclearityJetIndex χ τ hτ)).some.symm⟩
 
-/-- Paper: Theorem 7.4.3.1(3), p. 368.
-For a fixed enumeration of the adjusted jets, the descended jets form a Schauder basis
-of the strong dual of the archimedean quotient, with continuous coefficient functionals
-on that strong dual. Pullback along the quotient map recovers the original jets.
-This is the second half of `archNuclearityJet_basis`; the first half, that the adjusted
-jet indices are countably infinite, is proved above. Given the jet-coordinate isomorphism
-of the quotient with `ArchNuclearityJetIndex χ τ hτ → ℂ` (the statement of
-`archNuclearityQuotient_jetEquiv`, which comes later in this file and so cannot be used
-here), take `d n` to be the coordinate at `σ n`, take `b m` to be evaluation at the vector
-with coordinate one at `σ m` and zero elsewhere, and use that a continuous functional on a
-product of copies of `ℂ` depends on finitely many coordinates. -/
-private theorem archNuclearityJet_basis_schauder
-    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F))
-    (τ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 F) F) (hτ : RightInverse τ (ideleNorm F))
-    (σ : ℕ ≃ ArchNuclearityJetIndex χ τ hτ) :
-    ∃ (d : ℕ → StrongDual ℂ (ArchNuclearityQuotient χ))
-      (b : ℕ → StrongDual ℂ (StrongDual ℂ (ArchNuclearityQuotient χ))),
-      (∀ n x, d n ((archNuclearityDenominator χ).mkQ x) = archNuclearityJet χ τ hτ (σ n) x) ∧
-        IsSchauderBasis d b := by sorry
-
-/-- Paper: Theorem 7.4.3.1(3), p. 368.
-Every enumeration of the adjusted jets gives a Schauder basis on the quotient strong
-dual. Pullback along the quotient map recovers the original jets. -/
-theorem archNuclearityJet_basis :
-    let Q := ArchNuclearityQuotient χ
-    let J := ArchNuclearityJetIndex χ τ hτ
-    Nonempty (ℕ ≃ J) ∧
-      ∀ σ : ℕ ≃ J, ∃ (d : ℕ → StrongDual ℂ Q) (b : ℕ → StrongDual ℂ (StrongDual ℂ Q)),
-        (∀ n x, d n ((archNuclearityDenominator χ).mkQ x) = archNuclearityJet χ τ hτ (σ n) x) ∧
-        IsSchauderBasis d b :=
-  ⟨archNuclearityJet_basis_index_equiv χ τ hτ, archNuclearityJet_basis_schauder χ τ hτ⟩
-
 local notation "finiteL(" χ ")" => (finiteHeckeL_exists_continuation χ).choose
 local notation "poleFactor(" χ ", " τ ", " hτ ", " s ")" =>
   ((s : ℂ) - 1 - atZeroPole(χ, τ, hτ)) ^ (if ω(χ) = 1 then (1 : ℕ) else 0)
@@ -1338,6 +1306,92 @@ private theorem archNuclearityStrongDual_finest_of_equiv {A E : Type*}
   apply le_antisymm <;> apply continuous_id_iff_le.mp
   · exact (h.comp e.symm.continuous).congr (fun x ↦ e.apply_symm_apply x)
   · exact (e.continuous.comp h').congr (fun x ↦ e.apply_symm_apply x)
+
+/-- Paper: Theorem 7.4.3.1(3), p. 368.
+For a fixed enumeration of the adjusted jets, the descended jets form a Schauder basis
+of the strong dual of the archimedean quotient, with continuous coefficient functionals
+on that strong dual. Pullback along the quotient map recovers the original jets.
+Under the quotient's jet-coordinate equivalence, the basis consists of the coordinate
+projections. Its coefficient functionals evaluate at the corresponding unit vectors.
+Each dual vector is already recovered by a finite coordinate truncation. -/
+private theorem archNuclearityJet_basis_schauder
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F))
+    (τ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 F) F) (hτ : RightInverse τ (ideleNorm F))
+    (σ : ℕ ≃ ArchNuclearityJetIndex χ τ hτ) :
+    ∃ (d : ℕ → StrongDual ℂ (ArchNuclearityQuotient χ))
+      (b : ℕ → StrongDual ℂ (StrongDual ℂ (ArchNuclearityQuotient χ))),
+      (∀ n x, d n ((archNuclearityDenominator χ).mkQ x) = archNuclearityJet χ τ hτ (σ n) x) ∧
+        IsSchauderBasis d b := by
+  classical
+  obtain ⟨e, he⟩ := archNuclearityQuotient_jetEquiv χ τ hτ
+  let d (n : ℕ) : StrongDual ℂ (ArchNuclearityQuotient χ) :=
+    (ContinuousLinearMap.proj (σ n)).comp e.toContinuousLinearMap
+  let v (n : ℕ) : ArchNuclearityQuotient χ := e.symm (Pi.single (σ n) 1)
+  let b (n : ℕ) : StrongDual ℂ (StrongDual ℂ (ArchNuclearityQuotient χ)) :=
+    ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (v n)
+  refine ⟨d, b, fun n x ↦ he x (σ n), ⟨fun m n ↦ ?_, fun ℓ ↦ ?_⟩⟩
+  · change e (e.symm (Pi.single (σ m) 1)) (σ n) = if m = n then 1 else 0
+    rw [e.apply_symm_apply, Pi.single_apply]
+    by_cases hmn : m = n
+    · subst n
+      simp
+    · simp [hmn, show σ n ≠ σ m from fun h ↦ hmn (σ.injective h).symm]
+  · let L := ℓ.comp e.symm.toContinuousLinearMap
+    -- Adapted from sLocalGammaOrbitalQuotient_dual_basis_finite in Sec3b:
+    -- continuity in the product topology gives a finite set of coordinates
+    -- on which the functional depends.
+    have hU : L ⁻¹' Metric.ball 0 1 ∈ 𝓝 0 :=
+      L.continuous.continuousAt.preimage_mem_nhds (by
+        rw [map_zero]
+        exact Metric.ball_mem_nhds 0 one_pos)
+    rw [nhds_pi, Filter.mem_pi'] at hU
+    obtain ⟨T, neighborhoods, hU, hsub⟩ := hU
+    have hzero (y : ArchNuclearityJetIndex χ τ hτ → ℂ) (hy : ∀ i ∈ T, y i = 0) :
+        L y = 0 := by
+      by_contra hne
+      have hval : L ((2 / L y) • y) = 2 := by
+        rw [map_smul, smul_eq_mul, div_mul_cancel₀ _ hne]
+      have hmem : (2 / L y) • y ∈ Set.pi (↑T) neighborhoods := fun i hi ↦ by
+        rw [Pi.smul_apply, hy i hi, smul_zero]
+        exact mem_of_mem_nhds (hU i)
+      have hball := hsub hmem
+      rw [Set.mem_preimage, hval, Metric.mem_ball, dist_zero_right] at hball
+      norm_num at hball
+    let K := (T.image σ.symm).sup id + 1
+    unfold HasSum
+    rw [SummationFilter.conditional_filter_eq_map_range, Filter.tendsto_map'_iff]
+    refine tendsto_const_nhds.congr' ?_
+    filter_upwards [Filter.eventually_ge_atTop K] with k hk
+    symm
+    change ∑ m ∈ Finset.range k, b m ℓ • d m = ℓ
+    ext q
+    have hvan := hzero (e q - ∑ m ∈ Finset.range k, e q (σ m) • Pi.single (σ m) (1 : ℂ))
+      fun j hj ↦ by
+        have hjk : σ.symm j ∈ Finset.range k := by
+          have hjle := Finset.le_sup (f := id) (Finset.mem_image_of_mem σ.symm hj)
+          exact Finset.mem_range.mpr (by dsimp [K, id] at hk hjle; omega)
+        simp only [Pi.sub_apply, Finset.sum_apply, Pi.smul_apply]
+        rw [Finset.sum_eq_single_of_mem (σ.symm j) hjk]
+        · simp
+        · intro m _ hm
+          have hne : j ≠ σ m := fun h ↦ hm (by rw [h, σ.symm_apply_apply])
+          simp [hne]
+    simp only [map_sub, map_sum, map_smul, sub_eq_zero] at hvan
+    change ℓ (e.symm (e q)) = ∑ m ∈ Finset.range k, e q (σ m) • ℓ (v m) at hvan
+    rw [e.symm_apply_apply] at hvan
+    simpa [b, d, mul_comm] using hvan.symm
+
+/-- Paper: Theorem 7.4.3.1(3), p. 368.
+Every enumeration of the adjusted jets gives a Schauder basis on the quotient strong
+dual. Pullback along the quotient map recovers the original jets. -/
+theorem archNuclearityJet_basis :
+    let Q := ArchNuclearityQuotient χ
+    let J := ArchNuclearityJetIndex χ τ hτ
+    Nonempty (ℕ ≃ J) ∧
+      ∀ σ : ℕ ≃ J, ∃ (d : ℕ → StrongDual ℂ Q) (b : ℕ → StrongDual ℂ (StrongDual ℂ Q)),
+        (∀ n x, d n ((archNuclearityDenominator χ).mkQ x) = archNuclearityJet χ τ hτ (σ n) x) ∧
+        IsSchauderBasis d b :=
+  ⟨archNuclearityJet_basis_index_equiv χ τ hτ, archNuclearityJet_basis_schauder χ τ hτ⟩
 
 /-- Enumerating the adjusted jets identifies the quotient with the space of complex sequences. -/
 private theorem archNuclearityStrongDual_finest_sequenceEquiv
