@@ -1,6 +1,9 @@
 module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
+
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec6
 
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3
@@ -479,7 +482,16 @@ theorem sLocalOrbitalPrincipalValue_annihilator_le {T : Finset V} (hT : T ⊆ S)
     (PV(T, hT, ω)).dualAnnihilator.comap (ContinuousLinearMap.coeLM ℂ) ≤
       (Submodule.span ℂ
         (range (sLocalOrbitalPrincipalPart (F := F) (S := S) (T := T) (ω := ω)))).topologicalClosure := by
-  sorry
+  let E := Θₛ(ω)
+  have hN : IsNuclearTVS.{0} E := sLocalHomogeneousThetaSpace_nuclear (F := F) (S := S) ω
+  let : T2Space E := hN.1
+  let : PolynormableSpace ℂ E := hN.2.1
+  let : MontelSpace ℂ E := (sLocalHomogeneousThetaSpace_montel (F := F) (S := S) ω).2
+  apply le_of_eq
+  apply strongDual_annihilator_eq_closedSpan_of_kernels
+  intro x
+  simpa only [Set.forall_mem_range] using
+    (mem_sLocalOrbitalPrincipalValue_iff (F := F) hT _hTne _hS _hPic ω x)
 
 /-- Each selected coefficient vanishes on the principal-value image. -/
 private theorem sLocalOrbitalPrincipalValue_annihilator_ker {T : Finset V} (hT : T ⊆ S)
@@ -526,10 +538,86 @@ theorem sLocalOrbitalPrincipalValue_annihilator {T : Finset V} (hT : T ⊆ S) (_
   rintro _ ⟨i, rfl⟩ x hx
   exact sLocalOrbitalPrincipalValue_annihilator_ker hT ω i hx
 
--- TODO(paper-gap): For ℚ and T = {p}, dividing an entire zeta transform by
--- 1 - p⁻ˢ produces at most a simple pole at zero. The leading orbital coefficient
--- at the trivial character has order two. Page 342 needs an interpolant starting
--- with a test attaining the full allowed order at the selected center.
+open Classical in
+/-- Normalize a triangular witness and correct its later offsets at the same center. -/
+private theorem sLocalOrbitalPrincipalPart_triangular_dual {E A C : Type*}
+    [AddCommGroup E] [Module ℂ E] (center : A → C) (offset : A → ℕ)
+    (cutoff : C → ℕ) (φ : A → E →ₗ[ℂ] ℂ)
+    (hcut : ∀ i, offset i < cutoff (center i))
+    (hinj : ∀ i j, center i = center j → offset i = offset j → i = j)
+    (hwitness : ∀ j, ∃ x, φ j x ≠ 0 ∧
+      ∀ i, center i ≠ center j ∨ offset i < offset j → φ i x = 0) :
+    ∀ j, ∃ x, ∀ i, φ i x = if i = j then 1 else 0 := by
+  classical
+  let rank (i : A) := cutoff (center i) - offset i
+  suffices h : ∀ n : ℕ, ∀ j, rank j = n → ∃ x, ∀ i, φ i x = if i = j then 1 else 0 by
+    exact fun j ↦ h (rank j) j rfl
+  intro n
+  induction n using Nat.strong_induction_on with
+  | ind n ih =>
+    intro j hj
+    obtain ⟨x, hx, hzero⟩ := hwitness j
+    let y := (φ j x)⁻¹ • x
+    have hyj : φ j y = 1 := by simp [y, hx]
+    let B := {i : A // center i = center j ∧ offset j < offset i}
+    let index (i : B) : Fin (cutoff (center j)) :=
+      ⟨offset i.val, by simpa only [i.property.1] using hcut i.val⟩
+    let : Fintype B := Fintype.ofInjective index (fun i k h ↦ Subtype.ext
+      (hinj i.val k.val (i.property.1.trans k.property.1.symm) (congrArg Fin.val h)))
+    have hsmaller (i : B) : rank i.val < n := by
+      have hlt := i.property.2
+      have hc := hcut i.val
+      rw [i.property.1] at hc
+      rw [← hj]
+      dsimp [rank]
+      rw [i.property.1]
+      omega
+    choose z hz using fun i : B ↦ ih _ (hsmaller i) i.val rfl
+    refine ⟨y - ∑ i : B, φ i.val y • z i, fun i ↦ ?_⟩
+    simp only [map_sub, map_sum, map_smul, smul_eq_mul, hz, mul_ite, mul_one, mul_zero]
+    have hsum : (∑ k : B, if i = k.val then φ k.val y else 0) =
+        if center i = center j ∧ offset j < offset i then φ i y else 0 := by
+      split_ifs with hi
+      · let k : B := ⟨i, hi⟩
+        rw [Finset.sum_eq_single k]
+        · simp [k]
+        · intro b _ hb
+          exact ite_eq_right (fun h ↦ hb (Subtype.ext h.symm))
+        · exact fun h ↦ (h (Finset.mem_univ k)).elim
+      · apply Finset.sum_eq_zero
+        intro k _
+        apply ite_eq_right
+        intro h
+        exact hi (by simpa only [h] using k.property)
+    rw [hsum]
+    by_cases h : i = j
+    · subst i
+      simp [hyj]
+    · rw [ite_eq_right h]
+      by_cases hi : center i = center j ∧ offset j < offset i
+      · simp [hi]
+      · rw [ite_eq_right hi, sub_zero]
+        have hz' : center i ≠ center j ∨ offset i < offset j := by
+          by_cases hc : center i = center j
+          · right
+            have he : offset i ≠ offset j := fun h' ↦ h (hinj i j hc h')
+            exact lt_of_le_of_ne (le_of_not_gt (fun h' ↦ hi ⟨hc, h'⟩)) he
+          · exact Or.inl hc
+        simp [y, hzero i hz']
+
+/-- Realize a nonzero selected coefficient while killing selected coefficients at other
+centers and higher selected orders at this center. Lower orders at this center and
+unselected coefficients are unrestricted. For `ℚ` and `T = {p}`, undoing the finite
+principal value on an entire transform gives at most a simple pole at the trivial
+character, where the highest selected order is two. -/
+private theorem exists_sLocalOrbitalPrincipalPart_triangular_test {T : Finset V}
+    (_hT : T ⊆ S) (_hTne : T.Nonempty) (_hS : IsSaturatedPlaceSet S) (_hPic : PicTrivial)
+    (ω : PontryaginDual J₁) (j : I(T, ω)) :
+    ∃ f : ℬₛ,
+      sLocalOrbitalPrincipalPart j ((Kₛ(ω)).mkQ f) ≠ 0 ∧
+      ∀ i : I(T, ω), i.val.1 ≠ j.val.1 ∨ i.val.2 < j.val.2 →
+        sLocalOrbitalPrincipalPart i ((Kₛ(ω)).mkQ f) = 0 := by sorry
+
 open Classical in
 /-- Paper: Theorem 7.3.1.2(2), p. 342.
 For each selected coefficient there is a homogeneous theta class on which it takes the
@@ -541,7 +629,15 @@ theorem exists_sLocalOrbitalPrincipalPart_dual {T : Finset V} (_hT : T ⊆ S)
     (ω : PontryaginDual J₁) (j : I(T, ω)) :
     ∃ x : Θₛ(ω), ∀ i : I(T, ω),
       sLocalOrbitalPrincipalPart (F := F) (S := S) (T := T) (ω := ω) i x =
-        if i = j then 1 else 0 := by sorry
+        if i = j then 1 else 0 := by
+  refine sLocalOrbitalPrincipalPart_triangular_dual
+    (fun i : I(T, ω) ↦ i.val.1) (fun i ↦ i.val.2) (sLocalFinitePoleMultiplicity T)
+    (fun i ↦ (sLocalOrbitalPrincipalPart i).toLinearMap) (fun i ↦ i.property.2) ?_ ?_ j
+  · intro i k hc hr
+    exact Subtype.ext (Prod.ext hc hr)
+  · intro i
+    obtain ⟨f, hf, hzero⟩ := exists_sLocalOrbitalPrincipalPart_triangular_test _hT _hTne _hS _hPic ω i
+    exact ⟨(Kₛ(ω)).mkQ f, hf, hzero⟩
 
 open Classical in
 /-- Paper: Theorem 7.3.1.2(2), p. 341.
@@ -1257,7 +1353,76 @@ it lies in the image of the transpose of the quotient map. -/
 theorem sLocalOrbitalFourierJet_range_le_ker
     (p : Vℚ) (ω : PontryaginDual J₁) (j : Idx(p, ω)) :
     Rₚ(p, ω) ≤
-      (sLocalOrbitalFourierJet (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j).ker := by sorry
+      (sLocalOrbitalFourierJet (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j).ker := by
+  classical
+  apply sLocalOrbitalPrincipalPart_range_le_ker_range ((Kₛ(ω)).mkQ) (Submodule.mkQ_surjective _)
+    (sLocalHomogeneousThetaPrincipalValue hₚ(p) ω)
+    (sLocalOrbitalFourierJet (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j)
+  intro f
+  let c := j.val.1
+  let g := sAdelePrincipalValue F hₚ(p) f
+  rw [show sLocalHomogeneousThetaPrincipalValue hₚ(p) ω ((Kₛ(ω)).mkQ f) =
+      (Kₛ(ω)).mkQL g from sLocalHomogeneousThetaPrincipalValue_mk hₚ(p) ω f,
+    sLocalOrbitalFourierJet_mk]
+  obtain ⟨χ, a, hx, -⟩ := sLocalOrbitalFourierZeta_chart j
+  let Q (z : ℂ) := ∏ v : S, if v.val ∈ Sₚ(p) then
+    (finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (twistₛ c z)))⁻¹ else 1
+  let Z (v : ℬₛ) (η : PontryaginDual Jₛ) (z : ℂ) := sLocalIdelicZFunction v (chart(η) z)
+  let R (z : ℂ) := sLocalRhoFactor (chart(χ) z)
+  let D (v : ℬₛ) (z : ℂ) := Z (sAdeleSchwartzFourier v) χ⁻¹ (1 - z)
+  have heq (v : ℬₛ) : Z v χ =ᶠ[codiscrete ℂ] R * D v := by
+    have hZ (w : ℬₛ) (η : PontryaginDual Jₛ) (z : ℂ) : MeromorphicAt (Z w η) z :=
+      ((sLocalIdelicZFunction_meromorphic w η) (mem_univ z)).meromorphicAt
+    apply sLocal_meromorphic_identity (hZ v χ) (fun z ↦ (sLocalRhoFactor_meromorphic χ z).mul
+      ((hZ _ _ (1 - z)).comp_analyticAt (analyticAt_const.sub analyticAt_id)))
+    intro z hz
+    have hd : 0 < (1 - z).re := by simp; linarith [hz.2]
+    exact (sLocalIdelicZFunction_eq_integral v ⟨χ, z, hz.1, rfl⟩).trans <|
+      (sLocalIdelicZetaIntegral_functionalEquation v χ z hz).trans <|
+      (congrArg (fun d ↦ R z * sLocalIdelicZetaIntegral (sAdeleSchwartzFourier v) d)
+        (sLocal_dual_normTwist χ z)).trans <| congrArg (R z * ·)
+        (sLocalIdelicZFunction_eq_integral (sAdeleSchwartzFourier v) ⟨χ⁻¹, 1 - z, hd, rfl⟩).symm
+  have hc : ∀ᶠ z : ℂ in codiscrete ℂ, D g z = D f z *
+      ∏ v : S, if v.val ∈ Sₚ(p) then
+        (finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (chart(χ) z)))⁻¹ else 1 := by
+    filter_upwards [heq g, heq f, sLocalRhoFactor_mul_dual χ,
+      sLocalIdelicZFunction_principalValue Sₚ(p) hₚ(p) f χ] with z hg hf hr hpv
+    have hn : R z ≠ 0 := left_ne_zero_of_mul
+      (hr.trans_ne ((Group.isUnit (QuotientGroup.mk (-1 : (SAdeleRing F S)ˣ) : Jₛ)).map
+        (chart(χ) z)).ne_zero)
+    apply mul_left_cancel₀ hn
+    rw [← mul_assoc, ← show Z f χ z = R z * D f z from hf,
+      ← show Z g χ z = R z * D g z from hg]
+    change sLocalIdelicZFunction (sAdelePrincipalValue F hₚ(p) f) _ = sLocalIdelicZFunction f _ * _
+    rw [hpv, div_eq_mul_inv, ← Finset.prod_inv_distrib]
+    congr 1
+    refine Finset.prod_congr rfl fun v _ ↦ ?_
+    split_ifs <;> simp
+  have ht : Tendsto (fun z : ℂ ↦ z + a) (𝓝[≠] 0) (𝓝[≠] a) := by
+    have h : Tendsto (fun z : ℂ ↦ z + a) (𝓝[≠] 0) (𝓝[≠] (0 + a)) :=
+      ((Homeomorph.addRight a).map_punctured_nhds_eq 0).le
+    simpa only [zero_add] using h
+  have hprod : fourierZeta(c) g =ᶠ[𝓝[≠] 0] fourierZeta(c) f * Q := by
+    filter_upwards [ht.eventually (nhdsNE_le_codiscrete a hc)] with z hz
+    simp only [c, hx, Q, normTwist_normTwist, sLocal_dual_normTwist, Pi.mul_apply]
+    refine hz.trans (congrArg (D f (z + a) * ·) ?_)
+    refine Finset.prod_congr rfl fun v _ ↦ ?_
+    split_ifs <;> rfl
+  obtain ⟨hQ, horder⟩ := sLocalOrbitalPrincipalPart_range_le_ker_prod Sₚ(p) c
+  have hg := sLocalOrbitalFourierZeta_analyticAt j g
+  have hf := sLocalOrbitalFourierZeta_analyticAt j f
+  have hm : ((sLocalFinitePoleMultiplicity Sₚ(p) c : ℕ) : WithTop ℤ) ≤
+      meromorphicOrderAt (fourierZeta(c) g) 0 := by
+    rw [meromorphicOrderAt_congr hprod, meromorphicOrderAt_mul hf.meromorphicAt hQ]
+    exact horder.trans (le_add_of_nonneg_left hf.meromorphicOrderAt_nonneg)
+  have ha : (sLocalFinitePoleMultiplicity Sₚ(p) c : ℕ∞) ≤ analyticOrderAt (fourierZeta(c) g) 0 := by
+    rw [hg.meromorphicOrderAt_eq] at hm
+    cases ho : analyticOrderAt (fourierZeta(c) g) 0 using ENat.recTopCoe with
+    | top => exact le_top
+    | coe n =>
+      rw [ho, ENat.map_natCast] at hm
+      exact_mod_cast hm
+  exact (natCast_le_analyticOrderAt_iff_iteratedDeriv_eq_zero hg).mp ha j.val.2 j.property.2
 
 /-- a unitary chart covers exactly the chosen norm-one component. -/
 private theorem sLocalOrbitalIndex_enumerable_or_empty_chart

@@ -4,6 +4,10 @@ public import RiemannMasullo.Ch10_TraceSpectral.Sec1
 public import RiemannMasullo.Ch11_ShellStructure.Sec1a
 
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import RiemannMasullo.Ch05_ThetaZSpaces.Sec5
+import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
+import RiemannMasullo.Ch09_HardySobolev.Sec2
+import Mathlib.MeasureTheory.Integral.ExpDecay
 
 /-!
 # S-local carvings
@@ -1174,20 +1178,484 @@ theorem sLocalCarvingLimit_le_cutoffIsotype {S : Finset V} (χ : PontryaginDual 
   exact (iInf_le _ (⟨∅, Finset.disjoint_empty_right S⟩ : SLocalCarvingIndex (F := F) S)).trans
     (sLocalCutoffCarving_le_cutoffIsotype _ _ _ _ _ _)
 
--- TODO(paper-gap): On p. 482 the basis conclusion of Theorem 11.2.0.2
--- requires s ≥ 2 * card(i'), while (11.1.2.2) bounds the field degree.
--- A direct proof can use a Mellin evaluation at a new Euler zero if one
--- exhibits a polar-free test on which the smaller stage has nonzero value.
+local notation "reciprocalMeasure(" s ")" =>
+  (μ𝔽).withDensity (fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (Real.log (norm𝔽 g)))⁻¹)
+
+/-- At degree greater than one, a unitary character represents a continuous Mellin
+evaluation on the zero-line Sobolev space. -/
+private theorem sLocalUncutCarving_lt_mellinFunctional (χ : PontryaginDual C𝔽) (z : ℂ)
+    (hz : z.re = 0) {s : ℝ} (hs : 1 < s) :
+    ∃ Λ : StrongDual ℂ W(s), ∀ f : W(s),
+      Λ f = ∫ g, f g * ideleClassNormTwist χ z g ∂μ𝔽 := by
+  let hm : IsModulation m𝔽 :=
+    ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+  have hsurj : Surjective m𝔽 := fun x ↦
+    ⟨classOf (canonicalIdeleNormSection F x), canonicalIdeleNormSection_rightInverse F x⟩
+  have h₀ : 0 ≤ s := zero_le_one.trans hs.le
+  let ρ (g : C𝔽) := (intervalSobolevDensity 0 0 s (Real.log (norm𝔽 g)))⁻¹
+  have hρ_eq (g : C𝔽) : ρ g = (1 + |Real.log (norm𝔽 g)| ^ 2) ^ (-s / 2) := by
+    simp only [ρ, intervalSobolevDensity, mul_zero, zero_mul, Real.exp_zero, max_self, one_mul,
+      sq_abs]
+    rw [show -s / 2 = -(s / 2) by ring, Real.rpow_neg (by positivity)]
+  have hρ_cont : Continuous ρ := by
+    simp_rw [show ρ = fun g ↦ (1 + (Real.log (norm𝔽 g)) ^ 2) ^ (-s / 2) from
+      funext fun g ↦ by rw [hρ_eq, sq_abs]]
+    have hn : Continuous norm𝔽 := NNReal.continuous_coe.comp (Units.continuous_val.comp (m𝔽).continuous)
+    have hl : Continuous (fun g ↦ Real.log (norm𝔽 g)) :=
+      hn.log (fun g ↦ (NNReal.coe_pos.mpr (Units.zero_lt (ideleClassNorm F g))).ne')
+    exact ((continuous_const (y := (1 : ℝ))).add (hl.pow 2)).rpow_const (fun g ↦
+      Or.inl (ne_of_gt (add_pos_of_pos_of_nonneg one_pos (sq_nonneg _))))
+  have hρ_int : Integrable ρ μ𝔽 :=
+    ((modulatedSobolev_reciprocal_integrable_iff m𝔽 μ𝔽 hm hsurj h₀).mpr hs).congr
+      (Filter.Eventually.of_forall fun g ↦ (hρ_eq g).symm)
+  have hc (g : C𝔽) : ‖ideleClassNormTwist χ z g‖ = 1 := by
+    change ‖(χ g : ℂ) * (norm𝔽 g : ℂ) ^ z‖ = 1
+    rw [norm_mul, Circle.norm_coe, Complex.norm_cpow_eq_rpow_re_of_pos
+      (NNReal.coe_pos.mpr (Units.zero_lt (ideleClassNorm F g))), hz, Real.rpow_zero, mul_one]
+  have hmem : MemLp (ideleClassNormTwist χ z) 2 (reciprocalMeasure(s)) := by
+    apply (memLp_two_iff_integrable_sq_norm (ideleClassNormTwist χ z).continuous.aestronglyMeasurable).mpr
+    apply (integrable_withDensity_iff hρ_cont.measurable.ennreal_ofReal
+      (ae_of_all μ𝔽 fun _ ↦ ENNReal.ofReal_lt_top)).mpr
+    refine hρ_int.congr (ae_of_all μ𝔽 fun g ↦ ?_)
+    change ρ g = ‖ideleClassNormTwist χ z g‖ ^ 2 * (ENNReal.ofReal (ρ g)).toReal
+    simp [hc, ENNReal.toReal_ofReal (show 0 ≤ ρ g from inv_nonneg.mpr (by
+      unfold intervalSobolevDensity
+      positivity))]
+  obtain ⟨e, he, _⟩ := modulatedIntervalSobolev_dual m𝔽 hm μ𝔽 0 0 s le_rfl h₀
+  let u : CompactIntervalSobolev μ𝔽 (fun g ↦ Real.log (norm𝔽 g)) 0 0 s true :=
+    hmem.toLp _
+  let Λ : StrongDual ℂ W(s) := e.symm u
+  refine ⟨Λ, fun f ↦ (he Λ f).2.trans (integral_congr_ae ?_)⟩
+  have hu : (u : C𝔽 → ℂ) =ᵐ[reciprocalMeasure(s)] (ideleClassNormTwist χ z : C𝔽 → ℂ) :=
+    MemLp.coeFn_toLp _
+  have hu' := (ae_withDensity_iff hρ_cont.measurable.ennreal_ofReal).mp hu
+  have heq : e Λ = u := e.apply_symm_apply u
+  rw [heq]
+  filter_upwards [hu'] with g hg
+  have hp : 0 < ρ g := by
+    rw [hρ_eq]
+    positivity
+  exact congrArg (f g * ·) (hg (ENNReal.ofReal_pos.mpr hp).ne')
+
+/-- Weil integration on a polar test identifies the zero-line pairing with global
+Mellin evaluation times the mass of the norm-one class group. This is the polar-test
+version of `homogeneousTheta_classMellin_eq_mass_mul`. -/
+private theorem sLocalUncutCarving_lt_classMellin (χ : PontryaginDual C𝔽) (z : ℂ) (f : ℬ₀) :
+    (∫ g : C𝔽, homogeneousAdelicTheta (ωOf(χ)) f.val g * ideleClassNormTwist χ z g ∂μ𝔽) =
+      ((μ₁ univ).toReal : ℂ) * globalIdelicZFunction f.val (ideleClassNormTwist χ z) := by
+  let ν := normOneIdeleClassTamagawaMeasure F
+  let μ := ideleClassTamagawaMeasure F
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : ν.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let : μ.IsHaarMeasure := (ideleClassTamagawaMeasure_isWeil F).1
+  let ω : PontryaginDual C₁ := ωOf(χ)
+  let c := ideleClassNormTwist χ z
+  let W (g : C𝔽) := adelicTheta f.val g * c g
+  let A (g : C𝔽) := homogeneousAdelicTheta ω f.val g * c g
+  let Φ (p : C𝔽 × C₁) := W (p.2.val * p.1)
+  have hf := (mem_adelePolarSubspace f.val).mp f.property
+  have hi : Integrable W μ :=
+    globalThetaMellinIntegral_integrable_of_vanishing f.val hf.1 hf.2 c
+  have hP : AEStronglyMeasurable Φ (μ.prod ν) := by
+    apply Continuous.aestronglyMeasurable
+    exact ((adelicTheta f.val).continuous.mul c.continuous).comp ((continuous_subtype_val.comp continuous_snd).mul continuous_fst)
+  have hp : Integrable Φ (μ.prod ν) := by
+    apply (integrable_prod_iff' hP).mpr
+    constructor
+    · filter_upwards with u
+      change Integrable (fun g ↦ W (u.val * g)) μ
+      have hm : Measure.map (fun g : C𝔽 ↦ u.val * g) μ = μ := map_mul_left_eq_self μ u.val
+      have hw : AEStronglyMeasurable W (Measure.map (fun g : C𝔽 ↦ u.val * g) μ) := by
+        rw [hm]; exact hi.aestronglyMeasurable
+      have hi' : Integrable W (Measure.map (fun g : C𝔽 ↦ u.val * g) μ) := by rw [hm]; exact hi
+      have h := (integrable_map_measure hw ((continuous_const.mul continuous_id).measurable.aemeasurable)).mp hi'
+      exact h
+    · have he : (fun u : C₁ ↦ ∫ g, ‖Φ (g,u)‖ ∂μ) = fun _ ↦ ∫ g, ‖W g‖ ∂μ := by
+        funext u
+        change (∫ g, ‖W (u.val * g)‖ ∂μ) = _
+        exact integral_mul_left_eq_self (fun g ↦ ‖W g‖) u.val
+      rw [he]
+      exact integrable_const _
+  have ha (g : C𝔽) : (∫ u, Φ (g,u) ∂ν) = A g := by
+    have hu (u : C₁) : c u.val = (ω u : ℂ) := by
+      change (χ u.val : ℂ) * (((ideleClassNorm F u.val : ℝ≥0) : ℝ) : ℂ) ^ z = _
+      simp only [MonoidHom.mem_ker.mp u.property, Units.val_one, NNReal.coe_one, Complex.ofReal_one, Complex.one_cpow, mul_one]
+      rfl
+    change (∫ u, adelicTheta f.val (u.val * g) * c (u.val * g) ∂ν) = _
+    simp_rw [map_mul c, hu, ← mul_assoc, integral_mul_const]
+    rfl
+  change (∫ g, A g ∂μ) = ((ν univ).toReal : ℂ) * globalIdelicZFunction f c
+  rw [← integral_congr_ae (Filter.Eventually.of_forall ha), ← integral_prod Φ hp, integral_prod_symm Φ hp]
+  have he (u : C₁) : (∫ g, Φ (g,u) ∂μ) = ∫ g, W g ∂μ := integral_mul_left_eq_self W u.val
+  simp_rw [he, integral_const]
+  rw [RCLike.real_smul_eq_coe_mul]
+  congr 1
+  exact congrFun (globalThetaMellinIntegral_eq_continuation_of_vanishing f.val hf.1 hf.2) c
+
+/-- On a polar test the principal-value multiplier identity extends across every
+point, since both sides are continuous. -/
+private theorem sLocalUncutCarving_lt_pvMellin (χ : PontryaginDual C𝔽) (T : Finset V)
+    (f : ℬ₀) (z : ℂ) :
+    globalIdelicZFunction (adelePrincipalValue F T f.val) (ideleClassNormTwist χ z) =
+      reciprocalPartialHeckeEulerProduct χ T z * globalIdelicZFunction f.val (ideleClassNormTwist χ z) := by
+  have h₁ := (globalIdelicZFunction_entire_of_vanishing _
+    (adelePrincipalValue_mem_polarSubspace T f) χ).continuous.continuousAt (x := z)
+  have h₂ := (globalIdelicZFunction_entire_of_vanishing _ f.property χ).continuous.continuousAt (x := z)
+  have hfactor (v : V) : Differentiable ℂ (fun w ↦ (finiteHeckeEulerFactor χ v w)⁻¹) := by
+    unfold finiteHeckeEulerFactor
+    split_ifs
+    · simp_rw [inv_inv]
+      have hq : (v.asIdeal.absNorm : ℂ) ≠ 0 :=
+        Nat.cast_ne_zero.mpr ((Ideal.absNorm_eq_zero_iff).not.mpr v.ne_bot)
+      exact (differentiable_const _).sub ((differentiable_const _).mul
+        (differentiable_neg.const_cpow (Or.inl hq)))
+    · simp_rw [inv_one]
+      exact differentiable_const _
+  have hprod : Continuous (reciprocalPartialHeckeEulerProduct χ T) := by
+    unfold reciprocalPartialHeckeEulerProduct
+    exact (Differentiable.fun_finsetProd (𝕜 := ℂ) fun v _ ↦ hfactor v).continuous
+  exact ((h₁.eventuallyEq_nhds_iff_eventuallyEq_nhdsNE ((hprod.continuousAt (x := z)).mul h₂)).mp
+    ((globalPrincipalValueConverse_mellin T χ f.val).filter_mono (nhdsNE_le_codiscrete z))).eq_of_nhds
+
+/-- On a principal-value generator the ambient Mellin functional reads the product of the
+norm-one class mass, the Euler multiplier and the polar test's Mellin value. -/
+private theorem sLocalUncutCarving_lt_evalGenerator (χ : PontryaginDual C𝔽) (z : ℂ)
+    {s : ℝ} {Λ : StrongDual ℂ W(s)}
+    (hΛ : ∀ f : W(s), Λ f = ∫ g, f g * ideleClassNormTwist χ z g ∂μ𝔽)
+    (T : Finset V) (f : ℬ₀) :
+    Λ (θ(s, ωOf(χ), P(T, f))) = ((μ₁ univ).toReal : ℂ) *
+      (reciprocalPartialHeckeEulerProduct χ T z * globalIdelicZFunction f.val (ideleClassNormTwist χ z)) := by
+  have hn : Continuous norm𝔽 :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)
+  have hdens : Continuous (intervalSobolevDensity 0 0 s) := by
+    unfold intervalSobolevDensity
+    exact ((Real.continuous_exp.comp (continuous_const.mul continuous_id)).max
+      (Real.continuous_exp.comp (continuous_const.mul continuous_id))).mul
+      (Continuous.rpow_const (f := fun x : ℝ ↦ 1 + x ^ 2) (by fun_prop)
+        fun x ↦ Or.inl (by positivity))
+  have hpos (g : C𝔽) : 0 < intervalSobolevDensity 0 0 s (Real.log (norm𝔽 g)) :=
+    mul_pos (lt_max_of_lt_left (Real.exp_pos _)) (Real.rpow_pos_of_pos (by positivity) _)
+  have hμν : μ𝔽 ≪ ν(s) := withDensity_absolutelyContinuous'
+    ((hdens.measurable.comp (Real.measurable_log.comp hn.measurable)).ennreal_ofReal.aemeasurable)
+    (.of_forall fun g ↦ (ENNReal.ofReal_pos.mpr (hpos g)).ne')
+  have hf := (MemLp.coeFn_toLp
+    (memLp_homogeneousTheta_zeroLine s (ωOf(χ)) (P(T, f)))).filter_mono hμν.ae_le
+  rw [hΛ]
+  convert (sLocalUncutCarving_lt_classMellin χ z (P(T, f))).trans ?_ using 1
+  · apply integral_congr_ae
+    filter_upwards [hf] with g hg using congrArg (· * ideleClassNormTwist χ z g) hg
+  · rw [sLocalUncutCarving_lt_pvMellin χ T f z]
+
+/-- A zero of the reciprocal Euler factor at an unramified place is a simple pole. -/
+private theorem sLocalUncutCarving_lt_eulerPole (χ : PontryaginDual C𝔽) (v : V)
+    (hu : (ideleClassNormTwist χ 0).IsUnramifiedAt v) {z : ℂ}
+    (hz : (finiteHeckeEulerFactor χ v z)⁻¹ = 0) :
+    meromorphicOrderAt (finiteHeckeEulerFactor χ v) z < 0 := by
+  have hq : (1 : ℝ) < (v.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have hq0 : (v.asIdeal.absNorm : ℂ) ≠ 0 := by
+    exact_mod_cast (zero_lt_one.trans hq).ne'
+  let L := Complex.log (v.asIdeal.absNorm : ℂ)
+  have hL : L ≠ 0 := by
+    simp only [L, ← Complex.natCast_log]
+    exact_mod_cast (Real.log_pos hq).ne'
+  let a := (ideleClassNormTwist χ 0).localValue v
+  let d (w : ℂ) := 1 - a * Complex.exp (-(L * w))
+  have hd : (fun w ↦ (finiteHeckeEulerFactor χ v w)⁻¹) = d := by
+    funext w
+    rw [finiteHeckeEulerFactor, ite_eq_left hu, inv_inv, Complex.cpow_def_of_ne_zero hq0]
+    unfold d
+    congr 3
+    ring
+  have hv : d z = 0 := congrFun hd z ▸ hz
+  have ha : a ≠ 0 := by
+    intro h
+    simp [d, h] at hv
+  have hder : HasDerivAt d (-(a * (Complex.exp (-(L * z)) * -(L * 1)))) z :=
+    ((((hasDerivAt_id z).const_mul L).neg.cexp).const_mul a).const_sub 1
+  have han : AnalyticAt ℂ d z := by unfold d; fun_prop
+  have ho := han.analyticOrderAt_eq_one_of_zero_deriv_ne_zero hv (by
+    rw [hder.deriv]
+    simp [ha, hL, Complex.exp_ne_zero])
+  have hm : meromorphicOrderAt d z = 1 := by rw [han.meromorphicOrderAt_eq, ho]; rfl
+  have hfun : finiteHeckeEulerFactor χ v = fun w ↦ (d w)⁻¹ := by
+    funext w
+    rw [← congrFun hd w, inv_inv]
+  rw [hfun]
+  change meromorphicOrderAt d⁻¹ z < 0
+  rw [meromorphicOrderAt_inv, hm]
+  exact WithTop.coe_lt_coe.mpr (by decide : (-1 : ℤ) < 0)
+
+/-- Different exponents give different global norm twists of a fixed character. -/
+private theorem sLocalUncutCarving_lt_chart_injective (χ : PontryaginDual C𝔽) :
+    Injective (ideleClassNormTwist χ) := by
+  intro s t h
+  let w := quasiCharacterNormTwist (MonoidHom.id ℝ≥0ˣ) continuous_id 1 s
+  have hw (u : ℝ≥0ˣ) : w u = ((u.val : ℝ) : ℂ) ^ s := one_mul _
+  apply (existsUnique_complexPower w).unique hw
+  intro u
+  let g : C𝔽 := classOf (canonicalIdeleNormSection F u)
+  have hg : ideleClassNorm F g = u := canonicalIdeleNormSection_rightInverse F u
+  have he := DFunLike.congr_fun h g
+  change (χ g : ℂ) * (norm𝔽 g : ℂ) ^ s = (χ g : ℂ) * (norm𝔽 g : ℂ) ^ t at he
+  rw [show norm𝔽 g = (u.val : ℝ) from congrArg (fun x : ℝ≥0ˣ ↦ (x.val : ℝ)) hg] at he
+  exact (hw u).trans (mul_left_cancel₀ (Circle.coe_ne_zero _) he)
+
+/-- A newly selected rational prime supplies infinitely many potential Euler zeros. Each old
+place rules out at most one, by the distinct-prime common-pole bound. -/
+private theorem sLocalUncutCarving_lt_newZero {S T T' : Finset V} (χ : PontryaginDual C𝔽)
+    (hχ : Unramified(χ, S)) (hT : Disjoint S T) (hT' : Disjoint S T')
+    {p : ℕ} (hpT : ∀ v ∈ T, (p : 𝓞 F) ∉ v.asIdeal)
+    (v : V) (hv : v ∈ T') (hpv : (p : 𝓞 F) ∈ v.asIdeal) :
+    ∃ z : ℂ, z.re = 0 ∧ ideleClassNormTwist χ z ≠ 1 ∧
+      reciprocalPartialHeckeEulerProduct χ T z ≠ 0 ∧
+      reciprocalPartialHeckeEulerProduct χ T' z = 0 := by
+  classical
+  have hu : (ideleClassNormTwist χ 0).IsUnramifiedAt v :=
+    hχ v (fun h ↦ Finset.disjoint_left.mp hT' h hv)
+  obtain ⟨π₀, hπ₀⟩ := (Valued.v : Valuation (v.adicCompletion F)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π := Units.mk0 (π₀ : v.adicCompletion F) hπ₀.ne_zero
+  have hπ : Valued.v.IsUniformizer (π : v.adicCompletion F) := hπ₀
+  obtain ⟨t, ⟨_, ht, _⟩, _⟩ := unramifiedHeckeCharacter_existsUnique_phase χ v hu π hπ
+  have hval : (ideleClassNormTwist χ 0).localValue v =
+      (v.asIdeal.absNorm : ℂ) ^ (-(t : ℂ) * Complex.I) := by
+    rw [hu.localValue_eq π hπ, HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    exact ht
+  have hq : (1 : ℝ) < (v.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have hq0 : (v.asIdeal.absNorm : ℂ) ≠ 0 := by
+    exact_mod_cast (zero_lt_one.trans hq).ne'
+  let L := Real.log (v.asIdeal.absNorm : ℝ)
+  have hL : 0 < L := Real.log_pos hq
+  let d := 2 * Real.pi / L
+  have hd : 0 < d := div_pos Real.two_pi_pos hL
+  let z (n : ℕ) := (((n : ℝ) * d - t : ℝ) : ℂ) * Complex.I
+  have hzreal (n : ℕ) : (z n).re = 0 := by simp [z]
+  have hzinj : Injective z := by
+    intro a b h
+    have he := congrArg Complex.im h
+    simp only [z, Complex.mul_im, Complex.ofReal_re, Complex.ofReal_im,
+      Complex.I_re, Complex.I_im, mul_one, zero_mul, add_zero] at he
+    have heq : (a : ℝ) = b := mul_right_cancel₀ hd.ne' (by linarith only [he])
+    exact_mod_cast heq
+  have hzv (n : ℕ) : (finiteHeckeEulerFactor χ v (z n))⁻¹ = 0 := by
+    rw [finiteHeckeEulerFactor_inv_eq_phase χ v hu t hval,
+      Complex.cpow_def_of_ne_zero hq0]
+    apply sub_eq_zero.mpr
+    symm
+    apply Complex.exp_eq_one_iff.mpr
+    refine ⟨-(n : ℤ), ?_⟩
+    have hdL : (d : ℂ) * (L : ℂ) = 2 * (Real.pi : ℂ) := by
+      exact_mod_cast (div_mul_cancel₀ (2 * Real.pi) hL.ne')
+    rw [← Complex.natCast_log]
+    change (L : ℂ) * (-z n - (t : ℂ) * Complex.I) = _
+    simp only [z, Complex.ofReal_sub, Complex.ofReal_mul, Complex.ofReal_natCast, Int.cast_neg, Int.cast_natCast]
+    change (L : ℂ) * (-(((n : ℂ) * (d : ℂ) - (t : ℂ)) * Complex.I) - (t : ℂ) * Complex.I) = _
+    linear_combination -(n : ℂ) * Complex.I * hdL
+  let excluded (w : V) : Set ℂ := {a | meromorphicOrderAt (finiteHeckeEulerFactor χ v) a < 0 ∧
+    meromorphicOrderAt (finiteHeckeEulerFactor χ w) a < 0}
+  have hfinite (w : V) (hw : w ∈ T) : (excluded w).Finite := by
+    let R := S ∪ T ∪ T'
+    let a : R := ⟨v, Finset.mem_union_right _ hv⟩
+    let b : R := ⟨w, Finset.mem_union_left _ (Finset.mem_union_right _ hw)⟩
+    have hχR : Unramified(χ, R) := fun w h ↦ hχ w
+      (fun hS ↦ h (Finset.mem_union_left _ (Finset.mem_union_left _ hS)))
+    have hwχ : (ideleClassNormTwist χ 0).IsUnramifiedAt w :=
+      hχ w (fun h ↦ Finset.disjoint_left.mp hT h hw)
+    have hne : v.under (𝓞 ℚ) ≠ w.under (𝓞 ℚ) := by
+      intro h
+      apply hpT w hw
+      have he := congrArg HeightOneSpectrum.asIdeal h
+      change v.asIdeal.under (𝓞 ℚ) = w.asIdeal.under (𝓞 ℚ) at he
+      have hmem : (p : 𝓞 ℚ) ∈ v.asIdeal.under (𝓞 ℚ) := by
+        change algebraMap (𝓞 ℚ) (𝓞 F) (p : 𝓞 ℚ) ∈ v.asIdeal
+        simpa only [map_natCast] using hpv
+      rw [he] at hmem
+      change algebraMap (𝓞 ℚ) (𝓞 F) (p : 𝓞 ℚ) ∈ w.asIdeal at hmem
+      simpa only [map_natCast] using hmem
+    exact (finiteHeckeEulerFactors_common_pole_subsingleton χ hχR a b hu hwχ hne).finite
+  let bad := (⋃ w ∈ T, excluded w) ∪ {a | ideleClassNormTwist χ a = 1}
+  have hbad : bad.Finite := T.finite_toSet.biUnion hfinite |>.union
+    ((show {a | ideleClassNormTwist χ a = 1}.Subsingleton from
+      fun _ hz _ hw ↦ sLocalUncutCarving_lt_chart_injective χ (hz.trans hw.symm)).finite)
+  obtain ⟨_, ⟨n, rfl⟩, hn⟩ := (infinite_range_of_injective hzinj).exists_notMem_finite hbad
+  refine ⟨z n, hzreal n, (fun h ↦ hn (Or.inr h)), ?_, ?_⟩
+  · unfold reciprocalPartialHeckeEulerProduct
+    apply Finset.prod_ne_zero_iff.mpr
+    intro w hw hz
+    have hwχ : (ideleClassNormTwist χ 0).IsUnramifiedAt w :=
+      hχ w (fun h ↦ Finset.disjoint_left.mp hT h hw)
+    exact hn (Or.inl (mem_iUnion₂.mpr ⟨w, hw, sLocalUncutCarving_lt_eulerPole χ v hu (hzv n),
+      sLocalUncutCarving_lt_eulerPole χ w hwχ hz⟩))
+  · unfold reciprocalPartialHeckeEulerProduct
+    exact Finset.prod_eq_zero hv (hzv n)
+
+/-- Unit translation preserves evaluation at zero and scales Fourier evaluation by the norm. -/
+private theorem sLocalUncutCarving_lt_translatePolar
+    (u : IdeleGroup (𝓞 F) F)
+    (f : SchwartzBruhat (Multiplicative 𝔸[F])) :
+    adelePolarValues (F := F) (schwartzBruhatUnitTranslate u f) =
+      ((adelePolarValues (F := F) f).1,
+        (((ideleNorm F u).val : ℝ) : ℂ) * (adelePolarValues (F := F) f).2) := by
+  apply Prod.ext
+  · change f (Multiplicative.ofAdd (u.inv * 0)) = f (Multiplicative.ofAdd 0)
+    rw [mul_zero]
+  · have h := globalThetaPolarValues_snd_translate (F := F) (QuotientGroup.mk u)
+      (Submodule.Quotient.mk f)
+    rw [(existsUnique_globalThetaAction (F := F)).exists.choose_spec.2 u f] at h
+    exact h
+
+/-- Reflection across the critical strip gives a test nonzero at any nontrivial unitary
+character. Two translation differences annihilate evaluation at zero and Fourier evaluation
+at zero while preserving nonvanishing of the Mellin value. -/
+private theorem sLocalUncutCarving_lt_polarNonzero (χ : PontryaginDual C𝔽) (z : ℂ) (hz : z.re = 0)
+    (hc : ideleClassNormTwist χ z ≠ 1) :
+    ∃ f : adelePolarSubspace F, globalIdelicZFunction f.val (ideleClassNormTwist χ z) ≠ 0 := by
+  let c := ideleClassNormTwist χ z
+  have h₁ : ideleClassNormTwist (1 : PontryaginDual C𝔽) 0 = 1 := by
+    ext1 g
+    change (1 : ℂ) * _ ^ (0 : ℂ) = 1
+    simp
+  have hDual (η : PontryaginDual C𝔽) (s : ℂ) :
+      dualQuasiCharacter (G := C𝔽) (ideleClassNorm F) (isProperMap_ideleClassNorm F).continuous
+        (ideleClassNormTwist η s) = ideleClassNormTwist η⁻¹ (1 - s) := by
+    ext1 g
+    let N : ℂ := (((ideleClassNorm F g).val : ℝ) : ℂ)
+    have hN : N ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (ideleClassNorm F g).ne_zero)
+    change N * ideleClassNormTwist η s g⁻¹ = ideleClassNormTwist η⁻¹ (1 - s) g
+    rw [map_inv]
+    change N * ((η g : ℂ) * N ^ s)⁻¹ = (η g : ℂ)⁻¹ * N ^ (1 - s)
+    rw [mul_inv_rev, Complex.cpow_sub 1 s hN, Complex.cpow_one, div_eq_mul_inv]
+    ac_rfl
+  have hr : (1 - z).re = 1 := by simp [hz]
+  have hreg₁ : ideleClassNormTwist χ⁻¹ (1 - z) ≠ 1 := by
+    intro e
+    have h := quasiCharacterAbscissa_ideleClassNormTwist χ⁻¹ (1 - z)
+    rw [e, ← h₁, quasiCharacterAbscissa_ideleClassNormTwist, hr] at h
+    norm_num at h
+  have hreg₂ : ideleClassNormTwist χ⁻¹ (1 - z) ≠ ideleClassNormTwist (1 : PontryaginDual C𝔽) 1 := by
+    intro e
+    have h := congrArg (fun c : HeckeCharacter (𝓞 F) F ↦
+      dualQuasiCharacter (G := C𝔽) (ideleClassNorm F) (isProperMap_ideleClassNorm F).continuous c) e
+    rw [hDual, hDual,
+      inv_inv, inv_one, sub_sub_cancel, sub_self, h₁] at h
+    exact hc h
+  obtain ⟨g, hg⟩ := exists_globalIdelicZetaIntegral_eq_completedHeckeL χ⁻¹
+  let L (s : ℂ) := globalIdelicZFunction g (ideleClassNormTwist χ⁻¹ s)
+  have hL : MeromorphicNFOn L univ := globalIdelicZFunction_meromorphic g χ⁻¹
+  have hn : L (1 - z) ≠ 0 := by
+    intro he
+    have han : AnalyticAt ℂ L (1 - z) := (globalIdelicZFunction_poles g χ⁻¹).1 _ ⟨hreg₁, hreg₂⟩
+    have hpos : 0 < meromorphicOrderAt L (1 - z) :=
+      lt_of_le_of_ne han.meromorphicOrderAt_nonneg
+        (fun h ↦ ((hL (mem_univ _)).meromorphicOrderAt_eq_zero_iff.mp h.symm) he)
+    have hlt := completedHeckeL_continuation_zeros χ⁻¹ L hL (fun s ↦ by
+      change globalIdelicZFunction _ _ = _
+      rw [globalIdelicZFunction_eq_integral, hg s]
+      change 1 < quasiCharacterAbscissa _ _ _ _
+      rw [quasiCharacterAbscissa_ideleClassNormTwist]
+      exact s.2) (by rw [hr]; norm_num) hpos
+    linarith
+  let E := adeleSchwartzFourier g
+  have hE : globalIdelicZFunction E c ≠ 0 := by
+    change globalIdelicZFunction g (ideleClassNormTwist χ⁻¹ (1 - z)) ≠ 0 at hn
+    rwa [globalIdelicZFunction_functionalEquation, hDual,
+      inv_inv, sub_sub_cancel] at hn
+  have hcn : c ≠ ideleClassNormTwist (1 : PontryaginDual C𝔽) 1 := by
+    intro e
+    have h := quasiCharacterAbscissa_ideleClassNormTwist χ z
+    change ideleClassNormTwist χ z = _ at e
+    rw [e, quasiCharacterAbscissa_ideleClassNormTwist, hz] at h
+    norm_num at h
+  have hreg : 0 ≤ globalIdelicOrderBound c := by
+    rw [globalIdelicOrderBound, ite_eq_right (not_or.mpr ⟨hc, hcn⟩)]
+  let Z : SchwartzBruhat (Multiplicative 𝔸[F]) →ₗ[ℂ] ℂ :=
+    { toFun := fun f ↦ (globalIdelicMellin (F := F) f).val ⟨c, hreg⟩
+      map_add' := by intro f g; rw [map_add]; rfl
+      map_smul' := by intro a g; rw [map_smul]; rfl }
+  have hZT (t : I𝔽) (f : SchwartzBruhat (Multiplicative 𝔸[F])) :
+      Z (schwartzBruhatUnitTranslate t f) = c (QuotientGroup.mk t) * Z f :=
+    globalIdelicMellin_unitTranslate t f ⟨c, hreg⟩
+  have hZE : Z E ≠ 0 := hE
+  let r : NNRealˣ := Units.mk0 2 (by norm_num)
+  let u := canonicalIdeleNormSection F r
+  have hn' : (((ideleNorm F u).val : ℝ) : ℂ) = 2 := by
+    rw [canonicalIdeleNormSection_rightInverse F r]
+    rfl
+  have hcu : c (QuotientGroup.mk u) ≠ 2 := by
+    intro h
+    have hnrm (q : C𝔽) : ‖c q‖ = 1 := by
+      change ‖(χ q : ℂ) * (((ideleClassNorm F q : NNReal) : ℝ) : ℂ) ^ z‖ = 1
+      rw [norm_mul, Circle.norm_coe,
+        Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _)), hz]
+      simp
+    have hb := hnrm (QuotientGroup.mk u)
+    rw [h] at hb
+    norm_num at hb
+  obtain ⟨q, hq⟩ : ∃ q : C𝔽, c q ≠ 1 := by
+    by_contra! h
+    exact hc (ContinuousMonoidHom.ext fun q ↦ h q)
+  obtain ⟨v, rfl⟩ := QuotientGroup.mk_surjective q
+  let d := schwartzBruhatUnitTranslate u E - (2 : ℂ) • E
+  let f := schwartzBruhatUnitTranslate v d - d
+  have hp : f ∈ adelePolarSubspace F := by
+    change adelePolarValues (F := F) f = 0
+    dsimp only [f, d]
+    rw [map_sub, sLocalUncutCarving_lt_translatePolar, map_sub, map_smul, sLocalUncutCarving_lt_translatePolar, hn']
+    apply Prod.ext <;> simp
+  refine ⟨⟨f, hp⟩, ?_⟩
+  change Z f ≠ 0
+  have he : Z f = (c (QuotientGroup.mk v) - 1) * (c (QuotientGroup.mk u) - 2) * Z E := by
+    dsimp only [f, d]
+    rw [map_sub, hZT, map_sub, hZT, map_smul]
+    simp only [smul_eq_mul]
+    ring
+  rw [he]
+  exact mul_ne_zero (mul_ne_zero (sub_ne_zero.mpr hq) (sub_ne_zero.mpr hcu)) hZE
 
 /-- Paper: Theorem 11.1.2.1(2), p. 480, (11.1.2.5). If the larger stage adds
 a place over a rational prime absent at the smaller stage, the inclusion of the
-uncut completions is strict. -/
+uncut completions is strict.
+Deviation: A continuous Mellin evaluation at a new reciprocal Euler zero separates the stages. -/
 theorem sLocalUncutCarving_lt {S : Finset V} (χ : PontryaginDual C𝔽)
     (_hχ : Unramified(χ, S)) (_hPic : TrivialPic((S : Set V)))
     (s : ℝ) (_hs : DegreeBound(s)) (i i' : SLocalCarvingIndex (F := F) S) (_hii' : i < i')
     (_hp : ∃ p : ℕ, p.Prime ∧
       (∀ v ∈ i.val, (p : 𝓞 F) ∉ v.asIdeal) ∧ ∃ v ∈ i'.val, (p : 𝓞 F) ∈ v.asIdeal) :
-    sLocalUncutCarving s (ωOf(χ)) i'.val < sLocalUncutCarving s (ωOf(χ)) i.val := by sorry
+    sLocalUncutCarving s (ωOf(χ)) i'.val < sLocalUncutCarving s (ωOf(χ)) i.val := by
+  obtain ⟨p, _, hpT, v, hv, hpv⟩ := _hp
+  obtain ⟨z, hz, hzunit, hzT, hzT'⟩ :=
+    sLocalUncutCarving_lt_newZero χ _hχ i.property i'.property hpT v hv hpv
+  have hd : 1 ≤ (Module.finrank ℚ F : ℝ) := by
+    exact_mod_cast (Nat.succ_le_of_lt (Module.finrank_pos (R := ℚ) (M := F)))
+  have hs : 1 < s := by linarith
+  obtain ⟨Λ, hΛ⟩ := sLocalUncutCarving_lt_mellinFunctional χ z hz hs
+  have hsubset : sLocalUncutCarving s (ωOf(χ)) i'.val ≤ sLocalUncutCarving s (ωOf(χ)) i.val := by
+    let ω : PontryaginDual C₁ := ωOf(χ)
+    exact (sLocalCutoffCarving_univ s ω i'.val).ge.trans
+      ((sLocalCutoffCarving_antitone s ω univ MeasurableSet.univ _hii'.le).trans
+        (sLocalCutoffCarving_univ s ω i.val).le)
+  refine hsubset.lt_of_not_ge fun hreverse ↦ ?_
+  have hvan : sLocalUncutCarving s (ωOf(χ)) i'.val ≤ Λ.ker := by
+    unfold sLocalUncutCarving
+    refine Submodule.topologicalClosure_minimal _ (Submodule.span_le.mpr ?_) Λ.isClosed_ker
+    rintro _ ⟨f, rfl⟩
+    apply LinearMap.mem_ker.mpr
+    have h := sLocalUncutCarving_lt_evalGenerator χ z hΛ i'.val f
+    rw [hzT', zero_mul, mul_zero] at h
+    exact h
+  obtain ⟨f, hf⟩ := sLocalUncutCarving_lt_polarNonzero χ z hz hzunit
+  have hmass : ((μ₁ univ).toReal : ℂ) ≠ 0 := by
+    let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+    let : (μ₁).IsHaarMeasure :=
+      (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+    exact Complex.ofReal_ne_zero.mpr measureReal_univ_pos.ne'
+  have hmem : θ(s, ωOf(χ), P(i.val, f)) ∈ sLocalUncutCarving s (ωOf(χ)) i.val :=
+    Submodule.le_topologicalClosure _ (Submodule.subset_span ⟨f, rfl⟩)
+  have hzero := LinearMap.mem_ker.mp (hvan (hreverse hmem))
+  exact (mul_ne_zero hmass (mul_ne_zero hzT hf)) <|
+    (sLocalUncutCarving_lt_evalGenerator χ z hΛ i.val f).symm.trans hzero
 
 /-- Paper: Theorem 11.1.2.1(2), p. 480, (11.1.2.6). The cutoff stages
 are nested under the inclusion order of their finite-place indices.
@@ -1512,6 +1980,294 @@ theorem sLocalCarvingGenerator_trivial (S : Finset V) (J : Set ℝ) (f : ℬₛ(
     simp [integral_const]
   · simp [Set.indicator_of_notMem hg]
 
+/-- At an idele that is a unit outside `S`, the class norm is the S-norm of its projection. -/
+private theorem memLp_sLocalCarvingGenerator_norm (S : Finset V) (y : I𝔽)
+    (hy : ∀ v ∉ S, Valued.v (y.val.2 v) = 1) :
+    ((ideleClassNorm F (classOf y)).val : ℝ) =
+      ((sIdeleNorm F S (Units.map (adeleProjection F S).toMonoidHom y)).val : ℝ) := by
+  have hU : y ∈ range (integralIdeleInsertion F S) := by
+    rw [mem_range_integralIdeleInsertion]
+    intro v hv
+    have h1 : y.val.2 v * y.inv.2 v = 1 :=
+      congrArg (fun x : AdeleRing (𝓞 F) F ↦ x.2 v) y.val_inv
+    have h2 : y.inv.2 v * y.val.2 v = 1 :=
+      congrArg (fun x : AdeleRing (𝓞 F) F ↦ x.2 v) y.inv_val
+    exact (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one
+      (a := ⟨y.val.2 v, y.inv.2 v, h1, h2⟩)).mpr (hy v hv)
+  obtain ⟨u, rfl⟩ := hU
+  exact congrArg (fun t : ℝ≥0ˣ ↦ ((t : ℝ≥0) : ℝ)) ((sIdeleNorm_spec F S).1 u)
+
+/-- The raw theta generator decays at every inverse power of the class norm. -/
+private theorem memLp_sLocalCarvingGenerator_decay (S : Finset V) (f : ℬₛ(S)) (k : ℕ)
+    (hk : 1 ≤ k) :
+    ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ g : C𝔽, T < ((ideleClassNorm F g).val : ℝ) →
+      ‖sLocalCarvingTheta S f g‖ ≤ C * (((ideleClassNorm F g).val : ℝ) ^ k)⁻¹ := by
+  obtain ⟨C, T, hC, hT, hdec⟩ := sLocalAdelicTheta_decay_large F S f k hk
+  refine ⟨C, T, hC, hT, fun g hg ↦ ?_⟩
+  obtain ⟨x, rfl⟩ := QuotientGroup.mk'_surjective (IdeleGroup.principalSubgroup (𝓞 F) F) g
+  rw [sLocalCarvingTheta_classOf]
+  by_cases hex : ∃ ξ₀ : Fˣ, IdeleGroup.unitEmbedding (𝓞 F) F ξ₀ * x ∈
+      {g' : I𝔽 | ∀ v ∉ S, Valued.v (g'.val.2 v) = 1}
+  · obtain ⟨ξ₀, h₀⟩ := hex
+    have hcl : classOf (IdeleGroup.unitEmbedding (𝓞 F) F ξ₀ * x) = classOf x := by
+      rw [map_mul, QuotientGroup.mk'_apply,
+        (QuotientGroup.eq_one_iff (N := IdeleGroup.principalSubgroup (𝓞 F) F)
+          (IdeleGroup.unitEmbedding (𝓞 F) F ξ₀)).mpr ⟨ξ₀, rfl⟩, one_mul]
+    have heq : ideleThetaSum (sLocalCarvingIdeleTest S f) x =
+        sLocalAdelicTheta F S f (Units.map (adeleProjection F S).toMonoidHom
+          (IdeleGroup.unitEmbedding (𝓞 F) F ξ₀ * x)) := by
+      rw [← sLocalCarvingTheta_classOf, ← hcl, sLocalCarvingTheta_classOf]
+      exact integrable_sLocalCarvingTheta_normOne_eq S f _ h₀
+    have hn := memLp_sLocalCarvingGenerator_norm S _ h₀
+    rw [hcl] at hn
+    rw [heq, hn]
+    rw [hn] at hg
+    exact hdec _ hg
+  · push Not at hex
+    have h0 : ideleThetaSum (sLocalCarvingIdeleTest S f) x = 0 := by
+      unfold ideleThetaSum
+      refine (tsum_congr fun ξ ↦ ?_).trans tsum_zero
+      unfold sLocalCarvingIdeleTest
+      exact Set.indicator_of_notMem (hex ξ) _
+    rw [h0, norm_zero]
+    have hpos : 0 < ((ideleClassNorm F (classOf x)).val : ℝ) :=
+      NNReal.coe_pos.mpr (Units.zero_lt _)
+    positivity
+
+/-- The norm band from `a` to `T` is compact in the positive reals. -/
+private theorem memLp_sLocalCarvingGenerator_isCompact (a T : ℝ) (ha : 0 < a) :
+    IsCompact {t : ℝ≥0ˣ | ((t : ℝ≥0) : ℝ) ∈ Icc a T} := by
+  let E : ℝ → ℝ≥0ˣ := fun x ↦ Units.mk0 (Real.exp x).toNNReal
+    (Real.toNNReal_eq_zero.not.mpr (not_le_of_gt (Real.exp_pos x)))
+  have hE : Continuous E := by
+    rw [Units.continuous_iff]
+    refine ⟨continuous_real_toNNReal.comp Real.continuous_exp, ?_⟩
+    simp only [E, Units.val_inv_eq_inv_val, Units.val_mk0]
+    exact (continuous_real_toNNReal.comp Real.continuous_exp).inv₀ fun x ↦
+      Real.toNNReal_eq_zero.not.mpr (not_le_of_gt (Real.exp_pos x))
+  refine ((isCompact_Icc (a := Real.log a) (b := Real.log T)).image hE).of_isClosed_subset
+    (isClosed_Icc.preimage (NNReal.continuous_coe.comp Units.continuous_val)) ?_
+  rintro t ⟨h1, h2⟩
+  have ht : 0 < ((t : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  refine ⟨Real.log ((t : ℝ≥0) : ℝ), ⟨Real.log_le_log ha h1, Real.log_le_log ht h2⟩, ?_⟩
+  apply Units.ext
+  apply NNReal.coe_injective
+  change ((Real.exp (Real.log ((t : ℝ≥0) : ℝ))).toNNReal : ℝ) = _
+  rw [Real.exp_log ht, Real.coe_toNNReal _ ht.le]
+
+/-- Above any positive norm, the raw theta generator is bounded by a multiple of an
+inverse power of the class norm. -/
+private theorem memLp_sLocalCarvingGenerator_bound (S : Finset V) (f : ℬₛ(S)) (a : ℝ)
+    (ha : 0 < a) (k : ℕ) (hk : 1 ≤ k) :
+    ∃ D : ℝ, 0 ≤ D ∧ ∀ g : C𝔽, a ≤ ((ideleClassNorm F g).val : ℝ) →
+      ‖sLocalCarvingTheta S f g‖ ≤ D * (((ideleClassNorm F g).val : ℝ) ^ k)⁻¹ := by
+  obtain ⟨C, T, hC, hT, hdec⟩ := memLp_sLocalCarvingGenerator_decay S f k hk
+  have hK : IsCompact ((m𝔽) ⁻¹' {t : ℝ≥0ˣ | ((t : ℝ≥0) : ℝ) ∈ Icc a T}) :=
+    (isProperMap_ideleClassNorm F).isCompact_preimage
+      (memLp_sLocalCarvingGenerator_isCompact a T ha)
+  obtain ⟨K, hKb⟩ := hK.exists_bound_of_continuousOn
+    (integrable_sLocalCarvingTheta_normOne_classContinuous S f).continuousOn
+  refine ⟨max (max K 0 * T ^ k) C, le_max_of_le_right hC.le, fun g hg ↦ ?_⟩
+  have hpos : 0 < ((ideleClassNorm F g).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hinv : 0 < (((ideleClassNorm F g).val : ℝ) ^ k)⁻¹ := by positivity
+  by_cases hgT : ((ideleClassNorm F g).val : ℝ) ≤ T
+  · have h1 := hKb g ⟨hg, hgT⟩
+    have h2 : (T ^ k)⁻¹ ≤ (((ideleClassNorm F g).val : ℝ) ^ k)⁻¹ :=
+      inv_anti₀ (pow_pos hpos k) (pow_le_pow_left₀ hpos.le hgT k)
+    calc ‖sLocalCarvingTheta S f g‖ ≤ max K 0 * T ^ k * (T ^ k)⁻¹ := by
+          rw [mul_assoc, mul_inv_cancel₀ (pow_pos hT k).ne', mul_one]
+          exact h1.trans (le_max_left _ _)
+      _ ≤ max K 0 * T ^ k * (((ideleClassNorm F g).val : ℝ) ^ k)⁻¹ := by
+          gcongr
+      _ ≤ _ := by
+          gcongr
+          exact le_max_left _ _
+  · calc ‖sLocalCarvingTheta S f g‖ ≤ C * (((ideleClassNorm F g).val : ℝ) ^ k)⁻¹ :=
+          hdec g (lt_of_not_ge hgT)
+      _ ≤ _ := by
+          gcongr
+          exact le_max_right _ _
+
+/-- The norm-one character average of the raw theta generator is continuous. -/
+private theorem memLp_sLocalCarvingGenerator_continuous (S : Finset V)
+    (ω : PontryaginDual C₁) (f : ℬₛ(S)) :
+    Continuous (fun g : C𝔽 ↦ ∫ h : C₁, sLocalCarvingTheta S f (h.val * g) * (ω h : ℂ) ∂μ₁) := by
+  have : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  have : (μ₁).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have hθ := integrable_sLocalCarvingTheta_normOne_classContinuous S f
+  have hjoint : Continuous (fun p : C𝔽 × C₁ ↦
+      sLocalCarvingTheta S f (p.2.val * p.1) * (ω p.2 : ℂ)) :=
+    (hθ.comp ((continuous_subtype_val.comp continuous_snd).mul continuous_fst)).mul
+      (continuous_subtype_val.comp (ω.continuous.comp continuous_snd))
+  let Φ : C𝔽 → C(C₁, ℂ) := fun g ↦ ⟨fun h ↦ sLocalCarvingTheta S f (h.val * g) * (ω h : ℂ),
+    (hθ.comp (continuous_subtype_val.mul continuous_const)).mul
+      (continuous_subtype_val.comp ω.continuous)⟩
+  have hΦ : Continuous Φ := ContinuousMap.continuous_of_continuous_uncurry Φ hjoint
+  have hint (u : C(C₁, ℂ)) : Integrable u μ₁ :=
+    u.continuous.integrable_of_hasCompactSupport (HasCompactSupport.of_compactSpace _)
+  have hlip : LipschitzWith ((μ₁).real univ).toNNReal
+      (fun u : C(C₁, ℂ) ↦ ∫ h, u h ∂μ₁) := by
+    refine LipschitzWith.of_dist_le_mul fun u v ↦ ?_
+    rw [dist_eq_norm, dist_eq_norm, ← integral_sub (hint u) (hint v),
+      Real.coe_toNNReal _ measureReal_nonneg, mul_comm]
+    exact norm_integral_le_of_norm_le_const
+      (.of_forall fun h ↦ (u - v).norm_coe_le_norm h)
+  exact hlip.continuous.comp hΦ
+
+/-- On its band the projected generator is bounded by a decaying exponential of the
+logarithmic norm. -/
+private theorem memLp_sLocalCarvingGenerator_pointwise (S : Finset V) (ω : PontryaginDual C₁)
+    (J : Set ℝ) (f : ℬₛ(S)) (a D : ℝ) (ha : 0 < a) (hD0 : 0 ≤ D) (k : ℕ)
+    (hJ : ∀ x ∈ J, a ≤ x)
+    (hD : ∀ g : C𝔽, a ≤ ((ideleClassNorm F g).val : ℝ) →
+      ‖sLocalCarvingTheta S f g‖ ≤ D * (((ideleClassNorm F g).val : ℝ) ^ k)⁻¹)
+    (g : C𝔽) :
+    ‖sLocalCarvingGenerator S ω J f g‖ ≤ (Ici (Real.log a)).indicator
+      (fun x ↦ (μ₁).real univ * D * Real.exp (-(k : ℝ) * x))
+      (Real.log ((ideleClassNorm F g).val : ℝ)) := by
+  have : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  have : (μ₁).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  unfold sLocalCarvingGenerator
+  by_cases hg : g ∈ (fun g : C𝔽 ↦ ((ideleClassNorm F g).val : ℝ)) ⁻¹' J
+  · have hag : a ≤ ((ideleClassNorm F g).val : ℝ) := hJ _ hg
+    have hpos : 0 < ((ideleClassNorm F g).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+    have hlog : Real.log ((ideleClassNorm F g).val : ℝ) ∈ Ici (Real.log a) :=
+      Real.log_le_log ha hag
+    rw [Set.indicator_of_mem hg, Set.indicator_of_mem hlog]
+    have hexp : Real.exp (-(k : ℝ) * Real.log ((ideleClassNorm F g).val : ℝ)) =
+        (((ideleClassNorm F g).val : ℝ) ^ k)⁻¹ := by
+      rw [neg_mul, Real.exp_neg, ← Real.log_pow, Real.exp_log (pow_pos hpos k)]
+    rw [hexp]
+    have hb : ∀ h : C₁, ‖sLocalCarvingTheta S f (h.val * g) * (ω h : ℂ)‖ ≤
+        D * (((ideleClassNorm F g).val : ℝ) ^ k)⁻¹ := by
+      intro h
+      have hN : ideleClassNorm F (h.val * g) = ideleClassNorm F g := by
+        rw [map_mul, MonoidHom.mem_ker.mp h.property, one_mul]
+      rw [norm_mul, Circle.norm_coe, mul_one]
+      have h1 := hD (h.val * g) (by rw [hN]; exact hag)
+      rwa [hN] at h1
+    calc ‖∫ h : C₁, sLocalCarvingTheta S f (h.val * g) * (ω h : ℂ) ∂μ₁‖
+        ≤ D * (((ideleClassNorm F g).val : ℝ) ^ k)⁻¹ * (μ₁).real univ :=
+          norm_integral_le_of_norm_le_const (.of_forall hb)
+      _ = _ := by ring
+  · rw [Set.indicator_of_notMem hg, norm_zero]
+    exact Set.indicator_nonneg (fun x _ ↦
+      mul_nonneg (mul_nonneg measureReal_nonneg hD0) (Real.exp_pos _).le) _
+
+/-- The zero-line weight times the square of a one-sided decaying exponential is
+Lebesgue integrable once the decay rate beats the Sobolev degree. -/
+private theorem memLp_sLocalCarvingGenerator_integrable_real (s c E : ℝ) (k : ℕ)
+    (hs : 0 ≤ s) (hks : s + 1 ≤ 2 * (k : ℝ)) :
+    Integrable (fun x : ℝ ↦ (ENNReal.ofReal (intervalSobolevDensity 0 0 s x)).toReal •
+      ‖(Ici c).indicator (fun x ↦ E * Real.exp (-(k : ℝ) * x)) x‖ ^ 2) := by
+  let φ : ℝ → ℝ := fun x ↦ E ^ 2 * Real.exp (s * |x| - 2 * k * x)
+  have hφc : Continuous φ := by fun_prop
+  have hφ : IntegrableOn φ (Ici c) := by
+    rw [integrableOn_Ici_iff_integrableOn_Ioi]
+    refine integrable_of_isBigO_exp_neg one_pos hφc.continuousOn ?_
+    refine Asymptotics.IsBigO.of_bound (E ^ 2) ?_
+    filter_upwards [eventually_ge_atTop 0] with x hx
+    simp only [φ]
+    rw [Real.norm_of_nonneg (by positivity), Real.norm_of_nonneg (Real.exp_pos _).le,
+      abs_of_nonneg hx]
+    gcongr
+    nlinarith
+  have hw : Continuous (intervalSobolevDensity 0 0 s) := by
+    unfold intervalSobolevDensity
+    refine Continuous.mul (by fun_prop) (Continuous.rpow_const (by fun_prop) fun t ↦ Or.inl ?_)
+    positivity
+  have hmeas : Measurable (fun x : ℝ ↦ (ENNReal.ofReal (intervalSobolevDensity 0 0 s x)).toReal •
+      ‖(Ici c).indicator (fun x ↦ E * Real.exp (-(k : ℝ) * x)) x‖ ^ 2) :=
+    (ENNReal.measurable_ofReal.comp hw.measurable).ennreal_toReal.smul
+      (((Measurable.indicator (by fun_prop) measurableSet_Ici).norm).pow_const 2)
+  refine ((integrable_indicator_iff measurableSet_Ici).mpr hφ).mono'
+    hmeas.aestronglyMeasurable (ae_of_all _ fun x ↦ ?_)
+  by_cases hx : x ∈ Ici c
+  · rw [Set.indicator_of_mem hx, Set.indicator_of_mem hx]
+    have hw0 : 0 ≤ intervalSobolevDensity 0 0 s x := by
+      unfold intervalSobolevDensity
+      positivity
+    rw [ENNReal.toReal_ofReal hw0, smul_eq_mul, Real.norm_of_nonneg (by positivity)]
+    have hden : intervalSobolevDensity 0 0 s x ≤ Real.exp (s * |x|) := by
+      unfold intervalSobolevDensity
+      simp only [mul_zero, zero_mul, Real.exp_zero, max_self, one_mul]
+      have h1 : 1 + x ^ 2 ≤ Real.exp (2 * |x|) := by
+        have h := Real.add_one_le_exp |x|
+        have h2 : Real.exp (2 * |x|) = Real.exp |x| ^ 2 := by rw [two_mul, Real.exp_add, sq]
+        rw [h2]
+        nlinarith [abs_nonneg x, sq_abs x]
+      calc (1 + x ^ 2) ^ (s / 2) ≤ Real.exp (2 * |x|) ^ (s / 2) :=
+            Real.rpow_le_rpow (by positivity) h1 (by positivity)
+        _ = Real.exp (s * |x|) := by rw [← Real.exp_mul]; ring_nf
+    have hsq : ‖E * Real.exp (-(k : ℝ) * x)‖ ^ 2 = E ^ 2 * Real.exp (-(2 * k * x)) := by
+      rw [Real.norm_eq_abs, sq_abs, mul_pow, ← Real.exp_nat_mul]
+      ring_nf
+    rw [hsq]
+    calc intervalSobolevDensity 0 0 s x * (E ^ 2 * Real.exp (-(2 * k * x)))
+        ≤ Real.exp (s * |x|) * (E ^ 2 * Real.exp (-(2 * k * x))) := by gcongr
+      _ = φ x := by
+          simp only [φ]
+          rw [sub_eq_add_neg, Real.exp_add]
+          ring
+  · rw [Set.indicator_of_notMem hx, Set.indicator_of_notMem hx]
+    simp
+
+/-- The logarithm of the class norm carries the canonical modulated Haar measure to
+Lebesgue measure. -/
+private theorem memLp_sLocalCarvingGenerator_measurePreserving :
+    MeasurePreserving (fun g : C𝔽 ↦ Real.log ((ideleClassNorm F g).val : ℝ))
+      (canonicalModulatedHaar m𝔽
+        (⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ : IsModulation m𝔽))
+      volume := by
+  have hm : IsModulation m𝔽 := ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+  have hcont : Continuous (fun g : C𝔽 ↦ Real.log ((ideleClassNorm F g).val : ℝ)) :=
+    Real.continuousOn_log.comp_continuous
+      (NNReal.continuous_coe.comp (Units.continuous_val.comp (m𝔽).continuous))
+      fun _ ↦ (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+  obtain ⟨τ, hτc, hτ⟩ := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.2.2.2.2.1
+  let τ' : ℝ≥0ˣ →ₜ* C𝔽 := ⟨τ, hτc⟩
+  let : CompactSpace (m𝔽).toMonoidHom.ker :=
+    isCompact_iff_compactSpace.mp (IsModulation.isCompact_ker hm)
+  let μk : Measure (m𝔽).toMonoidHom.ker := Measure.haarMeasure ⊤
+  let : IsProbabilityMeasure μk := ⟨Measure.haarMeasure_self⟩
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SFinite positiveRealHaar := by unfold positiveRealHaar; infer_instance
+  refine ⟨hcont.measurable, ?_⟩
+  rw [canonicalModulatedHaar_eq_map_prod m𝔽 hm τ' hτ μk Measure.haarMeasure_self]
+  have hsplit_meas : Measurable (fun z : (m𝔽).toMonoidHom.ker × ℝ≥0ˣ ↦ (z.1 : C𝔽) * τ' z.2) :=
+    ((continuous_subtype_val.comp continuous_fst).mul
+      (τ'.continuous.comp continuous_snd)).measurable
+  rw [Measure.map_map hcont.measurable hsplit_meas]
+  have hcomp : ((fun g : C𝔽 ↦ Real.log ((ideleClassNorm F g).val : ℝ)) ∘
+      fun z : (m𝔽).toMonoidHom.ker × ℝ≥0ˣ ↦ (z.1 : C𝔽) * τ' z.2) =
+      (fun t : ℝ≥0ˣ ↦ Real.log ((t.val : ℝ≥0) : ℝ)) ∘ Prod.snd := by
+    funext ⟨k, t⟩
+    change Real.log ((ideleClassNorm F ((k : C𝔽) * τ t)).val : ℝ) =
+      Real.log ((t.val : ℝ≥0) : ℝ)
+    have hk : ideleClassNorm F (k : C𝔽) = 1 := k.property
+    rw [map_mul, hk, one_mul, hτ t]
+  have hlogt : Measurable (fun t : ℝ≥0ˣ ↦ Real.log ((t.val : ℝ≥0) : ℝ)) :=
+    (Real.continuousOn_log.comp_continuous (NNReal.continuous_coe.comp Units.continuous_val)
+      fun _ ↦ (NNReal.coe_pos.mpr (Units.zero_lt _)).ne').measurable
+  rw [hcomp, ← Measure.map_map hlogt measurable_snd,
+    (measurePreserving_snd (μ := μk) (ν := positiveRealHaar)).map_eq]
+  unfold positiveRealHaar
+  have hexp : Measurable (fun x : ℝ ↦
+      Units.mk0 (Real.exp x).toNNReal
+        (Real.toNNReal_eq_zero.not.mpr (not_le_of_gt (Real.exp_pos x)))) :=
+    measurable_comap_iff.mpr (continuous_real_toNNReal.comp Real.continuous_exp).measurable
+  rw [Measure.map_map hlogt hexp]
+  have hid : ((fun t : ℝ≥0ˣ ↦ Real.log ((t.val : ℝ≥0) : ℝ)) ∘ fun x : ℝ ↦
+      Units.mk0 (Real.exp x).toNNReal
+        (Real.toNNReal_eq_zero.not.mpr (not_le_of_gt (Real.exp_pos x)))) = id := by
+    funext x
+    change Real.log ((Real.exp x).toNNReal : ℝ) = x
+    rw [Real.coe_toNNReal _ (Real.exp_pos x).le, Real.log_exp]
+  rw [hid, Measure.map_id]
+
 /-- Paper: Theorem 11.1.2.1(3), p. 480. The projected cutoff generators are
 square-integrable for the zero-line weight. -/
 theorem memLp_sLocalCarvingGenerator {S : Finset V} (χ : PontryaginDual C𝔽)
@@ -1519,7 +2275,67 @@ theorem memLp_sLocalCarvingGenerator {S : Finset V} (χ : PontryaginDual C𝔽)
     (s : ℝ) (_hs : DegreeBound(s)) (twoSided : Bool) (Λ : ℝ) (_hΛ : 0 < Λ)
     (f : ℬₛ(S)) (_hf : f (Multiplicative.ofAdd 0) = 0)
     (_hFf : sAdeleSchwartzFourier f (Multiplicative.ofAdd 0) = 0) :
-    MemLp (sLocalCarvingGenerator S (ωOf(χ)) (J(twoSided, Λ)) f) 2 (ν(s)) := by sorry
+    MemLp (sLocalCarvingGenerator S (ωOf(χ)) (J(twoSided, Λ)) f) 2 (ν(s)) := by
+  have hs0 : 0 ≤ s := (mul_nonneg zero_le_two (Nat.cast_nonneg _)).trans _hs
+  have hk1 : 1 ≤ ⌈s⌉₊ + 1 := Nat.le_add_left 1 _
+  have hks : s + 1 ≤ 2 * ((⌈s⌉₊ + 1 : ℕ) : ℝ) := by
+    have := Nat.le_ceil s
+    push_cast
+    linarith
+  have ha : 0 < Λ⁻¹ := inv_pos.mpr _hΛ
+  have hJ : ∀ x ∈ J(twoSided, Λ), Λ⁻¹ ≤ x := by
+    intro x hx
+    unfold sLocalCarvingBand at hx
+    split_ifs at hx
+    · exact hx.1
+    · exact hx
+  obtain ⟨D, hD0, hD⟩ := memLp_sLocalCarvingGenerator_bound S f Λ⁻¹ ha (⌈s⌉₊ + 1) hk1
+  have : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  have : (μ₁).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let r : ℝ → ℝ := (Ici (Real.log Λ⁻¹)).indicator
+    (fun x ↦ (μ₁).real univ * D * Real.exp (-((⌈s⌉₊ + 1 : ℕ) : ℝ) * x))
+  have hL : Continuous (fun g : C𝔽 ↦ Real.log ((ideleClassNorm F g).val : ℝ)) :=
+    Real.continuousOn_log.comp_continuous
+      (NNReal.continuous_coe.comp (Units.continuous_val.comp (m𝔽).continuous))
+      fun _ ↦ (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+  have hr : Measurable r := Measurable.indicator (by fun_prop) measurableSet_Ici
+  have hRmeas : AEStronglyMeasurable (fun g : C𝔽 ↦ r (Real.log ((ideleClassNorm F g).val : ℝ)))
+      (ν(s)) := (hr.comp hL.measurable).aestronglyMeasurable
+  have hgen : sLocalCarvingGenerator S (ωOf(χ)) (J(twoSided, Λ)) f =
+      ((fun g : C𝔽 ↦ ((ideleClassNorm F g).val : ℝ)) ⁻¹' J(twoSided, Λ)).indicator
+        (fun g ↦ ∫ h : C₁, sLocalCarvingTheta S f (h.val * g) * ((ωOf(χ)) h : ℂ) ∂μ₁) := rfl
+  have hmeasJ : MeasurableSet ((fun g : C𝔽 ↦ ((ideleClassNorm F g).val : ℝ)) ⁻¹'
+      J(twoSided, Λ)) :=
+    (hJ(twoSided, Λ)).preimage
+      (NNReal.continuous_coe.comp (Units.continuous_val.comp (m𝔽).continuous)).measurable
+  have hmeas : AEStronglyMeasurable (sLocalCarvingGenerator S (ωOf(χ)) (J(twoSided, Λ)) f)
+      (ν(s)) := by
+    rw [hgen]
+    exact ((memLp_sLocalCarvingGenerator_continuous S (ωOf(χ)) f).measurable.indicator
+      hmeasJ).aestronglyMeasurable
+  refine MemLp.of_le (g := fun g : C𝔽 ↦ r (Real.log ((ideleClassNorm F g).val : ℝ))) ?_ hmeas
+    (ae_of_all _ fun g ↦ ?_)
+  · rw [memLp_two_iff_integrable_sq_norm hRmeas]
+    have hwc : Continuous (intervalSobolevDensity 0 0 s) := by
+      unfold intervalSobolevDensity
+      refine Continuous.mul (by fun_prop) (Continuous.rpow_const (by fun_prop) fun t ↦ Or.inl ?_)
+      positivity
+    refine (integrable_withDensity_iff_integrable_smul'
+      (f := fun g : C𝔽 ↦ ENNReal.ofReal
+        (intervalSobolevDensity 0 0 s (Real.log ((ideleClassNorm F g).val : ℝ))))
+      (ENNReal.measurable_ofReal.comp (hwc.comp hL).measurable)
+      (ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top)).mpr ?_
+    have hreal := memLp_sLocalCarvingGenerator_integrable_real s (Real.log Λ⁻¹)
+      ((μ₁).real univ * D) (⌈s⌉₊ + 1) hs0 hks
+    change Integrable ((fun x : ℝ ↦ (ENNReal.ofReal (intervalSobolevDensity 0 0 s x)).toReal •
+      ‖r x‖ ^ 2) ∘ (fun g : C𝔽 ↦ Real.log ((ideleClassNorm F g).val : ℝ))) μ𝔽
+    rw [ideleClassTamagawaMeasure_eq_smul_canonical]
+    refine Integrable.smul_measure ?_ (measure_ne_top _ _)
+    exact (memLp_sLocalCarvingGenerator_measurePreserving.integrable_comp
+      hreal.aestronglyMeasurable).mpr hreal
+  · exact (memLp_sLocalCarvingGenerator_pointwise S (ωOf(χ)) (J(twoSided, Λ)) f Λ⁻¹ D ha hD0
+      (⌈s⌉₊ + 1) hJ hD g).trans (Real.le_norm_self _)
 
 -- TODO(paper-gap): Page 483 uses R_{Λ,S} without defining it. Both spans in
 -- the quotient already have Fourier value zero. The argument still needs to

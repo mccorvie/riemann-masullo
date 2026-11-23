@@ -34,6 +34,7 @@ Role instructions are in [`prompts/`](prompts/README.md).
 | Path | Contents | Who edits |
 |---|---|---|
 | `RiemannMasullo/<Chapter>/Sec<N>.lean` | paper section N of that chapter; a long section is split into `Sec<N>a.lean`, `Sec<N>b.lean`, …, and the section issue names the file | digesters, provers |
+| `RiemannMasullo/<Chapter>/Sec<N>_Imports.lean` | the private imports of that section file, each as `public import`; only the section file imports it, with a plain `import` (see "Rules for Lean code") | digesters, provers |
 | `RiemannMasullo/<Chapter>/Sec<N>_Printed.lean` | statements of that section that are false as printed, each kept as a proposition with a proof of its negation; it imports the section file, and nothing imports it | integrator (the propositions), provers (the refutations) |
 | `RiemannMasullo/<Chapter>.lean` | chapter index (docstring only) | nobody |
 | `RiemannMasullo/ForMathlib/` | general lemmas missing from Mathlib, at the path Mathlib would use | provers |
@@ -86,6 +87,16 @@ been extended.
   moved lemma a `section` of its own, so that the universe names of later declarations do not
   change. Leave private instances private. The existing `import all` lines are being removed
   (#5966); do not add new ones.
+- **A new import or public declaration in a low file rebuilds everything above it.** Lake
+  rebuilds a module when the public `.olean` changes in any module it reaches through
+  `public import`, not only in its direct imports. That `.olean` changes when an `import` line
+  is added or removed, even a private one, or when a public declaration is added or restated. A
+  proof, a `private` declaration or a docstring leaves it unchanged. One `import` added with a
+  proof to `Ch05_ThetaZSpaces/Sec3b` rebuilt 58 modules instead of 5 (#6263), and 61 of the
+  107 section files have 30 or more modules above them. In a proof, use what the file already
+  imports where you can, and keep helpers `private`. Put an unavoidable new import in the
+  section's import file `Sec<N>_Imports.lean` when it has one: the section imports that file
+  privately, so a line added there rebuilds only the section.
 - **Every declaration taken from the paper has a docstring** starting `Paper: <item>, p. <page>.`
   (for example `Paper: Proposition 2.1.3.4, p. 63.`), followed by what the Lean says in plain
   words. Mark any difference from the paper with `Deviation:`.

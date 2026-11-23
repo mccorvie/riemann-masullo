@@ -271,7 +271,7 @@ theorem modulatedExponentialDecay_stageLimit :
 
 /-- Point evaluation on the Schwartz–Bruhat space is continuous since on each
 structural stage it is bounded by the zeroth Schwartz seminorm. -/
-private theorem continuous_schwartzBruhat_eval {A : Type*} [CommGroup A] [TopologicalSpace A]
+theorem continuous_schwartzBruhat_eval {A : Type*} [CommGroup A] [TopologicalSpace A]
     (x : A) : Continuous (fun f : SchwartzBruhat A ↦ f x) := by
   let ev : SchwartzBruhat A →ₗ[ℂ] ℂ :=
     (LinearMap.proj x).comp (schwartzBruhatSubmodule A).subtype
@@ -440,7 +440,7 @@ theorem modulatedExponentialDecay_shift_equiv (a : ℝ) :
 
 /-- Multiplication by a unitary character is continuous on Schwartz–Bruhat functions,
 since the Fourier transform turns it into translation on the dual group. -/
-private theorem schwartzBruhat_mul_unitaryCharacter {A : Type*} [CommGroup A]
+theorem schwartzBruhat_mul_unitaryCharacter {A : Type*} [CommGroup A]
     [TopologicalSpace A] [IsTopologicalGroup A] [T2Space A] [LocallyCompactSpace A]
     [SecondCountableTopology A] (η : PontryaginDual A) :
     ∃ M : SchwartzBruhat A →L[ℂ] SchwartzBruhat A,
@@ -799,7 +799,7 @@ private theorem exists_positiveRealExponentialDecay_translate (c : ℝ) (hI : I.
 set_option linter.unusedSectionVars false in
 /-- Point evaluation on the decay space is continuous because on each quotient
 stage it is a constant multiple of evaluation of any one weighted profile. -/
-private theorem continuous_modulatedExponentialDecay_eval (hI : I.Nonempty) (g : G) :
+theorem continuous_modulatedExponentialDecay_eval (hI : I.Nonempty) (g : G) :
     Continuous (fun f : E ↦ f.val g) := by
   let b : I := ⟨hI.choose, hI.choose_spec⟩
   let ev : E →ₗ[ℂ] ℂ := (LinearMap.proj g).comp (modulatedExponentialDecaySubmodule m I).subtype

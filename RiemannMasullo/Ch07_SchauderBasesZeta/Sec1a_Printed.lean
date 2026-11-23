@@ -5,6 +5,8 @@ import Mathlib.Algebra.Field.ULift
 import Mathlib.NumberTheory.NumberField.Cyclotomic.Embeddings
 import Mathlib.Analysis.Real.Pi.Irrational
 
+import Mathlib.Analysis.Meromorphic.RCLike
+
 import Mathlib.Algebra.Field.ULift
 import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec1a
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
@@ -760,12 +762,123 @@ def Printed.sLocalIdelicZFunction_verticalIntegrable_neg : Prop :=
       Complex.VerticalIntegrable
         (fun s ↦ sLocalIdelicZFunction f (twistₛ(F, S) ((circleToComplex).comp χ) s)) (-A)
 
+/-- At a simple pole the vertical restriction dominates a constant times `1 / |t|`. -/
+private theorem sLocalIdelicZFunction_verticalIntegrable_neg_simplePole {Z : ℂ → ℂ} {σ : ℝ}
+    (hZ : MeromorphicAt Z (σ : ℂ)) (hp : meromorphicOrderAt Z (σ : ℂ) = -1) :
+    ¬ Complex.VerticalIntegrable Z σ := by
+  obtain ⟨g, hg, hg₀, he⟩ := (meromorphicOrderAt_eq_int_iff (n := -1) hZ).mp hp
+  let l (t : ℝ) : ℂ := σ + t * Complex.I
+  have hl : Tendsto l (𝓝 (0 : ℝ)) (𝓝 (σ : ℂ)) := by
+    have hc : Continuous l := by dsimp [l]; fun_prop
+    simpa [l] using hc.tendsto 0
+  have hle : Tendsto l (𝓝[≠] (0 : ℝ)) (𝓝[≠] (σ : ℂ)) := by
+    apply tendsto_nhdsWithin_iff.mpr
+    refine ⟨hl.mono_left nhdsWithin_le_nhds, ?_⟩
+    filter_upwards [self_mem_nhdsWithin (α := ℝ) (a := 0) (s := {0}ᶜ)] with t ht
+    simpa [l] using ht
+  have hpos : 0 < ‖g (σ : ℂ)‖ := norm_pos_iff.mpr hg₀
+  have hbound : ∀ᶠ t in 𝓝[≠] (0 : ℝ), ‖g (σ : ℂ)‖ / 2 < ‖g (l t)‖ :=
+    ((hg.continuousAt.norm.tendsto.comp hl).eventually
+      (lt_mem_nhds (half_lt_self hpos))).filter_mono nhdsWithin_le_nhds
+  have hO : (fun t : ℝ ↦ (t - 0)⁻¹) =O[𝓝[≠] 0] (fun t ↦ Z (l t)) := by
+    refine isBigO_iff''.mpr ⟨_, half_pos hpos, ?_⟩
+    filter_upwards [hbound, hle.eventually he] with t ht heq
+    simp only [heq, norm_smul, zpow_neg_one, norm_inv, show l t - (σ : ℂ) = t * Complex.I by simp [l],
+      norm_mul, Complex.norm_I, mul_one, Complex.norm_real, sub_zero]
+    rw [mul_comm (‖g (σ : ℂ)‖ / 2)]
+    exact mul_le_mul_of_nonneg_left ht.le (by positivity)
+  intro hi
+  exact not_intervalIntegrable_of_sub_inv_isBigO_punctured hO zero_ne_one left_mem_uIcc
+    (hi.intervalIntegrable (a := 0) (b := 1))
+
+/-- For a field with just one place at infinity, real, transport a test realizing the local
+simple pole at −2. Its S-local transform agrees with the local one by continuation. -/
+private theorem sLocalIdelicZFunction_verticalIntegrable_neg_onePlace (F : Type u) [Field F] [NumberField F]
+    [Unique (InfinitePlace F)] (hw : (default : InfinitePlace F).IsReal) :
+    ∃ f : Tests(F, ∅), ¬ Complex.VerticalIntegrable
+      (fun s ↦ sLocalIdelicZFunction f (twistₛ(F, ∅) ((circleToComplex).comp
+        (1 : PontryaginDual Jₛ(F, ∅))) s)) (-2) := by
+  classical
+  let w := (default : InfinitePlace F)
+  let χ := (1 : PontryaginDual Jₛ(F, ∅))
+  let chart := twistₛ(F, ∅) ((circleToComplex).comp χ)
+  let localChart := quasiCharacterNormTwist (Units.map nnNormHom.toMonoidHom ^ w.mult)
+    (continuous_infiniteLocalModule w) ((circleToComplex).comp (1 : PontryaginDual w.Completionˣ))
+  obtain ⟨g, hgp⟩ := (infiniteLocalIdelicZFunction_real_poles w hw 1 0
+    (fun x ↦ by simp only [Fin.val_zero, pow_zero, Complex.cpow_zero, mul_one]; rfl) (-2)).2.mpr
+      ⟨1, by norm_num⟩
+  let D := infiniteLocalIdelicZFunction w g ∘ localChart
+  let e : SAdeleRing F ∅ ≃ₜ w.Completion := (Homeomorph.prodUnique _ _).trans
+    (Homeomorph.piUnique fun v : InfinitePlace F ↦ v.Completion)
+  let E : Multiplicative (SAdeleRing F ∅) ≃ₜ* Multiplicative w.Completion :=
+    ContinuousMulEquiv.mk' e (fun _ _ ↦ rfl)
+  have : LocallyCompactSpace (Multiplicative w.Completion) :=
+    inferInstanceAs (LocallyCompactSpace w.Completion)
+  have : LocallyCompactSpace (Multiplicative (SAdeleRing F ∅)) :=
+    e.isOpenEmbedding.locallyCompactSpace
+  have : T2Space (Multiplicative (SAdeleRing F ∅)) := e.isEmbedding.t2Space
+  let f : Tests(F, ∅) := ⟨g.val ∘ E, schwartzBruhat_mem_comp_equiv E g.property⟩
+  let Z (s : ℂ) := sLocalIdelicZFunction f (chart s)
+  let a (v : InfinitePlace F) : SchwartzBruhat (Multiplicative v.Completion) :=
+    Subsingleton.elim w v ▸ g
+  let b (v : (∅ : Finset Places(F))) : SchwartzBruhat (Multiplicative (v.val.adicCompletion F)) := 0
+  have hf (x : SAdeleRing F ∅) : f (Multiplicative.ofAdd x) =
+      (∏ v, a v (Multiplicative.ofAdd (x.1 v))) *
+        ∏ v : (∅ : Finset Places(F)), b v (Multiplicative.ofAdd (x.2 v)) := by
+    simp only [Finset.univ_eq_empty (α := (∅ : Finset Places(F))), Finset.prod_empty, mul_one]
+    rw [Fintype.prod_subsingleton (fun v ↦ a v (Multiplicative.ofAdd (x.1 v))) w]
+    rfl
+  have hch (s : ℂ) : sLocalInfiniteRestriction w (chart s) = localChart s := by
+    ext1 x
+    rw [sLocalInfiniteRestriction_normTwist]
+    exact (one_mul _).symm
+  have heq (s : ℂ) (hs : 0 < s.re) : Z s = D s := by
+    have hc := sLocalIdelicZFunction_eq_integral f (x := chart s) ⟨χ, s, hs, rfl⟩
+    have ht := sLocalIdelicZetaIntegral_pureTensor (chart s) ⟨χ, s, hs, rfl⟩ f a b hf
+    simp only [Finset.univ_eq_empty (α := (∅ : Finset Places(F))), Finset.prod_empty, mul_one] at ht
+    rw [Fintype.prod_subsingleton _ w, hch] at ht
+    exact hc.trans (ht.trans (infiniteLocalIdelicZFunction_eq_integral w g 1 hs).symm)
+  have hZ : MeromorphicNFOn Z univ := sLocalIdelicZFunction_meromorphic f χ
+  have hD : MeromorphicNFOn D univ :=
+    ((infiniteLocalIdelicZFunction_existsUnique w g).exists.choose_spec 1).1
+  have hZD : Z = D := by
+    funext s
+    have hnear : Z =ᶠ[𝓝[≠] (1 : ℂ)] D := by
+      have hpos : ∀ᶠ z : ℂ in 𝓝 (1 : ℂ), 0 < z.re :=
+        (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+      exact (hpos.filter_mono nhdsWithin_le_nhds).mono (fun z hz ↦ heq z hz)
+    have h0 := (hZ.meromorphicOn.sub hD.meromorphicOn).meromorphicOrderAt_eq_top_of_isPreconnected
+      isPreconnected_univ (mem_univ (1 : ℂ)) (mem_univ s)
+      (meromorphicOrderAt_eq_top_iff.mpr (hnear.mono fun _ hz ↦ sub_eq_zero.mpr hz))
+    have h1 : Z =ᶠ[𝓝[≠] s] D := (meromorphicOrderAt_eq_top_iff.mp h0).mono fun _ hz ↦ sub_eq_zero.mp hz
+    exact (((hZ (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds (hD (mem_univ s))).mp h1).self_of_nhds
+  refine ⟨f, sLocalIdelicZFunction_verticalIntegrable_neg_simplePole (hZ (mem_univ _)).meromorphicAt ?_⟩
+  change meromorphicOrderAt Z ((-2 : ℝ) : ℂ) = -1
+  rw [hZD]
+  simpa using hgp
+
 /-- Paper: Proof of Theorem 7.1.2.3, p. 322.
 Take ℚ(√2), only its two real places, the trivial character, and at each place
 `x² exp(-πx²)`. The zeta transform is a nonzero constant times Γℝ(s + 2)².
 At A = 2 its norm on the vertical line is of order `|Im s|⁻²` near −2. -/
 theorem Printed.sLocalIdelicZFunction_verticalIntegrable_neg_false :
-    ¬ Printed.sLocalIdelicZFunction_verticalIntegrable_neg := by sorry
+    ¬ Printed.sLocalIdelicZFunction_verticalIntegrable_neg := by
+  classical
+  intro h
+  have : CharZero (ULift ℚ) := ⟨fun a b hab ↦ by simpa using congrArg ULift.down hab⟩
+  have : NumberField (ULift ℚ) := ⟨⟩
+  let F := ULift ℚ
+  have hd : Module.finrank ℚ F = 1 := by simp [F, finrank_ulift]
+  have hr := InfinitePlace.nrRealPlaces_eq_one_of_finrank_eq_one hd
+  have hc := InfinitePlace.nrComplexPlaces_eq_zero_of_finrank_eq_one hd
+  have hcard : Fintype.card (InfinitePlace F) = 1 := by
+    rw [InfinitePlace.card_eq_nrRealPlaces_add_nrComplexPlaces, hr, hc, add_zero]
+  let : Unique (InfinitePlace F) := (Fintype.card_eq_one_iff_nonempty_unique.mp hcard).some
+  obtain ⟨v⟩ : Nonempty {v : InfinitePlace F // v.IsReal} :=
+    Fintype.card_pos_iff.mp (by change 0 < InfinitePlace.nrRealPlaces F; omega)
+  have hw : (default : InfinitePlace F).IsReal := Subsingleton.elim v.val default ▸ v.property
+  obtain ⟨f, hf⟩ := sLocalIdelicZFunction_verticalIntegrable_neg_onePlace F hw
+  exact hf (h F ∅ 1 f 2 (by norm_num))
 
 /-- Paper: Discussion of Theorem 7.1.2.3, p. 320.
 As printed: Each nonnegative Laurent coefficient at c is an S-local eigendistribution
@@ -777,13 +890,109 @@ def Printed.sLocalZLaurentCoeff_eigendistribution : Prop :=
     sLocalZLaurentCoeff (schwartzBruhatUnitTranslate g f) c (m : ℤ) =
       c (QuotientGroup.mk g) * sLocalZLaurentCoeff f c (m : ℤ)
 
+/-- At a regular center the Laurent coefficient of index one is the derivative. -/
+private theorem sLocalZLaurentCoeff_eigendistribution_false_deriv
+    {F : Type u} [Field F] [NumberField F] {S : Finset Places(F)}
+    (f : Tests(F, S)) (c : QuasiCharacter Jₛ(F, S))
+    (H : ℂ → ℂ) (hH : ∀ z, H z = sLocalIdelicZFunction f (twistₛ(F, S) c z))
+    (ha : AnalyticAt ℂ H 0) : sLocalZLaurentCoeff f c 1 = deriv H 0 := by
+  obtain ⟨R, hR, hA⟩ := ha.exists_ball_analyticOnNhd
+  unfold sLocalZLaurentCoeff complexResidue
+  refine (tendsto_const_nhds.congr' ?_).limUnder_eq
+  filter_upwards [Ioo_mem_nhdsGT hR] with r hr
+  have hd := (hA.differentiableOn.mono (Metric.closedBall_subset_ball hr.2)).deriv_eq_smul_circleIntegral hr.1
+  symm
+  apply (div_eq_iff (by simp [Real.pi_ne_zero, Complex.I_ne_zero])).mpr
+  rw [mul_comm]
+  simpa only [← hH, sub_zero, smul_eq_mul, one_div, div_eq_inv_mul, mul_one,
+    show (1 : ℤ) + 1 = (2 : ℕ) by decide, zpow_natCast] using hd
+
+private theorem sLocalZLaurentCoeff_eigendistribution_false_translate
+    {F : Type u} [Field F] [NumberField F] {S : Finset Places(F)}
+    (f : Tests(F, S)) (g : (SAdeleRing F S)ˣ) (c : QuasiCharacter Jₛ(F, S)) :
+    sLocalIdelicZetaIntegral (schwartzBruhatUnitTranslate g f) c =
+      c (QuotientGroup.mk g) * sLocalIdelicZetaIntegral f c := by
+  let : MeasurableSpace (SAdeleRing F S) := instMeasurableSpaceSAdeleRing F S
+  have := sIdeleGroup_borelSpace (F := F) (S := S)
+  have := sMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) (S := S)
+  let u (x : (SAdeleRing F S)ˣ) := f (Multiplicative.ofAdd x.val)
+  let χ := c.toMonoidHom.comp (QuotientGroup.mk' _)
+  change (∫ x, u (g⁻¹ * x) * χ x ∂sMultiplicativeTamagawaMeasure F S) =
+    χ g * ∫ x, u x * χ x ∂sMultiplicativeTamagawaMeasure F S
+  rw [← integral_mul_left_eq_self (μ := sMultiplicativeTamagawaMeasure F S)
+    (fun x ↦ u (g⁻¹ * x) * χ x) g, ← integral_const_mul]
+  exact integral_congr_ae (.of_forall fun x ↦ by simp only [mul_inv_cancel_left, map_mul, mul_left_comm])
+
+/-- Use index one at the regular character of exponent one. Translation by a
+norm-two idele differentiates the weight as well as the zeta integral. -/
+private theorem sLocalZLaurentCoeff_eigendistribution_false_field
+    (F : Type u) [Field F] [NumberField F]
+    (h : Printed.sLocalZLaurentCoeff_eigendistribution.{u}) : False := by
+  let S : Finset Places(F) := ∅
+  let χ : PontryaginDual Jₛ(F, S) := 1
+  let chart := twistₛ(F, S) ((circleToComplex).comp χ)
+  let c := chart 1
+  let Z (f : Tests(F, S)) (z : ℂ) := sLocalIdelicZFunction f (chart (1 + z))
+  have htw (z : ℂ) : twistₛ(F, S) c z = chart (1 + z) := by
+    ext1 x
+    let N : ℂ := (((normₛ(F, S) x : ℝ≥0) : ℝ) : ℂ)
+    have hn : N ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (normₛ(F, S) x).ne_zero)
+    change (((χ x : Circle) : ℂ) * N ^ (1 : ℂ)) * N ^ z = ((χ x : Circle) : ℂ) * N ^ (1 + z)
+    rw [mul_assoc, Complex.cpow_add _ _ hn]
+  have hpos : ∀ᶠ z : ℂ in 𝓝 0, 0 < (1 + z).re :=
+    (isOpen_lt continuous_const (Complex.continuous_re.comp (continuous_const.add continuous_id))).mem_nhds
+      (by simp)
+  have hZ (f : Tests(F, S)) : Z f =ᶠ[𝓝 0] (fun z ↦ sLocalIdelicZetaIntegral f (chart (1 + z))) := by
+    filter_upwards [hpos] with z hz
+    exact sLocalIdelicZFunction_eq_integral f ⟨χ, 1 + z, hz, rfl⟩
+  have ha (f : Tests(F, S)) : AnalyticAt ℂ (Z f) 0 := by
+    apply AnalyticAt.congr _ (hZ f).symm
+    exact (sLocalIdelicZetaIntegral_analyticOn f χ (1 + (0 : ℂ)) (by simp)).comp
+      (analyticAt_const.add analyticAt_id)
+  have hcoeff (f : Tests(F, S)) : sLocalZLaurentCoeff f c 1 = deriv (Z f) 0 :=
+    sLocalZLaurentCoeff_eigendistribution_false_deriv f c (Z f)
+      (fun z ↦ congrArg (sLocalIdelicZFunction f) (htw z).symm) (ha f)
+  obtain ⟨f, -, hf⟩ := sLocal_exists_real_test c ⟨χ, 1, by simp, rfl⟩
+  have hne : Z f 0 ≠ 0 := by
+    rw [(hZ f).eq_of_nhds, add_zero]
+    exact hf
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  let two := Units.mk0 (2 : ℝ≥0) (by norm_num)
+  obtain ⟨g, hg⟩ := QuotientGroup.mk_surjective (σ two)
+  let q : Jₛ(F, S) := QuotientGroup.mk g
+  have hn : (((normₛ(F, S) q : ℝ≥0) : ℝ) : ℂ) = 2 :=
+    congrArg (fun t : ℝ≥0ˣ ↦ ((t.val : ℝ) : ℂ)) ((congrArg normₛ(F, S) hg).trans (hσ two))
+  have hw (s : ℂ) : chart s q = (2 : ℂ) ^ s := by
+    change ((χ q : Circle) : ℂ) * (((normₛ(F, S) q : ℝ≥0) : ℝ) : ℂ) ^ s = _
+    simp [χ, hn]
+  have he : Z (schwartzBruhatUnitTranslate g f) =ᶠ[𝓝 0]
+      (fun z ↦ (2 : ℂ) ^ (1 + z) * Z f z) := by
+    filter_upwards [hZ (schwartzBruhatUnitTranslate g f), hZ f] with z hz hfz
+    rw [hz, hfz, sLocalZLaurentCoeff_eigendistribution_false_translate, ← hw]
+  have hd : HasDerivAt (fun z : ℂ ↦ (2 : ℂ) ^ (1 + z)) (2 * Complex.log 2) 0 := by
+    simpa using ((hasDerivAt_id' (0 : ℂ)).const_add 1).const_cpow (c := (2 : ℂ)) (Or.inl (by norm_num))
+  have h1 := h F S c 1 g f
+  change sLocalZLaurentCoeff _ c 1 = chart 1 q * sLocalZLaurentCoeff f c 1 at h1
+  rw [hcoeff, hcoeff, hw, Complex.cpow_one, he.deriv_eq,
+    (hd.fun_mul (ha f).differentiableAt.hasDerivAt).deriv] at h1
+  have hlog : Complex.log 2 ≠ 0 := by
+    intro h0
+    have := Complex.exp_log (by norm_num : (2 : ℂ) ≠ 0)
+    rw [h0, Complex.exp_zero] at this
+    norm_num at this
+  exact (mul_ne_zero (mul_ne_zero (by norm_num : (2 : ℂ) ≠ 0) hlog) hne) (by simpa using h1)
+
 /-- Paper: Discussion of Theorem 7.1.2.3, p. 320.
 Over ℚ with only the real place and the trivial center, use m = 0 and the
 Gaussian `exp(-πx²)`. Replacing it by `exp(-π(x/2)²)` multiplies its zeta
 transform by `2^s`. The residue is 2, so the constant coefficient changes
 by `2 log 2`, contrary to the trivial weight law. -/
 theorem Printed.sLocalZLaurentCoeff_eigendistribution_false :
-    ¬ Printed.sLocalZLaurentCoeff_eigendistribution := by sorry
+    ¬ Printed.sLocalZLaurentCoeff_eigendistribution := by
+  intro h
+  have : CharZero (ULift ℚ) := ⟨fun a b hab ↦ by simpa using congrArg ULift.down hab⟩
+  have : NumberField (ULift ℚ) := ⟨⟩
+  exact sLocalZLaurentCoeff_eigendistribution_false_field (ULift ℚ) h
 
 /-- Paper: Discussion of Theorem 7.1.2.3, p. 321.
 As printed: The coefficient whose Laurent index equals the finite-place lattice

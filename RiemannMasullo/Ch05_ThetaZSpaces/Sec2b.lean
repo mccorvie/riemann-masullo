@@ -17,6 +17,8 @@ import RiemannMasullo.ForMathlib.Topology.ContinuousMap.Sigma
 import RiemannMasullo.ForMathlib.MeasureTheory.Integral.Bochner.Regular
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
+import Mathlib.MeasureTheory.Integral.Pi
+
 import all RiemannMasullo.AppC_LCTVS.Sec1
 
 import all RiemannMasullo.AppC_LCTVS.Sec1
@@ -2757,6 +2759,125 @@ theorem existsUnique_globalThetaFourier :
 -- different indicator. An archimedean bump supported near 1/2 detects the difference.
 
 set_option maxSynthPendingDepth 8 in
+open Classical in
+/-- Integrating a stage function times one factor at each new place separates over the
+additive Tamagawa measure, without a pure-tensor hypothesis on the old stage function. -/
+private theorem sLocalThetaFourier_transition_integral
+    {D : Finset (HeightOneSpectrum (𝓞 F))} (hD : Disjoint S D)
+    (g : SAdeleRing F S → ℂ) (k : (v : D) → v.val.adicCompletion F → ℂ) :
+    (∫ z : SAdeleRing F (S ∪ D),
+      g (z.1, fun v ↦ z.2 ⟨v.val, Finset.mem_union_left D v.property⟩) *
+        ∏ v : D, k v (z.2 ⟨v.val, Finset.mem_union_right S v.property⟩)
+        ∂sAdditiveTamagawaMeasure F (S ∪ D)) =
+      (∫ z, g z ∂sAdditiveTamagawaMeasure F S) *
+        ∏ v : D, ∫ x, k v x ∂finiteLocalAdditiveTamagawaMeasure F v.val := by
+  classical
+  let V := HeightOneSpectrum (𝓞 F)
+  let K (v : V) := v.adicCompletion F
+  let (v : V) : MeasurableSpace (K v) := borel (v.adicCompletion F)
+  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+  let : MeasurableSpace (InfiniteAdeleRing F) :=
+    inferInstanceAs (MeasurableSpace ((w : InfinitePlace F) → w.Completion))
+  let μ (v : V) : Measure (K v) := finiteLocalAdditiveTamagawaMeasure F v
+  let (v : V) : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let (v : V) : (finiteLocalAdditiveTamagawaMeasure F v).IsAddHaarMeasure :=
+    finiteLocalAdditiveTamagawaMeasure_isAddHaar F v
+  let (v : V) : SigmaFinite (μ v) :=
+    inferInstanceAs (SigmaFinite (finiteLocalAdditiveTamagawaMeasure F v))
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let (w : InfinitePlace F) : (infiniteLocalAdditiveTamagawaMeasure F w).IsAddHaarMeasure :=
+    infiniteLocalAdditiveTamagawaMeasure_haar F w
+  let μa := Measure.pi (infiniteLocalAdditiveTamagawaMeasure F)
+  let η (A : Finset V) := Measure.pi (fun v : A ↦ μ v.val)
+  let e := MeasurableEquiv.piFinsetUnion K hD
+  let E := MeasurableEquiv.prodAssoc.trans ((MeasurableEquiv.refl (InfiniteAdeleRing F)).prodCongr e)
+  have hE : MeasurePreserving E ((μa.prod (η S)).prod (η D)) (μa.prod (η (S ∪ D))) :=
+    ((MeasurePreserving.id μa).prod (measurePreserving_piFinsetUnion hD μ)).comp
+      (measurePreserving_prodAssoc μa (η S) (η D))
+  let H (z : SAdeleRing F (S ∪ D)) :=
+    g (z.1, fun v ↦ z.2 ⟨v.val, Finset.mem_union_left D v.property⟩) *
+      ∏ v : D, k v (z.2 ⟨v.val, Finset.mem_union_right S v.property⟩)
+  change (∫ z, H z ∂μa.prod (η (S ∪ D))) = _
+  refine (hE.integral_comp' H).symm.trans ?_
+  have h (p : SAdeleRing F S × ((v : D) → K v.val)) :
+      H (E p) = g p.1 * ∏ v : D, k v (p.2 v) := by
+    change g (p.1.1, fun v ↦ Equiv.piFinsetUnion K hD (p.1.2, p.2) ⟨v.val, Finset.mem_union_left D v.property⟩) *
+      ∏ v : D, k v (Equiv.piFinsetUnion K hD (p.1.2, p.2) ⟨v.val, Finset.mem_union_right S v.property⟩) = _
+    simp only [Equiv.piFinsetUnion_left K hD (Subtype.property _),
+      Equiv.piFinsetUnion_right K hD (Subtype.property _)]
+    rfl
+  simp_rw [h]
+  exact (integral_prod_mul (μ := μa.prod (η S)) (ν := η D) g (fun x ↦ ∏ v : D, k v (x v))).trans
+    (congrArg (_ * ·) (integral_fintype_prod_eq_prod k (μ := fun v : D ↦ μ v.val)))
+
+open Classical in
+/-- Extending to a disjoint union multiplies by the integer indicators on its second summand. -/
+private theorem sLocalThetaFourier_transition_apply
+    {D : Finset (HeightOneSpectrum (𝓞 F))} (hD : Disjoint S D)
+    (f : ℬₛ(S)) (z : SAdeleRing F (S ∪ D)) :
+    sAdeleSchwartzTransition F (Finset.subset_union_left (s₁ := S) (s₂ := D)) f
+        (Multiplicative.ofAdd z) =
+      f (Multiplicative.ofAdd (z.1, fun v : S ↦ z.2 ⟨v.val, Finset.mem_union_left D v.property⟩)) *
+        ∏ v : D, (v.val.adicCompletionIntegers F : Set (v.val.adicCompletion F)).indicator
+          (fun _ ↦ (1 : ℂ)) (z.2 ⟨v.val, Finset.mem_union_right S v.property⟩) := by
+  classical
+  rw [sAdeleSchwartzTransition_apply]
+  split_ifs with h
+  · rw [Finset.prod_eq_one (fun v _ ↦ Set.indicator_of_mem
+      (h ⟨v.val, Finset.mem_union_right S v.property⟩
+        (fun hv ↦ Finset.disjoint_left.mp hD hv v.property)) _), mul_one]
+  · push Not at h
+    obtain ⟨v, hv, hz⟩ := h
+    have hvD := (Finset.mem_union.mp v.property).resolve_left hv
+    rw [Finset.prod_eq_zero (Finset.mem_univ (⟨v.val, hvD⟩ : D))
+      (Set.indicator_of_notMem hz _), mul_zero]
+
+open Classical in
+/-- The Fourier integral for an enlarged test function factors into its stage transform
+and the local transforms of the newly inserted integer indicators. -/
+private theorem sLocalThetaFourier_transition_union
+    {D : Finset (HeightOneSpectrum (𝓞 F))} (hD : Disjoint S D)
+    (hgood : ∀ v ∈ D, ¬ v.asIdeal ∣ differentIdeal ℤ (𝓞 F)) (f : ℬₛ(S)) :
+    let i := sAdeleSchwartzTransition F (Finset.subset_union_left (s₁ := S) (s₂ := D))
+    sAdeleSchwartzFourier (i f) = i (sAdeleSchwartzFourier f) := by
+  classical
+  intro i
+  apply Subtype.ext
+  funext y
+  let p (z : SAdeleRing F (S ∪ D)) : SAdeleRing F S :=
+    (z.1, fun v ↦ z.2 ⟨v.val, Finset.mem_union_left D v.property⟩)
+  let j (v : D) : ↥(S ∪ D) := ⟨v.val, Finset.mem_union_right S v.property⟩
+  let I (v : D) := (v.val.adicCompletionIntegers F : Set (v.val.adicCompletion F)).indicator
+    (fun _ ↦ (1 : ℂ))
+  let C := (starRingEnd ℂ).toMonoidHom.comp Circle.coeHom
+  let g (x : SAdeleRing F S) := f (Multiplicative.ofAdd x) * C (sAdeleStandardCharacter F S (x * p y.toAdd))
+  let k (v : D) (x : v.val.adicCompletion F) :=
+    I v x * C (finiteLocalStandardCharacter F v.val (x * y.toAdd.2 (j v)))
+  have hψ (z : SAdeleRing F (S ∪ D)) : sAdeleStandardCharacter F (S ∪ D) (z * y.toAdd) =
+      sAdeleStandardCharacter F S (p z * p y.toAdd) *
+        ∏ v : D, finiteLocalStandardCharacter F v.val (z.2 (j v) * y.toAdd.2 (j v)) := by
+    let b (v : ↥(S ∪ D)) := finiteLocalStandardCharacter F v.val (z.2 v * y.toAdd.2 v)
+    change _ * (∏ v, b v) = (_ * _) * _
+    rw [← (Equiv.Finset.union S D hD).prod_comp b, Fintype.prod_sum_type, ← mul_assoc]
+    rfl
+  have hInt (z : SAdeleRing F (S ∪ D)) :
+      i f (Multiplicative.ofAdd z) * C (sAdeleStandardCharacter F (S ∪ D) (z * y.toAdd)) =
+        g (p z) * ∏ v : D, k v (z.2 (j v)) := by
+    rw [show i f (Multiplicative.ofAdd z) = _ from sLocalThetaFourier_transition_apply hD f z,
+      hψ, map_mul, map_prod]
+    simp only [g, k, Finset.prod_mul_distrib]
+    ring
+  have hfix (v : D) : (∫ x, k v x ∂finiteLocalAdditiveTamagawaMeasure F v.val) =
+      I v (y.toAdd.2 (j v)) :=
+    congrFun ((finiteLocalTamagawaFourier_fixes_integers_iff F v.val).mpr (hgood v.val v.property)) _
+  change (∫ z, i f (Multiplicative.ofAdd z) * C (sAdeleStandardCharacter F (S ∪ D) (z * y.toAdd))
+      ∂sAdditiveTamagawaMeasure F (S ∪ D)) = _
+  simp_rw [hInt]
+  exact (sLocalThetaFourier_transition_integral hD g k).trans
+    ((congrArg (_ * ·) (Finset.prod_congr rfl fun v _ ↦ hfix v)).trans
+      (sLocalThetaFourier_transition_apply hD (sAdeleSchwartzFourier f) y.toAdd).symm)
+
 /-- Paper: Theorem 5.2.4.1(1), p. 239.
 The S-local Fourier involutions commute with stage enlargement away from the different.
 Deviation: Every added place is required to have a Fourier-fixed integer indicator. -/
@@ -2767,7 +2888,22 @@ theorem sLocalThetaFourier_transition (hST : S ⊆ T)
     let fourierS := (existsUnique_sLocalThetaFourier (F := F) (S := S)).exists.choose
     let fourierT := (existsUnique_sLocalThetaFourier (F := F) (S := T)).exists.choose
     let transition := sLocalThetaTransition (F := F) (S := S) (T := T) hST
-    fourierT (transition x) = transition (fourierS x) := by sorry
+    fourierT (transition x) = transition (fourierS x) := by
+  classical
+  intro fourierS fourierT transition
+  induction x using Submodule.Quotient.induction_on with
+  | _ f =>
+    let P (A : Finset (HeightOneSpectrum (𝓞 F))) := ∀ h : S ⊆ A,
+      let i := sAdeleSchwartzTransition F h
+      sAdeleSchwartzFourier (i f) = i (sAdeleSchwartzFourier f)
+    have hu : P (S ∪ (T \ S)) := fun _ ↦
+      sLocalThetaFourier_transition_union Finset.disjoint_sdiff
+        (fun v hv ↦ hgood v (Finset.mem_sdiff.mp hv).1 (Finset.mem_sdiff.mp hv).2) f
+    have hT : P T := (Finset.union_sdiff_of_subset hST) ▸ hu
+    exact ((existsUnique_sLocalThetaFourier (F := F) (S := T)).exists.choose_spec.2
+      (sAdeleSchwartzTransition F hST f)).trans
+      ((congrArg (Kₛ(T)).mkQ (hT hST)).trans (congrArg transition
+        ((existsUnique_sLocalThetaFourier (F := F) (S := S)).exists.choose_spec.2 f).symm))
 
 set_option maxSynthPendingDepth 8 in
 /-- Paper: (5.2.4.4), p. 239.
