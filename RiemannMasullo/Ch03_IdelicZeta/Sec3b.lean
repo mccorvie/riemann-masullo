@@ -2003,13 +2003,14 @@ theorem infiniteLocalIdelicZFunction_existsUnique (w : InfinitePlace F) (f : ℬ
       MeromorphicNFOn (Z ∘ chart∞[w, χ]) univ ∧
         EqOn (Z ∘ chart∞[w, χ]) (fun s ↦ localIdelicZetaIntegral μ∞(w) test(f) (chart∞[w, χ] s))
           rightHalf := by
+  have hι := InfinitePlace.Completion.isometry_extensionEmbedding w
   have htwo : 1 < ‖(2 : w.Completion)‖ := by
-    rw [← (InfinitePlace.Completion.isometry_extensionEmbedding w).norm_map_of_map_zero
+    rw [← hι.norm_map_of_map_zero
       (map_zero _) (2 : w.Completion), map_ofNat]
     norm_num
   let : NontriviallyNormedField w.Completion := ⟨⟨2, htwo⟩⟩
   let : ProperSpace w.Completion :=
-    .of_nontriviallyNormedField_of_weaklyLocallyCompactSpace w.Completion
+    LipschitzWith.properSpace hι.isClosedEmbedding.isProperMap hι.lipschitzWith
   let : LocallyCompactSpace w.Completionˣ :=
     (IsOpenUnits.isOpenEmbedding_unitsVal (M := w.Completion)).locallyCompactSpace
   let : BorelSpace w.Completion := ⟨rfl⟩
