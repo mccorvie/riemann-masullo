@@ -143,15 +143,6 @@ theorem integralIdeleInsertion_exhaustive :
     intro v hv
     exact not_not.mp (fun h ↦ hv (hfinite.mem_toFinset.mpr h))
 
-/- The subring of adeles integral outside a finite set of finite places is open,
-being the product of the infinite adeles with the cofinite distinguished sets of
-the finite adeles. Used to make each full stage an open subgroup of the ideles. -/
-private theorem isOpen_integralAdelesOutside (S : Finset (HeightOneSpectrum (𝓞 F))) :
-    IsOpen (integralAdelesOutside F S : Set 𝔸[F]) := by
-  simp only [integralAdelesOutside, Subring.coe_iInf, Set.iInter_ofPred]
-  exact (isOpen_restrictedProduct_forall_mem (↑S : Set (HeightOneSpectrum (𝓞 F)))ᶜ
-    (fun v _ ↦ Valued.isOpen_integer (v.adicCompletion F))).preimage continuous_snd
-
 /- The insertion from the full stage into the ideles is continuous, injective and open
 onto its image, and its image is the open set of ideles integral outside `S` with
 integral inverse (helper for Lemma D.1.10.1(1), p. 784, and (2), p. 784). -/
