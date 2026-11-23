@@ -56,10 +56,14 @@ def WeaklyContinuousOn (f : ℂ → E) (Ω : Set ℂ) : Prop :=
   ∀ φ : StrongDual ℂ E, ContinuousOn (φ ∘ f) Ω
 
 /-- Paper: Definition C.5.2.1(2), p. 737. Weak continuous differentiability through
-order `k` is continuous differentiability through that order after scalar evaluation.
-Deviation: The scalar `C^k` condition uses real derivatives on the complex plane. -/
+order `k` is continuous complex differentiability through that order after scalar
+evaluation.
+Deviation: The page says only that each scalar evaluation "is an element of `C^k(Ω)`" and
+does not say whether the derivatives are real or complex. They are complex here, as
+Theorem C.5.2.6(2) and (C.5.2.6) require: with real derivatives complex conjugation would
+qualify at every order without being holomorphic. Order zero is allowed as well. -/
 def WeaklyContDiffOrderOn (k : ℕ) (f : ℂ → E) (Ω : Set ℂ) : Prop :=
-  ∀ φ : StrongDual ℂ E, ContDiffOn ℝ k (φ ∘ f) Ω
+  ∀ φ : StrongDual ℂ E, ContDiffOn ℂ k (φ ∘ f) Ω
 
 /-- Paper: Definition C.5.2.1(3), p. 737. Weak holomorphy is weak differentiability
 over the complex field as in §C.5.1. -/
@@ -67,17 +71,17 @@ abbrev WeaklyHolomorphicOn (f : ℂ → E) (Ω : Set ℂ) : Prop :=
   WeaklyDifferentiableOn ℂ f Ω
 
 /-- Paper: Definition C.5.2.1(1–3), p. 737. Scalar testing on the complex line
-recovers ordinary continuity, real smoothness of the specified order, and holomorphy.
+recovers ordinary continuity, complex smoothness of the specified order, and holomorphy.
 Deviation: This is a sanity check for the three weak definitions. -/
 theorem weakComplexRegularity_iff (f : ℂ → ℂ) (k : ℕ) :
     (WeaklyContinuousOn f Ω ↔ ContinuousOn f Ω) ∧
-      (WeaklyContDiffOrderOn k f Ω ↔ ContDiffOn ℝ k f Ω) ∧
+      (WeaklyContDiffOrderOn k f Ω ↔ ContDiffOn ℂ k f Ω) ∧
       (WeaklyHolomorphicOn f Ω ↔ DifferentiableOn ℂ f Ω) := by
   refine ⟨⟨fun h ↦ h (ContinuousLinearMap.id ℂ ℂ), ?_⟩,
     ⟨fun h ↦ h (ContinuousLinearMap.id ℂ ℂ), ?_⟩,
     ⟨fun h ↦ h (ContinuousLinearMap.id ℂ ℂ), ?_⟩⟩
   · exact fun hf φ ↦ φ.continuous.comp_continuousOn hf
-  · exact fun hf φ ↦ (φ.restrictScalars ℝ).contDiff.comp_contDiffOn hf
+  · exact fun hf φ ↦ φ.contDiff.comp_contDiffOn hf
   · exact fun hf φ ↦ φ.differentiable.comp_differentiableOn hf
 
 variable [ContinuousSMul ℂ E]
@@ -2143,7 +2147,12 @@ variable {Ω D : Set ℂ} {f : ℂ → E} {z : ℂ}
 discrete exceptional set, and at each exceptional point a power of the local
 coordinate times the function extends holomorphically.
 Deviation: Uses the paper's parenthetical pole-clearing criterion. The punctured
-domain is explicitly open, so the exceptional set is relatively closed. -/
+domain is explicitly open, so the exceptional set is relatively closed.
+
+Deviation: Definition C.5.3.1 pairs the pole-clearing criterion with an expansion whose lower
+bound excludes negative powers. We use the pole-clearing criterion with a natural power. The
+separate Laurent expansion allows a signed lower bound.
+-/
 def IsVectorMeromorphicOn (f : ℂ → E) (Ω D : Set ℂ) : Prop :=
   D ⊆ Ω ∧ IsDiscrete D ∧ IsOpen (Ω \ D) ∧ VectorHolomorphicOn f (Ω \ D) ∧
     ∀ z ∈ D, ∃ (n : ℕ) (r : ℝ) (g : ℂ → E),
@@ -2167,7 +2176,12 @@ def HasVectorLaurentSeriesAt (f : ℂ → E) (z : ℂ) (a : ℤ → E) : Prop :=
 
 /-- Paper: Definition C.5.3.1(1), p. 739. A finite order is the least Laurent
 exponent with nonzero coefficient.
-Deviation: This is a relation for finite order. The zero germ has no finite order. -/
+Deviation: This is a relation for finite order. The zero germ has no finite order.
+
+Deviation: Definition C.5.3.1(1) minimizes an admissible series bound, which can be lowered by
+padding with zeros. Finite order is the least exponent with a nonzero coefficient, and the zero
+germ has no finite order.
+-/
 def HasVectorMeromorphicOrderAt (f : ℂ → E) (z : ℂ) (k : ℤ) : Prop :=
   ∃ a : ℤ → E, HasVectorLaurentSeriesAt f z a ∧ a k ≠ 0 ∧ ∀ j < k, a j = 0
 
@@ -2925,7 +2939,13 @@ theorem vectorResidue_linear (hΩ : IsOpen Ω) (hconn : IsConnected Ω) (hz : z 
 /-- Paper: Lemma C.5.3.3(2), p. 740. The normalized contour integral around an
 enclosed point gives its residue when the only possible interior pole is that point.
 Deviation: The point is explicitly enclosed, and the contour and interior
-satisfy the conditions of the Laurent coefficient formula above. -/
+satisfy the conditions of the Laurent coefficient formula above.
+
+Deviation: The operator label below (C.5.3.7) gives the full meromorphic space as its domain.
+For a fixed contour the pointwise formula requires regularity along its trace. The designated
+point lies inside, the interior is contained in the domain, and every interior pole is the
+designated point.
+-/
 theorem hasPettisIntegral_vectorResidue (hΩ : IsOpen Ω) (hconn : IsConnected Ω)
     (hf : IsVectorMeromorphicOn f Ω D) (γ : PositiveSimpleContour)
     (htrace : γ.val.trace ⊆ Ω) (hinterior : γ.interior ⊆ Ω) (hz : z ∈ γ.interior)

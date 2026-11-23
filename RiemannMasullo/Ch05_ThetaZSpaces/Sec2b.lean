@@ -1,6 +1,8 @@
 module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2
+
+import RiemannMasullo.Ch03_IdelicZeta.Sec2
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
@@ -16,6 +18,8 @@ import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 import RiemannMasullo.ForMathlib.Topology.ContinuousMap.Sigma
 import RiemannMasullo.ForMathlib.MeasureTheory.Integral.Bochner.Regular
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+
+import Mathlib.MeasureTheory.Integral.Pi
 
 import all RiemannMasullo.AppC_LCTVS.Sec1
 
@@ -668,12 +672,6 @@ theorem sLocalHomogeneousThetaTransition_spec
     Submodule.mapQ_mkQ _ _ _
       (h := sLocalHomogeneousThetaTransition_preserves_kernel (F := F) (ω := ω) hω hST)
   exact ⟨h, fun π hπ ↦ Submodule.linearMap_qext _ (Eq.trans hπ (Eq.symm h))⟩
-
-/-- Paper: Theorem 5.2.3.1(1), p. 233.
-Each homogeneous stage is embedded as a closed subspace of a larger stage. -/
-theorem sLocalHomogeneousThetaTransition_isClosedEmbedding
-    (hω : NormOneCharacterUnramifiedOutside (F := F) ω S) (hST : S ⊆ T) :
-    IsClosedEmbedding (sLocalHomogeneousThetaTransition (F := F) (ω := ω) hω hST) := by sorry
 
 section
 open Set TopologicalSpace
@@ -1340,6 +1338,23 @@ theorem sLocalHomogeneousTheta_inductiveLimit (hω : NormOneCharacterUnramifiedO
     (∀ x : Θ𝔽ω(ω), ∃ T y, i T y = x) ∧
     (inferInstance : TopologicalSpace Θ𝔽ω(ω)) = locallyConvexFinalTopology i := by sorry
 
+/-- Paper: Theorem 5.2.3.1(1), p. 233.
+Each homogeneous stage is embedded as a closed subspace of a larger stage. -/
+theorem sLocalHomogeneousThetaTransition_isClosedEmbedding
+    (hω : NormOneCharacterUnramifiedOutside (F := F) ω S) (hST : S ⊆ T) :
+    IsClosedEmbedding (sLocalHomogeneousThetaTransition (F := F) (ω := ω) hω hST) := by
+  let I := {U : Finset (HeightOneSpectrum (𝓞 F)) // S ⊆ U}
+  let s : I := ⟨S, Finset.Subset.refl S⟩
+  let t : I := ⟨T, hST⟩
+  let i (u : I) := sLocalHomogeneousThetaToGlobal (F := F) (ω := ω) (hω.mono u.property)
+  have h := sLocalHomogeneousTheta_inductiveLimit (F := F) (S := S) (ω := ω) hω
+  have he : IsClosedEmbedding (i t) := h.1 t
+  apply he.of_comp_iff.mp
+  have hc : (i t) ∘ (sLocalHomogeneousThetaTransition (F := F) (ω := ω) hω hST) = i s :=
+    funext (LinearMap.congr_fun (h.2.1 s t hST))
+  rw [hc]
+  exact h.1 s
+
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 A Hausdorff space admits a countable locally convex inductive presentation whose
 stages, with their own topologies, are nuclear Fréchet spaces. -/
@@ -1706,32 +1721,9 @@ theorem sLocalHomogeneousThetaSpace_strongDual_complete (χ : PontryaginDual (J�
   exact completeSpace_strongDual_quotient _
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
-The strong dual of the global homogeneous quotient is nuclear. -/
-theorem globalHomogeneousThetaSpace_strongDual_nuclear :
-    IsNuclearTVS (StrongDual ℂ Θ𝔽ω(ω)) := by sorry
-
-/-- Paper: Theorem 5.2.3.1(2), p. 233.
 The strong dual of the S-local homogeneous quotient is nuclear. -/
 theorem sLocalHomogeneousThetaSpace_strongDual_nuclear (χ : PontryaginDual (J₁(S))) :
     IsNuclearTVS (StrongDual ℂ (Θₛω(S, χ))) := by sorry
-
-/-- Paper: Theorem 5.2.3.1(2), p. 233.
-The strong dual of the global homogeneous quotient is Montel. -/
-theorem globalHomogeneousThetaSpace_strongDual_montel :
-    BarrelledSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) ∧ MontelSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) := by
-  have hN : IsNuclearTVS.{0} Θ𝔽ω(ω) :=
-    globalHomogeneousThetaSpace_nuclear (F := F) (ω := ω)
-  let : T2Space Θ𝔽ω(ω) := hN.1
-  let : PolynormableSpace ℂ Θ𝔽ω(ω) := hN.2.1
-  let : MontelSpace ℂ Θ𝔽ω(ω) := (globalHomogeneousThetaSpace_montel (F := F) (ω := ω)).2
-  let : CompleteSpace (StrongDual ℂ Θ𝔽ω(ω)) :=
-    globalHomogeneousThetaSpace_strongDual_complete (F := F) (ω := ω)
-  have hdual : IsNuclearTVS.{0} (StrongDual ℂ Θ𝔽ω(ω)) :=
-    globalHomogeneousThetaSpace_strongDual_nuclear (F := F) (ω := ω)
-  let : PolynormableSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) := hdual.2.1
-  refine ⟨barrelled_strongDual_of_montel, ⟨fun B hc hb ↦ ?_⟩⟩
-  simpa only [hc.closure_eq] using
-    isCompact_closure_of_isNuclearTVS (StrongDual ℂ Θ𝔽ω(ω)) hdual hb
 
 private theorem sLocalHomogeneousThetaSpace_strongDual_montel_aux {E : Type*}
     [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
@@ -1865,6 +1857,37 @@ local notation "P𝔽(" ω ")" => (existsUnique_globalThetaIsotypicAverage (F :=
 local notation "Pₛ(" S ", " χ ")" =>
   (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := S) χ).exists.choose
 
+/-- A normalized character average splits the inclusion of its isotype. Transposing
+the splitting realizes the strong dual of any equivalent space inside the ambient strong dual. -/
+private theorem strongDual_nuclear_of_compact_isotype.{test} {G E Q : Type*}
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [CompactSpace G]
+    [MeasurableSpace G] [BorelSpace G] [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [IsTopologicalAddGroup E] [T2Space E] [ContinuousSMul ℂ E] [LocallyConvexSpace ℝ E]
+    [AddCommGroup Q] [Module ℂ Q] [TopologicalSpace Q]
+    (μ : Measure G) [μ.IsHaarMeasure] (ρ : G →* (E →L[ℂ] E))
+    (ω : PontryaginDual G) (P : E →L[ℂ] E) (hP : IsPettisIsotypicAverageOn μ Set.univ ρ ω P)
+    (e : Q ≃L[ℂ] actionIsotype ρ ω) (hE : IsNuclearTVS.{test} (StrongDual ℂ E)) :
+    IsNuclearTVS.{test} (StrongDual ℂ Q) := by
+  let V := actionIsotype ρ ω
+  let c : ℂ := μ.real Set.univ
+  have hc : c ≠ 0 := Complex.ofReal_ne_zero.mpr (measureReal_univ_pos (μ := μ)).ne'
+  let A := P.codRestrict V (compactActionAverage_mem_isotype μ ρ ω P hP)
+  let q := e.symm.toContinuousLinearMap.comp A
+  let i := c⁻¹ • (V.subtypeL.comp e.toContinuousLinearMap)
+  have hretract (y : Q) : q (i y) = y := by
+    apply e.injective
+    change e (e.symm _) = e y
+    rw [e.apply_symm_apply]
+    apply Subtype.ext
+    change P (c⁻¹ • (e y : E)) = (e y : E)
+    rw [map_smul, compactActionAverage_apply_isotype μ ρ ω P hP (e y).property]
+    exact inv_smul_smul₀ hc _
+  let pull := ContinuousLinearMap.precomp (τ := RingHom.id ℂ) ℂ q
+  let back := ContinuousLinearMap.precomp (τ := RingHom.id ℂ) ℂ i
+  have hleft : Function.LeftInverse back pull := fun φ ↦
+    ContinuousLinearMap.ext fun y ↦ congrArg φ (hretract y)
+  exact nuclear_of_linear_embedding pull (hleft.isEmbedding back.continuous pull.continuous) hE
+
 /-- Compose the homogeneous-to-coinvariant identification with the compact average's
 identification of its kernel quotient with the isotype. -/
 private theorem globalThetaIsotypicAverage_equiv_of_coinvariants {G E T : Type*}
@@ -1916,6 +1939,50 @@ theorem globalThetaIsotypicAverage_equiv (ω : PontryaginDual C₁) :
       C₁ (K𝔽ω(ω)) (K𝔽).mkQ μ𝔽₁ ρ𝔽 (existsUnique_globalThetaAction (F := F)).exists.choose_spec.1
       ω (P𝔽(ω)) (existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose_spec
       (globalHomogeneousThetaSpace_equiv_coinvariants (F := F) ω)
+
+section
+variable {ω : PontryaginDual (ideleClassNorm F).ker}
+
+/-- Paper: Theorem 5.2.3.1(2), p. 233.
+The strong dual of the global homogeneous quotient is nuclear. -/
+theorem globalHomogeneousThetaSpace_strongDual_nuclear :
+    IsNuclearTVS (StrongDual ℂ Θ𝔽ω(ω)) := by
+  let : MeasurableSpace C𝔽 := borel _
+  let : BorelSpace C𝔽 := ⟨rfl⟩
+  let : T2Space C₁ := (ideleClassGroup_finiteness F).2.2.1
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : (μ𝔽₁).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let : T2Space Θ𝔽 := globalAdelicThetaSpace_t2_of_isClosed (F := F) adelicTheta_ker_isClosed
+  let : PolynormableSpace ℂ Θ𝔽 := globalAdelicThetaSpace_polynormable (F := F)
+  let : Module ℝ Θ𝔽 := Module.restrictScalars ℝ ℂ _
+  let : IsScalarTower ℝ ℂ Θ𝔽 := IsScalarTower.restrictScalars ℝ ℂ _
+  let : LocallyConvexSpace ℝ Θ𝔽 := (PolynormableSpace.withSeminorms ℂ Θ𝔽).toLocallyConvexSpace
+  with_reducible_and_instances
+    exact strongDual_nuclear_of_compact_isotype μ𝔽₁ ρ𝔽₁ ω (P𝔽(ω))
+      (existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose_spec
+      (globalThetaIsotypicAverage_equiv (F := F) ω).2.choose
+      (globalAdelicThetaSpace_strongDual_nuclear (F := F))
+
+/-- Paper: Theorem 5.2.3.1(2), p. 233.
+The strong dual of the global homogeneous quotient is Montel. -/
+theorem globalHomogeneousThetaSpace_strongDual_montel :
+    BarrelledSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) ∧ MontelSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) := by
+  have hN : IsNuclearTVS.{0} Θ𝔽ω(ω) :=
+    globalHomogeneousThetaSpace_nuclear (F := F) (ω := ω)
+  let : T2Space Θ𝔽ω(ω) := hN.1
+  let : PolynormableSpace ℂ Θ𝔽ω(ω) := hN.2.1
+  let : MontelSpace ℂ Θ𝔽ω(ω) := (globalHomogeneousThetaSpace_montel (F := F) (ω := ω)).2
+  let : CompleteSpace (StrongDual ℂ Θ𝔽ω(ω)) :=
+    globalHomogeneousThetaSpace_strongDual_complete (F := F) (ω := ω)
+  have hdual : IsNuclearTVS.{0} (StrongDual ℂ Θ𝔽ω(ω)) :=
+    globalHomogeneousThetaSpace_strongDual_nuclear (F := F) (ω := ω)
+  let : PolynormableSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) := hdual.2.1
+  refine ⟨barrelled_strongDual_of_montel, ⟨fun B hc hb ↦ ?_⟩⟩
+  simpa only [hc.closure_eq] using
+    isCompact_closure_of_isNuclearTVS (StrongDual ℂ Θ𝔽ω(ω)) hdual hb
+
+end
 
 /-- Paper: Proposition 5.2.3.2(1), p. 236.
 The S-local average induces a topological linear equivalence from the homogeneous quotient
@@ -2757,6 +2824,125 @@ theorem existsUnique_globalThetaFourier :
 -- different indicator. An archimedean bump supported near 1/2 detects the difference.
 
 set_option maxSynthPendingDepth 8 in
+open Classical in
+/-- Integrating a stage function times one factor at each new place separates over the
+additive Tamagawa measure, without a pure-tensor hypothesis on the old stage function. -/
+private theorem sLocalThetaFourier_transition_integral
+    {D : Finset (HeightOneSpectrum (𝓞 F))} (hD : Disjoint S D)
+    (g : SAdeleRing F S → ℂ) (k : (v : D) → v.val.adicCompletion F → ℂ) :
+    (∫ z : SAdeleRing F (S ∪ D),
+      g (z.1, fun v ↦ z.2 ⟨v.val, Finset.mem_union_left D v.property⟩) *
+        ∏ v : D, k v (z.2 ⟨v.val, Finset.mem_union_right S v.property⟩)
+        ∂sAdditiveTamagawaMeasure F (S ∪ D)) =
+      (∫ z, g z ∂sAdditiveTamagawaMeasure F S) *
+        ∏ v : D, ∫ x, k v x ∂finiteLocalAdditiveTamagawaMeasure F v.val := by
+  classical
+  let V := HeightOneSpectrum (𝓞 F)
+  let K (v : V) := v.adicCompletion F
+  let (v : V) : MeasurableSpace (K v) := borel (v.adicCompletion F)
+  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+  let : MeasurableSpace (InfiniteAdeleRing F) :=
+    inferInstanceAs (MeasurableSpace ((w : InfinitePlace F) → w.Completion))
+  let μ (v : V) : Measure (K v) := finiteLocalAdditiveTamagawaMeasure F v
+  let (v : V) : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let (v : V) : (finiteLocalAdditiveTamagawaMeasure F v).IsAddHaarMeasure :=
+    finiteLocalAdditiveTamagawaMeasure_isAddHaar F v
+  let (v : V) : SigmaFinite (μ v) :=
+    inferInstanceAs (SigmaFinite (finiteLocalAdditiveTamagawaMeasure F v))
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let (w : InfinitePlace F) : (infiniteLocalAdditiveTamagawaMeasure F w).IsAddHaarMeasure :=
+    infiniteLocalAdditiveTamagawaMeasure_haar F w
+  let μa := Measure.pi (infiniteLocalAdditiveTamagawaMeasure F)
+  let η (A : Finset V) := Measure.pi (fun v : A ↦ μ v.val)
+  let e := MeasurableEquiv.piFinsetUnion K hD
+  let E := MeasurableEquiv.prodAssoc.trans ((MeasurableEquiv.refl (InfiniteAdeleRing F)).prodCongr e)
+  have hE : MeasurePreserving E ((μa.prod (η S)).prod (η D)) (μa.prod (η (S ∪ D))) :=
+    ((MeasurePreserving.id μa).prod (measurePreserving_piFinsetUnion hD μ)).comp
+      (measurePreserving_prodAssoc μa (η S) (η D))
+  let H (z : SAdeleRing F (S ∪ D)) :=
+    g (z.1, fun v ↦ z.2 ⟨v.val, Finset.mem_union_left D v.property⟩) *
+      ∏ v : D, k v (z.2 ⟨v.val, Finset.mem_union_right S v.property⟩)
+  change (∫ z, H z ∂μa.prod (η (S ∪ D))) = _
+  refine (hE.integral_comp' H).symm.trans ?_
+  have h (p : SAdeleRing F S × ((v : D) → K v.val)) :
+      H (E p) = g p.1 * ∏ v : D, k v (p.2 v) := by
+    change g (p.1.1, fun v ↦ Equiv.piFinsetUnion K hD (p.1.2, p.2) ⟨v.val, Finset.mem_union_left D v.property⟩) *
+      ∏ v : D, k v (Equiv.piFinsetUnion K hD (p.1.2, p.2) ⟨v.val, Finset.mem_union_right S v.property⟩) = _
+    simp only [Equiv.piFinsetUnion_left K hD (Subtype.property _),
+      Equiv.piFinsetUnion_right K hD (Subtype.property _)]
+    rfl
+  simp_rw [h]
+  exact (integral_prod_mul (μ := μa.prod (η S)) (ν := η D) g (fun x ↦ ∏ v : D, k v (x v))).trans
+    (congrArg (_ * ·) (integral_fintype_prod_eq_prod k (μ := fun v : D ↦ μ v.val)))
+
+open Classical in
+/-- Extending to a disjoint union multiplies by the integer indicators on its second summand. -/
+private theorem sLocalThetaFourier_transition_apply
+    {D : Finset (HeightOneSpectrum (𝓞 F))} (hD : Disjoint S D)
+    (f : ℬₛ(S)) (z : SAdeleRing F (S ∪ D)) :
+    sAdeleSchwartzTransition F (Finset.subset_union_left (s₁ := S) (s₂ := D)) f
+        (Multiplicative.ofAdd z) =
+      f (Multiplicative.ofAdd (z.1, fun v : S ↦ z.2 ⟨v.val, Finset.mem_union_left D v.property⟩)) *
+        ∏ v : D, (v.val.adicCompletionIntegers F : Set (v.val.adicCompletion F)).indicator
+          (fun _ ↦ (1 : ℂ)) (z.2 ⟨v.val, Finset.mem_union_right S v.property⟩) := by
+  classical
+  rw [sAdeleSchwartzTransition_apply]
+  split_ifs with h
+  · rw [Finset.prod_eq_one (fun v _ ↦ Set.indicator_of_mem
+      (h ⟨v.val, Finset.mem_union_right S v.property⟩
+        (fun hv ↦ Finset.disjoint_left.mp hD hv v.property)) _), mul_one]
+  · push Not at h
+    obtain ⟨v, hv, hz⟩ := h
+    have hvD := (Finset.mem_union.mp v.property).resolve_left hv
+    rw [Finset.prod_eq_zero (Finset.mem_univ (⟨v.val, hvD⟩ : D))
+      (Set.indicator_of_notMem hz _), mul_zero]
+
+open Classical in
+/-- The Fourier integral for an enlarged test function factors into its stage transform
+and the local transforms of the newly inserted integer indicators. -/
+private theorem sLocalThetaFourier_transition_union
+    {D : Finset (HeightOneSpectrum (𝓞 F))} (hD : Disjoint S D)
+    (hgood : ∀ v ∈ D, ¬ v.asIdeal ∣ differentIdeal ℤ (𝓞 F)) (f : ℬₛ(S)) :
+    let i := sAdeleSchwartzTransition F (Finset.subset_union_left (s₁ := S) (s₂ := D))
+    sAdeleSchwartzFourier (i f) = i (sAdeleSchwartzFourier f) := by
+  classical
+  intro i
+  apply Subtype.ext
+  funext y
+  let p (z : SAdeleRing F (S ∪ D)) : SAdeleRing F S :=
+    (z.1, fun v ↦ z.2 ⟨v.val, Finset.mem_union_left D v.property⟩)
+  let j (v : D) : ↥(S ∪ D) := ⟨v.val, Finset.mem_union_right S v.property⟩
+  let I (v : D) := (v.val.adicCompletionIntegers F : Set (v.val.adicCompletion F)).indicator
+    (fun _ ↦ (1 : ℂ))
+  let C := (starRingEnd ℂ).toMonoidHom.comp Circle.coeHom
+  let g (x : SAdeleRing F S) := f (Multiplicative.ofAdd x) * C (sAdeleStandardCharacter F S (x * p y.toAdd))
+  let k (v : D) (x : v.val.adicCompletion F) :=
+    I v x * C (finiteLocalStandardCharacter F v.val (x * y.toAdd.2 (j v)))
+  have hψ (z : SAdeleRing F (S ∪ D)) : sAdeleStandardCharacter F (S ∪ D) (z * y.toAdd) =
+      sAdeleStandardCharacter F S (p z * p y.toAdd) *
+        ∏ v : D, finiteLocalStandardCharacter F v.val (z.2 (j v) * y.toAdd.2 (j v)) := by
+    let b (v : ↥(S ∪ D)) := finiteLocalStandardCharacter F v.val (z.2 v * y.toAdd.2 v)
+    change _ * (∏ v, b v) = (_ * _) * _
+    rw [← (Equiv.Finset.union S D hD).prod_comp b, Fintype.prod_sum_type, ← mul_assoc]
+    rfl
+  have hInt (z : SAdeleRing F (S ∪ D)) :
+      i f (Multiplicative.ofAdd z) * C (sAdeleStandardCharacter F (S ∪ D) (z * y.toAdd)) =
+        g (p z) * ∏ v : D, k v (z.2 (j v)) := by
+    rw [show i f (Multiplicative.ofAdd z) = _ from sLocalThetaFourier_transition_apply hD f z,
+      hψ, map_mul, map_prod]
+    simp only [g, k, Finset.prod_mul_distrib]
+    ring
+  have hfix (v : D) : (∫ x, k v x ∂finiteLocalAdditiveTamagawaMeasure F v.val) =
+      I v (y.toAdd.2 (j v)) :=
+    congrFun ((finiteLocalTamagawaFourier_fixes_integers_iff F v.val).mpr (hgood v.val v.property)) _
+  change (∫ z, i f (Multiplicative.ofAdd z) * C (sAdeleStandardCharacter F (S ∪ D) (z * y.toAdd))
+      ∂sAdditiveTamagawaMeasure F (S ∪ D)) = _
+  simp_rw [hInt]
+  exact (sLocalThetaFourier_transition_integral hD g k).trans
+    ((congrArg (_ * ·) (Finset.prod_congr rfl fun v _ ↦ hfix v)).trans
+      (sLocalThetaFourier_transition_apply hD (sAdeleSchwartzFourier f) y.toAdd).symm)
+
 /-- Paper: Theorem 5.2.4.1(1), p. 239.
 The S-local Fourier involutions commute with stage enlargement away from the different.
 Deviation: Every added place is required to have a Fourier-fixed integer indicator. -/
@@ -2767,7 +2953,22 @@ theorem sLocalThetaFourier_transition (hST : S ⊆ T)
     let fourierS := (existsUnique_sLocalThetaFourier (F := F) (S := S)).exists.choose
     let fourierT := (existsUnique_sLocalThetaFourier (F := F) (S := T)).exists.choose
     let transition := sLocalThetaTransition (F := F) (S := S) (T := T) hST
-    fourierT (transition x) = transition (fourierS x) := by sorry
+    fourierT (transition x) = transition (fourierS x) := by
+  classical
+  intro fourierS fourierT transition
+  induction x using Submodule.Quotient.induction_on with
+  | _ f =>
+    let P (A : Finset (HeightOneSpectrum (𝓞 F))) := ∀ h : S ⊆ A,
+      let i := sAdeleSchwartzTransition F h
+      sAdeleSchwartzFourier (i f) = i (sAdeleSchwartzFourier f)
+    have hu : P (S ∪ (T \ S)) := fun _ ↦
+      sLocalThetaFourier_transition_union Finset.disjoint_sdiff
+        (fun v hv ↦ hgood v (Finset.mem_sdiff.mp hv).1 (Finset.mem_sdiff.mp hv).2) f
+    have hT : P T := (Finset.union_sdiff_of_subset hST) ▸ hu
+    exact ((existsUnique_sLocalThetaFourier (F := F) (S := T)).exists.choose_spec.2
+      (sAdeleSchwartzTransition F hST f)).trans
+      ((congrArg (Kₛ(T)).mkQ (hT hST)).trans (congrArg transition
+        ((existsUnique_sLocalThetaFourier (F := F) (S := S)).exists.choose_spec.2 f).symm))
 
 set_option maxSynthPendingDepth 8 in
 /-- Paper: (5.2.4.4), p. 239.
@@ -2779,7 +2980,18 @@ theorem sLocalThetaFourier_toGlobal
     (x : Θₛ(S)) :
     let fourierS := (existsUnique_sLocalThetaFourier (F := F) (S := S)).exists.choose
     let fourier := (existsUnique_globalThetaFourier (F := F)).exists.choose
-    fourier (sLocalThetaToGlobal F S x) = sLocalThetaToGlobal F S (fourierS x) := by sorry
+    fourier (sLocalThetaToGlobal F S x) = sLocalThetaToGlobal F S (fourierS x) := by
+  intro fourierS fourier
+  induction x using Submodule.Quotient.induction_on with | _ f => ?_
+  have hS := (existsUnique_sLocalThetaFourier (F := F) (S := S)).exists.choose_spec.2 f
+  have hF := (existsUnique_globalThetaFourier (F := F)).exists.choose_spec.2
+    (sAdeleSchwartzToGlobal F S f)
+  calc
+    _ = (K𝔽).mkQ (adeleSchwartzFourier (sAdeleSchwartzToGlobal F S f)) := hF
+    _ = (K𝔽).mkQ (sAdeleSchwartzToGlobal F S (sAdeleSchwartzFourier f)) :=
+      congrArg (K𝔽).mkQ
+        (adeleSchwartzFourier_sAdeleSchwartzToGlobal_of_different F S hgood f (sAdeleSchwartzFourier f) rfl)
+    _ = _ := (congrArg (sLocalThetaToGlobal F S) hS).symm
 
 section
 

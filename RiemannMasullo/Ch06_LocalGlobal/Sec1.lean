@@ -551,6 +551,44 @@ theorem finitePlaceSchwartz_invariants_isClosed (w : Places) :
     IsClosed (SetLike.coe (Representation.invariants (V := ℬᵥ(w)) (ρ(w))) : Set ℬᵥ(w)) :=
   unitInvariants_isClosed _
 
+/-- The free Laurent generator and the uniformizer translation give every ball
+indicator: the monomial of exponent n goes to the ball of exponent n. -/
+private theorem finitePlaceSchwartz_invariants_laurent_equiv_monomial (w : Places)
+    (π : (L(w))ˣ) (e : LaurentPolynomial ℂ ≃ₗ[ℂ] (Representation.invariants (ρ(w))))
+    (h1 : ∀ x, (e 1).val (Multiplicative.ofAdd x) = finitePlaceBallIndicator w π 0 x)
+    (hT : ∀ P, (e (LaurentPolynomial.T 1 * P)).val =
+        schwartzBruhatUnitTranslate π (e P).val) :
+    ∀ n x, (e (LaurentPolynomial.T n)).val (Multiplicative.ofAdd x) =
+        finitePlaceBallIndicator w π n x := by
+  intro n
+  induction n using Int.induction_on with
+  | zero =>
+    intro x
+    rw [LaurentPolynomial.T_zero]
+    exact h1 x
+  | succ k ih =>
+    intro x
+    rw [show (k : ℤ) + 1 = 1 + k by ring, LaurentPolynomial.T_add, hT,
+      schwartzBruhatUnitTranslate_apply, ih]
+    unfold finitePlaceBallIndicator
+    congr 1
+    rw [← mul_assoc, ← Units.val_mul, ← zpow_neg_one, ← zpow_add]
+    congr 3
+    ring
+  | pred k ih =>
+    intro x
+    have h := ih ((π : L(w)) * x)
+    rw [show -(k : ℤ) = 1 + (-(k : ℤ) - 1) by ring, LaurentPolynomial.T_add, hT,
+      schwartzBruhatUnitTranslate_apply] at h
+    rw [show (π⁻¹ : (L(w))ˣ).val * ((π : L(w)) * x) = x by
+      rw [← mul_assoc, ← Units.val_mul, inv_mul_cancel, Units.val_one, one_mul]] at h
+    rw [h]
+    unfold finitePlaceBallIndicator
+    congr 1
+    rw [← mul_assoc, ← Units.val_mul, ← zpow_add_one]
+    congr 3
+    ring
+
 /-- Paper: Lemma 6.1.2.2(1)(2), p. 288.
 With the finest locally convex topology on Laurent polynomials, the monomial-to-ball
 correspondence is a linear homeomorphism onto the unit invariants. -/
@@ -560,7 +598,33 @@ theorem finitePlaceSchwartz_invariants_laurent_equiv (w : Places)
       (Valued.v : Valuation (L(w)) (WithZero (Multiplicative ℤ))) π.val) :
     ∃ e : FinestLocallyConvex (LaurentPolynomial ℂ) ≃L[ℂ] (Representation.invariants (ρ(w))),
       ∀ n x, (e (LaurentPolynomial.T n)).val (Multiplicative.ofAdd x) =
-        finitePlaceBallIndicator w π n x := by sorry
+        finitePlaceBallIndicator w π n x := by
+  obtain ⟨e, h1, hT⟩ := finitePlaceSchwartz_invariants_laurent_free w π _hπ
+  let S := Representation.invariants (ρ(w))
+  have := finestLocallyConvex_t2 (LaurentPolynomial ℂ)
+  have := finestLocallyConvex_t2 ℬᵥ(w)
+  let S' : Submodule ℂ (FinestLocallyConvex ℬᵥ(w)) := S
+  have hS : (instTopologicalSpaceSubtype : TopologicalSpace S) =
+      (instTopologicalSpaceSubtype : TopologicalSpace S') :=
+    congrArg (fun t : TopologicalSpace ℬᵥ(w) ↦ TopologicalSpace.induced
+      (Subtype.val : S → ℬᵥ(w)) t) (finitePlaceSchwartz_finestTopology F w)
+  have hS2 : (instTopologicalSpaceSubtype : TopologicalSpace S') =
+      (inferInstance : TopologicalSpace (FinestLocallyConvex S')) :=
+    finestLocallyConvex_submodule_topology S'
+  have hfwd : @Continuous (FinestLocallyConvex (LaurentPolynomial ℂ)) S _
+      instTopologicalSpaceSubtype e := by
+    rw [hS]
+    refine continuous_induced_rng.2 ?_
+    exact continuous_of_finestLocallyConvex (LaurentPolynomial ℂ) (M := FinestLocallyConvex ℬᵥ(w))
+      (S'.subtype.comp (e : LaurentPolynomial ℂ →ₗ[ℂ] S))
+  have hinv : @Continuous S (FinestLocallyConvex (LaurentPolynomial ℂ))
+      instTopologicalSpaceSubtype _ e.symm := by
+    rw [hS, hS2]
+    let g : FinestLocallyConvex S' →ₗ[ℂ] FinestLocallyConvex (LaurentPolynomial ℂ) :=
+      e.symm.toLinearMap
+    exact continuous_of_finestLocallyConvex S' g
+  exact ⟨{ toLinearEquiv := e, continuous_toFun := hfwd, continuous_invFun := hinv },
+    finitePlaceSchwartz_invariants_laurent_equiv_monomial w π e h1 hT⟩
 
 end Laurent
 
@@ -1938,13 +2002,6 @@ theorem finitePlaceUnitAverage_integrable (w : Places) (f : ℬᵥ(w)) (x : L(w)
     ((ae_restrict_iff' (units_isOpen w).measurableSet).2 (Filter.Eventually.of_forall hC))
 
 
-/-- Paper: Lemma 6.1.2.4(2), p. 292.
-A test function averages to zero exactly when it belongs to the span of unit
-translation differences. -/
-theorem finitePlaceUnitAverage_eq_zero_iff (w : Places) (f : ℬᵥ(w)) :
-    (∀ x, finitePlaceUnitAverage w f x = 0) ↔
-      f ∈ Representation.Coinvariants.ker (ρ(w)) := by sorry
-
 -- TODO(paper-gap): The proof on p. 292 identifies multiplicative unit averaging
 -- with additive convolution and deduces vanishing of the function from unramified
 -- Mellin values. For the indicator of the integer ring at the trivial character,
@@ -2129,6 +2186,29 @@ theorem finitePlaceUnitAverage_coinvariants_equiv (w : Places) :
     exact H (finitePlaceUnitAverage_coinvariants_equiv_lift (F := F) w)
       (finitePlaceUnitAverage_coinvariants_equiv_fixed (F := F) w)
       (finitePlaceUnitAverage_coinvariants_equiv_surj (F := F) w)
+
+/-- Paper: Lemma 6.1.2.4(2), p. 292.
+A test function averages to zero exactly when it belongs to the span of unit
+translation differences. -/
+theorem finitePlaceUnitAverage_eq_zero_iff (w : Places) (f : ℬᵥ(w)) :
+    (∀ x, finitePlaceUnitAverage w f x = 0) ↔
+      f ∈ Representation.Coinvariants.ker (ρ(w)) := by
+  obtain ⟨N, hN⟩ := finitePlaceUnitAverage_coinvariants_equiv (F := F) w
+  constructor
+  · intro h
+    have hz : N (Submodule.Quotient.mk f) = 0 := by
+      refine Subtype.ext (SchwartzBruhat.ext fun y ↦ ?_)
+      exact (hN f (Multiplicative.toAdd y)).trans (h _)
+    have h0 : (Submodule.Quotient.mk f :
+        ℬᵥ(w) ⧸ Representation.Coinvariants.ker (ρ(w))) = 0 :=
+      N.injective (hz.trans (map_zero N).symm)
+    exact (Submodule.Quotient.mk_eq_zero _).mp h0
+  · intro hf x
+    have hz : (Submodule.Quotient.mk f :
+        ℬᵥ(w) ⧸ Representation.Coinvariants.ker (ρ(w))) = 0 :=
+      (Submodule.Quotient.mk_eq_zero _).mpr hf
+    rw [← hN f x, hz, map_zero]
+    rfl
 
 /-- Paper: Lemma 6.1.2.4(2), p. 292.
 Local unit averaging also defines a continuous linear map in the intrinsic

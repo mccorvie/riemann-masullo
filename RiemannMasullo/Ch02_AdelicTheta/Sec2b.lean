@@ -13,7 +13,7 @@ import Mathlib.MeasureTheory.Integral.Prod
 import Mathlib.RingTheory.Complex
 import Mathlib.Topology.Algebra.Nonarchimedean.TotallyDisconnected
 import all RiemannMasullo.AppA_AlgebraicNT.Sec1
-import all RiemannMasullo.AppA_AlgebraicNT.Sec2
+import RiemannMasullo.AppA_AlgebraicNT.Sec2
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Basic
@@ -2746,7 +2746,7 @@ def homogeneousAdelicTheta_polarTerm (ω₁ : χ[F]) (f : ℬ[F]) (g : C[F]) : �
   if ω₁ = 1 then (μ̄₁ univ).toReal •
     ((normℝ g)⁻¹ • adeleSchwartzFourier f zeroAdele - f zeroAdele) else 0
 
-/-- Paper: Equation (2.2.5.10), p. 97. At norm one and for the trivial
+/-- Paper: Equation (2.2.5.10), p. 97. At the identity class and for the trivial
 character the polar term is the class volume times the difference of the evaluations. -/
 theorem homogeneousAdelicTheta_polarTerm_trivial_at_one (f : ℬ[F]) :
     homogeneousAdelicTheta_polarTerm (1 : χ[F]) f 1 =

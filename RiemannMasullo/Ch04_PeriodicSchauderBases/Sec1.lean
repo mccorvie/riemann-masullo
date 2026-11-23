@@ -482,9 +482,9 @@ theorem tsum_seminorm_coordinates (q : Seminorm ℂ E) (u : E)
     (∑' m, q (f m u • x m)) = ∑' m, ‖f m u‖ * q (x m) := by
   simp only [map_smul_eq_mul]
 
-/-- Paper: Remark 4.1.2.2, p. 159. The coordinate basis of the complex sequence
-space has equicontinuous basic projections and fails equicontinuity for its
-coefficient functionals. -/
+/-- Paper: Remark 4.1.2.2, pp. 158–159. The coordinate functionals of the complex
+sequence space fail equicontinuity at zero. The basic projections are equicontinuous by
+`pi_isEquicontinuous`, so this coordinate basis witnesses the non-implication in the remark. -/
 theorem pi_coeff_not_equicontinuousAt :
     ¬ EquicontinuousAt (fun n (u : ℕ → ℂ) ↦ coordinateFunctional n u) 0 := by
   rw [Metric.equicontinuousAt_iff_right]
@@ -1022,11 +1022,11 @@ theorem exists_ne_zero_seminorm_apply_pi (q : Seminorm ℂ (ℕ → ℂ)) (hq : 
       (div_lt_iff₀ (lt_of_le_of_ne (NonnegHomClass.apply_nonneg _ _) (Ne.symm hv))).mp hn
     linarith [hlt n]
 
-/-- Helper for Remark 4.1.2.3, p. 159. If `E` carries a continuous seminorm that
-separates points, then no submodule of `E` is continuously linearly isomorphic to
-the complex sequence space with the product topology: pulling the seminorm back
-along the isomorphism would give an injective continuous seminorm there, and
-`exists_ne_zero_seminorm_apply_pi` forbids that. -/
+/-- Paper: Remark 4.1.2.3, p. 159. If `E` carries a continuous seminorm with trivial
+kernel, then no submodule of `E` is continuously linearly isomorphic to the complex sequence
+space with its product topology. Pulling back along such an isomorphism would give a continuous
+seminorm with trivial kernel on the sequence space, which `exists_ne_zero_seminorm_apply_pi`
+rules out. -/
 theorem not_nonempty_pi_equiv_of_continuous_norm {q : Seminorm ℂ E} (hq : Continuous q)
     (hnorm : ∀ u, q u = 0 → u = 0) (S : Submodule ℂ E) :
     ¬ Nonempty (S ≃L[ℂ] (ℕ → ℂ)) := by
