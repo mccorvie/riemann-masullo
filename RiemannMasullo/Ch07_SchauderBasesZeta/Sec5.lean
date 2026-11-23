@@ -439,7 +439,9 @@ At the places above one rational prime the denominator agrees with the
 primary denominator of §7.4. -/
 theorem strongCoprimalityDenominator_primary (p : Vℚ) :
     let T := (finite_nuclearityPlacesAbove (F := F) p).toFinset
-    strongCoprimalityDenominator (ω(χ)) T = finiteNuclearityDenominator χ p := by sorry
+    strongCoprimalityDenominator (ω(χ)) T = finiteNuclearityDenominator χ p := by
+  unfold strongCoprimalityDenominator finiteNuclearityDenominator
+  with_reducible rfl
 
 /-- Paper: Remark 7.5.0.2 and Equation (7.5.0.15), p. 378.
 The primary principal-value quotient is a Hausdorff nuclear Fréchet space. -/
