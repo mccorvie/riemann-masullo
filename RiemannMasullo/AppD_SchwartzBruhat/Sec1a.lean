@@ -6356,7 +6356,7 @@ open TensorProduct
 
 /-- Reading a Euclidean Schwartz function in the real coordinate gives a
 continuous linear equivalence with the corresponding elementary Schwartz space. -/
-private theorem elementarySchwartz_real_equiv (m : ℕ) :
+private theorem elementarySchwartz_tensorRealFactor_equiv (m : ℕ) :
     ∃ e : SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ ≃L[ℂ] ElementarySchwartz m 0 0 PUnit.{1},
       ∀ f g, e f g = f g.1 := by
   let X := EuclideanSpace ℝ (Fin m)
@@ -6868,7 +6868,7 @@ theorem elementarySchwartzTensor_isEmbedding :
     let : T2Space T := elementarySchwartz_t2
     let : T2Space RT := elementarySchwartz_t2
     let : T2Space D := elementarySchwartz_t2
-    obtain ⟨eR, heR⟩ := elementarySchwartz_real_equiv m
+    obtain ⟨eR, heR⟩ := elementarySchwartz_tensorRealFactor_equiv m
     obtain ⟨eD, heD⟩ := elementarySchwartz_latticeFinite_equiv r F
     let : T2Space S₂ := eD.toHomeomorph.symm.t2Space
     have hRT : @IsHomeomorph (ProjectiveTensor R T) (InjectiveTensor R T) _ _ id :=
