@@ -23,19 +23,19 @@ of them asks for the value of the Riemann-Siegel phase.
 * `hG`: `0 < Re (Γℝ(1/2 + ia) · conj Γℝ(1/2 + ib))`, which says only that the
   phase of `Γℝ` turns by less than a quarter turn between `a` and `b`.
 
-Why that suffices: `hardyZ t = Λ(1/2 + it) / d(t)` with `d(t) > 0`
+Why that suffices: `ZetaLab.hardyZ t = Λ(1/2 + it) / d(t)` with `d(t) > 0`
 (`ZetaLean/HardyZ.lean`), and `Λ = ζ · Γℝ` off the poles, so
 `Z(a) Z(b) d(a) d(b) = X G` with `X` and `G` the two products above. The left
 side is real, so multiplying by `conj X` and taking real parts gives
 `Z(a) Z(b) d(a) d(b) Re X = ‖X‖² Re G > 0`, hence `Z(a) Z(b) < 0`, and the
-intermediate value theorem on the continuous real `hardyZReal` finishes.
+intermediate value theorem on the continuous real `ZetaLab.hardyZReal` finishes.
 
 Nothing here is numerical. The two hypotheses are the open work: `hX` needs an
 evaluation of `ζ` with a proved error bound, `hG` a crude bound on the phase
 of `Γ` (`RESULTS.md`, routes E and P).
 -/
 
-open Complex
+open Complex RiemannMasullo.External
 open scoped ComplexConjugate
 
 namespace HardyFirstZero
@@ -58,7 +58,7 @@ lemma completed_eq (t : ℝ) :
   rw [riemannZeta_def_of_ne_zero (sOf_ne_zero t)]
   exact (div_mul_cancel₀ _ (Gammaℝ_ne_zero_of_re_pos hre)).symm
 
-/-- The positive real denominator of `hardyZ`. -/
+/-- The positive real denominator of `ZetaLab.hardyZ`. -/
 noncomputable def den (t : ℝ) : ℝ := Real.pi ^ (-(1 / 4 : ℝ)) * ‖Gamma (1 / 4 + t / 2 * I)‖
 
 lemma den_pos (t : ℝ) : 0 < den t := by
@@ -67,21 +67,21 @@ lemma den_pos (t : ℝ) : 0 < den t := by
   apply Gamma_ne_zero_of_re_pos
   simp
 
-lemma hardyZ_eq (t : ℝ) : hardyZ t = completedRiemannZeta (sOf t) / ((den t : ℝ) : ℂ) := by
-  unfold hardyZ den sOf
+lemma hardyZ_eq (t : ℝ) : ZetaLab.hardyZ t = completedRiemannZeta (sOf t) / ((den t : ℝ) : ℂ) := by
+  unfold ZetaLab.hardyZ den sOf
   congr 1
   rw [Complex.ofReal_mul, Complex.ofReal_cpow Real.pi_pos.le, Complex.ofReal_neg]
 
 /-- `Z(a) Z(b) d(a) d(b) = (ζ_a conj ζ_b) (Γℝ_a conj Γℝ_b)`, as complex numbers. -/
 lemma hardyZReal_mul (a b : ℝ) :
-    ((hardyZReal a * hardyZReal b : ℝ) : ℂ) * ((den a * den b : ℝ) : ℂ)
+    ((ZetaLab.hardyZReal a * ZetaLab.hardyZReal b : ℝ) : ℂ) * ((den a * den b : ℝ) : ℂ)
       = (riemannZeta (sOf a) * conj (riemannZeta (sOf b)))
         * (Gammaℝ (sOf a) * conj (Gammaℝ (sOf b))) := by
-  have hb : ((hardyZReal b : ℝ) : ℂ) = conj (hardyZ b) := by
-    rw [← hardyZReal_eq_hardyZ b, Complex.conj_ofReal]
+  have hb : ((ZetaLab.hardyZReal b : ℝ) : ℂ) = conj (ZetaLab.hardyZ b) := by
+    rw [← ZetaLab.hardyZReal_eq_hardyZ b, Complex.conj_ofReal]
   have hda : ((den a : ℝ) : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (den_pos a).ne'
   have hdb : ((den b : ℝ) : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (den_pos b).ne'
-  rw [Complex.ofReal_mul, Complex.ofReal_mul, hb, hardyZReal_eq_hardyZ a, hardyZ_eq a,
+  rw [Complex.ofReal_mul, Complex.ofReal_mul, hb, ZetaLab.hardyZReal_eq_hardyZ a, hardyZ_eq a,
     hardyZ_eq b, map_div₀, Complex.conj_ofReal, completed_eq a, completed_eq b, map_mul]
   field_simp
 
@@ -115,13 +115,13 @@ theorem exists_zero_of_sign_data {a b : ℝ} (hab : a < b)
     (hX : (riemannZeta (sOf a) * conj (riemannZeta (sOf b))).re < 0)
     (hG : 0 < (Gammaℝ (sOf a) * conj (Gammaℝ (sOf b))).re) :
     ∃ t ∈ Set.Ioo a b, riemannZeta (1 / 2 + t * I) = 0 := by
-  have hP : hardyZReal a * hardyZReal b < 0 :=
+  have hP : ZetaLab.hardyZReal a * ZetaLab.hardyZReal b < 0 :=
     neg_of_mul_eq (mul_pos (den_pos a) (den_pos b)) (hardyZReal_mul a b) hX hG
-  have hc : ContinuousOn hardyZReal (Set.Icc a b) := continuous_hardyZReal.continuousOn
+  have hc : ContinuousOn ZetaLab.hardyZReal (Set.Icc a b) := ZetaLab.continuous_hardyZReal.continuousOn
   rcases mul_neg_iff.mp hP with ⟨ha, hb⟩ | ⟨ha, hb⟩
   · obtain ⟨t, ht, h0⟩ := intermediate_value_Ioo' hab.le hc ⟨hb, ha⟩
-    exact ⟨t, ht, (hardyZReal_zero_iff t).mp h0⟩
+    exact ⟨t, ht, (ZetaLab.hardyZReal_zero_iff t).mp h0⟩
   · obtain ⟨t, ht, h0⟩ := intermediate_value_Ioo hab.le hc ⟨ha, hb⟩
-    exact ⟨t, ht, (hardyZReal_zero_iff t).mp h0⟩
+    exact ⟨t, ht, (ZetaLab.hardyZReal_zero_iff t).mp h0⟩
 
 end HardyFirstZero

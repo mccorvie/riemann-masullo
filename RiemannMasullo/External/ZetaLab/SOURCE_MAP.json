@@ -171,7 +171,7 @@
       "local": "HardyFirstZero/Spine.lean",
       "upstream": "hunts/hardy_first_zero/lean/HardyFirstZero/Spine.lean",
       "original_sha256": "970ee33563d6158b1a82ff29363de27b368fac1ce02662dbaedb166fbfb31e3d",
-      "ported_sha256": "2784dc6dc9d9da08db119a9cad59aa4f8fbb0d4fcaeb720fc98800cf12c50c5c",
+      "ported_sha256": "fde22e5b88731102156e6d3ea757212f76cf8093ceeb91b43e41eda9293364e6",
       "license": "MIT",
       "unchanged_line_ranges": [
         {
@@ -187,10 +187,130 @@
         {
           "source": [
             4,
-            120
+            18
           ],
           "local": [
             11,
+            25
+          ]
+        },
+        {
+          "source": [
+            20,
+            23
+          ],
+          "local": [
+            27,
+            30
+          ]
+        },
+        {
+          "source": [
+            25,
+            30
+          ],
+          "local": [
+            32,
+            37
+          ]
+        },
+        {
+          "source": [
+            32,
+            53
+          ],
+          "local": [
+            39,
+            60
+          ]
+        },
+        {
+          "source": [
+            55,
+            62
+          ],
+          "local": [
+            62,
+            69
+          ]
+        },
+        {
+          "source": [
+            65,
+            69
+          ],
+          "local": [
+            72,
+            76
+          ]
+        },
+        {
+          "source": [
+            71,
+            72
+          ],
+          "local": [
+            78,
+            79
+          ]
+        },
+        {
+          "source": [
+            75,
+            76
+          ],
+          "local": [
+            82,
+            83
+          ]
+        },
+        {
+          "source": [
+            78,
+            110
+          ],
+          "local": [
+            85,
+            117
+          ]
+        },
+        {
+          "source": [
+            112,
+            112
+          ],
+          "local": [
+            119,
+            119
+          ]
+        },
+        {
+          "source": [
+            114,
+            115
+          ],
+          "local": [
+            121,
+            122
+          ]
+        },
+        {
+          "source": [
+            117,
+            117
+          ],
+          "local": [
+            124,
+            124
+          ]
+        },
+        {
+          "source": [
+            119,
+            120
+          ],
+          "local": [
+            126,
             127
           ]
         }
@@ -2171,7 +2291,7 @@
       "local": "ZetaLean/HardyZ.lean",
       "upstream": "lean/ZetaLean/HardyZ.lean",
       "original_sha256": "21259011d07285653f190ba574140bed167e09f067c72d0bcc90446173dd9a21",
-      "ported_sha256": "d65654a77b3d31d295af650e466d3f2f10fd6c8c84b79181d0be940944892650",
+      "ported_sha256": "cf94f067e5658f7faa4a48dcc27a4505882443768e0d9150574dde6e70a1a268",
       "license": "MIT",
       "unchanged_line_ranges": [
         {
@@ -2187,21 +2307,31 @@
         {
           "source": [
             2,
-            5
+            6
           ],
           "local": [
             6,
-            9
+            10
           ]
         },
         {
           "source": [
-            6,
+            7,
+            10
+          ],
+          "local": [
+            14,
+            17
+          ]
+        },
+        {
+          "source": [
+            11,
             70
           ],
           "local": [
-            13,
-            77
+            20,
+            79
           ]
         },
         {
@@ -2210,8 +2340,8 @@
             257
           ],
           "local": [
-            79,
-            264
+            81,
+            266
           ]
         }
       ]

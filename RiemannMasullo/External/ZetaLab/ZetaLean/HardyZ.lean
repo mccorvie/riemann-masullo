@@ -16,6 +16,8 @@ set_option relaxedAutoImplicit true
 open Complex
 open scoped ComplexConjugate
 
+namespace RiemannMasullo.External.ZetaLab
+
 /--
 Hardy's Z function.
 
@@ -75,7 +77,7 @@ lemma completedRiemannZeta_conj_half (t : ℝ) :
     apply Complex.ext <;> simp
   rw [← h_conj_s]
   change conj (completedRiemannZeta s) = completedRiemannZeta (conj s)
-  rw [H1, H2, map_mul, ← riemannZeta_conj, _root_.Gammaℝ_conj]
+  rw [H1, H2, map_mul, ← riemannZeta_conj, RiemannMasullo.External.ZetaLab.Gammaℝ_conj]
 
 /-- `Z t` is strictly real. -/
 lemma hardyZ_is_real (t : ℝ) : ∃ (r : ℝ), hardyZ t = r := by
@@ -262,3 +264,5 @@ lemma hardyZReal_zero_iff (t : ℝ) :
 /-- `hardyZReal` is continuous. -/
 lemma continuous_hardyZReal : Continuous hardyZReal :=
   Complex.continuous_re.comp continuous_hardyZ
+
+end RiemannMasullo.External.ZetaLab

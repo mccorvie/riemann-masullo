@@ -2,9 +2,9 @@
 
 The source map records each file's original and ported SHA-256 hashes and the corresponding unchanged line ranges. Paths below are relative to this directory. The upstream revisions, copyright holders, and licenses are listed in [README.md](README.md).
 
-- Selected the import closure for `RHHeight.Main`. Redirected local module imports to `RiemannMasullo.External.ZetaLab`, added provenance headers, and enabled upstream implicit-binder settings where needed. Upstream declaration names are preserved.
+- Selected the import closure for `RHHeight.Main`. Redirected local module imports to `RiemannMasullo.External.ZetaLab`, added provenance headers, and enabled upstream implicit-binder settings where needed. Declaration names are unchanged outside the Hardy Z namespace adjustment below.
 - Replaced whole-library Mathlib imports with individual modules for complex powers, logarithmic derivatives, exponential estimates, and arithmetic tactics. Added the complex p-series import to `HardyFirstZero/EulerMaclaurin.lean`.
-- In `ZetaLean/HardyZ.lean`, qualified the root gamma-conjugation lemma to resolve its name on Lean 4.36.
+- Scoped the definitions and lemmas in `ZetaLean/HardyZ.lean` under `RiemannMasullo.External.ZetaLab` so the port can be imported alongside Mathlib’s `hardyZ` and `continuous_hardyZ`. Qualified the port’s gamma-conjugation lemma and updated the Hardy Z references in `HardyFirstZero/Spine.lean`.
 - In `Zeta23/FromPNTPlus/ResidueCalcOnRectangles.lean`, expressed the additive combination using Mathlib’s `linear_combination` and `abel`. This removes the dependency on the upstream custom tactic.
 - Rewrapped one sentence in the module comment in `Zeta23/Hypotheses.lean` so the project linter recognizes it as prose.
 - In `Zeta23/Analytic/RectangleLogDeriv.lean`, unfolded set difference before applying the filter-intersection lemma.
