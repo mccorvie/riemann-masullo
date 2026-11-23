@@ -45,7 +45,44 @@ def truncatedPerronIntegral (f : ℂ → ℂ) (s : ℂ) (x c T : ℝ) : ℂ :=
 constant series at cutoff one gives the arctangent factor. -/
 theorem truncatedPerronIntegral_one (s : ℂ) {c T : ℝ} (hc : 0 < c) :
     truncatedPerronIntegral (fun _ ↦ 1) s 1 c T = (Real.arctan (T / c) / Real.pi : ℝ) := by
-  sorry
+  have hz : ∀ t : ℝ, (⟨c, t⟩ : ℂ) ≠ 0 := fun t h ↦ hc.ne' (congrArg Complex.re h)
+  have hinv : ∀ t : ℝ, 1 / (⟨c, t⟩ : ℂ) =
+      ((c / (c ^ 2 + t ^ 2) : ℝ) : ℂ) - Complex.I * ((t / (c ^ 2 + t ^ 2) : ℝ) : ℂ) := by
+    intro t
+    rw [one_div]
+    apply Complex.ext <;>
+      simp only [Complex.inv_re, Complex.inv_im, Complex.normSq_mk, Complex.sub_re,
+        Complex.sub_im, Complex.mul_re, Complex.mul_im, Complex.I_re, Complex.I_im,
+        Complex.ofReal_re, Complex.ofReal_im] <;>
+      ring
+  have hderiv : ∀ t : ℝ, HasDerivAt
+      (fun t : ℝ ↦ (Real.arctan (t / c) : ℂ) - Complex.I * (Real.log (c ^ 2 + t ^ 2) / 2 : ℝ))
+      (1 / (⟨c, t⟩ : ℂ)) t := by
+    intro t
+    have hpos : 0 < c ^ 2 + t ^ 2 := by positivity
+    have h1 := ((hasDerivAt_id' t).div_const c).arctan.ofReal_comp
+    have h2 := ((((hasDerivAt_pow 2 t).const_add (c ^ 2)).log hpos.ne').div_const 2).ofReal_comp
+    convert h1.sub (h2.const_mul Complex.I) using 1
+    rw [hinv t]
+    congr 3
+    · field_simp
+    · field_simp
+      ring
+  have hcont : Continuous fun t : ℝ ↦ 1 / (⟨c, t⟩ : ℂ) := by
+    refine continuous_const.div ?_ hz
+    rw [show Complex.mk c = fun t : ℝ ↦ (c : ℂ) + (t : ℂ) * Complex.I from
+      funext fun t ↦ Complex.mk_eq_add_mul_I c t]
+    fun_prop
+  have hπ : (Real.pi : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr Real.pi_ne_zero
+  show (∫ t in -T..T, (1 : ℂ) * ((1 : ℝ) : ℂ) ^ (⟨c, t⟩ : ℂ) / (⟨c, t⟩ : ℂ)) /
+    (2 * (Real.pi : ℂ)) = _
+  simp only [Complex.ofReal_one, Complex.one_cpow, one_mul]
+  rw [intervalIntegral.integral_eq_sub_of_hasDerivAt (fun t _ ↦ hderiv t)
+    (hcont.intervalIntegrable _ _)]
+  simp only [neg_div, Real.arctan_neg, neg_sq, Complex.ofReal_neg]
+  push_cast
+  field_simp
+  ring
 
 /-- Paper: Lemma B.7.1.1, pp. 644–645. This sums the Dirichlet terms for positive
 integers up to the real cutoff, with half weight when the cutoff is an integer. -/
@@ -146,7 +183,21 @@ allowed and half-integer cuts are allowed precisely when `b ≤ 1/2`. -/
 theorem perronCutoffSet_integer_half_integer {b : ℝ} (hb : 0 < b) (n : ℤ) :
     (n : ℝ) ∈ perronCutoffSet b ∧
       ((n : ℝ) + 1 / 2 ∈ perronCutoffSet b ↔ b ≤ 1 / 2) := by
-  sorry
+  refine ⟨Or.inl ⟨n, rfl⟩, ?_⟩
+  have hround : round ((n : ℝ) + 1 / 2) = n + 1 := by
+    rw [round_eq, add_assoc, add_halves, Int.floor_intCast_add, Int.floor_one]
+  have hnot : (n : ℝ) + 1 / 2 ∉ Set.range (Int.cast : ℤ → ℝ) := by
+    rintro ⟨k, hk⟩
+    have h : ((2 * (k - n) : ℤ) : ℝ) = 1 := by push_cast; linarith
+    have h' : 2 * (k - n) = 1 := by exact_mod_cast h
+    omega
+  have habs : |(n : ℝ) + 1 / 2 - (round ((n : ℝ) + 1 / 2) : ℝ)| = 1 / 2 := by
+    rw [hround, Int.cast_add, Int.cast_one, show (n : ℝ) + 1 / 2 - (n + 1) = -(1 / 2) by ring,
+      abs_neg, abs_of_pos one_half_pos]
+  change (n : ℝ) + 1 / 2 ∈ Set.range (Int.cast : ℤ → ℝ) ∨
+    b ≤ |(n : ℝ) + 1 / 2 - (round ((n : ℝ) + 1 / 2) : ℝ)| ↔ _
+  rw [habs]
+  exact ⟨fun h ↦ h.resolve_left hnot, Or.inr⟩
 
 /-- Paper: Theorem B.7.1.2(1), Equation (B.7.1.8), p. 645. For the character
 `|·|^(-it₀)`, the cutoff polynomial on the 1-line is the negative shifted
