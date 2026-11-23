@@ -404,6 +404,214 @@ theorem sLocalAbsolutePW_mk_mem (hST : S ⊆ T) (X : ℝ) (D : Submodule ℂ (B(
   Submodule.le_topologicalClosure _
     (Submodule.mem_map_of_mem ⟨Submodule.mem_map_of_mem (Submodule.subset_span _hf), _hD⟩)
 
+section LocalFourierSupport
+
+open Classical
+
+private theorem sLocalAbsolutePW_fourier_transition_support {S T : Finset V} (hST : S ⊆ T)
+    (g : B(S)) (y : SAdeleRing F T)
+    (hy : sAdeleSchwartzFourier (Π(hST) g) (Multiplicative.ofAdd y) ≠ 0) :
+    let yS : SAdeleRing F S := (y.1, fun w : S ↦ y.2 ⟨w.val, hST w.property⟩)
+    sAdeleSchwartzFourier g (Multiplicative.ofAdd yS) ≠ 0 ∧
+      ∀ v : {v : T // v.val ∉ S},
+        ‖y.2 v.val‖ ≤
+          (v.val.val.asIdeal.absNorm : ℝ) ^ multiplicity v.val.val.asIdeal (differentIdeal ℤ (𝓞 F)) := by
+  intro yS
+  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+  let (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+  let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+  let (v : HeightOneSpectrum (𝓞 F)) : BorelSpace (v.adicCompletion F) := ⟨rfl⟩
+  let (v : HeightOneSpectrum (𝓞 F)) : ProperSpace (v.adicCompletion F) :=
+    properSpace_adicCompletion v
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let (w : InfinitePlace F) : (infiniteLocalAdditiveTamagawaMeasure F w).IsAddHaarMeasure :=
+    infiniteLocalAdditiveTamagawaMeasure_haar F w
+  let (v : HeightOneSpectrum (𝓞 F)) :
+      (finiteLocalAdditiveTamagawaMeasure F v).IsAddHaarMeasure :=
+    finiteLocalAdditiveTamagawaMeasure_isAddHaar F v
+  let : MeasurableSpace (InfiniteAdeleRing F) :=
+    inferInstanceAs (MeasurableSpace ((w : InfinitePlace F) → w.Completion))
+  let (w : InfinitePlace F) :
+      MeasureTheory.SigmaFinite (infiniteLocalAdditiveTamagawaMeasure F w) :=
+    inferInstanceAs (MeasureTheory.SigmaFinite (infiniteLocalAdditiveTamagawaMeasure F w))
+  let (v : HeightOneSpectrum (𝓞 F)) :
+      MeasureTheory.SigmaFinite (finiteLocalAdditiveTamagawaMeasure F v) :=
+    inferInstanceAs (MeasureTheory.SigmaFinite (finiteLocalAdditiveTamagawaMeasure F v))
+  let μArch := MeasureTheory.Measure.pi (infiniteLocalAdditiveTamagawaMeasure F)
+  let μS := MeasureTheory.Measure.pi (fun w : S ↦ finiteLocalAdditiveTamagawaMeasure F w.val)
+  let μT := MeasureTheory.Measure.pi (fun v : T ↦ finiteLocalAdditiveTamagawaMeasure F v.val)
+  let μP := MeasureTheory.Measure.pi (fun v : {v : T // v.val ∈ S} ↦
+    finiteLocalAdditiveTamagawaMeasure F v.val.val)
+  let μU := MeasureTheory.Measure.pi (fun v : {v : T // v.val ∉ S} ↦
+    finiteLocalAdditiveTamagawaMeasure F v.val.val)
+  let eS : S ≃ {v : T // v.val ∈ S} :=
+    { toFun := fun w ↦ ⟨⟨w.val, hST w.property⟩, w.property⟩
+      invFun := fun v ↦ ⟨v.val.val, v.property⟩
+      left_inv := fun ⟨_, _⟩ ↦ rfl
+      right_inv := fun ⟨⟨_, _⟩, _⟩ ↦ rfl }
+  let B : T → Type _ := fun v ↦ v.val.adicCompletion F
+  let e1 : ((v : T) → B v) ≃ᵐ
+      ((v : {v : T // v.val ∈ S}) → B v.val) × ((v : {v : T // v.val ∉ S}) → B v.val) :=
+    MeasurableEquiv.piEquivPiSubtypeProd B (fun v : T ↦ v.val ∈ S)
+  let e2 : ((w : S) → B ⟨w.val, hST w.property⟩) ≃ᵐ ((v : {v : T // v.val ∈ S}) → B v.val) :=
+    MeasurableEquiv.piCongrLeft (fun v : {v : T // v.val ∈ S} ↦ B v.val) eS
+  let eFin : (((w : S) → B ⟨w.val, hST w.property⟩) ×
+      ((v : {v : T // v.val ∉ S}) → B v.val)) ≃ᵐ ((v : T) → B v) :=
+    (e2.prodCongr (MeasurableEquiv.refl _)).trans e1.symm
+  let eTotal : (SAdeleRing F S × ((v : {v : T // v.val ∉ S}) → B v.val)) ≃ᵐ SAdeleRing F T :=
+    (MeasurableEquiv.prodAssoc).trans ((MeasurableEquiv.refl _).prodCongr eFin)
+  have he1 : MeasureTheory.MeasurePreserving e1 μT (μP.prod μU) :=
+    MeasureTheory.measurePreserving_piEquivPiSubtypeProd
+      (fun v : T ↦ finiteLocalAdditiveTamagawaMeasure F v.val) (fun v : T ↦ v.val ∈ S)
+  have he2 : MeasureTheory.MeasurePreserving e2 μS μP :=
+    MeasureTheory.measurePreserving_piCongrLeft
+      (fun v : {v : T // v.val ∈ S} ↦ finiteLocalAdditiveTamagawaMeasure F v.val.val) eS
+  have heFin : MeasureTheory.MeasurePreserving eFin (μS.prod μU) μT :=
+    he1.symm.comp (he2.prod (MeasureTheory.MeasurePreserving.id μU))
+  have heTotal : MeasureTheory.MeasurePreserving eTotal ((μArch.prod μS).prod μU) (μArch.prod μT) :=
+    ((MeasureTheory.MeasurePreserving.id μArch).prod heFin).comp
+      (MeasureTheory.measurePreserving_prodAssoc μArch μS μU)
+  let Φ : SAdeleRing F T → ℂ := fun x ↦
+    (Π(hST) g) (Multiplicative.ofAdd x) * star (sAdeleStandardCharacter F T (x * y) : ℂ)
+  let H : SAdeleRing F S → ℂ := fun xS ↦
+    g (Multiplicative.ofAdd xS) * star (sAdeleStandardCharacter F S (xS * yS) : ℂ)
+  let b : (v : {v : T // v.val ∉ S}) → B v.val → ℂ := fun v xv ↦
+    ((v.val.val.adicCompletionIntegers F : Set (B v.val)).indicator (fun _ ↦ (1 : ℂ)) xv) *
+      star (finiteLocalStandardCharacter F v.val.val (xv * y.2 v.val) : ℂ)
+  have hΦ (p : SAdeleRing F S × ((v : {v : T // v.val ∉ S}) → B v.val)) :
+      Φ (eTotal p) = H p.1 * ∏ v : {v : T // v.val ∉ S}, b v (p.2 v) := by
+    rcases p with ⟨⟨aArch, aS⟩, aU⟩
+    let x := eTotal ((aArch, aS), aU)
+    have hx1 : x.1 = aArch := rfl
+    have hxS (w : S) : x.2 ⟨w.val, hST w.property⟩ = aS w := by
+      change (e1.symm (e2 aS, aU)) ⟨w.val, hST w.property⟩ = aS w
+      have hw : e1.symm (e2 aS, aU) (eS w).val = (e2 aS) (eS w) := by
+        change (Equiv.piEquivPiSubtypeProd (fun v : T ↦ v.val ∈ S) B).symm
+          (e2 aS, aU) (eS w).val = _
+        simp [Equiv.piEquivPiSubtypeProd_symm_apply, (eS w).property]
+      refine hw.trans ?_
+      exact Equiv.piCongrLeft_apply_apply (fun v : {v : T // v.val ∈ S} ↦ B v.val) eS aS w
+    have hxU (v : {v : T // v.val ∉ S}) : x.2 v.val = aU v := by
+      change (Equiv.piEquivPiSubtypeProd (fun v : T ↦ v.val ∈ S) B).symm (e2 aS, aU) v.val = aU v
+      simp [Equiv.piEquivPiSubtypeProd_symm_apply, v.property]
+    have hproj : (x.1, fun w : S ↦ x.2 ⟨w.val, hST w.property⟩) = (aArch, aS) :=
+      Prod.ext hx1 (funext hxS)
+    have htrans : (Π(hST) g) (Multiplicative.ofAdd x) =
+        g (Multiplicative.ofAdd (aArch, aS)) *
+          ∏ v : {v : T // v.val ∉ S},
+            ((v.val.val.adicCompletionIntegers F : Set (B v.val)).indicator
+              (fun _ ↦ (1 : ℂ)) (aU v)) := by
+      rw [sAdeleSchwartzTransition_apply, hproj]
+      by_cases hmem : ∀ w : T, w.val ∉ S → x.2 w ∈ w.val.adicCompletionIntegers F
+      · rw [ite_eq_left hmem]
+        have hprod : (∏ v : {v : T // v.val ∉ S},
+            ((v.val.val.adicCompletionIntegers F : Set (B v.val)).indicator
+              (fun _ ↦ (1 : ℂ)) (aU v))) = 1 := by
+          refine Finset.prod_eq_one fun v _ ↦ Set.indicator_of_mem ?_ _
+          rw [← hxU v]
+          exact hmem v.val v.property
+        rw [hprod, mul_one]
+      · rw [ite_eq_right hmem]
+        push Not at hmem
+        rcases hmem with ⟨w, hwS, hxw⟩
+        have hprod : (∏ v : {v : T // v.val ∉ S},
+            ((v.val.val.adicCompletionIntegers F : Set (B v.val)).indicator
+              (fun _ ↦ (1 : ℂ)) (aU v))) = 0 := by
+          refine Finset.prod_eq_zero (Finset.mem_univ (⟨w, hwS⟩ : {v : T // v.val ∉ S})) ?_
+          apply Set.indicator_of_notMem
+          simpa only [SetLike.mem_coe, ← hxU ⟨w, hwS⟩] using hxw
+        rw [hprod, mul_zero]
+    have hchar : (sAdeleStandardCharacter F T (x * y) : ℂ) =
+        (sAdeleStandardCharacter F S ((aArch, aS) * yS) : ℂ) *
+          ∏ v : {v : T // v.val ∉ S},
+            (finiteLocalStandardCharacter F v.val.val (aU v * y.2 v.val) : ℂ) := by
+      unfold sAdeleStandardCharacter
+      have hsplit := Fintype.prod_subtype_mul_prod_subtype (fun v : T ↦ v.val ∈ S)
+        (fun v : T ↦ finiteLocalStandardCharacter F v.val ((x * y).2 v))
+      have hfst : (∏ w : InfinitePlace F,
+          adeleStandardCharacter F (Pi.single w ((x * y).1 w), 0)) =
+          (∏ w : InfinitePlace F,
+            adeleStandardCharacter F (Pi.single w (((aArch, aS) * yS).1 w), 0)) := by
+        refine Finset.prod_congr rfl fun w _ ↦ ?_
+        rw [Prod.fst_mul, Prod.fst_mul, hx1]
+      have hsub : (∏ v : {v : T // v.val ∈ S},
+          finiteLocalStandardCharacter F v.val.val ((x * y).2 v.val)) =
+          ∏ w : S, finiteLocalStandardCharacter F w.val (((aArch, aS) * yS).2 w) := by
+        refine Fintype.prod_equiv eS.symm _ _ fun v ↦ ?_
+        change finiteLocalStandardCharacter F v.val.val (x.2 v.val * y.2 v.val) =
+          finiteLocalStandardCharacter F v.val.val (aS ⟨v.val.val, v.property⟩ * y.2 v.val)
+        rw [← hxS ⟨v.val.val, v.property⟩]
+      have hsnd : (∏ v : {v : T // v.val ∉ S},
+          finiteLocalStandardCharacter F v.val.val ((x * y).2 v.val)) =
+          ∏ v : {v : T // v.val ∉ S},
+            finiteLocalStandardCharacter F v.val.val (aU v * y.2 v.val) := by
+        refine Finset.prod_congr rfl fun v _ ↦ ?_
+        change finiteLocalStandardCharacter F v.val.val (x.2 v.val * y.2 v.val) = _
+        rw [hxU v]
+      have hcoe : (↑(∏ v : {v : T // v.val ∉ S},
+            finiteLocalStandardCharacter F v.val.val (aU v * y.2 v.val)) : ℂ) =
+          ∏ v : {v : T // v.val ∉ S},
+            (finiteLocalStandardCharacter F v.val.val (aU v * y.2 v.val) : ℂ) :=
+        map_prod Circle.coeHom _ Finset.univ
+      rw [← hsplit, hfst, hsub, hsnd]
+      simp only [Circle.coe_mul]
+      rw [← mul_assoc]
+      exact congrArg (fun z : ℂ ↦ _ * z) hcoe
+    have hstar : star (sAdeleStandardCharacter F T (x * y) : ℂ) =
+        star (sAdeleStandardCharacter F S ((aArch, aS) * yS) : ℂ) *
+          ∏ v : {v : T // v.val ∉ S},
+            star (finiteLocalStandardCharacter F v.val.val (aU v * y.2 v.val) : ℂ) := by
+      rw [hchar, star_mul', star_prod]
+    dsimp only [Φ]
+    rw [htrans, hstar, Finset.prod_mul_distrib]
+    dsimp only [H, b]
+    ring
+  have hfact : sAdeleSchwartzFourier (Π(hST) g) (Multiplicative.ofAdd y) =
+      sAdeleSchwartzFourier g (Multiplicative.ofAdd yS) *
+        ∏ v : {v : T // v.val ∉ S},
+          tamagawaFourier (finiteLocalAdditiveTamagawaMeasure F v.val.val)
+            (finiteLocalStandardCharacter F v.val.val)
+            ((v.val.val.adicCompletionIntegers F : Set (B v.val)).indicator fun _ ↦ (1 : ℂ))
+            (y.2 v.val) := by
+    calc
+      sAdeleSchwartzFourier (Π(hST) g) (Multiplicative.ofAdd y)
+        = ∫ x : SAdeleRing F T, Φ x ∂(μArch.prod μT) := rfl
+      _ = ∫ p : SAdeleRing F S × ((v : {v : T // v.val ∉ S}) → B v.val), Φ (eTotal p)
+            ∂((μArch.prod μS).prod μU) := (heTotal.integral_comp' Φ).symm
+      _ = ∫ p : SAdeleRing F S × ((v : {v : T // v.val ∉ S}) → B v.val),
+            H p.1 * ∏ v : {v : T // v.val ∉ S}, b v (p.2 v) ∂((μArch.prod μS).prod μU) := by
+          refine MeasureTheory.integral_congr_ae (Filter.Eventually.of_forall hΦ)
+      _ = (∫ xS : SAdeleRing F S, H xS ∂(μArch.prod μS)) *
+            ∫ aU : (v : {v : T // v.val ∉ S}) → B v.val,
+              ∏ v : {v : T // v.val ∉ S}, b v (aU v) ∂μU :=
+          MeasureTheory.integral_prod_mul (μ := μArch.prod μS) (ν := μU) H
+            (fun aU ↦ ∏ v : {v : T // v.val ∉ S}, b v (aU v))
+      _ = sAdeleSchwartzFourier g (Multiplicative.ofAdd yS) *
+            ∏ v : {v : T // v.val ∉ S},
+              tamagawaFourier (finiteLocalAdditiveTamagawaMeasure F v.val.val)
+                (finiteLocalStandardCharacter F v.val.val)
+                ((v.val.val.adicCompletionIntegers F : Set (B v.val)).indicator fun _ ↦ (1 : ℂ))
+                (y.2 v.val) :=
+          congrArg₂ (· * ·) rfl (MeasureTheory.integral_fintype_prod_eq_prod b)
+  rw [hfact] at hy
+  refine ⟨left_ne_zero_of_mul hy, fun v ↦ ?_⟩
+  have hFT : tamagawaFourier (finiteLocalAdditiveTamagawaMeasure F v.val.val)
+      (finiteLocalStandardCharacter F v.val.val)
+      ((v.val.val.adicCompletionIntegers F : Set (B v.val)).indicator fun _ ↦ (1 : ℂ))
+      (y.2 v.val) ≠ 0 := by
+    intro hv
+    apply right_ne_zero_of_mul hy
+    exact Finset.prod_eq_zero (Finset.mem_univ v) hv
+  rw [finiteLocalTamagawaFourier_integers] at hFT
+  by_contra hle
+  apply hFT
+  simp only [Pi.smul_apply, smul_eq_mul, mul_eq_zero]
+  right
+  exact Set.indicator_of_notMem hle _
+
+end LocalFourierSupport
+
 section AbsoluteLevels
 
 open Classical
@@ -620,7 +828,101 @@ theorem sLocalAbsolutePW_localFourierSupport {S₀ : Finset (HeightOneSpectrum (
     (X : ℝ) (_hX : 0 < X) :
     ∃ bound > (0 : ℝ), ∀ (f : B(T)), f ∈ sLocalPWTests hST (sLocalPWBox S X) →
       tsupport (sLocalHomogeneousAdelicThetaLinearMap F T χ (sAdeleSchwartzFourier f)) ⊆
-          {g | ((m(T) g).val : ℝ) ≤ bound} := by sorry
+          {g | ((m(T) g).val : ℝ) ≤ bound} := by
+  let U := {v : T // v.val ∉ S}
+  let radius (v : V) : ℝ :=
+    (v.asIdeal.absNorm : ℝ) ^ multiplicity v.asIdeal (differentIdeal ℤ (𝓞 F))
+  let bound₀ : ℝ :=
+    X ^ (Fintype.card (InfinitePlace F) + S.card) * ∏ v : U, radius v.val.val
+  let bound : ℝ := max 1 bound₀
+  refine ⟨bound, zero_lt_one.trans_le (le_max_left 1 bound₀), fun f hf ↦ ?_⟩
+  obtain ⟨g, rfl, _, hsupp⟩ := (mem_sLocalPWTests hST (sLocalPWBox S X) f).mp hf
+  let φ : B(T) := sAdeleSchwartzFourier (Π(hST) g)
+  have hbound_adele : ∀ y : SAdeleRing F T,
+      φ (Multiplicative.ofAdd y) ≠ 0 →
+        (∏ w : InfinitePlace F, ‖y.1 w‖ ^ w.mult) * ∏ v : T, ‖y.2 v‖ ≤ bound := by
+    intro y hy
+    obtain ⟨hyS_ne, hyU_bound⟩ := sLocalAbsolutePW_fourier_transition_support (F := F) hST g y hy
+    have hyS_box : (y.1, fun w : S ↦ y.2 ⟨w.val, hST w.property⟩) ∈ sLocalPWBox S X :=
+      hsupp (subset_tsupport _ hyS_ne)
+    have harch : (∏ w : InfinitePlace F, ‖y.1 w‖ ^ w.mult) ≤
+        X ^ Fintype.card (InfinitePlace F) := by
+      calc
+        _ ≤ ∏ _w : InfinitePlace F, X :=
+          Finset.prod_le_prod₀ (fun w _ ↦ pow_nonneg (norm_nonneg _) _) fun w _ ↦ hyS_box.1 w
+        _ = X ^ Fintype.card (InfinitePlace F) := by
+          rw [Finset.prod_const, Finset.card_univ]
+    have hfinS : (∏ v : {v : T // v.val ∈ S}, ‖y.2 v.val‖) ≤ X ^ S.card := by
+      let eS : S ≃ {v : T // v.val ∈ S} :=
+        { toFun := fun w ↦ ⟨⟨w.val, hST w.property⟩, w.property⟩
+          invFun := fun v ↦ ⟨v.val.val, v.property⟩
+          left_inv := fun ⟨_, _⟩ ↦ rfl
+          right_inv := fun ⟨⟨_, _⟩, _⟩ ↦ rfl }
+      calc
+        (∏ v : {v : T // v.val ∈ S}, ‖y.2 v.val‖)
+          = ∏ w : S, ‖y.2 ⟨w.val, hST w.property⟩‖ := Fintype.prod_equiv eS.symm _ _ fun _ ↦ rfl
+        _ ≤ ∏ _w : S, X :=
+          Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _) fun w _ ↦ hyS_box.2 w
+        _ = X ^ S.card := by
+          rw [Finset.prod_const, Finset.card_univ, Fintype.card_coe]
+    have hfinU : (∏ v : U, ‖y.2 v.val‖) ≤ ∏ v : U, radius v.val.val :=
+      Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _) fun v _ ↦ hyU_bound v
+    have hfin : (∏ v : T, ‖y.2 v‖) ≤ X ^ S.card * ∏ v : U, radius v.val.val := by
+      rw [← Fintype.prod_subtype_mul_prod_subtype (fun v : T ↦ v.val ∈ S) (fun v : T ↦ ‖y.2 v‖)]
+      exact mul_le_mul hfinS hfinU (Finset.prod_nonneg fun _ _ ↦ norm_nonneg _)
+        (pow_nonneg _hX.le _)
+    have htot : (∏ w : InfinitePlace F, ‖y.1 w‖ ^ w.mult) * (∏ v : T, ‖y.2 v‖) ≤ bound₀ := by
+      calc
+        _ ≤ X ^ Fintype.card (InfinitePlace F) * (X ^ S.card * ∏ v : U, radius v.val.val) :=
+          mul_le_mul harch hfin (Finset.prod_nonneg fun _ _ ↦ norm_nonneg _)
+            (pow_nonneg _hX.le _)
+        _ = bound₀ := by
+          dsimp only [bound₀]
+          rw [pow_add, mul_assoc]
+    exact htot.trans (le_max_right 1 bound₀)
+  have hvanish : ∀ q : J(T), bound < ((m(T) q).val : ℝ) →
+      sLocalHomogeneousAdelicThetaLinearMap F T χ φ q = 0 := by
+    intro q hq
+    rw [sLocalHomogeneousAdelicThetaLinearMap_apply]
+    have hint : ∀ h : J₁(T), sLocalAdelicThetaOnClasses F T φ (q * h.val) * (χ h : ℂ) = 0 := by
+      intro h
+      have hm_eq : m(T) (q * h.val) = m(T) q := by
+        rw [map_mul, MonoidHom.mem_ker.mp h.property, mul_one]
+      have hq' : bound < ((m(T) (q * h.val)).val : ℝ) := hm_eq.symm ▸ hq
+      obtain ⟨a, ha⟩ := QuotientGroup.mk_surjective (q * h.val)
+      have ha_theta : sLocalAdelicThetaOnClasses F T φ (QuotientGroup.mk a) = 0 := by
+        rw [sLocalAdelicThetaOnClasses_mk, sLocalAdelicTheta_apply]
+        have hzero : ∀ ξ : (Set.integer (T : Set V) F)ˣ,
+            φ (Multiplicative.ofAdd (Units.val (MonoidHom.comp
+              (Units.map (RingHom.toMonoidHom (RingHom.comp (adeleProjection F T)
+                (Subring.subtype (integralAdelesOutside F T)))))
+              (Units.map (RingHom.toMonoidHom (integralAdeleDiagonal F T))) ξ * a))) = 0 := by
+          intro ξ
+          let unitAtT : (Set.integer (T : Set V) F)ˣ →* (SAdeleRing F T)ˣ :=
+            MonoidHom.comp (Units.map (RingHom.toMonoidHom (RingHom.comp (adeleProjection F T)
+              (Subring.subtype (integralAdelesOutside F T)))))
+              (Units.map (RingHom.toMonoidHom (integralAdeleDiagonal F T)))
+          by_contra hnz
+          have hle := hbound_adele (unitAtT ξ * a).val hnz
+          have hnorm_unit : sIdeleNorm F T (unitAtT ξ) = 1 :=
+            MonoidHom.mem_ker.mp ((sIdeleNorm_spec F T).2 ⟨ξ, rfl⟩)
+          have hnorm_eq : ((sIdeleNorm F T (unitAtT ξ * a)).val : ℝ) =
+              ((m(T) (q * h.val)).val : ℝ) := by
+            rw [map_mul, hnorm_unit, one_mul, ← ha, sIdeleQuotientNorm_mk]
+          have hmod_fn (z : (SAdeleRing F T)ˣ) : ((sIdeleNorm F T z).val : ℝ) =
+              (∏ w : InfinitePlace F, ‖z.val.1 w‖ ^ w.mult) * ∏ v : T, ‖z.val.2 v‖ := by
+            simp [sIdeleNorm]
+          have hmod := hmod_fn (unitAtT ξ * a)
+          linarith [hle, hmod, hnorm_eq, hq']
+        exact (tsum_congr hzero).trans tsum_zero
+      rw [← ha, ha_theta, zero_mul]
+    simp only [hint]
+    exact MeasureTheory.integral_zero (α := ↥J₁(T)) (G := ℂ)
+  refine closure_minimal (fun q hq ↦ ?_) ?_
+  · by_contra hle
+    exact hq (hvanish q (lt_of_not_ge hle))
+  · exact isClosed_le (NNReal.continuous_coe.comp
+      (Units.continuous_val.comp (isProperMap_sIdeleQuotientNorm F T).continuous)) continuous_const
 
 end AbsoluteLevels
 
