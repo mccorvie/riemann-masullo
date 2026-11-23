@@ -411,6 +411,67 @@ def globalLineGeometricKernel (p : C𝔽 × C𝔽) : ℂ :=
 
 local notation "geomLine" => globalLineGeometricKernel (F := F) a hs φ
 
+/-- Evaluate the two projection identities on a vector fixed by the geometric projection. -/
+private theorem geometricLineKernel_apply_projections {E : Type*} [NormedAddCommGroup E]
+    [NormedSpace ℂ E] (P Q A : E →L[ℂ] E) (u : E) (hu : P u = u)
+    (hP : P.comp (A.comp P) = A.comp P) (hQ : Q.comp (A.comp P) = 0) :
+    P (A u) = A u ∧ Q (A u) = 0 := by
+  have hp := DFunLike.congr_fun hP u
+  have hq := DFunLike.congr_fun hQ u
+  simpa only [ContinuousLinearMap.comp_apply, hu, zero_apply] using And.intro hp hq
+
+/-- Subtracting a spectral row of integral zero leaves the Haar convolution on the
+given input. Inversion followed by translation gives the output-first kernel. -/
+private theorem geometricLineKernel_apply_sub {G : Type*} [CommGroup G]
+    [MeasurableSpace G] [MeasurableMul₂ G] [MeasurableInv G] (μ : Measure G)
+    [μ.IsMulLeftInvariant] [μ.IsInvInvariant] (φ u A : G → ℂ) (k : G × G → ℂ)
+    (hi : ∀ᵐ x ∂μ, Integrable (fun y ↦ φ y * u (y⁻¹ * x)) μ)
+    (hA : ∀ᵐ x ∂μ, A x = ∫ y, φ y * u (y⁻¹ * x) ∂μ)
+    (hk : ∀ᵐ x ∂μ, Integrable (fun y ↦ k (x, y) * u y) μ ∧
+      (∫ y, k (x, y) * u y ∂μ) = 0) :
+    ∀ᵐ x ∂μ, Integrable (fun y ↦ (φ (x * y⁻¹) - k (x, y)) * u y) μ ∧
+      A x = ∫ y, (φ (x * y⁻¹) - k (x, y)) * u y ∂μ := by
+  filter_upwards [hi, hA, hk] with x hx hAx ⟨hkx, hzero⟩
+  let f (g : G) := φ g * u (g⁻¹ * x)
+  have hsub (y : G) : f (x / y) = φ (x * y⁻¹) * u y := by simp [f, div_eq_mul_inv]
+  have hint : Integrable (fun y ↦ φ (x * y⁻¹) * u y) μ := by
+    have hy := ((Measure.measurePreserving_div_left μ x).integrable_comp_emb
+      (MeasurableEquiv.divLeft x).measurableEmbedding).mpr hx
+    exact hy.congr (.of_forall hsub)
+  simp only [sub_mul]
+  refine ⟨hint.sub hkx, ?_⟩
+  rw [integral_sub hint hkx, hzero, sub_zero, hAx, ← integral_div_left_eq_self f μ x]
+  simp_rw [hsub]
+
+/-- On a weighted Sobolev space, subtract the kernel of a vanishing projection block
+from the convolution kernel. The positive weight transfers the zero representative to Haar measure. -/
+private theorem geometricLineKernel_apply_rows {G : Type*} [CommGroup G]
+    [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    [MeasurableSpace G] [BorelSpace G] [SecondCountableTopology G] (μ : Measure G)
+    [μ.IsHaarMeasure] (m : G →ₜ* ℝ≥0ˣ) (a b s : ℝ) (hab : a ≤ b) (hs : 0 ≤ s)
+    (φ : BruhatCompactSupport G)
+    (u : CompactIntervalSobolev μ (fun g ↦ Real.log ((m g).val : ℝ)) a b s)
+    (k : G × G → ℂ)
+    (hk : ∀ᵐ x ∂μ, Integrable (fun y ↦ k (x, y) * u y) μ ∧
+      (0 : CompactIntervalSobolev μ (fun g ↦ Real.log ((m g).val : ℝ)) a b s) x =
+        ∫ y, k (x, y) * u y ∂μ) :
+    ∀ᵐ x ∂μ, Integrable (fun y ↦ (φ.val (x * y⁻¹) - k (x, y)) * u y) μ ∧
+      hardySobolevTestAction μ m a b s hab hs φ u x =
+        ∫ y, (φ.val (x * y⁻¹) - k (x, y)) * u y ∂μ := by
+  have hc : Continuous φ.val :=
+    continuous_of_bruhatSmooth ((mem_bruhatSmoothSubmodule_iff _).1 φ.property.1)
+  have hi := hc.integrable_of_hasCompactSupport (μ := μ) φ.property.2
+  have horbit := hardySobolev_orbit_integral μ m a b s hab hs (φ := φ.val) hi φ.property.2 u
+  let w (g : G) := intervalSobolevDensity a b s (Real.log ((m g).val : ℝ))
+  have hw : Continuous w := (continuous_intervalSobolevDensity a b s).comp (continuous_logModule' m)
+  let ν := μ.withDensity (fun g ↦ ENNReal.ofReal (w g))
+  have hμ : μ ≪ ν := withDensity_absolutelyContinuous' hw.measurable.ennreal_ofReal.aemeasurable
+    (.of_forall fun g ↦ (ENNReal.ofReal_pos.mpr (intervalSobolevDensity_pos' a b s _)).ne')
+  apply geometricLineKernel_apply_sub μ φ.val u _ k (horbit.mono fun _ h ↦ h.1)
+    (hardySobolevTestAction_apply μ m a b s hab hs φ u)
+  filter_upwards [hk, hμ.ae_le (Lp.coeFn_zero ℂ 2 ν)] with x hx hx₀
+  exact ⟨hx.1, hx.2.symm.trans hx₀⟩
+
 /-- Paper: Theorem 10.4.3.4(1), p. 470. On a theta vector the global
 geometric kernel represents convolution and geometric projection after convolution.
 The tested row is Haar integrable almost everywhere. -/
@@ -418,7 +479,22 @@ theorem geometricLineKernel_apply (_ha : 0 < a)
     (u : W(0, s)) (_hu : u ∈ Θline) :
     ∀ᵐ x ∂μ𝔽, Integrable (fun y ↦ geomLine (x, y) * u y) μ𝔽 ∧
       Aline u x = (Pgeom(a, hline, hs₀(hs))).comp Aline u x ∧
-      Aline u x = ∫ y, geomLine (x, y) * u y ∂μ𝔽 := by sorry
+      Aline u x = ∫ y, geomLine (x, y) * u y ∂μ𝔽 := by
+  obtain ⟨hgeom, hspec⟩ := geometricLineKernel_apply_projections
+    (Pgeom(a, hline, hs₀(hs))) (Pspec(a, hline, hs₀(hs))) Aline u
+    (geometricProjection_apply_of_mem (F := F) a hline hs₀(hs) _hu)
+    (geometricProjection_convolution_geometricProjection (F := F) a hline hs₀(hs) φ)
+    (spectralProjection_convolution_geometricProjection (F := F) a hline hs₀(hs) φ)
+  have hk := spectralLineKernel_apply (F := F) a hs φ u
+  let row (v : W(0, s)) := ∀ᵐ x ∂μ𝔽, Integrable (fun y ↦ kLine (x, y) * u y) μ𝔽 ∧
+    v x = ∫ y, kLine (x, y) * u y ∂μ𝔽
+  have hk₀ : row 0 := Eq.mp (congrArg row hspec) hk
+  -- Specialize the Haar identity before inserting the Sobolev vector and kernel.
+  let haarRows := geometricLineKernel_apply_rows (G := C𝔽) μ𝔽 m𝔽 (-0) 0 s
+    (hStrip(hline)) hs₀(hs) φ
+  have hrows := haarRows u (kLine : C𝔽 × C𝔽 → ℂ) hk₀
+  filter_upwards [hrows] with x hx
+  exact ⟨hx.1, congrArg (fun v : W(0, s) ↦ v x) hgeom.symm, hx.2⟩
 
 /-- Paper: Theorem 10.4.3.4(2), pp. 470–471, first formula. Divide the
 global spectral kernel by the input weight to obtain the Hilbert-Schmidt
