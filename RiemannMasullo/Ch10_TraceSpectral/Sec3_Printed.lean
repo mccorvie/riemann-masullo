@@ -178,7 +178,6 @@ private theorem spectralLine_wrongWeight_test {F : Type} [Field F] [NumberField 
     exact (hb.continuous.integral_pos_of_hasCompactSupport_nonneg_ne_zero hbc hb.1.nonneg
       (show b 1 ≠ 0 from (IsModulatedCutoff.apply_one (m := m) (ρ := b) hb.1 (by norm_num) (by norm_num)).trans_ne one_ne_zero)).ne'
 
-set_option maxHeartbeats 800000 in
 /-- A continuous functional given by a character pairing is an eigenfunctional
 for left translations, and integrating the orbit yields the test's multiplier. -/
 private theorem spectralLine_wrongWeight_convolution {F : Type} [Field F] [NumberField F]
@@ -214,7 +213,6 @@ private theorem spectralLine_wrongWeight_convolution {F : Type} [Field F] [Numbe
   rw [map_smul, eig]
   simp only [smul_eq_mul, mul_assoc]
 
-set_option maxHeartbeats 800000 in
 /-- A weighted Sobolev class representing a compactly supported Bruhat test. -/
 private theorem spectralLine_wrongWeight_test_vector {F : Type} [Field F] [NumberField F]
     (φ : BruhatCompactSupport C𝔽(F)) (hc : Continuous φ.val) :
@@ -298,7 +296,6 @@ private theorem spectralLine_wrongWeight_zeta {F : Type} [Field F] [NumberField 
   rw [hD z hp₀ hp₁ f, show gaussianCompletedHeckeL θ z = c * L z from congrFun hGa z,
     hLz, mul_zero, zero_mul]
 
-set_option maxHeartbeats 800000 in
 /-- The zeroth jet at a zero of the completed L-function kills the closed
 weighted theta subspace, by Mellin factorization on the dense polar-free tests. -/
 private theorem spectralLine_wrongWeight_kernel {F : Type} [Field F] [NumberField F]
@@ -338,7 +335,6 @@ private theorem spectralLine_wrongWeight_kernel {F : Type} [Field F] [NumberFiel
     exact spectralLine_wrongWeight_zeta θ k hk (shift(a, t)) hz _
   exact fun f hf ↦ hN hf
 
-set_option maxHeartbeats 1000000 in
 private theorem spectralLine_wrongWeight_range_of_zero {F : Type} [Field F] [NumberField F]
     (θ : PontryaginDual C𝔽(F)) (k : C₁(F))
     (hk : (θ k.val : ℂ) ≠ (θ k.val : ℂ)⁻¹)
