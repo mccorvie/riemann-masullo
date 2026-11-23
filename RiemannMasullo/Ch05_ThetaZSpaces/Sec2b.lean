@@ -1721,32 +1721,9 @@ theorem sLocalHomogeneousThetaSpace_strongDual_complete (χ : PontryaginDual (J�
   exact completeSpace_strongDual_quotient _
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
-The strong dual of the global homogeneous quotient is nuclear. -/
-theorem globalHomogeneousThetaSpace_strongDual_nuclear :
-    IsNuclearTVS (StrongDual ℂ Θ𝔽ω(ω)) := by sorry
-
-/-- Paper: Theorem 5.2.3.1(2), p. 233.
 The strong dual of the S-local homogeneous quotient is nuclear. -/
 theorem sLocalHomogeneousThetaSpace_strongDual_nuclear (χ : PontryaginDual (J₁(S))) :
     IsNuclearTVS (StrongDual ℂ (Θₛω(S, χ))) := by sorry
-
-/-- Paper: Theorem 5.2.3.1(2), p. 233.
-The strong dual of the global homogeneous quotient is Montel. -/
-theorem globalHomogeneousThetaSpace_strongDual_montel :
-    BarrelledSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) ∧ MontelSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) := by
-  have hN : IsNuclearTVS.{0} Θ𝔽ω(ω) :=
-    globalHomogeneousThetaSpace_nuclear (F := F) (ω := ω)
-  let : T2Space Θ𝔽ω(ω) := hN.1
-  let : PolynormableSpace ℂ Θ𝔽ω(ω) := hN.2.1
-  let : MontelSpace ℂ Θ𝔽ω(ω) := (globalHomogeneousThetaSpace_montel (F := F) (ω := ω)).2
-  let : CompleteSpace (StrongDual ℂ Θ𝔽ω(ω)) :=
-    globalHomogeneousThetaSpace_strongDual_complete (F := F) (ω := ω)
-  have hdual : IsNuclearTVS.{0} (StrongDual ℂ Θ𝔽ω(ω)) :=
-    globalHomogeneousThetaSpace_strongDual_nuclear (F := F) (ω := ω)
-  let : PolynormableSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) := hdual.2.1
-  refine ⟨barrelled_strongDual_of_montel, ⟨fun B hc hb ↦ ?_⟩⟩
-  simpa only [hc.closure_eq] using
-    isCompact_closure_of_isNuclearTVS (StrongDual ℂ Θ𝔽ω(ω)) hdual hb
 
 private theorem sLocalHomogeneousThetaSpace_strongDual_montel_aux {E : Type*}
     [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
@@ -1880,6 +1857,37 @@ local notation "P𝔽(" ω ")" => (existsUnique_globalThetaIsotypicAverage (F :=
 local notation "Pₛ(" S ", " χ ")" =>
   (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := S) χ).exists.choose
 
+/-- A normalized character average splits the inclusion of its isotype. Transposing
+the splitting realizes the strong dual of any equivalent space inside the ambient strong dual. -/
+private theorem strongDual_nuclear_of_compact_isotype.{test} {G E Q : Type*}
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [CompactSpace G]
+    [MeasurableSpace G] [BorelSpace G] [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [IsTopologicalAddGroup E] [T2Space E] [ContinuousSMul ℂ E] [LocallyConvexSpace ℝ E]
+    [AddCommGroup Q] [Module ℂ Q] [TopologicalSpace Q]
+    (μ : Measure G) [μ.IsHaarMeasure] (ρ : G →* (E →L[ℂ] E))
+    (ω : PontryaginDual G) (P : E →L[ℂ] E) (hP : IsPettisIsotypicAverageOn μ Set.univ ρ ω P)
+    (e : Q ≃L[ℂ] actionIsotype ρ ω) (hE : IsNuclearTVS.{test} (StrongDual ℂ E)) :
+    IsNuclearTVS.{test} (StrongDual ℂ Q) := by
+  let V := actionIsotype ρ ω
+  let c : ℂ := μ.real Set.univ
+  have hc : c ≠ 0 := Complex.ofReal_ne_zero.mpr (measureReal_univ_pos (μ := μ)).ne'
+  let A := P.codRestrict V (compactActionAverage_mem_isotype μ ρ ω P hP)
+  let q := e.symm.toContinuousLinearMap.comp A
+  let i := c⁻¹ • (V.subtypeL.comp e.toContinuousLinearMap)
+  have hretract (y : Q) : q (i y) = y := by
+    apply e.injective
+    change e (e.symm _) = e y
+    rw [e.apply_symm_apply]
+    apply Subtype.ext
+    change P (c⁻¹ • (e y : E)) = (e y : E)
+    rw [map_smul, compactActionAverage_apply_isotype μ ρ ω P hP (e y).property]
+    exact inv_smul_smul₀ hc _
+  let pull := ContinuousLinearMap.precomp (τ := RingHom.id ℂ) ℂ q
+  let back := ContinuousLinearMap.precomp (τ := RingHom.id ℂ) ℂ i
+  have hleft : Function.LeftInverse back pull := fun φ ↦
+    ContinuousLinearMap.ext fun y ↦ congrArg φ (hretract y)
+  exact nuclear_of_linear_embedding pull (hleft.isEmbedding back.continuous pull.continuous) hE
+
 /-- Compose the homogeneous-to-coinvariant identification with the compact average's
 identification of its kernel quotient with the isotype. -/
 private theorem globalThetaIsotypicAverage_equiv_of_coinvariants {G E T : Type*}
@@ -1931,6 +1939,50 @@ theorem globalThetaIsotypicAverage_equiv (ω : PontryaginDual C₁) :
       C₁ (K𝔽ω(ω)) (K𝔽).mkQ μ𝔽₁ ρ𝔽 (existsUnique_globalThetaAction (F := F)).exists.choose_spec.1
       ω (P𝔽(ω)) (existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose_spec
       (globalHomogeneousThetaSpace_equiv_coinvariants (F := F) ω)
+
+section
+variable {ω : PontryaginDual (ideleClassNorm F).ker}
+
+/-- Paper: Theorem 5.2.3.1(2), p. 233.
+The strong dual of the global homogeneous quotient is nuclear. -/
+theorem globalHomogeneousThetaSpace_strongDual_nuclear :
+    IsNuclearTVS (StrongDual ℂ Θ𝔽ω(ω)) := by
+  let : MeasurableSpace C𝔽 := borel _
+  let : BorelSpace C𝔽 := ⟨rfl⟩
+  let : T2Space C₁ := (ideleClassGroup_finiteness F).2.2.1
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : (μ𝔽₁).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let : T2Space Θ𝔽 := globalAdelicThetaSpace_t2_of_isClosed (F := F) adelicTheta_ker_isClosed
+  let : PolynormableSpace ℂ Θ𝔽 := globalAdelicThetaSpace_polynormable (F := F)
+  let : Module ℝ Θ𝔽 := Module.restrictScalars ℝ ℂ _
+  let : IsScalarTower ℝ ℂ Θ𝔽 := IsScalarTower.restrictScalars ℝ ℂ _
+  let : LocallyConvexSpace ℝ Θ𝔽 := (PolynormableSpace.withSeminorms ℂ Θ𝔽).toLocallyConvexSpace
+  with_reducible_and_instances
+    exact strongDual_nuclear_of_compact_isotype μ𝔽₁ ρ𝔽₁ ω (P𝔽(ω))
+      (existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose_spec
+      (globalThetaIsotypicAverage_equiv (F := F) ω).2.choose
+      (globalAdelicThetaSpace_strongDual_nuclear (F := F))
+
+/-- Paper: Theorem 5.2.3.1(2), p. 233.
+The strong dual of the global homogeneous quotient is Montel. -/
+theorem globalHomogeneousThetaSpace_strongDual_montel :
+    BarrelledSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) ∧ MontelSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) := by
+  have hN : IsNuclearTVS.{0} Θ𝔽ω(ω) :=
+    globalHomogeneousThetaSpace_nuclear (F := F) (ω := ω)
+  let : T2Space Θ𝔽ω(ω) := hN.1
+  let : PolynormableSpace ℂ Θ𝔽ω(ω) := hN.2.1
+  let : MontelSpace ℂ Θ𝔽ω(ω) := (globalHomogeneousThetaSpace_montel (F := F) (ω := ω)).2
+  let : CompleteSpace (StrongDual ℂ Θ𝔽ω(ω)) :=
+    globalHomogeneousThetaSpace_strongDual_complete (F := F) (ω := ω)
+  have hdual : IsNuclearTVS.{0} (StrongDual ℂ Θ𝔽ω(ω)) :=
+    globalHomogeneousThetaSpace_strongDual_nuclear (F := F) (ω := ω)
+  let : PolynormableSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) := hdual.2.1
+  refine ⟨barrelled_strongDual_of_montel, ⟨fun B hc hb ↦ ?_⟩⟩
+  simpa only [hc.closure_eq] using
+    isCompact_closure_of_isNuclearTVS (StrongDual ℂ Θ𝔽ω(ω)) hdual hb
+
+end
 
 /-- Paper: Proposition 5.2.3.2(1), p. 236.
 The S-local average induces a topological linear equivalence from the homogeneous quotient

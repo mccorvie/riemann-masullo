@@ -147,16 +147,20 @@ private theorem existsUnique_sLocalZetaPair_right (χ : PontryaginDual Jₛ) (f 
         (div_le_div_of_nonneg_left hC.le (pow_pos hy0 _) hpow)) (norm_nonneg _) (by positivity)
     _ = 2 ^ N * C := by rw [mul_pow]; field_simp
 
-private theorem existsUnique_sLocalZetaPair_reflect (u : B⁺) :
-    ∃ v : B⁻, ∀ z, v.val z = u.val (1 - z) := by
-  have hpos (z : ℂ) : 1 - z ∈ rightHalf ↔ z ∈ leftHalf := by
-    change 0 < (1 - z).re ↔ z.re < 1
-    simp
-  refine ⟨⟨fun z ↦ u.val (1-z), fun z hz ↦ u.property.1 (mt (hpos z).mp hz),
-    u.property.2.1.comp (by fun_prop) (fun z hz ↦ (hpos z).mpr hz), ?_⟩, fun z ↦ rfl⟩
+/-- Reflecting a closed substrip preserves rapid decay since the polynomial weights at
+`z` and `1 - z` bound each other up to a constant and a weight of degree zero. -/
+private theorem existsUnique_sLocalZetaPair_reflect_mem {I J : Set ℝ}
+    (hIJ : ∀ x : ℝ, 1 - x ∈ I ↔ x ∈ J) (u : SchwartzBergman I) :
+    (fun z ↦ u.val (1 - z)) ∈ schwartzBergmanSubmodule J := by
+  have href (z : ℂ) : 1 - z ∈ Complex.re ⁻¹' I ↔ z ∈ Complex.re ⁻¹' J := by
+    simpa only [mem_preimage, Complex.sub_re, Complex.one_re] using hIJ z.re
+  refine ⟨fun z hz ↦ u.property.1 (mt (href z).mp hz),
+    u.property.2.1.comp (by fun_prop) (fun z hz ↦ (href z).mpr hz), ?_⟩
   intro a b hab hsub N
-  have hb : b < 1 := hsub (right_mem_Icc.mpr hab)
-  have hi : Icc (1-b) (1-a) ⊆ rightInterval := fun _ hw ↦ (sub_pos.mpr hb).trans_le hw.1
+  have hi : Icc (1-b) (1-a) ⊆ I := by
+    intro x hx
+    have h : 1 - x ∈ J := hsub ⟨by linarith [hx.2], by linarith [hx.1]⟩
+    simpa only [sub_sub_cancel] using (hIJ (1-x)).mpr h
   obtain ⟨A, hA⟩ := u.property.2.2 (1-b) (1-a) (by linarith) hi 0
   obtain ⟨B, hB⟩ := u.property.2.2 (1-b) (1-a) (by linarith) hi N
   refine ⟨2 ^ N * max A B, ?_⟩
@@ -179,6 +183,11 @@ private theorem existsUnique_sLocalZetaPair_reflect (u : B⁺) :
       _ ≤ (2 * ‖w‖) ^ N * ‖u.val w‖ := by gcongr; linarith
       _ = 2 ^ N * (‖w‖ ^ N * ‖u.val w‖) := by rw [mul_pow, mul_assoc]
       _ ≤ _ := mul_le_mul_of_nonneg_left (hB'.trans (le_max_right _ _)) (by positivity)
+
+private theorem existsUnique_sLocalZetaPair_reflect (u : B⁺) :
+    ∃ v : B⁻, ∀ z, v.val z = u.val (1 - z) := by
+  exact ⟨⟨_, existsUnique_sLocalZetaPair_reflect_mem (I := rightInterval) (J := leftInterval)
+    (fun x ↦ by simp [mem_Ioi, mem_Iio]) u⟩, fun _ ↦ rfl⟩
 
 private theorem existsUnique_sLocalZetaPair_eval (χ : PontryaginDual Jₛ) (s : ℂ)
     (hs : s ∈ rightHalf) : ∃ E : Θω(restrict₁(χ)) →ₗ[ℂ] ℂ,
@@ -1941,6 +1950,63 @@ theorem existsUnique_sLocalCechThetaPair (χ : PontryaginDual Jₛ) :
 local notation "cechThetaPair(" χ ")" => (show Θω(restrict₁(χ)) →L[ℂ] upperMiddle(χ) from
   (existsUnique_sLocalCechThetaPair (F := F) (S := S) χ).exists.choose)
 
+/-- On each vertical trace the strip reflection is the continuous Schwartz pullback by negation. -/
+private theorem sLocalCechBergman_exact_reflect_continuous {I J : Set ℝ}
+    (hI : IsOpen I) (hJ : IsOpen J) (cI : OrdConnected I) (cJ : OrdConnected J)
+    (nI : I.Nonempty) (nJ : J.Nonempty) (hIJ : ∀ x ∈ J, 1 - x ∈ I)
+    (R : SchwartzBergman I → SchwartzBergman J)
+    (hR : ∀ f z, (R f).val z = f.val (1 - z)) : Continuous R := by
+  obtain ⟨T, hT, eT⟩ := schwartzBergman_schwartzLine_topology I hI cI nI
+  obtain ⟨V, hV, eV⟩ := schwartzBergman_schwartzLine_topology J hJ cJ nJ
+  let N := SchwartzMap.compCLMOfContinuousLinearEquiv ℂ (ContinuousLinearEquiv.neg ℝ : ℝ ≃L[ℝ] ℝ) (F := ℂ)
+  apply eV.continuous_iff.mpr
+  apply continuous_pi
+  intro a
+  let b : I := ⟨1 - a.val, hIJ a.val a.property⟩
+  have heq (f : SchwartzBergman I) : V (R f) a = N (T f b) := by
+    ext x
+    change V (R f) a x = T f b (-x)
+    rw [hV, hT]
+    simp only [weightedVerticalTrace, pow_zero, one_mul, hR, b, Complex.ofReal_sub,
+      Complex.ofReal_one, Complex.ofReal_neg, neg_mul]
+    apply congrArg f.val
+    ring
+  exact (N.continuous.comp ((continuous_apply b).comp eT.continuous)).congr fun f ↦ (heq f).symm
+
+/-- Reflection exchanges the two half-plane spaces, including their vertical-trace topologies. -/
+private theorem sLocalCechBergman_exact_reflection :
+    ∃ e : B⁻ ≃L[ℂ] B⁺, (∀ (v : B⁻) z, (e v).val z = v.val (1 - z)) ∧
+      ∀ (u : B⁺) z, (e.symm u).val z = u.val (1 - z) := by
+  have hl (x : ℝ) : 1 - x ∈ leftInterval ↔ x ∈ rightInterval := by
+    simp [mem_Iio, mem_Ioi]
+  have hr (x : ℝ) : 1 - x ∈ rightInterval ↔ x ∈ leftInterval := by
+    simp [mem_Iio, mem_Ioi]
+  let R (v : B⁻) : B⁺ := ⟨_, existsUnique_sLocalZetaPair_reflect_mem hl v⟩
+  let L (u : B⁺) : B⁻ := ⟨_, existsUnique_sLocalZetaPair_reflect_mem hr u⟩
+  let e : B⁻ ≃ₗ[ℂ] B⁺ :=
+    { toFun := R
+      invFun := L
+      left_inv := fun v ↦ Subtype.ext (funext fun z ↦ congrArg v.val (sub_sub_cancel 1 z))
+      right_inv := fun u ↦ Subtype.ext (funext fun z ↦ congrArg u.val (sub_sub_cancel 1 z))
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  have cp := sLocalCechBergman_exact_reflect_continuous isOpen_Iio isOpen_Ioi
+    ordConnected_Iio ordConnected_Ioi ⟨0, by norm_num⟩ ⟨1, by norm_num⟩
+    (fun x ↦ (hl x).mpr) R (fun _ _ ↦ rfl)
+  have cm := sLocalCechBergman_exact_reflect_continuous isOpen_Ioi isOpen_Iio
+    ordConnected_Ioi ordConnected_Iio ⟨1, by norm_num⟩ ⟨0, by norm_num⟩
+    (fun x ↦ (hr x).mpr) L (fun _ _ ↦ rfl)
+  exact ⟨⟨e, cp, cm⟩, fun _ _ ↦ rfl, fun _ _ ↦ rfl⟩
+
+private theorem sLocalCechBergman_exact_fourier (χ : PontryaginDual Jₛ) (e : B⁻ ≃L[ℂ] B⁺)
+    (he : ∀ (v : B⁻) z, (e v).val z = v.val (1 - z)) (f : ℬₛ) :
+    EqOn (e ((sLocalZetaPair χ (Submodule.Quotient.mk f)).2)).val
+      (fun s ↦ Zₛ (Fourierₛ f) (normChart(χ⁻¹) s)) rightHalf := by
+  intro s hs
+  rw [he]
+  have hs' : 1 - s ∈ leftHalf := by simpa [mem_preimage, mem_Iio] using hs
+  simpa only [sub_sub_cancel] using (sLocalZetaPair_mk χ f).2 hs'
+
 /-- Paper: (5.4.2.6), p. 276.
 On the lower row the right half-plane zeta pair maps to the difference of the
 first entry and the reflected second entry multiplied on the overlap by the
@@ -1954,7 +2020,32 @@ theorem sLocalCechBergman_exact (χ : PontryaginDual Jₛ) :
           (fun s ↦ Zₛ (Fourierₛ f) (normChart(χ⁻¹) s)) rightHalf) ∧
       (∀ p : B⁺ × B⁺,
         EqOn (D p).val (fun s ↦ p.1.val s - ρₛ(χ, s) * p.2.val (1 - s)) overlap) ∧
-      Function.Exact U D := by sorry
+      Function.Exact U D := by
+  let e : B⁻ ≃L[ℂ] B⁺ := sLocalCechBergman_exact_reflection.choose
+  have he := sLocalCechBergman_exact_reflection.choose_spec.1
+  have hi := sLocalCechBergman_exact_reflection.choose_spec.2
+  let E : (B⁺ × B⁻) ≃L[ℂ] (B⁺ × B⁺) := (ContinuousLinearEquiv.refl ℂ B⁺).prodCongr e
+  let Z : Θω(restrict₁(χ)) →L[ℂ] B⁺ × B⁻ := ⟨sLocalZetaPair χ, continuous_sLocalZetaPair χ⟩
+  let D : B⁺ × B⁻ →L[ℂ] B⁰ :=
+    (existsUnique_sLocalZetaMatchingDifference (F := F) (S := S) χ).exists.choose
+  refine ⟨E.toContinuousLinearMap.comp Z, D.comp E.symm.toContinuousLinearMap, ?_, ?_, ?_⟩
+  · intro f
+    exact ⟨(sLocalZetaPair_mk χ f).1, sLocalCechBergman_exact_fourier χ e he f⟩
+  · intro p s hs
+    have h := (existsUnique_sLocalZetaMatchingDifference (F := F) (S := S) χ).exists.choose_spec
+    change (D (E.symm p)).val s = _
+    exact (h (E.symm p) hs).trans (congrArg (fun w ↦ p.1.val s - ρₛ(χ, s) * w) (hi p.2 s))
+  · intro p
+    change D (E.symm p) = 0 ↔ ∃ x, E (Z x) = p
+    have hker : D (E.symm p) = 0 ↔ E.symm p ∈ (sLocalZetaPair (F := F) (S := S) χ).range := by
+      rw [sLocalZetaPair_range]
+      rfl
+    rw [hker]
+    constructor
+    · rintro ⟨x, hx⟩
+      exact ⟨x, (congrArg E hx).trans (E.apply_symm_apply p)⟩
+    · rintro ⟨x, rfl⟩
+      exact ⟨x, (E.symm_apply_apply (Z x)).symm⟩
 
 /-- Paper: (5.4.2.6), p. 276.
 In the lower row the zeta pair of the test and its Fourier transform is a
@@ -1964,7 +2055,18 @@ theorem sLocalCechBergman_isClosedEmbedding (χ : PontryaginDual Jₛ) (U : Θω
       EqOn (U (Submodule.Quotient.mk f)).1.val (fun s ↦ Zₛ f (normChart(χ) s)) rightHalf ∧
       EqOn (U (Submodule.Quotient.mk f)).2.val
         (fun s ↦ Zₛ (Fourierₛ f) (normChart(χ⁻¹) s)) rightHalf) :
-    IsClosedEmbedding U := by sorry
+    IsClosedEmbedding U := by
+  let e : B⁻ ≃L[ℂ] B⁺ := sLocalCechBergman_exact_reflection.choose
+  have he := sLocalCechBergman_exact_reflection.choose_spec.1
+  let E : (B⁺ × B⁻) ≃L[ℂ] (B⁺ × B⁺) := (ContinuousLinearEquiv.refl ℂ B⁺).prodCongr e
+  have h : E ∘ sLocalZetaPair (F := F) (S := S) χ = ⇑U := by
+    funext x
+    obtain ⟨f, rfl⟩ := Submodule.Quotient.mk_surjective _ x
+    apply Prod.ext
+    · exact existsUnique_sLocalZetaPair_ext ((sLocalZetaPair_mk χ f).1.trans (_hU f).1.symm)
+    · exact existsUnique_sLocalZetaPair_ext
+        ((sLocalCechBergman_exact_fourier χ e he f).trans (_hU f).2.symm)
+  exact h ▸ E.toHomeomorph.isClosedEmbedding.comp (sLocalZetaPair_isClosedEmbedding χ)
 
 /-- Paper: Theorem 5.4.2.2, p. 276.
 Restriction of a unitary character to the norm section defines a unique real
