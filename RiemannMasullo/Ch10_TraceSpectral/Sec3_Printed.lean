@@ -2,10 +2,11 @@ module
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec3
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
-import RiemannMasullo.AppB_AnalyticNT.Sec4b
 import RiemannMasullo.AppD_SchwartzBruhat.Sec3a_part2
 import RiemannMasullo.Ch03_IdelicZeta.Sec4
 import RiemannMasullo.Ch06_LocalGlobal.Sec3
+import RiemannMasullo.Ch13_ZerosHecke.Targets
+import RiemannMasullo.ForMathlib.NumberTheory.LSeries.DirichletZeros
 import RiemannMasullo.External.AlgebraicNumberTheoryLean.Chebotarev.DirichletHecke
 import Mathlib.Analysis.Complex.CauchyIntegral
 import Mathlib.Analysis.Complex.Polynomial.Basic
@@ -412,132 +413,6 @@ private theorem spectralLine_wrongWeight_range_of_zero {F : Type} [Field F] [Num
   rw [hηk, hωk] at he
   exact (mul_eq_mul_right_iff.mp he).resolve_left (Ne.symm hk)
 
-/-- Compact support gives both exponential bounds for every derivative. -/
-private theorem compactTest_exponentialDecay (f : SchwartzMap ℝ ℂ)
-    (hf : HasCompactSupport (f : ℝ → ℂ)) : ExponentialDecay f := by
-  have hz (j : ℕ) : iteratedDeriv j (f : ℝ → ℂ) =ᶠ[cocompact ℝ] 0 := by
-    have hh := hf.iteratedFDeriv (𝕜 := ℝ) j
-    rw [hasCompactSupport_iff_eventuallyEq, coclosedCompact_eq_cocompact] at hh
-    filter_upwards [hh] with x hx
-    rw [iteratedDeriv_eq_iteratedFDeriv, hx]
-    rfl
-  exact ⟨fun j _ _ ↦ ((hz j).filter_mono atTop_le_cocompact).trans_isBigO
-    (Asymptotics.isBigO_zero _ _), fun j _ _ ↦ ((hz j).filter_mono atBot_le_cocompact).trans_isBigO
-    (Asymptotics.isBigO_zero _ _)⟩
-
-/-- A logarithmic bump supported before the first prime-power sample can be chosen
-so that the real-place kernel integrates to a nonzero multiple of its mass. -/
-private theorem exists_archimedeanSoloTest (A B : ℂ) :
-    ∃ f : SchwartzMap ℝ ℂ, ExponentialDecay f ∧ (∀ x : ℝ, x ≤ 0 ∨ Real.log 2 ≤ x → f x = 0) ∧
-      (∫ t in Ioi (0 : ℝ), heckeArchimedeanDigammaKernel (1 / 2) A B f t) ≠ 0 := by
-  let r := Real.log 2 / 2
-  have hr : 0 < r := half_pos (Real.log_pos (by norm_num))
-  let b : ContDiffBump r := ⟨r / 4, r / 2, by positivity, by linarith⟩
-  let β (x : ℝ) : ℂ := b x
-  let q (x : ℝ) : ℂ := 1 - Complex.exp (-2 * (x : ℂ))
-  let w (x : ℝ) : ℂ := Complex.exp (A * (2 * (x : ℂ)))
-  have hβ : HasCompactSupport β := b.hasCompactSupport.comp_left Complex.ofReal_zero
-  have hs : HasCompactSupport (fun x ↦ β x * q x * w x) := hβ.mul_right.mul_right
-  have hd : ContDiff ℝ (⊤ : ℕ∞) (fun x ↦ β x * q x * w x) := by
-    have hb : ContDiff ℝ (⊤ : ℕ∞) β := Complex.ofRealCLM.contDiff.comp b.contDiff
-    have hcoe : ContDiff ℝ (⊤ : ℕ∞) (fun x : ℝ ↦ (x : ℂ)) := Complex.ofRealCLM.contDiff
-    have hq : ContDiff ℝ (⊤ : ℕ∞) q := by dsimp [q]; fun_prop
-    have hw : ContDiff ℝ (⊤ : ℕ∞) w := by dsimp [w]; fun_prop
-    exact (hb.mul hq).mul hw
-  let f : SchwartzMap ℝ ℂ := hs.toSchwartzMap hd
-  have hb0 (x : ℝ) (hx : x ≤ 0 ∨ Real.log 2 ≤ x) : b x = 0 := by
-    apply b.zero_of_le_dist
-    change r / 2 ≤ dist x r
-    rw [Real.dist_eq]
-    rcases hx with hx | hx
-    · exact (show r / 2 ≤ -(x-r) by linarith).trans (neg_le_abs _)
-    · have hr' : Real.log 2 = 2 * r := by dsimp [r]; ring
-      exact (show r / 2 ≤ x-r by linarith).trans (le_abs_self _)
-  have hf0 (x : ℝ) (hx : x ≤ 0 ∨ Real.log 2 ≤ x) : f x = 0 := by
-    change (b x : ℂ) * q x * w x = 0
-    rw [hb0 x hx]
-    simp
-  refine ⟨f, compactTest_exponentialDecay f hs, hf0, ?_⟩
-  let φ (t : ℝ) := b ((1/2) * t)
-  have hφ : Continuous φ := b.continuous.comp (continuous_const.mul continuous_id)
-  have hsφ : HasCompactSupport φ := by
-    simpa only [φ, smul_eq_mul] using
-      (HasCompactSupport.comp_smul (α := ℝ) (β := ℝ) (f := (b : ℝ → ℝ)) b.hasCompactSupport
-        (c := (1/2:ℝ)) (by norm_num))
-  have hφpos : 0 < ∫ t in Ioi (0 : ℝ), φ t := by
-    have hcent : φ (2*r) ≠ 0 := by
-      change b ((1 / 2) * (2*r)) ≠ 0
-      rw [show (1 / 2 : ℝ) * (2*r) = r by ring, b.one_of_mem_closedBall (Metric.mem_closedBall_self b.rIn_pos.le)]
-      norm_num
-    have hφ0 (t : ℝ) (ht : t ∉ Ioi (0 : ℝ)) : φ t = 0 := by
-      exact hb0 _ (.inl (mul_nonpos_of_nonneg_of_nonpos (by norm_num) (not_lt.mp ht)))
-    exact (hφ.integral_pos_of_hasCompactSupport_nonneg_ne_zero hsφ (fun _ ↦ b.nonneg) hcent).trans_eq
-      (setIntegral_eq_integral_of_forall_compl_eq_zero (μ := volume) hφ0).symm
-  have he (t : ℝ) (ht : t ∈ Ioi (0 : ℝ)) :
-      heckeArchimedeanDigammaKernel (1/2) A B f t = (-(1/2) : ℂ) * (φ t : ℂ) := by
-    have ht' : 0 < t := ht
-    have hden : (1 - (Real.exp (-t) : ℂ)) ≠ 0 := sub_ne_zero.mpr (Ne.symm
-      (Complex.ofReal_ne_one.mpr (Real.exp_lt_one_iff.mpr (neg_lt_zero.mpr ht')).ne))
-    rw [heckeArchimedeanDigammaKernel, hf0 0 (Or.inl le_rfl),
-      hf0 _ (Or.inl (by linarith : -((1/2:ℝ) * t) ≤ 0))]
-    change _ * (_ - (((b ((1/2) * t) : ℂ) * q ((1/2) * t) * w ((1/2) * t)) * _ + _) / _) = _
-    have hq : q ((1/2)*t) = 1 - (Real.exp (-t) : ℂ) := by
-      dsimp [q]
-      rw [Complex.ofReal_exp]
-      push_cast
-      congr 2
-      ring
-    have hw : w ((1/2)*t) * Complex.exp (-A * (t : ℂ)) = 1 := by
-      dsimp only [w]
-      rw [← Complex.exp_add]
-      push_cast
-      convert Complex.exp_zero using 2
-      ring
-    rw [hq, mul_assoc ((b _ : ℂ) * _) _ _, hw, mul_one]
-    dsimp [φ]
-    field_simp
-    push_cast
-    ring
-  rw [setIntegral_congr_fun measurableSet_Ioi he, integral_const_mul, integral_complex_ofReal]
-  exact mul_ne_zero (by norm_num) (Complex.ofReal_ne_zero.mpr hφpos.ne')
-
-/-- The explicit formula detects a zero for each rational Hecke character which
-is nontrivial on norm-one idele classes. -/
-private theorem rationalHeckeZero (χ : PontryaginDual C𝔽(ℚ))
-    (hχ : χ.toMonoidHom.comp (ideleClassNorm ℚ).ker.subtype ≠ 1) :
-    ∃ z : ℂ, 0 < (meromorphicOrderAt (continuedCompletedHeckeL χ) z).untop₀.toNat := by
-  classical
-  let L := continuedCompletedHeckeL χ
-  obtain ⟨hL, hEq⟩ := continuedCompletedHeckeL_spec χ
-  have hD : Differentiable ℂ L := completedHeckeL_continuation_entire χ L hL hEq hχ
-  let p := (realHeckeCharacter_parameters χ Rat.infinitePlace Rat.isReal_infinitePlace).exists.choose
-  let A : ℂ := (1 / 2 + p.1 + p.2.val) / 2
-  let B : ℂ := (1 / 2 - p.1 + p.2.val) / 2
-  obtain ⟨f, hf, hzero, hneq⟩ := exists_archimedeanSoloTest A B
-  have hp := hasSum_heckeExplicitFormula χ f hf L hL hEq
-  by_contra! h
-  have hdiv (z : ℂ) : MeromorphicOn.divisor L univ z = 0 := by
-    have hz := h z
-    rw [hL.meromorphicOn.divisor_apply (mem_univ z)]
-    have hnonneg : 0 ≤ (meromorphicOrderAt L z).untop₀ := WithTop.untop₀_nonneg.mpr (hD.analyticAt z).meromorphicOrderAt_nonneg
-    change (meromorphicOrderAt L z).untop₀.toNat ≤ 0 at hz
-    change (meromorphicOrderAt L z).untop₀ = 0
-    omega
-  simp_rw [hdiv, Int.cast_zero, zero_mul] at hp
-  have hv := hp.unique (hasSum_zero (β := ℂ) (α := ℂ))
-  rw [Fintype.sum_subsingleton _ Rat.infinitePlace, dite_eq_left Rat.isReal_infinitePlace,
-    hzero 0 (Or.inl le_rfl), mul_zero, mul_zero, sub_zero] at hv
-  have hpv (j : HeightOneSpectrum (𝓞 ℚ) × ℕ) : Real.log 2 ≤ ((j.2 + 1 : ℕ) : ℝ) * Real.log (j.1.asIdeal.absNorm : ℝ) := by
-    have hN : (2 : ℝ) ≤ j.1.asIdeal.absNorm := by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm j.1
-    have hl := Real.log_le_log (by norm_num : (0 : ℝ) < 2) hN
-    have hlog := (Real.log_pos (by norm_num : (1:ℝ)<2)).le.trans hl
-    apply hl.trans
-    exact le_mul_of_one_le_left hlog (by exact_mod_cast Nat.le_add_left 1 j.2)
-  have hfn (j : HeightOneSpectrum (𝓞 ℚ) × ℕ) := hzero _ (Or.inr (hpv j))
-  have hfn' (j : HeightOneSpectrum (𝓞 ℚ) × ℕ) := hzero _ (Or.inl (neg_nonpos.mpr ((Real.log_pos (by norm_num : (1:ℝ)<2)).le.trans (hpv j))))
-  simp only [hfn, hfn', mul_zero, add_zero, ite_self, tsum_zero, sub_zero, zero_add] at hv
-  exact hneq hv
-
 -- The local evaluation uses the computation in Ch06_LocalGlobal/Sec2_Printed.lean.
 open NumberFieldKB.Chebotarev.RatIdele in
 /-- The idelic character of a Dirichlet character modulo 5, at the idele with `2` at the place
@@ -578,27 +453,22 @@ private theorem rational_quartic_local_two
 
 /-- The rational idele class character induced by a quartic Dirichlet character modulo five
 is nonreal on the norm-one class of the local unit two. -/
-private theorem exists_ratNormOne_nonselfinverse :
+private theorem exists_ratNormOne_nonselfinverse_zero :
     ∃ (θ : PontryaginDual C𝔽(ℚ)) (k : (ideleClassNorm ℚ).ker),
-      (θ k.val : ℂ) ≠ (θ k.val : ℂ)⁻¹ := by
+      (θ k.val : ℂ) ≠ (θ k.val : ℂ)⁻¹ ∧
+      ∃ z : ℂ, 0 < (meromorphicOrderAt (continuedCompletedHeckeL θ) z).untop₀.toNat := by
   classical
   let v5 : HeightOneSpectrum (𝓞 ℚ) := NumberFieldKB.Chebotarev.RatIdele.placeOf 5 Nat.prime_five
   have hv5 : NumberFieldKB.Chebotarev.RatIdele.pr v5 = 5 := NumberFieldKB.Chebotarev.RatIdele.pr_placeOf 5 Nat.prime_five
   -- Detecting 4 forces the image of 2 to have order four.
   obtain ⟨χ, hχ4⟩ := MulChar.exists_apply_ne_one_of_hasEnoughRootsOfUnity (ZMod 5) ℂ
     (a := (4 : ZMod 5)) (by decide)
-  -- The idelic character and its norm-one restriction.
-  let H : HeckeCharacter (𝓞 ℚ) ℚ := (⟨Units.coeHom ℂ, Units.continuous_val⟩ : ℂˣ →ₜ* ℂ).comp
-    (NumberFieldKB.Chebotarev.RatIdele.ratDirichletChar 5 χ)
-  have hH (x : IdeleClassGroup (𝓞 ℚ) ℚ) : ‖H x‖ = 1 := by
-    obtain ⟨y, rfl⟩ := QuotientGroup.mk_surjective x
-    change ‖((NumberFieldKB.Chebotarev.RatIdele.ideleChar 5 χ y : ℂˣ) : ℂ)‖ = 1
-    rw [NumberFieldKB.Chebotarev.RatIdele.coe_ideleChar, norm_inv, MulChar.coe_toUnitHom,
-      DirichletCharacter.unit_norm_eq_one χ, inv_one]
-  let ψ : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ) :=
-    ⟨{ toFun := fun x ↦ ⟨H x, mem_sphere_zero_iff_norm.2 (hH x)⟩
-       map_one' := Circle.ext H.map_one
-       map_mul' := fun x y ↦ Circle.ext (H.map_mul x y) }, H.continuous.subtype_mk _⟩
+  obtain ⟨hprim, z, hzr, _, hz⟩ := dirichletFive_positiveOrder χ hχ4
+  obtain ⟨ψ, _, hval, hf⟩ := DirichletCharacter.IsPrimitive.exists_finiteHeckeL_eq_with_values hprim
+  have hψz : 0 < (meromorphicOrderAt (continuedCompletedHeckeL ψ) z).untop₀.toNat := by
+    rw [← meromorphicOrderAt_finiteHeckeL_continuation ψ (meromorphic_dirichletLFunction χ)
+      (fun s ↦ (_root_.DirichletCharacter.LFunction_eq_LSeries χ s.property).trans (hf s s.property).symm) hzr]
+    exact hz
   have hval2 : Valued.v ((2 : ℕ) : v5.adicCompletion ℚ) = 1 := by
     rw [← Rat.cast_natCast, NumberFieldKB.Chebotarev.RatIdele.valued_ratCast,
       ← map_natCast (algebraMap (𝓞 ℚ) ℚ) 2,
@@ -615,8 +485,10 @@ private theorem exists_ratNormOne_nonselfinverse :
     rw [MonoidHom.mem_ker, ideleClassNorm_ofAdicCompletion]
     ext
     simpa using (Valued.toNormedField.norm_eq_one_iff.mpr hu2v)
-  refine ⟨ψ, ⟨a, hmem⟩, ?_⟩
-  have hev : (ψ a : ℂ) = (χ (2 : ZMod 5))⁻¹ := rational_quartic_local_two χ v5 hv5 u2 rfl
+  refine ⟨ψ, ⟨a, hmem⟩, ?_, z, hψz⟩
+  have hev : (ψ a : ℂ) = (χ (2 : ZMod 5))⁻¹ :=
+    (hval (IdeleGroup.ofAdicCompletion (𝓞 ℚ) ℚ v5 u2)).trans
+      (rational_quartic_local_two χ v5 hv5 u2 rfl)
   change (ψ a : ℂ) ≠ (ψ a : ℂ)⁻¹
   rw [hev, inv_inv]
   intro h
@@ -636,12 +508,7 @@ functional detects the ω⁻¹-isotype. Its transpose eigenvalue is the positive
 integral of the bump, and it annihilates the ω-isotype. See ERRATA.md F177. -/
 theorem Printed.spectralLineConvolution_conjugateWeight_range_false :
     ¬ Printed.spectralLineConvolution_conjugateWeight_range := by
-  obtain ⟨θ, k, hk⟩ := exists_ratNormOne_nonselfinverse
-  have hθ : θ.toMonoidHom.comp (ideleClassNorm ℚ).ker.subtype ≠ 1 := by
-    intro h
-    have hk₁ : θ k.val = 1 := DFunLike.congr_fun h k
-    exact hk (by rw [hk₁]; simp)
-  obtain ⟨z, hz⟩ := rationalHeckeZero θ hθ
+  obtain ⟨θ, k, hk, z, hz⟩ := exists_ratNormOne_nonselfinverse_zero
   apply spectralLine_wrongWeight_range_of_zero θ k hk z.re z.im
   rw [Complex.re_add_im]
   exact hz
