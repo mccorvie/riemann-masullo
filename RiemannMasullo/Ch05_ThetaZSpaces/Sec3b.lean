@@ -1975,6 +1975,225 @@ theorem sAdeleFiniteZeroSchwartz_tmul_iff (T : Finset V)
     obtain ⟨v, hv, hx⟩ := x.property
     rw [he, Finset.prod_eq_zero (Finset.mem_univ v) (by rw [hx, h v hv]), mul_zero]
 
+/-- A submodule containing every pure tensor of an inductive tensor product with a tensor
+power contains the whole space. -/
+private theorem sAdeleFiniteZeroSchwartz_eq_span_tmul_top {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] {ι : Type*} {D : ι → Type*}
+    [∀ i, AddCommGroup (D i)] [∀ i, Module ℂ (D i)]
+    (e : InductiveTensor A (FinestLocallyConvex (⨂[ℂ] i, D i)) ≃L[ℂ] B) (s : Submodule ℂ B)
+    (h : ∀ (a : A) (g : ∀ i, D i), e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, g i)) ∈ s) (x : B) : x ∈ s := by
+  obtain ⟨t, rfl⟩ := e.surjective x
+  let W := FinestLocallyConvex (⨂[ℂ] i, D i)
+  let M : A ⊗[ℂ] W →ₗ[ℂ] B := (e.toLinearMap : InductiveTensor A W →ₗ[ℂ] B)
+  change M t ∈ s
+  refine TensorProduct.induction_on (motive := fun t : A ⊗[ℂ] W ↦ M t ∈ s) t
+    (by rw [map_zero]; exact s.zero_mem) (fun a z ↦ ?_) fun t₁ t₂ h₁ h₂ ↦ by
+      rw [map_add]; exact s.add_mem h₁ h₂
+  refine PiTensorProduct.induction_on (motive := fun z : ⨂[ℂ] i, D i ↦
+    M (a ⊗ₜ[ℂ] (z : W)) ∈ s) z ?_ ?_
+  · intro r g
+    have ht : (a ⊗ₜ[ℂ] (((r • (⨂ₜ[ℂ] i, g i) : ⨂[ℂ] i, D i)) : W) : A ⊗[ℂ] W) =
+        r • (a ⊗ₜ[ℂ] (((⨂ₜ[ℂ] i, g i) : ⨂[ℂ] i, D i) : W)) :=
+      (TensorProduct.mk ℂ A W a).map_smul r (((⨂ₜ[ℂ] i, g i) : ⨂[ℂ] i, D i) : W)
+    have hp : M (a ⊗ₜ[ℂ] (((⨂ₜ[ℂ] i, g i) : ⨂[ℂ] i, D i) : W)) ∈ s := h a g
+    exact (congrArg (· ∈ s) ((congrArg M ht).trans (map_smul M r _))).mpr (s.smul_mem r hp)
+  · intro z₁ z₂ h₁ h₂
+    have ht : (a ⊗ₜ[ℂ] (((z₁ + z₂ : ⨂[ℂ] i, D i)) : W) : A ⊗[ℂ] W) =
+        a ⊗ₜ[ℂ] (z₁ : W) + a ⊗ₜ[ℂ] (z₂ : W) :=
+      (TensorProduct.mk ℂ A W a).map_add (z₁ : W) (z₂ : W)
+    exact (congrArg (· ∈ s) ((congrArg M ht).trans (map_add M _ _))).mpr (s.add_mem h₁ h₂)
+
+/-- Applying a linear map in one factor of a tensor power, conjugated by the identification,
+acts on pure tensors by updating that factor. -/
+private theorem sAdeleFiniteZeroSchwartz_eq_span_tmul_conj {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] {ι : Type*} [DecidableEq ι]
+    {D : ι → Type*} [∀ i, AddCommGroup (D i)] [∀ i, Module ℂ (D i)]
+    (e : InductiveTensor A (FinestLocallyConvex (⨂[ℂ] i, D i)) ≃L[ℂ] B) (w : ι)
+    (L : D w →ₗ[ℂ] D w) (a : A) (g : ∀ i, D i) :
+    let W := FinestLocallyConvex (⨂[ℂ] i, D i)
+    let P : W →ₗ[ℂ] W := PiTensorProduct.map (R := ℂ)
+      (Function.update (fun i ↦ (LinearMap.id : D i →ₗ[ℂ] D i)) w L)
+    let I : A →ₗ[ℂ] A := LinearMap.id
+    (e.toLinearMap.comp ((TensorProduct.map I P).comp e.symm.toLinearMap))
+        (e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, g i))) =
+      e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, Function.update g w (L (g w)) i)) := by
+  intro W P I
+  change e (TensorProduct.map I P (e.symm (e _))) = e _
+  erw [e.symm_apply_apply, TensorProduct.map_tmul]
+  apply congrArg e
+  apply congrArg (TensorProduct.tmul ℂ a)
+  refine (PiTensorProduct.map_tprod _ g).trans (congrArg (PiTensorProduct.tprod ℂ) (funext fun i ↦ ?_))
+  by_cases hi : i = w
+  · subst hi
+    simp
+  · simp [Function.update_of_ne hi]
+
+/-- At a selected place, subtracting the value at zero times the integer indicator gives a
+linear map that fixes every test vanishing where that coordinate is zero, and on a pure
+tensor replaces the factor by one vanishing at zero. -/
+private theorem sAdeleFiniteZeroSchwartz_eq_span_tmul_step (w : S) :
+    ∃ Q : ℬₛ →ₗ[ℂ] ℬₛ,
+      (∀ (f : ℬ(A∞)) (g : ∀ v : S, ℬ(v.val.adicCompletion F)),
+        ∃ g' : ∀ v : S, ℬ(v.val.adicCompletion F),
+          g' w (Multiplicative.ofAdd 0) = 0 ∧ (∀ v, v ≠ w → g' v = g v) ∧
+          Q ((sAdeleSchwartz_inductiveTensor_equiv F S).choose (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, g v))) =
+            (sAdeleSchwartz_inductiveTensor_equiv F S).choose (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, g' v))) ∧
+      ∀ h : ℬₛ, (∀ x : Aₛ, x.2 w = 0 → h (Multiplicative.ofAdd x) = 0) → Q h = h := by
+  let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+  have he := (sAdeleSchwartz_inductiveTensor_equiv F S).choose_spec
+  let K := w.val.adicCompletion F
+  let φ : ℬ(K) := finiteStandardGaussian w.val 1
+  have hφ : φ (Multiplicative.ofAdd 0) = 1 := by
+    change finiteStandardGaussianValue w.val 1 0 = 1
+    unfold finiteStandardGaussianValue
+    rw [if_pos (by intro u _; rfl)]
+    exact Set.indicator_of_mem (w.val.adicCompletionIntegers F).zero_mem _
+  let ev : ℬ(K) →ₗ[ℂ] ℂ :=
+    { toFun := fun g ↦ g (Multiplicative.ofAdd 0)
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  let L : ℬ(K) →ₗ[ℂ] ℬ(K) := LinearMap.id - LinearMap.smulRight ev φ
+  have hL (g : ℬ(K)) : L g = g - g (Multiplicative.ofAdd 0) • φ := rfl
+  let W := FinestLocallyConvex (⨂[ℂ] v : S, ℬ(v.val.adicCompletion F))
+  let P : W →ₗ[ℂ] W := PiTensorProduct.map (R := ℂ)
+    (Function.update (fun v : S ↦ (LinearMap.id : ℬ(v.val.adicCompletion F) →ₗ[ℂ] _)) w L)
+  let I : ℬ(A∞) →ₗ[ℂ] ℬ(A∞) := LinearMap.id
+  let Q : ℬₛ →ₗ[ℂ] ℬₛ := e.toLinearMap.comp ((TensorProduct.map I P).comp e.symm.toLinearMap)
+  have hQ' (f : ℬ(A∞)) (g : ∀ v : S, ℬ(v.val.adicCompletion F)) :
+      Q (e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, g v))) =
+        e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, Function.update g w (L (g w)) v)) := by
+    with_reducible exact sAdeleFiniteZeroSchwartz_eq_span_tmul_conj e w L f g
+  refine ⟨Q, fun f g ↦ ⟨Function.update g w (L (g w)), ?_, fun v hv ↦ ?_, hQ' f g⟩, ?_⟩
+  · rw [Function.update_self, hL]
+    change g w (Multiplicative.ofAdd 0) - g w (Multiplicative.ofAdd 0) * φ (Multiplicative.ofAdd 0) = 0
+    rw [hφ, mul_one, sub_self]
+  · exact Function.update_of_ne hv _ _
+  · intro h hh
+    apply Subtype.ext
+    funext y
+    let x : Aₛ := y.toAdd
+    let x₀ : Aₛ := (x.1, Function.update x.2 w 0)
+    let Λ₁ : ℬₛ →ₗ[ℂ] ℂ :=
+      { toFun := fun k ↦ Q k (Multiplicative.ofAdd x)
+        map_add' := fun k₁ k₂ ↦ by rw [map_add]; rfl
+        map_smul' := fun r k ↦ by rw [map_smul]; rfl }
+    let Λ₂ : ℬₛ →ₗ[ℂ] ℂ :=
+      { toFun := fun k ↦ k (Multiplicative.ofAdd x) -
+          k (Multiplicative.ofAdd x₀) * φ (Multiplicative.ofAdd (x.2 w))
+        map_add' := fun k₁ k₂ ↦ by
+          change (k₁ + k₂) _ - (k₁ + k₂) _ * _ = (k₁ _ - k₁ _ * _) + (k₂ _ - k₂ _ * _)
+          change (k₁ _ + k₂ _) - (k₁ _ + k₂ _) * _ = _
+          ring
+        map_smul' := fun r k ↦ by
+          change (r • k) _ - (r • k) _ * _ = r • (k _ - k _ * _)
+          change r * k _ - r * k _ * _ = r * (k _ - k _ * _)
+          ring }
+    have hpure (f : ℬ(A∞)) (g : ∀ v : S, ℬ(v.val.adicCompletion F)) :
+        (Λ₁ - Λ₂) (e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, g v))) = 0 := by
+      rw [LinearMap.sub_apply, sub_eq_zero]
+      have h1 : ∏ v : S, Function.update g w (L (g w)) v (Multiplicative.ofAdd (x.2 v)) =
+          L (g w) (Multiplicative.ofAdd (x.2 w)) *
+            ∏ v ∈ Finset.univ.erase w, g v (Multiplicative.ofAdd (x.2 v)) := by
+        rw [← Finset.mul_prod_erase _ _ (Finset.mem_univ w), Function.update_self]
+        congr 1
+        exact Finset.prod_congr rfl fun v hv ↦ by
+          rw [Function.update_of_ne (Finset.ne_of_mem_erase hv)]
+      have h2 : ∏ v : S, g v (Multiplicative.ofAdd (x.2 v)) =
+          g w (Multiplicative.ofAdd (x.2 w)) *
+            ∏ v ∈ Finset.univ.erase w, g v (Multiplicative.ofAdd (x.2 v)) :=
+        (Finset.mul_prod_erase _ _ (Finset.mem_univ w)).symm
+      have h3 : ∏ v : S, g v (Multiplicative.ofAdd (x₀.2 v)) =
+          g w (Multiplicative.ofAdd 0) *
+            ∏ v ∈ Finset.univ.erase w, g v (Multiplicative.ofAdd (x.2 v)) := by
+        rw [← Finset.mul_prod_erase _ _ (Finset.mem_univ w)]
+        congr 1
+        · exact congrArg (fun z ↦ g w (Multiplicative.ofAdd z)) (Function.update_self ..)
+        · exact Finset.prod_congr rfl fun v hv ↦ congrArg (fun z ↦ g v (Multiplicative.ofAdd z))
+            (Function.update_of_ne (Finset.ne_of_mem_erase hv) _ _)
+      have hLw : L (g w) (Multiplicative.ofAdd (x.2 w)) = g w (Multiplicative.ofAdd (x.2 w)) -
+          g w (Multiplicative.ofAdd 0) * φ (Multiplicative.ofAdd (x.2 w)) := rfl
+      have hval : f (Multiplicative.ofAdd x.1) *
+            ∏ v : S, Function.update g w (L (g w)) v (Multiplicative.ofAdd (x.2 v)) =
+          f (Multiplicative.ofAdd x.1) * ∏ v : S, g v (Multiplicative.ofAdd (x.2 v)) -
+            (f (Multiplicative.ofAdd x₀.1) * ∏ v : S, g v (Multiplicative.ofAdd (x₀.2 v))) *
+              φ (Multiplicative.ofAdd (x.2 w)) := by
+        rw [h1, h2, h3, hLw]
+        ring
+      exact (congrArg (fun k : ℬₛ ↦ k (Multiplicative.ofAdd x)) (hQ' f g)).trans
+        ((he f _ x).trans (hval.trans (congrArg₂ (fun a b ↦ a - b * φ (Multiplicative.ofAdd (x.2 w)))
+          (he f g x).symm (he f g x₀).symm)))
+    have hall := sAdeleFiniteZeroSchwartz_eq_span_tmul_top
+      (D := fun v : S ↦ ℬ(v.val.adicCompletion F)) e (LinearMap.ker (Λ₁ - Λ₂))
+      (fun a g ↦ LinearMap.mem_ker.mpr (by with_reducible exact hpure a g)) h
+    have hx := sub_eq_zero.mp (LinearMap.mem_ker.mp hall)
+    change Q h (Multiplicative.ofAdd x) = h (Multiplicative.ofAdd x)
+    refine hx.trans ?_
+    change h _ - h (Multiplicative.ofAdd x₀) * _ = _
+    rw [hh x₀ (Function.update_self ..), zero_mul, sub_zero]
+
+/-- Every test with finite-coordinate vanishing at the places of `T` lies in the span of the
+pure tensors whose factors vanish at zero at the places of any `T' ⊆ T`. -/
+private theorem sAdeleFiniteZeroSchwartz_eq_span_tmul_ind (T T' : Finset V) (hT' : T' ⊆ T)
+    (h : ℬₛ) (hh : h ∈ sAdeleFiniteZeroSchwartz S T) :
+    h ∈ Submodule.span ℂ {k : ℬₛ |
+      ∃ (f : ℬ(A∞)) (g : ∀ v : S, ℬ(v.val.adicCompletion F)),
+        (∀ v : S, v.val ∈ T' → g v (Multiplicative.ofAdd 0) = 0) ∧
+        (sAdeleSchwartz_inductiveTensor_equiv F S).choose (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, g v)) = k} := by
+  induction T' using Finset.induction_on with
+  | empty =>
+    have hgen (f : ℬ(A∞)) (g : ∀ v : S, ℬ(v.val.adicCompletion F)) :
+        (sAdeleSchwartz_inductiveTensor_equiv F S).choose (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, g v)) ∈
+          Submodule.span ℂ {k : ℬₛ |
+            ∃ (f : ℬ(A∞)) (g : ∀ v : S, ℬ(v.val.adicCompletion F)),
+              (∀ v : S, v.val ∈ (∅ : Finset V) → g v (Multiplicative.ofAdd 0) = 0) ∧
+              (sAdeleSchwartz_inductiveTensor_equiv F S).choose (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, g v)) = k} :=
+      Submodule.subset_span ⟨f, g, fun v hv ↦ absurd hv (Finset.notMem_empty _), rfl⟩
+    exact sAdeleFiniteZeroSchwartz_eq_span_tmul_top
+      (D := fun v : S ↦ ℬ(v.val.adicCompletion F)) _ _ (by with_reducible exact hgen) h
+  | insert w T' hw ih =>
+    have hprev := ih ((Finset.subset_insert w T').trans hT')
+    by_cases hwS : w ∈ S
+    · let w' : S := ⟨w, hwS⟩
+      have hstep := sAdeleFiniteZeroSchwartz_eq_span_tmul_step (F := F) w'
+      let Q := hstep.choose
+      have hQpure := hstep.choose_spec.1
+      have hfix : Q h = h := hstep.choose_spec.2 h fun x hx ↦
+        (Submodule.mem_iInf _).mp hh ⟨x, w', hT' (Finset.mem_insert_self w T'), hx⟩
+      refine (congrArg (· ∈ _) hfix).mp ?_
+      refine Submodule.mem_comap.mp (Submodule.span_le.mpr ?_ hprev)
+      rintro _ ⟨f, g, hg, rfl⟩
+      have hg' := hQpure f g
+      let g' := hg'.choose
+      have hg'w := hg'.choose_spec.1
+      have hg'v := hg'.choose_spec.2.1
+      have hQ := hg'.choose_spec.2.2
+      have hmem : (sAdeleSchwartz_inductiveTensor_equiv F S).choose (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, g' v)) ∈
+          Submodule.span ℂ {k : ℬₛ |
+            ∃ (f : ℬ(A∞)) (g : ∀ v : S, ℬ(v.val.adicCompletion F)),
+              (∀ v : S, v.val ∈ insert w T' → g v (Multiplicative.ofAdd 0) = 0) ∧
+              (sAdeleSchwartz_inductiveTensor_equiv F S).choose (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, g v)) = k} := by
+        apply Submodule.subset_span
+        refine ⟨f, g', fun v hv ↦ ?_, rfl⟩
+        by_cases hvw : v = w'
+        · rw [hvw]; exact hg'w
+        · refine (congrArg (fun k : ℬ(v.val.adicCompletion F) ↦ k (Multiplicative.ofAdd 0))
+            (hg'v v hvw)).trans (hg v ?_)
+          rcases Finset.mem_insert.mp hv with h' | h'
+          · exact absurd (Subtype.ext h') hvw
+          · exact h'
+      exact (congrArg (· ∈ Submodule.span ℂ {k : ℬₛ |
+            ∃ (f : ℬ(A∞)) (g : ∀ v : S, ℬ(v.val.adicCompletion F)),
+              (∀ v : S, v.val ∈ insert w T' → g v (Multiplicative.ofAdd 0) = 0) ∧
+              (sAdeleSchwartz_inductiveTensor_equiv F S).choose (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, g v)) = k})
+        hQ).mpr hmem
+    · have hiff (v : S) : v.val ∈ insert w T' ↔ v.val ∈ T' := by
+        rw [Finset.mem_insert]
+        exact or_iff_right fun h' ↦ hwS (h' ▸ v.property)
+      simp only [hiff]
+      exact hprev
+
 /-- Paper: Proposition 5.3.4.5(3), p. 264.
 The selected finite zero-coordinate conditions cut out the span in (5.3.4.15).
 Deviation: At the selected places its factors are the zero extensions of compactly
@@ -1984,7 +2203,22 @@ theorem sAdeleFiniteZeroSchwartz_eq_span_tmul (T : Finset V) :
     sAdeleFiniteZeroSchwartz S T = Submodule.span ℂ {h : ℬₛ |
       ∃ (f : ℬ(A∞)) (g : ∀ v : S, ℬ(v.val.adicCompletion F)),
         (∀ v : S, v.val ∈ T → g v (Multiplicative.ofAdd 0) = 0) ∧
-        e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, g v)) = h} := by sorry
+        e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, g v)) = h} := by
+  intro e
+  have he := (sAdeleSchwartz_inductiveTensor_equiv F S).choose_spec
+  have mem (h : ℬₛ) : h ∈ sAdeleFiniteZeroSchwartz S T ↔
+      ∀ x : {x : Aₛ // ∃ v : S, v.val ∈ T ∧ x.2 v = 0}, h (Multiplicative.ofAdd x.val) = 0 :=
+    Submodule.mem_iInf _
+  refine le_antisymm ?_ ?_
+  · exact fun h hh ↦ sAdeleFiniteZeroSchwartz_eq_span_tmul_ind T T subset_rfl h hh
+  · rw [Submodule.span_le]
+    rintro _ ⟨f, g, hg, rfl⟩
+    refine (mem _).mpr fun x ↦ ?_
+    refine x.property.elim fun v hvx ↦ ?_
+    have hv := hvx.1
+    have hx := hvx.2
+    exact (he f g x.val).trans
+      (by rw [Finset.prod_eq_zero (Finset.mem_univ v) (by rw [hx, hg v hv]), mul_zero])
 
 /-- Paper: Definition 5.3.4.1, p. 259.
 The slice definition equals the span of the corrected pure tensors in (5.3.4.1). Their
