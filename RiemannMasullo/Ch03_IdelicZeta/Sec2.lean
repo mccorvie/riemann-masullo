@@ -3230,6 +3230,46 @@ private theorem tailDual_eq_integers (S : Finset V)
   rw [hd v hv, pow_zero]
   exact Valued.toNormedField.norm_le_one_iff
 
+/-- At a stage containing the different, the Fourier lift formula has the same
+integer tail on both sides and no factor from the omitted places. -/
+theorem adeleSchwartzFourier_sAdeleSchwartzToGlobal_of_different (S : Finset V)
+    (hgood : ∀ v : HeightOneSpectrum (𝓞 F), v.asIdeal ∣ differentIdeal ℤ (𝓞 F) → v ∈ S)
+    (f g : SchwartzBruhat (Multiplicative (SAdeleRing F S)))
+    (hg :
+      letI : MeasurableSpace (SAdeleRing F S) :=
+        (@MeasurableSpace.pi _ _ (fun w : InfinitePlace F ↦ borel w.Completion)).prod
+          (@MeasurableSpace.pi _ _ (fun v : S ↦ borel (v.val.adicCompletion F)))
+      tamagawaFourier (sAdditiveTamagawaMeasure F S) (sAdeleStandardCharacter F S)
+        (fun x ↦ f (Multiplicative.ofAdd x)) = fun y ↦ g (Multiplicative.ofAdd y)) :
+    adeleSchwartzFourier (sAdeleSchwartzToGlobal F S f) =
+      sAdeleSchwartzToGlobal F S g := by
+  classical
+  have hd (v : HeightOneSpectrum (𝓞 F)) (hv : v ∉ S) :
+      multiplicity v.asIdeal (differentIdeal ℤ (𝓞 F)) = 0 :=
+    multiplicity_eq_zero_of_not_dvd (fun h ↦ hv (hgood v h))
+  have hp := sAdeleProjection_restrict F S ∅ (Finset.disjoint_empty_right _)
+    (by simpa only [Finset.union_empty] using hd) (fun _ ↦ Set.univ)
+    (fun _ ↦ MeasurableSet.univ) 1 (by simp)
+  have hft := tamagawaFourier_sAdeleLift F S 1 (by simpa using hp)
+    (fun x ↦ f (Multiplicative.ofAdd x)) (partialTensor_integrable F S f)
+  dsimp only at hft
+  rw [tailDual_eq_integers F S hd, NNReal.coe_one, one_smul, hg] at hft
+  let I : Set 𝔸[F] := integralAdelesOutside F S
+  have hlift (g : SchwartzBruhat (Multiplicative (SAdeleRing F S))) (x : 𝔸[F]) :
+      sAdeleSchwartzToGlobal F S g (Multiplicative.ofAdd x) =
+      I.indicator ((fun z ↦ g (Multiplicative.ofAdd z)) ∘ adeleProjection F S) x := by
+    rw [sAdeleSchwartzToGlobal_apply]
+    by_cases hx : x ∈ integralAdelesOutside F S
+    · rw [Set.indicator_of_mem hx, ite_eq_left ((integralTail_iff F S x).mp hx)]; rfl
+    · rw [Set.indicator_of_notMem hx, ite_eq_right ((integralTail_iff F S x).not.mp hx)]
+  apply Subtype.ext
+  funext y
+  let : MeasurableSpace 𝔸[F] := borel _
+  let ft : (𝔸[F] → ℂ) → 𝔸[F] → ℂ := tamagawaFourier (additiveTamagawaMeasure F) (adeleStandardCharacter F)
+  change ft (fun x ↦ sAdeleSchwartzToGlobal F S f (Multiplicative.ofAdd x)) y.toAdd = _
+  exact (congrArg (fun g ↦ ft g y.toAdd) (funext (hlift f))).trans
+    ((congrFun hft y.toAdd).trans (hlift g y.toAdd).symm)
+
 private theorem partialTensor_lift_apply (S : Finset V) (A : Arch)
     (p : (v : S) → v.val.adicCompletion F → ℂ)
     (f : SchwartzBruhat (Multiplicative (SAdeleRing F S)))
