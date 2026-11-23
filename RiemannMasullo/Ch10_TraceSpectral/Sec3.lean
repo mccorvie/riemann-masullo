@@ -1450,7 +1450,14 @@ theorem spectralStripConvolution_traceNorm_continuous {α s : ℝ} (hα : 0 ≤ 
     let H := Q(a, hStrip(hα), hs₀(hs))
     ∃ T : BruhatCompactSupport C𝔽 →ₗ[ℂ] nuclearEndomorphisms H,
       (∀ φ, (T φ).val = spectralConvolution (F := F) a hStrip(hα) hs₀(hs) φ) ∧
-      Tendsto (fun φ : BruhatCompactSupport C𝔽 ↦ traceNorm (H := H) (T φ)) (𝓝 0) (𝓝 0) := by sorry
+      Tendsto (fun φ : BruhatCompactSupport C𝔽 ↦ traceNorm (H := H) (T φ)) (𝓝 0) (𝓝 0) := by
+  intro H
+  let A : BruhatCompactSupport C𝔽 →ₗ[ℂ] (H →L[ℂ] H) :=
+    (spectralConvolution_isLinear (F := F) a hStrip(hα) hs₀(hs)).mk'
+      (spectralConvolution (F := F) a hStrip(hα) hs₀(hs))
+  exact spectralConvolution_traceNorm_lift bruhatCompactSupport_strictLF A
+    (spectralConvolution_opNorm_continuous (F := F) a hStrip(hα) hs₀(hs))
+    (spectralStripConvolution_nuclear (F := F) a hα hs)
 
 /-- Paper: Theorem 10.3.2.1(2), p. 454. Taking the trace of convolution gives
 a distribution on the Bruhat compactly supported test space. -/

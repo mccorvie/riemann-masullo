@@ -797,7 +797,11 @@ local notation "logModule" =>
 
 /-- Paper: Definition 9.2.1.1(1), p. 404. The logarithmic weight is the sum of the
 squared moment multipliers from order zero through order N, times the squared twist.
-Deviation: N is the largest order included. The scalar source in (9.2.1.2) uses N − 1. -/
+Deviation: N is the largest order included. The scalar source in (9.2.1.2) uses N − 1.
+
+Deviation: The scalar source on p. 404 uses orders through $N-1$. The density uses orders
+through $N$ and allows $N=0$, as in the group convention on p. 408.
+-/
 def lineSobolevDensity (b : ℝ) (N : ℕ) (x : ℝ) : ℝ :=
   Real.exp (2 * b * x) * ∑ k ∈ Finset.range (N + 1), x ^ (2 * k)
 
@@ -810,7 +814,11 @@ theorem lineSobolevDensity_order_zero (b x : ℝ) :
 
 /-- Paper: Definition 9.2.1.1(1), p. 404. The completion is realized as weighted L².
 Deviation: The norm combines the squared norms in (9.2.1.2) by summing them. The
-maximum order is an explicit parameter and the scalar case uses Lebesgue measure and `id`. -/
+maximum order is an explicit parameter and the scalar case uses Lebesgue measure and `id`.
+
+Deviation: Page 404 defines the scalar topology using the component norms through $N-1$. We use
+weighted $L^2$ with the Hilbert sum of the squared component norms through $N$.
+-/
 abbrev LineSobolev {A : Type*} [MeasurableSpace A] (μ : Measure A) (logNorm : A → ℝ)
     (b : ℝ) (N : ℕ) :=
   Lp ℂ 2 (μ.withDensity fun x ↦ ENNReal.ofReal (lineSobolevDensity b N (logNorm x)))
@@ -819,7 +827,11 @@ abbrev LineSobolev {A : Type*} [MeasurableSpace A] (μ : Measure A) (logNorm : A
 moments of order zero through N.
 Deviation: (9.2.1.2) prints 0 ≤ k ≤ N − 1. The proof of Theorem 9.2.1.2(1) on p. 405, the
 target in Definition 9.2.1.1(2) and Theorem 9.2.1.5, which is the same space for a general
-group, all use 0 ≤ k ≤ N. -/
+group, all use 0 ≤ k ≤ N.
+
+Deviation: The scalar source on p. 404 starts at $N=1$ and uses orders through $N-1$. We take
+$N\ge0$ and moments through order $N$, matching the target order.
+-/
 abbrev ScalarLineSobolev (b : ℝ) (N : ℕ) :=
   LineSobolev volume id b N
 
@@ -1877,8 +1889,10 @@ theorem scalarLineSobolev_mellin (b : ℝ) (N : ℕ) :
 
 /-- Paper: Corollary 9.2.1.4, p. 407. In the left half-plane each indicated derivative
 evaluation is bounded on the part supported above the cutoff and is given by the moment integral.
-Deviation: State the continuous functional on the supported source, where it extends the
-derivative of the test Mellin transform. The normalization uses the corrected isometry in `scalarLineSobolev_mellin`. -/
+
+Deviation: The functional is extended to the full source by precomposing with the support
+projection. On supported tests it gives the derivative of the Mellin transform. The
+normalization uses the corrected isometry in `scalarLineSobolev_mellin`. -/
 theorem scalarLineSobolev_cutoff_eval (a b : ℝ) (_ha : 1 < a)
     (N k : ℕ) (_hk : k < N) (z : ℂ) (_hz : z.re < b) :
     ∃ Λ : ScalarLineSobolev b N →L[ℂ] ℂ,
@@ -2917,7 +2931,12 @@ theorem modulatedLineSobolev_mellin (hm : IsModulation m)
 set_option linter.unusedSectionVars false in
 /-- Paper: Theorem 9.2.1.5(2), p. 408, and Equation (9.2.1.25), p. 409.
 Taking the isotype coefficient of a line Mellin tensor multiplies the scalar trace
-by the kernel Fourier coefficient at the inverse character, as in (D.3.3.14). -/
+by the kernel Fourier coefficient at the inverse character, as in (D.3.3.14).
+
+Deviation: The split Mellin formulas on pp. 403 and 416 omit the compact character. We take the
+coefficient with the positive character factor of (9.2.1.25), expressed as Fourier evaluation at
+the inverse character.
+-/
 theorem modulatedLineSobolev_mellin_isotype
     [MeasurableSpace m.toMonoidHom.ker] [BorelSpace m.toMonoidHom.ker]
     (μ₁ : Measure m.toMonoidHom.ker) [μ₁.IsHaarMeasure] (_hμ₁ : μ₁ univ = 1)
@@ -2954,9 +2973,11 @@ theorem modulatedLineSobolev_mellin_isotype
 
 /-- Paper: Corollary 9.2.1.7, p. 409. Each quasi-character of abscissa below b
 gives a continuous moment functional after the cutoff.
-Deviation: Use the canonical Haar measure and the intrinsic quasi-character in the
-product integral on the supported source. In split coordinates this gives
-(9.2.1.25). A change of section changes the coordinates of the same quasi-character. -/
+
+Deviation: The functional is extended to the full source by precomposing with the support
+projection. The integral uses the canonical Haar measure and the intrinsic quasi-character.
+In split coordinates this gives (9.2.1.25) with the radial exponent of that quasi-character.
+A change of section changes the coordinates of the same quasi-character. -/
 theorem modulatedLineSobolev_cutoff_eval (hm : IsModulation m) (_hms : Surjective m)
     (a b : ℝ) (_ha : 1 < a) (N k : ℕ) (_hk : k < N) (z : ℂ) (_hz : z.re < b)
     (χ : QuasiCharacter G) (_hχ : ∀ g, ‖χ g‖ = 1) :
@@ -3057,7 +3078,12 @@ theorem intervalSobolevDensity_at_unit (a b s : ℝ) :
 /-- Paper: Proposition 9.2.1.8, p. 410. The compact-interval space has the positive
 endpoint density, and its dual model uses the reciprocal density.
 Deviation: Both spaces are realized as weighted L². The measure and logarithmic
-coordinate are explicit, and `dual = true` selects the reciprocal density. -/
+coordinate are explicit, and `dual = true` selects the reciprocal density.
+
+Deviation: Propositions 9.2.1.8 and 9.2.2.11 complete all of the second copy of $\mathcal S_J$
+in the reciprocal norm, which may be infinite on those tests. The dual branch is the reciprocal
+weighted $L^2$ space.
+-/
 abbrev CompactIntervalSobolev {A : Type*} [MeasurableSpace A] (μ : Measure A)
     (logNorm : A → ℝ) (a b s : ℝ) (dual : Bool := false) :=
   Lp ℂ 2 (μ.withDensity fun x ↦ ENNReal.ofReal
@@ -3742,7 +3768,12 @@ private theorem intervalSobolev_integrable_moment (a b s : ℝ) (hs : 0 ≤ s)
 
 /-- Paper: Proposition 9.2.2.4(2), p. 414. A weighted L² class on a nondegenerate
 compact base interval gives a holomorphic Mellin transform on its open strip.
-Deviation: State the compact-base assertion in the weighted source model. -/
+Deviation: State the compact-base assertion in the weighted source model.
+
+Deviation: Proposition 9.2.2.4 uses the analytic completion sampled along vertical lines. We
+construct the holomorphic function from the physical weighted $L^2$ space controlling both
+endpoints.
+-/
 theorem scalarIntervalSobolev_mellin_holomorphic (a b s : ℝ) (_hab : a < b) (_hs : 0 ≤ s) :
     let E := CompactIntervalSobolev volume id a b s
     let strip := Complex.re ⁻¹' Ioo a b
@@ -4076,7 +4107,12 @@ private theorem strip_abel_boundary {a b c : ℝ} (hab : a < b) (hc : c ∈ ({a,
 /-- Paper: Proposition 9.2.2.4(2), p. 414. On either endpoint line of a
 nondegenerate compact base interval, the interior Mellin integral has an almost-everywhere
 limit, whose inverse Fourier transform has the required Sobolev weight.
-Deviation: State the compact-base assertion using the weighted source model. -/
+Deviation: State the compact-base assertion using the weighted source model.
+
+Deviation: Proposition 9.2.2.4(2) asserts boundary values for every element of the sampled
+completion. We use endpoint-weighted physical data and identify the almost-everywhere limits by
+the corresponding weighted inverse Fourier transforms.
+-/
 theorem scalarIntervalSobolev_boundary_values (a b s : ℝ) (_hab : a < b) (_hs : 0 ≤ s)
     (c : ℝ) (_hc : c ∈ ({a, b} : Set ℝ)) (f : CompactIntervalSobolev volume id a b s) :
     ∃ u : Lp ℂ 2 (volume : Measure ℝ),
@@ -4369,7 +4405,12 @@ private theorem boundaryMoment_identify (a b : ℝ) (hab : a < b) (N : ℕ)
 /-- Paper: Proposition 9.2.2.4(2), p. 414. At even degree the almost-everywhere endpoint
 limits of the moments from order zero through N are the traces of one element of the
 Hardy–Sobolev space on that line.
-Deviation: State the compact nondegenerate case in the weighted source model. -/
+Deviation: State the compact nondegenerate case in the weighted source model.
+
+Deviation: Proposition 9.2.2.4(2) gives a line-space trace on the sampled completion, though
+interior sampling can produce a limit with no $L^2$ endpoint trace. The even-degree line-space
+traces here use the physical norm controlling both endpoints.
+-/
 theorem scalarIntervalSobolev_boundary_traces (a b : ℝ) (_hab : a < b) (N : ℕ)
     (c : ℝ) (_hc : c ∈ ({a, b} : Set ℝ))
     (f : CompactIntervalSobolev volume id a b (2 * (N : ℝ))) :
@@ -4873,7 +4914,12 @@ theorem scalarIntervalSobolev_cutoff_iteratedDeriv_mellin
 /-- Paper: Corollary 9.2.2.8(2), p. 416. At the upper endpoint a derivative
 evaluation of an even-degree supported space is bounded exactly below order N.
 Deviation: State bounded extendibility of the evaluation on supported tests in the
-compact-interval source model. Here the degree is 2N, so there is no critical equality. -/
+compact-interval source model. Here the degree is 2N, so there is no critical equality.
+
+Deviation: The source of the upper-endpoint assertion in Corollary 9.2.2.8(2) is implicit after
+the construction on p. 415. We use the physical endpoint norm. In this norm bounded
+extendibility for even degree agrees with the printed range.
+-/
 theorem scalarIntervalSobolev_cutoff_eval_boundary_iff (a b A : ℝ)
     (_hab : a ≤ b) (_hA : 1 < A) (N k : ℕ) (z : ℂ) (_hz : z.re = b) :
     (∃ Λ : CompactIntervalSobolev volume id a b (2 * (N : ℝ)) →L[ℂ] ℂ,
@@ -4893,7 +4939,12 @@ theorem scalarIntervalSobolev_cutoff_eval_boundary_iff (a b A : ℝ)
 extends at a distinct lower endpoint. At the upper endpoint the degree must exceed
 twice the derivative order plus one.
 Deviation: State the endpoint criterion in the compact weighted model for all nonnegative
-degrees. The corollary states the even-degree case, with part (2) on p. 416. -/
+degrees. The corollary states the even-degree case, with part (2) on p. 416.
+
+Deviation: The source of the upper-endpoint assertion on p. 416 is implicit after the
+construction on p. 415. In the physical endpoint norm the supported functional extends exactly
+when $\Re z<b$ or $2k+1<s$.
+-/
 theorem scalarIntervalSobolev_cutoff_eval_endpoints_iff (a b A s : ℝ)
     (_hab : a ≤ b) (_hA : 1 < A) (_hs : 0 ≤ s) (k : ℕ) (z : ℂ)
     (_hz : z.re ∈ ({a, b} : Set ℝ)) :
@@ -5224,7 +5275,12 @@ private theorem exp_le_intervalSobolevDensity (a b s : ℝ) (hs : 0 ≤ s) (x : 
 /-- Paper: Corollary 9.2.2.12(1), p. 418. Each isotype has a bounded
 interior derivative evaluation on the supported compact-interval space.
 Deviation: Use the weighted source model and the intrinsic quasi-character for
-the chosen isotype. The printed formula corresponds to the trivial character. -/
+the chosen isotype. The printed formula corresponds to the trivial character.
+
+Deviation: Equation (9.2.2.43) omits the kernel character and uses log power $m$ for the $k$th
+derivative. We use the intrinsic twisted character, including the phase of its lift, and log
+power $k$.
+-/
 theorem modulatedIntervalSobolev_cutoff_eval (a b A s : ℝ)
     (_hA : 1 < A) (_hs : 0 ≤ s) (z : ℂ) (_hz : z.re ∈ Ioo a b) (k : ℕ)
     (χ : QuasiCharacter G) (_hχ : ∀ g, ‖χ g‖ = 1) :
@@ -5540,7 +5596,12 @@ end
 /-- Paper: Corollary 9.2.2.12(2), p. 418. A Mellin derivative evaluation in any
 isotype extends from supported tests at the endpoints of the compact base.
 Deviation: At the upper endpoint the condition is strict. At a distinct lower
-endpoint the cutoff allows all orders. The modulation is onto as in §9.2. -/
+endpoint the cutoff allows all orders. The modulation is onto as in §9.2.
+
+Deviation: Corollary 9.2.2.12(2) asserts continuity at every boundary point in the printed range
+on the supported analytic tensor space. We use the physical endpoint norm, with criterion $\Re
+z<b$ or $2k+1<s$.
+-/
 theorem modulatedIntervalSobolev_cutoff_eval_endpoints_iff (_hms : Surjective m)
     (a b A s : ℝ) (_hab : a ≤ b) (_hA : 1 < A) (_hs : 0 ≤ s) (k : ℕ)
     (z : ℂ) (_hz : z.re ∈ ({a, b} : Set ℝ))

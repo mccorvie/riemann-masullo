@@ -6,6 +6,7 @@ import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec6
 
+import RiemannMasullo.AppC_LCTVS.Sec1
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
 
@@ -765,6 +766,43 @@ variable (A : E₁ →L[ℂ] E₂) (A₀ : (E₁ ⧸ H₁) →L[ℂ] (E₂ ⧸ H
 variable (x : ℕ → E₂) (d : ℕ → StrongDual ℂ (E₂ ⧸ H₂))
 variable (B : Seminorm ℂ (E₂ ⧸ H₂) → ℕ → ℝ≥0) (y : ℕ → E₁)
 
+/-- The induced map of quotients is a linear homeomorphism: it is injective because
+`H₁` is the preimage of `H₂`, and open by the open mapping theorem for Fréchet spaces. -/
+private theorem orbitalQuotient_lift_equiv (E₁ E₂ : Type*) [AddCommGroup E₁] [Module ℂ E₁]
+    [TopologicalSpace E₁] [AddCommGroup E₂] [Module ℂ E₂] [TopologicalSpace E₂]
+    [IsTopologicalAddGroup E₁] [ContinuousSMul ℂ E₁] [ContinuousSMul ℂ E₂]
+    (H₁ : Submodule ℂ E₁) (H₂ : Submodule ℂ E₂)
+    (A : E₁ →L[ℂ] E₂) (A₀ : (E₁ ⧸ H₁) →L[ℂ] (E₂ ⧸ H₂))
+    (hF₁ : IsFrechetTVS E₁) (hF₂ : IsFrechetTVS E₂)
+    (hH₁ : IsClosed (H₁ : Set E₁)) (hH₂ : IsClosed (H₂ : Set E₂))
+    (hpre : H₂.comap A.toLinearMap = H₁)
+    (hA₀ : A₀.comp H₁.mkQL = H₂.mkQL.comp A) (hsurj : Surjective A₀) :
+    ∃ e : (E₁ ⧸ H₁) ≃L[ℂ] (E₂ ⧸ H₂), e.toContinuousLinearMap = A₀ := by
+  have hQ₁ := isFrechetTVS_quotient hF₁ H₁ hH₁
+  have hQ₂ := isFrechetTVS_quotient hF₂ H₂ hH₂
+  obtain ⟨hadd₂, -, -, -⟩ := hF₂
+  let := hadd₂
+  obtain ⟨_, _, hmet₁, _⟩ := hQ₁
+  have hinj : Injective A₀ := by
+    refine (injective_iff_map_eq_zero A₀).mpr fun z hz ↦ ?_
+    induction z using Submodule.Quotient.induction_on with
+    | _ a =>
+    have h2 : H₂.mkQ (A a) = 0 := by
+      have := congrArg (fun L : (E₁ →L[ℂ] (E₂ ⧸ H₂)) ↦ L a) hA₀
+      exact this.symm.trans hz
+    have ha : a ∈ H₁ := hpre ▸ (Submodule.Quotient.mk_eq_zero H₂).mp h2
+    exact (Submodule.Quotient.mk_eq_zero H₁).mpr ha
+  have hop : IsOpenMap A₀ := isOpenMap_of_surjective_toLF (isLFSpace_of_isFrechetTVS hQ₂)
+    (X := fun _ ↦ E₁ ⧸ H₁) (fun _ ↦ isFrechetTVS_quotient hF₁ H₁ hH₁)
+    (fun _ ↦ ContinuousLinearMap.id ℂ (E₁ ⧸ H₁)) (fun _ ↦ Subset.rfl) (fun a ↦ ⟨0, a, rfl⟩) A₀
+    hsurj
+  let e := LinearEquiv.ofBijective A₀.toLinearMap ⟨hinj, hsurj⟩
+  let d : (E₁ ⧸ H₁) ≃L[ℂ] (E₂ ⧸ H₂) :=
+    { e with
+      continuous_toFun := A₀.continuous
+      continuous_invFun := e.toEquiv.continuous_symm_iff.mpr hop }
+  exact ⟨d, rfl⟩
+
 /-- Paper: Lemma 7.3.1.5(1), p. 343.
 Lifts of the absolute basis vectors give an absolute basis in the first quotient.
 Their biorthogonal functionals are an unconditional basis of its strong dual. -/
@@ -868,7 +906,17 @@ theorem orbitalQuotient_lift_growth
     ∃ e : (E₁ ⧸ H₁) ≃L[ℂ] (E₂ ⧸ H₂), e.toContinuousLinearMap = A₀ ∧
       ∀ q : Seminorm ℂ (E₁ ⧸ H₁), Continuous q →
         (fun n ↦ q (H₁.mkQL (y n))) =O[atTop]
-          (fun n ↦ (B (q.comp e.symm.toLinearMap) n : ℝ)) := by sorry
+          (fun n ↦ (B (q.comp e.symm.toLinearMap) n : ℝ)) := by
+  obtain ⟨e, he⟩ := orbitalQuotient_lift_equiv E₁ E₂ H₁ H₂ A A₀ _hF₁ _hF₂ _hH₁ _hH₂ _hpre _hA₀
+    _hsurj
+  refine ⟨e, he, fun q hq ↦ ?_⟩
+  have hey (n : ℕ) : H₁.mkQL (y n) = e.symm (H₂.mkQL (x n)) := by
+    rw [ContinuousLinearEquiv.eq_symm_apply, ← _hy n]
+    change e.toContinuousLinearMap _ = _
+    rw [he]
+    exact congrArg (fun L : (E₁ →L[ℂ] (E₂ ⧸ H₂)) ↦ L (y n)) _hA₀
+  simp only [hey]
+  exact _hB (q.comp e.symm.toLinearMap) (hq.comp e.symm.continuous)
 
 end QuotientTransfer
 
@@ -1897,6 +1945,30 @@ section OrbitalBasisProperties
 local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
 
 
+/-- The primary orbital quotient is a nuclear Fréchet space, and evaluation into its strong
+bidual is a homeomorphism. -/
+private theorem sLocalOrbitalSystem_quotient_nuclearFrechet (p : Vℚ) (ω : PontryaginDual J₁) :
+    IsFrechetTVS (Q(p, ω)) ∧ IsNuclearTVS.{0} (Q(p, ω)) ∧
+      IsHomeomorph (ContinuousLinearMap.applyₗ (E := Q(p, ω)) ℂ (RingHom.id ℂ)) := by
+  have hR : IsClosed (Rₚ(p, ω) : Set (Θₛ(ω))) :=
+    (sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding (F := F) (S := S) hₚ(p) ω).isClosed_range
+  have hF : IsFrechetTVS (Q(p, ω)) :=
+    isFrechetTVS_quotient (sLocalHomogeneousThetaSpace_frechet ω) _ hR
+  have hT2 : T2Space (Θₛ(ω) ⧸ Rₚ(p, ω)) := by
+    obtain ⟨_, _, hmet, _⟩ := hF
+    let : TopologicalSpace.MetrizableSpace (Θₛ(ω) ⧸ Rₚ(p, ω)) := hmet
+    infer_instance
+  have hN : IsNuclearTVS.{0} (Q(p, ω)) :=
+    isNuclearTVS_quotient (sLocalHomogeneousThetaSpace_nuclear ω) _
+  have hmon := montelSpace_of_schwartz_frechet hF (isSchwartzTVS_of_isNuclearTVS hN)
+  have hbar := isFrechetTVS_barrelled hF
+  refine ⟨hF, hN, ?_⟩
+  obtain ⟨_, hpoly, hmet, _⟩ := hF
+  let : UniformSpace (Q(p, ω)) := IsTopologicalAddGroup.rightUniformSpace (Q(p, ω))
+  have : IsUniformAddGroup (Q(p, ω)) := isUniformAddGroup_of_addCommGroup
+  exact isHomeomorph_iff_isEmbedding_surjective.mpr
+    ⟨isEmbedding_strongBidual_eval, surjective_strongBidual_eval⟩
+
 /-- Paper: Corollary 7.3.1.8(1), p. 350.
 The enumerated polar and Fourier systems give equicontinuous, shrinking and boundedly
 complete bases of the strong dual.
@@ -1916,7 +1988,37 @@ theorem sLocalOrbitalSystem_strongDual_basis_properties
     let ev : ℕ → StrongDual ℂ (StrongDual ℂ (Q(p, ω))) :=
       fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (e n)
     SchauderBasis.IsEquicontinuous d ev ∧ SchauderBasis.IsShrinking d ev ∧
-      SchauderBasis.IsBoundedlyComplete d := by sorry
+      SchauderBasis.IsBoundedlyComplete d := by
+  intro ev
+  obtain ⟨hF, hN, hrefl⟩ := sLocalOrbitalSystem_quotient_nuclearFrechet (F := F) (S := S) p ω
+  have habs := SchauderBasis.isAbsolute_of_nuclear_frechet hN hF _he
+  have hbar := isFrechetTVS_barrelled hF
+  obtain ⟨_, hpoly, _, hcomp⟩ := hF
+  have hdb : IsSchauderBasis d ev := SchauderBasis.isShrinking_of_isAbsolute hcomp hrefl _he habs
+  have heq : SchauderBasis.IsEquicontinuous d ev := by
+    let D := StrongDual ℂ (Q(p, ω))
+    let : UniformSpace (Q(p, ω)) := IsTopologicalAddGroup.rightUniformSpace (Q(p, ω))
+    have : IsUniformAddGroup (Q(p, ω)) := isUniformAddGroup_of_addCommGroup
+    let : PolynormableSpace ℂ D :=
+      uniformConvergenceCLM_polynormable (F := ℂ) {B : Set (Q(p, ω)) | Bornology.IsVonNBounded ℂ B}
+        (fun _ h ↦ h) (by rw [Bornology.sUnion_isVonNBounded_eq_univ, Submodule.span_univ]; simp)
+    have : BarrelledSpace ℂ D := barrelled_of_barrel_nbhd fun B hB hBabs hBabsorb ↦
+      strongDual_barrel_nbhd (fun l ↦ (hrefl.surjective l).elim fun z hz ↦ ⟨z, fun φ ↦ hz ▸ rfl⟩)
+        B hB hBabs hBabsorb
+    let : UniformSpace D := IsTopologicalAddGroup.rightUniformSpace D
+    have : IsUniformAddGroup D := isUniformAddGroup_of_addCommGroup
+    have htend (z : D) :
+        Tendsto (fun k ↦ SchauderBasis.partialProjection d ev k z) atTop (𝓝 z) := by
+      have hsum := hdb.2 z
+      rw [HasSum, SummationFilter.conditional_filter_eq_map_range, tendsto_map'_iff] at hsum
+      simpa only [Function.comp_def, ContinuousLinearMap.coe_coe,
+        SchauderBasis.partialProjection, ← Nat.range_succ_eq_Iic,
+        sum_apply, ContinuousLinearMap.smulRight_apply]
+        using hsum.comp (tendsto_add_atTop_nat 1)
+    exact (PolynormableSpace.banach_steinhaus (𝓕 := SchauderBasis.partialProjection d ev)
+      (fun z ↦ (htend z).isVonNBounded_range ℂ)).equicontinuous 0
+  exact ⟨heq, SchauderBasis.strongDual_isShrinking_of_isAbsolute hcomp hrefl _he habs hN,
+    SchauderBasis.strongDual_isBoundedlyComplete_of_isAbsolute hcomp hrefl _he habs⟩
 
 /-- Paper: Corollary 7.3.1.8(2), p. 350.
 The corresponding biorthogonal bases of the primary quotient are equicontinuous,
@@ -1934,7 +2036,26 @@ theorem sLocalOrbitalSystem_quotient_basis_properties
         sLocalOrbitalFourierJet (F := F) (S := S) (T := Sₚ(p)) (ω := ω) (σ n) x))
     (_he : IsSchauderBasis e d) :
     SchauderBasis.IsEquicontinuous e d ∧ SchauderBasis.IsShrinking e d ∧
-      SchauderBasis.IsBoundedlyComplete e := by sorry
+      SchauderBasis.IsBoundedlyComplete e := by
+  obtain ⟨hF, hN, hrefl⟩ := sLocalOrbitalSystem_quotient_nuclearFrechet (F := F) (S := S) p ω
+  have habs := SchauderBasis.isAbsolute_of_nuclear_frechet hN hF _he
+  have hbar := isFrechetTVS_barrelled hF
+  obtain ⟨_, hpoly, _, hcomp⟩ := hF
+  have heq : SchauderBasis.IsEquicontinuous e d := by
+    let : UniformSpace (Q(p, ω)) := IsTopologicalAddGroup.rightUniformSpace (Q(p, ω))
+    have : IsUniformAddGroup (Q(p, ω)) := isUniformAddGroup_of_addCommGroup
+    have htend (z : Q(p, ω)) :
+        Tendsto (fun k ↦ SchauderBasis.partialProjection e d k z) atTop (𝓝 z) := by
+      have hsum := _he.2 z
+      rw [HasSum, SummationFilter.conditional_filter_eq_map_range, tendsto_map'_iff] at hsum
+      simpa only [Function.comp_def, ContinuousLinearMap.coe_coe,
+        SchauderBasis.partialProjection, ← Nat.range_succ_eq_Iic,
+        sum_apply, ContinuousLinearMap.smulRight_apply]
+        using hsum.comp (tendsto_add_atTop_nat 1)
+    exact (PolynormableSpace.banach_steinhaus (𝓕 := SchauderBasis.partialProjection e d)
+      (fun z ↦ (htend z).isVonNBounded_range ℂ)).equicontinuous 0
+  exact ⟨heq, SchauderBasis.isShrinking_of_isAbsolute hcomp hrefl _he habs,
+    SchauderBasis.isBoundedlyComplete_of_isAbsolute hcomp hrefl _he habs⟩
 
 end OrbitalBasisProperties
 
