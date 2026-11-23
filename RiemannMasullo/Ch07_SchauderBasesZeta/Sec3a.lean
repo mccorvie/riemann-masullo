@@ -5,6 +5,10 @@ public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec6
+import RiemannMasullo.Ch03_IdelicZeta.Sec4
+import RiemannMasullo.Ch02_AdelicTheta.Sec3
+import RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
+import RiemannMasullo.Ch06_LocalGlobal.Sec3
 
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
@@ -607,7 +611,299 @@ private theorem sLocalOrbitalPrincipalPart_triangular_dual {E A C : Type*}
 
 section TriangularPrincipalPartTests
 
+local notation "hmₛ" => (isProperMap_sIdeleQuotientNorm F S).continuous
+
 local notation "Z(" f ", " c ")" => (fun z ↦ sLocalIdelicZFunction f (twistₛ c z))
+
+private theorem sLocalOrbital_centered_order (f : Xₛ → ℂ) (d : Xₛ) (a : ℂ) :
+    meromorphicOrderAt (fun z ↦ f (twistₛ (twistₛ d a) z)) 0 =
+      meromorphicOrderAt (fun z ↦ f (twistₛ d z)) a := by
+  have he : (fun z ↦ f (twistₛ (twistₛ d a) z)) =
+      (fun z ↦ f (twistₛ d z)) ∘ (· + a) :=
+    funext fun z ↦ congrArg f (normTwist_normTwist mₛ hmₛ d a z)
+  rw [he, meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt, zero_add]
+
+private theorem sLocalOrbital_eventually_regular (c : Xₛ) :
+    ∀ᶠ z : ℂ in 𝓝[≠] (0 : ℂ), 0 ≤ sLocalIdelicOrderBound (twistₛ c z) := by
+  obtain ⟨χ, a, ha⟩ := exists_sLocalNormTwist (F := F) (S := S) c
+  have he : (fun z ↦ sLocalRhoFactor (twistₛ c z)) =
+      (fun z ↦ sLocalRhoFactor (chart(χ) z)) ∘ (· + a) := by
+    funext z
+    rw [← ha]
+    exact congrArg sLocalRhoFactor (normTwist_normTwist mₛ hmₛ _ a z)
+  have hm : MeromorphicAt (fun z ↦ sLocalRhoFactor (twistₛ c z)) 0 := by
+    rw [he]
+    exact (sLocalRhoFactor_meromorphic χ (0 + a)).comp_analyticAt
+      (g := fun z : ℂ ↦ z + a) (by fun_prop)
+  filter_upwards [hm.eventually_analyticAt] with z hz
+  change 0 ≤ min 0 (meromorphicOrderAt (fun w ↦ sLocalRhoFactor (twistₛ (twistₛ c z) w)) 0)
+  rw [sLocalOrbital_centered_order]
+  exact le_min le_rfl hz.meromorphicOrderAt_nonneg
+
+/-- The product of the local standard Gaussians is normalized to a nonzero value at the given center. -/
+private theorem exists_sLocalGaussian_normalized_ne_zero (c : Xₛ) :
+    ∃ f : ℬₛ, sLocalNormalizedZFunction f c ≠ 0 := by
+  classical
+  obtain ⟨χ, a, rfl⟩ := exists_sLocalNormTwist (F := F) (S := S) c
+  let d := twistₛ ((circleToComplex).comp χ) a
+  let i (w : InfinitePlace F) : w.Completionˣ →ₜ* Jₛ :=
+    let h := sLocalInfiniteInsertion_properties (F := F) (S := S) w
+    ⟨{ toFun := _, map_one' := h.1, map_mul' := h.2.1 }, h.2.2⟩
+  let χArch (w : InfinitePlace F) := χ.comp (i w)
+  have hχ (w : InfinitePlace F) :
+      (circleToComplex).comp (χArch w) = sLocalInfiniteRestriction w ((circleToComplex).comp χ) := rfl
+  let G (w : InfinitePlace F) := Multiplicative w.Completion
+  let (w : InfinitePlace F) : T2Space (G w) := (inferInstance : T2Space w.Completion)
+  let (w : InfinitePlace F) : LocallyCompactSpace (G w) := (inferInstance : LocallyCompactSpace w.Completion)
+  let (w : InfinitePlace F) : SecondCountableTopology (G w) :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  obtain ⟨g, hg⟩ := schwartzBruhat_pi_test G (fun w ↦ infiniteStandardGaussian w (χArch w))
+  let e : Multiplicative (InfiniteAdeleRing F) ≃ₜ* ((w : InfinitePlace F) → G w) :=
+    { toFun := fun x w ↦ Multiplicative.ofAdd (x.toAdd w)
+      invFun := fun x ↦ Multiplicative.ofAdd (fun w ↦ (x w).toAdd)
+      left_inv := fun _ ↦ rfl
+      right_inv := fun _ ↦ rfl
+      map_mul' := fun _ _ ↦ rfl
+      continuous_toFun := continuous_id
+      continuous_invFun := continuous_id }
+  let : T2Space (Multiplicative (InfiniteAdeleRing F)) := e.toHomeomorph.isEmbedding.t2Space
+  let : LocallyCompactSpace (Multiplicative (InfiniteAdeleRing F)) :=
+    e.toHomeomorph.isOpenEmbedding.locallyCompactSpace
+  let a₀ : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) :=
+    ⟨g.val ∘ e, schwartzBruhat_mem_comp_equiv e g.property⟩
+  let f := sLocalStandardThetaTensor d a₀
+  have hf := sLocalNormalizedEigendistribution_gaussian χ a χArch hχ f
+    (fun x ↦ (sLocalStandardThetaTensor_apply d a₀ x).trans (congrArg (· * _) (hg (e (Multiplicative.ofAdd x.1)))))
+  have he := (existsUnique_sLocalNormalizedEigendistribution d).exists.choose_spec f
+  change _ * sLocalNormalizedEigendistribution d f = sLocalNormalizedZFunction f d at he
+  change sLocalNormalizedEigendistribution d f = 1 at hf
+  refine ⟨f, ?_⟩
+  change sLocalNormalizedZFunction f d ≠ 0
+  rw [← he, hf, mul_one]
+  apply Complex.ofReal_ne_zero.mpr
+  apply Finset.prod_ne_zero_iff.mpr
+  intro v hv
+  rw [finiteLocalMultiplicativeTamagawaMeasure_integerUnits, ENNReal.toReal_ne_zero]
+  refine ⟨ENNReal.inv_ne_zero.mpr ENNReal.ofReal_ne_top, ENNReal.inv_ne_top.mpr ?_⟩
+  refine (ENNReal.ofReal_pos.mpr (Real.sqrt_pos.mpr (pow_pos ?_ _))).ne'
+  exact_mod_cast (NumberField.HeightOneSpectrum.one_lt_absNorm v.val).trans' zero_lt_one
+
+
+/-- A standard local test realizes the full Euler pole at a polar center. -/
+private theorem exists_sLocalZeta_full_pole (c : Xₛ) (hc : 0 < sLocalRhoPoleOrder c) :
+    ∃ f : ℬₛ, meromorphicOrderAt Z(f,c) 0 =
+      ((-(sLocalRhoPoleOrder c : ℤ) : ℤ) : WithTop ℤ) := by
+  obtain ⟨f, hf⟩ := exists_sLocalGaussian_normalized_ne_zero c
+  refine ⟨f, ?_⟩
+  obtain ⟨χ, a, ha⟩ := exists_sLocalNormTwist (F := F) (S := S) c
+  let L : ℂ → ℂ := fun z ↦ sLocalHeckeL (twistₛ c z)
+  have hLbound : min 0 (meromorphicOrderAt L 0) =
+      ((-(sLocalRhoPoleOrder c : ℤ) : ℤ) : WithTop ℤ) := by
+    have he : min 0 (meromorphicOrderAt L 0) = sLocalIdelicOrderBound c := by
+      dsimp only [L]
+      unfold sLocalIdelicOrderBound
+      rw [← ha, sLocalOrbital_centered_order, sLocalOrbital_centered_order]
+      exact sLocalHeckeL_poleOrder_eq (F := F) S χ a
+    exact he.trans (sLocalIdelicOrderBound_eq_neg_poleOrder c)
+  have hlt : min 0 (meromorphicOrderAt L 0) < 0 := by
+    rw [hLbound]
+    exact_mod_cast (show -(sLocalRhoPoleOrder c : ℤ) < 0 by omega)
+  have hLo : meromorphicOrderAt L 0 = ((-(sLocalRhoPoleOrder c : ℤ) : ℤ) : WithTop ℤ) :=
+    (min_eq_right ((min_lt_iff.mp hlt).resolve_left (lt_irrefl _)).le).symm.trans hLbound
+  let N := Z(f,c) / L
+  change toMeromorphicNFOn N univ 0 ≠ 0 at hf
+  have hN : MeromorphicOn N univ := by
+    by_contra h
+    exact hf (congrFun (toMeromorphicNFOn_of_not_meromorphicOn h) 0)
+  have hNo : meromorphicOrderAt N 0 = 0 := by
+    rw [toMeromorphicNFOn_eq_toMeromorphicNFAt hN (mem_univ _)] at hf
+    exact ((hN 0 trivial).meromorphicOrderAt_eq_zero_iff_toMeromorphicNFAt_ne_zero).mpr hf
+  have hLm := meromorphicAt_of_meromorphicOrderAt_ne_zero
+    (((min_lt_iff.mp hlt).resolve_left (lt_irrefl _)).ne)
+  have hNZ : Z(f,c) =ᶠ[𝓝[≠] (0 : ℂ)] N * L := by
+    filter_upwards [(meromorphicOrderAt_ne_top_iff_eventually_ne_zero hLm).mp
+      (hLo.trans_ne WithTop.coe_ne_top)] with z hz
+    exact (div_mul_cancel₀ _ hz).symm
+  rw [meromorphicOrderAt_congr hNZ, meromorphicOrderAt_mul (hN 0 trivial) hLm, hNo, zero_add, hLo]
+
+section CompactNormAverage
+
+open Bornology Function MeasureTheory
+
+private theorem exists_intervalAverage {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [UniformSpace E] [IsUniformAddGroup E] [T2Space E] [ContinuousSMul ℂ E]
+    [LocallyConvexSpace ℝ E] [QuasiCompleteSpace ℂ E] (f : ℝ → E) (hf : Continuous f) :
+    ∃ v : E, ∀ ℓ : StrongDual ℂ E, ℓ v = ∫ t in (0 : ℝ)..1, ℓ (f t) := by
+  let μ := volume.restrict (Ioc (0 : ℝ) 1)
+  have : IsFiniteMeasure μ := ⟨by
+    change volume.restrict (Ioc (0 : ℝ) 1) univ < ⊤
+    simp⟩
+  have hμ : ∀ᵐ x ∂μ, x ∈ Icc (0 : ℝ) 1 :=
+    (ae_restrict_mem measurableSet_Ioc).mono fun _ hx ↦ Ioc_subset_Icc_self hx
+  have : ContinuousSMul ℝ E := IsScalarTower.continuousSMul ℂ
+  have hi : PettisWeaklyIntegrable (.positive μ) f := by
+    intro ℓ
+    have h := ℓ.continuous.comp hf
+    obtain ⟨r, hr⟩ := isCompact_Icc.exists_bound_of_continuousOn h.continuousOn
+    exact (integrable_const (μ := μ) r).mono' h.aestronglyMeasurable (hμ.mono hr)
+  let C := closure (convexHull ℝ (insert 0 (f '' Icc (0 : ℝ) 1)))
+  have hc : IsCompact (insert 0 (f '' Icc (0 : ℝ) 1)) := (isCompact_Icc.image hf).insert 0
+  have hC : IsCompact C :=
+    isCompact_closure_of_totallyBounded_quasiComplete (𝕜 := ℂ) hc.totallyBounded.convexHull
+  obtain ⟨v, -, _, he⟩ := exists_hasPettisIntegral_mem_smul_of_isCompact_convex μ hi hC
+    (convex_convexHull ..).closure (subset_closure (subset_convexHull _ _ (mem_insert _ _)))
+    (hμ.mono fun x hx ↦ subset_closure (subset_convexHull _ _ (mem_insert_of_mem _ ⟨x, hx, rfl⟩)))
+  refine ⟨v, fun ℓ ↦ ?_⟩
+  rw [intervalIntegral.integral_of_le zero_le_one]
+  exact congrArg (fun z : PettisWeakCompletion E ↦
+    (show Module.Dual ℂ (StrongDual ℂ E) from z) ℓ) he
+
+private theorem exists_sLocalUnitOrbitAverage (u : ℝ → (SAdeleRing F S)ˣ) (hu : Continuous u)
+    (w : ℝ → ℂ) (hw : Continuous w) (f : ℬₛ) :
+    ∃ v : ℬₛ, ∀ ℓ : StrongDual ℂ ℬₛ,
+      ℓ v = ∫ t in (0 : ℝ)..1, w t * ℓ (schwartzBruhatUnitTranslate (u t) f) := by
+  let : T2Space ℬₛ := (sAdeleSchwartz_nuclear.{_,0} F S).1
+  let : PolynormableSpace ℂ ℬₛ := (sAdeleSchwartz_nuclear.{_,0} F S).2.1
+  let : LocallyConvexSpace ℝ ℬₛ := (PolynormableSpace.withSeminorms ℂ ℬₛ).toLocallyConvexSpace
+  let : CompleteSpace ℬₛ := sAdeleSchwartz_complete F S
+  have h : Continuous fun t ↦ schwartzBruhatUnitTranslate (u t) f :=
+    continuous_sAdeleSchwartz_unitTranslate.comp (hu.prodMk continuous_const)
+  obtain ⟨v, hv⟩ := exists_intervalAverage _ (hw.smul h)
+  exact ⟨v, fun ℓ ↦ by simpa only [Pi.smul_apply', map_smul, smul_eq_mul, RingHom.id_apply] using hv ℓ⟩
+
+private theorem exists_sLocalLogNormSection :
+    ∃ u : ℝ → (SAdeleRing F S)ˣ, Continuous u ∧ ∀ t, ((sIdeleNorm F S (u t)).val : ℝ) = Real.exp t := by
+  let σ := (Units.map (adeleProjection F S).toMonoidHom).comp (canonicalIdeleNormSection F)
+  let r (t : ℝ) := (Nonneg.unitsHomeomorphPos ℝ).symm (Real.expOrderIso t)
+  have hr : Continuous r := (Nonneg.unitsHomeomorphPos ℝ).symm.continuous.comp Real.expOrderIso.continuous
+  have hp : Continuous (Units.map (adeleProjection F S).toMonoidHom) :=
+    (continuous_fst.prodMk (continuous_pi fun v : S ↦
+      (RestrictedProduct.continuous_eval v.val).comp continuous_snd)).units_map _
+  refine ⟨fun t ↦ σ (r t), hp.comp ((canonicalIdeleNormSection_continuous F).comp hr), ?_⟩
+  intro t
+  rw [show sIdeleNorm F S (σ (r t)) = r t from sIdeleNorm_project_canonicalSection F S _]
+  rfl
+
+private theorem intervalAverage_exp_neg (c : ℂ) (hc : c ≠ 0) :
+    (∫ t in (0 : ℝ)..1, Complex.exp (-c * t)) = (1 - Complex.exp (-c)) / c := by
+  rw [integral_exp_mul_complex (neg_ne_zero.mpr hc)]
+  simp
+  ring
+
+private theorem exists_sLocalRegularEval (c : Xₛ) (hc : 0 ≤ sLocalIdelicOrderBound c) :
+    ∃ ℓ : StrongDual ℂ ℬₛ, ∀ f, ℓ f = sLocalIdelicZFunction f c := by
+  let d : {c : Xₛ // 0 ≤ sLocalIdelicOrderBound c} := ⟨c, hc⟩
+  let M := (Submodule.subtype _).comp (sLocalIdelicMellin (F := F) (S := S))
+  let ℓ : ℬₛ →ₗ[ℂ] ℂ := (ContinuousMap.evalCLM ℂ d).toLinearMap.comp M
+  refine ⟨⟨ℓ, ?_⟩, fun _ ↦ rfl⟩
+  exact (ContinuousMap.evalCLM ℂ d).continuous.comp sLocalIdelicMellin_continuous.subtype_val
+
+private theorem sLocalLogSection_twist (c₀ : Xₛ) (g : (SAdeleRing F S)ˣ) (z : ℂ) (r : ℝ)
+    (hr : ((sIdeleNorm F S g).val : ℝ) = Real.exp r) :
+    (twistₛ c₀ z) (QuotientGroup.mk g) =
+      c₀ (QuotientGroup.mk g) * Complex.exp ((r : ℂ) * z) := by
+  change c₀ _ * (((((sIdeleNorm F S g).val : ℝ) : ℂ)) ^ z) = _
+  rw [hr, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (Real.exp_pos _).ne'),
+    ← Complex.ofReal_log (Real.exp_pos _).le, Real.log_exp]
+
+private theorem sLocalRegularEval_translate (c : Xₛ) (hc : 0 ≤ sLocalIdelicOrderBound c)
+    (u : (SAdeleRing F S)ˣ) (f : ℬₛ) (ℓ : StrongDual ℂ ℬₛ)
+    (hℓ : ∀ f, ℓ f = sLocalIdelicZFunction f c) :
+    ℓ (schwartzBruhatUnitTranslate u f) = c (QuotientGroup.mk u) * ℓ f := by
+  rw [hℓ, hℓ]
+  exact sLocalIdelicMellin_unitTranslate (F := F) (S := S) u f ⟨c, hc⟩
+
+private theorem exists_sLocalMellin_dividedFactor (c₀ : Xₛ) {L : ℝ} (hL : L ≠ 0) (f : ℬₛ) :
+    ∃ v : ℬₛ, ∀ z : ℂ, z ≠ 0 → 0 ≤ sLocalIdelicOrderBound (twistₛ c₀ z) →
+      sLocalIdelicZFunction v (twistₛ c₀ z) =
+        (1 - Complex.exp (-(L : ℂ) * z)) / ((L : ℂ) * z) * sLocalIdelicZFunction f (twistₛ c₀ z) := by
+  obtain ⟨u, hu, hN⟩ := exists_sLocalLogNormSection (F := F) (S := S)
+  let γ (t : ℝ) := u (-L * t)
+  let x (t : ℝ) : Jₛ := QuotientGroup.mk (γ t)
+  have hγ : Continuous γ := hu.comp (continuous_const.mul continuous_id)
+  have hx : Continuous x := QuotientGroup.continuous_mk.comp hγ
+  have hc (t : ℝ) : c₀ (x t) ≠ 0 := ((Group.isUnit _).map c₀).ne_zero
+  obtain ⟨v, hv⟩ := exists_sLocalUnitOrbitAverage (F := F) (S := S) γ hγ _ ((c₀.continuous.comp hx).inv₀ hc) f
+  refine ⟨v, ?_⟩
+  intro z hz hreg
+  let d : Xₛ := twistₛ c₀ z
+  change 0 ≤ sLocalIdelicOrderBound d at hreg
+  change sLocalIdelicZFunction v d = _ * sLocalIdelicZFunction f d
+  obtain ⟨ℓ, hℓ⟩ := exists_sLocalRegularEval (F := F) (S := S) d hreg
+  have hval (t : ℝ) : (twistₛ c₀ z) (x t) = c₀ (x t) * Complex.exp (-((L : ℂ) * z) * t) := by
+    rw [show (twistₛ c₀ z) (x t) = _ from sLocalLogSection_twist (F := F) (S := S)
+      c₀ (γ t) z (-L * t) (hN _), Complex.ofReal_mul, Complex.ofReal_neg]
+    congr 2
+    ring
+  rw [← hℓ v, hv ℓ, ← hℓ f]
+  calc
+    _ = ∫ t in (0 : ℝ)..1, Complex.exp (-((L : ℂ) * z) * t) * ℓ f := by
+      refine intervalIntegral.integral_congr fun t _ ↦ ?_
+      change (c₀ (x t))⁻¹ * ℓ (schwartzBruhatUnitTranslate (γ t) f) = _
+      rw [sLocalRegularEval_translate (F := F) (S := S) d hreg (γ t) f ℓ hℓ]
+      change (c₀ (x t))⁻¹ * ((twistₛ c₀ z) (x t) * ℓ f) = _
+      rw [hval, ← mul_assoc, inv_mul_cancel_left₀ (hc t)]
+    _ = _ := by
+      rw [intervalIntegral.integral_mul_const, intervalAverage_exp_neg _ (mul_ne_zero
+        (Complex.ofReal_ne_zero.mpr hL) hz), neg_mul]
+
+/-- Averaging a local Schwartz test over a compact interval of norm translations
+multiplies its centered Mellin germ by the divided exponential factor. -/
+private theorem exists_sLocalMellin_dividedFactor_germ (c₀ : Xₛ) {L : ℝ} (hL : L ≠ 0) (f : ℬₛ) :
+    ∃ v : ℬₛ, ∀ (c : Xₛ) (b : ℂ), twistₛ c₀ b = c →
+      (fun z ↦ sLocalIdelicZFunction v (twistₛ c z)) =ᶠ[𝓝[≠] (0 : ℂ)]
+        fun z ↦ ((1 - Complex.exp (-(L : ℂ) * (z + b))) / ((L : ℂ) * (z + b))) *
+          sLocalIdelicZFunction f (twistₛ c z) := by
+  obtain ⟨v, hv⟩ := exists_sLocalMellin_dividedFactor (F := F) (S := S) c₀ hL f
+  refine ⟨v, ?_⟩
+  intro c b hcb
+  have hreg := sLocalOrbital_eventually_regular c
+  have hne : ∀ᶠ z : ℂ in 𝓝[≠] 0, z ≠ 0 := self_mem_nhdsWithin (a := (0 : ℂ)) (s := {0}ᶜ)
+  have hn : ∀ᶠ z : ℂ in 𝓝[≠] 0, z + b ≠ 0 := by
+    by_cases hb : b = 0
+    · simpa only [hb, add_zero] using hne
+    · filter_upwards [eventually_ne_nhdsWithin (s := {(0 : ℂ)}ᶜ) (show (0 : ℂ) ≠ -b by simpa using hb)] with z hz
+      exact fun h ↦ hz (eq_neg_of_add_eq_zero_left h)
+  filter_upwards [hreg, hn] with z h hz'
+  have heq : twistₛ c z = twistₛ c₀ (z + b) := by
+    rw [← hcb]
+    have e := normTwist_normTwist (G := Jₛ) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous c₀ b z
+    exact e
+  exact heq.symm ▸ hv (z + b) hz' (heq ▸ h)
+
+end CompactNormAverage
+
+/-- Residues only depend on the germ on a punctured neighbourhood. -/
+private theorem orbitalResidue_congr {g h : ℂ → ℂ}
+    (he : g =ᶠ[𝓝[≠] (0 : ℂ)] h) : complexResidue g 0 = complexResidue h 0 := by
+  obtain ⟨δ, hδ, hEq⟩ := Metric.nhdsWithin_basis_ball.eventually_iff.mp he
+  unfold complexResidue limUnder
+  refine congrArg lim (Filter.map_congr ?_)
+  filter_upwards [Ioo_mem_nhdsGT hδ] with r hr
+  rw [circleIntegral.integral_congr hr.1.le fun z hz ↦ hEq ⟨?_, ?_⟩]
+  · rw [Metric.mem_ball, Metric.mem_sphere.mp hz]
+    exact hr.2
+  · rintro rfl
+    exact hr.1.ne (by simpa using hz)
+
+/-- An exact pole order gives a nonzero coefficient at that order. -/
+private theorem sLocalPrincipalPartCoeff_ne_zero_of_centered_order (f : ℬₛ) (c : Xₛ) (k : ℕ)
+    (h : meromorphicOrderAt (fun z ↦ sLocalIdelicZFunction f (twistₛ c z)) 0 = ((-(k : ℤ) : ℤ) : WithTop ℤ)) :
+    sLocalPrincipalPartCoeff c k f ≠ 0 := by
+  let Z : ℂ → ℂ := fun z ↦ sLocalIdelicZFunction f (twistₛ c z)
+  obtain ⟨χ, s, hs⟩ := sLocalOrbitalPrincipalPart_range_le_ker_chart c
+  have hmer : MeromorphicAt Z 0 := (sLocalOrbitalPrincipalPart_range_le_ker_zeta f χ s c hs).1
+  obtain ⟨G, hG, hG0, hEq⟩ := (meromorphicOrderAt_eq_int_iff hmer).mp h
+  rw [sLocalPrincipalPartCoeff_apply]
+  change complexResidue (fun z ↦ Z z / z ^ (-(k : ℤ) + 1)) 0 ≠ 0
+  have he : (fun z ↦ Z z / z ^ (-(k : ℤ) + 1)) =ᶠ[𝓝[≠] 0] (fun z ↦ G z / (z - 0)) := by
+    filter_upwards [hEq, self_mem_nhdsWithin] with z hz hz0
+    have hn : z ≠ 0 := hz0
+    rw [hz, sub_zero, smul_eq_mul, zpow_add₀ hn, zpow_one]
+    field_simp [zpow_ne_zero _ hn]
+  rwa [orbitalResidue_congr he, complexResidue_div_sub hG]
+
 
 private theorem orbitalCoeff_zero_of_centered_order (f : ℬₛ) (c : Xₛ) (k : ℕ)
     (hk : 0 < k) (h : ((-(k : ℤ) : ℤ) : WithTop ℤ) < meromorphicOrderAt Z(f,c) 0) :
@@ -949,24 +1245,43 @@ private theorem orbitalNormTwist_zero (c : Xₛ) : twistₛ c 0 = c := by
   change c t * _ ^ (0 : ℂ) = c t
   rw [Complex.cpow_zero, mul_one]
 
+private theorem orbitalNormTwist_of_same_restriction (c d : Xₛ)
+    (h : normOneRestriction mₛ c = normOneRestriction mₛ d) :
+    ∃ b : ℂ, twistₛ c b = d := by
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  obtain ⟨a, ha, -⟩ := existsUnique_complexPower (c.comp σ)
+  obtain ⟨b, hb, -⟩ := existsUnique_complexPower (d.comp σ)
+  refine ⟨b - a, ContinuousMonoidHom.ext fun x ↦ ?_⟩
+  let t := mₛ x
+  let k : J₁ := ⟨x / σ t, by
+    change mₛ (x / σ t) = 1
+    rw [map_div, hσ, div_self']⟩
+  have hk : c k.val = d k.val := DFunLike.congr_fun h k
+  have hx : k.val * σ t = x := div_mul_cancel _ _
+  have hn : (((t : ℝ≥0) : ℝ) : ℂ) ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr t.ne_zero)
+  change c x * (((t : ℝ≥0) : ℝ) : ℂ) ^ (b - a) = d x
+  rw [← hx, map_mul, map_mul, hk]
+  change d k.val * (c.comp σ) t * _ = d k.val * (d.comp σ) t
+  rw [ha, hb, mul_assoc, ← Complex.cpow_add _ _ hn]
+  congr 2
+  ring
+
 private theorem orbitalReciprocal_lift_shift {T : Finset V} (ω : PontryaginDual J₁) (j : I(T,ω)) :
     ∃ b : I(T,ω) → ℂ, (∀ i, b i = 0 ↔ i.val.1 = j.val.1) ∧
       ∀ i, twistₛ j.val.1 (b i) = i.val.1 := by
   classical
-  obtain ⟨χ, -, hcover⟩ := sLocalThetaPoleBound_zero_chart (F := F) (S := S) ω
-  obtain ⟨a, ha⟩ := hcover j.val.1 j.property.1
-  choose w hw using fun i : I(T,ω) ↦ hcover i.val.1 i.property.1
-  let b (i : I(T,ω)) := if i.val.1 = j.val.1 then 0 else w i - a
-  have e (i : I(T,ω)) : twistₛ j.val.1 (b i) = i.val.1 := by
+  choose w hw using fun i : I(T,ω) ↦
+    orbitalNormTwist_of_same_restriction _ _ (j.property.1.trans i.property.1.symm)
+  let b (i : I(T,ω)) := if i.val.1 = j.val.1 then 0 else w i
+  have he (i : I(T,ω)) : twistₛ j.val.1 (b i) = i.val.1 := by
     by_cases h : i.val.1 = j.val.1
     · simp only [b, ite_eq_left h]
       exact (orbitalNormTwist_zero j.val.1).trans h.symm
-    · simp only [b, ite_eq_right h]
-      rw [← ha, normTwist_normTwist, sub_add_cancel]
-      exact hw i
-  refine ⟨b, fun i ↦ ⟨?_, fun h ↦ ite_eq_left h⟩, e⟩
+    · simpa only [b, ite_eq_right h] using hw i
+  refine ⟨b, fun i ↦ ⟨?_, fun h ↦ ite_eq_left h⟩, he⟩
   intro h
-  have h' := e i
+  have h' := he i
   rw [h, orbitalNormTwist_zero] at h'
   exact h'.symm
 
