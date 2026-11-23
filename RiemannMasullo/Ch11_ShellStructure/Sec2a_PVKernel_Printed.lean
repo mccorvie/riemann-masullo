@@ -522,8 +522,9 @@ private theorem pvKernel_rat_simple_zero :
     exact mul_ne_zero (neg_ne_zero.mpr (mul_ne_zero (Complex.exp_ne_zero _)
       (mul_ne_zero (neg_ne_zero.mpr (Complex.ofReal_ne_zero.mpr hlog.ne')) one_ne_zero))) h₃
 
-/-- At the simple zero of the rational two-prime Euler product, a first
-logarithmic moment can be nonzero on the principal-value image. -/
+/-- Paper: Proof of Proposition 11.2.0.1(2), p. 485.
+At the simple zero of the rational two-prime Euler product, a first logarithmic
+moment can be nonzero on the principal-value image. -/
 theorem Printed.globalThetaSobolevPrincipalValue_range_eq_jetKernels_false :
     ¬ Printed.globalThetaSobolevPrincipalValue_range_eq_jetKernels := by
   intro h
