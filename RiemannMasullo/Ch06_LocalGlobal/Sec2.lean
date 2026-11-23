@@ -1032,6 +1032,39 @@ local notation "sumProperties(" D ")" =>
     BarrelledSpace ℂ (StrongDual ℂ D) ∧ MontelSpace ℂ (StrongDual ℂ D)
 
 /-- Paper: Remark 6.2.1.4(1), p. 297.
+The locally convex sum of the S-local isotypes is an LF-space and is nuclear. This is the
+first half of the space part of Theorem 5.2.3.1(2) for that sum. -/
+theorem sLocalThetaIsotypeSum_isLFSpace_nuclear :
+    let X := fun χ : PontryaginDual J₁(S) ↦ ↥(Eₛ(χ))
+    letI := Classical.decEq (PontryaginDual J₁(S))
+    let D := ⨁ χ, X χ
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
+    IsLFSpace D ∧ IsNuclearTVS D := by sorry
+
+/-- Paper: Remark 6.2.1.4(1), p. 297.
+The locally convex sum of the S-local isotypes is barrelled and Montel. This is the second
+half of the space part of Theorem 5.2.3.1(2) for that sum; together with the completeness
+and polynormability of `sLocalThetaIsotypeSum_complete` it is the full space half. -/
+theorem sLocalThetaIsotypeSum_barrelled_montel :
+    let X := fun χ : PontryaginDual J₁(S) ↦ ↥(Eₛ(χ))
+    letI := Classical.decEq (PontryaginDual J₁(S))
+    let D := ⨁ χ, X χ
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
+    BarrelledSpace ℂ D ∧ MontelSpace ℂ D := by sorry
+
+/-- Paper: Remark 6.2.1.4(1), p. 297.
+The strong dual of the locally convex sum of the S-local isotypes is complete, nuclear,
+barrelled and Montel: its strong dual identifies with the product of the strong duals of
+the summands, and a product of nuclear spaces is nuclear. -/
+theorem sLocalThetaIsotypeSum_strongDual_properties :
+    let X := fun χ : PontryaginDual J₁(S) ↦ ↥(Eₛ(χ))
+    letI := Classical.decEq (PontryaginDual J₁(S))
+    let D := ⨁ χ, X χ
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
+    CompleteSpace (StrongDual ℂ D) ∧ IsNuclearTVS (StrongDual ℂ D) ∧
+      BarrelledSpace ℂ (StrongDual ℂ D) ∧ MontelSpace ℂ (StrongDual ℂ D) := by sorry
+
+/-- Paper: Remark 6.2.1.4(1), p. 297.
 The locally convex sum of the local isotypes inherits the space and strong-dual properties
 listed in Theorem 5.2.3.1(2). -/
 theorem sLocalThetaIsotypeSum_inherited_properties :
@@ -1039,7 +1072,44 @@ theorem sLocalThetaIsotypeSum_inherited_properties :
     letI := Classical.decEq (PontryaginDual J₁(S))
     let D := ⨁ χ, X χ
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
-    sumProperties(D) := by sorry
+    sumProperties(D) := by
+  have h₁ := sLocalThetaIsotypeSum_isLFSpace_nuclear (F := F) (S := S)
+  have h₂ := sLocalThetaIsotypeSum_barrelled_montel (F := F) (S := S)
+  have h₃ := sLocalThetaIsotypeSum_strongDual_properties (F := F) (S := S)
+  exact ⟨h₁.1, h₁.2, h₂.1, h₂.2, h₃.1, h₃.2.1, h₃.2.2.1, h₃.2.2.2⟩
+
+/-- Paper: Remark 6.2.1.4(1), p. 297.
+The locally convex sum of the global isotypes is an LF-space and is nuclear. This is the
+first half of the space part of Theorem 5.2.3.1(2) for that sum. -/
+theorem globalThetaIsotypeSum_isLFSpace_nuclear :
+    let X := fun ω : PontryaginDual C₁ ↦ ↥(E𝔽(ω))
+    letI := Classical.decEq (PontryaginDual C₁)
+    let D := ⨁ ω, X ω
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
+    IsLFSpace D ∧ IsNuclearTVS D := by sorry
+
+/-- Paper: Remark 6.2.1.4(1), p. 297.
+The locally convex sum of the global isotypes is barrelled and Montel. This is the second
+half of the space part of Theorem 5.2.3.1(2) for that sum; together with the completeness
+and polynormability of `globalThetaIsotypeSum_complete` it is the full space half. -/
+theorem globalThetaIsotypeSum_barrelled_montel :
+    let X := fun ω : PontryaginDual C₁ ↦ ↥(E𝔽(ω))
+    letI := Classical.decEq (PontryaginDual C₁)
+    let D := ⨁ ω, X ω
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
+    BarrelledSpace ℂ D ∧ MontelSpace ℂ D := by sorry
+
+/-- Paper: Remark 6.2.1.4(1), p. 297.
+The strong dual of the locally convex sum of the global isotypes is complete, nuclear,
+barrelled and Montel: its strong dual identifies with the product of the strong duals of
+the summands, and a product of nuclear spaces is nuclear. -/
+theorem globalThetaIsotypeSum_strongDual_properties :
+    let X := fun ω : PontryaginDual C₁ ↦ ↥(E𝔽(ω))
+    letI := Classical.decEq (PontryaginDual C₁)
+    let D := ⨁ ω, X ω
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
+    CompleteSpace (StrongDual ℂ D) ∧ IsNuclearTVS (StrongDual ℂ D) ∧
+      BarrelledSpace ℂ (StrongDual ℂ D) ∧ MontelSpace ℂ (StrongDual ℂ D) := by sorry
 
 /-- Paper: Remark 6.2.1.4(1), p. 297.
 The locally convex sum of the global isotypes inherits the space and strong-dual properties
@@ -1049,7 +1119,11 @@ theorem globalThetaIsotypeSum_inherited_properties :
     letI := Classical.decEq (PontryaginDual C₁)
     let D := ⨁ ω, X ω
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
-    sumProperties(D) := by sorry
+    sumProperties(D) := by
+  have h₁ := globalThetaIsotypeSum_isLFSpace_nuclear (F := F)
+  have h₂ := globalThetaIsotypeSum_barrelled_montel (F := F)
+  have h₃ := globalThetaIsotypeSum_strongDual_properties (F := F)
+  exact ⟨h₁.1, h₁.2, h₂.1, h₂.2, h₃.1, h₃.2.1, h₃.2.2.1, h₃.2.2.2⟩
 
 -- TODO(paper-gap): Remark 6.2.1.4(2) also asserts nonclosed product images.
 -- At the rational archimedean stage the image in the product of homogeneous

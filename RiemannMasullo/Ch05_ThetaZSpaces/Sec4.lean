@@ -1042,11 +1042,330 @@ theorem mem_sLocalPolarFreeMatching_iff (χ : PontryaginDual Jₛ) (p : B⁺ × 
     (p.2.property.2.1.analyticOnNhd (isOpen_Iio.preimage Complex.continuous_re))
     ((mem_sLocalZetaMatching χ p).mp hp)
 
+/-- The real vertical trace differentiates by one factor of I at each step. -/
+private theorem sLocalPolarFreeZetaPair_vertical_deriv (b : B⁻) (a : leftInterval)
+    (n : ℕ) (x : ℝ) :
+    iteratedDeriv n (fun y : ℝ ↦ b.val ((a.val : ℂ) + (y : ℂ) * Complex.I)) x =
+      Complex.I ^ n * iteratedDeriv n b.val ((a.val : ℂ) + (x : ℂ) * Complex.I) := by
+  let L (z : ℂ) := (a.val : ℂ) + z * Complex.I
+  have hL (z : ℂ) : HasDerivAt L Complex.I z := by
+    change HasDerivAt (fun w : ℂ ↦ (a.val : ℂ) + w * Complex.I) Complex.I z
+    simpa only [id_eq, one_mul] using
+      ((hasDerivAt_id z).mul_const Complex.I).const_add (a.val : ℂ)
+  have ha : AnalyticOnNhd ℂ b.val leftHalf :=
+    b.property.2.1.analyticOnNhd (isOpen_Iio.preimage Complex.continuous_re)
+  have hn (k : ℕ) : AnalyticOnNhd ℂ (iteratedDeriv k b.val) leftHalf := by
+    rw [iteratedDeriv_eq_iterate]
+    exact ha.iterated_deriv k
+  change iteratedDeriv n (fun y : ℝ ↦ b.val (L y)) x = Complex.I ^ n * iteratedDeriv n b.val (L x)
+  induction n generalizing x with
+  | zero => simp [iteratedDeriv_zero]
+  | succ k ih =>
+    have hx : L x ∈ leftHalf := by simp [L, Complex.add_re, Complex.mul_re]
+    have hh : HasDerivAt (iteratedDeriv k b.val) (iteratedDeriv (k + 1) b.val (L x)) (L x) := by
+      rw [iteratedDeriv_succ]
+      exact (hn k (L x) hx).differentiableAt.hasDerivAt
+    have he : (iteratedDeriv k (fun y : ℝ ↦ b.val (L y))) =
+        fun y : ℝ ↦ Complex.I ^ k * iteratedDeriv k b.val (L y) := funext ih
+    have hdiff : HasDerivAt (fun y : ℝ ↦ Complex.I ^ k * iteratedDeriv k b.val (L y))
+        (Complex.I ^ k * (iteratedDeriv (k + 1) b.val (L x) * Complex.I)) x :=
+      (((hh.comp (x : ℂ) (hL x)).comp_ofReal).const_mul (Complex.I ^ k))
+    rw [iteratedDeriv_succ, he]
+    exact hdiff.deriv.trans (by ring)
+
+private theorem sLocalPolarFreeZetaPair_schwartz_deriv_continuous (n : ℕ) :
+    Continuous (fun f : SchwartzMap ℝ ℂ ↦ iteratedDeriv n (f : ℝ → ℂ)) := by
+  have h (n : ℕ) : ∀ f : SchwartzMap ℝ ℂ,
+      (⇑((SchwartzMap.derivCLM ℂ ℂ)^[n] f) : ℝ → ℂ) = iteratedDeriv n (f : ℝ → ℂ) := by
+    induction n with
+    | zero => intro f; simp [iteratedDeriv_zero]
+    | succ k ih =>
+      intro f
+      rw [Function.iterate_succ_apply', iteratedDeriv_succ, ← ih f]
+      exact funext (SchwartzMap.derivCLM_apply ℂ ((SchwartzMap.derivCLM ℂ ℂ)^[k] f))
+  simp_rw [← h]
+  have hc : Continuous (fun f : SchwartzMap ℝ ℂ ↦ (f : ℝ → ℂ)) :=
+    continuous_pi fun x ↦ ((continuous_eval_const (F := BoundedContinuousFunction ℝ ℂ) x).comp
+      (SchwartzMap.toBoundedContinuousFunctionCLM ℂ ℝ ℂ).continuous)
+  exact hc.comp ((SchwartzMap.derivCLM ℂ ℂ).continuous.iterate n)
+
+/-- The Schwartz-line realization of a Bergman function makes each complex jet continuous. -/
+private theorem sLocalPolarFreeZetaPair_continuous_jet (s : ℂ) (hs : s ∈ leftHalf) (n : ℕ) :
+    Continuous (fun b : B⁻ ↦ iteratedDeriv n b.val s) := by
+  obtain ⟨T, hT, hE⟩ := schwartzBergman_schwartzLine_topology leftInterval isOpen_Iio
+    ordConnected_Iio ⟨0, by norm_num⟩
+  let a : leftInterval := ⟨s.re, hs⟩
+  have hL : (a.val : ℂ) + (s.im : ℂ) * Complex.I = s := Complex.re_add_im s
+  have hTeq (b : B⁻) : ⇑(T b a) = fun y : ℝ ↦ b.val ((a.val : ℂ) + (y : ℂ) * Complex.I) := by
+    funext y
+    simpa only [weightedVerticalTrace, pow_zero, one_mul] using hT b a y
+  have hC : Continuous (fun b : B⁻ ↦ iteratedDeriv n ((T b a : SchwartzMap ℝ ℂ) : ℝ → ℂ) s.im) :=
+    (continuous_apply s.im).comp ((sLocalPolarFreeZetaPair_schwartz_deriv_continuous n).comp
+      ((continuous_apply a).comp hE.continuous))
+  apply (hC.const_mul ((Complex.I ^ n)⁻¹)).congr
+  intro b
+  rw [hTeq, sLocalPolarFreeZetaPair_vertical_deriv b a n, hL,
+    inv_mul_cancel_left₀ (pow_ne_zero _ Complex.I_ne_zero)]
+
+private theorem sLocalPolarFreeZetaPair_closed_at (ρ : ℂ → ℂ) (s : ℂ) (hs : s ∈ leftHalf)
+    (hρ : MeromorphicAt ρ s) :
+    IsClosed {b : B⁻ | 0 ≤ meromorphicOrderAt (fun z ↦ ρ z * b.val z) s} := by
+  have hb (b : B⁻) : AnalyticAt ℂ b.val s :=
+    b.property.2.1.analyticAt ((isOpen_Iio.preimage Complex.continuous_re).mem_nhds hs)
+  cases h : meromorphicOrderAt ρ s with
+  | top =>
+    convert isClosed_univ using 1
+    ext b
+    simp only [mem_univ, iff_true]
+    change 0 ≤ meromorphicOrderAt (ρ * b.val) s
+    simp [meromorphicOrderAt_mul hρ (hb b).meromorphicAt, h]
+  | coe k =>
+    by_cases hk : 0 ≤ k
+    · convert isClosed_univ using 1
+      ext b
+      simp only [mem_univ, iff_true]
+      change 0 ≤ meromorphicOrderAt (ρ * b.val) s
+      rw [meromorphicOrderAt_mul hρ (hb b).meromorphicAt, h]
+      exact add_nonneg (WithTop.coe_nonneg.mpr hk) (hb b).meromorphicOrderAt_nonneg
+    · let N := (-k).toNat
+      have hN : (N : ℤ) = -k := Int.toNat_of_nonneg (neg_nonneg.mpr (le_of_not_ge hk))
+      have he (b : B⁻) : (0 ≤ meromorphicOrderAt (fun z ↦ ρ z * b.val z) s) ↔
+          ∀ n < N, iteratedDeriv n b.val s = 0 := by
+        change (0 ≤ meromorphicOrderAt (ρ * b.val) s) ↔ _
+        rw [← natCast_le_analyticOrderAt_iff_iteratedDeriv_eq_zero (hb b),
+          meromorphicOrderAt_mul hρ (hb b).meromorphicAt, h, (hb b).meromorphicOrderAt_eq]
+        cases hord : analyticOrderAt b.val s with
+        | top => simp
+        | coe m =>
+          rw [show (↑m : ℕ∞) = (m : ENat) from rfl, ENat.map_natCast, ← WithTop.coe_add]
+          norm_cast
+          omega
+      have hset : {b : B⁻ | 0 ≤ meromorphicOrderAt (fun z ↦ ρ z * b.val z) s} =
+          ⋂ (n : ℕ) (_ : n < N), {b : B⁻ | iteratedDeriv n b.val s = 0} := by
+        ext b
+        simp only [Set.mem_ofPred_eq, Set.mem_iInter, he]
+      rw [hset]
+      exact isClosed_iInter fun n ↦ isClosed_iInter fun _ ↦
+        isClosed_eq (sLocalPolarFreeZetaPair_continuous_jet s hs n) continuous_const
+
+/-- On the left half-plane the pole cancellation conditions are closed in the
+Bergman topology, since each is a finite collection of vanishing jets. -/
+private theorem sLocalPolarFreeZetaPair_closed_poles (ρ : ℂ → ℂ) (hρ : Meromorphic ρ) :
+    IsClosed {p : B⁺ × B⁻ | ∀ s ∈ leftHalf,
+      0 ≤ meromorphicOrderAt (fun z ↦ ρ z * p.2.val z) s} := by
+  have he : {p : B⁺ × B⁻ | ∀ s ∈ leftHalf, 0 ≤ meromorphicOrderAt (fun z ↦ ρ z * p.2.val z) s} =
+      ⋂ (s : ℂ) (_ : s ∈ leftHalf), Prod.snd ⁻¹'
+        {b : B⁻ | 0 ≤ meromorphicOrderAt (fun z ↦ ρ z * b.val z) s} := by
+    ext p
+    simp only [mem_ofPred_eq, mem_iInter, mem_preimage]
+  rw [he]
+  exact isClosed_iInter fun s ↦ isClosed_iInter fun hs ↦
+    (sLocalPolarFreeZetaPair_closed_at ρ s hs (hρ s)).preimage continuous_snd
+
+/-- In normal form, agreeing on the right half-plane with an entire function
+forces the meromorphic continuation to equal that function everywhere. -/
+private theorem sLocalPolarFreeZetaPair_entire_of_extension (f H : ℂ → ℂ)
+    (hf : MeromorphicNFOn f univ) (hH : AnalyticOnNhd ℂ H univ)
+    (hEq : EqOn f H rightHalf) : AnalyticOnNhd ℂ f univ := by
+  have hdiff : MeromorphicOn (fun z ↦ f z - H z) univ :=
+    hf.meromorphicOn.sub (fun z hz ↦ (hH z hz).meromorphicAt)
+  have h₁ : meromorphicOrderAt (fun z ↦ f z - H z) (1 : ℂ) = ⊤ := by
+    rw [meromorphicOrderAt_eq_top_iff]
+    have hright : (1 : ℂ) ∈ rightHalf := by norm_num [mem_preimage]
+    filter_upwards [nhdsWithin_le_nhds ((isOpen_Ioi.preimage Complex.continuous_re).mem_nhds hright)]
+      with z hz using sub_eq_zero.mpr (hEq hz)
+  have htop (s : ℂ) : meromorphicOrderAt (fun z ↦ f z - H z) s = ⊤ := by
+    by_contra hnot
+    exact (hdiff.exists_meromorphicOrderAt_ne_top_iff_forall_mem isConnected_univ).mp
+      ⟨s, mem_univ s, hnot⟩ 1 (mem_univ _) h₁
+  have he (s : ℂ) : f s = H s := by
+    have hne : f =ᶠ[𝓝[≠] s] H := by
+      filter_upwards [meromorphicOrderAt_eq_top_iff.mp (htop s)] with z hz
+      exact sub_eq_zero.mp hz
+    exact ((hf (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds
+      (hH s (mem_univ s)).meromorphicNFAt).mp hne |>.self_of_nhds
+  rwa [funext he]
+
+/-- On a test the two ordinary zeta components agree by the Tate relation on the overlap. -/
+private theorem sLocalPolarFreeZetaPair_test_matches (χ : PontryaginDual Jₛ) (f : ℬₛ) :
+    let p := sLocalZetaPair (F := F) (S := S) χ (Submodule.Quotient.mk f)
+    EqOn p.1.val (fun z ↦ ρₛ(χ,z) * p.2.val z) overlap := by
+  intro p z hz
+  have h := sLocalZetaPair_mk χ f
+  exact (h.1 hz.1).trans ((existsUnique_sLocalZetaPair_equation χ f z hz).trans
+    (congrArg (ρₛ(χ,z) * ·) (h.2 hz.2).symm))
+
+private theorem sLocalPolarFreeZetaPair_test_entire_iff (χ : PontryaginDual Jₛ) (f : ℬₛ) :
+    let p := sLocalZetaPair (F := F) (S := S) χ (Submodule.Quotient.mk f)
+    (∀ s ∈ leftHalf, 0 ≤ meromorphicOrderAt (fun z ↦ ρₛ(χ,z) * p.2.val z) s) ↔
+      AnalyticOnNhd ℂ (fun z ↦ Zₛ f (normChart(χ) z)) univ := by
+  intro p
+  have h := mem_sLocalPolarFreeMatching_iff_aux (fun z ↦ ρₛ(χ,z)) p.1.val p.2.val
+    (sLocalRhoFactor_meromorphic χ)
+    (p.1.property.2.1.analyticOnNhd (isOpen_Ioi.preimage Complex.continuous_re))
+    (p.2.property.2.1.analyticOnNhd (isOpen_Iio.preimage Complex.continuous_re))
+    (sLocalPolarFreeZetaPair_test_matches χ f)
+  have hright := (sLocalZetaPair_mk χ f).1
+  constructor
+  · intro horders
+    obtain ⟨H, hH, hEq⟩ := h.mpr horders
+    exact sLocalPolarFreeZetaPair_entire_of_extension _ H (sLocalIdelicZFunction_meromorphic f χ)
+      hH (hright.symm.trans hEq.symm)
+  · intro ha
+    exact h.mp ⟨_, ha, hright.symm⟩
+
+/-- The polar-free range is exactly the part of the ordinary zeta range with the
+left pole cancellation conditions. This uses the polar-free representative theorem
+of §5.3 for the entire normalized continuation. -/
+private theorem sLocalPolarFreeZetaPair_range_inter (χ : PontryaginDual Jₛ)
+    (r : RealModels) (c : ComplexModels) :
+    range (sLocalPolarFreeZetaPair (F := F) (S := S) χ r c) =
+      range (sLocalZetaPair (F := F) (S := S) χ) ∩
+        {p : B⁺ × B⁻ | ∀ s ∈ leftHalf, 0 ≤ meromorphicOrderAt (fun z ↦ ρₛ(χ,z) * p.2.val z) s} := by
+  let P := polarTests(r, c)
+  let K := polarKernel(P, restrict₁(χ))
+  let Z := sLocalZetaPair (F := F) (S := S) χ
+  let T := sLocalPolarFreeZetaPair (F := F) (S := S) χ r c
+  have hk (f : P) : T (K.mkQ f) = Z (Submodule.Quotient.mk f.val) := rfl
+  ext p
+  constructor
+  · rintro ⟨u, rfl⟩
+    obtain ⟨f, rfl⟩ := K.mkQ_surjective u
+    rw [hk]
+    exact ⟨⟨_, rfl⟩, (sLocalPolarFreeZetaPair_test_entire_iff χ f.val).mpr
+      (sLocalIdelicZFunction_entire_of_polarFree r c f.val f.property χ)⟩
+  · rintro ⟨⟨u, rfl⟩, hp⟩
+    induction u using Submodule.Quotient.induction_on with
+    | H f =>
+      have hf := (sLocalPolarFreeZetaPair_test_entire_iff χ f).mp hp
+      have hlift := (sLocalIdelicZFunction_entire_iff_eq_polarFree r c χ f).mp hf
+      let g : P := hlift.choose
+      let f' := g.val
+      have he := hlift.choose_spec
+      have hfirst : (Z (Submodule.Quotient.mk f')).1 = (Z (Submodule.Quotient.mk f)).1 := by
+        apply existsUnique_sLocalZetaPair_ext
+        intro z hz
+        exact ((sLocalZetaPair_mk χ f').1 hz).trans
+          ((he z).symm.trans ((sLocalZetaPair_mk χ f).1 hz).symm)
+      have hsecond : (Z (Submodule.Quotient.mk f')).2 = (Z (Submodule.Quotient.mk f)).2 := by
+        apply existsUnique_sLocalZetaPair_left_ext χ
+        intro z hz
+        exact ((sLocalPolarFreeZetaPair_test_matches χ f') hz).symm.trans
+          ((congrArg (fun v : B⁺ ↦ v.val z) hfirst).trans (sLocalPolarFreeZetaPair_test_matches χ f hz))
+      exact ⟨K.mkQ g, (hk _).trans (Prod.ext hfirst hsecond)⟩
+
+private theorem sLocalPolarFreeZetaPair_frechet_submodule {E : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] (hE : IsFrechetTVS E)
+    (P : Submodule ℂ E) (hP : IsClosed (P : Set E)) : IsFrechetTVS P := by
+  obtain ⟨hadd, hpoly, hmet, hcomp⟩ := hE
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace E := hcomp
+  let : IsUniformAddGroup P := P.toAddSubgroup.isUniformAddGroup
+  refine ⟨inferInstance, inferInstance, MetrizableSpace.subtype _, ?_⟩
+  rw [IsUniformAddGroup.rightUniformSpace_eq]
+  exact hP.completeSpace_coe
+
+private theorem sLocalPolarFreeZetaPair_frechet_prod {E V : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [AddCommGroup V] [Module ℂ V] [TopologicalSpace V]
+    (hE : IsFrechetTVS E) (hV : IsFrechetTVS V) : IsFrechetTVS (E × V) := by
+  obtain ⟨haddE, hpolyE, hmetE, hcompE⟩ := hE
+  obtain ⟨haddV, hpolyV, hmetV, hcompV⟩ := hV
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : UniformSpace V := IsTopologicalAddGroup.rightUniformSpace V
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let : IsUniformAddGroup V := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace E := hcompE
+  let : CompleteSpace V := hcompV
+  refine ⟨inferInstance, inferInstance, inferInstance, ?_⟩
+  rw [IsUniformAddGroup.rightUniformSpace_eq]
+  infer_instance
+
+/-- A continuous injection from the quotient of a closed submodule of a strict LF-space
+into a Fréchet space is a closed embedding when its range is closed. The open mapping
+theorem is applied using the closed intersections with the Fréchet stages. -/
+private theorem sLocalPolarFreeZetaPair_embedding_aux {E V : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E] [ContinuousSMul ℂ E]
+    [AddCommGroup V] [Module ℂ V] [TopologicalSpace V]
+    (hE : IsStrictLFSpace E) (hV : IsFrechetTVS V)
+    (P : Submodule ℂ E) (hP : IsClosed (P : Set E)) (K : Submodule ℂ P)
+    (T : P ⧸ K →ₗ[ℂ] V) (hc : Continuous T) (hi : Injective T)
+    (hR : IsClosed (range T)) : IsClosedEmbedding T := by
+  obtain ⟨hT2, S, hmono, hS, hcover, _⟩ := hE
+  let R := T.range
+  have hR' : IsClosed (R : Set V) := hR
+  let Q : P ⧸ K →L[ℂ] R :=
+    (⟨T, hc⟩ : (P ⧸ K) →L[ℂ] V).codRestrict R fun x ↦ ⟨x, rfl⟩
+  let A : P →L[ℂ] R := Q.comp K.mkQL
+  have hsurj : Surjective Q := by
+    intro y
+    obtain ⟨x, h⟩ := y.property
+    exact ⟨x, Subtype.ext h⟩
+  let D (k : ℕ) := P.comap (S k).subtype
+  let d (k : ℕ) : D k →L[ℂ] P :=
+    ((S k).subtypeL.comp (D k).subtypeL).codRestrict P fun x ↦ x.property
+  have hD (k : ℕ) : IsFrechetTVS (D k) :=
+    sLocalPolarFreeZetaPair_frechet_submodule (hS k) _ (hP.preimage continuous_subtype_val)
+  have hinc (k : ℕ) : range (d k) ⊆ range (d (k + 1)) := by
+    rintro _ ⟨x, rfl⟩
+    exact ⟨⟨⟨x.val.val, hmono k.le_succ x.val.property⟩, x.property⟩, rfl⟩
+  have hcov (x : P) : ∃ k, x ∈ range (d k) := by
+    obtain ⟨k, hk⟩ := hcover x.val
+    exact ⟨k, ⟨⟨⟨x.val, hk⟩, x.property⟩, rfl⟩⟩
+  have hAf : IsOpenMap A :=
+    isOpenMap_of_surjective_toLF
+      (isLFSpace_of_isFrechetTVS (sLocalPolarFreeZetaPair_frechet_submodule hV R hR'))
+      hD d hinc hcov A (hsurj.comp K.mkQ_surjective)
+  have hQf : IsOpenMap Q := by
+    intro U hU
+    have hU' := hAf (K.mkQ ⁻¹' U) (hU.preimage K.continuous_mkQ)
+    have he : A '' (K.mkQ ⁻¹' U) = Q '' U := by
+      ext y
+      constructor
+      · rintro ⟨x, hx, rfl⟩
+        exact ⟨K.mkQ x, hx, rfl⟩
+      · rintro ⟨v, hv, rfl⟩
+        obtain ⟨x, rfl⟩ := K.mkQ_surjective v
+        exact ⟨x, hv, rfl⟩
+    exact he ▸ hU'
+  have hQi : Injective Q := fun _ _ h ↦ hi (congrArg Subtype.val h)
+  have hQe := IsOpenEmbedding.of_continuous_injective_isOpenMap Q.continuous hQi hQf
+  exact hR'.isClosedEmbedding_subtypeVal.comp
+    ⟨hQe.isEmbedding, (range_eq_univ.mpr hsurj).symm ▸ isClosed_univ⟩
+
 /-- Paper: Proposition 5.4.1.4, p. 267.
 The zeta pair on the polar-free quotient is a topological embedding with closed range. -/
 theorem sLocalPolarFreeZetaPair_isClosedEmbedding (χ : PontryaginDual Jₛ)
     (r : RealModels) (c : ComplexModels) :
-    IsClosedEmbedding (sLocalPolarFreeZetaPair (F := F) (S := S) χ r c) := by sorry
+    IsClosedEmbedding (sLocalPolarFreeZetaPair (F := F) (S := S) χ r c) := by
+  let P := polarTests(r, c)
+  let K := polarKernel(P, restrict₁(χ))
+  let Q := LinearMap.ker (φω(restrict₁(χ)))
+  let i := polarInclusion(P, restrict₁(χ))
+  let Z := sLocalZetaPair (F := F) (S := S) χ
+  let T := sLocalPolarFreeZetaPair (F := F) (S := S) χ r c
+  have hmap (f : P) : i (K.mkQ f) = Q.mkQ f.val := rfl
+  have hZ : IsClosedEmbedding Z := sLocalZetaPair_isClosedEmbedding χ
+  have hc : Continuous i := by
+    apply K.isQuotientMap_mkQ.continuous_iff.mpr
+    exact (Q.continuous_mkQ.comp continuous_subtype_val).congr fun f ↦ (hmap f).symm
+  have hi : Injective i := by
+    apply LinearMap.ker_eq_bot.mp
+    change LinearMap.ker (K.mapQ Q P.subtype _) = ⊥
+    rw [Submodule.ker_mapQ]
+    exact K.mkQ_map_self
+  have hR : IsClosed (range T) := by
+    show IsClosed (range (sLocalPolarFreeZetaPair (F := F) (S := S) χ r c))
+    rw [sLocalPolarFreeZetaPair_range_inter χ r c]
+    exact hZ.isClosed_range.inter (sLocalPolarFreeZetaPair_closed_poles _ (sLocalRhoFactor_meromorphic χ))
+  have hplus := schwartzBergman_frechet rightInterval isOpen_Ioi ordConnected_Ioi ⟨1, by norm_num⟩
+  have hminus := schwartzBergman_frechet leftInterval isOpen_Iio ordConnected_Iio ⟨0, by norm_num⟩
+  have hV := sLocalPolarFreeZetaPair_frechet_prod hplus hminus
+  have hP : IsClosed (P : Set ℬₛ) := sAdelePolarFree_isClosed r c
+  have hE : IsStrictLFSpace ℬₛ := sAdeleSchwartz_strictLF F S
+  exact sLocalPolarFreeZetaPair_embedding_aux hE hV P hP K T (hZ.continuous.comp hc)
+    (hZ.injective.comp hi) hR
 
 /-- Paper: Proposition 5.4.1.4, p. 267.
 The image of the polar-free quotient consists exactly of the matching pairs in V. -/

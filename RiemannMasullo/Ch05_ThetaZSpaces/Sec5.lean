@@ -455,7 +455,86 @@ theorem sLocalNormalizedEigendistribution_apply_pureTensor (χ : PontryaginDual 
       (∏ w, fArch w (Multiplicative.ofAdd (x.1 w))) *
         ∏ v : S, fFin v (Multiplicative.ofAdd (x.2 v))) :
     sLocalNormalizedEigendistribution (chartₛ(χ) s) f =
-      (∏ w, TArch w (fArch w)) * ∏ v : S, TFin v (fFin v) := by sorry
+      (∏ w, TArch w (fArch w)) * ∏ v : S, TFin v (fFin v) := by
+  classical
+  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+  let (v : S) : MeasurableSpace (v.val.adicCompletion F)ˣ := borel _
+  choose η hη using fun v : S ↦ sLocalNormalizedEigendistribution_gaussian_finChart χ v
+  choose DA hDAh hDA hZA using fun w ↦ infiniteEigendistribution_normalized w (χArch w)
+  choose DB hDBh hDB hZB using fun v : S ↦ finiteEigendistribution_normalized v.val (η v)
+  have heA (w : InfinitePlace F) (z : ℂ) :
+      sLocalInfiniteRestriction w (chartₛ(χ) z) =
+        quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+          ((circleToComplex).comp (χArch w)) z := by
+    ext1 g
+    have hn := sLocalInfiniteRestriction_normTwist (S := S) w z g
+    change (1 : ℂ) * _ = _ at hn
+    rw [one_mul] at hn
+    exact congrArg₂ (· * ·) (DFunLike.congr_fun (hχ w).symm g) hn
+  have hTA (w : InfinitePlace F) : TArch w = DA w s := by
+    apply (hDA w s _).mpr
+    exact (congrArg (fun c ↦ TArch w ∈ schwartzBruhatEigendistributions c ∧
+      TArch w (infiniteStandardGaussian w (χArch w)) = 1) (heA w s)).mp (hArch w)
+  have hTB (v : S) : TFin v = DB v s := by
+    apply (hDB v s _).mpr
+    exact (congrArg (fun c ↦ TFin v ∈ schwartzBruhatEigendistributions c ∧
+      TFin v (finiteStandardGaussian v.val c) = 1) (hη v s)).mp (hFin v)
+  let M : ℂ := ↑(∏ v : S, unitMass(v.val))
+  let Z (z : ℂ) := sLocalNormalizedZFunction f (chartₛ(χ) z)
+  let A (z : ℂ) := ∏ w, DA w z (fArch w)
+  let B (z : ℂ) := ∏ v : S, DB v z (fFin v)
+  have ha : AnalyticOnNhd ℂ Z univ := sLocalNormalizedZFunction_entire f χ
+  have hpa : AnalyticOnNhd ℂ A univ := Finset.univ.analyticOnNhd_fun_prod fun w _ ↦
+    analytic_eval_normalized (hDAh w) (fArch w)
+  have hpb : AnalyticOnNhd ℂ B univ := Finset.univ.analyticOnNhd_fun_prod fun v _ ↦
+    analytic_eval_normalized (hDBh v) (fFin v)
+  have hpos : ∀ᶠ z in 𝓝[≠] (1 : ℂ), 0 < z.re := nhdsWithin_le_nhds
+    ((isOpen_Ioi.preimage Complex.continuous_re).mem_nhds
+      (show (1 : ℂ) ∈ Complex.re ⁻¹' Ioi 0 by simp))
+  have harch := Filter.eventually_all.mpr hZA
+  have hZ : ∀ᶠ z in 𝓝[≠] (1 : ℂ), Z z = M * (A z * B z) := by
+    filter_upwards [hpos, nhdsNE_le_codiscrete _ harch,
+      nhdsNE_le_codiscrete _ (sLocalNormalizedEigendistribution_gaussian_heckeL_ne_zero χ)]
+      with z hz hA hL
+    let c := chartₛ(χ) z
+    have hF : ∏ v : S, finiteLocalEulerFactor v.val (sLocalFiniteRestriction v c) ≠ 0 :=
+      right_ne_zero_of_mul hL
+    have eA (w : InfinitePlace F) :
+        localIdelicZetaIntegral (infiniteLocalMultiplicativeTamagawaMeasure F w)
+          (fun x ↦ fArch w (Multiplicative.ofAdd x)) (sLocalInfiniteRestriction w c) =
+            infiniteLocalEulerFactor w (sLocalInfiniteRestriction w c) * DA w z (fArch w) := by
+      rw [heA, ← infiniteLocalIdelicZFunction_eq_integral w _ (χArch w) hz]
+      exact hA w (fArch w)
+    have eB (v : S) :
+        localIdelicZetaIntegral (finiteLocalMultiplicativeTamagawaMeasure F v.val)
+          (fun x ↦ fFin v (Multiplicative.ofAdd x)) (sLocalFiniteRestriction v c) =
+            unitMass(v.val) * finiteLocalEulerFactor v.val (sLocalFiniteRestriction v c) *
+              DB v z (fFin v) := by
+      have hne : quasiCharacterNormTwist _ (continuous_finiteLocalModule v.val)
+          ((circleToComplex).comp (η v)) z ≠ 1 := by
+        intro h
+        have hn := Finset.prod_ne_zero_iff.mp hF v (Finset.mem_univ v)
+        apply hn
+        rw [(hη v z).trans h]
+        simp [finiteLocalEulerFactor]
+      rw [hη, ← finiteLocalIdelicZFunction_eq_integral v.val _ (η v) hz]
+      exact hZB v z hne (fFin v)
+    change sLocalNormalizedZFunction f c = M * (A z * B z)
+    rw [sLocalNormalizedZFunction_eq_div f χ hz, div_eq_iff hL,
+      sLocalIdelicZetaIntegral_pureTensor c ⟨χ, z, hz, rfl⟩ f fArch fFin hf,
+      Finset.prod_congr (s₁ := Finset.univ) rfl (fun w _ ↦ eA w),
+      Finset.prod_congr (s₁ := Finset.univ) rfl (fun v _ ↦ eB v)]
+    simp only [M, A, B, Complex.ofReal_prod, Finset.prod_mul_distrib, sLocalHeckeL]
+    ring
+  have hAll : Z = fun z ↦ M * (A z * B z) :=
+    ha.eq_of_frequently_eq (analyticOnNhd_const.mul (hpa.mul hpb)) hZ.frequently
+  have hM : M ≠ 0 := sLocalNormalizedEigendistribution_mass_ne_zero (F := F) (S := S)
+  have hspec : M * sLocalNormalizedEigendistribution (chartₛ(χ) s) f = Z s :=
+    (existsUnique_sLocalNormalizedEigendistribution (chartₛ(χ) s)).exists.choose_spec f
+  have he := mul_left_cancel₀ hM (hspec.trans (congrFun hAll s))
+  exact he.trans (congrArg₂ (· * ·)
+    (Finset.prod_congr rfl fun w _ ↦ congrArg (fun T ↦ T (fArch w)) (hTA w).symm)
+    (Finset.prod_congr rfl fun v _ ↦ congrArg (fun T ↦ T (fFin v)) (hTB v).symm))
 
 /-- Paper: Theorem 5.5.1.2(1), p. 278.
 The normalized S-local distribution spans the eigenspace of its weight. -/
