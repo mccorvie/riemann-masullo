@@ -7,6 +7,8 @@ public import RiemannMasullo.AppC_LCTVS.Sec3a
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 
+import all RiemannMasullo.Ch03_IdelicZeta.Sec2
+import all RiemannMasullo.Ch06_LocalGlobal.Sec3
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec3b
@@ -973,7 +975,18 @@ theorem archNuclearityJet_apply (j : ArchNuclearityJetIndex χ τ hτ) (f : P) :
     Complex.VerticalIntegrable u 0 ∧ MellinConvergent moment j.val.1.re ∧
       archNuclearityJet χ τ hτ j mkΘ(χ, f) =
         iteratedDeriv j.val.2 (fun s ↦ globalIdelicZFunction f.val (ideleClassNormTwist χ s)) j.val.1 ∧
-      archNuclearityJet χ τ hτ j mkΘ(χ, f) = mellin moment j.val.1 := by sorry
+      archNuclearityJet χ τ hτ j mkΘ(χ, f) = mellin moment j.val.1 := by
+  let v : B := (Z(χ, τ, hτ)) mkΘ(χ, f)
+  have hmoment := schwartzBergman_jet_eq_mellinInv_moment v j.val.1 j.val.2
+  have hz : (v.val : ℂ → ℂ) = (fun s ↦ globalIdelicZFunction f.val (ideleClassNormTwist χ s)) :=
+    funext fun s ↦ ((exists_globalPolarThetaMellin χ τ hτ).choose_spec f s).2
+  have hjet : archNuclearityJet χ τ hτ j mkΘ(χ, f) = iteratedDeriv j.val.2 v.val j.val.1 := by
+    unfold archNuclearityJet
+    rw [ContinuousLinearMap.comp_apply, ContinuousLinearMap.comp_apply, entireJet_apply]
+    exact congrArg (fun g : ℂ → ℂ ↦ iteratedDeriv j.val.2 g j.val.1)
+      (funext (schwartzBergmanEntireInclusion_apply v))
+  exact ⟨hmoment.1, hmoment.2.1, hjet.trans (congrArg (fun g : ℂ → ℂ ↦
+    iteratedDeriv j.val.2 g j.val.1) hz), hjet.trans hmoment.2.2⟩
 
 /-- Paper: Theorem 7.4.3.1(2), p. 368.
 The closure of the linear span of the jets in the strong dual is the annihilator
@@ -998,12 +1011,90 @@ local notation "finiteL(" χ ")" => (finiteHeckeL_exists_continuation χ).choose
 local notation "poleFactor(" χ ", " τ ", " hτ ", " s ")" =>
   ((s : ℂ) - 1 - atZeroPole(χ, τ, hτ)) ^ (if ω(χ) = 1 then (1 : ℕ) else 0)
 
+private theorem archRegularizedFiniteHeckeL_cancel_simplePole {A Z : ℂ → ℂ} {z : ℂ}
+    (ha : AnalyticAt ℂ A z) (hvan : A z = 0)
+    (hZ : MeromorphicAt Z z) (hpole : meromorphicOrderAt Z z = -1) :
+    0 ≤ meromorphicOrderAt (A * Z) z := by
+  have hpos : 0 < meromorphicOrderAt A z := lt_of_le_of_ne ha.meromorphicOrderAt_nonneg
+    (fun he ↦ ha.meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mp he.symm hvan)
+  rw [meromorphicOrderAt_mul ha.meromorphicAt hZ, hpole]
+  cases ho : meromorphicOrderAt A z with
+  | top => simp
+  | coe k =>
+    rw [ho] at hpos
+    have hk : (0 : ℤ) < k := WithTop.coe_lt_coe.mp hpos
+    exact WithTop.coe_le_coe.mpr (show (0 : ℤ) ≤ k + (-1) by omega)
+
 /-- Paper: Equation (7.4.3.5), p. 368.
 After cancellation of the pole on the trivial norm-one component, the continued
 finite Hecke function is entire. -/
 theorem archRegularizedFiniteHeckeL_differentiable :
     Differentiable ℂ (toMeromorphicNFOn
-      (fun s ↦ poleFactor(χ, τ, hτ, s) * finiteL(χ) s) univ) := by sorry
+      (fun s ↦ poleFactor(χ, τ, hτ, s) * finiteL(χ) s) univ) := by
+  let p : ℂ → ℂ := fun z ↦ poleFactor(χ, τ, hτ, z)
+  let R : ℂ → ℂ := fun z ↦ (heckeGammaFactor χ z)⁻¹
+  let L := finiteL(χ)
+  let Z := continuedCompletedHeckeL χ
+  obtain ⟨hL, heL⟩ := (finiteHeckeL_exists_continuation χ).choose_spec
+  obtain ⟨hZ, heZ⟩ := continuedCompletedHeckeL_spec χ
+  have hp : Differentiable ℂ p := by
+    dsimp only [p]
+    fun_prop
+  have hR : Differentiable ℂ R := differentiable_inv_heckeGammaFactor χ
+  have hA : Differentiable ℂ (p * R) := hp.mul hR
+  have hm : MeromorphicOn ((p * R) * Z) univ := fun z _ ↦
+    (hA.analyticAt z).meromorphicAt.mul (hZ (mem_univ z)).meromorphicAt
+  change Differentiable ℂ (toMeromorphicNFOn (p * L) univ)
+  rw [heckeEulerProductOutside_eq_finite_nf_eq (p * L) ((p * R) * Z)
+    (fun z _ ↦ (hp.analyticAt z).meromorphicAt.mul (hL (mem_univ z)).meromorphicAt) hm (by
+      intro z hz
+      change p z * L z = p z * (heckeGammaFactor χ z)⁻¹ * Z z
+      rw [show L z = _ from heL ⟨z, hz⟩, show Z z = _ from heZ ⟨z, hz⟩]
+      change _ = p z * (heckeGammaFactor χ z)⁻¹ * (heckeGammaFactor χ z * _)
+      rw [mul_assoc, inv_mul_cancel_left₀ (heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans hz))]
+      rfl)]
+  by_cases hk : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1
+  · have hω : ω(χ) = 1 := by
+      ext1 u
+      exact DFunLike.congr_fun hk u
+    obtain ⟨t, ⟨hc, hzero, hone, haway⟩, -⟩ := completedHeckeL_continuation_simplePoles χ Z hZ heZ hk
+    let b : ℂ := Complex.I * (t : ℂ)
+    have hphase := existsUnique_ideleNormSection_character_phase χ τ hτ
+    have hx : -t = hphase.exists.choose := by
+      apply hphase.unique _ hphase.exists.choose_spec
+      intro u
+      have he := DFunLike.congr_fun hc (QuotientGroup.mk (τ u))
+      change (χ (QuotientGroup.mk (τ u)) : ℂ) * _ ^ (0 : ℂ) =
+        1 * ((((ideleNorm F (τ u)).val : ℝ) : ℂ) ^ (-Complex.I * (t : ℂ))) at he
+      rw [Complex.cpow_zero, mul_one, one_mul, hτ u] at he
+      simpa only [Complex.ofReal_neg, neg_mul, mul_comm (t : ℂ) Complex.I] using he
+    have hpole : atZeroPole(χ, τ, hτ) = b := by
+      change -(hphase.exists.choose : ℂ) * Complex.I = b
+      rw [← hx, Complex.ofReal_neg, neg_neg, mul_comm]
+    have hz₀ : (p * R) b = 0 := by
+      have hshift := heckeGammaFactor_of_normTwist χ (-Complex.I * (t : ℂ)) (by simp [Complex.mul_re]) hc b
+      have hneg : b + -Complex.I * (t : ℂ) = 0 := by
+        dsimp [b]
+        ring
+      have hg : R b = 0 := by
+        change (heckeGammaFactor χ b)⁻¹ = 0
+        rw [hshift, hneg]
+        simpa using inv_heckeGammaFactor_one_neg_even (F := F) 0
+      simp [hg]
+    have hz₁ : (p * R) (1 + b) = 0 := by simp [p, hω, hpole]
+    intro z
+    apply AnalyticAt.differentiableAt
+    apply (meromorphicNFOn_toMeromorphicNFOn _ _ (mem_univ z)).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+    rw [meromorphicOrderAt_toMeromorphicNFOn hm (mem_univ _)]
+    by_cases hz : z = b ∨ z = 1 + b
+    · rcases hz with rfl | rfl
+      · exact archRegularizedFiniteHeckeL_cancel_simplePole (hA.analyticAt _) hz₀
+          (hZ (mem_univ _)).meromorphicAt hzero
+      · exact archRegularizedFiniteHeckeL_cancel_simplePole (hA.analyticAt _) hz₁
+          (hZ (mem_univ _)).meromorphicAt hone
+    · exact ((hA.analyticAt z).mul (haway z (by simpa [b] using hz))).meromorphicOrderAt_nonneg
+  · have hd := hA.mul (completedHeckeL_continuation_entire χ Z hZ heZ hk)
+    rwa [toMeromorphicNFOn_eq_self.mpr (fun z _ ↦ (hd.analyticAt z).meromorphicNFAt)]
 
 /-- Paper: Equation (7.4.3.5), p. 368.
 The generator of the archimedean ideal is the pole-removed finite Hecke function.

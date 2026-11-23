@@ -1,8 +1,11 @@
 module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec4
+import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
+import Mathlib.Analysis.Calculus.FDeriv.Mul
 
 /-! # Third Structure Theorem: strong duals and eigendistributions
 
@@ -457,10 +460,48 @@ theorem sLocalEigendistributions_eq_span (c : QuasiCharacter Jₛ) :
     sLocalEigendistributions c =
       Submodule.span ℂ {sLocalNormalizedEigendistribution c} := by sorry
 
+/-- On a Montel space, pointwise holomorphy of a family in the complete strong dual
+implies strong holomorphy, since every bidual functional is an evaluation. -/
+private theorem sLocalNormalizedEigendistribution_holomorphic_pointwise
+    {E : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E]
+    [IsUniformAddGroup E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E] [T2Space E]
+    [MontelSpace ℂ E] [CompleteSpace (StrongDual ℂ E)]
+    [PolynormableSpace ℂ (StrongDual ℂ E)]
+    (T : ℂ → StrongDual ℂ E)
+    (hT : ∀ x : E, DifferentiableOn ℂ (fun z ↦ T z x) univ) :
+    VectorHolomorphicOn T univ := by
+  have : @QuasiCompleteSpace ℂ (StrongDual ℂ E) _
+      (IsTopologicalAddGroup.rightUniformSpace _) _ _ := by
+    convert (inferInstance : QuasiCompleteSpace ℂ (StrongDual ℂ E)) using 1
+    exact IsUniformAddGroup.rightUniformSpace_eq
+  apply WeaklyHolomorphicOn.vectorHolomorphicOn isOpen_univ isConnected_univ
+  intro φ
+  obtain ⟨x, rfl⟩ := surjective_strongBidual_eval (E := E) φ
+  exact hT x
+
 /-- Paper: Theorem 5.5.1.2(1), p. 278.
 The normalized S-local distributions form a holomorphic family on each norm chart. -/
 theorem sLocalNormalizedEigendistribution_holomorphic (χ : PontryaginDual Jₛ) :
-    VectorHolomorphicOn (fun s ↦ sLocalNormalizedEigendistribution (chartₛ(χ) s)) univ := by sorry
+    VectorHolomorphicOn (fun s ↦ sLocalNormalizedEigendistribution (chartₛ(χ) s)) univ := by
+  let : UniformSpace ℬ(Aₛ) := IsTopologicalAddGroup.rightUniformSpace _
+  let : IsUniformAddGroup ℬ(Aₛ) := isUniformAddGroup_of_addCommGroup
+  let : T2Space ℬ(Aₛ) := (sAdeleSchwartz_nuclear.{_, 0} F S).1
+  let : PolynormableSpace ℂ ℬ(Aₛ) := (sAdeleSchwartz_nuclear.{_, 0} F S).2.1
+  let : MontelSpace ℂ ℬ(Aₛ) := (sAdeleSchwartz_montel F S).2
+  let : CompleteSpace D(ℬ(Aₛ)) := sAdeleSchwartz_strongDual_complete F S
+  let : PolynormableSpace ℂ D(ℬ(Aₛ)) := (sAdeleSchwartz_strongDual_nuclear.{_, 0} F S).2.1
+  apply sLocalNormalizedEigendistribution_holomorphic_pointwise
+  intro f
+  let M : ℂ := ↑(∏ v : S, unitMass(v.val))
+  have hM : M ≠ 0 := sLocalNormalizedEigendistribution_mass_ne_zero
+  have he : (fun z ↦ sLocalNormalizedEigendistribution (chartₛ(χ) z) f) =
+      (fun z ↦ M⁻¹ * sLocalNormalizedZFunction f (chartₛ(χ) z)) := by
+    funext z
+    have h := (existsUnique_sLocalNormalizedEigendistribution (chartₛ(χ) z)).exists.choose_spec f
+    change M * sLocalNormalizedEigendistribution (chartₛ(χ) z) f = _ at h
+    rw [← h, ← mul_assoc, inv_mul_cancel₀ hM, one_mul]
+  rw [he]
+  exact (sLocalNormalizedZFunction_entire f χ).differentiableOn.const_mul M⁻¹
 
 /-- Paper: Theorem 5.5.1.2(2), pp. 278–279.
 Each S-local eigendistribution has a unique continuous descent to the theta space.
@@ -1329,11 +1370,79 @@ theorem sLocalThetaEigendistributions_separate_of_accumulation
     (φ := fun z : ℂ ↦ sLocalThetaEigendistribution (F := F) (S := S) (chartₛ(χ) z) x)
     (A := chartₛ(χ) ⁻¹' W) hφ hz₀ hA s
 
+/-- A split quotient has an embedded strong transpose; composing with an already
+embedded transpose preserves this property. -/
+private theorem globalHomogeneousThetaTranspose_isEmbedding_split
+    {E X Y : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [IsTopologicalAddGroup X]
+    [ContinuousSMul ℂ X] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (q : E →L[ℂ] X) (r : E →L[ℂ] Y) (S : Submodule ℂ X)
+    (e : Y ≃L[ℂ] S) (P : X →L[ℂ] X) (c : ℂ) (hc : c ≠ 0)
+    (hmem : ∀ x, P x ∈ S) (hfix : ∀ x : S, P x.val = c • x.val)
+    (he : ∀ f, (e (r f) : X) = P (q f))
+    (hq : IsEmbedding (fun l : StrongDual ℂ X ↦ l.comp q)) :
+    IsEmbedding (ContinuousLinearMap.precomp (τ := RingHom.id ℂ) (ρ := RingHom.id ℂ) ℂ r) := by
+  let Q : X →L[ℂ] Y := e.symm.toContinuousLinearMap.comp (P.codRestrict S hmem)
+  let J : Y →L[ℂ] X := c⁻¹ • (S.subtypeL.comp e.toContinuousLinearMap)
+  have hQJ (y : Y) : Q (J y) = y := by
+    apply e.injective
+    apply Subtype.ext
+    change (e (e.symm _)).val = (e y).val
+    rw [e.apply_symm_apply]
+    change P (c⁻¹ • (e y).val) = (e y).val
+    rw [map_smul, hfix, smul_smul, inv_mul_cancel₀ hc, one_smul]
+  have hQr (f : E) : Q (q f) = r f := by
+    apply e.injective
+    apply Subtype.ext
+    exact (congrArg Subtype.val (e.apply_symm_apply _)).trans (he f).symm
+  let A : StrongDual ℂ Y →L[ℂ] StrongDual ℂ X := ContinuousLinearMap.precomp (τ := RingHom.id ℂ) (ρ := RingHom.id ℂ) ℂ Q
+  let B : StrongDual ℂ X →L[ℂ] StrongDual ℂ Y := ContinuousLinearMap.precomp (τ := RingHom.id ℂ) (ρ := RingHom.id ℂ) ℂ J
+  have hBA : (B : _ → _) ∘ A = id := by
+    funext l
+    ext y
+    exact congrArg l (hQJ y)
+  have hA : IsEmbedding A := IsEmbedding.of_comp A.continuous B.continuous
+    (hBA ▸ IsEmbedding.id)
+  have hr : (ContinuousLinearMap.precomp (τ := RingHom.id ℂ) (ρ := RingHom.id ℂ) ℂ r : _ → _) =
+      (ContinuousLinearMap.precomp (τ := RingHom.id ℂ) (ρ := RingHom.id ℂ) ℂ q : _ → _) ∘ A := by
+    funext l
+    ext f
+    exact congrArg l (hQr f).symm
+  rw [hr]
+  exact hq.comp hA
+
 /-- Paper: Theorem 5.5.3.4(1), p. 285.
 Pullback from the homogeneous global theta quotient is a topological embedding
 for the strong dual topologies. -/
 theorem globalHomogeneousThetaTranspose_isEmbedding (ω : PontryaginDual (m𝔽).ker) :
-    IsEmbedding (pull(K𝔽ω(ω))) := by sorry
+    IsEmbedding (pull(K𝔽ω(ω))) := by
+  let : MeasurableSpace C𝔽 := borel _
+  let : BorelSpace C𝔽 := ⟨rfl⟩
+  let : T2Space (m𝔽).ker := (ideleClassGroup_finiteness F).2.2.1
+  let : CompactSpace (m𝔽).ker := (ideleClassGroup_finiteness F).2.1
+  let μ := normOneIdeleClassTamagawaMeasure F
+  let : μ.IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let X := GlobalAdelicThetaSpace F
+  let : T2Space X := globalAdelicThetaSpace_t2_of_isClosed (F := F) adelicTheta_ker_isClosed
+  let : PolynormableSpace ℂ X := globalAdelicThetaSpace_polynormable (F := F)
+  let : Module ℝ X := Module.restrictScalars ℝ ℂ _
+  let : IsScalarTower ℝ ℂ X := IsScalarTower.restrictScalars ℝ ℂ _
+  let : LocallyConvexSpace ℝ X := (PolynormableSpace.withSeminorms ℂ X).toLocallyConvexSpace
+  let ρ := (existsUnique_globalThetaAction (F := F)).exists.choose
+  let A := (existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose
+  have hA := (existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose_spec
+  obtain ⟨e, he⟩ := (globalThetaIsotypicAverage_equiv (F := F) ω).2
+  have hm : (μ.real univ : ℂ) ≠ 0 := by
+    exact_mod_cast (MeasureTheory.measureReal_univ_pos (μ := μ)).ne'
+  with_reducible_and_instances
+    exact globalHomogeneousThetaTranspose_isEmbedding_split
+      (K𝔽).mkQL (K𝔽ω(ω)).mkQL (actionIsotype (ρ.comp (m𝔽).ker.subtype) ω)
+      e A (μ.real univ) hm
+      (compactActionAverage_mem_isotype μ (ρ.comp (m𝔽).ker.subtype) ω A hA)
+      (fun x ↦ compactActionAverage_apply_isotype μ (ρ.comp (m𝔽).ker.subtype) ω A hA x.property)
+      (by simpa only [Submodule.mkQL_apply] using he)
+      (globalThetaQuotient_transpose_isEmbedding (F := F))
 
 /-- Global theta of a unit translate is theta at the inversely translated idele class. -/
 private theorem globalTheta_unitTranslate_apply (g : IdeleGroup (𝓞 F) F) (f : ℬ(𝔸[F]))

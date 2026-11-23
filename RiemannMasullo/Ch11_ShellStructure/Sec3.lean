@@ -387,10 +387,99 @@ theorem divisorialThetaStage_empty (ω : PontryaginDual C₁) :
     Subtype.ext (LinearMap.ext_iff.mp divisorialThetaStage_empty_PV p.val)
   exact congrArg (fun y : P ↦ (Submodule.Quotient.mk y : Θ(ω))) e
 
+/-- Two linear maps agree once they agree on the pure tensors of an
+inductive tensor product with a finite tensor product. -/
+private theorem divisorialThetaStage_antitone_extPi {ι : Type*} [Fintype ι] {E N : Type*}
+    {M : ι → Type*} [∀ i, AddCommGroup (M i)] [∀ i, Module ℂ (M i)]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [AddCommGroup N] [Module ℂ N] [TopologicalSpace N]
+    (e : InductiveTensor E (FinestLocallyConvex (PiTensorProduct ℂ M)) ≃L[ℂ] N)
+    (L₁ L₂ : N →ₗ[ℂ] N)
+    (h : ∀ (a : E) (g : ∀ i, M i),
+      L₁ (e (TensorProduct.tmul ℂ a (PiTensorProduct.tprod ℂ g))) =
+        L₂ (e (TensorProduct.tmul ℂ a (PiTensorProduct.tprod ℂ g)))) :
+    L₁ = L₂ := by
+  apply (LinearMap.cancel_right (g := e.toLinearMap) e.surjective).mp
+  apply TensorProduct.ext
+  exact LinearMap.ext fun a ↦ LinearMap.ext_on_range PiTensorProduct.span_tprod_eq_top (h a)
+
+/-- The S-local principal values compose over disjoint sets of selected places. -/
+private theorem divisorialThetaStage_antitone_sPV {T T' : Finset (HeightOneSpectrum (𝓞 F))} (hT : T ⊆ T') :
+    sAdelePrincipalValue F (Finset.Subset.refl T') =
+      (sAdelePrincipalValue F hT).comp (sAdelePrincipalValue F (Finset.sdiff_subset (s := T') (t := T))) := by
+  refine divisorialThetaStage_antitone_extPi (sAdeleSchwartz_inductiveTensor_equiv F T').choose _ _ fun a g ↦ ?_
+  have h1 := sAdelePrincipalValue_tmul (F := F) (Finset.Subset.refl T') a g
+  have h2 := sAdelePrincipalValue_tmul (F := F) (Finset.sdiff_subset (s := T') (t := T)) a g
+  have h3 := sAdelePrincipalValue_tmul (F := F) hT a
+    (fun w : T' ↦ if (w : HeightOneSpectrum (𝓞 F)) ∈ T' \ T then
+      finitePlacePrincipalValue (F := F) w.val (g w) else g w)
+  refine h1.trans ?_
+  refine Eq.trans ?_ (LinearMap.comp_apply _ _ _).symm
+  refine Eq.trans ?_ (congrArg (sAdelePrincipalValue F hT) h2.symm)
+  refine Eq.trans ?_ h3.symm
+  apply congrArg
+  apply congrArg
+  apply congrArg
+  funext w
+  by_cases hw : (w : HeightOneSpectrum (𝓞 F)) ∈ T
+  · simp [hw, w.2, Finset.mem_sdiff]
+  · simp [hw, w.2, Finset.mem_sdiff]
+
+/-- Two linear maps agree once they agree on the pure tensors of an inductive tensor product. -/
+private theorem divisorialThetaStage_antitone_extTail {E G N : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [AddCommGroup G] [Module ℂ G] [TopologicalSpace G]
+    [AddCommGroup N] [Module ℂ N] [TopologicalSpace N]
+    (e : InductiveTensor E G ≃L[ℂ] N) (L₁ L₂ : N →ₗ[ℂ] N)
+    (h : ∀ (a : E) (b : G), L₁ (e (TensorProduct.tmul ℂ a b)) = L₂ (e (TensorProduct.tmul ℂ a b))) :
+    L₁ = L₂ := by
+  apply (LinearMap.cancel_right (g := e.toLinearMap) e.surjective).mp
+  apply TensorProduct.ext
+  exact LinearMap.ext fun a ↦ LinearMap.ext (h a)
+
+/-- The global principal value at a larger set is the one at the smaller set after the one
+at the difference. -/
+private theorem divisorialThetaStage_antitone_PV {T T' : Finset (HeightOneSpectrum (𝓞 F))} (hT : T ⊆ T') :
+    adelePrincipalValue F T' =
+      (adelePrincipalValue F T).comp (adelePrincipalValue F (T' \ T)) := by
+  refine divisorialThetaStage_antitone_extTail (sAdeleTailSchwartz_inductiveTensor_equiv F T').choose _ _ fun a b ↦ ?_
+  have h1 := adelePrincipalValue_tmul (F := F) (Finset.Subset.refl T') a b
+  have h2 := adelePrincipalValue_tmul (F := F) (Finset.sdiff_subset (s := T') (t := T)) a b
+  have h3 := adelePrincipalValue_tmul (F := F) hT
+    (sAdelePrincipalValue F (Finset.sdiff_subset (s := T') (t := T)) a) b
+  refine h1.trans ?_
+  refine Eq.trans ?_ (LinearMap.comp_apply _ _ _).symm
+  refine Eq.trans ?_ (congrArg (adelePrincipalValue F T) h2.symm)
+  refine Eq.trans ?_ h3.symm
+  apply congrArg
+  apply congrArg₂ _ _ rfl
+  exact (LinearMap.ext_iff.mp (divisorialThetaStage_antitone_sPV hT) a).trans (LinearMap.comp_apply _ _ _)
+
+/-- A factorization through a map preserving the submodule gives inclusion of images
+after applying the quotient map. -/
+private theorem divisorialThetaStage_antitone_range {A β : Type*} [AddCommMonoid A] [Module ℂ A]
+    (B : Submodule ℂ A) (Φ : B → β) (L L' R : A → A)
+    (h : ∀ f : B, L f.val ∈ B) (h' : ∀ f : B, L' f.val ∈ B) (hR : ∀ f : B, R f.val ∈ B)
+    (hc : ∀ f : B, L (R f.val) = L' f.val) :
+    Set.range (fun f : B ↦ Φ ⟨L' f.val, h' f⟩) ⊆ Set.range (fun f : B ↦ Φ ⟨L f.val, h f⟩) := by
+  rintro _ ⟨f, rfl⟩
+  exact ⟨⟨R f.val, hR f⟩, congrArg Φ (Subtype.ext (hc f))⟩
+
 /-- Paper: (11.3.1.3), p. 494. Adding places decreases the principal-value image
 of the polar theta space. -/
 theorem divisorialThetaStage_antitone (ω : PontryaginDual C₁) :
-    Antitone (divisorialThetaStage ω) := by sorry
+    Antitone (divisorialThetaStage ω) := by
+  intro T T' hTT'
+  have hP : ∀ f : P, adelePrincipalValue F T (adelePrincipalValue F (T' \ T) f.val) =
+      adelePrincipalValue F T' f.val := fun f ↦
+    ((LinearMap.ext_iff.mp (divisorialThetaStage_antitone_PV hTT') f.val).trans
+      (LinearMap.comp_apply _ _ _)).symm
+  unfold divisorialThetaStage
+  exact Submodule.span_mono (divisorialThetaStage_antitone_range P
+    (fun f : P ↦ (Submodule.Quotient.mk f : Θ(ω)))
+    (adelePrincipalValue F T) (adelePrincipalValue F T') (adelePrincipalValue F (T' \ T))
+    (adelePrincipalValue_mem_polarSubspace T) (adelePrincipalValue_mem_polarSubspace T')
+    (adelePrincipalValue_mem_polarSubspace (T' \ T)) hP)
 
 /-- Paper: (11.3.1.3), p. 494, and (7.4.0.2), p. 366. At the fibre over one
 rational prime the stage is the finite-place denominator of §7.4, so the first
@@ -493,12 +582,77 @@ region in the definition of β consists of ideles that are units outside S. -/
 def sLocalDivisorialStratum (S : Finset V) : Set I𝔽 :=
   {g | ∀ v ∉ S, Valued.v (g.val.2 v) = 1}
 
+/-- the finite components of an idele and its inverse multiply to one. -/
+private theorem mem_sLocalDivisorialStratum_iff_inv_mul {F : Type*} [Field F] [NumberField F]
+    (g : IdeleGroup (𝓞 F) F) (v : HeightOneSpectrum (𝓞 F)) :
+    (g⁻¹).val.2 v * g.val.2 v = 1 := by
+  change ((g⁻¹ * g : IdeleGroup (𝓞 F) F).val).2 v = 1
+  rw [inv_mul_cancel]
+  rfl
+
+/-- an idele component has valuation one exactly when it and the inverse component are
+integral. -/
+private theorem mem_sLocalDivisorialStratum_iff_valued_eq_one {F : Type*} [Field F]
+    [NumberField F] (g : IdeleGroup (𝓞 F) F) (v : HeightOneSpectrum (𝓞 F)) :
+    Valued.v (g.val.2 v) = 1 ↔
+      g.val.2 v ∈ v.adicCompletionIntegers F ∧ (g⁻¹).val.2 v ∈ v.adicCompletionIntegers F := by
+  have h := congrArg Valued.v (mem_sLocalDivisorialStratum_iff_inv_mul g v)
+  rw [map_mul, map_one] at h
+  simp only [HeightOneSpectrum.mem_adicCompletionIntegers]
+  constructor
+  · intro h1
+    rw [h1, mul_one] at h
+    exact ⟨h1.le, h.le⟩
+  · rintro ⟨h1, h2⟩
+    refine le_antisymm h1 ?_
+    calc (1 : _) = Valued.v ((g⁻¹).val.2 v) * Valued.v (g.val.2 v) := h.symm
+      _ ≤ 1 * Valued.v (g.val.2 v) := mul_le_mul_left h2 _
+      _ = Valued.v (g.val.2 v) := one_mul _
+
 /-- Paper: §11.3.2, p. 495. The region of β is the product of the inserted
 S-ideles and the outside integer unit group. -/
 theorem mem_sLocalDivisorialStratum_iff (S : Finset V) (g : I𝔽) :
     g ∈ sLocalDivisorialStratum F S ↔
       ∃ (a : (SAdeleRing F S)ˣ) (u : outsideIntegralIdeleUnits F S),
-        g = sIdeleInsertion F S a * u.val := by sorry
+        g = sIdeleInsertion F S a * u.val := by
+  constructor
+  · intro hg
+    set b := sIdeleInsertion F S (Units.map (adeleProjection F S).toMonoidHom g)
+    obtain ⟨hb1, hbS, hbout⟩ :=
+      sIdeleInsertion_apply F S (Units.map (adeleProjection F S).toMonoidHom g)
+    have hinv1 : (b⁻¹).val.1 * b.val.1 = 1 := by
+      change ((b⁻¹ * b : I𝔽).val).1 = 1
+      rw [inv_mul_cancel]
+      rfl
+    refine ⟨_, ⟨b⁻¹ * g, ?_⟩, (mul_inv_cancel_left b g).symm⟩
+    rw [mem_outsideIntegralIdeleUnits_iff]
+    refine ⟨?_, fun w hw ↦ ?_, fun w hw ↦ ?_⟩
+    · change (b⁻¹).val.1 * g.val.1 = 1
+      rw [← hinv1, hb1]
+      rfl
+    · change (b⁻¹).val.2 w * g.val.2 w = 1
+      rw [← mem_sLocalDivisorialStratum_iff_inv_mul b w, hbS ⟨w, hw⟩]
+      rfl
+    · have hbw : (b⁻¹).val.2 w = 1 := by
+        have h := mem_sLocalDivisorialStratum_iff_inv_mul b w
+        rwa [hbout w hw, mul_one] at h
+      have h1 : (b⁻¹ * g).val.2 w = g.val.2 w := by
+        change (b⁻¹).val.2 w * g.val.2 w = _
+        rw [hbw, one_mul]
+      have h2 : ((b⁻¹ * g)⁻¹).val.2 w = (g⁻¹).val.2 w := by
+        rw [mul_inv_rev, inv_inv]
+        change (g⁻¹).val.2 w * b.val.2 w = _
+        rw [hbout w hw, mul_one]
+      rw [h1, h2]
+      exact (mem_sLocalDivisorialStratum_iff_valued_eq_one g w).1 (hg w hw)
+  · rintro ⟨a, ⟨u, hu⟩, rfl⟩ v hv
+    obtain ⟨-, -, hu⟩ := (mem_outsideIntegralIdeleUnits_iff u).1 hu
+    have hb := (sIdeleInsertion_apply F S a).2.2 v hv
+    have hval : (sIdeleInsertion F S a * u).val.2 v = u.val.2 v := by
+      change (sIdeleInsertion F S a).val.2 v * u.val.2 v = _
+      rw [hb, one_mul]
+    rw [hval]
+    exact (mem_sLocalDivisorialStratum_iff_valued_eq_one u v).2 (hu v hv)
 
 /-- Paper: §11.3.2, p. 495, and (D.1.10.1), p. 783. The region of β is the range
 of the insertion of the ideles integral outside S. -/

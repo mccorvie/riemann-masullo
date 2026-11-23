@@ -6,6 +6,8 @@ public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec4
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
 
+import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
+
 /-! # Sobolev Paley–Wiener levels and orbital nuclearity
 
 Masullo, §§11.2.1–11.2.2, pp. 487–491. The stage parameter lists the finite
@@ -165,7 +167,21 @@ theorem sLocalPWThetaSobolevMap_apply {a : ℝ} (ha : 0 < a) (ω : PontryaginDua
 Globalized polar-free tests yield weighted Sobolev vectors.
 Deviation: Use direct integer-indicator insertion as in the repaired §7.3.2. -/
 theorem globalPWTheta_memLp (a : ℝ) (ω : PontryaginDual C₁) (f : Zₛ) :
-    MemLp (globalWeightedTheta(a, ω, f)) 2 globalWMeasure := by sorry
+    MemLp (globalWeightedTheta(a, ω, f)) 2 globalWMeasure := by
+  let f₀ : adelePolarSubspace F := ⟨sAdeleSchwartzToGlobal F S f.val,
+    sAdeleSchwartzToGlobal_mem_polarSubspace f⟩
+  let x : globalPolarFreeThetaSubmodule (F := F) ω :=
+    ⟨Submodule.Quotient.mk f₀.val, ⟨f₀.val, f₀.property, rfl⟩⟩
+  obtain ⟨j, -, -, hj⟩ := exists_globalHomogeneousThetaSobolevInclusion
+    (F := F) (a := a) hGeo (le_max_right s 0) ω
+  have he := (hj f₀ x rfl).2
+  have hv := (Lp.memLp (j x).val.val).ae_eq ((withDensity_absolutelyContinuous _ _).ae_le he)
+  apply hv.mono_measure (withDensity_mono (Filter.Eventually.of_forall fun g ↦ ?_))
+  apply ENNReal.ofReal_le_ofReal
+  unfold intervalSobolevDensity
+  apply mul_le_mul_of_nonneg_left _ (le_trans (Real.exp_pos _).le (le_max_left _ _))
+  exact Real.rpow_le_rpow_of_exponent_le (by nlinarith [sq_nonneg (logNorm(m𝔽) g)])
+    (div_le_div_of_nonneg_right (le_max_left s 0) (by norm_num))
 
 /-- Paper: (11.2.1.2) and (11.2.1.7), pp. 487–488.
 Insert a local polar-free test and take its weighted global homogeneous theta class.
@@ -384,7 +400,8 @@ homogeneous theta vector in the global invariant level.
 Deviation: Use the direct integer-indicator insertion. -/
 theorem globalInvariantPWSobolev_mem (a : ℝ) (ω : PontryaginDual C₁) (Λ : ℝ)
     (f : Zₛ) (_hf : f ∈ band(sLocalPWProductRegion S Λ)) :
-    globalPWThetaSobolevMap (F := F) (S := S) (s := s) a ω f ∈ globalInvariantPWSobolev (F := F) (S := S) hs a ω Λ := by sorry
+    globalPWThetaSobolevMap (F := F) (S := S) (s := s) a ω f ∈ globalInvariantPWSobolev (F := F) (S := S) hs a ω Λ := by
+  exact Submodule.le_topologicalClosure _ (Submodule.subset_span ⟨⟨f, _hf⟩, rfl⟩)
 
 local notation "invLevel(" a ", " ω ", " Λ ")" =>
   (globalInvariantPWSobolev (F := F) (S := S) hs a ω Λ).comap (GeoIsotype(ω)).subtype
@@ -698,7 +715,27 @@ include h₁ in
 The degree bound admits all jet orders below the multiplicity of a prime Euler zero.
 The strict integrability cutoff then leaves that multiplicity unchanged. -/
 theorem primeOrbitalMultiplicity_saturates (z : zeros) :
-    spectralBoundaryMultiplicity s (mult(z.val)) = mult(z.val) := by sorry
+    spectralBoundaryMultiplicity s (mult(z.val)) = mult(z.val) := by
+  classical
+  let S := Sₚ(p)
+  have hcard : S.card ≤ Module.finrank ℚ F := by
+    let e (v : S) : p.asIdeal.primesOver (𝓞 F) :=
+      ⟨v.val.asIdeal, v.val.isPrime, ⟨(congrArg HeightOneSpectrum.asIdeal
+        (show v.val.under (𝓞 ℚ) = p from (finite_nuclearityPlacesAbove (F := F) p).mem_toFinset.mp v.property)).symm⟩⟩
+    have hi : Function.Injective e := fun v w h ↦
+      Subtype.ext (HeightOneSpectrum.ext (congrArg Subtype.val h))
+    simpa only [Fintype.card_coe] using (Fintype.card_le_of_injective e hi).trans
+      (reciprocalEulerProduct_over_prime_order_le_card_le (F := F) p)
+  have hm : mult(z.val) ≤ Module.finrank ℚ F := by
+    rw [orbitalEulerMultiplicity_eq_card]
+    exact (Finset.card_filter_le _ _).trans hcard
+  apply Nat.le_antisymm (min_le_left _ _)
+  by_contra! hlt
+  have hk : (spectralBoundaryMultiplicity s (mult(z.val)) : ℝ) + 1 ≤ Module.finrank ℚ F := by
+    exact_mod_cast (Nat.succ_le_of_lt hlt).trans hm
+  have himp := (lt_spectralBoundaryMultiplicity s (mult(z.val))
+    (spectralBoundaryMultiplicity s (mult(z.val)))).mpr ⟨hlt, by linarith only [hk, _hdeg]⟩
+  exact (lt_irrefl _ himp)
 
 /-- Paper: Remark 11.2.2.2 and (11.2.2.13), p. 491.
 The prime orbital convolution trace is independent of the Sobolev degree

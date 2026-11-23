@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec5
+import Mathlib.NumberTheory.NumberField.Cyclotomic.Embeddings
 
 /-!
 # Chapter 5.5: statements that are false as printed
@@ -28,6 +29,30 @@ def Printed.globalThetaPolarValues_eq_eigendistributions : Prop :=
       (globalThetaEigendistribution (F := F) (1 : QuasiCharacter C) x,
         globalThetaEigendistribution (F := F) (ideleClassNormTwist (1 : PontryaginDual C) 1) x)
 
+/-- At a field with one complex place, the Gaussian already contradicts the first coordinate. -/
+private theorem globalThetaPolarValues_gaussian_contradiction (F : Type) [Field F] [NumberField F]
+    (hF : InfinitePlace.nrComplexPlaces F = 1)
+    (hall : Printed.globalThetaPolarValues_eq_eigendistributions) : False := by
+  let χ : PontryaginDual (IdeleClassGroup (𝓞 F) F) := 1
+  let f := adelicStandardGaussian χ
+  let q := (LinearMap.ker (adelicThetaLinearMap F)).mkQL
+  have h := congrArg Prod.fst (hall F (q f))
+  have hp := congrArg Prod.fst (globalThetaPolarValues_mk f)
+  have he := globalThetaEigendistribution_mk (F := F) 1 f
+  have ht : ideleClassNormTwist χ 0 = 1 := by
+    ext g
+    change (1 : ℂ) * (((ideleClassNorm F g).val : ℝ) : ℂ) ^ (0 : ℂ) = 1
+    simp
+  have hn := adelicNormalizedEigendistribution_gaussian (F := F) χ 0
+  rw [ht] at hn
+  have hval : f (Multiplicative.ofAdd 0) = (1 : ℂ) := hp.symm.trans (h.trans (he.trans hn))
+  have hzero := adelicStandardGaussian_trivial_zero (F := F)
+  rw [hF, pow_one] at hzero
+  have hinv : (2 * (Real.pi : ℂ))⁻¹ = 1 := hzero.symm.trans hval
+  have heq := inv_eq_one.mp hinv
+  have hre : 2 * Real.pi = 1 := by exact_mod_cast heq
+  linarith [Real.pi_gt_three]
+
 /-- Paper: Lemma 5.5.2.1, (5.5.2.3), p. 280.
 Take `F = ℚ(i)` and the theta class of the trivial-character standard adelic Gaussian
 `E`. The complex Gaussian factor is `(2π)⁻¹ exp(−2π|z|²)`, and the finite factors are
@@ -37,7 +62,15 @@ since the complex integral against `2 dx dy` is `1/(2π)` and the finite integer
 have product additive mass `1/2`. -/
 theorem Printed.globalThetaPolarValues_eq_eigendistributions_false :
     ¬ Printed.globalThetaPolarValues_eq_eigendistributions := by
-  sorry
+  let F := CyclotomicField 4 ℚ
+  have : NeZero (4 : ℕ) := ⟨by decide⟩
+  have : IsCyclotomicExtension {4} ℚ F := by
+    convert CyclotomicField.isCyclotomicExtension 4 ℚ
+    exact Subsingleton.elim _ _
+  have : NumberField F := IsCyclotomicExtension.numberField {4} ℚ F
+  apply globalThetaPolarValues_gaussian_contradiction F
+  rw [IsCyclotomicExtension.Rat.nrComplexPlaces_eq_totient_div_two (n := 4) F]
+  decide
 
 /-- Paper: Remark 5.5.3.3, p. 285.
 As printed: if the weights range over a connected set containing an interval with
@@ -88,6 +121,7 @@ standard Gaussian E. Both normalized generators take value 1 there. The complex 
 `(2π)⁻¹`, and the product of the finite integer-ring masses is 1/2. The Fourier evaluation
 is therefore `(4π)⁻¹`. -/
 theorem Printed.globalConverse_polarValues_eq_eigendistributions_false :
-    ¬ Printed.globalConverse_polarValues_eq_eigendistributions := by sorry
+    ¬ Printed.globalConverse_polarValues_eq_eigendistributions :=
+  Printed.globalThetaPolarValues_eq_eigendistributions_false
 
 end RiemannMasullo

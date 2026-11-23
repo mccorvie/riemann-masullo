@@ -4,6 +4,8 @@ public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec6
 
 import all RiemannMasullo.AppC_LCTVS.Sec1
+import all RiemannMasullo.Ch03_IdelicZeta.Sec3
+import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
 
 /-! # §7.3.1 Orbital Schauder bases
@@ -782,29 +784,195 @@ local notation "fourierZeta(" c ")" =>
   (fun (f : ℬₛ) (z : ℂ) ↦ sLocalIdelicZFunction (sAdeleSchwartzFourier f)
     (dualₛ (twistₛ c z)))
 
+/-- A selected finite pole lies in the closed left half-plane of any unitary chart. -/
+private theorem sLocalOrbitalFourierZeta_chart {T : Finset V} {ω : PontryaginDual J₁}
+    (j : I(T, ω)) : ∃ (χ : PontryaginDual Jₛ) (a : ℂ),
+      j.val.1 = chart(χ) a ∧ a.re ≤ 0 := by
+  classical
+  obtain ⟨χ, a, ha⟩ := exists_sLocalNormTwist (F := F) (S := S) j.val.1
+  refine ⟨χ, a, ha.symm, ?_⟩
+  have hm : 0 < sLocalRhoPoleOrder j.val.1 := by
+    have hle : sLocalFinitePoleMultiplicity T j.val.1 ≤ sLocalRhoPoleOrder j.val.1 := by
+      rw [sLocalRhoPoleOrder_eq_card_polePlaces]
+      exact (Finset.card_filter_le _ _).trans (Nat.le_add_left _ _)
+    exact lt_of_le_of_lt (Nat.zero_le j.val.2) (j.property.2.trans_le hle)
+  by_contra h
+  have hpos : 0 < a.re := lt_of_not_ge h
+  have hA : AnalyticAt ℂ (fun z ↦ sLocalRhoFactor (twistₛ j.val.1 z)) 0 := by
+    have h := (sLocalRhoFactor_analyticOn χ a hpos).comp_of_eq
+      (f := fun z : ℂ ↦ z + a) (x := 0) (by fun_prop) (zero_add a)
+    simpa only [← ha, normTwist_normTwist, Function.comp_def] using h
+  have hb : sLocalIdelicOrderBound j.val.1 = 0 :=
+    min_eq_left hA.meromorphicOrderAt_nonneg
+  simp [sLocalRhoPoleOrder, hb] at hm
+
+/-- On the reflected convergence half-plane, the continued zeta function is analytic. -/
+private theorem sLocalOrbitalFourierZeta_analyticOn (χ : PontryaginDual Jₛ) (a : ℂ)
+    (f : ℬₛ) : AnalyticOnNhd ℂ
+      (fun z ↦ sLocalIdelicZFunction (sAdeleSchwartzFourier f) (chart(χ⁻¹) (1 - (z + a))))
+      {z : ℂ | 0 < (1 - (z + a)).re} := by
+  have hZ : AnalyticOnNhd ℂ
+      (fun s ↦ sLocalIdelicZFunction (sAdeleSchwartzFourier f) (chart(χ⁻¹) s))
+      {s : ℂ | 0 < s.re} :=
+    (sLocalIdelicZetaIntegral_analyticOn (sAdeleSchwartzFourier f) χ⁻¹).congr
+      (isOpen_Ioi.preimage Complex.continuous_re)
+      (fun z hz ↦ (sLocalIdelicZFunction_eq_integral _ ⟨χ⁻¹, z, hz, rfl⟩).symm)
+  intro z hz
+  exact (hZ _ hz).comp (f := fun w : ℂ ↦ 1 - (w + a)) (by fun_prop)
+
 /-- Paper: Equation (7.3.1.14), p. 344.
 The reflected Fourier zeta transform is holomorphic near each selected finite pole
 of the correcting factor. Its derivatives therefore evaluate the analytic germ there. -/
 theorem sLocalOrbitalFourierZeta_analyticAt {T : Finset V} {ω : PontryaginDual J₁}
     (j : I(T, ω)) (f : ℬₛ) :
-    AnalyticAt ℂ (fourierZeta(j.val.1) f) 0 := by sorry
+    AnalyticAt ℂ (fourierZeta(j.val.1) f) 0 := by
+  obtain ⟨χ, a, ha, hle⟩ := sLocalOrbitalFourierZeta_chart j
+  have hpos : 0 < (1 - ((0 : ℂ) + a)).re := by simp; linarith
+  simpa only [ha, normTwist_normTwist, sLocal_dual_normTwist] using
+    sLocalOrbitalFourierZeta_analyticOn χ a f 0 hpos
+
+section
+
+universe u
+
+/-- Difference quotients of continuous functionals give continuous jets on a barrelled space. -/
+private theorem orbitalFourierJet_exists_continuousLinear
+    {E : Type u} [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUniformAddGroup E]
+    [ContinuousSMul ℂ E] [BarrelledSpace ℂ E] (Φ : E → ℂ → ℂ) {U : Set ℂ}
+    (hU : IsOpen U) (hΦ : ∀ f, AnalyticOnNhd ℂ (Φ f) U)
+    (hbase : ∀ z ∈ U, ∃ L : E →L[ℂ] ℂ, ∀ f, L f = Φ f z)
+    (n : ℕ) {z : ℂ} (hz : z ∈ U) :
+    ∃ L : E →L[ℂ] ℂ, ∀ f, L f = iteratedDeriv n (Φ f) z := by
+  classical
+  have analyticDeriv (f : E) {x : ℂ} (hx : x ∈ U) (k : ℕ) :
+      AnalyticAt ℂ (iteratedDeriv k (Φ f)) x := by
+    induction k with
+    | zero => simpa only [iteratedDeriv_zero] using hΦ f x hx
+    | succ k ih => rw [iteratedDeriv_succ]; exact ih.deriv
+  induction n generalizing z with
+  | zero => simpa only [iteratedDeriv_zero] using hbase z hz
+  | succ n ih =>
+    let A (y : ℂ) : E →L[ℂ] ℂ := if hy : y ∈ U then (ih hy).choose else 0
+    have hA {y : ℂ} (hy : y ∈ U) (f : E) : A y f = iteratedDeriv n (Φ f) y := by
+      simpa only [A, dite_eq_left hy] using (ih hy).choose_spec f
+    let D (y : ℂ) := (y - z)⁻¹ • (A y - A z)
+    have hlim : Tendsto (fun y f ↦ D y f) (𝓝[≠] z)
+        (𝓝 fun f ↦ iteratedDeriv (n + 1) (Φ f) z) := by
+      refine tendsto_pi_nhds.mpr fun f ↦ ?_
+      rw [iteratedDeriv_succ]
+      refine (analyticDeriv f hz n).differentiableAt.hasDerivAt.tendsto_slope.congr' ?_
+      filter_upwards [mem_nhdsWithin_of_mem_nhds (hU.mem_nhds hz)] with y hy
+      simp only [D, smul_apply, sub_apply,
+        hA hy, hA hz, slope, vsub_eq_sub]
+    exact ⟨continuousLinearMapOfTendsto D hlim, fun _ ↦ rfl⟩
+
+end
 
 /-- Paper: Equation (7.3.1.14), p. 344.
 On S-adelic tests the Fourier jet is continuous and complex linear. -/
 theorem sLocalOrbitalFourierJet_continuous_linear {T : Finset V} {ω : PontryaginDual J₁}
     (j : I(T, ω)) :
     let D := fun f : ℬₛ ↦ iteratedDeriv j.val.2 (fourierZeta(j.val.1) f) 0
-    Continuous D ∧ IsLinearMap ℂ D := by sorry
+    Continuous D ∧ IsLinearMap ℂ D := by
+  obtain ⟨χ, a, ha, hle⟩ := sLocalOrbitalFourierZeta_chart j
+  let U := {z : ℂ | 0 < (1 - (z + a)).re}
+  let Φ := fun (f : ℬₛ) (z : ℂ) ↦
+    sLocalIdelicZFunction (sAdeleSchwartzFourier f) (chart(χ⁻¹) (1 - (z + a)))
+  have hU : IsOpen U := isOpen_lt continuous_const (by fun_prop)
+  have hzero : (0 : ℂ) ∈ U := by change 0 < (1 - (0 + a)).re; simp; linarith
+  have hbase : ∀ z ∈ U, ∃ L : ℬₛ →L[ℂ] ℂ, ∀ f, L f = Φ f z := by
+    intro z hz
+    obtain ⟨T, hT⟩ := sLocal_fourier_continuousLinear (F := F) (S := S)
+    obtain ⟨Z, hZ⟩ := sLocalIdelicZetaIntegral_tempered
+      (chart(χ⁻¹) (1 - (z + a))) ⟨χ⁻¹, _, hz, rfl⟩
+    refine ⟨Z.comp T, fun f ↦ ?_⟩
+    change Z (T f) = _
+    rw [hT, hZ]
+    exact (sLocalIdelicZFunction_eq_integral _ ⟨χ⁻¹, _, hz, rfl⟩).symm
+  let : BarrelledSpace ℂ ℬₛ := (sAdeleSchwartz_montel (F := F) S).1
+  obtain ⟨L, hL⟩ := orbitalFourierJet_exists_continuousLinear Φ hU
+    (sLocalOrbitalFourierZeta_analyticOn χ a) hbase j.val.2 hzero
+  have heq : (fun f : ℬₛ ↦ iteratedDeriv j.val.2 (fourierZeta(j.val.1) f) 0) = L := by
+    funext f
+    rw [hL]
+    simp only [Φ, ha, normTwist_normTwist, sLocal_dual_normTwist]
+  change Continuous _ ∧ IsLinearMap ℂ _
+  rw [heq]
+  exact ⟨L.continuous, L.toLinearMap.isLinear⟩
 
 local notation "fourierJet(" j ")" =>
   (⟨(sLocalOrbitalFourierJet_continuous_linear j).2.mk' _,
     (sLocalOrbitalFourierJet_continuous_linear j).1⟩ : StrongDual ℂ ℬₛ)
 
+/-- A homogeneous theta-kernel test has zero zeta function throughout its component. -/
+private theorem orbitalFourierJet_kernel_zeta_zero (ω : PontryaginDual J₁) (c : Xₛ)
+    (hc : onComponent(c, ω)) (f : ℬₛ) (hf : f ∈ Kₛ(ω))
+    (χ : PontryaginDual Jₛ) (a : ℂ) (ha : chart(χ) a = c) :
+    (fun z : ℂ ↦ sLocalIdelicZFunction f (chart(χ) z)) = 0 := by
+  have hv := (mem_sLocalHomogeneousAdelicTheta_ker_iff (F := F) (S := S) ω f).mp hf
+  have hω := (congrArg (normOneRestriction mₛ) ha).trans hc
+  have hr (z : ℂ) (g : J₁) : normOneRestriction mₛ (chart(χ) z) g = (ω g : ℂ) :=
+    (normOneRestriction_unitaryChart mₛ (isProperMap_sIdeleQuotientNorm F S).continuous χ z g).trans
+      ((normOneRestriction_unitaryChart mₛ (isProperMap_sIdeleQuotientNorm F S).continuous χ a g).symm.trans
+        (DFunLike.congr_fun hω g))
+  refine eq_of_agree_rightHalf (sLocalIdelicZFunction_meromorphic f χ)
+    (fun _ _ ↦ analyticAt_const.meromorphicNFAt) 0 fun z hz ↦ ?_
+  let d := (⟨chart(χ) z, sLocalOrderBound_positive χ hz⟩ :
+    {q : Xₛ // 0 ≤ sLocalIdelicOrderBound q})
+  exact (sLocalIdelicMellin_apply f d).symm.trans (hv d (hr z))
+
+/-- The functional equation transfers identically zero zeta functions to their reflected Fourier germs. -/
+private theorem orbitalFourierJet_kernel_reflected_zero (χ : PontryaginDual Jₛ) (f : ℬₛ)
+    (hf : (fun z : ℂ ↦ sLocalIdelicZFunction f (chart(χ) z)) = 0) :
+    (fun z : ℂ ↦ sLocalIdelicZFunction (sAdeleSchwartzFourier f) (chart(χ⁻¹) (1 - z)))
+      =ᶠ[codiscrete ℂ] 0 := by
+  let Z (g : ℬₛ) (η : PontryaginDual Jₛ) (z : ℂ) := sLocalIdelicZFunction g (chart(η) z)
+  let R (z : ℂ) := sLocalRhoFactor (chart(χ) z)
+  let D (z : ℂ) := Z (sAdeleSchwartzFourier f) χ⁻¹ (1 - z)
+  have hZ (g : ℬₛ) (η : PontryaginDual Jₛ) (z : ℂ) : MeromorphicAt (Z g η) z :=
+    ((sLocalIdelicZFunction_meromorphic g η) (mem_univ z)).meromorphicAt
+  have hEq : Z f χ =ᶠ[codiscrete ℂ] R * D := by
+    apply sLocal_meromorphic_identity (hZ f χ) (fun z ↦ (sLocalRhoFactor_meromorphic χ z).mul
+      ((hZ _ _ (1 - z)).comp_analyticAt (analyticAt_const.sub analyticAt_id)))
+    intro z hz
+    have hd : 0 < (1 - z).re := by simp; linarith [hz.2]
+    change sLocalIdelicZFunction f (chart(χ) z) =
+      R z * sLocalIdelicZFunction (sAdeleSchwartzFourier f) (chart(χ⁻¹) (1 - z))
+    refine (sLocalIdelicZFunction_eq_integral f ⟨χ, z, hz.1, rfl⟩).trans ?_
+    refine (sLocalIdelicZetaIntegral_functionalEquation f χ z hz).trans ?_
+    refine (congrArg (fun c ↦ R z * sLocalIdelicZetaIntegral (sAdeleSchwartzFourier f) c)
+      (sLocal_dual_normTwist χ z)).trans ?_
+    exact congrArg (R z * ·)
+      (sLocalIdelicZFunction_eq_integral (sAdeleSchwartzFourier f) ⟨χ⁻¹, 1 - z, hd, rfl⟩).symm
+  filter_upwards [hEq, sLocalRhoFactor_mul_dual χ] with z hz hprod
+  have hr : R z ≠ 0 := left_ne_zero_of_mul
+    (hprod.trans_ne ((Group.isUnit (QuotientGroup.mk (-1 : (SAdeleRing F S)ˣ) : Jₛ)).map
+      (chart(χ) z)).ne_zero)
+  have hzero : R z * D z = 0 := hz.symm.trans (congrFun hf z)
+  exact (mul_eq_zero.mp hzero).resolve_left hr
+
 /-- Paper: Equation (7.3.1.14), p. 344.
 The Fourier jet annihilates the kernel of the homogeneous theta map. -/
 theorem sLocalOrbitalFourierJet_ker {T : Finset V} {ω : PontryaginDual J₁}
     (j : I(T, ω)) :
-    Kₛ(ω) ≤ (fourierJet(j)).ker := by sorry
+    Kₛ(ω) ≤ (fourierJet(j)).ker := by
+  intro f hf
+  obtain ⟨χ, a, ha, _⟩ := sLocalOrbitalFourierZeta_chart j
+  have hzero := orbitalFourierJet_kernel_zeta_zero ω j.val.1 j.property.1 f hf χ a ha.symm
+  have hcod := orbitalFourierJet_kernel_reflected_zero χ f hzero
+  have hshift : Tendsto (fun z : ℂ ↦ z + a) (𝓝[≠] 0) (𝓝[≠] a) := by
+    refine tendsto_nhdsWithin_of_tendsto_nhds_of_eventually_within _ ?_ ?_
+    · exact ((continuous_id.add continuous_const : Continuous fun z : ℂ ↦ z + a).tendsto'
+        0 a (zero_add a)).mono_left nhdsWithin_le_nhds
+    · filter_upwards [self_mem_nhdsWithin] with z hz
+      exact fun h ↦ hz (add_eq_right.mp h)
+  have hev : fourierZeta(j.val.1) f =ᶠ[𝓝[≠] 0] 0 := by
+    filter_upwards [hshift.eventually (hcod.filter_mono (nhdsNE_le_codiscrete a))] with z hz
+    simpa only [ha, normTwist_normTwist, sLocal_dual_normTwist, Pi.zero_apply] using hz
+  have hnhds := (ContinuousAt.eventuallyEq_nhds_iff_eventuallyEq_nhdsNE
+    (sLocalOrbitalFourierZeta_analyticAt j f).continuousAt continuousAt_const).mp hev
+  change iteratedDeriv j.val.2 (fourierZeta(j.val.1) f) 0 = 0
+  exact (hnhds.iteratedDeriv_eq j.val.2).trans iteratedDeriv_const_zero
 
 /-- Paper: Equations (7.3.1.13)–(7.3.1.14), p. 344.
 The indexed Fourier functional is the jet of the reflected zeta transform at its center.

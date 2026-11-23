@@ -585,7 +585,21 @@ The topology on the global theta quotient induced by the product of homogeneous
 quotients is strictly coarser than its intrinsic topology.
 Deviation: The earlier continuous injection in (5.2.3.13) identifies the product map. -/
 theorem globalThetaToHomogeneousProduct_not_isInducing :
-    ¬ IsInducing (exists_globalThetaToHomogeneousProduct (F := F)).choose := by sorry
+    ¬ IsInducing (exists_globalThetaToHomogeneousProduct (F := F)).choose := by
+  intro h
+  let P := (exists_globalThetaToHomogeneousProduct (F := F)).choose
+  let : UniformSpace Θ𝔽 := IsTopologicalAddGroup.rightUniformSpace _
+  let : IsUniformAddGroup Θ𝔽 := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace Θ𝔽 := globalAdelicThetaSpace_complete
+  let (ω : PontryaginDual C₁) : UniformSpace (Θ𝔽ω(ω)) := IsTopologicalAddGroup.rightUniformSpace _
+  let (ω : PontryaginDual C₁) : IsUniformAddGroup (Θ𝔽ω(ω)) := isUniformAddGroup_of_addCommGroup
+  let (ω : PontryaginDual C₁) : T2Space (Θ𝔽ω(ω)) := by
+    have : IsClosed (LinearMap.ker (homogeneousAdelicThetaLinearMap F ω) :
+        Set (SchwartzBruhat (Multiplicative 𝔸[F]))) :=
+      homogeneousAdelicTheta_ker_isClosed ω
+    infer_instance
+  exact globalThetaToHomogeneousProduct_not_isClosed_range (F := F)
+    (AddMonoidHom.isUniformInducing_of_isInducing (f := P.toAddMonoidHom) h).isComplete_range.isClosed
 
 end IsotypicSums
 

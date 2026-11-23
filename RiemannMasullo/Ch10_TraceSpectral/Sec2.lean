@@ -671,7 +671,36 @@ theorem spectralLineIsotypeDual_pullback (a : ℝ) {s : ℝ} (hs : 0 ≤ s) (ω 
     let i := (existsUnique_spectralLineTestCompletion a hs ω).exists.choose
     let D : StrongDual ℂ (spectralSobolevIsotypeQuotient F a hI hs ω) →L[ℂ]
         StrongDual ℂ Eω(ω) := (N.mkQL.comp i).precomp ℂ
-    Injective D ∧ ∀ Λ (φ : Eω(ω)) (f : ℬ₀), φ.val.val = homogeneousAdelicTheta ω f.val → D Λ φ = 0 := by sorry
+    Injective D ∧ ∀ Λ (φ : Eω(ω)) (f : ℬ₀), φ.val.val = homogeneousAdelicTheta ω f.val → D Λ φ = 0 := by
+  intro hI N i D
+  have hi := (existsUnique_spectralLineTestCompletion (F := F) a hs ω).exists.choose_spec
+  constructor
+  · have hd : DenseRange (N.mkQL.comp i) :=
+      N.mkQ_surjective.denseRange.comp hi.2.1 N.mkQL.continuous
+    intro Λ₁ Λ₂ hΛ
+    apply DFunLike.coe_injective
+    exact hd.equalizer Λ₁.continuous Λ₂.continuous
+      (funext fun φ ↦ congrArg (fun T : StrongDual ℂ Eω(ω) ↦ T φ) hΛ)
+  · intro Λ φ f hφ
+    let x : globalPolarFreeThetaSubmodule (F := F) ω :=
+      ⟨Submodule.Quotient.mk f.val, Submodule.mem_map.mpr ⟨f.val, f.property, rfl⟩⟩
+    let j := (exists_globalHomogeneousThetaSobolevInclusion
+      (F := F) (a := a) hI hs ω).choose
+    have hj := (exists_globalHomogeneousThetaSobolevInclusion
+      (F := F) (a := a) hI hs ω).choose_spec.2.2
+    have he : (i φ).val = (j x).val.val := by
+      apply Lp.ext
+      apply (withDensity_absolutelyContinuous μ𝔽 _).ae_eq
+      have hw : modulationWeight m𝔽 a φ.val.val =ᵐ[μ𝔽]
+          modulationWeight m𝔽 a (homogeneousAdelicTheta ω f.val) :=
+        Filter.Eventually.of_forall (congrFun (congrArg (modulationWeight m𝔽 a) hφ))
+      exact (hi.1 φ).trans (hw.trans (hj f x rfl).2.symm)
+    have hn : i φ ∈ N := by
+      change (i φ).val ∈ Θ(a, hI, hs)
+      rw [he]
+      exact (j x).val.property
+    change Λ (N.mkQ (i φ)) = 0
+    exact (congrArg Λ ((Submodule.Quotient.mk_eq_zero N).mpr hn)).trans (map_zero Λ)
 
 end TestDuality
 
@@ -688,6 +717,38 @@ theorem spectralLineJet_functional (χ : PontryaginDual C₁ → PontryaginDual 
         Λ f = iteratedDeriv j.val.2.2 (fun z ↦ modulatedFourierMellin m𝔽 univ hm𝔽 μ𝔽
           φ.val (ideleClassNormTwist (χ j.val.1) z)) (shift(a, j.val.2.1)) := by sorry
 
+section
+
+universe u v
+
+/-- Integrating scalar multiples of a commutative action preserves every eigenspace. -/
+private theorem spectral_integrated_action_eigenvector
+    {G : Type u} [CommGroup G] [MeasurableSpace G] (μ : Measure G)
+    {V : Type v} [NormedAddCommGroup V] [NormedSpace ℂ V]
+    (ρ : G →* (V →L[ℂ] V)) (f : G → ℂ) (u v : V)
+    (hv : HasPettisIntegral (.positive μ) (fun g ↦ f g • ρ g u) v)
+    (k : G) (c : ℂ) (hu : ρ k u = c • u) : ρ k v = c • v := by
+  have hev (δ : StrongDual ℂ V) : δ v = ∫ g, δ (f g • ρ g u) ∂μ :=
+    congrArg (fun z : PettisWeakCompletion V ↦
+      (show Module.Dual ℂ (StrongDual ℂ V) from z) δ) hv.2
+  apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+  intro δ
+  have he (g : G) : ρ k (f g • ρ g u) = c • (f g • ρ g u) := by
+    rw [map_smul]
+    have hc : ρ k (ρ g u) = ρ g (ρ k u) := by
+      change (ρ k * ρ g) u = (ρ g * ρ k) u
+      rw [← map_mul, ← map_mul, mul_comm k g]
+    rw [hc, hu, map_smul, smul_comm]
+  calc
+    δ (ρ k v) = ∫ g, δ (ρ k (f g • ρ g u)) ∂μ :=
+      hev (δ.comp (ρ k))
+    _ = ∫ g, c • δ (f g • ρ g u) ∂μ :=
+      integral_congr_ae (.of_forall fun g ↦ (congrArg δ (he g)).trans (map_smul δ c _))
+    _ = c • δ v := by rw [integral_smul, ← hev δ]
+    _ = δ (c • v) := (map_smul δ c v).symm
+
+end
+
 /-- Paper: (10.2.1.10), pp. 442–443. The band-limited approximate unit acts
 by convolution on the fixed norm-one isotype and converges there strongly.
 Deviation: The Fourier band is centered on the inverse lift for the
@@ -702,7 +763,58 @@ theorem exists_spectralLineIsotypeConvolution (χ : PontryaginDual C𝔽) {s : �
       (∀ n, tsupport (lcaFourier μ𝔽 (φ n)) ⊆
         modulatedFrequencyBand m𝔽 χ⁻¹ (-(n : ℝ)) n) ∧
       (∀ n (f : E), (P n f).val = A (φ n) f.val) ∧
-      ∀ f : E, Tendsto (fun n ↦ P n f) atTop (𝓝 f) := by sorry
+      ∀ f : E, Tendsto (fun n ↦ P n f) atTop (𝓝 f) := by
+  intro hI E A
+  let τ := hardySobolevTranslation μ𝔽 m𝔽 0 0 s hI hs
+  let B := (existsUnique_singletonDecay_lineAction μ𝔽 m𝔽 hm𝔽 hms𝔽 0 s hs).exists.choose
+  have hB := (existsUnique_singletonDecay_lineAction μ𝔽 m𝔽 hm𝔽 hms𝔽 0 s hs).exists.choose_spec.1
+  have hA := (existsUnique_schwartzBruhat_zeroLineAction μ𝔽 m𝔽 s hs).exists.choose_spec
+  let e := (modulatedExponentialDecay_singleton_schwartz m𝔽 hm𝔽 hms𝔽 0).choose
+  have he (f : ModulatedExponentialDecay m𝔽 {0}) : (e f : C𝔽 → ℂ) = f.val := by
+    exact ((modulatedExponentialDecay_singleton_schwartz m𝔽 hm𝔽 hms𝔽 0).choose_spec f).trans
+      (modulationWeight_zero m𝔽 f.val)
+  have hAB (f : ModulatedExponentialDecay m𝔽 {0}) : A (e f) = B f := by
+    apply ContinuousLinearMap.ext
+    intro u
+    have hp : (fun g ↦ (e f).val g • τ g u) = (fun g ↦ f.val g • τ g u) :=
+      funext fun g ↦ congrArg (fun z : ℂ ↦ z • τ g u) (congrFun (he f) g)
+    have hP : HasPettisIntegral (.positive μ𝔽) (fun g ↦ f.val g • τ g u) (A (e f) u) :=
+      hp ▸ hA (e f) u
+    exact hP.unique (hB f u)
+  let φ := (exists_singletonDecay_isotype_approximation μ𝔽 m𝔽 hm𝔽 hms𝔽 0 s hs χ⁻¹).choose
+  have hφ := (exists_singletonDecay_isotype_approximation μ𝔽 m𝔽 hm𝔽 hms𝔽 0 s hs χ⁻¹).choose_spec
+  have hmem (n : ℕ) (u : E) : A (e (φ n)) u.val ∈ E := by
+    apply (mem_actionIsotype _ _ _).mpr
+    intro k
+    exact spectral_integrated_action_eigenvector μ𝔽 τ (e (φ n)).val u.val
+      (A (e (φ n)) u.val) (hA (e (φ n)) u.val) k.val (χ k.val : ℂ)
+      ((mem_actionIsotype _ _ _).mp u.property k)
+  let P (n : ℕ) : E →L[ℂ] E :=
+    ((A (e (φ n))).comp E.subtypeL).codRestrict E (hmem n)
+  refine ⟨fun n ↦ e (φ n), P, ?_, ?_, ?_, ?_, ?_⟩
+  · intro n
+    rw [hAB]
+    exact hφ.1 n
+  · intro n k g
+    have hchar : star ((χ⁻¹) k.val : ℂ) = (χ k.val : ℂ) := by
+      change star (((χ k.val)⁻¹ : Circle) : ℂ) = _
+      rw [Circle.coe_inv_eq_conj]
+      exact star_star _
+    calc
+      e (φ n) (k.val⁻¹ * g) = (φ n).val (k.val⁻¹ * g) := congrFun (he (φ n)) _
+      _ = star ((χ⁻¹) k.val : ℂ) * (φ n).val g := hφ.2.1 n k g
+      _ = (χ k.val : ℂ) * e (φ n) g := congrArg₂ (· * ·) hchar (congrFun (he (φ n)) g).symm
+  · intro n
+    simpa only [he, modulationWeight_zero] using hφ.2.2.1 n
+  · intro n f
+    rfl
+  · intro f
+    apply tendsto_subtype_rng.mpr
+    change Tendsto (fun n ↦ A (e (φ n)) f.val) atTop (𝓝 f.val)
+    have h : Tendsto (fun n ↦ B (φ n) f.val) atTop (𝓝 f.val) :=
+      hφ.2.2.2 ⟨f.val, by simpa only [inv_inv] using f.property⟩
+    exact h.congr' (Filter.Eventually.of_forall fun n ↦
+      congrArg (fun T : W(0, 0, s) →L[ℂ] W(0, 0, s) ↦ T f.val) (hAB (φ n)).symm)
 
 private theorem spectralJet_lp_norm_sq {μ : Measure C𝔽} (u : Lp ℂ 2 μ) :
     ‖u‖ ^ 2 = ∫ g : C𝔽, ‖u g‖ ^ 2 ∂μ := by

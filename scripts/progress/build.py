@@ -552,7 +552,12 @@ def section_meta(issue):
     body = issue["body"] or ""
     nm = NEEDS_MARK.search(body)
     needs = [int(x) for x in nm.group(1).split()] if nm else []
-    targets = re.findall(r"RiemannMasullo/(\w+)/(Sec\w*?)…?\.lean", body)
+    # The issue's own "Target" line says which file it is for, whatever the file is called (the
+    # bridge to the Comparator targets, #5630, is `Targets.lean`, and its body also mentions the
+    # `Sec4.lean` it builds on). Issues without such a line are read as before.
+    named = re.search(r"^- \*\*Target\*\*:(.*)$", body, re.M)
+    targets = re.findall(r"RiemannMasullo/(\w+)/(\w+?)…?\.lean", named.group(1)) if named else []
+    targets = targets or re.findall(r"RiemannMasullo/(\w+)/(Sec\w*?)…?\.lean", body)
     subs = []
     sm = re.search(r"\*\*Subsections\*\*:\s*(.*)", body)
     if sm:

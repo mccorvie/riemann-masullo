@@ -269,17 +269,86 @@ theorem finitePlaceDifference_integerIndicator (v : V) (π : Fᵥ(v)ˣ)
       indicator_of_notMem (show _ ∉ (v.adicCompletionIntegers F : Set Fᵥ(v)) from h1),
       indicator_of_notMem fun hx ↦ h.ne' ((hmem x).mp hx), sub_zero]
 
+private theorem finitePlaceDifference_injective_aux (v : V) (π : Fᵥ(v)ˣ)
+    (hπ : vval(v).IsUniformizer π.val) (g : Fᵥ(v) → ℂ) (hlc : IsLocallyConstant g)
+    (hcs : HasCompactSupport g) (hg : ∀ x, g x = g ((↑π⁻¹ : Fᵥ(v)) * x)) : g = 0 := by
+  have hval : vval(v) π.val = WithZero.exp (-1 : ℤ) := hπ.trans
+    (congrArg Units.val (Valuation.IsRankOneDiscrete.generator_eq_exp_neg_one_of_surjective
+      (v.valuedAdicCompletion_surjective F)))
+  have hv1 : vval(v) π.val < 1 := by
+    rw [hval, ← WithZero.exp_zero, WithZero.exp_lt_exp]; norm_num
+  have hpow (n : ℕ) (x : Fᵥ(v)) : g ((π : Fᵥ(v)) ^ n * x) = g x := by
+    induction n generalizing x with
+    | zero => simp
+    | succ n ih => rw [pow_succ, mul_assoc, ih, hg (π * x), Units.inv_mul_cancel_left]
+  let := Valued.toNontriviallyNormedField (Fᵥ(v)) _
+  have hn : ‖(π : Fᵥ(v))‖ < 1 := Valued.toNormedField.norm_lt_one_iff.mpr hv1
+  have hconst (x : Fᵥ(v)) : g x = g 0 := by
+    have ht : Tendsto (fun n : ℕ ↦ (π : Fᵥ(v)) ^ n * x) atTop (𝓝 0) := by
+      simpa using (tendsto_pow_atTop_nhds_zero_of_norm_lt_one hn).mul_const x
+    have h := (hlc.continuous.tendsto 0).comp ht
+    simp only [Function.comp_def, hpow] at h
+    exact tendsto_nhds_unique tendsto_const_nhds h
+  funext x
+  by_contra hx
+  have hc : support g = univ := eq_univ_of_forall fun y ↦ by
+    rw [mem_support, hconst y, ← hconst x]; exact hx
+  have hK : IsCompact (univ : Set Fᵥ(v)) := by
+    have := hcs.isCompact
+    rwa [tsupport, hc, closure_univ] at this
+  exact noncompact_univ _ hK
+
+private theorem finitePlaceDifference_injective (v : V) (π : Fᵥ(v)ˣ)
+    (hπ : vval(v).IsUniformizer π.val) : Function.Injective (finitePlaceDifference v π) := by
+  intro f f' hf
+  have hg (x : Fᵥ(v)) : f (Multiplicative.ofAdd x) - f' (Multiplicative.ofAdd x) =
+      f (Multiplicative.ofAdd ((↑π⁻¹ : Fᵥ(v)) * x)) -
+        f' (Multiplicative.ofAdd ((↑π⁻¹ : Fᵥ(v)) * x)) := by
+    have h := congrArg (fun k : ℬ(Fᵥ(v)) ↦ k (Multiplicative.ofAdd x)) hf
+    change f (Multiplicative.ofAdd x) - f (Multiplicative.ofAdd ((↑π⁻¹ : Fᵥ(v)) * x)) =
+      f' (Multiplicative.ofAdd x) - f' (Multiplicative.ofAdd ((↑π⁻¹ : Fᵥ(v)) * x)) at h
+    linear_combination h
+  obtain ⟨hlc, hcs⟩ := (mem_finitePlaceSchwartz_iff F v
+    (fun x ↦ f (Multiplicative.ofAdd x))).1 ⟨f, fun _ ↦ rfl⟩
+  obtain ⟨hlc', hcs'⟩ := (mem_finitePlaceSchwartz_iff F v
+    (fun x ↦ f' (Multiplicative.ofAdd x))).1 ⟨f', fun _ ↦ rfl⟩
+  have h0 := finitePlaceDifference_injective_aux v π hπ
+    (fun x ↦ f (Multiplicative.ofAdd x) - f' (Multiplicative.ofAdd x)) (hlc.sub hlc')
+    (hcs.sub hcs') hg
+  refine Subtype.ext (funext fun y ↦ ?_)
+  have hy := congrFun h0 (Multiplicative.toAdd y)
+  exact sub_eq_zero.mp hy
+
+private theorem finestLocallyConvex_isEmbedding_of_injective {E : Type*} [AddCommGroup E]
+    [Module ℂ E] (D : FinestLocallyConvex E →ₗ[ℂ] FinestLocallyConvex E)
+    (hD : Function.Injective D) : IsEmbedding D := by
+  have : T2Space (FinestLocallyConvex E) := finestLocallyConvex_t2 E
+  obtain ⟨L, hL⟩ := D.exists_leftInverse_of_injective (LinearMap.ker_eq_bot.mpr hD)
+  have hLD : Function.LeftInverse L D := fun f ↦ LinearMap.congr_fun hL f
+  exact Topology.IsEmbedding.of_leftInverse hLD
+    (continuous_of_finestLocallyConvex E L) (continuous_of_finestLocallyConvex E D)
+
 /-- Paper: Lemma 5.3.1.1, p. 240.
 For each fixed uniformizer the local difference is a topological embedding. -/
 theorem finitePlaceDifference_isEmbedding (v : V) (π : Fᵥ(v)ˣ)
     (hπ : vval(v).IsUniformizer π.val) :
-    IsEmbedding (finitePlaceDifference v π) := by sorry
+    IsEmbedding (finitePlaceDifference v π) := by
+  have heq := finitePlaceSchwartz_finestTopology F v
+  have h := finestLocallyConvex_isEmbedding_of_injective (E := ℬ(Fᵥ(v)))
+    (finitePlaceDifference v π) (finitePlaceDifference_injective v π hπ)
+  exact (congrArg (fun t ↦ @IsEmbedding ℬ(Fᵥ(v)) ℬ(Fᵥ(v)) t t
+    (fun f ↦ finitePlaceDifference v π f)) heq).mpr h
 
 /-- Paper: Lemma 5.3.1.1, pp. 240–241.
 The range of the difference for a fixed uniformizer is closed on the full test space. -/
 theorem finitePlaceDifference_isClosed_range (v : V) (π : Fᵥ(v)ˣ)
     (_hπ : vval(v).IsUniformizer π.val) :
-    IsClosed (Set.range (finitePlaceDifference v π)) := by sorry
+    IsClosed (Set.range (finitePlaceDifference v π)) := by
+  have heq := finitePlaceSchwartz_finestTopology F v
+  have h := finestLocallyConvex_submodule_isClosed (E := ℬ(Fᵥ(v)))
+    (LinearMap.range (finitePlaceDifference v π))
+  exact (congrArg (fun t ↦ @IsClosed ℬ(Fᵥ(v)) t (Set.range (finitePlaceDifference v π)))
+    heq).mpr h
 
 -- TODO(paper-gap): ERRATA R7 gives the failure of independence and range on the whole space.
 
@@ -1503,25 +1572,6 @@ private theorem realSchwartzFlatQuotient_strongDual_lift
   change realDiracDerivative n f - realDiracDerivative n g = 0
   rw [hfd n, sub_self]
 
--- TODO(paper-gap): The coefficient seminorms in (5.3.2.2) give the coefficientwise
--- topology on the whole polynomial space and do not give its finest locally convex topology.
-
-/-- Paper: Theorem 5.3.2.1(1), p. 243.
-Polynomials with the finest locally convex topology identify with the strong dual of the
-real Schwartz quotient by flat functions through the factorial-normalized Dirac derivatives.
-The least order bound of the distribution is the polynomial's natural degree.
-Deviation: Uses the finest locally convex topology and omits the false equivalence in (5.3.2.2). -/
-theorem realDiracDerivatives_polynomialEquiv :
-    ∃ e : FinestLocallyConvex (Polynomial ℂ) ≃L[ℂ]
-        StrongDual ℂ (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin),
-      (∀ k : ℕ, ∀ f : 𝓢(ℝ, ℂ),
-        e (Polynomial.monomial k 1) (realSchwartzFlatAtOrigin.mkQ f) =
-          realDiracDerivative k f / (k.factorial : ℂ)) ∧
-      ∀ (p : Polynomial ℂ) (N : ℕ),
-        DistributionOrderLE
-          (fun f : 𝒟ℝ ↦ e p (realSchwartzFlatAtOrigin.mkQ
-            (f.hasCompactSupport.toSchwartzMap f.contDiff))) N ↔ p.natDegree ≤ N := by sorry
-
 /-- A Borel series `∑ bₙ φₙ` whose terms past `m` are dominated by a summable sequence converges
 in the Schwartz space. Its Dirac derivatives are those of the coefficients, and its seminorms of
 order at most `m` are bounded by the first `m + 1` terms plus the dominating sum. -/
@@ -1784,6 +1834,261 @@ theorem realSchwartzFlatQuotient_strongDual :
   rw [range_transpose_mkQL]
   ext T
   simp [Set.mem_iInter]
+
+/-- A continuous functional on formal power series vanishes on every series whose coefficients
+up to some fixed order are zero. -/
+private theorem realDiracDerivatives_polynomialEquiv_finite (L : PowerSeries ℂ →L[ℂ] ℂ) :
+    ∃ N : ℕ, ∀ s : PowerSeries ℂ, (∀ n ≤ N, PowerSeries.coeff n s = 0) → L s = 0 := by
+  by_contra h
+  push Not at h
+  choose s hs0 hs using h
+  let t (N : ℕ) : PowerSeries ℂ := (L (s N))⁻¹ • s N
+  have ht : Tendsto t atTop (𝓝 0) := by
+    rw [PowerSeries.WithPiTopology.tendsto_iff_coeff_tendsto]
+    intro d
+    rw [map_zero]
+    refine tendsto_const_nhds.congr' ?_
+    filter_upwards [eventually_ge_atTop d] with N hN
+    simp [t, hs0 N d hN]
+  have h1 := (L.continuous.tendsto 0).comp ht
+  rw [map_zero] at h1
+  have h2 : ⇑L ∘ t = fun _ ↦ 1 := by
+    funext N
+    simp [t, inv_mul_cancel₀ (hs N)]
+  rw [h2] at h1
+  exact one_ne_zero (tendsto_nhds_unique tendsto_const_nhds h1)
+
+-- TODO(paper-gap): The coefficient seminorms in (5.3.2.2) give the coefficientwise
+-- topology on the whole polynomial space and do not give its finest locally convex topology.
+
+/-- Paper: Theorem 5.3.2.1(1), p. 243.
+Polynomials with the finest locally convex topology identify with the strong dual of the
+real Schwartz quotient by flat functions through the factorial-normalized Dirac derivatives.
+The least order bound of the distribution is the polynomial's natural degree.
+Deviation: Uses the finest locally convex topology and omits the false equivalence in (5.3.2.2). -/
+theorem realDiracDerivatives_polynomialEquiv :
+    ∃ e : FinestLocallyConvex (Polynomial ℂ) ≃L[ℂ]
+        StrongDual ℂ (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin),
+      (∀ k : ℕ, ∀ f : 𝓢(ℝ, ℂ),
+        e (Polynomial.monomial k 1) (realSchwartzFlatAtOrigin.mkQ f) =
+          realDiracDerivative k f / (k.factorial : ℂ)) ∧
+      ∀ (p : Polynomial ℂ) (N : ℕ),
+        DistributionOrderLE
+          (fun f : 𝒟ℝ ↦ e p (realSchwartzFlatAtOrigin.mkQ
+            (f.hasCompactSupport.toSchwartzMap f.contDiff))) N ↔ p.natDegree ≤ N := by
+  obtain ⟨τ, hτ⟩ := realSchwartzTaylor_equiv
+  have hfact (k : ℕ) : (k.factorial : ℂ) ≠ 0 := mod_cast Nat.factorial_ne_zero k
+  let cf (k : ℕ) : PowerSeries ℂ →L[ℂ] ℂ :=
+    ⟨PowerSeries.coeff k, PowerSeries.WithPiTopology.continuous_coeff ℂ k⟩
+  let c (k : ℕ) : StrongDual ℂ (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin) :=
+    ((-1 : ℂ) ^ k) • (cf k).comp τ.toContinuousLinearMap
+  have hc (k : ℕ) (y : 𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin) :
+      c k y = (-1 : ℂ) ^ k * PowerSeries.coeff k (τ y) := rfl
+  have hcf (k : ℕ) (f : 𝓢(ℝ, ℂ)) :
+      c k (realSchwartzFlatAtOrigin.mkQ f) = realDiracDerivative k f / (k.factorial : ℂ) := by
+    rw [hc, hτ, realSchwartzFlatQuotient_strongDual_dirac]
+    ring
+  let Φ : Polynomial ℂ →ₗ[ℂ] StrongDual ℂ (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin) :=
+    Polynomial.lsum fun k ↦ LinearMap.smulRight LinearMap.id (c k)
+  have hΦ (p : Polynomial ℂ) (y : 𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin) :
+      Φ p y = ∑ k ∈ p.support, p.coeff k * c k y := by
+    simp [Φ, Polynomial.lsum_apply, Polynomial.sum_def, sum_apply]
+  have hΦm (k : ℕ) (a : ℂ) : Φ (Polynomial.monomial k a) = a • c k := by
+    simp [Φ, Polynomial.lsum_apply, Polynomial.sum_monomial_index]
+  have hinj : Function.Injective Φ := by
+    refine (injective_iff_map_eq_zero Φ).mpr fun p hp ↦ ?_
+    ext n
+    have h := congrArg (fun T : StrongDual ℂ (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin) ↦
+      T (τ.symm (PowerSeries.X ^ n))) hp
+    simp only [hΦ, hc, ContinuousLinearEquiv.apply_symm_apply, PowerSeries.coeff_X_pow,
+      zero_apply] at h
+    rw [Finset.sum_eq_single n (fun k _ hk ↦ by simp [hk])
+      (fun hn ↦ by simp [Polynomial.notMem_support_iff.mp hn])] at h
+    simpa using h
+  have hsurj : Function.Surjective Φ := by
+    intro T
+    let L : PowerSeries ℂ →L[ℂ] ℂ := T.comp τ.symm.toContinuousLinearMap
+    obtain ⟨N, hN⟩ := realDiracDerivatives_polynomialEquiv_finite L
+    refine ⟨∑ n ∈ Finset.range (N + 1),
+      Polynomial.monomial n ((-1 : ℂ) ^ n * L (PowerSeries.X ^ n)), ?_⟩
+    ext y
+    rw [map_sum]
+    simp only [hΦm, sum_apply, smul_apply, hc,
+      smul_eq_mul]
+    have hy : T y = L (τ y) := by simp [L]
+    have hs : L (τ y - ∑ n ∈ Finset.range (N + 1),
+        PowerSeries.coeff n (τ y) • PowerSeries.X ^ n) = 0 := by
+      apply hN
+      intro m hm
+      rw [map_sub, map_sum]
+      simp [PowerSeries.coeff_X_pow, Finset.sum_ite_eq, Finset.mem_range, Nat.lt_succ_of_le hm]
+    rw [map_sub, map_sum, sub_eq_zero] at hs
+    rw [hy, hs]
+    refine Finset.sum_congr rfl fun n _ ↦ ?_
+    rw [map_smul, smul_eq_mul]
+    have : ((-1 : ℂ) ^ n) * (-1) ^ n = 1 := by rw [← mul_pow]; norm_num
+    linear_combination (L (PowerSeries.X ^ n) * PowerSeries.coeff n (τ y)) * this
+  let e₀ : Polynomial ℂ ≃ₗ[ℂ] StrongDual ℂ (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin) :=
+    LinearEquiv.ofBijective Φ ⟨hinj, hsurj⟩
+  let e₁ : FinestLocallyConvex (Polynomial ℂ) ≃ₗ[ℂ]
+      StrongDual ℂ (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin) := e₀
+  have he₁ (p : Polynomial ℂ) : e₁ p = Φ p := rfl
+  have : IsClosed (realSchwartzFlatAtOrigin : Set 𝓢(ℝ, ℂ)) := realSchwartzFlatAtOrigin_isClosed
+  let : UniformSpace (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin) :=
+    IsTopologicalAddGroup.rightUniformSpace _
+  let : IsUniformAddGroup (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin) :=
+    isUniformAddGroup_of_addCommGroup
+  let : PolynormableSpace ℂ (StrongDual ℂ (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin)) :=
+    uniformConvergenceCLM_polynormable (F := ℂ)
+      {B : Set (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin) | Bornology.IsVonNBounded ℂ B}
+      (fun _ h ↦ by exact h)
+      (by rw [Bornology.sUnion_isVonNBounded_eq_univ, Submodule.span_univ]; simp)
+  have hcont : Continuous e₁ :=
+    continuous_of_finestLocallyConvex (Polynomial ℂ) e₁.toLinearMap
+  have hsymm : Continuous e₁.symm := by
+    refine (finestLocallyConvex_withSeminorms (Polynomial ℂ)).continuous_of_continuous_comp
+      e₁.symm.toLinearMap fun p ↦ ?_
+    refine Seminorm.continuous (r := 1) ?_
+    let w (n : ℕ) : ℝ := p (Polynomial.monomial n 1)
+    obtain ⟨S, hS, hSc⟩ :=
+      realSchwartzFlatQuotient_strongDual_borel fun n ↦ (n.factorial : ℝ) * w n
+    have hB : Bornology.IsVonNBounded ℂ (realSchwartzFlatAtOrigin.mkQ '' S) :=
+      hS.image realSchwartzFlatAtOrigin.mkQL
+    filter_upwards [ContinuousLinearMap.eventually_nhds_zero_mapsTo hB
+      (Metric.ball_mem_nhds (0 : ℂ) one_pos)] with T hT
+    rw [Seminorm.mem_ball_zero]
+    change p (e₁.symm T) < 1
+    obtain ⟨q, hq⟩ : ∃ q : Polynomial ℂ, e₁.symm T = q := ⟨_, rfl⟩
+    have hTq : T = Φ q := by rw [← he₁, ← hq, LinearEquiv.apply_symm_apply]
+    rw [hq]
+    let d (n : ℕ) : ℂ :=
+      (n.factorial : ℂ) * (w n : ℂ) * (star (q.coeff n) / (‖q.coeff n‖ : ℂ))
+    have hd (n : ℕ) : ‖d n‖ ≤ (n.factorial : ℝ) * w n := by
+      have hw : 0 ≤ w n := apply_nonneg _ _
+      have hu : ‖star (q.coeff n) / (‖q.coeff n‖ : ℂ)‖ ≤ 1 := by
+        rw [norm_div, norm_star, Complex.norm_real, Real.norm_of_nonneg (norm_nonneg _)]
+        exact div_self_le_one _
+      calc ‖d n‖ = (n.factorial : ℝ) * w n * ‖star (q.coeff n) / (‖q.coeff n‖ : ℂ)‖ := by
+            simp only [d, norm_mul, Complex.norm_natCast, Complex.norm_real,
+              Real.norm_of_nonneg hw]
+        _ ≤ (n.factorial : ℝ) * w n * 1 := by gcongr
+        _ = (n.factorial : ℝ) * w n := mul_one _
+    obtain ⟨f, hfS, hf⟩ := hSc d hd
+    have hval : T (realSchwartzFlatAtOrigin.mkQ f) =
+        ((∑ k ∈ q.support, w k * ‖q.coeff k‖ : ℝ) : ℂ) := by
+      rw [hTq, hΦ]
+      push_cast
+      refine Finset.sum_congr rfl fun k hk ↦ ?_
+      have hq0 : q.coeff k ≠ 0 := Polynomial.mem_support_iff.mp hk
+      have hn0 : (‖q.coeff k‖ : ℂ) ≠ 0 := by exact_mod_cast norm_ne_zero_iff.mpr hq0
+      rw [hcf, hf k]
+      simp only [d]
+      field_simp
+      rw [Complex.star_def, show q.coeff k * (k.factorial : ℂ) * (w k : ℂ) *
+          (starRingEnd ℂ) (q.coeff k) = (q.coeff k * (starRingEnd ℂ) (q.coeff k)) *
+          ((k.factorial : ℂ) * (w k : ℂ)) by ring, Complex.mul_conj']
+      field_simp
+      exact mul_div_cancel_left₀ _ (hfact k)
+    have hle : p q ≤ ∑ k ∈ q.support, w k * ‖q.coeff k‖ := by
+      conv_lhs => rw [q.as_sum_support]
+      refine (Finset.le_sum_of_subadditive p (map_zero p).le (map_add_le_add p) _ _).trans
+        (Finset.sum_le_sum fun k _ ↦ ?_)
+      rw [show Polynomial.monomial k (q.coeff k) = q.coeff k • Polynomial.monomial k 1 by
+        rw [Polynomial.smul_monomial, smul_eq_mul, mul_one], map_smul_eq_mul, mul_comm]
+    have hlt := hT ⟨f, hfS, rfl⟩
+    rw [Metric.mem_ball, dist_zero_right, hval, Complex.norm_real,
+      Real.norm_of_nonneg (Finset.sum_nonneg fun k _ ↦
+        mul_nonneg (apply_nonneg _ _) (norm_nonneg _))] at hlt
+    exact hle.trans_lt hlt
+  let e : FinestLocallyConvex (Polynomial ℂ) ≃L[ℂ]
+      StrongDual ℂ (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin) :=
+    { e₁ with
+      continuous_toFun := hcont
+      continuous_invFun := hsymm }
+  have he (p : Polynomial ℂ) : e p = Φ p := rfl
+  have hev (p : Polynomial ℂ) (g : 𝓢(ℝ, ℂ)) : e p (realSchwartzFlatAtOrigin.mkQ g) =
+      ∑ k ∈ p.support, p.coeff k * (realDiracDerivative k g / (k.factorial : ℂ)) := by
+    rw [he, hΦ]
+    simp only [hcf]
+  refine ⟨e, fun k f ↦ ?_, fun p N ↦ ⟨fun hord ↦ ?_, fun hdeg K ↦ ?_⟩⟩
+  · rw [he, hΦm, one_smul, hcf]
+  · by_contra hlt
+    push Not at hlt
+    have hpd : p.coeff p.natDegree ≠ 0 :=
+      Polynomial.leadingCoeff_ne_zero.mpr (Polynomial.ne_zero_of_natDegree_gt hlt)
+    have hpd' : 0 < ‖p.coeff p.natDegree‖ := norm_pos_iff.mpr hpd
+    let K0 : Compacts ℝ := ⟨Metric.closedBall 0 1, isCompact_closedBall 0 1⟩
+    obtain ⟨C, hC0, hC⟩ := hord K0
+    let χ : ContDiffBump (0 : ℝ) := ⟨1 / 2, 1, by norm_num, by norm_num⟩
+    obtain ⟨G, hG⟩ := realSchwartzFlatQuotient_strongDual_exists_bump χ p.natDegree
+    have hGc : HasCompactSupport (G : ℝ → ℂ) :=
+      (isCompact_closedBall (0 : ℝ) 1).of_isClosed_subset (isClosed_tsupport _)
+        (realSchwartzFlatQuotient_strongDual_bump_tsupport χ le_rfl _ G hG)
+    let A : ℝ := ∑ j ∈ Finset.range (N + 1), SchwartzMap.seminorm ℂ 0 j G
+    have hA : 0 ≤ A := Finset.sum_nonneg fun _ _ ↦ apply_nonneg _ _
+    let ε : ℝ := min 1 (‖p.coeff p.natDegree‖ / (2 * (C * A + 1)))
+    have hε : 0 < ε := lt_min one_pos (by positivity)
+    have hε1 : ε ≤ 1 := min_le_left _ _
+    have hε2 : ε * (2 * (C * A + 1)) ≤ ‖p.coeff p.natDegree‖ :=
+      (le_div_iff₀ (by positivity)).mp (min_le_right _ _)
+    obtain ⟨ψ, hψ⟩ := realSchwartzFlatQuotient_strongDual_exists_scaled G hGc p.natDegree ε hε.ne'
+    have hψsupp : tsupport (ψ : ℝ → ℂ) ⊆ Metric.closedBall 0 1 := by
+      refine closure_minimal (fun x hx ↦ ?_) Metric.isClosed_closedBall
+      rw [mem_support, hψ] at hx
+      have hGx : ε⁻¹ * x ∈ tsupport (G : ℝ → ℂ) := subset_tsupport _ (right_ne_zero_of_mul hx)
+      have h := realSchwartzFlatQuotient_strongDual_bump_tsupport χ le_rfl _ G hG hGx
+      rw [Metric.mem_closedBall, Real.dist_eq, sub_zero, abs_mul, abs_inv, abs_of_pos hε,
+        inv_mul_le_iff₀ hε] at h
+      rw [Metric.mem_closedBall, Real.dist_eq, sub_zero]
+      nlinarith
+    have hψc : HasCompactSupport (ψ : ℝ → ℂ) :=
+      (isCompact_closedBall (0 : ℝ) 1).of_isClosed_subset (isClosed_tsupport _) hψsupp
+    let φ : 𝒟ℝ := ⟨ψ, ψ.smooth ⊤, hψc, by simp⟩
+    have hφ : φ.hasCompactSupport.toSchwartzMap φ.contDiff = ψ := by ext x; rfl
+    have hbound := hC φ hψsupp (ε * A) (by positivity) fun j hj x ↦ by
+      change ‖iteratedFDeriv ℝ j (ψ : ℝ → ℂ) x‖ ≤ ε * A
+      rw [norm_iteratedFDeriv_eq_norm_iteratedDeriv]
+      have h1 := SchwartzMap.le_seminorm' ℂ 0 j ψ x
+      rw [pow_zero, one_mul] at h1
+      have h2 := realSchwartzFlatQuotient_strongDual_scaled_seminorm χ le_rfl p.natDegree j 0
+        (by omega) G ψ hG ε hε hε1 hψ
+      have h3 : SchwartzMap.seminorm ℂ 0 j G ≤ A :=
+        Finset.single_le_sum (f := fun j ↦ SchwartzMap.seminorm ℂ 0 j G)
+          (fun _ _ ↦ apply_nonneg _ _) (Finset.mem_range.mpr (by omega))
+      calc ‖iteratedDeriv j (ψ : ℝ → ℂ) x‖ ≤ SchwartzMap.seminorm ℂ 0 j ψ := h1
+        _ ≤ ε * SchwartzMap.seminorm ℂ 0 j G := h2
+        _ ≤ ε * A := by gcongr
+    simp only at hbound
+    rw [hφ, hev] at hbound
+    have hsum : ∑ k ∈ p.support, p.coeff k * (realDiracDerivative k ψ / (k.factorial : ℂ)) =
+        p.coeff p.natDegree * (-1 : ℂ) ^ p.natDegree := by
+      rw [Finset.sum_eq_single p.natDegree]
+      · rw [realSchwartzFlatQuotient_strongDual_scaled_dirac χ _ G ψ hG ε hε hψ]
+        simp only [↓reduceIte]
+        rw [mul_div_assoc, div_self (hfact _), mul_one]
+      · intro k _ hk
+        rw [realSchwartzFlatQuotient_strongDual_scaled_dirac χ _ G ψ hG ε hε hψ]
+        simp [hk]
+      · intro h
+        exact absurd (Polynomial.mem_support_iff.mpr hpd) h
+    rw [hsum, norm_mul, norm_pow, norm_neg, norm_one, one_pow, mul_one] at hbound
+    have hCA : 0 ≤ C * (ε * A) := by positivity
+    nlinarith
+  · refine ⟨∑ k ∈ p.support, ‖p.coeff k‖, Finset.sum_nonneg fun _ _ ↦ norm_nonneg _,
+      fun f _ B _ hf ↦ ?_⟩
+    beta_reduce
+    rw [hev, Finset.sum_mul]
+    refine (norm_sum_le _ _).trans (Finset.sum_le_sum fun k hk ↦ ?_)
+    have hkN : k ≤ N := (Polynomial.le_natDegree_of_mem_supp k hk).trans hdeg
+    have hB := hf k hkN 0
+    change ‖iteratedFDeriv ℝ k (f.hasCompactSupport.toSchwartzMap f.contDiff : ℝ → ℂ) 0‖ ≤ B
+      at hB
+    rw [norm_iteratedFDeriv_eq_norm_iteratedDeriv] at hB
+    have hf1 : (1 : ℝ) ≤ k.factorial := mod_cast k.factorial_pos
+    rw [norm_mul, norm_div, realSchwartzFlatQuotient_strongDual_dirac, norm_mul, norm_pow,
+      norm_neg, norm_one, one_pow, one_mul, Complex.norm_natCast]
+    gcongr
+    exact (div_le_self (norm_nonneg _) hf1).trans hB
 
 end RealOrigin
 

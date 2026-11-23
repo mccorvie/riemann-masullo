@@ -6,10 +6,15 @@ import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import RiemannMasullo.ForMathlib.Topology.Algebra.Group.AutomaticContinuity
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Separable
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
+import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongDual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
 
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 import RiemannMasullo.ForMathlib.Topology.ContinuousMap.Sigma
+import RiemannMasullo.ForMathlib.MeasureTheory.Integral.Bochner.Regular
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 import all RiemannMasullo.AppC_LCTVS.Sec1
 
@@ -1120,11 +1125,84 @@ theorem HasNuclearFrechetPresentation.isLFSpace {E : Type*} [AddCommGroup E] [Mo
   obtain ⟨hE, X, a, m, t, hX, hlim⟩ := h
   exact ⟨hE, X, a, m, t, fun k ↦ (hX k).1, hlim⟩
 
+private theorem nuclearFrechetPresentation_quotient_of_strictLF.{v,u}
+    {E : Type u} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (hs : IsStrictLFSpace E) (hn : IsNuclearTVS.{v} E)
+    (M : Submodule ℂ E) (hM : IsClosed (M : Set E)) :
+    HasNuclearFrechetPresentation.{v} (E ⧸ M) := by
+  obtain ⟨_, V, hV, hF, hex, ht⟩ := hs
+  have hN (k : ℕ) : IsNuclearTVS.{v} (V k) := isNuclearTVS_submodule hn (V k)
+  let j (k : ℕ) := (V k).subtypeL.codRestrict (V (k+1)) fun x ↦ hV k.le_succ x.property
+  let i (k : ℕ) := (V k).subtypeL
+  have h : IsInjectiveLCLimit j i := by
+    refine ⟨fun _ ↦ Subtype.val_injective, fun _ ↦ rfl, ?_, ht⟩
+    intro x
+    obtain ⟨k, hk⟩ := hex x
+    exact ⟨k, ⟨x, hk⟩, rfl⟩
+  have hP : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ E // ∀ k, Continuous (p ∘ (i k).toLinearMap)} →
+        Seminorm ℂ E) := ⟨h.topology_eq⟩
+  let : IsTopologicalAddGroup E := hP.isTopologicalAddGroup
+  let : T2Space (E ⧸ M) := inferInstance
+  let f (k : ℕ) := M.mkQL.comp (i k)
+  let K (k : ℕ) := (f k).ker
+  have hf (k : ℕ) (x : V k) : f (k+1) (j k x) = f k x :=
+    congrArg M.mkQ (DFunLike.congr_fun (h.compatible k) x)
+  let iQ (k : ℕ) : V k ⧸ K k →L[ℂ] E ⧸ M := (K k).liftQL (f k) le_rfl
+  let jQ (k : ℕ) : V k ⧸ K k →L[ℂ] V (k+1) ⧸ K (k+1) :=
+    (K k).liftQL ((K (k+1)).mkQL.comp (j k)) (by
+      intro x hx
+      change (K (k+1)).mkQ (j k x) = 0
+      rw [Submodule.mkQ_apply, Submodule.Quotient.mk_eq_zero]
+      change f (k+1) (j k x) = 0
+      rwa [hf])
+  have hiQ (k : ℕ) (x : V k) : iQ k ((K k).mkQ x) = f k x := rfl
+  have hjQ (k : ℕ) (x : V k) : jQ k ((K k).mkQ x) = (K (k+1)).mkQ (j k x) := rfl
+  refine ⟨inferInstance, fun k ↦ V k ⧸ K k, _, _, _, fun k ↦
+    ⟨isFrechetTVS_quotient (hF k) (K k) (f k).isClosed_ker, by
+      let : IsClosed (K k : Set (V k)) := (f k).isClosed_ker
+      exact isNuclearTVS_quotient (hN k) (K k)⟩, jQ, iQ, ⟨?_, ?_, ?_, ?_⟩⟩
+  · intro k
+    apply (LinearMap.ker_eq_bot (f := (iQ k).toLinearMap)).mp
+    exact (K k).ker_liftQ_eq_bot' (f k).toLinearMap rfl
+  · intro k
+    ext y
+    obtain ⟨x, rfl⟩ := (K k).mkQ_surjective y
+    change iQ (k+1) (jQ k ((K k).mkQ x)) = iQ k ((K k).mkQ x)
+    rw [hjQ, hiQ, hiQ, hf]
+  · intro y
+    obtain ⟨x, rfl⟩ := M.mkQ_surjective y
+    obtain ⟨k, z, rfl⟩ := h.exhaustive x
+    exact ⟨k, (K k).mkQ z, hiQ k z⟩
+  · let : PolynormableSpace ℂ E := hP.toPolynormableSpace
+    let : PolynormableSpace ℂ (E ⧸ M) := (isNuclearTVS_quotient hn M).2.1
+    have hseminorms : (fun p : Seminorm ℂ (E ⧸ M) ↦
+        ∀ k, Continuous (p ∘ (iQ k).toLinearMap)) =
+        (fun p : Seminorm ℂ (E ⧸ M) ↦ Continuous p) := by
+      funext p
+      apply propext
+      refine ⟨fun hp ↦ M.isQuotientMap_mkQL.continuous_iff.mpr ?_,
+        fun hp k ↦ hp.comp (iQ k).continuous⟩
+      apply hP.continuous_seminorm (⟨p.comp M.mkQ, fun k ↦ ?_⟩ : _)
+      change Continuous (fun x : V k ↦ p (f k x))
+      simpa only [Function.comp_def, ContinuousLinearMap.coe_coe, Submodule.coe_mkQL, hiQ] using
+        (hp k).comp (K k).mkQL.continuous
+    change (inferInstance : TopologicalSpace (E ⧸ M)) =
+      (SeminormFamily.moduleFilterBasis
+        (Subtype.val : {p : Seminorm ℂ (E ⧸ M) // ∀ k, Continuous (p ∘ (iQ k).toLinearMap)} →
+          Seminorm ℂ (E ⧸ M))).topology
+    rw [hseminorms]
+    exact (PolynormableSpace.withSeminorms ℂ (E ⧸ M)).withSeminorms_eq
+
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The global homogeneous theta quotient is a locally convex inductive limit of nuclear
 Fréchet spaces. The test-function stages can be quotiented by the restricted kernel. -/
 theorem globalHomogeneousThetaSpace_nuclearFrechetPresentation :
-    HasNuclearFrechetPresentation Θ𝔽ω(ω) := by sorry
+    HasNuclearFrechetPresentation Θ𝔽ω(ω) := by
+  apply nuclearFrechetPresentation_quotient_of_strictLF
+  · exact (adeleSchwartz_strictLF (F := F)).2
+  · exact (adeleSchwartz_nuclear (F := F)).2
+  · exact homogeneousAdelicTheta_ker_isClosed ω
 
 /-- A closed quotient of a nuclear strict LF-space has nuclear Fréchet quotient stages. -/
 private theorem sLocalHomogeneousThetaSpace_nuclearFrechetPresentation_quotient.{v}
@@ -1225,10 +1303,90 @@ theorem sLocalHomogeneousThetaSpace_lf (χ : PontryaginDual (J₁(S))) :
     sLocalHomogeneousThetaSpace_nuclearFrechetPresentation χ
   exact h.isLFSpace
 
+private theorem globalHomogeneousThetaSpace_complete_coinvariants {G E : Type*}
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [CompactSpace G] [T2Space G] [MeasurableSpace G] [BorelSpace G]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [T2Space E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E]
+    (hE : @CompleteSpace E (IsTopologicalAddGroup.rightUniformSpace E))
+    (μ : Measure G) [μ.IsHaarMeasure] (ρ : G →* (E →L[ℂ] E))
+    (hρ : Continuous fun p : G × E ↦ ρ p.1 p.2) (ω : PontryaginDual G) :
+    @CompleteSpace (E ⧸ (Submodule.span ℂ (Set.range (fun p : G × E ↦
+      p.2 - star (ω p.1 : ℂ) • ρ p.1 p.2))).topologicalClosure)
+      (IsTopologicalAddGroup.rightUniformSpace _) := by
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace E := hE
+  let : Module ℝ E := Module.restrictScalars ℝ ℂ E
+  let : IsScalarTower ℝ ℂ E := IsScalarTower.restrictScalars ℝ ℂ E
+  let : LocallyConvexSpace ℝ E := (PolynormableSpace.withSeminorms ℂ E).toLocallyConvexSpace
+  let : SeparatingDual ℂ E := locallyConvexSpace_separatingDual ℂ E
+  let A (g : G) := star (ω g : ℂ) • ρ g
+  have hA : Continuous (fun p : G × E ↦ A p.1 p.2) :=
+    (show Continuous (fun p : G × E ↦ star (ω p.1 : ℂ)) from by fun_prop).smul hρ
+  obtain ⟨P, hP, _⟩ := existsUnique_pettisIntegral_continuousFamily μ isCompact_univ
+    (ae_of_all _ fun _ ↦ Set.mem_univ _) A hA
+  have hav : IsPettisIsotypicAverageOn μ Set.univ ρ ω P := by
+    simpa [IsPettisIsotypicAverageOn, A] using hP
+  have hk := compactActionAverage_ker μ ρ hρ ω P hav
+  obtain ⟨e, _⟩ := compactActionAverage_quotient_equiv μ ρ hρ ω P hav
+  let : IsUniformAddGroup (actionIsotype ρ ω) := IsUniformAddGroup.comap (actionIsotype ρ ω).subtype
+  have hc : CompleteSpace (actionIsotype ρ ω) :=
+    completeSpace_coe_iff_isComplete.mpr (isClosed_actionIsotype ρ ω).isComplete
+  rw [← hk]
+  let : UniformSpace (E ⧸ P.ker) := IsTopologicalAddGroup.rightUniformSpace _
+  let : IsUniformAddGroup (E ⧸ P.ker) := isUniformAddGroup_of_addCommGroup
+  exact (completeSpace_congr (e := e.toEquiv) e.isUniformEmbedding).2 hc
+
+private theorem globalHomogeneousThetaSpace_complete_subgroup {H E : Type*}
+    [CommGroup H] [TopologicalSpace H] [IsTopologicalGroup H]
+    (N : Subgroup H) [CompactSpace N] [T2Space N] [MeasurableSpace N] [BorelSpace N]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [T2Space E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E]
+    (hE : @CompleteSpace E (IsTopologicalAddGroup.rightUniformSpace E))
+    (μ : Measure N) [μ.IsHaarMeasure] (ρ : H →* (E →L[ℂ] E))
+    (hρ : Continuous fun p : N × E ↦ ρ p.1.val p.2) (ω : PontryaginDual N) :
+    @CompleteSpace (E ⧸ (Submodule.span ℂ (Set.range (fun p : N × E ↦
+      p.2 - star (ω p.1 : ℂ) • ρ p.1.val p.2))).topologicalClosure)
+      (IsTopologicalAddGroup.rightUniformSpace _) := by
+  exact globalHomogeneousThetaSpace_complete_coinvariants hE μ (ρ.comp N.subtype) hρ ω
+
+private theorem globalHomogeneousThetaSpace_complete_transfer {X Y : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [IsTopologicalAddGroup X] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    [IsTopologicalAddGroup Y] (e : X ≃L[ℂ] Y)
+    (h : @CompleteSpace Y (IsTopologicalAddGroup.rightUniformSpace Y)) :
+    @CompleteSpace X (IsTopologicalAddGroup.rightUniformSpace X) := by
+  let : UniformSpace X := IsTopologicalAddGroup.rightUniformSpace X
+  let : IsUniformAddGroup X := isUniformAddGroup_of_addCommGroup
+  let : UniformSpace Y := IsTopologicalAddGroup.rightUniformSpace Y
+  let : IsUniformAddGroup Y := isUniformAddGroup_of_addCommGroup
+  exact (completeSpace_congr (e := e.toEquiv) e.isUniformEmbedding).2 h
+
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The global homogeneous quotient is complete for its additive uniformity. -/
 theorem globalHomogeneousThetaSpace_complete :
-    @CompleteSpace Θ𝔽ω(ω) (IsTopologicalAddGroup.rightUniformSpace _) := by sorry
+    @CompleteSpace Θ𝔽ω(ω) (IsTopologicalAddGroup.rightUniformSpace _) := by
+  let E := GlobalAdelicThetaSpace F
+  let G := (ideleClassNorm F).ker
+  let : T2Space E := globalAdelicThetaSpace_t2_of_isClosed (F := F) (adelicTheta_ker_isClosed (F := F))
+  let : PolynormableSpace ℂ E := globalAdelicThetaSpace_polynormable (F := F)
+  let : T2Space G := (ideleClassGroup_finiteness F).2.2.1
+  let : CompactSpace G := (ideleClassGroup_finiteness F).2.1
+  let : MeasurableSpace (IdeleClassGroup (𝓞 F) F) := borel _
+  let : BorelSpace (IdeleClassGroup (𝓞 F) F) := ⟨rfl⟩
+  let μ := normOneIdeleClassTamagawaMeasure F
+  let : μ.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let ρ : IdeleClassGroup (𝓞 F) F →* (E →L[ℂ] E) := (existsUnique_globalThetaAction (F := F)).exists.choose
+  let σ : G →* (E →L[ℂ] E) := ρ.comp G.subtype
+  have hσ : Continuous (fun p : G × E ↦ σ p.1 p.2) :=
+    (existsUnique_globalThetaAction (F := F)).exists.choose_spec.1.comp
+      ((continuous_subtype_val.comp continuous_fst).prodMk continuous_snd)
+  have hq := globalHomogeneousThetaSpace_complete_subgroup G
+    (globalAdelicThetaSpace_complete (F := F)) μ ρ hσ ω
+  have he := (globalHomogeneousThetaSpace_equiv_coinvariants (F := F) ω).choose
+  with_reducible_and_instances
+    exact globalHomogeneousThetaSpace_complete_transfer he hq
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The S-local homogeneous quotient is complete for its additive uniformity. -/
@@ -1321,10 +1479,31 @@ theorem globalHomogeneousThetaSpace_strongDual_montel :
   simpa only [hc.closure_eq] using
     isCompact_closure_of_isNuclearTVS (StrongDual ℂ Θ𝔽ω(ω)) hdual hb
 
+private theorem sLocalHomogeneousThetaSpace_strongDual_montel_aux {E : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [ContinuousSMul ℂ E] [T2Space E] [PolynormableSpace ℂ E]
+    [BarrelledSpace ℂ E] [MontelSpace ℂ E] :
+    BarrelledSpace ℂ (StrongDual ℂ E) ∧ MontelSpace ℂ (StrongDual ℂ E) := by
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace _
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  constructor
+  · apply barrelled_of_barrel_nbhd
+    apply strongDual_barrel_nbhd
+    intro l
+    obtain ⟨x, rfl⟩ := surjective_strongBidual_eval l
+    exact ⟨x, fun _ ↦ rfl⟩
+  · exact montelSpace_strongDual
+
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The strong dual of the S-local homogeneous quotient is Montel. -/
 theorem sLocalHomogeneousThetaSpace_strongDual_montel (χ : PontryaginDual (J₁(S))) :
-    BarrelledSpace ℂ (StrongDual ℂ (Θₛω(S, χ))) ∧ MontelSpace ℂ (StrongDual ℂ (Θₛω(S, χ))) := by sorry
+    BarrelledSpace ℂ (StrongDual ℂ (Θₛω(S, χ))) ∧ MontelSpace ℂ (StrongDual ℂ (Θₛω(S, χ))) := by
+  let : T2Space (Θₛω(S, χ)) := (sLocalHomogeneousThetaSpace_lf χ).1
+  have hn : IsNuclearTVS.{0} (Θₛω(S, χ)) := sLocalHomogeneousThetaSpace_nuclear χ
+  let : PolynormableSpace ℂ (Θₛω(S, χ)) := hn.2.1
+  let : BarrelledSpace ℂ (Θₛω(S, χ)) := (sLocalHomogeneousThetaSpace_montel χ).1
+  let : MontelSpace ℂ (Θₛω(S, χ)) := (sLocalHomogeneousThetaSpace_montel χ).2
+  exact sLocalHomogeneousThetaSpace_strongDual_montel_aux
 
 /-- Paper: Theorem 5.2.3.1(3), p. 233.
 There are continuous idempotents onto the stage images. The net of these idempotents
@@ -1496,24 +1675,159 @@ theorem sLocalThetaIsotypicAverage_equiv (χ : PontryaginDual (J₁(S))) :
 -- TODO(paper-gap): The global L² argument on p. 237 fails at norm zero for
 -- the rational Gaussian. Apply character uniqueness on each compact norm-one fibre.
 
+set_option linter.overlappingInstances false in
+/-- A continuous function on a compact abelian group whose integrals against all characters
+vanish is zero. -/
+private theorem exists_globalThetaToHomogeneousProduct_charUnique {G : Type*} [CommGroup G]
+    [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [CompactSpace G]
+    [MeasurableSpace G] [BorelSpace G]
+    (μ : Measure G) [μ.IsHaarMeasure] [μ.Regular] (φ : C(G, ℂ))
+    (hz : ∀ χ : PontryaginDual G, ∫ x, φ x * (χ x : ℂ) ∂μ = 0) : φ = 0 := by
+  let ev (x : G) : PontryaginDual G →* Circle :=
+    { toFun := fun χ ↦ χ x, map_one' := rfl, map_mul' := fun _ _ ↦ rfl }
+  have hsep : Injective ev := fun _ _ h ↦
+    pontryaginDual_pairing_separates.1 (funext (DFunLike.congr_fun h))
+  have hi : Integrable φ μ :=
+    φ.continuous.integrable_of_hasCompactSupport (HasCompactSupport.of_compactSpace _)
+  have hae := ae_eq_zero_of_integral_mul_circle_eq_zero ev (fun χ ↦ χ.continuous) hsep hi hz
+  have heq := Measure.eq_of_ae_eq hae φ.continuous continuous_const
+  exact ContinuousMap.ext fun g ↦ congrFun heq g
+
+private theorem exists_globalThetaToHomogeneousProduct_pi {E : Type*} [AddCommGroup E]
+    [Module ℂ E] [TopologicalSpace E] {ι : Type*} (K : Submodule ℂ E) (L : ι → Submodule ℂ E)
+    (hKL : ∀ i, K ≤ L i) (hinj : ∀ f, (∀ i, f ∈ L i) → f ∈ K) :
+    ∃ P : (E ⧸ K) →L[ℂ] (∀ i, E ⧸ L i),
+      Injective P ∧ ∀ (f : E) i, P (K.mkQ f) i = (L i).mkQ f := by
+  let P : (E ⧸ K) →ₗ[ℂ] (∀ i, E ⧸ L i) :=
+    LinearMap.pi fun i ↦ K.mapQ (L i) LinearMap.id (hKL i)
+  have hc : Continuous P :=
+    K.isQuotientMap_mkQ.continuous_iff.mpr
+      (continuous_pi fun i ↦ (L i).isQuotientMap_mkQ.continuous)
+  refine ⟨⟨P, hc⟩, ?_, fun f i ↦ rfl⟩
+  change Injective P
+  refine LinearMap.ker_eq_bot.mp (LinearMap.ker_eq_bot'.mpr fun q hq ↦ ?_)
+  induction q using Submodule.Quotient.induction_on with
+  | _ f =>
+    refine (Submodule.Quotient.mk_eq_zero K).mpr (hinj f fun i ↦ ?_)
+    exact (Submodule.Quotient.mk_eq_zero (L i)).mp (congrFun hq i)
+
+private theorem exists_sLocalThetaToHomogeneousProduct_le (χ : PontryaginDual (J₁(S))) :
+    Kₛ(S) ≤ Kₛω(S, χ) := by
+  intro f hf
+  have hθ (g : Jₛ(S)) : sLocalAdelicThetaOnClasses F S f g = 0 := by
+    induction g using QuotientGroup.induction_on with | H x => ?_
+    exact (sLocalAdelicThetaOnClasses_mk F S f x).trans
+      (DFunLike.congr_fun (LinearMap.mem_ker.mp hf) x)
+  refine LinearMap.mem_ker.mpr (ContinuousMap.ext fun g ↦ ?_)
+  rw [sLocalHomogeneousAdelicThetaLinearMap_apply]
+  simp [hθ]
+
+private theorem exists_globalThetaToHomogeneousProduct_le (ω : PontryaginDual C₁) :
+    K𝔽 ≤ K𝔽ω(ω) := by
+  intro f hf
+  have hθ : adelicTheta f = 0 := hf
+  refine LinearMap.mem_ker.mpr (ContinuousMap.ext fun g ↦ ?_)
+  change homogeneousAdelicTheta ω f g = 0
+  simp [homogeneousAdelicTheta, hθ]
+
+private theorem exists_sLocalThetaToHomogeneousProduct_ker (f : ℬₛ(S))
+    (hf : ∀ χ : PontryaginDual (J₁(S)), f ∈ Kₛω(S, χ)) : f ∈ Kₛ(S) := by
+  let : MeasurableSpace (J₁(S)) := borel _
+  have : BorelSpace (J₁(S)) := ⟨rfl⟩
+  have : CompactSpace (J₁(S)) := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage isCompact_singleton)
+  have : T2Space (Jₛ(S)) :=
+    letI := isClosed_sProjectedDiagonal (F := F) (S := S)
+    inferInstance
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let : SecondCountableTopology (SAdeleRing F S) := inferInstanceAs (SecondCountableTopology
+    (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let : SecondCountableTopology (SAdeleRing F S)ˣ :=
+    (sIdeleGroup_description F S).1.secondCountableTopology
+  let : SecondCountableTopology (Jₛ(S)) := inferInstance
+  let : SecondCountableTopology (J₁(S)) := TopologicalSpace.Subtype.secondCountableTopology _
+  let μ := sLocalNormOneQuotientMeasure F S
+  have : μ.IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  have : μ.Regular := Measure.regular_of_isMulLeftInvariant isCompact_univ
+    (by simp) (measure_ne_top μ _)
+  have hθ : sLocalAdelicThetaOnClasses F S f = 0 := by
+    ext g
+    let φ : C(J₁(S), ℂ) := ⟨fun h ↦ sLocalAdelicThetaOnClasses F S f (g * h.val),
+      (sLocalAdelicThetaOnClasses F S f).continuous.comp
+        (continuous_const.mul continuous_subtype_val)⟩
+    have hφ : φ = 0 := exists_globalThetaToHomogeneousProduct_charUnique μ φ fun χ ↦ by
+      have h := DFunLike.congr_fun (LinearMap.mem_ker.mp (hf χ)) g
+      rw [sLocalHomogeneousAdelicThetaLinearMap_apply] at h
+      exact h
+    simpa [φ] using DFunLike.congr_fun hφ 1
+  refine LinearMap.mem_ker.mpr (ContinuousMap.ext fun x ↦ ?_)
+  refine (sLocalAdelicThetaOnClasses_mk F S f x).symm.trans ?_
+  rw [hθ]
+  rfl
+
+private theorem exists_globalThetaToHomogeneousProduct_ker (f : ℬ𝔽)
+    (hf : ∀ ω : PontryaginDual C₁, f ∈ K𝔽ω(ω)) : f ∈ K𝔽 := by
+  let : MeasurableSpace C𝔽 := borel _
+  have : BorelSpace C𝔽 := ⟨rfl⟩
+  have : T2Space C𝔽 := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.1
+  have : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let μ := normOneIdeleClassTamagawaMeasure F
+  have hspec := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec
+  have : μ.IsHaarMeasure := hspec.2.2.2.1
+  have : μ.Regular := hspec.2.2.2.2.1
+  have hθ : adelicTheta f = 0 := by
+    ext g
+    let φ : C(C₁, ℂ) := ⟨fun h ↦ adelicTheta f (h.val * g),
+      (adelicTheta f).continuous.comp (continuous_subtype_val.mul continuous_const)⟩
+    have hφ : φ = 0 := exists_globalThetaToHomogeneousProduct_charUnique μ φ fun ω ↦ by
+      have h := DFunLike.congr_fun (LinearMap.mem_ker.mp (hf ω)) g
+      exact h
+    simpa [φ] using DFunLike.congr_fun hφ 1
+  exact hθ
+
 /-- Paper: Proposition 5.2.3.2(2), p. 236.
 The canonical global map to the product of homogeneous theta quotients is
 continuous and injective. -/
 theorem exists_globalThetaToHomogeneousProduct :
     ∃ P : Θ𝔽 →L[ℂ] (∀ ω : PontryaginDual C₁, Θ𝔽ω(ω)),
-      Injective P ∧ ∀ (f : ℬ𝔽) ω, P ((K𝔽).mkQ f) ω = (K𝔽ω(ω)).mkQ f := by sorry
+      Injective P ∧ ∀ (f : ℬ𝔽) ω, P ((K𝔽).mkQ f) ω = (K𝔽ω(ω)).mkQ f :=
+  exists_globalThetaToHomogeneousProduct_pi (K𝔽) (fun ω ↦ K𝔽ω(ω))
+    exists_globalThetaToHomogeneousProduct_le exists_globalThetaToHomogeneousProduct_ker
 
 /-- Paper: Proposition 5.2.3.2(2), p. 236.
 The canonical S-local map to the product of homogeneous theta quotients is
 continuous and injective. -/
 theorem exists_sLocalThetaToHomogeneousProduct :
     ∃ P : Θₛ(S) →L[ℂ] (∀ χ : PontryaginDual (J₁(S)), Θₛω(S, χ)),
-      Injective P ∧ ∀ (f : ℬₛ(S)) χ, P ((Kₛ(S)).mkQ f) χ = (Kₛω(S, χ)).mkQ f := by sorry
+      Injective P ∧ ∀ (f : ℬₛ(S)) χ, P ((Kₛ(S)).mkQ f) χ = (Kₛω(S, χ)).mkQ f :=
+  exists_globalThetaToHomogeneousProduct_pi (Kₛ(S)) (fun χ ↦ Kₛω(S, χ))
+    exists_sLocalThetaToHomogeneousProduct_le exists_sLocalThetaToHomogeneousProduct_ker
 
 local notation "M𝔽ω(" ω ")" => meromorphicNormOneComponent m𝔽
   (isProperMap_ideleClassNorm F).continuous ω (globalIdelicOrderBound (F := F))
 local notation "Mₛω(" S ", " ω ")" => meromorphicNormOneComponent (mₛ(S))
   (isProperMap_sIdeleQuotientNorm F S).continuous ω (sLocalIdelicOrderBound (F := F) (S := S))
+
+/-- Restriction to a norm-one component is continuous for compact convergence, and
+restricting a continuation preserves its pole bound. -/
+private theorem exists_globalHomogeneousThetaMellin_restriction {G : Type*}
+    [CommGroup G] [TopologicalSpace G] (m : G →* ℝ≥0ˣ) (hm : Continuous m)
+    (ω : PontryaginDual m.ker) (b : QuasiCharacter G → WithTop ℤ) :
+    ∃ R : ↥(meromorphicWithPoleBound (quasiCharacterNormTwist m hm) b) →L[ℂ]
+        ↥(meromorphicNormOneComponent m hm ω b),
+      ∀ u c, (R u).val c = u.val ⟨c.val.val, c.property⟩ := by
+  let Ω := {c : QuasiCharacter G // ∀ h : m.ker, c h.val = (ω h : ℂ)}
+  let i : C({c : Ω // 0 ≤ b c.val}, {c : QuasiCharacter G // 0 ≤ b c}) :=
+    ⟨fun c ↦ ⟨c.val.val, c.property⟩,
+      (continuous_subtype_val.comp continuous_subtype_val).subtype_mk _⟩
+  let M := meromorphicWithPoleBound (quasiCharacterNormTwist m hm) b
+  let A := (ContinuousMap.compCLM ℂ ℂ i).comp M.subtypeL
+  refine ⟨A.codRestrict _ ?_, fun _ _ ↦ rfl⟩
+  intro u
+  obtain ⟨Z, hZ, hgerm⟩ := u.property
+  exact ⟨fun c ↦ Z c.val, fun c ↦ hZ (i c), fun c ↦ hgerm c.val⟩
 
 /-- Paper: (5.2.3.14), p. 236.
 The global Mellin transform on homogeneous classes is continuous and injective.
@@ -1522,7 +1836,30 @@ theorem exists_globalHomogeneousThetaMellin (ω : PontryaginDual C₁) :
     ∃ Z : Θ𝔽ω(ω) →L[ℂ] ↥(M𝔽ω(ω)), Injective Z ∧
       ∀ (f : ℬ𝔽) c,
         (Z ((K𝔽ω(ω)).mkQ f)).val c =
-          (globalIdelicMellin (F := F) f).val ⟨c.val.val, c.property⟩ := by sorry
+          (globalIdelicMellin (F := F) f).val ⟨c.val.val, c.property⟩ := by
+  refine (exists_globalHomogeneousThetaMellin_restriction m𝔽
+    (isProperMap_ideleClassNorm F).continuous ω (globalIdelicOrderBound (F := F))).elim fun R hR ↦ ?_
+  let L : ℬ𝔽 →L[ℂ] _ := ⟨globalIdelicMellin (F := F), globalIdelicMellin_continuous⟩
+  let T : ℬ𝔽 →L[ℂ] ↥(M𝔽ω(ω)) := R.comp L
+  have hT (f : ℬ𝔽) c : (T f).val c =
+      (globalIdelicMellin (F := F) f).val ⟨c.val.val, c.property⟩ := hR _ c
+  have hker : K𝔽ω(ω) = T.ker := by
+    apply SetLike.ext
+    intro f
+    constructor
+    · intro hf
+      apply LinearMap.mem_ker.mpr
+      apply Subtype.ext
+      exact ContinuousMap.ext fun c ↦ (hT f c).trans
+        ((mem_homogeneousAdelicTheta_ker_iff ω f).mp hf _ c.val.property)
+    · intro hf
+      apply (mem_homogeneousAdelicTheta_ker_iff ω f).mpr
+      intro c hc
+      exact (hT f ⟨⟨c.val, hc⟩, c.property⟩).symm.trans
+        (congrArg (fun v : ↥(M𝔽ω(ω)) ↦ v.val ⟨⟨c.val, hc⟩, c.property⟩)
+          (LinearMap.mem_ker.mp hf))
+  exact ⟨(K𝔽ω(ω)).liftQL T hker.le,
+    LinearMap.ker_eq_bot.mp ((K𝔽ω(ω)).ker_liftQ_eq_bot T.toLinearMap hker.le hker.ge), hT⟩
 
 /-- Restrict a bounded-pole continuation and its regular values along the component inclusion. -/
 private theorem exists_sLocalHomogeneousThetaMellin_restrict {G : Type*} [CommGroup G]

@@ -5,8 +5,10 @@ public import RiemannMasullo.Ch05_ThetaZSpaces.Sec4
 public import RiemannMasullo.Ch06_LocalGlobal.Sec3
 public import RiemannMasullo.Ch09_HardySobolev.Sec3
 
+import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
 import all RiemannMasullo.Ch02_AdelicTheta.Sec3
+import all RiemannMasullo.Ch02_AdelicTheta.Sec2b
 
 import Mathlib.MeasureTheory.Measure.SeparableMeasure
 
@@ -668,13 +670,69 @@ local notation "H" => ↥(H𝔽(a, hI, hs))
 local notation "ρ₁" => (R𝔽(a, hI, hs)).comp (ideleClassNorm F).ker.subtype
 local notation "Hω(" ω ")" => actionIsotype ρ₁ ω
 
+section
+
+universe u v
+
+/-- The compact-group average, restricted to its isotype, is a unique open surjection. -/
+private theorem existsUnique_thetaSobolevAverage_of_compact
+    {G : Type u} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    (N : Subgroup G) [T2Space N] [CompactSpace N] [MeasurableSpace N] [BorelSpace N]
+    {E : Type v} [NormedAddCommGroup E] [NormedSpace ℂ E] [CompleteSpace E]
+    (μ : Measure N) [μ.IsHaarMeasure] (ρ : G →* (E →L[ℂ] E))
+    (hρ : Continuous fun p : G × E ↦ ρ p.1 p.2) (ω : PontryaginDual N) :
+    ∃! A : E →L[ℂ] actionIsotype (ρ.comp N.subtype) ω,
+      IsPettisIsotypicAverageOn μ univ (ρ.comp N.subtype) ω
+        ((actionIsotype (ρ.comp N.subtype) ω).subtypeL.comp A) ∧
+      Surjective A ∧ IsOpenMap A := by
+  let : NormedSpace ℝ E := NormedSpace.restrictScalars ℝ ℂ E
+  have hc : @CompleteSpace E (IsTopologicalAddGroup.rightUniformSpace E) := by
+    rw [IsUniformAddGroup.rightUniformSpace_eq]
+    infer_instance
+  obtain ⟨P, hP, huniq⟩ := existsUnique_globalThetaIsotypicAverage_of_compact N hc μ ρ hρ ω
+  have hcρ : Continuous (fun p : N × E ↦ (ρ.comp N.subtype) p.1 p.2) :=
+    hρ.comp ((continuous_subtype_val.comp continuous_fst).prodMk continuous_snd)
+  have hr := compactActionAverage_range μ (ρ.comp N.subtype) hcρ ω P hP
+  let V := actionIsotype (ρ.comp N.subtype) ω
+  have hmem (x : E) : P x ∈ V := by
+    change P x ∈ actionIsotype (ρ.comp N.subtype) ω
+    rw [← hr]
+    exact LinearMap.mem_range_self P.toLinearMap x
+  let A : E →L[ℂ] V := P.codRestrict V hmem
+  have hcomp : V.subtypeL.comp A = P := by ext; rfl
+  have hsurj : Surjective A := by
+    rintro ⟨x, hx⟩
+    obtain ⟨y, hy⟩ := (show x ∈ LinearMap.range P.toLinearMap from hr.symm ▸ hx)
+    exact ⟨y, Subtype.ext hy⟩
+  obtain ⟨e, he⟩ := compactActionAverage_quotient_equiv μ (ρ.comp N.subtype) hcρ ω P hP
+  have hA : (A : E → V) = e ∘ P.ker.mkQ := by
+    funext x
+    exact Subtype.ext (he x).symm
+  refine ⟨A, ⟨by rwa [hcomp], hsurj, ?_⟩, ?_⟩
+  · rw [hA]
+    exact e.isOpenMap.comp P.ker.isOpenMap_mkQ
+  · intro B hB
+    apply ContinuousLinearMap.ext
+    intro x
+    apply Subtype.ext
+    exact DFunLike.congr_fun (huniq _ hB.1) x
+
+end
+
 /-- Paper: Proposition 10.1.1.5(1), p. 436. The global Pettis average for the
 norm-one Tamagawa measure is a continuous open linear surjection onto its isotype.
 Deviation: Use polar-free global theta functions, as in Definition 10.1.1.1(1). -/
 theorem existsUnique_globalThetaSobolevAverage (ω : PontryaginDual C₁) :
     ∃! P : H →L[ℂ] Hω(ω),
       IsPettisIsotypicAverageOn μ𝔽₁ univ ρ₁ ω ((Hω(ω)).subtypeL.comp P) ∧
-      Surjective P ∧ IsOpenMap P := by sorry
+      Surjective P ∧ IsOpenMap P := by
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : (μ𝔽₁).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let : CompleteSpace H := (globalThetaSobolev_closed_complete_separable a hI hs).2.1
+  with_reducible_and_instances
+    exact existsUnique_thetaSobolevAverage_of_compact (E := H) (ideleClassNorm F).ker
+      μ𝔽₁ (R𝔽(a, hI, hs)) (exists_globalThetaSobolevAction (F := F) a hI hs).choose_spec.2.1 ω
 
 local notation "P(" ω ")" =>
   (existsUnique_globalThetaSobolevAverage (F := F) (a := a) hI hs ω).exists.choose
@@ -692,6 +750,32 @@ theorem exists_globalHomogeneousThetaSobolevInclusion (ω : PontryaginDual C₁)
           ((j x).val.val : C𝔽 → ℂ) =ᵐ[μ𝔽]
             modulationWeight m𝔽 a (homogeneousAdelicTheta ω f.val) := by sorry
 
+section
+
+universe u v
+
+/-- The kernel of a compact isotypic average is the closed span of twisted differences. -/
+private theorem thetaSobolevAverage_quotient_equiv_of_compact
+    {G : Type u} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [T2Space G] [CompactSpace G] [MeasurableSpace G] [BorelSpace G]
+    {E : Type v} [NormedAddCommGroup E] [NormedSpace ℂ E]
+    (μ : Measure G) [μ.IsHaarMeasure] (ρ : G →* (E →L[ℂ] E))
+    (hρ : Continuous fun p : G × E ↦ ρ p.1 p.2) (ω : PontryaginDual G)
+    (P : E →L[ℂ] actionIsotype ρ ω)
+    (hP : IsPettisIsotypicAverageOn μ univ ρ ω ((actionIsotype ρ ω).subtypeL.comp P)) :
+    let D := (Submodule.span ℂ (range (fun p : G × E ↦
+      p.2 - star (ω p.1 : ℂ) • ρ p.1 p.2))).topologicalClosure
+    ∃ T : (E ⧸ D) ≃L[ℂ] actionIsotype ρ ω, ∀ u, T (D.mkQ u) = P u := by
+  let : NormedSpace ℝ E := NormedSpace.restrictScalars ℝ ℂ E
+  let Q := (actionIsotype ρ ω).subtypeL.comp P
+  have hker := compactActionAverage_ker μ ρ hρ ω Q hP
+  obtain ⟨e, he⟩ := compactActionAverage_quotient_equiv μ ρ hρ ω Q hP
+  dsimp only
+  rw [← hker]
+  exact ⟨e, fun u ↦ Subtype.ext (he u)⟩
+
+end
+
 /-- Paper: Proposition 10.1.1.5(1), p. 437. The global raw average induces a
 topological linear isomorphism from the completed homogeneous quotient to the isotype.
 Deviation: Use polar-free tests. The completed coinvariant quotient is realized by
@@ -699,7 +783,16 @@ dividing the completed space by the closed span of the twisted differences. -/
 theorem globalThetaSobolevAverage_quotient_equiv (ω : PontryaginDual C₁) :
     let D := (Submodule.span ℂ (range (fun p : C₁ × H ↦
       p.2 - star (ω p.1 : ℂ) • ρ₁ p.1 p.2))).topologicalClosure
-    ∃ T : (H ⧸ D) ≃L[ℂ] Hω(ω), ∀ u : H, T (D.mkQ u) = P(ω) u := by sorry
+    ∃ T : (H ⧸ D) ≃L[ℂ] Hω(ω), ∀ u : H, T (D.mkQ u) = P(ω) u := by
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : (μ𝔽₁).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have hρ : Continuous (fun p : C₁ × H ↦ ρ₁ p.1 p.2) :=
+    (exists_globalThetaSobolevAction (F := F) a hI hs).choose_spec.2.1.comp
+      ((continuous_subtype_val.comp continuous_fst).prodMk continuous_snd)
+  with_reducible_and_instances
+    exact thetaSobolevAverage_quotient_equiv_of_compact μ𝔽₁ ρ₁ hρ ω (P(ω))
+      (existsUnique_globalThetaSobolevAverage (F := F) (a := a) hI hs ω).exists.choose_spec.1
 
 /-- Paper: Proposition 10.1.1.5(2), p. 437. The global coordinate map is a
 continuous injection into the product and factors through the isometric Hilbert sum.
@@ -728,7 +821,16 @@ Deviation: The letter a represents the local weight b of the proposition. -/
 theorem existsUnique_sLocalThetaSobolevAverage (ω : PontryaginDual J₁) :
     ∃! P : H →L[ℂ] Hω(ω),
       IsPettisIsotypicAverageOn μₛ₁ univ ρ₁ ω ((Hω(ω)).subtypeL.comp P) ∧
-      Surjective P ∧ IsOpenMap P := by sorry
+      Surjective P ∧ IsOpenMap P := by
+  let : BorelSpace J₁ := ⟨rfl⟩
+  let : CompactSpace J₁ := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let : (μₛ₁).IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  let : CompleteSpace H := (sLocalThetaSobolev_closed_complete_separable ha hI hs hp).2.1
+  with_reducible_and_instances
+    exact existsUnique_thetaSobolevAverage_of_compact (E := H) (sIdeleQuotientNorm F S).ker
+      μₛ₁ (Rₛ(ha, hI, hs, hp))
+      (exists_sLocalThetaSobolevAction (F := F) (S := S) ha hI hs hp).choose_spec.2.1 ω
 
 local notation "P(" ω ")" =>
   (existsUnique_sLocalThetaSobolevAverage (F := F) (S := S) ha hI hs hα ω).exists.choose
@@ -750,7 +852,17 @@ space by the closed span of the twisted differences. -/
 theorem sLocalThetaSobolevAverage_quotient_equiv (ω : PontryaginDual J₁) :
     let D := (Submodule.span ℂ (range (fun p : J₁ × H ↦
       p.2 - star (ω p.1 : ℂ) • ρ₁ p.1 p.2))).topologicalClosure
-    ∃ T : (H ⧸ D) ≃L[ℂ] Hω(ω), ∀ u : H, T (D.mkQ u) = P(ω) u := by sorry
+    ∃ T : (H ⧸ D) ≃L[ℂ] Hω(ω), ∀ u : H, T (D.mkQ u) = P(ω) u := by
+  let : BorelSpace J₁ := ⟨rfl⟩
+  let : CompactSpace J₁ := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let : (μₛ₁).IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  have hρ : Continuous (fun p : J₁ × H ↦ ρ₁ p.1 p.2) :=
+    (exists_sLocalThetaSobolevAction (F := F) (S := S) ha hI hs hp).choose_spec.2.1.comp
+      ((continuous_subtype_val.comp continuous_fst).prodMk continuous_snd)
+  with_reducible_and_instances
+    exact thetaSobolevAverage_quotient_equiv_of_compact μₛ₁ ρ₁ hρ ω (P(ω))
+      (existsUnique_sLocalThetaSobolevAverage (F := F) (S := S) ha hI hs hα ω).exists.choose_spec.1
 
 /-- Paper: Proposition 10.1.1.5(2), p. 437. The S-local coordinate map is a
 continuous injection into the product and factors through the isometric Hilbert sum.
@@ -962,11 +1074,109 @@ theorem globalThetaSobolev_fourier_weight (a : ℝ) (f : ℬ₀) (g : C𝔽) :
       using adelicTheta_riemannRoch (F := F) f.val g⁻¹
   exact weights r ((ideleClassNorm F g⁻¹).val : ℝ) _ _ hr hinv hθ
 
+/-- A continuous linear map that preserves a submodule, preserves the kernel of a linear map
+on it, and is an involution modulo that kernel induces a unique continuous linear automorphism
+of the quotient. Stated for abstract modules, so that it elaborates without unfolding the
+Schwartz–Bruhat instances. -/
+private theorem existsUnique_globalPolarFreeThetaFourier_quotient {M N : Type*}
+    [AddCommGroup M] [Module ℂ M] [TopologicalSpace M] [AddCommGroup N] [Module ℂ N]
+    (P : Submodule ℂ M) (θ : M →ₗ[ℂ] N) (Φ : M →L[ℂ] M) (φ : M → M) (hΦ : ∀ f, Φ f = φ f)
+    (hP : ∀ f : P, φ f ∈ P) (hker : ∀ f : P, θ f = 0 → θ (φ f) = 0)
+    (hinv : ∀ f : P, θ (φ (φ f)) = θ f) :
+    ∃! T : (P ⧸ (LinearMap.ker θ).comap P.subtype) ≃L[ℂ]
+        (P ⧸ (LinearMap.ker θ).comap P.subtype),
+      ∀ f : P, T (Submodule.Quotient.mk f) = Submodule.Quotient.mk ⟨φ f, hP f⟩ := by
+  set Q := (LinearMap.ker θ).comap P.subtype
+  let Φ₀ : P →L[ℂ] P := (Φ.comp P.subtypeL).codRestrict P fun f ↦ by
+    rw [ContinuousLinearMap.comp_apply, Submodule.subtypeL_apply, hΦ]
+    exact hP f
+  have hΦ₀ (f : P) : Φ₀ f = ⟨φ f, hP f⟩ := Subtype.ext (hΦ f)
+  have hQ : Q ≤ (Q.mkQL.comp Φ₀).ker := by
+    intro f hf
+    change Q.mkQ (Φ₀ f) = 0
+    rw [Submodule.mkQ_apply, Submodule.Quotient.mk_eq_zero, hΦ₀]
+    exact hker f hf
+  let T₀ := Q.liftQL (Q.mkQL.comp Φ₀) hQ
+  have hT₀ (f : P) : T₀ (Submodule.Quotient.mk f) = Submodule.Quotient.mk ⟨φ f, hP f⟩ := by
+    change Q.mkQ (Φ₀ f) = _
+    rw [hΦ₀]
+    rfl
+  have hTT (x : P ⧸ Q) : T₀ (T₀ x) = x := by
+    refine Submodule.Quotient.induction_on _ x fun f ↦ ?_
+    rw [hT₀, hT₀, Submodule.Quotient.eq, Submodule.mem_comap, LinearMap.mem_ker, map_sub,
+      map_sub]
+    change θ (φ (φ f)) - θ f = 0
+    rw [hinv, sub_self]
+  refine ⟨ContinuousLinearEquiv.equivOfInverse T₀ T₀ hTT hTT, hT₀, fun T hT ↦ ?_⟩
+  refine ContinuousLinearEquiv.ext (funext fun x ↦ ?_)
+  refine Submodule.Quotient.induction_on _ x fun f ↦ ?_
+  exact (hT f).trans (hT₀ f).symm
+
+/-- Riemann–Roch for a theta transform, for a test whose polar values vanish together with
+those of its Fourier transform: the Fourier transform preserves vanishing of theta, and the
+double Fourier transform has the same theta. Stated for abstract data, so that it elaborates
+without unfolding the adelic types. -/
+private theorem existsUnique_globalPolarFreeThetaFourier_rr {B X : Type*} [InvolutiveInv X]
+    (Θ : B → X → ℂ) (Fo : B → B) (e : B → ℂ) (n : X → ℝ)
+    (hn : ∀ g, n g⁻¹ = (n g)⁻¹) (hpos : ∀ g, 0 < n g)
+    (hRR : ∀ f g, Θ f g = (n g)⁻¹ • Θ (Fo f) g⁻¹ + (n g)⁻¹ • e (Fo f) - e f)
+    (f : B) (hf0 : e f = 0) (hF0 : e (Fo f) = 0) :
+    ((∀ g, Θ f g = 0) → ∀ g, Θ (Fo f) g = 0) ∧
+      (e (Fo (Fo f)) = 0 → ∀ g, Θ (Fo (Fo f)) g = Θ f g) := by
+  refine ⟨fun hΘ g ↦ ?_, fun hFF0 g ↦ ?_⟩
+  · have h := hRR f g⁻¹
+    simp only [hf0, hF0, smul_zero, add_zero, sub_zero, inv_inv, hn, hΘ] at h
+    exact (smul_eq_zero.mp h.symm).resolve_left (hpos g).ne'
+  · have h1 := hRR f g
+    have h2 := hRR (Fo f) g⁻¹
+    have hr : n g ≠ 0 := (hpos g).ne'
+    simp only [hf0, hF0, smul_zero, add_zero, sub_zero, inv_inv, hn] at h1 h2
+    rw [h1, h2, smul_add, smul_smul, smul_smul, inv_mul_cancel₀ hr, one_smul, one_smul, hFF0,
+      add_zero]
+
+/-- The Fourier transform of a polar-free test whose theta vanishes has vanishing theta. -/
+private theorem existsUnique_globalPolarFreeThetaFourier_ker (f : ℬ₀)
+    (hf : adelicThetaLinearMap F f.val = 0) :
+    adelicThetaLinearMap F (adeleSchwartzFourier f.val) = 0 := by
+  have hz := (mem_adelePolarSubspace (F := F) f.val).mp f.property
+  have hn (g : C𝔽) :
+      ((ideleClassNorm F g⁻¹ : NNReal) : ℝ) = ((ideleClassNorm F g : NNReal) : ℝ)⁻¹ := by
+    simp only [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv]
+  have hpos (g : C𝔽) : 0 < ((ideleClassNorm F g : NNReal) : ℝ) :=
+    NNReal.coe_pos.mpr (Units.zero_lt (ideleClassNorm F g))
+  have h := (existsUnique_globalPolarFreeThetaFourier_rr (fun f g ↦ adelicTheta (F := F) f g)
+    adeleSchwartzFourier (fun f ↦ f (Multiplicative.ofAdd 0))
+    (fun g ↦ ((ideleClassNorm F g : NNReal) : ℝ)) hn hpos (adelicTheta_riemannRoch (F := F))
+    f.val hz.1 hz.2).1 fun g ↦ DFunLike.congr_fun hf g
+  exact ContinuousMap.ext h
+
+/-- The double Fourier transform of a polar-free test has the same theta. -/
+private theorem existsUnique_globalPolarFreeThetaFourier_inv (f : ℬ₀) :
+    adelicThetaLinearMap F (adeleSchwartzFourier (adeleSchwartzFourier f.val)) =
+      adelicThetaLinearMap F f.val := by
+  have hz := (mem_adelePolarSubspace (F := F) f.val).mp f.property
+  have hz' := (mem_adelePolarSubspace (F := F) (adeleSchwartzFourier f.val)).mp
+    (adelePolarSubspace_fourier f)
+  have hn (g : C𝔽) :
+      ((ideleClassNorm F g⁻¹ : NNReal) : ℝ) = ((ideleClassNorm F g : NNReal) : ℝ)⁻¹ := by
+    simp only [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv]
+  have hpos (g : C𝔽) : 0 < ((ideleClassNorm F g : NNReal) : ℝ) :=
+    NNReal.coe_pos.mpr (Units.zero_lt (ideleClassNorm F g))
+  have h := (existsUnique_globalPolarFreeThetaFourier_rr (fun f g ↦ adelicTheta (F := F) f g)
+    adeleSchwartzFourier (fun f ↦ f (Multiplicative.ofAdd 0))
+    (fun g ↦ ((ideleClassNorm F g : NNReal) : ℝ)) hn hpos (adelicTheta_riemannRoch (F := F))
+    f.val hz.1 hz.2).2 hz'.2
+  exact ContinuousMap.ext h
+
 /-- Paper: Theorem 10.1.2.1, pp. 437–438. The polar-free theta quotient has the
 continuous Fourier automorphism induced by the adelic transform of its tests. -/
 theorem existsUnique_globalPolarFreeThetaFourier :
     ∃! T : Θ₀ ≃L[ℂ] Θ₀, ∀ f : ℬ₀,
-      T (Submodule.Quotient.mk f) = Submodule.Quotient.mk (fourier₀(f)) := by sorry
+      T (Submodule.Quotient.mk f) = Submodule.Quotient.mk (fourier₀(f)) := by
+  obtain ⟨Φ, hΦ⟩ := exists_adeleFourier_clm (F := F)
+  exact existsUnique_globalPolarFreeThetaFourier_quotient (adelePolarSubspace F)
+    (adelicThetaLinearMap F) Φ adeleSchwartzFourier hΦ adelePolarSubspace_fourier
+    existsUnique_globalPolarFreeThetaFourier_ker existsUnique_globalPolarFreeThetaFourier_inv
 
 local notation "Fourier𝔽" => (existsUnique_globalPolarFreeThetaFourier (F := F)).exists.choose
 

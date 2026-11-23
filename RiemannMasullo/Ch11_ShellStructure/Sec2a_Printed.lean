@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch11_ShellStructure.Sec2a
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3a
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
+import all RiemannMasullo.Ch11_ShellStructure.Sec2a
 
 /-! # §11.2.0 assertions that are false as printed -/
 
@@ -176,11 +177,97 @@ def Printed.orbitalJet_memLp : Prop :=
         let u := h.toLp (jet(χ, t, m))
         ∀ k : C₁(F), (fun g ↦ u (k.val⁻¹ * g)) =ᵐ[μ(F)] fun g ↦ (χ⁻¹ k.val : ℂ) * u g
 
+/-- The reciprocal of the square root of `1 + x²` is not integrable on the line: on `(1, ∞)` it
+dominates `x⁻¹ / 2`. -/
+private theorem Printed.orbitalJet_memLp_false_line :
+    ∫⁻ x : ℝ, ENNReal.ofReal ((1 + x ^ 2) ^ ((1 : ℝ) / 2))⁻¹ = ⊤ := by
+  by_contra hfin
+  have hmeas : Measurable fun x : ℝ ↦ ENNReal.ofReal ((1 + x ^ 2) ^ ((1 : ℝ) / 2))⁻¹ := by
+    fun_prop
+  have hint := integrable_toReal_of_lintegral_ne_top hmeas.aemeasurable hfin
+  have hint' : IntegrableOn (fun x : ℝ ↦ 2 * ((1 + x ^ 2) ^ ((1 : ℝ) / 2))⁻¹) (Ioi 1) := by
+    refine IntegrableOn.congr_fun ((hint.const_mul 2).integrableOn (s := Ioi 1))
+      (fun x _ ↦ ?_) measurableSet_Ioi
+    change 2 * (ENNReal.ofReal _).toReal = _
+    rw [ENNReal.toReal_ofReal (inv_nonneg.mpr (Real.rpow_nonneg (by positivity) _))]
+  apply not_integrableOn_Ioi_inv (a := 1)
+  refine hint'.mono' (by fun_prop) ?_
+  refine (ae_restrict_mem measurableSet_Ioi).mono fun x hx ↦ ?_
+  have hx1 : (1 : ℝ) < x := hx
+  have hx0 : 0 < x := by linarith
+  rw [Real.norm_of_nonneg (inv_nonneg.mpr hx0.le)]
+  have hsq : (1 + x ^ 2) ^ ((1 : ℝ) / 2) ≤ 2 * x := by
+    rw [← Real.sqrt_eq_rpow, Real.sqrt_le_left (by linarith)]
+    nlinarith
+  have hpos : 0 < (1 + x ^ 2) ^ ((1 : ℝ) / 2) := Real.rpow_pos_of_pos (by positivity) _
+  rw [le_mul_inv_iff₀ hpos, inv_mul_eq_div, div_le_iff₀ hx0]
+  linarith
+
+/-- The reciprocal Euler factor of the trivial character over ℚ vanishes at zero at every
+finite place. -/
+private theorem Printed.orbitalJet_memLp_false_factor (v : V(ℚ)) :
+    (finiteHeckeEulerFactor (1 : PontryaginDual C𝔽(ℚ)) v 0)⁻¹ = 0 := by
+  obtain ⟨hv, -⟩ := Printed.orbitalEulerProduct_eq_primary_false_trivial v
+  have hπ := (Valued.v : Valuation (v.adicCompletion ℚ)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial.choose_spec
+  rw [finiteHeckeEulerFactor, ite_eq_left hv, inv_inv]
+  have h1 : ideleClassNormTwist (1 : PontryaginDual C𝔽(ℚ)) 0 = 1 := by
+    ext g
+    change (1 : ℂ) * _ ^ (0 : ℂ) = 1
+    simp
+  rw [h1]
+  simp [HeckeCharacter.localValue, hπ.ne_zero]
+
+/-- A function of the log-norm whose integral over the line is infinite has infinite integral
+over the idele classes of ℚ: Haar measure is a positive multiple of the canonical one, which the
+log-norm pushes forward to Lebesgue measure. -/
+private theorem Printed.orbitalJet_memLp_false_push (ψ : ℝ → ENNReal) (hψ : Measurable ψ)
+    (htop : ∫⁻ x : ℝ, ψ x = ⊤) : ∫⁻ g, ψ (logNorm(ℚ) g) ∂(μ(ℚ)) = ⊤ := by
+  have hm : IsModulation (⟨ideleClassNorm ℚ, (isProperMap_ideleClassNorm ℚ).continuous⟩ :
+      C𝔽(ℚ) →ₜ* ℝ≥0ˣ) := ⟨isProperMap_ideleClassNorm ℚ, ideleClassNorm_ne_one (F := ℚ)⟩
+  let ν : Measure C𝔽(ℚ) := canonicalModulatedHaar _ hm
+  let : ν.IsHaarMeasure := (existsUnique_canonicalModulatedHaar _ hm).exists.choose_spec.1
+  rw [Measure.isMulLeftInvariant_eq_smul (μ(ℚ)) ν, lintegral_smul_measure,
+    (orbitalJet_logNorm_measurePreserving (F := ℚ)).lintegral_comp hψ, htop]
+  exact ENNReal.mul_top (by exact_mod_cast (Measure.haarScalarFactor_pos_of_isHaarMeasure _ _).ne')
+
+/-- Over ℚ the reciprocal Sobolev measure of degree one has infinite total mass. -/
+private theorem Printed.orbitalJet_memLp_false_mass : (μ'(ℚ, 1)) univ = ⊤ := by
+  let φ : ℝ → ENNReal := fun x ↦ ENNReal.ofReal ((1 + x ^ 2) ^ ((1 : ℝ) / 2))⁻¹
+  have hdens (g : C𝔽(ℚ)) : ENNReal.ofReal (intervalSobolevDensity 0 0 1 (logNorm(ℚ) g))⁻¹ =
+      φ (logNorm(ℚ) g) := by
+    simp only [φ, intervalSobolevDensity, mul_zero, zero_mul, Real.exp_zero, max_self, one_mul]
+  rw [withDensity_apply _ MeasurableSet.univ, Measure.restrict_univ, lintegral_congr hdens]
+  exact Printed.orbitalJet_memLp_false_push φ (by fun_prop) Printed.orbitalJet_memLp_false_line
+
 /-- Paper: Theorem 11.2.0.2 and (11.2.0.6), p. 485. Over ℚ with the trivial
 character and S₀ = {2}, the factor 1 − 2⁻ᶻ has a simple zero at 0. At degree
 1 the printed floor admits the constant jet. Its squared norm diverges
 because the reciprocal weight is asymptotic to 1/|x|. -/
-theorem Printed.orbitalJet_memLp_false : ¬ Printed.orbitalJet_memLp := by sorry
+theorem Printed.orbitalJet_memLp_false : ¬ Printed.orbitalJet_memLp := by
+  intro h
+  classical
+  obtain ⟨v, -, -⟩ := Printed.orbitalEulerProduct_eq_primary_false_twoPlaces
+  obtain ⟨hv, -⟩ := Printed.orbitalEulerProduct_eq_primary_false_trivial v
+  have hf0 : frequency((0 : ℝ)) = 0 := by simp
+  have hfac := Printed.orbitalJet_memLp_false_factor v
+  have hz : reciprocalPartialHeckeEulerProduct (1 : PontryaginDual C𝔽(ℚ)) {v}
+      (frequency((0 : ℝ))) = 0 := by
+    rw [hf0, reciprocalPartialHeckeEulerProduct, Finset.prod_singleton, hfac]
+  have hmult : orbitalEulerMultiplicity (1 : PontryaginDual C𝔽(ℚ)) {v} (frequency((0 : ℝ))) = 1 := by
+    rw [orbitalEulerMultiplicity_eq_card, hf0, Finset.filter_singleton, if_pos hfac,
+      Finset.card_singleton]
+  obtain ⟨hmem, -⟩ := h ℚ 1 {v} (by simpa using hv) 1 zero_le_one 0 0 hz (by
+    rw [hmult]; norm_num)
+  have hjet : (jet((1 : PontryaginDual C𝔽(ℚ)), 0, 0) : C𝔽(ℚ) → ℂ) = fun _ ↦ 1 := by
+    funext g
+    rw [spectralZeroJet_zero]
+    rfl
+  rw [hjet] at hmem
+  have hne := hmem.eLpNorm_lt_top
+  rw [eLpNorm_const' _ two_ne_zero ENNReal.ofNat_ne_top, Printed.orbitalJet_memLp_false_mass]
+    at hne
+  simp at hne
 
 /-- Paper: Theorem 11.2.0.2, p. 485. The jet vectors form a Markushevich
 basis of the PV annihilator taken in the full negative space with its subspace topology. -/
@@ -366,11 +453,92 @@ def Printed.orbitalJet_norm_annulus : Prop :=
     ∀ (s : ℝ), 1 < s → ∃ C : ℝ, 0 < C ∧
       Printed.orbitalJetsIn χ S s {u | C⁻¹ ≤ ‖u‖ ∧ ‖u‖ ≤ C}
 
+/-- The function `x² / (1 + x²)^{3/2}` is not integrable on the line: on `(1, ∞)` it dominates
+`x⁻¹ / 8`. -/
+private theorem Printed.orbitalJet_norm_annulus_false_line :
+    ∫⁻ x : ℝ, ENNReal.ofReal (x ^ 2 * ((1 + x ^ 2) ^ ((3 : ℝ) / 2))⁻¹) = ⊤ := by
+  by_contra hfin
+  have hmeas : Measurable fun x : ℝ ↦ ENNReal.ofReal (x ^ 2 * ((1 + x ^ 2) ^ ((3 : ℝ) / 2))⁻¹) := by
+    fun_prop
+  have hint := integrable_toReal_of_lintegral_ne_top hmeas.aemeasurable hfin
+  have hint' : IntegrableOn (fun x : ℝ ↦ 8 * (x ^ 2 * ((1 + x ^ 2) ^ ((3 : ℝ) / 2))⁻¹)) (Ioi 1) := by
+    refine IntegrableOn.congr_fun ((hint.const_mul 8).integrableOn (s := Ioi 1))
+      (fun x _ ↦ ?_) measurableSet_Ioi
+    change 8 * (ENNReal.ofReal _).toReal = _
+    rw [ENNReal.toReal_ofReal (mul_nonneg (sq_nonneg _)
+      (inv_nonneg.mpr (Real.rpow_nonneg (by positivity) _)))]
+  apply not_integrableOn_Ioi_inv (a := 1)
+  refine hint'.mono' (by fun_prop) ?_
+  refine (ae_restrict_mem measurableSet_Ioi).mono fun x hx ↦ ?_
+  have hx1 : (1 : ℝ) < x := hx
+  have hx0 : 0 < x := by linarith
+  rw [Real.norm_of_nonneg (inv_nonneg.mpr hx0.le)]
+  have hsq : (1 + x ^ 2) ^ ((1 : ℝ) / 2) ≤ 2 * x := by
+    rw [← Real.sqrt_eq_rpow, Real.sqrt_le_left (by linarith)]
+    nlinarith
+  have hcube : (1 + x ^ 2) ^ ((3 : ℝ) / 2) ≤ 8 * x ^ 3 := by
+    have h3 : (1 + x ^ 2) ^ ((3 : ℝ) / 2) = ((1 + x ^ 2) ^ ((1 : ℝ) / 2)) ^ 3 := by
+      rw [← Real.rpow_natCast ((1 + x ^ 2) ^ ((1 : ℝ) / 2)) 3, ← Real.rpow_mul (by positivity)]
+      norm_num
+    rw [h3]
+    calc ((1 + x ^ 2) ^ ((1 : ℝ) / 2)) ^ 3 ≤ (2 * x) ^ 3 :=
+          pow_le_pow_left₀ (Real.rpow_nonneg (by positivity) _) hsq 3
+      _ = 8 * x ^ 3 := by ring
+  have hpos : 0 < (1 + x ^ 2) ^ ((3 : ℝ) / 2) := Real.rpow_pos_of_pos (by positivity) _
+  rw [← div_eq_mul_inv, mul_div_assoc', le_div_iff₀ hpos]
+  calc x⁻¹ * (1 + x ^ 2) ^ ((3 : ℝ) / 2) ≤ x⁻¹ * (8 * x ^ 3) :=
+        mul_le_mul_of_nonneg_left hcube (inv_nonneg.mpr hx0.le)
+    _ = 8 * x ^ 2 := by field_simp
+
 /-- Paper: Proposition 11.2.0.4, p. 486. In ℚ(i), take the two places over 5
 and the trivial character. The product (1 − 5⁻ᶻ)² has a double zero at 0.
 For degree 3 the permitted jet of order 1 has squared integrand asymptotic
 to 1/|x| in the log-norm coordinate, so it has no finite norm. -/
-theorem Printed.orbitalJet_norm_annulus_false : ¬ Printed.orbitalJet_norm_annulus := by sorry
+theorem Printed.orbitalJet_norm_annulus_false : ¬ Printed.orbitalJet_norm_annulus := by
+  intro h
+  classical
+  obtain ⟨v, w, hvw⟩ := Printed.orbitalEulerProduct_eq_primary_false_twoPlaces
+  obtain ⟨hv, -⟩ := Printed.orbitalEulerProduct_eq_primary_false_trivial v
+  obtain ⟨hw, -⟩ := Printed.orbitalEulerProduct_eq_primary_false_trivial w
+  have hf0 : frequency((0 : ℝ)) = 0 := by simp
+  have hz : reciprocalPartialHeckeEulerProduct (1 : PontryaginDual C𝔽(ℚ)) {v, w}
+      (frequency((0 : ℝ))) = 0 := by
+    rw [hf0, reciprocalPartialHeckeEulerProduct, Finset.prod_pair hvw,
+      Printed.orbitalJet_memLp_false_factor v, zero_mul]
+  have hmult : orbitalEulerMultiplicity (1 : PontryaginDual C𝔽(ℚ)) {v, w}
+      (frequency((0 : ℝ))) = 2 := by
+    rw [orbitalEulerMultiplicity_eq_card, hf0, Finset.filter_true_of_mem fun u _ ↦
+      Printed.orbitalJet_memLp_false_factor u, Finset.card_pair hvw]
+  obtain ⟨C, -, hC⟩ := h ℚ 1 {v, w} (by simp [hv, hw]) 3 (by norm_num)
+  obtain ⟨hmem, -⟩ := hC 0 1 hz (by rw [hmult]; norm_num)
+  have hjet : (jet((1 : PontryaginDual C𝔽(ℚ)), 0, 1) : C𝔽(ℚ) → ℂ) =
+      fun g ↦ (logNorm(ℚ) g : ℂ) := by
+    funext g
+    unfold spectralZeroJet
+    simp only [pow_one, Complex.ofReal_zero, zero_mul, add_zero]
+    change (1 : ℂ) * _ ^ (0 : ℂ) * _ = _
+    rw [Complex.cpow_zero, one_mul, one_mul]
+  rw [hjet] at hmem
+  have hne := hmem.eLpNorm_lt_top
+  have hcont : Continuous fun g : C𝔽(ℚ) ↦ (logNorm(ℚ) g : ℂ) :=
+    Complex.continuous_ofReal.comp orbitalJet_logNorm_continuous
+  rw [eLpNorm_eq_lintegral_rpow_eNorm_toReal two_ne_zero ENNReal.ofNat_ne_top
+    hcont.aestronglyMeasurable] at hne
+  have hdens : Measurable fun g : C𝔽(ℚ) ↦
+      ENNReal.ofReal (intervalSobolevDensity 0 0 3 (logNorm(ℚ) g))⁻¹ :=
+    (orbitalJet_density_continuous 3).measurable.ennreal_ofReal
+  have htop : ∫⁻ g, ‖(logNorm(ℚ) g : ℂ)‖ₑ ^ ((2 : ENNReal).toReal) ∂(μ'(ℚ, 3)) = ⊤ := by
+    rw [lintegral_withDensity_eq_lintegral_mul _ hdens
+      ((hcont.measurable.eNorm).pow_const _)]
+    refine (lintegral_congr fun g ↦ ?_).trans (Printed.orbitalJet_memLp_false_push
+      (fun x ↦ ENNReal.ofReal (x ^ 2 * ((1 + x ^ 2) ^ ((3 : ℝ) / 2))⁻¹)) (by fun_prop)
+      Printed.orbitalJet_norm_annulus_false_line)
+    simp only [Pi.mul_apply, ENNReal.toReal_ofNat, intervalSobolevDensity, mul_zero, zero_mul,
+      Real.exp_zero, max_self, one_mul, ← ofReal_norm, Complex.norm_real, Real.norm_eq_abs]
+    rw [ENNReal.ofReal_rpow_of_nonneg (abs_nonneg _) (by norm_num), Real.rpow_two, sq_abs,
+      ← ENNReal.ofReal_mul (inv_nonneg.mpr (Real.rpow_nonneg (by positivity) _)), mul_comm]
+  rw [htop, ENNReal.top_rpow_of_pos (by norm_num)] at hne
+  exact lt_irrefl _ hne
 
 /-- Paper: Proposition 11.2.0.4, p. 486. The printed family lies in the annulus
 and has an element outside the open ball in the same isotype, with the same C. -/

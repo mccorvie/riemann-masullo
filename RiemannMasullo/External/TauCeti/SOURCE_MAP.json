@@ -1,0 +1,47 @@
+{
+  "upstream": "https://github.com/TauCetiProject/TauCeti",
+  "commit": "8794ab329bb60340fa690a2902cf995f0571721b",
+  "files": [
+    {
+      "path": "Analysis/Normed/Group/LocallyBounded.lean",
+      "upstream_path": "TauCeti/Analysis/Normed/Group/LocallyBounded.lean",
+      "upstream_lines": "1-8,10-18,24-28,31-85,115",
+      "upstream_sha256": "cc8378b114460333fff98350543da71c379405633123ffb3e5c3bde7fc3d90ed",
+      "sha256": "8583608e246ccf9bc8e9aa02ef2a3787f4cd3f005ed2389ce8ce0a2ea9624c86"
+    },
+    {
+      "path": "Analysis/Complex/Conformal/NormalFamilies.lean",
+      "upstream_path": "TauCeti/Analysis/Complex/Conformal/NormalFamilies.lean",
+      "upstream_lines": "1-9,11-48,54-56,60-138,184-204,232-234",
+      "upstream_sha256": "733fd79fdf87a243e01f8140cf4fdfc685518d8db61d25ec4afb88127c740d64",
+      "sha256": "f2b908b4a95b814bd3e9127f54622bb25bc665bae5b735d4d7778d2dbfb1960f"
+    },
+    {
+      "path": "Topology/ContinuousMap/Ascoli.lean",
+      "upstream_path": "TauCeti/Topology/ContinuousMap/Ascoli.lean",
+      "upstream_lines": "1-7,10,27-37,39-41,111-121,136-170",
+      "upstream_sha256": "257c60a0767cba7ea09dc72640daf4aad3a51f2b672b9e419727a7ff8c64c4fb",
+      "sha256": "5c0c3f724136d0206ade3f71c189cf573d7c1e0b3ebc27d109b4c2190d184822"
+    },
+    {
+      "path": "Analysis/Complex/Conformal/Montel/Precompact.lean",
+      "upstream_path": "TauCeti/Analysis/Complex/Conformal/Montel/Precompact.lean",
+      "upstream_lines": "1-14,16-19,24-31,34-38,42-80,90",
+      "upstream_sha256": "0245cbdd37fcea32d5776d3006169550132e24d9dc632468b607b61c53832b92",
+      "sha256": "c5aa2055c4920e6728aa1f0b49ef4a1cad3d06c9983f634b3b87c7d67ddc62b7"
+    },
+    {
+      "path": "Analysis/Complex/Conformal/Montel/Basic.lean",
+      "upstream_path": "TauCeti/Analysis/Complex/Conformal/Montel/Basic.lean",
+      "upstream_lines": "1-16,20-21,23-80",
+      "upstream_sha256": "f732b8786cd144301b7f02be28e3b162e97165287d8dde3d463dec51c0c656de",
+      "sha256": "dfdb61d6ef7dd90d1131518a5ecf58ccd939a6c7a100722e1b8a77c3334fe1cb"
+    },
+    {
+      "path": "LICENSE",
+      "upstream_path": "LICENSE",
+      "upstream_sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+      "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+    }
+  ]
+}

@@ -9,6 +9,9 @@ public import Mathlib.Topology.Algebra.RestrictedProduct.TopologicalSpace
 public import Mathlib.Topology.Algebra.Valued.NormedValued
 public import Mathlib.Topology.Algebra.Constructions
 public import Mathlib.Analysis.SpecificLimits.Basic
+import all RiemannMasullo.Ch02_AdelicTheta.Sec2b
+import all RiemannMasullo.Ch03_IdelicZeta.Sec2
+import Mathlib.Analysis.Fourier.FiniteAbelian.PontryaginDuality
 public import Mathlib.NumberTheory.NumberField.Cyclotomic.Basic
 
 /-! # Chapter 3.2: printed residues and absolute convergence -/
@@ -158,6 +161,173 @@ def Printed.globalThetaMellinIntegral_integrable_of_nontrivial : Prop :=
     ∀ s : ℂ, Integrable (fun g : C[F] ↦ adelicTheta f g * ideleClassNormTwist χ s g)
       (ideleClassTamagawaMeasure F)
 
+/-- Reduction modulo `p` on the `p`-adic integers is continuous. -/
+private theorem toZMod_continuous_aux (p : ℕ) [Fact p.Prime] :
+    Continuous (PadicInt.toZMod : ℤ_[p] →+* ZMod p) := by
+  apply continuous_of_continuousAt_zero (PadicInt.toZMod : ℤ_[p] →+* ZMod p)
+  refine (tendsto_pure.mpr ?_).mono_right (pure_le_nhds _)
+  filter_upwards [Metric.ball_mem_nhds (0 : ℤ_[p]) one_pos] with x hx
+  rw [map_zero, ← RingHom.mem_ker, PadicInt.ker_toZMod, IsLocalRing.mem_maximalIdeal,
+    PadicInt.mem_nonunits]
+  simpa using hx
+
+/-- A character of `(ℤ/3)ˣ` that is nontrivial at `-1`. -/
+private theorem exists_zmod3_char :
+    ∃ ψ : (ZMod 3)ˣ →* Circle, ψ (-1) ≠ 1 := by
+  have h : (Additive.ofMul (-1 : (ZMod 3)ˣ)) ≠ 0 := by decide
+  obtain ⟨ψ, hψ⟩ := AddChar.exists_apply_ne_zero.mpr h
+  refine ⟨(AddChar.circleEquivComplex.symm ψ).toMonoidHom, fun h1 ↦ hψ ?_⟩
+  have h2 := congrArg (fun z : Circle ↦ (z : ℂ)) h1
+  exact h2
+
+
+open IsDedekindDomain in
+/-- A unit of the local integers has norm one. -/
+private theorem norm_unit_integers_aux (w : HeightOneSpectrum (𝓞 ℚ))
+    (u : (w.adicCompletionIntegers ℚ)ˣ) : ‖((u.val : w.adicCompletionIntegers ℚ) :
+      w.adicCompletion ℚ)‖ = 1 := by
+  have hle : ∀ y : w.adicCompletionIntegers ℚ, ‖(y : w.adicCompletion ℚ)‖ ≤ 1 := fun y ↦
+    Valued.toNormedField.norm_le_one_iff.mpr y.2
+  have hmul : ‖((u.val : w.adicCompletionIntegers ℚ) : w.adicCompletion ℚ)‖ *
+      ‖(((u⁻¹ : (w.adicCompletionIntegers ℚ)ˣ).val : w.adicCompletionIntegers ℚ) :
+        w.adicCompletion ℚ)‖ = 1 := by
+    rw [← norm_mul, ← Subring.coe_mul, Units.mul_inv]
+    simp
+  have h1 := hle u.val
+  have h2 := hle (u⁻¹).val
+  nlinarith [norm_nonneg ((u.val : w.adicCompletionIntegers ℚ) : w.adicCompletion ℚ),
+    norm_nonneg (((u⁻¹ : (w.adicCompletionIntegers ℚ)ˣ).val : w.adicCompletionIntegers ℚ) :
+        w.adicCompletion ℚ)]
+
+open IsDedekindDomain in
+/-- The idele classes of `ℚ` carry a character that is nontrivial on the norm-one classes:
+the quadratic character of `(ℤ/3)ˣ` read off the unit at the place `3`. -/
+private theorem exists_rat_char_nontrivial :
+    ∃ χ : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ),
+      χ.toMonoidHom.comp (ideleClassNorm ℚ).ker.subtype ≠ 1 := by
+  classical
+  let p : Nat.Primes := ⟨3, Nat.prime_three⟩
+  let v : HeightOneSpectrum (𝓞 ℚ) := (Rat.HeightOneSpectrum.primesEquiv (R := 𝓞 ℚ)).symm p
+  let E := (PadicInt.adicCompletionIntegersEquiv (𝓞 ℚ) p).symm
+  let φ : v.adicCompletionIntegers ℚ →+* ZMod 3 :=
+    (PadicInt.toZMod : ℤ_[p] →+* ZMod p).comp E.toRingEquiv.toRingHom
+  have hφ : Continuous φ := (toZMod_continuous_aux p).comp E.continuous
+  obtain ⟨ψ, hψ⟩ := exists_zmod3_char
+  obtain ⟨e, he⟩ := ratIdeleClassGroup_decomposition
+  let χl : (v.adicCompletionIntegers ℚ)ˣ →* Circle := ψ.comp (Units.map φ.toMonoidHom)
+  have hχl : Continuous χl := (continuous_of_discreteTopology (f := (ψ : (ZMod 3)ˣ → Circle))).comp (hφ.units_map _)
+  let χh : IdeleClassGroup (𝓞 ℚ) ℚ →* Circle :=
+    χl.comp ((Pi.evalMonoidHom _ v).comp ((MonoidHom.snd _ _).comp e.symm.toMonoidHom))
+  have hχh : Continuous χh :=
+    hχl.comp ((continuous_apply v).comp (continuous_snd.comp e.symm.continuous))
+  let χ : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ) := ⟨χh, hχh⟩
+  refine ⟨χ, fun h ↦ ?_⟩
+  obtain ⟨g, hginf, hgfin, hge⟩ := he 1 (Pi.mulSingle v (-1))
+  have hker : e (1, Pi.mulSingle v (-1)) ∈ (ideleClassNorm ℚ).ker := by
+    rw [MonoidHom.mem_ker, hge]
+    apply Units.ext
+    apply NNReal.coe_injective
+    change ((ideleNorm ℚ g : ℝ≥0) : ℝ) = 1
+    rw [((ideleNorm_spec ℚ).1 g).2]
+    have hfin : (∏ᶠ w : HeightOneSpectrum (𝓞 ℚ), ‖g.val.2 w‖) = 1 := by
+      apply finprod_eq_one_of_forall_eq_one
+      intro w
+      rw [hgfin w]
+      exact norm_unit_integers_aux w _
+    have hinf : ∀ w : InfinitePlace ℚ, ‖g.val.1 w‖ ^ w.mult = 1 := by
+      intro w
+      obtain rfl : w = Rat.infinitePlace := Subsingleton.elim _ _
+      have hiso := (InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal
+        Rat.isReal_infinitePlace).norm_map_of_map_zero (map_zero _) (g.val.1 Rat.infinitePlace)
+      rw [← hiso, hginf]
+      simp
+    rw [hfin, mul_one]
+    exact Finset.prod_eq_one fun w _ ↦ hinf w
+  have h1 := DFunLike.congr_fun h ⟨_, hker⟩
+  change χh (e (1, Pi.mulSingle v (-1))) = 1 at h1
+  apply hψ
+  have h2 : χh (e (1, Pi.mulSingle v (-1))) = ψ (Units.map φ.toMonoidHom (-1)) := by
+    change χl ((e.symm (e (1, Pi.mulSingle v (-1)))).2 v) = _
+    rw [e.symm_apply_apply]
+    simp [χl]
+  rw [← h1, h2]
+  exact congrArg ψ (Units.ext (by simp)).symm
+
+/-- At `s = 0` the theta Mellin integrand has norm at least one near norm zero, a set of
+infinite class measure, once the Fourier transform of the test is nonzero at zero. -/
+private theorem not_integrable_aux (F : Type) [Field F] [NumberField F] (f : ℬ[F])
+    (χ : PontryaginDual C[F])
+    (ha : adeleSchwartzFourier f (Multiplicative.ofAdd (0 : 𝔸[F])) ≠ 0) :
+    ¬ Integrable (fun g : C[F] ↦ adelicTheta f g * ideleClassNormTwist χ 0 g)
+      (ideleClassTamagawaMeasure F) := by
+  intro hI
+  let nr : C[F] → ℝ := fun g ↦ ((ideleClassNorm F g : ℝ≥0) : ℝ)
+  have hnpos : ∀ g, 0 < nr g := fun g ↦
+    NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr (Units.ne_zero (ideleClassNorm F g)))
+  obtain ⟨C, T, hC, hT, hsmall⟩ := adelicTheta_decay_small f 1
+  set a := adeleSchwartzFourier f (Multiplicative.ofAdd (0 : 𝔸[F]))
+  set b := f (Multiplicative.ofAdd (0 : 𝔸[F]))
+  have ha' : 0 < ‖a‖ := norm_pos_iff.mpr ha
+  set δ := min T (min 1 (‖a‖ / (‖b‖ + C + 1)))
+  have hδ : 0 < δ := lt_min hT (lt_min one_pos (by positivity))
+  -- the integrand has norm at least one at small norm
+  have hlow : ∀ g : C[F], nr g < δ →
+      1 ≤ ‖adelicTheta f g * ideleClassNormTwist χ 0 g‖ := by
+    intro g hg
+    have hn := hnpos g
+    have hgT : nr g < T := lt_of_lt_of_le hg (min_le_left _ _)
+    have hg1 : nr g < 1 := lt_of_lt_of_le hg ((min_le_right _ _).trans (min_le_left _ _))
+    have hga : nr g < ‖a‖ / (‖b‖ + C + 1) :=
+      lt_of_lt_of_le hg ((min_le_right _ _).trans (min_le_right _ _))
+    have hb := hsmall g hgT
+    have htw : ‖ideleClassNormTwist χ 0 g‖ = 1 := by
+      change ‖(χ g : ℂ) * ((nr g : ℂ) ^ (0 : ℂ))‖ = 1
+      simp
+    rw [norm_mul, htw, mul_one]
+    have hsa : ‖(nr g)⁻¹ • a‖ = ‖a‖ / nr g := by
+      rw [norm_smul, Real.norm_eq_abs, abs_inv, abs_of_pos hn, inv_mul_eq_div]
+    have htri : ‖(nr g)⁻¹ • a‖ ≤ ‖adelicTheta f g‖ + ‖b‖ + C * nr g ^ 1 := by
+      have := norm_sub_le_norm_sub_add_norm_sub ((nr g)⁻¹ • a) (adelicTheta f g + b) 0
+      have e1 : ‖(nr g)⁻¹ • a - (adelicTheta f g + b)‖ =
+          ‖adelicTheta f g - (nr g)⁻¹ • a + b‖ := by
+        rw [← norm_neg]; congr 1; abel
+      calc ‖(nr g)⁻¹ • a‖ ≤ ‖adelicTheta f g - (nr g)⁻¹ • a + b‖ + ‖adelicTheta f g + b‖ := by
+            have := norm_sub_norm_le ((nr g)⁻¹ • a) (adelicTheta f g + b)
+            rw [e1] at this; linarith
+        _ ≤ C * nr g ^ 1 + (‖adelicTheta f g‖ + ‖b‖) := add_le_add hb (norm_add_le _ _)
+        _ = _ := by ring
+    rw [hsa] at htri
+    have hbig : ‖b‖ + C + 1 < ‖a‖ / nr g := by
+      rw [lt_div_iff₀ hn]
+      have := (lt_div_iff₀ (by positivity : (0:ℝ) < ‖b‖ + C + 1)).mp hga
+      linarith
+    nlinarith
+  -- the set of small norm has infinite measure
+  have hinf : ideleClassTamagawaMeasure F {g | nr g < δ} = ⊤ := by
+    have hmap := classTamagawa_map_log_norm (F := F)
+    let : BorelSpace C[F] := ⟨rfl⟩
+    have hcont : Continuous (ideleClassNorm F) :=
+      (QuotientGroup.isQuotientMap_mk _).continuous_iff.mpr (ideleGroup_topology F).2.2.2.2.1
+    have hmeas : Measurable fun g : C[F] ↦ Real.log (nr g) :=
+      Real.measurable_log.comp
+        (NNReal.continuous_coe.comp (Units.continuous_val.comp hcont)).measurable
+    have hset : {g | nr g < δ} = (fun g : C[F] ↦ Real.log (nr g)) ⁻¹' Iio (Real.log δ) := by
+      ext g
+      simp only [mem_preimage, mem_Iio]
+      exact (Real.log_lt_log_iff (hnpos g) hδ).symm
+    rw [hset, ← Measure.map_apply hmeas measurableSet_Iio, hmap]
+    let : CompactSpace (ideleClassNorm F).ker := (ideleClassGroup_finiteness F).2.1
+    let : (normOneIdeleClassTamagawaMeasure F).IsHaarMeasure :=
+      (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+    have hk : (normOneIdeleClassTamagawaMeasure F univ).toNNReal ≠ 0 := by
+      rw [Ne, ENNReal.toNNReal_eq_zero_iff, not_or]
+      exact ⟨isOpen_univ.measure_ne_zero _ univ_nonempty,
+        measure_ne_top _ _⟩
+    rw [smul_apply, Real.volume_Iio, ENNReal.smul_def, smul_eq_mul,
+      ENNReal.mul_top (ENNReal.coe_ne_zero.mpr hk)]
+  have hfin := hI.measure_norm_ge_lt_top one_pos
+  exact absurd (lt_of_le_of_lt (measure_mono fun g hg ↦ hlow g hg) hfin) (by rw [hinf]; exact lt_irrefl _)
+
 /-- Paper: Theorem 3.2.2.1(2)(b), p. 125. Take F = ℚ, the standard Gaussian
 at infinity, the indicator of ℤ̂ at the finite places, and χ induced by the
 quadratic Dirichlet character of conductor 5. At s = 0 the character has modulus
@@ -165,7 +335,11 @@ one and takes the value −1 at the norm-one idele with component 2 at 5 and 1
 elsewhere. At norm t, the theta sum is
 Σ_{n ≠ 0} exp(−πn²t²) ∼ 1/t as t tends to zero, so its integral against dt/t diverges. -/
 theorem Printed.globalThetaMellinIntegral_integrable_of_nontrivial_false :
-    ¬ Printed.globalThetaMellinIntegral_integrable_of_nontrivial := by sorry
+    ¬ Printed.globalThetaMellinIntegral_integrable_of_nontrivial := by
+  intro hP
+  obtain ⟨χ, hχ⟩ := exists_rat_char_nontrivial
+  obtain ⟨f, -, ha⟩ := exists_positive_polar_test (F := ℚ)
+  exact not_integrable_aux ℚ f χ ha (hP ℚ f χ hχ 0)
 
 /-- Paper: Remark 3.2.2.2, p. 125. As printed: the domain of each truncated
 idele integral with norm in [1/n, n] is compact. This is the compactness

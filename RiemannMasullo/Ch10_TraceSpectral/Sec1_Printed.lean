@@ -3,13 +3,15 @@ module
 public import RiemannMasullo.Ch10_TraceSpectral.Sec1
 
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import all RiemannMasullo.Ch06_LocalGlobal.Sec2
+import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Gaussian
 
 /-! # §10.1 assertions that are false as printed -/
 
 @[expose] public noncomputable section
 
 open Filter IsDedekindDomain MeasureTheory NumberField Set
-open scoped NNReal NumberField.AdeleRing
+open scoped NNReal ENNReal NumberField.AdeleRing
 
 namespace RiemannMasullo
 
@@ -71,12 +73,143 @@ def Printed.sLocalThetaSobolev_integrable : Prop :=
         intervalSobolevDensity (a + α) (a + β) s
           (Real.log ((sIdeleQuotientNorm F S g).val : ℝ))) (sLocalQuotientTamagawaMeasure F S)
 
+private theorem sLocalThetaSobolev_integrable_false_measure {G : Type*} [Group G]
+    [TopologicalSpace G] [IsTopologicalGroup G] [MeasurableSpace G] [BorelSpace G]
+    (μ : Measure G) [μ.IsMulLeftInvariant] [μ.IsOpenPosMeasure]
+    (N : G →* ℝ≥0ˣ) (hN : Continuous N) (hs : Function.Surjective N) :
+    μ {g | ((N g : ℝ≥0) : ℝ) < 1} = ⊤ := by
+  obtain ⟨t, ht⟩ := hs (Units.mk0 (2 : ℝ≥0) two_ne_zero)
+  obtain ⟨g₀, hg₀⟩ := hs (Units.mk0 (3 / 4 : ℝ≥0) (by norm_num))
+  have hcont : Continuous fun g ↦ ((N g : ℝ≥0) : ℝ) :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp hN)
+  let A : Set G := {g | 1 / 2 < ((N g : ℝ≥0) : ℝ) ∧ ((N g : ℝ≥0) : ℝ) < 1}
+  have hAo : IsOpen A :=
+    (isOpen_lt continuous_const hcont).inter (isOpen_lt hcont continuous_const)
+  have hg₀A : g₀ ∈ A := by
+    simp only [A, mem_setOf_eq, hg₀, Units.val_mk0, NNReal.coe_div, NNReal.coe_ofNat]
+    norm_num
+  have hA0 : μ A ≠ 0 := (hAo.measure_pos μ ⟨g₀, hg₀A⟩).ne'
+  let B (k : ℕ) : Set G := (fun g ↦ t ^ k * g) ⁻¹' A
+  have hB (k : ℕ) (g : G) : g ∈ B k ↔
+      1 / 2 < 2 ^ k * ((N g : ℝ≥0) : ℝ) ∧ 2 ^ k * ((N g : ℝ≥0) : ℝ) < 1 := by
+    show (1 / 2 < ((N (t ^ k * g) : ℝ≥0) : ℝ) ∧ ((N (t ^ k * g) : ℝ≥0) : ℝ) < 1) ↔ _
+    rw [map_mul, map_pow, ht]
+    simp only [Units.val_mul, Units.val_pow_eq_pow_val, Units.val_mk0, NNReal.coe_mul,
+      NNReal.coe_pow, NNReal.coe_ofNat]
+  have hmeas (k : ℕ) : μ (B k) = μ A := measure_preimage_mul μ (t ^ k) A
+  have hdisj : Pairwise (Function.onFun Disjoint B) := by
+    have key (k l : ℕ) (h : k < l) (g : G) (h1 : g ∈ B k) (h2 : g ∈ B l) : False := by
+      rw [hB] at h1 h2
+      have h2l : (2 : ℝ) * 2 ^ k ≤ 2 ^ l := by
+        calc (2 : ℝ) * 2 ^ k = 2 ^ (k + 1) := by ring
+          _ ≤ 2 ^ l := pow_le_pow_right₀ (by norm_num) h
+      have hr : 0 ≤ ((N g : ℝ≥0) : ℝ) := NNReal.coe_nonneg _
+      nlinarith
+    intro k l hkl
+    rw [Function.onFun, Set.disjoint_left]
+    intro g h1 h2
+    rcases lt_or_gt_of_ne hkl with h | h
+    · exact key k l h g h1 h2
+    · exact key l k h g h2 h1
+  have hsub : (⋃ k, B k) ⊆ {g | ((N g : ℝ≥0) : ℝ) < 1} := by
+    intro g hg
+    obtain ⟨k, hk⟩ := mem_iUnion.mp hg
+    rw [hB] at hk
+    have h1 : (1 : ℝ) ≤ 2 ^ k := one_le_pow₀ (by norm_num)
+    have hr : 0 ≤ ((N g : ℝ≥0) : ℝ) := NNReal.coe_nonneg _
+    simp only [mem_setOf_eq]
+    nlinarith
+  refine eq_top_mono (measure_mono hsub) ?_
+  rw [measure_iUnion hdisj (fun k ↦ (measurable_const_mul (t ^ k)) hAo.measurableSet)]
+  simp only [hmeas]
+  exact ENNReal.tsum_const_eq_top_of_ne_zero hA0
+
+
+private theorem sLocalThetaSobolev_integrable_false_norm (x : (SAdeleRing ℚ ∅)ˣ) :
+    ((sIdeleNorm ℚ ∅ x : ℝ≥0) : ℝ) = ‖x.val.1 Rat.infinitePlace‖ := by
+  simp [sIdeleNorm]
+  rw [Unique.eq_default Rat.infinitePlace]
+
+private theorem sLocalThetaSobolev_integrable_false_theta
+    (f : SchwartzBruhat (Multiplicative (SAdeleRing ℚ ∅)))
+    (hf : ∀ x : SAdeleRing ℚ ∅, f (Multiplicative.ofAdd x) =
+      ((Real.exp (-‖x.1 Rat.infinitePlace‖ ^ 2) : ℝ) : ℂ))
+    (x : (SAdeleRing ℚ ∅)ˣ) :
+    Real.exp (-‖x.val.1 Rat.infinitePlace‖ ^ 2) ≤
+      ‖sLocalAdelicThetaOnClasses ℚ ∅ f (QuotientGroup.mk x)‖ := by
+  have hs := ((sLocalAdelicTheta_hasSumUniformlyOn ℚ ∅ f {x} isCompact_singleton).hasSum
+    rfl).summable
+  rw [sLocalAdelicThetaOnClasses_mk, sLocalAdelicTheta_apply]
+  simp only [hf] at hs ⊢
+  rw [← Complex.ofReal_tsum, Complex.norm_real, Real.norm_eq_abs]
+  refine le_trans ?_ (le_abs_self _)
+  have hr := Complex.summable_ofReal.mp hs
+  refine le_trans (le_of_eq ?_) (hr.le_tsum 1 fun _ _ ↦ (Real.exp_pos _).le)
+  simp
+
 /-- Paper: Definition 10.1.1.1(2) and Remark 10.1.1.2, p. 434.
 For ℚ with S consisting of the real place, take f(x) = exp(-πx²), a = 1,
 I = {-1} and s = 0. The two S-units give theta(t) = 2 exp(-πt²), whose
 square is not integrable near zero against dt/t. -/
 theorem Printed.sLocalThetaSobolev_integrable_false :
-    ¬ Printed.sLocalThetaSobolev_integrable := by sorry
+    ¬ Printed.sLocalThetaSobolev_integrable := by
+  intro h
+  obtain ⟨E, hE⟩ := ratTrivialHomogeneousTheta_quotient_realEquiv
+  let φ : SchwartzMap ℝ ℂ := (SchwartzMap.gaussian 1 one_pos).postcompCLM Complex.ofRealCLM
+  have hf : ∀ x : SAdeleRing ℚ ∅, E φ (Multiplicative.ofAdd x) =
+      ((Real.exp (-‖x.1 Rat.infinitePlace‖ ^ 2) : ℝ) : ℂ) := by
+    intro x
+    rw [hE]
+    have hn (z : Rat.infinitePlace.Completion) : ‖InfinitePlace.Completion.ringEquivRealOfIsReal
+        Rat.isReal_infinitePlace z‖ = ‖z‖ := by
+      rw [← dist_zero_right, ← dist_zero_right z,
+        ← map_zero (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace)]
+      exact (InfinitePlace.Completion.isometryEquivRealOfIsReal
+        Rat.isReal_infinitePlace).dist_eq z 0
+    have hφ (y : ℝ) : φ y = ((Real.exp (-‖y‖ ^ 2) : ℝ) : ℂ) := by
+      change Complex.ofRealCLM (SchwartzMap.gaussian 1 one_pos y) = _
+      rw [SchwartzMap.gaussian_apply, Complex.ofRealCLM_apply, neg_mul, one_mul]
+    rw [hφ, hn]
+  have hint := h ℚ ∅ 1 (-1) (-1) 0 one_pos le_rfl le_rfl (E φ)
+  let θ := sLocalAdelicThetaOnClasses ℚ ∅ (E φ)
+  have hint' : Integrable (fun g ↦ ‖θ g‖ ^ 2) (sLocalQuotientTamagawaMeasure ℚ ∅) :=
+    hint.congr (Eventually.of_forall fun g ↦ by simp only [θ]; norm_num [intervalSobolevDensity])
+  have : BorelSpace (SIdeleQuotient ℚ ∅) := ⟨rfl⟩
+  have hW := sLocalQuotientTamagawaMeasure_isWeil (F := ℚ) (S := ∅)
+  have : (sLocalQuotientTamagawaMeasure ℚ ∅).IsHaarMeasure := hW.1
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section (F := ℚ) (S := ∅)
+  have hNc : Continuous (sIdeleQuotientNorm ℚ ∅) := (isProperMap_sIdeleQuotientNorm ℚ ∅).continuous
+  have hB := sLocalThetaSobolev_integrable_false_measure (sLocalQuotientTamagawaMeasure ℚ ∅)
+    (sIdeleQuotientNorm ℚ ∅) hNc hσ.surjective
+  let B := {g : SIdeleQuotient ℚ ∅ | ((sIdeleQuotientNorm ℚ ∅ g : ℝ≥0) : ℝ) < 1}
+  have hBm : MeasurableSet B :=
+    (isOpen_lt (NNReal.continuous_coe.comp (Units.continuous_val.comp hNc))
+      continuous_const).measurableSet
+  have hlow : ∀ g ∈ B, ENNReal.ofReal (Real.exp (-1) ^ 2) ≤ ‖‖θ g‖ ^ 2‖ₑ := by
+    intro g hg
+    obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective g
+    have hx : ‖x.val.1 Rat.infinitePlace‖ < 1 := by
+      rw [← sLocalThetaSobolev_integrable_false_norm]
+      exact hg
+    have h1 := sLocalThetaSobolev_integrable_false_theta (E φ) hf x
+    have h2 : Real.exp (-1) ≤ Real.exp (-‖x.val.1 Rat.infinitePlace‖ ^ 2) := by
+      gcongr
+      nlinarith [norm_nonneg (x.val.1 Rat.infinitePlace)]
+    rw [Real.eNorm_eq_ofReal (by positivity)]
+    exact ENNReal.ofReal_le_ofReal (pow_le_pow_left₀ (Real.exp_pos _).le (h2.trans h1) 2)
+  have hfin : (∫⁻ g, ‖‖θ g‖ ^ 2‖ₑ ∂sLocalQuotientTamagawaMeasure ℚ ∅) < ⊤ :=
+    hint'.hasFiniteIntegral
+  have hBdef : B = {g : SIdeleQuotient ℚ ∅ | ((sIdeleQuotientNorm ℚ ∅ g : ℝ≥0) : ℝ) < 1} := rfl
+  have hge : ⊤ ≤ ∫⁻ g, ‖‖θ g‖ ^ 2‖ₑ ∂sLocalQuotientTamagawaMeasure ℚ ∅ :=
+    calc (⊤ : ℝ≥0∞) = ENNReal.ofReal (Real.exp (-1) ^ 2) * sLocalQuotientTamagawaMeasure ℚ ∅ B := by
+          rw [hBdef, hB, ENNReal.mul_top (by positivity)]
+      _ = ∫⁻ _ in B, ENNReal.ofReal (Real.exp (-1) ^ 2) ∂sLocalQuotientTamagawaMeasure ℚ ∅ :=
+          (setLIntegral_const B _).symm
+      _ ≤ ∫⁻ g in B, ‖‖θ g‖ ^ 2‖ₑ ∂sLocalQuotientTamagawaMeasure ℚ ∅ :=
+          setLIntegral_mono' hBm hlow
+      _ ≤ _ := setLIntegral_le_lintegral B _
+  exact absurd (lt_of_le_of_lt hge hfin) (lt_irrefl _)
+
 
 /-- Paper: Proof of Lemma 10.1.1.4(1), p. 436. As printed, the density of
 the weighted S-idele measure vanishes at infinity. -/
