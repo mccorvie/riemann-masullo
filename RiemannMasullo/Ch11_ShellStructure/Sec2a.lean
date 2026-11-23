@@ -1800,6 +1800,228 @@ theorem orbitalMarkushevichBasis (χ : PontryaginDual C𝔽) (S : Finset V) {s :
         Λ j ((N(S, hs, ω)).mkQ f) = spectralSobolevPairing f.val (jetLp(χ, S, hs, j)) :=
   by sorry
 
+/-- A Hilbert quotient of a closed subspace maps isometrically into the dual
+model of the ambient space, onto the functionals that kill the orthogonal
+complement of the subspace and the denominator. -/
+private theorem orbitalQuotientDual_isometry_range_hilbert
+    {H₀ Y₀ : Type*} [NormedAddCommGroup H₀] [InnerProductSpace ℂ H₀] [CompleteSpace H₀]
+    [NormedAddCommGroup Y₀] [NormedSpace ℂ Y₀]
+    (K : Submodule ℂ H₀) (hK : IsClosed (K : Set H₀))
+    (N : Submodule ℂ K) [IsClosed (N : Set K)] (B : H₀ → Y₀ → ℂ)
+    (hT : ∃ T : StrongDual ℂ H₀ ≃ₗᵢ[ℂ] Y₀, ∀ (Λ : StrongDual ℂ H₀) (x : H₀), Λ x = B x (T Λ))
+    (C : Y₀ → Prop) (hC : ∀ v, C v ↔ ∀ x ∈ Kᗮ, B x v = 0) :
+    ∃ D : StrongDual ℂ (K ⧸ N) →ₗᵢ[ℂ] Y₀,
+      range D = {u | C u ∧ ∀ f ∈ N, B f.val u = 0} ∧
+      ∀ (Λ : StrongDual ℂ (K ⧸ N)) (f : K), B f.val (D Λ) = Λ (N.mkQ f) := by
+  obtain ⟨T, hB⟩ := hT
+  have : CompleteSpace K := hK.completeSpace_coe
+  let Pr : H₀ →L[ℂ] K := K.orthogonalProjectionOnto
+  have hPK (f : K) : Pr f.val = f := K.orthogonalProjectionOnto_mem_subspace_eq_self f
+  have hPo (x : H₀) (hx : x ∈ Kᗮ) : Pr x = 0 :=
+    K.orthogonalProjectionOnto_apply_of_mem_orthogonal hx
+  let L : StrongDual ℂ (K ⧸ N) →ₗ[ℂ] StrongDual ℂ H₀ :=
+    ((N.mkQL.comp Pr).precomp ℂ).toLinearMap
+  have hL (Λ : StrongDual ℂ (K ⧸ N)) (x : H₀) : L Λ x = Λ (N.mkQ (Pr x)) := rfl
+  have hnorm (Λ : StrongDual ℂ (K ⧸ N)) : ‖L Λ‖ = ‖Λ‖ := by
+    apply le_antisymm
+    · apply ContinuousLinearMap.opNorm_le_bound _ (norm_nonneg Λ)
+      intro x
+      rw [hL]
+      calc ‖Λ (N.mkQ (Pr x))‖ ≤ ‖Λ‖ * ‖N.mkQ (Pr x)‖ := Λ.le_opNorm _
+        _ ≤ ‖Λ‖ * ‖x‖ := by
+          refine mul_le_mul_of_nonneg_left ?_ (norm_nonneg Λ)
+          exact (Submodule.Quotient.norm_mk_le N (Pr x)).trans
+            (K.norm_orthogonalProjectionOnto_apply_le x)
+    · apply ContinuousLinearMap.opNorm_le_bound _ (norm_nonneg (L Λ))
+      intro q
+      let v : Nᗮ := N.quotientEquivOrthogonal q
+      have hv : N.mkQ v.val = q := by
+        change (Submodule.Quotient.mk v.val : K ⧸ N) = q
+        exact (N.quotientEquivOrthogonal_symm_eq_mk v.val v.property).symm.trans
+          (N.quotientEquivOrthogonal.symm_apply_apply q)
+      have hn : ‖v.val‖ = ‖q‖ := N.quotientEquivOrthogonal.norm_map q
+      calc
+        ‖Λ q‖ = ‖(L Λ) (v.val : H₀)‖ := by rw [hL, hPK, hv]
+        _ ≤ ‖L Λ‖ * ‖(v.val : H₀)‖ := (L Λ).le_opNorm _
+        _ = ‖L Λ‖ * ‖q‖ := by rw [← hn]; rfl
+  let D : StrongDual ℂ (K ⧸ N) →ₗᵢ[ℂ] Y₀ :=
+    { toLinearMap := T.toLinearEquiv.toLinearMap.comp L
+      norm_map' := fun Λ ↦ by
+        change ‖T (L Λ)‖ = ‖Λ‖
+        rw [T.norm_map, hnorm] }
+  have hD (Λ : StrongDual ℂ (K ⧸ N)) : D Λ = T (L Λ) := rfl
+  have hpair (Λ : StrongDual ℂ (K ⧸ N)) (x : H₀) : B x (D Λ) = Λ (N.mkQ (Pr x)) := by
+    rw [hD, ← hB, hL]
+  refine ⟨D, ?_, fun Λ f ↦ by rw [hpair, hPK]⟩
+  ext u
+  constructor
+  · rintro ⟨Λ, rfl⟩
+    refine ⟨(hC _).2 fun x hx ↦ ?_, fun f hf ↦ ?_⟩
+    · rw [hpair, hPo x hx, map_zero, map_zero]
+    · rw [hpair, hPK, Submodule.mkQ_apply, (Submodule.Quotient.mk_eq_zero N).mpr hf, map_zero]
+  · rintro ⟨hCu, hN⟩
+    let φ : StrongDual ℂ H₀ := T.symm u
+    have hφ (x : H₀) : φ x = B x u := by
+      rw [hB φ x]
+      change B x (T (T.symm u)) = B x u
+      rw [T.apply_symm_apply]
+    let ψ : StrongDual ℂ K := φ.comp K.subtypeL
+    have hψ : N ≤ ψ.ker := fun f hf ↦ by
+      change φ f.val = 0
+      rw [hφ]
+      exact hN f hf
+    refine ⟨N.liftQL ψ hψ, ?_⟩
+    have hLφ : L (N.liftQL ψ hψ) = φ := by
+      ext x
+      rw [hL]
+      change φ (Pr x : H₀) = φ x
+      have hsub : x - (Pr x : H₀) ∈ Kᗮ := K.sub_starProjection_mem_orthogonal x
+      have h0 : φ (x - (Pr x : H₀)) = 0 := by rw [hφ]; exact (hC u).1 hCu _ hsub
+      rw [map_sub, sub_eq_zero] at h0
+      exact h0.symm
+    rw [hD, hLφ]
+    exact T.apply_symm_apply u
+
+/-- The unweighted product integral against a vector of the reciprocal-weight
+space is the inner product with the conjugate vector divided by the weight. -/
+private theorem orbitalQuotientDual_isometry_range_riesz {X : Type*} [MeasurableSpace X]
+    (ν : Measure X) {ρ ρ' : X → ℝ} (hρ : Measurable ρ) (hρ' : Measurable ρ')
+    (hpos : ∀ x, 0 < ρ x) (hpos' : ∀ x, 0 < ρ' x) (hr : ∀ x, ρ x * ρ' x = 1)
+    (u : Lp ℂ 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ' x))) :
+    ∃ v : Lp ℂ 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ x)),
+      (v : X → ℂ) =ᵐ[ν] (fun x ↦ (ρ' x : ℂ) * star (u x)) ∧
+      ∀ f : Lp ℂ 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ x)),
+        ∫ x, f x * u x ∂ν = inner ℂ v f := by
+  have hbase {ρ : X → ℝ} (hρ : Measurable ρ) (hpos : ∀ x, 0 < ρ x) :
+      ν ≪ ν.withDensity fun x ↦ ENNReal.ofReal (ρ x) :=
+    withDensity_absolutelyContinuous' hρ.ennreal_ofReal.aemeasurable
+      (ae_of_all _ fun x ↦ (ENNReal.ofReal_pos.mpr (hpos x)).ne')
+  let g : X → ℂ := fun x ↦ (ρ' x : ℂ) * star (u x)
+  have hsq (x : X) : ‖g x‖ ^ 2 * ρ x = ‖u x‖ ^ 2 * ρ' x := by
+    calc
+      _ = ‖u x‖ ^ 2 * ρ' x * (ρ x * ρ' x) := by
+        dsimp only [g]
+        rw [norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos (hpos' x), norm_star]
+        ring
+      _ = _ := by rw [hr, mul_one]
+  have hmeas : AEStronglyMeasurable g (ν.withDensity fun x ↦ ENNReal.ofReal (ρ x)) :=
+    (Complex.measurable_ofReal.comp hρ').aestronglyMeasurable.mul
+      (((Lp.aestronglyMeasurable u).mono_ac (hbase hρ' hpos')).mono_ac
+        (withDensity_absolutelyContinuous _ _)).star
+  have hu2 : Integrable (fun x ↦ ‖u x‖ ^ 2 * ρ' x) ν := by
+    have h1 := (memLp_two_iff_integrable_sq_norm (Lp.aestronglyMeasurable u)).1 (Lp.memLp u)
+    have h2 := (integrable_withDensity_iff hρ'.ennreal_ofReal
+      (ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top)).1 h1
+    refine h2.congr (ae_of_all _ fun x ↦ ?_)
+    change ‖u x‖ ^ 2 * (ENNReal.ofReal (ρ' x)).toReal = ‖u x‖ ^ 2 * ρ' x
+    rw [ENNReal.toReal_ofReal (hpos' x).le]
+  have hmem : MemLp g 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ x)) := by
+    apply (memLp_two_iff_integrable_sq_norm hmeas).2
+    apply (integrable_withDensity_iff hρ.ennreal_ofReal
+      (ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top)).2
+    refine hu2.congr (ae_of_all _ fun x ↦ ?_)
+    change ‖u x‖ ^ 2 * ρ' x = ‖g x‖ ^ 2 * (ENNReal.ofReal (ρ x)).toReal
+    rw [ENNReal.toReal_ofReal (hpos x).le, hsq]
+  have hcoe : (hmem.toLp g : X → ℂ) =ᵐ[ν] g := (hbase hρ hpos).ae_eq hmem.coeFn_toLp
+  refine ⟨hmem.toLp g, hcoe, fun f ↦ ?_⟩
+  rw [L2.inner_def, integral_withDensity_eq_integral_toReal_smul hρ.ennreal_ofReal
+    (ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top)]
+  refine integral_congr_ae ?_
+  filter_upwards [hcoe] with x hx
+  rw [hx, ENNReal.toReal_ofReal (hpos x).le, RCLike.inner_apply]
+  dsimp only [g]
+  simp only [map_mul, Complex.conj_ofReal, Complex.star_def, Complex.conj_conj,
+    Complex.real_smul]
+  have hr' : (ρ x : ℂ) * ρ' x = 1 := by exact_mod_cast hr x
+  linear_combination (-(f x * u x)) * hr'
+
+/-- On the 0-line, a reciprocal-weight vector is of the conjugate isotype exactly
+when its product integral kills the orthogonal complement of the isotype. -/
+private theorem orbitalQuotientDual_isometry_range_conj {s : ℝ} (hs : 0 ≤ s)
+    (ω : PontryaginDual C₁) (u : W'(s)) :
+    (∀ k : C₁, (fun g ↦ u (k.val⁻¹ * g)) =ᵐ[μ𝔽] fun g ↦ (ω⁻¹ k : ℂ) * u g) ↔
+      ∀ x ∈ (Wω(hs, ω))ᗮ, spectralSobolevPairing x u = 0 := by
+  let w : C𝔽 → ℝ := fun g ↦ intervalSobolevDensity 0 0 s (logNorm g)
+  have hlog : Measurable logNorm :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp
+      (isProperMap_ideleClassNorm F).continuous)).measurable.log
+  have hdens : Continuous (intervalSobolevDensity 0 0 s) := by
+    change Continuous fun x : ℝ ↦
+      max (Real.exp (2 * 0 * x)) (Real.exp (2 * 0 * x)) * (1 + x ^ 2) ^ (s / 2)
+    refine Continuous.mul (by fun_prop) (Continuous.rpow_const (by fun_prop) fun t ↦ Or.inl ?_)
+    positivity
+  have hw : Measurable w := hdens.measurable.comp hlog
+  have hwpos : ∀ x, 0 < w x := fun x ↦ by
+    change 0 < max (Real.exp (2 * 0 * logNorm x)) (Real.exp (2 * 0 * logNorm x)) *
+      (1 + (logNorm x) ^ 2) ^ (s / 2)
+    exact mul_pos (lt_max_of_lt_left (Real.exp_pos _)) (Real.rpow_pos_of_pos (by positivity) _)
+  have hwk : ∀ (k : C₁) g, w (k.val⁻¹ * g) = w g := by
+    intro k g
+    have hk : ideleClassNorm F k.val = 1 := k.2
+    simp only [w, map_mul, map_inv, hk, inv_one, one_mul]
+  have hbase : μ𝔽 ≪ (μ𝔽).withDensity (fun x ↦ ENNReal.ofReal (w x)) :=
+    withDensity_absolutelyContinuous' hw.ennreal_ofReal.aemeasurable
+      (ae_of_all _ fun x ↦ (ENNReal.ofReal_pos.mpr (hwpos x)).ne')
+  have hwd : ((μ𝔽).withDensity fun x ↦ ENNReal.ofReal (w x)) ≪ μ𝔽 :=
+    withDensity_absolutelyContinuous _ _
+  have hiso (f : W(s)) : f ∈ Wω(hs, ω) ↔
+      ∀ k : C₁, (fun g ↦ f (k.val⁻¹ * g)) =ᵐ[μ𝔽] fun g ↦ (ω k : ℂ) * f g := by
+    rw [mem_actionIsotype]
+    refine forall_congr' fun k ↦ ?_
+    have htr := hardySobolevTranslation_apply μ𝔽 m𝔽 0 0 s hI hs k.val f
+    have hsm := hbase.ae_eq (Lp.coeFn_smul (ω k : ℂ) f)
+    change hardySobolevTranslation μ𝔽 m𝔽 0 0 s hI hs k.val f = (ω k : ℂ) • f ↔ _
+    constructor
+    · intro h
+      rw [h] at htr
+      exact htr.symm.trans hsm
+    · intro h
+      exact Lp.ext (hwd.ae_eq (htr.trans (h.trans hsm.symm)))
+  have hωinv (k : C₁) : ((ω⁻¹ k : Circle) : ℂ) = star (ω k : ℂ) := by
+    rw [show ω⁻¹ k = (ω k)⁻¹ from rfl, Circle.coe_inv_eq_conj]
+    rfl
+  have hqmp (k : C₁) := (measurePreserving_mul_left μ𝔽 k.val⁻¹).quasiMeasurePreserving
+  obtain ⟨v, hv, hpair⟩ := orbitalQuotientDual_isometry_range_riesz μ𝔽
+    (ρ := fun x ↦ if false = true then (w x)⁻¹ else w x)
+    (ρ' := fun x ↦ if true = true then (w x)⁻¹ else w x)
+    (by simpa using hw) (by simp only [↓reduceIte]; exact hw.inv) (by simpa using hwpos)
+    (by simpa using fun x ↦ inv_pos.2 (hwpos x))
+    (fun x ↦ by simpa using mul_inv_cancel₀ (hwpos x).ne') u
+  have hv' : (v : C𝔽 → ℂ) =ᵐ[μ𝔽] fun x ↦ ((w x)⁻¹ : ℂ) * star (u x) := by
+    filter_upwards [hv] with x hx
+    rw [hx]
+    simp only [↓reduceIte, Complex.ofReal_inv]
+  have hu' : (u : C𝔽 → ℂ) =ᵐ[μ𝔽] fun x ↦ (w x : ℂ) * star (v x) := by
+    filter_upwards [hv'] with x hx
+    rw [hx, star_mul', star_star, ← mul_assoc]
+    have h0 : (w x : ℂ) ≠ 0 := Complex.ofReal_ne_zero.2 (hwpos x).ne'
+    simp [h0]
+  have key : (∀ k : C₁, (fun g ↦ u (k.val⁻¹ * g)) =ᵐ[μ𝔽] fun g ↦ (ω⁻¹ k : ℂ) * u g) ↔
+      v ∈ Wω(hs, ω) := by
+    rw [hiso]
+    refine forall_congr' fun k ↦ ⟨fun hk ↦ ?_, fun hk ↦ ?_⟩
+    · have h1 := (hqmp k).ae_eq_comp hv'
+      filter_upwards [h1, hk, hv'] with g h1 h2 h3
+      simp only [comp_apply] at h1
+      rw [h1, h2, h3, hwk, star_mul']
+      simp only [hωinv, star_star]
+      ring
+    · have h1 := (hqmp k).ae_eq_comp hu'
+      filter_upwards [h1, hk, hu'] with g h1 h2 h3
+      simp only [comp_apply] at h1
+      rw [h1, h2, h3, hwk, star_mul']
+      simp only [hωinv]
+      ring
+  have hK : (Wω(hs, ω)).HasOrthogonalProjection := by
+    have : CompleteSpace (Wω(hs, ω)) := (isClosed_actionIsotype _ ω).completeSpace_coe
+    infer_instance
+  rw [key]
+  conv_lhs => rw [← Submodule.orthogonal_orthogonal (Wω(hs, ω))]
+  rw [Submodule.mem_orthogonal]
+  refine forall₂_congr fun x _ ↦ ?_
+  change _ = _ ↔ ∫ g, x g * u g ∂μ𝔽 = 0
+  rw [hpair x, inner_eq_zero_symm]
+
 -- TODO(paper-gap): Remark 11.2.0.3 drops PV from the denominator of the quotient.
 
 /-- Paper: Remark 11.2.0.3, p. 485. The pairing represents the quotient
@@ -1812,7 +2034,11 @@ theorem orbitalQuotientDual_isometry_range (S : Finset V) {s : ℝ} (hs : 0 ≤ 
         (∀ k : C₁, (fun g ↦ u (k.val⁻¹ * g)) =ᵐ[μ𝔽] fun g ↦ (ω⁻¹ k : ℂ) * u g) ∧
         ∀ f ∈ N(S, hs, ω), spectralSobolevPairing f.val u = 0} ∧
       ∀ (Λ : StrongDual ℂ Q(S, hs, ω)) (f : Wω(hs, ω)),
-        spectralSobolevPairing f.val (D Λ) = Λ ((N(S, hs, ω)).mkQ f) := by sorry
+        spectralSobolevPairing f.val (D Λ) = Λ ((N(S, hs, ω)).mkQ f) :=
+  orbitalQuotientDual_isometry_range_hilbert (H₀ := W(s)) (Y₀ := W'(s)) (Wω(hs, ω))
+    (isClosed_actionIsotype _ ω) (N(S, hs, ω)) spectralSobolevPairing
+    ⟨_, fun Λ f ↦ (spectralSobolevPairing_dual hI hs Λ f).2⟩ _
+    (orbitalQuotientDual_isometry_range_conj hs ω)
 
 local notation "E" => ModulatedExponentialDecay m𝔽 (univ : Set ℝ)
 local notation "hm𝔽" => (⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ :
