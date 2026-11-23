@@ -9,7 +9,7 @@ public import Mathlib.Analysis.Normed.Module.Completion
 public import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
 import Mathlib.Algebra.Module.ULift
 import Mathlib.Analysis.LocallyConvex.Barrelled
-import Mathlib.Analysis.LocallyConvex.Montel
+public import Mathlib.Analysis.LocallyConvex.Montel
 import Mathlib.Analysis.LocallyConvex.Separation
 import Mathlib.Analysis.InnerProductSpace.Dual
 import Mathlib.Analysis.Normed.Lp.lpSpace
@@ -2527,7 +2527,7 @@ private theorem isCompact_closure_of_schwartz
 
 /-- A Schwartz Fréchet space has the Heine–Borel property used in the Montel regularity
 criterion. -/
-private theorem montelSpace_of_schwartz_frechet
+theorem montelSpace_of_schwartz_frechet
     {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
     (hE : IsFrechetTVS E) (hS : IsSchwartzTVS E) : MontelSpace ℂ E := by
   obtain ⟨hadd, _, _, hcomplete⟩ := hE

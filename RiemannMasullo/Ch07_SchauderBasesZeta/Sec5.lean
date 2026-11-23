@@ -17,6 +17,7 @@ import RiemannMasullo.Ch03_IdelicZeta.Sec3
 import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3a
 import RiemannMasullo.Ch06_LocalGlobal.Sec3
 import RiemannMasullo.ForMathlib.Topology.Maps.Strict.Module
+import RiemannMasullo.Ch09_HardySobolev.Sec2
 
 /-! # §7.5 Strong co-primality -/
 
@@ -69,13 +70,292 @@ The comparison space is the norm-one isotype of the full exponential-decay space
 abbrev StrongCoprimalityDecaySpace (ω : PontryaginDual C₁) :=
   ↥(modulatedDecayIsotype m𝔽 univ (mem_univ (0 : ℝ)) ω)
 
+/-- Closed graph theorem between Fréchet spaces. The proof is the one of the private
+`weilTest_continuous_of_isClosed_graph` in `AppB_AnalyticNT/Sec4b.lean`, for the whole space. -/
+private theorem exists_strongCoprimalityThetaLinearMap_closedGraph {E Y : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [ContinuousSMul ℂ E]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [IsTopologicalAddGroup Y]
+    [ContinuousSMul ℂ Y]
+    (hE : IsFrechetTVS E) (hY : IsFrechetTVS Y)
+    (T : E →ₗ[ℂ] Y) (hT : IsClosed (T.graph : Set (E × Y))) : Continuous T := by
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : UniformSpace Y := IsTopologicalAddGroup.rightUniformSpace Y
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  have : IsUniformAddGroup Y := isUniformAddGroup_of_addCommGroup
+  have : CompleteSpace E := hE.2.2.2
+  have : CompleteSpace Y := hY.2.2.2
+  have : TopologicalSpace.MetrizableSpace E := hE.2.2.1
+  have : TopologicalSpace.MetrizableSpace Y := hY.2.2.1
+  let Γ := T.graph
+  have : CompleteSpace Γ := completeSpace_coe_iff_isComplete.mpr hT.isComplete
+  have : IsUniformAddGroup Γ := Γ.toAddSubgroup.isUniformAddGroup
+  have : TopologicalSpace.MetrizableSpace (E × Y) := inferInstance
+  have : TopologicalSpace.MetrizableSpace Γ :=
+    inferInstanceAs (TopologicalSpace.MetrizableSpace (Γ : Set (E × Y)))
+  have : FirstCountableTopology Γ := inferInstance
+  have : FirstCountableTopology E := inferInstance
+  have : (uniformity E).IsCountablyGenerated := IsUniformAddGroup.uniformity_countably_generated
+  have : BaireSpace E := BaireSpace.of_completelyPseudoMetrizable
+  let Pr : Γ →L[ℂ] E := (ContinuousLinearMap.fst ℂ E Y).comp Γ.subtypeL
+  have hmem (x : E) : (x, T x) ∈ Γ := (LinearMap.mem_graph_iff _ _).mpr rfl
+  have hval (p : Γ) : p.val.2 = T p.val.1 := (LinearMap.mem_graph_iff _ _).mp p.property
+  have hinj : Injective Pr := fun p q h ↦ by
+    have h1 : p.val.1 = q.val.1 := h
+    exact Subtype.ext (Prod.ext h1 (by rw [hval, hval, h1]))
+  have hsurj : Surjective Pr := fun x ↦ ⟨⟨(x, T x), hmem x⟩, rfl⟩
+  have ho : IsOpenMap Pr := by
+    apply isOpenMap_of_not_isMeagre_range Pr
+    rw [hsurj.range_eq]
+    exact not_isMeagre_of_isOpen isOpen_univ univ_nonempty
+  let h : Γ ≃ₜ E :=
+    (Equiv.ofBijective Pr ⟨hinj, hsurj⟩).toHomeomorphOfContinuousOpen Pr.continuous ho
+  refine (continuous_snd.comp (continuous_subtype_val.comp h.symm.continuous)).congr fun x ↦ ?_
+  have h1 : (h.symm x).val.1 = x := h.apply_symm_apply x
+  change (h.symm x).val.2 = T x
+  rw [hval, h1]
+
+/-- A linear map from a final locally convex topology to a polynormable space is continuous
+if its composites with the defining maps are. The proof is the one of the private
+`continuous_of_locallyConvexFinalTopology` in `AppC_LCTVS/Sec2b.lean`. -/
+private theorem exists_strongCoprimalityThetaLinearMap_final
+    {I : Type*} {X : I → Type*} [∀ i, AddCommGroup (X i)] [∀ i, Module ℂ (X i)]
+    [∀ i, TopologicalSpace (X i)] {D G : Type*} [AddCommGroup D] [Module ℂ D]
+    [AddCommGroup G] [Module ℂ G] [TopologicalSpace G] [PolynormableSpace ℂ G]
+    (j : ∀ i, X i →ₗ[ℂ] D) (g : D →ₗ[ℂ] G) (hg : ∀ i, Continuous (g ∘ j i)) :
+    letI := locallyConvexFinalTopology j
+    Continuous g := by
+  let := locallyConvexFinalTopology j
+  have hD : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ D // ∀ i, Continuous (p ∘ j i)} → Seminorm ℂ D) := ⟨rfl⟩
+  let := hD.isTopologicalAddGroup
+  exact (PolynormableSpace.withSeminorms ℂ G).continuous_of_continuous_comp g fun p ↦
+    hD.continuous_seminorm ⟨p.val.comp g, fun i ↦ p.property.comp (hg i)⟩
+
+/-- At a fixed idele class, global theta is continuous in the test function, by the
+Banach–Steinhaus theorem on the barrelled Schwartz–Bruhat space applied to the finite partial
+sums of point evaluations. The proof is the one of the private `adelicTheta_eval_continuous`
+in `Ch05_ThetaZSpaces/Sec1.lean`. -/
+private theorem exists_strongCoprimalityThetaLinearMap_thetaEval (c : C𝔽) :
+    Continuous (fun f : SchwartzBruhat (Multiplicative (AdeleRing (𝓞 F) F)) ↦ adelicTheta f c) := by
+  induction c using QuotientGroup.induction_on with | H g => ?_
+  let : BarrelledSpace ℂ (SchwartzBruhat (Multiplicative (AdeleRing (𝓞 F) F))) :=
+    (adeleSchwartz_montel (F := F)).2.1
+  let : Countable F := Countable.of_moduleFinite (R := ℚ)
+  let : Countable Fˣ := Units.val_injective.countable
+  let pt (ξ : Fˣ) : Multiplicative (AdeleRing (𝓞 F) F) :=
+    Multiplicative.ofAdd (algebraMap F (AdeleRing (𝓞 F) F) (ξ : F) * g.val)
+  let ev (ξ : Fˣ) : SchwartzBruhat (Multiplicative (AdeleRing (𝓞 F) F)) →L[ℂ] ℂ :=
+    ⟨(LinearMap.proj (pt ξ)).comp (schwartzBruhatSubmodule _).subtype,
+      continuous_schwartzBruhat_eval (pt ξ)⟩
+  let L (s : Finset Fˣ) : SchwartzBruhat (Multiplicative (AdeleRing (𝓞 F) F)) →L[ℂ] ℂ :=
+    ∑ ξ ∈ s, ev ξ
+  have hL (s : Finset Fˣ) (f : SchwartzBruhat (Multiplicative (AdeleRing (𝓞 F) F))) :
+      L s f = ∑ ξ ∈ s, f (pt ξ) := by
+    simp only [L, FunLike.coe_sum, Finset.sum_apply]
+    rfl
+  have hsum (f : SchwartzBruhat (Multiplicative (AdeleRing (𝓞 F) F))) :
+      HasSum (fun ξ ↦ f (pt ξ)) (adelicTheta f (QuotientGroup.mk g)) := by
+    rw [adelicTheta_mk]
+    refine Summable.hasSum ?_
+    have hs := ((adelicAverage_summableUniformlyOn f {(g, 0)} isCompact_singleton).summable
+      rfl).of_norm
+    simpa only [add_zero, mul_comm g.val] using hs
+  have hT : Filter.Tendsto (fun s f ↦ L s f) Filter.atTop
+      (𝓝 fun f ↦ adelicTheta f (QuotientGroup.mk g)) :=
+    tendsto_pi_nhds.mpr fun f ↦ by
+      simp only [hL]
+      exact hsum f
+  exact (continuousLinearMapOfTendsto L hT).continuous
+
+open MeasureTheory in
+/-- On a barrelled space, the integral over a compact space of a family of continuous linear
+functionals is continuous if each test vector gives a continuous function of the parameter.
+The proof is the one of the private `continuous_integral_of_continuous_eval` in
+`Ch05_ThetaZSpaces/Sec1.lean`. -/
+private theorem exists_strongCoprimalityThetaLinearMap_integral {E H : Type*} [AddCommGroup E]
+    [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E] [ContinuousConstSMul ℂ E]
+    [BarrelledSpace ℂ E] [TopologicalSpace H] [CompactSpace H] {m : MeasurableSpace H}
+    (μ : Measure H) [IsFiniteMeasure μ]
+    (Φ : E → H → ℂ) (hlin : ∀ h, IsLinearMap ℂ fun f ↦ Φ f h)
+    (hE : ∀ h, Continuous fun f ↦ Φ f h) (hH : ∀ f, Continuous (Φ f))
+    (hint : ∀ f, Integrable (Φ f) μ) : Continuous fun f ↦ ∫ h, Φ f h ∂μ := by
+  let p (h : H) : Seminorm ℂ E := (normSeminorm ℂ ℂ).comp (IsLinearMap.mk' _ (hlin h))
+  have hp (h : H) : Continuous (p h) := continuous_norm.comp (hE h)
+  have hpt (f : E) : BddAbove (Set.range fun h ↦ p h f) :=
+    (isCompact_range (hH f).norm).bddAbove
+  have hbdd : BddAbove (Set.range p) := Seminorm.bddAbove_range_iff.mpr hpt
+  have hsup : Continuous (⨆ h, p h : Seminorm ℂ E) :=
+    (congrArg Continuous (Seminorm.coe_iSup_eq hbdd)).mpr (Seminorm.continuous_iSup p hp hbdd)
+  let I : E →ₗ[ℂ] ℂ := IsLinearMap.mk' (fun f ↦ ∫ h, Φ f h ∂μ)
+    ⟨fun f f' ↦ (integral_congr_ae (.of_forall fun h ↦ (hlin h).map_add f f')).trans
+        (integral_add (hint f) (hint f')),
+      fun c f ↦ (integral_congr_ae (.of_forall fun h ↦ (hlin h).map_smul c f)).trans
+        (integral_smul c _)⟩
+  have hq : Continuous ((μ Set.univ).toNNReal • ⨆ h, p h : Seminorm ℂ E) :=
+    hsup.const_smul _
+  refine (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp I fun _ ↦
+    Seminorm.continuous_of_le hq fun f ↦ ?_
+  have hle (h : H) : ‖Φ f h‖ ≤ (⨆ h, p h) f := by
+    rw [Seminorm.coe_iSup_eq hbdd, iSup_apply]
+    exact le_ciSup (hpt f) h
+  exact (norm_integral_le_of_norm_le_const (.of_forall hle)).trans_eq
+    (mul_comm _ ((μ Set.univ).toNNReal : ℝ))
+
+/-- At a fixed idele class, global homogeneous theta is continuous in the test function. -/
+private theorem exists_strongCoprimalityThetaLinearMap_eval (ω : PontryaginDual C₁) (g : C𝔽) :
+    Continuous (fun f : SchwartzBruhat (Multiplicative (AdeleRing (𝓞 F) F)) ↦
+      homogeneousAdelicTheta ω f g) := by
+  let : BarrelledSpace ℂ (SchwartzBruhat (Multiplicative (AdeleRing (𝓞 F) F))) :=
+    (adeleSchwartz_montel (F := F)).2.1
+  let : MeasurableSpace C𝔽 := borel _
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : (normOneIdeleClassTamagawaMeasure F).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have hθ := adelicTheta_isLinear (F := F)
+  have hlin (c : C𝔽) : IsLinearMap ℂ fun f : SchwartzBruhat (Multiplicative (AdeleRing (𝓞 F) F)) ↦
+      adelicTheta f c :=
+    ⟨fun f f' ↦ congrArg (fun φ : C(C𝔽, ℂ) ↦ φ c) (hθ.map_add f f'),
+      fun a f ↦ congrArg (fun φ : C(C𝔽, ℂ) ↦ φ c) (hθ.map_smul a f)⟩
+  exact exists_strongCoprimalityThetaLinearMap_integral (normOneIdeleClassTamagawaMeasure F)
+    (fun f h ↦ adelicTheta f (h.val * g) * (ω h : ℂ))
+    (fun h ↦ ⟨fun f f' ↦ (congrArg (· * (ω h : ℂ)) ((hlin _).map_add f f')).trans
+        (add_mul _ _ _),
+      fun a f ↦ (congrArg (· * (ω h : ℂ)) ((hlin _).map_smul a f)).trans
+        (smul_mul_assoc _ _ _)⟩)
+    (fun h ↦ (exists_strongCoprimalityThetaLinearMap_thetaEval (h.val * g)).mul continuous_const)
+    (fun f ↦ ((adelicTheta f).continuous.comp
+      (continuous_subtype_val.mul continuous_const)).mul
+        (continuous_subtype_val.comp ω.continuous))
+    (fun f ↦ homogeneousAdelicTheta_integrable ω f g)
+
+open MeasureTheory in
+/-- The homogeneous theta function of a zero-moment test decays exponentially in both
+directions: each real twist is the isotypic average of the corresponding twist of the plain
+theta function (Remark 9.2.0.1), up to the volume of the norm-one classes. -/
+private theorem exists_strongCoprimalityThetaLinearMap_mem (ω : PontryaginDual C₁) (f : P) :
+    (homogeneousAdelicTheta ω f.val : C𝔽 → ℂ) ∈ modulatedExponentialDecaySubmodule m𝔽 univ := by
+  let : MeasurableSpace C𝔽 := borel _
+  have : BorelSpace C𝔽 := ⟨rfl⟩
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let μ₁ := normOneIdeleClassTamagawaMeasure F
+  let : μ₁.IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have hm : IsModulation m𝔽 := ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+  have hθ := adelicTheta_mem_modulatedExponentialDecay_of_polar f.val f.property
+  simp only [modulatedExponentialDecaySubmodule, Submodule.mem_iInf, Submodule.mem_comap] at hθ ⊢
+  intro a
+  let φ : SchwartzBruhat C𝔽 := ⟨_, hθ a⟩
+  let Q := schwartzBruhatIsotypicProjector m𝔽 hm μ₁ ω
+  let w (x : C𝔽) : ℂ := ((((m𝔽 x).val : ℝ) ^ (a : ℝ) : ℝ) : ℂ)
+  have hφ (k : C₁) (x : C𝔽) :
+      φ ((k : C𝔽)⁻¹ * x) = w x * adelicTheta f.val ((k : C𝔽)⁻¹ * x) := by
+    change w ((k : C𝔽)⁻¹ * x) * _ = _
+    have hk : m𝔽 ((k : C𝔽)⁻¹ * x) = m𝔽 x := by
+      change ideleClassNorm F ((k : C𝔽)⁻¹ * x) = ideleClassNorm F x
+      rw [map_mul, map_inv, MonoidHom.mem_ker.mp k.property, inv_one, one_mul]
+    simp only [w, hk]
+  have hreal : μ₁.real univ ≠ 0 := measureReal_univ_ne_zero
+  have key : modulationWeight m𝔽 a (⇑(homogeneousAdelicTheta ω f.val)) =
+      ((μ₁.real univ : ℝ) : ℂ) • ⇑(Q φ) := by
+    funext x
+    change w x * (∫ k : C₁, adelicTheta f.val (k.val * x) * (ω k : ℂ) ∂μ₁) =
+      ((μ₁.real univ : ℝ) : ℂ) * Q φ x
+    rw [(schwartzBruhatIsotypicProjector_apply m𝔽 hm μ₁ ω φ x).2, Complex.real_smul,
+      ← mul_assoc, ← Complex.ofReal_mul, mul_inv_cancel₀ hreal, Complex.ofReal_one, one_mul]
+    calc w x * (∫ k : C₁, adelicTheta f.val (k.val * x) * (ω k : ℂ) ∂μ₁)
+        = ∫ k : C₁, w x * (adelicTheta f.val (k.val * x) * (ω k : ℂ)) ∂μ₁ :=
+          (integral_const_mul _ _).symm
+      _ = ∫ k : C₁, (fun k : C₁ ↦ w x * (adelicTheta f.val (k.val * x) * (ω k : ℂ))) k⁻¹ ∂μ₁ :=
+          (integral_inv_eq_self _ μ₁).symm
+      _ = ∫ k : C₁, star (ω k : ℂ) * φ ((k : C𝔽)⁻¹ * x) ∂μ₁ := by
+          refine integral_congr_ae (.of_forall fun k ↦ ?_)
+          simp only [hφ, Subgroup.coe_inv, map_inv, Circle.coe_inv_eq_conj, Complex.star_def]
+          ring
+  rw [key]
+  exact Submodule.smul_mem _ _ (Q φ).property
+
 /-- Paper: Equation (7.5.0.2), p. 374.
 The homogeneous theta transform of a zero-moment test is an exponentially decaying function of
 the given isotype, continuously in the test. Continuity is with respect to the topology of the
 zero-moment test space and that of the isotype. -/
 theorem exists_strongCoprimalityThetaLinearMap (ω : PontryaginDual C₁) :
     ∃ T : P →L[ℂ] StrongCoprimalityDecaySpace ω, ∀ (f : P) (g : C𝔽),
-      (T f).val.val g = homogeneousAdelicThetaLinearMap F ω f.val g := by sorry
+      (T f).val.val g = homogeneousAdelicThetaLinearMap F ω f.val g := by
+  classical
+  have hm : IsModulation m𝔽 := ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+  have hms : Surjective m𝔽 := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.2.2.2.1
+  let Y := StrongCoprimalityDecaySpace ω
+  have hY : IsFrechetTVS Y := isotype_frechet m𝔽 hm hms ω
+  have : PolynormableSpace ℂ Y := hY.2.1
+  have : ContinuousSMul ℂ Y := PolynormableSpace.continuousSMul ℂ Y
+  have hθlin := homogeneousAdelicTheta_isLinear (F := F) ω
+  -- The theta function of a zero-moment test as a vector of the isotype.
+  let Vθ (f : P) : Y := ⟨⟨⇑(homogeneousAdelicTheta ω f.val),
+    exists_strongCoprimalityThetaLinearMap_mem ω f⟩, by
+      apply (mem_modulatedDecayIsotype_iff (m := m𝔽) (ω := ω) _ _ _).mpr
+      intro u x
+      exact homogeneousAdelicTheta_homogeneous ω f.val u x⟩
+  let A : P →ₗ[ℂ] Y :=
+    { toFun := Vθ
+      map_add' := fun f f' ↦ Subtype.ext (Subtype.ext (funext fun g ↦
+        congrArg (fun v : C(C𝔽, ℂ) ↦ v g) (hθlin.map_add f.val f'.val)))
+      map_smul' := fun t f ↦ Subtype.ext (Subtype.ext (funext fun g ↦
+        congrArg (fun v : C(C𝔽, ℂ) ↦ v g) (hθlin.map_smul t f.val))) }
+  -- A continuous projection of all tests onto the zero-moment tests.
+  obtain ⟨e₁, he₁⟩ := adelePolarValues_surjective (F := F) (1, 0)
+  obtain ⟨e₂, he₂⟩ := adelePolarValues_surjective (F := F) (0, 1)
+  let pv := adelePolarValues (F := F)
+  let π₀ := LinearMap.id - (LinearMap.fst ℂ ℂ ℂ ∘ₗ pv).smulRight e₁ -
+    (LinearMap.snd ℂ ℂ ℂ ∘ₗ pv).smulRight e₂
+  have he₁' : pv e₁ = (1, 0) := he₁
+  have he₂' : pv e₂ = (0, 1) := he₂
+  have hπ₀ (f) : π₀ f ∈ P := by
+    change pv (π₀ f) = 0
+    simp only [π₀, map_sub, LinearMap.sub_apply, LinearMap.id_apply, LinearMap.smulRight_apply,
+      LinearMap.comp_apply, map_smul, he₁', he₂', LinearMap.fst_apply, LinearMap.snd_apply]
+    ext <;> simp
+  have hπ₀P (f : P) : π₀ f.val = f.val := by
+    have hf : pv f.val = 0 := f.property
+    simp only [π₀, LinearMap.sub_apply, LinearMap.id_apply, LinearMap.smulRight_apply,
+      LinearMap.comp_apply, hf, LinearMap.fst_apply, LinearMap.snd_apply, Prod.fst_zero,
+      Prod.snd_zero, zero_smul, sub_zero]
+  have hπ₀c : Continuous π₀ := by
+    have hpv := adelePolarValues_continuous (F := F)
+    exact (continuous_id.sub ((continuous_fst.comp hpv).smul continuous_const)).sub
+      ((continuous_snd.comp hpv).smul continuous_const)
+  let T₀ : SchwartzBruhat (Multiplicative (AdeleRing (𝓞 F) F)) →ₗ[ℂ] Y :=
+    A ∘ₗ (π₀.codRestrict P hπ₀)
+  -- Continuity on the strict LF space of all tests, stage by stage, by the closed graph theorem.
+  let : MeasurableSpace C𝔽 := borel _
+  have : BorelSpace C𝔽 := ⟨rfl⟩
+  obtain ⟨-, S, -, hS, -, ht⟩ := (adeleSchwartz_strictLF (F := F)).2
+  have hstage (k : ℕ) : Continuous (T₀ ∘ (S k).subtype) := by
+    have hE := hS k
+    have : IsTopologicalAddGroup (S k) := hE.1
+    have : PolynormableSpace ℂ (S k) := hE.2.1
+    have : ContinuousSMul ℂ (S k) := PolynormableSpace.continuousSMul ℂ (S k)
+    refine exists_strongCoprimalityThetaLinearMap_closedGraph hE hY (T₀ ∘ₗ (S k).subtype) ?_
+    have hset : ((T₀ ∘ₗ (S k).subtype).graph : Set (S k × Y)) =
+        ⋂ g : C𝔽, {p | p.2.val.val g = (T₀ p.1.val).val.val g} := by
+      ext p
+      refine ⟨fun h ↦ mem_iInter.mpr fun g ↦ ?_, fun h ↦ ?_⟩
+      · exact congrArg (fun y : Y ↦ y.val.val g) ((LinearMap.mem_graph_iff _ p).mp h)
+      · exact (LinearMap.mem_graph_iff _ p).mpr (Subtype.ext (Subtype.ext (funext fun g ↦
+          mem_iInter.mp h g)))
+    rw [hset]
+    refine isClosed_iInter fun g ↦ isClosed_eq
+      ((isotype_eval_continuous m𝔽 hm hms ω g).comp continuous_snd) ?_
+    exact ((exists_strongCoprimalityThetaLinearMap_eval ω g).comp hπ₀c).comp
+      (continuous_subtype_val.comp continuous_fst)
+  have hT₀ : Continuous T₀ := by
+    have hc := exists_strongCoprimalityThetaLinearMap_final (fun k ↦ (S k).subtype) T₀ hstage
+    rw [ht]
+    exact hc
+  have hA (f : P) : T₀ f.val = A f := by
+    change A (⟨π₀ f.val, hπ₀ f.val⟩ : P) = A f
+    rw [show (⟨π₀ f.val, hπ₀ f.val⟩ : P) = f from Subtype.ext (hπ₀P f)]
+  exact ⟨⟨A, (hT₀.comp continuous_subtype_val).congr hA⟩, fun f g ↦ rfl⟩
 
 private theorem exists_strongCoprimalityThetaEmbedding_ker_le (ω : PontryaginDual C₁)
     (T : P →L[ℂ] StrongCoprimalityDecaySpace ω)

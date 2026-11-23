@@ -1419,6 +1419,25 @@ theorem primeOrbitalSobolevConvolution_trace_distribution :
 local notation "zeros" => {z : ℂ // reciprocalPartialHeckeEulerProduct χ (Sₚ(p)) z = 0}
 local notation "mult(" z ")" => orbitalEulerMultiplicity χ (Sₚ(p)) z
 
+/-- Paper: Theorem 11.2.2.1 and (11.2.2.4)–(11.2.2.5), p. 490. The Mellin values of the
+test at the zeros of the reciprocal partial Euler product over the places above p, weighted
+by the admissible multiplicity, form an absolutely summable family. -/
+theorem primeOrbitalSobolevConvolution_trace_summable (φ : BruhatCompactSupport C𝔽) :
+    onClosedPrimeQuotient(hs₁, ω(χ),
+      ∀ (T : nuclearEndomorphisms OrbQ), T.val = OrbA(φ) →
+        let term (z : zeros) :=
+          (spectralBoundaryMultiplicity s (mult(z.val)) : ℂ) * nuclearityTestMellin χ φ z.val
+        Summable (fun z ↦ ‖term z‖)) := by sorry
+
+/-- Paper: Theorem 11.2.2.1 and (11.2.2.4)–(11.2.2.5), p. 490. The sum of those weighted
+Mellin values is the trace of the convolution, for any nuclear presentation of it. -/
+theorem primeOrbitalSobolevConvolution_trace_hasSum (φ : BruhatCompactSupport C𝔽) :
+    onClosedPrimeQuotient(hs₁, ω(χ),
+      ∀ (T : nuclearEndomorphisms OrbQ), T.val = OrbA(φ) →
+        let term (z : zeros) :=
+          (spectralBoundaryMultiplicity s (mult(z.val)) : ℂ) * nuclearityTestMellin χ φ z.val
+        HasSum term (hilbertTrace T)) := by sorry
+
 /-- Paper: Theorem 11.2.2.1 and (11.2.2.4)–(11.2.2.5), p. 490.
 The trace is the absolutely convergent sum of Mellin values at the zeros of the
 reciprocal Euler product over the places above p, weighted by admissible multiplicity.
@@ -1429,7 +1448,12 @@ theorem primeOrbitalSobolevConvolution_trace (φ : BruhatCompactSupport C𝔽) :
       ∀ (T : nuclearEndomorphisms OrbQ), T.val = OrbA(φ) →
         let term (z : zeros) :=
           (spectralBoundaryMultiplicity s (mult(z.val)) : ℂ) * nuclearityTestMellin χ φ z.val
-        Summable (fun z ↦ ‖term z‖) ∧ HasSum term (hilbertTrace T)) := by sorry
+        Summable (fun z ↦ ‖term z‖) ∧ HasSum term (hilbertTrace T)) :=
+  fun T hT => And.intro
+    (primeOrbitalSobolevConvolution_trace_summable (F := F) (p := p) (s := s) (χ := χ)
+      (h₁ := h₁) (_hdeg := _hdeg) (_hχ := _hχ) φ T hT)
+    (primeOrbitalSobolevConvolution_trace_hasSum (F := F) (p := p) (s := s) (χ := χ)
+      (h₁ := h₁) (_hdeg := _hdeg) (_hχ := _hχ) φ T hT)
 
 include h₁ in
 /-- Paper: Remark 11.2.2.2, p. 491.
