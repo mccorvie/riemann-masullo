@@ -6,6 +6,8 @@ public import RiemannMasullo.Ch11_ShellStructure.Sec2b
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 import all RiemannMasullo.Ch11_ShellStructure.Sec1a
 
+import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec5
+
 /-!
 # Orbital kernels and orbital traces
 
@@ -258,7 +260,21 @@ theorem primaryDivisorialZeta_succ_of_polar (S : Finset V) (k : ℕ) (χ : Pontr
     let Z := fun j ↦ globalIdelicZFunction
       (adelePrincipalValue F (primaryDivisorialPlaces F S j) (sAdeleSchwartzToGlobal F S f)) c
     Z (k + 1) = reciprocalPartialHeckeEulerProduct χ above(primaryDivisorialPrime S k) z * Z k :=
-  by sorry
+  by
+  let f₀ : adelePolarSubspace F := ⟨sAdeleSchwartzToGlobal F S f, _hf⟩
+  let Z (j : ℕ) (w : ℂ) := globalIdelicZFunction
+    (adelePrincipalValue F (primaryDivisorialPlaces F S j) f₀.val) (ideleClassNormTwist χ w)
+  have ha (j : ℕ) : AnalyticOnNhd ℂ (Z j) univ := fun z _ ↦
+    (globalIdelicZFunction_entire_of_vanishing _
+      (adelePrincipalValue_mem_polarSubspace (primaryDivisorialPlaces F S j) f₀) χ).analyticAt z
+  let Q := reciprocalPartialHeckeEulerProduct χ above(primaryDivisorialPrime S k)
+  have hQ : AnalyticOnNhd ℂ Q univ := fun w _ ↦
+    (strongCoprimalityJetMatrix_det_ne_zero_euler χ above(primaryDivisorialPrime S k)).1 w
+  have he : Z (k + 1) =ᶠ[nhds (2 : ℂ)] Q * Z k := by
+    filter_upwards [Complex.continuous_re.continuousAt.eventually
+      (eventually_gt_nhds (show (1 : ℝ) < (2 : ℂ).re by norm_num))] with w hw
+    exact primaryDivisorialZeta_succ S k χ _hχ f w hw
+  exact congrFun ((ha _).eq_of_eventuallyEq (hQ.mul (ha k)) he) z
 
 -- TODO(paper-gap): The local "Weil's Identity" on p. 492 has an extra factor
 -- μᵥ(𝒪ᵥˣ) on the left. With the Tamagawa measure of (A.3.2.2) both
