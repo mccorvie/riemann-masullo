@@ -3252,6 +3252,170 @@ theorem introTrace_combined_limit_extension (τ : ℝ≥0ˣ →ₜ* C𝔽)
   exact (introTrace_combined_limit_extension_overlap τ _hτ χ _hχ _ha h ρ hA).congr_right
     fun z hz ↦ (hEq hz).symm
 
+/-- A normalized meromorphic function admits a holomorphic continuation of its logarithmic
+derivative from a right half-plane exactly when its divisor vanishes in the larger half-plane. -/
+private theorem introTrace_logDeriv_extension_iff_order (a : ℝ) (g D : ℂ → ℂ)
+    (hg : MeromorphicNFOn g univ) (hfin : ∀ z, meromorphicOrderAt g z ≠ ⊤)
+    (heq : EqOn (logDeriv g) D right(max a 1)) :
+    (∃ H : ℂ → ℂ, AnalyticOnNhd ℂ H right(a) ∧ EqOn H D right(max a 1)) ↔
+      ∀ z ∈ right(a), meromorphicOrderAt g z = 0 := by
+  constructor
+  · rintro ⟨H, hH, hD⟩ z hz
+    have hlog : MeromorphicOn (logDeriv g) right(a) := fun w _ ↦ (hg (mem_univ w)).meromorphicAt.logDeriv
+    have hm := hlog.sub hH.meromorphicOn
+    let q : ℂ := (max a 1 + 1 : ℝ)
+    have hq : max a 1 < q.re := by simp [q]
+    have hb : meromorphicOrderAt (logDeriv g - H) q = ⊤ := by
+      apply meromorphicOrderAt_eq_top_iff.mpr
+      have hnear := Complex.continuous_re.continuousAt.eventually (eventually_gt_nhds hq)
+      filter_upwards [hnear.filter_mono nhdsWithin_le_nhds] with w hw
+      exact sub_eq_zero.mpr ((heq hw).trans (hD hw).symm)
+    have h := hm.meromorphicOrderAt_eq_top_of_isPreconnected (convex_halfSpace_re_gt _).isPreconnected
+      ((le_max_left _ _).trans_lt hq) hz hb
+    have hnear : logDeriv g =ᶠ[𝓝[≠] z] H := (meromorphicOrderAt_eq_top_iff.mp h).mono fun w hw ↦ sub_eq_zero.mp hw
+    have hn : 0 ≤ meromorphicOrderAt (logDeriv g) z := (meromorphicOrderAt_congr hnear).symm ▸ (hH z hz).meromorphicOrderAt_nonneg
+    by_contra hzero
+    rw [meromorphicOrderAt_logDeriv_eq_neg_one hzero (hfin z)] at hn
+    exact (by decide : ¬ (0 : WithTop ℤ) ≤ -1) hn
+  · intro h
+    refine ⟨logDeriv g, fun z hz ↦ ?_, heq⟩
+    have hnf := hg (mem_univ z)
+    have ho := h z hz
+    have ha := hnf.meromorphicOrderAt_nonneg_iff_analyticAt.mp ho.ge
+    exact ha.deriv.div ha (hnf.meromorphicOrderAt_eq_zero_iff.mp ho)
+
+/-- The polar factors have order one at the exceptional point of the trivial chart and
+order zero everywhere else in the right half-plane. -/
+private theorem introTrace_polar_factor_order (c : Prop) [Decidable c] (z : ℂ) (hz : 0 < z.re)
+    (k : WithTop ℤ) :
+    meromorphicOrderAt (if c then fun w : ℂ ↦ (w + 1 / 2) * (w - 1 / 2) else fun _ ↦ 1) z + k = 0 ↔
+      k = if c ∧ z + 1 / 2 = 1 then -1 else 0 := by
+  by_cases hχ : c
+  · simp only [hχ, ite_true, true_and]
+    have hp : z + 1 / 2 ≠ 0 := by intro he; have := congrArg Complex.re he; norm_num at this; linarith
+    have hleft : meromorphicOrderAt (fun w : ℂ ↦ w + 1 / 2) z = 0 :=
+      (show AnalyticAt ℂ (fun w : ℂ ↦ w + 1 / 2) z by fun_prop).meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mpr hp
+    have hpord := meromorphicOrderAt_mul
+      (show MeromorphicAt (fun w : ℂ ↦ w + 1 / 2) z by fun_prop)
+      (show MeromorphicAt (fun w : ℂ ↦ w - 1 / 2) z by fun_prop)
+    rw [show meromorphicOrderAt (fun w : ℂ ↦ (w + 1 / 2) * (w - 1 / 2)) z = _ from hpord, hleft, zero_add]
+    by_cases h : z = 1 / 2
+    · subst z
+      rw [meromorphicOrderAt_id_sub_const, show (1 / 2 : ℂ) + 1 / 2 = 1 by norm_num, ite_eq_left rfl]
+      cases k with
+      | top =>
+        change (1 + (⊤ : WithTop ℤ) = 0) ↔ (⊤ : WithTop ℤ) = ↑(-1 : ℤ)
+        exact iff_of_false (by simp) WithTop.top_ne_coe
+      | coe n =>
+        change ((↑(1 : ℤ) : WithTop ℤ) + ↑n = ↑(0 : ℤ)) ↔ (↑n : WithTop ℤ) = ↑(-1 : ℤ)
+        rw [← WithTop.coe_add, WithTop.coe_inj, WithTop.coe_inj]
+        omega
+    · have hn : z + 1 / 2 ≠ 1 := by intro he; apply h; linear_combination he
+      have hr : meromorphicOrderAt (fun w : ℂ ↦ w - 1 / 2) z = 0 :=
+        (show AnalyticAt ℂ (fun w : ℂ ↦ w - 1 / 2) z by fun_prop).meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mpr (sub_ne_zero.mpr h)
+      simp only [hr, zero_add, ite_eq_right hn]
+  · have hc : meromorphicOrderAt (fun _ : ℂ ↦ (1 : ℂ)) z = 0 :=
+      analyticAt_const.meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mpr one_ne_zero
+    simp only [hχ, ite_false, false_and, hc, zero_add]
+
+open Classical in
+/-- Paper: §1.4.5, p. 30. At any fixed half-width the claimed continuation exists precisely
+when the finite Hecke function has order zero to the right of the corresponding line, apart
+from the simple pole canceled by the correction in the trivial chart. -/
+theorem introTrace_continuation_iff_finiteL_orders (χ : U𝔽) (a : ℝ) (ha : 0 ≤ a) :
+    (∃ H : ℂ → ℂ, AnalyticOnNhd ℂ H right(a) ∧ EqOn H
+      (fun z ↦ logDeriv finiteL(χ) (z + 1 / 2) +
+        if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) right(max a 1)) ↔
+      ∀ s : ℂ, a + 1 / 2 < s.re → meromorphicOrderAt finiteL(χ) s =
+        if χ = 1 ∧ s = 1 then -1 else 0 := by
+  classical
+  let L := finiteL(χ)
+  let S : ℂ → ℂ := fun z ↦ L (z + 1 / 2)
+  let P : ℂ → ℂ := if χ = 1 then fun z ↦ (z + 1 / 2) * (z - 1 / 2) else fun _ ↦ 1
+  have hL := (finiteHeckeL_exists_continuation χ).choose_spec
+  have hS : Meromorphic S := fun z ↦ meromorphicAt_comp_add_const_iff_meromorphicAt.mpr (hL.1 (mem_univ _)).meromorphicAt
+  have hP (z : ℂ) : AnalyticAt ℂ P z := by dsimp only [P]; split_ifs <;> fun_prop
+  let f := P * S
+  have hf : MeromorphicOn f univ := fun z _ ↦ (hP z).meromorphicAt.mul (hS z)
+  let g := toMeromorphicNFOn f univ
+  have hg : MeromorphicNFOn g univ := meromorphicNFOn_toMeromorphicNFOn _ _
+  have heuler (z : ℂ) (hz : 1 < z.re) : AnalyticAt ℂ S z ∧ S z ≠ 0 ∧ P z ≠ 0 := by
+    have hw : 1 < (z + 1 / 2).re := by norm_num; linarith
+    have hne : L (z + 1 / 2) ≠ 0 := by
+      rw [show L (z + 1 / 2) = finiteHeckeL χ ⟨_, hw⟩ from hL.2 ⟨_, hw⟩]
+      exact finiteHeckeL_ne_zero_of_one_lt_re χ _
+    have H := hL.1 (mem_univ (z + 1 / 2))
+    have haL := H.meromorphicOrderAt_nonneg_iff_analyticAt.mp (H.meromorphicOrderAt_eq_zero_iff.mpr hne).ge
+    refine ⟨haL.comp (f := fun w : ℂ ↦ w + 1 / 2) (x := z) (by fun_prop), hne, ?_⟩
+    dsimp only [P]; split_ifs
+    · apply mul_ne_zero <;> intro h <;> have he := congrArg Complex.re h <;> norm_num at he <;> linarith
+    · exact one_ne_zero
+  have hgf (z : ℂ) (hz : 1 < z.re) : g =ᶠ[𝓝 z] f := by
+    have hnear := Complex.continuous_re.continuousAt.eventually (eventually_gt_nhds hz)
+    filter_upwards [hnear] with w hw
+    exact (toMeromorphicNFOn_eq_toMeromorphicNFAt hf (mem_univ w)).trans
+      (congrFun (toMeromorphicNFAt_eq_self.mpr ((hP w).mul (heuler w hw).1).meromorphicNFAt) w)
+  have hfinite (z : ℂ) : meromorphicOrderAt g z ≠ ⊤ := by
+    apply hg.meromorphicOn.meromorphicOrderAt_ne_top_of_isPreconnected isPreconnected_univ
+      (x := 2) (mem_univ _) (mem_univ z)
+    have h := heuler 2 (by norm_num)
+    have hne : g 2 ≠ 0 := (hgf 2 (by norm_num)).eq_of_nhds ▸ mul_ne_zero h.2.2 h.2.1
+    rw [(hg (mem_univ _)).meromorphicOrderAt_eq_zero_iff.mpr hne]
+    exact WithTop.zero_ne_top
+  have hEq : EqOn (logDeriv g) (fun z ↦ logDeriv L (z + 1 / 2) +
+        if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) right(max a 1) := by
+    intro z hz
+    have hz' : 1 < z.re := (le_max_right _ _).trans_lt hz
+    have h := heuler z hz'
+    have hf' := hgf z hz'
+    calc logDeriv g z = logDeriv f z := by simp only [logDeriv_apply, hf'.deriv_eq, hf'.eq_of_nhds]
+         _ = logDeriv P z + logDeriv S z := logDeriv_mul z h.2.2 h.2.1 (hP z).differentiableAt h.1.differentiableAt
+         _ = _ := by
+           have hs : logDeriv S z = logDeriv L (z + 1 / 2) := by simp [S, logDeriv_apply, deriv_comp_add_const]
+           rw [hs, add_comm]; congr 1
+           dsimp only [P]; split_ifs
+           · have h₁ : z + 1 / 2 ≠ 0 := by intro he; have := congrArg Complex.re he; norm_num at this; linarith
+             have h₂ : z - 1 / 2 ≠ 0 := by intro he; have := congrArg Complex.re he; norm_num at this; linarith
+             rw [logDeriv_fun_mul z h₁ h₂ (by fun_prop) (by fun_prop)]
+             simp [logDeriv_apply]
+           · simp [logDeriv_apply]
+  rw [introTrace_logDeriv_extension_iff_order a g _ hg hfinite hEq]
+  have hord (z : ℂ) (hz : a < z.re) : meromorphicOrderAt g z = 0 ↔
+      meromorphicOrderAt L (z + 1 / 2) = if χ = 1 ∧ z + 1 / 2 = 1 then -1 else 0 := by
+    rw [show meromorphicOrderAt g z = meromorphicOrderAt f z from meromorphicOrderAt_toMeromorphicNFOn hf (mem_univ z),
+      show meromorphicOrderAt f z = meromorphicOrderAt P z + meromorphicOrderAt S z from meromorphicOrderAt_mul (hP z).meromorphicAt (hS z),
+      show meromorphicOrderAt S z = meromorphicOrderAt L (z + 1 / 2) from meromorphicOrderAt_fun_comp_add_const_eq_meromorphicOrderAt]
+    exact introTrace_polar_factor_order (χ = 1) z (ha.trans_lt hz) _
+  constructor
+  · intro h s hs
+    have hz : a < (s - 1 / 2).re := by norm_num; linarith
+    change meromorphicOrderAt L s = _
+    simpa only [sub_add_cancel] using (hord _ hz).mp (h _ hz)
+  · intro h z hz
+    apply (hord _ hz).mpr
+    apply h
+    change a < z.re at hz
+    norm_num; linarith
+
+
+open Classical in
+/-- Paper: §1.4.5, p. 30. If the half-width is at least one half, the proposed
+continuation holds for every unitary character by nonvanishing on the Euler half-plane. -/
+theorem introTrace_continuation_of_half_le (χ : U𝔽) {a : ℝ} (ha : 1 / 2 ≤ a) :
+    ∃ H : ℂ → ℂ, AnalyticOnNhd ℂ H right(a) ∧ EqOn H
+      (fun z ↦ logDeriv finiteL(χ) (z + 1 / 2) +
+        if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) right(max a 1) := by
+  classical
+  apply (introTrace_continuation_iff_finiteL_orders χ a (by linarith)).mpr
+  intro s hs
+  have hre : 1 < s.re := by linarith
+  have hn : ¬(χ = 1 ∧ s = 1) := fun h ↦ (lt_irrefl (1 : ℝ)) (by simpa [h.2] using hre)
+  rw [ite_eq_right hn]
+  have hL := (finiteHeckeL_exists_continuation χ).choose_spec
+  apply (hL.1 (mem_univ s)).meromorphicOrderAt_eq_zero_iff.mpr
+  rw [show finiteL(χ) s = finiteHeckeL χ ⟨s, hre⟩ from hL.2 ⟨s, hre⟩]
+  exact finiteHeckeL_ne_zero_of_one_lt_re χ _
+
 open Classical in
 /-- Paper: §1.4.5, p. 30. Continuation from every positive half-width gives
 holomorphy of the shifted logarithmic derivative throughout the right half-plane
