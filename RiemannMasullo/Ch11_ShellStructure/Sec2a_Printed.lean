@@ -87,10 +87,82 @@ def Printed.orbitalEulerProduct_eq_primary : Prop :=
       reciprocalPartialHeckeEulerProduct χ S z =
         reciprocalPartialHeckeEulerProduct χ (sLocalPrimaryPlaces S p) z
 
+private theorem Printed.orbitalEulerProduct_eq_primary_false_twoPlaces :
+    ∃ v w : HeightOneSpectrum (𝓞 ℚ), v ≠ w := by
+  have hP (p : ℤ) (hp : Prime p) :
+      (Ideal.comap Rat.ringOfIntegersEquiv (Ideal.span {p})).IsPrime :=
+    Ideal.IsPrime.comap _ (hK := (Ideal.span_singleton_prime hp.ne_zero).mpr hp)
+  have hB (p : ℤ) (hp : Prime p) :
+      Ideal.comap Rat.ringOfIntegersEquiv (Ideal.span {p}) ≠ ⊥ := by
+    intro h
+    have := Ideal.map_comap_of_surjective _ Rat.ringOfIntegersEquiv.surjective (Ideal.span {p})
+    rw [h, Ideal.map_bot] at this
+    exact hp.ne_zero (Ideal.span_singleton_eq_bot.mp this.symm)
+  have h2 : Prime (2 : ℤ) := Int.prime_two
+  have h3 : Prime (3 : ℤ) := Int.prime_three
+  refine ⟨⟨_, hP 2 h2, hB 2 h2⟩, ⟨_, hP 3 h3, hB 3 h3⟩, fun h ↦ ?_⟩
+  have h' := congrArg HeightOneSpectrum.asIdeal h
+  have := Ideal.comap_injective_of_surjective _ Rat.ringOfIntegersEquiv.surjective h'
+  have hmem : (2 : ℤ) ∈ Ideal.span {(3 : ℤ)} := this ▸ Ideal.mem_span_singleton_self 2
+  rw [Ideal.mem_span_singleton] at hmem
+  omega
+
+private theorem Printed.orbitalEulerProduct_eq_primary_false_trivial
+    (v : HeightOneSpectrum (𝓞 ℚ)) :
+    (ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ)) 0).IsUnramifiedAt v ∧
+      (finiteHeckeEulerFactor (1 : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ)) v 1)⁻¹ =
+        1 - ((Ideal.absNorm v.asIdeal : ℂ))⁻¹ := by
+  have hr (u : (v.adicCompletion ℚ)ˣ) :
+      (ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ)) 0).restrict v
+        (u : v.adicCompletion ℚ) = 1 := by
+    rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    change (1 : ℂ) * _ ^ (0 : ℂ) = _
+    simp
+  obtain ⟨u, hu⟩ :=
+    (Valued.v : Valuation (v.adicCompletion ℚ) _).exists_isUniformizer_of_isCyclic_of_nontrivial
+  have hχ : (ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ)) 0).IsUnramifiedAt
+      v :=
+    HeckeCharacter.isUnramifiedAt_iff.mpr fun x ↦
+      hr (Units.map (v.adicCompletionIntegers ℚ).subtype.toMonoidHom x)
+  have hl := (hχ.localValue_eq _ hu).trans (hr (Units.mk0 (u : v.adicCompletion ℚ) hu.ne_zero))
+  refine ⟨hχ, ?_⟩
+  rw [finiteHeckeEulerFactor, ite_eq_left hχ, inv_inv, hl, one_mul, Complex.cpow_neg_one]
+
 /-- Paper: Theorem 11.2.0.2(1), p. 485. Over ℚ with trivial character,
 S = {2,3}, p = 2, and z = 1, the two sides are 1/3 and 1/2. -/
 theorem Printed.orbitalEulerProduct_eq_primary_false :
-    ¬ Printed.orbitalEulerProduct_eq_primary := by sorry
+    ¬ Printed.orbitalEulerProduct_eq_primary := by
+  intro h
+  classical
+  obtain ⟨v, w, hvw⟩ := Printed.orbitalEulerProduct_eq_primary_false_twoPlaces
+  obtain ⟨hv, hav⟩ := Printed.orbitalEulerProduct_eq_primary_false_trivial v
+  obtain ⟨hw, haw⟩ := Printed.orbitalEulerProduct_eq_primary_false_trivial w
+  have hunder (u : HeightOneSpectrum (𝓞 ℚ)) : u.under (𝓞 ℚ) = u :=
+    HeightOneSpectrum.ext (Ideal.comap_id u.asIdeal)
+  have hprim : sLocalPrimaryPlaces ({v, w} : Finset _) v = {v} := by
+    ext u
+    rw [mem_sLocalPrimaryPlaces, Finset.mem_insert, Finset.mem_singleton, Finset.mem_singleton]
+    erw [hunder]
+    constructor
+    · exact fun h ↦ h.2
+    · exact fun h ↦ ⟨Or.inl h, h⟩
+  have key := h ℚ 1 {v, w} (by simp [hv, hw]) v (by rw [hprim]; simp) 1
+  rw [hprim, reciprocalPartialHeckeEulerProduct, reciprocalPartialHeckeEulerProduct,
+    Finset.prod_pair hvw, Finset.prod_singleton, hav, haw] at key
+  have hv1 : (1 : ℂ) - (Ideal.absNorm v.asIdeal : ℂ)⁻¹ ≠ 0 := by
+    rw [sub_ne_zero, ne_comm, inv_ne_one]
+    have : Ideal.absNorm v.asIdeal ≠ 1 := by
+      rw [Ne, Ideal.absNorm_eq_one_iff]
+      exact v.isPrime.ne_top
+    exact_mod_cast this
+  have hw0 : (Ideal.absNorm w.asIdeal : ℂ) ≠ 0 := by
+    have : Ideal.absNorm w.asIdeal ≠ 0 := by
+      rw [Ne, Ideal.absNorm_eq_zero_iff]
+      exact w.ne_bot
+    exact_mod_cast this
+  have := mul_left_cancel₀ hv1 (key.trans (mul_one _).symm)
+  rw [sub_eq_self, inv_eq_zero] at this
+  exact hw0 this
 
 /-- Paper: Theorem 11.2.0.2 and (11.2.0.6), p. 485. Every jet admitted by
 the printed floor cutoff is asserted to lie in the conjugate reciprocal-weight isotype. -/
