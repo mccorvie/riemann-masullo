@@ -976,13 +976,107 @@ theorem geometricStripKernel_apply (_ha : 0 < a)
       B u x = ((B).comp Pg) u x ∧
       B u x = ∫ y, geomStrip(hK) (x, y) * u y ∂μ𝔽 := by sorry
 
+section MixedWeightKernel
+
+open scoped ENNReal NNReal
+
+/-- Dividing a mixed-weight kernel by its input weight changes square integrability
+from the reciprocal input measure to the positive input measure. -/
+private theorem spectralStripKernel_hilbertSchmidt_memLp {X : Type*} [MeasurableSpace X]
+    (μ ν : Measure X) [SFinite μ]
+    (w : X → ℝ≥0) (hw : Measurable w) (hp : ∀ x, 0 < w x)
+    {k : X × X → ℂ} (hm : StronglyMeasurable k)
+    (hk : MemLp k 2 (ν.prod (μ.withDensity fun y ↦ ↑((w y)⁻¹)))) :
+    MemLp (fun p : X × X ↦ ((w p.2 : ℝ)⁻¹) • k p) 2
+      (ν.prod (μ.withDensity fun y ↦ ↑(w y))) := by
+  have hmeas : Measurable fun p : X × X ↦ (w p.2 : ℝ)⁻¹ :=
+    (NNReal.continuous_coe.measurable.comp (hw.comp measurable_snd)).inv
+  have hw' : Measurable (fun y ↦ (w y : ℝ≥0∞)) := ENNReal.continuous_coe.measurable.comp hw
+  have hwi : Measurable (fun y ↦ (((w y)⁻¹ : ℝ≥0) : ℝ≥0∞)) := by fun_prop
+  have hw2 : Measurable (fun p : X × X ↦ w p.2) := hw.comp measurable_snd
+  have him : Measurable (fun p : X × X ↦ (w p.2)⁻¹) := by fun_prop
+  have hsq := (memLp_two_iff_integrable_sq_norm hm.aestronglyMeasurable).mp hk
+  rw [prod_withDensity_right (μ := ν) (ν := μ) hwi,
+    integrable_withDensity_iff_integrable_smul him] at hsq
+  apply (memLp_two_iff_integrable_sq_norm (f := fun p : X × X ↦ (w p.2 : ℝ)⁻¹ • k p)
+    (hmeas.stronglyMeasurable.smul hm).aestronglyMeasurable).mpr
+  rw [prod_withDensity_right (μ := ν) (ν := μ) hw',
+    integrable_withDensity_iff_integrable_smul hw2]
+  apply hsq.congr
+  refine Filter.Eventually.of_forall fun p ↦ ?_
+  change ((w p.2)⁻¹ : ℝ≥0) * (‖k p‖ ^ 2 : ℝ) = (w p.2 : ℝ) * ‖(w p.2 : ℝ)⁻¹ • k p‖ ^ 2
+  rw [norm_smul, Real.norm_of_nonneg (inv_nonneg.mpr (w p.2).coe_nonneg), NNReal.coe_inv]
+  field_simp [(NNReal.coe_pos.mpr (hp p.2)).ne']
+
+/-- Integration against the normalized kernel with the weighted measure realizes
+the operator given by integration against the original kernel with Haar measure. -/
+private theorem spectralStripKernel_hilbertSchmidt_operator {X : Type*} [TopologicalSpace X] [T2Space X]
+    [LocallyCompactSpace X] [SecondCountableTopology X] [MeasurableSpace X] [BorelSpace X]
+    (μ ν : Measure X) [SFinite μ] [IsFiniteMeasureOnCompacts ν] [ν.InnerRegular] [SFinite ν]
+    (w : X → ℝ≥0) (hw : Measurable w) (hp : ∀ x, 0 < w x)
+    (hν : ν = μ.withDensity fun y ↦ ↑(w y))
+    (op : Lp ℂ 2 ν →L[ℂ] Lp ℂ 2 ν) (k : X × X → ℂ) (hm : StronglyMeasurable k)
+    (hk : MemLp k 2 (ν.prod (μ.withDensity fun y ↦ ↑((w y)⁻¹))))
+    (hrow : ∀ u : Lp ℂ 2 ν, ∀ᵐ x ∂μ, op u x = ∫ y, k (x, y) * u y ∂μ) :
+    let K (p : X × X) := ((w p.2 : ℝ)⁻¹) • k p
+    ∃ h : MemLp K 2 (ν.prod ν), (integralKernelOperator ν (h.toLp K)).val = op := by
+  intro K
+  have hK : MemLp K 2 (ν.prod ν) := by
+    simpa only [← hν] using spectralStripKernel_hilbertSchmidt_memLp μ ν w hw hp hm hk
+  have integral_weighted (g : X → ℂ) : (∫ y, g y ∂ν) = ∫ y, w y • g y ∂μ := by
+    rw [hν, integral_withDensity_eq_integral_smul hw]
+  refine ⟨hK, ?_⟩
+  ext u
+  have hμν : ν ≪ μ := hν ▸ withDensity_absolutelyContinuous _ _
+  filter_upwards [integralKernelOperator_apply ν (hK.toLp K) u,
+    Measure.ae_ae_of_ae_prod hK.coeFn_toLp, hμν.ae_le (hrow u)] with x hx hrep hB
+  rw [hx.2, hB]
+  calc
+    _ = ∫ y, K (x, y) * u y ∂ν :=
+      integral_congr_ae (hrep.mono fun y hy ↦ congrArg (· * u y) hy)
+    _ = ∫ y, k (x, y) * u y ∂μ := by
+      rw [integral_weighted]
+      refine integral_congr_ae (Filter.Eventually.of_forall fun y ↦ ?_)
+      change (w y : ℝ) • (((w y : ℝ)⁻¹ • k (x, y)) * u y) = _
+      rw [← smul_mul_assoc, smul_smul, mul_inv_cancel₀ (NNReal.coe_pos.mpr (hp y)).ne', one_smul]
+
+/-- Normalize the mixed Sobolev kernel which realizes an operator by Haar integration. -/
+private theorem spectralStripKernel_hilbertSchmidt_of_rows {α s : ℝ}
+    (op : W(α, s) →L[ℂ] W(α, s))
+    (k : Lp ℂ 2 ((ν(α, s)).prod (ν'(α, s))))
+    (hrow : ∀ u : W(α, s), ∀ᵐ x ∂μ𝔽, op u x = ∫ y, k (x, y) * u y ∂μ𝔽) :
+    IsSobolevHilbertSchmidtKernel (F := F) op
+      (fun p : C𝔽 × C𝔽 ↦ ((w(α, s) p.2)⁻¹ : ℝ) • k p) := by
+  let ν := ν(α, s)
+  let wi (y : C𝔽) := w(α, s) y
+  have hp (y : C𝔽) : 0 < wi y := intervalSobolevDensity_pos' _ _ _ _
+  let wNN (y : C𝔽) : ℝ≥0 := ⟨wi y, (hp y).le⟩
+  have hcont : Continuous wi :=
+    (continuous_intervalSobolevDensity (-α) α s).comp (continuous_logModule' m𝔽)
+  have hw : Continuous wNN := hcont.subtype_mk _
+  have hν : ν = (μ𝔽).withDensity (fun y ↦ (wNN y : ENNReal)) :=
+    congrArg (μ𝔽).withDensity (funext fun y ↦ ENNReal.ofReal_eq_coe_nnreal (hp y).le)
+  have hν' : ν'(α, s) = (μ𝔽).withDensity (fun y ↦ (((wNN y)⁻¹ : ℝ≥0) : ENNReal)) := by
+    apply congrArg (μ𝔽).withDensity
+    funext y
+    exact ENNReal.ofReal_eq_coe_nnreal (inv_nonneg.mpr (hp y).le)
+  have hk : MemLp (k : C𝔽 × C𝔽 → ℂ) 2 (ν.prod ((μ𝔽).withDensity fun y ↦ ↑((wNN y)⁻¹))) :=
+    (congrArg (fun η : Measure C𝔽 ↦ MemLp (k : C𝔽 × C𝔽 → ℂ) 2 (ν.prod η)) hν').mp (Lp.memLp k)
+  exact spectralStripKernel_hilbertSchmidt_operator μ𝔽 ν wNN hw.measurable hp hν op k
+    (Lp.stronglyMeasurable k) hk hrow
+
+end MixedWeightKernel
+
 /-- Paper: Theorem 10.4.3.6(2), p. 473, first formula. Dividing the global spectral
 kernel by the input weight gives the Hilbert-Schmidt representative of convolution
 after spectral projection.
 Deviation: The exponent endpoints are −α and α, as in §9.2. -/
 theorem spectralStripKernel_hilbertSchmidt (_ha : 0 < a)
     (hK : stripTensorExists) :
-    IsSobolevHilbertSchmidtKernel (F := F) Bpre (weighted(kStrip(hK))) := by sorry
+    IsSobolevHilbertSchmidtKernel (F := F) Bpre (weighted(kStrip(hK))) := by
+  have hrow := spectralStripKernel_apply (F := F) a hα hs φ hK
+  exact spectralStripKernel_hilbertSchmidt_of_rows (F := F) Bpre (kStrip(hK))
+    (fun u ↦ (hrow u).mono fun _ hx ↦ hx.2)
 
 /-- Paper: Theorem 10.4.3.6(2), p. 473, second formula. Output multiplication
 gives the Hilbert-Schmidt representative of the strip spectral restriction.
