@@ -3395,7 +3395,7 @@ private theorem introTraceApprox_dilated_cutoff_support {R : ℝ} (hR : 0 < R) :
   have hp := (div_lt_iff₀ hR).2 (show 1 < (t - 1) * R by linarith)
   exact ⟨by linarith, ((div_lt_iff₀ hR).mp (show t / R < 2 by linarith)).le⟩
 
-/-- A concrete pair for the shift-two test: the lower transition occupies one
+/-- For these cutoffs the lower transition occupies one
 mesh interval and the upper transition has width comparable to its radius. -/
 private theorem introTraceApprox_exists_dilated :
     let hcut (n : ℕ) : ℝ := (n : ℝ) + 4
@@ -3483,23 +3483,86 @@ private theorem introTraceApprox_translated_power_jet (w : ℂ) {t u : ℝ} (ht 
     with x hx
   exact (hf x hx).deriv
 
-/-- The translated shift-two kernel and its first two radial derivatives satisfy uniform
-power estimates for bounded parameters on a right half-plane. The zeroth estimate keeps
-the linear factor from the lower endpoint. -/
-private theorem introTraceApprox_translated_shiftTwo_jet_bound (m Z : ℝ) (hZ : 0 ≤ Z) :
-    ∃ C : ℝ, 0 ≤ C ∧ ∀ (z : ℂ) (t u : ℝ), m ≤ z.re → ‖z‖ ≤ Z → 1 < t →
+/-- The derivative of the inverse power on `[1,x]` is bounded by the norm of its exponent. -/
+private theorem introTraceApprox_power_sub_one {q : ℂ} (hq : 0 ≤ q.re) {x : ℝ} (hx : 1 ≤ x) :
+    ‖(x : ℂ) ^ (-q) - 1‖ ≤ ‖q‖ * (x - 1) := by
+  let f (y : ℝ) := (y : ℂ) ^ (-q)
+  let d (y : ℝ) := -q * (y : ℂ) ^ (-q - 1)
+  have hd (y : ℝ) (hy : 1 ≤ y) : HasDerivAt f (d y) y := by
+    have hy0 := (zero_lt_one.trans_le hy).ne'
+    have h := (differentiableAt_id.ofReal_cpow_const (-q) hy0).hasDerivAt
+    simpa only [id_eq, Complex.deriv_ofReal_cpow_const (-q) hy0, f, d] using h
+  have hb (y : ℝ) (hy : 1 ≤ y) : ‖d y‖ ≤ ‖q‖ := by
+    dsimp only [d]
+    rw [norm_mul, norm_neg, Complex.norm_cpow_eq_rpow_re_of_pos (zero_lt_one.trans_le hy)]
+    exact mul_le_of_le_one_right (norm_nonneg _) (Real.rpow_le_one_of_one_le_of_nonpos hy (by simp; linarith))
+  simpa only [f, Complex.ofReal_one, Complex.one_cpow] using
+    norm_image_sub_le_of_norm_deriv_le_segment' (a := 1) (b := x) (f := f) (f' := d)
+      (fun y hy ↦ (hd y hy.1).hasDerivWithinAt) (fun y hy ↦ hb y hy.1) x ⟨hx, le_rfl⟩
+
+/-- On the lower transition both powers agree at one before translation. For `t ≥ 2`,
+the triangle inequality and the ordinary inverse-power estimate suffice. -/
+private theorem introTraceApprox_translated_reference_lower {m Z : ℝ} (hm : 0 ≤ m) (hZ : 0 ≤ Z) :
+    ∃ D : ℝ, 0 ≤ D ∧ ∀ (z w : ℂ) (t u : ℝ), m ≤ z.re → m ≤ w.re → ‖z‖ ≤ Z → ‖w‖ ≤ Z →
+      1 < t → |u| ≤ 1 → |u| ≤ t - 1 → 1 < t - u →
+      ‖introTracePower z (t - u) - introTracePower w (t - u)‖ ≤ (D * t ^ (-m)) * ((t - 1) / t) := by
+  let b := (1 / 2 : ℝ) ^ (-m) + 2 ^ (-m)
+  let D := max (8 * Z * 2 ^ m) (4 * b)
+  have hb : 0 ≤ b := by dsimp [b]; positivity
+  have hD : 0 ≤ D := (mul_nonneg (by norm_num : (0 : ℝ) ≤ 4) hb).trans (le_max_right _ _)
+  refine ⟨D, hD, ?_⟩
+  intro z w t u hz hw hzn hwn ht hu hsep hx
+  have ht0 : 0 < t := zero_lt_one.trans ht
+  by_cases ht2 : t ≤ 2
+  · have hz' := introTraceApprox_power_sub_one (hm.trans hz) hx.le
+    have hw' := introTraceApprox_power_sub_one (hm.trans hw) hx.le
+    have hsub : t - u - 1 ≤ 2 * (t - 1) := by linarith [(abs_le.mp hsep).1]
+    have hsmall : ‖introTracePower z (t - u) - introTracePower w (t - u)‖ ≤ 4 * Z * (t - 1) := by
+      simp only [introTracePower, hx, ite_true]
+      calc
+        _ ≤ ‖((t - u : ℝ) : ℂ) ^ (-z) - 1‖ + ‖((t - u : ℝ) : ℂ) ^ (-w) - 1‖ := by
+          simpa only [norm_sub_rev (1 : ℂ) _] using
+            norm_sub_le_norm_sub_add_norm_sub (((t - u : ℝ) : ℂ) ^ (-z)) 1 (((t - u : ℝ) : ℂ) ^ (-w))
+        _ ≤ Z * (2 * (t - 1)) + Z * (2 * (t - 1)) := by
+          exact add_le_add (hz'.trans (mul_le_mul hzn hsub (by linarith) hZ))
+            (hw'.trans (mul_le_mul hwn hsub (by linarith) hZ))
+        _ = _ := by ring
+    have htp : t ^ m ≤ 2 ^ m := Real.rpow_le_rpow ht0.le ht2 hm
+    have hconst : (4 * Z * t ^ m) * t ≤ D := (calc
+      _ ≤ (4 * Z * 2 ^ m) * 2 := by gcongr
+      _ = 8 * Z * 2 ^ m := by ring).trans (le_max_left _ _)
+    refine hsmall.trans ?_
+    calc
+      _ = (((4 * Z * t ^ m) * t) * t ^ (-m)) * ((t - 1) / t) := by
+        rw [Real.rpow_neg ht0.le]
+        field_simp
+      _ ≤ _ := by gcongr
+  · have hpow (q : ℂ) (hq : m ≤ q.re) : ‖introTracePower q (t - u)‖ ≤ b * t ^ (-m) :=
+      introTraceApprox_mellin_tendsto_power_bound ht (by simpa using hu) hq
+    have hlarge := (norm_sub_le (introTracePower z (t - u)) (introTracePower w (t - u))).trans
+      (add_le_add (hpow z hz) (hpow w hw))
+    have hhalf : (1 / 2 : ℝ) ≤ (t - 1) / t := (le_div_iff₀ ht0).2 (by linarith)
+    calc
+      _ ≤ b * t ^ (-m) + b * t ^ (-m) := hlarge
+      _ = ((4 * b) * t ^ (-m)) * (1 / 2) := by ring
+      _ ≤ _ := by gcongr; exact le_max_right _ _
+
+/-- A difference of translated powers vanishes to first order at the lower endpoint.
+Its first two radial derivatives have uniform power decay for bounded parameters. -/
+private theorem introTraceApprox_translated_reference_jet_bound (m Z : ℝ) (hm : 0 ≤ m) (hZ : 0 ≤ Z) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ (z w : ℂ) (t u : ℝ), m ≤ z.re → m ≤ w.re → ‖z‖ ≤ Z → ‖w‖ ≤ Z → 1 < t →
       |u| ≤ 1 → |u| ≤ t - 1 → 1 < t - u →
-      let f := fun y : ℝ ↦ introTracePower z (y - u) - introTracePower (z + 2) (y - u)
+      let f := fun y : ℝ ↦ introTracePower z (y - u) - introTracePower w (y - u)
       ‖f t‖ ≤ (C * t ^ (-m)) * ((t - 1) / t) ∧
       ‖deriv f t‖ ≤ C * t ^ (-m - 1) ∧ ‖deriv (deriv f) t‖ ≤ C * t ^ (-m - 2) := by
+  obtain ⟨D, hD, hlow⟩ := introTraceApprox_translated_reference_lower hm hZ
   let B (j : ℝ) := (1 / 2 : ℝ) ^ (-(m + j)) + 2 ^ (-(m + j))
-  let A := Z + 4
-  let C := max (8 * B 0) (max (2 * A * B 1) (2 * A ^ 2 * B 2))
-  have hB (j : ℝ) : 0 ≤ B j := by dsimp [B]; positivity
+  let A := Z + 1
+  let C := max D (max (2 * A * B 1) (2 * A ^ 2 * B 2))
   have hA : 0 ≤ A := by dsimp [A]; linarith
-  have hC : 0 ≤ C := (mul_nonneg (by norm_num : (0:ℝ) ≤ 8) (hB 0)).trans (le_max_left _ _)
+  have hC : 0 ≤ C := hD.trans (le_max_left _ _)
   refine ⟨C, hC, ?_⟩
-  intro z t u hz hnorm ht hu hmatch hx f
+  intro z w t u hz hw hnorm hwn ht hu hmatch hx f
   let v := ((t - u : ℝ) : ℂ)
   have hpow (q : ℂ) (j : ℝ) (hq : m + j ≤ q.re) :
       ‖v ^ (-q)‖ ≤ B j * t ^ (-(m + j)) := by
@@ -3508,21 +3571,21 @@ private theorem introTraceApprox_translated_shiftTwo_jet_bound (m Z : ℝ) (hZ :
   have hjet (w : ℂ) := introTraceApprox_translated_power_jet w hx
   let p := fun w : ℂ ↦ -w * v ^ (-w - 1)
   let q := fun w : ℂ ↦ (-w) * (-w - 1) * v ^ (-w - 2)
-  have hd : deriv f t = p z - p (z + 2) := ((hjet z).1.sub (hjet (z + 2)).1).deriv
-  have hdd : deriv (deriv f) t = q z - q (z + 2) := by
+  have hd : deriv f t = p z - p w := ((hjet z).1.sub (hjet w).1).deriv
+  have hdd : deriv (deriv f) t = q z - q w := by
     apply HasDerivAt.deriv
-    apply ((hjet z).2.sub (hjet (z + 2)).2).congr_of_eventuallyEq
+    apply ((hjet z).2.sub (hjet w).2).congr_of_eventuallyEq
     filter_upwards [(continuous_id.sub continuous_const).continuousAt.tendsto.eventually (lt_mem_nhds hx)]
       with x hxy
     change 1 < x - u at hxy
     exact deriv_sub ((introTraceApprox_translated_power_jet z hxy).1.differentiableAt)
-      ((introTraceApprox_translated_power_jet (z + 2) hxy).1.differentiableAt)
-  have hcoeff (w : ℂ) (hw : ‖w‖ ≤ Z + 2) :
+      ((introTraceApprox_translated_power_jet w hxy).1.differentiableAt)
+  have hcoeff (w : ℂ) (hw : ‖w‖ ≤ Z) :
       ‖-w‖ ≤ A ∧ ‖-w - 1‖ ≤ A := by
     rw [norm_neg]; constructor
     · dsimp [A]; linarith
     · exact (norm_sub_le _ _).trans (by simp [A]; linarith)
-  have h14 (w : ℂ) (hw : ‖w‖ ≤ Z + 2) (hw' : m ≤ w.re) :
+  have hderivs (w : ℂ) (hw : ‖w‖ ≤ Z) (hw' : m ≤ w.re) :
       ‖p w‖ ≤ A * (B 1 * t ^ (-m - 1)) ∧ ‖q w‖ ≤ A ^ 2 * (B 2 * t ^ (-m - 2)) := by
     obtain ⟨h1,h2⟩ := hcoeff w hw
     have hp1 := hpow (w + 1) 1 (by simpa using hw')
@@ -3534,17 +3597,12 @@ private theorem introTraceApprox_translated_shiftTwo_jet_bound (m Z : ℝ) (hZ :
     · simp only [q, norm_mul]
       apply mul_le_mul _ hp2 (norm_nonneg _) (sq_nonneg _)
       simpa [sq] using mul_le_mul h1 h2 (norm_nonneg _) hA
-  have hzn : ‖z + 2‖ ≤ Z + 2 := (norm_add_le _ _).trans (by simpa using hnorm)
-  have hz2 : m ≤ (z + 2).re := by simpa using (show m ≤ z.re + 2 by linarith)
-  obtain ⟨hp1,hq1⟩ := h14 z (by linarith) hz
-  obtain ⟨hp2,hq2⟩ := h14 (z + 2) hzn hz2
+  obtain ⟨hp1,hq1⟩ := hderivs z hnorm hz
+  obtain ⟨hp2,hq2⟩ := hderivs w hwn hw
   refine ⟨?_, ?_, ?_⟩
-  · have hh := introTraceApprox_rat_sub_shiftTwo_power_bound ht hu hmatch hz
-    change ‖_ - _‖ ≤ _
-    refine hh.trans ?_
-    have h0 : 8 * B 0 ≤ C := le_max_left _ _
-    calc _ = ((8 * B 0) * t ^ (-m)) * ((t - 1) / t) := by simp [B]; ring
-      _ ≤ _ := by gcongr
+  · refine (hlow z w t u hz hw hnorm hwn ht hu hmatch hx).trans ?_
+    have hDC : D ≤ C := le_max_left _ _
+    gcongr
   · rw [hd]
     refine (norm_sub_le _ _).trans ((add_le_add hp1 hp2).trans ?_)
     have h1 : 2 * A * B 1 ≤ C := (le_max_left _ _).trans (le_max_right _ _)
@@ -3638,19 +3696,19 @@ private theorem introTraceApprox_product_second_bound {c f : ℝ → ℂ} {t : �
 /-- For the translated inner kernel of an actual matched additive convolution the
 second derivative costs one inverse mesh unit in the lower boundary layer, and
 decays like `t^(-m-2)` throughout the remaining support. -/
-private theorem introTraceApprox_shiftTwo_dilated_second_bound (m Z : ℝ) (hm : 0 ≤ m) (hZ : 0 ≤ Z) :
-    ∃ A : ℝ, 0 ≤ A ∧ ∀ (R t u : ℝ) (z : ℂ),
-      4 ≤ R → 1 + 1 / R ≤ t → t ≤ 2 * R → |u| ≤ 1 / (2 * R) → m ≤ z.re → ‖z‖ ≤ Z →
+private theorem introTraceApprox_reference_dilated_second_bound (m Z : ℝ) (hm : 0 ≤ m) (hZ : 0 ≤ Z) :
+    ∃ A : ℝ, 0 ≤ A ∧ ∀ (R t u : ℝ) (z w : ℂ),
+      4 ≤ R → 1 + 1 / R ≤ t → t ≤ 2 * R → |u| ≤ 1 / (2 * R) → m ≤ z.re → m ≤ w.re → ‖z‖ ≤ Z → ‖w‖ ≤ Z →
       let c := fun x : ℝ ↦ ((Real.smoothTransition (R * (x - 1) - 1) * Real.smoothTransition (2 - x / R) : ℝ) : ℂ)
-      let f := fun x : ℝ ↦ introTracePower z (x - u) - introTracePower (z + 2) (x - u)
+      let f := fun x : ℝ ↦ introTracePower z (x - u) - introTracePower w (x - u)
       (t ≤ 1 + 2 / R → ‖deriv (deriv (c * f)) t‖ ≤ A * R) ∧
       (1 + 2 / R < t → ‖deriv (deriv (c * f)) t‖ ≤ A * t ^ (-m - 2)) := by
-  obtain ⟨C, hC, hfjet⟩ := introTraceApprox_translated_shiftTwo_jet_bound m Z hZ
+  obtain ⟨C, hC, hfjet⟩ := introTraceApprox_translated_reference_jet_bound m Z hm hZ
   obtain ⟨D, hD, hcjet⟩ := introTraceApprox_dilated_cutoff_jet
   let A := (8 * D + 1) * C
   have hD0 : 0 ≤ D := zero_le_one.trans hD
   refine ⟨A, by dsimp [A]; positivity, ?_⟩
-  intro R t u z hR hl hr hu hz hnorm c f
+  intro R t u z w hR hl hr hu hz hw hnorm hwn c f
   have hp : 0 < R := by linarith
   have hd : 0 < 1 / R := by positivity
   have hh : 1 / (2 * R) < 1 / R := one_div_lt_one_div_of_lt hp (by linarith)
@@ -3659,7 +3717,7 @@ private theorem introTraceApprox_shiftTwo_dilated_second_bound (m Z : ℝ) (hm :
   have h1 : |u| ≤ 1 := hu.trans (by apply (div_le_one (by positivity)).2; linarith)
   have hsep : |u| ≤ t - 1 := by linarith
   have hx : 1 < t - u := by linarith [(abs_le.mp hu).2]
-  obtain ⟨hf0,hf1,hf2⟩ := hfjet z t u hz hnorm ht h1 hsep hx
+  obtain ⟨hf0,hf1,hf2⟩ := hfjet z w t u hz hw hnorm hwn ht h1 hsep hx
   obtain ⟨hc0,hlo,hhi⟩ := hcjet R t hR
   have hc : ContDiffAt ℝ 2 c t := (Complex.ofRealCLM.contDiff.comp
     ((Real.smoothTransition.contDiff.comp (by fun_prop)).mul
@@ -3668,7 +3726,7 @@ private theorem introTraceApprox_shiftTwo_dilated_second_bound (m Z : ℝ) (hm :
     have h := (introTracePower_contDiffOn w).contDiffAt (isClosed_singleton.isOpen_compl.mem_nhds
       (show t - u ∈ ({1}ᶜ : Set ℝ) from hx.ne'))
     exact (h.comp t (contDiffAt_id.sub contDiffAt_const)).of_le (by simp)
-  have hprod := introTraceApprox_product_second_bound hc ((hpwr z).sub (hpwr (z + 2)))
+  have hprod := introTraceApprox_product_second_bound hc ((hpwr z).sub (hpwr w))
   have hweight (j : ℝ) (hj : 0 ≤ j) : t ^ (-m - j) ≤ 1 :=
     Real.rpow_le_one_of_one_le_of_nonpos ht.le (by linarith)
   have hfbase : ‖f t‖ ≤ C * t ^ (-m) := hf0.trans
@@ -3703,10 +3761,10 @@ private theorem introTraceApprox_shiftTwo_dilated_second_bound (m Z : ℝ) (hm :
       _ ≤ (D * 2 ^ 2 + 2 * D * 2 + 1) * (C * t ^ (-m) / t ^ 2) := by gcongr
       _ = A * t ^ (-m - 2) := by rw [hptwo]; dsimp [A]; ring
 
-private theorem introTraceApprox_shiftTwo_dilated_support {R u : ℝ} (hR : 4 ≤ R)
-    (hu : |u| ≤ 1 / (2 * R)) (z : ℂ) :
+private theorem introTraceApprox_reference_dilated_support {R u : ℝ} (hR : 4 ≤ R)
+    (hu : |u| ≤ 1 / (2 * R)) (z w : ℂ) :
     let c := fun x : ℝ ↦ ((Real.smoothTransition (R * (x - 1) - 1) * Real.smoothTransition (2 - x / R) : ℝ) : ℂ)
-    let f := fun x : ℝ ↦ introTracePower z (x - u) - introTracePower (z + 2) (x - u)
+    let f := fun x : ℝ ↦ introTracePower z (x - u) - introTracePower w (x - u)
     ContDiff ℝ 2 (c * f) ∧ tsupport (c * f) ⊆ Icc (1 + 1 / R) (2 * R) := by
   intro c f
   have hp : 0 < R := by linarith
@@ -3725,22 +3783,22 @@ private theorem introTraceApprox_shiftTwo_dilated_support {R u : ℝ} (hR : 4 �
       have h := (introTracePower_contDiffOn w).contDiffAt (isClosed_singleton.isOpen_compl.mem_nhds
         (show t - u ∈ ({1}ᶜ : Set ℝ) from hx.ne'))
       exact (h.comp t (contDiffAt_id.sub contDiffAt_const)).of_le (by simp)
-    exact hc.contDiffAt.mul ((hpow z).sub (hpow (z + 2)))
+    exact hc.contDiffAt.mul ((hpow z).sub (hpow w))
   · exact contDiffAt_const.congr_of_eventuallyEq (notMem_tsupport_iff_eventuallyEq.mp ht)
 
 /-- The translated profile multiplied by the chosen smooth cutoff has uniformly
 bounded weighted zeroth and second radial derivatives. The lower-layer cost
 `R` is integrated over an interval of length `1/R`. -/
-private theorem introTraceApprox_shiftTwo_dilated_weighted (a m Z : ℝ) (ha : 0 ≤ a)
+private theorem introTraceApprox_reference_dilated_weighted (a m Z : ℝ) (ha : 0 ≤ a)
     (ham : a < m) (hZ : 0 ≤ Z) :
-    ∃ B : ℝ, 0 ≤ B ∧ ∀ (R u : ℝ) (z : ℂ),
-      4 ≤ R → |u| ≤ 1 / (2 * R) → m ≤ z.re → ‖z‖ ≤ Z →
+    ∃ B : ℝ, 0 ≤ B ∧ ∀ (R u : ℝ) (z w : ℂ),
+      4 ≤ R → |u| ≤ 1 / (2 * R) → m ≤ z.re → m ≤ w.re → ‖z‖ ≤ Z → ‖w‖ ≤ Z →
       let c := fun x : ℝ ↦ ((Real.smoothTransition (R * (x - 1) - 1) * Real.smoothTransition (2 - x / R) : ℝ) : ℂ)
-      let f := fun x : ℝ ↦ introTracePower z (x - u) - introTracePower (z + 2) (x - u)
+      let f := fun x : ℝ ↦ introTracePower z (x - u) - introTracePower w (x - u)
       (∫ t in 1..3 * R, t ^ (a - 1) * ‖(c * f) t‖) ≤ B ∧
       (∫ t in 1..3 * R, t ^ (a + 1) * ‖deriv (deriv (c * f)) t‖) ≤ B := by
-  obtain ⟨C, hC, hjet⟩ := introTraceApprox_translated_shiftTwo_jet_bound m Z hZ
-  obtain ⟨A, hA, hbound⟩ := introTraceApprox_shiftTwo_dilated_second_bound m Z (ha.trans ham.le) hZ
+  obtain ⟨C, hC, hjet⟩ := introTraceApprox_translated_reference_jet_bound m Z (ha.trans ham.le) hZ
+  obtain ⟨A, hA, hbound⟩ := introTraceApprox_reference_dilated_second_bound m Z (ha.trans ham.le) hZ
   let p (t : ℝ) := t ^ (a - m - 1)
   have hpint : IntegrableOn p (Ioi 1) := integrableOn_Ioi_rpow_of_lt (by linarith : a - m - 1 < -1) zero_lt_one
   have hpnn : ∀ᵐ t ∂volume.restrict (Ioi 1), 0 ≤ p t := by
@@ -3750,7 +3808,7 @@ private theorem introTraceApprox_shiftTwo_dilated_weighted (a m Z : ℝ) (ha : 0
   have hI : 0 ≤ I := integral_nonneg_of_ae hpnn
   let B := max (C * I) (A * 2 ^ (a + 1) + A * I)
   refine ⟨B, (mul_nonneg hC hI).trans (le_max_left _ _), ?_⟩
-  intro R u z hR hu hz hnorm c f
+  intro R u z w hR hu hz hw hnorm hwn c f
   let S := Ioc (1 : ℝ) (3 * R)
   let L := Icc (1 + 1 / R) (1 + 2 / R)
   let H := A * R * 2 ^ (a + 1)
@@ -3770,10 +3828,10 @@ private theorem introTraceApprox_shiftTwo_dilated_weighted (a m Z : ℝ) (ha : 0
     ring
   have htailI : ∫ t in S, p t ≤ I :=
     setIntegral_mono_set hpint hpnn (ae_of_all _ hSS)
-  obtain ⟨hsm, hs⟩ := introTraceApprox_shiftTwo_dilated_support hR hu z
+  obtain ⟨hsm, hs⟩ := introTraceApprox_reference_dilated_support hR hu z w
   have h1R : 1 ≤ 3 * R := by linarith
   rw [intervalIntegral.integral_of_le h1R, intervalIntegral.integral_of_le h1R]
-  have hw (t : ℝ) (ht : 1 < t) (j k : ℝ) (hjk : j + k=a - m - 1) : t ^ j * t ^ k = p t := by
+  have hpowers (t : ℝ) (ht : 1 < t) (j k : ℝ) (hjk : j + k=a - m - 1) : t ^ j * t ^ k = p t := by
     rw [← Real.rpow_add (zero_lt_one.trans ht), hjk]
   have hbase (t : ℝ) (ht : 1 < t) : t ^ (a - 1)*‖(c * f) t‖ ≤ C * p t := by
     by_cases hm : t ∈ tsupport (c * f)
@@ -3782,7 +3840,7 @@ private theorem introTraceApprox_shiftTwo_dilated_weighted (a m Z : ℝ) (ha : 0
       have hsep : |u| ≤ t - 1 := by linarith
       have hnear : |u| ≤ 1 := hu.trans ((div_le_one (by positivity)).2 (by linarith))
       have hx : 1 < t - u := by linarith [(abs_le.mp hu).2]
-      have hf := (hjet z t u hz hnorm ht hnear hsep hx).1
+      have hf := (hjet z w t u hz hw hnorm hwn ht hnear hsep hx).1
       have hsmall : (t - 1) / t ≤ 1 := (div_le_one (zero_lt_one.trans ht)).2 (by linarith)
       have hfv := hf.trans (mul_le_of_le_one_right (by positivity) hsmall)
       have hc : ‖c t‖ ≤ 1 := by
@@ -3792,7 +3850,7 @@ private theorem introTraceApprox_shiftTwo_dilated_weighted (a m Z : ℝ) (ha : 0
       calc
         _ = t ^ (a - 1) * (‖c t‖*‖f t‖) := by rw [Pi.mul_apply, norm_mul]
         _ ≤ t ^ (a - 1) * (1 * (C * t ^ (-m))) := by gcongr
-        _ = C * p t := by rw [← hw t ht (a - 1) (-m) (by ring)]; ring
+        _ = C * p t := by rw [← hpowers t ht (a - 1) (-m) (by ring)]; ring
     · rw [image_eq_zero_of_notMem_tsupport hm, norm_zero, mul_zero]
       exact mul_nonneg hC (Real.rpow_nonneg (zero_le_one.trans ht.le) _)
   have hsecond (t : ℝ) (ht : 1 < t) :
@@ -3800,7 +3858,7 @@ private theorem introTraceApprox_shiftTwo_dilated_weighted (a m Z : ℝ) (ha : 0
     have hnon : 0 ≤ A * p t := mul_nonneg hA (Real.rpow_nonneg (zero_le_one.trans ht.le) _)
     by_cases hm : t ∈ tsupport (c * f)
     · obtain ⟨hl,hr⟩ := hs hm
-      obtain ⟨low,high⟩ := hbound R t u z hR hl hr hu hz hnorm
+      obtain ⟨low,high⟩ := hbound R t u z w hR hl hr hu hz hw hnorm hwn
       by_cases htop : t ≤ 1 + 2 / R
       · rw [indicator_of_mem (show t ∈ L from ⟨hl,htop⟩)]
         refine le_add_of_le_of_nonneg ?_ hnon
@@ -3809,7 +3867,7 @@ private theorem introTraceApprox_shiftTwo_dilated_weighted (a m Z : ℝ) (ha : 0
       · rw [indicator_of_notMem (show t ∉ L from fun h ↦ htop h.2), zero_add]
         calc
           _ ≤ t ^ (a + 1) * (A * t ^ (-m - 2)) := by gcongr; exact high (lt_of_not_ge htop)
-          _ = A * p t := by rw [← hw t ht (a + 1) (-m - 2) (by ring)]; ring
+          _ = A * p t := by rw [← hpowers t ht (a + 1) (-m - 2) (by ring)]; ring
     · have he := (notMem_tsupport_iff_eventuallyEq.mp hm).deriv.deriv_eq
       have hzero : deriv (deriv (c * f)) t = 0 := by simpa using he
       rw [hzero, norm_zero, mul_zero]
@@ -3984,6 +4042,80 @@ private theorem introTraceApprox_mellin_sub_le_of_translated {h ρ : ℝ → ℝ
            exact mul_le_mul_of_nonneg_left (hbound u hu) (hρ u)
        _ = B := by rw [integral_mul_const, h1, one_mul]
 
+/-- Paper: §1.4.3, p. 29. One admissible family realizes the multiplicity-weighted
+resolvent series for every character, every centered window of half-width `a ≥ 0`,
+and every holomorphic reference map `w` from `Re z > a` into itself. At each cutoff
+first sum the smoothed Mellin differences at `z` and `w z` over the entire window.
+The cutoff limit is locally uniform on `Re z > a`. The same family gives the rational
+real-place limit for the shift by two on `Re z > -1/2`.
+Deviation: On each compact set `K`, estimate both parameters on `K ∪ w '' K`. Their
+powers agree at one, which controls the lower transition of the matched cutoffs. -/
+theorem introTraceApprox_exists_reference_spectral_limit :
+    ∃ (h ρ : ℕ → ℝ → ℝ), IsIntroTraceApproximation h ρ ∧
+      TendstoLocallyUniformlyOn (fun n z ↦
+        introTraceArchimedean (F := ℚ) 1 approx(h, ρ, n, z) Rat.infinitePlace -
+        introTraceArchimedean (F := ℚ) 1 approx(h, ρ, n, (z + 2)) Rat.infinitePlace)
+        (fun z ↦ 1 / (z + 1 / 2)) atTop right(-(1 / 2 : ℝ)) ∧
+      ∀ (χ : U𝔽) (a : ℝ), 0 ≤ a → ∀ w : ℂ → ℂ, MapsTo w right(a) right(a) →
+        DifferentiableOn ℂ w right(a) →
+        TendstoLocallyUniformlyOn (fun n z ↦ introTraceSpectralSum χ approx(h, ρ, n, z) a -
+          introTraceSpectralSum χ approx(h, ρ, n, (w z)) a)
+          (fun z ↦ ∑' r : windowZeros(χ, a), (zeroOrder(χ, r.val) : ℂ) *
+            (1 / (z - (r.val - 1 / 2)) - 1 / (w z - (r.val - 1 / 2)))) atTop right(a) := by
+  let R (n : ℕ) : ℝ := (n : ℝ) + 4
+  let h (n : ℕ) (t : ℝ) := Real.smoothTransition (R n * (t - 1) - 1) * Real.smoothTransition (2 - t / R n)
+  have hR (n : ℕ) : 4 ≤ R n := by dsimp [R]; exact le_add_of_nonneg_left (Nat.cast_nonneg n)
+  have hp (n : ℕ) : 0 < R n := by linarith [hR n]
+  obtain ⟨ρ, ha, hρ⟩ := introTraceApprox_exists_dilated
+  change IsIntroTraceApproximation h ρ at ha
+  have hs (n : ℕ) : tsupport (h n) ⊆ Icc (1 + 1 / R n) (2 * R n) :=
+    introTraceApprox_dilated_cutoff_support (hp n)
+  have hmatch (n : ℕ) (t u : ℝ) (ht : h n t ≠ 0) (hu : ρ n u ≠ 0) :
+      |u| ≤ 1 ∧ |u| ≤ t - 1 := by
+    obtain ⟨hl,_⟩ := hs n (subset_tsupport _ ht)
+    have hu' : |u| ≤ 1 / (2 * R n) := hρ n u hu
+    have hsmall := one_div_lt_one_div_of_lt (hp n) (show R n < 2 * R n by linarith [hp n])
+    exact ⟨hu'.trans ((div_le_one (by positivity)).2 (by linarith [hR n])), by linarith⟩
+  refine ⟨h, ρ, ha, introTraceApprox_rat_sub_shiftTwo_matched h ρ ha hmatch, ?_⟩
+  intro χ a ha₀ w hw hdw
+  apply introTrace_spectral_referenceSub_of_bound χ a w hw hdw h ρ ha
+  intro K hsub hK
+  rcases K.eq_empty_or_nonempty with rfl | hne
+  · exact ⟨0, .of_forall fun _ _ _ hz ↦ hz.elim⟩
+  let S := K ∪ w '' K
+  have hS : IsCompact S := hK.union (hK.image_of_continuousOn (hdw.continuousOn.mono hsub))
+  have hSR : S ⊆ right(a) := union_subset hsub (fun _ ⟨q, hq, e⟩ ↦ e ▸ hw (hsub hq))
+  obtain ⟨y, hy, hmin⟩ := hS.exists_isMinOn (hne.mono subset_union_left) Complex.continuous_re.continuousOn
+  obtain ⟨Z, hZ⟩ := hS.isBounded.exists_norm_le
+  have hym : a < y.re := hSR hy
+  obtain ⟨B, _, hB⟩ := introTraceApprox_reference_dilated_weighted a y.re Z ha₀ hym
+    ((norm_nonneg _).trans (hZ _ hy))
+  refine ⟨4 * B, .of_forall fun n r z hz ↦ ?_⟩
+  have h₁ : z ∈ S := Or.inl hz
+  have h₂ : w z ∈ S := Or.inr (mem_image_of_mem _ hz)
+  have hminz : y.re ≤ z.re := isMinOn_iff.mp hmin z h₁
+  have hminw : y.re ≤ (w z).re := isMinOn_iff.mp hmin (w z) h₂
+  have hz₀ := ha₀.trans (hym.le.trans hminz)
+  have hw₀ := ha₀.trans (hym.le.trans hminw)
+  have hsub' : Icc (1 + 1 / R n) (2 * R n) ⊆ Ioo 1 (3 * R n) := by
+    intro t ht
+    have hr : 0 < 1 / R n := by positivity
+    exact ⟨by linarith [ht.1], by linarith [hp n,ht.2]⟩
+  obtain ⟨ε, _, hρ'⟩ := ha.2.2.2
+  obtain ⟨_, hsm, hnn, hsρ, hmass⟩ := hρ' n
+  have hcompact := isCompact_Icc.of_isClosed_subset (isClosed_tsupport _) hsρ
+  have hi : Integrable (ρ n) := hsm.continuous.integrable_of_hasCompactSupport hcompact
+  apply introTraceApprox_mellin_sub_le_of_translated (T := 3 * R n) (by linarith [hp n,hR n])
+    (ha.1 n).1.continuous ((hs n).trans hsub') hi hsm.continuous.measurable hnn hmass
+    z (w z) (r.val - 1 / 2) hz₀ hw₀
+  intro u hu
+  have hu' : |u| ≤ 1 / (2 * R n) := hρ n u hu
+  obtain ⟨h0,h2⟩ := hB (R n) u z (w z) (hR n) hu' hminz hminw (hZ z h₁) (hZ _ h₂)
+  obtain ⟨hsm',hs'⟩ := introTraceApprox_reference_dilated_support (hR n) hu' z (w z)
+  have hre : (r.val - 1 / 2).re ≤ a := by simpa using (abs_lt.mp r.property.2).2.le
+  simpa only [Pi.mul_def, h, Complex.sub_im, Complex.div_ofNat_im, Complex.one_im, zero_div, sub_zero] using
+    introTraceMellin_le_of_weighted_deriv (by linarith [hR n]) hsm' (hs'.trans hsub') h0 h2 _ hre
+
 /-- Paper: §1.4.3, p. 29. Subtract the value at `z+2` at each cutoff. For one
 admissible smooth family, the differences of the full spectral sums converge
 locally uniformly to the resolvent series on `Re z > a` for every character and
@@ -4002,58 +4134,12 @@ theorem introTraceApprox_exists_shiftTwo_spectral_limit :
           introTraceSpectralSum χ approx(h, ρ, n, (z + 2)) a)
           (fun z ↦ ∑' r : windowZeros(χ, a), (zeroOrder(χ, r.val) : ℂ) *
             (1 / (z - (r.val - 1 / 2)) - 1 / (z + 2 - (r.val - 1 / 2)))) atTop right(a) := by
-  let R (n : ℕ) : ℝ := (n : ℝ) + 4
-  let h (n : ℕ) (t : ℝ) := Real.smoothTransition (R n * (t - 1) - 1) * Real.smoothTransition (2 - t / R n)
-  have hR (n : ℕ) : 4 ≤ R n := by dsimp [R]; exact le_add_of_nonneg_left (Nat.cast_nonneg n)
-  have hp (n : ℕ) : 0 < R n := by linarith [hR n]
-  obtain ⟨ρ, ha, hρ⟩ := introTraceApprox_exists_dilated
-  change IsIntroTraceApproximation h ρ at ha
-  have hs (n : ℕ) : tsupport (h n) ⊆ Icc (1 + 1 / R n) (2 * R n) :=
-    introTraceApprox_dilated_cutoff_support (hp n)
-  have hmatch (n : ℕ) (t u : ℝ) (ht : h n t ≠ 0) (hu : ρ n u ≠ 0) :
-      |u| ≤ 1 ∧ |u| ≤ t - 1 := by
-    obtain ⟨hl,_⟩ := hs n (subset_tsupport _ ht)
-    have hu' : |u| ≤ 1 / (2 * R n) := hρ n u hu
-    have hsmall := one_div_lt_one_div_of_lt (hp n) (show R n < 2 * R n by linarith [hp n])
-    exact ⟨hu'.trans ((div_le_one (by positivity)).2 (by linarith [hR n])), by linarith⟩
-  refine ⟨h, ρ, ha, introTraceApprox_rat_sub_shiftTwo_matched h ρ ha hmatch, ?_⟩
-  intro χ a ha₀
-  have hw : MapsTo (fun z : ℂ ↦ z + 2) right(a) right(a) := by
-    intro z hz
-    change a < z.re at hz
-    change a < (z + 2).re
-    simpa using (by linarith : a < z.re + 2)
-  apply introTrace_spectral_referenceSub_of_bound χ a (fun z ↦ z + 2) hw (by fun_prop) h ρ ha
-  intro K hsub hK
-  rcases K.eq_empty_or_nonempty with rfl | hne
-  · exact ⟨0, .of_forall fun _ _ _ hz ↦ hz.elim⟩
-  obtain ⟨y, hy, hmin⟩ := hK.exists_isMinOn hne Complex.continuous_re.continuousOn
-  obtain ⟨Z, hZ⟩ := hK.isBounded.exists_norm_le
-  have hym : a < y.re := hsub hy
-  obtain ⟨B, _, hB⟩ := introTraceApprox_shiftTwo_dilated_weighted a y.re Z ha₀ hym
-    ((norm_nonneg _).trans (hZ _ hy))
-  refine ⟨4 * B, .of_forall fun n r z hz ↦ ?_⟩
-  have hminz : y.re ≤ z.re := isMinOn_iff.mp hmin z hz
-  have hz₀ : 0 ≤ z.re := ha₀.trans (hym.le.trans hminz)
-  have hz₂ : 0 ≤ (z + 2).re := by simpa using (by linarith : 0 ≤ z.re + 2)
-  have hsub' : Icc (1 + 1 / R n) (2 * R n) ⊆ Ioo 1 (3 * R n) := by
-    intro t ht
-    have hr : 0 < 1 / R n := by positivity
-    exact ⟨by linarith [ht.1], by linarith [hp n,ht.2]⟩
-  obtain ⟨ε, _, hρ'⟩ := ha.2.2.2
-  obtain ⟨_, hsm, hnn, hsρ, hmass⟩ := hρ' n
-  have hcompact := isCompact_Icc.of_isClosed_subset (isClosed_tsupport _) hsρ
-  have hi : Integrable (ρ n) := hsm.continuous.integrable_of_hasCompactSupport hcompact
-  apply introTraceApprox_mellin_sub_le_of_translated (T := 3 * R n) (by linarith [hp n,hR n])
-    (ha.1 n).1.continuous ((hs n).trans hsub') hi hsm.continuous.measurable hnn hmass
-    z (z + 2) (r.val - 1 / 2) hz₀ hz₂
-  intro u hu
-  have hu' : |u| ≤ 1 / (2 * R n) := hρ n u hu
-  obtain ⟨h0,h2⟩ := hB (R n) u z (hR n) hu' hminz (hZ z hz)
-  obtain ⟨hsm',hs'⟩ := introTraceApprox_shiftTwo_dilated_support (hR n) hu' z
-  have hre : (r.val - 1 / 2).re ≤ a := by simpa using (abs_lt.mp r.property.2).2.le
-  simpa only [Pi.mul_def, h, Complex.sub_im, Complex.div_ofNat_im, Complex.one_im, zero_div, sub_zero] using
-    introTraceMellin_le_of_weighted_deriv (by linarith [hR n]) hsm' (hs'.trans hsub') h0 h2 _ hre
+  obtain ⟨h, ρ, hA, harch, hspec⟩ := introTraceApprox_exists_reference_spectral_limit (F := F)
+  refine ⟨h, ρ, hA, harch, fun χ a ha ↦ hspec χ a ha (fun z ↦ z + 2) ?_ (by fun_prop)⟩
+  intro z hz
+  change a < z.re at hz
+  change a < (z + 2).re
+  simpa using (show a < z.re + 2 by linarith)
 
 /-- At parameter two the radial approximant is real and nonnegative. -/
 private theorem introTraceApprox_rat_spectral_tendsto_atBot_profile (h ρ : ℕ → ℝ → ℝ)
