@@ -14,7 +14,7 @@ import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongDualPrecompact
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.ChangeOfVariables
 import Mathlib.Data.Finset.Lattice.Union
 import all RiemannMasullo.AppC_LCTVS.Sec1
-import all RiemannMasullo.AppC_LCTVS.Sec2b
+import RiemannMasullo.AppC_LCTVS.Sec2b
 import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
 import RiemannMasullo.ForMathlib.Analysis.Normed.Group.InfiniteSum
 import RiemannMasullo.ForMathlib.Topology.Algebra.Valued.LocallyConstant

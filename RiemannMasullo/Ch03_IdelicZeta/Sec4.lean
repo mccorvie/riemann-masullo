@@ -9,7 +9,7 @@ import RiemannMasullo.ForMathlib.Analysis.MellinTransform.Holomorphic
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform.Gaussian
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import all RiemannMasullo.AppC_LCTVS.Sec2a_part2
-import all RiemannMasullo.AppC_LCTVS.Sec2b
+import RiemannMasullo.AppC_LCTVS.Sec2b
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import all RiemannMasullo.AppC_LCTVS.Sec5b
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3

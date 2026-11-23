@@ -6,7 +6,7 @@ public import RiemannMasullo.AppA_AlgebraicNT.Sec1
 public import Mathlib.Geometry.Manifold.ChartedSpace
 public import Mathlib.Topology.MetricSpace.Ultra.Basic
 public import Mathlib.Topology.Instances.ZMod
-import all RiemannMasullo.AppC_LCTVS.Sec2b
+import RiemannMasullo.AppC_LCTVS.Sec2b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1a
 import Mathlib.Algebra.Category.Grp.Injective
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
