@@ -30,7 +30,27 @@ def Printed.latticeShiftedPowerSum_converges : Prop :=
 the absolute value, K = {1}, x = 1 and σ = 2. The index ξ = −1 remains in the
 sum and its extended nonnegative real term is 0^(-2) = ∞. -/
 theorem Printed.latticeShiftedPowerSum_converges_false :
-    ¬ Printed.latticeShiftedPowerSum_converges := by sorry
+    ¬ Printed.latticeShiftedPowerSum_converges := by
+  intro h
+  let b := Pi.basisFun ℝ (Fin 1)
+  let x₀ : Fin 1 → ℝ := fun _ ↦ 1
+  have hx₀ : x₀ ∈ (Submodule.span ℤ (Set.range b) : Set (Fin 1 → ℝ)) :=
+    Submodule.subset_span ⟨0, by funext i; fin_cases i; simp [b, x₀]⟩
+  have hmem : -x₀ ∈ ((Submodule.span ℤ (Set.range b) : Set (Fin 1 → ℝ)) \ {x₀}) := by
+    refine ⟨neg_mem hx₀, fun hc ↦ ?_⟩
+    have := congrFun (Set.mem_singleton_iff.mp hc) 0
+    simp [x₀] at this
+    norm_num at this
+  have hlt := h 1 le_rfl (Submodule.span ℤ (Set.range b)) (normSeminorm ℝ (Fin 1 → ℝ))
+    (fun x hx ↦ norm_eq_zero.mp hx) (norm_withSeminorms ℝ (Fin 1 → ℝ)) {x₀}
+    isCompact_singleton 2 (by norm_num) x₀ rfl
+  refine hlt.ne (eq_top_iff.mpr ?_)
+  have hterm : (ENNReal.ofReal (normSeminorm ℝ (Fin 1 → ℝ) ((-x₀) + x₀))) ^ (-(2 : ℝ)) = ⊤ := by
+    rw [neg_add_cancel, map_zero, ENNReal.ofReal_zero]
+    exact ENNReal.zero_rpow_of_neg (by norm_num)
+  rw [← hterm]
+  exact le_tsum (fun ξ : ↥((Submodule.span ℤ (Set.range b) : Set (Fin 1 → ℝ)) \ {x₀}) ↦
+    (ENNReal.ofReal (normSeminorm ℝ (Fin 1 → ℝ) (ξ.val + x₀))) ^ (-(2 : ℝ))) ⟨_, hmem⟩
 
 local notation "𝕀[" F "]" => IdeleGroup (𝓞 F) F
 local notation "ℬ(" X ")" => SchwartzBruhat (Multiplicative X)
