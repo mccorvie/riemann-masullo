@@ -45,11 +45,52 @@ def Printed.reciprocalPartialHeckeEulerProduct_unshifted_zeros : Prop :=
     let s : ℂ := ((m : ℝ) * period(v.val) : ℝ) * Complex.I
     ∏ w : S, (1 - (w.val.asIdeal.absNorm : ℂ) ^ (-s - (t w : ℂ) * Complex.I)) = 0
 
+private theorem Printed.reciprocalPartialHeckeEulerProduct_unshifted_zeros_false_factor (q : ℕ)
+    (hq : 1 < q) :
+    1 - (q : ℂ) ^ (-(0 : ℂ) - ((Real.pi / Real.log q : ℝ) : ℂ) * Complex.I) ≠ 0 := by
+  have hq0 : (q : ℂ) ≠ 0 := by exact_mod_cast (zero_lt_one.trans hq).ne'
+  have hlog : Real.log q ≠ 0 := by
+    have : (1 : ℝ) < q := by exact_mod_cast hq
+    exact (Real.log_pos this).ne'
+  rw [Complex.cpow_def_of_ne_zero hq0, ← Complex.ofReal_natCast,
+    ← Complex.ofReal_log (Nat.cast_nonneg q)]
+  have : ((Real.log q : ℝ) : ℂ) * (-(0 : ℂ) - ((Real.pi / Real.log q : ℝ) : ℂ) * Complex.I) =
+      -(Real.pi * Complex.I) := by
+    have hlogc : ((Real.log q : ℝ) : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr hlog
+    rw [Complex.ofReal_div]
+    field_simp
+    ring
+  rw [this, Complex.exp_neg, Complex.exp_pi_mul_I]
+  norm_num
+
+private theorem Printed.reciprocalPartialHeckeEulerProduct_unshifted_zeros_false_ulift
+    (h : Printed.reciprocalPartialHeckeEulerProduct_unshifted_zeros.{u}) : False := by
+  have : CharZero (ULift.{u} ℚ) := ⟨fun a b hab ↦ by simpa using congrArg ULift.down hab⟩
+  have : NumberField (ULift.{u} ℚ) := ⟨⟩
+  obtain ⟨m, hm⟩ := Ideal.exists_maximal (𝓞 (ULift.{u} ℚ))
+  let v : HeightOneSpectrum (𝓞 (ULift.{u} ℚ)) := ⟨m, hm.isPrime, NeZero.ne m⟩
+  have hq : 1 < Ideal.absNorm v.asIdeal := by
+    have h0 : Ideal.absNorm v.asIdeal ≠ 0 := by
+      rw [Ne, Ideal.absNorm_eq_zero_iff]
+      exact v.ne_bot
+    have h1 : Ideal.absNorm v.asIdeal ≠ 1 := by
+      rw [Ne, Ideal.absNorm_eq_one_iff]
+      exact v.isPrime.ne_top
+    omega
+  have key := h (ULift.{u} ℚ) {v} (fun _ ↦ Real.pi / Real.log (Ideal.absNorm v.asIdeal))
+    ⟨v, Finset.mem_singleton_self v⟩ 0
+  simp only [Int.cast_zero, zero_mul, Complex.ofReal_zero] at key
+  rw [Finset.prod_coe_sort ({v} : Finset _)
+    (fun w ↦ 1 - (w.asIdeal.absNorm : ℂ) ^ (-(0 : ℂ) - ((Real.pi / Real.log
+      (Ideal.absNorm v.asIdeal) : ℝ) : ℂ) * Complex.I)), Finset.prod_singleton] at key
+  exact Printed.reciprocalPartialHeckeEulerProduct_unshifted_zeros_false_factor _ hq key
+
 /-- Paper: Before Lemma 7.1.1.1, p. 313.
 Take the rational field, the singleton place above 2, and tᵥ = π/(2 log 2).
 At m = 0 the factor is 1 − exp(−iπ/2) = 1 + i. -/
 theorem Printed.reciprocalPartialHeckeEulerProduct_unshifted_zeros_false :
-    ¬ Printed.reciprocalPartialHeckeEulerProduct_unshifted_zeros := by sorry
+    ¬ Printed.reciprocalPartialHeckeEulerProduct_unshifted_zeros :=
+  fun h ↦ Printed.reciprocalPartialHeckeEulerProduct_unshifted_zeros_false_ulift h
 
 /-- Paper: Lemma 7.1.2.2(1), p. 317.
 As printed: At every complex place of angular weight k, a nonpositive integer in
