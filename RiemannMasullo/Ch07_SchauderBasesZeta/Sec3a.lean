@@ -328,6 +328,43 @@ variable (A : E₁ →L[ℂ] E₂) (A₀ : (E₁ ⧸ H₁) →L[ℂ] (E₂ ⧸ H
 variable (x : ℕ → E₂) (d : ℕ → StrongDual ℂ (E₂ ⧸ H₂))
 variable (B : Seminorm ℂ (E₂ ⧸ H₂) → ℕ → ℝ≥0) (y : ℕ → E₁)
 
+/-- The induced map of quotients is a linear homeomorphism: it is injective because
+`H₁` is the preimage of `H₂`, and open by the open mapping theorem for Fréchet spaces. -/
+private theorem orbitalQuotient_lift_equiv (E₁ E₂ : Type*) [AddCommGroup E₁] [Module ℂ E₁]
+    [TopologicalSpace E₁] [AddCommGroup E₂] [Module ℂ E₂] [TopologicalSpace E₂]
+    [IsTopologicalAddGroup E₁] [ContinuousSMul ℂ E₁] [ContinuousSMul ℂ E₂]
+    (H₁ : Submodule ℂ E₁) (H₂ : Submodule ℂ E₂)
+    (A : E₁ →L[ℂ] E₂) (A₀ : (E₁ ⧸ H₁) →L[ℂ] (E₂ ⧸ H₂))
+    (hF₁ : IsFrechetTVS E₁) (hF₂ : IsFrechetTVS E₂)
+    (hH₁ : IsClosed (H₁ : Set E₁)) (hH₂ : IsClosed (H₂ : Set E₂))
+    (hpre : H₂.comap A.toLinearMap = H₁)
+    (hA₀ : A₀.comp H₁.mkQL = H₂.mkQL.comp A) (hsurj : Surjective A₀) :
+    ∃ e : (E₁ ⧸ H₁) ≃L[ℂ] (E₂ ⧸ H₂), e.toContinuousLinearMap = A₀ := by
+  have hQ₁ := isFrechetTVS_quotient hF₁ H₁ hH₁
+  have hQ₂ := isFrechetTVS_quotient hF₂ H₂ hH₂
+  obtain ⟨hadd₂, -, -, -⟩ := hF₂
+  let := hadd₂
+  obtain ⟨_, _, hmet₁, _⟩ := hQ₁
+  have hinj : Injective A₀ := by
+    refine (injective_iff_map_eq_zero A₀).mpr fun z hz ↦ ?_
+    induction z using Submodule.Quotient.induction_on with
+    | _ a =>
+    have h2 : H₂.mkQ (A a) = 0 := by
+      have := congrArg (fun L : (E₁ →L[ℂ] (E₂ ⧸ H₂)) ↦ L a) hA₀
+      exact this.symm.trans hz
+    have ha : a ∈ H₁ := hpre ▸ (Submodule.Quotient.mk_eq_zero H₂).mp h2
+    exact (Submodule.Quotient.mk_eq_zero H₁).mpr ha
+  have hop : IsOpenMap A₀ := isOpenMap_of_surjective_toLF (isLFSpace_of_isFrechetTVS hQ₂)
+    (X := fun _ ↦ E₁ ⧸ H₁) (fun _ ↦ isFrechetTVS_quotient hF₁ H₁ hH₁)
+    (fun _ ↦ ContinuousLinearMap.id ℂ (E₁ ⧸ H₁)) (fun _ ↦ Subset.rfl) (fun a ↦ ⟨0, a, rfl⟩) A₀
+    hsurj
+  let e := LinearEquiv.ofBijective A₀.toLinearMap ⟨hinj, hsurj⟩
+  let d : (E₁ ⧸ H₁) ≃L[ℂ] (E₂ ⧸ H₂) :=
+    { e with
+      continuous_toFun := A₀.continuous
+      continuous_invFun := e.toEquiv.continuous_symm_iff.mpr hop }
+  exact ⟨d, rfl⟩
+
 /-- Paper: Lemma 7.3.1.5(1), p. 343.
 Lifts of the absolute basis vectors give an absolute basis in the first quotient.
 Their biorthogonal functionals are an unconditional basis of its strong dual. -/
@@ -364,7 +401,17 @@ theorem orbitalQuotient_lift_growth
     ∃ e : (E₁ ⧸ H₁) ≃L[ℂ] (E₂ ⧸ H₂), e.toContinuousLinearMap = A₀ ∧
       ∀ q : Seminorm ℂ (E₁ ⧸ H₁), Continuous q →
         (fun n ↦ q (H₁.mkQL (y n))) =O[atTop]
-          (fun n ↦ (B (q.comp e.symm.toLinearMap) n : ℝ)) := by sorry
+          (fun n ↦ (B (q.comp e.symm.toLinearMap) n : ℝ)) := by
+  obtain ⟨e, he⟩ := orbitalQuotient_lift_equiv E₁ E₂ H₁ H₂ A A₀ _hF₁ _hF₂ _hH₁ _hH₂ _hpre _hA₀
+    _hsurj
+  refine ⟨e, he, fun q hq ↦ ?_⟩
+  have hey (n : ℕ) : H₁.mkQL (y n) = e.symm (H₂.mkQL (x n)) := by
+    rw [ContinuousLinearEquiv.eq_symm_apply, ← _hy n]
+    change e.toContinuousLinearMap _ = _
+    rw [he]
+    exact congrArg (fun L : (E₁ →L[ℂ] (E₂ ⧸ H₂)) ↦ L (y n)) _hA₀
+  simp only [hey]
+  exact _hB (q.comp e.symm.toLinearMap) (hq.comp e.symm.continuous)
 
 end QuotientTransfer
 
