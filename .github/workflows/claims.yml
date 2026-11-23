@@ -9,11 +9,10 @@ name: Claims
 # request refers to are released (scripts/ci/stale_claims.py), so that an issue does not sit idle
 # behind a claim nobody is working on. The holder can claim it again.
 #
-# CLAIMS_CLOSE below, when set, is the time (UTC, ISO 8601) from which no new claim is recorded:
-# the phase is being finished and the open pull requests worked off (#6674). From then on a
-# "Claiming" comment gets a reply and nothing else, and idle claims are no longer released,
-# since nobody could take the issue over. Releasing by hand still works. Set it to "" to accept
-# claims again.
+# CLAIMS_CLOSE below, when set, is the time (UTC, ISO 8601) from which new claims are paused
+# while the open pull requests are worked off (#6674). A "Claiming" comment made after it gets
+# a reply and nothing else, and idle claims are not released meanwhile, since nobody could take
+# the issue over. Releasing by hand still works. Set it to "" to accept claims again.
 
 on:
   issue_comment:
@@ -43,7 +42,7 @@ jobs:
           sparse-checkout: scripts/ci
       - run: |
           if [ -n "$CLAIMS_CLOSE" ] && [ "$(date -u +%s)" -ge "$(date -u -d "$CLAIMS_CLOSE" +%s)" ]; then
-            echo "claims closed at $CLAIMS_CLOSE: idle claims are not released"; exit 0
+            echo "claims paused since $CLAIMS_CLOSE: idle claims are not released"; exit 0
           fi
           python3 scripts/ci/stale_claims.py --apply
 
@@ -73,7 +72,7 @@ jobs:
           if [ -n "$CLAIMS_CLOSE" ] && [ "$(date -u -d "${COMMENT_AT:-now}" +%s)" -ge "$(date -u -d "$CLAIMS_CLOSE" +%s)" ]; then closed=1; fi
           if [[ "$first" =~ ^claim(ing|ed)?([^a-z]|$) ]]; then
             if [ $closed = 1 ] && [ $mine = 0 ]; then
-              gh issue comment "$ISSUE" --body "New claims closed at $CLAIMS_CLOSE: this phase of the project is being finished and the open pull requests are being worked off, so this claim was not recorded and the issue stays open for the next phase. Details: $CLAIMS_NOTICE"
+              gh issue comment "$ISSUE" --body "New claims are paused since $CLAIMS_CLOSE while the open pull requests are checked and merged, so this claim was not recorded. Claims will reopen when the backlog is cleared; please claim it again then. Details: $CLAIMS_NOTICE"
             elif [ $claimed = 0 ]; then
               gh issue edit "$ISSUE" --add-label claimed --add-assignee "$WHO"
             elif [ $mine = 0 ] && [ $member = 0 ]; then
