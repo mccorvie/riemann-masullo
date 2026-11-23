@@ -4141,6 +4141,222 @@ theorem introTraceApprox_exists_shiftTwo_spectral_limit :
   change a < (z + 2).re
   simpa using (show a < z.re + 2 by linarith)
 
+/-- At real parameters two and four the power difference is a nonnegative real function. -/
+private theorem introTraceApprox_exists_rat_sub_shiftTwo_unmatched_power (x : ℝ) :
+    introTracePower 2 x - introTracePower 4 x =
+      ((if 1 < x then (x ^ 2 - 1) / x ^ 4 else 0 : ℝ) : ℂ) := by
+  by_cases hx : 1 < x
+  · have hn : (x : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (by linarith)
+    simp only [introTracePower, hx, ite_true, Complex.cpow_neg, Complex.cpow_ofNat]
+    push_cast
+    field_simp
+  · simp [introTracePower, hx]
+
+/-- A mollifier supported between `-ε` and `-ε/2` leaves a contribution of order
+`ε log (1/d)` when the cutoff already equals one on `[1+d,2]`. -/
+private theorem introTraceApprox_exists_rat_sub_shiftTwo_unmatched_lower (h ρ : ℕ → ℝ → ℝ)
+    (hA : IsIntroTraceApproximation h ρ) (n : ℕ) {ε d : ℝ}
+    (he : 0 < ε) (he1 : ε ≤ 1) (hd : 0 < d) (hd1 : d ≤ 1)
+    (hcut : ∀ t ∈ Icc (1 + d) 2, h n t = 1)
+    (hs : ∀ u, ρ n u ≠ 0 → u ∈ Icc (-ε) (-ε / 2)) :
+    ε / 324 * Real.log (1 / d) ≤
+      (introTraceArchimedean (F := ℚ) 1 (introTraceApprox (h n) (ρ n) 2) Rat.infinitePlace -
+       introTraceArchimedean (F := ℚ) 1 (introTraceApprox (h n) (ρ n) 4) Rat.infinitePlace).re := by
+  let P := fun x : ℝ ↦ if 1 < x then (x ^ 2 - 1) / x ^ 4 else 0
+  let b := fun t : ℝ ↦ h n t * ∫ u, ρ n u * P (t - u)
+  let g := fun t : ℝ ↦ |t|⁻¹ * (b |t| * Real.sqrt |t| / |1 - t|)
+  let f := fun z : ℂ ↦ introTraceApprox (h n) (ρ n) z
+  let W := fun (z : ℂ) (t : ℝ) ↦ ((|t|⁻¹ : ℝ) : ℂ) *
+    (f z |t| * (Real.sqrt |t| : ℂ) / ((|1 - t| : ℝ) : ℂ))
+  obtain ⟨_, _, hρ⟩ := hA.2.2.2
+  obtain ⟨_, hsm, hpos, hsupp, hmass⟩ := hρ n
+  have hc : HasCompactSupport (ρ n) := isCompact_Icc.of_isClosed_subset (isClosed_tsupport _) hsupp
+  have hr : Integrable (ρ n) := hsm.continuous.integrable_of_hasCompactSupport hc
+  have hi (t : ℝ) (z : ℂ) : Integrable (fun u : ℝ ↦ (ρ n u : ℂ) * introTracePower z (t - u)) :=
+    (hc.comp_left (g := Complex.ofReal) (by simp)).convolutionExists_left (ContinuousLinearMap.mul ℝ ℂ)
+      (Complex.continuous_ofReal.comp hsm.continuous) (introTracePower_locallyIntegrable z) t
+  -- Express the convolution difference as an integral of a nonnegative real function.
+  have hpt (t u : ℝ) : (ρ n u : ℂ) * introTracePower 2 (t - u) -
+      (ρ n u : ℂ) * introTracePower 4 (t - u) = ((ρ n u * P (t - u) : ℝ) : ℂ) := by
+    rw [← mul_sub, introTraceApprox_exists_rat_sub_shiftTwo_unmatched_power, Complex.ofReal_mul]
+  have hpre (t : ℝ) : Integrable (fun u ↦ ρ n u * P (t - u)) := by
+    exact ((hi t 2).sub (hi t 4)).re.congr (.of_forall fun u ↦ by
+      change ((ρ n u : ℂ) * _ - (ρ n u : ℂ) * _).re = _
+      rw [hpt, Complex.ofReal_re])
+  have hb (t : ℝ) : f 2 t - f 4 t = (b t : ℂ) := by
+    dsimp only [f, introTraceApprox, b]
+    rw [← mul_sub, ← integral_sub (hi t 2) (hi t 4), Complex.ofReal_mul, ← integral_complex_ofReal]
+    congr 1
+    exact integral_congr_ae (.of_forall fun u ↦ hpt t u)
+  have hP0 (x : ℝ) : 0 ≤ P x := by
+    dsimp only [P]
+    split_ifs with ht
+    · exact div_nonneg (by nlinarith) (by positivity)
+    · exact le_rfl
+  have hb0 (t : ℝ) : 0 ≤ b t := mul_nonneg ((hA.1 n).2.2.2 t).1
+    (integral_nonneg fun u ↦ mul_nonneg (hpos _) (hP0 _))
+  have hbl (t : ℝ) (ht : t ∈ Icc (1 + d) 2) : ε / 81 ≤ b t := by
+    dsimp only [b]
+    rw [hcut t ht, one_mul]
+    calc ε / 81 = ∫ u, ρ n u * (ε / 81) := by rw [integral_mul_const, hmass, one_mul]
+         _ ≤ _ := integral_mono (hr.mul_const _) (hpre t) fun u ↦ by
+           by_cases hu : ρ n u = 0
+           · simp [hu]
+           obtain ⟨hlo, hhi⟩ := hs u hu
+           obtain ⟨ht₁, ht₂⟩ := ht
+           have hv : 1 < t - u := by linarith
+           have h3 : t - u ≤ 3 := by linarith
+           have h4 : (t - u) ^ 4 ≤ 81 := by
+             simpa only [show (3 : ℝ) ^ 4 = 81 by norm_num] using
+               pow_le_pow_left₀ (by linarith : 0 ≤ t - u) h3 4
+           apply mul_le_mul_of_nonneg_left _ (hpos u)
+           rw [show P (t - u) = ((t - u) ^ 2 - 1) / (t - u) ^ 4 by simp [P, hv]]
+           apply (le_div_iff₀ (pow_pos (by linarith) 4)).2
+           calc ε / 81 * (t - u) ^ 4 ≤ ε / 81 * 81 := by gcongr
+                _ ≤ (t - u) ^ 2 - 1 := by nlinarith [sq_nonneg (t - u - 1)]
+  -- Pass to the real coordinate and retain the positive branch on the shell.
+  have hW (z : ℂ) : Integrable (W z) := by
+    obtain ⟨hcon, hcom⟩ := introTraceApprox_rat_sub_shiftTwo_profile h ρ hA n z
+    exact introTraceApprox_rat_sub_shiftTwo_integrable _ hcon hcom (introTraceApprox_support h ρ hA n z)
+  have hWe (t : ℝ) : W 2 t - W 4 t = (g t : ℂ) := by
+    dsimp only [W, g]
+    push_cast
+    rw [← hb]
+    ring
+  have hgi : Integrable g := ((hW 2).sub (hW 4)).re.congr (.of_forall fun t ↦ by
+    change (W 2 t - W 4 t).re = _
+    rw [hWe, Complex.ofReal_re])
+  have heq :
+      (introTraceArchimedean (F := ℚ) 1 (f 2) Rat.infinitePlace -
+       introTraceArchimedean (F := ℚ) 1 (f 4) Rat.infinitePlace).re = (∫ t, g t) / 2 := by
+    have hm (z : ℂ) := (introTraceApprox_rat_sub_shiftTwo_profile h ρ hA n z).1.measurable
+    rw [introTraceArchimedean_rat_sub_shiftTwo_integral _ (hm 2),
+        introTraceArchimedean_rat_sub_shiftTwo_integral _ (hm 4), ← mul_sub]
+    change ((1 / 2 : ℂ) * ((∫ t, W 2 t) - ∫ t, W 4 t)).re = _
+    rw [← integral_sub (hW 2) (hW 4), integral_congr_ae (.of_forall hWe), integral_complex_ofReal]
+    simp [Complex.mul_re, div_eq_mul_inv, mul_comm]
+  have hg0 (t : ℝ) : 0 ≤ g t := by
+    exact mul_nonneg (by positivity)
+      (div_nonneg (mul_nonneg (hb0 _) (Real.sqrt_nonneg _)) (abs_nonneg _))
+  have hgl (t : ℝ) (ht : t ∈ Icc (1 + d) 2) : (ε / 162) * (t - 1)⁻¹ ≤ g t := by
+    have ht0 : 0 < t := by linarith [ht.1]
+    have ht1 : 1 < t := by linarith [ht.1]
+    have hroot : 1 ≤ Real.sqrt t := by simpa using Real.sqrt_le_sqrt ht1.le
+    have hinv : 1 / 2 ≤ t⁻¹ := by simpa only [one_div] using inv_anti₀ ht0 ht.2
+    have hcoeff := mul_le_mul (hbl t ht) hroot (by norm_num) (hb0 t)
+    dsimp only [g]
+    rw [abs_of_pos ht0, abs_sub_comm, abs_of_pos (sub_pos.mpr ht1)]
+    calc (ε / 162) * (t - 1)⁻¹ = (1 / 2) * ((ε / 81 * 1) / (t - 1)) := by ring
+         _ ≤ _ := mul_le_mul hinv (div_le_div_of_nonneg_right hcoeff (by linarith))
+           (by positivity) (inv_nonneg.mpr ht0.le)
+  have hab : 1 + d ≤ 2 := by linarith
+  -- Integrating the reciprocal distance to one gives the logarithmic lower bound.
+  have hIi : IntervalIntegrable (fun t : ℝ ↦ (t - 1)⁻¹) volume (1 + d) 2 := by
+    rw [intervalIntegrable_sub_inv_iff]
+    exact Or.inr (by rw [uIcc_of_le hab]; exact fun hx ↦ by linarith [hx.1])
+  have hIl := intervalIntegral.integral_mono_on hab (hIi.const_mul (ε / 162)) hgi.intervalIntegrable hgl
+  rw [intervalIntegral.integral_const_mul, intervalIntegral.integral_comp_sub_right (fun x : ℝ ↦ x⁻¹) (1 : ℝ)] at hIl
+  have hstep : 1 + d - 1 = d := by ring
+  rw [hstep, show (2 : ℝ) - 1 = 1 by norm_num, integral_inv_of_pos hd zero_lt_one,
+    intervalIntegral.integral_of_le hab] at hIl
+  have hTot := setIntegral_le_integral (s := Ioc (1 + d) 2) hgi (.of_forall hg0)
+  change _ ≤ (introTraceArchimedean (F := ℚ) 1 (f 2) Rat.infinitePlace -
+       introTraceArchimedean (F := ℚ) 1 (f 4) Rat.infinitePlace).re
+  rw [heq]
+  linarith
+
+/-- Paper: §1.4.2–§1.4.3, pp. 28–29. For one admissible pair the real part of the
+rational real-place difference at two and four tends to positive infinity.
+Deviation: The reference subtraction is a proposed regularization of the real-place
+term. With `N = n + 1` the mollifier is supported in `[-1/N,-1/(2N)]` and the cutoff
+equals one on `[1+exp(-N²),2]`, giving a lower bound of `N/324`. -/
+theorem introTraceApprox_exists_rat_sub_shiftTwo_unmatched :
+    ∃ (h ρ : ℕ → ℝ → ℝ), IsIntroTraceApproximation h ρ ∧
+      Tendsto (fun n ↦ (introTraceArchimedean (F := ℚ) 1 (introTraceApprox (h n) (ρ n) 2) Rat.infinitePlace -
+        introTraceArchimedean (F := ℚ) 1 (introTraceApprox (h n) (ρ n) 4) Rat.infinitePlace).re) atTop atTop := by
+  let N (n : ℕ) : ℝ := (n : ℝ) + 1
+  let ε (n : ℕ) : ℝ := 1 / N n
+  let d (n : ℕ) := Real.exp (-(N n) ^ 2)
+  let k (n : ℕ) := n + ⌈2 * Real.exp ((N n) ^ 2)⌉₊
+  let R (j : ℕ) : ℝ := (j : ℝ) + 4
+  let H (j : ℕ) (t : ℝ) := Real.smoothTransition (R j * (t - 1) - 1) * Real.smoothTransition (2 - t / R j)
+  obtain ⟨_, hA, _⟩ := introTraceApprox_exists_dilated
+  change IsIntroTraceApproximation H _ at hA
+  have hN (n : ℕ) : 0 < N n := by dsimp [N]; positivity
+  have he (n : ℕ) : 0 < ε n := one_div_pos.mpr (hN n)
+  have he1 (n : ℕ) : ε n ≤ 1 := (div_le_one (hN n)).2 (by dsimp [N]; linarith)
+  let b (n : ℕ) : ContDiffBump (-3 * ε n / 4) :=
+    ⟨ε n / 8, ε n / 4, by linarith [he n], by linarith [he n]⟩
+  let ρ (n : ℕ) := (b n).normed volume
+  have hneg (n : ℕ) : tsupport (ρ n) ⊆ Icc (-ε n) (-ε n / 2) := by
+    dsimp only [ρ]
+    rw [(b n).tsupport_normed_eq, Real.closedBall_eq_Icc]
+    exact Icc_subset_Icc (by dsimp [b]; linarith) (by dsimp [b]; linarith)
+  have hmono : Monotone k := by
+    intro i j hij
+    have hij' : N i ≤ N j := by dsimp [N]; exact_mod_cast (Nat.add_le_add_right hij 1)
+    exact Nat.add_le_add hij (Nat.ceil_mono (by gcongr))
+  have hk : Tendsto k atTop atTop := tendsto_atTop_mono (fun n ↦ Nat.le_add_right n _) tendsto_id
+  have hfamily : IsIntroTraceApproximation (H ∘ k) ρ := by
+    refine ⟨fun _ ↦ hA.1 _, hA.2.1.comp hmono, fun t ht ↦ (hA.2.2.1 t ht).comp hk,
+      ε, tendsto_one_div_add_atTop_nhds_zero_nat, fun n ↦ ?_⟩
+    refine ⟨he n, (b n).contDiff_normed, (b n).nonneg_normed,
+      (hneg n).trans (Icc_subset_Icc le_rfl (by linarith [he n])), (b n).integral_normed⟩
+  have hbound (n : ℕ) :
+      N n / 324 ≤ (introTraceArchimedean (F := ℚ) 1 (introTraceApprox ((H ∘ k) n) (ρ n) 2) Rat.infinitePlace -
+        introTraceArchimedean (F := ℚ) 1 (introTraceApprox ((H ∘ k) n) (ρ n) 4) Rat.infinitePlace).re := by
+    have hd : 0 < d n := Real.exp_pos _
+    have hd1 : d n ≤ 1 := Real.exp_le_one_iff.mpr (neg_nonpos.mpr (sq_nonneg _))
+    have hR : 2 * Real.exp ((N n) ^ 2) ≤ R (k n) := by
+      have hceil := Nat.le_ceil (2 * Real.exp ((N n) ^ 2))
+      dsimp only [R, k]
+      push_cast
+      linarith [Nat.cast_nonneg (α := ℝ) n]
+    have hR₀ : 4 ≤ R (k n) := by dsimp [R]; linarith [Nat.cast_nonneg (α := ℝ) (k n)]
+    have hcut (t : ℝ) (ht : t ∈ Icc (1 + d n) 2) : (H ∘ k) n t = 1 := by
+      have hdR : 2 ≤ R (k n) * d n := by
+        dsimp only [d]; rw [Real.exp_neg]
+        simpa only [div_eq_mul_inv] using (le_div_iff₀ (Real.exp_pos _)).2 hR
+      have hlt : 1 ≤ R (k n) * (t - 1) - 1 := by
+        have := mul_le_mul_of_nonneg_left (show d n ≤ t - 1 by linarith [ht.1]) (by linarith : 0 ≤ R (k n))
+        linarith
+      have hrt : 1 ≤ 2 - t / R (k n) := by
+        have := (div_le_one (by linarith : 0 < R (k n))).2 (show t ≤ R (k n) by linarith [ht.2])
+        linarith
+      simp [H, Real.smoothTransition.one_of_one_le hlt, Real.smoothTransition.one_of_one_le hrt]
+    have hlog : Real.log (1 / d n) = (N n) ^ 2 := by simp [d, Real.exp_neg]
+    have hl := introTraceApprox_exists_rat_sub_shiftTwo_unmatched_lower (H ∘ k) ρ hfamily n (he n) (he1 n) hd hd1 hcut
+      (fun u hu ↦ hneg n (subset_tsupport _ hu))
+    rw [hlog] at hl
+    convert hl using 1
+    dsimp only [ε]
+    field_simp [(hN n).ne']
+  refine ⟨H ∘ k, ρ, hfamily, tendsto_atTop_mono hbound ?_⟩
+  refine tendsto_atTop.2 fun M ↦ ?_
+  filter_upwards [tendsto_natCast_atTop_atTop.eventually_ge_atTop (324 * M)] with n hn
+  dsimp [N]
+  linarith
+
+/-- Paper: §1.4.3, p. 29. The shift-by-two rational real-place limit fails for
+some admissible pairs on their original common index. The obstruction occurs at two.
+Deviation: The preceding counterexample tests the proposed reference subtraction.
+The cofinal reindexing in `introTraceApprox_rat_sub_shiftTwo_tendsto` gives the
+locally uniform limit for each initial pair. -/
+theorem introTraceApprox_not_forall_rat_sub_shiftTwo :
+    ¬ ∀ (h ρ : ℕ → ℝ → ℝ), IsIntroTraceApproximation h ρ →
+      TendstoLocallyUniformlyOn (fun n z ↦
+        introTraceArchimedean (F := ℚ) 1 (introTraceApprox (h n) (ρ n) z) Rat.infinitePlace -
+        introTraceArchimedean (F := ℚ) 1 (introTraceApprox (h n) (ρ n) (z + 2)) Rat.infinitePlace)
+        (fun z ↦ 1 / (z + 1 / 2)) atTop right(-(1 / 2 : ℝ)) := by
+  obtain ⟨h, ρ, hA, hdiv⟩ := introTraceApprox_exists_rat_sub_shiftTwo_unmatched
+  intro hlim
+  have hp := (hlim h ρ hA).tendsto_at (a := (2 : ℂ)) (by
+    change -(1 / 2 : ℝ) < (2 : ℂ).re
+    norm_num)
+  apply not_tendsto_nhds_of_tendsto_atTop hdiv _
+  simpa only [show (2 : ℂ) + 2 = 4 by norm_num, Function.comp_def] using
+    Complex.continuous_re.continuousAt.tendsto.comp hp
+
 /-- At parameter two the radial approximant is real and nonnegative. -/
 private theorem introTraceApprox_rat_spectral_tendsto_atBot_profile (h ρ : ℕ → ℝ → ℝ)
     (hA : IsIntroTraceApproximation h ρ) (n : ℕ) :
