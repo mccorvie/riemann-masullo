@@ -1253,6 +1253,30 @@ section OrbitalBasisProperties
 local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
 
 
+/-- The primary orbital quotient is a nuclear Fréchet space, and evaluation into its strong
+bidual is a homeomorphism. -/
+private theorem sLocalOrbitalSystem_quotient_nuclearFrechet (p : Vℚ) (ω : PontryaginDual J₁) :
+    IsFrechetTVS (Q(p, ω)) ∧ IsNuclearTVS.{0} (Q(p, ω)) ∧
+      IsHomeomorph (ContinuousLinearMap.applyₗ (E := Q(p, ω)) ℂ (RingHom.id ℂ)) := by
+  have hR : IsClosed (Rₚ(p, ω) : Set (Θₛ(ω))) :=
+    (sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding (F := F) (S := S) hₚ(p) ω).isClosed_range
+  have hF : IsFrechetTVS (Q(p, ω)) :=
+    isFrechetTVS_quotient (sLocalHomogeneousThetaSpace_frechet ω) _ hR
+  have hT2 : T2Space (Θₛ(ω) ⧸ Rₚ(p, ω)) := by
+    obtain ⟨_, _, hmet, _⟩ := hF
+    let : TopologicalSpace.MetrizableSpace (Θₛ(ω) ⧸ Rₚ(p, ω)) := hmet
+    infer_instance
+  have hN : IsNuclearTVS.{0} (Q(p, ω)) :=
+    isNuclearTVS_quotient (sLocalHomogeneousThetaSpace_nuclear ω) _
+  have hmon := montelSpace_of_schwartz_frechet hF (isSchwartzTVS_of_isNuclearTVS hN)
+  have hbar := isFrechetTVS_barrelled hF
+  refine ⟨hF, hN, ?_⟩
+  obtain ⟨_, hpoly, hmet, _⟩ := hF
+  let : UniformSpace (Q(p, ω)) := IsTopologicalAddGroup.rightUniformSpace (Q(p, ω))
+  have : IsUniformAddGroup (Q(p, ω)) := isUniformAddGroup_of_addCommGroup
+  exact isHomeomorph_iff_isEmbedding_surjective.mpr
+    ⟨isEmbedding_strongBidual_eval, surjective_strongBidual_eval⟩
+
 /-- Paper: Corollary 7.3.1.8(1), p. 350.
 The enumerated polar and Fourier systems give equicontinuous, shrinking and boundedly
 complete bases of the strong dual.
@@ -1290,7 +1314,26 @@ theorem sLocalOrbitalSystem_quotient_basis_properties
         sLocalOrbitalFourierJet (F := F) (S := S) (T := Sₚ(p)) (ω := ω) (σ n) x))
     (_he : IsSchauderBasis e d) :
     SchauderBasis.IsEquicontinuous e d ∧ SchauderBasis.IsShrinking e d ∧
-      SchauderBasis.IsBoundedlyComplete e := by sorry
+      SchauderBasis.IsBoundedlyComplete e := by
+  obtain ⟨hF, hN, hrefl⟩ := sLocalOrbitalSystem_quotient_nuclearFrechet (F := F) (S := S) p ω
+  have habs := SchauderBasis.isAbsolute_of_nuclear_frechet hN hF _he
+  have hbar := isFrechetTVS_barrelled hF
+  obtain ⟨_, hpoly, _, hcomp⟩ := hF
+  have heq : SchauderBasis.IsEquicontinuous e d := by
+    let : UniformSpace (Q(p, ω)) := IsTopologicalAddGroup.rightUniformSpace (Q(p, ω))
+    have : IsUniformAddGroup (Q(p, ω)) := isUniformAddGroup_of_addCommGroup
+    have htend (z : Q(p, ω)) :
+        Tendsto (fun k ↦ SchauderBasis.partialProjection e d k z) atTop (𝓝 z) := by
+      have hsum := _he.2 z
+      rw [HasSum, SummationFilter.conditional_filter_eq_map_range, tendsto_map'_iff] at hsum
+      simpa only [Function.comp_def, ContinuousLinearMap.coe_coe,
+        SchauderBasis.partialProjection, ← Nat.range_succ_eq_Iic,
+        sum_apply, ContinuousLinearMap.smulRight_apply]
+        using hsum.comp (tendsto_add_atTop_nat 1)
+    exact (PolynormableSpace.banach_steinhaus (𝓕 := SchauderBasis.partialProjection e d)
+      (fun z ↦ (htend z).isVonNBounded_range ℂ)).equicontinuous 0
+  exact ⟨heq, SchauderBasis.isShrinking_of_isAbsolute hcomp hrefl _he habs,
+    SchauderBasis.isBoundedlyComplete_of_isAbsolute hcomp hrefl _he habs⟩
 
 end OrbitalBasisProperties
 
