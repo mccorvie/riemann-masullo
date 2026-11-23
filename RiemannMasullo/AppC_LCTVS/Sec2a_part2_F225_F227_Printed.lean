@@ -1814,8 +1814,8 @@ end completedInductiveTensor_bornological_false_aux
 /-- Paper: Proposition C.2.3.13(3), p. 683. Let S be stationary in ω₁ with stationary
 complement and let X = S ∪ {ω₁} have the subspace topology from ω₁ + 1. Take E = C(X, ℂ)
 with compact convergence and F = ℂ. The space X is zero-dimensional and Lindelöf,
-so every seminorm bounded on bounded sets is controlled by a compact support. Its completion is C(S, ℂ) × ℂ with
-compact convergence on S. Each continuous function on S is eventually constant.
+so every seminorm bounded on bounded sets is controlled by a compact support. Its completion
+is C(S, ℂ) × ℂ with compact convergence on S. Each continuous function on S is eventually constant.
 The norm of its eventual value is a seminorm bounded on bounded sets, since countably
 many stabilization ordinals have a countable supremum. It is discontinuous, since
 one can set the function to zero on any prescribed compact set and to one on a tail. -/
