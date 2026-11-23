@@ -799,6 +799,43 @@ def sLocalGammaFiltration (ω : PontryaginDual J₁(S)) (N : depths) :
     Submodule ℂ (fullPV(ω)) :=
   ⨅ j : ΓIndex(ω, sLocalGammaPoleCutoff (F := F) (S := S) ω N), (ΓCoeff(ω, j)).ker
 
+/-- On a full finite principal value only archimedean poles remain. Express the
+pole bound of §5.3.4 in the norm coordinate centered at the given character. -/
+private theorem gammaFiltration_principalValue_bound (g : B(S)) (c : Xₛ) :
+    sLocalPolarMultiplicity (sAdelePrincipalValue F (Finset.Subset.refl S) g) c ≤
+      (arch(c)).card := by
+  classical
+  obtain ⟨χ, a, rfl⟩ := exists_sLocalNormTwist (F := F) (S := S) c
+  let d : Xₛ := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ
+  have translate (H : Xₛ → ℂ) :
+      meromorphicOrderAt (fun z : ℂ ↦ H (shift(shift(d, a), z))) 0 =
+        meromorphicOrderAt (fun z : ℂ ↦ H (shift(d, z))) a := by
+    have e : (fun z : ℂ ↦ H (shift(shift(d, a), z))) =
+        (fun z : ℂ ↦ H (shift(d, z))) ∘ (· + a) := by
+      funext z
+      rw [normTwist_normTwist]
+      rfl
+    rw [e, meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt, zero_add]
+  have places : (arch(shift(d, a))).card = sLocalArchimedeanPoleMultiplicity χ a := by
+    unfold sLocalArchPolePlaces sLocalArchimedeanPoleMultiplicity
+    apply congrArg Finset.card
+    apply Finset.filter_congr
+    intro w _
+    rw [translate (fun b ↦ infiniteLocalEulerFactor w (sLocalInfiniteRestriction w b))]
+  let p := sAdelePrincipalValue F (Finset.Subset.refl S) g
+  change (-(meromorphicOrderAt (fun z : ℂ ↦ sLocalIdelicZFunction p (shift(shift(d, a), z))) 0).untop₀).toNat ≤ _
+  rw [translate (sLocalIdelicZFunction p), places]
+  have hb := sLocalIdelicZFunction_principalValue_pole_bound g χ a
+  change ((-(sLocalArchimedeanPoleMultiplicity χ a : ℤ) : ℤ) : WithTop ℤ) ≤
+    meromorphicOrderAt (fun z : ℂ ↦ sLocalIdelicZFunction p (shift(d, z))) a at hb
+  generalize meromorphicOrderAt (fun z : ℂ ↦ sLocalIdelicZFunction p (shift(d, z))) a = o at hb ⊢
+  induction o using WithTop.recTopCoe with
+  | top => simp
+  | coe n =>
+    have hn := WithTop.coe_le_coe.mp hb
+    simp only [WithTop.untop₀_coe]
+    omega
+
 /-- Paper: Notation 7.3.4.1, p. 364.
 A class in the full finite principal-value image is in a filtered stage exactly
 when its representative's Mellin transform has no poles at the selected centers. -/
@@ -806,7 +843,38 @@ theorem mem_sLocalGammaFiltration (ω : PontryaginDual J₁(S)) (N : depths)
     (x : fullPV(ω)) (f : B(S)) (_hf : q(S, ω) f = x.val) :
     x ∈ sLocalGammaFiltration ω N ↔
       ∀ c ∈ sLocalGammaPoleCutoff (F := F) (S := S) ω N,
-        0 ≤ meromorphicOrderAt (fun z : ℂ ↦ sLocalIdelicZFunction f (shift(c, z))) 0 := by sorry
+        0 ≤ meromorphicOrderAt (fun z : ℂ ↦ sLocalIdelicZFunction f (shift(c, z))) 0 := by
+  classical
+  change (x ∈ ⨅ j : ΓIndex(ω, sLocalGammaPoleCutoff (F := F) (S := S) ω N),
+    (ΓCoeff(ω, j)).ker) ↔ _
+  rw [Submodule.mem_iInf]
+  constructor
+  · intro h c hc
+    rw [← sLocalPolarMultiplicity_eq_zero_iff]
+    by_contra hne
+    let k := sLocalPolarMultiplicity f c
+    have hk : 0 < k := Nat.pos_of_ne_zero hne
+    let L := sLocalThetaPrincipalPartCoeff ω c hc.1 k
+    have hL : L x.val ≠ 0 := by
+      rw [← _hf]
+      exact mem_sLocalThetaPoleBound_iff_leading (sLocalZ_centered f c).1 hk rfl
+    obtain ⟨y, hy⟩ := x.property
+    obtain ⟨g, rfl⟩ := (Submodule.mkQ_surjective _) y
+    have hg : sLocalPrincipalPartCoeff c k (sAdelePrincipalValue F (Finset.Subset.refl S) g) ≠ 0 := by
+      rw [← hy] at hL
+      exact hL
+    have hle := (sLocalPrincipalPartCoeff_ne_zero_imp_pole c k hk _ hg).2
+    let j : ΓIndex(ω, sLocalGammaPoleCutoff (F := F) (S := S) ω N) :=
+      ⟨(c, k), hc.1, hc, hk, hle.trans (gammaFiltration_principalValue_bound g c)⟩
+    exact hL (h j)
+  · intro h j
+    change sLocalThetaPrincipalPartCoeff ω j.val.1 j.property.1 j.val.2 x.val = 0
+    rw [← _hf]
+    change sLocalPrincipalPartCoeff j.val.1 j.val.2 f = 0
+    by_contra hne
+    have hle := (sLocalPrincipalPartCoeff_ne_zero_imp_pole _ _ j.property.2.2.1 f hne).2
+    rw [(sLocalPolarMultiplicity_eq_zero_iff f _).2 (h _ j.property.2.1)] at hle
+    exact (not_lt_of_ge hle) j.property.2.2.1
 
 /-- Paper: Notation 7.3.4.1, p. 364.
 The denominator of the archimedean polar quotient is the subspace with entire Mellin transform.
