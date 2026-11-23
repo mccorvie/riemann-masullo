@@ -93,8 +93,8 @@ the roadmap below the order of work.
 
 ### What the formalization has found
 
-[`ERRATA.md`](ERRATA.md) has about 710 entries: some 260 statements that are false as printed,
-375 that are imprecise, inconsistent or wrongly justified, 50 placeholders or missing pieces,
+[`ERRATA.md`](ERRATA.md) has about 750 entries: some 270 statements that are false as printed,
+400 that are imprecise, inconsistent or wrongly justified, 50 placeholders or missing pieces,
 and 25 reports about parts of the paper that are not stated in Lean. Five outside audits have
 been compared with it report by report, and it names them where they found the same thing. Those in the appendices' and early
 chapters' accounts of standard material are repaired where they occur: the Lean states the

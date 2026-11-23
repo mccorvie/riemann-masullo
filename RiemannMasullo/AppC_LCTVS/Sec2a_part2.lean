@@ -4116,8 +4116,9 @@ convex topology of its canonical stage maps, as in §C.1.5. -/
 abbrev lcDirectLimitTopology (f : ∀ i j, i ≤ j → X i →ₗ[ℂ] X j) :=
   locallyConvexFinalTopology (Module.DirectLimit.of ℂ I X f)
 
-/-- Paper: (C.2.3.19), p. 680. A system consisting of a single locally convex
-space has that space as its locally convex direct limit. -/
+/-- Paper: §C.1.5, p. 663. The canonical map from the only stage of a singleton system
+to its locally convex direct limit is a homeomorphism. This checks the direct-limit construction
+used in (C.2.3.19), p. 680, which is formalized by `projectiveTensor_directLimit`. -/
 theorem lcDirectLimitTopology_singleton (V : Type*) [AddCommGroup V] [Module ℂ V]
     [TopologicalSpace V] [PolynormableSpace ℂ V] :
     let f : ∀ i j : Unit, i ≤ j → V →ₗ[ℂ] V := fun _ _ _ ↦ LinearMap.id

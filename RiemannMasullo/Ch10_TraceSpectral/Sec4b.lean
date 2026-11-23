@@ -1274,6 +1274,251 @@ theorem spectralStripTransposedKernel_tendsto (_ha : 0 < a)
 -- of the ambient net with convolution on the output factor. The quotient net
 -- only controls the part of that net with spectral output.
 
+section StripJetConvolution
+
+/-- An integral that annihilates every lower jet also annihilates a translate of the jet. -/
+private theorem integral_mul_translated_zeroJet_eq_zero
+    (η : PontryaginDual C𝔽) (b t : ℝ) (m : ℕ) (v : C𝔽 → ℂ)
+    (hv : ∀ i ≤ m, Integrable (fun x ↦ v x * spectralZeroJet η b t i x) μ𝔽 ∧
+      ∫ x, v x * spectralZeroJet η b t i x ∂μ𝔽 = 0) (g : C𝔽) :
+    ∫ y, v y * spectralZeroJet η b t m (g * y) ∂μ𝔽 = 0 := by
+  let T := ideleClassNormTwist η ((b : ℂ) + (t : ℂ) * Complex.I)
+  let L (y : C𝔽) : ℂ := logNorm y
+  let c (i : ℕ) := T g * L g ^ (m - i) * (m.choose i : ℂ)
+  have hlog (y : C𝔽) : L (g * y) = L y + L g := by
+    dsimp only [L]
+    rw [map_mul, Units.val_mul, NNReal.coe_mul, Real.log_mul
+      (NNReal.coe_ne_zero.2 (ideleClassNorm F g).ne_zero)
+      (NNReal.coe_ne_zero.2 (ideleClassNorm F y).ne_zero), Complex.ofReal_add, add_comm]
+  have hs (y : C𝔽) : v y * spectralZeroJet η b t m (g * y) =
+      ∑ i ∈ Finset.range (m + 1), c i * (v y * spectralZeroJet η b t i y) := by
+    change v y * (T (g * y) * L (g * y) ^ m) = _
+    rw [map_mul, hlog, add_pow]
+    simp only [Finset.mul_sum]
+    refine Finset.sum_congr rfl fun i _ ↦ ?_
+    change v y * (T g * T y * (L y ^ i * L g ^ (m - i) * (m.choose i : ℂ))) =
+      (T g * L g ^ (m - i) * (m.choose i : ℂ)) * (v y * (T y * L y ^ i))
+    ring
+  simp_rw [hs]
+  rw [integral_finsetSum _ fun i hi ↦ ((hv i (Finset.mem_range_succ_iff.mp hi)).1).const_mul (c i)]
+  refine Finset.sum_eq_zero fun i hi ↦ ?_
+  rw [integral_const_mul, (hv i (Finset.mem_range_succ_iff.mp hi)).2, mul_zero]
+
+local notation "raw(" χ ", " j ")" =>
+  spectralZeroJet (F := F) (χ (j).val.1) (j).val.2.1 (j).val.2.2.1 (j).val.2.2.2
+
+/-- A quotient jet functional evaluates on a representative by its explicit Haar moment. -/
+private theorem spectralStripJet_eval_mkQ
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (j : SpectralStripJetIndex χ a α s) (f : StrongDual ℂ H(a, hα, hs₀(hs)))
+    (hf : D f = (spectralStripJet_memLp χ hα hs₀(hs) j).toLp (raw(χ, j))) (v : W(α, s)) :
+    Integrable (fun y ↦ v y * raw(χ, j) y) μ𝔽 ∧
+      f (Q(a, hα, hs₀(hs)) v) = ∫ y, v y * raw(χ, j) y ∂μ𝔽 := by
+  let w (g : C𝔽) := intervalSobolevDensity (-α) α s (logNorm g)
+  have hw : Measurable w := by
+    have hD : Continuous (intervalSobolevDensity (-α) α s) := by
+      unfold intervalSobolevDensity
+      fun_prop
+    exact hD.measurable.comp ((NNReal.continuous_coe.comp
+      (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)).measurable.log)
+  have habs : μ𝔽 ≪ (μ𝔽).withDensity (fun g ↦ ENNReal.ofReal (w g)⁻¹) := by
+    refine withDensity_absolutelyContinuous' hw.inv.ennreal_ofReal.aemeasurable (.of_forall fun g ↦ ?_)
+    refine ENNReal.ofReal_ne_zero_iff.mpr (inv_pos.mpr ?_)
+    exact mul_pos (lt_max_of_lt_left (Real.exp_pos _)) (Real.rpow_pos_of_pos (by positivity) _)
+  have hae : (D f : C𝔽 → ℂ) =ᵐ[μ𝔽] raw(χ, j) := by
+    rw [hf]
+    exact habs.ae_le (MemLp.coeFn_toLp _)
+  have he := spectralSobolevPairing_dual (hStrip(hα)) hs₀(hs) (f.comp (Q(a, hα, hs₀(hs)))) v
+  change Integrable (fun y ↦ v y * D f y) μ𝔽 ∧
+      f (Q(a, hα, hs₀(hs)) v) = ∫ y, v y * D f y ∂μ𝔽 at he
+  have hEq := hae.mono fun y hy ↦ congrArg (v y * ·) hy
+  exact ⟨he.1.congr hEq, he.2.trans (integral_congr_ae hEq)⟩
+
+
+/-- Hardy translation preserves simultaneous vanishing of the lower Haar moments of a jet. -/
+private theorem integral_hardy_translation_zeroJet_eq_zero
+    (η : PontryaginDual C𝔽) (b t : ℝ) (m : ℕ) (v : W(α, s))
+    (hv : ∀ i ≤ m, Integrable (fun x ↦ v x * spectralZeroJet η b t i x) μ𝔽 ∧
+      ∫ x, v x * spectralZeroJet η b t i x ∂μ𝔽 = 0) (g : C𝔽) :
+    let T := hardySobolevTranslation μ𝔽 m𝔽 (-α) α s (hStrip(hα)) hs₀(hs)
+    ∫ y, T g v y * spectralZeroJet η b t m y ∂μ𝔽 = 0 := by
+  let J := spectralZeroJet η b t m
+  let H (y : C𝔽) := v (g⁻¹ * y) * J y
+  intro T
+  calc
+    _ = ∫ y, H y ∂μ𝔽 := integral_congr_ae
+      ((hardySobolevTranslation_apply μ𝔽 m𝔽 (-α) α s (hStrip(hα)) hs₀(hs) g v).mono
+        fun y hy ↦ congrArg (· * J y) hy)
+    _ = ∫ y, H (g * y) ∂μ𝔽 := (integral_mul_left_eq_self H g).symm
+    _ = ∫ y, v y * J (g * y) ∂μ𝔽 := by simp only [H, inv_mul_cancel_left]
+    _ = 0 := integral_mul_translated_zeroJet_eq_zero η b t m v hv g
+
+local notation "J(" χ ")" => SpectralStripJetIndex (F := F) χ a α s
+
+/-- A strip zero's entire finite jet block annihilates convolution of a basis vector
+belonging to a different zero. -/
+private theorem spectralStripConvolution_offBlock
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (x : J(χ) → H(a, hα, hs₀(hs))) (f : J(χ) → StrongDual ℂ H(a, hα, hs₀(hs)))
+    (hb : IsSpectralMarkushevichBasis x f)
+    (hj : ∀ j, D (f j) = (spectralStripJet_memLp χ hα hs₀(hs) j).toLp (raw(χ, j)))
+    (φ : BruhatCompactSupport C𝔽) {z z' : Z(χ)} (hne : z ≠ z')
+    (m : Fin (N(χ, z))) (n : Fin (N(χ, z'))) :
+    f (jet(z, m)) (spectralConvolution (F := F) a (hStrip(hα)) hs₀(hs) φ (x (jet(z', n)))) = 0 := by
+  let θ := globalThetaSobolev F a (hStrip(hα)) hs₀(hs)
+  obtain ⟨v, hv⟩ := θ.mkQ_surjective (x (jet(z', n)))
+  have heval (j : J(χ)) (w : W(α, s)) := spectralStripJet_eval_mkQ (a := a) hα hs χ j (f j) (hj j) w
+  have hmoment (i : ℕ) (hi : i ≤ m.val) :
+      Integrable (fun y ↦ v y * spectralZeroJet (χ z.val.1) z.val.2.1 z.val.2.2 i y) μ𝔽 ∧
+        ∫ y, v y * spectralZeroJet (χ z.val.1) z.val.2.1 z.val.2.2 i y ∂μ𝔽 = 0 := by
+    let k : Fin (N(χ, z)) := ⟨i, hi.trans_lt m.isLt⟩
+    have hne' : (jet(z', n) : J(χ)) ≠ jet(z, k) := by
+      intro h
+      apply hne
+      exact Subtype.ext (congrArg (fun u : J(χ) ↦ (u.val.1, u.val.2.1, u.val.2.2.1)) h).symm
+    refine ⟨(heval (jet(z, k)) v).1, (heval (jet(z, k)) v).2.symm.trans ?_⟩
+    change f (jet(z, k)) (θ.mkQ v) = 0
+    rw [hv]
+    exact hb.2.1 _ _ hne'
+  let j : J(χ) := jet(z, m)
+  let T := hardySobolevTranslation μ𝔽 m𝔽 (-α) α s (hStrip(hα)) hs₀(hs)
+  let ℓ := (f j).comp θ.mkQL
+  have hT (g : C𝔽) : ℓ (T g v) = 0 := (heval j (T g v)).2.trans
+    (integral_hardy_translation_zeroJet_eq_zero hα hs (χ z.val.1) z.val.2.1 z.val.2.2 m.val v hmoment g)
+  have hP := bruhatRegularizedAction_apply μ𝔽 T
+    (exists_hardySobolevTranslation μ𝔽 m𝔽 (-α) α s (hStrip(hα)) hs₀(hs)).choose_spec.2 φ v
+  have he := congrArg (fun p : PettisWeakCompletion W(α, s) ↦
+    (show Module.Dual ℂ (StrongDual ℂ W(α, s)) from p) ℓ) hP.2
+  change ℓ (hardySobolevTestAction μ𝔽 m𝔽 (-α) α s (hStrip(hα)) hs₀(hs) φ v) =
+    ∫ g, ℓ (φ.val g • T g v) ∂μ𝔽 at he
+  rw [← hv, spectralConvolution_mkQ]
+  refine he.trans (integral_eq_zero_of_ae (.of_forall fun g ↦ ?_))
+  change ℓ (φ.val g • T g v) = (0 : ℂ)
+  exact (map_smul ℓ _ _).trans ((congrArg (φ.val g • ·) (hT g)).trans (smul_zero _))
+
+end StripJetConvolution
+
+section AmbientKernelRectangles
+
+/-- A block-diagonal operator commutes with every finite sum of whole coordinate-block projections. -/
+private theorem spectralStripAmbientKernel_tendsto_blocks {E J Z : Type*}
+    [NormedAddCommGroup E] [NormedSpace ℂ E]
+    (x : J → E) (f : J → StrongDual ℂ E) (hb : IsSpectralMarkushevichBasis x f)
+    (N : Z → ℕ) (j : (z : Z) → Fin (N z) → J)
+    (hj : Bijective (fun p : (z : Z) × Fin (N z) ↦ j p.1 p.2))
+    (op : E →L[ℂ] E)
+    (hcross : ∀ z z', z ≠ z' → ∀ m n, f (j z m) (op (x (j z' n))) = 0)
+    (K : Finset Z) (u : E) :
+    (∑ z ∈ K, ∑ m, f (j z m) u • op (x (j z m))) =
+      ∑ z ∈ K, ∑ m, f (j z m) (op u) • x (j z m) := by
+  classical
+  have same (z : Z) (m n : Fin (N z)) :
+      f (j z m) (x (j z n)) = if n = m then 1 else 0 := by
+    split_ifs with h
+    · subst n
+      exact hb.1 _
+    · apply hb.2.1
+      intro e
+      exact h (eq_of_heq (Sigma.mk.inj (hj.1 e)).2)
+  have other {z z' : Z} (h : z ≠ z') (m : Fin (N z)) (n : Fin (N z')) :
+      f (j z m) (x (j z' n)) = 0 := by
+    apply hb.2.1
+    intro e
+    exact h (congrArg Sigma.fst (hj.1 (a₁ := ⟨z', n⟩) (a₂ := ⟨z, m⟩) e)).symm
+  have separate {v w : E} (h : ∀ i, f i v = f i w) : v = w := by
+    apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+    have he : ContinuousLinearMap.apply ℂ ℂ v = ContinuousLinearMap.apply ℂ ℂ w := by
+      apply ContinuousLinearMap.ext_on hb.2.2.2
+      rintro _ ⟨i, rfl⟩
+      exact h i
+    exact fun ℓ ↦ DFunLike.congr_fun he ℓ
+  apply Finset.sum_congr rfl
+  intro z _
+  let P : E →L[ℂ] E := ∑ m : Fin (N z), (f (j z m)).smulRight (x (j z m))
+  have vec (z' : Z) (n : Fin (N z')) :
+      P (x (j z' n)) = if z' = z then x (j z' n) else 0 := by
+    by_cases h : z' = z
+    · subst z'
+      simp [P, same, ite_smul]
+    · simp [P, other (Ne.symm h), h]
+  have coord (z' : Z) (n : Fin (N z')) (v : E) :
+      f (j z' n) (P v) = if z' = z then f (j z' n) v else 0 := by
+    by_cases h : z' = z
+    · subst z'
+      simp [P, map_sum, same, smul_eq_mul, mul_ite]
+    · simp [P, map_sum, other h, h]
+  have comm : op.comp P = P.comp op := by
+    apply ContinuousLinearMap.ext_on hb.2.2.1
+    rintro _ ⟨i, rfl⟩
+    obtain ⟨⟨z', n⟩, rfl⟩ := hj.2 i
+    apply separate
+    intro k
+    obtain ⟨⟨z'', m⟩, rfl⟩ := hj.2 k
+    change f (j z'' m) (op (P (x (j z' n)))) = f (j z'' m) (P (op (x (j z' n))))
+    rw [vec, coord]
+    by_cases hi : z' = z <;> by_cases ho : z'' = z
+    · simp [hi, ho]
+    · subst z'
+      simp [ho, hcross _ _ ho]
+    · subst z''
+      simp [hi, hcross _ _ (Ne.symm hi)]
+    · simp [hi, ho]
+  simpa [P, map_sum] using DFunLike.congr_fun comm u
+
+/-- Splitting each output vector splits the rectangular kernel tensor. -/
+private theorem spectralStripAmbientKernel_tendsto_add {Z J X Y : Type*}
+    [NormedAddCommGroup X] [NormedSpace ℂ X] [NormedAddCommGroup Y] [NormedSpace ℂ Y]
+    (e : Z ↪ ℕ × ℕ) (N : Z → ℕ) (j : (z : Z) → Fin (N z) → J)
+    (u : J → X) (v w : J → Y) (ij : ℕ × ℕ) :
+    spectralKernelRectangle e N j u (fun k ↦ v k + w k) ij =
+      spectralKernelRectangle e N j u v ij + spectralKernelRectangle e N j u w ij := by
+  classical
+  unfold spectralKernelRectangle
+  rw [← Completion.coe_add]
+  apply congrArg ((↑) : ProjectiveTensor X Y → Π(X, Y))
+  let K := ((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn
+  change (∑ z ∈ K, ∑ m, u (j z m) ⊗ₜ[ℂ] (v (j z m) + w (j z m)) : X ⊗[ℂ] Y) =
+    (∑ z ∈ K, ∑ m, u (j z m) ⊗ₜ[ℂ] v (j z m)) + ∑ z ∈ K, ∑ m, u (j z m) ⊗ₜ[ℂ] w (j z m)
+  simp only [TensorProduct.tmul_add, Finset.sum_add_distrib]
+
+/-- If convolution commutes with each finite block projection, lifting and transposing
+it give the same rectangular spectral tensor. -/
+private theorem spectralStripAmbientKernel_tendsto_swap {Z J : Type*} {α s : ℝ}
+    (a : ℝ) (hα : 0 ≤ α) (hs : 0 ≤ s)
+    (e : Z ↪ ℕ × ℕ) (N : Z → ℕ) (j : (z : Z) → Fin (N z) → J)
+    (x : J → H(a, hα, hs)) (f : J → StrongDual ℂ H(a, hα, hs))
+    (T : H(a, hα, hs) →L[ℂ] H(a, hα, hs)) (lift : H(a, hα, hs) →L[ℂ] W(α, s))
+    (hcomm : ∀ (K : Finset Z) (v : H(a, hα, hs)),
+      (∑ z ∈ K, ∑ m, f (j z m) v • T (x (j z m))) =
+        ∑ z ∈ K, ∑ m, f (j z m) (T v) • x (j z m)) (ij : ℕ × ℕ) :
+    spectralKernelRectangle e N j (fun i ↦ spectralSobolevDualEmbedding F a (hStrip(hα)) hs (f i))
+        (fun i ↦ lift (T (x i))) ij =
+      spectralKernelRectangle e N j
+        (fun i ↦ spectralSobolevDualEmbedding F a (hStrip(hα)) hs ((f i).comp T))
+        (fun i ↦ lift (x i)) ij := by
+  apply sobolevProjectiveKernelOperator_injective (F := F) hα hs
+  apply ContinuousLinearMap.ext
+  intro v
+  have h₁ := spectralLineAmbientKernel_operator_eval (F := F) a hα hs e N j f
+    (fun i ↦ lift (T (x i))) ij v
+  have h₂ := spectralLineAmbientKernel_operator_eval (F := F) a hα hs e N j
+    (fun i ↦ (f i).comp T) (fun i ↦ lift (x i)) ij v
+  refine h₁.trans (Eq.trans ?_ h₂.symm)
+  let K := ((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn
+  simpa only [map_sum, map_smul, ContinuousLinearMap.comp_apply] using
+    congrArg lift (hcomm K (Q(a, hα, hs) v))
+
+/-- A Cauchy geometric part and a convergent spectral part give the limit of their sum. -/
+private theorem spectralStripAmbientKernel_tendsto_of_parts {I V : Type*} [AddCommGroup V]
+    [UniformSpace V] [IsUniformAddGroup V] [CompleteSpace V] {l : Filter I} [NeBot l]
+    {g p t : I → V} (hg : Cauchy (Filter.map g l)) (hp : ∃ v, Tendsto p l (𝓝 v))
+    (ht : ∀ i, g i + p i = t i) : ∃ v, Tendsto t l (𝓝 v) := by
+  obtain ⟨u, hu⟩ := cauchy_map_iff_exists_tendsto.mp hg
+  obtain ⟨v, hv⟩ := hp
+  exact ⟨u + v, (hu.add hv).congr ht⟩
+
+end AmbientKernelRectangles
+
 /-- Paper: Theorem 10.4.3.5(2), pp. 472–473, equation (10.4.3.43).
 The ambient rectangles for convolution after spectral projection converge.
 Deviation: Convolution acts on the lifted output vector. The printed
@@ -1290,7 +1535,48 @@ theorem spectralStripAmbientKernel_tendsto (_ha : 0 < a)
     (_hgeom : Cauchy (Filter.map (rectangle(χ, e) (fun j ↦ D (f j))
       (fun j ↦ Pg (B (S(a, hα, hs₀(hs)) (x j))))) atTop)) :
     ∃ K, Tendsto (rectangle(χ, e) (fun j ↦ D (f j))
-      (fun j ↦ B (S(a, hα, hs₀(hs)) (x j)))) atTop (𝓝 K) := by sorry
+      (fun j ↦ B (S(a, hα, hs₀(hs)) (x j)))) atTop (𝓝 K) := by
+  let θ := Θ(a, hα, hs₀(hs))
+  let lift := θ.orthogonal.subtypeL.comp θ.quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
+  let T := Aq(a, hα, hs₀(hs), φ)
+  have hsection (u) : θ.mkQL (lift u) = u :=
+    (θ.quotientEquivOrthogonal_symm_eq_mk _ (θ.quotientEquivOrthogonal u).property).symm.trans
+      (θ.quotientEquivOrthogonal.symm_apply_apply u)
+  have hsplit (u : H(a, hα, hs₀(hs))) : Pg (B (lift u)) + lift (T u) = B (lift u) := by
+    have hp := DFunLike.congr_fun (spectralProjection_convolution_factor (F := F) a hα hs₀(hs) φ) (lift u)
+    change Ps (B (lift u)) = lift (T (θ.mkQL (lift u))) at hp
+    rw [hsection] at hp
+    exact (congrArg (Pg (B (lift u)) + ·) hp.symm).trans (θ.starProjection_add_starProjection_orthogonal _)
+  let key (z : Z(χ)) (m : Fin N(χ, z)) : SpectralStripJetIndex χ a α s := jet(z, m)
+  let index : ((z : Z(χ)) × Fin N(χ, z)) ≃ SpectralStripJetIndex χ a α s :=
+    ⟨fun p ↦ key p.1 p.2,
+      fun j ↦ ⟨⟨(j.val.1, j.val.2.1, j.val.2.2.1), SpectralStripJetIndex.mem_strip_order_pos hα j⟩,
+        ⟨j.val.2.2.2, j.property⟩⟩, fun _ ↦ rfl, fun _ ↦ rfl⟩
+  have hcross (z z' : Z(χ)) (hne : z ≠ z') (m : Fin N(χ, z)) (n : Fin N(χ, z')) :
+      f (key z m) (T (x (key z' n))) = 0 :=
+    spectralStripConvolution_offBlock a hα hs χ x f _hb.1 _hb.2 φ hne m n
+  have hcomm := spectralStripAmbientKernel_tendsto_blocks x f _hb.1 (fun z : Z(χ) ↦ N(χ, z)) key
+    index.bijective T hcross
+  refine spectralStripAmbientKernel_tendsto_of_parts (I := ℕ × ℕ) (V := Π(W'(α, s), W(α, s)))
+    (l := atTop)
+    (g := spectralKernelRectangle e _ key (fun i ↦ D (f i)) (fun i ↦ Pg (B (lift (x i)))))
+    (p := spectralKernelRectangle e _ key (fun i ↦ D ((f i).comp T)) (fun i ↦ lift (x i)))
+    (t := spectralKernelRectangle e _ key (fun i ↦ D (f i)) (fun i ↦ B (lift (x i)))) _hgeom
+    (spectralStripTransposedKernel_tendsto (F := F) a hα hs φ _ha χ eχ e x f
+      _hχ _he _horder _hb) ?_
+  intro ij
+  let geom (i) := Pg (B (lift (x i)))
+  let spec (i) := lift (T (x i))
+  change spectralKernelRectangle e _ key (fun i ↦ D (f i)) geom ij +
+      spectralKernelRectangle e _ key (fun i ↦ D ((f i).comp T)) (fun i ↦ lift (x i)) ij = _
+  have hswap := spectralStripAmbientKernel_tendsto_swap (F := F) a hα hs₀(hs) e
+    (fun z : Z(χ) ↦ N(χ, z)) key x f T lift hcomm ij
+  have hadd := spectralStripAmbientKernel_tendsto_add e (fun z : Z(χ) ↦ N(χ, z)) key
+    (fun i ↦ D (f i)) geom spec ij
+  have hfinal := congrArg (fun outputs ↦ spectralKernelRectangle e (fun z : Z(χ) ↦ N(χ, z)) key
+    (fun i ↦ D (f i)) outputs ij) (funext fun i ↦ hsplit (x i))
+  exact (congrArg (spectralKernelRectangle e _ key (fun i ↦ D (f i)) geom ij + ·)
+    hswap.symm).trans (hadd.symm.trans hfinal)
 
 /-- On a lifted basis vector biorthogonality makes the rectangular net eventually constant.
 The rectangle only uses the quotient of its input, so this determines the operator everywhere. -/

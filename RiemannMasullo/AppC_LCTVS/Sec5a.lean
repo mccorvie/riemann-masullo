@@ -1763,7 +1763,13 @@ set_option linter.unusedVariables false in
 /-- Paper: Corollary C.5.1.25, p. 734. In a quasi-complete space, the all-order
 condition is equivalent to the same all-order condition on every scalar evaluation.
 Deviation: The scalar side uses Definition C.5.1.23, including its order-zero
-boundedness condition. Ordinary scalar smoothness alone does not suffice. -/
+boundedness condition. Ordinary scalar smoothness alone does not suffice.
+
+Deviation: The sentence after Corollary C.5.1.25 identifies weak infinite differentiability in
+one complex variable with holomorphy, although the recursive order-zero bound can fail for
+entire functions. The equivalence uses the recursive smoothness condition for both the vector
+function and each scalar evaluation.
+-/
 theorem vectorSmoothOn_iff_scalar {Ω : Set V} (hΩ : IsOpen Ω) (hd : 1 ≤ d) (f : V → E) :
     letI := IsTopologicalAddGroup.rightUniformSpace E
     QuasiCompleteSpace ℂ E →
