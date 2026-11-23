@@ -722,6 +722,70 @@ theorem integralKernelOperator_mul_dSequenceKernelSmoothening (ρ : Lp ℂ ∞ �
       with p hp hs
     exact hp.trans (congrArg (ρ p.1 * ·) hs.symm)
 
+/-- Paper: Theorem 12.1.1.2(2), p. 499. Along the diagonal, multiplication by an
+essentially bounded symbol commutes with kernel smoothening for Haar-almost every
+center. This is `dSequenceKernelSmoothening_mul_continuous_diagonal` with the
+multiplier only in `Lp ℂ ∞ ν`: the two limit statements are taken for the kernel
+`κ` and for the kernel `ρ p.1 * κ p`, whose row map is `conj (ρ x) • Φ x`. -/
+private theorem dSequenceKernelSmoothening_mul_holderL_diagonal (ρ : Lp ℂ ∞ ν) :
+    ∀ᵐ x ∂μ, dSequenceKernelSmoothening μ U (fun p : G × G ↦ ρ p.1 * κ p) (x, x) =
+      ρ x * dSequenceKernelSmoothening μ U κ (x, x) := by
+  let : Fact (1 ≤ (2 : ℝ≥0∞)) := ⟨by norm_num⟩
+  let : Fact ((2 : ℝ≥0∞) ≠ ∞) := ⟨by simp⟩
+  have : SecondCountableTopology (Lp ℂ 2 ν) := Lp.SecondCountableTopology
+  obtain ⟨Φ, Ψ, hΦm, hΦ2, hΨm, hΨ2, hκ_eq, -, -⟩ :=
+    exists_diagonal_smoothening_factorization hκ hf hf_pos hν hT
+  have hac_μν : μ ≪ ν :=
+    hν ▸ withDensity_absolutelyContinuous'
+      hf.measurable.coe_nnreal_ennreal.aemeasurable
+      (Eventually.of_forall fun x ↦ by simpa using (hf_pos x).ne')
+  have hρm : AEStronglyMeasurable (⇑ρ) μ :=
+    AEStronglyMeasurable.mono_ac hac_μν (Lp.aestronglyMeasurable ρ)
+  obtain ⟨C, hCν⟩ : ∃ C : ℝ, ∀ᵐ x ∂ν, ‖ρ x‖ ≤ C := by
+    have hmρ := Lp.aestronglyMeasurable ρ
+    have hb := (Lp.memLp ρ).eLpNorm_lt_top
+    rw [eLpNorm_exponent_top hmρ, eLpNormEssSup_lt_top_iff_isBoundedUnder] at hb
+    obtain ⟨C, hC⟩ := hb
+    exact ⟨(C : ℝ), by
+      filter_upwards [hC] with x hx
+      exact_mod_cast hx⟩
+  have hCμ : ∀ᵐ x ∂μ, ‖ρ x‖ ≤ C := hac_μν.ae_le hCν
+  let Φρ : G → Lp ℂ 2 ν := fun x ↦ conj (ρ x) • Φ x
+  have hΦρm : AEStronglyMeasurable Φρ μ :=
+    (Complex.continuous_conj.comp_aestronglyMeasurable hρm).smul hΦm
+  have hΦρ2 : LocallyIntegrable (fun x ↦ ‖Φρ x‖ ^ 2) μ := by
+    refine (hΦ2.smul (C ^ 2)).mono (hΦρm.norm.pow 2) ?_
+    filter_upwards [hCμ] with x hx
+    have h1 : ‖Φρ x‖ = ‖ρ x‖ * ‖Φ x‖ := by
+      simp only [Φρ, norm_smul, Complex.norm_conj]
+    have h2 : ‖ρ x‖ * ‖Φ x‖ ≤ C * ‖Φ x‖ :=
+      mul_le_mul_of_nonneg_right hx (norm_nonneg _)
+    have h3 : (‖ρ x‖ * ‖Φ x‖) ^ 2 ≤ (C * ‖Φ x‖) ^ 2 :=
+      pow_le_pow_left₀ (mul_nonneg (norm_nonneg _) (norm_nonneg _)) h2 2
+    have h4 : ‖Φρ x‖ ^ 2 ≤ C ^ 2 * ‖Φ x‖ ^ 2 := by
+      rw [h1]
+      exact h3.trans_eq (by ring)
+    simpa only [Pi.pow_apply, Pi.smul_apply, smul_eq_mul, Real.norm_of_nonneg (sq_nonneg _),
+      Real.norm_of_nonneg (mul_nonneg (sq_nonneg C) (sq_nonneg _))] using h4
+  have hkρ_eq : (fun p : G × G ↦ ρ p.1 * κ p) =ᵐ[μ.prod μ]
+      fun p ↦ inner ℂ (Φρ p.1) (Ψ p.2) := by
+    filter_upwards [hκ_eq] with p hp
+    simp only [Φρ, inner_smul_left, Complex.conj_conj, hp]
+  filter_upwards [ae_tendsto_dSequenceAverage_diagonal_inner hU hΦm hΦ2 hΨm hΨ2 hκ_eq,
+    ae_tendsto_dSequenceAverage_diagonal_inner hU hΦρm hΦρ2 hΨm hΨ2 hkρ_eq] with x hx hxρ
+  have hreg : (x, x) ∈ dSequenceRegularSet (μ.prod μ) (fun n ↦ U n ×ˢ U n) κ := ⟨_, hx⟩
+  have hregρ : (x, x) ∈ dSequenceRegularSet (μ.prod μ) (fun n ↦ U n ×ˢ U n)
+      (fun p : G × G ↦ ρ p.1 * κ p) := ⟨_, hxρ⟩
+  have h1 : dSequenceKernelSmoothening μ U κ (x, x) = inner ℂ (Φ x) (Ψ x) := by
+    simpa only [dSequenceKernelSmoothening, dSequenceSmootheningOrZero, dite_eq_left hreg,
+      dSequenceSmoothening] using hx.limUnder_eq
+  have h2 : dSequenceKernelSmoothening μ U (fun p : G × G ↦ ρ p.1 * κ p) (x, x) =
+      inner ℂ (Φρ x) (Ψ x) := by
+    simpa only [dSequenceKernelSmoothening, dSequenceSmootheningOrZero, dite_eq_left hregρ,
+      dSequenceSmoothening] using hxρ.limUnder_eq
+  rw [h2, h1]
+  simp only [Φρ, inner_smul_left, Complex.conj_conj]
+
 /-- Paper: Theorem 12.1.1.2(2), p. 499. The weighted integral of the
 smoothened diagonal against an essentially bounded symbol equals the trace
 of the operator followed by multiplication by that symbol. -/
@@ -730,7 +794,23 @@ theorem integral_mul_dSequenceKernelSmoothening_diagonal (ρ : Lp ℂ ∞ ν) :
     let T : nuclearEndomorphisms (Lp ℂ 2 ν) := ⟨(integralKernelOperator ν k).val, hT⟩
     Integrable (fun x ↦ ρ x * dSequenceKernelSmoothening μ U κ (x, x)) ν ∧
       (∫ x, ρ x * dSequenceKernelSmoothening μ U κ (x, x) ∂ν) =
-        hilbertTrace ⟨Mρ * T.val, mul_mem_nuclearEndomorphisms_left Mρ T⟩ := by sorry
+        hilbertTrace ⟨Mρ * T.val, mul_mem_nuclearEndomorphisms_left Mρ T⟩ := by
+  intro Mρ T
+  obtain ⟨K, hKop, hKκ, -⟩ :=
+    integralKernelOperator_mul_dSequenceKernelSmoothening hκ hU hBorel hf hf_pos hν hT ρ
+  have hKnuc : IsNuclearOperator (integralKernelOperator ν K).val := by
+    rw [hKop]
+    exact mul_mem_nuclearEndomorphisms_left Mρ T
+  obtain ⟨hInt, hEq⟩ :=
+    integral_dSequenceKernelSmoothening_diagonal (k := K) hKκ.symm hU hBorel hf hf_pos hν hKnuc
+  have hmul : ∀ᵐ x ∂μ, dSequenceKernelSmoothening μ U (fun p : G × G ↦ ρ p.1 * κ p) (x, x) =
+      ρ x * dSequenceKernelSmoothening μ U κ (x, x) :=
+    dSequenceKernelSmoothening_mul_holderL_diagonal hκ hU hBorel hf hf_pos hν hT ρ
+  have hac_νμ : ν ≪ μ := hν ▸ withDensity_absolutelyContinuous _ _
+  have hmulν : ∀ᵐ x ∂ν, dSequenceKernelSmoothening μ U (fun p : G × G ↦ ρ p.1 * κ p) (x, x) =
+      ρ x * dSequenceKernelSmoothening μ U κ (x, x) := hac_νμ.ae_le hmul
+  refine ⟨hInt.congr hmulν, ?_⟩
+  exact (integral_congr_ae hmulν).symm.trans (hEq.trans (congrArg hilbertTrace (Subtype.ext hKop)))
 
 section FiniteRank
 
