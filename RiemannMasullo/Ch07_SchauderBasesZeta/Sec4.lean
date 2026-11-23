@@ -4,6 +4,10 @@ public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3b
 public import RiemannMasullo.Ch06_LocalGlobal.Sec3
 public import RiemannMasullo.AppC_LCTVS.Sec3a
 
+import Mathlib.LinearAlgebra.TensorProduct.RightExactness
+import RiemannMasullo.Ch02_AdelicTheta.Sec2b
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 
@@ -625,7 +629,69 @@ variable (F) in
 The archimedean-flat tensor image is closed in the adelic Schwartz topology,
 including when the archimedean integral of each tensor factor must vanish. -/
 theorem globalArchimedeanFlatTests_isClosed (requireArchMoment : Prop) :
-    IsClosed (globalArchimedeanFlatTests F requireArchMoment : Set ℬ(𝔸[F])) := by sorry
+    IsClosed (globalArchimedeanFlatTests F requireArchMoment : Set ℬ(𝔸[F])) := by
+  classical
+  let E := ℬ(InfiniteAdeleRing F)
+  let Ef := ℬ(FiniteAdeleRing (𝓞 F) F)
+  let flat := archimedeanFlatSchwartz (ι := RealPlaces) (κ := ComplexPlaces)
+  let I : SchwartzMap Coordinates ℂ →L[ℂ] ℂ := SchwartzMap.integralCLM ℂ volume
+  let flatWithMoment := flat ⊓ ⨅ _ : requireArchMoment, I.ker
+  have hP : IsClosed (flatWithMoment : Set (SchwartzMap Coordinates ℂ)) := by
+    simpa only [flatWithMoment, Submodule.coe_inf, Submodule.coe_iInf] using
+      (archimedeanFlatSchwartz_isClosed (ι := RealPlaces) (κ := ComplexPlaces)).inter
+        (isClosed_iInter fun _ : requireArchMoment ↦ I.isClosed_ker)
+  obtain ⟨J, hJ⟩ := archimedeanSchwartzBruhat_equiv (F := F)
+  let K := flatWithMoment.comap J.symm.toLinearMap
+  have hK : IsClosed (K : Set E) := hP.preimage J.symm.continuous
+  let : T2Space E := J.symm.toHomeomorph.isEmbedding.t2Space
+  let : T2Space Ef := schwartzBruhat_t2_of_stages
+  let : T2Space (E ⧸ K) := inferInstance
+  let : PolynormableSpace ℂ (E ⧸ K) := polynormableSpace_quotient K
+  let q : InductiveTensor E Ef →L[ℂ] InductiveTensor (E ⧸ K) Ef :=
+    ⟨inductiveTensorMap K.mkQ LinearMap.id, inductiveTensorMap_continuous K.mkQL (ContinuousLinearMap.id ℂ Ef)⟩
+  let e := (adeleSchwartz_inductiveTensor_equiv F).choose
+  let D := globalArchimedeanFlatTests F requireArchMoment
+  have hr : q.ker = (K.subtype.rTensor Ef).range := rTensor_mkQ Ef K
+  have hmem (f : E) : f ∈ K ↔ ∃ h : flat,
+      (∀ x : InfiniteAdeleRing F, f (Multiplicative.ofAdd x) =
+        h.val (InfiniteAdeleRing.ringEquiv_mixedSpace F x)) ∧
+      (requireArchMoment → (∫ u : Coordinates, h.val u) = 0) := by
+    change J.symm f ∈ flat ⊓ ⨅ _ : requireArchMoment, I.ker ↔ _
+    simp only [Submodule.mem_inf, Submodule.mem_iInf, LinearMap.mem_ker]
+    constructor
+    · rintro ⟨hf, hi⟩
+      exact ⟨⟨J.symm f, hf⟩, fun x ↦ ((congrArg (fun g : E ↦ g (Multiplicative.ofAdd x))
+        (J.apply_symm_apply f)).symm.trans (hJ _ _)), hi⟩
+    · rintro ⟨h, hf, hi⟩
+      have he : f = J h.val := Subtype.ext (funext fun x ↦ (hf x.toAdd).trans (hJ _ _).symm)
+      rw [he, J.symm_apply_apply]
+      exact ⟨h.property, hi⟩
+  let insertFlat : (K ⊗[ℂ] Ef) →ₗ[ℂ] ℬ(𝔸[F]) := e.toLinearMap.comp (K.subtype.rTensor Ef)
+  have hB (z : K ⊗[ℂ] Ef) : insertFlat z ∈ D := by
+    induction z using TensorProduct.inductionOn with
+    | tmul f g =>
+      obtain ⟨h, hf, hi⟩ := (hmem f.val).mp f.property
+      exact Submodule.subset_span ⟨f.val, g, h, hf, hi, rfl⟩
+    | add u v hu hv => exact (map_add insertFlat u v).symm ▸ D.add_mem hu hv
+  have hD : D = (q.comp e.symm.toContinuousLinearMap).ker := by
+    apply le_antisymm
+    · apply Submodule.span_le.mpr
+      rintro _ ⟨f, g, h, hf, hi, rfl⟩
+      have hfK := (hmem f).mpr ⟨h, hf, hi⟩
+      let z : InductiveTensor E Ef := f ⊗ₜ[ℂ] g
+      refine (congrArg q (e.symm_apply_apply z)).trans ?_
+      change K.mkQ f ⊗ₜ[ℂ] g = 0
+      have hf0 : K.mkQ f = 0 := (Submodule.Quotient.mk_eq_zero K).mpr hfK
+      rw [hf0, TensorProduct.zero_tmul]
+    · intro x hx
+      have hh : e.symm x ∈ q.ker := hx
+      rw [hr] at hh
+      obtain ⟨z, hz⟩ := hh
+      have he : insertFlat z = x := (congrArg (fun v : InductiveTensor E Ef ↦ e v) hz).trans (e.apply_symm_apply x)
+      exact he ▸ hB z
+  change IsClosed (D : Set ℬ(𝔸[F]))
+  rw [hD]
+  exact (q.comp e.symm.toContinuousLinearMap).isClosed_ker
 
 /-- A flat archimedean Schwartz function vanishes at the origin, which meets a wall. -/
 private theorem globalArchimedeanFlatTests_zero_moments_flat
