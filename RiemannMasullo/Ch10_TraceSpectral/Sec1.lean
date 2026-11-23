@@ -1840,7 +1840,7 @@ section
 universe u v
 
 /-- The compact-group average, restricted to its isotype, is a unique open surjection. -/
-private theorem existsUnique_thetaSobolevAverage_of_compact
+theorem existsUnique_thetaSobolevAverage_of_compact
     {G : Type u} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
     (N : Subgroup G) [T2Space N] [CompactSpace N] [MeasurableSpace N] [BorelSpace N]
     {E : Type v} [NormedAddCommGroup E] [NormedSpace ℂ E] [CompleteSpace E]

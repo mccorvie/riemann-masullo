@@ -97,6 +97,217 @@ abbrev spectralSobolevIsotypeQuotient (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (hs
     (ω : PontryaginDual C₁) :=
   ↥(Wω(hI, hs, ω)) ⧸ (Θ(a, hI, hs)).comap (Wω(hI, hs, ω)).subtype
 
+/-- Testing an isotypic Pettis average against a functional gives its scalar integral. -/
+private theorem spectralSobolevIsotypeQuotient_isometry_dual {K W : Type*} [Group K]
+    [TopologicalSpace K] [MeasurableSpace K] [NormedAddCommGroup W] [NormedSpace ℂ W]
+    (μ : Measure K) (ρ : K →* (W →L[ℂ] W)) (ω : PontryaginDual K) (P : W →L[ℂ] W)
+    (hP : IsPettisIsotypicAverageOn μ univ ρ ω P) (u : W) (φ : StrongDual ℂ W) :
+    φ (P u) = ∫ k, star (ω k : ℂ) * φ (ρ k u) ∂μ := by
+  obtain ⟨_, he⟩ := hP u
+  have h := congrArg (fun z : PettisWeakCompletion W ↦
+    (show Module.Dual ℂ (StrongDual ℂ W) from z) φ) he
+  change φ (P u) = ∫ g, φ (star (ω g : ℂ) • ρ g u) ∂μ.restrict univ at h
+  simpa only [Measure.restrict_univ, map_smul, smul_eq_mul] using h
+
+/-- A unit complex number times its conjugate is one. -/
+private theorem spectralSobolevIsotypeQuotient_isometry_star_mul {K : Type*} [Group K]
+    [TopologicalSpace K] (ω : PontryaginDual K) (k : K) :
+    star (ω k : ℂ) * (ω k : ℂ) = 1 := by
+  rw [Complex.star_def, Complex.conj_mul', Circle.norm_coe]
+  simp
+
+/-- The isotypic average descends to a quotient by an invariant subspace. -/
+private theorem spectralSobolevIsotypeQuotient_isometry_quot {G W : Type*} [Group G]
+    (K : Subgroup G) [TopologicalSpace K] [MeasurableSpace K]
+    [NormedAddCommGroup W] [NormedSpace ℂ W] (ρ : G →* (W →L[ℂ] W))
+    (N : Submodule ℂ W) [IsClosed (N : Set W)] (ω : PontryaginDual K) (μ : Measure K)
+    (P : W →L[ℂ] W) (hP : IsPettisIsotypicAverageOn μ univ (ρ.comp K.subtype) ω P)
+    (u : W) (ψ : StrongDual ℂ (W ⧸ N)) :
+    ψ (N.mkQ (P u)) = ∫ k, star (ω k : ℂ) * ψ (N.mkQ (ρ k u)) ∂μ :=
+  spectralSobolevIsotypeQuotient_isometry_dual μ (ρ.comp K.subtype) ω P hP u
+    (ψ.comp N.mkQL)
+
+/-- On the isotype the average is multiplication by the total mass. -/
+private theorem spectralSobolevIsotypeQuotient_isometry_fix {G W : Type*} [Group G]
+    (K : Subgroup G) [TopologicalSpace K] [MeasurableSpace K]
+    [NormedAddCommGroup W] [NormedSpace ℂ W] (ρ : G →* (W →L[ℂ] W))
+    (ω : PontryaginDual K) (μ : Measure K) (P : W →L[ℂ] W)
+    (hP : IsPettisIsotypicAverageOn μ univ (ρ.comp K.subtype) ω P)
+    {u : W} (hu : u ∈ actionIsotype (ρ.comp K.subtype) ω) :
+    P u = (μ.real univ : ℂ) • u := by
+  apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+  intro φ
+  rw [spectralSobolevIsotypeQuotient_isometry_dual μ (ρ.comp K.subtype) ω P hP u φ]
+  have hu' := (mem_actionIsotype _ _ _).1 hu
+  have h (k : K) : star (ω k : ℂ) * φ ((ρ.comp K.subtype) k u) = φ u := by
+    rw [hu' k, map_smul, smul_eq_mul, ← mul_assoc,
+      spectralSobolevIsotypeQuotient_isometry_star_mul, one_mul]
+  simp only [h, integral_const, map_smul, Complex.real_smul, smul_eq_mul]
+
+/-- The average is bounded by the mass when the subgroup acts by contractions. -/
+private theorem spectralSobolevIsotypeQuotient_isometry_norm {G W : Type*} [Group G]
+    (K : Subgroup G) [TopologicalSpace K] [MeasurableSpace K]
+    [NormedAddCommGroup W] [NormedSpace ℂ W] (ρ : G →* (W →L[ℂ] W))
+    (hK : ∀ (k : K) (u : W), ‖ρ k u‖ ≤ ‖u‖)
+    (ω : PontryaginDual K) (μ : Measure K) [IsFiniteMeasure μ] (P : W →L[ℂ] W)
+    (hP : IsPettisIsotypicAverageOn μ univ (ρ.comp K.subtype) ω P) (u : W) :
+    ‖P u‖ ≤ μ.real univ * ‖u‖ := by
+  obtain ⟨g, hg, hgu⟩ := exists_dual_vector'' ℂ (P u)
+  have h1 : g (P u) = ∫ k, star (ω k : ℂ) * g ((ρ.comp K.subtype) k u) ∂μ :=
+    spectralSobolevIsotypeQuotient_isometry_dual μ (ρ.comp K.subtype) ω P hP u g
+  have h3 : ‖g (P u)‖ = ‖P u‖ := by rw [hgu]; simp
+  have h2 : ‖∫ k, star (ω k : ℂ) * g ((ρ.comp K.subtype) k u) ∂μ‖ ≤ ‖u‖ * μ.real univ := by
+    apply norm_integral_le_of_norm_le_const
+    refine ae_of_all _ fun k ↦ ?_
+    rw [norm_mul, norm_star, Circle.norm_coe, one_mul]
+    exact (g.le_opNorm _).trans ((mul_le_of_le_one_left (norm_nonneg _) hg).trans (hK k u))
+  rw [← h1, h3] at h2
+  linarith
+
+/-- The average maps an invariant closed subspace into itself. -/
+private theorem spectralSobolevIsotypeQuotient_isometry_mem {G W : Type*} [Group G]
+    (K : Subgroup G) [TopologicalSpace K] [MeasurableSpace K]
+    [NormedAddCommGroup W] [NormedSpace ℂ W] (ρ : G →* (W →L[ℂ] W))
+    (N : Submodule ℂ W) [IsClosed (N : Set W)] (hN : ∀ g, ∀ n ∈ N, ρ g n ∈ N)
+    (ω : PontryaginDual K) (μ : Measure K) (P : W →L[ℂ] W)
+    (hP : IsPettisIsotypicAverageOn μ univ (ρ.comp K.subtype) ω P) {n : W} (hn : n ∈ N) :
+    P n ∈ N := by
+  rw [← Submodule.Quotient.mk_eq_zero]
+  apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+  intro ψ
+  have h := spectralSobolevIsotypeQuotient_isometry_quot K ρ N ω μ P hP n ψ
+  have h0 (k : K) : N.mkQ (ρ k n) = 0 := (Submodule.Quotient.mk_eq_zero N).2 (hN _ n hn)
+  simp only [h0, map_zero, mul_zero, integral_zero] at h
+  simpa using h
+
+/-- On the quotient, the average of a class in the quotient isotype is the mass times it. -/
+private theorem spectralSobolevIsotypeQuotient_isometry_quotFix {G W : Type*} [Group G]
+    (K : Subgroup G) [TopologicalSpace K] [MeasurableSpace K]
+    [NormedAddCommGroup W] [NormedSpace ℂ W] (ρ : G →* (W →L[ℂ] W))
+    (N : Submodule ℂ W) [IsClosed (N : Set W)]
+    (ω : PontryaginDual K) (μ : Measure K) (P : W →L[ℂ] W)
+    (hP : IsPettisIsotypicAverageOn μ univ (ρ.comp K.subtype) ω P) {f : W}
+    (hf : ∀ k : K, N.mkQ (ρ k f) = (ω k : ℂ) • N.mkQ f) :
+    N.mkQ (P f) = (μ.real univ : ℂ) • N.mkQ f := by
+  apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+  intro ψ
+  rw [spectralSobolevIsotypeQuotient_isometry_quot K ρ N ω μ P hP f ψ]
+  have h (k : K) : star (ω k : ℂ) * ψ (N.mkQ (ρ k f)) = ψ (N.mkQ f) := by
+    rw [hf k, map_smul, smul_eq_mul, ← mul_assoc,
+      spectralSobolevIsotypeQuotient_isometry_star_mul, one_mul]
+  simp only [h, integral_const, map_smul, Complex.real_smul, smul_eq_mul]
+
+/-- Abstract form of `spectralSobolevIsotypeQuotient_isometry`: an action preserving a
+closed subspace descends to the quotient, and if a compact subgroup acts by contractions
+with an isotypic average, the isotype quotient is isometric to the isotype of the quotient. -/
+private theorem spectralSobolevIsotypeQuotient_isometry_abstract {G W : Type*} [Group G]
+    [TopologicalSpace G] (K : Subgroup G) [TopologicalSpace K] [MeasurableSpace K]
+    [NormedAddCommGroup W] [NormedSpace ℂ W] (ρ : G →* (W →L[ℂ] W))
+    (hρ : Continuous fun p : G × W ↦ ρ p.1 p.2)
+    (N : Submodule ℂ W) [IsClosed (N : Set W)] (hN : ∀ g, ∀ n ∈ N, ρ g n ∈ N)
+    (hK : ∀ (k : K) (u : W), ‖ρ k u‖ ≤ ‖u‖)
+    (ω : PontryaginDual K) (μ : Measure K) [IsFiniteMeasure μ] (hμ : μ univ ≠ 0)
+    (A : W →L[ℂ] actionIsotype (ρ.comp K.subtype) ω)
+    (hA : IsPettisIsotypicAverageOn μ univ (ρ.comp K.subtype) ω
+      ((actionIsotype (ρ.comp K.subtype) ω).subtypeL.comp A))
+    [IsClosed ((N.comap (actionIsotype (ρ.comp K.subtype) ω).subtype) :
+      Set (actionIsotype (ρ.comp K.subtype) ω))] :
+    ∃ ρQ : G →* ((W ⧸ N) →L[ℂ] (W ⧸ N)),
+      (∀ g f, ρQ g (N.mkQ f) = N.mkQ (ρ g f)) ∧
+      Continuous (fun p : G × (W ⧸ N) ↦ ρQ p.1 p.2) ∧
+      ∃ U : (↥(actionIsotype (ρ.comp K.subtype) ω) ⧸
+          N.comap (actionIsotype (ρ.comp K.subtype) ω).subtype) ≃ₗᵢ[ℂ]
+          actionIsotype (ρQ.comp K.subtype) ω,
+        ∀ f : actionIsotype (ρ.comp K.subtype) ω,
+          (U ((N.comap (actionIsotype (ρ.comp K.subtype) ω).subtype).mkQ f) : W ⧸ N) =
+            N.mkQ f.val := by
+  let E := actionIsotype (ρ.comp K.subtype) ω
+  let M := N.comap E.subtype
+  let P : W →L[ℂ] W := E.subtypeL.comp A
+  let c : ℝ := μ.real univ
+  have hc : 0 < c := ENNReal.toReal_pos hμ (measure_ne_top μ univ)
+  have hker (g : G) : N ≤ (N.mkQL.comp (ρ g)).ker := fun n hn ↦
+    (Submodule.Quotient.mk_eq_zero N).2 (hN g n hn)
+  let T (g : G) : (W ⧸ N) →L[ℂ] (W ⧸ N) := N.liftQL (N.mkQL.comp (ρ g)) (hker g)
+  have hT (g : G) (f : W) : T g (N.mkQ f) = N.mkQ (ρ g f) := rfl
+  let ρQ : G →* ((W ⧸ N) →L[ℂ] (W ⧸ N)) :=
+    { toFun := T
+      map_one' := by
+        refine ContinuousLinearMap.ext fun x ↦ ?_
+        obtain ⟨f, rfl⟩ := N.mkQ_surjective x
+        change T 1 (N.mkQ f) = N.mkQ f
+        rw [hT, map_one, one_apply_eq_self]
+      map_mul' := fun g h ↦ by
+        refine ContinuousLinearMap.ext fun x ↦ ?_
+        obtain ⟨f, rfl⟩ := N.mkQ_surjective x
+        change T (g * h) (N.mkQ f) = T g (T h (N.mkQ f))
+        rw [hT, hT, hT, map_mul, mul_apply_eq_comp] }
+  have hρQ (g : G) (f : W) : ρQ g (N.mkQ f) = N.mkQ (ρ g f) := rfl
+  refine ⟨ρQ, hρQ, ?_, ?_⟩
+  · have hq : IsOpenQuotientMap (Prod.map id N.mkQ : G × W → G × (W ⧸ N)) :=
+      IsOpenQuotientMap.id.prodMap N.isOpenQuotientMap_mkQL
+    rw [hq.isQuotientMap.continuous_iff]
+    exact N.mkQL.continuous.comp hρ
+  -- the isometry
+  have hmemQ (f : E) : N.mkQ (f : W) ∈ actionIsotype (ρQ.comp K.subtype) ω := by
+    refine (mem_actionIsotype _ _ _).2 fun k ↦ ?_
+    change ρQ k (N.mkQ (f : W)) = _
+    rw [hρQ, show ρ k (f : W) = (ω k : ℂ) • (f : W) from (mem_actionIsotype _ _ _).1 f.2 k,
+      map_smul]
+  let L₀ : E →ₗ[ℂ] actionIsotype (ρQ.comp K.subtype) ω :=
+    LinearMap.codRestrict _ (N.mkQ ∘ₗ E.subtype) hmemQ
+  have hL₀ : M ≤ LinearMap.ker L₀ := fun f hf ↦ by
+    apply Subtype.ext
+    exact (Submodule.Quotient.mk_eq_zero N).2 hf
+  let L : (E ⧸ M) →ₗ[ℂ] actionIsotype (ρQ.comp K.subtype) ω := M.liftQ L₀ hL₀
+  have hL (f : E) : (L (M.mkQ f) : W ⧸ N) = N.mkQ (f : W) := rfl
+  -- the projection `c⁻¹ • A` onto `E`
+  have hfix (f : E) : P f = (c : ℂ) • (f : W) :=
+    spectralSobolevIsotypeQuotient_isometry_fix K ρ ω μ P hA f.2
+  have hnorm (w : W) : ‖P w‖ ≤ c * ‖w‖ :=
+    spectralSobolevIsotypeQuotient_isometry_norm K ρ hK ω μ P hA w
+  let B (w : W) : E := (c⁻¹ : ℂ) • A w
+  have hB (f : E) (w : W) (hw : N.mkQ w = N.mkQ (f : W)) : M.mkQ (B w) = M.mkQ f := by
+    apply (Submodule.Quotient.eq M).2
+    change ((c⁻¹ : ℂ) • P w - (f : W)) ∈ N
+    have h1 : w - (f : W) ∈ N := (Submodule.Quotient.eq N).1 hw
+    have h2 := spectralSobolevIsotypeQuotient_isometry_mem K ρ N hN ω μ P hA h1
+    rw [map_sub, hfix f] at h2
+    have hc' : (c : ℂ) ≠ 0 := by exact_mod_cast hc.ne'
+    convert N.smul_mem (c⁻¹ : ℂ) h2 using 1
+    rw [smul_sub, smul_smul, inv_mul_cancel₀ hc', one_smul]
+  have hBn (w : W) : ‖B w‖ ≤ ‖w‖ := by
+    change ‖(c⁻¹ : ℂ) • P w‖ ≤ ‖w‖
+    rw [norm_smul, norm_inv, Complex.norm_real, Real.norm_of_nonneg hc.le]
+    calc c⁻¹ * ‖P w‖ ≤ c⁻¹ * (c * ‖w‖) := by gcongr; exact hnorm w
+      _ = ‖w‖ := by field_simp
+  have hiso (x : E ⧸ M) : ‖L x‖ = ‖x‖ := by
+    obtain ⟨f, rfl⟩ := M.mkQ_surjective x
+    change ‖N.mkQ (f : W)‖ = ‖M.mkQ f‖
+    apply le_antisymm
+    · refine le_of_forall_pos_lt_add fun ε hε ↦ ?_
+      obtain ⟨m, hm, hmε⟩ := Submodule.Quotient.norm_mk_lt (M.mkQ f) hε
+      have hmN : N.mkQ (m : W) = N.mkQ (f : W) := by
+        apply (Submodule.Quotient.eq N).2
+        exact (Submodule.Quotient.eq M).1 hm
+      rw [← hmN]
+      exact (Submodule.Quotient.norm_mk_le N (m : W)).trans_lt hmε
+    · refine le_of_forall_pos_lt_add fun ε hε ↦ ?_
+      obtain ⟨w, hw, hwε⟩ := Submodule.Quotient.norm_mk_lt (N.mkQ (f : W)) hε
+      rw [← hB f w hw]
+      exact ((Submodule.Quotient.norm_mk_le M (B w)).trans (hBn w)).trans_lt hwε
+  have hsurj : Surjective L := by
+    rintro ⟨y, hy⟩
+    obtain ⟨w, rfl⟩ := N.mkQ_surjective y
+    refine ⟨M.mkQ (B w), Subtype.ext ?_⟩
+    rw [hL]
+    change N.mkQ ((c⁻¹ : ℂ) • P w) = N.mkQ w
+    have hw : ∀ k : K, N.mkQ (ρ k w) = (ω k : ℂ) • N.mkQ w := fun k ↦
+      (mem_actionIsotype _ _ _).1 hy k
+    rw [map_smul, spectralSobolevIsotypeQuotient_isometry_quotFix K ρ N ω μ P hA hw, smul_smul,
+      inv_mul_cancel₀ (by exact_mod_cast hc.ne'), one_smul]
+  exact ⟨LinearIsometryEquiv.ofSurjective ⟨L, hiso⟩ hsurj, fun f ↦ rfl⟩
+
 /-- Paper: (10.2.1.2), p. 439, and (10.2.2.2), p. 445. The isotype quotient
 maps isometrically onto the isotype of the full quotient by inclusion of
 representatives. The isotype action is the restriction of the continuous
@@ -112,7 +323,35 @@ theorem spectralSobolevIsotypeQuotient_isometry (a : ℝ) {l r s : ℝ} (hI : l 
       Continuous (fun p : C𝔽 × Q ↦ ρQ p.1 p.2) ∧
       ∃ U : spectralSobolevIsotypeQuotient F a hI hs ω ≃ₗᵢ[ℂ]
           actionIsotype (ρQ.comp (ideleClassNorm F).ker.subtype) ω,
-        ∀ f : E, (U ((N.comap E.subtype).mkQ f) : Q) = N.mkQ f.val := by sorry
+        ∀ f : E, (U ((N.comap E.subtype).mkQ f) : Q) = N.mkQ f.val := by
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : (normOneIdeleClassTamagawaMeasure F).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have hρ := (exists_hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs).choose_spec.2
+  have hA := (existsUnique_thetaSobolevAverage_of_compact (ideleClassNorm F).ker
+    (normOneIdeleClassTamagawaMeasure F) (hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs) hρ
+    ω).exists
+  have hR := (exists_globalThetaSobolevAction (F := F) a hI hs).choose_spec.1
+  have hN (g : C𝔽) (n : W(l, r, s)) (hn : n ∈ Θ(a, hI, hs)) :
+      hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs g n ∈ Θ(a, hI, hs) := by
+    rw [← hR g ⟨n, hn⟩]
+    exact (_ : ↥(Θ(a, hI, hs))).2
+  have hK (k : C₁) (u : W(l, r, s)) :
+      ‖hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs k u‖ ≤ ‖u‖ := by
+    have h1 : ((m𝔽 (k : C𝔽)).val : ℝ) = 1 := by
+      have h : ideleClassNorm F (k : C𝔽) = 1 := k.2
+      change (((ideleClassNorm F (k : C𝔽)).val : ℝ≥0) : ℝ) = 1
+      rw [h]
+      rfl
+    have h := norm_hardySobolevTranslation_le μ𝔽 m𝔽 l r s hI hs (k : C𝔽)
+    simp only [h1, Real.log_one, mul_zero, Real.exp_zero, max_self, abs_zero, add_zero,
+      Real.one_rpow, mul_one] at h
+    exact (ContinuousLinearMap.le_opNorm _ _).trans (mul_le_of_le_one_left (norm_nonneg _) h)
+  have hμ : normOneIdeleClassTamagawaMeasure F univ ≠ 0 :=
+    isOpen_univ.measure_ne_zero _ univ_nonempty
+  exact spectralSobolevIsotypeQuotient_isometry_abstract (ideleClassNorm F).ker
+    (hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs) hρ (Θ(a, hI, hs)) hN hK ω
+    (normOneIdeleClassTamagawaMeasure F) hμ hA.choose hA.choose_spec.1
 
 /-- Paper: (10.2.1.3), pp. 439–440, and (10.2.2.3), p. 445. The Sobolev
 duality evaluates the unweighted bilinear product integral. -/
