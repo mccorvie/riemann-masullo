@@ -380,6 +380,224 @@ theorem mem_spectralNuclearityDenominator_iff (a : ℝ) (f : B) :
       (a : ℂ) (specDenom_range_mem χ τ hτ)
       (fun φ ↦ ⟨⟨_, specDenom_shift_mem φ (a : ℂ)⟩, fun _ ↦ rfl⟩) f)
 
+/-- A fixed first factor defines a continuous map into the completed inductive tensor. -/
+private theorem spectralNuclearityDenominator_isotypeModel_tensor
+    {X Y Z : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [IsTopologicalAddGroup Y]
+    [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z]
+    [UniformContinuousConstSMul ℂ (InductiveTensor X Y)]
+    (e : UniformSpace.Completion (InductiveTensor X Y) ≃L[ℂ] Z) (u : X) :
+    ∃ J : Y →L[ℂ] Z, ∀ p, J p = e (UniformSpace.Completion.coe' (α := InductiveTensor X Y) (u ⊗ₜ[ℂ] p)) := by
+  let j : InductiveTensor X Y →L[ℂ] UniformSpace.Completion (InductiveTensor X Y) :=
+    UniformSpace.Completion.toComplL
+  let hs := withGeneratingSeminorms_spec (X ⊗[ℂ] Y)
+    (fun q : {q : Seminorm ℂ (X ⊗[ℂ] Y) // (∀ x : X, Continuous (fun y : Y ↦ q (x ⊗ₜ[ℂ] y))) ∧
+      (∀ y : Y, Continuous (fun x : X ↦ q (x ⊗ₜ[ℂ] y)))} ↦ q.val)
+  exact ⟨e.toContinuousLinearMap.comp (j.comp ⟨TensorProduct.mk ℂ X Y u,
+    hs.continuous_of_continuous_comp (TensorProduct.mk ℂ X Y u) fun q ↦ q.property.1 u⟩), fun _ ↦ rfl⟩
+
+/-- Lift a scalar logarithmic profile by its tensor with the inverse compact character. -/
+private theorem spectralNuclearityDenominator_isotypeModel_lift
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [SecondCountableTopology G]
+    (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
+    (χ : PontryaginDual G) :
+    let K := m.toMonoidHom.ker
+    let ω := χ.comp (⟨K.subtype, continuous_subtype_val⟩ : K →ₜ* G)
+    let E := modulatedDecayIsotype m univ (mem_univ 0) ω
+    ∃ J : PositiveRealExponentialDecay univ →L[ℂ] E, ∀ p t,
+      (J p).val.val (τ t) = p.val (Real.log (t.val : ℝ)) := by
+  intro K ω E
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let : SecondCountableTopology K := TopologicalSpace.Subtype.secondCountableTopology _
+  obtain ⟨oneK, hone⟩ := compact_schwartzBruhat_one (H := K)
+  obtain ⟨M, hM⟩ := schwartzBruhat_mul_unitaryCharacter (A := K) ω⁻¹
+  let u := M oneK
+  have hu (k : K) : u k = ((χ k.val : ℂ))⁻¹ := by
+    rw [hM, hone, mul_one]
+    exact Circle.coe_inv _
+  let : UniformContinuousConstSMul ℂ (InductiveTensor (SchwartzBruhat K) (PositiveRealExponentialDecay univ)) :=
+    uniformContinuousConstSMul_of_continuousConstSMul _ _
+  have hB := modulatedExponentialDecay_tensor_equiv m univ hm ordConnected_univ univ_nonempty τ hτ
+  let D := ModulatedExponentialDecay m univ
+  let Profile := PositiveRealExponentialDecay univ
+  have hJ : ∃ J : Profile →L[ℂ] D, ∀ p (k : K) t,
+      (J p).val (k.val * τ t) = ((χ k.val : ℂ))⁻¹ * p.val (Real.log (t.val : ℝ)) := by
+    have h := spectralNuclearityDenominator_isotypeModel_tensor
+      (X := SchwartzBruhat K) (Y := Profile) (Z := D) hB.choose u
+    obtain ⟨J, hJ⟩ := h
+    refine ⟨J, fun p k t ↦ ?_⟩
+    let ev (w : D) := w.val (k.val * τ t)
+    have he : ev (J p) = u k * p.val (Real.log (t.val : ℝ)) := by
+      with_reducible_and_instances exact (congrArg ev (hJ p)).trans (hB.choose_spec u p k t)
+    exact he.trans (congrArg (· * _) (hu k))
+  obtain ⟨J, hJ⟩ := hJ
+  have hmem (p : Profile) : J p ∈ E := by
+    apply (mem_modulatedDecayIsotype_iff m ω univ (mem_univ _) _).mpr
+    intro k g
+    let v : K := ⟨g / τ (m g), by change m (g / τ (m g)) = 1; rw [map_div, hτ _, div_self']⟩
+    have hv : v.val * τ (m g) = g := div_mul_cancel _ _
+    have hk : (k⁻¹ * v : K).val * τ (m g) = k.val⁻¹ * g := by
+      rw [Subgroup.coe_mul, Subgroup.coe_inv, mul_assoc, hv]
+    rw [← hk, hJ, show (J p).val g = _ from (congrArg (J p).val hv.symm).trans (hJ p v (m g))]
+    change (↑(χ ((k.val)⁻¹ * v.val)) : ℂ)⁻¹ * _ = (χ k.val : ℂ) * (_ * _)
+    rw [map_mul, map_inv, Circle.coe_mul, Circle.coe_inv, mul_inv_rev, inv_inv]
+    ac_rfl
+  refine ⟨J.codRestrict E hmem, fun p t ↦ ?_⟩
+  change (J p).val (τ t) = _
+  have he := hJ p (1 : K) t
+  simpa only [Subgroup.coe_one, one_mul, map_one, Circle.coe_one, inv_one] using he
+
+/-- The compact character integral of an isotype vector is its section value when
+the compact Haar measure has mass one. -/
+private theorem spectralNuclearityDenominator_isotypeModel_average
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [SecondCountableTopology G] [MeasurableSpace G] [BorelSpace G]
+    (m : G →ₜ* ℝ≥0ˣ) (τ : ℝ≥0ˣ →ₜ* G) (χ : PontryaginDual G)
+    (μ₁ : Measure m.toMonoidHom.ker) (hv : μ₁ univ = 1) :
+    let K := m.toMonoidHom.ker
+    let ω := χ.comp (⟨K.subtype, continuous_subtype_val⟩ : K →ₜ* G)
+    let E := modulatedDecayIsotype m univ (mem_univ 0) ω
+    ∀ (u : E) t, (∫ k : K, (χ k.val : ℂ) * u.val.val (k.val * τ t) ∂μ₁) = u.val.val (τ t) := by
+  intro K ω E u t
+  have hv' (k : K) : (χ k.val : ℂ) * u.val.val (k.val * τ t) = u.val.val (τ t) := by
+    have he := (mem_modulatedDecayIsotype_iff m ω univ (mem_univ _) u.val).mp u.property k (k.val * τ t)
+    change (ω k : ℂ) * u.val.val (k.val * τ t) = u.val.val (τ t)
+    exact he.symm.trans (congrArg u.val.val (inv_mul_cancel_left k.val (τ t)))
+  rw [integral_congr_ae (.of_forall hv'), integral_const, measureReal_def, hv, ENNReal.toReal_one, one_smul]
+
+/-- The unitary phase on the positive reals is an imaginary power. -/
+private theorem spectralNuclearityDenominator_isotypeModel_phase (ψ : PontryaginDual ℝ≥0ˣ) :
+    ∃ b : ℝ, ∀ t, ψ t = Circle.exp (b * Real.log (t.val : ℝ)) := by
+  let c := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ψ
+  obtain ⟨z, ⟨hz0, hz⟩, -⟩ := existsUnique_unitaryComplexPower c (fun t ↦ Circle.norm_coe (ψ t))
+  have hz' : (z.im : ℂ) * Complex.I = z := by apply Complex.ext <;> simp [hz0]
+  refine ⟨z.im, fun t ↦ Circle.ext ((hz t).trans ?_)⟩
+  have hpos : 0 < (t.val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt t)
+  rw [Circle.coe_exp, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hpos.ne'),
+    ← Complex.ofReal_log hpos.le]
+  conv_lhs => rw [← hz']
+  congr 1
+  push_cast
+  ring
+
+/-- The compact average realizes the section profile of the isotype. Its inverse
+inserts the inverse compact character in the split tensor product. -/
+private theorem spectralNuclearityDenominator_isotypeModel_mellin
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [SecondCountableTopology G]
+    (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
+    (χ : PontryaginDual G) :
+    let K := m.toMonoidHom.ker
+    let ω := χ.comp (⟨K.subtype, continuous_subtype_val⟩ : K →ₜ* G)
+    let E := modulatedDecayIsotype m univ (mem_univ 0) ω
+    ∃ M : E ≃L[ℂ] SchwartzBergman univ, ∀ (u : E) (s : ℂ),
+      let v (t : ℝ≥0ˣ) := u.val.val (τ t) * ((χ (τ t) : ℂ) * ((t.val : ℝ) : ℂ) ^ s)
+      Integrable v positiveRealHaar ∧ (M u).val s = ∫ t, v t ∂positiveRealHaar := by
+  intro K ω E
+  let : MeasurableSpace G := borel G
+  let : BorelSpace G := ⟨rfl⟩
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let μ₁ : Measure K := Measure.haarMeasure ⊤
+  have hμ₁ : μ₁ univ = 1 := Measure.haarMeasure_self
+  let μ := canonicalModulatedHaar m hm
+  let : μ.IsHaarMeasure := (Classical.choose_spec (existsUnique_canonicalModulatedHaar m hm).exists).1
+  have hμ := canonicalModulatedHaar_eq_map_prod m hm τ hτ μ₁ hμ₁
+  obtain ⟨b, hb⟩ := spectralNuclearityDenominator_isotypeModel_phase (χ.comp τ)
+  obtain ⟨A, F, T, e, hA, hF, _, he, hT⟩ := modulatedMellin_isotypicDiagram
+    m hm hτ.surjective univ isOpen_univ ordConnected_univ univ_nonempty τ hτ μ₁ μ hμ χ b hb
+  obtain ⟨J, hJ⟩ := spectralNuclearityDenominator_isotypeModel_lift m hm τ hτ χ
+  have hp (u : E) (t : ℝ≥0ˣ) : (A u.val).val (Real.log (t.val : ℝ)) = u.val.val (τ t) :=
+    (hA u.val t).trans (spectralNuclearityDenominator_isotypeModel_average m τ χ μ₁ hμ₁ u t)
+  let R := A.comp E.subtypeL
+  have hleft (u : E) : J (R u) = u := by
+    refine Subtype.ext (Subtype.ext (funext fun g ↦ ?_))
+    let k : K := ⟨τ (m g) / g, by change m (τ (m g) / g) = 1; rw [map_div, hτ _, div_self']⟩
+    have hk : k.val⁻¹ * τ (m g) = g := by change (_ / _)⁻¹ * _ = _; rw [inv_div, div_mul_cancel]
+    have hact (v : E) := (mem_modulatedDecayIsotype_iff m ω univ (mem_univ _) v.val).mp v.property k (τ (m g))
+    change (J (R u)).val.val g = u.val.val g
+    rw [← hk, hact, hact, hJ]
+    exact congrArg ((ω k : ℂ) * ·) (hp u (m g))
+  have hright (p : PositiveRealExponentialDecay univ) : R (J p) = p := by
+    apply Subtype.ext
+    funext x
+    let t : ℝ≥0ˣ := Units.mk0 (Real.exp x).toNNReal (by positivity)
+    have ht : Real.log (t.val : ℝ) = x := by
+      change Real.log ((Real.exp x).toNNReal : ℝ) = x
+      rw [Real.coe_toNNReal _ (Real.exp_pos x).le, Real.log_exp]
+    exact ht ▸ (hp (J p) t).trans (hJ p t)
+  let r := ContinuousLinearEquiv.equivOfInverse R J hleft hright
+  let scalarMellin := positiveRealFourierMellin univ isOpen_univ ordConnected_univ univ_nonempty
+  let M := (r.trans scalarMellin).trans T.symm
+  refine ⟨M, fun u s ↦ ?_⟩
+  let avg (t : ℝ≥0ˣ) := ∫ k : K, (χ k.val : ℂ) * u.val.val (k.val * τ t) ∂μ₁
+  have havg (t : ℝ≥0ˣ) : avg t = u.val.val (τ t) :=
+    spectralNuclearityDenominator_isotypeModel_average m τ χ μ₁ hμ₁ u t
+  have hval (t : ℝ≥0ˣ) : ((t.val : ℝ) : ℂ) ^ s * (χ (τ t) : ℂ) * avg t =
+      u.val.val (τ t) * ((χ (τ t) : ℂ) * ((t.val : ℝ) : ℂ) ^ s) := by rw [havg]; ring
+  have hsplit := modulatedMellin_split m hm hτ.surjective univ isOpen_univ ordConnected_univ
+    univ_nonempty τ hτ μ₁ μ hμ χ u.val s (mem_univ _)
+  have hFT : M u = F u.val := by
+    apply T.injective
+    change T (T.symm (scalarMellin (A u.val))) = _
+    rw [T.apply_symm_apply, hT, he]
+  exact ⟨hsplit.2.1.congr (.of_forall hval), (congrArg (fun H : SchwartzBergman univ ↦ H.val s) hFT).trans
+    ((hF u.val s (mem_univ _)).trans (hsplit.2.2.trans (integral_congr_ae (.of_forall hval))))⟩
+
+/-- Continuous integrable positive-real profiles are determined by their
+integrals against the unitary powers. -/
+private theorem spectralNuclearityDenominator_isotypeModel_unique (f h : ℝ≥0ˣ → ℂ)
+    (hf : Continuous f) (hh : Continuous h) (hi : Integrable f positiveRealHaar)
+    (hj : Integrable h positiveRealHaar)
+    (he : ∀ z : ℂ, z.re = 0 →
+      ∫ t : ℝ≥0ˣ, f t * ((t.val : ℝ) : ℂ) ^ z ∂positiveRealHaar =
+        ∫ t : ℝ≥0ˣ, h t * ((t.val : ℝ) : ℂ) ^ z ∂positiveRealHaar) : f = h := by
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  let : positiveRealHaar.IsHaarMeasure := positiveRealHaar_isHaarMeasure
+  let e : ℝ ≃ₜ ℝ≥0ˣ := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  let : LocallyCompactSpace ℝ≥0ˣ := e.symm.isOpenEmbedding.locallyCompactSpace
+  let : SecondCountableTopology ℝ≥0ˣ := e.symm.isEmbedding.secondCountableTopology
+  let ev (x : ℝ≥0ˣ) : PontryaginDual ℝ≥0ˣ →* Circle :=
+    { toFun := fun η ↦ η x, map_one' := rfl, map_mul' := fun _ _ ↦ rfl }
+  have hsep : Injective ev := fun _ _ e ↦ pontryaginDual_pairing_separates.1 (funext (DFunLike.congr_fun e))
+  have hzero : f - h =ᵐ[positiveRealHaar] 0 := by
+    apply ae_eq_zero_of_integral_mul_circle_eq_zero ev (fun η ↦ η.continuous) hsep (hi.sub hj)
+    intro η
+    let c := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η
+    obtain ⟨z, ⟨hz, hη⟩, _⟩ := existsUnique_unitaryComplexPower c (fun t ↦ Circle.norm_coe (η t))
+    have iχ (q : ℝ≥0ˣ → ℂ) (hq : Continuous q) (i : Integrable q positiveRealHaar) :
+        Integrable (fun t ↦ q t * (η t : ℂ)) positiveRealHaar :=
+      i.norm.mono' (hq.mul (continuous_subtype_val.comp η.continuous)).aestronglyMeasurable
+        (.of_forall fun t ↦ by rw [norm_mul, Circle.norm_coe, mul_one])
+    have hc (t) : (η t : ℂ) = ((t.val : ℝ) : ℂ) ^ z := hη t
+    change ∫ t, (f t - h t) * (η t : ℂ) ∂positiveRealHaar = 0
+    simp_rw [sub_mul]
+    rw [integral_sub (iχ f hf hi) (iχ h hh hj), sub_eq_zero]
+    simpa only [hc] using he z hz
+  exact sub_eq_zero.mp (Measure.eq_of_ae_eq hzero (hf.sub hh) continuous_const)
+
+/-- Shifting the Mellin argument by a real exponent inserts the corresponding
+norm power in the integrand of a polar homogeneous theta transform. -/
+private theorem spectralNuclearityDenominator_isotypeModel_shift (hτ : RightInverse τ (ideleNorm F)) (a : ℝ) (f : P) (s : ℂ) :
+    let σ (t : ℝ≥0ˣ) : C𝔽 := QuotientGroup.mk (τ t)
+    let H (t : ℝ≥0ˣ) := ((((t.val : ℝ) ^ a : ℝ) : ℂ) * homogeneousAdelicTheta (ω(χ)) f.val (σ t)) *
+      (χ (σ t) : ℂ)
+    let v (t : ℝ≥0ˣ) := H t * ((t.val : ℝ) : ℂ) ^ s
+    Integrable v positiveRealHaar ∧
+      homogeneousThetaMellinIntegral τ (ω(χ)) f.val (ideleClassNormTwist χ (s + a)) = ∫ t, v t ∂positiveRealHaar := by
+  intro σ H v
+  let c := ideleClassNormTwist χ (s + a)
+  have hc (t : ℝ≥0ˣ) : homogeneousAdelicTheta (ω(χ)) f.val (σ t) * c (σ t) = v t := by
+    change _ * ((χ (σ t) : ℂ) * (((ideleNorm F (τ t)).val : ℝ) : ℂ) ^ (s + (a : ℂ))) =
+      (((((t.val : ℝ) ^ a : ℝ) : ℂ) * _) * _) * _
+    rw [hτ, Complex.cpow_add _ _ (Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr t.ne_zero)),
+      Complex.ofReal_cpow (NNReal.coe_nonneg _) a]
+    ring
+  have hi := homogeneousThetaMellinIntegral_integrable_on_component τ (ω(χ)) f.val hτ (Or.inl f.property) c
+    ⟨mem_univ _, fun g ↦ normOneRestriction_unitaryChart (ideleClassNorm F)
+      (isProperMap_ideleClassNorm F).continuous χ (s + a) g⟩
+  exact ⟨hi.congr (.of_forall hc), integral_congr_ae (.of_forall hc)⟩
+
 /-- Paper: Equation (7.4.0.1), p. 366.
 The section Mellin transform identifies the decay isotype with the full
 Schwartz–Bergman space and takes the norm-twisted theta image to the denominator.
@@ -394,7 +612,75 @@ theorem spectralNuclearityDenominator_isotypeModel (a : ℝ) :
       ∀ u : E, M u ∈ spectralNuclearityDenominator χ τ hτ a ↔
         ∃ f : P, ∀ g : C𝔽, u.val.val g =
           ((((ideleClassNorm F g).val : ℝ) ^ a : ℝ) : ℂ) *
-            homogeneousAdelicTheta (ω(χ)) f.val g := by sorry
+            homogeneousAdelicTheta (ω(χ)) f.val g := by
+  intro m E
+  let : BorelSpace C𝔽 := ⟨rfl⟩
+  let q : IdeleGroup (𝓞 F) F →ₜ* C𝔽 := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
+  let σ := q.comp τ
+  have hσ : RightInverse σ m := hτ
+  have hm : IsModulation m := ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one⟩
+  obtain ⟨M, hM⟩ := spectralNuclearityDenominator_isotypeModel_mellin m hm σ hσ χ
+  have hc (s : ℂ) (t : ℝ≥0ˣ) : ideleClassNormTwist χ s (σ t) =
+      (χ (σ t) : ℂ) * ((t.val : ℝ) : ℂ) ^ s := by
+    change (χ (σ t) : ℂ) * (((m (σ t)).val : ℝ) : ℂ) ^ s = _
+    rw [hσ]
+  refine ⟨M, fun u s ↦ (hM u s).2.trans (integral_congr_ae (.of_forall fun t ↦
+    congrArg (u.val.val (σ t) * ·) (hc s t).symm)), fun u ↦ ?_⟩
+  let profile (t : ℝ≥0ˣ) := u.val.val (σ t) * (χ (σ t) : ℂ)
+  have hU (s : ℂ) : Integrable (fun t : ℝ≥0ˣ ↦ profile t * ((t.val : ℝ) : ℂ) ^ s) positiveRealHaar ∧
+      (M u).val s = ∫ t : ℝ≥0ˣ, profile t * ((t.val : ℝ) : ℂ) ^ s ∂positiveRealHaar := by
+    simpa only [profile, mul_assoc] using hM u s
+  let w (g : C𝔽) := ((((m g).val : ℝ) ^ a : ℝ) : ℂ)
+  let H (f : P) (t : ℝ≥0ˣ) := w (σ t) * homogeneousAdelicTheta (ω(χ)) f.val (σ t) * (χ (σ t) : ℂ)
+  have hH (f : P) (s : ℂ) :
+      Integrable (fun t : ℝ≥0ˣ ↦ H f t * ((t.val : ℝ) : ℂ) ^ s) positiveRealHaar ∧
+      ((exists_globalPolarThetaMellin χ τ hτ).choose (Submodule.Quotient.mk f)).val (s + (a : ℂ)) =
+        ∫ t : ℝ≥0ˣ, H f t * ((t.val : ℝ) : ℂ) ^ s ∂positiveRealHaar := by
+    have h := spectralNuclearityDenominator_isotypeModel_shift χ τ hτ a f s
+    have hw (t : ℝ≥0ˣ) : w (σ t) = (((t.val : ℝ) ^ a : ℝ) : ℂ) :=
+      congrArg (fun x : ℝ≥0ˣ ↦ (((x.val : ℝ) ^ a : ℝ) : ℂ)) (hσ t)
+    simp only [H, hw]
+    exact ⟨h.1, ((exists_globalPolarThetaMellin χ τ hτ).choose_spec f _).1.trans h.2⟩
+  rw [mem_spectralNuclearityDenominator_iff]
+  constructor
+  · rintro ⟨x, hx⟩
+    obtain ⟨f, rfl⟩ := Submodule.Quotient.mk_surjective _ x
+    have he : profile = H f := by
+      have hu : Continuous u.val.val := by
+        let z := modulatedExponentialDecayTwist m univ ⟨0, mem_univ _⟩ u.val
+        exact (schwartzBruhat_continuous z).congr
+          ((modulatedExponentialDecay_zeroTwist_injective m univ (mem_univ _)).2 u.val)
+      have hχ : Continuous (fun t : ℝ≥0ˣ ↦ (χ (σ t) : ℂ)) :=
+        continuous_subtype_val.comp (χ.continuous.comp σ.continuous)
+      have hr : Continuous (fun t : ℝ≥0ˣ ↦ (((t.val : ℝ) ^ a : ℝ) : ℂ)) :=
+        Complex.continuous_ofReal.comp ((NNReal.continuous_coe.comp Units.continuous_val).rpow_const
+          (fun t ↦ Or.inl (NNReal.coe_ne_zero.mpr t.ne_zero)))
+      have hw (t : ℝ≥0ˣ) : w (σ t) = (((t.val : ℝ) ^ a : ℝ) : ℂ) := congrArg
+        (fun x : ℝ≥0ˣ ↦ (((x.val : ℝ) ^ a : ℝ) : ℂ)) (hσ t)
+      apply spectralNuclearityDenominator_isotypeModel_unique
+      · exact (hu.comp σ.continuous).mul hχ
+      · exact (((hr.congr fun t ↦ (hw t).symm).mul
+          ((homogeneousAdelicTheta (ω(χ)) f.val).continuous.comp σ.continuous)).mul hχ)
+      · simpa only [Complex.cpow_zero, mul_one] using (hU 0).1
+      · simpa only [Complex.cpow_zero, mul_one] using (hH f 0).1
+      · exact fun s _ ↦ (hU s).2.symm.trans ((hx s).trans (hH f s).2)
+    have hsec (t : ℝ≥0ˣ) : u.val.val (σ t) = w (σ t) * homogeneousAdelicTheta (ω(χ)) f.val (σ t) :=
+      mul_right_cancel₀ (Circle.coe_ne_zero _) (congrFun he t)
+    refine ⟨f, fun g ↦ ?_⟩
+    let k : m.toMonoidHom.ker := ⟨σ (m g) / g, by change m (σ (m g) / g) = 1; rw [map_div, hσ _, div_self']⟩
+    have hk : k.val⁻¹ * σ (m g) = g := by change (_ / _)⁻¹ * _ = _; rw [inv_div, div_mul_cancel]
+    have hr := (mem_modulatedDecayIsotype_iff m (ω(χ)) univ (mem_univ _) u.val).mp u.property k (σ (m g))
+    have ht := homogeneousAdelicTheta_homogeneous (ω(χ)) f.val k (σ (m g))
+    rw [hk] at hr ht
+    change u.val.val g = w g * _
+    rw [hr, ht, hsec, mul_left_comm, show w (σ (m g)) = w g from congrArg
+      (fun x : ℝ≥0ˣ ↦ (((x.val : ℝ) ^ a : ℝ) : ℂ)) (hσ _)]
+  · rintro ⟨f, hf⟩
+    refine ⟨Submodule.Quotient.mk f, fun s ↦ (hU s).2.trans <| (_root_.Eq.trans ?_ (hH f s).2.symm)⟩
+    apply integral_congr_ae (.of_forall fun t ↦ ?_)
+    change (u.val.val (σ t) * _ ) * _ = ((w (σ t) * _) * _) * _
+    rw [hf]
+    rfl
 
 /-- Paper: Theorem 7.4.1.1(1), p. 366.
 The twisted theta image is closed. Compactly supported Bruhat tests act by continuous
