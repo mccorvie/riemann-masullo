@@ -13,7 +13,7 @@ import Mathlib.Topology.Algebra.Group.SubmonoidClosure
 import Mathlib.Analysis.Calculus.SmoothSeries
 import Mathlib.Analysis.Calculus.ParametricIntegral
 import Mathlib.Analysis.SpecialFunctions.SmoothTransition
-import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Bounded
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Completion

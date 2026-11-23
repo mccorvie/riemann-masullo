@@ -1,7 +1,7 @@
 module
 
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec1c
-import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 public import RiemannMasullo.ForMathlib.Analysis.Distribution.TestFunction
 public import Mathlib.LinearAlgebra.PiTensorProduct.Basic
 import Mathlib.LinearAlgebra.PiTensorProduct.Generators

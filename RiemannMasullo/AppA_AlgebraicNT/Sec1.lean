@@ -1014,7 +1014,7 @@ private theorem isDiscrete_principalIdeles :
 
 /-- Paper: Lemma A.1.3.3, p. 541. The ideles are locally compact because the adele ring
 is Hausdorff locally compact and its unit group is closed in the product with its opposite. -/
-theorem adeleHausdorff_ideleLocallyCompact :
+private theorem adeleHausdorff_ideleLocallyCompact :
     T2Space 𝔸[F] ∧ LocallyCompactSpace 𝕀[F] := by
   have : T2Space 𝔸[F] := by
     change T2Space (((v : InfinitePlace F) → v.Completion) ×
@@ -1064,7 +1064,7 @@ private theorem continuous_idelicNorm : Continuous (ideleNorm F) := by
 
 /-- Paper: Lemma A.2.2.6, p. 547. The section of the idelic norm obtained from one infinite
 place has finite part one. -/
-theorem exists_ideleNorm_section_finite_one :
+private theorem exists_ideleNorm_section_finite_one :
     ∃ s : ℝ≥0ˣ →* 𝕀[F], Continuous s ∧ RightInverse s (ideleNorm F) ∧
       ∀ t, (s t).val.2 = 1 := by
   classical
@@ -1357,11 +1357,11 @@ local notation "primeUnit" v => (Units.mk0 ((HeightOneSpectrum.asIdeal v) :
   FractionalIdeal (𝓞 F)⁰ F) (FractionalIdeal.coeIdeal_ne_zero.mpr (HeightOneSpectrum.ne_bot v)))
 
 /-- The finite valuation of an idele, with a uniformizer assigned exponent one. -/
-def ideleExponent (g : 𝕀[F]) (v : Primes(F)) : ℤ :=
+private def ideleExponent (g : 𝕀[F]) (v : Primes(F)) : ℤ :=
   -WithZero.log (Valued.v (g.val.2 v))
 
 /-- Almost every finite exponent of an idele is zero. -/
-theorem eventually_ideleExponent_eq_zero (g : 𝕀[F]) :
+private theorem eventually_ideleExponent_eq_zero (g : 𝕀[F]) :
     ∀ᶠ v in cofinite, ideleExponent F g v = 0 :=
   ((AdeleRing.isUnit_iff.mp g.isUnit).2.2).mono fun v hv ↦ by
     simp [ideleExponent, hv]
@@ -2045,7 +2045,7 @@ def sIdeleClassNorm : SIdeleClassGroup F S →* ℝ≥0ˣ :=
     (sIdeleNorm_spec F S).2
 
 /-- The adeles integral outside the chosen finite set form an open subring. -/
-theorem isOpen_integralAdelesOutside : IsOpen (integralAdelesOutside F S : Set 𝔸[F]) := by
+private theorem isOpen_integralAdelesOutside : IsOpen (integralAdelesOutside F S : Set 𝔸[F]) := by
   have h : (integralAdelesOutside F S : Set 𝔸[F]) =
       Prod.snd ⁻¹' {a : 𝔸ᶠ[𝓞 F, F] | ∀ v ∈ (S : Set (Primes(F)))ᶜ,
         a v ∈ v.adicCompletionIntegers F} := by
@@ -2058,7 +2058,7 @@ theorem isOpen_integralAdelesOutside : IsOpen (integralAdelesOutside F S : Set �
     (fun _ _ ↦ Valued.isOpen_valuationSubring _)).preimage continuous_snd
 
 /-- The units of the integral adelic model form an open subgroup of the ideles. -/
-theorem isOpenEmbedding_integralAdeleUnits :
+private theorem isOpenEmbedding_integralAdeleUnits :
     IsOpenEmbedding (Units.map (integralAdelesOutside F S).subtype.toMonoidHom) := by
   let A := integralAdelesOutside F S
   let j := Units.map A.subtype.toMonoidHom
@@ -2761,7 +2761,7 @@ local notation "LocalQuot(" F ", " T ", " D ")" =>
   _ ⧸ MonoidHom.range (sUnitLocalClasses F T D)
 
 /-- The class of the divisor given by finitely many prime exponents. -/
-def divisorPic : Multiplicative (Primes(F) →₀ ℤ) →* CommRing.Pic (𝓞 F) where
+private def divisorPic : Multiplicative (Primes(F) →₀ ℤ) →* CommRing.Pic (𝓞 F) where
   toFun n := n.toAdd.prod fun v k ↦
     ClassGroup.equivPic (𝓞 F)
       (ClassGroup.mk0 ⟨v.asIdeal, mem_nonZeroDivisors_iff_ne_zero.mpr v.ne_bot⟩) ^ k
@@ -2857,7 +2857,7 @@ open scoped nonZeroDivisors in
 /-- Paper: Equation (A.1.5.9), p. 544. A divisor becomes principal over the S-integers
 precisely when its exponents away from S agree with the orders of a single nonzero field
 element. The exponents at the primes in S disappear under localization. -/
-theorem sInteger_divisorPic_eq_one_iff (S : Finset (Primes(F))) (n : Primes(F) →₀ ℤ) :
+private theorem sInteger_divisorPic_eq_one_iff (S : Finset (Primes(F))) (n : Primes(F) →₀ ℤ) :
     CommRing.Pic.mapAlgebra (𝓞 F) (Oₛ(F, S)) (divisorPic F (Multiplicative.ofAdd n)) = 1 ↔
       ∃ a : Fˣ, ∀ v ∉ S, n v = -WithZero.log (v.valuation F (a : F)) := by
   classical
@@ -3212,7 +3212,7 @@ private theorem exists_normOne_idele_with_exponents (n : Primes(F) → ℤ)
 
 open scoped WithZero in
 /-- An idele is a unit in the integral adele model exactly when every finite order is zero. -/
-theorem mem_integralIdeleRange_iff (g : 𝕀[F]) :
+private theorem mem_integralIdeleRange_iff (g : 𝕀[F]) :
     g ∈ (Units.map (integralAdelesOutside F ∅).subtype.toMonoidHom).range ↔
       ∀ v : Primes(F), Valued.v (g.val.2 v) = (1 : ℤᵐ⁰) := by
   have hval (a : 𝕀[F]) (v : Primes(F)) :

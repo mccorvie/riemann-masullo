@@ -348,17 +348,6 @@ theorem globalThetaIsotypeSum_dense :
     let i := DirectSum.toModule ℂ _ Θ𝔽 (fun ω ↦ (E𝔽(ω)).subtype)
     Continuous i ∧ Injective i ∧ DenseRange i := by sorry
 
-/-- Paper: Remark 6.2.1.4(1), p. 297.
-The locally convex direct sum of the S-local isotypes is Hausdorff and complete. -/
-theorem sLocalThetaIsotypeSum_complete :
-    let X := fun χ : PontryaginDual J₁(S) ↦ ↥(Eₛ(χ))
-    letI := Classical.decEq (PontryaginDual J₁(S))
-    let D := ⨁ χ, X χ
-    letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
-    T2Space D ∧ PolynormableSpace ℂ D ∧
-      ∀ (u : UniformSpace D), u.toTopologicalSpace = (inferInstance : TopologicalSpace D) →
-        @IsUniformAddGroup D u _ → @CompleteSpace D u := by sorry
-
 /-- The generating seminorms for the final locally convex topology are tested on each stage. -/
 private theorem globalThetaIsotypeSum_finalTopology_withSeminorms {K Z : Type*} {Y : K → Type*}
     [AddCommGroup Z] [Module ℂ Z] [∀ k, AddCommGroup (Y k)] [∀ k, Module ℂ (Y k)]
@@ -500,6 +489,49 @@ private theorem globalThetaIsotypeSum_uniform_eq {A : Type*} [AddCommGroup A] (t
     (hg : @IsUniformAddGroup A u _) : u = @IsTopologicalAddGroup.rightUniformSpace A _ t h := by
   subst t
   exact (@IsUniformAddGroup.rightUniformSpace_eq A u _ hg).symm
+
+/-- Paper: Remark 6.2.1.4(1), p. 297.
+The locally convex direct sum of the S-local isotypes is Hausdorff and complete. -/
+theorem sLocalThetaIsotypeSum_complete :
+    let X := fun χ : PontryaginDual J₁(S) ↦ ↥(Eₛ(χ))
+    letI := Classical.decEq (PontryaginDual J₁(S))
+    let D := ⨁ χ, X χ
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
+    T2Space D ∧ PolynormableSpace ℂ D ∧
+      ∀ (u : UniformSpace D), u.toTopologicalSpace = (inferInstance : TopologicalSpace D) →
+        @IsUniformAddGroup D u _ → @CompleteSpace D u := by
+  classical
+  let : T2Space (Θₛ(S)) := sLocalAdelicThetaSpace_t2_of_isClosed
+    (sLocalAdelicTheta_ker_isClosed (F := F) (S := S))
+  let : PolynormableSpace ℂ (Θₛ(S)) := sLocalAdelicThetaSpace_polynormable
+  let : IsTopologicalAddGroup (Θₛ(S)) := PolynormableSpace.isTopologicalAddGroup ℂ _
+  let : UniformSpace (Θₛ(S)) := IsTopologicalAddGroup.rightUniformSpace _
+  let : IsUniformAddGroup (Θₛ(S)) := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace (Θₛ(S)) := sLocalAdelicThetaSpace_complete
+  let X := fun χ : PontryaginDual J₁(S) ↦ ↥(Eₛ(χ))
+  let D := ⨁ χ, X χ
+  let lof := DirectSum.lof ℂ (PontryaginDual J₁(S)) X
+  let : ∀ χ, UniformSpace (X χ) := fun χ ↦ UniformSpace.comap Subtype.val inferInstance
+  let : ∀ χ, IsUniformAddGroup (X χ) := fun χ ↦
+    IsUniformAddGroup.comap (f := (Eₛ(χ)).subtype.toAddMonoidHom)
+  let : ∀ χ, CompleteSpace (X χ) := fun χ ↦
+    (sLocalThetaIsotypicAverage_equiv (F := F) (S := S) χ).1.completeSpace_coe
+  let : TopologicalSpace D := locallyConvexFinalTopology lof
+  have hD := globalThetaIsotypeSum_finalTopology_withSeminorms lof
+  let : IsTopologicalAddGroup D := hD.isTopologicalAddGroup
+  let : PolynormableSpace ℂ D := hD.toPolynormableSpace
+  refine ⟨T2Space.of_injective_continuous (f := fun x : D ↦ fun i ↦ x i)
+    (fun _ _ h ↦ DFinsupp.ext (congrFun h))
+    (continuous_pi (globalThetaIsotypeSum_continuous_lcDirectSum_component X)), inferInstance, ?_⟩
+  intro u hu hg
+  have ht : u.toTopologicalSpace = locallyConvexFinalTopology lof := hu
+  let : UniformSpace D := u
+  let : IsUniformAddGroup D := hg
+  have heq : u = @IsTopologicalAddGroup.rightUniformSpace D _
+      (locallyConvexFinalTopology lof) hD.isTopologicalAddGroup :=
+    globalThetaIsotypeSum_uniform_eq _ hD.isTopologicalAddGroup u ht hg
+  rw [heq]
+  exact globalThetaIsotypeSum_completeSpace_lcDirectSum X
 
 /-- Paper: Remark 6.2.1.4(1), p. 297.
 The locally convex direct sum of the global isotypes is Hausdorff and complete. -/

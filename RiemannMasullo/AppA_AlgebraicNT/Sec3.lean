@@ -12,7 +12,7 @@ public import Mathlib.NumberTheory.Padics.RingHoms
 public import Mathlib.RingTheory.DedekindDomain.Different
 public import Mathlib.Topology.Algebra.Group.Units
 
-import RiemannMasullo.AppA_AlgebraicNT.Sec1  -- for the open integral subgroups
+import all RiemannMasullo.AppA_AlgebraicNT.Sec1  -- for the open integral subgroups
 import RiemannMasullo.AppA_AlgebraicNT.Sec2  -- for the diagonal adelic basis
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1a  -- for Weil disintegration
 import RiemannMasullo.AppD_SchwartzBruhat.Sec1b  -- for duality of a quotient and its annihilator
@@ -21,7 +21,6 @@ import Mathlib.Analysis.SpecialFunctions.Complex.CircleAddChar
 import Mathlib.Analysis.SpecialFunctions.Gaussian.FourierTransform
 import Mathlib.Analysis.SpecialFunctions.Integrals.Basic
 import Mathlib.Analysis.SpecialFunctions.Pow.NNReal
-import Mathlib.Analysis.SpecialFunctions.PolarCoord
 import Mathlib.LinearAlgebra.Countable
 import Mathlib.LinearAlgebra.TensorProduct.Basis
 import Mathlib.MeasureTheory.Integral.Pi

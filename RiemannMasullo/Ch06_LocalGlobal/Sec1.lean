@@ -11,7 +11,7 @@ public import Mathlib.MeasureTheory.Integral.Pi
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Data.Pi.Interval
 import Mathlib.Topology.Algebra.Valued.WithZeroMulInt
-import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1d
 import all RiemannMasullo.Ch02_AdelicTheta.Sec1
 

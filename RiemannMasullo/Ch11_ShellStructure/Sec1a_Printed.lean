@@ -2,7 +2,7 @@ module
 
 public import RiemannMasullo.Ch11_ShellStructure.Sec1a
 import all RiemannMasullo.Ch11_ShellStructure.Sec1a
-import RiemannMasullo.AppA_AlgebraicNT.Sec1
+import all RiemannMasullo.AppA_AlgebraicNT.Sec1
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 import Mathlib.NumberTheory.NumberField.ClassNumber
 

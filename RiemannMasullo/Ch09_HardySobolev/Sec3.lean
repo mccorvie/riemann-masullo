@@ -8,7 +8,7 @@ import all RiemannMasullo.AppC_LCTVS.Sec3a_part2
 import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import all RiemannMasullo.Ch09_HardySobolev.Sec1
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1a
-import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 import RiemannMasullo.ForMathlib.MeasureTheory.Integral.Bochner.Seminorm
