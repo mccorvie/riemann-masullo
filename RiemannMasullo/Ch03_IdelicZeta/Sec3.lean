@@ -212,6 +212,44 @@ theorem sAdeleSchwartzFourier_apply_zero (f : ℬ(Aₛ)) :
   change tamagawaFourier _ _ _ (0 : Aₛ) = _
   simp [tamagawaFourier, hS]
 
+/-- Integer-indicator insertion multiplies Fourier evaluation at zero by the
+same nonzero additive tail mass for every local test. -/
+theorem sAdeleSchwartzToGlobal_fourier_zero_scale :
+    ∃ c : ℂ, c ≠ 0 ∧ ∀ f : ℬ(Aₛ),
+      adeleSchwartzFourier (sAdeleSchwartzToGlobal F S f) (Multiplicative.ofAdd 0) =
+        c * sAdeleSchwartzFourier f (Multiplicative.ofAdd 0) := by
+  classical
+  obtain ⟨c, hc, -, hm, -⟩ := sAdeleProjection_dual_masses F S
+  refine ⟨((c : ℝ) : ℂ), by exact_mod_cast hc, fun f ↦ ?_⟩
+  let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let (v : HeightOneSpectrum (𝓞 F)) : BorelSpace (v.adicCompletion F) := ⟨rfl⟩
+  let (v : HeightOneSpectrum (𝓞 F)) : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let : BorelSpace Aₛ := inferInstanceAs
+    (BorelSpace (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let : MeasurableSpace (AdeleRing (𝓞 F) F) := borel _
+  let : BorelSpace (AdeleRing (𝓞 F) F) := ⟨rfl⟩
+  let I := (integralAdelesOutside F S : Set (AdeleRing (𝓞 F) F))
+  let z (y : Aₛ) := f (Multiplicative.ofAdd y)
+  have hf : (fun x ↦ sAdeleSchwartzToGlobal F S f (Multiplicative.ofAdd x)) =
+      I.indicator (z ∘ adeleProjection F S) := by
+    funext x
+    have hI : x ∈ I ↔ ∀ v ∉ S, x.2 v ∈ v.adicCompletionIntegers F := by
+      change x ∈ integralAdelesOutside F S ↔ _
+      simp only [integralAdelesOutside, Subring.mem_iInf]
+      rfl
+    rw [sAdeleSchwartzToGlobal_apply, indicator_apply, hI]
+    rfl
+  rw [(adeleSchwartzFourier_apply_zero _).2, sAdeleSchwartzFourier_apply_zero, hf,
+    integral_indicator (isOpen_integralAdelesOutside F S).measurableSet]
+  have hZ : Continuous z := (schwartzBruhat_continuous f).comp continuous_ofAdd
+  have he := integral_map (μ := (additiveTamagawaMeasure F).restrict I)
+    hm.measurable.aemeasurable (f := z)
+    (by rw [hm.map_eq]; exact hZ.aestronglyMeasurable)
+  refine he.symm.trans ?_
+  rw [hm.map_eq, integral_smul_nnreal_measure, NNReal.smul_def, Complex.real_smul]
+
 /-- Paper: Equation (3.3.1.1), p. 129. The S-local zeta integral weights
 the restriction of the test function to the S-ideles by the quasi-character. -/
 def sLocalIdelicZetaIntegral (f : ℬ(Aₛ)) (c : Xₛ) : ℂ :=

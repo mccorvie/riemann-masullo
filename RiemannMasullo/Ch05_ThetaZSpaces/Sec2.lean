@@ -13,6 +13,9 @@ import all RiemannMasullo.Ch02_AdelicTheta.Sec3
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongDualPrecompact
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.ChangeOfVariables
 import Mathlib.Data.Finset.Lattice.Union
+import Mathlib.Analysis.Distribution.SchwartzSpace.CompactSupport
+import Mathlib.NumberTheory.NumberField.CanonicalEmbedding.Basic
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.InfiniteAdeleRing
 import all RiemannMasullo.AppC_LCTVS.Sec1
 import all RiemannMasullo.AppC_LCTVS.Sec2b
 import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
@@ -45,6 +48,132 @@ local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
 local notation "Jₛ(" S ")" => SIdeleQuotient F S
 local notation "C₁" => MonoidHom.ker (ideleClassNorm F)
 local notation "J₁(" S ")" => MonoidHom.ker (sIdeleQuotientNorm F S)
+
+open scoped TensorProduct in
+private theorem sAdeleSchwartz_continuous_tmul_fixed {A V : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] [IsTopologicalAddGroup A]
+    [AddCommGroup V] [Module ℂ V] [TopologicalSpace V] (t : V) :
+    @Continuous A (InductiveTensor A V) _ _ (fun b ↦ b ⊗ₜ[ℂ] t) := by
+  let p := fun q : {q : Seminorm ℂ (A ⊗[ℂ] V) //
+    (∀ a : A, Continuous fun b : V ↦ q (a ⊗ₜ[ℂ] b)) ∧
+    (∀ b : V, Continuous fun a : A ↦ q (a ⊗ₜ[ℂ] b))} ↦ q.val
+  have h := withGeneratingSeminorms_spec (A ⊗[ℂ] V) p
+  exact h.continuous_of_continuous_comp ((TensorProduct.mk ℂ A V).flip t) (fun q ↦ q.property.2 t)
+
+private theorem sAdeleSchwartz_compact_support_product (f : ℬₛ(S))
+    (a : InfiniteAdeleRing F → ℂ) (g : ∀ w : S, SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))
+    (ha : HasCompactSupport a)
+    (he : ∀ x : SAdeleRing F S, f (Multiplicative.ofAdd x) =
+      a x.1 * ∏ w : S, g w (Multiplicative.ofAdd (x.2 w))) : HasCompactSupport f.val := by
+  let K : Set (SAdeleRing F S) :=
+    tsupport a ×ˢ (Set.pi Set.univ (fun w : S ↦ tsupport (fun x : w.val.adicCompletion F ↦
+      g w (Multiplicative.ofAdd x))))
+  have hG (w : S) : HasCompactSupport (fun x : w.val.adicCompletion F ↦ g w (Multiplicative.ofAdd x)) :=
+    ((mem_finitePlaceSchwartz_iff F w.val _).mp ⟨g w, fun _ ↦ rfl⟩).2
+  have hK : IsCompact K := ha.prod (isCompact_univ_pi fun w ↦ hG w)
+  refine HasCompactSupport.intro (hK.image continuous_ofAdd) (fun x hx ↦ ?_)
+  change f x = 0
+  rw [← show Multiplicative.ofAdd x.toAdd = x from rfl, he]
+  by_contra hn
+  obtain ⟨h₁, h₂⟩ := mul_ne_zero_iff.mp hn
+  apply hx
+  refine ⟨x.toAdd, ⟨subset_tsupport _ h₁, fun w _ ↦ subset_tsupport _ ?_⟩, rfl⟩
+  intro hz
+  exact h₂ (Finset.prod_eq_zero (Finset.mem_univ w) hz)
+
+open scoped Classical in
+private theorem sAdeleSchwartz_archimedean_compact_seq (c : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ) :
+    ∃ u : ℕ → SchwartzMap (mixedEmbedding.mixedSpace F) ℂ,
+      (∀ n, HasCompactSupport (u n)) ∧ Tendsto u atTop (𝓝 c) := by
+  let C : Set (SchwartzMap (mixedEmbedding.mixedSpace F) ℂ) := {b | HasCompactSupport b}
+  have hcC : c ∈ closure C := SchwartzMap.dense_hasCompactSupport c
+  exact mem_closure_iff_seq_limit.mp hcC
+
+open scoped Classical TensorProduct in
+private theorem sAdeleSchwartz_pure_compact_support_seq
+    (J : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ ≃L[ℂ]
+      SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+    (hJ : ∀ f x, J f (Multiplicative.ofAdd x) = f (InfiniteAdeleRing.ringEquiv_mixedSpace F x))
+    (e : InductiveTensor (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+      (FinestLocallyConvex (⨂[ℂ] w : S, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))))
+      ≃L[ℂ] ℬₛ(S))
+    (he : ∀ (a : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+      (g : ∀ w : S, SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))
+      (x : SAdeleRing F S),
+      e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w)) (Multiplicative.ofAdd x) =
+        a (Multiplicative.ofAdd x.1) * ∏ w : S, g w (Multiplicative.ofAdd (x.2 w)))
+    (c : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ)
+    (g : ∀ w : S, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))) :
+    ∃ u : ℕ → ℬₛ(S), (∀ n, HasCompactSupport (u n).val) ∧
+      Tendsto u atTop (𝓝 (e (J c ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w)))) := by
+  let A := SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))
+  let B (w : S) := SchwartzBruhat (Multiplicative (w.val.adicCompletion F))
+  let V := FinestLocallyConvex (⨂[ℂ] w, B w)
+  let h := sAdeleSchwartz_archimedean_compact_seq (F := F) c
+  let u := h.choose
+  have hu := h.choose_spec.1
+  have hut := h.choose_spec.2
+  let t : V := ⨂ₜ[ℂ] w, g w
+  have htmul := sAdeleSchwartz_continuous_tmul_fixed (A := A) (V := V) t
+  let M := fun b : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ ↦ e (J b ⊗ₜ[ℂ] t)
+  have hM : Continuous M := e.continuous.comp (htmul.comp J.continuous)
+  refine ⟨M ∘ u, fun n ↦ ?_, ?_⟩
+  · change HasCompactSupport (M (u n)).val
+    let a (x : InfiniteAdeleRing F) := u n (InfiniteAdeleRing.ringEquiv_mixedSpace F x)
+    have ha : HasCompactSupport a := (hu n).comp_homeomorph (infiniteAdeleHomeomorphMixedSpace F)
+    apply sAdeleSchwartz_compact_support_product (M (u n)) a g ha
+    intro x
+    exact (he (J (u n)) g x).trans
+      (congrArg (fun z : ℂ ↦ z * ∏ w, g w (Multiplicative.ofAdd (x.2 w))) (hJ _ _))
+  · exact hM.continuousAt.tendsto.comp hut
+
+open scoped TensorProduct in
+/-- Compactly supported S-adelic Schwartz–Bruhat tests approximate every test
+sequentially. Only the archimedean factor needs approximation. -/
+theorem exists_sAdeleSchwartz_compact_support_seq (f : ℬₛ(S)) :
+    ∃ u : ℕ → ℬₛ(S), (∀ n, HasCompactSupport (u n).val) ∧ Tendsto u atTop (𝓝 f) := by
+  classical
+  let A := SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))
+  let B (w : S) := SchwartzBruhat (Multiplicative (w.val.adicCompletion F))
+  let V := FinestLocallyConvex (⨂[ℂ] w, B w)
+  let D : Submodule ℂ (ℬₛ(S)) :=
+    { carrier := {x | ∃ u : ℕ → ℬₛ(S), (∀ n, HasCompactSupport (u n).val) ∧ Tendsto u atTop (𝓝 x)}
+      zero_mem' := ⟨fun _ ↦ 0, fun _ ↦ HasCompactSupport.zero, tendsto_const_nhds⟩
+      add_mem' := by
+        rintro x y ⟨u, hu, hut⟩ ⟨v, hv, hvt⟩
+        exact ⟨fun n ↦ u n + v n, fun n ↦ (hu n).add (hv n), hut.add hvt⟩
+      smul_mem' := by
+        rintro c x ⟨u, hu, ht⟩
+        exact ⟨fun n ↦ c • u n, fun n ↦ (hu n).smul_left (f := fun _ ↦ c), ht.const_smul c⟩ }
+  obtain ⟨J, hJ⟩ := archimedeanSchwartzBruhat_equiv (F := F)
+  obtain ⟨e, he⟩ := sAdeleSchwartz_inductiveTensor_equiv F S
+  have hpure (a : A) (g : ∀ w, B w) :
+      e (a ⊗ₜ[ℂ] (show V from (⨂ₜ[ℂ] w, g w))) ∈ D := by
+    have h : ∃ c : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ, J c = a := J.surjective a
+    obtain ⟨c, hc⟩ := h
+    have hP := sAdeleSchwartz_pure_compact_support_seq J hJ e he c g
+    change ∃ u : ℕ → ℬₛ(S), (∀ n, HasCompactSupport (u n).val) ∧
+      Tendsto u atTop (𝓝 (e (a ⊗ₜ[ℂ] (show V from (⨂ₜ[ℂ] w, g w)))))
+    rw [← hc]
+    exact hP
+  have hgen (a : A) (v : V) : e (a ⊗ₜ[ℂ] v) ∈ D := by
+    let L : V →ₗ[ℂ] ℬₛ(S) := e.toLinearMap.comp (TensorProduct.mk ℂ A V a)
+    change L v ∈ D
+    refine PiTensorProduct.induction_on (motive := fun v : ⨂[ℂ] w, B w ↦ L v ∈ D) v ?_ ?_
+    · intro r g
+      change L (r • (show V from (⨂ₜ[ℂ] w, g w))) ∈ D
+      rw [map_smul]
+      exact D.smul_mem r (hpure a g)
+    · intro x y hx hy
+      exact (D.comap L).add_mem hx hy
+  obtain ⟨z, rfl⟩ := e.surjective f
+  exact TensorProduct.inductionOn (motive := fun z ↦ e z ∈ D) z hgen
+    (fun _ _ hx hy ↦ (D.comap e.toLinearMap).add_mem hx hy)
+
+/-- Evaluation on the S-adelic Schwartz–Bruhat space is continuous. -/
+theorem continuous_sAdeleSchwartz_eval (x : SAdeleRing F S) :
+    Continuous (fun f : ℬₛ(S) ↦ f (Multiplicative.ofAdd x)) :=
+  continuous_schwartzBruhat_eval (Multiplicative.ofAdd x)
 
 section Topology
 

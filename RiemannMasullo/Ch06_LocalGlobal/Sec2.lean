@@ -82,7 +82,7 @@ theorem sLocalHomogeneousThetaTransition_equiv_of_unramified
 
 /-- The descended character at a larger stage kills the additional integral units:
 use the same global lift to evaluate the descent identity at both stages. -/
-private theorem sLocalHomogeneousThetaToGlobal_equiv_of_unramified_units
+theorem sLocalHomogeneousThetaToGlobal_equiv_of_unramified_units
     (hST : S ⊆ T) {ω : PontryaginDual C₁} (hω : NormOneCharacterUnramifiedOutside ω S)
     (x : J₁(T)) (u : relativeIntegralIdeleUnits F S T) (hx : x.val = QuotientGroup.mk u.val) :
     sLocalNormOneCharacter T ω (hω.mono hST) x = 1 := by
