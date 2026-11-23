@@ -528,14 +528,23 @@ theorem exists_bruhatRegularizedAction [CompleteSpace E]
 /-- Paper: Definition 9.3.1.1, p. 419. A test function acts by integrating
 its scalar multiples of left translations against Haar measure.
 Deviation: The Pettis integral is specified on each input vector. Instantiate the
-representation with the action on the decay space or the Hardy–Sobolev space. -/
+representation with the action on the decay space or the Hardy–Sobolev space.
+
+Deviation: Equation (9.3.1.2) specifies an operator-valued Pettis integral in $\mathcal
+L_\beta(E)$, which may fail to exist. We construct the operator by taking a Pettis integral in
+$E$ for each input vector.
+-/
 def bruhatRegularizedAction [CompleteSpace E]
     (hρ : Continuous (fun p : G × E ↦ ρ p.1 p.2)) :
     BruhatCompactSupport G →ₗ[ℂ] Lβ E :=
   (exists_bruhatRegularizedAction μ ρ hρ).choose
 
 /-- Paper: Definition 9.3.1.1, p. 419. The action on each vector represents
-the Pettis integral of the test function times its orbit. -/
+the Pettis integral of the test function times its orbit.
+
+Deviation: The Pettis identity in Definition 9.3.1.1 can fail against a continuous functional on
+the full operator space. We state the Pettis identity in $E$ for each vector.
+-/
 theorem bruhatRegularizedAction_apply [CompleteSpace E]
     (hρ : Continuous (fun p : G × E ↦ ρ p.1 p.2)) (φ : BruhatCompactSupport G) (u : E) :
     HasPettisIntegral (.positive μ) (fun g ↦ φ.val g • ρ g u)
@@ -1441,7 +1450,12 @@ theorem existsUnique_schwartzBruhat_zeroLineAction (s : ℝ) (hs : 0 ≤ s) :
 /-- Paper: Lemma 9.3.2.1, p. 422. On the b-line, kernels whose b-twist is
 Schwartz act continuously and extend the test action.
 Deviation: The source is the singleton decay space from Example D.3.3.5,
-as required by the conjugation in the proof on p. 422. -/
+as required by the conjugation in the proof on p. 422.
+
+Deviation: Equation (9.3.2.1) takes ordinary Schwartz–Bruhat kernels for arbitrary $b$, and the
+proof prints the twist with the wrong sign on the arrow out of that space. Multiplication by
+$m^b$ sends the singleton decay kernels used here to Schwartz–Bruhat kernels.
+-/
 theorem existsUnique_singletonDecay_lineAction (hm : IsModulation m) (hms : Surjective m)
     (b s : ℝ) (hs : 0 ≤ s) :
     let W := CompactIntervalSobolev μ (fun x ↦ Real.log ((m x).val : ℝ)) b b s
@@ -1477,7 +1491,12 @@ theorem existsUnique_singletonDecay_lineAction (hm : IsModulation m) (hms : Surj
 
 /-- Paper: Corollary 9.3.2.3(1), p. 425. The frequency band attached to a character
 consists of its twists by imaginary powers of the module with exponents in the given interval.
-Deviation: The band is a subset of the full dual, as in the construction in the proof. -/
+Deviation: The band is a subset of the full dual, as in the construction in the proof.
+
+Deviation: Corollary 9.3.2.3(1) places the band containing the Fourier support in the dual of
+$G^1$. This band is in the full dual of $G$, and all its characters restrict to the same
+character on $G^1$.
+-/
 def modulatedFrequencyBand (m : G →ₜ* ℝ≥0ˣ) (χ : PontryaginDual G) (α β : ℝ) :
     Set (PontryaginDual G) :=
   {ψ | ∃ t ∈ Icc α β, ∀ g, ψ g = χ g * Circle.exp (t * Real.log ((m g).val : ℝ))}
@@ -2055,7 +2074,11 @@ private theorem normalized_line_kernel_model (hm : IsModulation m) (hms : Surjec
 /-- Paper: Lemma 9.3.2.1(4), p. 422. Band-limited convolutions approximate
 the identity on the full b-line space with a uniform operator norm bound.
 Deviation: The kernels may combine finitely many compact-group frequencies,
-as needed for inputs with components in several isotypes. -/
+as needed for inputs with components in several isotypes.
+
+Deviation: Lemma 9.3.2.1(4) claims strong approximation on the full space by individual
+homogeneous kernels. We allow mixed compact frequencies for convergence on the full space.
+-/
 theorem exists_singletonDecay_approximation (hm : IsModulation m) (hms : Surjective m)
     (b s : ℝ) (hs : 0 ≤ s) :
     let A := (existsUnique_singletonDecay_lineAction μ m hm hms b s hs).exists.choose
@@ -2379,7 +2402,11 @@ private theorem projected_approximate_identity {E : Type*} [NormedAddCommGroup E
 there is a uniformly bounded sequence of convolutions converging strongly to
 the identity there, with band-limited twisted kernels.
 Deviation: A single homogeneous kernel kills the other isotypes. The
-left-translation eigencharacter is inverse to the Fourier frequency on the kernel. -/
+left-translation eigencharacter is inverse to the Fourier frequency on the kernel.
+
+Deviation: Lemma 9.3.2.1(4) claims full-space convergence with individual homogeneous kernels.
+The homogeneous family here converges to the identity on the corresponding isotype.
+-/
 theorem exists_singletonDecay_isotype_approximation (hm : IsModulation m) (hms : Surjective m)
     (b s : ℝ) (hs : 0 ≤ s) (χ : PontryaginDual G) :
     let τ := hardySobolevTranslation μ m b b s le_rfl hs
@@ -2755,7 +2782,11 @@ local notation "W" => (fun a b s ↦
 /-- Paper: §9.3.3.1, p. 426. A bounded measurable compactly supported kernel
 acts by convolution on the Hardy–Sobolev space.
 Deviation: Haar measurability is explicit. The existing weighted L² model
-is available for compact base intervals. -/
+is available for compact base intervals.
+
+Deviation: Theorem 9.3.3.5(1) specifies a bounded compactly supported symbol. We require
+measurability for completed Haar measure, expressed as `AEMeasurable φ μ`.
+-/
 theorem exists_hardySobolevConvolution (a b s : ℝ) (_hab : a ≤ b) (_hs : 0 ≤ s)
     (φ : G → ℂ) (_hφ : AEMeasurable φ μ) (_hc : HasCompactSupport φ)
     (_hb : ∃ C : ℝ, ∀ x, ‖φ x‖ ≤ C) :
@@ -2807,7 +2838,11 @@ theorem exists_hardySobolevConvolution (a b s : ℝ) (_hab : a ≤ b) (_hs : 0 �
     _ = _ := by rw [integral_mul_const, mul_assoc]
 
 /-- Paper: §9.3.3.1, p. 426. The integrated regular representation for a bounded
-measurable compactly supported symbol is the operator given by convolution. -/
+measurable compactly supported symbol is the operator given by convolution.
+
+Deviation: The convolution formula on p. 426 specifies boundedness and compact support. The
+symbol must also be measurable for completed Haar measure, expressed as `AEMeasurable φ μ`.
+-/
 def hardySobolevConvolution (a b s : ℝ) (hab : a ≤ b) (hs : 0 ≤ s)
     (φ : G → ℂ) (hφ : AEMeasurable φ μ) (hc : HasCompactSupport φ)
     (hb : ∃ C : ℝ, ∀ x, ‖φ x‖ ≤ C) :
@@ -2961,7 +2996,7 @@ theorem IsSmoothModulatedCutoff.continuous {Λ ε : ℝ} {ρ : G → ℝ}
 omit [MeasurableSpace G] [BorelSpace G] [SecondCountableTopology G] in
 /-- A smooth function of the logarithmic module is Bruhat smooth. On each
 structural quotient, compose the descended positive quasi-character with log. -/
-private theorem isBruhatSmooth_logProfile (m : G →ₜ* ℝ≥0ˣ) {f : ℝ → ℝ}
+theorem isBruhatSmooth_logProfile (m : G →ₜ* ℝ≥0ˣ) {f : ℝ → ℂ}
     (hf : ContDiff ℝ ∞ f) :
     IsBruhatSmooth (fun x ↦ (f (Real.log ((m x).val : ℝ)) : ℂ)) := by
   let χ : QuasiCharacter G :=
@@ -2983,8 +3018,8 @@ private theorem isBruhatSmooth_logProfile (m : G →ₜ* ℝ≥0ˣ) {f : ℝ →
   refine ⟨fun y ↦ (f (Real.log (q y).re) : ℂ),
     fun x ↦ congrArg (fun z : ℂ ↦ (f (Real.log z.re) : ℂ)) (hq x), ?_⟩
   intro e z b
-  exact Complex.ofRealCLM.contDiff.comp ((hf.of_le (by simp)).comp
-    ((Complex.reCLM.contDiff.comp (hdiff e z b)).log fun x ↦ (hpos _).ne'))
+  exact (hf.of_le (by simp)).comp
+    ((Complex.reCLM.contDiff.comp (hdiff e z b)).log fun x ↦ (hpos _).ne')
 
 /-- Paper: Definition 9.3.3.1, p. 427. A positive real modulation admits a
 smooth cutoff with outer radius two and width one quarter.
@@ -3003,7 +3038,7 @@ theorem exists_smoothModulatedCutoff_radius_two (_hm : IsModulation m) (_hms : S
     simp [r, B.rIn_pos.le]
   refine ⟨ρ, ⟨by norm_num, by norm_num, by norm_num, by norm_num,
     fun _ ↦ B.nonneg, fun x ↦ (abs_of_nonneg (B.nonneg (x := Real.log (r x)))) ▸ B.le_one,
-    ?_, ?_, ?_, ?_, ?_⟩, isBruhatSmooth_logProfile m B.contDiff⟩
+    ?_, ?_, ?_, ?_, ?_⟩, isBruhatSmooth_logProfile m (Complex.ofRealCLM.contDiff.comp B.contDiff)⟩
   · exact IsGreatest.csSup_eq ⟨⟨1, h1⟩, forall_mem_range.mpr fun _ ↦ B.le_one⟩
   · refine ⟨fun t ↦ B (Real.log t), ∅, fun _ ↦ rfl, by simp, ?_, by simp⟩
     simp only [Finset.coe_empty, sdiff_empty]
@@ -3104,7 +3139,14 @@ theorem modulatedCutoffOperator_isPositive (ν : Measure G) {Λ ε : ℝ} {ρ : 
 /-- Paper: Remark 9.3.3.2, p. 428. The multiplier norm is the essential
 supremum of its symbol for a sigma-finite measure.
 Deviation: A pointwise supremum of one can be attained only on a null set
-when the inner band is empty. -/
+when the inner band is empty.
+
+Deviation: Remark 9.3.3.2 identifies the norm with the uniform supremum and asserts it is one.
+The width condition on p. 427 can leave the plateau empty and the maximum confined to a
+Haar-null set. The operator norm is the essential supremum. The strict width condition
+$1/\Lambda+\varepsilon<\Lambda-\varepsilon$ on p. 429 ensures a positive-measure plateau for the
+Haar measure on the positive reals.
+-/
 theorem modulatedCutoffOperator_norm (ν : Measure G) [SigmaFinite ν] {Λ ε : ℝ} {ρ : G → ℝ}
     (hρ : IsModulatedCutoff m Λ ε ρ) :
     ‖modulatedCutoffOperator m ν hρ‖ = (eLpNorm ρ ∞ ν).toReal := by

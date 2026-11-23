@@ -204,7 +204,8 @@ private theorem continuousAt_of_normTwist (hm : Continuous m) (hchart : HasNormT
 
 end NormCoordinates
 
-private theorem exists_ideleClassNormTwist (c : X𝔽) :
+/-- Every idele class quasi-character is a complex norm twist of a unitary character. -/
+theorem exists_ideleClassNormTwist (c : X𝔽) :
     ∃ (χ : PontryaginDual C𝔽) (s : ℂ), ideleClassNormTwist χ s = c := by
   let : T2Space C𝔽 := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.1
   let : LocallyCompactSpace C𝔽 := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.1
@@ -729,7 +730,7 @@ theorem sLocalAdelicThetaSpace_mk_eq_iff (f g : ℬₛ) :
       ((DFunLike.congr_fun h _).trans (sLocalAdelicThetaOnClasses_mk F S g x))
 
 /-- Two normalized meromorphic functions agreeing on a right half-plane agree everywhere. -/
-private theorem eq_of_agree_rightHalf {U V : ℂ → ℂ} (hU : MeromorphicNFOn U Set.univ)
+theorem eq_of_agree_rightHalf {U V : ℂ → ℂ} (hU : MeromorphicNFOn U Set.univ)
     (hV : MeromorphicNFOn V Set.univ) (a : ℝ) (h : ∀ z : ℂ, a < z.re → U z = V z) : U = V := by
   let b : ℂ := (a + 1 : ℝ)
   have hb : ∀ᶠ z : ℂ in 𝓝 b, a < z.re :=
@@ -747,12 +748,15 @@ private theorem eq_of_agree_rightHalf {U V : ℂ → ℂ} (hU : MeromorphicNFOn 
 local notation "globalRightHalf" => relativeRightHalfPlane m𝔽 (isProperMap_ideleClassNorm F)
   (ideleClassNorm_ne_one (F := F)) 1
 
-private theorem globalTwist_mem_rightHalf (χ : PontryaginDual C𝔽) {s : ℂ} (hs : 1 < s.re) :
+/-- The unitary norm chart lies in the global convergence region when its exponent has real part greater than one. -/
+theorem globalTwist_mem_rightHalf (χ : PontryaginDual C𝔽) {s : ℂ} (hs : 1 < s.re) :
     ideleClassNormTwist χ s ∈ globalRightHalf := by
   change 1 < quasiCharacterAbscissa _ _ _ _
   rwa [quasiCharacterAbscissa_ideleClassNormTwist]
 
-private theorem globalZ_eq_zero_of_theta_eq_zero (f : ℬ𝔽) (hf : adelicTheta f = 0) (c : X𝔽) :
+/-- A Schwartz-Bruhat function whose adelic theta series vanishes has zero global Z-function at
+every quasi-character of the idele class group. -/
+theorem globalZ_eq_zero_of_theta_eq_zero (f : ℬ𝔽) (hf : adelicTheta f = 0) (c : X𝔽) :
     globalIdelicZFunction f c = 0 := by
   obtain ⟨χ, s, rfl⟩ := exists_ideleClassNormTwist c
   refine congrFun (eq_of_agree_rightHalf (globalIdelicZFunction_meromorphic f χ)
@@ -913,7 +917,7 @@ variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
   [T2Space G] [LocallyCompactSpace G] [MeasurableSpace G] [BorelSpace G]
 
 /-- Testing a weighted continuous function against all characters recovers the function. -/
-private theorem eq_zero_of_weighted_integrals (μ : Measure G) [μ.IsHaarMeasure] [μ.Regular]
+theorem eq_zero_of_weighted_integrals (μ : Measure G) [μ.IsHaarMeasure] [μ.Regular]
     (θ : C(G, ℂ)) (w : QuasiCharacter G) (hi : Integrable (fun x ↦ θ x * w x) μ)
     (hz : ∀ χ : PontryaginDual G, ∫ x, θ x * w x * (χ x : ℂ) ∂μ = 0) : θ = 0 := by
   let ev (x : G) : PontryaginDual G →* Circle :=
@@ -927,7 +931,8 @@ private theorem eq_zero_of_weighted_integrals (μ : Measure G) [μ.IsHaarMeasure
 
 end FourierUniqueness
 
-private theorem globalOrderBound_rightHalf (χ : PontryaginDual C𝔽) {s : ℂ} (hs : 1 < s.re) :
+/-- The global idelic order bound is nonnegative on the half-plane of absolute convergence. -/
+theorem globalOrderBound_rightHalf (χ : PontryaginDual C𝔽) {s : ℂ} (hs : 1 < s.re) :
     0 ≤ globalIdelicOrderBound (ideleClassNormTwist χ s) := by
   have h0 : ideleClassNormTwist (1 : PontryaginDual C𝔽) 0 = 1 := by
     ext1 g
@@ -974,7 +979,8 @@ theorem globalThetaMellin_injective : Injective (globalThetaMellin (F := F)) := 
     adelicTheta f g * ((χ g : ℂ) * _ ^ (2 : ℂ))
   rw [one_mul, mul_right_comm, mul_assoc]
 
-private theorem sLocalOrderBound_positive (χ : PontryaginDual Jₛ) {s : ℂ} (hs : 0 < s.re) :
+/-- Positive real part gives a regular S-local order bound on the unitary chart. -/
+theorem sLocalOrderBound_positive (χ : PontryaginDual Jₛ) {s : ℂ} (hs : 0 < s.re) :
     0 ≤ sLocalIdelicOrderBound (unitaryₛ(χ) s) := by
   rw [sLocalOrderBound_chart, le_min_iff]
   have h := sLocalRhoFactor_iteratedDeriv_analyticOn χ 0 s hs
@@ -1042,7 +1048,7 @@ private theorem schwartzBruhat_eval_continuous {G : Type*} [CommGroup G] [Topolo
 /-- At a fixed idele class, global theta is continuous in the test function. It is the
 pointwise limit of the finite partial sums of point evaluations, and the global
 Schwartz–Bruhat space is barrelled, so the Banach–Steinhaus theorem applies. -/
-private theorem adelicTheta_eval_continuous (c : C𝔽) :
+theorem adelicTheta_eval_continuous (c : C𝔽) :
     Continuous (fun f : ℬ𝔽 ↦ adelicTheta f c) := by
   induction c using QuotientGroup.induction_on with | H g => ?_
   let : BarrelledSpace ℂ ℬ𝔽 := (adeleSchwartz_montel (F := F)).2.1
@@ -1267,7 +1273,8 @@ variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
 local notation "unitaryChart(" χ ")" => quasiCharacterNormTwist m hm
   ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ)
 
-private theorem normOneRestriction_unitaryChart (χ : PontryaginDual G) (s : ℂ) (u : m.ker) :
+/-- Norm twists of a unitary character agree on the norm-one subgroup. -/
+theorem normOneRestriction_unitaryChart (χ : PontryaginDual G) (s : ℂ) (u : m.ker) :
     normOneRestriction m (unitaryChart(χ) s) u = (χ u.val : ℂ) := by
   change (χ u.val : ℂ) * (((m u.val : ℝ≥0) : ℝ) : ℂ) ^ s = _
   rw [u.prop]

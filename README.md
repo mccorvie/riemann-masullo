@@ -35,6 +35,11 @@ not.
 
 ## Get involved
 
+> **New claims are paused** (since 14:10 UTC on 23 November 2026) while the open pull requests
+> are checked and merged: they were arriving faster than they could be checked. Work that is
+> already claimed is welcome, and claims will reopen when the backlog is cleared. See
+> [#6674](https://github.com/mccorvie/riemann-masullo/issues/6674).
+
 Several hundred proofs are open, and each one is a single Lean statement that is already
 written. You need no special access and no knowledge of the whole paper. Give your coding agent
 (Codex, Claude Code or any agent that can run shell commands) this instruction:
@@ -93,8 +98,8 @@ the roadmap below the order of work.
 
 ### What the formalization has found
 
-[`ERRATA.md`](ERRATA.md) has about 710 entries: some 260 statements that are false as printed,
-375 that are imprecise, inconsistent or wrongly justified, 50 placeholders or missing pieces,
+[`ERRATA.md`](ERRATA.md) has about 750 entries: some 270 statements that are false as printed,
+400 that are imprecise, inconsistent or wrongly justified, 50 placeholders or missing pieces,
 and 25 reports about parts of the paper that are not stated in Lean. Five outside audits have
 been compared with it report by report, and it names them where they found the same thing. Those in the appendices' and early
 chapters' accounts of standard material are repaired where they occur: the Lean states the
@@ -294,6 +299,9 @@ on work that does not appear there.
   when they are nested. He measured every one in the library and proposed the redesign (#5398)
   and the rules for new definitions (#5362), which are adapted from
   [Tau Ceti](https://github.com/TauCetiProject/TauCetiReview)'s review rubric.
+- **Cornelius Roemer** ([@corneliusroemer](https://github.com/corneliusroemer)) analysed why
+  the checks and the merge queue fell behind, proposed a staged plan to relieve them (#6787),
+  offered a dedicated machine for it, and wrote a scheduler for the pull-request checks (#6834).
 - Proofs were adapted from [`CBirkbeck/AINTLIB`](https://github.com/CBirkbeck/AINTLIB) and
   [`Rogerhu12/hecke-seven-eighths`](https://github.com/Rogerhu12/hecke-seven-eighths). The
   scouts' surveys of what already exists in Lean

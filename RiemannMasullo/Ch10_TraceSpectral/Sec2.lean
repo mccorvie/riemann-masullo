@@ -3,6 +3,9 @@ module
 public import RiemannMasullo.Ch10_TraceSpectral.Sec1
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a_part2
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec1
+import Mathlib.LinearAlgebra.Eigenspace.Pi
+import Mathlib.Algebra.Polynomial.Basis
+import Mathlib.Algebra.Polynomial.Roots
 import all RiemannMasullo.Ch09_HardySobolev.Sec2
 import all RiemannMasullo.Ch09_HardySobolev.Sec3
 
@@ -97,6 +100,217 @@ abbrev spectralSobolevIsotypeQuotient (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (hs
     (ω : PontryaginDual C₁) :=
   ↥(Wω(hI, hs, ω)) ⧸ (Θ(a, hI, hs)).comap (Wω(hI, hs, ω)).subtype
 
+/-- Testing an isotypic Pettis average against a functional gives its scalar integral. -/
+private theorem spectralSobolevIsotypeQuotient_isometry_dual {K W : Type*} [Group K]
+    [TopologicalSpace K] [MeasurableSpace K] [NormedAddCommGroup W] [NormedSpace ℂ W]
+    (μ : Measure K) (ρ : K →* (W →L[ℂ] W)) (ω : PontryaginDual K) (P : W →L[ℂ] W)
+    (hP : IsPettisIsotypicAverageOn μ univ ρ ω P) (u : W) (φ : StrongDual ℂ W) :
+    φ (P u) = ∫ k, star (ω k : ℂ) * φ (ρ k u) ∂μ := by
+  obtain ⟨_, he⟩ := hP u
+  have h := congrArg (fun z : PettisWeakCompletion W ↦
+    (show Module.Dual ℂ (StrongDual ℂ W) from z) φ) he
+  change φ (P u) = ∫ g, φ (star (ω g : ℂ) • ρ g u) ∂μ.restrict univ at h
+  simpa only [Measure.restrict_univ, map_smul, smul_eq_mul] using h
+
+/-- A unit complex number times its conjugate is one. -/
+private theorem spectralSobolevIsotypeQuotient_isometry_star_mul {K : Type*} [Group K]
+    [TopologicalSpace K] (ω : PontryaginDual K) (k : K) :
+    star (ω k : ℂ) * (ω k : ℂ) = 1 := by
+  rw [Complex.star_def, Complex.conj_mul', Circle.norm_coe]
+  simp
+
+/-- The isotypic average descends to a quotient by an invariant subspace. -/
+private theorem spectralSobolevIsotypeQuotient_isometry_quot {G W : Type*} [Group G]
+    (K : Subgroup G) [TopologicalSpace K] [MeasurableSpace K]
+    [NormedAddCommGroup W] [NormedSpace ℂ W] (ρ : G →* (W →L[ℂ] W))
+    (N : Submodule ℂ W) [IsClosed (N : Set W)] (ω : PontryaginDual K) (μ : Measure K)
+    (P : W →L[ℂ] W) (hP : IsPettisIsotypicAverageOn μ univ (ρ.comp K.subtype) ω P)
+    (u : W) (ψ : StrongDual ℂ (W ⧸ N)) :
+    ψ (N.mkQ (P u)) = ∫ k, star (ω k : ℂ) * ψ (N.mkQ (ρ k u)) ∂μ :=
+  spectralSobolevIsotypeQuotient_isometry_dual μ (ρ.comp K.subtype) ω P hP u
+    (ψ.comp N.mkQL)
+
+/-- On the isotype the average is multiplication by the total mass. -/
+private theorem spectralSobolevIsotypeQuotient_isometry_fix {G W : Type*} [Group G]
+    (K : Subgroup G) [TopologicalSpace K] [MeasurableSpace K]
+    [NormedAddCommGroup W] [NormedSpace ℂ W] (ρ : G →* (W →L[ℂ] W))
+    (ω : PontryaginDual K) (μ : Measure K) (P : W →L[ℂ] W)
+    (hP : IsPettisIsotypicAverageOn μ univ (ρ.comp K.subtype) ω P)
+    {u : W} (hu : u ∈ actionIsotype (ρ.comp K.subtype) ω) :
+    P u = (μ.real univ : ℂ) • u := by
+  apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+  intro φ
+  rw [spectralSobolevIsotypeQuotient_isometry_dual μ (ρ.comp K.subtype) ω P hP u φ]
+  have hu' := (mem_actionIsotype _ _ _).1 hu
+  have h (k : K) : star (ω k : ℂ) * φ ((ρ.comp K.subtype) k u) = φ u := by
+    rw [hu' k, map_smul, smul_eq_mul, ← mul_assoc,
+      spectralSobolevIsotypeQuotient_isometry_star_mul, one_mul]
+  simp only [h, integral_const, map_smul, Complex.real_smul, smul_eq_mul]
+
+/-- The average is bounded by the mass when the subgroup acts by contractions. -/
+private theorem spectralSobolevIsotypeQuotient_isometry_norm {G W : Type*} [Group G]
+    (K : Subgroup G) [TopologicalSpace K] [MeasurableSpace K]
+    [NormedAddCommGroup W] [NormedSpace ℂ W] (ρ : G →* (W →L[ℂ] W))
+    (hK : ∀ (k : K) (u : W), ‖ρ k u‖ ≤ ‖u‖)
+    (ω : PontryaginDual K) (μ : Measure K) [IsFiniteMeasure μ] (P : W →L[ℂ] W)
+    (hP : IsPettisIsotypicAverageOn μ univ (ρ.comp K.subtype) ω P) (u : W) :
+    ‖P u‖ ≤ μ.real univ * ‖u‖ := by
+  obtain ⟨g, hg, hgu⟩ := exists_dual_vector'' ℂ (P u)
+  have h1 : g (P u) = ∫ k, star (ω k : ℂ) * g ((ρ.comp K.subtype) k u) ∂μ :=
+    spectralSobolevIsotypeQuotient_isometry_dual μ (ρ.comp K.subtype) ω P hP u g
+  have h3 : ‖g (P u)‖ = ‖P u‖ := by rw [hgu]; simp
+  have h2 : ‖∫ k, star (ω k : ℂ) * g ((ρ.comp K.subtype) k u) ∂μ‖ ≤ ‖u‖ * μ.real univ := by
+    apply norm_integral_le_of_norm_le_const
+    refine ae_of_all _ fun k ↦ ?_
+    rw [norm_mul, norm_star, Circle.norm_coe, one_mul]
+    exact (g.le_opNorm _).trans ((mul_le_of_le_one_left (norm_nonneg _) hg).trans (hK k u))
+  rw [← h1, h3] at h2
+  linarith
+
+/-- The average maps an invariant closed subspace into itself. -/
+private theorem spectralSobolevIsotypeQuotient_isometry_mem {G W : Type*} [Group G]
+    (K : Subgroup G) [TopologicalSpace K] [MeasurableSpace K]
+    [NormedAddCommGroup W] [NormedSpace ℂ W] (ρ : G →* (W →L[ℂ] W))
+    (N : Submodule ℂ W) [IsClosed (N : Set W)] (hN : ∀ g, ∀ n ∈ N, ρ g n ∈ N)
+    (ω : PontryaginDual K) (μ : Measure K) (P : W →L[ℂ] W)
+    (hP : IsPettisIsotypicAverageOn μ univ (ρ.comp K.subtype) ω P) {n : W} (hn : n ∈ N) :
+    P n ∈ N := by
+  rw [← Submodule.Quotient.mk_eq_zero]
+  apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+  intro ψ
+  have h := spectralSobolevIsotypeQuotient_isometry_quot K ρ N ω μ P hP n ψ
+  have h0 (k : K) : N.mkQ (ρ k n) = 0 := (Submodule.Quotient.mk_eq_zero N).2 (hN _ n hn)
+  simp only [h0, map_zero, mul_zero, integral_zero] at h
+  simpa using h
+
+/-- On the quotient, the average of a class in the quotient isotype is the mass times it. -/
+private theorem spectralSobolevIsotypeQuotient_isometry_quotFix {G W : Type*} [Group G]
+    (K : Subgroup G) [TopologicalSpace K] [MeasurableSpace K]
+    [NormedAddCommGroup W] [NormedSpace ℂ W] (ρ : G →* (W →L[ℂ] W))
+    (N : Submodule ℂ W) [IsClosed (N : Set W)]
+    (ω : PontryaginDual K) (μ : Measure K) (P : W →L[ℂ] W)
+    (hP : IsPettisIsotypicAverageOn μ univ (ρ.comp K.subtype) ω P) {f : W}
+    (hf : ∀ k : K, N.mkQ (ρ k f) = (ω k : ℂ) • N.mkQ f) :
+    N.mkQ (P f) = (μ.real univ : ℂ) • N.mkQ f := by
+  apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+  intro ψ
+  rw [spectralSobolevIsotypeQuotient_isometry_quot K ρ N ω μ P hP f ψ]
+  have h (k : K) : star (ω k : ℂ) * ψ (N.mkQ (ρ k f)) = ψ (N.mkQ f) := by
+    rw [hf k, map_smul, smul_eq_mul, ← mul_assoc,
+      spectralSobolevIsotypeQuotient_isometry_star_mul, one_mul]
+  simp only [h, integral_const, map_smul, Complex.real_smul, smul_eq_mul]
+
+/-- Abstract form of `spectralSobolevIsotypeQuotient_isometry`: an action preserving a
+closed subspace descends to the quotient, and if a compact subgroup acts by contractions
+with an isotypic average, the isotype quotient is isometric to the isotype of the quotient. -/
+private theorem spectralSobolevIsotypeQuotient_isometry_abstract {G W : Type*} [Group G]
+    [TopologicalSpace G] (K : Subgroup G) [TopologicalSpace K] [MeasurableSpace K]
+    [NormedAddCommGroup W] [NormedSpace ℂ W] (ρ : G →* (W →L[ℂ] W))
+    (hρ : Continuous fun p : G × W ↦ ρ p.1 p.2)
+    (N : Submodule ℂ W) [IsClosed (N : Set W)] (hN : ∀ g, ∀ n ∈ N, ρ g n ∈ N)
+    (hK : ∀ (k : K) (u : W), ‖ρ k u‖ ≤ ‖u‖)
+    (ω : PontryaginDual K) (μ : Measure K) [IsFiniteMeasure μ] (hμ : μ univ ≠ 0)
+    (A : W →L[ℂ] actionIsotype (ρ.comp K.subtype) ω)
+    (hA : IsPettisIsotypicAverageOn μ univ (ρ.comp K.subtype) ω
+      ((actionIsotype (ρ.comp K.subtype) ω).subtypeL.comp A))
+    [IsClosed ((N.comap (actionIsotype (ρ.comp K.subtype) ω).subtype) :
+      Set (actionIsotype (ρ.comp K.subtype) ω))] :
+    ∃ ρQ : G →* ((W ⧸ N) →L[ℂ] (W ⧸ N)),
+      (∀ g f, ρQ g (N.mkQ f) = N.mkQ (ρ g f)) ∧
+      Continuous (fun p : G × (W ⧸ N) ↦ ρQ p.1 p.2) ∧
+      ∃ U : (↥(actionIsotype (ρ.comp K.subtype) ω) ⧸
+          N.comap (actionIsotype (ρ.comp K.subtype) ω).subtype) ≃ₗᵢ[ℂ]
+          actionIsotype (ρQ.comp K.subtype) ω,
+        ∀ f : actionIsotype (ρ.comp K.subtype) ω,
+          (U ((N.comap (actionIsotype (ρ.comp K.subtype) ω).subtype).mkQ f) : W ⧸ N) =
+            N.mkQ f.val := by
+  let E := actionIsotype (ρ.comp K.subtype) ω
+  let M := N.comap E.subtype
+  let P : W →L[ℂ] W := E.subtypeL.comp A
+  let c : ℝ := μ.real univ
+  have hc : 0 < c := ENNReal.toReal_pos hμ (measure_ne_top μ univ)
+  have hker (g : G) : N ≤ (N.mkQL.comp (ρ g)).ker := fun n hn ↦
+    (Submodule.Quotient.mk_eq_zero N).2 (hN g n hn)
+  let T (g : G) : (W ⧸ N) →L[ℂ] (W ⧸ N) := N.liftQL (N.mkQL.comp (ρ g)) (hker g)
+  have hT (g : G) (f : W) : T g (N.mkQ f) = N.mkQ (ρ g f) := rfl
+  let ρQ : G →* ((W ⧸ N) →L[ℂ] (W ⧸ N)) :=
+    { toFun := T
+      map_one' := by
+        refine ContinuousLinearMap.ext fun x ↦ ?_
+        obtain ⟨f, rfl⟩ := N.mkQ_surjective x
+        change T 1 (N.mkQ f) = N.mkQ f
+        rw [hT, map_one, one_apply_eq_self]
+      map_mul' := fun g h ↦ by
+        refine ContinuousLinearMap.ext fun x ↦ ?_
+        obtain ⟨f, rfl⟩ := N.mkQ_surjective x
+        change T (g * h) (N.mkQ f) = T g (T h (N.mkQ f))
+        rw [hT, hT, hT, map_mul, mul_apply_eq_comp] }
+  have hρQ (g : G) (f : W) : ρQ g (N.mkQ f) = N.mkQ (ρ g f) := rfl
+  refine ⟨ρQ, hρQ, ?_, ?_⟩
+  · have hq : IsOpenQuotientMap (Prod.map id N.mkQ : G × W → G × (W ⧸ N)) :=
+      IsOpenQuotientMap.id.prodMap N.isOpenQuotientMap_mkQL
+    rw [hq.isQuotientMap.continuous_iff]
+    exact N.mkQL.continuous.comp hρ
+  -- the isometry
+  have hmemQ (f : E) : N.mkQ (f : W) ∈ actionIsotype (ρQ.comp K.subtype) ω := by
+    refine (mem_actionIsotype _ _ _).2 fun k ↦ ?_
+    change ρQ k (N.mkQ (f : W)) = _
+    rw [hρQ, show ρ k (f : W) = (ω k : ℂ) • (f : W) from (mem_actionIsotype _ _ _).1 f.2 k,
+      map_smul]
+  let L₀ : E →ₗ[ℂ] actionIsotype (ρQ.comp K.subtype) ω :=
+    LinearMap.codRestrict _ (N.mkQ ∘ₗ E.subtype) hmemQ
+  have hL₀ : M ≤ LinearMap.ker L₀ := fun f hf ↦ by
+    apply Subtype.ext
+    exact (Submodule.Quotient.mk_eq_zero N).2 hf
+  let L : (E ⧸ M) →ₗ[ℂ] actionIsotype (ρQ.comp K.subtype) ω := M.liftQ L₀ hL₀
+  have hL (f : E) : (L (M.mkQ f) : W ⧸ N) = N.mkQ (f : W) := rfl
+  -- the projection `c⁻¹ • A` onto `E`
+  have hfix (f : E) : P f = (c : ℂ) • (f : W) :=
+    spectralSobolevIsotypeQuotient_isometry_fix K ρ ω μ P hA f.2
+  have hnorm (w : W) : ‖P w‖ ≤ c * ‖w‖ :=
+    spectralSobolevIsotypeQuotient_isometry_norm K ρ hK ω μ P hA w
+  let B (w : W) : E := (c⁻¹ : ℂ) • A w
+  have hB (f : E) (w : W) (hw : N.mkQ w = N.mkQ (f : W)) : M.mkQ (B w) = M.mkQ f := by
+    apply (Submodule.Quotient.eq M).2
+    change ((c⁻¹ : ℂ) • P w - (f : W)) ∈ N
+    have h1 : w - (f : W) ∈ N := (Submodule.Quotient.eq N).1 hw
+    have h2 := spectralSobolevIsotypeQuotient_isometry_mem K ρ N hN ω μ P hA h1
+    rw [map_sub, hfix f] at h2
+    have hc' : (c : ℂ) ≠ 0 := by exact_mod_cast hc.ne'
+    convert N.smul_mem (c⁻¹ : ℂ) h2 using 1
+    rw [smul_sub, smul_smul, inv_mul_cancel₀ hc', one_smul]
+  have hBn (w : W) : ‖B w‖ ≤ ‖w‖ := by
+    change ‖(c⁻¹ : ℂ) • P w‖ ≤ ‖w‖
+    rw [norm_smul, norm_inv, Complex.norm_real, Real.norm_of_nonneg hc.le]
+    calc c⁻¹ * ‖P w‖ ≤ c⁻¹ * (c * ‖w‖) := by gcongr; exact hnorm w
+      _ = ‖w‖ := by field_simp
+  have hiso (x : E ⧸ M) : ‖L x‖ = ‖x‖ := by
+    obtain ⟨f, rfl⟩ := M.mkQ_surjective x
+    change ‖N.mkQ (f : W)‖ = ‖M.mkQ f‖
+    apply le_antisymm
+    · refine le_of_forall_pos_lt_add fun ε hε ↦ ?_
+      obtain ⟨m, hm, hmε⟩ := Submodule.Quotient.norm_mk_lt (M.mkQ f) hε
+      have hmN : N.mkQ (m : W) = N.mkQ (f : W) := by
+        apply (Submodule.Quotient.eq N).2
+        exact (Submodule.Quotient.eq M).1 hm
+      rw [← hmN]
+      exact (Submodule.Quotient.norm_mk_le N (m : W)).trans_lt hmε
+    · refine le_of_forall_pos_lt_add fun ε hε ↦ ?_
+      obtain ⟨w, hw, hwε⟩ := Submodule.Quotient.norm_mk_lt (N.mkQ (f : W)) hε
+      rw [← hB f w hw]
+      exact ((Submodule.Quotient.norm_mk_le M (B w)).trans (hBn w)).trans_lt hwε
+  have hsurj : Surjective L := by
+    rintro ⟨y, hy⟩
+    obtain ⟨w, rfl⟩ := N.mkQ_surjective y
+    refine ⟨M.mkQ (B w), Subtype.ext ?_⟩
+    rw [hL]
+    change N.mkQ ((c⁻¹ : ℂ) • P w) = N.mkQ w
+    have hw : ∀ k : K, N.mkQ (ρ k w) = (ω k : ℂ) • N.mkQ w := fun k ↦
+      (mem_actionIsotype _ _ _).1 hy k
+    rw [map_smul, spectralSobolevIsotypeQuotient_isometry_quotFix K ρ N ω μ P hA hw, smul_smul,
+      inv_mul_cancel₀ (by exact_mod_cast hc.ne'), one_smul]
+  exact ⟨LinearIsometryEquiv.ofSurjective ⟨L, hiso⟩ hsurj, fun f ↦ rfl⟩
+
 /-- Paper: (10.2.1.2), p. 439, and (10.2.2.2), p. 445. The isotype quotient
 maps isometrically onto the isotype of the full quotient by inclusion of
 representatives. The isotype action is the restriction of the continuous
@@ -112,7 +326,35 @@ theorem spectralSobolevIsotypeQuotient_isometry (a : ℝ) {l r s : ℝ} (hI : l 
       Continuous (fun p : C𝔽 × Q ↦ ρQ p.1 p.2) ∧
       ∃ U : spectralSobolevIsotypeQuotient F a hI hs ω ≃ₗᵢ[ℂ]
           actionIsotype (ρQ.comp (ideleClassNorm F).ker.subtype) ω,
-        ∀ f : E, (U ((N.comap E.subtype).mkQ f) : Q) = N.mkQ f.val := by sorry
+        ∀ f : E, (U ((N.comap E.subtype).mkQ f) : Q) = N.mkQ f.val := by
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : (normOneIdeleClassTamagawaMeasure F).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have hρ := (exists_hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs).choose_spec.2
+  have hA := (existsUnique_thetaSobolevAverage_of_compact (ideleClassNorm F).ker
+    (normOneIdeleClassTamagawaMeasure F) (hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs) hρ
+    ω).exists
+  have hR := (exists_globalThetaSobolevAction (F := F) a hI hs).choose_spec.1
+  have hN (g : C𝔽) (n : W(l, r, s)) (hn : n ∈ Θ(a, hI, hs)) :
+      hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs g n ∈ Θ(a, hI, hs) := by
+    rw [← hR g ⟨n, hn⟩]
+    exact (_ : ↥(Θ(a, hI, hs))).2
+  have hK (k : C₁) (u : W(l, r, s)) :
+      ‖hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs k u‖ ≤ ‖u‖ := by
+    have h1 : ((m𝔽 (k : C𝔽)).val : ℝ) = 1 := by
+      have h : ideleClassNorm F (k : C𝔽) = 1 := k.2
+      change (((ideleClassNorm F (k : C𝔽)).val : ℝ≥0) : ℝ) = 1
+      rw [h]
+      rfl
+    have h := norm_hardySobolevTranslation_le μ𝔽 m𝔽 l r s hI hs (k : C𝔽)
+    simp only [h1, Real.log_one, mul_zero, Real.exp_zero, max_self, abs_zero, add_zero,
+      Real.one_rpow, mul_one] at h
+    exact (ContinuousLinearMap.le_opNorm _ _).trans (mul_le_of_le_one_left (norm_nonneg _) h)
+  have hμ : normOneIdeleClassTamagawaMeasure F univ ≠ 0 :=
+    isOpen_univ.measure_ne_zero _ univ_nonempty
+  exact spectralSobolevIsotypeQuotient_isometry_abstract (ideleClassNorm F).ker
+    (hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs) hρ (Θ(a, hI, hs)) hN hK ω
+    (normOneIdeleClassTamagawaMeasure F) hμ hA.choose hA.choose_spec.1
 
 /-- Paper: (10.2.1.3), pp. 439–440, and (10.2.2.3), p. 445. The Sobolev
 duality evaluates the unweighted bilinear product integral. -/
@@ -2015,6 +2257,211 @@ theorem spectralStripJet_memLp (χ : PontryaginDual C₁ → PontryaginDual C�
   rw [spectralZeroJet_norm_sq,
     ENNReal.toReal_ofReal (inv_nonneg.mpr (symmIntervalSobolevDensity_pos _hα s (logNorm g)).le),
     stripJet_integrand_eq _hα]
+
+section
+
+open Polynomial
+open scoped Polynomial
+
+/-- Multiplying distinct powers of an additive coordinate by one character preserves
+linear independence when the coordinate has infinite range. -/
+private theorem jetPowers_independent {G : Type*} [Group G] (χ : G →* ℂ)
+    (L : G → ℂ) (hL : (range L).Infinite) :
+    LinearIndependent ℂ (fun n : ℕ ↦ fun g ↦ χ g * (L g) ^ n) := by
+  let E : ℂ[X] →ₗ[ℂ] (G → ℂ) :=
+    { toFun := fun p g ↦ χ g * p.eval (L g)
+      map_add' := fun p q ↦ funext fun g ↦ by simp [mul_add]
+      map_smul' := fun r p ↦ funext fun g ↦ by simp [smul_eq_mul, mul_left_comm] }
+  have einj : Injective E := by
+    intro p q h
+    apply Polynomial.eq_of_infinite_eval_eq
+    refine hL.mono ?_
+    rintro _ ⟨g, rfl⟩
+    exact mul_left_cancel₀ ((Group.isUnit g).map χ).ne_zero (congrFun h g)
+  have h := (Polynomial.basisMonomials ℂ).linearIndependent.map' E (LinearMap.ker_eq_bot.mpr einj)
+  simpa only [Function.comp_def, Polynomial.coe_basisMonomials, E, LinearMap.coe_mk, AddHom.coe_mk,
+    Polynomial.eval_monomial, one_mul] using h
+
+/-- Translations put the character times the mth power of an additive coordinate in
+the simultaneous generalized eigenspace of that character. -/
+private theorem jetPowers_mem_weight {G : Type*} [CommGroup G] (χ : G →* ℂ) (L : G → ℂ)
+    (hL : ∀ g y, L (g * y) = L g + L y)
+    (τ : G → Module.End ℂ (G → ℂ)) (hτ : ∀ g f y, τ g f y = f (g * y)) (m : ℕ) :
+    (fun g ↦ χ g * (L g) ^ m) ∈ ⨅ g, (τ g).maxGenEigenspace (χ g) := by
+  apply (Submodule.mem_iInf _).mpr
+  intro g
+  let v (i : ℕ) (y : G) := χ y * (L y) ^ i
+  let δ := τ g - χ g • (1 : Module.End ℂ (G → ℂ))
+  change v m ∈ (τ g).maxGenEigenspace (χ g)
+  induction m using Nat.strong_induction_on with | ind m ih => ?_
+  let c (i : ℕ) := χ g * (L g) ^ (m - i) * (m.choose i : ℂ)
+  have diff : δ (v m) = ∑ i ∈ Finset.range m, c i • v i := by
+    funext y
+    change τ g (v m) y - χ g * v m y = _
+    rw [hτ]
+    have hsum : v m (g * y) = ∑ i ∈ Finset.range (m+1), c i * v i y := by
+      simp only [v, map_mul, hL]
+      rw [add_comm (L g), add_pow, Finset.mul_sum]
+      refine Finset.sum_congr rfl fun i hi ↦ ?_
+      dsimp only [c]
+      ring
+    rw [hsum, Finset.sum_range_succ]
+    simp [c, Finset.sum_apply]
+  have hmem : δ (v m) ∈ (τ g).maxGenEigenspace (χ g) := by
+    rw [diff]
+    exact Submodule.sum_mem _ fun i hi ↦ Submodule.smul_mem _ _ (ih i (Finset.mem_range.mp hi))
+  obtain ⟨k, hk⟩ := (Module.End.mem_maxGenEigenspace _ _ _).mp hmem
+  apply (Module.End.mem_maxGenEigenspace _ _ _).mpr
+  exact ⟨k+1, by simpa only [pow_succ, mul_apply_eq_comp] using hk⟩
+
+/-- Exponential polynomials attached to distinct characters have independent coefficients. -/
+private theorem jetPowers_all_independent {G Z : Type*} [CommGroup G]
+    (χ : Z → G →* ℂ) (hc : Injective χ) (L : G → ℂ)
+    (hL : ∀ g y, L (g * y) = L g + L y) (hi : (range L).Infinite) :
+    LinearIndependent ℂ (fun zn : (_ : Z) × ℕ ↦ fun g ↦ χ zn.1 g * (L g) ^ zn.2) := by
+  let τ (g : G) : Module.End ℂ (G → ℂ) :=
+    { toFun := fun f y ↦ f (g * y), map_add' := by intros; rfl, map_smul' := by intros; rfl }
+  have ht (g f y) : τ g f y = f (g * y) := rfl
+  have hcomm (a b : G) : Commute (τ a) (τ b) := by
+    apply LinearMap.ext
+    intro f
+    funext y
+    change f (b * (a * y)) = f (a * (b * y))
+    rw [mul_left_comm]
+  have hind : iSupIndep (fun ψ : G → ℂ ↦ ⨅ g, (τ g).maxGenEigenspace (ψ g)) :=
+    Module.End.independent_iInf_maxGenEigenspace_of_forall_mapsTo τ
+    (fun i j p ↦ Module.End.mapsTo_maxGenEigenspace_of_comm (hcomm j i) p)
+  let V (z : Z) (n : ℕ) := fun g ↦ χ z g * (L g) ^ n
+  have hiχ : Injective (fun z g ↦ χ z g) := fun _ _ h ↦ hc (MonoidHom.ext (congrFun h))
+  have hspaces : iSupIndep fun z ↦ Submodule.span ℂ (range (V z)) :=
+    (hind.comp hiχ).mono (by
+      intro z
+      apply Submodule.span_le.mpr
+      rintro _ ⟨n, rfl⟩
+      exact jetPowers_mem_weight (χ z) L hL τ ht n)
+  apply linearIndependent_iUnion_finite (f := V) (fun z ↦ jetPowers_independent (χ z) L hi)
+  exact fun _ _ _ hz ↦ hspaces.disjoint_biSup hz
+
+section StripJetIndependence
+
+private theorem spectralStripJet_twist_injective
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ) :
+    Injective (fun p : PontryaginDual C₁ × ℂ ↦ (ideleClassNormTwist (χ p.1) p.2).toMonoidHom) := by
+  have hres (ω : PontryaginDual C₁) (z : ℂ) (g : C₁) :
+      ideleClassNormTwist (χ ω) z g.val = (ω g : ℂ) := by
+    change (χ ω g.val : ℂ) * ((((ideleClassNorm F g.val).val : ℝ) : ℂ) ^ z) = _
+    rw [show ideleClassNorm F g.val = 1 from g.property]
+    simp only [Units.val_one, NNReal.coe_one, Complex.ofReal_one, Complex.one_cpow, mul_one]
+    exact congrArg ((↑) : Circle → ℂ) (DFunLike.congr_fun (hχ ω) g)
+  rintro ⟨ω, z⟩ ⟨η, w⟩ he
+  have htw : ideleClassNormTwist (χ ω) z = ideleClassNormTwist (χ η) w :=
+    ContinuousMonoidHom.ext fun g ↦ DFunLike.congr_fun he g
+  have hω : ω = η := by
+    ext g : 1
+    apply Subtype.ext
+    exact (hres ω z g).symm.trans ((DFunLike.congr_fun htw g.val).trans (hres η w g))
+  subst η
+  have hu := hχ.existsUnique_normTwist ω (ideleClassNormTwist (χ ω) z) (hres ω z)
+  exact Prod.ext rfl (hu.unique rfl htw)
+
+/-- Distinct choices of base character, both real coordinates of a norm twist, or
+logarithmic degree give linearly independent functions on the idele class group. -/
+private theorem spectralAdelicJet_linearIndependent
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ) :
+    LinearIndependent ℂ (fun j : PontryaginDual C₁ × ℝ × ℝ × ℕ ↦
+      spectralZeroJet (χ j.1) j.2.1 j.2.2.1 j.2.2.2) := by
+  let L (g : C𝔽) : ℂ := logNorm g
+  have hadd (g y : C𝔽) : L (g * y) = L g + L y := by
+    dsimp only [L]
+    rw [map_mul, Units.val_mul, NNReal.coe_mul, Real.log_mul
+      (NNReal.coe_ne_zero.2 (ideleClassNorm F g).ne_zero)
+      (NNReal.coe_ne_zero.2 (ideleClassNorm F y).ne_zero), Complex.ofReal_add]
+  have hinf : (range L).Infinite := by
+    refine (Set.infinite_range_of_injective Complex.ofReal_injective).mono ?_
+    rintro _ ⟨r, rfl⟩
+    let e : ℝ ≃ₜ ℝ≥0ˣ := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+    let g : C𝔽 := QuotientGroup.mk (canonicalIdeleNormSection F (e r))
+    have hg : ideleClassNorm F g = e r := canonicalIdeleNormSection_rightInverse F _
+    refine ⟨g, ?_⟩
+    change (Real.log ((ideleClassNorm F g).val : ℝ) : ℂ) = r
+    rw [hg]
+    exact congrArg ((↑) : ℝ → ℂ) (Real.log_exp r)
+  let char (p : PontryaginDual C₁ × ℂ) := (ideleClassNormTwist (χ p.1) p.2).toMonoidHom
+  let key (j : PontryaginDual C₁ × ℝ × ℝ × ℕ) : (_ : PontryaginDual C₁ × ℂ) × ℕ :=
+    ⟨(j.1, shift(j.2.1, j.2.2.1)), j.2.2.2⟩
+  have hk : Injective key := by
+    intro i j he
+    have hω := congrArg (fun p ↦ p.1.1) he
+    have hre := congrArg (fun p ↦ p.1.2.re) he
+    have him := congrArg (fun p ↦ p.1.2.im) he
+    have hn : i.2.2.2 = j.2.2.2 := eq_of_heq (Sigma.mk.inj he).2
+    exact Prod.ext hω (Prod.ext (by simpa [key] using hre) (Prod.ext (by simpa [key] using him) hn))
+  exact (jetPowers_all_independent char (spectralStripJet_twist_injective χ hχ) L hadd hinf).comp key hk
+
+private theorem spectralStripJet_raw_linearIndependent
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ) (a α s : ℝ) :
+    LinearIndependent ℂ (fun j : SpectralStripJetIndex χ a α s ↦
+      spectralZeroJet (χ j.val.1) j.val.2.1 j.val.2.2.1 j.val.2.2.2) :=
+  (spectralAdelicJet_linearIndependent χ hχ).comp Subtype.val Subtype.val_injective
+
+open Filter MeasureTheory
+
+/-- Continuous representatives remain linearly independent in L² when a measure positive
+on open sets is absolutely continuous with respect to the L² measure. -/
+private theorem jetFunctions_toLp_independent {X I : Type*} [TopologicalSpace X]
+    [MeasurableSpace X] (μ ν : Measure X) [μ.IsOpenPosMeasure] (hμ : μ ≪ ν)
+    (f : I → X → ℂ) (hc : ∀ i, Continuous (f i)) (hm : ∀ i, MemLp (f i) 2 ν)
+    (hi : LinearIndependent ℂ f) :
+    LinearIndependent ℂ (fun i ↦ (hm i).toLp (f i)) := by
+  rw [linearIndependent_iff'] at hi ⊢
+  intro t c hz
+  apply hi t c
+  have he (i : I) : ((c i • (hm i).toLp (f i) : Lp ℂ 2 ν) : X → ℂ) =ᵐ[ν] c i • f i :=
+    (Lp.coeFn_smul _ _).trans ((hm i).coeFn_toLp.const_smul _)
+  have hsum : (⇑(∑ i ∈ t, c i • (hm i).toLp (f i)) : X → ℂ) =ᵐ[ν] ∑ i ∈ t, c i • f i :=
+    (Lp.coeFn_finsetSum _ _).trans (eventuallyEq_sum fun i _ ↦ he i)
+  rw [hz] at hsum
+  apply MeasureTheory.Measure.eq_of_ae_eq (hμ.ae_le (hsum.symm.trans (Lp.coeFn_zero _ _ _)))
+  · have hfun : (∑ i ∈ t, c i • f i) = fun x ↦ ∑ i ∈ t, (c i • f i) x := by
+      funext x
+      exact Finset.sum_apply _ _ _
+    rw [hfun]
+    exact continuous_finsetSum t fun i _ ↦ (hc i).const_smul (c i)
+  · exact continuous_zero
+
+/-- Paper: Theorem 10.2.2.1, p. 446. The surviving strip jets form a linearly
+independent family in reciprocal-weight L². This holds already for finite
+linear combinations, before passing to any quotient or choosing interpolants. -/
+theorem spectralStripJet_toLp_linearIndependent
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    (a : ℝ) {α s : ℝ} (hα : 0 ≤ α) (hs : 0 ≤ s) :
+    LinearIndependent ℂ (fun j : SpectralStripJetIndex χ a α s ↦
+      (spectralStripJet_memLp χ hα hs j).toLp (spectralZeroJet
+        (χ j.val.1) j.val.2.1 j.val.2.2.1 j.val.2.2.2)) := by
+  let μ := ideleClassTamagawaMeasure F
+  let w (g : C𝔽) := intervalSobolevDensity (-α) α s (logNorm g)
+  let ν := μ.withDensity (fun g ↦ ENNReal.ofReal (w g)⁻¹)
+  have hw : Measurable w := by
+    have hD : Continuous (intervalSobolevDensity (-α) α s) := by
+      unfold intervalSobolevDensity
+      fun_prop
+    exact hD.measurable.comp ((NNReal.continuous_coe.comp
+      (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)).measurable.log)
+  have habs : μ ≪ ν := by
+    refine withDensity_absolutelyContinuous' hw.inv.ennreal_ofReal.aemeasurable (.of_forall fun g ↦ ?_)
+    refine ENNReal.ofReal_ne_zero_iff.mpr (inv_pos.mpr ?_)
+    exact mul_pos (lt_max_of_lt_left (Real.exp_pos _)) (Real.rpow_pos_of_pos (by positivity) _)
+  have hlog : Continuous logNorm := (NNReal.continuous_coe.comp
+    (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)).log
+      (fun g ↦ NNReal.coe_ne_zero.2 (ideleClassNorm F g).ne_zero)
+  apply jetFunctions_toLp_independent μ ν habs _ (fun j ↦ ?_) _
+    (spectralStripJet_raw_linearIndependent χ hχ a α s)
+  exact (ideleClassNormTwist (χ j.val.1) (shift(j.val.2.1, j.val.2.2.1))).continuous.mul
+    ((Complex.continuous_ofReal.comp hlog).pow _)
+
+end StripJetIndependence
+
+end
 
 local notation "stripI(" hα ")" => (neg_nonpos.mpr hα |>.trans hα)
 local notation "stripU(" χ ", " hα ", " hs ")" =>

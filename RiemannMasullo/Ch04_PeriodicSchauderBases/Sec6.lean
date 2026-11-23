@@ -706,7 +706,12 @@ end IsotypicQuotient
 
 /-- Paper: Lemma 4.6.1.4, p. 211. Logarithmic commensurability of the bases
 is equivalent to finiteness of all mutual cyclic phases.
-Deviation: Part (1) uses log bₖ as in both directions of the proof. -/
+Deviation: Part (1) uses log bₖ as in both directions of the proof.
+
+Deviation: Part (1) on p. 211 and the opening assumption of its proof put the bases themselves
+in $\mathbb Q\cdot\log(b)$. We use their logarithms, as the subsequent reasoning in both
+directions does.
+-/
 theorem finite_cyclicPhases_iff {N : ℕ} (hN : 0 < N) (b : Fin N → ℝ) (hb : ∀ k, 1 < b k) :
     (∃ a : ℝ, 1 < a ∧ ∀ k, ∃ r : ℚ, Real.log (b k) = (r : ℝ) * Real.log a) ↔
       (range fun p : Fin N × Fin N × ℤ ↦
@@ -837,7 +842,12 @@ include hm hms hχ in
 /-- Paper: Situation 4.6.1.1(5) and Theorem 4.6.1.5, pp. 209, 212.
 The integer frequency parametrizes each cyclic fiber bijectively.
 Deviation: Frequencies have denominator log |γₖ| and use the normalized phase.
-The character is the inverse of the pulled-back basis character of §4.4. -/
+The character is the inverse of the pulled-back basis character of §4.4.
+
+Deviation: Part (4) on p. 209 leaves the restriction equation unfinished. We require
+$\chi\vert_{G^1}=\omega$. The phase equation in part (5) determines the phase modulo $2\pi/L_k$.
+We choose it in $[0,2\pi/L_k)$, where $L_k=\log\lvert\gamma_k\rvert_G$, as on pp. 192 and 215.
+-/
 theorem modulatedPeriodicFrequency_bijective (k : Fin N) :
     Injective (fun n : ℤ ↦ freq[k, n]) ∧
       range (fun n : ℤ ↦ freq[k, n]) = modulatedCyclicAnnihilatorFiber m ω (γs k) := by
@@ -1085,7 +1095,10 @@ private theorem integral_difference_polynomial (ξ : PontryaginDual G) (g : G)
 
 open scoped Classical in
 open Polynomial in
-private theorem integral_differenceProduct_polynomial (ξ : PontryaginDual G)
+/-- A log-polynomial moment of an iterated cyclic difference vanishes whenever
+the polynomial degree is less than the number of factors on whose generator
+the character is trivial in the selected norm-one isotype. -/
+theorem integral_differenceProduct_polynomial (ξ : PontryaginDual G)
     (v : List G → G → ℂ)
     (hdiff : ∀ g l x, v (g :: l) x = v l x - v l (g * x))
     (hint : ∀ l r, Integrable (fun x ↦ v l x * (ξ x : ℂ) * (period x : ℂ) ^ (r : ℕ)) μ)
@@ -1316,6 +1329,56 @@ theorem modulatedPeriodicMomentIndex_enumerable (hN : 0 < N) :
 variable (hcomm : ∃ a : ℝ, 0 < a ∧ ∀ k, ∃ r : ℚ, Real.log ((m (γs k)).val : ℝ) = (r : ℝ) * a)
 
 include hcomm in
+/-- Paper: Theorem 4.6.1.5, p. 212. There is a family of vectors of the difference quotient on
+which the descended log-moments take the values of the Kronecker delta. The vectors are chosen
+by induction from the density of the span of the descended moments in the strong dual; the
+lattice Schwartz decay of (4.6.1.15) provides the surjectivity used at each step. -/
+private theorem modulatedQuotientLogMoment_bases_biorthogonal :
+    ∃ ψ : J → U, (∀ j, D j (ψ j) = 1) ∧ ∀ j k, j ≠ k → D j (ψ k) = 0 := by
+  sorry
+
+include hγs in
+/-- Paper: Theorem 4.1.2.6(2), p. 161, applied to Theorem 4.6.1.5, p. 212. The difference quotient
+is a separable nuclear Frechet space (by `modulatedIsotypicDifferenceProduct_quotient`), and every
+Schauder basis of a nuclear Frechet space is absolute. -/
+private theorem modulatedQuotientLogMoment_bases_absolute (σ : ℕ ≃ J) (ψ : J → U)
+    (hb : IsSchauderBasis (ψ ∘ σ) (D ∘ σ)) :
+    SchauderBasis.IsAbsolute (ψ ∘ σ) (D ∘ σ) := by
+  have hS₀ : ∀ g ∈ List.ofFn γs, 1 < (m g).val := by
+    intro g hg
+    obtain ⟨k, rfl⟩ := List.mem_ofFn.mp hg
+    exact hγs k
+  obtain ⟨-, hN, hF⟩ := modulatedIsotypicDifferenceProduct_quotient (m := m) (hm := hm)
+    (hms := hms) (ω := ω) (List.ofFn γs) hS₀
+  exact SchauderBasis.isAbsolute_of_nuclear_frechet.{_, 0} hN hF hb
+
+include hcomm in
+/-- Paper: Theorem 4.6.1.5 and Equation (4.6.1.15), p. 212. Under every enumeration of the
+moment family, the biorthogonal vectors are a Schauder basis of the difference quotient with
+the descended log-moments as coefficient functionals. This is the expansion step: the coordinate
+series of a quotient representative converges to it because the coefficients decay faster than
+any power of the lattice frequency. Absoluteness is
+`modulatedQuotientLogMoment_bases_absolute`. -/
+private theorem modulatedQuotientLogMoment_bases_quotient (σ : ℕ ≃ J) (ψ : J → U)
+    (hbi : (∀ j, D j (ψ j) = 1) ∧ ∀ j k, j ≠ k → D j (ψ k) = 0) :
+    IsSchauderBasis (ψ ∘ σ) (D ∘ σ) := by
+  sorry
+
+include hcomm in
+/-- Paper: Theorem 4.6.1.5 and Equation (4.6.1.16), p. 212, via Lemma 4.1.2.4, p. 159. Once
+the descended log-moments are the coefficient functionals of an absolute Schauder basis of the
+difference quotient, they form an unconditional Schauder basis of the strong dual, whose
+coordinates are the evaluations at the basis vectors. -/
+private theorem modulatedQuotientLogMoment_bases_dual (σ : ℕ ≃ J) (ψ : J → U)
+    (hb : IsSchauderBasis (ψ ∘ σ) (D ∘ σ))
+    (ha : SchauderBasis.IsAbsolute (ψ ∘ σ) (D ∘ σ)) :
+    let d := D ∘ σ
+    let ev : ℕ → StrongDual ℂ (StrongDual ℂ U) :=
+      fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) ((ψ ∘ σ) n)
+    IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev := by
+  sorry
+
+include hcomm in
 /-- Paper: Theorem 4.6.1.5 and Equations (4.6.1.15)–(4.6.1.16), p. 212.
 Every enumeration of the moment family is an unconditional basis of the
 strong dual. The biorthogonal vectors are an absolute basis of the quotient.
@@ -1328,7 +1391,15 @@ theorem modulatedQuotientLogMoment_bases (σ : ℕ ≃ J) :
       let ev : ℕ → StrongDual ℂ (StrongDual ℂ U) :=
         fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (e n)
       IsSchauderBasis e d ∧ SchauderBasis.IsAbsolute e d ∧
-        IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev := by sorry
+        IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev := by
+  obtain ⟨ψ, hbi⟩ := modulatedQuotientLogMoment_bases_biorthogonal (m := m) (hm := hm)
+    (hms := hms) (ω := ω) (γs := γs) (hγs := hγs) (μ := μ) (hcomm := hcomm)
+  obtain hb := modulatedQuotientLogMoment_bases_quotient (m := m) (hm := hm)
+    (hms := hms) (ω := ω) (γs := γs) (hγs := hγs) (μ := μ) (hcomm := hcomm) σ ψ hbi
+  have ha := modulatedQuotientLogMoment_bases_absolute (m := m) (hm := hm) (hms := hms)
+    (ω := ω) (γs := γs) (hγs := hγs) (μ := μ) σ ψ hb
+  exact ⟨ψ, hb, ha, modulatedQuotientLogMoment_bases_dual (m := m) (hm := hm)
+    (hms := hms) (ω := ω) (γs := γs) (hγs := hγs) (μ := μ) (hcomm := hcomm) σ ψ hb ha⟩
 
 include hχ hcomm in
 /-- Paper: Theorem 4.6.1.5(1), p. 212. A continuous seminorm of the
@@ -1343,17 +1414,125 @@ theorem modulatedQuotientLogMoment_biorthogonal_growth (ψ : J → U)
       ∀ (n : ℤ) (j : J), j.val.1 = freq[k, n] →
         q (ψ j) ≤ C * (1 + |(n : ℝ)|) ^ d := by sorry
 
+/-- A logarithmic moment along a one-parameter family of characters is the Fourier
+transform of a single Schwartz function on the logarithmic coordinate. -/
+private theorem modulatedLogMoment_logFourier (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
+    (μ₁ : Measure m.toMonoidHom.ker) [μ₁.IsHaarMeasure] [CompactSpace m.toMonoidHom.ker]
+    (ν : Measure G) (hν : ν = (μ₁.prod positiveRealHaar).map
+      (fun z : m.toMonoidHom.ker × ℝ≥0ˣ ↦ z.1.val * τ z.2))
+    (χ₀ : PontryaginDual G) (b : ℝ) (hb : ∀ t : ℝ≥0ˣ, χ₀ (τ t) = Circle.exp (b * Real.log (t.val : ℝ)))
+    (φ : G → ℂ) (p : PositiveRealExponentialDecay univ)
+    (hp : ∀ t : ℝ≥0ˣ, p.val (Real.log (t.val : ℝ)) =
+      ∫ k : m.toMonoidHom.ker, (χ₀ k.val : ℂ) * φ (k.val * τ t) ∂μ₁) (r : ℕ) :
+    ∃ H : SchwartzMap ℝ ℂ, ∀ (q : ℝ) (ξ : PontryaginDual G),
+      (∀ x, ξ x = χ₀ x * Circle.exp (q * period x)) →
+      Integrable (fun x ↦ φ x * (ξ x : ℂ) * (period x : ℂ)^r) ν →
+      (∫ x, φ x * (ξ x : ℂ) * (period x : ℂ)^r ∂ν) = H (-(q+b)/(2*Real.pi)) := by
+  let s₀ := logExponentialDecayTwist univ ⟨0, mem_univ _⟩ p
+  have hs₀ (x : ℝ) : s₀ x = p.val x := by
+    change (logExponentialDecayTwist univ ⟨0, mem_univ _⟩ p) x = _
+    simpa only [zero_mul, Real.exp_zero, Complex.ofReal_one, one_mul] using
+      logExponentialDecayTwist_apply univ ⟨0, mem_univ _⟩ p x
+  let w (x : ℝ) := (x : ℂ)^r
+  have hw : w.HasTemperateGrowth := by dsimp [w]; fun_prop
+  let s := SchwartzMap.smulLeftCLM ℂ w s₀
+  have hs (x : ℝ) : s x = (x : ℂ)^r * p.val x := by
+    change (SchwartzMap.smulLeftCLM ℂ w s₀) x = _
+    rw [SchwartzMap.smulLeftCLM_apply hw]
+    exact congrArg ((x : ℂ)^r * ·) (hs₀ x)
+  refine ⟨FourierTransform.fourier s, fun q ξ hξ hi ↦ ?_⟩
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SFinite positiveRealHaar := by unfold positiveRealHaar; infer_instance
+  let split (z : K × ℝ≥0ˣ) := z.1.val * τ z.2
+  have hsplit : Continuous split :=
+    (continuous_subtype_val.comp continuous_fst).mul (τ.continuous.comp continuous_snd)
+  let F (x : G) := φ x * (ξ x : ℂ) * (period x : ℂ)^r
+  have hi' : Integrable F ((μ₁.prod positiveRealHaar).map split) := hν ▸ hi
+  have hprod := hi'.comp_measurable hsplit.measurable
+  have hfiber (t : ℝ≥0ˣ) : (∫ k : K, (F ∘ split) (k,t) ∂μ₁) =
+      (Circle.exp ((q+b)*Real.log (t.val : ℝ)) : ℂ) * (Real.log (t.val : ℝ) : ℂ)^r *
+        p.val (Real.log (t.val : ℝ)) := by
+    rw [hp, ← integral_const_mul]
+    apply integral_congr_ae (.of_forall fun k ↦ ?_)
+    change φ (k.val * τ t) * (ξ (k.val * τ t) : ℂ) * (period (k.val * τ t) : ℂ)^r = _
+    rw [hξ, map_mul χ₀, map_mul m, show m k.val = 1 from k.property, hτ t, one_mul, hb]
+    rw [add_mul, Circle.exp_add]
+    simp only [Circle.coe_mul]
+    ring
+  let ex : ℝ ≃ₜ ℝ≥0ˣ := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  have hval (x : ℝ) : ((ex x).val : ℝ) = Real.exp x := rfl
+  have hex : positiveRealHaar = Measure.map ex volume := by
+    unfold positiveRealHaar
+    congr 1
+    funext x
+    apply Units.ext
+    apply NNReal.eq
+    exact (Real.coe_toNNReal _ (Real.exp_pos x).le).trans (hval x).symm
+  change (∫ x, F x ∂ν) = _
+  rw [hν, integral_map hsplit.measurable.aemeasurable hi'.aestronglyMeasurable]
+  change (∫ z, (F ∘ split) z ∂μ₁.prod positiveRealHaar) = _
+  rw [integral_prod_symm (F ∘ split) hprod]
+  simp_rw [hfiber]
+  rw [hex, ex.measurableEmbedding.integral_map, SchwartzMap.fourier_coe, Real.fourier_eq]
+  apply integral_congr_ae (.of_forall fun x ↦ ?_)
+  rw [hval, Real.log_exp, Real.fourierChar_apply', Circle.smul_def, smul_eq_mul, hs, Real.inner_apply]
+  have hphase : 2 * Real.pi * -(x * (-(q+b) / (2*Real.pi))) = (q+b)*x := by
+    field_simp
+  rw [hphase, mul_assoc]
+
 include hχ in
 /-- Paper: Theorem 4.6.1.5(2), p. 212. At each fixed moment order, the
 coefficients on each cyclic lattice give a Schwartz sequence.
 Deviation: The sequence is extended by zero at indices where the moment
-order is at least the multiplicity, consistent with (4.6.1.15).
+order is at least the multiplicity, consistent with (4.6.1.15). The page prints
+"multiplicity at least m", which includes the indices where the order equals the
+multiplicity; the moment of the test function at those indices is not covered here.
 The decay estimate does not require commensurability. -/
 theorem modulatedLogMoment_lattice_schwartz (f : H₀[ω]) (r : Fin N) (k : Fin N) :
     ∃ v : SchwartzBruhat (Multiplicative ℤ), ∀ n : ℤ, v (Multiplicative.ofAdd n) =
       if r.val < modulatedPeriodicMultiplicity m ω γs (freq[k, n]) then
         modulatedLogMoment (m := m) (hm := hm) (hms := hms) (ω := ω) (μ := μ) (freq[k, n]) r.val f
-      else 0 := by sorry
+      else 0 := by
+  classical
+  obtain ⟨τ, hτ⟩ := exists_surjectiveModulation_section m hm hms
+  obtain ⟨b, hb⟩ := exists_circleExp_freq ((χ ω).comp τ)
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let μ₁ : Measure K := Measure.haarMeasure (⊤ : TopologicalSpace.PositiveCompacts K)
+  let ν := canonicalModulatedHaar m hm
+  let : ν.IsHaarMeasure := (Classical.choose_spec (existsUnique_canonicalModulatedHaar m hm).exists).1
+  have hν := canonicalModulatedHaar_eq_map_prod m hm τ hτ μ₁ Measure.haarMeasure_self
+  obtain ⟨A, _, _, _, hA, _⟩ := modulatedMellin_isotypicDiagram m hm hms univ
+    isOpen_univ ordConnected_univ univ_nonempty τ hτ μ₁ ν hν (χ ω) b hb
+  obtain ⟨H, hH⟩ := modulatedLogMoment_logFourier m τ hτ μ₁ ν hν (χ ω) b hb
+    f.val.val (A f.val) (hA f.val) r.val
+  let L := Real.log ((m (γs k)).val : ℝ)
+  have hL : 0 < L := Real.log_pos (by exact_mod_cast hγs k)
+  let q (n : ℤ) := -(t₀ k ω - 2 * Real.pi * (n : ℝ) / L)
+  have hξ (n : ℤ) (x : G) : freq[k, n] x = χ ω x * Circle.exp (q n * period x) := by
+    change (modulatedCyclicCharacter m (γs k) (hγs k) χ (t₀ k) (ht₀ k) (ω, n)
+      (QuotientGroup.mk x))⁻¹ = _
+    rw [modulatedCyclicCharacter_mk, show q n * (period x) =
+      -((t₀ k ω - 2 * Real.pi * (n : ℝ) / L) * period x) from neg_mul _ _, Circle.exp_neg, mul_inv, inv_inv]
+  let c := Measure.haarScalarFactor μ ν
+  have hscale : μ = c • ν := Measure.isMulLeftInvariant_eq_smul μ ν
+  let a : ℝ := -1 / L
+  let d := (t₀ k ω - b) / (2 * Real.pi)
+  have hsample (n : ℤ) : modulatedLogMoment (m := m) (hm := hm) (hms := hms)
+      (ω := ω) (μ := μ) (freq[k, n]) r.val f = (((c : ℝ) : ℂ) • H) (a*n+d) := by
+    change (∫ x, f.val.val x * (freq[k, n] x : ℂ) * (period x : ℂ)^r.val ∂μ) = _
+    rw [hscale, integral_smul_nnreal_measure, hH (q n) (freq[k, n]) (hξ n)
+      (integrable_logMoment m ω ν (freq[k, n]) r.val f)]
+    have heq : -(q n + b)/(2*Real.pi) = a*n+d := by
+      dsimp [q, a, d]
+      field_simp
+      ring
+    rw [heq]
+    rfl
+  let mask (n : ℤ) := r.val < modulatedPeriodicMultiplicity m ω γs (freq[k, n])
+  obtain ⟨v, hv⟩ := schwartzBruhat_of_affine_integer_samples (((c : ℝ) : ℂ) • H) a d
+    (div_ne_zero (by norm_num) hL.ne') mask
+  exact ⟨v, fun n ↦ (hv n).trans (by simp only [mask, hsample])⟩
 
 end Moments
 

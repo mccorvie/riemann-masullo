@@ -377,12 +377,13 @@ private theorem adelePrincipalValue_mem_polarSubspace_toGlobal_zero (S : Finset 
 
 /-- Integrating the global inclusion of an S-local test multiplies its S-local integral by a
 constant, the mass of the integral tail. -/
-private theorem adelePrincipalValue_mem_polarSubspace_toGlobal_integral (S : Finset V) :
-    ∃ M : ℂ, ∀ k : ℬₛ(S),
+private theorem sAdeleSchwartzToGlobal_integral_scale (S : Finset V) :
+    ∃ M : ℂ, M ≠ 0 ∧ ∀ k : ℬₛ(S),
       ∫ x, sAdeleSchwartzToGlobal F S k (Multiplicative.ofAdd x) ∂additiveTamagawaMeasure F =
         M * ∫ y, k (Multiplicative.ofAdd y) ∂sAdditiveTamagawaMeasure F S := by
-  obtain ⟨c, -, -, hm, -⟩ := sAdeleProjection_dual_masses F S
-  refine ⟨((c : ℝ) : ℂ), fun k ↦ ?_⟩
+  obtain ⟨c, hc, -, hm, -⟩ := sAdeleProjection_dual_masses F S
+  refine ⟨((c : ℝ) : ℂ), ?_, fun k ↦ ?_⟩
+  · exact_mod_cast hc
   let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
   let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
   let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
@@ -435,6 +436,24 @@ private theorem adelePrincipalValue_mem_polarSubspace_toGlobal_integral (S : Fin
     (by rw [hm.map_eq]; exact hk.aestronglyMeasurable)
   refine h2.symm.trans ?_
   rw [hm.map_eq, integral_smul_nnreal_measure, NNReal.smul_def, Complex.real_smul]
+
+private theorem adelePrincipalValue_mem_polarSubspace_toGlobal_integral (S : Finset V) :
+    ∃ M : ℂ, ∀ k : ℬₛ(S),
+      ∫ x, sAdeleSchwartzToGlobal F S k (Multiplicative.ofAdd x) ∂additiveTamagawaMeasure F =
+        M * ∫ y, k (Multiplicative.ofAdd y) ∂sAdditiveTamagawaMeasure F S := by
+  obtain ⟨M, -, hM⟩ := sAdeleSchwartzToGlobal_integral_scale (F := F) S
+  exact ⟨M, hM⟩
+
+/-- Insertion preserves and detects both zero moments. Fourier evaluation at zero
+is multiplied by the nonzero additive mass of the integer tail. -/
+theorem sAdeleSchwartzToGlobal_mem_polarSubspace_iff (S : Finset V) (f : ℬₛ(S)) :
+    sAdeleSchwartzToGlobal F S f ∈ adelePolarSubspace F ↔
+      f (Multiplicative.ofAdd 0) = 0 ∧ sAdeleSchwartzFourier f (Multiplicative.ofAdd 0) = 0 := by
+  obtain ⟨M, hM, h⟩ := sAdeleSchwartzToGlobal_integral_scale (F := F) S
+  rw [mem_adelePolarSubspace,
+    adelePrincipalValue_mem_polarSubspace_toGlobal_zero,
+    (adeleSchwartzFourier_apply_zero _).2, h f, ← sAdeleSchwartzFourier_apply_zero,
+    mul_eq_zero, or_iff_right hM]
 
 open scoped TensorProduct in
 /-- On a pure tensor the S-local integral is the product of the archimedean integral and
@@ -1932,8 +1951,8 @@ private theorem integrable_sLocalCarvingTheta_normOne_continuous (S : Finset V) 
     convert this using 1
     group
 
-/-- The raw theta generator is continuous on the idele classes. -/
-private theorem integrable_sLocalCarvingTheta_normOne_classContinuous (S : Finset V)
+/-- The principal-orbit sum is continuous on the idele class group. -/
+theorem continuous_sLocalCarvingTheta (S : Finset V)
     (f : ℬₛ(S)) : Continuous (sLocalCarvingTheta S f) := by
   rw [(QuotientGroup.isQuotientMap_mk (IdeleGroup.principalSubgroup (𝓞 F) F)).continuous_iff]
   have h : sLocalCarvingTheta S f ∘ QuotientGroup.mk =
@@ -1952,7 +1971,7 @@ theorem integrable_sLocalCarvingTheta_normOne (S : Finset V) (ω : PontryaginDua
   have : (μ₁).IsHaarMeasure :=
     (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
   have hc : Continuous (fun h : C₁ ↦ sLocalCarvingTheta S f (h.val * g) * (ω h : ℂ)) :=
-    ((integrable_sLocalCarvingTheta_normOne_classContinuous S f).comp
+    ((continuous_sLocalCarvingTheta S f).comp
       (continuous_subtype_val.mul continuous_const)).mul
       (continuous_subtype_val.comp ω.continuous)
   exact hc.integrable_of_hasCompactSupport
@@ -2066,7 +2085,7 @@ private theorem memLp_sLocalCarvingGenerator_bound (S : Finset V) (f : ℬₛ(S)
     (isProperMap_ideleClassNorm F).isCompact_preimage
       (memLp_sLocalCarvingGenerator_isCompact a T ha)
   obtain ⟨K, hKb⟩ := hK.exists_bound_of_continuousOn
-    (integrable_sLocalCarvingTheta_normOne_classContinuous S f).continuousOn
+    (continuous_sLocalCarvingTheta S f).continuousOn
   refine ⟨max (max K 0 * T ^ k) C, le_max_of_le_right hC.le, fun g hg ↦ ?_⟩
   have hpos : 0 < ((ideleClassNorm F g).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
   have hinv : 0 < (((ideleClassNorm F g).val : ℝ) ^ k)⁻¹ := by positivity
@@ -2095,7 +2114,7 @@ private theorem memLp_sLocalCarvingGenerator_continuous (S : Finset V)
   have : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
   have : (μ₁).IsHaarMeasure :=
     (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
-  have hθ := integrable_sLocalCarvingTheta_normOne_classContinuous S f
+  have hθ := continuous_sLocalCarvingTheta S f
   have hjoint : Continuous (fun p : C𝔽 × C₁ ↦
       sLocalCarvingTheta S f (p.2.val * p.1) * (ω p.2 : ℂ)) :=
     (hθ.comp ((continuous_subtype_val.comp continuous_snd).mul continuous_fst)).mul
@@ -2337,9 +2356,89 @@ theorem memLp_sLocalCarvingGenerator {S : Finset V} (χ : PontryaginDual C𝔽)
   · exact (memLp_sLocalCarvingGenerator_pointwise S (ωOf(χ)) (J(twoSided, Λ)) f Λ⁻¹ D ha hD0
       (⌈s⌉₊ + 1) hJ hD g).trans (Real.le_norm_self _)
 
+/-- At the trivial character the cutoff carving limit consists of vectors that
+are almost everywhere invariant under each fixed norm-one translation. -/
+theorem sLocalCarvingLimit_trivial_ae_translate {S : Finset V}
+    (hχ : Unramified((1 : PontryaginDual C𝔽), S)) (hPic : TrivialPic((S : Set V)))
+    (s : ℝ) (hs : DegreeBound(s)) (twoSided : Bool) (Λ : ℝ) (hΛ : 0 < Λ)
+    {u : W(s)}
+    (hu : u ∈ sLocalCarvingLimit s (ωOf((1 : PontryaginDual C𝔽))) S
+      (J(twoSided, Λ)) (hJ(twoSided, Λ))) (g : C₁) :
+    (fun x ↦ u (g.val⁻¹ * x)) =ᵐ[μ𝔽] (u : C𝔽 → ℂ) := by
+  let hs₀ : 0 ≤ s := (mul_nonneg zero_le_two (Nat.cast_nonneg _)).trans hs
+  let J := J(twoSided, Λ)
+  let hJ := hJ(twoSided, Λ)
+  let M := M(s, J, hJ)
+  obtain ⟨v, hv, he⟩ := Submodule.mem_map.mp
+    (sLocalCarvingLimit_le_cutoffIsotype 1 hχ hPic s hs twoSided Λ hΛ hu)
+  have hMv : M v = u := he
+  have hvfix : hardySobolevTranslation μ𝔽 m𝔽 0 0 s le_rfl hs₀ g.val v = v := by
+    have h := (mem_actionIsotype _ _ _).mp hv g
+    change hardySobolevTranslation μ𝔽 m𝔽 0 0 s le_rfl hs₀ g.val v = (1 : ℂ) • v at h
+    simpa only [one_smul] using h
+  have hufix : hardySobolevTranslation μ𝔽 m𝔽 0 0 s le_rfl hs₀ g.val u = u := by
+    rw [← hMv, ← sLocalCutoffCarving_le_cutoffIsotype_comm s hs₀ J hJ g v, hvfix]
+  simpa only [hufix] using (hardySobolevTranslation_apply μ𝔽 m𝔽 0 0 s le_rfl hs₀ g.val u).symm
+
 -- TODO(paper-gap): Page 483 uses R_{Λ,S} without defining it. Both spans in
 -- the quotient already have Fourier value zero. The argument still needs to
 -- approximate every vector of the intersection by projected local generators.
+
+/-- Paper: Theorem 11.1.2.1(3), pp. 482-483. Every projected S-local generator lies
+in every finite-place cutoff stage. This is the convergence step of the printed
+proof of (3): by Proposition 11.1.1.2 the generator is the limit of the projected
+local generators along a cofinal sequence, whose tail from any stage on lies in that
+stage, and the stages are closed.
+Remaining input: this file has no Proposition 11.1.1.2 for the extension by the unit
+ideles outside `S`, so that convergence is not available here. -/
+private theorem sLocalCarvingLimit_eq_closedSpan_generator_mem {S : Finset V}
+    (χ : PontryaginDual C𝔽) (hχ : Unramified(χ, S)) (hPic : TrivialPic((S : Set V)))
+    (s : ℝ) (hs : DegreeBound(s)) (twoSided : Bool) (Λ : ℝ) (hΛ : 0 < Λ)
+    (f : ℬₛ(S)) (hf : f (Multiplicative.ofAdd 0) = 0)
+    (hFf : sAdeleSchwartzFourier f (Multiplicative.ofAdd 0) = 0)
+    (i : SLocalCarvingIndex (F := F) S) :
+    (memLp_sLocalCarvingGenerator χ hχ hPic s hs twoSided Λ hΛ f hf hFf).toLp
+        (sLocalCarvingGenerator S (ωOf(χ)) (J(twoSided, Λ)) f) ∈
+      sLocalCutoffCarving s (ωOf(χ)) i.val (J(twoSided, Λ)) (hJ(twoSided, Λ)) := by
+  sorry
+
+/-- Paper: Theorem 11.1.2.1(3), pp. 482-483. The closed span of the projected
+generators is contained in the cofinal limit, which is closed and contains each of
+them by `sLocalCarvingLimit_eq_closedSpan_generator_mem`. -/
+private theorem sLocalCarvingLimit_eq_closedSpan_ge {S : Finset V} (χ : PontryaginDual C𝔽)
+    (hχ : Unramified(χ, S)) (hPic : TrivialPic((S : Set V)))
+    (s : ℝ) (hs : DegreeBound(s)) (twoSided : Bool) (Λ : ℝ) (hΛ : 0 < Λ) :
+    (Submodule.span ℂ {u : W(s) |
+      ∃ (f : ℬₛ(S)) (hf : f (Multiplicative.ofAdd 0) = 0)
+        (hFf : sAdeleSchwartzFourier f (Multiplicative.ofAdd 0) = 0),
+        u = (memLp_sLocalCarvingGenerator χ hχ hPic s hs twoSided Λ hΛ f hf hFf).toLp
+          (sLocalCarvingGenerator S (ωOf(χ)) (J(twoSided, Λ)) f)}).topologicalClosure ≤
+      sLocalCarvingLimit s (ωOf(χ)) S (J(twoSided, Λ)) (hJ(twoSided, Λ)) := by
+  refine le_iInf fun i ↦ ?_
+  unfold sLocalCutoffCarving
+  refine Submodule.topologicalClosure_minimal _ (Submodule.span_le.mpr ?_)
+    (Submodule.isClosed_topologicalClosure _)
+  rintro u ⟨f, hf, hFf, rfl⟩
+  exact sLocalCarvingLimit_eq_closedSpan_generator_mem χ hχ hPic s hs twoSided Λ hΛ f hf hFf i
+
+/-- Paper: Theorem 11.1.2.1(3), p. 483. The cofinal limit is contained in the closed
+span of the projected generators. This is the quotient step of the printed proof: if the
+closure of the span of the tests with both vanishing conditions were smaller than the
+span of those with only `\widehat{f}(0) = 0`, the quotient would extend `\widehat{\delta}_0`
+continuously, which multiplication by the idelic norm contradicts.
+Remaining input: the object `R_{Λ,S}` that the printed argument uses at this point is
+never defined, and the approximation of a vector of the intersection by projected local
+generators is not established. -/
+private theorem sLocalCarvingLimit_eq_closedSpan_le {S : Finset V} (χ : PontryaginDual C𝔽)
+    (hχ : Unramified(χ, S)) (hPic : TrivialPic((S : Set V)))
+    (s : ℝ) (hs : DegreeBound(s)) (twoSided : Bool) (Λ : ℝ) (hΛ : 0 < Λ) :
+    sLocalCarvingLimit s (ωOf(χ)) S (J(twoSided, Λ)) (hJ(twoSided, Λ)) ≤
+      (Submodule.span ℂ {u : W(s) |
+        ∃ (f : ℬₛ(S)) (hf : f (Multiplicative.ofAdd 0) = 0)
+          (hFf : sAdeleSchwartzFourier f (Multiplicative.ofAdd 0) = 0),
+          u = (memLp_sLocalCarvingGenerator χ hχ hPic s hs twoSided Λ hΛ f hf hFf).toLp
+            (sLocalCarvingGenerator S (ωOf(χ)) (J(twoSided, Λ)) f)}).topologicalClosure := by
+  sorry
 
 /-- Paper: Theorem 11.1.2.1(3), p. 480. The cofinal limit is the closed span of
 the projected cutoff theta functions of local tests whose value and Fourier value
@@ -2353,7 +2452,10 @@ theorem sLocalCarvingLimit_eq_closedSpan {S : Finset V} (χ : PontryaginDual C�
       ∃ (f : ℬₛ(S)) (hf : f (Multiplicative.ofAdd 0) = 0)
         (hFf : sAdeleSchwartzFourier f (Multiplicative.ofAdd 0) = 0),
         u = (memLp_sLocalCarvingGenerator χ hχ hPic s hs twoSided Λ hΛ f hf hFf).toLp
-          (sLocalCarvingGenerator S (ωOf(χ)) (J(twoSided, Λ)) f)}).topologicalClosure := by sorry
+          (sLocalCarvingGenerator S (ωOf(χ)) (J(twoSided, Λ)) f)}).topologicalClosure :=
+  le_antisymm
+    (sLocalCarvingLimit_eq_closedSpan_le χ hχ hPic s hs twoSided Λ hΛ)
+    (sLocalCarvingLimit_eq_closedSpan_ge χ hχ hPic s hs twoSided Λ hΛ)
 
 /-- The L² norm of a vector of a weighted L² space that agrees almost everywhere with the
 restriction of another vector to a measurable set is the weighted integral of the square of

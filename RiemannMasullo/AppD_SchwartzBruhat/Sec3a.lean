@@ -159,9 +159,9 @@ def schwartzBergmanSubmodule (I : Set ℝ) : Submodule ℂ (ℂ → ℂ) where
   add_mem' := (schwartzBergman_closure I).2.1
   smul_mem' := (schwartzBergman_closure I).2.2
 
-/-- Paper: Definition D.3.1.3, p. 800. The Gaussian restricted to a strip
-gives a nonzero example whenever the strip is nonempty.
-Deviation: Sanity check in the zero-extension representation. -/
+/-- Paper: Definition D.3.1.3, p. 800. The zero extension of the Gaussian restricted
+to an open strip belongs to its Schwartz–Bergman space. This is an example of membership
+in the space defined in the paper. -/
 theorem gaussian_mem_schwartzBergmanSubmodule (I : Set ℝ) (hI : IsOpen I) :
     (Complex.re ⁻¹' I).indicator (fun z : ℂ ↦ Complex.exp (z ^ 2)) ∈
       schwartzBergmanSubmodule I := by
@@ -3741,7 +3741,8 @@ private theorem schwartzBruhat_realCoordinate_equiv {G : Type*} [CommGroup G] [T
     dite_eq_left (hm x), hT]
   exact congrArg f (hw x)
 
-private def positiveRealLogEquiv : ℝ≥0ˣ ≃ₜ* Multiplicative ℝ := by
+/-- The logarithm identifies positive real units with the additive reals. -/
+def positiveRealLogEquiv : ℝ≥0ˣ ≃ₜ* Multiplicative ℝ := by
   let e : ℝ≥0ˣ ≃ₜ Multiplicative ℝ :=
     (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.symm.toHomeomorph
   have he (t : ℝ≥0ˣ) : (e t).toAdd = Real.log (t.val : ℝ) :=
@@ -3752,7 +3753,8 @@ private def positiveRealLogEquiv : ℝ≥0ˣ ≃ₜ* Multiplicative ℝ := by
     Real.log_mul (NNReal.coe_pos.mpr (Units.zero_lt s)).ne'
       (NNReal.coe_pos.mpr (Units.zero_lt t)).ne']
 
-private theorem positiveRealLogEquiv_apply (t : ℝ≥0ˣ) :
+/-- On positive real units, the log equivalence applies the real logarithm. -/
+theorem positiveRealLogEquiv_apply (t : ℝ≥0ˣ) :
     (positiveRealLogEquiv t).toAdd = Real.log (t.val : ℝ) :=
   (Real.log_of_pos (NNReal.coe_pos.mpr (Units.zero_lt t))).symm
 

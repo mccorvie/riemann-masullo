@@ -1,5 +1,9 @@
 module
 
+public import Mathlib.Analysis.Calculus.ContDiff.Bounds
+public import Mathlib.Analysis.Calculus.FDeriv.Symmetric
+public import Mathlib.Analysis.Distribution.SchwartzSpace.CompactSupport
+public import RiemannMasullo.ForMathlib.Analysis.Distribution.ContDiffMapSupportedIn
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
 public import RiemannMasullo.Ch03_IdelicZeta.Sec4
 public import Mathlib.Analysis.Distribution.Support
@@ -11,8 +15,12 @@ public import Mathlib.RingTheory.MvPowerSeries.PiTopology
 public import Mathlib.RingTheory.PowerSeries.PiTopology
 public import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Complete
 public import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
+import Mathlib.Analysis.Distribution.SchwartzSpace.CompactSupport
+import Mathlib.Geometry.Manifold.PartitionOfUnity
+import Mathlib.LinearAlgebra.Dual.Lemmas
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Analysis.Fourier.FiniteAbelian.PontryaginDuality
+import RiemannMasullo.ForMathlib.Topology.MetricSpace.CompactQuotient
 
 /-! # Non-archimedean principal values and distributions supported at the origin
 
@@ -1215,25 +1223,472 @@ theorem adelePrincipalValue_tmul {S S₀ : Finset V} (h₀ : S₀ ⊆ S)
     adelePrincipalValue F S₀ (e (f ⊗ₜ[ℂ] g)) = e (sAdelePrincipalValue F h₀ f ⊗ₜ[ℂ] g) :=
   by sorry
 
+section PrincipalValueInjectivity
+
+/-- A tensor product of injective endomorphisms of finitely many factors is injective: an
+injective linear map over a field has a left inverse, and a left inverse of each factor composes
+to a left inverse of the tensor product. -/
+private theorem sAdelePrincipalValue_isClosedEmbedding_injective_piTensor {ι : Type*}
+    [Fintype ι] {D : ι → Type*} [∀ i, AddCommGroup (D i)] [∀ i, Module ℂ (D i)]
+    (T : ∀ i, D i →ₗ[ℂ] D i) (hT : ∀ i, Function.Injective (T i)) :
+    Function.Injective (PiTensorProduct.map (R := ℂ) T) := by
+  classical
+  choose g hg using fun i ↦
+    LinearMap.exists_leftInverse_of_injective (T i) (LinearMap.ker_eq_bot.mpr (hT i))
+  have hcomp : (PiTensorProduct.map (R := ℂ) g) ∘ₗ (PiTensorProduct.map (R := ℂ) T) =
+      LinearMap.id := by
+    rw [← PiTensorProduct.map_comp (f := T) (g := g), funext hg, PiTensorProduct.map_id]
+  intro x y hxy
+  have hx : (PiTensorProduct.map (R := ℂ) g) ((PiTensorProduct.map (R := ℂ) T) x) = x := by
+    simpa using congrArg (fun L => L x) hcomp
+  have hy : (PiTensorProduct.map (R := ℂ) g) ((PiTensorProduct.map (R := ℂ) T) y) = y := by
+    simpa using congrArg (fun L => L y) hcomp
+  rw [← hx, ← hy, hxy]
+
+/-- A tensor product of two injective linear maps over a field is injective, by the left inverse
+of each factor. -/
+private theorem sAdelePrincipalValue_isClosedEmbedding_injective_tensorProduct
+    {A A' B B' : Type*} [AddCommGroup A] [Module ℂ A] [AddCommGroup A'] [Module ℂ A']
+    [AddCommGroup B] [Module ℂ B] [AddCommGroup B'] [Module ℂ B']
+    (f : A →ₗ[ℂ] A') (g : B →ₗ[ℂ] B') (hf : Function.Injective f)
+    (hg : Function.Injective g) : Function.Injective (TensorProduct.map f g) := by
+  obtain ⟨f', hf'⟩ := LinearMap.exists_leftInverse_of_injective f (LinearMap.ker_eq_bot.mpr hf)
+  obtain ⟨g', hg'⟩ := LinearMap.exists_leftInverse_of_injective g (LinearMap.ker_eq_bot.mpr hg)
+  have hcomp : TensorProduct.map f' g' ∘ₗ TensorProduct.map f g = LinearMap.id := by
+    rw [← TensorProduct.map_comp f' g' f g, hf', hg', TensorProduct.map_id]
+  intro x y hxy
+  have hx : TensorProduct.map f' g' (TensorProduct.map f g x) = x := by
+    simpa using congrArg (fun L => L x) hcomp
+  have hy : TensorProduct.map f' g' (TensorProduct.map f g y) = y := by
+    simpa using congrArg (fun L => L y) hcomp
+  rw [← hx, ← hy, hxy]
+
+/-- An operator given by the identity on the archimedean factor and by a tensor product of
+endomorphisms of the finite factors, conjugated by a linear homeomorphism, is injective as soon
+as those endomorphisms are. -/
+private theorem sAdelePrincipalValue_isClosedEmbedding_injective_aux {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] {ι : Type*} [Fintype ι] {D : ι → Type*}
+    [∀ i, AddCommGroup (D i)] [∀ i, Module ℂ (D i)] [∀ i, TopologicalSpace (D i)]
+    (e : InductiveTensor A (FinestLocallyConvex (⨂[ℂ] i, D i)) ≃L[ℂ] B)
+    (p : ι → Prop) [DecidablePred p] (T : ∀ i, D i →L[ℂ] D i)
+    (hT : ∀ i, Function.Injective (T i)) :
+    let W := FinestLocallyConvex (⨂[ℂ] i, D i)
+    let P : W →ₗ[ℂ] W := PiTensorProduct.map fun i ↦
+      if p i then (T i).toLinearMap else LinearMap.id
+    let I : A →ₗ[ℂ] A := LinearMap.id
+    Function.Injective (e.toLinearMap.comp ((TensorProduct.map I P).comp e.symm.toLinearMap)) := by
+  classical
+  intro W P I
+  have hP : Function.Injective P := by
+    refine sAdelePrincipalValue_isClosedEmbedding_injective_piTensor
+      (fun i => if p i then (T i).toLinearMap else LinearMap.id) ?_
+    intro i
+    by_cases h : p i
+    · simpa [h] using hT i
+    · simpa [h] using (show Function.Injective (LinearMap.id : D i →ₗ[ℂ] D i)
+        from fun a b hab => hab)
+  have hI : Function.Injective I := fun a b hab => hab
+  have hTens : Function.Injective (TensorProduct.map I P) :=
+    sAdelePrincipalValue_isClosedEmbedding_injective_tensorProduct I P hI hP
+  intro x y hxy
+  have hxy' : e (TensorProduct.map I P (e.symm x)) =
+      e (TensorProduct.map I P (e.symm y)) := hxy
+  exact e.symm.injective (hTens (e.injective hxy'))
+
+end PrincipalValueInjectivity
+
+/-- Paper: Definition 5.3.1.4(1) and Lemma 5.3.1.3, p. 242.
+The S-local principal value has trivial kernel: on a selected finite place it is the local
+principal value of Lemma 5.3.1.3, whose kernel is trivial, and on every other factor of the
+tensor decomposition it is the identity. -/
+private theorem sAdelePrincipalValue_isClosedEmbedding_injective {S S₀ : Finset V}
+    (h₀ : S₀ ⊆ S) : Function.Injective (sAdelePrincipalValue F h₀) := by
+  classical
+  unfold sAdelePrincipalValue
+  with_reducible
+    exact sAdelePrincipalValue_isClosedEmbedding_injective_aux
+      (sAdeleSchwartz_inductiveTensor_equiv F S).choose (fun w : S ↦ w.val ∈ S₀)
+      (fun w ↦ finitePlacePrincipalValue w.val)
+      (fun w ↦ (finitePlacePrincipalValue_isClosedEmbedding w.val).injective)
+
+/-- Paper: Definition 5.3.1.4(1), p. 242.
+The S-local principal value induces the topology of the S-local test space: it is the identity
+on the archimedean factor and a tensor product of endomorphisms of the finite factors, so it is
+a linear self-map of a space whose topology is transported from that tensor decomposition. -/
+private theorem sAdelePrincipalValue_isClosedEmbedding_isInducing {S S₀ : Finset V}
+    (h₀ : S₀ ⊆ S) : IsInducing (sAdelePrincipalValue F h₀) := by
+  sorry
+
+/-- Paper: Definition 5.3.1.4(1) and Lemma 5.3.1.3, p. 242.
+The image of the S-local principal value is closed: it is the image of the whole archimedean
+factor and of the image of the local principal value in each selected finite place, that is, of
+tests vanishing at the origin there, which is the zero set of a continuous functional. -/
+private theorem sAdelePrincipalValue_isClosedEmbedding_isClosed {S S₀ : Finset V}
+    (h₀ : S₀ ⊆ S) : IsClosed (Set.range (sAdelePrincipalValue F h₀)) := by
+  sorry
+
 /-- Paper: Definition 5.3.1.4(1), p. 242.
 The S-local principal value is a topological embedding with closed range. -/
 theorem sAdelePrincipalValue_isClosedEmbedding {S S₀ : Finset V} (h₀ : S₀ ⊆ S) :
-    IsClosedEmbedding (sAdelePrincipalValue F h₀) := by sorry
+    IsClosedEmbedding (sAdelePrincipalValue F h₀) :=
+  ⟨⟨sAdelePrincipalValue_isClosedEmbedding_isInducing h₀,
+    sAdelePrincipalValue_isClosedEmbedding_injective h₀⟩,
+    sAdelePrincipalValue_isClosedEmbedding_isClosed h₀⟩
 
 /-- Paper: Definition 5.3.1.4(2), p. 242.
 The global principal value is a topological embedding with closed range. -/
 theorem adelePrincipalValue_isClosedEmbedding (S₀ : Finset V) :
     IsClosedEmbedding (adelePrincipalValue F S₀) := by sorry
 
+local instance instMeasurableSpaceAdicUnitsSec3aKernel (v : V) :
+    MeasurableSpace (v.adicCompletion F)ˣ := borel _
+
+/-- The unit of the S-local adele ring that is the given local unit at `v` and `1` at every
+other place of `S`; translating by it rescales only the `v`-coordinate of the argument. -/
+private def adelicPrincipalValueLocalUnit {S : Finset V} (v : S)
+    (c : (v.val.adicCompletion F)ˣ) : (SAdeleRing F S)ˣ := by
+  classical
+  refine Units.mk (1, Function.update (fun w : S => (1 : w.val.adicCompletion F)) v c.val)
+    (1, Function.update (fun w : S => (1 : w.val.adicCompletion F)) v c.inv) ?_ ?_
+  · refine Prod.ext (by simp) (funext fun w => ?_)
+    by_cases h : w = v
+    · subst h
+      simp [Function.update_apply, Units.mul_inv]
+    · simp [Function.update_apply, h]
+  · refine Prod.ext (by simp) (funext fun w => ?_)
+    by_cases h : w = v
+    · subst h
+      simp [Function.update_apply, Units.inv_mul]
+    · simp [Function.update_apply, h]
+
+/-- S-local theta of a translate is S-local theta evaluated at the inverse-translated idele. -/
+private theorem sAdelePrincipalValue_preserves_thetaKernel_translate
+    {S : Finset V} (g x : (SAdeleRing F S)ˣ) (f : ℬₛ(S)) :
+    sLocalAdelicTheta F S (schwartzBruhatUnitTranslate g f) x =
+      sLocalAdelicTheta F S f (g⁻¹ * x) := by
+  let d := (Units.map ((adeleProjection F S).comp
+    (integralAdelesOutside F S).subtype).toMonoidHom).comp
+      (Units.map (integralAdeleDiagonal F S).toMonoidHom)
+  refine (sLocalAdelicTheta_apply F S (schwartzBruhatUnitTranslate g f) x).trans
+    (Eq.trans ?_ (sLocalAdelicTheta_apply F S f (g⁻¹ * x)).symm)
+  exact tsum_congr fun t => congrArg (fun y => f (Multiplicative.ofAdd y))
+    (mul_left_comm g.inv (d t).val x.val)
+
+/-- Paper: (5.3.1.9), p. 242.
+The single-place operator at `v` is `1` minus the normalized average over the integer units at
+`v` of the translates by the reciprocal uniformizer times the unit, and S-local theta turns this
+into the same recipe on the theta function: theta of the principal value at one place is theta of
+the test minus the normalized average, over the integer units at that place, of theta of its
+translates. This is the analytic content of (5.3.1.9): the theta sum over the S-units is exchanged
+with the integral over the compact group of integer units, as in the proof of the formula for the
+global theta function in one place in `Ch11_ShellStructure.Sec2a`. -/
+private theorem sLocalAdelicTheta_sAdelePrincipalValue_singleton {S : Finset V} (v : S)
+    (π : (v.val.adicCompletion F)ˣ)
+    (hπ : (Valued.v : Valuation (v.val.adicCompletion F) (WithZero (Multiplicative ℤ))).IsUniformizer
+      (π : v.val.adicCompletion F))
+    (f : ℬₛ(S)) (x : (SAdeleRing F S)ˣ) :
+    sLocalAdelicTheta F S
+        (sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.property) f) x =
+      sLocalAdelicTheta F S f x -
+        ((finiteLocalMultiplicativeTamagawaMeasure F v.val).real
+          ((HeightOneSpectrum.adicCompletionIntegers F v.val).units :
+            Set (v.val.adicCompletion F)ˣ) : ℂ)⁻¹ *
+          ∫ u in ((HeightOneSpectrum.adicCompletionIntegers F v.val).units :
+              Set (v.val.adicCompletion F)ˣ),
+            sLocalAdelicTheta F S
+              (schwartzBruhatUnitTranslate
+                (adelicPrincipalValueLocalUnit v (π * (u : (v.val.adicCompletion F)ˣ))) f) x
+            ∂(finiteLocalMultiplicativeTamagawaMeasure F v.val) := by sorry
+
+/-- Paper: (5.3.1.9), p. 242.
+The single-place principal value at `v` maps the theta kernel into itself: theta of the average
+of the translates vanishes because theta of every translate is theta of the test at another
+idele, and theta of the test is zero. -/
+private theorem sAdelePrincipalValue_preserves_thetaKernel_singleton {S : Finset V} (v : S)
+    (f : ℬₛ(S)) (hf : sLocalAdelicTheta F S f = 0) :
+    sLocalAdelicTheta F S
+      (sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.property) f) = 0 := by
+  let hunif := (Valued.v :
+    Valuation (v.val.adicCompletion F) (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π : (v.val.adicCompletion F)ˣ :=
+    Units.mk0 (hunif.choose : v.val.adicCompletion F) hunif.choose_spec.ne_zero
+  have hπ : (Valued.v :
+      Valuation (v.val.adicCompletion F) (WithZero (Multiplicative ℤ))).IsUniformizer
+        (π : v.val.adicCompletion F) := hunif.choose_spec
+  refine ContinuousMap.ext fun y => ?_
+  refine (sLocalAdelicTheta_sAdelePrincipalValue_singleton v π hπ f y).trans ?_
+  have hzero : ∀ (u : (v.val.adicCompletion F)ˣ) (z : (SAdeleRing F S)ˣ), sLocalAdelicTheta F S
+        (schwartzBruhatUnitTranslate (R := SAdeleRing F S)
+          (adelicPrincipalValueLocalUnit v (π * u)) f) z = 0 := by
+    intro u z
+    rw [sAdelePrincipalValue_preserves_thetaKernel_translate]
+    exact DFunLike.congr_fun hf _
+  have hfun : (fun u : (v.val.adicCompletion F)ˣ => sLocalAdelicTheta F S
+        (schwartzBruhatUnitTranslate (R := SAdeleRing F S)
+          (adelicPrincipalValueLocalUnit v (π * u)) f) y) = fun _ => 0 :=
+    funext fun u => hzero u y
+  have hf0 : sLocalAdelicTheta F S f y = 0 := DFunLike.congr_fun hf y
+  rw [hfun, integral_zero, mul_zero, sub_zero]
+  exact hf0
+
+private theorem sAdelePrincipalValue_list_comp {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] {ι : Type*} {D : ι → Type*}
+    [∀ i, AddCommGroup (D i)] [∀ i, Module ℂ (D i)] [∀ i, TopologicalSpace (D i)]
+    (e : InductiveTensor A (FinestLocallyConvex (⨂[ℂ] i, D i)) ≃L[ℂ] B)
+    (φ ψ : ∀ i, D i →ₗ[ℂ] D i) :
+    let W := FinestLocallyConvex (⨂[ℂ] i, D i)
+    let I : A →ₗ[ℂ] A := LinearMap.id
+    let Q : (∀ i, D i →ₗ[ℂ] D i) → (B →ₗ[ℂ] B) := fun χ ↦
+      e.toLinearMap.comp ((TensorProduct.map I (PiTensorProduct.map χ : W →ₗ[ℂ] W)).comp
+        e.symm.toLinearMap)
+    Q φ * Q ψ = Q (fun i ↦ φ i ∘ₗ ψ i) := by
+  intro W I Q
+  apply LinearMap.ext
+  intro x
+  change e (TensorProduct.map I _ (e.symm (e _))) = e _
+  erw [e.symm_apply_apply]
+  apply congrArg e
+  have h : (TensorProduct.map I (PiTensorProduct.map φ : W →ₗ[ℂ] W)) ∘ₗ
+      (TensorProduct.map I (PiTensorProduct.map ψ : W →ₗ[ℂ] W)) =
+        TensorProduct.map I (PiTensorProduct.map (fun i ↦ φ i ∘ₗ ψ i) : W →ₗ[ℂ] W) := by
+    rw [← TensorProduct.map_comp, PiTensorProduct.map_comp]
+    rfl
+  exact LinearMap.congr_fun h (e.symm x)
+
+private theorem sAdelePrincipalValue_list_one {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] {ι : Type*} {D : ι → Type*}
+    [∀ i, AddCommGroup (D i)] [∀ i, Module ℂ (D i)] [∀ i, TopologicalSpace (D i)]
+    (e : InductiveTensor A (FinestLocallyConvex (⨂[ℂ] i, D i)) ≃L[ℂ] B) :
+    let W := FinestLocallyConvex (⨂[ℂ] i, D i)
+    let I : A →ₗ[ℂ] A := LinearMap.id
+    e.toLinearMap.comp ((TensorProduct.map I
+      (PiTensorProduct.map (fun i ↦ (LinearMap.id : D i →ₗ[ℂ] D i)) : W →ₗ[ℂ] W)).comp
+        e.symm.toLinearMap) = (1 : B →ₗ[ℂ] B) := by
+  intro W I
+  apply LinearMap.ext
+  intro x
+  show e (TensorProduct.map I
+    (PiTensorProduct.map (fun i ↦ (LinearMap.id : D i →ₗ[ℂ] D i)) : W →ₗ[ℂ] W) (e.symm x)) = x
+  rw [PiTensorProduct.map_id]
+  erw [TensorProduct.map_id]
+  exact e.apply_symm_apply x
+
+open Classical in
+/-- Paper: (5.3.1.9), p. 242.
+The S-local principal value is the composition, over the selected places, of its single-place
+versions: each factor acts in its own coordinate of the tensor decomposition of the S-local test
+space, so the operators commute and compose to the operator attached to the whole set. The
+composite is written as a product over a list so that it can be peeled one place at a time. -/
+private theorem sAdelePrincipalValue_preserves_thetaKernel_list {S S₀ : Finset V} (h₀ : S₀ ⊆ S)
+    (f : ℬₛ(S)) :
+    sAdelePrincipalValue F h₀ f =
+      (S₀.val.toList.map fun v => if h : v ∈ S then
+        sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr h) else 1).prod f := by
+  let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+  let W := FinestLocallyConvex (⨂[ℂ] w : S, ℬ(w.val.adicCompletion F))
+  let I : ℬ(InfiniteAdeleRing F) →ₗ[ℂ] ℬ(InfiniteAdeleRing F) := LinearMap.id
+  let Q : (∀ w : S, ℬ(w.val.adicCompletion F) →ₗ[ℂ] ℬ(w.val.adicCompletion F)) →
+      (ℬₛ(S) →ₗ[ℂ] ℬₛ(S)) := fun χ ↦
+    e.toLinearMap.comp ((TensorProduct.map I (PiTensorProduct.map χ : W →ₗ[ℂ] W)).comp
+      e.symm.toLinearMap)
+  let T : ∀ w : S, ℬ(w.val.adicCompletion F) →ₗ[ℂ] ℬ(w.val.adicCompletion F) :=
+    fun w ↦ (finitePlacePrincipalValue w.val).toLinearMap
+  have hcomp : ∀ φ ψ, Q φ * Q ψ = Q (fun i ↦ φ i ∘ₗ ψ i) := fun φ ψ ↦
+    sAdelePrincipalValue_list_comp e φ ψ
+  have hone : Q (fun _ ↦ LinearMap.id) = 1 := sAdelePrincipalValue_list_one e
+  have hPV : ∀ {S₁ : Finset V} (h : S₁ ⊆ S),
+      sAdelePrincipalValue F h = Q (fun w ↦ if w.val ∈ S₁ then T w else LinearMap.id) :=
+    fun _ ↦ rfl
+  have hg : ∀ v : V, (if h : v ∈ S then
+      sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr h) else 1) =
+        Q (fun w ↦ if w.val = v then T w else LinearMap.id) := by
+    intro v
+    by_cases hv : v ∈ S
+    · rw [dite_eq_left_of_eq_true (eq_true hv), hPV]
+      congr 1
+      funext w
+      simp only [Finset.mem_singleton]
+    · rw [dite_eq_right_of_eq_false (eq_false hv), ← hone]
+      congr 1
+      funext w
+      have hw : ¬(w.val = v) := fun hw ↦ hv (hw ▸ w.property)
+      simp [hw]
+  have hL : ∀ L : List V, L.Nodup → (L.map fun v ↦ if h : v ∈ S then
+      sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr h) else 1).prod =
+        Q (fun w ↦ if w.val ∈ L then T w else LinearMap.id) := by
+    intro L
+    induction L with
+    | nil =>
+      intro _
+      rw [List.map_nil, List.prod_nil, ← hone]
+      congr 1
+    | cons a L ih =>
+      intro hnd
+      have ha : a ∉ L := (List.nodup_cons.mp hnd).1
+      rw [List.map_cons, List.prod_cons, hg a, ih (List.nodup_cons.mp hnd).2, hcomp]
+      congr 1
+      funext w
+      by_cases hw : w.val = a
+      · simp [hw, ha]
+      · simp [hw]
+  refine LinearMap.congr_fun ?_ f
+  have hnd : S₀.val.toList.Nodup := by
+    rw [← Multiset.coe_nodup, Multiset.coe_toList]
+    exact S₀.nodup
+  rw [hL _ hnd, hPV h₀]
+  congr 1
+  funext w
+  simp only [Multiset.mem_toList, Finset.mem_val]
+
 /-- Paper: (5.3.1.9), p. 242.
 The S-local principal value preserves the kernel of theta averaging. -/
 theorem sAdelePrincipalValue_preserves_thetaKernel {S S₀ : Finset V} (h₀ : S₀ ⊆ S) :
-    Kₛ(S) ≤ (Kₛ(S)).comap (sAdelePrincipalValue F h₀) := by sorry
+    Kₛ(S) ≤ (Kₛ(S)).comap (sAdelePrincipalValue F h₀) := by
+  classical
+  have key : ∀ (l : List V), (∀ v ∈ l, v ∈ S) → ∀ g : ℬₛ(S), sLocalAdelicTheta F S g = 0 →
+      sLocalAdelicTheta F S ((l.map fun v => if h : v ∈ S then
+        sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr h) else 1).prod g) = 0 := by
+    intro l
+    induction l with
+    | nil =>
+      intro _ g hg
+      simpa using hg
+    | cons a l ih =>
+      intro hmem g hg
+      have ha : a ∈ S := hmem a List.mem_cons_self
+      have hta : ∀ v ∈ l, v ∈ S := fun v hv => hmem v (List.mem_cons_of_mem a hv)
+      have htail := ih hta g hg
+      have hQa : (if h : a ∈ S then
+          sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr h) else 1) =
+          sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr ha) := dif_pos ha
+      rw [List.map_cons, List.prod_cons, hQa]
+      exact sAdelePrincipalValue_preserves_thetaKernel_singleton ⟨a, ha⟩ _ htail
+  intro f hf
+  rw [LinearMap.mem_ker] at hf
+  rw [Submodule.mem_comap]
+  rw [sAdelePrincipalValue_preserves_thetaKernel_list h₀]
+  exact key S₀.val.toList (fun v hv => h₀ (Multiset.mem_toList.mp hv)) f hf
+
+open Classical in
+/-- Through a stage containing the selected places, the global principal value of an
+inserted test is the insertion of the S-local principal value. The integer tail indicator
+is obtained by slicing the inserted test `k₀` at a point `p` where its value is one. -/
+private theorem sLocalThetaPrincipalValue_toGlobal_slice {S₀ S : Finset V}
+    (h₀ : S₀ ⊆ S) (k₀ : ℬₛ(S)) (p : SAdeleRing F S)
+    (hk₀ : k₀ (Multiplicative.ofAdd p) = 1) (k : ℬₛ(S)) :
+    adelePrincipalValue F S₀ (sAdeleSchwartzToGlobal F S k) =
+      sAdeleSchwartzToGlobal F S (sAdelePrincipalValue F h₀ k) := by
+  let Tl := ℬ(FiniteAdeleTail F S)
+  let e := (sAdeleTailSchwartz_inductiveTensor_equiv F S).choose
+  have he := (sAdeleTailSchwartz_inductiveTensor_equiv F S).choose_spec
+  let ev : ℬₛ(S) →ₗ[ℂ] ℂ :=
+    { toFun := fun a ↦ a (Multiplicative.ofAdd p)
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  let L : ℬₛ(S) ⊗[ℂ] Tl →ₗ[ℂ] Tl := TensorProduct.lift ((LinearMap.lsmul ℂ Tl).comp ev)
+  let c : Tl := L (e.symm (sAdeleSchwartzToGlobal F S k₀))
+  have hc (y : FiniteAdeleTail F S) : c (Multiplicative.ofAdd y) =
+      if ∀ w, y w ∈ w.val.adicCompletionIntegers F then 1 else 0 := by
+    let f : ∀ w : V, w.adicCompletion F := fun w ↦ if h : w ∈ S then p.2 ⟨w, h⟩ else y ⟨w, h⟩
+    have hf : ∀ᶠ w in Filter.cofinite, f w ∈ w.adicCompletionIntegers F := by
+      filter_upwards [S.eventually_cofinite_notMem, Filter.eventually_comap.mp
+        (y.2.filter_mono (Filter.comap_cofinite_le Subtype.val))] with w hw h
+      simp only [f, dite_eq_right hw]
+      exact h ⟨w, hw⟩ rfl
+    let z : FiniteAdeleRing (𝓞 F) F := ⟨f, hf⟩
+    let x : AdeleRing (𝓞 F) F := (p.1, z)
+    have hx (w : V) (hw : w ∉ S) : x.2 w = y ⟨w, hw⟩ := dite_eq_right hw
+    have hp : adeleProjection F S x = p :=
+      Prod.ext rfl (funext fun w ↦ (dite_eq_left w.2 : f w.val = p.2 w))
+    have ht : finiteAdeleTailProjection F S x.2 = y := by
+      apply RestrictedProduct.ext
+      intro w
+      exact dite_eq_right w.2
+    let evy : Tl →ₗ[ℂ] ℂ :=
+      { toFun := fun b ↦ b (Multiplicative.ofAdd y)
+        map_add' := fun _ _ ↦ rfl
+        map_smul' := fun _ _ ↦ rfl }
+    let evx : ℬ(AdeleRing (𝓞 F) F) →ₗ[ℂ] ℂ :=
+      { toFun := fun b ↦ b (Multiplicative.ofAdd x)
+        map_add' := fun _ _ ↦ rfl
+        map_smul' := fun _ _ ↦ rfl }
+    have key : evy ∘ₗ L = evx ∘ₗ (e.toLinearMap : InductiveTensor ℬₛ(S) Tl →ₗ[ℂ] _) := by
+      refine TensorProduct.ext' fun a b ↦ ?_
+      change (a (Multiplicative.ofAdd p) • b) (Multiplicative.ofAdd y) =
+        e (a ⊗ₜ[ℂ] b) (Multiplicative.ofAdd x)
+      rw [he a b x, hp, ht]
+      rfl
+    have h2 : c (Multiplicative.ofAdd y) =
+        sAdeleSchwartzToGlobal F S k₀ (Multiplicative.ofAdd x) :=
+      (LinearMap.congr_fun key (e.symm (sAdeleSchwartzToGlobal F S k₀))).trans
+        (congrArg (fun φ : ℬ(AdeleRing (𝓞 F) F) ↦
+          φ (Multiplicative.ofAdd x)) (e.apply_symm_apply _))
+    rw [h2, sAdeleSchwartzToGlobal_apply, hp, hk₀]
+    by_cases hy : ∀ w, y w ∈ w.val.adicCompletionIntegers F
+    · rw [ite_eq_left hy, ite_eq_left fun w hw ↦ by rw [hx w hw]; exact hy ⟨w, hw⟩]
+    · rw [ite_eq_right hy, ite_eq_right fun h ↦ hy fun w ↦ by rw [← hx w.val w.2]; exact h w.val w.2]
+  have hslice (a : ℬₛ(S)) : e (a ⊗ₜ[ℂ] c) = sAdeleSchwartzToGlobal F S a := by
+    apply Subtype.ext
+    funext x
+    change e (a ⊗ₜ[ℂ] c) (Multiplicative.ofAdd x.toAdd) =
+      sAdeleSchwartzToGlobal F S a (Multiplicative.ofAdd x.toAdd)
+    rw [he a c x.toAdd, hc, sAdeleSchwartzToGlobal_apply]
+    by_cases hx : ∀ w : V, w ∉ S → x.toAdd.2 w ∈ w.adicCompletionIntegers F
+    · rw [ite_eq_left hx, ite_eq_left (show ∀ w : {w : V // w ∉ S},
+        finiteAdeleTailProjection F S x.toAdd.2 w ∈ w.val.adicCompletionIntegers F from
+          fun w ↦ hx w.val w.2), mul_one]
+    · rw [ite_eq_right hx, ite_eq_right (show ¬ ∀ w : {w : V // w ∉ S},
+        finiteAdeleTailProjection F S x.toAdd.2 w ∈ w.val.adicCompletionIntegers F from
+          fun h ↦ hx fun w hw ↦ h ⟨w, hw⟩), mul_zero]
+  rw [← hslice k, ← hslice (sAdelePrincipalValue F h₀ k)]
+  exact adelePrincipalValue_tmul h₀ k c
+
+/-- On test functions, insertion of an S-local stage intertwines the S-local and the
+global principal values. A nonzero test, normalized at a point where it does not vanish,
+supplies the slice that identifies the integer tail indicator. -/
+private theorem sLocalThetaPrincipalValue_toGlobal_tests {S₀ S : Finset V} (h₀ : S₀ ⊆ S) :
+    (sAdeleSchwartzToGlobal F S).comp (sAdelePrincipalValue F h₀) =
+      (adelePrincipalValue F S₀).comp (sAdeleSchwartzToGlobal F S) := by
+  apply LinearMap.ext
+  intro k
+  by_cases hk : k = 0
+  · rw [hk, map_zero, map_zero]
+  · obtain ⟨x, hx⟩ : ∃ x : Multiplicative (SAdeleRing F S), k x ≠ 0 := by
+      by_contra h
+      apply hk
+      apply Subtype.ext
+      funext x
+      exact not_not.mp fun hx ↦ h ⟨x, hx⟩
+    have hk₀ : ((k x)⁻¹ • k) (Multiplicative.ofAdd x.toAdd) = 1 := inv_mul_cancel₀ hx
+    exact (sLocalThetaPrincipalValue_toGlobal_slice h₀ _ x.toAdd hk₀ k).symm
 
 /-- Paper: (5.3.1.10), p. 242.
 The global principal value preserves the kernel of theta averaging. -/
 theorem adelePrincipalValue_preserves_thetaKernel (S₀ : Finset V) :
-    K𝔽 ≤ (K𝔽).comap (adelePrincipalValue F S₀) := by sorry
+    K𝔽 ≤ (K𝔽).comap (adelePrincipalValue F S₀) := by
+  classical
+  intro f hf
+  change adelePrincipalValue F S₀ f ∈ K𝔽
+  obtain ⟨U, g, hg⟩ := sAdeleSchwartzToGlobal_exhaustive F f
+  let T := U ∪ S₀
+  have hu : U ⊆ T := Finset.subset_union_left
+  have h₀ : S₀ ⊆ T := Finset.subset_union_right
+  let k := sAdeleSchwartzTransition F hu g
+  have hk : sAdeleSchwartzToGlobal F T k = f :=
+    (LinearMap.congr_fun (sAdeleSchwartzToGlobal_comp F hu) g).trans hg
+  have hlocal : k ∈ Kₛ(T) := by
+    apply sLocalThetaToGlobal_reflects_kernel (F := F) (S := T)
+    change sAdeleSchwartzToGlobal F T k ∈ K𝔽
+    rwa [hk]
+  have hcomm : sAdeleSchwartzToGlobal F T (sAdelePrincipalValue F h₀ k) =
+      adelePrincipalValue F S₀ (sAdeleSchwartzToGlobal F T k) :=
+    LinearMap.congr_fun (sLocalThetaPrincipalValue_toGlobal_tests h₀) k
+  rw [← hk, ← hcomm]
+  exact sLocalThetaToGlobal_preserves_kernel (F := F) (S := T)
+    (sAdelePrincipalValue_preserves_thetaKernel h₀ hlocal)
 
 variable (F) in
 /-- Paper: (5.3.1.9), p. 242.
@@ -1288,14 +1743,6 @@ The S-local principal value on theta classes is a closed topological embedding. 
 theorem sLocalThetaPrincipalValue_isClosedEmbedding {S S₀ : Finset V} (h₀ : S₀ ⊆ S)
     (hn : S₀.Nonempty) :
     IsClosedEmbedding (sLocalThetaPrincipalValue F h₀) := by sorry
-
--- TODO(paper-gap): The proof of global closed range claims that the image is contained in
--- any fixed S-stage. This does not follow from stage compatibility and fails at larger stages.
-
-/-- Paper: Lemma 5.3.1.5, p. 242.
-The global principal value on theta classes is a closed topological embedding. -/
-theorem globalThetaPrincipalValue_isClosedEmbedding {S₀ : Finset V} (hn : S₀.Nonempty) :
-    IsClosedEmbedding (globalThetaPrincipalValue F S₀) := by sorry
 
 private theorem sLocalThetaPrincipalValue_transition_ext {ι A X Y : Type*} {M : ι → Type*}
     [TopologicalSpace A] [AddCommGroup A] [Module ℂ A] [TopologicalSpace X]
@@ -1418,99 +1865,6 @@ theorem sLocalThetaPrincipalValue_transition {S₀ S T : Finset V}
   unfold sLocalThetaTransition sLocalThetaPrincipalValue
   apply sLocalThetaPrincipalValue_transition_mapQ
   exact sLocalThetaPrincipalValue_transition_tests h₀ hST
-
-open Classical in
-/-- Through a stage containing the selected places, the global principal value of an
-inserted test is the insertion of the S-local principal value. The integer tail indicator
-is obtained by slicing the inserted test `k₀` at a point `p` where its value is one. -/
-private theorem sLocalThetaPrincipalValue_toGlobal_slice {S₀ S : Finset V}
-    (h₀ : S₀ ⊆ S) (k₀ : ℬₛ(S)) (p : SAdeleRing F S)
-    (hk₀ : k₀ (Multiplicative.ofAdd p) = 1) (k : ℬₛ(S)) :
-    adelePrincipalValue F S₀ (sAdeleSchwartzToGlobal F S k) =
-      sAdeleSchwartzToGlobal F S (sAdelePrincipalValue F h₀ k) := by
-  let Tl := ℬ(FiniteAdeleTail F S)
-  let e := (sAdeleTailSchwartz_inductiveTensor_equiv F S).choose
-  have he := (sAdeleTailSchwartz_inductiveTensor_equiv F S).choose_spec
-  let ev : ℬₛ(S) →ₗ[ℂ] ℂ :=
-    { toFun := fun a ↦ a (Multiplicative.ofAdd p)
-      map_add' := fun _ _ ↦ rfl
-      map_smul' := fun _ _ ↦ rfl }
-  let L : ℬₛ(S) ⊗[ℂ] Tl →ₗ[ℂ] Tl := TensorProduct.lift ((LinearMap.lsmul ℂ Tl).comp ev)
-  let c : Tl := L (e.symm (sAdeleSchwartzToGlobal F S k₀))
-  have hc (y : FiniteAdeleTail F S) : c (Multiplicative.ofAdd y) =
-      if ∀ w, y w ∈ w.val.adicCompletionIntegers F then 1 else 0 := by
-    let f : ∀ w : V, w.adicCompletion F := fun w ↦ if h : w ∈ S then p.2 ⟨w, h⟩ else y ⟨w, h⟩
-    have hf : ∀ᶠ w in Filter.cofinite, f w ∈ w.adicCompletionIntegers F := by
-      filter_upwards [S.eventually_cofinite_notMem, Filter.eventually_comap.mp
-        (y.2.filter_mono (Filter.comap_cofinite_le Subtype.val))] with w hw h
-      simp only [f, dite_eq_right hw]
-      exact h ⟨w, hw⟩ rfl
-    let z : FiniteAdeleRing (𝓞 F) F := ⟨f, hf⟩
-    let x : AdeleRing (𝓞 F) F := (p.1, z)
-    have hx (w : V) (hw : w ∉ S) : x.2 w = y ⟨w, hw⟩ := dite_eq_right hw
-    have hp : adeleProjection F S x = p :=
-      Prod.ext rfl (funext fun w ↦ (dite_eq_left w.2 : f w.val = p.2 w))
-    have ht : finiteAdeleTailProjection F S x.2 = y := by
-      apply RestrictedProduct.ext
-      intro w
-      exact dite_eq_right w.2
-    let evy : Tl →ₗ[ℂ] ℂ :=
-      { toFun := fun b ↦ b (Multiplicative.ofAdd y)
-        map_add' := fun _ _ ↦ rfl
-        map_smul' := fun _ _ ↦ rfl }
-    let evx : ℬ(AdeleRing (𝓞 F) F) →ₗ[ℂ] ℂ :=
-      { toFun := fun b ↦ b (Multiplicative.ofAdd x)
-        map_add' := fun _ _ ↦ rfl
-        map_smul' := fun _ _ ↦ rfl }
-    have key : evy ∘ₗ L = evx ∘ₗ (e.toLinearMap : InductiveTensor ℬₛ(S) Tl →ₗ[ℂ] _) := by
-      refine TensorProduct.ext' fun a b ↦ ?_
-      change (a (Multiplicative.ofAdd p) • b) (Multiplicative.ofAdd y) =
-        e (a ⊗ₜ[ℂ] b) (Multiplicative.ofAdd x)
-      rw [he a b x, hp, ht]
-      rfl
-    have h2 : c (Multiplicative.ofAdd y) =
-        sAdeleSchwartzToGlobal F S k₀ (Multiplicative.ofAdd x) :=
-      (LinearMap.congr_fun key (e.symm (sAdeleSchwartzToGlobal F S k₀))).trans
-        (congrArg (fun φ : ℬ(AdeleRing (𝓞 F) F) ↦
-          φ (Multiplicative.ofAdd x)) (e.apply_symm_apply _))
-    rw [h2, sAdeleSchwartzToGlobal_apply, hp, hk₀]
-    by_cases hy : ∀ w, y w ∈ w.val.adicCompletionIntegers F
-    · rw [ite_eq_left hy, ite_eq_left fun w hw ↦ by rw [hx w hw]; exact hy ⟨w, hw⟩]
-    · rw [ite_eq_right hy, ite_eq_right fun h ↦ hy fun w ↦ by rw [← hx w.val w.2]; exact h w.val w.2]
-  have hslice (a : ℬₛ(S)) : e (a ⊗ₜ[ℂ] c) = sAdeleSchwartzToGlobal F S a := by
-    apply Subtype.ext
-    funext x
-    change e (a ⊗ₜ[ℂ] c) (Multiplicative.ofAdd x.toAdd) =
-      sAdeleSchwartzToGlobal F S a (Multiplicative.ofAdd x.toAdd)
-    rw [he a c x.toAdd, hc, sAdeleSchwartzToGlobal_apply]
-    by_cases hx : ∀ w : V, w ∉ S → x.toAdd.2 w ∈ w.adicCompletionIntegers F
-    · rw [ite_eq_left hx, ite_eq_left (show ∀ w : {w : V // w ∉ S},
-        finiteAdeleTailProjection F S x.toAdd.2 w ∈ w.val.adicCompletionIntegers F from
-          fun w ↦ hx w.val w.2), mul_one]
-    · rw [ite_eq_right hx, ite_eq_right (show ¬ ∀ w : {w : V // w ∉ S},
-        finiteAdeleTailProjection F S x.toAdd.2 w ∈ w.val.adicCompletionIntegers F from
-          fun h ↦ hx fun w hw ↦ h ⟨w, hw⟩), mul_zero]
-  rw [← hslice k, ← hslice (sAdelePrincipalValue F h₀ k)]
-  exact adelePrincipalValue_tmul h₀ k c
-
-/-- On test functions, insertion of an S-local stage intertwines the S-local and the
-global principal values. A nonzero test, normalized at a point where it does not vanish,
-supplies the slice that identifies the integer tail indicator. -/
-private theorem sLocalThetaPrincipalValue_toGlobal_tests {S₀ S : Finset V} (h₀ : S₀ ⊆ S) :
-    (sAdeleSchwartzToGlobal F S).comp (sAdelePrincipalValue F h₀) =
-      (adelePrincipalValue F S₀).comp (sAdeleSchwartzToGlobal F S) := by
-  apply LinearMap.ext
-  intro k
-  by_cases hk : k = 0
-  · rw [hk, map_zero, map_zero]
-  · obtain ⟨x, hx⟩ : ∃ x : Multiplicative (SAdeleRing F S), k x ≠ 0 := by
-      by_contra h
-      apply hk
-      apply Subtype.ext
-      funext x
-      exact not_not.mp fun hx ↦ h ⟨x, hx⟩
-    have hk₀ : ((k x)⁻¹ • k) (Multiplicative.ofAdd x.toAdd) = 1 := inv_mul_cancel₀ hx
-    exact (sLocalThetaPrincipalValue_toGlobal_slice h₀ _ x.toAdd hk₀ k).symm
 
 /-- Paper: Lemma 5.3.1.5, p. 242.
 The local and global principal value operators commute with insertion of an S-local theta stage. -/
@@ -1826,6 +2180,350 @@ theorem globalThetaPrincipalValue_isotypicAverage (S₀ : Finset V)
       (globalThetaPrincipalValue_isotypicAverage_empty (F := F))
       (fun S hn y ↦ globalThetaPrincipalValue_isotypicAverage_nonempty (F := F) S hn χ y) S₀ x
 
+/-- Through an inducing linear map into a polynormable space, every continuous seminorm of the
+source is bounded by a continuous seminorm of the target. -/
+private theorem globalThetaPrincipalValue_isClosedEmbedding_bound {X E : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [PolynormableSpace ℂ E]
+    (f : X →ₗ[ℂ] E) (hf : IsInducing f) (s : Seminorm ℂ X) (hs : Continuous s) :
+    ∃ t : Seminorm ℂ E, Continuous t ∧ ∀ z, s z ≤ t (f z) := by
+  have : IsTopologicalAddGroup E := PolynormableSpace.isTopologicalAddGroup ℂ E
+  obtain ⟨F, C, -, hle⟩ :=
+    Seminorm.bound_of_continuous (hf.withSeminorms (PolynormableSpace.withSeminorms ℂ E)) s hs
+  refine ⟨C • F.sup (fun p : {p : Seminorm ℂ E // Continuous p} ↦ p.1),
+    (Seminorm.continuous_finsetSup fun t _ ↦ t.2).const_smul _, fun z ↦ (hle z).trans ?_⟩
+  simp only [smul_apply, Seminorm.finset_sup_apply, SeminormFamily.comp_apply,
+    Seminorm.comp_apply, le_refl]
+
+/-- An endomorphism of a space exhausted by closed embedded stages is a closed embedding when it
+restricts to a closed embedding on each stage and commutes with continuous projections onto the
+stages that fix every earlier stage. -/
+private theorem globalThetaPrincipalValue_isClosedEmbedding_ofProjections {E : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [hE : PolynormableSpace ℂ E]
+    {X : ℕ → Type*} [∀ n, AddCommGroup (X n)] [∀ n, Module ℂ (X n)] [∀ n, TopologicalSpace (X n)]
+    (ι : ∀ n, X n →L[ℂ] E) (hι : ∀ n, IsClosedEmbedding (ι n))
+    (P : E →L[ℂ] E) (Pn : ∀ n, X n →L[ℂ] X n) (hPn : ∀ n, IsClosedEmbedding (Pn n))
+    (hP : ∀ n z, P (ι n z) = ι n (Pn n z))
+    (pr : ℕ → E →L[ℂ] E) (hmem : ∀ n x, pr n x ∈ range (ι n))
+    (hfix : ∀ n m, n ≤ m → ∀ z, pr m (ι n z) = ι n z)
+    (hprP : ∀ n x, pr n (P x) = P (pr n x))
+    (hexh : ∀ x, ∃ n z, ι n z = x)
+    (hfin : ∀ q : Seminorm ℂ E, (∀ n, Continuous (q ∘ ι n)) → Continuous q) :
+    IsClosedEmbedding P := by
+  have : IsTopologicalAddGroup E := PolynormableSpace.isTopologicalAddGroup ℂ E
+  have hPι (n : ℕ) : IsClosedEmbedding (fun z ↦ P (ι n z)) := by
+    have h : (fun z ↦ P (ι n z)) = ι n ∘ Pn n := funext (hP n)
+    rw [h]
+    exact (hι n).comp (hPn n)
+  -- Injectivity is checked on a stage containing the vector.
+  have hinj : Injective P := by
+    refine (injective_iff_map_eq_zero P).mpr fun x hx ↦ ?_
+    obtain ⟨n, z, rfl⟩ := hexh x
+    have hz : z = 0 := (hPι n).injective (by simpa using hx)
+    rw [hz, map_zero]
+  -- A limit point of the range is fixed by the projection of its stage, which maps the
+  -- range into the closed range of the stage.
+  have hclosed : IsClosed (range P) := by
+    refine isClosed_of_closure_subset fun y hy ↦ ?_
+    obtain ⟨m, z, rfl⟩ := hexh y
+    have hmaps : MapsTo (pr m) (range P) (range fun w ↦ P (ι m w)) := by
+      rintro _ ⟨x, rfl⟩
+      obtain ⟨w, hw⟩ := hmem m x
+      exact ⟨w, by rw [hprP, ← hw]⟩
+    have h := map_mem_closure (pr m).continuous hy hmaps
+    rw [(hPι m).isClosed_range.closure_eq, hfix m m le_rfl] at h
+    obtain ⟨w, hw⟩ := h
+    exact ⟨ι m w, hw⟩
+  -- The successive differences of the projections split each vector into finitely many
+  -- stage pieces, on each of which the stage estimate applies.
+  let D : ℕ → E →L[ℂ] E := fun n ↦ Nat.casesOn n (pr 0) fun k ↦ pr (k + 1) - pr k
+  have hDsum (m : ℕ) (x : E) : ∑ n ∈ Finset.range (m + 1), D n x = pr m x := by
+    induction m with
+    | zero => simp [D]
+    | succ m ih =>
+      rw [Finset.sum_range_succ, ih]
+      simp [D]
+  have hDzero (m : ℕ) (z : X m) (n : ℕ) (hn : m < n) : D n (ι m z) = 0 := by
+    obtain ⟨k, rfl⟩ : ∃ k, n = k + 1 := ⟨n - 1, by omega⟩
+    simp only [D, sub_apply]
+    rw [hfix m (k + 1) (by omega), hfix m k (by omega), sub_self]
+  have hDmem (n : ℕ) (x : E) : ∃ w, ι n w = D n x := by
+    cases n with
+    | zero => exact hmem 0 x
+    | succ k =>
+      obtain ⟨a, ha⟩ := hmem (k + 1) x
+      obtain ⟨b, hb⟩ := hmem k x
+      obtain ⟨c, hc⟩ := hmem (k + 1) (ι k b)
+      rw [hfix k (k + 1) (Nat.le_succ k)] at hc
+      exact ⟨a - c, by simp [D, ha, hb, hc]⟩
+  have hDP (n : ℕ) (x : E) : D n (P x) = P (D n x) := by
+    cases n with
+    | zero => exact hprP 0 x
+    | succ k => simp [D, hprP]
+  have key (p : Seminorm ℂ E) (hp : Continuous p) :
+      ∃ q : Seminorm ℂ E, Continuous q ∧ ∀ x, p x ≤ q (P x) := by
+    have hb (n : ℕ) : ∃ t : Seminorm ℂ E, Continuous t ∧ ∀ z, p (ι n z) ≤ t (P (ι n z)) := by
+      obtain ⟨t, ht, hle⟩ := globalThetaPrincipalValue_isClosedEmbedding_bound
+        ((P : E →ₗ[ℂ] E).comp (ι n : X n →ₗ[ℂ] E)) (hPι n).isInducing
+        (p.comp (ι n : X n →ₗ[ℂ] E)) (hp.comp (ι n).continuous)
+      exact ⟨t, ht, hle⟩
+    choose t ht htle using hb
+    have hsupp (x : E) : ∃ m, ∀ n, m < n → D n x = 0 := by
+      obtain ⟨m, z, rfl⟩ := hexh x
+      exact ⟨m, hDzero m z⟩
+    have hsumm (x : E) : Summable fun n ↦ t n (D n x) := by
+      obtain ⟨m, hm⟩ := hsupp x
+      refine summable_of_ne_finset_zero (s := Finset.range (m + 1)) fun n hn ↦ ?_
+      rw [Finset.mem_range, not_lt] at hn
+      rw [hm n (by omega), map_zero]
+    let q : Seminorm ℂ E := Seminorm.of (fun x ↦ ∑' n, t n (D n x))
+      (fun x y ↦ by
+        have h := (hsumm x).add (hsumm y)
+        calc ∑' n, t n (D n (x + y)) ≤ ∑' n, (t n (D n x) + t n (D n y)) :=
+              (hsumm (x + y)).tsum_le_tsum (fun n ↦ by rw [map_add]; exact map_add_le_add _ _ _) h
+          _ = _ := (hsumm x).tsum_add (hsumm y))
+      (fun a x ↦ by
+        simp only [map_smul, map_smul_eq_mul]
+        exact tsum_mul_left)
+    have hq : Continuous q := by
+      refine hfin q fun k ↦ ?_
+      have h : (fun z ↦ q (ι k z)) = fun z ↦ ∑ n ∈ Finset.range (k + 1), t n (D n (ι k z)) := by
+        funext z
+        refine tsum_eq_sum fun n hn ↦ ?_
+        rw [Finset.mem_range, not_lt] at hn
+        rw [hDzero k z n (by omega), map_zero]
+      change Continuous (fun z ↦ q (ι k z))
+      rw [h]
+      exact continuous_finsetSum _ fun n _ ↦ (ht n).comp ((D n).continuous.comp (ι k).continuous)
+    refine ⟨q, hq, fun x ↦ ?_⟩
+    obtain ⟨m, z, rfl⟩ := hexh x
+    calc p (ι m z) = p (∑ n ∈ Finset.range (m + 1), D n (ι m z)) := by
+          rw [hDsum, hfix m m le_rfl]
+      _ ≤ ∑ n ∈ Finset.range (m + 1), p (D n (ι m z)) :=
+          Finset.le_sum_of_subadditive p (map_zero p).le (map_add_le_add p) _ _
+      _ ≤ ∑ n ∈ Finset.range (m + 1), t n (D n (P (ι m z))) := by
+          refine Finset.sum_le_sum fun n _ ↦ ?_
+          obtain ⟨w, hw⟩ := hDmem n (ι m z)
+          rw [hDP, ← hw]
+          exact htle n w
+      _ ≤ ∑' n, t n (D n (P (ι m z))) :=
+          (hsumm _).sum_le_tsum _ fun n _ ↦ apply_nonneg _ _
+  have hind : IsInducing P := by
+    rw [IsTopologicalAddGroup.isInducing_iff_nhds_zero]
+    refine le_antisymm ?_ (fun U hU ↦ ?_)
+    · have h := P.continuous.tendsto 0
+      rw [map_zero] at h
+      exact h.le_comap
+    · obtain ⟨p, hp, hpU⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ E).mem_iff.mp hU
+      obtain ⟨q, hq, hpq⟩ := key p hp
+      refine ⟨q.ball 0 1, Seminorm.ball_mem_nhds hq one_pos, fun x hx ↦ hpU ?_⟩
+      rw [mem_preimage, Seminorm.mem_ball_zero] at hx
+      exact (Seminorm.mem_ball_zero p).mpr ((hpq x).trans_lt hx)
+  exact ⟨⟨hind, hinj⟩, hclosed⟩
+
+/-- Continuous linear left inverses of the steps of a chain of stages, commuting with operators
+compatible with the stage maps, assemble into continuous projections onto the stages that fix
+the earlier stages and commute with the operator on the limit. -/
+private theorem globalThetaPrincipalValue_isClosedEmbedding_projections {E : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    {X : ℕ → Type*} [∀ n, AddCommGroup (X n)] [∀ n, Module ℂ (X n)] [∀ n, TopologicalSpace (X n)]
+    [hX : ∀ n, PolynormableSpace ℂ (X n)]
+    (ι : ∀ n, X n →L[ℂ] E) (hι : ∀ n, Injective (ι n))
+    (j : ∀ n, X n →L[ℂ] X (n + 1)) (hj : ∀ n z, ι (n + 1) (j n z) = ι n z)
+    (r : ∀ n, X (n + 1) →L[ℂ] X n) (hr : ∀ n z, r n (j n z) = z)
+    (P : E →L[ℂ] E) (Pn : ∀ n, X n →L[ℂ] X n) (hP : ∀ n z, P (ι n z) = ι n (Pn n z))
+    (hrP : ∀ n z, r n (Pn (n + 1) z) = Pn n (r n z))
+    (hexh : ∀ x, ∃ n z, ι n z = x)
+    (hfin : ∀ (N : ℕ) (q : Seminorm ℂ E), (∀ d, Continuous (q ∘ ι (N + d))) → Continuous q) :
+    ∃ pr : ℕ → E →L[ℂ] E, (∀ n x, pr n x ∈ range (ι n)) ∧
+      (∀ n m, n ≤ m → ∀ z, pr m (ι n z) = ι n z) ∧ (∀ n x, pr n (P x) = P (pr n x)) := by
+  have hnest (a b : ℕ) (hab : a ≤ b) (z : X a) : ∃ w : X b, ι b w = ι a z := by
+    induction b, hab using Nat.le_induction with
+    | base => exact ⟨z, rfl⟩
+    | succ b _ ih =>
+      obtain ⟨w, hw⟩ := ih
+      exact ⟨j b w, (hj b w).trans hw⟩
+  -- The composite of the left inverses from stage `n + d` down to stage `n`.
+  let R (n : ℕ) : ∀ d, X (n + d) →L[ℂ] X n := fun d ↦
+    Nat.rec (motive := fun d ↦ X (n + d) →L[ℂ] X n) (ContinuousLinearMap.id ℂ (X n))
+      (fun d R ↦ R.comp (r (n + d))) d
+  have hRsucc (n d : ℕ) (z : X (n + (d + 1))) : R n (d + 1) z = R n d (r (n + d) z) := rfl
+  have hRP (n d : ℕ) (z : X (n + d)) : R n d (Pn (n + d) z) = Pn n (R n d z) := by
+    induction d with
+    | zero => rfl
+    | succ d ih =>
+      have h := hrP (n + d) z
+      exact (congrArg (R n d) h).trans (ih (r (n + d) z))
+  -- The composite only depends on the vector of the limit that a stage vector represents.
+  have hcons (n d : ℕ) (z : X (n + d)) (d' : ℕ) (hd : d ≤ d') :
+      ∀ z' : X (n + d'), ι (n + d') z' = ι (n + d) z → R n d' z' = R n d z := by
+    induction d', hd using Nat.le_induction with
+    | base => exact fun z' h ↦ congrArg (R n d) (hι _ h)
+    | succ d' hdd' ih =>
+      intro z' h
+      obtain ⟨w, hw⟩ := hnest (n + d) (n + d') (by omega) z
+      have hz' : z' = j (n + d') w := hι (n + d' + 1) (h.trans (hw.symm.trans (hj _ w).symm))
+      rw [hz']
+      exact (congrArg (R n d') (hr (n + d') w)).trans (ih w hw)
+  have hcons' (n d d' : ℕ) (z : X (n + d)) (z' : X (n + d'))
+      (h : ι (n + d') z' = ι (n + d) z) : R n d' z' = R n d z := by
+    rcases le_total d d' with hd | hd
+    · exact hcons n d z d' hd z' h
+    · exact (hcons n d' z' d hd z h.symm).symm
+  have hrep (n : ℕ) (x : E) : ∃ d, ∃ z : X (n + d), ι (n + d) z = x := by
+    obtain ⟨k, z, rfl⟩ := hexh x
+    obtain ⟨w, hw⟩ := hnest k (n + k) (by omega) z
+    exact ⟨k, w, hw⟩
+  have hcommon (n : ℕ) (x y : E) :
+      ∃ d, ∃ a b : X (n + d), ι (n + d) a = x ∧ ι (n + d) b = y := by
+    obtain ⟨d₁, z₁, rfl⟩ := hrep n x
+    obtain ⟨d₂, z₂, rfl⟩ := hrep n y
+    obtain ⟨a, ha⟩ := hnest (n + d₁) (n + max d₁ d₂) (by omega) z₁
+    obtain ⟨b, hb⟩ := hnest (n + d₂) (n + max d₁ d₂) (by omega) z₂
+    exact ⟨max d₁ d₂, a, b, ha, hb⟩
+  choose dx zx hzx using hrep
+  have hQ (n d : ℕ) (z : X (n + d)) : R n (dx n (ι (n + d) z)) (zx n (ι (n + d) z)) = R n d z :=
+    hcons' n d _ z _ (hzx n _)
+  let Q (n : ℕ) : E →ₗ[ℂ] X n :=
+    { toFun := fun x ↦ R n (dx n x) (zx n x)
+      map_add' := fun x y ↦ by
+        obtain ⟨d, a, b, rfl, rfl⟩ := hcommon n x y
+        have h := hQ n d (a + b)
+        rw [map_add] at h
+        rw [h, hQ, hQ, map_add]
+      map_smul' := fun c x ↦ by
+        obtain ⟨d, z, rfl⟩ : ∃ d, ∃ z : X (n + d), ι (n + d) z = x := ⟨dx n x, zx n x, hzx n x⟩
+        have h := hQ n d (c • z)
+        rw [map_smul] at h
+        rw [h, hQ, map_smul]
+        rfl }
+  have hQapp (n d : ℕ) (z : X (n + d)) : Q n (ι (n + d) z) = R n d z := hQ n d z
+  have hQc (n : ℕ) : Continuous (Q n) := by
+    refine (PolynormableSpace.withSeminorms ℂ (X n)).continuous_of_continuous_comp (Q n)
+      fun s ↦ hfin n ((s.1).comp (Q n)) fun d ↦ ?_
+    have h : ⇑((s.1).comp (Q n)) ∘ ι (n + d) = s.1 ∘ R n d :=
+      funext fun z ↦ congrArg s.1 (hQapp n d z)
+    rw [h]
+    exact s.2.comp (R n d).continuous
+  refine ⟨fun n ↦ (ι n).comp ⟨Q n, hQc n⟩, fun n x ↦ ⟨_, rfl⟩, fun n m hnm z ↦ ?_,
+    fun n x ↦ ?_⟩
+  · obtain ⟨w, hw⟩ := hnest n m hnm z
+    change ι m (Q m (ι n z)) = ι n z
+    rw [← hw]
+    exact congrArg (ι m) (hQapp m 0 w)
+  · obtain ⟨d, z, rfl⟩ : ∃ d, ∃ z : X (n + d), ι (n + d) z = x := ⟨dx n x, zx n x, hzx n x⟩
+    change ι n (Q n (P (ι (n + d) z))) = P (ι n (Q n (ι (n + d) z)))
+    rw [hP (n + d), hP n, hQapp, hQapp, hRP]
+
+/-- The finite places of a number field form a countable set, since their ideals are finitely
+generated over the countable ring of integers. -/
+private theorem globalThetaPrincipalValue_isClosedEmbedding_countable : Countable V := by
+  let : Countable F := (Module.finBasis ℚ F).equivFun.injective.countable
+  let : Countable (𝓞 F) := (RingOfIntegers.coe_injective (K := F)).countable
+  have h : Function.Surjective (fun s : Finset (𝓞 F) ↦ Ideal.span (s : Set (𝓞 F))) :=
+    fun I ↦ IsNoetherian.noetherian I
+  let : Countable (Ideal (𝓞 F)) := h.countable
+  exact (show Function.Injective (HeightOneSpectrum.asIdeal (R := 𝓞 F)) from fun _ _ h ↦
+    HeightOneSpectrum.ext h).countable
+
+open Classical in
+/-- Paper: Lemma 5.3.1.5, proof, p. 242.
+At a stage `S` containing the selected places `S₀`, the transition of theta classes to the stage
+`T = insert v S` with one more finite place `v` has a continuous linear left inverse that
+commutes with the principal value.
+
+`sLocalThetaTransition_exists_leftInverse_insert` gives a continuous left inverse: it reads the
+theta function of a class at the S-ideles completed at `v` by a unit, and by a unit times a fixed
+`c` with `Valued.v c = WithZero.exp 1`, and averages the difference over the units at `v`. On the
+class of a test `f ⊗ h`, with `f` on the stage `S` and `h` at `v`, this is a finite combination of
+the classes of translates of `f` by `(S ∪ {v})`-units. The principal value acts as the identity at
+`v` and commutes with translation by S-ideles, so it commutes with this left inverse.
+With the closed embeddings on the stages, these left inverses give the global closed embedding
+`globalThetaPrincipalValue_isClosedEmbedding`. They replace the printed step that the global
+range is the image of the range at one fixed stage.
+The larger stage `T` is an argument with `hT : T = insert v S`, so that the lemma applies to
+stages that equal `insert v S` without being written that way. -/
+private theorem globalThetaPrincipalValue_isClosedEmbedding_retraction {S₀ S T : Finset V}
+    (h₀ : S₀ ⊆ S) (hST : S ⊆ T) (v : V) (hv : v ∉ S) (hT : T = insert v S) :
+    ∃ r : Θₛ(T) →L[ℂ] Θₛ(S),
+      Function.LeftInverse r (sLocalThetaTransition (F := F) hST) ∧
+      ∀ x, r (sLocalThetaPrincipalValue F (h₀.trans hST) x) =
+        sLocalThetaPrincipalValue F h₀ (r x) := by sorry
+
+-- TODO(paper-gap): The proof of global closed range claims that the image is contained in
+-- any fixed S-stage. This does not follow from stage compatibility and fails at larger stages.
+
+/-- Paper: Lemma 5.3.1.5, p. 242.
+The global principal value on theta classes is a closed topological embedding. -/
+theorem globalThetaPrincipalValue_isClosedEmbedding {S₀ : Finset V} (hn : S₀.Nonempty) :
+    IsClosedEmbedding (globalThetaPrincipalValue F S₀) := by
+  classical
+  have : Countable V := globalThetaPrincipalValue_isClosedEmbedding_countable (F := F)
+  have : Nonempty V := ⟨hn.choose⟩
+  obtain ⟨e, he⟩ := exists_surjective_nat V
+  -- A cofinal chain of stages that starts at `S₀` and adds one place at a time.
+  let S : ℕ → Finset V := fun n ↦
+    Nat.rec (motive := fun _ ↦ Finset V) S₀ (fun k T ↦ insert (e k) T) n
+  have hstep (n : ℕ) : S n ⊆ S (n + 1) := Finset.subset_insert (e n) (S n)
+  have hmono : Monotone S := monotone_nat_of_le_succ hstep
+  have h₀ (n : ℕ) : S₀ ⊆ S n := hmono (Nat.zero_le n)
+  have hcof (T : Finset V) (N : ℕ) : ∃ d, T ⊆ S (N + d) := by
+    choose k hk using he
+    refine ⟨T.sup fun v ↦ k v + 1, fun v hv ↦ ?_⟩
+    have hle : k v + 1 ≤ N + T.sup fun v ↦ k v + 1 :=
+      (Finset.le_sup (f := fun v ↦ k v + 1) hv).trans (Nat.le_add_left _ _)
+    have hv' : e (k v) ∈ S (k v + 1) := Finset.mem_insert_self (e (k v)) (S (k v))
+    rw [hk v] at hv'
+    exact hmono hle hv'
+  let ι (n : ℕ) : Θₛ(S n) →L[ℂ] Θ𝔽 :=
+    ⟨sLocalThetaToGlobal F (S n), sLocalThetaToGlobal_continuous⟩
+  let j (n : ℕ) : Θₛ(S n) →L[ℂ] Θₛ(S (n + 1)) :=
+    ⟨sLocalThetaTransition (hstep n), sLocalThetaTransition_continuous (hstep n)⟩
+  let Pn (n : ℕ) : Θₛ(S n) →L[ℂ] Θₛ(S n) :=
+    ⟨sLocalThetaPrincipalValue F (h₀ n), sLocalThetaPrincipalValue_continuous (h₀ n)⟩
+  let P : Θ𝔽 →L[ℂ] Θ𝔽 := ⟨globalThetaPrincipalValue F S₀, globalThetaPrincipalValue_continuous S₀⟩
+  have hret (n : ℕ) : ∃ r : Θₛ(S (n + 1)) →L[ℂ] Θₛ(S n),
+      Function.LeftInverse r (sLocalThetaTransition (F := F) (hstep n)) ∧
+      ∀ z, r (sLocalThetaPrincipalValue F ((h₀ n).trans (hstep n)) z) =
+        sLocalThetaPrincipalValue F (h₀ n) (r z) := by
+    by_cases hv : e n ∈ S n
+    · -- The step adds no place, and the transition back is a left inverse.
+      have hsub : S (n + 1) ⊆ S n := Finset.insert_subset hv subset_rfl
+      refine ⟨⟨sLocalThetaTransition hsub, sLocalThetaTransition_continuous hsub⟩,
+        fun z ↦ sLocalThetaToGlobal_injective (F := F) (S := S n) ?_,
+        fun z ↦ LinearMap.congr_fun (sLocalThetaPrincipalValue_transition (h₀ (n + 1)) hsub hn) z⟩
+      exact (LinearMap.congr_fun (sLocalThetaToGlobal_comp hsub) _).trans
+        (LinearMap.congr_fun (sLocalThetaToGlobal_comp (hstep n)) z)
+    · exact globalThetaPrincipalValue_isClosedEmbedding_retraction (h₀ n) (hstep n) (e n) hv rfl
+  choose r hr hrP using hret
+  have hexh (x : Θ𝔽) : ∃ n, ∃ z : Θₛ(S n), ι n z = x := by
+    obtain ⟨T, y, rfl⟩ := sLocalThetaToGlobal_exhaustive x
+    obtain ⟨d, hd⟩ := hcof T 0
+    exact ⟨0 + d, sLocalThetaTransition hd y, LinearMap.congr_fun (sLocalThetaToGlobal_comp hd) y⟩
+  -- Seminorms continuous on every stage are continuous on the global quotient.
+  have hW : WithSeminorms (Subtype.val : {p : Seminorm ℂ Θ𝔽 //
+      ∀ T, Continuous (p ∘ sLocalThetaToGlobal F T)} → Seminorm ℂ Θ𝔽) :=
+    ⟨sLocalThetaToGlobal_finalTopology⟩
+  have hfin (N : ℕ) (q : Seminorm ℂ Θ𝔽) (hq : ∀ d, Continuous (q ∘ ι (N + d))) : Continuous q := by
+    refine hW.continuous_seminorm ⟨q, fun T ↦ ?_⟩
+    obtain ⟨d, hd⟩ := hcof T N
+    have h : q ∘ sLocalThetaToGlobal F T = (q ∘ ι (N + d)) ∘ sLocalThetaTransition hd :=
+      funext fun y ↦ congrArg q (LinearMap.congr_fun (sLocalThetaToGlobal_comp hd) y).symm
+    rw [h]
+    exact (hq d).comp (sLocalThetaTransition_continuous hd)
+  have hP (n : ℕ) (z : Θₛ(S n)) : P (ι n z) = ι n (Pn n z) :=
+    (LinearMap.congr_fun (sLocalThetaPrincipalValue_toGlobal (h₀ n) hn) z).symm
+  obtain ⟨pr, hmem, hfix, hprP⟩ := globalThetaPrincipalValue_isClosedEmbedding_projections
+    (hX := fun n ↦ sLocalAdelicThetaSpace_polynormable) ι
+    (fun n ↦ sLocalThetaToGlobal_injective) j
+    (fun n z ↦ LinearMap.congr_fun (sLocalThetaToGlobal_comp (hstep n)) z) r hr P Pn hP hrP hexh
+    hfin
+  exact globalThetaPrincipalValue_isClosedEmbedding_ofProjections
+    (hE := globalAdelicThetaSpace_polynormable) ι
+    (fun n ↦ ⟨sLocalThetaToGlobal_isEmbedding, sLocalThetaToGlobal_isClosed_range⟩) P Pn
+    (fun n ↦ sLocalThetaPrincipalValue_isClosedEmbedding (h₀ n) hn) hP pr hmem hfix hprP hexh
+    fun q hq ↦ hfin 0 q fun d ↦ hq (0 + d)
+
 end AdelicPrincipalValue
 
 
@@ -2060,13 +2758,211 @@ theorem realDiracDerivative_one (f : 𝓢(ℝ, ℂ)) :
   change (-1 : ℂ) ^ 1 • (((SchwartzMap.derivCLM ℂ ℂ) ^ 1) f) 0 = _
   rw [pow_one, pow_one, SchwartzMap.derivCLM_apply, neg_one_smul]
 
+open scoped Manifold in
+/-- A compactly supported test away from zero is a finite sum of tests on open sets
+where the distribution vanishes. -/
+private theorem realTemperedDistribution_zero_of_away (T : StrongDual ℂ 𝓢(ℝ, ℂ))
+    (hT : Distribution.dsupport (⇑T) ⊆ {(0 : ℝ)}) (f : 𝓢(ℝ, ℂ))
+    (hc : HasCompactSupport (f : ℝ → ℂ)) (h0 : 0 ∉ tsupport (f : ℝ → ℂ)) : T f = 0 := by
+  classical
+  let K := tsupport (f : ℝ → ℂ)
+  have hx (x : K) : x.val ∉ Distribution.dsupport (⇑T) := by
+    intro h
+    exact h0 ((Set.mem_singleton_iff.mp (hT h)) ▸ x.property)
+  choose U hv ho hmem using fun x : K ↦ (Distribution.notMem_dsupport_iff x.val).mp (hx x)
+  obtain ⟨s, hs⟩ := hc.elim_finite_subcover U ho fun x hx ↦ mem_iUnion.mpr ⟨⟨x, hx⟩, hmem _⟩
+  obtain ⟨ρ, hρ⟩ := SmoothPartitionOfUnity.exists_isSubordinate 𝓘(ℝ, ℝ)
+    (isClosed_tsupport (f : ℝ → ℂ)) (fun i : s ↦ U i.val) (fun i ↦ ho i.val)
+    (by simpa only [iUnion_subtype] using hs)
+  let g (i : s) : 𝓢(ℝ, ℂ) := (hc.smul_left (f := (ρ i : ℝ → ℝ))).toSchwartzMap
+    ((contMDiff_iff_contDiff.mp (ρ i).contMDiff).smul (f.smooth ⊤))
+  have hz (i : s) : T (g i) = 0 :=
+    hv i.val (g i) ((tsupport_smul_subset_left _ _).trans (hρ i))
+  have hsum : f = ∑ i : s, g i := by
+    ext x
+    simp only [sum_apply]
+    change f x = ∑ i : s, ρ i x • f x
+    rw [← Finset.sum_smul]
+    by_cases h : x ∈ K
+    · rw [← finsum_eq_sum_of_fintype, ρ.sum_eq_one h, one_smul]
+    · rw [image_eq_zero_of_notMem_tsupport h, smul_zero]
+  rw [hsum, map_sum]
+  exact Finset.sum_eq_zero fun i _ ↦ hz i
+
+/-- Repeated mean-value bounds on a ball. Each vanishing derivative at the origin
+contributes one power of its radius. -/
+private theorem realTemperedDistribution_jet_bound (f : 𝓢(ℝ, ℂ)) (ε : ℝ) (hε : 0 ≤ ε)
+    (j d : ℕ) (hjet : ∀ i < d, iteratedDeriv (j + i) (f : ℝ → ℂ) 0 = 0)
+    (x : ℝ) (hx : |x| ≤ ε) :
+    ‖iteratedDeriv j (f : ℝ → ℂ) x‖ ≤ ε ^ d * SchwartzMap.seminorm ℂ 0 (j + d) f := by
+  induction d generalizing j x with
+  | zero => simpa using SchwartzMap.le_seminorm' ℂ 0 j f x
+  | succ d ih =>
+    let K := Metric.closedBall (0 : ℝ) ε
+    have hz : iteratedDeriv j (f : ℝ → ℂ) 0 = 0 := by simpa using hjet 0 (Nat.zero_lt_succ d)
+    have hstep (y : ℝ) (hy : y ∈ K) :
+        ‖deriv (iteratedDeriv j (f : ℝ → ℂ)) y‖ ≤
+          ε ^ d * SchwartzMap.seminorm ℂ 0 (j + (d + 1)) f := by
+      rw [← iteratedDeriv_succ]
+      simpa only [Nat.succ_add, Nat.add_succ] using
+        ih (j + 1) (fun i hi ↦ by
+          simpa only [Nat.succ_add, Nat.add_succ] using hjet (i + 1) (Nat.succ_lt_succ hi)) y (by simpa [K, Real.dist_eq] using hy)
+    have hd := (convex_closedBall (0 : ℝ) ε).norm_image_sub_le_of_norm_deriv_le
+      (fun y _ ↦ ((f.smooth (j + 1 : ℕ)).differentiable_iteratedDeriv j (by exact_mod_cast Nat.lt_succ_self j)).differentiableAt)
+      hstep (Metric.mem_closedBall_self hε) (show x ∈ K by simpa [K, Real.dist_eq] using hx)
+    rw [hz, sub_zero, sub_zero, Real.norm_eq_abs] at hd
+    calc _ ≤ _ := hd
+         _ ≤ (ε ^ d * SchwartzMap.seminorm ℂ 0 (j + (d + 1)) f) * ε := by gcongr
+         _ = _ := by rw [pow_succ]; ring
+
+
+/-- Multiplication by a smooth cutoff equal to one near zero preserves the value
+of a point-supported distribution, by density of compactly supported tests. -/
+private theorem realTemperedDistribution_cutoff_eq (T : StrongDual ℂ 𝓢(ℝ, ℂ))
+    (hT : Distribution.dsupport (⇑T) ⊆ {(0 : ℝ)}) (b : ℝ → ℂ)
+    (hb : b.HasTemperateGrowth) (h1 : b =ᶠ[𝓝 0] 1) (f : 𝓢(ℝ, ℂ)) :
+    T (SchwartzMap.smulLeftCLM ℂ b f) = T f := by
+  apply closure_minimal (s := {g : 𝓢(ℝ, ℂ) | HasCompactSupport (g : ℝ → ℂ)})
+    (t := {g | T (SchwartzMap.smulLeftCLM ℂ b g) = T g}) _
+    (isClosed_eq (T.continuous.comp (SchwartzMap.smulLeftCLM ℂ b).continuous) T.continuous)
+    (SchwartzMap.dense_hasCompactSupport f)
+  intro g hg
+  change T (SchwartzMap.smulLeftCLM ℂ b g) = T g
+  rw [← sub_eq_zero, ← map_sub]
+  apply realTemperedDistribution_zero_of_away T hT
+  · change HasCompactSupport (⇑(SchwartzMap.smulLeftCLM ℂ b g) - (g : ℝ → ℂ))
+    rw [SchwartzMap.smulLeftCLM_apply hb]
+    exact (HasCompactSupport.smul_left (f := b) (show HasCompactSupport (g : ℝ → ℂ) from hg)).sub hg
+  · apply notMem_tsupport_iff_eventuallyEq.mpr
+    filter_upwards [h1] with x hx
+    simp [SchwartzMap.smulLeftCLM_apply_apply hb, show b x = 1 from hx]
+
+/-- The first `N` derivatives of a shrinking cutoff times a function with zero
+`N`-jet are uniformly of order at most its radius. -/
+private theorem realTemperedDistribution_cutoff_bound (b f : 𝓢(ℝ, ℂ))
+    (hb : tsupport (b : ℝ → ℂ) ⊆ Metric.closedBall 0 1)
+    (N m : ℕ) (hm : m ≤ N) (hjet : ∀ j ≤ N, iteratedDeriv j (f : ℝ → ℂ) 0 = 0) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ ε : ℝ, 0 < ε → ε ≤ 1 → ∀ k : ℕ,
+      SchwartzMap.seminorm ℂ k m (SchwartzMap.smulLeftCLM ℂ (fun x ↦ b (ε⁻¹ * x)) f) ≤ ε * C := by
+  let A := SchwartzMap.seminorm ℂ 0 (N + 1) f
+  let B (i : ℕ) := SchwartzMap.seminorm ℂ 0 i b
+  have hA : 0 ≤ A := apply_nonneg _ _
+  have hB (i : ℕ) : 0 ≤ B i := apply_nonneg _ _
+  refine ⟨∑ i ∈ Finset.range (m + 1), (m.choose i : ℝ) * B i * A, by positivity, ?_⟩
+  intro ε hε hε1 k
+  let bε := fun x : ℝ ↦ b (ε⁻¹ * x)
+  have htemp : bε.HasTemperateGrowth := by dsimp [bε]; fun_prop
+  refine SchwartzMap.seminorm_le_bound' ℂ k m _ (by positivity) fun x ↦ ?_
+  rw [SchwartzMap.smulLeftCLM_apply htemp]
+  change |x| ^ k * ‖iteratedDeriv m (fun y ↦ b (ε⁻¹ * y) * f y) x‖ ≤ _
+  by_cases hx : |x| ≤ ε
+  · have hb' : ContDiff ℝ m bε := (b.smooth m).comp (contDiff_const.mul contDiff_id)
+    rw [iteratedDeriv_fun_mul hb'.contDiffAt (f.smooth m).contDiffAt]
+    have hk := pow_le_one₀ (abs_nonneg x) (hx.trans hε1) (n := k)
+    refine (mul_le_of_le_one_left (norm_nonneg _) hk).trans ((norm_sum_le _ _).trans ?_)
+    rw [Finset.mul_sum]
+    apply Finset.sum_le_sum
+    intro i hi
+    have him : i ≤ m := Nat.le_of_lt_succ (Finset.mem_range.mp hi)
+    let j := m - i
+    let d := N + 1 - j
+    have hjd : j + d = N + 1 := by dsimp [j, d]; omega
+    have hdi : i < d := by dsimp [d, j]; omega
+    have hf : ‖iteratedDeriv j (f : ℝ → ℂ) x‖ ≤ ε ^ d * A := by
+      simpa only [hjd, A] using realTemperedDistribution_jet_bound f ε hε.le j d
+        (fun l hl ↦ hjet (j + l) (by omega)) x hx
+    have hbnd : ‖iteratedDeriv i (b : ℝ → ℂ) (ε⁻¹ * x)‖ ≤ B i := by
+      simpa [B] using SchwartzMap.le_seminorm' ℂ 0 i b (ε⁻¹ * x)
+    have hp : (ε⁻¹) ^ i * ε ^ d ≤ ε := by
+      rw [← pow_sub_mul_pow ε hdi.le, mul_left_comm, ← mul_pow, inv_mul_cancel₀ hε.ne', one_pow,
+        mul_one]
+      simpa using pow_le_pow_of_le_one hε.le hε1 (show 1 ≤ d - i by omega)
+    rw [iteratedDeriv_comp_const_smul (b.smooth i), norm_mul, norm_mul, norm_smul,
+      norm_pow, Real.norm_eq_abs, abs_of_pos (inv_pos.mpr hε), Complex.norm_natCast]
+    calc _ ≤ ((m.choose i : ℝ) * ((ε⁻¹) ^ i * B i)) * (ε ^ d * A) := by gcongr
+         _ = ((ε⁻¹) ^ i * ε ^ d) * ((m.choose i : ℝ) * B i * A) := by ring
+         _ ≤ _ := by gcongr
+  · have hout : ε⁻¹ * x ∉ tsupport (b : ℝ → ℂ) := by
+      intro h
+      have h' := hb h
+      rw [Metric.mem_closedBall, Real.dist_eq, sub_zero, abs_mul, abs_inv, abs_of_pos hε,
+        inv_mul_le_iff₀ hε, mul_one] at h'
+      exact hx h'
+    have heq : (fun y ↦ b (ε⁻¹ * y) * f y) =ᶠ[𝓝 x] 0 := by
+      have hcont : ContinuousAt (fun y : ℝ ↦ ε⁻¹ * y) x := by fun_prop
+      filter_upwards [hcont (notMem_tsupport_iff_eventuallyEq.mp hout)] with y hy
+      simp [show b (ε⁻¹ * y) = 0 from hy]
+    rw [heq.iteratedDeriv_eq, iteratedDeriv_const_zero, norm_zero, mul_zero]
+    positivity
+
+
+/-- Continuity bounds a tempered distribution by finitely many Schwartz seminorms.
+Localization and the shrinking-cutoff bound therefore make it vanish on a finite jet kernel. -/
+private theorem realTemperedDistribution_finite_jet (T : StrongDual ℂ 𝓢(ℝ, ℂ))
+    (hT : Distribution.dsupport (⇑T) ⊆ {(0 : ℝ)}) :
+    ∃ N : ℕ, ∀ f : 𝓢(ℝ, ℂ), (∀ j ≤ N, iteratedDeriv j (f : ℝ → ℂ) 0 = 0) → T f = 0 := by
+  classical
+  obtain ⟨s, C, -, hC⟩ := Seminorm.bound_of_continuous (schwartz_withSeminorms ℂ ℝ ℂ)
+    ((normSeminorm ℂ ℂ).comp T.toLinearMap) T.continuous.norm
+  let N := s.sup Prod.snd
+  refine ⟨N, fun f hf ↦ ?_⟩
+  let χ : ContDiffBump (0 : ℝ) := ⟨1 / 2, 1, by norm_num, by norm_num⟩
+  let b : 𝓢(ℝ, ℂ) := (χ.hasCompactSupport.comp_left Complex.ofReal_zero).toSchwartzMap
+    (Complex.ofRealCLM.contDiff.comp χ.contDiff)
+  have hb : tsupport (b : ℝ → ℂ) ⊆ Metric.closedBall 0 1 :=
+    (tsupport_comp_subset Complex.ofReal_zero _).trans χ.tsupport_eq.subset
+  have h1 : (b : ℝ → ℂ) =ᶠ[𝓝 0] 1 := by
+    filter_upwards [χ.eventuallyEq_one] with x hx
+    change ((χ x : ℝ) : ℂ) = 1
+    simp [show χ x = 1 from hx]
+  choose D hD hbound using fun i : s ↦ realTemperedDistribution_cutoff_bound b f hb N i.val.2
+    (Finset.le_sup (f := Prod.snd) i.property) hf
+  let M := ∑ i : s, D i
+  have hM : 0 ≤ M := Finset.sum_nonneg fun i _ ↦ hD i
+  have hsmall (ε : ℝ) (hε : 0 < ε) (hε1 : ε ≤ 1) : ‖T f‖ ≤ (C : ℝ) * (ε * M) := by
+    let g := SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ b (ε⁻¹ * x)) f
+    have htemp : (fun x : ℝ ↦ b (ε⁻¹ * x)).HasTemperateGrowth := by fun_prop
+    have hc : Tendsto (fun x : ℝ ↦ ε⁻¹ * x) (𝓝 0) (𝓝 0) := by
+      simpa only [mul_zero] using (continuous_const_mul ε⁻¹).tendsto (0 : ℝ)
+    have heq : T g = T f := realTemperedDistribution_cutoff_eq T hT _ htemp (hc h1) f
+    rw [← heq]
+    refine (hC g).trans ?_
+    change (C : ℝ) * s.sup (schwartzSeminormFamily ℂ ℝ ℂ) g ≤ _
+    gcongr
+    apply Seminorm.finset_sup_apply_le (mul_nonneg hε.le hM)
+    intro i hi
+    exact (hbound ⟨i, hi⟩ ε hε hε1 i.1).trans (mul_le_mul_of_nonneg_left
+      (Finset.single_le_sum (fun j _ ↦ hD j) (Finset.mem_univ (⟨i, hi⟩ : s))) hε.le)
+  apply norm_le_zero_iff.mp
+  have ht : Tendsto (fun ε : ℝ ↦ (C : ℝ) * (ε * M)) (𝓝[>] 0) (𝓝 0) := by
+    have hid : Tendsto (fun ε : ℝ ↦ ε) (𝓝[>] 0) (𝓝 0) := nhdsWithin_le_nhds
+    simpa only [zero_mul, mul_zero] using (hid.mul_const M).const_mul (C : ℝ)
+  apply le_of_tendsto_of_tendsto tendsto_const_nhds ht
+  filter_upwards [self_mem_nhdsWithin, mem_nhdsWithin_of_mem_nhds (gt_mem_nhds (zero_lt_one : (0 : ℝ) < 1))] with ε hε hε1
+  exact hsmall ε hε hε1.le
+
 /-- Paper: Theorem 5.3.2.1, p. 243.
 Every real tempered distribution supported at zero is a finite linear combination of
 derivatives of the Dirac distribution at zero. -/
 theorem realTemperedDistribution_eq_sum_diracDerivative (T : StrongDual ℂ 𝓢(ℝ, ℂ))
     (hT : TemperedSupportedAtOrigin T) :
     ∃ (N : ℕ) (c : Fin (N + 1) → ℂ),
-      T = ∑ k : Fin (N + 1), c k • realDiracDerivative k.val := by sorry
+      T = ∑ k : Fin (N + 1), c k • realDiracDerivative k.val := by
+  obtain ⟨N, hN⟩ := realTemperedDistribution_finite_jet T hT
+  let L (k : Fin (N + 1)) := (realDiracDerivative k.val).toLinearMap
+  have hker : (⨅ k, LinearMap.ker (L k)) ≤ LinearMap.ker T.toLinearMap := by
+    intro f hf
+    apply hN f
+    intro j hj
+    have hz := (Submodule.mem_iInf _).mp hf (⟨j, Nat.lt_succ_of_le hj⟩ : Fin (N + 1))
+    change realDiracDerivative j f = 0 at hz
+    rw [realSchwartzFlatQuotient_strongDual_dirac, mul_eq_zero] at hz
+    exact hz.resolve_left (pow_ne_zero _ (by norm_num))
+  obtain ⟨c, hc⟩ := (Submodule.mem_span_range_iff_exists_fun ℂ).mp (mem_span_of_iInf_ker_le_ker hker)
+  refine ⟨N, c, ?_⟩
+  ext f
+  simpa only [sum_apply, LinearMap.sum_apply, LinearMap.smul_apply, smul_apply, L,
+    ContinuousLinearMap.coe_coe] using (LinearMap.congr_fun hc f).symm
 
 /-- Paper: Theorem 5.3.2.1(1), p. 243.
 The flat real Schwartz subspace is the intersection of the kernels of all Dirac derivatives. -/
@@ -2990,6 +3886,63 @@ theorem coordinateDerivative_testFunction_toSchwartz {ι : Type*} [Fintype ι]
     simp only [List.map_cons, List.prod_cons, mul_apply_eq_comp]
     rw [← ih, ← hpow]
 
+/-- Paper: Theorem 5.3.2.3(5), p. 245.
+A compactly supported distribution has a tempered extension. Cutting a Schwartz test off by a
+test function that equals one on a neighbourhood of the distribution's support does not change
+the value of the distribution, and the resulting functional is continuous on the Schwartz space. -/
+private theorem distribution_coordinatePlane_decomposition_tempered_extension {E : Type*}
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [FiniteDimensional ℝ E]
+    (A : StrongDual ℂ 𝓓((⊤ : Opens E), ℂ))
+    (hA : IsCompact (Distribution.dsupport (⇑A))) :
+    ∃ B : StrongDual ℂ 𝓢(E, ℂ),
+      ∀ g : 𝓓((⊤ : Opens E), ℂ), B (g.hasCompactSupport.toSchwartzMap g.contDiff) = A g := by
+  sorry
+
+/-- Restriction to the coordinate plane commutes with passing a compactly supported test to
+its Schwartz function: both restrictions are given by inserting zeros in the normal
+coordinates. -/
+private theorem distribution_coordinatePlane_decomposition_tempered_restriction_toSchwartz
+    (f : 𝒟(ι ⊕ κ)) :
+    let g := R𝒟 f
+    R𝒮 (f.hasCompactSupport.toSchwartzMap f.contDiff) =
+      g.hasCompactSupport.toSchwartzMap g.contDiff := by
+  intro g
+  ext y
+  rw [(exists_schwartz_coordinatePlaneRestriction (ι := ι) (κ := κ)).choose_spec _ y]
+  simp only [HasCompactSupport.toSchwartzMap_toFun]
+  exact ((exists_testFunction_coordinatePlaneRestriction (ι := ι) (κ := κ)).choose_spec f y).symm
+
+open Classical in
+/-- Passing from a compactly supported test on the product to its Schwartz function commutes
+with coordinate derivatives, at the product type itself. -/
+private theorem distribution_coordinatePlane_decomposition_tempered_toSchwartz
+    (β : (ι ⊕ κ) → ℕ) (f : 𝒟(ι ⊕ κ)) :
+    let g := ∂𝒟[ι ⊕ κ, β] f
+    g.hasCompactSupport.toSchwartzMap g.contDiff =
+      ∂𝒮[ι ⊕ κ, β] (f.hasCompactSupport.toSchwartzMap f.contDiff) := by
+  intro g
+  have hpow : ∀ i (k : ℕ) (f : 𝒟(ι ⊕ κ)),
+      ((LineDeriv.lineDerivOpCLM ℂ 𝒟(ι ⊕ κ) (eᵣ i : Eᵣ(ι ⊕ κ)) ^ k)
+          f).hasCompactSupport.toSchwartzMap
+          ((LineDeriv.lineDerivOpCLM ℂ 𝒟(ι ⊕ κ) (eᵣ i : Eᵣ(ι ⊕ κ)) ^ k) f).contDiff =
+        (LineDeriv.lineDerivOpCLM ℂ 𝒮(ι ⊕ κ) (eᵣ i : Eᵣ(ι ⊕ κ)) ^ k)
+          (f.hasCompactSupport.toSchwartzMap f.contDiff) := by
+    intro i k
+    induction k with
+    | zero => intro f; rfl
+    | succ k ih =>
+      intro f
+      rw [pow_succ, pow_succ, mul_apply_eq_comp, mul_apply_eq_comp, ih]
+      congr 1
+  show (∂𝒟[ι ⊕ κ, β] f).hasCompactSupport.toSchwartzMap (∂𝒟[ι ⊕ κ, β] f).contDiff = _
+  unfold coordinateDerivative
+  generalize (Finset.univ.toList : List (ι ⊕ κ)) = l
+  induction l generalizing f with
+  | nil => rfl
+  | cons a t ih =>
+    simp only [List.map_cons, List.prod_cons, mul_apply_eq_comp]
+    rw [← ih, ← hpow]
+
 open Classical in
 /-- Paper: Theorem 5.3.2.3(5), p. 245.
 The coefficient distributions and the ambient distribution have tempered extensions.
@@ -3003,7 +3956,22 @@ theorem distribution_coordinatePlane_decomposition_tempered {N : ℕ} (T : 𝒟'
     ∃ (U : 𝒮'(ι ⊕ κ)) (B : index(N) → 𝒮'(κ)),
       (∀ f : 𝒟(ι ⊕ κ), U (f.hasCompactSupport.toSchwartzMap f.contDiff) = T f) ∧
       (∀ α, ∀ g : 𝒟(κ), B α (g.hasCompactSupport.toSchwartzMap g.contDiff) = A α g) ∧
-      ∀ f : 𝒮(ι ⊕ κ), U f = ∑ α : index(N), B α (R𝒮 (∂𝒮[ι ⊕ κ, multi(α)] f)) := by sorry
+      ∀ f : 𝒮(ι ⊕ κ), U f = ∑ α : index(N), B α (R𝒮 (∂𝒮[ι ⊕ κ, multi(α)] f)) := by
+  choose B hB using fun α : index(N) =>
+    distribution_coordinatePlane_decomposition_tempered_extension (A α) (hK α)
+  refine ⟨∑ α : index(N), (B α).comp ((R𝒮).comp ∂𝒮[ι ⊕ κ, multi(α)]), B, ?_, fun α => hB α, ?_⟩
+  · intro f
+    simp only [sum_apply, ContinuousLinearMap.comp_apply]
+    rw [hA f]
+    refine Finset.sum_congr rfl fun α _ => ?_
+    have hder : ∂𝒮[ι ⊕ κ, multi(α)] (f.hasCompactSupport.toSchwartzMap f.contDiff) =
+        (∂𝒟[ι ⊕ κ, multi(α)] f).hasCompactSupport.toSchwartzMap
+          (∂𝒟[ι ⊕ κ, multi(α)] f).contDiff :=
+      (distribution_coordinatePlane_decomposition_tempered_toSchwartz (multi(α)) f).symm
+    rw [← hB α, ← distribution_coordinatePlane_decomposition_tempered_restriction_toSchwartz
+      (∂𝒟[ι ⊕ κ, multi(α)] f), hder]
+  · intro f
+    simp only [sum_apply, ContinuousLinearMap.comp_apply]
 
 /-- Paper: Remark 5.3.2.4, p. 246.
 Products of test functions define a map from the inductive tensor product with
@@ -3471,6 +4439,409 @@ theorem complexDiracDerivative_one_zero (f : 𝓢(ℂ, ℂ)) :
 -- derivatives for each normal index is determined. For a point support,
 -- take both real coordinates normal in Theorem 5.3.2.3, then change basis.
 
+section ComplexPointSupportHelpers
+
+
+/-- The LF topology makes inclusion of smooth compactly supported tests into Schwartz space continuous. -/
+private theorem complexTemperedDistribution_eq_sum_diracDerivative_test_schwartz_map
+    (E : Type*) [NormedAddCommGroup E] [NormedSpace ℝ E] :
+    ∃ J : TestFunction (⊤ : TopologicalSpace.Opens E) ℂ ⊤ →L[ℂ] SchwartzMap E ℂ,
+      ∀ f x, J f x = f x := by
+  let J : TestFunction (⊤ : TopologicalSpace.Opens E) ℂ ⊤ →ₗ[ℂ] SchwartzMap E ℂ :=
+    { toFun := fun f ↦ f.hasCompactSupport.toSchwartzMap f.contDiff
+      map_add' := fun _ _ ↦ by ext; rfl
+      map_smul' := fun _ _ ↦ by ext; rfl }
+  have hc : Continuous J := by
+    refine (TestFunction.continuous_iff_continuous_comp J).mpr fun K hK ↦ ?_
+    have he : J ∘ TestFunction.ofSupportedIn hK = (supportedToSchwartzCLM ℂ K) := by
+      funext f
+      ext x
+      rfl
+    rw [he]
+    exact (supportedToSchwartzCLM ℂ K).continuous
+  exact ⟨⟨J, hc⟩, fun _ _ ↦ rfl⟩
+
+private theorem complexTemperedDistribution_eq_sum_diracDerivative_complex_coordinates :
+    Nonempty (EuclideanSpace ℝ (Fin 2 ⊕ Fin 0) ≃L[ℝ] ℂ) := by
+  let : Unique (EuclideanSpace ℝ (Fin 0)) := uniqueOfSubsingleton 0
+  exact ⟨EuclideanSpace.sumEquivProd.trans
+    ((ContinuousLinearEquiv.prodUnique ℝ (EuclideanSpace ℝ (Fin 2)) (EuclideanSpace ℝ (Fin 0))).trans
+      Complex.orthonormalBasisOneI.repr.symm.toContinuousLinearEquiv)⟩
+
+private theorem complexTemperedDistribution_eq_sum_diracDerivative_support_schwartz_pull
+    (E : Type*) [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (D : E ≃L[ℝ] ℂ) (T : StrongDual ℂ (SchwartzMap ℂ ℂ)) :
+    Distribution.dsupport (fun f : SchwartzMap E ℂ ↦ T (SchwartzMap.compCLMOfContinuousLinearEquiv ℂ D.symm f)) ⊆
+      D ⁻¹' Distribution.dsupport (⇑T) := by
+  intro x hx
+  by_contra hn
+  obtain ⟨U, hU, hOpen, hxU⟩ := (Distribution.notMem_dsupport_iff _).mp hn
+  apply ((Distribution.notMem_dsupport_iff _).mpr ⟨D ⁻¹' U, ?_, hOpen.preimage D.continuous, hxU⟩) hx
+  intro f hf
+  apply hU
+  intro y hy
+  change y ∈ tsupport ((f : E → ℂ) ∘ D.symm.toHomeomorph) at hy
+  rw [tsupport_comp_eq_preimage _ D.symm.toHomeomorph] at hy
+  have hh := hf hy
+  change D (D.symm y) ∈ U at hh
+  simpa only [D.apply_symm_apply] using hh
+
+private theorem complexTemperedDistribution_eq_sum_diracDerivative_support_test_restrict
+    (E : Type*) [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (J : TestFunction (⊤ : TopologicalSpace.Opens E) ℂ ⊤ →L[ℂ] SchwartzMap E ℂ)
+    (hJ : ∀ f x, J f x = f x) (T : StrongDual ℂ (SchwartzMap E ℂ)) :
+    Distribution.dsupport (fun f ↦ T (J f)) ⊆ Distribution.dsupport (⇑T) := by
+  intro x hx
+  by_contra hn
+  obtain ⟨U, hU, hOpen, hxU⟩ := (Distribution.notMem_dsupport_iff _).mp hn
+  apply ((Distribution.notMem_dsupport_iff _).mpr ⟨U, ?_, hOpen, hxU⟩) hx
+  intro f hf
+  apply hU
+  have he : (J f : E → ℂ) = f := funext (hJ f)
+  simpa only [he] using hf
+
+/-- A finite Schwartz seminorm bound gives finite derivative order on each compact support. -/
+private theorem complexTemperedDistribution_eq_sum_diracDerivative_tempered_order_finite
+    (E : Type*) [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (T : StrongDual ℂ (SchwartzMap E ℂ)) :
+    ∃ N : ℕ, DistributionOrderLE
+      (fun f : TestFunction (⊤ : TopologicalSpace.Opens E) ℂ ⊤ ↦ T (f.hasCompactSupport.toSchwartzMap f.contDiff)) N := by
+  let q : Seminorm ℂ (SchwartzMap E ℂ) := (normSeminorm ℂ ℂ).comp T.toLinearMap
+  have hq : Continuous q := continuous_norm.comp T.continuous
+  obtain ⟨s, C, hC, hb⟩ := Seminorm.bound_sum_of_continuous (schwartz_withSeminorms ℂ E ℂ) q hq
+  let N := s.sup Prod.snd
+  refine ⟨N, fun K ↦ ?_⟩
+  obtain ⟨R, hR0, hR⟩ := K.isCompact.isBounded.exists_pos_norm_le
+  refine ⟨(C : ℝ) * ∑ i ∈ s, R ^ i.1, by positivity, fun f hf B hB hderiv ↦ ?_⟩
+  let φ := f.hasCompactSupport.toSchwartzMap f.contDiff
+  have hsemi (i : ℕ × ℕ) (hi : i ∈ s) : SchwartzMap.seminorm ℂ i.1 i.2 φ ≤ R ^ i.1 * B := by
+    apply SchwartzMap.seminorm_le_bound ℂ i.1 i.2 φ (by positivity)
+    intro x
+    change ‖x‖ ^ i.1 * ‖iteratedFDeriv ℝ i.2 (f : E → ℂ) x‖ ≤ R ^ i.1 * B
+    by_cases hx : x ∈ (K : Set E)
+    · have hn : i.2 ≤ N := Finset.le_sup hi
+      exact mul_le_mul (pow_le_pow_left₀ (norm_nonneg x) (hR x hx) _) (hderiv i.2 hn x)
+        (norm_nonneg _) (pow_nonneg hR0.le _)
+    · have hx' : x ∉ tsupport (iteratedFDeriv ℝ i.2 (f : E → ℂ)) :=
+        fun h ↦ hx (hf ((tsupport_iteratedFDeriv_subset i.2) h))
+      rw [image_eq_zero_of_notMem_tsupport hx', norm_zero, mul_zero]
+      positivity
+  have ht := hb φ
+  simp only [smul_apply, sum_apply, NNReal.smul_def, smul_eq_mul] at ht
+  change ‖T φ‖ ≤ (C : ℝ) * ∑ i ∈ s, SchwartzMap.seminorm ℂ i.1 i.2 φ at ht
+  calc
+    ‖T φ‖ ≤ (C : ℝ) * ∑ i ∈ s, SchwartzMap.seminorm ℂ i.1 i.2 φ := ht
+    _ ≤ (C : ℝ) * ∑ i ∈ s, R ^ i.1 * B := mul_le_mul_of_nonneg_left (Finset.sum_le_sum hsemi) C.coe_nonneg
+    _ = ((C : ℝ) * ∑ i ∈ s, R ^ i.1) * B := by rw [← Finset.sum_mul]; ring
+
+
+private theorem complexTemperedDistribution_eq_sum_diracDerivative_point_coordinate_distribution
+    (T : StrongDual ℂ (SchwartzMap ℂ ℂ)) (hT : TemperedSupportedAtOrigin T) :
+    ∃ (D : EuclideanSpace ℝ (Fin 2 ⊕ Fin 0) ≃L[ℝ] ℂ)
+      (V : TestFunction (⊤ : TopologicalSpace.Opens (EuclideanSpace ℝ (Fin 2 ⊕ Fin 0))) ℂ ⊤ →L[ℂ] ℂ)
+      (N : ℕ), DistributionOrderLE V N ∧ Distribution.dsupport (⇑V) ⊆ {0} ∧
+      ∀ f, V f = T (SchwartzMap.compCLMOfContinuousLinearEquiv ℂ D.symm (f.hasCompactSupport.toSchwartzMap f.contDiff)) := by
+  let E := EuclideanSpace ℝ (Fin 2 ⊕ Fin 0)
+  obtain ⟨D⟩ := complexTemperedDistribution_eq_sum_diracDerivative_complex_coordinates
+  obtain ⟨J, hJ⟩ := complexTemperedDistribution_eq_sum_diracDerivative_test_schwartz_map E
+  let U : StrongDual ℂ (SchwartzMap E ℂ) := T.comp (SchwartzMap.compCLMOfContinuousLinearEquiv ℂ D.symm)
+  let V := U.comp J
+  have hsU : Distribution.dsupport (⇑U) ⊆ {0} := by
+    intro x hx
+    have he := hT (complexTemperedDistribution_eq_sum_diracDerivative_support_schwartz_pull E D T hx)
+    have hx0 : x = 0 := D.injective ((show D x = 0 from he).trans (map_zero D).symm)
+    exact hx0
+  have hsV : Distribution.dsupport (⇑V) ⊆ {0} :=
+    (complexTemperedDistribution_eq_sum_diracDerivative_support_test_restrict E J hJ U).trans hsU
+  have heJ (f) : J f = f.hasCompactSupport.toSchwartzMap f.contDiff := SchwartzMap.ext (hJ f)
+  obtain ⟨N, hN⟩ := complexTemperedDistribution_eq_sum_diracDerivative_tempered_order_finite E U
+  have hVN : DistributionOrderLE V N := by
+    have he : (fun f ↦ V f) = (fun f ↦ U (f.hasCompactSupport.toSchwartzMap f.contDiff)) :=
+      funext fun f ↦ congrArg U (heJ f)
+    change DistributionOrderLE (fun f ↦ V f) N
+    rw [he]
+    exact hN
+  refine ⟨D, V, N, hVN, hsV, fun f ↦ ?_⟩
+  change U (J f) = _
+  rw [heJ]
+  rfl
+
+private theorem complexTemperedDistribution_eq_sum_diracDerivative_zero_dim_dual
+    (T : StrongDual ℂ (SchwartzMap (EuclideanSpace ℝ (Fin 0)) ℂ)) :
+    ∃ c : ℂ, ∀ f, T f = c * f 0 := by
+  let E := EuclideanSpace ℝ (Fin 0)
+  let one : SchwartzMap E ℂ := (show HasCompactSupport (fun _ : E ↦ (1 : ℂ)) from
+    (isClosed_tsupport _).isCompact).toSchwartzMap contDiff_const
+  refine ⟨T one, fun f ↦ ?_⟩
+  have he : f = (f 0) • one := by
+    ext x
+    change f x = f 0 * (1 : ℂ)
+    rw [Subsingleton.elim x 0, mul_one]
+  calc T f = T ((f 0) • one) := congrArg T he
+       _ = f 0 * T one := T.map_smul _ _
+       _ = T one * f 0 := mul_comm _ _
+
+private theorem complexTemperedDistribution_eq_sum_diracDerivative_single_independent
+    (d₁ d₂ : DecidableEq (Fin 2 ⊕ Fin 0)) (i : Fin 2 ⊕ Fin 0) (a : ℝ) :
+    @Pi.single (Fin 2 ⊕ Fin 0) (fun _ ↦ ℝ) (fun _ ↦ inferInstance) d₁ i a =
+      @Pi.single (Fin 2 ⊕ Fin 0) (fun _ ↦ ℝ) (fun _ ↦ inferInstance) d₂ i a :=
+  congrArg (fun d ↦ @Pi.single (Fin 2 ⊕ Fin 0) (fun _ ↦ ℝ) (fun _ ↦ inferInstance) d i a) (Subsingleton.elim d₁ d₂)
+open Classical in
+
+/-- Take both real coordinates normal in the coordinate-plane decomposition, then use density. -/
+private theorem complexTemperedDistribution_eq_sum_diracDerivative_point_real_decomposition
+    (T : StrongDual ℂ (SchwartzMap ℂ ℂ)) (hT : TemperedSupportedAtOrigin T) :
+    ∃ (D : EuclideanSpace ℝ (Fin 2 ⊕ Fin 0) ≃L[ℝ] ℂ) (N : ℕ)
+      (c : {α : (Fin 2 ⊕ Fin 0) → Fin (N + 1) // (∑ i, (α i).val) ≤ N} → ℂ),
+      ∀ f : SchwartzMap (EuclideanSpace ℝ (Fin 2 ⊕ Fin 0)) ℂ,
+        T (SchwartzMap.compCLMOfContinuousLinearEquiv ℂ D.symm f) =
+          ∑ α, c α * (coordinateDerivative
+            (fun i : Fin 2 ⊕ Fin 0 ↦ (LineDeriv.lineDerivOpCLM ℂ (SchwartzMap (EuclideanSpace ℝ (Fin 2 ⊕ Fin 0)) ℂ)
+              (WithLp.toLp 2 (Pi.single i (1 : ℝ)) : EuclideanSpace ℝ (Fin 2 ⊕ Fin 0)) : _ →L[ℂ] _)) (fun i ↦ (α.val i).val) f) 0 := by
+  classical
+  let E := EuclideanSpace ℝ (Fin 2 ⊕ Fin 0)
+  obtain ⟨D, V, N, hVN, hsV, hVS⟩ := complexTemperedDistribution_eq_sum_diracDerivative_point_coordinate_distribution T hT
+  have hK : IsCompact (Distribution.dsupport (⇑V)) :=
+    isCompact_singleton.of_isClosed_subset Distribution.isClosed_dsupport hsV
+  have hp : Distribution.dsupport (⇑V) ⊆ Set.range (fun y : EuclideanSpace ℝ (Fin 0) ↦
+      (WithLp.toLp 2 (Sum.elim (fun _ : Fin 2 ↦ (0 : ℝ)) (fun j : Fin 0 ↦ y j)) : E)) := by
+    intro x hx
+    have he : x = 0 := hsV hx
+    refine ⟨0, ?_⟩
+    rw [he]
+    ext i
+    cases i <;> rfl
+  obtain ⟨A, hA, heA⟩ := distribution_coordinatePlane_decomposition (ι := Fin 2) (κ := Fin 0) V N hVN hK hp
+  obtain ⟨U, B, hU, hB, hrep⟩ := distribution_coordinatePlane_decomposition_tempered V A (fun α ↦ (hA α).2) heA
+  let W : StrongDual ℂ (SchwartzMap E ℂ) := T.comp (SchwartzMap.compCLMOfContinuousLinearEquiv ℂ D.symm)
+  have heUW : U = W := by
+    apply DFunLike.ext'
+    apply Continuous.ext_on (SchwartzMap.dense_hasCompactSupport (E := E) (F := ℂ)) U.continuous W.continuous
+    intro f hf
+    let φ : TestFunction (⊤ : TopologicalSpace.Opens E) ℂ ⊤ := ⟨f, f.smooth ⊤, hf, by simp⟩
+    have he : φ.hasCompactSupport.toSchwartzMap φ.contDiff = f := by ext; rfl
+    have hu := hU φ
+    rw [he] at hu
+    exact hu.trans (hVS φ)
+  have hz : (WithLp.toLp 2 (Sum.elim (fun _ : Fin 2 ↦ (0 : ℝ)) (fun j : Fin 0 ↦ (0 : EuclideanSpace ℝ (Fin 0)) j)) : E) = 0 := by
+    ext i
+    cases i <;> rfl
+  have hr0 (φ : SchwartzMap E ℂ) :
+      (exists_schwartz_coordinatePlaneRestriction (ι := Fin 2) (κ := Fin 0)).choose φ 0 = φ 0 := by
+    have hr := (exists_schwartz_coordinatePlaneRestriction (ι := Fin 2) (κ := Fin 0)).choose_spec φ 0
+    simpa only [hz] using hr
+  choose c hc using fun α ↦ complexTemperedDistribution_eq_sum_diracDerivative_zero_dim_dual (B α)
+  refine ⟨D, N, c, fun f ↦ ?_⟩
+  change W f = _
+  rw [← heUW]
+  rw [hrep]
+  refine Finset.sum_congr ?_ ?_
+  · ext α
+    simp
+  · intro α hα
+    rw [hc, hr0]
+    congr 2
+    apply congrArg (fun op : SchwartzMap E ℂ →L[ℂ] SchwartzMap E ℂ ↦ op f)
+    apply congrArg (fun d ↦ coordinateDerivative d (fun i ↦ (α.val i).val))
+    funext i
+    apply congrArg (fun v : E ↦ (LineDeriv.lineDerivOpCLM ℂ (SchwartzMap E ℂ) v : _ →L[ℂ] _))
+    apply congrArg (WithLp.toLp 2)
+    exact complexTemperedDistribution_eq_sum_diracDerivative_single_independent _ _ i (1 : ℝ)
+
+
+private theorem complexTemperedDistribution_eq_sum_diracDerivative_partials_commute
+    (v w : ℂ) :
+    Commute (LineDeriv.lineDerivOpCLM ℂ (SchwartzMap ℂ ℂ) v : _ →L[ℂ] _)
+      (LineDeriv.lineDerivOpCLM ℂ (SchwartzMap ℂ ℂ) w : _ →L[ℂ] _) := by
+  ext f x
+  have hs : IsSymmSndFDerivAt ℝ (f : ℂ → ℂ) x :=
+    (f.smooth 2).contDiffAt.isSymmSndFDerivAt (by simp)
+  calc
+    _ = iteratedFDeriv ℝ 2 (f : ℂ → ℂ) x ![v, w] :=
+      SchwartzMap.iteratedLineDerivOp_eq_iteratedFDeriv
+    _ = iteratedFDeriv ℝ 2 (f : ℂ → ℂ) x ![w, v] := hs.iteratedFDeriv_cons
+    _ = _ := SchwartzMap.iteratedLineDerivOp_eq_iteratedFDeriv.symm
+
+private theorem complexTemperedDistribution_eq_sum_diracDerivative_wirtingers_commute : Commute schwartzWirtingerZ schwartzWirtingerZBar := by
+  let X := (LineDeriv.lineDerivOpCLM ℂ (SchwartzMap ℂ ℂ) (1 : ℂ) : _ →L[ℂ] _)
+  let Y := (LineDeriv.lineDerivOpCLM ℂ (SchwartzMap ℂ ℂ) Complex.I : _ →L[ℂ] _)
+  have hXY : Commute X (Complex.I • Y) := (complexTemperedDistribution_eq_sum_diracDerivative_partials_commute 1 Complex.I).smul_right Complex.I
+  have hleft : Commute (X - Complex.I • Y) X := (Commute.refl X).sub_left hXY.symm
+  have hright : Commute (X - Complex.I • Y) (Complex.I • Y) := hXY.sub_left (Commute.refl _)
+  exact ((hleft.add_right hright).smul_left ((2 : ℂ)⁻¹)).smul_right ((2 : ℂ)⁻¹)
+
+private theorem complexTemperedDistribution_eq_sum_diracDerivative_direction_wirtingers
+    (v : ℂ) :
+    (LineDeriv.lineDerivOpCLM ℂ (SchwartzMap ℂ ℂ) v : _ →L[ℂ] _) =
+      v • schwartzWirtingerZ + (star v) • schwartzWirtingerZBar := by
+  ext f x
+  change fderiv ℝ (f : ℂ → ℂ) x v = v * schwartzWirtingerZ f x + star v * schwartzWirtingerZBar f x
+  rw [(schwartzWirtinger_apply f x).1, (schwartzWirtinger_apply f x).2]
+  have hv : v = v.re • (1 : ℂ) + v.im • Complex.I := by simp [Complex.real_smul, Complex.re_add_im]
+  have hm : fderiv ℝ (f : ℂ → ℂ) x v =
+      (v.re : ℂ) * fderiv ℝ (f : ℂ → ℂ) x 1 + (v.im : ℂ) * fderiv ℝ (f : ℂ → ℂ) x Complex.I := by
+    conv_lhs => rw [hv, map_add, map_smul, map_smul]
+    simp [Complex.real_smul]
+  rw [hm]
+  unfold wirtingerDeriv wirtingerConjDeriv
+  conv_rhs => rw [← Complex.re_add_im v]
+  simp only [star_add, star_mul, Complex.star_def, Complex.conj_ofReal, Complex.conj_I]
+  ring_nf
+  simp [Complex.I_sq]
+
+/-- Commuting Wirtinger powers span every finite word of real directional derivatives. -/
+private theorem complexTemperedDistribution_eq_sum_diracDerivative_coordinate_operator_span
+    (ι : Type*) [Fintype ι] (d : ι → ℂ) (α : ι → ℕ) :
+    coordinateDerivative (fun i ↦ (LineDeriv.lineDerivOpCLM ℂ (SchwartzMap ℂ ℂ) (d i) : _ →L[ℂ] _)) α ∈
+      Submodule.span ℂ (Set.range (fun p : ℕ × ℕ ↦ schwartzWirtingerZ ^ p.1 * schwartzWirtingerZBar ^ p.2)) := by
+  classical
+  let A := schwartzWirtingerZ
+  let B := schwartzWirtingerZBar
+  let W := Submodule.span ℂ (Set.range (fun p : ℕ × ℕ ↦ A ^ p.1 * B ^ p.2))
+  have hAB : Commute A B := complexTemperedDistribution_eq_sum_diracDerivative_wirtingers_commute
+  have hA (q) (hq : q ∈ W) : A * q ∈ W := by
+    refine Submodule.span_induction (p := fun q _ ↦ A * q ∈ W) ?_ ?_ ?_ ?_ hq
+    · rintro q ⟨⟨k, l⟩, rfl⟩
+      have he : A * (A ^ k * B ^ l) = A ^ (k + 1) * B ^ l := by rw [pow_succ']; simp only [mul_assoc]
+      rw [he]
+      exact Submodule.subset_span ⟨(k + 1, l), rfl⟩
+    · simpa only [mul_zero] using W.zero_mem
+    · intro q r _ _ hq hr
+      simpa only [mul_add] using W.add_mem hq hr
+    · intro c q _ hq
+      simpa only [mul_smul_comm] using W.smul_mem c hq
+  have hB (q) (hq : q ∈ W) : B * q ∈ W := by
+    refine Submodule.span_induction (p := fun q _ ↦ B * q ∈ W) ?_ ?_ ?_ ?_ hq
+    · rintro q ⟨⟨k, l⟩, rfl⟩
+      have he : B * (A ^ k * B ^ l) = A ^ k * B ^ (l + 1) := by
+        rw [← mul_assoc, (hAB.symm.pow_right k).eq, mul_assoc, ← pow_succ']
+      rw [he]
+      exact Submodule.subset_span ⟨(k, l + 1), rfl⟩
+    · simpa only [mul_zero] using W.zero_mem
+    · intro q r _ _ hq hr
+      simpa only [mul_add] using W.add_mem hq hr
+    · intro c q _ hq
+      simpa only [mul_smul_comm] using W.smul_mem c hq
+  have hv (v : ℂ) (q) (hq : q ∈ W) :
+      (LineDeriv.lineDerivOpCLM ℂ (SchwartzMap ℂ ℂ) v : _ →L[ℂ] _) * q ∈ W := by
+    rw [complexTemperedDistribution_eq_sum_diracDerivative_direction_wirtingers, add_mul, smul_mul_assoc, smul_mul_assoc]
+    exact W.add_mem (W.smul_mem v (hA q hq)) (W.smul_mem (star v) (hB q hq))
+  have hpow (v : ℂ) (n : ℕ) (q) (hq : q ∈ W) :
+      (LineDeriv.lineDerivOpCLM ℂ (SchwartzMap ℂ ℂ) v : _ →L[ℂ] _) ^ n * q ∈ W := by
+    induction n with
+    | zero => simpa only [pow_zero, one_mul] using hq
+    | succ n ih => rw [pow_succ', mul_assoc]; exact hv v _ ih
+  have h1 : (1 : SchwartzMap ℂ ℂ →L[ℂ] SchwartzMap ℂ ℂ) ∈ W := by
+    change A ^ 0 * B ^ 0 ∈ W
+    exact Submodule.subset_span ⟨(0, 0), rfl⟩
+  unfold coordinateDerivative
+  generalize (Finset.univ.toList : List ι) = l
+  induction l with
+  | nil => exact h1
+  | cons i l ih =>
+    simp only [List.map_cons, List.prod_cons]
+    exact hpow (d i) (α i) _ ih
+
+private theorem complexTemperedDistribution_eq_sum_diracDerivative_coordinate_functional_span
+    (ι : Type*) [Fintype ι] (d : ι → ℂ) (α : ι → ℕ) :
+    (TemperedDistribution.delta (0 : ℂ)).comp
+      (coordinateDerivative (fun i ↦ (LineDeriv.lineDerivOpCLM ℂ (SchwartzMap ℂ ℂ) (d i) : _ →L[ℂ] _)) α) ∈
+      Submodule.span ℂ (Set.range (fun p : ℕ × ℕ ↦ complexDiracDerivative p.1 p.2)) := by
+  let A := schwartzWirtingerZ
+  let B := schwartzWirtingerZBar
+  let W := Submodule.span ℂ (Set.range (fun p : ℕ × ℕ ↦ A ^ p.1 * B ^ p.2))
+  let S := Submodule.span ℂ (Set.range (fun p : ℕ × ℕ ↦ complexDiracDerivative p.1 p.2))
+  let Φ : (SchwartzMap ℂ ℂ →L[ℂ] SchwartzMap ℂ ℂ) →ₗ[ℂ] StrongDual ℂ (SchwartzMap ℂ ℂ) :=
+    { toFun := fun op ↦ (TemperedDistribution.delta (0 : ℂ)).comp op
+      map_add' := fun op op' ↦ by
+        ext f
+        change (TemperedDistribution.delta (0 : ℂ)) (op f + op' f) = _
+        exact map_add (TemperedDistribution.delta (0 : ℂ)) _ _
+      map_smul' := fun c op ↦ by
+        ext f
+        change (TemperedDistribution.delta (0 : ℂ)) (c • op f) = c • (TemperedDistribution.delta (0 : ℂ)) (op f)
+        exact map_smul (TemperedDistribution.delta (0 : ℂ)) _ _ }
+  have hgen (k l : ℕ) : Φ (A ^ k * B ^ l) = (-1 : ℂ) ^ (k + l) • complexDiracDerivative k l := by
+    ext f
+    change ((A ^ k) ((B ^ l) f)) 0 = (-1 : ℂ) ^ (k + l) * ((-1 : ℂ) ^ (k + l) * ((A ^ k) ((B ^ l) f)) 0)
+    have hs : (-1 : ℂ) ^ (k + l) * (-1) ^ (k + l) = 1 := by rw [← mul_pow]; norm_num
+    rw [← mul_assoc, hs, one_mul]
+  have hmap (op) (hop : op ∈ W) : Φ op ∈ S := by
+    refine Submodule.span_induction (p := fun op _ ↦ Φ op ∈ S) ?_ ?_ ?_ ?_ hop
+    · rintro op ⟨⟨k, l⟩, rfl⟩
+      rw [hgen]
+      exact S.smul_mem _ (Submodule.subset_span ⟨(k, l), rfl⟩)
+    · simpa only [map_zero] using S.zero_mem
+    · intro q r _ _ hq hr
+      simpa only [map_add] using S.add_mem hq hr
+    · intro c q _ hq
+      simpa only [map_smul] using S.smul_mem c hq
+  exact hmap _ (complexTemperedDistribution_eq_sum_diracDerivative_coordinate_operator_span ι d α)
+
+private theorem complexTemperedDistribution_eq_sum_diracDerivative_coordinate_pull
+    (E : Type*) [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (ι : Type*) [Fintype ι] (D : E ≃L[ℝ] ℂ) (d : ι → E) (α : ι → ℕ)
+    (f : SchwartzMap ℂ ℂ) :
+    coordinateDerivative (fun i ↦ (LineDeriv.lineDerivOpCLM ℂ (SchwartzMap E ℂ) (d i) : _ →L[ℂ] _)) α
+      (SchwartzMap.compCLMOfContinuousLinearEquiv ℂ D f) =
+    SchwartzMap.compCLMOfContinuousLinearEquiv ℂ D
+      (coordinateDerivative (fun i ↦ (LineDeriv.lineDerivOpCLM ℂ (SchwartzMap ℂ ℂ) (D (d i)) : _ →L[ℂ] _)) α f) := by
+  have hp (i : ι) (k : ℕ) (f : SchwartzMap ℂ ℂ) :
+      ((LineDeriv.lineDerivOpCLM ℂ (SchwartzMap E ℂ) (d i) : _ →L[ℂ] _) ^ k)
+        (SchwartzMap.compCLMOfContinuousLinearEquiv ℂ D f) =
+      SchwartzMap.compCLMOfContinuousLinearEquiv ℂ D
+        (((LineDeriv.lineDerivOpCLM ℂ (SchwartzMap ℂ ℂ) (D (d i)) : _ →L[ℂ] _) ^ k) f) := by
+    induction k generalizing f with
+    | zero => rfl
+    | succ k ih =>
+      rw [pow_succ', pow_succ', mul_apply_eq_comp, mul_apply_eq_comp, ih]
+      exact SchwartzMap.lineDerivOp_compCLMOfContinuousLinearEquiv ℂ _ D _
+  unfold coordinateDerivative
+  generalize (Finset.univ.toList : List ι) = l
+  induction l generalizing f with
+  | nil => rfl
+  | cons i l ih =>
+    simp only [List.map_cons, List.prod_cons, mul_apply_eq_comp]
+    rw [ih, hp]
+
+
+private theorem complexTemperedDistribution_eq_sum_diracDerivative_point_complex_span
+    (T : StrongDual ℂ (SchwartzMap ℂ ℂ)) (hT : TemperedSupportedAtOrigin T) :
+    T ∈ Submodule.span ℂ (Set.range (fun p : ℕ × ℕ ↦ complexDiracDerivative p.1 p.2)) := by
+  classical
+  obtain ⟨D, N, c, hrep⟩ := complexTemperedDistribution_eq_sum_diracDerivative_point_real_decomposition T hT
+  let E := EuclideanSpace ℝ (Fin 2 ⊕ Fin 0)
+  let I := {α : (Fin 2 ⊕ Fin 0) → Fin (N + 1) // (∑ i, (α i).val) ≤ N}
+  let d : Fin 2 ⊕ Fin 0 → E := fun i ↦ WithLp.toLp 2 (Pi.single i (1 : ℝ))
+  let Q (α : I) := coordinateDerivative (fun i ↦
+    (LineDeriv.lineDerivOpCLM ℂ (SchwartzMap ℂ ℂ) (D (d i)) : _ →L[ℂ] _)) (fun i ↦ (α.val i).val)
+  let V (α : I) := (TemperedDistribution.delta (0 : ℂ)).comp (Q α)
+  have he : T = ∑ α : I, c α • V α := by
+    ext f
+    have hh := hrep (SchwartzMap.compCLMOfContinuousLinearEquiv ℂ D f)
+    have hi : SchwartzMap.compCLMOfContinuousLinearEquiv ℂ D.symm
+        (SchwartzMap.compCLMOfContinuousLinearEquiv ℂ D f) = f := by
+      ext z
+      change f (D (D.symm z)) = f z
+      rw [D.apply_symm_apply]
+    rw [hi] at hh
+    rw [hh]
+    simp only [sum_apply, smul_apply, smul_eq_mul]
+    apply Finset.sum_congr rfl
+    intro α hα
+    change c α * _ = c α * (Q α f) 0
+    congr 1
+    have hp := congrArg (fun φ : SchwartzMap E ℂ ↦ φ 0)
+      (complexTemperedDistribution_eq_sum_diracDerivative_coordinate_pull E (Fin 2 ⊕ Fin 0) D d (fun i ↦ (α.val i).val) f)
+    change _ = (Q α f) (D 0) at hp
+    simpa only [map_zero] using hp
+  rw [he]
+  apply Submodule.sum_mem
+  intro α hα
+  apply Submodule.smul_mem
+  exact complexTemperedDistribution_eq_sum_diracDerivative_coordinate_functional_span (Fin 2 ⊕ Fin 0) (fun i ↦ D (d i)) (fun i ↦ (α.val i).val)
+end ComplexPointSupportHelpers
+
 /-- Paper: Theorem 5.3.2.5, p. 246.
 Every complex tempered distribution supported at zero is a finite linear combination of
 mixed Wirtinger derivatives of the Dirac distribution. -/
@@ -3478,7 +4849,27 @@ theorem complexTemperedDistribution_eq_sum_diracDerivative (T : StrongDual ℂ �
     (hT : TemperedSupportedAtOrigin T) :
     ∃ (N : ℕ) (c : (k : Fin (N + 1)) → Fin (N + 1 - k.val) → ℂ),
       T = ∑ k : Fin (N + 1), ∑ l : Fin (N + 1 - k.val),
-        c k l • complexDiracDerivative k.val l.val := by sorry
+        c k l • complexDiracDerivative k.val l.val := by
+  classical
+  obtain ⟨a,ha⟩ := Finsupp.mem_span_range_iff_exists_finsupp.mp (complexTemperedDistribution_eq_sum_diracDerivative_point_complex_span T hT)
+  let N := a.support.sup (fun p ↦ p.1+p.2)
+  let I := (k : Fin (N+1)) × Fin (N+1-k.val)
+  let e : I ↪ ℕ × ℕ :=
+    { toFun := fun u ↦ (u.1.val, u.2.val)
+      inj' := by
+        rintro ⟨k,l⟩ ⟨k',l'⟩ h
+        have hk : k = k' := Fin.ext (congrArg Prod.fst h)
+        subst k'
+        congr
+        exact Fin.ext (congrArg Prod.snd h) }
+  have hs : a.support ⊆ Finset.univ.map e := by
+    rintro ⟨k,l⟩ hp
+    have hb : k+l ≤ N := Finset.le_sup (f := fun p : ℕ × ℕ ↦ p.1+p.2) hp
+    let u : I := ⟨⟨k, by omega⟩, ⟨l, by change l < N+1-k; omega⟩⟩
+    exact Finset.mem_map.mpr ⟨u, Finset.mem_univ _, rfl⟩
+  refine ⟨N, fun k l ↦ a (k.val,l.val), ?_⟩
+  rw [← ha, a.sum_of_support_subset hs _ (by intro p hp; simp), Finset.sum_map]
+  exact Fintype.sum_sigma' (fun (k : Fin (N+1)) (l : Fin (N+1-k.val)) ↦ a (k.val,l.val) • complexDiracDerivative k.val l.val)
 
 /-- Paper: Theorem 5.3.2.5(1), p. 246.
 The flat complex Schwartz subspace is the common kernel of the mixed Dirac derivatives. -/
@@ -3502,36 +4893,6 @@ theorem complexSchwartzFlatAtOrigin_isClosed :
     IsClosed (complexSchwartzFlatAtOrigin : Set 𝓢(ℂ, ℂ)) := by
   simp only [complexSchwartzFlatAtOrigin, Submodule.coe_iInf]
   exact isClosed_iInter fun k ↦ isClosed_iInter fun l ↦ (complexDiracDerivative k l).isClosed_ker
-
-/-- Paper: Theorem 5.3.2.5(1), p. 246.
-The quotient adjoint identifies the strong dual of the complex flat quotient with
-the annihilator in the strong dual of the complex Schwartz space. -/
-theorem complexSchwartzFlatQuotient_strongDual :
-    let pull := fun T : StrongDual ℂ (𝓢(ℂ, ℂ) ⧸ complexSchwartzFlatAtOrigin) ↦
-      T.comp complexSchwartzFlatAtOrigin.mkQL
-    IsEmbedding pull ∧ Set.range pull =
-      {T : StrongDual ℂ 𝓢(ℂ, ℂ) | ∀ f ∈ complexSchwartzFlatAtOrigin, T f = 0} := by sorry
-
--- TODO(paper-gap): The coefficient seminorms in (5.3.2.12) give the coefficientwise
--- topology on the whole polynomial space and do not give its finest locally convex topology.
-
-/-- Paper: Theorem 5.3.2.5(1), p. 246.
-Polynomials in two variables with the finest locally convex topology identify with the strong
-dual of the complex flat quotient through factorial-normalized mixed Dirac derivatives.
-The least order bound of the distribution is the polynomial's total degree.
-Deviation: Uses the finest locally convex topology and omits the false equivalence in
-(5.3.2.12). -/
-theorem complexDiracDerivatives_polynomialEquiv :
-    ∃ e : FinestLocallyConvex (MvPolynomial (Fin 2) ℂ) ≃L[ℂ]
-        StrongDual ℂ (𝓢(ℂ, ℂ) ⧸ complexSchwartzFlatAtOrigin),
-      (∀ s : Fin 2 →₀ ℕ, ∀ f : 𝓢(ℂ, ℂ),
-        e (MvPolynomial.monomial s 1) (complexSchwartzFlatAtOrigin.mkQ f) =
-          complexDiracDerivative (s 0) (s 1) f /
-            ((s 0).factorial * (s 1).factorial : ℂ)) ∧
-      ∀ (p : MvPolynomial (Fin 2) ℂ) (N : ℕ),
-        DistributionOrderLE
-          (fun f : 𝒟ℂ ↦ e p (complexSchwartzFlatAtOrigin.mkQ
-            (f.hasCompactSupport.toSchwartzMap f.contDiff))) N ↔ p.totalDegree ≤ N := by sorry
 
 -- TODO(paper-gap): Under ordinary coefficient pairing the adjoint on p. 249
 -- has a sign for each odd total degree and includes all degrees. The positive
@@ -4022,6 +5383,465 @@ theorem complexSchwartzTaylor_equiv :
   change MvPowerSeries.coeff d (TL f) = _
   rw [hTL, ha]
 
+
+/-- Paper: Theorem 5.3.2.5(1), p. 246.
+The quotient adjoint identifies the strong dual of the complex flat quotient with
+the annihilator in the strong dual of the complex Schwartz space. -/
+theorem complexSchwartzFlatQuotient_strongDual :
+    let pull := fun T : StrongDual ℂ (𝓢(ℂ, ℂ) ⧸ complexSchwartzFlatAtOrigin) ↦
+      T.comp complexSchwartzFlatAtOrigin.mkQL
+    IsEmbedding pull ∧ Set.range pull =
+      {T : StrongDual ℂ 𝓢(ℂ, ℂ) | ∀ f ∈ complexSchwartzFlatAtOrigin, T f = 0} := by
+  intro pull
+  refine ⟨realSchwartzFlatQuotient_strongDual_isEmbedding _ ?_, ?_⟩
+  · let K := complexSchwartzFlatAtOrigin
+    let I := Fin 2 →₀ ℕ
+    let e := complexSchwartzTaylor_equiv.choose
+    let coeff : MvPowerSeries (Fin 2) ℂ →L[ℂ] (I → ℂ) :=
+      ContinuousLinearMap.pi fun i ↦ ⟨MvPowerSeries.coeff i, MvPowerSeries.WithPiTopology.continuous_coeff ℂ i⟩
+    let T := coeff.comp e.toContinuousLinearMap
+    have hback : Continuous (fun p : I → ℂ ↦ e.symm p) := e.symm.continuous
+    have hN : IsNuclearTVS.{0} (I → ℂ) :=
+      isNuclearTVS_pi (X := fun _ : I ↦ ℂ) (fun _ ↦ isNuclearTVS_of_finiteDimensional ℂ)
+    let : PolynormableSpace ℂ (I → ℂ) := hN.2.1
+    have : IsClosed (K : Set 𝓢(ℂ, ℂ)) := complexSchwartzFlatAtOrigin_isClosed
+    let : CompleteSpace 𝓢(ℂ, ℂ) := completeSpace_schwartzMap
+    have : (uniformity 𝓢(ℂ, ℂ)).IsCountablyGenerated := by
+      rw [uniformity_eq_comap_nhds_zero]
+      infer_instance
+    let := UniformSpace.pseudoMetricSpace 𝓢(ℂ, ℂ)
+    intro B hB
+    have hc := isCompact_closure_of_isNuclearTVS (I → ℂ) hN (hB.image T)
+    obtain ⟨A, hA, heq⟩ := exists_isCompact_image_eq_of_isOpenQuotientMap K.isOpenQuotientMap_mkQL
+      (hc.image hback)
+    refine ⟨A, hA.isVonNBounded ℂ, ?_⟩
+    intro y hy
+    change y ∈ K.mkQL '' A
+    rw [heq]
+    exact ⟨T y, subset_closure ⟨y, hy, rfl⟩, e.symm_apply_apply y⟩
+  · change Set.range (fun T : StrongDual ℂ (𝓢(ℂ, ℂ) ⧸ complexSchwartzFlatAtOrigin) ↦
+      T.comp complexSchwartzFlatAtOrigin.mkQL) = _
+    rw [range_transpose_mkQL]
+    ext T
+    simp [Set.mem_iInter]
+
+section ComplexPolynomialDualHelpers
+
+
+/-- A continuous functional on coefficientwise formal power series has finite coefficient support. -/
+private theorem complexDiracDerivatives_polynomialEquiv_poly_finite
+    (L : MvPowerSeries (Fin 2) ℂ →L[ℂ] ℂ) :
+    ∃ N : ℕ, ∀ s : MvPowerSeries (Fin 2) ℂ,
+      (∀ d : Fin 2 →₀ ℕ, d 0 + d 1 ≤ N → MvPowerSeries.coeff d s = 0) → L s = 0 := by
+  by_contra h
+  push Not at h
+  choose s hs0 hs using h
+  let t (N : ℕ) : MvPowerSeries (Fin 2) ℂ := (L (s N))⁻¹ • s N
+  have ht : Tendsto t atTop (𝓝 0) := by
+    rw [MvPowerSeries.WithPiTopology.tendsto_iff_coeff_tendsto]
+    intro d
+    rw [map_zero]
+    refine tendsto_const_nhds.congr' ?_
+    filter_upwards [eventually_ge_atTop (d 0 + d 1)] with N hN
+    simp [t, hs0 N d hN]
+  have h1 := (L.continuous.tendsto 0).comp ht
+  rw [map_zero] at h1
+  have h2 : ⇑L ∘ t = fun _ ↦ 1 := by
+    funext N
+    simp [t, inv_mul_cancel₀ (hs N)]
+  rw [h2] at h1
+  exact one_ne_zero (tendsto_nhds_unique tendsto_const_nhds h1)
+
+private theorem complexDiracDerivatives_polynomialEquiv_poly_box
+    (N : ℕ) :
+    ∃ t : Finset (Fin 2 →₀ ℕ), ∀ d : Fin 2 →₀ ℕ, d 0 + d 1 ≤ N → d ∈ t := by
+  classical
+  refine ⟨((Finset.range (N + 1)).product (Finset.range (N + 1))).image
+    (fun p ↦ Finsupp.equivFunOnFinite.symm ![p.1, p.2]), fun d hd ↦ ?_⟩
+  apply Finset.mem_image.mpr
+  refine ⟨(d 0, d 1), Finset.mem_product.mpr ⟨Finset.mem_range.mpr (by omega), Finset.mem_range.mpr (by omega)⟩, ?_⟩
+  ext i
+  fin_cases i <;> rfl
+
+private theorem complexDiracDerivatives_polynomialEquiv_poly_bounded
+    (w : (Fin 2 →₀ ℕ) → ℝ) :
+    Bornology.IsVonNBounded ℂ {b : MvPowerSeries (Fin 2) ℂ | ∀ d, ‖MvPowerSeries.coeff d b‖ ≤ w d} := by
+  change Bornology.IsVonNBounded ℂ {b : (Fin 2 →₀ ℕ) → ℂ | ∀ d, ‖b d‖ ≤ w d}
+  rw [Bornology.isVonNBounded_pi_iff]
+  intro d
+  apply (NormedSpace.isVonNBounded_iff ℂ).mpr
+  apply (Metric.isBounded_closedBall (x := (0 : ℂ)) (r := w d)).subset
+  rintro z ⟨b, hb, rfl⟩
+  simpa only [Metric.mem_closedBall, dist_zero_right] using hb d
+
+private theorem complexDiracDerivatives_polynomialEquiv_poly_algebra :
+    ∃ e : MvPolynomial (Fin 2) ℂ ≃ₗ[ℂ] StrongDual ℂ (SchwartzMap ℂ ℂ ⧸ complexSchwartzFlatAtOrigin),
+      ∀ (p : MvPolynomial (Fin 2) ℂ) (y : SchwartzMap ℂ ℂ ⧸ complexSchwartzFlatAtOrigin),
+        e p y = ∑ d ∈ p.support, p.coeff d * (-1 : ℂ) ^ (d 0 + d 1) *
+          MvPowerSeries.coeff d (complexSchwartzTaylor_equiv.choose y) := by
+  classical
+  let τ := complexSchwartzTaylor_equiv.choose
+  let cf (d : Fin 2 →₀ ℕ) : MvPowerSeries (Fin 2) ℂ →L[ℂ] ℂ :=
+    ⟨MvPowerSeries.coeff d, MvPowerSeries.WithPiTopology.continuous_coeff ℂ d⟩
+  let c (d : Fin 2 →₀ ℕ) : StrongDual ℂ (SchwartzMap ℂ ℂ ⧸ complexSchwartzFlatAtOrigin) :=
+    (-1 : ℂ) ^ (d 0 + d 1) • (cf d).comp τ.toContinuousLinearMap
+  have hc (d) (y : SchwartzMap ℂ ℂ ⧸ complexSchwartzFlatAtOrigin) :
+      c d y = (-1 : ℂ) ^ (d 0 + d 1) * MvPowerSeries.coeff d (τ y) := rfl
+  let Φ : MvPolynomial (Fin 2) ℂ →ₗ[ℂ] StrongDual ℂ (SchwartzMap ℂ ℂ ⧸ complexSchwartzFlatAtOrigin) :=
+    (Finsupp.linearCombination ℂ c).comp (AddMonoidAlgebra.coeffLinearEquiv ℂ).toLinearMap
+  have hΦ (p : MvPolynomial (Fin 2) ℂ) (y : SchwartzMap ℂ ℂ ⧸ complexSchwartzFlatAtOrigin) :
+      Φ p y = ∑ d ∈ p.support, p.coeff d * c d y := by
+    simp [Φ, Finsupp.linearCombination_apply, Finsupp.sum, sum_apply]
+    rfl
+  have hΦm (d : Fin 2 →₀ ℕ) (a : ℂ) : Φ (MvPolynomial.monomial d a) = a • c d := by
+    simp [Φ, MvPolynomial.monomial, Finsupp.linearCombination_apply]
+  have hinj : Function.Injective Φ := by
+    refine (injective_iff_map_eq_zero Φ).mpr fun p hp ↦ ?_
+    ext n
+    have h := congrArg (fun T : StrongDual ℂ (SchwartzMap ℂ ℂ ⧸ complexSchwartzFlatAtOrigin) ↦
+      T (τ.symm (MvPowerSeries.monomial n 1))) hp
+    simp only [hΦ, hc, ContinuousLinearEquiv.apply_symm_apply, MvPowerSeries.coeff_monomial,
+      zero_apply] at h
+    rw [Finset.sum_eq_single n (fun d _ hd ↦ by simp [hd])
+      (fun hn ↦ by simp [MvPolynomial.notMem_support_iff.mp hn])] at h
+    simpa using h
+  have hsurj : Function.Surjective Φ := by
+    intro T
+    let L : MvPowerSeries (Fin 2) ℂ →L[ℂ] ℂ := T.comp τ.symm.toContinuousLinearMap
+    obtain ⟨N, hN⟩ := complexDiracDerivatives_polynomialEquiv_poly_finite L
+    obtain ⟨t, ht⟩ := complexDiracDerivatives_polynomialEquiv_poly_box N
+    refine ⟨∑ d ∈ t, MvPolynomial.monomial d ((-1 : ℂ) ^ (d 0 + d 1) * L (MvPowerSeries.monomial d 1)), ?_⟩
+    ext y
+    rw [map_sum]
+    simp only [hΦm, sum_apply, smul_apply, hc, smul_eq_mul]
+    have hy : T y = L (τ y) := by simp [L]
+    have hs : L (τ y - ∑ d ∈ t, MvPowerSeries.coeff d (τ y) • MvPowerSeries.monomial d 1) = 0 := by
+      apply hN
+      intro m hm
+      rw [map_sub, map_sum]
+      simp [MvPowerSeries.coeff_monomial, ht m hm, Finset.sum_ite_eq]
+    rw [map_sub, map_sum, sub_eq_zero] at hs
+    rw [hy, hs]
+    refine Finset.sum_congr rfl fun d _ ↦ ?_
+    rw [map_smul, smul_eq_mul]
+    have he : (-1 : ℂ) ^ (d 0 + d 1) * (-1) ^ (d 0 + d 1) = 1 := by rw [← mul_pow]; norm_num
+    linear_combination (L (MvPowerSeries.monomial d 1) * MvPowerSeries.coeff d (τ y)) * he
+  refine ⟨LinearEquiv.ofBijective Φ ⟨hinj, hsurj⟩, fun p y ↦ ?_⟩
+  change Φ p y = _
+  rw [hΦ]
+  simp only [hc, mul_assoc]
+  rfl
+
+/-- Bounded coefficient polydiscs control every seminorm of the inverse strong-dual map. -/
+private theorem complexDiracDerivatives_polynomialEquiv_poly_topology :
+    ∃ e : FinestLocallyConvex (MvPolynomial (Fin 2) ℂ) ≃L[ℂ]
+        StrongDual ℂ (SchwartzMap ℂ ℂ ⧸ complexSchwartzFlatAtOrigin),
+      ∀ (p : MvPolynomial (Fin 2) ℂ) (y : SchwartzMap ℂ ℂ ⧸ complexSchwartzFlatAtOrigin),
+        e p y = ∑ d ∈ p.support, p.coeff d * (-1 : ℂ) ^ (d 0 + d 1) *
+          MvPowerSeries.coeff d (complexSchwartzTaylor_equiv.choose y) := by
+  classical
+  obtain ⟨e₀, he₀⟩ := complexDiracDerivatives_polynomialEquiv_poly_algebra
+  let τ := complexSchwartzTaylor_equiv.choose
+  let e₁ : FinestLocallyConvex (MvPolynomial (Fin 2) ℂ) ≃ₗ[ℂ]
+      StrongDual ℂ (SchwartzMap ℂ ℂ ⧸ complexSchwartzFlatAtOrigin) := e₀
+  have : IsClosed (complexSchwartzFlatAtOrigin : Set (SchwartzMap ℂ ℂ)) := complexSchwartzFlatAtOrigin_isClosed
+  let : UniformSpace (SchwartzMap ℂ ℂ ⧸ complexSchwartzFlatAtOrigin) :=
+    IsTopologicalAddGroup.rightUniformSpace _
+  let : IsUniformAddGroup (SchwartzMap ℂ ℂ ⧸ complexSchwartzFlatAtOrigin) :=
+    isUniformAddGroup_of_addCommGroup
+  let : PolynormableSpace ℂ (StrongDual ℂ (SchwartzMap ℂ ℂ ⧸ complexSchwartzFlatAtOrigin)) :=
+    uniformConvergenceCLM_polynormable (F := ℂ)
+      {B : Set (SchwartzMap ℂ ℂ ⧸ complexSchwartzFlatAtOrigin) | Bornology.IsVonNBounded ℂ B}
+      (fun _ h ↦ h)
+      (by rw [Bornology.sUnion_isVonNBounded_eq_univ, Submodule.span_univ]; simp)
+  have hcont : Continuous e₁ := continuous_of_finestLocallyConvex _ e₁.toLinearMap
+  have hsymm : Continuous e₁.symm := by
+    refine (finestLocallyConvex_withSeminorms (MvPolynomial (Fin 2) ℂ)).continuous_of_continuous_comp
+      e₁.symm.toLinearMap fun p ↦ ?_
+    refine Seminorm.continuous (r := 1) ?_
+    let w (d : Fin 2 →₀ ℕ) : ℝ := p (MvPolynomial.monomial d 1)
+    let B : Set (MvPowerSeries (Fin 2) ℂ) := {b | ∀ d, ‖MvPowerSeries.coeff d b‖ ≤ w d}
+    have hB := (complexDiracDerivatives_polynomialEquiv_poly_bounded w).image τ.symm.toContinuousLinearMap
+    filter_upwards [ContinuousLinearMap.eventually_nhds_zero_mapsTo hB
+      (Metric.ball_mem_nhds (0 : ℂ) one_pos)] with T hT
+    rw [Seminorm.mem_ball_zero]
+    change p (e₁.symm T) < 1
+    let q : MvPolynomial (Fin 2) ℂ := e₁.symm T
+    have hTq : T = e₀ q := by exact (e₁.apply_symm_apply T).symm
+    let b : MvPowerSeries (Fin 2) ℂ := fun d ↦
+      (-1 : ℂ) ^ (d 0 + d 1) * (w d : ℂ) * (star (q.coeff d) / (‖q.coeff d‖ : ℂ))
+    have hb : b ∈ B := by
+      intro d
+      have hw : 0 ≤ w d := apply_nonneg _ _
+      have hu : ‖star (q.coeff d) / (‖q.coeff d‖ : ℂ)‖ ≤ 1 := by
+        rw [norm_div, norm_star, Complex.norm_real, Real.norm_of_nonneg (norm_nonneg _)]
+        exact div_self_le_one _
+      change ‖(-1 : ℂ) ^ (d 0 + d 1) * (w d : ℂ) * _‖ ≤ w d
+      simpa only [norm_mul, norm_pow, norm_neg, norm_one, one_pow, one_mul,
+        Complex.norm_real, Real.norm_of_nonneg hw, mul_one] using mul_le_mul_of_nonneg_left hu hw
+    have hval : T (τ.symm b) = ((∑ d ∈ q.support, w d * ‖q.coeff d‖ : ℝ) : ℂ) := by
+      rw [hTq, he₀]
+      simp only [τ, ContinuousLinearEquiv.apply_symm_apply]
+      push_cast
+      refine Finset.sum_congr rfl fun d hd ↦ ?_
+      have hz : q.coeff d ≠ 0 := MvPolynomial.mem_support_iff.mp hd
+      have hn : (‖q.coeff d‖ : ℂ) ≠ 0 := by exact_mod_cast norm_ne_zero_iff.mpr hz
+      have hs : (-1 : ℂ) ^ (d 0 + d 1) * (-1) ^ (d 0 + d 1) = 1 := by rw [← mul_pow]; norm_num
+      change q.coeff d * (-1 : ℂ) ^ (d 0 + d 1) *
+        ((-1 : ℂ) ^ (d 0 + d 1) * (w d : ℂ) * (star (q.coeff d) / (‖q.coeff d‖ : ℂ))) = _
+      calc
+        _ = ((-1 : ℂ) ^ (d 0 + d 1) * (-1) ^ (d 0 + d 1)) * (w d : ℂ) *
+            (q.coeff d * star (q.coeff d)) / (‖q.coeff d‖ : ℂ) := by ring
+        _ = _ := by rw [hs, Complex.star_def, Complex.mul_conj']; field_simp
+    have hle : p q ≤ ∑ d ∈ q.support, w d * ‖q.coeff d‖ := by
+      conv_lhs => rw [q.as_sum]
+      refine (Finset.le_sum_of_subadditive p (map_zero p).le (map_add_le_add p) _ _).trans
+        (Finset.sum_le_sum fun d _ ↦ ?_)
+      rw [show MvPolynomial.monomial d (q.coeff d) = q.coeff d • MvPolynomial.monomial d 1 by
+        rw [MvPolynomial.smul_monomial, smul_eq_mul, mul_one], map_smul_eq_mul, mul_comm]
+    have hlt := hT ⟨b, hb, rfl⟩
+    rw [Metric.mem_ball, dist_zero_right] at hlt
+    change ‖T (τ.symm b)‖ < 1 at hlt
+    rw [hval, Complex.norm_real,
+      Real.norm_of_nonneg (Finset.sum_nonneg fun d _ ↦ mul_nonneg (apply_nonneg _ _) (norm_nonneg _))] at hlt
+    exact hle.trans_lt hlt
+  refine ⟨{e₁ with continuous_toFun := hcont, continuous_invFun := hsymm}, ?_⟩
+  exact he₀
+
+private theorem complexDiracDerivatives_polynomialEquiv_dir_norm
+    (v x : ℂ) (f : SchwartzMap ℂ ℂ) (n : ℕ) :
+    ‖iteratedFDeriv ℝ n (LineDeriv.lineDerivOp v f : ℂ → ℂ) x‖ ≤
+      ‖v‖ * ‖iteratedFDeriv ℝ (n + 1) (f : ℂ → ℂ) x‖ := by
+  have hf : ContDiff ℝ (n : ℕ∞ω) (fderiv ℝ (f : ℂ → ℂ)) :=
+    (f.smooth (n + 1)).fderiv_right (by simp)
+  have h := norm_iteratedFDeriv_clm_apply_const (c := v) (x := x) hf.contDiffAt le_rfl
+  have he : (LineDeriv.lineDerivOp v f : ℂ → ℂ) = fun y ↦ fderiv ℝ (f : ℂ → ℂ) y v :=
+    funext (SchwartzMap.lineDerivOp_apply_eq_fderiv v f)
+  rw [he]
+  simpa only [norm_iteratedFDeriv_fderiv] using h
+
+private theorem complexDiracDerivatives_polynomialEquiv_wirt_norm
+    (f : SchwartzMap ℂ ℂ) (n : ℕ) (x : ℂ) :
+    ‖iteratedFDeriv ℝ n (schwartzWirtingerZ f : ℂ → ℂ) x‖ ≤
+        ‖iteratedFDeriv ℝ (n + 1) (f : ℂ → ℂ) x‖ ∧
+    ‖iteratedFDeriv ℝ n (schwartzWirtingerZBar f : ℂ → ℂ) x‖ ≤
+        ‖iteratedFDeriv ℝ (n + 1) (f : ℂ → ℂ) x‖ := by
+  have h1 := complexDiracDerivatives_polynomialEquiv_dir_norm 1 x f n
+  have hI := complexDiracDerivatives_polynomialEquiv_dir_norm Complex.I x f n
+  simp only [norm_one, Complex.norm_I, one_mul] at h1 hI
+  have hd (g : SchwartzMap ℂ ℂ) (c : ℂ) :
+      iteratedFDeriv ℝ n (c • g : SchwartzMap ℂ ℂ) x = c • iteratedFDeriv ℝ n (g : ℂ → ℂ) x :=
+    by
+      change iteratedFDeriv ℝ n (fun z ↦ c • g z) x = _
+      exact iteratedFDeriv_const_smul_apply' (a := c) (g.smooth n).contDiffAt
+  have hsub (g h : SchwartzMap ℂ ℂ) :
+      iteratedFDeriv ℝ n (g - h : SchwartzMap ℂ ℂ) x =
+        iteratedFDeriv ℝ n (g : ℂ → ℂ) x - iteratedFDeriv ℝ n (h : ℂ → ℂ) x := by
+    change iteratedFDeriv ℝ n ((g : ℂ → ℂ) - (h : ℂ → ℂ)) x = _
+    exact iteratedFDeriv_sub_apply (g.smooth n).contDiffAt (h.smooth n).contDiffAt
+  have hadd (g h : SchwartzMap ℂ ℂ) :
+      iteratedFDeriv ℝ n (g + h : SchwartzMap ℂ ℂ) x =
+        iteratedFDeriv ℝ n (g : ℂ → ℂ) x + iteratedFDeriv ℝ n (h : ℂ → ℂ) x := by
+    change iteratedFDeriv ℝ n ((g : ℂ → ℂ) + (h : ℂ → ℂ)) x = _
+    exact iteratedFDeriv_add_apply (g.smooth n).contDiffAt (h.smooth n).contDiffAt
+  constructor
+  · change ‖iteratedFDeriv ℝ n (((2 : ℂ)⁻¹ • (LineDeriv.lineDerivOp (1 : ℂ) f -
+      Complex.I • LineDeriv.lineDerivOp Complex.I f)) : SchwartzMap ℂ ℂ) x‖ ≤ _
+    rw [hd, hsub, hd, norm_smul, show ‖(2 : ℂ)⁻¹‖ = (1/2 : ℝ) by norm_num]
+    refine (mul_le_mul_of_nonneg_left (norm_sub_le _ _) (by norm_num)).trans ?_
+    rw [norm_smul, Complex.norm_I, one_mul]
+    linarith
+  · change ‖iteratedFDeriv ℝ n (((2 : ℂ)⁻¹ • (LineDeriv.lineDerivOp (1 : ℂ) f +
+      Complex.I • LineDeriv.lineDerivOp Complex.I f)) : SchwartzMap ℂ ℂ) x‖ ≤ _
+    rw [hd, hadd, hd, norm_smul, show ‖(2 : ℂ)⁻¹‖ = (1/2 : ℝ) by norm_num]
+    refine (mul_le_mul_of_nonneg_left (norm_add_le _ _) (by norm_num)).trans ?_
+    rw [norm_smul, Complex.norm_I, one_mul]
+    linarith
+
+private theorem complexDiracDerivatives_polynomialEquiv_mixed_norm
+    (f : SchwartzMap ℂ ℂ) (k l : ℕ) (x : ℂ) :
+    ‖((schwartzWirtingerZ ^ k) ((schwartzWirtingerZBar ^ l) f)) x‖ ≤
+      ‖iteratedFDeriv ℝ (k + l) (f : ℂ → ℂ) x‖ := by
+  have hp (op : SchwartzMap ℂ ℂ →L[ℂ] SchwartzMap ℂ ℂ)
+      (ho : ∀ (f : SchwartzMap ℂ ℂ) (n : ℕ), ‖iteratedFDeriv ℝ n (op f : ℂ → ℂ) x‖ ≤
+        ‖iteratedFDeriv ℝ (n + 1) (f : ℂ → ℂ) x‖)
+      (m n : ℕ) (f : SchwartzMap ℂ ℂ) :
+      ‖iteratedFDeriv ℝ n ((op ^ m) f : ℂ → ℂ) x‖ ≤
+        ‖iteratedFDeriv ℝ (n + m) (f : ℂ → ℂ) x‖ := by
+    induction m generalizing n with
+    | zero => simp
+    | succ m ih =>
+      rw [pow_succ', mul_apply_eq_comp]
+      have h := (ho ((op ^ m) f) n).trans (ih (n + 1))
+      rw [show n + 1 + m = n + (m + 1) by omega] at h
+      exact h
+  have hz := hp schwartzWirtingerZ (fun f n ↦ (complexDiracDerivatives_polynomialEquiv_wirt_norm f n x).1) k 0 ((schwartzWirtingerZBar ^ l) f)
+  have hb := hp schwartzWirtingerZBar (fun f n ↦ (complexDiracDerivatives_polynomialEquiv_wirt_norm f n x).2) l k f
+  rw [zero_add, norm_iteratedFDeriv_zero] at hz
+  exact hz.trans hb
+
+private theorem complexDiracDerivatives_polynomialEquiv_dirac_bound
+    (f : SchwartzMap ℂ ℂ) (k l : ℕ) :
+    ‖complexDiracDerivative k l f / ((k.factorial * l.factorial : ℂ))‖ ≤
+      ‖iteratedFDeriv ℝ (k + l) (f : ℂ → ℂ) 0‖ := by
+  change ‖((-1 : ℂ) ^ (k + l) * ((schwartzWirtingerZ ^ k) ((schwartzWirtingerZBar ^ l) f)) 0) /
+    ((k.factorial * l.factorial : ℂ))‖ ≤ _
+  rw [norm_div, norm_mul, norm_pow, norm_neg, norm_one, one_pow, one_mul,
+    norm_mul, Complex.norm_natCast, Complex.norm_natCast]
+  have hf : (1 : ℝ) ≤ (k.factorial : ℝ) * (l.factorial : ℝ) := by
+    have hk : (1 : ℝ) ≤ k.factorial := mod_cast k.factorial_pos
+    have hl : (1 : ℝ) ≤ l.factorial := mod_cast l.factorial_pos
+    nlinarith
+  exact (div_le_self (norm_nonneg _) hf).trans (complexDiracDerivatives_polynomialEquiv_mixed_norm f k l 0)
+
+private theorem complexDiracDerivatives_polynomialEquiv_poly_weight
+    (d : Fin 2 →₀ ℕ) : d.sum (fun _ n ↦ n) = d 0 + d 1 := by
+  rw [Finsupp.sum_fintype _ _ (by intro i; rfl), Fin.sum_univ_two]
+
+private theorem complexDiracDerivatives_polynomialEquiv_poly_upper
+    (e : FinestLocallyConvex (MvPolynomial (Fin 2) ℂ) ≃L[ℂ]
+      StrongDual ℂ (SchwartzMap ℂ ℂ ⧸ complexSchwartzFlatAtOrigin))
+    (hev : ∀ (p : MvPolynomial (Fin 2) ℂ) (g : SchwartzMap ℂ ℂ), e p (complexSchwartzFlatAtOrigin.mkQ g) =
+      ∑ d ∈ p.support, p.coeff d * (complexDiracDerivative (d 0) (d 1) g /
+        ((d 0).factorial * (d 1).factorial : ℂ)))
+    (p : MvPolynomial (Fin 2) ℂ) (N : ℕ) (hdeg : p.totalDegree ≤ N) :
+    DistributionOrderLE (fun f : TestFunction (⊤ : TopologicalSpace.Opens ℂ) ℂ ⊤ ↦
+      e p (complexSchwartzFlatAtOrigin.mkQ (f.hasCompactSupport.toSchwartzMap f.contDiff))) N := by
+  intro K
+  refine ⟨∑ d ∈ p.support, ‖p.coeff d‖, Finset.sum_nonneg fun _ _ ↦ norm_nonneg _, fun f _ B _ hf ↦ ?_⟩
+  beta_reduce
+  rw [hev, Finset.sum_mul]
+  refine (norm_sum_le _ _).trans (Finset.sum_le_sum fun d hd ↦ ?_)
+  rw [norm_mul]
+  apply mul_le_mul_of_nonneg_left _ (norm_nonneg _)
+  have hdN : d 0 + d 1 ≤ N := by
+    have h := (MvPolynomial.le_totalDegree hd).trans hdeg
+    simpa only [complexDiracDerivatives_polynomialEquiv_poly_weight] using h
+  exact (complexDiracDerivatives_polynomialEquiv_dirac_bound _ _ _).trans (hf _ hdN 0)
+
+/-- Shrinking mixed-monomial bumps isolate a coefficient while all lower-order derivatives vanish in norm. -/
+private theorem complexDiracDerivatives_polynomialEquiv_poly_lower
+    (e : FinestLocallyConvex (MvPolynomial (Fin 2) ℂ) ≃L[ℂ]
+      StrongDual ℂ (SchwartzMap ℂ ℂ ⧸ complexSchwartzFlatAtOrigin))
+    (hev : ∀ (p : MvPolynomial (Fin 2) ℂ) (g : SchwartzMap ℂ ℂ), e p (complexSchwartzFlatAtOrigin.mkQ g) =
+      ∑ d ∈ p.support, p.coeff d * (complexDiracDerivative (d 0) (d 1) g /
+        ((d 0).factorial * (d 1).factorial : ℂ)))
+    (p : MvPolynomial (Fin 2) ℂ) (N : ℕ)
+    (hord : DistributionOrderLE (fun f : TestFunction (⊤ : TopologicalSpace.Opens ℂ) ℂ ⊤ ↦
+      e p (complexSchwartzFlatAtOrigin.mkQ (f.hasCompactSupport.toSchwartzMap f.contDiff))) N) :
+    p.totalDegree ≤ N := by
+  classical
+  rw [MvPolynomial.totalDegree]
+  apply Finset.sup_le
+  intro d hd
+  rw [complexDiracDerivatives_polynomialEquiv_poly_weight]
+  by_contra hdn
+  have hn : N < d 0 + d 1 := by omega
+  have hpd : p.coeff d ≠ 0 := MvPolynomial.mem_support_iff.mp hd
+  have hpd' : 0 < ‖p.coeff d‖ := norm_pos_iff.mpr hpd
+  let K0 : Compacts ℂ := ⟨Metric.closedBall 0 1, isCompact_closedBall 0 1⟩
+  obtain ⟨C, hC0, hC⟩ := hord K0
+  obtain ⟨G, hG, hscale⟩ := complexSchwartzTaylor_equiv_bump (d 0) (d 1)
+  let A : ℝ := ∑ j ∈ Finset.range (N + 1), SchwartzMap.seminorm ℂ 0 j G
+  have hA : 0 ≤ A := Finset.sum_nonneg fun _ _ ↦ apply_nonneg _ _
+  let ε : ℝ := min 1 (‖p.coeff d‖ / (2 * (C * A + 1)))
+  have hε : 0 < ε := lt_min one_pos (by positivity)
+  have hε1 : ε ≤ 1 := min_le_left _ _
+  have hε2 : ε * (2 * (C * A + 1)) ≤ ‖p.coeff d‖ := (le_div_iff₀ (by positivity)).mp (min_le_right _ _)
+  obtain ⟨ψ, hψ, hjets⟩ := hscale ε hε
+  have hψsupp : tsupport (ψ : ℂ → ℂ) ⊆ Metric.closedBall 0 1 := by
+    refine closure_minimal (fun z hz ↦ ?_) Metric.isClosed_closedBall
+    rw [mem_support, hψ] at hz
+    have hzG : ε⁻¹ • z ∈ tsupport (G : ℂ → ℂ) := subset_tsupport _ (right_ne_zero_of_mul hz)
+    have hb := hG hzG
+    rw [Metric.mem_closedBall, dist_zero_right, norm_smul, Real.norm_eq_abs,
+      abs_inv, abs_of_pos hε, inv_mul_le_iff₀ hε, mul_one] at hb
+    rw [Metric.mem_closedBall, dist_zero_right]
+    exact hb.trans hε1
+  have hψc : HasCompactSupport (ψ : ℂ → ℂ) :=
+    (isCompact_closedBall (0 : ℂ) 1).of_isClosed_subset (isClosed_tsupport _) hψsupp
+  let φ : TestFunction (⊤ : TopologicalSpace.Opens ℂ) ℂ ⊤ := ⟨ψ, ψ.smooth ⊤, hψc, by simp⟩
+  have hφ : φ.hasCompactSupport.toSchwartzMap φ.contDiff = ψ := by ext; rfl
+  have hbound := hC φ hψsupp (ε * A) (by positivity) fun j hj z ↦ by
+    change ‖iteratedFDeriv ℝ j (ψ : ℂ → ℂ) z‖ ≤ ε * A
+    have h1 : ‖iteratedFDeriv ℝ j (ψ : ℂ → ℂ) z‖ ≤ SchwartzMap.seminorm ℂ 0 j ψ := by
+      simpa using SchwartzMap.le_seminorm ℂ 0 j ψ z
+    have h2 := complexSchwartzTaylor_equiv_scaled G ψ (d 0 + d 1) j 0 hG ε hε hε1 (by omega) hψ
+    have h3 : SchwartzMap.seminorm ℂ 0 j G ≤ A :=
+      Finset.single_le_sum (fun _ _ ↦ apply_nonneg _ _) (Finset.mem_range.mpr (by omega))
+    exact h1.trans (h2.trans (mul_le_mul_of_nonneg_left h3 hε.le))
+  beta_reduce at hbound
+  rw [hφ, hev] at hbound
+  have hjet (q : Fin 2 →₀ ℕ) : complexDiracDerivative (q 0) (q 1) ψ /
+      ((q 0).factorial * (q 1).factorial : ℂ) = if q = d then (-1 : ℂ) ^ (d 0 + d 1) else 0 := by
+    change ((-1 : ℂ) ^ (q 0 + q 1) * ((schwartzWirtingerZ ^ (q 0)) ((schwartzWirtingerZBar ^ (q 1)) ψ)) 0) / _ = _
+    rw [hjets]
+    by_cases h : q = d
+    · subst q
+      simp only [↓reduceIte, and_self]
+      rw [mul_div_assoc, div_self (mul_ne_zero (by exact_mod_cast Nat.factorial_ne_zero (d 0))
+        (by exact_mod_cast Nat.factorial_ne_zero (d 1))), mul_one]
+    · have he : ¬ (q 0 = d 0 ∧ q 1 = d 1) := by
+        rintro ⟨h0, h1⟩
+        apply h
+        ext i
+        fin_cases i <;> assumption
+      simp [he, h]
+  have hsum : ∑ q ∈ p.support, p.coeff q * (complexDiracDerivative (q 0) (q 1) ψ /
+      ((q 0).factorial * (q 1).factorial : ℂ)) = p.coeff d * (-1 : ℂ) ^ (d 0 + d 1) := by
+    simp_rw [hjet]
+    rw [Finset.sum_eq_single d]
+    · simp
+    · intro q hq hqd
+      simp [hqd]
+    · exact fun h ↦ False.elim (h hd)
+  rw [hsum, norm_mul, norm_pow, norm_neg, norm_one, one_pow, mul_one] at hbound
+  have hCA : 0 ≤ C * (ε * A) := by positivity
+  nlinarith
+end ComplexPolynomialDualHelpers
+
+-- TODO(paper-gap): The coefficient seminorms in (5.3.2.12) give the coefficientwise
+-- topology on the whole polynomial space and do not give its finest locally convex topology.
+
+/-- Paper: Theorem 5.3.2.5(1), p. 246.
+Polynomials in two variables with the finest locally convex topology identify with the strong
+dual of the complex flat quotient through factorial-normalized mixed Dirac derivatives.
+The least order bound of the distribution is the polynomial's total degree.
+Deviation: Uses the finest locally convex topology and omits the false equivalence in
+(5.3.2.12). -/
+theorem complexDiracDerivatives_polynomialEquiv :
+    ∃ e : FinestLocallyConvex (MvPolynomial (Fin 2) ℂ) ≃L[ℂ]
+        StrongDual ℂ (𝓢(ℂ, ℂ) ⧸ complexSchwartzFlatAtOrigin),
+      (∀ s : Fin 2 →₀ ℕ, ∀ f : 𝓢(ℂ, ℂ),
+        e (MvPolynomial.monomial s 1) (complexSchwartzFlatAtOrigin.mkQ f) =
+          complexDiracDerivative (s 0) (s 1) f /
+            ((s 0).factorial * (s 1).factorial : ℂ)) ∧
+      ∀ (p : MvPolynomial (Fin 2) ℂ) (N : ℕ),
+        DistributionOrderLE
+          (fun f : 𝒟ℂ ↦ e p (complexSchwartzFlatAtOrigin.mkQ
+            (f.hasCompactSupport.toSchwartzMap f.contDiff))) N ↔ p.totalDegree ≤ N := by
+  obtain ⟨e,he⟩ := complexDiracDerivatives_polynomialEquiv_poly_topology
+  have hcf (d : Fin 2 →₀ ℕ) (f : SchwartzMap ℂ ℂ) :
+      (-1 : ℂ)^(d 0+d 1) * MvPowerSeries.coeff d
+        (complexSchwartzTaylor_equiv.choose (complexSchwartzFlatAtOrigin.mkQ f)) =
+      complexDiracDerivative (d 0) (d 1) f / ((d 0).factorial * (d 1).factorial : ℂ) := by
+    rw [complexSchwartzTaylor_equiv.choose_spec]
+    change (-1 : ℂ)^(d 0+d 1) *
+      (((schwartzWirtingerZ^(d 0)) ((schwartzWirtingerZBar^(d 1)) f)) 0 /
+        ((d 0).factorial * (d 1).factorial : ℂ)) =
+      ((-1 : ℂ)^(d 0+d 1) * ((schwartzWirtingerZ^(d 0)) ((schwartzWirtingerZBar^(d 1)) f)) 0) /
+        ((d 0).factorial * (d 1).factorial : ℂ)
+    ring
+  have hev (p : MvPolynomial (Fin 2) ℂ) (f : SchwartzMap ℂ ℂ) :
+      e p (complexSchwartzFlatAtOrigin.mkQ f) =
+      ∑ d ∈ p.support, p.coeff d * (complexDiracDerivative (d 0) (d 1) f /
+        ((d 0).factorial * (d 1).factorial : ℂ)) := by
+    rw [he]
+    exact Finset.sum_congr rfl fun d _ ↦ by rw [mul_assoc, hcf]
+  refine ⟨e, ?_, fun p N ↦ ⟨complexDiracDerivatives_polynomialEquiv_poly_lower e hev p N, complexDiracDerivatives_polynomialEquiv_poly_upper e hev p N⟩⟩
+  intro s f
+  rw [hev]
+  simp [MvPolynomial.support_monomial, MvPolynomial.coeff_monomial]
 
 end ComplexOrigin
 

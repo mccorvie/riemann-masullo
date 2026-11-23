@@ -445,8 +445,6 @@ theorem Printed.spectralLineCompletion_descends_false :
   obtain ⟨t, ht, hz⟩ := exists_ratLinePositiveZero
   exact spectralLineCompletion_descends_false_of_zero t ht hz
 
-end CompletionCounterexample
-
 /-- Paper: Diagram (10.4.3.2), p. 465. As printed: the lower right arrow
 induced by bare completion is injective. On representatives, if the
 completed vector belongs to the twisted theta closure, the source
@@ -460,17 +458,78 @@ def Printed.spectralLineCompletion_quotientInjective : Prop :=
       v ∈ thetaClosure(F, ω, a, s) →
       ∃ f : adelePolarSubspace F, u.val.val = θ(ω, f)
 
-/-- Paper: Diagram (10.4.3.2), p. 465. Take `F = ℚ`, the trivial isotype,
-`a = 2` and `s = 4`. The polar-free test with real factor
-`G − 3G(2 ·) + 2G(4 ·)` for `G(x) = exp(−πx²)` and integral finite
-indicator has twisted theta with nowhere-zero Fourier transform in log norm.
-Its translates span a dense subspace of the completed trivial isotype.
-For a zeta zero with ordinate `γ > 0`, use a nonzero nonnegative smooth
-log-norm bump supported in `|x| < π/(4γ)`. Its Mellin value has positive
-real part there. It represents a nonzero source class and its completion
-is in the twisted theta closure. -/
+/-- Real norm weights preserve the two-sided decay space and the trivial
+norm-one isotype. -/
+private theorem ratLineCompletion_weightedTest (a : ℝ) (u : E₀) :
+    ∃ u' : E₀, u'.val.val = modulationWeight m a u.val.val := by
+  have hJ : (fun b : ℝ ↦ b - a) '' univ = univ :=
+    image_univ_of_surjective fun b ↦ ⟨b + a, add_sub_cancel_right b a⟩
+  obtain ⟨e, he⟩ : ∃ e : U ≃L[ℂ] U, ∀ f, (e f).val = modulationWeight m a f.val := by
+    exact (congrArg (fun J : Set ℝ ↦ ∃ e : U ≃L[ℂ] ModulatedExponentialDecay m J,
+      ∀ f, (e f).val = modulationWeight m a f.val) hJ).mp
+      (modulatedExponentialDecay_shift_equiv m univ hm hsurj ordConnected_univ univ_nonempty a)
+  refine ⟨⟨e u.val, (mem_modulatedDecayIsotype_iff m 1 univ (mem_univ _) _).mpr ?_⟩, he _⟩
+  intro k x
+  have hk : ideleClassNorm ℚ k.val = 1 := k.property
+  have hn : ideleClassNorm ℚ (k.val⁻¹ * x) = ideleClassNorm ℚ x := by
+    rw [map_mul, map_inv, hk, inv_one, one_mul]
+  have hu := (mem_modulatedDecayIsotype_iff m 1 univ (mem_univ _) _).mp u.property k x
+  simp only [PontryaginDual.one_apply, Circle.coe_one, one_mul] at hu ⊢
+  rw [he]
+  change (↑((((ideleClassNorm ℚ (k.val⁻¹ * x)).val : ℝ) ^ a)) : ℂ) *
+      u.val.val (k.val⁻¹ * x) =
+    (↑((((ideleClassNorm ℚ x).val : ℝ) ^ a)) : ℂ) * u.val.val x
+  rw [hn, hu]
+
+/-- Paper: Diagram (10.4.3.2), p. 465. Over the rationals in the trivial
+isotype, twist the same polar-free theta used in the descent counterexample
+by the exponent `-1/2`. Its completed vector is a twisted generator. Its
+Mellin value at the certified critical-line zero is the nonzero imaginary-axis
+value of the untwisted test, so it cannot itself be an untwisted theta. -/
 theorem Printed.spectralLineCompletion_quotientInjective_false :
-    ¬ Printed.spectralLineCompletion_quotientInjective := by sorry
+    ¬ Printed.spectralLineCompletion_quotientInjective := by
+  intro hinj
+  obtain ⟨t, ht, hz⟩ := exists_ratLinePositiveZero
+  let a : ℝ := -1 / 2
+  let z := shift((1 / 2 : ℝ), t)
+  obtain ⟨f, hf⟩ := exists_polar_eval_ne_zero t ht
+  obtain ⟨u, hu⟩ := exists_ratHomogeneousTheta_decay f
+  obtain ⟨u', hu'⟩ := ratLineCompletion_weightedTest a u
+  have hrep : u'.val.val = modulationWeight m a (θ₁(f.val)) := hu'.trans (congrArg _ hu)
+  obtain ⟨v, hv⟩ := exists_ratLineRepresentative u'
+  obtain ⟨g, hg⟩ := hinj ℚ 1 a 2 (by norm_num) u' v hv
+    (subset_closure ⟨f, hv.trans (.of_eq hrep)⟩)
+  have hshift : (a : ℂ) + z = (t : ℂ) * Complex.I := by
+    simp [a, z, Complex.ofReal_div]
+    ring
+  have hregular := ratUnitaryTwist_regular (z := z)
+    (fun h ↦ by
+      have he := congrArg Complex.re h
+      norm_num [z, Complex.mul_re] at he)
+    (fun h ↦ by
+      have he := congrArg Complex.re h
+      norm_num [z, Complex.mul_re] at he)
+  have hG : ΛG z = 0 := by
+    rw [gaussianRat_eq_continued]
+    by_contra h
+    have hL := (continuedCompletedHeckeL_spec (1 : PontryaginDual C)).1 (mem_univ z)
+    have ho := hL.meromorphicOrderAt_eq_zero_iff.mpr h
+    exact (lt_irrefl 0) (ho ▸ hz)
+  have he : (∫ x, θ₁(g.val) x * c(z) x ∂μC) =
+      ∫ x, θ₁(f.val) x * c((t : ℂ) * Complex.I) x ∂μC := by
+    simp only [← hg, hrep]
+    apply integral_congr_ae
+    exact ae_of_all _ fun x ↦ by
+      simpa only [hshift] using ratNormTwist_modulationWeight a z (θ₁(f.val)) x
+  rw [ratHomogeneousTheta_mellin, ratHomogeneousTheta_mellin] at he
+  obtain ⟨D, -, -, hD⟩ := adelicEigendistribution_normalized (1 : PontryaginDual C)
+  rw [hD _ hregular.1 hregular.2 g.val, hG, zero_mul, mul_zero] at he
+  let : (μ₁).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique ℚ).exists.choose_spec.2.2.2.1
+  let : CompactSpace K := (ideleClassGroup_finiteness ℚ).2.1
+  exact (mul_ne_zero (Complex.ofReal_ne_zero.mpr (measureReal_univ_pos (μ := μ₁)).ne') hf) he.symm
+
+end CompletionCounterexample
 
 local notation "zeroOrder(" χ ", " a ", " t ")" =>
   meromorphicOrderAt (continuedCompletedHeckeL χ) ((a : ℂ) + (t : ℂ) * Complex.I)

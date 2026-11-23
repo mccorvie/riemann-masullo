@@ -4261,10 +4261,13 @@ theorem mem_schwartzBruhatInvariantSubmodule_iff
   rw [LinearMap.mem_ker]
   exact sub_eq_zero
 
-/-- Paper: (D.1.10.15), p. 789. Apply the compact-direction derivatives and the
-derivatives along the norm section, then multiply by a weight in the absolute log norm.
-Deviation: The radial derivatives use the exponential coordinate, so differentiation
-with respect to its parameter is the operator t∂t. -/
+/-- Paper: (D.1.10.15), p. 789. The helper takes the compact-direction and norm-section
+derivatives at `x` and multiplies by a weight evaluated at the absolute logarithm of `t`.
+
+Deviation: The weight parameter is independent of `x`. Taking `t = n x` and
+`weight u = 1 + u ^ r` gives the weighted derivative used under the printed supremum.
+The radial derivatives use the exponential coordinate, so differentiation with respect
+to its parameter is the operator t∂t. -/
 def ideleClassWeightedDeriv {d : ℕ} (n : G →* ℝ≥0ˣ) (τ : ℝ≥0ˣ →ₜ* G)
     (γ : Fin d → LCATopologicalLie n.ker) (m : ℕ) (α : Fin d → ℕ) (weight : ℝ → ℝ)
     (f : SchwartzBruhat G) (t : ℝ≥0ˣ) (x : G) : ℂ :=
@@ -4284,9 +4287,9 @@ theorem bruhatDiffMonomial_zero {d : ℕ} (a : Fin d → LCATopologicalLie G) :
   rw [bruhatDiffMonomial, h]
   rfl
 
-/-- Paper: (D.1.10.15), p. 789. At zero differential orders the result is the
-value of the original function multiplied by the weight in the absolute log norm.
-Deviation: Sanity check on the derivatives and the argument of the weight. -/
+/-- Paper: (D.1.10.15), p. 789. At zero differential orders the value at `x` is
+multiplied by the weight at the absolute logarithm of `t`. Taking `t = n x` gives the
+norm argument in the printed expression. -/
 theorem ideleClassWeightedDeriv_zero {d : ℕ} (n : G →* ℝ≥0ˣ) (τ : ℝ≥0ˣ →ₜ* G)
     (γ : Fin d → LCATopologicalLie n.ker) (weight : ℝ → ℝ) (f : SchwartzBruhat G)
     (t : ℝ≥0ˣ) (x : G) :
@@ -4635,7 +4638,8 @@ private theorem compact_comap_openEmbedding (j : H →ₜ* G) (hj : IsOpenEmbedd
   have hr : IsClosed (range j) := j.toMonoidHom.range.isClosed_of_isOpen hj.isOpen_range
   exact (show IsClosedEmbedding j from ⟨hj.isEmbedding, hr⟩).isCompact_preimage hK
 
-private theorem openEmbedding_good_comap (j : H →ₜ* G) (hj : IsOpenEmbedding j) (K : Subgroup G)
+/-- An open embedding detects the Bruhat goodness of a compact subgroup on its preimage. -/
+theorem openEmbedding_good_comap (j : H →ₜ* G) (hj : IsOpenEmbedding j) (K : Subgroup G)
     (hK : IsCompact (K : Set G)) : IsBruhatGoodSubgroup (K.comap j.toMonoidHom) ↔ IsBruhatGoodSubgroup K := by
   have hL := compact_comap_openEmbedding j hj K hK
   have : IsClosed (K : Set G) := hK.isClosed

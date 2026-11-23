@@ -15,6 +15,9 @@ import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a_part2
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
+import RiemannMasullo.Ch03_IdelicZeta.Sec3
+import RiemannMasullo.Ch03_IdelicZeta.Sec2
+import RiemannMasullo.AppA_AlgebraicNT.Sec3
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec5
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec3b
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
@@ -3427,8 +3430,7 @@ private theorem sLocalPrincipalValue_homogeneous_comm {S₀ : Finset Places}
 private theorem sLocalPrincipalValue_tfae_three_four {S₀ : Finset Places}
     (h₀ : S₀ ⊆ S) (hn : S₀.Nonempty)
     (hPic : Subsingleton (CommRing.Pic ((S : Set Places).integer F)))
-    (χ : PontryaginDual C𝔽) (hχ : globalUnitary(χ) ∈ unramifiedOutside F S₀) (f : ℬₛ) :
-    let hS : globalUnitary(χ) ∈ unramifiedOutside F S := outsideS(h₀, hχ)
+    (χ : PontryaginDual C𝔽) (hS : globalUnitary(χ) ∈ unramifiedOutside F S) (f : ℬₛ) :
     let ω := globalNormOne(χ)
     let hω : NormOneCharacterUnramifiedOutside ω S := ⟨⟨globalUnitary(χ), hS⟩, fun _ ↦ rfl⟩
     let ωₛ := sLocalNormOneCharacter S ω hω
@@ -3436,7 +3438,7 @@ private theorem sLocalPrincipalValue_tfae_three_four {S₀ : Finset Places}
     let π := sLocalHomogeneousThetaToGlobal hω
     x ∈ (sLocalHomogeneousThetaPrincipalValue h₀ ωₛ).range ↔
       ∃ g : ℬ𝔽, (K𝔽(ω)).mkQ (adelePrincipalValue F S₀ g) = π x := by
-  intro hS ω hω ωₛ x π
+  intro ω hω ωₛ x π
   obtain ⟨e, he⟩ := sLocalHomogeneousThetaToGlobal_equiv_of_unramified hPic hω
   have heπ (z) : e z = π z := LinearMap.congr_fun he z
   let L := sAdeleSchwartzToGlobal F S
@@ -3457,6 +3459,25 @@ private theorem sLocalPrincipalValue_tfae_three_four {S₀ : Finset Places}
     refine ⟨Q u, e.injective ?_⟩
     exact (heπ _).trans ((hcomm u).trans
       ((sLocalPrincipalValue_global_congr ω (L u) g hu).trans (hg.trans (heπ x).symm)))
+
+/-- Vanishing of the selected highest coefficients gives a principal-value preimage
+on the component of a character unramified outside the ambient set of places. -/
+theorem sLocalPrincipalValue_mem_range_of_coeff_eq_zero {T : Finset Places}
+    (hT : T ⊆ S) (hn : T.Nonempty)
+    (hPic : Subsingleton (CommRing.Pic ((S : Set Places).integer F)))
+    (χ : PontryaginDual C𝔽) (hS : globalUnitary(χ) ∈ unramifiedOutside F S) (f : ℬₛ) :
+    let hω : NormOneCharacterUnramifiedOutside (globalNormOne(χ)) S :=
+      ⟨⟨globalUnitary(χ), hS⟩, fun _ ↦ rfl⟩
+    let ωₛ := sLocalNormOneCharacter S (globalNormOne(χ)) hω
+    (∀ c : Xₛ, onComponent(c, ωₛ) → 0 < sLocalFinitePoleMultiplicity T c →
+      ∀ k : ℕ, sLocalRhoPoleOrder c - sLocalFinitePoleMultiplicity T c < k →
+      k ≤ sLocalRhoPoleOrder c → sLocalPrincipalPartCoeff c k f = 0) →
+    (Kₛ(ωₛ)).mkQ f ∈ (sLocalHomogeneousThetaPrincipalValue hT ωₛ).range := by
+  intro hω ωₛ hf
+  apply (sLocalPrincipalValue_tfae_three_four hT hn hPic χ hS f).mpr
+  rw [sLocalHomogeneousThetaToGlobal_mk hω f]
+  exact (sLocalPrincipalValue_two_four hT χ hS (sAdeleSchwartzToGlobal F S f)).mp
+    ((sLocalPrincipalValue_tfae_one_two hT χ hS f).mp hf)
 
 open Classical in
 /-- Paper: Proposition 7.2.2.1, p. 339.
@@ -3488,7 +3509,7 @@ theorem sLocalPrincipalValue_tfae {S₀ : Finset Places} (h₀ : S₀ ⊆ S) (_h
     ] := by
   intro hS ω hω ωₛ x π Z
   tfae_have 1 ↔ 2 := sLocalPrincipalValue_tfae_one_two h₀ χ hS f
-  tfae_have 3 ↔ 4 := sLocalPrincipalValue_tfae_three_four h₀ _hn _hPic χ hχ f
+  tfae_have 3 ↔ 4 := sLocalPrincipalValue_tfae_three_four h₀ _hn _hPic χ hS f
   tfae_have 2 ↔ 4 := by
     have hπ : π x = (K𝔽(ω)).mkQ (sAdeleSchwartzToGlobal F S f) :=
       sLocalHomogeneousThetaToGlobal_mk hω f
@@ -3501,7 +3522,17 @@ local notation "polarValuesₛ" =>
 
 /-- Paper: Equation (7.2.2.3), p. 340.
 Evaluation at zero before and after S-adelic Fourier transform is complex linear. -/
-theorem sAdelePolarValues_isLinear : IsLinearMap ℂ polarValuesₛ := by sorry
+theorem sAdelePolarValues_isLinear : IsLinearMap ℂ polarValuesₛ := by
+  obtain ⟨T, hT⟩ := sLocal_fourier_continuousLinear (F := F) (S := S)
+  constructor
+  · intro f g
+    refine Prod.ext rfl ?_
+    rw [← hT, map_add, hT, hT]
+    rfl
+  · intro c f
+    refine Prod.ext rfl ?_
+    rw [← hT, map_smul, hT]
+    rfl
 
 variable (F S) in
 /-- Paper: Equation (7.2.2.3), p. 340.
@@ -3522,12 +3553,445 @@ theorem mem_sAdelePolarSubspace (f : ℬₛ) :
 Insertion with integer indicators outside S preserves the two zero evaluations
 that define the polar subspaces. -/
 theorem sAdeleSchwartzToGlobal_mem_polarSubspace (f : sAdelePolarSubspace F S) :
-    sAdeleSchwartzToGlobal F S f.val ∈ adelePolarSubspace F := by sorry
+    sAdeleSchwartzToGlobal F S f.val ∈ adelePolarSubspace F := by
+  classical
+  let : MeasurableSpace 𝔸[F] := borel _
+  let : MeasurableSpace Aₛ := instMeasurableSpaceSAdeleRing F S
+  obtain ⟨hf, hFourier⟩ := (mem_sAdelePolarSubspace f.val).mp f.property
+  apply (mem_adelePolarSubspace _).mpr
+  constructor
+  · rw [sAdeleSchwartzToGlobal_apply]
+    simp only [map_zero, hf, ite_self]
+  · obtain ⟨c, _, _, hm, _⟩ := sAdeleProjection_dual_masses F S
+    have hLift : (fun x ↦ sAdeleSchwartzToGlobal F S f.val (Multiplicative.ofAdd x)) =
+        (integralAdelesOutside F S : Set 𝔸[F]).indicator
+          ((fun x ↦ f.val (Multiplicative.ofAdd x)) ∘ adeleProjection F S) := by
+      funext x
+      rw [sAdeleSchwartzToGlobal_apply]
+      simp only [Set.indicator, SetLike.mem_coe, integralTail_iff, Function.comp_apply]
+    have h := congrFun (tamagawaFourier_sAdeleLift F S c hm
+      (fun x ↦ f.val (Multiplicative.ofAdd x)) (partialTensor_integrable F S f.val)) 0
+    change tamagawaFourier _ _ _ 0 = 0
+    rw [hLift, h]
+    change (sAdeleTailDual F S).indicator
+      (fun x ↦ (c : ℝ) • sAdeleSchwartzFourier f.val
+        (Multiplicative.ofAdd (adeleProjection F S x))) 0 = 0
+    simp only [Set.indicator, map_zero, hFourier, smul_zero, ite_self]
 
--- For the restricted range pullback (I225), insertion preserves evaluation at
--- zero and scales Fourier evaluation at zero by the nonzero outside additive
--- mass. The divided transform's two polar evaluations are described in
--- `globalPrincipalValueConverse_normTwist_divided_exact`.
+local notation "C₁" => (m𝔽).ker
+local notation "PicTrivial" => Subsingleton (CommRing.Pic ((S : Set Places).integer F))
+local notation "LocalChar(" ω ", " hω ")" => sLocalNormOneCharacter S ω hω
+
+/-- A character unramified outside S is determined by its local restriction when
+the S-integer Picard group is trivial. -/
+private theorem sLocalPolarPrincipalValue_character_eq_one (ω : PontryaginDual C₁)
+    (hω : NormOneCharacterUnramifiedOutside ω S) (hPic : PicTrivial)
+    (h : LocalChar(ω, hω) = 1) : ω = 1 := by
+  let := hPic
+  obtain ⟨e, he, -⟩ := sIdeleClassGroup_equiv_of_classNumberOne F S
+  apply PontryaginDual.ext
+  intro x
+  obtain ⟨x', hx⟩ := e.surjective x.val
+  obtain ⟨u, rfl⟩ := QuotientGroup.mk_surjective x'
+  rw [he] at hx
+  let g := Units.map (adeleProjection F S).toMonoidHom (integralIdeleInsertion F S u)
+  have hn : sIdeleQuotientNorm F S (QuotientGroup.mk g) = 1 := by
+    rw [sIdeleQuotientNorm_mk]
+    exact ((sIdeleNorm_spec F S).1 u).symm.trans ((congrArg m𝔽 hx).trans x.property)
+  let y : J₁ := ⟨QuotientGroup.mk g, hn⟩
+  have hh := sLocalNormOneCharacter_apply ω hω u x y hx.symm rfl
+  rw [h] at hh
+  exact hh.symm
+
+private theorem sLocalPolarPrincipalValue_chart_eq_one
+    [Subsingleton (CommRing.Pic ((S : Set Places).integer F))]
+    (χ : PontryaginDual C𝔽) (hS : globalUnitary(χ) ∈ unramifiedOutside F S) (s : ℂ) :
+    localChart(χ, hS) s = 1 ↔ ideleClassNormTwist χ s = 1 := by
+  constructor
+  · intro h
+    let hω : NormOneCharacterUnramifiedOutside (globalNormOne(χ)) S :=
+      ⟨⟨globalUnitary(χ), hS⟩, fun _ ↦ rfl⟩
+    obtain ⟨_, _, hcov, _⟩ := sLocalPrincipalValue_chart χ hS
+    have hlocal : LocalChar(globalNormOne(χ), hω) = 1 := by
+      apply PontryaginDual.ext
+      intro y
+      apply Subtype.ext
+      have hy := DFunLike.congr_fun (hcov s) y
+      change localChart(χ, hS) s y.val = (LocalChar(globalNormOne(χ), hω) y : ℂ) at hy
+      rw [h] at hy
+      exact hy.symm
+    have hw := sLocalPolarPrincipalValue_character_eq_one _ hω inferInstance hlocal
+    have hunit (x : (m𝔽).ker) : (χ x.val : ℂ) = 1 :=
+      congrArg (fun c : PontryaginDual C₁ ↦ (c x : ℂ)) hw
+    ext1 x
+    obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+    obtain ⟨g, hg⟩ := QuotientGroup.mk_surjective (σ (m𝔽 x))
+    let y : C𝔽 := QuotientGroup.mk (sIdeleInsertion F S g)
+    have hy : m𝔽 y = m𝔽 x := by
+      change ideleNorm F (sIdeleInsertion F S g) = _
+      rw [ideleNorm_sIdeleInsertion, ← sIdeleQuotientNorm_mk, hg, hσ]
+    have hn : m𝔽 (x / y) = 1 := by rw [map_div, hy, div_self']
+    have hz : ideleClassNormTwist χ s (x / y) = 1 := by
+      change (χ (x / y) : ℂ) * ((((m𝔽 (x / y)).val : ℝ) : ℂ) ^ s) = 1
+      rw [hunit ⟨_, hn⟩, hn, Units.val_one, NNReal.coe_one, Complex.ofReal_one, Complex.one_cpow, mul_one]
+    have hy' : ideleClassNormTwist χ s y = 1 :=
+      (sLocalPrincipalValue_chart_apply χ hS s g).symm.trans (DFunLike.congr_fun h _)
+    rwa [map_div, hy', div_one] at hz
+  · intro h
+    ext1 x
+    obtain ⟨g, rfl⟩ := QuotientGroup.mk_surjective x
+    rw [sLocalPrincipalValue_chart_apply, h]
+    rfl
+
+open Classical in
+private theorem sLocalPolarPrincipalValue_one_two {T : Finset Places} (hT : T ⊆ S)
+    [Subsingleton (CommRing.Pic ((S : Set Places).integer F))]
+    (χ : PontryaginDual C𝔽) (hS : globalUnitary(χ) ∈ unramifiedOutside F S)
+    (f : sAdelePolarSubspace F S) :
+    let hω : NormOneCharacterUnramifiedOutside (globalNormOne(χ)) S :=
+      ⟨⟨globalUnitary(χ), hS⟩, fun _ ↦ rfl⟩
+    let ωₛ := sLocalNormOneCharacter S (globalNormOne(χ)) hω
+    (∀ c : Xₛ, onComponent(c, ωₛ) → 0 < sLocalFinitePoleMultiplicity T c →
+      let m := sLocalRhoPoleOrder c
+      let n := sLocalFinitePoleMultiplicity T c
+      ∀ k : ℕ, (if c = 1 then m - n ≤ k ∧ k ≤ m - 1 else m - n < k ∧ k ≤ m) →
+        sLocalPrincipalPartCoeff c k f.val = 0) ↔
+    (∀ s : ℂ, 0 < sLocalFinitePoleMultiplicity T (localChart(χ, hS) s) →
+      (sLocalFinitePoleMultiplicity T (localChart(χ, hS) s) : WithTop ℤ) ≤
+        meromorphicOrderAt (gChart(χ, sAdeleSchwartzToGlobal F S f.val)) s) := by
+  intro hω ωₛ
+  obtain ⟨_, _, hcov, hsurj⟩ := sLocalPrincipalValue_chart χ hS
+  have horder (s : ℂ) (hn : 0 < sLocalFinitePoleMultiplicity T (localChart(χ, hS) s)) :
+      let c := localChart(χ, hS) s
+      let n := sLocalFinitePoleMultiplicity T c
+      let m := sLocalRhoPoleOrder c
+      (∀ k : ℕ, (if c = 1 then m - n ≤ k ∧ k ≤ m - 1 else m - n < k ∧ k ≤ m) →
+        sLocalPrincipalPartCoeff c k f.val = 0) ↔
+        (n : WithTop ℤ) ≤ meromorphicOrderAt (gChart(χ, sAdeleSchwartzToGlobal F S f.val)) s := by
+    intro c n m
+    have hbound (p : ℕ) (hp : 0 < p) (hpm : p ≤ m) :
+        (∀ k : ℕ, m - p < k → k ≤ m → sLocalPrincipalPartCoeff c k f.val = 0) ↔
+          ((if ideleClassNormTwist χ s = 1 then p - 1 else p : ℕ) : WithTop ℤ) ≤
+            meromorphicOrderAt (gChart(χ, sAdeleSchwartzToGlobal F S f.val)) s := by
+      have hre := (sLocalPrincipalValue_multiplier_order hT χ hS s).2.2 hn
+      rw [sLocalPrincipalValue_coeff_order, sLocalPrincipalValue_centered_order χ hS s (sLocalIdelicZFunction f.val),
+        sLocalPrincipalValue_insertion_order χ hS f.val s hn,
+        sLocalPrincipalValue_global_euler_order χ s hre]
+      exact sLocalPrincipalValue_bound_shift _ m p hp hpm _
+    have he := sLocalPolarPrincipalValue_chart_eq_one χ hS s
+    change c = 1 ↔ _ at he
+    by_cases hc : c = 1
+    · have hg := he.mp hc
+      have hm : n < m := by
+        change sLocalFinitePoleMultiplicity T c < sLocalRhoPoleOrder c
+        rw [hc, sLocalRhoPoleOrder_eq_card_polePlaces, (sLocalPolePlaces_one (F := F) (S := S)).1]
+        have ha : 0 < (Finset.univ : Finset (InfinitePlace F)).card := Finset.card_pos.mpr Finset.univ_nonempty
+        exact lt_of_le_of_lt (Finset.card_filter_le _ _) (Nat.lt_add_of_pos_left ha)
+      have hZ := globalIdelicZFunction_entire_of_vanishing _ (sAdeleSchwartzToGlobal_mem_polarSubspace f) χ
+      -- Entireness kills the top coefficient and leaves the next n coefficients.
+      have htop := (hbound 1 (by decide) (by omega)).mpr (by
+        simpa [hg] using (hZ.analyticAt s).meromorphicOrderAt_nonneg)
+      have h := hbound (n + 1) (by omega) (by omega)
+      simp only [ite_eq_left hg, Nat.add_sub_cancel] at h
+      simp only [ite_eq_left hc]
+      rw [← h]
+      constructor
+      · intro H k hk hk'
+        by_cases hk'' : k = m
+        · exact htop k (by omega) hk'
+        · exact H k ⟨by omega, by omega⟩
+      · intro H k hk
+        exact H k (by omega) (by omega)
+    · have hg := he.not.mp hc
+      simpa only [ite_eq_right hc, ite_eq_right hg, and_imp] using
+        hbound n hn (sLocalPrincipalValue_multiplicity_le T c)
+  constructor
+  · intro h s hn
+    exact (horder s hn).mp (h _ (hcov s) hn)
+  · intro h c hc hn
+    obtain ⟨s, rfl⟩ := hsurj c hc
+    exact (horder s hn).mpr (h s hn)
+
+/-- The norm-one mass in the residue formulas is nonzero, by the volume
+formula as in `grh_classVolume_ne_zero` in Chapter 12. -/
+private theorem sLocalPolarPrincipalValue_mass_ne_zero :
+    ((normOneIdeleClassTamagawaMeasure F univ).toReal : ℂ) ≠ 0 := by
+  have hvol := normOneIdeleClassTamagawaMeasure_volume (F := F)
+  have h0 : normOneIdeleClassTamagawaMeasure F univ ≠ 0 := by
+    rw [hvol, ne_eq, ENNReal.ofReal_eq_zero, not_le]
+    have := NumberField.Units.regulator_pos F
+    have := NumberField.classNumber_pos F
+    have := NumberField.Units.torsionOrder_pos F
+    have : (0 : ℝ) < Real.sqrt (Int.natAbs (NumberField.discr F) : ℝ) :=
+      Real.sqrt_pos.mpr (by exact_mod_cast Int.natAbs_pos.mpr (NumberField.discr_ne_zero F))
+    positivity
+  have hfin : normOneIdeleClassTamagawaMeasure F univ ≠ ⊤ := by
+    rw [hvol]
+    exact ENNReal.ofReal_ne_top
+  exact Complex.ofReal_ne_zero.mpr (ENNReal.toReal_ne_zero.mpr ⟨h0, hfin⟩)
+
+/-- An entire chart on the trivial norm-one component forces both polar evaluations
+of the test to vanish. -/
+private theorem sLocalPolarPrincipalValue_mem_of_entire_chart (χ : PontryaginDual C𝔽)
+    (hω : globalNormOne(χ) = 1) (g : ℬ𝔽) (hg : Differentiable ℂ (gChart(χ, g))) :
+    g ∈ adelePolarSubspace F := by
+  obtain ⟨t, ht, -⟩ := globalConverse_existsUnique_normTwist χ hω
+  let b := (t : ℂ) * Complex.I
+  have he : gChart((1 : PontryaginDual C𝔽), g) = fun s ↦ gChart(χ, g) (s - b) := by
+    funext s
+    have h := ideleClassNormTwist_add_of_eq ht (s - b)
+    have hb : b + (s - b) = s := by ring
+    change ideleClassNormTwist χ (0 + (s - b)) =
+      ideleClassNormTwist (1 : PontryaginDual C𝔽) (b + (s - b)) at h
+    rw [zero_add, hb] at h
+    exact congrArg (globalIdelicZFunction g) h.symm
+  have hc : Continuous (gChart((1 : PontryaginDual C𝔽), g)) := by
+    rw [he]
+    exact hg.continuous.comp (continuous_id.sub continuous_const)
+  have hmass := sLocalPolarPrincipalValue_mass_ne_zero (F := F)
+  have h0 : Tendsto (fun s : ℂ ↦ s * gChart((1 : PontryaginDual C𝔽), g) s)
+      (𝓝[≠] 0) (𝓝 0) := by
+    have h : ContinuousAt (fun s : ℂ ↦ s * gChart((1 : PontryaginDual C𝔽), g) s) 0 :=
+      continuousAt_id.mul hc.continuousAt
+    simpa only [zero_mul] using h.tendsto.mono_left nhdsWithin_le_nhds
+  have h1 : Tendsto (fun s : ℂ ↦ (s - 1) * gChart((1 : PontryaginDual C𝔽), g) s)
+      (𝓝[≠] 1) (𝓝 0) := by
+    have h : ContinuousAt (fun s : ℂ ↦ (s - 1) * gChart((1 : PontryaginDual C𝔽), g) s) 1 :=
+      (continuousAt_id.sub (continuousAt_const (y := (1 : ℂ)))).mul hc.continuousAt
+    simpa only [sub_self, zero_mul] using h.tendsto.mono_left nhdsWithin_le_nhds
+  refine (mem_adelePolarSubspace g).mpr ⟨?_, ?_⟩
+  · exact (mul_eq_zero.mp (tendsto_nhds_unique (globalIdelicZFunction_residue_zero g) h0)).resolve_left
+      (neg_ne_zero.mpr hmass)
+  · exact (mul_eq_zero.mp (tendsto_nhds_unique (globalIdelicZFunction_residue_one g) h1)).resolve_left hmass
+
+/-- Equality in the homogeneous principal-value image determines the order of the
+output in the global chart by adding the order of the Euler multiplier. -/
+private theorem sLocalPolarPrincipalValue_image_order {T : Finset Places} (hT : T ⊆ S)
+    (χ : PontryaginDual C𝔽) (hS : globalUnitary(χ) ∈ unramifiedOutside F S)
+    (f g : ℬ𝔽) (he : (K𝔽(globalNormOne(χ))).mkQ (adelePrincipalValue F T g) =
+      (K𝔽(globalNormOne(χ))).mkQ f) (s : ℂ) :
+    meromorphicOrderAt (gChart(χ, f)) s =
+      (sLocalFinitePoleMultiplicity T (localChart(χ, hS) s) : WithTop ℤ) +
+        meromorphicOrderAt (gChart(χ, g)) s := by
+  obtain ⟨hE, hEord, -⟩ := sLocalPrincipalValue_multiplier_order hT χ hS s
+  rw [← sLocalPrincipalValue_chart_eq_of_class χ _ _ he]
+  rw [meromorphicOrderAt_congr (nhdsNE_le_codiscrete s (globalPrincipalValueConverse_mellin T χ g))]
+  change meromorphicOrderAt (reciprocalPartialHeckeEulerProduct χ T * gChart(χ, g)) s = _
+  rw [meromorphicOrderAt_mul hE.meromorphicAt
+    ((globalIdelicZFunction_meromorphic g χ (mem_univ s)).meromorphicAt), hEord]
+
+/-- The global chart of an ambient principal-value preimage is entire when a polar
+output satisfies the unshifted order bound. -/
+private theorem sLocalPolarPrincipalValue_divided_entire {T : Finset Places} (hT : T ⊆ S)
+    (χ : PontryaginDual C𝔽) (hS : globalUnitary(χ) ∈ unramifiedOutside F S)
+    (f : adelePolarSubspace F) (g : ℬ𝔽)
+    (he : (K𝔽(globalNormOne(χ))).mkQ (adelePrincipalValue F T g) =
+      (K𝔽(globalNormOne(χ))).mkQ f.val)
+    (hf : ∀ s : ℂ, 0 < sLocalFinitePoleMultiplicity T (localChart(χ, hS) s) →
+      (sLocalFinitePoleMultiplicity T (localChart(χ, hS) s) : WithTop ℤ) ≤
+        meromorphicOrderAt (gChart(χ, f.val)) s) :
+    Differentiable ℂ (gChart(χ, g)) := by
+  intro s
+  apply AnalyticAt.differentiableAt
+  apply ((globalIdelicZFunction_meromorphic g χ (mem_univ s)).meromorphicOrderAt_nonneg_iff_analyticAt).mp
+  let n := sLocalFinitePoleMultiplicity T (localChart(χ, hS) s)
+  have hbound : (n : WithTop ℤ) ≤ meromorphicOrderAt (gChart(χ, f.val)) s := by
+    by_cases hp : 0 < n
+    · exact hf s hp
+    · simpa only [Nat.eq_zero_of_not_pos hp, Nat.cast_zero] using
+        ((globalIdelicZFunction_entire_of_vanishing f.val f.property χ).analyticAt s).meromorphicOrderAt_nonneg
+  rw [sLocalPolarPrincipalValue_image_order hT χ hS f.val g he s] at hbound
+  change (n : WithTop ℤ) ≤ (n : WithTop ℤ) + meromorphicOrderAt (gChart(χ, g)) s at hbound
+  generalize meromorphicOrderAt (gChart(χ, g)) s = a at hbound ⊢
+  cases a using WithTop.recTopCoe with
+  | top => exact le_top
+  | coe a =>
+    change ((n : ℤ) : WithTop ℤ) ≤ ((n : ℤ) : WithTop ℤ) + (a : WithTop ℤ) at hbound
+    rw [← WithTop.coe_add, WithTop.coe_le_coe] at hbound
+    exact WithTop.coe_le_coe.mpr (le_of_add_le_add_left (by simpa only [add_zero] using hbound))
+
+open Classical in
+private theorem sLocalPolarPrincipalValue_two_four {T : Finset Places} (hT : T ⊆ S)
+    (χ : PontryaginDual C𝔽) (hS : globalUnitary(χ) ∈ unramifiedOutside F S)
+    (f : adelePolarSubspace F) :
+    (∀ s : ℂ, 0 < sLocalFinitePoleMultiplicity T (localChart(χ, hS) s) →
+      (sLocalFinitePoleMultiplicity T (localChart(χ, hS) s) : WithTop ℤ) ≤
+        meromorphicOrderAt (gChart(χ, f.val)) s) ↔
+    ∃ g : adelePolarSubspace F, (K𝔽(globalNormOne(χ))).mkQ (adelePrincipalValue F T g.val) =
+      (K𝔽(globalNormOne(χ))).mkQ f.val := by
+  constructor
+  · intro hf
+    obtain ⟨g, hg⟩ := (sLocalPrincipalValue_two_four hT χ hS f.val).mp (fun s hn ↦ by
+      refine le_trans ?_ (hf s hn)
+      split_ifs
+      · exact_mod_cast Nat.sub_le _ _
+      · exact le_rfl)
+    by_cases hω : globalNormOne(χ) = 1
+    · exact ⟨⟨g, sLocalPolarPrincipalValue_mem_of_entire_chart χ hω g
+        (sLocalPolarPrincipalValue_divided_entire hT χ hS f g hg hf)⟩, hg⟩
+    · obtain ⟨u, hu⟩ := (globalConverse_nontrivial_exact (globalNormOne(χ)) hω).surjective
+        ((K𝔽(globalNormOne(χ))).mkQ g)
+      exact ⟨u, (sLocalPrincipalValue_global_congr (globalNormOne(χ)) u.val g hu).trans hg⟩
+  · rintro ⟨g, hg⟩ s -
+    rw [sLocalPolarPrincipalValue_image_order hT χ hS f.val g.val hg s]
+    exact le_add_of_nonneg_right
+      ((globalIdelicZFunction_entire_of_vanishing g.val g.property χ).analyticAt s).meromorphicOrderAt_nonneg
+
+/-- The two polar evaluations are determined by the untwisted global Mellin chart. -/
+private theorem sLocalPolarPrincipalValue_polarValues_congr (f g : ℬ𝔽)
+    (he : gChart((1 : PontryaginDual C𝔽), f) = gChart((1 : PontryaginDual C𝔽), g)) :
+    adelePolarValues (F := F) f = adelePolarValues (F := F) g := by
+  have hm := sLocalPolarPrincipalValue_mass_ne_zero (F := F)
+  apply Prod.ext
+  · change f (Multiplicative.ofAdd 0) = g (Multiplicative.ofAdd 0)
+    exact mul_left_cancel₀ (neg_ne_zero.mpr hm)
+      (tendsto_nhds_unique ((globalIdelicZFunction_residue_zero f).congr
+        (fun s ↦ congrArg (s * ·) (congrFun he s))) (globalIdelicZFunction_residue_zero g))
+  · change adeleSchwartzFourier f (Multiplicative.ofAdd 0) =
+      adeleSchwartzFourier g (Multiplicative.ofAdd 0)
+    exact mul_left_cancel₀ hm (tendsto_nhds_unique
+      ((globalIdelicZFunction_residue_one f).congr
+        (fun s ↦ congrArg ((s - 1) * ·) (congrFun he s))) (globalIdelicZFunction_residue_one g))
+
+/-- Equal finite-dimensional targets force equality of kernels once the larger
+kernel belongs to a surjection. -/
+private theorem polarEvaluation_ker_eq_of_surjective {E D : Type*} [AddCommGroup E] [Module ℂ E]
+    [AddCommGroup D] [Module ℂ D] [FiniteDimensional ℂ D]
+    (p d : E →ₗ[ℂ] D) (hs : Function.Surjective d) (h : p.ker ≤ d.ker) : p.ker = d.ker := by
+  obtain ⟨r, hr⟩ := d.exists_rightInverse_of_surjective (LinearMap.range_eq_top.mpr hs)
+  have hdr (z : D) : d (r z) = z := LinearMap.congr_fun hr z
+  have hin : Function.Injective (p.comp r) := by
+    intro a b hab
+    have hh : r a - r b ∈ p.ker := by
+      change p (r a - r b) = 0
+      exact (p.map_sub _ _).trans (sub_eq_zero.mpr hab)
+    have hz := LinearMap.mem_ker.mp (h hh)
+    rwa [map_sub, hdr, hdr, sub_eq_zero] at hz
+  have hout := LinearMap.injective_iff_surjective.mp hin
+  refine le_antisymm h fun x hx ↦ ?_
+  obtain ⟨z, hz⟩ := hout (p x)
+  change p (r z) = p x at hz
+  have hh : r z - x ∈ p.ker := by
+    change p (r z - x) = 0
+    rw [map_sub, hz, sub_self]
+  have hd := LinearMap.mem_ker.mp (h hh)
+  rw [map_sub, hdr, LinearMap.mem_ker.mp hx, sub_zero] at hd
+  change p x = 0
+  simpa only [hd, map_zero] using hz.symm
+
+/-- Inserting preserves polar tests, and the two global polar values are
+already independent on inserted tests when the S-integer Picard group is trivial. -/
+private theorem sLocalPolarPrincipalValue_reflect (hPic : PicTrivial)
+    (u : ℬₛ) (g : adelePolarSubspace F)
+    (hu : (K𝔽(1)).mkQ (sAdeleSchwartzToGlobal F S u) = (K𝔽(1)).mkQ g.val) :
+    u ∈ sAdelePolarSubspace F S := by
+  let L := sAdeleSchwartzToGlobal F S
+  let G := (K𝔽(1)).mkQ
+  have h₁ : NormOneCharacterUnramifiedOutside (1 : PontryaginDual C₁) S :=
+    ⟨⟨1, (mem_unramifiedOutside_iff F S 1).mpr (fun _ _ _ ↦ rfl)⟩, fun _ ↦ rfl⟩
+  let η := LocalChar(1, h₁)
+  let Q := (Kₛ(η)).mkQ
+  obtain ⟨e, he⟩ := sLocalHomogeneousThetaToGlobal_equiv_of_unramified (F := F) (S := S) hPic h₁
+  have hin (u : ℬₛ) : e (Q u) = G (L u) :=
+    (LinearMap.congr_fun he (Q u)).trans (sLocalHomogeneousThetaToGlobal_mk h₁ u)
+  have hval (v w : ℬ𝔽) (h : G v = G w) : adelePolarValues (F := F) v = adelePolarValues w := by
+    apply sLocalPolarPrincipalValue_polarValues_congr
+    exact sLocalPrincipalValue_chart_eq_of_class (1 : PontryaginDual C𝔽) v w h
+  let d := (adelePolarValues (F := F)).comp L
+  let p := (sAdelePolarValues_isLinear (F := F) (S := S)).mk' _
+  have hsur : Function.Surjective d := by
+    intro z
+    obtain ⟨w, hw⟩ := (adelePolarValues_surjective (F := F)) z
+    obtain ⟨v, hv⟩ := (Kₛ(η)).mkQ_surjective (e.symm (G w))
+    exact ⟨v, (hval _ _ ((hin v).symm.trans ((congrArg e hv).trans (e.apply_symm_apply _)))).trans hw⟩
+  have hk : p.ker ≤ d.ker := fun v hv ↦
+    sAdeleSchwartzToGlobal_mem_polarSubspace (⟨v, hv⟩ : sAdelePolarSubspace F S)
+  have heq := polarEvaluation_ker_eq_of_surjective p d hsur hk
+  have hx : u ∈ d.ker := (hval _ _ hu).trans (show adelePolarValues g.val = 0 from g.property)
+  exact (show u ∈ p.ker from heq.symm ▸ hx)
+
+/-- A norm-one translation difference kills the trivial homogeneous class.
+When the translating character value is nontrivial, its normalized difference
+represents the original class in that character's component. -/
+private theorem sLocalPolarPrincipalValue_translate_sub (hPic : PicTrivial) (η : PontryaginDual J₁)
+    (hη : η ≠ 1) (u : ℬₛ) : ∃ f : sAdelePolarSubspace F S, (Kₛ(η)).mkQ f.val = (Kₛ(η)).mkQ u := by
+  obtain ⟨h, hh⟩ : ∃ h : J₁, (η h : ℂ) ≠ 1 :=
+    not_forall.mp fun hall ↦ hη (PontryaginDual.ext fun x ↦ Subtype.ext (hall x))
+  obtain ⟨v, hv⟩ := QuotientGroup.mk_surjective h.val
+  let t := schwartzBruhatUnitTranslate v u - u
+  have h₁ : NormOneCharacterUnramifiedOutside (1 : PontryaginDual C₁) S :=
+    ⟨⟨1, (mem_unramifiedOutside_iff F S 1).mpr (fun _ _ _ ↦ rfl)⟩, fun _ ↦ rfl⟩
+  have hone : LocalChar(1, h₁) = 1 :=
+    ((normOneCharacterUnramifiedOutside_iff (F := F) (S := S) 1).mp h₁).unique
+      (sLocalNormOneCharacter_apply 1 h₁) (fun _ _ _ _ _ ↦ rfl)
+  have ht : t ∈ Kₛ(LocalChar(1, h₁)) := by
+    rw [hone]
+    change (sLocalHomogeneousAdelicThetaLinearMap F S 1) (schwartzBruhatUnitTranslate v u - u) = 0
+    rw [map_sub, sLocalHomogeneousTheta_unitTranslate (F := F) (S := S) (1 : PontryaginDual J₁) h v hv]
+    simp
+  have hp : t ∈ sAdelePolarSubspace F S := by
+    apply sLocalPolarPrincipalValue_reflect hPic t 0
+    change (K𝔽(1)).mkQ (sAdeleSchwartzToGlobal F S t) = (K𝔽(1)).mkQ 0
+    rw [map_zero]
+    exact (Submodule.Quotient.mk_eq_zero _).mpr (sLocalHomogeneousThetaToGlobal_preserves_kernel h₁ ht)
+  let a := (η h : ℂ) - 1
+  have ha : a ≠ 0 := sub_ne_zero.mpr hh
+  refine ⟨⟨a⁻¹ • t, (sAdelePolarSubspace F S).smul_mem _ hp⟩, ?_⟩
+  simp only [Submodule.mkQ_apply, Submodule.Quotient.eq]
+  change (sLocalHomogeneousAdelicThetaLinearMap F S η) (a⁻¹ • t - u) = 0
+  rw [map_sub, map_smul]
+  have htheta : (sLocalHomogeneousAdelicThetaLinearMap F S η) t =
+      a • (sLocalHomogeneousAdelicThetaLinearMap F S η) u := by
+    rw [show t = schwartzBruhatUnitTranslate v u - u from rfl, map_sub,
+      sLocalHomogeneousTheta_unitTranslate η h v hv, sub_smul, one_smul]
+  rw [htheta, inv_smul_smul₀ ha, sub_self]
+
+/-- Insertion of polar local tests surjects onto each polar homogeneous component. -/
+private theorem sLocalPolarPrincipalValue_lift (ω : PontryaginDual C₁)
+    (hω : NormOneCharacterUnramifiedOutside ω S) (hPic : PicTrivial)
+    (g : adelePolarSubspace F) :
+    ∃ f : sAdelePolarSubspace F S, (K𝔽(ω)).mkQ (sAdeleSchwartzToGlobal F S f.val) = (K𝔽(ω)).mkQ g.val := by
+  let η := LocalChar(ω, hω)
+  let Q := (Kₛ(η)).mkQ
+  let G := (K𝔽(ω)).mkQ
+  let L := sAdeleSchwartzToGlobal F S
+  obtain ⟨e, he⟩ := sLocalHomogeneousThetaToGlobal_equiv_of_unramified (F := F) (S := S) hPic hω
+  have hin (u : ℬₛ) : e (Q u) = G (L u) :=
+    (LinearMap.congr_fun he (Q u)).trans (sLocalHomogeneousThetaToGlobal_mk hω u)
+  obtain ⟨u, hu⟩ := (Kₛ(η)).mkQ_surjective (e.symm (G g.val))
+  have hre : G (L u) = G g.val := (hin u).symm.trans ((congrArg e hu).trans (e.apply_symm_apply _))
+  by_cases hw : ω = 1
+  · subst ω
+    exact ⟨⟨u, sLocalPolarPrincipalValue_reflect hPic u g hre⟩, hre⟩
+  · have hη : η ≠ 1 := fun h ↦ hw (sLocalPolarPrincipalValue_character_eq_one ω hω hPic h)
+    obtain ⟨v, hv⟩ := sLocalPolarPrincipalValue_translate_sub hPic η hη u
+    exact ⟨v, (hin v.val).symm.trans ((congrArg e hv).trans ((hin u).trans hre))⟩
+
+private theorem sLocalPolarPrincipalValue_three_four {S₀ : Finset Places}
+    (h₀ : S₀ ⊆ S) (hn : S₀.Nonempty) (hPic : PicTrivial)
+    (ω : PontryaginDual C₁) (hω : NormOneCharacterUnramifiedOutside ω S)
+    (x : SLocalHomogeneousThetaSpace F S (LocalChar(ω, hω))) :
+    let η := LocalChar(ω, hω)
+    let π := sLocalHomogeneousThetaToGlobal hω
+    (∃ f : sAdelePolarSubspace F S, (Kₛ(η)).mkQ (sAdelePrincipalValue F h₀ f.val) = x) ↔
+      ∃ g : adelePolarSubspace F, (K𝔽(ω)).mkQ (adelePrincipalValue F S₀ g.val) = π x := by
+  intro η π
+  let L := sAdeleSchwartzToGlobal F S
+  let Q := (Kₛ(η)).mkQ
+  let G := (K𝔽(ω)).mkQ
+  obtain ⟨e, he⟩ := sLocalHomogeneousThetaToGlobal_equiv_of_unramified (F := F) (S := S) hPic hω
+  have heπ (z) : e z = π z := LinearMap.congr_fun he z
+  have hcomm (f : ℬₛ) : π (Q (sAdelePrincipalValue F h₀ f)) = G (adelePrincipalValue F S₀ (L f)) :=
+    (sLocalHomogeneousThetaToGlobal_mk hω _).trans
+      (sLocalPrincipalValue_homogeneous_comm h₀ hn ω f)
+  constructor
+  · rintro ⟨f, hf⟩
+    exact ⟨⟨L f.val, sAdeleSchwartzToGlobal_mem_polarSubspace f⟩, (hcomm f.val).symm.trans (congrArg π hf)⟩
+  · rintro ⟨g, hg⟩
+    obtain ⟨f, hf⟩ := sLocalPolarPrincipalValue_lift ω hω hPic g
+    refine ⟨f, e.injective ?_⟩
+    exact (heπ _).trans ((hcomm f.val).trans ((sLocalPrincipalValue_global_congr ω (L f.val) g.val hf).trans
+      (hg.trans (heπ x).symm)))
 
 open Classical in
 /-- Paper: Corollary 7.2.2.2, p. 340.
@@ -3557,7 +4021,19 @@ theorem sLocalPolarPrincipalValue_tfae {S₀ : Finset Places} (h₀ : S₀ ⊆ S
         (sLocalFinitePoleMultiplicity S₀ (localChart(χ, hS) s) : WithTop ℤ) ≤ meromorphicOrderAt Z s),
       (∃ g : sAdelePolarSubspace F S, (Kₛ(ωₛ)).mkQ (sAdelePrincipalValue F h₀ g.val) = x),
       (∃ g : adelePolarSubspace F, (K𝔽(ω)).mkQ (adelePrincipalValue F S₀ g.val) = π x)
-    ] := by sorry
+    ] := by
+  intro hS ω hω ωₛ x π Z
+  let : Subsingleton (CommRing.Pic ((S : Set Places).integer F)) := _hPic
+  tfae_have 1 ↔ 2 := sLocalPolarPrincipalValue_one_two h₀ χ hS f
+  tfae_have 2 ↔ 4 := by
+    have hπ : π x = (K𝔽(ω)).mkQ (sAdeleSchwartzToGlobal F S f.val) :=
+      sLocalHomogeneousThetaToGlobal_mk hω f.val
+    rw [hπ]
+    let f𝔽 : adelePolarSubspace F :=
+      ⟨sAdeleSchwartzToGlobal F S f.val, sAdeleSchwartzToGlobal_mem_polarSubspace f⟩
+    exact sLocalPolarPrincipalValue_two_four h₀ χ hS f𝔽
+  tfae_have 3 ↔ 4 := sLocalPolarPrincipalValue_three_four h₀ _hn _hPic ω hω x
+  tfae_finish
 
 end LocalPolesGlobalZeros
 
