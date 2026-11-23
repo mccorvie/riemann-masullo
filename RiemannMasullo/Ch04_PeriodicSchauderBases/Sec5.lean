@@ -1866,6 +1866,37 @@ theorem modulatedCompactSupportStage_isClosed :
       fun h x ↦ Set.mem_iInter.mp (Set.mem_iInter.mp h x)⟩
   exact Eq.mpr (congrArg IsClosed hset) (hV.inter hJ)
 
+include hm in
+private theorem bruhatGood_of_modulation_kernel (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
+    (hk : IsCompact (k : Set G))
+    (hperp : IsCompactlyGeneratedGroup (lcaAnnihilator (k.comap (K).subtype))) :
+    IsBruhatGoodSubgroup k := by
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let kernelSubgroup := k.comap (K).subtype
+  have hL : IsClosed (kernelSubgroup : Set K) := hk.isClosed.preimage continuous_subtype_val
+  have hgL : IsBruhatGoodSubgroup kernelSubgroup := ⟨hL, isOpen_lcaAnnihilator kernelSubgroup hL.isCompact, hperp⟩
+  let line : EuclideanSpace ℝ (Fin 1) ≃L[ℝ] ℝ := PiLp.equivOfUnique 2 ℝ _
+  let chart : EuclideanSpace ℝ (Fin 1) ≃ₜ ℝ≥0ˣ :=
+    line.toHomeomorph.trans positiveRealLogEquiv.symm.toHomeomorph
+  have haxis : IsBruhatGoodSubgroup (⊥ : Subgroup ℝ≥0ˣ) :=
+    isBruhatGoodSubgroup_bot_iff.mpr ⟨1, ⟨chart.chartedSpace⟩⟩
+  obtain ⟨d, hd⟩ := hm.exists_sectionEquiv τ hτ
+  let j : K × ℝ≥0ˣ →ₜ* G := ⟨d.toMonoidHom, d.continuous⟩
+  apply (openEmbedding_good_comap j d.toHomeomorph.isOpenEmbedding k hk).mp
+  have hcomap : k.comap j.toMonoidHom = kernelSubgroup.prod ⊥ := by
+    ext ⟨u,t⟩
+    change d (u,t) ∈ k ↔ u.val ∈ k ∧ t = 1
+    rw [hd]
+    constructor
+    · intro hx
+      have ht : m (u.val * τ t) = 1 := compactSubgroup_le_modulation_ker m k hk hx
+      rw [map_mul, show m u.val = 1 from u.property, hτ, one_mul] at ht
+      exact ⟨by simpa [ht] using hx, ht⟩
+    · rintro ⟨hu,rfl⟩
+      simpa using hu
+  rw [hcomap]
+  exact prod_bruhat_good _ _ hgL haxis
+
 include hSC hm hms hk hperp hB hBi in
 /-- Paper: Proposition 4.5.2.1(1), p. 205. The inherited topology on the
 supported k-stage agrees with the fixed-support test-function topology on G/k.
@@ -1876,7 +1907,68 @@ theorem modulatedCompactSupportStage_testFunction_equiv :
       (C : TopologicalSpace.Compacts G)
       (F : bruhatCompactSupportStage p e C ≃L[ℂ] modulatedCompactSupportStage m B k),
       p.val.1 = ⊤ ∧ OrderDual.ofDual p.val.2 = k ∧ (C : Set G) = m ⁻¹' B ∧
-      ∀ f, (F f).val.val = schwartzBruhatStageRealization p e f.val := by sorry
+      ∀ f, (F f).val.val = schwartzBruhatStageRealization p e f.val := by
+  classical
+  let τ := (modulation_surjective_exists_section m hm hms).choose
+  have hτ := (modulation_surjective_exists_section m hm hms).choose_spec
+  let top : (⊤ : Subgroup G) ≃ₜ* G :=
+    { Subgroup.topEquiv with
+      continuous_toFun := continuous_subtype_val
+      continuous_invFun := continuous_id.subtype_mk _ }
+  let p : BruhatStructuralPair G :=
+    ⟨(⊤, OrderDual.toDual k), isOpen_univ,
+      isCompactlyGeneratedGroup_of_continuousMulEquiv top.symm
+        (compactlyGenerated_of_surjective_modulation m hm hms),
+      bruhatGood_of_modulation_kernel m hm k τ hτ hk hperp, le_top⟩
+  let e := Classical.choice p.elementary
+  let C : TopologicalSpace.Compacts G := ⟨m ⁻¹' B, hm.1.isCompact_preimage hB⟩
+  let V := bruhatCompactSupportStage p e C
+  let W := modulatedCompactSupportStage m B k
+  let j : V →ₗ[ℂ] BruhatCompactSupport G := bruhatCompactSupportStageInclusion p e C
+  have hj : Continuous j := (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp j
+    (fun testNorm ↦ testNorm.property p e C)
+  let T : V →L[ℂ] E := ⟨(bruhatCompactSupportToModulatedExponentialDecay m univ hm hms).comp j,
+    (bruhatCompactSupport_continuous_modulatedExponentialDecay m univ hm hms
+      ordConnected_univ univ_nonempty).comp hj⟩
+  have hT (v : V) : (T v).val = schwartzBruhatStageRealization p e v.val := rfl
+  have hTW (v : V) : T v ∈ W := by
+    apply (mem_modulatedCompactSupportStage_iff m B k _).mpr
+    have hs := (mem_bruhatCompactSupportStage_iff p e C _).mp v.property
+    refine ⟨(mem_modulatedCompactSupportSubmodule_iff m B hB.isClosed _).mpr ?_, ?_⟩
+    · rw [hT]
+      exact ⟨C.isCompact.of_isClosed_subset (isClosed_tsupport _) hs, hs⟩
+    · intro x u
+      rw [hT]
+      exact stage_realization_mul_kernel p e _ u.property x
+  let F₀ := T.codRestrict W hTW
+  have hi := modulatedExponentialDecay_continuous_inclusion m univ hm
+    ordConnected_univ univ_nonempty τ hτ (mem_univ 0)
+  let I := hi.choose
+  have hI := hi.choose_spec.2
+  let R := (schwartzBruhatStage_average_retraction p e).choose
+  have hpoint := (schwartzBruhatStage_average_retraction p e).choose_spec.2
+  let retract := R.comp (I.comp W.subtypeL)
+  have hQ (w : W) : schwartzBruhatStageRealization p e (retract w) = w.val.val := by
+    have hw := (mem_modulatedCompactSupportStage_iff m B k w.val).mp w.property
+    funext x
+    refine (hpoint (I w.val) x).trans ((stageAverage_eq_self_of_invariant p (I w.val).val
+      (fun _ hx ↦ (hx trivial).elim) (fun y u hu ↦ ?_) x).trans (hI w.val x))
+    rw [hI, hI, mul_comm y u]
+    exact hw.2 y ⟨u,hu⟩
+  have hQV (w : W) : retract w ∈ V := by
+    apply (mem_bruhatCompactSupportStage_iff p e C _).mpr
+    rw [hQ]
+    exact ((mem_modulatedCompactSupportSubmodule_iff m B hB.isClosed _).mp
+      ((mem_modulatedCompactSupportStage_iff m B k _).mp w.property).1).2
+  let J := retract.codRestrict V hQV
+  have hleft (v : V) : J (F₀ v) = v := by
+    apply Subtype.ext
+    apply schwartzBruhatStageInclusion_injective p e
+    exact Subtype.ext ((hQ (F₀ v)).trans (hT v))
+  have hright (w : W) : F₀ (J w) = w :=
+    Subtype.ext (Subtype.ext ((hT (J w)).trans (hQ w)))
+  let equiv := ContinuousLinearEquiv.equivOfInverse F₀ J hleft hright
+  exact ⟨p,e,C,equiv,rfl,rfl,rfl,hT⟩
 
 -- Remark 4.5.2.2, p. 207, uses the Fréchet topology of this elementary
 -- stage. See also modulatedExponentialDecayStage_frechet and
