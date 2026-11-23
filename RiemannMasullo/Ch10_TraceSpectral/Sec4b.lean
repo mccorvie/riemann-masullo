@@ -6,6 +6,9 @@ import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 
 import all RiemannMasullo.Ch09_HardySobolev.Sec3
 import all RiemannMasullo.AppC_LCTVS.Sec2a_part2
+
+import all RiemannMasullo.AppC_LCTVS.Sec3a
+import all RiemannMasullo.AppC_LCTVS.Sec3a_part2
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 public import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Completion
@@ -494,7 +497,58 @@ theorem spectralStripQuotientKernel_tendsto (_ha : 0 < a)
     (_hχ : IsSpectralBasepointChoice χ) (_he : ∀ z, (e z).1 = eχ z.val.1)
     (_horder : Order(χ, e)) (_hb : Bases(χ, x, f)) :
     ∃ K, Tendsto (rectangle(χ, e)
-      (fun j ↦ (f j).comp (Aq(a, hα, hs₀(hs), φ))) x) atTop (𝓝 K) := by sorry
+      (fun j ↦ (f j).comp (Aq(a, hα, hs₀(hs), φ))) x) atTop (𝓝 K) := by
+  classical
+  have transfer {H Z J : Type _} [NormedAddCommGroup H] [InnerProductSpace ℂ H]
+      [CompleteSpace H] (A : H →L[ℂ] H) (x : J → H) (f : J → StrongDual ℂ H)
+      (e : Z ↪ ℕ × ℕ) (N : Z → ℕ) (i : (z : Z) → Fin (N z) → J)
+      (hc : let partialOp (ij : ℕ × ℕ) := spectralConvolutionFiniteSum A x f
+              (((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn) N i
+            ∃ (hA : A ∈ traceClassOperators H H) (hB : ∀ ij, partialOp ij ∈ traceClassOperators H H),
+              Tendsto (fun ij ↦ schattenNorm (⟨partialOp ij, hB ij⟩ - ⟨A, hA⟩ : traceClassOperators H H))
+                atTop (𝓝 0)) :
+      ∃ K, Tendsto (spectralKernelRectangle e N i (fun j ↦ (f j).comp A) x) atTop (𝓝 K) := by
+    let P := ProjectiveTensor (StrongDual ℂ H) H
+    let W := WithLocalSeminorm (banachProjectiveSeminorm (X := StrongDual ℂ H) (Y := H))
+    let toW : P →L[ℂ] W := toProjectiveSeminorm (X := StrongDual ℂ H) (Y := H)
+    let fromW : W →L[ℂ] P := fromProjectiveSeminorm (X := StrongDual ℂ H) (Y := H)
+    let rect (ij : ℕ × ℕ) := ((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn
+    let partialOp (ij : ℕ × ℕ) := spectralConvolutionFiniteSum A x f (rect ij) N i
+    let w (ij : ℕ × ℕ) : StrongDual ℂ H ⊗[ℂ] H :=
+      ∑ z ∈ rect ij, ∑ m : Fin (N z), (f (i z m)).comp A ⊗ₜ[ℂ] x (i z m)
+    let R (ij : ℕ × ℕ) : Completion W := ↑(toW (w ij))
+    let L := projectiveModelToOperator (E := H) (F := H)
+    obtain ⟨hA, hB, hc⟩ := hc
+    obtain ⟨k, hk⟩ := exists_projectiveModel_preimage (E := H) (F := H) (⟨A, hA⟩ : traceClassOperators H H)
+    have hR (ij) : L (R ij) = partialOp ij := by
+      rw [show L (R ij) = tensorToFiniteRank (w ij) from projectiveModelToOperator_coe (E := H) (F := H) _]
+      unfold w partialOp spectralConvolutionFiniteSum
+      simp only [map_sum]
+      apply Finset.sum_congr rfl
+      intro z _
+      apply Finset.sum_congr rfl
+      intro m _
+      ext y
+      exact tensorToFiniteRank_tmul _ _ y
+    have hn (v : Completion W) (S : traceClassOperators H H) (hS : L v = S.val) :
+        ‖v‖ = schattenNorm S := by
+      obtain ⟨d, hd⟩ := projectiveModel_singular_sum (E := H) (F := H) v
+      change _ = (∑' n, approximationNumber S.val n ^ (1 : ℝ)) ^ (1 / (1 : ℝ))
+      rw [← hS]
+      simpa only [d.coeff_eq_approximationNumber, Real.rpow_one, div_one, L] using hd.tsum_eq.symm
+    have hconv : Tendsto R atTop (𝓝 k) := by
+      rw [tendsto_iff_norm_sub_tendsto_zero]
+      apply hc.congr
+      intro ij
+      apply Eq.symm
+      apply hn (R ij - k) (⟨partialOp ij, hB ij⟩ - ⟨A, hA⟩)
+      change L (R ij - k) = partialOp ij - A
+      rw [map_sub, hR, show L k = A from hk]
+    refine ⟨fromW.completion k, (fromW.completion.continuous.continuousAt.tendsto.comp hconv).congr ?_⟩
+    intro ij
+    exact (fromW.completion_apply_coe (toW (w ij))).trans rfl
+  exact transfer (Aq(a, hα, hs₀(hs), φ)) x f e _ _
+    (spectralStripConvolution_schatten_tendsto (F := F) a χ _hχ hα hs φ eχ e _he x f _hb.1 _hb.2 1 le_rfl)
 
 /-- Paper: Theorem 10.4.3.5(2), pp. 472–473, equation (10.4.3.43).
 The printed ambient rectangles with convolution transposed onto the input
