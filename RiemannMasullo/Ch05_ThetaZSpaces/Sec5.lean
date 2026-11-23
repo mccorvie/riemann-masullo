@@ -711,7 +711,33 @@ theorem globalThetaEigendistributions_eq_span (c : QuasiCharacter C𝔽) :
 The normalized global family in the strong dual of the theta quotient is holomorphic. -/
 theorem globalThetaEigendistribution_holomorphic (χ : PontryaginDual C𝔽) :
     VectorHolomorphicOn (fun s ↦ globalThetaEigendistribution (ideleClassNormTwist χ s))
-      univ := by sorry
+      univ := by
+  have descend
+      {E G : Type _} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+      [IsTopologicalAddGroup E] [ContinuousSMul ℂ E]
+      [AddCommGroup G] [Module ℂ G] [TopologicalSpace G]
+      [IsTopologicalAddGroup G] [ContinuousSMul ℂ G]
+      (L : E →L[ℂ] G) (hL : IsEmbedding L) (hclosed : IsClosed (Set.range L))
+      (f : ℂ → E) (hf : VectorHolomorphicOn (L ∘ f) univ) :
+      VectorHolomorphicOn f univ := by
+    rw [vectorHolomorphicOn_iff_tendsto isOpen_univ] at hf ⊢
+    intro z hz
+    obtain ⟨v, hv⟩ := hf z hz
+    have hmem : v ∈ Set.range L := hclosed.mem_of_tendsto hv (Filter.Eventually.of_forall
+      (fun w ↦ ⟨(w - z)⁻¹ • (f w - f z), by simp [map_smul, map_sub]⟩))
+    obtain ⟨u, rfl⟩ := hmem
+    refine ⟨u, hL.tendsto_nhds_iff.mpr ?_⟩
+    simpa only [Function.comp_def, map_smul, map_sub] using hv
+  let L := pull(K𝔽)
+  apply descend L
+    globalThetaQuotient_transpose_isEmbedding globalThetaQuotient_transpose_isClosed_range
+  have he : L ∘ (fun s ↦ globalThetaEigendistribution (ideleClassNormTwist χ s)) =
+      (fun s ↦ adelicNormalizedEigendistribution (ideleClassNormTwist χ s)) := by
+    funext s
+    ext f
+    exact globalThetaEigendistribution_mk _ f
+  rw [he]
+  exact adelicNormalizedEigendistribution_holomorphic χ
 
 /-- Paper: Remark 5.5.1.4, p. 280.
 The descended S-local eigendistributions span a strongly dense subspace of the theta dual. -/
