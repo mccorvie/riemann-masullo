@@ -309,14 +309,6 @@ theorem reciprocalEulerProduct_over_split_prime (χ : U𝔽) (S₀ : Finset Prim
   obtain ⟨he1, hf1⟩ := hp w (Finset.mem_filter.mp hw).2
   rw [hev, he1, hf1]
 
-/-- Paper: Remark 7.1.3.1, p. 323.
-There are infinitely many completely split rational primes at which the character
-is unramified at every place above the prime. -/
-theorem infinite_split_primes_unramified (χ : U𝔽) :
-    {p : RatPrimes | rationalPrimeSplitsCompletely F p ∧
-      ∀ v : Primes, v.under (𝓞 ℚ) = p → (ideleClassNormTwist χ 0).IsUnramifiedAt v}.Infinite :=
-  by sorry
-
 /-- Paper: Remark 7.1.3.1, p. 324.
 The completely split rational primes have positive density among the rational primes.
 Deviation: Uses Mathlib's Dirichlet density. -/
@@ -340,6 +332,26 @@ theorem infinite_split_primes_reciprocalEulerProduct_normTwist
         ∀ s : ℂ, reciprocalPartialHeckeEulerProduct χ overₚ(S₀, p) s =
           (1 - (p.asIdeal.absNorm : ℂ) ^ (-(s + (x : ℂ) * Complex.I))) ^ degree}.Infinite :=
   by sorry
+
+/-- Paper: Remark 7.1.3.1, p. 323.
+There are infinitely many completely split rational primes at which the character
+is unramified at every place above the prime. -/
+theorem infinite_split_primes_unramified (χ : U𝔽) :
+    {p : RatPrimes | rationalPrimeSplitsCompletely F p ∧
+      ∀ v : Primes, v.under (𝓞 ℚ) = p → (ideleClassNormTwist χ 0).IsUnramifiedAt v}.Infinite :=
+  by
+  have hsplit : {p : RatPrimes | rationalPrimeSplitsCompletely F p}.Infinite := by
+    have h := infinite_split_primes_reciprocalEulerProduct_normTwist (F := F) 1 1
+      IsOfFinOrder.one 0 (by simp)
+    apply Set.Infinite.mono _ h
+    intro p hp
+    exact hp.1
+  obtain ⟨T, hT⟩ : ∃ T : Finset Primes, ideleClassNormTwist χ 0 ∈ unramifiedOutside F T :=
+    Set.mem_iUnion.mp ((iUnion_unramifiedOutside F).symm ▸ Set.mem_univ _)
+  have hf := T.finite_toSet.image (fun v : Primes ↦ v.under (𝓞 ℚ))
+  apply (hsplit.sdiff hf).mono
+  rintro p ⟨hp, hgood⟩
+  exact ⟨hp, fun v hv ↦ hT v (fun hvT ↦ hgood ⟨v, hvT, hv⟩)⟩
 
 variable {S : Finset (HeightOneSpectrum (𝓞 F))}
 
