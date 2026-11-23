@@ -144,14 +144,95 @@ def introTraceArchimedean (χ : U𝔽) (h : ℝ → ℂ) (w : InfinitePlace F) :
   (if w.IsReal then (1 / 2 : ℂ) else 1 / (2 * (Real.pi : ℂ))) *
     ∫ u, archIntegrand(χ, h, w) u ∂infiniteLocalMultiplicativeTamagawaMeasure F w
 
+private theorem introTraceArchimedean_real_bound (w : InfinitePlace F) (hw : w.IsReal)
+    (φ : BruhatCompactSupport w.Completionˣ) (hφ : φ.val 1 = 0) :
+    ∃ C : ℝ, ∀ u : w.Completionˣ,
+      ‖φ.val u * (Real.sqrt ‖u.val‖ : ℂ) / ((‖1 - u.val‖ : ℝ) : ℂ)‖ ≤ C * ‖u.val‖ := by
+  let e := InfinitePlace.Completion.isometryEquivRealOfIsReal hw
+  let r := InfinitePlace.Completion.ringEquivRealOfIsReal hw
+  obtain ⟨A, hA⟩ := exists_infiniteWeilTestMap w
+  -- The real Mellin comparison supplies the ordinary Schwartz representative of the weighted test.
+  obtain ⟨s, he, _⟩ := realArchimedeanMellin_eq_infiniteLocalIdelicZFunction w hw (A φ)
+  have hmult : w.mult = 1 := by simp [InfinitePlace.mult, hw]
+  have hval (u : w.Completionˣ) :
+      s (e (u.val - 1)) = φ.val u / (Real.sqrt ‖u.val‖ : ℂ) := by
+    refine (he _).trans ((hA φ (u.val - 1)).trans ?_)
+    change Function.extend Units.val (φ.val : _ → ℂ) (fun _ ↦ 0) (1 + (u.val - 1)) / _ = _
+    simp only [show 1 + (u.val - 1) = u.val by ring, Units.val_injective.extend_apply, hmult, pow_one]
+  have hz : s 0 = 0 := by
+    have h := hval 1
+    simpa [show e 0 = 0 from map_zero r, hφ] using h
+  -- Vanishing at one becomes vanishing at zero after the weighted translation.
+  let C := SchwartzMap.seminorm ℝ 0 1 s
+  have hlip (t : ℝ) : ‖s t‖ ≤ C * ‖t‖ := by
+    have h := Convex.norm_image_sub_le_of_norm_fderiv_le (𝕜 := ℝ) (f := s) (s := univ) (C := C)
+      (fun x _ ↦ s.differentiableAt) (fun x _ ↦ ?_) convex_univ (mem_univ 0) (mem_univ t)
+    · simpa [hz] using h
+    · rw [← norm_iteratedFDeriv_one]
+      exact s.norm_iteratedFDeriv_le_seminorm ℝ 1 x
+  refine ⟨C, fun u ↦ ?_⟩
+  have he_norm (x : w.Completion) : ‖e x‖ = ‖x‖ :=
+    e.isometry.norm_map_of_map_zero (map_zero r) x
+  have h := hlip (e (u.val - 1))
+  rw [hval, he_norm, norm_sub_rev u.val 1] at h
+  have hr : 0 < ‖u.val‖ := norm_pos_iff.mpr u.ne_zero
+  have hs : 0 < Real.sqrt ‖u.val‖ := Real.sqrt_pos.mpr hr
+  simp only [norm_mul, norm_div, Complex.norm_real, Real.norm_eq_abs, abs_of_nonneg hs.le,
+    abs_of_nonneg (norm_nonneg _)] at h ⊢
+  by_cases hu : 1 - u.val = 0
+  · simp [hu, mul_nonneg (show 0 ≤ C from apply_nonneg _ _) hr.le]
+  · refine (div_le_iff₀ (norm_pos_iff.mpr hu)).mpr ?_
+    have hh := (div_le_iff₀ hs).mp h
+    calc
+      ‖φ.val u‖ * Real.sqrt ‖u.val‖ ≤
+          (C * ‖1 - u.val‖ * Real.sqrt ‖u.val‖) * Real.sqrt ‖u.val‖ :=
+        mul_le_mul_of_nonneg_right hh hs.le
+      _ = C * ‖u.val‖ * ‖1 - u.val‖ := by
+        rw [mul_assoc (C * ‖1 - u.val‖), Real.mul_self_sqrt hr.le]
+        ring
+
+private theorem introTraceArchimedean_real_integrable (w : InfinitePlace F) (hw : w.IsReal)
+    (φ : BruhatCompactSupport w.Completionˣ) (hφ : φ.val 1 = 0) :
+    Integrable (fun u : w.Completionˣ ↦
+      φ.val u * (Real.sqrt ‖u.val‖ : ℂ) / ((‖1 - u.val‖ : ℝ) : ℂ))
+      (infiniteLocalMultiplicativeTamagawaMeasure F w) := by
+  let : MeasurableSpace w.Completion := borel _
+  let : BorelSpace w.Completion := ⟨rfl⟩
+  let : BorelSpace w.Completionˣ := borelSpace_units_of_continuousInv₀ _
+  let : (infiniteLocalMultiplicativeTamagawaMeasure F w).IsHaarMeasure :=
+    infiniteLocalMultiplicativeTamagawaMeasure_haar F w
+  obtain ⟨C, hC⟩ := introTraceArchimedean_real_bound w hw φ hφ
+  have hc : Continuous φ.val := schwartzBruhat_continuous
+    (⟨φ.val, bruhatCompactSupport_mem_schwartz φ.property⟩ : SchwartzBruhat w.Completionˣ)
+  have hdom : Continuous (fun u : w.Completionˣ ↦ C * ‖u.val‖) := by fun_prop
+  have hK : IsCompact (tsupport φ.val) := φ.property.2
+  apply Integrable.mono' ((hdom.continuousOn.integrableOn_compact hK).integrable_indicator
+    hK.measurableSet)
+  · have hn : Measurable (fun u : w.Completionˣ ↦ ((‖1 - u.val‖ : ℝ) : ℂ)) := by fun_prop
+    exact ((hc.measurable.mul (by fun_prop)).div hn).aestronglyMeasurable
+  · refine .of_forall fun u ↦ ?_
+    by_cases hu : u ∈ tsupport φ.val
+    · simpa only [indicator_of_mem hu] using hC u
+    · simp only [indicator_of_notMem hu, image_eq_zero_of_notMem_tsupport hu,
+        zero_mul, zero_div, norm_zero, le_refl]
+
 /-- Paper: §1.4.1, p. 28. At a real place this integral is the local
-Connes–Weil term of a compactly supported Bruhat test vanishing at norm one. -/
+Connes–Weil term of a compactly supported Bruhat test vanishing at norm one.
+Deviation: The denominator on the negative real component is `1 + t` at `u = -t`,
+as in the local kernel of the first display on p. 28. The character-by-character
+display there prints `|1 - t|` on both components. -/
 theorem introTraceArchimedean_eq_realPrincipalValue (χ : U𝔽) (h : ℝ → ℂ)
     (_hh : h 1 = 0) (w : InfinitePlace F) (_hw : w.IsReal)
     (φ : BruhatCompactSupport w.Completionˣ)
     (_hφ : ∀ u, φ.val u = introTraceTest χ h (archClass(w) u)) :
     Integrable archIntegrand(χ, h, w) (infiniteLocalMultiplicativeTamagawaMeasure F w) ∧
-      introTraceArchimedean χ h w = infiniteConnesWeilPrincipalValue w φ := by sorry
+      introTraceArchimedean χ h w = infiniteConnesWeilPrincipalValue w φ := by
+  have hzero : φ.val 1 = 0 := by simp [_hφ, introTraceTest, _hh]
+  have hm : w.mult = 1 := by simp [InfinitePlace.mult, _hw]
+  constructor
+  · simpa only [_hφ, hm, pow_one] using introTraceArchimedean_real_integrable w _hw φ hzero
+  · rw [realConnesWeilPrincipalValue_of_apply_one_zero w _hw φ hzero]
+    simp only [introTraceArchimedean, ite_eq_left _hw, hm, pow_one, _hφ]
 
 open Classical in
 /-- Paper: §1.4.1, p. 28. The finite term at a place is a sum over the positive
