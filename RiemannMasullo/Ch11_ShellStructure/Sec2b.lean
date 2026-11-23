@@ -642,7 +642,16 @@ theorem primeOrbitalSobolevConvolution_trace_eq_of_degree {s' : ℝ} (h₁' : 1 
         ∀ (T : nuclearEndomorphisms OrbQ) (T' : nuclearEndomorphisms Q(p, hs', ω(χ))),
           T.val = OrbA(φ) →
           T'.val = primeOrbitalSobolevConvolution (F := F) p hs' (ω(χ)) φ →
-          hilbertTrace T = hilbertTrace T')) := by sorry
+          hilbertTrace T = hilbertTrace T')) := by
+  dsimp only
+  intro T T' hT hT'
+  have hsum := (primeOrbitalSobolevConvolution_trace (F := F) p χ h₁ _hdeg _hχ φ T hT).2
+  have hsum' := (primeOrbitalSobolevConvolution_trace (F := F) p χ h₁' _hdeg' _hχ φ T' hT').2
+  apply hsum.unique
+  apply hsum'.congr_fun
+  intro z
+  rw [primeOrbitalMultiplicity_saturates (F := F) p χ h₁ _hdeg _hχ z,
+    primeOrbitalMultiplicity_saturates (F := F) p χ h₁' _hdeg' _hχ z]
 
 end Orbital
 
