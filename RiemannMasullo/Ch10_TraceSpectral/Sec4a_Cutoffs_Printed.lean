@@ -2,6 +2,8 @@ module
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4a
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.Ch13_ZerosHecke.Targets
+import RiemannMasullo.External.ZetaLab.HardyFirstZero.FirstZero
 
 /-!
 # Printed cutoff and spectral lift claims in §§10.4.1–10.4.2
@@ -465,14 +467,205 @@ def Printed.spectralStripBasisLift_uniformUpperBound : Prop :=
       ∀ ε : ℝ, 0 < ε → ε < C⁻¹ → ∃ u : J → W[F, α, s],
         ∀ j, N.mkQ (u j) = incl (ψ j) ∧ ‖u j‖ < C + ε
 
-/-- Paper: Theorem 10.4.2.8, proof, (10.4.2.24), p. 463. Use `F = ℚ`,
-`χ = 1`, `a = s = α = 2`, and the order-zero jets with `b = −3/2` at
-distinct simple critical-line zeros with ordinates `t,u` arbitrarily close
-together (Bui–Conrey–Young, Theorem 1.1, and the zeta zero count).
-Dominated convergence in the reciprocal Sobolev weight makes
-the dual norm of the difference of these jets tend to zero. On the
-`t`-indexed lift the difference is one, forcing unbounded lift norms. -/
+/-- The class logarithmic norm pushes Haar measure forward to a positive multiple
+of Lebesgue measure. This uses the proper quotient map as in
+`exists_map_logClassNorm_eq_smul_volume` in Appendix B. -/
+private theorem sec4a_basisLift_radialIntegrable_iff {f : ℝ → ℝ} (hf : Measurable f) :
+    Integrable (f ∘ logNorm[ℚ]) μ[ℚ] ↔ Integrable f volume := by
+  let μ := μ[ℚ]
+  let ν : Measure (Multiplicative ℝ) := (volume : Measure ℝ)
+  let : μ.IsHaarMeasure := (ideleClassTamagawaMeasure_isWeil (F := ℚ)).1
+  let : ν.IsHaarMeasure := by
+    have : IsFiniteMeasureOnCompacts ν :=
+      inferInstanceAs (IsFiniteMeasureOnCompacts (volume : Measure ℝ))
+    have : Measure.IsOpenPosMeasure ν :=
+      inferInstanceAs (Measure.IsOpenPosMeasure (volume : Measure ℝ))
+    have : ν.IsMulLeftInvariant :=
+      ⟨fun t ↦ (measurePreserving_add_left (volume : Measure ℝ) t.toAdd).map_eq⟩
+    constructor
+  let e : ℝ≥0ˣ ≃ₜ ℝ :=
+    (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.toHomeomorph.symm
+  have he (t : ℝ≥0ˣ) : e t = Real.log (t.val : ℝ) :=
+    (Real.log_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _))).symm
+  let m : C[ℚ] →* Multiplicative ℝ :=
+    { toFun := fun g ↦ Multiplicative.ofAdd (e (ideleClassNorm ℚ g))
+      map_one' := by
+        change e (ideleClassNorm ℚ 1) = 0
+        simp [he]
+      map_mul' := fun g h ↦ by
+        change e (ideleClassNorm ℚ (g * h)) = e (ideleClassNorm ℚ g) + e (ideleClassNorm ℚ h)
+        rw [he, map_mul, Units.val_mul, NNReal.coe_mul, he, he]
+        exact Real.log_mul (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+          (NNReal.coe_pos.mpr (Units.zero_lt _)).ne' }
+  have hm : IsProperMap m := e.isProperMap.comp (isProperMap_ideleClassNorm ℚ)
+  have hsurj : Function.Surjective m := e.surjective.comp sec4a_ideleClassNorm_rat_surjective
+  let : (μ.map m).IsHaarMeasure :=
+    Measure.isHaarMeasure_map μ m hm.continuous hsurj (isProperMap_iff_tendsto_cocompact.mp hm).2
+  have hFun : (m : C[ℚ] → ℝ) = logNorm[ℚ] := funext fun g ↦ he (ideleClassNorm ℚ g)
+  have hmap := Measure.isMulLeftInvariant_eq_smul (μ.map m) ν
+  let c := Measure.haarScalarFactor (μ.map m) ν
+  have hpos : 0 < c := Measure.haarScalarFactor_pos_of_isHaarMeasure _ _
+  have hρ : Measure.map logNorm[ℚ] μ = c • (volume : Measure ℝ) := by
+    rw [← hFun]
+    exact hmap
+  have hmeas : Measurable logNorm[ℚ] := hFun ▸ hm.continuous.measurable
+  rw [← integrable_map_measure hf.aestronglyMeasurable hmeas.aemeasurable, hρ]
+  exact integrable_smul_measure (by exact_mod_cast hpos.ne') ENNReal.coe_ne_top
+
+/-- In degree zero, the boundary jet has a divergent pairing with a weighted L²
+test whose logarithmic profile is exp(−x)/x on x > 1. -/
+private theorem sec4a_basisLift_boundary_not_integrable (t : ℝ) :
+    ∃ v : W[ℚ, (1 : ℝ), (0 : ℝ)],
+      ¬ Integrable (fun g ↦ v g * spectralZeroJet (1 : PontryaginDual C[ℚ]) 1 t 0 g) μ[ℚ] := by
+  let μ := μ[ℚ]
+  let L := logNorm[ℚ]
+  let w := intervalSobolevDensity (-1) 1 0
+  let d (g : C[ℚ]) := ENNReal.ofReal (w (L g))
+  let η := spectralZeroJet (1 : PontryaginDual C[ℚ]) 1 t 0
+  let f : ℝ → ℂ := (Ioi (1 : ℝ)).indicator (fun x ↦ ((Real.exp (-x) * x⁻¹ : ℝ) : ℂ))
+  let p : ℝ → ℝ := (Ioi (1 : ℝ)).indicator (fun x ↦ x⁻¹)
+  let q : ℝ → ℝ := (Ioi (1 : ℝ)).indicator (fun x ↦ (x⁻¹) ^ 2)
+  have hL : Measurable L := Real.measurable_log.comp
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp (m[ℚ]).continuous)).measurable
+  have hw (x : ℝ) : w x = max (Real.exp (-2 * x)) (Real.exp (2 * x)) := by
+    simp only [w, intervalSobolevDensity, zero_div, Real.rpow_zero, mul_one]
+    congr 2
+    ring
+  have hwp (x : ℝ) : 0 < w x := by rw [hw]; exact (Real.exp_pos _).trans_le (le_max_right _ _)
+  have hwr {x : ℝ} (hx : 1 < x) : w x = Real.exp (2 * x) := by
+    rw [hw, max_eq_right (Real.exp_le_exp.mpr (by linarith))]
+  have hwm : Measurable w := by
+    rw [show w = fun x ↦ max (Real.exp (-2 * x)) (Real.exp (2 * x)) from funext hw]
+    fun_prop
+  have hd : Measurable d := (hwm.comp hL).ennreal_ofReal
+  have hq : Measurable q := (measurable_inv.pow_const 2).indicator measurableSet_Ioi
+  have hp : Measurable p := measurable_inv.indicator measurableSet_Ioi
+  have hf : Measurable f :=
+    (Complex.continuous_ofReal.measurable.comp ((by fun_prop : Measurable (fun x : ℝ ↦
+      Real.exp (-x))).mul measurable_inv)).indicator measurableSet_Ioi
+  have hqint : Integrable q volume := by
+    rw [show q = (Ioi (1 : ℝ)).indicator (fun x ↦ (x⁻¹) ^ 2) from rfl,
+      integrable_indicator_iff measurableSet_Ioi]
+    simpa only [← inv_pow, ← Real.rpow_natCast, ← Real.rpow_neg_eq_inv_rpow, Nat.cast_ofNat]
+      using (integrableOn_Ioi_rpow_of_lt (a := -2) (c := 1) (by norm_num) zero_lt_one)
+  have hqnorm (x : ℝ) : ‖f x‖ ^ 2 * w x = q x := by
+    by_cases hx : x ∈ Ioi (1 : ℝ)
+    · have hx' : 1 < x := hx
+      rw [show f x = ((Real.exp (-x) * x⁻¹ : ℝ) : ℂ) from indicator_of_mem hx _,
+        show q x = (x⁻¹) ^ 2 from indicator_of_mem hx _, hwr hx', Complex.norm_real,
+        Real.norm_of_nonneg (mul_nonneg (Real.exp_pos _).le (inv_nonneg.mpr (by linarith))),
+        Real.exp_neg, show Real.exp (2 * x) = Real.exp x ^ 2 by
+          rw [two_mul, Real.exp_add, pow_two]]
+      field_simp [Real.exp_ne_zero]
+    · simp only [f, q, indicator_of_notMem hx, norm_zero, zero_pow (by decide : (2 : ℕ) ≠ 0), zero_mul]
+  have hmem : MemLp (f ∘ L) 2 (μ.withDensity d) := by
+    apply (memLp_two_iff_integrable_sq_norm (hf.comp hL).aestronglyMeasurable).mpr
+    apply (integrable_withDensity_iff hd (ae_of_all μ fun _ ↦ ENNReal.ofReal_lt_top)).mpr
+    refine (sec4a_basisLift_radialIntegrable_iff hq |>.mpr hqint).congr
+      (ae_of_all μ fun g ↦ ?_)
+    change q (L g) = ‖f (L g)‖ ^ 2 * (ENNReal.ofReal (w (L g))).toReal
+    rw [ENNReal.toReal_ofReal (hwp _).le, hqnorm]
+  let v : W[ℚ, (1 : ℝ), (0 : ℝ)] := hmem.toLp _
+  refine ⟨v, fun hv ↦ ?_⟩
+  have hμν : μ ≪ μ.withDensity d := withDensity_absolutelyContinuous' hd.aemeasurable
+    (ae_of_all μ fun g ↦ (ENNReal.ofReal_pos.mpr (hwp (L g))).ne')
+  have hcoe : (v : C[ℚ] → ℂ) =ᵐ[μ] f ∘ L :=
+    (MemLp.coeFn_toLp hmem).filter_mono hμν.ae_le
+  have hjet (g : C[ℚ]) : ‖η g‖ = Real.exp (L g) := by
+    change ‖spectralZeroJet (1 : PontryaginDual C[ℚ]) 1 t 0 g‖ = _
+    unfold spectralZeroJet
+    rw [pow_zero, mul_one]
+    change ‖((1 : PontryaginDual C[ℚ]) g : ℂ) *
+      (((ideleClassNorm ℚ g).val : ℝ) : ℂ) ^ shift((1 : ℝ), t)‖ = _
+    rw [norm_mul, Circle.norm_coe, one_mul,
+      Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _))]
+    have ht : (shift((1 : ℝ), t)).re = 1 := by norm_num [Complex.mul_re]
+    rw [ht, Real.rpow_one]
+    exact (Real.exp_log (NNReal.coe_pos.mpr (Units.zero_lt _))).symm
+  have hnorm (x : ℝ) : ‖f x‖ * Real.exp x = p x := by
+    by_cases hx : x ∈ Ioi (1 : ℝ)
+    · have hx' : 1 < x := hx
+      rw [show f x = ((Real.exp (-x) * x⁻¹ : ℝ) : ℂ) from indicator_of_mem hx _,
+        show p x = x⁻¹ from indicator_of_mem hx _, Complex.norm_real,
+        Real.norm_of_nonneg (mul_nonneg (Real.exp_pos _).le (inv_nonneg.mpr (by linarith))),
+        Real.exp_neg]
+      field_simp [Real.exp_ne_zero]
+    · simp [f, p, hx]
+  have hprod : Integrable (p ∘ L) μ := by
+    refine hv.norm.congr ?_
+    filter_upwards [hcoe] with g hg
+    change ‖v g * η g‖ = p (L g)
+    rw [norm_mul, hg, Function.comp_apply, hjet, hnorm]
+  have hbad := (sec4a_basisLift_radialIntegrable_iff hp).mp hprod
+  exact not_integrableOn_Ioi_inv
+    ((integrable_indicator_iff measurableSet_Ioi).mp hbad)
+
+private theorem sec4a_basisLift_false_of_zero (t : ℝ)
+    (ht : 0 < (meromorphicOrderAt (continuedCompletedHeckeL (1 : PontryaginDual C[ℚ]))
+      (shift((1 / 2 : ℝ), t))).untop₀.toNat) :
+    ¬ Printed.spectralStripBasisLift_uniformUpperBound := by
+  intro hall
+  obtain ⟨_, _, _, _, _, _, _, hpair, _⟩ :=
+    hall ℚ (1 : PontryaginDual C[ℚ]) (1 / 2) 1 0 (by norm_num) (by norm_num)
+  let j : { j : ℝ × ℝ × ℕ // j.1 ∈ Icc (-1) 1 ∧ j.2.2 <
+      (meromorphicOrderAt (continuedCompletedHeckeL (1 : PontryaginDual C[ℚ]))
+        (shift((0 : ℝ) + j.1, j.2.1))).untop₀.toNat } :=
+    ⟨(1 / 2, t, 0), by norm_num, by simpa only [zero_add] using ht⟩
+  obtain ⟨v, hv⟩ := sec4a_basisLift_boundary_not_integrable t
+  apply hv
+  have hi := (hpair j v).1
+  change Integrable (fun g ↦ v g *
+    spectralZeroJet (1 : PontryaginDual C[ℚ]) ((1 / 2 : ℝ) + 1 / 2) t 0 g) μ[ℚ] at hi
+  simpa only [show (1 / 2 : ℝ) + 1 / 2 = 1 by norm_num] using hi
+
+/-- A certified critical-line zero supplies an index for the rational
+trivial-character strip. The order comparison follows the rational zero
+argument in Chapter 13. -/
+private theorem sec4a_basisLift_rational_zero :
+    ∃ t : ℝ, 0 < (meromorphicOrderAt (continuedCompletedHeckeL (1 : PontryaginDual C[ℚ]))
+      (shift((1 / 2 : ℝ), t))).untop₀.toNat := by
+  obtain ⟨t, _, ht⟩ := HardyFirstZero.first_zero_on_line
+  let z := shift((1 / 2 : ℝ), t)
+  have hne : z ≠ 1 := by
+    intro he
+    have := congrArg Complex.re he
+    norm_num [z] at this
+  have ha := analyticOn_riemannZeta z hne
+  have hm : MeromorphicOn riemannZeta univ := by
+    simpa only [DirichletCharacter.LFunction_modOne_eq] using
+      meromorphic_dirichletLFunction (1 : DirichletCharacter ℂ 1)
+  have he := meromorphicOrderAt_finiteHeckeL_continuation (1 : PontryaginDual C[ℚ])
+    hm (fun s ↦ by rw [finiteHeckeL_one_eq_dedekindZeta, dedekindZeta_rat_eq_riemannZeta s.property])
+    (s := z) (by norm_num [z])
+  have hz2 : meromorphicOrderAt riemannZeta (2 : ℂ) = 0 := by
+    have h := analyticOn_riemannZeta 2 (by norm_num : (2 : ℂ) ≠ 1)
+    rw [h.meromorphicOrderAt_eq, h.analyticOrderAt_eq_zero.mpr
+      (riemannZeta_ne_zero_of_one_lt_re (by norm_num))]
+    rfl
+  have hfin := hm.meromorphicOrderAt_ne_top_of_isPreconnected isPreconnected_univ
+    (mem_univ (2 : ℂ)) (mem_univ z) (by rw [hz2]; simp)
+  have hpos : analyticOrderAt riemannZeta z ≠ 0 :=
+    ha.analyticOrderAt_ne_zero.mpr (by simpa [z, Complex.ofReal_div] using ht)
+  refine ⟨t, ?_⟩
+  change 0 < (meromorphicOrderAt _ z).untop₀.toNat
+  rw [← he, ha.meromorphicOrderAt_eq]
+  rw [ha.meromorphicOrderAt_eq] at hfin
+  generalize analyticOrderAt riemannZeta z = k at hfin hpos ⊢
+  cases k using ENat.recTopCoe with
+  | top => simp at hfin
+  | coe n =>
+    have hn : n ≠ 0 := by simpa using hpos
+    simpa using Nat.pos_of_ne_zero hn
+
+/-- Paper: Theorem 10.4.2.8, proof, (10.4.2.24), p. 463. In the printed
+formulation the coefficient functionals must be given by integrable pairings
+on the ambient Sobolev space. For the rational trivial character, take
+`a = 1/2`, `α = 1`, and `s = 0`. The `b = 1/2` index from a certified
+critical-line zero places the order-zero jet on the Sobolev boundary, where
+the pairing diverges on a weighted L² test. -/
 theorem Printed.spectralStripBasisLift_uniformUpperBound_false :
-    ¬ Printed.spectralStripBasisLift_uniformUpperBound := by sorry
+    ¬ Printed.spectralStripBasisLift_uniformUpperBound := by
+  obtain ⟨t, ht⟩ := sec4a_basisLift_rational_zero
+  exact sec4a_basisLift_false_of_zero t ht
 
 end RiemannMasullo

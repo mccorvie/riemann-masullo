@@ -685,24 +685,6 @@ local notation "lineHs(" hs ")" => le_of_lt (zero_lt_one.trans hs)
 local notation "lineU(" χ ", " hs ")" =>
   (fun j ↦ (spectralLineJet_memLp χ hs j).toLp (lineJet(χ, j)))
 
-/-- Paper: Theorem 10.2.1.1, pp. 440–443. The weighted theta closure is
-the common kernel of the admitted line jets.
-Gap: The proof on p. 443 does not identify this closure in the line norm. -/
-theorem spectralLineJet_commonKernel (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
-    (_hχ : IsSpectralBasepointChoice χ) {a s : ℝ} (hs : 1 < s) :
-    let u : SpectralLineJetIndex χ a s → W'(0, 0, s) := lineU(χ, hs)
-    JetKernel(a, le_rfl (a := (0 : ℝ)), lineHs(hs), u) := by sorry
-
-/-- Paper: Theorem 10.2.1.1, pp. 440–443. Single-jet interpolants have
-representatives whose images span a dense subspace of the line quotient.
-Gap: The asserted finite-band adjoint range does not supply these interpolants
-and their density. -/
-theorem spectralLineJet_denseInterpolants (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
-    (_hχ : IsSpectralBasepointChoice χ) {a s : ℝ} (hs : 1 < s) :
-    let J := SpectralLineJetIndex χ a s
-    let u : J → W'(0, 0, s) := lineU(χ, hs)
-    JetInterpolation(J, a, le_rfl (a := (0 : ℝ)), lineHs(hs), u) := by sorry
-
 /-- Paper: Theorem 10.2.1.1, p. 440. The norm-one dual and the discrete
 zero sets in its charts give countably many admitted line jets. -/
 theorem spectralLineJet_countable (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (a s : ℝ) :
@@ -740,21 +722,6 @@ theorem spectralLineJet_countable (χ : PontryaginDual C₁ → PontryaginDual C
   have hω := congrArg (fun p : PontryaginDual C₁ × W × ℕ ↦ p.1) hij
   have hk := congrArg (fun p : PontryaginDual C₁ × W × ℕ ↦ p.2.2) hij
   exact Subtype.ext (Prod.ext hω (Prod.ext (by simpa [e] using him) hk))
-
-/-- Paper: Theorem 10.2.1.1 and Terminology 10.2.1.1, p. 440. The a-line
-jets represent quotient functionals and admit a Markushevich biorthogonal family.
-Deviation: Index directly by the admitted jets, so reindexing permits any
-enumeration, including finite and empty families. Apply the strict cutoff. -/
-theorem spectralLineMarkushevichBasis (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
-    (hχ : IsSpectralBasepointChoice χ) {a s : ℝ} (hs : 1 < s) :
-    let J := SpectralLineJetIndex χ a s
-    let Q := spectralSobolevQuotient F a (le_rfl (a := (0 : ℝ))) (le_of_lt (zero_lt_one.trans hs))
-    let D := spectralSobolevDualEmbedding F a (le_rfl (a := (0 : ℝ))) (le_of_lt (zero_lt_one.trans hs))
-    Countable J ∧ ∃ (x : J → Q) (Λ : J → StrongDual ℂ Q), IsSpectralMarkushevichBasis x Λ ∧
-      ∀ j, D (Λ j) = (spectralLineJet_memLp χ hs j).toLp (lineJet(χ, j)) := by
-  exact ⟨spectralLineJet_countable χ a s, spectralSobolevQuotient_basis_of_interpolation a
-    (le_rfl (a := (0 : ℝ))) (lineHs(hs)) (lineU(χ, hs))
-    (spectralLineJet_commonKernel χ hχ hs) (spectralLineJet_denseInterpolants χ hχ hs)⟩
 
 section TestDuality
 
@@ -1506,26 +1473,6 @@ theorem spectralFamily_singleton_normalized {E : Type*} [NormedAddCommGroup E] (
     (_hx : x ≠ 0) : IsNormalizedSpectralFamily (fun _ : Unit ↦ x) := by
   exact ⟨⟨‖x‖, fun _ ↦ le_rfl⟩, ‖x‖, norm_pos_iff.mpr _hx, fun _ ↦ le_rfl⟩
 
-/-- Paper: Corollary 10.2.1.4, p. 444. The a-line basis in the quotient dual
-is normalized in the norm of its realization in the negative space.
-Deviation: Apply the strict cutoff and allow finite or empty index types. -/
-theorem spectralLineMarkushevichBasis_normalized
-    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (_hχ : IsSpectralBasepointChoice χ)
-    {a s : ℝ} (hs : 1 < s) :
-    let J := SpectralLineJetIndex χ a s
-    let Q := spectralSobolevQuotient F a (le_rfl (a := (0 : ℝ))) (le_of_lt (zero_lt_one.trans hs))
-    let D := spectralSobolevDualEmbedding F a (le_rfl (a := (0 : ℝ))) (le_of_lt (zero_lt_one.trans hs))
-    ∃ (x : J → Q) (Λ : J → StrongDual ℂ Q), IsSpectralMarkushevichBasis x Λ ∧
-      (∀ j, D (Λ j) = (spectralLineJet_memLp χ hs j).toLp (lineJet(χ, j))) ∧
-      IsNormalizedSpectralFamily (fun j ↦ D (Λ j)) := by
-  obtain ⟨x, Λ, hB, hD⟩ := (spectralLineMarkushevichBasis (a := a) χ _hχ hs).2
-  obtain ⟨C, hC, hbound⟩ := spectralLineJet_annulus (a := a) χ _hχ hs
-  refine ⟨x, Λ, hB, hD, ⟨C, ?_⟩, ⟨C⁻¹, inv_pos.mpr hC, ?_⟩⟩
-  · intro j
-    simpa only [hD j] using (hbound j).2
-  · intro j
-    simpa only [hD j] using (hbound j).1
-
 -- TODO(paper-gap): The general claim about the Schauder property on p. 444
 -- lacks a proof. The primal normalization invoked again on p. 451 is false:
 -- close simple critical-line zeta zeros give jets at distance tending to zero,
@@ -2092,6 +2039,118 @@ theorem spectralStripJet_denseInterpolants (χ : PontryaginDual C₁ → Pontrya
     let J := SpectralStripJetIndex χ a α s
     let u : J → W'(-α, α, s) := stripU(χ, hα, hs)
     JetInterpolation(J, a, stripI(hα), hs, u) := by sorry
+
+/-- At width zero the real offset of each strip jet is zero, and its remaining
+indices give exactly one line jet with the same function representative. -/
+private theorem spectralLineJet_zeroWidth_indices (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (a s : ℝ) :
+    ∃ e : SpectralLineJetIndex χ a s ≃ SpectralStripJetIndex χ a 0 s,
+      ∀ i, stripJet(χ, e i) = lineJet(χ, i) := by
+  let L := SpectralLineJetIndex χ a s
+  let Z := SpectralStripJetIndex χ a 0 s
+  have hoff (j : Z) : j.val.2.1 = 0 := by
+    simpa using (SpectralStripJetIndex.mem_strip_order_pos (le_refl (0 : ℝ)) j).1
+  have hmult (n : ℕ) : spectralStripMultiplicity 0 s 0 n = spectralBoundaryMultiplicity s n :=
+    spectralStripMultiplicity_boundary le_rfl (Or.inr rfl) s n
+  let e : L ≃ Z :=
+    { toFun := fun i ↦ ⟨(i.val.1, 0, i.val.2.1, i.val.2.2), by
+        simpa only [add_zero, hmult] using i.property⟩
+      invFun := fun j ↦ ⟨(j.val.1, j.val.2.2.1, j.val.2.2.2), by
+        simpa only [hoff j, add_zero, hmult] using j.property⟩
+      left_inv := fun _ ↦ Subtype.ext rfl
+      right_inv := fun j ↦ Subtype.ext (Prod.ext rfl (Prod.ext (hoff j).symm rfl)) }
+  exact ⟨e, fun _ ↦ rfl⟩
+
+/-- Transport a statement about the reindexed reciprocal-weight vectors from
+the interval [−0, 0] to the identical line Sobolev space. -/
+private theorem spectralLineJet_zeroWidth_transport (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (a : ℝ) {s : ℝ} (hs : 1 < s)
+    (P : ∀ {l : ℝ}, l ≤ 0 → (SpectralLineJetIndex χ a s → W'(l, 0, s)) → Prop)
+    (h : ∀ (e : SpectralLineJetIndex χ a s ≃ SpectralStripJetIndex χ a 0 s),
+      P (stripI(le_refl (0 : ℝ))) (fun i ↦ stripU(χ, le_refl (0 : ℝ), lineHs(hs)) (e i))) :
+    P (le_refl (0 : ℝ)) (lineU(χ, hs)) := by
+  obtain ⟨e, he⟩ := spectralLineJet_zeroWidth_indices χ a s
+  let claim (l : ℝ) (hl : l ≤ 0) := ∀ hm : ∀ i : SpectralLineJetIndex χ a s,
+    MemLp (lineJet(χ, i)) 2 L2μ'(l, 0, s), P hl (fun i ↦ (hm i).toLp (lineJet(χ, i)))
+  have hstrip : claim (-0) (stripI(le_refl (0 : ℝ))) := by
+    intro hm
+    have eqv : (fun i ↦ stripU(χ, le_refl (0 : ℝ), lineHs(hs)) (e i)) =
+        fun i ↦ (hm i).toLp (lineJet(χ, i)) := by
+      funext i
+      exact MemLp.toLp_congr _ _ (Filter.Eventually.of_forall (congrFun (he i)))
+    exact eqv ▸ h e
+  have transport (l : ℝ) (hl : l ≤ 0) (hl0 : l = 0) : claim l hl → claim 0 le_rfl := by
+    subst l
+    exact id
+  exact transport (-0) _ neg_zero hstrip (spectralLineJet_memLp χ hs)
+
+/-- Paper: Theorem 10.2.1.1, pp. 440–443. The weighted theta closure is
+the common kernel of the admitted line jets.
+Gap: The line approximation required on p. 443 is the width-zero case of the strip common-kernel assertion. -/
+theorem spectralLineJet_commonKernel (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (_hχ : IsSpectralBasepointChoice χ) {a s : ℝ} (hs : 1 < s) :
+    let u : SpectralLineJetIndex χ a s → W'(0, 0, s) := lineU(χ, hs)
+    JetKernel(a, le_rfl (a := (0 : ℝ)), lineHs(hs), u) := by
+  apply spectralLineJet_zeroWidth_transport χ a hs
+    (fun hl u ↦ JetKernel(a, hl, lineHs(hs), u))
+  intro e y
+  refine (spectralStripJet_commonKernel (a := a) χ _hχ (le_refl (0 : ℝ)) (lineHs(hs)) y).trans ?_
+  exact e.surjective.forall
+
+/-- Paper: Theorem 10.2.1.1, pp. 440–443. Single-jet interpolants have
+representatives whose images span a dense subspace of the line quotient.
+Gap: The interpolation and density asserted on p. 443 follow from the corresponding
+strip assertion at width zero. -/
+theorem spectralLineJet_denseInterpolants (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (_hχ : IsSpectralBasepointChoice χ) {a s : ℝ} (hs : 1 < s) :
+    let J := SpectralLineJetIndex χ a s
+    let u : J → W'(0, 0, s) := lineU(χ, hs)
+    JetInterpolation(J, a, le_rfl (a := (0 : ℝ)), lineHs(hs), u) := by
+  apply spectralLineJet_zeroWidth_transport χ a hs
+    (fun hl u ↦ JetInterpolation(SpectralLineJetIndex χ a s, a, hl, lineHs(hs), u))
+  intro e
+  obtain ⟨v, hv, hc, hd⟩ :=
+    spectralStripJet_denseInterpolants (a := a) χ _hχ (le_refl (0 : ℝ)) (lineHs(hs))
+  refine ⟨v ∘ e, fun i ↦ hv (e i), fun i j hij ↦ hc (e i) (e j) (e.injective.ne hij), ?_⟩
+  let q := (Θ(a, stripI(le_refl (0 : ℝ)), lineHs(hs))).mkQ
+  change Dense (Submodule.span ℂ (range ((fun j ↦ q (v j)) ∘ e)) :
+    Set (spectralSobolevQuotient F a (stripI(le_refl (0 : ℝ))) (lineHs(hs))))
+  rwa [e.surjective.range_comp]
+
+/-- Paper: Theorem 10.2.1.1 and Terminology 10.2.1.1, p. 440. The a-line
+jets represent quotient functionals and admit a Markushevich biorthogonal family.
+Deviation: Index directly by the admitted jets, so reindexing permits any
+enumeration, including finite and empty families. Apply the strict cutoff. -/
+theorem spectralLineMarkushevichBasis (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (hχ : IsSpectralBasepointChoice χ) {a s : ℝ} (hs : 1 < s) :
+    let J := SpectralLineJetIndex χ a s
+    let Q := spectralSobolevQuotient F a (le_rfl (a := (0 : ℝ))) (le_of_lt (zero_lt_one.trans hs))
+    let D := spectralSobolevDualEmbedding F a (le_rfl (a := (0 : ℝ))) (le_of_lt (zero_lt_one.trans hs))
+    Countable J ∧ ∃ (x : J → Q) (Λ : J → StrongDual ℂ Q), IsSpectralMarkushevichBasis x Λ ∧
+      ∀ j, D (Λ j) = (spectralLineJet_memLp χ hs j).toLp (lineJet(χ, j)) := by
+  exact ⟨spectralLineJet_countable χ a s, spectralSobolevQuotient_basis_of_interpolation a
+    (le_rfl (a := (0 : ℝ))) (lineHs(hs)) (lineU(χ, hs))
+    (spectralLineJet_commonKernel χ hχ hs) (spectralLineJet_denseInterpolants χ hχ hs)⟩
+
+/-- Paper: Corollary 10.2.1.4, p. 444. The a-line basis in the quotient dual
+is normalized in the norm of its realization in the negative space.
+Deviation: Apply the strict cutoff and allow finite or empty index types. -/
+theorem spectralLineMarkushevichBasis_normalized
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (_hχ : IsSpectralBasepointChoice χ)
+    {a s : ℝ} (hs : 1 < s) :
+    let J := SpectralLineJetIndex χ a s
+    let Q := spectralSobolevQuotient F a (le_rfl (a := (0 : ℝ))) (le_of_lt (zero_lt_one.trans hs))
+    let D := spectralSobolevDualEmbedding F a (le_rfl (a := (0 : ℝ))) (le_of_lt (zero_lt_one.trans hs))
+    ∃ (x : J → Q) (Λ : J → StrongDual ℂ Q), IsSpectralMarkushevichBasis x Λ ∧
+      (∀ j, D (Λ j) = (spectralLineJet_memLp χ hs j).toLp (lineJet(χ, j))) ∧
+      IsNormalizedSpectralFamily (fun j ↦ D (Λ j)) := by
+  obtain ⟨x, Λ, hB, hD⟩ := (spectralLineMarkushevichBasis (a := a) χ _hχ hs).2
+  obtain ⟨C, hC, hbound⟩ := spectralLineJet_annulus (a := a) χ _hχ hs
+  refine ⟨x, Λ, hB, hD, ⟨C, ?_⟩, ⟨C⁻¹, inv_pos.mpr hC, ?_⟩⟩
+  · intro j
+    simpa only [hD j] using (hbound j).2
+  · intro j
+    simpa only [hD j] using (hbound j).1
 
 /-- Paper: Theorem 10.2.2.1, p. 446. The discrete divisor in each norm
 chart gives countably many strip jets over the countable norm-one dual. -/
