@@ -1077,12 +1077,216 @@ def sLocalThetaPoleBound_full_eq_polarFree : Prop :=
     sLocalThetaPoleBound ω sLocalRhoPoleOrder =
       ((sAdelePolarFree S r c).map (Kₛ(F, S, ω)).mkQ).topologicalClosure
 
+/-- A continuous functional vanishing on `K` and `P` vanishes on every vector whose class
+lies in the closure of the image of `P` in `M ⧸ K`. -/
+private theorem sLocalThetaPoleBound_full_eq_polarFree_closure {M : Type*} [AddCommGroup M]
+    [Module ℂ M] [TopologicalSpace M] [IsTopologicalAddGroup M] [ContinuousSMul ℂ M]
+    (K P : Submodule ℂ M) (L : M →ₗ[ℂ] ℂ) (hL : Continuous L) (hK : K ≤ LinearMap.ker L)
+    (hP : P ≤ LinearMap.ker L) (htop : (P.map K.mkQ).topologicalClosure = ⊤) (g : M) :
+    L g = 0 := by
+  let L' := K.liftQ L hK
+  have hc : Continuous L' := (Submodule.isQuotientMap_mkQ K).continuous_iff.mpr hL
+  have hcl : IsClosed (LinearMap.ker L' : Set (M ⧸ K)) := isClosed_eq hc continuous_const
+  have hle : P.map K.mkQ ≤ LinearMap.ker L' := by
+    rintro _ ⟨f, hf, rfl⟩
+    exact hP hf
+  have hmem : K.mkQ g ∈ (P.map K.mkQ).topologicalClosure :=
+    (Submodule.eq_top_iff'.mp htop) _
+  exact Submodule.topologicalClosure_minimal _ hle hcl hmem
+
+/-- A polar-free test vanishes at zero: its archimedean slice is flat on the walls, and zero
+lies on a wall. -/
+private theorem sLocalThetaPoleBound_full_eq_polarFree_zero {F : Type u} [Field F]
+    [NumberField F] (S : Finset Places(F))
+    (r : (w : {w : InfinitePlace F // w.IsReal}) →
+      {e : w.val.Completion ≃+* ℝ // IsHomeomorph (e : w.val.Completion → ℝ)})
+    (c : (w : {w : InfinitePlace F // w.IsComplex}) →
+      {e : w.val.Completion ≃+* ℂ // IsHomeomorph (e : w.val.Completion → ℂ)})
+    (w₀ : InfinitePlace F) (hw₀ : w₀.IsReal) (f : ℬₛ(F, S)) (hf : f ∈ sAdelePolarFree S r c) :
+    f (Multiplicative.ofAdd 0) = 0 := by
+  have h1 := (Submodule.mem_iInf _).mp (Submodule.mem_inf.mp hf).2 0
+  obtain ⟨φ, hφ, he⟩ := Submodule.mem_map.mp h1
+  have hwall := (Submodule.mem_iInf _).mp ((Submodule.mem_iInf _).mp ((Submodule.mem_iInf _).mp hφ
+    ⟨0, Or.inl ⟨⟨w₀, hw₀⟩, rfl⟩⟩) 0) Fin.elim0
+  have h0 : (φ : ((({w : InfinitePlace F // w.IsReal}) → ℝ) ×
+      (({w : InfinitePlace F // w.IsComplex}) → ℂ)) → ℂ) 0 = 0 := by
+    have := LinearMap.mem_ker.mp hwall
+    simpa using this
+  have h2 := congrFun he 0
+  change (φ : _ → ℂ) 0 = _ at h2
+  rw [h0] at h2
+  refine Eq.trans ?_ h2.symm
+  change f (Multiplicative.ofAdd 0) = f (Multiplicative.ofAdd (_, 0))
+  refine congrArg (fun a : SAdeleRing F S ↦ f (Multiplicative.ofAdd a)) (Prod.ext ?_ rfl)
+  refine (funext fun w ↦ ?_ : ((fun w ↦ 0 : (w : InfinitePlace F) → w.Completion)) = _)
+  dsimp only
+  split_ifs <;> simp
+
+/-- Over ℚ with no finite places, the class of an S-idele in the norm-one classes is trivial
+and the S-units are finite, so a test in the kernel of the homogeneous theta transform has
+vanishing sum over the unit translates of every idele. Letting the idele tend to zero gives
+a positive multiple of the value at zero. -/
+private theorem sLocalThetaPoleBound_full_eq_polarFree_ker [NumberField (ULift.{u} ℚ)]
+    (w₀ : InfinitePlace (ULift.{u} ℚ)) (hw₀ : w₀.IsReal)
+    (hsub : Subsingleton (InfinitePlace (ULift.{u} ℚ)))
+    (f : ℬₛ(ULift.{u} ℚ, ∅)) (hf : f ∈ Kₛ(ULift.{u} ℚ, ∅, 1)) :
+    f (Multiplicative.ofAdd 0) = 0 := by
+  let F := ULift.{u} ℚ
+  let S : Finset Places(F) := ∅
+  -- the S-idele norm is the absolute value at the real place
+  have hnorm (x : (SAdeleRing F S)ˣ) : ((sIdeleNorm F S x : ℝ≥0) : ℝ) = ‖x.val.1 w₀‖ := by
+    rw [sIdeleNorm, Finset.univ_eq_empty (α := (∅ : Finset Places(F))), Finset.prod_empty,
+      mul_one, Fintype.prod_subsingleton _ w₀, hw₀.mult_eq_one, pow_one]
+    rfl
+  -- the norm-one classes are trivial
+  have hJ (h : J₁(F, S)) : h = 1 := by
+    obtain ⟨h, hh⟩ := h
+    obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective h
+    have hx : ‖x.val.1 w₀‖ = 1 := by
+      rw [← hnorm]
+      have := MonoidHom.mem_ker.mp hh
+      rw [sIdeleQuotientNorm_mk] at this
+      rw [this]
+      rfl
+    let φ := InfinitePlace.Completion.extensionEmbeddingOfIsReal hw₀
+    have hφ : ‖φ (x.val.1 w₀)‖ = 1 :=
+      ((InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal hw₀).norm_map_of_map_zero
+        (map_zero φ) _).trans hx
+    rw [Real.norm_eq_abs] at hφ
+    have hpm : x.val.1 w₀ = 1 ∨ x.val.1 w₀ = -1 := by
+      rcases abs_eq zero_le_one |>.mp hφ with h1 | h1
+      · exact Or.inl (φ.injective (h1.trans (map_one φ).symm))
+      · exact Or.inr (φ.injective (h1.trans (by rw [map_neg, map_one])))
+    have hval (a : SAdeleRing F S) (ha : a.1 w₀ = x.val.1 w₀) : x.val = a :=
+      Prod.ext (funext fun w ↦ (Subsingleton.elim w w₀) ▸ ha.symm)
+        (funext fun v ↦ absurd v.2 (Finset.notMem_empty _))
+    refine Subtype.ext ?_
+    change (QuotientGroup.mk x : SIdeleQuotient F S) = 1
+    rcases hpm with h1 | h1
+    · rw [show x = 1 from Units.ext (hval 1 h1.symm), QuotientGroup.mk_one]
+    · refine (sIdeleQuotient_mk_eq_one F S x).mpr ⟨-1, Units.ext ?_⟩
+      rw [hval (-1) h1.symm]
+      simp
+  -- the S-units are finite
+  have hfin : Finite ((((∅ : Finset Places(F)) : Set Places(F)).integer F)ˣ) := by
+    rw [Finset.coe_empty, integer_empty]
+    let e := Algebra.botEquivOfInjective (IsFractionRing.injective (𝓞 F) F)
+    let units := Units.mapEquiv ((e.toRingEquiv.trans
+      (NumberField.RingOfIntegers.mapRingEquiv (ULift.ringEquiv.{0, u} (R := ℚ)))).trans
+        Rat.ringOfIntegersEquiv).toMulEquiv
+    exact Finite.of_equiv _ units.toEquiv.symm
+  let := Fintype.ofFinite ((((∅ : Finset Places(F)) : Set Places(F)).integer F)ˣ)
+  -- the theta sum vanishes at every idele
+  have hθ (y : (SAdeleRing F S)ˣ) : sLocalAdelicTheta F S f y = 0 := by
+    have h0 : sLocalHomogeneousAdelicThetaLinearMap F S 1 f (QuotientGroup.mk y) = 0 := by
+      rw [LinearMap.mem_ker.mp hf]
+      rfl
+    rw [sLocalHomogeneousAdelicThetaLinearMap_apply] at h0
+    have hc (h : J₁(F, S)) : sLocalAdelicThetaOnClasses F S f (QuotientGroup.mk y * h.val) *
+        (((1 : PontryaginDual J₁(F, S)) h : Circle) : ℂ) =
+        sLocalAdelicThetaOnClasses F S f (QuotientGroup.mk y) := by
+      rw [hJ h]
+      simp
+    simp only [hc, MeasureTheory.integral_const] at h0
+    have hμ : (sLocalNormOneQuotientMeasure F S).real univ ≠ 0 := by
+      let := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+      have : Subsingleton J₁(F, S) := ⟨fun a b ↦ (hJ a).trans (hJ b).symm⟩
+      rw [MeasureTheory.measureReal_def, ENNReal.toReal_ne_zero]
+      exact ⟨(MeasureTheory.Measure.IsOpenPosMeasure.open_pos _ isOpen_univ univ_nonempty),
+        isCompact_univ.measure_lt_top.ne⟩
+    have h1 := (mul_eq_zero.mp h0).resolve_left (by simpa using hμ)
+    rwa [sLocalAdelicThetaOnClasses_mk] at h1
+  -- ideles tending to zero
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  let t : ℕ → ℝ≥0ˣ := fun n ↦ Units.mk0 ((n : ℝ≥0) + 1)⁻¹ (by positivity)
+  choose y hy using fun n ↦ QuotientGroup.mk_surjective (σ (t n))
+  have hyn (n : ℕ) : ‖(y n).val.1 w₀‖ = 1 / ((n : ℝ) + 1) := by
+    rw [← hnorm, ← sIdeleQuotientNorm_mk, hy, hσ]
+    simp [t]
+  have h1 : Tendsto (fun n ↦ ((y n).val.1 : (w : InfinitePlace F) → w.Completion)) atTop
+      (𝓝 0) := by
+    refine tendsto_pi_nhds.mpr fun w ↦ ?_
+    obtain rfl := Subsingleton.elim w₀ w
+    refine tendsto_zero_iff_norm_tendsto_zero.mpr ?_
+    simp only [hyn]
+    exact tendsto_one_div_add_atTop_nhds_zero_nat
+  have h2 : Tendsto (fun n ↦ (y n).val.2) atTop (𝓝 0) :=
+    tendsto_const_nhds.congr fun n ↦ funext fun v ↦ absurd v.2 (Finset.notMem_empty _)
+  have hy0 : Tendsto (fun n ↦ ((y n).val : SAdeleRing F S)) atTop (𝓝 0) :=
+    h1.prodMk_nhds h2
+  have hlim : Tendsto (fun n ↦ sLocalAdelicTheta F S f (y n)) atTop
+      (𝓝 (∑ _ξ : (((∅ : Finset Places(F)) : Set Places(F)).integer F)ˣ,
+        f (Multiplicative.ofAdd 0))) := by
+    simp only [sLocalAdelicTheta_apply, tsum_fintype]
+    refine tendsto_finsetSum _ fun ξ _ ↦ ?_
+    refine ((schwartzBruhat_continuous f).comp continuous_ofAdd).tendsto 0 |>.comp ?_
+    simp only [Units.val_mul]
+    simpa only [mul_zero] using hy0.const_mul _
+  have he := tendsto_nhds_unique (tendsto_const_nhds.congr fun n ↦ (hθ (y n)).symm) hlim
+  rw [Finset.sum_const, Finset.card_univ, nsmul_eq_mul] at he
+  exact (mul_eq_zero.mp he.symm).resolve_left (Nat.cast_ne_zero.mpr Fintype.card_ne_zero)
+
+/-- Over ℚ with no finite places and the trivial norm-one character, every test meets the full
+pole bound, so the left side is everything. Evaluation at zero is continuous, kills the theta
+kernel and the polar-free tests, but not the standard Gaussian. -/
+private theorem sLocalThetaPoleBound_full_eq_polarFree_false_aux :
+    ¬ sLocalThetaPoleBound_full_eq_polarFree.{u} := by
+  intro h
+  let := ulift_rat_numberField.{u}
+  let F := ULift.{u} ℚ
+  let S : Finset Places(F) := ∅
+  have h1 : Module.finrank ℚ F = 1 := by
+    rw [((ULift.ringEquiv.{0, u} (R := ℚ)).toRatAlgEquiv.toLinearEquiv).finrank_eq,
+      Module.finrank_self]
+  have h₁ := InfinitePlace.card_add_two_mul_card_eq_rank F
+  have h₂ := InfinitePlace.card_eq_nrRealPlaces_add_nrComplexPlaces (K := F)
+  have hpos : 0 < Fintype.card (InfinitePlace F) := Fintype.card_pos
+  have hsub : Subsingleton (InfinitePlace F) :=
+    Fintype.card_le_one_iff_subsingleton.mp (by omega)
+  obtain ⟨w₀⟩ := (inferInstance : Nonempty (InfinitePlace F))
+  have hw₀ : w₀.IsReal := (NumberField.nrComplexPlaces_eq_zero_iff.mp
+    (InfinitePlace.nrComplexPlaces_eq_zero_of_finrank_eq_one h1)).isReal w₀
+  let r : (w : {w : InfinitePlace F // w.IsReal}) →
+      {e : w.val.Completion ≃+* ℝ // IsHomeomorph (e : w.val.Completion → ℝ)} := fun w ↦
+    ⟨InfinitePlace.Completion.ringEquivRealOfIsReal w.2,
+      (InfinitePlace.Completion.isometryEquivRealOfIsReal w.2).toHomeomorph.isHomeomorph⟩
+  let c : (w : {w : InfinitePlace F // w.IsComplex}) →
+      {e : w.val.Completion ≃+* ℂ // IsHomeomorph (e : w.val.Completion → ℂ)} := fun w ↦
+    ⟨InfinitePlace.Completion.ringEquivComplexOfIsComplex w.2,
+      (InfinitePlace.Completion.isometryEquivComplexOfIsComplex w.2).toHomeomorph.isHomeomorph⟩
+  have hEq := h F S 1 r c
+  have htop : sLocalThetaPoleBound (1 : PontryaginDual J₁(F, S)) sLocalRhoPoleOrder = ⊤ := by
+    unfold sLocalThetaPoleBound
+    exact sLocalThetaPoleBound_low_coefficients_exact_span_eq_top _
+      (Submodule.mkQ_surjective _) _ fun f c _ ↦
+        sLocalThetaPoleBound_low_coefficients_exact_polar_le f c
+  -- the standard Gaussian does not vanish at zero
+  obtain ⟨g, hg⟩ := sLocalPrincipalPartCoeff_eigendistribution_tensor S
+    (fun w ↦ infiniteStandardGaussian w 1) (fun v ↦ absurd v.2 (Finset.notMem_empty _))
+  have hg0 : g (Multiplicative.ofAdd 0) ≠ 0 := by
+    rw [hg, Finset.univ_eq_empty (α := (∅ : Finset Places(F))), Finset.prod_empty, mul_one]
+    refine Finset.prod_ne_zero_iff.mpr fun w _ ↦ ?_
+    change infiniteStandardGaussian w 1 (Multiplicative.ofAdd 0) ≠ 0
+    rw [infiniteStandardGaussian_trivial_zero]
+    split_ifs
+    · exact one_ne_zero
+    · exact inv_ne_zero (mul_ne_zero two_ne_zero (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero))
+  let L : ℬₛ(F, S) →ₗ[ℂ] ℂ :=
+    (LinearMap.proj (Multiplicative.ofAdd 0)).comp
+      (schwartzBruhatSubmodule (Multiplicative (SAdeleRing F S))).subtype
+  have hL : Continuous L := continuous_schwartzBruhat_eval' _
+  refine hg0 (sLocalThetaPoleBound_full_eq_polarFree_closure (Kₛ(F, S, 1))
+    (sAdelePolarFree S r c) L hL (fun f hf ↦ ?_) (fun f hf ↦ ?_) (hEq.symm.trans htop) g)
+  · exact LinearMap.mem_ker.mpr (sLocalThetaPoleBound_full_eq_polarFree_ker w₀ hw₀ hsub f hf)
+  · exact LinearMap.mem_ker.mpr (sLocalThetaPoleBound_full_eq_polarFree_zero S r c w₀ hw₀ f hf)
+
 /-- Paper: Remark 7.2.1.3, p. 335.
 For ℚ with the real place and p, the real Gaussian times the indicator of ℤₚ
 has a double pole at the trivial character. The coordinatewise polar-free
 image has entire Mellin transform and its closure still has the zero pole bound. -/
 theorem sLocalThetaPoleBound_full_eq_polarFree_false :
-    ¬ sLocalThetaPoleBound_full_eq_polarFree := by sorry
+    ¬ sLocalThetaPoleBound_full_eq_polarFree :=
+  sLocalThetaPoleBound_full_eq_polarFree_false_aux
 
 open Classical in
 /-- Paper: Preamble to (7.2.1.12), p. 336.

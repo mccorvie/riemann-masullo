@@ -6,8 +6,9 @@ import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 import all RiemannMasullo.AppC_LCTVS.Sec1
 import all RiemannMasullo.AppC_LCTVS.Sec2a_part2
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1a
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2a
+import Mathlib.Analysis.Calculus.BumpFunction.FiniteDimension
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import Mathlib.MeasureTheory.Integral.IntegralEqImproper
@@ -2916,7 +2917,7 @@ private theorem compact_kernel_differences {A : Type*} [CommGroup A] [Topologica
   let ev (a : A) : StrongDual ℂ (SchwartzBruhat A) :=
     ⟨(LinearMap.proj a).comp (schwartzBruhatSubmodule A).subtype, continuous_schwartzBruhat_eval a⟩
   refine ⟨fun n ↦ ev (u n).val - ev 1, fun n ↦ ?_, fun B hB ↦ ?_⟩
-  · refine (schwartzBruhat_exists_test (1 : A) (u n).val).elim fun f hf ↦ ?_
+  · refine (schwartzBruhat_exists_separating_function (1 : A) (u n).val).elim fun f hf ↦ ?_
     exact ⟨f, sub_ne_zero.mpr (hf.2 (fun he ↦ hu n (Subtype.ext he)))⟩
   · refine (schwartzBruhat_bounded_image_stage hB).elim fun b hb ↦
       hb.elim fun e he ↦ he.elim fun C hC ↦ ?_

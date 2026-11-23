@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch01_Introduction.Sec4
+import Mathlib.NumberTheory.NumberField.Cyclotomic.Basic
 import RiemannMasullo.Ch13_ZerosHecke.Targets
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.AppB_AnalyticNT.Sec4b
@@ -333,6 +334,46 @@ def Printed.introTrace_transition_mellin : Prop :=
       =ᶠ[codiscrete ℂ] (fun s ↦ sLocalIdelicZFunction f (twist s) *
         reciprocalPartialHeckeEulerProduct χ S s * finiteL[F](χ) s)
 
+/-- The product of the omitted unit masses at the archimedean-only stage is
+the reciprocal square root of the absolute discriminant. -/
+private theorem introTrace_transition_mellin_false_mass (F : Type) [Field F] [NumberField F] :
+    (∏ᶠ v : {v : V[F] // v ∉ (∅ : Finset V[F])},
+      (((finiteLocalMultiplicativeTamagawaMeasure F v.val) (v.val.adicCompletionIntegers F).units).toReal : ℂ)) =
+      (((Real.sqrt ((NumberField.discr F).natAbs : ℝ))⁻¹ : ℝ) : ℂ) := by
+  classical
+  let J := differentIdeal ℤ (𝓞 F)
+  have hJ : J ≠ ⊥ := differentIdeal_ne_bot
+  let T := (Ideal.finite_factors hJ).toFinset
+  let d (v : V[F]) := multiplicity v.asIdeal J
+  have hout (v : V[F]) (hv : v ∉ T) : d v = 0 := by
+    apply multiplicity_eq_zero_of_not_dvd
+    simpa [T, J] using hv
+  have hfactor : ∏ v ∈ T, v.asIdeal ^ d v = J := by
+    rw [← finprod_eq_finsetProd_of_mulSupport_subset (f := fun v : V[F] ↦ v.asIdeal ^ d v)]
+    · exact Ideal.finprod_heightOneSpectrum_pow_multiplicity hJ
+    · intro v hv
+      by_contra hn
+      exact hv (by simp [hout v hn])
+  have hnorm : (∏ v ∈ T, (v.asIdeal.absNorm : ℝ) ^ d v) = ((NumberField.discr F).natAbs : ℝ) := by
+    exact_mod_cast (by
+      simpa only [map_prod, map_pow, J, NumberField.absNorm_differentIdeal F (𝓞 F)] using
+        congrArg (fun I : Ideal (𝓞 F) ↦ Ideal.absNorm I) hfactor :
+      (∏ v ∈ T, v.asIdeal.absNorm ^ d v) = (NumberField.discr F).natAbs)
+  let m (v : V[F]) := (((finiteLocalMultiplicativeTamagawaMeasure F v)
+    (v.adicCompletionIntegers F).units).toReal : ℂ)
+  have hm (v : V[F]) : m v = (((Real.sqrt ((v.asIdeal.absNorm : ℝ) ^ d v))⁻¹ : ℝ) : ℂ) := by
+    simp [m, finiteLocalMultiplicativeTamagawaMeasure_integerUnits, ENNReal.toReal_inv, d, J]
+  change (∏ᶠ v : {v : V[F] // v ∉ (∅ : Finset V[F])}, m v.val) = _
+  rw [finprod_subtype_eq_finprod_cond (f := m)]
+  simp only [Finset.notMem_empty, not_false_eq_true, finprod_true]
+  rw [finprod_eq_finsetProd_of_mulSupport_subset m (s := T)]
+  · simp_rw [hm]
+    rw [← Complex.ofReal_prod, Finset.prod_inv_distrib,
+      ← Real.sqrt_prod T (fun _ _ ↦ by positivity), hnorm]
+  · intro v hv
+    by_contra hn
+    exact hv (by simp [hm, hout v hn])
+
 /-- Paper: §1.4.7, pp. 30–31. Take ℚ(i), the trivial character, S consisting
 of the complex place alone, and a positive Gaussian there. The prime above 2
 has different norm 4, hence unit mass 1/2. Every other finite unit mass is one.
@@ -340,6 +381,71 @@ The local transform and finite Euler product are positive for every real s > 1.
 Their product must be multiplied by 1/2. Enlarging S as on p. 25 to contain
 all field-ramified primes makes the printed multiplier valid in that case. -/
 theorem Printed.introTrace_transition_mellin_false :
-    ¬ Printed.introTrace_transition_mellin := by sorry
+    ¬ Printed.introTrace_transition_mellin := by
+  classical
+  intro h
+  let F := CyclotomicField 4 ℚ
+  have : NeZero (4 : ℕ) := ⟨by decide⟩
+  have : IsCyclotomicExtension {4} ℚ F := by
+    convert CyclotomicField.isCyclotomicExtension 4 ℚ
+    exact Subsingleton.elim _ _
+  have : NumberField F := IsCyclotomicExtension.numberField {4} ℚ F
+  have hdisc : (NumberField.discr F).natAbs = 4 := by
+    rw [IsCyclotomicExtension.Rat.natAbs_discr (n := 4) (K := F)]
+    have hfac : Nat.primeFactors 4 = {2} := by
+      rw [show 4 = 2 ^ 2 by decide]
+      exact Nat.primeFactors_prime_pow (by decide) Nat.prime_two
+    rw [hfac, Finset.prod_singleton, show Nat.totient 4 = 2 by decide]
+    norm_num
+  let S : Finset V[F] := ∅
+  let χ : U[F] := 1
+  let ψ : PontryaginDual (SIdeleQuotient F S) := 1
+  have hχ0 : ideleClassNormTwist χ 0 = 1 := by
+    ext1 g
+    change (1 : ℂ) * _ ^ (0 : ℂ) = 1
+    simp
+  have hχ : ideleClassNormTwist χ 0 ∈ unramifiedOutside F S := by
+    rw [hχ0]
+    exact (mem_unramifiedOutside_iff F S 1).mpr fun _ _ _ ↦ rfl
+  let c := sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩
+  have hc : c = (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ψ := by
+    ext g
+    obtain ⟨u, rfl⟩ := QuotientGroup.mk_surjective g
+    change (1 : ℂ) * _ ^ (0 : ℂ) = 1
+    simp
+  let twist := quasiCharacterNormTwist (G := SIdeleQuotient F S) (sIdeleQuotientNorm F S)
+    (isProperMap_sIdeleQuotientNorm F S).continuous c
+  obtain ⟨f, hf⟩ := exists_sLocalIdelicZFunction_principalValue_attaining_poles (S := S) ψ
+  let g := sAdelePrincipalValue F (Finset.Subset.refl S) f
+  let Z (s : ℂ) := sLocalIdelicZFunction g (twist s)
+  have hZ : meromorphicOrderAt Z 1 ≠ ⊤ := by
+    dsimp only [Z, twist]
+    rw [hc, hf]
+    exact WithTop.coe_ne_top
+  let L := finiteL[F](χ)
+  obtain ⟨hL, hLf⟩ := (finiteHeckeL_exists_continuation χ).choose_spec
+  have hnL : ∀ᶠ s in 𝓝[≠] (1 : ℂ), L s ≠ 0 := by
+    apply ((hL (mem_univ (1 : ℂ))).meromorphicAt.eventually_eq_zero_or_eventually_ne_zero).resolve_left
+    intro he
+    have horder : meromorphicOrderAt L 1 ≤ 0 := introTrace_finiteL_no_zeros_one_line χ 0
+    rw [meromorphicOrderAt_eq_top_iff.mpr he] at horder
+    exact (not_le.mpr (WithTop.coe_lt_top (0 : ℤ))) horder
+  have hraw := weilIdentity_unramifiedOutside_meromorphic (F := F) S g χ hχ L hL
+    (fun z hz ↦ hLf ⟨z, hz⟩)
+  have hbad := h F S χ hχ g
+  have hmass := introTrace_transition_mellin_false_mass F
+  rw [hdisc] at hmass
+  have hs4 : Real.sqrt 4 = 2 :=
+    (Real.sqrt_eq_iff_mul_self_eq (by norm_num) (by norm_num)).2 (by norm_num)
+  norm_num [hs4] at hmass
+  apply hZ (meromorphicOrderAt_eq_top_iff.mpr ?_)
+  filter_upwards [hbad.filter_mono (nhdsNE_le_codiscrete 1),
+    hraw.filter_mono (nhdsNE_le_codiscrete 1), hnL] with s h₁ h₂ hs
+  have he := h₁.symm.trans h₂
+  change Z s * reciprocalPartialHeckeEulerProduct χ S s * L s =
+    _ * Z s * (∏ v ∈ S, (finiteHeckeEulerFactor χ v s)⁻¹) * L s at he
+  simp only [reciprocalPartialHeckeEulerProduct, S, Finset.prod_empty, mul_one, hmass] at he
+  apply (mul_eq_zero.mp ?_).resolve_right hs
+  linear_combination 2 * he
 
 end RiemannMasullo

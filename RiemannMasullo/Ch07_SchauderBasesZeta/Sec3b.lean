@@ -436,6 +436,153 @@ theorem sLocalAbsolutePW_seqDense {S₀ : Finset (HeightOneSpectrum (𝓞 F))}
       (∀ n, ∃ X > 0, u n ∈ sLocalAbsolutePW hST X D χ) ∧
         Tendsto u atTop (𝓝 x) := by sorry
 
+/-- Paper: Theorem 2.2.3.2, p. 82, and the proof of Proposition 7.3.2.2(2)–(3), p. 353.
+The global Fourier transform of the global insertion of an S-local test vanishes at every
+adele where the S-local Fourier transform vanishes at the projection, and at every adele
+having a coordinate outside S beyond a fixed bound. The bounds are at least one and equal
+to one at all but finitely many places.
+The proof would integrate over the integer tail: translation by the omitted integer rings
+leaves the inserted test invariant, so the transform vanishes off the annihilator of those
+rings, and on the annihilator the tail integrates to a positive constant
+(compare `tamagawaFourier_sAdeleLift` in `AppA_AlgebraicNT/Sec3.lean`, where the bound is
+the absolute norm of the place raised to the exponent of the different). -/
+private theorem sLocalAbsolutePW_globalSupport_fourier {F : Type*} [Field F] [NumberField F]
+    (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    ∃ D : HeightOneSpectrum (𝓞 F) → ℝ, (∀ v, 1 ≤ D v) ∧ (mulSupport D).Finite ∧
+      ∀ (h : SchwartzBruhat (Multiplicative (SAdeleRing F S))) (y : AdeleRing (𝓞 F) F),
+        adeleSchwartzFourier (sAdeleSchwartzToGlobal F S h) (Multiplicative.ofAdd y) ≠ 0 →
+          sAdeleSchwartzFourier h (Multiplicative.ofAdd (adeleProjection F S y)) ≠ 0 ∧
+            ∀ v, v ∉ S → ‖y.2 v‖ ≤ D v := by
+  sorry
+
+/-- An idele whose S-coordinates lie in the S-product region of size `Y` and whose other
+finite coordinates are bounded by `D` has idelic norm at most `Y` times the product of `D`. -/
+private theorem sLocalAbsolutePW_globalSupport_norm {F : Type*} [Field F] [NumberField F]
+    (S : Finset (HeightOneSpectrum (𝓞 F))) (D : HeightOneSpectrum (𝓞 F) → ℝ)
+    (hD : ∀ v, 1 ≤ D v) (hDf : (mulSupport D).Finite) (Y : ℝ) (z : IdeleGroup (𝓞 F) F)
+    (hz : (∏ w : InfinitePlace F, ‖(adeleProjection F S z.val).1 w‖ ^ w.mult) *
+      (∏ v : S, ‖(adeleProjection F S z.val).2 v‖) ≤ Y)
+    (hout : ∀ v, v ∉ S → ‖z.val.2 v‖ ≤ D v) :
+    ((ideleNorm F z : ℝ≥0) : ℝ) ≤ Y * ∏ᶠ v, D v := by
+  classical
+  obtain ⟨hfin, hnorm⟩ := (ideleNorm_spec F).1 z
+  let a : HeightOneSpectrum (𝓞 F) → ℝ := fun v ↦ ‖z.val.2 v‖
+  let U : Finset (HeightOneSpectrum (𝓞 F)) := S ∪ hDf.toFinset ∪ Set.Finite.toFinset hfin
+  have ha : (∏ᶠ v, a v) = ∏ v ∈ U, a v :=
+    finprod_eq_prod_of_mulSupport_subset _ fun v hv ↦ by simp [U, (Set.Finite.mem_toFinset hfin).mpr hv]
+  have hDU : (∏ᶠ v, D v) = ∏ v ∈ U, D v :=
+    finprod_eq_prod_of_mulSupport_subset _ fun v hv ↦ by
+      have hv' : D v ≠ 1 := hv
+      simp [U, hv']
+  have hSU : S ⊆ U := fun v hv ↦ by simp [U, hv]
+  have hD0 (v) : 0 ≤ D v := zero_le_one.trans (hD v)
+  let P := ∏ w : InfinitePlace F, ‖z.val.1 w‖ ^ w.mult
+  have hP : 0 ≤ P := Finset.prod_nonneg fun w _ ↦ pow_nonneg (norm_nonneg _) _
+  have hS : (∏ v ∈ S, a v) = ∏ v : S, ‖(adeleProjection F S z.val).2 v‖ :=
+    (Finset.prod_coe_sort S a).symm
+  have hPS : P * ∏ v ∈ S, a v ≤ Y := by
+    rw [hS]
+    exact hz
+  have hSnn : 0 ≤ ∏ v ∈ S, a v := Finset.prod_nonneg fun v _ ↦ norm_nonneg _
+  have hY : 0 ≤ Y := (mul_nonneg hP hSnn).trans hPS
+  have hrest : (∏ v ∈ U \ S, a v) ≤ ∏ v ∈ U \ S, D v :=
+    Finset.prod_le_prod₀ (fun v _ ↦ norm_nonneg _)
+      fun v hv ↦ hout v (Finset.mem_sdiff.mp hv).2
+  have hrestD : (∏ v ∈ U \ S, D v) ≤ ∏ v ∈ U, D v := by
+    rw [← Finset.prod_sdiff hSU]
+    exact le_mul_of_one_le_right (Finset.prod_nonneg fun v _ ↦ hD0 v)
+      (Finset.one_le_prod₀ fun v _ ↦ hD v)
+  have hrestD0 : 0 ≤ ∏ v ∈ U \ S, D v := Finset.prod_nonneg fun v _ ↦ hD0 v
+  rw [show ((ideleNorm F z : ℝ≥0) : ℝ) = P * ∏ᶠ v, a v from hnorm, ha, hDU,
+    ← Finset.prod_sdiff hSU]
+  calc P * ((∏ v ∈ U \ S, a v) * ∏ v ∈ S, a v)
+      = (P * ∏ v ∈ S, a v) * ∏ v ∈ U \ S, a v := by ring
+    _ ≤ Y * ∏ v ∈ U \ S, D v := mul_le_mul hPS hrest
+        (Finset.prod_nonneg fun v _ ↦ norm_nonneg _) hY
+    _ ≤ Y * ∏ v ∈ U, D v := mul_le_mul_of_nonneg_left hrestD hY
+
+/-- Paper: Proposition 7.3.2.2(2), p. 352, and Proposition 7.3.2.4(2), p. 356.
+For any Fourier region inside an S-product region, the global homogeneous theta functions
+of the inserted zero-moment tests vanish below a uniform positive idelic norm.
+By Riemann–Roch they are the theta functions of the Fourier transforms at the inverse
+class, and those vanish above a uniform norm by the product formula. -/
+private theorem sLocalAbsolutePW_globalSupport_region {F : Type*} [Field F] [NumberField F]
+    {S T : Finset (HeightOneSpectrum (𝓞 F))} (hST : S ⊆ T)
+    (ω : PontryaginDual (ideleClassNorm F).ker) (K : Set (SAdeleRing F S)) (Y : ℝ)
+    (hY : 0 < Y)
+    (hK : ∀ x ∈ K, (∏ w : InfinitePlace F, ‖x.1 w‖ ^ w.mult) * (∏ v : S, ‖x.2 v‖) ≤ Y) :
+    ∃ bound > (0 : ℝ), ∀ (f : SchwartzBruhat (Multiplicative (SAdeleRing F T))),
+      f ∈ sLocalPWTests hST K ⊓ sAdelePolarSubspace F T →
+      tsupport (homogeneousAdelicTheta ω (sAdeleSchwartzToGlobal F T f)) ⊆
+        {g | bound⁻¹ ≤ ((ideleClassNorm F g).val : ℝ)} := by
+  classical
+  obtain ⟨D, hD, hDf, hA⟩ := sLocalAbsolutePW_globalSupport_fourier (F := F) S
+  have hD1 : 1 ≤ ∏ᶠ v, D v := by
+    rw [finprod_eq_prod_of_mulSupport_subset D (s := hDf.toFinset) fun v hv ↦
+      hDf.mem_toFinset.mpr hv]
+    exact Finset.one_le_prod₀ fun v _ ↦ hD v
+  let bound := Y * ∏ᶠ v, D v
+  have hb : 0 < bound := mul_pos hY (zero_lt_one.trans_le hD1)
+  refine ⟨bound, hb, ?_⟩
+  rintro f ⟨hf, hf0⟩
+  obtain ⟨h, rfl, -, hhK⟩ := (mem_sLocalPWTests hST K f).mp hf
+  let Φ := sAdeleSchwartzToGlobal F T (sAdeleSchwartzTransition F hST h)
+  have hΦ : Φ = sAdeleSchwartzToGlobal F S h :=
+    LinearMap.congr_fun (sAdeleSchwartzToGlobal_comp (F := F) hST) h
+  obtain ⟨hΦ0, hΦ1⟩ := (mem_adelePolarSubspace Φ).mp
+    (sAdeleSchwartzToGlobal_mem_polarSubspace (F := F) (S := T) ⟨_, hf0⟩)
+  -- The theta function of the Fourier transform vanishes at classes of large norm.
+  have hlarge (z : IdeleGroup (𝓞 F) F) (hz : bound < ((ideleNorm F z : ℝ≥0) : ℝ)) :
+      adelicTheta (adeleSchwartzFourier Φ) (QuotientGroup.mk z) = 0 := by
+    rw [adelicTheta_mk]
+    refine (tsum_congr fun ξ ↦ ?_).trans tsum_zero
+    by_contra hne
+    rw [hΦ] at hne
+    obtain ⟨hloc, htail⟩ := hA h _ hne
+    let u : IdeleGroup (𝓞 F) F := IdeleGroup.unitEmbedding (𝓞 F) F ξ * z
+    have hu : u.val = algebraMap F (AdeleRing (𝓞 F) F) (ξ : F) * z.val := rfl
+    have huK : adeleProjection F S u.val ∈ K := by
+      have hmem := hhK (subset_tsupport _ hloc)
+      rw [hu]
+      exact hmem
+    have hn := sLocalAbsolutePW_globalSupport_norm S D hD hDf Y u (hK _ huK)
+      (fun v hv ↦ by rw [hu]; exact htail v hv)
+    have hprin : ideleNorm F u = ideleNorm F z := by
+      rw [map_mul, MonoidHom.mem_ker.mp ((ideleNorm_spec F).2 ⟨ξ, rfl⟩), one_mul]
+    rw [hprin] at hn
+    exact absurd hz (not_lt.mpr hn)
+  -- Hence theta of the test vanishes at classes of small norm.
+  have hsmall (x : IdeleClassGroup (𝓞 F) F)
+      (hx : ((ideleClassNorm F x).val : ℝ) < bound⁻¹) : adelicTheta Φ x = 0 := by
+    have hpos : (0 : ℝ) < ((ideleClassNorm F x).val : ℝ) :=
+      NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr (ideleClassNorm F x).ne_zero)
+    rw [adelicTheta_riemannRoch, hΦ0, hΦ1, smul_zero, add_zero, sub_zero]
+    induction x using QuotientGroup.induction_on with
+    | _ z =>
+      rw [← QuotientGroup.mk_inv]
+      have hz : ((ideleClassNorm F (QuotientGroup.mk z)).val : ℝ) =
+          ((ideleNorm F z : ℝ≥0) : ℝ) := rfl
+      have hinv : bound < ((ideleNorm F z⁻¹ : ℝ≥0) : ℝ) := by
+        rw [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv, ← hz]
+        exact (lt_inv_comm₀ hpos hb).mp hx
+      rw [hlarge z⁻¹ hinv, smul_zero]
+  have hclosed : IsClosed {g : IdeleClassGroup (𝓞 F) F |
+      bound⁻¹ ≤ ((ideleClassNorm F g).val : ℝ)} :=
+    isClosed_le continuous_const (NNReal.continuous_coe.comp
+      (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous))
+  refine closure_minimal (fun g hg ↦ ?_) hclosed
+  by_contra hlt
+  simp only [Set.mem_ofPred_eq, not_le] at hlt
+  apply hg
+  change (∫ k, adelicTheta Φ (k.val * g) * (ω k : ℂ) ∂_) = 0
+  refine (MeasureTheory.integral_congr_ae (Filter.Eventually.of_forall fun k ↦ ?_)).trans
+    (MeasureTheory.integral_zero _ _)
+  have hk : ((ideleClassNorm F (k.val * g)).val : ℝ) < bound⁻¹ := by
+    rw [map_mul, MonoidHom.mem_ker.mp k.property, one_mul]
+    exact hlt
+  change adelicTheta Φ (k.val * g) * (ω k : ℂ) = 0
+  rw [hsmall _ hk, zero_mul]
+
 /-- Paper: Proposition 7.3.2.2(2), p. 352.
 At fixed finite stages, global theta of every inserted zero-moment test at this absolute
 level vanishes below a uniform positive idelic norm. -/
@@ -446,7 +593,19 @@ theorem sLocalAbsolutePW_globalSupport {S₀ : Finset (HeightOneSpectrum (𝓞 F
     (X : ℝ) (_hX : 0 < X) :
     ∃ bound > (0 : ℝ), ∀ (f : B(T)), f ∈ sLocalPWTests hST (sLocalPWBox S X) ⊓ Z₀(T) →
       tsupport (homogeneousAdelicTheta ω (sAdeleSchwartzToGlobal F T f)) ⊆
-        {g | bound⁻¹ ≤ ((ideleClassNorm F g).val : ℝ)} := by sorry
+        {g | bound⁻¹ ≤ ((ideleClassNorm F g).val : ℝ)} := by
+  refine sLocalAbsolutePW_globalSupport_region hST ω _ (X ^ count(S)) (pow_pos _hX _) ?_
+  rintro x ⟨hinf, hfin⟩
+  rw [pow_add]
+  have h1 : (∏ w : InfinitePlace F, ‖x.1 w‖ ^ w.mult) ≤ X ^ Fintype.card (InfinitePlace F) :=
+    calc (∏ w : InfinitePlace F, ‖x.1 w‖ ^ w.mult) ≤ ∏ _w : InfinitePlace F, X :=
+          Finset.prod_le_prod₀ (fun w _ ↦ pow_nonneg (norm_nonneg _) _) fun w _ ↦ hinf w
+      _ = X ^ Fintype.card (InfinitePlace F) := by rw [Finset.prod_const, Finset.card_univ]
+  have h2 : (∏ v : S, ‖x.2 v‖) ≤ X ^ S.card :=
+    calc (∏ v : S, ‖x.2 v‖) ≤ ∏ _v : S, X :=
+          Finset.prod_le_prod₀ (fun v _ ↦ norm_nonneg _) fun v _ ↦ hfin v
+      _ = X ^ S.card := by rw [Finset.prod_const, Finset.card_univ, Fintype.card_coe]
+  exact mul_le_mul h1 h2 (Finset.prod_nonneg fun v _ ↦ norm_nonneg _) (pow_nonneg _hX.le _)
 
 /-- Paper: Proposition 7.3.2.2(3), p. 352.
 The local homogeneous theta of the Fourier-transformed level tests has a uniform upper
@@ -771,7 +930,8 @@ theorem sLocalInvariantPW_globalSupport {S₀ : Finset (HeightOneSpectrum (𝓞 
     (Y : ℝ) (_hY : 0 < Y) :
     ∃ bound > (0 : ℝ), ∀ (f : B(T)), f ∈ sLocalPWTests hST (sLocalPWProductRegion S Y) ⊓ Z₀(T) →
       tsupport (homogeneousAdelicTheta ω (sAdeleSchwartzToGlobal F T f)) ⊆
-        {g | bound⁻¹ ≤ ((ideleClassNorm F g).val : ℝ)} := by sorry
+        {g | bound⁻¹ ≤ ((ideleClassNorm F g).val : ℝ)} :=
+  sLocalAbsolutePW_globalSupport_region hST ω _ Y _hY fun _ hx ↦ hx
 
 end InvariantLevels
 
@@ -2717,6 +2877,31 @@ theorem sLocalGammaOrbitalQuotient_product (ω : PontryaginDual J₁(S)) :
     (Denumerable.eqv _).trans (Denumerable.eqv depths).symm
   exact ⟨Ψ.trans (ContinuousLinearEquiv.piCongrLeft ℂ (fun _ : depths ↦ ℂ) e)⟩
 
+/-- The strong dual of a space identified with a countably infinite product of complex lines is
+the direct sum of complex lines over the same index with its finest locally convex topology. The
+product is identified with formal power series, whose strong dual is the space of polynomials. -/
+private theorem sLocalGammaOrbitalQuotient_dual_directSum_of_equiv {Q ι : Type*}
+    [AddCommGroup Q] [Module ℂ Q] [TopologicalSpace Q]
+    (Ψ : Q ≃L[ℂ] (ι → ℂ)) (σ : ℕ ≃ ι) :
+    Nonempty (StrongDual ℂ Q ≃L[ℂ] FinestLocallyConvex (ι →₀ ℂ)) := by
+  obtain ⟨t, _⟩ := realSchwartzTaylor_equiv
+  obtain ⟨p, _⟩ := realDiracDerivatives_polynomialEquiv
+  let : TopologicalSpace (PowerSeries ℂ) := inferInstanceAs (TopologicalSpace ((Unit →₀ ℕ) → ℂ))
+  let idx := (Finsupp.uniqueLinearEquiv ℕ ℕ ()).symm.toEquiv
+  let series := ContinuousLinearEquiv.piCongrLeft ℂ (fun _ : Unit →₀ ℕ ↦ ℂ) idx
+  let q : Q ≃L[ℂ] (ℕ → ℂ) :=
+    Ψ.trans (ContinuousLinearEquiv.piCongrLeft ℂ (fun _ : ℕ ↦ ℂ) σ.symm)
+  let e := (q.trans series).trans t.symm
+  let d : FinestLocallyConvex (Polynomial ℂ) ≃L[ℂ] StrongDual ℂ Q :=
+    p.trans (e.symm.arrowCongr (ContinuousLinearEquiv.refl ℂ ℂ))
+  let l : FinestLocallyConvex (Polynomial ℂ) ≃ₗ[ℂ] FinestLocallyConvex (ι →₀ ℂ) :=
+    (AddMonoidAlgebra.coeffLinearEquiv ℂ).trans (Finsupp.domLCongr σ)
+  let := finestLocallyConvex_t2 (Polynomial ℂ)
+  let := finestLocallyConvex_t2 (ι →₀ ℂ)
+  have h := continuous_of_finestLocallyConvex (Polynomial ℂ) l.toLinearMap
+  have h' := continuous_of_finestLocallyConvex (ι →₀ ℂ) l.symm.toLinearMap
+  exact ⟨d.symm.trans ⟨l, h, h'⟩⟩
+
 /-- Paper: Theorem 7.3.4.1(4), p. 365.
 The strong dual of the quotient is topologically linearly isomorphic to the
 direct sum of complex lines with its finest locally convex topology.
@@ -2724,7 +2909,12 @@ The quotient dual represents the annihilator via pullback along the quotient map
 theorem sLocalGammaOrbitalQuotient_dual_directSum (ω : PontryaginDual J₁(S)) :
     let E := ↥(fullPV(ω))
     let P := Γker(ω)
-    Nonempty (StrongDual ℂ (E ⧸ P) ≃L[ℂ] FinestLocallyConvex (depths →₀ ℂ)) := by sorry
+    Nonempty (StrongDual ℂ (E ⧸ P) ≃L[ℂ] FinestLocallyConvex (depths →₀ ℂ)) := by
+  intro E P
+  obtain ⟨Ψ⟩ := sLocalGammaOrbitalQuotient_product ω
+  let := Encodable.ofCountable depths
+  let := Denumerable.ofEncodableOfInfinite depths
+  exact sLocalGammaOrbitalQuotient_dual_directSum_of_equiv Ψ (Denumerable.eqv depths).symm
 
 /-- Paper: Theorem 7.3.4.1(5), pp. 365–366.
 The set of archimedean centers with their admissible Laurent orders admits an enumeration. -/

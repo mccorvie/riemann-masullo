@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
 
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 
 /-! # Chapter 5.3: printed properties of the local difference -/
