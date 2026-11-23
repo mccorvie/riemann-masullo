@@ -1,6 +1,8 @@
 module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2
+
+import RiemannMasullo.Ch03_IdelicZeta.Sec2
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
@@ -671,12 +673,6 @@ theorem sLocalHomogeneousThetaTransition_spec
       (h := sLocalHomogeneousThetaTransition_preserves_kernel (F := F) (ω := ω) hω hST)
   exact ⟨h, fun π hπ ↦ Submodule.linearMap_qext _ (Eq.trans hπ (Eq.symm h))⟩
 
-/-- Paper: Theorem 5.2.3.1(1), p. 233.
-Each homogeneous stage is embedded as a closed subspace of a larger stage. -/
-theorem sLocalHomogeneousThetaTransition_isClosedEmbedding
-    (hω : NormOneCharacterUnramifiedOutside (F := F) ω S) (hST : S ⊆ T) :
-    IsClosedEmbedding (sLocalHomogeneousThetaTransition (F := F) (ω := ω) hω hST) := by sorry
-
 section
 open Set TopologicalSpace
 
@@ -1341,6 +1337,23 @@ theorem sLocalHomogeneousTheta_inductiveLimit (hω : NormOneCharacterUnramifiedO
       (i U).comp (sLocalHomogeneousThetaTransition (F := F) (ω := ω) (h T) hTU) = i T) ∧
     (∀ x : Θ𝔽ω(ω), ∃ T y, i T y = x) ∧
     (inferInstance : TopologicalSpace Θ𝔽ω(ω)) = locallyConvexFinalTopology i := by sorry
+
+/-- Paper: Theorem 5.2.3.1(1), p. 233.
+Each homogeneous stage is embedded as a closed subspace of a larger stage. -/
+theorem sLocalHomogeneousThetaTransition_isClosedEmbedding
+    (hω : NormOneCharacterUnramifiedOutside (F := F) ω S) (hST : S ⊆ T) :
+    IsClosedEmbedding (sLocalHomogeneousThetaTransition (F := F) (ω := ω) hω hST) := by
+  let I := {U : Finset (HeightOneSpectrum (𝓞 F)) // S ⊆ U}
+  let s : I := ⟨S, Finset.Subset.refl S⟩
+  let t : I := ⟨T, hST⟩
+  let i (u : I) := sLocalHomogeneousThetaToGlobal (F := F) (ω := ω) (hω.mono u.property)
+  have h := sLocalHomogeneousTheta_inductiveLimit (F := F) (S := S) (ω := ω) hω
+  have he : IsClosedEmbedding (i t) := h.1 t
+  apply he.of_comp_iff.mp
+  have hc : (i t) ∘ (sLocalHomogeneousThetaTransition (F := F) (ω := ω) hω hST) = i s :=
+    funext (LinearMap.congr_fun (h.2.1 s t hST))
+  rw [hc]
+  exact h.1 s
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 A Hausdorff space admits a countable locally convex inductive presentation whose
@@ -2915,7 +2928,18 @@ theorem sLocalThetaFourier_toGlobal
     (x : Θₛ(S)) :
     let fourierS := (existsUnique_sLocalThetaFourier (F := F) (S := S)).exists.choose
     let fourier := (existsUnique_globalThetaFourier (F := F)).exists.choose
-    fourier (sLocalThetaToGlobal F S x) = sLocalThetaToGlobal F S (fourierS x) := by sorry
+    fourier (sLocalThetaToGlobal F S x) = sLocalThetaToGlobal F S (fourierS x) := by
+  intro fourierS fourier
+  induction x using Submodule.Quotient.induction_on with | _ f => ?_
+  have hS := (existsUnique_sLocalThetaFourier (F := F) (S := S)).exists.choose_spec.2 f
+  have hF := (existsUnique_globalThetaFourier (F := F)).exists.choose_spec.2
+    (sAdeleSchwartzToGlobal F S f)
+  calc
+    _ = (K𝔽).mkQ (adeleSchwartzFourier (sAdeleSchwartzToGlobal F S f)) := hF
+    _ = (K𝔽).mkQ (sAdeleSchwartzToGlobal F S (sAdeleSchwartzFourier f)) :=
+      congrArg (K𝔽).mkQ
+        (adeleSchwartzFourier_sAdeleSchwartzToGlobal_of_different F S hgood f (sAdeleSchwartzFourier f) rfl)
+    _ = _ := (congrArg (sLocalThetaToGlobal F S) hS).symm
 
 section
 

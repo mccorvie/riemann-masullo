@@ -1191,8 +1191,8 @@ variable {E F : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E] [CompleteSpace
 
 -- Keep the completeness hypotheses in the existing signature.
 set_option linter.unusedSectionVars false in
-/-- Paper: (C.3.1.2), p. 693. On Banach spaces the canonical tensor map is continuous
-for the operator norm on its target. -/
+/-- Paper: (C.3.1.1), p. 693. For Banach spaces the canonical map from the algebraic
+tensor product with the projective topology is continuous for the operator norm on its target. -/
 theorem continuous_tensorToFiniteRank_opNorm :
     Continuous (fun z : ProjectiveTensor (StrongDual ℂ E) F ↦
       (tensorToFiniteRank z : E →L[ℂ] F)) := by
@@ -2697,8 +2697,12 @@ theorem hilbertTrace_linear :
     simp only [smul_apply, inner_smul_right, smul_eq_mul]
     exact (hs T).tsum_mul_left c
 
-/-- Paper: Lemma C.3.4.4(3), p. 698. The modulus of the trace is bounded by
-the trace norm, which gives continuity for the trace norm. -/
+/-- Paper: Lemma C.3.4.4(3), p. 698. The modulus of the trace is bounded by the trace
+norm, which gives continuity for the trace norm.
+
+Deviation: The inequality prints the undefined norm subscript r. The continuity assertion in
+the same sentence uses the trace norm defined in Definition C.3.4.2(2), which is the bound here.
+-/
 theorem norm_hilbertTrace_le (T : nuclearEndomorphisms H) :
     ‖hilbertTrace T‖ ≤ traceNorm T := by
   let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
