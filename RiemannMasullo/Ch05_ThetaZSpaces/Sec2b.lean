@@ -1,6 +1,9 @@
 module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2
+
+import RiemannMasullo.Ch05_ThetaZSpaces.Sec1
+import RiemannMasullo.Ch03_IdelicZeta.Sec3
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
@@ -2548,6 +2551,97 @@ section Fourier
 -- The identity on theta functions has a norm factor and two zero terms,
 -- as in adelicTheta_riemannRoch.
 
+/-- A continuous operator preserving a submodule descends to a unique involution
+when its square acts trivially on the quotient. -/
+private theorem existsUnique_thetaFourier_quotient
+    {X : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [IsTopologicalAddGroup X] [ContinuousSMul ℂ X] (K : Submodule ℂ X)
+    (P : X →L[ℂ] X) (F : X → X) (hP : ∀ x, P x = F x)
+    (hK : K ≤ K.comap P.toLinearMap) (hPP : ∀ x, K.mkQ (F (F x)) = K.mkQ x) :
+    ∃! e : (X ⧸ K) ≃L[ℂ] (X ⧸ K), Involutive e ∧
+      ∀ x : X, e (K.mkQ x) = K.mkQ (F x) := by
+  let A := K.liftQL (K.mkQL.comp P) (fun x hx ↦ (Submodule.Quotient.mk_eq_zero K).mpr (hK hx))
+  have ha (x : X) : A (K.mkQ x) = K.mkQ (F x) := congrArg K.mkQ (hP x)
+  have hi : Involutive A := by
+    intro x
+    obtain ⟨f, rfl⟩ := K.mkQ_surjective x
+    rw [ha, ha, hPP]
+  refine ⟨ContinuousLinearEquiv.equivOfInverse A A hi hi, ⟨hi, ha⟩, ?_⟩
+  rintro e ⟨-, he⟩
+  ext x
+  obtain ⟨f, rfl⟩ := K.mkQ_surjective x
+  exact (he f).trans (ha f).symm
+
+/-- The double S-adelic Fourier transform is reflection, and minus one is an `S`-unit,
+so it has the same theta function. -/
+private theorem existsUnique_sLocalThetaFourier_inv (f : ℬₛ(S)) :
+    sLocalAdelicTheta F S (sAdeleSchwartzFourier (sAdeleSchwartzFourier f)) =
+      sLocalAdelicTheta F S f := by
+  ext g
+  have hneg : sLocalAdelicTheta F S f (-g) = sLocalAdelicTheta F S f g := by
+    refine sLocalAdelicTheta_factorsThrough F S f ?_
+    have hm1 : (QuotientGroup.mk (-1 : (SAdeleRing F S)ˣ) : Jₛ(S)) = 1 := by
+      refine (sIdeleQuotient_mk_eq_one F S _).2 ⟨-1, ?_⟩
+      apply Units.ext
+      simp
+    rw [show -g = (-1) * g by simp, QuotientGroup.mk_mul, hm1, one_mul]
+  rw [← hneg]
+  simp only [sLocalAdelicTheta_apply]
+  refine tsum_congr fun ξ ↦ ?_
+  rw [sLocal_fourier_inversion]
+  simp [mul_neg]
+
+/-- The S-adelic Fourier transform preserves the S-local theta kernel. At the center of
+the critical strip the functional equation sends each weighted theta integral of the
+transform to one of the double transform, which has the original theta function. -/
+private theorem existsUnique_sLocalThetaFourier_ker (f : ℬₛ(S))
+    (hf : sLocalAdelicTheta F S f = 0) :
+    sLocalAdelicTheta F S (sAdeleSchwartzFourier f) = 0 := by
+  let : MeasurableSpace (Jₛ(S)) := borel _
+  let : BorelSpace (Jₛ(S)) := ⟨rfl⟩
+  let : LocallyCompactSpace (SAdeleRing F S)ˣ := (sIdeleGroup_description F S).2.2.1
+  have := isClosed_sProjectedDiagonal (F := F) (S := S)
+  let μ := sLocalQuotientTamagawaMeasure F S
+  have : μ.IsHaarMeasure := (sLocalQuotientTamagawaMeasure_isWeil (F := F) (S := S)).1
+  have : μ.Regular := (sLocalQuotientTamagawaMeasure_isWeil (F := F) (S := S)).2.1
+  let u : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  let chart (χ : PontryaginDual (Jₛ(S))) : QuasiCharacter (Jₛ(S)) :=
+    quasiCharacterNormTwist (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous
+      (u.comp χ) (1 / 2)
+  have hpos (χ : PontryaginDual (Jₛ(S))) :
+      ∃ (ψ : PontryaginDual (Jₛ(S))) (s : ℂ), 0 < s.re ∧ chart χ = quasiCharacterNormTwist
+        (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous (u.comp ψ) s :=
+    ⟨χ, 1 / 2, by norm_num, rfl⟩
+  have hclasses (h : ℬₛ(S)) (hh : sLocalAdelicTheta F S h = 0) :
+      sLocalAdelicThetaOnClasses F S h = 0 := by
+    ext g
+    induction g using QuotientGroup.induction_on with
+    | H x => rw [sLocalAdelicThetaOnClasses_mk, hh]; rfl
+  have hθff := hclasses _ ((existsUnique_sLocalThetaFourier_inv f).trans hf)
+  have hθ : sLocalAdelicThetaOnClasses F S (sAdeleSchwartzFourier f) = 0 := by
+    refine eq_zero_of_weighted_integrals μ _ (chart 1)
+      (sLocalThetaMellinIntegral_integrable _ _ (hpos 1)) fun χ ↦ ?_
+    have hfe := sLocalIdelicZetaIntegral_functionalEquation (sAdeleSchwartzFourier f) χ (1 / 2)
+      (by norm_num)
+    dsimp only at hfe
+    rw [sLocal_dual_normTwist, show (1 : ℂ) - 1 / 2 = 1 / 2 by norm_num] at hfe
+    have hc : sLocalThetaMellinIntegral (sAdeleSchwartzFourier f) (chart χ) = 0 := by
+      rw [sLocalThetaMellinIntegral_eq_zeta _ (hpos χ)]
+      change sLocalIdelicZetaIntegral _ (quasiCharacterNormTwist _ _ (u.comp χ) (1 / 2)) = 0
+      have h2 := sLocalThetaMellinIntegral_eq_zeta
+        (sAdeleSchwartzFourier (sAdeleSchwartzFourier f)) (hpos χ⁻¹)
+      rw [hfe]
+      change _ * sLocalIdelicZetaIntegral _ (chart χ⁻¹) = 0
+      rw [← h2]
+      simp [sLocalThetaMellinIntegral, hθff]
+    refine (integral_congr_ae (Filter.Eventually.of_forall fun g ↦ ?_)).trans hc
+    change sLocalAdelicThetaOnClasses F S _ g * (1 * _ ^ (1 / 2 : ℂ)) * (χ g : ℂ) =
+      sLocalAdelicThetaOnClasses F S _ g * ((χ g : ℂ) * _ ^ (1 / 2 : ℂ))
+    rw [one_mul, mul_right_comm, mul_assoc]
+  ext g
+  rw [← sLocalAdelicThetaOnClasses_mk, hθ]
+  rfl
+
 /-- Paper: Theorem 5.2.4.1(1), pp. 238–239.
 S-adelic Fourier transform descends to a unique continuous linear involution
 on the S-local theta quotient. -/
@@ -2555,7 +2649,18 @@ theorem existsUnique_sLocalThetaFourier :
     ∃! e : Θₛ(S) ≃L[ℂ] Θₛ(S),
       Involutive e ∧ ∀ f : ℬₛ(S),
         e ((Kₛ(S)).mkQ f) = (Kₛ(S)).mkQ (sAdeleSchwartzFourier (F := F) (S := S) f) :=
-  by sorry
+  by
+  obtain ⟨P, hP⟩ := sLocal_fourier_continuousLinear (F := F) (S := S)
+  have hK : Kₛ(S) ≤ (Kₛ(S)).comap P.toLinearMap := fun f hf ↦ by
+    rw [Submodule.mem_comap, LinearMap.mem_ker, ContinuousLinearMap.coe_coe, hP]
+    exact existsUnique_sLocalThetaFourier_ker f (LinearMap.mem_ker.mp hf)
+  apply existsUnique_thetaFourier_quotient (Kₛ(S)) P _ hP hK
+  intro f
+  refine (sLocalAdelicThetaSpace_mk_eq_iff _ _).mpr (ContinuousMap.ext fun g ↦ ?_)
+  induction g using QuotientGroup.induction_on with
+  | H x =>
+    rw [sLocalAdelicThetaOnClasses_mk, sLocalAdelicThetaOnClasses_mk,
+      existsUnique_sLocalThetaFourier_inv]
 
 open scoped IsDedekindDomain.FiniteAdeleRing RestrictedProduct in
 /-- The adelic Fourier transform is a continuous linear operator on the global tests. It is
@@ -2731,27 +2836,9 @@ theorem existsUnique_globalThetaFourier :
   have hK : K𝔽 ≤ (K𝔽).comap P.toLinearMap := fun f hf ↦ by
     rw [Submodule.mem_comap, LinearMap.mem_ker, ContinuousLinearMap.coe_coe, hP]
     exact existsUnique_globalThetaFourier_ker f (LinearMap.mem_ker.mp hf)
-  let E₀ : Θ𝔽 →ₗ[ℂ] Θ𝔽 := (K𝔽).mapQ K𝔽 P.toLinearMap hK
-  have hE₀ (f : ℬ𝔽) : E₀ ((K𝔽).mkQ f) = (K𝔽).mkQ (adeleSchwartzFourier f) := by
-    rw [← hP]
-    rfl
-  have hcont : Continuous E₀ := by
-    refine (K𝔽).isQuotientMap_mkQ.continuous_iff.mpr ?_
-    have : (E₀ ∘ (K𝔽).mkQ) = (K𝔽).mkQ ∘ P :=
-      funext fun f ↦ (hE₀ f).trans (by simp only [Function.comp_apply, hP])
-    rw [this]
-    exact (K𝔽).isQuotientMap_mkQ.continuous.comp P.continuous
-  let E : Θ𝔽 →L[ℂ] Θ𝔽 := ⟨E₀, hcont⟩
-  have hEE (x : Θ𝔽) : E (E x) = x := by
-    obtain ⟨f, rfl⟩ := (K𝔽).mkQ_surjective x
-    change E₀ (E₀ _) = _
-    rw [hE₀, hE₀]
-    exact (globalAdelicThetaSpace_mk_eq_iff _ _).mpr (existsUnique_globalThetaFourier_inv f)
-  refine ⟨ContinuousLinearEquiv.equivOfInverse E E hEE hEE, ⟨hEE, hE₀⟩, ?_⟩
-  rintro e' ⟨-, he'⟩
-  ext x
-  obtain ⟨f, rfl⟩ := (K𝔽).mkQ_surjective x
-  exact (he' f).trans (hE₀ f).symm
+  apply existsUnique_thetaFourier_quotient K𝔽 P _ hP hK
+  intro f
+  exact (globalAdelicThetaSpace_mk_eq_iff _ _).mpr (existsUnique_globalThetaFourier_inv f)
 
 
 -- TODO(paper-gap): The unrestricted compatibility assertions on p. 239 fail.

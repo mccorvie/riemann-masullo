@@ -1956,7 +1956,7 @@ theorem sMultiplicativeTamagawaMeasure_isHaarMeasure : (μₛ).IsHaarMeasure := 
   exact E.isHaarMeasure_map _
 
 /-- Dualizing a norm twist inverts its unitary part and reflects its exponent. -/
-private theorem sLocal_dual_normTwist (χ : PontryaginDual Jₛ) (s : ℂ) :
+theorem sLocal_dual_normTwist (χ : PontryaginDual Jₛ) (s : ℂ) :
     dualQuasiCharacter mₛ hmₛ (chartₛ(χ) s) = chartₛ(χ⁻¹) (1 - s) :=
   dualQuasiCharacter_normTwist mₛ hmₛ χ s
 
@@ -2367,7 +2367,7 @@ private theorem sLocal_functionalEquation_of_tensor (χ : PontryaginDual Jₛ) (
 
 /-- Self-duality carries the continuous Fourier map on the Pontryagin dual
 back to the S-adelic Schwartz space. -/
-private theorem sLocal_fourier_continuousLinear :
+theorem sLocal_fourier_continuousLinear :
     ∃ T : ℬ(Aₛ) →L[ℂ] ℬ(Aₛ), ∀ f, T f = sAdeleSchwartzFourier f := by
   let G := Multiplicative Aₛ
   let μ : Measure G := sAdditiveTamagawaMeasure F S
