@@ -1004,20 +1004,6 @@ theorem spectralLineConvolution_trace_distribution {s : ℝ} (hs : 1 < s) :
 -- TODO(paper-gap): The L¹ comparison after (10.3.1.26) supplies no
 -- sampling estimate at zero ordinates, and the rapid-decay claim uses arbitrary numbering.
 
-/-- Paper: Theorem 10.3.1.1(2) and (10.3.1.3)–(10.3.1.4), p. 448. The
-trace of convolution is the absolutely convergent sum of the Mellin values at
-the line zeros weighted by their surviving multiplicities.
-Deviation: Apply the strict cutoff of §10.2 and use positive meromorphic
-order to exclude poles. The dependent double sum is expressed as one family. -/
-theorem spectralLineConvolution_trace (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
-    (_hχ : IsSpectralBasepointChoice (F := F) (fun ω ↦ χ ω))
-    {s : ℝ} (hs : 1 < s) (φ : BruhatCompactSupport C𝔽) :
-    let H := Q(a, h₀, hs₀(hs))
-    let term (z : Z(χ)) := (N(χ, s, z) : ℂ) * M(φ, χ z.val.1, shift(0, z.val.2))
-    ∀ (T : nuclearEndomorphisms H),
-      T.val = spectralConvolution (F := F) a h₀ hs₀(hs) φ →
-      Summable (fun z ↦ ‖term z‖) ∧ HasSum term (hilbertTrace (H := H) T) := by sorry
-
 /-- Paper: Theorem 10.3.1.1(3), p. 449. The singular values decay faster than every inverse power.
 Deviation: Assume trace class for all tests. Factor the homogeneous radial profile into
 finite sums of iterated convolutions of smooth compactly supported functions on ℝ.
@@ -1195,6 +1181,293 @@ theorem spectralStripConvolution_trace_distribution {α s : ℝ} (hα : 0 ≤ α
     (spectralConvolution (F := F) a hStrip(hα) hs₀(hs))
     (spectralStripConvolution_traceNorm_continuous (F := F) a hα hs)
 
+section InvariantBlockTrace
+
+/-- Along a countably generated filter, strong convergence to the identity suffices for
+convergence of the traces of left products with a fixed nuclear operator. -/
+private theorem stripTrace_tendsto_strong {H I : Type*} [NormedAddCommGroup H]
+    [InnerProductSpace ℂ H] [CompleteSpace H] {l : Filter I} [l.IsCountablyGenerated]
+    (P : I → H →L[ℂ] H) (hP : ∀ y, Tendsto (fun i ↦ P i y) l (𝓝 y))
+    (T : nuclearEndomorphisms H) :
+    Tendsto (fun i ↦ hilbertTrace ⟨P i * T.val, mul_mem_nuclearEndomorphisms_left (P i) T⟩)
+      l (𝓝 (hilbertTrace T)) := by
+  apply tendsto_iff_seq_tendsto.2
+  intro u hu
+  let A : traceClassOperators H H := ⟨T.val, (mem_traceClassOperators_iff_isNuclearOperator _).2 T.property⟩
+  let B (n : ℕ) : nuclearEndomorphisms H :=
+    ⟨P (u n) * T.val, mul_mem_nuclearEndomorphisms_left _ T⟩
+  obtain ⟨hm, hI, hlim⟩ := tendsto_schattenNorm_comp_left A (P ∘ u) (ContinuousLinearMap.id ℂ H)
+    (fun y ↦ (hP y).comp hu)
+  have hn : Tendsto (fun n ↦ traceNorm (B n - T)) atTop (𝓝 0) := by
+    refine hlim.congr fun n ↦ ?_
+    rw [← schattenNorm_one_eq_traceNorm]
+    congr 1
+  obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := H)
+  apply tendsto_iff_norm_sub_tendsto_zero.mpr
+  change Tendsto (fun n ↦ ‖hilbertTrace (B n) - hilbertTrace T‖) atTop (𝓝 0)
+  have hdiff (n : ℕ) : hilbertTrace (B n) - hilbertTrace T = hilbertTrace (B n - T) :=
+    ((congrArg₂ (· - ·) (htr (B n)).symm (htr T).symm).trans (tr.map_sub _ _).symm).trans (htr _)
+  simp only [hdiff]
+  exact squeeze_zero (fun _ ↦ norm_nonneg _) (fun n ↦ norm_hilbertTrace_le (B n - T)) hn
+
+/-- Summing whole finite invariant blocks of a Markushevich basis recovers the nuclear
+trace. Orthogonal projections onto their spans have norm at most one. -/
+private theorem stripTrace_hasSum_blocks {H Z J : Type*} [NormedAddCommGroup H]
+    [InnerProductSpace ℂ H] [CompleteSpace H] [Countable Z]
+    (x : J → H) (f : J → StrongDual ℂ H) (hb : IsSpectralMarkushevichBasis x f)
+    (N : Z → ℕ) (j : (z : Z) → Fin (N z) → J)
+    (hj : Bijective (fun p : (z : Z) × Fin (N z) ↦ j p.1 p.2))
+    (T : nuclearEndomorphisms H)
+    (hcross : ∀ z z', z ≠ z' → ∀ m n, f (j z m) (T.val (x (j z' n))) = 0) :
+    HasSum (fun z ↦ ∑ m, f (j z m) (T.val (x (j z m)))) (hilbertTrace T) := by
+  classical
+  let coords (K : Finset Z) : Set H := {y | ∃ z ∈ K, ∃ m, y = x (j z m)}
+  let V (K : Finset Z) := (Submodule.span ℂ (coords K)).topologicalClosure
+  let (K : Finset Z) : CompleteSpace (V K) :=
+    (Submodule.isClosed_topologicalClosure _).completeSpace_coe
+  let P (K : Finset Z) := (V K).starProjection
+  have xmem (K : Finset Z) {z : Z} (hz : z ∈ K) (m : Fin (N z)) : x (j z m) ∈ V K :=
+    (Submodule.span ℂ (coords K)).le_topologicalClosure (Submodule.subset_span ⟨z, hz, m, rfl⟩)
+  have mono : Monotone V := by
+    intro K L hKL
+    apply Submodule.topologicalClosure_mono
+    apply Submodule.span_mono
+    rintro _ ⟨z, hz, m, rfl⟩
+    exact ⟨z, hKL hz, m, rfl⟩
+  have hd : ⊤ ≤ (⨆ K, V K).topologicalClosure := by
+    rw [← Submodule.dense_iff_topologicalClosure_eq_top.mp hb.2.2.1]
+    apply Submodule.topologicalClosure_mono
+    apply Submodule.span_le.mpr
+    rintro _ ⟨i, rfl⟩
+    obtain ⟨⟨z, m⟩, rfl⟩ := hj.2 i
+    exact (le_iSup V {z}) (xmem {z} (Finset.mem_singleton_self z) m)
+  have hsot (v : H) := Submodule.starProjection_tendsto_self V mono v hd
+  have same (z : Z) (m n : Fin (N z)) : f (j z m) (x (j z n)) = if n = m then 1 else 0 := by
+    split_ifs with h
+    · subst n
+      exact hb.1 _
+    · exact hb.2.1 _ _ (fun e ↦ h (eq_of_heq (Sigma.mk.inj (hj.1 e)).2))
+  have other {z z' : Z} (h : z ≠ z') (m : Fin (N z)) (n : Fin (N z')) :
+      f (j z m) (x (j z' n)) = 0 := by
+    apply hb.2.1
+    intro e
+    exact h (congrArg Sigma.fst (hj.1 (a₁ := ⟨z', n⟩) (a₂ := ⟨z, m⟩) e)).symm
+  let R (K : Finset Z) : H →L[ℂ] H := ∑ z ∈ K, ∑ m, (f (j z m)).smulRight (x (j z m))
+  have fix (K : Finset Z) : V K ≤ ((R K) - 1).ker := by
+    refine (Submodule.span ℂ (coords K)).topologicalClosure_minimal (Submodule.span_le.mpr ?_) (ContinuousLinearMap.isClosed_ker _)
+    rintro _ ⟨z, hz, n, rfl⟩
+    change R K (x (j z n)) - x (j z n) = 0
+    apply sub_eq_zero.mpr
+    simp only [R, sum_apply, ContinuousLinearMap.smulRight_apply]
+    rw [Finset.sum_eq_single_of_mem z hz]
+    · simp [same, ite_smul]
+    · intro z' _ h
+      simp [other h]
+  have inv (K : Finset Z) {z : Z} (hz : z ∈ K) (n : Fin (N z)) : T.val (x (j z n)) ∈ V K := by
+    let v := T.val (x (j z n))
+    have heq : v = ∑ m, f (j z m) v • x (j z m) := by
+      apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+      have h : ContinuousLinearMap.apply ℂ ℂ v = ContinuousLinearMap.apply ℂ ℂ (∑ m, f (j z m) v • x (j z m)) := by
+        apply ContinuousLinearMap.ext_on hb.2.2.2
+        rintro _ ⟨i, rfl⟩
+        obtain ⟨⟨z', k⟩, rfl⟩ := hj.2 i
+        change f (j z' k) v = f (j z' k) (∑ m, f (j z m) v • x (j z m))
+        by_cases h : z' = z
+        · subst z'
+          simp [map_sum, same, smul_eq_mul, mul_ite]
+        · simp [map_sum, other h, hcross _ _ h, v]
+      exact fun ℓ ↦ DFunLike.congr_fun h ℓ
+    change v ∈ V K
+    rw [heq]
+    exact Submodule.sum_mem _ (fun m _ ↦ Submodule.smul_mem _ _ (xmem K hz m))
+  obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := H)
+  have hfin (K : Finset Z) :
+      hilbertTrace ⟨P K * T.val, mul_mem_nuclearEndomorphisms_left _ T⟩ =
+        ∑ z ∈ K, ∑ m, f (j z m) (T.val (x (j z m))) := by
+    let ℓ (z m) := (f (j z m)).comp ((P K).comp T.val)
+    let rankOne (z m) : nuclearEndomorphisms H :=
+      ⟨(ℓ z m).smulRight (x (j z m)), smulRight_mem_nuclearEndomorphisms _ _⟩
+    have heq : (⟨P K * T.val, mul_mem_nuclearEndomorphisms_left _ T⟩ : nuclearEndomorphisms H) =
+        ∑ z ∈ K, ∑ m, rankOne z m := by
+      apply Subtype.ext
+      ext v
+      have h := fix K ((V K).starProjection_apply_mem (T.val v))
+      change R K (P K (T.val v)) - P K (T.val v) = 0 at h
+      simpa [R, ℓ, rankOne, P, ContinuousLinearMap.mul_def, Submodule.coe_sum] using (sub_eq_zero.mp h).symm
+    rw [heq, ← htr, map_sum]
+    apply Finset.sum_congr rfl
+    intro z hz
+    rw [map_sum]
+    apply Finset.sum_congr rfl
+    intro m _
+    rw [htr, hilbertTrace_smulRight]
+    change f (j z m) ((V K).starProjection (T.val (x (j z m)))) = _
+    rw [Submodule.starProjection_eq_self_iff.mpr (inv K hz m)]
+  exact (stripTrace_tendsto_strong P hsot T).congr hfin
+
+end InvariantBlockTrace
+
+section StripConvolutionCoefficients
+
+variable {α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s)
+
+local notation "logNorm" => (fun g : C𝔽 ↦ Real.log ((ideleClassNorm F g).val : ℝ))
+local notation "D" => spectralSobolevDualEmbedding F a (hStrip(hα)) hs₀(hs)
+local notation "raw(" χ ", " j ")" =>
+  spectralZeroJet (F := F) (χ (j).val.1) (j).val.2.1 (j).val.2.2.1 (j).val.2.2.2
+local notation "jet(" z ", " m ")" => ⟨((z).val.1, (z).val.2.1, (z).val.2.2, (m).val), (m).isLt⟩
+local notation "J(" χ ")" => SpectralStripJetIndex (F := F) χ a α s
+
+/-- A quotient jet functional evaluates on a representative by its explicit Haar moment. -/
+private theorem spectralStripConvolution_jet_eval
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (j : SpectralStripJetIndex χ a α s) (f : StrongDual ℂ Q(a, hStrip(hα), hs₀(hs)))
+    (hf : D f = (spectralStripJet_memLp χ hα hs₀(hs) j).toLp (raw(χ, j))) (v : W(-α, α, s)) :
+    Integrable (fun y ↦ v y * raw(χ, j) y) μ𝔽 ∧
+      f ((Θ(a, hStrip(hα), hs₀(hs))).mkQL v) = ∫ y, v y * raw(χ, j) y ∂μ𝔽 := by
+  let w (g : C𝔽) := intervalSobolevDensity (-α) α s (logNorm g)
+  have hw : Measurable w := by
+    have hD : Continuous (intervalSobolevDensity (-α) α s) := by
+      unfold intervalSobolevDensity
+      fun_prop
+    exact hD.measurable.comp ((NNReal.continuous_coe.comp
+      (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)).measurable.log)
+  have habs : μ𝔽 ≪ (μ𝔽).withDensity (fun g ↦ ENNReal.ofReal (w g)⁻¹) := by
+    refine withDensity_absolutelyContinuous' hw.inv.ennreal_ofReal.aemeasurable (.of_forall fun g ↦ ?_)
+    refine ENNReal.ofReal_ne_zero_iff.mpr (inv_pos.mpr ?_)
+    exact mul_pos (lt_max_of_lt_left (Real.exp_pos _)) (Real.rpow_pos_of_pos (by positivity) _)
+  have hae : (D f : C𝔽 → ℂ) =ᵐ[μ𝔽] raw(χ, j) := by
+    rw [hf]
+    exact habs.ae_le (MemLp.coeFn_toLp _)
+  have he := spectralSobolevPairing_dual (hStrip(hα)) hs₀(hs) (f.comp ((Θ(a, hStrip(hα), hs₀(hs))).mkQL)) v
+  change Integrable (fun y ↦ v y * D f y) μ𝔽 ∧
+      f ((Θ(a, hStrip(hα), hs₀(hs))).mkQL v) = ∫ y, v y * D f y ∂μ𝔽 at he
+  have hEq := hae.mono fun y hy ↦ congrArg (v y * ·) hy
+  exact ⟨he.1.congr hEq, he.2.trans (integral_congr_ae hEq)⟩
+
+/-- If the lower moments vanish, translation multiplies the top moment by the norm twist. -/
+private theorem spectralStripConvolution_jet_translate (η : PontryaginDual C𝔽) (b t : ℝ)
+    (m : ℕ) (v : W(-α, α, s))
+    (hint : ∀ i ≤ m, Integrable (fun x ↦ v x * spectralZeroJet η b t i x) μ𝔽)
+    (hzero : ∀ i < m, ∫ x, v x * spectralZeroJet η b t i x ∂μ𝔽 = 0) (g : C𝔽) :
+    let τ := hardySobolevTranslation μ𝔽 m𝔽 (-α) α s (hStrip(hα)) hs₀(hs)
+    ∫ y, τ g v y * spectralZeroJet η b t m y ∂μ𝔽 =
+      ideleClassNormTwist η (shift(b, t)) g * ∫ y, v y * spectralZeroJet η b t m y ∂μ𝔽 := by
+  intro τ
+  let T := ideleClassNormTwist η ((b : ℂ) + (t : ℂ) * Complex.I)
+  let L (y : C𝔽) : ℂ := logNorm y
+  let c (i : ℕ) := T g * L g ^ (m - i) * (m.choose i : ℂ)
+  have hlog (y : C𝔽) : L (g * y) = L y + L g := by
+    dsimp only [L]
+    rw [map_mul, Units.val_mul, NNReal.coe_mul, Real.log_mul
+      (NNReal.coe_ne_zero.2 (ideleClassNorm F g).ne_zero)
+      (NNReal.coe_ne_zero.2 (ideleClassNorm F y).ne_zero), Complex.ofReal_add, add_comm]
+  have hsum (y : C𝔽) : v y * spectralZeroJet η b t m (g * y) =
+      ∑ i ∈ Finset.range (m + 1), c i * (v y * spectralZeroJet η b t i y) := by
+    change v y * (T (g * y) * L (g * y) ^ m) = _
+    rw [map_mul, hlog, add_pow]
+    simp only [Finset.mul_sum]
+    refine Finset.sum_congr rfl fun i _ ↦ ?_
+    change v y * (T g * T y * (L y ^ i * L g ^ (m - i) * (m.choose i : ℂ))) =
+      (T g * L g ^ (m - i) * (m.choose i : ℂ)) * (v y * (T y * L y ^ i))
+    ring
+  let J := spectralZeroJet η b t m
+  let H (y : C𝔽) := v (g⁻¹ * y) * J y
+  calc
+    _ = ∫ y, H y ∂μ𝔽 := integral_congr_ae
+      ((hardySobolevTranslation_apply μ𝔽 m𝔽 (-α) α s (hStrip(hα)) hs₀(hs) g v).mono
+        fun y hy ↦ congrArg (· * J y) hy)
+    _ = ∫ y, H (g * y) ∂μ𝔽 := (integral_mul_left_eq_self H g).symm
+    _ = ∫ y, v y * J (g * y) ∂μ𝔽 := by simp only [H, inv_mul_cancel_left]
+    _ = _ := by
+      simp_rw [show ∀ y, v y * J (g * y) = _ from hsum]
+      rw [integral_finsetSum _ fun i hi ↦ (hint i (Finset.mem_range_succ_iff.mp hi)).const_mul (c i)]
+      simp_rw [integral_const_mul]
+      rw [Finset.sum_eq_single_of_mem m (Finset.mem_range_succ_iff.mpr le_rfl)]
+      · simp [c, T]
+      · intro i hi hne
+        rw [hzero i (lt_of_le_of_ne (Finset.mem_range_succ_iff.mp hi) hne), mul_zero]
+
+/-- On the common kernel of all lower moments at this zero, the selected jet coordinate
+of the convolution is the Mellin value times the same coordinate of the input. -/
+private theorem spectralStripConvolution_jet_top
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (f : J(χ) → StrongDual ℂ Q(a, hStrip(hα), hs₀(hs)))
+    (hj : ∀ j, D (f j) = (spectralStripJet_memLp χ hα hs₀(hs) j).toLp (raw(χ, j)))
+    (φ : BruhatCompactSupport C𝔽) (z : Z(χ, α)) (m : Fin (N(χ, α, s, z)))
+    (u : Q(a, hStrip(hα), hs₀(hs)))
+    (hlower : ∀ k : Fin (N(χ, α, s, z)), k < m → f (jet(z, k)) u = 0) :
+    f (jet(z, m)) (spectralConvolution (F := F) a (hStrip(hα)) hs₀(hs) φ u) =
+      M(φ, χ z.val.1, shift(z.val.2.1, z.val.2.2)) * f (jet(z, m)) u := by
+  let θ := globalThetaSobolev F a (hStrip(hα)) hs₀(hs)
+  obtain ⟨v, hv⟩ := θ.mkQ_surjective u
+  let J (i : ℕ) := spectralZeroJet (χ z.val.1) z.val.2.1 z.val.2.2 i
+  let j : J(χ) := jet(z, m)
+  let τ := hardySobolevTranslation μ𝔽 m𝔽 (-α) α s (hStrip(hα)) hs₀(hs)
+  let ℓ := (f j).comp θ.mkQL
+  let η := ideleClassNormTwist (χ z.val.1) (shift(z.val.2.1, z.val.2.2))
+  have heval (j : J(χ)) (w : W(-α, α, s)) :=
+    spectralStripConvolution_jet_eval (a := a) hα hs χ j (f j) (hj j) w
+  have hint (i : ℕ) (hi : i ≤ m.val) : Integrable (fun y ↦ v y * J i y) μ𝔽 := by
+    let k : Fin (N(χ, α, s, z)) := ⟨i, hi.trans_lt m.isLt⟩
+    exact (heval (jet(z, k)) v).1
+  have hzero (i : ℕ) (hi : i < m.val) : ∫ y, v y * J i y ∂μ𝔽 = 0 := by
+    let k : Fin (N(χ, α, s, z)) := ⟨i, hi.trans m.isLt⟩
+    refine (heval (jet(z, k)) v).2.symm.trans ?_
+    change f (jet(z, k)) (θ.mkQ v) = 0
+    exact (congrArg (f (jet(z, k))) hv).trans (hlower k hi)
+  have htop : ∫ y, v y * J m.val y ∂μ𝔽 = f j u :=
+    (heval j v).2.symm.trans (congrArg (f j) hv)
+  have hτ (g : C𝔽) : ℓ (τ g v) = η g * f j u :=
+    (heval j (τ g v)).2.trans ((spectralStripConvolution_jet_translate hα hs
+      (χ z.val.1) z.val.2.1 z.val.2.2 m.val v hint hzero g).trans (congrArg (η g * ·) htop))
+  have hP := bruhatRegularizedAction_apply μ𝔽 τ
+    (exists_hardySobolevTranslation μ𝔽 m𝔽 (-α) α s (hStrip(hα)) hs₀(hs)).choose_spec.2 φ v
+  have he := congrArg (fun p : PettisWeakCompletion W(-α, α, s) ↦
+    (show Module.Dual ℂ (StrongDual ℂ W(-α, α, s)) from p) ℓ) hP.2
+  change ℓ (hardySobolevTestAction μ𝔽 m𝔽 (-α) α s (hStrip(hα)) hs₀(hs) φ v) =
+    ∫ g, ℓ (φ.val g • τ g v) ∂μ𝔽 at he
+  have hM := (spectralConvolution_mellin_integrable φ (χ z.val.1) (shift(z.val.2.1, z.val.2.2))).2
+  calc
+    _ = ℓ (hardySobolevTestAction μ𝔽 m𝔽 (-α) α s (hStrip(hα)) hs₀(hs) φ v) :=
+      (congrArg (fun w ↦ f j (spectralConvolution (F := F) a (hStrip(hα)) hs₀(hs) φ w)) hv.symm).trans
+        (congrArg (f j) (spectralConvolution_mkQ a (hStrip(hα)) hs₀(hs) φ v))
+    _ = ∫ g, ℓ (φ.val g • τ g v) ∂μ𝔽 := he
+    _ = ∫ g, (φ.val g * η g) * f j u ∂μ𝔽 := integral_congr_ae (.of_forall fun g ↦ by
+      exact (map_smul ℓ _ _).trans ((congrArg (φ.val g * ·) (hτ g)).trans (mul_assoc _ _ _).symm))
+    _ = _ := (integral_mul_const _ _).trans (congrArg (· * f j u) hM.symm)
+
+/-- Paper: Theorem 10.3.2.1(2), p. 454. In a basis realizing the strip jets, the
+convolution matrix has no coefficients between distinct zeros. Each diagonal coefficient
+is the Mellin value at the unshifted exponent of its zero. -/
+theorem spectralStripConvolution_jetCoefficients
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (x : J(χ) → Q(a, hStrip(hα), hs₀(hs))) (f : J(χ) → StrongDual ℂ Q(a, hStrip(hα), hs₀(hs)))
+    (hb : IsSpectralMarkushevichBasis x f)
+    (hj : ∀ j, D (f j) = (spectralStripJet_memLp χ hα hs₀(hs) j).toLp (raw(χ, j)))
+    (φ : BruhatCompactSupport C𝔽) :
+    (∀ (z z' : Z(χ, α)), z ≠ z' → ∀ (m : Fin (N(χ, α, s, z))) (n : Fin (N(χ, α, s, z'))),
+      f (jet(z, m)) (spectralConvolution (F := F) a (hStrip(hα)) hs₀(hs) φ (x (jet(z', n)))) = 0) ∧
+    (∀ (z : Z(χ, α)) (m : Fin (N(χ, α, s, z))),
+      f (jet(z, m)) (spectralConvolution (F := F) a (hStrip(hα)) hs₀(hs) φ (x (jet(z, m)))) =
+        M(φ, χ z.val.1, shift(z.val.2.1, z.val.2.2))) := by
+  have coeff := spectralStripConvolution_jet_top a hα hs χ f hj φ
+  constructor
+  · intro z z' hzz m n
+    have hindex (k : Fin (N(χ, α, s, z))) : (jet(z', n) : J(χ)) ≠ jet(z, k) := by
+      intro h
+      exact hzz (Subtype.ext (congrArg (fun u : J(χ) ↦ (u.val.1, u.val.2.1, u.val.2.2.1)) h).symm)
+    exact (coeff z m _ (fun k _ ↦ hb.2.1 _ _ (hindex k))).trans
+      ((congrArg (_ * ·) (hb.2.1 _ _ (hindex m))).trans (mul_zero _))
+  · intro z m
+    have hindex (k : Fin (N(χ, α, s, z))) (hk : k < m) : (jet(z, m) : J(χ)) ≠ jet(z, k) := by
+      intro h
+      exact (ne_of_lt hk) (Fin.ext (congrArg (fun u : J(χ) ↦ u.val.2.2.2) h).symm)
+    exact (coeff z m _ (fun k hk ↦ hb.2.1 _ _ (hindex k hk))).trans
+      ((congrArg (_ * ·) (hb.1 _)).trans (mul_one _))
+
+end StripConvolutionCoefficients
+
 /-- Paper: Theorem 10.3.2.1(2) and (10.3.2.3)–(10.3.2.4), p. 454. The trace
 is the absolutely convergent sum of the Mellin values at the strip zeros with
 full interior multiplicities and truncated boundary multiplicities.
@@ -1207,7 +1480,87 @@ theorem spectralStripConvolution_trace (χ : PontryaginDual C₁ → PontryaginD
     let term (z : Z(χ, α)) := (N(χ, α, s, z) : ℂ) * M(φ, χ z.val.1, shift(z.val.2.1, z.val.2.2))
     ∀ (T : nuclearEndomorphisms H),
       T.val = spectralConvolution (F := F) a hStrip(hα) hs₀(hs) φ →
-      Summable (fun z ↦ ‖term z‖) ∧ HasSum term (hilbertTrace (H := H) T) := by sorry
+      Summable (fun z ↦ ‖term z‖) ∧ HasSum term (hilbertTrace (H := H) T) := by
+  intro H term T hT
+  classical
+  obtain ⟨_, x, f, hb, hj⟩ := spectralStripMarkushevichBasis (a := a) χ _hχ hα hs₀(hs)
+  obtain ⟨_, e, _⟩ := spectralLineConvolution_nuclear_indices χ
+    (fun z : Z(χ, α) ↦ z.val.1) (fun z ↦ shift(a + z.val.2.1, z.val.2.2)) (by
+      intro i j h
+      have hrow := congrArg Prod.fst h
+      have hre := congrArg (fun p ↦ (p.2 : ℂ).re) h
+      have him := congrArg (fun p ↦ (p.2 : ℂ).im) h
+      exact Subtype.ext (Prod.ext hrow
+        (Prod.ext (by simpa using hre) (by simpa using him)))) (fun z ↦ z.property.2)
+  let : Countable (Z(χ, α)) := e.injective.countable
+  let count (z : Z(χ, α)) := N(χ, α, s, z)
+  let jet (z : Z(χ, α)) (m : Fin (count z)) : SpectralStripJetIndex (F := F) (fun ω ↦ χ ω) a α s :=
+    ⟨(z.val.1, z.val.2.1, z.val.2.2, m.val), m.isLt⟩
+  let index (j : SpectralStripJetIndex (F := F) (fun ω ↦ χ ω) a α s) : (z : Z(χ, α)) × Fin (count z) :=
+    ⟨⟨(j.val.1, j.val.2.1, j.val.2.2.1), SpectralStripJetIndex.mem_strip_order_pos hα j⟩, ⟨j.val.2.2.2, j.property⟩⟩
+  let equiv : ((z : Z(χ, α)) × Fin (count z)) ≃ SpectralStripJetIndex (F := F) (fun ω ↦ χ ω) a α s :=
+    ⟨fun zm ↦ jet zm.1 zm.2, index, fun _ ↦ rfl, fun _ ↦ rfl⟩
+  obtain ⟨hcross, hdiag⟩ := spectralStripConvolution_jetCoefficients a hα hs χ x f hb hj φ
+  have hsum := stripTrace_hasSum_blocks x f hb count jet equiv.bijective T (by
+    intro z z' hne m n
+    exact (congrArg (fun A : H →L[ℂ] H ↦ f (jet z m) (A (x (jet z' n)))) hT).trans
+      (hcross z z' hne m n))
+  have heq (z : Z(χ, α)) : (∑ m, f (jet z m) (T.val (x (jet z m)))) = term z := by
+    calc
+      _ = ∑ _m : Fin (count z), M(φ, χ z.val.1, shift(z.val.2.1, z.val.2.2)) := by
+        apply Finset.sum_congr rfl
+        intro m _
+        exact (congrArg (fun A : H →L[ℂ] H ↦ f (jet z m) (A (x (jet z m)))) hT).trans (hdiag z m)
+      _ = _ := by simp [term, count]
+  have ht := hsum.congr_fun (fun z ↦ (heq z).symm)
+  exact ⟨ht.summable.norm, ht⟩
+
+section LineTrace
+
+local notation "Z(" χ ")" => {z : PontryaginDual C₁ × ℝ // 0 < order(χ z.1, shift(a, z.2))}
+local notation "N(" χ ", " s ", " z ")" => spectralBoundaryMultiplicity s (mult(χ (z).val.1,
+  shift(a, (z).val.2)))
+
+/-- Paper: Theorem 10.3.1.1(2) and (10.3.1.3)–(10.3.1.4), p. 448. The
+trace of convolution is the absolutely convergent sum of the Mellin values at
+the line zeros weighted by their surviving multiplicities.
+Deviation: Apply the strict cutoff of §10.2 and use positive meromorphic
+order to exclude poles. The dependent double sum is expressed as one family. -/
+theorem spectralLineConvolution_trace (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (_hχ : IsSpectralBasepointChoice (F := F) (fun ω ↦ χ ω))
+    {s : ℝ} (hs : 1 < s) (φ : BruhatCompactSupport C𝔽) :
+    let H := Q(a, h₀, hs₀(hs))
+    let term (z : Z(χ)) := (N(χ, s, z) : ℂ) * M(φ, χ z.val.1, shift(0, z.val.2))
+    ∀ (T : nuclearEndomorphisms H),
+      T.val = spectralConvolution (F := F) a h₀ hs₀(hs) φ →
+      Summable (fun z ↦ ‖term z‖) ∧ HasSum term (hilbertTrace (H := H) T) := by
+  let L := Z(χ)
+  let term (z : L) := (N(χ, s, z) : ℂ) * M(φ, χ z.val.1, shift(0, z.val.2))
+  let claim (l : ℝ) (hl : l ≤ 0) := ∀ T : nuclearEndomorphisms Q(a, hl, hs₀(hs)),
+    T.val = spectralConvolution (F := F) a hl hs₀(hs) φ →
+      Summable (fun z ↦ ‖term z‖) ∧ HasSum term (hilbertTrace T)
+  have transport (l : ℝ) (hl : l ≤ 0) (h : l = 0) : claim l hl → claim 0 le_rfl := by
+    subst l
+    exact id
+  apply transport (-0) (hStrip(le_refl (0 : ℝ))) neg_zero
+  intro T hT
+  let Z := Z(χ, 0)
+  have hoff (z : Z) : z.val.2.1 = 0 := by simpa using z.property.1
+  let e : L ≃ Z :=
+    { toFun := fun z ↦ ⟨(z.val.1, 0, z.val.2), by simp, by simpa only [add_zero] using z.property⟩
+      invFun := fun z ↦ ⟨(z.val.1, z.val.2.2), by simpa only [hoff z, add_zero] using z.property.2⟩
+      left_inv := fun _ ↦ Subtype.ext rfl
+      right_inv := fun z ↦ Subtype.ext (Prod.ext rfl (Prod.ext (hoff z).symm rfl)) }
+  let u (z : Z) := (N(χ, 0, s, z) : ℂ) * M(φ, χ z.val.1, shift(z.val.2.1, z.val.2.2))
+  have hsum : HasSum u (hilbertTrace T) :=
+    (spectralStripConvolution_trace (F := F) a χ _hχ le_rfl hs φ T hT).2
+  have hterm (z : L) : u (e z) = term z := by
+    simp only [u, e, Equiv.coe_fn_mk, term, add_zero, spectralStripMultiplicity_boundary
+      (le_refl (0 : ℝ)) (Or.inr rfl)]
+  have h := (e.hasSum_iff.mpr hsum).congr_fun fun z ↦ (hterm z).symm
+  exact ⟨h.summable.norm, h⟩
+
+end LineTrace
 
 /-- Paper: Theorem 10.3.2.1(3), p. 454. The singular values decay faster than every inverse power.
 Deviation: Assume trace class for all tests. Factor the homogeneous radial profile into
