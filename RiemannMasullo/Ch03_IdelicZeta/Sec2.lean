@@ -4604,7 +4604,7 @@ section HeckeZeros
 local notation "χ₀(" χ ")" => ideleClassNormTwist χ 0
 
 /-- The Euler product gives a nonzero value in its half-plane of absolute convergence. -/
-private theorem finiteHeckeL_ne_zero_of_one_lt_re (χ : U[F]) (s : halfPlane) :
+theorem finiteHeckeL_ne_zero_of_one_lt_re (χ : U[F]) (s : halfPlane) :
     finiteHeckeL χ s ≠ 0 := by
   have hs : 1 < (s : ℂ).re := s.property
   rw [← (finiteHeckeL_hasProd χ s).tprod_eq]
