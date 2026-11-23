@@ -1339,13 +1339,38 @@ theorem archNuclearityQuotient_jetEquiv_coefficients :
   exact Submodule.liftQ_apply (p := archNuclearityDenominator χ)
     (f := (archNuclearityJet χ τ hτ j).toLinearMap) (h := hker j) (x := x)
 
+/-- If the closed span of a family of functionals is the annihilator of a closed subspace,
+their common kernel is that subspace. -/
+private theorem archNuclearityQuotient_jetEquiv_separating_of_span {Y ι : Type*}
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [IsTopologicalAddGroup Y]
+    [ContinuousSMul ℂ Y] [PolynormableSpace ℂ Y] (N : Submodule ℂ Y)
+    (hN : IsClosed (N : Set Y)) (J : ι → StrongDual ℂ Y)
+    (hspan : ((Submodule.span ℂ (Set.range J)).topologicalClosure : Set (StrongDual ℂ Y)) =
+      {L | ∀ y : N, L y.val = 0}) (x : Y) (hx : ∀ i, J i x = 0) : x ∈ N := by
+  let : Module ℝ Y := Module.restrictScalars ℝ ℂ Y
+  let : IsScalarTower ℝ ℂ Y := IsScalarTower.restrictScalars ℝ ℂ Y
+  let : LocallyConvexSpace ℝ Y := (PolynormableSpace.withSeminorms ℂ Y).toLocallyConvexSpace
+  by_contra hn
+  obtain ⟨L, hL, hz⟩ := exists_dual_eq_zero_on_submodule_of_notMem N hN hn
+  have hm : L ∈ (Submodule.span ℂ (Set.range J)).topologicalClosure :=
+    (Set.ext_iff.mp hspan L).mpr fun y ↦ hz y.val y.property
+  let ev := ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) x
+  have hle : Submodule.span ℂ (Set.range J) ≤ ev.ker :=
+    Submodule.span_le.mpr (fun _ ⟨i, hi⟩ ↦ hi ▸ hx i)
+  exact hL (Submodule.topologicalClosure_minimal _ hle ev.isClosed_ker hm)
+
 /-- Paper: Equation (7.4.3.13), p. 372.
 The adjusted jets separate the classes of the archimedean orbital quotient: a class
 on which every jet vanishes is the class of a flat test, that is, it lies in the
 denominator. -/
 theorem archNuclearityQuotient_jetEquiv_separating (x : Θ₀(χ))
     (hx : ∀ j, archNuclearityJet χ τ hτ j x = 0) : x ∈ archNuclearityDenominator χ := by
-  sorry
+  let : PolynormableSpace ℂ (SchwartzBruhat (Multiplicative 𝔸[F])) :=
+    (adeleSchwartz_nuclear.{_, 0} (F := F)).2.2.1
+  let : PolynormableSpace ℂ (Θ₀(χ)) := polynormableSpace_quotient (Π(χ))
+  exact archNuclearityQuotient_jetEquiv_separating_of_span (archNuclearityDenominator χ)
+    (archNuclearityDenominator_nonzero_closed χ).2 (archNuclearityJet χ τ hτ)
+    (archNuclearityJet_span χ τ hτ) x hx
 
 /-- Paper: Equation (7.4.3.13), p. 372.
 Every family of coefficient values is realized by a class of the archimedean
