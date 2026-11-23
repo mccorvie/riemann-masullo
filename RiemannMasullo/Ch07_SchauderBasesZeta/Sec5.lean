@@ -594,6 +594,61 @@ theorem strongCoprimalityFourierJet_mk (s : ℂ) (k : ℕ) (f : P) :
     rw [he, href, iteratedDeriv_comp_const_sub]
     simp only [sub_sub_cancel]
 
+/-- The reflected zeta function of a Fourier transformed test is analytic at the evaluation
+point of an imaginary-axis center, away from the exceptional center of the norm twist. -/
+private theorem exists_strongCoprimalityFourierJet_full_analytic (s : ℂ) (hs : s.re = 0)
+    (hc : ideleClassNormTwist χ s ≠ 1) (f : SchwartzBruhat (Multiplicative (𝔸[F]))) :
+    AnalyticAt ℂ (fun z ↦ globalIdelicZFunction (adeleSchwartzFourier f)
+      (ideleClassNormTwist χ⁻¹ z)) (1 - s) := by
+  have hne1 : ideleClassNormTwist χ⁻¹ (1 - s) ≠ 1 := by
+    intro h
+    have habs : (1 - s).re = 0 := by
+      rw [← quasiCharacterAbscissa_ideleClassNormTwist χ⁻¹ (1 - s), h]
+      simp [quasiCharacterAbscissa]
+    rw [Complex.sub_re, Complex.one_re, hs] at habs
+    norm_num at habs
+  have hne2 : ideleClassNormTwist χ⁻¹ (1 - s) ≠ ideleClassNormTwist (1 : U) 1 := by
+    intro h
+    apply hc
+    ext g
+    have hg := DFunLike.congr_fun h g
+    set N : ℂ := (((ideleClassNorm F g : NNReal) : ℝ) : ℂ) with hNdef
+    change (Circle.coeHom ((χ⁻¹ : U) g)) * N ^ (1 - s) = 1 * N ^ (1 : ℂ) at hg
+    change (Circle.coeHom (χ g)) * N ^ s = 1
+    have hinv : Circle.coeHom ((χ⁻¹ : U) g) = (Circle.coeHom (χ g))⁻¹ := rfl
+    rw [hinv, Complex.cpow_one, one_mul] at hg
+    have hN : N ≠ 0 := by
+      rw [hNdef]
+      exact_mod_cast (ideleClassNorm F g).ne_zero
+    have hNs : N ^ s ≠ 0 := Complex.cpow_ne_zero_iff.mpr (Or.inl hN)
+    rw [Complex.cpow_sub _ _ hN, Complex.cpow_one, div_eq_mul_inv] at hg
+    have h2 : (Circle.coeHom (χ g))⁻¹ = N ^ s := by
+      have h1 : (Circle.coeHom (χ g))⁻¹ * (N ^ s)⁻¹ = 1 := by
+        refine mul_right_cancel₀ hN ?_
+        calc (Circle.coeHom (χ g))⁻¹ * (N ^ s)⁻¹ * N
+            = (Circle.coeHom (χ g))⁻¹ * (N * (N ^ s)⁻¹) := by ring
+          _ = N := hg
+          _ = 1 * N := (one_mul N).symm
+      calc (Circle.coeHom (χ g))⁻¹ = (Circle.coeHom (χ g))⁻¹ * ((N ^ s)⁻¹ * N ^ s) := by
+              rw [inv_mul_cancel₀ hNs, mul_one]
+        _ = (Circle.coeHom (χ g))⁻¹ * (N ^ s)⁻¹ * N ^ s := by ring
+        _ = 1 * N ^ s := by rw [h1]
+        _ = N ^ s := one_mul _
+    rw [← h2]
+    exact mul_inv_cancel₀ (Circle.coe_ne_zero (χ g))
+  exact (globalIdelicZFunction_poles (adeleSchwartzFourier f) χ⁻¹).1 (1 - s) ⟨hne1, hne2⟩
+
+/-- Paper: Equation (7.5.0.8), p. 377.
+The reflected jet, read on the full homogeneous theta space, is a continuous linear
+functional taking a test to the corresponding derivative of its reflected zeta function. -/
+private theorem exists_strongCoprimalityFourierJet_full_functional (s : ℂ) (hs : s.re = 0)
+    (hc : ideleClassNormTwist χ s ≠ 1) (k : ℕ) :
+    let q := (LinearMap.ker (homogeneousAdelicThetaLinearMap F (ω(χ)))).mkQ
+    ∃ d : StrongDual ℂ (GlobalHomogeneousThetaSpace F (ω(χ))),
+      ∀ f : SchwartzBruhat (Multiplicative (𝔸[F])),
+        d (q f) = iteratedDeriv k (fun z ↦ globalIdelicZFunction (adeleSchwartzFourier f)
+          (ideleClassNormTwist χ⁻¹ z)) (1 - s) := by sorry
+
 /-- Paper: Equation (7.5.0.8), p. 377.
 At each regular center on the imaginary axis the reflected jet is defined on
 the full homogeneous theta space and restricts to the jet on polar tests.
@@ -607,7 +662,13 @@ theorem exists_strongCoprimalityFourierJet_full (s : ℂ) (_hs : s.re = 0)
           (ideleClassNormTwist χ⁻¹ z)
         AnalyticAt ℂ Z (1 - s) ∧ d (q f) = iteratedDeriv k Z (1 - s)) ∧
       ∀ f : P, d (q f.val) =
-        strongCoprimalityFourierJet χ τ hτ s k ((K(ω(χ))).mkQ f) := by sorry
+        strongCoprimalityFourierJet χ τ hτ s k ((K(ω(χ))).mkQ f) := by
+  obtain ⟨d, hd⟩ := exists_strongCoprimalityFourierJet_full_functional (F := F) χ s _hs _hc k
+  refine ⟨d, ?_, ?_⟩
+  · intro f
+    exact ⟨exists_strongCoprimalityFourierJet_full_analytic (F := F) χ s _hs _hc f, hd f⟩
+  · intro f
+    exact (hd f.val).trans (strongCoprimalityFourierJet_mk (F := F) χ τ hτ s k f).2.symm
 
 -- In the proof on pp. 376–377 one can enlarge S to contain the primes of
 -- the different and all places above each rational prime occurring in S

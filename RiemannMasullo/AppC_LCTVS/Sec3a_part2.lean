@@ -793,7 +793,11 @@ theorem tendsto_filtration_orthogonalProjections :
 -- Keep the separability hypothesis in the existing signature.
 set_option linter.unusedSectionVars false in
 /-- Paper: Corollary C.3.5.5(2), p. 702. Left multiplication by the
-projections of a dense filtration converges in trace norm to the original operator. -/
+projections of a dense filtration converges in trace norm to the original operator.
+
+Deviation: The left trace-norm limit uses projection onto the stage $H_i$ followed by inclusion
+into $H$, correcting “onto $H$” on p. 702.
+-/
 theorem tendsto_traceNorm_filtration_orthogonalProjections_mul (T : nuclearEndomorphisms H) :
     Tendsto (fun i ↦ traceNorm
       (⟨P(i) * T.val, mul_mem_nuclearEndomorphisms_left (P(i)) T⟩ - T)) atTop (𝓝 0) := by
@@ -910,7 +914,11 @@ private theorem traceNorm_le_of_rankOne_series (A : nuclearEndomorphisms H)
 set_option linter.unusedSectionVars false in
 open InnerProductSpace in
 /-- Paper: Corollary C.3.5.5(2), p. 702. Right multiplication by the
-projections of a dense filtration converges in trace norm to the original operator. -/
+projections of a dense filtration converges in trace norm to the original operator.
+
+Deviation: The right trace-norm limit uses projection onto the stage $H_i$ followed by inclusion
+into $H$, correcting “onto $H$” on p. 702.
+-/
 theorem tendsto_traceNorm_mul_filtration_orthogonalProjections (T : nuclearEndomorphisms H) :
     Tendsto (fun i ↦ traceNorm
       (⟨T.val * P(i), mul_mem_nuclearEndomorphisms_right (P(i)) T⟩ - T)) atTop (𝓝 0) := by
@@ -972,7 +980,11 @@ theorem tendsto_traceNorm_mul_filtration_orthogonalProjections (T : nuclearEndom
   simpa [heval, Q, map_sub, mul_apply_eq_comp] using hT (Q i x)
 
 /-- Paper: Corollary C.3.5.5(3), p. 702. The traces of the left-projected
-operators converge to the trace of the original operator. -/
+operators converge to the trace of the original operator.
+
+Deviation: The left trace limit uses projection onto the stage $H_i$ followed by inclusion into
+$H$, correcting “onto $H$” on p. 702.
+-/
 theorem tendsto_hilbertTrace_filtration_orthogonalProjections_mul (T : nuclearEndomorphisms H) :
     Tendsto (fun i ↦ hilbertTrace
       ⟨P(i) * T.val, mul_mem_nuclearEndomorphisms_left (P(i)) T⟩)
@@ -985,7 +997,11 @@ theorem tendsto_hilbertTrace_filtration_orthogonalProjections_mul (T : nuclearEn
     (tendsto_traceNorm_filtration_orthogonalProjections_mul V hV hdense T)
 
 /-- Paper: Corollary C.3.5.5(3), p. 702. The traces of the right-projected
-operators converge to the trace of the original operator. -/
+operators converge to the trace of the original operator.
+
+Deviation: The right trace limit uses projection onto the stage $H_i$ followed by inclusion into
+$H$, correcting “onto $H$” on p. 702.
+-/
 theorem tendsto_hilbertTrace_mul_filtration_orthogonalProjections (T : nuclearEndomorphisms H) :
     Tendsto (fun i ↦ hilbertTrace
       ⟨T.val * P(i), mul_mem_nuclearEndomorphisms_right (P(i)) T⟩)
@@ -1575,7 +1591,11 @@ theorem schattenClass_submodule_axioms (p : ℝ) (hp : 1 ≤ p) :
 variable (E F) in
 /-- Paper: Definition C.3.6.2(1), p. 704. The Schatten class of index p is
 the submodule of compact operators with summable p-th powers of their
-approximation numbers. -/
+approximation numbers.
+Deviation: The page makes this a normed space with the norm of (C.3.6.4). Here it is a
+submodule of the bounded operators, so the norm and the topology that Lean supplies on it
+are those of the operator norm. The norm of (C.3.6.4) is `schattenNorm`, and every statement
+about that norm or its topology has to name it. -/
 def schattenClass (p : ℝ) (hp : 1 ≤ p) : Submodule ℂ (E →L[ℂ] F) where
   carrier := {T | IsCompactOperator T ∧ Summable (fun n ↦ (approximationNumber T n) ^ p)}
   zero_mem' := (schattenClass_submodule_axioms p hp).1
