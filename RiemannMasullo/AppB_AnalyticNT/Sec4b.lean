@@ -250,6 +250,291 @@ private theorem hasSlowGrowthNearPoles_completedHeckeL_logDeriv_heights (χ : U[
             ‖logDeriv L ((σ : ℂ) + (T k : ℂ) * Complex.I)‖ ≤ A * |T k| ^ β := by
   sorry
 
+local notation "finiteSeries(" χ ")" => LSeries (χ₀(χ)).LFunction
+
+private theorem completedHeckeL_logDeriv_abscissa (χ : U[F]) {z : ℂ} (hz : 1 < z.re) :
+    LSeries.abscissaOfAbsConv (χ₀(χ)).LFunction < (z.re : EReal) := by
+  obtain ⟨r, hr, hrz⟩ := exists_between hz
+  exact (finiteHeckeL_seriesSummable χ ⟨(r : ℂ), by simpa using hr⟩).abscissaOfAbsConv_le.trans_lt
+    (by exact_mod_cast hrz)
+
+/-- A positive lower bound from the Euler product, uniform on a line to the right of one. -/
+private theorem completedHeckeL_logDeriv_finite_lower (χ : U[F]) (σ : ℝ) (hσ : 1 < σ)
+    (z : ℂ) (hz : z.re = σ) :
+    Real.exp (-(∑' v : Primes(F), q(v) ^ (-σ))) ≤ ‖finiteSeries(χ) z‖ := by
+  have hz' : 1 < z.re := hz ▸ hσ
+  let E (v : Primes(F)) := finiteHeckeEulerFactor χ v z
+  let r (v : Primes(F)) := q(v) ^ (-σ)
+  have hp : HasProd E (finiteSeries(χ) z) := finiteHeckeL_hasProd χ ⟨z, hz'⟩
+  have hsum : Summable r :=
+    (summable_absNorm_rpow F hσ).comp_injective (fun _ _ he ↦ HeightOneSpectrum.ext he)
+  have hnonneg (v : Primes(F)) : 0 ≤ r v := by positivity
+  have hlocal (v : Primes(F)) : Real.exp (-r v) ≤ ‖E v‖ := by
+    have hv : (1 : ℝ) < q(v) := by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+    unfold E finiteHeckeEulerFactor
+    split_ifs
+    · let u := (χ₀(χ)).localValue v * (v.asIdeal.absNorm : ℂ) ^ (-z)
+      change Real.exp (-r v) ≤ ‖(1 - u)⁻¹‖
+      have hu : ‖u‖ = r v := by
+        dsimp only [u, r]
+        rw [norm_mul, norm_ideleClassNormTwist_zero_localValue, one_mul, ← Complex.ofReal_natCast,
+          Complex.norm_cpow_eq_rpow_re_of_pos (zero_lt_one.trans hv), Complex.neg_re, hz]
+      have hu' : ‖u‖ < 1 := by
+        rw [hu]
+        exact Real.rpow_lt_one_of_one_lt_of_neg hv (by linarith)
+      have hne : 1 - u ≠ 0 := fun h ↦ hu'.ne (by rw [← sub_eq_zero.mp h, norm_one])
+      rw [norm_inv, Real.exp_neg]
+      apply (inv_le_inv₀ (Real.exp_pos _) (norm_pos_iff.mpr hne)).2
+      calc
+        ‖1 - u‖ ≤ ‖(1 : ℂ)‖ + ‖u‖ := norm_sub_le _ _
+        _ ≤ Real.exp (r v) := by rw [norm_one, hu, add_comm]; exact Real.add_one_le_exp _
+    · rw [norm_one]
+      exact Real.exp_le_one_iff.mpr (neg_nonpos.mpr (hnonneg v))
+  apply ge_of_tendsto' hp.norm
+  intro T
+  rw [norm_prod]
+  calc
+    _ ≤ Real.exp (∑ v ∈ T, -r v) := by
+      rw [Finset.sum_neg_distrib]
+      exact Real.exp_le_exp.mpr (neg_le_neg (hsum.sum_le_tsum T fun v _ ↦ hnonneg v))
+    _ = ∏ v ∈ T, Real.exp (-r v) := Real.exp_sum _ _
+    _ ≤ _ := Finset.prod_le_prod₀ (fun _ _ ↦ (Real.exp_pos _).le) (fun v _ ↦ hlocal v)
+
+private theorem completedHeckeL_logDeriv_finite_bound (χ : U[F]) (σ : ℝ) (hσ : 1 < σ) :
+    ∃ C ≥ (0 : ℝ), ∀ z : ℂ, z.re = σ → ‖logDeriv (finiteSeries(χ)) z‖ ≤ C := by
+  let c := (χ₀(χ)).LFunction
+  let a := ∑' n, ‖LSeries.term (LSeries.logMul c) (σ : ℂ) n‖
+  let b := Real.exp (∑' v : Primes(F), q(v) ^ (-σ))
+  have ha : 0 ≤ a := tsum_nonneg (fun _ ↦ norm_nonneg _)
+  have hb : 0 < b := Real.exp_pos _
+  have hσ' : 1 < (σ : ℂ).re := by simpa using hσ
+  have hsσ : Summable (fun n ↦ ‖LSeries.term (LSeries.logMul c) (σ : ℂ) n‖) :=
+    (LSeriesSummable_logMul_of_lt_re (completedHeckeL_logDeriv_abscissa χ hσ')).norm
+  refine ⟨a * b, mul_nonneg ha hb.le, fun z hz ↦ ?_⟩
+  have hz' : 1 < z.re := hz ▸ hσ
+  have hc := completedHeckeL_logDeriv_abscissa χ hz'
+  have hs : Summable (fun n ↦ ‖LSeries.term (LSeries.logMul c) z n‖) :=
+    (LSeriesSummable_logMul_of_lt_re hc).norm
+  have hA : ‖LSeries (LSeries.logMul c) z‖ ≤ a :=
+    (norm_tsum_le_tsum_norm hs).trans
+      (hs.tsum_le_tsum (LSeries.norm_term_le_of_re_le_re (LSeries.logMul c) (by simpa using hz.ge)) hsσ)
+  have hLower := completedHeckeL_logDeriv_finite_lower χ σ hσ z hz
+  have hB : ‖(finiteSeries(χ) z)⁻¹‖ ≤ b := by
+    rw [norm_inv]
+    calc
+      _ ≤ (Real.exp (-(∑' v : Primes(F), q(v) ^ (-σ))))⁻¹ :=
+        (inv_le_inv₀ ((Real.exp_pos _).trans_le hLower) (Real.exp_pos _)).2 hLower
+      _ = b := by rw [Real.exp_neg, inv_inv]
+  rw [logDeriv_apply, LSeries_deriv hc, div_eq_mul_inv, norm_mul, norm_neg]
+  exact mul_le_mul hA hB (norm_nonneg _) ha
+
+/-- The logarithmic derivative of the shifted real gamma factor on its right half-plane. -/
+private theorem realHeckeArchimedean_mellinLogDeriv_gamma (b s : ℂ) (h : 0 < ((s + b) / 2).re) :
+    logDeriv (fun w ↦ Complex.Gammaℝ (w + b)) s =
+      (Complex.digamma ((s + b) / 2) - (Real.log Real.pi : ℂ)) / 2 := by
+  let z (w : ℂ) := (w + b) / 2
+  let E (w : ℂ) := Complex.exp (-(Real.log Real.pi : ℂ) * z w)
+  have hf : (fun w ↦ Complex.Gammaℝ (w + b)) = fun w ↦ E w * Complex.Gamma (z w) := by
+    funext w
+    rw [Complex.Gammaℝ_def, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero),
+      ← Complex.ofReal_log Real.pi_pos.le]
+    simp only [E, z, neg_div, neg_mul, mul_neg]
+  have hz : HasDerivAt z (1 / 2) s := ((hasDerivAt_id s).add_const b).div_const 2
+  have hE := (hz.const_mul (-(Real.log Real.pi : ℂ))).cexp
+  have hG := (Complex.hasDerivAt_Gamma_of_re_pos h).differentiableAt
+  rw [hf, logDeriv_fun_mul (f := E) (g := fun w ↦ Complex.Gamma (z w)) s
+    (Complex.exp_ne_zero _) (Complex.Gamma_ne_zero_of_re_pos h) hE.differentiableAt
+    (hG.comp s hz.differentiableAt), hz.logDeriv_Gamma (fun m he ↦ by
+      have := congrArg Complex.re he
+      simp [z] at this h
+      linarith [show (0 : ℝ) ≤ m by positivity])]
+  rw [logDeriv_apply, show deriv E s = E s * (-(Real.log Real.pi : ℂ) * (1 / 2)) from hE.deriv,
+    mul_div_cancel_left₀ _ (show E s ≠ 0 from Complex.exp_ne_zero _)]
+  dsimp [z]
+  ring
+
+/-- The Gauss kernel bound gives a digamma bound linear in the absolute height. -/
+private theorem completedHeckeL_logDeriv_digamma_bound (u : ℝ) (hu : 0 < u) :
+    ∃ C ≥ (0 : ℝ), ∀ v : ℝ,
+      ‖Complex.digamma ((u : ℂ) + (v : ℂ) * Complex.I)‖ ≤ C * (1 + |v|) := by
+  let m := min 1 u
+  have hm : 0 < m := lt_min one_pos hu
+  let K (x : ℝ) := (1 + x) * Real.exp (-m * x)
+  have hExp := integrableOn_exp_mul_Ioi (neg_neg_of_pos hm) 0
+  have hxExp : IntegrableOn (fun x : ℝ ↦ x * Real.exp (-m * x)) (Ioi 0) := by
+    simpa using (integrableOn_rpow_mul_exp_neg_mul_rpow (p := 1) (s := 1) (by norm_num) one_pos hm)
+  have hK : IntegrableOn K (Ioi 0) := by
+    simpa only [K, Pi.add_def, add_mul, one_mul] using hExp.add hxExp
+  let A := ∫ x in Ioi (0 : ℝ), K x
+  have ha : 0 ≤ A := by
+    apply integral_nonneg_of_ae
+    filter_upwards [ae_restrict_mem (μ := volume) measurableSet_Ioi] with x hx
+    exact mul_nonneg (by linarith [show 0 < x from hx]) (Real.exp_pos _).le
+  let D := ‖Complex.digamma 1‖
+  have hd : 0 ≤ D := norm_nonneg _
+  refine ⟨(1 + |1 - u|) * A + D, by positivity, fun v ↦ ?_⟩
+  let w : ℂ := (u : ℂ) + (v : ℂ) * Complex.I
+  have hw : 0 < (w / (1 : ℂ)).re := by simpa [w] using hu
+  have hG := (integral_gaussDigammaDifferenceKernel (d := 1) (w := w) one_pos (by simpa using hw)).2
+  simp only [Complex.ofReal_one, div_one] at hG
+  have hB : ‖∫ x in Ioi (0 : ℝ), gaussDigammaDifferenceKernel 1 w x‖ ≤ (|1 - u| + |v|) * A := by
+    rw [← integral_const_mul]
+    refine norm_integral_le_of_norm_le (hK.const_mul _) ?_
+    filter_upwards [ae_restrict_mem (μ := volume) measurableSet_Ioi] with x hx
+    simpa only [K, m, div_one] using
+      (norm_gaussDigammaDifferenceKernel_le (d := 1) (u := u) (v := v) one_pos (show 0 < x from hx))
+  change ‖Complex.digamma w‖ ≤ _
+  calc
+    _ ≤ ‖Complex.digamma w - Complex.digamma 1‖ + D :=
+      (norm_le_insert' (Complex.digamma w) (Complex.digamma 1)).trans_eq (add_comm _ _)
+    _ ≤ (|1 - u| + |v|) * A + D := add_le_add (hG ▸ hB) (le_refl D)
+    _ ≤ _ := by
+      have h₁ := mul_nonneg (mul_nonneg (abs_nonneg (1 - u)) ha) (abs_nonneg v)
+      have h₂ := mul_nonneg hd (abs_nonneg v)
+      nlinarith
+
+private theorem completedHeckeL_logDeriv_GammaR_regular (b s : ℂ) (h : 0 < (s + b).re) :
+    Complex.Gammaℝ (s + b) ≠ 0 ∧ DifferentiableAt ℂ (fun z ↦ Complex.Gammaℝ (z + b)) s := by
+  have hn := Complex.Gammaℝ_ne_zero_of_re_pos h
+  have hD := Complex.differentiable_Gammaℝ_inv.differentiableAt (x := s + b)
+  have hI : DifferentiableAt ℂ (fun z ↦ ((Complex.Gammaℝ z)⁻¹)⁻¹) (s + b) :=
+    hD.inv (inv_ne_zero hn)
+  exact ⟨hn, (show DifferentiableAt ℂ Complex.Gammaℝ (s + b) from
+    by simpa only [inv_inv] using hI).comp s (differentiableAt_id.add_const b)⟩
+
+private theorem completedHeckeL_logDeriv_GammaR_bound (σ : ℝ) (b : ℂ) (h : 0 < σ + b.re) :
+    ∃ C ≥ (0 : ℝ), ∀ y : ℝ,
+      ‖logDeriv (fun z ↦ Complex.Gammaℝ (z + b)) ((σ : ℂ) + (y : ℂ) * Complex.I)‖ ≤
+        C * (1 + |y|) := by
+  let u := (σ + b.re) / 2
+  obtain ⟨A, hA, hD⟩ := completedHeckeL_logDeriv_digamma_bound u (half_pos h)
+  let C := A * (1 + |b.im|) + ‖(Real.log Real.pi : ℂ)‖
+  have hC : 0 ≤ C := by positivity
+  refine ⟨C, hC, fun y ↦ ?_⟩
+  let s := (σ : ℂ) + (y : ℂ) * Complex.I
+  have hs : (s + b) / 2 = (u : ℂ) + (((y + b.im) / 2 : ℝ) : ℂ) * Complex.I := by
+    apply Complex.ext <;> simp [s, u, Complex.div_ofNat_re, Complex.div_ofNat_im]
+  have hpos : 0 < ((s + b) / 2).re := by
+    rw [hs]
+    simpa using (show 0 < u from half_pos h)
+  have hv : |(y + b.im) / 2| ≤ |y| + |b.im| := by
+    rw [abs_div, abs_of_pos (by norm_num : (0 : ℝ) < 2)]
+    linarith [abs_add_le y b.im, abs_nonneg (y + b.im)]
+  change ‖logDeriv (fun z ↦ Complex.Gammaℝ (z + b)) s‖ ≤ _
+  rw [realHeckeArchimedean_mellinLogDeriv_gamma b s hpos, norm_div, hs, Complex.norm_ofNat]
+  apply (div_le_self (norm_nonneg _) (by norm_num : (1 : ℝ) ≤ 2)).trans
+  refine (norm_sub_le _ _).trans ?_
+  have hD' := (hD ((y + b.im) / 2)).trans (mul_le_mul_of_nonneg_left (add_le_add (le_refl 1) hv) hA)
+  refine (add_le_add hD' (le_refl _)).trans ?_
+  unfold C
+  have h₁ := mul_nonneg (mul_nonneg hA (abs_nonneg b.im)) (abs_nonneg y)
+  have h₂ := mul_nonneg (norm_nonneg (Real.log Real.pi : ℂ)) (abs_nonneg y)
+  nlinarith
+private theorem completedHeckeL_logDeriv_GammaC_split (b s : ℂ) (h : 0 < (s + b).re) :
+    (Complex.Gammaℂ (s + b) / 2 ≠ 0 ∧
+      DifferentiableAt ℂ (fun z ↦ Complex.Gammaℂ (z + b) / 2) s) ∧
+    logDeriv (fun z ↦ Complex.Gammaℂ (z + b) / 2) s =
+      logDeriv (fun z ↦ Complex.Gammaℝ (z + b)) s +
+      logDeriv (fun z ↦ Complex.Gammaℝ (z + (b + 1))) s := by
+  have h₁ : 0 < (s + (b + 1)).re := by
+    rw [← add_assoc, Complex.add_re, Complex.one_re]
+    positivity
+  have hR := completedHeckeL_logDeriv_GammaR_regular b s h
+  have hR₁ := completedHeckeL_logDeriv_GammaR_regular (b + 1) s h₁
+  have he : (fun z ↦ Complex.Gammaℂ (z + b) / 2) =
+      fun z ↦ (Complex.Gammaℝ (z + b) * Complex.Gammaℝ (z + (b + 1))) * (2 : ℂ)⁻¹ := by
+    funext z
+    rw [← Complex.Gammaℝ_mul_Gammaℝ_add_one, div_eq_mul_inv, add_assoc]
+  rw [show Complex.Gammaℂ (s + b) / 2 = _ from congrFun he s, he]
+  refine ⟨⟨mul_ne_zero (mul_ne_zero hR.1 hR₁.1) (inv_ne_zero two_ne_zero),
+    (hR.2.mul hR₁.2).mul_const _⟩, ?_⟩
+  rw [logDeriv_mul_const _ _ (inv_ne_zero two_ne_zero)]
+  exact logDeriv_fun_mul _ hR.1 hR₁.1 hR.2 hR₁.2
+
+private theorem completedHeckeL_logDeriv_gammaFactor_bound (χ : U[F]) (σ : ℝ) (hσ : 0 < σ) :
+    ∃ C ≥ (0 : ℝ), ∀ y : ℝ,
+      ‖logDeriv (heckeGammaFactor χ) ((σ : ℂ) + (y : ℂ) * Complex.I)‖ ≤ C * (1 + |y|) := by
+  let G (v : InfinitePlace F) (s : ℂ) : ℂ :=
+    if hv : v.IsReal then
+      let a := (realHeckeCharacter_parameters χ v hv).exists.choose
+      Complex.Gammaℝ (s + a.1 + (a.2.val : ℂ))
+    else
+      let a := (complexHeckeCharacter_parameters χ v
+        (InfinitePlace.not_isReal_iff_isComplex.mp hv)).exists.choose
+      Complex.Gammaℂ (s + a.1 + (a.2.natAbs : ℂ) / 2) / 2
+  let s (y : ℝ) : ℂ := (σ : ℂ) + (y : ℂ) * Complex.I
+  have hh (v : InfinitePlace F) : ∃ C ≥ (0 : ℝ), ∀ y,
+      G v (s y) ≠ 0 ∧ DifferentiableAt ℂ (G v) (s y) ∧
+        ‖logDeriv (G v) (s y)‖ ≤ C * (1 + |y|) := by
+    by_cases hv : v.IsReal
+    · let a := (realHeckeCharacter_parameters χ v hv).exists.choose
+      let b := a.1 + (a.2.val : ℂ)
+      have h0 : 0 ≤ b.re := by
+        have ha := (realHeckeCharacter_parameters χ v hv).exists.choose_spec.1
+        change a.1.re = 0 at ha
+        simp only [b, Complex.add_re, Complex.natCast_re, ha, zero_add]
+        positivity
+      have he : G v = fun z ↦ Complex.Gammaℝ (z + b) := by
+        funext z
+        simp only [G, dite_eq_left hv, b, a, add_assoc]
+      obtain ⟨C, hC, hG⟩ := completedHeckeL_logDeriv_GammaR_bound σ b (add_pos_of_pos_of_nonneg hσ h0)
+      have hpos (y : ℝ) : 0 < (s y + b).re := by
+        simpa [s] using add_pos_of_pos_of_nonneg hσ h0
+      refine ⟨C, hC, fun y ↦ ?_⟩
+      rw [he]
+      have ht := completedHeckeL_logDeriv_GammaR_regular b (s y) (hpos y)
+      exact ⟨ht.1, ht.2, hG y⟩
+    · let hw := InfinitePlace.not_isReal_iff_isComplex.mp hv
+      let a := (complexHeckeCharacter_parameters χ v hw).exists.choose
+      let b := a.1 + (a.2.natAbs : ℂ) / 2
+      have h0 : 0 ≤ b.re := by
+        have ha := (complexHeckeCharacter_parameters χ v hw).exists.choose_spec.1
+        change a.1.re = 0 at ha
+        simp only [b, Complex.add_re, Complex.div_ofNat_re, Complex.natCast_re, ha, zero_add]
+        positivity
+      have he : G v = fun z ↦ Complex.Gammaℂ (z + b) / 2 := by
+        funext z
+        simp only [G, dite_eq_right hv, b, a, add_assoc]
+      obtain ⟨C, hC, hG⟩ := completedHeckeL_logDeriv_GammaR_bound σ b (add_pos_of_pos_of_nonneg hσ h0)
+      obtain ⟨D, hD, hG'⟩ := completedHeckeL_logDeriv_GammaR_bound σ (b + 1) (by
+        rw [Complex.add_re, Complex.one_re]
+        positivity)
+      refine ⟨C + D, add_nonneg hC hD, fun y ↦ ?_⟩
+      have hpos : 0 < (s y + b).re := by simpa [s] using add_pos_of_pos_of_nonneg hσ h0
+      have hs := completedHeckeL_logDeriv_GammaC_split b (s y) hpos
+      rw [he]
+      refine ⟨hs.1.1, hs.1.2, ?_⟩
+      rw [hs.2, add_mul]
+      exact (norm_add_le _ _).trans (add_le_add (hG y) (hG' y))
+  choose C hC hG using hh
+  refine ⟨∑ v, C v, Finset.sum_nonneg fun v _ ↦ hC v, fun y ↦ ?_⟩
+  change ‖logDeriv (fun z ↦ ∏ v, G v z) (s y)‖ ≤ _
+  rw [logDeriv_fun_prod (fun v _ ↦ (hG v y).1) (fun v _ ↦ (hG v y).2.1), Finset.sum_mul]
+  exact (norm_sum_le _ _).trans (Finset.sum_le_sum fun v _ ↦ (hG v y).2.2)
+
+/-- On the right half-plane the continuation agrees with its holomorphic product,
+whose two factors are nonzero. -/
+private theorem completedHeckeL_logDeriv_right_local (χ : U[F]) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (hAgree : ∀ s : halfPlane, L s = completedHeckeL χ s) {z : ℂ} (hz : 1 < z.re) :
+    AnalyticAt ℂ (logDeriv L) z ∧
+      logDeriv L z = logDeriv (heckeGammaFactor χ) z + logDeriv (finiteSeries(χ)) z := by
+  have hEq : L =ᶠ[𝓝 z] fun w ↦ heckeGammaFactor χ w * finiteSeries(χ) w := by
+    have hopen : IsOpen halfPlane := isOpen_Ioi.preimage Complex.continuous_re
+    filter_upwards [hopen.mem_nhds (show z ∈ halfPlane from hz)] with w hw
+    exact hAgree ⟨w, hw⟩
+  have hG₀ := heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans hz)
+  have hF₀ : finiteSeries(χ) z ≠ 0 :=
+    norm_pos_iff.mp ((Real.exp_pos _).trans_le
+      (completedHeckeL_logDeriv_finite_lower χ z.re hz z rfl))
+  have hL₀ : L z ≠ 0 := hEq.eq_of_nhds ▸ mul_ne_zero hG₀ hF₀
+  have hNF : MeromorphicNFAt L z := hL (mem_univ z)
+  have hA := hNF.meromorphicOrderAt_nonneg_iff_analyticAt.mp
+    (le_of_eq (hNF.meromorphicOrderAt_eq_zero_iff.mpr hL₀).symm)
+  have hG := differentiableAt_heckeGammaFactor_of_re_pos χ (zero_lt_one.trans hz)
+  have hF := (LSeries_hasDerivAt (completedHeckeL_logDeriv_abscissa χ hz)).differentiableAt
+  refine ⟨hA.deriv.div hA hL₀, ?_⟩
+  exact (logDeriv_congr_nhds hEq).eq_of_nhds.trans (logDeriv_fun_mul _ hG₀ hF₀ hG hF)
+
 /-- Paper: §B.4.2.1, p. 614 (citing Lang, Ch. XVII). On a vertical line to the right
 of `Re(s) = 1` the logarithmic derivative of the completed function is continuous and
 grows at most polynomially in the height.
@@ -260,7 +545,20 @@ private theorem hasSlowGrowthNearPoles_completedHeckeL_logDeriv_right (χ : U[F]
     Continuous (fun y : ℝ ↦ logDeriv L ((σ : ℂ) + (y : ℂ) * Complex.I)) ∧
       ∃ γ > (0 : ℝ), (fun y : ℝ ↦ logDeriv L ((σ : ℂ) + (y : ℂ) * Complex.I)) =O[comap abs atTop]
         (fun y : ℝ ↦ |y| ^ γ) := by
-  sorry
+  have hσRange : σ ∈ Ioc (1 : ℝ) 2 := ⟨hσ, hσ2⟩
+  let s (y : ℝ) := (σ : ℂ) + (y : ℂ) * Complex.I
+  have hs (y : ℝ) : (s y).re = σ := by simp [s]
+  have hloc (y : ℝ) := completedHeckeL_logDeriv_right_local χ L hL hAgree
+    (show 1 < (s y).re from (hs y).symm ▸ hσ)
+  refine ⟨continuous_iff_continuousAt.mpr fun y ↦ (hloc y).1.continuousAt.comp (by fun_prop), ?_⟩
+  obtain ⟨C, hC, hG⟩ := completedHeckeL_logDeriv_gammaFactor_bound χ σ (zero_lt_one.trans hσRange.1)
+  obtain ⟨D, hD, hF⟩ := completedHeckeL_logDeriv_finite_bound χ σ hσ
+  refine ⟨1, one_pos, Asymptotics.IsBigO.of_bound (2 * C + D) ?_⟩
+  filter_upwards [(eventually_ge_atTop (1 : ℝ)).comap abs] with y hy
+  change ‖logDeriv L (s y)‖ ≤ _
+  rw [(hloc y).2, Real.rpow_one, Real.norm_eq_abs, abs_abs]
+  refine (norm_add_le _ _).trans ((add_le_add (hG y) (hF (s y) (hs y))).trans ?_)
+  nlinarith [mul_nonneg hC (sub_nonneg.mpr hy), mul_nonneg hD (sub_nonneg.mpr hy)]
 
 /-- Paper: §B.4.2.1, p. 614 (citing Lang, Ch. XVII, and (B.4.2.3)). On a vertical line
 to the left of `Re(s) = 0` the logarithmic derivative of the completed function is
@@ -662,31 +960,6 @@ private theorem realHeckeArchimedean_mellinLogDeriv_parameters (w : InfinitePlac
     change ((χ (Units.map e.toMonoidHom x) : ℂ))⁻¹ = _
     rw [hp, mul_inv, Complex.cpow_neg]
     split_ifs <;> simp [← inv_pow]
-
-/-- The logarithmic derivative of the shifted real gamma factor on its right half-plane. -/
-private theorem realHeckeArchimedean_mellinLogDeriv_gamma (b s : ℂ) (h : 0 < ((s + b) / 2).re) :
-    logDeriv (fun w ↦ Complex.Gammaℝ (w + b)) s =
-      (Complex.digamma ((s + b) / 2) - (Real.log Real.pi : ℂ)) / 2 := by
-  let z (w : ℂ) := (w + b) / 2
-  let E (w : ℂ) := Complex.exp (-(Real.log Real.pi : ℂ) * z w)
-  have hf : (fun w ↦ Complex.Gammaℝ (w + b)) = fun w ↦ E w * Complex.Gamma (z w) := by
-    funext w
-    rw [Complex.Gammaℝ_def, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero),
-      ← Complex.ofReal_log Real.pi_pos.le]
-    simp only [E, z, neg_div, neg_mul, mul_neg]
-  have hz : HasDerivAt z (1 / 2) s := ((hasDerivAt_id s).add_const b).div_const 2
-  have hE := (hz.const_mul (-(Real.log Real.pi : ℂ))).cexp
-  have hG := (Complex.hasDerivAt_Gamma_of_re_pos h).differentiableAt
-  rw [hf, logDeriv_fun_mul (f := E) (g := fun w ↦ Complex.Gamma (z w)) s
-    (Complex.exp_ne_zero _) (Complex.Gamma_ne_zero_of_re_pos h) hE.differentiableAt
-    (hG.comp s hz.differentiableAt), hz.logDeriv_Gamma (fun m he ↦ by
-      have := congrArg Complex.re he
-      simp [z] at this h
-      linarith [show (0 : ℝ) ≤ m by positivity])]
-  rw [logDeriv_apply, show deriv E s = E s * (-(Real.log Real.pi : ℂ) * (1 / 2)) from hE.deriv,
-    mul_div_cancel_left₀ _ (show E s ≠ 0 from Complex.exp_ne_zero _)]
-  dsimp [z]
-  ring
 
 /-- The Gauss difference times a Schwartz trace is absolutely integrable in both variables.
 Its bound uses the first absolute moment of the trace. -/

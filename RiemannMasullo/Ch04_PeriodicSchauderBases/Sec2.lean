@@ -694,8 +694,9 @@ theorem quotientDual_strongRange (M : Submodule ℂ X) (hM : IsClosed (M : Set X
       {l : StrongDual ℂ X | ∀ x ∈ M, l x = 0} := by
   exact (quotientDual_weakEmbedding M hM).2
 
-/-- Paper: Lemma 4.2.1.3(1), p. 163. For a nuclear Fréchet space the quotient
-adjoint also embeds the strong dual, with image the same annihilator. -/
+/-- Paper: Lemma 4.2.1.3(1), p. 163. For a nuclear Fréchet space the quotient adjoint
+is a topological embedding for the strong dual topologies. The separate theorem
+`quotientDual_strongRange` identifies its image with the annihilator of the closed subspace. -/
 theorem quotientDual_strongEmbedding_of_nuclear (M : Submodule ℂ X) (hM : IsClosed (M : Set X))
     (hN : IsNuclearTVS X) (hF : IsFrechetTVS X) :
     IsEmbedding (ContinuousLinearMap.precomp (τ := RingHom.id ℂ) ℂ M.mkQL) := by
@@ -747,7 +748,8 @@ theorem quotientDual_strongEmbedding_of_nuclear (M : Submodule ℂ X) (hM : IsCl
   exact congrArg (fun l : StrongDual ℂ X ↦ l x) hfg
 
 /-- Paper: Lemma 4.2.1.3(2), p. 164. For a Hilbert space the quotient adjoint
-embeds the strong dual, with image the annihilator of the closed subspace. -/
+is a topological embedding for the strong dual topologies. The separate theorem
+`quotientDual_strongRange` identifies its image with the annihilator of the closed subspace. -/
 theorem quotientDual_strongEmbedding_of_hilbert {H : Type*} [NormedAddCommGroup H]
     [InnerProductSpace ℂ H] [CompleteSpace H] (M : Submodule ℂ H) (hM : IsClosed (M : Set H)) :
     IsEmbedding (ContinuousLinearMap.precomp (τ := RingHom.id ℂ) ℂ M.mkQL) := by
@@ -975,8 +977,8 @@ as a continuous linear map. -/
 def cyclicPeriodizationCLM : E →L[ℂ] S :=
   ⟨cyclicPeriodization γ hγ, cyclicPeriodization_continuous γ hγ⟩
 
-/-- Paper: Lemma 4.2.1.5(2), p. 165. The bundled map gives the periodization
-with the same value at every logarithmic lift. -/
+/-- Paper: (4.2.1.2), p. 162. Evaluating the bundled periodization at a quotient
+point gives the sum of the translates over all integer multiples of the logarithmic period. -/
 theorem cyclicPeriodizationCLM_apply (f : E) (x : ℝ) :
     cyclicPeriodizationCLM γ hγ f (point ((x / Real.log γ : ℝ) : T)) =
       ∑' k : ℤ, f.val (x + (k : ℝ) * Real.log γ) :=

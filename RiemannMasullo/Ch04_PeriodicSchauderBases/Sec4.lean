@@ -1878,7 +1878,12 @@ theorem modulatedCyclicFourierCoeff_linearContinuous (j : J) :
 /-- Paper: Equation (4.4.2.6), p. 193. The coordinate functional integrates
 against the conjugate of the exponential and divides by the quotient volume.
 Deviation: The denominator inside the printed exponent is read as the logarithm
-of the module, in accordance with (4.4.2.5). -/
+of the module, in accordance with (4.4.2.5).
+Deviation: The page integrates against the Haar measure of the quotient that the measure
+of the group and the counting measure of the cyclic subgroup determine, whose total mass
+is the divisor used here. In this definition the measure on the quotient is any Haar
+measure, so the functional is the printed coefficient only when that measure has this
+mass; the basis theorems assume that it does. -/
 def modulatedCyclicFourierCoeff (j : J) : StrongDual ℂ S :=
   let h := modulatedCyclicFourierCoeff_linearContinuous m γ hm hγ χ t₀ ht₀ μ₁ ν j
   ⟨IsLinearMap.mk' (coeff⟦j⟧) h.1, h.2⟩

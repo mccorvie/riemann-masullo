@@ -666,6 +666,343 @@ private theorem rational_one_unramifiedOutside_empty :
         (⟨(ideleClassNorm ℚ).ker.subtype, continuous_subtype_val⟩ : C₁(ℚ) →ₜ* C𝔽(ℚ))) ∅ := by
   refine ⟨⟨1, (mem_unramifiedOutside_iff ℚ ∅ 1).mpr (fun _ _ _ ↦ rfl)⟩, fun _ ↦ rfl⟩
 
+/-- Expanding smooth cutoffs preserve the nonzero image of a vector under a continuous map. -/
+private theorem rational_cutoffConv_cutoff_image_ne_zero
+    {G E : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+    [MeasurableSpace G] [BorelSpace G] [TopologicalSpace E] [T1Space E] [Zero E]
+    (m : G →ₜ* ℝ≥0ˣ) (ν : Measure G) (Q : Lp ℂ 2 ν → E) (hQ : Continuous Q)
+    (y : Lp ℂ 2 ν) (hy : Q y ≠ 0) :
+    ∃ (R ε : ℝ) (ρ : G → ℝ) (hρ : IsModulatedCutoff m R ε ρ),
+      Q (modulatedCutoffOperator m ν hρ y) ≠ 0 := by
+  classical
+  let ε (R : ℝ) := R⁻¹ ^ 2
+  have hcut (R : ℝ) (hR : 3 ≤ R) : ∃ ρ : G → ℝ, IsModulatedCutoff m R (ε R) ρ := by
+    have hRpos : 0 < R := by positivity
+    have hi : 0 < R⁻¹ := inv_pos.mpr hRpos
+    have hie : R⁻¹ ≤ 1 / 3 := by
+      simpa only [one_div] using inv_anti₀ (by norm_num : (0 : ℝ) < 3) hR
+    have he : 0 < ε R := by dsimp [ε]; positivity
+    have he' : ε R ≤ R⁻¹ / 3 := by
+      dsimp [ε]
+      nlinarith [mul_nonneg hi.le (sub_nonneg.mpr hie)]
+    have hRight : 1 < R - ε R := by linarith
+    have hRightpos : 0 < R - ε R := by linarith
+    have hInv : (R - ε R)⁻¹ ≤ R⁻¹ + ε R := by
+      rw [← one_div]
+      apply (div_le_iff₀ hRightpos).2
+      have hRI : R⁻¹ * R = 1 := inv_mul_cancel₀ hRpos.ne'
+      have hDifference : 0 ≤ ε R * ((R - ε R) - R⁻¹) :=
+        mul_nonneg he.le (by linarith)
+      nlinarith only [hDifference, hRI]
+    let B : ContDiffBump (0 : ℝ) :=
+      ⟨Real.log (R - ε R), Real.log R, Real.log_pos hRight,
+        Real.log_lt_log hRightpos (sub_lt_self R he)⟩
+    let r (x : G) : ℝ := (m x).val
+    have hr : Continuous r := NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)
+    have hpos (x : G) : 0 < r x := NNReal.coe_pos.mpr (Units.zero_lt _)
+    let ρ (x : G) := B (Real.log (r x))
+    have h1 : ρ 1 = 1 := by
+      apply B.one_of_mem_closedBall
+      simp [r, B.rIn_pos.le]
+    refine ⟨ρ, hRpos, he, by linarith, by linarith,
+      fun _ ↦ B.nonneg, fun x ↦ (abs_of_nonneg (B.nonneg (x := Real.log (r x)))) ▸ B.le_one,
+      ?_, ?_, ?_, ?_, ?_⟩
+    · exact IsGreatest.csSup_eq ⟨⟨1, h1⟩, forall_mem_range.mpr fun _ ↦ B.le_one⟩
+    · refine ⟨fun t ↦ B (Real.log t), ∅, fun _ ↦ rfl, by simp, ?_, by simp⟩
+      simp only [Finset.coe_empty, sdiff_empty]
+      exact B.contDiff.comp_contDiffOn
+        (fun x hx ↦ (Real.contDiffAt_log.mpr (mem_Ioi.mp hx).ne').contDiffWithinAt)
+    · intro x
+      change B (Real.log ((m x).val : ℝ)) = B (Real.log ((m x⁻¹).val : ℝ))
+      rw [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv, Real.log_inv, B.neg]
+    · apply closure_minimal _ (isClosed_Icc.preimage hr)
+      intro x hx
+      have hmem : Real.log (r x) ∈ support B := hx
+      rw [B.support_eq, Metric.mem_ball, Real.dist_eq, sub_zero] at hmem
+      obtain ⟨hl, hu⟩ := abs_lt.mp hmem
+      change R⁻¹ ≤ r x ∧ r x ≤ R
+      rw [← Real.log_le_log_iff hi (hpos x), Real.log_inv,
+        ← Real.log_le_log_iff (hpos x) hRpos]
+      exact ⟨hl.le, hu.le⟩
+    · intro x hx
+      apply B.one_of_mem_closedBall
+      rw [Metric.mem_closedBall, Real.dist_eq, sub_zero, abs_le]
+      change -Real.log (R - ε R) ≤ _ ∧ _ ≤ Real.log (R - ε R)
+      rw [← Real.log_inv, Real.log_le_log_iff (inv_pos.mpr hRightpos) (hpos x),
+        Real.log_le_log_iff (hpos x) hRightpos]
+      change R⁻¹ + ε R ≤ r x ∧ r x ≤ R - ε R at hx
+      exact ⟨hInv.trans hx.1, hx.2⟩
+  let ρ (R : ℝ) : G → ℝ := if h : 3 ≤ R then (hcut R h).choose else 1
+  have hρ : ∀ᶠ R in atTop, IsModulatedCutoff m R (ε R) (ρ R) := by
+    filter_upwards [eventually_ge_atTop (3 : ℝ)] with R hR
+    simpa only [ρ, dite_eq_left hR] using (hcut R hR).choose_spec
+  let σ (R : ℝ) : G → ℝ := if IsModulatedCutoff m R (ε R) (ρ R) then ρ R else 1
+  let P (R : ℝ) : Lp ℂ 2 ν →L[ℂ] Lp ℂ 2 ν :=
+    if h : IsModulatedCutoff m R (ε R) (ρ R) then modulatedCutoffOperator m ν h else 1
+  have hσ (R : ℝ) : Measurable (σ R) := by
+    dsimp only [σ]
+    split_ifs with h
+    · exact h.measurable
+    · exact measurable_const
+  have hσbound (R : ℝ) (x : G) : |σ R x| ≤ 1 := by
+    dsimp only [σ]
+    split_ifs with h
+    · exact h.abs_le_one x
+    · simp
+  have hP (R : ℝ) : (P R y : G → ℂ) =ᵐ[ν] fun x ↦ (σ R x : ℂ) * y x := by
+    dsimp only [P, σ]
+    split_ifs with h
+    · exact modulatedCutoffOperator_apply m ν h y
+    · simp
+  have hinv : Tendsto (fun R : ℝ ↦ R⁻¹) atTop (𝓝 0) := tendsto_inv_atTop_zero
+  have heps : Tendsto ε atTop (𝓝 0) := by
+    simpa only [ε, zero_pow (by norm_num : (2 : ℕ) ≠ 0)] using hinv.pow 2
+  have hl : Tendsto (fun R : ℝ ↦ R⁻¹ + ε R) atTop (𝓝 0) := by
+    simpa using tendsto_inv_atTop_zero.add heps
+  have hright : Tendsto (fun R : ℝ ↦ R - ε R) atTop atTop := by
+    apply tendsto_atTop.mpr
+    intro b
+    filter_upwards [heps.eventually (gt_mem_nhds (show (0 : ℝ) < 1 by norm_num)),
+      eventually_ge_atTop (b + 1)] with R he hR
+    linarith
+  have hpoint (x : G) : ∀ᶠ R in atTop, σ R x = 1 := by
+    have hx : 0 < ((m x).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+    filter_upwards [hρ, hl.eventually (gt_mem_nhds hx), hright.eventually_ge_atTop ((m x).val : ℝ)]
+      with R hR hleft hright
+    simpa only [σ, ite_eq_left hR, Pi.one_apply] using hR.eq_one ⟨hleft.le, hright⟩
+  let d (R : ℝ) (x : G) : ℂ := (σ R x : ℂ) * y x - y x
+  have hd (R : ℝ) : AEStronglyMeasurable (d R) ν :=
+    (((Complex.measurable_ofReal.comp (hσ R)).aestronglyMeasurable.mul
+      (Lp.aestronglyMeasurable y)).sub (Lp.aestronglyMeasurable y))
+  have hbound (R : ℝ) (x : G) : ‖d R x‖ ^ 2 ≤ 4 * ‖y x‖ ^ 2 := by
+    have h : ‖d R x‖ ≤ 2 * ‖y x‖ := calc
+      ‖d R x‖ ≤ ‖(σ R x : ℂ) * y x‖ + ‖y x‖ := norm_sub_le _ _
+      _ = |σ R x| * ‖y x‖ + ‖y x‖ := by rw [norm_mul, Complex.norm_real, Real.norm_eq_abs]
+      _ ≤ _ := by nlinarith [hσbound R x, norm_nonneg (y x)]
+    nlinarith [mul_nonneg (sub_nonneg.mpr h) (show 0 ≤ 2 * ‖y x‖ + ‖d R x‖ by positivity)]
+  have hint : Integrable (fun x ↦ 4 * ‖y x‖ ^ 2) ν :=
+    ((memLp_two_iff_integrable_sq_norm (Lp.aestronglyMeasurable y)).mp (Lp.memLp y)).const_mul 4
+  have hconv : Tendsto (fun R ↦ ∫ x, ‖d R x‖ ^ 2 ∂ν) atTop (𝓝 0) := by
+    have h := tendsto_integral_filter_of_dominated_convergence (l := (atTop : Filter ℝ))
+      (F := fun R x ↦ ‖d R x‖ ^ 2) (f := fun _ : G ↦ (0 : ℝ)) (fun x ↦ 4 * ‖y x‖ ^ 2)
+      (.of_forall fun R ↦ (hd R).norm.pow 2) (.of_forall fun R ↦ .of_forall fun x ↦ by
+        rw [Real.norm_of_nonneg (sq_nonneg _)]; exact hbound R x) hint
+      (.of_forall fun x ↦ tendsto_const_nhds.congr' ((hpoint x).mono fun R hR ↦ by simp [d, hR]))
+    simpa using h
+  have heq (R : ℝ) : ‖P R y - y‖ ^ 2 = ∫ x, ‖d R x‖ ^ 2 ∂ν := by
+    let v := P R y - y
+    have hv : ‖v‖ ^ 2 = ∫ x, ‖v x‖ ^ 2 ∂ν := by
+      rw [norm_sq_eq_re_inner (𝕜 := ℂ), L2.inner_def, ← integral_re]
+      · exact integral_congr_ae (.of_forall fun x ↦ (norm_sq_eq_re_inner (𝕜 := ℂ) (v x)).symm)
+      · exact L2.integrable_inner v v
+    rw [hv]
+    apply integral_congr_ae
+    filter_upwards [hP R, Lp.coeFn_sub (P R y) y] with x hx hsub
+    rw [show v x = P R y x - y x from hsub, hx]
+  have hP_lim : Tendsto (fun R ↦ P R y) atTop (𝓝 y) := by
+    apply tendsto_iff_norm_sub_tendsto_zero.mpr
+    have hsq : Tendsto (fun R ↦ ‖P R y - y‖ ^ 2) atTop (𝓝 0) := by
+      simpa only [heq] using hconv
+    simpa using hsq.sqrt
+  have hlim : Tendsto (fun R ↦ Q (P R y)) atTop (𝓝 (Q y)) := (hQ.tendsto (x := y)).comp hP_lim
+  have hne : ∀ᶠ R in atTop, Q (P R y) ≠ 0 := hlim.eventually (isOpen_ne.mem_nhds hy)
+  obtain ⟨R, hR, hneR⟩ := (hρ.and hne).exists
+  exact ⟨R, ε R, ρ R, hR, by simpa only [P, dite_eq_left hR] using hneR⟩
+
+/-- A smooth function of the logarithmic module is Bruhat smooth. On each
+structural quotient, compose the descended positive quasi-character with log. -/
+private theorem rational_cutoffConv_bruhatSmooth_logProfile
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [T2Space G] [LocallyCompactSpace G] (m : G →ₜ* ℝ≥0ˣ) {f : ℝ → ℝ}
+    (hf : ContDiff ℝ ((⊤ : ENat) : WithTop ENat) f) :
+    IsBruhatSmooth (fun x ↦ (f (Real.log ((m x).val : ℝ)) : ℂ)) := by
+  let χ : QuasiCharacter G :=
+    { toFun := fun x ↦ ((m x).val : ℝ)
+      map_one' := by simp
+      map_mul' := fun x y ↦ by simp
+      continuous_toFun := Complex.continuous_ofReal.comp
+        (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)) }
+  intro p
+  obtain ⟨k, hk, hinv, hdesc⟩ :=
+    (mem_bruhatSmoothSubmodule_iff _).1 (quasiCharacter_mem_bruhatSmooth χ) p
+  refine ⟨k, hk, fun h x ↦ congrArg (fun z : ℂ ↦ (f (Real.log z.re) : ℂ)) (hinv h x), ?_⟩
+  intro a ha
+  obtain ⟨q, hq, hdiff⟩ := hdesc a ha
+  have hpos (y : a.quotient) : 0 < (q y).re := by
+    obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective y
+    rw [hq]
+    exact NNReal.coe_pos.mpr (Units.zero_lt _)
+  refine ⟨fun y ↦ (f (Real.log (q y).re) : ℂ),
+    fun x ↦ congrArg (fun z : ℂ ↦ (f (Real.log z.re) : ℂ)) (hq x), ?_⟩
+  intro e z b
+  exact Complex.ofRealCLM.contDiff.comp ((hf.of_le (by simp)).comp
+    ((Complex.reCLM.contDiff.comp (hdiff e z b)).log fun x ↦ (hpos _).ne'))
+
+/-- A nonzero projected translate at norm greater than one survives averaging by a
+smooth compactly supported function of the log norm. -/
+private theorem rational_cutoffConv_positive_test
+    {G E H : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+    [MeasurableSpace G] [BorelSpace G]
+    [NormedAddCommGroup E] [NormedSpace ℂ E] [CompleteSpace E]
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H]
+    (m : G →ₜ* ℝ≥0ˣ) (hm : IsProperMap m) (j : ℝ≥0ˣ → G)
+    (hj : Continuous j) (hj' : RightInverse j m) (μ : Measure G) [μ.IsHaarMeasure]
+    (τ : G →* (E →L[ℂ] E)) (hτ : Continuous (fun p : G × E ↦ τ p.1 p.2))
+    (Q : E →L[ℂ] H) (u : E) (hu : ∀ k : m.toMonoidHom.ker, τ k.val u = u)
+    (g₀ : G) (hg₀ : 1 < ((m g₀).val : ℝ)) (hne : Q (τ g₀ u) ≠ 0) :
+    ∃ φ : BruhatCompactSupport G, tsupport φ.val ⊆ {g | 1 ≤ ((m g).val : ℝ)} ∧
+      Q (bruhatRegularizedAction μ τ hτ φ u) ≠ 0 := by
+  have hfiber (g : G) : τ g u = τ (j (m g)) u := by
+    let t := j (m g)
+    let k : m.toMonoidHom.ker := ⟨g / t, by
+      change m (g / t) = 1
+      rw [map_div, show m t = m g from hj' (m g), div_self']⟩
+    have ht : t * k.val = g := by
+      rw [mul_comm t k.val]
+      exact div_mul_cancel g t
+    calc
+      τ g u = τ (t * k.val) u := congrArg (fun x ↦ τ x u) ht.symm
+      _ = τ t (τ k.val u) := congrArg (fun A : E →L[ℂ] E ↦ A u) (τ.map_mul t k.val)
+      _ = τ t u := congrArg (τ t) (hu k)
+  let l : ℝ≥0ˣ ≃ₜ ℝ := (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.symm.toHomeomorph
+  have hl (t : ℝ≥0ˣ) : l t = Real.log (t.val : ℝ) :=
+    (Real.log_of_pos (NNReal.coe_pos.mpr t.zero_lt)).symm
+  let x₀ := l (m g₀)
+  have hx₀ : 0 < x₀ := by
+    rw [show x₀ = Real.log ((m g₀).val : ℝ) from hl _]
+    exact Real.log_pos hg₀
+  let ζ := Q (τ g₀ u)
+  let δ : E →L[ℂ] ℂ := (innerSL ℂ ζ).comp Q
+  let c (x : ℝ) : ℝ := (δ (τ (j (l.symm x)) u)).re
+  have horbit : Continuous (fun g ↦ τ g u) := hτ.comp (continuous_id.prodMk continuous_const)
+  have hc : Continuous c := Complex.continuous_re.comp
+    (δ.continuous.comp (horbit.comp (hj.comp l.symm.continuous)))
+  have hcenter : 0 < c x₀ := by
+    change 0 < (δ (τ (j (l.symm (l (m g₀)))) u)).re
+    rw [l.symm_apply_apply, ← hfiber g₀]
+    change 0 < (innerSL ℂ ζ ζ).re
+    rw [innerSL_apply_apply]
+    change 0 < RCLike.re (inner ℂ ζ ζ)
+    rw [← norm_sq_eq_re_inner (𝕜 := ℂ)]
+    exact sq_pos_of_ne_zero (norm_ne_zero_iff.mpr hne)
+  have hnhds : {x | 0 < c x} ∩ Ioi 0 ∈ 𝓝 x₀ :=
+    ((isOpen_lt continuous_const hc).inter isOpen_Ioi).mem_nhds ⟨hcenter, hx₀⟩
+  obtain ⟨r, hr, hball⟩ := Metric.mem_nhds_iff.mp hnhds
+  let b : ContDiffBump x₀ := ⟨r / 4, r / 2, by positivity, by linarith⟩
+  let f (g : G) : ℂ := (b (l (m g)) : ℂ)
+  have hzero (g : G) (hg : l (m g) ∉ Metric.closedBall x₀ (r / 2)) : f g = 0 := by
+    change (b (l (m g)) : ℂ) = 0
+    rw [image_eq_zero_of_notMem_tsupport (f := (b : ℝ → ℝ)) (by simpa only [b.tsupport_eq] using hg), Complex.ofReal_zero]
+  have hcomp : HasCompactSupport f :=
+    HasCompactSupport.intro ((l.isProperMap.comp hm).isCompact_preimage (isCompact_closedBall x₀ (r / 2))) hzero
+  have hbs : IsBruhatSmooth f := by
+    simpa only [f, hl] using rational_cutoffConv_bruhatSmooth_logProfile m b.contDiff
+  let φ : BruhatCompactSupport G := ⟨f, (mem_bruhatSmoothSubmodule_iff _).mpr hbs, hcomp⟩
+  have hsupport : tsupport f ⊆ (l ∘ m) ⁻¹' Metric.closedBall x₀ (r / 2) :=
+    closure_minimal (fun g hg ↦ by
+      by_contra hn
+      exact hg (hzero g hn)) (Metric.isClosed_closedBall.preimage (l.continuous.comp hm.continuous))
+  refine ⟨φ, fun g hg ↦ ?_, ?_⟩
+  · have hg' := (hball (Metric.closedBall_subset_ball (by linarith) (hsupport hg))).2
+    change 0 < l (m g) at hg'
+    rw [hl] at hg'
+    exact (Real.log_pos_iff (NNReal.coe_nonneg _)).mp hg' |>.le
+  · let k (g : G) : ℂ := f g * δ (τ g u)
+    have hk : Continuous k := (continuous_of_bruhatSmooth hbs).mul (δ.continuous.comp horbit)
+    have hkc : HasCompactSupport k := hcomp.mul_right
+    have hreal (g : G) : (k g).re = b (l (m g)) * c (l (m g)) := by
+      change ((b (l (m g)) : ℂ) * δ (τ g u)).re = _
+      rw [Complex.re_ofReal_mul, hfiber g]
+      simp only [c, l.symm_apply_apply]
+    have hnonneg : 0 ≤ fun g ↦ (k g).re := by
+      intro g
+      change 0 ≤ (k g).re
+      rw [hreal]
+      by_cases hb : b (l (m g)) = 0
+      · simp [hb]
+      · have hb' : l (m g) ∈ Metric.ball x₀ (r / 2) := by
+          rw [← b.support_eq]
+          exact hb
+        exact mul_nonneg b.nonneg (hball (Metric.ball_subset_ball (by linarith) hb')).1.le
+    have hval : (k g₀).re ≠ 0 := by
+      rw [hreal]
+      change b x₀ * c x₀ ≠ 0
+      rw [b.one_of_mem_closedBall (Metric.mem_closedBall_self b.rIn_pos.le), one_mul]
+      exact hcenter.ne'
+    have hpos : 0 < ∫ g, (k g).re ∂μ :=
+      (Complex.continuous_re.comp hk).integral_pos_of_hasCompactSupport_nonneg_ne_zero
+        (hkc.comp_left Complex.zero_re) hnonneg hval
+    have hIntegral : δ (bruhatRegularizedAction μ τ hτ φ u) = ∫ g, k g ∂μ := by
+      have h := bruhatRegularizedAction_apply μ τ hτ φ u
+      refine (congrArg (fun z : PettisWeakCompletion E ↦
+        (show Module.Dual ℂ (StrongDual ℂ E) from z) δ) h.2).trans ?_
+      exact integral_congr_ae (.of_forall fun g ↦ δ.map_smul (f g) (τ g u))
+    intro heq
+    have hδ : δ (bruhatRegularizedAction μ τ hτ φ u) = 0 := by
+      change (innerSL ℂ ζ) (Q (bruhatRegularizedAction μ τ hτ φ u)) = 0
+      rw [heq, map_zero]
+    have hIreal : (∫ g, (k g).re ∂μ) = (∫ g, k g ∂μ).re :=
+      integral_re (𝕜 := ℂ) (hk.integrable_of_hasCompactSupport hkc)
+    rw [hIreal, ← hIntegral, hδ, Complex.zero_re] at hpos
+    exact (lt_irrefl 0) hpos
+
+/-- The action on the trivial isotype fixes vectors along the restricted subgroup. -/
+private theorem rational_cutoffConv_fixed
+    {G L E : Type*} [Monoid G] [Monoid L] [TopologicalSpace L]
+    [NormedAddCommGroup E] [NormedSpace ℂ E]
+    (τ : G →* (E →L[ℂ] E)) (i : L →* G) (ω : PontryaginDual L)
+    (hω : ∀ k, (ω k : ℂ) = 1) (u : actionIsotype (τ.comp i) ω) (k : L) :
+    τ (i k) u.val = u.val := by
+  have h := (mem_actionIsotype (τ.comp i) ω u.val).mp u.property k
+  change τ (i k) u.val = (ω k : ℂ) • u.val at h
+  rw [hω k, one_smul] at h
+  exact h
+
+/-- Bruhat averaging and then cutoff multiplication preserve some nonzero
+projected orbit value when the orbit is fixed by the norm-one subgroup. -/
+private theorem rational_cutoffConv_of_projected_translate
+    {G H : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+    [MeasurableSpace G] [BorelSpace G] [NormedAddCommGroup H] [InnerProductSpace ℂ H]
+    (m : G →ₜ* ℝ≥0ˣ) (hm : IsProperMap m) (j : ℝ≥0ˣ → G)
+    (hj : Continuous j) (hj' : RightInverse j m) (μ ν : Measure G) [μ.IsHaarMeasure]
+    (τ : G →* (Lp ℂ 2 ν →L[ℂ] Lp ℂ 2 ν))
+    (hτ : Continuous (fun p : G × Lp ℂ 2 ν ↦ τ p.1 p.2))
+    (P : Lp ℂ 2 ν →L[ℂ] Lp ℂ 2 ν) (O : Lp ℂ 2 ν →L[ℂ] H) (u : Lp ℂ 2 ν)
+    (hu : ∀ k : m.toMonoidHom.ker, τ k.val u = u) (g : G)
+    (hg : 1 < ((m g).val : ℝ)) (hne : O (P (τ g u)) ≠ 0) :
+    ∃ (φ : BruhatCompactSupport G), tsupport φ.val ⊆ {g | 1 ≤ ((m g).val : ℝ)} ∧
+      ∃ (R ε : ℝ) (ρ : G → ℝ) (hρ : IsModulatedCutoff m R ε ρ),
+        O (modulatedCutoffOperator m ν hρ (P (bruhatRegularizedAction μ τ hτ φ u))) ≠ 0 := by
+  obtain ⟨φ, hφ, htest⟩ := rational_cutoffConv_positive_test m hm j hj hj' μ τ hτ (O.comp P) u hu g hg hne
+  obtain ⟨R, ε, ρ, hρ, hcut⟩ := rational_cutoffConv_cutoff_image_ne_zero m ν O O.continuous
+    (P (bruhatRegularizedAction μ τ hτ φ u)) htest
+  exact ⟨φ, hφ, R, ε, ρ, hρ, hcut⟩
+
+/-- A theta-orthogonal vector in the rational trivial isotype has a translate with
+nonzero geometric projection at some norm greater than one. At an ordinate γ of a
+critical-line zero, use the Riesz vector `exp(-iγx)/(1+x²)` in log norm. Mellin
+factorization gives its orthogonality. The pairing with a nonzero radial theta
+profile is a Cauchy convolution with a nowhere-zero Fourier multiplier. Its
+nonvanishing somewhere, together with inversion and the conjugate zero, gives
+a positive translation. -/
+private theorem rational_cutoffConv_positive_translate (hs : (0 : ℝ) ≤ 2)
+    (ω : PontryaginDual C₁(ℚ))
+    (_hω : ω = (1 : PontryaginDual C𝔽(ℚ)).comp
+      (⟨(ideleClassNorm ℚ).ker.subtype, continuous_subtype_val⟩ : C₁(ℚ) →ₜ* C𝔽(ℚ))) :
+    let K := GeoIsotype(ℚ, hs, ω)
+    letI : CompleteSpace ↥K :=
+      (instClosedSpectralIsotypeSec2 (F := ℚ) (neg_nonpos.mpr (le_rfl (a := (0 : ℝ))))
+        hs ω).completeSpace_coe
+    let τ := hardySobolevTranslation (ideleClassTamagawaMeasure ℚ) (m𝔽(ℚ))
+      (-(0 : ℝ)) 0 2 (neg_nonpos.mpr (le_rfl (a := (0 : ℝ)))) hs
+    let P := geometricProjection (F := ℚ) (1 / 2) (le_rfl (a := (0 : ℝ))) hs
+    ∃ (u : K) (g : C𝔽(ℚ)), 1 < ((m𝔽(ℚ) g).val : ℝ) ∧
+      K.orthogonalProjectionOnto (P u.val) = 0 ∧
+      K.orthogonalProjectionOnto (P (τ g u.val)) ≠ 0 := by sorry
+
 /-- A fixed-cutoff geometric convolution is nonzero on a vector orthogonal to theta
 in the trivial rational isotype. Use a critical-line ordinate γ and the log-norm
 vector `exp(-iγx)/(1+x²)`. Pair its translates with the theta vector from
@@ -688,7 +1025,36 @@ private theorem rational_cutoffConv_ne_zero_of_geometricProjection_eq_zero :
             (GeoIsotype(ℚ, hs, ω)).subtypeL)) u = 0 ∧
         ((GeoIsotype(ℚ, hs, ω)).orthogonalProjectionOnto.comp
           ((geometricTruncatedConvolution (F := ℚ) (1 / 2) (le_rfl (a := (0 : ℝ))) hs hρ φ).comp
-            (GeoIsotype(ℚ, hs, ω)).subtypeL)) u ≠ 0 := by sorry
+            (GeoIsotype(ℚ, hs, ω)).subtypeL)) u ≠ 0 := by
+  intro hs ω
+  let K := GeoIsotype(ℚ, hs, ω)
+  let : CompleteSpace ↥K :=
+    (instClosedSpectralIsotypeSec2 (F := ℚ) (neg_nonpos.mpr (le_rfl (a := (0 : ℝ))))
+      hs ω).completeSpace_coe
+  let μ := ideleClassTamagawaMeasure ℚ
+  let τ := hardySobolevTranslation μ (m𝔽(ℚ)) (-(0 : ℝ)) 0 2
+    (neg_nonpos.mpr (le_rfl (a := (0 : ℝ)))) hs
+  let ν := μ.withDensity fun g ↦ ENNReal.ofReal
+    (intervalSobolevDensity (-(0 : ℝ)) 0 2 (Real.log (((m𝔽(ℚ)) g).val : ℝ)))
+  let W := Lp ℂ 2 ν
+  let P : W →L[ℂ] W := geometricProjection (F := ℚ) (1 / 2) (le_rfl (a := (0 : ℝ))) hs
+  let O : W →L[ℂ] K := K.orthogonalProjectionOnto
+  let j : ℝ≥0ˣ → C𝔽(ℚ) := (QuotientGroup.mk' _).comp ratIdeleNormSection
+  have hj : Continuous j := QuotientGroup.continuous_mk.comp ratIdeleNormSection_continuous
+  have witness : ∃ (u : ↥K) (g : C𝔽(ℚ)), 1 < ((m𝔽(ℚ) g).val : ℝ) ∧
+      O (P u.val) = 0 ∧ O (P (τ g u.val)) ≠ 0 := rational_cutoffConv_positive_translate hs ω rfl
+  obtain ⟨u, g, hg, hPu, hPg⟩ := witness
+  have hτ : Continuous (fun p : C𝔽(ℚ) × W ↦ τ p.1 p.2) :=
+    (exists_hardySobolevTranslation μ (m𝔽(ℚ)) (-(0 : ℝ)) 0 2
+      (neg_nonpos.mpr (le_rfl (a := (0 : ℝ)))) hs).choose_spec.2
+  have hu (k : C₁(ℚ)) : τ k.val u.val = u.val :=
+    rational_cutoffConv_fixed (G := C𝔽(ℚ)) (L := C₁(ℚ)) (E := W)
+      τ (ideleClassNorm ℚ).ker.subtype ω (fun _ ↦ rfl) u k
+  have hcut := rational_cutoffConv_of_projected_translate (G := C𝔽(ℚ)) (H := ↥K)
+    (m𝔽(ℚ)) (isProperMap_ideleClassNorm ℚ) j hj ratIdeleNormSection_class_rightInverse
+    μ ν τ hτ P O u.val hu g hg hPg
+  obtain ⟨φ, hφ, R, ε, ρ, hρ, hρne⟩ := hcut
+  exact ⟨φ, hφ, R, ε, ρ, hρ, u, hPu, hρne⟩
 
 /-- Paper: Theorem 11.2.1.2(2) and (11.2.1.4), p. 488.
 On the trivial rational component with no finite places, a = 1/2 and s = 2, let γ be
