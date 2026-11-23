@@ -82,7 +82,47 @@ local notation "LocalW" => Lp ℂ 2 localWMeasure
 Local polar-free tests yield Sobolev vectors at positive twist.
 Deviation: Use the positive range of the local Sobolev embedding from §10.1. -/
 theorem sLocalPWTheta_memLp {a : ℝ} (_ha : 0 < a) (ω : PontryaginDual J₁) (f : Zₛ) :
-    MemLp (localWeightedTheta(a, ω, f)) 2 localWMeasure := by sorry
+    MemLp (localWeightedTheta(a, ω, f)) 2 localWMeasure := by
+  let : BorelSpace (SIdeleQuotient F S) := ⟨rfl⟩
+  let μ := sLocalQuotientTamagawaMeasure F S
+  let r (g : SIdeleQuotient F S) : ℝ := (mₛ(S) g).val
+  let θ := sLocalHomogeneousAdelicThetaLinearMap F S ω f.val
+  let t := max s 0
+  let b := a / 2
+  have hb : 0 < b := half_pos _ha
+  have hbb : b + b = a := add_halves a
+  have hr (g) : 0 < r g := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hc : Continuous r := NNReal.continuous_coe.comp (Units.continuous_val.comp (mₛ(S)).continuous)
+  obtain ⟨j, -, -, hj⟩ := exists_sLocalHomogeneousThetaSobolevInclusion (F := F) (S := S)
+    hb (le_refl b) (show 0 ≤ t from le_max_right _ _) hb ω
+  let u := (j (Submodule.Quotient.mk f.val)).val.val
+  have hi := (globalThetaSobolev_norm_aux μ r hr hc.measurable b b b t θ u (hj f.val).2).1
+  rw [hbb] at hi
+  let d (g : SIdeleQuotient F S) := intervalSobolevDensity 0 0 t (Real.log (r g))
+  have hd (g) : 0 ≤ d g := by dsimp [d, intervalSobolevDensity]; positivity
+  have hm : Measurable d := by dsimp [d, intervalSobolevDensity]; fun_prop
+  let Z (g : SIdeleQuotient F S) : ℂ := ((r g ^ a : ℝ) : ℂ) * θ g
+  have hZ : Continuous Z := (Complex.continuous_ofReal.comp (hc.rpow_const fun g ↦ Or.inl (hr g).ne')).mul θ.continuous
+  have mem : MemLp Z 2 (μ.withDensity fun g ↦ ENNReal.ofReal (d g)) := by
+    apply (memLp_two_iff_integrable_sq_norm hZ.aestronglyMeasurable).2
+    apply (integrable_withDensity_iff_integrable_smul' (ENNReal.measurable_ofReal.comp hm)
+      (.of_forall fun _ ↦ ENNReal.ofReal_lt_top)).2
+    refine hi.congr (.of_forall fun g ↦ ?_)
+    change ‖θ g‖ ^ 2 * intervalSobolevDensity a a t (Real.log (r g)) =
+      (ENNReal.ofReal (d g)).toReal • ‖Z g‖ ^ 2
+    rw [ENNReal.toReal_ofReal (hd g), smul_eq_mul]
+    simp only [Z, d, norm_mul, mul_pow, Complex.norm_real,
+      Real.rpow_def_of_pos (hr g), Real.norm_of_nonneg (Real.exp_pos _).le]
+    have he := globalThetaSobolev_norm_density a 0 0 t (Real.log (r g))
+    simp only [add_zero] at he
+    rw [← he, mul_comm (Real.log (r g)) a]
+    ring
+  apply mem.mono_measure (withDensity_mono (.of_forall fun g ↦ ?_))
+  apply ENNReal.ofReal_le_ofReal
+  unfold d intervalSobolevDensity
+  apply mul_le_mul_of_nonneg_left _ (le_trans (Real.exp_pos _).le (le_max_left _ _))
+  exact Real.rpow_le_rpow_of_exponent_le (by nlinarith [sq_nonneg (Real.log (r g))])
+    (div_le_div_of_nonneg_right (le_max_left s 0) (by norm_num))
 
 /-- Paper: (11.2.1.1) and (11.2.1.6), pp. 487–488.
 Send a local polar-free test to its weighted homogeneous theta class.
