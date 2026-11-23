@@ -1609,10 +1609,111 @@ theorem sLocalGammaOrbitalQuotient_dual_directSum (ω : PontryaginDual J₁(S)) 
     let P := Γker(ω)
     Nonempty (StrongDual ℂ (E ⧸ P) ≃L[ℂ] FinestLocallyConvex (depths →₀ ℂ)) := by sorry
 
+/-- Every unitary character of the norm-one group is the restriction of a quasi-character. -/
+private theorem sLocalGammaIndex_enumerable_exists (ω : PontryaginDual J₁(S)) :
+    ∃ c₀ : Xₛ, onComponent(c₀, ω) := by
+  let : LocallyCompactSpace (SAdeleRing F S)ˣ := (sIdeleGroup_description F S).2.2.1
+  have := isClosed_sProjectedDiagonal (F := F) (S := S)
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  obtain ⟨t, ht⟩ := exists_ne (1 : ℝ≥0ˣ)
+  have hr := range_normOneRestriction (m(S)) (isProperMap_sIdeleQuotientNorm F S)
+    ⟨σ t, (hσ t).trans_ne ht⟩
+  obtain ⟨c₀, hc₀⟩ : (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ω ∈
+      Set.range (normOneRestriction (m(S))) := hr ▸ ⟨ω, rfl⟩
+  exact ⟨c₀, hc₀⟩
+
+/-- A norm twist stays on the component of the quasi-character it twists. -/
+private theorem sLocalGammaIndex_enumerable_onComponent (ω : PontryaginDual J₁(S)) (c₀ : Xₛ)
+    (h₀ : onComponent(c₀, ω)) (s : ℂ) : onComponent(shift(c₀, s), ω) := by
+  refine Eq.trans ?_ h₀
+  ext u
+  change c₀ u.val * (((m(S) u.val : ℝ≥0) : ℝ) : ℂ) ^ s = c₀ u.val
+  rw [u.prop]
+  simp
+
+/-- Two quasi-characters on one component differ by a norm twist. -/
+private theorem sLocalGammaIndex_enumerable_shift (ω : PontryaginDual J₁(S)) (c₀ c : Xₛ)
+    (h₀ : onComponent(c₀, ω)) (hc : onComponent(c, ω)) : ∃ s : ℂ, c = shift(c₀, s) := by
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  let c₀inv := c₀.comp (ContinuousMonoidHom.inv J(S))
+  let P : QuasiCharacter ℝ≥0ˣ := (c * c₀inv).comp σ
+  obtain ⟨s, hs⟩ := (existsUnique_complexPower P).exists
+  refine ⟨s, ?_⟩
+  ext1 g
+  let u : J(S) := g * (σ (m(S) g))⁻¹
+  have hu_mem : u ∈ J₁(S) := by
+    change m(S) (g * (σ (m(S) g))⁻¹) = 1
+    rw [map_mul, map_inv, hσ, mul_inv_cancel]
+  have hu_eq : c u = c₀ u := DFunLike.congr_fun (hc.trans h₀.symm) ⟨u, hu_mem⟩
+  have hdecomp : g = u * σ (m(S) g) := by simp [u]
+  have hcg : c g = c u * c (σ (m(S) g)) := by
+    conv_lhs => rw [hdecomp]
+    exact map_mul c _ _
+  have hc₀g : c₀ g = c₀ u * c₀ (σ (m(S) g)) := by
+    conv_lhs => rw [hdecomp]
+    exact map_mul c₀ _ _
+  have hP : c (σ (m(S) g)) * (c₀ (σ (m(S) g)))⁻¹ =
+      (((m(S) g : ℝ≥0) : ℝ) : ℂ) ^ s := by
+    have h1 := hs (m(S) g)
+    change c (σ (m(S) g)) * c₀ (σ (m(S) g))⁻¹ = _ at h1
+    rwa [map_inv] at h1
+  have hc₀σ_ne : c₀ (σ (m(S) g)) ≠ 0 :=
+    ((Group.isUnit _).map c₀).ne_zero
+  change c g = c₀ g * (((m(S) g : ℝ≥0) : ℝ) : ℂ) ^ s
+  rw [hcg, hc₀g, hu_eq, ← hP]
+  field_simp [hc₀σ_ne]
+
 /-- Paper: Theorem 7.3.4.1(5), pp. 365–366.
 The set of archimedean centers with their admissible Laurent orders admits an enumeration. -/
 theorem sLocalGammaIndex_enumerable (ω : PontryaginDual J₁(S)) :
-    Nonempty (ℕ ≃ ΓIndex(ω, (Set.univ : Set Xₛ))) := by sorry
+    Nonempty (ℕ ≃ ΓIndex(ω, (Set.univ : Set Xₛ))) := by
+  obtain ⟨c₀, h₀⟩ := sLocalGammaIndex_enumerable_exists ω
+  let P (w : InfinitePlace F) := sLocalGammaFiltration_iInf_placePoles c₀ w
+  let pole (w : InfinitePlace F) (m : ℕ) : Xₛ :=
+    shift(c₀, -((P w).choose_spec.choose * (m : ℝ) : ℂ) - (P w).choose)
+  have hpole (w : InfinitePlace F) (m : ℕ) : w ∈ arch(pole w m) :=
+    ((P w).choose_spec.choose_spec.2 _).mpr ⟨m, rfl⟩
+  have hcount : Countable (ΓIndex(ω, (Set.univ : Set Xₛ))) := by
+    let U := ⋃ w : InfinitePlace F, Set.range (pole w)
+    have hU : U.Countable := Set.countable_iUnion fun w ↦ Set.countable_range _
+    have hmem (j : ΓIndex(ω, (Set.univ : Set Xₛ))) : j.val.1 ∈ U := by
+      obtain ⟨s, hs⟩ := sLocalGammaIndex_enumerable_shift ω c₀ j.val.1 h₀ j.property.1
+      obtain ⟨w, hw⟩ := Finset.card_pos.mp (j.property.2.2.1.trans_le j.property.2.2.2)
+      rw [hs] at hw
+      obtain ⟨m, hm⟩ := ((P w).choose_spec.choose_spec.2 s).mp hw
+      exact Set.mem_iUnion.mpr ⟨w, m, by rw [hs, hm]⟩
+    have : Countable U := hU.to_subtype
+    refine Function.Injective.countable
+      (f := fun j : ΓIndex(ω, (Set.univ : Set Xₛ)) ↦ ((⟨j.val.1, hmem j⟩ : U), j.val.2)) ?_
+    intro j₁ j₂ h
+    have h1 : j₁.val.1 = j₂.val.1 := congrArg (fun p ↦ p.1.val) h
+    have h2 : j₁.val.2 = j₂.val.2 := congrArg (fun p ↦ p.2) h
+    exact Subtype.ext (Prod.ext h1 h2)
+  have hinf : Infinite (ΓIndex(ω, (Set.univ : Set Xₛ))) := by
+    obtain ⟨w⟩ := (inferInstance : Nonempty (InfinitePlace F))
+    obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+    let t : ℝ≥0ˣ := Units.mk0 2 two_ne_zero
+    let f : ℕ → ΓIndex(ω, (Set.univ : Set Xₛ)) := fun m ↦
+      ⟨(pole w m, 1), sLocalGammaIndex_enumerable_onComponent ω c₀ h₀ _, Set.mem_univ _,
+        one_pos, Finset.card_pos.mpr ⟨w, hpole w m⟩⟩
+    refine Infinite.of_injective f fun m₁ m₂ h ↦ ?_
+    have hc : pole w m₁ = pole w m₂ := congrArg (fun j ↦ j.val.1) h
+    have hg := DFunLike.congr_fun hc (σ t)
+    change c₀ (σ t) * (((m(S) (σ t) : ℝ≥0) : ℝ) : ℂ) ^ (_ : ℂ) =
+      c₀ (σ t) * (((m(S) (σ t) : ℝ≥0) : ℝ) : ℂ) ^ (_ : ℂ) at hg
+    have hne : c₀ (σ t) ≠ 0 := ((Group.isUnit _).map c₀).ne_zero
+    have hpow := congrArg norm (mul_left_cancel₀ hne hg)
+    rw [hσ t] at hpow
+    have h2 : (0 : ℝ) < ((t : ℝ≥0) : ℝ) := by norm_num [t]
+    rw [Complex.norm_cpow_eq_rpow_re_of_pos h2, Complex.norm_cpow_eq_rpow_re_of_pos h2] at hpow
+    have hre := (Real.rpow_right_inj h2 (by norm_num [t])).mp hpow
+    have hstep := (P w).choose_spec.choose_spec.1
+    have hm : (P w).choose_spec.choose * (m₁ : ℝ) = (P w).choose_spec.choose * (m₂ : ℝ) := by
+      simpa [Complex.mul_re] using hre
+    exact_mod_cast mul_left_cancel₀ hstep.ne' hm
+  let := Encodable.ofCountable (ΓIndex(ω, (Set.univ : Set Xₛ)))
+  let := Denumerable.ofEncodableOfInfinite (ΓIndex(ω, (Set.univ : Set Xₛ)))
+  exact ⟨(Denumerable.eqv _).symm⟩
 
 /-- Paper: Theorem 7.3.4.1(5), p. 365.
 In every enumeration, the archimedean Laurent coefficients descend to a
