@@ -2124,7 +2124,63 @@ The principal value range in the homogeneous theta quotient is the image of test
 vanishing at the finite zero-coordinate hyperplanes. -/
 theorem sLocalPrincipalValue_homogeneousTheta_range (χ : PontryaginDual Jₛ) :
     LinearMap.range (sLocalHomogeneousThetaPrincipalValue (Finset.Subset.refl S) χ₁(χ)) =
-      (sAdeleFiniteZeroSchwartz S S).map (thetaQuotient(χ₁(χ))) := by sorry
+      (sAdeleFiniteZeroSchwartz S S).map (thetaQuotient(χ₁(χ))) := by
+  classical
+  let pv := sAdelePrincipalValue F (Finset.Subset.refl S)
+  let Z := sAdeleFiniteZeroSchwartz S S
+  let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+  have ht (f : ℬ(A∞)) (g : ∀ v : S, ℬ(v.val.adicCompletion F)) :
+      pv (e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, g v))) =
+        e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, finitePlacePrincipalValue v.val (g v))) := by
+    simpa [pv, e] using
+      sAdelePrincipalValue_tmul (F := F) (Finset.Subset.refl S) f g
+  let pack (a : ℬ(A∞)) (b : ∀ v : S, ℬ(v.val.adicCompletion F)) := e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, b v))
+  let act (b : ∀ v : S, ℬ(v.val.adicCompletion F)) := fun v ↦ finitePlacePrincipalValue v.val (b v)
+  let D (T : Finset V) (b : ∀ v : S, ℬ(v.val.adicCompletion F)) :=
+    ∀ v : S, v.val ∈ T → b v (Multiplicative.ofAdd 0) = 0
+  have rangeSpan {X A B : Type _} [AddCommGroup X] [Module ℂ X] (P : X →ₗ[ℂ] X)
+      (w : A → B → X) (l : B → B) (p q : B → Prop)
+      (hw : ∀ a b, P (w a b) = w a (l b))
+      (hgen : ∀ x, x ∈ Submodule.span ℂ {y | ∃ a b, p b ∧ w a b = y})
+      (hm : ∀ b, q (l b)) (hs : ∀ b, q b → ∃ c, l c = b) :
+      LinearMap.range P = Submodule.span ℂ {y | ∃ a b, q b ∧ w a b = y} := by
+    apply le_antisymm
+    · rintro _ ⟨x, rfl⟩
+      have incl : Submodule.span ℂ {y | ∃ a b, p b ∧ w a b = y} ≤
+          (Submodule.span ℂ {y | ∃ a b, q b ∧ w a b = y}).comap P := by
+        apply Submodule.span_le.mpr
+        rintro _ ⟨a, b, -, rfl⟩
+        exact Submodule.subset_span ⟨a, l b, hm b, (hw a b).symm⟩
+      exact incl (hgen x)
+    · apply Submodule.span_le.mpr
+      rintro _ ⟨a, b, hb, rfl⟩
+      obtain ⟨c, rfl⟩ := hs b hb
+      exact ⟨w a c, hw a c⟩
+  have hgen (f : ℬₛ) : f ∈ Submodule.span ℂ {y | ∃ a b, D ∅ b ∧ pack a b = y} := by
+    apply (sAdeleFiniteZeroSchwartz_eq_span_tmul (F := F) (S := S) ∅).le
+    exact (Submodule.mem_iInf _).2 fun x ↦ by
+      obtain ⟨v, hv, -⟩ := x.property
+      exact False.elim (Finset.notMem_empty _ hv)
+  have hm (b) : D S (act b) := by
+    intro v _
+    have hmem := Set.mem_range_self (f := finitePlacePrincipalValue v.val) (b v)
+    rwa [finitePlacePrincipalValue_range] at hmem
+  have hs (b) (hb : D S b) : ∃ c, act c = b := by
+    have hmem (v : S) : b v ∈ Set.range (finitePlacePrincipalValue v.val) := by
+      rw [finitePlacePrincipalValue_range]
+      exact hb v v.property
+    choose c hc using hmem
+    exact ⟨c, funext hc⟩
+  have hr : LinearMap.range pv = Z :=
+    (rangeSpan pv pack act (D ∅) (D S) ht hgen hm hs).trans
+      (sAdeleFiniteZeroSchwartz_eq_span_tmul (F := F) (S := S) S).symm
+  apply le_antisymm
+  · rintro _ ⟨y, rfl⟩
+    induction y using Submodule.Quotient.induction_on with
+    | _ f => exact ⟨pv f, hr.le ⟨f, rfl⟩, rfl⟩
+  · rintro _ ⟨f, hf, rfl⟩
+    obtain ⟨g, hg⟩ := hr.ge hf
+    exact ⟨Submodule.Quotient.mk g, congrArg (thetaQuotient(χ₁(χ))) hg⟩
 
 /-- Paper: Proposition 5.3.4.5(3), p. 264.
 The same homogeneous theta image is obtained by imposing finite zero-coordinate
