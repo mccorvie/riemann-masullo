@@ -3,13 +3,15 @@ module
 public import RiemannMasullo.Ch10_TraceSpectral.Sec2
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.Ch13_ZerosHecke.Targets
+import RiemannMasullo.External.ZetaLab.HardyFirstZero.FirstZero
 
 /-! # Printed assertions in the §10.3 proofs about the spectral constructions of §10.2 -/
 
 @[expose] public noncomputable section
 
-open Function MeasureTheory NumberField Set
-open scoped NNReal
+open Filter Function MeasureTheory NumberField Set
+open scoped ENNReal InnerProductSpace NNReal Topology
 
 namespace RiemannMasullo
 
@@ -64,15 +66,404 @@ def Printed.spectralLineBandAdjoint_contains_selectedEvaluations : Prop :=
                 let integrand := fun g ↦ f g * spectralZeroJet (χ ω.val) 0 t 0 g
                 Integrable integrand μ ∧ d (Θ.mkQ f) = ∫ g, integrand g ∂μ
 
+private theorem exists_quotientBandProjection
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℂ E] [CompleteSpace E]
+    (N : Submodule ℂ E) [IsClosed (N : Set E)] (M : Submodule ℂ (E ⧸ N)) :
+    ∃ P : (E ⧸ N) →L[ℂ] (E ⧸ N), range P = closure (M : Set (E ⧸ N)) ∧
+      ∀ q y, y ∈ closure (M : Set (E ⧸ N)) → ‖q - P q‖ ≤ ‖q - y‖ := by
+  let e := N.quotientEquivOrthogonal
+  let S : Submodule ℂ Nᗮ := M.topologicalClosure.comap e.symm.toLinearMap
+  have hS : IsClosed (S : Set Nᗮ) :=
+    M.isClosed_topologicalClosure.preimage e.symm.continuous
+  let P : (E ⧸ N) →L[ℂ] (E ⧸ N) :=
+    e.symm.toContinuousLinearEquiv.toContinuousLinearMap.comp
+      (S.starProjection.comp e.toContinuousLinearEquiv.toContinuousLinearMap)
+  have hP (q : E ⧸ N) : e (P q) = S.starProjection (e q) := by simp [P]
+  refine ⟨P, ?_, ?_⟩
+  · ext y
+    constructor
+    · rintro ⟨q, rfl⟩
+      have h : e (P q) ∈ S := hP q ▸ S.starProjection_apply_mem (e q)
+      change P q ∈ M.topologicalClosure
+      simpa [S] using h
+    · intro hy
+      have h : e y ∈ S := by
+        change y ∈ M.topologicalClosure at hy
+        simpa [S] using hy
+      refine ⟨y, e.injective ?_⟩
+      rw [hP, S.starProjection_eq_self_iff.mpr h]
+  · intro q y hy
+    have h : e y ∈ S := by
+      change y ∈ M.topologicalClosure at hy
+      simpa [S] using hy
+    rw [← e.norm_map (q - P q), ← e.norm_map (q - y), map_sub, map_sub, hP,
+      S.starProjection_minimal]
+    exact ciInf_le (f := fun z : S ↦ ‖e q - (z : Nᗮ)‖)
+      ⟨0, by rintro _ ⟨z, rfl⟩; positivity⟩ (⟨e y, h⟩ : S)
+
+private theorem adjointRange_eq_zero_of_vanishes
+    {Q : Type*} [NormedAddCommGroup Q] [NormedSpace ℂ Q]
+    (B : Set Q) (P : Q →L[ℂ] Q) (hP : range P = B)
+    (hmin : ∀ q y, y ∈ B → ‖q - P q‖ ≤ ‖q - y‖)
+    (d : StrongDual ℂ Q) (hd : d ∈ range (P.precomp ℂ))
+    (hvanish : ∀ q ∈ B, d q = 0) (q : Q) : d q = 0 := by
+  obtain ⟨d', hd'⟩ := hd
+  have hdEq (x : Q) : d' (P x) = d x := DFunLike.congr_fun hd' x
+  have hPq : P q ∈ B := hP ▸ mem_range_self q
+  have hPP : P (P q) = P q := by
+    have h := hmin (P q) (P q) hPq
+    rwa [sub_self, norm_zero, norm_le_zero_iff, sub_eq_zero, eq_comm] at h
+  calc
+    d q = d' (P q) := (hdEq q).symm
+    _ = d' (P (P q)) := congrArg (fun x : Q ↦ d' x) hPP.symm
+    _ = d (P q) := hdEq (P q)
+    _ = 0 := hvanish (P q) hPq
+
+private def fourierBandVectors
+    {G D : Type*} [MeasurableSpace G] [MeasurableSpace D]
+    (μ μ' : Measure G) (hμ : μ ≪ μ') (ν : Measure D)
+    (U : Lp ℂ 2 μ ≃ₗᵢ[ℂ] Lp ℂ 2 ν) (band : Set D) : Submodule ℂ (Lp ℂ 2 μ') where
+  carrier := {f | ∃ u : Lp ℂ 2 μ, (u : G → ℂ) =ᵐ[μ] (f : G → ℂ) ∧
+    ∀ᵐ ψ ∂ν, ψ ∉ band → U u ψ = 0}
+  zero_mem' := by
+    refine ⟨0, (Lp.coeFn_zero ℂ 2 μ).trans (hμ.ae_eq (Lp.coeFn_zero ℂ 2 μ')).symm, ?_⟩
+    rw [map_zero]
+    exact (Lp.coeFn_zero ℂ 2 ν).mono fun _ h _ ↦ h
+  add_mem' := by
+    rintro f f' ⟨u, huf, hu⟩ ⟨v, hvf, hv⟩
+    refine ⟨u + v, ?_, ?_⟩
+    · filter_upwards [Lp.coeFn_add u v, hμ.ae_eq (Lp.coeFn_add f f'), huf, hvf] with g hg hg' h₁ h₂
+      rw [hg, hg', Pi.add_apply, Pi.add_apply, h₁, h₂]
+    · rw [map_add]
+      filter_upwards [Lp.coeFn_add (U u) (U v), hu, hv] with ψ hψ h₁ h₂ hout
+      rw [hψ, Pi.add_apply, h₁ hout, h₂ hout, add_zero]
+  smul_mem' := by
+    rintro c f ⟨u, huf, hu⟩
+    refine ⟨c • u, ?_, ?_⟩
+    · filter_upwards [Lp.coeFn_smul c u, hμ.ae_eq (Lp.coeFn_smul c f), huf] with g hg hg' h₁
+      rw [hg, hg', Pi.smul_apply, Pi.smul_apply, h₁]
+    · rw [map_smul]
+      filter_upwards [Lp.coeFn_smul c (U u), hu] with ψ hψ h₁ hout
+      rw [hψ, Pi.smul_apply, h₁ hout, smul_zero]
+
+local notation "C" => C𝔽(ℚ)
+local notation "logNorm" => (fun g : C ↦ Real.log ((ideleClassNorm ℚ g).val : ℝ))
+
+private theorem continuous_ratLogNorm : Continuous logNorm :=
+  Real.continuousOn_log.comp_continuous
+    ((NNReal.continuous_coe.comp Units.continuous_val).comp (isProperMap_ideleClassNorm ℚ).continuous)
+    (fun g ↦ (NNReal.coe_pos.mpr (Units.zero_lt (ideleClassNorm ℚ g))).ne')
+
+private def radialCharacter (r : ℝ) : PontryaginDual C where
+  toFun g := Circle.exp (r * logNorm g)
+  map_one' := by simp
+  map_mul' g h := by
+    change Circle.exp (r * Real.log (((ideleClassNorm ℚ (g * h)).val : ℝ≥0) : ℝ)) = _
+    rw [map_mul (ideleClassNorm ℚ), Units.val_mul, NNReal.coe_mul, Real.log_mul
+      (NNReal.coe_pos.mpr (Units.zero_lt (ideleClassNorm ℚ g))).ne'
+      (NNReal.coe_pos.mpr (Units.zero_lt (ideleClassNorm ℚ h))).ne', mul_add, Circle.exp_add]
+  continuous_toFun := Circle.exp.continuous.comp (continuous_const.mul continuous_ratLogNorm)
+
+private theorem radialCharacter_injective : Injective radialCharacter := by
+  intro r s h
+  by_contra hrs
+  let x := Real.pi / (r - s)
+  let a : ℝ≥0 := ⟨Real.exp x, (Real.exp_pos x).le⟩
+  let a' : ℝ≥0ˣ := Units.mk0 a (by exact ne_of_gt (Real.exp_pos x))
+  obtain ⟨g, hg⟩ := (ideleGroup_quotient.{_, 0} ℚ).2.2.2.2.2.2.2.2.2.1 a'
+  have hlog : logNorm g = x := by
+    change Real.log ((ideleClassNorm ℚ g).val : ℝ) = x
+    rw [hg]
+    exact Real.log_exp x
+  have heq : Circle.exp (r * logNorm g) = Circle.exp (s * logNorm g) :=
+    DFunLike.congr_fun h g
+  rw [hlog] at heq
+  apply Circle.exp_pi_ne_one
+  calc
+    Circle.exp Real.pi = Circle.exp ((r - s) * x) := by
+      change Circle.exp Real.pi = Circle.exp ((r - s) * (Real.pi / (r - s)))
+      rw [mul_div_cancel₀ _ (sub_ne_zero.mpr hrs)]
+    _ = Circle.exp (r * x) * (Circle.exp (s * x))⁻¹ := by
+      rw [sub_mul, sub_eq_add_neg, Circle.exp_add, Circle.exp_neg]
+    _ = 1 := by rw [heq, mul_inv_cancel]
+
+private theorem trivialModulatedBand_eq_image (l u : ℝ) :
+    modulatedFrequencyBand m𝔽(ℚ) (1 : PontryaginDual C) l u =
+      radialCharacter '' Icc l u := by
+  ext ψ
+  change (∃ r ∈ Icc l u, ∀ g, ψ g = (1 : PontryaginDual C) g * Circle.exp (r * logNorm g)) ↔ _
+  simp only [PontryaginDual.one_apply, one_mul]
+  exact ⟨fun ⟨r, hr, h⟩ ↦ ⟨r, hr, ContinuousMonoidHom.ext fun g ↦ (h g).symm⟩,
+    fun ⟨r, hr, h⟩ ↦ ⟨r, hr, fun g ↦ DFunLike.congr_fun h.symm g⟩⟩
+
+private theorem continuous_radialCharacter : Continuous radialCharacter :=
+  ContinuousMonoidHom.continuous_of_continuous_uncurry _ <|
+    Circle.exp.continuous.comp (continuous_fst.mul (continuous_ratLogNorm.comp continuous_snd))
+
+private theorem radialJet_eq_star_radialCharacter (t : ℝ) (g : C) :
+    spectralZeroJet (1 : PontryaginDual C) 0 t 0 g = star (radialCharacter (-t) g : ℂ) := by
+  have hmem : radialCharacter t ∈ modulatedFrequencyBand m𝔽(ℚ) (1 : PontryaginDual C) t t := by
+    rw [trivialModulatedBand_eq_image]
+    exact ⟨t, by simp, rfl⟩
+  obtain ⟨r, hr, h⟩ := (mem_modulatedFrequencyBand_iff_normTwist m𝔽(ℚ)
+    (1 : PontryaginDual C) (radialCharacter t) t t).mp hmem
+  have hrt : r = t := by simpa using hr
+  subst r
+  have hEval : (radialCharacter t g : ℂ) = ideleClassNormTwist (1 : PontryaginDual C)
+      ((t : ℂ) * Complex.I) g := DFunLike.congr_fun h g
+  rw [spectralZeroJet, pow_zero, mul_one, Complex.ofReal_zero, zero_add, ← hEval]
+  change (Circle.exp (t * logNorm g) : ℂ) = star (Circle.exp (-t * logNorm g) : ℂ)
+  rw [neg_mul, Circle.exp_neg, Circle.coe_inv_eq_conj, ← Complex.star_def, star_star]
+
+local notation "μQ" => ideleClassTamagawaMeasure ℚ
+
+private theorem lcaFourier_eq_zero_of_ae_outside_closed
+    (ν : Measure (PontryaginDual C)) (hν : IsLCAPlancherelMeasure μQ ν)
+    (band : Set (PontryaginDual C)) (hband : IsClosed band)
+    (u : Lp ℂ 2 μQ) (hu : Integrable (u : C → ℂ) μQ)
+    (hU : ∀ᵐ ψ ∂ν, ψ ∉ band → (lcaFourier_unitary μQ ν hν).exists.choose u ψ = 0)
+    (ψ₀ : PontryaginDual C) (hψ₀ : ψ₀ ∉ band) :
+    lcaFourier μQ u ψ₀ = 0 := by
+  let : BorelSpace (PontryaginDual C) := ⟨rfl⟩
+  let : ν.IsHaarMeasure := hν.1
+  have heq := (lcaFourier_unitary μQ ν hν).exists.choose_spec
+    (u : C → ℂ) hu (Lp.memLp u)
+  rw [Lp.toLp_coeFn] at heq
+  have hzero : ∀ᵐ ψ ∂ν, ψ ∉ band → lcaFourier μQ u ψ = 0 := by
+    filter_upwards [heq, hU] with ψ hψ hψ' hout
+    exact hψ ▸ hψ' hout
+  obtain ⟨F, hF⟩ := lcaFourier_zeroAtInfty μQ hu
+  have hcont : Continuous (lcaFourier μQ u) :=
+    (funext hF) ▸ F.continuous
+  let O := bandᶜ ∩ {ψ | lcaFourier μQ u ψ ≠ 0}
+  have hO : IsOpen O := hband.isOpen_compl.inter (isOpen_ne_fun hcont continuous_const)
+  by_contra hbad
+  have hpos := hO.measure_pos ν ⟨ψ₀, hψ₀, hbad⟩
+  have hnull : ∀ᵐ ψ ∂ν, ψ ∉ O := hzero.mono fun ψ hz hψ ↦ hψ.2 (hz hψ.1)
+  exact hpos.ne' (by simpa only [ae_iff, not_not, ofPred_mem_eq] using hnull)
+
+local notation "ρQ" =>
+  (fun g : C ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 2 (logNorm g)))
+local notation "μW" => (μQ).withDensity ρQ
+
+private theorem spectralWeight_apply (g : C) :
+    intervalSobolevDensity 0 0 2 (logNorm g) = 1 + (logNorm g) ^ 2 := by
+  norm_num [intervalSobolevDensity]
+
+private theorem spectralWeight_ac : μQ ≪ μW := by
+  have hρ : Continuous (ρQ : C → ℝ≥0∞) := by
+    simp_rw [spectralWeight_apply]
+    exact ENNReal.continuous_ofReal.comp (continuous_const.add (continuous_ratLogNorm.pow 2))
+  exact withDensity_absolutelyContinuous' hρ.measurable.aemeasurable
+    (.of_forall fun g ↦ by
+      rw [spectralWeight_apply]
+      exact ENNReal.ofReal_ne_zero_iff.mpr (by positivity))
+
+/-- The compact-neighborhood test in `lcaFourier_isometry_surjective`, viewed here in weighted L². -/
+private theorem exists_nonzero_lcaFourier_weighted (ψ : PontryaginDual C) :
+    ∃ f : Lp ℂ 2 μW, lcaFourier μQ f ψ ≠ 0 := by
+  obtain ⟨L, hL, hL₁⟩ := exists_compact_mem_nhds (1 : C)
+  have hLm := hL.isClosed.measurableSet
+  have hLfin := (hL.measure_lt_top (μ := μQ)).ne
+  have hLpos : 0 < μQ L := (isOpen_interior.measure_pos μQ
+    ⟨1, mem_interior_iff_mem_nhds.mpr hL₁⟩).trans_le (measure_mono interior_subset)
+  obtain ⟨M, hM⟩ := (hL.image (continuous_const.add (continuous_ratLogNorm.pow 2))).bddAbove
+  have hWfin : μW L ≠ ∞ := by
+    rw [withDensity_apply _ hLm]
+    refine (lt_of_le_of_lt (lintegral_mono_ae (g := fun _ ↦ ENNReal.ofReal M) ?_) ?_).ne
+    · filter_upwards [ae_restrict_mem hLm] with g hg
+      rw [spectralWeight_apply]
+      exact ENNReal.ofReal_le_ofReal (hM ⟨g, hg, rfl⟩)
+    · rw [lintegral_const, Measure.restrict_apply_univ]
+      exact ENNReal.mul_lt_top ENNReal.ofReal_lt_top hLfin.lt_top
+  let : IsFiniteMeasure ((μW).restrict L) := isFiniteMeasure_restrict.mpr hWfin
+  let F : C → ℂ := L.indicator fun g ↦ (ψ g : ℂ)
+  have hF : MemLp F 2 μW :=
+    (memLp_indicator_iff_restrict hLm.nullMeasurableSet).mpr <|
+      MemLp.of_bound (continuous_subtype_val.comp ψ.continuous).aestronglyMeasurable
+        1 (.of_forall fun g ↦ (Circle.norm_coe (ψ g)).le)
+  refine ⟨hF.toLp F, ?_⟩
+  unfold lcaFourier
+  rw [integral_congr_ae ((spectralWeight_ac.ae_eq hF.coeFn_toLp).mono fun g hg ↦
+    congrArg (· * star (ψ g : ℂ)) hg)]
+  rw [show (fun g ↦ F g * star (ψ g : ℂ)) = L.indicator (fun _ ↦ (1 : ℂ)) by
+    funext g
+    by_cases hg : g ∈ L
+    · simp only [F, indicator_of_mem hg, Complex.star_def, Complex.mul_conj,
+        Complex.normSq_eq_norm_sq, Circle.norm_coe, one_pow, Complex.ofReal_one]
+    · simp [F, hg]]
+  rw [integral_indicator hLm, integral_const, Measure.real, Measure.restrict_apply_univ,
+    Complex.real_smul, mul_one]
+  exact Complex.ofReal_ne_zero.mpr (ENNReal.toReal_pos hLpos.ne' hLfin).ne'
+
+private theorem spectralLineBandAdjoint_false_of_isolated_zero
+    (t ε : ℝ) (hε : 0 < ε) (hεt : ε < t)
+    (hiso : Icc (t - ε) (t + ε) ∩
+      {r | 0 < orderAt((1 : PontryaginDual C), shift((1 / 2 : ℝ), r))} = {t}) :
+    ¬ Printed.spectralLineBandAdjoint_contains_selectedEvaluations := by
+  classical
+  intro hclaim
+  obtain ⟨χ₀, hχ₀⟩ := exists_spectralBasepointChoice ℚ
+  let χ (ω : PontryaginDual C₁(ℚ)) : PontryaginDual C := if ω = 1 then 1 else χ₀ ω
+  have hχ : IsSpectralBasepointChoice χ := by
+    intro ω
+    by_cases hω : ω = 1
+    · subst ω
+      simp only [χ, ite_true]
+      ext g
+      rfl
+    · simpa [χ, hω] using hχ₀ ω
+  let K : Finset (PontryaginDual C₁(ℚ)) := {1}
+  let ω₁ : K := ⟨1, Finset.mem_singleton_self 1⟩
+  have hω (ω : K) : ω.val = 1 := Finset.mem_singleton.mp ω.property
+  let T : K → Finset ℝ := fun _ ↦ {t}
+  let hT : ∀ ω : K, (T ω).Nonempty := fun _ ↦ Finset.singleton_nonempty t
+  have htε : ∀ ω : K, 0 < ε ∧
+      Icc ((T ω).min' (hT ω) - ε) ((T ω).max' (hT ω) + ε) ∩
+        {r | 0 < orderAt(χ ω.val, shift((1 / 2 : ℝ), r))} = (T ω : Set ℝ) := by
+    intro ω
+    exact ⟨hε, by simpa [T, χ, hω ω] using hiso⟩
+  let : BorelSpace (PontryaginDual C) := ⟨rfl⟩
+  obtain ⟨ν, hν, -⟩ := lcaPlancherelMeasure_existsUnique μQ
+  let band := modulatedFrequencyBand m𝔽(ℚ) (1 : PontryaginDual C) (t - ε) (t + ε)
+  have hband : IsClosed band := by
+    change IsClosed (modulatedFrequencyBand _ _ _ _)
+    rw [trivialModulatedBand_eq_image]
+    exact (isCompact_Icc.image continuous_radialCharacter).isClosed
+  have hout : radialCharacter (-t) ∉ band := by
+    change radialCharacter (-t) ∉ modulatedFrequencyBand _ _ _ _
+    rw [trivialModulatedBand_eq_image]
+    rintro ⟨r, hr, heq⟩
+    have hr' := radialCharacter_injective heq
+    have := hr.1
+    linarith
+  let Θ := globalThetaSobolev ℚ (1 / 2) (le_rfl (a := (0 : ℝ))) (show (0 : ℝ) ≤ 2 by norm_num)
+  let Q := spectralSobolevQuotient ℚ (1 / 2) (le_rfl (a := (0 : ℝ)))
+    (show (0 : ℝ) ≤ 2 by norm_num)
+  let U := (lcaFourier_unitary μQ ν hν).exists.choose
+  let D := fourierBandVectors μQ μW spectralWeight_ac ν U band
+  let M : Submodule ℂ Q := D.map Θ.mkQ
+  obtain ⟨P, hP, hmin⟩ := exists_quotientBandProjection Θ M
+  have hbandUnion :
+      (⋃ ω : K, modulatedFrequencyBand m𝔽(ℚ) (χ ω.val)
+        ((T ω).min' (hT ω) - ε) ((T ω).max' (hT ω) + ε)) = band := by
+    ext ψ
+    simp only [mem_iUnion, T, Finset.min'_singleton, Finset.max'_singleton, hω, χ, ite_true]
+    exact ⟨fun ⟨_, h⟩ ↦ h, fun h ↦ ⟨ω₁, h⟩⟩
+  have hconclusion := hclaim ℚ χ hχ (1 / 2) 2 (show (1 : ℝ) < 2 by norm_num)
+    K T hT (fun _ ↦ ε) htε ν hν
+  dsimp only at hconclusion
+  rw [hbandUnion] at hconclusion
+  let B : Set Q := {q | ∃ f : Lp ℂ 2 μW, q = Θ.mkQ f ∧
+      ∃ u : Lp ℂ 2 μQ, (u : C → ℂ) =ᵐ[μQ] (f : C → ℂ) ∧
+        ∀ᵐ ψ ∂ν, ψ ∉ band → U u ψ = 0}
+  have hM : (M : Set Q) = B := by
+    ext q
+    constructor
+    · rintro ⟨f, hf, hq⟩
+      exact ⟨f, hq.symm, hf⟩
+    · rintro ⟨f, hq, hf⟩
+      exact ⟨f, hf, hq.symm⟩
+  have hPB : range P = closure B := hP.trans (congrArg closure hM)
+  have hminB (q y : Q) (hy : y ∈ closure B) : ‖q - P q‖ ≤ ‖q - y‖ :=
+    hmin q y ((congrArg closure hM).symm ▸ hy)
+  obtain ⟨d, hd, hpair⟩ := hconclusion P hPB hminB ω₁ t (Finset.mem_singleton_self t)
+  have hpair' (f : Lp ℂ 2 μW) :
+      Integrable (fun g ↦ f g * star (radialCharacter (-t) g : ℂ)) μQ ∧
+      d (Θ.mkQ f) = lcaFourier μQ f (radialCharacter (-t)) := by
+    simpa only [χ, hω, ite_true, radialJet_eq_star_radialCharacter, lcaFourier] using hpair f
+  have hvanishD (f : Lp ℂ 2 μW) (hf : f ∈ D) : d (Θ.mkQ f) = 0 := by
+    obtain ⟨u, huf, hU⟩ := hf
+    rw [(hpair' f).2]
+    have hu' : Integrable (fun g ↦ u g * star (radialCharacter (-t) g : ℂ)) μQ :=
+      (hpair' f).1.congr (huf.symm.mono fun g hg ↦ congrArg (· * _) hg)
+    have hu : Integrable (u : C → ℂ) μQ :=
+      hu'.mono (Lp.aestronglyMeasurable u) (.of_forall fun g ↦ by simp)
+    have hz := lcaFourier_eq_zero_of_ae_outside_closed ν hν band hband u hu hU _ hout
+    exact (integral_congr_ae (huf.symm.mono fun g hg ↦ congrArg (· * _) hg)).trans hz
+  have hvanish (q : Q) (hq : q ∈ closure (M : Set Q)) : d q = 0 := by
+    have hsub : (M : Set Q) ⊆ {x : Q | d x = 0} := by
+      rintro _ ⟨f, hf, rfl⟩
+      exact hvanishD f hf
+    exact closure_minimal hsub (isClosed_eq d.continuous continuous_const) hq
+  have hzero := adjointRange_eq_zero_of_vanishes (closure (M : Set Q)) P hP hmin d hd hvanish
+  obtain ⟨f, hf⟩ := exists_nonzero_lcaFourier_weighted (radialCharacter (-t))
+  exact hf ((hpair' f).2.symm.trans (hzero _))
+
+/-- The rational trivial-character chart has a positive critical-line zero
+isolated by a closed interval entirely above zero. The positive ordinate comes from the
+vendored Lince project certificate `HardyFirstZero.first_zero_on_line`. The Hecke normalization
+uses the comparisons in `Ch13_ZerosHecke.Targets` as in the F183 proof. -/
+private theorem rationalLine_isolated_positive_zero :
+    ∃ t ε : ℝ, 0 < ε ∧ ε < t ∧ Icc (t - ε) (t + ε) ∩
+      {r : ℝ | 0 < meromorphicOrderAt
+        (continuedCompletedHeckeL (1 : PontryaginDual C))
+        (((1 / 2 : ℝ) : ℂ) + (r : ℂ) * Complex.I)} = {t} := by
+  let z (r : ℝ) : ℂ := 1 / 2 + (r : ℂ) * Complex.I
+  have hne (r : ℝ) : z r ≠ 1 := by
+    intro he
+    have := congrArg Complex.re he
+    norm_num [z] at this
+  have ha (r : ℝ) := analyticOn_riemannZeta _ (hne r)
+  have hm : MeromorphicOn riemannZeta univ := by
+    simpa only [DirichletCharacter.LFunction_modOne_eq] using
+      meromorphic_dirichletLFunction (1 : DirichletCharacter ℂ 1)
+  have hOrd (r : ℝ) : 0 < meromorphicOrderAt
+      (continuedCompletedHeckeL (1 : PontryaginDual C)) (z r) ↔
+      riemannZeta (z r) = 0 := by
+    have he := meromorphicOrderAt_finiteHeckeL_continuation (1 : PontryaginDual C)
+      hm (fun s ↦ by rw [finiteHeckeL_one_eq_dedekindZeta, dedekindZeta_rat_eq_riemannZeta s.property])
+      (s := z r) (by norm_num [z])
+    rw [← he, (ha r).meromorphicOrderAt_eq, ← (ha r).analyticOrderAt_ne_zero]
+    cases analyticOrderAt riemannZeta (z r) using ENat.recTopCoe with
+    | top => simp
+    | coe k => simp [Nat.pos_iff_ne_zero]
+  obtain ⟨t, ht, hzero⟩ := HardyFirstZero.first_zero_on_line
+  have htpos : 0 < t := by linarith [ht.1]
+  have hz2 : meromorphicOrderAt riemannZeta (2 : ℂ) = 0 := by
+    rw [(analyticOn_riemannZeta _ (by norm_num : (2 : ℂ) ≠ 1)).meromorphicOrderAt_eq,
+      (analyticOn_riemannZeta _ (by norm_num : (2 : ℂ) ≠ 1)).analyticOrderAt_eq_zero.mpr
+        (riemannZeta_ne_zero_of_one_lt_re (by norm_num))]
+    rfl
+  have hfin := hm.meromorphicOrderAt_ne_top_of_isPreconnected isPreconnected_univ
+      (mem_univ (2 : ℂ)) (mem_univ (z t)) (by rw [hz2]; simp)
+  have hiso := (ha t).eventually_eq_zero_or_eventually_ne_zero.resolve_left fun h ↦
+    hfin (meromorphicOrderAt_eq_top_iff.mpr (h.filter_mono nhdsWithin_le_nhds))
+  have hc : Continuous z := by dsimp [z]; fun_prop
+  have hr := (hc.tendsto t).eventually (eventually_nhdsWithin_iff.mp hiso)
+  obtain ⟨d, hd, hd'⟩ := Metric.eventually_nhds_iff.mp hr
+  let ε := min (d/2) (t/2)
+  have hε : 0 < ε := lt_min (half_pos hd) (half_pos htpos)
+  refine ⟨t, ε, hε, (min_le_right _ _).trans_lt (half_lt_self htpos), ?_⟩
+  ext r
+  simp only [mem_inter_iff, mem_Icc, mem_ofPred_eq, mem_singleton_iff]
+  push_cast
+  change (_ ∧ 0 < meromorphicOrderAt _ (z r)) ↔ r = t
+  rw [hOrd]
+  constructor
+  · rintro ⟨⟨hlo, hhi⟩, h⟩
+    by_contra hne
+    have hdist : dist r t < d := by
+      rw [Real.dist_eq, abs_lt]
+      have he : ε < d := (min_le_left _ _).trans_lt (half_lt_self hd)
+      constructor <;> linarith
+    apply hd' hdist _ h
+    intro he
+    exact hne (by simpa [z] using congrArg Complex.im he)
+  · rintro rfl
+    exact ⟨⟨by linarith, by linarith⟩, hzero⟩
+
 /-- Paper: Theorem 10.3.1.1, (10.3.1.15)–(16), p. 450.
 Take the rational field, the trivial base character, a = 1/2 and s = 2. Select only
-the first positive critical-line zeta ordinate t and take a small isolating interval about t.
+a positive critical-line zeta ordinate t and take a small isolating interval about t.
 The zeroth jet pairs with the Fourier value at −t, so it vanishes on the band image and
-its closure. The jet is nonzero, as is seen by pairing it with a nonnegative smooth radial
-bump of positive integral times exp(−it log |g|). Every element of the adjoint range of the
+its closure. To see that the jet is nonzero, pair it with the indicator of a compact
+neighborhood times exp(−it log |g|). Every element of the adjoint range of the
 orthogonal projection that annihilates its image is zero. -/
 theorem Printed.spectralLineBandAdjoint_contains_selectedEvaluations_false :
-    ¬ Printed.spectralLineBandAdjoint_contains_selectedEvaluations := by sorry
+    ¬ Printed.spectralLineBandAdjoint_contains_selectedEvaluations := by
+  obtain ⟨t, ε, hε, hεt, ht⟩ := rationalLine_isolated_positive_zero
+  exact spectralLineBandAdjoint_false_of_isolated_zero t ε hε hεt ht
 
 /-- Paper: Theorem 10.3.2.1, proof before (10.3.2.6), p. 454.
 As printed: for every strip of positive half-width, the truncated multiplicities attained

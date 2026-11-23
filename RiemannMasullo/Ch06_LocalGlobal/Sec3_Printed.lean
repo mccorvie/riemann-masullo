@@ -84,6 +84,232 @@ def Printed.globalConverse_normTwist_printedGenerator_divides : Prop :=
       EntireMultiple(H, fun s ↦ E(χ, S) s * G s) ∧
         EntireMultiple(H, fun s ↦ E(χ, S) s * s * (s - 1) * ζ̂(F) s)
 
+/-- Isolated zeros and poles leave an imaginary point with nonzero transform and analytic zeta. -/
+private theorem Printed.globalConverse_normTwist_printedGenerator_divides_false_select
+    (H L : ℂ → ℂ) (hH : Differentiable ℂ H)
+    (hn : ∃ z, H z ≠ 0) (hL : Meromorphic L) :
+    ∃ t : ℝ, H ((t : ℂ) * Complex.I + (t : ℂ) * Complex.I) ≠ 0 ∧
+      AnalyticAt ℂ L ((t : ℂ) * Complex.I + (t : ℂ) * Complex.I) := by
+  have he : ∀ᶠ z in codiscrete ℂ, H z ≠ 0 := by
+    have ha : AnalyticOnNhd ℂ H univ := fun z _ ↦ hH.analyticAt z
+    rcases ha.eqOn_zero_or_eventually_ne_zero_of_preconnected
+      isPreconnected_univ with hz | hz
+    · obtain ⟨z, hz'⟩ := hn
+      exact (hz' (hz (mem_univ z))).elim
+    · exact hz
+  have hnear := (he.filter_mono (nhdsNE_le_codiscrete (0 : ℂ))).and
+    (hL 0).eventually_analyticAt
+  have ht : Tendsto (fun t : ℝ ↦ (t : ℂ) * Complex.I + (t : ℂ) * Complex.I)
+      (nhdsWithin 0 {0}ᶜ) (nhdsWithin 0 {0}ᶜ) := by
+    apply tendsto_nhdsWithin_iff.mpr
+    constructor
+    · have hc : Continuous (fun t : ℝ ↦ (t : ℂ) * Complex.I + (t : ℂ) * Complex.I) := by fun_prop
+      simpa using (hc.tendsto 0).mono_left (nhdsWithin_le_nhds (s := {0}ᶜ))
+    · filter_upwards [self_mem_nhdsWithin] with t ht
+      simp only [mem_compl_iff, mem_singleton_iff] at ht ⊢
+      intro heq
+      have := congrArg Complex.im heq
+      simp at this
+      exact ht (by linarith)
+  exact (ht.eventually hnear).exists
+
+/-- A continuous entire multiple inherits the zero of its analytic generator. -/
+private theorem Printed.globalConverse_normTwist_printedGenerator_divides_false_obstruction
+    (H L u : ℂ → ℂ) (a : ℂ)
+    (hH : ContinuousAt H a) (hL : ContinuousAt L (a + a))
+    (hu : ContinuousAt u a)
+    (he : H =ᶠ[codiscrete ℂ] fun s ↦ (s - a) * (1 - s - a) * L (s + a) * u s) :
+    H a = 0 := by
+  have hr : ContinuousAt (fun s ↦ (s - a) * (1 - s - a) * L (s + a) * u s) a :=
+    ((continuousAt_id.sub continuousAt_const).mul
+      ((continuousAt_const.sub continuousAt_id).sub continuousAt_const)).mul
+      (hL.comp (f := fun s : ℂ ↦ s + a) (continuousAt_id.add continuousAt_const)) |>.mul hu
+  have h := tendsto_nhds_unique (hH.mono_left nhdsWithin_le_nhds)
+    ((hr.mono_left nhdsWithin_le_nhds).congr' (he.filter_mono (nhdsNE_le_codiscrete a)).symm)
+  simpa using h
+
+/-- Multiplicative Haar invariance gives the character factor under unit translation. -/
+private theorem Printed.globalConverse_normTwist_printedGenerator_divides_false_translate
+    (g : IdeleGroup (𝓞 ℚ) ℚ) (f : SchwartzBruhat (Multiplicative 𝔸[ℚ])) (c : HeckeCharacter (𝓞 ℚ) ℚ) :
+    globalIdelicZetaIntegral (schwartzBruhatUnitTranslate g f) c =
+      c (QuotientGroup.mk g) * globalIdelicZetaIntegral f c := by
+  let : MeasurableSpace (IdeleGroup (𝓞 ℚ) ℚ) := borel _
+  let : BorelSpace (IdeleGroup (𝓞 ℚ) ℚ) := ⟨rfl⟩
+  have : (multiplicativeTamagawaMeasure ℚ).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique ℚ).exists.choose_spec.1
+  unfold globalIdelicZetaIntegral
+  rw [← integral_mul_left_eq_self (μ := multiplicativeTamagawaMeasure ℚ)
+    (fun x ↦ schwartzBruhatUnitTranslate g f (Multiplicative.ofAdd x.val) *
+      c (QuotientGroup.mk x)) g, ← integral_const_mul]
+  apply integral_congr_ae
+  exact Filter.Eventually.of_forall fun x ↦ by
+    change f (Multiplicative.ofAdd (g⁻¹ * (g * x)).val) * c (QuotientGroup.mk (g * x)) = _
+    rw [inv_mul_cancel_left, QuotientGroup.mk_mul, map_mul, mul_left_comm]
+
+/-- additive Haar scaling under unit translation. -/
+private theorem Printed.globalConverse_normTwist_printedGenerator_divides_false_fourier_integral
+    (u : IdeleGroup (𝓞 ℚ) ℚ)
+    (k : 𝔸[ℚ] → ℂ) :
+    ∫ x, k ((↑u⁻¹ : 𝔸[ℚ]) * x) ∂additiveTamagawaMeasure ℚ =
+      (((ideleNorm ℚ u).val : ℝ) : ℂ) * ∫ x, k x ∂additiveTamagawaMeasure ℚ := by
+  let : MeasurableSpace 𝔸[ℚ] := borel _
+  have : BorelSpace 𝔸[ℚ] := ⟨rfl⟩
+  have hH : (additiveTamagawaMeasure ℚ).IsAddHaarMeasure :=
+    (additiveTamagawaMeasure_existsUnique ℚ).exists.choose_spec.1
+  let d : 𝔸[ℚ] ≃ₜ 𝔸[ℚ] := Homeomorph.smul (u⁻¹ : IdeleGroup (𝓞 ℚ) ℚ)
+  have hset (s : Set 𝔸[ℚ]) :
+      d ⁻¹' s = (fun a : 𝔸[ℚ] ↦ (u : 𝔸[ℚ]) * a) '' s := by
+    ext y
+    constructor
+    · intro hy
+      exact ⟨(↑u⁻¹ : 𝔸[ℚ]) * y, hy, Units.mul_inv_cancel_left u y⟩
+    · rintro ⟨a, ha, rfl⟩
+      change (↑u⁻¹ : 𝔸[ℚ]) * ((u : 𝔸[ℚ]) * a) ∈ s
+      rwa [Units.inv_mul_cancel_left]
+  have hmap : (additiveTamagawaMeasure ℚ).map d =
+      ((ideleNorm ℚ u).val : ENNReal) • additiveTamagawaMeasure ℚ := by
+    refine Measure.ext fun s hs ↦ ?_
+    rw [Measure.map_apply d.continuous.measurable hs, hset s]
+    exact adeleHaar_mul_image ℚ (additiveTamagawaMeasure ℚ) u s hs
+  have h1 : ∫ x, k (d.toMeasurableEquiv x) ∂additiveTamagawaMeasure ℚ =
+      ∫ y, k y ∂((additiveTamagawaMeasure ℚ).map d.toMeasurableEquiv) :=
+    (integral_map_equiv d.toMeasurableEquiv k).symm
+  have h2 : ((additiveTamagawaMeasure ℚ).map d.toMeasurableEquiv) =
+      ((ideleNorm ℚ u).val : ENNReal) • additiveTamagawaMeasure ℚ := hmap
+  rw [h2, integral_smul_measure, ENNReal.coe_toReal, Complex.real_smul] at h1
+  exact h1
+
+/-- Unit translation preserves evaluation at zero and scales Fourier evaluation by the norm. -/
+private theorem Printed.globalConverse_normTwist_printedGenerator_divides_false_polar
+    (u : IdeleGroup (𝓞 ℚ) ℚ)
+    (f : SchwartzBruhat (Multiplicative 𝔸[ℚ])) :
+    adelePolarValues (F := ℚ) (schwartzBruhatUnitTranslate u f) =
+      ((adelePolarValues (F := ℚ) f).1,
+        (((ideleNorm ℚ u).val : ℝ) : ℂ) * (adelePolarValues (F := ℚ) f).2) := by
+  apply Prod.ext
+  · change f (Multiplicative.ofAdd (u.inv * 0)) = f (Multiplicative.ofAdd 0)
+    rw [mul_zero]
+  · change adeleSchwartzFourier _ _ = _ * adeleSchwartzFourier f _
+    rw [(adeleSchwartzFourier_apply_zero _).2, (adeleSchwartzFourier_apply_zero f).2]
+    exact Printed.globalConverse_normTwist_printedGenerator_divides_false_fourier_integral u
+      (fun x ↦ f (Multiplicative.ofAdd x))
+
+/-- On the convergence half-plane the zeta integral respects linear differences. -/
+private theorem Printed.globalConverse_normTwist_printedGenerator_divides_false_integral_sub
+    (f g : SchwartzBruhat (Multiplicative 𝔸[ℚ]))
+    (a : ℂ) (c : HeckeCharacter (𝓞 ℚ) ℚ)
+    (hc : 1 < quasiCharacterAbscissa (ideleClassNorm ℚ) (isProperMap_ideleClassNorm ℚ)
+      (ideleClassNorm_ne_one (F := ℚ)) c) :
+    globalIdelicZetaIntegral (f - a • g) c =
+      globalIdelicZetaIntegral f c - a * globalIdelicZetaIntegral g c := by
+  have hf := globalIdelicZetaIntegral_integrable f c hc
+  have hg := globalIdelicZetaIntegral_integrable g c hc
+  unfold globalIdelicZetaIntegral
+  calc
+    (∫ x, (f - a • g) (Multiplicative.ofAdd x.val) * c (QuotientGroup.mk x)
+      ∂multiplicativeTamagawaMeasure ℚ) =
+      ∫ x, f (Multiplicative.ofAdd x.val) * c (QuotientGroup.mk x) -
+        a * (g (Multiplicative.ofAdd x.val) * c (QuotientGroup.mk x))
+        ∂multiplicativeTamagawaMeasure ℚ := by
+          apply integral_congr_ae
+          exact .of_forall fun x ↦ by change (_ - a * _) * _ = _; ring
+    _ = _ := by rw [integral_sub hf (hg.const_mul a), integral_const_mul]
+
+/-- The rational completed zeta value at two is nonzero. -/
+private theorem Printed.globalConverse_normTwist_printedGenerator_divides_false_completed_ne_zero :
+    completedHeckeL (1 : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ))
+      ⟨2, by norm_num⟩ ≠ 0 := by
+  have hc (n : ℕ) : Nat.card {I : Ideal (𝓞 ℚ) // I.absNorm = n} = 1 := by
+    let : Unique {I : Ideal (𝓞 ℚ) // I.absNorm = n} :=
+      { default := ⟨_, RatRingOfIntegers.absNorm_span_natCast n⟩
+        uniq := fun I ↦ by
+          apply Subtype.ext
+          obtain ⟨m, hm⟩ := RatRingOfIntegers.exists_eq_span_natCast I.val
+          have hmn : m = n := by
+            simpa only [hm, RatRingOfIntegers.absNorm_span_natCast] using I.property
+          simpa only [hmn] using hm }
+    exact Nat.card_unique
+  have hz : dedekindZeta ℚ 2 = riemannZeta 2 := by
+    simpa only [dedekindZeta, hc, Nat.cast_one, Pi.one_def] using
+      LSeries_one_eq_riemannZeta (s := 2) (by norm_num)
+  have hr : InfinitePlace.nrRealPlaces ℚ = 1 :=
+    InfinitePlace.nrRealPlaces_eq_one_of_finrank_eq_one (Module.finrank_self ℚ)
+  have hcc : InfinitePlace.nrComplexPlaces ℚ = 0 :=
+    InfinitePlace.nrComplexPlaces_eq_zero_of_finrank_eq_one (Module.finrank_self ℚ)
+  rw [completedHeckeL_one_eq_dedekindZeta, hr, hcc, pow_one, pow_zero, mul_one]
+  change Complex.Gammaℝ 2 * dedekindZeta ℚ 2 ≠ 0
+  rw [hz]
+  exact mul_ne_zero (Complex.Gammaℝ_ne_zero_of_re_pos (by norm_num))
+    (riemannZeta_ne_zero_of_one_lt_re (by norm_num))
+
+/-- Paper: Theorem 6.3.2.1, (6.3.2.8), p. 304.
+The double translation difference is polar-free and has nonzero untwisted transform at two. -/
+private theorem Printed.globalConverse_normTwist_printedGenerator_divides_false_witness :
+    ∃ f : adelePolarSubspace ℚ,
+      globalIdelicZFunction f.val
+        (ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ)) 2) ≠ 0 := by
+  let χ : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ) := 1
+  let c := ideleClassNormTwist χ 2
+  have hc : 1 < quasiCharacterAbscissa (ideleClassNorm ℚ) (isProperMap_ideleClassNorm ℚ)
+      (ideleClassNorm_ne_one (F := ℚ)) c := by
+    rw [quasiCharacterAbscissa_ideleClassNormTwist]
+    norm_num
+  obtain ⟨E, hE⟩ := exists_globalIdelicZetaIntegral_eq_completedHeckeL χ
+  have hE0 : globalIdelicZetaIntegral E c ≠ 0 := by
+    rw [hE ⟨2, by norm_num⟩]
+    exact Printed.globalConverse_normTwist_printedGenerator_divides_false_completed_ne_zero
+  let r : NNRealˣ := Units.mk0 2 (by norm_num)
+  let u := canonicalIdeleNormSection ℚ r
+  have hn : ideleNorm ℚ u = r := canonicalIdeleNormSection_rightInverse ℚ r
+  have hn' : (((ideleNorm ℚ u).val : ℝ) : ℂ) = 2 := by rw [hn]; rfl
+  let T := schwartzBruhatUnitTranslate u
+  let d := T E - (2 : ℂ) • E
+  let f := T d - (1 : ℂ) • d
+  have hp : f ∈ adelePolarSubspace ℚ := by
+    change adelePolarValues (F := ℚ) f = 0
+    dsimp only [f, d, T]
+    rw [map_sub, map_smul, Printed.globalConverse_normTwist_printedGenerator_divides_false_polar,
+      hn', map_sub, map_smul, Printed.globalConverse_normTwist_printedGenerator_divides_false_polar,
+      hn']
+    apply Prod.ext <;> simp
+  refine ⟨⟨f, hp⟩, ?_⟩
+  rw [globalIdelicZFunction_eq_integral f hc]
+  have hcu : c (QuotientGroup.mk u) = 4 := by
+    change (1 : ℂ) * (((ideleNorm ℚ u).val : ℝ) : ℂ) ^ (2 : ℂ) = 4
+    rw [hn']
+    norm_num
+  have heq : globalIdelicZetaIntegral f c = 6 * globalIdelicZetaIntegral E c := by
+    dsimp only [f, d, T]
+    rw [Printed.globalConverse_normTwist_printedGenerator_divides_false_integral_sub _ _ _ _ hc,
+      Printed.globalConverse_normTwist_printedGenerator_divides_false_translate,
+      Printed.globalConverse_normTwist_printedGenerator_divides_false_integral_sub _ _ _ _ hc,
+      Printed.globalConverse_normTwist_printedGenerator_divides_false_translate, hcu]
+    ring
+  rw [heq]
+  exact mul_ne_zero (by norm_num) hE0
+
+/-- A purely imaginary norm power is a unitary idele class character. -/
+private theorem Printed.globalConverse_normTwist_printedGenerator_divides_false_character (t : ℝ) :
+    ∃ χ : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ), ideleClassNormTwist χ 0 =
+      ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ))
+        ((t : ℂ) * Complex.I) := by
+  let c := ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ))
+    ((t : ℂ) * Complex.I)
+  have hn (g : IdeleClassGroup (𝓞 ℚ) ℚ) : ‖c g‖ = 1 := by
+    change ‖(1 : ℂ) * (((ideleClassNorm ℚ g : NNReal) : ℝ) : ℂ) ^
+      ((t : ℂ) * Complex.I)‖ = 1
+    rw [one_mul, Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _))]
+    simp
+  let χ : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ) :=
+    { toFun := fun g ↦ ⟨c g, mem_sphere_zero_iff_norm.mpr (hn g)⟩
+      map_one' := Subtype.ext (map_one c)
+      map_mul' := fun x y ↦ Subtype.ext (map_mul c x y)
+      continuous_toFun := c.continuous.subtype_mk _ }
+  refine ⟨χ, ?_⟩
+  ext1 g
+  change c g * _ ^ (0 : ℂ) = c g
+  simp
+
 /-- Paper: Theorems 6.3.2.1–2, (6.3.2.8), (6.3.2.20), (6.3.2.24), p. 304 and p. 310.
 Over ℚ let E be the trivial standard Gaussian and T its translation operator for the idele
 with real component 2 and all finite components 1. The test `(T-1)(T-2)E` is polar-free, and
@@ -93,7 +319,31 @@ there. This also applies with an empty removal set. The unshifted generator in (
 forces a zero at any completed zeta zero ρ, while the same test's shifted transform is nonzero
 at ρ for a choice of t₀ avoiding its discrete zero set. -/
 theorem Printed.globalConverse_normTwist_printedGenerator_divides_false :
-    ¬ Printed.globalConverse_normTwist_printedGenerator_divides := by sorry
+    ¬ Printed.globalConverse_normTwist_printedGenerator_divides := by
+  intro h
+  obtain ⟨f, hf⟩ := Printed.globalConverse_normTwist_printedGenerator_divides_false_witness
+  let H := fun s ↦ globalIdelicZFunction f.val
+    (ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ)) s)
+  have hH : Differentiable ℂ H := globalIdelicZFunction_entire_of_vanishing f.val f.property 1
+  obtain ⟨t, ht, hL⟩ := Printed.globalConverse_normTwist_printedGenerator_divides_false_select H
+    (continuedCompletedHeckeL (1 : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ)))
+    hH ⟨2, hf⟩ (fun z ↦ (continuedCompletedHeckeL_spec _).1.meromorphicOn z (mem_univ z))
+  obtain ⟨χ, hχ⟩ := Printed.globalConverse_normTwist_printedGenerator_divides_false_character t
+  obtain ⟨u, hu, he⟩ := (h ℚ χ t hχ).1 f
+  have htw (s : ℂ) : ideleClassNormTwist χ s =
+      ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ))
+        (s + (t : ℂ) * Complex.I) := by
+    simpa [add_comm] using ideleClassNormTwist_add_of_eq hχ s
+  simp only [htw] at he
+  have hz := Printed.globalConverse_normTwist_printedGenerator_divides_false_obstruction
+    (fun s ↦ H (s + (t : ℂ) * Complex.I))
+    (continuedCompletedHeckeL (1 : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ)))
+    u ((t : ℂ) * Complex.I)
+    (hH.continuous.continuousAt.comp
+      (f := fun s : ℂ ↦ s + (t : ℂ) * Complex.I)
+      (continuousAt_id.add continuousAt_const)) hL.continuousAt
+    (hu.continuous.continuousAt) he
+  exact ht hz
 
 /-- Paper: Theorems 6.3.2.1–2, (6.3.2.8), (6.3.2.25)–(26), p. 304 and p. 310. As printed:
 the pair of residues maps the middle term, obtained by intersecting the shifted completed

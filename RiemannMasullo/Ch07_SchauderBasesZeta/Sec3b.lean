@@ -7,6 +7,7 @@ import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3a
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import RiemannMasullo.ForMathlib.MeasureTheory.Integral.ProdPi
 
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3
 
@@ -166,6 +167,29 @@ private theorem sLocalPWTests_moments_surjective_bump
   · change (f x)⁻¹ * f x = 1
     exact inv_mul_cancel₀ hfx
 
+/-- Modulating a nonzero bump by a character can make its integral nonzero
+without enlarging its support. -/
+private theorem sLocalPWTests_moments_surjective_zero_bump_modulate
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+    [MeasurableSpace G] [BorelSpace G] (μ : MeasureTheory.Measure G) [μ.IsHaarMeasure]
+    (p : SchwartzBruhat G) (hp : p ≠ 0) :
+    ∃ h : SchwartzBruhat G, tsupport h.val ⊆ tsupport p.val ∧
+      MeasureTheory.integral μ h.val ≠ 0 := by
+  obtain ⟨L, hL⟩ := schwartzBruhat_fourier_equiv μ
+  obtain ⟨χ, hχ⟩ : ∃ χ, L p χ ≠ 0 := by
+    by_contra! hall
+    exact hp (L.map_eq_zero_iff.mp (Subtype.ext (funext hall)))
+  let h : SchwartzBruhat G := ⟨_, pontryaginDual_mul_schwartzBruhat χ⁻¹ p⟩
+  refine ⟨h, tsupport_mul_subset_right, ?_⟩
+  rw [(hL p).2 χ] at hχ
+  intro he
+  apply hχ
+  refine (MeasureTheory.integral_congr_ae ?_).trans he
+  exact .of_forall fun x ↦ by
+    change p x * star (χ x : ℂ) = (((χ x)⁻¹ : Circle) : ℂ) * p x
+    rw [Circle.coe_inv_eq_conj, Complex.star_def, mul_comm]
+
 /-- Paper: Definitions 7.3.2.1(1) and 7.3.2.3(1), pp. 351, 355.
 Every neighborhood of zero contains the support of a compact Schwartz–Bruhat
 bump vanishing at zero and having nonzero additive Tamagawa integral.
@@ -178,8 +202,56 @@ private theorem sLocalPWTests_moments_surjective_zero_bump
       h (Multiplicative.ofAdd 0) = 0 ∧
       MeasureTheory.integral (sAdditiveTamagawaMeasure F S)
         (fun x ↦ h (Multiplicative.ofAdd x)) ≠ 0 := by
-  sorry
+  classical
+  let A := SAdeleRing F S
+  let G := Multiplicative A
+  let w : InfinitePlace F := Classical.arbitrary _
+  have hi := InfinitePlace.Completion.isometry_extensionEmbedding w
+  let : NontriviallyNormedField w.Completion := ⟨⟨2, by
+    rw [← hi.norm_map_of_map_zero (map_zero _) (2 : w.Completion), map_ofNat]
+    norm_num⟩⟩
+  let j (z : w.Completion) : A := (Pi.single w z, 0)
+  have hj : Continuous j := (continuous_single w).prodMk continuous_const
+  have h0 : j 0 = 0 := by
+    change (Pi.single w 0, (0 : (v : S) → v.val.adicCompletion F)) = (0, 0)
+    rw [Pi.single_zero]
+  have hnear : ∀ᶠ z in 𝓝[≠] (0 : w.Completion), j z ∈ interior K :=
+    ((hj.tendsto' _ _ h0).mono_left nhdsWithin_le_nhds) (interior_mem_nhds.mpr hK)
+  obtain ⟨z, hzK, hz⟩ := (hnear.and (self_mem_nhdsWithin :
+    {0}ᶜ ∈ 𝓝[≠] (0 : w.Completion))).exists
+  have hjz : j z ≠ 0 := by
+    intro he
+    have hz0 : Pi.single w z w = (0 : w.Completion) := congrArg (fun a : A ↦ a.1 w) he
+    exact hz (Set.mem_singleton_iff.mpr ((Pi.single_eq_same w z).symm.trans hz0))
+  let (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+  let (v : InfinitePlace F) : MeasurableSpace v.Completion := borel _
+  let : MeasurableSpace (InfiniteAdeleRing F) :=
+    inferInstanceAs (MeasurableSpace ((v : InfinitePlace F) → v.Completion))
+  let : MeasurableSpace A := inferInstanceAs
+    (MeasurableSpace (InfiniteAdeleRing F × ((v : S) → v.val.adicCompletion F)))
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let (v : InfinitePlace F) : SecondCountableTopology v.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding v).isEmbedding.secondCountableTopology
+  let : SecondCountableTopology G := inferInstanceAs (SecondCountableTopology
+    (((v : InfinitePlace F) → v.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let μ : MeasureTheory.Measure G := sAdditiveTamagawaMeasure F S
+  obtain ⟨hT₂, hLC, hBor, hHaar, -⟩ := sAdele_fourierMeasure (F := F) (S := S)
+  let : T2Space G := hT₂
+  let : LocallyCompactSpace G := hLC
+  let : BorelSpace G := hBor
+  let : μ.IsHaarMeasure := hHaar
+  let U : Set G := (Multiplicative.toAdd ⁻¹' interior K) ∩ {Multiplicative.ofAdd (0 : A)}ᶜ
+  have hU : IsOpen U := (isOpen_interior.preimage continuous_toAdd).inter isClosed_singleton.isOpen_compl
+  obtain ⟨p, hpc, hpU, hpx⟩ := sLocalPWTests_moments_surjective_bump
+    (Multiplicative.ofAdd (j z)) U (hU.mem_nhds ⟨hzK, hjz⟩)
+  have hp : p ≠ 0 := fun he ↦ zero_ne_one ((congrArg
+    (fun f : SchwartzBruhat G ↦ f (Multiplicative.ofAdd (j z))) he).symm.trans hpx)
+  obtain ⟨h, hs, hI⟩ := sLocalPWTests_moments_surjective_zero_bump_modulate μ p hp
+  refine ⟨h, hpc.of_isClosed_subset isClosed_closure hs, fun x hx ↦
+    interior_subset (hpU (hs hx)).1, ?_, hI⟩
+  exact image_eq_zero_of_notMem_tsupport fun hx ↦ (hpU (hs hx)).2 rfl
 
+open MeasureTheory in
 /-- Paper: Definitions 7.3.2.1(1) and 7.3.2.3(1), pp. 351, 355.
 Insertion of integer-ring indicators multiplies the Fourier value at zero by
 one nonzero scalar, independent of the test.
@@ -190,7 +262,59 @@ private theorem sLocalPWTests_moments_surjective_transition
     ∃ c : ℂ, c ≠ 0 ∧ ∀ g : SchwartzBruhat (Multiplicative (SAdeleRing F S)),
       sAdeleSchwartzFourier (sAdeleSchwartzTransition F hST g) (Multiplicative.ofAdd 0) =
         c * sAdeleSchwartzFourier g (Multiplicative.ofAdd 0) := by
-  sorry
+  classical
+  obtain ⟨D, hd, rfl⟩ : ∃ D : Finset (HeightOneSpectrum (𝓞 F)),
+      Disjoint S D ∧ T = S ∪ D :=
+    ⟨T \ S, Finset.disjoint_sdiff, (Finset.union_sdiff_of_subset hST).symm⟩
+  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+  let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+  let (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+  let (v : HeightOneSpectrum (𝓞 F)) : BorelSpace (v.adicCompletion F) := ⟨rfl⟩
+  let (v : HeightOneSpectrum (𝓞 F)) : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let μ := finiteLocalAdditiveTamagawaMeasure F
+  let (v : HeightOneSpectrum (𝓞 F)) : (μ v).IsAddHaarMeasure :=
+    finiteLocalAdditiveTamagawaMeasure_isAddHaar F v
+  let b (v : D) := (v.val.adicCompletionIntegers F : Set (v.val.adicCompletion F)).indicator (fun _ ↦ (1 : ℂ))
+  refine ⟨∏ v : D, ∫ x, b v x ∂μ v, Finset.prod_ne_zero_iff.mpr ?_, fun g ↦ ?_⟩
+  · intro v _
+    let O := (v.val.adicCompletionIntegers F : Set (v.val.adicCompletion F))
+    have ho : IsOpen O := Valued.isOpen_valuationSubring _
+    have hc : IsCompact O := isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v.val)
+    have hm : 0 < (μ v).real O := ENNReal.toReal_pos
+      (ho.measure_pos (μ v) ⟨0, (v.val.adicCompletionIntegers F).zero_mem⟩).ne'
+      (hc.measure_ne_top (μ := μ v))
+    change (∫ x, O.indicator (fun _ ↦ (1 : ℂ)) x ∂μ v) ≠ 0
+    rw [integral_indicator_const _ ho.measurableSet, Complex.real_smul, mul_one]
+    exact Complex.ofReal_ne_zero.mpr hm.ne'
+  rw [sAdeleSchwartzFourier_apply_zero, sAdeleSchwartzFourier_apply_zero, mul_comm]
+  let (w : InfinitePlace F) : SigmaFinite (infiniteLocalAdditiveTamagawaMeasure F w) := by
+    rw [infiniteLocalAdditiveTamagawaMeasure]
+    split_ifs with hw
+    · exact (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).symm.toHomeomorph.measurableEmbedding.sigmaFinite_map
+    · rw [two_nsmul]
+      exact (InfinitePlace.Completion.isometryEquivComplexOfIsComplex
+        (InfinitePlace.not_isReal_iff_isComplex.mp hw)).symm.toHomeomorph.measurableEmbedding.sigmaFinite_map
+  apply integral_prod_piFinsetUnion (Measure.pi (infiniteLocalAdditiveTamagawaMeasure F)) μ hd
+    (fun z ↦ g (Multiplicative.ofAdd z)) b
+  intro a x y
+  rw [sAdeleSchwartzTransition_apply]
+  let X (v : HeightOneSpectrum (𝓞 F)) := v.adicCompletion F
+  let t := MeasurableEquiv.piFinsetUnion X hd (x, y)
+  have hmem : (∀ w : ↥(S ∪ D), w.val ∉ S → t w ∈ w.val.adicCompletionIntegers F) ↔
+      ∀ v : D, y v ∈ v.val.adicCompletionIntegers F := by
+    constructor
+    · intro h v
+      have hv := h ⟨v.val, Finset.mem_union_right S v.property⟩
+        (fun hs ↦ Finset.disjoint_left.mp hd hs v.property)
+      simpa only [t, MeasurableEquiv.piFinsetUnion_right X hd v.property] using hv
+    · intro h w hw
+      have hv := (Finset.mem_union.mp w.property).resolve_left hw
+      simpa only [t, MeasurableEquiv.piFinsetUnion_right X hd hv] using! h ⟨w.val, hv⟩
+  change (if _ then g (Multiplicative.ofAdd (a, fun v : S ↦ t ⟨v.val, hST v.property⟩)) else 0) = _
+  have hx : (fun v : S ↦ t ⟨v.val, hST v.property⟩) = x :=
+    funext fun v ↦ MeasurableEquiv.piFinsetUnion_left X hd v.property _
+  simp only [b, indicator_apply, Fintype.prod_boole, mul_ite, mul_one, mul_zero]
+  exact if_congr hmem (congrArg (fun u ↦ g (Multiplicative.ofAdd (a, u))) hx) rfl
 
 /-- Paper: Definitions 7.3.2.1(1) and 7.3.2.3(1), pp. 351, 355.
 The two moments on the inserted test space can be specified independently whenever
@@ -312,6 +436,153 @@ theorem sLocalAbsolutePW_seqDense {S₀ : Finset (HeightOneSpectrum (𝓞 F))}
       (∀ n, ∃ X > 0, u n ∈ sLocalAbsolutePW hST X D χ) ∧
         Tendsto u atTop (𝓝 x) := by sorry
 
+/-- Paper: Theorem 2.2.3.2, p. 82, and the proof of Proposition 7.3.2.2(2)–(3), p. 353.
+The global Fourier transform of the global insertion of an S-local test vanishes at every
+adele where the S-local Fourier transform vanishes at the projection, and at every adele
+having a coordinate outside S beyond a fixed bound. The bounds are at least one and equal
+to one at all but finitely many places.
+The proof would integrate over the integer tail: translation by the omitted integer rings
+leaves the inserted test invariant, so the transform vanishes off the annihilator of those
+rings, and on the annihilator the tail integrates to a positive constant
+(compare `tamagawaFourier_sAdeleLift` in `AppA_AlgebraicNT/Sec3.lean`, where the bound is
+the absolute norm of the place raised to the exponent of the different). -/
+private theorem sLocalAbsolutePW_globalSupport_fourier {F : Type*} [Field F] [NumberField F]
+    (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    ∃ D : HeightOneSpectrum (𝓞 F) → ℝ, (∀ v, 1 ≤ D v) ∧ (mulSupport D).Finite ∧
+      ∀ (h : SchwartzBruhat (Multiplicative (SAdeleRing F S))) (y : AdeleRing (𝓞 F) F),
+        adeleSchwartzFourier (sAdeleSchwartzToGlobal F S h) (Multiplicative.ofAdd y) ≠ 0 →
+          sAdeleSchwartzFourier h (Multiplicative.ofAdd (adeleProjection F S y)) ≠ 0 ∧
+            ∀ v, v ∉ S → ‖y.2 v‖ ≤ D v := by
+  sorry
+
+/-- An idele whose S-coordinates lie in the S-product region of size `Y` and whose other
+finite coordinates are bounded by `D` has idelic norm at most `Y` times the product of `D`. -/
+private theorem sLocalAbsolutePW_globalSupport_norm {F : Type*} [Field F] [NumberField F]
+    (S : Finset (HeightOneSpectrum (𝓞 F))) (D : HeightOneSpectrum (𝓞 F) → ℝ)
+    (hD : ∀ v, 1 ≤ D v) (hDf : (mulSupport D).Finite) (Y : ℝ) (z : IdeleGroup (𝓞 F) F)
+    (hz : (∏ w : InfinitePlace F, ‖(adeleProjection F S z.val).1 w‖ ^ w.mult) *
+      (∏ v : S, ‖(adeleProjection F S z.val).2 v‖) ≤ Y)
+    (hout : ∀ v, v ∉ S → ‖z.val.2 v‖ ≤ D v) :
+    ((ideleNorm F z : ℝ≥0) : ℝ) ≤ Y * ∏ᶠ v, D v := by
+  classical
+  obtain ⟨hfin, hnorm⟩ := (ideleNorm_spec F).1 z
+  let a : HeightOneSpectrum (𝓞 F) → ℝ := fun v ↦ ‖z.val.2 v‖
+  let U : Finset (HeightOneSpectrum (𝓞 F)) := S ∪ hDf.toFinset ∪ Set.Finite.toFinset hfin
+  have ha : (∏ᶠ v, a v) = ∏ v ∈ U, a v :=
+    finprod_eq_prod_of_mulSupport_subset _ fun v hv ↦ by simp [U, (Set.Finite.mem_toFinset hfin).mpr hv]
+  have hDU : (∏ᶠ v, D v) = ∏ v ∈ U, D v :=
+    finprod_eq_prod_of_mulSupport_subset _ fun v hv ↦ by
+      have hv' : D v ≠ 1 := hv
+      simp [U, hv']
+  have hSU : S ⊆ U := fun v hv ↦ by simp [U, hv]
+  have hD0 (v) : 0 ≤ D v := zero_le_one.trans (hD v)
+  let P := ∏ w : InfinitePlace F, ‖z.val.1 w‖ ^ w.mult
+  have hP : 0 ≤ P := Finset.prod_nonneg fun w _ ↦ pow_nonneg (norm_nonneg _) _
+  have hS : (∏ v ∈ S, a v) = ∏ v : S, ‖(adeleProjection F S z.val).2 v‖ :=
+    (Finset.prod_coe_sort S a).symm
+  have hPS : P * ∏ v ∈ S, a v ≤ Y := by
+    rw [hS]
+    exact hz
+  have hSnn : 0 ≤ ∏ v ∈ S, a v := Finset.prod_nonneg fun v _ ↦ norm_nonneg _
+  have hY : 0 ≤ Y := (mul_nonneg hP hSnn).trans hPS
+  have hrest : (∏ v ∈ U \ S, a v) ≤ ∏ v ∈ U \ S, D v :=
+    Finset.prod_le_prod₀ (fun v _ ↦ norm_nonneg _)
+      fun v hv ↦ hout v (Finset.mem_sdiff.mp hv).2
+  have hrestD : (∏ v ∈ U \ S, D v) ≤ ∏ v ∈ U, D v := by
+    rw [← Finset.prod_sdiff hSU]
+    exact le_mul_of_one_le_right (Finset.prod_nonneg fun v _ ↦ hD0 v)
+      (Finset.one_le_prod₀ fun v _ ↦ hD v)
+  have hrestD0 : 0 ≤ ∏ v ∈ U \ S, D v := Finset.prod_nonneg fun v _ ↦ hD0 v
+  rw [show ((ideleNorm F z : ℝ≥0) : ℝ) = P * ∏ᶠ v, a v from hnorm, ha, hDU,
+    ← Finset.prod_sdiff hSU]
+  calc P * ((∏ v ∈ U \ S, a v) * ∏ v ∈ S, a v)
+      = (P * ∏ v ∈ S, a v) * ∏ v ∈ U \ S, a v := by ring
+    _ ≤ Y * ∏ v ∈ U \ S, D v := mul_le_mul hPS hrest
+        (Finset.prod_nonneg fun v _ ↦ norm_nonneg _) hY
+    _ ≤ Y * ∏ v ∈ U, D v := mul_le_mul_of_nonneg_left hrestD hY
+
+/-- Paper: Proposition 7.3.2.2(2), p. 352, and Proposition 7.3.2.4(2), p. 356.
+For any Fourier region inside an S-product region, the global homogeneous theta functions
+of the inserted zero-moment tests vanish below a uniform positive idelic norm.
+By Riemann–Roch they are the theta functions of the Fourier transforms at the inverse
+class, and those vanish above a uniform norm by the product formula. -/
+private theorem sLocalAbsolutePW_globalSupport_region {F : Type*} [Field F] [NumberField F]
+    {S T : Finset (HeightOneSpectrum (𝓞 F))} (hST : S ⊆ T)
+    (ω : PontryaginDual (ideleClassNorm F).ker) (K : Set (SAdeleRing F S)) (Y : ℝ)
+    (hY : 0 < Y)
+    (hK : ∀ x ∈ K, (∏ w : InfinitePlace F, ‖x.1 w‖ ^ w.mult) * (∏ v : S, ‖x.2 v‖) ≤ Y) :
+    ∃ bound > (0 : ℝ), ∀ (f : SchwartzBruhat (Multiplicative (SAdeleRing F T))),
+      f ∈ sLocalPWTests hST K ⊓ sAdelePolarSubspace F T →
+      tsupport (homogeneousAdelicTheta ω (sAdeleSchwartzToGlobal F T f)) ⊆
+        {g | bound⁻¹ ≤ ((ideleClassNorm F g).val : ℝ)} := by
+  classical
+  obtain ⟨D, hD, hDf, hA⟩ := sLocalAbsolutePW_globalSupport_fourier (F := F) S
+  have hD1 : 1 ≤ ∏ᶠ v, D v := by
+    rw [finprod_eq_prod_of_mulSupport_subset D (s := hDf.toFinset) fun v hv ↦
+      hDf.mem_toFinset.mpr hv]
+    exact Finset.one_le_prod₀ fun v _ ↦ hD v
+  let bound := Y * ∏ᶠ v, D v
+  have hb : 0 < bound := mul_pos hY (zero_lt_one.trans_le hD1)
+  refine ⟨bound, hb, ?_⟩
+  rintro f ⟨hf, hf0⟩
+  obtain ⟨h, rfl, -, hhK⟩ := (mem_sLocalPWTests hST K f).mp hf
+  let Φ := sAdeleSchwartzToGlobal F T (sAdeleSchwartzTransition F hST h)
+  have hΦ : Φ = sAdeleSchwartzToGlobal F S h :=
+    LinearMap.congr_fun (sAdeleSchwartzToGlobal_comp (F := F) hST) h
+  obtain ⟨hΦ0, hΦ1⟩ := (mem_adelePolarSubspace Φ).mp
+    (sAdeleSchwartzToGlobal_mem_polarSubspace (F := F) (S := T) ⟨_, hf0⟩)
+  -- The theta function of the Fourier transform vanishes at classes of large norm.
+  have hlarge (z : IdeleGroup (𝓞 F) F) (hz : bound < ((ideleNorm F z : ℝ≥0) : ℝ)) :
+      adelicTheta (adeleSchwartzFourier Φ) (QuotientGroup.mk z) = 0 := by
+    rw [adelicTheta_mk]
+    refine (tsum_congr fun ξ ↦ ?_).trans tsum_zero
+    by_contra hne
+    rw [hΦ] at hne
+    obtain ⟨hloc, htail⟩ := hA h _ hne
+    let u : IdeleGroup (𝓞 F) F := IdeleGroup.unitEmbedding (𝓞 F) F ξ * z
+    have hu : u.val = algebraMap F (AdeleRing (𝓞 F) F) (ξ : F) * z.val := rfl
+    have huK : adeleProjection F S u.val ∈ K := by
+      have hmem := hhK (subset_tsupport _ hloc)
+      rw [hu]
+      exact hmem
+    have hn := sLocalAbsolutePW_globalSupport_norm S D hD hDf Y u (hK _ huK)
+      (fun v hv ↦ by rw [hu]; exact htail v hv)
+    have hprin : ideleNorm F u = ideleNorm F z := by
+      rw [map_mul, MonoidHom.mem_ker.mp ((ideleNorm_spec F).2 ⟨ξ, rfl⟩), one_mul]
+    rw [hprin] at hn
+    exact absurd hz (not_lt.mpr hn)
+  -- Hence theta of the test vanishes at classes of small norm.
+  have hsmall (x : IdeleClassGroup (𝓞 F) F)
+      (hx : ((ideleClassNorm F x).val : ℝ) < bound⁻¹) : adelicTheta Φ x = 0 := by
+    have hpos : (0 : ℝ) < ((ideleClassNorm F x).val : ℝ) :=
+      NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr (ideleClassNorm F x).ne_zero)
+    rw [adelicTheta_riemannRoch, hΦ0, hΦ1, smul_zero, add_zero, sub_zero]
+    induction x using QuotientGroup.induction_on with
+    | _ z =>
+      rw [← QuotientGroup.mk_inv]
+      have hz : ((ideleClassNorm F (QuotientGroup.mk z)).val : ℝ) =
+          ((ideleNorm F z : ℝ≥0) : ℝ) := rfl
+      have hinv : bound < ((ideleNorm F z⁻¹ : ℝ≥0) : ℝ) := by
+        rw [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv, ← hz]
+        exact (lt_inv_comm₀ hpos hb).mp hx
+      rw [hlarge z⁻¹ hinv, smul_zero]
+  have hclosed : IsClosed {g : IdeleClassGroup (𝓞 F) F |
+      bound⁻¹ ≤ ((ideleClassNorm F g).val : ℝ)} :=
+    isClosed_le continuous_const (NNReal.continuous_coe.comp
+      (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous))
+  refine closure_minimal (fun g hg ↦ ?_) hclosed
+  by_contra hlt
+  simp only [Set.mem_ofPred_eq, not_le] at hlt
+  apply hg
+  change (∫ k, adelicTheta Φ (k.val * g) * (ω k : ℂ) ∂_) = 0
+  refine (MeasureTheory.integral_congr_ae (Filter.Eventually.of_forall fun k ↦ ?_)).trans
+    (MeasureTheory.integral_zero _ _)
+  have hk : ((ideleClassNorm F (k.val * g)).val : ℝ) < bound⁻¹ := by
+    rw [map_mul, MonoidHom.mem_ker.mp k.property, one_mul]
+    exact hlt
+  change adelicTheta Φ (k.val * g) * (ω k : ℂ) = 0
+  rw [hsmall _ hk, zero_mul]
+
 /-- Paper: Proposition 7.3.2.2(2), p. 352.
 At fixed finite stages, global theta of every inserted zero-moment test at this absolute
 level vanishes below a uniform positive idelic norm. -/
@@ -322,7 +593,19 @@ theorem sLocalAbsolutePW_globalSupport {S₀ : Finset (HeightOneSpectrum (𝓞 F
     (X : ℝ) (_hX : 0 < X) :
     ∃ bound > (0 : ℝ), ∀ (f : B(T)), f ∈ sLocalPWTests hST (sLocalPWBox S X) ⊓ Z₀(T) →
       tsupport (homogeneousAdelicTheta ω (sAdeleSchwartzToGlobal F T f)) ⊆
-        {g | bound⁻¹ ≤ ((ideleClassNorm F g).val : ℝ)} := by sorry
+        {g | bound⁻¹ ≤ ((ideleClassNorm F g).val : ℝ)} := by
+  refine sLocalAbsolutePW_globalSupport_region hST ω _ (X ^ count(S)) (pow_pos _hX _) ?_
+  rintro x ⟨hinf, hfin⟩
+  rw [pow_add]
+  have h1 : (∏ w : InfinitePlace F, ‖x.1 w‖ ^ w.mult) ≤ X ^ Fintype.card (InfinitePlace F) :=
+    calc (∏ w : InfinitePlace F, ‖x.1 w‖ ^ w.mult) ≤ ∏ _w : InfinitePlace F, X :=
+          Finset.prod_le_prod₀ (fun w _ ↦ pow_nonneg (norm_nonneg _) _) fun w _ ↦ hinf w
+      _ = X ^ Fintype.card (InfinitePlace F) := by rw [Finset.prod_const, Finset.card_univ]
+  have h2 : (∏ v : S, ‖x.2 v‖) ≤ X ^ S.card :=
+    calc (∏ v : S, ‖x.2 v‖) ≤ ∏ _v : S, X :=
+          Finset.prod_le_prod₀ (fun v _ ↦ norm_nonneg _) fun v _ ↦ hfin v
+      _ = X ^ S.card := by rw [Finset.prod_const, Finset.card_univ, Fintype.card_coe]
+  exact mul_le_mul h1 h2 (Finset.prod_nonneg fun v _ ↦ norm_nonneg _) (pow_nonneg _hX.le _)
 
 /-- Paper: Proposition 7.3.2.2(3), p. 352.
 The local homogeneous theta of the Fourier-transformed level tests has a uniform upper
@@ -647,7 +930,8 @@ theorem sLocalInvariantPW_globalSupport {S₀ : Finset (HeightOneSpectrum (𝓞 
     (Y : ℝ) (_hY : 0 < Y) :
     ∃ bound > (0 : ℝ), ∀ (f : B(T)), f ∈ sLocalPWTests hST (sLocalPWProductRegion S Y) ⊓ Z₀(T) →
       tsupport (homogeneousAdelicTheta ω (sAdeleSchwartzToGlobal F T f)) ⊆
-        {g | bound⁻¹ ≤ ((ideleClassNorm F g).val : ℝ)} := by sorry
+        {g | bound⁻¹ ≤ ((ideleClassNorm F g).val : ℝ)} :=
+  sLocalAbsolutePW_globalSupport_region hST ω _ Y _hY fun _ hx ↦ hx
 
 end InvariantLevels
 
@@ -920,6 +1204,68 @@ theorem sLocalInvariantPW_principalValue {S₀ : Finset (HeightOneSpectrum (𝓞
     (Y : ℝ) (_hY : 0 < Y) :
     (invPW(hST, Y, χ)).map (PV(hRT, χ)) ≤ invPW(hST, size(R) * Y, χ) := by sorry
 
+/-- Modulo an arbitrary subspace, the kernel of the two moments is still closed:
+its preimage is the inverse image of a subspace of the moment plane. -/
+private theorem sLocalPW_principalValue_diagram_closed {E : Type*} [AddCommGroup E]
+    [Module ℂ E] [TopologicalSpace E] (K : Submodule ℂ E) (m : E →ₗ[ℂ] ℂ × ℂ)
+    (hm : Continuous m) : IsClosed (m.ker.map K.mkQ : Set (E ⧸ K)) := by
+  apply K.isQuotientMap_mkQ.isCoinducing.isClosed_preimage.mp
+  change IsClosed (((m.ker.map K.mkQ).comap K.mkQ : Submodule ℂ E) : Set E)
+  rw [Submodule.comap_map_mkQ, ← Submodule.comap_map_eq m K]
+  exact (K.map m).isClosed_of_finiteDimensional.preimage hm
+
+private theorem sLocalPW_principalValue_diagram_polar (χ : PontryaginDual J₁(T)) :
+    IsClosed ((Z₀(T)).map (q(T, χ)) : Set (Θ(T, χ))) := by
+  unfold sAdelePolarSubspace
+  apply sLocalPW_principalValue_diagram_closed
+  obtain ⟨L, hL⟩ := sLocal_fourier_continuousLinear (F := F) (S := T)
+  have he := schwartzBruhat_eval_continuous (Multiplicative.ofAdd (0 : SAdeleRing F T))
+  exact he.prodMk ((he.comp L.continuous).congr fun f ↦ congrArg (fun g : B(T) ↦
+    g (Multiplicative.ofAdd 0)) (hL f))
+
+private theorem sLocalPW_principalValue_diagram_empty (h : (∅ : Finset V) ⊆ T) :
+    sAdelePrincipalValue F h = LinearMap.id := by
+  have conj {E G Y : Type _} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+      [AddCommGroup G] [Module ℂ G] [TopologicalSpace G]
+      [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+      (e : InductiveTensor E G ≃L[ℂ] Y) (P : G →ₗ[ℂ] G) (hp : ∀ x, P x = x) :
+      e.toLinearMap.comp ((TensorProduct.map (LinearMap.id : E →ₗ[ℂ] E) P).comp e.symm.toLinearMap)
+        = LinearMap.id := by
+    have he : P = LinearMap.id := LinearMap.ext hp
+    subst he
+    exact LinearMap.ext fun x ↦ (congrArg e (LinearMap.congr_fun
+      (TensorProduct.map_id (R := ℂ) (M := E) (N := G)) (e.symm x))).trans (e.apply_symm_apply x)
+  unfold sAdelePrincipalValue
+  refine conj _ _ fun x ↦ ?_
+  simp only [Finset.notMem_empty, ite_false, PiTensorProduct.map_id]
+  rfl
+
+private theorem sLocalPW_principalValue_diagram_test (h : R ⊆ T) (χ : PontryaginDual J₁(T))
+    (u : (SAdeleRing F T)ˣ) (f : B(T)) :
+    q(T, χ) (sAdelePrincipalValue F h (schwartzBruhatUnitTranslate u f)) =
+      q(T, χ) (schwartzBruhatUnitTranslate u (sAdelePrincipalValue F h f)) := by
+  rcases R.eq_empty_or_nonempty with rfl | hn
+  · rw [sLocalPW_principalValue_diagram_empty h]
+    rfl
+  · apply (sLocalHomogeneousThetaSpace_mk_eq_iff χ _ _).2
+    have he := (sLocalAdelicThetaSpace_mk_eq_iff (F := F) (S := T) _ _).1
+      (sLocalThetaPrincipalValue_equivariant (F := F) h hn u f)
+    exact ContinuousMap.ext fun y ↦ by simp only [sLocalHomogeneousAdelicThetaLinearMap_apply, he]
+
+private theorem sLocalPW_principalValue_diagram_comm (h : R ⊆ T) (χ : PontryaginDual J₁(T))
+    (g : J(T)) (x : Θ(T, χ)) : PV(h, χ) (A(T, χ) g x) = A(T, χ) g (PV(h, χ) x) := by
+  let ρ := A(T, χ)
+  let U := PV(h, χ)
+  let Q := q(T, χ)
+  change U (ρ g x) = ρ g (U x)
+  have hx : Surjective (Q : B(T) → Θ(T, χ)) := Submodule.mkQ_surjective _
+  obtain ⟨u, hu⟩ := QuotientGroup.mk_surjective g
+  obtain ⟨f, hf⟩ := hx x
+  rw [← hu, ← hf]
+  have ha := (existsUnique_sLocalHomogeneousThetaAction (F := F) (S := T) χ).exists.choose_spec.2 u
+  exact ((congrArg U (ha f)).trans (sLocalPW_principalValue_diagram_test h χ u f)).trans
+    (ha (sAdelePrincipalValue F h f)).symm
+
 /-- Paper: Proposition 7.3.3.2, p. 358.
 There are inclusions along both rows of the PW diagram. The restrictions of the
 ambient principal value are continuous and commute with the translations.
@@ -943,7 +1289,22 @@ theorem sLocalPW_principalValue_diagram {S₀ : Finset (HeightOneSpectrum (𝓞 
         (∀ x : b, (P' x).val = PV(hRT, χ) x.val) ∧
         ∀ (g : J(T)), 1 ≤ ((m(T) g).val : ℝ) →
           ∀ x : (Z₀(T)).map (q(T, χ)),
-            PV(hRT, χ) (A(T, χ) g x.val) = A(T, χ) g (PV(hRT, χ) x.val) := by sorry
+            PV(hRT, χ) (A(T, χ) g x.val) = A(T, χ) g (PV(hRT, χ) x.val) := by
+  have hsize : 0 < size(R) := Finset.prod_pos fun v _ ↦
+    Nat.cast_pos.mpr (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v))
+  have row (l r : ℝ) (hl : 0 < l) (hlr : l ^ count(S) ≤ r) : absPW(hST, l, χ) ≤ invPW(hST, r, χ) :=
+    (sLocalAbsolutePW_le_invariant hST l hl _ χ).trans (sLocalInvariantPW_mono hST hlr _ χ)
+  have polar (r : ℝ) : invPW(hST, r, χ) ≤ (Z₀(T)).map (q(T, χ)) :=
+    Submodule.topologicalClosure_minimal _ (Submodule.map_mono inf_le_right)
+      (sLocalPW_principalValue_diagram_polar χ)
+  let p : Θ(T, χ) →L[ℂ] Θ(T, χ) := ⟨PV(hRT, χ),
+    (sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding hRT χ).continuous⟩
+  have hA := sLocalAbsolutePW_principalValue hST _hT hRT _hR _hsatR _hdis _hsat _hPic ω hu χ _hχ X _hX
+  have hB := sLocalInvariantPW_principalValue hST _hT hRT _hR _hsatR _hdis _hsat _hPic ω hu χ _hχ Y _hY
+  exact ⟨row _ _ _hX _hXY, row _ _ (mul_pos hsize _hX) _hXY', polar _, polar _,
+    (p.comp (absPW(hST, X, χ)).subtypeL).codRestrict _ (fun x ↦ hA ⟨x, x.property, rfl⟩),
+    (p.comp (invPW(hST, Y, χ)).subtypeL).codRestrict _ (fun x ↦ hB ⟨x, x.property, rfl⟩),
+    fun _ ↦ rfl, fun _ ↦ rfl, fun g _ x ↦ sLocalPW_principalValue_diagram_comm hRT χ g x.val⟩
 
 end PrincipalValues
 
@@ -2035,10 +2396,214 @@ theorem sLocalGammaFiltration_dual_span (ω : PontryaginDual J₁(S)) (N : depth
   exact @dual_range_mkQL_eq_span_of_finite _ _ _ _ _ _ _ hι_fin
     (fun j : ΓIndex(ω, U) ↦ ΓCoeff(ω, j))
 
+/-- Along the norm-twist line through a quasi-character, an archimedean place has its
+poles at an arithmetic progression running to the left. -/
+private theorem sLocalGammaFiltration_iInf_placePoles (c₀ : Xₛ) (w : InfinitePlace F) :
+    ∃ (a : ℂ) (step : ℝ), 0 < step ∧
+      ∀ s : ℂ, w ∈ arch(shift(c₀, s)) ↔ ∃ m : ℕ, s = -(step * (m : ℝ) : ℂ) - a := by
+  have htw (c : Xₛ) (a z : ℂ) : shift(shift(c, a), z) = shift(c, z + a) := by
+    ext1 g
+    change c g * _ ^ a * _ ^ z = c g * _ ^ (z + a)
+    rw [add_comm, Complex.cpow_add _ _ (Complex.ofReal_ne_zero.mpr
+      (NNReal.coe_ne_zero.mpr (m(S) g).ne_zero)), mul_assoc]
+  have hres_shift (z : ℂ) (g : w.Completionˣ) :
+      sLocalInfiniteRestriction w (shift(c₀, z)) g =
+        sLocalInfiniteRestriction w c₀ g *
+          ((((Units.map nnNormHom.toMonoidHom ^ w.mult : w.Completionˣ →* ℝ≥0ˣ) g : ℝ≥0) : ℝ) : ℂ) ^ z := by
+    have h1 := sLocalInfiniteRestriction_normTwist (F := F) (S := S) w z g
+    rw [← h1]
+    change c₀ _ * _ = c₀ _ * (((1 : Circle) : ℂ) * _)
+    rw [Circle.coe_one, one_mul]
+    rfl
+  by_cases hw : w.IsReal
+  · let p := (realLocalEulerParameters w hw (sLocalInfiniteRestriction w c₀)).exists.choose
+    have hp := (realLocalEulerParameters w hw (sLocalInfiniteRestriction w c₀)).exists.choose_spec
+    have hE (u : ℂ) :
+        infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (shift(c₀, u))) =
+          Complex.Gammaℝ (u + (p.1 + (p.2.val : ℂ))) := by
+      let e := (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm
+      have hshape : ∀ x : ℝˣ, sLocalInfiniteRestriction w (shift(c₀, u))
+          (Units.map e.toMonoidHom x) =
+            (‖(x : ℝ)‖ : ℂ) ^ (p.1 + u) * (if 0 < (x : ℝ) then 1 else (-1 : ℂ)) ^ p.2.val := by
+        intro x
+        have hn : ‖(e (x : ℝ) : w.Completion)‖ = ‖(x : ℝ)‖ :=
+          (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).symm.isometry.norm_map_of_map_zero
+            (map_zero e) (x : ℝ)
+        have hm : (((Units.map nnNormHom.toMonoidHom ^ w.mult : w.Completionˣ →* ℝ≥0ˣ)
+            (Units.map e.toMonoidHom x) : ℝ≥0) : ℝ) = ‖(x : ℝ)‖ := by
+          simp [InfinitePlace.mult, hw, hn]
+        rw [hres_shift, hp x, hm]
+        have hne : (‖(x : ℝ)‖ : ℂ) ≠ 0 :=
+          Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr x.ne_zero)
+        rw [Complex.cpow_add _ _ hne]
+        ring
+      have hq := (realLocalEulerParameters w hw (sLocalInfiniteRestriction w (shift(c₀, u)))).unique
+        (realLocalEulerParameters w hw (sLocalInfiniteRestriction w (shift(c₀, u)))).exists.choose_spec
+        (y₂ := (p.1 + u, p.2)) hshape
+      simp only [infiniteLocalEulerFactor, hw, ↓reduceDIte, hq]
+      congr 1; ring
+    refine ⟨p.1 + (p.2.val : ℂ), 2, two_pos, fun s ↦ ?_⟩
+    simp only [sLocalArchPolePlaces, Finset.mem_filter, Finset.mem_univ, true_and]
+    have hfun : (fun z : ℂ ↦ infiniteLocalEulerFactor w
+        (sLocalInfiniteRestriction w (shift(shift(c₀, s), z)))) =
+        fun z : ℂ ↦ Complex.Gammaℝ (z + (s + (p.1 + (p.2.val : ℂ)))) := by
+      funext z
+      rw [htw, hE]
+      congr 1; ring
+    rw [hfun, meromorphicOrderAt_gammaR_lt_zero_iff]
+    constructor <;> rintro ⟨m, hm⟩ <;> refine ⟨m, ?_⟩
+    · push_cast at hm ⊢; linear_combination hm
+    · push_cast at hm ⊢; linear_combination hm
+  · have hwc : w.IsComplex := InfinitePlace.not_isReal_iff_isComplex.mp hw
+    let p := (complexLocalEulerParameters w hwc (sLocalInfiniteRestriction w c₀)).exists.choose
+    have hp := (complexLocalEulerParameters w hwc (sLocalInfiniteRestriction w c₀)).exists.choose_spec
+    have hE (u : ℂ) :
+        infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (shift(c₀, u))) =
+          Complex.Gammaℂ (u + (p.1 + (p.2.natAbs : ℂ) / 2)) / 2 := by
+      let e := (InfinitePlace.Completion.ringEquivComplexOfIsComplex hwc).symm
+      have hshape : ∀ x : ℂˣ, sLocalInfiniteRestriction w (shift(c₀, u))
+          (Units.map e.toMonoidHom x) =
+            ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ^ (p.1 + u) * ((x : ℂ) / (‖(x : ℂ)‖ : ℂ)) ^ p.2 := by
+        intro x
+        have hn : ‖(e (x : ℂ) : w.Completion)‖ = ‖(x : ℂ)‖ :=
+          (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hwc).symm.isometry.norm_map_of_map_zero
+            (map_zero e) (x : ℂ)
+        have hm : (((Units.map nnNormHom.toMonoidHom ^ w.mult : w.Completionˣ →* ℝ≥0ˣ)
+            (Units.map e.toMonoidHom x) : ℝ≥0) : ℝ) = ‖(x : ℂ)‖ ^ 2 := by
+          simp [InfinitePlace.mult, hw, hn]
+        rw [hres_shift, hp x, hm]
+        have hne : ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ≠ 0 :=
+          Complex.ofReal_ne_zero.mpr (pow_ne_zero 2 (norm_ne_zero_iff.mpr x.ne_zero))
+        rw [Complex.cpow_add _ _ hne]
+        ring
+      have hq := (complexLocalEulerParameters w hwc (sLocalInfiniteRestriction w (shift(c₀, u)))).unique
+        (complexLocalEulerParameters w hwc (sLocalInfiniteRestriction w (shift(c₀, u)))).exists.choose_spec
+        (y₂ := (p.1 + u, p.2)) hshape
+      simp only [infiniteLocalEulerFactor, hw, ↓reduceDIte, hq]
+      congr 2; ring
+    refine ⟨p.1 + (p.2.natAbs : ℂ) / 2, 1, one_pos, fun s ↦ ?_⟩
+    simp only [sLocalArchPolePlaces, Finset.mem_filter, Finset.mem_univ, true_and]
+    have hfun : (fun z : ℂ ↦ infiniteLocalEulerFactor w
+        (sLocalInfiniteRestriction w (shift(shift(c₀, s), z)))) =
+        fun z : ℂ ↦ Complex.Gammaℂ (z + (s + (p.1 + (p.2.natAbs : ℂ) / 2))) / 2 := by
+      funext z
+      rw [htw, hE]
+      congr 2; ring
+    rw [hfun, meromorphicOrderAt_gammaC_div_two_lt_zero_iff]
+    constructor <;> rintro ⟨m, hm⟩ <;> refine ⟨m, ?_⟩
+    · push_cast at hm ⊢; linear_combination hm
+    · push_cast at hm ⊢; linear_combination hm
+
+/-- An archimedean place has only finitely many poles to the right of a quasi-character
+along its norm-twist line. -/
+private theorem sLocalGammaFiltration_iInf_finite (c : Xₛ) (w : InfinitePlace F) :
+    ({t : ℝ | 0 < t ∧ w ∈ arch(shift(c, (t : ℂ)))} : Set ℝ).Finite := by
+  obtain ⟨a, step, hstep, hiff⟩ := sLocalGammaFiltration_iInf_placePoles c w
+  obtain ⟨M, hM⟩ := exists_nat_gt (-a.re / step)
+  refine ((Set.finite_lt_nat M).image fun m : ℕ ↦ -(step * (m : ℝ)) - a.re).subset ?_
+  rintro t ⟨ht, hw⟩
+  obtain ⟨m, hm⟩ := (hiff _).mp hw
+  have hre : t = -(step * (m : ℝ)) - a.re := by
+    have := congrArg Complex.re hm
+    simpa using this
+  refine ⟨m, ?_, hre.symm⟩
+  have h1 : step * (m : ℝ) < -a.re := by linarith
+  have h2 : (m : ℝ) < -a.re / step := by rwa [lt_div_iff₀ hstep, mul_comm]
+  exact_mod_cast h2.trans hM
+
+/-- Every quasi-character with an archimedean pole on the component lies in some cutoff. -/
+private theorem sLocalGammaFiltration_iInf_mem_cutoff (ω : PontryaginDual J₁(S)) (c : Xₛ)
+    (hc : onComponent(c, ω)) (hne : (arch(c)).Nonempty) :
+    ∃ N : depths, c ∈ sLocalGammaPoleCutoff (F := F) (S := S) ω N := by
+  obtain ⟨w, hw⟩ := hne
+  refine ⟨fun w' ↦ (sLocalGammaFiltration_iInf_finite c w').toFinset.card, hc, w, hw, ?_⟩
+  rw [Set.Finite.encard_eq_coe_toFinset_card (sLocalGammaFiltration_iInf_finite c w)]
+
+/-- After the finite principal values, the pole order on a component is bounded by the
+number of archimedean places with a pole there. -/
+private theorem sLocalGammaFiltration_iInf_bound (g : B(S)) (c : Xₛ) :
+    sLocalPolarMultiplicity (sAdelePrincipalValue F (Finset.Subset.refl S) g) c ≤
+      (arch(c)).card := by
+  obtain ⟨χ, s, rfl⟩ := exists_sLocalNormTwist (F := F) (S := S) c
+  have hb := sLocalIdelicZFunction_principalValue_pole_bound (F := F) (S := S) g χ s
+  let ch := quasiCharacterNormTwist (m(S)) (isProperMap_sIdeleQuotientNorm F S).continuous
+    ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ)
+  have hcomp (G : Xₛ → ℂ) : meromorphicOrderAt (fun z ↦ G (shift(ch s, z))) 0 =
+      meromorphicOrderAt (fun z ↦ G (ch z)) s := by
+    have htw (z : ℂ) : shift(ch s, z) = ch (z + s) := normTwist_normTwist _ _ _ s z
+    simp only [htw]
+    rw [meromorphicOrderAt_fun_comp_add_const_eq_meromorphicOrderAt (f := fun z ↦ G (ch z)),
+      zero_add]
+  have hcard : (arch(ch s)).card = sLocalArchimedeanPoleMultiplicity χ s := by
+    unfold sLocalArchPolePlaces sLocalArchimedeanPoleMultiplicity
+    congr 1
+    refine Finset.filter_congr fun w _ ↦ ?_
+    rw [hcomp (fun c ↦ infiniteLocalEulerFactor w (sLocalInfiniteRestriction w c))]
+  rw [hcard]
+  unfold sLocalPolarMultiplicity
+  rw [hcomp (sLocalIdelicZFunction (sAdelePrincipalValue F (Finset.Subset.refl S) g))]
+  generalize meromorphicOrderAt (fun z ↦ sLocalIdelicZFunction
+    (sAdelePrincipalValue F (Finset.Subset.refl S) g) (ch z)) s = o at hb ⊢
+  induction o using WithTop.recTopCoe with
+  | top => simp
+  | coe n =>
+    have hn : -(sLocalArchimedeanPoleMultiplicity χ s : ℤ) ≤ n := WithTop.coe_le_coe.mp hb
+    simp only [WithTop.untop₀_coe]
+    omega
+
 /-- Paper: Theorem 7.3.4.1(3), p. 365.
 The intersection of all stages is the entire-Mellin subspace. -/
 theorem sLocalGammaFiltration_iInf (ω : PontryaginDual J₁(S)) :
-    (⨅ N : depths, sLocalGammaFiltration ω N) = Γker(ω) := by sorry
+    (⨅ N : depths, sLocalGammaFiltration ω N) = Γker(ω) := by
+  apply le_antisymm
+  · intro x hx
+    obtain ⟨y, hy⟩ := x.property
+    obtain ⟨g, rfl⟩ := Submodule.mkQ_surjective _ y
+    let f := sAdelePrincipalValue F (Finset.Subset.refl S) g
+    have hf : q(S, ω) f = x.val := hy
+    rw [mem_sLocalGammaEntireSubmodule ω x f hf]
+    intro c hc
+    rw [← sLocalPolarMultiplicity_eq_zero_iff]
+    by_contra hne
+    have hN : 0 < sLocalPolarMultiplicity f c := Nat.pos_of_ne_zero hne
+    have hbound : sLocalPolarMultiplicity f c ≤ (arch(c)).card :=
+      sLocalGammaFiltration_iInf_bound g c
+    obtain ⟨N, hcN⟩ := sLocalGammaFiltration_iInf_mem_cutoff ω c hc
+      (Finset.card_pos.mp (hN.trans_le hbound))
+    have hx' := (Submodule.mem_iInf _).mp hx N
+    have h0 := (Submodule.mem_iInf _).mp hx'
+      ⟨(c, sLocalPolarMultiplicity f c), hc, hcN, hN, hbound⟩
+    change sLocalThetaPrincipalPartCoeff ω c hc (sLocalPolarMultiplicity f c) x.val = 0 at h0
+    rw [← hf] at h0
+    exact mem_sLocalThetaPoleBound_iff_leading (sLocalZ_centered f c).1 hN rfl h0
+  · intro x hx
+    obtain ⟨y, hy⟩ := x.property
+    obtain ⟨g, rfl⟩ := Submodule.mkQ_surjective _ y
+    let f := sAdelePrincipalValue F (Finset.Subset.refl S) g
+    have hf : q(S, ω) f = x.val := hy
+    have hent := (mem_sLocalGammaEntireSubmodule ω x f hf).mp hx
+    refine (Submodule.mem_iInf _).mpr fun N ↦ (Submodule.mem_iInf _).mpr fun j ↦ ?_
+    change sLocalThetaPrincipalPartCoeff ω j.val.1 j.property.1 j.val.2 x.val = 0
+    rw [← hf]
+    change sLocalZLaurentCoeff f j.val.1 (-(j.val.2 : ℤ)) = 0
+    have hZ := (sLocalZ_centered f j.val.1).1
+    have ha := hZ.meromorphicOrderAt_nonneg_iff_analyticAt_toMeromorphicNFAt.1
+      (hent j.val.1 j.property.1)
+    have he : (fun z ↦ sLocalIdelicZFunction f (shift(j.val.1, z)) /
+        z ^ (-(j.val.2 : ℤ) + 1)) =ᶠ[𝓝[≠] (0 : ℂ)]
+        (fun z ↦ z ^ j.val.2 * toMeromorphicNFAt
+          (fun z ↦ sLocalIdelicZFunction f (shift(j.val.1, z))) 0 z / (z - 0)) := by
+      filter_upwards [hZ.eq_nhdsNE_toMeromorphicNFAt, self_mem_nhdsWithin] with z hz hz0
+      have hz0' : z ≠ 0 := hz0
+      rw [hz, sub_zero, zpow_add₀ hz0', zpow_one, zpow_neg, zpow_natCast]
+      field_simp
+    change complexResidue (fun z ↦ sLocalIdelicZFunction f (shift(j.val.1, z)) /
+        z ^ (-(j.val.2 : ℤ) + 1)) 0 = 0
+    have hg : AnalyticAt ℂ (fun z ↦ z ^ j.val.2 * toMeromorphicNFAt
+        (fun z ↦ sLocalIdelicZFunction f (shift(j.val.1, z))) 0 z) 0 :=
+      (analyticAt_id.pow _).mul ha
+    rw [mem_sLocalThetaPoleBound_iff_residue_congr he, complexResidue_div_sub hg]
+    simp [zero_pow j.property.2.2.1.ne']
 
 -- TODO(paper-gap): ERRATA I168 applies to the appeal to §5.4 on p. 365.
 -- Finite interpolation only gives a dense coefficient image in the product topology.
@@ -2052,6 +2617,236 @@ theorem sLocalGamma_all_coeff_surjective (ω : PontryaginDual J₁(S)) :
     Function.Surjective (fun (x : fullPV(ω)) (j : ΓIndex(ω, (Set.univ : Set Xₛ))) ↦
       ΓCoeff(ω, j) x) := by sorry
 
+/-- Every unitary character of the norm-one group is the restriction of a quasi-character. -/
+private theorem sLocalGammaOrbitalQuotient_coeff_exists (ω : PontryaginDual J₁(S)) :
+    ∃ c₀ : Xₛ, onComponent(c₀, ω) := by
+  let : LocallyCompactSpace (SAdeleRing F S)ˣ := (sIdeleGroup_description F S).2.2.1
+  have := isClosed_sProjectedDiagonal (F := F) (S := S)
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  obtain ⟨t, ht⟩ := exists_ne (1 : ℝ≥0ˣ)
+  have hr := range_normOneRestriction (m(S)) (isProperMap_sIdeleQuotientNorm F S)
+    ⟨σ t, (hσ t).trans_ne ht⟩
+  obtain ⟨c₀, hc₀⟩ : (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ω ∈
+      Set.range (normOneRestriction (m(S))) := hr ▸ ⟨ω, rfl⟩
+  exact ⟨c₀, hc₀⟩
+
+/-- A norm twist stays on the component of the quasi-character it twists. -/
+private theorem sLocalGammaOrbitalQuotient_coeff_onComponent (ω : PontryaginDual J₁(S)) (c₀ : Xₛ)
+    (h₀ : onComponent(c₀, ω)) (s : ℂ) : onComponent(shift(c₀, s), ω) := by
+  refine Eq.trans ?_ h₀
+  ext u
+  change c₀ u.val * (((m(S) u.val : ℝ≥0) : ℝ) : ℂ) ^ s = c₀ u.val
+  rw [u.prop]
+  simp
+
+/-- Two quasi-characters on one component differ by a norm twist. -/
+private theorem sLocalGammaOrbitalQuotient_coeff_shift (ω : PontryaginDual J₁(S)) (c₀ c : Xₛ)
+    (h₀ : onComponent(c₀, ω)) (hc : onComponent(c, ω)) : ∃ s : ℂ, c = shift(c₀, s) := by
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  let c₀inv := c₀.comp (ContinuousMonoidHom.inv J(S))
+  let P : QuasiCharacter ℝ≥0ˣ := (c * c₀inv).comp σ
+  obtain ⟨s, hs⟩ := (existsUnique_complexPower P).exists
+  refine ⟨s, ?_⟩
+  ext1 g
+  let u : J(S) := g * (σ (m(S) g))⁻¹
+  have hu_mem : u ∈ J₁(S) := by
+    change m(S) (g * (σ (m(S) g))⁻¹) = 1
+    rw [map_mul, map_inv, hσ, mul_inv_cancel]
+  have hu_eq : c u = c₀ u := DFunLike.congr_fun (hc.trans h₀.symm) ⟨u, hu_mem⟩
+  have hdecomp : g = u * σ (m(S) g) := by simp [u]
+  have hcg : c g = c u * c (σ (m(S) g)) := by
+    conv_lhs => rw [hdecomp]
+    exact map_mul c _ _
+  have hc₀g : c₀ g = c₀ u * c₀ (σ (m(S) g)) := by
+    conv_lhs => rw [hdecomp]
+    exact map_mul c₀ _ _
+  have hP : c (σ (m(S) g)) * (c₀ (σ (m(S) g)))⁻¹ =
+      (((m(S) g : ℝ≥0) : ℝ) : ℂ) ^ s := by
+    have h1 := hs (m(S) g)
+    change c (σ (m(S) g)) * c₀ (σ (m(S) g))⁻¹ = _ at h1
+    rwa [map_inv] at h1
+  have hc₀σ_ne : c₀ (σ (m(S) g)) ≠ 0 :=
+    ((Group.isUnit _).map c₀).ne_zero
+  change c g = c₀ g * (((m(S) g : ℝ≥0) : ℝ) : ℂ) ^ s
+  rw [hcg, hc₀g, hu_eq, ← hP]
+  field_simp [hc₀σ_ne]
+
+/-- The pairs of an archimedean center on the component and an admissible Laurent order
+form a countable set. -/
+private theorem sLocalGammaOrbitalQuotient_coeff_countable (ω : PontryaginDual J₁(S)) :
+    Countable (ΓIndex(ω, (Set.univ : Set Xₛ))) := by
+  obtain ⟨c₀, h₀⟩ := sLocalGammaOrbitalQuotient_coeff_exists ω
+  let P (w : InfinitePlace F) := sLocalGammaFiltration_iInf_placePoles c₀ w
+  let pole (w : InfinitePlace F) (m : ℕ) : Xₛ :=
+    shift(c₀, -((P w).choose_spec.choose * (m : ℝ) : ℂ) - (P w).choose)
+  let U := ⋃ w : InfinitePlace F, Set.range (pole w)
+  have hU : U.Countable := Set.countable_iUnion fun w ↦ Set.countable_range _
+  have hmem (j : ΓIndex(ω, (Set.univ : Set Xₛ))) : j.val.1 ∈ U := by
+    obtain ⟨s, hs⟩ := sLocalGammaOrbitalQuotient_coeff_shift ω c₀ j.val.1 h₀ j.property.1
+    obtain ⟨w, hw⟩ := Finset.card_pos.mp (j.property.2.2.1.trans_le j.property.2.2.2)
+    rw [hs] at hw
+    obtain ⟨m, hm⟩ := ((P w).choose_spec.choose_spec.2 s).mp hw
+    exact Set.mem_iUnion.mpr ⟨w, m, by rw [hs, hm]⟩
+  have : Countable U := hU.to_subtype
+  refine Function.Injective.countable
+    (f := fun j : ΓIndex(ω, (Set.univ : Set Xₛ)) ↦ ((⟨j.val.1, hmem j⟩ : U), j.val.2)) ?_
+  intro j₁ j₂ h
+  have h1 : j₁.val.1 = j₂.val.1 := congrArg (fun p ↦ p.1.val) h
+  have h2 : j₁.val.2 = j₂.val.2 := congrArg (fun p ↦ p.2) h
+  exact Subtype.ext (Prod.ext h1 h2)
+
+/-- There are infinitely many pairs of an archimedean center on the component and an
+admissible Laurent order. -/
+private theorem sLocalGammaOrbitalQuotient_coeff_infinite (ω : PontryaginDual J₁(S)) :
+    Infinite (ΓIndex(ω, (Set.univ : Set Xₛ))) := by
+  obtain ⟨c₀, h₀⟩ := sLocalGammaOrbitalQuotient_coeff_exists ω
+  let P (w : InfinitePlace F) := sLocalGammaFiltration_iInf_placePoles c₀ w
+  let pole (w : InfinitePlace F) (m : ℕ) : Xₛ :=
+    shift(c₀, -((P w).choose_spec.choose * (m : ℝ) : ℂ) - (P w).choose)
+  have hpole (w : InfinitePlace F) (m : ℕ) : w ∈ arch(pole w m) :=
+    ((P w).choose_spec.choose_spec.2 _).mpr ⟨m, rfl⟩
+  obtain ⟨w⟩ := (inferInstance : Nonempty (InfinitePlace F))
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  let t : ℝ≥0ˣ := Units.mk0 2 two_ne_zero
+  let f : ℕ → ΓIndex(ω, (Set.univ : Set Xₛ)) := fun m ↦
+    ⟨(pole w m, 1), sLocalGammaOrbitalQuotient_coeff_onComponent ω c₀ h₀ _, Set.mem_univ _,
+      one_pos, Finset.card_pos.mpr ⟨w, hpole w m⟩⟩
+  refine Infinite.of_injective f fun m₁ m₂ h ↦ ?_
+  have hc : pole w m₁ = pole w m₂ := congrArg (fun j ↦ j.val.1) h
+  have hg := DFunLike.congr_fun hc (σ t)
+  change c₀ (σ t) * (((m(S) (σ t) : ℝ≥0) : ℝ) : ℂ) ^ (_ : ℂ) =
+    c₀ (σ t) * (((m(S) (σ t) : ℝ≥0) : ℝ) : ℂ) ^ (_ : ℂ) at hg
+  have hne : c₀ (σ t) ≠ 0 := ((Group.isUnit _).map c₀).ne_zero
+  have hpow := congrArg norm (mul_left_cancel₀ hne hg)
+  rw [hσ t] at hpow
+  have h2 : (0 : ℝ) < ((t : ℝ≥0) : ℝ) := by norm_num [t]
+  rw [Complex.norm_cpow_eq_rpow_re_of_pos h2, Complex.norm_cpow_eq_rpow_re_of_pos h2] at hpow
+  have hre := (Real.rpow_right_inj h2 (by norm_num [t])).mp hpow
+  have hstep := (P w).choose_spec.choose_spec.1
+  have hm : (P w).choose_spec.choose * (m₁ : ℝ) = (P w).choose_spec.choose * (m₂ : ℝ) := by
+    simpa [Complex.mul_re] using hre
+  exact_mod_cast mul_left_cancel₀ hstep.ne' hm
+
+/-- A class lies in the entire-Mellin subspace exactly when all of its archimedean
+Laurent coefficients on the component vanish. -/
+private theorem sLocalGammaOrbitalQuotient_coeff_ker (ω : PontryaginDual J₁(S))
+    (x : fullPV(ω)) :
+    x ∈ Γker(ω) ↔ ∀ j : ΓIndex(ω, (Set.univ : Set Xₛ)), ΓCoeff(ω, j) x = 0 := by
+  rw [← sLocalGammaFiltration_iInf, Submodule.mem_iInf]
+  constructor
+  · intro h j
+    obtain ⟨N, hN⟩ := sLocalGammaFiltration_iInf_mem_cutoff ω j.val.1 j.property.1
+      (Finset.card_pos.mp (j.property.2.2.1.trans_le j.property.2.2.2))
+    exact (Submodule.mem_iInf _).mp (h N) ⟨j.val, j.property.1, hN, j.property.2.2⟩
+  · intro h N
+    exact (Submodule.mem_iInf _).mpr fun j ↦
+      h ⟨j.val, j.property.1, Set.mem_univ _, j.property.2.2⟩
+
+/-- A surjective continuous linear map from a Fréchet space onto a countable product of
+complex lines is open. -/
+private theorem sLocalGammaOrbitalQuotient_coeff_isOpenMap {Q ι : Type*} [AddCommGroup Q]
+    [Module ℂ Q] [TopologicalSpace Q] [IsTopologicalAddGroup Q] [ContinuousSMul ℂ Q]
+    [Countable ι] (hQ : IsFrechetTVS Q) (L : Q →L[ℂ] (ι → ℂ))
+    (hL : Function.Surjective L) : IsOpenMap L := by
+  obtain ⟨_, _, hmet, hcomplete⟩ := hQ
+  let : UniformSpace Q := IsTopologicalAddGroup.rightUniformSpace Q
+  have : IsUniformAddGroup Q := isUniformAddGroup_of_addCommGroup
+  have : CompleteSpace Q := hcomplete
+  have := hmet
+  refine isOpenMap_of_not_isMeagre_range L ?_
+  rw [hL.range_eq]
+  exact not_isMeagre_of_isOpen isOpen_univ Set.univ_nonempty
+
+/-- The archimedean Laurent coefficients identify the archimedean polar quotient with the
+product of complex lines indexed by centers and orders. -/
+private theorem sLocalGammaOrbitalQuotient_coeff_equiv (ω : PontryaginDual J₁(S)) :
+    ∃ Ψ : (fullPV(ω) ⧸ Γker(ω)) ≃L[ℂ] (ΓIndex(ω, (Set.univ : Set Xₛ)) → ℂ),
+      ∀ (x : fullPV(ω)) (j : ΓIndex(ω, (Set.univ : Set Xₛ))),
+        Ψ ((Γker(ω)).mkQ x) j = ΓCoeff(ω, j) x := by
+  have := sLocalGammaOrbitalQuotient_coeff_countable ω
+  let Φ : fullPV(ω) →L[ℂ] (ΓIndex(ω, (Set.univ : Set Xₛ)) → ℂ) :=
+    ContinuousLinearMap.pi fun j ↦ ΓCoeff(ω, j)
+  have hker : Γker(ω) ≤ LinearMap.ker Φ.toLinearMap := fun x hx ↦
+    funext fun j ↦ (sLocalGammaOrbitalQuotient_coeff_ker ω x).mp hx j
+  let L := (Γker(ω)).liftQ Φ.toLinearMap hker
+  have hcont : Continuous L :=
+    (QuotientAddGroup.isQuotientMap_mk _).continuous_iff.mpr Φ.continuous
+  have hinj : Function.Injective L := by
+    rw [← LinearMap.ker_eq_bot]
+    refine Submodule.ker_liftQ_eq_bot _ _ _ fun x hx ↦ ?_
+    exact (sLocalGammaOrbitalQuotient_coeff_ker ω x).mpr fun j ↦ congrFun hx j
+  have hsurj : Function.Surjective L := fun v ↦ by
+    obtain ⟨x, hx⟩ := sLocalGamma_all_coeff_surjective ω v
+    exact ⟨(Γker(ω)).mkQ x, hx⟩
+  let e := LinearEquiv.ofBijective L ⟨hinj, hsurj⟩
+  have hopen : IsOpenMap L :=
+    sLocalGammaOrbitalQuotient_coeff_isOpenMap (sLocalGammaOrbitalQuotient_frechet ω)
+      ⟨L, hcont⟩ hsurj
+  let h := e.toEquiv.toHomeomorphOfContinuousOpen hcont hopen
+  exact ⟨{ e with continuous_toFun := hcont, continuous_invFun := h.symm.continuous },
+    fun x j ↦ rfl⟩
+
+/-- If a product of lines is identified with a quotient by coefficient functionals, each of
+which already vanishes on one of a family of larger subspaces, then the maps to the quotients by
+that family induce the topology of the quotient. -/
+private theorem sLocalGammaOrbitalQuotient_projectiveTopology_inducing {E ι κ : Type*}
+    {_ : AddCommGroup E} {_ : Module ℂ E} {_ : TopologicalSpace E}
+    (P : Submodule ℂ E) (stage : κ → Submodule ℂ E) (hle : ∀ N, P ≤ stage N)
+    (φ : ι → StrongDual ℂ E) (Ψ : E ⧸ P → ι → ℂ) (hΨi : IsInducing Ψ)
+    (hΨ : ∀ (x : E) (j : ι), Ψ (P.mkQ x) j = φ j x)
+    (hN : ∀ j, ∃ N, ∀ x ∈ stage N, φ j x = 0) :
+    IsInducing (fun (x : E ⧸ P) (N : κ) ↦ P.mapQ (stage N) LinearMap.id (hle N) x) := by
+  let ℓ (j : ι) : (E ⧸ stage (hN j).choose) →ₗ[ℂ] ℂ :=
+    (stage (hN j).choose).liftQ (φ j).toLinearMap fun x hx ↦ (hN j).choose_spec x hx
+  have hℓ (j : ι) : Continuous (ℓ j) :=
+    (QuotientAddGroup.isQuotientMap_mk _).continuous_iff.mpr (φ j).continuous
+  let H : ((N : κ) → E ⧸ stage N) → (ι → ℂ) := fun y j ↦ ℓ j (y (hN j).choose)
+  have hH : Continuous H := continuous_pi fun j ↦ (hℓ j).comp (continuous_apply _)
+  have hF : Continuous (fun (x : E ⧸ P) (N : κ) ↦ P.mapQ (stage N) LinearMap.id (hle N) x) :=
+    continuous_pi fun N ↦ (QuotientAddGroup.isQuotientMap_mk P.toAddSubgroup).continuous_iff.mpr
+      (QuotientAddGroup.isQuotientMap_mk (stage N).toAddSubgroup).continuous
+  have hcomp : H ∘ (fun (x : E ⧸ P) (N : κ) ↦ P.mapQ (stage N) LinearMap.id (hle N) x) =
+      fun x ↦ Ψ x := by
+    funext x j
+    obtain ⟨x, rfl⟩ := P.mkQ_surjective x
+    exact (hΨ x j).symm
+  refine IsInducing.of_comp hF hH ?_
+  rw [hcomp]
+  exact hΨi
+
+/-- Each archimedean Laurent coefficient vanishes on some stage of the filtration. -/
+private theorem sLocalGammaOrbitalQuotient_projectiveTopology_cutoff (ω : PontryaginDual J₁(S))
+    (j : ΓIndex(ω, (Set.univ : Set Xₛ))) : ∃ N : depths,
+      ∀ x ∈ sLocalGammaFiltration (F := F) (S := S) ω N, ΓCoeff(ω, j) x = 0 := by
+  obtain ⟨N, hN⟩ := sLocalGammaFiltration_iInf_mem_cutoff ω j.val.1 j.property.1
+    (Finset.card_pos.mp (j.property.2.2.1.trans_le j.property.2.2.2))
+  exact ⟨N, fun x hx ↦
+    (Submodule.mem_iInf _).mp hx ⟨j.val, j.property.1, hN, j.property.2.2⟩⟩
+
+/-- The statement of `sLocalGammaOrbitalQuotient_projectiveTopology` with its abbreviations
+expanded. -/
+private theorem sLocalGammaOrbitalQuotient_projectiveTopology_aux (ω : PontryaginDual J₁(S)) :
+    ∃ qN : (N : depths) → (fullPV(ω) ⧸ Γker(ω)) →ₗ[ℂ]
+        (fullPV(ω) ⧸ sLocalGammaFiltration (F := F) (S := S) ω N),
+      (∀ N (x : fullPV(ω)), qN N ((Γker(ω)).mkQ x) = (sLocalGammaFiltration ω N).mkQ x) ∧
+      IsInducing (fun (x : fullPV(ω) ⧸ Γker(ω)) (N : depths) ↦ qN N x) := by
+  have hle (N : depths) : Γker(ω) ≤ sLocalGammaFiltration (F := F) (S := S) ω N := by
+    rw [← sLocalGammaFiltration_iInf]
+    exact iInf_le _ N
+  have h := sLocalGammaOrbitalQuotient_coeff_equiv ω
+  have k := sLocalGammaOrbitalQuotient_projectiveTopology_inducing (Γker(ω))
+      (sLocalGammaFiltration (F := F) (S := S) ω) hle (fun j ↦ ΓCoeff(ω, j)) h.choose
+      h.choose.toHomeomorph.isInducing (fun x j ↦ by
+        have := h.choose_spec x j
+        rw [this])
+      (fun j ↦ by
+        obtain ⟨N, hN⟩ := sLocalGammaOrbitalQuotient_projectiveTopology_cutoff ω j
+        refine ⟨N, fun x hx ↦ ?_⟩
+        have := hN x hx
+        rw [this])
+  exact ⟨fun N ↦ (Γker(ω)).mapQ (sLocalGammaFiltration (F := F) (S := S) ω N) LinearMap.id (hle N),
+    fun N x ↦ rfl, k⟩
+
 /-- Paper: Theorem 7.3.4.1(4), p. 365.
 The quotient topology is induced by the family of canonical finite-cutoff quotient maps. -/
 theorem sLocalGammaOrbitalQuotient_projectiveTopology (ω : PontryaginDual J₁(S)) :
@@ -2060,7 +2855,8 @@ theorem sLocalGammaOrbitalQuotient_projectiveTopology (ω : PontryaginDual J₁(
     let stage := sLocalGammaFiltration (F := F) (S := S) ω
     ∃ qN : (N : depths) → (E ⧸ P) →ₗ[ℂ] (E ⧸ stage N),
       (∀ N (x : E), qN N (P.mkQ x) = (stage N).mkQ x) ∧
-      IsInducing (fun (x : E ⧸ P) (N : depths) ↦ qN N x) := by sorry
+      IsInducing (fun (x : E ⧸ P) (N : depths) ↦ qN N x) := by
+  exact sLocalGammaOrbitalQuotient_projectiveTopology_aux ω
 
 /-- Paper: Theorem 7.3.4.1(4), p. 365.
 The quotient is topologically linearly isomorphic to the product of complex
@@ -2068,7 +2864,18 @@ lines indexed by cutoff tuples. -/
 theorem sLocalGammaOrbitalQuotient_product (ω : PontryaginDual J₁(S)) :
     let E := ↥(fullPV(ω))
     let P := Γker(ω)
-    Nonempty ((E ⧸ P) ≃L[ℂ] (depths → ℂ)) := by sorry
+    Nonempty ((E ⧸ P) ≃L[ℂ] (depths → ℂ)) := by
+  intro E P
+  obtain ⟨Ψ, -⟩ := sLocalGammaOrbitalQuotient_coeff_equiv ω
+  have := sLocalGammaOrbitalQuotient_coeff_countable ω
+  have := sLocalGammaOrbitalQuotient_coeff_infinite ω
+  let := Encodable.ofCountable (ΓIndex(ω, (Set.univ : Set Xₛ)))
+  let := Denumerable.ofEncodableOfInfinite (ΓIndex(ω, (Set.univ : Set Xₛ)))
+  let := Encodable.ofCountable depths
+  let := Denumerable.ofEncodableOfInfinite depths
+  let e : ΓIndex(ω, (Set.univ : Set Xₛ)) ≃ depths :=
+    (Denumerable.eqv _).trans (Denumerable.eqv depths).symm
+  exact ⟨Ψ.trans (ContinuousLinearEquiv.piCongrLeft ℂ (fun _ : depths ↦ ℂ) e)⟩
 
 /-- Paper: Theorem 7.3.4.1(4), p. 365.
 The strong dual of the quotient is topologically linearly isomorphic to the
@@ -2082,7 +2889,114 @@ theorem sLocalGammaOrbitalQuotient_dual_directSum (ω : PontryaginDual J₁(S)) 
 /-- Paper: Theorem 7.3.4.1(5), pp. 365–366.
 The set of archimedean centers with their admissible Laurent orders admits an enumeration. -/
 theorem sLocalGammaIndex_enumerable (ω : PontryaginDual J₁(S)) :
-    Nonempty (ℕ ≃ ΓIndex(ω, (Set.univ : Set Xₛ))) := by sorry
+    Nonempty (ℕ ≃ ΓIndex(ω, (Set.univ : Set Xₛ))) := by
+  have := sLocalGammaOrbitalQuotient_coeff_countable ω
+  have := sLocalGammaOrbitalQuotient_coeff_infinite ω
+  let := Encodable.ofCountable (ΓIndex(ω, (Set.univ : Set Xₛ)))
+  let := Denumerable.ofEncodableOfInfinite (ΓIndex(ω, (Set.univ : Set Xₛ)))
+  exact ⟨(Denumerable.eqv _).symm⟩
+
+/-- A continuous linear functional on a product of complex lines vanishes on every vector
+whose coordinates vanish on some finite set of indices. -/
+private theorem sLocalGammaOrbitalQuotient_dual_basis_finite {ι : Type*}
+    (L : (ι → ℂ) →L[ℂ] ℂ) : ∃ T : Finset ι, ∀ y : ι → ℂ, (∀ i ∈ T, y i = 0) → L y = 0 := by
+  have hU : L ⁻¹' Metric.ball 0 1 ∈ 𝓝 (0 : ι → ℂ) :=
+    L.continuous.continuousAt.preimage_mem_nhds (by
+      rw [map_zero]
+      exact Metric.ball_mem_nhds 0 one_pos)
+  rw [nhds_pi, Filter.mem_pi'] at hU
+  obtain ⟨T, t, ht, hsub⟩ := hU
+  refine ⟨T, fun y hy ↦ ?_⟩
+  by_contra hne
+  have h2 : L ((2 / L y) • y) = 2 := by
+    rw [map_smul, smul_eq_mul, div_mul_cancel₀ _ hne]
+  have hmem : (2 / L y) • y ∈ Set.pi (↑T) t := fun i hi ↦ by
+    rw [Pi.smul_apply, hy i hi, smul_zero]
+    exact mem_of_mem_nhds (ht i)
+  have h1 := hsub hmem
+  rw [Set.mem_preimage, h2, Metric.mem_ball, dist_zero_right] at h1
+  norm_num at h1
+
+/-- On a space identified with a product of complex lines indexed by an enumerated set, the
+coordinate functionals form a Schauder basis of the strong dual, with evaluation at the
+dual vectors as coefficient functionals. -/
+private theorem sLocalGammaOrbitalQuotient_dual_basis_pi {Q ι : Type*} [AddCommGroup Q]
+    [Module ℂ Q] [TopologicalSpace Q] [IsTopologicalAddGroup Q] [ContinuousSMul ℂ Q]
+    [DecidableEq ι] (Ψ : Q ≃L[ℂ] (ι → ℂ)) (σ : ℕ ≃ ι) :
+    IsSchauderBasis
+      (fun n ↦ (ContinuousLinearMap.proj (σ n) : (ι → ℂ) →L[ℂ] ℂ).comp (Ψ : Q →L[ℂ] (ι → ℂ)))
+      (fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (Ψ.symm (Pi.single (σ n) 1))) := by
+  refine ⟨fun m n ↦ ?_, fun ℓ ↦ ?_⟩
+  · change Ψ (Ψ.symm (Pi.single (σ m) 1)) (σ n) = if m = n then 1 else 0
+    rw [Ψ.apply_symm_apply, Pi.single_apply]
+    by_cases hmn : m = n
+    · subst hmn
+      simp
+    · have hne : σ n ≠ σ m := fun e ↦ hmn (σ.injective e).symm
+      simp [hmn, hne]
+  · obtain ⟨T, hT⟩ := sLocalGammaOrbitalQuotient_dual_basis_finite
+      (ℓ.comp (Ψ.symm : (ι → ℂ) →L[ℂ] Q))
+    have hzero (m : ℕ) (hm : σ m ∉ T) : ℓ (Ψ.symm (Pi.single (σ m) 1)) = 0 :=
+      hT _ fun i hi ↦ by
+        simp [show i ≠ σ m from fun e ↦ hm (e ▸ hi)]
+    have hrep : ℓ = ∑ i ∈ T, ℓ (Ψ.symm (Pi.single i 1)) •
+        (ContinuousLinearMap.proj i : (ι → ℂ) →L[ℂ] ℂ).comp (Ψ : Q →L[ℂ] (ι → ℂ)) := by
+      ext q
+      have hy := hT (Ψ q - ∑ i ∈ T, Ψ q i • Pi.single i (1 : ℂ)) fun i hi ↦ by
+        simp [Finset.sum_apply, Pi.single_apply, hi]
+      simp only [ContinuousLinearMap.comp_apply, map_sub, map_sum, map_smul,
+        ContinuousLinearEquiv.coe_coe, ContinuousLinearEquiv.symm_apply_apply,
+        sub_eq_zero] at hy
+      rw [hy]
+      simp [mul_comm]
+    let K := (T.image σ.symm).sup id + 1
+    unfold HasSum
+    rw [SummationFilter.conditional_filter_eq_map_range, Filter.tendsto_map'_iff]
+    refine tendsto_const_nhds.congr' ?_
+    filter_upwards [Filter.eventually_ge_atTop K] with k hk
+    have hsub : T.map σ.symm.toEmbedding ⊆ Finset.range k := by
+      intro m hm
+      obtain ⟨i, hi, rfl⟩ := Finset.mem_map.mp hm
+      have hle : σ.symm i ≤ (T.image σ.symm).sup id :=
+        Finset.le_sup (f := id) (Finset.mem_image_of_mem _ hi)
+      change σ.symm i ∈ Finset.range k
+      exact Finset.mem_range.mpr (by omega)
+    symm
+    change ∑ m ∈ Finset.range k, ℓ (Ψ.symm (Pi.single (σ m) 1)) •
+        (ContinuousLinearMap.proj (σ m) : (ι → ℂ) →L[ℂ] ℂ).comp (Ψ : Q →L[ℂ] (ι → ℂ)) = ℓ
+    rw [← Finset.sum_subset hsub fun m _ hm ↦ ?_, Finset.sum_map]
+    · conv_rhs => rw [hrep]
+      refine Finset.sum_congr rfl fun i _ ↦ ?_
+      simp
+    · have hσ : σ m ∉ T := fun h ↦ hm (Finset.mem_map.mpr ⟨σ m, h, by simp⟩)
+      rw [hzero m hσ, zero_smul]
+
+/-- On a quotient identified with a product of complex lines through coefficient
+functionals, the descended coefficients in any enumeration form a Schauder basis of the
+strong dual. -/
+private theorem sLocalGammaOrbitalQuotient_dual_basis_quot {E ι : Type*} {_ : AddCommGroup E}
+    {_ : Module ℂ E} {_ : TopologicalSpace E} (P : Submodule ℂ E)
+    [IsTopologicalAddGroup (E ⧸ P)] [ContinuousSMul ℂ (E ⧸ P)] [DecidableEq ι]
+    (φ : ι → StrongDual ℂ E) (Ψ : (E ⧸ P) ≃L[ℂ] (ι → ℂ))
+    (hΨ : ∀ (x : E) (j : ι), Ψ (P.mkQ x) j = φ j x) (σ : ℕ ≃ ι) :
+    ∃ (a : ℕ → StrongDual ℂ (E ⧸ P)) (d : ℕ → StrongDual ℂ (StrongDual ℂ (E ⧸ P))),
+      (∀ n (x : E), a n (P.mkQ x) = φ (σ n) x) ∧ IsSchauderBasis a d :=
+  ⟨_, _, fun n x ↦ hΨ x (σ n), sLocalGammaOrbitalQuotient_dual_basis_pi Ψ σ⟩
+
+/-- The statement of `sLocalGammaOrbitalQuotient_dual_basis` with its abbreviations
+expanded. -/
+private theorem sLocalGammaOrbitalQuotient_dual_basis_aux (ω : PontryaginDual J₁(S))
+    (σ : ℕ ≃ ΓIndex(ω, (Set.univ : Set Xₛ))) :
+    ∃ (a : ℕ → StrongDual ℂ (fullPV(ω) ⧸ Γker(ω)))
+      (d : ℕ → StrongDual ℂ (StrongDual ℂ (fullPV(ω) ⧸ Γker(ω)))),
+      (∀ n (x : fullPV(ω)), a n ((Γker(ω)).mkQ x) = ΓCoeff(ω, (σ n)) x) ∧
+      IsSchauderBasis a d := by
+  classical
+  have h := sLocalGammaOrbitalQuotient_coeff_equiv ω
+  exact sLocalGammaOrbitalQuotient_dual_basis_quot (ι := ΓIndex(ω, (Set.univ : Set Xₛ)))
+    (Γker(ω)) (fun j ↦ ΓCoeff(ω, j)) h.choose (fun x j ↦ by
+      have := h.choose_spec x j
+      rw [this]) σ
 
 /-- Paper: Theorem 7.3.4.1(5), p. 365.
 In every enumeration, the archimedean Laurent coefficients descend to a
@@ -2094,7 +3008,8 @@ theorem sLocalGammaOrbitalQuotient_dual_basis (ω : PontryaginDual J₁(S))
     let P := Γker(ω)
     ∃ (a : ℕ → StrongDual ℂ (E ⧸ P)) (d : ℕ → StrongDual ℂ (StrongDual ℂ (E ⧸ P))),
       (∀ n (x : E), a n (P.mkQ x) = ΓCoeff(ω, (σ n)) x) ∧
-      IsSchauderBasis a d := by sorry
+      IsSchauderBasis a d := by
+  exact sLocalGammaOrbitalQuotient_dual_basis_aux ω σ
 
 end ArchimedeanPoles
 

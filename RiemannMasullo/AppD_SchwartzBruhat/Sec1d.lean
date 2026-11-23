@@ -16,7 +16,7 @@ import Mathlib.MeasureTheory.Function.LpSeminorm.Count
 import Mathlib.MeasureTheory.Integral.Marginal
 import Mathlib.MeasureTheory.Integral.Pi
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2b
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric

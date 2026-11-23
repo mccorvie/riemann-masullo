@@ -6,8 +6,9 @@ import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 import all RiemannMasullo.AppC_LCTVS.Sec1
 import all RiemannMasullo.AppC_LCTVS.Sec2a_part2
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1a
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2a
+import Mathlib.Analysis.Calculus.BumpFunction.FiniteDimension
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import Mathlib.MeasureTheory.Integral.IntegralEqImproper
@@ -271,7 +272,7 @@ theorem modulatedExponentialDecay_stageLimit :
 
 /-- Point evaluation on the Schwartz–Bruhat space is continuous since on each
 structural stage it is bounded by the zeroth Schwartz seminorm. -/
-private theorem continuous_schwartzBruhat_eval {A : Type*} [CommGroup A] [TopologicalSpace A]
+theorem continuous_schwartzBruhat_eval {A : Type*} [CommGroup A] [TopologicalSpace A]
     (x : A) : Continuous (fun f : SchwartzBruhat A ↦ f x) := by
   let ev : SchwartzBruhat A →ₗ[ℂ] ℂ :=
     (LinearMap.proj x).comp (schwartzBruhatSubmodule A).subtype
@@ -440,7 +441,7 @@ theorem modulatedExponentialDecay_shift_equiv (a : ℝ) :
 
 /-- Multiplication by a unitary character is continuous on Schwartz–Bruhat functions,
 since the Fourier transform turns it into translation on the dual group. -/
-private theorem schwartzBruhat_mul_unitaryCharacter {A : Type*} [CommGroup A]
+theorem schwartzBruhat_mul_unitaryCharacter {A : Type*} [CommGroup A]
     [TopologicalSpace A] [IsTopologicalGroup A] [T2Space A] [LocallyCompactSpace A]
     [SecondCountableTopology A] (η : PontryaginDual A) :
     ∃ M : SchwartzBruhat A →L[ℂ] SchwartzBruhat A,
@@ -799,7 +800,7 @@ private theorem exists_positiveRealExponentialDecay_translate (c : ℝ) (hI : I.
 set_option linter.unusedSectionVars false in
 /-- Point evaluation on the decay space is continuous because on each quotient
 stage it is a constant multiple of evaluation of any one weighted profile. -/
-private theorem continuous_modulatedExponentialDecay_eval (hI : I.Nonempty) (g : G) :
+theorem continuous_modulatedExponentialDecay_eval (hI : I.Nonempty) (g : G) :
     Continuous (fun f : E ↦ f.val g) := by
   let b : I := ⟨hI.choose, hI.choose_spec⟩
   let ev : E →ₗ[ℂ] ℂ := (LinearMap.proj g).comp (modulatedExponentialDecaySubmodule m I).subtype
@@ -2916,7 +2917,7 @@ private theorem compact_kernel_differences {A : Type*} [CommGroup A] [Topologica
   let ev (a : A) : StrongDual ℂ (SchwartzBruhat A) :=
     ⟨(LinearMap.proj a).comp (schwartzBruhatSubmodule A).subtype, continuous_schwartzBruhat_eval a⟩
   refine ⟨fun n ↦ ev (u n).val - ev 1, fun n ↦ ?_, fun B hB ↦ ?_⟩
-  · refine (schwartzBruhat_exists_test (1 : A) (u n).val).elim fun f hf ↦ ?_
+  · refine (schwartzBruhat_exists_separating_function (1 : A) (u n).val).elim fun f hf ↦ ?_
     exact ⟨f, sub_ne_zero.mpr (hf.2 (fun he ↦ hu n (Subtype.ext he)))⟩
   · refine (schwartzBruhat_bounded_image_stage hB).elim fun b hb ↦
       hb.elim fun e he ↦ he.elim fun C hC ↦ ?_
