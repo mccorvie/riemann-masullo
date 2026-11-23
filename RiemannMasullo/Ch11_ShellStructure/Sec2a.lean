@@ -855,6 +855,187 @@ private def globalThetaSobolevTestClass (a : ℝ) {s : ℝ} (hs : 0 ≤ s) :
   (j(a, hs)).toLinearMap.comp (Submodule.mkQ
     ((LinearMap.ker (adelicThetaLinearMap F)).comap (adelePolarSubspace F).subtype))
 
+/-- Abstract form of the last step of the weighted single-place bound: if `A` has L² norm at
+most `C` times that of `φ`, then `φ - K A` has L² norm at most `1 + K C` times that of `φ`. -/
+private theorem globalThetaPrincipalValue_sobolevBound_sub_abstract {X : Type*}
+    [MeasurableSpace X] (ν : Measure X) (φ A : X → ℂ) {K C : ℝ} (hK : 0 ≤ K) (hC : 0 ≤ C)
+    (hφ : MemLp φ 2 ν) (hA : eLpNorm A 2 ν ≤ ENNReal.ofReal C * eLpNorm φ 2 ν) :
+    (eLpNorm (fun g ↦ φ g - (K : ℂ) * A g) 2 ν).toReal ≤ (1 + K * C) * (eLpNorm φ 2 ν).toReal := by
+  have hle : eLpNorm (fun g ↦ φ g - (K : ℂ) * A g) 2 ν ≤
+      ENNReal.ofReal (1 + K * C) * eLpNorm φ 2 ν := by
+    calc eLpNorm (fun g ↦ φ g - (K : ℂ) * A g) 2 ν
+        ≤ eLpNorm φ 2 ν + eLpNorm (K • A) 2 ν :=
+          eLpNorm_sub_le (by norm_num : (1 : ENNReal) ≤ 2)
+      _ = eLpNorm φ 2 ν + ENNReal.ofReal K * eLpNorm A 2 ν := by
+          rw [eLpNorm_const_smul, Real.eNorm_of_nonneg hK]
+      _ ≤ eLpNorm φ 2 ν + ENNReal.ofReal K * (ENNReal.ofReal C * eLpNorm φ 2 ν) := by
+          gcongr
+      _ = ENNReal.ofReal (1 + K * C) * eLpNorm φ 2 ν := by
+          rw [ENNReal.ofReal_add zero_le_one (mul_nonneg hK hC), ENNReal.ofReal_mul hK,
+            ENNReal.ofReal_one, add_mul, one_mul, mul_assoc]
+  refine (ENNReal.toReal_mono (ENNReal.mul_ne_top ENNReal.ofReal_ne_top hφ.eLpNorm_ne_top)
+    hle).trans_eq ?_
+  rw [ENNReal.toReal_mul, ENNReal.toReal_ofReal (by positivity)]
+
+/-- Abstract form of the descent to the test classes: a linear map bounded by a constant
+times another descends to a continuous linear map on the range of the other. -/
+private theorem globalThetaPrincipalValue_clm_onTests_abstract {E W : Type*} [AddCommGroup E]
+    [Module ℂ E] [NormedAddCommGroup W] [NormedSpace ℂ W] {H : Submodule ℂ W}
+    (ι T : E →ₗ[ℂ] H) (C : ℝ) (hC : ∀ f, ‖T f‖ ≤ C * ‖ι f‖) :
+    ∃ g : LinearMap.range ι →L[ℂ] H, ∀ f, g ⟨ι f, LinearMap.mem_range_self _ f⟩ = T f := by
+  have hker : LinearMap.ker ι ≤ LinearMap.ker T := fun f hf ↦ by
+    have h1 : ‖T f‖ ≤ 0 := (hC f).trans_eq (by rw [LinearMap.mem_ker.mp hf, norm_zero, mul_zero])
+    exact LinearMap.mem_ker.mpr (norm_le_zero_iff.mp h1)
+  let L : LinearMap.range ι →ₗ[ℂ] H :=
+    (LinearMap.ker ι).liftQ T hker ∘ₗ (LinearMap.quotKerEquivRange ι).symm.toLinearMap
+  have hL (f : E) : L ⟨ι f, LinearMap.mem_range_self _ f⟩ = T f := by
+    simp only [L, LinearMap.coe_comp, LinearEquiv.coe_coe, Function.comp_apply,
+      LinearMap.quotKerEquivRange_symm_apply_image]
+    rfl
+  refine ⟨L.mkContinuous C fun x ↦ ?_, fun f ↦ ?_⟩
+  · obtain ⟨f, hf⟩ := LinearMap.mem_range.mp x.2
+    have hx : x = ⟨ι f, LinearMap.mem_range_self _ f⟩ := Subtype.ext hf.symm
+    calc ‖L x‖ = ‖T f‖ := by rw [hx, hL f]
+      _ ≤ C * ‖ι f‖ := hC f
+      _ = C * ‖x‖ := by rw [hf, Submodule.norm_coe]
+  · rw [LinearMap.mkContinuous_apply]
+    exact hL f
+
+/-- The principal value at a single finite place is bounded in the norm of the weighted
+global theta completion. Each unit translate in the average moves the idelic norm by the
+fixed factor `‖π‖⁻¹`, so weighting by `‖g‖ ^ a` turns the average of the theta function into
+`‖π‖ ^ a` times the average of the weighted theta function, which the unweighted estimate
+bounds. -/
+private theorem globalThetaPrincipalValue_sobolevBound_single_weighted_at (v : V)
+    (π : (v.adicCompletion F)ˣ) (hπ₀ : Valued.v.IsUniformizer π.val) (a : ℝ)
+    {s : ℝ} (hs : 0 ≤ s) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ f : ℬ₀,
+      ‖j(a, hs) (theta(pvTest({v}, f)))‖ ≤ C * ‖j(a, hs) (theta(f))‖ := by
+  let _ : MeasurableSpace (v.adicCompletion F)ˣ := borel _
+  have _ : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+  obtain ⟨C, hC, hA⟩ := globalThetaPrincipalValue_sobolevBound_average v π hs
+  let ν := (μ𝔽).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))
+  let U : Set (v.adicCompletion F)ˣ :=
+    ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ)
+  let τ : (v.adicCompletion F)ˣ → C𝔽 := fun u ↦ IdeleClassGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹
+  let w : C𝔽 → ℝ := fun g ↦ (((ideleClassNorm F g).val : ℝ≥0) : ℝ) ^ a
+  let φ : ℬ₀ → C𝔽 → ℂ := fun h g ↦ (w g : ℂ) * adelicTheta h.val g
+  let K : ℝ := ‖(π : v.adicCompletion F)‖ ^ a
+  have hπ0 : 0 < ‖(π : v.adicCompletion F)‖ := norm_pos_iff.mpr π.ne_zero
+  have hK : 0 ≤ K := Real.rpow_nonneg hπ0.le a
+  have hw : Continuous w :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp (m𝔽).continuous)).rpow_const
+      fun g ↦ Or.inl (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+  have hφc (h : ℬ₀) : Continuous (φ h) :=
+    (Complex.continuous_ofReal.comp hw).mul (adelicTheta h.val).continuous
+  -- The norm of a weighted theta class is the weighted L² norm of its weighted theta function.
+  have hθ (h : ℬ₀) : ((j(a, hs) (theta(h)) : W(s)) : C𝔽 → ℂ) =ᵐ[ν] φ h :=
+    (withDensity_absolutelyContinuous _ _).ae_le
+      ((existsUnique_globalThetaSobolevEmbedding (F := F) a 0 0 s hI hs).exists.choose_spec.2 h)
+  have hmem (h : ℬ₀) : MemLp (φ h) 2 ν := (Lp.memLp _).ae_eq (hθ h)
+  have hnorm (h : ℬ₀) : ‖j(a, hs) (theta(h))‖ = (eLpNorm (φ h) 2 ν).toReal :=
+    (Lp.norm_def _).trans (congrArg ENNReal.toReal (eLpNorm_congr_ae (hθ h)))
+  -- A unit translate divides the idelic norm by `‖π‖`.
+  have hnormu (u : (v.adicCompletion F)ˣ) (hu : u ∈ U) : ‖(u : v.adicCompletion F)‖ = 1 := by
+    have h1 : ‖(u : v.adicCompletion F)‖ ≤ 1 :=
+      (Valued.toNormedField.norm_le_one_iff).mpr hu.1
+    have h2 : ‖((u⁻¹ : (v.adicCompletion F)ˣ) : v.adicCompletion F)‖ ≤ 1 :=
+      (Valued.toNormedField.norm_le_one_iff).mpr hu.2
+    have h3 : ‖(u : v.adicCompletion F)‖ *
+        ‖((u⁻¹ : (v.adicCompletion F)ˣ) : v.adicCompletion F)‖ = 1 := by
+      rw [← norm_mul, Units.mul_inv, norm_one]
+    nlinarith [norm_nonneg (u : v.adicCompletion F),
+      norm_nonneg ((u⁻¹ : (v.adicCompletion F)ˣ) : v.adicCompletion F)]
+  have hwτ (u : (v.adicCompletion F)ˣ) (hu : u ∈ U) (g : C𝔽) : K * w (τ u * g) = w g := by
+    have hn' (h : C𝔽) : (((ideleClassNorm F ((τ u)⁻¹ * h)).val : ℝ≥0) : ℝ) =
+        ‖(π : v.adicCompletion F)‖ * (((ideleClassNorm F h).val : ℝ≥0) : ℝ) := by
+      simp only [τ, map_mul, map_inv, inv_inv, ideleClassNorm_ofAdicCompletion, Units.val_mul,
+        NNReal.coe_mul]
+      change ‖(π : v.adicCompletion F)‖ * ‖(u : v.adicCompletion F)‖ * _ = _
+      rw [hnormu u hu, mul_one]
+    have hn := hn' (τ u * g)
+    rw [inv_mul_cancel_left] at hn
+    simp only [w, K, hn]
+    rw [Real.mul_rpow hπ0.le (NNReal.coe_nonneg _)]
+  refine ⟨1 + K * C, by positivity, fun f ↦ ?_⟩
+  have hA' := hA _ (hφc f) (hmem f)
+  let A : C𝔽 → ℂ := fun g ↦ ((finiteLocalMultiplicativeTamagawaMeasure F v).real U)⁻¹ *
+    ∫ u in U, φ f (τ u * g) ∂(finiteLocalMultiplicativeTamagawaMeasure F v)
+  have hAm : MemLp A 2 ν := hA'.1
+  have hAle : eLpNorm A 2 ν ≤ ENNReal.ofReal C * eLpNorm (φ f) 2 ν := hA'.2
+  -- The weighted principal value is the weighted theta function minus `K` times the average.
+  have hpv : φ (pvTest({v}, f)) = fun g ↦ φ f g - (K : ℂ) * A g := by
+    funext g
+    have hint : ∫ u in U, φ f (τ u * g) ∂(finiteLocalMultiplicativeTamagawaMeasure F v) =
+        ((K⁻¹ * w g : ℝ) : ℂ) * ∫ u in U, adelicTheta f.val (τ u * g)
+          ∂(finiteLocalMultiplicativeTamagawaMeasure F v) := by
+      rw [← integral_const_mul]
+      refine setIntegral_congr_fun
+        (Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)).measurableSet fun u hu ↦ ?_
+      have hK0 : K ≠ 0 := (Real.rpow_pos_of_pos hπ0 a).ne'
+      have hw' : w (τ u * g) = K⁻¹ * w g := by
+        rw [← hwτ u hu g, ← mul_assoc, inv_mul_cancel₀ hK0, one_mul]
+      simp only [φ, hw']
+    simp only [φ, A]
+    rw [globalThetaPrincipalValue_sobolevBound_formula v π hπ₀ f g, hint]
+    have hK0 : (K : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (Real.rpow_pos_of_pos hπ0 a).ne'
+    change _ = _ - _ * (_ * (((K⁻¹ * w g : ℝ) : ℂ) * ∫ u in U, adelicTheta f.val (τ u * g)
+      ∂(finiteLocalMultiplicativeTamagawaMeasure F v)))
+    push_cast
+    rw [mul_sub]
+    congr 1
+    field_simp
+    rfl
+  rw [hnorm, hnorm, hpv]
+  exact globalThetaPrincipalValue_sobolevBound_sub_abstract ν (φ f) A hK hC (hmem f) hAle
+
+/-- The principal value at a single finite place is bounded in the norm of the weighted
+global theta completion, at some uniformizer of that place. -/
+private theorem globalThetaPrincipalValue_sobolevBound_single_weighted (v : V) (a : ℝ)
+    {s : ℝ} (hs : 0 ≤ s) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ f : ℬ₀,
+      ‖j(a, hs) (theta(pvTest({v}, f)))‖ ≤ C * ‖j(a, hs) (theta(f))‖ := by
+  obtain ⟨π₀, hπ₀⟩ := (Valued.v : Valuation (v.adicCompletion F)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  exact globalThetaPrincipalValue_sobolevBound_single_weighted_at v (Units.mk0 π₀ hπ₀.ne_zero)
+    hπ₀ a hs
+
+/-- The principal value at a finite set of places is bounded in the norm of the weighted
+global theta completion: compose the single-place bounds. -/
+private theorem globalThetaPrincipalValue_sobolevBound_weighted (S : Finset V) (a : ℝ)
+    {s : ℝ} (hs : 0 ≤ s) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ f : ℬ₀,
+      ‖j(a, hs) (theta(pvTest(S, f)))‖ ≤ C * ‖j(a, hs) (theta(f))‖ := by
+  classical
+  induction S using Finset.induction_on with
+  | empty =>
+    refine ⟨1, zero_le_one, fun f ↦ ?_⟩
+    have h : pvTest(∅, f) = f := by
+      refine Subtype.ext ?_
+      change adelePrincipalValue F ∅ f.val = f.val
+      rw [sLocalUncutCarving_empty_PV]
+      rfl
+    rw [h, one_mul]
+  | insert v T hvT ih =>
+    obtain ⟨K₁, hK₁, h₁⟩ := ih
+    have hsingle := globalThetaPrincipalValue_sobolevBound_single_weighted (F := F) v a hs
+    have hK₂ := hsingle.choose_spec.1
+    have h₂ := hsingle.choose_spec.2
+    refine ⟨K₁ * hsingle.choose, mul_nonneg hK₁ hK₂, fun f ↦ ?_⟩
+    have hcomp : pvTest(insert v T, f) = pvTest(T, pvTest({v}, f)) := by
+      refine Subtype.ext ?_
+      change adelePrincipalValue F (insert v T) f.val =
+        adelePrincipalValue F T (adelePrincipalValue F {v} f.val)
+      rw [sLocalCutoffCarving_antitone_PV (Finset.subset_insert v T),
+        Finset.insert_sdiff_cancel hvT]
+      rfl
+    calc ‖j(a, hs) (theta(pvTest(insert v T, f)))‖
+        = ‖j(a, hs) (theta(pvTest(T, pvTest({v}, f))))‖ :=
+          congrArg (fun h : ℬ₀ ↦ ‖j(a, hs) (theta(h))‖) hcomp
+      _ ≤ K₁ * ‖j(a, hs) (theta(pvTest({v}, f)))‖ := h₁ _
+      _ ≤ K₁ * (hsingle.choose * ‖j(a, hs) (theta(f))‖) := mul_le_mul_of_nonneg_left (h₂ f) hK₁
+      _ = K₁ * hsingle.choose * ‖j(a, hs) (theta(f))‖ := (mul_assoc _ _ _).symm
+
 /-- Paper: Proposition 11.2.0.1(2), pp. 484–485. The principal value is bounded and well
 defined on the polar-free theta test classes of the completion: on their span it is a
 continuous linear map sending a test class to the class of its principal value. -/
@@ -868,7 +1049,18 @@ private theorem globalThetaPrincipalValue_clm_onTests (S : Finset V) (a : ℝ) {
   -- theta class of a test depends only on its theta function. Bounded: the estimates of
   -- `globalThetaPrincipalValue_sobolevBound` and of its local form bound the norm of the
   -- principal value by that of the test class.
-  sorry
+  have hbound := globalThetaPrincipalValue_sobolevBound_weighted (F := F) S a hs
+  have hCb := hbound.choose_spec.2
+  let C := hbound.choose
+  let Q := (LinearMap.ker (adelicThetaLinearMap F)).comap (adelePolarSubspace F).subtype
+  let pv : ℬ₀ →ₗ[ℂ] ℬ₀ := (adelePrincipalValue F S).restrict
+    fun f hf ↦ adelePrincipalValue_mem_polarSubspace S ⟨f, hf⟩
+  let T : ℬ₀ →ₗ[ℂ] H(a, hs) := (j(a, hs)).toLinearMap ∘ₗ Q.mkQ ∘ₗ pv
+  have hT (f : ℬ₀) : T f = j(a, hs) (theta(pvTest(S, f))) := rfl
+  have hι (f : ℬ₀) : globalThetaSobolevTestClass (F := F) a hs f = j(a, hs) (theta(f)) := rfl
+  have hg := globalThetaPrincipalValue_clm_onTests_abstract
+    (globalThetaSobolevTestClass (F := F) a hs) T C fun f ↦ by rw [hT f, hι f]; exact hCb f
+  exact ⟨hg.choose, fun f ↦ (hg.choose_spec f).trans (hT f)⟩
 
 /-- Paper: Proposition 11.2.0.1(2) and (11.2.0.4), pp. 484–485. A continuous linear map on
 the test classes of the completion which agrees with the principal value extends uniquely to
