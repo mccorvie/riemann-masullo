@@ -2440,7 +2440,8 @@ private theorem absolutePW_cutoff_convolution_nuclear
   exact hT
 
 
-private abbrev absolutePW_rational_isotype (l : ℝ) (hl : l ≤ 0) :=
+private def absolutePW_rational_isotype (l : ℝ) (hl : l ≤ 0) :
+    Submodule ℂ (CompactIntervalSobolev μQ logQ l 0 2) :=
   actionIsotype ((hardySobolevTranslation μQ mQ l 0 2 hl hs₂).comp
     (ideleClassNorm ℚ).ker.subtype) (1 : PontryaginDual CQ₁)
 
