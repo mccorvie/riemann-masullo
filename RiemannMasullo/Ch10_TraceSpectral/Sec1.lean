@@ -68,6 +68,54 @@ local notation "θ𝔽(" f ")" => adelicTheta (f : ℬ₀).val
 local notation "θₛ(" f ")" => sLocalAdelicThetaOnClasses F S f
 local notation "ρₛ" => (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose
 
+/-- A function whose derivative along every orbit of a one-parameter subgroup is again given
+by the same recipe is smooth along the orbit, and every iterated derivative at time zero is
+continuous in the base point. Stated for abstract types so that the induction does not unfold
+the Schwartz–Bruhat model. -/
+private theorem globalPolarFreeTheta_directionallySmooth_orbit.{uG, uX} {G : Type uG} {X : Type uX} [Group G] [TopologicalSpace G]
+    [IsTopologicalGroup G]
+    (γ : Multiplicative ℝ →ₜ* G) (F : X → G → ℂ) (J : X → X)
+    (hderiv : ∀ (i : X) (g : G) (t : ℝ),
+      HasDerivAt (fun s : ℝ ↦ F i (γ (Multiplicative.ofAdd s) * g))
+        (F (J i) (γ (Multiplicative.ofAdd t) * g)) t)
+    (hcont : ∀ i : X, Continuous (F i)) :
+    (∀ (i : X) (g : G) (k : ℕ),
+      ContDiff ℝ k (fun t : ℝ ↦ F i (γ (Multiplicative.ofAdd t) * g))) ∧
+    ∀ (i : X) (n : ℕ), Continuous (fun g : G ↦
+      iteratedDeriv n (fun t : ℝ ↦ F i (γ (Multiplicative.ofAdd t) * g)) 0) := by
+  have hderivfun (i : X) (g : G) :
+      deriv (fun t : ℝ ↦ F i (γ (Multiplicative.ofAdd t) * g)) =
+        fun t : ℝ ↦ F (J i) (γ (Multiplicative.ofAdd t) * g) := by
+    funext t
+    exact (hderiv i g t).deriv
+  have hcd (i : X) (g : G) (n : ℕ) :
+      ContDiff ℝ n (fun t : ℝ ↦ F i (γ (Multiplicative.ofAdd t) * g)) := by
+    induction n generalizing i with
+    | zero =>
+      refine contDiff_zero.mpr ?_
+      exact (hcont i).comp ((γ.continuous.comp continuous_ofAdd).mul_const g)
+    | succ n ih =>
+      refine (contDiff_succ_iff_deriv (n := (n : WithTop ℕ∞))).mpr
+        ⟨fun s ↦ (hderiv i g s).differentiableAt, by simp, ?_⟩
+      rw [hderivfun i g]
+      exact ih (J i)
+  have hiter (m : ℕ) (i : X) (g : G) :
+      iteratedDeriv m (fun t : ℝ ↦ F i (γ (Multiplicative.ofAdd t) * g)) =
+        fun t : ℝ ↦ F ((J^[m]) i) (γ (Multiplicative.ofAdd t) * g) := by
+    induction m generalizing i with
+    | zero => simp [iteratedDeriv_zero]
+    | succ m ih =>
+      rw [iteratedDeriv_succ, ih, hderivfun, Function.iterate_succ_apply']
+  refine ⟨hcd, fun i n ↦ ?_⟩
+  have hfun : (fun g : G ↦
+      iteratedDeriv n (fun t : ℝ ↦ F i (γ (Multiplicative.ofAdd t) * g)) 0) =
+      fun g : G ↦ F ((J^[n]) i) g := by
+    funext g
+    rw [hiter n i g]
+    simp
+  rw [hfun]
+  exact hcont _
+
 /-- Paper: (10.1.1.1), p. 434. Weighted global polar-free theta functions are
 continuous and have continuous derivatives of every order along every continuous
 real one-parameter subgroup. The function realization is injective. -/
@@ -78,7 +126,63 @@ theorem globalPolarFreeTheta_directionallySmooth (a : ℝ) :
         ∀ γ : Multiplicative ℝ →ₜ* C𝔽,
           (∀ (g : C𝔽) (k : ℕ), ContDiff ℝ k (fun t : ℝ ↦ E u (γ (Multiplicative.ofAdd t) * g))) ∧
           ∀ n : ℕ, Continuous (fun g : C𝔽 ↦
-            iteratedDeriv n (fun t : ℝ ↦ E u (γ (Multiplicative.ofAdd t) * g)) 0) := by sorry
+            iteratedDeriv n (fun t : ℝ ↦ E u (γ (Multiplicative.ofAdd t) * g)) 0) := by
+  classical
+  let Q := adelePolarSubspace F
+  let K : Submodule ℂ Q := (LinearMap.ker (adelicThetaLinearMap F)).comap Q.subtype
+  let φ : Q →ₗ[ℂ] (C𝔽 → ℂ) :=
+    (modulationWeight m𝔽 a).comp
+      ((ContinuousMap.coeFnLinearMap ℂ).comp ((adelicThetaLinearMap F).comp Q.subtype))
+  have hK : K ≤ LinearMap.ker φ := by
+    intro i hi
+    simp only [K, Submodule.mem_comap, LinearMap.mem_ker] at hi
+    simp only [φ, LinearMap.mem_ker, LinearMap.comp_apply, hi, map_zero]
+  let E : (Q ⧸ K) →ₗ[ℂ] (C𝔽 → ℂ) := K.liftQ φ hK
+  have hE (i : Q) : E (Submodule.Quotient.mk i) = φ i := K.liftQ_apply φ i
+  have hw (g : C𝔽) : (((m𝔽 g).val : ℝ) ^ a : ℝ) ≠ 0 :=
+    (Real.rpow_pos_of_pos (NNReal.coe_pos.mpr (Units.zero_lt (m𝔽 g))) a).ne'
+  have htwist (i : Q) :
+      E (Submodule.Quotient.mk i) = thetaTwist (F := F) a i.val := by
+    rw [hE i]
+    funext g
+    simp only [φ, LinearMap.comp_apply, modulationWeight, LinearMap.mulLeft_apply,
+      thetaTwist, thetaLog_apply]
+    change ((((m𝔽 g).val : ℝ) ^ a : ℝ) : ℂ) * adelicTheta (F := F) i.val g =
+      (Real.exp (a * Real.log ((m𝔽 g).val : ℝ)) : ℂ) * adelicTheta (F := F) i.val g
+    rw [Real.rpow_def_of_pos (NNReal.coe_pos.mpr (Units.zero_lt (m𝔽 g)))]
+    congr 1
+    rw [mul_comm]
+  refine ⟨E, ?_, ?_, ?_⟩
+  · apply LinearMap.ker_eq_bot.mp (K.ker_liftQ_eq_bot φ hK ?_)
+    intro i hi
+    change (adelicThetaLinearMap F) i.val = 0
+    ext g
+    have hv := congrFun (LinearMap.mem_ker.mp hi) g
+    change ((((m𝔽 g).val : ℝ) ^ a : ℝ) : ℂ) * adelicTheta (F := F) i.val g = 0 at hv
+    exact (mul_eq_zero.mp hv).resolve_left (Complex.ofReal_ne_zero.mpr (hw g))
+  · intro f
+    exact hE f
+  · intro u
+    obtain ⟨i, rfl⟩ := (Submodule.Quotient.mk_surjective (p := K)) u
+    rw [htwist i]
+    refine ⟨thetaTwist_continuous a i.val, ?_⟩
+    intro γ
+    let J : Q → Q := fun j ↦ (theta_class_derivative (F := F) a γ j).choose
+    have hJt (j : Q) (g : C𝔽) (t₀ : ℝ) :
+        HasDerivAt (fun t : ℝ ↦ thetaTwist (F := F) a j.val
+          (γ (Multiplicative.ofAdd t) * g))
+          (thetaTwist (F := F) a (J j).val (γ (Multiplicative.ofAdd t₀) * g)) t₀ := by
+      have h := (theta_class_derivative (F := F) a γ j).choose_spec
+        (γ (Multiplicative.ofAdd t₀) * g)
+      have hγt (t : ℝ) :
+          γ (Multiplicative.ofAdd (t - t₀)) * (γ (Multiplicative.ofAdd t₀) * g) =
+            γ (Multiplicative.ofAdd t) * g := by
+        rw [← mul_assoc, ← map_mul, ← ofAdd_add, sub_add_cancel]
+      exact hasDerivAt_of_shift h (fun t ↦
+        (congrArg (fun y ↦ thetaTwist (F := F) a j.val y) (hγt t)).symm)
+    have hsm := globalPolarFreeTheta_directionallySmooth_orbit γ (fun j (g : C𝔽) ↦ thetaTwist (F := F) a j.val g)
+      J hJt (fun j ↦ thetaTwist_continuous (F := F) a j.val)
+    exact ⟨fun g k ↦ hsm.1 i g k, fun n ↦ hsm.2 i n⟩
 
 -- TODO(paper-gap): The assertion preceding (10.1.1.2) on p. 434 and the open
 -- half-line on p. 435 require care. Every compact subinterval gives a finite norm.
