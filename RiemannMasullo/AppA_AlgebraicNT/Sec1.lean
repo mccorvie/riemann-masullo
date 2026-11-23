@@ -2999,6 +2999,35 @@ private theorem sInteger_divisorPic_eq_one_iff (S : Finset (Primes(F))) (n : Pri
     have h := (hdivisor_eq m).mpr (fun v hv ↦ (ha v hv).trans (hm v).symm)
     exact ⟨a, (h.trans hmI).symm⟩
 
+open scoped WithZero in
+/-- Trivial S-integer Picard group lets one clear the finite valuations outside S
+by a principal idele. -/
+theorem exists_idele_unit_outside_of_trivial_sInteger_picard (S : Finset (Primes(F)))
+    (hPic : Subsingleton (CommRing.Pic (Oₛ(F, S)))) (g : 𝕀[F]) :
+    ∃ x : Fˣ, ∀ v : Primes(F), v ∉ S →
+      Valued.v ((g * IdeleGroup.unitEmbedding (𝓞 F) F x⁻¹).val.2 v) = (1 : ℤᵐ⁰) := by
+  let n := Finsupp.ofSupportFinite (ideleExponent F g)
+    (eventually_cofinite.mp (eventually_ideleExponent_eq_zero F g))
+  obtain ⟨x, hx⟩ := (sInteger_divisorPic_eq_one_iff F S n).mp (hPic.elim _ _)
+  refine ⟨x, fun v hv ↦ ?_⟩
+  have he : WithZero.log (Valued.v (g.val.2 v)) =
+      WithZero.log (Valued.v ((x : F) : v.adicCompletion F)) := by
+    have h := hx v hv
+    change -WithZero.log (Valued.v (g.val.2 v)) = -WithZero.log (v.valuation F (x : F)) at h
+    rw [HeightOneSpectrum.valuedAdicCompletion_eq_valuation']
+    exact neg_injective h
+  have hg0 : Valued.v (g.val.2 v) ≠ (0 : ℤᵐ⁰) :=
+    (Valuation.ne_zero_iff _).mpr ((AdeleRing.isUnit_iff.mp g.isUnit).2.1 v)
+  have hx0 : Valued.v ((x : F) : v.adicCompletion F) ≠ (0 : ℤᵐ⁰) :=
+    (Valuation.ne_zero_iff _).mpr ((map_ne_zero (algebraMap F (v.adicCompletion F))).mpr x.ne_zero)
+  have h := congrArg WithZero.exp he
+  rw [WithZero.exp_log hg0, WithZero.exp_log hx0] at h
+  let l := algebraMap F (v.adicCompletion F)
+  change Valued.v (g.val.2 v) = Valued.v (l (x : F)) at h
+  change Valued.v (l (x : F)) ≠ 0 at hx0
+  change Valued.v (g.val.2 v * l (↑x⁻¹ : F)) = 1
+  rw [Units.val_inv_eq_inv_val, map_inv₀ l, map_mul, map_inv₀, h, mul_inv_cancel₀ hx0]
+
 /-- The additive order identifies the local multiplicative classes with the integers. -/
 private def localClassOrder (v : Primes(F)) : LocalClass(F, v) ≃* Multiplicative ℤ := by
   let order : (v.adicCompletion F)ˣ →* Multiplicative ℤ :=
