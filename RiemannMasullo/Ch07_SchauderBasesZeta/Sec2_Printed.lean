@@ -831,13 +831,189 @@ Reading the subscript according to Definition 7.1.2.1 gives a nonnegative expone
 def sLocalPrincipalPartCoeff_leading_literal : Prop :=
   sLocalUnscaledLeadingIdentity.{u} (fun m ↦ (m : ℤ))
 
+/-- Transfer an identity on the open right half-plane to the punctured germ at zero. -/
+private theorem sLocalPrincipalPartCoeff_leading_literal_germ {A B : ℂ → ℂ}
+    (hA : Meromorphic A) (hB : Meromorphic B) (h : ∀ z : ℂ, 0 < z.re → A z = B z) :
+    A =ᶠ[𝓝[≠] (0 : ℂ)] B := by
+  have hd : Meromorphic (A - B) := fun z ↦ (hA z).sub (hB z)
+  have ho : {z : ℂ | 0 < z.re} ∈ 𝓝 (1 : ℂ) :=
+    (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by simp)
+  have he := hd.exists_meromorphicOrderAt_eq_top_iff_eventually_zero.mp
+    ⟨1, meromorphicOrderAt_eq_top_iff.mpr (Filter.eventually_of_mem (nhdsWithin_le_nhds ho)
+      fun z hz ↦ sub_eq_zero.mpr (h z hz))⟩
+  exact (he.filter_mono (nhdsNE_le_codiscrete 0)).mono fun _ hz ↦ sub_eq_zero.mp hz
+
+/-- At the sole real place choose a test with a simple pole. The second difference under
+translation has germ z B(z), with B(0) the residue times the square of the log norm. -/
+private theorem sLocalPrincipalPartCoeff_leading_literal_test {F : Type u} [Field F]
+    [NumberField F] [Unique (InfinitePlace F)] (hw : ∀ w : InfinitePlace F, w.IsReal) :
+    ∃ (g : ℬₛ(F, ∅)) (B : ℂ → ℂ), AnalyticAt ℂ B 0 ∧ B 0 ≠ 0 ∧
+      (fun z ↦ sLocalIdelicZFunction g (twistₛ(F, ∅) 1 z)) =ᶠ[𝓝[≠] (0 : ℂ)]
+        fun z ↦ z * B z := by
+  classical
+  let S : Finset Places(F) := ∅
+  let w : InfinitePlace F := default
+  let χ := (1 : PontryaginDual Jₛ(F, S))
+  let chart := twistₛ(F, S) ((circleToComplex).comp χ)
+  let α (i : InfinitePlace F) := quasiCharacterNormTwist
+    ((Units.map nnNormHom.toMonoidHom) ^ i.mult) (continuous_infiniteLocalModule i)
+    ((circleToComplex).comp (1 : PontryaginDual i.Completionˣ))
+  have hpole (i : InfinitePlace F) := (infiniteLocalIdelicZFunction_real_poles i (hw i) 1 0
+    (fun _ ↦ by simp; rfl) 0).2.mpr ⟨0, by simp⟩
+  choose a ha using hpole
+  let Z (z : ℂ) := infiniteLocalIdelicZFunction w (a w) (α w z)
+  have hm : Meromorphic Z := fun z ↦
+    (((infiniteLocalIdelicZFunction_existsUnique w (a w)).exists.choose_spec 1).1
+      (mem_univ z)).meromorphicAt
+  obtain ⟨H, hH, hnH, hZ⟩ := (meromorphicOrderAt_eq_int_iff (n := -1) (hm 0)).mp (ha w)
+  obtain ⟨f, hf⟩ := sLocalPrincipalPartCoeff_eigendistribution_tensor S a (fun _ ↦ 0)
+  have hI (z : ℂ) (hz : 0 < z.re) : sLocalIdelicZetaIntegral f (chart z) = Z z := by
+    have he := sLocalIdelicZetaIntegral_pureTensor (chart z) ⟨χ, z, hz, rfl⟩ f a _ hf
+    have harch : sLocalInfiniteRestriction w (chart z) = α w z := by
+      ext1 x
+      rw [sLocalInfiniteRestriction_normTwist]
+      change _ = ((1 : Circle) : ℂ) *
+        ((((((Units.map nnNormHom.toMonoidHom) ^ w.mult) x : ℝ≥0ˣ) : ℝ≥0) : ℝ) : ℂ) ^ z
+      rw [Circle.coe_one, one_mul]
+    rw [Fintype.prod_subsingleton _ w, harch] at he
+    apply Eq.trans _ (infiniteLocalIdelicZFunction_eq_integral w (a w) 1 hz).symm
+    simpa [S] using he
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  obtain ⟨t, ht⟩ := exists_ne (1 : ℝ≥0ˣ)
+  obtain ⟨u, hu⟩ := QuotientGroup.mk_surjective (σ t)
+  let r : ℂ := (((t : ℝ≥0) : ℝ) : ℂ)
+  have hr : r ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_pos.mpr (Units.zero_lt t)).ne'
+  have hr1 : r ≠ 1 := fun h ↦ ht (Units.val_eq_one.mp (NNReal.coe_eq_one.mp
+    (Complex.ofReal_eq_one.mp h)))
+  let E (z : ℂ) := r ^ z
+  have hE (z : ℂ) : AnalyticAt ℂ E z :=
+    (differentiable_id.const_cpow (c := r) (Or.inl hr)).analyticAt z
+  let D := dslope E 0
+  have hD : AnalyticAt ℂ D 0 := (hE 0).dslope 0
+  have hnD : D 0 ≠ 0 := by
+    have hval : D 0 = Complex.log r := by simp [D, dslope_same, E]
+    intro hzero
+    exact hr1 (by rw [← Complex.exp_log hr, ← hval, hzero, Complex.exp_zero])
+  let T := schwartzBruhatUnitTranslate u
+  let g := (T (T f) - T f) - (T f - f)
+  have he (z : ℂ) (hz : 0 < z.re) :
+      sLocalIdelicZFunction g (chart z) = (E z - 1) ^ 2 * Z z := by
+    obtain ⟨L, hL⟩ := sLocalIdelicZetaIntegral_tempered (chart z) ⟨χ, z, hz, rfl⟩
+    have ht' (b : ℬₛ(F, S)) : L (T b) = E z * L b := by
+      rw [hL, hL, sLocalPrincipalPartCoeff_eigendistribution_translate]
+      change (((circleToComplex).comp χ) _ * _ ^ z) * _ = _
+      rw [hu, hσ]
+      change (((1 : Circle) : ℂ) * r ^ z) * _ = _
+      rw [Circle.coe_one, one_mul]
+    rw [sLocalIdelicZFunction_eq_integral g ⟨χ, z, hz, rfl⟩, ← hL]
+    simp only [g, map_sub, ht', hL f, hI z hz]
+    ring
+  have hg := sLocalPrincipalPartCoeff_leading_literal_germ
+    (fun z ↦ ((sLocalIdelicZFunction_meromorphic g χ) (mem_univ z)).meromorphicAt)
+    (fun z ↦ ((((hE z).sub analyticAt_const).pow 2).meromorphicAt).mul (hm z)) he
+  refine ⟨g, fun z ↦ D z ^ 2 * H z, (hD.pow 2).mul hH, mul_ne_zero (pow_ne_zero _ hnD) hnH, ?_⟩
+  have hbase : (circleToComplex).comp χ = 1 := by ext; rfl
+  change (fun z ↦ sLocalIdelicZFunction g (twistₛ(F, S) 1 z)) =ᶠ[_] _
+  rw [← hbase]
+  filter_upwards [hg, hZ, self_mem_nhdsWithin] with z hgz hz hz0
+  have hn : z ≠ 0 := hz0
+  change sLocalIdelicZFunction g (chart z) = _
+  rw [hgz]
+  change (E z - 1) ^ 2 * Z z = _
+  change Z z = _ at hz
+  rw [hz]
+  simp only [D, dslope_of_ne E hn, slope_def_field, E, Complex.cpow_zero, sub_zero,
+    zpow_neg_one, smul_eq_mul]
+  field_simp
+  <;> ring
+
+/-- Residues depend only on the punctured germ of the integrand. -/
+private theorem sLocalPrincipalPartCoeff_leading_literal_residue {A B : ℂ → ℂ}
+    (he : A =ᶠ[𝓝[≠] (0 : ℂ)] B) : complexResidue A 0 = complexResidue B 0 := by
+  obtain ⟨δ, hδ, hEq⟩ := Metric.nhdsWithin_basis_ball.eventually_iff.mp he
+  unfold complexResidue limUnder
+  refine congrArg lim (Filter.map_congr ?_)
+  filter_upwards [Ioo_mem_nhdsGT hδ] with r hr
+  rw [circleIntegral.integral_congr hr.1.le fun z hz ↦ hEq ⟨?_, ?_⟩]
+  · rw [Metric.mem_ball, Metric.mem_sphere.mp hz]
+    exact hr.2
+  · rintro rfl
+    exact hr.1.ne (by simpa using hz)
+
+/-- The second difference has nonzero first coefficient and zero residue, whereas the
+literal identity would make the latter a nonzero scalar times the former. -/
+private theorem sLocalPrincipalPartCoeff_leading_literal_false_aux :
+    ¬ sLocalPrincipalPartCoeff_leading_literal.{u} := by
+  classical
+  intro h
+  let := ulift_rat_numberField.{u}
+  let F := ULift.{u} ℚ
+  let S : Finset Places(F) := ∅
+  have hd : Module.finrank ℚ F = 1 := by
+    rw [((ULift.ringEquiv.{0, u} (R := ℚ)).toRatAlgEquiv.toLinearEquiv).finrank_eq,
+      Module.finrank_self]
+  have hreal := InfinitePlace.nrRealPlaces_eq_one_of_finrank_eq_one hd
+  have hcard : Fintype.card (InfinitePlace F) = 1 := by
+    rw [InfinitePlace.card_eq_nrRealPlaces_add_nrComplexPlaces, hreal,
+      InfinitePlace.nrComplexPlaces_eq_zero_of_finrank_eq_one hd, add_zero]
+  let := (Fintype.card_eq_one_iff_nonempty_unique.mp hcard).some
+  have hw (w : InfinitePlace F) : w.IsReal := by
+    obtain ⟨⟨i, hi⟩⟩ : Nonempty {i : InfinitePlace F // i.IsReal} :=
+      Fintype.card_pos_iff.mp (by rw [← InfinitePlace.nrRealPlaces, hreal]; decide)
+    simpa only [Subsingleton.elim i w] using hi
+  let c : Xₛ(F, S) := 1
+  have hm : sLocalRhoPoleOrder c = 1 := by
+    rw [sLocalRhoPoleOrder_eq_card_polePlaces, sLocalPolePlaces_one.1, sLocalPolePlaces_one.2,
+      Finset.card_univ, Finset.card_univ, hcard]
+    simp [S]
+  have hp : 0 < sLocalRhoPoleOrder c := hm ▸ Nat.one_pos
+  obtain ⟨g, B, hB, hnB, hg⟩ := sLocalPrincipalPartCoeff_leading_literal_test hw
+  let Z (z : ℂ) := sLocalIdelicZFunction g (twistₛ(F, S) c z)
+  have hcoeff (n : ℤ) : sLocalZLaurentCoeff g c n = complexResidue (fun z ↦ Z z / z ^ (n + 1)) 0 := rfl
+  have hfirst : sLocalZLaurentCoeff g c 1 = B 0 := by
+    rw [hcoeff]
+    apply Eq.trans (sLocalPrincipalPartCoeff_leading_literal_residue (B := fun z ↦ B z / (z - 0)) ?_)
+      (complexResidue_div_sub hB)
+    filter_upwards [hg, self_mem_nhdsWithin] with z hz hz0
+    have hn : z ≠ 0 := hz0
+    change Z z = _ at hz
+    rw [hz]
+    norm_num
+    field_simp
+  have hres : sLocalZLaurentCoeff g c (-1) = 0 := by
+    rw [hcoeff]
+    have ha : AnalyticAt ℂ (fun z : ℂ ↦ z * (z * B z)) 0 :=
+      analyticAt_id.mul (analyticAt_id.mul hB)
+    refine (sLocalPrincipalPartCoeff_leading_literal_residue
+      (B := fun z ↦ z * (z * B z) / (z - 0)) ?_).trans ((complexResidue_div_sub ha).trans (by simp))
+    filter_upwards [hg, self_mem_nhdsWithin] with z hz hz0
+    have hn : z ≠ 0 := hz0
+    change Z z = _ at hz
+    rw [hz]
+    simp [hn]
+  have hprinted := h F S c hp g
+  have htrue := sLocalPrincipalPartCoeff_leading_formula c hp g
+  dsimp only at hprinted htrue
+  rw [sLocalPrincipalPartCoeff_apply, hm] at htrue
+  rw [hm] at hprinted
+  simp only [Nat.cast_one, hfirst] at hprinted
+  have hmass : (∏ v : S, (((finiteLocalMultiplicativeTamagawaMeasure F v.val)
+      (v.val.adicCompletionIntegers F).units).toReal : ℂ)) = 1 := by simp [S]
+  simp only [Nat.cast_one, hres, hmass, one_mul] at htrue
+  apply hnB
+  apply (mul_eq_zero.mp (show sLocalEpsilonFactor c * B 0 = 0 from ?_)).resolve_left
+    (sLocalEpsilonFactor_ne_zero c)
+  rw [hprinted]
+  linear_combination -htrue
+
 /-- Paper: Equation (7.2.1.13), p. 336.
 For ℚ with the real place take the trivial center and an even nonzero nonnegative
 bump on 2 < |x| < 3. Its first Mellin derivative is positive. The right side is
 zero since the leading polar functional at the trivial character is a multiple
 of the test value at zero. -/
 theorem sLocalPrincipalPartCoeff_leading_literal_false :
-    ¬ sLocalPrincipalPartCoeff_leading_literal := by sorry
+    ¬ sLocalPrincipalPartCoeff_leading_literal :=
+  sLocalPrincipalPartCoeff_leading_literal_false_aux
 
 /-- Paper: Equation (7.2.1.13), p. 336.
 With the leading-pole interpretation specified in (7.2.1.19), the unscaled
