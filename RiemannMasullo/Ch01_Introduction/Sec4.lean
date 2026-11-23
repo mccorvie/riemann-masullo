@@ -3416,6 +3416,126 @@ theorem introTrace_continuation_of_half_le (χ : U𝔽) {a : ℝ} (ha : 1 / 2 �
   rw [show finiteL(χ) s = finiteHeckeL χ ⟨s, hre⟩ from hL.2 ⟨s, hre⟩]
   exact finiteHeckeL_ne_zero_of_one_lt_re χ _
 
+/-- On the positive half-plane the reciprocal gamma factor is regular and nonzero. -/
+private theorem introTrace_normalized_finite_order_eq_completed (χ : U𝔽) (s : ℂ) (hs : 0 < s.re) :
+    meromorphicOrderAt finiteL(χ) s = meromorphicOrderAt (continuedCompletedHeckeL χ) s := by
+  let L := continuedCompletedHeckeL χ
+  let G (z : ℂ) := (heckeGammaFactor χ z)⁻¹
+  have hG := differentiable_inv_heckeGammaFactor χ
+  have hL := continuedCompletedHeckeL_spec χ
+  have hF := (finiteHeckeL_exists_continuation χ).choose_spec
+  have hm : MeromorphicOn (fun z ↦ G z * L z) univ := fun z hz ↦
+    (hG.analyticAt z).meromorphicAt.mul (hL.1 hz).meromorphicAt
+  have he (z : ℂ) (hz : 1 < z.re) : finiteL(χ) z = G z * L z := by
+    rw [hF.2 ⟨z, hz⟩, show L z = completedHeckeL χ ⟨z, hz⟩ from hL.2 ⟨z, hz⟩]
+    exact (inv_mul_cancel_left₀ (heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans hz)) _).symm
+  have hU : ∀ᶠ z : ℂ in 𝓝 2, 1 < z.re :=
+    (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+  have htop : meromorphicOrderAt (finiteL(χ) - fun z ↦ G z * L z) 2 = ⊤ :=
+    meromorphicOrderAt_eq_top_iff.mpr (eventuallyEq_iff_sub.mp
+      ((hU.mono he).filter_mono nhdsWithin_le_nhds))
+  have ht := (hF.1.meromorphicOn.sub hm).meromorphicOrderAt_eq_top_of_isPreconnected
+    isPreconnected_univ (mem_univ (2 : ℂ)) (mem_univ s) htop
+  have hlocal : finiteL(χ) =ᶠ[𝓝[≠] s] (fun z ↦ G z * L z) :=
+    eventuallyEq_iff_sub.mpr (meromorphicOrderAt_eq_top_iff.mp ht)
+  rw [meromorphicOrderAt_congr hlocal]
+  exact meromorphicOrderAt_mul_of_ne_zero (hG.analyticAt s)
+    (inv_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ hs))
+
+/-- A nontrivial chart representative must already be nontrivial on the norm-one classes. -/
+private theorem introTrace_normalized_nontrivial_on_kernel
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : U𝔽) (hχ : ∀ t, χ (τ t) = 1) (hn : χ ≠ 1) :
+    χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype ≠ 1 := by
+  intro he
+  apply hn
+  ext1 g
+  let u := g / τ (ideleClassNorm F g)
+  have hu : u ∈ (ideleClassNorm F).ker := by
+    change ideleClassNorm F (g / τ _) = 1
+    rw [map_div, hτ, div_self']
+  have hc := DFunLike.congr_fun he (⟨u, hu⟩ : (ideleClassNorm F).ker)
+  change χ u = 1 at hc
+  dsimp [u] at hc
+  rwa [map_div, hχ, div_one] at hc
+
+/-- The unshifted pole of the completed trivial character has order minus one. -/
+private theorem introTrace_normalized_trivial_order_one :
+    meromorphicOrderAt (continuedCompletedHeckeL (F := F) 1) 1 = -1 := by
+  let χ : U𝔽 := 1
+  let L := continuedCompletedHeckeL χ
+  have hL := continuedCompletedHeckeL_spec χ
+  obtain ⟨t, ⟨_, ho₀, ho₁, _⟩, _⟩ := completedHeckeL_continuation_simplePoles χ L hL.1 hL.2
+    (by ext; rfl)
+  have ht : Complex.I * (t : ℂ) = 0 := by
+    by_contra hne
+    have hne' : Complex.I * (t : ℂ) ≠ 1 := by
+      intro h
+      have := congrArg Complex.re h
+      simp [Complex.mul_re] at this
+    have hmem : Complex.I * (t : ℂ) ∈ ({0, 1}ᶜ : Set ℂ) := by simpa using And.intro hne hne'
+    have hnn := (completedHeckeL_one_analyticOnNhd (F := F) L hL.1 hL.2 _ hmem).meromorphicOrderAt_nonneg
+    rw [ho₀] at hnn
+    exact (WithTop.coe_lt_coe.mpr (show (-1 : ℤ) < 0 by decide)).not_ge hnn
+  simpa [ht] using ho₁
+
+/-- Away from the unshifted trivial pole, a chart character has no poles in the positive half-plane. -/
+private theorem introTrace_normalized_completed_order_nonneg
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : U𝔽) (hχ : ∀ t, χ (τ t) = 1) (s : ℂ) (hs : 0 < s.re) (hn : ¬(χ = 1 ∧ s = 1)) :
+    0 ≤ meromorphicOrderAt (continuedCompletedHeckeL χ) s := by
+  have hL := continuedCompletedHeckeL_spec χ
+  by_cases h : χ = 1
+  · subst χ
+    have h₀ : s ≠ 0 := fun h ↦ (ne_of_gt hs) (by rw [h]; rfl)
+    have h₁ : s ≠ 1 := fun h ↦ hn ⟨rfl, h⟩
+    exact (completedHeckeL_one_analyticOnNhd (F := F) _ hL.1 hL.2 s
+      (by simpa using And.intro h₀ h₁)).meromorphicOrderAt_nonneg
+  · exact ((completedHeckeL_continuation_entire χ _ hL.1 hL.2
+      (introTrace_normalized_nontrivial_on_kernel τ hτ χ hχ h)).analyticAt s).meromorphicOrderAt_nonneg
+
+open Classical in
+/-- Paper: §1.4.5, p. 30. In a normalized chart, fixed-width continuation is equivalent to
+absence of completed zeros strictly to the right of the window. -/
+theorem introTrace_normalized_continuation_iff_no_right_zeros
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : U𝔽) (hχ : ∀ t, χ (τ t) = 1) (a : ℝ) (ha : 0 ≤ a) :
+    (∃ H : ℂ → ℂ, AnalyticOnNhd ℂ H right(a) ∧ EqOn H
+      (fun z ↦ logDeriv finiteL(χ) (z + 1 / 2) +
+        if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) right(max a 1)) ↔
+    ∀ s : ℂ, a + 1 / 2 < s.re → ¬ 0 < meromorphicOrderAt (continuedCompletedHeckeL χ) s := by
+  rw [introTrace_continuation_iff_finiteL_orders χ a ha]
+  constructor
+  · intro h s hs
+    have ho := h s hs
+    rw [introTrace_normalized_finite_order_eq_completed χ s (by linarith)] at ho
+    rw [ho]
+    split_ifs <;> norm_num
+  · intro h s hs
+    rw [introTrace_normalized_finite_order_eq_completed χ s (by linarith)]
+    split_ifs with he
+    · obtain ⟨rfl, rfl⟩ := he
+      exact introTrace_normalized_trivial_order_one
+    · exact le_antisymm (not_lt.mp (h s hs))
+        (introTrace_normalized_completed_order_nonneg τ hτ χ hχ s (by linarith) he)
+
+open Classical in
+/-- Paper: §1.4.5, p. 30. Proposition 3.2.1.3 excludes positive order on and to the right of the Euler boundary,
+so the fixed-width criterion only tests the open strip below one. -/
+theorem introTrace_normalized_continuation_iff_no_right_zeros_in_strip
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : U𝔽) (hχ : ∀ t, χ (τ t) = 1) (a : ℝ) (ha : 0 ≤ a) :
+    (∃ H : ℂ → ℂ, AnalyticOnNhd ℂ H right(a) ∧ EqOn H
+      (fun z ↦ logDeriv finiteL(χ) (z + 1 / 2) +
+        if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) right(max a 1)) ↔
+    ∀ s : ℂ, a + 1 / 2 < s.re → s.re < 1 → ¬ 0 < meromorphicOrderAt (continuedCompletedHeckeL χ) s := by
+  rw [introTrace_normalized_continuation_iff_no_right_zeros τ hτ χ hχ a ha]
+  constructor
+  · exact fun h s hs _ ↦ h s hs
+  · intro h s hs hp
+    have hL := continuedCompletedHeckeL_spec χ
+    exact h s hs (completedHeckeL_continuation_zeros χ _ hL.1 hL.2 (by linarith) hp) hp
+
 open Classical in
 /-- Paper: §1.4.5, p. 30. Continuation from every positive half-width gives
 holomorphy of the shifted logarithmic derivative throughout the right half-plane
@@ -4308,6 +4428,40 @@ end Boundary
 -- does not compare the fixed geometric distribution across widths. The missing
 -- orbital comparison is recorded by traceFormula_exteriorZeros in Chapter 12.
 
+open Classical in
+/-- Paper: §1.4.5, p. 30. Fix a norm section. The continuation asserted in all its
+normalized charts and at every positive half-width is equivalent to the critical-line
+assertion for the completed L-functions of all unitary characters of the number field. -/
+theorem introTrace_all_continuations_iff_critical_line
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F)) :
+    (∀ (χ : U𝔽), (∀ t, χ (τ t) = 1) → ∀ a : ℝ, 0 < a →
+      ∃ H : ℂ → ℂ, AnalyticOnNhd ℂ H right(a) ∧ EqOn H
+        (fun z ↦ logDeriv finiteL(χ) (z + 1 / 2) +
+          if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) right(max a 1)) ↔
+      ∀ (χ : U𝔽) (s : ℂ), 0 < s.re → s.re < 1 →
+        0 < meromorphicOrderAt (continuedCompletedHeckeL χ) s → s.re = 1 / 2 := by
+  constructor
+  · intro hext
+    have hr (χ : U𝔽) (s : ℂ) (hs : 1 / 2 < s.re) :
+        meromorphicOrderAt (continuedCompletedHeckeL χ) s ≤ 0 := by
+      apply introTrace_completedL_no_right_zeros τ hτ _ χ s hs
+      intro η hη w hw
+      let a := (w.re - 1 / 2) / 2
+      have ha : 0 < a := by dsimp [a]; linarith
+      have hw' : a + 1 / 2 < w.re := by dsimp [a]; linarith
+      have h := (introTrace_continuation_iff_finiteL_orders η a ha.le).mp (hext η hη a ha) w hw'
+      rw [h]
+      split_ifs <;> decide
+    intro χ s _ _ hz
+    apply le_antisymm
+    · exact le_of_not_gt fun h ↦ hz.not_ge (hr χ s h)
+    · exact le_of_not_gt fun h ↦ hz.not_ge (introTrace_completedL_no_left_zeros χ (hr χ⁻¹) s h)
+  · intro hline χ hχ a ha
+    apply (introTrace_normalized_continuation_iff_no_right_zeros_in_strip τ hτ χ hχ a ha.le).mpr
+    intro s hs hs₁ hz
+    have he := hline χ s (by linarith) hs₁ hz
+    linarith
+
 /-- Paper: §1.4.5, p. 30. For every number field and every unitary character
 of its idele class group, a zero of the continued completed Hecke L-function
 in the open critical strip has real part one half. The paper gives no
@@ -4323,17 +4477,8 @@ theorem heckeL_zero_re_eq_half (χ : U𝔽) (s : ℂ) (_hs₀ : 0 < s.re) (_hs�
   let τ : ℝ≥0ˣ →ₜ* C𝔽 := q.comp
     ⟨canonicalIdeleNormSection F, canonicalIdeleNormSection_continuous F⟩
   have hτ : RightInverse τ (ideleClassNorm F) := canonicalIdeleNormSection_rightInverse F
-  have hr (ψ : U𝔽) (w : ℂ) (hw : 1 / 2 < w.re) :
-      meromorphicOrderAt (continuedCompletedHeckeL ψ) w ≤ 0 := by
-    refine introTrace_completedL_no_right_zeros τ hτ ?_ ψ w hw
-    intro η hη
-    refine introTrace_finiteL_no_right_zeros η (introTrace_logDeriv_analytic_of_extensions η ?_)
-    intro a ha
-    obtain ⟨h, ρ, H, hA, hH, hlim⟩ := introTrace_combined_limit_extension τ hτ η hη a ha
-    exact ⟨H, hH, introTrace_logDeriv_extension_of_limit τ hτ η hη a ha h ρ hA H hH hlim⟩
-  apply le_antisymm
-  · exact le_of_not_gt fun h ↦ _hzero.not_ge (hr χ s h)
-  · exact le_of_not_gt fun h ↦ _hzero.not_ge
-      (introTrace_completedL_no_left_zeros χ (hr χ⁻¹) s h)
+  apply (introTrace_all_continuations_iff_critical_line τ hτ).mp _ χ s _hs₀ _hs₁ _hzero
+  intro η hη a ha
+  exact introTrace_combined_limit_extension_analytic τ hτ η hη ha
 
 end RiemannMasullo
