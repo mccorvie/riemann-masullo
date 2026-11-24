@@ -5231,6 +5231,282 @@ private theorem finiteNuclearity_trace_of_bounds {E Z : Type*} [DecidableEq Z] [
       using hasSum_fintype (fun _ : Fin (m z) ↦ M z)
   exact ⟨⟨r, rapid⟩, hterm.summable.norm, fun s ↦ hterm.tsum_eq.symm ▸ (ht s).2⟩
 
+/-- Restricting the Mellin closed embedding to its range and then taking the
+closed principal-value quotient preserves the Fréchet property. -/
+private theorem finiteNuclearity_trace_jet_bounds_frechet {X Y : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [IsTopologicalAddGroup X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (i : X →L[ℂ] Y) (hi : IsClosedEmbedding i) (hY : IsFrechetTVS Y)
+    (D : Submodule ℂ X) (hD : IsClosed (D : Set X)) : IsFrechetTVS (X ⧸ D) := by
+  obtain ⟨_, _, _, c⟩ := hY
+  let : UniformSpace Y := IsTopologicalAddGroup.rightUniformSpace Y
+  have : IsUniformAddGroup Y := isUniformAddGroup_of_addCommGroup
+  have : CompleteSpace Y := c
+  let : UniformSpace X := IsTopologicalAddGroup.rightUniformSpace X
+  have : IsUniformAddGroup X := isUniformAddGroup_of_addCommGroup
+  have hu := AddMonoidHom.isUniformInducing_of_isInducing
+    (f := i.toLinearMap.toAddMonoidHom) hi.isInducing
+  exact isFrechetTVS_quotient
+    ⟨inferInstance, hi.isInducing.polynormableSpace (f := i.toLinearMap),
+      hi.isEmbedding.metrizableSpace, hu.completeSpace hi.isClosed_range.isComplete⟩ D hD
+
+/-- A positive envelope for the test multiplier on the unit circles about the
+imaginary axis. Its square dominates the multiplier and the envelope itself
+still decreases faster than every inverse power of the height. -/
+private theorem finiteNuclearity_trace_jet_bounds_envelope (M : ℂ → ℂ) (hM : Continuous M)
+    (hdecay : ∀ k : ℕ, ∃ C : ℝ, ∀ w : ℂ, w.re ∈ Icc (-1 : ℝ) 1 →
+      ‖M w‖ * (1 + |w.im|) ^ k ≤ C) :
+    ∃ r : ℂ → ℝ, (∀ z, 0 < r z) ∧
+      (∀ z, ∀ w ∈ Metric.sphere z 1, ‖M w‖ ≤ (r z) ^ 2) ∧
+      ∀ k : ℕ, ∃ C : ℝ, ∀ z : ℂ, z.re = 0 → r z * (1 + |z.im|) ^ k ≤ C := by
+  classical
+  choose u hu hmax using fun z : ℂ ↦
+    (isCompact_closedBall z 1).exists_isMaxOn (Metric.nonempty_closedBall.mpr zero_le_one)
+      hM.norm.continuousOn
+  let W (z : ℂ) := 1 + |z.im|
+  let r (z : ℂ) := Real.sqrt (‖M (u z)‖ + (Real.exp (W z))⁻¹)
+  have hW (z : ℂ) : 0 ≤ W z := by dsimp [W]; positivity
+  have hr (z : ℂ) : 0 < r z := Real.sqrt_pos.2 (by positivity)
+  have hs (z : ℂ) : (r z) ^ 2 = ‖M (u z)‖ + (Real.exp (W z))⁻¹ := Real.sq_sqrt (by positivity)
+  refine ⟨r, hr, fun z w hw ↦ (hmax z (Metric.sphere_subset_closedBall hw)).trans
+    ((le_add_of_nonneg_right (by positivity)).trans_eq (hs z).symm), ?_⟩
+  intro k
+  let n := k + k
+  obtain ⟨C, hC⟩ := hdecay n
+  refine ⟨Real.sqrt (C * 2 ^ n + n.factorial), fun z hz ↦ ?_⟩
+  have hd := mem_closedBall_iff_norm.mp (hu z)
+  have hx := (Complex.abs_re_le_norm (u z - z)).trans hd
+  have hy := (Complex.abs_im_le_norm (u z - z)).trans hd
+  rw [Complex.sub_re, hz, sub_zero] at hx
+  rw [Complex.sub_im, abs_sub_comm] at hy
+  have hw : W z ≤ 2 * W (u z) := by
+    dsimp [W]
+    linarith [abs_sub_abs_le_abs_sub z.im (u z).im, abs_nonneg (u z).im]
+  have h₁ : ‖M (u z)‖ * W z ^ n ≤ C * 2 ^ n := calc
+    _ ≤ ‖M (u z)‖ * (2 * W (u z)) ^ n := by gcongr
+    _ = (‖M (u z)‖ * W (u z) ^ n) * 2 ^ n := by rw [mul_pow]; ring
+    _ ≤ C * 2 ^ n := by gcongr; exact hC _ (abs_le.mp hx)
+  have h₂ : (Real.exp (W z))⁻¹ * W z ^ n ≤ n.factorial := by
+    rw [inv_mul_le_iff₀ (Real.exp_pos _)]
+    exact (div_le_iff₀ (by positivity : (0 : ℝ) < n.factorial)).mp
+      (Real.pow_div_factorial_le_exp (W z) (hW z) n)
+  apply Real.le_sqrt_of_sq_le
+  calc
+    (r z * W z ^ k) ^ 2 = (r z) ^ 2 * W z ^ n := by rw [mul_pow, sq (W z ^ k), ← pow_add]
+    _ ≤ C * 2 ^ n + n.factorial := by rw [hs, add_mul]; exact add_le_add h₁ h₂
+
+/-- A bounded-order Cauchy estimate with one bound on the entire input strip.
+The square of the envelope accounts for the multiplier on each integration circle. -/
+private theorem finiteNuclearity_trace_jet_bounds_cauchy (M : ℂ → ℂ) (hM : Differentiable ℂ M)
+    (r : ℂ → ℝ)
+    (hs : ∀ z, ∀ w ∈ Metric.sphere z 1, ‖M w‖ ≤ r z ^ 2)
+    (N : ℕ) (f : SchwartzBergman (univ : Set ℝ)) :
+    ∃ C : ℝ, ∀ (z : ℂ) (k : ℕ), z.re = 0 → k ≤ N →
+      ‖iteratedDeriv k (M * f.val) z‖ ≤ r z ^ 2 * C := by
+  obtain ⟨K, hK⟩ := f.property.2.2 (-1) 1 (by norm_num) (subset_univ _) 0
+  have hf : Differentiable ℂ f.val := differentiableOn_univ.mp (by simpa using f.property.2.1)
+  refine ⟨N.factorial * max K 0, fun z k hz hk ↦ ?_⟩
+  have hcircle (w : ℂ) (hw : w ∈ Metric.sphere z 1) : ‖(M * f.val) w‖ ≤ r z ^ 2 * max K 0 := by
+    have hx := (Complex.abs_re_le_norm (w - z)).trans (mem_sphere_iff_norm.mp hw).le
+    rw [Complex.sub_re, hz, sub_zero] at hx
+    have hb : ‖f.val w‖ ≤ K := by simpa only [pow_zero, one_mul] using hK ⟨w, abs_le.mp hx, rfl⟩
+    exact (norm_mul ..).le.trans (mul_le_mul (hs z w hw) (hb.trans (le_max_left ..))
+      (norm_nonneg _) (sq_nonneg _))
+  have h := Complex.norm_iteratedDeriv_le_of_forall_mem_sphere_norm_le k one_pos
+    (hM.mul hf).diffContOnCl hcircle
+  rw [one_pow, div_one] at h
+  calc
+    _ ≤ (k.factorial : ℝ) * (r z ^ 2 * max K 0) := h
+    _ ≤ (N.factorial : ℝ) * (r z ^ 2 * max K 0) := by
+      gcongr
+    _ = _ := by ring
+
+/-- Encode a jet by one vanishing local factor, its integer phase and its derivative
+order. There are finitely many factor/order labels, so the code grows at most
+linearly in the absolute imaginary part, even when local factors share zeros. -/
+private theorem finiteNuclearity_trace_jet_bounds_enumeration
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (p : HeightOneSpectrum (𝓞 ℚ)) :
+    let S := Sₚ(p)
+    let R := reciprocalPartialHeckeEulerProduct χ S
+    let J := Σ z : {z : ℂ // 0 < analyticOrderAt R z}, Fin (analyticOrderAt R z.val).toNat
+    ∃ (e : J ↪ ℕ) (C : ℝ), ∀ j, j.1.val.re = 0 ∧ j.2.val ≤ Module.finrank ℚ F ∧
+      (e j : ℝ) + 1 ≤ C * (1 + |j.1.val.im|) := by
+  classical
+  intro S R J
+  let Z := {z : ℂ // 0 < analyticOrderAt R z}
+  let l (v : S) := Real.log (v.val.asIdeal.absNorm : ℝ)
+  let c (v : S) := (ideleClassNormTwist χ 0).localValue v.val
+  have hl (v : S) : 0 < l v := Real.log_pos (by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val)
+  have hs : S.filter (fun v ↦ v.under (𝓞 ℚ) = p) = S := by
+    ext v
+    exact Finset.mem_filter.trans (and_iff_left_of_imp fun hv ↦
+      (finite_nuclearityPlacesAbove (F := F) p).mem_toFinset.mp hv)
+  let N := Module.finrank ℚ F
+  have order (z : Z) : (analyticOrderAt R z.val).toNat ≤ N := by
+    have h := reciprocalEulerProduct_over_prime_order_le χ S p z.val
+    rw [hs] at h
+    exact ENat.toNat_le_of_le_natCast h
+  have phase (z : Z) : ∃ (v : S) (n : ℤ),
+      Complex.log (c v) - (l v : ℂ) * z.val = n * (2 * Real.pi * Complex.I) := by
+    obtain ⟨v, hv, h⟩ := Finset.prod_eq_zero_iff.mp
+      (show R z.val = 0 from apply_eq_zero_of_analyticOrderAt_ne_zero z.property.ne')
+    by_cases hu : (ideleClassNormTwist χ 0).IsUnramifiedAt v
+    · let w : S := ⟨v, hv⟩
+      have hc := norm_ideleClassNormTwist_zero_localValue χ v
+      have hne : c w ≠ 0 := norm_ne_zero_iff.mp (hc.trans_ne one_ne_zero)
+      have hq : (v.asIdeal.absNorm : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr
+        (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)).ne'
+      rw [finiteHeckeEulerFactor, ite_eq_left hu, inv_inv, sub_eq_zero,
+        Complex.cpow_def_of_ne_zero hq, ← Complex.natCast_log] at h
+      refine ⟨w, Complex.exp_eq_one_iff.mp ?_⟩
+      rw [sub_eq_add_neg, Complex.exp_add, Complex.exp_log hne]
+      simpa only [l, c, w, mul_neg] using h.symm
+    · simp [finiteHeckeEulerFactor, hu] at h
+  choose v n hn using phase
+  have hre (z : Z) : z.val.re = 0 := by
+    have h := reciprocalEulerProduct_over_prime_zero χ S p (s := z.val)
+    rw [hs] at h
+    obtain ⟨_, _, _, _, _, _, _, he⟩ := h (apply_eq_zero_of_analyticOrderAt_ne_zero z.property.ne')
+    rw [he, Complex.mul_re, Complex.ofReal_im, Complex.I_re, mul_zero, zero_mul, sub_zero]
+  let label (j : J) : S × Fin (N + 1) := ⟨v j.1, j.2.val, by
+    exact Nat.lt_succ_of_le (j.2.isLt.le.trans (order _))⟩
+  let code := Fintype.equivFin (S × Fin (N + 1))
+  let L := Fintype.card (S × Fin (N + 1)) + 1
+  let tag (j : J) : Fin L := (code (label j)).castSucc
+  let e (j : J) := (Nat.divModEquiv L).symm (Equiv.intEquivNat (n j.1), tag j)
+  have inj : Injective e := by
+    intro i j h
+    have he := (Nat.divModEquiv L).symm.injective h
+    have hi := Equiv.intEquivNat.injective (congrArg Prod.fst he)
+    have ht := code.injective (Fin.castSucc_injective _ (congrArg Prod.snd he))
+    have hv : v i.1 = v j.1 := congrArg Prod.fst ht
+    have hp := hn i.1
+    rw [hv, hi, ← hn j.1] at hp
+    have hz : i.1 = j.1 := Subtype.ext (mul_left_cancel₀ (Complex.ofReal_ne_zero.mpr (hl _).ne')
+      (sub_right_injective hp))
+    have hk : i.2.val = j.2.val := congrArg (fun a : S × Fin (N + 1) ↦ a.2.val) ht
+    cases i with | mk z k =>
+      cases j with | mk w m =>
+        cases hz
+        exact congrArg (Sigma.mk z) (Fin.ext hk)
+  let K := 1 + ∑ w : S, l w
+  have hK (w : S) : l w ≤ K := (Finset.single_le_sum
+    (f := l) (fun u _ ↦ (hl u).le) (Finset.mem_univ w)).trans (by dsimp [K]; linarith)
+  let A := (Real.pi + K) / (2 * Real.pi)
+  have hA (z : Z) : |((n z : ℤ) : ℝ)| ≤ A * (1 + |z.val.im|) := by
+    have hi := congrArg Complex.im (hn z)
+    simp only [Complex.sub_im, Complex.mul_im, Complex.ofReal_re, Complex.ofReal_im,
+      Complex.I_im, Complex.I_re, Complex.intCast_re, Complex.intCast_im, Complex.log_im,
+      Complex.mul_re, Complex.re_ofNat, Complex.im_ofNat, sub_zero,
+      zero_mul, mul_zero, mul_one, add_zero] at hi
+    have hb := abs_sub ((c (v z)).arg) (l (v z) * z.val.im)
+    rw [hi, abs_mul, abs_of_pos Real.two_pi_pos, abs_mul, abs_of_pos (hl _)] at hb
+    dsimp only [A]
+    rw [div_mul_eq_mul_div, le_div_iff₀ Real.two_pi_pos]
+    have h₁ := Complex.abs_arg_le_pi (c (v z))
+    have h₂ := mul_le_mul_of_nonneg_right (hK (v z)) (abs_nonneg z.val.im)
+    have hk₀ := (hl (v z)).le.trans (hK (v z))
+    nlinarith [mul_nonneg Real.pi_pos.le (abs_nonneg z.val.im)]
+  refine ⟨⟨e, inj⟩, (L : ℝ) * (2 * (1 + A)), fun j ↦ ⟨hre _, j.2.isLt.le.trans (order _), ?_⟩⟩
+  let m := Equiv.intEquivNat (n j.1)
+  have hm := (latticeWeight_bounds m).2.2
+  simp only [m, latticeWeight, Equiv.symm_apply_apply] at hm
+  have hb : (m : ℝ) + 1 ≤ (2 * (1 + A)) * (1 + |j.1.val.im|) := by
+    nlinarith [hA j.1, abs_nonneg j.1.val.im]
+  change ((m * L + (tag j).val : ℕ) : ℝ) + 1 ≤ _
+  push_cast
+  have ht : ((tag j).val : ℝ) + 1 ≤ L := by exact_mod_cast (tag j).isLt
+  calc
+    _ ≤ (L : ℝ) * ((m : ℝ) + 1) := by linarith only [ht]
+    _ ≤ (L : ℝ) * ((2 * (1 + A)) * (1 + |j.1.val.im|)) := mul_le_mul_of_nonneg_left hb (Nat.cast_nonneg _)
+    _ = _ := by ring
+
+/-- In a Fréchet space a rapid positive scale absorbs polynomial column growth.
+Pointwise boundedness of the rows divided by its square gives one continuous
+seminorm by the barrelled-space uniform boundedness principle. -/
+private theorem finiteNuclearity_trace_jet_bounds_rescale {I E : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [ContinuousSMul ℂ E] (hE : IsFrechetTVS E)
+    (e : I ↪ ℕ) (W r : I → ℝ) (hW : ∀ j, 0 ≤ W j) (hr : ∀ j, 0 < r j)
+    (K : ℝ) (he : ∀ j, (e j : ℝ) + 1 ≤ K * W j)
+    (hrapid : ∀ k : ℕ, ∃ C : ℝ, ∀ j, r j * W j ^ k ≤ C)
+    (b : I → E) (row : I → StrongDual ℂ E)
+    (hb : ∀ q : Seminorm ℂ E, Continuous q → ∃ (m : ℕ) (C : ℝ), ∀ j, q (b j) ≤ C * W j ^ m)
+    (hd : ∀ x, ∃ C : ℝ, ∀ j, ‖row j x‖ ≤ r j ^ 2 * C) :
+    letI : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+    ∃ (a : I → ℂˣ) (disc : Set E) (q : Seminorm ℂ E),
+      IsBanachDisc disc ∧ (∀ j, (a j : ℂ) • b j ∈ disc) ∧ Continuous q ∧
+      (∀ j x, ‖((a j : ℂ) * (a j : ℂ))⁻¹ * row j x‖ ≤ q x) ∧
+      ∀ k : ℕ, ∃ C : ℝ, ∀ j, ‖(a j : ℂ)‖ * ((e j : ℝ) + 1) ^ k ≤ C := by
+  classical
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let : BarrelledSpace ℂ E := isFrechetTVS_barrelled hE
+  obtain ⟨_, hpoly, hmet, hcomp⟩ := hE
+  let : CompleteSpace E := hcomp
+  let a (j : I) : ℂˣ := Units.mk0 (r j : ℂ) (Complex.ofReal_ne_zero.mpr (hr j).ne')
+  have ha (j : I) : ‖(a j : ℂ)‖ = r j := Complex.norm_of_nonneg (hr j).le
+  have hbounded : Bornology.IsVonNBounded ℂ (range fun j ↦ (a j : ℂ) • b j) := by
+    apply (PolynormableSpace.withSeminorms ℂ E).isVonNBounded_iff_seminorm_bddAbove.mpr
+    intro q
+    obtain ⟨m, C, hC⟩ := hb q.val q.property
+    obtain ⟨L, hL⟩ := hrapid m
+    refine ⟨max C 0 * L, ?_⟩
+    rintro _ ⟨_, ⟨j, rfl⟩, rfl⟩
+    change q.val ((a j : ℂ) • b j) ≤ _
+    rw [map_smul_eq_mul, ha]
+    calc
+      _ ≤ r j * (max C 0 * W j ^ m) := by
+        apply mul_le_mul_of_nonneg_left _ (hr j).le
+        exact (hC j).trans (mul_le_mul_of_nonneg_right (le_max_left ..) (pow_nonneg (hW _) _))
+      _ = max C 0 * (r j * W j ^ m) := by ring
+      _ ≤ _ := mul_le_mul_of_nonneg_left (hL j) (le_max_right ..)
+  obtain ⟨disc, hdisc, hv⟩ := spectralBoundary_bounded_common_disc _ hbounded
+  let scaled (j : I) : StrongDual ℂ E := ((a j : ℂ) * (a j : ℂ))⁻¹ • row j
+  let norms (j : I) := (normSeminorm ℂ ℂ).comp (scaled j).toLinearMap
+  have bounded : BddAbove (range norms) := by
+    rw [Seminorm.bddAbove_range_iff]
+    intro x
+    obtain ⟨C, hC⟩ := hd x
+    refine ⟨C, forall_mem_range.mpr fun j ↦ ?_⟩
+    change ‖((a j : ℂ) * (a j : ℂ))⁻¹ * row j x‖ ≤ C
+    rw [norm_mul, norm_inv, norm_mul, ha, ← sq, inv_mul_le_iff₀ (sq_pos_of_pos (hr j))]
+    exact hC j
+  have hq : Continuous ⇑(⨆ j, norms j) := by
+    rw [Seminorm.coe_iSup_eq bounded]
+    exact Seminorm.continuous_iSup norms (fun j ↦ (scaled j).continuous.norm) bounded
+  refine ⟨a, disc, ⨆ j, norms j, hdisc, hv, hq, fun j x ↦ (le_ciSup bounded j : norms j ≤ _) x, ?_⟩
+  intro k
+  obtain ⟨C, hC⟩ := hrapid k
+  refine ⟨(max K 0) ^ k * C, fun j ↦ ?_⟩
+  rw [ha]
+  have h := (he j).trans (mul_le_mul_of_nonneg_right (le_max_left K 0) (hW j))
+  calc
+    _ ≤ r j * (max K 0 * W j) ^ k :=
+      mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (by positivity) h k) (hr j).le
+    _ = (max K 0) ^ k * (r j * W j ^ k) := by rw [mul_pow]; ring
+    _ ≤ _ := mul_le_mul_of_nonneg_left (hC j) (by positivity)
+
+open Classical in
+/-- Polynomial growth of the cardinal Euler jets in each continuous seminorm of the
+polar quotient. The constants and exponent may depend on the seminorm. A construction
+of interpolants in the polar Mellin image with polynomial strip bounds suffices,
+since the jets separate the quotient. This estimate is independent of the test action. -/
+private theorem finiteNuclearity_trace_jet_bounds_cardinal_growth
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F))
+    (τ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 F) F) (hτ : RightInverse τ (ideleNorm F))
+    (p : HeightOneSpectrum (𝓞 ℚ)) :
+    let D := finiteNuclearityDenominator χ p
+    let Q := Θ₀(χ) ⧸ D
+    let R := reciprocalPartialHeckeEulerProduct χ (Sₚ(p))
+    let J := Σ z : {z : ℂ // 0 < analyticOrderAt R z}, Fin (analyticOrderAt R z.val).toNat
+    ∀ (d : J → StrongDual ℂ Q) (b : J → Q),
+      (∀ j x, d j (D.mkQ x) = iteratedDeriv j.2.val ((Z(χ, τ, hτ)) x).val j.1.val) →
+      (∀ i j, d i (b j) = if i = j then 1 else 0) →
+      ∀ q : Seminorm ℂ Q, Continuous q →
+        ∃ (m : ℕ) (C : ℝ), ∀ j, q (b j) ≤ C * (1 + |j.1.val.im|) ^ m := by
+  sorry
+
 -- TODO(paper-gap): The cited §7.1.4.3 concerns the entire comparison space.
 -- To apply the rapid-decay argument on this quotient, one needs bounds in its
 -- own topology for the functionals and the biorthogonal vectors.
@@ -5255,7 +5531,50 @@ private theorem finiteNuclearity_trace_jet_bounds (p : HeightOneSpectrum (𝓞 �
         IsBanachDisc B₀ ∧ (∀ j, (a j : ℂ) • b j ∈ B₀) ∧ Continuous q ∧
         (∀ j x, ‖((c j : ℂ) * (a j : ℂ))⁻¹ * d j (D.mkQ (Aθ(φ) x))‖ ≤ q (D.mkQ x)) ∧
         ∀ k : ℕ, ∃ C : ℝ, ∀ j, ‖(c j : ℂ)‖ * ((e j : ℝ) + 1) ^ k ≤ C := by
-  sorry
+  classical
+  intro D Q R J d b hd hb
+  obtain ⟨hclosed, hmaps⟩ := finiteNuclearityDenominator_closed_invariant χ τ hτ p φ
+  have hQ : IsFrechetTVS Q := finiteNuclearity_trace_jet_bounds_frechet (Z(χ, τ, hτ))
+    (exists_polarThetaNuclearityAction_mellin_closedEmbedding F χ τ hτ)
+    (schwartzBergman_frechet univ isOpen_univ ordConnected_univ univ_nonempty) D hclosed
+  let M := nuclearityTestMellin χ φ
+  have hM : Differentiable ℂ M := archNuclearityDenominator_closed_invariant_multiplier χ φ
+  have decay (k : ℕ) : ∃ C : ℝ, ∀ w : ℂ, w.re ∈ Icc (-1 : ℝ) 1 →
+      ‖M w‖ * (1 + |w.im|) ^ k ≤ C := by
+    obtain ⟨C, _, h⟩ := spectralBoundary_globalStrip hM.continuous
+      (spectralNuclearity_trace_vertical_decay χ φ (-1) 1 (by norm_num)) k
+    exact ⟨C, h⟩
+  obtain ⟨r, hr, hcircle, hrapid⟩ := finiteNuclearity_trace_jet_bounds_envelope M hM.continuous decay
+  have enumeration : ∃ (e : J ↪ ℕ) (K : ℝ), ∀ j, j.1.val.re = 0 ∧
+      j.2.val ≤ Module.finrank ℚ F ∧ (e j : ℝ) + 1 ≤ K * (1 + |j.1.val.im|) :=
+    finiteNuclearity_trace_jet_bounds_enumeration (F := F) χ p
+  obtain ⟨e, K, hcode⟩ := enumeration
+  let T₀ := D.mapQ D (Aθ(φ)).toLinearMap (fun _ hx ↦ hmaps hx)
+  let T : Q →L[ℂ] Q := ⟨T₀, (Submodule.isQuotientMap_mkQ D).continuous_iff.mpr
+    ((Submodule.isQuotientMap_mkQ D).continuous.comp (Aθ(φ)).continuous)⟩
+  let row (j : J) := (d j).comp T
+  have hrow (x : Q) : ∃ C : ℝ, ∀ j, ‖row j x‖ ≤ r j.1.val ^ 2 * C := by
+    obtain ⟨y, rfl⟩ := D.mkQ_surjective x
+    let f := (Z(χ, τ, hτ)) y
+    obtain ⟨C, hC⟩ := finiteNuclearity_trace_jet_bounds_cauchy M hM r hcircle (Module.finrank ℚ F) f
+    refine ⟨C, fun j ↦ ?_⟩
+    change ‖d j (D.mkQ (Aθ(φ) y))‖ ≤ _
+    have hprod : ((Z(χ, τ, hτ)) ((Aθ(φ)) y)).val = M * f.val :=
+      funext ((exists_polarThetaNuclearityAction χ τ hτ φ).choose_spec.1 y)
+    rw [hd, hprod]
+    exact hC _ _ (hcode j).1 (hcode j).2.1
+  have hcol := finiteNuclearity_trace_jet_bounds_cardinal_growth χ τ hτ p d b hd hb
+  let : UniformSpace Q := IsTopologicalAddGroup.rightUniformSpace Q
+  have rescaled : ∃ (a : J → ℂˣ) (disc : Set Q) (q : Seminorm ℂ Q),
+      IsBanachDisc disc ∧ (∀ j, (a j : ℂ) • b j ∈ disc) ∧ Continuous q ∧
+      (∀ j x, ‖((a j : ℂ) * (a j : ℂ))⁻¹ * row j x‖ ≤ q x) ∧
+      ∀ k : ℕ, ∃ C : ℝ, ∀ j, ‖(a j : ℂ)‖ * ((e j : ℝ) + 1) ^ k ≤ C :=
+    finiteNuclearity_trace_jet_bounds_rescale (I := J) (E := Q)
+    hQ e (fun j ↦ 1 + |j.1.val.im|) (fun j ↦ r j.1.val) (fun j ↦ by positivity)
+    (fun j ↦ hr _) K (fun j ↦ (hcode j).2.2)
+    (fun k ↦ (hrapid k).imp fun C h j ↦ h _ (hcode j).1) b row hcol hrow
+  obtain ⟨a, disc, q, hB, hv, hq, hrows, hc⟩ := rescaled
+  exact ⟨e, a, a, disc, q, hB, hv, hq, fun j x ↦ hrows j (D.mkQ x), hc⟩
 
 /-- Paper: Theorem 7.4.2.1(2), p. 367.
 The operator induced on the finite orbital quotient is of order zero. Its trace sums
