@@ -4444,4 +4444,180 @@ theorem finiteHeckeL_outside_inv_iteratedDeriv_horizontal_bound (m : ℕ) :
 
 end OutsideEulerProduct
 
+private def heckeFrequencyPhase (r u : ℝ) : ℂ := Complex.exp ((r : ℂ) * Complex.I * u)
+
+private def heckeFrequencyGaussian (u : ℝ) : ℂ := Complex.exp (-(Real.pi : ℂ) * u ^ 2)
+
+private theorem heckeFrequencyGaussian_mul_phase (r u : ℝ) : heckeFrequencyGaussian u * heckeFrequencyPhase r u =
+    Complex.exp (-(Real.pi : ℂ) * u ^ 2 + (r : ℂ) * Complex.I * u + 0) := by
+  simp [heckeFrequencyGaussian, heckeFrequencyPhase, Complex.exp_add]
+
+private theorem heckeFrequencyGaussian_mul_phase_integrable (r : ℝ) :
+    Integrable (fun u : ℝ => heckeFrequencyGaussian u * heckeFrequencyPhase r u) := by
+  simp_rw [heckeFrequencyGaussian_mul_phase]
+  exact integrable_cexp_quadratic' (by simpa using Real.pi_pos : (-(Real.pi : ℂ)).re < 0) _ _
+
+private theorem heckeFrequencyGaussian_mul_phase_integral (r : ℝ) :
+    (∫ u : ℝ, heckeFrequencyGaussian u * heckeFrequencyPhase r u) = (Real.exp (-r ^ 2 / (4 * Real.pi)) : ℂ) := by
+  simp_rw [heckeFrequencyGaussian_mul_phase]
+  rw [integral_cexp_quadratic (by simpa using Real.pi_pos : (-(Real.pi : ℂ)).re < 0)]
+  rw [neg_neg, div_self (by exact_mod_cast Real.pi_ne_zero), Complex.one_cpow, one_mul,
+    Complex.ofReal_exp]
+  congr 1
+  push_cast
+  rw [mul_pow, Complex.I_sq]
+  ring
+
+private theorem heckeFrequencyPhase_mul_conj (a b u : ℝ) :
+    heckeFrequencyPhase a u * (starRingEnd ℂ) (heckeFrequencyPhase b u) = heckeFrequencyPhase (a - b) u := by
+  simp only [heckeFrequencyPhase, ← Complex.exp_conj, map_mul, Complex.conj_ofReal, Complex.conj_I,
+    ← Complex.exp_add, Complex.ofReal_sub]
+  congr 1
+  ring
+
+private theorem heckeFrequencyGaussian_integral_normSq_complex (S : Finset ℕ) (c : ℕ → ℂ) (x : ℕ → ℝ) :
+    (∫ u : ℝ, heckeFrequencyGaussian u * (‖∑ n ∈ S, c n * heckeFrequencyPhase (x n) u‖ ^ 2 : ℝ)) =
+      ∑ n ∈ S, ∑ m ∈ S, (c n * (starRingEnd ℂ) (c m)) * (Real.exp (-(x n - x m) ^ 2 / (4 * Real.pi)) : ℂ) := by
+  let f (n m : ℕ) (u : ℝ) :=
+    (c n * (starRingEnd ℂ) (c m)) * (heckeFrequencyGaussian u * heckeFrequencyPhase (x n - x m) u)
+  have hi (n m : ℕ) : Integrable (f n m) := (heckeFrequencyGaussian_mul_phase_integrable _).const_mul _
+  have h (u : ℝ) : heckeFrequencyGaussian u * (‖∑ n ∈ S, c n * heckeFrequencyPhase (x n) u‖ ^ 2 : ℝ) =
+      ∑ n ∈ S, ∑ m ∈ S, f n m u := by
+    rw [Complex.ofReal_pow, ← Complex.mul_conj', map_sum, Finset.sum_mul_sum, Finset.mul_sum]
+    refine Finset.sum_congr rfl (fun n hn => ?_)
+    rw [Finset.mul_sum]
+    refine Finset.sum_congr rfl (fun m hm => ?_)
+    simp only [f, map_mul, ← heckeFrequencyPhase_mul_conj]
+    ring
+  simp_rw [h]
+  rw [integral_finsetSum S (fun n _ => integrable_finsetSum S (fun m _ => hi n m))]
+  refine Finset.sum_congr rfl (fun n hn => ?_)
+  rw [integral_finsetSum S (fun m _ => hi n m)]
+  simp only [f, integral_const_mul, heckeFrequencyGaussian_mul_phase_integral]
+
+private theorem heckeFrequencyGaussian_integral_normSq (S : Finset ℕ) (c : ℕ → ℂ) (x : ℕ → ℝ) :
+    (∫ u : ℝ, Real.exp (-Real.pi * u ^ 2) * ‖∑ n ∈ S, c n * heckeFrequencyPhase (x n) u‖ ^ 2) =
+      ∑ n ∈ S, ∑ m ∈ S, (c n * (starRingEnd ℂ) (c m)).re * Real.exp (-(x n - x m) ^ 2 / (4 * Real.pi)) := by
+  have h := heckeFrequencyGaussian_integral_normSq_complex S c x
+  have hg (u : ℝ) : heckeFrequencyGaussian u = (Real.exp (-Real.pi * u ^ 2) : ℂ) := by
+    simp [heckeFrequencyGaussian, Complex.ofReal_exp]
+  simp_rw [hg, ← Complex.ofReal_mul] at h
+  rw [integral_complex_ofReal] at h
+  simpa only [Complex.re_sum, Complex.mul_re, Complex.ofReal_re, Complex.ofReal_im,
+    mul_zero, sub_zero] using congrArg Complex.re h
+
+private theorem heckeFrequencyGaussian_offDiagonal_tendsto_zero {d : ℝ} (hd : d ≠ 0) :
+    Tendsto (fun H : ℝ => Real.exp (-(H * d) ^ 2 / (4 * Real.pi))) atTop (𝓝 0) := by
+  have h := Real.tendsto_exp_neg_atTop_nhds_zero.comp
+    ((tendsto_pow_atTop (α := ℝ) (by decide : 2 ≠ 0)).atTop_mul_const
+      (show 0 < d ^ 2 / (4 * Real.pi) by positivity))
+  convert h using 1
+  ext H
+  dsimp
+  congr 1
+  ring
+
+private theorem heckeFrequencyGaussian_integral_tendsto_of_injOn (S : Finset ℕ) (x : ℕ → ℝ)
+    (hx : Set.InjOn x (S : Set ℕ)) (c : ℝ → ℕ → ℂ) (d : ℕ → ℝ)
+    (hc : ∀ H n, ‖c H n‖ = d n) :
+    Tendsto (fun H : ℝ => ∫ u : ℝ, Real.exp (-Real.pi * u ^ 2) *
+      ‖∑ n ∈ S, c H n * heckeFrequencyPhase (H * x n) u‖ ^ 2) atTop (𝓝 (∑ n ∈ S, (d n) ^ 2)) := by
+  simp_rw [heckeFrequencyGaussian_integral_normSq]
+  have hd (n : ℕ) (hn : n ∈ S) :
+      (∑ m ∈ S, if m = n then (d m) ^ 2 else 0) = (d n) ^ 2 := by simp [hn]
+  have hs : (∑ n ∈ S, (d n) ^ 2) = ∑ n ∈ S, ∑ m ∈ S, if m = n then (d m) ^ 2 else 0 :=
+    Finset.sum_congr rfl fun n hn => (hd n hn).symm
+  rw [hs]
+  refine tendsto_finsetSum S fun n hn => tendsto_finsetSum S fun m hm => ?_
+  by_cases heq : m = n
+  · subst m
+    simp [Complex.mul_conj', hc, ← Complex.ofReal_pow]
+  · simp only [ite_eq_right_iff.mpr (fun h => (heq h).elim), ← mul_sub]
+    have hdiff : x n - x m ≠ 0 := sub_ne_zero.mpr (fun h => heq (hx hn hm h).symm)
+    have hlim := (heckeFrequencyGaussian_offDiagonal_tendsto_zero hdiff).const_mul (d n * d m)
+    apply squeeze_zero_norm (a := fun H : ℝ => (d n * d m) *
+      Real.exp (-(H * (x n - x m)) ^ 2 / (4 * Real.pi)))
+    · intro H
+      rw [Real.norm_eq_abs, abs_mul, abs_of_pos (Real.exp_pos _)]
+      apply mul_le_mul_of_nonneg_right _ (Real.exp_pos _).le
+      simpa [norm_mul, Complex.norm_conj, hc] using Complex.abs_re_le_norm (c H n * (starRingEnd ℂ) (c H m))
+    · simpa using hlim
+
+private theorem norm_heckeFrequencyPhase (r u : ℝ) : ‖heckeFrequencyPhase r u‖ = 1 := by
+  simpa only [heckeFrequencyPhase, Complex.ofReal_mul, mul_right_comm (r : ℂ) Complex.I (u : ℂ)] using
+    Complex.norm_exp_ofReal_mul_I (r * u)
+
+private theorem heckeFrequencyPhase_add (x H y u : ℝ) :
+    heckeFrequencyPhase x y * heckeFrequencyPhase (H * x) u = heckeFrequencyPhase x (y + H * u) := by
+  simp only [heckeFrequencyPhase, ← Complex.exp_add, Complex.ofReal_mul, Complex.ofReal_add]
+  congr 1
+  ring
+
+private theorem heckeFrequencyGaussian_integral_tendsto_log (S : Finset ℕ) (hS : ∀ n ∈ S, 0 < n)
+    (a : ℕ → ℂ) (Y : ℝ → ℝ) :
+    Tendsto (fun H : ℝ => ∫ u : ℝ, Real.exp (-Real.pi * u ^ 2) *
+      ‖∑ n ∈ S, a n * heckeFrequencyPhase (Real.log n) (Y H + H * u)‖ ^ 2)
+      atTop (𝓝 (∑ n ∈ S, ‖a n‖ ^ 2)) := by
+  let x := fun n : ℕ => Real.log n
+  have hx : Set.InjOn x (S : Set ℕ) := by
+    intro n hn m hm he
+    have he' := Real.log_injOn_pos (by exact_mod_cast hS n hn : 0 < (n : ℝ))
+      (by exact_mod_cast hS m hm : 0 < (m : ℝ)) he
+    exact_mod_cast he'
+  have h := heckeFrequencyGaussian_integral_tendsto_of_injOn S x hx
+    (fun H n => a n * heckeFrequencyPhase (x n) (Y H))
+    (fun n => ‖a n‖) (fun H n => by simp only [norm_mul, norm_heckeFrequencyPhase, mul_one])
+  change Tendsto (fun H : ℝ => ∫ u : ℝ, Real.exp (-Real.pi * u ^ 2) *
+    ‖∑ n ∈ S, a n * heckeFrequencyPhase (x n) (Y H + H * u)‖ ^ 2) atTop (𝓝 (∑ n ∈ S, ‖a n‖ ^ 2))
+  simpa only [mul_assoc, heckeFrequencyPhase_add] using h
+
+/-- The Gaussian frequency average of a finite weighted measurement of the normalized
+Hecke logarithmic derivative tends to its diagonal. The center can move arbitrarily
+as the frequency range grows. -/
+theorem heckeLogDerivCoefficient_gaussian_frequency_meanSq {F : Type*} [Field F] [NumberField F]
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (S : Finset ℕ)
+    (hS : ∀ n ∈ S, 0 < n) (w : ℕ → ℂ) (Y : ℝ → ℝ) :
+    let a := fun n => heckeLogDerivCoefficient (ideleClassNormTwist χ 0) n * w n
+    Tendsto (fun H : ℝ => ∫ u : ℝ, Real.exp (-Real.pi * u ^ 2) *
+      ‖∑ n ∈ S, a n * Complex.exp ((Real.log n : ℂ) * Complex.I * (Y H + H * u : ℝ))‖ ^ 2)
+      atTop (𝓝 (∑ n ∈ S, ‖a n‖ ^ 2)) := by
+  exact heckeFrequencyGaussian_integral_tendsto_log S hS _ Y
+
+/-- The frequency mean-square distance from the weighted first-prime measurement to a
+polynomial supported on positive nonprime norms is the sum of their separate diagonals.
+In particular sampling higher rational prime powers cannot recover that measurement. -/
+theorem heckeLogDerivCoefficient_gaussian_prime_sub_nonprime_meanSq
+    {F : Type*} [Field F] [NumberField F] (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F))
+    (S T : Finset ℕ) (hS : ∀ n ∈ S, n.Prime) (hT : ∀ n ∈ T, 0 < n ∧ ¬n.Prime)
+    (w v : ℕ → ℂ) (Y : ℝ → ℝ) :
+    let a := fun n => heckeLogDerivCoefficient (ideleClassNormTwist χ 0) n * w n
+    let e := fun (n : ℕ) (z : ℝ) => Complex.exp ((Real.log n : ℂ) * Complex.I * z)
+    Tendsto (fun H : ℝ => ∫ u : ℝ, Real.exp (-Real.pi * u ^ 2) *
+      ‖(∑ n ∈ S, a n * e n (Y H + H * u)) - (∑ m ∈ T, v m * e m (Y H + H * u))‖ ^ 2)
+      atTop (𝓝 ((∑ n ∈ S, ‖a n‖ ^ 2) + ∑ m ∈ T, ‖v m‖ ^ 2)) := by
+  let a := fun n => heckeLogDerivCoefficient (ideleClassNormTwist χ 0) n * w n
+  let c := fun n => if n ∈ S then a n else -v n
+  have hdis : Disjoint S T := Finset.disjoint_left.mpr fun n hn hm => (hT n hm).2 (hS n hn)
+  have hs (n : ℕ) (hn : n ∈ S) : c n = a n := by simp [c, hn]
+  have ht (n : ℕ) (hn : n ∈ T) : c n = -v n := by
+    have hnot : n ∉ S := fun h => Finset.disjoint_left.mp hdis h hn
+    simp [c, hnot]
+  have hpos (n : ℕ) (hn : n ∈ S ∪ T) : 0 < n :=
+    (Finset.mem_union.mp hn).elim (fun h => (hS n h).pos) (fun h => (hT n h).1)
+  have hpoly (z : ℝ) : (∑ n ∈ S ∪ T, c n * heckeFrequencyPhase (Real.log n) z) =
+      (∑ n ∈ S, a n * heckeFrequencyPhase (Real.log n) z) -
+        (∑ n ∈ T, v n * heckeFrequencyPhase (Real.log n) z) := by
+    rw [Finset.sum_union hdis, sub_eq_add_neg, ← Finset.sum_neg_distrib]
+    congr 1
+    · exact Finset.sum_congr rfl fun n hn => by rw [hs n hn]
+    · exact Finset.sum_congr rfl fun n hn => by rw [ht n hn, neg_mul]
+  have hdiag : (∑ n ∈ S ∪ T, ‖c n‖ ^ 2) = (∑ n ∈ S, ‖a n‖ ^ 2) + ∑ n ∈ T, ‖v n‖ ^ 2 := by
+    rw [Finset.sum_union hdis]
+    congr 1
+    · exact Finset.sum_congr rfl fun n hn => by rw [hs n hn]
+    · exact Finset.sum_congr rfl fun n hn => by rw [ht n hn, norm_neg]
+  have h := heckeFrequencyGaussian_integral_tendsto_log (S ∪ T) hpos c Y
+  simp_rw [hpoly] at h
+  simpa only [hdiag, heckeFrequencyPhase, a] using h
+
 end RiemannMasullo
