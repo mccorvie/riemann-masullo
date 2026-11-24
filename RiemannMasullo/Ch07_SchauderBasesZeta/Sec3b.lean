@@ -5391,10 +5391,555 @@ private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_
     w g harch hval n hn u harchU (hvalU w)
   exact (map_pow (QuotientGroup.mk' _) g n).trans he
 
+/-- If a circle image contains a common positive power of every element,
+an infinite-order character has torsion kernel. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_circle_kernel
+    {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] (ψ : PontryaginDual G) (hψ : ¬ IsOfFinOrder ψ)
+    (t : Circle →ₜ* G) (N : ℕ) (hN : 0 < N) (hcover : ∀ x : G, ∃ z : Circle, t z = x ^ N)
+    (x : G) (hx : ψ x = 1) : IsOfFinOrder x := by
+  let inc : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  obtain ⟨k, hk, _⟩ := existsUnique_circleCharacter_zpow ((inc.comp ψ).comp t)
+  change ∀ z : Circle, (ψ (t z) : ℂ) = (z : ℂ) ^ k at hk
+  have hk' : k ≠ 0 := by
+    intro he
+    apply hψ
+    refine isOfFinOrder_iff_pow_eq_one.mpr ⟨N, hN, ?_⟩
+    ext1 y
+    obtain ⟨z, hz⟩ := hcover y
+    apply (ContinuousMonoidHom.pow_apply (ψ : G →ₜ* Circle) N y).trans
+    change (ψ y) ^ N = 1
+    apply Circle.ext
+    rw [← map_pow, ← hz, hk, he, zpow_zero, Circle.coe_one]
+  obtain ⟨z, hz⟩ := hcover x
+  have hfz : IsOfFinOrder z := isOfFinOrder_iff_zpow_eq_one.mpr ⟨k, hk', Circle.ext (by
+    rw [Circle.coe_zpow, ← hk, hz, map_pow, hx, one_pow, Circle.coe_one])⟩
+  obtain ⟨m, hm, hmz⟩ := hfz.exists_pow_eq_one
+  have hfx : IsOfFinOrder (x ^ N) := isOfFinOrder_iff_pow_eq_one.mpr
+    ⟨m, hm, by rw [← hz, ← map_pow, hmz, map_one]⟩
+  exact (isOfFinOrder_pow.mp hfx).resolve_right hN.ne'
+
+/-- A quotient by finite units whose circle image contains a common power
+of every class precludes repeated primary poles when a power of the character
+descends to an infinite-order character. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_circle_quotient
+    (p : HeightOneSpectrum (𝓞 ℚ)) (χ : PontryaginDual J₁(T))
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    (π : J₁(T) →* G)
+    (hπ : ∀ x, π x = 1 → ∃ u : (SAdeleRing F T)ˣ, (∀ σ : InfinitePlace F, u.val.1 σ = 1) ∧
+      (∀ w : T, ‖u.val.2 w‖ = 1) ∧ x.val = QuotientGroup.mk u)
+    (ψ : PontryaginDual G) (hψ : ¬ IsOfFinOrder ψ) (e : ℕ) (hχ : ∀ x, ψ (π x) = χ x ^ e)
+    (t : Circle →ₜ* G) (N : ℕ) (hN : 0 < N) (hG : ∀ x : G, ∃ z : Circle, t z = x ^ N)
+    (j : Iₚ(p, χ)) : j.val.2 = 0 := by
+  apply sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_kernel_torsion p χ _ j
+  intro x hx
+  have htriv : ψ (π x) = 1 := by rw [hχ, hx, one_pow]
+  have hfin := sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_circle_kernel
+    ψ hψ t N hN hG (π x) htriv
+  obtain ⟨m, hm, hmx⟩ := hfin.exists_pow_eq_one
+  obtain ⟨u, harch, hunit, he⟩ := hπ (x ^ m) (by rw [map_pow, hmx])
+  exact ⟨m, hm, u, harch, hunit, he⟩
+
+/-- The integral finite units map continuously into the norm-one group, with the stated image. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_integral_image :
+    ∃ i : ((w : T) → (w.val.adicCompletionIntegers F).units) →ₜ* J₁(T), ∀ x : J₁(T), x ∈ i.toMonoidHom.range ↔
+      ∃ u : (SAdeleRing F T)ˣ, (∀ σ : InfinitePlace F, u.val.1 σ = 1) ∧
+        (∀ w : T, ‖u.val.2 w‖ = 1) ∧ x.val = QuotientGroup.mk u := by
+  let r : ((w : T) → (w.val.adicCompletionIntegers F).units) →ₜ* (∀ w : T, (w.val.adicCompletion F)ˣ) :=
+    ⟨MonoidHom.pi (fun w ↦ (w.val.adicCompletionIntegers F).units.subtype.comp (Pi.evalMonoidHom _ w)),
+      continuous_pi fun w ↦ continuous_subtype_val.comp (continuous_apply w)⟩
+  let fin : ((w : T) → (w.val.adicCompletion F)ˣ) ≃ₜ* _ := ContinuousMulEquiv.piUnits.symm
+  let prod := ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F) ((i : T) → i.val.adicCompletion F)
+  let raw : ((w : T) → (w.val.adicCompletionIntegers F).units) →ₜ* (SAdeleRing F T)ˣ := ⟨prod.symm.toMonoidHom.comp
+    ((MonoidHom.inr _ _).comp (fin.toMonoidHom.comp r.toMonoidHom)),
+    prod.symm.continuous.comp (continuous_const.prodMk (fin.continuous.comp r.continuous))⟩
+  have harch (u : ((w : T) → (w.val.adicCompletionIntegers F).units)) (σ : InfinitePlace F) : (raw u).val.1 σ = 1 := rfl
+  have hfin (u : ((w : T) → (w.val.adicCompletionIntegers F).units)) (w : T) : ‖(raw u).val.2 w‖ = 1 :=
+    Valued.toNormedField.norm_eq_one_iff.mpr
+      (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp (u w).property)
+  have normOne (u : ((w : T) → (w.val.adicCompletionIntegers F).units)) : sIdeleNorm F T (raw u) = 1 := by
+    apply Units.ext
+    apply NNReal.coe_injective
+    let ev : ((SAdeleRing F T)ˣ →* ℝ≥0ˣ) →* ℝ := NNReal.toRealHom.toMonoidHom.comp
+      ((Units.coeHom ℝ≥0).comp (MonoidHom.eval (raw u)))
+    change ev (sIdeleNorm F T) = 1
+    simp only [sIdeleNorm, map_mul, map_prod]
+    change (∏ v : InfinitePlace F, ‖(raw u).val.1 v‖ ^ v.mult) * ∏ w : T, ‖(raw u).val.2 w‖ = 1
+    simp [harch, hfin]
+  let q : (SAdeleRing F T)ˣ →* J(T) := QuotientGroup.mk' _
+  let i : ((w : T) → (w.val.adicCompletionIntegers F).units) →ₜ* J₁(T) :=
+    ⟨(q.comp raw.toMonoidHom).codRestrict _ (fun u ↦ by exact normOne u),
+      (QuotientGroup.continuous_mk.comp raw.continuous).subtype_mk _⟩
+  refine ⟨i, fun x ↦ ⟨?_, ?_⟩⟩
+  · rintro ⟨u, rfl⟩
+    exact ⟨raw u, harch u, hfin u, rfl⟩
+  · rintro ⟨u, ha, hf, he⟩
+    let ev (w : T) : (SAdeleRing F T)ˣ →* (w.val.adicCompletion F)ˣ :=
+      Units.map ((Pi.evalRingHom (fun i : T ↦ i.val.adicCompletion F) w).comp (RingHom.snd _ _)).toMonoidHom
+    let U (w : T) : (w.val.adicCompletionIntegers F).units := ⟨ev w u,
+      HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mpr
+        (Valued.toNormedField.norm_eq_one_iff.mp (hf w))⟩
+    refine ⟨U, Subtype.ext ?_⟩
+    change q (raw U) = x.val
+    rw [he]
+    apply congrArg q
+    apply Units.ext
+    exact Prod.ext (funext fun v ↦ (ha v).symm) rfl
+
+/-- A compact totally disconnected group has only finite-order circle characters. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_integral_orders
+    {U : Type*} [CommGroup U] [TopologicalSpace U]
+    [IsTopologicalGroup U] [T2Space U] [CompactSpace U] [TotallyDisconnectedSpace U]
+    (ψ : PontryaginDual U) : ∃ e : ℕ, 0 < e ∧ ∀ u, ψ u ^ e = 1 := by
+  have hopen := (Circle.isOpen_centeredArc (Real.pi / 2)).preimage ψ.continuous
+  have hone : (1 : U) ∈ ψ ⁻¹' Circle.centeredArc (Real.pi / 2) := by
+    change ψ 1 ∈ Circle.centeredArc (Real.pi / 2)
+    rw [map_one, Circle.mem_centeredArc (by linarith [Real.pi_pos])]
+    simp [Real.pi_pos]
+  obtain ⟨H, _, hH⟩ := exists_compact_openSubgroup_sub_mem_nhds (hopen.mem_nhds hone)
+  have hker (u : U) (hu : u ∈ H) : ψ u = 1 := by
+    apply Circle.eq_one_of_forall_pow_mem_centeredArc_pi_div_two
+    intro n hn
+    rw [← map_pow]
+    exact hH (H.pow_mem hu n)
+  refine ⟨H.toSubgroup.index, Nat.card_pos, fun u ↦ ?_⟩
+  rw [← map_pow]
+  exact hker _ (H.toSubgroup.pow_index_mem u)
+
+/-- A power of a character descends through a compact totally disconnected
+subgroup without losing infinite order. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_integral_descent
+    {A U : Type*}
+    [CommGroup A] [TopologicalSpace A] [IsTopologicalGroup A]
+    [CommGroup U] [TopologicalSpace U] [IsTopologicalGroup U] [T2Space U]
+    [CompactSpace U] [TotallyDisconnectedSpace U]
+    (i : U →ₜ* A) (χ : PontryaginDual A) (hχ : ¬ IsOfFinOrder χ) :
+    ∃ e : ℕ, 0 < e ∧ ∃ ψ : PontryaginDual (A ⧸ i.toMonoidHom.range),
+      ¬ IsOfFinOrder ψ ∧ ∀ x : A, ψ (QuotientGroup.mk x) = χ x ^ e := by
+  obtain ⟨e, he, hall⟩ := sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_integral_orders (χ.comp i)
+  let h : A →ₜ* Circle := ⟨(powMonoidHom e).comp χ.toMonoidHom, χ.continuous.pow e⟩
+  have hker : i.toMonoidHom.range ≤ h.toMonoidHom.ker := by
+    rintro x ⟨u, rfl⟩
+    exact hall u
+  let ψ : PontryaginDual (A ⧸ i.toMonoidHom.range) :=
+    ⟨QuotientGroup.lift i.toMonoidHom.range h.toMonoidHom hker,
+      (QuotientGroup.isQuotientMap_mk _).continuous_iff.mpr h.continuous⟩
+  have hp (x : A) : ψ (QuotientGroup.mk x) = χ x ^ e := rfl
+  refine ⟨e, he, ψ, ?_, hp⟩
+  intro hfin
+  obtain ⟨n, hn, hnψ⟩ := hfin.exists_pow_eq_one
+  apply hχ
+  apply isOfFinOrder_iff_pow_eq_one.mpr
+  refine ⟨e * n, Nat.mul_pos he hn, PontryaginDual.ext fun x ↦ ?_⟩
+  apply (ContinuousMonoidHom.pow_apply (χ : A →ₜ* Circle) (e * n) x).trans
+  change (χ x) ^ (e * n) = 1
+  rw [pow_mul, ← hp]
+  exact (ContinuousMonoidHom.pow_apply (ψ : _ →ₜ* Circle) n (QuotientGroup.mk x)).symm.trans
+    (DFunLike.congr_fun hnψ (QuotientGroup.mk x))
+
+/-- Restriction to an unramified stage preserves infinite order, by the finite index of its image. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_infinite_stage
+    (ω : PontryaginDual C₁)
+    (hω : NormOneCharacterUnramifiedOutside ω T) (hi : ¬ IsOfFinOrder ω) :
+    ¬ IsOfFinOrder (sLocalNormOneCharacter T ω hω) := by
+  intro hf
+  obtain ⟨k, hk, hpow⟩ := hf.exists_pow_eq_one
+  obtain ⟨m, hm, _, he⟩ := sIdeleClassGroup_openEmbedding F T
+  let H := m.range.comap (ideleClassNorm F).ker.subtype
+  let : IsMulCommutative C₁ := .of_comm fun a b ↦ Subtype.ext (mul_comm a.val b.val)
+  have hopen : IsOpen (H : Set C₁) := hm.isOpen_range.preimage continuous_subtype_val
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : Finite (C₁ ⧸ H) := H.quotient_finite_of_isOpen hopen
+  apply hi
+  refine isOfFinOrder_iff_pow_eq_one.mpr ⟨H.index * k, Nat.mul_pos Nat.card_pos hk, PontryaginDual.ext fun x ↦ ?_⟩
+  apply (ContinuousMonoidHom.pow_apply (ω : C₁ →ₜ* Circle) (H.index * k) x).trans
+  change (ω x) ^ (H.index * k) = 1
+  rw [pow_mul, ← map_pow]
+  let a := x ^ H.index
+  obtain ⟨z, hz⟩ := H.pow_index_mem x
+  obtain ⟨u, hu⟩ := QuotientGroup.mk_surjective z
+  have hx : a.val = QuotientGroup.mk (integralIdeleInsertion F T u) := by
+    exact hz.symm.trans ((congrArg m hu.symm).trans (he u))
+  let y := Units.map (adeleProjection F T).toMonoidHom (integralIdeleInsertion F T u)
+  have hnorm : sIdeleQuotientNorm F T (QuotientGroup.mk y) = 1 := by
+    rw [sIdeleQuotientNorm_mk]
+    change sIdeleNorm F T (Units.map ((adeleProjection F T).comp (integralAdelesOutside F T).subtype).toMonoidHom u) = 1
+    rw [← (sIdeleNorm_spec F T).1 u]
+    exact (congrArg (ideleClassNorm F) hx).symm.trans a.property
+  let c : J₁(T) := ⟨QuotientGroup.mk y, hnorm⟩
+  have h := sLocalNormOneCharacter_apply (S := T) ω hω u a c hx rfl
+  change (ω a) ^ k = 1
+  rw [← h]
+  exact (ContinuousMonoidHom.pow_apply (sLocalNormOneCharacter T ω hω : J₁(T) →ₜ* Circle) k c).symm.trans
+    (DFunLike.congr_fun hpow c)
+
+/-- A nonzero real period gives a continuous circle parametrization of the same range. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_real_period_circle
+    {G : Type*} [Group G] [TopologicalSpace G]
+    (b : ℝ → G) (hc : Continuous b) (ha : ∀ x y, b (x+y) = b x * b y)
+    (r : ℝ) (hr : r ≠ 0) (hb : b r = 1) :
+    ∃ s : Circle →ₜ* G, ∀ t : ℝ, ∃ z : Circle, s z = b t := by
+  have hper : Function.Periodic b r := fun x ↦ by rw [ha, hb, mul_one]
+  let f : AddCircle r → G := hper.lift
+  have hf : Continuous f := continuous_coinduced_dom.mpr hc
+  have hfa (x y : AddCircle r) : f (x + y) = f x * f y := by
+    induction x using QuotientAddGroup.induction_on
+    induction y using QuotientAddGroup.induction_on
+    exact ha _ _
+  have h0 : f 0 = 1 := by simpa using (mul_left_cancel (a := f 0) (show f 0 * f 0 = f 0 * 1 by simpa using (hfa 0 0).symm))
+  let e := AddCircle.homeomorphCircle hr
+  have he (x y : AddCircle r) : e (x + y) = e x * e y := by
+    simpa only [e, AddCircle.homeomorphCircle_apply] using AddCircle.toCircle_add x y
+  have he0 : e 0 = 1 := by simp [e, AddCircle.homeomorphCircle_apply]
+  let s : Circle →ₜ* G :=
+    ⟨⟨⟨fun z ↦ f (e.symm z), by change f (e.symm 1) = 1; rw [← he0, e.symm_apply_apply, h0]⟩, fun x y ↦ by
+      change f (e.symm (x * y)) = f (e.symm x) * f (e.symm y)
+      rw [← hfa]; congr 1; apply e.injective; rw [e.apply_symm_apply, he, e.apply_symm_apply, e.apply_symm_apply]⟩,
+      hf.comp e.symm.continuous⟩
+  exact ⟨s, fun t ↦ ⟨e (t : AddCircle r), congrArg f (e.symm_apply_apply (t : AddCircle r))⟩⟩
+
+/-- If the circle image contains a common power of each integral idèle,
+compactness supplies a common power for every norm-one idèle class. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_integral_box
+    (H : Subgroup J₁(T)) [H.Normal] (s : Circle →ₜ* (J₁(T) ⧸ H))
+    (d : ℕ) (hd : 0 < d)
+    (hchart : ∀ g : (SAdeleRing F T)ˣ, ∀ hg : sIdeleQuotientNorm F T (QuotientGroup.mk g) = 1,
+      (∀ v : T, ‖g.val.2 v‖ = 1) → ∃ z : Circle, s z = (QuotientGroup.mk (⟨QuotientGroup.mk g, hg⟩ : J₁(T))) ^ d) :
+    ∃ N : ℕ, 0 < N ∧ ∀ x : J₁(T) ⧸ H, ∃ z : Circle, s z = x ^ N := by
+  let : IsMulCommutative J₁(T) := .of_comm fun a b ↦ Subtype.ext (mul_comm a.val b.val)
+  let q : (SAdeleRing F T)ˣ →* J(T) := QuotientGroup.mk' _
+  let π : J₁(T) →ₜ* J₁(T) ⧸ H := ⟨QuotientGroup.mk' _, QuotientGroup.continuous_mk⟩
+  let pow : J₁(T) →* J₁(T) := {
+    toFun := fun x ↦ x ^ d
+    map_one' := one_pow d
+    map_mul' := fun x y ↦ (show Commute x y from Subtype.ext (mul_comm x.val y.val)).mul_pow d }
+  let L := s.toMonoidHom.range.comap (π.toMonoidHom.comp pow)
+  let eval (v : T) : (SAdeleRing F T)ˣ →ₜ* (v.val.adicCompletion F)ˣ :=
+    let e := ((Pi.evalRingHom (fun w : T ↦ w.val.adicCompletion F) v).comp (RingHom.snd _ _)).toMonoidHom
+    ⟨Units.map e, ((continuous_apply v).comp continuous_snd).units_map e⟩
+  let integralBox : Set (SAdeleRing F T)ˣ := ⋂ v : T, eval v ⁻¹' (v.val.adicCompletionIntegers F).units
+  have hV : IsOpen integralBox := isOpen_iInter_of_finite fun v ↦
+    (Submonoid.isOpen_units (Valued.isOpen_valuationSubring (v.val.adicCompletion F))).preimage (eval v).continuous
+  have hq : IsOpenQuotientMap q := QuotientGroup.isOpenQuotientMap_mk
+  have hL : IsOpen (L : Set J₁(T)) := by
+    apply L.isOpen_of_mem_nhds (g := 1)
+    have h1 : (1 : J₁(T)).val ∈ q '' integralBox := ⟨1, Set.mem_iInter.mpr (fun v ↦ by
+      change eval v 1 ∈ (v.val.adicCompletionIntegers F).units
+      rw [map_one]
+      exact Subgroup.one_mem _), map_one _⟩
+    refine Filter.mem_of_superset (((hq.isOpenMap integralBox hV).preimage continuous_subtype_val).mem_nhds h1) ?_
+    rintro x ⟨g, hgV, hgx⟩
+    have hg : sIdeleQuotientNorm F T (QuotientGroup.mk g) = 1 := by
+      change sIdeleQuotientNorm F T (q g) = 1
+      rw [hgx]
+      exact x.property
+    have hn (v : T) : ‖g.val.2 v‖ = 1 := Valued.toNormedField.norm_eq_one_iff.mpr
+      (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp (Set.mem_iInter.mp hgV v))
+    obtain ⟨z, hz⟩ := hchart g hg hn
+    have hx : (⟨QuotientGroup.mk g, hg⟩ : J₁(T)) = x := Subtype.ext hgx
+    rw [hx] at hz
+    exact ⟨z, hz.trans (map_pow π x d).symm⟩
+  let : CompactSpace J₁(T) := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F T).isCompact_preimage (isCompact_singleton (x := 1)))
+  let : Finite (J₁(T) ⧸ L) := L.quotient_finite_of_isOpen hL
+  refine ⟨L.index * d, Nat.mul_pos Nat.card_pos hd, ?_⟩
+  intro x
+  obtain ⟨k, hk⟩ := QuotientGroup.mk_surjective x
+  obtain ⟨z, hz⟩ := L.pow_index_mem k
+  refine ⟨z, hz.trans ?_⟩
+  change π ((k ^ L.index) ^ d) = x ^ (L.index * d)
+  rw [map_pow, map_pow, pow_mul, show π k = x from hk]
+
+/-- At a single complex place the archimedean norm-one factor of an integral
+idèle lies on the unit circle. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_complex_chart [Subsingleton (InfinitePlace F)]
+    (v : InfinitePlace F) (hv : v.IsComplex) (H : Subgroup J₁(T))
+    (hH : ∀ x : J₁(T), x ∈ H ↔ ∃ u : (SAdeleRing F T)ˣ, (∀ σ : InfinitePlace F, u.val.1 σ = 1) ∧
+      (∀ w : T, ‖u.val.2 w‖ = 1) ∧ x.val = QuotientGroup.mk u) :
+    ∃ t : Circle →ₜ* J₁(T), ∀ g : (SAdeleRing F T)ˣ, ∀ hg : sIdeleQuotientNorm F T (QuotientGroup.mk g) = 1,
+      (∀ w : T, ‖g.val.2 w‖ = 1) → ∃ z : Circle, (⟨QuotientGroup.mk g, hg⟩ : J₁(T)) / t z ∈ H := by
+  classical
+  have hc (w : InfinitePlace F) : w.IsComplex := Subsingleton.elim v w ▸ hv
+  let e (w : InfinitePlace F) := InfinitePlace.Completion.ringEquivComplexOfIsComplex (hc w)
+  let c : Circle →ₜ* ℂˣ := ⟨Circle.toUnits, Units.isEmbedding_val₀.continuous_iff.mpr continuous_subtype_val⟩
+  let arch (w : InfinitePlace F) : Circle →ₜ* w.Completionˣ :=
+    (⟨Units.map (e w).symm.toMonoidHom,
+      (InfinitePlace.Completion.isometryEquivComplexOfIsComplex (hc w)).symm.continuous.units_map _⟩ :
+        ℂˣ →ₜ* w.Completionˣ).comp c
+  let ac : Circle →ₜ* (∀ w : InfinitePlace F, w.Completionˣ) :=
+    ⟨MonoidHom.pi (fun w ↦ (arch w).toMonoidHom), continuous_pi fun w ↦ (arch w).continuous⟩
+  let prod := ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F) ((w : T) → w.val.adicCompletion F)
+  let a : Circle →ₜ* (SAdeleRing F T)ˣ := ⟨prod.symm.toMonoidHom.comp
+    ((MonoidHom.inl _ _).comp (ContinuousMulEquiv.piUnits.symm.toMonoidHom.comp ac.toMonoidHom)),
+    prod.symm.continuous.comp ((ContinuousMulEquiv.piUnits.symm.continuous.comp ac.continuous).prodMk continuous_const)⟩
+  have aarch (z : Circle) (w : InfinitePlace F) : (a z).val.1 w = (e w).symm (z : ℂ) := rfl
+  have afin (z : Circle) (w : T) : (a z).val.2 w = 1 := rfl
+  have unorm (g : (SAdeleRing F T)ˣ) (hf : ∀ w : T, ‖g.val.2 w‖ = 1) :
+      ((sIdeleNorm F T g).val : ℝ) = ‖g.val.1 v‖ ^ 2 := by
+    let ev : ((SAdeleRing F T)ˣ →* ℝ≥0ˣ) →* ℝ := NNReal.toRealHom.toMonoidHom.comp
+      ((Units.coeHom ℝ≥0).comp (MonoidHom.eval g))
+    change ev (sIdeleNorm F T) = _
+    simp only [sIdeleNorm, map_mul, map_prod]
+    change (∏ w : InfinitePlace F, ‖g.val.1 w‖ ^ w.mult) * ∏ w : T, ‖g.val.2 w‖ = _
+    have hsingle : (Finset.univ : Finset (InfinitePlace F)) = {v} := by ext w; simp [Subsingleton.elim w v]
+    simp [hsingle, hv.mult_eq_two, hf]
+  have iso (w : InfinitePlace F) (z : ℂ) : ‖(e w).symm z‖ = ‖z‖ :=
+    (InfinitePlace.Completion.isometryEquivComplexOfIsComplex (hc w)).symm.isometry.norm_map_of_map_zero
+      (map_zero (e w).symm) z
+  let q : (SAdeleRing F T)ˣ →* J(T) := QuotientGroup.mk' _
+  have ha (z : Circle) : sIdeleQuotientNorm F T (q (a z)) = 1 := by
+    apply Units.ext
+    apply NNReal.coe_injective
+    change ((sIdeleNorm F T (a z)).val : ℝ) = 1
+    rw [unorm _ (fun w ↦ by rw [afin, norm_one]), aarch, iso, Circle.norm_coe, one_pow]
+  let t : Circle →ₜ* J₁(T) :=
+    ⟨(q.comp a.toMonoidHom).codRestrict _ ha, (QuotientGroup.continuous_mk.comp a.continuous).subtype_mk _⟩
+  refine ⟨t, fun g hg hf ↦ ?_⟩
+  have h1 : ‖g.val.1 v‖ = 1 := by
+    have h := unorm g hf
+    change sIdeleNorm F T g = 1 at hg
+    rw [hg] at h
+    change 1 = ‖g.val.1 v‖ ^ 2 at h
+    nlinarith [norm_nonneg (g.val.1 v)]
+  let z : Circle := ⟨e v (g.val.1 v), mem_sphere_zero_iff_norm.mpr (by
+    rw [← iso v, RingEquiv.symm_apply_apply, h1])⟩
+  refine ⟨z, (hH _).mpr ⟨g / a z, ?_, ?_, ?_⟩⟩
+  · intro w
+    obtain rfl := Subsingleton.elim w v
+    let ev : (SAdeleRing F T)ˣ →* w.Completionˣ :=
+      Units.map ((Pi.evalRingHom (fun t : InfinitePlace F ↦ t.Completion) w).comp (RingHom.fst _ _)).toMonoidHom
+    have hval : ev g = ev (a z) := Units.ext (by change g.val.1 w = (e w).symm (e w (g.val.1 w)); simp)
+    exact congrArg Units.val (show ev (g / a z) = 1 by rw [map_div, hval, div_self'])
+  · intro w
+    let ev : (SAdeleRing F T)ˣ →* (w.val.adicCompletion F)ˣ :=
+      Units.map ((Pi.evalRingHom (fun k : T ↦ k.val.adicCompletion F) w).comp (RingHom.snd _ _)).toMonoidHom
+    have he : ev (a z) = 1 := Units.ext (afin z w)
+    have hr : ev (g / a z) = ev g := by rw [map_div, he, div_one]
+    exact (congrArg (fun b : (w.val.adicCompletion F)ˣ ↦ ‖b.val‖) hr).trans (hf w)
+  · rfl
+
+/-- A global unit with nonzero logarithm at a designated infinite place
+gives a finite-integral representative of the identity class. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_unit_period
+    (v w : InfinitePlace F) (hvw : v ≠ w) :
+    ∃ g : (SAdeleRing F T)ˣ, (QuotientGroup.mk g : J(T)) = 1 ∧
+      (∀ k : T, ‖g.val.2 k‖ = 1) ∧ Real.log ‖g.val.1 v‖ < 0 := by
+  obtain ⟨u, hu⟩ := NumberField.Units.dirichletUnitTheorem.exists_unit F w
+  let i := algebraMap (𝓞 F) ((T : Set (HeightOneSpectrum (𝓞 F))).integer F)
+  let a := Units.map i.toMonoidHom u
+  let g := sUnitEmbedding F T a
+  refine ⟨g, (sIdeleQuotient_mk_eq_one F T _).mpr ⟨a, rfl⟩, fun k ↦ ?_, ?_⟩
+  · apply Valued.toNormedField.norm_eq_one_iff.mpr
+    change Valued.v (algebraMap F (k.val.adicCompletion F) (algebraMap (𝓞 F) F u.val)) = 1
+    change Valued.v ((algebraMap (𝓞 F) F u.val : F) : k.val.adicCompletion F) = 1
+    rw [HeightOneSpectrum.valuedAdicCompletion_eq_valuation']
+    rw [HeightOneSpectrum.valuation_eq_one_iff_notMem]
+    exact k.val.asIdeal.notMem_of_isUnit u.isUnit
+  · change Real.log ‖algebraMap F v.Completion (algebraMap (𝓞 F) F u.val)‖ < 0
+    simpa only [AbsoluteValue.Completion.algebraMap_def, AbsoluteValue.Completion.norm_coe,
+      WithAbs.algebraMap_right_apply, Algebra.algebraMap_self_apply, WithAbs.ofAbs_toAbs, InfinitePlace.coe_apply] using hu v hvw
+
+/-- With two real places, opposite real exponentials represent the square
+of an integral idèle modulo finite units. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_real_chart
+    (v w : InfinitePlace F) (hvw : v ≠ w) (hplaces : ∀ k, k = v ∨ k = w)
+    (hr : ∀ k : InfinitePlace F, k.IsReal) (H : Subgroup J₁(T)) [H.Normal]
+    (hH : ∀ x : J₁(T), x ∈ H ↔ ∃ u : (SAdeleRing F T)ˣ, (∀ σ : InfinitePlace F, u.val.1 σ = 1) ∧
+      (∀ k : T, ‖u.val.2 k‖ = 1) ∧ x.val = QuotientGroup.mk u) :
+    ∃ b : Multiplicative ℝ →ₜ* (J₁(T) ⧸ H), ∀ g : (SAdeleRing F T)ˣ, ∀ hg : sIdeleQuotientNorm F T (QuotientGroup.mk g) = 1,
+      (∀ k : T, ‖g.val.2 k‖ = 1) →
+      b (Multiplicative.ofAdd (2 * Real.log ‖g.val.1 v‖)) =
+        (QuotientGroup.mk (⟨QuotientGroup.mk g, hg⟩ : J₁(T))) ^ 2 := by
+  classical
+  let sign (k : InfinitePlace F) : ℝ := if k = v then 1 else -1
+  let e (k : InfinitePlace F) := InfinitePlace.Completion.ringEquivRealOfIsReal (hr k)
+  let c (k : InfinitePlace F) : Multiplicative ℝ →ₜ* ℝˣ := {
+    toFun := fun z ↦ Units.mk0 (Real.exp (sign k * z.toAdd)) (Real.exp_ne_zero _)
+    map_one' := Units.ext (by simp)
+    map_mul' := fun x y ↦ Units.ext (by
+      change Real.exp (sign k * (x.toAdd + y.toAdd)) = Real.exp _ * Real.exp _
+      rw [mul_add, Real.exp_add])
+    continuous_toFun := Units.isEmbedding_val₀.continuous_iff.mpr (Real.continuous_exp.comp
+      (continuous_const.mul (continuous_id : Continuous (fun x : ℝ ↦ x)))) }
+  let arch (k : InfinitePlace F) : Multiplicative ℝ →ₜ* k.Completionˣ :=
+    (⟨Units.map (e k).symm.toMonoidHom,
+      (InfinitePlace.Completion.isometryEquivRealOfIsReal (hr k)).symm.continuous.units_map _⟩ :
+        ℝˣ →ₜ* k.Completionˣ).comp (c k)
+  let ac : Multiplicative ℝ →ₜ* (∀ k : InfinitePlace F, k.Completionˣ) :=
+    ⟨MonoidHom.pi (fun k ↦ (arch k).toMonoidHom), continuous_pi fun k ↦ (arch k).continuous⟩
+  let prod := ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F) ((k : T) → k.val.adicCompletion F)
+  let a : Multiplicative ℝ →ₜ* (SAdeleRing F T)ˣ := ⟨prod.symm.toMonoidHom.comp
+    ((MonoidHom.inl _ _).comp (ContinuousMulEquiv.piUnits.symm.toMonoidHom.comp ac.toMonoidHom)),
+    prod.symm.continuous.comp ((ContinuousMulEquiv.piUnits.symm.continuous.comp ac.continuous).prodMk continuous_const)⟩
+  have aarch (z : Multiplicative ℝ) (k : InfinitePlace F) : (a z).val.1 k = (e k).symm (Real.exp (sign k * z.toAdd)) := rfl
+  have afin (z : Multiplicative ℝ) (k : T) : (a z).val.2 k = 1 := rfl
+  have unorm (g : (SAdeleRing F T)ˣ) (hf : ∀ k : T, ‖g.val.2 k‖ = 1) :
+      ((sIdeleNorm F T g).val : ℝ) = ‖g.val.1 v‖ * ‖g.val.1 w‖ := by
+    let ev : ((SAdeleRing F T)ˣ →* ℝ≥0ˣ) →* ℝ := NNReal.toRealHom.toMonoidHom.comp
+      ((Units.coeHom ℝ≥0).comp (MonoidHom.eval g))
+    change ev (sIdeleNorm F T) = _
+    simp only [sIdeleNorm, map_mul, map_prod]
+    change (∏ k : InfinitePlace F, ‖g.val.1 k‖ ^ k.mult) * ∏ k : T, ‖g.val.2 k‖ = _
+    have h2 : (Finset.univ : Finset (InfinitePlace F)) = {v,w} := by ext k; simpa using hplaces k
+    simp [h2, hvw, fun k ↦ (hr k).mult_eq_one, hf]
+  have iso (k : InfinitePlace F) (x : ℝ) : ‖(e k).symm x‖ = ‖x‖ :=
+    (InfinitePlace.Completion.isometryEquivRealOfIsReal (hr k)).symm.isometry.norm_map_of_map_zero
+      (map_zero (e k).symm) x
+  let q : (SAdeleRing F T)ˣ →* J(T) := QuotientGroup.mk' _
+  have ha (z : Multiplicative ℝ) : sIdeleQuotientNorm F T (q (a z)) = 1 := by
+    apply Units.ext
+    apply NNReal.coe_injective
+    change ((sIdeleNorm F T (a z)).val : ℝ) = 1
+    rw [unorm _ (fun k ↦ by rw [afin, norm_one]), aarch, aarch, iso, iso]
+    simp [sign, hvw.symm, Real.norm_eq_abs, abs_of_pos (Real.exp_pos _), Real.exp_neg]
+  let t : Multiplicative ℝ →ₜ* J₁(T) :=
+    ⟨(q.comp a.toMonoidHom).codRestrict _ ha, (QuotientGroup.continuous_mk.comp a.continuous).subtype_mk _⟩
+  let π : J₁(T) →ₜ* J₁(T) ⧸ H := ⟨QuotientGroup.mk' _, QuotientGroup.continuous_mk⟩
+  refine ⟨π.comp t, fun g hg hf ↦ ?_⟩
+  let z := Multiplicative.ofAdd (2 * Real.log ‖g.val.1 v‖)
+  let x : J₁(T) := ⟨q g, hg⟩
+  have hprod : ‖g.val.1 v‖ * ‖g.val.1 w‖ = 1 := (unorm g hf).symm.trans (by
+    change sIdeleNorm F T g = 1 at hg
+    rw [hg]; rfl)
+  have hvpos : 0 < ‖g.val.1 v‖ := lt_of_le_of_ne (norm_nonneg _) (by intro h; rw [← h, zero_mul] at hprod; exact zero_ne_one hprod)
+  have hwval : ‖g.val.1 w‖ = (‖g.val.1 v‖)⁻¹ := by
+    apply mul_left_cancel₀ hvpos.ne'
+    rw [hprod, mul_inv_cancel₀ hvpos.ne']
+  have harch (k : InfinitePlace F) : (a z).val.1 k = (g.val.1 k) ^ 2 := by
+    rw [aarch]
+    apply (e k).injective
+    rw [RingEquiv.apply_symm_apply, map_pow]
+    have hnorm : ‖g.val.1 k‖ = |(e k) (g.val.1 k)| := by simpa [Real.norm_eq_abs] using iso k ((e k) (g.val.1 k))
+    rw [← sq_abs, ← hnorm]
+    rcases hplaces k with rfl | rfl
+    · simp [sign, z, two_mul, Real.exp_add, Real.exp_log hvpos, pow_two]
+    · simp [sign, hvw.symm, z, hwval, two_mul, Real.exp_add, Real.exp_neg, Real.exp_log hvpos, pow_two]
+  have hmem : x ^ 2 / t z ∈ H := by
+    apply (hH _).mpr
+    refine ⟨g ^ 2 / a z, ?_, ?_, rfl⟩
+    · intro k
+      let E : (SAdeleRing F T)ˣ →* k.Completionˣ :=
+        Units.map ((Pi.evalRingHom (fun k : InfinitePlace F ↦ k.Completion) k).comp (RingHom.fst _ _)).toMonoidHom
+      have he : E (a z) = E g ^ 2 := Units.ext (harch k)
+      exact congrArg Units.val (show E (g ^ 2 / a z) = 1 by rw [map_div, map_pow, he, div_self'])
+    · intro k
+      let E : (SAdeleRing F T)ˣ →* (k.val.adicCompletion F)ˣ :=
+        Units.map ((Pi.evalRingHom (fun k : T ↦ k.val.adicCompletion F) k).comp (RingHom.snd _ _)).toMonoidHom
+      have he : E (a z) = 1 := Units.ext (afin z k)
+      have h := congrArg (fun u : (k.val.adicCompletion F)ˣ ↦ ‖u.val‖)
+        (show E (g ^ 2 / a z) = E g ^ 2 by rw [map_div, map_pow, he, div_one])
+      exact h.trans (by change ‖(E g).val ^ 2‖ = 1; rw [norm_pow, show ‖(E g).val‖ = 1 from hf k, one_pow])
+  have hq : π (x ^ 2 / t z) = 1 := (QuotientGroup.eq_one_iff _).mpr hmem
+  rw [map_div, div_eq_one, map_pow] at hq
+  exact hq.symm
+
+/-- The diagonal of a global unit is a nonzero period for the real chart. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_real_circle
+    (v w : InfinitePlace F) (hvw : v ≠ w) (hplaces : ∀ k, k = v ∨ k = w)
+    (hr : ∀ k : InfinitePlace F, k.IsReal) (H : Subgroup J₁(T)) [H.Normal]
+    (hH : ∀ x : J₁(T), x ∈ H ↔ ∃ u : (SAdeleRing F T)ˣ, (∀ σ : InfinitePlace F, u.val.1 σ = 1) ∧
+      (∀ k : T, ‖u.val.2 k‖ = 1) ∧ x.val = QuotientGroup.mk u) :
+    ∃ s : Circle →ₜ* (J₁(T) ⧸ H), ∃ N : ℕ, 0 < N ∧ ∀ x, ∃ z : Circle, s z = x ^ N := by
+  obtain ⟨b, hb⟩ := sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_real_chart v w hvw hplaces hr H hH
+  obtain ⟨g, hg, hf, hu⟩ := sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_unit_period (T := T) v w hvw
+  have h1 : sIdeleQuotientNorm F T (QuotientGroup.mk g) = 1 := by rw [hg, map_one]
+  have hk : (⟨QuotientGroup.mk g, h1⟩ : J₁(T)) = 1 := Subtype.ext hg
+  let B (t : ℝ) := b (Multiplicative.ofAdd t)
+  have hper : B (2 * Real.log ‖g.val.1 v‖) = 1 := by
+    have h := hb g h1 hf
+    rw [hk, QuotientGroup.mk_one, one_pow] at h
+    exact h
+  obtain ⟨s, hs⟩ := sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_real_period_circle B b.continuous
+    (fun x y ↦ b.map_mul (Multiplicative.ofAdd x) (Multiplicative.ofAdd y))
+    _ (mul_ne_zero two_ne_zero hu.ne) hper
+  refine ⟨s, sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_integral_box H s 2 (by decide) ?_⟩
+  intro u hn hfin
+  obtain ⟨z, hz⟩ := hs (2 * Real.log ‖u.val.1 v‖)
+  exact ⟨z, hz.trans (hb u hn hfin)⟩
+
+/-- In degree two a circle image contains a common positive power of every
+norm-one class modulo finite units. Every primary jet of an infinite-order character
+therefore has order zero. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_quadratic
+    (hF : Module.finrank ℚ F = 2)
+    (p : HeightOneSpectrum (𝓞 ℚ)) (ω : PontryaginDual C₁)
+    (hω : NormOneCharacterUnramifiedOutside ω T) (hInf : ¬ IsOfFinOrder ω)
+    (j : Iₚ(p, sLocalNormOneCharacter T ω hω)) :
+    j.val.2 = 0 := by
+  classical
+  let χ := sLocalNormOneCharacter T ω hω
+  have hχ : ¬ IsOfFinOrder χ := sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_infinite_stage ω hω hInf
+  obtain ⟨i, hi⟩ := sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_integral_image (F := F) (T := T)
+  let : IsMulCommutative J₁(T) := .of_comm fun a b ↦ Subtype.ext (mul_comm a.val b.val)
+  let H := i.toMonoidHom.range
+  let _ (k : T) : CompactSpace (k.val.adicCompletionIntegers F).units :=
+    isCompact_iff_compactSpace.mp (Submonoid.units_isCompact
+      (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers k.val)))
+  let _ (k : T) : TotallyDisconnectedSpace (k.val.adicCompletion F)ˣ :=
+    ⟨isTotallyDisconnected_of_image Units.continuous_val.continuousOn Units.val_injective
+      (isTotallyDisconnected_of_totallyDisconnectedSpace _)⟩
+  let _ : CompactSpace ((w : T) → (w.val.adicCompletionIntegers F).units) := Pi.compactSpace
+  let _ : TotallyDisconnectedSpace ((w : T) → (w.val.adicCompletionIntegers F).units) := inferInstance
+  obtain ⟨e, _, ψ, hψ, he⟩ :=
+    sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_integral_descent
+      (A := J₁(T)) (U := ((w : T) → (w.val.adicCompletionIntegers F).units)) i χ hχ
+  obtain ⟨s, N, hN, hG⟩ : ∃ s : Circle →ₜ* (J₁(T) ⧸ H), ∃ N : ℕ, 0 < N ∧ ∀ x, ∃ z : Circle, s z = x ^ N := by
+    by_cases hc : ∃ v : InfinitePlace F, v.IsComplex
+    · obtain ⟨v, hv⟩ := hc
+      have hnc : 0 < InfinitePlace.nrComplexPlaces F :=
+        Fintype.card_pos_iff.mpr ⟨⟨v, hv⟩⟩
+      let : Subsingleton (InfinitePlace F) := Fintype.card_le_one_iff_subsingleton.mp (by
+        rw [InfinitePlace.card_eq_nrRealPlaces_add_nrComplexPlaces]
+        have h := InfinitePlace.card_add_two_mul_card_eq_rank F
+        omega)
+      obtain ⟨t, ht⟩ := sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_complex_chart v hv H hi
+      let π : J₁(T) →ₜ* J₁(T) ⧸ H := ⟨QuotientGroup.mk' _, QuotientGroup.continuous_mk⟩
+      let s := π.comp t
+      refine ⟨s, sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_integral_box H s 1 (by decide) ?_⟩
+      intro g hg hf
+      obtain ⟨z, hz⟩ := ht g hg hf
+      let x : J₁(T) := ⟨QuotientGroup.mk g, hg⟩
+      have ha : π (x / t z) = 1 := (QuotientGroup.eq_one_iff _).mpr hz
+      rw [map_div, div_eq_one] at ha
+      exact ⟨z, by rw [pow_one]; exact ha.symm⟩
+    · have hr (k : InfinitePlace F) : k.IsReal :=
+        (InfinitePlace.isReal_or_isComplex k).resolve_right (fun h ↦ hc ⟨k,h⟩)
+      have hz : InfinitePlace.nrComplexPlaces F = 0 :=
+        Fintype.card_eq_zero_iff.mpr ⟨fun x ↦ hc ⟨x.val,x.property⟩⟩
+      have hcard : (Finset.univ : Finset (InfinitePlace F)).card = 2 := by
+        rw [Finset.card_univ, InfinitePlace.card_eq_nrRealPlaces_add_nrComplexPlaces, hz, add_zero]
+        simpa only [hz, mul_zero, add_zero] using (InfinitePlace.card_add_two_mul_card_eq_rank F).trans hF
+      obtain ⟨v,w,hvw,hset⟩ := Finset.card_eq_two.mp hcard
+      have hplaces (k : InfinitePlace F) : k = v ∨ k = w := by
+        have hk := Finset.mem_univ k
+        rw [hset] at hk
+        simpa using hk
+      exact sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_real_circle v w hvw hplaces hr H hi
+  apply sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_circle_quotient p χ (QuotientGroup.mk' H) _ ψ hψ e he s N hN hG j
+  intro x hx
+  exact (hi x).mp ((QuotientGroup.eq_one_iff x).mp hx)
+
+/-- The number of primary primes is at most the field degree, by the ramification-inertia identity. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_primary_card
+    (p : HeightOneSpectrum (𝓞 ℚ)) :
+    (sLocalPrimaryPlaces (F := F) T p).card ≤ Module.finrank ℚ F := by
+  let i (w : sLocalPrimaryPlaces (F := F) T p) : p.asIdeal.primesOver (𝓞 F) :=
+    ⟨w.val.asIdeal, w.val.isPrime,
+      ⟨(congrArg HeightOneSpectrum.asIdeal ((mem_sLocalPrimaryPlaces p w.val).mp w.property).2).symm⟩⟩
+  have hi : Function.Injective i := fun x y h ↦ Subtype.ext (HeightOneSpectrum.ext (congrArg Subtype.val h))
+  have h := Ideal.sum_ramification_inertia_eq_finrank p.asIdeal (𝓞 F)
+  rw [← IsFractionRing.finrank_eq (𝓞 ℚ) ℚ (𝓞 F) F] at h
+  rw [← Fintype.card_coe, ← h]
+  apply (Fintype.card_le_of_injective i hi).trans
+  rw [Fintype.card_eq_sum_ones]
+  exact Finset.sum_le_sum fun Q _ ↦ Nat.mul_pos
+    (Ideal.ramificationIdx_pos (𝓞 ℚ) Q.val) (Ideal.inertiaDeg_pos Q.val (𝓞 ℚ))
+
 /-- At repeated primary poles of an infinite-order character, keep only strict closest
 approaches to one among distinct centers through squared height.
 Only infinitely many such centers with unbounded inverse distances remain. A repeated
 pole also gives a character-kernel element of infinite order modulo finite units.
+No number field of degree at most two has such a pole.
 Gap: For these separated record centers the phases of the Hecke character still need a
 polynomial inhomogeneous lower bound (Theorem 7.3.3.4, p. 360, using p. 349). -/
 private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_minima
@@ -5420,6 +5965,7 @@ private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_
       z j ^ N = Complex.exp (N * (-(Real.log v.val.asIdeal.absNorm : ℂ) * (s j - σ)))) →
     (∀ j ∈ R, ∀ k ∈ R, j.val.1 ≠ k.val.1 → H j ≤ H k → H j ^ 2 < H k ∧ ‖1 - z k‖ < ‖1 - z j‖) →
     ((fun j ↦ j.val.1) '' R).Infinite → ¬ BddAbove ((fun j ↦ ‖1 - z j‖⁻¹) '' R) →
+    2 < Module.finrank ℚ F →
     (¬ ∀ x : J₁(T), χ x = 1 →
       ∃ n : ℕ, 0 < n ∧ ∃ t : (SAdeleRing F T)ˣ, (∀ σ : InfinitePlace F, t.val.1 σ = 1) ∧
         (∀ i : T, ‖t.val.2 i‖ = 1) ∧ x.val ^ n = QuotientGroup.mk t) →
@@ -5485,9 +6031,16 @@ private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_
       apply sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_minima
         hST _hT _hdis _hsat _hPic p _hp₀ ω hu χ _hχ _hinf τ _hτ v w _hv _hw u _hu _hind
         hcard hinf hbd hshift hsparse hi hb
-      intro hker
-      obtain ⟨_, j, hj, rfl⟩ := hi.nonempty
-      exact hj.1.1 (sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_kernel_torsion p χ hker j)
+      · by_contra! hdegree
+        have hF : Module.finrank ℚ F = 2 :=
+          le_antisymm hdegree ((Nat.succ_le_of_lt hcard).trans (sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_primary_card (T := T) p))
+        obtain ⟨_, j, hj, rfl⟩ := hi.nonempty
+        subst χ
+        exact hj.1.1 (sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_quadratic
+          hF p ω (NormOneCharacterUnramifiedOutside.mono hu hST) _hinf j)
+      · intro hker
+        obtain ⟨_, j, hj, rfl⟩ := hi.nonempty
+        exact hj.1.1 (sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_kernel_torsion p χ hker j)
   obtain ⟨d, D, hD, hrec⟩ := hregular
   have hpole' (j : Iₚ(p, χ)) (hj : j ∈ A) : b * Complex.exp (-(Real.log w.val.asIdeal.absNorm : ℂ) * s j) = 1 :=
     hpole j hj.2.1
