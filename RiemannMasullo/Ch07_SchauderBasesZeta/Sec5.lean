@@ -18,11 +18,12 @@ import Mathlib.Analysis.Calculus.DSlope
 import RiemannMasullo.Ch05_ThetaZSpaces.Sec1
 import RiemannMasullo.Ch03_IdelicZeta.Sec4
 import RiemannMasullo.Ch03_IdelicZeta.Sec3
-import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3a
+public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3a
 import RiemannMasullo.Ch06_LocalGlobal.Sec3
 import RiemannMasullo.ForMathlib.Topology.Maps.Strict.Module
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Barrelled
 import RiemannMasullo.Ch09_HardySobolev.Sec2
+public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3b_PWLevels
 
 /-! # §7.5 Strong co-primality -/
 

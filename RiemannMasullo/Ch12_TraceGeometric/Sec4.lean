@@ -2,7 +2,7 @@ module
 
 public import RiemannMasullo.Ch12_TraceGeometric.Sec2
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
-public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3b
+public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3b_PWLevels
 public import RiemannMasullo.Ch10_TraceSpectral.Sec1
 public import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.WeightedIntegral
 public import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Count
