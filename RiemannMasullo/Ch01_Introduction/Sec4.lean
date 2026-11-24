@@ -15,6 +15,7 @@ import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gamma.DigammaIntegral
 import Mathlib.Analysis.Fourier.RiemannLebesgueLemma
 public import Mathlib.Analysis.SpecialFunctions.Gamma.Digamma
 import RiemannMasullo.External.HardyCriticalLine.DigammaFormula
+import RiemannMasullo.External.HardyCriticalLine.CriticalLineStirlingPhase
 import Mathlib.Analysis.Calculus.BumpFunction.Normed
 import Mathlib.Analysis.Calculus.ContDiff.Convolution
 
@@ -9121,6 +9122,223 @@ theorem introTrace_heckeGamma_vertical_main_term (χ : U𝔽) (σ : ℝ) (hσ : 
   intro t
   rw [introTrace_heckeGamma_logDeriv_eq_sum χ (s t) (hs t), Complex.re_sum]
   simp only [Finset.sum_sub_distrib,← Finset.sum_mul,hkdeg]
+
+/-- After its first Stirling correction, the digamma remainder has
+quadratic decay in the height on the entire open right half-plane. -/
+private theorem introTrace_digamma_quadratic_remainder (z : ℂ) (hz : 0 < z.re)
+    (hi : z.im ≠ 0) :
+    ‖Complex.digamma z - Complex.log z + 1 / (2*z)‖ ≤ 1 / (2*z.im^2) := by
+  let b := |z.im|
+  have hb : 0 < b := abs_pos.mpr hi
+  have hB := HardyCriticalLine.bennettGammaBinetDigamma_eqOn hz
+  dsimp only at hB
+  rw [hB, ← HardyCriticalLine.complexBinetSawtoothCorrection_eq_bennett hz,
+    HardyCriticalLine.complexBinetSawtoothCorrection,
+    HardyCriticalLine.integral_binetSawtooth_div_sq_eq_periodicPrimitive hz]
+  set J := ∫ u : ℝ in Ioi 0, (HardyCriticalLine.binetSawtoothPrimitive u : ℂ)/(z+(u:ℂ))^3
+  rw [show Complex.log z - 1/(2*z) - 2*J - Complex.log z + 1/(2*z) = -(2*J) by ring,
+    norm_neg,norm_mul,Complex.norm_ofNat]
+  have hJ : ‖J‖ ≤ (1/(4*b))*(1/b) := by
+    rw [← HardyCriticalLine.integral_Ioi_one_div_add_sq hb, ← integral_const_mul]
+    apply norm_integral_le_of_norm_le ((HardyCriticalLine.integrableOn_one_div_sq_add_const hb).const_mul _)
+    filter_upwards [ae_restrict_mem measurableSet_Ioi] with u hu
+    have hu₀ : 0 < u := hu
+    let w := z+(u:ℂ)
+    have hw : b ≤ ‖w‖ := by simpa [w,b] using Complex.abs_im_le_norm w
+    have hws : ‖w‖ ^ 2 = (z.re+u)^2+b^2 := by
+      rw [Complex.sq_norm, Complex.normSq_apply]; simp [w,b,pow_two]
+    have hq : (u+b)^2 ≤ 2*‖w‖^2 := by
+      rw [hws]; nlinarith [sq_nonneg (u-b), mul_nonneg hu₀.le hz.le, sq_nonneg z.re]
+    have hcube : b*(u+b)^2 ≤ 2*‖w‖^3 := calc
+      _ ≤ b*(2*‖w‖^2) := mul_le_mul_of_nonneg_left hq hb.le
+      _ ≤ ‖w‖*(2*‖w‖^2) := mul_le_mul_of_nonneg_right hw (by positivity)
+      _ = _ := by ring
+    change ‖(HardyCriticalLine.binetSawtoothPrimitive u : ℂ)/w^3‖ ≤ _
+    rw [norm_div,norm_pow,Complex.norm_real,Real.norm_eq_abs]
+    have hw₀ := hb.trans_le hw
+    calc
+      _ ≤ (1/8)/‖w‖^3 := div_le_div_of_nonneg_right (HardyCriticalLine.abs_binetSawtoothPrimitive_le u) (by positivity)
+      _ ≤ _ := by
+        rw [show 1/(4*b)*(1/(u+b)^2) = 1/(4*(b*(u+b)^2)) by field_simp]
+        have := div_le_div_of_nonneg_left (by norm_num : (0:ℝ) ≤ 1)
+          (show 0 < 4*(b*(u+b)^2) by positivity) (show 4*(b*(u+b)^2) ≤ 8*‖w‖^3 by linarith)
+        convert this using 1; field_simp
+  calc
+    2*‖J‖ ≤ 2*((1/(4*b))*(1/b)) := by linarith
+    _ = 1/(2*z.im^2) := by rw [← sq_abs z.im]; change _ = 1/(2*b^2); ring
+
+/-- The real digamma remainder after subtracting the logarithm of the
+absolute height is bounded by an explicit multiple of its inverse square. -/
+theorem introTrace_digamma_real_log_height_bound (z : ℂ) (hz : 0 < z.re) (hi : z.im ≠ 0) :
+    |(Complex.digamma z).re - Real.log (|z.im|)| ≤
+      (z.re^2 + z.re + 1) / (2*z.im^2) := by
+  have hi₂ := sq_pos_of_ne_zero hi
+  have hz₂ : ‖z‖^2 = z.re^2 + z.im^2 := by rw [Complex.sq_norm,Complex.normSq_apply]; ring
+  have hn : 0 < ‖z‖ := lt_of_lt_of_le (abs_pos.mpr hi) (Complex.abs_im_le_norm z)
+  let e := Complex.digamma z - Complex.log z + 1/(2*z)
+  have he : |e.re| ≤ 1/(2*z.im^2) :=
+    (Complex.abs_re_le_norm e).trans (introTrace_digamma_quadratic_remainder z hz hi)
+  have hrec : (1/(2*z)).re = z.re / (2*‖z‖^2) := by
+    rw [show (1/(2*z) : ℂ) = z⁻¹/2 by ring,Complex.div_ofNat_re,Complex.inv_re,Complex.sq_norm]
+    ring
+  have hrec' : |(1/(2*z)).re| ≤ z.re/(2*z.im^2) := by
+    rw [hrec,abs_of_nonneg (by positivity)]
+    exact div_le_div_of_nonneg_left hz.le (by positivity) (by nlinarith [sq_nonneg z.re])
+  have hr : ‖z‖^2 / |z.im|^2 = 1 + z.re^2/z.im^2 := by
+    rw [hz₂,sq_abs]; field_simp [hi]; ring
+  have hlog : Real.log ‖z‖ - Real.log |z.im| ≤ z.re^2/(2*z.im^2) := by
+    have h := Real.log_le_sub_one_of_pos (show 0 < ‖z‖^2 / |z.im|^2 by positivity)
+    rw [Real.log_div (pow_ne_zero _ hn.ne') (pow_ne_zero _ (abs_pos.mpr hi).ne'),Real.log_pow,
+      Real.log_pow,hr] at h
+    norm_num only [Nat.cast_ofNat] at h
+    linarith [show z.re^2/(2*z.im^2) = (z.re^2/z.im^2)/2 by ring]
+  have hdiff : 0 ≤ Real.log ‖z‖ - Real.log |z.im| :=
+    sub_nonneg.mpr (Real.log_le_log (abs_pos.mpr hi) (Complex.abs_im_le_norm z))
+  have he' : (Complex.digamma z).re - Real.log |z.im| =
+      e.re - (1/(2*z)).re + (Real.log ‖z‖ - Real.log |z.im|) := by
+    simp [e,Complex.log_re]
+  rw [he']
+  calc
+    _ ≤ |e.re - (1/(2*z)).re| + |Real.log ‖z‖ - Real.log (|z.im|)| := abs_add_le _ _
+    _ ≤ (|e.re| + |(1/(2*z)).re|) + (Real.log ‖z‖ - Real.log |z.im|) := by
+      rw [abs_of_nonneg hdiff]; linarith [abs_sub e.re (1/(2*z)).re]
+    _ ≤ 1/(2*z.im^2) + z.re/(2*z.im^2) + z.re^2/(2*z.im^2) := by linarith
+    _ = _ := by ring
+
+/-- The linear Taylor approximation of the height logarithm has a
+quadratic error whenever the height dominates the fixed translation. -/
+private theorem introTrace_log_abs_add_linear_bound {t b : ℝ} (ht : t ≠ 0) (hb : 2*|b| ≤ |t|) :
+    |Real.log |t+b| - Real.log |t| - b/t| ≤ 2*b^2/t^2 := by
+  let x := b/t
+  have hx : |x| ≤ 1/2 := by
+    dsimp only [x]
+    rw [abs_div, div_le_iff₀ (abs_pos.mpr ht)]
+    linarith
+  have hp : 0 < 1+x := by linarith [(abs_le.mp hx).1]
+  have hlog : Real.log |t+b| - Real.log |t| = Real.log (1+x) := by
+    rw [show t+b=t*(1+x) by dsimp only [x]; field_simp,
+      abs_mul,abs_of_pos hp,Real.log_mul (abs_pos.mpr ht).ne' hp.ne']
+    ring
+  rw [hlog]
+  change |Real.log (1+x)-x| ≤ _
+  have hupper := Real.log_le_sub_one_of_pos hp
+  rw [abs_of_nonpos (show Real.log (1+x)-x ≤ 0 by linarith)]
+  have hlow := Real.one_sub_inv_le_log_of_pos hp
+  have hedge : x-(1-(1+x)⁻¹) = x^2/(1+x) := by field_simp; ring
+  have hsmall : x^2/(1+x) ≤ 2*x^2 := by
+    rw [div_le_iff₀ hp]
+    nlinarith [mul_nonneg (sq_nonneg x) (show 0 ≤ 2*x+1 by linarith [(abs_le.mp hx).1])]
+  calc
+    _ ≤ x^2/(1+x) := by linarith
+    _ ≤ 2*x^2 := hsmall
+    _ = _ := by dsimp only [x]; ring
+
+/-- On an affine vertical line the imaginary translation produces the
+reciprocal-height term in the real digamma asymptotic. -/
+private theorem introTrace_digamma_affine_quadratic (u k b : ℝ) (hu : 0 < u) (hk : 0 < k)
+    (t : ℝ) (ht : t ≠ 0) (hb : 2*|b| ≤ |t|) :
+    |(Complex.digamma ((u:ℂ) + ((k*(t+b):ℝ):ℂ)*Complex.I)).re -
+      Real.log |t| - Real.log k - b/t| ≤ (2*(u^2+u+1)/k^2 + 2*b^2)/t^2 := by
+  let w := (u:ℂ) + ((k*(t+b):ℝ):ℂ)*Complex.I
+  have hre : w.re = u := by simp [w]
+  have him : w.im = k*(t+b) := by simp [w]
+  have htri : |t| ≤ |t+b|+|b| := by
+    simpa only [add_sub_cancel_right] using abs_sub (t+b) b
+  have hdist : |t|/2 ≤ |t+b| := by linarith
+  have htb : 0 < |t+b| := lt_of_lt_of_le (half_pos (abs_pos.mpr ht)) hdist
+  have hi : w.im ≠ 0 := by rw [him]; exact mul_ne_zero hk.ne' (abs_pos.mp htb)
+  have h := introTrace_digamma_real_log_height_bound w (hre.symm ▸ hu) hi
+  rw [hre,him,abs_mul,abs_of_pos hk,Real.log_mul hk.ne' htb.ne'] at h
+  have hv := introTrace_log_abs_add_linear_bound ht hb
+  have hsq : t^2 ≤ 4*(t+b)^2 := by
+    have hle : |t| ≤ 2*|t+b| := by linarith
+    have h₂ := pow_le_pow_left₀ (abs_nonneg t) hle 2
+    norm_num only [mul_pow,sq_abs,Nat.reducePow,one_mul, OfNat.ofNat] at h₂ ⊢
+    nlinarith only [h₂]
+  have htb₀ := abs_pos.mp htb
+  have hn : 0 < 2*(k*(t+b))^2 := by positivity
+  have hdiff : (u^2+u+1)/(2*(k*(t+b))^2) ≤ (2*(u^2+u+1)/k^2)/t^2 := by
+    rw [div_div,div_le_div_iff₀ hn (by positivity)]
+    have hmul := mul_le_mul_of_nonneg_left hsq
+      (show 0 ≤ k^2*(u^2+u+1) by positivity)
+    nlinarith only [hmul]
+  calc
+    _ = |((Complex.digamma w).re - (Real.log k + Real.log |t+b|)) +
+        (Real.log |t+b| - Real.log |t| - b/t)| := by congr 1; ring
+    _ ≤ _ := (abs_add_le _ _).trans (add_le_add (h.trans hdiff) hv) |>.trans_eq (by ring)
+
+open Classical in
+/-- For a fixed unitary character the imaginary parts of its archimedean
+parameters give the first reciprocal-height correction on every positive
+vertical line. The remaining error is bounded by a constant times the
+inverse square of the height in both directions. -/
+theorem introTrace_heckeGamma_vertical_first_correction (χ : U𝔽) (σ : ℝ) (hσ : 0 < σ) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ᶠ t : ℝ in cocompact ℝ,
+      |(logDeriv (heckeGammaFactor χ) ((σ:ℂ)+(t:ℂ)*Complex.I)).re -
+        ((Module.finrank ℚ F : ℝ)/2)*(Real.log |t| - Real.log (2*Real.pi)) -
+        (∑ v : InfinitePlace F, archScale(v)*(archShift(χ,v)).im)/t| ≤ C/t^2 := by
+  classical
+  let k (v : InfinitePlace F) := archScale(v)
+  let b (v : InfinitePlace F) := archShift(χ,v)
+  let u (v : InfinitePlace F) := k v * (σ + (b v).re)
+  let M (v : InfinitePlace F) := 2*((u v)^2+u v+1)/(k v)^2 + 2*(b v).im^2
+  let s (t : ℝ) : ℂ := (σ:ℂ)+(t:ℂ)*Complex.I
+  let L (t : ℝ) := Real.log |t| - Real.log (2*Real.pi)
+  have hs (t : ℝ) : 0 < (s t).re := by simpa [s] using hσ
+  have hk (v : InfinitePlace F) : 0 < k v := by dsimp [k]; split_ifs <;> norm_num
+  have hu (v : InfinitePlace F) : 0 < u v := by
+    apply mul_pos (hk v)
+    apply add_pos_of_pos_of_nonneg hσ
+    dsimp only [b]
+    split_ifs with hv
+    · have h := (realHeckeCharacter_parameters χ v hv).exists.choose_spec.1
+      simp only [Complex.add_re,h,zero_add,Complex.natCast_re]; positivity
+    · have h := (complexHeckeCharacter_parameters χ v (InfinitePlace.not_isReal_iff_isComplex.mp hv)).exists.choose_spec.1
+      simp only [Complex.add_re,h,zero_add,Complex.div_ofNat_re,Complex.natCast_re]; positivity
+  have hdeg : ∑ v : InfinitePlace F, k v = (Module.finrank ℚ F : ℝ)/2 := by
+    calc
+      _ = ∑ v : InfinitePlace F, (InfinitePlace.mult v : ℝ)/2 := by
+        apply Finset.sum_congr rfl
+        intro v _
+        by_cases hv : v.IsReal <;> simp [k,InfinitePlace.mult,hv]
+      _ = _ := by rw [← Finset.sum_div,← Nat.cast_sum,InfinitePlace.sum_mult_eq]
+  let err (v : InfinitePlace F) (t : ℝ) := (logDeriv archGamma(χ,v) (s t)).re -
+    k v * L t - (k v * (b v).im)/t
+  have hv (v : InfinitePlace F) : ∀ᶠ t : ℝ in cocompact ℝ, |err v t| ≤ (k v*M v)/t^2 := by
+    have htend := tendsto_norm_cocompact_atTop (E := ℝ)
+    filter_upwards [htend.eventually_gt_atTop 0,htend.eventually_ge_atTop (2*|(b v).im|)] with t ht hb
+    have ht₀ := norm_pos_iff.mp ht
+    have h := introTrace_digamma_affine_quadratic (u v) (k v) (b v).im (hu v) (hk v) t ht₀ hb
+    let D : ℝ := if v.IsReal then Real.pi else 2*Real.pi
+    have hD : D = (2*Real.pi)*k v := by dsimp [D,k]; split_ifs <;> ring
+    have hDC : (if v.IsReal then (Real.pi:ℂ) else 2*(Real.pi:ℂ)) = (D:ℂ) := by
+      dsimp [D]; split_ifs <;> push_cast <;> rfl
+    have hlog : (Complex.log (D:ℂ)).re = Real.log (2*Real.pi) + Real.log (k v) := by
+      rw [Complex.log_re,Complex.norm_real,Real.norm_of_nonneg (by rw [hD]; positivity),
+        hD,Real.log_mul (by positivity) (hk v).ne']
+    have he : (k v : ℂ)*(s t + b v) = (u v : ℂ) + ((k v*(t+(b v).im):ℝ):ℂ)*Complex.I := by
+      apply Complex.ext <;> simp [s,u,Complex.mul_re,Complex.mul_im]
+    let w := (u v : ℂ) + ((k v*(t+(b v).im):ℝ):ℂ)*Complex.I
+    have hE : err v t = k v *((Complex.digamma w).re-Real.log |t|-Real.log (k v)-(b v).im/t) := by
+      dsimp only [err,L]
+      rw [introTrace_logDeriv_local_gamma χ v (s t) (hs t)]
+      change ((k v:ℂ)*(Complex.digamma ((k v:ℂ)*(s t + b v))-Complex.log _)).re - _ - _ = _
+      rw [he,hDC,Complex.re_ofReal_mul,Complex.sub_re,hlog]; dsimp only [w]; ring
+    rw [hE,abs_mul,abs_of_pos (hk v),mul_div_assoc]
+    exact mul_le_mul_of_nonneg_left h (hk v).le
+  refine ⟨∑ v, k v*M v, Finset.sum_nonneg (fun v _ ↦ ?_), ?_⟩
+  · have := hu v
+    have := hk v
+    dsimp only [M]
+    positivity
+  filter_upwards [eventually_all.mpr hv] with t ht
+  have he : (logDeriv (heckeGammaFactor χ) (s t)).re -
+      ((Module.finrank ℚ F:ℝ)/2)*L t - (∑ v, k v * (b v).im)/t = ∑ v, err v t := by
+    rw [introTrace_heckeGamma_logDeriv_eq_sum χ (s t) (hs t),Complex.re_sum]
+    simp only [err,Finset.sum_sub_distrib,← Finset.sum_mul,← Finset.sum_div,hdeg]
+  change |(logDeriv (heckeGammaFactor χ) (s t)).re - _*L t - _/t| ≤ _
+  rw [he,Finset.sum_div]
+  exact (Finset.abs_sum_le_sum_abs _ _).trans (Finset.sum_le_sum (fun v _ ↦ ht v))
 
 end ArchimedeanGammaEvaluation
 
