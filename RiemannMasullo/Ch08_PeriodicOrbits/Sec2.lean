@@ -286,6 +286,148 @@ theorem adeleNormOneOrbitMap_surjective : Surjective (adeleNormOneOrbitMap F) :=
   obtain ⟨g, hg⟩ := hi
   exact ⟨(g, ⟨adeleOrbitBasepoint F i, Set.mem_range_self i⟩), Subtype.ext hg⟩
 
+/-- The coordinates of a unit adele are nonzero. -/
+private theorem adeleNormOneOrbitMap_isOpenQuotientMap_ne_zero (u : 𝔸[F]ˣ) :
+    (∀ w : InfinitePlace F, u.val.1 w ≠ 0) ∧ ∀ w : HeightOneSpectrum (𝓞 F), u.val.2 w ≠ 0 := by
+  constructor
+  · intro w h
+    have hc : u.val.1 w * u.inv.1 w = 1 := congrArg (fun a : 𝔸[F] ↦ a.1 w) u.val_inv
+    rw [h, zero_mul] at hc
+    exact zero_ne_one hc
+  · intro w h
+    have hc : u.val.2 w * u.inv.2 w = 1 := congrArg (fun a : 𝔸[F] ↦ a.2 w) u.val_inv
+    rw [h, zero_mul] at hc
+    exact zero_ne_one hc
+
+/-- The coordinates of a base point are zero at its own place and one elsewhere. -/
+private theorem adeleNormOneOrbitMap_isOpenQuotientMap_coord
+    (k : Option (InfinitePlace F ⊕ HeightOneSpectrum (𝓞 F))) :
+    (∀ w : InfinitePlace F, (k = some (.inl w) → (adeleOrbitBasepoint F k).1 w = 0) ∧
+      (k ≠ some (.inl w) → (adeleOrbitBasepoint F k).1 w = 1)) ∧
+    ∀ w : HeightOneSpectrum (𝓞 F), (k = some (.inr w) → (adeleOrbitBasepoint F k).2 w = 0) ∧
+      (k ≠ some (.inr w) → (adeleOrbitBasepoint F k).2 w = 1) := by
+  classical
+  rcases k with _ | v | v
+  · exact ⟨fun w ↦ ⟨fun h ↦ (by cases h), fun _ ↦ rfl⟩, fun w ↦ ⟨fun h ↦ (by cases h), fun _ ↦ rfl⟩⟩
+  · refine ⟨fun w ↦ ⟨fun h ↦ ?_, fun h ↦ ?_⟩, fun w ↦ ⟨fun h ↦ (by cases h), fun _ ↦ rfl⟩⟩
+    · cases h
+      exact Pi.mulSingle_eq_same (M := fun u : InfinitePlace F ↦ u.Completion) _ _
+    · have hvw : w ≠ v := fun e ↦ h (e ▸ rfl)
+      exact Pi.mulSingle_eq_of_ne (M := fun u : InfinitePlace F ↦ u.Completion) hvw _
+  · refine ⟨fun w ↦ ⟨fun h ↦ (by cases h), fun _ ↦ rfl⟩, fun w ↦ ⟨fun h ↦ ?_, fun h ↦ ?_⟩⟩
+    · cases h
+      exact (FiniteAdeleRing.ofAdicCompletion_apply_coe F v 0 v).trans (Pi.mulSingle_eq_same _ _)
+    · have hvw : w ≠ v := fun e ↦ h (e ▸ rfl)
+      exact (FiniteAdeleRing.ofAdicCompletion_apply_coe F v 0 w).trans
+        (Pi.mulSingle_eq_of_ne hvw _)
+
+/-- Two base points in the same idele orbit are equal. -/
+private theorem adeleNormOneOrbitMap_isOpenQuotientMap_eq (u : 𝔸[F]ˣ)
+    (i j : Option (InfinitePlace F ⊕ HeightOneSpectrum (𝓞 F)))
+    (h : u • adeleOrbitBasepoint F i = adeleOrbitBasepoint F j) : i = j := by
+  obtain ⟨hu1, hu2⟩ := adeleNormOneOrbitMap_isOpenQuotientMap_ne_zero F u
+  have hco := adeleNormOneOrbitMap_isOpenQuotientMap_coord F
+  have k1 : ∀ w, (adeleOrbitBasepoint F j).1 w = u.val.1 w * (adeleOrbitBasepoint F i).1 w :=
+    fun w ↦ by rw [← h]; rfl
+  have k2 : ∀ w, (adeleOrbitBasepoint F j).2 w = u.val.2 w * (adeleOrbitBasepoint F i).2 w :=
+    fun w ↦ by rw [← h]; rfl
+  rcases j with _ | w | w
+  · rcases i with _ | v | v
+    · rfl
+    · exfalso
+      have hc := k1 v
+      rw [((hco none).1 v).2 (by simp), ((hco _).1 v).1 rfl, mul_zero] at hc
+      exact one_ne_zero hc
+    · exfalso
+      have hc := k2 v
+      rw [((hco none).2 v).2 (by simp), ((hco _).2 v).1 rfl, mul_zero] at hc
+      exact one_ne_zero hc
+  · have hc := k1 w
+    rw [((hco _).1 w).1 rfl] at hc
+    by_contra hne
+    rw [((hco i).1 w).2 hne, mul_one] at hc
+    exact hu1 w hc.symm
+  · have hc := k2 w
+    rw [((hco _).2 w).1 rfl] at hc
+    by_contra hne
+    rw [((hco i).2 w).2 hne, mul_one] at hc
+    exact hu2 w hc.symm
+
+/-- The saturation of an open set under the norm-one orbit relation is open. -/
+private theorem adeleNormOneOrbitMap_isOpenQuotientMap_sat (U : Set (N₁ × adeleOrbitBasepoints F))
+    (hU : IsOpen U) :
+    IsOpen {p : N₁ × adeleOrbitBasepoints F | ∃ q ∈ U, q.1 • q.2.val = p.1 • p.2.val} := by
+  classical
+  rw [isOpen_iff_mem_nhds]
+  rintro p ⟨q, hqU, hqp⟩
+  obtain ⟨i, hi⟩ := p.2.prop
+  obtain ⟨j, hj⟩ := q.2.prop
+  have hk : (p.1.val⁻¹ * q.1.val) • q.2.val = p.2.val := by
+    rw [mul_smul]
+    change p.1.val⁻¹ • (q.1 • q.2.val) = _
+    rw [hqp]
+    exact inv_smul_smul p.1.val _
+  have hji : j = i := adeleNormOneOrbitMap_isOpenQuotientMap_eq F _ j i (by rw [hj, hi]; exact hk)
+  have hq2 : q.2 = p.2 := Subtype.ext (by rw [← hj, ← hi, hji])
+  have hfix := hk
+  rw [hq2] at hfix
+  rcases i with _ | pl
+  · have h1 : ((p.1.val⁻¹ * q.1.val : 𝔸[F]ˣ) : 𝔸[F]) * 1 = 1 := by
+      rw [← hi] at hfix
+      exact hfix
+    rw [mul_one] at h1
+    have hpq : q = p := Prod.ext (Subtype.ext (inv_mul_eq_one.mp (Units.ext h1)).symm) hq2
+    exact Filter.mem_of_superset (hU.mem_nhds (hpq ▸ hqU)) fun u hu ↦ ⟨u, hu, rfl⟩
+  · obtain ⟨O, hOo, hpO, hOu⟩ : ∃ O : Set 𝔸[F], IsOpen O ∧ p.2.val ∈ O ∧
+        ∀ y : adeleOrbitBasepoints F, y.val ∈ O → y = p.2 := by
+      rcases pl with w | w
+      · refine ⟨{y | y.1 w ≠ 1},
+          isOpen_ne_fun ((continuous_apply w).comp continuous_fst) continuous_const, ?_, ?_⟩
+        · show (p.2.val).1 w ≠ 1
+          rw [← hi, ((adeleNormOneOrbitMap_isOpenQuotientMap_coord F _).1 w).1 rfl]
+          exact zero_ne_one
+        · intro y hy
+          obtain ⟨k, hk⟩ := y.prop
+          have hy' : (adeleOrbitBasepoint F k).1 w ≠ 1 := by
+            rw [hk]
+            exact hy
+          have hkw : k = some (.inl w) := by
+            by_contra hne
+            exact hy' (((adeleNormOneOrbitMap_isOpenQuotientMap_coord F k).1 w).2 hne)
+          exact Subtype.ext (by rw [← hk, ← hi, hkw])
+      · refine ⟨{y | y.2 w ≠ 1}, isOpen_ne_fun
+          ((RestrictedProduct.continuous_eval w).comp continuous_snd) continuous_const, ?_, ?_⟩
+        · show (p.2.val).2 w ≠ 1
+          rw [← hi, ((adeleNormOneOrbitMap_isOpenQuotientMap_coord F _).2 w).1 rfl]
+          exact zero_ne_one
+        · intro y hy
+          obtain ⟨k, hk⟩ := y.prop
+          have hy' : (adeleOrbitBasepoint F k).2 w ≠ 1 := by
+            rw [hk]
+            exact hy
+          have hkw : k = some (.inr w) := by
+            by_contra hne
+            exact hy' (((adeleNormOneOrbitMap_isOpenQuotientMap_coord F k).2 w).2 hne)
+          exact Subtype.ext (by rw [← hk, ← hi, hkw])
+    let k : N₁ := p.1⁻¹ * q.1
+    have hcont : Continuous fun x : N₁ × adeleOrbitBasepoints F ↦ (x.1 * k, x.2) := by
+      refine Continuous.prodMk ?_ continuous_snd
+      refine Topology.IsInducing.subtypeVal.continuous_iff.mpr ?_
+      show Continuous fun x : N₁ × adeleOrbitBasepoints F ↦ x.1.val * k.val
+      exact (continuous_subtype_val.comp continuous_fst).mul continuous_const
+    have hV : IsOpen ((fun x : N₁ × adeleOrbitBasepoints F ↦ (x.1 * k, x.2)) ⁻¹' U ∩
+        {x | x.2.val ∈ O}) :=
+      (hU.preimage hcont).inter (hOo.preimage (continuous_subtype_val.comp continuous_snd))
+    refine Filter.mem_of_superset (hV.mem_nhds ⟨?_, hpO⟩) ?_
+    · show (p.1 * k, p.2) ∈ U
+      rw [show p.1 * k = q.1 from mul_inv_cancel_left p.1 q.1, ← hq2]
+      exact hqU
+    · rintro x ⟨hxU, hxO⟩
+      have hx2 : x.2 = p.2 := hOu x.2 hxO
+      refine ⟨(x.1 * k, x.2), hxU, ?_⟩
+      change (x.1.val * k.val) • x.2.val = x.1.val • x.2.val
+      rw [mul_smul, hx2, show (k : 𝔸[F]ˣ) • p.2.val = p.2.val from hfix]
+
 /-- Paper: Lemma 8.2.0.3(2), p. 385. The global orbit map is an open quotient map
 for its coinduced topology.
 Deviation: The target carries the quotient topology of the global orbit map.
@@ -294,7 +436,17 @@ theorem adeleNormOneOrbitMap_isOpenQuotientMap :
     @IsOpenQuotientMap _ _ inferInstance
       (TopologicalSpace.coinduced (adeleNormOneOrbitMap F) inferInstance)
       (adeleNormOneOrbitMap F) := by
-  sorry
+  refine @IsOpenQuotientMap.mk _ _ _
+    (TopologicalSpace.coinduced (adeleNormOneOrbitMap F) inferInstance) (adeleNormOneOrbitMap F)
+    (adeleNormOneOrbitMap_surjective F) continuous_coinduced_rng fun U hU ↦ ?_
+  rw [isOpen_coinduced]
+  convert adeleNormOneOrbitMap_isOpenQuotientMap_sat F U hU using 1
+  ext p
+  constructor
+  · rintro ⟨q, hq, hqp⟩
+    exact ⟨q, hq, congrArg Subtype.val hqp⟩
+  · rintro ⟨q, hq, hqp⟩
+    exact ⟨q, hq, Subtype.ext hqp⟩
 
 /-- The S-adele ring is Hausdorff: it is a product of Hausdorff completions of `F`.
 The instance has to be routed through the definition, exactly as in
@@ -321,42 +473,158 @@ theorem adeleNormOneOrbitUnion_t2Space : T2Space (adeleNormOneOrbitUnion F) := b
   have := t2Space_adeleRing F
   infer_instance
 
+/-- The S-adele ring is metrizable: a finite product of metrizable completions of `F`,
+routed through the definition as for `t2Space_sAdeleRing`. -/
+private theorem metrizableSpace_sAdeleRing : MetrizableSpace (SAdeleRing F S) := by
+  change MetrizableSpace (((w : InfinitePlace F) → w.Completion) × ((v : S) → (v.val.adicCompletion F)))
+  infer_instance
+
 /-- Paper: Lemma 8.2.0.3, p. 385. The S-local norm-one orbit union is metrizable. -/
 theorem sAdeleNormOneOrbitUnion_metrizableSpace :
     MetrizableSpace (sAdeleNormOneOrbitUnion F S) := by
-  sorry
+  have := metrizableSpace_sAdeleRing F S
+  infer_instance
+
+/-- The nonzero prime ideals of the ring of integers form a countable type: the ring is
+countable, its ideals are finitely generated, and a height-one spectrum element is
+determined by its underlying ideal. -/
+private theorem countable_heightOneSpectrum : Countable (HeightOneSpectrum (𝓞 F)) := by
+  haveI : Countable F := (Module.finBasis ℚ F).equivFun.injective.countable
+  haveI : Countable (𝓞 F) := RingOfIntegers.coe_injective.countable
+  haveI : Countable (Ideal (𝓞 F)) := by
+    refine Function.Surjective.countable
+      (f := fun s : Finset (𝓞 F) => Ideal.span (s : Set (𝓞 F))) ?_
+    intro I
+    exact (IsNoetherian.noetherian I : I.FG)
+  exact HeightOneSpectrum.asIdeal_injective.countable
+
+/-- A restricted product over a countable index type, with open distinguished subsets,
+is second countable: the pieces where the coordinates lie in the distinguished subsets
+outside a fixed finite set form a countable open cover by second countable subspaces. -/
+private theorem secondCountableTopology_restrictedProduct_cofinite
+    {ι : Type*} [Countable ι] (R : ι → Type*) [∀ i, TopologicalSpace (R i)]
+    [∀ i, SecondCountableTopology (R i)] (A : ∀ i, Set (R i))
+    (hA : ∀ i, IsOpen (A i)) :
+    SecondCountableTopology (RestrictedProduct R A Filter.cofinite) := by
+  have hS (T : Finset ι) : Filter.cofinite ≤ Filter.principal ((T : Set ι)ᶜ) :=
+    Filter.le_principal_iff.2 (T.finite_toSet.compl_mem_cofinite)
+  haveI (T : Finset ι) : SecondCountableTopology
+      (RestrictedProduct R A (Filter.principal ((T : Set ι)ᶜ))) :=
+    RestrictedProduct.isEmbedding_coe_of_principal.secondCountableTopology
+  have he (T : Finset ι) : IsOpenEmbedding (RestrictedProduct.inclusion R A (hS T)) :=
+    RestrictedProduct.isOpenEmbedding_inclusion_principal hA (hS T)
+  haveI (T : Finset ι) : SecondCountableTopology
+      (Set.range (RestrictedProduct.inclusion R A (hS T))) :=
+    (he T).isEmbedding.toHomeomorph.symm.secondCountableTopology
+  refine secondCountableTopology_of_countable_cover (fun T => (he T).isOpen_range) ?_
+  refine Set.eq_univ_of_forall fun x => Set.mem_iUnion.2 ?_
+  have hx : {i | ¬ x i ∈ A i}.Finite := Filter.eventually_cofinite.1 x.2
+  refine ⟨hx.toFinset, ?_⟩
+  refine RestrictedProduct.exists_inclusion_eq_of_eventually R A (hS _) ?_
+  intro i hi
+  by_contra h
+  exact hi (by simpa [Set.Finite.mem_toFinset] using h)
+
+/-- The finite adele ring is second countable: the local completions are proper metric
+spaces, hence second countable, and the restricted product is taken over a countable
+index with open integer subrings. -/
+private theorem secondCountableTopology_finiteAdeleRing :
+    SecondCountableTopology (FiniteAdeleRing (𝓞 F) F) := by
+  haveI : Countable (HeightOneSpectrum (𝓞 F)) := countable_heightOneSpectrum F
+  haveI (v : HeightOneSpectrum (𝓞 F)) : ProperSpace (v.adicCompletion F) :=
+    properSpace_adicCompletion v
+  change SecondCountableTopology (RestrictedProduct
+    (fun v : HeightOneSpectrum (𝓞 F) => v.adicCompletion F)
+    (fun v : HeightOneSpectrum (𝓞 F) => (v.adicCompletionIntegers F : Set (v.adicCompletion F)))
+    Filter.cofinite)
+  exact secondCountableTopology_restrictedProduct_cofinite
+    (fun v : HeightOneSpectrum (𝓞 F) => v.adicCompletion F)
+    (fun v : HeightOneSpectrum (𝓞 F) => (v.adicCompletionIntegers F : Set (v.adicCompletion F)))
+    (fun _ ↦ Valued.isOpen_valuationSubring _)
+
+/-- The adele ring is metrizable. The infinite part is a finite product of metrizable
+completions. The finite part is second countable and weakly locally compact (the integer
+subrings are compact open), hence regular; with T0 this gives T3, and Urysohn's
+metrization theorem applies. -/
+private theorem metrizableSpace_adeleRing : MetrizableSpace 𝔸[F] := by
+  haveI (v : HeightOneSpectrum (𝓞 F)) : ProperSpace (v.adicCompletion F) :=
+    properSpace_adicCompletion v
+  haveI (v : HeightOneSpectrum (𝓞 F)) : CompactSpace (v.adicCompletionIntegers F) :=
+    compactSpace_adicCompletionIntegers v
+  haveI : Fact (∀ v : HeightOneSpectrum (𝓞 F),
+      IsOpen (v.adicCompletionIntegers F : Set (v.adicCompletion F))) :=
+    ⟨fun _ ↦ Valued.isOpen_valuationSubring _⟩
+  haveI : SecondCountableTopology (RestrictedProduct
+    (fun v : HeightOneSpectrum (𝓞 F) => v.adicCompletion F)
+    (fun v : HeightOneSpectrum (𝓞 F) => v.adicCompletionIntegers F) Filter.cofinite) :=
+    secondCountableTopology_finiteAdeleRing F
+  exact inferInstanceAs (MetrizableSpace (((w : InfinitePlace F) → w.Completion) ×
+    RestrictedProduct (fun v : HeightOneSpectrum (𝓞 F) => v.adicCompletion F)
+      (fun v : HeightOneSpectrum (𝓞 F) => v.adicCompletionIntegers F) Filter.cofinite))
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The global norm-one orbit union is metrizable. -/
 theorem adeleNormOneOrbitUnion_metrizableSpace : MetrizableSpace (adeleNormOneOrbitUnion F) := by
-  sorry
+  have := metrizableSpace_adeleRing F
+  infer_instance
+
+/-- The S-adele ring is second countable: the archimedean completions embed isometrically
+into `ℂ`, and the finite completions in `S` are proper metric spaces. -/
+private theorem secondCountableTopology_sAdeleRing :
+    SecondCountableTopology (SAdeleRing F S) := by
+  change SecondCountableTopology (((w : InfinitePlace F) → w.Completion) × ((v : S) → (v.val.adicCompletion F)))
+  haveI (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  haveI (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  infer_instance
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The S-local norm-one orbit union is second-countable. -/
 theorem sAdeleNormOneOrbitUnion_secondCountable :
     SecondCountableTopology (sAdeleNormOneOrbitUnion F S) := by
-  sorry
+  have := secondCountableTopology_sAdeleRing F S
+  infer_instance
+
+/-- The adele ring is second countable: the archimedean factor is a finite product of
+completions that embed isometrically into `ℂ`, and the finite adele ring is second
+countable by `secondCountableTopology_finiteAdeleRing`. -/
+private theorem secondCountableTopology_adeleRing :
+    SecondCountableTopology 𝔸[F] := by
+  haveI (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  haveI : SecondCountableTopology (RestrictedProduct
+    (fun v : HeightOneSpectrum (𝓞 F) => v.adicCompletion F)
+    (fun v : HeightOneSpectrum (𝓞 F) => v.adicCompletionIntegers F) Filter.cofinite) :=
+    secondCountableTopology_finiteAdeleRing F
+  exact inferInstanceAs (SecondCountableTopology (((w : InfinitePlace F) → w.Completion) ×
+    RestrictedProduct (fun v : HeightOneSpectrum (𝓞 F) => v.adicCompletion F)
+      (fun v : HeightOneSpectrum (𝓞 F) => v.adicCompletionIntegers F) Filter.cofinite))
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The global norm-one orbit union is second-countable. -/
 theorem adeleNormOneOrbitUnion_secondCountable :
     SecondCountableTopology (adeleNormOneOrbitUnion F) := by
-  sorry
+  have := secondCountableTopology_adeleRing F
+  infer_instance
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The S-local norm-one orbit union is perfectly normal. -/
 theorem sAdeleNormOneOrbitUnion_perfectlyNormal :
     PerfectlyNormalSpace (sAdeleNormOneOrbitUnion F S) := by
-  sorry
+  have := sAdeleNormOneOrbitUnion_metrizableSpace F S
+  infer_instance
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The global norm-one orbit union is perfectly normal. -/
 theorem adeleNormOneOrbitUnion_perfectlyNormal :
     PerfectlyNormalSpace (adeleNormOneOrbitUnion F) := by
-  sorry
+  have := adeleNormOneOrbitUnion_metrizableSpace F
+  infer_instance
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The S-local norm-one orbit union is separable. -/
 theorem sAdeleNormOneOrbitUnion_separableSpace : SeparableSpace (sAdeleNormOneOrbitUnion F S) := by
-  sorry
+  have := sAdeleNormOneOrbitUnion_secondCountable F S
+  infer_instance
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The global norm-one orbit union is separable. -/
 theorem adeleNormOneOrbitUnion_separableSpace : SeparableSpace (adeleNormOneOrbitUnion F) := by
-  sorry
+  have := adeleNormOneOrbitUnion_secondCountable F
+  infer_instance
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The S-local norm-one orbit union is locally compact. -/
 theorem sAdeleNormOneOrbitUnion_locallyCompactSpace :
@@ -1157,13 +1425,219 @@ theorem sAdeleFullOrbitUnion_closure_sectionRay (v : InfinitePlace F) :
       adeleProjection F S (singlePlaceIdeleNormSection F v t).val
     closure ray ∩ sAdeleFullOrbitUnion F S =
       ray ∪ {sAdeleOrbitBasepoint F S (some (.inl v))} := by
-  sorry
+  classical
+  intro ray
+  let ψ := InfinitePlace.Completion.extensionEmbedding v
+  have hψ : Isometry ψ := InfinitePlace.Completion.isometry_extensionEmbedding v
+  let φ : v.Completion → SAdeleRing F S := fun x ↦
+    adeleProjection F S (AdeleRing.ofCompletion (𝓞 F) F v x)
+  have hp : Continuous (adeleProjection F S) :=
+    continuous_fst.prodMk (continuous_pi fun u : S ↦
+      (RestrictedProduct.continuous_eval u.val).comp continuous_snd)
+  have hφ0 : Continuous fun x : v.Completion ↦ AdeleRing.ofCompletion (𝓞 F) F v x :=
+    (continuous_mulSingle (A := InfinitePlace.Completion) v).prodMk continuous_const
+  have hφ : Continuous φ := hp.comp hφ0
+  let e : ℝ := (v.mult : ℝ)⁻¹
+  have he0 : 0 < e := inv_pos.mpr (by exact_mod_cast InfinitePlace.mult_pos)
+  let r : ℝ≥0ˣ → v.Completion := fun t ↦ (infinitePlaceRealPower F v e t).val
+  have hray : ∀ t, adeleProjection F S (singlePlaceIdeleNormSection F v t).val = φ (r t) :=
+    fun t ↦ rfl
+  have hψr : ∀ t, ψ (r t) = (((t.val : ℝ) ^ e : ℝ) : ℂ) := fun t ↦
+    infinitePlaceRealPower_apply F v e t
+  let K : Set ℂ := {z | z.im = 0 ∧ 0 ≤ z.re}
+  have hK : IsClosed K :=
+    (isClosed_eq Complex.continuous_im continuous_const).inter
+      (isClosed_le continuous_const Complex.continuous_re)
+  let C : Set (SAdeleRing F S) :=
+    {y | y.2 = 1} ∩ (⋂ w ∈ ({v}ᶜ : Set (InfinitePlace F)), {y | y.1 w = 1}) ∩
+      {y | ψ (y.1 v) ∈ K}
+  have hC0 : IsClosed {y : SAdeleRing F S | y.2 = 1} := isClosed_eq continuous_snd continuous_const
+  have hC1 : IsClosed (⋂ w ∈ ({v}ᶜ : Set (InfinitePlace F)), {y : SAdeleRing F S | y.1 w = 1}) :=
+    isClosed_biInter fun w _ ↦
+      isClosed_eq ((continuous_apply w).comp continuous_fst) continuous_const
+  have hC2 : IsClosed {y : SAdeleRing F S | ψ (y.1 v) ∈ K} :=
+    hK.preimage (hψ.continuous.comp ((continuous_apply v).comp continuous_fst))
+  have hC : IsClosed C := (hC0.inter hC1).inter hC2
+  have hrayC : ray ⊆ C := by
+    rintro _ ⟨t, rfl⟩
+    change adeleProjection F S (singlePlaceIdeleNormSection F v t).val ∈ C
+    rw [hray]
+    refine ⟨⟨rfl, Set.mem_iInter₂.mpr fun w hw ↦ ?_⟩, ?_⟩
+    · exact Pi.mulSingle_eq_of_ne hw _
+    · change ψ (Pi.mulSingle v (r t) v) ∈ K
+      rw [Pi.mulSingle_eq_same, hψr]
+      exact ⟨Complex.ofReal_im _, by rw [Complex.ofReal_re]; positivity⟩
+  have hbase : sAdeleOrbitBasepoint F S (some (.inl v)) ∈ closure ray := by
+    let tn : ℕ → ℝ≥0ˣ := fun n ↦ Units.mk0 ((n : ℝ≥0) + 1)⁻¹ (by positivity)
+    have hn : ∀ n : ℕ, ‖r (tn n)‖ = ((n : ℝ) + 1)⁻¹ ^ e := by
+      intro n
+      rw [← hψ.norm_map_of_map_zero (map_zero ψ), hψr, Complex.norm_real,
+        Real.norm_of_nonneg (by positivity)]
+      simp [tn]
+    have hlim : Filter.Tendsto (fun n ↦ r (tn n)) Filter.atTop (𝓝 0) := by
+      rw [tendsto_zero_iff_norm_tendsto_zero]
+      simp_rw [hn]
+      have h1 : Filter.Tendsto (fun n : ℕ ↦ ((n : ℝ) + 1)⁻¹) Filter.atTop (𝓝 0) :=
+        tendsto_one_div_add_atTop_nhds_zero_nat.congr fun n ↦ one_div _
+      have h0 : (0 : ℝ) ^ e = 0 := Real.zero_rpow he0.ne'
+      rw [← h0]
+      exact (Real.continuousAt_rpow_const 0 e (Or.inr he0.le)).tendsto.comp h1
+    have hlim' : Filter.Tendsto
+        (fun n ↦ adeleProjection F S (singlePlaceIdeleNormSection F v (tn n)).val)
+        Filter.atTop (𝓝 (sAdeleOrbitBasepoint F S (some (.inl v)))) := by
+      simp_rw [hray]
+      exact (hφ.tendsto 0).comp hlim
+    exact mem_closure_of_tendsto hlim' (Filter.Eventually.of_forall fun n ↦ ⟨tn n, rfl⟩)
+  ext y
+  constructor
+  · rintro ⟨hy, -⟩
+    obtain ⟨⟨h2, h1⟩, him, hre⟩ := closure_minimal hrayC hC hy
+    have hyφ : y = φ (y.1 v) := by
+      refine Prod.ext (funext fun w ↦ ?_) h2
+      change y.1 w = Pi.mulSingle v (y.1 v) w
+      obtain rfl | hw := eq_or_ne w v
+      · rw [Pi.mulSingle_eq_same]
+      · rw [Pi.mulSingle_eq_of_ne hw]
+        exact Set.mem_iInter₂.mp h1 w hw
+    have hψy : ψ (y.1 v) = (((ψ (y.1 v)).re : ℝ) : ℂ) := Complex.ext rfl (by simpa using him)
+    rcases hre.eq_or_lt with h0 | hpos
+    · right
+      have hy0 : y.1 v = 0 := by
+        apply hψ.injective
+        rw [hψy, ← h0, Complex.ofReal_zero, map_zero]
+      rw [Set.mem_singleton_iff, hyφ, hy0]
+      rfl
+    · left
+      set s := (ψ (y.1 v)).re with hs
+      let t : ℝ≥0ˣ := Units.mk0 (Real.toNNReal (s ^ (v.mult : ℝ))) (by
+        rw [ne_eq, Real.toNNReal_eq_zero, not_le]
+        positivity)
+      have ht : r t = y.1 v := by
+        apply hψ.injective
+        rw [hψr, hψy]
+        congr 1
+        change ((Real.toNNReal (s ^ (v.mult : ℝ)) : ℝ)) ^ e = s
+        rw [Real.coe_toNNReal _ (by positivity), Real.rpow_rpow_inv hpos.le
+          (by exact_mod_cast InfinitePlace.mult_pos.ne')]
+      exact ⟨t, by
+        change adeleProjection F S (singlePlaceIdeleNormSection F v t).val = y
+        rw [hray, ht, ← hyφ]⟩
+  · rintro (⟨t, rfl⟩ | hy)
+    · refine ⟨subset_closure ⟨t, rfl⟩, Set.mem_iUnion.mpr ⟨none,
+        Units.map (adeleProjection F S).toMonoidHom (singlePlaceIdeleNormSection F v t), ?_⟩⟩
+      change _ • adeleProjection F S (1 : 𝔸[F]) = _
+      rw [map_one, Units.smul_def, smul_eq_mul, mul_one]
+      rfl
+    · rw [Set.mem_singleton_iff] at hy
+      subst hy
+      exact ⟨hbase, Set.mem_iUnion.mpr ⟨some (.inl v), MulAction.mem_orbit_self _⟩⟩
 
 /-- Paper: Proposition 8.2.0.6(2), p. 387. The closure of the positive section ray
 relative to the global full-orbit union adds the single-zero base point. -/
 theorem adeleFullOrbitUnion_closure_sectionRay (v : InfinitePlace F) :
     let ray : Set 𝔸[F] := Set.range fun t : ℝ≥0ˣ ↦ (singlePlaceIdeleNormSection F v t).val
     closure ray ∩ adeleFullOrbitUnion F = ray ∪ {adeleOrbitBasepoint F (some (.inl v))} := by
-  sorry
+  classical
+  intro ray
+  let ψ := InfinitePlace.Completion.extensionEmbedding v
+  have hψ : Isometry ψ := InfinitePlace.Completion.isometry_extensionEmbedding v
+  let φ : v.Completion → 𝔸[F] := fun x ↦ AdeleRing.ofCompletion (𝓞 F) F v x
+  have hφ : Continuous φ :=
+    (continuous_mulSingle (A := InfinitePlace.Completion) v).prodMk continuous_const
+  let e : ℝ := (v.mult : ℝ)⁻¹
+  have he0 : 0 < e := inv_pos.mpr (by exact_mod_cast InfinitePlace.mult_pos)
+  let r : ℝ≥0ˣ → v.Completion := fun t ↦ (infinitePlaceRealPower F v e t).val
+  have hray : ∀ t, (singlePlaceIdeleNormSection F v t).val = φ (r t) := fun t ↦ rfl
+  have hψr : ∀ t, ψ (r t) = (((t.val : ℝ) ^ e : ℝ) : ℂ) := fun t ↦
+    infinitePlaceRealPower_apply F v e t
+  let K : Set ℂ := {z | z.im = 0 ∧ 0 ≤ z.re}
+  have hK : IsClosed K :=
+    (isClosed_eq Complex.continuous_im continuous_const).inter
+      (isClosed_le continuous_const Complex.continuous_re)
+  let C : Set 𝔸[F] :=
+    (⋂ w : HeightOneSpectrum (𝓞 F), {y | y.2 w = 1}) ∩
+      (⋂ w ∈ ({v}ᶜ : Set (InfinitePlace F)), {y | y.1 w = 1}) ∩ {y | ψ (y.1 v) ∈ K}
+  have hC0 : IsClosed (⋂ w : HeightOneSpectrum (𝓞 F), {y : 𝔸[F] | y.2 w = 1}) :=
+    isClosed_iInter fun w ↦
+      isClosed_eq ((RestrictedProduct.continuous_eval w).comp continuous_snd) continuous_const
+  have hC1 : IsClosed (⋂ w ∈ ({v}ᶜ : Set (InfinitePlace F)), {y : 𝔸[F] | y.1 w = 1}) :=
+    isClosed_biInter fun w _ ↦
+      isClosed_eq ((continuous_apply w).comp continuous_fst) continuous_const
+  have hC2 : IsClosed {y : 𝔸[F] | ψ (y.1 v) ∈ K} :=
+    hK.preimage (hψ.continuous.comp ((continuous_apply v).comp continuous_fst))
+  have hC : IsClosed C := (hC0.inter hC1).inter hC2
+  have hrayC : ray ⊆ C := by
+    rintro _ ⟨t, rfl⟩
+    change (singlePlaceIdeleNormSection F v t).val ∈ C
+    rw [hray]
+    refine ⟨⟨Set.mem_iInter.mpr fun w ↦ ?_, Set.mem_iInter₂.mpr fun w hw ↦ ?_⟩, ?_⟩
+    · rfl
+    · exact Pi.mulSingle_eq_of_ne hw _
+    · change ψ (Pi.mulSingle v (r t) v) ∈ K
+      rw [Pi.mulSingle_eq_same, hψr]
+      exact ⟨Complex.ofReal_im _, by rw [Complex.ofReal_re]; positivity⟩
+  have hbase : adeleOrbitBasepoint F (some (.inl v)) ∈ closure ray := by
+    let tn : ℕ → ℝ≥0ˣ := fun n ↦ Units.mk0 ((n : ℝ≥0) + 1)⁻¹ (by positivity)
+    have hn : ∀ n : ℕ, ‖r (tn n)‖ = ((n : ℝ) + 1)⁻¹ ^ e := by
+      intro n
+      rw [← hψ.norm_map_of_map_zero (map_zero ψ), hψr, Complex.norm_real,
+        Real.norm_of_nonneg (by positivity)]
+      simp [tn]
+    have hlim : Filter.Tendsto (fun n ↦ r (tn n)) Filter.atTop (𝓝 0) := by
+      rw [tendsto_zero_iff_norm_tendsto_zero]
+      simp_rw [hn]
+      have h1 : Filter.Tendsto (fun n : ℕ ↦ ((n : ℝ) + 1)⁻¹) Filter.atTop (𝓝 0) :=
+        tendsto_one_div_add_atTop_nhds_zero_nat.congr fun n ↦ one_div _
+      have h0 : (0 : ℝ) ^ e = 0 := Real.zero_rpow he0.ne'
+      rw [← h0]
+      exact (Real.continuousAt_rpow_const 0 e (Or.inr he0.le)).tendsto.comp h1
+    have hlim' : Filter.Tendsto (fun n ↦ (singlePlaceIdeleNormSection F v (tn n)).val) Filter.atTop
+        (𝓝 (adeleOrbitBasepoint F (some (.inl v)))) := by
+      simp_rw [hray]
+      exact (hφ.tendsto 0).comp hlim
+    exact mem_closure_of_tendsto hlim' (Filter.Eventually.of_forall fun n ↦ ⟨tn n, rfl⟩)
+  ext y
+  constructor
+  · rintro ⟨hy, -⟩
+    obtain ⟨⟨h2', h1⟩, him, hre⟩ := closure_minimal hrayC hC hy
+    have h2 : y.2 = 1 := FiniteAdeleRing.ext F fun w ↦ Set.mem_iInter.mp h2' w
+    have hyφ : y = φ (y.1 v) := by
+      refine Prod.ext (funext fun w ↦ ?_) h2
+      change y.1 w = Pi.mulSingle v (y.1 v) w
+      obtain rfl | hw := eq_or_ne w v
+      · rw [Pi.mulSingle_eq_same]
+      · rw [Pi.mulSingle_eq_of_ne hw]
+        exact Set.mem_iInter₂.mp h1 w hw
+    have hψy : ψ (y.1 v) = (((ψ (y.1 v)).re : ℝ) : ℂ) := Complex.ext rfl (by simpa using him)
+    rcases hre.eq_or_lt with h0 | hpos
+    · right
+      have hy0 : y.1 v = 0 := by
+        apply hψ.injective
+        rw [hψy, ← h0, Complex.ofReal_zero, map_zero]
+      rw [Set.mem_singleton_iff, hyφ, hy0]
+      rfl
+    · left
+      set s := (ψ (y.1 v)).re with hs
+      let t : ℝ≥0ˣ := Units.mk0 (Real.toNNReal (s ^ (v.mult : ℝ))) (by
+        rw [ne_eq, Real.toNNReal_eq_zero, not_le]
+        positivity)
+      have ht : r t = y.1 v := by
+        apply hψ.injective
+        rw [hψr, hψy]
+        congr 1
+        change ((Real.toNNReal (s ^ (v.mult : ℝ)) : ℝ)) ^ e = s
+        rw [Real.coe_toNNReal _ (by positivity), Real.rpow_rpow_inv hpos.le
+          (by exact_mod_cast InfinitePlace.mult_pos.ne')]
+      exact ⟨t, by
+        change (singlePlaceIdeleNormSection F v t).val = y
+        rw [hray, ht, ← hyφ]⟩
+  · rintro (⟨t, rfl⟩ | hy)
+    · refine ⟨subset_closure ⟨t, rfl⟩,
+        Set.mem_iUnion.mpr ⟨none, singlePlaceIdeleNormSection F v t, ?_⟩⟩
+      change singlePlaceIdeleNormSection F v t • (1 : 𝔸[F]) = _
+      rw [Units.smul_def, smul_eq_mul, mul_one]
+    · rw [Set.mem_singleton_iff] at hy
+      subst hy
+      exact ⟨hbase, Set.mem_iUnion.mpr ⟨some (.inl v), MulAction.mem_orbit_self _⟩⟩
 
 end RiemannMasullo
