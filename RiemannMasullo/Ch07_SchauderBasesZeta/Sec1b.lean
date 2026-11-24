@@ -747,6 +747,96 @@ theorem sLocalRhoPoleOrder_le_archimedean_of_re_neg {s : ℂ} (hs : s.re < 0) :
 -- omits real sign factors. The odd Dirichlet character modulo 4 gives a pole at -1
 -- over ℚ, where r₂ = 0.
 
+/-- Paper: Theorem 7.1.3.2(2), p. 324, finite-place computation.
+The restricted finite Tate factor of a unitary twist is holomorphic in the open left
+half-plane, so no place of `S` contributes to the pole count there. -/
+private theorem sLocalRhoPoleOrder_finite_filter_eq_zero (ψ : PontryaginDual Jₛ) {s : ℂ}
+    (hs : s.re < 0) :
+    (Finset.univ.filter (fun v : S ↦ meromorphicOrderAt (fun z ↦ finiteLocalTateFactor v.val
+      (sLocalFiniteRestriction v (twistₛ ((⟨Circle.coeHom, continuous_subtype_val⟩ :
+        Circle →ₜ* ℂ).comp ψ) z))) s < 0)).card = 0 := by
+  classical
+  have hunit : ∀ (v : S) (x : (v.val.adicCompletion F)ˣ),
+      ‖sLocalFiniteRestriction v (twistₛ ((⟨Circle.coeHom, continuous_subtype_val⟩ :
+        Circle →ₜ* ℂ).comp ψ) 0) x‖ = 1 := by
+    intro v x
+    change ‖(ψ _ : ℂ) * _ ^ (0 : ℂ)‖ = 1
+    simp
+  refine Finset.card_eq_zero.mpr ?_
+  rw [Finset.filter_eq_empty_iff]
+  intro v _ hv
+  obtain ⟨π, hπ, hall⟩ := sLocalRhoFactor_poles_iff_finite (S := S) ψ v
+  obtain ⟨-, hiff, -, -⟩ := hall s
+  obtain ⟨m, t, -, -, hse⟩ := sLocalRhoFactor_poles_iff_finite_explicit v.val
+    (sLocalFiniteRestriction v (twistₛ ((⟨Circle.coeHom, continuous_subtype_val⟩ :
+      Circle →ₜ* ℂ).comp ψ) 0)) (hunit v) π hπ s |>.mp (hiff.mp hv)
+  have hs0 : s.re = 0 := by
+    rw [hse, Complex.mul_re]
+    simp only [Complex.ofReal_re, Complex.ofReal_im, Complex.I_re, Complex.I_im, mul_zero,
+      mul_one, sub_zero]
+  rw [hs0] at hs
+  exact lt_irrefl (0 : ℝ) hs
+
+/-- Paper: Theorem 7.1.3.2(2), p. 324, archimedean computation.
+At a negative odd abscissa a real place contributes a pole only when its sign character
+is odd, that is, only when the restricted character takes the value `-1` at `-1`. -/
+private theorem sLocalRhoPoleOrder_real_pole_odd (ψ : PontryaginDual Jₛ) (w : InfinitePlace F)
+    {s : ℂ} (n : ℕ) (hs : s.re = -((2 * n + 1 : ℕ) : ℝ))
+    (hpole : meromorphicOrderAt (fun z ↦ infiniteLocalTateFactor w (sLocalInfiniteRestriction w
+      (twistₛ ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ψ) z))) s < 0)
+    (hw : w.IsReal) :
+    sLocalInfiniteRestriction w (twistₛ ((⟨Circle.coeHom, continuous_subtype_val⟩ :
+      Circle →ₜ* ℂ).comp ψ) 0) (-1) = -1 := by
+  classical
+  let c₀ : QuasiCharacter w.Completionˣ :=
+    sLocalInfiniteRestriction w (twistₛ ((⟨Circle.coeHom, continuous_subtype_val⟩ :
+      Circle →ₜ* ℂ).comp ψ) 0)
+  have hunit (x : w.Completionˣ) : ‖c₀ x‖ = 1 := by
+    change ‖(ψ _ : ℂ) * _ ^ (0 : ℂ)‖ = 1
+    simp
+  let p := (realLocalEulerParameters w hw c₀).exists.choose
+  obtain ⟨-, hiff, -, -⟩ := sLocalRhoFactor_poles_iff_real (S := S) ψ w hw s
+  obtain ⟨k, hk⟩ := hiff.mp hpole
+  change s = -p.1 - ((2 * k + p.2.val : ℕ) : ℂ) at hk
+  have hp1 : p.1.re = 0 := by
+    have hsp := (realLocalEulerParameters w hw c₀).exists.choose_spec
+      (Units.mk0 (2 : ℝ) (by norm_num))
+    rw [Units.val_mk0] at hsp
+    have hnorm : ‖c₀ (Units.map
+        (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm.toMonoidHom
+        (Units.mk0 (2 : ℝ) (by norm_num)))‖ = 1 := hunit _
+    rw [hsp] at hnorm
+    have hsign : ‖(if (0 : ℝ) < 2 then (1 : ℂ) else -1) ^ p.2.val‖ = 1 := by
+      norm_num
+    rw [norm_mul, hsign, mul_one] at hnorm
+    have hlog := congrArg Real.log (show (2 : ℝ) ^ p.1.re = 1 from by
+      rw [show (2 : ℝ) = ‖(2 : ℝ)‖ by simp]
+      rw [← Complex.norm_cpow_eq_rpow_re_of_pos (x := ‖(2 : ℝ)‖)
+        (by norm_num : (0 : ℝ) < ‖(2 : ℝ)‖) p.1]
+      exact hnorm)
+    rw [Real.log_rpow (by norm_num : (0 : ℝ) < 2), Real.log_one,
+      mul_eq_zero] at hlog
+    rcases hlog with h | h
+    · exact h
+    · exact absurd h (ne_of_gt (Real.log_pos (by norm_num)))
+  have hp2 : p.2.val = 1 := by
+    have hre := congrArg Complex.re hk
+    simp only [Complex.sub_re, Complex.neg_re, Complex.natCast_re] at hre
+    rw [hs, hp1] at hre
+    have hcast : ((2 * k + p.2.val : ℕ) : ℝ) = ((2 * n + 1 : ℕ) : ℝ) := by
+      push_cast at hre ⊢
+      linarith
+    have hnk : 2 * k + p.2.val = 2 * n + 1 := by exact_mod_cast hcast
+    have := p.2.isLt
+    omega
+  have he := (realLocalEulerParameters w hw c₀).exists.choose_spec (-1 : ℝˣ)
+  have hneg : Units.map (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm.toMonoidHom
+      (-1 : ℝˣ) = -1 := Units.ext (by simp)
+  change _ = _ * _ ^ p.2.val at he
+  rw [hneg, hp2] at he
+  refine he.trans ?_
+  norm_num
+
 open Classical in
 /-- Paper: Theorem 7.1.3.2(2), p. 324. At a negative odd abscissa the order
 is bounded by the number of complex places plus the number of odd real places.
@@ -755,7 +845,86 @@ theorem sLocalRhoPoleOrder_le_of_re_neg_odd (n : ℕ) {s : ℂ}
     (hs : s.re = -((2 * n + 1 : ℕ) : ℝ)) :
     sLocalRhoPoleOrder (chartₛ(χ, hχ) s) ≤
       (Finset.univ.filter (fun w : InfinitePlace F ↦ w.IsComplex ∨
-        w.IsReal ∧ sLocalInfiniteRestriction w (chartₛ(χ, hχ) 0) (-1) = -1)).card := by sorry
+        w.IsReal ∧ sLocalInfiniteRestriction w (chartₛ(χ, hχ) 0) (-1) = -1)).card := by
+  classical
+  have hsneg : s.re < 0 := by
+    rw [hs]
+    have hpos : (0 : ℝ) < ((2 * n + 1 : ℕ) : ℝ) := by
+      exact_mod_cast Nat.succ_pos (2 * n)
+    linarith
+  let c := sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩
+  have hc (x : Jₛ) : ‖c x‖ = 1 := by
+    obtain ⟨g, rfl⟩ := QuotientGroup.mk_surjective x
+    rw [show c (QuotientGroup.mk g) = ideleClassNormTwist χ 0
+      (QuotientGroup.mk (sIdeleInsertion F S g)) from sIdeleRestriction_mk F S _ g]
+    change ‖(χ _ : ℂ) * _ ^ (0 : ℂ)‖ = 1
+    simp
+  let ψ : PontryaginDual Jₛ :=
+    { toFun := fun x ↦ ⟨c x, mem_sphere_zero_iff_norm.mpr (hc x)⟩
+      map_one' := Subtype.ext (map_one c)
+      map_mul' := fun x y ↦ Subtype.ext (map_mul c x y)
+      continuous_toFun := c.continuous.subtype_mk _ }
+  have hψ : (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ψ = c := by
+    ext x
+    rfl
+  have hcomp : (fun z ↦ sLocalRhoFactor (F := F) (S := S)
+        (twistₛ (chartₛ(χ, hχ) s) z)) = rhoChart(χ, hχ) ∘ (· + s) := by
+    funext z
+    simp only [Function.comp]
+    congr 1
+    ext1 g
+    simp only [quasiCharacterNormTwist]
+    have hn : (((mₛ g : ℝ≥0ˣ) : ℝ≥0) : ℂ) ≠ 0 := by simp
+    change ((_ : ℂ) * _) * _ = (_ : ℂ) * _
+    rw [mul_assoc]
+    congr 1
+    change (((mₛ g : ℝ≥0ˣ) : ℝ≥0) : ℂ) ^ s * (((mₛ g : ℝ≥0ˣ) : ℝ≥0) : ℂ) ^ z = _
+    rw [← Complex.cpow_add _ _ hn, add_comm]
+    rfl
+  have key : sLocalIdelicOrderBound (chartₛ(χ, hχ) s) =
+      min 0 (meromorphicOrderAt rhoChart(χ, hχ) s) := by
+    unfold sLocalIdelicOrderBound
+    rw [hcomp, meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt, zero_add]
+  by_cases hpole : meromorphicOrderAt rhoChart(χ, hχ) s < 0
+  · have hord := sLocalRhoFactor_orderAt_pole (F := F) (S := S) ψ s
+    dsimp only at hord
+    rw [hψ] at hord
+    change meromorphicOrderAt rhoChart(χ, hχ) s < 0 → _ at hord
+    let arch := Finset.univ.filter (fun w : InfinitePlace F ↦ meromorphicOrderAt (fun z ↦
+      infiniteLocalTateFactor w (sLocalInfiniteRestriction w (chartₛ(χ, hχ) z))) s < 0)
+    let fin := Finset.univ.filter (fun v : S ↦ meromorphicOrderAt (fun z ↦
+      finiteLocalTateFactor v.val (sLocalFiniteRestriction v (chartₛ(χ, hχ) z))) s < 0)
+    have hpe : sLocalRhoPoleOrder (chartₛ(χ, hχ) s) = arch.card + fin.card := by
+      have hb : sLocalIdelicOrderBound (chartₛ(χ, hχ) s) =
+          ((-((arch.card + fin.card : ℕ) : ℤ)) : WithTop ℤ) := by
+        rw [key, min_eq_right hpole.le]
+        exact hord hpole
+      have h2 := sLocalIdelicOrderBound_eq_neg_poleOrder (chartₛ(χ, hχ) s)
+      rw [hb] at h2
+      have h3 : (-((arch.card + fin.card : ℕ) : ℤ)) =
+          -(sLocalRhoPoleOrder (chartₛ(χ, hχ) s) : ℤ) := WithTop.coe_injective h2
+      omega
+    have hfin : fin.card = 0 :=
+      sLocalRhoPoleOrder_finite_filter_eq_zero (F := F) (S := S) ψ hsneg
+    have harch : arch.card ≤ (Finset.univ.filter (fun w : InfinitePlace F ↦ w.IsComplex ∨
+        w.IsReal ∧ sLocalInfiniteRestriction w (chartₛ(χ, hχ) 0) (-1) = -1)).card := by
+      refine Finset.card_le_card ?_
+      intro w hw
+      rw [Finset.mem_filter] at hw ⊢
+      refine ⟨Finset.mem_univ w, ?_⟩
+      by_cases hr : w.IsReal
+      · exact Or.inr ⟨hr, sLocalRhoPoleOrder_real_pole_odd (F := F) (S := S) ψ w n hs hw.2 hr⟩
+      · exact Or.inl (InfinitePlace.not_isReal_iff_isComplex.mp hr)
+    rw [hpe, hfin, Nat.add_zero]
+    exact harch
+  · have hzero : sLocalIdelicOrderBound (chartₛ(χ, hχ) s) = 0 := by
+      rw [key, min_eq_left (le_of_not_gt hpole)]
+    have hpz : sLocalRhoPoleOrder (chartₛ(χ, hχ) s) = 0 := by
+      unfold sLocalRhoPoleOrder
+      rw [hzero]
+      simp
+    rw [hpz]
+    exact Nat.zero_le _
 
 -- On a radial subgroup, taking a power kills the finite-order part of the character.
 

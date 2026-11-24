@@ -4146,17 +4146,80 @@ private theorem finiteHeckeL_outside_inv_iteratedDeriv_horizontal_bound_good (m 
   rw [h1, h2, mul_pow, ← Real.rpow_mul_natCast hpos.le, Real.rpow_add hpos]
   ring
 
+omit hL hSeries in
+open scoped ComplexConjugate in
+/-- Each finite Euler factor of the inverse character is the conjugate of the original
+factor evaluated at the conjugate point. -/
+private theorem finiteHeckeEulerFactor_invCharacter
+    (v : HeightOneSpectrum (𝓞 F)) (s : ℂ) :
+    finiteHeckeEulerFactor χ⁻¹ v s = conj (finiteHeckeEulerFactor χ v (conj s)) := by
+  have hres (x : v.adicCompletion F) :
+      (ideleClassNormTwist χ⁻¹ 0).restrict v x = conj ((ideleClassNormTwist χ 0).restrict v x) := by
+    rcases eq_or_ne x 0 with rfl | hx
+    · simp
+    let u := Units.mk0 x hx
+    change (ideleClassNormTwist χ⁻¹ 0).restrict v (u : v.adicCompletion F) =
+      conj ((ideleClassNormTwist χ 0).restrict v (u : v.adicCompletion F))
+    simp only [HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    change (((χ _)⁻¹ : Circle) : ℂ) * _ ^ (0 : ℂ) = conj ((χ _ : ℂ) * _ ^ (0 : ℂ))
+    simp only [Complex.cpow_zero, mul_one, Circle.coe_inv_eq_conj]
+  have hu : (ideleClassNormTwist χ⁻¹ 0).IsUnramifiedAt v ↔
+      (ideleClassNormTwist χ 0).IsUnramifiedAt v := by
+    simp only [HeckeCharacter.isUnramifiedAt_iff, hres, map_eq_one_iff _ (starRingEnd ℂ).injective]
+  have hv : (ideleClassNormTwist χ⁻¹ 0).localValue v =
+      conj ((ideleClassNormTwist χ 0).localValue v) := hres _
+  have hpow : conj ((v.asIdeal.absNorm : ℂ) ^ (-conj s)) = (v.asIdeal.absNorm : ℂ) ^ (-s) := by
+    rw [← map_neg, ← Complex.conj_cpow _ _ (by rw [Complex.natCast_arg]; positivity),
+      Complex.conj_natCast]
+  unfold finiteHeckeEulerFactor
+  rw [hu]
+  split_ifs <;> simp only [map_inv₀, map_sub, map_mul, map_one, hpow, hv]
+
+open scoped ComplexConjugate in
 /-- Paper: Theorem B.6.1.7, p. 641, on the negative tail. Each sufficiently high open unit
 interval `(T, T + 1)` contains a height `t` such that the Euler product outside `S` has the
 polynomial lower bound `|t| ^ (-A)` on the whole horizontal segment from real part `-1` to `2`
 at height `-t`. The paper obtains it from the positive-tail statement for the conjugate
 character `χ⁻¹`, using `L_f(s̄, χ̄) = conj L_f(s, χ)` and the same identity for the finitely many
-Euler factors. The conjugation identities for `finiteHeckeL`, `finiteHeckeEulerFactor` and a
-meromorphic normal form are not yet available in this development. -/
+Euler factors. -/
 theorem finiteHeckeL_outside_inv_iteratedDeriv_horizontal_bound_neg :
     ∃ A : ℝ, 0 < A ∧ ∀ᶠ T : ℝ in atTop, ∃ t ∈ Ioo T (T + 1),
       ∀ σ ∈ Icc (-1 : ℝ) 2, |t| ^ (-A) < ‖Loutside ⟨σ, -t⟩‖ := by
-  sorry
+  let R : ℂ → ℂ := conj ∘ L ∘ conj
+  -- Reflect the local normal form, keeping the order of its zero or pole.
+  have hR : MeromorphicNFOn R univ := by
+    intro z _
+    have hc := Complex.continuous_conj.tendsto z
+    rcases hL (mem_univ (conj z)) with hzero | ⟨n, g, hg, hne, heq⟩
+    · left
+      filter_upwards [hc.eventually hzero] with w hw
+      exact (congrArg conj hw).trans (map_zero _)
+    · refine Or.inr ⟨n, conj ∘ g ∘ conj, ?_, ?_, ?_⟩
+      · apply Complex.analyticAt_iff_eventually_differentiableAt.mpr
+        filter_upwards [hc.eventually (Complex.analyticAt_iff_eventually_differentiableAt.mp hg)]
+          with w hw
+        simpa only [Complex.conj_conj] using hw.comp_ringHom conj conj
+      · exact (map_ne_zero_iff _ (starRingEnd ℂ).injective).mpr hne
+      · filter_upwards [hc.eventually heq] with w hw
+        simpa only [R, comp_apply, Pi.smul_apply', Pi.pow_apply, smul_eq_mul, map_mul,
+          map_zpow₀, map_sub, Complex.conj_conj] using congrArg conj hw
+  have hSeriesR (s : halfPlane) : R s = finiteHeckeL χ⁻¹ s := by
+    let w : halfPlane := ⟨conj (s : ℂ), s.property⟩
+    change conj (L w) = _
+    rw [hSeries w]
+    have hp := (finiteHeckeL_hasProd χ w).map conj Complex.continuous_conj
+    exact (hp.congr_fun (fun v ↦ finiteHeckeEulerFactor_invCharacter χ v s)).unique
+      (finiteHeckeL_hasProd χ⁻¹ s)
+  obtain ⟨A, hA, hT⟩ := finiteHeckeL_outside_exists_horizontal_lower_bound χ⁻¹ R S hR hSeriesR
+  refine ⟨A, hA, ?_⟩
+  filter_upwards [hT] with T h
+  obtain ⟨t, ht, hgood⟩ := h
+  refine ⟨t, ht, fun σ hσ ↦ ?_⟩
+  have hreflect (z : ℂ) : (∏ v ∈ S, (finiteHeckeEulerFactor χ⁻¹ v z)⁻¹) * R z =
+      conj (Loutside (conj z)) := by
+    simp only [R, comp_apply, map_mul, map_prod, map_inv₀, finiteHeckeEulerFactor_invCharacter]
+  have hconj : conj (⟨σ, t⟩ : ℂ) = ⟨σ, -t⟩ := rfl
+  simpa only [hreflect, Complex.norm_conj, hconj] using hgood σ hσ
 
 /-- Paper: Corollary B.6.1.8, p. 643. For each derivative order there is a
 nondecreasing sequence of heights tending to infinity in absolute value and
