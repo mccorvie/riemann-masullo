@@ -1284,7 +1284,9 @@ At any prescribed compact character and frequency, the Mellin integral is nonzer
 Bruhat test. The norm section identifies the full character with the product of the compact
 character and the radial oscillation. The inverse of this character times a smooth bump
 in the log norm gives a test whose Mellin integral is the norm-one Haar mass times the
-positive integral of the bump. -/
+positive integral of the bump.
+The map `τ` is a section of the idelic norm, as on p. 455; without that the statement fails
+(for the constant map every test has Mellin value zero, #6741). -/
 private theorem spectralStripMellinJet_norm_le_false_exists_mellin
     (τ : ℝ≥0ˣ →ₜ* C𝔽(ℚ)) (_hτ : Function.RightInverse τ (ideleClassNorm ℚ))
     (ω : PontryaginDual C₁(ℚ)) (t : ℝ) :
