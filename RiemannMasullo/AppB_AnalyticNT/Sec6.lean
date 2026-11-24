@@ -5,7 +5,7 @@ public import RiemannMasullo.ForMathlib.RingTheory.DedekindDomain.Ideal.Lemmas
 public import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Basic
 public import Mathlib.Analysis.Calculus.LogDeriv
 public import Mathlib.NumberTheory.ArithmeticFunction.VonMangoldt
-import Mathlib.NumberTheory.Chebyshev
+public import Mathlib.NumberTheory.Chebyshev
 import Mathlib.RingTheory.Ideal.Int
 import Mathlib.RingTheory.RamificationInertia.Basic
 import Mathlib.Analysis.Complex.LocallyUniformLimit
@@ -1257,214 +1257,121 @@ private theorem heckeLogDerivCoefficient_bound_liesOver (v : HeightOneSpectrum (
     Ideal.inertiaDeg_pos _ _, hl, ?_⟩
   rw [← Ideal.natAbs_pow_inertiaDeg (q : ℤ) v.asIdeal, Int.natAbs_natCast]
 
-/-- Grouping the positive prime powers of one norm by their radicals bounds their
-logarithmic weights by the sum of residue degrees over one rational prime. -/
-private theorem heckeLogDerivCoefficient_vonMangoldt_fiber (m : ℕ) :
+/-- At each prime-power norm, sum the residue degrees of the underlying prime ideals.
+The fundamental identity bounds this sum by the field degree. -/
+private theorem heckeLogDerivCoefficient_le_vonMangoldt_finsum (m : ℕ) :
     ∑ᶠ I : {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ I.absNorm = m}, idealVonMangoldt I.val ≤
       Module.finrank ℚ F * ArithmeticFunction.vonMangoldt m := by
   classical
   by_cases hm : IsPrimePow m
   swap
-  · rw [ArithmeticFunction.vonMangoldt_apply, ite_eq_right hm, mul_zero]
-    apply le_of_eq
-    apply finsum_eq_zero_of_forall_eq_zero
-    intro I
+  · rw [ArithmeticFunction.vonMangoldt_eq_zero_iff.mpr hm, mul_zero]
+    refine le_of_eq (finsum_eq_zero_of_forall_eq_zero fun I ↦ ?_)
     unfold idealVonMangoldt
-    apply dite_eq_right
-    rintro ⟨v, k, hk, he⟩
-    obtain ⟨q, f, hq, hf, _, hN⟩ := heckeLogDerivCoefficient_bound_liesOver v
-    apply hm
-    refine (isPrimePow_nat_iff m).mpr ⟨q, f * k, hq, Nat.mul_pos hf hk, ?_⟩
-    rw [pow_mul, ← hN, ← map_pow, ← he, I.2.2]
-  have hm2 := hm.one_lt
-  set p := m.minFac
-  have hp : p.Prime := Nat.minFac_prime (by omega)
+    split_ifs with h
+    · obtain ⟨v, k, hk, hI⟩ := h
+      obtain ⟨q, f, hq, hf, -, hv⟩ := heckeLogDerivCoefficient_bound_liesOver v
+      apply (hm _).elim
+      refine (isPrimePow_nat_iff _).mpr ⟨q, f * k, hq, Nat.mul_pos hf hk, ?_⟩
+      rw [← I.2.2, hI, map_pow, hv, pow_mul]
+    · rfl
+  obtain ⟨p, j, hp, hj, hm_eq⟩ := (isPrimePow_nat_iff m).mp hm
   have : Fact p.Prime := ⟨hp⟩
-  set P : Ideal ℤ := Ideal.span {(p : ℤ)}
+  let P : Ideal ℤ := Ideal.span {(p : ℤ)}
   have hfin : {I : Ideal (𝓞 F) | I ≠ ⊥ ∧ I.absNorm = m}.Finite :=
     (Ring.HasFiniteQuotients.finite_absNorm_eq (S := 𝓞 F) m).subset fun _ h ↦ h.2
-  have : Finite {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ I.absNorm = m} := hfin.to_subtype
-  have : Fintype {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ I.absNorm = m} := Fintype.ofFinite _
-  have : Fintype (P.primesOver (𝓞 F)) := (primesOver_finite P (𝓞 F)).fintype
-  -- The ideals with nonzero weight are positive powers of primes over `p`.
-  have hpow : ∀ I : {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ I.absNorm = m}, idealVonMangoldt I.val ≠ 0 →
-      ∃ v : HeightOneSpectrum (𝓞 F), ∃ k, 0 < k ∧ I.val = v.asIdeal ^ k := by
-    intro I hI
-    by_contra h
-    exact hI (by rw [idealVonMangoldt, dite_eq_right_iff.mpr fun h' ↦ absurd h' h])
-  have hover : ∀ (v : HeightOneSpectrum (𝓞 F)) (k : ℕ), 0 < k →
-      (v.asIdeal ^ k).absNorm = m → v.asIdeal ∈ P.primesOver (𝓞 F) := by
-    intro v k hk hvk
-    obtain ⟨q, f, hq, hf, hlies, hnorm⟩ := heckeLogDerivCoefficient_bound_liesOver v
-    rw [map_pow, hnorm, ← pow_mul] at hvk
-    have hqp : q = p := by
-      have h : m.minFac = q := by rw [← hvk, hq.pow_minFac (Nat.mul_ne_zero hf.ne' hk.ne')]
-      exact h.symm
-    subst hqp
-    exact ⟨v.isPrime, hlies⟩
-  -- Weighted ideals inject into the primes over `p` through their radicals.
-  set s := Finset.univ.filter fun I : {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ I.absNorm = m} ↦
-    idealVonMangoldt I.val ≠ 0
-  have hrad : ∀ I ∈ s, ∃ v : HeightOneSpectrum (𝓞 F), ∃ k, 0 < k ∧ I.val = v.asIdeal ^ k ∧
-      I.val.radical = v.asIdeal := by
-    intro I hI
-    obtain ⟨v, k, hk, hI'⟩ := hpow I (Finset.mem_filter.mp hI).2
-    exact ⟨v, k, hk, hI', by rw [hI', Ideal.radical_pow v.asIdeal hk.ne', v.isPrime.radical]⟩
-  let rad (I : s) : P.primesOver (𝓞 F) := ⟨I.1.1.radical, by
-    obtain ⟨v, k, hk, hI, hr⟩ := hrad I.1 I.2
-    rw [hr]
-    exact hover v k hk (hI ▸ I.1.2.2)⟩
-  have hinj : Function.Injective rad := by
-    rintro ⟨I, hI⟩ ⟨J, hJ⟩ hIJ
-    obtain ⟨v, k, hk, hI', hrI⟩ := hrad I hI
-    obtain ⟨w, j, hj, hJ', hrJ⟩ := hrad J hJ
-    have hvw : v.asIdeal = w.asIdeal := by
-      have eqRad : I.val.radical = J.val.radical := congrArg Subtype.val hIJ
-      rw [← hrI, ← hrJ, eqRad]
+  let S := {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ I.absNorm = m}
+  have : Finite S := hfin.to_subtype
+  let : Fintype S := Fintype.ofFinite _
+  let : Fintype (P.primesOver (𝓞 F)) := (primesOver_finite P (𝓞 F)).fintype
+  let s := Finset.univ.filter fun I : S ↦ idealVonMangoldt I.val ≠ 0
+  have hrad (I : s) : ∃ v : HeightOneSpectrum (𝓞 F), ∃ k, 0 < k ∧
+      I.val.val = v.asIdeal ^ k ∧ I.val.val.radical = v.asIdeal ∧
+      v.asIdeal ∈ P.primesOver (𝓞 F) := by
+    have hn := (Finset.mem_filter.mp I.2).2
+    unfold idealVonMangoldt at hn
+    split_ifs at hn with h
+    · obtain ⟨v, k, hk, hI⟩ := h
+      obtain ⟨q, f, hq, hf, hl, hv⟩ := heckeLogDerivCoefficient_bound_liesOver v
+      have eq := I.val.2.2
+      rw [hI, map_pow, hv, ← pow_mul] at eq
+      have eqp : q = p := by
+        have hmin := congrArg Nat.minFac (eq.trans hm_eq.symm)
+        simpa only [hq.pow_minFac (Nat.mul_pos hf hk).ne', hp.pow_minFac hj.ne'] using hmin
+      subst q
+      exact ⟨v, k, hk, hI, by rw [hI, Ideal.radical_pow _ hk.ne', v.isPrime.radical],
+        v.isPrime, hl⟩
+    · exact (hn rfl).elim
+  -- At a fixed rational norm, a prime-ideal power is determined by its radical.
+  let radical (I : s) : P.primesOver (𝓞 F) :=
+    ⟨I.val.val.radical, by
+      obtain ⟨v, k, hk, -, hr, hv⟩ := hrad I
+      rwa [hr]⟩
+  have hinj : Injective radical := by
+    intro I J h
+    obtain ⟨v, k, hk, hI, hrI, -⟩ := hrad I
+    obtain ⟨w, l, hl, hJ, hrJ, -⟩ := hrad J
+    have hradEq : I.val.val.radical = J.val.val.radical := congrArg Subtype.val h
+    have hvw := hrI.symm.trans (hradEq.trans hrJ)
     have h2 : 2 ≤ v.asIdeal.absNorm := by
       have h0 := Ideal.absNorm_eq_zero_iff.not.mpr v.ne_bot
-      have h1 : v.asIdeal.absNorm ≠ 1 := by
-        rw [Ne, Ideal.absNorm_eq_one_iff]
-        exact v.isPrime.ne_top
+      have h1 := Ideal.absNorm_eq_one_iff.not.mpr v.isPrime.ne_top
       omega
-    have hkj : k = j := by
-      have hI2 := I.2.2
-      have hJ2 := J.2.2
-      rw [hI', map_pow] at hI2
-      rw [hJ', ← hvw, map_pow] at hJ2
-      exact Nat.pow_right_injective h2 (hI2.trans hJ2.symm)
-    have : I = J := Subtype.ext (by rw [hI', hJ', hvw, hkj])
-    subst this
-    rfl
-  have hlog (I : s) : idealVonMangoldt I.1.1 =
-      ((rad I).1.inertiaDeg ℤ : ℝ) * Real.log p := by
-    obtain ⟨v, k, hk, hv, hr⟩ := hrad I.1 I.2
-    have hvP := hover v k hk (hv ▸ I.1.2.2)
-    have : v.asIdeal.LiesOver P := hvP.2
-    have hvnorm : v.asIdeal.absNorm = p ^ v.asIdeal.inertiaDeg ℤ := by
-      rw [← Ideal.natAbs_pow_inertiaDeg (p : ℤ) v.asIdeal, Int.natAbs_natCast]
-    change idealVonMangoldt I.1.1 = (I.1.1.radical.inertiaDeg ℤ : ℝ) * Real.log p
-    rw [hr, hv, idealVonMangoldt_prime_pow v hk, hvnorm, Nat.cast_pow, Real.log_pow]
-  let e : s ↪ P.primesOver (𝓞 F) := ⟨rad, hinj⟩
-  have hsumf : ∑ I : s, (rad I).1.inertiaDeg ℤ ≤ Module.finrank ℚ F := by
-    calc ∑ I : s, (rad I).1.inertiaDeg ℤ =
-          ∑ Q ∈ Finset.univ.map e, Q.1.inertiaDeg ℤ := (Finset.sum_map Finset.univ e (fun Q : P.primesOver (𝓞 F) ↦ Q.1.inertiaDeg ℤ)).symm
-      _ ≤ ∑ Q : P.primesOver (𝓞 F), Q.1.inertiaDeg ℤ :=
-        Finset.sum_le_sum_of_subset (Finset.subset_univ _)
-      _ ≤ ∑ Q : P.primesOver (𝓞 F), Q.1.ramificationIdx ℤ * Q.1.inertiaDeg ℤ := by
-        apply Finset.sum_le_sum
-        intro Q _
-        have := Q.2.1
-        have := Q.2.2
-        exact Nat.le_mul_of_pos_left _ (Ideal.ramificationIdx_pos ℤ Q.1)
-      _ = _ := (Ideal.sum_ramification_inertia_eq_finrank P (𝓞 F)).trans (RingOfIntegers.rank _)
-  rw [finsum_eq_sum_of_fintype, ← Finset.sum_filter_ne_zero]
-  change ∑ I ∈ s, idealVonMangoldt I.1 ≤ _
-  rw [← Finset.sum_coe_sort s, Finset.sum_congr rfl (fun I _ ↦ hlog I),
-    ← Finset.sum_mul, ArithmeticFunction.vonMangoldt_apply, ite_eq_left hm]
-  gcongr
-  exact_mod_cast hsumf
+    have hnorm := I.val.2.2.trans J.val.2.2.symm
+    rw [hI, hJ, ← hvw, map_pow, map_pow] at hnorm
+    have hkl := Nat.pow_right_injective h2 hnorm
+    exact Subtype.ext (Subtype.ext (by rw [hI, hJ, hvw, hkl]))
+  -- The ideal weight is f log p, and every ramification index is positive.
+  let ef (q : P.primesOver (𝓞 F)) := q.val.ramificationIdx ℤ * q.val.inertiaDeg ℤ
+  have hweight (I : s) : idealVonMangoldt I.val.val ≤ (ef (radical I) : ℝ) * Real.log p := by
+    obtain ⟨v, k, hk, hI, hr, hP⟩ := hrad I
+    have : v.asIdeal.LiesOver P := hP.2
+    have hn := Ideal.natAbs_pow_inertiaDeg (p : ℤ) v.asIdeal
+    have he : 1 ≤ v.asIdeal.ramificationIdx ℤ := Ideal.ramificationIdx_pos ℤ v.asIdeal
+    rw [hI, idealVonMangoldt_prime_pow v hk, ← hn, Int.natAbs_natCast, Nat.cast_pow, Real.log_pow]
+    change _ ≤ ((I.val.val.radical.ramificationIdx ℤ * I.val.val.radical.inertiaDeg ℤ : ℕ) : ℝ) * _
+    rw [hr]
+    gcongr
+    exact_mod_cast Nat.le_mul_of_pos_left _ he
+  have hsum : ∑ I : s, idealVonMangoldt I.val.val ≤
+      ∑ q : P.primesOver (𝓞 F), (ef q : ℝ) * Real.log p := by
+    refine Finset.sum_le_sum_of_injOn radical hinj.injOn (Finset.subset_univ _)
+      (fun I _ ↦ hweight I) fun q _ _ ↦ mul_nonneg (Nat.cast_nonneg _) (Real.log_natCast_nonneg _)
+  have hΛ : ArithmeticFunction.vonMangoldt m = Real.log p := by
+    rw [← hm_eq, ArithmeticFunction.vonMangoldt_apply_pow hj.ne',
+      ArithmeticFunction.vonMangoldt_apply_prime hp]
+  rw [finsum_eq_sum_of_fintype, ← Finset.sum_filter_ne_zero, hΛ]
+  change ∑ I ∈ s, idealVonMangoldt I.val ≤ _
+  rw [← Finset.sum_attach]
+  refine hsum.trans_eq ?_
+  rw [← Finset.sum_mul, ← Nat.cast_sum, ← RingOfIntegers.rank,
+    ← Ideal.sum_ramification_inertia_eq_finrank P (𝓞 F)]
 
 /-- At most `[F : ℚ]` positive prime-ideal powers have a given norm `m ≥ 2`, and each
 has von Mangoldt weight at most `log m`. -/
 private theorem heckeLogDerivCoefficient_bound_finsum_le {m : ℕ} (hm : 2 ≤ m) :
     ∑ᶠ I : {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ I.absNorm = m}, idealVonMangoldt I.val ≤
       Module.finrank ℚ F * Real.log m := by
-  refine (heckeLogDerivCoefficient_vonMangoldt_fiber (F := F) m).trans
-    (mul_le_mul_of_nonneg_left ?_ (by positivity))
-  rw [ArithmeticFunction.vonMangoldt_apply]
-  split_ifs
-  · exact Real.log_le_log (by exact_mod_cast Nat.minFac_pos m)
-      (by exact_mod_cast Nat.minFac_le (by omega : 0 < m))
-  · exact Real.log_nonneg (by exact_mod_cast (by omega : 1 ≤ m))
+  have hlog : 0 ≤ Real.log m := Real.log_nonneg (by exact_mod_cast (show 1 ≤ m by omega))
+  refine (heckeLogDerivCoefficient_le_vonMangoldt_finsum (F := F) m).trans ?_
+  simpa only [mul_comm (Module.finrank ℚ F : ℝ)] using
+    mul_le_mul ArithmeticFunction.vonMangoldt_le_log le_rfl (Nat.cast_nonneg (Module.finrank ℚ F)) hlog
 
-/-- Every norm-grouped unitary Hecke logarithmic derivative is bounded, coefficient by
-coefficient, by the rational von Mangoldt function times the field degree. -/
-theorem heckeLogDerivCoefficient_norm_le_vonMangoldt (χ : U[F]) (n : ℕ) :
-    ‖heckeLogDerivCoefficient (ideleClassNormTwist χ 0) n‖ ≤
-      Module.finrank ℚ F * ArithmeticFunction.vonMangoldt n := by
+/-- The normalized coefficients of the negative logarithmic derivative are dominated
+pointwise by the rational von Mangoldt function times the field degree. -/
+theorem heckeLogDerivCoefficient_le_vonMangoldt (χ : U[F]) (m : ℕ) :
+    ‖heckeLogDerivCoefficient (ideleClassNormTwist χ 0) m‖ ≤
+      Module.finrank ℚ F * ArithmeticFunction.vonMangoldt m := by
   classical
-  have : Finite {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ I.absNorm = n} :=
-    ((Ring.HasFiniteQuotients.finite_absNorm_eq (S := 𝓞 F) n).subset
-      (show {I : Ideal (𝓞 F) | I ≠ ⊥ ∧ I.absNorm = n} ⊆ {I | I.absNorm = n} from
-        fun I hI ↦ hI.2)).to_subtype
-  let := Fintype.ofFinite {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ I.absNorm = n}
-  unfold heckeLogDerivCoefficient
-  rw [finsum_eq_sum_of_fintype]
-  refine (norm_sum_le _ _).trans ((Finset.sum_le_sum fun I _ ↦
-    heckeLogDerivCoefficient_bound_norm_le χ I.val).trans ?_)
-  rw [← finsum_eq_sum_of_fintype]
-  exact heckeLogDerivCoefficient_vonMangoldt_fiber n
-
-/-- Uniformly bounded weights at composite integer norms make a square-root contribution
-to a truncated finite Hecke logarithmic derivative, uniformly in the unitary character. -/
-theorem exists_heckeLogDerivCoefficient_nonprime_sqrt (F : Type*) [Field F] [NumberField F] :
-    ∃ C : ℝ, 0 ≤ C ∧ ∀ (χ : U[F]) (x H : ℝ) (w : ℕ → ℂ), 0 ≤ H →
-      (∀ n, ‖w n‖ ≤ H) →
-      ‖∑ n ∈ (Finset.Ioc 0 ⌊x⌋₊).filter (fun n ↦ ¬ n.Prime),
-        heckeLogDerivCoefficient (ideleClassNormTwist χ 0) n * w n‖ ≤ C * H * Real.sqrt x := by
-  obtain ⟨A, hA⟩ := Chebyshev.psi_sub_theta_le_mul_sqrt
-  refine ⟨Module.finrank ℚ F * max A 0, by positivity, ?_⟩
-  intro χ x H w hH hw
-  calc
-    _ ≤ ∑ n ∈ (Finset.Ioc 0 ⌊x⌋₊).filter (fun n ↦ ¬ n.Prime),
-        (Module.finrank ℚ F * ArithmeticFunction.vonMangoldt n) * H := by
-      refine (norm_sum_le _ _).trans (Finset.sum_le_sum fun n _ ↦ ?_)
-      rw [norm_mul]
-      gcongr
-      exact heckeLogDerivCoefficient_norm_le_vonMangoldt χ n
-      exact hw n
-    _ = (Module.finrank ℚ F) * (Chebyshev.psi x - Chebyshev.theta x) * H := by
-      rw [← Finset.sum_mul, ← Finset.mul_sum, Chebyshev.psi_sub_theta_eq_sum_not_prime]
-    _ ≤ (Module.finrank ℚ F) * (max A 0 * Real.sqrt x) * H := by
-      gcongr
-      exact (hA x).trans (mul_le_mul_of_nonneg_right (le_max_left _ _) (Real.sqrt_nonneg _))
-    _ = _ := by ring
-
-/-- On a dyad the signed prime-norm truncation differs from the full smoothed
-logarithmic-derivative polynomial by bounded squared energy, uniformly in the height,
-the unitary character and the detector with a common sup norm. -/
-theorem exists_heckeLogDerivCoefficient_prime_dyadic_error (F : Type*) [Field F] [NumberField F] :
-    ∃ C : ℝ, 0 ≤ C ∧ ∀ (χ : U[F]) (Y H : ℝ) (h : ℝ → ℂ),
-      0 < Y → 0 ≤ H → Continuous h → (∀ r, ‖h r‖ ≤ H) →
-      let a := heckeLogDerivCoefficient (ideleClassNormTwist χ 0)
-      let S := Finset.Ioc 0 ⌊2 * Y⌋₊
-      (∫ y in Y..2 * Y,
-        ‖(∑ n ∈ S, a n * h (n / y)) - (∑ n ∈ S.filter Nat.Prime, a n * h (n / y))‖ ^ 2 /
-          y ^ 2) ≤ C * H ^ 2 := by
-  obtain ⟨B, hB, bound⟩ := exists_heckeLogDerivCoefficient_nonprime_sqrt F
-  refine ⟨2 * B ^ 2, by positivity, ?_⟩
-  intro χ Y H h hY hH hc hbound a S
-  have hY2 : Y ≤ 2 * Y := by linarith
-  have hn (y : ℝ) : ‖(∑ n ∈ S, a n * h (n / y)) -
-      ∑ n ∈ S.filter Nat.Prime, a n * h (n / y)‖ ≤ B * H * Real.sqrt (2 * Y) := by
-    have e := Finset.sum_filter_add_sum_filter_not S Nat.Prime (fun n ↦ a n * h (n / y))
-    rw [← e, add_sub_cancel_left]
-    exact bound χ _ H _ hH (fun n ↦ hbound _)
-  have hne : ∀ y ∈ uIcc Y (2 * Y), y ≠ 0 := by
-    rw [uIcc_of_le hY2]
-    exact fun y hy ↦ (hY.trans_le hy.1).ne'
-  have hc' : ContinuousOn (fun y : ℝ ↦
-      ‖(∑ n ∈ S, a n * h (n / y)) - ∑ n ∈ S.filter Nat.Prime, a n * h (n / y)‖ ^ 2 /
-      y ^ 2) (uIcc Y (2 * Y)) := by
-    have sum_cont (T : Finset ℕ) : ContinuousOn (fun y : ℝ ↦
-        ∑ n ∈ T, a n * h (n / y)) (uIcc Y (2 * Y)) := by
-      apply continuousOn_finsetSum
-      intro n _
-      exact continuousOn_const.mul (hc.comp_continuousOn (continuousOn_const.div continuousOn_id hne))
-    exact (((sum_cont S).sub (sum_cont _)).norm.pow 2).div (continuousOn_id.pow 2)
-      (fun y hy ↦ pow_ne_zero _ (hne y hy))
-  calc
-    _ ≤ ∫ _y in Y..2 * Y, (B * H) ^ 2 * (2 * Y) / Y ^ 2 := by
-      apply intervalIntegral.integral_mono_on hY2 hc'.intervalIntegrable intervalIntegrable_const
-      intro y hy
-      apply div_le_div₀ (by positivity) _ (by positivity) (by gcongr; exact hy.1)
-      calc _ ≤ (B * H * Real.sqrt (2 * Y)) ^ 2 := by gcongr; exact hn y
-        _ = _ := by rw [mul_pow, Real.sq_sqrt (by positivity)]
-    _ = _ := by
-      rw [intervalIntegral.integral_const, smul_eq_mul]
-      field_simp
-      ring
+  have hfin : {I : Ideal (𝓞 F) | I ≠ ⊥ ∧ I.absNorm = m}.Finite :=
+    (Ring.HasFiniteQuotients.finite_absNorm_eq (S := 𝓞 F) m).subset fun _ h ↦ h.2
+  have : Finite {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ I.absNorm = m} := hfin.to_subtype
+  let : Fintype {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ I.absNorm = m} := Fintype.ofFinite _
+  have hsum := heckeLogDerivCoefficient_le_vonMangoldt_finsum (F := F) m
+  rw [finsum_eq_sum_of_fintype] at hsum
+  rw [heckeLogDerivCoefficient, finsum_eq_sum_of_fintype]
+  exact (norm_sum_le _ _).trans ((Finset.sum_le_sum fun I _ ↦
+    heckeLogDerivCoefficient_bound_norm_le χ I.val).trans hsum)
 
 /-- Paper: Lemma B.6.1.4, p. 638. The logarithmic-derivative coefficients are
 bounded by a constant times `log m`, with the constant depending only on the field degree. -/
@@ -1489,6 +1396,90 @@ theorem heckeLogDerivCoefficient_bound (d : ℕ) :
     heckeLogDerivCoefficient_bound_norm_le χ I.val).trans (hsum.trans ?_))
   gcongr
   linarith
+
+/-- Removing composite norms from a bounded weighted normalized Hecke sum costs at most
+the field degree times the weight bound times the rational prime-power correction. -/
+theorem heckeLogDerivCoefficient_sum_sub_sum_prime_le (χ : U[F]) (x : ℝ) (b : ℕ → ℂ)
+    {M : ℝ} (hb : ∀ n, ‖b n‖ ≤ M) :
+    ‖(∑ n ∈ Finset.Ioc 0 ⌊x⌋₊, heckeLogDerivCoefficient (ideleClassNormTwist χ 0) n * b n) -
+      ∑ n ∈ Finset.Ioc 0 ⌊x⌋₊ with n.Prime,
+        heckeLogDerivCoefficient (ideleClassNormTwist χ 0) n * b n‖ ≤
+      Module.finrank ℚ F * M * (Chebyshev.psi x - Chebyshev.theta x) := by
+  let a := heckeLogDerivCoefficient (ideleClassNormTwist χ 0)
+  have he : (∑ n ∈ Finset.Ioc 0 ⌊x⌋₊, a n * b n) -
+      (∑ n ∈ Finset.Ioc 0 ⌊x⌋₊ with n.Prime, a n * b n) =
+      ∑ n ∈ Finset.Ioc 0 ⌊x⌋₊ with ¬n.Prime, a n * b n := by
+    rw [Finset.sum_filter, Finset.sum_filter, ← Finset.sum_sub_distrib]
+    exact Finset.sum_congr rfl fun n _ ↦ by by_cases hn : n.Prime <;> simp [hn]
+  rw [he, Chebyshev.psi_sub_theta_eq_sum_not_prime, Finset.mul_sum]
+  refine (norm_sum_le _ _).trans (Finset.sum_le_sum fun n _ ↦ ?_)
+  rw [norm_mul]
+  calc ‖a n‖ * ‖b n‖ ≤ (Module.finrank ℚ F * ArithmeticFunction.vonMangoldt n) * M :=
+         mul_le_mul (heckeLogDerivCoefficient_le_vonMangoldt χ n) (hb n) (norm_nonneg _)
+           (mul_nonneg (Nat.cast_nonneg _) ArithmeticFunction.vonMangoldt_nonneg)
+    _ = Module.finrank ℚ F * M * ArithmeticFunction.vonMangoldt n := by ring
+
+/-- A single square-root constant works for every unitary character and number field,
+after extracting the field degree and the uniform bound of the weight. -/
+theorem heckeLogDerivCoefficient_sum_sub_sum_prime_le_mul_sqrt :
+    ∃ C : ℝ, ∀ (F : Type*) [Field F] [NumberField F] (χ : U[F]) (x : ℝ) (b : ℕ → ℂ)
+      (M : ℝ), (∀ n, ‖b n‖ ≤ M) →
+      ‖(∑ n ∈ Finset.Ioc 0 ⌊x⌋₊, heckeLogDerivCoefficient (ideleClassNormTwist χ 0) n * b n) -
+        ∑ n ∈ Finset.Ioc 0 ⌊x⌋₊ with n.Prime,
+          heckeLogDerivCoefficient (ideleClassNormTwist χ 0) n * b n‖ ≤
+        Module.finrank ℚ F * M * (C * Real.sqrt x) := by
+  obtain ⟨C, hC⟩ := Chebyshev.psi_sub_theta_le_mul_sqrt
+  refine ⟨C, fun F _ _ χ x b M hb ↦ (heckeLogDerivCoefficient_sum_sub_sum_prime_le χ x b hb).trans ?_⟩
+  exact mul_le_mul_of_nonneg_left (hC x) (mul_nonneg (Nat.cast_nonneg _) ((norm_nonneg _).trans (hb 0)))
+
+/-- On a dyad the signed prime-norm truncation differs from the full smoothed
+logarithmic-derivative polynomial by bounded squared energy, uniformly in the height,
+the unitary character and the detector with a common sup norm. -/
+theorem exists_heckeLogDerivCoefficient_prime_dyadic_error (F : Type*) [Field F] [NumberField F] :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ (χ : U[F]) (Y H : ℝ) (h : ℝ → ℂ),
+      0 < Y → 0 ≤ H → Continuous h → (∀ r, ‖h r‖ ≤ H) →
+      let a := heckeLogDerivCoefficient (ideleClassNormTwist χ 0)
+      let S := Finset.Ioc 0 ⌊2 * Y⌋₊
+      (∫ y in Y..2 * Y,
+        ‖(∑ n ∈ S, a n * h (n / y)) - (∑ n ∈ S.filter Nat.Prime, a n * h (n / y))‖ ^ 2 /
+          y ^ 2) ≤ C * H ^ 2 := by
+  obtain ⟨A, bound⟩ := heckeLogDerivCoefficient_sum_sub_sum_prime_le_mul_sqrt
+  let B : ℝ := Module.finrank ℚ F * max A 0
+  refine ⟨2 * B ^ 2, by positivity, ?_⟩
+  intro χ Y H h hY hH hc hbound a S
+  have hY2 : Y ≤ 2 * Y := by linarith
+  have hn (y : ℝ) : ‖(∑ n ∈ S, a n * h (n / y)) -
+      ∑ n ∈ S.filter Nat.Prime, a n * h (n / y)‖ ≤ B * H * Real.sqrt (2 * Y) := by
+    refine (bound F χ (2 * Y) (fun n ↦ h (n / y)) H (fun n ↦ hbound _)).trans ?_
+    calc (Module.finrank ℚ F : ℝ) * H * (A * Real.sqrt (2 * Y)) ≤
+          Module.finrank ℚ F * H * (max A 0 * Real.sqrt (2 * Y)) := by
+            gcongr
+            exact le_max_left _ _
+      _ = B * H * Real.sqrt (2 * Y) := by dsimp [B]; ring
+  have hne : ∀ y ∈ uIcc Y (2 * Y), y ≠ 0 := by
+    rw [uIcc_of_le hY2]
+    exact fun y hy ↦ (hY.trans_le hy.1).ne'
+  have hc' : ContinuousOn (fun y : ℝ ↦
+      ‖(∑ n ∈ S, a n * h (n / y)) - ∑ n ∈ S.filter Nat.Prime, a n * h (n / y)‖ ^ 2 /
+      y ^ 2) (uIcc Y (2 * Y)) := by
+    have sum_cont (T : Finset ℕ) : ContinuousOn (fun y : ℝ ↦
+        ∑ n ∈ T, a n * h (n / y)) (uIcc Y (2 * Y)) := by
+      apply continuousOn_finsetSum
+      intro n _
+      exact continuousOn_const.mul (hc.comp_continuousOn (continuousOn_const.div continuousOn_id hne))
+    exact (((sum_cont S).sub (sum_cont _)).norm.pow 2).div (continuousOn_id.pow 2)
+      (fun y hy ↦ pow_ne_zero _ (hne y hy))
+  calc
+    _ ≤ ∫ _y in Y..2 * Y, (B * H) ^ 2 * (2 * Y) / Y ^ 2 := by
+      apply intervalIntegral.integral_mono_on hY2 hc'.intervalIntegrable intervalIntegrable_const
+      intro y hy
+      apply div_le_div₀ (by positivity) _ (by positivity) (by gcongr; exact hy.1)
+      calc _ ≤ (B * H * Real.sqrt (2 * Y)) ^ 2 := by gcongr; exact hn y
+        _ = _ := by rw [mul_pow, Real.sq_sqrt (by positivity)]
+    _ = _ := by
+      rw [intervalIntegral.integral_const, smul_eq_mul]
+      field_simp
+      ring
 
 -- TODO(paper-gap): In (B.6.1.16) a pure norm twist can have a pole in Ω.
 -- Restrict the logarithm to heights above the pole. After (B.6.1.19) the

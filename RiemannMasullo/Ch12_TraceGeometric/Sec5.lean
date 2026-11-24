@@ -1184,4 +1184,438 @@ end NormTests
 
 end ExteriorZerosGRH
 
+section GlobalDiagonal
+
+/-! ### The trace formula on the strip quotient
+
+By (12.5.1.4) the trace of convolution on the strip spectral quotient is the sum over the zeros
+in the strip (`spectralStripConvolution_trace`), and by Theorem B.4.4.7 the local terms are the
+sum over all zeros. So the trace identity on the strip quotient (trace = local terms) at every
+small width, together with projective kernels `hK` of (12.5.1.4), gives the conclusion of
+`traceFormula_exteriorZeros` (`traceFormula_exteriorZeros_of_stripTrace`). Given nuclearity, at a
+width whose edges carry no zeros, the trace identity is equivalent to the absence of zeros
+outside the strip (`spectralStripTrace_eq_localTerms_iff`); for half-widths at least one half it
+holds (`spectralStripTrace_eq_localTerms_of_half_le`). -/
+
+attribute [local instance] instSpectralQuotientPolynormableSec3
+
+local notation "hStrip(" hα ")" => (neg_nonpos.mpr hα |>.trans hα)
+local notation "stripQuot(" hα ", " hs ")" =>
+  spectralSobolevQuotient F (1 / 2) (hStrip(hα)) (le_of_lt (zero_lt_one.trans hs))
+local notation "stripConv(" hα ", " hs ", " φ ")" =>
+  spectralConvolution (F := F) (1 / 2) (hStrip(hα)) (le_of_lt (zero_lt_one.trans hs)) φ
+local notation "stripTensorExists(" hα ", " hs ", " φ ")" =>
+  (∃ K, sobolevProjectiveKernelOperator (F := F) hα (zero_le_one.trans (le_of_lt hs)) K =
+    (hardySobolevTestAction μ𝔽 m𝔽 _ _ _ (neg_le_self hα) (zero_le_one.trans (le_of_lt hs)) φ).comp
+      (spectralProjection (F := F) (1 / 2) hα (zero_le_one.trans (le_of_lt hs))))
+local notation "localTerms(" φ ", " a ", " b ")" =>
+  (M(φ, twist(1, 1 / 2)) + M(φ, twist(1, -1 / 2)) -
+    classVolume * ((∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) +
+      ∑' v : V, finiteTerm(v, b v)))
+local notation "archRestricts(" φ ", " a ")" =>
+  (∀ (w : InfinitePlace F) (u : w.Completionˣ), (a w).val u = (φ).val (archClass(w) u))
+local notation "finiteRestricts(" φ ", " b ")" =>
+  (∀ (v : V) (u : (v.adicCompletion F)ˣ), (b v).val u = (φ).val (finiteClass(v) u))
+local notation "restriction" =>
+  (⟨(ideleClassNorm F).ker.subtype, continuous_subtype_val⟩ : C₁ →ₜ* C𝔽)
+local notation "order(" χ ", " z ")" => meromorphicOrderAt (continuedCompletedHeckeL (F := F) χ) z
+
+/-- Paper: Theorem 10.3.2.1(2), p. 454, from (10.4.3.45), p. 473. Convolution on the spectral
+quotient of the strip [1/2 − α, 1/2 + α] is nuclear for every half-width α ≥ 0 and Sobolev order
+s > 1 whenever convolution after spectral projection on the strip Sobolev space has a projective
+tensor kernel (the kernel `hK` of (12.5.1.4)): it is the compression, along the quotient map and
+its orthogonal section, of the nuclear operator given by that kernel. Unlike
+`spectralStripConvolution_nuclear`, this does not use Theorem 10.3.2.1(1). -/
+theorem spectralStripConvolution_nuclear_of_projectiveKernel {α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s)
+    (φ : BruhatCompactSupport C𝔽) (hK : stripTensorExists(hα, hs, φ)) :
+    IsNuclearOperator stripConv(hα, hs, φ) := by
+  let W := CompactIntervalSobolev μ𝔽 (logIdeleClassNorm F) (-α) α s
+  let A : W →L[ℂ] W :=
+    hardySobolevTestAction μ𝔽 m𝔽 (-α) α s (hStrip(hα)) (zero_le_one.trans hs.le) φ
+  let P : W →L[ℂ] W := spectralProjection (F := F) (1 / 2) hα (zero_le_one.trans hs.le)
+  let theta := globalThetaSobolev F (1 / 2) (hStrip(hα)) (zero_le_one.trans hs.le)
+  let q := theta.mkQL
+  let j := theta.orthogonal.subtypeL.comp
+    theta.quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
+  let B := stripConv(hα, hs, φ)
+  have hap : IsNuclearOperator (A * P) :=
+    (congrArg (fun L : W →L[ℂ] W ↦ IsNuclearOperator L) hK.choose_spec).mp
+      (stripDiagonal_projective_nuclear (F := F) hα (zero_le_one.trans hs.le) hK.choose)
+  have hqj : q.comp j = ContinuousLinearMap.id ℂ _ := by
+    ext x
+    exact theta.quotientEquivOrthogonal.symm_apply_apply x
+  have hjq : j.comp q = P := by
+    apply ContinuousLinearMap.ext
+    intro x
+    exact (spectralQuotient_orthogonalRepresentative (F := F) (1 / 2) hα
+      (zero_le_one.trans hs.le) (by norm_num) x).1
+  have hqA : q.comp A = B.comp q := by
+    apply ContinuousLinearMap.ext
+    intro x
+    exact (spectralConvolution_mkQ (F := F) (1 / 2) (hStrip(hα)) (zero_le_one.trans hs.le)
+      φ x).symm
+  exact (stripDiagonal_quotientAction q j P A B hqj hjq hqA hap).choose
+
+local notation "three" => (show (1 : ℝ) < 3 by norm_num)
+
+/-- A norm section gives a basepoint choice whose lifts are trivial on the section, and every
+character trivial on the section is the lift of its restriction. -/
+private theorem exteriorZeros_basepoint (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F)) :
+    ∃ χ : PontryaginDual C₁ → PontryaginDual C𝔽, IsSpectralBasepointChoice χ ∧
+      (∀ ω t, χ ω (τ t) = 1) ∧
+      ∀ ψ : PontryaginDual C𝔽, (∀ t, ψ (τ t) = 1) → χ (ψ.comp restriction) = ψ := by
+  let n : C𝔽 →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+  let P : C𝔽 →ₜ* C𝔽 := ContinuousMonoidHom.id C𝔽 / τ.comp n
+  have hP (x : C𝔽) : P x ∈ (ideleClassNorm F).ker := by
+    change ideleClassNorm F (x / τ (ideleClassNorm F x)) = 1
+    rw [map_div, hτ, div_self']
+  let r : C𝔽 →ₜ* C₁ := ⟨P.toMonoidHom.codRestrict _ hP, P.continuous.subtype_mk _⟩
+  have hr (x : C𝔽) : (r x : C𝔽) = x / τ (ideleClassNorm F x) := rfl
+  refine ⟨fun ω ↦ ω.comp r, fun ω ↦ ?_, fun ω t ↦ ?_, fun ψ hψ ↦ ?_⟩
+  · ext x : 1
+    change ω (r (x : C𝔽)) = ω x
+    apply congrArg ω
+    apply Subtype.ext
+    rw [hr, show ideleClassNorm F (x : C𝔽) = 1 from x.property, map_one, div_one]
+  · change ω (r (τ t)) = 1
+    have : r (τ t) = 1 := Subtype.ext (by rw [hr, hτ, div_self']; rfl)
+    rw [this, map_one]
+  · ext x : 1
+    change ψ (r x : C𝔽) = ψ x
+    rw [hr, map_div, hψ, div_one]
+
+/-- The order of a continued completed Hecke L-function is finite everywhere. -/
+private theorem exteriorZeros_order_ne_top (χ : PontryaginDual C𝔽) (z : ℂ) : order(χ, z) ≠ ⊤ := by
+  obtain ⟨hL, heq⟩ := continuedCompletedHeckeL_spec χ
+  have hfinite : order(χ, (2 : ℂ)) ≠ ⊤ := by
+    intro h
+    have hp : 0 < order(χ, (2 : ℂ)) := by rw [h]; exact WithTop.coe_lt_top (0 : ℤ)
+    have := completedHeckeL_continuation_zeros χ _ hL heq (by norm_num : 0 < (2 : ℂ).re) hp
+    norm_num at this
+  exact hL.meromorphicOn.meromorphicOrderAt_ne_top_of_isPreconnected
+    isPreconnected_univ (mem_univ _) (mem_univ z) hfinite
+
+/-- The divisor of a continued completed Hecke L-function is its order. -/
+private theorem exteriorZeros_ord_eq (χ : PontryaginDual C𝔽) (z : ℂ) :
+    ord(χ, z) = (order(χ, z)).untop₀ :=
+  MeromorphicOn.divisor_apply (continuedCompletedHeckeL_spec χ).1.meromorphicOn (mem_univ z)
+
+/-- A zero in the sense of the divisor is a zero in the sense of the order. -/
+private theorem exteriorZeros_ord_pos_iff (χ : PontryaginDual C𝔽) (z : ℂ) :
+    0 < ord(χ, z) ↔ 0 < order(χ, z) := by
+  rw [exteriorZeros_ord_eq]
+  obtain ⟨k, hk⟩ := WithTop.ne_top_iff_exists.mp (exteriorZeros_order_ne_top χ z)
+  rw [← hk, WithTop.untop₀_coe]
+  exact_mod_cast Iff.rfl
+
+/-- The lifted characters and their zeros are countable, so some width in (0, α] has no zero on
+either edge of its strip. -/
+private theorem exteriorZeros_exists_width (χ : PontryaginDual C₁ → PontryaginDual C𝔽) {α : ℝ}
+    (hα : 0 < α) :
+    ∃ β, 0 < β ∧ β ≤ α ∧ ∀ ω (z : ℂ), 0 < order(χ ω, z) → |z.re - 1 / 2| ≠ β := by
+  have hK := IsModulation.isCompact_ker (m := m𝔽) hm𝔽
+  let : CompactSpace C₁ := isCompact_iff_compactSpace.mp hK
+  let : LocallyCompactSpace C₁ := hK.isClosed.locallyCompactSpace
+  let : SecondCountableTopology C₁ := Topology.IsInducing.subtypeVal.secondCountableTopology
+  let : SecondCountableTopology Circle :=
+    inferInstanceAs (SecondCountableTopology (Metric.sphere (0 : ℂ) 1))
+  let : SecondCountableTopology (PontryaginDual C₁) :=
+    (ContinuousMonoidHom.isEmbedding_toContinuousMap C₁ Circle).secondCountableTopology
+  let : Countable (PontryaginDual C₁) := countable_of_Lindelof_of_discrete
+  let zeros (ω : PontryaginDual C₁) := {z : ℂ | 0 < order(χ ω, z)}
+  have hc (ω) : (zeros ω).Countable := by
+    obtain ⟨hL, _⟩ := continuedCompletedHeckeL_spec (χ ω)
+    have hd : (zeros ω)ᶜ ∈ codiscrete ℂ := by
+      filter_upwards
+        [hL.meromorphicOn.codiscreteWithin_setOfPred_meromorphicOrderAt_eq_zero_or_top] with z hz'
+      rcases hz'.2 with h | h
+      · simp [zeros, h]
+      · exact (exteriorZeros_order_ne_top (χ ω) z h).elim
+    let : DiscreteTopology (zeros ω) := isDiscrete_iff_discreteTopology.mp
+      (compl_mem_codiscrete_iff.mp hd).2
+    exact Set.countable_coe_iff.mp countable_of_Lindelof_of_discrete
+  let S := ⋃ ω, (fun z : ℂ ↦ |z.re - 1 / 2|) '' zeros ω
+  have hS : S.Countable := countable_iUnion fun ω ↦ (hc ω).image _
+  obtain ⟨β, hβI, hβS⟩ : (Ioo 0 α \ S).Nonempty := by
+    apply MeasureTheory.nonempty_of_measure_ne_zero (μ := MeasureTheory.volume)
+    rw [MeasureTheory.measure_sdiff_null (hS.measure_zero _)]
+    simp [Real.volume_Ioo, hα]
+  exact ⟨β, hβI.1, hβI.2.le, fun ω z hz h ↦ hβS (mem_iUnion.mpr ⟨ω, z, hz, h⟩)⟩
+
+/-- With both edges free of zeros, the closed-strip sum of (12.5.1.4) for the lifts of a norm
+section is the sum over the zeros in the open strip, indexed as in `exteriorZeros`. -/
+private theorem exteriorZeros_hasSum_interior (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    (hχτ : ∀ ω t, χ ω (τ t) = 1)
+    (hlift : ∀ ψ : PontryaginDual C𝔽, (∀ t, ψ (τ t) = 1) → χ (ψ.comp restriction) = ψ)
+    {β : ℝ} (s : ℝ) (hedge : ∀ ω (z : ℂ), 0 < order(χ ω, z) → |z.re - 1 / 2| ≠ β)
+    (φ : BruhatCompactSupport C𝔽) {T : ℂ}
+    (h : HasSum (fun z : {z : PontryaginDual C₁ × ℝ × ℝ // z.2.1 ∈ Icc (-β) β ∧
+        0 < order(χ z.1, ((1 / 2 + z.2.1 : ℝ) : ℂ) + (z.2.2 : ℂ) * Complex.I)} ↦
+      ((spectralStripMultiplicity β s z.val.2.1
+        (order(χ z.val.1, ((1 / 2 + z.val.2.1 : ℝ) : ℂ) + (z.val.2.2 : ℂ) * Complex.I)).untop₀.toNat
+          : ℕ) : ℂ) *
+        M(φ, twist(χ z.val.1, (z.val.2.1 : ℂ) + (z.val.2.2 : ℂ) * Complex.I))) T) :
+    HasSum (fun z : interiorZeros(τ, β) ↦ zeroTerm(φ, z)) T := by
+  let Z := {z : PontryaginDual C₁ × ℝ × ℝ // z.2.1 ∈ Icc (-β) β ∧
+    0 < order(χ z.1, ((1 / 2 + z.2.1 : ℝ) : ℂ) + (z.2.2 : ℂ) * Complex.I)}
+  have hre (σ t : ℝ) : ((((1 / 2 + σ : ℝ) : ℂ) + (t : ℂ) * Complex.I).re - 1 / 2) = σ := by
+    simp
+  have hin (z : Z) : |z.val.2.1| < β := by
+    have h1 := hedge _ _ z.property.2
+    rw [hre] at h1
+    exact lt_of_le_of_ne (abs_le.mpr z.property.1) h1
+  let e : Z → interiorZeros(τ, β) := fun z ↦
+    ⟨(⟨χ z.val.1, hχτ z.val.1⟩, ((1 / 2 + z.val.2.1 : ℝ) : ℂ) + (z.val.2.2 : ℂ) * Complex.I),
+      (exteriorZeros_ord_pos_iff _ _).mpr z.property.2, by rw [hre]; exact hin z⟩
+  have he : Bijective e := by
+    constructor
+    · intro z z' hzz
+      have h1 := congrArg (fun y : interiorZeros(τ, β) ↦ y.val.1.val) hzz
+      have h2 : ((1 / 2 + z.val.2.1 : ℝ) : ℂ) + (z.val.2.2 : ℂ) * Complex.I =
+          ((1 / 2 + z'.val.2.1 : ℝ) : ℂ) + (z'.val.2.2 : ℂ) * Complex.I :=
+        congrArg (fun y : interiorZeros(τ, β) ↦ y.val.2) hzz
+      have hω : z.val.1 = z'.val.1 := by
+        rw [← hχ z.val.1, ← hχ z'.val.1]
+        exact congrArg (fun ψ : PontryaginDual C𝔽 ↦ ψ.comp restriction) h1
+      have hr : z.val.2.1 = z'.val.2.1 := by simpa using congrArg Complex.re h2
+      have hi : z.val.2.2 = z'.val.2.2 := by simpa using congrArg Complex.im h2
+      exact Subtype.ext (Prod.ext hω (Prod.ext hr hi))
+    · rintro ⟨⟨ψ, ρ⟩, hpos, hlt⟩
+      have hψ := hlift ψ.val ψ.property
+      have hρ : (((1 / 2 + (ρ.re - 1 / 2) : ℝ) : ℂ) + (ρ.im : ℂ) * Complex.I) = ρ := by
+        apply Complex.ext <;> simp
+      refine ⟨⟨(ψ.val.comp restriction, ρ.re - 1 / 2, ρ.im),
+        ⟨⟨by linarith [(abs_lt.mp hlt).1], by linarith [(abs_lt.mp hlt).2]⟩, ?_⟩⟩, ?_⟩
+      · change 0 < order(χ (ψ.val.comp restriction), _)
+        rw [hψ, hρ]
+        exact (exteriorZeros_ord_pos_iff _ _).mp hpos
+      · apply Subtype.ext
+        change ((⟨χ (ψ.val.comp restriction), _⟩ :
+          {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1}), _) = (ψ, ρ)
+        exact Prod.ext (Subtype.ext hψ) hρ
+  have hterm (z : Z) : zeroTerm(φ, e z) =
+      ((spectralStripMultiplicity β s z.val.2.1
+        (order(χ z.val.1, ((1 / 2 + z.val.2.1 : ℝ) : ℂ) + (z.val.2.2 : ℂ) * Complex.I)).untop₀.toNat
+          : ℕ) : ℂ) *
+        M(φ, twist(χ z.val.1, (z.val.2.1 : ℂ) + (z.val.2.2 : ℂ) * Complex.I)) := by
+    have hpt : ((1 / 2 + z.val.2.1 : ℝ) : ℂ) + (z.val.2.2 : ℂ) * Complex.I - 1 / 2 =
+        (z.val.2.1 : ℂ) + (z.val.2.2 : ℂ) * Complex.I := by
+      push_cast; ring
+    have hord : ((ord(χ z.val.1, ((1 / 2 + z.val.2.1 : ℝ) : ℂ) + (z.val.2.2 : ℂ) * Complex.I)
+        : ℤ) : ℂ) = ((spectralStripMultiplicity β s z.val.2.1
+          (order(χ z.val.1,
+            ((1 / 2 + z.val.2.1 : ℝ) : ℂ) + (z.val.2.2 : ℂ) * Complex.I)).untop₀.toNat
+            : ℕ) : ℂ) := by
+      rw [spectralStripMultiplicity_interior (abs_lt.mp (hin z)) s, exteriorZeros_ord_eq]
+      have hpos := z.property.2
+      obtain ⟨k, hk⟩ := WithTop.ne_top_iff_exists.mp (exteriorZeros_order_ne_top (χ z.val.1)
+        (((1 / 2 + z.val.2.1 : ℝ) : ℂ) + (z.val.2.2 : ℂ) * Complex.I))
+      rw [← hk] at hpos ⊢
+      rw [WithTop.untop₀_coe]
+      have hk0 : 0 ≤ k := WithTop.coe_le_coe.mp hpos.le
+      rw [show ((k.toNat : ℕ) : ℂ) = ((k.toNat : ℤ) : ℂ) from rfl, Int.toNat_of_nonneg hk0]
+    exact congrArg₂ (· * ·) hord (congrArg (fun c ↦ M(φ, twist(χ z.val.1, c))) hpt)
+  have h' : HasSum (fun z : Z ↦ zeroTerm(φ, e z)) T := by
+    rw [funext hterm]
+    exact h
+  exact ((Equiv.ofBijective e he).hasSum_iff).mp h'
+
+/-- Two sums with the same value over a set and a subset leave a sum of zero over the rest. -/
+private theorem exteriorZeros_hasSum_diff {X : Type*} (G : X → ℂ) (A I E : Set X)
+    (hE : ∀ p, p ∈ E ↔ p ∈ A ∧ p ∉ I) (hIA : I ⊆ A) {T : ℂ}
+    (hA : HasSum (fun z : A ↦ G z) T) (hI : HasSum (fun z : I ↦ G z) T) :
+    HasSum (fun z : E ↦ G z) 0 := by
+  classical
+  replace hA := (hasSum_subtype_iff_indicator (f := G) (s := A)).mp hA
+  replace hI := (hasSum_subtype_iff_indicator (f := G) (s := I)).mp hI
+  refine (hasSum_subtype_iff_indicator (f := G) (s := E)).mpr ?_
+  have h : E.indicator G = A.indicator G - I.indicator G := by
+    funext p
+    by_cases hp : p ∈ I
+    · simp [Set.indicator_of_mem hp, Set.indicator_of_mem (hIA hp),
+        Set.indicator_of_notMem (fun h ↦ ((hE p).mp h).2 hp)]
+    · by_cases ha : p ∈ A
+      · simp [Set.indicator_of_mem ((hE p).mpr ⟨ha, hp⟩), Set.indicator_of_mem ha,
+          Set.indicator_of_notMem hp]
+      · simp [Set.indicator_of_notMem ha, Set.indicator_of_notMem hp,
+          Set.indicator_of_notMem (fun h ↦ ha ((hE p).mp h).1)]
+  rw [h, ← sub_self T]
+  exact hA.sub hI
+
+/-- The local tests of a test are unique, so the local terms do not depend on their choice. -/
+private theorem exteriorZeros_localTerms_congr (φ : BruhatCompactSupport C𝔽)
+    {a a' : archTest} {b b' : finiteTest} (ha : archRestricts(φ, a)) (hb : finiteRestricts(φ, b))
+    (ha' : archRestricts(φ, a')) (hb' : finiteRestricts(φ, b')) :
+    localTerms(φ, a, b) = localTerms(φ, a', b') := by
+  have h1 : a = a' := funext fun w ↦ Subtype.ext (funext fun u ↦ (ha w u).trans (ha' w u).symm)
+  have h2 : b = b' := funext fun v ↦ Subtype.ext (funext fun u ↦ (hb v u).trans (hb' v u).symm)
+  rw [h1, h2]
+
+/-- At a width whose edges carry no zeros of the characters trivial on a norm section, the strip
+trace is the sum over the zeros in the open strip (`spectralStripConvolution_trace`). -/
+private theorem exteriorZeros_hasSum_stripTrace (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) {β s : ℝ} (hβ : 0 < β) (hs : 1 < s)
+    (hedge : ∀ χ : PontryaginDual C𝔽, (∀ t, χ (τ t) = 1) →
+      ∀ z : ℂ, 0 < ord(χ, z) → |z.re - 1 / 2| ≠ β)
+    (φ : BruhatCompactSupport C𝔽) (T : nuclearEndomorphisms stripQuot(hβ.le, hs))
+    (hT : T.val = stripConv(hβ.le, hs, φ)) :
+    HasSum (fun z : interiorZeros(τ, β) ↦ zeroTerm(φ, z)) (hilbertTrace T) := by
+  obtain ⟨χ, hχ, hχτ, hlift⟩ := exteriorZeros_basepoint τ hτ
+  have ht := (spectralStripConvolution_trace (F := F) (1 / 2) χ hχ hβ.le hs φ T hT).2
+  exact exteriorZeros_hasSum_interior τ χ hχ hχτ hlift s
+    (fun ω z hz ↦ hedge (χ ω) (hχτ ω) z ((exteriorZeros_ord_pos_iff _ _).mpr hz)) φ ht
+
+/-- A sum over a set is a sum over any set with the same members. -/
+private theorem exteriorZeros_hasSum_of_iff {X : Type*} (G : X → ℂ) (A B : Set X)
+    (h : ∀ p, p ∈ A ↔ p ∈ B) {T : ℂ} (hA : HasSum (fun z : A ↦ G z) T) :
+    HasSum (fun z : B ↦ G z) T := by
+  obtain rfl : A = B := Set.ext h
+  exact hA
+
+/-- If the trace of the strip action of a test is its local terms, at a width whose edges carry
+no zeros, then the exterior zero terms of the test sum to zero. -/
+private theorem exteriorZeros_hasSum_of_width (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) {β s : ℝ} (hβ : 0 < β) (hs : 1 < s)
+    (hedge : ∀ χ : PontryaginDual C𝔽, (∀ t, χ (τ t) = 1) →
+      ∀ z : ℂ, 0 < ord(χ, z) → |z.re - 1 / 2| ≠ β)
+    (φ : BruhatCompactSupport C𝔽)
+    (T : nuclearEndomorphisms stripQuot(hβ.le, hs)) (hT : T.val = stripConv(hβ.le, hs, φ))
+    (htr : ∀ (a : archTest) (b : finiteTest), archRestricts(φ, a) → finiteRestricts(φ, b) →
+      hilbertTrace T = localTerms(φ, a, b)) :
+    HasSum (fun z : exteriorZeros(τ, β) ↦ zeroTerm(φ, z)) 0 := by
+  obtain ⟨a, b, ha, hb, -, hall⟩ := traceFormula_of_half_le τ hτ φ (le_refl (1 / 2 : ℝ))
+  have hint := exteriorZeros_hasSum_stripTrace τ hτ hβ hs hedge φ T hT
+  rw [htr a b ha hb] at hint
+  have hempty : IsEmpty exteriorZeros(τ, 1 / 2) :=
+    exteriorZeros_isEmpty_of_half_le τ (le_refl (1 / 2 : ℝ))
+  have hhalf (p : {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ)
+      (hp : 0 < ord(p.1.val, p.2)) : |p.2.re - 1 / 2| < 1 / 2 :=
+    lt_of_not_ge fun h ↦ hempty.false ⟨p, hp, h⟩
+  exact exteriorZeros_hasSum_diff (fun p : {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ ↦
+      ((ord(p.1.val, p.2) : ℤ) : ℂ) * M(φ, twist(p.1.val, p.2 - 1 / 2)))
+    {p | 0 < ord(p.1.val, p.2) ∧ |p.2.re - 1 / 2| < 1 / 2}
+    {p | 0 < ord(p.1.val, p.2) ∧ |p.2.re - 1 / 2| < β}
+    {p | 0 < ord(p.1.val, p.2) ∧ β ≤ |p.2.re - 1 / 2|}
+    (fun p ↦ ⟨fun h ↦ ⟨⟨h.1, hhalf p h.1⟩, fun h' ↦ (not_lt.mpr h.2) h'.2⟩,
+      fun h ↦ ⟨h.1.1, not_lt.mp fun h' ↦ h.2 ⟨h.1.1, h'⟩⟩⟩)
+    (fun p hp ↦ ⟨hp.1, hhalf p hp.1⟩) hall hint
+
+/-- With no zeros outside the strip, the trace of the strip action of every test, when it is
+nuclear, equals its local terms. -/
+private theorem exteriorZeros_stripTrace_of_isEmpty (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) {β s : ℝ} (hβ : 0 < β) (hs : 1 < s)
+    (hE : IsEmpty exteriorZeros(τ, β)) (φ : BruhatCompactSupport C𝔽)
+    (a : archTest) (b : finiteTest) (ha : archRestricts(φ, a)) (hb : finiteRestricts(φ, b))
+    (T : nuclearEndomorphisms stripQuot(hβ.le, hs)) (hT : T.val = stripConv(hβ.le, hs, φ)) :
+    hilbertTrace T = localTerms(φ, a, b) := by
+  have hin (p : {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ)
+      (hp : 0 < ord(p.1.val, p.2)) : |p.2.re - 1 / 2| < β :=
+    lt_of_not_ge fun h ↦ hE.false ⟨p, hp, h⟩
+  have hempty : IsEmpty exteriorZeros(τ, 1 / 2) :=
+    exteriorZeros_isEmpty_of_half_le τ (le_refl (1 / 2 : ℝ))
+  have hhalf (p : {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ)
+      (hp : 0 < ord(p.1.val, p.2)) : |p.2.re - 1 / 2| < 1 / 2 :=
+    lt_of_not_ge fun h ↦ hempty.false ⟨p, hp, h⟩
+  have hint := exteriorZeros_hasSum_stripTrace τ hτ hβ hs
+    (fun χ hχ z hz ↦ (hin (⟨χ, hχ⟩, z) hz).ne) φ T hT
+  obtain ⟨a', b', ha', hb', -, hall⟩ := traceFormula_of_half_le τ hτ φ (le_refl (1 / 2 : ℝ))
+  have hall' := exteriorZeros_hasSum_of_iff (fun p : {χ : PontryaginDual C𝔽 //
+      ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ ↦
+        ((ord(p.1.val, p.2) : ℤ) : ℂ) * M(φ, twist(p.1.val, p.2 - 1 / 2)))
+    {p | 0 < ord(p.1.val, p.2) ∧ |p.2.re - 1 / 2| < 1 / 2}
+    {p | 0 < ord(p.1.val, p.2) ∧ |p.2.re - 1 / 2| < β}
+    (fun p ↦ ⟨fun h ↦ ⟨h.1, hin p h.1⟩, fun h ↦ ⟨h.1, hhalf p h.1⟩⟩) hall
+  exact (hint.unique hall').trans (exteriorZeros_localTerms_congr φ ha' hb' ha hb)
+
+/-- Paper: Theorem 12.5.1.1, p. 520, with (12.5.1.4) and Theorem B.4.4.7, p. 623. Fix a norm
+section τ and a half-width β > 0 such that no completed Hecke L-function of a character trivial on
+τ vanishes on the edges |Re s − 1/2| = β. Then the trace identity on the strip quotient (the
+trace equals the local terms) holds at β for every test vanishing on the norm-one classes, whose
+strip actions are assumed nuclear, exactly when none of these L-functions has a zero with
+|Re s − 1/2| ≥ β. The identity is stated at any Sobolev order s > 1. -/
+theorem spectralStripTrace_eq_localTerms_iff (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) {β s : ℝ} (hβ : 0 < β) (hs : 1 < s)
+    (hedge : ∀ χ : PontryaginDual C𝔽, (∀ t, χ (τ t) = 1) →
+      ∀ z : ℂ, 0 < ord(χ, z) → |z.re - 1 / 2| ≠ β)
+    (hN : ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C₁, φ.val g = 0) →
+      IsNuclearOperator stripConv(hβ.le, hs, φ)) :
+    (∀ φ : BruhatCompactSupport C𝔽, (∀ g : C₁, φ.val g = 0) →
+      ∀ (a : archTest) (b : finiteTest), archRestricts(φ, a) → finiteRestricts(φ, b) →
+        ∀ T : nuclearEndomorphisms stripQuot(hβ.le, hs), T.val = stripConv(hβ.le, hs, φ) →
+          hilbertTrace T = localTerms(φ, a, b)) ↔
+      IsEmpty exteriorZeros(τ, β) :=
+  ⟨fun h ↦ isEmpty_exteriorZeros_of_hasSum τ hτ β fun φ hφ ↦
+      exteriorZeros_hasSum_of_width τ hτ hβ hs hedge φ ⟨_, hN φ hφ⟩ rfl
+        (fun a b ha hb ↦ h φ hφ a b ha hb _ rfl),
+    fun hE φ _ a b ha hb T hT ↦ exteriorZeros_stripTrace_of_isEmpty τ hτ hβ hs hE φ a b ha hb T hT⟩
+
+/-- Paper: Theorem 12.5.1.1, p. 520, with Proposition 3.2.1.3(3)–(4), p. 123, and Theorem
+B.4.4.7, p. 623. For every half-width at least one half and every test, the trace of the strip
+action, for any nuclear representative, equals the local terms, with no nuclearity
+assumption.
+Deviation: The test need not vanish on the norm-one classes. -/
+theorem spectralStripTrace_eq_localTerms_of_half_le (φ : BruhatCompactSupport C𝔽)
+    {α s : ℝ} (hα : 1 / 2 ≤ α) (hs : 1 < s)
+    (a : archTest) (b : finiteTest) (ha : archRestricts(φ, a)) (hb : finiteRestricts(φ, b))
+    (T : nuclearEndomorphisms stripQuot((one_half_pos.trans_le hα).le, hs))
+    (hT : T.val = stripConv((one_half_pos.trans_le hα).le, hs, φ)) :
+    hilbertTrace T = localTerms(φ, a, b) := by
+  let q : IdeleGroup (𝓞 F) F →ₜ* C𝔽 := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
+  let τ : ℝ≥0ˣ →ₜ* C𝔽 := q.comp
+    ⟨canonicalIdeleNormSection F, canonicalIdeleNormSection_continuous F⟩
+  have hτ : RightInverse τ (ideleClassNorm F) := canonicalIdeleNormSection_rightInverse F
+  exact exteriorZeros_stripTrace_of_isEmpty τ hτ (one_half_pos.trans_le hα) hs
+    (exteriorZeros_isEmpty_of_half_le τ hα) φ a b ha hb T hT
+
+/-- Paper: Theorem 12.5.1.1, p. 520, with (12.5.1.4) and Theorem B.4.4.7, p. 623. If the
+conclusion of `traceFormula_exteriorZeros` holds at a half-width α > 0 for every test vanishing on
+the norm-one classes, then the trace identity on the strip quotient holds at α, at every Sobolev
+order s > 1: the trace of any nuclear representative equals the local terms. No nuclearity is
+assumed; where the strip action has no nuclear representative the identity says nothing. -/
+theorem spectralStripTrace_eq_localTerms_of_exteriorZeros (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) {α s : ℝ} (hα : 0 < α) (hs : 1 < s)
+    (hX : ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C₁, φ.val g = 0) →
+      HasSum (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z)) 0)
+    (φ : BruhatCompactSupport C𝔽)
+    (a : archTest) (b : finiteTest) (ha : archRestricts(φ, a)) (hb : finiteRestricts(φ, b))
+    (T : nuclearEndomorphisms stripQuot(hα.le, hs)) (hT : T.val = stripConv(hα.le, hs, φ)) :
+    hilbertTrace T = localTerms(φ, a, b) :=
+  exteriorZeros_stripTrace_of_isEmpty τ hτ hα hs (isEmpty_exteriorZeros_of_hasSum τ hτ α hX)
+    φ a b ha hb T hT
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520, with (12.5.1.4) and Theorem B.4.4.7, p. 623. Suppose
+that for every positive half-width and every test vanishing on the norm-one classes, convolution
+after spectral projection on the Sobolev order 3 strip space has a projective tensor kernel (`hK`
+of (12.5.1.4)), and that the trace of convolution on the strip quotient equals the local terms.
+Then the conclusion of `traceFormula_exteriorZeros` holds: for such a test the zero terms
+omitted by a positive-width open strip sum to zero. At a width β ≤ α whose edges carry no zeros,
+`spectralStripConvolution_trace` gives the trace as the sum over the zeros inside the strip and
+Theorem B.4.4.7 gives the local terms as the sum over all zeros, so the zeros outside cancel for
+every test, and by `isEmpty_exteriorZeros_of_hasSum` there are none. -/
+theorem traceFormula_exteriorZeros_of_stripTrace (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F))
+    (hK : ∀ {β : ℝ} (hβ : 0 < β) (φ : BruhatCompactSupport C𝔽), (∀ g : C₁, φ.val g = 0) →
+      stripTensorExists(hβ.le, three, φ))
+    (htrace : ∀ (φ : BruhatCompactSupport C𝔽), (∀ g : C₁, φ.val g = 0) →
+      ∀ {β : ℝ} (hβ : 0 < β) (a : archTest) (b : finiteTest),
+        archRestricts(φ, a) → finiteRestricts(φ, b) →
+        ∀ T : nuclearEndomorphisms stripQuot(hβ.le, three),
+          T.val = stripConv(hβ.le, three, φ) → hilbertTrace T = localTerms(φ, a, b))
+    (φ : BruhatCompactSupport C𝔽) {α : ℝ} (hα : 0 < α) :
+    HasSum (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z)) 0 := by
+  obtain ⟨χ, -, -, hlift⟩ := exteriorZeros_basepoint τ hτ
+  obtain ⟨β, hβ, hβα, hedge⟩ := exteriorZeros_exists_width χ hα
+  have hE := isEmpty_exteriorZeros_of_hasSum τ hτ β fun φ' hφ' ↦
+    exteriorZeros_hasSum_of_width τ hτ hβ three
+      (fun ψ hψ z hz ↦ hedge (ψ.comp restriction) z
+        (by rw [hlift ψ hψ]; exact (exteriorZeros_ord_pos_iff _ _).mp hz)) φ'
+      ⟨_, spectralStripConvolution_nuclear_of_projectiveKernel hβ.le three φ' (hK hβ φ' hφ')⟩ rfl
+      (fun a b ha hb ↦ htrace φ' hφ' hβ a b ha hb _ rfl)
+  have : IsEmpty exteriorZeros(τ, α) :=
+    ⟨fun z ↦ hE.false ⟨z.val, z.property.1, hβα.trans z.property.2⟩⟩
+  exact hasSum_empty
+
+end GlobalDiagonal
+
 end RiemannMasullo
