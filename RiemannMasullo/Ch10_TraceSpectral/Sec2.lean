@@ -9088,4 +9088,370 @@ theorem spectralStripMarkushevichBasis_normalized
   · intro j
     simpa only [hD j] using hlower j
 
+/-- The norm integral of a strip jet does not change when the real offset changes sign. -/
+private theorem spectralStripJet_order_and_margin_of_upperBound_neg (α s b : ℝ) (k : ℕ) :
+    ∫ x : ℝ, Real.exp (2 * (-b) * x - 2 * α * |x|) * x ^ (2 * k) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume =
+      ∫ x : ℝ, Real.exp (2 * b * x - 2 * α * |x|) * x ^ (2 * k) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume := by
+  rw [← integral_neg_eq_self (fun x : ℝ ↦ Real.exp (2 * b * x - 2 * α * |x|) * x ^ (2 * k) *
+    ((1 + x ^ 2) ^ (s / 2))⁻¹) volume]
+  refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+  dsimp only
+  rw [abs_neg, neg_sq, (even_two_mul k).neg_pow, show 2 * b * -x = 2 * (-b) * x by ring]
+
+/-- For a jet whose order is at least the boundary threshold, the norm integral is at least a
+fixed multiple of the logarithm of the inverse distance of its real offset from the edge. -/
+private theorem spectralStripJet_order_and_margin_of_upperBound_log {α s b : ℝ} {k : ℕ}
+    (hs : 0 ≤ s) (hbα : b < α) (hε : α - b < 1) (hk : s ≤ 2 * (k : ℝ) + 1)
+    (hint : Integrable (fun x : ℝ ↦ Real.exp (2 * b * x - 2 * α * |x|) * x ^ (2 * k) *
+      ((1 + x ^ 2) ^ (s / 2))⁻¹) volume) :
+    Real.exp (-2) * ((2 : ℝ) ^ (s / 2))⁻¹ * Real.log (α - b)⁻¹ ≤
+      ∫ x : ℝ, Real.exp (2 * b * x - 2 * α * |x|) * x ^ (2 * k) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume := by
+  have hε0 : 0 < α - b := sub_pos.mpr hbα
+  have hone : 1 ≤ (α - b)⁻¹ := (one_le_inv₀ hε0).mpr hε.le
+  have h2pos : 0 < (2 : ℝ) ^ (s / 2) := Real.rpow_pos_of_pos (by norm_num) _
+  have hg_int : Integrable ((Ioc 1 (α - b)⁻¹).indicator fun x : ℝ ↦
+      Real.exp (-2) * ((2 : ℝ) ^ (s / 2))⁻¹ * x⁻¹) volume := by
+    refine ((ContinuousOn.integrableOn_Icc ?_).mono_set
+      Ioc_subset_Icc_self).integrable_indicator measurableSet_Ioc
+    exact continuousOn_const.mul
+      (continuousOn_inv₀.mono fun x hx ↦ (zero_lt_one.trans_le hx.1).ne')
+  have hle : ∀ x : ℝ, (Ioc 1 (α - b)⁻¹).indicator (fun x : ℝ ↦
+      Real.exp (-2) * ((2 : ℝ) ^ (s / 2))⁻¹ * x⁻¹) x ≤
+      Real.exp (2 * b * x - 2 * α * |x|) * x ^ (2 * k) * ((1 + x ^ 2) ^ (s / 2))⁻¹ := by
+    intro x
+    by_cases hx : x ∈ Ioc 1 (α - b)⁻¹
+    · rw [indicator_of_mem hx]
+      have hx1 : 1 ≤ x := hx.1.le
+      have hx0 : 0 < x := zero_lt_one.trans hx.1
+      have hεx : (α - b) * x ≤ 1 := by
+        have h := mul_le_mul_of_nonneg_left hx.2 hε0.le
+        rwa [mul_inv_cancel₀ hε0.ne'] at h
+      have hexp : Real.exp (-2) ≤ Real.exp (2 * b * x - 2 * α * |x|) := by
+        rw [abs_of_pos hx0]
+        apply Real.exp_le_exp.mpr
+        nlinarith
+      have hD : (1 + x ^ 2) ^ (s / 2) ≤ 2 ^ (s / 2) * x ^ s := by
+        calc (1 + x ^ 2) ^ (s / 2) ≤ (2 * x ^ 2) ^ (s / 2) :=
+              Real.rpow_le_rpow (by positivity) (by nlinarith) (by linarith)
+          _ = 2 ^ (s / 2) * x ^ s := by
+              rw [Real.mul_rpow (by norm_num) (by positivity), ← Real.rpow_natCast x 2,
+                ← Real.rpow_mul hx0.le]
+              congr 2
+              push_cast
+              ring
+      have hpow : x ^ s ≤ x ^ (2 * k) * x := by
+        calc x ^ s ≤ x ^ ((2 * k + 1 : ℕ) : ℝ) :=
+              Real.rpow_le_rpow_of_exponent_le hx1 (by push_cast; linarith)
+          _ = x ^ (2 * k) * x := by rw [Real.rpow_natCast, pow_succ]
+      have hDpos : 0 < (1 + x ^ 2) ^ (s / 2) := Real.rpow_pos_of_pos (by positivity) _
+      have hfrac : ((2 : ℝ) ^ (s / 2))⁻¹ * x⁻¹ ≤ x ^ (2 * k) * ((1 + x ^ 2) ^ (s / 2))⁻¹ := by
+        rw [← mul_inv, ← div_eq_mul_inv, inv_eq_one_div,
+          div_le_div_iff₀ (mul_pos h2pos hx0) hDpos]
+        calc 1 * (1 + x ^ 2) ^ (s / 2) ≤ 2 ^ (s / 2) * x ^ s := by rw [one_mul]; exact hD
+          _ ≤ 2 ^ (s / 2) * (x ^ (2 * k) * x) := mul_le_mul_of_nonneg_left hpow h2pos.le
+          _ = x ^ (2 * k) * (2 ^ (s / 2) * x) := by ring
+      calc Real.exp (-2) * ((2 : ℝ) ^ (s / 2))⁻¹ * x⁻¹
+          = Real.exp (-2) * (((2 : ℝ) ^ (s / 2))⁻¹ * x⁻¹) := by ring
+        _ ≤ Real.exp (2 * b * x - 2 * α * |x|) *
+            (x ^ (2 * k) * ((1 + x ^ 2) ^ (s / 2))⁻¹) :=
+            mul_le_mul hexp hfrac (by positivity) (Real.exp_pos _).le
+        _ = _ := by ring
+    · rw [indicator_of_notMem hx]
+      exact mul_nonneg (mul_nonneg (Real.exp_pos _).le (Even.pow_nonneg (even_two_mul _) x))
+        (inv_nonneg.mpr (Real.rpow_pos_of_pos (by positivity) _).le)
+  have h1 := integral_mono hg_int hint hle
+  have h2 : ∫ x : ℝ, (Ioc 1 (α - b)⁻¹).indicator (fun x : ℝ ↦
+      Real.exp (-2) * ((2 : ℝ) ^ (s / 2))⁻¹ * x⁻¹) x ∂volume =
+      Real.exp (-2) * ((2 : ℝ) ^ (s / 2))⁻¹ * Real.log (α - b)⁻¹ := by
+    rw [integral_indicator measurableSet_Ioc, ← intervalIntegral.integral_of_le hone,
+      intervalIntegral.integral_const_mul, integral_inv_of_pos one_pos
+        (zero_lt_one.trans_le hone), div_one]
+  linarith
+
+/-- Paper: Proposition 10.2.2.2 and (10.2.2.8), pp. 446–447. The converse of
+`spectralStripJet_upperBound_of_margin`: on one strip, a common upper bound for the norms of
+the strip jets bounds their orders, and keeps the jets of order at least `(s - 1) / 2` at a
+fixed distance from the two edges. So on every strip the upper bound of Proposition 10.2.2.2
+is equivalent to the conclusion of `spectralStripJet_order_and_margin`.
+Deviation: The paper does not state this. The squared norm of a jet of order `m` is at least
+a constant times `4 ^ m`, and for `m ≥ (s - 1) / 2` at least a constant times the logarithm of
+the inverse distance of its real offset from the edge. -/
+theorem spectralStripJet_order_and_margin_of_upperBound
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) {a α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s) (C : ℝ)
+    (_h : ∀ j : SpectralStripJetIndex χ a α s,
+      ‖(spectralStripJet_memLp χ hα (lineHs(hs)) j).toLp (stripJet(χ, j))‖ ≤ C) :
+    ∃ (K : ℕ) (δ : ℝ), 0 < δ ∧ ∀ j : SpectralStripJetIndex χ a α s,
+      j.val.2.2.2 ≤ K ∧ ((s - 1) / 2 ≤ (j.val.2.2.2 : ℝ) → |j.val.2.1| ≤ α - δ) := by
+  let ν : Measure C𝔽 := canonicalModulatedHaar m𝔽 hm𝔽
+  let : ν.IsHaarMeasure := (existsUnique_canonicalModulatedHaar m𝔽 hm𝔽).exists.choose_spec.1
+  let hs₀ : 0 ≤ s := lineHs(hs)
+  have hfac_pos : 0 < (Measure.haarScalarFactor μ𝔽 ν : ℝ) := by
+    exact_mod_cast (Measure.haarScalarFactor_pos_of_isHaarMeasure μ𝔽 ν)
+  let c₁ : ℝ := Real.exp (-12 * α) * ((10 : ℝ) ^ (s / 2))⁻¹
+  let c₂ : ℝ := Real.exp (-2) * ((2 : ℝ) ^ (s / 2))⁻¹
+  have hc₁ : 0 < c₁ :=
+    mul_pos (Real.exp_pos _) (inv_pos.mpr (Real.rpow_pos_of_pos (by norm_num) _))
+  have hc₂ : 0 < c₂ :=
+    mul_pos (Real.exp_pos _) (inv_pos.mpr (Real.rpow_pos_of_pos (by norm_num) _))
+  let L : ℝ := C ^ 2 / ((Measure.haarScalarFactor μ𝔽 ν : ℝ) * c₂)
+  have hL : 0 ≤ L := div_nonneg (sq_nonneg C) (mul_pos hfac_pos hc₂).le
+  have hsq (j : SpectralStripJetIndex χ a α s) : (Measure.haarScalarFactor μ𝔽 ν : ℝ) *
+      ∫ x : ℝ, Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j.val.2.2.2) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume ≤ C ^ 2 := by
+    rw [← spectralStripJet_norm_sq χ hα hs₀ j ν rfl]
+    exact pow_le_pow_left₀ (norm_nonneg _) (_h j) 2
+  refine ⟨⌈C ^ 2 / ((Measure.haarScalarFactor μ𝔽 ν : ℝ) * c₁)⌉₊, Real.exp (-L),
+    Real.exp_pos _, fun j ↦ ⟨?_, fun hk ↦ ?_⟩⟩
+  · have hcond : (-α < j.val.2.1 ∧ j.val.2.1 < α) ∨
+        ((j.val.2.1 = -α ∨ j.val.2.1 = α) ∧ 2 * (j.val.2.2.2 : ℝ) + 1 < s) := by
+      have hj := j.property
+      unfold spectralStripMultiplicity at hj
+      split_ifs at hj with h1 h2
+      · exact Or.inl h1
+      · refine Or.inr ⟨h2, ?_⟩
+        have horder : (j.val.2.2.2 : ℝ) < (s - 1) / 2 :=
+          ((lt_spectralBoundaryMultiplicity s _ _).mp hj).2
+        linarith
+      · omega
+    have hf_int : Integrable (fun x : ℝ ↦
+        Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j.val.2.2.2) *
+          ((1 + x ^ 2) ^ (s / 2))⁻¹) volume :=
+      spectralStripJet_integrable hα hs₀ hcond
+    have hb : j.val.2.1 ∈ Icc (-α) α := (SpectralStripJetIndex.mem_strip_order_pos hα j).1
+    have hind_int : Integrable ((Icc (2 : ℝ) 3).indicator fun _ ↦
+        c₁ * 4 ^ j.val.2.2.2) volume :=
+      (integrableOn_const (by simp)).integrable_indicator measurableSet_Icc
+    have hle : ∀ x : ℝ, (Icc (2 : ℝ) 3).indicator (fun _ ↦ c₁ * 4 ^ j.val.2.2.2) x ≤
+        Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j.val.2.2.2) *
+          ((1 + x ^ 2) ^ (s / 2))⁻¹ := by
+      intro x
+      by_cases hx : x ∈ Icc (2 : ℝ) 3
+      · rw [indicator_of_mem hx]
+        have hxpos : 0 ≤ x := by linarith [hx.1]
+        have hexp : Real.exp (-12 * α) ≤ Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) := by
+          rw [abs_of_nonneg hxpos]
+          exact Real.exp_le_exp.mpr (by nlinarith [hb.1, hx.1, hx.2])
+        have hpow : (4 : ℝ) ^ j.val.2.2.2 ≤ x ^ (2 * j.val.2.2.2) := by
+          rw [pow_mul]
+          exact pow_le_pow_left₀ (by norm_num) (by nlinarith [hx.1]) _
+        have hbase : 1 + x ^ 2 ≤ 10 := by nlinarith [hx.1, hx.2]
+        have hrpow : (1 + x ^ 2) ^ (s / 2) ≤ (10 : ℝ) ^ (s / 2) :=
+          Real.rpow_le_rpow (by positivity) hbase (by linarith)
+        have hinv : ((10 : ℝ) ^ (s / 2))⁻¹ ≤ ((1 + x ^ 2) ^ (s / 2))⁻¹ :=
+          inv_anti₀ (Real.rpow_pos_of_pos (by positivity) _) hrpow
+        calc c₁ * 4 ^ j.val.2.2.2
+            = Real.exp (-12 * α) * 4 ^ j.val.2.2.2 * ((10 : ℝ) ^ (s / 2))⁻¹ := by
+              simp only [c₁]
+              ring
+          _ ≤ _ := mul_le_mul (mul_le_mul hexp hpow (by positivity) (Real.exp_pos _).le) hinv
+              (inv_nonneg.mpr (Real.rpow_pos_of_pos (by norm_num) _).le)
+              (mul_nonneg (Real.exp_pos _).le (Even.pow_nonneg (even_two_mul _) x))
+      · rw [indicator_of_notMem hx]
+        exact mul_nonneg (mul_nonneg (Real.exp_pos _).le (Even.pow_nonneg (even_two_mul _) x))
+          (inv_nonneg.mpr (Real.rpow_pos_of_pos (by positivity) _).le)
+    have hint_le : c₁ * 4 ^ j.val.2.2.2 ≤ ∫ x : ℝ,
+        Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j.val.2.2.2) *
+          ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume := by
+      have h1 := integral_mono hind_int hf_int hle
+      have h2 : ∫ x : ℝ, (Icc (2 : ℝ) 3).indicator (fun _ ↦ c₁ * 4 ^ j.val.2.2.2) x ∂volume =
+          c₁ * 4 ^ j.val.2.2.2 := by
+        rw [integral_indicator measurableSet_Icc, setIntegral_const, Real.volume_real_Icc]
+        norm_num
+      linarith
+    have h4 : (4 : ℝ) ^ j.val.2.2.2 ≤ C ^ 2 / ((Measure.haarScalarFactor μ𝔽 ν : ℝ) * c₁) := by
+      rw [le_div_iff₀ (mul_pos hfac_pos hc₁)]
+      calc (4 : ℝ) ^ j.val.2.2.2 * ((Measure.haarScalarFactor μ𝔽 ν : ℝ) * c₁)
+          = (Measure.haarScalarFactor μ𝔽 ν : ℝ) * (c₁ * 4 ^ j.val.2.2.2) := by ring
+        _ ≤ _ := (mul_le_mul_of_nonneg_left hint_le hfac_pos.le).trans (hsq j)
+    have hk : (j.val.2.2.2 : ℝ) ≤ 4 ^ j.val.2.2.2 := by
+      exact_mod_cast (Nat.lt_pow_self (by norm_num : 1 < 4)).le
+    exact Nat.cast_le.mp ((hk.trans h4).trans (Nat.le_ceil _))
+  · have hj := j.property
+    unfold spectralStripMultiplicity at hj
+    split_ifs at hj with hb he
+    · have habs : |j.val.2.1| < α := abs_lt.mpr hb
+      by_cases h1 : 1 ≤ α - |j.val.2.1|
+      · have : Real.exp (-L) ≤ 1 := Real.exp_le_one_iff.mpr (by linarith)
+        linarith
+      · have hint' : Integrable (fun x : ℝ ↦
+            Real.exp (2 * |j.val.2.1| * x - 2 * α * |x|) * x ^ (2 * j.val.2.2.2) *
+              ((1 + x ^ 2) ^ (s / 2))⁻¹) volume :=
+          spectralStripJet_integrable hα hs₀
+            (Or.inl ⟨by linarith [abs_nonneg j.val.2.1], habs⟩)
+        have hlog := spectralStripJet_order_and_margin_of_upperBound_log hs₀
+          habs (not_le.mp h1) (by linarith) hint'
+        have hsym : ∫ x : ℝ, Real.exp (2 * |j.val.2.1| * x - 2 * α * |x|) *
+            x ^ (2 * j.val.2.2.2) * ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume =
+            ∫ x : ℝ, Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) *
+              x ^ (2 * j.val.2.2.2) * ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume := by
+          rcases abs_cases j.val.2.1 with ⟨h, _⟩ | ⟨h, _⟩
+          · rw [h]
+          · rw [h]
+            exact spectralStripJet_order_and_margin_of_upperBound_neg α s _ _
+        rw [hsym] at hlog
+        have h3 : (Measure.haarScalarFactor μ𝔽 ν : ℝ) *
+            (c₂ * Real.log (α - |j.val.2.1|)⁻¹) ≤ C ^ 2 :=
+          (mul_le_mul_of_nonneg_left hlog hfac_pos.le).trans (hsq j)
+        have h4 : Real.log (α - |j.val.2.1|)⁻¹ ≤ L := by
+          rw [le_div_iff₀ (mul_pos hfac_pos hc₂)]
+          linarith
+        rw [Real.log_inv] at h4
+        have h5 : Real.exp (-L) ≤ α - |j.val.2.1| := by
+          calc Real.exp (-L) ≤ Real.exp (Real.log (α - |j.val.2.1|)) :=
+                Real.exp_le_exp.mpr (by linarith)
+            _ = α - |j.val.2.1| := Real.exp_log (sub_pos.mpr habs)
+        linarith
+    · have hlt := ((lt_spectralBoundaryMultiplicity _ _ _).mp hj).2
+      linarith
+    · omega
+
+/-- Paper: Proposition 10.2.2.2 and (10.2.2.8), pp. 446–447, as used before (10.3.1.19),
+p. 451. Among the strip jets with the same real offset, a jet of lower order has norm at most a
+fixed multiple of the norm of a jet of higher order. So the products of the norm of a jet and
+the norm of the biorthogonal vector of a jet of higher order at the same zero, for which
+p. 451 asks one constant, are bounded by the products with equal orders. No bound on the
+multiplicities of the zeros is used.
+Deviation: The paper does not state this. It takes the bound from an upper bound for the norms
+of all the jets. -/
+theorem spectralStripJet_norm_le_of_order_le (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (_hχ : IsSpectralBasepointChoice χ) {a α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s) :
+    ∃ C : ℝ, 0 < C ∧ ∀ j j' : SpectralStripJetIndex χ a α s,
+      j'.val.2.1 = j.val.2.1 → j'.val.2.2.2 ≤ j.val.2.2.2 →
+      ‖(spectralStripJet_memLp χ hα (lineHs(hs)) j').toLp (stripJet(χ, j'))‖ ≤
+        C * ‖(spectralStripJet_memLp χ hα (lineHs(hs)) j).toLp (stripJet(χ, j))‖ := by
+  let ν : Measure C𝔽 := canonicalModulatedHaar m𝔽 hm𝔽
+  let : ν.IsHaarMeasure := (existsUnique_canonicalModulatedHaar m𝔽 hm𝔽).exists.choose_spec.1
+  let hs₀ : 0 ≤ s := lineHs(hs)
+  have hfac_nonneg : 0 ≤ (Measure.haarScalarFactor μ𝔽 ν : ℝ) := NNReal.coe_nonneg _
+  obtain ⟨c, hc, hlower⟩ := spectralStripJet_lowerBound (a := a) χ _hχ hα hs
+  let I₀ : ℝ := ∫ x : ℝ, ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume
+  have hI₀_int : Integrable (fun x : ℝ ↦ ((1 + x ^ 2) ^ (s / 2))⁻¹) volume := by
+    have h := integrable_pow_mul_rpow_inv (k := 0) (s := s) (by
+      rw [Nat.cast_zero, mul_zero, zero_add]
+      exact hs)
+    simpa only [mul_zero, pow_zero, one_mul] using h
+  have hI₀ : 0 ≤ I₀ := integral_nonneg fun x ↦
+    inv_nonneg.mpr (Real.rpow_pos_of_pos (by positivity) _).le
+  let B : ℝ := (Measure.haarScalarFactor μ𝔽 ν : ℝ) * I₀ / c ^ 2 + 1
+  have hB : 0 < B := by
+    have : 0 ≤ (Measure.haarScalarFactor μ𝔽 ν : ℝ) * I₀ / c ^ 2 :=
+      div_nonneg (mul_nonneg hfac_nonneg hI₀) (sq_nonneg c)
+    linarith
+  refine ⟨Real.sqrt B, Real.sqrt_pos.mpr hB, fun j j' hb hm ↦ ?_⟩
+  have hcond (i : SpectralStripJetIndex χ a α s) : (-α < i.val.2.1 ∧ i.val.2.1 < α) ∨
+      ((i.val.2.1 = -α ∨ i.val.2.1 = α) ∧ 2 * (i.val.2.2.2 : ℝ) + 1 < s) := by
+    have hi := i.property
+    unfold spectralStripMultiplicity at hi
+    split_ifs at hi with h1 h2
+    · exact Or.inl h1
+    · refine Or.inr ⟨h2, ?_⟩
+      have horder : (i.val.2.2.2 : ℝ) < (s - 1) / 2 :=
+        ((lt_spectralBoundaryMultiplicity s _ _).mp hi).2
+      linarith
+    · omega
+  have hcond₀ : (-α < j.val.2.1 ∧ j.val.2.1 < α) ∨
+      ((j.val.2.1 = -α ∨ j.val.2.1 = α) ∧ 2 * ((0 : ℕ) : ℝ) + 1 < s) := by
+    rcases hcond j with h | ⟨h, -⟩
+    · exact Or.inl h
+    · refine Or.inr ⟨h, ?_⟩
+      rw [Nat.cast_zero, mul_zero, zero_add]
+      exact hs
+  have hint : Integrable (fun x : ℝ ↦
+      Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j.val.2.2.2) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹) volume := spectralStripJet_integrable hα hs₀ (hcond j)
+  have hint' : Integrable (fun x : ℝ ↦
+      Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j'.val.2.2.2) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹) volume := by
+    have h := spectralStripJet_integrable hα hs₀ (hcond j')
+    rwa [hb] at h
+  have hint₀ : Integrable (fun x : ℝ ↦
+      Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * 0) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹) volume := spectralStripJet_integrable hα hs₀ hcond₀
+  have hbα : j.val.2.1 ∈ Icc (-α) α := (SpectralStripJetIndex.mem_strip_order_pos hα j).1
+  have hpos (x : ℝ) : 0 ≤ ((1 + x ^ 2) ^ (s / 2))⁻¹ :=
+    inv_nonneg.mpr (Real.rpow_pos_of_pos (by positivity) _).le
+  -- The zeroth jet has a norm integral bounded independently of the offset.
+  have h₀ : ∫ x : ℝ, Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * 0) *
+      ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume ≤ I₀ := by
+    refine integral_mono hint₀ hI₀_int fun x ↦ ?_
+    have hbx : j.val.2.1 * x ≤ α * |x| := by
+      calc
+        j.val.2.1 * x ≤ |j.val.2.1 * x| := le_abs_self _
+        _ = |j.val.2.1| * |x| := abs_mul _ _
+        _ ≤ α * |x| := mul_le_mul_of_nonneg_right (abs_le.mpr hbα) (abs_nonneg x)
+    have hexp : Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) ≤ 1 :=
+      Real.exp_le_one_iff.mpr (by linarith)
+    calc Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * 0) * ((1 + x ^ 2) ^ (s / 2))⁻¹
+        = Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * ((1 + x ^ 2) ^ (s / 2))⁻¹ := by
+          rw [mul_zero, pow_zero, mul_one]
+      _ ≤ 1 * ((1 + x ^ 2) ^ (s / 2))⁻¹ := mul_le_mul_of_nonneg_right hexp (hpos x)
+      _ = ((1 + x ^ 2) ^ (s / 2))⁻¹ := one_mul _
+  -- A lower power is at most one plus a higher power.
+  have hle : ∫ x : ℝ, Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j'.val.2.2.2) *
+      ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume ≤
+      (∫ x : ℝ, Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * 0) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume) +
+      ∫ x : ℝ, Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j.val.2.2.2) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume := by
+    rw [← integral_add hint₀ hint]
+    refine integral_mono hint' (hint₀.add hint) fun x ↦ ?_
+    have hpow : x ^ (2 * j'.val.2.2.2) ≤ x ^ (2 * 0) + x ^ (2 * j.val.2.2.2) := by
+      have hxa : x ^ (2 * j'.val.2.2.2) = |x| ^ (2 * j'.val.2.2.2) := by
+        rw [pow_mul, ← sq_abs, ← pow_mul]
+      have hxaK : x ^ (2 * j.val.2.2.2) = |x| ^ (2 * j.val.2.2.2) := by
+        rw [pow_mul, ← sq_abs, ← pow_mul]
+      rw [hxa, hxaK, mul_zero, pow_zero]
+      rcases le_total |x| 1 with hx1 | hx1
+      · have : |x| ^ (2 * j'.val.2.2.2) ≤ 1 := pow_le_one₀ (abs_nonneg x) hx1
+        linarith [pow_nonneg (abs_nonneg x) (2 * j.val.2.2.2)]
+      · have : |x| ^ (2 * j'.val.2.2.2) ≤ |x| ^ (2 * j.val.2.2.2) :=
+          pow_le_pow_right₀ hx1 (Nat.mul_le_mul_left 2 hm)
+        linarith
+    calc Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j'.val.2.2.2) *
+          ((1 + x ^ 2) ^ (s / 2))⁻¹
+        ≤ Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) *
+            (x ^ (2 * 0) + x ^ (2 * j.val.2.2.2)) * ((1 + x ^ 2) ^ (s / 2))⁻¹ :=
+          mul_le_mul_of_nonneg_right
+            (mul_le_mul_of_nonneg_left hpow (Real.exp_pos _).le) (hpos x)
+      _ = _ := by ring
+  have hsq := spectralStripJet_norm_sq χ hα hs₀ j ν rfl
+  have hsq' : ‖(spectralStripJet_memLp χ hα hs₀ j').toLp (stripJet(χ, j'))‖ ^ 2 =
+      (Measure.haarScalarFactor μ𝔽 ν : ℝ) *
+        ∫ x : ℝ, Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j'.val.2.2.2) *
+          ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume := by
+    rw [spectralStripJet_norm_sq χ hα hs₀ j' ν rfl, hb]
+  have hc2 : c ^ 2 ≤ ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖ ^ 2 :=
+    pow_le_pow_left₀ hc.le (hlower j) 2
+  have hmain : ‖(spectralStripJet_memLp χ hα hs₀ j').toLp (stripJet(χ, j'))‖ ^ 2 ≤
+      B * ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖ ^ 2 := by
+    have h1 : ‖(spectralStripJet_memLp χ hα hs₀ j').toLp (stripJet(χ, j'))‖ ^ 2 ≤
+        (Measure.haarScalarFactor μ𝔽 ν : ℝ) * I₀ +
+          ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖ ^ 2 := by
+      rw [hsq', hsq, ← mul_add]
+      exact mul_le_mul_of_nonneg_left (by linarith) hfac_nonneg
+    have h2 : (Measure.haarScalarFactor μ𝔽 ν : ℝ) * I₀ ≤
+        (Measure.haarScalarFactor μ𝔽 ν : ℝ) * I₀ / c ^ 2 *
+          ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖ ^ 2 := by
+      calc (Measure.haarScalarFactor μ𝔽 ν : ℝ) * I₀
+          = (Measure.haarScalarFactor μ𝔽 ν : ℝ) * I₀ / c ^ 2 * c ^ 2 := by
+            field_simp
+        _ ≤ _ := mul_le_mul_of_nonneg_left hc2
+            (div_nonneg (mul_nonneg hfac_nonneg hI₀) (sq_nonneg c))
+    calc ‖(spectralStripJet_memLp χ hα hs₀ j').toLp (stripJet(χ, j'))‖ ^ 2
+        ≤ (Measure.haarScalarFactor μ𝔽 ν : ℝ) * I₀ / c ^ 2 *
+            ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖ ^ 2 +
+          ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖ ^ 2 := by linarith
+      _ = B * ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖ ^ 2 := by
+          simp only [B]
+          ring
+  have hfinal : ‖(spectralStripJet_memLp χ hα hs₀ j').toLp (stripJet(χ, j'))‖ ^ 2 ≤
+      (Real.sqrt B * ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖) ^ 2 := by
+    rw [mul_pow, Real.sq_sqrt hB.le]
+    exact hmain
+  exact (pow_le_pow_iff_left₀ (norm_nonneg _)
+    (mul_nonneg (Real.sqrt_nonneg _) (norm_nonneg _)) two_ne_zero).mp hfinal
+
 end RiemannMasullo
