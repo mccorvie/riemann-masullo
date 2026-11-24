@@ -1430,6 +1430,476 @@ theorem globalThetaSobolevPrincipalValue_injective (S : Finset V) (a : ℝ) {s :
     rw [he]
     exact ih.comp (globalThetaPrincipalValue_injective_single v a hs)
 
+section PositiveTwist
+
+open Filter Topology
+
+/-- If the square of an operator `K` factors as `S * K` through an operator whose powers tend to
+zero in norm, then `1 - K` is bijective: a power of `K` has norm below one, and a geometric sum
+inverts one minus that power on both sides. -/
+private theorem globalThetaPrincipalValue_bijective_one_sub {X : Type*} [NormedAddCommGroup X]
+    [NormedSpace ℂ X] [CompleteSpace X] (K S : X →L[ℂ] X) (hK : K * K = S * K)
+    (hS : Tendsto (fun n : ℕ ↦ ‖S ^ n‖) atTop (𝓝 0)) :
+    Bijective ((1 - K : X →L[ℂ] X) : X → X) := by
+  have hpow (n : ℕ) : K ^ (n + 1) = S ^ n * K := by
+    induction n with
+    | zero => simp
+    | succ n ih => rw [pow_succ, ih, mul_assoc, hK, ← mul_assoc, ← pow_succ]
+  have hlim : Tendsto (fun n : ℕ ↦ ‖K ^ (n + 1)‖) atTop (𝓝 0) := by
+    refine squeeze_zero (fun _ ↦ norm_nonneg _) (fun n ↦ ?_) (by simpa using hS.mul_const ‖K‖)
+    rw [hpow]
+    exact norm_mul_le _ _
+  obtain ⟨N, hN⟩ := (hlim.eventually (gt_mem_nhds one_pos)).exists
+  let u := Units.oneSub (K ^ (N + 1)) hN
+  have hu : (u : X →L[ℂ] X) = 1 - K ^ (N + 1) := Units.val_oneSub _ _
+  let G := ∑ i ∈ Finset.range (N + 1), K ^ i
+  have hr : (1 - K) * (G * ↑u⁻¹) = 1 := by
+    rw [← mul_assoc, mul_neg_geom_sum, ← hu, Units.mul_inv]
+  have hl : (↑u⁻¹ * G) * (1 - K) = 1 := by
+    rw [mul_assoc, geom_sum_mul_neg, ← hu, Units.inv_mul]
+  refine ⟨Function.LeftInverse.injective (g := fun y ↦ (↑u⁻¹ * G) y) fun x ↦ ?_,
+    Function.RightInverse.surjective (g := fun y ↦ (G * ↑u⁻¹) y) fun y ↦ ?_⟩
+  · simpa only [mul_apply_eq_comp, one_apply_eq_self] using
+      congrArg (fun T : X →L[ℂ] X ↦ T x) hl
+  · simpa only [mul_apply_eq_comp, one_apply_eq_self] using
+      congrArg (fun T : X →L[ℂ] X ↦ T y) hr
+
+/-- A geometric decay beats a polynomial factor with real exponent. -/
+private theorem globalThetaPrincipalValue_tendsto_geom_poly {r ℓ t : ℝ} (hr₀ : 0 < r)
+    (hr : r < 1) (hℓ : 0 ≤ ℓ) :
+    Tendsto (fun n : ℕ ↦ r ^ n * (1 + n * ℓ) ^ t) atTop (𝓝 0) := by
+  let k := ⌈t⌉₊
+  have hshift : Tendsto (fun n : ℕ ↦ ((n + 1 : ℕ) : ℝ) ^ k * r ^ (n + 1)) atTop (𝓝 0) :=
+    (tendsto_pow_const_mul_const_pow_of_abs_lt_one k (by rwa [abs_of_pos hr₀])).comp
+      (tendsto_add_atTop_nat 1)
+  have hmain : Tendsto (fun n : ℕ ↦ (1 + ℓ) ^ k * r⁻¹ *
+      (((n + 1 : ℕ) : ℝ) ^ k * r ^ (n + 1))) atTop (𝓝 0) := by
+    simpa using hshift.const_mul ((1 + ℓ) ^ k * r⁻¹)
+  refine squeeze_zero (fun n ↦ by positivity) (fun n ↦ ?_) hmain
+  have hb : 1 ≤ 1 + (n : ℝ) * ℓ := le_add_of_nonneg_right (by positivity)
+  have h1 : (1 + (n : ℝ) * ℓ) ^ t ≤ (1 + (n : ℝ) * ℓ) ^ k := by
+    rw [← Real.rpow_natCast]
+    exact Real.rpow_le_rpow_of_exponent_le hb (Nat.le_ceil t)
+  have h2 : (1 + (n : ℝ) * ℓ) ^ k ≤ ((1 + ℓ) * ((n + 1 : ℕ) : ℝ)) ^ k := by
+    refine pow_le_pow_left₀ (by positivity) ?_ k
+    push_cast
+    nlinarith [(n.cast_nonneg : (0 : ℝ) ≤ n)]
+  have h3 : r ^ (n + 1) = r ^ n * r := pow_succ r n
+  calc r ^ n * (1 + n * ℓ) ^ t ≤ r ^ n * ((1 + ℓ) * ((n + 1 : ℕ) : ℝ)) ^ k :=
+        mul_le_mul_of_nonneg_left (h1.trans h2) (by positivity)
+    _ = (1 + ℓ) ^ k * r⁻¹ * (((n + 1 : ℕ) : ℝ) ^ k * r ^ (n + 1)) := by
+        rw [h3, mul_pow]
+        field_simp
+
+/-- On the weighted theta completion, the complement of a singleton principal value squares to a
+scaled uniformizer translate of itself: `(1 - P)² = |p|ᵃ R(p) (1 - P)` with `|p| < 1`. This is
+the identity behind `globalThetaPrincipalValue_injective_single`, stated for the operators. -/
+private theorem globalThetaPrincipalValue_single_sq (v : V) (a : ℝ) {s : ℝ} (hs : 0 ≤ s) :
+    ∃ p : C𝔽, ((m𝔽 p).val : ℝ) < 1 ∧
+      (1 - P({v}, a, hs)) * (1 - P({v}, a, hs)) =
+        ((((((m𝔽 p).val : ℝ) ^ a : ℝ) : ℂ)) •
+          (exists_globalThetaSobolevAction (F := F) a hI hs).choose p) * (1 - P({v}, a, hs)) := by
+  obtain ⟨π₀, hπ⟩ := (Valued.v : Valuation (v.adicCompletion F)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π : (v.adicCompletion F)ˣ := Units.mk0 (π₀ : v.adicCompletion F) hπ.ne_zero
+  let ι := IdeleClassGroup.ofAdicCompletion (𝓞 F) F v
+  let p := ι π
+  let c : ℂ := (((m𝔽 p).val : ℝ) ^ a : ℝ)
+  have hp : ((m𝔽 p).val : ℝ) < 1 := by
+    change ((ideleClassNorm F (ι π)).val : ℝ) < 1
+    rw [ideleClassNorm_ofAdicCompletion]
+    change ‖(π₀ : v.adicCompletion F)‖ < 1
+    rw [norm_uniformizer_adicCompletion v _ hπ]
+    exact inv_lt_one_of_one_lt₀ (by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v)
+  let μ := finiteLocalMultiplicativeTamagawaMeasure F v
+  let : MeasurableSpace (v.adicCompletion F)ˣ := borel _
+  let : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+  let : μ.IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) v
+  let K : Subgroup (v.adicCompletion F)ˣ := (HeightOneSpectrum.adicCompletionIntegers F v).units
+  have hKo : IsOpen (K : Set (v.adicCompletion F)ˣ) :=
+    Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hKc : IsCompact (K : Set (v.adicCompletion F)ˣ) := Submonoid.units_isCompact
+    (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v))
+  have hm : μ.real K ≠ 0 := (measureReal_ne_zero_iff hKc.measure_ne_top).mpr
+    (hKo.measure_pos μ ⟨1, K.one_mem⟩).ne'
+  let A (f : ℬ₀) := f - pvTest({v}, f)
+  let θ (f : ℬ₀) := (adelicTheta f.val : C𝔽 → ℂ)
+  have hθ (f : ℬ₀) (x : C𝔽) : θ (A f) x = ((μ.real K)⁻¹ : ℝ) *
+      ∫ k in (K : Set (v.adicCompletion F)ˣ), θ f (ι ((π * k)⁻¹) * x) ∂μ := by
+    have hsub := congrArg (fun h : C(C𝔽, ℂ) ↦ h x)
+      (map_sub (adelicThetaLinearMap F) f.val (pvTest({v}, f)).val)
+    exact hsub.trans (sub_eq_iff_eq_add.mpr (by
+      have h := globalThetaPrincipalValue_sobolevBound_formula v π hπ f x
+      change _ = _ + adelicTheta (adelePrincipalValue F {v} f.val) x
+      rw [h]
+      abel))
+  let D := globalThetaSobolevTestClass (F := F) a hs
+  have hd : DenseRange D := (globalThetaSobolev_dense (F := F) a hI hs).comp
+    (Submodule.mkQ_surjective _).denseRange (j(a, hs)).continuous
+  let R := (exists_globalThetaSobolevAction (F := F) a hI hs).choose
+  have hR (w : H(a, hs)) : (R p w).val = ρ(hs) p w.val :=
+    (exists_globalThetaSobolevAction (F := F) a hI hs).choose_spec.1 p w
+  have hrep (f : ℬ₀) : ((D f).val : C𝔽 → ℂ) =ᵐ[μ𝔽] modulationWeight m𝔽 a (θ f) :=
+    (existsUnique_globalThetaSobolevEmbedding (F := F) a 0 0 s hI hs).exists.choose_spec.2 f
+  refine ⟨p, hp, ?_⟩
+  let T := 1 - P({v}, a, hs)
+  have hT (f : ℬ₀) : T (D f) = D (A f) :=
+    (congrArg (D f - ·) (globalThetaSobolevPrincipalValue_apply {v} a hs f)).trans
+      (map_sub D f (pvTest({v}, f))).symm
+  have hRT (f : ℬ₀) : D (A (A f)) = (c • R p) (D (A f)) := by
+    refine Subtype.ext ?_
+    change (D (A (A f))).val = c • (R p (D (A f))).val
+    rw [hR]
+    exact globalThetaPrincipalValue_weighted_translate a hs p _ _ _ _ (hrep _) (hrep _)
+      (globalThetaPrincipalValue_average_twice μ K hKo.measurableSet hm ι π θ A hθ f)
+  have h := hd.equalizer (T.continuous.comp T.continuous) ((c • R p).continuous.comp T.continuous)
+    (funext fun f ↦ (congrArg T (hT f)).trans ((hT (A f)).trans ((hRT f).trans
+      (congrArg (c • R p) (hT f)).symm)))
+  exact ContinuousLinearMap.ext fun x ↦ congrFun h x
+
+/-- Translation by the powers of a class, restricted to the weighted theta completion over the
+base `[0, 0]`, grows at most polynomially in the exponent. -/
+private theorem globalThetaPrincipalValue_translation_pow_norm (a : ℝ) {s : ℝ} (hs : 0 ≤ s)
+    (p : C𝔽) (n : ℕ) :
+    ‖(exists_globalThetaSobolevAction (F := F) a hI hs).choose p ^ n‖ ≤
+      (1 + n * |Real.log ((m𝔽 p).val : ℝ)|) ^ (s / 2) := by
+  let R := (exists_globalThetaSobolevAction (F := F) a hI hs).choose
+  have hR (w : H(a, hs)) : (R (p ^ n) w).val = ρ(hs) (p ^ n) w.val :=
+    (exists_globalThetaSobolevAction (F := F) a hI hs).choose_spec.1 (p ^ n) w
+  have hρ := norm_hardySobolevTranslation_le μ𝔽 m𝔽 0 0 s hI hs (p ^ n)
+  have hlog : Real.log (((m𝔽 (p ^ n)).val : ℝ≥0) : ℝ) = n * Real.log ((m𝔽 p).val : ℝ) := by
+    rw [map_pow, Units.val_pow_eq_pow_val, NNReal.coe_pow, Real.log_pow]
+  simp only [zero_mul, Real.exp_zero, max_self, one_mul, hlog, abs_mul, Nat.abs_cast] at hρ
+  rw [← map_pow]
+  refine ContinuousLinearMap.opNorm_le_bound _ (by positivity) fun w ↦ ?_
+  change ‖(R (p ^ n) w).val‖ ≤ _ * ‖w.val‖
+  rw [hR]
+  exact (ContinuousLinearMap.le_opNorm _ _).trans
+    (mul_le_mul_of_nonneg_right hρ (norm_nonneg _))
+
+/-- Paper: (11.2.0.3), p. 484, and (11.3.1.3)–(11.3.1.4), p. 494. For a positive norm twist
+`a`, in particular for the half twist `a = 1/2` that p. 494 incorporates, the completed
+principal value on the weighted θ-completion over the base `[0, 0]` is bijective, for every
+finite set of finite places. On a singleton the complement `K = 1 - P` satisfies
+`K² = |p|ᵃ R(p) K` for a uniformizer class `p`, and the translations `R(pⁿ)` grow only
+polynomially, so a power of `K` has norm below one.
+Deviation: The paper does not state this. It shows that for `a > 0` the closed range in
+(11.2.0.3) is the whole completion, so the successive quotients (11.3.1.3) of completed θ-images
+are zero: the orbital functionals `χ(g)|g|^(ε-a)` of Theorem 11.2.0.2 are not continuous there,
+and among the twists `a ≥ 0` only `a = 0` carries the orbital bases of §11.2.2. -/
+theorem globalThetaSobolevPrincipalValue_bijective_of_pos (S : Finset V) {a : ℝ} (ha : 0 < a)
+    {s : ℝ} (hs : 0 ≤ s) : Bijective (P(S, a, hs)) := by
+  classical
+  induction S using Finset.induction_on with
+  | empty =>
+    have he : ∀ f : ℬ₀, pvTest(∅, f) = f := fun f ↦ Subtype.ext (by
+      change adelePrincipalValue F ∅ f.val = f.val
+      rw [sLocalUncutCarving_empty_PV]
+      rfl)
+    have hid : P(∅, a, hs) = ContinuousLinearMap.id ℂ _ :=
+      (existsUnique_globalThetaSobolevPrincipalValue ∅ a hs).unique
+        (existsUnique_globalThetaSobolevPrincipalValue ∅ a hs).exists.choose_spec
+        (fun f ↦ congrArg (fun b : ℬ₀ ↦ j(a, hs) (theta(b))) (he f).symm)
+    rw [hid]
+    exact bijective_id
+  | insert v S hv ih =>
+    have htest (f : ℬ₀) : pvTest(insert v S, f) = pvTest(S, pvTest({v}, f)) := by
+      refine Subtype.ext ?_
+      change adelePrincipalValue F (insert v S) f.val =
+        adelePrincipalValue F S (adelePrincipalValue F {v} f.val)
+      rw [sLocalCutoffCarving_antitone_PV (Finset.subset_insert v S), Finset.insert_sdiff_cancel hv]
+      rfl
+    have he : P(insert v S, a, hs) = (P(S, a, hs)).comp (P({v}, a, hs)) := by
+      apply (existsUnique_globalThetaSobolevPrincipalValue (insert v S) a hs).unique
+        (existsUnique_globalThetaSobolevPrincipalValue (insert v S) a hs).exists.choose_spec
+      intro f
+      rw [ContinuousLinearMap.comp_apply, globalThetaSobolevPrincipalValue_apply,
+        globalThetaSobolevPrincipalValue_apply, htest]
+    rw [he]
+    refine ih.comp ?_
+    obtain ⟨p, hp, hsq⟩ := globalThetaPrincipalValue_single_sq (F := F) v a hs
+    let R := (exists_globalThetaSobolevAction (F := F) a hI hs).choose
+    have : CompleteSpace H(a, hs) := (Submodule.isClosed_topologicalClosure _).completeSpace_coe
+    have hp₀ : 0 < ((m𝔽 p).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+    let r := ((m𝔽 p).val : ℝ) ^ a
+    have hr₀ : 0 < r := Real.rpow_pos_of_pos hp₀ a
+    have hr : r < 1 := Real.rpow_lt_one hp₀.le hp ha
+    have hS : Tendsto (fun n : ℕ ↦ ‖((r : ℂ) • R p) ^ n‖) atTop (𝓝 0) := by
+      refine squeeze_zero (fun _ ↦ norm_nonneg _) (fun n ↦ ?_)
+        (globalThetaPrincipalValue_tendsto_geom_poly (t := s / 2) hr₀ hr
+          (abs_nonneg (Real.log ((m𝔽 p).val : ℝ))))
+      rw [smul_pow, norm_smul, norm_pow, Complex.norm_real, Real.norm_of_nonneg hr₀.le]
+      exact mul_le_mul_of_nonneg_left
+        (globalThetaPrincipalValue_translation_pow_norm (F := F) a hs p n) (by positivity)
+    have hbij := globalThetaPrincipalValue_bijective_one_sub (1 - P({v}, a, hs)) _ hsq hS
+    rwa [sub_sub_cancel] at hbij
+
+end PositiveTwist
+
+section PositiveTwistStrip
+
+open Filter Topology
+
+/-- The weighted θ-class of a translated function is the scaled Sobolev translate, on any base
+interval. -/
+private theorem globalThetaPrincipalValue_weighted_translate_strip (a : ℝ) {l r s : ℝ}
+    (hlr : l ≤ r) (hs : 0 ≤ s) (p : C𝔽) (φ ψ : C𝔽 → ℂ)
+    (u w : CompactIntervalSobolev μ𝔽 logNorm l r s)
+    (hu : (u : C𝔽 → ℂ) =ᵐ[μ𝔽] modulationWeight m𝔽 a φ)
+    (hw : (w : C𝔽 → ℂ) =ᵐ[μ𝔽] modulationWeight m𝔽 a ψ)
+    (hφ : ∀ x, φ x = ψ (p⁻¹ * x)) :
+    u = ((((m𝔽 p).val : ℝ) ^ a : ℝ) : ℂ) • hardySobolevTranslation μ𝔽 m𝔽 l r s hlr hs p w := by
+  apply Lp.ext
+  refine ((withDensity_absolutelyContinuous μ𝔽 _).ae_eq ?_).trans (Lp.coeFn_smul ..).symm
+  have ht := (hardySobolevTranslation_apply μ𝔽 m𝔽 l r s hlr hs p w).trans
+    ((measurePreserving_mul_left μ𝔽 p⁻¹).quasiMeasurePreserving.ae_eq_comp hw)
+  filter_upwards [hu, ht] with x hx hy
+  rw [hx]
+  change _ = _ * ((hardySobolevTranslation μ𝔽 m𝔽 l r s hlr hs p w :
+    CompactIntervalSobolev μ𝔽 logNorm l r s) x)
+  rw [hy]
+  change ((((m𝔽 x).val : ℝ) ^ a : ℝ) : ℂ) * φ x =
+    _ * (((((m𝔽 (p⁻¹ * x)).val : ℝ) ^ a : ℝ) : ℂ) * ψ (p⁻¹ * x))
+  rw [hφ x, ← mul_assoc, ← Complex.ofReal_mul, ← Real.mul_rpow (NNReal.coe_nonneg _)
+    (NNReal.coe_nonneg _), ← NNReal.coe_mul, ← Units.val_mul, ← map_mul, mul_inv_cancel_left]
+
+/-- On the weighted θ-completion over a base interval `[l, r]`, the complement `A = 1 - PV_v`
+of a singleton principal value on the polar-free tests satisfies
+`D(A^(n+1) f) = (|p|ᵃ R(p))ⁿ D(A f)` for a uniformizer class `p`, where `D` is the
+θ-class map. -/
+private theorem globalThetaPrincipalValue_iterate_strip (v : V) (a : ℝ) {l r s : ℝ}
+    (hlr : l ≤ r) (hs : 0 ≤ s) :
+    ∃ p : C𝔽, ((m𝔽 p).val : ℝ) < 1 ∧ ∀ (n : ℕ) (f : ℬ₀),
+      globalThetaSobolevInclusion F a hlr hs
+          (theta((((LinearMap.id - (adelePrincipalValue F {v}).restrict fun g hg ↦
+            adelePrincipalValue_mem_polarSubspace {v} ⟨g, hg⟩ : ℬ₀ →ₗ[ℂ] ℬ₀)) ^ (n + 1)) f)) =
+        (((((((m𝔽 p).val : ℝ) ^ a : ℝ) : ℂ)) •
+          (exists_globalThetaSobolevAction (F := F) a hlr hs).choose p) ^ n)
+          (globalThetaSobolevInclusion F a hlr hs
+            (theta(((LinearMap.id - (adelePrincipalValue F {v}).restrict fun g hg ↦
+              adelePrincipalValue_mem_polarSubspace {v} ⟨g, hg⟩ : ℬ₀ →ₗ[ℂ] ℬ₀)) f))) := by
+  obtain ⟨π₀, hπ⟩ := (Valued.v : Valuation (v.adicCompletion F)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π : (v.adicCompletion F)ˣ := Units.mk0 (π₀ : v.adicCompletion F) hπ.ne_zero
+  let ι := IdeleClassGroup.ofAdicCompletion (𝓞 F) F v
+  let p := ι π
+  let c : ℂ := (((m𝔽 p).val : ℝ) ^ a : ℝ)
+  have hp : ((m𝔽 p).val : ℝ) < 1 := by
+    change ((ideleClassNorm F (ι π)).val : ℝ) < 1
+    rw [ideleClassNorm_ofAdicCompletion]
+    change ‖(π₀ : v.adicCompletion F)‖ < 1
+    rw [norm_uniformizer_adicCompletion v _ hπ]
+    exact inv_lt_one_of_one_lt₀ (by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v)
+  let μ := finiteLocalMultiplicativeTamagawaMeasure F v
+  let : MeasurableSpace (v.adicCompletion F)ˣ := borel _
+  let : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+  let : μ.IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) v
+  let K : Subgroup (v.adicCompletion F)ˣ := (HeightOneSpectrum.adicCompletionIntegers F v).units
+  have hKo : IsOpen (K : Set (v.adicCompletion F)ˣ) :=
+    Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hKc : IsCompact (K : Set (v.adicCompletion F)ˣ) := Submonoid.units_isCompact
+    (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v))
+  have hm : μ.real K ≠ 0 := (measureReal_ne_zero_iff hKc.measure_ne_top).mpr
+    (hKo.measure_pos μ ⟨1, K.one_mem⟩).ne'
+  let Aₗ : ℬ₀ →ₗ[ℂ] ℬ₀ := LinearMap.id - (adelePrincipalValue F {v}).restrict fun g hg ↦
+    adelePrincipalValue_mem_polarSubspace {v} ⟨g, hg⟩
+  let A (f : ℬ₀) := Aₗ f
+  have hA (f : ℬ₀) : A f = f - pvTest({v}, f) := rfl
+  let θ (f : ℬ₀) := (adelicTheta f.val : C𝔽 → ℂ)
+  have hθ (f : ℬ₀) (x : C𝔽) : θ (A f) x = ((μ.real K)⁻¹ : ℝ) *
+      ∫ k in (K : Set (v.adicCompletion F)ˣ), θ f (ι ((π * k)⁻¹) * x) ∂μ := by
+    rw [hA]
+    have hsub := congrArg (fun h : C(C𝔽, ℂ) ↦ h x)
+      (map_sub (adelicThetaLinearMap F) f.val (pvTest({v}, f)).val)
+    exact hsub.trans (sub_eq_iff_eq_add.mpr (by
+      have h := globalThetaPrincipalValue_sobolevBound_formula v π hπ f x
+      change _ = _ + adelicTheta (adelePrincipalValue F {v} f.val) x
+      rw [h]
+      abel))
+  let D (f : ℬ₀) := globalThetaSobolevInclusion F a hlr hs (theta(f))
+  let R := (exists_globalThetaSobolevAction (F := F) a hlr hs).choose
+  have hR (w : globalThetaSobolev F a hlr hs) :
+      (R p w).val = hardySobolevTranslation μ𝔽 m𝔽 l r s hlr hs p w.val :=
+    (exists_globalThetaSobolevAction (F := F) a hlr hs).choose_spec.1 p w
+  have hrep (f : ℬ₀) : ((D f).val : C𝔽 → ℂ) =ᵐ[μ𝔽] modulationWeight m𝔽 a (θ f) :=
+    (existsUnique_globalThetaSobolevEmbedding (F := F) a l r s hlr hs).exists.choose_spec.2 f
+  have hRT (f : ℬ₀) : D (A (A f)) = (c • R p) (D (A f)) := by
+    refine Subtype.ext ?_
+    change (D (A (A f))).val = c • (R p (D (A f))).val
+    rw [hR]
+    exact globalThetaPrincipalValue_weighted_translate_strip a hlr hs p _ _ _ _ (hrep _)
+      (hrep _) (globalThetaPrincipalValue_average_twice μ K hKo.measurableSet hm ι π θ A hθ f)
+  refine ⟨p, hp, fun n ↦ ?_⟩
+  induction n with
+  | zero => intro f; simp
+  | succ n ih =>
+    intro f
+    have h1 := ih (Aₗ f)
+    change D ((Aₗ ^ (n + 1)) (Aₗ f)) = ((c • R p) ^ n) (D (Aₗ (Aₗ f))) at h1
+    have h2 : (Aₗ ^ (n + 1 + 1)) f = (Aₗ ^ (n + 1)) (Aₗ f) := by rw [pow_succ]; rfl
+    change D ((Aₗ ^ (n + 1 + 1)) f) = ((c • R p) ^ (n + 1)) (D (Aₗ f))
+    rw [h2, h1, pow_succ, mul_apply_eq_comp]
+    exact congrArg ((c • R p) ^ n) (hRT f)
+
+/-- Translation by the powers of a class of norm below one, restricted to the weighted
+θ-completion over `[l, r]`, has norm at most `|p|^(l n)` times a polynomial in `n`. -/
+private theorem globalThetaPrincipalValue_translation_pow_norm_strip (a : ℝ) {l r s : ℝ}
+    (hlr : l ≤ r) (hs : 0 ≤ s) (p : C𝔽) (hp : ((m𝔽 p).val : ℝ) < 1) (n : ℕ) :
+    ‖(exists_globalThetaSobolevAction (F := F) a hlr hs).choose p ^ n‖ ≤
+      (((m𝔽 p).val : ℝ) ^ l) ^ n * (1 + n * |Real.log ((m𝔽 p).val : ℝ)|) ^ (s / 2) := by
+  let R := (exists_globalThetaSobolevAction (F := F) a hlr hs).choose
+  have hR (w : globalThetaSobolev F a hlr hs) :
+      (R (p ^ n) w).val = hardySobolevTranslation μ𝔽 m𝔽 l r s hlr hs (p ^ n) w.val :=
+    (exists_globalThetaSobolevAction (F := F) a hlr hs).choose_spec.1 (p ^ n) w
+  have hp₀ : 0 < ((m𝔽 p).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hρ := norm_hardySobolevTranslation_le μ𝔽 m𝔽 l r s hlr hs (p ^ n)
+  have hlog : Real.log (((m𝔽 (p ^ n)).val : ℝ≥0) : ℝ) = n * Real.log ((m𝔽 p).val : ℝ) := by
+    rw [map_pow, Units.val_pow_eq_pow_val, NNReal.coe_pow, Real.log_pow]
+  have hneg : n * Real.log ((m𝔽 p).val : ℝ) ≤ 0 :=
+    mul_nonpos_of_nonneg_of_nonpos n.cast_nonneg (Real.log_nonpos hp₀.le hp.le)
+  have hmax : max (Real.exp (l * (n * Real.log ((m𝔽 p).val : ℝ))))
+      (Real.exp (r * (n * Real.log ((m𝔽 p).val : ℝ)))) = (((m𝔽 p).val : ℝ) ^ l) ^ n := by
+    rw [max_eq_left (Real.exp_le_exp.mpr (mul_le_mul_of_nonpos_right hlr hneg)),
+      ← Real.rpow_natCast, ← Real.rpow_mul hp₀.le, Real.rpow_def_of_pos hp₀]
+    congr 1
+    ring
+  simp only [hlog, hmax, abs_mul, Nat.abs_cast] at hρ
+  rw [← map_pow]
+  refine ContinuousLinearMap.opNorm_le_bound _ (by positivity) fun w ↦ ?_
+  change ‖(R (p ^ n) w).val‖ ≤ _ * ‖w.val‖
+  rw [hR]
+  exact (ContinuousLinearMap.le_opNorm _ _).trans
+    (mul_le_mul_of_nonneg_right hρ (norm_nonneg _))
+
+set_option maxHeartbeats 1000000 in
+/-- For a class of norm below one and `a + l > 0`, the powers of the scaled translation
+`|p|ᵃ R(p)` on the weighted θ-completion over `[l, r]` tend to zero in norm. -/
+private theorem globalThetaPrincipalValue_scaled_translation_pow_tendsto {a l r s : ℝ}
+    (hlr : l ≤ r) (hs : 0 ≤ s) (hal : 0 < a + l) (p : C𝔽) (hp : ((m𝔽 p).val : ℝ) < 1) :
+    Tendsto (fun N : ℕ ↦ ‖((((((m𝔽 p).val : ℝ) ^ a : ℝ) : ℂ)) •
+      (exists_globalThetaSobolevAction (F := F) a hlr hs).choose p) ^ N‖) atTop (𝓝 0) := by
+  have hp₀ : 0 < ((m𝔽 p).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hρ₀ : 0 < ((m𝔽 p).val : ℝ) ^ (a + l) := Real.rpow_pos_of_pos hp₀ _
+  have hρ₁ : ((m𝔽 p).val : ℝ) ^ (a + l) < 1 := Real.rpow_lt_one hp₀.le hp hal
+  have hsplit : ((m𝔽 p).val : ℝ) ^ (a + l) =
+      ((m𝔽 p).val : ℝ) ^ a * ((m𝔽 p).val : ℝ) ^ l := Real.rpow_add hp₀ a l
+  refine squeeze_zero (fun _ ↦ norm_nonneg _) (fun N ↦ ?_)
+    (globalThetaPrincipalValue_tendsto_geom_poly (t := s / 2) hρ₀ hρ₁
+      (abs_nonneg (Real.log ((m𝔽 p).val : ℝ))))
+  rw [smul_pow, norm_smul, norm_pow, Complex.norm_real,
+    Real.norm_of_nonneg (Real.rpow_nonneg hp₀.le a), hsplit, mul_pow, mul_assoc]
+  exact mul_le_mul_of_nonneg_left
+    (globalThetaPrincipalValue_translation_pow_norm_strip (F := F) a hlr hs p hp N)
+    (by positivity)
+
+set_option maxHeartbeats 1000000 in
+open Classical in
+/-- The inductive step: with `v ∉ S`, the θ-class of a principal value at `S` is a limit of
+θ-classes of principal values at `insert v S`. -/
+private theorem globalThetaPrincipalValue_closure_insert_strip (v : V) (S : Finset V)
+    (hv : v ∉ S) {a l r s : ℝ} (hlr : l ≤ r) (hs : 0 ≤ s) (hal : 0 < a + l) (f : ℬ₀) :
+    globalThetaSobolevInclusion F a hlr hs (theta(pvTest(S, f))) ∈
+      closure (range fun g : ℬ₀ ↦ globalThetaSobolevInclusion F a hlr hs
+        (theta(pvTest(insert v S, g)))) := by
+  classical
+  obtain ⟨p, hp, hit⟩ := globalThetaPrincipalValue_iterate_strip (F := F) v a hlr hs
+  have hnorm := globalThetaPrincipalValue_scaled_translation_pow_tendsto (F := F) hlr hs hal p hp
+  let pvₗ : ℬ₀ →ₗ[ℂ] ℬ₀ := (adelePrincipalValue F {v}).restrict fun g hg ↦
+    adelePrincipalValue_mem_polarSubspace {v} ⟨g, hg⟩
+  let pvSₗ : ℬ₀ →ₗ[ℂ] ℬ₀ := (adelePrincipalValue F S).restrict fun g hg ↦
+    adelePrincipalValue_mem_polarSubspace S ⟨g, hg⟩
+  let Aₗ : ℬ₀ →ₗ[ℂ] ℬ₀ := LinearMap.id - pvₗ
+  have hcomm : pvSₗ * pvₗ = pvₗ * pvSₗ := by
+    refine LinearMap.ext fun g ↦ Subtype.ext ?_
+    change adelePrincipalValue F S (adelePrincipalValue F {v} g.val) =
+      adelePrincipalValue F {v} (adelePrincipalValue F S g.val)
+    have h1 := sLocalCutoffCarving_antitone_PV (F := F) (Finset.subset_insert v S)
+    have h2 := sLocalCutoffCarving_antitone_PV (F := F)
+      (Finset.singleton_subset_iff.mpr (Finset.mem_insert_self v S))
+    rw [Finset.insert_sdiff_cancel hv] at h1
+    rw [Finset.insert_sdiff_of_mem _ (Finset.mem_singleton_self v),
+      Finset.sdiff_singleton_eq_erase, Finset.erase_eq_of_notMem hv] at h2
+    exact (LinearMap.congr_fun h1 g.val).symm.trans (LinearMap.congr_fun h2 g.val)
+  have hins (g : ℬ₀) : pvTest(insert v S, g) = pvSₗ (pvₗ g) := by
+    refine Subtype.ext ?_
+    change adelePrincipalValue F (insert v S) g.val =
+      adelePrincipalValue F S (adelePrincipalValue F {v} g.val)
+    rw [sLocalCutoffCarving_antitone_PV (Finset.subset_insert v S),
+      Finset.insert_sdiff_cancel hv]
+    rfl
+  have hAcomm : Commute Aₗ pvSₗ := by
+    change (LinearMap.id - pvₗ) * pvSₗ = pvSₗ * (LinearMap.id - pvₗ)
+    simp only [sub_mul, mul_sub, hcomm, ← Module.End.one_eq_id, one_mul, mul_one]
+  let G (N : ℕ) : ℬ₀ := (∑ i ∈ Finset.range (N + 1), Aₗ ^ i) f
+  have hdiff (N : ℕ) : globalThetaSobolevInclusion F a hlr hs (theta(pvTest(S, f))) -
+      globalThetaSobolevInclusion F a hlr hs (theta(pvTest(insert v S, G N))) =
+      (((((((m𝔽 p).val : ℝ) ^ a : ℝ) : ℂ)) •
+        (exists_globalThetaSobolevAction (F := F) a hlr hs).choose p) ^ N)
+        (globalThetaSobolevInclusion F a hlr hs (theta(Aₗ (pvSₗ f)))) := by
+    have hgeom : pvₗ * ∑ i ∈ Finset.range (N + 1), Aₗ ^ i = 1 - Aₗ ^ (N + 1) := by
+      have h := mul_neg_geom_sum Aₗ (N + 1)
+      have h1 : (1 : Module.End ℂ ℬ₀) - Aₗ = pvₗ := by
+        change 1 - (LinearMap.id - pvₗ) = pvₗ
+        rw [← Module.End.one_eq_id, sub_sub_cancel]
+      rwa [h1] at h
+    have hrest : pvTest(S, f) - pvTest(insert v S, G N) = pvSₗ ((Aₗ ^ (N + 1)) f) := by
+      rw [hins]
+      change pvSₗ f - pvSₗ ((pvₗ * ∑ i ∈ Finset.range (N + 1), Aₗ ^ i) f) = _
+      rw [hgeom, ← map_sub]
+      simp
+    have hcommN : pvSₗ ((Aₗ ^ (N + 1)) f) = (Aₗ ^ (N + 1)) (pvSₗ f) :=
+      (LinearMap.congr_fun ((hAcomm.pow_left (N + 1)).eq) f).symm
+    rw [← map_sub, ← Submodule.Quotient.mk_sub, hrest, hcommN]
+    exact hit N (pvSₗ f)
+  have hlim : Tendsto (fun N : ℕ ↦ globalThetaSobolevInclusion F a hlr hs
+      (theta(pvTest(insert v S, G N)))) atTop
+      (𝓝 (globalThetaSobolevInclusion F a hlr hs (theta(pvTest(S, f))))) := by
+    have h0 := hnorm.mul_const (‖globalThetaSobolevInclusion F a hlr hs (theta(Aₗ (pvSₗ f)))‖)
+    rw [zero_mul] at h0
+    rw [tendsto_iff_norm_sub_tendsto_zero]
+    refine squeeze_zero (fun _ ↦ norm_nonneg _) (fun N ↦ ?_) h0
+    rw [norm_sub_rev, hdiff]
+    exact ContinuousLinearMap.le_opNorm _ _
+  exact mem_closure_of_tendsto hlim (.of_forall fun N ↦ ⟨G N, rfl⟩)
+
+/-- Paper: (11.2.0.3), p. 484, (11.2.1.1)–(11.2.1.2), p. 487, and (11.3.1.3)–(11.3.1.4),
+p. 494. On the weighted θ-completion `W^{s,2}_{[l,r]}` with norm twist `a`, if `a + l > 0`
+then the norm closure of the θ-classes of the principal values of the polar-free tests at any
+finite set of finite places is the whole completion. For the half twist `a = 1/2` and the
+strips `I = [-α, α]` of Theorem 11.3.2.1 this holds for every `0 ≤ α < 1/2`: there the stages
+of the primary divisorial filtration all have the same closure, and the successive quotients
+(11.3.1.3) formed in the completion are zero, so they carry no orbital basis.
+Deviation: The paper does not state this. The proof is a Neumann series at the test level:
+with `A = 1 - PV_v`, `f = PV_v (∑_{i ≤ N} Aⁱ f) + A^(N+1) f`, and the θ-class of
+`A^(N+1) f` is `(|p|ᵃ R(p))ᴺ` applied to that of `A f`, of norm
+`O(|p|^((a+l) N) N^(s/2))`. -/
+theorem globalThetaSobolev_principalValue_closure_eq_univ (S : Finset V) {a l r s : ℝ}
+    (hlr : l ≤ r) (hs : 0 ≤ s) (hal : 0 < a + l) :
+    closure (range fun f : ℬ₀ ↦ globalThetaSobolevInclusion F a hlr hs (theta(pvTest(S, f)))) =
+      univ := by
+  classical
+  induction S using Finset.induction_on with
+  | empty =>
+    have he : ∀ f : ℬ₀, pvTest(∅, f) = f := fun f ↦ Subtype.ext (by
+      change adelePrincipalValue F ∅ f.val = f.val
+      rw [sLocalUncutCarving_empty_PV]
+      rfl)
+    rw [show (fun f : ℬ₀ ↦ globalThetaSobolevInclusion F a hlr hs (theta(pvTest(∅, f)))) =
+      fun f : ℬ₀ ↦ globalThetaSobolevInclusion F a hlr hs (theta(f)) from
+      funext fun f ↦ congrArg (fun g : ℬ₀ ↦ globalThetaSobolevInclusion F a hlr hs (theta(g)))
+        (he f)]
+    exact ((globalThetaSobolev_dense (F := F) a hlr hs).comp
+      (Submodule.mkQ_surjective _).denseRange
+      (globalThetaSobolevInclusion F a hlr hs).continuous).closure_range
+  | insert v S hv ih =>
+    refine eq_univ_of_forall fun x ↦ closure_minimal
+      (range_subset_iff.mpr (globalThetaPrincipalValue_closure_insert_strip v S hv hlr hs hal))
+      isClosed_closure ?_
+    rw [ih]
+    exact mem_univ x
+
+end PositiveTwistStrip
+
 private theorem globalThetaSobolevPrincipalValue_equivariant_val_eq {A B : Type*}
     (θ : A → B) (pv : A → A) {x x' y y' : A} (hx : x = x') (hy : y = y')
     (h : θ (pv x') = θ y') : θ (pv x) = θ y := by
