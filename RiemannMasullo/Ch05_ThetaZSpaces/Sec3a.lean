@@ -3073,22 +3073,6 @@ private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_tra
       ∀ n a x, P n (ρ a x) = ρ a (P n x) := by
   sorry
 
-/-- Sequential closedness of Mellin divisibility on Schwartz–Bruhat tests. On the line
-of unitary characters times the norm, divide by the nowhere-zero dilation multiplier.
-If a convergent sequence of tests has quotients represented by tests, the quotient for
-its limit is represented by a test. -/
-private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_dilation_division
-    {T S : Finset V} (v : S) (i : T ⊆ S) (hv : ∀ w : S, w.val ∉ T ↔ w = v)
-    (u : ((S : Set V).integer F)ˣ) :
-    let g := Units.map ((adeleProjection F T).comp (integralAdelesOutside F S).subtype).toMonoidHom
-      (Units.map (integralAdeleDiagonal F S).toMonoidHom u)
-    let c := fun χ : PontryaginDual (SIdeleQuotient F T) ↦
-      quasiCharacterNormTwist (sIdeleQuotientNorm F T) (isProperMap_sIdeleQuotientNorm F T).continuous
-        ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ) 1
-    sIdeleNorm F T g ≠ 1 → IsSeqClosed {h : ℬₛ(T) | ∃ f : ℬₛ(T), ∀ χ,
-      sLocalIdelicZFunction f (c χ) = sLocalIdelicZFunction h (c χ) / (1 - c χ (QuotientGroup.mk g))} := by
-  sorry
-
 /-- The open mapping theorem on one Fréchet summand turns sequential closedness of the
 range into an inducing map. -/
 private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_dilation_frechet
@@ -3277,6 +3261,122 @@ private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_tra
     rw [one_mul, mul_right_comm, mul_assoc]
   exact LinearMap.mem_ker.mpr (ContinuousMap.ext fun a ↦
     (sLocalAdelicThetaOnClasses_mk F T f a).symm.trans (DFunLike.congr_fun hθ _))
+
+/-- At nonzero real weight the distance of the dilation multiplier from zero has
+a positive lower bound independent of the unitary character. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_dilation_division_gap
+    (T : Finset V) (g : (SAdeleRing F T)ˣ) (hg : sIdeleNorm F T g ≠ 1)
+    (r : ℝ) (hr : r ≠ 0) :
+    ∃ ε : ℝ, 0 < ε ∧ ∀ χ : PontryaginDual (SIdeleQuotient F T),
+      let c := quasiCharacterNormTwist (sIdeleQuotientNorm F T) (isProperMap_sIdeleQuotientNorm F T).continuous
+        ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ) (r : ℂ)
+      ε ≤ ‖1 - c (QuotientGroup.mk g)‖ := by
+  let m : ℝ := (sIdeleNorm F T g).val
+  refine ⟨|1 - m ^ r|, abs_pos.mpr (sub_ne_zero.mpr fun he ↦ hg ?_), ?_⟩
+  · have hm : m ^ r = 1 ^ r := he.symm.trans (Real.one_rpow r).symm
+    exact Units.ext (NNReal.eq ((Real.rpow_left_inj (NNReal.coe_nonneg _) zero_le_one hr).mp hm))
+  · intro χ c
+    have hm : ‖c (QuotientGroup.mk g)‖ = m ^ r := by
+      change ‖(χ (QuotientGroup.mk g) : ℂ) * _ ^ (r : ℂ)‖ = _
+      rw [norm_mul, Circle.norm_coe, one_mul, sIdeleQuotientNorm_mk,
+        Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _)), Complex.ofReal_re]
+    simpa only [norm_one, hm] using abs_norm_sub_norm_le (1 : ℂ) (c (QuotientGroup.mk g))
+
+/-- Mellin evaluation of a dilation difference at any regular quasi-character. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_dilation_division_symbol
+    (T : Finset V) (g : (SAdeleRing F T)ˣ) (f : ℬₛ(T))
+    (d : {d : QuasiCharacter (SIdeleQuotient F T) // 0 ≤ sLocalIdelicOrderBound d}) :
+    let ρ := (existsUnique_sLocalThetaAction (F := F) (S := T)).exists.choose
+    let D := ContinuousLinearMap.id ℂ Θₛ(T) - ρ (QuotientGroup.mk g)
+    (sLocalThetaMellin (D ((Kₛ(T)).mkQ f))).val d =
+      (1 - d.val (QuotientGroup.mk g)) * sLocalIdelicZFunction f d.val := by
+  intro ρ D
+  change (sLocalThetaMellin ((Kₛ(T)).mkQ f - ρ _ ((Kₛ(T)).mkQ f))).val d = _
+  rw [show ρ (QuotientGroup.mk g) ((Kₛ(T)).mkQ f) = (Kₛ(T)).mkQ (schwartzBruhatUnitTranslate g f) from
+    (existsUnique_sLocalThetaAction (F := F) (S := T)).exists.choose_spec.2 g f, map_sub]
+  change (sLocalIdelicMellin f).val d - (sLocalIdelicMellin (schwartzBruhatUnitTranslate g f)).val d = _
+  rw [sLocalIdelicMellin_unitTranslate, sub_mul, one_mul]
+  rfl
+
+/-- Classical input: R. Meyer's bornological description of the S-local coinvariants in
+*On a representation of the idele class group related to primes and zeros of L-functions*,
+§4, specialized to the following Mellin comparison. Suppose the transforms of a sequence of
+tests are dominated on each nonzero real-weight line by those of a bounded sequence, with
+a constant uniform in the unitary character and the sequence index. Then their theta
+classes are bounded. Positive weights control the weighted theta functions. On reflected
+pole-free lines the functional equation cancels the common local factor, giving the same
+comparison for the Fourier transforms. Domination at weight one preserves the common
+finite conductor. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_dilation_division_bounded
+    (T : Finset V) (b f : ℕ → ℬₛ(T)) (hb : Bornology.IsVonNBounded ℂ (range b))
+    (h : ∀ r : ℝ, r ≠ 0 → ∃ C : ℝ, ∀ n (χ : PontryaginDual (SIdeleQuotient F T)),
+      let c := quasiCharacterNormTwist (sIdeleQuotientNorm F T) (isProperMap_sIdeleQuotientNorm F T).continuous
+        ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ) (r : ℂ)
+      0 ≤ sLocalIdelicOrderBound c → ‖sLocalIdelicZFunction (f n) c‖ ≤ C * ‖sLocalIdelicZFunction (b n) c‖) :
+    Bornology.IsVonNBounded ℂ (range fun n ↦ (Kₛ(T)).mkQ (f n)) := by
+  sorry
+
+/-- Sequential closedness of Mellin divisibility on Schwartz–Bruhat tests. On the line
+of unitary characters times the norm, divide by the nowhere-zero dilation multiplier.
+If a convergent sequence of tests has quotients represented by tests, the quotient for
+its limit is represented by a test. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_dilation_division
+    {T S : Finset V} (v : S) (i : T ⊆ S) (hv : ∀ w : S, w.val ∉ T ↔ w = v)
+    (u : ((S : Set V).integer F)ˣ) :
+    let g := Units.map ((adeleProjection F T).comp (integralAdelesOutside F S).subtype).toMonoidHom
+      (Units.map (integralAdeleDiagonal F S).toMonoidHom u)
+    let c := fun χ : PontryaginDual (SIdeleQuotient F T) ↦
+      quasiCharacterNormTwist (sIdeleQuotientNorm F T) (isProperMap_sIdeleQuotientNorm F T).continuous
+        ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ) 1
+    sIdeleNorm F T g ≠ 1 → IsSeqClosed {h : ℬₛ(T) | ∃ f : ℬₛ(T), ∀ χ,
+      sLocalIdelicZFunction f (c χ) = sLocalIdelicZFunction h (c χ) / (1 - c χ (QuotientGroup.mk g))} := by
+  intro g c hg b h hb hlim
+  clear_value g
+  choose f hf using hb
+  let q := (Kₛ(T)).mkQL
+  let a : SIdeleQuotient F T := QuotientGroup.mk g
+  let ρ := (existsUnique_sLocalThetaAction (F := F) (S := T)).exists.choose
+  let D := ContinuousLinearMap.id ℂ Θₛ(T) - ρ a
+  obtain ⟨ε, hε, hgap⟩ :=
+    sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_dilation_division_gap T g hg 1 one_ne_zero
+  have den (χ) : 1 - c χ a ≠ 0 :=
+    norm_pos_iff.mp (hε.trans_le (by simpa only [Complex.ofReal_one] using hgap χ))
+  have symbol := sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_dilation_division_symbol T g
+  let Z (x : Θₛ(T)) (χ : PontryaginDual (SIdeleQuotient F T)) :=
+    (sLocalThetaMellin x).val ⟨c χ, sLocalOrderBound_positive χ (s := 1) (by norm_num)⟩
+  have hZ : Injective Z := sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_dilation_line T
+  have eqn (n : ℕ) : D (q (f n)) = q (b n) := by
+    apply hZ
+    funext χ
+    change (sLocalThetaMellin (D (q (f n)))).val _ = sLocalIdelicZFunction (b n) (c χ)
+    exact (symbol (f n) ⟨c χ, sLocalOrderBound_positive χ (s := 1) (by norm_num)⟩).trans
+      ((mul_comm ..).trans ((eq_div_iff (den χ)).mp (hf n χ)))
+  have hbounded := sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_dilation_division_bounded
+    T b f (hlim.isVonNBounded_range ℂ) (by
+      intro r hr
+      obtain ⟨δ, hδ, hδχ⟩ :=
+        sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_dilation_division_gap T g hg r hr
+      refine ⟨δ⁻¹, ?_⟩
+      intro n χ d hd
+      have he := symbol (f n) ⟨d, hd⟩
+      change (sLocalThetaMellin (D (q (f n)))).val ⟨d, hd⟩ = _ at he
+      rw [eqn n] at he
+      change sLocalIdelicZFunction (b n) d = (1 - d a) * sLocalIdelicZFunction (f n) d at he
+      rw [he, norm_mul, ← mul_assoc]
+      exact le_mul_of_one_le_left (norm_nonneg _) ((inv_mul_cancel₀ hδ.ne').symm.le.trans
+        (mul_le_mul_of_nonneg_left (hδχ χ) (inv_nonneg.mpr hδ.le))))
+  let : T2Space (Θₛ(T)) := sLocalAdelicThetaSpace_strictLF.1
+  let : MontelSpace ℂ (Θₛ(T)) := sLocalAdelicThetaSpace_montel
+  have hc := MontelSpace.isCompact_of_isClosed_of_isVonNBounded ℂ isClosed_closure hbounded.closure
+  obtain ⟨y, _, hy⟩ := (hc.image D.continuous).isClosed.mem_of_tendsto
+    ((q.continuous.tendsto h).comp hlim) (Eventually.of_forall fun n ↦
+      ⟨q (f n), subset_closure (mem_range_self n), eqn n⟩)
+  obtain ⟨x, rfl⟩ := (Kₛ(T)).mkQ_surjective y
+  refine ⟨x, fun χ ↦ (eq_div_iff (den χ)).mpr ?_⟩
+  have he := symbol x ⟨c χ, sLocalOrderBound_positive χ (s := 1) (by norm_num)⟩
+  change (sLocalThetaMellin (D (q x))).val _ = _ at he
+  rw [show D (q x) = q h from hy] at he
+  exact (mul_comm ..).trans he.symm
 
 /-- On the stage with the selected finite place removed, take the translation by
 the projection of a diagonal S-unit. When its modulus changes, the difference
