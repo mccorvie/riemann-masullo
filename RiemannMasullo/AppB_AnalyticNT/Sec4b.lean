@@ -11495,6 +11495,296 @@ theorem idelicExplicitFormula_infiniteMatching_realCharacterSum (τ : ℝ≥0ˣ 
   funext χ
   exact dite_eq_left hw
 
+/-- Cut off the comparison function at additive distance `ε` from zero. The negative
+half contributes `-log ε` and the positive half contributes `log (1+ε) - log ε`. -/
+private theorem idelicExplicitFormula_infiniteMatching_realLocal_cutoff {ε : ℝ}
+    (hε : 0 < ε) (h₁ : ε ≤ 1) :
+    let R (x : ℝ) := if 0 < x then (1 + x)⁻¹ else if -1 ≤ x then 1 else 0
+    let A := {x : ℝ | ε ≤ |x|}
+    IntegrableOn (fun x ↦ R x / |x|) A ∧
+      (∫ x in A, R x / |x|) = Real.log (1 + ε) - 2 * Real.log ε := by
+  intro R A
+  let p (x : ℝ) := (1 + x)⁻¹ / x
+  let n (x : ℝ) := x⁻¹
+  have hd (x : ℝ) (hx : ε ≤ x) :
+      HasDerivAt (fun y : ℝ ↦ -Real.log (1 + y⁻¹)) (p x) x := by
+    have hx' : 0 < x := hε.trans_le hx
+    convert (((hasDerivAt_inv hx'.ne').const_add 1).log (by positivity)).neg using 1
+    dsimp [p]
+    field_simp
+    ring
+  have hlim : Tendsto (fun y : ℝ ↦ -Real.log (1 + y⁻¹)) atTop (𝓝 0) := by
+    simpa using (((Real.continuousAt_log one_ne_zero).tendsto.comp
+      (show Tendsto (fun y : ℝ ↦ 1 + y⁻¹) atTop (𝓝 1) by
+        simpa using tendsto_inv_atTop_zero.const_add (1 : ℝ))).neg)
+  have hp := integrableOn_Ioi_deriv_of_nonneg' hd (fun x (hx : ε < x) ↦ by
+    dsimp [p]
+    have := hε.trans hx
+    positivity) hlim
+  have hpv := integral_Ioi_of_hasDerivAt_of_tendsto' hd hp hlim
+  have hn : IntegrableOn n (Icc ε 1) :=
+    (continuousOn_inv₀.mono (fun x (hx : x ∈ Icc ε (1 : ℝ)) ↦
+      (hε.trans_le hx.1).ne')).integrableOn_compact isCompact_Icc
+  let P := (Ici ε).indicator p
+  let N := (Icc ε 1).indicator n
+  have hP : Integrable P := (integrable_indicator_iff measurableSet_Ici).mpr
+    ((integrableOn_Ici_iff_integrableOn_Ioi (by simp)).mpr hp)
+  have hN : Integrable N := (integrable_indicator_iff measurableSet_Icc).mpr hn
+  have hA : MeasurableSet A := measurableSet_le measurable_const continuous_abs.measurable
+  have he (x : ℝ) : A.indicator (fun y ↦ R y / |y|) x = P x + N (-x) := by
+    rcases lt_or_ge 0 x with hx | hx
+    · have hh : ¬ ε ≤ -x := by linarith
+      simp [A, R, P, N, p, indicator, abs_of_pos hx, hx, hh]
+    · have hh : ¬ ε ≤ x := by linarith
+      have hiff : -x ≤ 1 ↔ -1 ≤ x := by constructor <;> intro h <;> linarith
+      simp only [A, R, P, N, n, indicator, mem_ofPred_eq, abs_of_nonpos hx, mem_Ici, hh,
+        ite_false, zero_add, mem_Icc, not_lt.mpr hx]
+      by_cases h : ε ≤ -x <;> by_cases h' : -1 ≤ x <;>
+        simp [h, hiff, h', one_div]
+  rw [← integrable_indicator_iff hA, ← integral_indicator hA, funext he]
+  refine ⟨hP.add hN.comp_neg, ?_⟩
+  rw [integral_add hP hN.comp_neg, integral_neg_eq_self, show P = _ from rfl,
+    show N = _ from rfl, integral_indicator measurableSet_Ici, integral_indicator measurableSet_Icc,
+    integral_Ici_eq_integral_Ioi, hpv, integral_Icc_eq_integral_Ioc,
+    ← intervalIntegral.integral_of_le h₁, show n = _ from rfl, integral_inv_of_pos hε one_pos]
+  rw [show 1 + ε⁻¹ = (1 + ε) / ε by field_simp; ring,
+    Real.log_div (by positivity) hε.ne', one_div, Real.log_inv]
+  ring
+
+/-- Folding both signs of the multiplicative group and both signs of its logarithmic
+coordinate gives four evaluations of an absolutely integrable additive density. -/
+private theorem idelicExplicitFormula_infiniteMatching_realLocal_fold (D : ℝ → ℂ)
+    (hD : Integrable D) :
+    let T (y : ℝ) := Real.exp y • (D (Real.exp y - 1) + D (-Real.exp y - 1))
+    IntegrableOn (fun y ↦ T y + T (-y)) (Ioi 0) ∧
+      (∫ y in Ioi 0, T y + T (-y)) = ∫ x, D x := by
+  intro T
+  let g (u : ℝ) := D (u - 1)
+  have hg : Integrable g := hD.comp_sub_right 1
+  have hT : Integrable T := (integrable_comp_exp (fun u ↦ g u + g (-u))).mpr
+    (hg.add hg.comp_neg).integrableOn
+  have fold (f : ℝ → ℂ) (hf : Integrable f) :
+      (∫ y in Ioi 0, f y + f (-y)) = ∫ y, f y := by
+    rw [integral_add hf.integrableOn hf.comp_neg.integrableOn, integral_comp_neg_Ioi, neg_zero,
+      add_comm, intervalIntegral.integral_Iic_add_Ioi hf.integrableOn hf.integrableOn]
+  refine ⟨hT.integrableOn.add hT.comp_neg.integrableOn, ?_⟩
+  rw [fold T hT, show T = (fun y ↦ Real.exp y • (g (Real.exp y) + g (-Real.exp y))) from rfl,
+    integral_comp_exp (fun u ↦ g u + g (-u)), fold g hg]
+  exact integral_sub_right_eq_self D 1
+
+/-- In the half-logarithmic coordinate the comparison function contributes the Gauss
+kernel at one plus the Frullani difference for exponential scales two and one. -/
+private theorem idelicExplicitFormula_infiniteMatching_realLocal_constant :
+    let C (y : ℝ) := Real.exp (-2 * y) / y - Real.exp (-y) / (1 - Real.exp (-y))
+    IntegrableOn C (Ioi 0) ∧ (∫ y in Ioi 0, C y) =
+      -Real.eulerMascheroniConstant - Real.log 2 := by
+  intro C
+  obtain ⟨hF, hV⟩ := complexLogFourier_finitePart_frullani_exp (α := 2) (β := 1)
+    (by norm_num) one_pos
+  have he : C = fun y ↦ gaussDigammaKernel y + y⁻¹ * (Real.exp (-2 * y) - Real.exp (-1 * y)) := by
+    funext y
+    simp only [C, gaussDigammaKernel, neg_one_mul]
+    ring
+  rw [he, integral_add integrableOn_gaussDigammaKernel hF, integral_gaussDigammaKernel, hV,
+    one_div, Real.log_inv]
+  exact ⟨integrableOn_gaussDigammaKernel.add hF, by ring⟩
+
+/-- Subtract the comparison function before removing the additive cutoff. The remainder
+is bounded near zero by a first derivative of the Schwartz test. -/
+private theorem idelicExplicitFormula_infiniteMatching_realLocal_remainder (s : 𝓢(ℝ, ℂ)) :
+    let R (x : ℝ) := if 0 < x then (1 + x)⁻¹ else if -1 ≤ x then 1 else 0
+    let D (x : ℝ) := (s x - s 0 * (R x : ℂ)) / ((|x| : ℝ) : ℂ)
+    Integrable D ∧ Tendsto (fun ε : ℝ ↦
+      (∫ x in {z : ℝ | ε ≤ |z|}, s x / ((|x| : ℝ) : ℂ)) + 2 * s 0 * (Real.log ε : ℂ))
+      (𝓝[>] 0) (𝓝 (∫ x, D x)) := by
+  intro R D
+  let A (ε : ℝ) := {x : ℝ | ε ≤ |x|}
+  have hA (ε : ℝ) : MeasurableSet (A ε) :=
+    measurableSet_le measurable_const continuous_abs.measurable
+  have hR : Measurable R :=
+    ((measurable_const.add measurable_id).inv.ite (measurableSet_lt measurable_const measurable_id)
+      (measurable_const.ite (measurableSet_le measurable_const measurable_id) measurable_const))
+  have hDmeas : Measurable D :=
+    (s.continuous.measurable.sub ((Complex.measurable_ofReal.comp hR).const_mul _)).div
+      (Complex.measurable_ofReal.comp continuous_abs.measurable)
+  have htail {ε : ℝ} (hε : 0 < ε) (h₁ : ε ≤ 1) :
+      IntegrableOn D (A ε) := by
+    have hi := (real_log_fourier_cutoff s).2.1 ε hε
+    have hr := (idelicExplicitFormula_infiniteMatching_realLocal_cutoff hε h₁).1.ofReal.const_mul (s 0)
+    refine (hi.sub hr).congr_fun (fun x _ ↦ ?_) (hA ε)
+    change s x / _ - s 0 * ((R x / |x| : ℝ) : ℂ) = _
+    simp only [D, Complex.ofReal_div, sub_div, mul_div_assoc]
+  let C := SchwartzMap.seminorm ℝ 0 1 s
+  have hlip (x : ℝ) : ‖s x - s 0‖ ≤ C * |x| := by
+    have h := Convex.norm_image_sub_le_of_norm_fderiv_le (𝕜 := ℝ) (f := s) (s := univ) (C := C)
+      (fun z _ ↦ s.differentiableAt) (fun z _ ↦ ?_) convex_univ (mem_univ 0) (mem_univ x)
+    · simpa [Real.norm_eq_abs] using h
+    · rw [← norm_iteratedFDeriv_one]
+      exact s.norm_iteratedFDeriv_le_seminorm ℝ 1 z
+  have hbound (x : ℝ) (hx : |x| < 1 / 2) : |1 - R x| ≤ |x| := by
+    by_cases hp : 0 < x
+    · rw [show R x = (1 + x)⁻¹ from ite_eq_left hp, abs_of_pos hp,
+        show 1 - (1 + x)⁻¹ = x / (1 + x) by field_simp; ring, abs_of_nonneg (by positivity)]
+      exact div_le_self hp.le (by linarith)
+    · have hx' : -1 ≤ x := by linarith [(abs_lt.mp hx).1]
+      simp [R, hp, hx']
+  have hnear : IntegrableOn D (Ioo (-(1 / 2 : ℝ)) (1 / 2)) := by
+    refine (integrableOn_const (C := C + ‖s 0‖) measure_Ioo_lt_top.ne).mono'
+      hDmeas.aestronglyMeasurable ?_
+    filter_upwards [ae_restrict_mem (μ := volume) measurableSet_Ioo] with x hx
+    rcases eq_or_ne x 0 with rfl | hx0
+    · simp [D, C, add_nonneg (apply_nonneg _ _) (norm_nonneg _)]
+    rw [show D x = (s x - s 0 + s 0 * ((1 - R x : ℝ) : ℂ)) / ((|x| : ℝ) : ℂ) by
+        dsimp [D]; push_cast; ring, norm_div, Complex.norm_real, Real.norm_eq_abs, abs_abs,
+      div_le_iff₀ (abs_pos.mpr hx0), add_mul]
+    refine (norm_add_le _ _).trans (add_le_add (hlip x) ?_)
+    rw [norm_mul, Complex.norm_real, Real.norm_eq_abs]
+    exact mul_le_mul_of_nonneg_left (hbound x (abs_lt.mpr hx)) (norm_nonneg _)
+  have hu : A (1 / 2) ∪ Ioo (-(1 / 2 : ℝ)) (1 / 2) = univ := by
+    ext x
+    simp [A, ← abs_lt, le_or_gt]
+  have hD : Integrable D := integrableOn_univ.mp
+    (hu ▸ ((htail (ε := 1 / 2) (by norm_num) (by norm_num)).union hnear))
+  refine ⟨hD, ?_⟩
+  have hlim : Tendsto (fun ε ↦ ∫ x in A ε, D x) (𝓝[>] 0) (𝓝 (∫ x, D x)) := by
+    simp_rw [← integral_indicator (hA _)]
+    apply tendsto_integral_filter_of_dominated_convergence (fun x ↦ ‖D x‖)
+      (.of_forall fun ε ↦ hD.aestronglyMeasurable.indicator (hA ε))
+      (.of_forall fun _ ↦ .of_forall fun x ↦ norm_indicator_le_norm_self _ _) hD.norm
+    have hne : ∀ᵐ x : ℝ ∂volume, x ≠ 0 := ae_iff.mpr (by simp)
+    filter_upwards [hne] with x hx
+    refine tendsto_const_nhds.congr' ?_
+    filter_upwards [nhdsWithin_le_nhds (eventually_lt_nhds (abs_pos.mpr hx))] with ε hε
+    exact (indicator_of_mem (s := A ε) hε.le D).symm
+  have hlog : Tendsto (fun ε : ℝ ↦ (Real.log (1 + ε) : ℂ)) (𝓝[>] 0) (𝓝 0) := by
+    have hc : ContinuousAt (fun ε : ℝ ↦ (Real.log (1 + ε) : ℂ)) 0 := by fun_prop (disch := norm_num)
+    simpa using hc.tendsto.mono_left (nhdsWithin_le_nhds (s := Ioi 0))
+  apply (show Tendsto (fun ε ↦ (∫ x in A ε, D x) + s 0 * (Real.log (1 + ε) : ℂ)) _ _ by
+    simpa using hlim.add (hlog.const_mul (s 0))).congr'
+  filter_upwards [self_mem_nhdsWithin (s := Ioi (0 : ℝ)),
+    nhdsWithin_le_nhds (eventually_lt_nhds zero_lt_one)] with ε (hε : 0 < ε) h₁
+  obtain ⟨hr, hv⟩ := idelicExplicitFormula_infiniteMatching_realLocal_cutoff hε h₁.le
+  have he (x : ℝ) : D x = s x / ((|x| : ℝ) : ℂ) - s 0 * ((R x / |x| : ℝ) : ℂ) := by
+    simp only [D, Complex.ofReal_div, sub_div, mul_div_assoc]
+  have hi := (real_log_fourier_cutoff s).2.1 ε hε
+  have hr' : IntegrableOn (fun x ↦ s 0 * ((R x / |x| : ℝ) : ℂ)) (A ε) := hr.ofReal.const_mul _
+  change (∫ x in A ε, D x) + _ = _
+  simp_rw [he]
+  rw [integral_sub hi hr', integral_const_mul, integral_complex_ofReal, hv]
+  push_cast
+  ring
+
+/-- Express the weighted translate in a real coordinate, together with its additive
+finite part. Multiplication by `exp (y / 2)` recovers either signed multiplicative test. -/
+private theorem idelicExplicitFormula_infiniteMatching_realLocal_coordinate
+    (w : InfinitePlace F) (hw : w.IsReal) (f : 𝒟(w.Completionˣ)) :
+    let e := Units.map (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm.toMonoidHom
+    ∃ s : 𝓢(ℝ, ℂ), s 0 = f.val 1 ∧
+      (∀ u : ℝˣ, f.val (e u) = (Real.sqrt |(u : ℝ)| : ℂ) * s ((u : ℝ) - 1)) ∧
+      Tendsto (fun ε : ℝ ↦ (∫ x in {z : ℝ | ε ≤ |z|}, s x / ((|x| : ℝ) : ℂ)) +
+        2 * s 0 * (Real.log ε : ℂ)) (𝓝[>] 0)
+        (𝓝 (2 * (infiniteConnesWeilPrincipalValue w f -
+          ((Real.log (2 * Real.pi) + Real.eulerMascheroniConstant : ℝ) : ℂ) * s 0))) := by
+  intro e
+  let : BorelSpace w.Completion := ⟨rfl⟩
+  let A := (exists_infiniteWeilTestMap w).choose f
+  let r := InfinitePlace.Completion.ringEquivRealOfIsReal hw
+  let j := InfinitePlace.Completion.isometryEquivRealOfIsReal hw
+  let m := j.symm.toHomeomorph.toMeasurableEquiv
+  have hμ : ν∞(w) = (volume : Measure ℝ).map m := dite_eq_left hw
+  have hm (x : ℝ) : r (m x) = x := r.apply_symm_apply x
+  have hn (x : ℝ) : ‖m x‖ = |x| :=
+    j.symm.isometry.norm_map_of_map_zero (map_zero r.symm) x
+  obtain ⟨s, hs⟩ := realLogFourier_finitePart_realTest w hw A
+  change ∀ x, addTest(A) x = s (r x) at hs
+  have hval (u : ℝˣ) : f.val (e u) = (Real.sqrt |(u : ℝ)| : ℂ) * s ((u : ℝ) - 1) := by
+    have hu : 1 + m ((u : ℝ) - 1) = (e u).val := by
+      change 1 + r.symm ((u : ℝ) - 1) = r.symm (u : ℝ)
+      rw [map_sub, map_one]; ring
+    rw [← hm ((u : ℝ) - 1), ← hs, (exists_infiniteWeilTestMap w).choose_spec]
+    change _ = _ * (Function.extend Units.val (f.val : _ → ℂ) (fun _ ↦ 0)
+      (1 + m ((u : ℝ) - 1)) / _)
+    rw [hu, Units.val_injective.extend_apply, hw.mult_eq_one]
+    dsimp only
+    rw [pow_one, show ‖(e u).val‖ = |(u : ℝ)| from hn _]
+    field_simp [Complex.ofReal_ne_zero.mpr (Real.sqrt_pos.mpr (abs_pos.mpr u.ne_zero)).ne']
+  have h0 : s 0 = f.val 1 := by simpa using (hval 1).symm
+  refine ⟨s, h0, hval, ?_⟩
+  have hlim := (realLogFourier_finitePart w hw A).2.2
+  have hv := ((exists_infiniteConnesPrincipalValue w).choose_spec A).2
+  change infiniteConnesWeilPrincipalValue w f = _ at hv
+  simp only [hμ, hs] at hv
+  rw [hv]
+  simp only [hμ, setIntegral_map_equiv, preimage_ofPred_eq, hn, hs,
+    hm, map_zero] at hlim
+  push_cast
+  convert hlim using 2
+  ring
+
+/-- At positive log-radius `y`, identify the two sign averages with the four
+Jacobian-weighted evaluations of the additive remainder. -/
+private theorem idelicExplicitFormula_infiniteMatching_realLocal_kernel (s : ℝ → ℂ)
+    (gp gm : ℝ → ℂ)
+    (hp : ∀ y, gp y = (Real.exp (y / 2) : ℂ) * s (Real.exp y - 1))
+    (hm : ∀ y, gm y = (Real.exp (y / 2) : ℂ) * s (-Real.exp y - 1))
+    {y : ℝ} (hy : 0 < y) :
+    let R (x : ℝ) := if 0 < x then (1 + x)⁻¹ else if -1 ≤ x then 1 else 0
+    let D (x : ℝ) := (s x - s 0 * (R x : ℂ)) / ((|x| : ℝ) : ℂ)
+    let T (z : ℝ) := Real.exp z • (D (Real.exp z - 1) + D (-Real.exp z - 1))
+    let Q (t z : ℝ) := (gp z + gm z) / 2 + (Real.exp (-(t / 2)) : ℂ) * (gp z - gm z) / 2
+    let t := 2 * y
+    2 * ((1 / 2 : ℂ) * (2 * (Real.exp (-t) : ℂ) * s 0 / (t : ℂ) -
+        (Real.exp (-(t / 4)) : ℂ) * (Q t (t / 2) + Q t (-(t / 2))) / (1 - (Real.exp (-t) : ℂ)))) =
+      ((Real.exp (-2 * y) / y - Real.exp (-y) / (1 - Real.exp (-y)) : ℝ) : ℂ) * s 0 -
+        (T y + T (-y)) / 2 := by
+  intro R D T Q t
+  let b := Real.exp (y / 2)
+  let u := Real.exp y
+  let v := Real.exp (-y)
+  have hu : 1 < u := Real.one_lt_exp_iff.mpr hy
+  have hv : v < 1 := Real.exp_lt_one_iff.mpr (neg_lt_zero.mpr hy)
+  have hv₀ : 0 < v := Real.exp_pos _
+  have hP : D (u - 1) = (s (u - 1) - s 0 * ((u⁻¹ : ℝ) : ℂ)) / ((u - 1 : ℝ) : ℂ) := by
+    simp [D, R, sub_pos.mpr hu, abs_of_pos (sub_pos.mpr hu)]
+  have hN (a : ℝ) (ha : 0 < a) : D (-a - 1) = s (-a - 1) / ((a + 1 : ℝ) : ℂ) := by
+    have h₁ : -a - 1 < 0 := by linarith
+    have h₂ : -a - 1 < -1 := by linarith
+    simp [D, R, not_lt.mpr h₁.le, not_le.mpr h₂, abs_of_neg h₁, add_comm]
+  have hV : D (v - 1) = (s (v - 1) - s 0) / ((1 - v : ℝ) : ℂ) := by
+    have hv₁ : -1 ≤ v - 1 := by linarith
+    simp [D, R, not_lt.mpr (sub_nonpos.mpr hv.le), hv₁, abs_of_neg (sub_neg.mpr hv)]
+  have hub : u = b ^ 2 := by dsimp [u, b]; rw [← Real.exp_nat_mul]; congr 1; ring
+  have hvu : v = u⁻¹ := Real.exp_neg _
+  have hq : Real.exp (-t) = v ^ 2 := by rw [← Real.exp_nat_mul]; congr 1; dsimp [t]; ring
+  have hhalf : t / 2 = y := by dsimp [t]; ring
+  have hquarter : Real.exp (-(t / 4)) = b⁻¹ := by
+    rw [show t / 4 = y / 2 by dsimp [t]; ring, Real.exp_neg]
+  have hbneg : Real.exp (-y / 2) = b⁻¹ := by rw [neg_div, Real.exp_neg]
+  have hu₀ : (u : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (Real.exp_pos _).ne'
+  have hb₀ : (b : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (Real.exp_pos _).ne'
+  have h₁ : (u : ℂ) - 1 ≠ 0 := sub_ne_zero.mpr (by exact_mod_cast hu.ne')
+  have h₂ : (u : ℂ) + 1 ≠ 0 := by exact_mod_cast (by linarith : u + 1 ≠ 0)
+  have h₃ : (u : ℂ) ^ 2 - 1 ≠ 0 := sub_ne_zero.mpr (by exact_mod_cast (by nlinarith : u ^ 2 ≠ 1))
+  have h₂' : 1 + (u : ℂ) ≠ 0 := by rwa [add_comm]
+  have hscale : -(2 : ℝ) * y = -t := by dsimp [t]; ring
+  simp only [Q, T, hhalf, hquarter, hscale, hq, hp, hm, hbneg,
+    show Real.exp (y / 2) = b from rfl, show Real.exp y = u from rfl,
+    show Real.exp (-y) = v from rfl]
+  change _ = _ - ((u • (D (u - 1) + D (-u - 1))) + v • (D (v - 1) + D (-v - 1))) / 2
+  rw [hP, hV, hN u (Real.exp_pos _), hN v hv₀]
+  -- Use `v = 1/u` and `b² = u` only in the scalar coefficients.
+  generalize s (u - 1) = P
+  generalize s (-u - 1) = N
+  generalize s (v - 1) = p
+  generalize s (-v - 1) = n
+  simp only [hvu, t, Complex.real_smul, Complex.ofReal_sub, Complex.ofReal_add,
+    Complex.ofReal_div, Complex.ofReal_mul, Complex.ofReal_pow, Complex.ofReal_inv,
+    Complex.ofReal_one, Complex.ofReal_ofNat]
+  field_simp [hu₀, hb₀, h₁, h₂, h₂', h₃, Complex.ofReal_ne_zero.mpr hy.ne']
+  rw [hub]
+  push_cast
+  ring
+
 /-- Paper: Theorem B.4.4.7, pp. 625–626, footnote 27 (local identity at a real place `w`).
 For a test `f` on `F_w^× = ℝ^×`, with `g₊(y) = f(e^y)`, `g₋(y) = f(-e^y)` and `Q` as in
 `idelicExplicitFormula_infiniteMatching_realCharacterSum`,
@@ -11522,7 +11812,47 @@ theorem idelicExplicitFormula_infiniteMatching_realLocal (w : InfinitePlace F) (
             (1 - (Real.exp (-t) : ℂ)))) -
         (Real.log Real.pi : ℂ) * testI.val 1 =
       -infiniteConnesWeilPrincipalValue w testI := by
-  sorry
+  intro e gp gm Q
+  obtain ⟨s, h0, hu, hPV⟩ := idelicExplicitFormula_infiniteMatching_realLocal_coordinate w hw testI
+  let R (x : ℝ) := if 0 < x then (1 + x)⁻¹ else if -1 ≤ x then 1 else 0
+  let D (x : ℝ) := (s x - s 0 * (R x : ℂ)) / ((|x| : ℝ) : ℂ)
+  let T (y : ℝ) := Real.exp y • (D (Real.exp y - 1) + D (-Real.exp y - 1))
+  let C (y : ℝ) := Real.exp (-2 * y) / y - Real.exp (-y) / (1 - Real.exp (-y))
+  obtain ⟨hD, hlim⟩ := idelicExplicitFormula_infiniteMatching_realLocal_remainder s
+  have hvalue := tendsto_nhds_unique hlim hPV
+  change (∫ x, D x) = _ at hvalue
+  obtain ⟨hT, hfold⟩ := idelicExplicitFormula_infiniteMatching_realLocal_fold D hD
+  change IntegrableOn (fun y ↦ T y + T (-y)) (Ioi 0) at hT
+  change (∫ y in Ioi 0, T y + T (-y)) = _ at hfold
+  obtain ⟨hC, hconst⟩ := idelicExplicitFormula_infiniteMatching_realLocal_constant
+  change (∫ y in Ioi 0, C y) = _ at hconst
+  have hsqrt (y : ℝ) : Real.sqrt (Real.exp y) = Real.exp (y / 2) := by
+    rw [show Real.exp y = Real.exp (y / 2) ^ 2 by rw [← Real.exp_nat_mul]; congr 1; ring,
+      Real.sqrt_sq (Real.exp_pos _).le]
+  have hp (y : ℝ) : gp y = (Real.exp (y / 2) : ℂ) * s (Real.exp y - 1) := by
+    simpa only [gp, Units.val_mk0, abs_of_pos (Real.exp_pos _), hsqrt] using
+      hu (Units.mk0 (Real.exp y) (Real.exp_pos y).ne')
+  have hm (y : ℝ) : gm y = (Real.exp (y / 2) : ℂ) * s (-Real.exp y - 1) := by
+    simpa only [gm, Units.val_neg, Units.val_mk0, abs_neg, abs_of_pos (Real.exp_pos _), hsqrt] using
+      hu (-Units.mk0 (Real.exp y) (Real.exp_pos y).ne')
+  let S (t : ℝ) := (1 / 2 : ℂ) * (2 * (Real.exp (-t) : ℂ) * s 0 / (t : ℂ) -
+    (Real.exp (-(t / 4)) : ℂ) * (Q t (t / 2) + Q t (-(t / 2))) / (1 - (Real.exp (-t) : ℂ)))
+  rw [← h0]
+  change (∫ t in Ioi 0, S t) - _ = _
+  have hscale : (∫ t in Ioi 0, S t) = ∫ y in Ioi 0, (2 : ℂ) * S (2 * y) := by
+    rw [integral_const_mul (2 : ℂ) (fun y ↦ S (2 * y)),
+      integral_comp_mul_left_Ioi S 0 (by norm_num : (0 : ℝ) < 2), mul_zero, Complex.real_smul]
+    push_cast
+    ring
+  rw [hscale, setIntegral_congr_fun measurableSet_Ioi
+      (fun y hy ↦ idelicExplicitFormula_infiniteMatching_realLocal_kernel s gp gm hp hm hy)]
+  change (∫ y in Ioi 0, (C y : ℂ) * s 0 - (T y + T (-y)) / 2) - _ = _
+  have hi : IntegrableOn (fun y ↦ (C y : ℂ) * s 0) (Ioi 0) := hC.ofReal.mul_const _
+  rw [integral_sub hi (hT.div_const (2 : ℂ)), integral_mul_const,
+    integral_complex_ofReal, integral_div, hconst, hfold, hvalue,
+    Real.log_mul (by norm_num : (2 : ℝ) ≠ 0) Real.pi_pos.ne']
+  push_cast
+  ring
 
 /-- Paper: Theorem B.4.4.7, pp. 625–626, footnote 27 (character sum at a complex place `w`).
 Let `Φ_χ` be the radial profiles of a test `f`, as in `idelicExplicitFormula_finiteMatching`,
