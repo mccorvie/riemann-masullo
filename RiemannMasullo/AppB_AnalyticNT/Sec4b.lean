@@ -9717,136 +9717,6 @@ private theorem idelicExplicitFormula_summable_spectral_characters_radial
     Complex.cpow_def_of_ne_zero (Complex.exp_ne_zero _),
     Complex.log_exp (by simp [Real.pi_pos]) (by simp [Real.pi_pos.le])]
 
-/-- Classical input: the uniform local zero count for Hecke L-functions
-(Lagarias–Odlyzko, 1977, Lemma 5.4 for finite-order characters, and
-Iwaniec–Kowalski, *Analytic Number Theory*, Proposition 5.7 in general).
-On a fixed Bruhat quotient the finite conductor is bounded. In torus coordinates the
-derivatives of the unitary character along lifted angular directions have norms `|n_j|`.
-Zeros with these frequencies and `|Im ρ|` below `T+1` have polynomially bounded total
-multiplicity. Finite subsums express this before local finiteness has been proved.
-This known theorem is an external arithmetic input whose formal proof is missing here. -/
-private theorem idelicExplicitFormula_summable_spectral_characters_polynomialCount
-    (τ : ℝ≥0ˣ →ₜ* C[F]) (_hτ : RightInverse τ (ideleClassNorm F))
-    (k : Subgroup C[F]) (_hk : IsBruhatGoodSubgroup k) :
-    ∃ (n : ℕ) (Y : Fin n → LCATopologicalLie (ideleClassNorm F).ker) (C : ℝ) (d : ℕ),
-      ∀ T : ℕ, ∀ S : Finset (chartZeros(τ)),
-        (∀ z ∈ S, (∀ u : k, z.val.1.val u.val = 1) ∧ |z.val.2.im| < (T : ℝ) + 1 ∧
-          ∀ i, ‖bruhatDirectionalDeriv (Y i) (fun u ↦ (z.val.1.val u.val : ℂ)) 1‖ < (T : ℝ) + 1) →
-        ∑ z ∈ S, ‖zeroMultiplicity(z)‖ ≤ C * ((T : ℝ) + 1) ^ d := by
-  sorry
-
-/-- Paper: Lemma B.4.4.9, pp. 624–625, summed over characters. Over the unitary characters
-trivial on the image of the norm section `τ`, the per-character sums of the absolute spectral
-terms of the idelic explicit formula at a fixed test are summable. This is the uniform half of
-Lemma B.4.4.9: a test only sees the characters of a Lie quotient of the idele classes, and the
-zero count of their completed Hecke L-functions must be polynomial jointly in the height and in
-the archimedean frequency of the character (see the paper-gap note at
-`summable_ideleClassMellin_completedHeckeZeros`). -/
-theorem idelicExplicitFormula_summable_spectral_characters (τ : ℝ≥0ˣ →ₜ* C[F])
-    (_hτ : RightInverse τ (ideleClassNorm F)) (f : 𝒟(C[F])) :
-    Summable (fun χ : {χ : U[F] // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} ↦
-      ∑' s : {s : ℂ // 0 < MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ.val) univ s},
-        ‖(MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ.val) univ s.val : ℂ) *
-          ∫ g, classMellinIntegrand(f, ideleClassNormTwist χ.val s.val, -1 / 2) g
-            ∂classMeasure‖) := by
-  classical
-  let Z := chartZeros(τ)
-  let c (z : Z) := ideleClassNormTwist z.val.1.val (z.val.2 - 1 / 2)
-  let M (z : Z) := ‖∫ x, f.val x * c z x ∂classMeasure‖
-  obtain ⟨k, hk, hinv, _⟩ := (mem_bruhatSmoothSubmodule_iff _).mp f.property.1 0
-  obtain ⟨n, Y, C, d, hcount⟩ :=
-    idelicExplicitFormula_summable_spectral_characters_polynomialCount τ _hτ k hk
-  let incl : (ideleClassNorm F).ker →ₜ* C[F] := ⟨(ideleClassNorm F).ker.subtype, continuous_subtype_val⟩
-  -- The radial flow and the norm-one flows measure all frequencies in the counting box.
-  let X : Fin (n + 1) → LCATopologicalLie C[F] :=
-    Fin.cons (τ.comp (positiveRealLogEquiv.symm : _ →ₜ* _)) (fun i ↦ incl.comp (Y i))
-  let freq (i : Fin (n + 1)) (z : Z) := ‖bruhatDirectionalDeriv (X i) (c z) 1‖
-  let level (z : Z) := Finset.univ.sup (fun i ↦ ⌊freq i z⌋₊)
-  have hlevel (z : Z) : ∃ i, (level z : ℝ) ≤ freq i z := by
-    obtain ⟨i, _, hi⟩ := Finset.univ.exists_mem_eq_sup Finset.univ_nonempty (fun i ↦ ⌊freq i z⌋₊)
-    exact ⟨i, by simpa only [level, hi] using Nat.floor_le (norm_nonneg _)⟩
-  let r (x : C[F]) : ℝ := ((ideleClassNorm F x).val : ℝ)
-  have hr (x : C[F]) : 0 < r x := NNReal.coe_pos.mpr (Units.zero_lt _)
-  have hrc : Continuous r := NNReal.continuous_coe.comp
-    (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)
-  let W (x : C[F]) := r x ^ (-(1 / 2) : ℝ) + r x ^ (1 / 2 : ℝ)
-  have hW : Continuous W := (hrc.rpow_const fun x ↦ Or.inl (hr x).ne').add
-    (hrc.rpow_const fun x ↦ Or.inl (hr x).ne')
-  have hbound (z : Z) (x : C[F]) : ‖c z x‖ ≤ W x := by
-    have hs := explicitFormulaCompletedHeckeL_zero_re_mem z.val.1.val z.property
-    have hre : (z.val.2 - (1 / 2 : ℂ)).re = z.val.2.re - 1 / 2 := by simp
-    change ‖((z.val.1.val x : Circle) : ℂ) * (r x : ℂ) ^ (z.val.2 - 1 / 2)‖ ≤ _
-    rw [norm_mul, Circle.norm_coe, one_mul, Complex.norm_cpow_eq_rpow_re_of_pos (hr x), hre]
-    rcases le_total (r x) 1 with h | h
-    · exact (Real.rpow_le_rpow_of_exponent_ge (hr x) h (by linarith [hs.1])).trans
-        (le_add_of_nonneg_right (Real.rpow_nonneg (hr x).le _))
-    · exact (Real.rpow_le_rpow_of_exponent_le h (by linarith [hs.2])).trans
-        (le_add_of_nonneg_left (Real.rpow_nonneg (hr x).le _))
-  obtain ⟨B, hB, hdecay⟩ := idelicExplicitFormula_summable_spectral_characters_decay X c W hW
-    hbound level hlevel (d + 2) f
-  have hker : k ≤ (ideleClassNorm F).ker := by
-    obtain ⟨m, hm, _, _⟩ := exists_ideleClassModulation F
-    rw [← hm]
-    exact compactSubgroup_le_modulation_ker m k hk.isCompact
-  have hrestrict (z : Z) (g : C[F]) (hg : ideleClassNorm F g = 1) :
-      c z g = (z.val.1.val g : ℂ) := by
-    change ((z.val.1.val g : Circle) : ℂ) *
-      (((ideleClassNorm F g).val : ℝ) : ℂ) ^ (z.val.2 - 1 / 2) = _
-    simp [hg]
-  have hsum : Summable (fun z : Z ↦ ‖zeroMultiplicity(z)‖ * M z) := by
-    apply idelicExplicitFormula_summable_spectral_characters_shells level _ M (fun _ ↦ norm_nonneg _)
-      (fun _ ↦ norm_nonneg _) C B hB d _ hdecay
-    intro j S hS
-    apply hcount j S
-    intro z hz
-    obtain ⟨hne, hj⟩ := hS z hz
-    have hsmall (i : Fin (n + 1)) : freq i z < (j : ℝ) + 1 := by
-      have hi : ⌊freq i z⌋₊ ≤ level z := Finset.le_sup (f := fun i ↦ ⌊freq i z⌋₊) (Finset.mem_univ i)
-      exact (Nat.lt_floor_add_one (freq i z)).trans_le (by exact_mod_cast Nat.succ_le_succ (hj ▸ hi))
-    refine ⟨fun u ↦ Circle.coe_injective ?_, ?_, fun i ↦ ?_⟩
-    · rw [← hrestrict z u.val (hker u.property), Circle.coe_one]
-      exact idelicExplicitFormula_summable_spectral_characters_annihilator k f hinv (c z)
-        (norm_ne_zero_iff.mp hne) u
-    · have h0 := hsmall 0
-      simp only [freq, X, Fin.cons_zero, c,
-        idelicExplicitFormula_summable_spectral_characters_radial τ _hτ] at h0
-      simpa using (Complex.abs_im_le_norm (z.val.2 - 1 / 2)).trans_lt h0
-    · have he : bruhatDirectionalDeriv (X i.succ) (c z) 1 =
-          bruhatDirectionalDeriv (Y i) (fun u ↦ (z.val.1.val u.val : ℂ)) 1 := by
-        simp only [bruhatDirectionalDeriv, one_mul, X, Fin.cons_succ]
-        exact congrArg (fun g : ℝ → ℂ ↦ deriv g 0)
-          (funext fun t ↦ hrestrict z _ (Y i (Multiplicative.ofAdd t)).property)
-      simpa only [freq, he] using hsmall i.succ
-  have hcenter (z : Z) (x : C[F]) : zeroCharacter(z) x * classWeight(x, -1 / 2) = c z x := by
-    change ((z.val.1.val x : Circle) : ℂ) * (r x : ℂ) ^ z.val.2 * (r x : ℂ) ^ (-1 / 2 : ℂ) =
-      ((z.val.1.val x : Circle) : ℂ) * (r x : ℂ) ^ (z.val.2 - 1 / 2)
-    rw [mul_assoc, ← Complex.cpow_add _ _ (Complex.ofReal_ne_zero.mpr (hr x).ne')]
-    congr 2
-    ring
-  have hflat : Summable (fun z : Z ↦ ‖zeroMultiplicity(z) *
-      ∫ x, classMellinIntegrand(f, zeroCharacter(z), -1 / 2) x ∂classMeasure‖) := by
-    simpa only [norm_mul, mul_assoc, hcenter, M] using hsum
-  -- Regroup the weighted zero sum using the fixed-character convergence theorem.
-  let P (χ : {χ : U[F] // ∀ t : ℝ≥0ˣ, χ (τ t) = 1}) (s : ℂ) :=
-    0 < MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ.val) univ s
-  let e := Equiv.subtypeProdEquivSigmaSubtype P
-  exact ((e.symm.hasSum_iff.mpr hflat.hasSum).sigma fun χ ↦
-    (idelicExplicitFormula_summable_spectral_fiber f χ.val).hasSum).summable
-
-/-- Paper: Theorem B.4.4.7, pp. 623–626, and Lemma B.4.4.9, pp. 624–625. The spectral terms
-of the idelic explicit formula are absolutely summable at every test. -/
-theorem idelicExplicitFormula_summable_spectral (τ : ℝ≥0ˣ →ₜ* C[F])
-    (_hτ : RightInverse τ (ideleClassNorm F)) (f : 𝒟(C[F])) :
-    Summable (fun z : chartZeros(τ) ↦ ‖zeroMultiplicity(z) *
-      ∫ g, classMellinIntegrand(f, zeroCharacter(z), -1 / 2) g ∂classMeasure‖) := by
-  let P : {χ : U[F] // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} → ℂ → Prop := fun χ s ↦
-    0 < MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ.val) univ s
-  let e := Equiv.subtypeProdEquivSigmaSubtype P
-  rw [← e.symm.summable_iff]
-  exact (summable_sigma_of_nonneg fun _ ↦ norm_nonneg _).2
-    ⟨fun χ ↦ idelicExplicitFormula_summable_spectral_fiber f χ.val,
-      idelicExplicitFormula_summable_spectral_characters τ _hτ f⟩
-
 /-- Paper: Theorem B.4.4.7, p. 625, (B.4.4.22). For all but finitely many primes the
 restricted test is a constant multiple of the integer-unit indicator at an unramified
 prime, so its finite principal value vanishes. -/
@@ -15450,6 +15320,734 @@ theorem idelicExplicitFormula_infiniteMatching (τ : ℝ≥0ˣ →ₜ* C[F])
     simp only at h2
     rwa [h2] at h1
 
+/-- The finite conductor is bounded on the annihilator of a fixed good subgroup.
+All but finitely many full unit groups map into the subgroup, and at the
+remaining primes a sufficiently deep principal unit group maps into it. -/
+private theorem idelicExplicitFormula_summable_spectral_characters_conductor
+    (k : Subgroup C[F]) (hk : IsBruhatGoodSubgroup k) :
+    ∃ A : ℝ, ∀ χ : U[F], (∀ u : k, χ u.val = 1) → heckeLogDiscriminantConductor χ ≤ A := by
+  classical
+  obtain ⟨W, hW, hpow⟩ := explicitFormula_smallPowers k hk
+  have hgood := explicitFormula_eventually_units_mem W hW
+  let bad := eventually_cofinite.mp hgood
+  let S := bad.toFinset
+  have hdepth (v : Primes(F)) : ∃ m : ℕ, ∀ u : (v.adicCompletion F)ˣ, ‖u.val‖ = 1 →
+      ‖u.val - 1‖ ≤ q(v) ^ (-(m : ℤ)) → finiteClassMap(v) u ∈ k := by
+    have hpre : finiteClassMap(v) ⁻¹' W ∈ 𝓝 (1 : (v.adicCompletion F)ˣ) :=
+      (continuous_ideleClass_ofAdicCompletion F v).continuousAt.preimage_mem_nhds (by simpa using hW)
+    rw [Units.isEmbedding_val₀.isInducing.nhds_eq_comap] at hpre
+    obtain ⟨V, hV, hsub⟩ := mem_comap.mp hpre
+    obtain ⟨r, hr, hball⟩ := Metric.mem_nhds_iff.mp hV
+    have hq : 1 < q(v) := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+    obtain ⟨m, hm⟩ := exists_pow_lt_of_lt_one hr (inv_lt_one_of_one_lt₀ hq)
+    refine ⟨m, fun u hu hd ↦ hpow _ fun j ↦ ?_⟩
+    rw [← map_pow]
+    apply hsub
+    apply hball
+    change dist (u.val ^ j) 1 < r
+    rw [dist_eq_norm]
+    exact (local_unit_pow_bound u.val hu.le j).trans_lt
+      (hd.trans_lt (by simpa only [zpow_neg, zpow_natCast, inv_pow] using hm))
+  choose m hm using hdepth
+  refine ⟨Real.log (Int.natAbs (NumberField.discr F)) + ∑ v ∈ S, Real.log q(v) * (m v : ℝ),
+    fun χ hχ ↦ add_le_add_right ?_ _⟩
+  let a (v : Primes(F)) := sInf (conductorExponents(χ, v))
+  change ∑ᶠ v, Real.log q(v) * (a v : ℝ) ≤ _
+  rw [finsum_eq_sum_of_support_subset (s := S)]
+  · refine Finset.sum_le_sum fun v _ ↦ mul_le_mul_of_nonneg_left ?_ (Real.log_nonneg ?_)
+    · exact_mod_cast Nat.sInf_le (s := conductorExponents(χ, v))
+        (show m v ∈ conductorExponents(χ, v) from fun u hu hd ↦ hχ ⟨_, hm v u hu hd⟩)
+    · exact_mod_cast (HeightOneSpectrum.one_lt_absNorm v).le
+  · intro v hv
+    by_contra hvS
+    have hunit : ∀ u ∈ (O(v)).units, finiteClassMap(v) u ∈ W := by
+      simpa [S, bad] using hvS
+    have hz : 0 ∈ conductorExponents(χ, v) := by
+      intro u hu _
+      have hu' : u ∈ (O(v)).units := HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mpr
+        (Valued.toNormedField.norm_eq_one_iff.mp hu)
+      exact hχ ⟨_, hpow _ fun j ↦ by rw [← map_pow]; exact hunit _ ((O(v)).units.pow_mem hu' j)⟩
+    have ha : a v = 0 := Nat.le_zero.mp (Nat.sInf_le hz)
+    exact hv (by change Real.log q(v) * (a v : ℝ) = 0; rw [ha, Nat.cast_zero, mul_zero])
+
+/-- Projecting the local radial and angular flows along the norm section preserves
+their frequencies for every character in the chart. Thus a single frequency box
+bounds all the shifts in the archimedean gamma factors. -/
+private theorem idelicExplicitFormula_summable_spectral_characters_archimedean
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F)) :
+    ∃ (n : ℕ) (Y : Fin n → LCATopologicalLie (ideleClassNorm F).ker),
+      ∀ (χ : chartChars(τ)) (X : ℝ),
+        (∀ i, ‖bruhatDirectionalDeriv (Y i) (fun u ↦ (χ.val u.val : ℂ)) 1‖ ≤ X) →
+        ∀ w : InfinitePlace F, if hw : w.IsReal then
+          ‖(realHeckeCharacter_parameters χ.val w hw).exists.choose.1‖ ≤ X
+        else
+          let p := (complexHeckeCharacter_parameters χ.val w
+            (InfinitePlace.not_isReal_iff_isComplex.mp hw)).exists.choose
+          ‖p.1‖ ≤ X ∧ (p.2.natAbs : ℝ) ≤ X := by
+  classical
+  let N : C[F] →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+  let proj : C[F] →ₜ* (ideleClassNorm F).ker :=
+    ⟨(ContinuousMonoidHom.id C[F] / τ.comp N).toMonoidHom.codRestrict _ (fun x ↦ by
+      change ideleClassNorm F (x / τ (ideleClassNorm F x)) = 1
+      rw [map_div, hτ, div_self']), ((ContinuousMonoidHom.id C[F] / τ.comp N).continuous).subtype_mk _⟩
+  have hfreq (b : LCATopologicalLie C[F]) (χ : chartChars(τ)) (a : ℂ)
+      (ha : ∀ t : ℝ, (χ.val (b (Multiplicative.ofAdd t)) : ℂ) = Complex.exp (a * t)) :
+      bruhatDirectionalDeriv (proj.comp b) (fun u ↦ (χ.val u.val : ℂ)) 1 = a := by
+    have hd : HasDerivAt (fun t : ℝ ↦ Complex.exp (a * t)) a 0 := by
+      simpa using ((hasDerivAt_id (0 : ℝ)).ofReal_comp.const_mul a).cexp
+    apply (hd.congr_of_eventuallyEq (.of_forall fun t ↦ ?_)).deriv
+    simp only [one_mul]
+    change (χ.val (b _ / τ (N (b _))) : ℂ) = _
+    rw [map_div, χ.property, div_one, ha]
+  have hplace (w : InfinitePlace F) : ∃ b : Bool → LCATopologicalLie (ideleClassNorm F).ker,
+      ∀ (χ : chartChars(τ)) (X : ℝ),
+        (∀ j, ‖bruhatDirectionalDeriv (b j) (fun u ↦ (χ.val u.val : ℂ)) 1‖ ≤ X) →
+        if hw : w.IsReal then ‖(realHeckeCharacter_parameters χ.val w hw).exists.choose.1‖ ≤ X
+        else
+          let p := (complexHeckeCharacter_parameters χ.val w
+            (InfinitePlace.not_isReal_iff_isComplex.mp hw)).exists.choose
+          ‖p.1‖ ≤ X ∧ (p.2.natAbs : ℝ) ≤ X := by
+    let ι : w.Completionˣ →ₜ* C[F] := ⟨infiniteClassMap(w), continuous_ideleClass_ofCompletion F w⟩
+    by_cases hw : w.IsReal
+    · let e : ℝˣ →ₜ* w.Completionˣ :=
+        ⟨Units.map (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm.toMonoidHom,
+          (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).symm.continuous.units_map _⟩
+      let expU : Multiplicative ℝ →ₜ* ℝˣ :=
+        { toFun := fun t ↦ Units.mk0 (Real.exp t.toAdd) (Real.exp_pos _).ne'
+          map_one' := Units.ext Real.exp_zero
+          map_mul' := fun x y ↦ Units.ext (Real.exp_add _ _)
+          continuous_toFun := Units.isEmbedding_val₀.continuous_iff.mpr
+            (Real.continuous_exp.comp continuous_toAdd) }
+      let b := ι.comp (e.comp expU)
+      refine ⟨fun _ ↦ proj.comp b, fun χ X hb ↦ ?_⟩
+      rw [dite_eq_left hw]
+      have he := hfreq b χ (realHeckeCharacter_parameters χ.val w hw).exists.choose.1 (fun t ↦ by
+        rw [show (χ.val (b (Multiplicative.ofAdd t)) : ℂ) = _ from
+          explicitFormula_real_character w hw χ.val (expU (Multiplicative.ofAdd t))]
+        simp only [show (expU (Multiplicative.ofAdd t)).val = Real.exp t from rfl,
+          ite_eq_left (Real.exp_pos t), one_pow, mul_one, Real.norm_of_nonneg (Real.exp_pos t).le,
+          explicitFormula_exp_cpow])
+      exact he ▸ hb false
+    · have hc := InfinitePlace.not_isReal_iff_isComplex.mp hw
+      let e : ℂˣ →ₜ* w.Completionˣ :=
+        ⟨Units.map (InfinitePlace.Completion.ringEquivComplexOfIsComplex hc).symm.toMonoidHom,
+          (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hc).symm.continuous.units_map _⟩
+      let b (d : ℂ) : Multiplicative ℝ →ₜ* ℂˣ :=
+        { toFun := fun x ↦ Units.mk0 (Complex.exp ((x.toAdd : ℂ) * d)) (Complex.exp_ne_zero _)
+          map_one' := Units.ext (by simp)
+          map_mul' := fun x y ↦ Units.ext (by simp [add_mul, Complex.exp_add])
+          continuous_toFun := Units.isEmbedding_val₀.continuous_iff.mpr
+            (Complex.continuous_exp.comp ((Complex.continuous_ofReal.comp continuous_toAdd).mul continuous_const)) }
+      let path (d : ℂ) := ι.comp (e.comp (b d))
+      refine ⟨fun j ↦ proj.comp (path (if j then Complex.I else 1 / 2)), fun χ X hb ↦ ?_⟩
+      rw [dite_eq_right hw]
+      let p := (complexHeckeCharacter_parameters χ.val w hc).exists.choose
+      have hval (y φ : ℝ) :=
+        congrArg Inv.inv ((idelicExplicitFormula_infiniteMatching_complexCharacterSum_polar w hc y φ).2 χ.val)
+      have hr := hfreq (path (1 / 2)) χ p.1 (fun t ↦ by
+        change (χ.val (infiniteClassMap(w) (e (Units.mk0 (Complex.exp ((t : ℂ) * (1 / 2))) (Complex.exp_ne_zero _)))) : ℂ) = _
+        have h := hval t 0
+        simp only [Complex.ofReal_zero, zero_mul, add_zero, Complex.exp_zero, one_zpow, mul_one, neg_mul, Complex.exp_neg, inv_inv, div_eq_mul_inv, one_mul] at h ⊢
+        exact h)
+      have hi := hfreq (path Complex.I) χ ((p.2 : ℂ) * Complex.I) (fun t ↦ by
+        have h := hval 0 t
+        simp only [Complex.ofReal_zero, zero_div, zero_add, mul_zero, Complex.exp_zero,
+          one_mul, zpow_neg, inv_inv, ← Complex.exp_int_mul] at h
+        exact h.trans (congrArg Complex.exp (by dsimp [p]; ring)))
+      have h₁ := hb false
+      have h₂ := hb true
+      simp only [Bool.false_eq_true, ite_false, hr] at h₁
+      simp only [ite_true, hi, norm_mul, Complex.norm_I, mul_one, Complex.norm_intCast] at h₂
+      change ‖p.1‖ ≤ X ∧ (p.2.natAbs : ℝ) ≤ X
+      exact ⟨h₁, by simpa using h₂⟩
+  choose b hb using hplace
+  let e := Fintype.equivFin (InfinitePlace F × Bool)
+  exact ⟨_, fun i ↦ b (e.symm i).1 (e.symm i).2, fun χ X h w ↦ hb w χ X fun j ↦
+    by simpa only [e.symm_apply_apply] using h (e (w, j))⟩
+
+/-- Absolute convergence of the Euler product bounds the finite L-function
+uniformly in the character on each closed half-plane to the right of one. -/
+private theorem idelicExplicitFormula_summable_spectral_characters_euler (r : ℝ) (hr : 1 < r) :
+    ∃ D ≥ (1 : ℝ), ∀ (χ : U[F]) (s : halfPlane), r ≤ s.val.re → ‖finiteHeckeL χ s‖ ≤ D := by
+  let u (v : Primes(F)) := 2 * q(v) ^ (-r)
+  have hu : Summable u := ((summable_absNorm_rpow F hr).comp_injective
+    (fun _ _ he ↦ HeightOneSpectrum.ext he)).mul_left 2
+  have hpos (v : Primes(F)) : 0 ≤ u v := by dsimp [u]; positivity
+  refine ⟨Real.exp (∑' v, u v), Real.one_le_exp (tsum_nonneg hpos), fun χ s hs ↦ ?_⟩
+  apply le_of_tendsto' (finiteHeckeL_hasProd χ s).norm
+  intro V
+  rw [norm_prod]
+  calc
+    _ ≤ ∏ v ∈ V, Real.exp (u v) := by
+      refine Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _) fun v _ ↦ ?_
+      have h : ‖finiteHeckeEulerFactor χ v s - 1‖ ≤ u v :=
+        norm_finiteHeckeEulerFactor_sub_one_le χ v hr hs
+      apply (norm_le_norm_add_norm_sub' (finiteHeckeEulerFactor χ v s) 1).trans
+      rw [norm_one]
+      linarith [Real.add_one_le_exp (u v)]
+    _ ≤ _ := by rw [← Real.exp_sum]; exact Real.exp_le_exp.mpr (hu.sum_le_tsum V fun v _ ↦ hpos v)
+
+/-- On the line `Re s = -1/2`, conjugation and the Deligne gamma recurrences
+turn each reflected gamma quotient into at most two linear factors. -/
+private theorem idelicExplicitFormula_summable_spectral_characters_gamma
+    (χ : U[F]) (X : ℝ) (hX : 1 ≤ X)
+    (harch : ∀ w : InfinitePlace F, if hw : w.IsReal then
+        ‖(realHeckeCharacter_parameters χ w hw).exists.choose.1‖ ≤ X
+      else
+        let p := (complexHeckeCharacter_parameters χ w
+          (InfinitePlace.not_isReal_iff_isComplex.mp hw)).exists.choose
+        ‖p.1‖ ≤ X ∧ (p.2.natAbs : ℝ) ≤ X)
+    (s : ℂ) (hs : s.re = -1 / 2) :
+    ‖heckeGammaFactor χ⁻¹ (1 - s) / heckeGammaFactor χ s‖ ≤
+      (4 * (1 + X + |s.im|)) ^ (2 * Fintype.card (InfinitePlace F)) := by
+  classical
+  let U := 4 * (1 + X + |s.im|)
+  have hU : 1 ≤ U := by dsimp [U]; linarith [abs_nonneg s.im]
+  have hsn : ‖s‖ ≤ 1 + |s.im| := (Complex.norm_le_abs_re_add_abs_im s).trans (by rw [hs]; norm_num)
+  have hshift (a : ℂ) (ha : a.re = 0) (j : ℝ) :
+      starRingEnd ℂ (1 - s + -a + (j : ℂ)) = s + a + (j : ℂ) + 2 := by
+    apply Complex.ext <;> simp [Complex.add_re, Complex.sub_re, hs, ha]
+    ring
+  have hstep (g : ℂ → ℂ) (v d : ℂ) (hrec : v ≠ 0 → g (v + d) = g v * v / 2 / Real.pi)
+      (hv : ‖v‖ ≤ U) (hzero : g 0 = 0) : ‖g (v + d) / g v‖ ≤ U := by
+    by_cases h : v = 0
+    · simp [h, hzero, hU.trans' zero_le_one]
+    · rw [hrec h, norm_div, norm_div, norm_div, norm_mul, Complex.norm_two,
+        Complex.norm_real, Real.norm_of_nonneg Real.pi_pos.le]
+      by_cases hn : ‖g v‖ = 0
+      · simp [hn, hU.trans' zero_le_one]
+      · rw [div_le_iff₀ (lt_of_le_of_ne (norm_nonneg _) (Ne.symm hn))]
+        calc
+          _ ≤ ‖g v‖ * ‖v‖ := (div_le_self (by positivity) (by linarith [Real.pi_gt_three])).trans
+            (div_le_self (by positivity) (by norm_num))
+          _ ≤ U * ‖g v‖ := by rw [mul_comm]; gcongr
+  let γ (ψ : U[F]) (w : InfinitePlace F) := fun z : ℂ ↦ if hw : w.IsReal then
+    let p := (realHeckeCharacter_parameters ψ w hw).exists.choose
+    Complex.Gammaℝ (z + p.1 + (p.2.val : ℂ))
+    else
+      let p := (complexHeckeCharacter_parameters ψ w (InfinitePlace.not_isReal_iff_isComplex.mp hw)).exists.choose
+      Complex.Gammaℂ (z + p.1 + (p.2.natAbs : ℂ) / 2) / 2
+  have hloc (w : InfinitePlace F) : ‖γ χ⁻¹ w (1 - s) / γ χ w s‖ ≤ U ^ 2 := by
+    by_cases hw : w.IsReal
+    · let p := (realHeckeCharacter_parameters χ w hw).exists.choose
+      have hp : ‖p.1‖ ≤ X := by simpa only [dite_eq_left hw] using harch w
+      have hj : (p.2.val : ℝ) ≤ 1 := by exact_mod_cast (show p.2.val ≤ 1 by omega)
+      let v := s + p.1 + (p.2.val : ℂ)
+      have hv : ‖v‖ ≤ U := by
+        dsimp [v, U]
+        calc
+          _ ≤ ‖s‖ + ‖p.1‖ + (p.2.val : ℝ) := by grw [norm_add_le, norm_add_le]; simp
+          _ ≤ _ := by linarith [abs_nonneg s.im]
+      simp only [γ, dite_eq_left hw, realHecke_inverse_parameters, norm_div]
+      rw [← Complex.norm_conj (Complex.Gammaℝ _), ← Complex.Gammaℝ_conj,
+        ← Complex.ofReal_natCast, hshift _ (realHeckeCharacter_parameters χ w hw).exists.choose_spec.1]
+      change ‖Complex.Gammaℝ (v + 2)‖ / ‖Complex.Gammaℝ v‖ ≤ U ^ 2
+      rw [← norm_div]
+      exact (hstep _ _ _ (fun h ↦ Complex.Gammaℝ_add_two h) hv (by simp [Complex.Gammaℝ_def])).trans
+        (by nlinarith [sq_nonneg (U - 1)])
+    · have hc := InfinitePlace.not_isReal_iff_isComplex.mp hw
+      let p := (complexHeckeCharacter_parameters χ w hc).exists.choose
+      have hp : ‖p.1‖ ≤ X ∧ (p.2.natAbs : ℝ) ≤ X := by simpa only [dite_eq_right hw] using harch w
+      let v := s + p.1 + (p.2.natAbs : ℂ) / 2
+      have hv : ‖v‖ + 1 ≤ U := by
+        dsimp [v, U]
+        calc
+          _ ≤ ‖s‖ + ‖p.1‖ + (p.2.natAbs : ℝ) / 2 + 1 := by
+            grw [norm_add_le, norm_add_le]; simp
+          _ ≤ _ := by linarith [hp.1, hp.2, abs_nonneg s.im]
+      simp only [γ, dite_eq_right hw, complexHecke_inverse_parameters, Int.natAbs_neg,
+        div_div_div_cancel_right₀ (two_ne_zero' ℂ), norm_div]
+      rw [← Complex.norm_conj (Complex.Gammaℂ _), ← Complex.Gammaℂ_conj,
+        show (p.2.natAbs : ℂ) / 2 = (((p.2.natAbs : ℝ) / 2 : ℝ) : ℂ) by push_cast; rfl,
+        hshift _ (complexHeckeCharacter_parameters χ w hc).exists.choose_spec.1]
+      suffices h : ‖Complex.Gammaℂ (v + 2)‖ / ‖Complex.Gammaℂ v‖ ≤ U ^ 2 by
+        simpa only [v, p, Complex.ofReal_div, Complex.ofReal_ofNat, Complex.ofReal_natCast] using h
+      by_cases hz : Complex.Gammaℂ v = 0
+      · simp [hz, sq_nonneg]
+      have hΓ0 : Complex.Gammaℂ 0 = 0 := by simp [Complex.Gammaℂ_def]
+      have hv0 : v ≠ 0 := fun h ↦ hz (h ▸ hΓ0)
+      have hv1 : Complex.Gammaℂ (v + 1) ≠ 0 := by
+        rw [Complex.Gammaℂ_add_one hv0]; exact div_ne_zero (div_ne_zero (mul_ne_zero hz hv0) (by norm_num))
+          (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero)
+      rw [← norm_div, show v + 2 = v + 1 + 1 by ring, ← div_mul_div_cancel₀ hv1, norm_mul, sq]
+      exact mul_le_mul
+        (hstep _ _ _ (fun h ↦ Complex.Gammaℂ_add_one h) ((norm_add_le v 1).trans (by simpa using hv)) hΓ0)
+        (hstep _ _ _ (fun h ↦ Complex.Gammaℂ_add_one h) (by linarith) hΓ0) (norm_nonneg _) (by linarith)
+  change ‖(∏ w, γ χ⁻¹ w (1 - s)) / (∏ w, γ χ w s)‖ ≤ _
+  rw [← Finset.prod_div_distrib, norm_prod, pow_mul, ← Finset.card_univ, ← Finset.prod_const]
+  exact Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _) (fun w _ ↦ hloc w)
+
+/-- Phragmén–Lindelöf transfers a common polynomial majorant on the two
+boundary lines to the Jensen disc. Only the preliminary growth exponent in
+the interior is allowed to depend on the function. -/
+private theorem idelicExplicitFormula_summable_spectral_characters_strip
+    (G : ℂ → ℂ) (hd : Differentiable ℂ G) (M : ℝ)
+    (hg : G =O[comap (abs ∘ Complex.im) atTop ⊓ 𝓟 (Complex.re ⁻¹' Icc (-1 / 2 : ℝ) 5)]
+      fun z ↦ |z.im| ^ M) (n : ℕ) (D X : ℝ) (hD : 0 ≤ D) (hX : 1 ≤ X)
+    (hedge : ∀ z : ℂ, z.re = -1 / 2 ∨ z.re = 5 →
+      ‖G z‖ ≤ D * (4 * (1 + X + |z.im|)) ^ n)
+    (t : ℝ) (ht : |t| ≤ X) (z : ℂ) (hz : z ∈ Metric.closedBall (⟨2, t⟩ : ℂ) (5 / 2)) :
+    ‖G z‖ ≤ D * 72 ^ n * X ^ n := by
+  let W (s : ℂ) := s + (X : ℂ) + 2
+  let H (s : ℂ) := G s / W s ^ n
+  let U := Complex.re ⁻¹' Ioo (-1 / 2 : ℝ) 5
+  let V := Complex.re ⁻¹' Icc (-1 / 2 : ℝ) 5
+  have hW {s : ℂ} (hs : s ∈ V) : 1 + X ≤ ‖W s‖ := by
+    apply le_trans _ (Complex.re_le_norm (W s))
+    change 1 + X ≤ s.re + X + 2
+    linarith [hs.1]
+  have hW0 {s : ℂ} (hs : s ∈ V) : W s ≠ 0 := norm_pos_iff.mp (by linarith [hW hs])
+  have hHd {s : ℂ} (hs : s ∈ V) : DifferentiableAt ℂ H s :=
+    (hd s).div (((differentiableAt_id.add_const _).add_const _).pow n) (pow_ne_zero _ (hW0 hs))
+  have hUV : U ⊆ V := preimage_mono Ioo_subset_Icc_self
+  have hCont : DiffContOnCl ℂ H U :=
+    ⟨fun s hs ↦ (hHd (hUV hs)).differentiableWithinAt, fun s hs ↦
+      (hHd (closure_minimal hUV (isClosed_Icc.preimage Complex.continuous_re) hs)).continuousAt.continuousWithinAt⟩
+  let l := comap (abs ∘ Complex.im) atTop ⊓ 𝓟 U
+  have hmem : ∀ᶠ s : ℂ in l, s ∈ U := mem_inf_of_right (mem_principal_self _)
+  have htend : Tendsto (abs ∘ Complex.im) l atTop := tendsto_inf_left tendsto_comap
+  have hHG : H =O[l] G := Asymptotics.IsBigO.of_bound 1 (hmem.mono fun s hs ↦ by
+    rw [one_mul, show H s = _ from rfl, norm_div, norm_pow]
+    exact div_le_self (norm_nonneg _) (one_le_pow₀ (by linarith [hW (hUV hs)])))
+  let c := Real.pi / (5 - (-1 / 2)) / 2
+  have hc : 0 < c := by dsimp [c]; positivity
+  have hO := (hHG.trans (hg.mono (inf_le_inf_left _ (principal_mono.mpr hUV)))).trans
+    ((isLittleO_rpow_exp_pos_mul_atTop M hc).isBigO.comp_tendsto htend)
+  have hbound (s : ℂ) (hs : s.re = -1 / 2 ∨ s.re = 5) : ‖H s‖ ≤ D * 8 ^ n := by
+    have hV : s ∈ V := by rcases hs with h | h <;> constructor <;> rw [h] <;> norm_num
+    have him : |s.im| ≤ ‖W s‖ := by simpa only [W, Complex.add_im, Complex.ofReal_im,
+      Complex.im_ofNat, add_zero] using Complex.abs_im_le_norm (W s)
+    rw [show H s = G s / W s ^ n from rfl, norm_div, norm_pow,
+      div_le_iff₀ (pow_pos (norm_pos_iff.mpr (hW0 hV)) _), mul_assoc, ← mul_pow]
+    exact (hedge s hs).trans (mul_le_mul_of_nonneg_left
+      (pow_le_pow_left₀ (by positivity) (by linarith [hW hV]) _) hD)
+  have hdist : ‖z - (⟨2, t⟩ : ℂ)‖ ≤ 5 / 2 := by
+    simpa only [Metric.mem_closedBall, dist_eq_norm] using hz
+  have hzr := (Complex.abs_re_le_norm _).trans hdist
+  change |z.re - 2| ≤ 5 / 2 at hzr
+  have hzV : z ∈ V := ⟨by linarith [(abs_le.mp hzr).1], by linarith [(abs_le.mp hzr).2]⟩
+  have hPL := PhragmenLindelof.vertical_strip hCont
+    ⟨c, half_lt_self (by positivity), 1, hO.trans (Asymptotics.IsBigO.of_bound 1
+      (Eventually.of_forall fun s ↦ by
+        simp only [Function.comp_apply, one_mul, Real.norm_of_nonneg (Real.exp_pos _).le]
+        exact Real.exp_le_exp.mpr (by linarith [Real.add_one_le_exp (c * |s.im|)])))⟩
+    (fun s hs ↦ hbound s (.inl hs)) (fun s hs ↦ hbound s (.inr hs)) hzV.1 hzV.2
+  have hn : ‖z‖ ≤ 5 / 2 + (2 + |t|) := by
+    have h := norm_le_norm_add_norm_sub' z (⟨2, t⟩ : ℂ)
+    have h₂ := Complex.norm_le_abs_re_add_abs_im (⟨2, t⟩ : ℂ)
+    change ‖(⟨2, t⟩ : ℂ)‖ ≤ |(2 : ℝ)| + |t| at h₂
+    norm_num at h₂
+    linarith
+  have hWz : ‖W z‖ ≤ 9 * X := by
+    calc
+      _ ≤ ‖z‖ + ‖(X : ℂ)‖ + ‖(2 : ℂ)‖ := (norm_add_le ..).trans (by grw [norm_add_le])
+      _ ≤ _ := by rw [Complex.norm_real, Real.norm_of_nonneg (by linarith : 0 ≤ X), Complex.norm_two]; linarith
+  change ‖G z / W z ^ n‖ ≤ D * 8 ^ n at hPL
+  rw [norm_div, norm_pow, div_le_iff₀ (pow_pos (norm_pos_iff.mpr (hW0 hzV)) _)] at hPL
+  calc
+    _ ≤ D * 8 ^ n * (9 * X) ^ n := hPL.trans (by gcongr)
+    _ = _ := by rw [mul_pow, ← mul_assoc, mul_assoc D, ← mul_pow]; norm_num
+
+/-- Multiplying the finite L-functions of a character and its inverse cancels
+the unknown constant of the functional equation. For a character nontrivial on
+the norm-one classes this gives an entire function with uniform growth on each
+Jensen disc and with orders dominating those of the completed L-function. -/
+private theorem idelicExplicitFormula_summable_spectral_characters_discs (A : ℝ) :
+    ∃ (K : ℝ) (n : ℕ), 0 < K ∧ ∀ (χ : U[F]) (X t : ℝ),
+      χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype ≠ 1 → 1 ≤ X → |t| ≤ X →
+      heckeLogDiscriminantConductor χ ≤ A →
+      (∀ w : InfinitePlace F, if hw : w.IsReal then
+        ‖(realHeckeCharacter_parameters χ w hw).exists.choose.1‖ ≤ X
+      else
+        let p := (complexHeckeCharacter_parameters χ w
+          (InfinitePlace.not_isReal_iff_isComplex.mp hw)).exists.choose
+        ‖p.1‖ ≤ X ∧ (p.2.natAbs : ℝ) ≤ X) →
+      ∃ G : ℂ → ℂ, Differentiable ℂ G ∧ G ⟨2, t⟩ ≠ 0 ∧
+        (∀ s, meromorphicOrderAt (explicitFormulaCompletedHeckeL χ) s ≤ meromorphicOrderAt G s) ∧
+        ∀ z ∈ Metric.closedBall (⟨2, t⟩ : ℂ) (5 / 2), ‖G z / G ⟨2, t⟩‖ ≤ K * X ^ n := by
+  classical
+  obtain ⟨D, hD, hright⟩ := idelicExplicitFormula_summable_spectral_characters_euler
+    (F := F) (3 / 2) (by norm_num)
+  let m := 2 * Fintype.card (InfinitePlace F)
+  let n := m + m
+  let B := (1 + Real.exp (2 * A)) * D ^ 2
+  let c := Real.exp (-(∑' v : Primes(F), q(v) ^ (-(2 : ℝ))))
+  have hc : 0 < c := Real.exp_pos _
+  have hB : 0 < B := mul_pos (by positivity) (pow_pos (by linarith) _)
+  refine ⟨B * 72 ^ n / c ^ 2, n, by positivity, fun χ X t hχ hX ht hA harch ↦ ?_⟩
+  let Λ := fun ψ : U[F] ↦ explicitFormulaCompletedHeckeL ψ
+  let L (ψ : U[F]) (s : ℂ) := Λ ψ s * (heckeGammaFactor ψ s)⁻¹
+  let G := L χ * L χ⁻¹
+  have ha (ψ : U[F]) (hψ : ψ.toMonoidHom.comp (ideleClassNorm F).ker.subtype ≠ 1) :
+      Differentiable ℂ (Λ ψ) := completedHeckeL_continuation_entire ψ _ (explicitFormulaCompletedHeckeL_spec ψ).1
+        (explicitFormulaCompletedHeckeL_spec ψ).2 hψ
+  have hχ' : χ⁻¹.toMonoidHom.comp (ideleClassNorm F).ker.subtype ≠ 1 := by
+    intro h
+    apply hχ
+    ext1 u
+    exact inv_eq_one.mp (DFunLike.congr_fun h u : (χ u.val)⁻¹ = 1)
+  have hd (ψ : U[F]) (hψ : Differentiable ℂ (Λ ψ)) : Differentiable ℂ (L ψ) :=
+    hψ.mul (differentiable_inv_heckeGammaFactor ψ)
+  have hd₁ := hd χ (ha χ hχ)
+  have hd₂ := hd χ⁻¹ (ha χ⁻¹ hχ')
+  have hG : Differentiable ℂ G := hd₁.mul hd₂
+  have hseries (ψ : U[F]) (s : halfPlane) : L ψ s = finiteHeckeL ψ s := by
+    simp only [L, Λ, (explicitFormulaCompletedHeckeL_spec ψ).2 s, completedHeckeL, finiteHeckeL]
+    field_simp [heckeGammaFactor_ne_zero_of_re_pos ψ (zero_lt_one.trans s.property)]
+  have hcenter (ψ : U[F]) : c ≤ ‖L ψ ⟨2, t⟩‖ := by
+    rw [hseries ψ ⟨_, by change (1 : ℝ) < 2; norm_num⟩]
+    exact completedHeckeL_logDeriv_finite_lower ψ 2 (by norm_num) _ rfl
+  have hlow : c ^ 2 ≤ ‖G ⟨2, t⟩‖ := by
+    change c ^ 2 ≤ ‖L χ ⟨2, t⟩ * L χ⁻¹ ⟨2, t⟩‖
+    rw [norm_mul, sq]
+    exact mul_le_mul (hcenter χ) (hcenter χ⁻¹) hc.le (norm_nonneg _)
+  refine ⟨G, hG, norm_pos_iff.mp ((sq_pos_of_pos hc).trans_le hlow), fun s ↦ ?_, fun z hz ↦ ?_⟩
+  · rw [show meromorphicOrderAt G s = _ from meromorphicOrderAt_mul
+      (hd₁.analyticAt s).meromorphicAt (hd₂.analyticAt s).meromorphicAt]
+    apply le_add_of_le_of_nonneg _ (hd₂.analyticAt s).meromorphicOrderAt_nonneg
+    rw [show meromorphicOrderAt (L χ) s = _ from meromorphicOrderAt_mul
+      ((ha χ hχ).analyticAt s).meromorphicAt ((differentiable_inv_heckeGammaFactor χ).analyticAt s).meromorphicAt]
+    exact le_add_of_nonneg_right ((differentiable_inv_heckeGammaFactor χ).analyticAt s).meromorphicOrderAt_nonneg
+  · have hpoly (ψ : U[F]) (h : Differentiable ℂ (L ψ)) :=
+      finiteHeckeL_continuation_isBigO_rpow ψ (L ψ) (fun s _ ↦ (h.analyticAt s).meromorphicNFAt)
+        (hseries ψ) (-1 / 2) 5 (by norm_num)
+    -- The preliminary strip growth is only used to apply Phragmén–Lindelöf.
+    obtain ⟨M, hMpos, hM⟩ := hpoly χ hd₁
+    obtain ⟨M', hMpos', hM'⟩ := hpoly χ⁻¹ hd₂
+    have hg := (hM.mul hM').congr' (g₂ := fun s : ℂ ↦ |s.im| ^ (M + M'))
+      EventuallyEq.rfl (Eventually.of_forall fun s ↦ by
+        by_cases hs : s.im = 0
+        · simp [hs, hMpos.ne', hMpos'.ne', (add_pos hMpos hMpos').ne']
+        · exact (Real.rpow_add (abs_pos.mpr hs) _ _).symm)
+    have hΓ (ψ : U[F]) (s : ℂ) (hs : s.re = -1 / 2) (hψ : ψ = χ ∨ ψ = χ⁻¹) :
+        ‖heckeGammaFactor ψ⁻¹ (1 - s) / heckeGammaFactor ψ s‖ ≤ (4 * (1 + X + |s.im|)) ^ m := by
+      refine idelicExplicitFormula_summable_spectral_characters_gamma ψ X hX (fun w ↦ ?_) s hs
+      obtain rfl | rfl := hψ
+      · exact harch w
+      · simpa only [realHecke_inverse_parameters, complexHecke_inverse_parameters,
+          norm_neg, Int.natAbs_neg] using harch w
+    obtain ⟨ε, _, hfe⟩ := completedHeckeL_functionalEquation_conductorScale χ (Λ χ) (Λ χ⁻¹)
+      (explicitFormulaCompletedHeckeL_spec χ).1 (explicitFormulaCompletedHeckeL_spec χ).2
+      (explicitFormulaCompletedHeckeL_spec χ⁻¹).1 (explicitFormulaCompletedHeckeL_spec χ⁻¹).2
+    let a := heckeLogDiscriminantConductor χ
+    have hedge (s : ℂ) (hs : s.re = -1 / 2 ∨ s.re = 5) :
+        ‖G s‖ ≤ B * (4 * (1 + X + |s.im|)) ^ n := by
+      rcases hs with hs | hs
+      · let w : halfPlane := ⟨1 - s, by change 1 < 1 - s.re; rw [hs]; norm_num⟩
+        let E := Complex.exp ((a : ℂ) * (1 - 2 * s))
+        have hE : E * Complex.exp ((a : ℂ) * (s - 1 / 2)) =
+            Complex.exp ((a : ℂ) * ((1 - s) - 1 / 2)) := by
+          rw [← Complex.exp_add]; congr 1; ring
+        have hdual : Λ χ⁻¹ s = ε * Complex.exp ((a : ℂ) * ((1 - s) - 1 / 2)) * Λ χ (1 - s) := by
+          simpa only [sub_sub_cancel] using hfe (1 - s)
+        -- At s and 1-s the same epsilon constant occurs, so it drops out of the product.
+        have hpair : Λ χ s * Λ χ⁻¹ s = E * (Λ χ⁻¹ (1 - s) * Λ χ (1 - s)) := by
+          rw [hdual, ← hE, hfe]; ring
+        have hleft : G s = E * (heckeGammaFactor χ⁻¹ (1 - s) / heckeGammaFactor χ s) *
+            (heckeGammaFactor χ (1 - s) / heckeGammaFactor χ⁻¹ s) *
+            (finiteHeckeL χ⁻¹ w * finiteHeckeL χ w) := by
+          change (Λ χ s * _ ) * (Λ χ⁻¹ s * _) = _
+          rw [mul_mul_mul_comm, hpair]
+          have hval (ψ : U[F]) : Λ ψ (1 - s) = heckeGammaFactor ψ (1 - s) * finiteHeckeL ψ w :=
+            (explicitFormulaCompletedHeckeL_spec ψ).2 w
+          rw [hval, hval, div_eq_mul_inv, div_eq_mul_inv]; ring
+        have hE' : ‖E‖ ≤ Real.exp (2 * A) := by
+          dsimp [E]; rw [Complex.norm_exp]; apply Real.exp_le_exp.mpr
+          simp only [Complex.mul_re, Complex.ofReal_re, Complex.ofReal_im, Complex.sub_re,
+            Complex.one_re, Complex.re_ofNat, Complex.im_ofNat, zero_mul, sub_zero, hs]; dsimp [a]; linarith
+        have hw : 3 / 2 ≤ w.val.re := by change 3 / 2 ≤ 1 - s.re; rw [hs]; norm_num
+        have hinv := hΓ χ⁻¹ s hs (Or.inr rfl)
+        rw [inv_inv] at hinv
+        rw [hleft, norm_mul, norm_mul, norm_mul, norm_mul]
+        calc
+          _ ≤ Real.exp (2 * A) * (4 * (1 + X + |s.im|)) ^ m * (4 * (1 + X + |s.im|)) ^ m * (D * D) := by
+            gcongr
+            · exact hΓ χ s hs (.inl rfl)
+            · exact hright χ⁻¹ w hw
+            · exact hright χ w hw
+          _ ≤ _ := by
+            dsimp [B,n]; rw [pow_add, sq]; nlinarith only [sq_nonneg D,
+              mul_nonneg (sq_nonneg ((4 * (1 + X + |s.im|)) ^ m)) (sq_nonneg D)]
+      · have hw : (1 : ℝ) < s.re := by rw [hs]; norm_num
+        have hval (ψ : U[F]) : ‖L ψ s‖ ≤ D := by
+          rw [hseries ψ ⟨s, hw⟩]; exact hright ψ _ (by change 3 / 2 ≤ s.re; rw [hs]; norm_num)
+        have h₁ : 1 ≤ (4 * (1 + X + |s.im|)) ^ n := one_le_pow₀ (by linarith [abs_nonneg s.im])
+        change ‖L χ s * L χ⁻¹ s‖ ≤ _
+        rw [norm_mul]
+        calc
+          _ ≤ D ^ 2 := by rw [sq]; gcongr <;> apply hval
+          _ ≤ B := le_mul_of_one_le_left (sq_nonneg _) (by linarith [Real.exp_pos (2 * A)])
+          _ ≤ _ := le_mul_of_one_le_right hB.le h₁
+    have hstrip := idelicExplicitFormula_summable_spectral_characters_strip G hG _ hg n B X hB.le hX hedge t ht z hz
+    rw [norm_div]
+    calc
+      _ ≤ (B * 72 ^ n * X ^ n) / c ^ 2 := div_le_div₀ (by positivity) hstrip (sq_pos_of_pos hc) hlow
+      _ = _ := by ring
+
+/-- A unit window of a chart character with bounded finite conductor and bounded
+archimedean parameters has polynomially bounded total multiplicity. Jensen gives
+the estimate for characters nontrivial on the norm-one classes. The remaining
+chart character is trivial, so its fixed-character summability bound suffices. -/
+private theorem idelicExplicitFormula_summable_spectral_characters_window
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F)) (A : ℝ) :
+    ∃ B ≥ (0 : ℝ), ∀ (χ : U[F]) (X t : ℝ), (∀ u, χ (τ u) = 1) → 1 ≤ X → |t| ≤ X →
+      heckeLogDiscriminantConductor χ ≤ A →
+      (∀ w : InfinitePlace F, if hw : w.IsReal then
+        ‖(realHeckeCharacter_parameters χ w hw).exists.choose.1‖ ≤ X
+      else
+        let p := (complexHeckeCharacter_parameters χ w
+          (InfinitePlace.not_isReal_iff_isComplex.mp hw)).exists.choose
+        ‖p.1‖ ≤ X ∧ (p.2.natAbs : ℝ) ≤ X) →
+      ∀ P : Finset ℂ, (∀ s ∈ P, 0 < MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ) univ s ∧
+        |s.im - t| ≤ 1) →
+      ∑ s ∈ P, (MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ) univ s : ℝ) ≤ B * X ^ 2 := by
+  classical
+  let D := MeromorphicOn.divisor (explicitFormulaCompletedHeckeL (1 : U[F])) univ
+  let w (s : {s : ℂ // 0 < D s}) := (D s.val : ℝ) / (1 + |s.val.im|) ^ 2
+  have hw : Summable w := explicitFormulaCompletedHeckeL_summable_divisor_div_sq 1
+  have hw₀ (s) : 0 ≤ w s := div_nonneg (by exact_mod_cast s.property.le) (sq_nonneg _)
+  obtain ⟨K, n, hK, hdisc⟩ := idelicExplicitFormula_summable_spectral_characters_discs (F := F) A
+  obtain ⟨B, hB, hlog⟩ := explicitZeroCount_log_bound K n (9 / 4) (5 / 2) hK
+    (Nat.cast_nonneg _) (by norm_num) (by norm_num)
+  refine ⟨max (9 * ∑' s, w s) B, hB.trans (le_max_right _ _), fun χ X t hτχ hX ht hA harch P hP ↦ ?_⟩
+  by_cases hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1
+  · have htriv : χ = 1 := congrArg Subtype.val (explicitFormula_chartChar_ext τ hτ ⟨χ, hτχ⟩
+        ⟨1, fun _ ↦ rfl⟩ (fun u ↦ DFunLike.congr_fun hχ u))
+    subst χ
+    let S := P.subtype (fun s ↦ 0 < D s)
+    rw [← Finset.sum_subtype_of_mem (fun s ↦ (D s : ℝ)) (fun s hs ↦ (hP s hs).1)]
+    calc
+      ∑ s ∈ S, (D s.val : ℝ) ≤ ∑ s ∈ S, w s * (3 * X) ^ 2 := by
+        refine Finset.sum_le_sum fun s hs ↦ ?_
+        have him := (hP s.val (Finset.mem_subtype.mp hs)).2
+        have hle : 1 + |s.val.im| ≤ 3 * X := by
+          linarith [(abs_sub_abs_le_abs_sub s.val.im t).trans him]
+        have he : (D s.val : ℝ) = w s * (1 + |s.val.im|) ^ 2 := by
+          dsimp [w]; field_simp
+        exact he.trans_le (mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (by positivity) hle 2) (hw₀ s))
+      _ ≤ (∑' s, w s) * (3 * X) ^ 2 := by
+        rw [← Finset.sum_mul]; gcongr; exact hw.sum_le_tsum S (fun s _ ↦ hw₀ s)
+      _ = (9 * ∑' s, w s) * X ^ 2 := by ring
+      _ ≤ _ := mul_le_mul_of_nonneg_right (le_max_left _ _) (sq_nonneg _)
+  · obtain ⟨G, hG, hc, hcmp, hbound⟩ := hdisc χ X t hχ hX ht hA harch
+    let c : ℂ := ⟨2, t⟩
+    have hmem (s) (hs : s ∈ P) : s ∈ Metric.closedBall c (9 / 4) := by
+      obtain ⟨hr₁, hr₂⟩ := explicitFormulaCompletedHeckeL_zero_re_mem χ (hP s hs).1
+      have him := abs_le.mp (hP s hs).2
+      have hnorm := Complex.sq_norm_sub_sq_re (s - c)
+      change ‖s - c‖ ^ 2 - (s.re - 2) ^ 2 = (s.im - t) ^ 2 at hnorm
+      rw [Metric.mem_closedBall, dist_eq_norm]
+      nlinarith [mul_nonneg hr₁ (show 0 ≤ 4 - s.re by linarith),
+        mul_nonneg (sub_nonneg.mpr him.1) (sub_nonneg.mpr him.2)]
+    have ha : AnalyticOnNhd ℂ G (Metric.closedBall c (5 / 2)) := fun z _ ↦ hG.analyticAt z
+    calc
+      _ ≤ ∑ s ∈ P, (analyticOrderNatAt G s : ℝ) := Finset.sum_le_sum fun s hs ↦
+        explicitZeroCount_local_order (explicitFormulaCompletedHeckeL_spec χ).1.meromorphicOn
+          (by norm_num : (0 : ℝ) ≤ 5 / 2) ha hc hcmp (Metric.closedBall_subset_closedBall (by norm_num) (hmem s hs))
+      _ ≤ _ := explicitZeroCount_disk_sum (by norm_num : (0 : ℝ) < 9 / 4)
+        (by norm_num : (9 / 4 : ℝ) < 5 / 2) ha hc hbound P hmem
+      _ ≤ B * X ^ (1 / 2 : ℝ) := by simpa only [Real.rpow_natCast] using hlog X hX
+      _ ≤ max (9 * ∑' s, w s) B * X ^ 2 := by
+        gcongr
+        · exact le_max_right _ _
+        · exact_mod_cast Real.rpow_le_rpow_of_exponent_le hX (by norm_num : (1 / 2 : ℝ) ≤ 2)
+
+/-- Paper: Lemma B.4.4.9, pp. 624–625. On a fixed Bruhat quotient, the total
+multiplicity of zeros with height and angular frequencies below `T+1` is
+polynomial in `T+1`. The finite-subsum formulation needs no local finiteness
+assumption. Compare Iwaniec–Kowalski, Proposition 5.7(1), and, for finite-order
+characters, Lagarias–Odlyzko, Lemma 5.4. -/
+private theorem idelicExplicitFormula_summable_spectral_characters_polynomialCount
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (_hτ : RightInverse τ (ideleClassNorm F))
+    (k : Subgroup C[F]) (_hk : IsBruhatGoodSubgroup k) :
+    ∃ (n : ℕ) (Y : Fin n → LCATopologicalLie (ideleClassNorm F).ker) (C : ℝ) (d : ℕ),
+      ∀ T : ℕ, ∀ S : Finset (chartZeros(τ)),
+        (∀ z ∈ S, (∀ u : k, z.val.1.val u.val = 1) ∧ |z.val.2.im| < (T : ℝ) + 1 ∧
+          ∀ i, ‖bruhatDirectionalDeriv (Y i) (fun u ↦ (z.val.1.val u.val : ℂ)) 1‖ < (T : ℝ) + 1) →
+        ∑ z ∈ S, ‖zeroMultiplicity(z)‖ ≤ C * ((T : ℝ) + 1) ^ d := by
+  classical
+  obtain ⟨r, b, hb, C, d, hC⟩ := idelicExplicitFormula_normOneFourier_count τ _hτ k _hk
+  obtain ⟨n, Y, hY⟩ := idelicExplicitFormula_summable_spectral_characters_archimedean τ _hτ
+  obtain ⟨A, hA⟩ := idelicExplicitFormula_summable_spectral_characters_conductor k _hk
+  obtain ⟨B, hB, hwindow⟩ := idelicExplicitFormula_summable_spectral_characters_window τ _hτ A
+  let b' (j : Fin r) : LCATopologicalLie (ideleClassNorm F).ker :=
+    ⟨(b j).toMonoidHom.codRestrict _ (hb j), (b j).continuous.subtype_mk _⟩
+  refine ⟨r + n, Fin.addCases b' Y, (C : ℝ) * 2 ^ d * 2 * B, d + 3, fun T S hS ↦ ?_⟩
+  let X : ℝ := (T : ℝ) + 1
+  have hX : 1 ≤ X := by dsimp [X]; linarith [Nat.cast_nonneg (α := ℝ) T]
+  let chars := S.image (fun z ↦ z.val.1)
+  let heights := Finset.Ico (-(T + 1 : ℕ) : ℤ) (T + 1 : ℕ)
+  let key (z : chartZeros(τ)) : chartChars(τ) × ℤ := (z.val.1, ⌊z.val.2.im⌋)
+  have hbox (z) (hz : z ∈ S) : key z ∈ chars ×ˢ heights := by
+    refine Finset.mem_product.mpr ⟨Finset.mem_image_of_mem _ hz, Finset.mem_Ico.mpr ⟨?_, ?_⟩⟩
+    · exact Int.le_floor.mpr (by push_cast; linarith [(abs_lt.mp (hS z hz).2.1).1])
+    · exact Int.floor_lt.mpr (by exact_mod_cast (abs_lt.mp (hS z hz).2.1).2)
+  have hc : chars.card ≤ C * ((T + 1) + 1) ^ d := by
+    have hsub : (chars : Set chartChars(τ)) ⊆ {χ : chartChars(τ) |
+        (∀ u : (ideleClassNorm F).ker, (u : C[F]) ∈ k → χ.val u = 1) ∧
+        ∀ j, ‖bruhatDirectionalDeriv (b j) (fun x : C[F] ↦ (χ.val x : ℂ)) 1‖ ≤ (T + 1 : ℕ)} := fun χ hχ ↦ by
+      obtain ⟨z, hz, rfl⟩ := Finset.mem_image.mp hχ
+      refine ⟨fun u hu ↦ (hS z hz).1 ⟨u, hu⟩, fun j ↦ ?_⟩
+      have h := ((hS z hz).2.2 (Fin.castAdd n j)).le
+      simp only [bruhatDirectionalDeriv, one_mul, Fin.addCases_left, Nat.cast_add, Nat.cast_one] at h ⊢
+      exact h
+    have h := (Set.encard_mono hsub).trans (hC (T + 1))
+    rw [Set.encard_coe_eq_coe_finsetCard] at h
+    exact_mod_cast h
+  have hslice (q : chartChars(τ) × ℤ) (hq : q ∈ chars ×ˢ heights) :
+      ∑ z ∈ S with key z = q, ‖zeroMultiplicity(z)‖ ≤ B * X ^ 2 := by
+    obtain ⟨χ, m⟩ := q
+    obtain ⟨z₀, hz₀, rfl⟩ := Finset.mem_image.mp (Finset.mem_product.mp hq).1
+    have hm := Finset.mem_Ico.mp (Finset.mem_product.mp hq).2
+    change -(↑(T + 1) : ℤ) ≤ m ∧ m < (↑(T + 1) : ℤ) at hm
+    have hmt : |(m : ℝ)| ≤ X := by
+      change |(m : ℝ)| ≤ (T : ℝ) + 1
+      exact_mod_cast (abs_le.mpr ⟨hm.1, hm.2.le⟩ : |m| ≤ (T + 1 : ℕ))
+    let V := S.filter (fun z ↦ key z = (z₀.val.1, m))
+    let p (z : chartZeros(τ)) := z.val.2
+    have he (z) (hz : z ∈ V) := (Finset.mem_filter.mp hz).2
+    have hχ (z) (hz : z ∈ V) : z.val.1 = z₀.val.1 := congrArg (Prod.fst (β := ℤ)) (he z hz)
+    have hP := hwindow z₀.val.1.val X m z₀.val.1.property hX hmt (hA _ (hS z₀ hz₀).1)
+      (hY _ X (fun i ↦ by simpa only [Fin.addCases_right] using
+        ((hS z₀ hz₀).2.2 (Fin.natAdd r i)).le)) (V.image p) (by
+        intro s hs
+        obtain ⟨z, hz, rfl⟩ := Finset.mem_image.mp hs
+        refine ⟨hχ z hz ▸ z.property, ?_⟩
+        have hmz : ⌊z.val.2.im⌋ = m := congrArg Prod.snd (he z hz)
+        rw [← hmz]
+        exact abs_le.mpr ⟨by linarith [Int.floor_le z.val.2.im], by linarith [Int.lt_floor_add_one z.val.2.im]⟩)
+    rw [Finset.sum_image (fun z hz z' hz' hp ↦ Subtype.ext
+      (Prod.ext ((hχ z hz).trans (hχ z' hz').symm) hp))] at hP
+    refine le_trans (le_of_eq (Finset.sum_congr rfl fun z hz ↦ ?_)) hP
+    rw [← hχ z hz]
+    rw [Complex.norm_intCast, abs_of_pos (by exact_mod_cast z.property)]
+  rw [← Finset.sum_fiberwise_of_maps_to hbox]
+  calc
+    _ ≤ ∑ _q ∈ chars ×ˢ heights, B * X ^ 2 := Finset.sum_le_sum hslice
+    _ = (chars.card : ℝ) * (2 * X) * (B * X ^ 2) := by
+      have hh : heights.card = 2 * (T + 1) := by
+        simp only [heights, Int.card_Ico]; omega
+      simp only [Finset.sum_const, nsmul_eq_mul, Finset.card_product, hh, Nat.cast_mul,
+        Nat.cast_two, Nat.cast_add, Nat.cast_one, X]
+    _ ≤ ((C : ℝ) * (2 * X) ^ d) * (2 * X) * (B * X ^ 2) := by
+      gcongr
+      have hc' : (chars.card : ℝ) ≤ C * ((T : ℝ) + 1 + 1) ^ d := by exact_mod_cast hc
+      exact hc'.trans (by dsimp [X]; gcongr; linarith [Nat.cast_nonneg (α := ℝ) T])
+    _ = _ := by dsimp [X]; rw [mul_pow, pow_add]; ring
+
+
+/-- Paper: Lemma B.4.4.9, pp. 624–625, summed over characters. Over the unitary characters
+trivial on the image of the norm section `τ`, the per-character sums of the absolute spectral
+terms of the idelic explicit formula at a fixed test are summable. This is the uniform half of
+Lemma B.4.4.9: a test only sees the characters of a Lie quotient of the idele classes, and the
+zero count of their completed Hecke L-functions must be polynomial jointly in the height and in
+the archimedean frequency of the character (see the paper-gap note at
+`summable_ideleClassMellin_completedHeckeZeros`). -/
+theorem idelicExplicitFormula_summable_spectral_characters (τ : ℝ≥0ˣ →ₜ* C[F])
+    (_hτ : RightInverse τ (ideleClassNorm F)) (f : 𝒟(C[F])) :
+    Summable (fun χ : {χ : U[F] // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} ↦
+      ∑' s : {s : ℂ // 0 < MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ.val) univ s},
+        ‖(MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ.val) univ s.val : ℂ) *
+          ∫ g, classMellinIntegrand(f, ideleClassNormTwist χ.val s.val, -1 / 2) g
+            ∂classMeasure‖) := by
+  classical
+  let Z := chartZeros(τ)
+  let c (z : Z) := ideleClassNormTwist z.val.1.val (z.val.2 - 1 / 2)
+  let M (z : Z) := ‖∫ x, f.val x * c z x ∂classMeasure‖
+  obtain ⟨k, hk, hinv, _⟩ := (mem_bruhatSmoothSubmodule_iff _).mp f.property.1 0
+  obtain ⟨n, Y, C, d, hcount⟩ :=
+    idelicExplicitFormula_summable_spectral_characters_polynomialCount τ _hτ k hk
+  let incl : (ideleClassNorm F).ker →ₜ* C[F] := ⟨(ideleClassNorm F).ker.subtype, continuous_subtype_val⟩
+  -- The radial flow and the norm-one flows measure all frequencies in the counting box.
+  let X : Fin (n + 1) → LCATopologicalLie C[F] :=
+    Fin.cons (τ.comp (positiveRealLogEquiv.symm : _ →ₜ* _)) (fun i ↦ incl.comp (Y i))
+  let freq (i : Fin (n + 1)) (z : Z) := ‖bruhatDirectionalDeriv (X i) (c z) 1‖
+  let level (z : Z) := Finset.univ.sup (fun i ↦ ⌊freq i z⌋₊)
+  have hlevel (z : Z) : ∃ i, (level z : ℝ) ≤ freq i z := by
+    obtain ⟨i, _, hi⟩ := Finset.univ.exists_mem_eq_sup Finset.univ_nonempty (fun i ↦ ⌊freq i z⌋₊)
+    exact ⟨i, by simpa only [level, hi] using Nat.floor_le (norm_nonneg _)⟩
+  let r (x : C[F]) : ℝ := ((ideleClassNorm F x).val : ℝ)
+  have hr (x : C[F]) : 0 < r x := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hrc : Continuous r := NNReal.continuous_coe.comp
+    (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)
+  let W (x : C[F]) := r x ^ (-(1 / 2) : ℝ) + r x ^ (1 / 2 : ℝ)
+  have hW : Continuous W := (hrc.rpow_const fun x ↦ Or.inl (hr x).ne').add
+    (hrc.rpow_const fun x ↦ Or.inl (hr x).ne')
+  have hbound (z : Z) (x : C[F]) : ‖c z x‖ ≤ W x := by
+    have hs := explicitFormulaCompletedHeckeL_zero_re_mem z.val.1.val z.property
+    have hre : (z.val.2 - (1 / 2 : ℂ)).re = z.val.2.re - 1 / 2 := by simp
+    change ‖((z.val.1.val x : Circle) : ℂ) * (r x : ℂ) ^ (z.val.2 - 1 / 2)‖ ≤ _
+    rw [norm_mul, Circle.norm_coe, one_mul, Complex.norm_cpow_eq_rpow_re_of_pos (hr x), hre]
+    rcases le_total (r x) 1 with h | h
+    · exact (Real.rpow_le_rpow_of_exponent_ge (hr x) h (by linarith [hs.1])).trans
+        (le_add_of_nonneg_right (Real.rpow_nonneg (hr x).le _))
+    · exact (Real.rpow_le_rpow_of_exponent_le h (by linarith [hs.2])).trans
+        (le_add_of_nonneg_left (Real.rpow_nonneg (hr x).le _))
+  obtain ⟨B, hB, hdecay⟩ := idelicExplicitFormula_summable_spectral_characters_decay X c W hW
+    hbound level hlevel (d + 2) f
+  have hker : k ≤ (ideleClassNorm F).ker := by
+    obtain ⟨m, hm, _, _⟩ := exists_ideleClassModulation F
+    rw [← hm]
+    exact compactSubgroup_le_modulation_ker m k hk.isCompact
+  have hrestrict (z : Z) (g : C[F]) (hg : ideleClassNorm F g = 1) :
+      c z g = (z.val.1.val g : ℂ) := by
+    change ((z.val.1.val g : Circle) : ℂ) *
+      (((ideleClassNorm F g).val : ℝ) : ℂ) ^ (z.val.2 - 1 / 2) = _
+    simp [hg]
+  have hsum : Summable (fun z : Z ↦ ‖zeroMultiplicity(z)‖ * M z) := by
+    apply idelicExplicitFormula_summable_spectral_characters_shells level _ M (fun _ ↦ norm_nonneg _)
+      (fun _ ↦ norm_nonneg _) C B hB d _ hdecay
+    intro j S hS
+    apply hcount j S
+    intro z hz
+    obtain ⟨hne, hj⟩ := hS z hz
+    have hsmall (i : Fin (n + 1)) : freq i z < (j : ℝ) + 1 := by
+      have hi : ⌊freq i z⌋₊ ≤ level z := Finset.le_sup (f := fun i ↦ ⌊freq i z⌋₊) (Finset.mem_univ i)
+      exact (Nat.lt_floor_add_one (freq i z)).trans_le (by exact_mod_cast Nat.succ_le_succ (hj ▸ hi))
+    refine ⟨fun u ↦ Circle.coe_injective ?_, ?_, fun i ↦ ?_⟩
+    · rw [← hrestrict z u.val (hker u.property), Circle.coe_one]
+      exact idelicExplicitFormula_summable_spectral_characters_annihilator k f hinv (c z)
+        (norm_ne_zero_iff.mp hne) u
+    · have h0 := hsmall 0
+      simp only [freq, X, Fin.cons_zero, c,
+        idelicExplicitFormula_summable_spectral_characters_radial τ _hτ] at h0
+      simpa using (Complex.abs_im_le_norm (z.val.2 - 1 / 2)).trans_lt h0
+    · have he : bruhatDirectionalDeriv (X i.succ) (c z) 1 =
+          bruhatDirectionalDeriv (Y i) (fun u ↦ (z.val.1.val u.val : ℂ)) 1 := by
+        simp only [bruhatDirectionalDeriv, one_mul, X, Fin.cons_succ]
+        exact congrArg (fun g : ℝ → ℂ ↦ deriv g 0)
+          (funext fun t ↦ hrestrict z _ (Y i (Multiplicative.ofAdd t)).property)
+      simpa only [freq, he] using hsmall i.succ
+  have hcenter (z : Z) (x : C[F]) : zeroCharacter(z) x * classWeight(x, -1 / 2) = c z x := by
+    change ((z.val.1.val x : Circle) : ℂ) * (r x : ℂ) ^ z.val.2 * (r x : ℂ) ^ (-1 / 2 : ℂ) =
+      ((z.val.1.val x : Circle) : ℂ) * (r x : ℂ) ^ (z.val.2 - 1 / 2)
+    rw [mul_assoc, ← Complex.cpow_add _ _ (Complex.ofReal_ne_zero.mpr (hr x).ne')]
+    congr 2
+    ring
+  have hflat : Summable (fun z : Z ↦ ‖zeroMultiplicity(z) *
+      ∫ x, classMellinIntegrand(f, zeroCharacter(z), -1 / 2) x ∂classMeasure‖) := by
+    simpa only [norm_mul, mul_assoc, hcenter, M] using hsum
+  -- Regroup the weighted zero sum using the fixed-character convergence theorem.
+  let P (χ : {χ : U[F] // ∀ t : ℝ≥0ˣ, χ (τ t) = 1}) (s : ℂ) :=
+    0 < MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ.val) univ s
+  let e := Equiv.subtypeProdEquivSigmaSubtype P
+  exact ((e.symm.hasSum_iff.mpr hflat.hasSum).sigma fun χ ↦
+    (idelicExplicitFormula_summable_spectral_fiber f χ.val).hasSum).summable
+
+/-- Paper: Theorem B.4.4.7, pp. 623–626, and Lemma B.4.4.9, pp. 624–625. The spectral terms
+of the idelic explicit formula are absolutely summable at every test. -/
+theorem idelicExplicitFormula_summable_spectral (τ : ℝ≥0ˣ →ₜ* C[F])
+    (_hτ : RightInverse τ (ideleClassNorm F)) (f : 𝒟(C[F])) :
+    Summable (fun z : chartZeros(τ) ↦ ‖zeroMultiplicity(z) *
+      ∫ g, classMellinIntegrand(f, zeroCharacter(z), -1 / 2) g ∂classMeasure‖) := by
+  let P : {χ : U[F] // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} → ℂ → Prop := fun χ s ↦
+    0 < MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ.val) univ s
+  let e := Equiv.subtypeProdEquivSigmaSubtype P
+  rw [← e.symm.summable_iff]
+  exact (summable_sigma_of_nonneg fun _ ↦ norm_nonneg _).2
+    ⟨fun χ ↦ idelicExplicitFormula_summable_spectral_fiber f χ.val,
+      idelicExplicitFormula_summable_spectral_characters τ _hτ f⟩
+
 /-- Paper: Theorem B.4.4.7, pp. 623–626. The pointwise idelic explicit formula: at every
 test, the multiplicity-weighted Mellin values at the completed Hecke zeros sum to the pole
 terms minus the archimedean and finite Connes–Weil principal values of the restricted tests. -/
@@ -16215,8 +16813,8 @@ private theorem summable_ideleClassMellin_completedHeckeZeros_weight
   rw [Complex.ofReal_cpow (m g).val.coe_nonneg]
 
 -- TODO(paper-gap): On p. 625, passing to a Lie quotient eliminates other kernel
--- characters. A uniform zero count with multiplicity for the remaining characters
--- is still needed to apply the corrected Lemma B.4.4.8.
+-- characters. The uniform multiplicity bound needed for the remaining characters
+-- is proved in `idelicExplicitFormula_summable_spectral_characters_polynomialCount`.
 
 /-- Paper: Lemma B.4.4.9, pp. 624–625. Mellin evaluations on any subset
 of the completed Hecke zeros are absolutely summable after a real norm twist.
