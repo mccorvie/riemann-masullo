@@ -784,4 +784,59 @@ theorem exists_holomorphic_disk_tails {ι : Type*} (a : ι → ℂ) (m : ι → 
   exact product_divisible (fun j : {j // j ∉ S} ↦ a j.val) (fun j ↦ m j.val)
     (fun j ↦ ha j.val) (fun j ↦ ha' j.val) (hs.subtype _) ⟨i, hi⟩
 
+/-- The complementary product differs from one by at most the remaining
+Blaschke mass times the disk distortion at the evaluation point. -/
+theorem norm_tail_sub_one_le {ι : Type*} (a : ι → ℂ) (m : ι → ℕ) (S : Finset ι)
+    (ha : ∀ i, a i ≠ 0) (ha' : ∀ i, ‖a i‖ < 1)
+    (hs : Summable fun i ↦ (m i : ℝ) * (1 - ‖a i‖)) {z : ℂ} (hz : ‖z‖ < 1) :
+    ‖tail a m S z - 1‖ ≤ ((1 + ‖z‖) / (1 - ‖z‖)) *
+      ∑' i : {j // j ∉ S}, (m i.val : ℝ) * (1 - ‖a i.val‖) :=
+  (product_bound (fun i : {j // j ∉ S} ↦ a i.val) (fun i ↦ m i.val)
+    (fun i ↦ ha i.val) (fun i ↦ ha' i.val) (hs.subtype _) z hz).2
+
+/-- The complementary Blaschke products tend locally uniformly to one
+on the entire open disk as the finite set of omitted factors grows. -/
+theorem tendstoLocallyUniformlyOn_tail {ι : Type*} (a : ι → ℂ) (m : ι → ℕ)
+    (ha : ∀ i, a i ≠ 0) (ha' : ∀ i, ‖a i‖ < 1)
+    (hs : Summable fun i ↦ (m i : ℝ) * (1 - ‖a i‖)) :
+    TendstoLocallyUniformlyOn (tail a m) (fun _ ↦ 1) atTop (ball 0 1) := by
+  apply isOpen_ball.tendstoLocallyUniformlyOn_iff_forall_tendsto.2
+  intro z hz
+  let mass (i : ι) := (m i : ℝ) * (1 - ‖a i‖)
+  let l := (atTop : Filter (Finset ι)) ×ˢ 𝓝 z
+  have hd : ContinuousAt (fun w : ℂ ↦ (1 + ‖w‖) / (1 - ‖w‖)) z :=
+    (continuous_const.add continuous_norm).continuousAt.div
+      (continuous_const.sub continuous_norm).continuousAt (sub_pos.mpr (mem_ball_zero_iff.mp hz)).ne'
+  have hm : Tendsto (fun q : Finset ι × ℂ ↦ ∑' j : {i // i ∉ q.1}, mass j.val) l (𝓝 0) :=
+    (tendsto_tsum_compl_atTop_zero mass).comp tendsto_fst
+  have hb := (hd.tendsto.comp (tendsto_snd (f := (atTop : Filter (Finset ι))) (g := 𝓝 z))).mul hm
+  have htail : Tendsto (fun q : Finset ι × ℂ ↦ tail a m q.1 q.2) l (𝓝 1) := by
+    apply tendsto_iff_norm_sub_tendsto_zero.2
+    apply squeeze_zero' (.of_forall fun _ ↦ norm_nonneg _) _ (by simpa only [mul_zero] using hb)
+    filter_upwards [(tendsto_snd (f := (atTop : Filter (Finset ι))) (g := 𝓝 z)).eventually
+      (isOpen_ball.mem_nhds hz)] with q hq
+    exact norm_tail_sub_one_le a m q.1 ha ha' hs (mem_ball_zero_iff.mp hq)
+  exact (tendsto_const_nhds.prodMk_nhds htail).mono_right (nhds_le_uniformity _)
+
+/-- The normalized Blaschke tails are contractive. Their distance from one is
+bounded by the disk distortion times the remaining Blaschke mass, uniformly
+on each closed subdisk. -/
+theorem exists_holomorphic_disk_tails_bound {ι : Type*} (a : ι → ℂ) (m : ι → ℕ)
+    (ha : ∀ i, a i ≠ 0) (ha' : ∀ i, ‖a i‖ < 1)
+    (hs : Summable (fun i ↦ (m i : ℝ) * (1 - ‖a i‖))) :
+    ∃ B : Finset ι → ℂ → ℂ,
+      (∀ S, AnalyticOnNhd ℂ (B S) (ball 0 1)) ∧
+      (∀ S z, ‖z‖ < 1 → ‖B S z‖ ≤ 1) ∧
+      (∀ (S : Finset ι) (z : ℂ), ‖z‖ < 1 → ‖B S z - 1‖ ≤
+        ((1 + ‖z‖) / (1 - ‖z‖)) * ∑' j : {j // j ∉ S}, (m j.val : ℝ) * (1 - ‖a j.val‖)) ∧
+      ∀ (S : Finset ι) (i : ι), i ∉ S →
+        ∃ G : ℂ → ℂ, AnalyticAt ℂ G (a i) ∧
+          B S =ᶠ[𝓝 (a i)] fun z ↦ (z - a i) ^ m i * G z := by
+  refine ⟨tail a m, fun S ↦ analyticOnNhd_tail a m S ha ha' hs,
+    fun S _ hz ↦ norm_tail_le_one a m S ha ha' hs hz,
+    fun S _ hz ↦ norm_tail_sub_one_le a m S ha ha' hs hz, ?_⟩
+  intro S i hi
+  exact product_divisible (fun j : {j // j ∉ S} ↦ a j.val) (fun j ↦ m j.val)
+    (fun j ↦ ha j.val) (fun j ↦ ha' j.val) (hs.subtype _) ⟨i, hi⟩
+
 end RiemannMasullo.Blaschke
