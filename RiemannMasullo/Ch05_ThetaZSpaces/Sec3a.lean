@@ -3693,19 +3693,30 @@ private def sLocalMellinSchwartzBounds (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SI
     mellinSchwartzStage (fun n χ z ↦ Z (g n) (chartₜ(T, χ.val) z)) a H
 
 /-- Classical input: R. Meyer, *On a representation of the idele class group related to
-primes and zeros of L-functions*, Corollary 4.17 and Lemma 4.20 (preprint pp. 34, 36).
+primes and zeros of L-functions*, Duke Math. J. 127 (2005), arXiv:math/0311468 (page numbers
+are those of the preprint). Used: Corollary 4.17, p. 34, with the summation map of §5.2,
+p. 38; Lemma 4.20, p. 36, at α = 1, with (12) and (15), p. 17, the reflection of weights on
+p. 25, Proposition 4.4 and (24), pp. 26–28; and the Fourier isomorphism and the bornologies of
+§4.1, pp. 23–24.
 The degree-zero isomorphism identifies the S-unit coinvariants, via summation, with
 `T(C_S)`. A family in the quotient bornology has representatives in one bounded set.
 With α = 1 the embedding tests this bornology on the weighted lines of real part > 1
 for the test and its additive Fourier transform (the involution J reflects the weight
-as s ↦ 1 − s). We write the Schwartz bornology on those lines on the Fourier side
-(§4.1, pp. 23–24 and §5.7, p. 46). A norm section splits the dual as a real line times the
+as s ↦ 1 − s). We write the Schwartz bornology on those lines on the Fourier side.
+A norm section splits the dual as a real line times the
 discrete group of characters trivial on the section. An elementary stage on this dual is
 supported on a finitely generated subgroup of the discrete factor. On that stage
 the ordinary Schwartz seminorms are polynomial weights in the discrete variable
 and derivatives of polynomially weighted functions on the real line. Every group
 seminorm is bounded by a multiple of word length, itself a group seminorm. The
-subgroup and the seminorm bounds may depend on the line. -/
+subgroup and the seminorm bounds may depend on the line.
+The paper states its results for bornological spaces and in the variable of the idele
+classes. Writing them for this library is the project's work and is not proved in Lean:
+that the bounded sets of the Schwartz–Bruhat space here are the paper's, that the kernel of
+the S-unit sum is the closed span the paper divides by, the normalizations of the Fourier
+transform and of the Haar measures, and the seminorms on the dual group. The integrator and
+an independent reviewer checked these steps against the paper (#7346); no specialist in
+the paper's framework has. -/
 private theorem sLocalMellinSchwartzBounds_meyer
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T) (hτ : RightInverse τ (sIdeleQuotientNorm F T))
     (v : ℕ → ℬₛ(T)) :
