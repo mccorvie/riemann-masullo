@@ -111,8 +111,7 @@ had pull requests merged, some 2,660 pull requests in all.
   proved nor refuted, and the Lean proof of the targets uses none of them. Four, under the
   bases and traces of Chapters 7 and 10, are statements from which other theorems of the paper
   are proved. Four, under §10.3, §10.4 and (12.5.1.4), are used by nothing else in Lean and are
-  not known to hold; they are kept in files that nothing imports. Contributors narrowed four
-  of the earlier statements on 24 November, which is why there are more, smaller ones.
+  not known to hold; they are kept in files that nothing imports.
 - **Five proof steps that the manuscript does not state precisely enough to formalize,** in
   Chapters 7, 11 and 12. They have no Lean statement.
 - **Four classical inputs:** theorems of the literature that are stated in Lean and used, and
