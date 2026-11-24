@@ -8069,6 +8069,205 @@ private theorem summable_bruhatMellin_of_polynomialCount_of_polyCount_decay
       _ = (C : ℝ) * K * (2 : ℝ) ^ k * 8 := by ring
   exact Summable.of_norm (summable_of_sum_le (fun z => norm_nonneg _) hbound)
 
+section
+
+variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+  [LocallyCompactSpace G] [MeasurableSpace G] [BorelSpace G]
+
+/-- Integrate a derivative along a one-parameter subgroup by first integrating its
+translates over a unit time interval. Haar invariance cancels the two endpoints.
+This is the σ-finite case of the argument in AppD §1c, `integral_orbit_derivative_zero`. -/
+private theorem bruhatMellin_integral_orbitDeriv (μ : Measure G) [μ.IsHaarMeasure] [SFinite μ]
+    (X : LCATopologicalLie G) {w v : G → ℂ} (hw : Integrable w μ) (hv : Integrable v μ)
+    (hc : Continuous v)
+    (hd : ∀ x, HasDerivAt (fun t : ℝ ↦ w (x * X (Multiplicative.ofAdd t))) (v x) 0) :
+    ∫ x, v x ∂μ = 0 := by
+  let γ (t : ℝ) := X (Multiplicative.ofAdd t)
+  have hγ : Continuous γ := X.continuous.comp continuous_ofAdd
+  let V (t : ℝ) (x : G) := v (x * γ t)
+  have htime (x : G) (t : ℝ) : HasDerivAt (fun s ↦ w (x * γ s)) (V t x) t := by
+    have h : HasDerivAt (fun s ↦ w ((x * γ t) * γ s)) (V t x) (t - t) := sub_self t ▸ hd _
+    convert h.comp_sub_const t t using 1
+    funext s
+    simp only [γ, mul_assoc, ← map_mul, ← ofAdd_add, add_sub_cancel]
+  have hFTC (x : G) : (∫ t in (0 : ℝ)..1, V t x) = w (x * γ 1) - w x := by
+    simpa only [γ, ofAdd_zero, map_one, mul_one] using
+      intervalIntegral.integral_eq_sub_of_hasDerivAt (fun t _ ↦ htime x t)
+        ((hc.comp (continuous_const.mul hγ)).intervalIntegrable (μ := volume) 0 1)
+  have hV : Continuous (uncurry V) := hc.comp (continuous_snd.mul (hγ.comp continuous_fst))
+  have hi : Integrable (uncurry V) ((volume.restrict (uIoc (0 : ℝ) 1)).prod μ) := by
+    let : IsFiniteMeasure (volume.restrict (uIoc (0 : ℝ) 1)) :=
+      isFiniteMeasure_restrict.mpr (by simp)
+    refine (integrable_prod_iff hV.aestronglyMeasurable).mpr ⟨.of_forall fun t ↦
+      (measurePreserving_mul_right μ (γ t)).integrable_comp_of_integrable hv, ?_⟩
+    have hnorm (t : ℝ) : (∫ x, ‖V t x‖ ∂μ) = ∫ x, ‖v x‖ ∂μ :=
+      integral_mul_right_eq_self (fun x ↦ ‖v x‖) (γ t)
+    simpa only [uncurry_apply_pair, hnorm] using
+      (integrable_const (μ := volume.restrict (uIoc (0 : ℝ) 1)) (∫ x, ‖v x‖ ∂μ))
+  have he := intervalIntegral_integral_swap hi
+  simp_rw [hFTC] at he
+  have hw' : Integrable (fun x ↦ w (x * γ 1)) μ :=
+    (measurePreserving_mul_right μ (γ 1)).integrable_comp_of_integrable hw
+  rw [integral_sub hw' hw, integral_mul_right_eq_self, sub_self] at he
+  simpa [V, integral_mul_right_eq_self] using he
+
+/-- A directional derivative is again a compactly supported test. Integration by parts
+expresses its Mellin coefficient as the original coefficient times the negative character derivative. -/
+private theorem bruhatMellin_directionalTest (μ : Measure G) [μ.IsHaarMeasure] [SFinite μ]
+    (X : LCATopologicalLie G) (f : 𝒟(G)) (hf : Continuous f.val) :
+    ∃ F : 𝒟(G), ∀ (c : QuasiCharacter G) (v : ℂ),
+      HasDerivAt (fun t : ℝ ↦ c (X (Multiplicative.ofAdd t))) v 0 →
+      (∫ x, F.val x * c x ∂μ) = -(v * ∫ x, f.val x * c x ∂μ) := by
+  let D := bruhatDirectionalDeriv X f.val
+  have h₁ := (mem_bruhatSmoothSubmodule_iff _).mp f.property.1 1
+  have hD : Continuous D := bruhatDirectionalDeriv_continuous X h₁
+  have hK : HasCompactSupport D := by
+    apply HasCompactSupport.of_support_subset_isCompact f.property.2
+    intro x
+    contrapose
+    intro hx
+    have hγ : Tendsto (fun t : ℝ ↦ x * X (Multiplicative.ofAdd t)) (𝓝 0) (𝓝 x) := by
+      have h : Continuous (fun t : ℝ ↦ x * X (Multiplicative.ofAdd t)) :=
+        continuous_const.mul (X.continuous.comp continuous_ofAdd)
+      simpa using h.tendsto 0
+    have hz := (notMem_tsupport_iff_eventuallyEq.mp hx).comp_tendsto hγ
+    rw [notMem_support]
+    simpa [D, bruhatDirectionalDeriv, comp_def] using hz.deriv_eq
+  refine ⟨⟨D, bruhatDirectionalDeriv_mem_smooth X ⟨_, f.property.1⟩, hK⟩, ?_⟩
+  intro c v hc
+  have hi : Integrable (fun x ↦ f.val x * c x) μ :=
+    (hf.mul c.continuous).integrable_of_hasCompactSupport f.property.2.mul_right
+  have hi' : Integrable (fun x ↦ D x * c x) μ :=
+    (hD.mul c.continuous).integrable_of_hasCompactSupport hK.mul_right
+  have he := bruhatMellin_integral_orbitDeriv μ X
+    (v := fun x ↦ D x * c x + v * (f.val x * c x)) hi (hi'.add (hi.const_mul v))
+    ((hD.mul c.continuous).add (continuous_const.mul (hf.mul c.continuous))) (fun x ↦ by
+      have h := (hasDerivAt_bruhatDirectionalDeriv X h₁ x).fun_mul (hc.const_mul (c x))
+      simp only [ofAdd_zero, map_one, mul_one] at h
+      simpa only [map_mul, D, mul_left_comm, mul_comm, mul_assoc] using h)
+  rw [integral_add hi' (hi.const_mul v), integral_const_mul] at he
+  exact eq_neg_of_add_eq_zero_left he
+
+/-- If one of finitely many directional multipliers dominates the height, one more
+integration by parts gains one power of the height, uniformly over all the characters. -/
+private theorem bruhatMellin_decay_of_directions {Z ι : Type*} [Finite ι]
+    (μ : Measure G) [μ.IsHaarMeasure] [SFinite μ] (c : Z → QuasiCharacter G)
+    (W : G → ℝ) (hW : Continuous W) (hbound : ∀ z x, ‖c z x‖ ≤ W x)
+    (hcont : ∀ f : 𝒟(G), Continuous f.val)
+    (X : ι → LCATopologicalLie G) (v : ι → Z → ℂ)
+    (hd : ∀ i z, HasDerivAt (fun t : ℝ ↦ c z (X i (Multiplicative.ofAdd t))) (v i z) 0)
+    (H : Z → ℝ) (hH : ∀ z, 0 ≤ H z) (hcoord : ∀ z, ∃ i, H z ≤ ‖v i z‖)
+    (N : ℕ) (f : 𝒟(G)) :
+    ∃ K : ℝ, 0 < K ∧ ∀ z, ‖∫ x, f.val x * c z x ∂μ‖ ≤ K / (1 + H z) ^ N := by
+  let M (φ : 𝒟(G)) (z : Z) := ‖∫ x, φ.val x * c z x ∂μ‖
+  suffices ∀ φ : 𝒟(G), ∃ B : ℝ, ∀ z, M φ z * (1 + H z) ^ N ≤ B by
+    obtain ⟨B, hB⟩ := this f
+    exact ⟨max 1 B, zero_lt_one.trans_le (le_max_left ..), fun z ↦
+      (le_div_iff₀ (pow_pos (by linarith [hH z]) N)).mpr ((hB z).trans (le_max_right ..))⟩
+  induction N with
+  | zero =>
+    intro φ
+    refine ⟨∫ x, ‖φ.val x‖ * W x ∂μ, fun z ↦ ?_⟩
+    simp only [pow_zero, mul_one, M]
+    apply norm_integral_le_of_norm_le (((hcont φ).norm.mul hW).integrable_of_hasCompactSupport
+      φ.property.2.norm.mul_right)
+    exact .of_forall fun x ↦ (norm_mul _ _).le.trans
+      (mul_le_mul_of_nonneg_left (hbound z x) (norm_nonneg _))
+  | succ n ih =>
+    intro φ
+    choose D hD using fun i ↦ bruhatMellin_directionalTest μ (X i) φ (hcont φ)
+    choose B hB using fun i ↦ ih (D i)
+    obtain ⟨C, hC⟩ := Finite.exists_le B
+    obtain ⟨B₀, h₀⟩ := ih φ
+    refine ⟨B₀ + C, fun z ↦ ?_⟩
+    obtain ⟨i, hi⟩ := hcoord z
+    have hmul : ‖v i z‖ * M φ z = M (D i) z := by
+      simp only [M, hD i (c z) _ (hd i z), norm_neg, norm_mul]
+    have hgain : H z * M φ z ≤ M (D i) z :=
+      (mul_le_mul_of_nonneg_right hi (norm_nonneg _)).trans_eq hmul
+    calc M φ z * (1 + H z) ^ (n + 1)
+        = M φ z * (1 + H z) ^ n + (H z * M φ z) * (1 + H z) ^ n := by ring
+      _ ≤ B₀ + C := add_le_add (h₀ z)
+        ((mul_le_mul_of_nonneg_right hgain (pow_nonneg (by linarith [hH z]) n)).trans
+          ((hB i z).trans (hC i)))
+
+end
+
+section
+
+variable {A : Type*} [CommGroup A] [TopologicalSpace A] [DiscreteTopology A] {d : ℕ}
+local notation "P" => ℝ≥0ˣ × (Fin d → Circle) × A
+local notation "Z" => ℂ × (Fin d → ℤ) × PontryaginDual A
+local notation "weight(" z ", " p ")" =>
+  ((((p).1.val : ℝ) : ℂ) ^ (z).1 * (∏ j : Fin d, (((p).2.1 j : Circle) : ℂ) ^ (z).2.1 j) *
+    ((z).2.2 (p).2.2 : ℂ))
+
+/-- The product of the torus and finite characters, twisted by the radial complex power. -/
+private theorem bruhatMellin_coordinateCharacter (z : Z) :
+    ∃ c : QuasiCharacter P, ∀ p, c p = weight(z, p) := by
+  let m := ContinuousMonoidHom.fst ℝ≥0ˣ ((Fin d → Circle) × A)
+  let χ : P →ₜ* Circle :=
+    { toFun := fun p ↦ (∏ j, p.2.1 j ^ z.2.1 j) * z.2.2 p.2.2
+      map_one' := by simp
+      map_mul' := fun x y ↦ by
+        simp only [Prod.snd_mul, Prod.fst_mul, Pi.mul_apply, mul_zpow, Finset.prod_mul_distrib,
+          map_mul]
+        ac_rfl
+      continuous_toFun := (continuous_finsetProd _ fun j _ ↦
+        ((continuous_apply j).comp (continuous_fst.comp continuous_snd)).zpow _).mul
+        (z.2.2.continuous.comp (continuous_snd.comp continuous_snd)) }
+  let coeχ := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ
+  refine ⟨quasiCharacterNormTwist m.toMonoidHom m.continuous coeχ z.1, fun p ↦ ?_⟩
+  change Circle.coeHom ((∏ j, p.2.1 j ^ z.2.1 j) * z.2.2 p.2.2) *
+    (((p.1.val : ℝ) : ℂ) ^ z.1) = _
+  rw [map_mul, map_prod]
+  change ((∏ j, ((p.2.1 j : Circle) : ℂ) ^ z.2.1 j) * (z.2.2 p.2.2 : ℂ)) * _ = _
+  ac_rfl
+
+/-- The logarithmic radial flow and the individual rotations have eigenvalues
+`s` and `nⱼ i` respectively. -/
+private theorem bruhatMellin_coordinateDirections :
+    ∃ X : Option (Fin d) → LCATopologicalLie P, ∀ i (z : Z),
+      HasDerivAt (fun t : ℝ ↦ weight(z, X i (Multiplicative.ofAdd t)))
+        (i.elim z.1 (fun j ↦ (z.2.1 j : ℂ) * Complex.I)) 0 := by
+  let radial : LCATopologicalLie P := (ContinuousMonoidHom.inl _ _).comp positiveRealLogEquiv.symm
+  let rot : Multiplicative ℝ →ₜ* Circle :=
+    { toFun := fun t ↦ Circle.exp t.toAdd
+      map_one' := Circle.exp_zero
+      map_mul' := fun s t ↦ Circle.exp_add _ _
+      continuous_toFun := by fun_prop }
+  let axis (j : Fin d) : Circle →ₜ* (Fin d → Circle) :=
+    ⟨MonoidHom.mulSingle (fun _ : Fin d ↦ Circle) j,
+      continuous_mulSingle (A := fun _ : Fin d ↦ Circle) j⟩
+  let angular (j : Fin d) : LCATopologicalLie P :=
+    (ContinuousMonoidHom.inr _ _).comp ((ContinuousMonoidHom.inl _ _).comp ((axis j).comp rot))
+  refine ⟨fun i ↦ i.elim radial angular, fun i z ↦ ?_⟩
+  have hd (v : ℂ) : HasDerivAt (fun t : ℝ ↦ Complex.exp ((t : ℂ) * v)) v 0 := by
+    simpa using (((hasDerivAt_id (0 : ℝ)).ofReal_comp.mul_const v).cexp)
+  cases i with
+  | none =>
+    apply (hd z.1).congr_of_eventuallyEq
+    filter_upwards with t
+    change ((Real.exp t : ℝ) : ℂ) ^ z.1 * (∏ j : Fin d, ((1 : Circle) : ℂ) ^ z.2.1 j) *
+      (z.2.2 1 : ℂ) = _
+    rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (Real.exp_pos t).ne'),
+      ← Complex.ofReal_log (Real.exp_pos t).le, Real.log_exp]
+    simp
+  | some j =>
+    apply (hd ((z.2.1 j : ℂ) * Complex.I)).congr_of_eventuallyEq
+    filter_upwards with t
+    change ((1 : ℝ) : ℂ) ^ z.1 *
+      (∏ k, ((Pi.mulSingle (M := fun _ : Fin d ↦ Circle) j (Circle.exp t) k : Circle) : ℂ) ^ z.2.1 k) *
+        (z.2.2 1 : ℂ) = _
+    rw [Finset.prod_eq_single_of_mem j (Finset.mem_univ _) (fun k _ h ↦ by
+      simp [Pi.mulSingle_eq_of_ne h]), Pi.mulSingle_eq_same]
+    simp only [Complex.ofReal_one, Complex.one_cpow, one_mul, map_one, Circle.coe_one, mul_one,
+      Circle.coe_exp, ← Complex.exp_int_mul]
+    congr 1
+    ring
+
+end
+
 /-- Paper: Lemma B.4.4.8, p. 624. On a bounded vertical strip, the Mellin evaluation of
 compactly supported Bruhat test is dominated by any inverse power of the joint height
 `max |Im s| (max_j |n_j|)`, with a constant that depends on the test and on the strip.
@@ -8089,7 +8288,65 @@ private theorem summable_bruhatMellin_of_polynomialCount_decay
         (z.2.2 (e g).2.2 : ℂ) ∂μ‖ ≤
       K / (1 + max |z.1.im|
         ((Finset.univ.sup (fun j : Fin d => (z.2.1 j).natAbs) : ℕ) : ℝ)) ^ N := by
-  sorry
+  classical
+  let Z := {z : ℂ × (Fin d → ℤ) × PontryaginDual A // z.1.re ∈ Icc a b}
+  let m := (ContinuousMonoidHom.fst ℝ≥0ˣ ((Fin d → Circle) × A)).comp (e : G →ₜ* _)
+  let r (g : G) : ℝ := ((e g).1.val : ℝ)
+  have hr (g : G) : 0 < r g := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hrc : Continuous r := NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)
+  -- The two endpoint weights bound every character in the strip on either side of r = 1.
+  let W (g : G) := r g ^ a + r g ^ b
+  have hW : Continuous W := (hrc.rpow_const (fun g ↦ .inl (hr g).ne')).add
+    (hrc.rpow_const (fun g ↦ .inl (hr g).ne'))
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SecondCountableTopology G := e.toHomeomorph.isEmbedding.secondCountableTopology
+  have hms : Surjective m := Prod.fst_surjective.comp e.surjective
+  have hm : IsModulation m := ⟨isProperMap_fst_of_compactSpace.comp e.toHomeomorph.isProperMap, by
+    obtain ⟨u, hu⟩ := exists_ne (1 : ℝ≥0ˣ)
+    obtain ⟨g, hg⟩ := hms u
+    exact ⟨g, hg ▸ hu⟩⟩
+  -- The decay space at exponent zero supplies continuity of the underlying tests.
+  have hcont (φ : 𝒟(G)) : Continuous φ.val := by
+    have h := bruhatCompactSupport_le_modulatedExponentialDecay m {0} hm hms φ.property
+    rw [modulatedExponentialDecaySubmodule_singleton_zero] at h
+    exact schwartzBruhat_continuous (⟨_, h⟩ : SchwartzBruhat G)
+  choose c hc using fun z : Z ↦ bruhatMellin_coordinateCharacter z.val
+  let χ (z : Z) := (c z).comp (e : G →ₜ* _)
+  have hbound (z : Z) (g : G) : ‖χ z g‖ ≤ W g := by
+    change ‖c z (e g)‖ ≤ _
+    rw [hc]
+    simp only [norm_mul, Complex.norm_prod, norm_zpow, Circle.norm_coe, one_zpow,
+      Finset.prod_const_one, mul_one]
+    change ‖(r g : ℂ) ^ z.val.1‖ ≤ W g
+    rw [Complex.norm_cpow_eq_rpow_re_of_pos (hr g)]
+    rcases le_total (r g) 1 with h | h
+    · exact (Real.rpow_le_rpow_of_exponent_ge (hr g) h z.property.1).trans
+        (le_add_of_nonneg_right (Real.rpow_nonneg (hr g).le b))
+    · exact (Real.rpow_le_rpow_of_exponent_le h z.property.2).trans
+        (le_add_of_nonneg_left (Real.rpow_nonneg (hr g).le a))
+  obtain ⟨X, hX⟩ := bruhatMellin_coordinateDirections (A := A) (d := d)
+  let Y (i : Option (Fin d)) : LCATopologicalLie G := (e.symm : _ →ₜ* G).comp (X i)
+  let v (i : Option (Fin d)) (z : Z) := i.elim z.val.1 (fun j ↦ (z.val.2.1 j : ℂ) * Complex.I)
+  have hd (i) (z : Z) :
+      HasDerivAt (fun t : ℝ ↦ χ z (Y i (Multiplicative.ofAdd t))) (v i z) 0 := by
+    change HasDerivAt (fun t : ℝ ↦ c z (e (e.symm (X i (Multiplicative.ofAdd t))))) _ _
+    simp only [ContinuousMulEquiv.apply_symm_apply, hc]
+    exact hX i z.val
+  let H (z : Z) := max |z.val.1.im| ((Finset.univ.sup (fun j ↦ (z.val.2.1 j).natAbs) : ℕ) : ℝ)
+  have hcoord (z : Z) : ∃ i, H z ≤ ‖v i z‖ := by
+    by_cases h : ((Finset.univ.sup (fun j ↦ (z.val.2.1 j).natAbs) : ℕ) : ℝ) ≤ |z.val.1.im|
+    · exact ⟨none, (max_eq_left h).le.trans (Complex.abs_im_le_norm _)⟩
+    · have hn : (Finset.univ : Finset (Fin d)).Nonempty := by
+        by_contra! hempty
+        simp [hempty] at h
+      obtain ⟨j, _, hj⟩ := Finset.univ.exists_mem_eq_sup hn (fun j ↦ (z.val.2.1 j).natAbs)
+      refine ⟨some j, ?_⟩
+      simp [H, max_eq_right (le_of_not_ge h), hj, v, Complex.norm_intCast]
+  obtain ⟨K, hK, hdec⟩ := bruhatMellin_decay_of_directions μ χ W hW hbound hcont Y v hd H
+    (fun z ↦ (abs_nonneg _).trans (le_max_left ..)) hcoord N f
+  refine ⟨K, hK, fun z hz ↦ ?_⟩
+  have heval (g : G) : χ ⟨z, hz⟩ g = _ := hc ⟨z, hz⟩ (e g)
+  simpa only [heval, H, mul_assoc] using hdec ⟨z, hz⟩
 
 end BruhatMellinPolynomialCount
 
