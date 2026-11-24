@@ -12,7 +12,7 @@ import RiemannMasullo.Ch09_HardySobolev.Sec2
 import Mathlib.MeasureTheory.Integral.ExpDecay
 import Mathlib.MeasureTheory.Group.Integral
 import Mathlib.Analysis.Normed.Lp.SmoothApprox
-import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3b
+import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3b_PWLevels
 import RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
 import RiemannMasullo.Ch03_IdelicZeta.Sec1
 import RiemannMasullo.AppA_AlgebraicNT.Sec2

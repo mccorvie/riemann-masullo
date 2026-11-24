@@ -1370,7 +1370,7 @@ theorem modulatedExponentialDecay_complete : CompleteSpace E := by
 
 omit hSC hm hInt hne hτ in
 /-- Nuclearity passes from embedded nuclear Fréchet stages to their locally convex limit. -/
-private theorem nuclear_of_embedded_stages.{u,v} {Y : Type u} [AddCommGroup Y] [Module ℂ Y]
+theorem nuclear_of_embedded_stages.{u,v} {Y : Type u} [AddCommGroup Y] [Module ℂ Y]
     [UniformSpace Y] [IsUniformAddGroup Y] [PolynormableSpace ℂ Y] [T2Space Y]
     {A : Type*} {X : A → Type u} [∀ a, AddCommGroup (X a)] [∀ a, Module ℂ (X a)]
     [∀ a, UniformSpace (X a)] [∀ a, IsUniformAddGroup (X a)] [∀ a, PolynormableSpace ℂ (X a)]
@@ -1553,7 +1553,7 @@ theorem modulatedExponentialDecay_strongDual_complete :
 
 omit hSC hm hInt hne hτ in
 /-- Restriction to the stages realizes the strong dual inside a product of nuclear duals. -/
-private theorem strictLF_dual_nuclear.{u,v} {X : Type u} [AddCommGroup X] [Module ℂ X]
+theorem strictLF_dual_nuclear.{u,v} {X : Type u} [AddCommGroup X] [Module ℂ X]
     [UniformSpace X] [IsUniformAddGroup X] [ContinuousSMul ℂ X] [PolynormableSpace ℂ X]
     (h : IsStrictLFSpace X) (hN : IsNuclearTVS.{v} X) : IsNuclearTVS.{v} (StrongDual ℂ X) := by
   obtain ⟨S, hF, he⟩ := strictLF_dual_closed_embedding h

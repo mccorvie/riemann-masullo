@@ -117,7 +117,7 @@ local instance : MeasurableSpace Aₛ :=
 
 /-- The additive S-adeles are locally compact Hausdorff, with regular Haar
 measure in their product Borel structure. -/
-private theorem sAdele_fourierMeasure :
+theorem sAdele_fourierMeasure :
     let G := Multiplicative Aₛ
     let μ : Measure G := sAdditiveTamagawaMeasure F S
     T2Space G ∧ LocallyCompactSpace G ∧ BorelSpace G ∧ μ.IsHaarMeasure ∧ μ.Regular := by

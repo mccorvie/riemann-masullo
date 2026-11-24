@@ -3,6 +3,8 @@ module
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec5
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Separation
+import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec1
+import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec6
 
 /-! # False claims printed in §7.5 -/
 
