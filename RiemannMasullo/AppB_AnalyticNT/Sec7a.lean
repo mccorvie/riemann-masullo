@@ -32,7 +32,7 @@ theorem finiteHeckeL_negLogDeriv_hasSum_ideals (χ : U[F]) (L : ℂ → ℂ)
     HasSum (fun I : {I : Ideal (𝓞 F) // I ≠ ⊥} ↦
       heckeIdealVonMangoldt (ideleClassNormTwist χ 0) I.val /
         (I.val.absNorm : ℂ) ^ (s : ℂ)) (-logDeriv L s) := by
-  sorry
+  simpa only [neg_div, neg_neg] using (finiteHeckeL_logDeriv_hasSum_ideals χ L hL hSeries s).2.2.neg
 
 /-- Paper: Equations (B.7.1.4)–(B.7.1.5), p. 644. This is the normalized integral
 of `f(s+w) x^w / w` up the segment from `c - iT` to `c + iT`. The factor

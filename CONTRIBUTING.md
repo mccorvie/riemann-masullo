@@ -140,10 +140,12 @@ found.
   and types.
 - Do not raise `maxHeartbeats` to get a proof through.
 
-### Get merged without waiting
+### Keep your pull request easy to read
 
-The automatic merge decides from the text of your change whether it is "only proofs". To stay
-on that path:
+Since 24 November 2026 nothing is merged automatically: every pull request is checked
+automatically and then read by the project before it merges. The check still decides from the
+text of your change whether it is "only proofs", and such a pull request is the quickest to
+read. To stay on that path:
 
 - Write helpers as `private theorem` or `private lemma`, with all their arguments written out.
   A public lemma, a `def`, an `instance`, an attribute such as `@[simp]`, a notation, or a new

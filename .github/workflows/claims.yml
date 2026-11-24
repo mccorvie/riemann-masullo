@@ -13,6 +13,10 @@ name: Claims
 # while the open pull requests are worked off (#6674). A "Claiming" comment made after it gets
 # a reply and nothing else, and idle claims are not released meanwhile, since nobody could take
 # the issue over. Releasing by hand still works. Set it to "" to accept claims again.
+# (Claims were paused from 2026-11-23T14:10:00Z to 24 November 2026.)
+#
+# An issue labelled `open-problem` is never claimed: a "Claiming" comment on it gets a reply
+# saying that anyone may work on it.
 
 on:
   issue_comment:
@@ -26,7 +30,7 @@ permissions:
   pull-requests: read
 
 env:
-  CLAIMS_CLOSE: "2026-11-23T14:10:00Z"
+  CLAIMS_CLOSE: ""
   CLAIMS_NOTICE: "https://github.com/mccorvie/riemann-masullo/issues/6674"
 
 jobs:
@@ -74,7 +78,10 @@ jobs:
           closed=0
           if [ -n "$CLAIMS_CLOSE" ] && [ "$(date -u -d "${COMMENT_AT:-now}" +%s)" -ge "$(date -u -d "$CLAIMS_CLOSE" +%s)" ]; then closed=1; fi
           if [[ "$first" =~ ^claim(ing|ed)?([^a-z]|$) ]]; then
-            if [ $closed = 1 ] && [ $mine = 0 ]; then
+            if [[ " $LABELS " == *" open-problem "* ]]; then
+              # Open problems are not claimed: anyone may work on one at any time.
+              gh issue comment "$ISSUE" --body "This is an open problem, and open problems are not claimed: anyone may work on it at any time, several people at once. No claim was recorded. Post what you find here, partial results included."
+            elif [ $closed = 1 ] && [ $mine = 0 ]; then
               gh issue comment "$ISSUE" --body "New claims are paused since $CLAIMS_CLOSE while the open pull requests are checked and merged, so this claim was not recorded. Claims will reopen when the backlog is cleared; please claim it again then. Details: $CLAIMS_NOTICE"
             elif [ $claimed = 0 ]; then
               gh issue edit "$ISSUE" --add-label claimed --add-assignee "$WHO"
