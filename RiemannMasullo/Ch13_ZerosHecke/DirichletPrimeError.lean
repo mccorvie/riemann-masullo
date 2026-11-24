@@ -9,7 +9,7 @@ import Mathlib.Analysis.MellinTransform
 import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
 import Mathlib.Analysis.Complex.Convex
 import Mathlib.Analysis.Complex.CauchyIntegral
-import Mathlib.Analysis.Meromorphic.Order
+public import Mathlib.Analysis.Meromorphic.Order
 import RiemannMasullo.External.HardyCriticalLine.CriticalLineZeroInfinitude
 
 /-!
@@ -39,219 +39,6 @@ namespace RiemannMasullo
 @[expose] def dirichletChebyshevError {q : ℕ} (χ : DirichletCharacter ℂ q) (x : ℝ) : ℂ :=
   (∑ n ∈ Finset.Icc 1 ⌊x⌋₊, χ (n : ZMod q) * (vonMangoldt n : ℂ)) -
     (if χ = 1 then (x : ℂ) else 0)
-
-private theorem primeError_analytic_mellin_integral {P : ℝ → ℂ} (hm : Measurable P) {b : ℝ}
-    (hI : ∀ d > b, IntegrableOn (fun x : ℝ ↦ ‖P x‖ * x ^ (-d-1)) (Ioi 1)) :
-    AnalyticOnNhd ℂ (fun s : ℂ ↦ ∫ x in Ioi (1 : ℝ), P x * (x : ℂ) ^ (-(s+1))) {s | b < s.re} := by
-  let U := {s : ℂ | b < s.re}
-  have hopen : IsOpen U := isOpen_lt continuous_const Complex.continuous_re
-  apply DifferentiableOn.analyticOnNhd _ hopen
-  intro s hs
-  change b < s.re at hs
-  let d := (s.re - b)/3
-  have hd : 0 < d := by dsimp [d]; linarith
-  let F (z : ℂ) (x : ℝ) := P x * (x : ℂ) ^ (-(z+1))
-  let F' (z : ℂ) (x : ℝ) := P x * ((x : ℂ) ^ (-(z+1)) * (-(Real.log x : ℂ)))
-  have hF (z : ℂ) : Measurable (F z) := by dsimp [F]; fun_prop
-  have hF' (z : ℂ) : Measurable (F' z) := by dsimp [F']; fun_prop
-  have hr (z : ℂ) (x : ℝ) (hx : 0 < x) : ‖F z x‖ = ‖P x‖ * x ^ (-z.re-1) := by
-    simp only [F, norm_mul, Complex.norm_cpow_eq_rpow_re_of_pos hx, Complex.neg_re,
-      Complex.add_re, Complex.one_re, neg_add_rev]
-    ring_nf
-  have hi : IntegrableOn (F s) (Ioi (1 : ℝ)) := by
-    apply (hI s.re hs).mono' (hF _).aestronglyMeasurable
-    filter_upwards [ae_restrict_mem measurableSet_Ioi] with x hx
-    exact (hr _ _ (lt_trans zero_lt_one hx)).le
-  let bound (x : ℝ) := (‖P x‖ * x ^ (-(s.re-2*d)-1))/d
-  have hbound : IntegrableOn bound (Ioi 1) := (hI _ (by dsimp [d]; linarith)).div_const d
-  have hl : ∀ᵐ x : ℝ ∂volume.restrict (Ioi 1),
-      ∀ z ∈ ball s d, ‖F' z x‖ ≤ bound x := by
-    filter_upwards [ae_restrict_mem measurableSet_Ioi] with x hx z hz
-    have hx₁ : 1 ≤ x := le_of_lt hx
-    have hx₀ := lt_of_lt_of_le zero_lt_one hx₁
-    have hzr := (Complex.re_le_norm (s-z)).trans_lt (mem_ball_iff_norm'.mp hz)
-    rw [Complex.sub_re] at hzr
-    change ‖P x * ((x : ℂ) ^ (-(z+1)) * (-(Real.log x : ℂ)))‖ ≤ _
-    rw [norm_mul, norm_mul, norm_neg, Complex.norm_real, Real.norm_of_nonneg (Real.log_nonneg hx₁),
-      Complex.norm_cpow_eq_rpow_re_of_pos hx₀]
-    simp only [Complex.neg_re, Complex.add_re, Complex.one_re]
-    calc
-      _ ≤ ‖P x‖ * (x ^ (-(z.re+1)) * (x^d/d)) := by
-        gcongr; exact Real.log_le_rpow_div hx₀.le hd
-      _ = ‖P x‖ * x ^ (-(z.re+1) + d) / d := by rw [Real.rpow_add hx₀]; ring
-      _ ≤ bound x := by
-        apply div_le_div_of_nonneg_right _ hd.le
-        exact mul_le_mul_of_nonneg_left (Real.rpow_le_rpow_of_exponent_le hx₁ (by linarith)) (norm_nonneg _)
-  have hder : ∀ᵐ x : ℝ ∂volume.restrict (Ioi 1),
-      ∀ z ∈ ball s d, HasDerivAt (fun z ↦ F z x) (F' z x) z := by
-    filter_upwards [ae_restrict_mem measurableSet_Ioi] with x hx z _
-    have hpos : 0 < x := lt_trans zero_lt_one hx
-    have hh := (((hasDerivAt_id' z).add_const 1).neg.const_cpow
-      (c := (x : ℂ)) (Or.inl (Complex.ofReal_ne_zero.mpr hpos.ne'))).const_mul (P x)
-    convert hh using 1
-    simp [F', Complex.ofReal_log hpos.le]
-  exact (hasDerivAt_integral_of_dominated_loc_of_deriv_le (ball_mem_nhds s hd)
-    (Eventually.of_forall fun z ↦ (hF z).aestronglyMeasurable) hi
-    (hF' s).aestronglyMeasurable hl hbound hder).2.differentiableAt.differentiableWithinAt
-
-private theorem primeError_mellin_energy_bound {P : ℝ → ℂ} (hm : Measurable P) (b : ℝ)
-    (hE : IntegrableOn (fun x : ℝ ↦ ‖P x‖ ^ 2 * x ^ (-2*b-1)) (Ioi 1))
-    {u : ℝ} (hu : 0 < u) :
-    let E := ∫ x in Ioi (1 : ℝ), ‖P x‖ ^ 2 * x ^ (-2*b-1)
-    let W (x : ℝ) := ‖P x‖ * x ^ (-(b+u^2)-1)
-    IntegrableOn W (Ioi 1) ∧ (∫ x in Ioi (1 : ℝ), W x) ≤ (E+1) / u := by
-  intro E W
-  let f (x : ℝ) := ‖P x‖ ^ 2 * x ^ (-2*b-1)
-  let g (x : ℝ) := x ^ (-2*u^2-1)
-  have hp : -2*u^2-1 < -1 := by nlinarith [sq_pos_of_pos hu]
-  have hi : IntegrableOn g (Ioi 1) := integrableOn_Ioi_rpow_of_lt hp zero_lt_one
-  have hfg : IntegrableOn (fun x ↦ (f x + u^2 * g x) / (2*u)) (Ioi 1) :=
-    (hE.add (hi.const_mul (u^2))).div_const _
-  have hle (x : ℝ) (hx : x ∈ Ioi (1 : ℝ)) : W x ≤ (f x + u^2 * g x)/(2*u) := by
-    have hx₀ := lt_trans zero_lt_one hx
-    let v := ‖P x‖ * x ^ (-b-1/2)
-    let t := x ^ (-u^2-1/2)
-    have h₁ : v^2 = f x := by
-      simp only [v, f, mul_pow, ← Real.rpow_mul_natCast hx₀.le]
-      congr 2
-      push_cast
-      ring
-    have h₂ : t^2 = g x := by
-      simp only [t, g, ← Real.rpow_mul_natCast hx₀.le]
-      congr 1
-      push_cast
-      ring
-    have h₃ : v*t = W x := by
-      dsimp only [v,t,W]
-      rw [mul_assoc, ← Real.rpow_add hx₀]
-      congr 2
-      ring
-    rw [le_div_iff₀ (by positivity), ← h₁, ← h₂, ← h₃]
-    nlinarith [sq_nonneg (v-u*t)]
-  have hW : IntegrableOn W (Ioi 1) := by
-    apply hfg.mono' (by dsimp [W]; fun_prop)
-    filter_upwards [ae_restrict_mem measurableSet_Ioi] with x hx
-    have hx₀ := lt_trans zero_lt_one hx
-    rw [Real.norm_of_nonneg (show 0 ≤ W x from mul_nonneg (norm_nonneg _) (Real.rpow_nonneg hx₀.le _))]
-    exact hle x hx
-  have hn : 0 ≤ E := integral_nonneg_of_ae <| (ae_restrict_mem measurableSet_Ioi).mono fun x hx ↦
-    mul_nonneg (sq_nonneg _) (Real.rpow_nonneg (lt_trans zero_lt_one hx).le _)
-  refine ⟨hW, (setIntegral_mono_on hW hfg measurableSet_Ioi hle).trans ?_⟩
-  rw [integral_div, integral_add hE (hi.const_mul _), integral_const_mul]
-  change (E + u^2 * (∫ x in Ioi (1 : ℝ), x ^ (-2*u^2-1))) / (2*u) ≤ _
-  rw [integral_Ioi_rpow_of_lt hp zero_lt_one, Real.one_rpow]
-  rw [show -2*u^2 - 1 + 1 = -(2*u^2) by ring]
-  have he : u^2 * (-1 / -(2*u^2)) = 1/2 := by field_simp
-  rw [he]
-  field_simp
-  linarith
-
-private theorem primeError_logDeriv_pole {f : ℂ → ℂ} (hf : Differentiable ℂ f) {ρ : ℂ} (hz : f ρ = 0)
-    (hn : ∃ z, f z ≠ 0) :
-    let z (u : ℝ) := ρ + ((u^2 : ℝ) : ℂ)
-    (∀ᶠ u in 𝓝[>] (0 : ℝ), f (z u) ≠ 0) ∧
-      ∃ a : ℂ, a ≠ 0 ∧ Tendsto (fun u : ℝ ↦ ((u^2 : ℝ) : ℂ) * logDeriv f (z u))
-        (𝓝[>] 0) (𝓝 a) := by
-  intro z
-  have hfa := hf.analyticAt ρ
-  have htop : meromorphicOrderAt f ρ ≠ ⊤ := by
-    intro h
-    have hA : AnalyticOnNhd ℂ f univ := fun w _ ↦ hf.analyticAt w
-    have he := hA.eqOn_zero_of_preconnected_of_frequently_eq_zero
-      isPreconnected_univ (mem_univ ρ) (meromorphicOrderAt_eq_top_iff.mp h).frequently
-    obtain ⟨w, hw⟩ := hn
-    exact hw (he (mem_univ w))
-  have hne : ∀ᶠ w in 𝓝[≠] ρ, f w ≠ 0 :=
-    hfa.eventually_eq_zero_or_eventually_ne_zero.resolve_left
-      (fun h ↦ htop (meromorphicOrderAt_eq_top_iff.mpr (h.filter_mono nhdsWithin_le_nhds)))
-  have hzero : meromorphicOrderAt f ρ ≠ 0 := by
-    intro h
-    obtain ⟨a, ha, ht⟩ := tendsto_ne_zero_of_meromorphicOrderAt_eq_zero hfa.meromorphicAt h
-    exact ha ((tendsto_nhds_unique ht (hfa.continuousAt.tendsto.mono_left nhdsWithin_le_nhds)).trans hz)
-  have ho := meromorphicOrderAt_logDeriv_eq_neg_one hzero htop
-  have hmer : MeromorphicAt (logDeriv f) ρ := hfa.deriv.meromorphicAt.div hfa.meromorphicAt
-  obtain ⟨g, hg, hg₀, hfac⟩ := (meromorphicOrderAt_eq_int_iff (n := -1) hmer).mp (by simpa using ho)
-  have hzlim : Tendsto z (𝓝[>] 0) (𝓝 ρ) := by
-    have h : Continuous z := by dsimp [z]; fun_prop
-    simpa [z] using (h.continuousAt (x := (0 : ℝ))).tendsto.mono_left (nhdsWithin_le_nhds (s := Ioi (0 : ℝ)))
-  have hzp : Tendsto z (𝓝[>] 0) (𝓝[≠] ρ) := by
-    refine tendsto_nhdsWithin_iff.mpr ⟨hzlim, ?_⟩
-    filter_upwards [self_mem_nhdsWithin] with u (hu : 0 < u)
-    change z u ≠ ρ
-    simpa [z] using (pow_ne_zero 2 hu.ne')
-  refine ⟨hzp.eventually hne, g ρ, hg₀, (hg.continuousAt.tendsto.comp hzlim).congr' ?_⟩
-  filter_upwards [hzp.eventually hfac, self_mem_nhdsWithin] with u hu (hp : 0 < u)
-  change g (z u) = _
-  rw [hu]
-  simp [z, smul_eq_mul, hp.ne']
-
-private theorem primeError_energy_at_zero {P : ℝ → ℂ} (hm : Measurable P) {f : ℂ → ℂ} (hf : Differentiable ℂ f)
-    (hn : ∃ w, f w ≠ 0) (e : ℂ) {ρ : ℂ} (hρ : ρ.re < 2) (hz : f ρ = 0)
-    (he : ∀ s : ℂ, 2 < s.re →
-      IntegrableOn (fun x : ℝ ↦ P x * (x : ℂ) ^ (-(s+1))) (Ioi 1) →
-      deriv f s = -(s * (∫ x in Ioi (1 : ℝ), P x * (x : ℂ) ^ (-(s+1))) + e) * f s) :
-    ¬ IntegrableOn (fun x : ℝ ↦ ‖P x‖ ^ 2 * x ^ (-2*ρ.re-1)) (Ioi 1) := by
-  intro hE
-  let H (s : ℂ) := ∫ x in Ioi (1 : ℝ), P x * (x : ℂ) ^ (-(s+1))
-  let E := ∫ x in Ioi (1 : ℝ), ‖P x‖ ^ 2 * x ^ (-2*ρ.re-1)
-  have hI (d : ℝ) (hd : ρ.re < d) :
-      IntegrableOn (fun x : ℝ ↦ ‖P x‖ * x ^ (-d-1)) (Ioi 1) := by
-    have h := (primeError_mellin_energy_bound hm ρ.re hE (Real.sqrt_pos_of_pos (sub_pos.mpr hd))).1
-    simpa only [Real.sq_sqrt (sub_nonneg.mpr hd.le), add_sub_cancel] using h
-  have hnorm (s : ℂ) (x : ℝ) (hx : x ∈ Ioi (1 : ℝ)) :
-      ‖P x * (x : ℂ) ^ (-(s+1))‖ = ‖P x‖ * x ^ (-s.re-1) := by
-    rw [norm_mul, Complex.norm_cpow_eq_rpow_re_of_pos (lt_trans zero_lt_one hx)]
-    simp only [Complex.neg_re, Complex.add_re, Complex.one_re]
-    congr 2
-    ring
-  have ha : AnalyticOnNhd ℂ H {s | ρ.re < s.re} := primeError_analytic_mellin_integral hm hI
-  have hleft : AnalyticOnNhd ℂ (deriv f) {s | ρ.re < s.re} := fun s _ ↦ (hf.analyticAt s).deriv
-  have hright : AnalyticOnNhd ℂ (fun s ↦ -(s*H s + e) * f s) {s | ρ.re < s.re} :=
-    fun s hs ↦ (((analyticAt_id.mul (ha s hs)).add analyticAt_const).neg).mul (hf.analyticAt _)
-  have heq := hleft.eqOn_of_preconnected_of_eventuallyEq hright
-    (convex_halfSpace_re_gt ρ.re).isPreconnected (z₀ := (3 : ℂ))
-    (by change ρ.re < (3 : ℂ).re; norm_num; linarith) (by
-      filter_upwards [(isOpen_lt continuous_const Complex.continuous_re).mem_nhds
-        (by norm_num : (3 : ℂ) ∈ {w : ℂ | 2 < w.re})] with s hs
-      apply he s hs
-      apply (hI s.re (hρ.trans hs)).mono' (by fun_prop)
-      filter_upwards [ae_restrict_mem measurableSet_Ioi] with x hx
-      exact (hnorm s x hx).le)
-  let z (u : ℝ) := ρ + ((u^2 : ℝ) : ℂ)
-  obtain ⟨hfn, a, ha₀, hres⟩ := primeError_logDeriv_pole hf hz hn
-  have hlim : Tendsto z (𝓝[>] 0) (𝓝 ρ) := by
-    have h : Continuous z := by dsimp [z]; fun_prop
-    simpa [z] using (h.continuousAt (x := (0 : ℝ))).tendsto.mono_left (nhdsWithin_le_nhds (s := Ioi (0 : ℝ)))
-  have hH : Tendsto (fun u : ℝ ↦ ((u^2 : ℝ) : ℂ) * H (z u)) (𝓝[>] 0) (𝓝 0) := by
-    apply squeeze_zero_norm' (a := fun u : ℝ ↦ u*(E+1))
-    · filter_upwards [self_mem_nhdsWithin] with u (hu : 0 < u)
-      have hW := (primeError_mellin_energy_bound hm ρ.re hE hu).2
-      have hr : (z u).re = ρ.re + u^2 := by simp only [z, Complex.add_re, Complex.ofReal_re]
-      have hN : ‖H (z u)‖ ≤ (E+1)/u := by
-        apply (norm_integral_le_integral_norm _).trans
-        convert hW using 1
-        apply setIntegral_congr_fun measurableSet_Ioi
-        intro x hx
-        simpa only [hr] using hnorm (z u) x hx
-      rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg (sq_nonneg _)]
-      calc
-        _ ≤ u^2 * ((E+1)/u) := mul_le_mul_of_nonneg_left hN (sq_nonneg _)
-        _ = _ := by field_simp
-    · simpa using (show Tendsto (fun u : ℝ ↦ u) (𝓝[>] 0) (𝓝 0) from nhdsWithin_le_nhds).mul_const (E+1)
-  have hu0 : Tendsto (fun u : ℝ ↦ ((u^2 : ℝ) : ℂ)) (𝓝[>] 0) (𝓝 0) := by
-    have h : Continuous (fun u : ℝ ↦ ((u^2 : ℝ) : ℂ)) := by fun_prop
-    simpa using (h.continuousAt (x := (0 : ℝ))).tendsto.mono_left (nhdsWithin_le_nhds (s := Ioi (0 : ℝ)))
-  have hcontr : Tendsto (fun u : ℝ ↦ ((u^2 : ℝ) : ℂ) * logDeriv f (z u)) (𝓝[>] 0) (𝓝 0) := by
-    have htarget := ((hlim.mul hH).add (hu0.mul_const e)).neg
-    apply (show Tendsto _ _ (𝓝 (0 : ℂ)) from by simpa using htarget).congr'
-    filter_upwards [hfn, self_mem_nhdsWithin] with u hn' (hu : 0 < u)
-    have hr : ρ.re < (z u).re := by simpa only [z, Complex.add_re, Complex.ofReal_re, lt_add_iff_pos_right] using sq_pos_of_pos hu
-    change f (z u) ≠ 0 at hn'
-    rw [logDeriv_apply, heq hr]
-    push_cast
-    field_simp
-    ring
-  exact ha₀ (tendsto_nhds_unique hres hcontr)
 
 private theorem primeError_measurable {q : ℕ} (χ : DirichletCharacter ℂ q) : Measurable (dirichletChebyshevError χ) := by
   let A (m : ℕ) := ∑ n ∈ Finset.Icc 1 m, χ (n : ZMod q) * (vonMangoldt n : ℂ)
@@ -316,11 +103,56 @@ private theorem primeError_logDeriv_integral {q : ℕ} [NeZero q] (χ : Dirichle
   rw [hrep, neg_div] at heq
   linear_combination -heq
 
-/-- At every Dirichlet L-function zero to the left of real part one, the weighted
-mean-square error of its prime-power count diverges at the real part of that zero. -/
-theorem dirichletLFunction_zero_primePower_energy {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q)
-    {ρ : ℂ} (hr : ρ.re < 1) (hz : χ.LFunction ρ = 0) :
-    ¬ IntegrableOn (fun x : ℝ ↦ ‖dirichletChebyshevError χ x‖ ^ 2 * x ^ (-2*ρ.re-1)) (Ioi 1) := by
+private theorem primeError_horizontal_logDeriv_limit {f : ℂ → ℂ} (hf : Differentiable ℂ f) (hn : ∃ w, f w ≠ 0) (ρ : ℂ) :
+    let z (u : ℝ) := ρ + (u : ℂ)
+    (∀ᶠ u in 𝓝[>] (0 : ℝ), f (z u) ≠ 0) ∧
+      Tendsto (fun u : ℝ ↦ (u : ℂ) * logDeriv f (z u)) (𝓝[>] 0)
+        (𝓝 (analyticOrderNatAt f ρ : ℂ)) := by
+  intro z
+  let m := analyticOrderNatAt f ρ
+  have htop : analyticOrderAt f ρ ≠ ⊤ := by
+    intro h
+    have hA : AnalyticOnNhd ℂ f univ := fun w _ ↦ hf.analyticAt w
+    have hzero := hA.eqOn_zero_of_preconnected_of_eventuallyEq_zero isPreconnected_univ (mem_univ ρ)
+      (analyticOrderAt_eq_top.mp h)
+    obtain ⟨w, hw⟩ := hn
+    exact hw (hzero (mem_univ w))
+  obtain ⟨g,hg,hg₀,hfac⟩ := (hf.analyticAt ρ).analyticOrderAt_ne_top.mp htop
+  let p (w : ℂ) := (w-ρ)^m
+  change f =ᶠ[𝓝 ρ] fun w ↦ p w*g w at hfac
+  have hlim : Tendsto z (𝓝[>] 0) (𝓝 ρ) := by
+    have hc : Continuous z := by dsimp [z]; fun_prop
+    simpa [z] using (hc.continuousAt (x := 0)).tendsto.mono_left (nhdsWithin_le_nhds (s := Ioi (0 : ℝ)))
+  have h₀ := hlim.eventually (hg.continuousAt.eventually_ne hg₀)
+  have hu0 : Tendsto (fun u : ℝ ↦ (u : ℂ)) (𝓝[>] 0) (𝓝 0) := by
+    simpa using (Complex.continuous_ofReal.continuousAt (x := 0)).tendsto.mono_left nhdsWithin_le_nhds
+  have hG : ContinuousAt (logDeriv g) ρ := hg.deriv.continuousAt.div hg.continuousAt hg₀
+  have hlog := hlim.eventually (logDeriv_congr_nhds hfac)
+  refine ⟨?_, ?_⟩
+  · filter_upwards [hlim.eventually hfac, h₀, self_mem_nhdsWithin] with u he hgu (hu : 0 < u)
+    rw [he]; exact mul_ne_zero (pow_ne_zero _ (by simp [z,hu.ne'])) hgu
+  · have ht := tendsto_const_nhds (x := (m : ℂ)) |>.add (hu0.mul (hG.tendsto.comp hlim))
+    apply (show Tendsto _ _ (𝓝 (m : ℂ)) from by simpa using ht).congr'
+    filter_upwards [hlog, h₀, hlim.eventually hg.eventually_analyticAt, self_mem_nhdsWithin] with u
+      he hgu hga (hu : 0 < u)
+    have hdiff : z u-ρ ≠ 0 := by simp [z,hu.ne']
+    rw [he, logDeriv_fun_mul (f := p) (g := g) (z u) (pow_ne_zero _ hdiff) hgu (by dsimp [p]; fun_prop) hga.differentiableAt]
+    have hp : logDeriv p (z u) = m / (z u - ρ) := by
+      have hd : HasDerivAt (fun w : ℂ ↦ w-ρ) 1 (z u) := (hasDerivAt_id' (z u)).sub_const ρ
+      change logDeriv (fun w : ℂ ↦ (w-ρ)^m) (z u) = _
+      rw [logDeriv_fun_pow hd.differentiableAt, logDeriv_apply, hd.deriv]
+      ring
+    rw [hp]
+    dsimp [z]
+    field_simp [hu.ne']
+    ring
+
+private theorem primeError_pole_removed {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) {ρ : ℂ} (hr : ρ.re < 1) :
+    ∃ f : ℂ → ℂ, Differentiable ℂ f ∧ f 1 ≠ 0 ∧ analyticOrderNatAt f ρ = analyticOrderNatAt χ.LFunction ρ ∧
+      ∀ s : ℂ, 2 < s.re →
+      IntegrableOn (fun x : ℝ ↦ dirichletChebyshevError χ x * (x : ℂ) ^ (-(s+1))) (Ioi 1) →
+      deriv f s = -(s * (∫ x in Ioi (1 : ℝ), dirichletChebyshevError χ x * (x : ℂ) ^ (-(s+1))) +
+        (if χ = 1 then 1 else 0)) * f s := by
   have hne (s : ℂ) (hs : 2 < s.re) : χ.LFunction s ≠ 0 := by
     have h₁ : 1 < s.re := by linarith
     rw [χ.LFunction_eq_LSeries h₁]
@@ -329,28 +161,304 @@ theorem dirichletLFunction_zero_primePower_energy {q : ℕ} [NeZero q] (χ : Dir
   · subst χ
     let f := DirichletCharacter.LFunctionTrivChar₁ q
     have hz₁ : ρ ≠ 1 := fun e ↦ by simp [e] at hr
-    have hzero : f ρ = 0 := by
-      rw [show f ρ = (ρ-1) * DirichletCharacter.LFunctionTrivChar q ρ from Function.update_of_ne hz₁ ..]
-      exact mul_eq_zero_of_right _ hz
-    apply primeError_energy_at_zero (primeError_measurable _) (DirichletCharacter.differentiable_LFunctionTrivChar₁ q)
-      ⟨1, DirichletCharacter.LFunctionTrivChar₁_apply_one_ne_zero q⟩ 1 (by linarith) hzero
-    intro s hs hi
-    have hs₁ : s ≠ 1 := fun e ↦ by norm_num [e] at hs
-    have hL := hne s hs
-    have h := primeError_logDeriv_integral (1 : DirichletCharacter ℂ q) s hs hi
-    simp only [ite_true, one_mul] at h
-    rw [DirichletCharacter.deriv_LFunctionTrivChar₁_apply_of_ne_one q hs₁,
-      DirichletCharacter.LFunctionTrivChar₁, Function.update_of_ne hs₁]
-    change _ * deriv (DirichletCharacter.LFunction (1 : DirichletCharacter ℂ q)) s +
-      (DirichletCharacter.LFunction (1 : DirichletCharacter ℂ q)) s = _
-    field_simp [hL, sub_ne_zero.mpr hs₁] at h
-    linear_combination h
-  · apply primeError_energy_at_zero (primeError_measurable χ) (DirichletCharacter.differentiable_LFunction he)
-      ⟨1, DirichletCharacter.LFunction_apply_one_ne_zero he⟩ 0 (by linarith) hz
+    refine ⟨f, DirichletCharacter.differentiable_LFunctionTrivChar₁ q,
+      DirichletCharacter.LFunctionTrivChar₁_apply_one_ne_zero q, ?_, ?_⟩
+    · have hloc : f =ᶠ[𝓝 ρ] fun w ↦ (w-1)*DirichletCharacter.LFunctionTrivChar q w := by
+        filter_upwards [eventually_ne_nhds hz₁] with w hw
+        exact Function.update_of_ne hw ..
+      have hA : AnalyticAt ℂ (DirichletCharacter.LFunctionTrivChar q) ρ := by
+        have ho : IsOpen ({1}ᶜ : Set ℂ) := isClosed_singleton.isOpen_compl
+        apply DifferentiableOn.analyticAt (s := ({1}ᶜ : Set ℂ)) _ (ho.mem_nhds hz₁)
+        exact fun z hz ↦ (DirichletCharacter.differentiableAt_LFunction _ z (.inl hz)).differentiableWithinAt
+      have hF : AnalyticAt ℂ (fun w : ℂ ↦ w-1) ρ := by fun_prop
+      simp only [analyticOrderNatAt, analyticOrderAt_congr hloc, analyticOrderAt_fun_mul hF hA,
+        hF.analyticOrderAt_eq_zero.mpr (sub_ne_zero.mpr hz₁), zero_add]
+    · intro s hs hi
+      have hs₁ : s ≠ 1 := fun e ↦ by norm_num [e] at hs
+      have hL := hne s hs
+      have h := primeError_logDeriv_integral (1 : DirichletCharacter ℂ q) s hs hi
+      simp only [ite_true, one_mul] at h
+      simp only [f, ite_true]
+      rw [DirichletCharacter.deriv_LFunctionTrivChar₁_apply_of_ne_one q hs₁,
+        DirichletCharacter.LFunctionTrivChar₁, Function.update_of_ne hs₁]
+      change _ * deriv (DirichletCharacter.LFunction (1 : DirichletCharacter ℂ q)) s +
+        (DirichletCharacter.LFunction (1 : DirichletCharacter ℂ q)) s = _
+      field_simp [hL, sub_ne_zero.mpr hs₁] at h
+      linear_combination h
+  · refine ⟨χ.LFunction, DirichletCharacter.differentiable_LFunction he,
+      DirichletCharacter.LFunction_apply_one_ne_zero he, rfl, ?_⟩
     intro s hs hi
     have h := primeError_logDeriv_integral χ s hs hi
     simp only [ite_eq_right he, zero_mul, zero_div, sub_zero] at h
-    simpa using (div_eq_iff (hne s hs)).mp h
+    simpa [he] using (div_eq_iff (hne s hs)).mp h
+
+private theorem primeError_analytic_mellin_integral {P : ℝ → ℂ} (hm : Measurable P) {b : ℝ}
+    (hI : ∀ d > b, IntegrableOn (fun x : ℝ ↦ ‖P x‖ * x ^ (-d-1)) (Ioi 1)) :
+    AnalyticOnNhd ℂ (fun s : ℂ ↦ ∫ x in Ioi (1 : ℝ), P x * (x : ℂ) ^ (-(s+1))) {s | b < s.re} := by
+  let U := {s : ℂ | b < s.re}
+  have hopen : IsOpen U := isOpen_lt continuous_const Complex.continuous_re
+  apply DifferentiableOn.analyticOnNhd _ hopen
+  intro s hs
+  change b < s.re at hs
+  let d := (s.re - b)/3
+  have hd : 0 < d := by dsimp [d]; linarith
+  let F (z : ℂ) (x : ℝ) := P x * (x : ℂ) ^ (-(z+1))
+  let F' (z : ℂ) (x : ℝ) := P x * ((x : ℂ) ^ (-(z+1)) * (-(Real.log x : ℂ)))
+  have hF (z : ℂ) : Measurable (F z) := by dsimp [F]; fun_prop
+  have hF' (z : ℂ) : Measurable (F' z) := by dsimp [F']; fun_prop
+  have hr (z : ℂ) (x : ℝ) (hx : 0 < x) : ‖F z x‖ = ‖P x‖ * x ^ (-z.re-1) := by
+    simp only [F, norm_mul, Complex.norm_cpow_eq_rpow_re_of_pos hx, Complex.neg_re,
+      Complex.add_re, Complex.one_re, neg_add_rev]
+    ring_nf
+  have hi : IntegrableOn (F s) (Ioi (1 : ℝ)) := by
+    apply (hI s.re hs).mono' (hF _).aestronglyMeasurable
+    filter_upwards [ae_restrict_mem measurableSet_Ioi] with x hx
+    exact (hr _ _ (lt_trans zero_lt_one hx)).le
+  let bound (x : ℝ) := (‖P x‖ * x ^ (-(s.re-2*d)-1))/d
+  have hbound : IntegrableOn bound (Ioi 1) := (hI _ (by dsimp [d]; linarith)).div_const d
+  have hl : ∀ᵐ x : ℝ ∂volume.restrict (Ioi 1),
+      ∀ z ∈ ball s d, ‖F' z x‖ ≤ bound x := by
+    filter_upwards [ae_restrict_mem measurableSet_Ioi] with x hx z hz
+    have hx₁ : 1 ≤ x := le_of_lt hx
+    have hx₀ := lt_of_lt_of_le zero_lt_one hx₁
+    have hzr := (Complex.re_le_norm (s-z)).trans_lt (mem_ball_iff_norm'.mp hz)
+    rw [Complex.sub_re] at hzr
+    change ‖P x * ((x : ℂ) ^ (-(z+1)) * (-(Real.log x : ℂ)))‖ ≤ _
+    rw [norm_mul, norm_mul, norm_neg, Complex.norm_real, Real.norm_of_nonneg (Real.log_nonneg hx₁),
+      Complex.norm_cpow_eq_rpow_re_of_pos hx₀]
+    simp only [Complex.neg_re, Complex.add_re, Complex.one_re]
+    calc
+      _ ≤ ‖P x‖ * (x ^ (-(z.re+1)) * (x^d/d)) := by
+        gcongr; exact Real.log_le_rpow_div hx₀.le hd
+      _ = ‖P x‖ * x ^ (-(z.re+1) + d) / d := by rw [Real.rpow_add hx₀]; ring
+      _ ≤ bound x := by
+        apply div_le_div_of_nonneg_right _ hd.le
+        exact mul_le_mul_of_nonneg_left (Real.rpow_le_rpow_of_exponent_le hx₁ (by linarith)) (norm_nonneg _)
+  have hder : ∀ᵐ x : ℝ ∂volume.restrict (Ioi 1),
+      ∀ z ∈ ball s d, HasDerivAt (fun z ↦ F z x) (F' z x) z := by
+    filter_upwards [ae_restrict_mem measurableSet_Ioi] with x hx z _
+    have hpos : 0 < x := lt_trans zero_lt_one hx
+    have hh := (((hasDerivAt_id' z).add_const 1).neg.const_cpow
+      (c := (x : ℂ)) (Or.inl (Complex.ofReal_ne_zero.mpr hpos.ne'))).const_mul (P x)
+    convert hh using 1
+    simp [F', Complex.ofReal_log hpos.le]
+  exact (hasDerivAt_integral_of_dominated_loc_of_deriv_le (ball_mem_nhds s hd)
+    (Eventually.of_forall fun z ↦ (hF z).aestronglyMeasurable) hi
+    (hF' s).aestronglyMeasurable hl hbound hder).2.differentiableAt.differentiableWithinAt
+
+/-- The horizontal Mellin residue of the centered prime-power count, multiplied by the boundary point,
+equals the negative order of the L-function whenever the integral converges absolutely to the right. -/
+theorem dirichletChebyshevError_mellin_boundary {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) (ρ : ℂ) (hr : ρ.re < 1)
+    (hI : ∀ d > ρ.re, IntegrableOn (fun x : ℝ ↦ ‖dirichletChebyshevError χ x‖ * x ^ (-d-1)) (Ioi 1)) :
+    Tendsto (fun u : ℝ ↦ (u : ℂ) * (ρ+u) *
+      ∫ x in Ioi (1 : ℝ), dirichletChebyshevError χ x * (x : ℂ) ^ (-(ρ+u+1)))
+      (𝓝[>] 0) (𝓝 (-(analyticOrderNatAt χ.LFunction ρ : ℂ))) := by
+  let P := dirichletChebyshevError χ
+  let H (s : ℂ) := ∫ x in Ioi (1 : ℝ), P x * (x : ℂ) ^ (-(s+1))
+  let e : ℂ := if χ = 1 then 1 else 0
+  obtain ⟨f, hf, hn, horder, he⟩ := primeError_pole_removed χ hr
+  have hm := primeError_measurable χ
+  have hA : AnalyticOnNhd ℂ H {s | ρ.re < s.re} := primeError_analytic_mellin_integral hm hI
+  have hleft : AnalyticOnNhd ℂ (deriv f) {s | ρ.re < s.re} := fun s _ ↦ (hf.analyticAt s).deriv
+  have hright : AnalyticOnNhd ℂ (fun s ↦ -(s*H s + e) * f s) {s | ρ.re < s.re} :=
+    fun s hs ↦ (((analyticAt_id.mul (hA s hs)).add analyticAt_const).neg).mul (hf.analyticAt _)
+  have heq := hleft.eqOn_of_preconnected_of_eventuallyEq hright
+    (convex_halfSpace_re_gt ρ.re).isPreconnected (z₀ := (3 : ℂ))
+    (by change ρ.re < (3 : ℂ).re; norm_num; linarith) (by
+      filter_upwards [(isOpen_lt continuous_const Complex.continuous_re).mem_nhds
+        (by norm_num : (3 : ℂ) ∈ {w : ℂ | 2 < w.re})] with s hs
+      apply he s hs
+      apply (hI s.re (lt_trans (by linarith : ρ.re < 2) hs)).mono' (by fun_prop)
+      filter_upwards [ae_restrict_mem measurableSet_Ioi] with x hx
+      rw [norm_mul, Complex.norm_cpow_eq_rpow_re_of_pos (lt_trans zero_lt_one hx)]
+      simp only [Complex.neg_re, Complex.add_re, Complex.one_re, neg_add_rev]
+      ring_nf
+      exact le_rfl)
+  obtain ⟨hfn, hres⟩ := primeError_horizontal_logDeriv_limit hf ⟨1, hn⟩ ρ
+  rw [horder] at hres
+  have h0 : Tendsto (fun u : ℝ ↦ (u : ℂ)) (𝓝[>] 0) (𝓝 0) := by
+    simpa using (Complex.continuous_ofReal.continuousAt (x := 0)).tendsto.mono_left nhdsWithin_le_nhds
+  have ht := hres.neg.sub (h0.mul_const e)
+  rw [zero_mul, sub_zero] at ht
+  apply ht.congr'
+  filter_upwards [hfn, self_mem_nhdsWithin] with u hn' (hu : 0 < u)
+  have hu' : ρ.re < (ρ+u).re := by simp [hu]
+  change -((u : ℂ) * logDeriv f (ρ+u)) - u*e = (u : ℂ)*(ρ+u)*H (ρ+u)
+  change f (ρ+u) ≠ 0 at hn'
+  rw [logDeriv_apply, heq hu']
+  field_simp
+  ring
+
+private theorem primeError_mellin_energy_bound {P : ℝ → ℂ} (hm : Measurable P) (b : ℝ)
+    (hE : IntegrableOn (fun x : ℝ ↦ ‖P x‖ ^ 2 * x ^ (-2*b-1)) (Ioi 1))
+    {u : ℝ} (hu : 0 < u) :
+    let E := ∫ x in Ioi (1 : ℝ), ‖P x‖ ^ 2 * x ^ (-2*b-1)
+    let W (x : ℝ) := ‖P x‖ * x ^ (-(b+u^2)-1)
+    IntegrableOn W (Ioi 1) ∧ (∫ x in Ioi (1 : ℝ), W x) ≤ (E+1) / u := by
+  intro E W
+  let f (x : ℝ) := ‖P x‖ ^ 2 * x ^ (-2*b-1)
+  let g (x : ℝ) := x ^ (-2*u^2-1)
+  have hp : -2*u^2-1 < -1 := by nlinarith [sq_pos_of_pos hu]
+  have hi : IntegrableOn g (Ioi 1) := integrableOn_Ioi_rpow_of_lt hp zero_lt_one
+  have hfg : IntegrableOn (fun x ↦ (f x + u^2 * g x) / (2*u)) (Ioi 1) :=
+    (hE.add (hi.const_mul (u^2))).div_const _
+  have hle (x : ℝ) (hx : x ∈ Ioi (1 : ℝ)) : W x ≤ (f x + u^2 * g x)/(2*u) := by
+    have hx₀ := lt_trans zero_lt_one hx
+    let v := ‖P x‖ * x ^ (-b-1/2)
+    let t := x ^ (-u^2-1/2)
+    have h₁ : v^2 = f x := by
+      simp only [v, f, mul_pow, ← Real.rpow_mul_natCast hx₀.le]
+      congr 2
+      push_cast
+      ring
+    have h₂ : t^2 = g x := by
+      simp only [t, g, ← Real.rpow_mul_natCast hx₀.le]
+      congr 1
+      push_cast
+      ring
+    have h₃ : v*t = W x := by
+      dsimp only [v,t,W]
+      rw [mul_assoc, ← Real.rpow_add hx₀]
+      congr 2
+      ring
+    rw [le_div_iff₀ (by positivity), ← h₁, ← h₂, ← h₃]
+    nlinarith [sq_nonneg (v-u*t)]
+  have hW : IntegrableOn W (Ioi 1) := by
+    apply hfg.mono' (by dsimp [W]; fun_prop)
+    filter_upwards [ae_restrict_mem measurableSet_Ioi] with x hx
+    have hx₀ := lt_trans zero_lt_one hx
+    rw [Real.norm_of_nonneg (show 0 ≤ W x from mul_nonneg (norm_nonneg _) (Real.rpow_nonneg hx₀.le _))]
+    exact hle x hx
+  have hn : 0 ≤ E := integral_nonneg_of_ae <| (ae_restrict_mem measurableSet_Ioi).mono fun x hx ↦
+    mul_nonneg (sq_nonneg _) (Real.rpow_nonneg (lt_trans zero_lt_one hx).le _)
+  refine ⟨hW, (setIntegral_mono_on hW hfg measurableSet_Ioi hle).trans ?_⟩
+  rw [integral_div, integral_add hE (hi.const_mul _), integral_const_mul]
+  change (E + u^2 * (∫ x in Ioi (1 : ℝ), x ^ (-2*u^2-1))) / (2*u) ≤ _
+  rw [integral_Ioi_rpow_of_lt hp zero_lt_one, Real.one_rpow]
+  rw [show -2*u^2 - 1 + 1 = -(2*u^2) by ring]
+  have he : u^2 * (-1 / -(2*u^2)) = 1/2 := by field_simp
+  rw [he]
+  field_simp
+  linarith
+
+/-- If a correction has a horizontal Mellin residue and leaves a finite weighted square integral,
+its residue times the boundary point must equal the negative order of the L-function. -/
+theorem dirichletChebyshevError_correction_residue {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) (ρ : ℂ) (hr : ρ.re < 1)
+    (D : ℝ → ℂ) (hmD : Measurable D) {C : ℝ} (hD : ∀ x : ℝ, 1 ≤ x → ‖D x‖ ≤ C*x^ρ.re)
+    {v : ℂ} (hV : Tendsto (fun u : ℝ ↦ (u : ℂ) * ∫ x in Ioi (1 : ℝ), D x * (x : ℂ) ^ (-(ρ+u+1)))
+      (𝓝[>] 0) (𝓝 v))
+    (hE : IntegrableOn (fun x : ℝ ↦ ‖dirichletChebyshevError χ x - D x‖^2 * x^(-2*ρ.re-1)) (Ioi 1)) :
+    ρ*v = -(analyticOrderNatAt χ.LFunction ρ : ℂ) := by
+  let P := dirichletChebyshevError χ
+  let Q (x : ℝ) := P x - D x
+  have hP := primeError_measurable χ
+  have hQ : Measurable Q := hP.sub hmD
+  let E := ∫ x in Ioi (1 : ℝ), ‖Q x‖^2 * x^(-2*ρ.re-1)
+  have hIQ (d : ℝ) (hd : ρ.re < d) : IntegrableOn (fun x : ℝ ↦ ‖Q x‖ * x^(-d-1)) (Ioi 1) := by
+    have he := (primeError_mellin_energy_bound hQ ρ.re hE (Real.sqrt_pos_of_pos (sub_pos.mpr hd))).1
+    simpa only [Real.sq_sqrt (sub_nonneg.mpr hd.le), add_sub_cancel] using he
+  have hID (d : ℝ) (hd : ρ.re < d) : IntegrableOn (fun x : ℝ ↦ ‖D x‖ * x^(-d-1)) (Ioi 1) := by
+    have hi := integrableOn_Ioi_rpow_of_lt (by linarith : ρ.re+(-d-1) < -1) zero_lt_one
+    apply (hi.const_mul C).mono' (by apply Measurable.aestronglyMeasurable; fun_prop)
+    filter_upwards [ae_restrict_mem measurableSet_Ioi] with x hx
+    have hx₀ := lt_trans zero_lt_one hx
+    rw [Real.norm_of_nonneg (mul_nonneg (norm_nonneg _) (Real.rpow_nonneg hx₀.le _)),
+      Real.rpow_add hx₀, ← mul_assoc]
+    exact mul_le_mul_of_nonneg_right (hD x hx.le) (Real.rpow_nonneg hx₀.le _)
+  have hIP (d : ℝ) (hd : ρ.re < d) : IntegrableOn (fun x : ℝ ↦ ‖P x‖ * x^(-d-1)) (Ioi 1) := by
+    apply ((hIQ d hd).add (hID d hd)).mono' (by dsimp only [P]; apply Measurable.aestronglyMeasurable; fun_prop)
+    filter_upwards [ae_restrict_mem measurableSet_Ioi] with x hx
+    have hw := Real.rpow_nonneg (lt_trans zero_lt_one hx).le (-d-1)
+    rw [Real.norm_of_nonneg (mul_nonneg (norm_nonneg _) hw)]
+    change _ ≤ ‖Q x‖ * _ + ‖D x‖ * _
+    rw [← add_mul]
+    apply mul_le_mul_of_nonneg_right _ hw
+    simpa [Q] using norm_add_le (Q x) (D x)
+  let z (t : ℝ) := ρ + ((t^2 : ℝ) : ℂ)
+  let H (g : ℝ → ℂ) (t : ℝ) := ∫ x in Ioi (1 : ℝ), g x * (x : ℂ) ^ (-(z t+1))
+  have ht₂ : Tendsto (fun t : ℝ ↦ t^2) (𝓝[>] 0) (𝓝[>] 0) := by
+    apply tendsto_nhdsWithin_iff.mpr
+    refine ⟨?_, ?_⟩
+    · have hc : Continuous (fun t : ℝ ↦ t^2) := by fun_prop
+      simpa using (hc.continuousAt (x := (0:ℝ))).tendsto.mono_left nhdsWithin_le_nhds
+    · filter_upwards [self_mem_nhdsWithin] with t (ht : 0 < t)
+      exact sq_pos_of_pos ht
+  have hz : Tendsto z (𝓝[>] 0) (𝓝 ρ) := by
+    have h : Continuous z := by dsimp [z]; fun_prop
+    simpa [z] using (h.continuousAt (x := (0:ℝ))).tendsto.mono_left nhdsWithin_le_nhds
+  have hn (g : ℝ → ℂ) (t x : ℝ) (hx : x ∈ Ioi (1:ℝ)) :
+      ‖g x * (x : ℂ)^(-(z t+1))‖ = ‖g x‖ * x^(-(ρ.re+t^2)-1) := by
+    rw [norm_mul, Complex.norm_cpow_eq_rpow_re_of_pos (lt_trans zero_lt_one hx)]
+    simp only [z, Complex.neg_re, Complex.add_re, Complex.ofReal_re, Complex.one_re]
+    congr 2
+    ring
+  have hHQ : Tendsto (fun t : ℝ ↦ ((t^2 : ℝ) : ℂ) * H Q t) (𝓝[>] 0) (𝓝 0) := by
+    apply squeeze_zero_norm' (a := fun t : ℝ ↦ t*(E+1))
+    · filter_upwards [self_mem_nhdsWithin] with t (ht : 0 < t)
+      have hb := (primeError_mellin_energy_bound hQ ρ.re hE ht).2
+      have hu : ‖H Q t‖ ≤ (E+1)/t := by
+        apply (norm_integral_le_integral_norm _).trans
+        convert hb using 1
+        exact setIntegral_congr_fun measurableSet_Ioi (hn Q t)
+      rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg (sq_nonneg _)]
+      calc
+        _ ≤ t^2*((E+1)/t) := mul_le_mul_of_nonneg_left hu (sq_nonneg _)
+        _ = _ := by field_simp
+    · simpa using (show Tendsto (fun t : ℝ ↦ t) (𝓝[>] 0) (𝓝 0) from nhdsWithin_le_nhds).mul_const (E+1)
+  have hd : Tendsto (fun t : ℝ ↦ ((t^2 : ℝ) : ℂ) * H D t) (𝓝[>] 0) (𝓝 v) := hV.comp ht₂
+  have hp : Tendsto (fun t : ℝ ↦ ((t^2 : ℝ) : ℂ) * (z t) * H P t) (𝓝[>] 0)
+      (𝓝 (-(analyticOrderNatAt χ.LFunction ρ : ℂ))) := (dirichletChebyshevError_mellin_boundary χ ρ hr hIP).comp ht₂
+  apply tendsto_nhds_unique _ hp
+  have hsum := hz.mul (hHQ.add hd)
+  rw [zero_add] at hsum
+  apply hsum.congr'
+  filter_upwards [self_mem_nhdsWithin] with t (ht : 0 < t)
+  have hi (g : ℝ → ℂ) (hm : Measurable g)
+      (hg : IntegrableOn (fun x : ℝ ↦ ‖g x‖ * x ^ (-(ρ.re+t^2)-1)) (Ioi 1)) :
+      IntegrableOn (fun x : ℝ ↦ g x * (x : ℂ)^(-(z t+1))) (Ioi 1) := by
+    apply hg.mono' (by dsimp [z]; apply Measurable.aestronglyMeasurable; fun_prop)
+    filter_upwards [ae_restrict_mem measurableSet_Ioi] with x hx
+    exact (hn g t x hx).le
+  have hg : H Q t + H D t = H P t := by
+    dsimp only [H]
+    have hlt := lt_add_of_pos_right ρ.re (sq_pos_of_pos ht)
+    rw [← integral_add (hi Q hQ (hIQ _ hlt)) (hi D hmD (hID _ hlt))]
+    apply setIntegral_congr_fun measurableSet_Ioi
+    intro x _
+    change Q x * _ + D x * _ = P x * _
+    rw [← add_mul, show Q x + D x = P x from sub_add_cancel ..]
+  change z t * (((t^2 : ℝ) : ℂ) * H Q t + ((t^2 : ℝ) : ℂ) * H D t) = _
+  rw [← mul_add, hg]
+  ring
+
+/-- Every Dirichlet L-function zero to the left of one has nonzero finite natural order. -/
+theorem dirichletLFunction_zero_order_ne_zero {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) {ρ : ℂ} (hr : ρ.re < 1)
+    (hz : χ.LFunction ρ = 0) : analyticOrderNatAt χ.LFunction ρ ≠ 0 := by
+  have hn : ρ ∈ ({1}ᶜ : Set ℂ) := fun e ↦ by change ρ = 1 at e; simp [e] at hr
+  have hA : AnalyticOnNhd ℂ χ.LFunction ({1}ᶜ : Set ℂ) := by
+    apply DifferentiableOn.analyticOnNhd _ isClosed_singleton.isOpen_compl
+    exact fun z h ↦ (DirichletCharacter.differentiableAt_LFunction χ z (.inl h)).differentiableWithinAt
+  have ht : analyticOrderAt χ.LFunction ρ ≠ ⊤ := by
+    intro h
+    have hzero := hA.eqOn_zero_of_preconnected_of_eventuallyEq_zero
+      (isConnected_compl_singleton_of_one_lt_rank (by simp) (1 : ℂ)).isPreconnected hn (analyticOrderAt_eq_top.mp h)
+    have h₂ : 2 < (3 : ℂ).re := by norm_num
+    have he := χ.LFunction_eq_LSeries (by linarith : 1 < (3 : ℂ).re)
+    exact (DirichletCharacter.LSeries_ne_zero_of_one_lt_re χ (by linarith : 1 < (3 : ℂ).re))
+      (he ▸ hzero (show (3 : ℂ) ∈ {1}ᶜ by norm_num))
+  intro h
+  exact (analyticOrderAt_ne_zero.mpr ⟨hA _ hn, hz⟩) (by rw [← Nat.cast_analyticOrderNatAt ht, h]; rfl)
+
+/-- At every Dirichlet L-function zero to the left of real part one, the weighted
+mean-square error of its prime-power count diverges at the real part of that zero. -/
+theorem dirichletLFunction_zero_primePower_energy {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q)
+    {ρ : ℂ} (hr : ρ.re < 1) (hz : χ.LFunction ρ = 0) :
+    ¬ IntegrableOn (fun x : ℝ ↦ ‖dirichletChebyshevError χ x‖ ^ 2 * x ^ (-2*ρ.re-1)) (Ioi 1) := by
+  intro hE
+  have h := dirichletChebyshevError_correction_residue χ ρ hr (fun _ ↦ 0) measurable_const (C := 0) (by simp)
+    (v := 0) (by simp) (by simpa using hE)
+  have hm : analyticOrderNatAt χ.LFunction ρ = 0 := by simpa using h.symm
+  exact dirichletLFunction_zero_order_ne_zero χ hr hz hm
 
 /-- Each zeta zero to the left of real part one forces divergence of this weighted
 mean square of the ordinary Chebyshev error. -/
