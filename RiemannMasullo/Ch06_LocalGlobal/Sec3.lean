@@ -756,6 +756,57 @@ theorem globalConverse_nontrivial_exact (ω : PontryaginDual C₁) (_hω : ω �
     (globalConverse_nontrivial_exact_polar_translate (F := F) g hnorm)
     (globalConverse_nontrivial_exact_theta_translate (F := F) ω h g hg)
 
+/-- A zero homogeneous theta function has zero Mellin continuation on the trivial
+component. The residue formulas at zero and one then force both polar values to vanish. -/
+private theorem globalConverse_normTwist_exact_kernel (hm : mass ≠ 0) : K(1) ≤ P := by
+  intro f hf
+  have hθ : homogeneousAdelicTheta 1 f = 0 := hf
+  let τ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 F) F :=
+    ⟨canonicalIdeleNormSection F, canonicalIdeleNormSection_continuous F⟩
+  have hZ := (homogeneousThetaMellinIntegral_meromorphicContinuation τ 1 f
+    (canonicalIdeleNormSection_rightInverse F) (1 : U) (fun _ ↦ rfl) 0).mp
+    ⟨fun _ _ ↦ analyticAt_const.meromorphicNFAt, fun s _ ↦ by
+      change 0 = ∫ t, homogeneousAdelicTheta 1 f (QuotientGroup.mk (τ t)) *
+        ideleClassNormTwist (1 : U) s (QuotientGroup.mk (τ t)) ∂positiveRealHaar
+      simp only [hθ, ContinuousMap.zero_apply, zero_mul, integral_zero]⟩
+  have hz (s : ℂ) : globalIdelicZFunction f (ideleClassNormTwist (1 : U) s) = 0 :=
+    (congrFun hZ s).symm
+  have h₀ := globalIdelicZFunction_residue_zero f
+  have h₁ := globalIdelicZFunction_residue_one f
+  simp only [hz, mul_zero] at h₀ h₁
+  exact (mem_adelePolarSubspace f).mpr
+    ⟨(mul_eq_zero.mp (tendsto_nhds_unique h₀ tendsto_const_nhds)).resolve_left (neg_ne_zero.mpr hm),
+     (mul_eq_zero.mp (tendsto_nhds_unique h₁ tendsto_const_nhds)).resolve_left hm⟩
+
+/-- The signed polar values descend through a quotient by a submodule of their common kernel.
+The polar subspace is the full preimage of its image, so the open quotient
+map restricts to an open quotient map on that subspace. -/
+private theorem globalConverse_normTwist_exact_quotient.{u} {E : Type u}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [ContinuousSMul ℂ E] (p : E →ₗ[ℂ] ℂ × ℂ) (hp : Continuous p) (hs : Surjective p)
+    (K : Submodule ℂ E) (hk : K ≤ p.ker) (m : ℂ) (hm : m ≠ 0) :
+    ∃ R : (E ⧸ K) →L[ℂ] ℂ × ℂ,
+      (∀ f, R (K.mkQ f) = (-m * (p f).1, m * (p f).2)) ∧
+      R.ker = p.ker.map K.mkQ ∧ IsOpenQuotientMap R ∧
+      IsOpenQuotientMap ((K.mkQ.comp p.ker.subtype).rangeRestrict) := by
+  let q := K.liftQL (⟨p, hp⟩ : E →L[ℂ] ℂ × ℂ) hk
+  let scale (u : ℂˣ) : ℂ ≃L[ℂ] ℂ := ContinuousLinearEquiv.smulLeft u
+  let d := (scale (Units.mk0 (-m) (neg_ne_zero.mpr hm))).prodCongr (scale (Units.mk0 m hm))
+  let R := d.toContinuousLinearMap.comp q
+  have hsur : Surjective R := by
+    intro z
+    obtain ⟨f, hf⟩ := hs (d.symm z)
+    exact ⟨K.mkQ f, (congrArg d hf).trans (d.apply_symm_apply z)⟩
+  refine ⟨R, fun _ ↦ rfl, (d.toLinearEquiv.ker_comp q.toLinearMap).trans (K.ker_liftQ p hk),
+    ⟨hsur, R.continuous, R.toLinearMap.isOpenMap_of_finiteDimensional hsur⟩, ?_⟩
+  let W := (K.mkQ.comp p.ker.subtype).range
+  have hpre : W.comap K.mkQ = p.ker := by
+    simp only [W, LinearMap.range_comp, Submodule.range_subtype, Submodule.comap_map_mkQ,
+      sup_of_le_right hk]
+  let e : p.ker ≃ₜ (K.mkQ ⁻¹' (W : Set (E ⧸ K))) :=
+    Homeomorph.setCongr (congrArg SetLike.coe hpre.symm)
+  exact (K.isOpenQuotientMap_mkQ.restrictPreimage W).comp e.isOpenQuotientMap
+
 /-- Paper: Theorem 6.3.2.1(2), p. 304, equations (6.3.2.5)–(6.3.2.6).
 The signed polar evaluations descend to a continuous residue map on the trivial
 norm-one quotient. Its kernel is the pole-free theta subspace with its quotient
@@ -766,7 +817,14 @@ theorem globalConverse_normTwist_exact :
         mass * adeleSchwartzFourier f zeroAdele)) ∧
       R.ker = globalPolarFreeThetaSubmodule (F := F) 1 ∧ IsOpenQuotientMap R ∧
       IsOpenQuotientMap (((K(1)).mkQ.comp (P).subtype).rangeRestrict) := by
-  sorry
+  let μ := normOneIdeleClassTamagawaMeasure F
+  let : MeasurableSpace C𝔽 := borel _
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : μ.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have hm : mass ≠ 0 := Complex.ofReal_ne_zero.mpr (measureReal_univ_pos (μ := μ)).ne'
+  exact globalConverse_normTwist_exact_quotient (E := ℬ) (adelePolarValues (F := F))
+    adelePolarValues_continuous adelePolarValues_surjective (K(1))
+    (globalConverse_normTwist_exact_kernel hm) _ hm
 
 -- TODO(paper-gap): In (6.3.2.8), the middle ideal contains functions with
 -- poles, so intersection with the entire Schwartz–Bergman space kills both
