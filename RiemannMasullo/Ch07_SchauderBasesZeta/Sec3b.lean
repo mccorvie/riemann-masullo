@@ -3935,7 +3935,7 @@ private theorem sLocalPWOrbital_eventually_equiv_quotient (p : Vℚ)
     have hFΘ : IsFrechetTVS (Θ(T, χ)) :=
       sLocalHomogeneousThetaSpace_frechet (F := F) (S := T) χ
     have hFW : IsFrechetTVS W :=
-      frechet_of_closed_embedding W.subtypeL (W.isClosedEmbedding_subtypeL hW) hFΘ
+      isFrechetTVS_of_closedEmbedding W.subtypeL (W.isClosedEmbedding_subtypeL hW) hFΘ
     have hFQ : IsFrechetTVS (Qₚ(p, χ)) := isFrechetTVS_quotient hFΘ (Rₚ(p, χ)) hR
     obtain ⟨hTΘ, hPΘ, hMΘ, hCΘ⟩ := hFΘ
     obtain ⟨hTW, hP0W, hMW, hCW⟩ := hFW
@@ -6152,7 +6152,7 @@ private theorem sLocalPWOrbital_bases_transfer {E Q : Type*}
       have h := (hb.2 (A x)).mapL A.symm.toContinuousLinearMap
       simpa only [ContinuousLinearMap.coe_coe, ContinuousLinearEquiv.coe_coe, map_smul,
         A.symm_apply_apply] using h
-  have hFW := frechet_of_closed_embedding A.toContinuousLinearMap A.toHomeomorph.isClosedEmbedding hF
+  have hFW := isFrechetTVS_of_closedEmbedding A.toContinuousLinearMap A.toHomeomorph.isClosedEmbedding hF
   let : PolynormableSpace ℂ E := hFW.choose_spec.1
   let : TopologicalSpace.MetrizableSpace E := hFW.choose_spec.2.1
   have hNW := nuclear_of_equiv A.symm hN
@@ -7270,7 +7270,7 @@ theorem sLocalGammaOrbitalQuotient_frechet (ω : PontryaginDual J₁(S)) :
     (sLocalThetaPoleBound_isClosed (F := F) (S := S) ω (fun _ ↦ 0)).preimage continuous_subtype_val
   have hR := (sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding (Finset.Subset.refl S) ω).isClosed_range
   exact isFrechetTVS_quotient
-    (frechet_of_closed_embedding (fullPV(ω)).subtypeL ((fullPV(ω)).isClosedEmbedding_subtypeL hR)
+    (isFrechetTVS_of_closedEmbedding (fullPV(ω)).subtypeL ((fullPV(ω)).isClosedEmbedding_subtypeL hR)
       (sLocalHomogeneousThetaSpace_frechet (F := F) (S := S) ω)) P hP
 
 /-- Paper: Notation 7.3.4.1, p. 364.
