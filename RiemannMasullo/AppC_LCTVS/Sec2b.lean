@@ -150,7 +150,7 @@ private theorem injectiveSeminorm_continuousAt_tmul
 
 /-- Paper: §C.2.3.2, p. 679. Tensoring with a fixed vector is continuous for the
 projective topology. -/
-private theorem continuous_projectiveTensor_tmul_left (x : E) :
+theorem continuous_projectiveTensor_tmul_left (x : E) :
     Continuous (show F → ProjectiveTensor E F from TensorProduct.mk ℂ E F x) := by
   have := PolynormableSpace.isTopologicalAddGroup ℂ F
   let hP := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
@@ -824,9 +824,9 @@ theorem isNuclearTVS_iff_localBanach_series :
     exact e.isHomeomorph
 
 omit [T2Space E] in
-/-- Paper: (C.2.4.1), p. 685. Each injective generator is continuous for the
-projective topology, so the tensor comparison is uniformly continuous. -/
-private theorem uniformContinuous_tensorComparison
+/-- The tensor comparison from the projective to the injective tensor product is
+uniformly continuous. -/
+theorem uniformContinuous_tensorComparison
     (F : Type*) [AddCommGroup F] [Module ℂ F] [TopologicalSpace F] [PolynormableSpace ℂ F] :
     @UniformContinuous (ProjectiveTensor E F) (InjectiveTensor E F) _ _ id := by
   let f : ProjectiveTensor E F →ₗ[ℂ] InjectiveTensor E F := LinearMap.id
@@ -2087,7 +2087,7 @@ private def weakDualEvaluationCLM {X K : Type*} [AddCommGroup X] [Module ℂ X]
 set_option maxHeartbeats 500000 in
 /-- Every continuous seminorm on a nuclear space is bounded by the norm of a
 continuous linear map into a Hilbert space, up to a constant. -/
-private theorem exists_hilbert_domination (hE : IsNuclearTVS.{v, u} E)
+theorem exists_hilbert_domination (hE : IsNuclearTVS.{v, u} E)
     (q : Seminorm ℂ E) (hq : Continuous q) :
     ∃ (H : Type (max v u)) (_ : NormedAddCommGroup H) (_ : InnerProductSpace ℂ H)
       (_ : CompleteSpace H) (a : E →L[ℂ] H) (C : ℝ), 0 ≤ C ∧ ∀ x, q x ≤ C * ‖a x‖ := by
@@ -3266,7 +3266,7 @@ theorem isNuclearTVS_projectiveTensor {F : Type w}
 
 /-- The local absolute summability criterion can be checked on finite families whose
 linear combinations with coefficients in the unit disk stay in one zero-neighborhood. -/
-private theorem isNuclearTVS_of_signedSum_bound [PolynormableSpace ℂ E] [T2Space E]
+theorem isNuclearTVS_of_signedSum_bound [PolynormableSpace ℂ E] [T2Space E]
     (h : ∀ (q : Seminorm ℂ E), Continuous q →
       ∃ U ∈ 𝓝 (0 : E), ∃ C : ℝ, 0 ≤ C ∧ ∀ (n : ℕ) (x : Fin n → E),
         (∀ a : Fin n → ℂ, (∀ i, ‖a i‖ ≤ 1) → (∑ i, a i • x i) ∈ U) →
@@ -3669,7 +3669,7 @@ private theorem isNuclearTVS_strongDual_of_bounded_series_cover [IsTopologicalAd
 
 /-- A linear map from a final locally convex topology to a polynormable space is
 continuous if its composites with the defining maps are continuous. -/
-private theorem continuous_of_locallyConvexFinalTopology
+theorem continuous_of_locallyConvexFinalTopology
     {I : Type*} {X : I → Type*} [∀ i, AddCommGroup (X i)] [∀ i, Module ℂ (X i)]
     [∀ i, TopologicalSpace (X i)] {D G : Type*} [AddCommGroup D] [Module ℂ D]
     [AddCommGroup G] [Module ℂ G] [TopologicalSpace G] [PolynormableSpace ℂ G]
@@ -5081,7 +5081,7 @@ theorem finestLocallyConvex_isStrictLFSpace (hE : Module.rank ℂ E ≤ ℵ₀) 
     exact FiniteDimensional.completeSpace ℂ (S n)⟩
 
 /-- The local integral criterion is independent of the universe of test spaces. -/
-private theorem nuclear_changeUniverse.{a, b, c} {X : Type c} [AddCommGroup X] [Module ℂ X]
+theorem nuclear_changeUniverse.{a, b, c} {X : Type c} [AddCommGroup X] [Module ℂ X]
     [TopologicalSpace X] (hX : IsNuclearTVS.{a} X) : IsNuclearTVS.{b} X := by
   let := hX.1
   let := hX.2.1
@@ -5089,7 +5089,7 @@ private theorem nuclear_changeUniverse.{a, b, c} {X : Type c} [AddCommGroup X] [
     ((isNuclearTVS_iff_localBanach_integral X).mp hX)
 
 /-- Nuclearity is invariant under continuous linear equivalence, across carrier universes. -/
-private theorem nuclear_of_equiv {X : Type u} {Y : Type w}
+theorem nuclear_of_equiv {X : Type u} {Y : Type w}
     [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
     [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [PolynormableSpace ℂ Y]
     (e : X ≃L[ℂ] Y) (hX : IsNuclearTVS.{v} X) : IsNuclearTVS.{v} Y := by

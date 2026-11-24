@@ -2,6 +2,8 @@ module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec4
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.InfiniteAdeleRing
+import RiemannMasullo.Ch01_Introduction.Sec4
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
 
 /-! # False claims printed in §7.4 -/
 
@@ -67,6 +69,172 @@ between 2 and 3 has positive Mellin derivative at 1/2. The first-derivative
 functional there vanishes on the printed closed span, yet takes this positive
 value on the ambient image of its zeroth biorthogonal vector. -/
 theorem Printed.spectralNuclearity_trace_false : ¬ Printed.spectralNuclearity_trace := by sorry
+
+section FactorialNormalization
+
+open Filter
+
+/-- Paper: Theorem 7.4.1.1(2), proof following (7.4.1.2), p. 367. The printed
+factorial normalization makes the retained primal biorthogonals bounded, while the
+full multiplicity factorial grows at most linearly in the absolute zero height.
+Here the completed divisor indexes the zeros of the character. -/
+def Printed.spectralNuclearity_factorialNormalization : Prop :=
+  ∀ (F : Type) [Field F] [NumberField F] (χ : U[F])
+    (τ : ℝ≥0ˣ →ₜ* I[F]) (hτ : RightInverse τ (ideleNorm F)) (a : ℝ) (N : ℕ), 0 < N →
+    let m := MeromorphicOn.divisor (continuedCompletedHeckeL χ) univ
+    let Z := {z : ℂ // 0 < m z}
+    let J := Σ z : Z, Fin (min N (m z.val).toNat)
+    let D := spectralNuclearityDenominator χ τ hτ a
+    let Q := SpectralNuclearityQuotient χ τ hτ a
+    ∃ (d : J → StrongDual ℂ Q) (b : J → Q),
+      (∀ i f, d i (D.mkQ f) = iteratedDeriv i.2.val f.val (i.1.val - (a : ℂ))) ∧
+      (∀ i j, d i (b j) = if i = j then 1 else 0) ∧
+      Bornology.IsVonNBounded ℂ (range fun i : J ↦ (((m i.1.val).toNat.factorial : ℂ)⁻¹) • b i) ∧
+      ∃ C T : ℝ, 0 < C ∧ ∀ z : Z, T ≤ |z.val.im| →
+        ((m z.val).toNat.factorial : ℝ) ≤ C * |z.val.im|
+
+local notation "ratZeroOrder" => MeromorphicOn.divisor (continuedCompletedHeckeL (F := ℚ) 1) univ
+local notation "ratWindow" => {z : ℂ // 0 < ratZeroOrder z ∧ |z.re - 1 / 2| < 1}
+
+/-- Paper: §1.4.3, p. 29. The completed L-function of the trivial rational character
+has infinitely many distinct positive-divisor zeros. Otherwise its smoothed spectral
+sum in the unit window would have a finite limit at parameter two, since each
+individual Mellin moment converges there. -/
+private theorem factorialNormalization_window_infinite : Infinite ratWindow := by
+  classical
+  let m := ratZeroOrder
+  let Z := ratWindow
+  by_contra hn
+  let : Finite Z := not_infinite_iff_finite.mp hn
+  let : Fintype Z := Fintype.ofFinite Z
+  obtain ⟨h, ρ, hA⟩ := exists_introTraceApproximation
+  let f (n : ℕ) := introTraceApprox (h n) (ρ n) 2
+  let s (r : Z) := r.val - 1 / 2
+  have hlim (r : Z) : Tendsto (fun n ↦ (m r.val : ℂ) * introTraceMellin (f n) (s r)) atTop
+      (𝓝 ((m r.val : ℂ) * introTraceMellin (introTracePower 2) (s r))) := by
+    apply Filter.Tendsto.const_mul
+    apply (introTraceApprox_mellin_tendsto h ρ hA (s r)).tendsto_at
+    change (s r).re < (2 : ℂ).re
+    have hs := (abs_lt.mp r.property.2).2
+    dsimp [s]
+    norm_num
+    linarith
+  have hsum := tendsto_finsetSum Finset.univ (fun r _ ↦ hlim r)
+  let q := ∑ r : Z, (m r.val : ℂ) * introTraceMellin (introTracePower 2) (s r)
+  apply not_tendsto_nhds_of_tendsto_atBot (introTraceApprox_rat_spectral_tendsto_atBot h ρ hA) q.re
+  have hspec : Tendsto (fun n ↦ introTraceSpectralSum (F := ℚ) 1 (f n) 1) atTop (𝓝 q) := by
+    simpa only [introTraceSpectralSum, tsum_fintype] using hsum
+  exact Complex.continuous_re.continuousAt.tendsto.comp hspec
+
+
+
+/-- A compact rectangle contains only finitely many points of the completed divisor. -/
+private theorem factorialNormalization_unbounded_height (M : ℝ) :
+    ∃ z : ratWindow, M < |z.val.im| := by
+  classical
+  by_contra! h
+  let R := |M| + 3
+  let D := Metric.closedBall (0 : ℂ) R
+  let L := continuedCompletedHeckeL (F := ℚ) 1
+  have hmer := (continuedCompletedHeckeL_spec (F := ℚ) 1).1.meromorphicOn
+  have hD : (MeromorphicOn.divisor L D).support.Finite :=
+    (MeromorphicOn.divisor L D).finiteSupport (isCompact_closedBall _ _)
+  let : Finite (MeromorphicOn.divisor L D).support := hD.to_subtype
+  have hmem (z : ratWindow) : z.val ∈ D := by
+    change z.val ∈ Metric.closedBall 0 R
+    rw [Metric.mem_closedBall, dist_zero_right]
+    have hs := abs_lt.mp z.property.2
+    have hre : |z.val.re| ≤ 2 := abs_le.mpr ⟨by linarith [hs.1], by linarith [hs.2]⟩
+    exact (Complex.norm_le_abs_re_add_abs_im _).trans (by dsimp [R]; linarith [h z, le_abs_self M])
+  let e (z : ratWindow) : (MeromorphicOn.divisor L D).support := ⟨z.val, by
+    have hz := z.property.1.ne'
+    change MeromorphicOn.divisor L D z.val ≠ 0
+    rw [MeromorphicOn.divisor_apply (show MeromorphicOn L D from fun x _ ↦ hmer x (mem_univ _)) (hmem z)]
+    rwa [MeromorphicOn.divisor_apply hmer (mem_univ _)] at hz⟩
+  let : Infinite ratWindow := factorialNormalization_window_infinite
+  let : Finite ratWindow := Finite.of_injective e fun _ _ he ↦
+    Subtype.ext (congrArg (fun t : (MeromorphicOn.divisor L D).support ↦ t.val) he)
+  exact not_finite ratWindow
+
+/-- On a quotient of the entire Schwartz–Bergman space a height-square weighted family
+of point evaluations in a fixed strip is bounded on every bounded set. -/
+private theorem factorialNormalization_pairing {Q ι : Type*} [AddCommGroup Q] [Module ℂ Q]
+    [TopologicalSpace Q] [PolynormableSpace ℂ Q]
+    (π : B →L[ℂ] Q) (hπ : Topology.IsQuotientMap π) (z : ι → ℂ)
+    (d : ι → StrongDual ℂ Q) (hz : ∀ i, (z i).re ∈ Icc (-1) 2)
+    (heval : ∀ i f, d i (π f) = f.val (z i)) (S : Set Q) (hS : Bornology.IsVonNBounded ℂ S) :
+    ∃ A : ℝ, ∀ i x, x ∈ S → ‖(z i)^2 * d i x‖ ≤ A := by
+  let : BarrelledSpace ℂ B := isFrechetTVS_barrelled
+    (schwartzBergman_frechet univ isOpen_univ inferInstance univ_nonempty)
+  let : BarrelledSpace ℂ Q := by
+    constructor
+    intro q hq
+    exact hπ.continuous_iff.mpr ((q.comp π.toLinearMap).continuous_of_lowerSemicontinuous
+      (hq.comp π.continuous))
+  let L (i : ι) := (z i)^2 • d i
+  let s (i : ι) := (normSeminorm ℂ ℂ).comp (L i).toLinearMap
+  have hb : BddAbove (range s) := Seminorm.bddAbove_range_iff.mpr fun x ↦ by
+    obtain ⟨f, rfl⟩ := hπ.surjective x
+    obtain ⟨A, hA⟩ := f.property.2.2 (-1) 2 (by norm_num) (subset_univ _) 2
+    exact ⟨A, forall_mem_range.mpr fun i ↦ by
+      change ‖(z i)^2 * d i (π f)‖ ≤ A
+      rw [heval]
+      exact hA ⟨z i, hz i, rfl⟩⟩
+  have hc : Continuous (⨆ i, s i : Seminorm ℂ Q) := by
+    rw [Seminorm.coe_iSup_eq hb]
+    exact Seminorm.continuous_iSup s (fun i ↦ (L i).continuous.norm) hb
+  obtain ⟨A, _, hA⟩ := (PolynormableSpace.withSeminorms ℂ Q).isVonNBounded_iff_seminorm_bounded.mp
+    hS ⟨⨆ i, s i, hc⟩
+  exact ⟨A, fun i x hx ↦ ((le_ciSup hb i : s i ≤ ⨆ j, s j) x).trans (hA x hx).le⟩
+
+/-- Paper: Theorem 7.4.1.1(2), p. 367. Over ℚ take the trivial character, zero twist
+and only the evaluation at each zero. Bounded rescaled biorthogonals would give a
+quadratic lower bound on the factorials at unbounded heights; the printed bound is linear. -/
+theorem Printed.spectralNuclearity_factorialNormalization_false :
+    ¬ Printed.spectralNuclearity_factorialNormalization := by
+  intro h
+  let τ : ℝ≥0ˣ →ₜ* I[ℚ] := ⟨canonicalIdeleNormSection ℚ, canonicalIdeleNormSection_continuous ℚ⟩
+  let hτ := canonicalIdeleNormSection_rightInverse ℚ
+  let D := spectralNuclearityDenominator (1 : U[ℚ]) τ hτ 0
+  let Q := SpectralNuclearityQuotient (1 : U[ℚ]) τ hτ 0
+  let Z := {z : ℂ // 0 < ratZeroOrder z}
+  let J := Σ z : Z, Fin (min 1 (ratZeroOrder z.val).toNat)
+  obtain ⟨d,b,he,hb,hS,C,T,hC,hfac⟩ := h ℚ 1 τ hτ 0 1 one_pos
+  let j (z : ratWindow) : J := ⟨⟨z.val, z.property.1⟩, 0, by
+    change 0 < min 1 (ratZeroOrder z.val).toNat
+    have := z.property.1
+    exact lt_min one_pos (by omega)⟩
+  let S := range fun i : J ↦ ((ratZeroOrder i.1.val).toNat.factorial : ℂ)⁻¹ • b i
+  let : PolynormableSpace ℂ B := (schwartzBergman_frechet univ isOpen_univ inferInstance univ_nonempty).2.1
+  let : PolynormableSpace ℂ Q := polynormableSpace_quotient D
+  obtain ⟨A,hA⟩ := factorialNormalization_pairing D.mkQL (Submodule.isQuotientMap_mkQ D)
+    (fun z : ratWindow ↦ z.val) (fun z ↦ d (j z))
+    (fun z ↦ by
+      obtain ⟨h₁,h₂⟩ := abs_lt.mp z.property.2
+      exact ⟨by linarith, by linarith⟩)
+    (fun z f ↦ by simpa [j] using he (j z) f) S hS
+  obtain ⟨z,hz⟩ := factorialNormalization_unbounded_height (max T (max 1 (max A 0 * C)))
+  have hT := (le_max_left _ _).trans_lt hz
+  have hbig := (le_max_right _ _).trans_lt hz
+  have hpos : 0 < |z.val.im| := zero_lt_one.trans ((le_max_left _ _).trans_lt hbig)
+  have hzbig := (le_max_right _ _).trans_lt hbig
+  let m := (ratZeroOrder z.val).toNat.factorial
+  have hdiag : d (j z) (b (j z)) = 1 := by simp [hb]
+  have hzero : 0 < (m : ℝ) := by dsimp [m]; positivity
+  have ha := hA z _ (mem_range_self (j z))
+  change ‖z.val^2 * d (j z) ((m : ℂ)⁻¹ • b (j z))‖ ≤ A at ha
+  rw [map_smul, hdiag, smul_eq_mul, mul_one, norm_mul, norm_pow, norm_inv,
+    Complex.norm_natCast, ← div_eq_mul_inv, div_le_iff₀ hzero] at ha
+  have hest : |z.val.im|^2 ≤ (max A 0 * C) * |z.val.im| := calc
+    _ ≤ ‖z.val‖^2 := pow_le_pow_left₀ (abs_nonneg _) (Complex.abs_im_le_norm _) 2
+    _ ≤ A * m := ha
+    _ ≤ max A 0 * m := by gcongr; exact le_max_left _ _
+    _ ≤ max A 0 * (C * |z.val.im|) := mul_le_mul_of_nonneg_left
+      (hfac ⟨z.val,z.property.1⟩ hT.le) (le_max_right _ _)
+    _ = _ := by ring
+  exact hzbig.not_ge ((mul_le_mul_iff_left₀ hpos).mp (by simpa [pow_two] using hest))
+
+end FactorialNormalization
 
 open scoped TensorProduct in
 /-- Paper: Equation (7.4.3.1), p. 368.
@@ -1021,11 +1189,163 @@ def Printed.archNuclearityJet_basis : Prop :=
     (τ : ℝ≥0ˣ →ₜ* I[F]) (hτ : RightInverse τ (ideleNorm F)),
     Printed.HasQuotientJetBasis (archNuclearityDenominator χ) (Printed.archNuclearityJet χ τ hτ)
 
+/-- The gamma factor of `|·|^i` vanishes at every point `-i - 2n` of the real pole
+progression. -/
+private theorem archNuclearityJet_basis_false_gamma_zero (χ : U[ℚ])
+    (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[ℚ]) Complex.I) (n : ℕ) :
+    heckeGammaFactor χ (-Complex.I - 2 * (n : ℂ)) = 0 := by
+  unfold heckeGammaFactor
+  apply Finset.prod_eq_zero (Finset.mem_univ Rat.infinitePlace)
+  rw [dite_eq_left_of_eq_true (eq_true Rat.isReal_infinitePlace)]
+  dsimp only
+  rw [archNuclearityJet_span_false_params χ hχ]
+  rw [Complex.Gammaℝ_eq_zero_iff]
+  refine ⟨n, ?_⟩
+  simp only [Fin.val_zero, Nat.cast_zero, add_zero]
+  ring
+
+/-- The reciprocal gamma factor of `|·|^i` has positive finite order at each `-i - 2n`. -/
+private theorem archNuclearityJet_basis_false_gammaOrder_pos (χ : U[ℚ])
+    (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[ℚ]) Complex.I) (n : ℕ) :
+    0 < (analyticOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) (-Complex.I - 2 * (n : ℂ))).toNat := by
+  have han : AnalyticOnNhd ℂ (fun z ↦ (heckeGammaFactor χ z)⁻¹) univ :=
+    fun z _ ↦ (differentiable_inv_heckeGammaFactor χ).analyticAt z
+  have h0 : analyticOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) (-Complex.I - 2 * (n : ℂ)) ≠ 0 := by
+    rw [Ne, (han _ trivial).analyticOrderAt_eq_zero,
+      archNuclearityJet_basis_false_gamma_zero χ hχ n]
+    simp
+  have h1 : analyticOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) 1 ≠ ⊤ := by
+    rw [(han _ trivial).analyticOrderAt_eq_zero.mpr
+      (inv_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ (by simp)))]
+    exact ENat.zero_ne_top
+  have htop := han.analyticOrderAt_ne_top_of_isPreconnected (y := -Complex.I - 2 * (n : ℂ))
+    isPreconnected_univ trivial trivial h1
+  generalize analyticOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) (-Complex.I - 2 * (n : ℂ)) = m
+    at h0 htop ⊢
+  induction m using ENat.recTopCoe with
+  | top => exact absurd rfl htop
+  | coe m => simpa [Nat.pos_iff_ne_zero] using h0
+
+/-- The printed index contains `(-i - 2n, 0)` for every `n`: the norm-character correction
+never fires on the real pole progression. -/
+private theorem archNuclearityJet_basis_false_mult (χ : U[ℚ])
+    (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[ℚ]) Complex.I)
+    (τ : ℝ≥0ˣ →ₜ* I[ℚ]) (hτ : RightInverse τ (ideleNorm ℚ)) (n : ℕ) :
+    0 < Printed.archNuclearityMultiplicity χ τ hτ (-Complex.I - 2 * (n : ℂ)) := by
+  have hph := existsUnique_ideleNormSection_character_phase χ τ hτ
+  have hnorm (t : ℝ≥0ˣ) : ideleClassNorm ℚ (QuotientGroup.mk (τ t)) = t := hτ t
+  have h1 : ∀ t : ℝ≥0ˣ, (χ (QuotientGroup.mk (τ t)) : ℂ) =
+      (((t : ℝ≥0) : ℝ) : ℂ) ^ (((1 : ℝ) : ℂ) * Complex.I) := by
+    intro t
+    rw [archNuclearityJet_span_false_char_apply χ hχ, hnorm, Complex.ofReal_one, one_mul]
+  have hx1 : hph.exists.choose = 1 := hph.unique hph.exists.choose_spec h1
+  have hif : ¬ (ω[ℚ, χ] = 1 ∧ ideleClassNormTwist χ (-Complex.I - 2 * (n : ℂ)) =
+      ideleClassNormTwist (1 : U[ℚ]) (-((hph.exists.choose : ℂ) * Complex.I))) := by
+    rintro ⟨-, h⟩
+    rw [hx1, Complex.ofReal_one, one_mul] at h
+    let t : ℝ≥0ˣ := Units.mk0 ⟨Real.exp Real.pi, (Real.exp_pos _).le⟩
+      (fun h ↦ (Real.exp_pos Real.pi).ne' (congrArg Subtype.val h))
+    have he := DFunLike.congr_fun h (QuotientGroup.mk (τ t))
+    change (χ (QuotientGroup.mk (τ t)) : ℂ) *
+        (((ideleClassNorm ℚ (QuotientGroup.mk (τ t)) : ℝ≥0) : ℝ) : ℂ) ^
+          (-Complex.I - 2 * (n : ℂ)) =
+      (1 : ℂ) * (((ideleClassNorm ℚ (QuotientGroup.mk (τ t)) : ℝ≥0) : ℝ) : ℂ) ^
+          (-Complex.I) at he
+    rw [archNuclearityJet_span_false_char_apply χ hχ, hnorm] at he
+    have ht : (((t : ℝ≥0) : ℝ) : ℂ) = ((Real.exp Real.pi : ℝ) : ℂ) := rfl
+    rw [ht] at he
+    have hL : ((Real.exp Real.pi : ℝ) : ℂ) ^ Complex.I *
+        ((Real.exp Real.pi : ℝ) : ℂ) ^ (-Complex.I - 2 * (n : ℂ)) =
+        ((Real.exp (-(2 * (n : ℝ) * Real.pi)) : ℝ) : ℂ) := by
+      rw [← Complex.cpow_add Complex.I (-Complex.I - 2 * (n : ℂ))
+        (Complex.ofReal_ne_zero.mpr (Real.exp_pos _).ne')]
+      rw [show Complex.I + (-Complex.I - 2 * (n : ℂ)) = -2 * (n : ℂ) by ring]
+      rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (Real.exp_pos _).ne'),
+        ← Complex.ofReal_log (Real.exp_pos _).le, Real.log_exp]
+      rw [show (Real.pi : ℂ) * (-2 * (n : ℂ)) =
+        ((-(2 * (n : ℝ) * Real.pi) : ℝ) : ℂ) by push_cast; ring]
+      rw [Complex.ofReal_exp]
+    rw [hL, one_mul, archNuclearityJet_span_false_exp_pi] at he
+    have hre := congrArg Complex.re he
+    simp only [Complex.ofReal_re, Complex.neg_re, Complex.one_re] at hre
+    have := Real.exp_pos (-(2 * (n : ℝ) * Real.pi))
+    linarith
+  unfold Printed.archNuclearityMultiplicity
+  dsimp only
+  rw [ite_eq_right_iff.mpr fun h ↦ absurd h hif, Nat.sub_zero]
+  exact archNuclearityJet_basis_false_gammaOrder_pos χ hχ n
+
+/-- The printed jet index set for `|·|^i` over `ℚ` is countably infinite: it lies over the
+discrete gamma-pole set and contains `(-i - 2n, 0)` for every `n`. -/
+private theorem archNuclearityJet_basis_false_index_equiv (χ : U[ℚ])
+    (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[ℚ]) Complex.I)
+    (τ : ℝ≥0ˣ →ₜ* I[ℚ]) (hτ : RightInverse τ (ideleNorm ℚ)) :
+    Nonempty (ℕ ≃ Printed.ArchNuclearityJetIndex χ τ hτ) := by
+  let S := {s : ℂ | 0 < (analyticOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) s).toNat}
+  have hS : S.Countable := by
+    have hd := (archNuclearityPoleSet_discrete χ).2
+    have : DiscreteTopology S := hd.to_subtype
+    exact Set.countable_coe_iff.mp
+      (TopologicalSpace.separableSpace_iff_countable.mp inferInstance)
+  have hmem (j : Printed.ArchNuclearityJetIndex χ τ hτ) : j.val.1 ∈ S := by
+    have h := j.property
+    unfold Printed.archNuclearityMultiplicity at h
+    dsimp only at h
+    show 0 < (analyticOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) j.val.1).toNat
+    omega
+  have : Countable (Printed.ArchNuclearityJetIndex χ τ hτ) := by
+    have := hS.to_subtype
+    refine Function.Injective.countable
+      (f := fun j : Printed.ArchNuclearityJetIndex χ τ hτ ↦ ((⟨j.val.1, hmem j⟩ : S), j.val.2)) ?_
+    intro a b h
+    simp only [Prod.mk.injEq, Subtype.mk.injEq] at h
+    exact Subtype.ext (Prod.ext h.1 h.2)
+  have : Infinite (Printed.ArchNuclearityJetIndex χ τ hτ) := by
+    refine Infinite.of_injective
+      (fun n : ℕ ↦ (⟨(-Complex.I - 2 * (n : ℂ), 0),
+        archNuclearityJet_basis_false_mult χ hχ τ hτ n⟩ :
+          Printed.ArchNuclearityJetIndex χ τ hτ)) ?_
+    intro a b h
+    have h1 : (-Complex.I - 2 * (a : ℂ)) = -Complex.I - 2 * (b : ℂ) :=
+      congrArg (fun j : Printed.ArchNuclearityJetIndex χ τ hτ ↦ j.val.1) h
+    have h2 := congrArg Complex.re h1
+    simp only [Complex.sub_re, Complex.neg_re, Complex.mul_re, Complex.natCast_re,
+      Complex.natCast_im, Complex.I_re] at h2
+    norm_num at h2
+    exact_mod_cast h2
+  exact ⟨(nonempty_equiv_of_countable (α := Printed.ArchNuclearityJetIndex χ τ hτ)).some.symm⟩
+
 /-- Paper: Theorem 7.4.3.1(3), p. 368.
 The same flat test h(x) − 2 h(2x) has nonzero evaluation at the printed index
 (−i, 0) for the rational character |·|^i. A functional on the quotient vanishes
 on the class of this test. -/
-theorem Printed.archNuclearityJet_basis_false : ¬ Printed.archNuclearityJet_basis := by sorry
+theorem Printed.archNuclearityJet_basis_false : ¬ Printed.archNuclearityJet_basis := by
+  intro h
+  obtain ⟨χ, hχ⟩ := archNuclearityJet_span_false_char
+  let τ : ℝ≥0ˣ →ₜ* I[ℚ] := ⟨ratIdeleNormSection, ratIdeleNormSection_continuous⟩
+  have hτ : RightInverse τ (ideleNorm ℚ) := ratIdeleNormSection_rightInverse
+  obtain ⟨σ⟩ := archNuclearityJet_basis_false_index_equiv χ hχ τ hτ
+  obtain ⟨d, -, hd, -⟩ := h ℚ χ τ hτ σ
+  obtain ⟨f, hfD, hne⟩ := archNuclearityJet_span_false_key
+  have hω := archNuclearityJet_span_false_omega χ hχ
+  obtain ⟨n, hn⟩ := σ.surjective
+    (⟨(-Complex.I, 0), archNuclearityJet_span_false_mult χ hχ τ hτ⟩ :
+      Printed.ArchNuclearityJetIndex χ τ hτ)
+  have hD : (Submodule.Quotient.mk f : Θ₀[ℚ, χ]) ∈ archNuclearityDenominator χ :=
+    Submodule.subset_span ⟨f, by rw [eq_true hω]; exact hfD, rfl⟩
+  have h0 : (archNuclearityDenominator χ).mkQ (Submodule.Quotient.mk f) = 0 :=
+    (Submodule.Quotient.mk_eq_zero _).mpr hD
+  have hc := hd n (Submodule.Quotient.mk f)
+  rw [h0, map_zero, hn] at hc
+  unfold Printed.archNuclearityJet at hc
+  rw [ContinuousLinearMap.comp_apply, ContinuousLinearMap.comp_apply, entireJet_apply,
+    iteratedDeriv_zero, schwartzBergmanEntireInclusion_apply] at hc
+  apply hne
+  have htw : ideleClassNormTwist χ (-Complex.I) = ideleClassNormTwist (1 : U[ℚ]) 0 := by
+    have := ideleClassNormTwist_add_of_eq hχ (-Complex.I)
+    simpa using this
+  rw [← htw, ← ((exists_globalPolarThetaMellin χ τ hτ).choose_spec f (-Complex.I)).2]
+  exact hc.symm
 
 /-- Paper: Equation (7.4.3.4), p. 368.
 The unnormalized vertical integral in the printed jet formula is 2πi times the
@@ -1044,8 +1364,51 @@ For ℚ and the trivial character, take the jet at −2 of order zero. Tensor
 exp(−πx²) − 3 exp(−4πx²) + 2 exp(−16πx²) with the finite integral indicator.
 The coefficients make the two polar moments vanish. The x² coefficient is
 −21π, so the simple archimedean Mellin pole at −2 cancels the simple zeta zero
-with nonzero result. The missing factor therefore changes the value. -/
-theorem Printed.archNuclearityJet_apply_false : ¬ Printed.archNuclearityJet_apply := by sorry
+with nonzero result. The missing factor therefore changes the value.
+
+The Lean proof uses instead the character `|·|^i` and the nonzero flat
+zero-moment test of `archNuclearityJet_span_false_key`. Its zeta value at the
+printed index `(−i, 0)` is nonzero, and `schwartzBergman_jet_eq_mellinInv_moment`
+computes that jet as the unnormalized logarithmic moment itself, so the printed
+factor `2πi` would force the nonzero value to vanish. -/
+theorem Printed.archNuclearityJet_apply_false : ¬ Printed.archNuclearityJet_apply := by
+  intro h
+  obtain ⟨χ, hχ⟩ := archNuclearityJet_span_false_char
+  let τ : ℝ≥0ˣ →ₜ* I[ℚ] := ⟨ratIdeleNormSection, ratIdeleNormSection_continuous⟩
+  have hτ : RightInverse τ (ideleNorm ℚ) := ratIdeleNormSection_rightInverse
+  obtain ⟨f, -, hne⟩ := archNuclearityJet_span_false_key
+  let v : B := Z(χ, τ, hτ) (Submodule.Quotient.mk f : Θ₀[ℚ, χ])
+  have hz : (v.val : ℂ → ℂ) = fun s ↦
+      globalIdelicZFunction f.val (ideleClassNormTwist χ s) :=
+    funext fun s ↦ ((exists_globalPolarThetaMellin χ τ hτ).choose_spec f s).2
+  have hmom := (schwartzBergman_jet_eq_mellinInv_moment v (-Complex.I) 0).2.2
+  have heq := h ℚ χ τ hτ
+    ⟨(-Complex.I, 0), archNuclearityJet_span_false_mult χ hχ τ hτ⟩ f
+  simp only [iteratedDeriv_zero, pow_zero, one_mul] at hmom heq
+  rw [← hz] at heq
+  have hzpt : globalIdelicZFunction f.val (ideleClassNormTwist χ (-Complex.I)) =
+      v.val (-Complex.I) := by
+    simpa using (congrFun hz (-Complex.I)).symm
+  rw [hzpt, hmom] at heq
+  have h2 : (1 - 2 * (Real.pi : ℂ) * Complex.I) *
+      mellin (fun t : ℝ ↦ mellinInv 0 v.val t) (-Complex.I) = 0 := by
+    rw [sub_mul, one_mul]
+    exact sub_eq_zero.mpr heq
+  have hc : (1 - 2 * (Real.pi : ℂ) * Complex.I) ≠ 0 := by
+    intro h0
+    have hre := congrArg Complex.re h0
+    simp at hre
+  have hz0 : mellin (fun t : ℝ ↦ mellinInv 0 v.val t) (-Complex.I) = 0 :=
+    (mul_eq_zero.mp h2).resolve_left hc
+  have hu0 : v.val (-Complex.I) = 0 := by
+    rw [hmom]
+    exact hz0
+  apply hne
+  have htw : ideleClassNormTwist χ (-Complex.I) = ideleClassNormTwist (1 : U[ℚ]) 0 := by
+    have := ideleClassNormTwist_add_of_eq hχ (-Complex.I)
+    simpa using this
+  rw [← htw]
+  simpa [hz] using hu0
 
 /-- Paper: Equation (7.4.3.14), p. 373. The printed gamma-pole sum with its
 norm-character correction. -/

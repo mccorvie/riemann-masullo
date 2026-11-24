@@ -1616,8 +1616,9 @@ theorem modulatedExponentialDecay_compact_projective_topology (hI : IsCompact I)
 
 omit hSC hm hInt hne hτ
 
-/-- The ordinary split Schwartz product has logarithmic scalar coordinate. -/
-private theorem split_schwartz_product {H : Type*} [CommGroup H] [TopologicalSpace H]
+/-- For a group split as a product with the positive real units, tensor a Schwartz–Bruhat
+function on the first factor with a real Schwartz function in logarithmic coordinates. -/
+theorem split_schwartz_product {H : Type*} [CommGroup H] [TopologicalSpace H]
     [IsTopologicalGroup H] [T2Space H] [LocallyCompactSpace H] [SecondCountableTopology H]
     (d : H × ℝ≥0ˣ ≃ₜ* G) :
     ∃ M : InductiveTensor (SchwartzBruhat H) (SchwartzMap ℝ ℂ) →L[ℂ] SchwartzBruhat G,

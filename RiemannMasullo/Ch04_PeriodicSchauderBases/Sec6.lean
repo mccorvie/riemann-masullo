@@ -4,7 +4,7 @@ public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec2
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec5
 
 import Mathlib.Algebra.Polynomial.Taylor
-import all RiemannMasullo.AppC_LCTVS.Sec2b
+import RiemannMasullo.AppC_LCTVS.Sec2b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a_part2
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
@@ -1095,7 +1095,10 @@ private theorem integral_difference_polynomial (ξ : PontryaginDual G) (g : G)
 
 open scoped Classical in
 open Polynomial in
-private theorem integral_differenceProduct_polynomial (ξ : PontryaginDual G)
+/-- A log-polynomial moment of an iterated cyclic difference vanishes whenever
+the polynomial degree is less than the number of factors on whose generator
+the character is trivial in the selected norm-one isotype. -/
+theorem integral_differenceProduct_polynomial (ξ : PontryaginDual G)
     (v : List G → G → ℂ)
     (hdiff : ∀ g l x, v (g :: l) x = v l x - v l (g * x))
     (hint : ∀ l r, Integrable (fun x ↦ v l x * (ξ x : ℂ) * (period x : ℂ) ^ (r : ℕ)) μ)
@@ -1326,6 +1329,56 @@ theorem modulatedPeriodicMomentIndex_enumerable (hN : 0 < N) :
 variable (hcomm : ∃ a : ℝ, 0 < a ∧ ∀ k, ∃ r : ℚ, Real.log ((m (γs k)).val : ℝ) = (r : ℝ) * a)
 
 include hcomm in
+/-- Paper: Theorem 4.6.1.5, p. 212. There is a family of vectors of the difference quotient on
+which the descended log-moments take the values of the Kronecker delta. The vectors are chosen
+by induction from the density of the span of the descended moments in the strong dual; the
+lattice Schwartz decay of (4.6.1.15) provides the surjectivity used at each step. -/
+private theorem modulatedQuotientLogMoment_bases_biorthogonal :
+    ∃ ψ : J → U, (∀ j, D j (ψ j) = 1) ∧ ∀ j k, j ≠ k → D j (ψ k) = 0 := by
+  sorry
+
+include hγs in
+/-- Paper: Theorem 4.1.2.6(2), p. 161, applied to Theorem 4.6.1.5, p. 212. The difference quotient
+is a separable nuclear Frechet space (by `modulatedIsotypicDifferenceProduct_quotient`), and every
+Schauder basis of a nuclear Frechet space is absolute. -/
+private theorem modulatedQuotientLogMoment_bases_absolute (σ : ℕ ≃ J) (ψ : J → U)
+    (hb : IsSchauderBasis (ψ ∘ σ) (D ∘ σ)) :
+    SchauderBasis.IsAbsolute (ψ ∘ σ) (D ∘ σ) := by
+  have hS₀ : ∀ g ∈ List.ofFn γs, 1 < (m g).val := by
+    intro g hg
+    obtain ⟨k, rfl⟩ := List.mem_ofFn.mp hg
+    exact hγs k
+  obtain ⟨-, hN, hF⟩ := modulatedIsotypicDifferenceProduct_quotient (m := m) (hm := hm)
+    (hms := hms) (ω := ω) (List.ofFn γs) hS₀
+  exact SchauderBasis.isAbsolute_of_nuclear_frechet.{_, 0} hN hF hb
+
+include hcomm in
+/-- Paper: Theorem 4.6.1.5 and Equation (4.6.1.15), p. 212. Under every enumeration of the
+moment family, the biorthogonal vectors are a Schauder basis of the difference quotient with
+the descended log-moments as coefficient functionals. This is the expansion step: the coordinate
+series of a quotient representative converges to it because the coefficients decay faster than
+any power of the lattice frequency. Absoluteness is
+`modulatedQuotientLogMoment_bases_absolute`. -/
+private theorem modulatedQuotientLogMoment_bases_quotient (σ : ℕ ≃ J) (ψ : J → U)
+    (hbi : (∀ j, D j (ψ j) = 1) ∧ ∀ j k, j ≠ k → D j (ψ k) = 0) :
+    IsSchauderBasis (ψ ∘ σ) (D ∘ σ) := by
+  sorry
+
+include hcomm in
+/-- Paper: Theorem 4.6.1.5 and Equation (4.6.1.16), p. 212, via Lemma 4.1.2.4, p. 159. Once
+the descended log-moments are the coefficient functionals of an absolute Schauder basis of the
+difference quotient, they form an unconditional Schauder basis of the strong dual, whose
+coordinates are the evaluations at the basis vectors. -/
+private theorem modulatedQuotientLogMoment_bases_dual (σ : ℕ ≃ J) (ψ : J → U)
+    (hb : IsSchauderBasis (ψ ∘ σ) (D ∘ σ))
+    (ha : SchauderBasis.IsAbsolute (ψ ∘ σ) (D ∘ σ)) :
+    let d := D ∘ σ
+    let ev : ℕ → StrongDual ℂ (StrongDual ℂ U) :=
+      fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) ((ψ ∘ σ) n)
+    IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev := by
+  sorry
+
+include hcomm in
 /-- Paper: Theorem 4.6.1.5 and Equations (4.6.1.15)–(4.6.1.16), p. 212.
 Every enumeration of the moment family is an unconditional basis of the
 strong dual. The biorthogonal vectors are an absolute basis of the quotient.
@@ -1338,7 +1391,15 @@ theorem modulatedQuotientLogMoment_bases (σ : ℕ ≃ J) :
       let ev : ℕ → StrongDual ℂ (StrongDual ℂ U) :=
         fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (e n)
       IsSchauderBasis e d ∧ SchauderBasis.IsAbsolute e d ∧
-        IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev := by sorry
+        IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev := by
+  obtain ⟨ψ, hbi⟩ := modulatedQuotientLogMoment_bases_biorthogonal (m := m) (hm := hm)
+    (hms := hms) (ω := ω) (γs := γs) (hγs := hγs) (μ := μ) (hcomm := hcomm)
+  obtain hb := modulatedQuotientLogMoment_bases_quotient (m := m) (hm := hm)
+    (hms := hms) (ω := ω) (γs := γs) (hγs := hγs) (μ := μ) (hcomm := hcomm) σ ψ hbi
+  have ha := modulatedQuotientLogMoment_bases_absolute (m := m) (hm := hm) (hms := hms)
+    (ω := ω) (γs := γs) (hγs := hγs) (μ := μ) σ ψ hb
+  exact ⟨ψ, hb, ha, modulatedQuotientLogMoment_bases_dual (m := m) (hm := hm)
+    (hms := hms) (ω := ω) (γs := γs) (hγs := hγs) (μ := μ) (hcomm := hcomm) σ ψ hb ha⟩
 
 include hχ hcomm in
 /-- Paper: Theorem 4.6.1.5(1), p. 212. A continuous seminorm of the
@@ -1353,6 +1414,73 @@ theorem modulatedQuotientLogMoment_biorthogonal_growth (ψ : J → U)
       ∀ (n : ℤ) (j : J), j.val.1 = freq[k, n] →
         q (ψ j) ≤ C * (1 + |(n : ℝ)|) ^ d := by sorry
 
+/-- A logarithmic moment along a one-parameter family of characters is the Fourier
+transform of a single Schwartz function on the logarithmic coordinate. -/
+private theorem modulatedLogMoment_logFourier (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
+    (μ₁ : Measure m.toMonoidHom.ker) [μ₁.IsHaarMeasure] [CompactSpace m.toMonoidHom.ker]
+    (ν : Measure G) (hν : ν = (μ₁.prod positiveRealHaar).map
+      (fun z : m.toMonoidHom.ker × ℝ≥0ˣ ↦ z.1.val * τ z.2))
+    (χ₀ : PontryaginDual G) (b : ℝ) (hb : ∀ t : ℝ≥0ˣ, χ₀ (τ t) = Circle.exp (b * Real.log (t.val : ℝ)))
+    (φ : G → ℂ) (p : PositiveRealExponentialDecay univ)
+    (hp : ∀ t : ℝ≥0ˣ, p.val (Real.log (t.val : ℝ)) =
+      ∫ k : m.toMonoidHom.ker, (χ₀ k.val : ℂ) * φ (k.val * τ t) ∂μ₁) (r : ℕ) :
+    ∃ H : SchwartzMap ℝ ℂ, ∀ (q : ℝ) (ξ : PontryaginDual G),
+      (∀ x, ξ x = χ₀ x * Circle.exp (q * period x)) →
+      Integrable (fun x ↦ φ x * (ξ x : ℂ) * (period x : ℂ)^r) ν →
+      (∫ x, φ x * (ξ x : ℂ) * (period x : ℂ)^r ∂ν) = H (-(q+b)/(2*Real.pi)) := by
+  let s₀ := logExponentialDecayTwist univ ⟨0, mem_univ _⟩ p
+  have hs₀ (x : ℝ) : s₀ x = p.val x := by
+    change (logExponentialDecayTwist univ ⟨0, mem_univ _⟩ p) x = _
+    simpa only [zero_mul, Real.exp_zero, Complex.ofReal_one, one_mul] using
+      logExponentialDecayTwist_apply univ ⟨0, mem_univ _⟩ p x
+  let w (x : ℝ) := (x : ℂ)^r
+  have hw : w.HasTemperateGrowth := by dsimp [w]; fun_prop
+  let s := SchwartzMap.smulLeftCLM ℂ w s₀
+  have hs (x : ℝ) : s x = (x : ℂ)^r * p.val x := by
+    change (SchwartzMap.smulLeftCLM ℂ w s₀) x = _
+    rw [SchwartzMap.smulLeftCLM_apply hw]
+    exact congrArg ((x : ℂ)^r * ·) (hs₀ x)
+  refine ⟨FourierTransform.fourier s, fun q ξ hξ hi ↦ ?_⟩
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SFinite positiveRealHaar := by unfold positiveRealHaar; infer_instance
+  let split (z : K × ℝ≥0ˣ) := z.1.val * τ z.2
+  have hsplit : Continuous split :=
+    (continuous_subtype_val.comp continuous_fst).mul (τ.continuous.comp continuous_snd)
+  let F (x : G) := φ x * (ξ x : ℂ) * (period x : ℂ)^r
+  have hi' : Integrable F ((μ₁.prod positiveRealHaar).map split) := hν ▸ hi
+  have hprod := hi'.comp_measurable hsplit.measurable
+  have hfiber (t : ℝ≥0ˣ) : (∫ k : K, (F ∘ split) (k,t) ∂μ₁) =
+      (Circle.exp ((q+b)*Real.log (t.val : ℝ)) : ℂ) * (Real.log (t.val : ℝ) : ℂ)^r *
+        p.val (Real.log (t.val : ℝ)) := by
+    rw [hp, ← integral_const_mul]
+    apply integral_congr_ae (.of_forall fun k ↦ ?_)
+    change φ (k.val * τ t) * (ξ (k.val * τ t) : ℂ) * (period (k.val * τ t) : ℂ)^r = _
+    rw [hξ, map_mul χ₀, map_mul m, show m k.val = 1 from k.property, hτ t, one_mul, hb]
+    rw [add_mul, Circle.exp_add]
+    simp only [Circle.coe_mul]
+    ring
+  let ex : ℝ ≃ₜ ℝ≥0ˣ := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  have hval (x : ℝ) : ((ex x).val : ℝ) = Real.exp x := rfl
+  have hex : positiveRealHaar = Measure.map ex volume := by
+    unfold positiveRealHaar
+    congr 1
+    funext x
+    apply Units.ext
+    apply NNReal.eq
+    exact (Real.coe_toNNReal _ (Real.exp_pos x).le).trans (hval x).symm
+  change (∫ x, F x ∂ν) = _
+  rw [hν, integral_map hsplit.measurable.aemeasurable hi'.aestronglyMeasurable]
+  change (∫ z, (F ∘ split) z ∂μ₁.prod positiveRealHaar) = _
+  rw [integral_prod_symm (F ∘ split) hprod]
+  simp_rw [hfiber]
+  rw [hex, ex.measurableEmbedding.integral_map, SchwartzMap.fourier_coe, Real.fourier_eq]
+  apply integral_congr_ae (.of_forall fun x ↦ ?_)
+  rw [hval, Real.log_exp, Real.fourierChar_apply', Circle.smul_def, smul_eq_mul, hs, Real.inner_apply]
+  have hphase : 2 * Real.pi * -(x * (-(q+b) / (2*Real.pi))) = (q+b)*x := by
+    field_simp
+  rw [hphase, mul_assoc]
+
 include hχ in
 /-- Paper: Theorem 4.6.1.5(2), p. 212. At each fixed moment order, the
 coefficients on each cyclic lattice give a Schwartz sequence.
@@ -1365,7 +1493,46 @@ theorem modulatedLogMoment_lattice_schwartz (f : H₀[ω]) (r : Fin N) (k : Fin 
     ∃ v : SchwartzBruhat (Multiplicative ℤ), ∀ n : ℤ, v (Multiplicative.ofAdd n) =
       if r.val < modulatedPeriodicMultiplicity m ω γs (freq[k, n]) then
         modulatedLogMoment (m := m) (hm := hm) (hms := hms) (ω := ω) (μ := μ) (freq[k, n]) r.val f
-      else 0 := by sorry
+      else 0 := by
+  classical
+  obtain ⟨τ, hτ⟩ := exists_surjectiveModulation_section m hm hms
+  obtain ⟨b, hb⟩ := exists_circleExp_freq ((χ ω).comp τ)
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let μ₁ : Measure K := Measure.haarMeasure (⊤ : TopologicalSpace.PositiveCompacts K)
+  let ν := canonicalModulatedHaar m hm
+  let : ν.IsHaarMeasure := (Classical.choose_spec (existsUnique_canonicalModulatedHaar m hm).exists).1
+  have hν := canonicalModulatedHaar_eq_map_prod m hm τ hτ μ₁ Measure.haarMeasure_self
+  obtain ⟨A, _, _, _, hA, _⟩ := modulatedMellin_isotypicDiagram m hm hms univ
+    isOpen_univ ordConnected_univ univ_nonempty τ hτ μ₁ ν hν (χ ω) b hb
+  obtain ⟨H, hH⟩ := modulatedLogMoment_logFourier m τ hτ μ₁ ν hν (χ ω) b hb
+    f.val.val (A f.val) (hA f.val) r.val
+  let L := Real.log ((m (γs k)).val : ℝ)
+  have hL : 0 < L := Real.log_pos (by exact_mod_cast hγs k)
+  let q (n : ℤ) := -(t₀ k ω - 2 * Real.pi * (n : ℝ) / L)
+  have hξ (n : ℤ) (x : G) : freq[k, n] x = χ ω x * Circle.exp (q n * period x) := by
+    change (modulatedCyclicCharacter m (γs k) (hγs k) χ (t₀ k) (ht₀ k) (ω, n)
+      (QuotientGroup.mk x))⁻¹ = _
+    rw [modulatedCyclicCharacter_mk, show q n * (period x) =
+      -((t₀ k ω - 2 * Real.pi * (n : ℝ) / L) * period x) from neg_mul _ _, Circle.exp_neg, mul_inv, inv_inv]
+  let c := Measure.haarScalarFactor μ ν
+  have hscale : μ = c • ν := Measure.isMulLeftInvariant_eq_smul μ ν
+  let a : ℝ := -1 / L
+  let d := (t₀ k ω - b) / (2 * Real.pi)
+  have hsample (n : ℤ) : modulatedLogMoment (m := m) (hm := hm) (hms := hms)
+      (ω := ω) (μ := μ) (freq[k, n]) r.val f = (((c : ℝ) : ℂ) • H) (a*n+d) := by
+    change (∫ x, f.val.val x * (freq[k, n] x : ℂ) * (period x : ℂ)^r.val ∂μ) = _
+    rw [hscale, integral_smul_nnreal_measure, hH (q n) (freq[k, n]) (hξ n)
+      (integrable_logMoment m ω ν (freq[k, n]) r.val f)]
+    have heq : -(q n + b)/(2*Real.pi) = a*n+d := by
+      dsimp [q, a, d]
+      field_simp
+      ring
+    rw [heq]
+    rfl
+  let mask (n : ℤ) := r.val < modulatedPeriodicMultiplicity m ω γs (freq[k, n])
+  obtain ⟨v, hv⟩ := schwartzBruhat_of_affine_integer_samples (((c : ℝ) : ℂ) • H) a d
+    (div_ne_zero (by norm_num) hL.ne') mask
+  exact ⟨v, fun n ↦ (hv n).trans (by simp only [mask, hsample])⟩
 
 end Moments
 
@@ -1588,6 +1755,112 @@ variable (S : List G) (hS : S ≠ []) (hγS : ∀ g ∈ S, 1 < (m g).val)
 -- TODO(paper-gap): On p. 219 the window needs 2 log b′₁ > log |γ₁|. The
 -- support enlargement uses γ₁⁻¹, and the final shift must have module below one.
 
+/-- A radial cutoff gives an isotypic representative in a negative window
+modulo a single expanding difference. -/
+private theorem modulatedDifferenceProduct_supported_single (ω : PontryaginDual m.toMonoidHom.ker) (g : G) (hg : 1 < (m g).val) :
+    ∃ B : Set ℝ≥0ˣ, IsCompact B ∧ (∀ t ∈ B, t.val < 1) ∧ ∀ f : H₀[ω],
+      ∃ v a : H₀[ω], (∀ x, m x ∉ B → v.val.val x = 0) ∧ f = v + P[ω, [g]] a := by
+  obtain ⟨B, c, hB, hneg, hc, hlift⟩ := modulatedPeriodization_compact_lift m g hm hms hg
+  refine ⟨B, hB, hneg, fun f ↦ ?_⟩
+  let per := modulatedPeriodizationCLM m g hm hms hg
+  let q := QuotientGroup.mk' (Subgroup.zpowers g)
+  obtain ⟨v, hv, he⟩ := hlift (per f.val)
+  have hf := (mem_modulatedDecayIsotype_iff m ω univ (mem_univ _) f.val).mp f.property
+  have hiso : v ∈ H₀[ω] := by
+    apply (mem_modulatedDecayIsotype_iff m ω univ (mem_univ _) v).mpr
+    intro u x
+    have ha := modulatedPeriodization_hasSum m g hm hms hg f.val x
+    have hb := modulatedPeriodization_hasSum m g hm hms hg f.val (u.val⁻¹ * x)
+    have hc' : per f.val (q (u.val⁻¹ * x)) = (ω u : ℂ) * per f.val (q x) := by
+      apply hb.unique
+      refine ((ha.mul_left (ω u : ℂ)).congr_fun fun n ↦ ?_)
+      rw [mul_left_comm (g ^ n) _ x, hf]
+    have hm' : m (u.val⁻¹ * x) = m x := by rw [map_mul, map_inv, show m u.val = 1 from u.property, inv_one, one_mul]
+    rw [he, he, hm', hc']
+    change c (m x) * ((ω u : ℂ) * per f.val (q x)) = (ω u : ℂ) * (c (m x) * per f.val (q x))
+    ring
+  let v' : H₀[ω] := ⟨v, hiso⟩
+  let δ := modulatedCyclicDifference m g hm hms univ ordConnected_univ univ_nonempty
+  have hclosed : IsClosed (δ.range : Set E) := modulatedCyclicDifference_isClosed_range m g hm hms hg
+  have hk : per.ker = δ.range :=
+    (modulatedPeriodization_ker_eq_closure m g hm hms hg).trans hclosed.submodule_topologicalClosure_eq
+  have harr : f.val - v ∈ δ.range := by
+    rw [← hk]
+    change per (f.val - v) = 0
+    rw [map_sub, hv, sub_self]
+  have hi := cyclicDifference_range_inf_isotype m hm hms ω g
+  have him : f.val - v ∈ (H₀[ω]).map δ.toLinearMap :=
+    hi ▸ (show f.val - v ∈ δ.range ⊓ H₀[ω] from ⟨harr, (H₀[ω]).sub_mem f.property hiso⟩)
+  obtain ⟨a, ha, heq⟩ := him
+  refine ⟨v', ⟨a, ha⟩, fun x hx ↦ (he x).trans (by rw [hc _ hx, zero_mul]), ?_⟩
+  apply Subtype.ext
+  change f.val = v + δ a
+  change δ a = f.val - v at heq
+  rw [heq]
+  abel
+
+/-- Induction localizes a product of differences. Applying the next expanding
+difference enlarges a window only in the direction of smaller modules. -/
+private theorem modulatedDifferenceProduct_supported_list (ω : PontryaginDual m.toMonoidHom.ker) (s : List G)
+    (hs : ∀ g ∈ s, 1 < (m g).val) :
+    ∃ B : Set ℝ≥0ˣ, IsCompact B ∧ (∀ t ∈ B, t.val < 1) ∧ ∀ f : H₀[ω],
+      ∃ v a : H₀[ω], (∀ x, m x ∉ B → v.val.val x = 0) ∧ f = v + P[ω, s] a := by
+  induction s with
+  | nil =>
+    refine ⟨∅, isCompact_empty, fun _ h ↦ False.elim h, fun f ↦ ⟨0, f, fun _ _ ↦ rfl, ?_⟩⟩
+    change f = 0 + f
+    rw [zero_add]
+  | cons g s ih =>
+    have hg := hs g List.mem_cons_self
+    obtain ⟨B, hB, hneg, hsingle⟩ := modulatedDifferenceProduct_supported_single m hm hms ω g hg
+    obtain ⟨C, hC, hCneg, htail⟩ := ih (fun x hx ↦ hs x (List.mem_cons_of_mem _ hx))
+    let tr := Homeomorph.mulLeft (m g)
+    refine ⟨B ∪ (C ∪ tr ⁻¹' C), hB.union (hC.union (tr.isCompact_preimage.mpr hC)), ?_, fun f ↦ ?_⟩
+    · rintro t (h | h | h)
+      · exact hneg _ h
+      · exact hCneg _ h
+      · have hlt := hCneg _ h
+        change (m g).val * t.val < 1 at hlt
+        exact (le_mul_of_one_le_left (by positivity : 0 ≤ t.val) hg.le).trans_lt hlt
+    obtain ⟨v, u, hv, he⟩ := hsingle f
+    obtain ⟨w, a, hw, hu⟩ := htail u
+    refine ⟨v + P[ω, [g]] w, a, fun x hx ↦ ?_, ?_⟩
+    · have h₁ := hv x fun h ↦ hx (Or.inl h)
+      have h₂ := hw x fun h ↦ hx (Or.inr (Or.inl h))
+      have h₃ := hw (g * x) fun h ↦ hx (Or.inr (Or.inr (show m g * m x ∈ C from map_mul m g x ▸ h)))
+      change v.val.val x + (modulatedCyclicDifference m g hm hms univ ordConnected_univ univ_nonempty w.val).val x = 0
+      rw [modulatedCyclicDifference_apply, h₁, h₂, h₃, sub_self, add_zero]
+    · rw [he, hu, map_add, add_assoc]
+      rfl
+
+/-- A surjection from a closed part of a Fréchet space onto a Hausdorff quotient
+identifies the target with the quotient by the restricted kernel. -/
+private theorem modulatedDifferenceProduct_supported_quotient {X : Type*} [AddCommGroup X]
+    [Module ℂ X] [TopologicalSpace X] (hX : IsFrechetTVS X) (W R : Submodule ℂ X)
+    (hW : IsClosed (W : Set X)) (hR : IsClosed (R : Set X))
+    (hs : Surjective (R.mkQ ∘ W.subtype)) :
+    ∃ F : (W ⧸ R.comap W.subtype) ≃L[ℂ] (X ⧸ R),
+      ∀ f : W, F ((R.comap W.subtype).mkQ f) = R.mkQ f.val := by
+  obtain ⟨hg, hp, hm, hc⟩ := hX
+  let : UniformSpace X := IsTopologicalAddGroup.rightUniformSpace X
+  let : IsUniformAddGroup X := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace X := hc
+  let : UniformSpace W := UniformSpace.comap Subtype.val inferInstance
+  let : IsUniformAddGroup W := W.toAddSubgroup.isUniformAddGroup
+  let : MetrizableSpace W := IsEmbedding.subtypeVal.metrizableSpace
+  let : CompleteSpace W := hW.completeSpace_coe
+  have hFW : IsFrechetTVS W := by
+    refine ⟨inferInstance, inferInstance, inferInstance, ?_⟩
+    rw [IsUniformAddGroup.rightUniformSpace_eq]
+    infer_instance
+  have hQ := isFrechetTVS_quotient ⟨hg, hp, hm, hc⟩ R hR
+  let A : W →L[ℂ] (X ⧸ R) := R.mkQL.comp W.subtypeL
+  have ho : IsOpenMap A := isOpenMap_of_surjective_toLF (isLFSpace_of_isFrechetTVS hQ)
+    (X := fun _ : ℕ ↦ W) (fun _ ↦ hFW) (fun _ ↦ ContinuousLinearMap.id ℂ W)
+    (fun _ ↦ subset_rfl) (fun x ↦ ⟨0, x, rfl⟩) A hs
+  apply exists_quotient_equiv_of_kernel A (ho.isQuotientMap A.continuous hs)
+  exact SetLike.ext fun f ↦ Submodule.Quotient.mk_eq_zero R
+
 include hS hγS in
 /-- Paper: Theorem 4.6.2.1, p. 218. Each isotype has a compact norm-one-stable
 support set of module below one. The supported functions surject onto the
@@ -1601,7 +1874,43 @@ theorem modulatedDifferenceProduct_compactSupport_quotient :
       let M := R.comap W.subtype
       Surjective (R.mkQ ∘ W.subtype) ∧
       ∃ F : (W ⧸ M) ≃L[ℂ] (H₀[ω] ⧸ R),
-        ∀ f : W, F (M.mkQ f) = R.mkQ f.val := by sorry
+        ∀ f : W, F (M.mkQ f) = R.mkQ f.val := by
+  let : MeasurableSpace G := borel G
+  let : BorelSpace G := ⟨rfl⟩
+  obtain ⟨B, hB, hneg, hlift⟩ := modulatedDifferenceProduct_supported_list m hm hms ω S hγS
+  refine ⟨B, hB, hneg, ?_⟩
+  let W := (modulatedCompactSupportSubmodule m B).comap (H₀[ω]).subtype
+  let R := (P[ω, S]).range
+  have hmem (f : H₀[ω]) : f ∈ W ↔ ∀ x, m x ∉ B → f.val.val x = 0 := by
+    change f.val ∈ modulatedCompactSupportSubmodule m B ↔ _
+    rw [mem_modulatedCompactSupportSubmodule_iff m B hB.isClosed]
+    constructor
+    · intro h x hx
+      exact notMem_support.mp fun h' ↦ hx (h.2 (subset_tsupport _ h'))
+    · intro h
+      have hsupp : support f.val.val ⊆ m ⁻¹' B := fun x hx ↦ by
+        by_contra hh
+        exact hx (h x hh)
+      have hk := hm.1.isCompact_preimage hB
+      exact ⟨HasCompactSupport.of_support_subset_isCompact hk hsupp,
+        closure_minimal hsupp (hB.isClosed.preimage m.continuous)⟩
+  have hs : Surjective (R.mkQ ∘ W.subtype) := by
+    intro z
+    obtain ⟨f, rfl⟩ := R.mkQ_surjective z
+    obtain ⟨v, a, hv, he⟩ := hlift f
+    refine ⟨⟨v, (hmem _).mpr hv⟩, ?_⟩
+    change R.mkQ v = R.mkQ f
+    rw [he, map_add, show R.mkQ (P[ω, S] a) = 0 from (Submodule.Quotient.mk_eq_zero R).mpr ⟨a,rfl⟩, add_zero]
+  have hW : IsClosed (W : Set H₀[ω]) := by
+    let ev (x : G) (f : H₀[ω]) := f.val.val x
+    have he : (W : Set H₀[ω]) = ⋂ x : {x : G // m x ∉ B}, (ev x.val) ⁻¹' {0} := by
+      ext f
+      rw [SetLike.mem_coe, hmem, Set.mem_iInter]
+      exact ⟨fun h x ↦ h x.val x.property, fun h x hx ↦ h ⟨x,hx⟩⟩
+    rw [he]
+    exact isClosed_iInter fun x ↦ isClosed_singleton.preimage (isotype_eval_continuous m hm hms ω x.val)
+  exact ⟨hs, modulatedDifferenceProduct_supported_quotient (isotype_frechet m hm hms ω) W R hW
+    (modulatedIsotypicDifferenceProduct_isClosed_range m hm hms ω S hγS) hs⟩
 
 /-! ## 4.6.3 The case of an interval containing zero -/
 

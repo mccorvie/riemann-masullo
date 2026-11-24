@@ -35,9 +35,10 @@ not.
 
 ## Get involved
 
-> **23 November 2026: this phase is closing.** No new claims are taken after 14:10 UTC. Pull
-> requests for work already claimed are welcome, and everything that is open is still checked
-> and merged. See [#6674](https://github.com/mccorvie/riemann-masullo/issues/6674).
+> **New claims are paused** (since 14:10 UTC on 23 November 2026) while the open pull requests
+> are checked and merged: they were arriving faster than they could be checked. Work that is
+> already claimed is welcome, and claims will reopen when the backlog is cleared. See
+> [#6674](https://github.com/mccorvie/riemann-masullo/issues/6674).
 
 Several hundred proofs are open, and each one is a single Lean statement that is already
 written. You need no special access and no knowledge of the whole paper. Give your coding agent
@@ -298,6 +299,9 @@ on work that does not appear there.
   when they are nested. He measured every one in the library and proposed the redesign (#5398)
   and the rules for new definitions (#5362), which are adapted from
   [Tau Ceti](https://github.com/TauCetiProject/TauCetiReview)'s review rubric.
+- **Cornelius Roemer** ([@corneliusroemer](https://github.com/corneliusroemer)) analysed why
+  the checks and the merge queue fell behind, proposed a staged plan to relieve them (#6787),
+  offered a dedicated machine for it, and wrote a scheduler for the pull-request checks (#6834).
 - Proofs were adapted from [`CBirkbeck/AINTLIB`](https://github.com/CBirkbeck/AINTLIB) and
   [`Rogerhu12/hecke-seven-eighths`](https://github.com/Rogerhu12/hecke-seven-eighths). The
   scouts' surveys of what already exists in Lean

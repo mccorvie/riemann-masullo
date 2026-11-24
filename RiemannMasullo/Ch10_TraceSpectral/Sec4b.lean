@@ -41,7 +41,7 @@ local notation "C₁" => (ideleClassNorm F).ker
 local notation "μ𝔽" => ideleClassTamagawaMeasure F
 local notation "m𝔽" =>
   (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C𝔽 →ₜ* ℝ≥0ˣ)
-local notation "logNorm" => (fun g : C𝔽 ↦ Real.log ((ideleClassNorm F g).val : ℝ))
+local notation "logNorm" => (logIdeleClassNorm F)
 local notation "hStrip(" hα ")" => (neg_nonpos.mpr hα |>.trans hα)
 local notation "hs₀(" hs ")" => (le_of_lt (zero_lt_one.trans hs))
 local notation "w(" α ", " s ")" => (fun g : C𝔽 ↦ intervalSobolevDensity (-α) α s (logNorm g))
@@ -1070,7 +1070,23 @@ theorem geometricLineKernel_apply (_ha : 0 < a)
 global spectral kernel by the input weight to obtain the Hilbert-Schmidt
 representative of spectral projection after convolution. -/
 theorem spectralLineKernel_hilbertSchmidt (_ha : 0 < a) :
-    IsSobolevHilbertSchmidtKernel (F := F) Bline (weightedLine(kLine)) := by sorry
+    IsSobolevHilbertSchmidtKernel (F := F) Bline (weightedLine(kLine)) := by
+  have hp (y : C𝔽) : 0 < w(0, s) y := intervalSobolevDensity_pos' _ _ _ _
+  let wNN (y : C𝔽) : ℝ≥0 := ⟨w(0, s) y, (hp y).le⟩
+  have hw : Continuous wNN :=
+    ((continuous_intervalSobolevDensity (-0) 0 s).comp (continuous_logModule' m𝔽)).subtype_mk _
+  have hν : ν(0, s) = (μ𝔽).withDensity (fun y ↦ (wNN y : ENNReal)) :=
+    congrArg (μ𝔽).withDensity (funext fun y ↦ ENNReal.ofReal_eq_coe_nnreal (hp y).le)
+  have hν' : ν'(0, s) = (μ𝔽).withDensity (fun y ↦ (((wNN y)⁻¹ : ℝ≥0) : ENNReal)) :=
+    congrArg (μ𝔽).withDensity
+      (funext fun y ↦ ENNReal.ofReal_eq_coe_nnreal (inv_nonneg.mpr (hp y).le))
+  have hk : MemLp (kLine : C𝔽 × C𝔽 → ℂ) 2
+      ((ν(0, s)).prod ((μ𝔽).withDensity fun y ↦ ↑((wNN y)⁻¹))) :=
+    (congrArg (fun η : Measure C𝔽 ↦ MemLp (kLine : C𝔽 × C𝔽 → ℂ) 2 ((ν(0, s)).prod η)) hν').mp
+      (Lp.memLp kLine)
+  have hrow := spectralLineKernel_apply (F := F) a hs φ
+  exact spectralStripKernel_hilbertSchmidt_operator μ𝔽 (ν(0, s)) wNN hw.measurable hp hν Bline
+    kLine (Lp.stronglyMeasurable kLine) hk (fun u ↦ (hrow u).mono fun _ hx ↦ hx.2)
 
 /-- Paper: Theorem 10.4.3.4(2), pp. 470–471, second formula. Output
 multiplication gives the representative of truncated spectral convolution.
@@ -1225,7 +1241,9 @@ theorem spectralStripQuotientKernel_tendsto (_ha : 0 < a)
     (_hχ : IsSpectralBasepointChoice χ) (_he : ∀ z, (e z).1 = eχ z.val.1)
     (_horder : Order(χ, e)) (_hb : Bases(χ, x, f)) :
     ∃ K, Tendsto (rectangle(χ, e)
-      (fun j ↦ (f j).comp (Aq(a, hα, hs₀(hs), φ))) x) atTop (𝓝 K) := by sorry
+      (fun j ↦ (f j).comp (Aq(a, hα, hs₀(hs), φ))) x) atTop (𝓝 K) := by
+  exact spectralLineQuotientKernel_tendsto_of_traceCauchy (Aq(a, hα, hs₀(hs), φ)) x f e _ _
+    (spectralStripConvolution_traceCauchy (F := F) a χ _hχ hα hs φ eχ e _he x f _hb.1 _hb.2)
 
 /-- Paper: Theorem 10.4.3.5(2), pp. 472–473, equation (10.4.3.43).
 The printed ambient rectangles with convolution transposed onto the input
@@ -1286,7 +1304,7 @@ private theorem integral_mul_translated_zeroJet_eq_zero
   let L (y : C𝔽) : ℂ := logNorm y
   let c (i : ℕ) := T g * L g ^ (m - i) * (m.choose i : ℂ)
   have hlog (y : C𝔽) : L (g * y) = L y + L g := by
-    dsimp only [L]
+    dsimp only [L, logIdeleClassNorm]
     rw [map_mul, Units.val_mul, NNReal.coe_mul, Real.log_mul
       (NNReal.coe_ne_zero.2 (ideleClassNorm F g).ne_zero)
       (NNReal.coe_ne_zero.2 (ideleClassNorm F y).ne_zero), Complex.ofReal_add, add_comm]
@@ -1677,7 +1695,23 @@ theorem geometricStripKernel_apply (_ha : 0 < a)
     (hK : stripTensorExists) (u : W(α, s)) (_hu : u ∈ Θ(a, hα, hs₀(hs))) :
     ∀ᵐ x ∂μ𝔽, Integrable (fun y ↦ geomStrip(hK) (x, y) * u y) μ𝔽 ∧
       B u x = ((B).comp Pg) u x ∧
-      B u x = ∫ y, geomStrip(hK) (x, y) * u y ∂μ𝔽 := by sorry
+      B u x = ∫ y, geomStrip(hK) (x, y) * u y ∂μ𝔽 := by
+  have hgeom : Pg u = u := geometricProjection_apply_of_mem (F := F) a hα hs₀(hs) _hu
+  have hspec : Ps u = 0 := Submodule.starProjection_orthogonal_apply_eq_zero _hu
+  have hk := spectralStripKernel_apply (F := F) a hα hs φ hK u
+  let row (v : W(α, s)) := ∀ᵐ x ∂μ𝔽, Integrable (fun y ↦ kStrip(hK) (x, y) * u y) μ𝔽 ∧
+    v x = ∫ y, kStrip(hK) (x, y) * u y ∂μ𝔽
+  have hB0 : Bpre u = 0 := by
+    change B (Ps u) = 0
+    rw [hspec, map_zero]
+  have hk₀ : row 0 := Eq.mp (congrArg row hB0) hk
+  let haarRows := geometricLineKernel_apply_rows (G := C𝔽) μ𝔽 m𝔽 (-α) α s
+    (hStrip(hα)) hs₀(hs) φ
+  have hrows := haarRows u (kStrip(hK) : C𝔽 × C𝔽 → ℂ) hk₀
+  have heq : B u = ((B).comp Pg) u := by
+    change B u = B (Pg u)
+    rw [hgeom]
+  exact hrows.mono fun x hx ↦ ⟨hx.1, congrArg (fun v : W(α, s) ↦ v x) heq, hx.2⟩
 
 section MixedWeightKernel
 

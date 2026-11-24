@@ -224,7 +224,7 @@ def NormOneCharacterUnramifiedOutside (ω : PontryaginDual C₁)
 /-- An idele class character unramified outside `S` takes the same value at an idele that is
 a unit outside `S` and at the reinsertion of its `S`-coordinates. The two differ by a family of
 local integer units outside `S`, on which the character is trivial by continuity. -/
-private theorem normOneCharacterUnramifiedOutside_iff_reinsert (c : unramifiedOutside F S)
+theorem normOneCharacterUnramifiedOutside_iff_reinsert (c : unramifiedOutside F S)
     (u : (integralAdelesOutside F S)ˣ) :
     c.val (QuotientGroup.mk (integralIdeleInsertion F S u)) =
       c.val (QuotientGroup.mk (sIdeleInsertion F S
@@ -1094,7 +1094,8 @@ private theorem unitTranslate_joint {R : Type*} [CommRing R] [TopologicalSpace R
   refine ⟨H, ((continuous_schwartzBruhatStageInclusion a e).comp hρ).congr fun u ↦ ?_⟩
   exact Subtype.ext (funext fun x ↦ hr u s x.toAdd)
 
-private theorem sLocalHomogeneous_unitTranslate_joint :
+/-- Unit translation on S-adelic Schwartz–Bruhat tests is jointly continuous. -/
+theorem continuous_sAdeleSchwartz_unitTranslate :
     Continuous fun p : (SAdeleRing F S)ˣ × ℬₛ(S) ↦ schwartzBruhatUnitTranslate p.1 p.2 := by
   let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
   let : LocallyCompactSpace (SAdeleRing F S) :=
@@ -1165,7 +1166,7 @@ theorem existsUnique_sLocalHomogeneousThetaAction (χ : PontryaginDual (J₁(S))
     have h : (QuotientGroup.mk g : (SAdeleRing F S)ˣ ⧸ N) = 1 := (QuotientGroup.eq_one_iff g).mpr hg
     exact congrArg (θ f) ((congrArg (fun b : Jₛ(S) ↦ b⁻¹ * a) h).trans (by simp only [inv_one, one_mul]))
   have result := thetaAction_of_translate (G := (SAdeleRing F S)ˣ) (E := ℬₛ(S)) (A := Jₛ(S))
-    N θ Tt t ht sLocalHomogeneous_unitTranslate_joint r hr hN
+    N θ Tt t ht continuous_sAdeleSchwartz_unitTranslate r hr hN
   simp only [Submodule.mkQ_apply]
   with_reducible exact result
 
@@ -1849,7 +1850,23 @@ There is a unique continuous linear S-local Pettis average with the norm-one
 quotient measure and the conjugate character weight. -/
 theorem existsUnique_sLocalThetaIsotypicAverage (χ : PontryaginDual (J₁(S))) :
     ∃! P : Θₛ(S) →L[ℂ] Θₛ(S),
-      IsPettisIsotypicAverageOn (μₛ₁(S)) Set.univ (ρₛ₁(S)) χ P := by sorry
+      IsPettisIsotypicAverageOn (μₛ₁(S)) Set.univ (ρₛ₁(S)) χ P := by
+  let E := SLocalAdelicThetaSpace F S
+  let G := J₁(S)
+  have := isClosed_sProjectedDiagonal (F := F) (S := S)
+  let : T2Space (Jₛ(S)) := inferInstanceAs (T2Space (_ ⧸ _))
+  let : T2Space G := inferInstanceAs (T2Space ((sIdeleQuotientNorm F S).ker : Set (Jₛ(S))))
+  let : BorelSpace G := ⟨rfl⟩
+  let : CompactSpace G := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let : T2Space E := sLocalAdelicThetaSpace_t2_of_isClosed (F := F) (S := S)
+    (sLocalAdelicTheta_ker_isClosed (F := F) (S := S))
+  let : PolynormableSpace ℂ E := sLocalAdelicThetaSpace_polynormable (F := F) (S := S)
+  let : (μₛ₁(S)).IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  with_reducible_and_instances
+    exact existsUnique_globalThetaIsotypicAverage_of_compact (H := Jₛ(S)) (E := E) G
+      (sLocalAdelicThetaSpace_complete (F := F) (S := S)) (μₛ₁(S)) (ρₛ(S))
+      (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose_spec.1 χ
 
 end IsotypicAverages
 
@@ -1991,7 +2008,29 @@ Deviation: The continuous coinvariant quotient is identified via Definition 5.2.
 theorem sLocalThetaIsotypicAverage_equiv (χ : PontryaginDual (J₁(S))) :
     IsClosed (Eₛω(S, χ) : Set (Θₛ(S))) ∧
       ∃ e : Θₛω(S, χ) ≃L[ℂ] Eₛω(S, χ), ∀ f : ℬₛ(S),
-        (e ((Kₛω(S, χ)).mkQ f) : Θₛ(S)) = Pₛ(S, χ) ((Kₛ(S)).mkQ f) := by sorry
+        (e ((Kₛω(S, χ)).mkQ f) : Θₛ(S)) = Pₛ(S, χ) ((Kₛ(S)).mkQ f) := by
+  let E := SLocalAdelicThetaSpace F S
+  let G := J₁(S)
+  have := isClosed_sProjectedDiagonal (F := F) (S := S)
+  let : T2Space (Jₛ(S)) := inferInstanceAs (T2Space (_ ⧸ _))
+  let : T2Space G := inferInstanceAs (T2Space ((sIdeleQuotientNorm F S).ker : Set (Jₛ(S))))
+  let : MeasurableSpace G := borel _
+  let : BorelSpace G := ⟨rfl⟩
+  let : CompactSpace G := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let : T2Space E := sLocalAdelicThetaSpace_t2_of_isClosed (F := F) (S := S)
+    (sLocalAdelicTheta_ker_isClosed (F := F) (S := S))
+  let : PolynormableSpace ℂ E := sLocalAdelicThetaSpace_polynormable (F := F) (S := S)
+  let : (μₛ₁(S)).IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  let : Module ℝ E := Module.restrictScalars ℝ ℂ E
+  let : IsScalarTower ℝ ℂ E := IsScalarTower.restrictScalars ℝ ℂ E
+  let : LocallyConvexSpace ℝ E := (PolynormableSpace.withSeminorms ℂ E).toLocallyConvexSpace
+  with_reducible_and_instances
+    exact globalThetaIsotypicAverage_equiv_of_coinvariants (G := Jₛ(S)) (E := E) (T := ℬₛ(S))
+      G (Kₛω(S, χ)) (Kₛ(S)).mkQ (μₛ₁(S)) (ρₛ(S))
+      (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose_spec.1 χ (Pₛ(S, χ))
+      (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := S) χ).exists.choose_spec
+      (sLocalHomogeneousThetaSpace_equiv_coinvariants (F := F) (S := S) χ)
 
 -- TODO(paper-gap): The global L² argument on p. 237 fails at norm zero for
 -- the rational Gaussian. Apply character uniqueness on each compact norm-one fibre.
@@ -2386,10 +2425,7 @@ theorem globalThetaKernel_eq_induced_closure :
       (globalThetaKernel_eq_induced_closure_translate p.1 p.2 c).symm).trans
         (adelicThetaLinearMap_apply (F := F) _).symm))
 
-local notation "unitAtₛ(" S ")" =>
-  MonoidHom.comp (Units.map (RingHom.toMonoidHom (RingHom.comp (adeleProjection F S)
-    (Subring.subtype (integralAdelesOutside F S)))))
-    (Units.map (RingHom.toMonoidHom (integralAdeleDiagonal F S)))
+local notation "unitAtₛ(" S ")" => sUnitEmbedding F S
 
 /-- A quotient by a smaller submodule maps onto the quotient by a larger one, compatibly
 with the quotient maps. -/
