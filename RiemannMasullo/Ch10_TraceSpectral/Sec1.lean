@@ -3822,6 +3822,91 @@ theorem globalThetaSobolev_fourier_extension_iff (a α s : ℝ) (hα : 0 ≤ α)
 
 end FourierExtension
 
+/-- At degree zero the Sobolev measure is just the base measure. Multiplying by
+the square root of the modulation absorbs the density of the source L² space. -/
+private theorem sLocalThetaSobolev_halfWeight_ambient {G : Type*} [CommGroup G]
+    [TopologicalSpace G] [MeasurableSpace G] [BorelSpace G] (μ : Measure G) (m : G →ₜ* ℝ≥0ˣ) :
+    let ν := μ.withDensity fun x ↦ ENNReal.ofReal ((m x).val : ℝ)
+    ∃ T : Lp ℂ 2 ν →ₗᵢ[ℂ] CompactIntervalSobolev μ (fun x ↦ Real.log ((m x).val : ℝ)) 0 0 0,
+      ∀ (u : Lp ℂ 2 ν) (φ : G → ℂ), (u : G → ℂ) =ᵐ[ν] φ →
+        (T u : G → ℂ) =ᵐ[μ] modulationWeight m (1 / 2) φ := by
+  intro ν
+  have hzero (l : G → ℝ) : intervalSobolevMeasure μ l 0 0 0 = μ := by
+    simp [intervalSobolevMeasure, intervalSobolevDensity]
+  unfold CompactIntervalSobolev
+  rw [hzero]
+  let r (x : G) : ℝ := (m x).val
+  have hr : Measurable r :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).measurable
+  have hac : μ ≪ ν := withDensity_absolutelyContinuous' hr.ennreal_ofReal.aemeasurable
+    (.of_forall fun x ↦ (ENNReal.ofReal_pos.mpr (NNReal.coe_pos.mpr (Units.zero_lt (m x)))).ne')
+  let w (x : G) : ℂ := Real.sqrt (r x)
+  let f (u : Lp ℂ 2 ν) (x : G) := w x * u x
+  have hm (u : Lp ℂ 2 ν) : AEStronglyMeasurable (f u) μ :=
+    (Complex.measurable_ofReal.comp hr.sqrt).aestronglyMeasurable.mul
+      ((Lp.aestronglyMeasurable u).mono_ac hac)
+  have hsq (x : G) : ‖w x‖ₑ ^ 2 = ENNReal.ofReal (r x) := by
+    rw [← ofReal_norm, Complex.norm_real, Real.norm_of_nonneg (Real.sqrt_nonneg _),
+      ← ENNReal.ofReal_pow (Real.sqrt_nonneg _), Real.sq_sqrt (NNReal.coe_nonneg _)]
+  have hnorm (u : Lp ℂ 2 ν) : eLpNorm (f u) 2 μ = eLpNorm u 2 ν := by
+    rw [eLpNorm_eq_lintegral_rpow_eNorm_toReal two_ne_zero ENNReal.ofNat_ne_top (hm u),
+      eLpNorm_eq_lintegral_rpow_eNorm_toReal two_ne_zero ENNReal.ofNat_ne_top
+        (Lp.aestronglyMeasurable u)]
+    simp only [ENNReal.toReal_ofNat, ENNReal.rpow_two]
+    rw [lintegral_withDensity_eq_lintegral_mul₀' hr.ennreal_ofReal.aemeasurable
+      ((Lp.aestronglyMeasurable u).eNorm.pow_const 2)]
+    simp only [f, eNorm_mul, mul_pow, hsq, Pi.mul_apply]
+  have hmem (u : Lp ℂ 2 ν) : MemLp (f u) 2 μ := (hnorm u).trans_lt (Lp.memLp u)
+  refine ⟨{
+    toFun := fun u ↦ (hmem u).toLp (f u)
+    map_add' := ?_
+    map_smul' := ?_
+    norm_map' := ?_ }, ?_⟩
+  · intro u v
+    rw [← MemLp.toLp_add (hmem u) (hmem v)]
+    apply MemLp.toLp_congr
+    filter_upwards [hac.ae_eq (Lp.coeFn_add u v)] with x hx
+    simp only [f, hx, Pi.add_apply, mul_add]
+  · intro c u
+    rw [RingHom.id_apply, ← MemLp.toLp_const_smul c (hmem u)]
+    apply MemLp.toLp_congr
+    filter_upwards [hac.ae_eq (Lp.coeFn_smul c u)] with x hx
+    simp only [f, hx, Pi.smul_apply, smul_eq_mul, mul_left_comm]
+  · intro u
+    change ‖(hmem u).toLp (f u)‖ = ‖u‖
+    rw [Lp.norm_toLp, hnorm, Lp.norm_def]
+  · intro u φ hu
+    filter_upwards [(hmem u).coeFn_toLp, hac.ae_eq hu] with x hx hφ
+    apply hx.trans
+    change (Real.sqrt (r x) : ℂ) * u x = (↑(r x ^ (1 / 2 : ℝ)) : ℂ) * φ x
+    rw [Real.sqrt_eq_rpow, hφ]
+
+/-- The half-weight isometry carries the closed ranges of two embeddings onto
+one another when it identifies their representatives on a common set of tests. -/
+private theorem sLocalThetaSobolev_halfWeight_closure {G Q Y : Type*} [CommGroup G]
+    [TopologicalSpace G] [MeasurableSpace G] [BorelSpace G] [AddCommGroup Q] [Module ℂ Q]
+    (μ : Measure G) (m : G →ₜ* ℝ≥0ˣ) (q : Y → Q) (hq : Surjective q) (θ : Y → G → ℂ)
+    (j : Q →ₗ[ℂ] Lp ℂ 2 (μ.withDensity fun x ↦ ENNReal.ofReal ((m x).val : ℝ)))
+    (k : Q →ₗ[ℂ] CompactIntervalSobolev μ (fun x ↦ Real.log ((m x).val : ℝ)) 0 0 0)
+    (hj : ∀ f, (j (q f) : G → ℂ) =ᵐ[μ.withDensity fun x ↦ ENNReal.ofReal ((m x).val : ℝ)] θ f)
+    (hk : ∀ f, (k (q f) : G → ℂ) =ᵐ[μ] modulationWeight m (1 / 2) (θ f)) :
+    ∃ e : j.range.topologicalClosure ≃ₗᵢ[ℂ] k.range.topologicalClosure, ∀ u,
+      ((e u).val : G → ℂ) =ᵐ[μ] modulationWeight m (1 / 2) (⇑u.val) := by
+  obtain ⟨T, hT⟩ := sLocalThetaSobolev_halfWeight_ambient μ m
+  have h (v : Q) : T (j v) = k v := by
+    obtain ⟨f, rfl⟩ := hq v
+    exact Lp.ext ((withDensity_absolutelyContinuous μ _).ae_eq
+      ((hT _ _ (hj f)).trans (hk f).symm))
+  have heq : j.range.topologicalClosure.map T.toLinearMap = k.range.topologicalClosure := by
+    apply SetLike.coe_injective
+    rw [Submodule.map_coe, Submodule.topologicalClosure_coe, Submodule.topologicalClosure_coe]
+    change T '' closure (range j) = closure (range k)
+    rw [← T.isometry.isClosedEmbedding.closure_image_eq, ← range_comp]
+    exact congrArg (fun v ↦ closure (range v)) (funext h)
+  refine ⟨(LinearIsometryEquiv.ofSurjective (T.submoduleMap _)
+    (T.toLinearMap.submoduleMap_surjective _)).trans (.ofEq _ _ heq), fun u ↦ ?_⟩
+  exact hT u.val _ .rfl
+
 -- TODO(paper-gap): The announcement on p. 435 extends beyond the degree-zero
 -- local result on p. 438. For ℚ and S = {∞}, at a = 1/2, I = {0}, the even
 -- Gaussians exp(-πx²) cos(2πNx) have bounded input norms for each s > 0.
@@ -3836,7 +3921,16 @@ theorem sLocalThetaSobolev_halfWeight_equiv :
     let hp : (0 : ℝ) < 1 / 2 + 0 := add_pos_of_pos_of_nonneg ha le_rfl
     ∃ T : SLocalThetaL2 F S ≃ₗᵢ[ℂ] Hₛ(ha, le_refl (0 : ℝ), le_refl (0 : ℝ), hp),
       ∀ u : SLocalThetaL2 F S,
-        ((T u).val : Jₛ → ℂ) =ᵐ[μₛ] modulationWeight mₛ (1 / 2) (⇑u.val) := by sorry
+        ((T u).val : Jₛ → ℂ) =ᵐ[μₛ] modulationWeight mₛ (1 / 2) (⇑u.val) := by
+  intro ha hp
+  let j := (existsUnique_sLocalThetaWeightedL2 (F := F) (S := S)).exists.choose
+  let k := Eₛ(ha, le_refl (0 : ℝ), le_refl (0 : ℝ), hp)
+  exact sLocalThetaSobolev_halfWeight_closure (Q := Θₛ) μₛ mₛ
+    (Submodule.Quotient.mk : ℬₛ → Θₛ) (Submodule.Quotient.mk_surjective _)
+    (fun f ↦ θₛ(f)) j.toLinearMap k.toLinearMap
+    (existsUnique_sLocalThetaWeightedL2 (F := F) (S := S)).exists.choose_spec.2
+    (existsUnique_sLocalThetaSobolevEmbedding (F := F) (S := S) _ _ _ _
+      ha (le_refl (0 : ℝ)) (le_refl (0 : ℝ)) hp).exists.choose_spec.2
 
 end Fourier
 

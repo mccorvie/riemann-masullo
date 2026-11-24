@@ -528,6 +528,163 @@ theorem existsUnique_sLocalNormOneQuotientTransition (hST : S ⊂ T)
   exact existsUnique_sLocalNormOneQuotientTransition_uniq q.toMonoidHom q'.toMonoidHom t π
     hs hqt hq't hk x
 
+/-- The character kills the kernel of the open transition, so its algebraic descent is continuous. -/
+private theorem sLocalHomogeneousThetaTransition_descend {A B : Type*} [Group A] [Group B]
+    [TopologicalSpace A] [TopologicalSpace B] (q : A →ₜ* B) (hs : Surjective q)
+    (ho : IsOpenMap q) (χ : PontryaginDual A) (hk : q.toMonoidHom.ker ≤ χ.toMonoidHom.ker) :
+    ∃ η : PontryaginDual B, ∀ x, η (q x) = χ x := by
+  let η := q.toMonoidHom.liftOfSurjective hs ⟨χ.toMonoidHom, hk⟩
+  have h (x : A) : η (q x) = χ x := MonoidHom.liftOfRightInverse_comp_apply ..
+  refine ⟨⟨η, (ho.isQuotientMap q.continuous hs).continuous_iff.mpr ?_⟩, h⟩
+  exact χ.continuous.congr (fun x ↦ (h x).symm)
+
+/-- On classes inserted from S, equivariance on tests descends to the ordinary theta quotient. -/
+private theorem sLocalHomogeneousThetaTransition_insert_action (hST : S ⊆ T)
+    (g : Iₛ(S)) (z : Θₛ(S)) :
+    let ρT := (existsUnique_sLocalThetaAction (F := F) (S := T)).exists.choose
+    let j := sIdeleInsertion F S g
+    let gT := Units.map (adeleProjection F T).toMonoidHom j
+    let i := sLocalThetaTransition (F := F) hST
+    ρT (QuotientGroup.mk gT) (i z) = i (ρₛ(S) (QuotientGroup.mk g) z) := by
+  intro ρT j gT i
+  -- The reinsertion of g is integral outside S and projects back to g.
+  obtain ⟨v, hv⟩ : j ∈ Set.range (integralIdeleInsertion F S) := by
+    apply (mem_range_integralIdeleInsertion F S j).mpr
+    intro w hw
+    have hi : j⁻¹ = sIdeleInsertion F S g⁻¹ := (map_inv _ _).symm
+    change j.val.2 w ∈ _ ∧ (j⁻¹).val.2 w ∈ _
+    rw [hi, (sIdeleInsertion_apply F S g).2.2 w hw, (sIdeleInsertion_apply F S g⁻¹).2.2 w hw]
+    exact ⟨one_mem _, one_mem _⟩
+  have hp : Units.map (adeleProjection F S).toMonoidHom j = g :=
+    Units.ext (Prod.ext (sIdeleInsertion_apply F S g).1 (funext (sIdeleInsertion_apply F S g).2.1))
+  obtain ⟨f, rfl⟩ := (LinearMap.ker (sLocalAdelicTheta F S)).mkQ_surjective z
+  have htrans := sLocalThetaTransition_equivariant hST v f
+  dsimp only at htrans
+  rw [hv, hp] at htrans
+  have hS := (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose_spec.2 g f
+  have hT := (existsUnique_sLocalThetaAction (F := F) (S := T)).exists.choose_spec.2 gT
+    (sAdeleSchwartzTransition F hST f)
+  have hi := LinearMap.congr_fun (sLocalThetaTransition_unique (F := F) hST).1 f
+  exact (congrArg (ρT (QuotientGroup.mk gT)) hi).trans
+    (hT.trans (htrans.symm.trans (congrArg i hS.symm)))
+
+/-- On the ordinary transition image, the action of a norm-one class at T factors
+through its image at S. An inserted lift has the same action, since the two differ
+by a relative integral unit. -/
+private theorem sLocalHomogeneousThetaTransition_intertwine (hST : S ⊂ T)
+    (hPic : Subsingleton Picₛ(S)) :
+    let q := (existsUnique_sLocalNormOneQuotientTransition hST hPic).exists.choose
+    let ρT := (existsUnique_sLocalThetaAction (F := F) (S := T)).exists.choose
+    ∀ (b : J₁(T)) (z : Θₛ(S)), ρT b.val (sLocalThetaTransition hST.le z) =
+      sLocalThetaTransition hST.le (ρₛ(S) (q b).val z) := by
+  intro q ρT b z
+  obtain ⟨φ, -, hn, -, -, -, hins⟩ := existsUnique_sLocalNormOneQuotientTransition_phi hST.le hPic
+  obtain ⟨g, hg⟩ := QuotientGroup.mk_surjective (q b).val
+  have hgn : sIdeleNorm F S g = 1 := by
+    rw [← sIdeleQuotientNorm_mk, hg]
+    exact (q b).property
+  let j := sIdeleInsertion F S g
+  let gT := Units.map (adeleProjection F T).toMonoidHom j
+  let b₀ : J₁(T) := ⟨QuotientGroup.mk gT, by
+    rw [MonoidHom.mem_ker, sIdeleQuotientNorm_mk, ← hn, hins, hgn]⟩
+  have hq := (existsUnique_sLocalNormOneQuotientTransition hST hPic).exists.choose_spec
+  have hb : q b₀ = q b := hq.2.2.2 ⟨g, hgn⟩ b₀ (q b) rfl hg.symm
+  have hk : q (b₀⁻¹ * b) = 1 := by rw [map_mul, map_inv, hb, inv_mul_cancel]
+  obtain ⟨u, hu⟩ := (hq.2.2.1 _).mp hk
+  let i := sLocalThetaTransition (F := F) hST.le
+  have hfixed : i z ∈ Set.range i := Set.mem_range_self z
+  rw [sLocalThetaTransition_range_eq_invariants hST hPic] at hfixed
+  have hact : ρT (b₀⁻¹ * b).val (i z) = i z := by
+    rw [hu]
+    exact hfixed u
+  have he : ρT b.val (i z) = ρT b₀.val (i z) := by
+    refine (congrArg (fun a : J₁(T) ↦ ρT a.val (i z)) (mul_inv_cancel_left b₀ b).symm).trans ?_
+    exact (DFunLike.congr_fun (map_mul ρT b₀.val (b₀⁻¹ * b).val) (i z)).trans
+      (congrArg (ρT b₀.val) hact)
+  exact he.trans ((sLocalHomogeneousThetaTransition_insert_action hST.le g z).trans
+    (congrArg (fun a : Jₛ(S) ↦ i (ρₛ(S) a z)) hg))
+
+/-- Restrict a scaled equivariant embedding to the two character spaces. Surjectivity
+of the group quotient detects the source isotype, and the target isotype lies in the image. -/
+private theorem sLocalHomogeneousThetaTransition_isotypes {G H X Y : Type*}
+    [Group G] [Group H] [TopologicalSpace G] [TopologicalSpace H]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [ContinuousSMul ℂ Y]
+    (q : H → G) (hq : Surjective q) (η : PontryaginDual G) (χ : PontryaginDual H)
+    (hχ : ∀ b, η (q b) = χ b) (ρ : G →* (X →L[ℂ] X)) (τ : H →* (Y →L[ℂ] Y))
+    (i : X →L[ℂ] Y) (hi : IsEmbedding i) (ha : ∀ b x, τ b (i x) = i (ρ (q b) x))
+    (hr : ∀ y ∈ actionIsotype τ χ, y ∈ Set.range i) (c : ℂ) (hc : c ≠ 0) :
+    ∃ e : actionIsotype ρ η ≃L[ℂ] actionIsotype τ χ, ∀ x, (e x : Y) = c • i x := by
+  let A := actionIsotype ρ η
+  let B := actionIsotype τ χ
+  have hm (x : X) : i x ∈ B ↔ x ∈ A := by
+    rw [mem_actionIsotype, mem_actionIsotype]
+    constructor
+    · intro h g
+      obtain ⟨b, rfl⟩ := hq g
+      apply hi.injective
+      rw [← ha, h, map_smul, hχ]
+    · intro h b
+      rw [ha, h, map_smul, hχ]
+  let j : A →ₗ[ℂ] B := (c • i.toLinearMap.comp A.subtype).codRestrict B
+    fun x ↦ B.smul_mem c ((hm x).mpr x.property)
+  have hj : IsEmbedding j :=
+    (((Homeomorph.smulOfNeZero (α := Y) c hc).isEmbedding.comp hi).comp
+      IsEmbedding.subtypeVal).codRestrict (B : Set Y) _
+  have hs : Surjective j := by
+    intro y
+    obtain ⟨x, hx⟩ := hr (c⁻¹ • y.val) (B.smul_mem _ y.property)
+    have hxB : i x ∈ B := hx.symm ▸ B.smul_mem _ y.property
+    refine ⟨⟨x, (hm x).mp hxB⟩, Subtype.ext ?_⟩
+    change c • i x = y.val
+    rw [hx, smul_inv_smul₀ hc]
+  let e := LinearEquiv.ofBijective j ⟨hj.injective, hs⟩
+  exact ⟨⟨e, hj.continuous, (e.toEquiv.toHomeomorphOfIsInducing hj.isInducing).symm.continuous⟩,
+    fun _ ↦ rfl⟩
+
+/-- Pushing the T-local Haar measure through the quotient scales the S-local Haar
+measure. Testing the Pettis averages against continuous functionals gives the same
+factor on the transition image. -/
+private theorem sLocalHomogeneousThetaTransition_averages {G H X Y : Type*}
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [CompactSpace G] [T2Space G]
+    [MeasurableSpace G] [BorelSpace G]
+    [CommGroup H] [TopologicalSpace H] [IsTopologicalGroup H] [CompactSpace H]
+    [MeasurableSpace H] [BorelSpace H]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [SeparatingDual ℂ Y]
+    (q : H →ₜ* G) (hq : Surjective q) (η : PontryaginDual G) (χ : PontryaginDual H)
+    (hχ : ∀ b, η (q b) = χ b) (ρ : G →* (X →L[ℂ] X)) (τ : H →* (Y →L[ℂ] Y))
+    (hρ : ∀ x, Continuous fun g ↦ ρ g x) (i : X →L[ℂ] Y)
+    (ha : ∀ b x, τ b (i x) = i (ρ (q b) x))
+    (μ : Measure G) [μ.IsHaarMeasure] (ν : Measure H) [ν.IsHaarMeasure]
+    (P : X →L[ℂ] X) (Q : Y →L[ℂ] Y) (hP : IsPettisIsotypicAverageOn μ Set.univ ρ η P)
+    (hQ : IsPettisIsotypicAverageOn ν Set.univ τ χ Q) :
+    ∃ c : ℂ, c ≠ 0 ∧ ∀ x, Q (i x) = c • i (P x) := by
+  have : (ν.map q).IsHaarMeasure :=
+    Measure.isHaarMeasure_map_of_isFiniteMeasure ν q.toMonoidHom q.continuous hq
+  let d := Measure.haarScalarFactor (ν.map q) μ
+  have hm : ν.map q = d • μ := Measure.isMulLeftInvariant_eq_smul_of_innerRegular (ν.map q) μ
+  refine ⟨(d : ℝ), by exact_mod_cast (Measure.haarScalarFactor_pos_of_isHaarMeasure (ν.map q) μ).ne', ?_⟩
+  intro x
+  apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr
+  intro φ
+  let f (g : G) := star (η g : ℂ) * (φ.comp i) (ρ g x)
+  have hf : Continuous f :=
+    (continuous_subtype_val.comp η.continuous).star.mul ((φ.comp i).continuous.comp (hρ x))
+  -- Evaluate the two Pettis integrals on corresponding functionals, as in §4.3.3.
+  have hs := LinearMap.congr_fun (hP x).2 (φ.comp i)
+  have ht := LinearMap.congr_fun (hQ (i x)).2 φ
+  change φ (i (P x)) = ∫ g, (φ.comp i) (star (η g : ℂ) • ρ g x) ∂μ.restrict Set.univ at hs
+  change φ (Q (i x)) = ∫ b, φ (star (χ b : ℂ) • τ b (i x)) ∂ν.restrict Set.univ at ht
+  simp only [Measure.restrict_univ, map_smul, smul_eq_mul] at hs ht
+  change φ (i (P x)) = ∫ g, f g ∂μ at hs
+  rw [ht, map_smul, hs]
+  simp_rw [ha, ← hχ]
+  change ∫ b, f (q b) ∂ν = ((d : ℝ) : ℂ) • ∫ g, f g ∂μ
+  rw [← integral_map (φ := (q : H → G)) (μ := ν) q.continuous.measurable.aemeasurable
+    hf.aestronglyMeasurable, hm, integral_smul_nnreal_measure]
+  exact Complex.real_smul
+
 /-- Paper: Theorem 6.2.1.1(1), p. 295.
 For a T-local character trivial on the additional integer units, adjoining integer
 indicators gives a surjective topological linear isomorphism on homogeneous classes.
@@ -540,7 +697,60 @@ theorem sLocalHomogeneousThetaTransition_equiv_of_unramified
     ∃ (χS : PontryaginDual J₁(S)) (e : Θₛω(S, χS) ≃L[ℂ] Θₛω(T, χ)),
       (∀ x, χS (q x) = χ x) ∧
       ∀ f : ℬₛ(S), e ((Kₛω(S, χS)).mkQ f) =
-        (Kₛω(T, χ)).mkQ (sAdeleSchwartzTransition F hST.le f) := by sorry
+        (Kₛω(T, χ)).mkQ (sAdeleSchwartzTransition F hST.le f) := by
+  intro q
+  have hq := (existsUnique_sLocalNormOneQuotientTransition hST hPic).exists.choose_spec
+  obtain ⟨η, hη⟩ := sLocalHomogeneousThetaTransition_descend q hq.1 hq.2.1 χ (fun x hx ↦ by
+    obtain ⟨u, hu⟩ := (hq.2.2.1 x).mp hx
+    exact _hχ x u hu)
+  let ρ (U : Finset V) := (existsUnique_sLocalThetaAction (F := F) (S := U)).exists.choose
+  let r (U : Finset V) := (ρ U).comp (J₁(U)).subtype
+  let i : Θₛ(S) →L[ℂ] Θₛ(T) :=
+    ⟨sLocalThetaTransition hST.le, sLocalThetaTransition_continuous hST.le⟩
+  have hi : IsEmbedding i := (sLocalThetaTransition_isClosedEmbedding hST.le).isEmbedding
+  have ha (b : J₁(T)) (x : Θₛ(S)) : r T b (i x) = i (r S (q b) x) :=
+    sLocalHomogeneousThetaTransition_intertwine hST hPic b x
+  have hr (y : Θₛ(T)) (hy : y ∈ actionIsotype (r T) χ) : y ∈ Set.range i := by
+    change y ∈ Set.range (sLocalThetaTransition (F := F) hST.le)
+    rw [sLocalThetaTransition_range_eq_invariants hST hPic]
+    intro u
+    obtain ⟨φ, -, hn, -, -, hrel, -⟩ := existsUnique_sLocalNormOneQuotientTransition_phi hST.le hPic
+    let b : J₁(T) := ⟨QuotientGroup.mk u.val, by
+      rw [MonoidHom.mem_ker, sIdeleQuotientNorm_mk, ← hn, hrel u.val u.property, map_one]⟩
+    have h := (mem_actionIsotype _ _ _).mp hy b
+    rw [_hχ b u rfl, Circle.coe_one, one_smul] at h
+    exact h
+  let (U : Finset V) : MeasurableSpace J₁(U) := borel _
+  let (U : Finset V) : BorelSpace J₁(U) := ⟨rfl⟩
+  let (U : Finset V) : CompactSpace J₁(U) := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F U).isCompact_preimage (isCompact_singleton (x := 1)))
+  have hclosed := isClosed_sProjectedDiagonal (F := F) (S := S)
+  let : T2Space Jₛ(S) := inferInstanceAs (T2Space (_ ⧸ _))
+  let : T2Space J₁(S) := inferInstanceAs (T2Space ((sIdeleQuotientNorm F S).ker : Set Jₛ(S)))
+  let μ (U : Finset V) := sLocalNormOneQuotientMeasure F U
+  let (U : Finset V) : (μ U).IsHaarMeasure :=
+    (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := U)).1
+  let : T2Space Θₛ(T) :=
+    sLocalAdelicThetaSpace_t2_of_isClosed (sLocalAdelicTheta_ker_isClosed (F := F) (S := T))
+  let : PolynormableSpace ℂ Θₛ(T) := sLocalAdelicThetaSpace_polynormable
+  let : SeparatingDual ℂ Θₛ(T) := polynormableSpace_separatingDual ℂ _
+  let P (U : Finset V) (ψ : PontryaginDual J₁(U)) :=
+    (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := U) ψ).exists.choose
+  have hρ (x : Θₛ(S)) : Continuous fun g : J₁(S) ↦ r S g x :=
+    (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose_spec.1.comp
+      (continuous_subtype_val.prodMk continuous_const)
+  obtain ⟨c, hc, havg⟩ := sLocalHomogeneousThetaTransition_averages q hq.1 η χ hη
+    (r S) (r T) hρ i ha (μ S) (μ T) (P S η) (P T χ)
+    (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := S) η).exists.choose_spec
+    (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := T) χ).exists.choose_spec
+  obtain ⟨e, he⟩ := sLocalHomogeneousThetaTransition_isotypes q hq.1 η χ hη
+    (r S) (r T) i hi ha hr c hc
+  obtain ⟨eS, hS⟩ := (sLocalThetaIsotypicAverage_equiv (F := F) (S := S) η).2
+  obtain ⟨eT, hT⟩ := (sLocalThetaIsotypicAverage_equiv (F := F) (S := T) χ).2
+  refine ⟨η, (eS.trans e).trans eT.symm, hη, fun f ↦ eT.symm_apply_eq.mpr ?_⟩
+  apply Subtype.ext
+  exact (he _).trans ((congrArg (fun x ↦ c • i x) (hS f)).trans
+    ((havg _).symm.trans (hT (sAdeleSchwartzTransition F hST.le f)).symm))
 
 /-- The descended character at a larger stage kills the additional integral units:
 use the same global lift to evaluate the descent identity at both stages. -/
@@ -4085,6 +4295,190 @@ theorem infiniteStandardThetaMellinAverage_apply (χ : PontryaginDual Iₛ(S)) (
   (exists_infiniteStandardThetaMellinAverage χ).choose_spec f x
 
 /-- Paper: Theorem 6.2.2.1(1), p. 299.
+A multi-index geometric telescope: if for every shift `m` the weighted sums
+`∑ₖ (∏ᵢ aᵢ ^ kᵢ) · B (m + k)` over `k : ι → ℕ` vanish, then `B` vanishes. One
+applies `(1 - aᵢ Tᵢ)` once in each coordinate. -/
+private theorem telescope_zero_pi {ι : Type*} [Fintype ι] (a : ι → ℂ) (B : (ι → ℕ) → ℂ)
+    (h : ∀ m, HasSum (fun k : ι → ℕ ↦ (∏ i, a i ^ k i) * B (m + k)) 0) : B = 0 := by
+  have one : ∀ (a : ℂ) (B : ℕ → ℂ), (∀ m, HasSum (fun k : ℕ ↦ a ^ k * B (m + k)) 0) → B = 0 := by
+    intro a B h
+    funext m
+    have h1 := (h (m + 1)).mul_left a
+    have h0 := h m
+    rw [← hasSum_nat_add_iff' 1] at h0
+    simp only [Finset.range_one, Finset.sum_singleton, pow_zero, one_mul, add_zero] at h0
+    have e : (fun k : ℕ ↦ a ^ (k + 1) * B (m + (k + 1))) =
+        fun k ↦ a * (a ^ k * B (m + 1 + k)) := by
+      funext k; rw [pow_succ]; ring_nf
+    rw [e] at h0
+    have := h0.unique h1
+    simp only [mul_zero] at this
+    simpa using this
+  refine Fintype.induction_empty_option
+    (P := fun ι _ ↦ ∀ (a : ι → ℂ) (B : (ι → ℕ) → ℂ),
+      (∀ m, HasSum (fun k : ι → ℕ ↦ (∏ i, a i ^ k i) * B (m + k)) 0) → B = 0) ?_ ?_ ?_ ι a B h
+  · intro α β _ e ih a B h
+    let _ : Fintype α := Fintype.ofEquiv β e.symm
+    let E : (α → ℕ) ≃ (β → ℕ) := e.arrowCongr (Equiv.refl ℕ)
+    have hadd : ∀ m k, E m + E k = E (m + k) := fun _ _ ↦ rfl
+    have hB := ih (a ∘ e) (B ∘ E) fun m ↦ by
+      have h' := E.hasSum_iff.mpr (h (E m))
+      convert h' using 2 with k
+      simp only [Function.comp_apply, hadd]
+      congr 1
+      exact Fintype.prod_equiv e _ _ fun _ ↦ by simp [E, Equiv.arrowCongr_apply]
+    funext m
+    have := congrFun hB (E.symm m)
+    simp only [Function.comp_apply, Equiv.apply_symm_apply] at this
+    exact this
+  · intro a B h
+    funext m
+    have := (h m).unique (hasSum_fintype _)
+    have hd : ∀ d : PEmpty → ℕ, m + d = m := fun _ ↦ funext fun i ↦ i.elim
+    rw [Fintype.sum_unique, hd] at this
+    show B m = 0
+    simpa using this.symm
+  · intro α _ ih a B h
+    let F : (Option α → ℕ) ≃ ℕ × (α → ℕ) := Equiv.piOptionEquivProd
+    have hadd : ∀ c m' (p : ℕ × (α → ℕ)),
+        F.symm (c, m') + F.symm p = F.symm (c + p.1, m' + p.2) := by
+      intro c m' p; funext i; cases i <;> rfl
+    have hfam : ∀ c m', HasSum (fun q : (α → ℕ) × ℕ ↦
+        (∏ i, a (some i) ^ q.1 i) * (a none ^ q.2 * B (F.symm (c + q.2, m' + q.1)))) 0 := by
+      intro c m'
+      have h1 := F.symm.hasSum_iff.mpr (h (F.symm (c, m')))
+      have h2 := (Equiv.prodComm _ _).hasSum_iff.mpr h1
+      convert h2 using 2 with q
+      simp only [Function.comp_apply, Equiv.prodComm_apply, Prod.fst_swap, Prod.snd_swap, hadd,
+        Fintype.prod_option]
+      simp only [F, Equiv.piOptionEquivProd, Equiv.coe_fn_symm_mk]
+      simp only [Prod.fst_swap, Prod.snd_swap]
+      ring
+    let B' : ℕ → (α → ℕ) → ℂ := fun c k' ↦ ∑' n, a none ^ n * B (F.symm (c + n, k'))
+    have hB' : ∀ c, B' c = 0 := by
+      intro c
+      refine ih (fun i ↦ a (some i)) (B' c) fun m' ↦ ?_
+      refine (hfam c m').prod_fiberwise fun k ↦ ?_
+      have hs := (hfam c m').summable.prod_factor k
+      convert hs.hasSum using 1
+      simp only [B', ← tsum_mul_left]
+    funext m
+    have hm : m = F.symm (m none, fun i ↦ m (some i)) := by funext i; cases i <;> rfl
+    rw [hm]
+    refine congrFun (one (a none) (fun n ↦ B (F.symm (n, fun i ↦ m (some i))))
+      fun c ↦ ?_) (m none)
+    have hs := (hfam c (fun i ↦ m (some i))).summable.prod_factor 0
+    simp only [Pi.zero_apply, pow_zero, Finset.prod_const_one, one_mul, add_zero] at hs
+    have := hs.hasSum
+    rwa [show (∑' n, a none ^ n * B (F.symm (c + n, fun i ↦ m (some i)))) = 0 from
+      congrFun (hB' c) _] at this
+
+/-- Paper: Theorem 6.2.2.1(1), p. 299.
+Unfolding: the S-local homogeneous theta transform of a test, integrated over the norm-one
+classes `J₁(S) = Nₛ(S) / (S-units)` against the S-local norm-one character of `ω`, is a fixed
+nonzero multiple of the integral over the norm-one S-ideles `Nₛ(S)` of the test itself against
+any character `χ` of the S-ideles that restricts on `Nₛ(S)` to that norm-one character. The sum
+over S-units in theta is absorbed by the quotient. -/
+private theorem sLocalHomogeneousTheta_unfold {ω : PontryaginDual C₁}
+    (hω : NormOneCharacterUnramifiedOutside ω S) (χ : PontryaginDual Iₛ(S))
+    (hχ : ∀ (g : Nₛ(S)) (y : J₁(S)), y.val = QuotientGroup.mk g.val →
+      χ g.val = sLocalNormOneCharacter S ω hω y) :
+    ∃ c : ℂ, c ≠ 0 ∧ ∀ (φ : ℬₛ(S)) (g : Iₛ(S)),
+      sLocalHomogeneousAdelicThetaLinearMap F S (sLocalNormOneCharacter S ω hω) φ
+          (QuotientGroup.mk g) =
+        c * ∫ h : Nₛ(S), φ (Multiplicative.ofAdd (g * h.val).val) * (χ h.val : ℂ)
+          ∂sNormOneIdeleTamagawaMeasure F S := by sorry
+
+open Classical in
+/-- Paper: Theorem 6.2.2.1(1), p. 299.
+Fibre formula: for an archimedean test `f` tensored with the standard finite tests, the
+integral over the norm-one S-ideles against `χ` is a geometric series in the archimedean
+Mellin average. The weights `a v` and the archimedean translations `t v` are chosen once,
+independently of the test. At a place `v` of `S` where the finite restriction of the
+character is ramified, the standard finite test is supported on the units, so only
+valuation zero contributes and the weight is zero. At an unramified place the standard
+test is the indicator of the local integers, the weight has modulus one, and the `k`-th
+shell is translated by an archimedean idele of norm `q_v ^ k`. For each S-idele `y` there
+are a point `z` and a nonzero constant `c` giving the series at `y`. -/
+private theorem sLocalStandardThetaTensor_fibre_hasSum {ω : PontryaginDual C₁}
+    (hω : NormOneCharacterUnramifiedOutside ω S) (χ : PontryaginDual Iₛ(S))
+    (hχ : ∀ (g : Nₛ(S)) (y : J₁(S)), y.val = QuotientGroup.mk g.val →
+      χ g.val = sLocalNormOneCharacter S ω hω y) :
+    let d := sIdeleRestriction F S hω.choose
+    ∃ (a : S → ℂ) (t : S → I∞),
+      (∀ v : S, if ∀ u : (L(v.val))ˣ, u ∈ U(v.val) → sLocalFiniteRestriction v d u = 1
+        then ‖a v‖ = 1 else a v = 0) ∧
+      (∀ v, ((infiniteIdeleNorm F (t v)).val : ℝ) = v.val.asIdeal.absNorm) ∧
+      ∀ y : Iₛ(S), ∃ (z : I∞) (c : ℂ), c ≠ 0 ∧ ∀ (f : ℬ∞) (x : I∞), HasSum
+        (fun k : S → ℕ ↦ c * ((∏ v, a v ^ k v) *
+          infiniteStandardThetaMellinAverage χ f ((∏ v, t v ^ k v) * (z * x))))
+        (∫ h : Nₛ(S), sLocalStandardThetaTensor d f
+          (Multiplicative.ofAdd (archInsert(S) x * y * h.val).val) * (χ h.val : ℂ)
+          ∂sNormOneIdeleTamagawaMeasure F S) := by sorry
+
+/-- Paper: Theorem 6.2.2.1(1), p. 299.
+For trivial S-integer Picard group, every class of the S-local homogeneous theta quotient
+has a representative of the form `f` tensored with the standard finite tests. -/
+private theorem sLocalStandardThetaTensor_exists_representative
+    (hPic : Subsingleton Picₛ(S)) {ω : PontryaginDual C₁}
+    (hω : NormOneCharacterUnramifiedOutside ω S) :
+    ∀ y : Θₛω(S, sLocalNormOneCharacter S ω hω), ∃ f : ℬ∞,
+      (Kₛω(S, sLocalNormOneCharacter S ω hω)).mkQ
+        (sLocalStandardThetaTensor (sIdeleRestriction F S hω.choose) f) = y := by sorry
+
+/-- Paper: Theorem 6.2.2.1(1), p. 299.
+The archimedean Schwartz–Bruhat space is a Fréchet space. -/
+private theorem infiniteSchwartzBruhat_frechet : IsFrechetTVS ℬ∞ := by sorry
+
+/-- Paper: Theorem 6.2.2.1(1), p. 299.
+An archimedean test tensored with the standard finite tests lies in the kernel of the
+S-local homogeneous theta map exactly when its archimedean Mellin average vanishes
+identically. The character on the S-ideles restricts on the norm-one S-ideles to the
+S-local norm-one character of ω. -/
+private theorem sLocalStandardThetaTensor_mem_ker_iff {ω : PontryaginDual C₁}
+    (hω : NormOneCharacterUnramifiedOutside ω S) (χ : PontryaginDual Iₛ(S))
+    (hχ : ∀ (g : Nₛ(S)) (y : J₁(S)), y.val = QuotientGroup.mk g.val →
+      χ g.val = sLocalNormOneCharacter S ω hω y) (f : ℬ∞) :
+    sLocalStandardThetaTensor (sIdeleRestriction F S hω.choose) f ∈
+        Kₛω(S, sLocalNormOneCharacter S ω hω) ↔
+      f ∈ (infiniteStandardThetaMellinAverage χ).ker := by
+  obtain ⟨c₀, hc₀, hu⟩ := sLocalHomogeneousTheta_unfold hω χ hχ
+  obtain ⟨a, t, -, -, hs⟩ := sLocalStandardThetaTensor_fibre_hasSum hω χ hχ
+  rw [LinearMap.mem_ker, LinearMap.mem_ker]
+  constructor
+  · intro hk
+    obtain ⟨z, c, hc, hz⟩ := hs 1
+    ext x₀
+    have hB := telescope_zero_pi a
+      (fun m ↦ infiniteStandardThetaMellinAverage χ f ((∏ v, t v ^ m v) * x₀)) fun m ↦ by
+        have h0 := hz f (z⁻¹ * ((∏ v, t v ^ m v) * x₀))
+        have hv := hu (sLocalStandardThetaTensor (sIdeleRestriction F S hω.choose) f)
+          (archInsert(S) (z⁻¹ * ((∏ v, t v ^ m v) * x₀)) * 1)
+        rw [hk, ContinuousMap.zero_apply, eq_comm, mul_eq_zero] at hv
+        rw [hv.resolve_left hc₀] at h0
+        convert (h0.mul_left c⁻¹) using 1
+        · funext k
+          rw [← mul_assoc c⁻¹, inv_mul_cancel₀ hc, one_mul, mul_inv_cancel_left]
+          congr 2
+          rw [← mul_assoc, ← Finset.prod_mul_distrib]
+          simp [pow_add, mul_comm]
+        · simp
+    simpa using congrFun hB 0
+  · intro hm
+    ext q
+    induction q using QuotientGroup.induction_on with
+    | H g =>
+      rw [hu, ContinuousMap.zero_apply]
+      obtain ⟨z, c, -, hz⟩ := hs g
+      have hx : ∀ x, infiniteStandardThetaMellinAverage χ f x = 0 := fun x ↦ by
+        simpa using DFunLike.congr_fun hm x
+      have h1 := hz f 1
+      simp only [hx, mul_zero] at h1
+      have h2 := h1.unique hasSum_zero
+      simp only [map_one, one_mul] at h2
+      exact (congrArg (c₀ * ·) h2).trans (mul_zero c₀)
+
+/-- Paper: Theorem 6.2.2.1(1), p. 299.
 Tensoring with the standard finite test identifies the local homogeneous quotient with
 the archimedean quotient by the kernel of the archimedean Mellin average.
 Deviation: This kernel uses the character orientation of §5.2 and the single norm fibre
@@ -4098,7 +4492,71 @@ theorem sLocalStandardThetaTensor_quotient_equiv
     let χS := sLocalNormOneCharacter S ω hω
     let K := (infiniteStandardThetaMellinAverage χ).ker
     ∃ e : (ℬ∞ ⧸ K) ≃L[ℂ] Θₛω(S, χS), ∀ f : ℬ∞,
-      e (K.mkQ f) = (Kₛω(S, χS)).mkQ (sLocalStandardThetaTensor c f) := by sorry
+      e (K.mkQ f) = (Kₛω(S, χS)).mkQ (sLocalStandardThetaTensor c f) := by
+  intro c χS K
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let : SecondCountableTopology (Multiplicative (InfiniteAdeleRing F)) :=
+    inferInstanceAs (SecondCountableTopology ((w : InfinitePlace F) → w.Completion))
+  let : SecondCountableTopology (Multiplicative (SAdeleRing F S)) := inferInstanceAs
+    (SecondCountableTopology (((w : InfinitePlace F) → w.Completion) ×
+      ((v : S) → v.val.adicCompletion F)))
+  let : T2Space (Multiplicative (InfiniteAdeleRing F)) :=
+    inferInstanceAs (T2Space ((w : InfinitePlace F) → w.Completion))
+  let : T2Space (Multiplicative (SAdeleRing F S)) := inferInstanceAs
+    (T2Space (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let : LocallyCompactSpace (Multiplicative (InfiniteAdeleRing F)) :=
+    inferInstanceAs (LocallyCompactSpace ((w : InfinitePlace F) → w.Completion))
+  let : LocallyCompactSpace (Multiplicative (SAdeleRing F S)) := inferInstanceAs
+    (LocallyCompactSpace (((w : InfinitePlace F) → w.Completion) ×
+      ((v : S) → v.val.adicCompletion F)))
+  let : T2Space ℬ∞ := schwartzBruhat_t2
+  let : T2Space ℬₛ(S) := schwartzBruhat_t2
+  let P : ℬ∞ →ₗ[ℂ] Θₛω(S, χS) := (Kₛω(S, χS)).mkQ ∘ₗ sLocalStandardThetaTensor c
+  have hsurj : Function.Surjective P := sLocalStandardThetaTensor_exists_representative _hPic hω
+  have hPc : Continuous P := by
+    let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+    let W := FinestLocallyConvex (⨂[ℂ] v : S, ℬ(L(v.val)))
+    let g : W := ⨂ₜ[ℂ] v : S, finiteStandardGaussian v.val (sLocalFiniteRestriction v c)
+    let : PolynormableSpace ℂ W := (finestLocallyConvex_withSeminorms _).toPolynormableSpace
+    let : T2Space W := finestLocallyConvex_t2 _
+    have ht : Continuous fun f : ℬ∞ ↦ e (f ⊗ₜ[ℂ] g) :=
+      ((continuous_inductiveTensor_iff (e : InductiveTensor ℬ∞ W →L[ℂ] ℬₛ(S)).toLinearMap).mp
+        e.continuous).2 g
+    exact (Kₛω(S, χS)).isOpenQuotientMap_mkQ.continuous.comp ht
+  let Pc : ℬ∞ →L[ℂ] Θₛω(S, χS) := ⟨P, hPc⟩
+  have hPo : IsOpenMap P := isOpenMap_of_surjective_toLF
+    (sLocalHomogeneousThetaSpace_lf (F := F) (S := S) χS)
+    (X := fun _ ↦ ℬ∞) (fun _ ↦ infiniteSchwartzBruhat_frechet)
+    (fun _ ↦ ContinuousLinearMap.id ℂ ℬ∞) (fun _ ↦ Set.Subset.rfl)
+    (fun x ↦ ⟨0, x, rfl⟩) Pc hsurj
+  have hP : IsOpenQuotientMap P := ⟨hsurj, hPc, hPo⟩
+  have hker : K = LinearMap.ker P := by
+    ext f
+    exact (sLocalStandardThetaTensor_mem_ker_iff hω χ _hχ f).symm.trans
+      (Submodule.Quotient.mk_eq_zero _).symm
+  let L : (ℬ∞ ⧸ K) ≃ₗ[ℂ] Θₛω(S, χS) :=
+    (Submodule.quotEquivOfEq _ _ hker).trans (P.quotKerEquivOfSurjective hP.surjective)
+  have hL : ∀ f, L (K.mkQ f) = P f := fun _ ↦ rfl
+  have hK := K.isOpenQuotientMap_mkQL
+  have hcont : Continuous L := by
+    rw [hK.isQuotientMap.continuous_iff]
+    exact hP.continuous.congr fun f ↦ (hL f).symm
+  have hopen : IsOpenMap L := by
+    intro U hU
+    have himg : L '' U = P '' (K.mkQ ⁻¹' U) := by
+      ext y
+      constructor
+      · rintro ⟨u, hu, rfl⟩
+        obtain ⟨f, rfl⟩ := K.mkQ_surjective u
+        exact ⟨f, hu, (hL f).symm⟩
+      · rintro ⟨f, hf, rfl⟩
+        exact ⟨K.mkQ f, hf, hL f⟩
+    rw [himg]
+    exact hP.isOpenMap _ (hU.preimage K.mkQL.continuous)
+  exact ⟨⟨L, hcont, (L.toEquiv.toHomeomorphOfContinuousOpen hcont hopen).symm.continuous⟩,
+    hL⟩
 
 /-- Paper: Theorem 6.2.2.1, p. 298.
 For trivial S-integer Picard group, the archimedean test space maps continuously,

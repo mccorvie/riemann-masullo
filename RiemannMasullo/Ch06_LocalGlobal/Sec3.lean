@@ -836,16 +836,6 @@ local notation "removal(" χ ", " S ")" => reciprocalPartialHeckeEulerProduct χ
 -- component, as in (6.3.2.23). In a pure norm-twist component with a nonempty
 -- removal set, the first residue vanishes on the entire principal-value image.
 
-/-- Paper: Theorem 6.3.2.2(2), p. 310, equations (6.3.2.21) and (6.3.2.23).
-On a nontrivial norm-one component, principal values of polar-free tests already
-give the full homogeneous principal-value image with its subspace topology.
-The inclusion corresponds to the identity on the range in (6.3.2.19).
-Deviation: The terminal residue space is zero, as in (6.3.2.23). -/
-theorem globalPrincipalValueConverse_nontrivial_exact (S : Finset V)
-    (ω : PontryaginDual C₁) (_hω : ω ≠ 1) :
-    IsOpenQuotientMap ((pvMorphism(S, ω)).rangeRestrict.comp (P).subtype) := by
-  sorry
-
 -- TODO(paper-gap): The powers in (6.3.2.22) drop the local phases when
 -- evaluating at the two shifted poles. The factors are 1 - 1 and 1 - qᵥ⁻¹
 -- on a pure norm-twist component.
@@ -1545,6 +1535,20 @@ private theorem globalPrincipalValueConverse_normTwist_divided_exact_transport (
     simp only [e.apply_symm_apply]
     exact continuous_id)
   exact ⟨{e with continuous_toFun := hT.continuous, continuous_invFun := hInv}, ht⟩
+
+/-- Paper: Theorem 6.3.2.2(2), p. 310, equations (6.3.2.21) and (6.3.2.23).
+On a nontrivial norm-one component, principal values of polar-free tests already
+give the full homogeneous principal-value image with its subspace topology.
+The inclusion corresponds to the identity on the range in (6.3.2.19).
+Deviation: The terminal residue space is zero, as in (6.3.2.23). -/
+theorem globalPrincipalValueConverse_nontrivial_exact (S : Finset V)
+    (ω : PontryaginDual C₁) (_hω : ω ≠ 1) :
+    IsOpenQuotientMap ((pvMorphism(S, ω)).rangeRestrict.comp (P).subtype) := by
+  obtain ⟨e, he⟩ := globalPrincipalValueConverse_normTwist_divided_exact_transport S ω
+  have hmap : ⇑((pvMorphism(S, ω)).rangeRestrict.comp (P).subtype) =
+      e ∘ ((K(ω)).mkQ.comp (P).subtype) := funext fun f ↦ (he f.val).symm
+  rw [hmap]
+  exact e.toHomeomorph.isOpenQuotientMap.comp (globalConverse_nontrivial_exact ω _hω)
 
 /-- The Euler product is nonzero away from a discrete set, since each nonconstant
 factor has modulus strictly below one in its exponential term at the point 1. -/
