@@ -1819,6 +1819,9 @@ blocks are summable. The jets at each zero are summed before testing summability
 The estimates for (10.3.2.7) involve only Mellin derivatives and give no bound for these
 pairings with a compact operator. A summable majorant for the absolute block
 traces, allowed to depend on the operator and test, would suffice.
+Reconstruction: The paper does not state this. It is the project's formulation of what the
+trace-norm estimates of Theorems 10.3.1.1(1) and 10.3.2.1(1) need, and it is not known whether
+it is what the author intends.
 Gap: The estimates on pp. 454–455 bound Mellin derivatives only. No bound for the block traces
 against an arbitrary compact operator, allowing clusters of zeros, is supplied or known to us. -/
 private theorem spectralStripConvolution_traceCauchy_compact_block_series (χ : PontryaginDual C₁ → PontryaginDual C𝔽)

@@ -74,7 +74,13 @@ statements and gaps") unless someone proves it, repairs it or refutes it.
 Sixteen of the twenty-eight rows have since been settled in Lean, and each of those says so in
 bold and points to the next section. The twelve that are still open are the project's open
 problems: each is an issue labelled `open-problem`, which nobody holds and anyone may work on,
-and [#7349](https://github.com/mccorvie/riemann-masullo/issues/7349) lists them.
+and [#7349](https://github.com/mccorvie/riemann-masullo/issues/7349) lists them. For four of the
+twelve the missing step is one named Lean statement: the cancellation in Theorem 12.5.1.1, on
+which the target theorems rest in Lean, and three statements that the targets do not use. For
+three more (Theorem 7.1.2.3, §10.4 and (12.5.1.4)) the manuscript prints a precise statement,
+which is not known to hold as printed and is being added to Lean without proof, in a file that
+nothing imports. The remaining five rows are proof steps that the manuscript does not state
+precisely enough to formalize.
 
 | Item | Entries | What is missing | Used later on pp. |
 |---|---|---|---|

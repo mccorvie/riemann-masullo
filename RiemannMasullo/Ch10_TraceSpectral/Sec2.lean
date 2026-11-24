@@ -8574,6 +8574,9 @@ multiplicity among multiple completed Hecke zeros, over all ordinates and chosen
 The norm integral on p. 447 gives no such restriction. It would suffice to bound the
 multiplicities on the line with that real part and exclude multiple zeros on all other
 sufficiently nearby vertical lines.
+Reconstruction: The paper does not state this. It is the project's formulation of what the
+estimates of Remark 10.2.1.5 and Proposition 10.2.2.2 need, and it is not known whether it is
+what the author intends.
 Gap: Neither a bound for the multiplicities of the zeros on a vertical line nor the absence
 of multiple zeros on the nearby lines is known, and Remark 10.2.1.5 and Proposition 10.2.2.2
 supply no argument for either. -/

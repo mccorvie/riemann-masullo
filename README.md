@@ -38,8 +38,9 @@ not.
 **What is left is open to everyone at once.** The formalization is close to its end, and the
 work now is to find repairs for the last gaps in the proof. Each open step is an issue labelled
 [`open-problem`](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aopen-problem), and [What is left: the open problems](https://github.com/mccorvie/riemann-masullo/issues/7349) lists them all: four
-statements that are in Lean and have no proof, seven steps of the paper that have no argument
-on the page, and three known theorems that have no formal proof here.
+the one statement on which the whole proof rests in Lean, further statements that are in Lean
+without a proof, proof steps that the manuscript does not state precisely enough to formalize,
+and known theorems that have no formal proof here.
 
 These issues are **not claimed**. Nobody holds one, several people can work on the same one, and
 a partial result posted on the issue is a contribution: a sketch, a reference, a weaker
@@ -91,24 +92,29 @@ give it back.
 ## Status
 
 **Searching for repairs of the final gaps in the proof.** As of 24 November 2026, about 13,200
-theorems and 1,800 definitions are stated in Lean. On the paper's main line (Chapters 2–7 and
-9–13, with Appendices A–D) all but seven of the theorems are proved. About ninety people have
+theorems and 1,800 definitions are stated in Lean. In the chapters the trace formula rests on
+(Chapters 2–7 and 9–13, with Appendices A–D) all but seven of the theorems are proved. About ninety people have
 had pull requests merged, some 2,660 pull requests in all.
 
-- **Everything on the main line is stated, and what could be proved is proved.** Where a
+- **Those chapters are stated, and what could be proved is proved.** Where a
   printed argument did not work, the statement was repaired or proved by another route, and
   [`ERRATA.md`](ERRATA.md) records it.
-- **All seven target theorems rest on one statement.** In Lean the paper's main claim, and the
+- **One gap on the main line: all seven target theorems rest on one statement.** In Lean the paper's main claim, and the
   theorems for Dedekind zeta functions, Dirichlet L-functions and the Riemann zeta function
   that are derived from it, use exactly one statement that has no proof: the cancellation of
   the zeros outside the strip in Theorem 12.5.1.1. It is proved in Lean that this cancellation,
   for every width, is equivalent to the main claim, so nothing weaker can supply it.
-- **Four recorded gaps:** that cancellation, and three statements under the bases and traces of
-  Chapters 7 and 10. Each is a named Lean statement with everything else proved around it.
-- **Seven steps with no argument on the page**, in Chapters 7 and 10–12. The Lean asserts
-  nothing for them.
+- **Three more open statements, off the main line,** under the bases and traces of Chapters 7
+  and 10. Each is a named Lean statement, neither proved nor refuted, from which other theorems
+  of the paper are proved. The Lean proof of the targets does not use them.
+- **Printed theorems that Lean does not yet state.** Theorem 7.1.2.3, the theorems of §10.4 in
+  their printed range, and the kernel that (12.5.1.4) needs are precise in the manuscript and
+  are not known to hold as printed. They are being added to Lean as statements without proof,
+  in files that nothing imports.
+- **Four proof steps that the manuscript does not state precisely enough to formalize,** in
+  Chapters 11 and 12. They have no Lean statement.
 - **Three classical inputs:** theorems of the literature that are stated in Lean and used, and
-  not proved there.
+  not proved there. The targets do not use them either.
 - The supplementary material (Chapters 8 and 14, Appendix E, §A.4, §B.7), on which the trace
   formula does not rest, is partly stated and proved, and is not being worked on.
 

@@ -46,6 +46,7 @@ used: the project tests the route of this paper.
 | `RiemannMasullo/<Chapter>/Sec<N>.lean` | paper section N of that chapter; a long section is split into `Sec<N>a.lean`, `Sec<N>b.lean`, …, and the section issue names the file | digesters, provers |
 | `RiemannMasullo/<Chapter>/Sec<N>_Imports.lean` | the private imports of that section file, each as `public import`; only the section file imports it, with a plain `import` (see "Rules for Lean code") | digesters, provers |
 | `RiemannMasullo/<Chapter>/Sec<N>_Printed.lean` | statements of that section that are false as printed, each kept as a proposition with a proof of its negation; it imports the section file, and nothing imports it | integrator (the propositions), provers (the refutations) |
+| `RiemannMasullo/<Chapter>/Sec<N>_Isolated.lean` | statements of that section that the manuscript prints precisely, that are neither proved nor refuted and that nothing else in Lean uses, each as a theorem with `sorry`; with them, what follows from them and what is equivalent to them; it imports the section file, and nothing imports it | integrator (the statements), provers (the proofs) |
 | `RiemannMasullo/<Chapter>.lean` | chapter index (docstring only) | nobody |
 | `RiemannMasullo/ForMathlib/` | general lemmas missing from Mathlib, at the path Mathlib would use | provers |
 | `RiemannMasullo/External/` | vendored third-party Lean, see its README | integrator |
@@ -148,6 +149,33 @@ proved yet, a statement known to be false, and a statement nobody can prove or r
   plain what rests on each gap. Never leave a `sorry` in the middle of a larger proof. Only the
   integrator declares a gap, and a gap is reviewed like any statement: one that is too strong
   makes everything above it empty.
+- **Where an open step stands is read off the Lean, in three kinds.**
+  1. *On the main line.* A precisely stated theorem whose proof is `sorry` and which the Lean
+     proof of the target theorems uses.
+  2. *Stated, off the main line.* A precisely stated theorem whose proof is `sorry` and which
+     the targets do not use. If other theorems of the paper are proved from it, it stays in
+     its section file. If nothing uses it, it goes in the section's isolation file,
+     `Sec<N>_Isolated.lean`, which nothing imports; its docstring says that it is not known how
+     it connects with the rest of the proof in Lean, and names the pages of the paper that use
+     it.
+  3. *Not stated.* A proof step that the manuscript does not state precisely enough to
+     formalize. It has a row in `ERRATA.md` and an issue, and no Lean statement.
+  Which of 1 and 2 holds is computed by walking the dependencies of the targets, at each sync.
+  It is never assigned by hand, and it changes when the Lean proof changes.
+- **A new route to the targets is speculative.** A change that would make the targets rest on
+  a different or a further unproved statement proposes a route for the proof. It does not go
+  into the main line unless the route comes from the author of the paper, or the change closes
+  the proof or brings it substantially closer. Until then the statement, what follows from it
+  and what it is equivalent to go in the isolation file, where nothing can build on them, and
+  the targets keep resting on what they rest on.
+- **A statement the paper does not make is marked as a reconstruction.** Where the missing step
+  is not stated in the paper, or not precisely, a Lean statement of it is the project's
+  formulation of what the surrounding pages need. Its docstring has a line starting
+  `Reconstruction:` that says so and says what it was reconstructed from. It is not known
+  whether such a statement is what the author intends. A reconstruction is added only together
+  with a proved theorem that derives the paper's statement from it, so that Lean has checked
+  that it suffices; where it can be had, a proved converse shows that it asks for no more than
+  the conclusion.
 - **Only the integrator changes a statement**, after checking the report against the page. What
   a contributor hands in is the finding: the paper item and page, exactly what fails, and the
   evidence, which is a concrete counterexample or the exact step that fails, and best of all a
