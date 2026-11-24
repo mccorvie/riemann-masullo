@@ -6864,8 +6864,8 @@ theorem introTrace_logDeriv_extension_of_limit (τ : ℝ≥0ˣ →ₜ* C𝔽)
 -- the separate terms or provide the holomorphic limit of their sum.
 
 open Classical in
-/-- A fixed-cutoff identity gives the overlap limit by convergence of its prime and polar terms. -/
-private theorem introTrace_combined_limit_of_fixed_identity (χ : U𝔽) {a : ℝ}
+/-- Convergence of the prime and polar terms gives the entire shifted Euler half-plane. -/
+private theorem introTrace_combined_euler_of_fixed_identity (χ : U𝔽) {a : ℝ}
     (h ρ : ℕ → ℝ → ℝ) (_hA : IsIntroTraceApproximation h ρ)
     (harch : ∀ n z, archSum(χ, approx(h, ρ, n, z)) + introTraceSpectralSum χ approx(h, ρ, n, z) a =
       (if χ = 1 then introTraceMellin approx(h, ρ, n, z) (1 / 2) +
@@ -6874,36 +6874,22 @@ private theorem introTrace_combined_limit_of_fixed_identity (χ : U𝔽) {a : �
       (fun n z ↦ archSum(χ, approx(h, ρ, n, z)) +
         introTraceSpectralSum χ approx(h, ρ, n, z) a)
       (fun z ↦ logDeriv finiteL(χ) (z + 1 / 2) +
-        if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) atTop right(max a 1) := by
-  have hone : (1 : ℝ) ≤ max a 1 := le_max_right a 1
-  have hpos : ∀ z ∈ right(max a 1), (1 : ℝ) / 2 < z.re := by
+        if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) atTop right(1/2) := by
+  have hsub₁ : right(1/2) ⊆ right(((1/2 : ℂ)).re) := by norm_num
+  have hsub₂ : right(1/2) ⊆ right(((-1/2 : ℂ)).re) := by
     intro z hz
-    have h1 : (1 : ℝ) < z.re := hone.trans_lt hz
-    linarith
-  have hsub₁ : right(max a 1) ⊆ right(((1 / 2 : ℂ)).re) := fun z hz ↦ by
-    have := hpos z hz
-    show (1 / 2 : ℂ).re < z.re
+    change (-1/2 : ℂ).re < z.re
     norm_num
-    linarith
-  have hsub₂ : right(max a 1) ⊆ right(((-1 / 2 : ℂ)).re) := fun z hz ↦ by
-    have := hpos z hz
-    show (-1 / 2 : ℂ).re < z.re
-    norm_num
-    linarith
-  have hsub₀ : right(max a 1) ⊆ right(1 / 2) := by
-    intro z hz
-    have h1 : (1 : ℝ) < z.re := hone.trans_lt hz
-    show (1 / 2 : ℝ) < z.re
-    linarith
+    linarith [show (1/2:ℝ) < z.re from hz]
   let P : ℕ → ℂ → ℂ := fun n z ↦ if χ = 1 then
     introTraceMellin approx(h, ρ, n, z) (1 / 2) +
       introTraceMellin approx(h, ρ, n, z) (-1 / 2) else 0
   have hM₁ : TendstoLocallyUniformlyOn (fun n z ↦ introTraceMellin approx(h, ρ, n, z) (1 / 2))
-      (fun z ↦ 1 / (z - 1 / 2)) atTop right(max a 1) :=
+      (fun z ↦ 1 / (z - 1 / 2)) atTop right(1/2) :=
     ((introTraceApprox_mellin_tendsto h ρ _hA (1 / 2)).mono hsub₁).congr_right
       fun z hz ↦ (introTracePower_mellin z (1 / 2) (hsub₁ hz)).2
   have hM₂ : TendstoLocallyUniformlyOn (fun n z ↦ introTraceMellin approx(h, ρ, n, z) (-1 / 2))
-      (fun z ↦ 1 / (z + 1 / 2)) atTop right(max a 1) :=
+      (fun z ↦ 1 / (z + 1 / 2)) atTop right(1/2) :=
     ((introTraceApprox_mellin_tendsto h ρ _hA (-1 / 2)).mono hsub₂).congr_right fun z hz ↦ by
       have hp := (introTracePower_mellin z (-1 / 2) (hsub₂ hz)).2
       show introTraceMellin (introTracePower z) (-1 / 2) = 1 / (z + 1 / 2)
@@ -6911,12 +6897,12 @@ private theorem introTrace_combined_limit_of_fixed_identity (χ : U𝔽) {a : �
       congr 1
       ring
   have hzero : TendstoLocallyUniformlyOn (fun (_ : ℕ) (_ : ℂ) ↦ (0 : ℂ)) (fun _ ↦ 0)
-      atTop right(max a 1) := by
+      atTop right(1/2) := by
     intro u hu x _
     exact ⟨univ, univ_mem, Eventually.of_forall fun _ _ _ ↦ refl_mem_uniformity hu⟩
   have hP : TendstoLocallyUniformlyOn P
       (fun z ↦ if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) atTop
-      right(max a 1) := by
+      right(1/2) := by
     by_cases htriv : χ = 1
     · subst htriv
       have hsum := hM₁.add hM₂
@@ -6928,7 +6914,7 @@ private theorem introTrace_combined_limit_of_fixed_identity (χ : U𝔽) {a : �
       · intro z _
         simp [P, htriv]
       · simp [htriv]
-  have hpr := (introTraceApprox_primeSum_tendsto χ h ρ _hA).mono hsub₀
+  have hpr := introTraceApprox_primeSum_tendsto χ h ρ _hA
   have hcomb := hP.sub hpr
   refine (hcomb.congr (fun n ↦ ?_)).congr_right (fun z _ ↦ ?_)
   · intro z _
@@ -6937,6 +6923,24 @@ private theorem introTrace_combined_limit_of_fixed_identity (χ : U𝔽) {a : �
       -logDeriv finiteL(χ) (z + 1 / 2) = logDeriv finiteL(χ) (z + 1 / 2) +
         if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0
     rw [sub_neg_eq_add, add_comm]
+
+open Classical in
+/-- A fixed-cutoff identity gives the overlap limit by convergence of its prime and polar terms. -/
+private theorem introTrace_combined_limit_of_fixed_identity (χ : U𝔽) {a : ℝ}
+    (h ρ : ℕ → ℝ → ℝ) (_hA : IsIntroTraceApproximation h ρ)
+    (harch : ∀ n z, archSum(χ, approx(h, ρ, n, z)) + introTraceSpectralSum χ approx(h, ρ, n, z) a =
+      (if χ = 1 then introTraceMellin approx(h, ρ, n, z) (1 / 2) +
+        introTraceMellin approx(h, ρ, n, z) (-1 / 2) else 0) - primeSum(χ, approx(h, ρ, n, z))) :
+    TendstoLocallyUniformlyOn
+      (fun n z ↦ archSum(χ, approx(h, ρ, n, z)) +
+        introTraceSpectralSum χ approx(h, ρ, n, z) a)
+      (fun z ↦ logDeriv finiteL(χ) (z + 1 / 2) +
+        if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) atTop right(max a 1) := by
+  apply (introTrace_combined_euler_of_fixed_identity χ h ρ _hA harch).mono
+  intro z hz
+  have h1 : (1 : ℝ) < z.re := (le_max_right a 1).trans_lt hz
+  change (1 : ℝ) / 2 < z.re
+  linarith
 
 open Classical in
 /-- The overlap limit follows from the prime and polar limits whenever the
@@ -7451,6 +7455,20 @@ private theorem introTraceApprox_full_window_fixed_digamma (τ : ℝ≥0ˣ →�
   simp only [hk, Finset.sum_neg_distrib]
   rw [introTrace_full_window_spectral_sum_eq χ f a ha]
   linear_combination hsum
+
+open Classical in
+/-- Paper: §§1.4.3–1.4.5, pp. 29–30. In a full zero window the raw combined
+cutoffs converge locally uniformly on the entire shifted Euler half-plane, for
+every admissible family and every norm-section-normalized character. -/
+theorem introTrace_full_window_combined_euler_limit
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F)) (χ : U𝔽) (hχ : ∀ t, χ (τ t) = 1)
+    {a : ℝ} (ha : 1 / 2 ≤ a) (h ρ : ℕ → ℝ → ℝ) (hA : IsIntroTraceApproximation h ρ) :
+    TendstoLocallyUniformlyOn
+      (fun n z ↦ archSum(χ, approx(h,ρ,n,z)) + introTraceSpectralSum χ approx(h,ρ,n,z) a)
+      (fun z ↦ logDeriv finiteL(χ) (z+1/2) + if χ = 1 then 1/(z+1/2) + 1/(z-1/2) else 0)
+      atTop right(1/2) :=
+  introTrace_combined_euler_of_fixed_identity χ h ρ hA
+    (introTraceApprox_full_window_fixed_digamma τ hτ χ hχ ha h ρ hA)
 
 /-- On a full rational window the exterior sum vanishes by the critical strip, so
 the combined real-place and spectral term has a finite limit for every family. -/
@@ -11719,6 +11737,155 @@ theorem introTrace_full_resolvent_not_summable (χ : U𝔽) (a : ℝ) (ha : 1/2 
     ¬ Summable (fun r : windowZeros(χ,a) ↦ (zeroOrder(χ,r.val) : ℂ) / (z-(r.val-1/2))) :=
   fun h ↦ introTrace_completed_zeros_not_summable_reciprocal_height χ a ha
     ((introTrace_resolvent_summable_iff_reciprocal_height χ (fun r ↦ |r.re-1/2| < a) z).mp h)
+
+open Classical in
+/-- For a matched cutoff family the individual moments obey the reciprocal-height
+bound, while subtracting the value at two gives a holomorphic limit throughout
+each narrow chart. -/
+private theorem introTraceApprox_sparse_moments_and_anchor :
+    ∃ (h ρ : ℕ → ℝ → ℝ), IsIntroTraceApproximation h ρ ∧
+      (∀ a m Z : ℝ, 0 ≤ a → a < m → 0 ≤ Z → ∃ B : ℝ, 0 ≤ B ∧
+        ∀ (n : ℕ) (z s : ℂ), m ≤ z.re → ‖z‖ ≤ Z → s.re ≤ a →
+          ‖introTraceMellin approx(h, ρ, n, z) s‖ ≤ B / (1 + |s.im|)) ∧
+      ∀ (χ : U𝔽) (a : ℝ), 0 ≤ a → a ≤ 1/2 →
+        let C (n : ℕ) (z : ℂ) := archSum(χ, approx(h,ρ,n,z)) + introTraceSpectralSum χ approx(h,ρ,n,z) a
+        ∃ K : ℂ → ℂ, AnalyticOnNhd ℂ K right(a) ∧
+          TendstoLocallyUniformlyOn (fun n z ↦ C n z - C n 2) K atTop right(a) := by
+  obtain ⟨h,ρ,hA,hmatch,hbound,hspec⟩ := introTraceApprox_exists_reference_and_sparse_moments (F := F)
+  refine ⟨h,ρ,hA,hbound,?_⟩
+  intro χ a ha hb C
+  let K (z : ℂ) := archSum(χ, (fun t ↦ introTracePower z t - introTracePower 2 t)) +
+    ∑' r : windowZeros(χ,a), (zeroOrder(χ,r.val) : ℂ) *
+      (1/(z-(r.val-1/2)) - 1/(2-(r.val-1/2)))
+  have hsub : right(a) ⊆ right(-(1/2:ℝ)) := fun z hz ↦ by
+    change -(1/2:ℝ) < z.re; linarith [show a < z.re from hz]
+  have hmap : MapsTo (fun _ : ℂ ↦ (2:ℂ)) right(a) right(a) := by
+    intro z _; change a < (2:ℂ).re; norm_num; linarith
+  have harch := (introTraceApprox_archimedean_reference_matched_sum χ h ρ hA 2 (by norm_num) hmatch).mono hsub
+  have hsp := hspec χ a ha (fun _ ↦ 2) hmap (differentiableOn_const (2:ℂ))
+  have hdiff : TendstoLocallyUniformlyOn (fun n z ↦ C n z-C n 2) K atTop right(a) := by
+    apply (harch.add hsp).congr
+    intro n z _; dsimp only [C,Pi.add_apply]; ring
+  have harchA := Finset.analyticOnNhd_fun_sum Finset.univ (fun v _ ↦
+    (introTraceApprox_archimedean_reference_matched χ v h ρ hA 2 (by norm_num) hmatch).1.mono hsub)
+  have hspA := (introTrace_spectral_referenceSub χ a _ hmap (differentiableOn_const (2:ℂ))).2.2.2
+  exact ⟨K,harchA.add hspA,hdiff⟩
+
+open Classical in
+/-- Paper: §§1.4.3–1.4.5, pp. 29–30. If the omitted zeros have summable
+multiplicity-weighted reciprocal heights, a single matched family gives an actual
+holomorphic cutoff limit throughout the narrow chart. Across the entire Euler
+half-plane the discrepancy is the absolutely convergent omitted resolvent. -/
+theorem introTrace_combined_limit_of_summable_exterior_heights :
+    ∃ h ρ : ℕ → ℝ → ℝ, IsIntroTraceApproximation h ρ ∧
+      ∀ (τ : ℝ≥0ˣ →ₜ* C𝔽), RightInverse τ (ideleClassNorm F) → ∀ χ : U𝔽,
+      (∀ t, χ (τ t) = 1) → ∀ a : ℝ, 0 ≤ a → a ≤ 1/2 →
+      let E := {r : windowZeros(χ,1/2) // ¬ |r.val.re - 1/2| < a}
+      Summable (fun r : E ↦ (zeroOrder(χ,r.val.val) : ℝ)/(1+|r.val.val.im|)) →
+      ∃ H : ℂ → ℂ, AnalyticOnNhd ℂ H right(a) ∧
+        TendstoLocallyUniformlyOn (fun n z ↦ archSum(χ, approx(h,ρ,n,z)) +
+          introTraceSpectralSum χ approx(h,ρ,n,z) a) H atTop right(a) ∧
+        ∀ z : ℂ, 1/2 < z.re →
+          let L := logDeriv finiteL(χ) (z+1/2) + if χ = 1 then 1/(z+1/2) + 1/(z-1/2) else 0
+          HasSum (fun r : E ↦ (zeroOrder(χ,r.val.val) : ℂ)/(z-(r.val.val-1/2))) (L-H z) ∧
+          (0 < (L-H z).re ↔ Nonempty E) := by
+  obtain ⟨h,ρ,hA,hbound,hanchor⟩ := introTraceApprox_sparse_moments_and_anchor (F := F)
+  refine ⟨h,ρ,hA,?_⟩
+  intro τ hτ χ hχ a ha hb E hsum
+  let v (r : E) := r.val.val-1/2
+  let d (r : E) := zeroOrder(χ,r.val.val)
+  let L (z : ℂ) := logDeriv finiteL(χ) (z+1/2) + if χ = 1 then 1/(z+1/2) + 1/(z-1/2) else 0
+  let U (z : ℂ) := ∑' r : E, (d r : ℂ)/(z-v r)
+  let C (n : ℕ) (z : ℂ) := archSum(χ, approx(h,ρ,n,z)) + introTraceSpectralSum χ approx(h,ρ,n,z) a
+  have hv (r : E) : (v r).re ≤ 1/2 := by
+    simpa only [v,Complex.sub_re,Complex.div_ofNat_re,Complex.one_re] using (abs_lt.mp r.val.property.2).2.le
+  have hweight : Summable (fun r ↦ (d r : ℝ)/(1+|(v r).im|)) := by
+    simpa only [d,v,Complex.sub_im,Complex.div_ofNat_im,Complex.one_im,zero_div,sub_zero] using hsum
+  obtain ⟨hu,htail⟩ := introTraceApprox_sparse_moments_limit h ρ hA hbound v d hv
+    (fun r ↦ r.val.property.1.le) hweight
+  have hexact (z : ℂ) (hz : 1/2 < z.re) : Tendsto (fun n ↦ C n z) atTop (𝓝 (L z-U z)) := by
+    apply (((introTrace_full_window_combined_euler_limit τ hτ χ hχ (a := 1/2) le_rfl h ρ hA).tendsto_at (a := z) hz).sub
+      (htail.tendsto_at (a := z) hz)).congr
+    intro n
+    dsimp only [C,v,d]
+    rw [← introTraceApprox_cutoff_omitted_sum χ a hb h ρ hA n z]
+    ring
+  obtain ⟨K,hK,hdiff⟩ := hanchor χ a ha hb
+  let c := L 2-U 2
+  let H (z : ℂ) := K z + c
+  have hC : TendstoLocallyUniformlyOn C H atTop right(a) := by
+    have hc := (hexact 2 (by norm_num)).tendstoUniformlyOn_const (s := right(a))
+    apply (hdiff.add hc.tendstoLocallyUniformlyOn).congr
+    intro n z _
+    exact sub_add_cancel (C n z) (C n 2)
+  refine ⟨H,hK.add analyticOnNhd_const,hC,?_⟩
+  intro z hz
+  have hp := tendsto_nhds_unique (hC.tendsto_at (a := z) (hb.trans_lt hz)) (hexact z hz)
+  have hU : L z-H z = U z := by rw [hp]; ring
+  change HasSum (fun r : E ↦ (d r : ℂ)/(z-v r)) (L z-H z) ∧ (0 < (L z-H z).re ↔ Nonempty E)
+  rw [hU]
+  refine ⟨(hu z hz).hasSum,?_⟩
+  constructor
+  · intro hh
+    by_contra he
+    let _ : IsEmpty E := not_nonempty_iff.mp he
+    simp [U] at hh
+  · rintro ⟨r₀⟩
+    rw [show (U z).re = _ from Complex.re_tsum (hu z hz)]
+    have hpos (r : E) : 0 < (((d r : ℂ)/(z-v r)).re) := by
+      have hden : 0 < (z-v r).re := by rw [Complex.sub_re]; linarith [hv r]
+      have hne : z-v r ≠ 0 := fun e ↦ hden.ne' (congrArg Complex.re e)
+      have hd : 0 < (d r : ℝ) := by exact_mod_cast r.val.property.1
+      simp only [Complex.div_re,Complex.intCast_re,Complex.intCast_im,zero_mul,zero_div,add_zero]
+      exact div_pos (mul_pos hd hden) (Complex.normSq_pos.mpr hne)
+    exact (Complex.hasSum_re (hu z hz).hasSum).summable.tsum_pos (fun r ↦ (hpos r).le) r₀ (hpos r₀)
+
+open Classical in
+/-- Paper: §§1.4.3–1.4.5, pp. 29–30. If the retained zeros have summable
+multiplicity-weighted reciprocal heights, the real parts of the combined cutoffs
+for a matched family tend uniformly to positive infinity on each compact subset
+of the narrow chart. -/
+theorem introTrace_combined_escape_of_summable_retained_heights :
+    ∃ h ρ : ℕ → ℝ → ℝ, IsIntroTraceApproximation h ρ ∧
+      ∀ (χ : U𝔽) (a : ℝ), 0 ≤ a → a ≤ 1/2 →
+        Summable (fun r : windowZeros(χ,a) ↦ (zeroOrder(χ,r.val) : ℝ)/(1+|r.val.im|)) →
+        ∀ K ⊆ right(a), IsCompact K → ∀ M : ℝ, ∀ᶠ n in atTop, ∀ z ∈ K,
+          M ≤ (archSum(χ, approx(h,ρ,n,z)) + introTraceSpectralSum χ approx(h,ρ,n,z) a).re := by
+  obtain ⟨h,ρ,hA,hbound,hanchor⟩ := introTraceApprox_sparse_moments_and_anchor (F := F)
+  refine ⟨h,ρ,hA,?_⟩
+  intro χ a ha hb hsum K hKsub hK M
+  let v (r : windowZeros(χ,a)) := r.val-1/2
+  let d (r : windowZeros(χ,a)) := zeroOrder(χ,r.val)
+  let C (n : ℕ) (z : ℂ) := archSum(χ, approx(h,ρ,n,z)) + introTraceSpectralSum χ approx(h,ρ,n,z) a
+  have hv (r : windowZeros(χ,a)) : (v r).re ≤ 1/2 := by
+    suffices (v r).re ≤ a from this.trans hb
+    simpa only [v,Complex.sub_re,Complex.div_ofNat_re,Complex.one_re] using (abs_lt.mp r.property.2).2.le
+  have hweight : Summable (fun r ↦ (d r : ℝ)/(1+|(v r).im|)) := by
+    simpa only [d,v,Complex.sub_im,Complex.div_ofNat_im,Complex.one_im,zero_div,sub_zero] using hsum
+  have hs := (introTraceApprox_sparse_moments_limit h ρ hA hbound v d hv
+    (fun r ↦ r.property.1.le) hweight).2.tendsto_at (a := (2:ℂ)) (by norm_num)
+  let c := (∑' r, (d r : ℂ)/(2-v r)).re
+  have hlim := (Complex.continuous_re.tendsto _).comp hs
+  have hC2 : Tendsto (fun n ↦ (C n 2).re) atTop atTop := by
+    apply tendsto_atTop.mpr
+    intro B
+    filter_upwards [tendsto_atTop.mp (introTraceApprox_archimedean_tendsto_atTop χ h ρ hA) (B-c+1),
+      hlim.eventually (lt_mem_nhds (sub_one_lt c))] with n hn hr
+    change c-1 < (introTraceSpectralSum χ approx(h,ρ,n,(2:ℂ)) a).re at hr
+    dsimp only [C,Complex.add_re]
+    linarith
+  obtain ⟨K₀,han,hdiff⟩ := hanchor χ a ha hb
+  obtain ⟨B,hB⟩ := (hK.image_of_continuousOn (han.continuousOn.mono hKsub)).isBounded.exists_norm_le
+  have hun := (tendstoLocallyUniformlyOn_iff_forall_isCompact (isOpen_Ioi.preimage Complex.continuous_re)).mp hdiff K hKsub hK
+  filter_upwards [Metric.tendstoUniformlyOn_iff.mp hun 1 zero_lt_one, tendsto_atTop.mp hC2 (M+B+1)] with n hn hnc
+  intro z hz
+  have hk := (Complex.abs_re_le_norm (K₀ z)).trans (hB _ ⟨z,hz,rfl⟩)
+  have he := hn z hz
+  rw [dist_eq_norm] at he
+  have herr := Complex.abs_re_le_norm (K₀ z - (C n z-C n 2))
+  simp only [Complex.sub_re] at herr
+  change M ≤ (C n z).re
+  linarith [(abs_le.mp hk).1,le_abs_self ((K₀ z).re-((C n z).re-(C n 2).re))]
 
 /-- Paper: §1.4.5, p. 30. The completed functional equation reflects the
 zero-free region for the inverse character to the left of one half for the
