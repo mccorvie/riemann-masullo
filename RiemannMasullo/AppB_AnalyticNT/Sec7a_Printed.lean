@@ -54,7 +54,102 @@ coefficients zero, `ψ ≡ 1`, and `α = c = T = 1`. At `x = 5/4` and
 Each proposed error bound tends to zero as `σ → +∞`. -/
 theorem Printed.truncatedPerron_error_of_isBigO_false :
     ¬ Printed.truncatedPerron_error_of_isBigO := by
-  sorry
+  intro h
+  obtain ⟨C, hC, H⟩ := h 1 1 one_pos one_pos
+  have H2 := H (fun _ _ ↦ 1) (fun _ _ _ _ ↦ one_pos) LSeries.delta (fun _ ↦ 1)
+  have hdelta_zero : ∀ (s : ℂ) (n : ℕ), n ≠ 1 → LSeries.term LSeries.delta s n = 0 := by
+    intro s n hn
+    simp [LSeries.term_delta, hn]
+  have hsum : ∀ σ : ℝ, ∑' n : ℕ, ‖LSeries.term LSeries.delta (σ : ℂ) n‖ = 1 := by
+    intro σ
+    rw [tsum_eq_single 1 (fun n hn => by simp [hdelta_zero _ n hn])]
+    simp [LSeries.delta]
+  have hsumm : ∀ s : ℂ, 1 < s.re → LSeriesSummable LSeries.delta s := by
+    intro s _
+    apply summable_of_ne_finset_zero (s := {1})
+    intro n hn
+    exact hdelta_zero s n (by simpa using hn)
+  have hev : ∀ᶠ n : ℕ in atTop, ‖LSeries.delta n‖ ≤ 1 * 1 := by
+    apply Eventually.of_forall
+    intro n
+    by_cases hn : n = 1 <;> simp [LSeries.delta, hn]
+  have hbig : Asymptotics.IsBigOWith ((fun _ _ ↦ (1:ℝ)) 1 1) (𝓝[>] (1 : ℝ))
+      (fun σ : ℝ ↦ ∑' n : ℕ, ‖LSeries.term LSeries.delta (σ : ℂ) n‖)
+      (fun σ : ℝ ↦ ((σ - 1) ^ (1:ℝ))⁻¹) := by
+    apply Asymptotics.IsBigOWith.of_bound
+    filter_upwards [Ioo_mem_nhdsGT (by norm_num : (1:ℝ) < 2)] with σ hσ
+    have h0 : (0:ℝ) < σ - 1 := by linarith [hσ.1]
+    rw [hsum σ]
+    simp only [Real.rpow_one, norm_inv, Real.norm_eq_abs, abs_of_pos h0, one_mul, abs_one]
+    exact (one_le_inv₀ h0).2 (by linarith [hσ.2])
+  have H3 := H2 (fun _ ↦ one_pos) monotone_const hsumm hev hbig
+  have hI : ∀ t : ℝ, ‖((5/4 : ℝ) : ℂ) ^ (⟨1, t⟩ : ℂ) / (⟨1, t⟩ : ℂ)‖ ≤ 5/4 := by
+    intro t
+    have hre : (⟨1, t⟩ : ℂ).re = 1 := rfl
+    have hge : (1:ℝ) ≤ ‖(⟨1, t⟩ : ℂ)‖ := by
+      have := Complex.abs_re_le_norm (⟨1, t⟩ : ℂ)
+      rw [hre, abs_one] at this
+      exact this
+    rw [norm_div, Complex.norm_cpow_eq_rpow_re_of_pos (by norm_num), hre, Real.rpow_one]
+    exact div_le_self (by norm_num) hge
+  have hIbound : ∀ s : ℂ, ‖truncatedPerronIntegral (LSeries LSeries.delta) s (5/4) 1 1‖ ≤ 5 / 12 := by
+    intro s
+    show ‖(∫ t in -(1:ℝ)..1, LSeries LSeries.delta (s + ⟨1, t⟩) *
+        ((5/4 : ℝ) : ℂ) ^ (⟨1, t⟩ : ℂ) / (⟨1, t⟩ : ℂ)) / (2 * (Real.pi : ℂ))‖ ≤ 5 / 12
+    simp only [LSeries_delta, Pi.one_apply, one_mul]
+    rw [norm_div]
+    have hint' : ‖∫ t in (-1:ℝ)..1, ((5/4 : ℝ) : ℂ) ^ (⟨1, t⟩ : ℂ) / (⟨1, t⟩ : ℂ)‖ ≤ 5/4 * |(1:ℝ) - -1| := by
+      apply intervalIntegral.norm_integral_le_of_norm_le_const
+      intro t _
+      exact hI t
+    rw [show |(1:ℝ) - -1| = 2 by norm_num] at hint'
+    have hn2 : ‖(2 * (Real.pi:ℂ))‖ = 2 * Real.pi := by
+      rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg Real.pi_pos.le]
+      simp
+    rw [hn2, div_le_iff₀ (by positivity)]
+    linarith [Real.pi_gt_three]
+  have hnot : (5/4:ℝ) ∉ Set.range (Int.cast : ℤ → ℝ) := by
+    rintro ⟨k, hk⟩
+    have h5 : (4 * k : ℤ) = 5 := by
+      have : (4 * (k:ℝ)) = 5 := by rw [hk]; norm_num
+      exact_mod_cast this
+    omega
+  have hfl : ⌊(5/4:ℝ)⌋₊ = 1 := by
+    rw [Nat.floor_eq_iff (by norm_num)]
+    norm_num
+  have hperron : ∀ σ : ℝ, perronHalfWeightedSum LSeries.delta ⟨σ, 1⟩ (5/4) = 1 := by
+    intro σ
+    show (∑ n ∈ Finset.Icc 1 ⌊(5/4:ℝ)⌋₊, if (n : ℝ) = 5/4 then
+      LSeries.term LSeries.delta ⟨σ, 1⟩ n / 2 else LSeries.term LSeries.delta ⟨σ, 1⟩ n) = 1
+    rw [hfl]
+    norm_num [LSeries.term_delta]
+  have hlim : Tendsto (fun σ : ℝ => C * ((5/4:ℝ) / σ + |(5/4:ℝ)^(1-σ) * Real.log (5/4)| + (5/4:ℝ)^(1-σ) * 4)) atTop (𝓝 0) := by
+    have h1 : Tendsto (fun σ : ℝ => (5/4:ℝ) / σ) atTop (𝓝 0) :=
+      tendsto_const_nhds.div_atTop tendsto_id
+    have h1s : Tendsto (fun σ : ℝ => 1 - σ) atTop atBot := by
+      simpa [sub_eq_add_neg] using tendsto_atBot_add_const_left atTop (1:ℝ) tendsto_neg_atTop_atBot
+    have h2 : Tendsto (fun σ : ℝ => (5/4:ℝ)^(1-σ)) atTop (𝓝 0) :=
+      (tendsto_rpow_atBot_of_base_gt_one (5/4) (by norm_num)).comp h1s
+    have h3 : Tendsto (fun σ : ℝ => |(5/4:ℝ)^(1-σ) * Real.log (5/4)|) atTop (𝓝 0) := by
+      have := (h2.mul_const (Real.log (5/4))).abs
+      simpa using this
+    have h4 : Tendsto (fun σ : ℝ => (5/4:ℝ)^(1-σ) * 4) atTop (𝓝 0) := by
+      simpa using h2.mul_const (4:ℝ)
+    have := ((h1.add h3).add h4).const_mul C
+    simpa using this
+  obtain ⟨σ, hRHS, hσ1⟩ := ((hlim.eventually (gt_mem_nhds (by norm_num : (0:ℝ) < 1/2))).and
+    (eventually_gt_atTop (1:ℝ))).exists
+  have hA := (H3 1 σ 1 one_pos (by linarith) le_rfl).1
+  have H4 := hA (5/4) (by norm_num) hnot 1 (by norm_num)
+  rw [hperron σ] at H4
+  have hlow : (7/12:ℝ) ≤ ‖(1:ℂ) - truncatedPerronIntegral (LSeries LSeries.delta) ⟨σ, 1⟩ (5/4) 1 1‖ := by
+    have h := norm_sub_norm_le (1:ℂ) (truncatedPerronIntegral (LSeries LSeries.delta) ⟨σ, 1⟩ (5/4) 1 1)
+    have h' := hIbound ⟨σ, 1⟩
+    rw [norm_one] at h
+    linarith
+  simp only [Real.rpow_one, one_mul, div_one, Int.cast_one] at H4
+  norm_num at H4 hRHS
+  linarith
 
 /-- Paper: Equation (B.7.1.11), p. 646. The printed bound uses a full weight at
 integer cutoffs with the error terms for the half-weight Perron formula. -/

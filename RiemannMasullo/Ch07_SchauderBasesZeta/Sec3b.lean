@@ -6,6 +6,8 @@ import Mathlib.Analysis.SpecialFunctions.Pow.Asymptotics
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec5
+import RiemannMasullo.Ch06_LocalGlobal.Sec2
+import RiemannMasullo.Ch06_LocalGlobal.Sec3
 import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3a
@@ -634,6 +636,321 @@ theorem sLocalAbsolutePW_mono (hST : S ⊆ T) {X Y : ℝ} (_hXY : X ≤ Y)
     Submodule.map_mono (Submodule.span_mono hgen)
   exact Submodule.topologicalClosure_mono (Submodule.map_mono (inf_le_inf htests le_rfl))
 
+private theorem sLocalZeroMomentTheta_eq_top_of_translate
+    {E W : Type*} [AddCommGroup E] [Module ℂ E] [AddCommGroup W] [Module ℂ W]
+    (p : E →ₗ[ℂ] ℂ × ℂ) (θ : E →ₗ[ℂ] W) (t : E → E)
+    (a b : ℂ) (ha : a ≠ 1) (hab : a ≠ b)
+    (hp : ∀ f, p (t f) = ((p f).1, b * (p f).2)) (hθ : ∀ f, θ (t f) = a • θ f) :
+    p.ker.map θ.ker.mkQ = ⊤ := by
+  apply top_unique
+  rintro x -
+  obtain ⟨f, rfl⟩ := θ.ker.mkQ_surjective x
+  -- The first difference kills evaluation at zero. The second kills the Fourier value at zero.
+  let k := t f - f
+  let h := t k - b • k
+  have hk : (p k).1 = 0 := by simp [k, hp]
+  have hh : h ∈ p.ker := by
+    change p (t k - b • k) = 0
+    rw [map_sub, map_smul, hp, sub_eq_zero]
+    exact Prod.ext (by simp [hk]) (by simp)
+  have hθk : θ k = (a - 1) • θ f := by simp [k, hθ, sub_smul]
+  have hθh : θ h = ((a - b) * (a - 1)) • θ f := by
+    change θ (t k - b • k) = _
+    rw [map_sub, map_smul, hθ, ← sub_smul, hθk, smul_smul]
+  let c := (a - b) * (a - 1)
+  have hc : c ≠ 0 := mul_ne_zero (sub_ne_zero.mpr hab) (sub_ne_zero.mpr ha)
+  refine ⟨c⁻¹ • h, p.ker.smul_mem _ hh, ?_⟩
+  simp only [Submodule.mkQ_apply, Submodule.Quotient.eq]
+  change θ (c⁻¹ • h - f) = 0
+  rw [map_sub, map_smul, hθh]
+  change c⁻¹ • (c • θ f) - θ f = 0
+  rw [inv_smul_smul₀ hc, sub_self]
+
+open MeasureTheory in
+private theorem sLocalZeroMomentTheta_eq_top_fourier {F : Type*} [Field F] [NumberField F]
+    {T : Finset (HeightOneSpectrum (𝓞 F))} (u : (SAdeleRing F T)ˣ) :
+    ∃ b : ℝ≥0, ∀ f : SchwartzBruhat (Multiplicative (SAdeleRing F T)),
+      sAdeleSchwartzFourier (schwartzBruhatUnitTranslate u f) (Multiplicative.ofAdd 0) =
+        ((b : ℝ) : ℂ) * sAdeleSchwartzFourier f (Multiplicative.ofAdd 0) := by
+  let A := SAdeleRing F T
+  let G := Multiplicative A
+  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+  let (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+  let : MeasurableSpace (InfiniteAdeleRing F) :=
+    inferInstanceAs (MeasurableSpace ((w : InfinitePlace F) → w.Completion))
+  let : MeasurableSpace A :=
+    inferInstanceAs (MeasurableSpace (InfiniteAdeleRing F × ((v : T) → v.val.adicCompletion F)))
+  let μ : Measure G := sAdditiveTamagawaMeasure F T
+  obtain ⟨hT₂, hLC, hBor, hHaar, hReg⟩ := sAdele_fourierMeasure (F := F) (S := T)
+  let : T2Space G := hT₂
+  let : LocallyCompactSpace G := hLC
+  let : BorelSpace G := hBor
+  let : μ.IsHaarMeasure := hHaar
+  let : μ.Regular := hReg
+  let d : G ≃ₜ* G :=
+    { toFun := fun x ↦ Multiplicative.ofAdd ((↑u⁻¹ : A) * x.toAdd)
+      invFun := fun x ↦ Multiplicative.ofAdd ((u : A) * x.toAdd)
+      left_inv := fun x ↦ Multiplicative.ext (by simp [← mul_assoc])
+      right_inv := fun x ↦ Multiplicative.ext (by simp [← mul_assoc])
+      map_mul' := fun x y ↦ Multiplicative.ext (mul_add _ _ _)
+      continuous_toFun := continuous_ofAdd.comp (continuous_const.mul continuous_toAdd)
+      continuous_invFun := continuous_ofAdd.comp (continuous_const.mul continuous_toAdd) }
+  -- Dilation sends additive Haar measure to a nonnegative multiple of itself.
+  let ν := μ.map d
+  let : ν.IsHaarMeasure := d.isHaarMeasure_map μ
+  let : ν.Regular := Measure.Regular.map d.toHomeomorph
+  refine ⟨ν.haarScalarFactor μ, fun f ↦ ?_⟩
+  rw [sAdeleSchwartzFourier_apply_zero, sAdeleSchwartzFourier_apply_zero]
+  change (∫ x : G, f (d.toHomeomorph.toMeasurableEquiv x) ∂μ) = _ * ∫ x : G, f x ∂μ
+  rw [← integral_map_equiv d.toHomeomorph.toMeasurableEquiv (fun x ↦ f x)]
+  change (∫ x : G, f x ∂ν) = _
+  calc
+    _ = ∫ x : G, f x ∂(ν.haarScalarFactor μ • μ) :=
+      congrArg (fun m : Measure G ↦ ∫ x : G, f x ∂m)
+        (Measure.isMulLeftInvariant_eq_smul_of_regular ν μ)
+    _ = _ := by
+      rw [integral_smul_nnreal_measure]
+      rfl
+
+/-- Paper: Equation (7.3.3.25), p. 363.
+For a nontrivial norm-one character the tests with both zero moments
+have the same homogeneous theta image as the unrestricted tests. -/
+theorem sLocalZeroMomentTheta_eq_top (ω : PontryaginDual J₁(T)) (_hω : ω ≠ 1) :
+    (Z₀(T)).map (q(T, ω)) = ⊤ := by
+  have hex : ∃ h : J₁(T), (ω h : ℂ) ≠ 1 :=
+    not_forall.mp fun hall ↦ _hω (PontryaginDual.ext fun x ↦ Subtype.ext (hall x))
+  obtain ⟨h, hh⟩ := hex
+  obtain ⟨u, hu⟩ := QuotientGroup.mk_surjective h.val
+  obtain ⟨b, hb⟩ := sLocalZeroMomentTheta_eq_top_fourier u
+  have hne : (ω h : ℂ) ≠ ((b : ℝ) : ℂ) := by
+    intro he
+    have hb1 : (b : ℝ) = 1 :=
+      (Real.norm_of_nonneg b.property).symm.trans
+        ((Complex.norm_real _).symm.trans ((congrArg norm he).symm.trans (Circle.norm_coe _)))
+    exact hh (he.trans (by exact_mod_cast hb1))
+  apply sLocalZeroMomentTheta_eq_top_of_translate
+    ((sAdelePolarValues_isLinear (F := F) (S := T)).mk' _)
+    (sLocalHomogeneousAdelicThetaLinearMap F T ω)
+    (schwartzBruhatUnitTranslate u) (ω h : ℂ) ((b : ℝ) : ℂ) hh hne
+  · intro f
+    apply Prod.ext
+    · exact congrArg f (congrArg Multiplicative.ofAdd (mul_zero _))
+    · exact hb f
+  · exact sLocalHomogeneousTheta_unitTranslate ω h u hu
+
+
+/-- Fourier inversion gives a continuous inverse on the local test space. -/
+private theorem sLocalAbsolutePW_fourier_inv (f : B(S)) :
+    sAdeleSchwartzFourier (sAdeleSchwartzFourier (sAdeleSchwartzFourier
+      (sAdeleSchwartzFourier f))) = f := by
+  apply Subtype.ext
+  funext x
+  exact (sLocal_fourier_inversion (sAdeleSchwartzFourier (sAdeleSchwartzFourier f))
+    x.toAdd).trans ((sLocal_fourier_inversion f (-x.toAdd)).trans
+      (congrArg (fun y ↦ f (Multiplicative.ofAdd y)) (neg_neg x.toAdd)))
+
+private theorem sLocalAbsolutePW_transition_self (f : B(S)) : sAdeleSchwartzTransition F (le_rfl (a := S)) f = f := by
+  classical
+  apply Subtype.ext
+  funext x
+  rw [← show Multiplicative.ofAdd x.toAdd = x from rfl, sAdeleSchwartzTransition_apply,
+    ite_eq_left (fun w hw ↦ (hw w.property).elim)]
+
+/-- Tests with compact Fourier support approximate every local test. -/
+private theorem sLocalAbsolutePW_fourier_compact_seq (f : B(S)) :
+    ∃ fₙ : ℕ → B(S), (∀ n, HasCompactSupport (sAdeleSchwartzFourier (fₙ n)).val) ∧
+      Tendsto fₙ atTop (𝓝 f) := by
+  obtain ⟨L, hL⟩ := sLocal_fourier_continuousLinear (F := F) (S := S)
+  obtain ⟨u, hu, ht⟩ := exists_sAdeleSchwartz_compact_support_seq (sAdeleSchwartzFourier f)
+  let M := L.comp (L.comp L)
+  have hM (g : B(S)) : M g = sAdeleSchwartzFourier (sAdeleSchwartzFourier (sAdeleSchwartzFourier g)) := by
+    change L (L (L g)) = _
+    rw [hL, hL, hL]
+  refine ⟨M ∘ u, fun n ↦ ?_, ?_⟩
+  · change HasCompactSupport (sAdeleSchwartzFourier (M (u n))).val
+    rw [hM, sLocalAbsolutePW_fourier_inv]
+    exact hu n
+  · have he := M.continuous.continuousAt.tendsto.comp ht
+    rwa [hM, sLocalAbsolutePW_fourier_inv] at he
+
+/-- The two zero moments can be imposed by subtracting fixed tests whose Fourier
+transforms are compactly supported. -/
+private theorem sLocalAbsolutePW_fourier_compact_seq_polar (f : Z₀(S)) :
+    ∃ fₙ : ℕ → B(S), (∀ n, fₙ n ∈ Z₀(S) ∧ HasCompactSupport (sAdeleSchwartzFourier (fₙ n)).val) ∧
+      Tendsto fₙ atTop (𝓝 f.val) := by
+  obtain ⟨L, hL⟩ := sLocal_fourier_continuousLinear (F := F) (S := S)
+  let P (g : B(S)) := g (Multiplicative.ofAdd 0)
+  let Q (g : B(S)) := L g (Multiplicative.ofAdd 0)
+  let K : Set (SAdeleRing F S) := univ
+  obtain ⟨a, haK, haP, haQ⟩ := sLocalPWTests_moments_surjective (F := F) (S := S) (T := S)
+    le_rfl K univ_mem 1 0
+  obtain ⟨b, hbK, hbP, hbQ⟩ := sLocalPWTests_moments_surjective (F := F) (S := S) (T := S)
+    le_rfl K univ_mem 0 1
+  have hc (z : B(S)) (hz : z ∈ sLocalPWTests le_rfl K) :
+      HasCompactSupport (L z).val := by
+    obtain ⟨w, hw, hwc, -⟩ := (mem_sLocalPWTests le_rfl K z).mp hz
+    rw [sLocalAbsolutePW_transition_self] at hw
+    rw [hL, ← hw]
+    exact hwc
+  obtain ⟨u, hu, ht⟩ := sLocalAbsolutePW_fourier_compact_seq f.val
+  let r (g : B(S)) := g - P g • a - Q g • b
+  have hP : Continuous P := continuous_sAdeleSchwartz_eval 0
+  have hQ : Continuous Q := hP.comp L.continuous
+  have hr : Continuous r := (continuous_id.sub (hP.smul continuous_const)).sub (hQ.smul continuous_const)
+  have hf := (mem_sAdelePolarSubspace f.val).mp f.property
+  have hrf : r f.val = f.val := by
+    change f.val - (f.val (Multiplicative.ofAdd 0)) • a - (L f.val (Multiplicative.ofAdd 0)) • b = f.val
+    rw [hL, hf.1, hf.2, zero_smul, zero_smul, sub_zero, sub_zero]
+  refine ⟨r ∘ u, fun n ↦ ?_, ?_⟩
+  · have he : L (r (u n)) = L (u n) - P (u n) • L a - Q (u n) • L b := by
+      change L (u n - P (u n) • a - Q (u n) • b) = _
+      simp only [map_sub, map_smul]
+    change r (u n) ∈ Z₀(S) ∧ HasCompactSupport (sAdeleSchwartzFourier (r (u n))).val
+    constructor
+    · apply (mem_sAdelePolarSubspace _).mpr
+      constructor
+      · change P (u n) - P (u n) * a (Multiplicative.ofAdd 0) -
+          Q (u n) * b (Multiplicative.ofAdd 0) = 0
+        rw [haP, hbP, mul_one, mul_zero, sub_self, sub_zero]
+      · rw [← hL, he]
+        change Q (u n) - P (u n) * L a (Multiplicative.ofAdd 0) -
+          Q (u n) * L b (Multiplicative.ofAdd 0) = 0
+        rw [hL, hL, haQ, hbQ, mul_zero, mul_one, sub_zero, sub_self]
+    · rw [← hL, he]
+      have huc : HasCompactSupport (L (u n)).val := (hL (u n)).symm ▸ hu n
+      exact (huc.sub ((hc a haK).smul_left (f := fun _ ↦ P (u n)))).sub
+        ((hc b hbK).smul_left (f := fun _ ↦ Q (u n)))
+  · have h := hr.continuousAt.tendsto.comp ht
+    rwa [hrf] at h
+
+/-- A compact set is contained in a sufficiently large Fourier box. -/
+private theorem sLocalAbsolutePW_compact_box {K : Set (Multiplicative (SAdeleRing F S))}
+    (hK : IsCompact K) : ∃ X > 0, K ⊆ Multiplicative.toAdd ⁻¹' sLocalPWBox S X := by
+  let N (x : SAdeleRing F S) :=
+    (∑ w : InfinitePlace F, ‖x.1 w‖ ^ w.mult) + ∑ v : S, ‖x.2 v‖
+  have hN : Continuous N := (continuous_finsetSum _ fun w _ ↦
+    ((continuous_apply w).comp continuous_fst).norm.pow w.mult).add
+      (continuous_finsetSum _ fun v _ ↦ ((continuous_apply v).comp continuous_snd).norm)
+  obtain ⟨R, hR⟩ := (hK.image (hN.comp continuous_toAdd)).bddAbove
+  refine ⟨max R 1, zero_lt_one.trans_le (le_max_right _ _), fun x hx ↦ ?_⟩
+  have hxR : N x.toAdd ≤ max R 1 := (hR (mem_image_of_mem _ hx)).trans (le_max_left _ _)
+  refine ⟨fun w ↦ ?_, fun v ↦ ?_⟩
+  · exact (Finset.single_le_sum (fun i _ ↦ by positivity) (Finset.mem_univ w)).trans
+      ((le_add_of_nonneg_right (Finset.sum_nonneg fun _ _ ↦ norm_nonneg _)).trans hxR)
+  · exact (Finset.single_le_sum (fun i _ ↦ norm_nonneg _) (Finset.mem_univ v)).trans
+      ((le_add_of_nonneg_left (Finset.sum_nonneg fun _ _ ↦ by positivity)).trans hxR)
+
+private theorem sLocalAbsolutePW_insert_polar (hST : S ⊆ T) (f : B(S)) :
+    Π(hST) f ∈ Z₀(T) ↔ f ∈ Z₀(S) := by
+  classical
+  obtain ⟨c, hc, hF⟩ := sLocalPWTests_moments_surjective_transition (F := F) hST
+  have h0 : Π(hST) f (Multiplicative.ofAdd 0) = f (Multiplicative.ofAdd 0) := by
+    rw [sAdeleSchwartzTransition_apply, ite_eq_left (fun w _ ↦ (w.val.adicCompletionIntegers F).zero_mem)]
+    rfl
+  rw [mem_sAdelePolarSubspace, mem_sAdelePolarSubspace, h0, hF, mul_eq_zero, or_iff_right hc]
+
+open MeasureTheory in
+/-- On the trivial local component the theta kernel has both moments zero, as
+seen by continuing the class into the global trivial-character residue map. -/
+private theorem sLocalAbsolutePW_trivial_kernel_polar (f : B(T))
+    (hf : f ∈ (sLocalHomogeneousAdelicThetaLinearMap F T 1).ker) :
+    f ∈ Z₀(T) := by
+  let c : unramifiedOutside F T := ⟨1, (mem_unramifiedOutside_iff F T 1).mpr (fun _ _ _ ↦ rfl)⟩
+  have hc : ∀ x : C₁, c.val x.val = ((1 : PontryaginDual C₁) x : ℂ) := fun _ ↦ rfl
+  let hω : NormOneCharacterUnramifiedOutside (F := F) 1 T := ⟨c, hc⟩
+  have htriv : sLocalNormOneCharacter (F := F) T 1 hω = 1 := by
+    apply PontryaginDual.ext
+    intro y
+    apply Subtype.ext
+    have h := sLocalNormOneCharacter_eq_sIdeleRestriction 1 c hc y
+    obtain ⟨g, hg⟩ := QuotientGroup.mk_surjective y.val
+    rw [← hg, sIdeleRestriction_mk] at h
+    exact h
+  have hf' : f ∈ (sLocalHomogeneousAdelicThetaLinearMap F T
+      (sLocalNormOneCharacter (F := F) T 1 hω)).ker := by rw [htriv]; exact hf
+  let G := sAdeleSchwartzToGlobal F T f
+  have hG : G ∈ (homogeneousAdelicThetaLinearMap F 1).ker :=
+    sLocalHomogeneousThetaToGlobal_preserves_kernel hω hf'
+  obtain ⟨R, hR, -, -, -⟩ := globalConverse_normTwist_exact (F := F)
+  have hp := hR G
+  rw [show (LinearMap.ker (homogeneousAdelicThetaLinearMap F 1)).mkQ G = 0 from
+    (Submodule.Quotient.mk_eq_zero (homogeneousAdelicThetaLinearMap F 1).ker).mpr hG, map_zero] at hp
+  let : MeasurableSpace (IdeleClassGroup (𝓞 F) F) := borel _
+  let μ := normOneIdeleClassTamagawaMeasure F
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : μ.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have hm : ((μ univ).toReal : ℂ) ≠ 0 := by
+    exact_mod_cast (measureReal_univ_pos (μ := μ)).ne'
+  have hG0 : G (Multiplicative.ofAdd 0) = 0 :=
+    (mul_eq_zero.mp (congrArg Prod.fst hp.symm)).resolve_left (neg_ne_zero.mpr hm)
+  have hGF : adeleSchwartzFourier G (Multiplicative.ofAdd 0) = 0 :=
+    (mul_eq_zero.mp (congrArg Prod.snd hp.symm)).resolve_left hm
+  obtain ⟨m, hm₀, hM⟩ := sAdeleSchwartzToGlobal_fourier_zero_scale (F := F) (S := T)
+  apply (mem_sAdelePolarSubspace f).mpr
+  constructor
+  · change sAdeleSchwartzToGlobal F T f (Multiplicative.ofAdd 0) = 0 at hG0
+    rwa [sAdeleSchwartzToGlobal_apply, ite_eq_left (fun v _ ↦ (v.adicCompletionIntegers F).zero_mem),
+      map_zero] at hG0
+  · change adeleSchwartzFourier (sAdeleSchwartzToGlobal F T f) (Multiplicative.ofAdd 0) = 0 at hGF
+    rw [hM] at hGF
+    exact (mul_eq_zero.mp hGF).resolve_left hm₀
+
+/-- Each larger-stage quotient representative can be replaced by an inserted
+test with the same pole constraint. -/
+private theorem sLocalAbsolutePW_exists_insert_rep
+    (hST : S ⊆ T) (hPic : PicTrivial) (ω : PontryaginDual C₁)
+    (hω : NormOneCharacterUnramifiedOutside ω S) (χ : PontryaginDual J₁(T))
+    (hχ : χ = descend(hST, ω, hω))
+    (f : B(T)) :
+    ∃ g : B(S), q(T, χ) (Π(hST) g) = q(T, χ) f ∧ (f ∈ Z₀(T) → g ∈ Z₀(S)) := by
+  classical
+  rcases eq_or_lt_of_le hST with h | h
+  · subst T
+    exact ⟨f, congrArg (q(S, χ)) (sLocalAbsolutePW_transition_self f), id⟩
+  · have hU : ∀ (x : J₁(T)) (u : relativeIntegralIdeleUnits F S T),
+        x.val = QuotientGroup.mk u.val → χ x = 1 := by
+      rw [hχ]
+      exact sLocalHomogeneousThetaToGlobal_equiv_of_unramified_units hST hω
+    obtain ⟨η, e, hη, he⟩ := sLocalHomogeneousThetaTransition_equiv_of_unramified h hPic χ hU
+    let x := e.symm (q(T, χ) f)
+    have hx (g : B(S)) (hg : q(S, η) g = x) : q(T, χ) (Π(hST) g) = q(T, χ) f :=
+      (he g).symm.trans ((congrArg e hg).trans (e.apply_symm_apply _))
+    by_cases ht : η = 1
+    · obtain ⟨g, hg⟩ := (sLocalHomogeneousAdelicThetaLinearMap F S η).ker.mkQ_surjective x
+      refine ⟨g, hx g hg, fun hf ↦ ?_⟩
+      have ht' : χ = 1 := by
+        apply PontryaginDual.ext
+        intro y
+        have h := hη y
+        rw [ht] at h
+        exact h.symm
+      have hker : Π(hST) g - f ∈ (sLocalHomogeneousAdelicThetaLinearMap F T (1 : PontryaginDual J₁(T))).ker := by
+        rw [← ht']
+        apply (Submodule.Quotient.mk_eq_zero (sLocalHomogeneousAdelicThetaLinearMap F T χ).ker).mp
+        change q(T, χ) (Π(hST) g - f) = 0
+        rw [map_sub, hx g hg, sub_self]
+      have hzero := sLocalAbsolutePW_trivial_kernel_polar (Π(hST) g - f) hker
+      have hsum := (Z₀(T)).add_mem hzero hf
+      rw [sub_add_cancel] at hsum
+      exact (sLocalAbsolutePW_insert_polar hST g).mp hsum
+    · have hy : x ∈ (Z₀(S)).map (q(S, η)) := by
+        rw [sLocalZeroMomentTheta_eq_top η ht]
+        exact Submodule.mem_top
+      obtain ⟨g, hg, hq⟩ := Submodule.mem_map.mp hy
+      exact ⟨g, hx g hq, fun _ ↦ hg⟩
+
+private theorem sLocalAbsolutePW_push_seq (hST : S ⊆ T) (D : Submodule ℂ (B(T)))
+    (χ : PontryaginDual J₁(T)) (g : B(S))
+    (u : ℕ → B(S)) (hu : ∀ n, HasCompactSupport (sAdeleSchwartzFourier (u n)).val)
+    (hD : ∀ n, Π(hST) (u n) ∈ D) (ht : Tendsto u atTop (𝓝 g)) :
+    ∃ v : ℕ → Θ(T, χ), (∀ n, ∃ X > 0, v n ∈ sLocalAbsolutePW hST X D χ) ∧
+      Tendsto v atTop (𝓝 (q(T, χ) (Π(hST) g))) := by
+  refine ⟨fun n ↦ q(T, χ) (Π(hST) (u n)), fun n ↦ ?_, ?_⟩
+  · obtain ⟨X, hX, hbox⟩ := sLocalAbsolutePW_compact_box (hu n)
+    exact ⟨X, hX, sLocalAbsolutePW_mk_mem hST X D χ (u n) ⟨hu n, hbox⟩ (hD n)⟩
+  · exact (((sLocalHomogeneousAdelicThetaLinearMap F T χ).ker.mkQL.continuous).comp
+      (sAdeleSchwartzTransition_isEmbedding F hST).continuous).continuousAt.tendsto.comp ht
+
 /-- Paper: Proposition 7.3.2.2(1), p. 352.
 The union of the absolute PW levels is sequentially dense in the full or zero-moment
 homogeneous theta space, according to the chosen test constraint.
@@ -646,7 +963,18 @@ theorem sLocalAbsolutePW_seqDense {S₀ : Finset (HeightOneSpectrum (𝓞 F))}
     (D : Submodule ℂ (B(T))) (_hD : D = ⊤ ∨ D = Z₀(T)) :
     ∀ (x : Θ(T, χ)), x ∈ D.map (q(T, χ)) → ∃ u : ℕ → Θ(T, χ),
       (∀ n, ∃ X > 0, u n ∈ sLocalAbsolutePW hST X D χ) ∧
-        Tendsto u atTop (𝓝 x) := by sorry
+        Tendsto u atTop (𝓝 x) := by
+  intro x hx
+  obtain ⟨f, hf, rfl⟩ := Submodule.mem_map.mp hx
+  obtain ⟨g, hg, hpol⟩ := sLocalAbsolutePW_exists_insert_rep hST _hPic ω hu χ _hχ f
+  rcases _hD with rfl | rfl
+  · obtain ⟨u, hu, ht⟩ := sLocalAbsolutePW_fourier_compact_seq g
+    rw [← hg]
+    exact sLocalAbsolutePW_push_seq hST ⊤ χ g u hu (fun _ ↦ Submodule.mem_top) ht
+  · obtain ⟨u, hu, ht⟩ := sLocalAbsolutePW_fourier_compact_seq_polar ⟨g, hpol hf⟩
+    rw [← hg]
+    exact sLocalAbsolutePW_push_seq hST (Z₀(T)) χ g u (fun n ↦ (hu n).2)
+      (fun n ↦ (sLocalAbsolutePW_insert_polar hST (u n)).mpr (hu n).1) ht
 
 /-- Paper: Theorem 2.2.3.2, p. 82, and the proof of Proposition 7.3.2.2(2)–(3), p. 353.
 The global Fourier transform of the global insertion of an S-local test vanishes at every
@@ -665,7 +993,21 @@ private theorem sLocalAbsolutePW_globalSupport_fourier {F : Type*} [Field F] [Nu
         adeleSchwartzFourier (sAdeleSchwartzToGlobal F S h) (Multiplicative.ofAdd y) ≠ 0 →
           sAdeleSchwartzFourier h (Multiplicative.ofAdd (adeleProjection F S y)) ≠ 0 ∧
             ∀ v, v ∉ S → ‖y.2 v‖ ≤ D v := by
-  sorry
+  classical
+  let D (v : HeightOneSpectrum (𝓞 F)) :=
+    (v.asIdeal.absNorm : ℝ) ^ multiplicity v.asIdeal (differentIdeal ℤ (𝓞 F))
+  refine ⟨D, fun v ↦ one_le_pow₀ (by exact_mod_cast (HeightOneSpectrum.one_lt_absNorm v).le), ?_, ?_⟩
+  · apply (Ideal.finite_factors (differentIdeal_ne_bot (A := ℤ) (B := 𝓞 F))).subset
+    intro v hv
+    by_contra hn
+    exact hv (by simp [D, multiplicity_eq_zero_of_not_dvd hn])
+  · obtain ⟨c, _, hc⟩ := adeleSchwartzFourier_sAdeleSchwartzToGlobal (F := F) (S := S)
+    intro h y hy
+    rw [hc] at hy
+    split at hy
+    · rename_i htail
+      exact ⟨fun hz ↦ hy (by rw [hz, smul_zero]), htail⟩
+    · exact (hy rfl).elim
 
 /-- An idele whose S-coordinates lie in the S-product region of size `Y` and whose other
 finite coordinates are bounded by `D` has idelic norm at most `Y` times the product of `D`. -/
@@ -3297,107 +3639,6 @@ theorem sLocalPWOrbital_fourier_decay (p : Vℚ) (ω : PontryaginDual J₁(T))
       show j.val.2 = k from congrArg Prod.snd hj]
   · exact (ha n).trans (if_neg hn)
 
-private theorem sLocalZeroMomentTheta_eq_top_of_translate
-    {E W : Type*} [AddCommGroup E] [Module ℂ E] [AddCommGroup W] [Module ℂ W]
-    (p : E →ₗ[ℂ] ℂ × ℂ) (θ : E →ₗ[ℂ] W) (t : E → E)
-    (a b : ℂ) (ha : a ≠ 1) (hab : a ≠ b)
-    (hp : ∀ f, p (t f) = ((p f).1, b * (p f).2)) (hθ : ∀ f, θ (t f) = a • θ f) :
-    p.ker.map θ.ker.mkQ = ⊤ := by
-  apply top_unique
-  rintro x -
-  obtain ⟨f, rfl⟩ := θ.ker.mkQ_surjective x
-  -- The first difference kills evaluation at zero. The second kills the Fourier value at zero.
-  let k := t f - f
-  let h := t k - b • k
-  have hk : (p k).1 = 0 := by simp [k, hp]
-  have hh : h ∈ p.ker := by
-    change p (t k - b • k) = 0
-    rw [map_sub, map_smul, hp, sub_eq_zero]
-    exact Prod.ext (by simp [hk]) (by simp)
-  have hθk : θ k = (a - 1) • θ f := by simp [k, hθ, sub_smul]
-  have hθh : θ h = ((a - b) * (a - 1)) • θ f := by
-    change θ (t k - b • k) = _
-    rw [map_sub, map_smul, hθ, ← sub_smul, hθk, smul_smul]
-  let c := (a - b) * (a - 1)
-  have hc : c ≠ 0 := mul_ne_zero (sub_ne_zero.mpr hab) (sub_ne_zero.mpr ha)
-  refine ⟨c⁻¹ • h, p.ker.smul_mem _ hh, ?_⟩
-  simp only [Submodule.mkQ_apply, Submodule.Quotient.eq]
-  change θ (c⁻¹ • h - f) = 0
-  rw [map_sub, map_smul, hθh]
-  change c⁻¹ • (c • θ f) - θ f = 0
-  rw [inv_smul_smul₀ hc, sub_self]
-
-open MeasureTheory in
-private theorem sLocalZeroMomentTheta_eq_top_fourier {F : Type*} [Field F] [NumberField F]
-    {T : Finset (HeightOneSpectrum (𝓞 F))} (u : (SAdeleRing F T)ˣ) :
-    ∃ b : ℝ≥0, ∀ f : SchwartzBruhat (Multiplicative (SAdeleRing F T)),
-      sAdeleSchwartzFourier (schwartzBruhatUnitTranslate u f) (Multiplicative.ofAdd 0) =
-        ((b : ℝ) : ℂ) * sAdeleSchwartzFourier f (Multiplicative.ofAdd 0) := by
-  let A := SAdeleRing F T
-  let G := Multiplicative A
-  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
-  let (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
-  let : MeasurableSpace (InfiniteAdeleRing F) :=
-    inferInstanceAs (MeasurableSpace ((w : InfinitePlace F) → w.Completion))
-  let : MeasurableSpace A :=
-    inferInstanceAs (MeasurableSpace (InfiniteAdeleRing F × ((v : T) → v.val.adicCompletion F)))
-  let μ : Measure G := sAdditiveTamagawaMeasure F T
-  obtain ⟨hT₂, hLC, hBor, hHaar, hReg⟩ := sAdele_fourierMeasure (F := F) (S := T)
-  let : T2Space G := hT₂
-  let : LocallyCompactSpace G := hLC
-  let : BorelSpace G := hBor
-  let : μ.IsHaarMeasure := hHaar
-  let : μ.Regular := hReg
-  let d : G ≃ₜ* G :=
-    { toFun := fun x ↦ Multiplicative.ofAdd ((↑u⁻¹ : A) * x.toAdd)
-      invFun := fun x ↦ Multiplicative.ofAdd ((u : A) * x.toAdd)
-      left_inv := fun x ↦ Multiplicative.ext (by simp [← mul_assoc])
-      right_inv := fun x ↦ Multiplicative.ext (by simp [← mul_assoc])
-      map_mul' := fun x y ↦ Multiplicative.ext (mul_add _ _ _)
-      continuous_toFun := continuous_ofAdd.comp (continuous_const.mul continuous_toAdd)
-      continuous_invFun := continuous_ofAdd.comp (continuous_const.mul continuous_toAdd) }
-  -- Dilation sends additive Haar measure to a nonnegative multiple of itself.
-  let ν := μ.map d
-  let : ν.IsHaarMeasure := d.isHaarMeasure_map μ
-  let : ν.Regular := Measure.Regular.map d.toHomeomorph
-  refine ⟨ν.haarScalarFactor μ, fun f ↦ ?_⟩
-  rw [sAdeleSchwartzFourier_apply_zero, sAdeleSchwartzFourier_apply_zero]
-  change (∫ x : G, f (d.toHomeomorph.toMeasurableEquiv x) ∂μ) = _ * ∫ x : G, f x ∂μ
-  rw [← integral_map_equiv d.toHomeomorph.toMeasurableEquiv (fun x ↦ f x)]
-  change (∫ x : G, f x ∂ν) = _
-  calc
-    _ = ∫ x : G, f x ∂(ν.haarScalarFactor μ • μ) :=
-      congrArg (fun m : Measure G ↦ ∫ x : G, f x ∂m)
-        (Measure.isMulLeftInvariant_eq_smul_of_regular ν μ)
-    _ = _ := by
-      rw [integral_smul_nnreal_measure]
-      rfl
-
-/-- Paper: Equation (7.3.3.25), p. 363.
-For a nontrivial norm-one character the tests with both zero moments
-have the same homogeneous theta image as the unrestricted tests. -/
-theorem sLocalZeroMomentTheta_eq_top (ω : PontryaginDual J₁(T)) (_hω : ω ≠ 1) :
-    (Z₀(T)).map (q(T, ω)) = ⊤ := by
-  have hex : ∃ h : J₁(T), (ω h : ℂ) ≠ 1 :=
-    not_forall.mp fun hall ↦ _hω (PontryaginDual.ext fun x ↦ Subtype.ext (hall x))
-  obtain ⟨h, hh⟩ := hex
-  obtain ⟨u, hu⟩ := QuotientGroup.mk_surjective h.val
-  obtain ⟨b, hb⟩ := sLocalZeroMomentTheta_eq_top_fourier u
-  have hne : (ω h : ℂ) ≠ ((b : ℝ) : ℂ) := by
-    intro he
-    have hb1 : (b : ℝ) = 1 :=
-      (Real.norm_of_nonneg b.property).symm.trans
-        ((Complex.norm_real _).symm.trans ((congrArg norm he).symm.trans (Circle.norm_coe _)))
-    exact hh (he.trans (by exact_mod_cast hb1))
-  apply sLocalZeroMomentTheta_eq_top_of_translate
-    ((sAdelePolarValues_isLinear (F := F) (S := T)).mk' _)
-    (sLocalHomogeneousAdelicThetaLinearMap F T ω)
-    (schwartzBruhatUnitTranslate u) (ω h : ℂ) ((b : ℝ) : ℂ) hh hne
-  · intro f
-    apply Prod.ext
-    · exact congrArg f (congrArg Multiplicative.ofAdd (mul_zero _))
-    · exact hb f
-  · exact sLocalHomogeneousTheta_unitTranslate ω h u hu
 
 end PWOrbitalQuotients
 

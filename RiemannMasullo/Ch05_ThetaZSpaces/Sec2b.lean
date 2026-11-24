@@ -1094,7 +1094,8 @@ private theorem unitTranslate_joint {R : Type*} [CommRing R] [TopologicalSpace R
   refine ⟨H, ((continuous_schwartzBruhatStageInclusion a e).comp hρ).congr fun u ↦ ?_⟩
   exact Subtype.ext (funext fun x ↦ hr u s x.toAdd)
 
-private theorem sLocalHomogeneous_unitTranslate_joint :
+/-- Unit translation on S-adelic Schwartz–Bruhat tests is jointly continuous. -/
+theorem continuous_sAdeleSchwartz_unitTranslate :
     Continuous fun p : (SAdeleRing F S)ˣ × ℬₛ(S) ↦ schwartzBruhatUnitTranslate p.1 p.2 := by
   let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
   let : LocallyCompactSpace (SAdeleRing F S) :=
@@ -1165,7 +1166,7 @@ theorem existsUnique_sLocalHomogeneousThetaAction (χ : PontryaginDual (J₁(S))
     have h : (QuotientGroup.mk g : (SAdeleRing F S)ˣ ⧸ N) = 1 := (QuotientGroup.eq_one_iff g).mpr hg
     exact congrArg (θ f) ((congrArg (fun b : Jₛ(S) ↦ b⁻¹ * a) h).trans (by simp only [inv_one, one_mul]))
   have result := thetaAction_of_translate (G := (SAdeleRing F S)ˣ) (E := ℬₛ(S)) (A := Jₛ(S))
-    N θ Tt t ht sLocalHomogeneous_unitTranslate_joint r hr hN
+    N θ Tt t ht continuous_sAdeleSchwartz_unitTranslate r hr hN
   simp only [Submodule.mkQ_apply]
   with_reducible exact result
 

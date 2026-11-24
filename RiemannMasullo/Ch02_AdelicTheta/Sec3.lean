@@ -500,6 +500,10 @@ private theorem thetaSection_rightInverse (t : ℝ≥0ˣ) : sIdeleNorm F S (τ t
   let g := A.toSubmonoid.unitsEquivUnitsType ⟨s t, ht⟩
   exact ((sIdeleNorm_spec F S).1 g).symm.trans (canonicalIdeleNormSection_rightInverse F t)
 
+/-- Projecting the canonical norm section to the S-ideles preserves its norm. -/
+theorem sIdeleNorm_project_canonicalSection (t : ℝ≥0ˣ) : sIdeleNorm F S (τ t) = t :=
+  thetaSection_rightInverse F S t
+
 /-- The canonical section acts by the same positive scalar at every infinite place. -/
 private theorem thetaSection_arch (t : ℝ≥0ˣ) (x : InfiniteAdeleRing F) :
     arch (x * (τ t).val.1) = root t • arch x := by

@@ -14,6 +14,7 @@ import Mathlib.Analysis.Complex.PhragmenLindelof
 import Mathlib.Analysis.MellinInversion
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Barrelled
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Bounded
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.MittagLefflerLift
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import all RiemannMasullo.AppB_AnalyticNT.Sec1
@@ -3865,6 +3866,379 @@ theorem orbitalSchwartzBergman_biorthogonal (S₀ : Finset Primes) :
     rw [Subtype.ext_iff]
   simpa only [hiff] using h
 
+
+section LeftJetInterpolation
+
+open Classical Topology TopologicalSpace
+
+local notation "I" => (univ : Set ℝ)
+
+/-- Exponential damping centred at a jet point. The norm is constant on each vertical line. -/
+private def archInterpDamp (w : ℂ) (n : ℕ) (f : Aℂ) : Aℂ := by
+  let E (z : ℂ) := Complex.exp ((n : ℂ) * (w - z))
+  have hE : Differentiable ℂ E := by dsimp [E]; fun_prop
+  refine ⟨E * f.val, fun z hz ↦ (hz (mem_univ _)).elim, hE.differentiableOn.mul f.property.2.1,
+    fun a b hab hI k ↦ ?_⟩
+  obtain ⟨C, hC⟩ := f.property.2.2 a b hab hI k
+  refine ⟨Real.exp ((n : ℝ) * (w.re - a)) * max C 0, ?_⟩
+  rintro _ ⟨z, hz, rfl⟩
+  have hz₁ : a ≤ z.re := hz.1
+  have hc : ‖z ^ k * f.val z‖ ≤ C := hC ⟨z, hz, rfl⟩
+  have he : ‖E z‖ ≤ Real.exp ((n : ℝ) * (w.re - a)) := by
+    rw [show ‖E z‖ = Real.exp ((n : ℝ) * (w.re - z.re)) by simp [E, Complex.norm_exp, Complex.mul_re]]
+    exact Real.exp_le_exp.mpr (mul_le_mul_of_nonneg_left (sub_le_sub_left hz₁ _) (Nat.cast_nonneg _))
+  change ‖z ^ k * (E z * f.val z)‖ ≤ _
+  rw [mul_left_comm, norm_mul]
+  exact mul_le_mul he (hc.trans (le_max_left _ _)) (norm_nonneg _) (Real.exp_pos _).le
+
+private def archInterpL2 : (I × ℕ) → Seminorm ℂ Aℂ := fun i ↦ Seminorm.of
+  (fun f : schwartzBergmanSubmodule I ↦ (eLpNorm (weightedVerticalTrace i.1 i.2 f.val) 2 volume).toReal)
+  (schwartzBergman_l2_seminorm I i).1 (schwartzBergman_l2_seminorm I i).2
+
+private theorem archInterpL2_spec : WithSeminorms archInterpL2 :=
+  withGeneratingSeminorms_spec (schwartzBergmanSubmodule I) archInterpL2
+
+private theorem archInterpL2_damp (w : ℂ) (n : ℕ) (f : Aℂ) (i : I × ℕ) :
+    archInterpL2 i (archInterpDamp w n f) =
+      Real.exp ((n : ℝ) * (w.re - (i.1 : ℝ))) * archInterpL2 i f := by
+  let F := weightedVerticalTrace i.1 i.2 f.val
+  let G := weightedVerticalTrace i.1 i.2 (archInterpDamp w n f).val
+  let c := Real.exp ((n : ℝ) * (w.re - (i.1 : ℝ)))
+  have hf : MemLp F 2 volume :=
+    schwartzBergman_trace_memLp I i.1 2 (by norm_num) (by norm_num) i.2 f
+  have hg : MemLp G 2 volume :=
+    schwartzBergman_trace_memLp I i.1 2 (by norm_num) (by norm_num) i.2 (archInterpDamp w n f)
+  have hFG : (fun x ↦ ‖G x‖) = c • (fun x ↦ ‖F x‖) := by
+    funext x
+    dsimp [G,F, c, weightedVerticalTrace, archInterpDamp]
+    rw [mul_left_comm, norm_mul]
+    simp [Complex.norm_exp, Complex.mul_re]
+  change lpNorm G 2 volume = c * lpNorm F 2 volume
+  rw [← lpNorm_norm hg.aestronglyMeasurable, hFG, lpNorm_const_smul, lpNorm_norm hf.aestronglyMeasurable]
+  change ‖c‖ * lpNorm F 2 volume = c * lpNorm F 2 volume
+  rw [Real.norm_of_nonneg (Real.exp_pos _).le]
+
+private theorem archInterpL2_damp_tendsto (w : ℂ) (f : Aℂ) (i : I × ℕ) (hi : w.re < (i.1 : ℝ)) :
+    Tendsto (fun n : ℕ ↦ archInterpL2 i (archInterpDamp w n f)) atTop (𝓝 0) := by
+  have hn : Tendsto (fun n : ℕ ↦ (n : ℝ) * (w.re - (i.1 : ℝ))) atTop atBot :=
+    tendsto_natCast_atTop_atTop.atTop_mul_const_of_neg (sub_neg.mpr hi)
+  simpa only [archInterpL2_damp, zero_mul, Function.comp_apply] using (Real.tendsto_exp_atBot.comp hn).mul_const
+    (archInterpL2 i f)
+
+private theorem archInterp_iteratedDeriv_pow_mul {f : ℂ → ℂ} (hf : Differentiable ℂ f)
+    (w : ℂ) (k l : ℕ) (hl : l ≤ k) :
+    iteratedDeriv l (fun z ↦ (z - w) ^ k * f z) w =
+      if l = k then (k.factorial : ℂ) * f w else 0 := by
+  have hP : Differentiable ℂ (fun z : ℂ ↦ (z - w) ^ k) := by fun_prop
+  change iteratedDeriv l ((fun z ↦ (z - w) ^ k) * f) w = _
+  rw [iteratedDeriv_mul hP.contDiff.contDiffAt hf.contDiff.contDiffAt]
+  simp only [iteratedDeriv_comp_sub_const (f := fun z : ℂ ↦ z ^ k), sub_self, iteratedDeriv_fun_pow_zero]
+  by_cases he : l = k
+  · subst l
+    rw [ite_eq_left rfl, Finset.sum_eq_single_of_mem k (Finset.mem_range.mpr (Nat.lt_succ_self k))]
+    · simp
+    · intro i hi hne
+      simp [hne]
+  · rw [ite_eq_right he]
+    apply Finset.sum_eq_zero
+    intro i hi
+    have hne : i ≠ k := fun e ↦ he (le_antisymm hl (by simpa [e] using Finset.mem_range.mp hi))
+    simp [hne]
+
+/-- A polynomial factor fixes one derivative and vanishes at the other prescribed jets.
+Damping preserves the derivative at the chosen centre because its lower derivatives vanish. -/
+private theorem archInterp_basis (H : Aℂ) (S : Finset (ℂ × ℕ)) (j : ℂ × ℕ)
+    (hH : H.val j.1 ≠ 0)
+    (hord : ∀ i ∈ S, i.1 = j.1 → i.2 ≤ j.2) :
+    ∃ (b : Aℂ) (P : Polynomial ℂ), (∀ z, b.val z = H.val z * P.eval z) ∧
+      ∀ n : ℕ, ∀ i ∈ S,
+        iteratedDeriv i.2 (archInterpDamp j.1 n b).val i.1 = if i = j then 1 else 0 := by
+  classical
+  let T := S.filter fun i ↦ i.1 ≠ j.1
+  let A (i : ℂ × ℕ) : Polynomial ℂ := (Polynomial.X - Polynomial.C i.1) ^ (i.2 + 1)
+  let Q := ∏ i ∈ T, A i
+  have hQ (z : ℂ) : Q.eval z = ∏ i ∈ T, (z - i.1) ^ (i.2 + 1) := by
+    simp [Q, A, Polynomial.eval_prod]
+  have hQne : Q.eval j.1 ≠ 0 := by
+    rw [hQ]
+    exact Finset.prod_ne_zero_iff.mpr fun i hi ↦ pow_ne_zero _ (sub_ne_zero.mpr
+      (Finset.mem_filter.mp hi).2.symm)
+  let a := ((j.2.factorial : ℂ) * (H.val j.1 * Q.eval j.1))⁻¹
+  let P := Polynomial.C a * (Polynomial.X - Polynomial.C j.1) ^ j.2 * Q
+  let b : Aℂ := ⟨fun z ↦ H.val z * P.eval z, schwartzBergman_univ_mul_polynomial _ H.property P⟩
+  refine ⟨b, P, fun _ ↦ rfl, fun n i hi ↦ ?_⟩
+  let E (z : ℂ) := Complex.exp ((n : ℂ) * (j.1 - z))
+  have hE : Differentiable ℂ E := by dsimp [E]; fun_prop
+  have hHd : Differentiable ℂ H.val := fun z ↦
+    (H.property.2.1 z (by simp)).differentiableAt (Filter.univ_mem' fun _ ↦ mem_univ _)
+  change iteratedDeriv i.2 (fun z ↦ E z * (H.val z * P.eval z)) i.1 = _
+  by_cases he : i.1 = j.1
+  · let g (z : ℂ) := E z * ((H.val z * Q.eval z) * a)
+    have hg : Differentiable ℂ g :=
+      hE.mul ((hHd.mul (Polynomial.differentiable Q)).mul_const a)
+    have hfac : (fun z ↦ E z * (H.val z * P.eval z)) = fun z ↦ (z - j.1) ^ j.2 * g z := by
+      funext z
+      simp [P, g]
+      ring
+    rw [hfac, he, archInterp_iteratedDeriv_pow_mul hg j.1 j.2 i.2 (hord i hi he)]
+    have hi' : i.2 = j.2 ↔ i = j := ⟨Prod.ext he, congrArg Prod.snd⟩
+    by_cases hij : i = j
+    · rw [ite_eq_left (hi'.2 hij), ite_eq_left hij]
+      have hne : (j.2.factorial : ℂ) * (H.val j.1 * Q.eval j.1) ≠ 0 :=
+        mul_ne_zero (Nat.cast_ne_zero.mpr (Nat.factorial_ne_zero _)) (mul_ne_zero hH hQne)
+      dsimp [g, E, a]
+      simp only [sub_self, mul_zero, Complex.exp_zero, one_mul, ← mul_assoc]
+      rw [mul_assoc (j.2.factorial : ℂ), mul_inv_cancel₀ hne]
+    · rw [ite_eq_right (fun hk ↦ hij (hi'.1 hk)), ite_eq_right hij]
+  · have hiT : i ∈ T := Finset.mem_filter.mpr ⟨hi, he⟩
+    let R := ∏ r ∈ T.erase i, A r
+    have hR : Q = A i * R := (Finset.mul_prod_erase _ _ hiT).symm
+    let g (z : ℂ) := E z * (H.val z * (a * (z - j.1) ^ j.2 * R.eval z))
+    have hg : Differentiable ℂ g :=
+      hE.mul (hHd.mul (((differentiable_id.sub_const j.1).pow j.2).const_mul a
+        |>.mul (Polynomial.differentiable R)))
+    have hfac : (fun z ↦ E z * (H.val z * P.eval z)) = fun z ↦ (z - i.1) ^ (i.2 + 1) * g z := by
+      funext z
+      simp [P, hR, A, g]
+      ring
+    rw [hfac, archInterp_iteratedDeriv_pow_mul hg i.1 (i.2 + 1) i.2 (Nat.le_succ _)]
+    simp [show i ≠ j from fun h ↦ he (congrArg Prod.fst h)]
+
+private theorem archInterp_damp_divisible (g : Entire) (H b : Aℂ) (P : Polynomial ℂ)
+    (hH : ∀ z, H.val z = g.val z * Complex.exp (z ^ 2))
+    (hb : ∀ z, b.val z = H.val z * P.eval z)
+    (w : ℂ) (n : ℕ) : archInterpDamp w n b ∈ schwartzBergmanDivisible g := by
+  rw [schwartzBergmanDivisible, Submodule.mem_comap, Submodule.restrictScalars_mem,
+    Ideal.mem_span_singleton']
+  let u (z : ℂ) := Complex.exp ((n : ℂ) * (w - z)) * (Complex.exp (z ^ 2) * P.eval z)
+  have hu : Differentiable ℂ u := by dsimp [u]; fun_prop
+  refine ⟨⟨⟨u, hu.continuous⟩, hu⟩, ?_⟩
+  apply Subtype.ext
+  ext z
+  change u z * g.val z = (schwartzBergmanEntireInclusion (archInterpDamp w n b)).val z
+  rw [schwartzBergmanEntireInclusion_apply]
+  change u z * g.val z = Complex.exp ((n : ℂ) * (w - z)) * b.val z
+  rw [hb, hH]
+  dsimp [u]
+  ring
+
+private theorem archInterp_damp_small {D : Submodule ℂ Aℂ} (b : Aℂ) (w : ℂ)
+    (hD : ∀ n, archInterpDamp w n b ∈ D)
+    (s : Finset (I × ℕ)) (hr : ∀ i ∈ s, w.re < (i.1 : ℝ))
+    (q : Seminorm ℂ D) (C : ℝ≥0) (hC : 0 < C)
+    (hq : q ≤ C • s.sup (fun i ↦ (archInterpL2 i).comp D.subtype))
+    (ε : ℝ) (hε : 0 < ε) :
+    ∃ n : ℕ, q ⟨archInterpDamp w n b, hD n⟩ < ε := by
+  have hC' : 0 < (C : ℝ) := hC
+  have hδ : 0 < ε / (C : ℝ) := div_pos hε hC'
+  have hev := (eventually_all_finset s).mpr fun i hi ↦
+    (archInterpL2_damp_tendsto w b i (hr i hi)).eventually (Iio_mem_nhds hδ)
+  obtain ⟨n, hn⟩ := hev.exists
+  refine ⟨n, (hq _).trans_lt ?_⟩
+  rw [smul_apply]
+  have hs : (s.sup (fun i ↦ (archInterpL2 i).comp D.subtype)) ⟨archInterpDamp w n b, hD n⟩ < ε / (C : ℝ) :=
+    Seminorm.finset_sup_apply_lt hδ fun i hi ↦ hn i hi
+  exact (mul_comm (C : ℝ) _).trans_lt ((lt_div_iff₀ hC').mp hs)
+
+private theorem archInterp_jet_apply {D : Submodule ℂ Aℂ} (j : ℂ × ℕ) (x : D) :
+    (((entireJet j.1 j.2).comp schwartzBergmanEntireInclusion).comp D.subtypeL) x =
+      iteratedDeriv j.2 x.val.val j.1 := by
+  rw [ContinuousLinearMap.comp_apply, ContinuousLinearMap.comp_apply, entireJet_apply]
+  exact congrArg (fun f : ℂ → ℂ ↦ iteratedDeriv j.2 f j.1)
+    (funext (schwartzBergmanEntireInclusion_apply x.val))
+
+local notation "J(" m ")" => Subtype (fun j : ℂ × ℕ ↦ Prod.snd j < m (Prod.fst j))
+local notation "D(" g ")" => schwartzBergmanDivisible g
+private def archInterpJetCLM (g : Entire) (j : ℂ × ℕ) : D(g) →L[ℂ] ℂ :=
+  ((entireJet j.1 j.2).comp schwartzBergmanEntireInclusion).comp (D(g)).subtypeL
+
+local notation "jet(" g ", " j ")" => archInterpJetCLM g j
+
+private theorem archInterp_level (m : ℂ → ℕ) (rank : J(m) → ℕ)
+    (g : Entire) (H : Aℂ) (hH : ∀ z, H.val z = g.val z * Complex.exp (z ^ 2))
+    (hne : ∀ j : J(m), g.val j.val.1 ≠ 0)
+    (hord : ∀ a b : J(m), a.val.1 = b.val.1 → rank a ≤ rank b → a.val.2 ≤ b.val.2)
+    (hfin : ∀ k, {j : J(m) | rank j ≤ k}.Finite)
+    (k : ℕ) (c : {j : J(m) // rank j = k} → ℂ)
+    (s : Finset (I × ℕ)) (hr : ∀ j : J(m), rank j = k → ∀ i ∈ s, j.val.1.re < (i.1 : ℝ))
+    (q : Seminorm ℂ D(g)) (C : ℝ≥0) (hC : 0 < C)
+    (hq : q ≤ C • s.sup (fun i ↦ (archInterpL2 i).comp (D(g)).subtype))
+    (ε : ℝ) (hε : 0 < ε) :
+    ∃ x : D(g), (∀ j : J(m), rank j < k → jet(g, j.val) x = 0) ∧
+      (∀ j : {j : J(m) // rank j = k}, jet(g, j.val.val) x = c j) ∧ q x < ε := by
+  classical
+  let S : Finset (ℂ × ℕ) := (hfin k).toFinset.image Subtype.val
+  let A := {j : J(m) // rank j = k}
+  have hA : {j : J(m) | rank j = k}.Finite := (hfin k).subset fun _ h ↦ h.le
+  let : Fintype A := hA.fintype
+  have hS (j : J(m)) (hj : rank j ≤ k) : j.val ∈ S :=
+    Finset.mem_image.mpr ⟨j, (hfin k).mem_toFinset.mpr hj, rfl⟩
+  have hbasis (j : A) := archInterp_basis H S j.val.val
+    (by rw [hH]; exact mul_ne_zero (hne j.val) (Complex.exp_ne_zero _))
+    (fun i hi he ↦ by
+      change i ∈ (hfin k).toFinset.image Subtype.val at hi
+      obtain ⟨p, hp, hp'⟩ := Finset.mem_image.mp hi
+      have hp₁ : rank p ≤ k := (hfin k).mem_toFinset.mp hp
+      rw [← hp'] at he ⊢
+      exact hord p j.val he (hp₁.trans_eq j.property.symm))
+  choose b P hb hjets using hbasis
+  let N : ℝ := ∑ j : A, ‖c j‖
+  have hN : 0 ≤ N := Finset.sum_nonneg fun _ _ ↦ norm_nonneg _
+  let δ := ε / (N + 1)
+  have hδ : 0 < δ := by positivity
+  have hD (j : A) (n : ℕ) : archInterpDamp j.val.val.1 n (b j) ∈ D(g) :=
+    archInterp_damp_divisible g H (b j) (P j) hH (hb j) _ n
+  have hsmall (j : A) := archInterp_damp_small (b j) j.val.val.1 (hD j) s
+    (hr j.val j.property) q C hC hq δ hδ
+  choose n hn using hsmall
+  let y (j : A) : D(g) := ⟨archInterpDamp j.val.val.1 (n j) (b j), hD j (n j)⟩
+  let x : D(g) := ∑ j : A, c j • y j
+  have hjet (i : J(m)) (hi : rank i ≤ k) (j : A) :
+      jet(g, i.val) (y j) = if i = j.val then 1 else 0 := by
+    rw [archInterpJetCLM, archInterp_jet_apply]
+    have h := hjets j (n j) i.val (hS i hi)
+    simpa only [y, Subtype.mk.injEq, Subtype.ext_iff] using h
+  refine ⟨x, ?_, ?_, ?_⟩
+  · intro i hi
+    simp only [x, map_sum, map_smul, smul_eq_mul, hjet i hi.le]
+    apply Finset.sum_eq_zero
+    intro j _
+    have he : i ≠ j.val := fun h ↦ hi.ne (h ▸ j.property)
+    rw [ite_eq_right he, mul_zero]
+  · intro i
+    simp only [x, map_sum, map_smul, smul_eq_mul, hjet i.val i.property.le]
+    rw [Finset.sum_eq_single i]
+    · simp
+    · intro j _ hj
+      have he : i.val ≠ j.val := fun h ↦ hj (Subtype.ext h.symm)
+      rw [ite_eq_right he, mul_zero]
+    · intro h
+      exact (h (Finset.mem_univ _)).elim
+  · calc
+      q x ≤ ∑ j : A, q (c j • y j) :=
+        Finset.le_sum_of_subadditive q (map_zero q).le (map_add_le_add q) _ _
+      _ ≤ ∑ j : A, ‖c j‖ * δ := by
+        exact Finset.sum_le_sum fun j _ ↦ by
+          rw [map_smul_eq_mul]
+          exact mul_le_mul_of_nonneg_left (hn j).le (norm_nonneg _)
+      _ = N * δ := (Finset.sum_mul _ _ _).symm
+      _ < ε := by
+        dsimp only [δ]
+        rw [← mul_div_assoc, div_lt_iff₀ (by positivity)]
+        nlinarith
+
+/-- Lift the jet values in the closed divisible ideal using the weighted line seminorms. -/
+private theorem archInterp_lift (m : ℂ → ℕ) (rank : J(m) → ℕ)
+    (g : Entire) (H : Aℂ) (hH : ∀ z, H.val z = g.val z * Complex.exp (z ^ 2))
+    (hne : ∀ j : J(m), g.val j.val.1 ≠ 0)
+    (hord : ∀ a b : J(m), a.val.1 = b.val.1 → rank a ≤ rank b → a.val.2 ≤ b.val.2)
+    (hfin : ∀ k, {j : J(m) | rank j ≤ k}.Finite)
+    (hleft : ∀ x : ℝ, ∃ K : ℕ, ∀ j : J(m), K ≤ rank j → j.val.1.re < x) :
+    ∀ c : J(m) → ℂ, ∃ f : D(g), ∀ j, jet(g, j.val) f = c j := by
+  classical
+  obtain ⟨hTop, _, hM, hC⟩ := schwartzBergman_frechet I isOpen_univ ordConnected_univ univ_nonempty
+  let : IsTopologicalAddGroup Aℂ := hTop
+  let : MetrizableSpace Aℂ := hM
+  let : UniformSpace Aℂ := IsTopologicalAddGroup.rightUniformSpace Aℂ
+  let : IsUniformAddGroup Aℂ := inferInstance
+  let : CompleteSpace Aℂ := hC
+  let : IsUniformAddGroup D(g) :=
+    IsUniformInducing.isUniformAddGroup (D(g)).subtype.toAddMonoidHom ⟨rfl⟩
+  let : MetrizableSpace D(g) := IsEmbedding.subtypeVal.metrizableSpace
+  let : CompleteSpace D(g) := (schwartzBergmanDivisible_isClosed g).completeSpace_coe
+  let p (i : I × ℕ) : Seminorm ℂ D(g) := (archInterpL2 i).comp (D(g)).subtype
+  have hp : WithSeminorms p := (D(g)).subtype.withSeminorms_induced archInterpL2_spec
+  let : PolynormableSpace ℂ D(g) := hp.toPolynormableSpace
+  let L (k : ℕ) (j : {j : J(m) // rank j = k}) : D(g) →L[ℂ] ℂ := jet(g, j.val.val)
+  have h1 (k : ℕ) (c : {j : J(m) // rank j = k} → ℂ) :
+      ∃ x : D(g), (∀ i < k, ∀ j, L i j x = 0) ∧ (∀ j, L k j x = c j) := by
+    obtain ⟨x, hx, hc, -⟩ := archInterp_level m rank g H hH hne hord hfin k c ∅
+      (by simp) 0 1 one_pos (by simp [Seminorm.bot_eq_zero]) 1 one_pos
+    exact ⟨x, fun i hi j ↦ hx j.val (j.property.trans_lt hi), hc⟩
+  have h2 (q : Seminorm ℂ D(g)) (hq : Continuous q) :
+      ∃ K, ∀ k ≥ K, ∀ (c : {j : J(m) // rank j = k} → ℂ) (ε : ℝ), 0 < ε →
+      ∃ x : D(g), (∀ i < k, ∀ j, L i j x = 0) ∧ (∀ j, L k j x = c j) ∧ q x < ε := by
+    obtain ⟨s, C, hC, hq⟩ := Seminorm.bound_of_continuous hp q hq
+    choose K hK using hleft
+    refine ⟨s.sup (fun i ↦ K i.1), fun k hk c ε hε ↦ ?_⟩
+    have hr (j : J(m)) (hj : rank j = k) (i : I × ℕ) (hi : i ∈ s) : j.val.1.re < (i.1 : ℝ) :=
+      hK i.1 j ((Finset.le_sup (f := fun i ↦ K i.1) hi).trans (hk.trans_eq hj.symm))
+    obtain ⟨x, hx, hc, hε'⟩ := archInterp_level m rank g H hH hne hord hfin k c s hr q C
+      (pos_iff_ne_zero.mpr hC) hq ε hε
+    exact ⟨x, fun i hi j ↦ hx j.val (j.property.trans_lt hi), hc, hε'⟩
+  intro c
+  obtain ⟨x, hx⟩ := surjective_coeff_of_eventually_small L h1 h2 (fun _ j ↦ c j.val)
+  exact ⟨x, fun j ↦ congrFun (congrFun hx (rank j)) ⟨j, rfl⟩⟩
+
+/-- Order jets by unit bands in the real part, then by derivative index.
+Every initial segment is finite, and later bands are to the left of each fixed line. -/
+private theorem archInterp_rank (m : ℂ → ℕ) (d : ℕ) (hd : 0 < d)
+    (horder : ∀ z, m z ≤ d) (hfinite : ∀ a : ℝ, {z : ℂ | 0 < m z ∧ a ≤ z.re}.Finite) :
+    ∃ rank : J(m) → ℕ,
+      (∀ a b : J(m), a.val.1 = b.val.1 → rank a ≤ rank b → a.val.2 ≤ b.val.2) ∧
+      (∀ k, {j : J(m) | rank j ≤ k}.Finite) ∧
+      (∀ x : ℝ, ∃ K : ℕ, ∀ j : J(m), K ≤ rank j → j.val.1.re < x) := by
+  let rank (j : J(m)) := ⌊-j.val.1.re⌋₊ * d + j.val.2
+  refine ⟨rank, ?_, ?_, ?_⟩
+  · intro a b he hr
+    dsimp [rank] at hr
+    rw [he] at hr
+    exact Nat.le_of_add_le_add_left hr
+  · intro k
+    let Z := {z : ℂ // 0 < m z ∧ -(k : ℝ) - 1 ≤ z.re}
+    have : Finite Z := (hfinite _).to_subtype
+    have hR (j : J(m)) (hj : rank j ≤ k) : -(k : ℝ) - 1 ≤ j.val.1.re := by
+      have ha : ⌊-j.val.1.re⌋₊ ≤ k :=
+        ((Nat.le_mul_of_pos_right _ hd).trans (Nat.le_add_right _ _)).trans hj
+      have hb : (⌊-j.val.1.re⌋₊ : ℝ) ≤ (k : ℝ) := by exact_mod_cast ha
+      linarith [Nat.lt_floor_add_one (-j.val.1.re)]
+    let f (j : {j : J(m) // rank j ≤ k}) : Z × Fin d :=
+      (⟨j.val.val.1, j.val.property.pos, hR j.val j.property⟩,
+        ⟨j.val.val.2, j.val.property.trans_le (horder _)⟩)
+    have hf : Injective f := fun a b e ↦
+      Subtype.ext (Subtype.ext (Prod.ext (congrArg (fun x : Z × Fin d ↦ x.1.val) e)
+        (congrArg (fun x : Z × Fin d ↦ x.2.val) e)))
+    have : Finite {j : J(m) // rank j ≤ k} := Finite.of_injective f hf
+    exact Set.toFinite _
+  · intro x
+    obtain ⟨n, hn⟩ := exists_nat_gt (max (-x) 0)
+    have hn₀ : n ≠ 0 := by
+      intro h
+      have hle : 0 ≤ max (-x) 0 := le_max_right _ _
+      simp [h, not_lt.mpr hle] at hn
+    refine ⟨n * d, fun j hj ↦ ?_⟩
+    have hf : n ≤ ⌊-j.val.1.re⌋₊ := by
+      by_contra! hf
+      have hj' : rank j < (⌊-j.val.1.re⌋₊ + 1) * d := by
+        dsimp [rank]
+        rw [Nat.add_mul, one_mul]
+        exact Nat.add_lt_add_left (j.property.trans_le (horder _)) _
+      exact (not_lt_of_ge hj) (hj'.trans_le (Nat.mul_le_mul_right d hf))
+    have hf' : (n : ℝ) ≤ -j.val.1.re := (Nat.le_floor_iff' hn₀).mp hf
+    linarith [lt_of_le_of_lt (le_max_left (-x) (0 : ℝ)) hn]
+
+/-- A family of jets with finitely many centers in every right half-plane,
+all at nonzeros of the orbital generator, can be prescribed simultaneously
+by a Schwartz–Bergman multiple of that generator. -/
+theorem orbitalSchwartzBergman_jetInterpolation (S₀ : Finset Primes) (m : ℂ → ℕ)
+    (d : ℕ) (hd : 0 < d) (horder : ∀ z, m z ≤ d)
+    (hfinite : ∀ a : ℝ, {z : ℂ | 0 < m z ∧ a ≤ z.re}.Finite)
+    (hne : ∀ z, 0 < m z → (orbitalHeckeGenerator χ τ hτ L hL hEq S₀).val z ≠ 0)
+    (c : J(m) → ℂ) :
+    ∃ f : Aℂ, f ∈ schwartzBergmanDivisible (orbitalHeckeGenerator χ τ hτ L hL hEq S₀) ∧
+      ∀ j : J(m), iteratedDeriv j.val.2 f.val j.val.1 = c j := by
+  let g := orbitalHeckeGenerator χ τ hτ L hL hEq S₀
+  let H : Aℂ := ⟨fun z ↦ g.val z * Complex.exp (z ^ 2),
+    orbitalHeckeGenerator_mul_gaussian_mem χ τ hτ L hL hEq S₀⟩
+  obtain ⟨rank, hord, hfin, hleft⟩ := archInterp_rank m d hd horder hfinite
+  obtain ⟨f, hf⟩ := archInterp_lift m rank g H (fun _ ↦ rfl)
+    (fun j ↦ hne _ j.property.pos) hord hfin hleft c
+  refine ⟨f.val, f.property, fun j ↦ ?_⟩
+  have hj := hf j
+  rw [archInterpJetCLM, archInterp_jet_apply] at hj
+  exact hj
+
+end LeftJetInterpolation
 
 -- TODO(prerequisite): Transport the analytic quotient and its jet families to
 -- (7.1.4.7) by §6.3.2. The orbital identification (7.1.4.26)–(7.1.4.28)

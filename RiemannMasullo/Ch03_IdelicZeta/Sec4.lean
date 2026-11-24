@@ -9,7 +9,7 @@ import RiemannMasullo.ForMathlib.Analysis.MellinTransform.Holomorphic
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform.Gaussian
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import all RiemannMasullo.AppC_LCTVS.Sec2a_part2
-import all RiemannMasullo.AppC_LCTVS.Sec2b
+import RiemannMasullo.AppC_LCTVS.Sec2b
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import all RiemannMasullo.AppC_LCTVS.Sec5b
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
@@ -1869,7 +1869,7 @@ open scoped TensorProduct
 section
 /-- The product of finitely many local tests belongs to the Schwartz–Bruhat space
 of the product group. -/
-private theorem schwartzBruhat_pi_test {ι : Type*} [Fintype ι] (G : ι → Type*)
+theorem schwartzBruhat_pi_test {ι : Type*} [Fintype ι] (G : ι → Type*)
     [∀ i, CommGroup (G i)] [∀ i, TopologicalSpace (G i)] [∀ i, IsTopologicalGroup (G i)]
     [∀ i, T2Space (G i)] [∀ i, LocallyCompactSpace (G i)] [∀ i, SecondCountableTopology (G i)]
     (f : ∀ i, SchwartzBruhat (G i)) : ∃ g : SchwartzBruhat (∀ i, G i),

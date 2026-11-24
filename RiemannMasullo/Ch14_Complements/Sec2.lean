@@ -9,6 +9,7 @@ public import Mathlib.Analysis.SpecialFunctions.ExpDeriv
 public import Mathlib.Analysis.SpecialFunctions.Pow.Complex
 public import Mathlib.Data.Finset.NatDivisors
 public import Mathlib.Data.Set.Card
+public import Mathlib.FieldTheory.Finite.GaloisField
 public import Mathlib.Topology.JacobsonSpace
 public import Mathlib.Topology.Algebra.InfiniteSum.Defs
 import Mathlib.NumberTheory.ArithmeticFunction.Moebius
@@ -211,6 +212,102 @@ theorem curveZetaEulerFactor_prod_order (f : X ⟶ Spec (.of k))
 -- quotient or show that the trace approximation requires one Mellin test to
 -- cancel all finite-stage poles. Under T = q^(-s) these lifts give one point.
 
+/-- A finitely generated algebra over a finite ring has finitely many ring homs into a
+finite field. -/
+private theorem finite_ringHom_of_adjoin {R A K : Type u} [CommSemiring R] [Finite R]
+    [CommRing A] [Algebra R A] [Field K] [Finite K]
+    (s : Finset A) (hs : Algebra.adjoin R (s : Set A) = ⊤) : Finite (A →+* K) := by
+  refine Finite.of_injective
+    (fun φ : A →+* K => (fun r : R => φ (algebraMap R A r), fun a : s => φ a)) ?_
+  intro φ ψ h
+  simp only [Prod.mk.injEq, funext_iff] at h
+  obtain ⟨h1, h2⟩ := h
+  have key : ∀ a, a ∈ Algebra.adjoin R (s : Set A) → φ a = ψ a := by
+    intro a ha
+    refine Algebra.adjoin_induction (p := fun a _ => φ a = ψ a) ?_ ?_ ?_ ?_ ha
+    · intro x hx
+      exact h2 ⟨x, hx⟩
+    · intro r
+      exact h1 r
+    · intro x y _ _ ihx ihy
+      rw [map_add, map_add, ihx, ihy]
+    · intro x y _ _ ihx ihy
+      rw [map_mul, map_mul, ihx, ihy]
+  exact RingHom.ext fun a => key a (hs ▸ Algebra.mem_top)
+
+/-- Morphisms from the spectrum of a finite field into an affine open of a scheme locally of
+finite type over a finite field are finite in number. -/
+private theorem finite_spec_hom_affineOpen (f : X ⟶ Spec (.of k)) [LocallyOfFiniteType f]
+    (K : Type u) [Field K] [Finite K] (U : X.Opens) (hU : IsAffineOpen U) :
+    Finite (Spec (.of K) ⟶ ↑U) := by
+  have hle : U ≤ f ⁻¹ᵁ (⊤ : (Spec (.of k)).Opens) := by simp
+  let g : Γ(Spec (.of k), ⊤) →+* Γ(X, U) := (Scheme.Hom.appLE f ⊤ U hle).hom
+  have hg : g.FiniteType :=
+    LocallyOfFiniteType.finiteType_appLE f (isAffineOpen_top _) hU hle
+  haveI : Finite Γ(Spec (.of k), ⊤) :=
+    Finite.of_injective
+      ((Scheme.ΓSpecIso (.of k)).commRingCatIsoToRingEquiv : Γ(Spec (.of k), ⊤) → k)
+      (Scheme.ΓSpecIso (.of k)).commRingCatIsoToRingEquiv.injective
+  have hAfin : Finite (Γ(X, U) →+* K) := by
+    letI := g.toAlgebra
+    obtain ⟨s, hs⟩ := hg.out
+    exact finite_ringHom_of_adjoin s hs
+  have h1 : Finite (Spec (.of K) ⟶ Spec (Γ(X, U))) := by
+    have h2 : Finite (CommRingCat.of (Γ(X, U)) ⟶ CommRingCat.of K) :=
+      Finite.of_injective (fun f => f.hom) (fun f g' h => CommRingCat.Hom.ext h)
+    exact Finite.of_injective (fun φ => Spec.homEquiv φ) Spec.homEquiv.injective
+  exact Finite.of_injective (fun φ : Spec (.of K) ⟶ ↑U => φ ≫ hU.isoSpec.hom)
+    (fun φ ψ h => by
+      have := congrArg (fun t => t ≫ hU.isoSpec.inv) h
+      simpa [Category.assoc] using this)
+
+/-- A scheme locally of finite type and quasi-compact over a finite field has finitely many
+points with values in any fixed finite field. -/
+private theorem finite_spec_hom (f : X ⟶ Spec (.of k)) [LocallyOfFiniteType f] [QuasiCompact f]
+    (K : Type u) [Field K] [Finite K] : Finite (Spec (.of K) ⟶ X) := by
+  classical
+  haveI : CompactSpace X := QuasiCompact.compactSpace_of_compactSpace f
+  have hpick : ∀ x : X, ∃ U : X.affineOpens, x ∈ (U : X.Opens) := by
+    intro x
+    obtain ⟨_, ⟨U, hU, rfl⟩, hx, -⟩ :=
+      X.isBasis_affineOpens.exists_subset_of_mem_open (Set.mem_univ x) isOpen_univ
+    exact ⟨⟨U, hU⟩, hx⟩
+  choose U hU using hpick
+  obtain ⟨t, ht⟩ := isCompact_univ.elim_finite_subcover (s := Set.univ)
+    (U := fun x : X => (U x : Set X)) (fun x => (U x : X.Opens).isOpen)
+    (fun y _ => Set.mem_iUnion.mpr ⟨y, hU y⟩)
+  have hcover : ∀ y : X, ∃ x : X, x ∈ t ∧ y ∈ (U x : X.Opens) := by
+    intro y
+    have h := ht (Set.mem_univ y)
+    simpa using h
+  haveI hpiece : ∀ x : X, Finite (Spec (.of K) ⟶ ↑(U x : X.Opens)) :=
+    fun x => finite_spec_hom_affineOpen f K (U x : X.Opens) (U x).2
+  let pt : Spec (.of K) := IsLocalRing.closedPoint K
+  haveI : Unique ↥(Spec (.of K)) := inferInstance
+  have key : ∀ h : Spec (.of K) ⟶ X,
+      ∃ (i : t) (h' : Spec (.of K) ⟶ ↑(U (i : X) : X.Opens)),
+        h' ≫ (U (i : X) : X.Opens).ι = h := by
+    intro h
+    obtain ⟨x, hx, hmem⟩ := hcover (h pt)
+    have hrange : Set.range ⇑h ⊆ Set.range ⇑(U x : X.Opens).ι := by
+      rw [Scheme.Opens.range_ι]
+      intro y hy
+      obtain ⟨z, rfl⟩ := hy
+      rw [Subsingleton.elim z pt]
+      exact hmem
+    exact ⟨⟨x, hx⟩, IsOpenImmersion.lift (U x : X.Opens).ι h hrange,
+      IsOpenImmersion.lift_fac (U x : X.Opens).ι h hrange⟩
+  let F : (Spec (.of K) ⟶ X) → Σ i : t, (Spec (.of K) ⟶ ↑(U (i : X) : X.Opens)) :=
+    fun h => ⟨(key h).choose, (key h).choose_spec.choose⟩
+  have Ffac : ∀ h, (F h).2 ≫ (U ((F h).1 : X) : X.Opens).ι = h :=
+    fun h => (key h).choose_spec.choose_spec
+  refine Finite.of_injective F ?_
+  intro a b hab
+  have h1 := Ffac a
+  have h2 := Ffac b
+  rw [hab] at h1
+  exact h1.symm.trans h2
+
 /-- Paper: §14.2, last paragraph, p. 534. For each degree there are finitely
 many closed points whose residue field has that degree over the base field.
 Deviation: Page 534 says that the factors repeat "infinitely many times". The
@@ -219,7 +316,66 @@ degree tends to infinity. -/
 theorem curveZeta_closedPointsOfDegree_finite (f : X ⟶ Spec (.of k))
     [SmoothOfRelativeDimension 1 f] [IsProper f] [GeometricallyConnected f] (m : ℕ) :
     {x : X | x ∈ closedPoints X ∧
-      Nat.card (X.residueField x) = Nat.card k ^ m}.Finite := by sorry
+      Nat.card (X.residueField x) = Nat.card k ^ m}.Finite := by
+  classical
+  have hq : 2 ≤ Nat.card k := by
+    haveI : Fintype k := Fintype.ofFinite k
+    rw [Nat.card_eq_fintype_card]
+    exact Fintype.one_lt_card
+  rcases m with _ | m
+  · have hempty : {x : X | x ∈ closedPoints X ∧
+        Nat.card (X.residueField x) = Nat.card k ^ 0} = ∅ := by
+      ext x
+      simp only [Set.mem_ofPred_eq, Set.mem_empty_iff_false, iff_false, not_and]
+      intro hx hc
+      obtain ⟨n, hn, hncard⟩ := closedPoint_residueField_card_pow f hx
+      have h2 : 2 ≤ Nat.card (X.residueField x) := by
+        rw [hncard]
+        exact le_trans hq (le_self_pow (by omega) (by omega))
+      rw [pow_zero] at hc
+      omega
+    rw [hempty]
+    exact Set.finite_empty
+  · set S : Set X := {x : X | x ∈ closedPoints X ∧
+      Nat.card (X.residueField x) = Nat.card k ^ (m + 1)} with hSdef
+    rcases S.eq_empty_or_nonempty with hempty | ⟨x₀, hx₀⟩
+    · rw [hempty]
+      exact Set.finite_empty
+    · rw [hSdef] at hx₀
+      obtain ⟨hx₀cl, hx₀card⟩ := hx₀
+      have hK0 : Nat.card (X.residueField x₀) ≠ 0 := by
+        rw [hx₀card]
+        exact pow_ne_zero _ (Nat.card_ne_zero.mpr ⟨⟨0⟩, inferInstance⟩)
+      haveI : Finite (X.residueField x₀) := (Nat.card_ne_zero.mp hK0).2
+      haveI : Fintype (X.residueField x₀) := Fintype.ofFinite _
+      haveI : QuasiCompact f := inferInstance
+      haveI : Finite (Spec (.of (↥(X.residueField x₀))) ⟶ X) :=
+        finite_spec_hom f (↥(X.residueField x₀))
+      let pt : ↥(Spec (.of (↥(X.residueField x₀)))) := default
+      have hsub : S ⊆ Set.range (fun h : Spec (.of (↥(X.residueField x₀))) ⟶ X => h pt) := by
+        intro x hx
+        rw [hSdef] at hx
+        obtain ⟨hxcl, hxcard⟩ := hx
+        have hx0 : Nat.card (X.residueField x) ≠ 0 := by
+          rw [hxcard]
+          exact pow_ne_zero _ (Nat.card_ne_zero.mpr ⟨⟨0⟩, inferInstance⟩)
+        haveI : Finite (X.residueField x) := (Nat.card_ne_zero.mp hx0).2
+        haveI : Fintype (X.residueField x) := Fintype.ofFinite _
+        have hcard : Fintype.card (X.residueField x) =
+            Fintype.card (X.residueField x₀) := by
+          have h1 : Fintype.card (X.residueField x) = Nat.card (X.residueField x) :=
+            (Nat.card_eq_fintype_card).symm
+          have h2 : Fintype.card (X.residueField x₀) = Nat.card (X.residueField x₀) :=
+            (Nat.card_eq_fintype_card).symm
+          rw [h1, h2, hxcard, hx₀card]
+        let e : (X.residueField x) ≃+* (X.residueField x₀) :=
+          FiniteField.ringEquivOfCardEq hcard
+        let h : Spec (.of (↥(X.residueField x₀))) ⟶ X :=
+          Spec.map (CommRingCat.ofHom e.toRingHom) ≫ X.fromSpecResidueField x
+        refine ⟨h, ?_⟩
+        show (Spec.map (CommRingCat.ofHom e.toRingHom) ≫ X.fromSpecResidueField x) pt = x
+        exact Scheme.fromSpecResidueField_apply x _
+      exact Set.Finite.subset (Set.finite_range _) hsub
 
 /-- Paper: §14.2, p. 535. The number of closed points of degree m over k. -/
 noncomputable def curveZetaClosedPointCount (f : X ⟶ Spec (.of k))

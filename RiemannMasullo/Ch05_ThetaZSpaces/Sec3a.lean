@@ -9,6 +9,7 @@ public import RiemannMasullo.Ch03_IdelicZeta.Sec4
 public import Mathlib.Analysis.Distribution.Support
 
 import Mathlib.Analysis.Calculus.FDeriv.Symmetric
+import RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 public import Mathlib.Analysis.Calculus.BumpFunction.FiniteDimension
 public import Mathlib.Algebra.MvPolynomial.Degrees
 public import Mathlib.RingTheory.MvPowerSeries.PiTopology
@@ -1312,21 +1313,71 @@ private theorem sAdelePrincipalValue_isClosedEmbedding_injective {S S₀ : Finse
       (fun w ↦ finitePlacePrincipalValue w.val)
       (fun w ↦ (finitePlacePrincipalValue_isClosedEmbedding w.val).injective)
 
+/-- Finite-place principal values admit algebraic left inverses. On the finite
+tensor factor these are continuous for the finest locally convex topology. -/
+private theorem sAdelePrincipalValue_isClosedEmbedding_tensorFamily {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] [PolynormableSpace ℂ A] [T2Space A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] [T2Space B]
+    {ι : Type*} {D : ι → Type*} [∀ i, AddCommGroup (D i)] [∀ i, Module ℂ (D i)]
+    (e : InductiveTensor A (FinestLocallyConvex (⨂[ℂ] i, D i)) ≃L[ℂ] B)
+    (T : ∀ i, D i →ₗ[ℂ] D i) (hinj : ∀ i, Function.Injective (T i)) :
+    let W := FinestLocallyConvex (⨂[ℂ] i, D i)
+    let P : W →ₗ[ℂ] W := PiTensorProduct.map T
+    IsClosedEmbedding (e.toLinearMap.comp ((TensorProduct.map
+      (LinearMap.id (R := ℂ) (M := A)) P).comp e.symm.toLinearMap)) := by
+  classical
+  intro W P
+  choose L hL using fun i ↦ (T i).exists_leftInverse_of_injective
+    (LinearMap.ker_eq_bot.mpr (hinj i))
+  let J : W →ₗ[ℂ] W := PiTensorProduct.map L
+  have hJP : J.comp P = LinearMap.id :=
+    (PiTensorProduct.map_comp L T).symm.trans ((congrArg (PiTensorProduct.map (R := ℂ))
+      (funext hL)).trans PiTensorProduct.map_id)
+  let : T2Space W := finestLocallyConvex_t2 _
+  let lift (p : W →ₗ[ℂ] W) : InductiveTensor A W →L[ℂ] InductiveTensor A W :=
+    ⟨inductiveTensorMap LinearMap.id p, inductiveTensorMap_continuous (ContinuousLinearMap.id ℂ A)
+      (⟨p, continuous_of_finestLocallyConvex _ p⟩ : W →L[ℂ] W)⟩
+  let f := e.toContinuousLinearMap.comp ((lift P).comp e.symm.toContinuousLinearMap)
+  let j := e.toContinuousLinearMap.comp ((lift J).comp e.symm.toContinuousLinearMap)
+  have hleft : Function.LeftInverse j f := by
+    intro x
+    change e (lift J (e.symm (e (lift P (e.symm x))))) = x
+    rw [e.symm_apply_apply]
+    have hmaps (z : A ⊗[ℂ] W) :
+        TensorProduct.map (LinearMap.id (M := A)) J (TensorProduct.map LinearMap.id P z) = z := by
+      rw [TensorProduct.map_map, hJP, LinearMap.id_comp, TensorProduct.map_id, LinearMap.id_apply]
+    exact (congrArg e (hmaps (e.symm x))).trans (e.apply_symm_apply x)
+  exact hleft.isClosedEmbedding j.continuous f.continuous
+
+/-- Transport the split injection through the S-adelic tensor presentation. -/
+private theorem sAdelePrincipalValue_isClosedEmbedding_tensor {S S₀ : Finset V} (h₀ : S₀ ⊆ S) :
+    IsClosedEmbedding (sAdelePrincipalValue F h₀) := by
+  classical
+  let : T2Space (ℬ(InfiniteAdeleRing F)) := schwartzBruhat_eval_t2
+  let : T2Space (ℬₛ(S)) := schwartzBruhat_eval_t2
+  unfold sAdelePrincipalValue
+  with_reducible_and_instances
+    apply sAdelePrincipalValue_isClosedEmbedding_tensorFamily
+  intro w
+  split
+  · exact fun _ _ h ↦ (finitePlacePrincipalValue_isClosedEmbedding w.val).injective h
+  · exact Function.injective_id
+
 /-- Paper: Definition 5.3.1.4(1), p. 242.
 The S-local principal value induces the topology of the S-local test space: it is the identity
 on the archimedean factor and a tensor product of endomorphisms of the finite factors, so it is
 a linear self-map of a space whose topology is transported from that tensor decomposition. -/
 private theorem sAdelePrincipalValue_isClosedEmbedding_isInducing {S S₀ : Finset V}
-    (h₀ : S₀ ⊆ S) : IsInducing (sAdelePrincipalValue F h₀) := by
-  sorry
+    (h₀ : S₀ ⊆ S) : IsInducing (sAdelePrincipalValue F h₀) :=
+  (sAdelePrincipalValue_isClosedEmbedding_tensor (F := F) h₀).isEmbedding.isInducing
 
 /-- Paper: Definition 5.3.1.4(1) and Lemma 5.3.1.3, p. 242.
 The image of the S-local principal value is closed: it is the image of the whole archimedean
 factor and of the image of the local principal value in each selected finite place, that is, of
 tests vanishing at the origin there, which is the zero set of a continuous functional. -/
 private theorem sAdelePrincipalValue_isClosedEmbedding_isClosed {S S₀ : Finset V}
-    (h₀ : S₀ ⊆ S) : IsClosed (Set.range (sAdelePrincipalValue F h₀)) := by
-  sorry
+    (h₀ : S₀ ⊆ S) : IsClosed (Set.range (sAdelePrincipalValue F h₀)) :=
+  (sAdelePrincipalValue_isClosedEmbedding_tensor (F := F) h₀).isClosed_range
 
 /-- Paper: Definition 5.3.1.4(1), p. 242.
 The S-local principal value is a topological embedding with closed range. -/

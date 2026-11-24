@@ -3270,12 +3270,66 @@ def Printed.invariantPWCondensation_trace_tendsto : Prop :=
               (productTraceClass(T, invariantPWProjection (F := F) (S := S) hs a ω Λ)))
               atTop (𝓝 (hilbertTrace T))
 
+section
+local notation "CQ" => IdeleClassGroup (𝓞 ℚ) ℚ
+local notation "CQ₁" => (ideleClassNorm ℚ).ker
+local notation "h₀" => le_rfl (a := (0 : ℝ))
+local notation "hs₂" => (show (0 : ℝ) ≤ 2 from zero_le_two)
+
+/-- The invariant printed trace convergence gives the same rational scalar trace
+compatibility as the absolute one: at the rational data the invariant projections
+also converge strongly to the isotypic geometric projection and are contractive,
+so the fixed-cutoff trace limit is unchanged. -/
+private theorem invariantPW_rational_trace_compatible_of_printed
+    (h : Printed.invariantPWCondensation_trace_tendsto) :
+    absolutePW_rational_trace_compatible 0 h₀ := by
+  have e : (1 : PontryaginDual CQ).comp
+      (⟨(ideleClassNorm ℚ).ker.subtype, continuous_subtype_val⟩ : CQ₁ →ₜ* CQ) = 1 := by
+    ext k
+    rfl
+  have h' : absolutePW_rational_trace_compatible (-(0 : ℝ)) (neg_nonpos.mpr h₀) := by
+    intro φ hφ R ε ρ hρ
+    let I := absolutePW_rational_isotype (-(0 : ℝ)) (neg_nonpos.mpr h₀)
+    let : CompleteSpace I := absolutePW_rational_isotype_complete _ _
+    let Q := (globalThetaSobolev ℚ (1/2) (neg_nonpos.mpr h₀) hs₂).starProjection
+    let P := I.orthogonalProjectionOnto.comp (Q.comp I.subtypeL)
+    have hh := h ℚ 1 ∅ (1/2) 2 hs₂
+      rational_one_unramifiedOutside_empty rational_empty_picTrivial φ hφ R ε ρ hρ
+    obtain ⟨T, ht, hlim⟩ := hh
+    let T' : nuclearEndomorphisms I := T
+    let PΛ (Λ : ℝ) : I →L[ℂ] I :=
+      invariantPWProjection (F := ℚ) (S := ∅) hs₂ (1/2) (1 : PontryaginDual CQ₁) Λ
+    have hu : NormOneCharacterUnramifiedOutside (1 : PontryaginDual CQ₁) ∅ :=
+      e ▸ rational_one_unramifiedOutside_empty
+    have hP (x : I) : Tendsto (fun Λ ↦ PΛ Λ x) atTop (𝓝 (P x)) :=
+      invariantPWProjection_tendsto (F := ℚ) (S := ∅) hs₂ (1/2) (1 : PontryaginDual CQ₁)
+        hu rational_empty_picTrivial x
+    have hPb : ∀ Λ, ‖PΛ Λ‖ ≤ 1 := by
+      intro Λ
+      apply ContinuousLinearMap.opNorm_le_bound (PΛ Λ) zero_le_one
+      intro x
+      rw [one_mul]
+      let K := (globalInvariantPWSobolev (F := ℚ) (S := ∅) hs₂ (1/2)
+        (1 : PontryaginDual CQ₁) Λ).comap I.subtype
+      let : IsClosed (K : Set I) :=
+        (Submodule.isClosed_topologicalClosure _).preimage continuous_subtype_val
+      exact Submodule.norm_starProjection_apply_le K x
+    refine ⟨T', fun x ↦ ?_, tendsto_nhds_unique
+      (absolutePWCondensation_trace_tendsto_strong I T' PΛ P hP hPb) hlim⟩
+    exact DFunLike.congr_fun ht x
+  let P (l : {l : ℝ // l ≤ 0}) := absolutePW_rational_trace_compatible l.val l.property
+  have he : (⟨-(0 : ℝ), neg_nonpos.mpr h₀⟩ : {l : ℝ // l ≤ 0}) = ⟨0, h₀⟩ := Subtype.ext neg_zero
+  exact (congrArg P he).mp h'
+
+end
+
 /-- Paper: Theorem 11.2.1.4(2) and (11.2.1.10), p. 489.
 For the rational data of the absolute scalar counterexample the
 only place in S is real. The product region equals the box at every level,
 so both scalar limits have the same discrepancy. -/
 theorem Printed.invariantPWCondensation_trace_tendsto_false :
-    ¬ Printed.invariantPWCondensation_trace_tendsto := by sorry
+    ¬ Printed.invariantPWCondensation_trace_tendsto := fun hall ↦
+  absolutePW_rational_trace_compatible_false (invariantPW_rational_trace_compatible_of_printed hall)
 
 local notation "theta0(" F ", " hs ")" => globalThetaSobolev F 0 (le_rfl (a := (0 : ℝ))) hs
 local notation "Sₚ(" F ", " p ")" => (finite_nuclearityPlacesAbove (F := F) p).toFinset

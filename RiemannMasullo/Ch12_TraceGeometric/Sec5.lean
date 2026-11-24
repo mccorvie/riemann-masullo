@@ -885,7 +885,7 @@ open Classical in
 /-- Fourier–Mellin transform of a test function of the norm: it vanishes unless the
 unitary character is trivial on the norm-one classes, and is then the volume of those
 classes times a one-variable Mellin transform for `dt/t`. -/
-private theorem normTest_mellin (g : ℝ → ℂ) (_hg : Continuous g) (φ : BruhatCompactSupport C𝔽)
+theorem normTest_mellin (g : ℝ → ℂ) (_hg : Continuous g) (φ : BruhatCompactSupport C𝔽)
     (hφ : ∀ x, φ.val x = g (Real.log ((ideleClassNorm F x : ℝ≥0) : ℝ)))
     (χ : PontryaginDual C𝔽) (s : ℂ) :
     modulatedFourierMellin m𝔽 univ hm𝔽 μ𝔽 φ.val (ideleClassNormTwist χ s) =
@@ -976,7 +976,7 @@ private theorem grh_cpow_exp (x : ℝ) (w : ℂ) :
     Complex.log_exp (by simp [Real.pi_pos]) (by simp [Real.pi_pos.le]), mul_comm]
 
 /-- The shifted radial integral against `t ^ w`, in logarithmic coordinates. -/
-private theorem grh_shift_integral (H : ℝ → ℂ) (hH : Continuous H) (c : ℝ≥0ˣ → ℂ)
+theorem grh_shift_integral (H : ℝ → ℂ) (hH : Continuous H) (c : ℝ≥0ˣ → ℂ)
     (hc : ∀ t, c t = 1) (y : ℝ) (w : ℂ) :
     ∫ t, H (Real.log ((t : ℝ≥0) : ℝ) - y) * c t * (((t : ℝ≥0) : ℝ) : ℂ) ^ w
         ∂positiveRealHaar =

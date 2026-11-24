@@ -1719,6 +1719,141 @@ theorem strongCoprimalityPrimaryQuotient_nuclearFrechet (ω : PontryaginDual C�
       IsNuclearTVS (StrongCoprimalityQuotient η (finite_nuclearityPlacesAbove (F := F) p).toFinset))
     hχ).mp (strongCoprimalityPrimaryQuotient_character χ _)
 
+/-- A linear equivalence preserves infinite-dimensionality. -/
+private theorem not_finiteDimensional_iff_of_linearEquiv {X Y : Type*} [AddCommGroup X]
+    [Module ℂ X] [AddCommGroup Y] [Module ℂ Y] (e : X ≃ₗ[ℂ] Y) :
+    ¬ FiniteDimensional ℂ X ↔ ¬ FiniteDimensional ℂ Y := by
+  constructor
+  · intro hX hY
+    haveI := hY
+    exact hX (FiniteDimensional.of_injective e.toLinearMap e.injective)
+  · intro hY hX
+    haveI := hX
+    exact hY (FiniteDimensional.of_surjective e.toLinearMap e.surjective)
+
+open Classical in
+/-- Paper: Remark 7.5.0.2 and Equation (7.5.0.15), p. 378.
+The primary quotient is infinite-dimensional exactly when the comparison difference quotient is:
+`strongCoprimality` identifies the two by a topological linear equivalence. The difference
+quotient is the modulated decay isotype modulo the range of the difference product over the
+unramified places, so the remaining input for the refutation of the printed subquotient model
+is that this range has infinite codimension. -/
+theorem not_finiteDimensional_strongCoprimalityQuotient_iff (χ : U) (S : Finset V)
+    (π : (v : V) → (v.adicCompletion F)ˣ)
+    (hπ : ∀ v ∈ S, Valuation.IsUniformizer
+      (Valued.v : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ))) (π v).val) :
+    let T := S.filter (fun v ↦ (ideleClassNormTwist χ 0).IsUnramifiedAt v)
+    ¬ FiniteDimensional ℂ (StrongCoprimalityQuotient ω(χ) S) ↔
+      ¬ FiniteDimensional ℂ (StrongCoprimalityDecaySpace ω(χ) ⧸
+        strongCoprimalityDifferenceRange ω(χ) T π) := by
+  obtain ⟨e, _⟩ := strongCoprimality χ S π hπ
+  exact not_finiteDimensional_iff_of_linearEquiv e.toLinearEquiv
+
+/-- Riesz's theorem: a compact set with nonempty interior in a Hausdorff topological vector
+space forces finite-dimensionality. -/
+private theorem finiteDimensional_of_isCompact_of_interior_nonempty {E : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [ContinuousSMul ℂ E] [T2Space E] {K : Set E} (hK : IsCompact K)
+    (hKi : (interior K).Nonempty) : FiniteDimensional ℂ E := by
+  obtain ⟨x, hx⟩ := hKi
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  exact FiniteDimensional.of_totallyBounded_nhds (𝕜 := ℂ)
+    (isOpen_interior.mem_nhds hx) (hK.totallyBounded.subset interior_subset)
+
+/-- A space whose strong dual is finite-dimensional is finite-dimensional. -/
+private theorem finiteDimensional_of_finiteDimensional_strongDual {E : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [PolynormableSpace ℂ E]
+    [T2Space E] (h : FiniteDimensional ℂ (StrongDual ℂ E)) : FiniteDimensional ℂ E := by
+  have : SeparatingDual ℂ E := polynormableSpace_separatingDual ℂ E
+  let f : E →ₗ[ℂ] Module.Dual ℂ (StrongDual ℂ E) :=
+    { toFun := fun x =>
+        { toFun := fun φ => φ x
+          map_add' := fun _ _ => rfl
+          map_smul' := fun c φ => rfl }
+      map_add' := fun x y => by
+        ext φ
+        exact map_add φ x y
+      map_smul' := fun c x => by
+        ext φ
+        exact map_smul φ c x }
+  have hf : Function.Injective f := by
+    intro x y hxy
+    refine (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr fun φ => ?_
+    exact congrFun (congrArg DFunLike.coe hxy) φ
+  exact FiniteDimensional.of_injective f hf
+
+open scoped Pointwise in
+/-- The strong dual of an infinite-dimensional nuclear Fréchet space is meagre: a countable
+neighbourhood basis of the primal has polars that are compact in the strong dual, and no
+compact subset of a Hausdorff topological vector space with nonempty interior can exist in
+an infinite-dimensional space by Riesz's theorem. -/
+theorem not_bairespace_strongDual (E : Type*) [AddCommGroup E] [Module ℂ E]
+    [TopologicalSpace E] (hE : IsFrechetTVS E) (hN : IsNuclearTVS E)
+    (hinf : ¬ FiniteDimensional ℂ E) : ¬ BaireSpace (StrongDual ℂ E) := by
+  classical
+  have hFE : IsFrechetTVS E := hE
+  obtain ⟨hadd, hpoly, hmet, hcomplete⟩ := hE
+  let : IsTopologicalAddGroup E := hadd
+  have : PolynormableSpace ℂ E := hpoly
+  have : ContinuousSMul ℂ E := PolynormableSpace.continuousSMul ℂ E
+  have : TopologicalSpace.MetrizableSpace E := hmet
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  -- A nuclear Fréchet space is Schwartz, hence Montel, so polars are strongly compact.
+  have hMontel : MontelSpace ℂ E :=
+    montelSpace_of_schwartz_frechet hFE (isSchwartzTVS_of_isNuclearTVS hN)
+  have : MontelSpace ℂ E := hMontel
+  -- A countable decreasing neighbourhood basis of the primal.
+  obtain ⟨Un, hUn⟩ := (𝓝 (0 : E)).exists_antitone_basis
+  set K : ℕ → Set (StrongDual ℂ E) :=
+    fun n => (((n + 1 : ℕ) : ℂ)) • StrongDual.polar ℂ (Un (n + 1)) with hKdef
+  -- The scaled polars cover the strong dual.
+  have hcover : (univ : Set (StrongDual ℂ E)) ⊆ ⋃ n, K n := by
+    intro φ _
+    have hb : Metric.ball (0 : ℂ) 1 ∈ 𝓝 (φ 0) := by
+      rw [map_zero]
+      exact Metric.ball_mem_nhds 0 one_pos
+    have hopen : φ ⁻¹' Metric.ball (0 : ℂ) 1 ∈ 𝓝 (0 : E) :=
+      φ.continuous.continuousAt.preimage_mem_nhds hb
+    obtain ⟨m, hm⟩ := hUn.mem_iff.mp hopen
+    refine mem_iUnion.mpr ⟨m, ?_⟩
+    have hsub : Un (m + 1) ⊆ Un m := hUn.antitone (Nat.le_succ m)
+    have hφ : φ ∈ StrongDual.polar ℂ (Un (m + 1)) := by
+      rw [StrongDual.mem_polar_iff]
+      intro x hx
+      exact (mem_ball_zero_iff.mp (hm (hsub hx))).le
+    have hcast : (((m + 1 : ℕ) : ℂ)) ≠ 0 := by
+      simpa using Nat.cast_ne_zero.mpr (Nat.succ_ne_zero m)
+    have hsmul : (((m + 1 : ℕ) : ℂ)) • (((((m + 1 : ℕ) : ℂ)))⁻¹ • φ) = φ := by
+      rw [smul_smul, mul_inv_cancel₀ hcast, one_smul]
+    have hψ : (((((m + 1 : ℕ) : ℂ)))⁻¹ • φ) ∈ StrongDual.polar ℂ (Un (m + 1)) := by
+      rw [StrongDual.mem_polar_iff]
+      intro x hx
+      rw [smul_apply, norm_smul, norm_inv, Complex.norm_natCast]
+      have h1 : (1 : ℝ) ≤ ((m + 1 : ℕ) : ℝ) :=
+        mod_cast Nat.succ_le_succ (Nat.zero_le m)
+      have hle : ‖φ x‖ ≤ 1 := hφ x hx
+      rw [inv_mul_le_iff₀ (by linarith)]
+      nlinarith [norm_nonneg (φ x)]
+    rw [← hsmul]
+    exact smul_mem_smul_set hψ
+  have hKcompact (n : ℕ) : IsCompact (K n) :=
+    (isCompact_strongDual_polar (hUn.mem (n + 1))).smul (((n + 1 : ℕ) : ℂ))
+  -- A compact set with nonempty interior would make the strong dual finite-dimensional.
+  have hKempty (n : ℕ) : interior (K n) = ∅ := by
+    by_contra hne
+    have hne' : (interior (K n)).Nonempty := Set.nonempty_iff_ne_empty.mpr hne
+    have hfin : FiniteDimensional ℂ (StrongDual ℂ E) :=
+      finiteDimensional_of_isCompact_of_interior_nonempty (hKcompact n) hne'
+    have hN' : IsNuclearTVS (StrongDual ℂ E) := (isNuclearTVS_strongDual_iff hFE).mpr hN
+    exact hinf (finiteDimensional_of_finiteDimensional_strongDual hfin)
+  intro hb
+  have : BaireSpace (StrongDual ℂ E) := hb
+  have hmeagre : IsMeagre (⋃ n, K n) := isMeagre_iUnion fun n =>
+    ((hKcompact n).isClosed.isNowhereDense_iff.mpr (hKempty n)).isMeagre
+  exact not_isMeagre_of_isOpen isOpen_univ univ_nonempty (IsMeagre.mono hcover hmeagre)
+
 section SLocal
 
 variable {S : Finset (HeightOneSpectrum (𝓞 F))}

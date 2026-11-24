@@ -491,11 +491,6 @@ theorem mem_sLocalZetaMatching (χ : PontryaginDual Jₛ) (p : B⁺ × B⁻) :
     (fun p : B⁺ × B⁻ ↦ p.1.val) (fun p s ↦ ρₛ(χ, s) * p.2.val s) h p
   exact key
 
-/-- Paper: Theorem 5.4.1.1(1), p. 266.
-The zeta pair is a topological embedding with closed range. -/
-theorem sLocalZetaPair_isClosedEmbedding (χ : PontryaginDual Jₛ) :
-    IsClosedEmbedding (sLocalZetaPair (F := F) (S := S) χ) := by sorry
-
 /-- The zeta pair lands in the matching space: on the overlap strip the two components
 satisfy the local functional equation of (5.4.1.3), by the equation proved for the
 integral representation on test functions. -/
@@ -561,6 +556,33 @@ theorem sLocalZetaPair_range (χ : PontryaginDual Jₛ) :
     (sLocalZetaPair (F := F) (S := S) χ).range = sLocalZetaMatching (F := F) (S := S) χ :=
   le_antisymm (sLocalZetaPair_range_le_matching (F := F) (S := S) χ)
     (sLocalZetaPair_matching_le_range (F := F) (S := S) χ)
+
+/-- Paper: Theorem 5.4.1.1(1), p. 266.
+The zeta pair induces the topology of the homogeneous theta space: a theta class is close
+to zero exactly when both of its zeta coordinates are close to zero on their half-planes. -/
+theorem sLocalZetaPair_isEmbedding (χ : PontryaginDual Jₛ) :
+    IsEmbedding (sLocalZetaPair (F := F) (S := S) χ) := by sorry
+
+/-- Paper: Theorem 5.4.1.1(1), p. 266.
+The zeta pair has closed range. A pair is the zeta pair of a theta class exactly when its
+two entries satisfy the functional equation on the overlap strip, and that condition is
+closed because it is the kernel of the continuous difference map of (5.4.1.3). -/
+theorem sLocalZetaPair_isClosed_range (χ : PontryaginDual Jₛ) :
+    IsClosed (Set.range (sLocalZetaPair (F := F) (S := S) χ)) := by
+  obtain ⟨-, -, hM, -⟩ := schwartzBergman_frechet overlapInterval isOpen_Ioo
+    ordConnected_Ioo ⟨1 / 2, by norm_num⟩
+  let : MetrizableSpace B⁰ := hM
+  have hclosed : IsClosed (sLocalZetaMatching (F := F) (S := S) χ : Set (B⁺ × B⁻)) := by
+    unfold sLocalZetaMatching
+    exact ContinuousLinearMap.isClosed_ker _
+  rw [← LinearMap.coe_range, sLocalZetaPair_range]
+  exact hclosed
+
+/-- Paper: Theorem 5.4.1.1(1), p. 266.
+The zeta pair is a topological embedding with closed range. -/
+theorem sLocalZetaPair_isClosedEmbedding (χ : PontryaginDual Jₛ) :
+    IsClosedEmbedding (sLocalZetaPair (F := F) (S := S) χ) :=
+  ⟨sLocalZetaPair_isEmbedding χ, sLocalZetaPair_isClosed_range χ⟩
 
 -- TODO(paper-gap): The two printed translation factors disagree on the overlap.
 -- The functional equation and Fourier scaling both give the first factor on both entries.

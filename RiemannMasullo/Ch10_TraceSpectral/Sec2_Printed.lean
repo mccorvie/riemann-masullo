@@ -5,6 +5,7 @@ public import RiemannMasullo.Ch10_TraceSpectral.Sec2
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.Ch13_ZerosHecke.Targets
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gamma.VerticalStrip
 import RiemannMasullo.External.ZetaLab.HardyFirstZero.FirstZero
 import Mathlib.Analysis.InnerProductSpace.l2Space
 import Mathlib.Logic.Equiv.Nat
@@ -1033,6 +1034,558 @@ private theorem spectralLineJet_memLp_false_primeCounts
       spectralLineJet_memLp_false_countSupport E n hn
     simp [h]
 
+section CubicZeroCount
+
+open Complex Bornology Metric IsDedekindDomain
+
+local notation "ζChar(" E ")" => (1 : PontryaginDual C𝔽(E))
+local notation "completedζ(" E ")" => continuedCompletedHeckeL ζChar(E)
+local notation "finiteζ(" E ")" => (finiteHeckeL_exists_continuation ζChar(E)).choose
+local notation "ζRatio(" E ")" => toMeromorphicNFOn (completedζ(ℚ) / completedζ(E)) univ
+
+/-- A bound on all four sides of a rectangle bounds the value at the real point one. -/
+private theorem cubicZeroCount_rectangle (f : ℂ → ℂ) (hf : Differentiable ℂ f)
+    {R lo hi C : ℝ} (hR : 1 < R) (hl : lo < 0) (hh : 0 < hi)
+    (hv : ∀ z : ℂ, z.re = -R ∨ z.re = R → ‖f z‖ ≤ C)
+    (hy : ∀ z : ℂ, |z.re| ≤ R → z.im = lo ∨ z.im = hi → ‖f z‖ ≤ C) :
+    ‖f 1‖ ≤ C := by
+  have hR' : -R < R := by linarith
+  have hT : lo < hi := hl.trans hh
+  apply Complex.norm_le_of_forall_mem_frontier_norm_le
+    ((isBounded_Ioo (-R) R).reProdIm (isBounded_Ioo lo hi)) hf.diffContOnCl
+  · intro z hz
+    rw [Complex.frontier_reProdIm, closure_Ioo hR'.ne, frontier_Ioo hT,
+      closure_Ioo hT.ne, frontier_Ioo hR'] at hz
+    rcases hz with hz | hz
+    · exact hy z (abs_le.mpr hz.1) hz.2
+    · exact hv z hz.1
+  · rw [Complex.closure_reProdIm, closure_Ioo hR'.ne, closure_Ioo hT.ne]
+    exact ⟨⟨by simp; linarith, by simpa using hR.le⟩, by simpa using And.intro hl.le hh.le⟩
+
+/-- Norm of the Gaussian used on a box of half-width R. -/
+private theorem cubicZeroCount_gaussianNorm {R : ℝ} (z : ℂ) :
+    ‖(Complex.exp (z ^ 2 / (R : ℂ)))‖ = Real.exp ((z.re ^ 2 - z.im ^ 2) / R) := by
+  simp only [Complex.norm_exp, Complex.div_ofReal_re, pow_two, Complex.mul_re]
+
+/-- For fixed R the Gaussian kills any exponential in the height on horizontal edges. -/
+private theorem cubicZeroCount_gaussianHorizontal {R A B C : ℝ} (hR : 0 < R) (hA : 0 < A) (hC : 0 < C) :
+    ∃ T : ℝ, 0 < T ∧ ∀ z : ℂ, |z.re| ≤ R → T ≤ |z.im| →
+      (A * Real.exp (B * |z.im|)) * ‖(Complex.exp (z ^ 2 / (R : ℂ)))‖ ≤ C := by
+  let T := max 1 (max ((B + 1) * R) (R - Real.log (C / A)))
+  refine ⟨T, lt_of_lt_of_le zero_lt_one (le_max_left ..), ?_⟩
+  intro z hx hy
+  have hy₁ : (B + 1) * R ≤ |z.im| := (le_trans (le_max_left ..) (le_max_right ..)).trans hy
+  have hy₂ : R - Real.log (C / A) ≤ |z.im| := (le_trans (le_max_right ..) (le_max_right ..)).trans hy
+  have hs : z.re ^ 2 ≤ R ^ 2 := by simpa [sq_abs] using pow_le_pow_left₀ (abs_nonneg z.re) hx 2
+  have hs' := mul_le_mul_of_nonneg_right hy₁ (abs_nonneg z.im)
+  rw [← sq, sq_abs] at hs'
+  have he : B * |z.im| + (z.re ^ 2 - z.im ^ 2) / R ≤ Real.log (C / A) := by
+    rw [← le_sub_iff_add_le', div_le_iff₀ hR]
+    nlinarith [mul_le_mul_of_nonneg_right hy₂ hR.le]
+  rw [cubicZeroCount_gaussianNorm, mul_assoc, ← Real.exp_add]
+  calc A * Real.exp _ ≤ A * Real.exp (Real.log (C / A)) := by gcongr
+       _ = C := by rw [Real.exp_log (div_pos hC hA)]; field_simp
+
+/-- On a vertical edge, completing the square makes the Gaussian cost only an exponential in R. -/
+private theorem cubicZeroCount_gaussianVertical {R B : ℝ} (hR : 0 < R) (z : ℂ) (hx : |z.re| ≤ R) :
+    Real.exp (B * |z.im|) * ‖(Complex.exp (z ^ 2 / (R : ℂ)))‖ ≤ Real.exp (R * (1 + B ^ 2)) := by
+  rw [cubicZeroCount_gaussianNorm, ← Real.exp_add, Real.exp_le_exp]
+  have hx' : z.re ^ 2 ≤ R ^ 2 := by simpa [sq_abs] using pow_le_pow_left₀ (abs_nonneg z.re) hx 2
+  have hs := sq_nonneg (|z.im| - 2⁻¹ * B * R)
+  rw [← le_sub_iff_add_le', div_le_iff₀ hR]
+  nlinarith [sq_abs z.im, sq_nonneg (B * R)]
+
+/-- An entire quotient cannot have uniform factorial savings on both distant
+vertical lines, even if its known horizontal estimates hold only along two
+sequences depending on the strip. The point tested is the real parameter 1. -/
+private theorem cubicZeroCount_factorialEdges (f : ℂ → ℂ) (hf : Differentiable ℂ f)
+    (D B : ℝ) (hD : 0 < D)
+    (hedge : ∀ (n : ℕ) (z : ℂ), |z.re| = 2 * (n + 1 : ℝ) →
+      ‖f z‖ ≤ D ^ (n + 1) / (n.factorial : ℝ) * Real.exp (B * |z.im|))
+    (hhor : ∀ n : ℕ, ∃ A > 0, ∃ b : ℝ, ∀ S > (0 : ℝ), ∃ lo hi : ℝ,
+      lo < -S ∧ S < hi ∧ ∀ z : ℂ, |z.re| ≤ 2 * (n + 1 : ℝ) →
+        z.im = lo ∨ z.im = hi → ‖f z‖ ≤ A * Real.exp (b * |z.im|)) :
+    f 1 = 0 := by
+  let c := D * Real.exp (2 * (1 + B ^ 2))
+  have hc : 0 < c := mul_pos hD (Real.exp_pos _)
+  have line (n : ℕ) : ‖f 1‖ ≤ c ^ (n + 1) / (n.factorial : ℝ) := by
+    let R : ℝ := 2 * (n + 1 : ℝ)
+    let V : ℝ := c ^ (n + 1) / (n.factorial : ℝ)
+    have hR : 1 < R := by dsimp [R]; linarith [Nat.cast_nonneg (α := ℝ) n]
+    have hR0 : 0 < R := zero_lt_one.trans hR
+    have hV : 0 < V := by dsimp [V]; positivity
+    obtain ⟨A, hA, b, hy⟩ := hhor n
+    obtain ⟨S, hS, hsmall⟩ := cubicZeroCount_gaussianHorizontal (B := b) hR0 hA hV
+    obtain ⟨lo, hi, hlo, hhi, hh⟩ := hy S hS
+    have hrect : ‖f 1 * (Complex.exp ((1 : ℂ) ^ 2 / (R : ℂ)))‖ ≤ V := by
+      apply cubicZeroCount_rectangle (fun z ↦ f z * (Complex.exp (z ^ 2 / (R : ℂ)))) (hf.mul (by fun_prop)) hR
+        (by linarith : lo < 0) (by linarith : 0 < hi)
+      · intro z hx
+        have heq : |z.re| = R := hx.elim (fun h ↦ by rw [h, abs_neg, abs_of_pos hR0])
+          (fun h ↦ by rw [h, abs_of_pos hR0])
+        rw [norm_mul]
+        calc
+          _ ≤ (D ^ (n + 1) / (n.factorial : ℝ) * Real.exp (B * |z.im|)) * ‖(Complex.exp (z ^ 2 / (R : ℂ)))‖ :=
+            mul_le_mul_of_nonneg_right (hedge n z heq) (norm_nonneg _)
+          _ ≤ (D ^ (n + 1) / (n.factorial : ℝ)) * Real.exp (R * (1 + B ^ 2)) := by
+            rw [mul_assoc]; gcongr; exact cubicZeroCount_gaussianVertical hR0 z heq.le
+          _ = V := by
+            have e : R * (1 + B ^ 2) = (n + 1 : ℕ) * (2 * (1 + B ^ 2)) := by push_cast; dsimp [R]; ring
+            rw [e, Real.exp_nat_mul]
+            dsimp [V, c]; rw [mul_pow]; ring
+      · intro z hx hz
+        rw [norm_mul]
+        apply (mul_le_mul_of_nonneg_right (hh z hx hz) (norm_nonneg _)).trans
+        apply hsmall z hx
+        rcases hz with h | h
+        · rw [h, abs_of_neg (by linarith : lo < 0)]; linarith
+        · rw [h, abs_of_pos (by linarith : 0 < hi)]; exact hhi.le
+    apply le_trans _ hrect
+    rw [norm_mul]
+    apply le_mul_of_one_le_right (norm_nonneg _)
+    rw [cubicZeroCount_gaussianNorm, Real.one_le_exp_iff]
+    simp [hR0.le]
+  have hlim : Tendsto (fun n : ℕ ↦ c ^ (n + 1) / (n.factorial : ℝ)) atTop (𝓝 0) := by
+    simpa [pow_succ, mul_div_right_comm] using (FloorSemiring.tendsto_pow_div_factorial_atTop c).mul_const c
+  exact norm_le_zero_iff.mp (le_of_tendsto_of_tendsto tendsto_const_nhds hlim (Eventually.of_forall line))
+
+/-- One step of the real gamma recurrence, valid also at a zero of its reciprocal. -/
+private theorem cubicZeroCount_gammaStep (s : ℂ) :
+    ‖s‖ * ‖(Gammaℝ (s + 2))⁻¹‖ = (2 * Real.pi) * ‖(Gammaℝ s)⁻¹‖ := by
+  by_cases hs : s = 0
+  · subst s; simp [Gammaℝ_def]
+  have he : (s * (Gammaℝ (s + 2))⁻¹) = (2 * (Real.pi : ℂ)) * (Gammaℝ s)⁻¹ := by
+    rw [Gammaℝ_add_two hs]; field_simp [hs]
+  simpa [norm_mul, Complex.norm_real, Real.norm_eq_abs, Real.pi_pos.le] using congrArg norm he
+
+/-- Gamma recursion on integer-spaced vertical contours gives factorial decay of its inverse. -/
+private theorem cubicZeroCount_gammaRecurrence (s : ℂ) (hs : 2 ≤ s.re) (n : ℕ) :
+    (n.factorial : ℝ) * ‖(Gammaℝ (s + 2 * n))⁻¹‖ ≤ (2 * Real.pi) ^ n * ‖(Gammaℝ s)⁻¹‖ := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    let w := s + 2 * (n : ℂ)
+    have hw : (n + 1 : ℝ) ≤ ‖w‖ := by
+      apply le_trans _ (re_le_norm w)
+      dsimp [w]
+      simp only [mul_re, re_ofNat, natCast_re, im_ofNat, zero_mul, sub_zero]
+      linarith [Nat.cast_nonneg (α := ℝ) n]
+    have hs' : s + 2 * (n.succ : ℂ) = w + 2 := by dsimp [w]; push_cast; ring
+    rw [hs', Nat.factorial_succ, Nat.cast_mul, Nat.cast_add, Nat.cast_one, pow_succ]
+    calc
+      ((n : ℝ) + 1) * (n.factorial : ℝ) * ‖(Gammaℝ (w + 2))⁻¹‖ =
+          (n.factorial : ℝ) * (((n : ℝ) + 1) * ‖(Gammaℝ (w + 2))⁻¹‖) := by ring
+      _ ≤ (n.factorial : ℝ) * (‖w‖ * ‖(Gammaℝ (w + 2))⁻¹‖) := by gcongr
+      _ = (2 * Real.pi) * ((n.factorial : ℝ) * ‖(Gammaℝ w)⁻¹‖) := by rw [cubicZeroCount_gammaStep]; ring
+      _ ≤ _ := by calc
+                    _ ≤ (2 * Real.pi) * ((2 * Real.pi) ^ n * ‖(Gammaℝ s)⁻¹‖) := by gcongr
+                    _ = _ := by ring
+
+/-- On a bounded positive strip the reciprocal real gamma factor grows at most exponentially. -/
+private theorem cubicZeroCount_gammaPositiveStrip (a b : ℝ) (ha : 0 < a) :
+    ∃ A > 0, ∃ B : ℝ, ∀ z : ℂ, z.re ∈ Icc a b → ‖(Gammaℝ z)⁻¹‖ ≤ A * Real.exp (B * |z.im|) := by
+  obtain ⟨A, hA, h⟩ := exists_norm_inv_GammaReal_add_le_on_strip a b ha 0 (by simp)
+  refine ⟨A, hA, 1 + Real.pi / 4, fun z hz ↦ ?_⟩
+  have h₀ : ‖(Gammaℝ z)⁻¹‖ ≤ A * ((1 + |z.im|) * Real.exp (Real.pi * |z.im|/4)) := by simpa using h z hz
+  apply h₀.trans
+  gcongr
+  calc
+    (1 + |z.im|) * Real.exp (Real.pi * |z.im|/4) ≤ Real.exp |z.im| * Real.exp (Real.pi * |z.im|/4) := by
+      gcongr; linarith [Real.add_one_le_exp |z.im|]
+    _ = _ := by rw [← Real.exp_add]; congr 1; ring
+
+/-- On every fixed vertical strip the reciprocal real gamma factor grows at most exponentially. -/
+private theorem cubicZeroCount_gammaStrip (a b : ℝ) :
+    ∃ A > 0, ∃ B : ℝ, ∀ z : ℂ, z.re ∈ Icc a b → ‖(Gammaℝ z)⁻¹‖ ≤ A * Real.exp (B * |z.im|) := by
+  obtain ⟨n, hn⟩ := exists_nat_gt (-a)
+  have haux (k : ℕ) (a b : ℝ) (hk : 0 < a + 2 * k) :
+      ∃ A > 0, ∃ B : ℝ, ∀ z : ℂ, z.re ∈ Icc a b → ‖(Gammaℝ z)⁻¹‖ ≤ A * Real.exp (B * |z.im|) := by
+    induction k generalizing a b with
+    | zero => exact cubicZeroCount_gammaPositiveStrip a b (by simpa using hk)
+    | succ k ih =>
+      obtain ⟨A, hA, B, h⟩ := ih (a + 2) (b + 2) (by push_cast at hk; linarith)
+      let C := 1 + |a| + |b|
+      have hC : 0 < C := by dsimp [C]; positivity
+      refine ⟨C * A, mul_pos hC hA, 1 + B, fun z hz ↦ ?_⟩
+      have hz' : (z + 2).re ∈ Icc (a + 2) (b + 2) := by simpa using hz
+      have hRe : |z.re| ≤ |a| + |b| := abs_le.mpr
+        ⟨by linarith [hz.1, neg_abs_le a, abs_nonneg b], by linarith [hz.2, le_abs_self b, abs_nonneg a]⟩
+      have hzN : ‖z‖ ≤ C * Real.exp |z.im| := by
+        apply (Complex.norm_le_abs_re_add_abs_im z).trans
+        calc _ ≤ C * (1 + |z.im|) := by dsimp [C]; nlinarith [mul_nonneg (add_nonneg (abs_nonneg a) (abs_nonneg b)) (abs_nonneg z.im)]
+             _ ≤ _ := by gcongr; linarith [Real.add_one_le_exp |z.im|]
+      have hu := (h (z + 2) hz')
+      simp only [Complex.add_im, Complex.im_ofNat, add_zero] at hu
+      calc
+        _ ≤ (2 * Real.pi) * ‖(Gammaℝ z)⁻¹‖ := le_mul_of_one_le_left (norm_nonneg _) (by linarith [Real.pi_gt_three])
+        _ = ‖z‖ * ‖(Gammaℝ (z + 2))⁻¹‖ := (cubicZeroCount_gammaStep z).symm
+        _ ≤ (C * Real.exp |z.im|) * (A * Real.exp (B * |z.im|)) := by gcongr
+        _ = _ := by rw [mul_mul_mul_comm, ← Real.exp_add]; congr 2; ring
+  exact haux n a b (by linarith [Nat.cast_nonneg (α := ℝ) n])
+
+/-- The completed Dedekind zeta function has the same order at reflected points. -/
+private theorem cubicZeroCount_reflectedOrder (E : Type) [Field E] [NumberField E] (z : ℂ) :
+    meromorphicOrderAt completedζ(E) (1 - z) = meromorphicOrderAt completedζ(E) z := by
+  obtain ⟨hL, ha⟩ := continuedCompletedHeckeL_spec ζChar(E)
+  obtain ⟨ε, hε, hne, hfe⟩ := completedHeckeL_continuation_functionalEquation ζChar(E) _ _ hL ha hL (by simpa using ha)
+  have hc := meromorphicOrderAt_comp_of_deriv_ne_zero (f := completedζ(E))
+    (show AnalyticAt ℂ (fun s : ℂ ↦ 1 - s) z by fun_prop)
+    (show deriv (fun s : ℂ ↦ 1 - s) z ≠ 0 by simp)
+  rw [show completedζ(E) ∘ (fun s : ℂ ↦ 1 - s) = ε * completedζ(E) from funext hfe,
+    meromorphicOrderAt_mul_of_ne_zero (hε.analyticAt z) (hne z)] at hc
+  exact hc.symm
+
+/-- Except at its two poles, the completed Dedekind zeta function has order zero outside the open strip. -/
+private theorem cubicZeroCount_exteriorOrder (E : Type) [Field E] [NumberField E] (z : ℂ)
+    (h : z.re ≤ 0 ∨ 1 ≤ z.re) (hz : z ≠ 0) (hz' : z ≠ 1) :
+    meromorphicOrderAt completedζ(E) z = 0 := by
+  obtain ⟨hm, ha⟩ := continuedCompletedHeckeL_spec ζChar(E)
+  have hpos := (completedHeckeL_one_analyticOnNhd _ hm ha z (by simp [hz, hz'])).meromorphicOrderAt_nonneg
+  refine le_antisymm (le_of_not_gt fun hn ↦ ?_) hpos
+  rcases h with hl | hr
+  · have hc : 0 < meromorphicOrderAt completedζ(E) (1 - z) := (cubicZeroCount_reflectedOrder E z).symm ▸ hn
+    have hs : 0 < (1 - z).re := by simp; linarith
+    have ht := completedHeckeL_continuation_zeros ζChar(E) _ hm ha hs hc
+    simp at ht; linarith
+  · exact (not_lt_of_ge hr) (completedHeckeL_continuation_zeros ζChar(E) _ hm ha (by linarith) hn)
+
+/-- If the cubic zero orders are dominated throughout the strip, the quotient of the two completed
+functions is entire. Their two poles cancel. -/
+private theorem cubicZeroCount_entireQuotient (K : Type) [Field K] [NumberField K]
+    (h : ∀ z : ℂ, 0 < z.re → z.re < 1 → order(ζChar(K), z) ≤ order(ζChar(ℚ), z)) :
+    Differentiable ℂ ζRatio(K) := by
+  intro z
+  have hQ := continuedCompletedHeckeL_spec ζChar(ℚ)
+  have hK := continuedCompletedHeckeL_spec ζChar(K)
+  apply AnalyticAt.differentiableAt
+  rw [← (meromorphicNFOn_toMeromorphicNFOn _ _ (mem_univ z)).meromorphicOrderAt_nonneg_iff_analyticAt,
+    meromorphicOrderAt_toMeromorphicNFOn (hQ.1.meromorphicOn.div hK.1.meromorphicOn) (mem_univ _),
+    meromorphicOrderAt_div (hQ.1.meromorphicOn z (mem_univ _)) (hK.1.meromorphicOn z (mem_univ _))]
+  by_cases h0 : z = 0
+  · subst z; rw [completedHeckeL_one_order_zero _ hQ.1 hQ.2, completedHeckeL_one_order_zero _ hK.1 hK.2]; decide
+  by_cases h1 : z = 1
+  · subst z; rw [completedHeckeL_one_order_one _ hQ.1 hQ.2, completedHeckeL_one_order_one _ hK.1 hK.2]; decide
+  by_cases hs : 0 < z.re ∧ z.re < 1
+  · rw [spectralLineJet_memLp_false_stripOrder ℚ z hs.1 hs.2, spectralLineJet_memLp_false_stripOrder K z hs.1 hs.2]
+    change (0 : WithTop ℤ) ≤ ((order(ζChar(ℚ), z) : ℤ) : WithTop ℤ) - ((order(ζChar(K), z) : ℤ) : WithTop ℤ)
+    exact WithTop.coe_le_coe.mpr (sub_nonneg.mpr (Int.ofNat_le.mpr (h z hs.1 hs.2)))
+  · have he : z.re ≤ 0 ∨ 1 ≤ z.re := by grind
+    rw [cubicZeroCount_exteriorOrder ℚ z he h0 h1, cubicZeroCount_exteriorOrder K z he h0 h1]; decide
+
+/-- In both possible cubic signatures, cancellation leaves two reciprocal real gamma factors. -/
+private theorem cubicZeroCount_eulerFactors (K : Type) [Field K] [NumberField K] (hd : Module.finrank ℚ K = 3) :
+    ∃ (c w : ℝ), 0 < c ∧ 0 ≤ w ∧ w ≤ 1 ∧ ∀ s : ℂ, 1 < s.re →
+      completedζ(ℚ) s / completedζ(K) s = c * (Gammaℝ s)⁻¹ * (Gammaℝ (s + (w : ℂ)))⁻¹ * (finiteζ(ℚ) s / finiteζ(K) s) := by
+  have sig := InfinitePlace.card_add_two_mul_card_eq_rank K
+  have sigQ := InfinitePlace.nrRealPlaces_eq_one_of_finrank_eq_one (K := ℚ) (by simp)
+  have sigQ' := InfinitePlace.nrComplexPlaces_eq_zero_of_finrank_eq_one (K := ℚ) (by simp)
+  have hs (s : ℂ) (h : 1 < s.re) (E : Type) [Field E] [NumberField E] :
+      completedζ(E) s = heckeGammaFactor ζChar(E) s * finiteζ(E) s := by
+    rw [(continuedCompletedHeckeL_spec ζChar(E)).2 ⟨s, h⟩, (finiteHeckeL_exists_continuation ζChar(E)).choose_spec.2 ⟨s, h⟩]
+    rfl
+  have hcase : (InfinitePlace.nrRealPlaces K = 3 ∧ InfinitePlace.nrComplexPlaces K = 0) ∨
+      (InfinitePlace.nrRealPlaces K = 1 ∧ InfinitePlace.nrComplexPlaces K = 1) := by omega
+  rcases hcase with ⟨hr, hc⟩ | ⟨hr, hc⟩
+  · refine ⟨1, 0, by norm_num, by norm_num, by norm_num, fun s h ↦ ?_⟩
+    have hg : Gammaℝ s ≠ 0 := Gammaℝ_ne_zero_of_re_pos (by linarith)
+    rw [hs s h ℚ, hs s h K, heckeGammaFactor_one, heckeGammaFactor_one, sigQ, sigQ', hr, hc]
+    simp only [pow_one, pow_zero, mul_one, ofReal_one, ofReal_zero, add_zero, one_mul]
+    generalize Gammaℝ s = g at hg ⊢
+    generalize finiteζ(ℚ) s = x
+    generalize finiteζ(K) s = y
+    by_cases hy : y = 0
+    · simp [hy]
+    · field_simp
+  · refine ⟨2, 1, by norm_num, by norm_num, by norm_num, fun s h ↦ ?_⟩
+    have hg : Gammaℝ s ≠ 0 := Gammaℝ_ne_zero_of_re_pos (by linarith)
+    rw [hs s h ℚ, hs s h K, heckeGammaFactor_one, heckeGammaFactor_one, sigQ, sigQ', hr, hc,
+      ← Gammaℝ_mul_Gammaℝ_add_one]
+    simp only [pow_one, pow_zero, mul_one, ofReal_ofNat, ofReal_one]
+    have hg' : Gammaℝ (s + 1) ≠ 0 := Gammaℝ_ne_zero_of_re_pos (by simp; linarith)
+    generalize Gammaℝ s = g at hg ⊢
+    generalize Gammaℝ (s + 1) = g' at hg' ⊢
+    generalize finiteζ(ℚ) s = x
+    generalize finiteζ(K) s = y
+    by_cases hy : y = 0
+    · simp [hy]
+    · field_simp
+
+/-- Continue the Euler factorization to every regular point of the finite quotient. -/
+private theorem cubicZeroCount_finiteQuotient (K : Type) [Field K] [NumberField K] (c w : ℝ)
+    (he : ∀ s : ℂ, 1 < s.re →
+      completedζ(ℚ) s / completedζ(K) s = c * (Gammaℝ s)⁻¹ * (Gammaℝ (s + (w : ℂ)))⁻¹ * (finiteζ(ℚ) s / finiteζ(K) s))
+    (s : ℂ) (hQ : AnalyticAt ℂ finiteζ(ℚ) s) (hK : AnalyticAt ℂ finiteζ(K) s) (hne : finiteζ(K) s ≠ 0) :
+    ζRatio(K) s = c * (Gammaℝ s)⁻¹ * (Gammaℝ (s + (w : ℂ)))⁻¹ * (finiteζ(ℚ) s / finiteζ(K) s) := by
+  let G (z : ℂ) := (c : ℂ) * (Gammaℝ z)⁻¹ * (Gammaℝ (z + w))⁻¹
+  have hG : Differentiable ℂ G := (differentiable_Gammaℝ_inv.const_mul (c : ℂ)).mul
+    (differentiable_Gammaℝ_inv.comp (differentiable_id.add_const _))
+  have hm := (continuedCompletedHeckeL_spec ζChar(ℚ)).1.meromorphicOn.div (continuedCompletedHeckeL_spec ζChar(K)).1.meromorphicOn
+  have hg := (analyticOnNhd_univ_iff_differentiable.mpr hG).meromorphicOn.mul ((finiteHeckeL_exists_continuation ζChar(ℚ)).choose_spec.1.meromorphicOn.div
+    (finiteHeckeL_exists_continuation ζChar(K)).choose_spec.1.meromorphicOn)
+  have hEq := (hm.toMeromorphicNFOn_eq_self_on_nhdsNE (mem_univ s)).trans (meromorphicContinuation_eventuallyEq hm hg he s)
+  have hlocal := (analyticOnNhd_univ_iff_differentiable.mpr hG s (mem_univ _)).mul (hQ.div hK hne)
+  exact (((meromorphicNFOn_toMeromorphicNFOn _ _ (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds hlocal.meromorphicNFAt).mp hEq).eq_of_nhds
+
+/-- The Euler products at real part two bound both the finite Dedekind zeta function and its reciprocal
+on the closed right half-plane. -/
+private theorem cubicZeroCount_eulerBound (E : Type) [Field E] [NumberField E] (s : ℂ) (hs : 2 ≤ s.re) :
+    ‖dedekindZeta E s‖ ≤ ‖dedekindZeta E 2‖ ∧ ‖(dedekindZeta E s)⁻¹‖ ≤ ‖dedekindZeta E 2‖ := by
+  have hs' : 1 < s.re := by linarith
+  have hp := dedekindZeta_hasProd E hs'
+  have h₂ := dedekindZeta_hasProd E (s := 2) (by norm_num)
+  have hn : dedekindZeta E s ≠ 0 :=
+    by rw [← finiteHeckeL_one_eq_dedekindZeta (K := E) ⟨s, hs'⟩]; exact finiteHeckeL_ne_zero_of_one_lt_re _ _
+  have hlocal (v : HeightOneSpectrum (𝓞 E)) :
+      let q := (v.asIdeal.absNorm : ℂ)
+      let t := q ^ (-s)
+      ‖(1 - t)⁻¹‖ ≤ ‖(1 - q ^ (-(2 : ℂ)))⁻¹‖ ∧ ‖((1 - t)⁻¹)⁻¹‖ ≤ ‖(1 - q ^ (-(2 : ℂ)))⁻¹‖ := by
+    intro q t
+    let x := (v.asIdeal.absNorm : ℝ)
+    have hx : 1 < x := by dsimp [x]; exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+    let b := x ^ (-(2 : ℝ))
+    have hb : 0 ≤ b := Real.rpow_nonneg (by linarith) _
+    have hb' : b < 1 := Real.rpow_lt_one_of_one_lt_of_neg hx (by norm_num)
+    have ht : ‖t‖ ≤ b := by
+      change ‖(x : ℂ) ^ (-s)‖ ≤ x ^ (-(2 : ℝ))
+      rw [Complex.norm_cpow_eq_rpow_re_of_pos (by linarith), Complex.neg_re]
+      exact Real.rpow_le_rpow_of_exponent_le hx.le (by linarith)
+    have eq : q ^ (-(2 : ℂ)) = (b : ℂ) := by
+      change (x : ℂ) ^ (-(2 : ℂ)) = ((x ^ (-(2 : ℝ)) : ℝ) : ℂ)
+      simpa only [Complex.ofReal_neg, Complex.ofReal_ofNat] using (Complex.ofReal_cpow (by linarith : 0 ≤ x) (-(2 : ℝ))).symm
+    have hbase : ‖(1 - q ^ (-(2 : ℂ)))⁻¹‖ = (1 - b)⁻¹ := by
+      rw [eq, ← Complex.ofReal_one, ← Complex.ofReal_sub, norm_inv, Complex.norm_real,
+        Real.norm_eq_abs, abs_of_pos (sub_pos.mpr hb')]
+    rw [hbase, inv_inv]
+    have hlow : 1 - b ≤ ‖1 - t‖ := by
+      have hh := norm_sub_norm_le (1 : ℂ) t
+      simp only [norm_one] at hh
+      linarith
+    have hupper : ‖1 - t‖ ≤ 1 + b := (norm_sub_le _ _).trans (by simp; exact ht)
+    constructor
+    · rw [norm_inv]
+      exact inv_anti₀ (by linarith) hlow
+    · rw [← one_div, le_div_iff₀ (by linarith : 0 < 1 - b)]
+      nlinarith [mul_le_mul_of_nonneg_left hupper (sub_nonneg.mpr hb'.le), sq_nonneg b]
+  constructor
+  · exact le_of_tendsto_of_tendsto hp.norm h₂.norm (Eventually.of_forall fun T ↦ by
+      simp only [norm_prod]; exact Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _) (fun v _ ↦ (hlocal v).1))
+  · exact le_of_tendsto_of_tendsto (hp.inv₀ hn).norm h₂.norm (Eventually.of_forall fun T ↦ by
+      simp only [norm_prod]; exact Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _) (fun v _ ↦ (hlocal v).2))
+
+/-- The finite continuation is regular away from the possible completed poles. -/
+private theorem cubicZeroCount_finiteRegular (E : Type) [Field E] [NumberField E] {s : ℂ} (h₀ : s ≠ 0) (h₁ : s ≠ 1) :
+    AnalyticAt ℂ finiteζ(E) s := by
+  have hf := (finiteHeckeL_exists_continuation ζChar(E)).choose_spec
+  have hL := continuedCompletedHeckeL_spec ζChar(E)
+  let g (w : ℂ) := (heckeGammaFactor ζChar(E) w)⁻¹
+  have hg : Differentiable ℂ g := differentiable_inv_heckeGammaFactor _
+  have hg' := analyticOnNhd_univ_iff_differentiable.mpr hg
+  have he := meromorphicContinuation_eventuallyEq hf.1.meromorphicOn (hL.1.meromorphicOn.mul hg'.meromorphicOn)
+    (fun z hz ↦ by
+      rw [hf.2 ⟨z, hz⟩, Pi.mul_apply, hL.2 ⟨z, hz⟩]
+      change finiteHeckeL _ _ = (heckeGammaFactor _ _ * finiteHeckeL _ _) * (heckeGammaFactor _ _)⁻¹
+      rw [mul_right_comm, mul_inv_cancel₀ (heckeGammaFactor_ne_zero_of_re_pos _ (by linarith)), one_mul]) s
+  have hlocal := (completedHeckeL_one_analyticOnNhd _ hL.1 hL.2 s (by simp [h₀, h₁])).mul (hg' s (mem_univ _))
+  exact (analyticAt_congr (((hf.1 (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds hlocal.meromorphicNFAt).mp he)).mpr hlocal
+
+/-- The normalized meromorphic quotient agrees with ordinary division wherever the denominator is regular
+and nonzero. -/
+private theorem cubicZeroCount_quotientValue (K : Type) [Field K] [NumberField K] {s : ℂ} (h₀ : s ≠ 0) (h₁ : s ≠ 1)
+    (hne : completedζ(K) s ≠ 0) : ζRatio(K) s = completedζ(ℚ) s / completedζ(K) s := by
+  have hQ := continuedCompletedHeckeL_spec ζChar(ℚ)
+  have hK := continuedCompletedHeckeL_spec ζChar(K)
+  have h := toMeromorphicNFOn_eq_toMeromorphicNFAt (hQ.1.meromorphicOn.div hK.1.meromorphicOn) (mem_univ s)
+  have he : s ∈ ({0, 1}ᶜ : Set ℂ) := by simp [h₀, h₁]
+  exact h.trans (congrFun (toMeromorphicNFAt_eq_self.mpr
+    ((completedHeckeL_one_analyticOnNhd _ hQ.1 hQ.2 s he).div (completedHeckeL_one_analyticOnNhd _ hK.1 hK.2 s he) hne).meromorphicNFAt) s)
+
+/-- Nonvanishing of the completed function on the Euler half-plane. -/
+private theorem cubicZeroCount_eulerNonzero (E : Type) [Field E] [NumberField E] {s : ℂ} (hs : 1 < s.re) :
+    completedζ(E) s ≠ 0 := by
+  rw [(continuedCompletedHeckeL_spec ζChar(E)).2 ⟨s, hs⟩]
+  exact mul_ne_zero (heckeGammaFactor_ne_zero_of_re_pos _ (by linarith)) (finiteHeckeL_ne_zero_of_one_lt_re _ _)
+
+/-- Reflection of the completed quotient costs an exponential in the real part, uniformly in the height. -/
+private theorem cubicZeroCount_quotientReflection (K : Type) [Field K] [NumberField K] :
+    ∃ A > 0, ∃ b : ℝ, ∀ s : ℂ, 1 < s.re →
+      ‖ζRatio(K) (1 - s)‖ = A * Real.exp (b * (s.re - 1 / 2)) * ‖ζRatio(K) s‖ := by
+  have fe (E : Type) [Field E] [NumberField E] := continuedCompletedHeckeL_spec ζChar(E)
+  obtain ⟨cQ, hQ, eQ⟩ := completedHeckeL_functionalEquation_conductorScale ζChar(ℚ) _ _ (fe ℚ).1 (fe ℚ).2 (fe ℚ).1 (by simpa using (fe ℚ).2)
+  obtain ⟨cK, hK, eK⟩ := completedHeckeL_functionalEquation_conductorScale ζChar(K) _ _ (fe K).1 (fe K).2 (fe K).1 (by simpa using (fe K).2)
+  refine ⟨‖cQ‖ / ‖cK‖, div_pos (norm_pos_iff.mpr hQ) (norm_pos_iff.mpr hK),
+    heckeLogDiscriminantConductor ζChar(ℚ) - heckeLogDiscriminantConductor ζChar(K), fun s hs ↦ ?_⟩
+  have h0 : s ≠ 0 := by rintro rfl; norm_num at hs
+  have h1 : s ≠ 1 := by rintro rfl; norm_num at hs
+  have hn := cubicZeroCount_eulerNonzero K hs
+  rw [cubicZeroCount_quotientValue K (sub_ne_zero.mpr h1.symm) (by simpa using h0) (by rw [eK]; exact mul_ne_zero (mul_ne_zero hK (Complex.exp_ne_zero _)) hn),
+    cubicZeroCount_quotientValue K h0 h1 hn, eQ, eK]
+  simp only [norm_div, norm_mul, Complex.norm_exp, Complex.re_ofReal_mul, Complex.sub_re, Complex.div_ofNat_re, Complex.one_re]
+  rw [sub_mul, Real.exp_sub]
+  ring
+
+/-- The gamma recurrence gives uniform factorial decay on the sequence of right edges. -/
+private theorem cubicZeroCount_gammaRight (w : ℝ) (hw : 0 ≤ w) :
+    ∃ D > 0, ∃ B : ℝ, ∀ (n : ℕ) (s : ℂ), s.re = 2 * ((n : ℝ) + 1) + 1 / 2 →
+      ‖(Gammaℝ (s + w))⁻¹‖ ≤ D ^ (n + 1) / (n.factorial : ℝ) * Real.exp (B * |s.im|) := by
+  obtain ⟨A, hA, B, h⟩ := cubicZeroCount_gammaStrip (5 / 2 + w) (5 / 2 + w)
+  let D := max A (2 * Real.pi)
+  have hD : 0 < D := hA.trans_le (le_max_left ..)
+  refine ⟨D, hD, B, fun n s hs ↦ ?_⟩
+  let u := s + (w : ℂ) - 2 * n
+  have hu : u.re = 5 / 2 + w := by dsimp [u]; simp [Complex.mul_re, hs]; ring
+  have hi : u.im = s.im := by simp [u, Complex.mul_im]
+  have he := cubicZeroCount_gammaRecurrence u (by linarith) n
+  have hz : u + 2 * (n : ℂ) = s + w := sub_add_cancel _ _
+  rw [hz] at he
+  have h₁ := h u (by rw [hu]; exact ⟨le_rfl, le_rfl⟩)
+  rw [hi] at h₁
+  have h₂ : (2 * Real.pi) ^ n * A ≤ D ^ (n + 1) := by
+    rw [pow_succ]; gcongr
+    · exact le_max_right ..
+    · exact le_max_left ..
+  have hden : 0 < (n.factorial : ℝ) := by positivity
+  rw [div_mul_eq_mul_div, le_div_iff₀ hden, mul_comm]
+  calc _ ≤ (2 * Real.pi) ^ n * ‖(Gammaℝ u)⁻¹‖ := he
+       _ ≤ (2 * Real.pi) ^ n * (A * Real.exp (B * |s.im|)) := by gcongr
+       _ ≤ _ := by rw [← mul_assoc]; gcongr
+
+/-- On the right edge the Euler factors stay bounded while both reciprocal gamma factors decay. -/
+private theorem cubicZeroCount_rightEdge (K : Type) [Field K] [NumberField K] (c w : ℝ) (hc : 0 < c) (hw : 0 ≤ w)
+    (he : ∀ s : ℂ, 1 < s.re →
+      completedζ(ℚ) s / completedζ(K) s = c * (Gammaℝ s)⁻¹ * (Gammaℝ (s + (w : ℂ)))⁻¹ * (finiteζ(ℚ) s / finiteζ(K) s)) :
+    ∃ D > 0, ∃ B : ℝ, ∀ (n : ℕ) (s : ℂ), s.re = 2 * ((n : ℝ) + 1) + 1 / 2 →
+      ‖ζRatio(K) s‖ ≤ D ^ (n + 1) / (n.factorial : ℝ) * Real.exp (B * |s.im|) := by
+  obtain ⟨D, hD, B, g⟩ := cubicZeroCount_gammaRight 0 le_rfl
+  obtain ⟨D', hD', B', g'⟩ := cubicZeroCount_gammaRight w hw
+  let C := 1 + c * ‖dedekindZeta ℚ 2‖*‖dedekindZeta K 2‖
+  have hC : 1 ≤ C := le_add_of_nonneg_right (by positivity)
+  refine ⟨C * (D * D'), by positivity, B + B', fun n s hs ↦ ?_⟩
+  have hx : 2 ≤ s.re := by rw [hs]; linarith [Nat.cast_nonneg (α := ℝ) n]
+  have h : 1 < s.re := by linarith
+  have hn (E : Type) [Field E] [NumberField E] : finiteζ(E) s = dedekindZeta E s :=
+    ((finiteHeckeL_exists_continuation ζChar(E)).choose_spec.2 ⟨s, h⟩).trans (finiteHeckeL_one_eq_dedekindZeta _)
+  have g₁ := g n s hs
+  simp only [ofReal_zero, add_zero] at g₁
+  have g₂ : ‖(Gammaℝ (s + w))⁻¹‖ ≤ D'^(n + 1) * Real.exp (B'*|s.im|) := by
+    apply (g' n s hs).trans
+    gcongr
+    apply div_le_self (by positivity)
+    exact_mod_cast Nat.factorial_pos n
+  have hp : c * ‖dedekindZeta ℚ 2‖*‖dedekindZeta K 2‖ ≤ C ^ (n + 1) :=
+    (le_add_of_nonneg_left zero_le_one).trans (le_self_pow₀ hC (Nat.succ_ne_zero n))
+  have hs₀ : s ≠ 0 := by rintro rfl; norm_num at h
+  have hs₁ : s ≠ 1 := by rintro rfl; norm_num at h
+  rw [cubicZeroCount_quotientValue K hs₀ hs₁ (cubicZeroCount_eulerNonzero K h), he s h, hn ℚ, hn K,
+    div_eq_mul_inv, norm_mul, norm_mul, norm_mul, norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hc]
+  calc
+    _ ≤ c * (D ^ (n + 1) / (n.factorial : ℝ) * Real.exp (B * |s.im|)) *
+      (D'^(n + 1) * Real.exp (B'*|s.im|)) * (‖dedekindZeta ℚ 2‖*‖dedekindZeta K 2‖) := by
+        gcongr
+        · exact (cubicZeroCount_eulerBound ℚ s hx).1
+        · exact (cubicZeroCount_eulerBound K s hx).2
+    _ = (c * ‖dedekindZeta ℚ 2‖*‖dedekindZeta K 2‖) *
+        (D ^ (n + 1) * D'^(n + 1) / (n.factorial : ℝ) * Real.exp ((B + B') * |s.im|)) := by rw [add_mul, Real.exp_add]; ring
+    _ ≤ _ := by rw [mul_pow, mul_pow]; grw [hp]; ring_nf; rfl
+
+/-- Reflect the right-edge bound to the left edge of the same centered box. -/
+private theorem cubicZeroCount_verticalEdges (K : Type) [Field K] [NumberField K]
+    {D B : ℝ} (hD : 0 < D)
+    (hr : ∀ (n : ℕ) (s : ℂ), s.re = 2 * ((n : ℝ) + 1) + 1 / 2 →
+      ‖ζRatio(K) s‖ ≤ D ^ (n + 1) / (n.factorial : ℝ) * Real.exp (B * |s.im|)) :
+    ∃ D' > 0, ∀ (n : ℕ) (z : ℂ), |z.re| = 2 * (n + 1 : ℝ) →
+      ‖ζRatio(K) (z + 1 / 2)‖ ≤ D'^(n + 1) / (n.factorial : ℝ) * Real.exp (B * |z.im|) := by
+  obtain ⟨A, hA, b, hf⟩ := cubicZeroCount_quotientReflection K
+  let C := (max 1 A) * Real.exp (2 * |b|)
+  have hC : 1 ≤ C := one_le_mul_of_one_le_of_one_le (le_max_left ..) (Real.one_le_exp (by positivity))
+  refine ⟨C * D, mul_pos (zero_lt_one.trans_le hC) hD, fun n z hz ↦ ?_⟩
+  have hh : (0 : ℝ) ≤ 2 * (n + 1 : ℝ) := by positivity
+  rcases (abs_eq hh).mp hz with hp | hm
+  · have h := hr n (z + 1 / 2) (by simp [hp])
+    simp only [add_im, div_ofNat_im, one_im, zero_div, add_zero] at h
+    apply h.trans; gcongr; exact le_mul_of_one_le_left hD.le hC
+  · let s := -z + 1 / 2
+    have hs : s.re = 2 * (n + 1 : ℝ) + 1 / 2 := by simp [s, hm]
+    have hs' : 1 < s.re := by rw [hs]; linarith [Nat.cast_nonneg (α := ℝ) n]
+    have hi : |s.im| = |z.im| := by simp [s]
+    have eq : z + 1 / 2 = 1 - s := by dsimp [s]; ring
+    have hA₁ : A ≤ (max 1 A) ^ (n + 1) := (le_max_right ..).trans (le_self_pow₀ (le_max_left ..) (Nat.succ_ne_zero n))
+    have hp : A * Real.exp (b * (s.re - 1 / 2)) ≤ C ^ (n + 1) := by
+      dsimp [C]; rw [mul_pow, ← Real.exp_nat_mul]
+      apply mul_le_mul hA₁ _ (Real.exp_pos _).le (by positivity)
+      apply Real.exp_le_exp.mpr
+      rw [hs]; push_cast; nlinarith [mul_le_mul_of_nonneg_right (le_abs_self b) hh]
+    rw [eq, hf s hs']
+    calc
+      _ ≤ C ^ (n + 1) * (D ^ (n + 1) / (n.factorial : ℝ) * Real.exp (B * |s.im|)) := by gcongr; exact hr n s hs
+      _ = _ := by rw [hi, mul_pow]; ring
+
+/-- Choose horizontal edges using the polynomial reciprocal bound for the finite cubic zeta function.
+Their heights may depend on the width of the box. -/
+private theorem cubicZeroCount_horizontalEdges (K : Type) [Field K] [NumberField K] (c w : ℝ) (hc : 0 < c)
+    (he : ∀ s : ℂ, 1 < s.re →
+      completedζ(ℚ) s / completedζ(K) s = c * (Gammaℝ s)⁻¹ * (Gammaℝ (s + (w : ℂ)))⁻¹ * (finiteζ(ℚ) s / finiteζ(K) s))
+    (R : ℝ) (hR : 0 < R) :
+    ∃ A > 0, ∃ b : ℝ, ∀ S > (0 : ℝ), ∃ lo hi : ℝ, lo < -S ∧ S < hi ∧
+      ∀ z : ℂ, |z.re| ≤ R → z.im = lo ∨ z.im = hi → ‖ζRatio(K) (z + 1 / 2)‖ ≤ A * Real.exp (b * |z.im|) := by
+  let a : ℝ := 1 / 2 - R
+  let d : ℝ := 1 / 2 + R
+  have had : a < d := by dsimp [a, d]; linarith
+  obtain ⟨A, hA, B, hΓ⟩ := cubicZeroCount_gammaStrip a d
+  obtain ⟨A', hA', B', hΓ'⟩ := cubicZeroCount_gammaStrip (a + w) (d + w)
+  have hQ := (finiteHeckeL_exists_continuation ζChar(ℚ)).choose_spec
+  obtain ⟨M, hM, hO⟩ := finiteHeckeL_continuation_isBigO_rpow ζChar(ℚ) _ hQ.1 hQ.2 a d had
+  obtain ⟨C, hC, hC'⟩ := Asymptotics.isBigO_iff'.mp hO
+  rw [eventually_inf_principal, eventually_comap, eventually_atTop] at hC'
+  obtain ⟨T₀, hT₀⟩ := hC'
+  obtain ⟨T, D, m, hD, hi, hl, hbound⟩ := introTrace_finiteL_inv_horizontal_growth ζChar(K) a d had
+  refine ⟨c * A * A'*(C * D), by positivity, B + B'+M + m, fun S hS ↦ ?_⟩
+  let Y := max 1 (max S T₀)
+  obtain ⟨k, hk⟩ := (hl.eventually (eventually_lt_atBot (-Y))).exists
+  obtain ⟨j, hj⟩ := (hi.eventually (eventually_gt_atTop Y)).exists
+  have hSY : S ≤ Y := le_trans (le_max_left ..) (le_max_right ..)
+  have hTY : T₀ ≤ Y := le_trans (le_max_right ..) (le_max_right ..)
+  have hY : 1 ≤ Y := le_max_left ..
+  refine ⟨T k, T j, by linarith, by linarith, fun z hx hyv ↦ ?_⟩
+  let s := z + 1 / 2
+  have hs : s.re ∈ Icc a d := by
+    dsimp [s, a, d]
+    simp only [div_ofNat_re, one_re]
+    constructor <;> linarith [(abs_le.mp hx).1, (abs_le.mp hx).2]
+  have him : s.im = z.im := by simp [s]
+  have hy : Y ≤ |z.im| := by
+    rcases hyv with h | h
+    · rw [h, abs_of_neg (by linarith : T k < 0)]; linarith
+    · rw [h, abs_of_pos (by linarith : 0 < T j)]; linarith
+  have hden : meromorphicOrderAt finiteζ(K) s = 0 ∧ ‖(finiteζ(K) s)⁻¹‖ ≤ D * (1 + |z.im|) ^ m := by
+    rcases hyv with h|h
+    · simpa [← h, ← him] using hbound k s.re hs
+    · simpa [← h, ← him] using hbound j s.re hs
+  have hf := (finiteHeckeL_exists_continuation ζChar(K)).choose_spec.1 (mem_univ s)
+  have hAf := hf.meromorphicOrderAt_nonneg_iff_analyticAt.mp hden.1.ge
+  have hn := hf.meromorphicOrderAt_eq_zero_iff.mp hden.1
+  have hnon (x : ℂ) (hx : x.im = 0) : s ≠ x := by intro h; rw [← him, h, hx, abs_zero] at hy; linarith
+  have hZ := cubicZeroCount_finiteQuotient K c w he s (cubicZeroCount_finiteRegular ℚ (hnon 0 rfl) (hnon 1 rfl)) hAf hn
+  have hq := hT₀ |s.im| (him ▸ hTY.trans hy) s rfl hs
+  rw [Real.norm_of_nonneg (Real.rpow_nonneg (abs_nonneg _) _), him] at hq
+  have hqp : |z.im| ^ M ≤ Real.exp (M * |z.im|) := by
+    rw [Real.rpow_def_of_pos (by linarith : 0 < |z.im|), Real.exp_le_exp, mul_comm]
+    gcongr; exact (Real.log_le_sub_one_of_pos (by linarith)).trans (by linarith)
+  have hkp : (1 + |z.im|) ^ m ≤ Real.exp ((m : ℝ) * |z.im|) := by
+    rw [Real.exp_nat_mul]; gcongr; linarith [Real.add_one_le_exp |z.im|]
+  have hshift : (s + (w : ℂ)).re ∈ Icc (a + w) (d + w) := by simpa using hs
+  have hga := hΓ s hs
+  have hgb := hΓ' (s + (w : ℂ)) hshift
+  simp only [add_im, ofReal_im, add_zero, him] at hga hgb
+  change ‖ζRatio(K) s‖ ≤ _
+  rw [hZ, div_eq_mul_inv, norm_mul, norm_mul, norm_mul, norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hc]
+  calc
+    _ ≤ c * (A * Real.exp (B * |z.im|)) * (A' * Real.exp (B'*|z.im|)) *
+        ((C * Real.exp (M * |z.im|)) * (D * Real.exp ((m : ℝ) * |z.im|))) := by
+      gcongr
+      · exact hq.trans (by gcongr)
+      · exact hden.2.trans (by gcongr)
+    _ = _ := by simp only [add_mul, Real.exp_add]; ring
+
 /-- On some finite subset of the open critical strip, the zero count with multiplicity
 for ℚ(∛2) exceeds the rational zero count. The Dedekind zero-count asymptotic has
 leading coefficient proportional to the degree, which is three for the cubic field.
@@ -1043,7 +1596,27 @@ private theorem spectralLineJet_memLp_false_cubicZeroCount
     (_hb : b.gen ^ 3 = 2) (_hd : b.dim = 3) :
     ∃ S : Finset ℂ, (∀ z ∈ S, 0 < z.re ∧ z.re < 1) ∧
       (∑ z ∈ S, order((1 : PontryaginDual C𝔽(ℚ)), z)) <
-        ∑ z ∈ S, order((1 : PontryaginDual C𝔽(K)), z) := by sorry
+        ∑ z ∈ S, order((1 : PontryaginDual C𝔽(K)), z) := by
+  classical
+  have hdeg : Module.finrank ℚ K = 3 := b.finrank.trans _hd
+  by_contra hn
+  have h (z : ℂ) (h₀ : 0 < z.re) (h₁ : z.re < 1) : order(ζChar(K), z) ≤ order(ζChar(ℚ), z) := by
+    by_contra! h
+    exact hn ⟨{z}, by simpa using And.intro h₀ h₁, by simpa using h⟩
+  obtain ⟨c, w, hc, hw, _, he⟩ := cubicZeroCount_eulerFactors K hdeg
+  obtain ⟨D, hD, B, hr⟩ := cubicZeroCount_rightEdge K c w hc hw he
+  obtain ⟨D', hD', hv⟩ := cubicZeroCount_verticalEdges K hD hr
+  have hz := cubicZeroCount_factorialEdges (fun z ↦ ζRatio(K) (z + 1 / 2))
+    ((cubicZeroCount_entireQuotient K h).comp (differentiable_id.add_const _)) D' B hD' hv
+    (fun n ↦ cubicZeroCount_horizontalEdges K c w hc he _ (by positivity))
+  let s : ℂ := 1 + 1 / 2
+  change ζRatio(K) s = 0 at hz
+  have hs : 1 < s.re := by norm_num [s]
+  rw [cubicZeroCount_quotientValue K (by norm_num [s]) (by norm_num [s]) (cubicZeroCount_eulerNonzero K hs)] at hz
+  exact div_ne_zero (cubicZeroCount_eulerNonzero ℚ hs) (cubicZeroCount_eulerNonzero K hs) hz
+
+
+end CubicZeroCount
 
 /-- Paper: Theorem 10.2.1.1, p. 440. The trivial Hecke character of some
 number field has a completed L-function with a zero of multiplicity at least two.
