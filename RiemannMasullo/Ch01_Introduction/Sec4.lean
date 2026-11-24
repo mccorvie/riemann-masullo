@@ -12,6 +12,9 @@ import RiemannMasullo.External.Grh.Lemmas.LogLossGoodHeight
 import RiemannMasullo.Ch12_TraceGeometric.Sec5
 import Mathlib.Analysis.Complex.Poisson
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gamma.DigammaIntegral
+import Mathlib.Analysis.Fourier.RiemannLebesgueLemma
+public import Mathlib.Analysis.SpecialFunctions.Gamma.Digamma
+import RiemannMasullo.External.HardyCriticalLine.DigammaFormula
 import Mathlib.Analysis.Calculus.BumpFunction.Normed
 import Mathlib.Analysis.Calculus.ContDiff.Convolution
 
@@ -8220,6 +8223,214 @@ theorem introTraceApprox_archimedean_sub_tendsto_heckeGamma_logDeriv (h ρ : ℕ
           logDeriv (heckeGammaFactor χ) (z + 1 / 2)) atTop right(-(1 / 2 : ℝ)) := by
   obtain ⟨k, hk, hAk, _, hχ⟩ := introTraceApprox_archimedean_sub_trivial_two_tendsto (F := F) h ρ hA
   exact ⟨k, hk, hAk, fun χ ↦ (hχ χ).2.2.2.2.congr_right fun z hz ↦ introTrace_archimedean_sub_sum_eq_heckeGamma_logDeriv χ z hz⟩
+
+/-- Removing the simple singularity in the Gauss kernel leaves a positive
+factor bounded by one on the positive real axis. -/
+private theorem introTrace_gauss_remainder_bounds (x : ℝ) (hx : 0 < x) :
+    0 ≤ (1-Real.exp (-x))⁻¹-x⁻¹ ∧ (1-Real.exp (-x))⁻¹-x⁻¹ ≤ 1 := by
+  let D := 1-Real.exp (-x)
+  have hd : 0 < D := sub_pos.mpr (Real.exp_lt_one_iff.mpr (neg_neg_of_pos hx))
+  have hdx : D ≤ x := by dsimp only [D]; linarith [Real.add_one_le_exp (-x)]
+  refine ⟨sub_nonneg.mpr (inv_anti₀ hd hdx),?_⟩
+  have h := mul_le_mul_of_nonneg_right (Real.add_one_le_exp x) (Real.exp_pos (-x)).le
+  rw [← Real.exp_add,add_neg_cancel,Real.exp_zero] at h
+  change D⁻¹-x⁻¹ ≤ 1
+  apply sub_le_iff_le_add.mpr
+  rw [inv_le_iff_one_le_mul₀ hd]
+  dsimp only [D]
+  field_simp
+  nlinarith
+
+/-- The Laplace transform of the bounded Gauss remainder has norm at most
+the reciprocal of the real part of its argument. -/
+private theorem introTrace_gauss_remainder_laplace (w : ℂ) (hw : 0 < w.re) :
+    let A (x : ℝ) := (1-Real.exp (-x))⁻¹-x⁻¹
+    let G (x : ℝ) := Complex.exp (-w*x)*(A x : ℂ)
+    IntegrableOn G (Ioi 0) ∧ ‖∫ x in Ioi (0:ℝ), G x‖ ≤ w.re⁻¹ := by
+  intro A G
+  have he : IntegrableOn (fun x : ℝ ↦ Real.exp (-w.re*x)) (Ioi 0) :=
+    integrableOn_exp_mul_Ioi (neg_neg_of_pos hw) 0
+  have h : ∀ᵐ x ∂volume.restrict (Ioi (0:ℝ)), ‖G x‖ ≤ Real.exp (-w.re*x) := by
+    filter_upwards [ae_restrict_mem (μ := volume) measurableSet_Ioi] with x hx
+    have ha := introTrace_gauss_remainder_bounds x hx
+    change ‖Complex.exp (-w*x)*(A x : ℂ)‖ ≤ _
+    rw [norm_mul,Complex.norm_exp,Complex.norm_real,Real.norm_of_nonneg ha.1]
+    simp only [Complex.mul_re,Complex.neg_re,Complex.ofReal_re,Complex.ofReal_im,mul_zero,sub_zero]
+    exact mul_le_of_le_one_right (Real.exp_pos _).le ha.2
+  exact ⟨he.mono' (by dsimp [G,A]; fun_prop) h,(norm_integral_le_of_norm_le he h).trans_eq
+    (by rw [integral_exp_mul_Ioi (neg_neg_of_pos hw)]; simp [one_div])⟩
+
+/-- The positive Gauss kernel is the centered Binet kernel plus one half. -/
+private theorem introTrace_gauss_eq_binet {x : ℝ} (hx : 0 < x) :
+    (((1-Real.exp (-x))⁻¹-x⁻¹ : ℝ) : ℂ) = HardyCriticalLine.bennettGammaBinetKernel x + 1/2 := by
+  rw [HardyCriticalLine.bennettGammaBinetKernel_eq_ofReal, ← Complex.ofReal_ofNat, ← Complex.ofReal_one,
+    ← Complex.ofReal_div, ← Complex.ofReal_add, Complex.ofReal_inj]
+  have he := Real.one_lt_exp_iff.mpr hx
+  have hn : 1 - (Real.exp x)⁻¹ ≠ 0 := by rw [← Real.exp_neg]; linarith [Real.exp_lt_one_iff.mpr (neg_neg_of_pos hx)]
+  rw [Real.exp_neg]
+  field_simp [hx.ne', (Real.exp_pos x).ne', (sub_pos.mpr he).ne', hn]
+  ring
+
+/-- The logarithmic derivative of the gamma function has a Laplace correction
+to its principal logarithm throughout the right half-plane. The correction
+has norm at most the reciprocal of the real part. -/
+theorem introTrace_digamma_log_laplace (w : ℂ) (hw : 0 < w.re) :
+    let A (x : ℝ) := (1-Real.exp (-x))⁻¹-x⁻¹
+    Complex.digamma w-Complex.log w = -(∫ x in Ioi (0:ℝ), Complex.exp (-w*x)*(A x : ℂ)) ∧
+      ‖Complex.digamma w-Complex.log w‖ ≤ w.re⁻¹ := by
+  intro A
+  have he := integrableOn_exp_mul_complex_Ioi (a := -w) (by simpa using hw) 0
+  have eq : (∫ x in Ioi (0:ℝ), Complex.exp (-w*x)*(A x : ℂ)) =
+      HardyCriticalLine.bennettGammaBinetIntegral w + 1/(2*w) := by
+    calc
+      _ = ∫ x in Ioi (0:ℝ), HardyCriticalLine.bennettGammaBinetKernel x * Complex.exp (-(x:ℂ)*w) +
+          Complex.exp (-w*x) * (1/2:ℂ) := by
+        apply setIntegral_congr_fun measurableSet_Ioi
+        intro x hx
+        dsimp only
+        rw [show (A x:ℂ) = _ from introTrace_gauss_eq_binet hx, show -(x:ℂ)*w = -w*x by ring]
+        ring
+      _ = _ := by
+        rw [integral_add (HardyCriticalLine.integrableOn_bennettGammaBinetIntegrand hw) (he.mul_const _),
+          integral_mul_const, integral_exp_mul_complex_Ioi (by simpa using hw)]
+        simp [HardyCriticalLine.bennettGammaBinetIntegral]
+  have h := HardyCriticalLine.bennettGammaBinetDigamma_eqOn hw
+  have hmain : Complex.digamma w-Complex.log w = -(∫ x in Ioi (0:ℝ), Complex.exp (-w*x)*(A x:ℂ)) := by
+    rw [eq,h]; ring
+  exact ⟨hmain, by rw [hmain,norm_neg]; exact (introTrace_gauss_remainder_laplace w hw).2⟩
+
+open scoped FourierTransform RealInnerProductSpace in
+/-- On each positive vertical line the digamma correction tends to zero at
+both height ends, by the Riemann–Lebesgue lemma for its Laplace density. -/
+private theorem introTrace_digamma_vertical_log_remainder (u : ℝ) (hu : 0 < u) :
+    Tendsto (fun t : ℝ ↦ Complex.digamma ((u:ℂ)+(t:ℂ)*Complex.I) -
+      Complex.log ((u:ℂ)+(t:ℂ)*Complex.I)) (cocompact ℝ) (𝓝 0) := by
+  classical
+  let A (x : ℝ) := (1-Real.exp (-x))⁻¹-x⁻¹
+  let f (x : ℝ) := Complex.exp (-(u:ℂ)*x)*(A x : ℂ)
+  let F₀ := (Ioi (0:ℝ)).indicator f
+  have hscale : Tendsto (fun t : ℝ ↦ t/(2*Real.pi)) (cocompact ℝ) (cocompact ℝ) := by
+    simpa only [div_eq_mul_inv] using Filter.tendsto_cocompact_mul_right₀ (a := (2*Real.pi)⁻¹) (by positivity)
+  have h := ((Real.zero_at_infty_fourier F₀).comp hscale).neg
+  rw [neg_zero] at h
+  apply h.congr
+  intro t
+  let w : ℂ := (u:ℂ)+(t:ℂ)*Complex.I
+  have hw : 0 < w.re := by simpa [w] using hu
+  rw [(introTrace_digamma_log_laplace w hw).1]
+  change -((𝓕 F₀) (t/(2*Real.pi))) = -∫ x in Ioi (0:ℝ), Complex.exp (-w*x)*(A x : ℂ)
+  congr 1
+  rw [Real.fourier_eq',← integral_indicator measurableSet_Ioi]
+  apply integral_congr_ae
+  filter_upwards with x
+  by_cases hx : x ∈ Ioi (0:ℝ)
+  · simp only [F₀,Set.indicator_of_mem hx, f,smul_eq_mul,Real.inner_apply]
+    rw [← mul_assoc,← Complex.exp_add]
+    congr 2
+    dsimp only [w]
+    push_cast
+    field_simp [Real.pi_ne_zero,Complex.ofReal_ne_zero.mpr Real.pi_ne_zero]
+    ring
+  · simp [F₀,hx]
+
+/-- The real digamma main term along an affine vertical line retains the
+logarithm of its positive height scale. -/
+private theorem introTrace_digamma_affine_log_main_term (u k b : ℝ) (hu : 0 < u) (hk : 0 < k) :
+    Tendsto (fun t : ℝ ↦ (Complex.digamma ((u:ℂ)+((k*t+b:ℝ):ℂ)*Complex.I)).re - Real.log |t|)
+      (cocompact ℝ) (𝓝 (Real.log k)) := by
+  let w (t : ℝ) := (u:ℂ)+((k*t+b:ℝ):ℂ)*Complex.I
+  have ha : Tendsto (fun t : ℝ ↦ k*t+b) (cocompact ℝ) (cocompact ℝ) :=
+    (Homeomorph.addRight b).isClosedEmbedding.tendsto_cocompact.comp
+      (Filter.tendsto_cocompact_mul_left₀ hk.ne')
+  have h₁ : Tendsto (fun t : ℝ ↦ (Complex.digamma (w t)).re - Real.log ‖w t‖)
+      (cocompact ℝ) (𝓝 0) := by
+    simpa only [Function.comp_def, Complex.sub_re, Complex.log_re, Complex.zero_re, w] using
+      Complex.continuous_re.continuousAt.tendsto.comp ((introTrace_digamma_vertical_log_remainder u hu).comp ha)
+  let c : ℂ := (u:ℂ)+(b:ℂ)*Complex.I
+  let q (t : ℝ) := c*(t:ℂ)⁻¹+(k:ℂ)*Complex.I
+  have htop := tendsto_norm_cocompact_atTop (E := ℝ)
+  have hr : Tendsto (fun t : ℝ ↦ t⁻¹) (cocompact ℝ) (𝓝 0) := by
+    apply squeeze_zero_norm' _ (tendsto_inv_atTop_zero.comp htop)
+    exact Eventually.of_forall fun t ↦ (norm_inv t).le
+  have hi : Tendsto (fun t : ℝ ↦ (t:ℂ)⁻¹) (cocompact ℝ) (𝓝 0) := by
+    simpa only [Function.comp_def,Complex.ofReal_inv,Complex.ofReal_zero] using
+      Complex.continuous_ofReal.continuousAt.tendsto.comp hr
+  have hq : Tendsto q (cocompact ℝ) (𝓝 ((k:ℂ)*Complex.I)) := by
+    simpa [q] using (hi.const_mul c).add_const ((k:ℂ)*Complex.I)
+  have hn : Tendsto (fun t : ℝ ↦ ‖q t‖) (cocompact ℝ) (𝓝 k) := by
+    simpa only [norm_mul,Complex.norm_I,mul_one,Complex.norm_real,Real.norm_of_nonneg hk.le] using hq.norm
+  have h₂ : Tendsto (fun t : ℝ ↦ Real.log ‖w t‖ - Real.log |t|) (cocompact ℝ) (𝓝 (Real.log k)) := by
+    apply ((Real.continuousAt_log hk.ne').tendsto.comp hn).congr'
+    filter_upwards [htop.eventually_gt_atTop 0, hn.eventually (lt_mem_nhds hk)] with t ht hqt
+    have ht' : t ≠ 0 := norm_pos_iff.mp ht
+    have he : w t = (t:ℂ)*q t := by
+      dsimp [w,q,c]
+      push_cast
+      field_simp [Complex.ofReal_ne_zero.mpr ht']
+      ring
+    change Real.log ‖q t‖ = Real.log ‖w t‖ - Real.log |t|
+    rw [he,norm_mul,Complex.norm_real,Real.norm_eq_abs,Real.log_mul (abs_ne_zero.mpr ht') hqt.ne']
+    ring
+  simpa only [zero_add,sub_add_sub_cancel] using h₁.add h₂
+
+open Classical in
+/-- Paper: Section 1.4.3. On every fixed positive vertical line the real
+logarithmic derivative of the Hecke gamma factor has leading term
+`[F : ℚ] / 2 * (log |t| - log (2π))`, with an error vanishing at both ends. -/
+theorem introTrace_heckeGamma_vertical_main_term (χ : U𝔽) (σ : ℝ) (hσ : 0 < σ) :
+    Tendsto (fun t : ℝ ↦ (logDeriv (heckeGammaFactor χ) ((σ:ℂ)+(t:ℂ)*Complex.I)).re -
+      ((Module.finrank ℚ F : ℝ)/2)*(Real.log |t| - Real.log (2*Real.pi))) (cocompact ℝ) (𝓝 0) := by
+  classical
+  let s (t : ℝ) : ℂ := (σ:ℂ)+(t:ℂ)*Complex.I
+  have hs (t : ℝ) : 0 < (s t).re := by simpa [s] using hσ
+  have hlocal (v : InfinitePlace F) : Tendsto (fun t : ℝ ↦ (logDeriv archGamma(χ,v) (s t)).re -
+      archScale(v)*(Real.log |t| - Real.log (2*Real.pi))) (cocompact ℝ) (𝓝 0) := by
+    let k := archScale(v)
+    let b := archShift(χ,v)
+    let D : ℝ := if v.IsReal then Real.pi else 2*Real.pi
+    have hk : 0 < k := by dsimp [k]; split_ifs <;> norm_num
+    have hD : D = (2*Real.pi)*k := by dsimp [D,k]; split_ifs <;> ring
+    have hDC : (if v.IsReal then (Real.pi:ℂ) else 2*(Real.pi:ℂ)) = (D:ℂ) := by
+      dsimp [D]; split_ifs <;> push_cast <;> rfl
+    have hlog : (Complex.log (D:ℂ)).re = Real.log (2*Real.pi) + Real.log k := by
+      rw [Complex.log_re,Complex.norm_real,Real.norm_of_nonneg (by rw [hD]; positivity),
+        hD,Real.log_mul (by positivity) hk.ne']
+    have hb : 0 ≤ b.re := by
+      dsimp only [b]
+      split_ifs with hv
+      · have h := (realHeckeCharacter_parameters χ v hv).exists.choose_spec.1
+        simp only [Complex.add_re, h, zero_add, Complex.natCast_re]
+        positivity
+      · have h := (complexHeckeCharacter_parameters χ v (InfinitePlace.not_isReal_iff_isComplex.mp hv)).exists.choose_spec.1
+        simp only [Complex.add_re,h,zero_add,Complex.div_ofNat_re,Complex.natCast_re]
+        positivity
+    let u := k*(σ+b.re)
+    have h := introTrace_digamma_affine_log_main_term u k (k*b.im) (mul_pos hk (add_pos_of_pos_of_nonneg hσ hb)) hk
+    have hzero := (h.sub_const (Real.log k)).const_mul k
+    rw [sub_self,mul_zero] at hzero
+    apply hzero.congr
+    intro t
+    have he : (k : ℂ)*(s t + b) = (u : ℂ) + ((k*t+k*b.im : ℝ) : ℂ)*Complex.I := by
+      apply Complex.ext <;> simp [s,u,Complex.mul_re,Complex.mul_im]
+      ring
+    rw [introTrace_logDeriv_local_gamma χ v (s t) (hs t)]
+    change _ = ((k:ℂ)*(Complex.digamma ((k:ℂ)*(s t+b)) - Complex.log _)).re -
+      k*(Real.log |t|-Real.log (2*Real.pi))
+    rw [he,hDC,Complex.re_ofReal_mul,Complex.sub_re,hlog]
+    ring
+  have hh := tendsto_finsetSum Finset.univ (fun v _ ↦ hlocal v)
+  simp only [Finset.sum_const_zero] at hh
+  have hkdeg : ∑ v : InfinitePlace F, archScale(v) = (Module.finrank ℚ F : ℝ)/2 := by
+    calc
+      _ = ∑ v : InfinitePlace F, (InfinitePlace.mult v : ℝ)/2 := by
+        apply Finset.sum_congr rfl
+        intro v _
+        by_cases hv : v.IsReal <;> simp [InfinitePlace.mult,hv]
+      _ = _ := by rw [← Finset.sum_div,← Nat.cast_sum,InfinitePlace.sum_mult_eq]
+  apply hh.congr
+  intro t
+  rw [introTrace_heckeGamma_logDeriv_eq_sum χ (s t) (hs t), Complex.re_sum]
+  simp only [Finset.sum_sub_distrib,← Finset.sum_mul,hkdeg]
 
 end ArchimedeanGammaEvaluation
 
