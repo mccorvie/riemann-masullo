@@ -10009,6 +10009,69 @@ theorem introTrace_completed_logDeriv_poles_residues
       rw [meromorphicOrderAt_congr he₀]
       exact hg.meromorphicOrderAt_nonneg
 
+/-- On the Euler half-plane the completed logarithmic derivative splits into the
+logarithmic derivatives of the gamma factor and the finite continuation. -/
+private theorem introTrace_completed_logDeriv_euler (χ : U𝔽) {s : ℂ} (hs : 1 < s.re) :
+    logDeriv (continuedCompletedHeckeL χ) s =
+      logDeriv (heckeGammaFactor χ) s + logDeriv finiteL(χ) s := by
+  have hΛeq := (continuedCompletedHeckeL_spec χ).2
+  obtain ⟨hL, hLeq⟩ := (finiteHeckeL_exists_continuation χ).choose_spec
+  have he : continuedCompletedHeckeL χ =ᶠ[𝓝 s] fun w ↦ heckeGammaFactor χ w * finiteL(χ) w := by
+    filter_upwards [(isOpen_Ioi.preimage Complex.continuous_re).mem_nhds (show s ∈ right(1) from hs)] with w hw
+    rw [hΛeq ⟨w, hw⟩, hLeq ⟨w, hw⟩]
+    rfl
+  have hG := heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans hs)
+  have hF : finiteL(χ) s ≠ 0 := by
+    rw [hLeq ⟨s, hs⟩]
+    exact finiteHeckeL_ne_zero_of_one_lt_re χ _
+  have hfa := (hL (mem_univ s)).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+    ((hL (mem_univ s)).meromorphicOrderAt_eq_zero_iff.mpr hF).ge
+  exact (logDeriv_congr_nhds he).eq_of_nhds.trans (logDeriv_fun_mul s hG hF
+    (differentiableAt_heckeGammaFactor_of_re_pos χ (zero_lt_one.trans hs)) hfa.differentiableAt)
+
+/-- On the shifted Euler half-plane the full reference-difference series, normalized
+at two, equals the corrected completed logarithmic derivative. -/
+private theorem introTrace_full_reference_series_eq_completed_logDeriv
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : U𝔽) (hχ : ∀ t, χ (τ t) = 1) :
+    let L (z : ℂ) := logDeriv finiteL(χ) (z + 1 / 2) +
+      if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0
+    let A (z : ℂ) := archSubTrivialSum(χ, z)
+    EqOn (fun z ↦ (∑' r : windowZeros(χ, (1 / 2 : ℝ)), (zeroOrder(χ, r.val) : ℂ) *
+      (1 / (z - (r.val - 1 / 2)) - 1 / (2 - (r.val - 1 / 2)))) + (L 2 - A 2))
+      (fun z ↦ completedSpectral(χ, z)) right(1 / 2) := by
+  classical
+  obtain ⟨_, _, _, hmatch⟩ := introTraceApprox_exists_common_counterterm_limits (F := F)
+  obtain ⟨_, hG, _, _, hsum⟩ := hmatch τ hτ χ hχ
+  dsimp only
+  apply hG.eqOn_of_preconnected_of_eventuallyEq (introTrace_completed_spectral_analytic χ)
+    (convex_halfSpace_re_gt (1 / 2 : ℝ)).isPreconnected (z₀ := 2) (by change 1 / 2 < (2 : ℂ).re; norm_num)
+  have hnear : ∀ᶠ z : ℂ in 𝓝 2, 1 < z.re :=
+    (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+  filter_upwards [hnear] with z hz
+  have hsum' := hsum hz
+  simp only [Pi.add_apply] at hsum'
+  rw [introTrace_archimedean_sub_sum_eq_heckeGamma_logDeriv χ z (by linarith)] at hsum'
+  rw [introTrace_completed_logDeriv_euler χ (s := z + 1 / 2) (by norm_num; linarith)]
+  linear_combination hsum'
+
+/-- Paper: §1.4.3, p. 29. Every full spectral window, after adding the common
+archimedean counterterm, converges locally uniformly on the shifted Euler half-plane
+to the completed logarithmic derivative with its polar and reference corrections. -/
+theorem introTraceApprox_exists_spectral_tendsto_completed_logDeriv :
+    ∃ h ρ : ℕ → ℝ → ℝ, IsIntroTraceApproximation h ρ ∧
+      ∀ (τ : ℝ≥0ˣ →ₜ* C𝔽), RightInverse τ (ideleClassNorm F) →
+      ∀ χ : U𝔽, (∀ t, χ (τ t) = 1) → ∀ a : ℝ, 1 / 2 ≤ a →
+        TendstoLocallyUniformlyOn (fun n z ↦ introTraceSpectralSum χ approx(h, ρ, n, z) a +
+          archSum((1 : U𝔽), approx(h, ρ, n, (2 : ℂ))))
+          (fun z ↦ completedSpectral(χ, z)) atTop right(1 / 2) := by
+  classical
+  obtain ⟨h, ρ, hA, hχ⟩ := introTraceApprox_exists_common_counterterm_limits (F := F)
+  refine ⟨h, ρ, hA, ?_⟩
+  intro τ hτ χ hnorm a ha
+  obtain ⟨_, _, _, hlim, _⟩ := hχ τ hτ χ hnorm
+  exact (hlim a ha).congr_right (introTrace_full_reference_series_eq_completed_logDeriv τ hτ χ hnorm)
+
 end CompletedSpectralContinuation
 
 /-- Paper: §1.4.3, p. 29. Every unitary character over a number field has infinitely
