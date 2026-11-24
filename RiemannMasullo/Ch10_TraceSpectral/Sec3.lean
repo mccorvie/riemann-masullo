@@ -2585,6 +2585,87 @@ private theorem spectralStripConvolution_jet_top
       exact (map_smul ℓ _ _).trans ((congrArg (φ.val g * ·) (hτ g)).trans (mul_assoc _ _ _).symm))
     _ = _ := (integral_mul_const _ _).trans (congrArg (· * f j u) hM.symm)
 
+/-- Rank-one insertions detect every scalar matrix entry of a single zero block.
+Two applications of uniform boundedness give one operator-norm bound for all blocks. -/
+private theorem spectralConvolutionFiniteSum_singleton_norm_bound
+    {E J Z : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E] [CompleteSpace E]
+    (A : E →L[ℂ] E) (x : J → E) (Λ : J → StrongDual ℂ E)
+    (N : Z → ℕ) (jet : (z : Z) → Fin (N z) → J)
+    (h : ∀ (v : E) (f : StrongDual ℂ E),
+      Summable (fun z ↦ ∑ m, Λ (jet z m) (A ((f.smulRight v) (x (jet z m)))))) :
+    ∃ C ≥ (0 : ℝ), ∀ z, ‖spectralConvolutionFiniteSum A x Λ {z} N jet‖ ≤ C := by
+  let B (z : Z) := spectralConvolutionFiniteSum A x Λ {z} N jet
+  obtain ⟨C, hC⟩ := banach_steinhaus (g := B) fun v ↦ by
+    let G (z : Z) := NormedSpace.inclusionInDoubleDual ℂ E (B z v)
+    obtain ⟨R, hR⟩ := banach_steinhaus (g := G) fun f ↦ by
+      let term (z : Z) := ∑ m, Λ (jet z m) (A ((f.smulRight v) (x (jet z m))))
+      refine ⟨∑' z, ‖term z‖, fun z ↦ ?_⟩
+      have he : G z f = term z := by
+        change f (B z v) = term z
+        simp [B, spectralConvolutionFiniteSum, term, smul_eq_mul, mul_comm]
+      rw [he]
+      exact (h v f).norm.le_tsum z (fun _ _ ↦ norm_nonneg _)
+    exact ⟨R, fun z ↦ ((NormedSpace.inclusionInDoubleDualLi ℂ).norm_map (B z v)).ge.trans (hR z)⟩
+  exact ⟨max C 0, le_max_right _ _, fun z ↦ (hC z).trans (le_max_left _ _)⟩
+
+/-- Paper: Theorem 10.3.2.1(1), pp. 453–455. If the zero-block traces for a
+fixed test are summable after every rank-one insertion, the Mellin value times
+the norm of each surviving zeroth coordinate is bounded by one constant times
+its distance from the span of all coordinates at the other zeros. -/
+theorem spectralStripConvolution_mellin_norm_le_of_summable_rankOne_blocks
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (x : J(χ) → Q(a, hStrip(hα), hs₀(hs))) (Λ : J(χ) → StrongDual ℂ Q(a, hStrip(hα), hs₀(hs)))
+    (hb : IsSpectralMarkushevichBasis x Λ)
+    (hj : ∀ j, D (Λ j) = (spectralStripJet_memLp χ hα hs₀(hs) j).toLp (raw(χ, j)))
+    (φ : BruhatCompactSupport C𝔽)
+    (h : ∀ (v : Q(a, hStrip(hα), hs₀(hs))) (f : StrongDual ℂ Q(a, hStrip(hα), hs₀(hs))),
+      Summable (fun z : Z(χ, α) ↦ ∑ m : Fin (N(χ, α, s, z)), Λ (jet(z, m))
+        (spectralConvolution (F := F) a (hStrip(hα)) hs₀(hs) φ ((f.smulRight v) (x (jet(z, m))))))) :
+    ∃ C > (0 : ℝ), ∀ (z : Z(χ, α)) (hz : 0 < N(χ, α, s, z)),
+      let Λ₀ := Λ (jet(z, (⟨0, hz⟩ : Fin (N(χ, α, s, z)))))
+      let P := Submodule.span ℂ {f | ∃ (w : Z(χ, α)) (_ : w ≠ z) (m : Fin (N(χ, α, s, w))),
+        f = Λ (jet(w, m))}
+      ‖M(φ, χ z.val.1, shift(z.val.2.1, z.val.2.2))‖ * ‖Λ₀‖ ≤ C * Metric.infDist Λ₀ (P : Set _) := by
+  classical
+  let A := spectralConvolution (F := F) a (hStrip(hα)) hs₀(hs) φ
+  let j (z : Z(χ, α)) (m : Fin (N(χ, α, s, z))) : J(χ) := jet(z, m)
+  obtain ⟨C, hC, hbound⟩ := spectralConvolutionFiniteSum_singleton_norm_bound A x Λ _ j h
+  have hpos : 0 < C + 1 := by linarith
+  refine ⟨C + 1, hpos, fun z hz ↦ ?_⟩
+  intro Λ₀ P
+  let B := spectralConvolutionFiniteSum A x Λ {z} _ j
+  let e := M(φ, χ z.val.1, shift(z.val.2.1, z.val.2.2))
+  have hinj : Injective (fun zm : (w : Z(χ, α)) × Fin (N(χ, α, s, w)) ↦ j zm.1 zm.2) := by
+    rintro ⟨w,m⟩ ⟨t,n⟩ hwt
+    have he : w = t := Subtype.ext (congrArg (fun i : J(χ) ↦ (i.val.1, i.val.2.1, i.val.2.2.1)) hwt)
+    subst t
+    exact congrArg (Sigma.mk w) (Fin.ext (congrArg (fun i : J(χ) ↦ i.val.2.2.2) hwt))
+  have he : Λ₀.comp B = e • Λ₀ := by
+    ext v
+    exact (spectralConvolutionFiniteSum_limit_of_traceCauchy_coordinate A x Λ {z} _ j hb hinj z
+      (Finset.mem_singleton_self _) ⟨0,hz⟩ v).trans
+      (spectralStripConvolution_jet_top a hα hs χ Λ hj φ z ⟨0,hz⟩ v (fun k hk ↦ (Nat.not_lt_zero _ hk).elim))
+  rw [mul_comm (C + 1)]
+  apply (div_le_iff₀ hpos).mp
+  apply (Metric.le_infDist (x := Λ₀) (s := (P : Set _)) ⟨0, P.zero_mem⟩).mpr
+  intro g hg
+  rw [dist_eq_norm, div_le_iff₀ hpos]
+  have hgB : g.comp B = 0 := by
+    apply (show Submodule.span ℂ _ ≤ (B.precomp ℂ).ker from ?_) hg
+    apply Submodule.span_le.mpr
+    rintro _ ⟨w, hw, m, rfl⟩
+    change (Λ (j w m)).comp B = 0
+    ext v
+    simp only [ContinuousLinearMap.comp_apply, B, spectralConvolutionFiniteSum, Finset.sum_singleton,
+      sum_apply, map_sum, ContinuousLinearMap.smulRight_apply, map_smul, smul_eq_mul, zero_apply]
+    apply Finset.sum_eq_zero
+    intro n _
+    have hne : j z n ≠ j w m := fun h' ↦ hw (congrArg Sigma.fst (hinj (a₁ := ⟨z,n⟩) (a₂ := ⟨w,m⟩) h')).symm
+    rw [hb.2.1 _ _ hne, mul_zero]
+  have hnorm := (Λ₀ - g).opNorm_comp_le B
+  rw [ContinuousLinearMap.sub_comp, he, hgB, sub_zero, norm_smul] at hnorm
+  exact hnorm.trans (mul_le_mul_of_nonneg_left ((hbound z).trans (by linarith)) (norm_nonneg _))
+
 /-- Paper: (10.3.1.17), p. 450, and Theorem 10.3.2.1(2), p. 454. In a basis realizing the strip jets, the
 convolution matrix has no coefficients between distinct zeros. Each diagonal coefficient
 is the Mellin value at the unshifted exponent of its zero. -/
