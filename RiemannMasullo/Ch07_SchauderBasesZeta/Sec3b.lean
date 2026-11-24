@@ -3310,12 +3310,403 @@ private theorem sLocalPWOrbital_eventually_equiv_inf {S₀ : Finset V} (hST : S 
     rfl
   exact ⟨1, one_pos, fun X Y _ _ _ W _ ↦ by rw [hR]⟩
 
+/-- Away from the unit ball, each derivative of an expanding dilate gains any
+prescribed inverse power of the dilation in the weighted supremum norm. -/
+private theorem sLocalPWOrbital_eventually_equiv_sup_singleton_lift_decay
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E] (f : SchwartzMap E ℂ)
+    (k j N : ℕ) (s : ℝ) (hs : 1 ≤ s) (x : E) (hx : 1 ≤ ‖x‖) :
+    ‖x‖ ^ k * ‖iteratedFDeriv ℝ j (fun y ↦ f (s • y)) x‖ ≤
+      f.seminorm ℝ (k + j + N) j / s ^ N := by
+  have hs0 : 0 < s := zero_lt_one.trans_le hs
+  rw [le_div_iff₀ (pow_pos hs0 _), iteratedFDeriv_comp_const_smul s (f.smooth _)]
+  simp only [norm_smul, norm_pow, Real.norm_of_nonneg hs0.le]
+  have h := f.le_seminorm ℝ (k + j + N) j (s • x)
+  rw [norm_smul, Real.norm_of_nonneg hs0.le, mul_pow] at h
+  refine le_trans ?_ h
+  calc
+    _ = (s ^ j * s ^ N) * ‖x‖ ^ k * ‖iteratedFDeriv ℝ j f (s • x)‖ := by ring
+    _ ≤ _ := by
+      gcongr
+      · rw [← pow_add]
+        exact pow_le_pow_right₀ hs (by omega)
+      · omega
+
+/-- A smooth cutoff vanishing on the unit ball makes the expanding dilation
+series summable in every Schwartz seminorm. -/
+private theorem sLocalPWOrbital_eventually_equiv_sup_singleton_lift_series
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (f : SchwartzMap E ℂ) (r : ℝ) (hr : 1 < r) (c : ℂ)
+    (β : E → ℝ) (hβ : ContDiff ℝ (⊤ : ℕ∞) β) (hzero : ∀ x, ‖x‖ < 1 → β x = 0)
+    (hb : ∀ i, ∃ A : ℝ, ∀ x, ‖iteratedFDeriv ℝ i β x‖ ≤ A)
+    (u : ℕ → SchwartzMap E ℂ) (hu : ∀ n x, u n x = β x • f ((r ^ n) • x)) :
+    Summable (fun n ↦ c ^ n • u n) := by
+  let : CompleteSpace (SchwartzMap E ℂ) := completeSpace_schwartzMap
+  let p := schwartzSeminormFamily ℂ E ℂ
+  let hp := schwartz_withSeminorms ℂ E ℂ
+  -- Finitely many seminorms specify a neighborhood. Take the union of their finite tails.
+  suffices h : ∀ i, Summable (fun n : ℕ ↦ p i (c ^ n • u n)) by
+    classical
+    rw [summable_iff_cauchySeq_finset, cauchySeq_finset_iff_sum_vanishing]
+    intro U hU
+    obtain ⟨⟨I, t⟩, ht, hsub⟩ := hp.hasBasis_zero_ball.mem_iff.mp hU
+    have hv (i) := (h i).vanishing (Metric.ball_mem_nhds (0 : ℝ) ht)
+    choose s hs using hv
+    refine ⟨I.biUnion s, fun a ha ↦ hsub ?_⟩
+    rw [Seminorm.mem_ball_zero]
+    refine Seminorm.finset_sup_apply_lt ht fun i hi ↦ ?_
+    have hsmall := hs i a (Finset.disjoint_of_subset_right (Finset.subset_biUnion_of_mem s hi) ha)
+    rw [Metric.mem_ball, dist_zero_right, Real.norm_eq_abs] at hsmall
+    exact (Finset.le_sum_of_subadditive (p i) (map_zero _).le (map_add_le_add _) _ _).trans_lt
+      ((le_abs_self _).trans_lt hsmall)
+  rintro ⟨k, j⟩
+  -- Choose enough decay to dominate the geometric weight in this seminorm.
+  obtain ⟨N, hN⟩ := pow_unbounded_of_one_lt ‖c‖ hr
+  have hr0 : 0 < r := zero_lt_one.trans hr
+  have hrN := pow_pos hr0 N
+  choose A hA using hb
+  let C := ∑ i ∈ Finset.range (j + 1), (j.choose i : ℝ) * max (A i) 0 *
+    f.seminorm ℝ (k + (j - i) + N) (j - i)
+  have hC : 0 ≤ C := Finset.sum_nonneg fun _ _ ↦ by positivity
+  have hbound (n : ℕ) : (u n).seminorm ℂ k j ≤ C / (r ^ n) ^ N := by
+    apply SchwartzMap.seminorm_le_bound _ _ _ _ (div_nonneg hC (by positivity))
+    intro x
+    rw [show ⇑(u n) = _ from funext (hu n)]
+    by_cases hx : ‖x‖ < 1
+    · have hz : (fun y ↦ β y • f ((r ^ n) • y)) =ᶠ[𝓝 x] 0 := by
+        filter_upwards [(isOpen_lt continuous_norm continuous_const).mem_nhds hx] with y hy
+        simp [hzero y hy]
+      rw [(hz.iteratedFDeriv ℝ j).eq_of_nhds]
+      simpa using
+        (div_nonneg hC (show 0 ≤ (r ^ n) ^ N by positivity))
+    · calc
+        _ ≤ ‖x‖ ^ k * ∑ i ∈ Finset.range (j + 1), (j.choose i : ℝ) *
+            ‖iteratedFDeriv ℝ i β x‖ *
+            ‖iteratedFDeriv ℝ (j - i) (fun y ↦ f ((r ^ n) • y)) x‖ := by
+              gcongr
+              exact norm_iteratedFDeriv_smul_le hβ ((f.smooth ⊤).comp (contDiff_const_smul _))
+                x (mod_cast le_top)
+        _ ≤ _ := by
+          dsimp only [C]
+          rw [Finset.mul_sum, Finset.sum_div]
+          apply Finset.sum_le_sum
+          intro i hi
+          calc
+            _ = (j.choose i : ℝ) * ‖iteratedFDeriv ℝ i β x‖ *
+                (‖x‖ ^ k * ‖iteratedFDeriv ℝ (j - i) (fun y ↦ f ((r ^ n) • y)) x‖) := by ring
+            _ ≤ _ := by
+              rw [mul_div_assoc]
+              gcongr
+              · exact (hA i x).trans (le_max_left _ _)
+              · exact sLocalPWOrbital_eventually_equiv_sup_singleton_lift_decay f k (j - i) N _
+                  (one_le_pow₀ hr.le) x (le_of_not_gt hx)
+  have hgeo := summable_geometric_of_lt_one (div_nonneg (norm_nonneg c) hrN.le)
+    ((div_lt_one hrN).mpr hN)
+  refine Summable.of_nonneg_of_le (fun n ↦ apply_nonneg (p (k, j)) _) (f := fun n ↦ (‖c‖ / r ^ N) ^ n * C)
+    (fun n ↦ ?_) (hgeo.mul_right C)
+  change (c ^ n • u n).seminorm ℂ k j ≤ _
+  rw [map_smul_eq_mul, norm_pow, div_pow]
+  calc
+    _ ≤ ‖c‖ ^ n * (C / (r ^ n) ^ N) := by
+      gcongr
+      exact hbound n
+    _ = _ := by rw [← pow_mul, Nat.mul_comm n N, pow_mul]; ring
+
+/-- Summing the dilates outside a ball solves the dilation difference equation
+there. The cutoff keeps its solution Schwartz at the origin. -/
+private theorem sLocalPWOrbital_eventually_equiv_sup_singleton_lift_tail
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E] [FiniteDimensional ℝ E]
+    (f : SchwartzMap E ℂ) (r : ℝ) (hr : 1 < r) (c : ℂ) :
+    ∃ h : SchwartzMap E ℂ, ∀ x, 2 ≤ ‖x‖ → f x = h x - c * h (r • x) := by
+  let b : ContDiffBump (0 : E) := ⟨1, 2, one_pos, one_lt_two⟩
+  let β (x : E) := 1 - b x
+  have hs : ContDiff ℝ (⊤ : ℕ∞) β := contDiff_const.sub b.contDiff
+  have ht : β.HasTemperateGrowth :=
+    (Function.HasTemperateGrowth.const _).sub (b.hasCompactSupport.hasTemperateGrowth b.contDiff)
+  have hz (x : E) (hx : ‖x‖ < 1) : β x = 0 := by
+    simp [β, b.one_of_mem_closedBall (mem_closedBall_zero_iff.mpr hx.le)]
+  have hb (i : ℕ) : ∃ A : ℝ, ∀ x, ‖iteratedFDeriv ℝ i β x‖ ≤ A := by
+    obtain ⟨A, -, hA⟩ := b.hasCompactSupport.exists_bound_iteratedFDeriv b.contDiff i
+    refine ⟨A + 1, fun x ↦ ?_⟩
+    cases i with
+    | zero =>
+      rw [norm_iteratedFDeriv_zero]
+      have h := hA 0 le_rfl x
+      rw [norm_iteratedFDeriv_zero] at h
+      exact (norm_sub_le (1 : ℝ) (b x)).trans (by rw [norm_one]; linarith)
+    | succ i =>
+      dsimp only [β]
+      rw [fun_iteratedFDeriv_sub_apply contDiffAt_const (b.contDiff.contDiffAt.of_le (mod_cast le_top)),
+        iteratedFDeriv_succ_const, Pi.zero_apply, zero_sub, norm_neg]
+      linarith [hA _ le_rfl x]
+  have hr0 : 0 < r := zero_lt_one.trans hr
+  let d (n : ℕ) := (LinearEquiv.smulOfNeZero ℝ E (r ^ n) (pow_ne_zero _ hr0.ne')).toContinuousLinearEquiv
+  let u (n : ℕ) := SchwartzMap.smulLeftCLM ℂ β (SchwartzMap.compCLMOfContinuousLinearEquiv ℂ (d n) f)
+  have hu (n : ℕ) (x : E) : u n x = β x • f ((r ^ n) • x) := by
+    dsimp only [u]
+    rw [SchwartzMap.smulLeftCLM_apply_apply ht]; rfl
+  have H := sLocalPWOrbital_eventually_equiv_sup_singleton_lift_series f r hr c β hs hz hb u hu
+  -- On the exterior the cutoff is one, so the shifted series cancels all but its first term.
+  let h := ∑' n : ℕ, c ^ n • u n
+  refine ⟨h, fun x hx ↦ ?_⟩
+  have he (y : E) (hy : 2 ≤ ‖y‖) : HasSum (fun n : ℕ ↦ c ^ n * f ((r ^ n) • y)) (h y) := by
+    let e := (BoundedContinuousFunction.evalCLM ℂ y).comp (SchwartzMap.toBoundedContinuousFunctionCLM ℂ E ℂ)
+    have hβy : β y = 1 := by
+      change 1 - b y = 1
+      rw [b.zero_of_le_dist (by simpa only [dist_zero_right] using hy), sub_zero]
+    convert H.hasSum.mapL e using 1
+    · funext n
+      change _ = (c ^ n) * u n y
+      rw [hu, hβy, one_smul]
+    · rfl
+  have hrx : 2 ≤ ‖r • x‖ := by
+    rw [norm_smul, Real.norm_of_nonneg hr0.le]
+    exact hx.trans (le_mul_of_one_le_left (norm_nonneg _) hr.le)
+  have htail : HasSum (fun n : ℕ ↦ c ^ (n + 1) * f ((r ^ (n + 1)) • x)) (c * h (r • x)) := by
+    convert (he _ hrx).mul_left c using 1
+    funext n
+    rw [smul_smul, pow_succ r, pow_succ c]
+    ring
+  have h' := (hasSum_nat_add_iff (f := fun n : ℕ ↦ c ^ n * f ((r ^ n) • x)) 1).mp htail
+  have heq := h'.unique (he x hx)
+  simp only [Finset.sum_range_one, pow_zero, one_smul, one_mul] at heq
+  linear_combination heq
+
+/-- Apply the exterior dilation equation in the mixed real and complex
+coordinates of the infinite adeles. -/
+private theorem sLocalPWOrbital_eventually_equiv_sup_singleton_lift_arch
+    (a : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) (u : InfiniteAdeleRing F)
+    (r : ℝ) (hr : 1 < r) (c : ℂ) (hm : InfiniteAdeleRing.ringEquiv_mixedSpace F u =
+      algebraMap ℝ (mixedEmbedding.mixedSpace F) r) :
+    ∃ g : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)), ∀ y : InfiniteAdeleRing F,
+      2 ≤ ‖InfiniteAdeleRing.ringEquiv_mixedSpace F y‖ → a (Multiplicative.ofAdd y) =
+        g (Multiplicative.ofAdd y) - c * g (Multiplicative.ofAdd (u * y)) := by
+  let mix := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  have ha := (mem_archimedeanSchwartzBruhat_iff (F := F) (fun y ↦ a (Multiplicative.ofAdd y))).mp a.property
+  let f := ha.choose
+  have H := sLocalPWOrbital_eventually_equiv_sup_singleton_lift_tail (E := mixedEmbedding.mixedSpace F) f r hr c
+  let J := (archimedeanSchwartzBruhat_equiv (F := F)).choose
+  refine ⟨J H.choose, fun y hy ↦ ?_⟩
+  rw [(archimedeanSchwartzBruhat_equiv (F := F)).choose_spec,
+    (archimedeanSchwartzBruhat_equiv (F := F)).choose_spec, map_mul, hm, ← Algebra.smul_def]
+  exact (ha.choose_spec y).symm.trans (H.choose_spec (mix y) hy)
+
+/-- On the small-stage Fourier side, an archimedean dilation leaves each
+finite factor unchanged. The archimedean tail equation therefore reduces an
+arbitrary test modulo a dilation difference to a compactly supported test. -/
+private theorem sLocalPWOrbital_eventually_equiv_sup_singleton_lift_compact
+    (u : (SAdeleRing F S)ˣ) (r : ℝ) (hr : 1 < r)
+    (hm : InfiniteAdeleRing.ringEquiv_mixedSpace F u.val.1 =
+      algebraMap ℝ (mixedEmbedding.mixedSpace F) r) (hf : u.val.2 = 1)
+    (c : ℂ) (f : B(S)) :
+    ∃ h : B(S), HasCompactSupport (fun y : Multiplicative (SAdeleRing F S) ↦
+      f y - (h y - c * h (Multiplicative.ofAdd (u.val * y.toAdd)))) := by
+  classical
+  let C : Submodule ℂ (B(S)) :=
+    { carrier := {g | HasCompactSupport g.val}
+      zero_mem' := HasCompactSupport.zero
+      add_mem' := fun ha hb ↦ ha.add hb
+      smul_mem' := fun z _ ha ↦ ha.smul_left (f := fun _ ↦ z) }
+  let D : Module.End ℂ (B(S)) := LinearMap.id - c • unitTranslateEnd (R := SAdeleRing F S) u⁻¹
+  have hD (g : B(S)) (x : SAdeleRing F S) : D g (Multiplicative.ofAdd x) =
+      g (Multiplicative.ofAdd x) - c * g (Multiplicative.ofAdd (u.val * x)) := by
+    change _ - c * g (Multiplicative.ofAdd (↑((u⁻¹)⁻¹) * x)) = _
+    rw [inv_inv]
+    rfl
+  let P := C ⊔ D.range
+  let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+
+  have hP : P.mkQ = 0 := by
+    refine sLocalAbsolutePW_tensor_ext (E := SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+      (W := fun w : S ↦ SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))
+      e.toLinearEquiv.toLinearMap e.surjective _ _ ?_
+    intro a b
+    let mix := InfiniteAdeleRing.ringEquiv_mixedSpace F
+    have H := sLocalPWOrbital_eventually_equiv_sup_singleton_lift_arch a u.val.1 r hr c hm
+    let g := H.choose
+    let mk (a' : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) :=
+      e (TensorProduct.tmul ℂ a' (PiTensorProduct.tprod ℂ b))
+    have hmk (a') (x : SAdeleRing F S) : mk a' (Multiplicative.ofAdd x) =
+        a' (Multiplicative.ofAdd x.1) * ∏ w : S, b w (Multiplicative.ofAdd (x.2 w)) := by
+      with_reducible exact (sAdeleSchwartz_inductiveTensor_equiv F S).choose_spec a' b x
+    change P.mkQ (mk a) = 0
+    apply (Submodule.Quotient.mk_eq_zero P).mpr
+    refine Submodule.mem_sup.mpr ⟨mk a - D (mk g), ?_, D (mk g), ⟨_, rfl⟩, sub_add_cancel _ _⟩
+    let K := mix.symm '' Metric.closedBall 0 2
+    let L (w : S) := tsupport (fun z : w.val.adicCompletion F ↦ b w (Multiplicative.ofAdd z))
+    have hK : IsCompact K := (isCompact_closedBall _ _).image (continuous_infiniteAdeleRingEquivMixedSpace_symm F)
+    have hL (w : S) : IsCompact (L w) := ((mem_finitePlaceSchwartz_iff F w.val _).mp
+      ⟨b w, fun _ ↦ rfl⟩).2
+    change HasCompactSupport (fun x : SAdeleRing F S ↦ mk a (Multiplicative.ofAdd x) -
+      D (mk g) (Multiplicative.ofAdd x))
+    apply HasCompactSupport.of_support_subset_isCompact (hK.prod (isCompact_univ_pi hL))
+    intro x hx
+    have hfin : (u.val * x).2 = x.2 := by change u.val.2 * x.2 = _; rw [hf, one_mul]
+    rw [Function.mem_support, hD, hmk, hmk, hmk, hfin] at hx
+    refine ⟨⟨mix x.1, mem_closedBall_zero_iff.mpr ?_, mix.symm_apply_apply _⟩, ?_⟩
+    · by_contra! h
+      apply hx
+      have ha : a (Multiplicative.ofAdd x.1) = g (Multiplicative.ofAdd x.1) -
+          c * g (Multiplicative.ofAdd ((u.val * x).1)) := H.choose_spec _ h.le
+      rw [ha]
+      ring
+    · intro w _
+      apply subset_tsupport
+      intro hz
+      have H : (∏ i : S, b i (Multiplicative.ofAdd (x.2 i))) = 0 :=
+        Finset.prod_eq_zero (Finset.mem_univ w) hz
+      exact hx (by rw [H]; ring)
+  obtain ⟨k, hk, _, ⟨h, rfl⟩, hh⟩ := Submodule.mem_sup.mp
+    ((Submodule.Quotient.mk_eq_zero P).mp (LinearMap.congr_fun hP f))
+  refine ⟨h, ?_⟩
+  convert (show HasCompactSupport k.val from hk) using 1
+  funext y
+  change f (Multiplicative.ofAdd y.toAdd) -
+    (h (Multiplicative.ofAdd y.toAdd) - c * h (Multiplicative.ofAdd (u.val * y.toAdd))) = _
+  rw [← hD h y.toAdd, ← hh]
+  exact add_sub_cancel_right _ _
+
+/-- A compact Fourier correction with the same two moments as the tail
+solution makes the solution polar. Translating that correction still has
+compact Fourier support, so the compact remainder is polar as well. -/
+private theorem sLocalPWOrbital_eventually_equiv_sup_singleton_lift_polar
+    (u : (SAdeleRing F S)ˣ) (r : ℝ) (hr : 1 < r)
+    (hm : InfiniteAdeleRing.ringEquiv_mixedSpace F u.val.1 =
+      algebraMap ℝ (mixedEmbedding.mixedSpace F) r) (hf : u.val.2 = 1)
+    (c : ℂ) (f : B(S)) (hpol : f ∈ Z₀(S)) :
+    ∃ k h : B(S), k ∈ Z₀(S) ∧ HasCompactSupport (sAdeleSchwartzFourier k).val ∧
+      f = k + (h - c • schwartzBruhatUnitTranslate u h) := by
+  obtain ⟨L, hL⟩ := sLocal_fourier_continuousLinear (F := F) (S := S)
+  obtain ⟨m, hmul⟩ := sLocalAbsolutePW_translate_fourier u
+  let d := c * ((m : ℝ) : ℂ)
+  obtain ⟨g, hg⟩ := sLocalPWOrbital_eventually_equiv_sup_singleton_lift_compact u r hr hm hf d
+    (sAdeleSchwartzFourier f)
+  let h := sAdeleSchwartzFourier (sAdeleSchwartzFourier (sAdeleSchwartzFourier g))
+  have hF : sAdeleSchwartzFourier h = g := sLocalAbsolutePW_fourier_inv g
+  obtain ⟨a, ha, ha0, ha1⟩ := sLocalPWTests_moments_surjective (le_rfl (a := S)) univ univ_mem
+    (h (Multiplicative.ofAdd 0)) (g (Multiplicative.ofAdd 0))
+  obtain ⟨a', haa, hac, -⟩ := (mem_sLocalPWTests le_rfl univ a).mp ha
+  rw [sLocalAbsolutePW_transition_self] at haa
+  subst a'
+  have hpolar : h - a ∈ Z₀(S) := by
+    apply (mem_sAdelePolarSubspace _).mpr
+    refine ⟨sub_eq_zero.mpr ha0.symm, ?_⟩
+    rw [← hL, map_sub]
+    change L h (Multiplicative.ofAdd 0) - L a (Multiplicative.ofAdd 0) = 0
+    rw [hL, hL, hF, ha1, sub_self]
+  let D := LinearMap.id - c • unitTranslateEnd (R := SAdeleRing F S) u
+  have hp (b : B(S)) (y : Multiplicative (SAdeleRing F S)) :
+      L (D b) y = L b y - d * L b (Multiplicative.ofAdd (u.val * y.toAdd)) := by
+    change L (b - c • schwartzBruhatUnitTranslate u b) y = _
+    rw [map_sub, map_smul]
+    change L b y - c * L (schwartzBruhatUnitTranslate u b) (Multiplicative.ofAdd y.toAdd) = _
+    rw [hL (schwartzBruhatUnitTranslate _ _), hmul, ← hL b, ← mul_assoc]
+  have he : HasCompactSupport (L (f - D h)).val := by
+    convert hg using 1
+    funext y
+    rw [map_sub]
+    change L f y - L (D h) y = _
+    rw [hp, hL f, hL h, hF]
+  have haL : HasCompactSupport (L a).val := hL a ▸ hac
+  have haD : HasCompactSupport (L (D a)).val := by
+    let e : SAdeleRing F S ≃ₜ SAdeleRing F S := Homeomorph.smul u
+    have hc : HasCompactSupport (fun x : SAdeleRing F S ↦
+        L a (Multiplicative.ofAdd (u.val * x))) :=
+      (show HasCompactSupport (fun x : SAdeleRing F S ↦ L a (Multiplicative.ofAdd x)) from haL).comp_homeomorph e
+    have hh := haL.sub (hc.smul_left (f := fun _ ↦ d))
+    convert hh using 1
+    exact funext (hp a)
+  let k := f - D (h - a)
+  refine ⟨k, h - a, (Z₀(S)).sub_mem hpol ((Z₀(S)).sub_mem hpolar
+    ((Z₀(S)).smul_mem _ (sLocalAbsolutePW_unitTranslate_polar u _ hpolar))), ?_, ?_⟩
+  · have hk : k = (f - D h) + D a := by dsimp only [k]; rw [map_sub]; abel
+    rw [← hL, hk, map_add]
+    exact he.add haD
+  · exact (sub_add_cancel f (D (h - a))).symm
+
+/-- Modulo the singleton principal value, translation by the archimedean
+section of norm q acts on inserted tests by a scalar. Its product with a
+uniformizer has norm one, so that scalar is the given character value. -/
+private theorem sLocalPWOrbital_eventually_equiv_sup_singleton_lift_translate
+    (hST : S ⊆ T) (v : T) (hv : v.val ∉ S) (h : ({v.val} : Finset V) ⊆ T)
+    (χ : PontryaginDual J₁(T)) :
+    let L := (PV(h, χ)).range.mkQ.comp ((q(T, χ)).comp (Π(hST)))
+    ∃ (u : (SAdeleRing F S)ˣ) (r : ℝ) (c : ℂ), 1 < r ∧
+      InfiniteAdeleRing.ringEquiv_mixedSpace F u.val.1 =
+        algebraMap ℝ (mixedEmbedding.mixedSpace F) r ∧ u.val.2 = 1 ∧
+      ∀ f : B(S), L f = c • L (schwartzBruhatUnitTranslate u f) := by
+  intro L
+  classical
+  obtain ⟨p, hp⟩ := (Valued.v : Valuation (v.val.adicCompletion F)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π := sLocalPW_singlePlaceUnit v (Units.mk0 p.val hp.ne_zero)
+  have hq : 1 < v.val.asIdeal.absNorm := NumberField.HeightOneSpectrum.one_lt_absNorm v.val
+  let t : ℝ≥0ˣ := Units.mk0 (v.val.asIdeal.absNorm : ℝ≥0) (by exact_mod_cast (zero_lt_one.trans hq).ne')
+  let g := canonicalIdeleNormSection F t
+  let u := Units.map (adeleProjection F S).toMonoidHom g
+  let w := Units.map (adeleProjection F T).toMonoidHom g
+  have hfin : g.val.2 = 1 := canonicalIdeleNormSection_finite F t
+  have hmem (R : Finset V) : g ∈ Set.range (integralIdeleInsertion F R) := by
+    apply (mem_range_integralIdeleInsertion F R g).mpr
+    intro z _
+    have h1 : g.val.2 z = 1 := congrArg (fun a : FiniteAdeleRing (𝓞 F) F ↦ a z) hfin
+    have h2 : g.val.2 z * g.inv.2 z = 1 := congrArg (fun a : AdeleRing (𝓞 F) F ↦ a.2 z) g.val_inv
+    rw [h1, one_mul] at h2
+    rw [h1, h2]
+    exact ⟨(z.adicCompletionIntegers F).one_mem, (z.adicCompletionIntegers F).one_mem⟩
+  obtain ⟨gS, hgS⟩ := hmem S
+  obtain ⟨gT, hgT⟩ := hmem T
+  have htr (f : B(S)) : Π(hST) (schwartzBruhatUnitTranslate u f) =
+      schwartzBruhatUnitTranslate w (Π(hST) f) := by
+    simpa only [u, w, ← hgS] using testTransition_translate_eq hST gS f
+  have hn : sIdeleNorm F T w = t := by
+    have H := (sIdeleNorm_spec F T).1 gT
+    change ideleNorm F (integralIdeleInsertion F T gT) =
+      sIdeleNorm F T (Units.map (adeleProjection F T).toMonoidHom (integralIdeleInsertion F T gT)) at H
+    rw [hgT] at H
+    exact H.symm.trans (canonicalIdeleNormSection_rightInverse F t)
+  have hnorm : (QuotientGroup.mk (π * w) : J(T)) ∈ J₁(T) := by
+    change sIdeleNorm F T (π * w) = 1
+    rw [map_mul, hn]
+    apply Units.ext
+    apply NNReal.eq
+    change ((sIdeleNorm F T π).val : ℝ) * (v.val.asIdeal.absNorm : ℝ) = 1
+    rw [sLocalPW_singlePlaceUnit_norm v p hp, inv_mul_cancel₀ (by exact_mod_cast (zero_lt_one.trans hq).ne')]
+  let α : Circle := χ ⟨QuotientGroup.mk (π * w), hnorm⟩
+  let r : ℝ := (t.val : ℝ) ^ (Module.finrank ℚ F : ℝ)⁻¹
+  refine ⟨u, r, (α : ℂ)⁻¹, Real.one_lt_rpow (by change (1 : ℝ) < (v.val.asIdeal.absNorm : ℝ); exact_mod_cast hq) (inv_pos.mpr (by
+    exact_mod_cast Module.finrank_pos (R := ℚ) (M := F))), ?_, ?_, fun f ↦ ?_⟩
+  · let mix := InfiniteAdeleRing.ringEquiv_mixedSpace F
+    apply mix.symm.injective
+    rw [mix.symm_apply_apply]
+    funext z
+    apply (InfinitePlace.Completion.extensionEmbedding z).injective
+    exact (canonicalIdeleNormSection_infinite F t z).trans
+      (infinitePlaceRealPower_apply F z (Module.finrank ℚ F : ℝ)⁻¹ t).symm
+  · funext z
+    exact congrArg (fun a : FiniteAdeleRing (𝓞 F) F ↦ a z.val) hfin
+  · let z := Π(hST) (schwartzBruhatUnitTranslate u f)
+    let R := (PV(h, χ)).range
+    have HP : R.mkQ (PV(h, χ) (q(T, χ) z)) = 0 :=
+      (Submodule.Quotient.mk_eq_zero R).mpr ⟨_, rfl⟩
+    change R.mkQ (PV(h, χ) (Submodule.Quotient.mk z)) = 0 at HP
+    rw [sLocalHomogeneousThetaPrincipalValue_mk] at HP
+    change R.mkQ (q(T, χ) (sAdelePrincipalValue F h (Π(hST) (schwartzBruhatUnitTranslate u f)))) = 0 at HP
+    rw [sLocalPW_principalValue_singleton_test hST v hv h p hp, map_sub, map_sub, sub_eq_zero] at HP
+    have H : schwartzBruhatUnitTranslate π z = schwartzBruhatUnitTranslate (π * w) (Π(hST) f) := by
+      dsimp only [z]
+      rw [htr]
+      exact (LinearMap.congr_fun (map_mul (unitTranslateEnd (R := SAdeleRing F T)) π w) _).symm
+    change R.mkQ (q(T, χ) z) = R.mkQ (q(T, χ) (schwartzBruhatUnitTranslate π z)) at HP
+    rw [H, sLocalAbsolutePW_quotient_unitTranslate χ (π * w) hnorm, map_smul] at HP
+    change L f = (α : ℂ)⁻¹ • R.mkQ (q(T, χ) z)
+    rw [HP]
+    exact (inv_smul_smul₀ (Circle.coe_ne_zero α) _).symm
+
 /-- Paper: Theorem 7.3.3.4, pp. 361–363. For one inserted pure tensor and one
 added place, its class modulo the singleton principal value has a zero-moment
 absolute PW representative at some level depending on the tensor. The lift
-cited on p. 362 gives no Fourier support condition. A lift of the single-period
-compact-window representative through Fourier transform and integer insertion,
-with the two moments zero and compact small-stage Fourier support, would suffice. -/
+cited on p. 362 gives no Fourier support condition. Summing archimedean dilates
+outside a ball removes the Fourier tail modulo the singleton principal value. -/
 private theorem sLocalPWOrbital_eventually_equiv_sup_singleton_lift
     {S₀ : Finset V} (hST : S ⊆ T) (hT : T = S ∪ S₀) (_hdis : Disjoint S S₀)
     (_hsat : IsSaturatedPlaceSet (F := F) S₀) (_hPic : PicTrivial)
@@ -3327,7 +3718,32 @@ private theorem sLocalPWOrbital_eventually_equiv_sup_singleton_lift
       (TensorProduct.tmul ℂ a (PiTensorProduct.tprod ℂ b))
     let hvT : ({v} : Finset V) ⊆ T := Finset.singleton_subset_iff.mpr (hT ▸ Finset.mem_union_right S hv)
     ∃ X : ℝ, q(T, χ) (Π(hST) f) ∈ absPW(hST, X, χ) ⊔ (PV(hvT, χ)).range := by
-  sorry
+  intro f h
+  have hχ₁ : χ ≠ 1 := fun H ↦ _hω (sLocalPWOrbital_eventually_equiv_inf_character
+    hST _hPic ω hu (_hχ.symm.trans H))
+  have H : q(T, χ) (Π(hST) f) ∈ (Z₀(T)).map (q(T, χ)) := by
+    rw [sLocalZeroMomentTheta_eq_top χ hχ₁]
+    exact Submodule.mem_top
+  obtain ⟨z, hz, hzf⟩ := Submodule.mem_map.mp H
+  obtain ⟨g, hgz, hg⟩ := sLocalAbsolutePW_exists_insert_rep hST _hPic ω hu χ _hχ z
+  obtain ⟨u, r, c, hr, hm, hu₁, hdiff⟩ := sLocalPWOrbital_eventually_equiv_sup_singleton_lift_translate
+    hST ⟨v, h (Finset.mem_singleton_self v)⟩ (Finset.disjoint_right.mp _hdis hv) h χ
+  obtain ⟨k, b', hk, hkc, hgb⟩ := sLocalPWOrbital_eventually_equiv_sup_singleton_lift_polar
+    u r hr hm hu₁ c g (hg hz)
+  obtain ⟨X, -, hX⟩ := sLocalAbsolutePW_compact_box hkc
+  let Q := (q(T, χ)).comp (Π(hST))
+  let R := (PV(h, χ)).range
+  have Hk : Q k ∈ absPW(hST, X, χ) := sLocalAbsolutePW_mk_mem hST X _ χ k ⟨hkc, hX⟩
+    ((sLocalAbsolutePW_insert_polar hST k).mpr hk)
+  have Hb : Q (b' - c • schwartzBruhatUnitTranslate u b') ∈ R := by
+    apply (Submodule.Quotient.mk_eq_zero R).mp
+    change (R.mkQ.comp Q) (b' - c • schwartzBruhatUnitTranslate u b') = 0
+    rw [map_sub, map_smul]
+    exact sub_eq_zero.mpr (hdiff b')
+  refine ⟨X, ?_⟩
+  change Q f ∈ _
+  rw [show Q f = Q g from (hgz.trans hzf).symm, hgb, map_add]
+  exact Submodule.add_mem_sup Hk Hb
 
 /-- A finite product of principal values is surjective modulo the union of the
 absolute levels if each singleton is. The singleton operators preserve that union
