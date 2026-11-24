@@ -12027,6 +12027,206 @@ theorem introTrace_all_characters_completed_resolvent_height_formula
     (by simpa only [Complex.ofReal_ofNat] using hlim) (by simpa only [Complex.ofReal_ofNat] using hilim)
   exact ⟨han,hlim,hpos,T χ,T χ⁻¹,hT χ,hT χ⁻¹,hsum⟩
 
+/-- Absolute convergence of the ideal logarithmic-derivative series gives a
+uniform bound on every fixed vertical line in the Euler half-plane. -/
+private theorem introTrace_finite_logDeriv_bounded_vertical (χ : U𝔽) (σ : ℝ) (hσ : 1 < σ) :
+    ∃ B : ℝ, ∀ s : ℂ, s.re = σ → ‖logDeriv finiteL(χ) s‖ ≤ B := by
+  let f (s : ℂ) (I : {I : Ideal (𝓞 F) // I ≠ ⊥}) :=
+    -heckeIdealVonMangoldt (ideleClassNormTwist χ 0) I.val / (I.val.absNorm : ℂ)^s
+  have hs (s : ℂ) (h : 1 < s.re) : HasSum (f s) (logDeriv finiteL(χ) s) :=
+    (finiteHeckeL_logDeriv_hasSum_ideals χ _ (finiteHeckeL_exists_continuation χ).choose_spec.1
+      (finiteHeckeL_exists_continuation χ).choose_spec.2 ⟨s,h⟩).2.2
+  refine ⟨∑' I, ‖f (σ : ℂ) I‖,?_⟩
+  intro s h
+  have hsum := hs s (h ▸ hσ)
+  rw [← hsum.tsum_eq]
+  apply (norm_tsum_le_tsum_norm hsum.summable.norm).trans_eq
+  apply tsum_congr
+  intro I
+  have hN : 0 < (I.val.absNorm : ℝ) := by
+    exact_mod_cast Ideal.absNorm_pos_iff_mem_nonZeroDivisors.mpr (mem_nonZeroDivisors_iff_ne_zero.mpr I.property)
+  simp only [f,norm_div]
+  congr 1
+  change ‖((I.val.absNorm : ℝ) : ℂ)^s‖ = ‖((I.val.absNorm : ℝ) : ℂ)^(σ : ℂ)‖
+  rw [Complex.norm_cpow_eq_rpow_re_of_pos hN,Complex.norm_cpow_eq_rpow_re_of_pos hN,h,Complex.ofReal_re]
+
+/-- Paper: Section 1.4.3, p. 29. The multiplicity-weighted real zero
+resolvent on every fixed vertical line with real part at least two is
+asymptotic at both height ends to half the field degree times the log height. -/
+theorem introTrace_real_zero_resolvent_log_height (χ : U𝔽) (σ : ℝ) (hσ : 2 ≤ σ) :
+    Tendsto (fun t : ℝ ↦ (∑' r : windowZeros(χ,1/2),
+      ((zeroOrder(χ,r.val):ℂ)/(((σ:ℂ)+(t:ℂ)*Complex.I)-r.val)).re) / Real.log |t|)
+      (cocompact ℝ) (𝓝 ((Module.finrank ℚ F : ℝ)/2)) := by
+  classical
+  have hsec := (ideleGroup_quotient.{_,0} F).2.2.2.2.2.2.2.2.2.2.1
+  let τ : ℝ≥0ˣ →ₜ* C𝔽 := ⟨hsec.choose,hsec.choose_spec.1⟩
+  have hτ : RightInverse τ (ideleClassNorm F) := hsec.choose_spec.2
+  obtain ⟨ψ,a,ha,_,_,_,_,hreal,_⟩ := introTrace_all_characters_completed_resolvent_height_formula τ hτ χ
+  let s (t : ℝ) := (σ:ℂ)+(t:ℂ)*Complex.I
+  let z (t : ℝ) := s t-1/2
+  let p (z : ℂ) := if ψ = 1 then 1/(z+a+1/2) + 1/(z+a-1/2) else 0
+  let C := (∑' r : windowZeros(χ,1/2), ((zeroOrder(χ,r.val):ℂ)/(2-(r.val-1/2))).re) -
+    (logDeriv (continuedCompletedHeckeL χ) (2+1/2) + p 2).re
+  let d := (Module.finrank ℚ F : ℝ)/2
+  let E (t : ℝ) := (logDeriv finiteL(χ) (s t)).re + (p (z t)).re + C
+  have hs (t : ℝ) : (s t).re = σ := by simp [s]
+  have hz (t : ℝ) : z t ∈ right(1/2) := by
+    change 1/2 < (s t-1/2).re
+    simp only [Complex.sub_re,hs,Complex.div_ofNat_re,Complex.one_re]
+    linarith
+  have hsum (t : ℝ) : (∑' r : windowZeros(χ,1/2),
+        ((zeroOrder(χ,r.val):ℂ)/(s t-r.val)).re) =
+      (logDeriv (heckeGammaFactor χ) (s t)).re + E t := by
+    have he := ((hreal (z t) (hz t)).1).tsum_eq
+    have hz₁ : z t + 1/2 = s t := by dsimp [z]; ring
+    have hz₂ (r : windowZeros(χ,1/2)) : z t - (r.val-1/2) = s t-r.val := by dsimp [z]; ring
+    dsimp only at he
+    simp only [hz₁,hz₂,Complex.add_re,Complex.sub_re,Complex.ofReal_re] at he
+    rw [he,introTrace_completed_logDeriv_euler χ (by rw [hs]; linarith)]
+    dsimp only [E,C,p]
+    simp only [Complex.add_re]
+    ring
+  obtain ⟨B,hB⟩ := introTrace_finite_logDeriv_bounded_vertical χ σ (by linarith)
+  have hp (t : ℝ) : ‖p (z t)‖ ≤ 2 := by
+    have hrec (w : ℂ) (hw : 1 ≤ w.re) : ‖1/w‖ ≤ 1 := by
+      rw [one_div,norm_inv,inv_le_one₀]
+      · exact hw.trans (Complex.re_le_norm _)
+      · exact lt_of_lt_of_le zero_lt_one (hw.trans (Complex.re_le_norm _))
+    dsimp only [p]
+    split_ifs
+    · apply (norm_add_le _ _).trans
+      have h₁ : 1 ≤ (z t+a+1/2).re := by simp [z,hs,ha]; linarith
+      have h₂ : 1 ≤ (z t+a-1/2).re := by simp [z,hs,ha]; linarith
+      linarith [hrec _ h₁,hrec _ h₂]
+    · norm_num
+  let U := |B|+2+|C|
+  have hE (t : ℝ) : |E t| ≤ U := by
+    dsimp only [E,U]
+    have h₁ := (Complex.abs_re_le_norm (logDeriv finiteL(χ) (s t))).trans ((hB _ (hs t)).trans (le_abs_self B))
+    have h₂ := (Complex.abs_re_le_norm (p (z t))).trans (hp t)
+    exact (abs_add_le _ _).trans (add_le_add ((abs_add_le _ _).trans (add_le_add h₁ h₂)) (le_refl |C|))
+  have hlo : Tendsto (fun t : ℝ ↦ Real.log |t|) (cocompact ℝ) atTop := by
+    simpa only [Function.comp_def,Real.norm_eq_abs] using Real.tendsto_log_atTop.comp (tendsto_norm_cocompact_atTop (E := ℝ))
+  have herr : Tendsto (fun t ↦ E t / Real.log |t|) (cocompact ℝ) (𝓝 0) := by
+    apply squeeze_zero_norm' _ ((tendsto_const_nhds (x := U)).div_atTop hlo)
+    filter_upwards [hlo.eventually_gt_atTop 0] with t ht
+    simp only [Real.norm_eq_abs,abs_div,abs_of_pos ht]
+    exact div_le_div_of_nonneg_right (hE t) ht.le
+  have hg := introTrace_heckeGamma_vertical_main_term χ σ (by linarith)
+  have hrem := hg.div_atTop hlo
+  have hc := (tendsto_const_nhds (x := d * Real.log (2*Real.pi))).div_atTop hlo
+  have h := ((tendsto_const_nhds (x := d)).add hrem).sub hc |>.add herr
+  rw [add_zero,sub_zero,add_zero] at h
+  apply h.congr'
+  filter_upwards [hlo.eventually_gt_atTop 0] with t ht
+  rw [hsum]
+  dsimp only [s,d]
+  field_simp [ht.ne']
+  ring
+
+/-- Outside a window of radius eight, half the Poisson kernel at real
+part eight majorizes the kernel at real part two. Inside the window the
+unweighted zero multiplicity majorizes the narrower kernel. -/
+private theorem introTrace_compare_zero_count_kernels (χ : U𝔽) (r : windowZeros(χ,1/2)) (t : ℝ) :
+    let K (σ : ℝ) := ((zeroOrder(χ,r.val):ℂ)/(((σ:ℂ)+(t:ℂ)*Complex.I)-r.val)).re
+    K 2 ≤ (if |t-r.val.im| ≤ 8 then (zeroOrder(χ,r.val):ℝ) else 0) + K 8/2 := by
+  intro K
+  let u := 2-r.val.re
+  let x := t-r.val.im
+  let m : ℝ := zeroOrder(χ,r.val)
+  have hm : 0 ≤ m := (Int.cast_pos.mpr r.property.1).le
+  have hu : 1 ≤ u ∧ u ≤ 2 := by
+    obtain ⟨hl,hr⟩ := abs_lt.mp r.property.2
+    dsimp [u]; constructor <;> linarith
+  have he (σ : ℝ) : K σ = m*((σ-r.val.re)/((σ-r.val.re)^2+x^2)) := by
+    simp [K,m,x,Complex.div_re,Complex.normSq_apply,Complex.sub_re,Complex.sub_im,Complex.mul_re,Complex.mul_im]
+    ring
+  rw [he,he,show (8:ℝ)-r.val.re = u+6 by dsimp [u]; ring]
+  change m*(u/(u^2+x^2)) ≤ (if |x| ≤ 8 then m else 0) + m*((u+6)/((u+6)^2+x^2))/2
+  have h₁ : 0 < u^2+x^2 := by nlinarith [sq_nonneg x, sq_nonneg (u-1)]
+  have h₂ : 0 < (u+6)^2+x^2 := by nlinarith [sq_nonneg x,sq_nonneg u]
+  have hu₀ : 0 ≤ u := by linarith [hu.1]
+  by_cases hx : |x| ≤ 8
+  · simp only [hx,ite_true]
+    have ha : u/(u^2+x^2) ≤ 1 := by
+      rw [div_le_one h₁]
+      nlinarith [sq_nonneg (u-1),sq_nonneg x]
+    have hb : 0 ≤ m*((u+6)/((u+6)^2+x^2))/2 := by positivity
+    linarith [mul_le_mul_of_nonneg_left ha hm]
+  · simp only [hx,ite_false,zero_add]
+    have hxs : 64 ≤ x^2 := by
+      have h := le_of_not_ge hx
+      nlinarith [sq_abs x,mul_nonneg (by linarith : 0 ≤ |x|-8) (by positivity : 0 ≤ |x|+8)]
+    have huv : 2*u*(u+6)^2 ≤ 256 := by
+      have hpos : 0 ≤ u := by linarith
+      have hv : u+6 ≤ 8 := by linarith
+      calc
+        2*u*(u+6)^2 ≤ 2*2*(8:ℝ)^2 := by gcongr; linarith
+        _ = 256 := by norm_num
+    have ha : u/(u^2+x^2) ≤ ((u+6)/((u+6)^2+x^2))/2 := by
+      rw [le_div_iff₀ (by norm_num : (0:ℝ)<2),div_mul_eq_mul_div,div_le_div_iff₀ h₁ h₂]
+      nlinarith [mul_nonneg (show 0 ≤ 2-u by linarith) (sq_nonneg x),
+        mul_nonneg (show 0 ≤ u+6 by linarith) (sq_nonneg u)]
+    simpa only [mul_div_assoc] using mul_le_mul_of_nonneg_left ha hm
+
+/-- Paper: Section 1.4.3, p. 29. Each interval of radius eight centered at
+sufficiently large positive or negative height contains more than
+`c * log |t|` completed zeros counted with multiplicity, for every
+`c < [F : ℚ] / 4`. -/
+theorem introTrace_completed_zero_count_height_lower (χ : U𝔽) {c : ℝ}
+    (hc : c < (Module.finrank ℚ F : ℝ)/4) :
+    ∀ᶠ t : ℝ in cocompact ℝ, ∃ T : Finset (windowZeros(χ,1/2)),
+      (∀ r, r ∈ T ↔ |t-r.val.im| ≤ 8) ∧
+      c*Real.log |t| < ∑ r ∈ T, (zeroOrder(χ,r.val):ℝ) := by
+  classical
+  let Z := windowZeros(χ,1/2)
+  let K (σ t : ℝ) (r : Z) := ((zeroOrder(χ,r.val):ℂ)/(((σ:ℂ)+(t:ℂ)*Complex.I)-r.val)).re
+  let S (σ t : ℝ) := ∑' r : Z, K σ t r
+  have h (σ : ℝ) (hσ : 2 ≤ σ) :
+      Tendsto (fun t : ℝ ↦ S σ t / Real.log |t|) (cocompact ℝ) (𝓝 ((Module.finrank ℚ F : ℝ)/2)) :=
+    introTrace_real_zero_resolvent_log_height χ σ hσ
+  have hd := (h 2 le_rfl).sub ((h 8 (by norm_num)).div_const 2)
+  have he : (Module.finrank ℚ F : ℝ)/2-((Module.finrank ℚ F : ℝ)/2)/2 = (Module.finrank ℚ F : ℝ)/4 := by ring
+  rw [he] at hd
+  have hre := (introTrace_resolvent_imaginary_subtraction χ (a := 1/2) (b := 2) (by norm_num))
+  obtain ⟨_,_,_,_,hR⟩ := hre
+  have hs (σ t : ℝ) (hσ : 2 ≤ σ) : Summable (K σ t) := by
+    let z := ((σ:ℂ)+(t:ℂ)*Complex.I)-1/2
+    have hz : z ∈ right(1/2) := by
+      change 1/2 < z.re
+      simp [z]; linarith
+    have hsub (r : Z) : z-(r.val-1/2) = ((σ:ℂ)+(t:ℂ)*Complex.I)-r.val := by dsimp [z]; ring
+    simpa only [K,hsub] using ((hR z hz).1).summable
+  obtain ⟨U,hU,_⟩ := introTrace_window_zeros_height_exhaustion χ (1/2)
+  have hlog : Tendsto (fun t : ℝ ↦ Real.log |t|) (cocompact ℝ) atTop := by
+    simpa only [Function.comp_def,Real.norm_eq_abs] using Real.tendsto_log_atTop.comp (tendsto_norm_cocompact_atTop (E := ℝ))
+  filter_upwards [hd.eventually (lt_mem_nhds hc),hlog.eventually_gt_atTop 0] with t hmain ht
+  let T := (U (|t|+8)).filter (fun r ↦ |t-r.val.im| ≤ 8)
+  have hT (r : Z) : r ∈ T ↔ |t-r.val.im| ≤ 8 := by
+    rw [Finset.mem_filter,hU,and_iff_right_iff_imp]
+    intro hr
+    calc
+      |r.val.im| = |t-(t-r.val.im)| := by ring_nf
+      _ ≤ |t|+|t-r.val.im| := abs_sub _ _
+      _ ≤ _ := by linarith
+  refine ⟨T,hT,?_⟩
+  let M (r : Z) := if |t-r.val.im| ≤ 8 then (zeroOrder(χ,r.val):ℝ) else 0
+  have hM (r : Z) (hr : r ∉ T) : M r = 0 := ite_eq_right (mt (hT r).mpr hr)
+  have hMs : Summable M := summable_of_ne_finset_zero hM
+  have hMt : ∑' r : Z, M r = ∑ r ∈ T, (zeroOrder(χ,r.val):ℝ) := by
+    rw [tsum_eq_sum hM]
+    exact Finset.sum_congr rfl fun r hr ↦ ite_eq_left ((hT r).mp hr)
+  have hbound := (hs 2 t le_rfl).tsum_le_tsum (fun r ↦ introTrace_compare_zero_count_kernels χ r t)
+    (hMs.add ((hs 8 t (by norm_num)).div_const 2))
+  change S 2 t ≤ ∑' r : Z, (M r + K 8 t r / 2) at hbound
+  rw [hMs.tsum_add ((hs 8 t (by norm_num)).div_const 2),hMt,tsum_div_const] at hbound
+  change S 2 t ≤ (∑ r ∈ T, (zeroOrder(χ,r.val):ℝ)) + S 8 t/2 at hbound
+  change c < S 2 t/Real.log |t| - (S 8 t/Real.log |t|)/2 at hmain
+  have := (lt_div_iff₀ ht).mp (show c < (S 2 t-S 8 t/2)/Real.log |t| by
+    convert hmain using 1
+    ring)
+  linarith
+
 end CompletedSpectralContinuation
 
 /-- Paper: §1.4.3, p. 29. Every unitary character over a number field has infinitely
