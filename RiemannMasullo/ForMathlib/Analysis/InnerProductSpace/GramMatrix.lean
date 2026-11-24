@@ -114,4 +114,97 @@ theorem finiteGram_coefficient_isLUB_iff (hu : LinearIndependent ℂ u) (i : ι)
   change IsLeast _ b ↔ IsLeast _ b
   rw [heq]
 
+private theorem finiteGram_inv_diag_smul [Fintype ι] [DecidableEq ι]
+    (a : ι → ℂ) (ha : ∀ j, a j ≠ 0) (i : ι) :
+    ((Matrix.gram ℂ (fun j ↦ a j • u j))⁻¹ i i).re =
+      (‖a i‖⁻¹)^2 * ((Matrix.gram ℂ u)⁻¹ i i).re := by
+  have hinv (d : ι → ℂ) (hd : ∀ j, d j ≠ 0) :
+      (Matrix.diagonal d)⁻¹ = Matrix.diagonal (fun j ↦ (d j)⁻¹) := by
+    apply Matrix.inv_eq_right_inv
+    simp [Matrix.diagonal_mul_diagonal, hd]
+  have hg : Matrix.gram ℂ (fun j ↦ a j • u j) =
+      Matrix.diagonal (fun j ↦ star (a j)) * Matrix.gram ℂ u * Matrix.diagonal a := by
+    ext j k
+    simp only [Matrix.gram_apply, Matrix.mul_diagonal, Matrix.diagonal_mul, inner_smul_left,
+      inner_smul_right, starRingEnd_apply]
+    ring
+  have hd : ((Matrix.gram ℂ (fun j ↦ a j • u j))⁻¹ i i) =
+      ((a i)⁻¹ * (star (a i))⁻¹) * ((Matrix.gram ℂ u)⁻¹ i i) := by
+    rw [hg, Matrix.mul_inv_rev, Matrix.mul_inv_rev, hinv a ha,
+      hinv (fun j ↦ star (a j)) (fun j ↦ star_ne_zero.mpr (ha j)), Matrix.diagonal_mul, Matrix.mul_diagonal]
+    ring
+  have hp : (a i)⁻¹ * (star (a i))⁻¹ = (((‖a i‖⁻¹)^2 : ℝ) : ℂ) := by
+    rw [← star_inv₀]
+    simpa only [starRingEnd_apply, norm_inv, Complex.ofReal_pow] using Complex.mul_conj' ((a i)⁻¹)
+  rw [hd, hp, Complex.re_ofReal_mul]
+
+/-- Each principal inverse Gram coordinate scales by the reciprocal modulus at the
+selected index. Only scalars on the finite block need to be nonzero. -/
+theorem finiteGramCoordinate_smul (a : ι → ℂ) (i : ι) (S : Finset ι)
+    (ha : ∀ j ∈ S, a j ≠ 0) :
+    finiteGramCoordinate (fun j ↦ a j • u j) i S = ‖a i‖⁻¹ * finiteGramCoordinate u i S := by
+  classical
+  by_cases hi : i ∈ S
+  · simp only [finiteGramCoordinate, hi, dite_eq_left]
+    rw [finiteGram_inv_diag_smul (u := fun j : S ↦ u j.val) (fun j ↦ a j.val) (fun j ↦ ha _ j.property),
+      Real.sqrt_mul (sq_nonneg _), Real.sqrt_sq (inv_nonneg.mpr (norm_nonneg _))]
+  · simp [finiteGramCoordinate, hi]
+
+/-- The condition number is unchanged by independent rescalings of the vectors. -/
+theorem norm_mul_finiteGramCoordinate_smul (a : ι → ℂ) (i : ι) (S : Finset ι)
+    (ha : ∀ j ∈ S, a j ≠ 0) :
+    ‖a i • u i‖ * finiteGramCoordinate (fun j ↦ a j • u j) i S = ‖u i‖ * finiteGramCoordinate u i S := by
+  by_cases hi : i ∈ S
+  · rw [finiteGramCoordinate_smul a i S ha, norm_smul]
+    field_simp [norm_ne_zero_iff.mpr (ha i hi)]
+  · simp [finiteGramCoordinate, hi]
+
+open Classical in
+/-- On a finite block the condition number is the square root of the inverse Gram
+diagonal of the unit vectors in the original directions. -/
+theorem norm_mul_finiteGramCoordinate_eq_normalized_inverse_diag
+    (S : Finset ι) (hu : ∀ j ∈ S, u j ≠ 0) (i : S) :
+    ‖u i.val‖ * finiteGramCoordinate u i.val S =
+      Real.sqrt ((Matrix.gram ℂ (fun j : S ↦ ((‖u j.val‖⁻¹ : ℝ) : ℂ) • u j.val))⁻¹ i i).re := by
+  let a (j : ι) : ℂ := (‖u j‖⁻¹ : ℝ)
+  have ha (j : ι) (hj : j ∈ S) : a j ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (inv_ne_zero (norm_ne_zero_iff.mpr (hu j hj)))
+  have h := (norm_mul_finiteGramCoordinate_smul (u := u) a i.val S ha).symm
+  have hn : ‖a i.val • u i.val‖ = 1 := by
+    rw [norm_smul, show ‖a i.val‖ = ‖u i.val‖⁻¹ by
+      simp [a]]
+    exact inv_mul_cancel₀ (norm_ne_zero_iff.mpr (hu _ i.property))
+  simpa only [hn, one_mul, finiteGramCoordinate, i.property, dite_eq_left, a] using h
+
+/-- A continuous functional which kills the other vectors in the finite block and
+takes a nonzero value `b` at `i` bounds the condition number of that block.
+Its values on vectors outside the block are unrestricted. -/
+theorem norm_mul_finiteGramCoordinate_le_of_pairings (i : ι) (S : Finset ι)
+    (hu : LinearIndependent ℂ (fun j : S ↦ u j.val)) (L : H →L[ℂ] ℂ) {b : ℂ} (hb : b ≠ 0)
+    (hdiag : i ∈ S → L (u i) = b) (hoff : ∀ j ∈ S, j ≠ i → L (u j) = 0) :
+    ‖u i‖ * finiteGramCoordinate u i S ≤ ‖u i‖ * ‖L‖ / ‖b‖ := by
+  classical
+  by_cases hi : i ∈ S
+  · let l : S := ⟨i, hi⟩
+    obtain ⟨c, hc⟩ := (finiteGram_coefficient_isGreatest hu l).1
+    let v := ∑ j : S, c j • u j.val
+    have hsum : L v = c l * b := by
+      change L (∑ j : S, c j • u j.val) = _
+      rw [map_sum, Finset.sum_eq_single l]
+      · rw [map_smul, hdiag hi, smul_eq_mul]
+      · intro j _ hji
+        rw [map_smul, hoff j j.property (fun h ↦ hji (Subtype.ext h)), smul_zero]
+      · simp
+    have hv := L.le_opNorm v
+    rw [hsum, norm_mul] at hv
+    have hbound : ‖c l‖ / ‖v‖ ≤ ‖L‖ / ‖b‖ := by
+      rcases eq_or_lt_of_le (norm_nonneg v) with hn | hn
+      · rw [← hn, div_zero]
+        positivity
+      exact (div_le_div_iff₀ hn (norm_pos_iff.mpr hb)).mpr hv
+    rw [finiteGramCoordinate, dite_eq_left hi, ← hc, mul_div_assoc]
+    exact mul_le_mul_of_nonneg_left hbound (norm_nonneg _)
+  · rw [finiteGramCoordinate, dite_eq_right hi, mul_zero]
+    exact div_nonneg (mul_nonneg (norm_nonneg _) (norm_nonneg _)) (norm_nonneg _)
+
 end RiemannMasullo
