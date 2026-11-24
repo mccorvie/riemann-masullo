@@ -5114,6 +5114,318 @@ private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_
   · exact (h.image (fun c ↦ ‖finiteLocalEulerFactor v.val (sLocalFiniteRestriction v c)‖)).bddAbove.mono
       (by rintro _ ⟨j, hj, rfl⟩; exact ⟨_, Set.mem_image_of_mem _ hj, rfl⟩)
 
+/-- Among the shifted phases with a specified primary pole, the homogeneous two-logarithm
+estimate controls every phase admitting an equally close competitor of at most squared height.
+The quotient of the phases cancels both shifts. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_competitor
+    {ι : Type*} (P Q : ℕ) (hP : 1 < P) (hQ : 1 < Q) (s z : ι → ℂ) (A : Set ι)
+    (a b : ℂ) (hvalue : ∀ j ∈ A, z j = a * Complex.exp (-(Real.log Q : ℂ) * s j))
+    (hpole : ∀ j ∈ A, b * Complex.exp (-(Real.log P : ℂ) * s j) = 1) :
+    ∃ d : ℕ, ∃ C ≥ (0 : ℝ), ∀ j ∈ A,
+      (∃ k ∈ A, z k ≠ z j ∧ 2 + ‖s k‖ ≤ (2 + ‖s j‖) ^ 2 ∧ ‖1 - z k‖ ≤ ‖1 - z j‖) →
+      1 ≤ C * (1 + ‖s j‖) ^ d * ‖1 - z j‖ := by
+  obtain ⟨d, B, hB, hpair⟩ := polynomial_bound_inv_one_sub_of_exp_eq_one P Q 1 hP hQ (by decide)
+  let C := max 2 (4 * B * 6 ^ d)
+  have hC : 2 ≤ C := le_max_left _ _
+  refine ⟨2 * d, C, by linarith, ?_⟩
+  rintro j hj ⟨k, hk, hne, hheight, hclose⟩
+  have hpow : 1 ≤ (1 + ‖s j‖) ^ (2 * d) := one_le_pow₀ (by linarith [norm_nonneg (s j)])
+  by_cases hlarge : 1 / 2 ≤ ‖1 - z j‖
+  · have hcoeff := hC.trans (le_mul_of_one_le_right (by linarith) hpow)
+    calc 1 = 2 * (1 / 2 : ℝ) := by norm_num
+         _ ≤ C * (1 + ‖s j‖) ^ (2 * d) * ‖1 - z j‖ := by gcongr
+  have hhalfnorm : 1 / 2 ≤ ‖z k‖ := by
+    have h := norm_add_le (1 - z k) (z k)
+    rw [sub_add_cancel, norm_one] at h
+    linarith
+  have hzk : z k ≠ 0 := norm_pos_iff.mp (by linarith)
+  have ha : a ≠ 0 := by intro he; simp [hvalue k hk, he] at hzk
+  have hb : b ≠ 0 := by intro he; simpa [he] using hpole k hk
+  have hper : Complex.exp (-(Real.log P : ℂ) * (s j - s k)) = 1 := by
+    rw [mul_sub, Complex.exp_sub, div_eq_one_iff_eq (Complex.exp_ne_zero _)]
+    exact mul_left_cancel₀ hb ((hpole j hj).trans (hpole k hk).symm)
+  have hz : z j / z k = Complex.exp (-(Real.log Q : ℂ) * (s j - s k)) := by
+    rw [hvalue j hj, hvalue k hk, mul_sub, Complex.exp_sub, mul_div_mul_left _ _ ha]
+  have hd : 0 < ‖1 - z j / z k‖ := by
+    apply norm_pos_iff.mpr
+    rw [sub_ne_zero, ne_comm]
+    exact fun he ↦ hne ((div_eq_one_iff_eq hzk).mp he).symm
+  have hraw := hpair (s j - s k) (z j / z k) (by simpa using hper) (by simpa using hz)
+  rw [norm_inv, inv_le_iff_one_le_mul₀ hd] at hraw
+  have hdist : ‖1 - z j / z k‖ ≤ 4 * ‖1 - z j‖ := by
+    have he : 1 - z j / z k = (z k - z j) / z k := by field_simp
+    rw [he, norm_div]
+    apply (div_le_iff₀ (norm_pos_iff.mpr hzk)).mpr
+    have ht : ‖z k - z j‖ ≤ ‖1 - z j‖ + ‖1 - z k‖ := by
+      rw [show z k - z j = (1 - z j) - (1 - z k) by ring]
+      exact norm_sub_le _ _
+    calc ‖z k - z j‖ ≤ 2 * ‖1 - z j‖ := by linarith
+         _ = (4 * ‖1 - z j‖) * (1 / 2) := by ring
+         _ ≤ (4 * ‖1 - z j‖) * ‖z k‖ := by gcongr
+  have hbase : 1 + ‖s j - s k‖ ≤ 6 * (1 + ‖s j‖) ^ 2 := by
+    nlinarith [norm_sub_le (s j) (s k), norm_nonneg (s j), sq_nonneg ‖s j‖]
+  calc 1 ≤ B * (1 + ‖s j - s k‖) ^ d * ‖1 - z j / z k‖ := hraw
+       _ ≤ B * (6 * (1 + ‖s j‖) ^ 2) ^ d * (4 * ‖1 - z j‖) := by gcongr
+       _ = (4 * B * 6 ^ d) * (1 + ‖s j‖) ^ (2 * d) * ‖1 - z j‖ := by
+         rw [mul_pow, ← pow_mul]; ring
+       _ ≤ C * (1 + ‖s j‖) ^ (2 * d) * ‖1 - z j‖ := by gcongr; exact le_max_right _ _
+
+/-- Simultaneous periods of two independent integer logarithms have zero height.
+This separates distinct centers even when their two shifts are non-torsion. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_periods
+    (P Q : ℕ) (hP : 1 < P) (hQ : 1 < Q)
+    (hind : ¬ ∃ k l : ℕ, 0 < k ∧ 0 < l ∧ Q ^ k = P ^ l) (t : ℂ)
+    (h₁ : Complex.exp (-(Real.log P : ℂ) * t) = 1)
+    (h₂ : Complex.exp (-(Real.log Q : ℂ) * t) = 1) : t = 0 := by
+  by_contra ht
+  obtain ⟨k, hk⟩ := Complex.exp_eq_one_iff.mp h₁
+  obtain ⟨l, hl⟩ := Complex.exp_eq_one_iff.mp h₂
+  have hlogP : 0 < Real.log (P : ℝ) := Real.log_pos (by exact_mod_cast hP)
+  have hlogQ : 0 < Real.log (Q : ℝ) := Real.log_pos (by exact_mod_cast hQ)
+  have hP' : (Real.log P : ℂ) ≠ 0 := by exact_mod_cast hlogP.ne'
+  have hQ' : (Real.log Q : ℂ) ≠ 0 := by exact_mod_cast hlogQ.ne'
+  have hk' : k ≠ 0 := by
+    intro h
+    rw [h, Int.cast_zero, zero_mul] at hk
+    exact mul_ne_zero (neg_ne_zero.mpr hP') ht hk
+  have hl' : l ≠ 0 := by
+    intro h
+    rw [h, Int.cast_zero, zero_mul] at hl
+    exact mul_ne_zero (neg_ne_zero.mpr hQ') ht hl
+  have hrel : (k : ℂ) * Real.log Q = (l : ℂ) * Real.log P := by
+    apply mul_right_cancel₀ (b := 2 * (Real.pi : ℂ) * Complex.I) (by simp [Real.pi_ne_zero])
+    linear_combination - (Real.log Q : ℂ) * hk + (Real.log P : ℂ) * hl
+  have hr : (k : ℝ) * Real.log Q = (l : ℝ) * Real.log P := by exact_mod_cast hrel
+  have ha := congrArg abs hr
+  rw [abs_mul, abs_mul, abs_of_pos hlogP, abs_of_pos hlogQ] at ha
+  apply hind ⟨k.natAbs, l.natAbs, Int.natAbs_pos.mpr hk', Int.natAbs_pos.mpr hl', ?_⟩
+  have hpow : (Q : ℝ) ^ k.natAbs = (P : ℝ) ^ l.natAbs := by
+    apply Real.log_injOn_pos (show 0 < (Q : ℝ) ^ k.natAbs by positivity)
+      (show 0 < (P : ℝ) ^ l.natAbs by positivity)
+    simpa [Real.log_pow] using ha
+  exact_mod_cast hpow
+
+/-- An Euler factor of norm greater than one forces the local character to be
+unramified. It therefore takes the same value on elements of equal norm. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_uniformizers
+    (v : V) (c : QuasiCharacter (v.adicCompletion F)ˣ) (u t : (v.adicCompletion F)ˣ)
+    (hut : ‖u.val‖ = ‖t.val‖) (hE : 1 < ‖finiteLocalEulerFactor v c‖) : c u = c t := by
+  let δ := u / t
+  have hnorm : ‖δ.val‖ = 1 := by
+    rw [show δ.val = u.val / t.val from Units.val_div_eq_div_val u t, norm_div, hut,
+      div_self (norm_ne_zero_iff.mpr t.ne_zero)]
+  have hmem : δ ∈ (v.adicCompletionIntegers F).units :=
+    HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mpr
+      (Valued.toNormedField.norm_eq_one_iff.mp hnorm)
+  let unit : (v.adicCompletionIntegers F)ˣ :=
+    ⟨⟨δ.val, hmem.1⟩, ⟨δ.inv, hmem.2⟩, Subtype.ext δ.val_inv, Subtype.ext δ.inv_val⟩
+  unfold finiteLocalEulerFactor at hE
+  split at hE
+  · rename_i hram
+    have hδ : c δ = 1 := hram unit
+    rw [← div_mul_cancel u t, map_mul, hδ, one_mul]
+  · simp at hE
+
+/-- Along a fixed primary pole lattice both unit phases are constant; at the other
+place the formula holds for the given uniformizer of the statement. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_phases
+    (p : Vℚ) (χ : PontryaginDual J₁(T)) (τ : ℝ≥0ˣ →ₜ* J(T)) (hτ : RightInverse τ (m(T)))
+    (v w : T) (u : (v.val.adicCompletion F)ˣ) (hu : ‖u.val‖ = (v.val.asIdeal.absNorm : ℝ)⁻¹) :
+    let s (j : Iₚ(p, χ)) := (existsUnique_complexPower (j.val.1.comp τ)).exists.choose
+    let z (j : Iₚ(p, χ)) := sLocalFiniteRestriction v j.val.1 u
+    let E (j : Iₚ(p, χ)) := finiteLocalEulerFactor v.val (sLocalFiniteRestriction v j.val.1)
+    ∃ a b : ℂ, a ≠ 0 ∧
+      (∀ j, 1 < ‖E j‖ → z j = a * Complex.exp (-(Real.log v.val.asIdeal.absNorm : ℂ) * s j) ∧ z j ≠ 1) ∧
+      ∀ j : Iₚ(p, χ), w ∈ sLocalFinitePolePlaces j.val.1 →
+        b * Complex.exp (-(Real.log w.val.asIdeal.absNorm : ℂ) * s j) = 1 := by
+  intro s z E
+  obtain ⟨t, ht, κ, hv⟩ := sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_value p χ τ hτ v
+  obtain ⟨_, _, ι, hw⟩ := sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_value p χ τ hτ w
+  refine ⟨χ κ, χ ι, Circle.coe_ne_zero _, fun j hE ↦ ?_, fun j hj ↦ ?_⟩
+  · have hzu : z j = sLocalFiniteRestriction v j.val.1 t :=
+      sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_uniformizers
+        v.val _ u t (hu.trans ht.symm) hE
+    refine ⟨hzu.trans (hv j).1, fun h ↦ ?_⟩
+    change 1 < ‖finiteLocalEulerFactor v.val (sLocalFiniteRestriction v j.val.1)‖ at hE
+    rcases (hv j).2 with hram | he
+    · simp [hram] at hE
+    · rw [← hzu, h] at he
+      norm_num [he] at hE
+  · have h₀ := sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_pole _ _ hj
+    rcases (hw j).2 with h | h
+    · exact False.elim (zero_ne_one (h₀.symm.trans h))
+    · rw [h₀, eq_comm, inv_eq_zero, sub_eq_zero] at h
+      exact (hw j).1.symm.trans h.symm
+
+/-- A finite idèle with a nontrivial valuation has infinite order in the class group
+even after quotienting by finite integral units. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_ratio_nontorsion
+    (w : T) (g : (SAdeleRing F T)ˣ)
+    (harch : ∀ σ : InfinitePlace F, g.val.1 σ = 1) (hg : ‖g.val.2 w‖ < 1)
+    (n : ℕ) (hn : 0 < n) (u : (SAdeleRing F T)ˣ)
+    (hunitArch : ∀ σ : InfinitePlace F, u.val.1 σ = 1) (hu : ‖u.val.2 w‖ = 1) :
+    (QuotientGroup.mk (g ^ n) : SIdeleQuotient F T) ≠ QuotientGroup.mk u := by
+  intro he
+  let q : (SAdeleRing F T)ˣ →* SIdeleQuotient F T := QuotientGroup.mk' _
+  have hq : q (g ^ n / u) = 1 := by rw [map_div, show q (g ^ n) = q u from he, div_self']
+  obtain ⟨x, hx⟩ := (sIdeleQuotient_mk_eq_one F T _).mp hq
+  let σ : InfinitePlace F := Classical.arbitrary _
+  let arch : (SAdeleRing F T)ˣ →* σ.Completionˣ :=
+    Units.map ((Pi.evalRingHom (fun t : InfinitePlace F ↦ t.Completion) σ).comp (RingHom.fst _ _)).toMonoidHom
+  let fin : (SAdeleRing F T)ˣ →* (w.val.adicCompletion F)ˣ :=
+    Units.map ((Pi.evalRingHom (fun i : T ↦ i.val.adicCompletion F) w).comp (RingHom.snd _ _)).toMonoidHom
+  have harchg : arch g = 1 := Units.ext (harch σ)
+  have harchu : arch u = 1 := Units.ext (hunitArch σ)
+  have h1 := congrArg arch hx
+  rw [map_div, map_pow, harchg, harchu, one_pow, div_one] at h1
+  have hx1 : (x.val : F) = 1 := (algebraMap F σ.Completion).injective (by
+    have := congrArg Units.val h1
+    change 1 = algebraMap F σ.Completion (x.val : F) at this
+    simpa only [map_one] using this.symm)
+  have h2 := congrArg fin hx
+  have hxunit : x = 1 := Units.ext (Subtype.ext hx1)
+  rw [hxunit, map_one, map_one, map_one, map_div, map_pow, div_eq_one] at h2
+  have hnorm := congrArg (fun a : (w.val.adicCompletion F)ˣ ↦ ‖a.val‖) h2
+  change ‖((fin g) ^ n).val‖ = ‖u.val.2 w‖ at hnorm
+  rw [Units.val_pow_eq_pow_val, norm_pow, hu] at hnorm
+  exact (pow_lt_one₀ (norm_nonneg _) hg hn.ne').ne hnorm
+/-- Every repeated primary pole produces a character-trivial norm-one ratio of
+local uniformizers with nontrivial valuation. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_kernel_ratio
+    (p : HeightOneSpectrum (𝓞 ℚ))
+    (χ : PontryaginDual (sIdeleQuotientNorm F T).ker)
+    (j : SLocalOrbitalIndex (F := F) (S := T) (sLocalPrimaryPlaces T p) χ) (hj : j.val.2 ≠ 0) :
+    ∃ w : T, ∃ g : (SAdeleRing F T)ˣ, ∃ h : sIdeleQuotientNorm F T (QuotientGroup.mk g) = 1,
+      χ ⟨QuotientGroup.mk g, h⟩ = 1 ∧ (∀ σ : InfinitePlace F, g.val.1 σ = 1) ∧ ‖g.val.2 w‖ < 1 := by
+  classical
+  let P := (sLocalFinitePolePlaces j.val.1).filter (fun w ↦ w.val ∈ sLocalPrimaryPlaces T p)
+  have hP : 1 < P.card := by have h := j.property.2; change j.val.2 < P.card at h; omega
+  obtain ⟨v, hv, w, hw, hne⟩ := Finset.one_lt_card.mp hP
+  obtain ⟨τ, hτ⟩ := sIdeleQuotientNorm_exists_section F T
+  let f (i : T) := i.val.asIdeal.inertiaDeg (𝓞 ℚ)
+  have residue (i : T) (hi : i ∈ P) : p.asIdeal.absNorm ^ f i = i.val.asIdeal.absNorm ∧ 0 < f i := by
+    have e := ((mem_sLocalPrimaryPlaces p i.val).mp (Finset.mem_filter.mp hi).2).2
+    let : i.val.asIdeal.IsPrime := i.val.isPrime
+    let : i.val.asIdeal.LiesOver p.asIdeal := ⟨(congrArg HeightOneSpectrum.asIdeal e).symm⟩
+    have h := Ideal.absNorm_pow_inertiaDeg p.asIdeal i.val.asIdeal
+    refine ⟨h, Nat.pos_of_ne_zero fun h0 ↦ ?_⟩
+    change p.asIdeal.absNorm ^ f i = i.val.asIdeal.absNorm at h
+    rw [h0, pow_zero] at h
+    exact (HeightOneSpectrum.one_lt_absNorm i.val).ne h
+  have pick (i : T) (hi : i ∈ P) : ∃ u : (i.val.adicCompletion F)ˣ,
+      ‖u.val‖ = (i.val.asIdeal.absNorm : ℝ)⁻¹ ∧ sLocalFiniteRestriction i j.val.1 u = 1 := by
+    obtain ⟨u, hu, _, hvalue⟩ :=
+      sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_value p χ τ hτ i
+    have h₀ := sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_pole j.val.1 i
+      (Finset.mem_filter.mp hi).1
+    refine ⟨u, hu, ?_⟩
+    rcases (hvalue j).2 with h | h
+    · exact False.elim (zero_ne_one (h₀.symm.trans h))
+    · rw [h₀, eq_comm, inv_eq_zero, sub_eq_zero] at h
+      exact h.symm
+  obtain ⟨u, hu, hzu⟩ := pick v hv
+  obtain ⟨t, ht, hzt⟩ := pick w hw
+  let q : (SAdeleRing F T)ˣ →* SIdeleQuotient F T := QuotientGroup.mk' _
+  let ins (i : T) (x : (i.val.adicCompletion F)ˣ) : (SAdeleRing F T)ˣ :=
+    (ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F) ((s : T) → s.val.adicCompletion F)).symm
+      (1, ContinuousMulEquiv.piUnits.symm (@Pi.mulSingle _ _ _ (Classical.decEq _) i x))
+  have modIns (i : T) (x : (i.val.adicCompletion F)ˣ) :
+      ((sIdeleQuotientNorm F T (q (ins i x))).val : ℝ) = ‖x.val‖ := by
+    have h := sLocalFiniteRestriction_norm (F := F) (S := T) i x
+    change ((1 : PontryaginDual (SIdeleQuotient F T)) (q (ins i x)) : ℂ) *
+      (((sIdeleQuotientNorm F T (q (ins i x))).val : ℝ) : ℂ) ^ (1 : ℂ) = _ at h
+    simpa using h
+  let g := ins v u ^ f w / ins w t ^ f v
+  have hnorm : sIdeleQuotientNorm F T (q g) = 1 := by
+    dsimp only [g]
+    rw [map_div, map_div, div_eq_one, map_pow, map_pow, map_pow, map_pow]
+    apply Units.ext
+    apply NNReal.eq
+    change ((sIdeleQuotientNorm F T (q (ins v u))).val : ℝ) ^ f w =
+      ((sIdeleQuotientNorm F T (q (ins w t))).val : ℝ) ^ f v
+    rw [modIns, modIns, hu, ht, inv_pow, inv_pow, ← Nat.cast_pow, ← Nat.cast_pow,
+      ← (residue v hv).1, ← (residue w hw).1, ← pow_mul, ← pow_mul, Nat.mul_comm]
+  refine ⟨v, g, hnorm, ?_, ?_, ?_⟩
+  · apply Circle.ext
+    have h := DFunLike.congr_fun j.property.1 (⟨q g, hnorm⟩ : (sIdeleQuotientNorm F T).ker)
+    change j.val.1 (q g) = (χ ⟨q g, hnorm⟩ : ℂ) at h
+    change (χ ⟨q g, hnorm⟩ : ℂ) = 1
+    rw [← h]
+    change j.val.1 (q (ins v u ^ f w / ins w t ^ f v)) = 1
+    rw [map_div, map_div, map_pow, map_pow, map_pow, map_pow,
+      show j.val.1 (q (ins v u)) = 1 from hzu, show j.val.1 (q (ins w t)) = 1 from hzt,
+      one_pow, one_pow, div_one]
+  · intro σ
+    let arch : (SAdeleRing F T)ˣ →* σ.Completionˣ :=
+      Units.map ((Pi.evalRingHom (fun t : InfinitePlace F ↦ t.Completion) σ).comp (RingHom.fst _ _)).toMonoidHom
+    have ha (i : T) (x : (i.val.adicCompletion F)ˣ) : arch (ins i x) = 1 := rfl
+    have ha' : arch g = 1 := by simp [g, ha]
+    exact congrArg Units.val ha'
+  · let fin : (SAdeleRing F T)ˣ →* (v.val.adicCompletion F)ˣ :=
+      Units.map ((Pi.evalRingHom (fun i : T ↦ i.val.adicCompletion F) v).comp (RingHom.snd _ _)).toMonoidHom
+    have hself : fin (ins v u) = u := by
+      change (@Pi.mulSingle T (fun k : T ↦ (k.val.adicCompletion F)ˣ) _ (Classical.decEq _) v u) v = u
+      exact @Pi.mulSingle_eq_same T (fun k : T ↦ (k.val.adicCompletion F)ˣ) _ (Classical.decEq _) v u
+    have hother : fin (ins w t) = 1 := by
+      change (@Pi.mulSingle T (fun k : T ↦ (k.val.adicCompletion F)ˣ) _ (Classical.decEq _) w t) v = 1
+      exact @Pi.mulSingle_eq_of_ne T (fun k : T ↦ (k.val.adicCompletion F)ˣ) _ (Classical.decEq _) w v hne t
+    have hf : fin g = u ^ f w := by simp [g, hself, hother]
+    change ‖(fin g).val‖ < 1
+    rw [hf, Units.val_pow_eq_pow_val, norm_pow, hu]
+    have hq : 1 < (v.val.asIdeal.absNorm : ℝ) := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val
+    exact pow_lt_one₀ (by positivity) (inv_lt_one_of_one_lt₀ hq) (residue w hw).2.ne'
+
+/-- If every member of the character kernel is torsion modulo finite local units,
+there are no repeated primary poles for this character. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_kernel_torsion
+    (p : HeightOneSpectrum (𝓞 ℚ)) (χ : PontryaginDual (sIdeleQuotientNorm F T).ker)
+    (hker : ∀ x : (sIdeleQuotientNorm F T).ker, χ x = 1 →
+      ∃ n : ℕ, 0 < n ∧ ∃ u : (SAdeleRing F T)ˣ, (∀ σ : InfinitePlace F, u.val.1 σ = 1) ∧
+        (∀ w : T, ‖u.val.2 w‖ = 1) ∧ x.val ^ n = QuotientGroup.mk u)
+    (j : SLocalOrbitalIndex (F := F) (S := T) (sLocalPrimaryPlaces T p) χ) : j.val.2 = 0 := by
+  by_contra hj
+  obtain ⟨w, g, hmod, hχ, harch, hval⟩ :=
+    sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_kernel_ratio p χ j hj
+  obtain ⟨n, hn, u, harchU, hvalU, he⟩ := hker ⟨QuotientGroup.mk g, hmod⟩ hχ
+  apply sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_ratio_nontorsion
+    w g harch hval n hn u harchU (hvalU w)
+  exact (map_pow (QuotientGroup.mk' _) g n).trans he
+
+/-- At repeated primary poles of an infinite-order character, keep only strict closest
+approaches to one among distinct centers through squared height.
+Only infinitely many such centers with unbounded inverse distances remain. A repeated
+pole also gives a character-kernel element of infinite order modulo finite units.
+Gap: For these separated record centers the phases of the Hecke character still need a
+polynomial inhomogeneous lower bound (Theorem 7.3.3.4, p. 360, using p. 349). -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_minima
+    {S₀ : Finset V} (hST : S ⊆ T) (_hT : T = S ∪ S₀) (_hdis : Disjoint S S₀)
+    (_hsat : IsSaturatedPlaceSet (F := F) S₀) (_hPic : PicTrivial)
+    (p : Vℚ) (_hp₀ : sLocalPrimaryPlaces (F := F) T p ⊆ S₀)
+    (ω : PontryaginDual C₁) (hu : NormOneCharacterUnramifiedOutside ω S)
+    (χ : PontryaginDual J₁(T)) (_hχ : χ = descend(hST, ω, hu)) (_hinf : ¬ IsOfFinOrder ω)
+    (τ : ℝ≥0ˣ →ₜ* J(T)) (_hτ : RightInverse τ (m(T))) (v w : T)
+    (_hv : v.val ∉ sLocalPrimaryPlaces T p) (_hw : w.val ∈ sLocalPrimaryPlaces T p)
+    (u : (v.val.adicCompletion F)ˣ) (_hu : ‖u.val‖ = (v.val.asIdeal.absNorm : ℝ)⁻¹)
+    (_hind : ¬ ∃ k l : ℕ, 0 < k ∧ 0 < l ∧ v.val.asIdeal.absNorm ^ k = w.val.asIdeal.absNorm ^ l) :
+    let s (j : Iₚ(p, χ)) := (existsUnique_complexPower (j.val.1.comp τ)).exists.choose
+    let z (j : Iₚ(p, χ)) := sLocalFiniteRestriction v j.val.1 u
+    let E (j : Iₚ(p, χ)) := finiteLocalEulerFactor v.val (sLocalFiniteRestriction v j.val.1)
+    let A := {j : Iₚ(p, χ) | j.val.2 ≠ 0 ∧ w ∈ sLocalFinitePolePlaces j.val.1 ∧ 1 < ‖E j‖}
+    let H (j : Iₚ(p, χ)) := 2 + ‖s j‖
+    let R := {j ∈ A | ∀ k ∈ A, k.val.1 ≠ j.val.1 → H k ≤ H j ^ 2 → ‖1 - z j‖ < ‖1 - z k‖}
+    1 < (sLocalPrimaryPlaces (F := F) T p).card → ((fun j ↦ j.val.1) '' A).Infinite →
+    ¬ BddAbove ((fun j ↦ ‖E j‖) '' A) →
+    (¬ ∃ σ : ℂ, ∃ N : ℕ, 0 < N ∧ ∀ j ∈ A,
+      Complex.exp (N * (-(Real.log w.val.asIdeal.absNorm : ℂ) * (s j - σ))) = 1 ∧
+      z j ^ N = Complex.exp (N * (-(Real.log v.val.asIdeal.absNorm : ℂ) * (s j - σ)))) →
+    (∀ j ∈ R, ∀ k ∈ R, j.val.1 ≠ k.val.1 → H j ≤ H k → H j ^ 2 < H k ∧ ‖1 - z k‖ < ‖1 - z j‖) →
+    ((fun j ↦ j.val.1) '' R).Infinite → ¬ BddAbove ((fun j ↦ ‖1 - z j‖⁻¹) '' R) →
+    (¬ ∀ x : J₁(T), χ x = 1 →
+      ∃ n : ℕ, 0 < n ∧ ∃ t : (SAdeleRing F T)ˣ, (∀ σ : InfinitePlace F, t.val.1 σ = 1) ∧
+        (∀ i : T, ‖t.val.2 i‖ = 1) ∧ x.val ^ n = QuotientGroup.mk t) →
+    ∃ d : ℕ, ∃ C ≥ (0 : ℝ), ∀ j ∈ R, 1 ≤ C * (1 + ‖s j‖) ^ d * ‖1 - z j‖ := by
+  sorry
+
 /-- Paper: Theorem 7.3.3.4, p. 360, with the coefficient change on p. 349.
 At repeated primary centers where the Euler value has norm greater than one, write `z = c(π_v)`. The missing inhomogeneous Diophantine inequality is
 `1 ≤ C (1 + ‖s‖)^d |1 - z|`. In the section chart, the pole condition at
@@ -5121,9 +5433,8 @@ At repeated primary centers where the Euler value has norm greater than one, wri
 The two logarithms are incommensurable, the Euler values are unbounded, and no
 translation of the height coordinate makes both phases roots of unity.
 For these shifts from infinite-order Hecke characters this is not a known theorem.
-Gap: A polynomial lower bound for a linear form in two logarithms shifted by the phases of a
-Hecke character of infinite order. Baker's theorem covers the unshifted form only, and p. 349
-supplies no bound. -/
+Comparing two centers cancels both shifts. It suffices to bound the infinite sequence
+of strict closest approaches whose heights increase by more than squaring. -/
 private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift
     {S₀ : Finset V} (hST : S ⊆ T) (_hT : T = S ∪ S₀) (_hdis : Disjoint S S₀)
     (_hsat : IsSaturatedPlaceSet (F := F) S₀) (_hPic : PicTrivial)
@@ -5144,7 +5455,69 @@ private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_
       Complex.exp (N * (-(Real.log w.val.asIdeal.absNorm : ℂ) * (s j - σ))) = 1 ∧
       z j ^ N = Complex.exp (N * (-(Real.log v.val.asIdeal.absNorm : ℂ) * (s j - σ)))) →
     ∃ d : ℕ, ∃ C ≥ (0 : ℝ), ∀ j ∈ A, 1 ≤ C * (1 + ‖s j‖) ^ d * ‖1 - z j‖ := by
-  sorry
+  intro s z E A hcard hinf hbd hshift
+  let H (j : Iₚ(p, χ)) := 2 + ‖s j‖
+  let R := {j ∈ A | ∀ k ∈ A, k.val.1 ≠ j.val.1 → H k ≤ H j ^ 2 → ‖1 - z j‖ < ‖1 - z k‖}
+  have hsparse : ∀ j ∈ R, ∀ k ∈ R, j.val.1 ≠ k.val.1 → H j ≤ H k →
+      H j ^ 2 < H k ∧ ‖1 - z k‖ < ‖1 - z j‖ := by
+    rintro j ⟨hj, hmin⟩ k ⟨hk, hmin'⟩ hne hh
+    have htwo : 2 ≤ H k := le_add_of_nonneg_right (norm_nonneg _)
+    have hclose := hmin' j hj hne (hh.trans (by nlinarith))
+    exact ⟨lt_of_not_ge (fun h ↦ (lt_asymm hclose) (hmin k hk hne.symm h)), hclose⟩
+  obtain ⟨a, b, ha, hphase, hpole⟩ :=
+    sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_phases p χ τ _hτ v w u _hu
+  have hvalue (j : Iₚ(p, χ)) (hj : j ∈ A) :
+      z j = a * Complex.exp (-(Real.log v.val.asIdeal.absNorm : ℂ) * s j) := (hphase j hj.2.2).1
+  have hregular : ∃ d : ℕ, ∃ D ≥ (0 : ℝ), ∀ j ∈ R, 1 ≤ D * (1 + ‖s j‖) ^ d * ‖1 - z j‖ := by
+    by_cases hb : BddAbove ((fun j ↦ ‖1 - z j‖⁻¹) '' R)
+    · obtain ⟨B, hB⟩ := hb
+      refine ⟨0, max B 0, le_max_right _ _, fun j hj ↦ ?_⟩
+      rw [pow_zero, mul_one]
+      have hz : z j ≠ 1 := (hphase j hj.1.2.2).2
+      have hpos : 0 < ‖1 - z j‖ := norm_pos_iff.mpr (sub_ne_zero.mpr hz.symm)
+      exact (inv_le_iff_one_le_mul₀ hpos).mp ((hB (Set.mem_image_of_mem _ hj)).trans (le_max_left _ _))
+    · have hi : ((fun j ↦ j.val.1) '' R).Infinite := by
+        intro hf
+        apply hb
+        apply (hf.image (fun c ↦ ‖1 - sLocalFiniteRestriction v c u‖⁻¹)).bddAbove.mono
+        rintro _ ⟨j, hj, rfl⟩
+        exact ⟨_, Set.mem_image_of_mem _ hj, rfl⟩
+      apply sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_minima
+        hST _hT _hdis _hsat _hPic p _hp₀ ω hu χ _hχ _hinf τ _hτ v w _hv _hw u _hu _hind
+        hcard hinf hbd hshift hsparse hi hb
+      intro hker
+      obtain ⟨_, j, hj, rfl⟩ := hi.nonempty
+      exact hj.1.1 (sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_kernel_torsion p χ hker j)
+  obtain ⟨d, D, hD, hrec⟩ := hregular
+  have hpole' (j : Iₚ(p, χ)) (hj : j ∈ A) : b * Complex.exp (-(Real.log w.val.asIdeal.absNorm : ℂ) * s j) = 1 :=
+    hpole j hj.2.1
+  obtain ⟨e, C, hC, hcomp⟩ := sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_competitor
+    _ _ (HeightOneSpectrum.one_lt_absNorm w.val) (HeightOneSpectrum.one_lt_absNorm v.val) s z A a b
+    hvalue hpole'
+  obtain ⟨η, hchart⟩ := sLocalPWOrbital_bases_bounded_interpolation_laurent_chart p χ τ _hτ
+  have hinj (j k : Iₚ(p, χ)) (hj : j ∈ A) (hk : k ∈ A) (he : z k = z j) : k.val.1 = j.val.1 := by
+    have hb : b ≠ 0 := by intro h; simpa [h] using hpole' j hj
+    have per (N : ℕ) (c : ℂ) (hc : c ≠ 0) (h : c * Complex.exp (-(Real.log N : ℂ) * s k) =
+        c * Complex.exp (-(Real.log N : ℂ) * s j)) : Complex.exp (-(Real.log N : ℂ) * (s k - s j)) = 1 := by
+      rw [mul_sub, Complex.exp_sub, div_eq_one_iff_eq (Complex.exp_ne_zero _)]
+      exact mul_left_cancel₀ hc h
+    have htime := sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_periods _ _
+      (HeightOneSpectrum.one_lt_absNorm w.val) (HeightOneSpectrum.one_lt_absNorm v.val) _hind (s k - s j)
+      (per _ b hb ((hpole' k hk).trans (hpole' j hj).symm))
+      (per _ a ha ((hvalue k hk).symm.trans (he.trans (hvalue j hj))))
+    have heq : s k = s j := sub_eq_zero.mp htime
+    exact (hchart k).symm.trans ((congrArg _ heq).trans (hchart j))
+  refine ⟨max d e, max D C, hD.trans (le_max_left _ _), fun j hj ↦ ?_⟩
+  have h1 : 1 ≤ 1 + ‖s j‖ := le_add_of_nonneg_right (norm_nonneg _)
+  by_cases hjR : j ∈ R
+  · apply (hrec j hjR).trans
+    gcongr <;> exact le_max_left _ _
+  · have hn : ¬ ∀ k ∈ A, k.val.1 ≠ j.val.1 → H k ≤ H j ^ 2 → ‖1 - z j‖ < ‖1 - z k‖ :=
+      fun h ↦ hjR ⟨hj, h⟩
+    push Not at hn
+    obtain ⟨k, hk, hne, hh, hle⟩ := hn
+    apply (hcomp j hj ⟨k, hk, fun hz ↦ hne (hinj j k hj hk hz), hh, hle⟩).trans
+    gcongr <;> exact le_max_right _ _
 
 /-- At repeated primary poles, a nonpolar Euler factor over a different rational prime
 is polynomially bounded in height. For an unramified place this asks for a lower bound on
