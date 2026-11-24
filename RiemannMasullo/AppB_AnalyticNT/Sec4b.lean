@@ -11353,6 +11353,253 @@ private theorem explicitFormula_real_shell (τ : ℝ≥0ˣ →ₜ* C[F])
 end ExplicitFormulaRealPlace
 
 
+/-- Fourier inversion followed by character orthogonality on a subgroup selects one
+restriction fiber of the full dual. Its Fourier mass bounds every translate. -/
+private theorem idelicExplicitFormula_infiniteMatching_realDomination_fiber
+    {G K : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [LocallyCompactSpace G]
+    [CommGroup K] [TopologicalSpace K] [IsTopologicalGroup K] [SecondCountableTopology K]
+    [MeasurableSpace K] [BorelSpace K] [MeasurableSpace (PontryaginDual G)]
+    [BorelSpace (PontryaginDual G)] (j : K →ₜ* G) (μ : Measure K) [μ.IsMulLeftInvariant]
+    [IsFiniteMeasure μ] [NeZero μ] (ν : Measure (PontryaginDual G)) [SFinite ν]
+    (H : PontryaginDual G → ℂ) (hi : Integrable H ν) (f : G → ℂ)
+    (hinv : ∀ x, f x = ∫ ψ, H ψ * (ψ x : ℂ) ∂ν) (χ : PontryaginDual K) (g : G) :
+    ‖((μ univ).toReal : ℂ)⁻¹ * ∫ u, f (g * j u) * (χ u : ℂ) ∂μ‖ ≤
+      ∫ ψ in {ψ | PontryaginDual.map j ψ = χ⁻¹}, ‖H ψ‖ ∂ν := by
+  let r := PontryaginDual.map j
+  let S := {ψ | r ψ = χ⁻¹}
+  have hm : MeasurableSet S := (isClosed_singleton.preimage r.continuous).measurableSet
+  have hV : ((μ univ).toReal : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr
+    (ENNReal.toReal_ne_zero.mpr ⟨Measure.measure_univ_ne_zero.mpr (NeZero.ne μ), measure_ne_top μ _⟩)
+  have horth (ψ : PontryaginDual G) :
+      ∫ u : K, (ψ (j u) : ℂ) * (χ u : ℂ) ∂μ =
+        if ψ ∈ S then ((μ univ).toReal : ℂ) else 0 := by
+    let δ := r ψ * χ
+    have he (u : K) : (δ u : ℂ) = (ψ (j u) : ℂ) * (χ u : ℂ) := rfl
+    simp_rw [← he]
+    split_ifs with h
+    · have hz : δ = 1 := eq_inv_iff_mul_eq_one.mp h
+      rw [hz]
+      change (∫ _ : K, (1 : ℂ) ∂μ) = _
+      rw [integral_const, Complex.real_smul, mul_one]
+      rfl
+    · obtain ⟨u, hu⟩ : ∃ u, δ u ≠ 1 := by
+        by_contra! hh
+        exact h ((eq_inv_iff_mul_eq_one).mpr (DFunLike.ext _ _ hh : δ = 1))
+      exact explicitFormula_integral_character_eq_zero μ δ hu
+  let L (u : K) (ψ : PontryaginDual G) := H ψ * (ψ (g * j u) : ℂ) * (χ u : ℂ)
+  have hEval : Continuous (fun p : K × PontryaginDual G ↦ (p.2 (g * j p.1) : ℂ)) :=
+    continuous_subtype_val.comp ((continuous_eval (F := C(G, Circle))).comp
+      (((ContinuousMonoidHom.isInducing_toContinuousMap _ _).continuous.comp continuous_snd).prodMk
+        (continuous_const.mul (j.continuous.comp continuous_fst))))
+  have hL : Integrable (uncurry L) (μ.prod ν) := by
+    refine (hi.norm.comp_snd μ).mono' ?_ (.of_forall fun ⟨u, ψ⟩ ↦ ?_)
+    · exact ((hi.comp_snd μ).aestronglyMeasurable.mul hEval.aestronglyMeasurable).mul
+        (continuous_subtype_val.comp (χ.continuous.comp continuous_fst)).aestronglyMeasurable
+    · simp only [L, uncurry_apply_pair, norm_mul, Circle.norm_coe, mul_one]
+      rfl
+  have hswap : (∫ u, f (g * j u) * (χ u : ℂ) ∂μ) =
+      ∫ ψ, ∫ u, L u ψ ∂μ ∂ν := by
+    refine Eq.trans (integral_congr_ae (.of_forall fun u ↦ ?_)) (integral_integral_swap hL)
+    exact (congrArg (· * (χ u : ℂ)) (hinv (g * j u))).trans (integral_mul_const ..).symm
+  have hinner (ψ : PontryaginDual G) : (∫ u, L u ψ ∂μ) =
+      ((μ univ).toReal : ℂ) * S.indicator (fun ψ ↦ H ψ * (ψ g : ℂ)) ψ := by
+    have he (u : K) : L u ψ = (H ψ * (ψ g : ℂ)) * ((ψ (j u) : ℂ) * (χ u : ℂ)) := by
+      simp only [L, map_mul, Circle.coe_mul]; ring
+    simp_rw [he]
+    rw [integral_const_mul, horth]
+    by_cases h : ψ ∈ S <;> simp [h, mul_comm]
+  rw [hswap]
+  simp_rw [hinner]
+  rw [integral_const_mul, inv_mul_cancel_left₀ hV, integral_indicator hm]
+  exact norm_integral_le_of_norm_le hi.norm.integrableOn (.of_forall fun ψ ↦ by
+    simp only [norm_mul, Circle.norm_coe, mul_one, le_refl])
+
+/-- The Fourier coefficients of all translates of a test on the norm-one subgroup have a
+common summable majorant. By Fourier inversion each coefficient uses only the part of the
+dual whose restriction is the inverse character. These parts are pairwise disjoint. -/
+private theorem idelicExplicitFormula_infiniteMatching_realDomination_translates
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F)) (f : 𝒟(C[F])) :
+    ∃ A : chartChars(τ) → ℝ, Summable A ∧ ∀ χ (g : C[F]),
+      ‖(classVolume : ℂ)⁻¹ * ∫ u, f.val (g * (u : C[F])) * (χ.val (u : C[F]) : ℂ)
+        ∂normOneIdeleClassTamagawaMeasure F‖ ≤ A χ := by
+  let K := (ideleClassNorm F).ker
+  let μ := normOneIdeleClassTamagawaMeasure F
+  let : BorelSpace C[F] := ⟨rfl⟩
+  let mK : MeasurableSpace K := Subtype.instMeasurableSpace
+  have hB : @BorelSpace K _ mK := Subtype.borelSpace _
+  let : CompactSpace K := (ideleClassGroup_finiteness F).2.1
+  let : μ.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let : SecondCountableTopology (AdeleRing (𝓞 F) F) := adeleGroupSecondCountable F
+  let : SecondCountableTopology (AdeleRing (𝓞 F) F)ᵐᵒᵖ :=
+    MulOpposite.opHomeomorph.symm.isEmbedding.secondCountableTopology
+  let : SecondCountableTopology (IdeleGroup (𝓞 F) F) :=
+    Units.isEmbedding_embedProduct.secondCountableTopology
+  let : SecondCountableTopology C[F] :=
+    Topology.IsOpenQuotientMap.secondCountableTopology (ideleGroup_quotient.{_, 0} F).2.2.2.2.1
+  let : SecondCountableTopology K := TopologicalSpace.Subtype.secondCountableTopology _
+  let : SecondCountableTopology U[F] :=
+    (ContinuousMonoidHom.isEmbedding_toContinuousMap C[F] Circle).secondCountableTopology
+  let : MeasurableSpace U[F] := borel _
+  let : BorelSpace U[F] := ⟨rfl⟩
+  let : (classMeasure).IsHaarMeasure := (ideleClassTamagawaMeasure_isWeil F).1
+  obtain ⟨ν, hν⟩ := (lcaPlancherelMeasure_existsUnique classMeasure).exists
+  let : ν.IsHaarMeasure := hν.1
+  let v : SchwartzBruhat C[F] := ⟨f.val, explicitTest_mem_schwartz f⟩
+  let H := lcaFourier classMeasure v
+  -- Fourier inversion as in AppD §1c, schwartzBruhat_fourier_inversion, using the compact
+  -- support of the test for its L² bound.
+  obtain ⟨T, hT⟩ := schwartzBruhat_fourier_continuousLinear classMeasure
+  have hi : Integrable H ν := (SchwartzBruhat.integrable ν (T v)).congr (.of_forall (hT v))
+  have hfc := explicitTest_continuous f
+  have hf₂ : MemLp f.val 2 classMeasure := hfc.memLp_of_hasCompactSupport f.property.2
+  obtain ⟨v', hv', hval⟩ := lcaInverseFourier_zeroAtInfty classMeasure ν hν _ H hi
+    ((lcaFourier_unitary classMeasure ν hν).exists.choose_spec f.val
+      (hfc.integrable_of_hasCompactSupport f.property.2) hf₂)
+  have hinv : (v' : C[F] → ℂ) = f.val :=
+    Measure.eq_of_ae_eq (hv'.trans hf₂.coeFn_toLp) v'.continuous hfc
+  let r : U[F] →ₜ* PontryaginDual K := PontryaginDual.map ⟨K.subtype, continuous_subtype_val⟩
+  let S (χ : chartChars(τ)) := {ψ : U[F] | r ψ = (r χ.val)⁻¹}
+  have hm (χ : chartChars(τ)) : MeasurableSet (S χ) :=
+    (isClosed_singleton.preimage r.continuous).measurableSet
+  have hd : Pairwise (Disjoint on S) := by
+    intro χ η hne
+    refine Set.disjoint_left.mpr fun ψ hχ hη ↦ hne ?_
+    have he := inv_injective (hχ.symm.trans hη : (r χ.val)⁻¹ = (r η.val)⁻¹)
+    exact explicitFormula_chartChar_ext τ hτ χ η (DFunLike.congr_fun he)
+  refine ⟨fun χ ↦ ∫ ψ in S χ, ‖H ψ‖ ∂ν, ?_, ?_⟩
+  · apply summable_of_sum_le (fun _ ↦ integral_nonneg fun _ ↦ norm_nonneg _) (c := ∫ ψ, ‖H ψ‖ ∂ν)
+    intro s
+    rw [← integral_biUnion_finset s (fun i _ ↦ hm i) (fun _ _ _ _ h ↦ hd h)
+      (fun _ _ ↦ hi.norm.integrableOn)]
+    exact setIntegral_le_integral hi.norm (.of_forall fun _ ↦ norm_nonneg _)
+  intro χ g
+  exact idelicExplicitFormula_infiniteMatching_realDomination_fiber
+    (⟨K.subtype, continuous_subtype_val⟩ : K →ₜ* C[F]) μ ν H hi f.val
+    (fun x ↦ (congrFun hinv x).symm.trans (hval x)) (r χ.val) g
+
+/-- On the local positive real flow the phase of the character is exactly the difference
+between translating along this flow and translating along the chosen norm section. -/
+private theorem idelicExplicitFormula_infiniteMatching_realDomination_flow
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F)) (f : 𝒟(C[F]))
+    (w : InfinitePlace F) (hw : w.IsReal) (Φ : chartChars(τ) → 𝓢(ℝ, ℂ))
+    (hM : ∀ χ s, (∫ g, classMellinIntegrand(f, ideleClassNormTwist χ.val s, -1 / 2) g
+      ∂classMeasure) / (classVolume : ℂ) = logMellin (Φ χ) (s - 1 / 2)) :
+    ∃ b : Multiplicative ℝ →ₜ* C[F], ∀ χ (x : ℝ),
+      (classVolume : ℂ)⁻¹ * (∫ u, f.val (b (Multiplicative.ofAdd x) * (u : C[F])) *
+        (χ.val (u : C[F]) : ℂ) ∂normOneIdeleClassTamagawaMeasure F) =
+      Φ χ x * Complex.exp (-(realHeckeCharacter_parameters χ.val w hw).exists.choose.1 * x) := by
+  let e : ℝˣ →ₜ* w.Completionˣ :=
+    ⟨Units.map (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm.toMonoidHom,
+      (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).symm.continuous.units_map _⟩
+  let expU : Multiplicative ℝ →ₜ* ℝˣ :=
+    { toFun := fun t ↦ Units.mk0 (Real.exp t.toAdd) (Real.exp_pos _).ne'
+      map_one' := Units.ext Real.exp_zero
+      map_mul' := fun x y ↦ Units.ext (Real.exp_add _ _)
+      continuous_toFun := Units.isEmbedding_val₀.continuous_iff.mpr
+        (Real.continuous_exp.comp continuous_toAdd) }
+  let b := (⟨infiniteClassMap(w), continuous_ideleClass_ofCompletion F w⟩ :
+    w.Completionˣ →ₜ* C[F]).comp (e.comp expU)
+  refine ⟨b, fun χ x ↦ ?_⟩
+  let r := radialFlow(τ, x)
+  let g := b (Multiplicative.ofAdd x)
+  have hn : ideleClassNorm F g = positiveRealLogEquiv.symm (Multiplicative.ofAdd x) := by
+    apply positiveRealLogEquiv.injective
+    apply Multiplicative.toAdd.injective
+    rw [ContinuousMulEquiv.apply_symm_apply, positiveRealLogEquiv_apply]
+    rw [show ((ideleClassNorm F g : ℝ≥0) : ℝ) = |Real.exp x| from
+      explicitFormula_real_classNorm w hw (expU (Multiplicative.ofAdd x)),
+      abs_of_pos (Real.exp_pos _), Real.log_exp, toAdd_ofAdd]
+  let k : (ideleClassNorm F).ker := ⟨r⁻¹ * g, by
+    rw [MonoidHom.mem_ker, map_mul, map_inv, show ideleClassNorm F r = _ from hτ _, hn,
+      inv_mul_cancel]⟩
+  let mK : MeasurableSpace (ideleClassNorm F).ker := Subtype.instMeasurableSpace
+  let : (normOneIdeleClassTamagawaMeasure F).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let : BorelSpace C[F] := ⟨rfl⟩
+  have hB : @BorelSpace (ideleClassNorm F).ker _ mK := Subtype.borelSpace _
+  have : @MeasurableMul (ideleClassNorm F).ker mK _ := @ContinuousMul.measurableMul _ _ mK hB _ _
+  have hχ : (χ.val (k : C[F]) : ℂ) =
+      Complex.exp ((realHeckeCharacter_parameters χ.val w hw).exists.choose.1 * x) := by
+    simp only [k, map_mul, map_inv, show χ.val r = 1 from χ.property _, inv_one, one_mul]
+    rw [show (χ.val g : ℂ) = _ from
+      explicitFormula_real_character w hw χ.val (expU (Multiplicative.ofAdd x))]
+    change (‖Real.exp x‖ : ℂ) ^ _ * (if 0 < Real.exp x then 1 else (-1 : ℂ)) ^ _ = _
+    rw [ite_eq_left (Real.exp_pos x), one_pow, mul_one, Real.norm_of_nonneg (Real.exp_pos x).le,
+      explicitFormula_exp_cpow]
+  rw [neg_mul, Complex.exp_neg, ← hχ, ← div_eq_mul_inv, eq_div_iff (Circle.coe_ne_zero _),
+    explicitFormula_profile_eq τ hτ f Φ hM χ x, mul_assoc, ← integral_mul_const]
+  congr 1
+  refine Eq.trans (integral_congr_ae (.of_forall fun u ↦ ?_))
+    (integral_mul_left_eq_self (μ := normOneIdeleClassTamagawaMeasure F)
+      (fun u : (ideleClassNorm F).ker ↦ f.val (r * (u : C[F])) * (χ.val (u : C[F]) : ℂ)) k)
+  change f.val (g * (u : C[F])) * _ * _ = f.val (r * ((r⁻¹ * g) * (u : C[F]))) * _
+  rw [← mul_assoc r, mul_inv_cancel_left]
+  simp only [Subgroup.coe_mul, map_mul, Circle.coe_mul]
+  ring
+
+/-- After the local character has been absorbed into the profile, subtract its value at zero
+before estimating the two samples. A Lipschitz bound then cancels the singular denominator. -/
+private theorem idelicExplicitFormula_infiniteMatching_realDomination_bound
+    (g : ℝ → ℂ) (c B t : ℝ) (hc : 1 / 4 ≤ c) (hc' : c ≤ 1) (hB : 0 ≤ B)
+    (hg : ∀ x : ℝ, ‖g x - g 0‖ ≤ B * |x|) (ht : 0 < t) :
+    ‖(1 / 2 : ℂ) * (2 * (Real.exp (-t) : ℂ) * g 0 / t -
+      (Real.exp (-c * t) : ℂ) * (g (t / 2) + g (-(t / 2))) / (1 - (Real.exp (-t) : ℂ)))‖ ≤
+      (2 * ‖g 0‖ + B) * ((1 + t) * Real.exp (-(1 / 4) * t)) := by
+  let E := Real.exp (-t)
+  let Z := Real.exp (-c * t)
+  let d := 1 - E
+  have hE : 0 < E := Real.exp_pos _
+  have hZ : 0 < Z := Real.exp_pos _
+  have hd : 0 < d := sub_pos.mpr (Real.exp_lt_one_iff.mpr (neg_lt_zero.mpr ht))
+  have hEZ : E ≤ Z := Real.exp_le_exp.mpr (by nlinarith)
+  have hZ1 : Z ≤ 1 := Real.exp_le_one_iff.mpr (by nlinarith)
+  have hZt : Z ≤ Real.exp (-(1 / 4) * t) := Real.exp_le_exp.mpr (by nlinarith)
+  have hr := digamma_remainder_bounds ht
+  change -1 ≤ 1 / t - 1 / d ∧ 1 / t - 1 / d ≤ 0 at hr
+  have htd : t / d ≤ 1 + t := by
+    have h := mul_le_mul_of_nonneg_right hr.1 ht.le
+    field_simp [ht.ne', hd.ne'] at h ⊢
+    linarith
+  have hconst : |E / t - Z / d| ≤ 2 * Z := by
+    have hrem : |E * (1 / t - 1 / d)| ≤ E := by
+      rw [abs_mul, abs_of_pos hE]
+      exact mul_le_of_le_one_right hE.le (abs_le.mpr ⟨hr.1, hr.2.trans zero_le_one⟩)
+    have hdiff : |(E - Z) / d| ≤ Z := by
+      rw [abs_div, abs_of_pos hd, abs_of_nonpos (sub_nonpos.mpr hEZ), div_le_iff₀ hd]
+      dsimp [d]
+      nlinarith [mul_le_mul_of_nonneg_right hZ1 hE.le]
+    rw [show E / t - Z / d = E * (1 / t - 1 / d) + (E - Z) / d by ring]
+    linarith [abs_add_le (E * (1 / t - 1 / d)) ((E - Z) / d)]
+  let Δ := (g (t / 2) - g 0) + (g (-(t / 2)) - g 0)
+  have hΔ : ‖Δ‖ ≤ B * t := by
+    have hp := hg (t / 2)
+    have hm := hg (-(t / 2))
+    rw [abs_neg] at hm
+    rw [abs_of_pos (half_pos ht)] at hp hm
+    exact (norm_add_le _ _).trans (by linarith)
+  have heq : (1 / 2 : ℂ) * (2 * (E : ℂ) * g 0 / t -
+      (Z : ℂ) * (g (t / 2) + g (-(t / 2))) / (1 - (E : ℂ))) =
+      ((E / t - Z / d : ℝ) : ℂ) * g 0 - ((Z / (2 * d) : ℝ) : ℂ) * Δ := by
+    dsimp only [Δ, d]
+    push_cast
+    rw [div_mul_eq_div_div]
+    ring
+  rw [heq]
+  calc
+    _ ≤ |E / t - Z / d| * ‖g 0‖ + (Z / (2 * d)) * ‖Δ‖ := by
+      simpa only [norm_mul, Complex.norm_real, Real.norm_eq_abs,
+        abs_of_nonneg (show 0 ≤ Z / (2 * d) by positivity)] using
+        norm_sub_le (((E / t - Z / d : ℝ) : ℂ) * g 0) (((Z / (2 * d) : ℝ) : ℂ) * Δ)
+    _ ≤ (2 * Z) * ‖g 0‖ + Z / (2 * d) * (B * t) :=
+      add_le_add (mul_le_mul_of_nonneg_right hconst (norm_nonneg _))
+        (mul_le_mul_of_nonneg_left hΔ (by positivity))
+    _ ≤ (2 * ‖g 0‖ + B) * ((1 + t) * Z) := by
+      rw [show Z / (2 * d) * (B * t) = (B * Z / 2) * (t / d) by rw [div_mul_eq_div_div]; ring]
+      have hm := mul_le_mul_of_nonneg_left htd (show 0 ≤ B * Z / 2 by positivity)
+      nlinarith [mul_nonneg (mul_nonneg (norm_nonneg (g 0)) ht.le) hZ.le,
+        mul_nonneg (mul_nonneg hB (show 0 ≤ 1 + t by linarith)) hZ.le]
+    _ ≤ _ := by gcongr
+
 /-- Paper: Theorem B.4.4.7, pp. 625–626, footnote 27 (domination at a real place `w`). For
 the radial profiles `Φ_χ` of a test `f` (as in `idelicExplicitFormula_finiteMatching`), each
 real digamma kernel `t ↦ K_χ(t)` at `w` (with the radial exponent and sign parity of `χ` at
@@ -11377,7 +11624,71 @@ theorem idelicExplicitFormula_infiniteMatching_realDomination (τ : ℝ≥0ˣ �
         ((1 / 2 - p.1 + p.2.val) / 2) (Φ χ) t
     (∀ χ, IntegrableOn (K χ) (Ioi 0)) ∧
       Summable (fun χ ↦ ∫ t in Ioi (0 : ℝ), ‖K χ t‖) := by
-  sorry
+  intro K
+  obtain ⟨b, hb⟩ := idelicExplicitFormula_infiniteMatching_realDomination_flow τ _hτ f w hw Φ _hM
+  let D : 𝒟(C[F]) := ⟨_, explicitFormula_flowDeriv_mem b f⟩
+  obtain ⟨A, hAs, hA⟩ := idelicExplicitFormula_infiniteMatching_realDomination_translates τ _hτ f
+  obtain ⟨B, hBs, hB⟩ := idelicExplicitFormula_infiniteMatching_realDomination_translates τ _hτ D
+  let G (φ : 𝒟(C[F])) (χ : chartChars(τ)) (y : ℝ) := (classVolume : ℂ)⁻¹ *
+    ∫ u, φ.val (b (Multiplicative.ofAdd y) * (u : C[F])) * (χ.val (u : C[F]) : ℂ)
+      ∂normOneIdeleClassTamagawaMeasure F
+  have hder (χ : chartChars(τ)) (x : ℝ) : HasDerivAt (G f χ) (G D χ x) x :=
+    (explicitFormula_radial_hasDerivAt b χ.val f x).const_mul _
+  have hLip (χ : chartChars(τ)) (x : ℝ) : ‖G f χ x - G f χ 0‖ ≤ B χ * |x| := by
+    simpa only [sub_zero, Real.norm_eq_abs] using convex_univ.norm_image_sub_le_of_norm_hasDerivWithin_le
+      (fun y _ ↦ (hder χ y).hasDerivWithinAt) (fun y _ ↦ hB χ (b (Multiplicative.ofAdd y)))
+      (Set.mem_univ (0 : ℝ)) (Set.mem_univ x)
+  let E (t : ℝ) := (1 + t) * Real.exp (-(1 / 4) * t)
+  have hi : IntegrableOn E (Ioi 0) := by
+    have h₁ := integrableOn_exp_mul_Ioi (a := -(1 / 4)) (by norm_num) 0
+    have h₂ : IntegrableOn (fun t : ℝ ↦ t * Real.exp (-(1 / 4) * t)) (Ioi 0) := by
+      simpa using (integrableOn_rpow_mul_exp_neg_mul_rpow (p := 1) (s := 1) (by norm_num)
+        one_pos (by norm_num : 0 < (1 / 4 : ℝ)))
+    simpa only [E, Pi.add_def, add_mul, one_mul] using h₁.add h₂
+  have hbound (χ : chartChars(τ)) (t : ℝ) (ht : 0 < t) :
+      ‖K χ t‖ ≤ (2 * A χ + B χ) * E t := by
+    let p := (realHeckeCharacter_parameters χ.val w hw).exists.choose
+    let c : ℝ := (1 / 2 + p.2.val) / 2
+    have hc : 1 / 4 ≤ c := by dsimp [c]; linarith [Nat.cast_nonneg (α := ℝ) p.2.val]
+    have hc' : c ≤ 1 := by
+      have hn : p.2.val ≤ 1 := Nat.le_of_lt_succ p.2.isLt
+      have hr : (p.2.val : ℝ) ≤ 1 := by exact_mod_cast hn
+      dsimp [c]; linarith
+    have he (z : ℂ) :
+        Complex.exp (-((1 / 2 + z + p.2.val) / 2) * t) =
+          (Real.exp (-c * t) : ℂ) * Complex.exp (-z * ((t / 2 : ℝ) : ℂ)) := by
+      rw [Complex.ofReal_exp, ← Complex.exp_add]
+      congr 1
+      dsimp [c]; push_cast; ring
+    have heq : K χ t = (1 / 2 : ℂ) * (2 * (Real.exp (-t) : ℂ) * G f χ 0 / t -
+        (Real.exp (-c * t) : ℂ) * (G f χ (t / 2) + G f χ (-(t / 2))) /
+          (1 - (Real.exp (-t) : ℂ))) := by
+      change heckeArchimedeanDigammaKernel _ ((1 / 2 + p.1 + p.2.val) / 2)
+        ((1 / 2 - p.1 + p.2.val) / 2) (Φ χ) t = _
+      simp only [heckeArchimedeanDigammaKernel, one_div_mul_eq_div, sub_eq_add_neg (1 / 2 : ℂ) p.1,
+        he, show ∀ y, G f χ y = Φ χ y * Complex.exp (-p.1 * y) from hb χ,
+        Complex.ofReal_zero, mul_zero, Complex.exp_zero, mul_one, neg_neg, Complex.ofReal_neg,
+        neg_mul_neg, Complex.ofReal_div, Complex.ofReal_one, Complex.ofReal_ofNat]
+      ring
+    rw [heq]
+    refine (idelicExplicitFormula_infiniteMatching_realDomination_bound (G f χ) c (B χ) t hc hc'
+      ((norm_nonneg _).trans (hB χ 1)) (hLip χ) ht).trans ?_
+    have h₀ : ‖G f χ 0‖ ≤ A χ := hA χ (b (Multiplicative.ofAdd 0))
+    exact mul_le_mul_of_nonneg_right (by linarith : 2 * ‖G f χ 0‖ + B χ ≤ 2 * A χ + B χ)
+      (show 0 ≤ E t from mul_nonneg (by linarith : 0 ≤ 1 + t) (Real.exp_pos _).le)
+  have hae (χ : chartChars(τ)) : ∀ᵐ t ∂volume.restrict (Ioi (0 : ℝ)),
+      ‖K χ t‖ ≤ (2 * A χ + B χ) * E t :=
+    (ae_restrict_mem measurableSet_Ioi).mono (fun t ht ↦ hbound χ t ht)
+  have hKi (χ : chartChars(τ)) : IntegrableOn (K χ) (Ioi 0) := by
+    refine (hi.const_mul _).mono' ?_ (hae χ)
+    apply Measurable.aestronglyMeasurable
+    dsimp only [K, heckeArchimedeanDigammaKernel]
+    fun_prop
+  refine ⟨hKi, Summable.of_nonneg_of_le (fun _ ↦ integral_nonneg fun _ ↦ norm_nonneg _) ?_
+    (((hAs.mul_left 2).add hBs).mul_right (∫ t in Ioi (0 : ℝ), E t))⟩
+  intro χ
+  rw [← integral_const_mul]
+  exact integral_mono_ae (hKi χ).norm (hi.const_mul _) (hae χ)
 
 
 /-- Paper: Theorem B.4.4.7, pp. 625–626, footnote 27 (character sum at a real place `w`).
