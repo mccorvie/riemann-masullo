@@ -7101,6 +7101,193 @@ theorem introTrace_normalized_continuation_iff_no_right_zeros_in_strip
     have hL := continuedCompletedHeckeL_spec χ
     exact h s hs (completedHeckeL_continuation_zeros χ _ hL.1 hL.2 (by linarith) hp) hp
 
+open scoped ComplexConjugate in
+/-- Complex conjugation of both the parameter and the value preserves a local meromorphic normal form and its order. -/
+private theorem introTrace_conjugate_germ_order (f : ℂ → ℂ) (s : ℂ) (hf : MeromorphicNFAt f (conj s)) :
+    MeromorphicNFAt (conj ∘ f ∘ conj) s ∧
+      meromorphicOrderAt (conj ∘ f ∘ conj) s = meromorphicOrderAt f (conj s) := by
+  have hc := Complex.continuous_conj.tendsto s
+  rcases hf with hz | ⟨n, g, hg, hn, hfg⟩
+  · have hr : conj ∘ f ∘ conj =ᶠ[𝓝 s] 0 := by
+      filter_upwards [hc.eventually hz] with w hw
+      exact (congrArg conj hw).trans (map_zero _)
+    exact ⟨Or.inl hr,
+      (meromorphicOrderAt_eq_top_iff.mpr (hr.filter_mono nhdsWithin_le_nhds)).trans
+        (meromorphicOrderAt_eq_top_iff.mpr (hz.filter_mono nhdsWithin_le_nhds)).symm⟩
+  · have hga : AnalyticAt ℂ (conj ∘ g ∘ conj) s := by
+      apply Complex.analyticAt_iff_eventually_differentiableAt.mpr
+      filter_upwards [hc.eventually (Complex.analyticAt_iff_eventually_differentiableAt.mp hg)] with w hw
+      simpa only [Complex.conj_conj] using hw.comp_ringHom conj conj
+    have hgn : (conj ∘ g ∘ conj) s ≠ 0 := (map_ne_zero_iff _ (starRingEnd ℂ).injective).mpr hn
+    have he : (conj ∘ f ∘ conj) =ᶠ[𝓝 s] (· - s) ^ n • (conj ∘ g ∘ conj) := by
+      filter_upwards [hc.eventually hfg] with w hw
+      simpa only [comp_apply, Pi.smul_apply', Pi.pow_apply, smul_eq_mul, map_mul, map_zpow₀,
+        map_sub, Complex.conj_conj] using congrArg conj hw
+    have hr : MeromorphicNFAt (conj ∘ f ∘ conj) s := Or.inr ⟨n, _, hga, hgn, he⟩
+    have hf : MeromorphicNFAt f (conj s) := Or.inr ⟨n, g, hg, hn, hfg⟩
+    exact ⟨hr, ((meromorphicOrderAt_eq_int_iff hr.meromorphicAt).mpr
+      ⟨_, hga, hgn, he.filter_mono nhdsWithin_le_nhds⟩).trans
+      ((meromorphicOrderAt_eq_int_iff hf.meromorphicAt).mpr
+        ⟨g, hg, hn, hfg.filter_mono nhdsWithin_le_nhds⟩).symm⟩
+
+open scoped ComplexConjugate in
+/-- Conjugating a finite Euler product on the half-plane of absolute convergence
+replaces the character by its inverse and conjugates the parameter. -/
+private theorem introTrace_finite_euler_conj (χ : U𝔽) (s : ℂ) (hs : 1 < s.re) :
+    finiteHeckeL χ⁻¹ ⟨s, hs⟩ = conj (finiteHeckeL χ ⟨conj s, hs⟩) := by
+  have htwist (z : ℂ) (g : C𝔽) :
+      ideleClassNormTwist χ⁻¹ z g = conj (ideleClassNormTwist χ (conj z) g) := by
+    have hn : (N(g) : ℂ).arg ≠ Real.pi := by
+      rw [Complex.arg_ofReal_of_nonneg (NNReal.coe_nonneg _)]
+      exact Real.pi_ne_zero.symm
+    change (((χ g)⁻¹ : Circle) : ℂ) * (N(g) : ℂ) ^ z =
+      conj ((χ g : ℂ) * (N(g) : ℂ) ^ (conj z))
+    rw [Circle.coe_inv_eq_conj, map_mul, ← Complex.conj_cpow _ _ hn, Complex.conj_ofReal]
+  apply (finiteHeckeL_hasProd χ⁻¹ ⟨s, hs⟩).unique
+  apply ((finiteHeckeL_hasProd χ ⟨conj s, hs⟩).map conj Complex.continuous_conj).congr_fun
+  intro v
+  have hunit (x : (v.adicCompletionIntegers F)ˣ) :
+      (ideleClassNormTwist χ⁻¹ 0).restrict v x = conj ((ideleClassNormTwist χ 0).restrict v x) := by
+    let u := Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom x
+    change (ideleClassNormTwist χ⁻¹ 0).restrict v (u : v.adicCompletion F) =
+      conj ((ideleClassNormTwist χ 0).restrict v (u : v.adicCompletion F))
+    simp only [HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    change ideleClassNormTwist χ⁻¹ 0 (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u) =
+      conj (ideleClassNormTwist χ 0 (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u))
+    simpa only [map_zero] using htwist 0 (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u)
+  have hu : (ideleClassNormTwist χ⁻¹ 0).IsUnramifiedAt v ↔ (ideleClassNormTwist χ 0).IsUnramifiedAt v := by
+    simp only [HeckeCharacter.isUnramifiedAt_iff, hunit, map_eq_one_iff _ (starRingEnd ℂ).injective]
+  change finiteHeckeEulerFactor χ⁻¹ v s = conj (finiteHeckeEulerFactor χ v (conj s))
+  by_cases h : (ideleClassNormTwist χ 0).IsUnramifiedAt v
+  · let val : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+    have hπ := val.exists_isUniformizer_of_isCyclic_of_nontrivial.choose_spec
+    let π : (v.adicCompletion F)ˣ := Units.mk0 _ hπ.ne_zero
+    rw [← inv_inj, ← map_inv₀,
+      finiteHeckeEulerFactor_inv_uniformizer χ⁻¹ v π hπ (hu.mpr h) hs,
+      finiteHeckeEulerFactor_inv_uniformizer χ v π hπ h (show 1 < (conj s).re from hs), map_sub, map_one]
+    exact congrArg (1 - ·) (htwist s (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v π))
+  · unfold finiteHeckeEulerFactor
+    rw [ite_eq_right (mt hu.mp h), ite_eq_right h, map_one]
+
+open scoped ComplexConjugate in
+/-- The finite Hecke continuations for inverse unitary characters have the same order at conjugate points. -/
+private theorem introTrace_finite_conj_order (χ : U𝔽) (s : ℂ) :
+    meromorphicOrderAt finiteL(χ⁻¹) s = meromorphicOrderAt finiteL(χ) (conj s) := by
+  let R := conj ∘ finiteL(χ) ∘ conj
+  have hχ := (finiteHeckeL_exists_continuation χ).choose_spec
+  have hI := (finiteHeckeL_exists_continuation χ⁻¹).choose_spec
+  have hg (z : ℂ) := introTrace_conjugate_germ_order finiteL(χ) z (hχ.1 (mem_univ _))
+  have hR : MeromorphicOn R univ := fun z _ ↦ (hg z).1.meromorphicAt
+  have he (z : ℂ) (hz : 1 < z.re) : finiteL(χ⁻¹) z = R z :=
+    (hI.2 ⟨z, hz⟩).trans <| (introTrace_finite_euler_conj χ z hz).trans (congrArg conj (hχ.2 ⟨conj z, hz⟩)).symm
+  have hU : ∀ᶠ z : ℂ in 𝓝 2, 1 < z.re := (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+  have ht : meromorphicOrderAt (finiteL(χ⁻¹) - R) 2 = ⊤ :=
+    meromorphicOrderAt_eq_top_iff.mpr (eventuallyEq_iff_sub.mp ((hU.mono he).filter_mono nhdsWithin_le_nhds))
+  have ht' := (hI.1.meromorphicOn.sub hR).meromorphicOrderAt_eq_top_of_isPreconnected
+    isPreconnected_univ (mem_univ (2 : ℂ)) (mem_univ s) ht
+  exact (meromorphicOrderAt_congr (eventuallyEq_iff_sub.mpr (meromorphicOrderAt_eq_top_iff.mp ht'))).trans (hg s).2
+
+open scoped ComplexConjugate in
+/-- The completed functional equation and conjugation of the finite Euler product reflect the order across the critical line for this same character. -/
+private theorem introTrace_single_character_reflected_order (χ : U𝔽) (s : ℂ) (h₁ : s.re < 1) :
+    meromorphicOrderAt (continuedCompletedHeckeL χ) (1 - conj s) =
+      meromorphicOrderAt (continuedCompletedHeckeL χ) s := by
+  obtain ⟨ε, hε, hne, he⟩ := completedHeckeL_continuation_functionalEquation χ
+    (continuedCompletedHeckeL χ) (continuedCompletedHeckeL χ⁻¹)
+    (continuedCompletedHeckeL_spec χ).1 (continuedCompletedHeckeL_spec χ).2
+    (continuedCompletedHeckeL_spec χ⁻¹).1 (continuedCompletedHeckeL_spec χ⁻¹).2
+  let r (z : ℂ) := 1 - z
+  have hr : HasDerivAt r (-1) s := by simpa [r] using (hasDerivAt_id s).const_sub 1
+  have e : continuedCompletedHeckeL χ⁻¹ ∘ r = fun z ↦ ε z * continuedCompletedHeckeL χ z := funext he
+  have ho := meromorphicOrderAt_comp_of_deriv_ne_zero (f := continuedCompletedHeckeL χ⁻¹)
+    (show AnalyticAt ℂ r s by dsimp [r]; fun_prop) (hr.deriv.trans_ne (by norm_num))
+  rw [e] at ho
+  change meromorphicOrderAt (ε * continuedCompletedHeckeL χ) s = _ at ho
+  rw [meromorphicOrderAt_mul_of_ne_zero (hε.analyticAt s) (hne s)] at ho
+  have hrpos : 0 < (1 - s).re := by simpa only [Complex.sub_re, Complex.one_re] using sub_pos.mpr h₁
+  calc
+    _ = meromorphicOrderAt finiteL(χ) (conj (1 - s)) := by
+      rw [map_sub, map_one]
+      exact (introTrace_normalized_finite_order_eq_completed χ _ (by simpa using hrpos)).symm
+    _ = meromorphicOrderAt finiteL(χ⁻¹) (1 - s) := (introTrace_finite_conj_order χ _).symm
+    _ = meromorphicOrderAt (continuedCompletedHeckeL χ⁻¹) (1 - s) :=
+      introTrace_normalized_finite_order_eq_completed χ⁻¹ _ hrpos
+    _ = _ := ho.symm
+
+private theorem introTrace_divisor_pos_iff_order_pos (χ : U𝔽) (s : ℂ) :
+    0 < zeroOrder(χ, s) ↔ 0 < meromorphicOrderAt (continuedCompletedHeckeL χ) s := by
+  have hL := (continuedCompletedHeckeL_spec χ).1
+  have hn : meromorphicOrderAt (continuedCompletedHeckeL χ) s ≠ ⊤ := by
+    apply hL.meromorphicOn.meromorphicOrderAt_ne_top_of_isPreconnected isPreconnected_univ
+      (x := 2) (mem_univ _) (mem_univ s)
+    rw [← introTrace_normalized_finite_order_eq_completed χ 2 (by norm_num)]
+    have hF := (finiteHeckeL_exists_continuation χ).choose_spec
+    have hne : finiteL(χ) 2 ≠ 0 := by
+      rw [hF.2 ⟨2, by norm_num⟩]
+      exact finiteHeckeL_ne_zero_of_one_lt_re χ _
+    rw [(hF.1 (mem_univ (2 : ℂ))).meromorphicOrderAt_eq_zero_iff.mpr hne]
+    exact WithTop.zero_ne_top
+  rw [MeromorphicOn.divisor_apply hL.meromorphicOn (mem_univ s)]
+  cases he : meromorphicOrderAt (continuedCompletedHeckeL χ) s with
+  | top => exact (hn he).elim
+  | coe k => simp
+
+open scoped ComplexConjugate in
+open Classical in
+/-- Paper: §1.4.5, p. 30. At a fixed nonnegative half-width, the asserted holomorphic
+continuation for a normalized character exists exactly when every positive-order zero of
+its completed L-function belongs to the closed centered window. Zeros on either
+boundary lie outside the open continuation domain or on its reflection. -/
+theorem introTrace_continuation_iff_zeros_in_closed_window
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : U𝔽) (hχ : ∀ t, χ (τ t) = 1) (a : ℝ) (ha : 0 ≤ a) :
+    (∃ H : ℂ → ℂ, AnalyticOnNhd ℂ H right(a) ∧ EqOn H
+      (fun z ↦ logDeriv finiteL(χ) (z + 1 / 2) +
+        if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) right(max a 1)) ↔
+      ∀ s : ℂ, 0 < zeroOrder(χ, s) → |s.re - 1 / 2| ≤ a := by
+  rw [introTrace_normalized_continuation_iff_no_right_zeros_in_strip τ hτ χ hχ a ha]
+  constructor
+  · intro h s hs
+    have hb := abs_lt.mp (introTrace_positive_divisor_in_critical_strip χ s hs)
+    have hs₀ : 0 < s.re := by linarith [hb.1]
+    have hs₁ : s.re < 1 := by linarith [hb.2]
+    have hp := (introTrace_divisor_pos_iff_order_pos χ s).mp hs
+    have hright : s.re ≤ a + 1 / 2 := le_of_not_gt fun he ↦ h s he hs₁ hp
+    have hre : (1 - conj s).re = 1 - s.re := by simp
+    have href : 0 < meromorphicOrderAt (continuedCompletedHeckeL χ) (1 - conj s) := by
+      rwa [introTrace_single_character_reflected_order χ s hs₁]
+    have hleft : (1 - conj s).re ≤ a + 1 / 2 :=
+      le_of_not_gt fun he ↦ h _ he (by rw [hre]; linarith) href
+    rw [hre] at hleft
+    exact abs_le.mpr ⟨by linarith, by linarith⟩
+  · intro hall s hs _ hp
+    have h := (abs_le.mp (hall s ((introTrace_divisor_pos_iff_order_pos χ s).mpr hp))).2
+    linarith
+
+open Classical in
+/-- Paper: §1.4.5, p. 30. For a single normalized character the continuation
+asserted at every positive half-width exists exactly when the positive-order
+zeros of its completed L-function all lie on the critical line. -/
+theorem introTrace_single_character_all_continuations_iff_critical_line
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : U𝔽) (hχ : ∀ t, χ (τ t) = 1) :
+    (∀ a : ℝ, 0 < a → ∃ H : ℂ → ℂ, AnalyticOnNhd ℂ H right(a) ∧ EqOn H
+      (fun z ↦ logDeriv finiteL(χ) (z + 1 / 2) +
+        if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) right(max a 1)) ↔
+      ∀ s : ℂ, 0 < zeroOrder(χ, s) → s.re = 1 / 2 := by
+  constructor
+  · intro h s hs
+    by_contra hne
+    let d := |s.re - 1 / 2|
+    have hd : 0 < d := abs_pos.mpr (sub_ne_zero.mpr hne)
+    have hw := (introTrace_continuation_iff_zeros_in_closed_window τ hτ χ hχ (d / 2)
+      (half_pos hd).le).mp (h (d / 2) (half_pos hd)) s hs
+    exact (not_le_of_gt (half_lt_self hd)) hw
+  · intro h a ha
+    apply (introTrace_continuation_iff_zeros_in_closed_window τ hτ χ hχ a ha.le).mpr
+    intro s hs
+    simpa only [h s hs, sub_self, abs_zero] using ha.le
+
 open Classical in
 /-- Paper: §1.4.5, p. 30. Continuation from every positive half-width gives
 holomorphy of the shifted logarithmic derivative throughout the right half-plane
