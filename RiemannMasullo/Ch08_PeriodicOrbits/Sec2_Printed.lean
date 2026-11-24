@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch08_PeriodicOrbits.Sec2
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-! # §8.2. Statements that are false as printed -/
 
@@ -79,6 +80,40 @@ fix x at the included left endpoint. Their ratio is outside the embedded local
 valuation-ring units. -/
 theorem Printed.adeleFiniteOrbit_transporter_false :
     ¬ Printed.adeleFiniteOrbit_transporter.{0} := by
-  sorry
+  intro h
+  obtain ⟨M, hM⟩ := Ideal.exists_maximal (𝓞 ℚ)
+  let v : HeightOneSpectrum (𝓞 ℚ) :=
+    ⟨M, hM.isPrime, Ring.ne_bot_of_isMaximal_of_not_isField hM (RingOfIntegers.not_isField ℚ)⟩
+  obtain ⟨g, hg, huniq⟩ := h ℚ v (canonicalIdeleNormSection ℚ)
+    (canonicalIdeleNormSection_continuous ℚ) (canonicalIdeleNormSection_rightInverse ℚ)
+    (adeleOrbitBasepoint ℚ (some (.inr v))) (MulAction.mem_orbit_self _)
+  let val : Valuation (v.adicCompletion ℚ) (WithZero (Multiplicative ℤ)) := Valued.v
+  obtain ⟨π, hπ⟩ := val.exists_isUniformizer_of_isCyclic_of_nontrivial
+  let u : (v.adicCompletion ℚ)ˣ := Units.mk0 (π : v.adicCompletion ℚ) hπ.ne_zero
+  have hnorm : ‖(u : v.adicCompletion ℚ)‖ = (v.asIdeal.absNorm : ℝ)⁻¹ :=
+    norm_uniformizer_adicCompletion v _ hπ
+  let e : 𝔸[ℚ]ˣ := IdeleGroup.ofAdicCompletion (𝓞 ℚ) ℚ v u
+  have hfix : e⁻¹ • adeleOrbitBasepoint ℚ (some (.inr v)) =
+      adeleOrbitBasepoint ℚ (some (.inr v)) := by
+    rw [Units.smul_def, ← map_inv]
+    change AdeleRing.ofAdicCompletion (𝓞 ℚ) ℚ v ((u⁻¹ : (v.adicCompletion ℚ)ˣ) : _) *
+        AdeleRing.ofAdicCompletion (𝓞 ℚ) ℚ v 0 = AdeleRing.ofAdicCompletion (𝓞 ℚ) ℚ v 0
+    rw [← map_mul, mul_zero]
+  have hmem := huniq (g * e) (by
+    rw [mul_inv, mul_smul, hfix]
+    exact hg)
+  rw [inv_mul_cancel_left, mem_embeddedFiniteLocalUnits_iff] at hmem
+  obtain ⟨_, hn, _⟩ := hmem
+  have he : e.val.2 v = (u : v.adicCompletion ℚ) := by
+    change (FiniteAdeleRing.ofAdicCompletion ℚ v (u : v.adicCompletion ℚ)) v = _
+    let := Classical.decEq (HeightOneSpectrum (𝓞 ℚ))
+    exact RestrictedProduct.mulSingle_eq_same
+      (A := fun w : HeightOneSpectrum (𝓞 ℚ) ↦ w.adicCompletionIntegers ℚ) v
+      (u : v.adicCompletion ℚ)
+  rw [he, hnorm] at hn
+  have h1 : (1 : ℝ) < v.asIdeal.absNorm := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have : (v.asIdeal.absNorm : ℝ)⁻¹ < 1 := inv_lt_one_of_one_lt₀ h1
+  linarith
 
 end RiemannMasullo
