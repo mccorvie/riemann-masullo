@@ -5142,6 +5142,14 @@ private theorem nuclear_of_injectiveLCLimit {D : Type*} [AddCommGroup D] [Module
   let := L.symm.toHomeomorph.t2Space
   exact nuclear_of_equiv L (isNuclearTVS_quotient hP q.ker)
 
+/-- A Hausdorff injective locally convex limit of nuclear spaces is nuclear. -/
+theorem isNuclearTVS_of_injectiveLCLimit {D : Type*} [AddCommGroup D] [Module ℂ D]
+    [TopologicalSpace D] [T2Space D] {X : ℕ → Type*}
+    [∀ k, AddCommGroup (X k)] [∀ k, Module ℂ (X k)] [∀ k, TopologicalSpace (X k)]
+    {j : ∀ k, X k →L[ℂ] X (k+1)} {i : ∀ k, X k →L[ℂ] D} (h : IsInjectiveLCLimit j i)
+    (hX : ∀ k, IsNuclearTVS.{v} (X k)) : IsNuclearTVS.{v} D :=
+  nuclear_of_injectiveLCLimit h hX
+
 /-- Increasing nuclear subspaces with the final locally convex topology have nuclear union. -/
 private theorem nuclear_of_submodule_exhaustion {D : Type*} [AddCommGroup D] [Module ℂ D]
     [TopologicalSpace D] [T2Space D] (S : ℕ → Submodule ℂ D) (hS : Monotone S)

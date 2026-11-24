@@ -4870,6 +4870,208 @@ theorem distribution_coordinatePlane_decomposition_tempered {N : ℕ} (T : 𝒟'
   · intro f
     simp only [sum_apply, ContinuousLinearMap.comp_apply]
 
+section EuclideanTestFunctionNuclearity
+
+open scoped ComplexOrder
+
+universe v
+
+/-- The inclusion of a fixed-support test-function stage into Schwartz space is inducing. -/
+private theorem fixedSupport_schwartz_isInducing
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E] (K : Compacts E) :
+    IsInducing (supportedToSchwartzCLM ℂ K : 𝓓_{K}(E, ℂ) → 𝓢(E, ℂ)) := by
+  let J := (supportedToSchwartzCLM ℂ K : 𝓓_{K}(E, ℂ) →L[ℂ] 𝓢(E, ℂ))
+  refine ⟨le_antisymm J.continuous.le_induced (continuous_id_iff_le.mp ?_)⟩
+  exact (J.toLinearMap.withSeminorms_induced (schwartz_withSeminorms ℂ E ℂ)).continuous_of_isBounded
+    (ContDiffMapSupportedIn.withSeminorms ℂ E ℂ ⊤ K) LinearMap.id (.of_real fun i ↦ by
+      refine ⟨{(0, i)}, 1, fun f ↦ ?_⟩
+      rw [Finset.sup_singleton, one_mul]
+      exact (ContDiffMapSupportedIn.seminorm_top_le_iff ℂ (apply_nonneg _ _) i f).mpr
+        fun x _ ↦ (J f).norm_iteratedFDeriv_le_seminorm ℂ i x)
+
+/-- Fixed-support Euclidean test-function stages are nuclear. -/
+private theorem euclideanTestFunctionStage_nuclear {m : ℕ}
+    (K : Compacts (EuclideanSpace ℝ (Fin m))) :
+    IsNuclearTVS.{v} 𝓓_{K}(EuclideanSpace ℝ (Fin m), ℂ) := by
+  let E := EuclideanSpace ℝ (Fin m)
+  let J : 𝓓_{K}(E, ℂ) →L[ℂ] 𝓢(E, ℂ) := supportedToSchwartzCLM ℂ K
+  have hJi : IsInducing J := fixedSupport_schwartz_isInducing K
+  have hJ : IsEmbedding J := ⟨hJi, fun f g h ↦ ContDiffMapSupportedIn.ext fun x ↦
+    congrArg (fun φ : 𝓢(E, ℂ) ↦ φ x) h⟩
+  let : PolynormableSpace ℂ 𝓓_{K}(E, ℂ) :=
+    (ContDiffMapSupportedIn.withSeminorms ℂ E ℂ ⊤ K).toPolynormableSpace
+  let : T2Space 𝓓_{K}(E, ℂ) := hJ.t2Space
+  let e := LinearEquiv.ofInjective J.toLinearMap hJ.injective
+  have he : IsInducing e := IsInducing.subtypeVal.of_comp_iff.mp hJ.isInducing
+  let h := e.toEquiv.toHomeomorphOfIsInducing he
+  let L : 𝓓_{K}(E, ℂ) ≃L[ℂ] J.toLinearMap.range :=
+    ⟨e, h.continuous, h.continuous_symm⟩
+  exact nuclear_of_equiv L.symm
+    (isNuclearTVS_submodule (euclideanSchwartz_nuclear m) J.toLinearMap.range)
+
+/-- The stages of the standard compact exhaustion of Euclidean space. -/
+private noncomputable def euclideanTestFunctionCompact (m n : ℕ) :
+    Compacts (EuclideanSpace ℝ (Fin m)) :=
+  ⟨CompactExhaustion.choice (EuclideanSpace ℝ (Fin m)) n,
+    (CompactExhaustion.choice (EuclideanSpace ℝ (Fin m))).isCompact n⟩
+
+/-- Inclusion of successive fixed-support stages. -/
+private noncomputable def euclideanTestFunctionTransition {m : ℕ} (n : ℕ) :
+    𝓓_{euclideanTestFunctionCompact m n}(EuclideanSpace ℝ (Fin m), ℂ) →L[ℂ]
+      𝓓_{euclideanTestFunctionCompact m (n + 1)}(EuclideanSpace ℝ (Fin m), ℂ) :=
+  ContDiffMapSupportedIn.monoCLM ℂ
+
+/-- Inclusion of a fixed-support stage into the full test-function space, as a linear map. -/
+private noncomputable def euclideanTestFunctionStageLinearMap {m : ℕ} (n : ℕ) :
+    𝓓_{euclideanTestFunctionCompact m n}(EuclideanSpace ℝ (Fin m), ℂ) →ₗ[ℂ]
+      𝓓((⊤ : Opens (EuclideanSpace ℝ (Fin m))), ℂ) :=
+  (TestFunction.ofSupportedInCLM ℂ (Set.subset_univ _)).toLinearMap
+
+/-- Inclusion of a fixed-support stage into the full test-function space. -/
+private noncomputable def euclideanTestFunctionStageMap {m : ℕ} (n : ℕ) :
+    𝓓_{euclideanTestFunctionCompact m n}(EuclideanSpace ℝ (Fin m), ℂ) →L[ℂ]
+      𝓓((⊤ : Opens (EuclideanSpace ℝ (Fin m))), ℂ) :=
+  TestFunction.ofSupportedInCLM ℂ (Set.subset_univ _)
+
+/-- The complex test-function topology is locally convex and has continuous scalar
+multiplication. -/
+private theorem testFunction_polynormable
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E] :
+    ContinuousSMul ℂ 𝓓((⊤ : Opens E), ℂ) ∧
+      PolynormableSpace ℂ 𝓓((⊤ : Opens E), ℂ) := by
+  let D := 𝓓((⊤ : Opens E), ℂ)
+  let L : D →L[ℂ] D :=
+    TestFunction.postcompCLM (Complex.I • ContinuousLinearMap.id ℂ ℂ)
+  have h : Continuous (fun z : ℂ × D ↦ z.1.re • z.2 + z.1.im • L z.2) :=
+    ((Complex.continuous_re.comp continuous_fst).smul continuous_snd).add
+      ((Complex.continuous_im.comp continuous_fst).smul (L.continuous.comp continuous_snd))
+  let : ContinuousSMul ℂ D := ⟨h.congr fun z ↦ TestFunction.ext fun x ↦ by
+    change (z.1.re : ℂ) * z.2 x + (z.1.im : ℂ) * (Complex.I * z.2 x) = z.1 * z.2 x
+    rw [← mul_assoc, ← add_mul, Complex.re_add_im]⟩
+  let : LocallyConvexSpace ℂ D :=
+    .ofBasisZero ℂ _ _ _ (LocallyConvexSpace.convex_basis_zero ℝ D)
+      (fun _ hs ↦ convex_of_nonneg_surjective_algebraMap ℂ
+        (fun _ hz ↦ RCLike.nonneg_iff_exists_ofReal.mp hz) hs.2)
+  exact ⟨inferInstance, inferInstance⟩
+
+/-- A compact exhaustion presents Euclidean test functions as an injective LC limit. -/
+private theorem euclideanTestFunction_isInjectiveLCLimit {m : ℕ} :
+    IsInjectiveLCLimit (euclideanTestFunctionTransition (m := m))
+      (euclideanTestFunctionStageMap (m := m)) := by
+  let E := EuclideanSpace ℝ (Fin m)
+  let D := 𝓓((⊤ : Opens E), ℂ)
+  let hD := testFunction_polynormable (E := E)
+  let : ContinuousSMul ℂ D := hD.1
+  let : PolynormableSpace ℂ D := hD.2
+  refine ⟨fun n ↦ (isEmbedding_testFunction_ofSupportedIn (Set.subset_univ _)).injective,
+    ?_, ?_, ?_⟩
+  · intro n
+    ext f x
+    change ((ContDiffMapSupportedIn.monoCLM ℂ f :
+      𝓓_{euclideanTestFunctionCompact m (n + 1)}(E, ℂ)) : E → ℂ) x = f x
+    rw [ContDiffMapSupportedIn.monoCLM_apply]
+    have hK : euclideanTestFunctionCompact m n ≤ euclideanTestFunctionCompact m (n + 1) := by
+      exact (CompactExhaustion.choice E).subset_succ n
+    rw [if_pos ⟨le_rfl, hK⟩]
+  · intro f
+    obtain ⟨n, hn⟩ := (CompactExhaustion.choice E).exists_superset_of_isCompact
+      f.hasCompactSupport
+    let g : 𝓓_{euclideanTestFunctionCompact m n}(E, ℂ) :=
+      .of_support_subset f.contDiff (subset_closure.trans hn)
+    exact ⟨n, g, TestFunction.ext fun _ ↦ rfl⟩
+  · let tF := locallyConvexFinalTopology
+      (fun n ↦ euclideanTestFunctionStageLinearMap (m := m) n)
+    let P : SeminormFamily ℂ D
+        {p : Seminorm ℂ D // ∀ n, @Continuous _ ℝ inferInstance inferInstance
+          (fun x ↦ p (euclideanTestFunctionStageLinearMap (m := m) n x))} :=
+      Subtype.val
+    have hP : @WithSeminorms ℂ D _ _ _ _ P tF := ⟨rfl⟩
+    have hback : @Continuous D D tF
+        (TestFunction.topologicalSpace (⊤ : Opens E) ℂ ⊤) id := by
+      let hW := @PolynormableSpace.withSeminorms ℂ D _ _ _
+        (TestFunction.topologicalSpace (⊤ : Opens E) ℂ ⊤) hD.2
+      refine @WithSeminorms.continuous_of_continuous_comp
+        ℂ ℂ D D _ _ _ _ _ _ _ (RingHom.id ℂ) _ _ tF hP.isTopologicalAddGroup
+          (TestFunction.topologicalSpace (⊤ : Opens E) ℂ ⊤) hW LinearMap.id (fun p ↦ ?_)
+      change @Continuous D ℝ tF inferInstance p.val
+      exact @WithSeminorms.continuous_seminorm ℂ D _ _ _ _ tF P hP
+        ⟨p.val, fun n ↦ by
+          have hstage : @Continuous _ D inferInstance
+              (TestFunction.topologicalSpace (⊤ : Opens E) ℂ ⊤)
+              (euclideanTestFunctionStageLinearMap n) := by
+            exact TestFunction.continuous_ofSupportedIn (Set.subset_univ _)
+          exact @Continuous.comp' _ D ℝ _
+            (TestFunction.topologicalSpace (⊤ : Opens E) ℂ ⊤) _
+            (euclideanTestFunctionStageLinearMap n) p.val p.property hstage⟩
+    have hi (n : ℕ) : @Continuous (𝓓_{euclideanTestFunctionCompact m n}(E, ℂ)) D inferInstance tF
+        (euclideanTestFunctionStageLinearMap (m := m) n) := by
+      exact @WithSeminorms.continuous_of_continuous_comp
+        ℂ ℂ _ D _ _ _ _ _ _ _ (RingHom.id ℂ) _ P _ _ tF hP
+          (euclideanTestFunctionStageLinearMap (m := m) n) fun p ↦ p.property n
+    have hforward : @Continuous D D
+        (TestFunction.topologicalSpace (⊤ : Opens E) ℂ ⊤) tF id := by
+      apply continuous_id_iff_le.mpr
+      letI : TopologicalSpace D := tF
+      letI : ContinuousSMul ℂ D := hP.continuousSMul
+      letI : Module ℝ D := Module.restrictScalars ℝ ℂ D
+      letI : IsScalarTower ℝ ℂ D := IsScalarTower.restrictScalars ℝ ℂ D
+      letI : ContinuousSMul ℝ D :=
+        MulAction.continuousSMul_compHom (f := (algebraMap ℝ ℂ).toMonoidHom)
+          Complex.continuous_ofReal
+      letI : LocallyConvexSpace ℝ D := hP.toLocallyConvexSpace
+      apply TestFunction.topologicalSpace_le_iff.mpr
+      unfold TestFunction.originalTop
+      refine iSup₂_le fun K hK ↦ ?_
+      have hc : @Continuous (𝓓_{K}(E, ℂ)) D inferInstance tF
+          (TestFunction.ofSupportedIn hK) := by
+        obtain ⟨n, hn⟩ := (CompactExhaustion.choice E).exists_superset_of_isCompact K.isCompact
+        let M : 𝓓_{K}(E, ℂ) →L[ℂ] 𝓓_{euclideanTestFunctionCompact m n}(E, ℂ) :=
+          ContDiffMapSupportedIn.monoCLM ℂ
+        have hM : Continuous M := M.continuous
+        exact ((hi n).comp hM).congr fun f ↦ by
+          apply TestFunction.ext
+          intro x
+          change ((ContDiffMapSupportedIn.monoCLM ℂ f :
+            𝓓_{euclideanTestFunctionCompact m n}(E, ℂ)) : E → ℂ) x = f x
+          rw [ContDiffMapSupportedIn.monoCLM_apply]
+          have hKn : K ≤ euclideanTestFunctionCompact m n := hn
+          rw [if_pos ⟨le_rfl, hKn⟩]
+      exact continuous_iff_coinduced_le.mp hc
+    exact le_antisymm (continuous_id_iff_le.mp hforward) (continuous_id_iff_le.mp hback)
+
+/-- Euclidean test-function space is Hausdorff. -/
+private theorem euclideanTestFunction_t2 {m : ℕ} :
+    T2Space 𝓓((⊤ : Opens (EuclideanSpace ℝ (Fin m))), ℂ) := by
+  let E := EuclideanSpace ℝ (Fin m)
+  let D := 𝓓((⊤ : Opens E), ℂ)
+  let J : D →ₗ[ℂ] 𝓢(E, ℂ) :=
+    { toFun := fun f ↦ f.hasCompactSupport.toSchwartzMap f.contDiff
+      map_add' := fun _ _ ↦ by ext; rfl
+      map_smul' := fun _ _ ↦ by ext; rfl }
+  have hc : Continuous J := by
+    refine (TestFunction.continuous_iff_continuous_comp J).mpr fun K hK ↦ ?_
+    have he : J ∘ TestFunction.ofSupportedIn hK = (supportedToSchwartzCLM ℂ K) := by
+      funext f
+      ext x
+      rfl
+    rw [he]
+    exact (supportedToSchwartzCLM ℂ K).continuous
+  have hi : Injective J := fun f g h ↦ TestFunction.ext fun x ↦
+    congrArg (fun φ : 𝓢(E, ℂ) ↦ φ x) h
+  exact T2Space.of_injective_continuous (f := J) hi hc
+
+/-- The space of compactly supported smooth complex test functions on a finite-dimensional
+Euclidean space is nuclear. -/
+theorem euclideanTestFunction_nuclear {m : ℕ} :
+    IsNuclearTVS.{v} 𝓓((⊤ : Opens (EuclideanSpace ℝ (Fin m))), ℂ) := by
+  let E := EuclideanSpace ℝ (Fin m)
+  let D := 𝓓((⊤ : Opens E), ℂ)
+  let : T2Space D := euclideanTestFunction_t2
+  exact isNuclearTVS_of_injectiveLCLimit euclideanTestFunction_isInjectiveLCLimit
+    (fun n ↦ euclideanTestFunctionStage_nuclear (euclideanTestFunctionCompact m n))
+
+end EuclideanTestFunctionNuclearity
+
 /-- Paper: Remark 5.3.2.4, p. 246.
 Products of test functions define a map from the inductive tensor product with
 sequentially dense range. The completed inductive tensor product is isomorphic

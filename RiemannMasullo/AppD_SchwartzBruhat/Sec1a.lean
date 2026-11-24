@@ -7565,8 +7565,10 @@ theorem elementarySchwartz_strongDual_barrelled :
   have hx : x ∈ A := fun ψ hψ ↦ hl ψ hψ
   exact (not_lt_of_ge (mem_ball_zero_iff.mp (hL hx)).le) hlt
 
--- TODO(later): needs §C.2.4 for the nuclearity of the Schwartz space and its
--- strong dual in Lemma D.1.3.7(3).
+-- Nuclearity of the Euclidean test functions is now proved: see
+-- `euclideanTestFunction_nuclear` (Ch05_ThetaZSpaces/Sec3a.lean) and the general
+-- transfer principle `isNuclearTVS_of_injectiveLCLimit` (AppC_LCTVS/Sec2b.lean).
+-- TODO(later): the nuclearity of the strong dual in Lemma D.1.3.7(3) is still open.
 -- TODO(later): needs §C.5.1 (Theorem C.5.1.30(4)) for the vector-valued Schwartz
 -- identifications used to define distribution tensor products in Remark D.1.3.8.
 
