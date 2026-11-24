@@ -43,7 +43,9 @@ on the page, and three known theorems that have no formal proof here.
 
 These issues are **not claimed**. Nobody holds one, several people can work on the same one, and
 a partial result posted on the issue is a contribution: a sketch, a reference, a weaker
-statement that the later pages can use, a counterexample. Nobody here knows whether these steps
+statement that the later pages can use, a counterexample. So is a reduction of a step to a
+classical or known result, ideally with a citation, even without a proof of that result.
+Nobody here knows whether these steps
 can be repaired. That is what there is to find out.
 
 You need no special access. Give your coding agent (Codex, Claude Code or any agent that can run
@@ -58,7 +60,10 @@ shell commands) this instruction, with the number of the issue you want it to wo
 > (`scripts/paper.sh <first> <last>`), and find out what is already known: what has been tried,
 > and what the library proves around the step. Then try, in this order. If the issue has a Lean
 > statement, prove it as written. If that is out of reach, prove it from one or two smaller
-> precise statements, each written in Lean, so that it is plain what is still missing. If the
+> precise statements, each written in Lean, so that it is plain what is still missing. A
+> reduction to a classical or known result is welcome even if you do not prove that result:
+> state it as a lemma of its own with `sorry`, begin its docstring with `Classical input:`, and
+> cite it, ideally with the item and page of the source. If the
 > step has no Lean statement, write the statement the later pages need and prove it. If the
 > step is false, give a counterexample, best of all as a Lean proof of the negation. Never
 > change a statement that is on `main`: propose the change on the issue. Use nothing from any
