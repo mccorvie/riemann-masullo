@@ -11594,6 +11594,111 @@ theorem introTrace_resolvent_summable_iff_reciprocal_height
     rw [← mul_div_assoc,div_le_div_iff₀ hden (hW r)]
     nlinarith [mul_le_mul_of_nonneg_left hbelow (show 0 ≤ d r by linarith [hd r])]
 
+/-- Multiplicity-weighted reciprocal heights are summable precisely when
+the masses of successive dyadic height shells, divided by their lower
+endpoints, form a summable numerical series. -/
+private theorem introTrace_dyadic_reciprocal_mass {ι : Type*} (m H : ι → ℝ)
+    (hm : ∀ r, 0 ≤ m r) (hH : ∀ r, 1 ≤ H r)
+    (S : ℕ → Finset ι) (hS : ∀ n r, r ∈ S n ↔ (2:ℝ)^n ≤ H r ∧ H r < (2:ℝ)^(n+1)) :
+    Summable (fun r ↦ m r / H r) ↔ Summable (fun n ↦ (∑ r ∈ S n, m r)/(2:ℝ)^n) := by
+  classical
+  let A (n : ℕ) : Set ι := ↑(S n)
+  have hpart (r : ι) : ∃! n, r ∈ A n := by
+    obtain ⟨n,hn⟩ := exists_nat_pow_near (hH r) (by norm_num : (1:ℝ)<2)
+    refine ⟨n,(hS n r).mpr hn,?_⟩
+    intro j hj
+    have hj' := (hS j r).mp hj
+    rcases lt_trichotomy j n with h | h | h
+    · have e : (2:ℝ)^(j+1) ≤ 2^n := pow_le_pow_right₀ (by norm_num) h
+      linarith [hn.1,hj'.2]
+    · exact h
+    · have e : (2:ℝ)^(n+1) ≤ 2^j := pow_le_pow_right₀ (by norm_num) h
+      linarith [hn.2,hj'.1]
+  let M (n : ℕ) := ∑ r ∈ S n, m r / H r
+  let D (n : ℕ) := (∑ r ∈ S n, m r)/(2:ℝ)^n
+  have hsum (n : ℕ) : ∑' r : A n, m r.val/H r.val = M n := by
+    let : Fintype (A n) := (S n).fintypeCoeSort
+    rw [tsum_fintype]
+    exact Finset.sum_coe_sort (S n) (fun r ↦ m r/H r)
+  have hbase : Summable (fun r ↦ m r/H r) ↔ Summable M := by
+    rw [summable_partition (s:=A) (fun r ↦ div_nonneg (hm r) (by linarith [hH r])) hpart]
+    simp_rw [hsum]
+    apply and_iff_right
+    intro n
+    let : Fintype (A n) := (S n).fintypeCoeSort
+    exact (hasSum_fintype _).summable
+  have hMD (n : ℕ) : 0 ≤ M n ∧ M n ≤ D n ∧ D n ≤ 2*M n := by
+    refine ⟨Finset.sum_nonneg (fun r _ ↦ div_nonneg (hm r) (by linarith [hH r])),?_,?_⟩
+    · dsimp only [D,M]
+      rw [Finset.sum_div]
+      exact Finset.sum_le_sum fun r hr ↦ div_le_div_of_nonneg_left (hm r) (by positivity) ((hS n r).mp hr).1
+    · dsimp only [D,M]
+      rw [Finset.sum_div,Finset.mul_sum]
+      apply Finset.sum_le_sum
+      intro r hr
+      rw [mul_div_assoc',div_le_div_iff₀ (by positivity) (by linarith [hH r])]
+      have h := ((hS n r).mp hr).2.le
+      rw [pow_succ] at h
+      nlinarith only [mul_le_mul_of_nonneg_left h (hm r)]
+  rw [hbase]
+  constructor
+  · intro h
+    exact Summable.of_nonneg_of_le (fun n ↦ (hMD n).1.trans (hMD n).2.1)
+      (fun n ↦ (hMD n).2.2) (h.mul_left 2)
+  · intro h
+    exact Summable.of_nonneg_of_le (fun n ↦ (hMD n).1) (fun n ↦ (hMD n).2.1) h
+
+open Classical in
+/-- For any selection of completed Hecke zeros, the ordinary resolvent is
+absolutely summable exactly when the dyadic shell multiplicities divided by
+the shell heights are summable. In particular, a power saving in the
+multiplicity on dyadic shells suffices at every complex parameter. -/
+theorem introTrace_resolvent_dyadic_zero_density (χ : U𝔽) (P : ℂ → Prop) :
+    let E := {r : ℂ // 0 < zeroOrder(χ,r) ∧ P r}
+    ∃ S : ℕ → Finset E,
+      (∀ n r, r ∈ S n ↔ (2:ℝ)^n ≤ 1+|r.val.im| ∧ 1+|r.val.im| < (2:ℝ)^(n+1)) ∧
+      let M (n : ℕ) := ∑ r ∈ S n, (zeroOrder(χ,r.val):ℝ)
+      (∀ z : ℂ, Summable (fun r : E ↦ (zeroOrder(χ,r.val):ℂ)/(z-(r.val-1/2))) ↔
+        Summable (fun n ↦ M n/(2:ℝ)^n)) ∧
+      (∀ q : ℝ, 0 ≤ q → q < 2 → ∀ C : ℝ, (∀ᶠ n : ℕ in atTop, M n ≤ C*q^n) →
+        ∀ z : ℂ, Summable (fun r : E ↦ (zeroOrder(χ,r.val):ℂ)/(z-(r.val-1/2)))) := by
+  classical
+  intro E
+  let H (r : E) := 1+|r.val.im|
+  let m (r : E) : ℝ := zeroOrder(χ,r.val)
+  have hm (r : E) : 0 ≤ m r := (Int.cast_pos.mpr r.property.1).le
+  let f : E ↪ windowZeros(χ,1/2) := ⟨fun r ↦ ⟨r.val,r.property.1,
+    introTrace_positive_divisor_in_critical_strip χ r.val r.property.1⟩,
+    fun x y h ↦ Subtype.ext (congrArg (fun v : windowZeros(χ,1/2) ↦ v.val) h)⟩
+  obtain ⟨U,hU,_⟩ := introTrace_window_zeros_height_exhaustion χ (1/2)
+  let B (n : ℕ) := {r : E | (2:ℝ)^n ≤ H r ∧ H r < (2:ℝ)^(n+1)}
+  have hfin (n : ℕ) : (B n).Finite := by
+    apply ((U ((2:ℝ)^(n+1))).finite_toSet.preimage_embedding f).subset
+    intro r hr
+    change f r ∈ U _
+    rw [hU]
+    change |r.val.im| ≤ _
+    have h := (show _ ∧ H r < (2:ℝ)^(n+1) from hr).2
+    dsimp only [H] at h
+    linarith
+  let S (n : ℕ) := (hfin n).toFinset
+  have hS (n : ℕ) (r : E) : r ∈ S n ↔ (2:ℝ)^n ≤ H r ∧ H r < (2:ℝ)^(n+1) :=
+    Set.Finite.mem_toFinset _
+  refine ⟨S,hS,?_⟩
+  let M (n : ℕ) := ∑ r ∈ S n, m r
+  have he (z : ℂ) := (introTrace_resolvent_summable_iff_reciprocal_height χ P z).trans
+    (introTrace_dyadic_reciprocal_mass m H hm (fun r ↦ by dsimp only [H]; linarith [abs_nonneg r.val.im]) S hS)
+  refine ⟨he,?_⟩
+  intro q h₀ h₂ C hM z
+  apply (he z).mpr
+  have hg := (summable_geometric_of_lt_one (div_nonneg h₀ (by norm_num : (0:ℝ)≤2))
+    (show q/2<1 by linarith)).mul_left C
+  apply hg.of_norm_bounded_eventually_nat
+  filter_upwards [hM] with n hn
+  change ‖M n/(2:ℝ)^n‖ ≤ _
+  rw [Real.norm_of_nonneg (div_nonneg (Finset.sum_nonneg (fun r _ ↦ hm r)) (by positivity)),div_pow,mul_div_assoc']
+  exact div_le_div_of_nonneg_right hn (by positivity)
+
 open Classical in
 /-- Absolute convergence of the reciprocal-height majorant lets the smoothed
 Mellin sum pass to its limiting resolvent, locally uniformly in the Euler chart. -/
