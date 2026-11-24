@@ -3189,6 +3189,120 @@ private theorem sLocalPWOrbital_eventually_equiv_inf {S₀ : Finset V} (hST : S 
       ∀ (W : Submodule ℂ (Θ(T, χ))), (W = absPW(hST, X, χ) ∨ W = invPW(hST, Y, χ)) →
         W ⊓ Rₚ(p, χ) = W ⊓ Rₚ₀(p, χ) := by sorry
 
+/-- Paper: Theorem 7.3.3.4, pp. 361–363. For one inserted pure tensor and one
+added place, its class modulo the singleton principal value has a zero-moment
+absolute PW representative at some level depending on the tensor. The lift
+cited on p. 362 gives no Fourier support condition. A lift of the single-period
+compact-window representative through Fourier transform and integer insertion,
+with the two moments zero and compact small-stage Fourier support, would suffice. -/
+private theorem sLocalPWOrbital_eventually_equiv_sup_singleton_lift
+    {S₀ : Finset V} (hST : S ⊆ T) (hT : T = S ∪ S₀) (_hdis : Disjoint S S₀)
+    (_hsat : IsSaturatedPlaceSet (F := F) S₀) (_hPic : PicTrivial)
+    (ω : PontryaginDual C₁) (hu : NormOneCharacterUnramifiedOutside ω S)
+    (χ : PontryaginDual J₁(T)) (_hχ : χ = descend(hST, ω, hu)) (_hω : ω ≠ 1)
+    (v : V) (hv : v ∈ S₀) (a : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+    (b : ∀ w : S, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))) :
+    let f := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+      (TensorProduct.tmul ℂ a (PiTensorProduct.tprod ℂ b))
+    let hvT : ({v} : Finset V) ⊆ T := Finset.singleton_subset_iff.mpr (hT ▸ Finset.mem_union_right S hv)
+    ∃ X : ℝ, q(T, χ) (Π(hST) f) ∈ absPW(hST, X, χ) ⊔ (PV(hvT, χ)).range := by
+  sorry
+
+/-- A finite product of principal values is surjective modulo the union of the
+absolute levels if each singleton is. The singleton operators preserve that union
+because each enlarges an absolute level by at most its residue cardinality. -/
+private theorem sLocalPWOrbital_eventually_equiv_sup_product
+    (hST : S ⊆ T) (hPic : PicTrivial) (χ : PontryaginDual J₁(T))
+    (R : Finset V) (hRT : R ⊆ T) (hd : Disjoint S R) :
+    let U := ⨆ X : ℝ, absPW(hST, X, χ)
+    (∀ v, (hv : v ∈ R) → U ⊔ (PV(Finset.singleton_subset_iff.mpr (hRT hv), χ)).range = ⊤) →
+      U ⊔ (PV(hRT, χ)).range = ⊤ := by
+  intro U hs
+  induction R using Finset.induction_on with
+  | empty => rw [sLocalAbsolutePW_pv_empty hRT χ, LinearMap.range_id, sup_top_eq]
+  | @insert v R hv ih =>
+    let hvT := hRT (Finset.mem_insert_self v R)
+    let h₁ := Finset.singleton_subset_iff.mpr hvT
+    let h₂ := (Finset.subset_insert v R).trans hRT
+    let P := PV(h₁, χ)
+    have hmap : U.map P ≤ U := by
+      rw [Submodule.map_le_iff_le_comap]
+      refine iSup_le fun X ↦ ?_
+      let Y := max X 1
+      have hXY := sLocalAbsolutePW_mono hST (le_max_left X 1) (Z₀(T)) χ
+      have hY : 0 < Y := zero_lt_one.trans_le (le_max_right _ _)
+      refine hXY.trans (Submodule.map_le_iff_le_comap.mp ?_)
+      exact (sLocalAbsolutePW_principalValue_singleton hST hPic v
+        (Finset.disjoint_right.mp hd (Finset.mem_insert_self _ _)) hvT χ Y hY).trans
+          (le_iSup (fun X : ℝ ↦ absPW(hST, X, χ)) _)
+    have ht : U ⊔ (PV(h₂, χ)).range = ⊤ :=
+      ih h₂ (hd.mono_right (Finset.subset_insert _ _)) (fun w hw ↦ hs w (Finset.mem_insert_of_mem hw))
+    have hsingle := hs v (Finset.mem_insert_self v R)
+    apply top_unique
+    rw [← hsingle, sLocalAbsolutePW_pv_insert R v hv hRT χ]
+    refine sup_le le_sup_left ?_
+    change P.range ≤ U ⊔ (P.comp (PV(h₂, χ))).range
+    rw [← Submodule.map_top, ← ht, Submodule.map_sup, LinearMap.range_comp]
+    exact sup_le_sup_right hmap _
+
+/-- Baire's theorem upgrades pointwise finite levels to a common level. The
+ranges of the addition maps from a closed level times the closed principal-value
+image cover the Fréchet theta space, so one map has nonmeagre range and is open. -/
+private theorem sLocalPWOrbital_eventually_equiv_sup_uniform
+    (hST : S ⊆ T) (p : Vℚ) (χ : PontryaginDual J₁(T))
+    (h : (⨆ X : ℝ, absPW(hST, X, χ)) ⊔ Rₚ(p, χ) = ⊤) :
+    ∃ B : ℝ, 0 < B ∧ absPW(hST, B, χ) ⊔ Rₚ(p, χ) = ⊤ := by
+  let E := Θ(T, χ)
+  let R := Rₚ(p, χ)
+  let W (n : ℕ) := absPW(hST, (n : ℝ) + 1, χ)
+  obtain ⟨hG, hP, hM, hC⟩ := sLocalHomogeneousThetaSpace_frechet (F := F) (S := T) χ
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  have : CompleteSpace E := hC
+  have : (uniformity E).IsCountablyGenerated := by
+    rw [uniformity_eq_comap_nhds_zero E]
+    infer_instance
+  have : BaireSpace E := by
+    let := UniformSpace.metricSpace E
+    infer_instance
+  have hW (n : ℕ) : IsClosed (W n : Set E) := Submodule.isClosed_topologicalClosure _
+  have hR : IsClosed (R : Set E) :=
+    (sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding (sLocalPrimaryPlaces_subset T p) χ).isClosed_range
+  let A (n : ℕ) : W n × R →L[ℂ] E :=
+    (W n).subtypeL.comp (ContinuousLinearMap.fst ℂ _ _) +
+      R.subtypeL.comp (ContinuousLinearMap.snd ℂ _ _)
+  have hr (n : ℕ) : Set.range (A n) = ↑(W n ⊔ R) := by
+    ext x
+    constructor
+    · rintro ⟨⟨w, r⟩, rfl⟩
+      exact Submodule.add_mem_sup w.property r.property
+    · intro hx
+      obtain ⟨w, hw, r, hr, e⟩ := Submodule.mem_sup.mp hx
+      exact ⟨(⟨w, hw⟩, ⟨r, hr⟩), e⟩
+  have hm : Monotone (fun X : ℝ ↦ absPW(hST, X, χ)) := fun _ _ hXY ↦
+    sLocalAbsolutePW_mono hST hXY _ χ
+  have hcover : ⋃ n, Set.range (A n) = univ := by
+    apply eq_univ_of_forall
+    intro x
+    have hx : x ∈ (⨆ X : ℝ, absPW(hST, X, χ)) ⊔ R := h ▸ Submodule.mem_top
+    obtain ⟨w, hw, r, hr', rfl⟩ := Submodule.mem_sup.mp hx
+    obtain ⟨X, hX⟩ := (Submodule.mem_iSup_of_directed _ hm.directed_le).mp hw
+    obtain ⟨n, hn⟩ := exists_nat_gt X
+    exact mem_iUnion.mpr ⟨n, hr n ▸ Submodule.add_mem_sup (hm (by linarith : X ≤ (n : ℝ) + 1) hX) hr'⟩
+  obtain ⟨n, hn⟩ : ∃ n, ¬ IsMeagre (Set.range (A n)) := by
+    by_contra! hall
+    exact not_isMeagre_of_isOpen isOpen_univ univ_nonempty (hcover ▸ isMeagre_iUnion hall)
+  have : CompleteSpace (W n) := (hW n).completeSpace_coe
+  have : CompleteSpace R := hR.completeSpace_coe
+  have : IsUniformAddGroup (W n) := (W n).toAddSubgroup.isUniformAddGroup
+  have : IsUniformAddGroup R := R.toAddSubgroup.isUniformAddGroup
+  have : FirstCountableTopology (W n) := inferInstanceAs (FirstCountableTopology (W n : Set E))
+  have : FirstCountableTopology R := inferInstanceAs (FirstCountableTopology (R : Set E))
+  have hopen : IsOpen (Set.range (A n)) := (isOpenMap_of_not_isMeagre_range (A n) hn).isOpen_range
+  refine ⟨(n : ℝ) + 1, by positivity, Submodule.eq_top_of_nonempty_interior' (W n ⊔ R) ?_⟩
+  rw [← hr n, hopen.interior_eq]
+  exact range_nonempty _
+
 /-- Paper: Theorem 7.3.3.4, arrow (4) of diagram (7.3.3.15), pp. 361–362.
 The second of the two level conditions of the theorem: for large enough absolute or
 invariant Paley–Wiener levels, the level and the primary principal-value image together
@@ -3203,7 +3317,38 @@ private theorem sLocalPWOrbital_eventually_equiv_sup {S₀ : Finset V} (hST : S 
     (χ : PontryaginDual J₁(T)) (_hχ : χ = descend(hST, ω, hu)) (_hω : ω ≠ 1) :
     ∃ B : ℝ, 0 < B ∧ ∀ X Y : ℝ, B ≤ X → B ≤ Y → X ^ count(S) ≤ Y →
       ∀ (W : Submodule ℂ (Θ(T, χ))), (W = absPW(hST, X, χ) ∨ W = invPW(hST, Y, χ)) →
-        W ⊔ Rₚ(p, χ) = ⊤ := by sorry
+        W ⊔ Rₚ(p, χ) = ⊤ := by
+  let U := ⨆ X : ℝ, absPW(hST, X, χ)
+  have hsingle (v : V) (hv : v ∈ sLocalPrimaryPlaces (F := F) T p) :
+      U ⊔ (PV(Finset.singleton_subset_iff.mpr (sLocalPrimaryPlaces_subset T p hv), χ)).range = ⊤ := by
+    have hv₀ : v ∈ S₀ := _hp₀ hv
+    let D := U ⊔ (PV(Finset.singleton_subset_iff.mpr (sLocalPrimaryPlaces_subset T p hv), χ)).range
+    let L := D.mkQ.comp ((q(T, χ)).comp (Π(hST)))
+    have hL : L = 0 := by
+      let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+      refine sLocalAbsolutePW_tensor_ext e.toLinearEquiv.toLinearMap e.surjective L 0 ?_
+      intro a b
+      with_reducible refine (sLocalPWOrbital_eventually_equiv_sup_singleton_lift (F := F)
+        hST _hT _hdis _hsat _hPic ω hu χ _hχ _hω v hv₀ a b).elim fun X hx ↦ ?_
+      exact (Submodule.Quotient.mk_eq_zero D).mpr
+        ((sup_le_sup_right (le_iSup (fun X : ℝ ↦ absPW(hST, X, χ)) X) _) hx)
+    apply top_unique
+    intro x _
+    obtain ⟨f, rfl⟩ := (sLocalHomogeneousAdelicThetaLinearMap F T χ).ker.mkQ_surjective x
+    obtain ⟨g, hg, -⟩ := sLocalAbsolutePW_exists_insert_rep hST _hPic ω hu χ _hχ f
+    rw [← hg]
+    exact (Submodule.Quotient.mk_eq_zero D).mp (LinearMap.congr_fun hL g)
+  have hprod := sLocalPWOrbital_eventually_equiv_sup_product hST _hPic χ
+    (sLocalPrimaryPlaces (F := F) T p) (sLocalPrimaryPlaces_subset T p) (_hdis.mono_right _hp₀) hsingle
+  obtain ⟨B, hB, htop⟩ := sLocalPWOrbital_eventually_equiv_sup_uniform hST p χ hprod
+  refine ⟨B, hB, fun X Y hBX _ hXY W hW ↦ top_unique ?_⟩
+  rw [← htop]
+  apply sup_le_sup_right
+  have hle := sLocalAbsolutePW_mono hST hBX (Z₀(T)) χ
+  rcases hW with rfl | rfl
+  · exact hle
+  · exact hle.trans ((sLocalAbsolutePW_le_invariant hST X (hB.trans_le hBX) _ χ).trans
+      (sLocalInvariantPW_mono hST hXY _ χ))
 
 /-- Paper: Theorem 7.3.3.4, p. 360, and diagram (7.3.3.15), p. 361.
 The quotient transfer: if a closed level `W` meets the primary principal-value image in
