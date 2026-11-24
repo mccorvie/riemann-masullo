@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4b
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.Projection.Basic
 
 /-! # The geometric part of the projective kernel in Theorem 10.4.3.5 -/
 
@@ -750,6 +751,188 @@ private theorem spectralStripGeometricKernel_cauchy_of_blocks {W W' H Z J : Type
   change d (((f (i z m)).comp q).comp idW) ⊗ₜ[ℂ] v (i z m) = u (i z m) ⊗ₜ[ℂ] v (i z m)
   rw [ContinuousLinearMap.comp_id, hu]
 
+section GeometricBlockDuality
+
+/-- A real family whose finite partial sums are bounded in absolute value is summable. -/
+private theorem geometricBlock_summable_real_of_bddAbove
+    {Z : Type*} (h : Z → ℝ) (C : ℝ) (hb : ∀ K : Finset Z, |∑ z ∈ K, h z| ≤ C) :
+    Summable h := by
+  classical
+  refine Summable.of_abs (summable_of_sum_le (c := C + C) (fun z ↦ abs_nonneg (h z)) fun K ↦ ?_)
+  have hsplit : ∑ z ∈ K, |h z| =
+      ∑ z ∈ K.filter (fun z ↦ 0 ≤ h z), h z - ∑ z ∈ K.filter (fun z ↦ ¬ 0 ≤ h z), h z := by
+    rw [← Finset.sum_filter_add_sum_filter_not K (fun z ↦ 0 ≤ h z) (fun z ↦ |h z|)]
+    rw [sub_eq_add_neg, ← Finset.sum_neg_distrib]
+    congr 1
+    · exact Finset.sum_congr rfl fun z hz ↦ abs_of_nonneg (Finset.mem_filter.mp hz).2
+    · exact Finset.sum_congr rfl fun z hz ↦ abs_of_neg (lt_of_not_ge (Finset.mem_filter.mp hz).2)
+  rw [hsplit]
+  have h1 := (abs_le.mp (hb (K.filter (fun z ↦ 0 ≤ h z)))).2
+  have h2 := (abs_le.mp (hb (K.filter (fun z ↦ ¬ 0 ≤ h z)))).1
+  linarith
+
+/-- A complex family whose finite partial sums are bounded in norm is summable. -/
+private theorem geometricBlock_summable_complex_of_bddAbove
+    {Z : Type*} (g : Z → ℂ) (C : ℝ) (hb : ∀ K : Finset Z, ‖∑ z ∈ K, g z‖ ≤ C) :
+    Summable g := by
+  have hre := geometricBlock_summable_real_of_bddAbove
+    (fun z ↦ (g z).re) C fun K ↦ by
+      rw [← Complex.re_sum]
+      exact (Complex.abs_re_le_norm _).trans (hb K)
+  have him := geometricBlock_summable_real_of_bddAbove
+    (fun z ↦ (g z).im) C fun K ↦ by
+      rw [← Complex.im_sum]
+      exact (Complex.abs_im_le_norm _).trans (hb K)
+  exact ((Complex.hasSum_iff g ⟨∑' z, (g z).re, ∑' z, (g z).im⟩).mpr
+    ⟨hre.hasSum, him.hasSum⟩).summable
+
+/-- Pointwise square-root norm identity for the contraction attaining the trace norm. -/
+private theorem geometricBlock_abs_norm
+    {W : Type*} [NormedAddCommGroup W] [InnerProductSpace ℂ W] [CompleteSpace W]
+    (X : W →L[ℂ] W) (v : W) : ‖CFC.sqrt (X.adjoint * X) v‖ = ‖X v‖ := by
+  let S := CFC.sqrt (X.adjoint * X)
+  have hpos : 0 ≤ S := CFC.sqrt_nonneg _
+  have ha := (ContinuousLinearMap.nonneg_iff_isPositive.mp hpos).isSelfAdjoint.adjoint_eq
+  have hsq : S * S = X.adjoint * X :=
+    CFC.sqrt_mul_sqrt_self _ (ContinuousLinearMap.nonneg_iff_isPositive.mpr X.isPositive_adjoint_comp_self)
+  change ‖S v‖ = ‖X v‖
+  rw [S.apply_norm_eq_sqrt_inner_adjoint_right, X.apply_norm_eq_sqrt_inner_adjoint_right, ha,
+    ← ContinuousLinearMap.mul_def, hsq, ContinuousLinearMap.mul_def]
+
+/-- A finite-rank operator attains its trace norm against a compact contraction. -/
+private theorem geometricBlock_norming
+    {W : Type*} [NormedAddCommGroup W] [InnerProductSpace ℂ W] [CompleteSpace W]
+    (T : nuclearEndomorphisms W) (hdim : FiniteDimensional ℂ T.val.toLinearMap.range) :
+    ∃ U : compactOperator (RingHom.id ℂ) W W, ‖U‖ ≤ 1 ∧
+      traceNorm T = (hilbertTrace ⟨U.val * T.val, mul_mem_nuclearEndomorphisms_left _ T⟩).re := by
+  let V := T.val.toLinearMap.range
+  let B := CFC.sqrt (T.val.adjoint * T.val)
+  obtain ⟨C, hC, hCB⟩ := exists_contraction_comp_eq_of_norm_le T.val B
+    fun v ↦ (geometricBlock_abs_norm T.val v).le
+  let U : compactOperator (RingHom.id ℂ) W W := ⟨C * V.starProjection,
+    (isCompactOperator_of_locallyCompactSpace_rng (C.comp V.subtypeL)).comp_clm V.orthogonalProjectionOnto⟩
+  refine ⟨U, (norm_mul_le C V.starProjection).trans
+    ((mul_le_of_le_one_right (norm_nonneg _) V.starProjection_norm_le).trans hC), ?_⟩
+  have hUB : U.val * T.val = B := by
+    ext v
+    change C (V.starProjection (T.val v)) = B v
+    rw [Submodule.starProjection_eq_self_iff.mpr (show T.val v ∈ V from ⟨v, rfl⟩)]
+    exact congrArg (fun L : W →L[ℂ] W ↦ L v) hCB
+  let D : nuclearEndomorphisms W := ⟨U.val * T.val, mul_mem_nuclearEndomorphisms_left _ T⟩
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := W)).choose_spec.choose
+  have h := Complex.reCLM.hasSum (summable_norm_hilbertDiagonal b D.val D.property).of_norm.hasSum
+  change HasSum (fun i ↦ (inner ℂ (b i) ((U.val * T.val) (b i))).re) (hilbertTrace D).re at h
+  rw [hUB] at h
+  exact (hasSum_traceNorm_diagonal b T).unique h
+
+/-- Every finite sum of rank-one blocks has finite-dimensional range. -/
+private theorem geometricBlock_finiteRank
+    {W Z : Type*} [NormedAddCommGroup W] [InnerProductSpace ℂ W] [CompleteSpace W]
+    (N : Z → ℕ) (φ : (z : Z) → Fin (N z) → StrongDual ℂ W) (y : (z : Z) → Fin (N z) → W)
+    (K : Finset Z) :
+    FiniteDimensional ℂ (∑ z ∈ K, ∑ m : Fin (N z),
+      (⟨(φ z m).smulRight (y z m),
+        smulRight_mem_nuclearEndomorphisms _ _⟩ : nuclearEndomorphisms W)).val.toLinearMap.range := by
+  classical
+  let Y := (K.sigma fun z ↦ (Finset.univ : Finset (Fin (N z)))).image (fun p ↦ y p.1 p.2)
+  let V := Submodule.span ℂ (Y : Set W)
+  let : FiniteDimensional ℂ V := FiniteDimensional.span_of_finite ℂ Y.finite_toSet
+  apply Submodule.finiteDimensional_of_le (S₂ := V)
+  rintro _ ⟨v, rfl⟩
+  change (∑ z ∈ K, ∑ m : Fin (N z),
+    (⟨(φ z m).smulRight (y z m),
+      smulRight_mem_nuclearEndomorphisms _ _⟩ : nuclearEndomorphisms W)).val v ∈ V
+  simp only [Submodule.coe_sum, FunLike.coe_sum, Finset.sum_apply,
+    ContinuousLinearMap.smulRight_apply]
+  refine V.sum_mem fun z hz ↦ V.sum_mem fun m _ ↦ V.smul_mem _ (Submodule.subset_span ?_)
+  exact Finset.mem_image.mpr ⟨⟨z, m⟩, Finset.mem_sigma.mpr ⟨hz, Finset.mem_univ _⟩, rfl⟩
+
+/-- Bounded trace norms of the finite block sums give summability of the block traces
+after inserting any bounded operator `U`. -/
+private theorem geometricBlock_summable_of_bddAbove
+    {W Z : Type*} [NormedAddCommGroup W] [InnerProductSpace ℂ W] [CompleteSpace W]
+    (N : Z → ℕ) (φ : (z : Z) → Fin (N z) → StrongDual ℂ W) (y : (z : Z) → Fin (N z) → W)
+    (hbound : BddAbove (range fun K : Finset Z ↦ traceNorm (∑ z ∈ K, ∑ m : Fin (N z),
+      (⟨(φ z m).smulRight (y z m),
+        smulRight_mem_nuclearEndomorphisms _ _⟩ : nuclearEndomorphisms W))))
+    (U : W →L[ℂ] W) :
+    Summable (fun z : Z ↦ ∑ m : Fin (N z), φ z m (U (y z m))) := by
+  classical
+  obtain ⟨c, hc⟩ := hbound
+  obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := W)
+  let term (z : Z) (m : Fin (N z)) (w : W) : nuclearEndomorphisms W :=
+    ⟨(φ z m).smulRight w, smulRight_mem_nuclearEndomorphisms _ _⟩
+  refine geometricBlock_summable_complex_of_bddAbove _ (‖U‖ * c) fun K ↦ ?_
+  let T : nuclearEndomorphisms W := ∑ z ∈ K, ∑ m : Fin (N z), term z m (y z m)
+  let D : nuclearEndomorphisms W := ⟨U * T.val, mul_mem_nuclearEndomorphisms_left U T⟩
+  have heq : D = ∑ z ∈ K, ∑ m : Fin (N z), term z m (U (y z m)) := by
+    apply Subtype.ext
+    ext v
+    change U (T.val v) = _
+    simp only [T, term, Submodule.coe_sum, FunLike.coe_sum, Finset.sum_apply,
+      ContinuousLinearMap.smulRight_apply, map_sum, map_smul]
+  have htrace : hilbertTrace D = ∑ z ∈ K, ∑ m : Fin (N z), φ z m (U (y z m)) := by
+    rw [← htr, heq, map_sum]
+    refine Finset.sum_congr rfl fun z _ ↦ ?_
+    rw [map_sum]
+    refine Finset.sum_congr rfl fun m _ ↦ ?_
+    rw [htr]
+    exact hilbertTrace_smulRight _ _
+  rw [← htrace]
+  refine (norm_hilbertTrace_le D).trans ((traceNorm_mul_left_le U T).trans ?_)
+  exact mul_le_mul_of_nonneg_left (hc ⟨K, rfl⟩) (norm_nonneg U)
+
+/-- Pointwise summability of the block traces against every compact operator gives
+a uniform trace-norm bound over all finite block sums, by uniform boundedness on
+the Banach space of compact operators. -/
+private theorem geometricBlock_bddAbove_of_compact_summable
+    {W Z : Type*} [NormedAddCommGroup W] [InnerProductSpace ℂ W] [CompleteSpace W]
+    (N : Z → ℕ) (φ : (z : Z) → Fin (N z) → StrongDual ℂ W) (y : (z : Z) → Fin (N z) → W)
+    (h : ∀ U : compactOperator (RingHom.id ℂ) W W,
+      Summable (fun z : Z ↦ ∑ m : Fin (N z), φ z m (U.val (y z m)))) :
+    BddAbove (range fun K : Finset Z ↦ traceNorm (∑ z ∈ K, ∑ m : Fin (N z),
+      (⟨(φ z m).smulRight (y z m),
+        smulRight_mem_nuclearEndomorphisms _ _⟩ : nuclearEndomorphisms W))) := by
+  classical
+  let term (z : Z) (m : Fin (N z)) (w : W) : nuclearEndomorphisms W :=
+    ⟨(φ z m).smulRight w, smulRight_mem_nuclearEndomorphisms _ _⟩
+  let R (z : Z) : nuclearEndomorphisms W := ∑ m : Fin (N z), term z m (y z m)
+  let C := compactOperator (RingHom.id ℂ) W W
+  let : CompleteSpace C := (show IsClosed (C : Set (W →L[ℂ] W)) from
+    isClosed_setOfPred_isCompactOperator).completeSpace_coe
+  let eval (z : Z) (m : Fin (N z)) :=
+    (φ z m).comp ((ContinuousLinearMap.apply ℂ W (y z m)).comp C.subtypeL)
+  let test (K : Finset Z) := ∑ z ∈ K, ∑ m : Fin (N z), eval z m
+  obtain ⟨c, hc⟩ := banach_steinhaus (g := test) (fun U ↦ by
+    refine ⟨∑' z, ‖∑ m : Fin (N z), φ z m (U.val (y z m))‖, fun K ↦ ?_⟩
+    simp only [test, FunLike.coe_sum, Finset.sum_apply]
+    exact (norm_sum_le _ _).trans ((h U).norm.sum_le_tsum K fun _ _ ↦ norm_nonneg _))
+  refine ⟨c, ?_⟩
+  rintro _ ⟨K, rfl⟩
+  let T : nuclearEndomorphisms W := ∑ z ∈ K, R z
+  have hd : FiniteDimensional ℂ T.val.toLinearMap.range :=
+    geometricBlock_finiteRank N φ y K
+  obtain ⟨U, hU, hnorm⟩ := geometricBlock_norming T hd
+  obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := W)
+  let D : nuclearEndomorphisms W := ⟨U.val * T.val, mul_mem_nuclearEndomorphisms_left _ T⟩
+  have heq : D = ∑ z ∈ K, ∑ m : Fin (N z), term z m (U.val (y z m)) := by
+    apply Subtype.ext
+    ext v
+    change U.val (T.val v) = _
+    simp only [T, R, term, Submodule.coe_sum, FunLike.coe_sum, Finset.sum_apply,
+      ContinuousLinearMap.smulRight_apply, map_sum, map_smul]
+  have ht : hilbertTrace D = test K U := by
+    rw [← htr, heq]
+    simp only [map_sum]
+    simp only [htr, term, hilbertTrace_smulRight, test, FunLike.coe_sum, Finset.sum_apply]
+    rfl
+  change traceNorm T ≤ c
+  rw [hnorm, show hilbertTrace ⟨U.val * T.val, _⟩ = test K U from ht]
+  exact (Complex.re_le_norm _).trans (((test K).le_opNorm U).trans
+    ((mul_le_of_le_one_right (norm_nonneg _) hU).trans (hc K)))
+
+end GeometricBlockDuality
+
 variable {F : Type*} [Field F] [NumberField F]
 variable (a : ℝ) {α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s)
   (φ : BruhatCompactSupport (IdeleClassGroup (𝓞 F) F)) (ha : 0 < a)
@@ -865,5 +1048,88 @@ theorem spectralStripAmbientKernel_exists :
       sobolevProjectiveKernelOperator (F := F) hα hs₀ K = (Aφ).comp Pₐ :=
   (spectralStripAmbientKernel_exists_iff_geometric_cauchy a hα hs φ ha χ eχ e x f hχ he horder hb).mpr
     (spectralStripGeometricKernel_cauchy a hα hs φ ha χ eχ e x f hχ he horder hb)
+
+local notation "Wₐ" =>
+  CompactIntervalSobolev (ideleClassTamagawaMeasure F) (logIdeleClassNorm F) (-α) α s
+
+/-- Paper: Theorem 10.4.3.5(2), p. 472. Bounded trace norms for the finite sums of the geometric
+zero blocks imply summability of the block traces after inserting any bounded operator on the
+ambient Sobolev space.
+Reconstruction: Formalizes the bounded-operator direction of the duality equivalence noted in
+`spectralStripGeometricKernel_blocks_bddAbove` (#7406), mirroring
+`spectralStripConvolution_compact_block_series_of_traceNorm_bddAbove` in `Sec3_Isolated`. -/
+theorem spectralStripGeometricKernel_bounded_block_series_of_blocks_bddAbove
+    (hbound : BddAbove (range fun K : Finset zeros(F, χ, a, α) ↦ traceNorm (∑ z ∈ K, geometricBlock(z))))
+    (U : Wₐ →L[ℂ] Wₐ) :
+    Summable (fun z : zeros(F, χ, a, α) ↦ ∑ m : Fin (jetCount(z)),
+      f jet(z, m) ((Θ₀).mkQL (U (Gₐ (Aφ (Sₐ(x jet(z, m)))))))) :=
+  geometricBlock_summable_of_bddAbove (W := Wₐ) (Z := zeros(F, χ, a, α))
+    (fun z ↦ jetCount(z))
+    (fun z m ↦ (f jet(z, m)).comp (Θ₀).mkQL)
+    (fun z m ↦ Gₐ (Aφ (Sₐ(x jet(z, m)))))
+    hbound U
+
+/-- Paper: Theorem 10.4.3.5(2), p. 472. Uniform trace-norm boundedness of the finite sums of the
+geometric zero blocks is equivalent to pointwise summability of the block traces against every
+compact operator on the ambient Sobolev space.
+Reconstruction: Formalizes the uniform-boundedness equivalence stated in the docstring of
+`spectralStripGeometricKernel_blocks_bddAbove` (#7406), characterizing the open geometric block
+estimate in dual form against compact operators. -/
+theorem spectralStripGeometricKernel_blocks_bddAbove_iff_compact_summable :
+    BddAbove (range fun K : Finset zeros(F, χ, a, α) ↦ traceNorm (∑ z ∈ K, geometricBlock(z))) ↔
+      ∀ U : compactOperator (RingHom.id ℂ) Wₐ Wₐ,
+        Summable (fun z : zeros(F, χ, a, α) ↦ ∑ m : Fin (jetCount(z)),
+          f jet(z, m) ((Θ₀).mkQL (U.val (Gₐ (Aφ (Sₐ(x jet(z, m)))))))) :=
+  ⟨fun hbound U ↦ geometricBlock_summable_of_bddAbove (W := Wₐ) (Z := zeros(F, χ, a, α))
+      (fun z ↦ jetCount(z))
+      (fun z m ↦ (f jet(z, m)).comp (Θ₀).mkQL)
+      (fun z m ↦ Gₐ (Aφ (Sₐ(x jet(z, m)))))
+      hbound U.val,
+    fun hsum ↦ geometricBlock_bddAbove_of_compact_summable (W := Wₐ) (Z := zeros(F, χ, a, α))
+      (fun z ↦ jetCount(z))
+      (fun z m ↦ (f jet(z, m)).comp (Θ₀).mkQL)
+      (fun z m ↦ Gₐ (Aφ (Sₐ(x jet(z, m)))))
+      hsum⟩
+
+/-- Paper: Theorem 10.4.3.5(2)–(3), pp. 472–473. If the geometric rectangles are Cauchy in the
+completed projective tensor product, then the ambient operator `A(φ) ∘ P^spec_a` is nuclear on
+the Sobolev space.
+Reconstruction: Combines `spectralStripAmbientKernel_exists_iff_geometric_cauchy` with the
+nuclearity characterization `existsUnique_sobolevProjectiveKernel_iff_nuclear` (#7406). -/
+theorem spectralStripAmbientKernel_isNuclear_of_geometric_cauchy
+    (hgeom : Cauchy (Filter.map geometricRectangles atTop)) :
+    IsNuclearOperator ((Aφ).comp Pₐ) := by
+  obtain ⟨K, -, hK⟩ :=
+    (spectralStripAmbientKernel_exists_iff_geometric_cauchy
+      a hα hs φ ha χ eχ e x f hχ he horder hb).mpr hgeom
+  exact (existsUnique_sobolevProjectiveKernel_iff_nuclear (F := F) hα hs₀ _).mp
+    ⟨K, hK, fun L hL ↦ sobolevProjectiveKernelOperator_injective (F := F) hα hs₀ (hL.trans hK.symm)⟩
+
+/-- Paper: Theorem 10.4.3.5(2)–(3), pp. 472–473. If the geometric rectangles are Cauchy in the
+completed projective tensor product, then the geometric part `P^geom_a ∘ A(φ) ∘ P^spec_a` is
+nuclear on the Sobolev space.
+Reconstruction: Formalizes the nuclearity consequence noted on #7406 by left-multiplying the
+ambient nuclear operator `A(φ) ∘ P^spec_a` by the bounded orthogonal projection `P^geom_a`. -/
+theorem spectralStripGeometric_isNuclear_of_geometric_cauchy
+    (hgeom : Cauchy (Filter.map geometricRectangles atTop)) :
+    IsNuclearOperator ((Gₐ).comp ((Aφ).comp Pₐ)) :=
+  mul_mem_nuclearEndomorphisms_left Gₐ
+    ⟨(Aφ).comp Pₐ, spectralStripAmbientKernel_isNuclear_of_geometric_cauchy
+      a hα hs φ ha χ eχ e x f hχ he horder hb hgeom⟩
+
+/-- Paper: Theorem 10.4.3.5(2), p. 472. Uniform trace-norm boundedness of the finite sums of the
+geometric zero blocks implies that `P^geom_a ∘ A(φ) ∘ P^spec_a` is nuclear on the Sobolev space.
+Reconstruction: Formalizes the nuclearity implication stated in the docstring of
+`spectralStripGeometricKernel_blocks_bddAbove` (#7406), without invoking that `sorry`. -/
+theorem spectralStripGeometric_isNuclear_of_blocks_bddAbove
+    (hbound : BddAbove (range fun K : Finset zeros(F, χ, a, α) ↦ traceNorm (∑ z ∈ K, geometricBlock(z)))) :
+    IsNuclearOperator ((Gₐ).comp ((Aφ).comp Pₐ)) :=
+  spectralStripGeometric_isNuclear_of_geometric_cauchy
+    a hα hs φ ha χ eχ e x f hχ he horder hb
+    (spectralStripGeometricKernel_cauchy_of_blocks
+      (modulatedIntervalSobolev_dual (continuousIdeleClassNorm F : IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ)
+        ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ (ideleClassTamagawaMeasure F)
+        (-α) α s hI hs₀).exists.choose.toContinuousLinearEquiv.toContinuousLinearMap
+      (Θ₀).mkQL e _ _ _ f _ (fun _ ↦ rfl) hbound)
 
 end RiemannMasullo.Isolated
