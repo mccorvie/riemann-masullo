@@ -2124,62 +2124,6 @@ local notation "N(" χ ", " α ", " s ", " z ")" => spectralStripMultiplicity α
 -- p. 455 also replaces log powers of unbounded order by a fixed Sobolev
 -- weight and concludes only p > 1 for the displayed scalar sum.
 
-/-- For included jets the finite section has exactly the convolution coordinate.
-Consequently the difference of two sufficiently large sections lies in the orthogonal
-complement of any fixed finite span of Riesz vectors. Finite diagonal sums for a
-single section after this orthogonal projection bound its trace norm. -/
-private theorem spectralStripConvolution_traceCauchy_of_compressed_diagonal
-    {H J κ : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
-    (A : H →L[ℂ] H) (B : ℕ × ℕ → H →L[ℂ] H) (Λ : J → StrongDual ℂ H)
-    (b : HilbertBasis κ ℂ H) (hnuc : ∀ j, B j ∈ nuclearEndomorphisms H)
-    (hcoord : ∀ k, ∀ᶠ j in atTop, ∀ v, Λ k (B j v) = Λ k (A v))
-    (ht : ∀ ε > (0 : ℝ), ∃ S : Finset J, ∀ᶠ j in atTop, ∀ t : Finset κ,
-      let V := Submodule.span ℂ ((fun k ↦ (InnerProductSpace.toDual ℂ H).symm (Λ k)) '' (S : Set J))
-      ∑ n ∈ t, (inner ℂ (b n) (CFC.sqrt ((B j).adjoint * Vᗮ.starProjection * B j) (b n))).re ≤ ε) :
-    SpectralRectanglesTraceCauchy B := by
-  classical
-  intro ε hε
-  obtain ⟨S, hS⟩ := ht (ε / 3) (by positivity)
-  let V := Submodule.span ℂ ((fun k ↦ (InnerProductSpace.toDual ℂ H).symm (Λ k)) '' (S : Set J))
-  let P := Vᗮ.starProjection
-  let D (j : ℕ × ℕ) : nuclearEndomorphisms H :=
-    ⟨P * B j, mul_mem_nuclearEndomorphisms_left P ⟨B j, hnuc j⟩⟩
-  have hgram (j : ℕ × ℕ) : (D j).val.adjoint * (D j).val = (B j).adjoint * P * B j := by
-    change star (P * B j) * (P * B j) = star (B j) * P * B j
-    have hP : IsStarProjection P := isStarProjection_starProjection
-    rw [star_mul, hP.isSelfAdjoint.star_eq, ← mul_assoc, mul_assoc (star (B j)), hP.isIdempotentElem.eq]
-  have hnorm : ∀ᶠ j in atTop, traceNorm (D j) ≤ ε / 3 := by
-    filter_upwards [hS] with j hj
-    apply le_of_tendsto' (hasSum_traceNorm_diagonal b (D j))
-    intro t
-    simpa only [hgram] using hj t
-  have hScoord : ∀ᶠ j in atTop, ∀ k ∈ S, ∀ v, Λ k (B j v) = Λ k (A v) :=
-    S.eventually_all.mpr fun k _ ↦ hcoord k
-  obtain ⟨j₀, hj₀⟩ := eventually_atTop.mp (hnorm.and hScoord)
-  refine ⟨j₀, fun j k hj hk ↦ ⟨D j - D k, ?_, ?_⟩⟩
-  · ext v
-    change P (B j v) - P (B k v) = B j v - B k v
-    rw [← map_sub]
-    apply Submodule.starProjection_eq_self_iff.mpr
-    intro u hu
-    induction hu using Submodule.span_induction with
-    | mem y hy =>
-      obtain ⟨r, hr, rfl⟩ := hy
-      rw [InnerProductSpace.toDual_symm_apply, map_sub, (hj₀ j hj).2 r hr v, (hj₀ k hk).2 r hr v,
-        sub_self]
-    | zero => exact inner_zero_left _
-    | add x y _ _ hx hy => rw [inner_add_left, hx, hy, add_zero]
-    | smul c x _ hx => rw [inner_smul_left, hx, mul_zero]
-  · let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
-    have hc := traceNorm_normedSpaceCore (H := H)
-    have hneg : traceNorm (-(D k)) = traceNorm (D k) := by
-      rw [← neg_one_smul ℂ (D k)]
-      simpa only [norm_neg, norm_one, one_mul] using hc.norm_smul (-1 : ℂ) (D k)
-    have htr := hc.norm_triangle (D j) (-(D k))
-    change traceNorm (D j + -(D k)) ≤ traceNorm (D j) + traceNorm (-(D k)) at htr
-    rw [← sub_eq_add_neg, hneg] at htr
-    linarith [(hj₀ j hj).1, (hj₀ k hk).1]
-
 section StripJetConvolutionBounds
 
 section
@@ -2783,6 +2727,62 @@ theorem spectralStripConvolution_traceCauchy_of_summable_jetNorms
     (norm_nonneg _)
 
 end StripJetConvolutionBounds
+
+/-- For included jets the finite section has exactly the convolution coordinate.
+Consequently the difference of two sufficiently large sections lies in the orthogonal
+complement of any fixed finite span of Riesz vectors. Finite diagonal sums for a
+single section after this orthogonal projection bound its trace norm. -/
+private theorem spectralStripConvolution_traceCauchy_of_compressed_diagonal
+    {H J κ : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (A : H →L[ℂ] H) (B : ℕ × ℕ → H →L[ℂ] H) (Λ : J → StrongDual ℂ H)
+    (b : HilbertBasis κ ℂ H) (hnuc : ∀ j, B j ∈ nuclearEndomorphisms H)
+    (hcoord : ∀ k, ∀ᶠ j in atTop, ∀ v, Λ k (B j v) = Λ k (A v))
+    (ht : ∀ ε > (0 : ℝ), ∃ S : Finset J, ∀ᶠ j in atTop, ∀ t : Finset κ,
+      let V := Submodule.span ℂ ((fun k ↦ (InnerProductSpace.toDual ℂ H).symm (Λ k)) '' (S : Set J))
+      ∑ n ∈ t, (inner ℂ (b n) (CFC.sqrt ((B j).adjoint * Vᗮ.starProjection * B j) (b n))).re ≤ ε) :
+    SpectralRectanglesTraceCauchy B := by
+  classical
+  intro ε hε
+  obtain ⟨S, hS⟩ := ht (ε / 3) (by positivity)
+  let V := Submodule.span ℂ ((fun k ↦ (InnerProductSpace.toDual ℂ H).symm (Λ k)) '' (S : Set J))
+  let P := Vᗮ.starProjection
+  let D (j : ℕ × ℕ) : nuclearEndomorphisms H :=
+    ⟨P * B j, mul_mem_nuclearEndomorphisms_left P ⟨B j, hnuc j⟩⟩
+  have hgram (j : ℕ × ℕ) : (D j).val.adjoint * (D j).val = (B j).adjoint * P * B j := by
+    change star (P * B j) * (P * B j) = star (B j) * P * B j
+    have hP : IsStarProjection P := isStarProjection_starProjection
+    rw [star_mul, hP.isSelfAdjoint.star_eq, ← mul_assoc, mul_assoc (star (B j)), hP.isIdempotentElem.eq]
+  have hnorm : ∀ᶠ j in atTop, traceNorm (D j) ≤ ε / 3 := by
+    filter_upwards [hS] with j hj
+    apply le_of_tendsto' (hasSum_traceNorm_diagonal b (D j))
+    intro t
+    simpa only [hgram] using hj t
+  have hScoord : ∀ᶠ j in atTop, ∀ k ∈ S, ∀ v, Λ k (B j v) = Λ k (A v) :=
+    S.eventually_all.mpr fun k _ ↦ hcoord k
+  obtain ⟨j₀, hj₀⟩ := eventually_atTop.mp (hnorm.and hScoord)
+  refine ⟨j₀, fun j k hj hk ↦ ⟨D j - D k, ?_, ?_⟩⟩
+  · ext v
+    change P (B j v) - P (B k v) = B j v - B k v
+    rw [← map_sub]
+    apply Submodule.starProjection_eq_self_iff.mpr
+    intro u hu
+    induction hu using Submodule.span_induction with
+    | mem y hy =>
+      obtain ⟨r, hr, rfl⟩ := hy
+      rw [InnerProductSpace.toDual_symm_apply, map_sub, (hj₀ j hj).2 r hr v, (hj₀ k hk).2 r hr v,
+        sub_self]
+    | zero => exact inner_zero_left _
+    | add x y _ _ hx hy => rw [inner_add_left, hx, hy, add_zero]
+    | smul c x _ hx => rw [inner_smul_left, hx, mul_zero]
+  · let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+    have hc := traceNorm_normedSpaceCore (H := H)
+    have hneg : traceNorm (-(D k)) = traceNorm (D k) := by
+      rw [← neg_one_smul ℂ (D k)]
+      simpa only [norm_neg, norm_one, one_mul] using hc.norm_smul (-1 : ℂ) (D k)
+    have htr := hc.norm_triangle (D j) (-(D k))
+    change traceNorm (D j + -(D k)) ≤ traceNorm (D j) + traceNorm (-(D k)) at htr
+    rw [← sub_eq_add_neg, hneg] at htr
+    linarith [(hj₀ j hj).1, (hj₀ k hk).1]
 
 /-- Paper: Theorem 10.3.2.1(1), pp. 453–455, after (10.3.2.7). For a fixed test,
 discard the output directions of finitely many jets. The positive square root of
