@@ -7,6 +7,7 @@ public import RiemannMasullo.AppC_LCTVS.Sec3a
 import Mathlib.LinearAlgebra.TensorProduct.RightExactness
 import RiemannMasullo.Ch02_AdelicTheta.Sec2b
 import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+import Mathlib.Analysis.Normed.Group.Tannery
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform.Holomorphic
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3b
@@ -1642,6 +1643,385 @@ private theorem spectralNuclearity_trace_finite_cluster (a : ℝ) (N : ℕ) (φ 
     change L i (R x) = L i (proj x)
     rw [hR,hp]
 
+section SpectralTraceHilbert
+
+open Filter
+open scoped InnerProductSpace
+
+/-- The inclusion of the complete gauge space of a Banach disc into the ambient space is continuous. -/
+private theorem spectralTrace_banachDisc_inclusion {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [UniformSpace E] [PolynormableSpace ℂ E] {D : Set E} (hD : IsBanachDisc D) :
+    Continuous (fun z : WithLocalSeminorm (gaugeSeminorm hD.balanced hD.convex hD.absorbent) ↦
+      (show Submodule.span ℂ D from z).val) := by
+  let G := WithLocalSeminorm (gaugeSeminorm hD.balanced hD.convex hD.absorbent)
+  let i : G →ₗ[ℂ] E := (Submodule.span ℂ D).subtype
+  let hE := PolynormableSpace.withSeminorms ℂ E
+  refine hE.continuous_of_continuous_comp i fun j ↦ ?_
+  obtain ⟨R, _, hR⟩ := hE.isVonNBounded_iff_seminorm_bounded.mp hD.bounded j
+  refine Seminorm.continuous' (r := R) (mem_of_superset (Metric.ball_mem_nhds (0 : G) one_pos) ?_)
+  intro z hz
+  rw [Metric.mem_ball, dist_zero_right] at hz
+  have hzD : (show Submodule.span ℂ D from z) ∈ ((↑) ⁻¹' D : Set (Submodule.span ℂ D)) :=
+    setOfPred_gauge_lt_one_subset_self hD.convex hD.absorbent.zero_mem hD.absorbent hz
+  rw [Seminorm.mem_closedBall_zero]
+  exact (hR (i z) hzD).le
+
+/-- Synthesis of an absolutely summable, uniformly seminorm-bounded series into a Banach space. -/
+private theorem spectralTrace_boundedSeries_toBanach {E Y : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [PolynormableSpace ℂ E] [SeminormedAddCommGroup Y] [NormedSpace ℂ Y] [T2Space Y] [CompleteSpace Y]
+    (L : ℕ → StrongDual ℂ E) (b : ℕ → Y) (a : ℕ → ℂ) (ha : Summable (fun n ↦ ‖a n‖))
+    (q : Seminorm ℂ E) (hq : Continuous q) (hL : ∀ n x, ‖L n x‖ ≤ q x) (hb : ∀ n, ‖b n‖ ≤ 1) :
+    ∃ analysisMap : E →L[ℂ] Y, ∀ x, HasSum (fun n ↦ (a n * L n x) • b n) (analysisMap x) := by
+  let term (x : E) (n : ℕ) := (a n * L n x) • b n
+  have bound (x : E) (n : ℕ) : ‖term x n‖ ≤ ‖a n‖*q x := by
+    calc
+      _ = ‖a n‖*‖L n x‖*‖b n‖ := by simp only [term,norm_smul,norm_mul]
+      _ ≤ ‖a n‖*q x*1 := by gcongr <;> first | exact hL _ _ | exact hb _
+      _ = _ := mul_one _
+  have hs (x : E) : Summable (term x) := (ha.mul_right (q x)).of_norm_bounded (bound x)
+  let analysisMap : E →ₗ[ℂ] Y := {
+    toFun x := ∑' n, term x n
+    map_add' x y := ((hs (x+y)).hasSum.unique <| ((hs x).hasSum.add (hs y).hasSum).congr_fun (fun n ↦
+      by simp only [term,map_add,mul_add,add_smul]))
+    map_smul' c x := ((hs (c • x)).hasSum.unique <| ((hs x).hasSum.const_smul c).congr_fun (fun n ↦
+      by simp only [term,map_smul,smul_eq_mul,smul_smul]; ring_nf)) }
+  let M := ∑' n, ‖a n‖
+  have hM : 0 ≤ M := tsum_nonneg (fun _ ↦ norm_nonneg _)
+  have dominated (x : E) : ‖analysisMap x‖ ≤ M * q x := by
+    calc
+      _ ≤ ∑' n, ‖a n‖*q x := by
+        have hnorm := Summable.of_nonneg_of_le (fun n ↦ norm_nonneg (term x n)) (bound x) (ha.mul_right (q x))
+        exact (norm_tsum_le_tsum_norm hnorm).trans (hnorm.tsum_le_tsum (bound x) (ha.mul_right (q x)))
+      _ = M*q x := tsum_mul_right
+  let p := M.toNNReal • q
+  have hp (x : E) : p x = M*q x := by simp [p,NNReal.smul_def,hM,Real.toNNReal_of_nonneg]
+  have hpcont : Continuous p := by simpa only [show (⇑p) = (fun x ↦ M*q x) from funext hp] using hq.const_mul M
+  have hU : Continuous analysisMap := (PolynormableSpace.withSeminorms ℂ E).continuous_normedSpace_rng Y analysisMap
+    ⟨{⟨p,hpcont⟩},1,by simpa using (show (normSeminorm ℂ Y).comp analysisMap ≤ p from fun x ↦ (dominated x).trans_eq (hp x).symm)⟩
+  exact ⟨⟨analysisMap,hU⟩,fun x ↦ (hs x).hasSum⟩
+
+/-- Factor a rapid presentation through ℓ² by giving the synthesis vectors the weights `(n + 1)⁻²`.
+Project away the kernel of synthesis to obtain an injective Hilbert-to-quotient map. -/
+private theorem spectralTrace_rapidPresentation_hilbert {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [UniformSpace E] [IsUniformAddGroup E] [PolynormableSpace ℂ E] [T2Space E]
+    (T : E →L[ℂ] E) (r : NuclearPresentation T)
+    (hr : ∀ k : ℕ, ∃ C : ℝ, ∀ n, ‖r.coeff n‖*((n:ℝ)+1)^k ≤ C) :
+    ∃ W : Submodule ℂ (lp (fun _ : ℕ ↦ ℂ) 2), IsClosed (W : Set (lp (fun _ : ℕ ↦ ℂ) 2)) ∧
+      ∃ (analysisMap : E →L[ℂ] W) (synthesisMap : W →L[ℂ] E) (a : ℕ → ℂ) (b : ℕ → W), Injective synthesisMap ∧
+        (∀ x, synthesisMap (analysisMap x) = T x) ∧ Summable (fun n ↦ ‖a n‖) ∧ (∀ n, ‖b n‖ ≤ 1) ∧
+        (∀ x, HasSum (fun n ↦ (a n*r.functional n x) • b n) (analysisMap x)) ∧
+        ∀ n, a n • synthesisMap (b n) = r.coeff n • (r.vector n).val := by
+  let H := (lp (fun _ : ℕ ↦ ℂ) 2)
+  let β (n : ℕ) := (((n:ℝ)+1)^2)⁻¹
+  let α (n : ℕ) : ℂ := r.coeff n * (((n:ℂ)+1)^2)
+  have hβ : Summable β := by
+    have h := (summable_nat_add_iff 1).mpr (Real.summable_one_div_nat_pow.mpr (by decide : 1 < 2))
+    simpa only [β,one_div,Nat.cast_add,Nat.cast_one] using h
+  have hβn (n : ℕ) : ‖(β n:ℂ)‖ = β n := by rw [Complex.norm_real,Real.norm_of_nonneg (by dsimp [β]; positivity)]
+  have ha : Summable (fun n ↦ ‖α n‖) := by
+    obtain ⟨C,hC⟩ := hr 4
+    apply Summable.of_nonneg_of_le (fun _ ↦ norm_nonneg _) _ (hβ.mul_left C)
+    intro n
+    have hnc : ‖(n:ℂ)+1‖ = (n:ℝ)+1 := by
+      rw [←Complex.ofReal_natCast,←Complex.ofReal_one,←Complex.ofReal_add,Complex.norm_real,Real.norm_of_nonneg (by positivity)]
+    change ‖r.coeff n * (((n:ℂ)+1)^2)‖ ≤ C / _
+    rw [norm_mul,norm_pow,hnc,le_div_iff₀ (by positivity)]
+    simpa only [mul_assoc,←pow_add] using hC n
+  have hαβ (n : ℕ) : α n*(β n:ℂ) = r.coeff n := by
+    dsimp only [α,β]; push_cast; field_simp
+  let e (n : ℕ) : H := lp.single 2 n (1:ℂ)
+  have he (n : ℕ) : ‖e n‖ ≤ 1 := by simp only [e,lp.norm_single (by norm_num : (0:ENNReal)<2),norm_one,le_refl]
+  have hqfa := ((norm_withSeminorms ℂ ℂ).equicontinuous_tfae (fun n ↦ (r.functional n).toLinearMap)).out 1 4
+  obtain ⟨q,hq,hqL⟩ := (hqfa.mp r.equicontinuous) ()
+  obtain ⟨analysisMap,hU⟩ := spectralTrace_boundedSeries_toBanach r.functional e α ha q hq hqL he
+  let G := WithLocalSeminorm (gaugeSeminorm r.isBanachDisc.balanced r.isBanachDisc.convex r.isBanachDisc.absorbent)
+  let : CompleteSpace G := r.isBanachDisc.complete
+  let : T2Space G := r.isBanachDisc.separated
+  let j : G →L[ℂ] E := ⟨(Submodule.span ℂ r.disc).subtype,spectralTrace_banachDisc_inclusion r.isBanachDisc⟩
+  let y (n : ℕ) : G := r.vector n
+  have hy (n : ℕ) : ‖y n‖ ≤ 1 := gauge_le_one_of_mem (show r.vector n ∈ ((↑) ⁻¹' r.disc : Set (Submodule.span ℂ r.disc)) from r.vector_mem n)
+  let eval (n : ℕ) : H →L[ℂ] ℂ := lp.evalCLM ℂ _ 2 n
+  obtain ⟨Vg,hVg⟩ := spectralTrace_boundedSeries_toBanach eval y (fun n ↦ (β n:ℂ)) (by simpa only [hβn] using hβ)
+    (normSeminorm ℂ H) continuous_norm (fun n x ↦ lp.norm_apply_le_norm (by norm_num) x n) hy
+  let synthesisMap := j.comp Vg
+  have hVe (n : ℕ) : synthesisMap (e n) = (β n:ℂ) • (r.vector n).val := by
+    have hg : Vg (e n) = (β n:ℂ) • y n := by
+      apply (hVg (e n)).unique
+      have heval (k : ℕ) : eval k (e n) = if k=n then 1 else 0 := by
+        change (lp.single (E := fun _ : ℕ ↦ ℂ) 2 n (1:ℂ)) k = _
+        simp [lp.single_apply,Pi.single_apply,eq_comm]
+      have hs := hasSum_single n (f := fun k ↦ ((β k:ℂ)*eval k (e n)) • y k) (fun k hkn ↦ by simp [heval,hkn])
+      exact (show (β n:ℂ) • y n = ((β n:ℂ)*eval n (e n)) • y n by rw [heval]; simp) ▸ hs
+    change j (Vg (e n)) = _
+    rw [hg,map_smul]; rfl
+  have hVU (x : E) : synthesisMap (analysisMap x) = T x := by
+    refine ((hU x).mapL synthesisMap).unique ((r.hasSum x).congr_fun (fun n ↦ ?_))
+    rw [map_smul,hVe,smul_smul,mul_right_comm,hαβ]
+  let K := synthesisMap.toLinearMap.ker
+  let : CompleteSpace K := synthesisMap.isClosed_ker.completeSpace_coe
+  let W := Kᗮ
+  let : CompleteSpace W := K.isClosed_orthogonal.completeSpace_coe
+  let π := W.orthogonalProjectionOnto
+  have hπ (x : H) : synthesisMap (π x).val = synthesisMap x := by
+    have hx : x-(π x).val ∈ K := by
+      simpa only [W,K.orthogonal_orthogonal,Submodule.starProjection_apply] using Submodule.sub_starProjection_mem_orthogonal (K := W) x
+    change synthesisMap (x-(π x).val) = 0 at hx
+    exact ((sub_eq_zero.mp <| (map_sub synthesisMap _ _) ▸ hx)).symm
+  refine ⟨W,K.isClosed_orthogonal,π.comp analysisMap,synthesisMap.comp W.subtypeL,α,fun n ↦ π (e n),?_,
+    fun x ↦ (hπ (analysisMap x)).trans (hVU x),ha,fun n ↦ (W.norm_orthogonalProjectionOnto_apply_le _).trans (he n),?_,?_⟩
+  · change Injective (synthesisMap.comp W.subtypeL).toLinearMap
+    apply LinearMap.ker_eq_bot.mp
+    apply LinearMap.ker_eq_bot'.mpr
+    intro x hx
+    exact Subtype.ext ((Submodule.disjoint_def.mp K.isCompl_orthogonal.disjoint) _ hx x.property)
+  · intro x
+    simpa only [map_smul,ContinuousLinearMap.comp_apply] using (hU x).mapL π
+  · intro n
+    change α n • synthesisMap (π (e n)).val = _
+    rw [hπ,hVe,smul_smul,hαβ]
+
+/-- The Hilbert representation of a finite spectral mask computes its algebraic trace
+without any estimate on the original (possibly very oblique) mask. -/
+private theorem spectralTrace_rectangular {E H : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [T2Space E]
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H] (u : E →L[ℂ] H) (v : H →L[ℂ] E)
+    (p : E →L[ℂ] E) (hid : ∀ x, p (p x) = p x) (hc : ∀ x, v (u (p x)) = p (v (u x)))
+    (hfin : FiniteDimensional ℂ p.toLinearMap.range)
+    (R : p.toLinearMap.range →ₗ[ℂ] p.toLinearMap.range) (hR : ∀ x, (R x).val = v (u x.val)) :
+    let K := (p.comp v).toLinearMap.ker
+    let W := Kᗮ
+    FiniteDimensional ℂ W ∧
+      LinearMap.trace ℂ W ((W.orthogonalProjectionOnto.comp ((u.comp v).comp W.subtypeL)).toLinearMap) =
+        LinearMap.trace ℂ _ R := by
+  classical
+  intro K W
+  let : CompleteSpace W := K.isClosed_orthogonal.completeSpace_coe
+  let : CompleteSpace K := (p.comp v).isClosed_ker.completeSpace_coe
+  let A : W →ₗ[ℂ] p.toLinearMap.range := (p.toLinearMap.rangeRestrict.comp v.toLinearMap).comp W.subtype
+  have hA (x : W) : (A x).val = p (v x.val) := rfl
+  have hinj : Injective A := by
+    apply LinearMap.ker_eq_bot.mp
+    apply LinearMap.ker_eq_bot'.mpr
+    intro x hx
+    have he : x.val ∈ K := congrArg Subtype.val hx
+    exact Subtype.ext ((Submodule.disjoint_def.mp K.isCompl_orthogonal.disjoint) _ he x.property)
+  let : FiniteDimensional ℂ W := FiniteDimensional.of_injective A hinj
+  refine ⟨inferInstance,?_⟩
+  let backward := (W.orthogonalProjectionOnto.toLinearMap.comp u.toLinearMap).comp p.toLinearMap.range.subtype
+  have hpk (y : H) : p (v (W.orthogonalProjectionOnto y).val) = p (v y) := by
+    have he := Submodule.sub_starProjection_mem_orthogonal (K := W) y
+    have hk : y - (W.orthogonalProjectionOnto y).val ∈ K := by simpa only [W,K.orthogonal_orthogonal,Submodule.starProjection_apply] using he
+    change p (v (y - (W.orthogonalProjectionOnto y).val)) = 0 at hk
+    rw [map_sub,map_sub,sub_eq_zero] at hk
+    exact hk.symm
+  have hpu (x : E) : W.orthogonalProjectionOnto (u (p x)) = W.orthogonalProjectionOnto (u x) := by
+    apply sub_eq_zero.mp
+    rw [←map_sub]
+    change u (p x) - u x ∈ W.orthogonalProjectionOnto.ker
+    rw [Submodule.ker_orthogonalProjectionOnto]
+    change u (p x)-u x ∈ Kᗮᗮ
+    rw [K.orthogonal_orthogonal]
+    change p (v (u (p x)-u x)) = 0
+    rw [map_sub,map_sub,hc,hid,sub_self]
+  have compW : backward.comp A = (W.orthogonalProjectionOnto.comp ((u.comp v).comp W.subtypeL)).toLinearMap := by
+    apply LinearMap.ext
+    intro x
+    change W.orthogonalProjectionOnto (u (p (v x.val))) = _
+    exact hpu _
+  have compE : A.comp backward = R := by
+    ext x
+    change p (v (W.orthogonalProjectionOnto (u x.val)).val) = (R x).val
+    rw [hpk,hR,←hc]
+    obtain ⟨z,hz⟩ := x.property
+    change p z = x.val at hz
+    rw [←hz,hid]
+  rw [←compW,←compE]
+  exact LinearMap.trace_comp_comm' _ _
+
+/-- Any pointwise absolutely converging rank-one expansion on a finite-dimensional Hilbert
+space gives its algebraic trace by contraction. -/
+private theorem spectralTrace_finiteDimensional_series {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H]
+    [FiniteDimensional ℂ H] (T : H →ₗ[ℂ] H) (a : ℕ → ℂ) (L : ℕ → StrongDual ℂ H) (b : ℕ → H)
+    (hT : ∀ x, HasSum (fun n ↦ (a n * L n x) • b n) (T x)) :
+    HasSum (fun n ↦ a n * L n (b n)) (LinearMap.trace ℂ H T) := by
+  classical
+  let e := stdOrthonormalBasis ℂ H
+  let D := Fin (Module.finrank ℂ H)
+  let c (i : D) := innerSL ℂ (e i)
+  have hs (i : D) (_ : i ∈ (Finset.univ : Finset D)) :
+      HasSum (fun n ↦ (a n * L n (e i)) * c i (b n)) (c i (T (e i))) := by
+    simpa only [map_smul,smul_eq_mul] using (hT (e i)).mapL (c i)
+  have hsum := hasSum_sum hs
+  have he (n : ℕ) : ∑ i : D, (a n*L n (e i))*c i (b n) = a n*L n (b n) := by
+    calc
+      _ = a n * L n (∑ i, c i (b n) • e i) := by
+        simp only [map_sum,map_smul,smul_eq_mul,Finset.mul_sum]
+        apply Finset.sum_congr rfl; intro i _; ring
+      _ = _ := congrArg (fun y ↦ a n * L n y) (e.sum_repr' (b n))
+  have ht : LinearMap.trace ℂ H T = ∑ i : D, c i (T (e i)) := by
+    rw [LinearMap.trace_eq_matrix_trace ℂ e.toBasis,Matrix.trace]
+    apply Finset.sum_congr rfl
+    intro i _
+    simp only [Matrix.diag_apply,LinearMap.toMatrix_apply,OrthonormalBasis.coe_toBasis,
+      OrthonormalBasis.coe_toBasis_repr_apply,OrthonormalBasis.repr_apply_apply,c,innerSL_apply_apply]
+  simpa only [ht,he] using hsum
+
+/-- Finite supported trace approximations identify the numerical trace of an already rapid
+presentation, irrespective of whether the cutoff operators are equicontinuous. -/
+private theorem spectralTrace_of_finiteProjections {E Z : Type*} [AddCommGroup E] [Module ℂ E]
+    [UniformSpace E] [IsUniformAddGroup E] [PolynormableSpace ℂ E] [T2Space E]
+    (T : E →L[ℂ] E) (r : NuclearPresentation T)
+    (hr : ∀ k : ℕ, ∃ C : ℝ, ∀ n, ‖r.coeff n‖*((n:ℝ)+1)^k ≤ C)
+    (p : Finset Z → E →L[ℂ] E) (R : (C : Finset Z) → (p C).toLinearMap.range →ₗ[ℂ] (p C).toLinearMap.range)
+    (hid : ∀ C x, p C (p C x) = p C x) (hc : ∀ C x, T (p C x) = p C (T x))
+    (hfin : ∀ C, FiniteDimensional ℂ (p C).toLinearMap.range) (hR : ∀ C x, (R C x).val = T x.val)
+    (hanti : ∀ C D, C ⊆ D → (p D).toLinearMap.ker ≤ (p C).toLinearMap.ker)
+    (hsep : ∀ x, (∀ C, p C x = 0) → x=0) (t : ℂ)
+    (hlen : Tendsto (fun C ↦ LinearMap.trace ℂ _ (R C)) atTop (𝓝 t)) :
+    HasSum (fun n ↦ r.coeff n * r.functional n (r.vector n).val) t := by
+  classical
+  obtain ⟨H,hclosed,analysisMap,synthesisMap,a,b,hV,hvu,ha,hb,hU,hvec⟩ := spectralTrace_rapidPresentation_hilbert T r hr
+  let : CompleteSpace H := hclosed.completeSpace_coe
+  let K (C : Finset Z) := ((p C).comp synthesisMap).toLinearMap.ker
+  let W (C : Finset Z) := (K C)ᗮ
+  let (C : Finset Z) : CompleteSpace (K C) := ((p C).comp synthesisMap).isClosed_ker.completeSpace_coe
+  let (C : Finset Z) : CompleteSpace (W C) := (K C).isClosed_orthogonal.completeSpace_coe
+  have mono : Monotone W := by
+    intro c d hcd
+    apply Submodule.orthogonal_le
+    exact fun x hx ↦ hanti c d hcd hx
+  have dense : ⊤ ≤ (⨆ C, W C).topologicalClosure := by
+    apply (Submodule.topologicalClosure_eq_top_iff.mpr ?_).ge
+    rw [Submodule.eq_bot_iff]
+    intro x hx
+    apply hV
+    rw [map_zero]
+    apply hsep
+    intro C
+    have hm : x ∈ (W C)ᗮ := Submodule.orthogonal_le (le_iSup W C) hx
+    change x ∈ K C
+    simpa only [W,(K C).orthogonal_orthogonal] using hm
+  have limit (y : H) := Submodule.starProjection_tendsto_self W mono y dense
+  -- Contract in the orthogonal Hilbert cutoffs, whose operator norms are at most one.
+  have hrect (C : Finset Z) := spectralTrace_rectangular analysisMap synthesisMap (p C) (hid C)
+    (fun x ↦ by rw [hvu,hvu,hc]) (hfin C) (R C) (fun x ↦ (hR C x).trans (hvu x.val).symm)
+  let d (C : Finset Z) (n : ℕ) := a n * r.functional n (synthesisMap ((W C).starProjection (b n)))
+  have loc (C : Finset Z) : HasSum (d C) (LinearMap.trace ℂ _ (R C)) := by
+    let : FiniteDimensional ℂ (W C) := (hrect C).1
+    let π := (W C).orthogonalProjectionOnto
+    let S := (π.comp ((analysisMap.comp synthesisMap).comp (W C).subtypeL)).toLinearMap
+    let L (n : ℕ) := (r.functional n).comp (synthesisMap.comp (W C).subtypeL)
+    have row (x : W C) : HasSum (fun n ↦ (a n * L n x) • π (b n)) (S x) := by
+      simpa only [L,S,ContinuousLinearMap.comp_apply,Submodule.subtypeL_apply,ContinuousLinearMap.coe_coe,map_smul] using
+        (hU (synthesisMap x.val)).mapL π
+    have hl := spectralTrace_finiteDimensional_series S a L (fun n ↦ π (b n)) row
+    have he : LinearMap.trace ℂ _ S = LinearMap.trace ℂ _ (R C) := (hrect C).2
+    rw [←he]
+    exact hl
+  have hqfa := ((norm_withSeminorms ℂ ℂ).equicontinuous_tfae (fun n ↦ (r.functional n).toLinearMap)).out 1 4
+  obtain ⟨q,hq,hqL⟩ := (hqfa.mp r.equicontinuous) ()
+  obtain ⟨M,hM,hbound⟩ := (q.comp synthesisMap.toLinearMap).bound_of_continuous_normedSpace (hq.comp synthesisMap.continuous)
+  have unif (n : ℕ) (y : H) (hy : ‖y‖ ≤ 1) : ‖r.functional n (synthesisMap y)‖ ≤ M :=
+    (hqL n (synthesisMap y)).trans ((hbound y).trans (mul_le_of_le_one_right hM.le hy))
+  let scalar (n : ℕ) := a n * r.functional n (synthesisMap (b n))
+  have normD (C : Finset Z) (n : ℕ) : ‖d C n‖ ≤ ‖a n‖*M := by
+    change ‖a n * _‖ ≤ _
+    rw [norm_mul]
+    exact mul_le_mul_of_nonneg_left (unif n _ (((W C).norm_starProjection_apply_le _).trans (hb _))) (norm_nonneg _)
+  have hscalar (n : ℕ) : scalar n = r.coeff n * r.functional n (r.vector n).val := by
+    simpa only [scalar,map_smul,smul_eq_mul] using congrArg (r.functional n) (hvec n)
+  have limD (n : ℕ) : Tendsto (fun C ↦ d C n) atTop (𝓝 (scalar n)) :=
+    (((r.functional n).continuous.comp synthesisMap.continuous).continuousAt.tendsto.comp (limit (b n))).const_mul _
+  -- Tannery’s theorem exchanges the finite-cluster limit with the presentation series.
+  have limTotal := tendsto_tsum_of_dominated_convergence (ha.mul_right M) limD
+    (Eventually.of_forall normD)
+  have hsum : Summable scalar := (ha.mul_right M).of_norm_bounded fun n ↦
+    (norm_mul _ _).le.trans (mul_le_mul_of_nonneg_left (unif n _ (hb n)) (norm_nonneg _))
+  have val : (∑' n,scalar n) = t := tendsto_nhds_unique limTotal (hlen.congr fun C ↦ (loc C).tsum_eq.symm)
+  exact val ▸ hsum.hasSum.congr_fun (fun n ↦ (hscalar n).symm)
+
+open Classical in
+/-- Every rapid presentation of the retained jet-endomorphism has the predicted divisor trace. -/
+private theorem spectralNuclearity_trace_of_rapid_presentation (a : ℝ) (N : ℕ) (φ : 𝒟)
+    (d : jets(χ,τ,hτ) → StrongDual ℂ (Q(a)))
+    (hd : ∀ i f, d i ((D(a)).mkQ f) = iteratedDeriv i.2.val f.val (i.1.val-(a:ℂ))) :
+    let I := {i : jets(χ,τ,hτ) // i.2.val < N}
+    let K := ⨅ i : I, (d i.val).toLinearMap.ker
+    let E := Q(a) ⧸ K
+    letI : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+    let Z := zeros(χ,τ,hτ)
+    let term (z : Z) := ((min N (multiplicity(χ,τ,hτ,z)) : ℕ):ℂ) * nuclearityTestMellin χ φ (z.val-(a:ℂ))
+    ∀ (A : B →L[ℂ] B) (Aq : Q(a) →L[ℂ] Q(a)) (T : E →L[ℂ] E),
+      (∀ f s, (A f).val s = nuclearityTestMellin χ φ s * f.val s) →
+      (∀ f, Aq ((D(a)).mkQ f) = (D(a)).mkQ (A f)) → (∀ x, T (K.mkQ x) = K.mkQ (Aq x)) →
+      ∀ r : NuclearPresentation T, (∀ k : ℕ, ∃ C : ℝ, ∀ n, ‖r.coeff n‖*((n:ℝ)+1)^k ≤ C) →
+        HasSum (fun n ↦ r.coeff n * r.functional n (r.vector n).val) (∑' z,term z) := by
+  classical
+  intro I K E Z term A Aq T hA hAq hT r hr
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let D := D(a)
+  let : IsClosed (D : Set B) := schwartzBergmanDivisible_isClosed _
+  have hB : IsNuclearTVS.{0} B := spectralJet_sb_nuclear
+  let : T2Space B := hB.1
+  let : PolynormableSpace ℂ B := hB.2.1
+  let : T2Space (Q(a)) := inferInstanceAs (T2Space (B ⧸ D))
+  have hQ : IsNuclearTVS.{0} (Q(a)) := isNuclearTVS_quotient hB D
+  let : PolynormableSpace ℂ (Q(a)) := hQ.2.1
+  let : IsClosed (K : Set (Q(a))) := by
+    change IsClosed (↑(⨅ i : I, (d i.val).toLinearMap.ker) : Set (Q(a)))
+    rw [Submodule.coe_iInf]
+    exact isClosed_iInter (fun i ↦ (d i.val).isClosed_ker)
+  let : T2Space E := inferInstanceAs (T2Space (Q(a) ⧸ K))
+  let : PolynormableSpace ℂ E := (isNuclearTVS_quotient hQ K).2.1
+  let L (i : I) : StrongDual ℂ E := ⟨K.liftQ (d i.val).toLinearMap (iInf_le _ i),
+    (Submodule.isQuotientMap_mkQ K).continuous_iff.mpr (d i.val).continuous⟩
+  have hL (i : I) (x : Q(a)) : L i (K.mkQ x) = d i.val x := rfl
+  have separates (x : E) (hx : ∀ i, L i x=0) : x=0 := by
+    obtain ⟨y,rfl⟩ := K.mkQ_surjective x
+    rw [Submodule.mkQ_apply,Submodule.Quotient.mk_eq_zero,Submodule.mem_iInf]
+    exact fun i ↦ hx i
+  choose proj hmask hid hcomm hfin Rq _ using
+    spectralNuclearity_trace_finite_cluster χ τ hτ a N φ d hd A Aq T hA hAq hT L hL
+  choose R hR htrace using Rq
+  refine spectralTrace_of_finiteProjections T r hr proj R hid hcomm hfin hR ?_ ?_ _ ?_
+  · intro c e hce x hx
+    change proj c x = 0
+    apply separates
+    intro i
+    rw [hmask]
+    by_cases hi : i.val.1 ∈ c
+    · rw [ite_eq_left hi]
+      have hm := hmask e i x
+      change proj e x = 0 at hx
+      simpa only [hx,map_zero,ite_eq_left (hce hi)] using hm.symm
+    · rw [ite_eq_right hi]
+  · intro x hx
+    apply separates
+    intro i
+    have hm := hmask {i.val.1} i x
+    simpa only [hx,map_zero,Finset.mem_singleton_self,ite_true] using hm.symm
+  · have hs : Summable term := Summable.of_norm (spectralNuclearity_trace_term_summable χ τ hτ a N φ)
+    have e : (fun C : Finset Z ↦ LinearMap.trace ℂ _ (R C)) = (fun C ↦ ∑ z ∈ C,term z) := funext htrace
+    rw [e]
+    exact hs.hasSum
+
+end SpectralTraceHilbert
+
+open Classical in
+/-- Paper: Theorem 7.4.1.1(2), p. 367. The remaining operator input is the
+existence of a rapidly decreasing nuclear presentation of the retained-jet action. -/
+private theorem spectralNuclearity_strong_of_jet_action (a : ℝ) (N : ℕ) (hN : 0 < N) (φ : 𝒟)
+    (d : jets(χ, τ, hτ) → StrongDual ℂ (Q(a)))
+    (hd : ∀ i f, d i ((D(a)).mkQ f) = iteratedDeriv i.2.val f.val (i.1.val - (a : ℂ))) :
+    let K := ⨅ i : {i : jets(χ, τ, hτ) // i.2.val < N}, (d i.val).toLinearMap.ker
+    let E := Q(a) ⧸ K
+    letI : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+    ∀ (A : B →L[ℂ] B) (Aq : Q(a) →L[ℂ] Q(a)) (T : E →L[ℂ] E),
+      (∀ f s, (A f).val s = nuclearityTestMellin χ φ s * f.val s) →
+      (∀ f, Aq ((D(a)).mkQ f) = (D(a)).mkQ (A f)) →
+      (∀ x, T (K.mkQ x) = K.mkQ (Aq x)) →
+      IsStronglyNuclearOperator T := by sorry
+
 open Classical in
 /-- Paper: Theorem 7.4.1.1(2), pp. 366–367. One rapidly decreasing presentation
 of the descended operator whose scalar series sums to the explicit zero formula. -/
@@ -1659,7 +2039,10 @@ private theorem spectralNuclearity_trace_presentation (a : ℝ) (N : ℕ) (hN : 
       (∀ x, T (K.mkQ x) = K.mkQ (Aq x)) →
       ∃ r : NuclearPresentation T, (∀ k : ℕ, ∃ C : ℝ, ∀ n : ℕ,
         ‖r.coeff n‖ * ((n : ℝ) + 1)^k ≤ C) ∧
-        HasSum (fun n ↦ r.coeff n * r.functional n (r.vector n).val) (∑' z, term z) := by sorry
+        HasSum (fun n ↦ r.coeff n * r.functional n (r.vector n).val) (∑' z, term z) := by
+  intro K E term A Aq T hA hAq hT
+  obtain ⟨r, hr⟩ := spectralNuclearity_strong_of_jet_action χ τ hτ a N hN φ d hd A Aq T hA hAq hT
+  exact ⟨r, hr, spectralNuclearity_trace_of_rapid_presentation χ τ hτ a N φ d hd A Aq T hA hAq hT r hr⟩
 
 open Classical in
 /-- Paper: Theorem 7.4.1.1(2), pp. 366–367. The Mellin action on the quotient
