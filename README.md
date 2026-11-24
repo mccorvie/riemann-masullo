@@ -74,8 +74,8 @@ shell commands) this instruction, with the number of the issue you want it to wo
 Doing it by hand works the same way, and mathematics without Lean is welcome on the issues: a
 sketch is enough for others to work from. (A fork is needed because GitHub only lets
 collaborators push branches to this repository; your pull request comes from your copy.) Every
-pull request is built and checked automatically. One that closes a recorded gap is read by the
-project owner before it merges. [`CONTRIBUTING.md`](CONTRIBUTING.md) has the details, and what
+pull request is built and checked automatically, and then read by the project before it
+merges: since 24 November 2026 nothing is merged automatically. [`CONTRIBUTING.md`](CONTRIBUTING.md) has the details, and what
 we have learned about doing this quickly.
 
 A few statements of the supplementary chapters are still open as ordinary
