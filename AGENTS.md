@@ -29,6 +29,13 @@ Work is organized with GitHub issues and pull requests. There is no blueprint.
 
 Role instructions are in [`prompts/`](prompts/README.md).
 
+**What is left (24 November 2026).** The steps that are still open are issues labelled
+`open-problem`; issue #7349 lists them. They are not claimed: do not comment `Claiming` on one,
+anyone may work on it at any time, and partial results belong on the issue. A pull request that
+closes a recorded gap is read by the project owner before it merges. Nothing from a
+formalization of the Riemann hypothesis released in November 2026, or derived from one, may be
+used: the project tests the route of this paper.
+
 ## Layout
 
 | Path | Contents | Who edits |
