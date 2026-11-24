@@ -89,6 +89,9 @@ local notation "traceIdentity(" τ ", " φ ", " α ")" =>
 
 /-- Paper: Theorem 12.5.1.1, pp. 519–520. For a test vanishing on the norm-one
 classes, the zero terms omitted by a positive-width open strip sum to zero.
+Reconstruction: The paper states the trace formula with the sum over the zeros inside the
+strip, and does not state this. With the explicit formula of Theorem B.4.4.7 the printed formula
+follows from this statement (`traceFormula_of_exteriorZeros`).
 Gap: The global to S-local comparison on p. 520 must account for every omitted
 zero, including zeros on the edges. The all-zero identity of Theorem B.4.4.7
 alone gives no such cancellation. -/

@@ -74,7 +74,10 @@ statements and gaps") unless someone proves it, repairs it or refutes it.
 Sixteen of the twenty-eight rows have since been settled in Lean, and each of those says so in
 bold and points to the next section. The twelve that are still open are the project's open
 problems: each is an issue labelled `open-problem`, which nobody holds and anyone may work on,
-and [#7349](https://github.com/mccorvie/riemann-masullo/issues/7349) lists them.
+and [#7349](https://github.com/mccorvie/riemann-masullo/issues/7349) lists them. For four of the
+twelve the missing step is one named Lean statement, a recorded gap. For the other eight we
+could not formalize the statement of the missing step: the manuscript gives none that is
+precise, or gives one that is not known to hold as printed.
 
 | Item | Entries | What is missing | Used later on pp. |
 |---|---|---|---|

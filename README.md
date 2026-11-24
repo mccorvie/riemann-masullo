@@ -38,8 +38,8 @@ not.
 **What is left is open to everyone at once.** The formalization is close to its end, and the
 work now is to find repairs for the last gaps in the proof. Each open step is an issue labelled
 [`open-problem`](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aopen-problem), and [What is left: the open problems](https://github.com/mccorvie/riemann-masullo/issues/7349) lists them all: four
-statements that are in Lean and have no proof, seven steps of the paper that have no argument
-on the page, and three known theorems that have no formal proof here.
+statements that are in Lean and have no proof, seven proof steps where we could not formalize
+the statement, and three known theorems that have no formal proof here.
 
 These issues are **not claimed**. Nobody holds one, several people can work on the same one, and
 a partial result posted on the issue is a contribution: a sketch, a reference, a weaker
@@ -105,8 +105,9 @@ had pull requests merged, some 2,660 pull requests in all.
   for every width, is equivalent to the main claim, so nothing weaker can supply it.
 - **Four recorded gaps:** that cancellation, and three statements under the bases and traces of
   Chapters 7 and 10. Each is a named Lean statement with everything else proved around it.
-- **Seven steps with no argument on the page**, in Chapters 7 and 10–12. The Lean asserts
-  nothing for them.
+- **Seven proof steps where we could not formalize the statement**, in Chapters 7 and 10–12.
+  For five of them the manuscript gives no precise statement of the step. For two it gives one
+  that is not known to hold as printed. The Lean asserts nothing for the missing part.
 - **Three classical inputs:** theorems of the literature that are stated in Lean and used, and
   not proved there.
 - The supplementary material (Chapters 8 and 14, Appendix E, §A.4, §B.7), on which the trace

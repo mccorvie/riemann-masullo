@@ -148,6 +148,14 @@ proved yet, a statement known to be false, and a statement nobody can prove or r
   plain what rests on each gap. Never leave a `sorry` in the middle of a larger proof. Only the
   integrator declares a gap, and a gap is reviewed like any statement: one that is too strong
   makes everything above it empty.
+- **A statement the paper does not make is marked as a reconstruction.** Where the missing step
+  is not stated in the paper, or not precisely, a Lean statement of it is the project's
+  formulation of what the surrounding pages need. Its docstring has a line starting
+  `Reconstruction:` that says so and says what it was reconstructed from. It is not known
+  whether such a statement is what the author intends. A reconstruction is added only together
+  with a proved theorem that derives the paper's statement from it, so that Lean has checked
+  that it suffices; where it can be had, a proved converse shows that it asks for no more than
+  the conclusion.
 - **Only the integrator changes a statement**, after checking the report against the page. What
   a contributor hands in is the finding: the paper item and page, exactly what fails, and the
   evidence, which is a concrete counterexample or the exact step that fails, and best of all a
