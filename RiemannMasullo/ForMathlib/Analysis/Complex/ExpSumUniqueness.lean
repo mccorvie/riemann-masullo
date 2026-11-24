@@ -1,6 +1,8 @@
 module
 
 public import Mathlib.Analysis.Complex.Exponential
+public import Mathlib.MeasureTheory.Integral.IntegrableOn
+public import Mathlib.MeasureTheory.Measure.Lebesgue.Basic
 public import Mathlib.Topology.Algebra.InfiniteSum.Defs
 
 import Mathlib.Analysis.Calculus.ParametricIntegral
@@ -265,53 +267,47 @@ private theorem expSum_continuousOn {ι : Type*} (w b : ι → ℂ) (hre : ∀ i
     (mem_of_superset (inter_mem_nhdsWithin _ (Iio_mem_nhds (by linarith : y₀ < y₀ + 1)))
       fun y hy ↦ ⟨hy.1, hy.2.le⟩)
 
-/-- The Laplace transform of a function bounded by `C * exp (c * y)` on the half-line converges
-for `Re z > c`, with modulus at most `C / (Re z - c)`. -/
-private theorem expSum_laplace_integrable (S : ℝ → ℂ) (hS : ContinuousOn S (Ici 0)) {C c : ℝ}
-    (hb : ∀ y, 0 ≤ y → ‖S y‖ ≤ C * Real.exp (c * y)) {z : ℂ} (hz : c < z.re) :
+/-- The Laplace transform of a function with a majorant `D`, such that `D y * exp (-σ * y)` is
+integrable on the half-line, converges for `Re z ≥ σ`, with modulus at most that integral. -/
+private theorem expSum_laplace_integrable (S : ℝ → ℂ) (hS : ContinuousOn S (Ici 0)) (D : ℝ → ℝ)
+    (hD : ∀ y, 0 ≤ y → ‖S y‖ ≤ D y) {σ : ℝ}
+    (hDi : IntegrableOn (fun y ↦ D y * Real.exp (-σ * y)) (Ioi 0)) {z : ℂ} (hz : σ ≤ z.re) :
     IntegrableOn (fun y : ℝ ↦ S y * Complex.exp (-(z * y))) (Ioi 0) ∧
-      ‖∫ y in Ioi (0 : ℝ), S y * Complex.exp (-(z * y))‖ ≤ C / (z.re - c) := by
-  have hlt : c - z.re < 0 := by linarith
-  have hg : IntegrableOn (fun y : ℝ ↦ C * Real.exp ((c - z.re) * y)) (Ioi 0) :=
-    (integrableOn_exp_mul_Ioi hlt 0).const_mul C
+      ‖∫ y in Ioi (0 : ℝ), S y * Complex.exp (-(z * y))‖ ≤
+        ∫ y in Ioi (0 : ℝ), D y * Real.exp (-σ * y) := by
   have hle : ∀ y ∈ Ioi (0 : ℝ),
-      ‖S y * Complex.exp (-(z * y))‖ ≤ C * Real.exp ((c - z.re) * y) := by
+      ‖S y * Complex.exp (-(z * y))‖ ≤ D y * Real.exp (-σ * y) := by
     intro y hy
+    have hy0 : (0 : ℝ) < y := hy
     have hzy : (-(z * (y : ℂ))).re = -(z.re * y) := by simp
     rw [norm_mul, Complex.norm_exp, hzy]
-    calc ‖S y‖ * Real.exp (-(z.re * y))
-        ≤ C * Real.exp (c * y) * Real.exp (-(z.re * y)) :=
-          mul_le_mul_of_nonneg_right (hb y (le_of_lt hy)) (Real.exp_pos _).le
-      _ = C * Real.exp ((c - z.re) * y) := by
-          rw [mul_assoc, ← Real.exp_add]; congr 2; ring
+    exact mul_le_mul (hD y hy0.le) (Real.exp_le_exp.mpr (by nlinarith))
+      (Real.exp_pos _).le ((norm_nonneg _).trans (hD y hy0.le))
   have hmeas : AEStronglyMeasurable (fun y : ℝ ↦ S y * Complex.exp (-(z * y)))
       (volume.restrict (Ioi 0)) :=
     ((hS.mono Ioi_subset_Ici_self).mul
       (Continuous.continuousOn (by fun_prop))).aestronglyMeasurable measurableSet_Ioi
   have hae : ∀ᵐ y ∂(volume.restrict (Ioi (0 : ℝ))),
-      ‖S y * Complex.exp (-(z * y))‖ ≤ C * Real.exp ((c - z.re) * y) := by
+      ‖S y * Complex.exp (-(z * y))‖ ≤ D y * Real.exp (-σ * y) := by
     filter_upwards [ae_restrict_mem measurableSet_Ioi] with y hy using hle y hy
-  refine ⟨hg.mono' hmeas hae, (norm_integral_le_of_norm_le hg hae).trans (le_of_eq ?_)⟩
-  rw [integral_const_mul, integral_exp_mul_Ioi hlt, mul_zero, Real.exp_zero]
-  have h1 : c - z.re ≠ 0 := hlt.ne
-  have h2 : z.re - c ≠ 0 := by linarith
-  field_simp
-  ring
+  exact ⟨hDi.mono' hmeas hae, norm_integral_le_of_norm_le hDi hae⟩
 
-/-- The Laplace transform of a function bounded by `C * exp (c * y)` on the half-line is
-holomorphic on `Re z > c`. -/
+/-- The Laplace transform of a function with a majorant `D`, such that `D y * exp (-σ * y)` is
+integrable on the half-line for every `σ > c`, is holomorphic on `Re z > c`. -/
 private theorem expSum_laplace_differentiableAt (S : ℝ → ℂ) (hS : ContinuousOn S (Ici 0))
-    {C c : ℝ} (hb : ∀ y, 0 ≤ y → ‖S y‖ ≤ C * Real.exp (c * y)) {z₀ : ℂ} (hz₀ : c < z₀.re) :
+    (D : ℝ → ℝ) (hD : ∀ y, 0 ≤ y → ‖S y‖ ≤ D y) {c : ℝ}
+    (hDi : ∀ σ, c < σ → IntegrableOn (fun y ↦ D y * Real.exp (-σ * y)) (Ioi 0)) {z₀ : ℂ}
+    (hz₀ : c < z₀.re) :
     DifferentiableAt ℂ (fun z : ℂ ↦ ∫ y in Ioi (0 : ℝ), S y * Complex.exp (-(z * y))) z₀ := by
   set ε := (z₀.re - c) / 3 with hε
   have hε0 : 0 < ε := by rw [hε]; linarith
-  have hC : 0 ≤ C := by simpa using (norm_nonneg _).trans (hb 0 le_rfl)
   have hcont (z : ℂ) : ContinuousOn (fun y : ℝ ↦ S y * Complex.exp (-(z * y))) (Ioi 0) :=
     (hS.mono Ioi_subset_Ici_self).mul (Continuous.continuousOn (by fun_prop))
   have hcont' : ContinuousOn (fun y : ℝ ↦ S y * (-(y : ℂ) * Complex.exp (-(z₀ * y)))) (Ioi 0) :=
     (hS.mono Ioi_subset_Ici_self).mul (Continuous.continuousOn (by fun_prop))
   have hbound : ∀ᵐ y ∂(volume.restrict (Ioi (0 : ℝ))), ∀ z ∈ Metric.ball z₀ ε,
-      ‖S y * (-(y : ℂ) * Complex.exp (-(z * y)))‖ ≤ C / ε * Real.exp (-ε * y) := by
+      ‖S y * (-(y : ℂ) * Complex.exp (-(z * y)))‖ ≤
+        1 / ε * (D y * Real.exp (-(c + ε) * y)) := by
     filter_upwards [ae_restrict_mem measurableSet_Ioi] with y hy z hz
     have hy0 : (0 : ℝ) < y := hy
     have hzre : z₀.re - ε < z.re := by
@@ -324,29 +320,29 @@ private theorem expSum_laplace_differentiableAt (S : ℝ → ℂ) (hS : Continuo
       rw [le_div_iff₀ hε0]
       have := Real.add_one_le_exp (ε * y)
       linarith
+    have hDy : ‖S y‖ ≤ D y := hD y hy0.le
+    have hD0 : 0 ≤ D y := (norm_nonneg _).trans hDy
     rw [norm_mul, norm_mul, norm_neg, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hy0,
       Complex.norm_exp, hzy]
     calc ‖S y‖ * (y * Real.exp (-(z.re * y)))
-        ≤ C * Real.exp (c * y) * (Real.exp (ε * y) / ε * Real.exp (-(z.re * y))) :=
-          mul_le_mul (hb y hy0.le)
-            (mul_le_mul_of_nonneg_right hy1 (Real.exp_pos _).le)
-            (mul_nonneg hy0.le (Real.exp_pos _).le)
-            (mul_nonneg hC (Real.exp_pos _).le)
-      _ = C / ε * Real.exp ((c + ε - z.re) * y) := by
-          rw [show (c + ε - z.re) * y = c * y + ε * y + -(z.re * y) by ring, Real.exp_add,
-            Real.exp_add]
+        ≤ D y * (Real.exp (ε * y) / ε * Real.exp (-(z.re * y))) :=
+          mul_le_mul hDy (mul_le_mul_of_nonneg_right hy1 (Real.exp_pos _).le)
+            (mul_nonneg hy0.le (Real.exp_pos _).le) hD0
+      _ = 1 / ε * (D y * Real.exp ((ε - z.re) * y)) := by
+          rw [show (ε - z.re) * y = ε * y + -(z.re * y) by ring, Real.exp_add]
           ring
-      _ ≤ C / ε * Real.exp (-ε * y) :=
-          mul_le_mul_of_nonneg_left (Real.exp_le_exp.mpr (by nlinarith))
-            (div_nonneg hC hε0.le)
+      _ ≤ 1 / ε * (D y * Real.exp (-(c + ε) * y)) :=
+          mul_le_mul_of_nonneg_left
+            (mul_le_mul_of_nonneg_left (Real.exp_le_exp.mpr (by nlinarith)) hD0)
+            (by positivity)
   have hderiv := hasDerivAt_integral_of_dominated_loc_of_deriv_le
     (μ := volume.restrict (Ioi (0 : ℝ))) (F := fun z y ↦ S y * Complex.exp (-(z * y)))
     (F' := fun z y ↦ S y * (-(y : ℂ) * Complex.exp (-(z * y))))
-    (bound := fun y ↦ C / ε * Real.exp (-ε * y)) (Metric.ball_mem_nhds z₀ hε0)
+    (bound := fun y ↦ 1 / ε * (D y * Real.exp (-(c + ε) * y))) (Metric.ball_mem_nhds z₀ hε0)
     (Eventually.of_forall fun z ↦ (hcont z).aestronglyMeasurable measurableSet_Ioi)
-    (expSum_laplace_integrable S hS hb hz₀).1
+    (expSum_laplace_integrable S hS D hD (hDi z₀.re hz₀) le_rfl).1
     (hcont'.aestronglyMeasurable measurableSet_Ioi) hbound
-    ((integrableOn_exp_mul_Ioi (by linarith : -ε < 0) 0).const_mul _)
+    ((hDi (c + ε) (by linarith)).const_mul _)
     (ae_of_all _ fun y z _ ↦ by
       convert ((hasDerivAt_mul_const (y : ℂ)).neg.cexp).const_mul (S y) using 1
       simp only [Pi.neg_apply]
@@ -355,18 +351,20 @@ private theorem expSum_laplace_differentiableAt (S : ℝ → ℂ) (hS : Continuo
 
 /-- Exponential sums of slow growth on a half-line. Let the frequencies `w i` be distinct, have
 no accumulation point in `ℂ`, and satisfy `Re (w i) ≤ 1/2`, and let the coefficients `b` be
-summable. If the sum `S y = ∑ i, b i * exp (w i * y)` satisfies `‖S y‖ ≤ C * exp (c * y)` for
-every `y ≥ 0`, then `b i = 0` for every frequency with `c < Re (w i)`. The Laplace transform of
-`S` is holomorphic on `Re z > c` and equals `∑ i, b i / (z - w i)` for `Re z > 1/2`. By the
-identity theorem on the half-plane `Re z > c` with the frequencies removed, the resolvent sum
-stays bounded as `z` tends to a frequency to the right of `c`. -/
-theorem eq_zero_of_hasSum_exp_of_norm_le {ι : Type*} (w : ι → ℂ) (b : ι → ℂ)
+summable. Suppose the sum `S y = ∑ i, b i * exp (w i * y)` has a majorant `D` on `y ≥ 0` such
+that `D y * exp (-σ * y)` is integrable on the half-line for every `σ > c`. Then `b i = 0` for
+every frequency with `c < Re (w i)`. The Laplace transform of `S` is holomorphic on `Re z > c`
+and equals `∑ i, b i / (z - w i)` for `Re z > 1/2`. By the identity theorem on the half-plane
+`Re z > c` with the frequencies removed, the resolvent sum stays bounded as `z` tends to a
+frequency to the right of `c`. -/
+theorem eq_zero_of_hasSum_exp_of_integrable {ι : Type*} (w : ι → ℂ) (b : ι → ℂ)
     (hw : Function.Injective w)
     (hdisc : ∀ z : ℂ, ∀ᶠ u in nhdsWithin z {z}ᶜ, u ∉ Set.range w)
     (hre : ∀ i, (w i).re ≤ 1 / 2)
-    (hb : Summable b) (S : ℝ → ℂ) {C c : ℝ}
+    (hb : Summable b) (S : ℝ → ℂ) {c : ℝ}
     (h : ∀ y : ℝ, 0 ≤ y → HasSum (fun i ↦ b i * Complex.exp (w i * y)) (S y))
-    (hS : ∀ y : ℝ, 0 ≤ y → ‖S y‖ ≤ C * Real.exp (c * y)) :
+    (D : ℝ → ℝ) (hS : ∀ y : ℝ, 0 ≤ y → ‖S y‖ ≤ D y)
+    (hDi : ∀ σ, c < σ → IntegrableOn (fun y ↦ D y * Real.exp (-σ * y)) (Ioi (0 : ℝ))) :
     ∀ i, c < (w i).re → b i = 0 := by
   classical
   intro i₀ hi₀
@@ -376,10 +374,9 @@ theorem eq_zero_of_hasSum_exp_of_norm_le {ι : Type*} (w : ι → ℂ) (b : ι �
     exact Function.Injective.countable (f := fun i => (⟨w i, i, rfl⟩ : range w))
       fun a b hab => hw (congrArg Subtype.val hab)
   set T : ℝ → ℂ := fun y ↦ ∑' i, b i * Complex.exp (w i * y) with hT
-  have hTb : ∀ y, 0 ≤ y → ‖T y‖ ≤ C * Real.exp (c * y) := fun y hy ↦ by
+  have hTb : ∀ y, 0 ≤ y → ‖T y‖ ≤ D y := fun y hy ↦ by
     rw [show T y = S y from (h y hy).tsum_eq]; exact hS y hy
   have hTc : ContinuousOn T (Ici 0) := expSum_continuousOn w b hre hb
-  have hC : 0 ≤ C := by simpa using (norm_nonneg _).trans (hS 0 le_rfl)
   set R : ℂ → ℂ := fun z => ∑' i, b i / (z - w i) with hR
   set L : ℂ → ℂ := fun z => ∫ y in Ioi (0 : ℝ), T y * Complex.exp (-(z * y)) with hL
   have hc : c < 1 / 2 := hi₀.trans_le (hre i₀)
@@ -389,7 +386,7 @@ theorem eq_zero_of_hasSum_exp_of_norm_le {ι : Type*} (w : ι → ℂ) (b : ι �
     ((expSum_resolvent_differentiableOn w b hb hcl).mono fun z (hz : z ∈ V) ↦ hz.2).analyticOnNhd hVo
   have hLa : AnalyticOnNhd ℂ L V :=
     DifferentiableOn.analyticOnNhd (fun z (hz : z ∈ V) ↦
-      (expSum_laplace_differentiableAt T hTc hTb hz.1).differentiableWithinAt) hVo
+      (expSum_laplace_differentiableAt T hTc D hTb hDi hz.1).differentiableWithinAt) hVo
   have h1 : (1 : ℂ) ∈ V := by
     refine ⟨by change c < (1 : ℂ).re; simp; linarith, ?_⟩
     rintro ⟨i, hi⟩
@@ -410,7 +407,8 @@ theorem eq_zero_of_hasSum_exp_of_norm_le {ι : Type*} (w : ι → ℂ) (b : ι �
     by_contra hcon
     exact hεball (not_le.1 hcon) (fun h0 => hi (hw h0)) ⟨i, rfl⟩
   set C₂ := (∑' i, ‖b i‖) * (1 / (ε / 2)) with hC₂
-  set C₁ := C / ((w i₀).re - c) with hC₁
+  set σ' := (c + (w i₀).re) / 2 with hσ'
+  set C₁ := ∫ y in Ioi (0 : ℝ), D y * Real.exp (-σ' * y) with hC₁
   have hbound : ∀ δ : ℝ, δ ∈ Ioo 0 (ε / 2) → ‖b i₀‖ ≤ δ * (C₁ + C₂) := by
     rintro δ ⟨hδ0, hδε⟩
     set z : ℂ := w i₀ + δ with hz
@@ -424,8 +422,8 @@ theorem eq_zero_of_hasSum_exp_of_norm_le {ι : Type*} (w : ι → ℂ) (b : ι �
         rw [h0, dist_self] at hdist; linarith)
     have hRz : R z = L z := sub_eq_zero.mp (hzero hzU)
     have hLz : ‖L z‖ ≤ C₁ :=
-      (expSum_laplace_integrable T hTc hTb (by rw [hzre]; linarith)).2.trans
-        (div_le_div_of_nonneg_left hC (sub_pos.mpr hi₀) (by rw [hzre]; linarith))
+      (expSum_laplace_integrable T hTc D hTb (hDi σ' (by rw [hσ']; linarith))
+        (by rw [hzre, hσ']; linarith)).2
     have hfar' : ∀ i, i ≠ i₀ → ε / 2 ≤ ‖z - w i‖ := fun i hi =>
       expSum_aux_dist (x := z) (z := w i₀) (w := w i) (r := ε) (by rw [hdist]; linarith)
         (hfar i hi)
@@ -466,5 +464,26 @@ theorem eq_zero_of_hasSum_exp_of_norm_le {ι : Type*} (w : ι → ℂ) (b : ι �
     ge_of_tendsto hlim (Filter.mem_of_superset (Ioo_mem_nhdsGT (half_pos hε))
       fun δ hδ => hbound δ hδ)
   exact norm_le_zero_iff.1 hle
+
+/-- Exponential sums of slow growth on a half-line, with a pointwise bound: if
+`‖∑ i, b i * exp (w i * y)‖ ≤ C * exp (c * y)` for every `y ≥ 0`, then `b i = 0` for every
+frequency with `c < Re (w i)` (`eq_zero_of_hasSum_exp_of_integrable`). -/
+theorem eq_zero_of_hasSum_exp_of_norm_le {ι : Type*} (w : ι → ℂ) (b : ι → ℂ)
+    (hw : Function.Injective w)
+    (hdisc : ∀ z : ℂ, ∀ᶠ u in nhdsWithin z {z}ᶜ, u ∉ Set.range w)
+    (hre : ∀ i, (w i).re ≤ 1 / 2)
+    (hb : Summable b) (S : ℝ → ℂ) {C c : ℝ}
+    (h : ∀ y : ℝ, 0 ≤ y → HasSum (fun i ↦ b i * Complex.exp (w i * y)) (S y))
+    (hS : ∀ y : ℝ, 0 ≤ y → ‖S y‖ ≤ C * Real.exp (c * y)) :
+    ∀ i, c < (w i).re → b i = 0 :=
+  eq_zero_of_hasSum_exp_of_integrable w b hw hdisc hre hb S h (fun y ↦ C * Real.exp (c * y)) hS
+    fun σ hσ ↦ by
+      have h1 : IntegrableOn (fun y ↦ C * Real.exp ((c - σ) * y)) (Ioi 0) :=
+        (integrableOn_exp_mul_Ioi (by linarith : c - σ < 0) 0).const_mul C
+      refine h1.congr_fun (fun y _ ↦ ?_) measurableSet_Ioi
+      show C * Real.exp ((c - σ) * y) = C * Real.exp (c * y) * Real.exp (-σ * y)
+      rw [mul_assoc, ← Real.exp_add]
+      congr 2
+      ring
 
 end RiemannMasullo
