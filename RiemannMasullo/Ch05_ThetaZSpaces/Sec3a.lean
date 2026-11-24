@@ -3298,12 +3298,14 @@ private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_tra
   rw [sLocalIdelicMellin_unitTranslate, sub_mul, one_mul]
   rfl
 
-/-- Classical input: R. Meyer's bornological description of the S-local coinvariants in
-*On a representation of the idele class group related to primes and zeros of L-functions*,
-§4, specialized to the following Mellin comparison. Suppose the transforms of a sequence of
-tests are dominated on each nonzero real-weight line by those of a bounded sequence, with
-a constant uniform in the unitary character and the sequence index. Then their theta
-classes are bounded. Positive weights control the weighted theta functions. On reflected
+/-- A Mellin comparison for boundedness of theta classes. Suppose the transforms of a
+sequence of tests are dominated on each nonzero real-weight line by those of a bounded
+sequence, with a constant uniform in the unitary character and the sequence index. Then
+their theta classes are bounded. The prover that isolated this statement expects it to
+follow from R. Meyer's bornological description of the S-local coinvariants (*On a
+representation of the idele class group related to primes and zeros of L-functions*, §4).
+That derivation has not been checked, so the statement is an open lemma here and not a
+recorded classical input. Positive weights control the weighted theta functions. On reflected
 pole-free lines the functional equation cancels the common local factor, giving the same
 comparison for the Fourier transforms. Domination at weight one preserves the common
 finite conductor. -/
