@@ -1111,6 +1111,97 @@ local notation "homTest(" ω ", " φ ")" =>
   ∀ (k : C₁) (x : C𝔽), (φ : BruhatCompactSupport C𝔽).val (k.val⁻¹ * x) =
     (ω k : ℂ) * (φ : BruhatCompactSupport C𝔽).val x
 
+/-- Classical input: the Dixmier–Malliavin factorization theorem on the additive real line,
+from J. Dixmier and P. Malliavin, *Factorisations de fonctions et de vecteurs indéfiniment
+différentiables*, Bull. Sci. Math. 102 (1978), 307–330. Every smooth compactly supported
+function is a finite sum of convolutions of such functions for the chosen Haar measure.
+`mem_bruhatCompactSupportSubmodule_real_iff` identifies the tests here with those functions. -/
+private theorem spectralHomogeneousTest_real_factorization
+    (ν : Measure (Multiplicative ℝ)) [ν.IsHaarMeasure]
+    (f : BruhatCompactSupport (Multiplicative ℝ)) :
+    f ∈ AddSubmonoid.closure {h | ∃ u v : BruhatCompactSupport (Multiplicative ℝ),
+      h.val = lcaConvolution ν u.val v.val} := by
+  sorry
+
+/-- Restriction to a one-parameter subgroup is smooth in the real parameter. -/
+private theorem spectralHomogeneousTest_section_smooth (σ : Multiplicative ℝ →ₜ* C𝔽)
+    (f : bruhatSmoothSubmodule (G := C𝔽)) :
+    ContDiff ℝ (⊤ : ℕ∞) (fun t : ℝ ↦ f.val (σ (Multiplicative.ofAdd t))) := by
+  apply contDiff_infty.mpr
+  intro n
+  induction n generalizing f with
+  | zero =>
+    exact contDiff_zero.mpr ((continuous_of_bruhatSmooth
+      ((mem_bruhatSmoothSubmodule_iff _).mp f.property)).comp σ.continuous)
+  | succ n ih =>
+    let d : bruhatSmoothSubmodule (G := C𝔽) :=
+      ⟨bruhatDirectionalDeriv σ f.val, bruhatDirectionalDeriv_mem_smooth σ f⟩
+    have hd (t : ℝ) : HasDerivAt (fun s : ℝ ↦ f.val (σ (Multiplicative.ofAdd s)))
+        (d.val (σ (Multiplicative.ofAdd t))) t := by
+      have h := hasDerivAt_bruhatDirectionalDeriv σ
+        ((mem_bruhatSmoothSubmodule_iff _).mp f.property 1) (σ (Multiplicative.ofAdd t))
+      have hs := HasDerivAt.comp_sub_const t t (by simpa only [sub_self] using h)
+      apply hs.congr_of_eventuallyEq (.of_forall fun s ↦ ?_)
+      change f.val (σ (Multiplicative.ofAdd s)) =
+        f.val (σ (Multiplicative.ofAdd t) * σ (Multiplicative.ofAdd (s - t)))
+      rw [← map_mul, ← ofAdd_add, add_sub_cancel]
+    rw [Nat.cast_succ, contDiff_succ_iff_deriv]
+    refine ⟨fun t ↦ (hd t).differentiableAt, fun h ↦ absurd h (by simp), ?_⟩
+    rw [show deriv (fun t : ℝ ↦ f.val (σ (Multiplicative.ofAdd t))) =
+      fun t ↦ d.val (σ (Multiplicative.ofAdd t)) from funext fun t ↦ (hd t).deriv]
+    exact ih d
+
+/-- A character times the pullback of a real-line test by the log norm is a Bruhat test. -/
+private theorem spectralHomogeneousTest_lift_mem (hsur : Surjective m𝔽)
+    (χ : PontryaginDual C𝔽) (f : BruhatCompactSupport (Multiplicative ℝ)) :
+    (fun x : C𝔽 ↦ (χ x : ℂ) * f.val (positiveRealLogEquiv (m𝔽 x))) ∈
+      bruhatCompactSupportSubmodule C𝔽 := by
+  let L := (positiveRealLogEquiv : ℝ≥0ˣ →ₜ* Multiplicative ℝ).comp m𝔽
+  have hp : IsProperMap L :=
+    positiveRealLogEquiv.toHomeomorph.isProperMap.comp (isProperMap_ideleClassNorm F)
+  have hc : HasCompactSupport (fun x : C𝔽 ↦ f.val (L x)) :=
+    HasCompactSupport.intro (hp.isCompact_preimage f.property.2) fun _ hx ↦
+      image_eq_zero_of_notMem_tsupport hx
+  have hs := isBruhatSmooth_logProfile m𝔽
+    ((mem_bruhatCompactSupportSubmodule_real_iff _).mp f.property).1
+  have hval (x : C𝔽) : L x = Multiplicative.ofAdd (Real.log ((m𝔽 x).val : ℝ)) :=
+    congrArg Multiplicative.ofAdd (positiveRealLogEquiv_apply _)
+  let r : BruhatCompactSupport C𝔽 := ⟨fun x ↦ f.val (L x),
+    (mem_bruhatSmoothSubmodule_iff _).mpr (by simpa only [hval, Function.comp_apply] using hs), hc⟩
+  -- At weight zero the radial test is Schwartz, so it can be multiplied by the character.
+  have hr := modulationWeight_mem_schwartzBruhat m𝔽 univ ⟨0, mem_univ _⟩
+    ⟨r.val, bruhatCompactSupport_le_modulatedExponentialDecay m𝔽 univ hm𝔽 hsur r.property⟩
+  rw [modulationWeight_zero] at hr
+  obtain ⟨M, hM⟩ := schwartzBruhat_mul_unitaryCharacter χ
+  let w := M (⟨r.val, hr⟩ : SchwartzBruhat C𝔽)
+  have hw : w.val = fun x ↦ (χ x : ℂ) * f.val (L x) := funext (hM _)
+  exact ⟨hw ▸ (mem_bruhatSmoothSubmodule_iff _).mpr (schwartzBruhat_isBruhatSmooth w), hc.mul_left⟩
+
+/-- The two character factors in the convolution integral multiply to `χ x`. The remaining
+integrand factors through the log norm, so it integrates against the pushforward Haar measure. -/
+private theorem spectralHomogeneousTest_lift_convolution (χ : PontryaginDual C𝔽)
+    (u v : BruhatCompactSupport (Multiplicative ℝ)) (x : C𝔽) :
+    let L := (positiveRealLogEquiv : ℝ≥0ˣ →ₜ* Multiplicative ℝ).comp m𝔽
+    (χ x : ℂ) * lcaConvolution ((μ𝔽).map L) u.val v.val (L x) =
+      lcaConvolution μ𝔽 (fun y ↦ (χ y : ℂ) * u.val (L y))
+        (fun y ↦ (χ y : ℂ) * v.val (L y)) x := by
+  intro L
+  let b (t : Multiplicative ℝ) := u.val t * v.val (t⁻¹ * L x)
+  have continuous_test (f : BruhatCompactSupport (Multiplicative ℝ)) : Continuous f.val :=
+    continuous_of_bruhatSmooth ((mem_bruhatSmoothSubmodule_iff _).mp f.property.1)
+  have hb : Continuous b := (continuous_test u).mul
+    ((continuous_test v).comp (continuous_inv.mul continuous_const))
+  change (χ x : ℂ) * (∫ t, b t ∂(μ𝔽).map L) = _
+  rw [integral_map (φ := (L : C𝔽 → Multiplicative ℝ)) L.continuous.measurable.aemeasurable
+    hb.aestronglyMeasurable, ← integral_const_mul]
+  apply integral_congr_ae (.of_forall fun y ↦ ?_)
+  change (χ x : ℂ) * (u.val (L y) * v.val ((L y)⁻¹ * L x)) =
+    ((χ y : ℂ) * u.val (L y)) * ((χ (y⁻¹ * x) : ℂ) * v.val (L (y⁻¹ * x)))
+  have hχ : (χ y : ℂ) * (χ (y⁻¹ * x) : ℂ) = (χ x : ℂ) := by
+    rw [← Circle.coe_mul, ← map_mul, mul_inv_cancel_left]
+  rw [map_mul L, map_inv, ← hχ]
+  ring
+
 /-- Paper: Theorems 10.3.1.1(3) and 10.3.2.1(3), pp. 449 and 454. A homogeneous
 compactly supported Bruhat test is a finite sum of convolutions of pairs of tests
 of the same character. Deviation: Isolate the radial Dixmier–Malliavin
@@ -1121,7 +1212,67 @@ private theorem spectralHomogeneousTest_convolution_factorization (ω : Pontryag
     φ ∈ AddSubmonoid.closure {θ : BruhatCompactSupport C𝔽 |
       ∃ ψ η : BruhatCompactSupport C𝔽,
         homTest(ω, ψ) ∧ homTest(ω, η) ∧ θ.val = lcaConvolution μ𝔽 ψ.val η.val} := by
-  sorry
+  let L := (positiveRealLogEquiv : ℝ≥0ˣ →ₜ* Multiplicative ℝ).comp m𝔽
+  let q : IdeleGroup (𝓞 F) F →ₜ* C𝔽 := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
+  let τ := q.comp ⟨canonicalIdeleNormSection F, canonicalIdeleNormSection_continuous F⟩
+  have hτ : RightInverse τ (ideleClassNorm F) := canonicalIdeleNormSection_rightInverse F
+  let σ := τ.comp (positiveRealLogEquiv.symm : Multiplicative ℝ →ₜ* ℝ≥0ˣ)
+  have hσ (t : Multiplicative ℝ) : L (σ t) = t :=
+    (congrArg positiveRealLogEquiv (hτ _)).trans (positiveRealLogEquiv.apply_symm_apply t)
+  -- The inverse compact component gives the eigencharacter for left translation.
+  let P : C𝔽 →ₜ* C𝔽 := (τ.comp m𝔽) / ContinuousMonoidHom.id C𝔽
+  have hP (x : C𝔽) : P x ∈ (ideleClassNorm F).ker := by
+    change ideleClassNorm F (τ (ideleClassNorm F x) / x) = 1
+    rw [map_div, hτ, div_self']
+  let r : C𝔽 →ₜ* C₁ := ⟨P.toMonoidHom.codRestrict _ hP, P.continuous.subtype_mk _⟩
+  let χ := ω.comp r
+  have hk (k : C₁) : χ k.val⁻¹ = ω k := by
+    apply congrArg ω
+    apply Subtype.ext
+    change τ (ideleClassNorm F k.val⁻¹) / k.val⁻¹ = k.val
+    rw [map_inv, show ideleClassNorm F k.val = 1 from k.property, inv_one, map_one,
+      one_div, inv_inv]
+  let T : BruhatCompactSupport (Multiplicative ℝ) →+ BruhatCompactSupport C𝔽 :=
+    { toFun := fun f ↦ ⟨fun x ↦ (χ x : ℂ) * f.val (L x),
+        spectralHomogeneousTest_lift_mem hτ.surjective χ f⟩
+      map_zero' := Subtype.ext (funext fun _ ↦ mul_zero _)
+      map_add' := fun _ _ ↦ Subtype.ext (funext fun _ ↦ mul_add _ _ _) }
+  have hT (f : BruhatCompactSupport (Multiplicative ℝ)) : homTest(ω, T f) := by
+    intro k x
+    have hL : L k.val = 1 :=
+      (congrArg positiveRealLogEquiv k.property).trans (map_one _)
+    change (χ (k.val⁻¹ * x) : ℂ) * f.val (L (k.val⁻¹ * x)) = _
+    rw [map_mul, hk, Circle.coe_mul, map_mul, map_inv, hL, inv_one, one_mul, mul_assoc]
+    rfl
+  -- Homogeneity recovers the whole test from its restriction to the section.
+  let f : BruhatCompactSupport (Multiplicative ℝ) := ⟨φ.val ∘ σ, (mem_bruhatCompactSupportSubmodule_real_iff _).mpr
+    ⟨spectralHomogeneousTest_section_smooth σ ⟨φ.val, φ.property.1⟩,
+      HasCompactSupport.intro (φ.property.2.image L.continuous) (fun t ht ↦
+        show φ.val (σ (Multiplicative.ofAdd t)) = 0 from
+          image_eq_zero_of_notMem_tsupport fun h ↦ ht ⟨_, h, hσ t⟩)⟩⟩
+  have hφT : φ = T f := by
+    apply Subtype.ext
+    funext x
+    have he : (r x).val⁻¹ * τ (m𝔽 x) = x := by
+      change (τ (m𝔽 x) / x)⁻¹ * τ (m𝔽 x) = x
+      rw [inv_div, div_mul_cancel]
+    have h := hφ (r x) (τ (m𝔽 x))
+    rw [he] at h
+    change φ.val x = (ω (r x) : ℂ) *
+      φ.val (τ (positiveRealLogEquiv.symm (positiveRealLogEquiv (m𝔽 x))))
+    rwa [positiveRealLogEquiv.symm_apply_apply]
+  let ν : Measure (Multiplicative ℝ) := (μ𝔽).map L
+  have hp : IsProperMap L :=
+    positiveRealLogEquiv.toHomeomorph.isProperMap.comp (isProperMap_ideleClassNorm F)
+  have : ν.IsHaarMeasure := Measure.isHaarMeasure_map μ𝔽 L.toMonoidHom L.continuous
+    (RightInverse.surjective hσ) (isProperMap_iff_tendsto_cocompact.mp hp).2
+  rw [hφT, ← AddSubmonoid.mem_comap (f := T)]
+  refine AddSubmonoid.closure_le.mpr ?_ (spectralHomogeneousTest_real_factorization ν f)
+  rintro a ⟨u, v, huv⟩
+  apply AddSubmonoid.mem_comap.mpr
+  refine AddSubmonoid.subset_closure ⟨T u, T v, hT u, hT v, ?_⟩
+  exact funext fun x ↦ (congrArg ((χ x : ℂ) * ·) (congrFun huv (L x))).trans
+    (spectralHomogeneousTest_lift_convolution χ u v x)
 
 /-- An additive convolution action transports finite factorizations to compositions. -/
 private theorem spectralApprox_map_factorization {V O : Type*}
@@ -1167,6 +1318,175 @@ local notation "Z(" χ ")" => {z : PontryaginDual C₁ × ℝ // 0 < order(χ z.
 local notation "N(" χ ", " s ", " z ")" => spectralBoundaryMultiplicity s (mult(χ (z).val.1,
   shift(a, (z).val.2)))
 
+/-- Finite sums of the jet functionals with vector coefficients approximate a contraction
+on each biorthogonal vector without increasing its norm. Project first onto the span of
+the finitely many Riesz vectors. -/
+private theorem spectralLineConvolution_traceCauchy_probes {H J : Type*}
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (x : J → H) (Λ : J → StrongDual ℂ H) (hb : IsSpectralMarkushevichBasis x Λ)
+    (U : H →L[ℂ] H) (hU : ‖U‖ ≤ 1) :
+    ∃ v : Finset J → J → H, (∀ K i, i ∉ K → v K i = 0) ∧
+      (∀ K, ‖∑ i ∈ K, (Λ i).smulRight (v K i)‖ ≤ 1) ∧
+      ∀ i, Tendsto (fun K ↦ v K i) atTop (𝓝 (U (x i))) := by
+  classical
+  let u (i : J) := (InnerProductSpace.toDual ℂ H).symm (Λ i)
+  let V (K : Finset J) := Submodule.span ℂ (u '' (K : Set J))
+  let dim (K : Finset J) : FiniteDimensional ℂ (V K) :=
+    FiniteDimensional.span_of_finite ℂ (K.finite_toSet.image u)
+  let v (K : Finset J) (i : J) := U ((V K).starProjection (x i))
+  have hoff (K : Finset J) (i : J) (hi : i ∉ K) : v K i = 0 := by
+    have hperp : x i ∈ (V K)ᗮ := by
+      have hV : V K ≤ (innerSL ℂ (x i)).ker := by
+        apply Submodule.span_le.mpr
+        rintro _ ⟨k, hk, rfl⟩
+        apply inner_eq_zero_symm.mp
+        rw [show u k = (InnerProductSpace.toDual ℂ H).symm (Λ k) from rfl,
+          InnerProductSpace.toDual_symm_apply]
+        exact hb.2.1 i k (fun h ↦ hi (h.symm ▸ hk))
+      exact ((V K).mem_orthogonal' _).mpr (fun _ hw ↦ hV hw)
+    simp only [v, ((V K).starProjection_apply_eq_zero_iff).mpr hperp, map_zero]
+  refine ⟨v, hoff, fun K ↦ ?_, fun i ↦ ?_⟩
+  · have heq : ∑ k ∈ K, (Λ k).smulRight (v K k) = U.comp (V K).starProjection := by
+      apply ContinuousLinearMap.ext_on hb.2.2.1
+      rintro _ ⟨i, rfl⟩
+      simp only [sum_apply, ContinuousLinearMap.smulRight_apply, ContinuousLinearMap.comp_apply]
+      change ∑ k ∈ K, (Λ k (x i)) • v K k = v K i
+      rw [Finset.sum_eq_single i]
+      · rw [hb.1, one_smul]
+      · intro k _ hki
+        rw [hb.2.1 i k hki.symm, zero_smul]
+      · intro hi
+        rw [hoff K i hi, smul_zero]
+    rw [heq]
+    exact (U.opNorm_comp_le _).trans
+      ((mul_le_of_le_one_right (norm_nonneg _) (V K).starProjection_norm_le).trans hU)
+  · have mono : Monotone V := fun K L h ↦ Submodule.span_mono (Set.image_mono h)
+    have hd : ⊤ ≤ (⨆ K, V K).topologicalClosure := by
+      apply (Submodule.topologicalClosure_eq_top_iff.mpr ?_).ge
+      rw [Submodule.eq_bot_iff]
+      intro w hw
+      have hev : ContinuousLinearMap.apply ℂ ℂ w = 0 := by
+        apply ContinuousLinearMap.ext_on hb.2.2.2
+        rintro _ ⟨k, rfl⟩
+        have hmem : u k ∈ V {k} := Submodule.subset_span ⟨k, Finset.mem_singleton_self k, rfl⟩
+        change Λ k w = 0
+        simpa only [u, InnerProductSpace.toDual_symm_apply] using
+          (Submodule.mem_orthogonal _ _).mp hw _ ((le_iSup V {k}) hmem)
+      exact (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr
+        (fun f ↦ (DFunLike.congr_fun hev f).trans (map_zero f).symm)
+    exact U.continuous.continuousAt.tendsto.comp (Submodule.starProjection_tendsto_self V mono (x i) hd)
+
+/-- A contraction attains the trace norm of a nuclear operator in the real trace pairing. -/
+private theorem spectralLineConvolution_traceCauchy_norming {H : Type*}
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H] (T : nuclearEndomorphisms H) :
+    ∃ U : H →L[ℂ] H, ‖U‖ ≤ 1 ∧
+      traceNorm T = (hilbertTrace ⟨U * T.val, mul_mem_nuclearEndomorphisms_left U T⟩).re := by
+  let S := CFC.sqrt (T.val.adjoint * T.val)
+  -- Pointwise norm identity as in AppC_LCTVS/Sec3a, norm_sqrt_adjoint_mul_apply.
+  have hpos : 0 ≤ S := CFC.sqrt_nonneg (T.val.adjoint * T.val)
+  have hS : S.adjoint = S := (ContinuousLinearMap.nonneg_iff_isPositive.mp hpos).isSelfAdjoint.adjoint_eq
+  have hsq : S * S = T.val.adjoint * T.val :=
+    CFC.sqrt_mul_sqrt_self _ (ContinuousLinearMap.nonneg_iff_isPositive.mpr
+      T.val.isPositive_adjoint_comp_self)
+  have hn (w : H) : ‖S w‖ ≤ ‖T.val w‖ := by
+    rw [S.apply_norm_eq_sqrt_inner_adjoint_right, T.val.apply_norm_eq_sqrt_inner_adjoint_right,
+      hS, ← ContinuousLinearMap.mul_def, hsq, ContinuousLinearMap.mul_def]
+  obtain ⟨U, hU, hUS⟩ := exists_contraction_comp_eq_of_norm_le T.val S hn
+  refine ⟨U, hU, ?_⟩
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  have hs := Complex.reCLM.hasSum (summable_norm_hilbertDiagonal b (U * T.val)
+    (mul_mem_nuclearEndomorphisms_left U T)).of_norm.hasSum
+  apply (hasSum_traceNorm_diagonal b T).unique
+  change HasSum _ (∑' i, inner ℂ (b i) ((U * T.val) (b i))).re
+  simpa only [Complex.reCLM_apply, ContinuousLinearMap.mul_def U, hUS] using hs
+
+/-- Testing the finite section against a left multiplier gives the scalar sum of its
+jet functionals evaluated on the images of the biorthogonal vectors. -/
+private theorem spectralLineConvolution_traceCauchy_pairing {H J Z : Type*}
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (U A : H →L[ℂ] H) (x : J → H) (Λ : J → StrongDual ℂ H) (K : Finset Z)
+    (N : Z → ℕ) (jet : (z : Z) → Fin (N z) → J) :
+    ∃ T : nuclearEndomorphisms H, T.val = U * spectralConvolutionFiniteSum A x Λ K N jet ∧
+      hilbertTrace T = ∑ z ∈ K, ∑ m : Fin (N z), Λ (jet z m) (A (U (x (jet z m)))) := by
+  let r (j : J) : nuclearEndomorphisms H :=
+    ⟨((Λ j).comp A).smulRight (U (x j)), smulRight_mem_nuclearEndomorphisms _ _⟩
+  refine ⟨∑ z ∈ K, ∑ m : Fin (N z), r (jet z m), ?_, ?_⟩
+  · ext w
+    simp [r, spectralConvolutionFiniteSum, sum_apply, ContinuousLinearMap.mul_def]
+  · obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := H)
+    simp only [← htr, map_sum]
+    exact Finset.sum_congr rfl fun z _ ↦ Finset.sum_congr rfl fun m _ ↦
+      (htr _).trans (hilbertTrace_smulRight _ _)
+
+/-- A scalar estimate on each enlargement of one rectangle bounds its difference
+from the anchor in trace norm. Two such bounds control arbitrary late rectangles. -/
+private theorem spectralLineConvolution_traceCauchy_of_scalar_shell {H J Z : Type*}
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H] [DecidableEq Z]
+    (A : H →L[ℂ] H) (x : J → H) (Λ : J → StrongDual ℂ H) (hb : IsSpectralMarkushevichBasis x Λ)
+    (box : ℕ × ℕ → Finset Z) (hbox : Monotone box) (N : Z → ℕ)
+    (jet : (z : Z) → Fin (N z) → J)
+    (hshell : ∀ ε > (0 : ℝ), ∃ i, ∀ j ≥ i, ∀ (K : Finset J) (v : J → H),
+      (∀ k ∉ K, v k = 0) → ‖∑ k ∈ K, (Λ k).smulRight (v k)‖ ≤ 1 →
+      (∑ z ∈ box j \ box i, ∑ m : Fin (N z), Λ (jet z m) (A (v (jet z m)))).re ≤ ε) :
+    SpectralRectanglesTraceCauchy (fun j ↦ spectralConvolutionFiniteSum A x Λ (box j) N jet) := by
+  classical
+  let B (K : Finset Z) := spectralConvolutionFiniteSum A x Λ K N jet
+  have hmem (K : Finset Z) : B K ∈ nuclearEndomorphisms H :=
+    (nuclearEndomorphisms H).sum_mem fun z _ ↦
+      (nuclearEndomorphisms H).sum_mem fun m _ ↦ smulRight_mem_nuclearEndomorphisms _ _
+  intro ε hε
+  obtain ⟨i, hi⟩ := hshell (ε / 3) (by positivity)
+  let D (j : ℕ × ℕ) : nuclearEndomorphisms H := ⟨B (box j \ box i), hmem _⟩
+  have hD (j : ℕ × ℕ) (hj : i ≤ j) : (D j).val + B (box i) = B (box j) :=
+    Finset.sum_sdiff (hbox hj)
+  have hsmall (j : ℕ × ℕ) (hj : i ≤ j) : traceNorm (D j) ≤ ε / 3 := by
+    obtain ⟨U, hU, hnorm⟩ := spectralLineConvolution_traceCauchy_norming (D j)
+    obtain ⟨v, hoff, hV, hlim⟩ := spectralLineConvolution_traceCauchy_probes x Λ hb U hU
+    obtain ⟨T, hT, htrace⟩ := spectralLineConvolution_traceCauchy_pairing U A x Λ (box j \ box i) N jet
+    have hEq : (⟨U * (D j).val, mul_mem_nuclearEndomorphisms_left _ _⟩ : nuclearEndomorphisms H) = T :=
+      Subtype.ext hT.symm
+    rw [hnorm, hEq, htrace]
+    apply le_of_tendsto' (Complex.continuous_re.continuousAt.tendsto.comp
+      (tendsto_finsetSum _ fun z _ ↦ tendsto_finsetSum _ fun m _ ↦
+        ((Λ (jet z m)).continuous.comp A.continuous).continuousAt.tendsto.comp (hlim (jet z m))))
+    exact fun K ↦ hi j hj K (v K) (hoff K) (hV K)
+  refine ⟨i, fun j k hj hk ↦ ⟨D j - D k, ?_, ?_⟩⟩
+  · change (D j).val - (D k).val = B (box j) - B (box k)
+    rw [← hD j hj, ← hD k hk, add_sub_add_right_eq_sub]
+  · let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+    let core := traceNorm_normedSpaceCore (H := H)
+    let : NormedAddCommGroup (nuclearEndomorphisms H) := NormedAddCommGroup.ofCore core
+    let : SeminormedAddCommGroup (nuclearEndomorphisms H) :=
+      (inferInstance : NormedAddCommGroup (nuclearEndomorphisms H)).toSeminormedAddCommGroup
+    apply (norm_sub_le (D j) (D k)).trans_lt
+    change traceNorm (D j) + traceNorm (D k) < ε
+    linarith [hsmall j hj, hsmall k hk]
+
+open Classical in
+/-- Paper: Theorem 10.3.1.1(1), p. 448. For a finite family of vectors defining a
+contraction by the jet functionals, the sum of the convolved evaluations on the added
+zero blocks should have uniformly small real part. Vectors outside the rectangle also
+enter the contraction bound. The finite Gram matrices of the jets and the vectors
+determine that bound. Estimating the scalar sum subject to it would account for the
+angles between nearby jets omitted in (10.3.1.18)–(23), pp. 451–452. -/
+private theorem spectralLineConvolution_traceCauchy_scalar_shell
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (_hχ : IsSpectralBasepointChoice (F := F) χ)
+    {s : ℝ} (hs : 1 < s) (φ : BruhatCompactSupport C𝔽)
+    (eχ : PontryaginDual C₁ ↪ ℕ) (e : Z(χ) ↪ ℕ × ℕ) (_he : ∀ z, (e z).1 = eχ z.val.1)
+    (Λ : SpectralLineJetIndex (F := F) χ a s → StrongDual ℂ Q(a, h₀, hs₀(hs)))
+    (_hj : ∀ j, spectralSobolevDualEmbedding F a h₀ hs₀(hs) (Λ j) =
+      (spectralLineJet_memLp (F := F) χ hs j).toLp
+        (spectralZeroJet (F := F) (χ j.val.1) 0 j.val.2.1 j.val.2.2)) :
+    let box (ij : ℕ × ℕ) := ((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn
+    let jet (z : Z(χ)) (m : Fin (N(χ, s, z))) : SpectralLineJetIndex (F := F) χ a s :=
+      ⟨(z.val.1, z.val.2, m.val), m.isLt⟩
+    let A := spectralConvolution (F := F) a h₀ hs₀(hs) φ
+    ∀ ε > (0 : ℝ), ∃ i, ∀ j ≥ i, ∀ (K : Finset (SpectralLineJetIndex (F := F) χ a s))
+      (v : SpectralLineJetIndex (F := F) χ a s → Q(a, h₀, hs₀(hs))),
+      (∀ k ∉ K, v k = 0) → ‖∑ k ∈ K, (Λ k).smulRight (v k)‖ ≤ 1 →
+      (∑ z ∈ box j \ box i, ∑ m : Fin (N(χ, s, z)), Λ (jet z m) (A (v (jet z m)))).re ≤ ε := by
+  sorry
+
 /-- Paper: Theorem 10.3.1.1(1), p. 448. The rectangular sums have Cauchy tails in trace norm.
 Gap: Trace-norm tails of the actual rectangles need an estimate allowing arbitrarily close zeros. -/
 theorem spectralLineConvolution_traceCauchy (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
@@ -1186,7 +1506,18 @@ theorem spectralLineConvolution_traceCauchy (χ : PontryaginDual C₁ → Pontry
         (((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn)
         (fun z ↦ N(χ, s, z))
         (fun z m ↦ ⟨(z.val.1, z.val.2, m.val), m.isLt⟩)
-    SpectralRectanglesTraceCauchy B := by sorry
+    SpectralRectanglesTraceCauchy B := by
+  classical
+  intro H A B
+  refine spectralLineConvolution_traceCauchy_of_scalar_shell A x Λ _hb
+    (fun ij : ℕ × ℕ ↦ ((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn)
+    ?_ (fun z ↦ N(χ, s, z)) (fun z m ↦ ⟨(z.val.1, z.val.2, m.val), m.isLt⟩) ?_
+  · intro i j hij z hz
+    obtain ⟨h₁, h₂⟩ := Finset.mem_product.mp (Finset.mem_preimage.mp hz)
+    exact Finset.mem_preimage.mpr (Finset.mem_product.mpr
+      ⟨Finset.mem_Iic.mpr ((Finset.mem_Iic.mp h₁).trans hij.1),
+       Finset.mem_Iic.mpr ((Finset.mem_Iic.mp h₂).trans hij.2)⟩)
+  · exact spectralLineConvolution_traceCauchy_scalar_shell (F := F) a χ _hχ hs φ eχ e _he Λ _hj
 
 /-- Paper: Theorem 10.3.1.1(1) and (10.3.1.1), p. 448. The rectangular
 finite-rank sums over any enumeration converge to convolution in each Schatten class.
