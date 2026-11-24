@@ -625,9 +625,10 @@ private theorem traceClass_blockSums_tails_of_bddAbove_seq
   rw [hδdef] at h4 hYle
   nlinarith
 
-/-- Classical input: in the trace class of a Hilbert space, a family whose finite sums are
+/-- In the trace class of a Hilbert space, a family whose finite sums are
 bounded in trace norm (a weakly unconditionally Cauchy family) is unconditionally summable, so
-its finite sums away from a large finite set are small. By the theorem of Bessaga and
+its finite sums away from a large finite set are small. Proved here directly, by a gliding-hump
+argument in the trace class (#7459). Classically, by the theorem of Bessaga and
 Pełczyński (Studia Math. 17 (1958), 151–164; Albiac–Kalton, *Topics in Banach Space Theory*,
 Theorem 2.4.11) this holds in every Banach space containing no copy of `c₀`. The trace class
 contains none: it has cotype 2 (N. Tomczak-Jaegermann, Studia Math. 50 (1974), 163–182), and it
@@ -709,7 +710,8 @@ private theorem spectralStripGeometricKernel_traceCauchy_of_tails {H Z : Type*}
     linarith
 
 /-- Bounded block sums of the rank-one operators `v ↦ f_j(q v) • v_j` make the rectangles of the
-tensors `d(f_j ∘ q) ⊗ v_j` Cauchy, by the classical input and the trace-class isometry. -/
+tensors `d(f_j ∘ q) ⊗ v_j` Cauchy, by `traceClass_blockSums_tails_of_bddAbove` and the
+trace-class isometry. -/
 private theorem spectralStripGeometricKernel_cauchy_of_blocks {W W' H Z J : Type*}
     [NormedAddCommGroup W] [InnerProductSpace ℂ W] [CompleteSpace W]
     [NormedAddCommGroup W'] [NormedSpace ℂ W'] [NormedAddCommGroup H] [NormedSpace ℂ H]
@@ -826,7 +828,7 @@ The rectangles use injections of the actual strip zeros and the strict §10.2 bo
 Reconstruction: This is the geometric component of the convergence claimed on pp. 472–473,
 with the operator order repaired in §10.4.3. The paper gives no separate geometric estimate.
 Proved here (#7427) from the open statement `spectralStripGeometricKernel_blocks_bddAbove`
-and the classical input `traceClass_blockSums_tails_of_bddAbove`. The quotient estimates
+and `traceClass_blockSums_tails_of_bddAbove`, which is proved (#7459). The quotient estimates
 control the spectral component only, and the bound (10.4.2.34) on p. 464 gives no bound
 tending to zero for these projective tails. Nothing in the Lean outside this file uses this
 statement, and it is not known how it connects with the rest of the proof in Lean; in the

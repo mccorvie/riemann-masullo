@@ -96,7 +96,7 @@ give it back.
 
 **Searching for repairs of the final gaps in the proof.** As of 24 November 2026, about 13,200
 theorems and 1,800 definitions are stated in Lean. In the chapters the trace formula rests on
-(Chapters 2–7 and 9–13, with Appendices A–D) all but thirteen of the theorems are proved. About ninety people have
+(Chapters 2–7 and 9–13, with Appendices A–D) all but twelve of the theorems are proved. About ninety people have
 had pull requests merged, some 2,660 pull requests in all.
 
 - **Those chapters are stated, and what could be proved is proved.** Where a
@@ -114,7 +114,7 @@ had pull requests merged, some 2,660 pull requests in all.
   not known to hold; they are kept in files that nothing imports.
 - **Five proof steps that the manuscript does not state precisely enough to formalize,** in
   Chapters 7, 11 and 12. They have no Lean statement.
-- **Four classical inputs:** theorems of the literature that are stated in Lean and used, and
+- **Three classical inputs:** theorems of the literature that are stated in Lean and used, and
   not proved there. The targets do not use them either.
 - **290 statements of the manuscript are proved false as printed.** Each is kept in Lean with
   a machine-checked proof of its negation, next to the corrected statement, which is proved.
