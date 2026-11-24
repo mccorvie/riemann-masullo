@@ -33,7 +33,6 @@ open scoped NNReal NumberField.AdeleRing
 namespace RiemannMasullo
 
 set_option quotPrecheck false
-set_option Elab.async false
 
 variable {F : Type*} [Field F] [NumberField F]
 

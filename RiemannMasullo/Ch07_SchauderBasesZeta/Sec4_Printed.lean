@@ -16,7 +16,6 @@ namespace RiemannMasullo
 
 set_option quotPrecheck false
 set_option maxHeartbeats 150000
-set_option Elab.async false
 
 local notation "C[" F "]" => IdeleClassGroup (𝓞 F) F
 local notation "I[" F "]" => IdeleGroup (𝓞 F) F

@@ -13,7 +13,6 @@ open scoped NumberField.AdeleRing
 namespace RiemannMasullo
 
 set_option quotPrecheck false
-set_option Elab.async false
 
 local notation "V[" F "]" => HeightOneSpectrum (𝓞 F)
 local notation "C[" F "]" => IdeleClassGroup (𝓞 F) F
