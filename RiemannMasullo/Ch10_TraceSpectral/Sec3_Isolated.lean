@@ -400,7 +400,9 @@ the reciprocal of the distance of `Λ_{z,0}` from the span of all the other jets
 forces a lower bound for the distance of `Λ_{z,0}` from each single `Λ_{w,0}`, `w ≠ z`.
 It is not known how this statement connects with the rest of the proof in Lean; the pages that
 use it are those of `spectralStripConvolution_traceCauchy`, pp. 452–455 and 458–473.
-Gap: No bound for the biorthogonal vectors of the zero jets is known when zeros cluster. At
+Proved here (#7468) from the open statement `spectralStripConvolution_finiteGram_bound`, a
+bound for finite Gram matrices of the weighted jets, to which it is proved equivalent in this
+file. No bound for the biorthogonal vectors of the zero jets is known when zeros cluster. At
 width zero it needs at least a lower bound, polynomial in the height, for the distance between
 distinct zeros of a Hecke `L`-function on the line (see #7241). No such bound is known to us
 even for the Riemann zeta function, unconditionally or on the Riemann hypothesis. -/

@@ -81,8 +81,10 @@ strip. That identification is `spectralStripJet_commonKernel`; at `s ≤ 1` no b
 survives. A Carleson formula with a positive measure for finite Blaschke products gives an
 orthonormal basis `B_{n−1} g_n` of `D_s ⊖ V`. A positivity bound for the normalized kernels
 `g_n`, uniform in the measure, gives `‖Φ g_n‖² ≪ (1 + (Im ρ_n)²)^{−M}`, and the count of zeros
-with multiplicity makes the sum converge. Not proved in Lean: the library has no Hardy or
-Dirichlet-type space of the strip. -/
+with multiplicity makes the sum converge.
+Gap: Not proved in Lean. The argument is posted on #7405 as mathematics and was checked there
+by other contributors, not by Lean; the library has no Hardy or Dirichlet-type space of the
+strip in which to carry it out. Nothing in the Lean outside this file uses this statement. -/
 theorem spectralStripConvolution_hilbertSchmidt_of_le_one (_hs₁ : s ≤ 1)
     (φ : BruhatCompactSupport C𝔽) : Aq(φ) ∈ hilbertSchmidtOperators H₀ H₀ := by
   sorry
