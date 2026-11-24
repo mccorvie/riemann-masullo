@@ -3134,11 +3134,9 @@ theorem sLocalOrbitalIndex_enumerable_or_empty
     intro x y
     obtain ⟨x, rfl⟩ := Submodule.mkQ_surjective (Rₚ(p, ω)) x
     obtain ⟨y, rfl⟩ := Submodule.mkQ_surjective (Rₚ(p, ω)) y
-    have hx := (sLocalPrimaryOrbitalQuotient_mk_eq_zero p _hS _hp _hPic ω x).2
-      (fun j ↦ isEmptyElim j)
-    have hy := (sLocalPrimaryOrbitalQuotient_mk_eq_zero p _hS _hp _hPic ω y).2
-      (fun j ↦ isEmptyElim j)
-    exact hx.trans hy.symm
+    have hzero (z : Θₛ(ω)) : π(p, ω) z = 0 := (Submodule.Quotient.mk_eq_zero _).2
+      ((sLocalOrbitalFourierJet_commonKer p ω _hS _hp _hPic z).2 (fun j ↦ isEmptyElim j))
+    exact (hzero x).trans (hzero y).symm
 
 
 /-- A selected Euler pole lies at a unitary character. -/
@@ -4024,8 +4022,13 @@ private theorem sLocalOrbital_dual_of_absolute (p : Vℚ) (ω : PontryaginDual J
     IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev ∧
       IsSchauderBasis e d ∧ SchauderBasis.IsAbsolute e d := by
   let Q := Q(p, ω)
-  have hclosed : IsClosed (Rₚ(p, ω) : Set (Θₛ(ω))) :=
-    sLocalOrbitalPrincipalValue_isClosed hₚ(p) hp hS hPic ω
+  have hclosed : IsClosed (Rₚ(p, ω) : Set (Θₛ(ω))) := by
+    have heq : (Rₚ(p, ω) : Set (Θₛ(ω))) = ⋂ j : Idx(p, ω), (sLocalOrbitalFourierJet j).ker := by
+      ext x
+      rw [Set.mem_iInter]
+      change x ∈ Rₚ(p, ω) ↔ ∀ j : Idx(p, ω), sLocalOrbitalFourierJet j x = 0
+      exact sLocalOrbitalFourierJet_commonKer p ω hS hp hPic x
+    exact heq ▸ isClosed_iInter fun j ↦ (sLocalOrbitalFourierJet j).isClosed_ker
   have hF : IsFrechetTVS Q := isFrechetTVS_quotient
     (sLocalHomogeneousThetaSpace_frechet ω) (Rₚ(p, ω)) hclosed
   have hN : IsNuclearTVS.{0} Q := isNuclearTVS_quotient
