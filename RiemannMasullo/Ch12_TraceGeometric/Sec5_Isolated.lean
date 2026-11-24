@@ -19,7 +19,7 @@ The second theorem specializes that formula to this kernel.
 open MeasureTheory NumberField Set
 open scoped NNReal
 
-namespace RiemannMasullo
+namespace RiemannMasullo.Isolated
 
 set_option quotPrecheck false
 
@@ -81,4 +81,4 @@ theorem hasSum_stripZeros_neg_integral_smoothenedDiagonal_of_vanishing
   hasSum_stripZeros_neg_integral_smoothenedDiagonal φ hφ χ hχ hα hs
     (exists_projectiveKernel_stripTestAction_spectralProjection φ hφ hα hs) U hU hBorel
 
-end RiemannMasullo
+end RiemannMasullo.Isolated
