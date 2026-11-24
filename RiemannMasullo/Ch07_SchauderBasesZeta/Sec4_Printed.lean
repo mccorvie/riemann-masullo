@@ -5,6 +5,8 @@ import RiemannMasullo.ForMathlib.NumberTheory.NumberField.DedekindZeta.MultipleZ
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.InfiniteAdeleRing
 import RiemannMasullo.Ch01_Introduction.Sec4
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
+import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
+public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
 
 /-! # False claims printed in §7.4 -/
 
