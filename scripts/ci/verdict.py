@@ -46,6 +46,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 import plain_proof
@@ -65,6 +66,21 @@ LARGE_SYNONYM = 10 ** 8
 # Remarks for the summary that do not change the verdict: a measurement that could not run
 # must not stop the automatic merge of every pull request at once.
 NOTES = []
+# Build times, for monitoring CI speed: per build ("main", "pr"), the modules Lake compiled and how
+# long each took. Written to verdict.json and the summary, and printed to the job log.
+TIMINGS = {}
+BUILT_LINE = re.compile(r"Built (RiemannMasullo[\w.]*) \(([^)]*)\)")
+
+
+def build_timing(log, wall):
+    """Modules compiled in a `lake build` output, with seconds each, slowest first."""
+    def seconds(text):
+        return sum(float(v) * {"ms": 0.001, "s": 1, "m": 60, "h": 3600}[u]
+                   for v, u in re.findall(r"([\d.]+)(ms|s|m|h)\b", text))
+    mods = sorted(((round(seconds(t), 1), m) for m, t in BUILT_LINE.findall(log or "")), reverse=True)
+    return dict(modules=len(mods), compile_seconds=round(sum(t for t, _ in mods)),
+                wall_seconds=round(wall) if wall is not None else None,
+                slowest=[[m, t] for t, m in mods[:15]])
 
 
 class Stop(Exception):
@@ -206,8 +222,12 @@ class Check:
 
     # 3 and 4. Build.
 
-    def build(self, sandboxed=True):
-        return self.lake("lake", "build", timeout=BUILD_MINUTES * 60, sandboxed=sandboxed)
+    def build(self, sandboxed=True, label=None):
+        start = time.monotonic()
+        status, log = self.lake("lake", "build", timeout=BUILD_MINUTES * 60, sandboxed=sandboxed)
+        if label:
+            TIMINGS[label] = build_timing(log, time.monotonic() - start)
+        return status, log
 
     def modules(self):
         found = []
@@ -257,7 +277,7 @@ class Check:
         if not self.docstrings_inert():
             raise Stop("error", ["main sets the option doc.verso, which makes Lean elaborate code inside doc "
                                  "comments; scripts/ci/plain_proof.py ignores comments and has to be revised first"])
-        status, log = self.build(sandboxed=False)
+        status, log = self.build(sandboxed=False, label="main")
         if status is None:
             raise Stop("error", [f"building main did not finish in {BUILD_MINUTES} minutes, so the pull "
                                  "request could not be checked; this is not a fault of the pull request"], log)
@@ -388,7 +408,7 @@ def decide(check, supplied_base):
     result = run([str(TOOLS / "scripts/lint.sh"), str(check.work)])
     if result.returncode:
         raise Stop("fail", ["the lint found a forbidden construct (see AGENTS.md)"], result.stdout)
-    status, log = check.build()
+    status, log = check.build(label="pr")
     if status is None:
         raise Stop("fail", [f"the build did not finish in {BUILD_MINUTES} minutes"], log)
     if status != 0:
@@ -457,13 +477,29 @@ def clean(text, limit):
     return text if len(text) <= limit else "...\n" + text[-limit:]
 
 
+def timing_lines():
+    """The build-time section of the summary: what was compiled for main and for the pull request."""
+    if not TIMINGS:
+        return []
+    what = {"main": "catching up with `main` from its saved build", "pr": "the pull request on top of `main`"}
+    lines = ["<details><summary>Build time</summary>", "",
+             "| Build | Modules compiled | Compile time | Wall time |", "|---|---|---|---|"]
+    for label, t in TIMINGS.items():
+        lines.append(f"| {what.get(label, label)} | {t['modules']} | {t['compile_seconds']} s | {t['wall_seconds']} s |")
+    slow = TIMINGS.get("pr", {}).get("slowest", [])
+    if slow:
+        lines += ["", "Slowest modules compiled for the pull request:", "",
+                  "| Module | Seconds |", "|---|---|", *[f"| `{m}` | {s} |" for m, s in slow]]
+    return lines + ["", "</details>", ""]
+
+
 def report(args, verdict, reasons, log):
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     reasons = [clean(r, 600).replace("\n", " ") for r in reasons[:40]] + (
         ["(more reasons not shown)"] if len(reasons) > 40 else [])
     data = dict(schema=1, verdict=verdict, pr=args.pr, head_sha=args.head, base_sha=args.base, reasons=reasons,
-                notes=list(NOTES))
+                notes=list(NOTES), timings=TIMINGS)
     (out / "verdict.json").write_text(json.dumps(data, indent=1) + "\n")
     lines = [f"## Verdict: `{verdict}`", "", NEXT[verdict], "",
              f"Checked commit `{args.head[:12]}` against `main` at `{args.base[:12]}`, "
@@ -472,11 +508,16 @@ def report(args, verdict, reasons, log):
         lines += ["```", *reasons, "```", ""]
     if NOTES:
         lines += ["Notes (they do not change the verdict):", "", *[f"- {clean(n, 600)}" for n in NOTES], ""]
+    lines += timing_lines()
     if log and verdict in ("fail", "error"):
         tail = "\n".join(clean(log, 6000).split("\n")[-60:])
         lines += ["<details><summary>Last lines of the output</summary>", "", "```", tail, "```", "", "</details>", ""]
     (out / "summary.md").write_text("\n".join(lines))
     print(f"verdict: {verdict}")
+    for label, t in TIMINGS.items():   # one parseable line per build and per slow module
+        print(f"timing {label}: {t['modules']} modules, {t['compile_seconds']} s compiling, {t['wall_seconds']} s wall")
+        for module, seconds in t["slowest"]:
+            print(f"timing {label} module: {module} {seconds} s")
     for reason in reasons:
         print(f"  {reason}")
 
