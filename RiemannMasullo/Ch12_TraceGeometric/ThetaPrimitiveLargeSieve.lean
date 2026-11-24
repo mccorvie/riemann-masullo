@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.Ch12_TraceGeometric.ThetaDirichletAverage
 import RiemannMasullo.ForMathlib.Analysis.Fourier.LargeSieve
+import RiemannMasullo.ForMathlib.NumberTheory.DirichletCharacter.PrimitiveCount
 
 /-!
 # A large sieve for primitive Dirichlet theta rows
@@ -160,4 +161,36 @@ theorem thetaMoebius_visible_primitive_large_sieve (Q : ℕ) (hQ : 0 < Q) (S : F
   dirichletThetaRow_primitive_large_sieve_integral (f := fun n y ↦ thetaMoebiusErrorCoefficient w n * h (n / y)) Q hQ S
     (fun n hn ↦ (hh n hn).const_smul (thetaMoebiusErrorCoefficient w n)) hLU hs
 
+/-- When the squared conductor bound covers the frequency width, the proportion of exceptional
+primitive characters is bounded by the coefficient energy divided by the threshold, uniformly in Q. -/
+theorem dirichletThetaRow_primitive_large_sieve_exception_proportion
+    {α : Type*} [MeasurableSpace α] {μ : Measure α}
+    (Q : ℕ) (hQ : 0 < Q) (S : Finset ℕ) {f : ℕ → α → ℂ} (hf : ∀ n ∈ S, MemLp (f n) 2 μ)
+    {L U : ℕ} (hLU : L ≤ U) (hs : ∀ n ∈ S, L ≤ n ∧ n ≤ U) (hwidth : U - L ≤ Q ^ 2)
+    (B : (m : ℕ) → Finset (DirichletCharacter ℂ (m + 1))) {δ : ℝ} (hδ : 0 < δ)
+    (hbad : ∀ m ∈ range Q, ∀ χ ∈ B m,
+      χ.IsPrimitive ∧ δ ≤ ∫ y, ‖dirichletThetaRow χ S (fun n ↦ f n y)‖ ^ 2 ∂μ) :
+    ((∑ m ∈ range Q, (B m).card : ℕ) : ℝ) /
+        ((∑ m ∈ range Q, ((univ : Finset (DirichletCharacter ℂ (m + 1))).filter
+          (·.IsPrimitive)).card : ℕ) : ℝ) ≤
+      1024 * (1 + Real.pi) * (∑ n ∈ S, ∫ y, ‖f n y‖ ^ 2 ∂μ) / δ := by
+  let P : ℕ := ∑ m ∈ range Q, ((univ : Finset (DirichletCharacter ℂ (m + 1))).filter
+    (·.IsPrimitive)).card
+  let D : ℝ := ∑ n ∈ S, ∫ y, ‖f n y‖ ^ 2 ∂μ
+  have hP : (Q : ℝ) ^ 2 ≤ 1024 * P := by
+    exact_mod_cast DirichletCharacter.quadratic_le_sum_card_primitive Q
+  have hP₀ : (0 : ℝ) < P := by nlinarith [sq_pos_of_pos (by exact_mod_cast hQ : (0 : ℝ) < Q)]
+  have hD : 0 ≤ D := sum_nonneg (fun n _ ↦ integral_nonneg fun _ ↦ sq_nonneg _)
+  have hw : (U : ℝ) - L ≤ (Q : ℝ) ^ 2 := by
+    simpa only [Nat.cast_sub hLU, Nat.cast_pow] using (Nat.cast_le (α := ℝ)).mpr hwidth
+  apply (div_le_div_iff₀ hP₀ hδ).mpr
+  calc
+    _ ≤ ((Q : ℝ) ^ 2 + Real.pi * ((U : ℝ) - L)) * D :=
+      dirichletThetaRow_primitive_large_sieve_exception_count Q hQ S hf hLU hs B δ hbad
+    _ ≤ ((Q : ℝ) ^ 2 + Real.pi * (Q : ℝ) ^ 2) * D :=
+      mul_le_mul_of_nonneg_right (by linarith [mul_le_mul_of_nonneg_left hw Real.pi_pos.le]) hD
+    _ = (Q : ℝ) ^ 2 * ((1 + Real.pi) * D) := by ring
+    _ ≤ (1024 * P) * ((1 + Real.pi) * D) :=
+      mul_le_mul_of_nonneg_right hP (mul_nonneg (by positivity) hD)
+    _ = _ := by ring
 end RiemannMasullo
