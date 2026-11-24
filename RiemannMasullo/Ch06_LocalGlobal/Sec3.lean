@@ -1808,6 +1808,503 @@ private theorem globalConverse_normTwist_local_lift {S : Finset V}
   exact ((sLocalZetaPair_mk η f).1 hz).symm.trans ((congrArg (fun y ↦ y.1.val z) hx).trans
     (congrArg (m z * ·) ((sLocalZetaPair_mk η g).1 hz)))
 
+/-- Lagrange denominators on the integer grid, with the node itself omitted. -/
+private theorem globalConverse_normTwist_gaussian_strip_bounds_grid (N i : ℕ) (hi : i ≤ N) :
+    ∏ j ∈ (Finset.range (N + 1)).erase i, |(i : ℝ) - j| =
+      (i.factorial : ℝ) * (N - i).factorial := by
+  induction N generalizing i with
+  | zero => obtain rfl : i = 0 := by omega
+            simp
+  | succ N ih =>
+    rcases eq_or_lt_of_le hi with rfl | hi
+    · rw [Finset.range_add_one, Finset.erase_insert (Finset.notMem_range_self)]
+      simp only [Nat.sub_self, Nat.factorial_zero, Nat.cast_one, mul_one]
+      calc
+        (∏ j ∈ Finset.range (N + 1), |((N + 1 : ℕ) : ℝ) - j|) = ∏ j ∈ Finset.range (N + 1), (((N + 1 - 1 - j) + 1 : ℕ) : ℝ) := by
+          apply Finset.prod_congr rfl
+          intro j hj
+          have hj' : j ≤ N := by simpa using hj
+          rw [abs_of_nonneg (by exact_mod_cast (show (0 : ℤ) ≤ (N + 1 : ℕ) - (j : ℤ) by omega))]
+          simp [Nat.cast_sub hj']; ring
+        _ = _ := by
+          rw [Finset.prod_range_reflect (fun j ↦ ((j + 1 : ℕ) : ℝ)) (N + 1)]
+          exact_mod_cast Finset.prod_range_add_one_eq_factorial (N + 1)
+    · have hi' : i ≤ N := by omega
+      rw [Finset.range_add_one, Finset.erase_insert_of_ne (by omega : N + 1 ≠ i),
+        Finset.prod_insert (fun h ↦ Finset.notMem_range_self (Finset.mem_of_mem_erase h)), ih _ hi']
+      have hsub : N + 1 - i = (N - i) + 1 := by omega
+      rw [abs_of_nonpos (by exact_mod_cast (show (i : ℤ) - (N + 1 : ℕ) ≤ 0 by omega)), hsub, Nat.factorial_succ]
+      push_cast
+      rw [Nat.cast_sub hi']
+      ring
+
+/-- Remove a finite set of distinct zeros from an analytic function by divided
+differences. This keeps the quotient analytic even at the interpolation nodes. -/
+private theorem globalConverse_normTwist_gaussian_strip_bounds_zeros (A : Finset ℂ)
+    (D : Set ℂ) (f : ℂ → ℂ) (hf : AnalyticOnNhd ℂ f D) (hz : ∀ v ∈ A, f v = 0) :
+    ∃ q : ℂ → ℂ, AnalyticOnNhd ℂ q D ∧ ∀ w, f w = q w * ∏ v ∈ A, (w - v) := by
+  classical
+  induction A using Finset.induction_on generalizing f with
+  | empty => exact ⟨f, hf, by simp⟩
+  | @insert v A hmem ih =>
+    have hv := hz v (Finset.mem_insert_self _ _)
+    have he (w : ℂ) : (w - v) * dslope f v w = f w := by
+      simpa only [smul_eq_mul, hv, sub_zero] using sub_smul_dslope f v w
+    obtain ⟨q, hq, hval⟩ := ih (dslope f v) (fun w hw ↦ (hf w hw).dslope v) (fun w hw ↦ by
+      have hn : w - v ≠ 0 := sub_ne_zero.mpr (fun h ↦ hmem (h ▸ hw))
+      exact (mul_eq_zero.mp ((he w).trans (hz w (Finset.mem_insert_of_mem hw)))).resolve_left hn)
+    refine ⟨q, hq, fun w ↦ ?_⟩
+    rw [← he, hval, Finset.prod_insert hmem]
+    ring
+
+/-- Equispaced radii control the Lagrange basis even when each complex interpolation
+node has an arbitrary angle on its circle. -/
+private theorem globalConverse_normTwist_gaussian_strip_bounds_interpolate
+    (ε : ℝ) (hε : 0 < ε) (hε₁ : ε ≤ 1) (N : ℕ) (v : ℕ → ℂ) (z c : ℂ)
+    (hzc : dist z c ≤ 2)
+    (hv : ∀ i ∈ Finset.range (N + 1), dist (v i) z = ε / (N + 1) * (i + 1))
+    (f : ℂ → ℂ) (s : ℝ) (hs : 0 ≤ s) (hf : ∀ i ∈ Finset.range (N + 1), ‖f (v i)‖ ≤ s) :
+    ∃ p : ℂ → ℂ, Differentiable ℂ p ∧ (∀ i ∈ Finset.range (N + 1), p (v i) = f (v i)) ∧
+      ∀ w ∈ Metric.closedBall c 8, ‖p w‖ ≤ s * (44 * Real.exp 1 / ε) ^ (N + 1) := by
+  classical
+  let A := Finset.range (N + 1)
+  let h := ε / (N + 1)
+  have hpos : 0 < h := by dsimp [h]; positivity
+  have hrad (i : ℕ) (hi : i ∈ A) : dist (v i) z ≤ 1 := by
+    rw [hv i hi, div_mul_eq_mul_div, div_le_iff₀ (by positivity : 0 < (N : ℝ) + 1)]
+    have hin : i ≤ N := by simpa [A] using hi
+    rw [one_mul]
+    calc ε * (i + 1) ≤ 1 * (i + 1) := by gcongr
+         _ ≤ (N : ℝ) + 1 := by simpa using (show (i : ℝ) ≤ N by exact_mod_cast hin)
+  have hsep (i j : ℕ) (hi : i ∈ A) (hj : j ∈ A) :
+      h * |(i : ℝ) - j| ≤ ‖v i - v j‖ := by
+    have he := abs_dist_sub_le (v i) (v j) z
+    rw [hv i hi, hv j hj, ← mul_sub, add_sub_add_right_eq_sub, abs_mul, abs_of_pos hpos] at he
+    simpa only [dist_eq_norm] using he
+  have hne (i j : ℕ) (hi : i ∈ A) (hj : j ∈ A) (hij : i ≠ j) : v i - v j ≠ 0 := by
+    have hcast : (i : ℝ) ≠ j := by exact_mod_cast hij
+    exact norm_pos_iff.mp ((mul_pos hpos (abs_pos.mpr (sub_ne_zero.mpr hcast))).trans_le (hsep i j hi hj))
+  let num (i : ℕ) (w : ℂ) := ∏ j ∈ A.erase i, (w - v j)
+  let p (w : ℂ) := ∑ i ∈ A, f (v i) * num i w / num i (v i)
+  have hp (i : ℕ) (hi : i ∈ A) : num i (v i) ≠ 0 :=
+    Finset.prod_ne_zero_iff.mpr fun j hj ↦ hne i j hi (Finset.mem_of_mem_erase hj) (Finset.ne_of_mem_erase hj).symm
+  refine ⟨p, Differentiable.fun_sum fun i _ ↦ ((Differentiable.fun_finsetProd
+    (fun j (_ : j ∈ A.erase i) ↦ differentiable_id.sub_const (v j))).const_mul _).div_const _, fun i hi ↦ ?_, fun w hw ↦ ?_⟩
+  · dsimp only [p]
+    rw [Finset.sum_eq_single_of_mem i hi]
+    · exact mul_div_cancel_right₀ _ (hp i hi)
+    · intro j hj hji
+      have hzero : num j (v i) = 0 := Finset.prod_eq_zero (Finset.mem_erase.mpr ⟨hji.symm, hi⟩) (sub_self _)
+      simp [hzero]
+  have hterm (i : ℕ) (hi : i ∈ A) : ‖f (v i) * num i w / num i (v i)‖ ≤
+      s * (22 / ε) ^ N * Real.exp (N + 1) := by
+    have hin : i ≤ N := by simpa [A] using hi
+    have hcard : (A.erase i).card = N := by simp [Finset.card_erase_of_mem hi, A]
+    have hnum : ‖num i w‖ ≤ (11 : ℝ) ^ N := by
+      dsimp only [num]
+      rw [norm_prod, ← hcard, ← Finset.prod_const]
+      apply Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _)
+      intro j hj
+      rw [← dist_eq_norm]
+      linarith [dist_triangle w c (v j), dist_triangle (v j) z c,
+        dist_comm c (v j), Metric.mem_closedBall.mp hw, hrad j (Finset.mem_of_mem_erase hj)]
+    have hden : h ^ N * ((i.factorial : ℝ) * (N - i).factorial) ≤ ‖num i (v i)‖ := by
+      dsimp only [num]
+      rw [← globalConverse_normTwist_gaussian_strip_bounds_grid N i hin, norm_prod,
+        show h ^ N = ∏ _j ∈ A.erase i, h by rw [Finset.prod_const, hcard], ← Finset.prod_mul_distrib]
+      exact Finset.prod_le_prod₀ (fun j _ ↦ mul_nonneg hpos.le (abs_nonneg _))
+        (fun j hj ↦ hsep i j hi (Finset.mem_of_mem_erase hj))
+    have hc : (N.factorial : ℝ) ≤ (2 : ℝ) ^ N * ((i.factorial : ℝ) * (N - i).factorial) := by
+      have hchoose := Nat.choose_mul_factorial_mul_factorial hin
+      calc
+        (N.factorial : ℝ) = (N.choose i : ℝ) * ((i.factorial : ℝ) * (N - i).factorial) := by
+          exact_mod_cast (by simpa only [mul_assoc] using hchoose.symm)
+        _ ≤ _ := by gcongr; exact_mod_cast Nat.choose_le_two_pow N i
+    have hfac : (N + 1 : ℝ) ^ N ≤ Real.exp (N + 1) * N.factorial :=
+      (div_le_iff₀ (by positivity)).mp (Real.pow_div_factorial_le_exp ((N : ℝ) + 1) (by positivity) N)
+    have hcoef : (11 : ℝ) ^ N ≤ ((22 / ε) ^ N * Real.exp (N + 1)) * ‖num i (v i)‖ := by
+      apply le_trans _ (mul_le_mul_of_nonneg_left hden (by positivity))
+      have he : (22 / ε) ^ N * h ^ N = (22 : ℝ) ^ N / (N + 1) ^ N := by
+        rw [← mul_pow, ← div_pow]; congr 1; dsimp [h]; field_simp
+      calc
+        (11 : ℝ) ^ N = (11 : ℝ) ^ N / (N + 1) ^ N * (N + 1) ^ N := by field_simp
+        _ ≤ (11 : ℝ) ^ N / (N + 1) ^ N * (Real.exp (N + 1) * ((2 : ℝ) ^ N * ((i.factorial : ℝ) * (N - i).factorial))) :=
+          mul_le_mul_of_nonneg_left (hfac.trans (mul_le_mul_of_nonneg_left hc (Real.exp_pos _).le)) (by positivity)
+        _ = _ := by
+          have h22 : (22 : ℝ) ^ N = 11 ^ N * 2 ^ N := by rw [← mul_pow]; norm_num
+          rw [show (22 / ε) ^ N * Real.exp (N + 1) * (h ^ N * _) =
+            ((22 / ε) ^ N * h ^ N) * Real.exp (N + 1) * ((i.factorial : ℝ) * (N - i).factorial) by ring, he, h22]
+          ring
+    rw [norm_div, norm_mul, div_le_iff₀ (norm_pos_iff.mpr (hp i hi))]
+    have h := mul_le_mul (hf i hi) (hnum.trans hcoef) (norm_nonneg _) hs
+    linarith only [h, show s * ((22 / ε) ^ N * Real.exp (N + 1) * ‖num i (v i)‖) =
+      s * (22 / ε) ^ N * Real.exp (N + 1) * ‖num i (v i)‖ by ring]
+  have h22 : 1 ≤ 22 / ε := (le_div_iff₀ hε).mpr (by linarith)
+  have hsize : (N + 1 : ℝ) ≤ 2 ^ (N + 1) := by exact_mod_cast (Nat.lt_two_pow_self (n := N + 1)).le
+  calc
+    ‖p w‖ ≤ ∑ i ∈ A, ‖f (v i) * num i w / num i (v i)‖ := norm_sum_le _ _
+    _ ≤ ∑ _i ∈ A, s * (22 / ε) ^ N * Real.exp (N + 1) := Finset.sum_le_sum hterm
+    _ = (N + 1 : ℝ) * (s * (22 / ε) ^ N * (Real.exp 1) ^ (N + 1)) := by
+      simp [A, nsmul_eq_mul, ← Real.exp_nat_mul]
+    _ ≤ 2 ^ (N + 1) * (s * (22 / ε) ^ (N + 1) * (Real.exp 1) ^ (N + 1)) := by gcongr; omega
+    _ = _ := by rw [show 44 * Real.exp 1 / ε = 2 * (22 / ε) * Real.exp 1 by ring, mul_pow, mul_pow]; ring
+
+/-- If an analytic function is bounded by `X` on the disk and has norm at least
+`1 / X` at the center, its norm stays above a fixed inverse power of `X` on a circle
+around `z`. The exponent depends only on the maximum permitted radius. -/
+private theorem globalConverse_normTwist_gaussian_strip_bounds_minimum (ε : ℝ)
+    (hε : 0 < ε) (hε₁ : ε ≤ 1) :
+    ∃ K : ℕ, ∀ (f : ℂ → ℂ) (c z : ℂ) (X : ℝ), 2 ≤ X → dist z c ≤ 2 →
+      AnalyticOnNhd ℂ f (Metric.closedBall c 8) →
+      (∀ u ∈ Metric.closedBall c 8, ‖f u‖ ≤ X) → 1 ≤ X * ‖f c‖ →
+      ∃ r : ℝ, 0 < r ∧ r ≤ ε ∧ ∀ w ∈ Metric.sphere z r, 1 ≤ X ^ K * ‖f w‖ := by
+  classical
+  let D := 44 * Real.exp 1 / ε
+  obtain ⟨p, hp⟩ := pow_unbounded_of_one_lt D (by norm_num : (1 : ℝ) < 2)
+  refine ⟨17 * p + 2, fun f c z X hX hzc hhol hub hcenter ↦ ?_⟩
+  obtain ⟨m, hm, hm'⟩ := exists_nat_pow_near (by linarith : 1 ≤ X) (by norm_num : (1 : ℝ) < 2)
+  have hm1 : 0 < m := by
+    by_contra! h
+    have : m = 0 := by omega
+    norm_num [this] at hm'
+    linarith
+  -- Use a number of nodes proportional to log X, so exponential costs are polynomial in X.
+  let N := 8 * (m + 1)
+  let A := Finset.range (N + 1)
+  let s := (X ^ (17 * p + 2))⁻¹
+  have hx : 0 < X := by linarith
+  by_contra! hbad
+  -- If every radius fails, interpolate a small value from each of these circles.
+  have hnodes (i : ℕ) (hi : i ∈ A) : ∃ w : ℂ,
+      dist w z = ε / (N + 1) * (i + 1) ∧ ‖f w‖ ≤ s := by
+    have hin : i ≤ N := by simpa [A] using hi
+    have hrad : ε / (N + 1) * (i + 1) ≤ ε := by
+      rw [div_mul_eq_mul_div, div_le_iff₀ (by positivity : 0 < (N : ℝ) + 1)]
+      gcongr
+    obtain ⟨w, hw, hsmall⟩ := hbad _ (by positivity) hrad
+    refine ⟨w, Metric.mem_sphere.mp hw, ?_⟩
+    change ‖f w‖ ≤ (X ^ (17 * p + 2))⁻¹
+    rw [← one_div]
+    apply (le_div_iff₀ (pow_pos hx _)).mpr
+    simpa only [mul_comm] using hsmall.le
+  choose! v hv hsmall using hnodes
+  obtain ⟨q, hq, heq, hqb⟩ := globalConverse_normTwist_gaussian_strip_bounds_interpolate
+    ε hε hε₁ N v z c hzc hv f s (by dsimp [s]; positivity) hsmall
+  have hD0 : 0 ≤ D := by dsimp [D]; positivity
+  have hpow : D ^ (N + 1) ≤ X ^ (17 * p) := calc
+    _ ≤ ((2 : ℝ) ^ p) ^ (N + 1) := pow_le_pow_left₀ hD0 hp.le _
+    _ = (2 : ℝ) ^ (p * (N + 1)) := (pow_mul _ _ _).symm
+    _ ≤ (2 : ℝ) ^ (m * (17 * p)) := by
+      apply pow_le_pow_right₀ (by norm_num)
+      have hN : N + 1 ≤ m * 17 := by dsimp [N]; omega
+      simpa only [mul_left_comm, mul_comm, mul_assoc] using Nat.mul_le_mul_left p hN
+    _ ≤ X ^ (17 * p) := by rw [pow_mul]; gcongr
+  have hqbd (w : ℂ) (hw : w ∈ Metric.closedBall c 8) : ‖q w‖ ≤ (X ^ 2)⁻¹ := by
+    apply (hqb w hw).trans
+    apply (mul_le_mul_of_nonneg_left hpow (by dsimp [s]; positivity)).trans_eq
+    dsimp only [s]; rw [pow_add]; field_simp
+  have hrad (i : ℕ) (hi : i ∈ A) : dist (v i) c ≤ 3 := by
+    have hin : i ≤ N := by simpa [A] using hi
+    have hεi : dist (v i) z ≤ ε := by
+      rw [hv i hi, div_mul_eq_mul_div, div_le_iff₀ (by positivity : 0 < (N : ℝ) + 1)]
+      gcongr
+    linarith [dist_triangle (v i) z c]
+  have hinj : Set.InjOn v A := by
+    intro i hi j hj he
+    have hh := (hv i hi).symm.trans ((congrArg (dist · z) he).trans (hv j hj))
+    have := mul_left_cancel₀ (ne_of_gt (div_pos hε (by positivity))) hh
+    exact_mod_cast (add_right_cancel this)
+  let V₀ := A.image v
+  obtain ⟨g, hg, hge⟩ := globalConverse_normTwist_gaussian_strip_bounds_zeros V₀
+    (Metric.closedBall c 8) (fun w ↦ f w - q w) (fun w hw ↦ (hhol w hw).sub (hq.analyticAt w))
+    (by rintro _ hw; obtain ⟨i, hi, rfl⟩ := Finset.mem_image.mp hw; exact sub_eq_zero.mpr (heq i hi).symm)
+  have hcard : V₀.card = N + 1 := (Finset.card_image_of_injOn hinj).trans (Finset.card_range _)
+  have hvc (w : ℂ) (hw : w ∈ V₀) : dist w c ≤ 3 := by
+    obtain ⟨i, hi, rfl⟩ := Finset.mem_image.mp hw; exact hrad i hi
+  have hdiff (w : ℂ) : ‖f w - q w‖ = ‖g w‖ * ∏ u ∈ V₀, ‖w - u‖ := by
+    rw [hge w, norm_mul, norm_prod]
+  have hunit : (X ^ 2)⁻¹ ≤ X := (inv_le_one_of_one_le₀ (one_le_pow₀ (by linarith))).trans (by linarith)
+  -- The nodes lie within radius 3 of c, hence at least 5 from the boundary of radius 8.
+  have hgb : ‖g c‖ ≤ (2 * X) / 5 ^ (N + 1) := by
+    apply Complex.norm_le_of_forall_mem_frontier_norm_le Metric.isBounded_ball
+      (hg.differentiableOn.diffContOnCl_ball subset_rfl) _ (subset_closure (Metric.mem_ball_self (by norm_num : (0 : ℝ) < 8)))
+    intro w hw
+    have hw' := Metric.frontier_ball_subset_sphere hw
+    have hwc := Metric.sphere_subset_closedBall hw'
+    have hdist : (5 : ℝ) ^ (N + 1) ≤ ∏ u ∈ V₀, ‖w - u‖ := by
+      rw [← hcard, ← Finset.prod_const]
+      apply Finset.prod_le_prod₀ (by intros; norm_num)
+      intro u hu
+      rw [← dist_eq_norm]
+      linarith [dist_triangle w u c, Metric.mem_sphere.mp hw', hvc u hu]
+    apply (le_div_iff₀ (by positivity)).mpr
+    calc
+      _ ≤ ‖g w‖ * ∏ u ∈ V₀, ‖w - u‖ := mul_le_mul_of_nonneg_left hdist (norm_nonneg _)
+      _ = ‖f w - q w‖ := (hdiff _).symm
+      _ ≤ 2 * X := (norm_sub_le _ _).trans (by linarith [hub w hwc, hqbd w hwc])
+  have htail : ‖f c - q c‖ ≤ 2 * X * (3 / 5 : ℝ) ^ (N + 1) := by
+    rw [hdiff]
+    have hp₃ : (∏ u ∈ V₀, ‖c - u‖) ≤ (3 : ℝ) ^ (N + 1) := by
+      rw [← hcard, ← Finset.prod_const]
+      exact Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _)
+        (fun u hu ↦ by simpa [dist_eq_norm, norm_sub_rev] using hvc u hu)
+    exact (mul_le_mul hgb hp₃ (Finset.prod_nonneg fun _ _ ↦ norm_nonneg _) (by positivity)).trans_eq (by rw [div_pow]; ring)
+  -- At the center the interpolation remainder therefore gains a factor (3/5) per node.
+  have hsmall' : 4 * X ^ 2 * (3 / 5 : ℝ) ^ (N + 1) < 1 := by
+    have hX₂ : 4 * X ^ 2 < (16 : ℝ) ^ (m + 1) := calc
+      _ < 4 * ((2 : ℝ) ^ (m + 1)) ^ 2 := by gcongr
+      _ ≤ ((4 : ℝ) ^ (m + 1)) * ((4 : ℝ) ^ (m + 1)) := by
+        rw [← pow_mul, Nat.mul_comm (m + 1) 2, pow_mul]
+        norm_num
+        exact le_self_pow₀ (by norm_num : (1 : ℝ) ≤ 4) (by omega : m + 1 ≠ 0)
+      _ = _ := by rw [← mul_pow]; norm_num
+    have hlarge : (16 : ℝ) ^ (m + 1) ≤ (5 / 3 : ℝ) ^ (N + 1) := calc
+      _ ≤ ((5 / 3 : ℝ) ^ 8) ^ (m + 1) := pow_le_pow_left₀ (by norm_num) (by norm_num) _
+      _ = (5 / 3 : ℝ) ^ N := (pow_mul _ _ _).symm
+      _ ≤ _ := pow_le_pow_right₀ (by norm_num) (by omega)
+    have h := mul_lt_mul_of_pos_right (hX₂.trans_le hlarge) (by positivity : 0 < (3 / 5 : ℝ) ^ (N + 1))
+    simpa only [← mul_pow, show (5 / 3 : ℝ) * (3 / 5) = 1 by norm_num, one_pow] using h
+  have hcq := hqbd c (Metric.mem_closedBall_self (by norm_num))
+  have hxc : X * ‖f c‖ ≤ X * ((X ^ 2)⁻¹ + 2 * X * (3 / 5 : ℝ) ^ (N + 1)) :=
+    mul_le_mul_of_nonneg_left ((norm_le_norm_add_norm_sub' (f c) (q c)).trans (by linarith)) hx.le
+  have hi : X * (X ^ 2)⁻¹ ≤ 1 / 2 := by
+    field_simp
+    nlinarith
+  nlinarith
+
+/-- The finite Euler polynomial is continuous and bounded away from zero on each
+half-plane strictly to the right of zero. -/
+private theorem globalConverse_normTwist_gaussian_strip_bounds_factors (χ : U) (S : Finset V)
+    (a : ℝ) (ha : 0 < a) :
+    Continuous (reciprocalPartialHeckeEulerProduct χ S) ∧
+    ∃ δ > (0 : ℝ), ∀ w : ℂ, a ≤ w.re → δ ≤ ‖reciprocalPartialHeckeEulerProduct χ S w‖ := by
+  classical
+  let q (v : V) := (v.asIdeal.absNorm : ℝ)
+  have hq (v : V) : 1 < q v := by
+    dsimp only [q]
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have hp (v : V) : 0 < 1 - q v ^ (-a) :=
+    sub_pos.mpr (Real.rpow_lt_one_of_one_lt_of_neg (hq v) (neg_lt_zero.mpr ha))
+  have hf (v : V) : Continuous (fun z ↦ (finiteHeckeEulerFactor χ v z)⁻¹) ∧
+      ∀ w : ℂ, a ≤ w.re → 1 - q v ^ (-a) ≤ ‖(finiteHeckeEulerFactor χ v w)⁻¹‖ := by
+    have hq0 := zero_lt_one.trans (hq v)
+    unfold finiteHeckeEulerFactor
+    split_ifs
+    · simp only [inv_inv]
+      have hd : Differentiable ℂ (fun z : ℂ ↦ (v.asIdeal.absNorm : ℂ) ^ (-z)) :=
+        differentiable_neg.const_cpow (Or.inl (Nat.cast_ne_zero.mpr ((Ideal.absNorm_eq_zero_iff).not.mpr v.ne_bot)))
+      refine ⟨(hd.const_mul _ |>.const_sub 1).continuous, fun w hw ↦ ?_⟩
+      apply le_trans _ (norm_sub_norm_le (1 : ℂ) _)
+      rw [norm_one, norm_mul, norm_ideleClassNormTwist_zero_localValue, one_mul,
+        ← Complex.ofReal_natCast, Complex.norm_cpow_eq_rpow_re_of_pos hq0, Complex.neg_re]
+      exact sub_le_sub_left (Real.rpow_le_rpow_of_exponent_le (hq v).le (neg_le_neg hw)) _
+    · simp only [inv_one, norm_one]
+      exact ⟨continuous_const, fun _ _ ↦ sub_le_self _ (Real.rpow_nonneg hq0.le _)⟩
+  refine ⟨continuous_finsetProd _ fun v _ ↦ (hf v).1,
+    ∏ v ∈ S, (1 - q v ^ (-a)), Finset.prod_pos (fun v _ ↦ hp v), fun w hw ↦ ?_⟩
+  change _ ≤ ‖∏ v ∈ S, (finiteHeckeEulerFactor χ v w)⁻¹‖
+  rw [norm_prod]
+  exact Finset.prod_le_prod₀ (fun v _ ↦ (hp v).le) (fun v _ ↦ (hf v).2 w hw)
+
+/-- On each high disc centered in a fixed positive strip, the outside Euler product
+has a polynomial lower bound on a circle inside the right half-plane. -/
+private theorem globalConverse_normTwist_gaussian_strip_bounds_circles (χ : U) (S : Finset V)
+    (L : ℂ → ℂ) (hL : MeromorphicNFOn L univ) (hs : ∀ z : halfPlane, L z = finiteHeckeL χ z)
+    (a d : ℝ) (ha : 0 < a) (had : a ≤ d) :
+    let D := fun z ↦ reciprocalPartialHeckeEulerProduct χ S z * L z
+    ∃ (k : ℕ) (T : ℝ), ∀ z : ℂ, z.re ∈ Icc a d → T ≤ |z.im| →
+      ∃ r : ℝ, 0 < r ∧ r ≤ a / 2 ∧ ∀ w ∈ Metric.sphere z r,
+        ContinuousAt D w ∧ 1 ≤ |w.im| ^ k * ‖D w‖ := by
+  obtain ⟨E, hE, hO⟩ := finiteHeckeL_continuation_isBigO_rpow χ L hL hs (a - 8) (d + 12) (by linarith)
+  obtain ⟨C, hC, hup⟩ := Asymptotics.isBigO_iff'.mp hO
+  rw [eventually_inf_principal, eventually_comap, eventually_atTop] at hup
+  obtain ⟨T, hup⟩ := hup
+  obtain ⟨j, hj⟩ := exists_nat_gt E
+  let T₀ := max (max T C) 1
+  have bound (w : ℂ) (hw : w.re ∈ Icc (a - 8) (d + 12)) (ht : T₀ ≤ |w.im|) :
+      ‖L w‖ ≤ |w.im| ^ (j + 1) := by
+    have ht' : max T C ≤ |w.im| := (le_max_left _ _).trans ht
+    have h1 : 1 ≤ |w.im| := (le_max_right _ _).trans ht
+    have hval := hup _ ((le_max_left _ _).trans ht') w rfl hw
+    rw [Real.norm_of_nonneg (Real.rpow_nonneg (abs_nonneg _) _)] at hval
+    rw [pow_succ, mul_comm]
+    exact hval.trans (mul_le_mul ((le_max_right _ _).trans ht')
+      (by simpa only [Real.rpow_natCast] using Real.rpow_le_rpow_of_exponent_le h1 hj.le)
+      (Real.rpow_nonneg (abs_nonneg _) _) (abs_nonneg _))
+  obtain ⟨hcP, δ, hδ, hP⟩ := globalConverse_normTwist_gaussian_strip_bounds_factors χ S (a / 2) (half_pos ha)
+  let ε := min (a / 2) 1
+  obtain ⟨K, hK⟩ := globalConverse_normTwist_gaussian_strip_bounds_minimum ε
+    (lt_min (half_pos ha) zero_lt_one) (min_le_right _ _)
+  let ζ := ‖dedekindZeta F 2‖
+  refine ⟨(2 * (j + 1)) * K + 1, max (T₀ + 10) (max (2 * ζ + 10) (2 * δ⁻¹ + 10)), fun z hz ht ↦ ?_⟩
+  -- Moving the center two units right gives an Euler-product lower bound at the center.
+  let c := z + 2
+  let y := |z.im| / 2
+  have htB : T₀ + 10 ≤ |z.im| := (le_max_left _ _).trans ht
+  have htζ : 2 * ζ + 10 ≤ |z.im| := (le_max_left _ _).trans ((le_max_right _ _).trans ht)
+  have htδ : 2 * δ⁻¹ + 10 ≤ |z.im| := (le_max_right _ _).trans ((le_max_right _ _).trans ht)
+  have hB : 1 ≤ T₀ := le_max_right _ _
+  have hy : 2 ≤ y := by dsimp [y]; linarith
+  have hyζ : ζ ≤ y := by dsimp [y]; linarith
+  have hyδ : δ⁻¹ ≤ y := by dsimp [y]; linarith
+  let X := y ^ (2 * (j + 1))
+  have hyX : y ≤ X := le_self_pow₀ (by linarith) (by omega)
+  have hdist : dist z c ≤ 2 := by simp [c, dist_eq_norm]
+  have hdisc (w : ℂ) (hw : w ∈ Metric.closedBall c 9) :
+      w.re ∈ Icc (a - 8) (d + 12) ∧ T₀ ≤ |w.im| ∧ |w.im| ≤ y ^ 2 := by
+    have hre := (Complex.abs_re_le_norm (w - c)).trans (mem_closedBall_iff_norm.mp hw)
+    have him := (Complex.abs_im_le_norm (w - c)).trans (mem_closedBall_iff_norm.mp hw)
+    norm_num [c, Complex.sub_re, Complex.add_re, Complex.sub_im, Complex.add_im] at hre him
+    have hlo := (abs_sub_abs_le_abs_sub z.im w.im).trans (by simpa only [abs_sub_comm z.im w.im] using him : |z.im - w.im| ≤ 9)
+    have hhi := (abs_sub_abs_le_abs_sub w.im z.im).trans him
+    obtain ⟨hl, hu⟩ := abs_le.mp hre
+    refine ⟨⟨by linarith [hz.1], by linarith [hz.2]⟩, by linarith, ?_⟩
+    have h5 : 5 ≤ y := by dsimp [y]; linarith
+    have ht' : |z.im| = 2 * y := by dsimp [y]; ring
+    nlinarith [mul_nonneg (show 0 ≤ y - 5 by linarith) (show 0 ≤ y + 3 by linarith)]
+  have hbd (w : ℂ) (hw : w ∈ Metric.closedBall c 9) : ‖L w‖ ≤ X := by
+    obtain ⟨hre, hlo, hhi⟩ := hdisc w hw
+    exact (bound _ hre hlo).trans ((pow_le_pow_left₀ (abs_nonneg _) hhi _).trans_eq (pow_mul _ _ _).symm)
+  -- Polynomial growth rules out poles throughout the smaller closed disk at this height.
+  have han : AnalyticOnNhd ℂ L (Metric.closedBall c 8) := by
+    intro w hw
+    apply (hL (mem_univ w)).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+    by_contra! hn
+    have hne : ∀ᶠ v in 𝓝 w, v ∈ Metric.ball c 9 := Metric.isOpen_ball.mem_nhds ((Metric.closedBall_subset_ball (by norm_num : (8 : ℝ) < 9)) hw)
+    have hp := (tendsto_norm_cobounded_atTop.comp (tendsto_cobounded_of_meromorphicOrderAt_neg hn)).eventually_gt_atTop X
+    obtain ⟨v, hv, hv'⟩ := (hp.and (hne.filter_mono nhdsWithin_le_nhds)).exists
+    exact hv.not_ge (hbd v (Metric.ball_subset_closedBall hv'))
+  have hcr : 2 ≤ c.re := by simp [c]; linarith [hz.1]
+  have hc : c ∈ halfPlane := lt_of_lt_of_le (by norm_num : (1 : ℝ) < 2) hcr
+  have hcenter : 1 ≤ X * ‖L c‖ := by
+    rw [hs ⟨c, hc⟩, mul_comm]
+    exact (finiteHeckeL_zeroFreeRegion_euler F χ ⟨c, hc⟩ (y := 2) (by norm_num) hcr).2.trans
+      (mul_le_mul_of_nonneg_left (hyζ.trans hyX) (norm_nonneg _))
+  obtain ⟨r, hr, hrε, hgood⟩ := hK L c z X (hy.trans hyX) hdist han
+    (fun w hw ↦ hbd _ (Metric.closedBall_subset_closedBall (by norm_num : (8 : ℝ) ≤ 9) hw)) hcenter
+  refine ⟨r, hr, hrε.trans (min_le_left _ _), fun w hw ↦ ?_⟩
+  have hwr := mem_sphere_iff_norm.mp hw
+  have h1 : r ≤ 1 := hrε.trans (min_le_right _ _)
+  have hwc : w ∈ Metric.closedBall c 8 := by
+    apply Metric.mem_closedBall.mpr
+    linarith [dist_triangle w z c, Metric.mem_sphere.mp hw]
+  have hre := (Complex.abs_re_le_norm (w - z)).trans hwr.le
+  have him := (Complex.abs_im_le_norm (w - z)).trans hwr.le
+  have hwre : a / 2 ≤ w.re := by
+    have h := (abs_le.mp hre).1
+    simp only [Complex.sub_re] at h
+    linarith [hz.1, hrε.trans (min_le_left (a / 2) 1)]
+  have hyw : y ≤ |w.im| := by
+    have h := (abs_sub_abs_le_abs_sub z.im w.im).trans (show |z.im - w.im| ≤ r by
+      rwa [abs_sub_comm, ← Complex.sub_im])
+    dsimp [y]; linarith
+  refine ⟨hcP.continuousAt.mul (han w hwc).continuousAt, ?_⟩
+  have hδw : 1 ≤ |w.im| * ‖reciprocalPartialHeckeEulerProduct χ S w‖ :=
+    ((inv_le_iff_one_le_mul₀ hδ).mp (hyδ.trans hyw)).trans (by
+      exact mul_le_mul_of_nonneg_left (hP w hwre) (abs_nonneg _))
+  have hXw : X ^ K ≤ |w.im| ^ ((2 * (j + 1)) * K) := by
+    rw [pow_mul]; exact pow_le_pow_left₀ (by positivity) (pow_le_pow_left₀ (by linarith) hyw _) _
+  have hLw := (hgood w hw).trans (mul_le_mul_of_nonneg_right hXw (norm_nonneg _))
+  dsimp only
+  rw [norm_mul, pow_succ]
+  calc
+    1 = 1 * 1 := by ring
+    _ ≤ (|w.im| ^ (2 * (j + 1) * K) * ‖L w‖) *
+        (|w.im| * ‖reciprocalPartialHeckeEulerProduct χ S w‖) :=
+      mul_le_mul hLw hδw zero_le_one (zero_le_one.trans hLw)
+    _ = _ := by ring
+
+/-- Apply maximum modulus on a good circle to the holomorphic local product, including
+its polynomial weight. The same argument applies in the reflected variable. -/
+private theorem globalConverse_normTwist_gaussian_strip_bounds_local (χ : U) (S : Finset V)
+    (hD : ∀ v : V, v.asIdeal ∣ differentIdeal ℤ (𝓞 F) → v ∈ S)
+    (g : SchwartzBruhat (Multiplicative (SAdeleRing F S)))
+    (η : PontryaginDual (SIdeleQuotient F S)) (hχ : χ₀(χ) ∈ unramifiedOutside F S)
+    (hη : sIdeleRestriction F S ⟨χ₀(χ), hχ⟩ = normChartₛ(η) 0)
+    (b : B) (m e : ℂ → ℂ) (hm : Differentiable ℂ m) (he : Differentiable ℂ e)
+    (hIm : ∀ z : ℂ, |z.im| ≤ ‖e z‖)
+    (hZ : ∀ z : ℂ, ∀ᶠ w in 𝓝[≠] z,
+      b.val (e w) = m (e w) * Z(sAdeleSchwartzToGlobal F S g, χ, w))
+    (a d : ℝ) (ha : 0 < a) (had : a ≤ d)
+    (l u : ℝ) (hlu : l ≤ u)
+    (hstrip : ∀ w : ℂ, w.re ∈ Icc (a / 2) (d + a / 2) → (e w).re ∈ Icc l u) (n : ℕ) :
+    BddAbove ((fun z : ℂ ↦ ‖(e z) ^ n * (m (e z) *
+      sLocalIdelicZFunction g (normChartₛ(η) z))‖) '' (Complex.re ⁻¹' Icc a d)) := by
+  classical
+  obtain ⟨L, hL, hs⟩ := finiteHeckeL_exists_continuation χ
+  obtain ⟨k, T, hcircle⟩ := globalConverse_normTwist_gaussian_strip_bounds_circles χ S L hL hs a d ha had
+  let p := (sLocalZetaPair η (Submodule.Quotient.mk g)).1
+  let H := fun z ↦ (e z) ^ n * (m (e z) * p.val z)
+  have hH : DifferentiableOn ℂ H (Complex.re ⁻¹' Ioi 0) :=
+    (he.pow n).differentiableOn.mul ((hm.comp he).differentiableOn.mul p.property.2.1)
+  have hbase : sIdeleRestriction F S ⟨χ₀(χ), hχ⟩ =
+      (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η := by
+    ext1 x
+    have hx := DFunLike.congr_fun hη x
+    change _ = (η x : ℂ) * _ ^ (0 : ℂ) at hx
+    change _ = (η x : ℂ)
+    simpa only [Complex.cpow_zero, mul_one] using hx
+  have hmass : (∏ᶠ v : {v : V // v ∉ S},
+      (((finiteLocalMultiplicativeTamagawaMeasure F v.val) (v.val.adicCompletionIntegers F).units).toReal : ℂ)) = 1 := by
+    apply finprod_eq_one_of_forall_eq_one
+    intro v
+    have hv : ¬v.val.asIdeal ∣ differentIdeal ℤ (𝓞 F) := fun h ↦ v.property (hD _ h)
+    simp [finiteLocalMultiplicativeTamagawaMeasure_integerUnits, multiplicity_eq_zero_of_not_dvd hv]
+  have hW := weilIdentity_unramifiedOutside_meromorphic S g χ hχ L hL (fun z hz ↦ hs ⟨z, hz⟩)
+  dsimp only at hW
+  rw [hmass, hbase] at hW
+  obtain ⟨C, hC⟩ := b.property.2.2 l u hlu (subset_univ _) (n + k)
+  let K := Complex.reProdIm (Icc a d) (Icc (-T) T)
+  have hK : IsCompact K := isCompact_Icc.reProdIm isCompact_Icc
+  obtain ⟨M, hM⟩ := hK.exists_bound_of_continuousOn (f := H)
+    (hH.continuousOn.mono (fun z hz ↦ ha.trans_le hz.1.1))
+  refine ⟨max C M, ?_⟩
+  rintro _ ⟨z, hz, rfl⟩
+  dsimp only
+  have hpz : p.val z = sLocalIdelicZFunction g (normChartₛ(η) z) :=
+    (sLocalZetaPair_mk η g).1 (ha.trans_le hz.1)
+  rw [← hpz]
+  change ‖H z‖ ≤ _
+  by_cases ht : |z.im| ≤ T
+  · exact (hM z ⟨hz, abs_le.mp ht⟩).trans (le_max_right _ _)
+  obtain ⟨r, hr, hra, hgood⟩ := hcircle z hz (le_of_not_ge ht)
+  have hwr (w : ℂ) (hw : w ∈ Metric.closedBall z r) : w.re ∈ Icc (a / 2) (d + a / 2) := by
+    have h := (Complex.abs_re_le_norm (w - z)).trans (mem_closedBall_iff_norm.mp hw)
+    obtain ⟨h₁, h₂⟩ := abs_le.mp h
+    simp only [Complex.sub_re] at h₁ h₂
+    exact ⟨by linarith [hz.1], by linarith [hz.2]⟩
+  have hball : Metric.closedBall z r ⊆ Complex.re ⁻¹' Ioi (0 : ℝ) :=
+    fun w hw ↦ (half_pos ha).trans_le (hwr w hw).1
+  apply le_trans _ (le_max_left C M)
+  apply Complex.norm_le_of_forall_mem_frontier_norm_le Metric.isBounded_ball
+    ((hH.mono hball).diffContOnCl_ball subset_rfl) _ (subset_closure (Metric.mem_ball_self hr))
+  intro w hw
+  have hw' := Metric.frontier_ball_subset_sphere hw
+  have hwc := Metric.sphere_subset_closedBall hw'
+  obtain ⟨hcont, hlow⟩ := hgood w hw'
+  have hpos : 0 < w.re := hball hwc
+  let D := fun z ↦ reciprocalPartialHeckeEulerProduct χ S z * L z
+  have hright : Complex.re ⁻¹' Ioi (0 : ℝ) ∈ 𝓝 w :=
+    (isOpen_Ioi.preimage Complex.continuous_re).mem_nhds hpos
+  -- On this circle the meromorphic identity gives an equality of continuous values.
+  have hEq : (e w) ^ n * b.val (e w) = H w * D w := by
+    have hbc : Continuous b.val :=
+      continuous_iff_continuousAt.mpr fun s ↦ b.property.2.1.continuousOn.continuousAt (by simp)
+    apply tendsto_nhds_unique_of_eventuallyEq (l := 𝓝[≠] w)
+      ((((he.pow n).continuous.mul (hbc.comp he.continuous)).continuousAt.tendsto).mono_left nhdsWithin_le_nhds)
+      (((hH.continuousOn.continuousAt hright).mul hcont).tendsto.mono_left nhdsWithin_le_nhds)
+    filter_upwards [hZ w, nhdsNE_le_codiscrete w hW, nhdsWithin_le_nhds hright] with v hv hwv hp
+    change (e v) ^ n * b.val (e v) = (e v) ^ n * (m (e v) * p.val v) *
+      ((∏ u ∈ S, (finiteHeckeEulerFactor χ u v)⁻¹) * L v)
+    have hpv : p.val v = sLocalIdelicZFunction g (normChartₛ(η) v) := (sLocalZetaPair_mk η g).1 hp
+    rw [hv, hwv, hpv]
+    ring
+  calc
+    ‖H w‖ ≤ ‖H w‖ * (|w.im| ^ k * ‖D w‖) := le_mul_of_one_le_right (norm_nonneg _) hlow
+    _ = |w.im| ^ k * ‖(e w) ^ n * b.val (e w)‖ := by rw [hEq, norm_mul (H w) (D w)]; ring
+    _ ≤ ‖e w‖ ^ k * ‖(e w) ^ n * b.val (e w)‖ := by gcongr; exact hIm w
+    _ = ‖(e w) ^ (n + k) * b.val (e w)‖ := by simp only [norm_mul, norm_pow, pow_add]; ring
+    _ ≤ C := hC (mem_image_of_mem _ (hstrip w (hwr w hwc)))
 /-- Paper: Theorem 6.3.2.1(1), p. 309. Let an entire multiplier times the
 global Gaussian zeta function extend to a Schwartz–Bergman function. Choose a finite
 stage representing the Gaussian at which the multiplier times each of the two local
@@ -1827,7 +2324,97 @@ private theorem globalConverse_normTwist_gaussian_strip_bounds (χ : U) (t : ℝ
       let bounded (I : Set ℝ) (v : ℂ → ℂ) := ∀ a b : ℝ, a ≤ b → Icc a b ⊆ I → ∀ n : ℕ,
         BddAbove ((fun z : ℂ ↦ ‖z ^ n * (m z * v z)‖) '' (Complex.re ⁻¹' Icc a b))
       bounded (Ioi 0) p.1.val ∧ bounded (Iio 1) p.2.val := by
-  sorry
+  classical
+  obtain ⟨A, f, hf⟩ := sAdeleSchwartzToGlobal_exhaustive F (adelicStandardGaussian χ)
+  -- Including the different makes the omitted unit masses one and identifies the Fourier transform.
+  let S := A ∪ (Ideal.finite_factors (differentIdeal_ne_bot : differentIdeal ℤ (𝓞 F) ≠ ⊥)).toFinset
+  have hA : A ⊆ S := Finset.subset_union_left
+  have hD (v : V) (hv : v.asIdeal ∣ differentIdeal ℤ (𝓞 F)) : v ∈ S :=
+    Finset.mem_union_right _ (by simpa using hv)
+  let g := sAdeleSchwartzTransition F hA f
+  have hg : sAdeleSchwartzToGlobal F S g = adelicStandardGaussian χ :=
+    (LinearMap.congr_fun (sAdeleSchwartzToGlobal_comp F hA) f).trans hf
+  refine ⟨S, g, hg, fun η hχ hη ↦ ?_⟩
+  let G := sAdeleSchwartzToGlobal F S g
+  have hbm : MeromorphicOn b.val univ := fun z _ ↦
+    (b.property.2.1.analyticAt (by simp : Complex.re ⁻¹' (univ : Set ℝ) ∈ 𝓝 z)).meromorphicAt
+  have hgm : MeromorphicOn (fun z ↦ m z * Z(G, χ, z)) univ :=
+    fun z hz ↦ (_hm.analyticAt z).meromorphicAt.mul ((globalIdelicZFunction_meromorphic G χ) hz).meromorphicAt
+  have hn := heckeEulerProductOutside_eq_finite_nf_eq _ _ hbm hgm (fun z hz ↦ by
+    simpa only [G, hg, gaussianCompletedHeckeL] using _hb ⟨z, hz⟩)
+  have hZ (z : ℂ) : ∀ᶠ w in 𝓝[≠] z, b.val w = m w * Z(G, χ, w) := by
+    exact (hbm.toMeromorphicNFOn_eq_self_on_nhdsNE (mem_univ z)).symm.trans
+      (hn ▸ hgm.toMeromorphicNFOn_eq_self_on_nhdsNE (mem_univ z))
+  constructor
+  · intro a d had hsub n
+    have ha : 0 < a := hsub (left_mem_Icc.mpr had)
+    obtain ⟨C, hC⟩ := globalConverse_normTwist_gaussian_strip_bounds_local χ S hD g η hχ hη b m id
+      _hm differentiable_id Complex.abs_im_le_norm hZ a d ha had (a / 2) (d + a / 2) (by linarith)
+      (fun _ h ↦ h) n
+    refine ⟨C, ?_⟩
+    rintro _ ⟨z, hz, rfl⟩
+    exact ((congrArg (fun v : ℂ ↦ ‖z ^ n * (m z * v)‖)
+      ((sLocalZetaPair_mk η g).1 (ha.trans_le hz.1)))).le.trans (hC (mem_image_of_mem _ hz))
+  · intro a d had hsub n
+    have hd : d < 1 := hsub (right_mem_Icc.mpr had)
+    have hinv (x : C𝔽) : χ₀(χ⁻¹) x = (χ₀(χ) x)⁻¹ := by
+      change ((χ x)⁻¹ : Circle) * _ ^ (0 : ℂ) = ((_ : ℂ) * _ ^ (0 : ℂ))⁻¹
+      simp
+      rfl
+    have hχ' : χ₀(χ⁻¹) ∈ unramifiedOutside F S := by
+      apply (mem_unramifiedOutside_iff F S _).mpr
+      intro v hv x
+      have hx := (mem_unramifiedOutside_iff F S _).mp hχ v hv x
+      change χ₀(χ) _ = 1 at hx
+      change χ₀(χ⁻¹) _ = 1
+      rw [hinv, hx, inv_one]
+    have hη' : sIdeleRestriction F S ⟨χ₀(χ⁻¹), hχ'⟩ = normChartₛ(η⁻¹) 0 := by
+      ext1 x
+      obtain ⟨y, rfl⟩ := QuotientGroup.mk_surjective x
+      have hy := DFunLike.congr_fun hη (QuotientGroup.mk y)
+      rw [sIdeleRestriction_mk] at hy ⊢
+      rw [hinv, hy]
+      change ((_ : ℂ) * _ ^ (0 : ℂ))⁻¹ = ((η (QuotientGroup.mk y))⁻¹ : Circle) * _ ^ (0 : ℂ)
+      simp
+      rfl
+    have hdual (z : ℂ) : Z(G, χ, 1 - z) =
+        Z(sAdeleSchwartzToGlobal F S (sAdeleSchwartzFourier g), χ⁻¹, z) := by
+      rw [globalIdelicZFunction_functionalEquation, show adeleSchwartzFourier G = _ from
+        adeleSchwartzFourier_sAdeleSchwartzToGlobal_of_different F S hD g (sAdeleSchwartzFourier g) rfl]
+      congr 1
+      ext1 x
+      let N : ℂ := (((ideleClassNorm F x).val : ℝ) : ℂ)
+      have hN : N ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (ideleClassNorm F x).ne_zero)
+      change N * ideleClassNormTwist χ (1 - z) x⁻¹ = _
+      rw [map_inv]
+      change N * ((χ x : ℂ) * N ^ (1 - z))⁻¹ = (χ x : ℂ)⁻¹ * N ^ z
+      rw [Complex.cpow_sub _ _ hN, Complex.cpow_one]
+      field_simp
+    have hZ' (z : ℂ) : ∀ᶠ w in 𝓝[≠] z, b.val (1 - w) = m (1 - w) *
+        Z(sAdeleSchwartzToGlobal F S (sAdeleSchwartzFourier g), χ⁻¹, w) := by
+      have hmap : Tendsto (fun w : ℂ ↦ 1 - w) (𝓝[≠] z) (𝓝[≠] (1 - z)) := by
+        apply tendsto_nhdsWithin_iff.mpr
+        refine ⟨(continuous_const.sub continuous_id).continuousAt.tendsto.mono_left nhdsWithin_le_nhds, ?_⟩
+        filter_upwards [self_mem_nhdsWithin] with w hw
+        exact fun h ↦ hw (sub_right_inj.mp h)
+      filter_upwards [hmap.eventually (hZ (1 - z))] with w hw
+      exact hw.trans (congrArg (_ * ·) (hdual w))
+    obtain ⟨C, hC⟩ := globalConverse_normTwist_gaussian_strip_bounds_local χ⁻¹ S hD
+      (sAdeleSchwartzFourier g) η⁻¹ hχ' hη' b m (fun w ↦ 1 - w) _hm (differentiable_const _ |>.sub differentiable_id)
+      (fun w ↦ by simpa using Complex.abs_im_le_norm (1 - w)) hZ'
+      (1 - d) (1 - a) (by linarith) (by linarith) (a - (1 - d) / 2) (1 - (1 - d) / 2) (by linarith)
+      (fun w hw ↦ by
+        simp only [Complex.sub_re, Complex.one_re]
+        exact ⟨by linarith [hw.2], by linarith [hw.1]⟩) n
+    refine ⟨C, ?_⟩
+    rintro _ ⟨z, hz, rfl⟩
+    have hzr : (1 - z).re ∈ Icc (1 - d) (1 - a) :=
+      ⟨sub_le_sub_left hz.2 _, sub_le_sub_left hz.1 _⟩
+    have hh := hC (mem_image_of_mem _ hzr)
+    dsimp only at hh ⊢
+    rw [sub_sub_cancel] at hh
+    exact ((congrArg (fun v : ℂ ↦ ‖z ^ n * (m z * v)‖)
+      ((sLocalZetaPair_mk η g).2 (hz.2.trans_lt hd)))).le.trans hh
 
 /-- On the right half-plane the pole-cancelled completion reduces to the usual
 Euler product times the pole polynomial, including the Gaussian normalization. -/
