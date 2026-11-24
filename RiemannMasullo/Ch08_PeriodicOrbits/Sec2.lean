@@ -93,8 +93,8 @@ def adeleOrbitBasepoints : Set 𝔸[F] :=
   Set.range (adeleOrbitBasepoint F)
 
 /-- Paper: Definition 8.2.0.1(1), p. 384. The ordinary base point lies in $Z_F$. -/
-theorem one_mem_adeleOrbitBasepoints : 1 ∈ adeleOrbitBasepoints F := by
-  sorry
+theorem one_mem_adeleOrbitBasepoints : 1 ∈ adeleOrbitBasepoints F :=
+  ⟨none, rfl⟩
 
 /-- Paper: Definition 8.2.0.1(2), p. 384. The family in (8.2.0.3) consists of the
 S-local full-idele orbits with their adelic subspace topologies. -/
@@ -639,25 +639,202 @@ theorem adeleNormOneOrbitUnion_locallyCompactSpace :
       (TopologicalSpace.coinduced (adeleNormOneOrbitMap F) inferInstance) := by
   sorry
 
+/-- The S-idelic norm is continuous: it is a finite product of powers of coordinate norms. -/
+private theorem sAdeleNormOneOrbitUnion_sigmaCompactSpace_continuous
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    Continuous (sIdeleNorm F S) := by
+  apply Units.isEmbedding_val₀.continuous_iff.mpr
+  change Continuous (fun g : (SAdeleRing F S)ˣ ↦ ((sIdeleNorm F S g).val))
+  simp only [sIdeleNorm, MonoidHom.mul_apply, MonoidHom.finsetProd_apply, MonoidHom.pow_apply,
+    Units.val_mul, Units.coe_prod, Units.val_pow_eq_pow_val]
+  change Continuous (fun g : (SAdeleRing F S)ˣ ↦
+    (∏ w : InfinitePlace F, ‖g.val.1 w‖₊ ^ w.mult) * ∏ v : S, ‖g.val.2 v‖₊)
+  fun_prop
+
+/-- The S-adele ring is second countable: each infinite completion embeds isometrically
+in the complex numbers, and each finite completion is a proper metric space. -/
+private theorem sAdeleNormOneOrbitUnion_sigmaCompactSpace_secondCountable
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    SecondCountableTopology (SAdeleRing F S) := by
+  have h1 (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  have h2 (v : S) : SecondCountableTopology (v.val.adicCompletion F) := by
+    have := properSpace_adicCompletion (K := F) v.val
+    infer_instance
+  change SecondCountableTopology
+    (((w : InfinitePlace F) → w.Completion) × ((v : S) → (v.val.adicCompletion F)))
+  infer_instance
+
+/-- The norm-one subgroup of the S-ideles is σ-compact: it is closed in the S-idele group,
+which is locally compact and second countable. -/
+private theorem sAdeleNormOneOrbitUnion_sigmaCompactSpace_kernel
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    SigmaCompactSpace (MonoidHom.ker (sIdeleNorm F S)) := by
+  have h2 := sAdeleNormOneOrbitUnion_sigmaCompactSpace_secondCountable F S
+  have hd := sIdeleGroup_description F S
+  have h3 : SecondCountableTopology (SAdeleRing F S)ˣ := hd.1.secondCountableTopology
+  have h4 : LocallyCompactSpace (SAdeleRing F S)ˣ := hd.2.2.1
+  have h5 : SigmaCompactSpace (SAdeleRing F S)ˣ := inferInstance
+  have hcl : IsClosed ((MonoidHom.ker (sIdeleNorm F S) : Subgroup (SAdeleRing F S)ˣ) :
+      Set (SAdeleRing F S)ˣ) := by
+    rw [MonoidHom.coe_ker]
+    exact isClosed_singleton.preimage
+      (sAdeleNormOneOrbitUnion_sigmaCompactSpace_continuous F S)
+  exact hcl.sigmaCompactSpace
+
 /-- Paper: Lemma 8.2.0.3, p. 385. The S-local norm-one orbit union is σ-compact. -/
 theorem sAdeleNormOneOrbitUnion_sigmaCompactSpace :
     SigmaCompactSpace (sAdeleNormOneOrbitUnion F S) := by
-  sorry
+  have h1 := sAdeleNormOneOrbitUnion_sigmaCompactSpace_kernel F S
+  have h2 : Finite (sAdeleOrbitBasepoints F S) :=
+    (Set.finite_range (sAdeleOrbitBasepoint F S)).to_subtype
+  have hc : Continuous (sAdeleNormOneOrbitMap F S) := by
+    refine Continuous.subtype_mk ?_ _
+    exact (continuous_subtype_val.comp continuous_fst).smul
+      (continuous_subtype_val.comp continuous_snd)
+  have hs : Surjective (sAdeleNormOneOrbitMap F S) := by
+    rintro ⟨x, hx⟩
+    obtain ⟨g, z, hgz⟩ := (mem_sAdeleNormOneOrbitUnion_iff F S x).mp hx
+    exact ⟨(g, z), Subtype.ext hgz⟩
+  have hr := isSigmaCompact_range hc
+  rw [hs.range_eq] at hr
+  exact isSigmaCompact_univ_iff.mp hr
+
+/-- The finite places of a number field form a countable set, since every prime ideal is
+finitely generated over the countable ring of integers. -/
+private theorem adeleNormOneOrbitUnion_sigmaCompactSpace_countable_places :
+    Countable (HeightOneSpectrum (𝓞 F)) := by
+  have hF : Countable F := (Module.finBasis ℚ F).equivFun.injective.countable
+  have hO : Countable (𝓞 F) := (RingOfIntegers.coe_injective (K := F)).countable
+  have h : Surjective (fun s : Finset (𝓞 F) ↦ Ideal.span (s : Set (𝓞 F))) :=
+    fun I ↦ IsNoetherian.noetherian I
+  have hI : Countable (Ideal (𝓞 F)) := h.countable
+  exact (show Injective (HeightOneSpectrum.asIdeal (R := 𝓞 F)) from fun _ _ h ↦
+    HeightOneSpectrum.ext h).countable
+
+/-- The adele ring is second countable. The finite adeles are covered by countably many open
+sets, each consisting of the adeles that are integral outside a finite set of places, and
+each of these embeds into the countable product of the second countable local fields. -/
+private theorem adeleNormOneOrbitUnion_sigmaCompactSpace_adeleRing :
+    SecondCountableTopology 𝔸[F] := by
+  classical
+  let I := HeightOneSpectrum (𝓞 F)
+  let K (w : I) := w.adicCompletion F
+  let O (w : I) : Set (K w) := w.adicCompletionIntegers F
+  have hopen (w : I) : IsOpen (O w) := Valued.isOpen_valuationSubring (K w)
+  have hI : Countable I := adeleNormOneOrbitUnion_sigmaCompactSpace_countable_places F
+  have hproper (w : I) : ProperSpace (K w) := properSpace_adicCompletion w
+  have hK (w : I) : SecondCountableTopology (K w) := secondCountable_of_proper
+  let U (s : Finset I) := {a : FiniteAdeleRing (𝓞 F) F | ∀ w ∉ s, a w ∈ O w}
+  have hU (s : Finset I) : SecondCountableTopology (U s) := by
+    have hs : Filter.cofinite ≤ Filter.principal (s : Set I)ᶜ :=
+      Filter.le_principal_iff.mpr s.finite_toSet.compl_mem_cofinite
+    have he := RestrictedProduct.isEmbedding_inclusion_principal (R := K) (A := O) hs
+    have h2 : SecondCountableTopology
+        (RestrictedProduct K O (Filter.principal (s : Set I)ᶜ)) :=
+      (RestrictedProduct.isEmbedding_coe_of_principal (R := K) (A := O)).secondCountableTopology
+    have hrange : Set.range (RestrictedProduct.inclusion K O hs) = U s := by
+      rw [RestrictedProduct.range_inclusion]
+      ext a
+      exact Filter.eventually_principal
+    exact hrange ▸ he.toHomeomorph.symm.isEmbedding.secondCountableTopology
+  have hfin : SecondCountableTopology (FiniteAdeleRing (𝓞 F) F) := by
+    refine secondCountableTopology_of_countable_cover (U := U)
+      (fun _ ↦ RestrictedProduct.isOpen_forall_imp_mem hopen) (Set.eq_univ_of_forall fun a ↦ ?_)
+    have he := Filter.eventually_cofinite.mp a.2
+    exact Set.mem_iUnion.mpr ⟨he.toFinset, fun w hw ↦ by
+      by_contra h
+      exact hw (he.mem_toFinset.mpr h)⟩
+  have hinf (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  exact inferInstanceAs (SecondCountableTopology
+    (((w : InfinitePlace F) → w.Completion) × FiniteAdeleRing (𝓞 F) F))
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The global norm-one orbit union is σ-compact
 in the adelic subspace topology. -/
 theorem adeleNormOneOrbitUnion_sigmaCompactSpace :
     SigmaCompactSpace (adeleNormOneOrbitUnion F) := by
-  sorry
+  obtain ⟨-, hlc, -, -, -, hker⟩ := ideleGroup_topology F
+  have h2 := adeleNormOneOrbitUnion_sigmaCompactSpace_adeleRing F
+  have hop : SecondCountableTopology 𝔸[F]ᵐᵒᵖ :=
+    MulOpposite.opHomeomorph.symm.isEmbedding.secondCountableTopology
+  have hu : SecondCountableTopology 𝔸[F]ˣ :=
+    Units.isEmbedding_embedProduct.secondCountableTopology
+  have hs : SigmaCompactSpace 𝔸[F]ˣ := inferInstance
+  have hN : SigmaCompactSpace N₁ := hker.sigmaCompactSpace
+  have hc : Countable (HeightOneSpectrum (𝓞 F)) :=
+    adeleNormOneOrbitUnion_sigmaCompactSpace_countable_places F
+  rw [← isSigmaCompact_iff_sigmaCompactSpace]
+  refine isSigmaCompact_iUnion _ fun i ↦ ?_
+  exact isSigmaCompact_range (f := fun g : N₁ ↦ g • adeleOrbitBasepoint F i)
+    (continuous_subtype_val.smul continuous_const)
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The S-local norm-one orbit union is paracompact. -/
 theorem sAdeleNormOneOrbitUnion_paracompactSpace :
     ParacompactSpace (sAdeleNormOneOrbitUnion F S) := by
-  sorry
+  have h1 := sAdeleNormOneOrbitUnion_t2Space F S
+  have h2 := sAdeleNormOneOrbitUnion_locallyCompactSpace F S
+  have h3 := sAdeleNormOneOrbitUnion_sigmaCompactSpace F S
+  infer_instance
+
+/-- A regular second countable space is paracompact: shrink the cover to countably many open
+sets whose closures lie in members of the cover, and remove from each chosen member the
+closures of the earlier sets. -/
+private theorem adeleNormOneOrbitUnion_paracompactSpace_of_regular_secondCountable
+    {X : Type*} [TopologicalSpace X] [RegularSpace X] [SecondCountableTopology X] :
+    ParacompactSpace X := by
+  classical
+  refine ⟨fun α s ho hc ↦ ?_⟩
+  have hx : ∀ x : X, ∃ a, x ∈ s a := fun x ↦ Set.mem_iUnion.mp (hc ▸ Set.mem_univ x)
+  choose a ha using hx
+  have hV : ∀ x : X, ∃ V : Set X, IsOpen V ∧ x ∈ V ∧ closure V ⊆ s (a x) := by
+    intro x
+    obtain ⟨K, hK, hKc, hKs⟩ := exists_mem_nhds_isClosed_subset ((ho (a x)).mem_nhds (ha x))
+    exact ⟨interior K, isOpen_interior, mem_interior_iff_mem_nhds.mpr hK,
+      (closure_minimal interior_subset hKc).trans hKs⟩
+  choose V hVo hVx hVs using hV
+  obtain ⟨T, hT, hTcov⟩ := isOpen_iUnion_countable V hVo
+  have hTc : Countable T := hT.to_subtype
+  obtain ⟨f, hf⟩ := exists_injective_nat T
+  have hmem : ∀ x : X, ∃ i : T, x ∈ V i := by
+    intro x
+    have h1 : x ∈ ⋃ i ∈ T, V i := by
+      rw [hTcov]
+      exact Set.mem_iUnion.mpr ⟨x, hVx x⟩
+    obtain ⟨i, hi, hxi⟩ := Set.mem_iUnion₂.mp h1
+    exact ⟨⟨i, hi⟩, hxi⟩
+  have hfin : ∀ n : ℕ, {j : T | f j < n}.Finite := fun n ↦
+    (Set.finite_Iio n).preimage hf.injOn
+  have hfin' : ∀ n : ℕ, {j : T | f j ≤ n}.Finite := fun n ↦
+    (Set.finite_Iic n).preimage hf.injOn
+  refine ⟨T, fun i ↦ s (a i) \ ⋃ j ∈ {j : T | f j < f i}, closure (V j), fun i ↦ ?_, ?_, ?_,
+    fun i ↦ ⟨a i, Set.sdiff_subset⟩⟩
+  · exact (ho _).sdiff ((hfin (f i)).isClosed_biUnion fun j _ ↦ isClosed_closure)
+  · refine Set.eq_univ_of_forall fun x ↦ ?_
+    have hex : ∃ n, ∃ i : T, f i = n ∧ x ∈ s (a i) := by
+      obtain ⟨i, hi⟩ := hmem x
+      exact ⟨f i, i, rfl, hVs i (subset_closure hi)⟩
+    obtain ⟨i, hi, hxi⟩ := Nat.find_spec hex
+    refine Set.mem_iUnion.mpr ⟨i, hxi, fun hmem' ↦ ?_⟩
+    obtain ⟨j, hj, hxj⟩ := Set.mem_iUnion₂.mp hmem'
+    have hlt : f j < Nat.find hex := by
+      rw [← hi]
+      exact hj
+    exact Nat.find_min hex hlt ⟨j, rfl, hVs j hxj⟩
+  · intro x
+    obtain ⟨m, hm⟩ := hmem x
+    refine ⟨V m, (hVo m).mem_nhds hm, (hfin' (f m)).subset ?_⟩
+    rintro i ⟨y, hy, hyV⟩
+    by_contra hlt
+    have hlt' : f m < f i := not_le.mp hlt
+    exact hy.2 (Set.mem_iUnion₂.mpr ⟨m, hlt', subset_closure hyV⟩)
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The global norm-one orbit union is paracompact. -/
 theorem adeleNormOneOrbitUnion_paracompactSpace : ParacompactSpace (adeleNormOneOrbitUnion F) := by
-  sorry
+  have h2 := adeleNormOneOrbitUnion_sigmaCompactSpace_adeleRing F
+  have ht2 := t2Space_adeleRing F
+  have ht3 : T3Space 𝔸[F] := inferInstance
+  exact adeleNormOneOrbitUnion_paracompactSpace_of_regular_secondCountable
 
 /-- Paper: Proposition 8.2.0.4, p. 386. The subgroup of global ideles obtained by
 inserting the units of the local valuation ring at the specified finite place. -/
@@ -720,7 +897,11 @@ def sAdeleFiniteOrbitSection (v : S) (τ : ℝ≥0ˣ →* 𝕀ₛ) : Set Aₛ :=
 single-zero base point. -/
 theorem sAdeleOrbitBasepoint_mem_finiteOrbitSection (v : S) (τ : ℝ≥0ˣ →* 𝕀ₛ) :
     sAdeleOrbitBasepoint F S (some (.inr v)) ∈ sAdeleFiniteOrbitSection F S v τ := by
-  sorry
+  have hN : (1 : ℝ≥0) < (v.val.asIdeal.absNorm : ℝ≥0) := by
+    exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v.val
+  refine ⟨1, ⟨by rw [Units.val_one], by rw [Units.val_one]; exact hN⟩, ?_⟩
+  change τ 1 • sAdeleOrbitBasepoint F S (some (.inr v)) = _
+  rw [map_one, one_smul]
 
 /-- Paper: Equation (8.2.0.10), p. 386. The global section at a finite place takes
 parameters in the half-open interval from 1 to the absolute prime ideal norm. -/
@@ -734,7 +915,11 @@ single-zero base point. -/
 theorem adeleOrbitBasepoint_mem_finiteOrbitSection (v : HeightOneSpectrum (𝓞 F))
     (τ : ℝ≥0ˣ →* 𝔸[F]ˣ) :
     adeleOrbitBasepoint F (some (.inr v)) ∈ adeleFiniteOrbitSection F v τ := by
-  sorry
+  have hN : (1 : ℝ≥0) < (v.asIdeal.absNorm : ℝ≥0) := by
+    exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  refine ⟨1, ⟨by rw [Units.val_one], by rw [Units.val_one]; exact hN⟩, ?_⟩
+  change τ 1 • adeleOrbitBasepoint F (some (.inr v)) = _
+  rw [map_one, one_smul]
 
 /-- A uniformizer at a finite place, as a unit, with norm the reciprocal of the absolute norm. -/
 private theorem sAdeleFiniteOrbit_transporter_uniformizer (v : HeightOneSpectrum (𝓞 F)) :
