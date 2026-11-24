@@ -5,6 +5,7 @@ public import RiemannMasullo.Ch10_TraceSpectral.Sec2
 import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
 import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
 import Mathlib.MeasureTheory.Integral.Asymptotics
+import Mathlib.MeasureTheory.Function.L2Space
 import Mathlib.Topology.Algebra.Module.Cardinality
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform.Weighted
 
@@ -19,7 +20,7 @@ family of such lifts would imply the exterior sum identity for every positive st
 -/
 
 open Filter Function IsDedekindDomain MeasureTheory NumberField Set Topology
-open scoped Asymptotics Classical NNReal NumberField.AdeleRing
+open scoped ComplexConjugate InnerProductSpace Asymptotics Classical NNReal NumberField.AdeleRing
 @[expose] public noncomputable section
 
 namespace RiemannMasullo
@@ -571,6 +572,252 @@ theorem exists_two_profiles_for_exterior_zero_exclusion
   · exact no_right_zeros_of_tilt_moment_cost χ σ hσ ha hs b hsupp t z hz h
       (hlift χ hχ t (by simp))
 
+private theorem thetaKernel_denominator_ne_zero {s t : ℂ} (hs : 1 / 2 < s.re) (ht : 1 / 2 < t.re) : s + conj t - 1 ≠ 0 := by
+  intro h
+  have hr := congrArg Complex.re h
+  simp only [Complex.sub_re, Complex.add_re, Complex.conj_re, Complex.one_re, Complex.zero_re] at hr
+  linarith
+
+private def thetaKernelFactor (w t : ℂ) := (t - w) / (t + conj w - 1)
+
+private def thetaKernelDeflate {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℂ E]
+    (U : ℂ → E) (w t : ℂ) : E :=
+  (conj (thetaKernelFactor w t))⁻¹ • (U t - ((w + conj w - 1) / (w + conj t - 1)) • U w)
+
+private theorem thetaKernelDeflate_inner {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℂ E]
+    (U : ℂ → E) (w s t : ℂ) (hw : 1 / 2 < w.re) (hs : 1 / 2 < s.re) (ht : 1 / 2 < t.re)
+    (hsw : s ≠ w) (htw : t ≠ w)
+    (hst : ⟪U s, U t⟫_ℂ = 1 / (s + conj t - 1))
+    (hsw' : ⟪U s, U w⟫_ℂ = 1 / (s + conj w - 1))
+    (hwt : ⟪U w, U t⟫_ℂ = 1 / (w + conj t - 1))
+    (hww : ⟪U w, U w⟫_ℂ = 1 / (w + conj w - 1)) :
+    ⟪thetaKernelDeflate U w s, thetaKernelDeflate U w t⟫_ℂ = 1 / (s + conj t - 1) := by
+  simp only [thetaKernelDeflate, thetaKernelFactor, inner_smul_left, inner_smul_right, inner_sub_left, inner_sub_right,
+    hst, hsw', hwt, hww, map_sub, map_div₀, map_add, map_one, map_inv₀,
+    starRingEnd_self_apply]
+  have hconj : conj t - conj w ≠ 0 := sub_ne_zero.mpr (fun h ↦ htw ((starRingEnd ℂ).injective h))
+  have hs' := thetaKernel_denominator_ne_zero hs hw
+  have ht' := thetaKernel_denominator_ne_zero hw ht
+  have hst' := thetaKernel_denominator_ne_zero hs ht
+  have hww' := thetaKernel_denominator_ne_zero hw hw
+  have hws' : conj w + s - 1 ≠ 0 := by simpa only [add_comm (conj w) s] using hs'
+  have htw' : conj t + w - 1 ≠ 0 := by simpa only [add_comm (conj t) w] using ht'
+  field_simp [sub_ne_zero.mpr hsw, hconj, hs', ht', hst', hww', hws', htw']
+  ring
+
+private theorem thetaKernel_inner_le_prod {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℂ E]
+    (S : Finset ℂ) (g : E) (U : ℂ → E) (hS : ∀ w ∈ S, 1 / 2 < w.re)
+    (hK : ∀ s ∈ insert 1 S, ∀ t ∈ insert 1 S, ⟪U s, U t⟫_ℂ = 1 / (s + conj t - 1))
+    (hzero : ∀ w ∈ S, ⟪U w, g⟫_ℂ = 0) :
+    ‖⟪U 1, g⟫_ℂ‖ ≤ ‖g‖ * ∏ w ∈ S, ‖thetaKernelFactor w 1‖ := by
+  classical
+  induction S using Finset.induction_on generalizing U with
+  | empty =>
+    have h := hK 1 (by simp) 1 (by simp)
+    have hn : ‖U 1‖ ^ 2 = 1 := by
+      rw [inner_self_eq_norm_sq_to_K] at h
+      exact_mod_cast (show ((‖U 1‖ : ℂ) ^ 2) = 1 by simpa using h)
+    have hnorm : ‖U 1‖ = 1 := by nlinarith [norm_nonneg (U 1)]
+    simpa [hnorm] using norm_inner_le_norm (𝕜 := ℂ) (U 1) g
+  | @insert w S hw ih =>
+    have hw' := hS w (Finset.mem_insert_self ..)
+    have hz := hzero w (Finset.mem_insert_self ..)
+    by_cases he : w = 1
+    · subst w
+      rw [hz, norm_zero]
+      positivity
+    have hsub : insert (1 : ℂ) S ⊆ insert 1 (insert w S) := by
+      intro t ht
+      simp only [Finset.mem_insert] at ht ⊢
+      tauto
+    have hpos (t : ℂ) (ht : t ∈ insert 1 S) : 1 / 2 < t.re := by
+      rcases Finset.mem_insert.mp ht with rfl | h
+      · norm_num
+      · exact hS t (Finset.mem_insert_of_mem h)
+    have hne (t : ℂ) (ht : t ∈ insert 1 S) : t ≠ w := by
+      rcases Finset.mem_insert.mp ht with rfl | h
+      · exact Ne.symm he
+      · exact fun ht ↦ hw (ht ▸ h)
+    have hwmem : w ∈ insert (1 : ℂ) (insert w S) := Finset.mem_insert_of_mem (Finset.mem_insert_self ..)
+    have hstep (t : ℂ) : ⟪thetaKernelDeflate U w t, g⟫_ℂ = (thetaKernelFactor w t)⁻¹ * ⟪U t, g⟫_ℂ := by
+      simp only [thetaKernelDeflate, inner_smul_left, inner_sub_left, hz, mul_zero, sub_zero, map_inv₀,
+        starRingEnd_self_apply]
+    have hb := ih (thetaKernelDeflate U w) (fun t ht ↦ hS t (Finset.mem_insert_of_mem ht))
+      (fun s hs t ht ↦ thetaKernelDeflate_inner U w s t hw' (hpos s hs) (hpos t ht) (hne s hs) (hne t ht)
+        (hK s (hsub hs) t (hsub ht)) (hK s (hsub hs) w hwmem)
+        (hK w hwmem t (hsub ht)) (hK w hwmem w hwmem))
+      (fun t ht ↦ by rw [hstep, hzero t (Finset.mem_insert_of_mem ht), mul_zero])
+    rw [hstep, norm_mul, norm_inv] at hb
+    have hp : 0 < ‖thetaKernelFactor w 1‖ := norm_pos_iff.mpr (div_ne_zero (sub_ne_zero.mpr (Ne.symm he))
+      (thetaKernel_denominator_ne_zero (by norm_num : 1 / 2 < (1 : ℂ).re) hw'))
+    rw [Finset.prod_insert hw]
+    calc
+      ‖⟪U 1, g⟫_ℂ‖ = ‖thetaKernelFactor w 1‖ * (‖thetaKernelFactor w 1‖⁻¹ * ‖⟪U 1, g⟫_ℂ‖) := by
+        rw [← mul_assoc, mul_inv_cancel₀ hp.ne', one_mul]
+      _ ≤ _ := (mul_le_mul_of_nonneg_left hb hp.le).trans_eq (by ring)
+
+private theorem thetaKernel_distance_sq {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℂ E]
+    (S : Finset ℂ) (g : E) (U : ℂ → E) (hS : ∀ w ∈ S, 1 / 2 < w.re)
+    (hK : ∀ s ∈ insert 1 S, ∀ t ∈ insert 1 S, ⟪U s, U t⟫_ℂ = 1 / (s + conj t - 1))
+    (hzero : ∀ w ∈ S, ⟪U w, g⟫_ℂ = 0) :
+    1 - (∏ w ∈ S, ‖thetaKernelFactor w 1‖) ^ 2 ≤ ‖U 1 - g‖ ^ 2 := by
+  let b := ∏ w ∈ S, ‖thetaKernelFactor w 1‖
+  have h := thetaKernel_inner_le_prod S g U hS hK hzero
+  have h1 := hK 1 (Finset.mem_insert_self ..) 1 (Finset.mem_insert_self ..)
+  rw [inner_self_eq_norm_sq_to_K] at h1
+  have hn : ‖U 1‖ ^ 2 = 1 := by exact_mod_cast (show ((‖U 1‖ : ℂ) ^ 2) = 1 by simpa using h1)
+  rw [@norm_sub_sq ℂ]
+  have hr := Complex.re_le_norm (⟪U 1, g⟫_ℂ)
+  change _ ≤ ‖U 1‖ ^ 2 - 2 * (⟪U 1, g⟫_ℂ).re + ‖g‖ ^ 2
+  change 1 - b ^ 2 ≤ _
+  change _ ≤ ‖g‖ * b at h
+  nlinarith [sq_nonneg (‖g‖ - b)]
+
+private theorem thetaKernel_halfLine_distance (S : Finset ℂ) (u : ℝ → ℂ)
+    (hu : MemLp u 2 (volume.restrict (Iic (0 : ℝ)))) (hS : ∀ w ∈ S, 1 / 2 < w.re)
+    (hz : ∀ w ∈ S, (∫ x in Iic (0 : ℝ), u x * Complex.exp ((w - 1 / 2) * x)) = 0) :
+    1 - (∏ w ∈ S, (‖1 - w‖ / ‖w‖)) ^ 2 ≤
+      ∫ x in Iic (0 : ℝ), ‖Complex.exp ((x : ℂ) / 2) - u x‖ ^ 2 := by
+  classical
+  let μ := volume.restrict (Iic (0 : ℝ))
+  let φ (z : ℂ) (x : ℝ) := Complex.exp ((conj z - 1 / 2) * x)
+  have hc2 : conj (2 : ℂ) = 2 := map_ofNat _ _
+  have hm (z : ℂ) (hz : 1 / 2 < z.re) : MemLp (φ z) 2 μ := by
+    apply (memLp_two_iff_integrable_sq_norm (show Continuous (φ z) by dsimp [φ]; fun_prop).aestronglyMeasurable).2
+    have h (x : ℝ) : ‖φ z x‖ ^ 2 = Real.exp ((2 * (z.re - 1 / 2)) * x) := by
+      dsimp only [φ]
+      rw [Complex.norm_exp, ← Real.exp_nat_mul]
+      congr 1
+      simp
+      ring
+    simp only [h]
+    exact integrableOn_exp_mul_Iic (by linarith : 0 < 2 * (z.re - 1 / 2)) 0
+  let U (z : ℂ) : Lp ℂ 2 μ := if h : 1 / 2 < z.re then (hm z h).toLp _ else 0
+  have hU (z : ℂ) (h : 1 / 2 < z.re) : ⇑(U z) =ᵐ[μ] φ z := by
+    simpa only [U, dite_eq_left h] using (hm z h).coeFn_toLp
+  have hpos (s : ℂ) (hs : s ∈ insert 1 S) : 1 / 2 < s.re := by
+    rcases Finset.mem_insert.mp hs with rfl | h
+    · norm_num
+    · exact hS _ h
+  have hK (s : ℂ) (hs : s ∈ insert 1 S) (t : ℂ) (ht : t ∈ insert 1 S) :
+      ⟪U s, U t⟫_ℂ = 1 / (s + conj t - 1) := by
+    rw [L2.inner_def]
+    have he : (fun x : ℝ ↦ ⟪U s x, U t x⟫_ℂ) =ᵐ[μ] fun x ↦ Complex.exp ((s + conj t - 1) * x) := by
+      filter_upwards [hU s (hpos s hs), hU t (hpos t ht)] with x hx hy
+      rw [hx, hy, RCLike.inner_apply']
+      dsimp only [φ]
+      rw [← Complex.exp_conj, ← Complex.exp_add]
+      congr 1
+      simp [hc2]
+      ring
+    rw [integral_congr_ae he]
+    have h : 0 < (s + conj t - 1).re := by
+      simp only [Complex.sub_re, Complex.add_re, Complex.conj_re, Complex.one_re]
+      linarith [hpos s hs, hpos t ht]
+    simpa [μ] using integral_exp_mul_complex_Iic h 0
+  let g : Lp ℂ 2 μ := hu.toLp u
+  have hg : ⇑g =ᵐ[μ] u := hu.coeFn_toLp
+  have hgzero (s : ℂ) (hs : s ∈ S) : ⟪U s, g⟫_ℂ = 0 := by
+    rw [L2.inner_def, ← hz s hs]
+    apply integral_congr_ae
+    filter_upwards [hU s (hS s hs), hg] with x hx hy
+    rw [hx, hy, RCLike.inner_apply]
+    dsimp only [φ]
+    rw [← Complex.exp_conj]
+    simp [hc2]
+  have hf (w : ℂ) : ‖thetaKernelFactor w 1‖ = ‖1 - w‖ / ‖w‖ := by
+    simp [thetaKernelFactor]
+  have h := thetaKernel_distance_sq S g U hS hK hgzero
+  simp only [hf] at h
+  apply h.trans_eq
+  rw [← inner_self_eq_norm_sq (𝕜 := ℂ), L2.inner_def, ← integral_re (L2.integrable_inner _ _)]
+  apply integral_congr_ae
+  filter_upwards [Lp.coeFn_sub (U 1) g, hU 1 (by norm_num), hg] with x hs hx hy
+  have hv : φ 1 x = Complex.exp ((x : ℂ) / 2) := by
+    dsimp only [φ]
+    rw [map_one]
+    congr 1
+    ring
+  simp only [inner_self_eq_norm_sq, hs, Pi.sub_apply, hx, hy, hv]
+
+private theorem thetaKernel_factor_defect (w : ℂ) (hw : 1 / 2 < w.re) :
+    1 - (‖1 - w‖ / ‖w‖) ^ 2 = (2 * w.re - 1) / ‖w‖ ^ 2 := by
+  have hw0 : w ≠ 0 := fun h ↦ by simp [h] at hw; linarith
+  have hn := norm_ne_zero_iff.mpr hw0
+  rw [div_pow]
+  field_simp
+  simp only [Complex.sq_norm, Complex.normSq_apply, Complex.sub_re, Complex.sub_im,
+    Complex.one_re, Complex.one_im]
+  ring
+
+private theorem thetaKernel_sum_defects_le (S : Finset ℂ) (e : ℝ) (he : e < 1)
+    (hS : ∀ w ∈ S, 1 / 2 < w.re)
+    (h : 1 - (∏ w ∈ S, (‖1 - w‖ / ‖w‖)) ^ 2 ≤ e) :
+    ∑ w ∈ S, (2 * w.re - 1) / ‖w‖ ^ 2 ≤ - Real.log (1 - e) := by
+  let b (w : ℂ) := (‖1 - w‖ / ‖w‖) ^ 2
+  have hprod : 1 - e ≤ ∏ w ∈ S, b w := by
+    simpa only [b, ← Finset.prod_pow] using (show 1 - e ≤ (∏ w ∈ S, (‖1 - w‖ / ‖w‖)) ^ 2 by linarith)
+  have hp : 0 < ∏ w ∈ S, b w := (sub_pos.mpr he).trans_le hprod
+  have hb (w : ℂ) (hw : w ∈ S) : 0 < b w := (sq_nonneg _).lt_of_ne' (Finset.prod_ne_zero_iff.mp hp.ne' w hw)
+  have hl := Real.log_le_log (sub_pos.mpr he) hprod
+  rw [Real.log_prod (fun w hw ↦ (hb w hw).ne')] at hl
+  have hsum : ∑ w ∈ S, (2 * w.re - 1) / ‖w‖ ^ 2 ≤ ∑ w ∈ S, -Real.log (b w) := by
+    apply Finset.sum_le_sum
+    intro w hw
+    rw [← thetaKernel_factor_defect w (hS w hw)]
+    change 1 - b w ≤ _
+    linarith [Real.log_le_sub_one_of_pos (hb w hw)]
+  rw [Finset.sum_neg_distrib] at hsum
+  linarith
+
+/-- For any finite set of distinct right-hand completed Hecke zeros, the squared half-line
+error of a supported polar-free lift from the centered indicator is at least one minus the
+product of their squared Blaschke factors at one. -/
+theorem centeredLogThetaLift_finite_zero_distance (χ : PontryaginDual C𝔽)
+    (σ : ℝ≥0ˣ →ₜ* I𝔽) (hσ : RightInverse σ (ideleNorm F)) (f : adelePolarSubspace F)
+    (ho : ∀ x : ℝ, 0 < x → centeredLogThetaLift χ σ f x = 0)
+    (S : Finset ℂ) (hS : ∀ ρ ∈ S, 1 / 2 < ρ.re ∧
+      0 < meromorphicOrderAt (continuedCompletedHeckeL χ) ρ) :
+    1 - (∏ ρ ∈ S, (‖1 - ρ‖ / ‖ρ‖)) ^ 2 ≤
+      hiddenThetaCost 0 0 0 (fun x ↦ Complex.exp ((x : ℂ) / 2) - centeredLogThetaLift χ σ f x) ^ 2 := by
+  let u := centeredLogThetaLift χ σ f
+  obtain ⟨hc, hi⟩ := centeredLogThetaLift_energy χ σ hσ f (α := 0) (s := 0) le_rfl le_rfl 0
+  have hw (x : ℝ) : intervalSobolevDensity 0 0 0 x = 1 := by simp [intervalSobolevDensity]
+  have hu : MemLp u 2 (volume.restrict (Iic (0 : ℝ))) :=
+    (memLp_two_iff_integrable_sq_norm hc.aestronglyMeasurable).mpr
+      (by simpa only [IntegrableOn, u, neg_zero, hw, mul_one] using hi)
+  have hm (ρ : ℂ) (hρ : ρ ∈ S) : (∫ x in Iic (0 : ℝ), u x * Complex.exp ((ρ - 1 / 2) * x)) = 0 := by
+    obtain ⟨_, hz⟩ := centeredLogThetaLift_zero_moment χ σ hσ f (z := ρ - 1 / 2)
+      (by simpa only [sub_add_cancel] using (hS ρ hρ).2)
+    rw [setIntegral_eq_integral_of_forall_compl_eq_zero (by
+      intro x hx; dsimp only [u]; rw [ho x (lt_of_not_ge hx), zero_mul])]
+    exact hz
+  simpa only [hiddenThetaCost, neg_zero, hw, mul_one, Real.sq_sqrt (integral_nonneg (fun _ ↦ sq_nonneg _))]
+    using thetaKernel_halfLine_distance S u hu (fun ρ hρ ↦ (hS ρ hρ).1) hm
+
+/-- A single polar-free lift of half-line error less than one bounds the sum of normalized
+real-part displacements over all distinct completed Hecke zeros to the right of the line. -/
+theorem centeredLogThetaLift_right_zero_sum (χ : PontryaginDual C𝔽)
+    (σ : ℝ≥0ˣ →ₜ* I𝔽) (hσ : RightInverse σ (ideleNorm F)) (f : adelePolarSubspace F)
+    (ho : ∀ x : ℝ, 0 < x → centeredLogThetaLift χ σ f x = 0)
+    (he : hiddenThetaCost 0 0 0 (fun x ↦ Complex.exp ((x : ℂ) / 2) - centeredLogThetaLift χ σ f x) ^ 2 < 1) :
+    let Z := {ρ : ℂ // 1 / 2 < ρ.re ∧ 0 < meromorphicOrderAt (continuedCompletedHeckeL χ) ρ}
+    let d (ρ : Z) := (2 * ρ.val.re - 1) / ‖ρ.val‖ ^ 2
+    Summable d ∧ ∑' ρ : Z, d ρ ≤ - Real.log (1 -
+      hiddenThetaCost 0 0 0 (fun x ↦ Complex.exp ((x : ℂ) / 2) - centeredLogThetaLift χ σ f x) ^ 2) := by
+  intro Z d
+  let e := hiddenThetaCost 0 0 0 (fun x ↦ Complex.exp ((x : ℂ) / 2) - centeredLogThetaLift χ σ f x) ^ 2
+  have hfin (T : Finset Z) : ∑ ρ ∈ T, d ρ ≤ - Real.log (1 - e) := by
+    let S := T.map (Function.Embedding.subtype _)
+    have hS (w : ℂ) (hw : w ∈ S) : 1 / 2 < w.re ∧ 0 < meromorphicOrderAt (continuedCompletedHeckeL χ) w := by
+      obtain ⟨ρ, _, rfl⟩ := Finset.mem_map.mp hw
+      exact ρ.property
+    have h := thetaKernel_sum_defects_le S e he (fun w hw ↦ (hS w hw).1)
+      (centeredLogThetaLift_finite_zero_distance χ σ hσ f ho S hS)
+    simpa [S, d] using h
+  have hd (ρ : Z) : 0 ≤ d ρ := div_nonneg (by linarith [ρ.property.1]) (sq_nonneg _)
+  exact ⟨summable_of_sum_le hd hfin, (summable_of_sum_le hd hfin).tsum_le_of_sum_le hfin⟩
+
 /-- At a completed Hecke zero ρ to the right of the central line, a polar-free theta lift
 supported in nonpositive log norm has L² distance at least
 sqrt(2 Re ρ − 1) / |ρ| from the normalized unit-interval indicator. -/
@@ -580,56 +827,15 @@ theorem centeredLogThetaLift_halfLine_distance (χ : PontryaginDual C𝔽)
     (ρ : ℂ) (hr : 1 / 2 < ρ.re) (hz : 0 < meromorphicOrderAt (continuedCompletedHeckeL χ) ρ) :
     Real.sqrt (2 * (ρ.re - 1 / 2)) / ‖ρ‖ ≤
       hiddenThetaCost 0 0 0 (fun x ↦ Complex.exp ((x : ℂ) / 2) - centeredLogThetaLift χ σ f x) := by
-  let z := ρ - 1 / 2
-  let u := centeredLogThetaLift χ σ f
-  let v (x : ℝ) := Complex.exp ((x : ℂ) / 2)
-  let μ := volume.restrict (Iic (0 : ℝ))
-  have hr' : 0 < ρ.re := by linarith
-  have hrz : z.re = ρ.re - 1 / 2 := by simp [z]
-  have hβ : 0 < z.re := by rw [hrz]; linarith
-  have hcβ := Real.sqrt_pos.mpr (show 0 < 2 * z.re by positivity)
-  have ⟨hu, hue⟩ := centeredLogThetaLift_energy χ σ hσ f (α := 0) (s := 0) le_rfl le_rfl 0
-  have ⟨hm, hzero⟩ := centeredLogThetaLift_zero_moment χ σ hσ f
-    (z := z) (by simpa only [z, sub_add_cancel] using hz)
-  change Integrable (fun x : ℝ ↦ u x * Complex.exp (z * x)) at hm
-  change Continuous u at hu
-  change IntegrableOn (fun x ↦ ‖u x‖ ^ 2 * intervalSobolevDensity (-0) 0 0 x) (Iic (-(0 : ℝ))) at hue
-  have hcut : (∫ x in Iic (0 : ℝ), u x * Complex.exp (z * x)) = 0 := by
-    rw [setIntegral_eq_integral_of_forall_compl_eq_zero (by
-      intro x hx; dsimp only [u]; rw [ho x (lt_of_not_ge hx), zero_mul])]
-    exact hzero
-  have hweight (x : ℝ) : intervalSobolevDensity 0 0 0 x = 1 := by simp [intervalSobolevDensity]
-  have huv : MemLp u 2 μ := (memLp_two_iff_integrable_sq_norm hu.aestronglyMeasurable).mpr
-    (by simpa only [IntegrableOn, μ, neg_zero, hweight, mul_one] using hue)
-  have hv : Continuous v := by dsimp [v]; fun_prop
-  have hvv : MemLp v 2 μ := by
-    apply (memLp_two_iff_integrable_sq_norm hv.aestronglyMeasurable).mpr
-    have hnorm (x : ℝ) : ‖v x‖ ^ 2 = Real.exp x := by
-      rw [show ‖v x‖ = Real.exp (x / 2) by simp [v, Complex.norm_exp], ← Real.exp_nat_mul]
-      congr 1; push_cast; ring
-    simpa only [IntegrableOn, μ, hnorm, one_mul] using
-      integrableOn_exp_mul_Iic (show (0 : ℝ) < 1 by norm_num) 0
-  have hd : Measurable (fun x ↦ v x - u x) := (hv.sub hu).measurable
-  have hd2 : IntegrableOn (fun x ↦ ‖v x - u x‖ ^ 2 * intervalSobolevDensity (-0) 0 0 x)
-      (Iic (-(0 : ℝ))) := by
-    simp only [neg_zero, hweight, mul_one]
-    exact (memLp_two_iff_integrable_sq_norm hd.aestronglyMeasurable).mp (hvv.sub huv)
-  have hvx (x : ℝ) : v x * Complex.exp (z * x) = Complex.exp (ρ * x) := by
-    dsimp only [v, z]; rw [← Complex.exp_add]; congr 1; ring
-  have hM : (∫ x in Iic (0 : ℝ), (v x - u x) * Complex.exp (z * x)) = 1 / ρ := by
-    simp_rw [sub_mul, hvx]
-    rw [integral_sub (integrableOn_exp_mul_complex_Iic hr' 0) hm.integrableOn, hcut,
-      sub_zero, integral_exp_mul_complex_Iic hr']
-    simp
-  have hb := hiddenThetaCost_tail_moment (α := 0) (s := 0) (R := 0) (z := z)
-    (by simpa using hβ) le_rfl le_rfl (fun x ↦ v x - u x) hd hd2
-  change _ ≤ hiddenThetaCost 0 0 0 (fun x ↦ v x - u x) * _ at hb
-  rw [neg_zero, hM, norm_div, norm_one] at hb
-  simp only [zero_add, mul_zero, Real.exp_zero, zero_div, Real.rpow_zero, mul_one,
-    one_div, Real.sqrt_inv] at hb
-  change Real.sqrt (2 * (ρ.re - 1 / 2)) / ‖ρ‖ ≤ hiddenThetaCost 0 0 0 (fun x ↦ v x - u x)
-  rw [← hrz, div_eq_mul_inv, mul_comm]
-  exact (le_div_iff₀ hcβ).mp (by simpa only [div_eq_mul_inv] using hb)
+  have h := centeredLogThetaLift_finite_zero_distance χ σ hσ f ho {ρ}
+    (by intro w hw; simpa only [Finset.mem_singleton.mp hw] using And.intro hr hz)
+  rw [Finset.prod_singleton, thetaKernel_factor_defect ρ hr] at h
+  have he : 0 ≤ hiddenThetaCost 0 0 0 (fun x ↦ Complex.exp ((x : ℂ) / 2) - centeredLogThetaLift χ σ f x) :=
+    Real.sqrt_nonneg _
+  have hpos : 0 ≤ 2 * ρ.re - 1 := by linarith
+  have hs := Real.sqrt_le_sqrt h
+  rw [Real.sqrt_div hpos, Real.sqrt_sq (norm_nonneg ρ), Real.sqrt_sq he] at hs
+  simpa only [show 2 * (ρ.re - 1 / 2) = 2 * ρ.re - 1 by ring] using hs
 
 /-- Approximating the normalized unit-interval indicator arbitrarily closely by polar-free
 theta lifts supported in nonpositive log norm suffices for exterior cancellation. There
