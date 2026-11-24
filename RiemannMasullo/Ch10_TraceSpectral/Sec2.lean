@@ -8569,6 +8569,39 @@ theorem spectralStripJet_lowerBound (χ : PontryaginDual C₁ → PontryaginDual
     _ = ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖ :=
       Real.sqrt_sq (norm_nonneg _)
 
+/-- One integer bounds the multiplicity of every zero of every chosen completed Hecke
+L-function: all components of the norm-one dual, all real parts and all ordinates at once.
+This is the half of `spectralStripJet_order_and_margin_locally_finite_multiple_zeros` that
+bounds the orders of the strip jets.
+Reconstruction: The paper does not state this. It is the project's formulation of the bound on
+the orders that the norm integral of Proposition 10.2.2.2, p. 447, needs, and it is not known
+whether it is what the author intends.
+Gap: The known bounds for the multiplicity of a zero grow with its height and with the
+conductor. Over `ℚ` this statement contains a height-independent bound for the multiplicities
+of the zeros of the Riemann zeta function, which is open, also on the Riemann hypothesis
+(report on #7220). The statement that all zeros lie on the critical line does not supply it. -/
+private theorem spectralStripJet_order_and_margin_multiplicity_bounded
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (_hχ : IsSpectralBasepointChoice χ) :
+    ∃ M : ℕ, ∀ (ω : PontryaginDual C₁) (σ t : ℝ), multiplicity(χ ω, shift(σ, t)) ≤ M := by
+  sorry
+
+/-- The multiple zeros of the chosen completed Hecke L-functions lie on finitely many vertical
+lines, over all components of the norm-one dual and all ordinates.
+This is the half of `spectralStripJet_order_and_margin_locally_finite_multiple_zeros` that
+keeps the jets of high order away from the edges of a strip.
+Reconstruction: The paper does not state this. It is the project's formulation of the margin
+that the norm integral of Proposition 10.2.2.2, p. 447, needs, and it is not known whether it
+is what the author intends.
+Gap: No argument is known. The statement follows from the paper's main claim, that all zeros in
+the critical strip have real part `1/2`, but Proposition 10.2.2.2 stands on the way to that
+claim. For the splitting field of `X³ - 2` it already gives a zero-free strip to the left of
+the line of real part `1` for an Artin L-function (report on #7220). -/
+private theorem spectralStripJet_order_and_margin_multiple_zero_lines_finite
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (_hχ : IsSpectralBasepointChoice χ) :
+    {σ : ℝ | ∃ (ω : PontryaginDual C₁) (t : ℝ),
+      1 < multiplicity(χ ω, shift(σ, t))}.Finite := by
+  sorry
+
 /-- Near any real number there are only finitely many distinct pairs of real part and
 multiplicity among multiple completed Hecke zeros, over all ordinates and chosen characters.
 The norm integral on p. 447 gives no such restriction. It would suffice to bound the
@@ -8579,11 +8612,19 @@ estimates of Remark 10.2.1.5 and Proposition 10.2.2.2 need, and it is not known 
 what the author intends.
 Gap: Neither a bound for the multiplicities of the zeros on a vertical line nor the absence
 of multiple zeros on the nearby lines is known, and Remark 10.2.1.5 and Proposition 10.2.2.2
-supply no argument for either. -/
+supply no argument for either. Proved here from these two statements in their global form,
+`spectralStripJet_order_and_margin_multiplicity_bounded` and
+`spectralStripJet_order_and_margin_multiple_zero_lines_finite`. -/
 private theorem spectralStripJet_order_and_margin_locally_finite_multiple_zeros
     (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (_hχ : IsSpectralBasepointChoice χ) (x : ℝ) :
     ∃ U ∈ 𝓝 x, {p : ℝ × ℕ | p.1 ∈ U ∧ 1 < p.2 ∧ ∃ (ω : PontryaginDual C₁) (t : ℝ),
-      multiplicity(χ ω, shift(p.1, t)) = p.2}.Finite := by sorry
+      multiplicity(χ ω, shift(p.1, t)) = p.2}.Finite := by
+  obtain ⟨M, hM⟩ := spectralStripJet_order_and_margin_multiplicity_bounded χ _hχ
+  refine ⟨univ, univ_mem, ?_⟩
+  refine ((spectralStripJet_order_and_margin_multiple_zero_lines_finite χ _hχ).prod
+    (finite_Iic M)).subset ?_
+  rintro ⟨σ, n⟩ ⟨-, hn, ω, t, h⟩
+  exact ⟨⟨ω, t, h.symm ▸ hn⟩, h ▸ hM ω σ t⟩
 
 /-- Paper: Proposition 10.2.2.2, pp. 446–447. A uniform strip estimate requires a
 bound on admitted jet orders and a boundary margin for the nonintegrable powers.
