@@ -178,7 +178,8 @@ theorem dirichletChebyshevPsi_sub_theta_div_sqrt_tendsto {q : ℕ} [NeZero q] (�
     ring
   · simp
 
-private theorem primeSquares_measurable {q : ℕ} (χ : DirichletCharacter ℂ q) :
+/-- Both character-weighted Chebyshev counts are measurable. -/
+theorem dirichletChebyshevPsi_theta_measurable {q : ℕ} (χ : DirichletCharacter ℂ q) :
     Measurable (dirichletChebyshevPsi χ) ∧ Measurable (dirichletChebyshevTheta χ) := by
   constructor
   · exact (measurable_of_countable (fun m : ℕ ↦ ∑ n ∈ Finset.Icc 1 m,
@@ -192,8 +193,8 @@ theorem dirichletChebyshevPsi_sub_theta_sub_squares_integrable {q : ℕ} (χ : D
     IntegrableOn (fun x : ℝ ↦ ‖dirichletChebyshevPsi χ x - dirichletChebyshevTheta χ x -
       dirichletChebyshevPsi (χ^2) (Real.sqrt x)‖ ^ 2 * x ^ (-2*b-1)) (Ioi 1) := by
   let C := 2*(Real.log 4 + 4)
-  have ⟨hm, ht⟩ := primeSquares_measurable χ
-  have hs := (primeSquares_measurable (χ^2)).1
+  have ⟨hm, ht⟩ := dirichletChebyshevPsi_theta_measurable χ
+  have hs := (dirichletChebyshevPsi_theta_measurable (χ^2)).1
   have hi := integrableOn_Ioi_rpow_of_lt (by linarith : (2/3 : ℝ) - 2*b-1 < -1) zero_lt_one
   apply (hi.const_mul (C^2)).mono' (by apply Measurable.aestronglyMeasurable; fun_prop)
   filter_upwards [ae_restrict_mem measurableSet_Ioi] with x hx
@@ -207,7 +208,8 @@ theorem dirichletChebyshevPsi_sub_theta_sub_squares_integrable {q : ℕ} (χ : D
   push_cast
   ring
 
-private theorem primeSquares_norm_bound {q : ℕ} (χ : DirichletCharacter ℂ q) {x : ℝ} (hx : 1 ≤ x) :
+/-- The contribution from higher prime powers is bounded uniformly in the character and modulus. -/
+theorem dirichletChebyshevPsi_sub_theta_norm_le {q : ℕ} (χ : DirichletCharacter ℂ q) {x : ℝ} (hx : 1 ≤ x) :
     ‖dirichletChebyshevPsi χ x - dirichletChebyshevTheta χ x‖ ≤ 3 * (Real.log 4 + 4) * Real.sqrt x := by
   have hpsi (η : DirichletCharacter ℂ q) (y : ℝ) : ‖dirichletChebyshevPsi η y‖ ≤ Chebyshev.psi y := by
     rw [Chebyshev.psi, ← Finset.Icc_succ_left_eq_Ioc]
@@ -265,7 +267,7 @@ theorem dirichletChebyshevPsi_sub_theta_mellin_boundary {q : ℕ} [NeZero q] (χ
   intro D
   let c : ℂ := if χ^2 = 1 then 1 else 0
   let B (x : ℝ) := D x / (Real.sqrt x : ℂ) - c
-  have hD : Measurable D := (primeSquares_measurable χ).1.sub (primeSquares_measurable χ).2
+  have hD : Measurable D := (dirichletChebyshevPsi_theta_measurable χ).1.sub (dirichletChebyshevPsi_theta_measurable χ).2
   have hm : Measurable B := by dsimp only [B]; fun_prop
   have ht : Tendsto B atTop (𝓝 0) := by
     simpa [B,c,D] using (dirichletChebyshevPsi_sub_theta_div_sqrt_tendsto χ).sub_const c
@@ -276,7 +278,7 @@ theorem dirichletChebyshevPsi_sub_theta_mellin_boundary {q : ℕ} [NeZero q] (χ
     apply add_le_add_left _ _
     rw [norm_div, Complex.norm_real, Real.norm_of_nonneg (Real.sqrt_nonneg _),
       div_le_iff₀ (Real.sqrt_pos.mpr hx₀)]
-    exact primeSquares_norm_bound χ hx
+    exact dirichletChebyshevPsi_sub_theta_norm_le χ hx
   have hab := primeSquares_abel_limit hm.norm (by simpa using ht.norm) (C := C) (fun x hx ↦ by simpa using hbd x hx)
   let K (u x : ℝ) := (x : ℂ) ^ ((1/2 : ℂ) - (ρ+u+1))
   have hK (u x : ℝ) (hx : 1 < x) : ‖K u x‖ = x ^ (-u-1) := by
