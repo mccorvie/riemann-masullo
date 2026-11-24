@@ -2593,6 +2593,383 @@ private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_tra
   have hyU := hsub (a := (⟨l (y, a), hk⟩ : K)) hkW
   exact (show f ⟨l (y, a), hk⟩ = y from Subtype.ext he) ▸ hyU
 
+/-- A principal power of the prime at the selected place gives an S-unit with
+nonzero valuation there. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_nonzero
+    {S : Finset V} (v : S) :
+    ∃ x : (S : Set V).unit F, v.val.valuation F (x.val : F) ≠ 1 := by
+  classical
+  let n := classNumber F
+  have hv := mem_nonZeroDivisors_iff_ne_zero.mpr v.val.ne_bot
+  have hpow : (ClassGroup.mk0 ⟨v.val.asIdeal, hv⟩) ^ n = 1 := pow_card_eq_one
+  have hp : (v.val.asIdeal ^ n).IsPrincipal := by
+    rw [← ClassGroup.mk0_eq_one_iff (pow_mem hv n), ← hpow, ← map_pow]
+    rfl
+  obtain ⟨a, ha⟩ := hp
+  change v.val.asIdeal ^ n = Ideal.span {a} at ha
+  have ha₀ : a ≠ 0 := fun h ↦ (pow_ne_zero n v.val.ne_bot) (by simpa [h] using ha)
+  let x := Units.mk0 (algebraMap (𝓞 F) F a) (fun h ↦ ha₀ (IsFractionRing.injective (𝓞 F) F (h.trans (map_zero _).symm)))
+  have hdiv (w : V) (hw : a ∈ w.asIdeal) : w = v.val := by
+    have hle := w.isPrime.le_of_pow_le (n := n) (ha.trans_le ((Ideal.span_singleton_le_iff_mem _).mpr hw))
+    exact HeightOneSpectrum.ext (v.val.isMaximal.eq_of_le w.isPrime.ne_top hle).symm
+  refine ⟨⟨x, fun w hw ↦ ?_⟩, ?_⟩
+  · change w.valuation F (algebraMap (𝓞 F) F a) = 1
+    rw [w.valuation_of_algebraMap, w.intValuation_eq_one_iff]
+    exact fun h ↦ hw (hdiv w h ▸ v.property)
+  · change v.val.valuation F (algebraMap (𝓞 F) F a) ≠ 1
+    rw [v.val.valuation_of_algebraMap, ne_eq, v.val.intValuation_eq_one_iff, not_not]
+    apply (Ideal.span_singleton_le_iff_mem _).mp
+    rw [← ha]
+    exact Ideal.pow_le_self (classNumber_ne_zero F)
+
+/-- The positive generator of the valuation image divides the order of every S-unit. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_generator
+    {S : Finset V} (v : S) (w : Fˣ →* Multiplicative ℤ)
+    (hw : ∀ t, WithZero.exp (w t).toAdd = v.val.valuation F (t : F)) :
+    ∃ u : (S : Set V).unit F,
+      let ord (t : (S : Set V).unit F) := -(w t.val).toAdd
+      0 < ord u ∧ ∀ t, ord u ∣ ord t := by
+  let f : Additive ((S : Set V).unit F) →+ ℤ := (w.comp
+    ((S : Set V).unit F).subtype).toAdditive
+  obtain ⟨z, hz⟩ := (AddSubgroup.isAddCyclic_iff_exists_zmultiples_eq f.range).mp
+    (AddSubgroup.isAddCyclic f.range)
+  have hz' := (Int.zmultiples_natAbs z).trans hz
+  obtain ⟨x, hx⟩ := show -(z.natAbs : ℤ) ∈ f.range by
+    rw [← hz']
+    exact AddSubgroup.neg_mem _ (AddSubgroup.mem_zmultiples _)
+  have hn : z ≠ 0 := by
+    obtain ⟨y, hy⟩ := sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_nonzero v
+    intro h
+    have hm : f (.ofMul y) ∈ f.range := ⟨_, rfl⟩
+    rw [← hz, h, Int.mem_zmultiples_iff, zero_dvd_iff] at hm
+    exact hy ((hw y.val).symm.trans (by change WithZero.exp (f (.ofMul y)) = 1; rw [hm, WithZero.exp_zero]))
+  refine ⟨x.toMul, ?_⟩
+  change 0 < -f x ∧ ∀ t : (S : Set V).unit F, -f x ∣ -f (.ofMul t)
+  rw [hx, neg_neg]
+  refine ⟨by positivity, fun t ↦ ?_⟩
+  rw [dvd_neg, ← Int.mem_zmultiples_iff, hz']
+  exact ⟨_, rfl⟩
+
+/-- Factor a product over the enlarged stage into its old coordinates and the
+factor at the added place. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_prod
+    {T S : Finset V} (v : S) (i : T ⊆ S) (hv : ∀ w : S, w.val ∉ T ↔ w = v)
+    {M : Type*} [CommMonoid M] (b : S → M) :
+    (∏ w : S, b w) = (∏ w : T, b ⟨w.val, i w.property⟩) * b v := by
+  classical
+  rw [← Finset.prod_erase_mul _ _ (Finset.mem_univ v)]
+  congr 1
+  exact Finset.prod_bij' (fun w hw ↦ (⟨w.val, by
+    by_contra h
+    exact Finset.ne_of_mem_erase hw ((hv w).mp h)⟩ : T))
+    (fun w _ ↦ (⟨w.val, i w.property⟩ : S)) (fun _ _ ↦ Finset.mem_univ _)
+    (fun w _ ↦ Finset.mem_erase.mpr ⟨fun h ↦ ((hv _).mpr h) w.property, Finset.mem_univ _⟩)
+    (fun _ _ ↦ rfl) (fun _ _ ↦ rfl) (fun _ _ ↦ rfl)
+
+/-- Removing the selected place from the product formula leaves a norm different
+from one whenever the S-unit has positive order there. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_norm
+    {T S : Finset V} (v : S) (i : T ⊆ S) (hv : ∀ w : S, w.val ∉ T ↔ w = v)
+    (u : ((S : Set V).integer F)ˣ) (hu : 0 < -WithZero.log (Valued.v ((sUnitEmbedding F S u).val.2 v))) :
+    let g := Units.map ((adeleProjection F T).comp (integralAdelesOutside F S).subtype).toMonoidHom
+      (Units.map (integralAdeleDiagonal F S).toMonoidHom u)
+    sIdeleNorm F T g ≠ 1 := by
+  classical
+  intro g
+  let a := sUnitEmbedding F S u
+  have he : sIdeleNorm F S a = 1 := (sIdeleNorm_spec F S).2 ⟨u, rfl⟩
+  have hp : (∏ w : S, ‖a.val.2 w‖) = (∏ w : T, ‖g.val.2 w‖) * ‖a.val.2 v‖ :=
+    sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_prod v i hv (fun w ↦ ‖a.val.2 w‖)
+  intro hg
+  have valS := congrArg (fun t : ℝ≥0ˣ ↦ (t.val : ℝ)) he
+  have valT := congrArg (fun t : ℝ≥0ˣ ↦ (t.val : ℝ)) hg
+  simp [sIdeleNorm] at valS valT
+  change (∏ w : InfinitePlace F, ‖g.val.1 w‖ ^ w.mult) * (∏ w : T, ‖g.val.2 w‖) = 1 at valT
+  change (∏ w : InfinitePlace F, ‖g.val.1 w‖ ^ w.mult) * (∏ w : S, ‖a.val.2 w‖) = 1 at valS
+  rw [hp, ← mul_assoc, valT, one_mul] at valS
+  have h := Valued.toNormedField.norm_eq_one_iff.mp valS
+  change 0 < -WithZero.log (Valued.v (a.val.2 v)) at hu
+  simp [h] at hu
+
+/-- Radial local tests are spanned by valuation balls. After removing the value at
+zero times the unit ball, only finitely many shells remain. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_radial
+    (v : V) (f : ℬ(v.adicCompletion F))
+    (hf : ∀ u ∈ (v.adicCompletionIntegers F).units, schwartzBruhatUnitTranslate u f = f)
+    (D : Submodule ℂ (v.adicCompletion F → ℂ))
+    (hD : ∀ n : ℤ, (fun x : v.adicCompletion F ↦
+      if Valued.v x ≤ WithZero.exp n then (1 : ℂ) else 0) ∈ D) :
+    (fun x ↦ f (Multiplicative.ofAdd x)) ∈ D := by
+  classical
+  let ball (n : ℤ) (x : v.adicCompletion F) : ℂ := if Valued.v x ≤ WithZero.exp n then 1 else 0
+  obtain ⟨b, hb⟩ := finitePlaceDifference_range_on_unitInvariants_ball (F := F) v 0 1
+  let c := f (Multiplicative.ofAdd 0)
+  let h := f - c • b
+  have he (x : v.adicCompletion F) :
+      h (Multiplicative.ofAdd x) = f (Multiplicative.ofAdd x) - c * ball 0 x := by
+    change _ - _ * b _ = _
+    rw [hb]
+  have h0 : h (Multiplicative.ofAdd 0) = 0 := by rw [he 0]; simp [ball, c]
+  obtain ⟨I, hI⟩ := finitePlaceDifference_range_on_unitInvariants_finite (F := F) v h h0
+  choose t ht using fun m : ℤ ↦ v.valuedAdicCompletion_surjective F (WithZero.exp m)
+  let shell (m : ℤ) := ball m - ball (m - 1)
+  have shell_val (m : ℤ) (x : v.adicCompletion F) (hx : x ≠ 0) :
+      shell m x = if m = (Valued.v x).log then 1 else 0 := by
+    have hh := WithZero.exp_log ((Valuation.ne_zero_iff Valued.v).mpr hx)
+    simp only [shell, Pi.sub_apply, ball]
+    conv_lhs => rw [← hh]
+    simp only [WithZero.exp_le_exp]
+    split_ifs <;> first | omega | simp_all
+  have rep : (fun x ↦ f (Multiplicative.ofAdd x)) =
+      c • ball 0 + ∑ m ∈ I, h (Multiplicative.ofAdd (t m)) • shell m := by
+    funext x
+    simp only [Pi.add_apply, Pi.smul_apply, Finset.sum_apply, smul_eq_mul]
+    apply (eq_add_of_sub_eq' (he x).symm).trans
+    congr 1
+    by_cases hx : x = 0
+    · subst x
+      rw [h0]
+      simp [shell, ball]
+    simp only [shell_val _ x hx, mul_ite, mul_one, mul_zero, Finset.sum_ite_eq']
+    split_ifs with hm
+    · let m := (Valued.v x).log
+      have hv : Valued.v (t m) = Valued.v x :=
+        (ht m).trans (WithZero.exp_log ((Valuation.ne_zero_iff _).mpr hx))
+      have hn : t m ≠ 0 := fun e ↦ hx ((Valuation.zero_iff _).mp (by rw [← hv, e, map_zero]))
+      have hfx := finitePlaceDifference_range_on_unitInvariants_radial (F := F) v f hf x (t m) hx hn hv.symm
+      change h (Multiplicative.ofAdd x) = h (Multiplicative.ofAdd (t m))
+      rw [he x, he (t m), hfx]
+      simp only [ball, hv]
+    · exact not_ne_iff.mp fun hne ↦ hm (hI x hne)
+  rw [rep]
+  exact D.add_mem (D.smul_mem _ (hD 0))
+    (D.sum_mem fun m _ ↦ D.smul_mem _ (D.sub_mem (hD m) (hD (m - 1))))
+
+/-- The unit-invariant part of a test has a finite expansion in valuation balls
+with test functions on the old stage as coefficients. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_expand
+    {T S : Finset V} (v : S) (i : T ⊆ S) (hv : ∀ w : S, w.val ∉ T ↔ w = v)
+    (k : ℬₛ(S)) :
+    let P := sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.property)
+    ∃ (I : Finset ℤ) (a : ℤ → ℬₛ(T)), ∀ x : SAdeleRing F S,
+      (k - P k) (Multiplicative.ofAdd x) = ∑ n ∈ I,
+        if Valued.v (x.2 v) ≤ WithZero.exp (-n) then
+          a n (Multiplicative.ofAdd (x.1, fun w : T ↦ x.2 ⟨w.val, i w.property⟩)) else 0 := by
+  classical
+  intro P
+  let old (x : SAdeleRing F S) : SAdeleRing F T := (x.1, fun w ↦ x.2 ⟨w.val, i w.property⟩)
+  let ev (y : SAdeleRing F T) : ℬₛ(T) →ₗ[ℂ] ℂ :=
+    (LinearMap.proj (Multiplicative.ofAdd y)).comp (schwartzBruhatSubmodule _).subtype
+  let B (n : ℤ) : ℬₛ(T) →ₗ[ℂ] (SAdeleRing F S → ℂ) :=
+    LinearMap.pi fun x ↦ if Valued.v (x.2 v) ≤ WithZero.exp (-n) then ev (old x) else 0
+  let L := Finsupp.lsum ℂ B
+  let valS : ℬₛ(S) →ₗ[ℂ] (SAdeleRing F S → ℂ) := LinearMap.pi fun x ↦
+    (LinearMap.proj (Multiplicative.ofAdd x)).comp (schwartzBruhatSubmodule _).subtype
+  let D := L.range.comap (valS.comp (LinearMap.id - P))
+  let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+  have pure (a : ℬ(InfiniteAdeleRing F)) (b : ∀ w : S, ℬ(w.val.adicCompletion F)) :
+      e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)) ∈ D := by
+    let f := (sAdeleSchwartz_inductiveTensor_equiv F T).choose
+      (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w : T, b ⟨w.val, i w.property⟩))
+    let ins (h : ℬ(v.val.adicCompletion F)) := e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, Function.update b v h w))
+    let pack := e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w))
+    have hin : ins (b v) = pack := congrArg (fun b ↦ e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)))
+      (Function.update_eq_self v b)
+    have hP : P pack = ins (finitePlacePrincipalValue v.val (b v)) := by
+      refine (sAdelePrincipalValue_tmul (Finset.singleton_subset_iff.mpr v.property) a b).trans ?_
+      apply congrArg (fun b : ∀ w : S, ℬ(w.val.adicCompletion F) ↦ e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)))
+      funext w
+      by_cases h : w = v
+      · subst w; simp
+      · simp [Function.update_of_ne h, show w.val ≠ v.val from fun he ↦ h (Subtype.ext he)]
+    have hins (h : ℬ(v.val.adicCompletion F)) (x : SAdeleRing F S) :
+        ins h (Multiplicative.ofAdd x) = f (Multiplicative.ofAdd (old x)) * h (Multiplicative.ofAdd (x.2 v)) := by
+      rw [(sAdeleSchwartz_inductiveTensor_equiv F S).choose_spec,
+        (sAdeleSchwartz_inductiveTensor_equiv F T).choose_spec,
+        sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_prod v i hv,
+        Function.update_self, ← mul_assoc]
+      congr 2
+      refine Finset.prod_congr rfl fun w _ ↦ ?_
+      rw [Function.update_of_ne (show (⟨w.val, i w.property⟩ : S) ≠ v from
+        fun he ↦ ((hv _).mpr he) w.property)]
+    let M : (v.val.adicCompletion F → ℂ) →ₗ[ℂ] (SAdeleRing F S → ℂ) :=
+      LinearMap.pi fun x ↦ f (Multiplicative.ofAdd (old x)) • LinearMap.proj (x.2 v)
+    have hm := sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_radial v.val
+      (b v - finitePlacePrincipalValue v.val (b v))
+      (finitePlacePrincipalValue_range_invariant v.val (b v)) (L.range.comap M) (fun n ↦ by
+        refine ⟨Finsupp.single (-n) f, ?_⟩
+        rw [show L (Finsupp.single (-n) f) = B (-n) f from Finsupp.lsum_single ..]
+        funext x
+        by_cases hx : Valued.v (x.2 v) ≤ WithZero.exp n <;> simp [B, M, hx, ev]
+        rfl)
+    change valS (pack - P pack) ∈ L.range
+    suffices hval : valS (pack - P pack) = M (fun x ↦
+        (b v - finitePlacePrincipalValue v.val (b v)) (Multiplicative.ofAdd x)) by rw [hval]; exact hm
+    funext x
+    change pack _ - P pack _ = f _ * ((b v) _ - finitePlacePrincipalValue v.val (b v) _)
+    rw [hP, ← hin, hins, hins, mul_sub]
+  have heq := sLocalThetaPrincipalValue_transition_ext e D.mkQ LinearMap.id 0
+    (fun a b ↦ (Submodule.Quotient.mk_eq_zero D).mpr (pure a b))
+  obtain ⟨a, ha⟩ := (Submodule.Quotient.mk_eq_zero D).mp (LinearMap.congr_fun heq k)
+  refine ⟨a.support, a, fun x ↦ (congrFun ha x).symm.trans ?_⟩
+  change (∑ n ∈ a.support, B n (a n)) x = _
+  rw [Finset.sum_apply]
+  apply Finset.sum_congr rfl
+  intro n _
+  by_cases hx : Valued.v (x.2 v) ≤ WithZero.exp (-n) <;> simp [B, hx, ev, old]
+  rfl
+
+/-- Summing on a valuation fiber is summing on its translate of the old unit
+group. The terms extended by zero have the same sum. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_fiber
+    {G A : Type*} [CommGroup G] [Group A] [DecidableEq A] (H J : Subgroup G) (w : G →* A)
+    (hH : ∀ t, t ∈ H ↔ t ∈ J ∧ w t = 1)
+    (b : J) (f : G → ℂ) (z : ℂ) (hz : HasSum (fun t : H ↦ f (b.val * t.val)) z) :
+    HasSum (fun t : J ↦ if w t.val = w b.val then f t.val else 0) z := by
+  classical
+  let inc (t : H) : J := ⟨b.val * t.val, J.mul_mem b.property ((hH _).mp t.property).1⟩
+  have hi : Injective inc := fun x y h ↦ Subtype.ext (mul_left_cancel (congrArg Subtype.val h))
+  have hw (t : H) : w (inc t).val = w b.val := by
+    change w (b.val * t.val) = _
+    rw [map_mul, ((hH _).mp t.property).2, mul_one]
+  refine (hi.hasSum_iff (fun t ht ↦ ite_eq_right (fun he ↦ ht ?_))).mp ?_
+  · have hm : b.val⁻¹ * t.val ∈ H := (hH _).mpr ⟨J.mul_mem (J.inv_mem b.property) t.property,
+      by rw [map_mul, map_inv, he, inv_mul_cancel]⟩
+    exact ⟨⟨_, hm⟩, Subtype.ext (mul_inv_cancel_left ..)⟩
+  · exact hz.congr_fun fun t ↦ ite_eq_left (hw t)
+
+/-- The two shells of orders `d - 1` and `-1` select a single valuation fiber
+for each ball, including balls with a negative index. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_select
+    (d j n : ℤ) (hd : 0 < d) (c : ℂ) :
+    (if n ≤ j * d + d - 1 then c else 0) - (if n ≤ j * d - 1 then c else 0) =
+      if j = n / d then c else 0 := by
+  have h := Int.ediv_eq_iff_of_pos (x := n) (y := j) hd
+  split_ifs <;> first | omega | simp_all
+
+/-- The theta series indexed by the subgroup of field units has the same sum
+as the series indexed by the units of the ring of S-integers. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_series
+    (S : Finset V) (f : ℬₛ(S)) (x : (SAdeleRing F S)ˣ) :
+    let diag := Units.map ((adeleProjection F S).comp (algebraMap F 𝔸[F])).toMonoidHom
+    HasSum (fun t : (S : Set V).unit F ↦ f (Multiplicative.ofAdd ((diag t.val * x).val)))
+      (sLocalAdelicTheta F S f x) := by
+  intro diag
+  let e := Set.unitEquivUnitsInteger (S : Set V) F
+  exact e.toEquiv.hasSum_iff.mpr
+    ((sLocalAdelicTheta_hasSumUniformlyOn F S f {x} isCompact_singleton).hasSum rfl)
+
+/-- Lift an old idele with any prescribed valuation at the added place. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_idele
+    {T S : Finset V} (v : S) (i : T ⊆ S) (hv : v.val ∉ T) (p : ℤ) (y : (SAdeleRing F T)ˣ) :
+    ∃ x : (SAdeleRing F S)ˣ,
+      (x.val.1, fun w : T ↦ x.val.2 ⟨w.val, i w.property⟩) = y.val ∧
+      Valued.v (x.val.2 v) = WithZero.exp p := by
+  classical
+  choose b hb using fun w : S ↦ w.val.valuedAdicCompletion_surjective F (WithZero.exp p)
+  let c (w : S) : (w.val.adicCompletion F)ˣ := if h : w.val ∈ T then
+    Units.map ((Pi.evalRingHom _ (⟨w.val, h⟩ : T)).comp (RingHom.snd _ _)).toMonoidHom y
+    else Units.mk0 (b w) (fun hz ↦ WithZero.exp_ne_zero ((hb w).symm.trans (hz ▸ map_zero _)))
+  let x : (SAdeleRing F S)ˣ :=
+    ⟨(y.val.1, fun w ↦ (c w).val), (y.inv.1, fun w ↦ (c w).inv),
+      Prod.ext (congrArg (fun t : SAdeleRing F T ↦ t.1) y.val_inv) (funext fun w ↦ (c w).val_inv),
+      Prod.ext (congrArg (fun t : SAdeleRing F T ↦ t.1) y.inv_val) (funext fun w ↦ (c w).inv_val)⟩
+  refine ⟨x, Prod.ext rfl (funext fun w ↦ ?_), ?_⟩
+  · change (c ⟨w.val, i w.property⟩).val = _
+    simp only [c, dite_eq_left w.property]
+    rfl
+  · change Valued.v (c v).val = _
+    simp only [c, dite_eq_right hv, Units.val_mk0, hb]
+
+/-- Evaluating the difference of two theta series a full valuation period apart
+extracts one translate of each ball coefficient. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_sum
+    {T S : Finset V} (v : S) (i : T ⊆ S) (hv : ∀ w : S, w.val ∉ T ↔ w = v)
+    (w : Fˣ →* Multiplicative ℤ) (hw : ∀ t, WithZero.exp (w t).toAdd = v.val.valuation F (t : F))
+    (u : (S : Set V).unit F) (d : ℤ) (hd : 0 < d)
+    (hu : (w u.val).toAdd = -d)
+    (hdiv : ∀ t : (S : Set V).unit F, d ∣ -(w t.val).toAdd)
+    (f : ℬₛ(S)) (hf : f ∈ Kₛ(S)) (I : Finset ℤ) (a : ℤ → ℬₛ(T))
+    (ha : ∀ x : SAdeleRing F S, f (Multiplicative.ofAdd x) = ∑ n ∈ I,
+      if Valued.v (x.2 v) ≤ WithZero.exp (-n) then
+        a n (Multiplicative.ofAdd (x.1, fun w : T ↦ x.2 ⟨w.val, i w.property⟩)) else 0) :
+    let diag := Units.map ((adeleProjection F T).comp (algebraMap F 𝔸[F])).toMonoidHom
+    (∑ n ∈ I, unitTranslateEnd (diag u.val ^ (-(n / d))) (a n)) ∈ Kₛ(T) := by
+  classical
+  intro diag
+  have hH (t : Fˣ) : t ∈ (T : Set V).unit F ↔ t ∈ (S : Set V).unit F ∧ w t = 1 := by
+    have h1 : w t = 1 ↔ v.val.valuation F t.val = 1 := by
+      rw [← hw t]
+      change w t = 1 ↔ (↑(w t) : WithZero (Multiplicative ℤ)) = 1
+      exact WithZero.coe_inj.symm
+    rw [h1]
+    refine ⟨fun h ↦ ⟨fun z hz ↦ h z (fun ht ↦ hz (i ht)), h _ ((hv v).mpr rfl)⟩, ?_⟩
+    rintro ⟨h, he⟩ z hz
+    by_cases hs : z ∈ S
+    · have eq := congrArg Subtype.val ((hv ⟨z, hs⟩).mp hz)
+      rwa [show z = v.val from eq]
+    · exact h z hs
+  let old : SAdeleRing F S →* SAdeleRing F T :=
+    ⟨⟨fun x ↦ (x.1, fun z ↦ x.2 ⟨z.val, i z.property⟩), rfl⟩, fun _ _ ↦ rfl⟩
+  let newDiag := Units.map ((adeleProjection F S).comp (algebraMap F 𝔸[F])).toMonoidHom
+  let tr (n : ℤ) := unitTranslateEnd (diag u.val ^ (-(n / d))) (a n)
+  apply LinearMap.mem_ker.mpr
+  ext y
+  let val (n : ℤ) (t : Fˣ) := a n (Multiplicative.ofAdd ((diag t * y).val))
+  let term (n : ℤ) (t : (S : Set V).unit F) :=
+    if w t.val = w (u.val ^ (n / d)) then val n t.val else 0
+  have row (n : ℤ) : HasSum (term n) (sLocalAdelicTheta F T (tr n) y) := by
+    apply sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_fiber
+      _ _ w hH (u ^ (n / d)) (val n)
+    refine (sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_series T (tr n) y).congr_fun
+      fun t ↦ ?_
+    symm
+    change a n (Multiplicative.ofAdd (((diag u.val ^ (-(n / d)))⁻¹ * (diag t.val * y)).val)) =
+      a n (Multiplicative.ofAdd ((diag (u.val ^ (n / d) * t.val) * y).val))
+    rw [map_mul, map_zpow, zpow_neg, inv_inv, mul_assoc]
+  have read (p : ℤ) : HasSum (fun t : (S : Set V).unit F ↦ ∑ n ∈ I,
+      if (w t.val).toAdd + p ≤ -n then val n t.val else 0) 0 := by
+    obtain ⟨x, hx, hp⟩ := sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_idele
+      v i ((hv v).mpr rfl) p y
+    have hs := sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_series S f x
+    rw [LinearMap.mem_ker.mp hf] at hs
+    refine hs.congr_fun fun t ↦ ((ha _).trans (Finset.sum_congr rfl fun n _ ↦ ?_)).symm
+    have he : old ((newDiag t.val * x).val) = (diag t.val * y).val := by
+      rw [Units.val_mul, map_mul, show old x.val = y.val from hx]
+      rfl
+    have hlocal : Valued.v ((newDiag t.val).val.2 v) = WithZero.exp (w t.val).toAdd := by
+      change Valued.v ((t.val : F) : v.val.adicCompletion F) = _
+      rw [HeightOneSpectrum.valuedAdicCompletion_eq_valuation']
+      exact (hw t.val).symm
+    change (if Valued.v ((newDiag t.val).val.2 v * x.val.2 v) ≤ WithZero.exp (-n)
+      then a n (Multiplicative.ofAdd (old ((newDiag t.val * x).val))) else 0) = _
+    simp only [map_mul, hlocal, hp, ← WithZero.exp_add, WithZero.exp_le_exp, he, val]
+  have hdif := (read (1 - d)).sub (read 1)
+  rw [sub_zero] at hdif
+  have hzero : HasSum (fun t ↦ ∑ n ∈ I, term n t) 0 := by
+    refine hdif.congr_fun fun t ↦ ?_
+    rw [← Finset.sum_sub_distrib]
+    apply Finset.sum_congr rfl
+    intro n _
+    obtain ⟨j, hj⟩ := hdiv t
+    have hj' : (w t.val).toAdd = -(j * d) := by
+      change -((w t.val).toAdd) = d * j at hj
+      rw [mul_comm d j] at hj
+      omega
+    have heq : w t.val = w (u.val ^ (n / d)) ↔ j = n / d := by
+      rw [map_zpow]
+      change (w t.val).toAdd = (n / d) • (w u.val).toAdd ↔ _
+      rw [hj', show (w u.val).toAdd = -d from hu, zsmul_eq_mul, mul_neg, neg_inj]
+      exact mul_left_inj' hd.ne'
+    symm
+    unfold term
+    simp only [heq, hj', show -(j * d) + (1 - d) ≤ -n ↔ n ≤ j * d + d - 1 by omega,
+      show -(j * d) + 1 ≤ -n ↔ n ≤ j * d - 1 by omega]
+    exact sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_select d j n hd _
+  change sLocalAdelicTheta F T (∑ n ∈ I, tr n) y = 0
+  rw [map_sum, ContinuousMap.sum_apply]
+  exact (hasSum_sum (s := I) fun n _ ↦ row n).unique hzero
+
 /-- Group the radial ball coefficients of a theta-null test by their indices modulo
 the positive valuation generator `d` of the S-units. Subtracting consecutive theta
 values on the local shells and summing over residues gives an old-stage theta-null
@@ -2611,7 +2988,46 @@ private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_tra
       sIdeleNorm F T g ≠ 1 ∧ ∀ k ∈ Kₛ(S), ∃ (I : Finset ℤ) (a : ℤ → ℬₛ(T)),
         r k = ∑ n ∈ I, a n ∧
           (∑ n ∈ I, unitTranslateEnd (g ^ (-(n / d))) (a n)) ∈ Kₛ(T) := by
-  sorry
+  classical
+  let w : Fˣ →* Multiplicative ℤ := WithZero.unitsWithZeroEquiv.toMonoidHom.comp
+    (Units.map (v.val.valuation F).toMonoidHom)
+  have hw (t : Fˣ) : WithZero.exp (w t).toAdd = v.val.valuation F (t : F) :=
+    WithZero.coe_unitsWithZeroEquiv_eq_units_val (Units.map (v.val.valuation F).toMonoidHom t)
+  obtain ⟨u, hd, hdiv⟩ :=
+    sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_generator v w hw
+  let e := Set.unitEquivUnitsInteger (S : Set V) F
+  let d := -(w u.val).toAdd
+  have he : -WithZero.log (Valued.v ((sUnitEmbedding F S (e u)).val.2 v)) = d := by
+    change -WithZero.log (Valued.v ((u.val : F) : v.val.adicCompletion F)) = _
+    rw [HeightOneSpectrum.valuedAdicCompletion_eq_valuation', ← hw u.val, WithZero.log_exp]
+  refine ⟨e u, sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_norm
+    v i hv (e u) (he ▸ hd), fun k hk ↦ ?_⟩
+  let P := sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.property)
+  obtain ⟨I, a, ha⟩ := sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_expand v i hv k
+  refine ⟨I, a, ?_, ?_⟩
+  · apply SchwartzBruhat.ext
+    intro y
+    let x : SAdeleRing F S := (y.toAdd.1, fun w ↦ if h : w.val ∈ T then y.toAdd.2 ⟨w.val, h⟩ else 0)
+    have hx : x.2 v = 0 := dite_eq_right ((hv v).mpr rfl)
+    have hy : (x.1, fun w : T ↦ x.2 ⟨w.val, i w.property⟩) = y.toAdd :=
+      Prod.ext rfl (funext fun w ↦ dite_eq_left w.property)
+    have hz := (sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_face v (P k)).mp ⟨k, rfl⟩ x hx
+    have hh := ha x
+    change k _ - P k _ = _ at hh
+    rw [hz, sub_zero, hx, hy, map_zero] at hh
+    simp only [zero_le, ite_true] at hh
+    let ev : ℬₛ(T) →ₗ[ℂ] ℂ := (LinearMap.proj y).comp (schwartzBruhatSubmodule _).subtype
+    exact ((congrArg (fun t ↦ r k (Multiplicative.ofAdd t)) hy.symm).trans (hr k x hx)).trans
+      (hh.trans (map_sum ev a I).symm)
+  · have hPk : P k ∈ Kₛ(S) :=
+      sAdelePrincipalValue_preserves_thetaKernel (F := F) (Finset.singleton_subset_iff.mpr v.property) hk
+    have hf : k - P k ∈ Kₛ(S) := (Kₛ(S)).sub_mem hk hPk
+    let diag := Units.map ((adeleProjection F T).comp (algebraMap F 𝔸[F])).toMonoidHom
+    have hg : Units.map ((adeleProjection F T).comp (integralAdelesOutside F S).subtype).toMonoidHom
+        (Units.map (integralAdeleDiagonal F S).toMonoidHom (e u)) = diag u.val := Units.ext rfl
+    rw [he, hg]
+    exact sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_sum v i hv w hw u d hd
+      (neg_neg _).symm hdiv (k - P k) hf I a ha
 
 /-- Modulo differences for one generator, each translated shell coefficient has
 the same class as the original coefficient, for positive and negative powers alike. -/
