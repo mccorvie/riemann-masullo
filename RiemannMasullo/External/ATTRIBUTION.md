@@ -10,6 +10,7 @@ one that applies.
 
 | Declaration here | Adapted from | License | Pull request |
 |---|---|---|---|
+| `spectralHomogeneousTest_real_factorization` | Uses the two [Dixmier–Malliavin proofs](FermatDixmierMalliavin/SOURCE_MAP.json) by [Anthropic, commit `6e837e7`](https://github.com/anthropics/fermats-last-theorem/tree/6e837e75355538c7f80bab5b956861e86c4eacc2/P2M/Sol) | [Apache-2.0](licenses/anthropics-fermats-last-theorem.LICENSE) · [NOTICE](licenses/anthropics-fermats-last-theorem.NOTICE) | Proof issue #7221 |
 | `spectralLineBand_jetCount_le_false_brackets` | Adapted from Thomas Lince’s [`HardyTenZeros.ten_zeros_on_line_below_fifty`](https://github.com/teal-sea/zeta-lab/blob/a401821c9608526425f3d4cf7ff8e59bc37e1c79/hunts/hardy_ten_zeros/lean/HardyTenZeros/TenZeros.lean), retaining two of the certified bracket endpoints. | [MIT](ZetaLab/LICENSE) | Proof issue #5364 |
 | `rectangleIntegral_sub_inv` | [CBirkbeck/AINTLIB, `c3bc9bf`, `RectangleContour.lean`](https://github.com/CBirkbeck/AINTLIB/blob/c3bc9bfafaf32cf281da174a7ec287c1e56acc99/projects/DedekindResidue/DedekindResidue/ExplicitFormula/RectangleContour.lean) | Apache-2.0 | #2839 (proof issue) |
 | `isBigO_pow_verticalStrip_of_exp` | `HeckeSkeleton.HeckeStripPolynomial.norm_le_on_closed_strip_of_polynomial_boundary` in [hecke-seven-eighths, `c77efa9`](https://github.com/Rogerhu12/hecke-seven-eighths/blob/c77efa9237c4635ed61933fbca98722c359c984a/src/HeckeSkeleton/HeckeStripPolynomial.lean), itself adapted from DedekindZetaZeroFree `09afbb4` | Apache-2.0 | #2895 (proof issue #1685) |
