@@ -1167,6 +1167,175 @@ local notation "Z(" χ ")" => {z : PontryaginDual C₁ × ℝ // 0 < order(χ z.
 local notation "N(" χ ", " s ", " z ")" => spectralBoundaryMultiplicity s (mult(χ (z).val.1,
   shift(a, (z).val.2)))
 
+/-- Finite sums of the jet functionals with vector coefficients approximate a contraction
+on each biorthogonal vector without increasing its norm. Project first onto the span of
+the finitely many Riesz vectors. -/
+private theorem spectralLineConvolution_traceCauchy_probes {H J : Type*}
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (x : J → H) (Λ : J → StrongDual ℂ H) (hb : IsSpectralMarkushevichBasis x Λ)
+    (U : H →L[ℂ] H) (hU : ‖U‖ ≤ 1) :
+    ∃ v : Finset J → J → H, (∀ K i, i ∉ K → v K i = 0) ∧
+      (∀ K, ‖∑ i ∈ K, (Λ i).smulRight (v K i)‖ ≤ 1) ∧
+      ∀ i, Tendsto (fun K ↦ v K i) atTop (𝓝 (U (x i))) := by
+  classical
+  let u (i : J) := (InnerProductSpace.toDual ℂ H).symm (Λ i)
+  let V (K : Finset J) := Submodule.span ℂ (u '' (K : Set J))
+  let dim (K : Finset J) : FiniteDimensional ℂ (V K) :=
+    FiniteDimensional.span_of_finite ℂ (K.finite_toSet.image u)
+  let v (K : Finset J) (i : J) := U ((V K).starProjection (x i))
+  have hoff (K : Finset J) (i : J) (hi : i ∉ K) : v K i = 0 := by
+    have hperp : x i ∈ (V K)ᗮ := by
+      have hV : V K ≤ (innerSL ℂ (x i)).ker := by
+        apply Submodule.span_le.mpr
+        rintro _ ⟨k, hk, rfl⟩
+        apply inner_eq_zero_symm.mp
+        rw [show u k = (InnerProductSpace.toDual ℂ H).symm (Λ k) from rfl,
+          InnerProductSpace.toDual_symm_apply]
+        exact hb.2.1 i k (fun h ↦ hi (h.symm ▸ hk))
+      exact ((V K).mem_orthogonal' _).mpr (fun _ hw ↦ hV hw)
+    simp only [v, ((V K).starProjection_apply_eq_zero_iff).mpr hperp, map_zero]
+  refine ⟨v, hoff, fun K ↦ ?_, fun i ↦ ?_⟩
+  · have heq : ∑ k ∈ K, (Λ k).smulRight (v K k) = U.comp (V K).starProjection := by
+      apply ContinuousLinearMap.ext_on hb.2.2.1
+      rintro _ ⟨i, rfl⟩
+      simp only [sum_apply, ContinuousLinearMap.smulRight_apply, ContinuousLinearMap.comp_apply]
+      change ∑ k ∈ K, (Λ k (x i)) • v K k = v K i
+      rw [Finset.sum_eq_single i]
+      · rw [hb.1, one_smul]
+      · intro k _ hki
+        rw [hb.2.1 i k hki.symm, zero_smul]
+      · intro hi
+        rw [hoff K i hi, smul_zero]
+    rw [heq]
+    exact (U.opNorm_comp_le _).trans
+      ((mul_le_of_le_one_right (norm_nonneg _) (V K).starProjection_norm_le).trans hU)
+  · have mono : Monotone V := fun K L h ↦ Submodule.span_mono (Set.image_mono h)
+    have hd : ⊤ ≤ (⨆ K, V K).topologicalClosure := by
+      apply (Submodule.topologicalClosure_eq_top_iff.mpr ?_).ge
+      rw [Submodule.eq_bot_iff]
+      intro w hw
+      have hev : ContinuousLinearMap.apply ℂ ℂ w = 0 := by
+        apply ContinuousLinearMap.ext_on hb.2.2.2
+        rintro _ ⟨k, rfl⟩
+        have hmem : u k ∈ V {k} := Submodule.subset_span ⟨k, Finset.mem_singleton_self k, rfl⟩
+        change Λ k w = 0
+        simpa only [u, InnerProductSpace.toDual_symm_apply] using
+          (Submodule.mem_orthogonal _ _).mp hw _ ((le_iSup V {k}) hmem)
+      exact (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr
+        (fun f ↦ (DFunLike.congr_fun hev f).trans (map_zero f).symm)
+    exact U.continuous.continuousAt.tendsto.comp (Submodule.starProjection_tendsto_self V mono (x i) hd)
+
+/-- A contraction attains the trace norm of a nuclear operator in the real trace pairing. -/
+private theorem spectralLineConvolution_traceCauchy_norming {H : Type*}
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H] (T : nuclearEndomorphisms H) :
+    ∃ U : H →L[ℂ] H, ‖U‖ ≤ 1 ∧
+      traceNorm T = (hilbertTrace ⟨U * T.val, mul_mem_nuclearEndomorphisms_left U T⟩).re := by
+  let S := CFC.sqrt (T.val.adjoint * T.val)
+  -- Pointwise norm identity as in AppC_LCTVS/Sec3a, norm_sqrt_adjoint_mul_apply.
+  have hpos : 0 ≤ S := CFC.sqrt_nonneg (T.val.adjoint * T.val)
+  have hS : S.adjoint = S := (ContinuousLinearMap.nonneg_iff_isPositive.mp hpos).isSelfAdjoint.adjoint_eq
+  have hsq : S * S = T.val.adjoint * T.val :=
+    CFC.sqrt_mul_sqrt_self _ (ContinuousLinearMap.nonneg_iff_isPositive.mpr
+      T.val.isPositive_adjoint_comp_self)
+  have hn (w : H) : ‖S w‖ ≤ ‖T.val w‖ := by
+    rw [S.apply_norm_eq_sqrt_inner_adjoint_right, T.val.apply_norm_eq_sqrt_inner_adjoint_right,
+      hS, ← ContinuousLinearMap.mul_def, hsq, ContinuousLinearMap.mul_def]
+  obtain ⟨U, hU, hUS⟩ := exists_contraction_comp_eq_of_norm_le T.val S hn
+  refine ⟨U, hU, ?_⟩
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  have hs := Complex.reCLM.hasSum (summable_norm_hilbertDiagonal b (U * T.val)
+    (mul_mem_nuclearEndomorphisms_left U T)).of_norm.hasSum
+  apply (hasSum_traceNorm_diagonal b T).unique
+  change HasSum _ (∑' i, inner ℂ (b i) ((U * T.val) (b i))).re
+  simpa only [Complex.reCLM_apply, ContinuousLinearMap.mul_def U, hUS] using hs
+
+/-- Testing the finite section against a left multiplier gives the scalar sum of its
+jet functionals evaluated on the images of the biorthogonal vectors. -/
+private theorem spectralLineConvolution_traceCauchy_pairing {H J Z : Type*}
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (U A : H →L[ℂ] H) (x : J → H) (Λ : J → StrongDual ℂ H) (K : Finset Z)
+    (N : Z → ℕ) (jet : (z : Z) → Fin (N z) → J) :
+    ∃ T : nuclearEndomorphisms H, T.val = U * spectralConvolutionFiniteSum A x Λ K N jet ∧
+      hilbertTrace T = ∑ z ∈ K, ∑ m : Fin (N z), Λ (jet z m) (A (U (x (jet z m)))) := by
+  let r (j : J) : nuclearEndomorphisms H :=
+    ⟨((Λ j).comp A).smulRight (U (x j)), smulRight_mem_nuclearEndomorphisms _ _⟩
+  refine ⟨∑ z ∈ K, ∑ m : Fin (N z), r (jet z m), ?_, ?_⟩
+  · ext w
+    simp [r, spectralConvolutionFiniteSum, sum_apply, ContinuousLinearMap.mul_def]
+  · obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := H)
+    simp only [← htr, map_sum]
+    exact Finset.sum_congr rfl fun z _ ↦ Finset.sum_congr rfl fun m _ ↦
+      (htr _).trans (hilbertTrace_smulRight _ _)
+
+/-- A scalar estimate on each enlargement of one rectangle bounds its difference
+from the anchor in trace norm. Two such bounds control arbitrary late rectangles. -/
+private theorem spectralLineConvolution_traceCauchy_of_scalar_shell {H J Z : Type*}
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H] [DecidableEq Z]
+    (A : H →L[ℂ] H) (x : J → H) (Λ : J → StrongDual ℂ H) (hb : IsSpectralMarkushevichBasis x Λ)
+    (box : ℕ × ℕ → Finset Z) (hbox : Monotone box) (N : Z → ℕ)
+    (jet : (z : Z) → Fin (N z) → J)
+    (hshell : ∀ ε > (0 : ℝ), ∃ i, ∀ j ≥ i, ∀ (K : Finset J) (v : J → H),
+      (∀ k ∉ K, v k = 0) → ‖∑ k ∈ K, (Λ k).smulRight (v k)‖ ≤ 1 →
+      (∑ z ∈ box j \ box i, ∑ m : Fin (N z), Λ (jet z m) (A (v (jet z m)))).re ≤ ε) :
+    SpectralRectanglesTraceCauchy (fun j ↦ spectralConvolutionFiniteSum A x Λ (box j) N jet) := by
+  classical
+  let B (K : Finset Z) := spectralConvolutionFiniteSum A x Λ K N jet
+  have hmem (K : Finset Z) : B K ∈ nuclearEndomorphisms H :=
+    (nuclearEndomorphisms H).sum_mem fun z _ ↦
+      (nuclearEndomorphisms H).sum_mem fun m _ ↦ smulRight_mem_nuclearEndomorphisms _ _
+  intro ε hε
+  obtain ⟨i, hi⟩ := hshell (ε / 3) (by positivity)
+  let D (j : ℕ × ℕ) : nuclearEndomorphisms H := ⟨B (box j \ box i), hmem _⟩
+  have hD (j : ℕ × ℕ) (hj : i ≤ j) : (D j).val + B (box i) = B (box j) :=
+    Finset.sum_sdiff (hbox hj)
+  have hsmall (j : ℕ × ℕ) (hj : i ≤ j) : traceNorm (D j) ≤ ε / 3 := by
+    obtain ⟨U, hU, hnorm⟩ := spectralLineConvolution_traceCauchy_norming (D j)
+    obtain ⟨v, hoff, hV, hlim⟩ := spectralLineConvolution_traceCauchy_probes x Λ hb U hU
+    obtain ⟨T, hT, htrace⟩ := spectralLineConvolution_traceCauchy_pairing U A x Λ (box j \ box i) N jet
+    have hEq : (⟨U * (D j).val, mul_mem_nuclearEndomorphisms_left _ _⟩ : nuclearEndomorphisms H) = T :=
+      Subtype.ext hT.symm
+    rw [hnorm, hEq, htrace]
+    apply le_of_tendsto' (Complex.continuous_re.continuousAt.tendsto.comp
+      (tendsto_finsetSum _ fun z _ ↦ tendsto_finsetSum _ fun m _ ↦
+        ((Λ (jet z m)).continuous.comp A.continuous).continuousAt.tendsto.comp (hlim (jet z m))))
+    exact fun K ↦ hi j hj K (v K) (hoff K) (hV K)
+  refine ⟨i, fun j k hj hk ↦ ⟨D j - D k, ?_, ?_⟩⟩
+  · change (D j).val - (D k).val = B (box j) - B (box k)
+    rw [← hD j hj, ← hD k hk, add_sub_add_right_eq_sub]
+  · let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+    let core := traceNorm_normedSpaceCore (H := H)
+    let : NormedAddCommGroup (nuclearEndomorphisms H) := NormedAddCommGroup.ofCore core
+    let : SeminormedAddCommGroup (nuclearEndomorphisms H) :=
+      (inferInstance : NormedAddCommGroup (nuclearEndomorphisms H)).toSeminormedAddCommGroup
+    apply (norm_sub_le (D j) (D k)).trans_lt
+    change traceNorm (D j) + traceNorm (D k) < ε
+    linarith [hsmall j hj, hsmall k hk]
+
+open Classical in
+/-- Paper: Theorem 10.3.1.1(1), p. 448. For a finite family of vectors defining a
+contraction by the jet functionals, the sum of the convolved evaluations on the added
+zero blocks should have uniformly small real part. Vectors outside the rectangle also
+enter the contraction bound. The finite Gram matrices of the jets and the vectors
+determine that bound. Estimating the scalar sum subject to it would account for the
+angles between nearby jets omitted in (10.3.1.18)–(23), pp. 451–452. -/
+private theorem spectralLineConvolution_traceCauchy_scalar_shell
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (_hχ : IsSpectralBasepointChoice (F := F) χ)
+    {s : ℝ} (hs : 1 < s) (φ : BruhatCompactSupport C𝔽)
+    (eχ : PontryaginDual C₁ ↪ ℕ) (e : Z(χ) ↪ ℕ × ℕ) (_he : ∀ z, (e z).1 = eχ z.val.1)
+    (Λ : SpectralLineJetIndex (F := F) χ a s → StrongDual ℂ Q(a, h₀, hs₀(hs)))
+    (_hj : ∀ j, spectralSobolevDualEmbedding F a h₀ hs₀(hs) (Λ j) =
+      (spectralLineJet_memLp (F := F) χ hs j).toLp
+        (spectralZeroJet (F := F) (χ j.val.1) 0 j.val.2.1 j.val.2.2)) :
+    let box (ij : ℕ × ℕ) := ((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn
+    let jet (z : Z(χ)) (m : Fin (N(χ, s, z))) : SpectralLineJetIndex (F := F) χ a s :=
+      ⟨(z.val.1, z.val.2, m.val), m.isLt⟩
+    let A := spectralConvolution (F := F) a h₀ hs₀(hs) φ
+    ∀ ε > (0 : ℝ), ∃ i, ∀ j ≥ i, ∀ (K : Finset (SpectralLineJetIndex (F := F) χ a s))
+      (v : SpectralLineJetIndex (F := F) χ a s → Q(a, h₀, hs₀(hs))),
+      (∀ k ∉ K, v k = 0) → ‖∑ k ∈ K, (Λ k).smulRight (v k)‖ ≤ 1 →
+      (∑ z ∈ box j \ box i, ∑ m : Fin (N(χ, s, z)), Λ (jet z m) (A (v (jet z m)))).re ≤ ε := by
+  sorry
+
 /-- Paper: Theorem 10.3.1.1(1), p. 448. The rectangular sums have Cauchy tails in trace norm.
 Gap: Trace-norm tails of the actual rectangles need an estimate allowing arbitrarily close zeros. -/
 theorem spectralLineConvolution_traceCauchy (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
@@ -1186,7 +1355,18 @@ theorem spectralLineConvolution_traceCauchy (χ : PontryaginDual C₁ → Pontry
         (((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn)
         (fun z ↦ N(χ, s, z))
         (fun z m ↦ ⟨(z.val.1, z.val.2, m.val), m.isLt⟩)
-    SpectralRectanglesTraceCauchy B := by sorry
+    SpectralRectanglesTraceCauchy B := by
+  classical
+  intro H A B
+  refine spectralLineConvolution_traceCauchy_of_scalar_shell A x Λ _hb
+    (fun ij : ℕ × ℕ ↦ ((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn)
+    ?_ (fun z ↦ N(χ, s, z)) (fun z m ↦ ⟨(z.val.1, z.val.2, m.val), m.isLt⟩) ?_
+  · intro i j hij z hz
+    obtain ⟨h₁, h₂⟩ := Finset.mem_product.mp (Finset.mem_preimage.mp hz)
+    exact Finset.mem_preimage.mpr (Finset.mem_product.mpr
+      ⟨Finset.mem_Iic.mpr ((Finset.mem_Iic.mp h₁).trans hij.1),
+       Finset.mem_Iic.mpr ((Finset.mem_Iic.mp h₂).trans hij.2)⟩)
+  · exact spectralLineConvolution_traceCauchy_scalar_shell (F := F) a χ _hχ hs φ eχ e _he Λ _hj
 
 /-- Paper: Theorem 10.3.1.1(1) and (10.3.1.1), p. 448. The rectangular
 finite-rank sums over any enumeration converge to convolution in each Schatten class.
