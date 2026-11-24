@@ -3173,6 +3173,119 @@ local notation "invPW(" h ", " b ", " ω ")" => sLocalInvariantPW h b (Z₀(_)) 
 -- The basis and growth statements in §7.3.1 assume saturation of the whole target T.
 -- To use them for an unsaturated base S, their proofs must be localized to the fiber over p.
 
+/-- When the Picard group of the `S`-integers is trivial, every idele becomes a unit at
+all finite places outside `S` after division by a single principal idele. -/
+private theorem sLocalPWOrbital_eventually_equiv_inf_unitOutside
+    {F : Type*} [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F)))
+    (hPic : Subsingleton (CommRing.Pic ((S : Set (HeightOneSpectrum (𝓞 F))).integer F)))
+    (g : IdeleGroup (𝓞 F) F) :
+    ∃ x : Fˣ, ∀ v : HeightOneSpectrum (𝓞 F), v ∉ S →
+      Valued.v ((g * IdeleGroup.unitEmbedding (𝓞 F) F x⁻¹).val.2 v) =
+        (1 : WithZero (Multiplicative ℤ)) := by
+  classical
+  have hg : {v : HeightOneSpectrum (𝓞 F) |
+      Valued.v (g.val.2 v) ≠ (1 : WithZero (Multiplicative ℤ))}.Finite :=
+    eventually_cofinite.mp (AdeleRing.isUnit_iff.mp g.isUnit).2.2
+  obtain ⟨T, hT, hPicT⟩ := (picard_uniformization F (S ∪ hg.toFinset)).1
+  have hST : S ⊆ T := Finset.subset_union_left.trans hT
+  let D := T \ S
+  let I (v : HeightOneSpectrum (𝓞 F)) : IdeleGroup (𝓞 F) F →* (v.adicCompletion F)ˣ :=
+    Units.map (((RestrictedProduct.evalRingHom
+      (fun w : HeightOneSpectrum (𝓞 F) ↦ w.adicCompletion F) v).comp
+      (RingHom.snd (InfiniteAdeleRing F) (FiniteAdeleRing (𝓞 F) F))).toMonoidHom)
+  let u : (v : D) → (v.val.adicCompletion F)ˣ ⧸ (v.val.adicCompletionIntegers F).units :=
+    fun v ↦ QuotientGroup.mk (I v.val g)
+  obtain ⟨e, -⟩ := (picard_uniformization F S).2.1 T hST hPicT
+  have he : (QuotientGroup.mk u : _ ⧸ (sUnitLocalClasses F T D).range) = 1 :=
+    e.injective (hPic.elim _ _)
+  obtain ⟨x, hx⟩ := (QuotientGroup.eq_one_iff (N := (sUnitLocalClasses F T D).range) u).mp he
+  refine ⟨x.val, fun v hv ↦ ?_⟩
+  have hmul : I v (g * IdeleGroup.unitEmbedding (𝓞 F) F x.val⁻¹) =
+      I v g * (Units.map (algebraMap F (v.adicCompletion F)).toMonoidHom x.val)⁻¹ := by
+    rw [map_mul, ← map_inv]
+    rfl
+  change Valued.v (I v (g * IdeleGroup.unitEmbedding (𝓞 F) F x.val⁻¹)).val = 1
+  rw [hmul]
+  by_cases hvT : v ∈ T
+  · -- inside the enlarged set the local classes of `g` and of the unit `x` agree
+    let w : D := ⟨v, Finset.mem_sdiff.mpr ⟨hvT, hv⟩⟩
+    have h := congrFun hx w
+    change (QuotientGroup.mk (Units.map (algebraMap F (v.adicCompletion F)).toMonoidHom x.val) :
+        (v.adicCompletion F)ˣ ⧸ (v.adicCompletionIntegers F).units) =
+      QuotientGroup.mk (I v g) at h
+    have hmem : I v g * (Units.map (algebraMap F (v.adicCompletion F)).toMonoidHom x.val)⁻¹ ∈
+        (v.adicCompletionIntegers F).units := by
+      apply (QuotientGroup.eq_one_iff _).mp
+      change (QuotientGroup.mk' (v.adicCompletionIntegers F).units)
+        (I v g * (Units.map (algebraMap F (v.adicCompletion F)).toMonoidHom x.val)⁻¹) = 1
+      rw [map_mul, map_inv]
+      exact mul_inv_eq_one.mpr h.symm
+    exact HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp hmem
+  · -- outside it both `g` and the unit `x` already have valuation one
+    have hg' : Valued.v (g.val.2 v) = (1 : WithZero (Multiplicative ℤ)) := by
+      by_contra h
+      exact hvT (hT (Finset.mem_union_right _ (hg.mem_toFinset.mpr h)))
+    have hx' : Valued.v ((x.val : F) : v.adicCompletion F) =
+        (1 : WithZero (Multiplicative ℤ)) := by
+      rw [HeightOneSpectrum.valuedAdicCompletion_eq_valuation']
+      exact x.property v hvT
+    rw [Units.val_mul, Units.val_inv_eq_inv_val]
+    change Valued.v (g.val.2 v * (((x.val : F) : v.adicCompletion F)⁻¹)) = 1
+    rw [map_mul, map_inv₀, hg', hx', inv_one, one_mul]
+
+/-- A character of the norm-one idele classes that is unramified outside `S` is trivial as
+soon as its descent to a larger stage `T` is trivial, provided the Picard group of the
+`S`-integers is trivial. -/
+private theorem sLocalPWOrbital_eventually_equiv_inf_character
+    {F : Type*} [Field F] [NumberField F] {S T : Finset (HeightOneSpectrum (𝓞 F))}
+    (hST : S ⊆ T)
+    (hPic : Subsingleton (CommRing.Pic ((S : Set (HeightOneSpectrum (𝓞 F))).integer F)))
+    (ω : PontryaginDual (ideleClassNorm F).ker) (hu : NormOneCharacterUnramifiedOutside ω S)
+    (h : sLocalNormOneCharacter (F := F) T ω
+      (NormOneCharacterUnramifiedOutside.mono (F := F) hu hST) = 1) : ω = 1 := by
+  apply PontryaginDual.ext
+  intro x
+  obtain ⟨g, hg⟩ := QuotientGroup.mk_surjective x.val
+  obtain ⟨a, ha⟩ := sLocalPWOrbital_eventually_equiv_inf_unitOutside S hPic g
+  let d := IdeleGroup.unitEmbedding (𝓞 F) F
+  let t := g * d a⁻¹
+  -- `t` represents the same idele class as `g` and is a unit at every place outside `S`
+  have ht : (QuotientGroup.mk t : IdeleClassGroup (𝓞 F) F) = x.val := by
+    have hd : (QuotientGroup.mk (d a⁻¹) : IdeleClassGroup (𝓞 F) F) = 1 :=
+      (QuotientGroup.eq_one_iff _).mpr ⟨a⁻¹, rfl⟩
+    change (QuotientGroup.mk' _) (g * d a⁻¹) = x.val
+    rw [map_mul]
+    change (QuotientGroup.mk g : IdeleClassGroup (𝓞 F) F) * QuotientGroup.mk (d a⁻¹) = x.val
+    rw [hd, mul_one, hg]
+  have htu : t ∈ range (integralIdeleInsertion F T) := by
+    apply (mem_range_integralIdeleInsertion F T t).mpr
+    intro v hv
+    have hvS : v ∉ S := fun hvS ↦ hv (hST hvS)
+    have h1 : t.val.2 v * t.inv.2 v = 1 :=
+      congrArg (fun z : AdeleRing (𝓞 F) F ↦ z.2 v) t.val_inv
+    have hval : Valued.v (t.inv.2 v) = 1 := by
+      have hvp := congrArg Valued.v h1
+      rw [map_mul, ha v hvS, one_mul, map_one] at hvp
+      exact hvp
+    exact ⟨(ha v hvS).le, hval.le⟩
+  obtain ⟨u, hu'⟩ := htu
+  let y₀ := Units.map (adeleProjection F T).toMonoidHom t
+  have hy : sIdeleQuotientNorm F T (QuotientGroup.mk y₀) = 1 := by
+    rw [sIdeleQuotientNorm_mk]
+    have hh := (sIdeleNorm_spec F T).1 u
+    change ideleNorm F (integralIdeleInsertion F T u) =
+      sIdeleNorm F T (Units.map (adeleProjection F T).toMonoidHom
+        (integralIdeleInsertion F T u)) at hh
+    rw [hu'] at hh
+    change ideleClassNorm F (QuotientGroup.mk t) = sIdeleNorm F T y₀ at hh
+    rw [ht, MonoidHom.mem_ker.mp x.property] at hh
+    exact hh.symm
+  let y : (sIdeleQuotientNorm F T).ker := ⟨QuotientGroup.mk y₀, hy⟩
+  have hh := sLocalNormOneCharacter_apply ω (hu.mono hST) u x y (by rw [hu', ht])
+    (by rw [hu'])
+  rw [h] at hh
+  exact hh.symm
+
 /-- Paper: Theorem 7.3.3.4, equations (7.3.3.18)–(7.3.3.19), p. 361.
 The first of the two level conditions of the theorem: for large enough absolute or
 invariant Paley–Wiener levels, the level meets the primary principal-value image exactly
@@ -3187,7 +3300,15 @@ private theorem sLocalPWOrbital_eventually_equiv_inf {S₀ : Finset V} (hST : S 
     (χ : PontryaginDual J₁(T)) (_hχ : χ = descend(hST, ω, hu)) (_hω : ω ≠ 1) :
     ∃ B : ℝ, 0 < B ∧ ∀ X Y : ℝ, B ≤ X → B ≤ Y → X ^ count(S) ≤ Y →
       ∀ (W : Submodule ℂ (Θ(T, χ))), (W = absPW(hST, X, χ) ∨ W = invPW(hST, Y, χ)) →
-        W ⊓ Rₚ(p, χ) = W ⊓ Rₚ₀(p, χ) := by sorry
+        W ⊓ Rₚ(p, χ) = W ⊓ Rₚ₀(p, χ) := by
+  -- the descended character is nontrivial, because the Picard group is trivial
+  have hχ1 : χ ≠ 1 := fun h ↦ _hω
+    (sLocalPWOrbital_eventually_equiv_inf_character hST _hPic ω hu (_hχ.symm.trans h))
+  -- hence every theta class has a zero-moment representative, and the two images coincide
+  have hR : Rₚ₀(p, χ) = Rₚ(p, χ) := by
+    rw [sLocalZeroMomentTheta_eq_top (F := F) (T := T) χ hχ1, Submodule.map_top]
+    rfl
+  exact ⟨1, one_pos, fun X Y _ _ _ W _ ↦ by rw [hR]⟩
 
 /-- Paper: Theorem 7.3.3.4, pp. 361–363. For one inserted pure tensor and one
 added place, its class modulo the singleton principal value has a zero-moment
@@ -3458,6 +3579,215 @@ theorem sLocalPWOrbital_eventually_equiv {S₀ : Finset V} (hST : S ⊆ T) (_hT 
     (hlev₁ X Y ((le_max_left B₁ B₂).trans hX) ((le_max_left B₁ B₂).trans hY) hXY W hW)
     (hlev₂ X Y ((le_max_right B₁ B₂).trans hX) ((le_max_right B₁ B₂).trans hY) hXY W hW)
 
+/-- At a selected center, vanishing of the first Fourier jets forces the top Laurent
+coefficients to vanish. The reflected transform contributes a zero of the indicated
+multiplicity to the local functional equation. -/
+private theorem sLocalPWOrbital_bases_fourier_kernel (p : Vℚ) (χ : PontryaginDual J₁(T))
+    (f : B(T)) (hz : ∀ j : Iₚ(p, χ), sLocalOrbitalFourierJet j (q(T, χ) f) = 0)
+    (c : QuasiCharacter J(T))
+    (hc : normOneRestriction (m(T)) c = (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ)
+    (hn : 0 < sLocalFinitePoleMultiplicity (sLocalPrimaryPlaces T p) c) :
+    ∀ k : ℕ, sLocalRhoPoleOrder c - sLocalFinitePoleMultiplicity (sLocalPrimaryPlaces T p) c < k →
+      k ≤ sLocalRhoPoleOrder c → sLocalPrincipalPartCoeff c k f = 0 := by
+  classical
+  let n := sLocalFinitePoleMultiplicity (sLocalPrimaryPlaces T p) c
+  let m := sLocalRhoPoleOrder c
+  let twist := quasiCharacterNormTwist (G := J(T)) (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous
+  let dual := dualQuasiCharacter (G := J(T)) (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous
+  let H (z : ℂ) := sLocalIdelicZFunction (sAdeleSchwartzFourier f) (dual (twist c z))
+  let ρ (z : ℂ) := sLocalRhoFactor (twist c z)
+  let j (r : ℕ) (hr : r < n) : Iₚ(p, χ) := ⟨(c, r), hc, hr⟩
+  have hH : AnalyticAt ℂ H 0 := sLocalOrbitalFourierZeta_analyticAt (j 0 hn) f
+  have hvan : (n : ℕ∞) ≤ analyticOrderAt H 0 :=
+    (natCast_le_analyticOrderAt_iff_iteratedDeriv_eq_zero hH).mpr (fun r hr ↦ hz (j r hr))
+  have horder : (n : WithTop ℤ) ≤ meromorphicOrderAt H 0 := by
+    rw [hH.meromorphicOrderAt_eq]
+    cases ho : analyticOrderAt H 0 using ENat.recTopCoe with
+    | top => exact le_top
+    | coe r =>
+      rw [ENat.map_natCast]
+      rw [ho] at hvan
+      exact_mod_cast hvan
+  obtain ⟨η, a, ha⟩ := exists_sLocalNormTwist (F := F) (S := T) c
+  have hρ : MeromorphicAt ρ 0 := by
+    dsimp only [ρ, twist]
+    simp only [← ha, normTwist_normTwist]
+    exact (sLocalRhoFactor_meromorphic η (0 + a)).comp_analyticAt (g := fun z : ℂ ↦ z + a)
+      (analyticAt_id.add analyticAt_const)
+  have hfe : (fun z ↦ sLocalIdelicZFunction f (twist c z)) =ᶠ[𝓝[≠] (0 : ℂ)] ρ * H := by
+    have ht : Tendsto (fun z : ℂ ↦ z + a) (𝓝[≠] 0) (𝓝[≠] (0 + a)) := ((Homeomorph.addRight a).map_punctured_nhds_eq 0).le
+    filter_upwards [ht.eventually (nhdsNE_le_codiscrete (0 + a)
+      (sLocalPrincipalPartCoeff_lower_formula_fe η f))] with z hz
+    simpa only [ρ, H, dual, twist, ← ha, normTwist_normTwist, Pi.mul_apply] using hz
+  apply (sLocalPrincipalValue_coeff_order f c n).mpr
+  rw [meromorphicOrderAt_congr hfe, meromorphicOrderAt_mul hρ hH.meromorphicAt]
+  have hnle : n ≤ m := by
+    dsimp only [m, n]
+    rw [sLocalRhoPoleOrder_eq_card_polePlaces]
+    exact (Finset.card_filter_le _ _).trans (Nat.le_add_left _ _)
+  have hρord : ((-(m : ℤ) : ℤ) : WithTop ℤ) ≤ meromorphicOrderAt ρ 0 :=
+    (sLocalIdelicOrderBound_eq_neg_poleOrder c).ge.trans (min_le_right _ _)
+  change ((-((m - n : ℕ) : ℤ) : ℤ) : WithTop ℤ) ≤ _
+  calc
+    _ = ((-(m : ℤ) : ℤ) : WithTop ℤ) + (n : WithTop ℤ) := by
+      rw [← WithTop.coe_natCast, ← WithTop.coe_add, Nat.cast_sub hnle]
+      congr 1
+      ring
+    _ ≤ _ := add_le_add hρord horder
+
+/-- The selected coordinates separate the ambient quotient. The argument of §7.3.1
+for the polar kernel uses the range criterion of §7.2.2, which only needs trivial
+Picard group at the target stage. The same criterion applies to vanishing Fourier jets. -/
+private theorem sLocalPWOrbital_bases_kernel (p : Vℚ)
+    (hp : (sLocalPrimaryPlaces (F := F) T p).Nonempty)
+    (hPic : Subsingleton (CommRing.Pic ((T : Set V).integer F))) (χ : PontryaginDual J₁(T))
+    (L : Iₚ(p, χ) → StrongDual ℂ (Θ(T, χ)))
+    (hL : L = sLocalOrbitalPrincipalPart ∨ L = sLocalOrbitalFourierJet)
+    (x : Θ(T, χ)) (hz : ∀ j, L j x = 0) : x ∈ Rₚ(p, χ) := by
+  obtain ⟨f, rfl⟩ := (LinearMap.ker (sLocalHomogeneousAdelicThetaLinearMap F T χ)).mkQ_surjective x
+  let cc : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  have hcoeff (c : QuasiCharacter J(T)) (hc : normOneRestriction (m(T)) c = cc.comp χ)
+      (hn : 0 < sLocalFinitePoleMultiplicity (sLocalPrimaryPlaces T p) c) :
+      ∀ k : ℕ, sLocalRhoPoleOrder c - sLocalFinitePoleMultiplicity (sLocalPrimaryPlaces T p) c < k →
+        k ≤ sLocalRhoPoleOrder c → sLocalPrincipalPartCoeff c k f = 0 := by
+    rcases hL with rfl | rfl
+    · intro k hk hkm
+      let j : Iₚ(p, χ) := ⟨(c, sLocalRhoPoleOrder c - k), hc, by dsimp; omega⟩
+      have h := hz j
+      change sLocalThetaPrincipalPartCoeff χ c hc
+        (sLocalRhoPoleOrder c - (sLocalRhoPoleOrder c - k)) (q(T, χ) f) = 0 at h
+      rw [Nat.sub_sub_self hkm] at h
+      exact h
+    · exact sLocalPWOrbital_bases_fourier_kernel p χ f hz c hc hn
+  -- Extend the component to a global unitary character, as in the proof of
+  -- sLocalThetaPoleBound_le_orbitalPrincipalValue in Sec3a.
+  obtain ⟨τ, hτ⟩ := sIdeleQuotientNorm_exists_section F T
+  obtain ⟨η, hη, _⟩ := exists_character_on_split (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous
+    τ hτ χ 1
+  obtain ⟨ξ, hξ, hrest, _⟩ := sLocal_character_extension η
+  let ω : PontryaginDual C₁ :=
+    ξ.comp (⟨(ideleClassNorm F).ker.subtype, continuous_subtype_val⟩ : C₁ →ₜ* _)
+  have hzero : ideleClassNormTwist ξ 0 = cc.comp ξ := by
+    ext1 g
+    change (ξ g : ℂ) * _ ^ (0 : ℂ) = (ξ g : ℂ)
+    simp
+  have hu : cc.comp ξ ∈ unramifiedOutside F T := hzero ▸ hξ
+  let hω : NormOneCharacterUnramifiedOutside ω T := ⟨⟨cc.comp ξ, hu⟩, fun _ ↦ rfl⟩
+  have hχ : sLocalNormOneCharacter T ω hω = χ := by
+    ext1 y
+    apply Subtype.ext
+    rw [sLocalNormOneCharacter_eq_sIdeleRestriction ω ⟨cc.comp ξ, hu⟩ (fun _ ↦ rfl) y,
+      show (⟨cc.comp ξ, hu⟩ : unramifiedOutside F T) = ⟨ideleClassNormTwist ξ 0, hξ⟩ from
+        Subtype.ext hzero.symm, hrest]
+    change (η y.val : ℂ) * _ ^ (0 : ℂ) = (χ y : ℂ)
+    simp [hη]
+  rw [← hχ] at hcoeff ⊢
+  exact sLocalPrincipalValue_mem_range_of_coeff_eq_zero
+    (sLocalPrimaryPlaces_subset (F := F) T p) hp hPic ξ hu f hcoeff
+
+/-- Compact interpolation of truncated coefficients gives the cardinal vectors and
+convergence of the ordered sums. Separation identifies every cluster point. -/
+private theorem sLocalPWOrbital_bases_reconstruct {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [TopologicalSpace E] (d : ℕ → StrongDual ℂ E) (hsep : Injective (fun x : E ↦ fun i ↦ d i x))
+    (h : ∀ b : ℕ → ℂ, (b ∈ range (fun x : E ↦ fun i ↦ d i x) ∨ ∃ n, b = Pi.single n 1) →
+      ∃ K : Set E, IsCompact K ∧ ∀ k : ℕ,
+        (fun i ↦ if i < k then b i else 0) ∈ (fun y : E ↦ fun i ↦ d i y) '' K) :
+    ∃ e : ℕ → E, IsSchauderBasis e d := by
+  classical
+  have single (n : ℕ) : ∃ y : E, ∀ i, d i y = if i = n then 1 else 0 := by
+    obtain ⟨_, _, hfit⟩ := h (Pi.single n 1) (Or.inr ⟨n, rfl⟩)
+    obtain ⟨y, _, hy⟩ := hfit (n + 1)
+    refine ⟨y, fun i ↦ ?_⟩
+    by_cases hi : i = n
+    · subst i
+      simpa using congrFun hy n
+    · simpa [Pi.single_apply, hi] using congrFun hy i
+  choose e he using single
+  refine ⟨e, fun m n ↦ he n m, fun x ↦ ?_⟩
+  let u (k : ℕ) := ∑ j ∈ Finset.range k, d j x • e j
+  have hu (k i : ℕ) : d i (u k) = if i < k then d i x else 0 := by
+    simp only [u, map_sum, map_smul, he, smul_eq_mul, mul_ite, mul_one, mul_zero,
+      Finset.sum_ite_eq, Finset.mem_range]
+  obtain ⟨K, hK, hfinite⟩ := h (fun i ↦ d i x) (Or.inl ⟨x, rfl⟩)
+  have hmem (k : ℕ) : u k ∈ K := by
+    obtain ⟨y, hyK, hy⟩ := hfinite k
+    suffices u k = y by rwa [this]
+    exact hsep ((funext (hu k)).trans hy.symm)
+  change HasSum (fun j ↦ d j x • e j) x (SummationFilter.conditional ℕ)
+  rw [HasSum, SummationFilter.conditional_filter_eq_map_range, tendsto_map'_iff]
+  change Tendsto u atTop (𝓝 x)
+  apply hK.tendsto_nhds_of_unique_mapClusterPt (Eventually.of_forall hmem)
+  intro z _ hcl
+  apply hsep
+  funext i
+  have ht : Tendsto (d i ∘ u) atTop (𝓝 (d i x)) := tendsto_const_nhds.congr'
+    ((eventually_gt_atTop i).mono fun k hk ↦ ((hu k i).trans (ite_eq_left hk)).symm)
+  exact eq_of_nhds_neBot ((hcl.continuousAt_comp (d i).continuous.continuousAt).clusterPt.mono ht)
+
+/-- Paper: Theorems 7.3.1.6 and 7.3.3.4(1)–(2), pp. 345, 349, 360–361.
+Approximate the truncations of one test's coordinate sequence, or of one unit
+sequence, by tests whose classes lie in a single bounded subset of the ambient
+quotient. Product-topology closure asks only for approximation on finitely many
+coordinates at a time. The bound must be independent of the cutoff, the finite
+set of coordinates and the accuracy.
+The periodic comparison on the full fibre above p would supply Fourier interpolants.
+For polar coordinates one also needs control of the triangular changes at repeated
+poles across centers. Page 349 applies the change separately at each center.
+Page 361 invokes the ambient theorem although T may be unsaturated. On a saturated
+stage only the polar family with a repeated selected pole is left here. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation {S₀ : Finset V} (hST : S ⊆ T)
+    (_hT : T = S ∪ S₀) (_hdis : Disjoint S S₀) (_hsat : IsSaturatedPlaceSet (F := F) S₀)
+    (_hPic : PicTrivial) (p : Vℚ) (_hp : (sLocalPrimaryPlaces (F := F) T p).Nonempty)
+    (_hp₀ : sLocalPrimaryPlaces (F := F) T p ⊆ S₀)
+    (ω : PontryaginDual C₁) (hu : NormOneCharacterUnramifiedOutside ω S)
+    (χ : PontryaginDual J₁(T)) (_hχ : χ = descend(hST, ω, hu)) (_hω : ω ≠ 1)
+    (L : Iₚ(p, χ) → StrongDual ℂ (Θ(T, χ)))
+    (_hL : L = sLocalOrbitalPrincipalPart ∨ L = sLocalOrbitalFourierJet)
+    (_hremaining : IsSaturatedPlaceSet T →
+      L = sLocalOrbitalPrincipalPart ∧ ∃ j : Iₚ(p, χ), j.val.2 ≠ 0)
+    (σ : ℕ ≃ Iₚ(p, χ)) (b : ℕ → ℂ)
+    (_hb : b ∈ range (fun x : Θ(T, χ) ↦ fun i ↦ L (σ i) x) ∨ ∃ n, b = Pi.single n 1) :
+    ∃ K : Set (Θ(T, χ)), Bornology.IsVonNBounded ℂ ((Rₚ(p, χ)).mkQ '' K) ∧ ∀ k : ℕ,
+      (fun i ↦ if i < k then b i else 0) ∈ closure ((fun x : Θ(T, χ) ↦ fun i ↦ L (σ i) x) '' K) := by
+  sorry
+
+/-- Transport the ordinary expansion back through the level isomorphism. Nuclear
+Fréchet duality then gives absoluteness and the unconditional strong-dual expansion. -/
+private theorem sLocalPWOrbital_bases_transfer {E Q : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E] [ContinuousSMul ℂ E]
+    [AddCommGroup Q] [Module ℂ Q] [TopologicalSpace Q] [IsTopologicalAddGroup Q]
+    (A : E ≃L[ℂ] Q) (hF : IsFrechetTVS Q) (hN : IsNuclearTVS.{0} Q)
+    (e : ℕ → Q) (d : ℕ → StrongDual ℂ Q) (hb : IsSchauderBasis e d) :
+    let eW := fun n ↦ A.symm (e n)
+    let dW := fun n ↦ (d n).comp A.toContinuousLinearMap
+    let ev := fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (eW n)
+    IsSchauderBasis dW ev ∧ SchauderBasis.IsUnconditional dW ev ∧
+      IsSchauderBasis eW dW ∧ SchauderBasis.IsAbsolute eW dW := by
+  intro eW dW ev
+  have hbW : IsSchauderBasis eW dW := by
+    refine ⟨fun m n ↦ ?_, fun x ↦ ?_⟩
+    · change d m (A (A.symm (e n))) = _
+      rw [A.apply_symm_apply]
+      exact hb.1 m n
+    · change HasSum (fun n ↦ d n (A x) • A.symm (e n)) x (SummationFilter.conditional ℕ)
+      have h := (hb.2 (A x)).mapL A.symm.toContinuousLinearMap
+      simpa only [ContinuousLinearMap.coe_coe, ContinuousLinearEquiv.coe_coe, map_smul,
+        A.symm_apply_apply] using h
+  have hFW := frechet_of_closed_embedding A.toContinuousLinearMap A.toHomeomorph.isClosedEmbedding hF
+  let : PolynormableSpace ℂ E := hFW.choose_spec.1
+  let : TopologicalSpace.MetrizableSpace E := hFW.choose_spec.2.1
+  have hNW := nuclear_of_equiv A.symm hN
+  have ha := SchauderBasis.isAbsolute_of_nuclear_frechet hNW hFW hbW
+  let : BarrelledSpace ℂ E := isFrechetTVS_barrelled hFW
+  let : MontelSpace ℂ E := montelSpace_of_schwartz_frechet hFW (isSchwartzTVS_of_isNuclearTVS hNW)
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  have href : IsHomeomorph (ContinuousLinearMap.applyₗ (E := E) ℂ (RingHom.id ℂ)) :=
+    isHomeomorph_iff_isEmbedding_surjective.mpr
+      ⟨isEmbedding_strongBidual_eval, surjective_strongBidual_eval⟩
+  exact ⟨SchauderBasis.isShrinking_of_isAbsolute hFW.choose_spec.2.2 href hbW ha,
+    SchauderBasis.strongDual_isUnconditional_of_isAbsolute hFW.choose_spec.2.2 href hbW ha, hbW, ha⟩
+
 /-- Paper: Theorem 7.3.3.4(1)–(2), pp. 360–361.
 For sufficiently large absolute or invariant levels, with the same enumeration
 as the ambient system, the restricted functionals are an unconditional dual basis
@@ -3488,7 +3818,82 @@ theorem sLocalPWOrbital_bases {S₀ : Finset V} (hST : S ⊆ T) (_hT : T = S ∪
               (Rₚ(p, χ)).mkQ x.val = e n) ∧
             (∀ n ℓ, ev n ℓ = ℓ (eW n)) ∧
             IsSchauderBasis dW ev ∧ SchauderBasis.IsUnconditional dW ev ∧
-            IsSchauderBasis eW dW ∧ SchauderBasis.IsAbsolute eW dW := by sorry
+            IsSchauderBasis eW dW ∧ SchauderBasis.IsAbsolute eW dW := by
+  obtain ⟨B, hB, hlevel⟩ := sLocalPWOrbital_eventually_equiv hST _hT _hdis _hsat _hPic
+    p _hp _hp₀ ω hu χ _hχ _hω
+  refine ⟨B, hB, ?_⟩
+  intro X Y hX hY hXY W hW L hL σ
+  obtain ⟨A, hA⟩ := hlevel X Y hX hY hXY W hW
+  have hPicT : Subsingleton (CommRing.Pic ((T : Set V).integer F)) := by
+    obtain ⟨_, _, _, hsurj, _⟩ := picard_localization_exact F S T hST
+    exact hsurj.subsingleton
+  have hF : IsFrechetTVS (Qₚ(p, χ)) := isFrechetTVS_quotient (sLocalHomogeneousThetaSpace_frechet χ)
+    (Rₚ(p, χ)) (sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding
+      (sLocalPrimaryPlaces_subset (F := F) T p) χ).isClosed_range
+  let : TopologicalSpace.MetrizableSpace (Qₚ(p, χ)) := hF.choose_spec.2.1
+  have : T2Space (Θ(T, χ) ⧸ Rₚ(p, χ)) := (inferInstance : T2Space (Qₚ(p, χ)))
+  have hN : IsNuclearTVS.{0} (Qₚ(p, χ)) :=
+    isNuclearTVS_quotient (sLocalHomogeneousThetaSpace_nuclear χ) (Rₚ(p, χ))
+  have ambient : ∃ (d : ℕ → StrongDual ℂ (Qₚ(p, χ))) (e : ℕ → Qₚ(p, χ)),
+      (∀ n x, d n ((Rₚ(p, χ)).mkQ x) = L (σ n) x) ∧ IsSchauderBasis e d := by
+    by_cases hremaining : IsSaturatedPlaceSet T →
+        L = sLocalOrbitalPrincipalPart ∧ ∃ j : Iₚ(p, χ), j.val.2 ≠ 0
+    · have hker (n : ℕ) : Rₚ(p, χ) ≤ (L (σ n)).ker := by
+        rcases hL with rfl | rfl
+        · exact sLocalOrbitalPrincipalPart_range_le_ker p χ _
+        · exact sLocalOrbitalFourierJet_range_le_ker p χ _
+      let d (n : ℕ) : StrongDual ℂ (Qₚ(p, χ)) := (Rₚ(p, χ)).liftQL (L (σ n)) (hker n)
+      have hd (n : ℕ) (x : Θ(T, χ)) : d n ((Rₚ(p, χ)).mkQ x) = L (σ n) x := rfl
+      have hsep : Injective (fun x : Qₚ(p, χ) ↦ fun n ↦ d n x) := by
+        intro x y heq
+        obtain ⟨z, hz⟩ := (Rₚ(p, χ)).mkQ_surjective (x - y)
+        apply sub_eq_zero.mp
+        rw [← hz]
+        apply (Submodule.Quotient.mk_eq_zero _).mpr
+        apply sLocalPWOrbital_bases_kernel p _hp hPicT χ L hL z
+        intro j
+        obtain ⟨n, rfl⟩ := σ.surjective j
+        rw [← hd, hz, map_sub]
+        exact sub_eq_zero.mpr (congrFun heq n)
+      let : PolynormableSpace ℂ (Qₚ(p, χ)) := hF.choose_spec.1
+      let : UniformSpace (Qₚ(p, χ)) := IsTopologicalAddGroup.rightUniformSpace _
+      let : IsUniformAddGroup (Qₚ(p, χ)) := isUniformAddGroup_of_addCommGroup
+      let : CompleteSpace (Qₚ(p, χ)) := hF.choose_spec.2.2
+      obtain ⟨e, he⟩ := sLocalPWOrbital_bases_reconstruct d hsep (by
+        intro b hb
+        have hb' : b ∈ range (fun z : Θ(T, χ) ↦ fun i ↦ L (σ i) z) ∨ ∃ n, b = Pi.single n 1 := by
+          apply hb.imp _ id
+          rintro ⟨x, rfl⟩
+          obtain ⟨z, rfl⟩ := (Rₚ(p, χ)).mkQ_surjective x
+          exact ⟨z, rfl⟩
+        obtain ⟨K, hK, hfit⟩ := sLocalPWOrbital_bases_bounded_interpolation hST _hT _hdis
+          _hsat _hPic p _hp _hp₀ ω hu χ _hχ _hω L hL hremaining σ b hb'
+        have hc := isCompact_closure_of_isNuclearTVS _ hN hK
+        have hcont : Continuous (fun x : Qₚ(p, χ) ↦ fun n ↦ d n x) :=
+          continuous_pi (fun n ↦ (d n).continuous)
+        refine ⟨_, hc, fun k ↦ closure_minimal ?_ (hc.image hcont).isClosed (hfit k)⟩
+        rintro _ ⟨y, hy, rfl⟩
+        exact ⟨_, subset_closure ⟨y, hy, rfl⟩, rfl⟩)
+      exact ⟨d, e, hd, he⟩
+    · obtain ⟨hs, hknown⟩ := Classical.not_imp.mp hremaining
+      rcases hL with rfl | rfl
+      · have hsimple (j : Iₚ(p, χ)) : j.val.2 = 0 := by
+          by_contra hj
+          exact hknown ⟨rfl, j, hj⟩
+        obtain ⟨D, e, _, _, hd, _, _, hb, _⟩ := sLocalPolarOrbital_bases_of_laurent_bounds
+          p χ hs _hp hPicT σ (fun _ ↦ ⟨0, 1, zero_lt_one, fun j _ hj ↦ (hj (hsimple j)).elim⟩)
+        exact ⟨D ∘ σ, e ∘ σ, fun n ↦ hd (σ n), hb⟩
+      · obtain ⟨D, e, _, _, hd, _, _, hb, _⟩ := sLocalFourierOrbital_bases p χ hs _hp hPicT σ
+        exact ⟨D ∘ σ, e ∘ σ, fun n ↦ hd (σ n), hb⟩
+  obtain ⟨d, e, hd, he⟩ := ambient
+  refine ⟨d, e, fun n ↦ (d n).comp A.toContinuousLinearMap, fun n ↦ A.symm (e n),
+    fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (A.symm (e n)), hd, he, ?_, ?_,
+    fun _ _ ↦ rfl, sLocalPWOrbital_bases_transfer A hF hN e d he⟩
+  · intro n x
+    exact (congrArg (d n) (hA x)).trans (hd n x.val)
+  · intro n
+    obtain ⟨x, hx⟩ := ((Rₚ₀(p, χ)).comap W.subtype).mkQ_surjective (A.symm (e n))
+    exact ⟨x, hx, (hA x).symm.trans ((congrArg A hx).trans (A.apply_symm_apply _))⟩
 
 /-- Paper: Theorem 7.3.1.6(4), p. 345, as used on p. 361. The ambient orbital
 quotient needs the polynomial seminorm estimate when all places above the
