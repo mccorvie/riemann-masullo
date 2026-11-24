@@ -122,6 +122,21 @@ private theorem zeroCount_local_order {L Λ : ℂ → ℂ} (hΛ : MeromorphicOn 
     simpa using WithTop.untop₀_le_untop₀ (WithTop.coe_ne_top : ((analyticOrderNatAt L z : ℤ) : WithTop ℤ) ≠ ⊤) h
   exact_mod_cast this
 
+/-- Jensen's inequality bounds the sum of the divisor on a finite subset of a
+smaller disk using the growth of an analytic function that dominates the local
+orders. This is the finite-set interface used in the candidate strip-kernel port. -/
+theorem sum_divisor_le_log_of_disk_bound {Λ L : ℂ → ℂ} (hΛ : MeromorphicOn Λ univ)
+    (hcmp : ∀ z, meromorphicOrderAt Λ z ≤ meromorphicOrderAt L z)
+    {c : ℂ} {r R B : ℝ} (hr : 0 < r) (hrR : r < R)
+    (ha : AnalyticOnNhd ℂ L (closedBall c R)) (hc : L c ≠ 0)
+    (hB : ∀ z ∈ closedBall c R, ‖L z / L c‖ ≤ B)
+    (S : Finset ℂ) (hS : ∀ z ∈ S, z ∈ closedBall c r) :
+    ∑ z ∈ S, (MeromorphicOn.divisor Λ univ z : ℝ) ≤ Real.log B / Real.log (R / r) := by
+  apply le_trans (Finset.sum_le_sum fun z hz ↦
+    zeroCount_local_order hΛ (hr.trans hrR).le ha hc hcmp
+      (closedBall_subset_closedBall hrR.le (hS z hz)))
+  exact zeroCount_disk_sum hr hrR ha hc hB S hS
+
 private theorem zeroCount_compact {f : ℂ → ℂ} (K : Set ℂ) (hK : IsCompact K) :
     {z : ℂ | z ∈ K ∧ MeromorphicOn.divisor f univ z ≠ 0}.Finite := by
   let D := MeromorphicOn.divisor f univ
