@@ -9799,6 +9799,369 @@ theorem introTraceApprox_exists_common_counterterm_limits :
     intro n
     ring
 
+open Classical in
+/-- The real part of the resolvent at a real point to the right of the window
+decays quadratically in the height of its pole. -/
+private theorem introTrace_resolvent_real_anchor_summable
+    (χ : U𝔽) {a b : ℝ} (hb : a < b) :
+    Summable (fun r : windowZeros(χ, a) ↦ ((zeroOrder(χ, r.val) : ℂ) /
+      ((b : ℂ) - (r.val - 1 / 2))).re) := by
+  let B : ℝ := 1 + (1 + ‖(b : ℂ)‖) / (b - a)
+  have hδ : 0 < b - a := sub_pos.mpr hb
+  apply Summable.of_norm_bounded ((introTraceApprox_spectral_differentiable_zeroCount χ a).mul_left
+    ((|b| + |a|) * B ^ 2))
+  intro r
+  let p := r.val - 1 / 2
+  let m : ℝ := zeroOrder(χ, r.val)
+  let W : ℝ := 1 + |r.val.im|
+  have hm : 0 < m := Int.cast_pos.mpr r.property.1
+  have hor : |p.re| < a := by simpa [p] using r.property.2
+  have hsep : b-a ≤ ((b : ℂ) - p).re := by
+    rw [Complex.sub_re,Complex.ofReal_re]
+    linarith [(abs_lt.mp hor).2]
+  have hreal : ((b : ℂ)-p).re ≤ |b|+|a| := by
+    rw [Complex.sub_re,Complex.ofReal_re]
+    linarith [(abs_lt.mp hor).1,le_abs_self b,le_abs_self a]
+  have hinv : 1 / ‖(b : ℂ)-p‖ ≤ B / W := by
+    have hh := introTrace_spectral_referenceSub_inv_bound (s := p) (z := (b : ℂ)) hδ
+      (by simpa only [Complex.sub_re] using hsep) (le_refl _)
+    simpa only [B,W,p,Complex.sub_im,Complex.div_ofNat_im,Complex.one_im,zero_div,sub_zero] using hh
+  have hid : ((zeroOrder(χ,r.val) : ℂ) / ((b : ℂ) - p)).re =
+      m * ((b : ℂ) - p).re * (1 / ‖(b : ℂ)-p‖)^2 := by
+    simp only [Complex.div_re,Complex.intCast_re,Complex.intCast_im,zero_mul,zero_div,add_zero,
+      one_div,inv_pow,Complex.sq_norm]
+    rfl
+  change ‖((zeroOrder(χ,r.val) : ℂ) / ((b : ℂ) - p)).re‖ ≤
+    ((|b|+|a|)*B^2) * (m / W^2)
+  rw [hid, Real.norm_of_nonneg (mul_nonneg (mul_nonneg hm.le (hδ.le.trans hsep)) (sq_nonneg _))]
+  calc
+    _ ≤ (m * (|b| + |a|)) * (B / W) ^ 2 :=
+      mul_le_mul (mul_le_mul_of_nonneg_left hreal hm.le)
+        (pow_le_pow_left₀ (by positivity) hinv 2) (by positivity)
+        (mul_nonneg hm.le (add_nonneg (abs_nonneg _) (abs_nonneg _)))
+    _ = _ := by rw [div_pow]; ring
+
+open Classical in
+/-- Paper: §1.4.3, p. 29. Subtracting only the imaginary part of each resolvent
+at a real reference point gives a locally uniformly convergent holomorphic sum.
+Its real part is the sum of the original real parts throughout the chart, and
+is strictly positive exactly when the window contains a zero. -/
+theorem introTrace_resolvent_imaginary_subtraction
+    (χ : U𝔽) {a b : ℝ} (hb : a < b) :
+    let v (r : windowZeros(χ, a)) (z : ℂ) := (zeroOrder(χ, r.val) : ℂ) / (z - (r.val - 1 / 2))
+    let k (r : windowZeros(χ, a)) (z : ℂ) := v r z - ((v r (b : ℂ)).im : ℂ) * Complex.I
+    ∃ H : ℂ → ℂ, AnalyticOnNhd ℂ H right(a) ∧ (H b).im = 0 ∧
+      TendstoLocallyUniformlyOn (fun (T : Finset (windowZeros(χ, a))) z ↦ ∑ r ∈ T, k r z)
+        H atTop right(a) ∧
+      ∀ z ∈ right(a), HasSum (fun r ↦ (v r z).re) (H z).re ∧
+        (0 < (H z).re ↔ Nonempty (windowZeros(χ, a))) := by
+  classical
+  intro v k
+  let d (r : windowZeros(χ, a)) (z : ℂ) := (zeroOrder(χ, r.val) : ℂ) *
+    (1 / (z - (r.val - 1 / 2)) - 1 / ((b : ℂ) - (r.val - 1 / 2)))
+  let c (r : windowZeros(χ, a)) : ℂ := (v r b).re
+  let H (z : ℂ) := (∑' r, d r z) + ∑' r, c r
+  have hm : MapsTo (fun _ : ℂ ↦ (b : ℂ)) right(a) right(a) := fun _ _ ↦ hb
+  obtain ⟨_, _, hdiff, han⟩ := introTrace_spectral_referenceSub χ a
+    (fun _ ↦ (b : ℂ)) hm (differentiableOn_const _)
+  have hc : Summable c := Complex.summable_ofReal.mpr (introTrace_resolvent_real_anchor_summable χ hb)
+  have hd (r : windowZeros(χ, a)) (z : ℂ) : d r z + c r = k r z := by
+    have he : d r z = v r z - v r b := by dsimp [d,v]; ring
+    rw [he]
+    dsimp only [c,k]
+    linear_combination Complex.re_add_im (v r b)
+  have hlim : TendstoLocallyUniformlyOn
+      (fun (T : Finset (windowZeros(χ,a))) z ↦ ∑ r ∈ T, k r z) H atTop right(a) := by
+    apply (hdiff.add (hc.hasSum.tendstoUniformlyOn_const (s := right(a))).tendstoLocallyUniformlyOn).congr
+    intro T z _
+    change (∑ r ∈ T, d r z) + (∑ r ∈ T, c r) = _
+    simp only [← Finset.sum_add_distrib,hd]
+  refine ⟨H,han.add analyticOnNhd_const,?_,hlim,?_⟩
+  · have he : ((∑' r, (v r b).re : ℝ) : ℂ) = ∑' r, ((v r b).re : ℂ) := Complex.ofReal_tsum _
+    dsimp [H,d]
+    simp only [sub_self,mul_zero,tsum_zero,Complex.zero_im,zero_add]
+    change (∑' r, ((v r b).re : ℂ)).im = 0
+    rw [← he,Complex.ofReal_im]
+  intro z hz
+  have hs : HasSum (fun r ↦ k r z) (H z) := hlim.tendsto_at hz
+  have hre : HasSum (fun r ↦ (v r z).re) (H z).re := by
+    simpa only [k,Complex.sub_re,Complex.mul_re,Complex.ofReal_re,Complex.ofReal_im,
+      Complex.I_re,Complex.I_im,mul_zero,zero_mul,sub_self,sub_zero] using Complex.hasSum_re hs
+  refine ⟨hre,?_⟩
+  constructor
+  · intro hpos
+    by_contra he
+    let _ : IsEmpty (windowZeros(χ,a)) := not_nonempty_iff.mp he
+    have h := hre.tsum_eq
+    simp only [tsum_empty] at h
+    linarith
+  · rintro ⟨r₀⟩
+    have hpos (r : windowZeros(χ,a)) : 0 < (v r z).re := by
+      let p := r.val-1/2
+      have hp : p.re < a := by simpa [p] using (abs_lt.mp r.property.2).2
+      have hx : 0 < (z-p).re := by rw [Complex.sub_re]; exact sub_pos.mpr (hp.trans hz)
+      have hne : z-p ≠ 0 := fun e ↦ hx.ne' (congrArg Complex.re e)
+      have hd := Int.cast_pos (R := ℝ) |>.mpr r.property.1
+      change 0 < ((zeroOrder(χ,r.val) : ℂ)/(z-p)).re
+      simp only [Complex.div_re,Complex.intCast_re,Complex.intCast_im,zero_mul,zero_div,add_zero]
+      exact div_pos (mul_pos hd hx) (Complex.normSq_pos.mpr hne)
+    rw [← hre.tsum_eq]
+    exact hre.summable.tsum_pos (fun r ↦ (hpos r).le) r₀ (hpos r₀)
+
+open Classical in
+/-- There are finitely many window zeros below any fixed absolute imaginary height.
+The resulting finite sets exhaust the window. -/
+private theorem introTrace_window_zeros_height_exhaustion (χ : U𝔽) (a : ℝ) :
+    ∃ T : ℝ → Finset (windowZeros(χ,a)),
+      (∀ t r, r ∈ T t ↔ |r.val.im| ≤ t) ∧ Tendsto T atTop atTop := by
+  classical
+  have hfin (t : ℝ) : {r : windowZeros(χ,a) | |r.val.im| ≤ t}.Finite := by
+    have ht : 0 < 1 / (1+|t|)^2 := by positivity
+    have he := (introTraceApprox_spectral_differentiable_zeroCount χ a).tendsto_cofinite_zero.eventually
+      (gt_mem_nhds ht)
+    apply (Filter.mem_cofinite.mp he).subset
+    intro r hr
+    change ¬ (zeroOrder(χ,r.val) : ℝ) / (1+|r.val.im|)^2 < 1/(1+|t|)^2
+    apply not_lt.mpr
+    have hd : (1 : ℝ) ≤ zeroOrder(χ,r.val) := by exact_mod_cast Int.add_one_le_iff.mpr r.property.1
+    have hi : |r.val.im| ≤ |t| := (show |r.val.im| ≤ t from hr).trans (le_abs_self t)
+    exact div_le_div₀ (zero_le_one.trans hd) hd (by positivity) (by gcongr)
+  let T (t : ℝ) := (hfin t).toFinset
+  have hT (t : ℝ) (r : windowZeros(χ,a)) : r ∈ T t ↔ |r.val.im| ≤ t := Set.Finite.mem_toFinset _
+  refine ⟨T,hT,tendsto_atTop.mpr fun U ↦ ?_⟩
+  induction U using Finset.induction_on with
+  | empty => exact Eventually.of_forall fun _ ↦ Finset.empty_subset _
+  | insert r U hr ih =>
+    filter_upwards [ih,eventually_ge_atTop |r.val.im|] with t hU ht
+    exact Finset.insert_subset ((hT t r).mpr ht) hU
+
+open scoped ComplexConjugate in
+open Classical in
+/-- Conjugating a positive zero of a completed Hecke character gives a zero
+of the inverse character with the same multiplicity. -/
+private theorem introTrace_inverse_character_conj_divisor (χ : U𝔽)
+    (s : ℂ) (hs : 0 < zeroOrder(χ,s)) :
+    zeroOrder(χ⁻¹, conj s) = zeroOrder(χ,s) := by
+  have hp := (abs_lt.mp (introTrace_positive_divisor_in_critical_strip χ s hs)).1
+  have hsre : 0 < s.re := by linarith
+  have he := introTrace_finite_conj_order χ (conj s)
+  rw [Complex.conj_conj] at he
+  rw [introTrace_normalized_finite_order_eq_completed χ⁻¹ (conj s) hsre,
+    introTrace_normalized_finite_order_eq_completed χ s hsre] at he
+  rw [MeromorphicOn.divisor_apply (continuedCompletedHeckeL_spec _).1.meromorphicOn (mem_univ _),
+    MeromorphicOn.divisor_apply (continuedCompletedHeckeL_spec _).1.meromorphicOn (mem_univ _),he]
+
+open scoped ComplexConjugate in
+open Classical in
+/-- For a character and its inverse the imaginary anchor terms cancel across
+the two symmetric height truncations, with their multiplicities. -/
+private theorem introTrace_dual_finite_height_balance
+    (χ : U𝔽) (a b t : ℝ) (T : Finset (windowZeros(χ,a))) (U : Finset (windowZeros(χ⁻¹,a)))
+    (hT : ∀ r, r ∈ T ↔ |r.val.im| ≤ t) (hU : ∀ r, r ∈ U ↔ |r.val.im| ≤ t) :
+    (∑ r ∈ T, ((zeroOrder(χ,r.val) : ℂ)/((b : ℂ)-(r.val-1/2))).im) +
+    (∑ r ∈ U, ((zeroOrder(χ⁻¹,r.val) : ℂ)/((b : ℂ)-(r.val-1/2))).im) = 0 := by
+  classical
+  let v (η : U𝔽) (r : windowZeros(η,a)) := (zeroOrder(η,r.val) : ℂ)/((b : ℂ)-(r.val-1/2))
+  have ho (r : windowZeros(χ,a)) := introTrace_inverse_character_conj_divisor χ r.val r.property.1
+  have hi (r : windowZeros(χ⁻¹,a)) : zeroOrder(χ,conj r.val) = zeroOrder(χ⁻¹,r.val) := by
+    simpa only [inv_inv] using introTrace_inverse_character_conj_divisor χ⁻¹ r.val r.property.1
+  let e : windowZeros(χ,a) ≃ windowZeros(χ⁻¹,a) :=
+    { toFun := fun r ↦ ⟨conj r.val, (ho r).symm ▸ r.property.1, r.property.2⟩
+      invFun := fun r ↦ ⟨conj r.val, (hi r).symm ▸ r.property.1, r.property.2⟩
+      left_inv := fun r ↦ Subtype.ext (Complex.conj_conj r.val)
+      right_inv := fun r ↦ Subtype.ext (Complex.conj_conj r.val) }
+  have hmem (r : windowZeros(χ,a)) : r ∈ T ↔ e r ∈ U := by
+    rw [hT r,hU (e r)]
+    simp [e]
+  have hv (r : windowZeros(χ,a)) : v χ⁻¹ (e r) = conj (v χ r) := by
+    dsimp [v,e]
+    rw [ho r]
+    have htwo : conj (2 : ℂ) = 2 := by
+      rw [show (2 : ℂ) = 1+1 by norm_num,map_add,map_one]
+    simp [htwo]
+  have hsum : (∑ r ∈ T, (v χ r).im) = ∑ r ∈ U, -(v χ⁻¹ r).im := by
+    apply Finset.sum_equiv e hmem
+    intro r _
+    rw [hv,Complex.conj_im,neg_neg]
+  rw [Finset.sum_neg_distrib] at hsum
+  exact add_eq_zero_iff_eq_neg.mpr hsum
+
+open Classical in
+/-- The two imaginary anchor corrections cancel in each common height cutoff;
+a locally uniform limit for each compensated series thus gives the ordinary
+joint height limit for a character and its inverse. -/
+private theorem introTrace_dual_height_truncation (a : ℝ) :
+    let v (η : U𝔽) (r : windowZeros(η,a)) (z : ℂ) := (zeroOrder(η,r.val) : ℂ)/(z-(r.val-1/2))
+    let k (η : U𝔽) (b : ℝ) (r : windowZeros(η,a)) (z : ℂ) :=
+      v η r z - ((v η r b).im : ℂ)*Complex.I
+    ∃ T : (η : U𝔽) → ℝ → Finset (windowZeros(η,a)), (∀ η t r, r ∈ T η t ↔ |r.val.im| ≤ t) ∧
+      ∀ (χ : U𝔽) (b : ℝ) (H J : ℂ → ℂ),
+        TendstoLocallyUniformlyOn (fun (U : Finset (windowZeros(χ,a))) z ↦ ∑ r ∈ U, k χ b r z) H atTop right(a) →
+        TendstoLocallyUniformlyOn (fun (U : Finset (windowZeros(χ⁻¹,a))) z ↦ ∑ r ∈ U, k χ⁻¹ b r z) J atTop right(a) →
+        (∀ x t : ℝ, (∑ r ∈ T χ t, (v χ r x).im) + (∑ r ∈ T χ⁻¹ t, (v χ⁻¹ r x).im) = 0) ∧
+        TendstoLocallyUniformlyOn (fun t z ↦ (∑ r ∈ T χ t, v χ r z) + ∑ r ∈ T χ⁻¹ t, v χ⁻¹ r z)
+          (fun z ↦ H z + J z) atTop right(a) := by
+  classical
+  intro v k
+  choose T hT hcof using (fun η : U𝔽 ↦ introTrace_window_zeros_height_exhaustion η a)
+  refine ⟨T,hT,?_⟩
+  intro χ b H J hH hJ
+  let c (η : U𝔽) (r : windowZeros(η,a)) := (v η r b).im
+  have hc (η : U𝔽) (Q : ℂ → ℂ)
+      (hQ : TendstoLocallyUniformlyOn (fun (U : Finset (windowZeros(η,a))) z ↦ ∑ r ∈ U, k η b r z) Q atTop right(a)) :
+      TendstoLocallyUniformlyOn (fun t z ↦ ∑ r ∈ T η t, (v η r z - (c η r : ℂ)*Complex.I)) Q atTop right(a) := by
+    intro u hu z hz
+    obtain ⟨neighborhood,hV,hU⟩ := hQ u hu z hz
+    exact ⟨neighborhood,hV,(hcof η).eventually hU⟩
+  have hzero (x t : ℝ) : (∑ r ∈ T χ t, (v χ r x).im) + (∑ r ∈ T χ⁻¹ t, (v χ⁻¹ r x).im) = 0 :=
+    introTrace_dual_finite_height_balance χ a x t _ _ (hT χ t) (hT χ⁻¹ t)
+  refine ⟨hzero,?_⟩
+  apply ((hc χ H hH).add (hc χ⁻¹ J hJ)).congr
+  intro t z _
+  simp only [Pi.add_apply, Finset.sum_sub_distrib, ← Finset.sum_mul, ← Complex.ofReal_sum]
+  have hb : (((∑ r ∈ T χ t, c χ r) : ℝ) : ℂ) +
+      (((∑ r ∈ T χ⁻¹ t, c χ⁻¹ r) : ℝ) : ℂ) = 0 := by exact_mod_cast hzero b t
+  linear_combination -Complex.I * hb
+
+open Classical in
+/-- Paper: §1.4.3, p. 29. For every character, the ordinary symmetric-height
+resolvent sums for the character and its inverse converge jointly. The limit
+is holomorphic and real on the real axis, and its real part is the sum of the
+two unmodified real resolvent series. -/
+theorem introTrace_dual_resolvent_height_limit (a : ℝ) :
+    let v (η : U𝔽) (r : windowZeros(η,a)) (z : ℂ) := (zeroOrder(η,r.val) : ℂ)/(z-(r.val-1/2))
+    ∃ T : (η : U𝔽) → ℝ → Finset (windowZeros(η,a)),
+      (∀ η t r, r ∈ T η t ↔ |r.val.im| ≤ t) ∧ ∀ χ : U𝔽, ∃ H : ℂ → ℂ,
+      AnalyticOnNhd ℂ H right(a) ∧ TendstoLocallyUniformlyOn (fun t z ↦
+        (∑ r ∈ T χ t, v χ r z) + ∑ r ∈ T χ⁻¹ t, v χ⁻¹ r z) H atTop right(a) ∧
+      (∀ x : ℝ, a < x → (H x).im = 0) ∧ ∀ z ∈ right(a),
+        (H z).re = (∑' r, (v χ r z).re) + ∑' r, (v χ⁻¹ r z).re := by
+  classical
+  intro v
+  let b := a+1
+  obtain ⟨T,hT,hjoint⟩ := introTrace_dual_height_truncation (F := F) a
+  choose H han hreal hlim hpos using (fun η : U𝔽 ↦
+    introTrace_resolvent_imaginary_subtraction η (b := b) (show a < b by dsimp [b]; linarith))
+  refine ⟨T,hT,fun χ ↦ ?_⟩
+  let L (z : ℂ) := H χ z + H χ⁻¹ z
+  obtain ⟨hzero,hbare⟩ := hjoint χ b (H χ) (H χ⁻¹) (hlim χ) (hlim χ⁻¹)
+  refine ⟨L,(han χ).add (han χ⁻¹),hbare,?_,?_⟩
+  · intro x hx
+    have hin := Complex.continuous_im.continuousAt.tendsto.comp (hbare.tendsto_at (a := (x : ℂ)) hx)
+    have hconst : Tendsto (fun t : ℝ ↦ ((∑ r ∈ T χ t, v χ r x) +
+        ∑ r ∈ T χ⁻¹ t, v χ⁻¹ r x).im) atTop (𝓝 0) := by
+      have hconst (t : ℝ) : ((∑ r ∈ T χ t, v χ r x) + ∑ r ∈ T χ⁻¹ t, v χ⁻¹ r x).im = 0 := by
+        rw [Complex.add_im,Complex.im_sum,Complex.im_sum]
+        exact hzero x t
+      simpa only [hconst] using
+        (tendsto_const_nhds : Tendsto (fun _ : ℝ ↦ (0 : ℝ)) atTop (𝓝 0))
+    exact tendsto_nhds_unique hin hconst
+  · intro z hz
+    exact congrArg₂ (· + ·) (hpos χ z hz).1.tsum_eq.symm (hpos χ⁻¹ z hz).1.tsum_eq.symm
+
+open Classical in
+/-- Along symmetric height truncations a self-dual character's imaginary parts
+cancel at every real anchor. The compensated finite sums therefore have exactly
+the same locally uniform limit as the bare finite sums. -/
+private theorem introTrace_selfdual_height_truncation (χ : U𝔽) (hχ : χ⁻¹ = χ) (a : ℝ) :
+    let v (r : windowZeros(χ,a)) (z : ℂ) := (zeroOrder(χ,r.val) : ℂ)/(z-(r.val-1/2))
+    ∃ T : ℝ → Finset (windowZeros(χ,a)), (∀ t r, r ∈ T t ↔ |r.val.im| ≤ t) ∧
+      (∀ x t : ℝ, ∑ r ∈ T t, (v r x).im = 0) ∧ ∀ (b : ℝ) (H : ℂ → ℂ),
+      TendstoLocallyUniformlyOn (fun (U : Finset (windowZeros(χ,a))) z ↦
+        ∑ r ∈ U, (v r z - ((v r b).im : ℂ)*Complex.I)) H atTop right(a) →
+      TendstoLocallyUniformlyOn (fun t z ↦ ∑ r ∈ T t, v r z) H atTop right(a) := by
+  classical
+  intro v
+  obtain ⟨T,hT,hcof⟩ := introTrace_window_zeros_height_exhaustion χ a
+  have hzero (x t : ℝ) : ∑ r ∈ T t, (v r x).im = 0 := by
+    have hpair := introTrace_dual_finite_height_balance χ a x t (T t)
+    rw [hχ] at hpair
+    have he := hpair (T t) (hT t) (hT t)
+    change (∑ r ∈ T t, (v r x).im) + (∑ r ∈ T t, (v r x).im) = 0 at he
+    linarith
+  refine ⟨T,hT,hzero,?_⟩
+  intro b H hlim
+  have hfinite (t : ℝ) (z : ℂ) :
+      (∑ r ∈ T t, (v r z - ((v r b).im : ℂ) * Complex.I)) = ∑ r ∈ T t, v r z := by
+    rw [Finset.sum_sub_distrib, ← Finset.sum_mul, ← Complex.ofReal_sum, hzero b t]
+    simp
+  intro u hu z hz
+  obtain ⟨neighborhood,hV,hU⟩ := hlim u hu z hz
+  refine ⟨neighborhood,hV,?_⟩
+  filter_upwards [hcof.eventually hU] with t ht
+  intro y hy
+  simpa only [← hfinite t y] using ht y hy
+
+open Classical in
+/-- Paper: §1.4.3, p. 29. For self-dual characters the ordinary resolvent sums
+over symmetric height truncations converge locally uniformly. Their holomorphic
+limit is real on the real axis and has positive real part wherever the window
+is nonempty. -/
+theorem introTrace_selfdual_resolvent_height_limit
+    (χ : U𝔽) (hχ : χ⁻¹ = χ) (a : ℝ) :
+    let v (r : windowZeros(χ,a)) (z : ℂ) := (zeroOrder(χ,r.val) : ℂ)/(z-(r.val-1/2))
+    ∃ (T : ℝ → Finset (windowZeros(χ,a))) (H : ℂ → ℂ),
+      (∀ t r, r ∈ T t ↔ |r.val.im| ≤ t) ∧ AnalyticOnNhd ℂ H right(a) ∧
+      TendstoLocallyUniformlyOn (fun t z ↦ ∑ r ∈ T t, v r z) H atTop right(a) ∧
+      (∀ x : ℝ, a < x → (H x).im = 0) ∧
+      ∀ z ∈ right(a), HasSum (fun r ↦ (v r z).re) (H z).re ∧
+        (0 < (H z).re ↔ Nonempty (windowZeros(χ,a))) := by
+  classical
+  intro v
+  let b := a + 1
+  obtain ⟨T,hT,hzero,htrunc⟩ := introTrace_selfdual_height_truncation χ hχ a
+  obtain ⟨H,hH,_,hlim,hpos⟩ := introTrace_resolvent_imaginary_subtraction χ (b := b)
+    (show a < b by dsimp [b]; linarith)
+  have hbare := htrunc b H hlim
+  refine ⟨T,H,hT,hH,hbare,?_,hpos⟩
+  intro x hx
+  have hin := Complex.continuous_im.continuousAt.tendsto.comp (hbare.tendsto_at (a := (x : ℂ)) hx)
+  have hconst : Tendsto (fun t : ℝ ↦ (∑ r ∈ T t, v r x).im) atTop (𝓝 0) := by
+    have hz (t : ℝ) : (∑ r ∈ T t, v r x).im = 0 := by
+      rw [Complex.im_sum]; exact hzero x t
+    simpa only [hz] using (tendsto_const_nhds : Tendsto (fun _ : ℝ ↦ (0 : ℝ)) atTop (𝓝 0))
+  exact tendsto_nhds_unique hin hconst
+
+open Classical in
+/-- Paper: §1.4.3, p. 29. The two orders of taking the real spectral limit at
+parameter two differ for every number field, character and admissible family.
+Removing the cutoff on finite sets first gives a strictly positive sum. Summing
+the absolutely convergent series at each cutoff first gives negative infinity. -/
+theorem introTrace_real_spectral_iterated_limits
+    (χ : U𝔽) (h ρ : ℕ → ℝ → ℝ) (hA : IsIntroTraceApproximation h ρ) :
+    let E := windowZeros(χ, 1/2)
+    let v (r : E) := (zeroOrder(χ,r.val) : ℂ) / (2 - (r.val - 1/2))
+    let g (n : ℕ) (r : E) := (zeroOrder(χ,r.val) : ℂ) *
+      introTraceMellin approx(h,ρ,n,(2:ℂ)) (r.val - 1/2)
+    ∃ R : ℝ, 0 < R ∧
+      (∀ T : Finset E, Tendsto (fun n ↦ ∑ r ∈ T, (g n r).re) atTop
+        (𝓝 (∑ r ∈ T, (v r).re))) ∧ HasSum (fun r ↦ (v r).re) R ∧
+      (∀ n, HasSum (fun r ↦ (g n r).re) (introTraceSpectralSum χ approx(h,ρ,n,(2:ℂ)) (1/2)).re) ∧
+      Tendsto (fun n ↦ (introTraceSpectralSum χ approx(h,ρ,n,(2:ℂ)) (1/2)).re) atTop atBot := by
+  classical
+  intro E v g
+  have hfull := introTraceApprox_full_window_spectral_tendsto_atBot χ h ρ hA (1/2) le_rfl
+  have he : Nonempty E := by
+    by_contra hempty
+    let _ : IsEmpty (windowZeros(χ,1/2)) := not_nonempty_iff.mp hempty
+    obtain ⟨n,hn⟩ := (tendsto_atBot.mp hfull (-1)).exists
+    norm_num [introTraceSpectralSum] at hn
+  obtain ⟨H,_,_,_,hs⟩ := introTrace_resolvent_imaginary_subtraction χ (a := 1/2) (b := 2) (by norm_num)
+  obtain ⟨hR,hpos⟩ := hs 2 (by change (1/2:ℝ) < (2:ℂ).re; norm_num)
+  refine ⟨(H 2).re,hpos.mpr he,?_,hR,?_,hfull⟩
+  · intro T
+    apply tendsto_finsetSum
+    intro r _
+    have hsep : (r.val - 1/2).re < (2:ℂ).re := by
+      have h₁ : (r.val-1/2).re < 1/2 := by simpa using (abs_lt.mp r.property.2).2
+      exact h₁.trans (by norm_num)
+    have hM := (introTraceApprox_mellin_tendsto h ρ hA (r.val-1/2)).tendsto_at (a := (2:ℂ)) hsep
+    rw [(introTracePower_mellin (2:ℂ) (r.val-1/2) hsep).2] at hM
+    have hterm := Complex.continuous_re.continuousAt.tendsto.comp (hM.const_mul (zeroOrder(χ,r.val):ℂ))
+    simpa only [g,v,mul_one_div,Function.comp_def] using hterm
+  · intro n
+    exact Complex.hasSum_re (introTraceApprox_spectral_summable χ h ρ hA n (1/2) (by norm_num) 2).hasSum
+
 section CompletedSpectralContinuation
 
 open Classical
