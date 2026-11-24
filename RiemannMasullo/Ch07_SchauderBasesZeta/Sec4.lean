@@ -909,7 +909,32 @@ shifted zeros of the regularized completed generator are the corresponding coord
 the `i.2`-th derivative at `i.1 − a` is `1` for `i = j` and `0` for every other jet index. -/
 theorem exists_spectralNuclearityBiorthogonal_vectors (a : ℝ) (j : jets(χ, τ, hτ)) :
     ∃ f : B, ∀ i : jets(χ, τ, hτ),
-      iteratedDeriv i.2.val f.val (i.1.val - (a : ℂ)) = if i = j then 1 else 0 := by sorry
+      iteratedDeriv i.2.val f.val (i.1.val - (a : ℂ)) = if i = j then 1 else 0 := by
+  classical
+  have h := orbitalSchwartzBergman_biorthogonal χ τ hτ (continuedCompletedHeckeL χ)
+    (continuedCompletedHeckeL_spec χ).1 (continuedCompletedHeckeL_spec χ).2 ∅
+  rw [orbitalHeckeGenerator_empty] at h
+  obtain ⟨b,hb⟩ := h
+  let J := {p : ℂ × ℕ // (p.2 : ℕ∞) < analyticOrderAt ((Λ(χ,τ,hτ)).val : ℂ → ℂ) p.1}
+  have emb {r : ℕ} {n : ℕ∞} (hr : r < n.toNat) : (r : ℕ∞) < n := by
+    cases n using ENat.recTopCoe with
+    | top => exact ENat.natCast_lt_top r
+    | coe n => exact_mod_cast (by simpa using hr : r < n)
+  let idx (i : jets(χ,τ,hτ)) : J := ⟨(i.1.val,i.2.val),emb i.2.isLt⟩
+  have hinj : Injective idx := by
+    rintro ⟨z,k⟩ ⟨w,l⟩ h
+    have ez : z = w := Subtype.ext (congrArg (fun x : J ↦ x.val.1) h)
+    subst w
+    have ek : k = l := Fin.ext (congrArg (fun x : J ↦ x.val.2) h)
+    subst l
+    rfl
+  let g := b (idx j)
+  refine ⟨⟨fun s ↦ g.val (s - -(a:ℂ)),specDenom_shift_mem g (-a)⟩,fun i ↦ ?_⟩
+  change iteratedDeriv i.2.val (fun s ↦ g.val (s - -(a:ℂ))) (i.1.val-(a:ℂ)) = _
+  rw [iteratedDeriv_comp_sub_const]
+  change iteratedDeriv i.2.val g.val ((i.1.val-(a:ℂ))- -(a:ℂ)) = _
+  rw [sub_neg_eq_add,sub_add_cancel]
+  simpa only [hinj.eq_iff] using hb (idx i) (idx j)
 
 open Classical in
 /-- Paper: Theorem 7.4.1.1(2), p. 366, using Theorem 7.1.4.2(3).
@@ -1460,6 +1485,162 @@ private theorem spectralJet_unique_presentation_sum (a : ℝ) (N : ℕ) (d : jet
   let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
   have hAP := dense_finiteRank_of_isNuclearTVS E hE
   exact exists_nuclearTrace_hasSum hAP T ((isNuclearOperator_iff_nonempty_presentation T).mpr hr)
+
+open Classical in
+/-- Paper: Theorem 7.4.1.1(2), pp. 366–367. Every finite set of zero sites has a
+unique continuous projector onto its retained jets. Its range is finite dimensional
+and invariant under the multiplier, whose restriction has the finite divisor trace. -/
+private theorem spectralNuclearity_trace_finite_cluster (a : ℝ) (N : ℕ) (φ : 𝒟)
+    (d : jets(χ,τ,hτ) → StrongDual ℂ (Q(a)))
+    (hd : ∀ i f, d i ((D(a)).mkQ f) = iteratedDeriv i.2.val f.val (i.1.val-(a:ℂ))) :
+    let Q := Q(a)
+    let I := {i : jets(χ,τ,hτ) // i.2.val < N}
+    let K := ⨅ i : I, (d i.val).toLinearMap.ker
+    let E := Q ⧸ K
+    ∀ (A : B →L[ℂ] B) (Aq : Q →L[ℂ] Q) (T : E →L[ℂ] E),
+      (∀ f s, (A f).val s = nuclearityTestMellin χ φ s * f.val s) →
+      (∀ f, Aq ((D(a)).mkQ f) = (D(a)).mkQ (A f)) →
+      (∀ x, T (K.mkQ x) = K.mkQ (Aq x)) →
+      ∀ (L : I → StrongDual ℂ E), (∀ i x, L i (K.mkQ x) = d i.val x) →
+      ∀ C : Finset (zeros(χ,τ,hτ)), ∃ proj : E →L[ℂ] E,
+        (∀ i x, L i (proj x) = if i.val.1 ∈ C then L i x else 0) ∧
+        (∀ x, proj (proj x) = proj x) ∧ (∀ x, T (proj x) = proj (T x)) ∧
+        FiniteDimensional ℂ proj.toLinearMap.range ∧
+        (∃ T' : proj.toLinearMap.range →ₗ[ℂ] proj.toLinearMap.range,
+          (∀ x, (T' x).val = T x.val) ∧ LinearMap.trace ℂ _ T' =
+            ∑ z ∈ C, ((min N (multiplicity(χ,τ,hτ,z)) : ℕ):ℂ) * nuclearityTestMellin χ φ (z.val-(a:ℂ))) ∧
+        ∀ R : E →L[ℂ] E, (∀ i x, L i (R x) = if i.val.1 ∈ C then L i x else 0) → R=proj := by
+  classical
+  intro Q I K E A Aq T hA hAq hT L hL C
+  let n (z : zeros(χ,τ,hτ)) := min N (multiplicity(χ,τ,hτ,z))
+  let t (i : I) : Fin (n i.val.1) := ⟨i.val.2.val,lt_min i.property i.val.2.isLt⟩
+  let idx (z : zeros(χ,τ,hτ)) (j : Fin (n z)) : I :=
+    ⟨⟨z,j.val,j.isLt.trans_le (min_le_right N _)⟩,j.isLt.trans_le (min_le_left N _)⟩
+  choose f hf using exists_spectralNuclearityBiorthogonal_vectors χ τ hτ a
+  let b (i : I) : E := K.mkQ ((D(a)).mkQ (f i.val))
+  have bio (i j : I) : L i (b j) = if i=j then 1 else 0 := by
+    change L i (K.mkQ ((D(a)).mkQ _)) = _
+    rw [hL,hd,hf]
+    simp only [Subtype.val_inj]
+  have sep : Injective (fun x : E ↦ fun i : I ↦ L i x) := by
+    intro x y h
+    apply sub_eq_zero.mp
+    obtain ⟨v,hv⟩ := K.mkQ_surjective (x-y)
+    rw [←hv,Submodule.mkQ_apply,Submodule.Quotient.mk_eq_zero,Submodule.mem_iInf]
+    intro i
+    change d i.val v = 0
+    rw [←hL,hv,map_sub,sub_eq_zero]
+    exact congrFun h i
+  let S := C.biUnion fun z ↦ Finset.univ.image (idx z)
+  have memS (i : I) : i ∈ S ↔ i.val.1 ∈ C := by
+    constructor
+    · intro h
+      obtain ⟨z,hz,hj⟩ := Finset.mem_biUnion.mp h
+      obtain ⟨j,_,rfl⟩ := Finset.mem_image.mp hj
+      exact hz
+    · intro h
+      exact Finset.mem_biUnion.mpr ⟨i.val.1,h,Finset.mem_image.mpr ⟨t i,Finset.mem_univ _,rfl⟩⟩
+  let proj : E →L[ℂ] E := ∑ j ∈ S, (L j).smulRight (b j)
+  have valP (x : E) : proj x = ∑ j ∈ S, L j x • b j := by
+    simp [proj]
+  have hp (i : I) (x : E) : L i (proj x) = if i.val.1 ∈ C then L i x else 0 := by
+    rw [valP,map_sum]
+    simp only [map_smul,bio,smul_eq_mul,mul_ite,mul_one,mul_zero]
+    simp [Finset.sum_ite_eq,memS]
+  let lower (i : I) (k : ℕ) : I :=
+    ⟨⟨i.val.1,i.val.2.val-k,(Nat.sub_le _ _).trans_lt i.val.2.isLt⟩,(Nat.sub_le _ _).trans_lt i.property⟩
+  have row (i : I) (x : E) : L i (T x) = ∑ k ∈ Finset.range (i.val.2.val+1),
+      (i.val.2.val.choose k : ℂ) * iteratedDeriv k (nuclearityTestMellin χ φ) (i.val.1.val-(a:ℂ)) * L (lower i k) x := by
+    obtain ⟨y,rfl⟩ := K.mkQ_surjective x
+    obtain ⟨f,rfl⟩ := (D(a)).mkQ_surjective y
+    rw [hT,hAq,hL,hd,show (A f).val = nuclearityTestMellin χ φ * f.val from funext (hA f)]
+    have hf : Differentiable ℂ f.val := fun z ↦
+      (f.property.2.1 z (mem_univ _)).differentiableAt (Filter.univ_mem' fun _ ↦ mem_univ _)
+    rw [iteratedDeriv_mul (archNuclearityDenominator_closed_invariant_multiplier χ φ).contDiff.contDiffAt
+      hf.contDiff.contDiffAt]
+    apply Finset.sum_congr rfl
+    intro k _
+    rw [hL,hd]
+  have idem : ∀ x, proj (proj x) = proj x := by
+    intro x
+    apply sep
+    funext i
+    change L i (proj (proj x)) = L i (proj x)
+    by_cases h : i.val.1 ∈ C <;> simp [hp,h]
+  have comm : ∀ x, T (proj x) = proj (T x) := by
+    intro x
+    apply sep
+    funext i
+    change L i (T (proj x)) = L i (proj (T x))
+    rw [row i (proj x),hp i (T x),row i x]
+    by_cases h : i.val.1 ∈ C <;> simp [hp,lower,h]
+  have finite : FiniteDimensional ℂ proj.toLinearMap.range := by
+    let rangeSpace := Submodule.span ℂ (b '' (S : Set I))
+    let : FiniteDimensional ℂ rangeSpace := FiniteDimensional.span_of_finite ℂ (S.finite_toSet.image b)
+    have hsub : proj.toLinearMap.range ≤ rangeSpace := by
+      rintro _ ⟨x,rfl⟩
+      change proj x ∈ rangeSpace
+      rw [valP]
+      exact Submodule.sum_mem rangeSpace fun i hi ↦ rangeSpace.smul_mem _ (Submodule.subset_span ⟨i,hi,rfl⟩)
+    exact FiniteDimensional.of_injective (Submodule.inclusion hsub) (Submodule.inclusion_injective hsub)
+  refine ⟨proj,hp,idem,comm,finite,?_,?_⟩
+  · let rangeSpace := proj.toLinearMap.range
+    let : FiniteDimensional ℂ rangeSpace := finite
+    let ℓ (i : I) : rangeSpace →ₗ[ℂ] ℂ := (L i).toLinearMap.comp rangeSpace.subtype
+    let y (i : I) : rangeSpace := ⟨proj (T (b i)),⟨_,rfl⟩⟩
+    let R : rangeSpace →ₗ[ℂ] rangeSpace := ∑ i ∈ S, (ℓ i).smulRight (y i)
+    have pfix (x : rangeSpace) : proj x.val = x.val := by
+      obtain ⟨u,hu⟩ := x.property
+      change proj u = x.val at hu
+      rw [←hu,idem]
+    refine ⟨R,?_,?_⟩
+    · intro x
+      calc
+        (R x).val = ∑ i ∈ S, L i x.val • proj (T (b i)) := by
+          change rangeSpace.subtype (R x) = _
+          simp only [R,LinearMap.sum_apply,map_sum,LinearMap.smulRight_apply,map_smul]
+          rfl
+        _ = proj (T (proj x.val)) := by rw [valP x.val,map_sum,map_sum]; simp only [map_smul]
+        _ = T x.val := by rw [←comm,idem,pfix]
+    · have diag (i : I) : L i (T (b i)) = nuclearityTestMellin χ φ (i.val.1.val-(a:ℂ)) := by
+        rw [row,Finset.sum_eq_single 0]
+        · have e0 : lower i 0 = i := by rfl
+          rw [e0,bio,ite_eq_left rfl]
+          simp
+        · intro j hj hj0
+          have hn : lower i j ≠ i := by
+            intro he
+            have eqv : i.val.2.val-j = i.val.2.val := congrArg (fun k : I ↦ k.val.2.val) he
+            have hle := Finset.mem_range.mp hj
+            omega
+          rw [bio,ite_eq_right hn,mul_zero]
+        · simp
+      have dis : (C : Set _).PairwiseDisjoint (fun z ↦ Finset.univ.image (idx z)) := by
+        intro z _ w _ hzw
+        apply Finset.disjoint_left.mpr
+        intro i hi hi'
+        obtain ⟨j,_,rfl⟩ := Finset.mem_image.mp hi
+        obtain ⟨k,_,h⟩ := Finset.mem_image.mp hi'
+        exact hzw (congrArg (fun x : I ↦ x.val.1) h).symm
+      calc
+        LinearMap.trace ℂ rangeSpace R = ∑ i ∈ S, ℓ i (y i) := by simp only [R,map_sum,LinearMap.trace_smulRight]
+        _ = ∑ i ∈ S, nuclearityTestMellin χ φ (i.val.1.val-(a:ℂ)) := by
+          apply Finset.sum_congr rfl
+          intro i hi
+          change L i (proj (T (b i))) = _
+          rw [hp,ite_eq_left ((memS i).mp hi),diag]
+        _ = _ := by
+          rw [show S = C.biUnion (fun z ↦ Finset.univ.image (idx z)) from rfl, Finset.sum_biUnion dis]
+          apply Finset.sum_congr rfl
+          intro z _
+          rw [Finset.sum_image (fun j _ k _ he ↦ Fin.ext (congrArg (fun u : I ↦ u.val.2.val) he))]
+          simp [idx,n,nsmul_eq_mul]
+  · intro R hR
+    ext x
+    apply sep
+    funext i
+    change L i (R x) = L i (proj x)
+    rw [hR,hp]
 
 open Classical in
 /-- Paper: Theorem 7.4.1.1(2), pp. 366–367. One rapidly decreasing presentation
