@@ -11,6 +11,8 @@ import RiemannMasullo.External.Grh.Lemmas.AnalyticGoodHeightDisk
 import RiemannMasullo.External.Grh.Lemmas.LogLossGoodHeight
 import RiemannMasullo.Ch12_TraceGeometric.Sec5
 import Mathlib.Analysis.Complex.Poisson
+import Mathlib.Analysis.Normed.Module.MultipliableUniformlyOn
+import Mathlib.Analysis.Calculus.LogDerivUniformlyOn
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gamma.DigammaIntegral
 import Mathlib.Analysis.Calculus.BumpFunction.Normed
 import Mathlib.Analysis.Calculus.ContDiff.Convolution
@@ -9011,6 +9013,390 @@ private theorem introTrace_window_pole_separation (χ : U𝔽) (a : ℝ) (p : �
     ring
   have hz : zeroOrder(χ, r.val) = 0 := hh ⟨hd, hn⟩
   exact r.property.1.ne' hz
+
+section WindowCanonicalProduct
+
+/-- A genus-one factor with multiplicity differs from one by at most
+twice its multiplicity times the squared displacement near the origin. -/
+private theorem introTrace_canonical_factor_bound (u : ℂ) (n : ℕ)
+    (hu : ‖u‖ ≤ 1 / 2) (hn : (n : ℝ) * ‖u‖ ^ 2 ≤ 1) :
+    ‖((1 + u) * Complex.exp (-u)) ^ n - 1‖ ≤ 2 * ((n : ℝ) * ‖u‖ ^ 2) := by
+  have hu₁ : ‖u‖ < 1 := by linarith
+  have hne : 1 + u ≠ 0 := by
+    intro h
+    have he : u = (-1 : ℂ) := by linear_combination h
+    simp [he] at hu₁
+  let L := Complex.log (1 + u) - u
+  have hL : ‖L‖ ≤ ‖u‖ ^ 2 := by
+    apply (Complex.norm_log_one_add_sub_self_le hu₁).trans
+    have hinv : (1 - ‖u‖)⁻¹ ≤ 2 := (inv_le_comm₀ (by linarith) (by norm_num)).mpr (by linarith)
+    nlinarith only [mul_le_mul_of_nonneg_left hinv (sq_nonneg ‖u‖)]
+  have hnorm : ‖(n : ℂ) * L‖ ≤ (n : ℝ) * ‖u‖ ^ 2 := by
+    simpa only [norm_mul, Complex.norm_natCast] using mul_le_mul_of_nonneg_left hL (Nat.cast_nonneg n)
+  have he : ((1 + u) * Complex.exp (-u)) ^ n = Complex.exp ((n : ℂ) * L) := by
+    rw [Complex.exp_nat_mul]
+    dsimp only [L]
+    rw [sub_eq_add_neg, Complex.exp_add, Complex.exp_log hne]
+  rw [he]
+  exact (Complex.norm_exp_sub_one_le (hnorm.trans hn)).trans (mul_le_mul_of_nonneg_left hnorm (by norm_num))
+
+/-- Square summability of the reciprocals, weighted by the given positive
+multiplicities, gives an entire genus-one product and its precise zero set. -/
+private theorem introTrace_canonical_product_normal {ι : Type*} (n : ι → ℕ) (q : ι → ℂ)
+    (hn : ∀ i, 0 < n i) (hq : Summable (fun i ↦ (n i : ℝ) * ‖q i‖ ^ 2)) (b : ℂ) :
+    let f (i : ι) (z : ℂ) := ((1 + (z - b) * q i) * Complex.exp (-((z - b) * q i))) ^ (n i)
+    let P (z : ℂ) := ∏' i, f i z
+    HasProdLocallyUniformlyOn f P univ ∧ Differentiable ℂ P ∧ P b = 1 ∧
+      ∀ z, P z = 0 ↔ ∃ i, 1 + (z - b) * q i = 0 := by
+  classical
+  intro f P
+  let e (i : ι) (z : ℂ) := f i z - 1
+  have hfe (i : ι) (z : ℂ) : 1 + e i z = f i z := by dsimp only [e]; ring
+  have hdiff (i : ι) : Differentiable ℂ (f i) := by dsimp only [f]; fun_prop
+  have hbound (K : Set ℂ) (hc : IsCompact K) :
+      ∃ v : ι → ℝ, Summable v ∧ ∀ᶠ i in cofinite, ∀ z ∈ K, ‖e i z‖ ≤ v i := by
+    obtain ⟨B, hB⟩ := hc.isBounded.exists_norm_le
+    let R := |B| + ‖b‖
+    have hR : 0 ≤ R := by dsimp only [R]; positivity
+    let v (i : ι) := R ^ 2 * ((n i : ℝ) * ‖q i‖ ^ 2)
+    have hv : Summable v := hq.mul_left _
+    refine ⟨fun i ↦ 2 * v i, hv.mul_left 2, ?_⟩
+    filter_upwards [hv.tendsto_cofinite_zero.eventually_le_const (by norm_num : (0 : ℝ) < 1 / 4)] with i hi
+    intro z hz
+    have hzR : ‖z - b‖ ≤ R := (norm_sub_le _ _).trans (add_le_add ((hB z hz).trans (le_abs_self B)) le_rfl)
+    have he : ‖(z - b) * q i‖ ^ 2 ≤ R ^ 2 * ‖q i‖ ^ 2 := by
+      rw [norm_mul, mul_pow]
+      exact mul_le_mul_of_nonneg_right (pow_le_pow_left₀ (norm_nonneg _) hzR 2) (sq_nonneg _)
+    have hw : (n i : ℝ) * ‖(z - b) * q i‖ ^ 2 ≤ v i := by
+      exact (mul_le_mul_of_nonneg_left he (Nat.cast_nonneg _)).trans_eq (by dsimp only [v]; ring)
+    have h₁ : (1 : ℝ) ≤ n i := by exact_mod_cast hn i
+    have hu : ‖(z - b) * q i‖ ≤ 1 / 2 := by
+      nlinarith only [sq_nonneg (‖(z - b) * q i‖ - 1 / 2), hw, hi,
+        mul_le_mul_of_nonneg_right h₁ (sq_nonneg ‖(z - b) * q i‖)]
+    exact (introTrace_canonical_factor_bound _ _ hu (by linarith [hw, hi])).trans
+      (mul_le_mul_of_nonneg_left hw (by norm_num))
+  have hprod : HasProdLocallyUniformlyOn f P univ := by
+    apply hasProdLocallyUniformlyOn_of_forall_compact isOpen_univ
+    intro K _ hc
+    obtain ⟨v, hv, h⟩ := hbound K hc
+    simpa only [hfe] using Summable.hasProdUniformlyOn_one_add hc hv h
+      (fun i ↦ ((hdiff i).continuous.sub continuous_const).continuousOn)
+  have hP : Differentiable ℂ P := by
+    rw [← differentiableOn_univ]
+    apply hprod.differentiableOn _ isOpen_univ
+    exact Eventually.of_forall fun S ↦ DifferentiableOn.fun_finsetProd (u := S) (fun i _ ↦ (hdiff i).differentiableOn)
+  refine ⟨hprod, hP, by simp [P, f], ?_⟩
+  intro z
+  constructor
+  · contrapose!
+    intro hz
+    obtain ⟨v, hv, h⟩ := hbound {z} isCompact_singleton
+    have hs : Summable (fun i ↦ ‖e i z‖) := hv.of_norm_bounded_eventually (by
+      filter_upwards [h] with i hi
+      simpa only [norm_norm] using hi z (mem_singleton z))
+    have hf (i : ι) : 1 + e i z ≠ 0 := by
+      rw [hfe]
+      exact pow_ne_zero _ (mul_ne_zero (hz i) (Complex.exp_ne_zero _))
+    simpa only [hfe] using tprod_one_add_ne_zero_of_summable hf hs
+  · rintro ⟨i, hi⟩
+    apply tprod_of_exists_eq_zero
+    exact ⟨i, by simp [f, hi, ne_of_gt (hn i)]⟩
+
+/-- Separating a single factor from the entire product identifies its
+vanishing order, since the complementary product is nonzero there. -/
+private theorem introTrace_canonical_product_order {ι : Type*} (p : ι → ℂ) (hp : Injective p)
+    (b : ℂ) (hb : ∀ i, b ≠ p i) (n : ι → ℕ) (hn : ∀ i, 0 < n i)
+    (hQ : Summable (fun i ↦ (n i : ℝ) * ‖(b - p i)⁻¹‖ ^ 2)) (i : ι) :
+    let f (j : ι) (z : ℂ) := ((1 + (z - b) * (b - p j)⁻¹) * Complex.exp (-((z - b) * (b - p j)⁻¹))) ^ (n j)
+    analyticOrderAt (fun z ↦ ∏' j, f j z) (p i) = (n i : ℕ∞) := by
+  classical
+  intro f
+  let S : Finset ι := {i}
+  let U (z : ℂ) := ∏' j : {j // j ∉ S}, f j.val z
+  obtain ⟨_, hP, _, _⟩ := introTrace_canonical_product_normal n (fun j ↦ (b - p j)⁻¹) hn hQ b
+  obtain ⟨hprod, hU, _, hzeros⟩ := introTrace_canonical_product_normal
+    (fun j : {j // j ∉ S} ↦ n j.val) (fun j ↦ (b - p j.val)⁻¹) (fun j ↦ hn j.val) (hQ.subtype _) b
+  have he (z : ℂ) (j : ι) : 1 + (z - b) * (b - p j)⁻¹ = (z - p j) * (b - p j)⁻¹ := by
+    field_simp [sub_ne_zero.mpr (hb j)]; ring
+  have hne : U (p i) ≠ 0 := by
+    intro h
+    obtain ⟨j, hj⟩ := (hzeros (p i)).mp h
+    rw [he] at hj
+    have heq := hp (sub_eq_zero.mp (mul_eq_zero.mp hj |>.resolve_right (inv_ne_zero (sub_ne_zero.mpr (hb j.val)))))
+    exact j.property (by simpa only [S, Finset.mem_singleton] using heq.symm)
+  let v (z : ℂ) := ((b - p i)⁻¹ * Complex.exp (-((z - b) * (b - p i)⁻¹))) ^ (n i)
+  apply (hP.analyticAt (p i)).analyticOrderAt_eq_natCast.mpr
+  refine ⟨fun z ↦ v z * U z, ?_, mul_ne_zero (pow_ne_zero _
+    (mul_ne_zero (inv_ne_zero (sub_ne_zero.mpr (hb i))) (Complex.exp_ne_zero _))) hne, ?_⟩
+  · apply AnalyticAt.mul _ (hU.analyticAt _)
+    dsimp only [v]
+    fun_prop
+  · apply Eventually.of_forall
+    intro z
+    have hout : Multipliable (fun j : {j // j ∉ S} ↦ f j.val z) := (hprod.hasProd (mem_univ z)).multipliable
+    have hin : Multipliable (fun j : {j // j ∈ S} ↦ f j.val z) := (hasProd_fintype _).multipliable
+    have hs := Multipliable.tprod_mul_tprod_compl (s := (S : Set ι)) (f := fun j ↦ f j z) hin hout
+    rw [Finset.tprod_subtype' S (fun j ↦ f j z)] at hs
+    change (∏ j ∈ S, f j z) * U z = _ at hs
+    rw [← hs, show (∏ j ∈ S, f j z) = f i z by simp [S], smul_eq_mul]
+    dsimp only [f, v]
+    rw [he, mul_assoc, mul_pow, mul_assoc]
+
+/-- The logarithmic derivative of a normalized genus-one factor is the
+difference of its resolvents at the variable and reference points. -/
+private theorem introTrace_canonical_factor_logDeriv (p b z : ℂ) (n : ℕ) (hb : b ≠ p) (hz : z ≠ p) :
+    logDeriv (fun w : ℂ ↦ ((1 + (w - b) * (b - p)⁻¹) * Complex.exp (-((w - b) * (b - p)⁻¹))) ^ n) z =
+      (n : ℂ) * (1 / (z - p) - 1 / (b - p)) := by
+  let q := (b - p)⁻¹
+  have hb₀ := sub_ne_zero.mpr hb
+  have hz₀ := sub_ne_zero.mpr hz
+  have he : 1 + (z - b) * q = (z - p) / (b - p) := by dsimp only [q]; field_simp [hb₀]; ring
+  have hf : 1 + (z - b) * q ≠ 0 := he ▸ div_ne_zero hz₀ hb₀
+  have hlin : HasDerivAt (fun w : ℂ ↦ (w - b) * q) q z := by
+    simpa using (((hasDerivAt_id z).sub_const b).mul_const q)
+  have hpow := logDeriv_fun_pow (f := fun w : ℂ ↦ (1 + (w - b) * q) * Complex.exp (-((w - b) * q)))
+    (x := z) (by fun_prop) n
+  rw [hpow, logDeriv_fun_mul (f := fun w : ℂ ↦ 1 + (w - b) * q)
+    (g := fun w : ℂ ↦ Complex.exp (-((w - b) * q))) z hf (Complex.exp_ne_zero _) (by fun_prop) (by fun_prop)]
+  have hneg : HasDerivAt (fun w : ℂ ↦ -((w - b) * q)) (-q) z := hlin.neg
+  rw [logDeriv_apply, logDeriv_apply, (hlin.const_add 1).deriv, hneg.cexp.deriv, he]
+  dsimp only [q]
+  field_simp [hb₀, hz₀, Complex.exp_ne_zero]
+  ring
+
+/-- At any point off the shifted zero set, the squared reciprocals of the
+distances to the zeros are summable with their actual multiplicities. -/
+private theorem introTrace_canonical_reciprocal_squares (χ : U𝔽) (a : ℝ) (z : ℂ)
+    (hz : ∀ r : windowZeros(χ, a), z ≠ r.val - 1 / 2) :
+    Summable (fun r : windowZeros(χ, a) ↦ (zeroOrder(χ, r.val) : ℝ) * ‖(z - (r.val - 1 / 2))⁻¹‖ ^ 2) := by
+  obtain ⟨η, hη, hsep⟩ := introTrace_window_pole_separation χ a z
+  let C := 1 + (1 + ‖z‖) / η
+  apply ((introTraceApprox_spectral_differentiable_zeroCount χ a).mul_left (C ^ 2)).of_norm_bounded
+  intro r
+  have hm : 0 ≤ (zeroOrder(χ, r.val) : ℝ) := (Int.cast_pos.mpr r.property.1).le
+  have hδ : η ≤ ‖z - (r.val - 1 / 2)‖ := by
+    rw [norm_sub_rev]
+    exact hsep r (hz r).symm
+  have h := introTrace_resolvent_inv_norm_of_separation hη hδ (le_refl ‖z‖)
+  have hw : ‖(z - (r.val - 1 / 2))⁻¹‖ ≤ C / (1 + |r.val.im|) := by
+    simpa [C, norm_inv, one_div, Complex.sub_im] using h
+  rw [Real.norm_of_nonneg (mul_nonneg hm (sq_nonneg _))]
+  exact (mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (norm_nonneg _) hw 2) hm).trans_eq
+    (by rw [div_pow]; ring)
+
+/-- Subtraction at the reference point gives an absolutely summable
+resolvent difference at every point away from the selected zeros. -/
+private theorem introTrace_canonical_resolvent_summable (χ : U𝔽) (a : ℝ) (b z : ℂ)
+    (hb : ∀ r : windowZeros(χ, a), b ≠ r.val - 1 / 2) (hz : ∀ r : windowZeros(χ, a), z ≠ r.val - 1 / 2) :
+    Summable (fun r : windowZeros(χ, a) ↦ (zeroOrder(χ, r.val) : ℂ)*
+      (1 / (z - (r.val - 1 / 2)) - 1 / (b - (r.val - 1 / 2)))) := by
+  have h := (introTrace_canonical_reciprocal_squares χ a z hz).add (introTrace_canonical_reciprocal_squares χ a b hb)
+  apply (h.mul_left ‖b - z‖).of_norm_bounded
+  intro r
+  let p := r.val - 1 / 2
+  let m := (zeroOrder(χ, r.val) : ℝ)
+  have hm : 0 ≤ m := (Int.cast_pos.mpr r.property.1).le
+  have hid : 1 / (z - p) - 1 / (b - p) = (b - z) * (z - p)⁻¹ * (b - p)⁻¹ := by
+    have hz₀ : z - p ≠ 0 := sub_ne_zero.mpr (hz r)
+    have hb₀ : b - p ≠ 0 := sub_ne_zero.mpr (hb r)
+    field_simp [hz₀, hb₀]
+    ring
+  change ‖(zeroOrder(χ, r.val) : ℂ) * (1 / (z - p) - 1 / (b - p))‖ ≤ _
+  rw [hid, norm_mul, norm_mul, norm_mul, Complex.norm_intCast, abs_of_nonneg hm]
+  let A := ‖(z - p)⁻¹‖
+  let B := ‖(b - p)⁻¹‖
+  change m * ((‖b - z‖ * A) * B) ≤ ‖b - z‖ * (m * A ^ 2 + m * B ^ 2)
+  have hab : A * B ≤ A ^ 2 + B ^ 2 := by nlinarith [sq_nonneg (A - B), sq_nonneg A, sq_nonneg B]
+  exact (show m * ((‖b - z‖ * A) * B) = ‖b - z‖ * (m * (A * B)) by ring).le.trans
+    ((mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_left hab hm) (norm_nonneg _)).trans_eq (by ring))
+
+open Classical in
+/-- Paper: §§1.4.3–1.4.5, pp. 29–30. Deviation: encode the
+reference-subtracted spectral resolvent by a genus-one canonical product.
+It is entire and normalized at the reference point. Its zeros are exactly
+the shifted window zeros, with their original multiplicities, and its
+logarithmic derivative sums the resolvent differences off this zero set. -/
+theorem introTrace_window_canonical_product (χ : U𝔽) (a : ℝ) (b : ℂ)
+    (hb : ∀ r : windowZeros(χ, a), b ≠ r.val - 1 / 2) :
+    let p (r : windowZeros(χ, a)) := r.val - 1 / 2
+    let n (r : windowZeros(χ, a)) := (zeroOrder(χ, r.val)).toNat
+    let f (r : windowZeros(χ, a)) (z : ℂ) :=
+      ((1 + (z - b) * (b - p r)⁻¹) * Complex.exp (-((z - b) * (b - p r)⁻¹))) ^ (n r)
+    let P (z : ℂ) := ∏' r, f r z
+    TendstoLocallyUniformlyOn (fun (S : Finset (windowZeros(χ, a))) z ↦ ∏ r ∈ S, f r z) P atTop univ ∧
+      Differentiable ℂ P ∧ P b = 1 ∧ (∀ z, P z = 0 ↔ ∃ r, z = p r) ∧
+      (∀ r, analyticOrderAt P (p r) = (n r : ℕ∞)) ∧
+      ∀ z, (∀ r, z ≠ p r) →
+        HasSum (fun r ↦ (zeroOrder(χ, r.val) : ℂ) * (1 / (z - p r) - 1 / (b - p r))) (logDeriv P z) := by
+  classical
+  intro p n f P
+  have hn (r : windowZeros(χ, a)) : 0 < n r := by
+    have h := r.property.1
+    dsimp only [n]
+    omega
+  have hr (r : windowZeros(χ, a)) : (n r : ℝ) = (zeroOrder(χ, r.val) : ℝ) := by
+    exact_mod_cast Int.toNat_of_nonneg r.property.1.le
+  have hc (r : windowZeros(χ, a)) : (n r : ℂ) = (zeroOrder(χ, r.val) : ℂ) := by
+    exact_mod_cast Int.toNat_of_nonneg r.property.1.le
+  have hQ : Summable (fun r ↦ (n r : ℝ) * ‖(b - p r)⁻¹‖ ^ 2) := by
+    simpa only [hr] using introTrace_canonical_reciprocal_squares χ a b hb
+  obtain ⟨hprod, hP, hbP, hzeros⟩ := introTrace_canonical_product_normal n (fun r ↦ (b - p r)⁻¹) hn hQ b
+  have he (z : ℂ) (r : windowZeros(χ, a)) : 1 + (z - b) * (b - p r)⁻¹ = (z - p r) * (b - p r)⁻¹ := by
+    have hr₀ : b - p r ≠ 0 := sub_ne_zero.mpr (hb r)
+    field_simp [hr₀]
+    ring
+  have he₀ (z : ℂ) (r : windowZeros(χ, a)) : 1 + (z - b) * (b - p r)⁻¹ = 0 ↔ z = p r := by
+    rw [he, mul_eq_zero, or_iff_left (inv_ne_zero (sub_ne_zero.mpr (hb r))), sub_eq_zero]
+  have hzero (z : ℂ) : P z = 0 ↔ ∃ r, z = p r := by simpa only [he₀] using hzeros z
+  have hinj : Injective p := fun r s h ↦ Subtype.ext (sub_left_inj.mp h)
+  refine ⟨hprod, hP, hbP, hzero, introTrace_canonical_product_order p hinj b hb n hn hQ, ?_⟩
+  intro z hz
+  have hf (r : windowZeros(χ, a)) : f r z ≠ 0 :=
+    pow_ne_zero _ (mul_ne_zero (fun h ↦ hz r ((he₀ z r).mp h)) (Complex.exp_ne_zero _))
+  have hfd (r : windowZeros(χ, a)) : DifferentiableOn ℂ (f r) univ := by dsimp only [f]; fun_prop
+  have hlog (r : windowZeros(χ, a)) :
+      logDeriv (f r) z = (zeroOrder(χ, r.val) : ℂ) * (1 / (z - p r) - 1 / (b - p r)) := by
+    simpa only [hc] using introTrace_canonical_factor_logDeriv (p r) b z (n r) (hb r) (hz r)
+  have hsum := introTrace_canonical_resolvent_summable χ a b z hb hz
+  have hs : Summable (fun r ↦ logDeriv (f r) z) := by simpa only [hlog] using hsum
+  have hne : P z ≠ 0 := fun h ↦ (hzero z |>.mp h).elim fun r h' ↦ hz r h'
+  have hd := logDeriv_tprod_eq_tsum isOpen_univ (mem_univ z) hf hfd hs hprod.multipliableLocallyUniformlyOn hne
+  exact hsum.hasSum_iff.mpr (by simpa only [hlog] using hd.symm)
+
+/-- Changing the reference of one genus-one factor multiplies its
+normalized value by an exponential of a linear function. -/
+private theorem introTrace_canonical_factor_change_anchor (p b c z : ℂ) (n : ℕ) (hb : b ≠ p) (hc : c ≠ p) :
+    let f (v w : ℂ) := ((1 + (w - v) * (v - p)⁻¹) * Complex.exp (-((w - v) * (v - p)⁻¹))) ^ n
+    f c z * f b c * Complex.exp ((z - c) * ((n : ℂ) * (1 / (c - p) - 1 / (b - p)))) = f b z := by
+  intro f
+  have he (v w : ℂ) (hv : v ≠ p) : 1 + (w - v) * (v - p)⁻¹ = (w - p) * (v - p)⁻¹ := by
+    field_simp [sub_ne_zero.mpr hv]; ring
+  have hp : (z - c) * ((n : ℂ) * (1 / (c - p) - 1 / (b - p))) =
+      (n : ℂ) * ((z - c) * (1 / (c - p) - 1 / (b - p))) := by ring
+  dsimp only [f]
+  rw [hp, Complex.exp_nat_mul, ← mul_pow, ← mul_pow]
+  congr 1
+  rw [he c z hc, he b c hb, he b z hb]
+  let u := -((z - c) * (c - p)⁻¹)
+  let v := -((c - b) * (b - p)⁻¹)
+  let w := (z - c) * (1 / (c - p) - 1 / (b - p))
+  have heq : (z - p) * (c - p)⁻¹ * Complex.exp u * ((c - p) * (b - p)⁻¹ * Complex.exp v) * Complex.exp w =
+      ((z - p) * (c - p)⁻¹ * (c - p) * (b - p)⁻¹) * (Complex.exp u * Complex.exp v * Complex.exp w) := by ring
+  rw [heq, ← Complex.exp_add, ← Complex.exp_add, inv_mul_cancel_right₀ (sub_ne_zero.mpr hc)]
+  congr 2
+  dsimp only [u, v, w]
+  ring
+
+/-- Paper: §§1.4.3–1.4.5, pp. 29–30. Deviation: changing the reference of
+the canonical product changes it by its value at the new reference and by
+a linear exponential determined by the old logarithmic derivative there. -/
+theorem introTrace_window_canonical_product_change_anchor (χ : U𝔽) (a : ℝ) (b c : ℂ)
+    (hb : ∀ r : windowZeros(χ, a), b ≠ r.val - 1 / 2) (hc : ∀ r : windowZeros(χ, a), c ≠ r.val - 1 / 2) :
+    let p (r : windowZeros(χ, a)) := r.val - 1 / 2
+    let n (r : windowZeros(χ, a)) := (zeroOrder(χ, r.val)).toNat
+    let f (v : ℂ) (r : windowZeros(χ, a)) (z : ℂ) :=
+      ((1 + (z - v) * (v - p r)⁻¹) * Complex.exp (-((z - v) * (v - p r)⁻¹))) ^ (n r)
+    let P (v z : ℂ) := ∏' r, f v r z
+    ∀ z, P b z = P c z * P b c * Complex.exp ((z - c) * logDeriv (P b) c) := by
+  classical
+  intro p n f P z
+  obtain ⟨hB, _, _, _, _, hs⟩ := introTrace_window_canonical_product χ a b hb
+  obtain ⟨hC, _, _, _, _, _⟩ := introTrace_window_canonical_product χ a c hc
+  let d (r : windowZeros(χ, a)) := (zeroOrder(χ, r.val) : ℂ) * (1 / (c - p r) - 1 / (b - p r))
+  have hsum : HasSum d (logDeriv (P b) c) := hs c hc
+  have harith (r : windowZeros(χ, a)) : (n r : ℂ) = (zeroOrder(χ, r.val) : ℂ) := by
+    exact_mod_cast Int.toNat_of_nonneg r.property.1.le
+  have hrow (r : windowZeros(χ, a)) : f c r z * f b r c * Complex.exp ((z - c) * d r) = f b r z := by
+    simpa only [harith] using introTrace_canonical_factor_change_anchor (p r) b c z (n r) (hb r) (hc r)
+  have hcprod : HasProd (fun r ↦ f c r z) (P c z) := hC.tendsto_at (mem_univ z)
+  have hbprod : HasProd (fun r ↦ f b r c) (P b c) := hB.tendsto_at (mem_univ c)
+  have h := ((hcprod.mul hbprod).mul ((hsum.mul_left (z - c)).cexp)).congr_fun (fun r ↦ (hrow r).symm)
+  exact h.tprod_eq
+
+open Classical in
+/-- Paper: §1.4.5, pp. 29–30. Deviation: on the common right half-plane
+the normalized products for two nested zero windows agree up to a
+nowhere-vanishing entire factor exactly when the larger window contains
+no additional zeros. -/
+theorem introTrace_window_canonical_product_eqOn_iff (χ : U𝔽) {a c : ℝ} (hac : a ≤ c) (b : ℂ)
+    (hb : ∀ r : windowZeros(χ, c), b ≠ r.val - 1 / 2) :
+    let f (s z : ℂ) := ((1 + (z - b) * (b - (s - 1 / 2))⁻¹) * Complex.exp (-((z - b) * (b - (s - 1 / 2))⁻¹)))^
+      (zeroOrder(χ, s)).toNat
+    let P (t : ℝ) (z : ℂ) := ∏' r : windowZeros(χ, t), f r.val z
+    (∃ E : ℂ → ℂ, Differentiable ℂ E ∧ (∀ z, E z ≠ 0) ∧
+      EqOn (P c) (fun z ↦ E z * P a z) right(c)) ↔ ∀ r : windowZeros(χ, c), |r.val.re - 1 / 2| < a := by
+  classical
+  intro f P
+  let up (r : windowZeros(χ, a)) : windowZeros(χ, c) := ⟨r.val, r.property.1, r.property.2.trans_le hac⟩
+  have hba (r : windowZeros(χ, a)) : b ≠ r.val - 1 / 2 := hb (up r)
+  obtain ⟨_, ha, _, hza, _, _⟩ := introTrace_window_canonical_product χ a b hba
+  obtain ⟨_, hc, _, hzc, _, _⟩ := introTrace_window_canonical_product χ c b hb
+  change Differentiable ℂ (P a) at ha
+  change Differentiable ℂ (P c) at hc
+  constructor
+  · rintro ⟨E, hE, hne, he⟩ r
+    have hopen : IsOpen right(c) := isOpen_Ioi.preimage Complex.continuous_re
+    have hx : ((c + 1 : ℝ) : ℂ) ∈ right(c) := by change c < ((c + 1 : ℝ) : ℂ).re; simp
+    have hnear : P c =ᶠ[𝓝 ((c + 1 : ℝ) : ℂ)] (fun z ↦ E z * P a z) := by
+      filter_upwards [hopen.mem_nhds hx] with z hz using he hz
+    have hAc : AnalyticOnNhd ℂ (P c) univ := fun z _ ↦ hc.analyticAt z
+    have hmul : AnalyticOnNhd ℂ (fun z ↦ E z * P a z) univ := fun z _ ↦ (hE.analyticAt z).mul (ha.analyticAt z)
+    have hevery := hAc.eq_of_eventuallyEq hmul hnear
+    have hz : P c (r.val - 1 / 2) = 0 := (hzc _).mpr ⟨r, rfl⟩
+    rw [hevery] at hz
+    obtain ⟨s, hs⟩ := (hza _).mp ((mul_eq_zero.mp hz).resolve_left (hne _))
+    have him : r.val = s.val := sub_left_inj.mp hs
+    rw [him]; exact s.property.2
+  · intro h
+    let eqv : windowZeros(χ, a) ≃ windowZeros(χ, c) := {
+      toFun := up
+      invFun := fun r ↦ ⟨r.val, r.property.1, h r⟩
+      left_inv := fun _ ↦ rfl
+      right_inv := fun _ ↦ rfl }
+    refine ⟨fun _ ↦ 1, differentiable_const _, fun _ ↦ one_ne_zero, ?_⟩
+    intro z _
+    change P c z = 1 * P a z
+    rw [one_mul]
+    exact (eqv.tprod_eq (fun r ↦ f r.val z)).symm
+
+open Classical in
+/-- Paper: §§1.4.3–1.4.5, pp. 29–30. The shift-by-two window resolvent
+is the logarithmic derivative of the quotient of the canonical product
+by its translate. The reference term cancels. -/
+theorem introTrace_window_canonical_quotient_resolvent (χ : U𝔽) (a : ℝ) (b : ℂ)
+    (hb : ∀ r : windowZeros(χ, a), b ≠ r.val - 1 / 2) :
+    let p (r : windowZeros(χ, a)) := r.val - 1 / 2
+    let P (z : ℂ) := ∏' r : windowZeros(χ, a),
+      ((1 + (z - b) * (b - p r)⁻¹) * Complex.exp (-((z - b) * (b - p r)⁻¹))) ^
+        (zeroOrder(χ, r.val)).toNat
+    let Q (z : ℂ) := P z / P (z + 2)
+    MeromorphicOn Q univ ∧ ∀ z, (∀ r, z ≠ p r) → (∀ r, z + 2 ≠ p r) →
+      HasSum (fun r ↦ (zeroOrder(χ, r.val) : ℂ) * (1 / (z - p r) - 1 / (z + 2 - p r)))
+        (logDeriv Q z) := by
+  classical
+  intro p P Q
+  obtain ⟨_, hP, _, hzeros, _, hs⟩ := introTrace_window_canonical_product χ a b hb
+  change Differentiable ℂ P at hP
+  let g (z : ℂ) := z + 2
+  have hg (z : ℂ) : HasDerivAt g 1 z := (hasDerivAt_id z).add_const 2
+  have hPg : Differentiable ℂ (P ∘ g) := hP.comp (fun z ↦ (hg z).differentiableAt)
+  refine ⟨fun z _ ↦ (hP.analyticAt z).meromorphicAt.div (hPg.analyticAt z).meromorphicAt, ?_⟩
+  intro z hz hshift
+  have hne (w : ℂ) (hw : ∀ r, w ≠ p r) : P w ≠ 0 := by
+    intro h
+    obtain ⟨r, hr⟩ := (hzeros w).mp h
+    exact hw r hr
+  have he : logDeriv Q z = logDeriv P z - logDeriv P (z + 2) := by
+    change logDeriv (P / (P ∘ g)) z = _
+    rw [logDeriv_div (g := P ∘ g) z (hne z hz) (hne (z + 2) hshift) (hP z) (hPg z),
+      logDeriv_comp (hP (g z)) (hg z).differentiableAt, (hg z).deriv, mul_one]
+  rw [he]
+  apply ((hs z hz).sub (hs (z + 2) hshift)).congr_fun
+  intro r
+  dsimp only [Pi.sub_apply]
+  ring
+
+end WindowCanonicalProduct
 
 private theorem introTrace_window_kernel_norm {s z : ℂ} {δ R : ℝ} (hδ : 0 < δ)
     (hd : δ ≤ ‖z - s‖) (hd' : δ ≤ ‖z + 2 - s‖) (hR : ‖z‖ ≤ R) (hR' : ‖z + 2‖ ≤ R) :
