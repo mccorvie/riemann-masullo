@@ -5,6 +5,8 @@ public import RiemannMasullo.Ch10_TraceSpectral.Sec2
 import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
 import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
 import Mathlib.MeasureTheory.Integral.Asymptotics
+import Mathlib.Topology.Algebra.Module.Cardinality
+import RiemannMasullo.ForMathlib.Analysis.MellinTransform.Weighted
 
 /-!
 # A theta-lift norm criterion for exterior-zero cancellation
@@ -434,5 +436,224 @@ theorem exteriorCancellation_of_modulated_bump_cost (σ : ℝ≥0ˣ →ₜ* I�
       (le_of_not_gt (fun hw ↦ ho.not_ge (introTrace_completedL_no_left_zeros χ (hr χ⁻¹) w hw)))
     simpa only [eq, sub_self, abs_zero] using hpos)
   simpa only [modulatedFourierMellin, relativeVerticalStrip, Set.preimage_univ, Set.indicator_univ] using h φ hφ
+
+private theorem centeredLogThetaLift_profile_zeros_countable (b : ℝ → ℝ) (hb : Continuous b)
+    (hc : HasCompactSupport b) (hn : 0 ≤ b) (hv : ∃ x, b x ≠ 0) :
+    {z : ℂ | (∫ x : ℝ, (b x : ℂ) * Complex.exp (z * x)) = 0}.Countable := by
+  let M (z : ℂ) := ∫ x : ℝ, (b x : ℂ) * Complex.exp (z * x)
+  have hp (z : ℂ) (x : ℝ) : (Real.exp x : ℂ) ^ z = Complex.exp (z * x) := by
+    rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (Real.exp_pos x).ne'),
+      ← Complex.ofReal_log (Real.exp_pos x).le, Real.log_exp, mul_comm]
+  have ha : AnalyticOnNhd ℂ M univ := by
+    have h := analyticOnNhd_integral_mul_cpow volume (fun x ↦ (b x : ℂ)) Real.exp
+      (Complex.continuous_ofReal.comp hb).measurable Real.continuous_exp.measurable
+      Real.exp_pos (U := univ) isOpen_univ (fun a _ ↦ ?_)
+    · simpa only [preimage_univ, hp, M] using h
+    · simp only [Complex.norm_real]
+      apply Continuous.integrable_of_hasCompactSupport _ hc.norm.mul_right
+      exact hb.norm.mul (Real.continuous_exp.rpow_const (fun x ↦ Or.inl (Real.exp_pos x).ne'))
+  obtain ⟨x, hx⟩ := hv
+  have hzero : M 0 ≠ 0 := by
+    simp only [M, zero_mul, Complex.exp_zero, mul_one]
+    rw [show (∫ x : ℝ, (b x : ℂ)) = ((∫ x : ℝ, b x : ℝ) : ℂ) from integral_ofReal]
+    exact Complex.ofReal_ne_zero.mpr (hb.integral_pos_of_hasCompactSupport_nonneg_ne_zero (μ := volume) hc hn hx).ne'
+  exact (HereditarilyLindelofSpace.isLindelof _).countable_of_isDiscrete
+    (compl_mem_codiscrete_iff.mp (ha.preimage_zero_mem_codiscrete hzero)).2
+
+/-- Two real exponential tilts of a positive compact profile have no common Mellin zero.
+The second tilt may be chosen in any prescribed nonempty interval. -/
+private theorem exists_tilt_without_common_moment_zero (b : ℝ → ℝ) (hb : Continuous b)
+    (hc : HasCompactSupport b) (hn : 0 ≤ b) (hv : ∃ x, b x ≠ 0) {l r : ℝ} (hlr : l < r) :
+    ∃ t ∈ Ioo l r, ∀ z : ℂ,
+      (∫ x : ℝ, (b x : ℂ) * Complex.exp (z * x)) ≠ 0 ∨
+      (∫ x : ℝ, (b x : ℂ) * Complex.exp ((z + t) * x)) ≠ 0 := by
+  let Z := {z : ℂ | (∫ x : ℝ, (b x : ℂ) * Complex.exp (z * x)) = 0}
+  have hZ : Z.Countable := centeredLogThetaLift_profile_zeros_countable b hb hc hn hv
+  let E := (fun x : ℝ ↦ (x : ℂ)) ⁻¹' ((fun p : ℂ × ℂ ↦ p.1 - p.2) '' (Z ×ˢ Z))
+  have hE : E.Countable := ((hZ.prod hZ).image _).preimage Complex.ofReal_injective
+  obtain ⟨t, ht, he⟩ := (hE.dense_compl ℝ).inter_open_nonempty _ isOpen_Ioo (nonempty_Ioo.mpr hlr)
+  refine ⟨t, ht, fun z ↦ or_iff_not_imp_left.mpr fun hz bad ↦ he ?_⟩
+  refine ⟨(z + t, z), ⟨bad, not_ne_iff.mp hz⟩, ?_⟩
+  dsimp
+  ring
+
+private theorem no_right_zeros_of_tilt_moment_cost (χ : PontryaginDual C𝔽)
+    (σ : ℝ≥0ˣ →ₜ* I𝔽) (hσ : RightInverse σ (ideleNorm F)) {α s : ℝ}
+    (ha : 0 ≤ α) (hs : 0 ≤ s) (b : ℝ → ℝ) (hb : ∀ x ≤ 0, b x = 0)
+    (t : ℝ) (z : ℂ) (hz : 0 < z.re)
+    (hM : (∫ x : ℝ, (b x : ℂ) * Complex.exp ((z + t) * x)) ≠ 0)
+    (hlift : ∀ ε : ℝ, 0 < ε → ∃ C : ℝ, 0 ≤ C ∧ ∀ᶠ n : ℕ in atTop,
+      ∃ f : adelePolarSubspace F,
+        (∀ x : ℝ, -(n : ℝ) < x → centeredLogThetaLift χ σ f x =
+          ((b x * Real.exp (t * x) : ℝ) : ℂ)) ∧
+        hiddenThetaCost α s n (centeredLogThetaLift χ σ f) ≤ C * Real.exp ((α + ε) * n)) :
+    ¬ 0 < meromorphicOrderAt (continuedCompletedHeckeL χ) (z + 1 / 2) := by
+  apply no_completed_zero_of_visible_moment_cost χ σ hσ ha hs hz _ hM
+  obtain ⟨C, hC, hc⟩ := hlift (z.re / 2) (half_pos hz)
+  refine ⟨z.re / 2, by linarith, C, hC, ?_⟩
+  filter_upwards [hc] with n hn
+  obtain ⟨f, hf, hcost⟩ := hn
+  refine ⟨f, ?_, hcost⟩
+  calc
+    _ = ∫ x in Ioi (-(n : ℝ)), (b x : ℂ) * Complex.exp ((z + t) * x) := by
+      apply setIntegral_congr_fun measurableSet_Ioi
+      intro x hx
+      change centeredLogThetaLift χ σ f x * _ = (b x : ℂ) * _
+      rw [hf x hx, Complex.ofReal_mul, Complex.ofReal_exp, Complex.ofReal_mul,
+        mul_assoc, ← Complex.exp_add]
+      congr 2
+      ring
+    _ = _ := setIntegral_eq_integral_of_forall_compl_eq_zero (by
+      intro x hx
+      rw [hb x ((le_of_not_gt hx).trans (neg_nonpos.mpr (Nat.cast_nonneg _)))]
+      simp)
+
+private theorem exteriorZeros_empty_of_normalized_right_bound (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    {a : ℝ} (ha : 0 < a)
+    (hr : ∀ (χ : PontryaginDual C𝔽), (∀ u, χ (τ u) = 1) → ∀ w : ℂ, 1 / 2 < w.re →
+      meromorphicOrderAt (continuedCompletedHeckeL χ) w ≤ 0) :
+    IsEmpty {p : {χ : PontryaginDual C𝔽 // ∀ u : ℝ≥0ˣ, χ (τ u) = 1} × ℂ //
+      0 < order(p.1.val, p.2) ∧ a ≤ |p.2.re - 1 / 2|} := by
+  refine ⟨fun ⟨⟨⟨χ, hχ⟩, w⟩, hw, hedge⟩ ↦ ?_⟩
+  change 0 < order(χ, w) at hw
+  change a ≤ |w.re - 1 / 2| at hedge
+  rw [MeromorphicOn.divisor_apply (continuedCompletedHeckeL_spec χ).1.meromorphicOn (mem_univ _)] at hw
+  have hzero : 0 < meromorphicOrderAt (continuedCompletedHeckeL χ) w := by
+    cases h : meromorphicOrderAt (continuedCompletedHeckeL χ) w with
+    | top => simp
+    | coe k => simpa [h] using hw
+  have hχinv : ∀ u, χ⁻¹ (τ u) = 1 := by
+    intro u
+    change (χ (τ u))⁻¹ = 1
+    rw [hχ u, inv_one]
+  have hline : w.re = 1 / 2 := le_antisymm
+    (le_of_not_gt fun h ↦ hzero.not_ge (hr χ hχ w h))
+    (le_of_not_gt fun h ↦ hzero.not_ge (introTrace_completedL_no_left_zeros χ (hr χ⁻¹ hχinv) w h))
+  simp [hline, ha.not_ge] at hedge
+
+local notation "C[" K "]" => IdeleClassGroup (𝓞 K) K
+local notation "I[" K "]" => IdeleGroup (𝓞 K) K
+local notation "extZeros(" K ", " τ ", " a ")" =>
+  {p : {χ : PontryaginDual C[K] // ∀ u : ℝ≥0ˣ, χ (τ u) = 1} × ℂ //
+    0 < MeromorphicOn.divisor (continuedCompletedHeckeL (F := K) p.1.val) univ p.2 ∧
+      a ≤ |p.2.re - 1 / 2|}
+
+/-- For a fixed positive log-norm bump, two real profiles suffice across all number fields.
+The second is an arbitrarily small real exponential tilt of the first. If both have
+polar-free lifts of near-baseline hidden cost for each character trivial on the chosen
+norm section, there are no exterior zero indices at any positive width. -/
+theorem exists_two_profiles_for_exterior_zero_exclusion
+    (b : ℝ → ℝ) (hb : Continuous b) (hc : HasCompactSupport b)
+    (hn : 0 ≤ b) (hv : ∃ x, b x ≠ 0) (hsupp : ∀ x ≤ 0, b x = 0) {l r : ℝ} (hlr : l < r) :
+    ∃ t ∈ Ioo l r, ∀ (K : Type*) [Field K] [NumberField K]
+      (σ : ℝ≥0ˣ →ₜ* I[K]), RightInverse σ (ideleNorm K) →
+      ∀ (τ : ℝ≥0ˣ →ₜ* C[K]) (α s : ℝ), 0 ≤ α → 0 ≤ s →
+      (∀ (χ : PontryaginDual C[K]), (∀ u, χ (τ u) = 1) →
+        ∀ c ∈ ({0, t} : Set ℝ), ∀ ε : ℝ, 0 < ε → ∃ C : ℝ, 0 ≤ C ∧ ∀ᶠ n : ℕ in atTop,
+          ∃ f : adelePolarSubspace K,
+            (∀ x : ℝ, -(n : ℝ) < x → centeredLogThetaLift χ σ f x =
+              ((b x * Real.exp (c * x) : ℝ) : ℂ)) ∧
+            hiddenThetaCost α s n (centeredLogThetaLift χ σ f) ≤ C * Real.exp ((α + ε) * n)) →
+      ∀ a : ℝ, 0 < a → IsEmpty extZeros(K, τ, a) := by
+  obtain ⟨t, ht, hdetect⟩ := exists_tilt_without_common_moment_zero b hb hc hn hv hlr
+  refine ⟨t, ht, ?_⟩
+  intro K _ _ σ hσ τ α s ha hs hlift a hpos
+  apply exteriorZeros_empty_of_normalized_right_bound τ hpos
+  intro χ hχ w hw
+  let z := w - 1 / 2
+  have hz : 0 < z.re := by simp only [z, Complex.sub_re]; norm_num; linarith
+  have hshift : z + 1 / 2 = w := sub_add_cancel _ _
+  suffices h : ¬ 0 < meromorphicOrderAt (continuedCompletedHeckeL χ) (z + 1 / 2) by
+    simpa only [hshift, not_lt] using h
+  obtain h | h := hdetect z
+  · apply no_right_zeros_of_tilt_moment_cost χ σ hσ ha hs b hsupp 0 z hz
+      (by simpa only [Complex.ofReal_zero, add_zero] using h) (hlift χ hχ 0 (by simp))
+  · exact no_right_zeros_of_tilt_moment_cost χ σ hσ ha hs b hsupp t z hz h
+      (hlift χ hχ t (by simp))
+
+/-- At a completed Hecke zero ρ to the right of the central line, a polar-free theta lift
+supported in nonpositive log norm has L² distance at least
+sqrt(2 Re ρ − 1) / |ρ| from the normalized unit-interval indicator. -/
+theorem centeredLogThetaLift_halfLine_distance (χ : PontryaginDual C𝔽)
+    (σ : ℝ≥0ˣ →ₜ* I𝔽) (hσ : RightInverse σ (ideleNorm F)) (f : adelePolarSubspace F)
+    (ho : ∀ x : ℝ, 0 < x → centeredLogThetaLift χ σ f x = 0)
+    (ρ : ℂ) (hr : 1 / 2 < ρ.re) (hz : 0 < meromorphicOrderAt (continuedCompletedHeckeL χ) ρ) :
+    Real.sqrt (2 * (ρ.re - 1 / 2)) / ‖ρ‖ ≤
+      hiddenThetaCost 0 0 0 (fun x ↦ Complex.exp ((x : ℂ) / 2) - centeredLogThetaLift χ σ f x) := by
+  let z := ρ - 1 / 2
+  let u := centeredLogThetaLift χ σ f
+  let v (x : ℝ) := Complex.exp ((x : ℂ) / 2)
+  let μ := volume.restrict (Iic (0 : ℝ))
+  have hr' : 0 < ρ.re := by linarith
+  have hrz : z.re = ρ.re - 1 / 2 := by simp [z]
+  have hβ : 0 < z.re := by rw [hrz]; linarith
+  have hcβ := Real.sqrt_pos.mpr (show 0 < 2 * z.re by positivity)
+  have ⟨hu, hue⟩ := centeredLogThetaLift_energy χ σ hσ f (α := 0) (s := 0) le_rfl le_rfl 0
+  have ⟨hm, hzero⟩ := centeredLogThetaLift_zero_moment χ σ hσ f
+    (z := z) (by simpa only [z, sub_add_cancel] using hz)
+  change Integrable (fun x : ℝ ↦ u x * Complex.exp (z * x)) at hm
+  change Continuous u at hu
+  change IntegrableOn (fun x ↦ ‖u x‖ ^ 2 * intervalSobolevDensity (-0) 0 0 x) (Iic (-(0 : ℝ))) at hue
+  have hcut : (∫ x in Iic (0 : ℝ), u x * Complex.exp (z * x)) = 0 := by
+    rw [setIntegral_eq_integral_of_forall_compl_eq_zero (by
+      intro x hx; dsimp only [u]; rw [ho x (lt_of_not_ge hx), zero_mul])]
+    exact hzero
+  have hweight (x : ℝ) : intervalSobolevDensity 0 0 0 x = 1 := by simp [intervalSobolevDensity]
+  have huv : MemLp u 2 μ := (memLp_two_iff_integrable_sq_norm hu.aestronglyMeasurable).mpr
+    (by simpa only [IntegrableOn, μ, neg_zero, hweight, mul_one] using hue)
+  have hv : Continuous v := by dsimp [v]; fun_prop
+  have hvv : MemLp v 2 μ := by
+    apply (memLp_two_iff_integrable_sq_norm hv.aestronglyMeasurable).mpr
+    have hnorm (x : ℝ) : ‖v x‖ ^ 2 = Real.exp x := by
+      rw [show ‖v x‖ = Real.exp (x / 2) by simp [v, Complex.norm_exp], ← Real.exp_nat_mul]
+      congr 1; push_cast; ring
+    simpa only [IntegrableOn, μ, hnorm, one_mul] using
+      integrableOn_exp_mul_Iic (show (0 : ℝ) < 1 by norm_num) 0
+  have hd : Measurable (fun x ↦ v x - u x) := (hv.sub hu).measurable
+  have hd2 : IntegrableOn (fun x ↦ ‖v x - u x‖ ^ 2 * intervalSobolevDensity (-0) 0 0 x)
+      (Iic (-(0 : ℝ))) := by
+    simp only [neg_zero, hweight, mul_one]
+    exact (memLp_two_iff_integrable_sq_norm hd.aestronglyMeasurable).mp (hvv.sub huv)
+  have hvx (x : ℝ) : v x * Complex.exp (z * x) = Complex.exp (ρ * x) := by
+    dsimp only [v, z]; rw [← Complex.exp_add]; congr 1; ring
+  have hM : (∫ x in Iic (0 : ℝ), (v x - u x) * Complex.exp (z * x)) = 1 / ρ := by
+    simp_rw [sub_mul, hvx]
+    rw [integral_sub (integrableOn_exp_mul_complex_Iic hr' 0) hm.integrableOn, hcut,
+      sub_zero, integral_exp_mul_complex_Iic hr']
+    simp
+  have hb := hiddenThetaCost_tail_moment (α := 0) (s := 0) (R := 0) (z := z)
+    (by simpa using hβ) le_rfl le_rfl (fun x ↦ v x - u x) hd hd2
+  change _ ≤ hiddenThetaCost 0 0 0 (fun x ↦ v x - u x) * _ at hb
+  rw [neg_zero, hM, norm_div, norm_one] at hb
+  simp only [zero_add, mul_zero, Real.exp_zero, zero_div, Real.rpow_zero, mul_one,
+    one_div, Real.sqrt_inv] at hb
+  change Real.sqrt (2 * (ρ.re - 1 / 2)) / ‖ρ‖ ≤ hiddenThetaCost 0 0 0 (fun x ↦ v x - u x)
+  rw [← hrz, div_eq_mul_inv, mul_comm]
+  exact (le_div_iff₀ hcβ).mp (by simpa only [div_eq_mul_inv] using hb)
+
+/-- Approximating the normalized unit-interval indicator arbitrarily closely by polar-free
+theta lifts supported in nonpositive log norm suffices for exterior cancellation. There
+is one approximation problem for each character trivial on the chosen norm section. -/
+theorem exteriorCancellation_of_halfLine_approximation (σ : ℝ≥0ˣ →ₜ* I𝔽)
+    (hσ : RightInverse σ (ideleNorm F)) (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (happrox : ∀ (χ : PontryaginDual C𝔽), (∀ t, χ (τ t) = 1) →
+      ∀ ε : ℝ, 0 < ε → ∃ f : adelePolarSubspace F,
+        (∀ x : ℝ, 0 < x → centeredLogThetaLift χ σ f x = 0) ∧
+        hiddenThetaCost 0 0 0 (fun x ↦ Complex.exp ((x : ℂ) / 2) - centeredLogThetaLift χ σ f x) < ε)
+    (φ : BruhatCompactSupport C𝔽) {a : ℝ} (ha : 0 < a) :
+    HasSum (fun z : extZeros(F, τ, a) ↦
+      ((order(z.val.1.val, z.val.2) : ℤ) : ℂ) *
+        modulatedFourierMellin m𝔽 univ hm𝔽 (ideleClassTamagawaMeasure F) φ.val
+          (ideleClassNormTwist z.val.1.val (z.val.2 - 1 / 2))) 0 := by
+  have := exteriorZeros_empty_of_normalized_right_bound τ ha (by
+    intro χ hχ ρ hρ
+    apply le_of_not_gt
+    intro hz
+    have hρ' : ρ ≠ 0 := fun h ↦ by simp [h] at hρ; linarith
+    have hε : 0 < Real.sqrt (2 * (ρ.re - 1 / 2)) / ‖ρ‖ :=
+      div_pos (Real.sqrt_pos.mpr (by linarith)) (norm_pos_iff.mpr hρ')
+    obtain ⟨f, ho, hdist⟩ := happrox χ hχ _ hε
+    exact hdist.not_ge (centeredLogThetaLift_halfLine_distance χ σ hσ f ho ρ hρ hz))
+  exact hasSum_empty
 
 end RiemannMasullo
