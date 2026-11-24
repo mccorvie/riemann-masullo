@@ -6657,10 +6657,33 @@ private theorem sLocalMellinSchwartzBounds_meyer_rational_empty_inverse_from_mod
   · obtain rfl := Set.mem_singleton_iff.mp hw
     exact hF
 
-/-- Classical input: the inverse bornology comparison in Meyer, Corollary 4.17, p. 34,
-and Lemma 4.20, p. 36. For a sequence of fixed conductor in a single Fréchet theta
-subspace, with infinite-dimensional linear span and no compatible even real Schwartz model, the weighted Mellin values of the
-tests and of their additive Fourier transforms should bound the theta classes. -/
+/-- Classical input: R. Meyer, *On a representation of the idele class group related to
+primes and zeros of L-functions*, Duke Math. J. 127 (2005), arXiv:math/0311468 (page numbers
+are those of the preprint), Corollary 4.17, p. 34, and Lemma 4.20, p. 36, at α = 1: the
+direction from bounds on the Mellin transforms to bounded classes, in the cases that Lean does
+not prove.
+For a sequence of tests whose θ-classes have one conductor level and lie in one Fréchet
+subspace of the θ-quotient: if the Mellin transforms of the θ-functions of the tests, and of
+their additive Fourier transforms, are bounded on every line of real part greater than one
+(supported on a finitely generated subgroup of the discrete factor of the dual, with every
+polynomial weight bounded uniformly in the index), then the θ-classes form a bounded set.
+Deviation: This is what remains of the criterion `sLocalMellinSchwartzBounds_meyer`, which is
+proved from it below. Proved in Lean, and excluded here by hypothesis: the case in which the
+classes span a finite-dimensional space (`hS`), and the case in which they are given by even
+real Schwartz profiles (`hreal`; it covers ℚ with no finite place). The other direction of the
+criterion is proved in Lean as well (`sLocalMellinSchwartzBounds_meyer_general_forward`). The
+hypotheses `hk`, `hM` and `hm` follow from the bounds and are proved before this statement is
+applied. The bounds are written without derivatives, which is equivalent
+(`sLocalMellinSchwartzBounds_meyer_zeroth_iff`), and the conclusion is boundedness in the
+quotient, which is equivalent to representatives in one bounded set
+(`sLocalMellinSchwartzBounds_meyer_lift_iff_quotient_bounded`).
+The paper states its results for bornological spaces and in the variable of the idele
+classes. Writing them for this library is the project's work and is not proved in Lean:
+that the bounded sets of the Schwartz–Bruhat space here are the paper's, that the kernel of
+the S-unit sum is the closed span the paper divides by, the normalizations of the Fourier
+transform and of the Haar measures, and the seminorms on the dual group. The integrator and
+an independent reviewer checked these steps against the paper for the whole criterion (#7346);
+no specialist in the paper's framework has. -/
 private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (hτ : RightInverse τ (sIdeleQuotientNorm F T)) (v : ℕ → ℬₛ(T))
     (hreal : ¬ ∃ c : ℝ, 0 < c ∧ ∃ (P : ℬₛ(T) → SchwartzMap ℝ ℂ)
@@ -6755,9 +6778,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_rational_empty
   · rintro ⟨hv,hF⟩
     exact sLocalMellinSchwartzBounds_meyer_rational_empty_inverse_from_model v τ hv hF
 
-/-- Classical input: R. Meyer, *On a representation of the idele class group related to
-primes and zeros of L-functions*, Duke Math. J. 127 (2005), arXiv:math/0311468 (page numbers
-are those of the preprint). Used: Corollary 4.17, p. 34, with the summation map of §5.2,
+/-- A criterion for bounded θ-classes, after R. Meyer, *On a representation of the idele class
+group related to primes and zeros of L-functions*, Duke Math. J. 127 (2005), arXiv:math/0311468
+(page numbers are those of the preprint). Used: Corollary 4.17, p. 34, with the summation map of §5.2,
 p. 38; Lemma 4.20, p. 36, at α = 1, with (12) and (15), p. 17, the reflection of weights on
 p. 25, Proposition 4.4 and (24), pp. 26–28; and the Fourier isomorphism and the bornologies of
 §4.1, pp. 23–24.
@@ -6773,13 +6796,12 @@ the ordinary Schwartz seminorms are polynomial weights in the discrete variable
 and derivatives of polynomially weighted functions on the real line. Every group
 seminorm is bounded by a multiple of word length, itself a group seminorm. The
 subgroup and the seminorm bounds may depend on the line.
-The paper states its results for bornological spaces and in the variable of the idele
-classes. Writing them for this library is the project's work and is not proved in Lean:
-that the bounded sets of the Schwartz–Bruhat space here are the paper's, that the kernel of
-the S-unit sum is the closed span the paper divides by, the normalizations of the Fourier
-transform and of the Haar measures, and the seminorms on the dual group. The integrator and
-an independent reviewer checked these steps against the paper (#7346); no specialist in
-the paper's framework has. -/
+Lean proves that bounded classes have bounded Mellin transforms, and the converse when the
+classes span a finite-dimensional space or are given by even real Schwartz profiles (#7434).
+The rest of the converse is the classical input
+`sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles`, which is not proved in
+Lean; what the project added in writing the paper's statement for this library is said
+there. -/
 private theorem sLocalMellinSchwartzBounds_meyer
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T) (hτ : RightInverse τ (sIdeleQuotientNorm F T))
     (v : ℕ → ℬₛ(T)) :
