@@ -33,7 +33,6 @@ namespace RiemannMasullo
 
 set_option quotPrecheck false
 set_option maxSynthPendingDepth 8
-set_option Elab.async false
 
 attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorelSpaceSec1
   instIdeleClassT2Sec1 instIdeleClassLocallyCompactSec1 instIdeleClassSecondCountableSec1

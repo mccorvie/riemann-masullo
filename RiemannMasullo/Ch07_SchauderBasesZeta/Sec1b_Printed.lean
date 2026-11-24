@@ -7,6 +7,7 @@ import Mathlib.Analysis.Calculus.BumpFunction.Normed
 import Mathlib.LinearAlgebra.Dimension.ErdosKaplansky
 import Mathlib.Algebra.Field.ULift
 import Mathlib.NumberTheory.LSeries.DirichletContinuation
+import RiemannMasullo.Ch01_Introduction.Sec4
 import RiemannMasullo.External.ZetaLab.HardyFirstZero.FirstZero
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Basic
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
@@ -451,6 +452,30 @@ private theorem spectralAnnihilator_product_false_of_infinite
   exact spectralAnnihilator_product_false_no_equiv Z (fun ρ ↦ ↥(J ρ))
     ⟨eProd.toLinearEquiv.trans eSum.symm.toLinearEquiv⟩
 
+/-- The completed trivial Hecke functions of a degree-one field and of ℚ agree
+on the convergence half-plane. The isomorphism of rings of integers preserves ideal norms. -/
+private theorem spectralAnnihilator_product_false_degree_one_eq_rat
+    (F : Type u) [Field F] [NumberField F] (hF : Module.finrank ℚ F = 1) (s : halfPlane) :
+    completedHeckeL (1 : U𝔽(F)) s = completedHeckeL (1 : U𝔽(ℚ)) s := by
+  let e := RingEquiv.ofBijective (algebraMap ℚ F)
+    (Algebra.finrank_eq_one_iff_bijective_algebraMap.mp hF)
+  let i := RingOfIntegers.mapRingEquiv e.symm
+  have hnorm (I : Ideal (𝓞 F)) : (I.map i).absNorm = I.absNorm := by
+    rw [Ideal.absNorm_eq_natCard, Ideal.absNorm_eq_natCard]
+    exact (Nat.card_congr (Ideal.quotientEquiv I (I.map i) i rfl).toEquiv).symm
+  have hcoeff (n : ℕ) : Nat.card {I : Ideal (𝓞 F) // I.absNorm = n} =
+      Nat.card {I : Ideal (𝓞 ℚ) // I.absNorm = n} := by
+    apply Nat.card_congr
+    refine Equiv.subtypeEquiv i.idealComapOrderIso.symm.toEquiv fun I ↦ ?_
+    change I.absNorm = n ↔ (I.map i).absNorm = n
+    rw [hnorm]
+  simp only [completedHeckeL_one_eq_dedekindZeta,
+    InfinitePlace.nrRealPlaces_eq_one_of_finrank_eq_one hF,
+    InfinitePlace.nrComplexPlaces_eq_zero_of_finrank_eq_one hF,
+    InfinitePlace.nrRealPlaces_eq_one_of_finrank_eq_one (Module.finrank_self ℚ),
+    InfinitePlace.nrComplexPlaces_eq_zero_of_finrank_eq_one (Module.finrank_self ℚ),
+    dedekindZeta, hcoeff]
+
 /-- Paper: Theorem 7.1.4.2(1), p. 326. Analytic input for the product refutation.
 The trivial completed Hecke function over a degree-one number field has
 infinitely many distinct positive-order zeros. This is the remaining analytic
@@ -463,7 +488,19 @@ private theorem spectralAnnihilator_product_false_degree_one_zeros
     (hEq : ∀ s : Complex.re ⁻¹' Set.Ioi (1 : ℝ),
       L s = completedHeckeL (1 : PontryaginDual (IdeleClassGroup (𝓞 F) F)) s) :
     Infinite {ρ : ℂ // 0 < meromorphicOrderAt L ρ} := by
-  sorry
+  have hRat := continuedCompletedHeckeL_spec (F := ℚ) 1
+  have he : L = continuedCompletedHeckeL (F := ℚ) 1 := by
+    apply eq_of_agree_rightHalf hL hRat.1 1
+    intro z hz
+    let s : halfPlane := ⟨z, hz⟩
+    exact (hEq s).trans ((spectralAnnihilator_product_false_degree_one_eq_rat F hF s).trans
+      (hRat.2 s).symm)
+  subst L
+  refine (Equiv.subtypeEquivRight (fun z ↦ ?_)).infinite_iff.mp
+    introTrace_rat_positive_divisor_infinite
+  rw [MeromorphicOn.divisor_apply hRat.1.meromorphicOn (mem_univ z), ← WithTop.coe_lt_coe,
+    WithTop.coe_zero, WithTop.coe_untop₀_of_ne_top
+      (spectralAnnihilator_product_false_order_ne_top ℚ 1 _ hRat.1 hRat.2 z)]
 
 /-- The degree-one zero infinitude and the dimension obstruction contradict
 an instance of the printed product assertion in the same universe. -/
