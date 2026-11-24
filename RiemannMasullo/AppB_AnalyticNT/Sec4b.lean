@@ -11524,6 +11524,569 @@ theorem idelicExplicitFormula_infiniteMatching_realLocal (w : InfinitePlace F) (
       -infiniteConnesWeilPrincipalValue w testI := by
   sorry
 
+/-- The idele classes are second countable as an open quotient of the ideles. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexCharacterSum_secondCountable
+    (F : Type*) [Field F] [NumberField F] : SecondCountableTopology C[F] := by
+  let : SecondCountableTopology (AdeleRing (𝓞 F) F) := adeleGroupSecondCountable F
+  let : SecondCountableTopology (AdeleRing (𝓞 F) F)ᵐᵒᵖ :=
+    MulOpposite.opHomeomorph.symm.isEmbedding.secondCountableTopology
+  let : SecondCountableTopology (IdeleGroup (𝓞 F) F) :=
+    Units.isEmbedding_embedProduct.secondCountableTopology
+  exact Topology.IsOpenQuotientMap.secondCountableTopology (ideleGroup_quotient.{_, 0} F).2.2.2.2.1
+
+/-- Restriction embeds the chart characters in the countable dual of the compact metrizable
+group of norm-one idele classes. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexCharacterSum_countable
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F)) : Countable chartChars(τ) := by
+  let J := (ideleClassNorm F).ker
+  let := idelicExplicitFormula_infiniteMatching_complexCharacterSum_secondCountable F
+  let : SecondCountableTopology J := TopologicalSpace.Subtype.secondCountableTopology _
+  let : CompactSpace J := (ideleClassGroup_finiteness F).2.1
+  let : SecondCountableTopology Circle :=
+    inferInstanceAs (SecondCountableTopology (Metric.sphere (0 : ℂ) 1))
+  let : SecondCountableTopology (PontryaginDual J) :=
+    (ContinuousMonoidHom.isEmbedding_toContinuousMap J Circle).secondCountableTopology
+  let : Countable (PontryaginDual J) := countable_of_Lindelof_of_discrete
+  let res (χ : chartChars(τ)) : PontryaginDual J :=
+    PontryaginDual.map ⟨J.subtype, continuous_subtype_val⟩ χ.val
+  apply Function.Injective.countable (f := res)
+  exact fun χ ψ he ↦
+    explicitFormula_chartChar_ext τ hτ χ ψ (fun u ↦ DFunLike.congr_fun he u)
+
+/-- The norm and the inverse character of a complex local unit in log-polar coordinates. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexCharacterSum_polar
+    (w : InfinitePlace F) (hw : w.IsComplex) (y φ : ℝ) :
+    let e := Units.map (InfinitePlace.Completion.ringEquivComplexOfIsComplex hw).symm.toMonoidHom
+    let z : ℂ := y / 2 + φ * Complex.I
+    let c := infiniteClassMap(w) (e (Units.mk0 (Complex.exp z) (Complex.exp_ne_zero z)))
+    Real.log ((ideleClassNorm F c : ℝ≥0) : ℝ) = y ∧ ∀ χ : U[F],
+      let p := (complexHeckeCharacter_parameters χ w hw).exists.choose
+      (χ c : ℂ)⁻¹ = Complex.exp (-p.1 * y) * Complex.exp (φ * Complex.I) ^ (-p.2) := by
+  intro e z
+  let u := Units.mk0 (Complex.exp z) (Complex.exp_ne_zero z)
+  let c := infiniteClassMap(w) (e u)
+  have hz : ‖(u : ℂ)‖ = Real.exp (y / 2) := by
+    change ‖Complex.exp _‖ = _
+    simp [Complex.norm_exp, z, Complex.div_ofNat_re]
+  have hr : ‖(u : ℂ)‖ ^ 2 = Real.exp y := by
+    rw [hz, sq, ← Real.exp_add]
+    congr 1
+    ring
+  have harg : (u : ℂ) / (‖(u : ℂ)‖ : ℂ) = Complex.exp (φ * Complex.I) := by
+    rw [hz, div_eq_iff (Complex.ofReal_ne_zero.mpr (Real.exp_pos _).ne')]
+    change Complex.exp (_ + _) = _
+    rw [Complex.exp_add, mul_comm, Complex.ofReal_exp, Complex.ofReal_div, Complex.ofReal_ofNat]
+  have hn : Real.log ((ideleClassNorm F c : ℝ≥0) : ℝ) = y := by
+    rw [show ((ideleClassNorm F c : ℝ≥0) : ℝ) = ‖(u : ℂ)‖ ^ 2 by
+      rw [ideleClassNorm_ofCompletion, hw.mult_eq_two]
+      change ‖((e u : w.Completionˣ) : w.Completion)‖ ^ 2 = _
+      congr 1
+      let j := InfinitePlace.Completion.isometryEquivComplexOfIsComplex hw
+      change ‖j.symm (u : ℂ)‖ = ‖(u : ℂ)‖
+      rw [← dist_zero_right, ← dist_zero_right (u : ℂ), ← j.symm.dist_eq _ 0,
+        show j.symm 0 = 0 from map_zero (InfinitePlace.Completion.ringEquivComplexOfIsComplex hw).symm],
+      hr, Real.log_exp]
+  refine ⟨hn, fun χ ↦ ?_⟩
+  let p := (complexHeckeCharacter_parameters χ w hw).exists.choose
+  have hp := (complexHeckeCharacter_parameters χ w hw).exists.choose_spec.2 u
+  change (χ c : ℂ) * _ ^ (0 : ℂ) = _ at hp
+  rw [Complex.cpow_zero, mul_one, hr, harg, explicitFormula_exp_cpow] at hp
+  rw [hp, mul_inv, ← Complex.exp_neg, ← zpow_neg]
+  simp only [neg_mul]
+
+/-- The Fourier coefficients on all translates of the compact norm-one group have one
+summable majorant. In the inverse Fourier integral for the full idele class group, a
+coefficient selects a single fiber of restriction to the norm-one group. Translation only
+changes the phase there. Summing these fibers gives Fourier inversion on the translate. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexCharacterSum_translatedFourier
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F)) (f : 𝒟(C[F])) :
+    (∃ B : chartChars(τ) → ℝ, Summable B ∧ ∀ χ (g : C[F]),
+      ‖∫ u, f.val (g * (u : C[F])) * (χ.val (u : C[F]) : ℂ) ∂normOneIdeleClassTamagawaMeasure F‖
+        ≤ B χ) ∧ ∀ g : C[F], HasSum (fun χ : chartChars(τ) ↦ (classVolume : ℂ)⁻¹ *
+          ∫ u, f.val (g * (u : C[F])) * (χ.val (u : C[F]) : ℂ) ∂normOneIdeleClassTamagawaMeasure F)
+          (f.val g) := by
+  let := idelicExplicitFormula_infiniteMatching_complexCharacterSum_countable τ hτ
+  let J := (ideleClassNorm F).ker
+  let η := normOneIdeleClassTamagawaMeasure F
+  let : BorelSpace C[F] := ⟨rfl⟩
+  let mJ : MeasurableSpace J := Subtype.instMeasurableSpace
+  have : BorelSpace J := Subtype.borelSpace _
+  let : η.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let : IsFiniteMeasure η := ⟨by rw [normOneIdeleClassTamagawaMeasure_volume]; exact ENNReal.ofReal_lt_top⟩
+  let := idelicExplicitFormula_infiniteMatching_complexCharacterSum_secondCountable F
+  let : SecondCountableTopology Circle := inferInstanceAs (SecondCountableTopology (Metric.sphere (0 : ℂ) 1))
+  let : SecondCountableTopology U[F] :=
+    (ContinuousMonoidHom.isEmbedding_toContinuousMap C[F] Circle).secondCountableTopology
+  let μ : Measure C[F] := Measure.haar
+  let : MeasurableSpace U[F] := borel _
+  let : BorelSpace U[F] := ⟨rfl⟩
+  obtain ⟨ν, hν, -⟩ := lcaPlancherelMeasure_existsUnique μ
+  let : ν.IsHaarMeasure := hν.1
+  let : ν.Regular := hν.2.1
+  let fS : SchwartzBruhat C[F] := ⟨_, explicitTest_mem_schwartz f⟩
+  let W := lcaFourier μ fS
+  have hinv (x : C[F]) := schwartzBruhat_inverse_integral μ ν hν fS x
+  have hW : Integrable W ν := by simpa [W] using (hinv 1).1
+  let res : U[F] → PontryaginDual J := PontryaginDual.map ⟨J.subtype, continuous_subtype_val⟩
+  let S := fun (χ : chartChars(τ)) ↦ {ψ : U[F] | res ψ = (res χ.val)⁻¹}
+  have hS (χ) : MeasurableSet (S χ) :=
+    (isClosed_eq (PontryaginDual.map ⟨J.subtype, continuous_subtype_val⟩).continuous continuous_const).measurableSet
+  have hdis : Pairwise (Disjoint on S) := by
+    intro χ χ' h
+    refine Set.disjoint_left.mpr fun _ h₁ h₂ ↦ h (explicitFormula_chartChar_ext τ hτ χ χ' ?_)
+    exact fun u ↦ DFunLike.congr_fun (inv_injective (h₁.symm.trans h₂)) u
+  let ev : U[F] × C[F] → Circle := fun x ↦ x.1 x.2
+  have hev : Continuous ev := (continuous_eval (F := C(C[F], Circle))).comp
+    (((ContinuousMonoidHom.isInducing_toContinuousMap C[F] Circle).continuous.comp
+      continuous_fst).prodMk continuous_snd)
+  have hEq (χ : chartChars(τ)) (g : C[F]) : (∫ u, f.val (g * (u : C[F])) * (χ.val (u : C[F]) : ℂ) ∂η) =
+      (η.real univ : ℂ) * ∫ ψ in S χ, W ψ * (ψ g : ℂ) ∂ν := by
+    let H := fun (u : J) (ψ : U[F]) ↦ W ψ * (ψ (g * (u : C[F])) : ℂ) * (χ.val (u : C[F]) : ℂ)
+    have hH : Integrable (uncurry H) (η.prod ν) := by
+      have hc : Continuous (fun z : J × U[F] ↦ (z.2 (g * (z.1 : C[F])) : ℂ)) :=
+        continuous_subtype_val.comp (hev.comp (continuous_snd.prodMk
+          (continuous_const.mul (continuous_subtype_val.comp continuous_fst))))
+      have hc' : Continuous (fun z : J × U[F] ↦ (χ.val (z.1 : C[F]) : ℂ)) :=
+        continuous_subtype_val.comp (χ.val.continuous.comp (continuous_subtype_val.comp continuous_fst))
+      apply (hW.norm.comp_snd η).mono' ((hW.1.comp_snd.mul hc.aestronglyMeasurable).mul hc'.aestronglyMeasurable)
+      exact .of_forall fun z ↦ by simp
+    have hinner (ψ : U[F]) : (∫ u, H u ψ ∂η) =
+        (S χ).indicator (fun ψ : U[F] ↦ (η.real univ : ℂ) * (W ψ * (ψ g : ℂ))) ψ := by
+      let δ := res ψ * res χ.val
+      have hfun (u : J) : H u ψ = (W ψ * (ψ g : ℂ)) * (δ u : ℂ) := by
+        simp only [H, map_mul, Circle.coe_mul]
+        change _ = (W ψ * (ψ g : ℂ)) * ((ψ (u : C[F]) * χ.val (u : C[F]) : Circle) : ℂ)
+        rw [Circle.coe_mul]
+        ring
+      simp_rw [hfun, integral_const_mul]
+      by_cases hs : ψ ∈ S χ
+      · have he : δ = 1 := by
+          change res ψ * res χ.val = 1
+          rw [show res ψ = _ from hs, inv_mul_cancel]
+        rw [indicator_of_mem hs, he]
+        simp [mul_comm]
+      · have hn : δ ≠ 1 := fun h ↦ hs (eq_inv_of_mul_eq_one_left h)
+        obtain ⟨u, hu⟩ : ∃ u : J, δ u ≠ 1 := by
+          by_contra! h
+          exact hn (DFunLike.ext _ _ h)
+        rw [indicator_of_notMem hs, explicitFormula_integral_character_eq_zero η δ hu, mul_zero]
+    calc
+      _ = ∫ u, ∫ ψ, H u ψ ∂ν ∂η := by
+        refine integral_congr_ae (.of_forall fun u ↦ ?_)
+        change f.val (g * (u : C[F])) * _ = _
+        rw [show f.val (g * (u : C[F])) = _ from (hinv _).2, ← integral_mul_const]
+      _ = ∫ ψ, ∫ u, H u ψ ∂η ∂ν := integral_integral_swap hH
+      _ = _ := by simp_rw [hinner]; rw [integral_indicator (hS _), integral_const_mul]
+  constructor
+  · refine ⟨fun χ ↦ η.real univ * ∫ ψ in S χ, ‖W ψ‖ ∂ν,
+      (hasSum_integral_iUnion hS hdis hW.norm.integrableOn).summable.mul_left _, fun χ g ↦ ?_⟩
+    rw [hEq, norm_mul, Complex.norm_real, Real.norm_of_nonneg measureReal_nonneg]
+    apply mul_le_mul_of_nonneg_left _ measureReal_nonneg
+    apply (norm_integral_le_integral_norm _).trans_eq
+    simp only [norm_mul, Circle.norm_coe, mul_one]
+  · intro g
+    have hcover : ⋃ χ, S χ = univ := by
+      apply eq_univ_of_forall
+      intro ψ
+      obtain ⟨χ, he⟩ := explicitFormula_exists_chartChar τ hτ ψ⁻¹
+      refine mem_iUnion.mpr ⟨χ, ?_⟩
+      apply DFunLike.ext
+      intro u
+      change ψ (u : C[F]) = (χ.val (u : C[F]))⁻¹
+      rw [he]
+      exact (inv_inv _).symm
+    have hsum := hasSum_integral_iUnion hS hdis (hinv g).1.integrableOn
+    rw [hcover, setIntegral_univ, ← (hinv g).2] at hsum
+    refine hsum.congr_fun fun χ ↦ ?_
+    have hv : (η.real univ : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr <|
+      ENNReal.toReal_ne_zero.mpr ⟨Measure.measure_univ_ne_zero.mpr (NeZero.ne η), measure_ne_top _ _⟩
+    rw [hEq]
+    exact inv_mul_cancel_left₀ hv _
+
+/-- Translating the norm-one Fourier integral to the shell through `g` introduces the
+inverse character at `g`. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexCharacterSum_translate
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F)) (f : 𝒟(C[F]))
+    (Φ : chartChars(τ) → 𝓢(ℝ, ℂ))
+    (hM : ∀ χ s, (∫ g, classMellinIntegrand(f, ideleClassNormTwist χ.val s, -1 / 2) g
+      ∂classMeasure) / (classVolume : ℂ) = logMellin (Φ χ) (s - 1 / 2))
+    (χ : chartChars(τ)) (g : C[F]) (y : ℝ) (hy : Real.log ((ideleClassNorm F g : ℝ≥0) : ℝ) = y) :
+    (classVolume : ℂ)⁻¹ * (∫ u, f.val (g * (u : C[F])) * (χ.val (u : C[F]) : ℂ)
+      ∂normOneIdeleClassTamagawaMeasure F) = Φ χ y * (χ.val g : ℂ)⁻¹ := by
+  let J := (ideleClassNorm F).ker
+  let η := normOneIdeleClassTamagawaMeasure F
+  let : BorelSpace C[F] := ⟨rfl⟩
+  let mJ : MeasurableSpace J := Subtype.instMeasurableSpace
+  have : BorelSpace J := Subtype.borelSpace _
+  let : η.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let r := radialFlow(τ, y)
+  have hn : ideleClassNorm F r = ideleClassNorm F g := by
+    rw [show ideleClassNorm F r = _ from hτ _, ContinuousMulEquiv.symm_apply_eq]
+    exact congrArg Multiplicative.ofAdd (hy.symm.trans (positiveRealLogEquiv_apply _).symm)
+  let k : J := ⟨r⁻¹ * g, by rw [MonoidHom.mem_ker, map_mul, map_inv, hn, inv_mul_cancel]⟩
+  let h := fun u : J ↦ f.val (r * (u : C[F])) * (χ.val (u : C[F]) : ℂ)
+  have hk : χ.val (k : C[F]) = χ.val g := by
+    change χ.val (r⁻¹ * g) = _
+    rw [map_mul, map_inv, show χ.val r = 1 from χ.property _, inv_one, one_mul]
+  rw [explicitFormula_profile_eq τ hτ f Φ hM, mul_assoc, ← integral_mul_const]
+  congr 1
+  calc
+    _ = ∫ u : J, h (k * u) * (χ.val g : ℂ)⁻¹ ∂η := by
+      refine integral_congr_ae (.of_forall fun u ↦ ?_)
+      change f.val _ * _ = f.val (r * ((k : C[F]) * (u : C[F]))) *
+        (χ.val ((k : C[F]) * (u : C[F])) : ℂ) * _
+      rw [show r * ((k : C[F]) * (u : C[F])) = g * (u : C[F]) by
+        change r * (r⁻¹ * g * (u : C[F])) = _
+        group, map_mul, hk, Circle.coe_mul]
+      field_simp
+    _ = _ := integral_mul_left_eq_self (μ := η) (fun u ↦ h u * (χ.val g : ℂ)⁻¹) k
+
+/-- A summable bound on the derivatives of norm-one coefficients translated along a flow. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexCharacterSum_flow
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F)) (f : 𝒟(C[F]))
+    (b : Multiplicative ℝ →ₜ* C[F]) :
+    let Q := fun (χ : chartChars(τ)) (y : ℝ) ↦ (classVolume : ℂ)⁻¹ *
+      ∫ u, f.val (b (Multiplicative.ofAdd y) * (u : C[F])) * (χ.val (u : C[F]) : ℂ)
+        ∂normOneIdeleClassTamagawaMeasure F
+    ∃ B : chartChars(τ) → ℝ, Summable B ∧ ∀ χ y,
+      HasDerivAt (Q χ) (deriv (Q χ) y) y ∧ ‖deriv (Q χ) y‖ ≤ B χ := by
+  intro Q
+  let df : 𝒟(C[F]) := ⟨_, explicitFormula_flowDeriv_mem b f⟩
+  obtain ⟨M, hM, h⟩ := (idelicExplicitFormula_infiniteMatching_complexCharacterSum_translatedFourier τ hτ df).1
+  refine ⟨_, hM.mul_left ‖(classVolume : ℂ)⁻¹‖, fun χ y ↦ ?_⟩
+  have hd := (explicitFormula_radial_hasDerivAt b χ.val f y).const_mul (classVolume : ℂ)⁻¹
+  refine ⟨hd.differentiableAt.hasDerivAt, ?_⟩
+  rw [show deriv (Q χ) y = _ from hd.deriv, norm_mul]
+  exact mul_le_mul_of_nonneg_left (h χ _) (norm_nonneg _)
+
+/-- Fourier inversion on the complex circle of log norm `y`, in angular coordinates. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexCharacterSum_shell
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F)) (f : 𝒟(C[F]))
+    (w : InfinitePlace F) (hw : w.IsComplex) (Φ : chartChars(τ) → 𝓢(ℝ, ℂ))
+    (hM : ∀ χ s, (∫ g, classMellinIntegrand(f, ideleClassNormTwist χ.val s, -1 / 2) g
+      ∂classMeasure) / (classVolume : ℂ) = logMellin (Φ χ) (s - 1 / 2)) (y φ : ℝ) :
+    let e := Units.map (InfinitePlace.Completion.ringEquivComplexOfIsComplex hw).symm.toMonoidHom
+    let z : ℂ := y / 2 + φ * Complex.I
+    HasSum (fun χ : chartChars(τ) ↦
+      let p := (complexHeckeCharacter_parameters χ.val w hw).exists.choose
+      (Φ χ y * Complex.exp (-p.1 * y)) * Complex.exp (φ * Complex.I) ^ (-p.2))
+      (f.val (infiniteClassMap(w) (e (Units.mk0 (Complex.exp z) (Complex.exp_ne_zero z))))) := by
+  intro e z
+  let c := infiniteClassMap(w) (e (Units.mk0 (Complex.exp z) (Complex.exp_ne_zero z)))
+  obtain ⟨hn, hχ⟩ := idelicExplicitFormula_infiniteMatching_complexCharacterSum_polar w hw y φ
+  have H := (idelicExplicitFormula_infiniteMatching_complexCharacterSum_translatedFourier τ hτ f).2 c
+  refine H.congr_fun fun χ ↦ ?_
+  rw [idelicExplicitFormula_infiniteMatching_complexCharacterSum_translate τ hτ f Φ hM χ c y hn,
+    hχ χ.val, mul_assoc]
+
+/-- The Fourier moments of the complex-place angular denominator, by Cauchy's formula
+at `r` applied to `z^k / (1 - r*z)`, and conjugation for negative indices. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexCharacterSum_moment
+    (r : ℝ) (hr : 0 < r) (hr₁ : r < 1) (n : ℤ) :
+    (2 * Real.pi : ℂ)⁻¹ * (∫ φ in (0 : ℝ)..2 * Real.pi,
+      Complex.exp (φ * Complex.I) ^ n / (‖1 - (r : ℂ) * Complex.exp (φ * Complex.I)‖ ^ 2 : ℝ)) =
+        (r : ℂ) ^ n.natAbs / (1 - (r : ℂ) ^ 2) := by
+  let E := fun φ : ℝ ↦ Complex.exp (φ * Complex.I)
+  have hE (φ) : ‖E φ‖ = 1 := Complex.norm_exp_ofReal_mul_I _
+  have hden (z : ℂ) (hz : ‖z‖ ≤ 1) : 1 - (r : ℂ) * z ≠ 0 := by
+    apply sub_ne_zero.mpr
+    intro h
+    have H := congrArg norm h
+    rw [norm_one, norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hr] at H
+    nlinarith
+  let D := fun φ : ℝ ↦ (‖1 - (r : ℂ) * E φ‖ ^ 2 : ℝ)
+  have hd (φ) : D φ ≠ 0 := pow_ne_zero 2 (norm_ne_zero_iff.mpr (hden _ (hE φ).le))
+  have hd' (φ) : (D φ : ℂ) * E φ = (1 - (r : ℂ) * E φ) * (E φ - r) := by
+    dsimp only [D]
+    rw [← Complex.normSq_eq_norm_sq, Complex.normSq_eq_conj_mul_self]
+    simp only [map_sub, map_one, map_mul, Complex.conj_ofReal, ← Complex.inv_eq_conj (hE φ)]
+    field_simp [show E φ ≠ 0 from Complex.exp_ne_zero _]
+  have hpos (k : ℕ) : (2 * Real.pi : ℂ)⁻¹ * (∫ φ in (0 : ℝ)..2 * Real.pi,
+      E φ ^ k / (D φ : ℂ)) = (r : ℂ) ^ k / (1 - (r : ℂ) ^ 2) := by
+    have hf : DifferentiableOn ℂ (fun z : ℂ ↦ z ^ k / (1 - (r : ℂ) * z))
+        (Metric.closedBall 0 1) := by
+      refine (differentiableOn_id.pow _).div (by fun_prop) fun z hz ↦ hden z ?_
+      simpa using hz
+    have hmem : (r : ℂ) ∈ Metric.ball (0 : ℂ) 1 := by simpa [Real.norm_eq_abs, abs_of_pos hr] using hr₁
+    have H := hf.circleIntegral_sub_inv_smul hmem
+    rw [circleIntegral] at H
+    simp only [deriv_circleMap, circleMap, Complex.ofReal_one, one_mul, zero_add, smul_eq_mul] at H
+    have ht (φ : ℝ) : E φ * Complex.I * ((E φ - r)⁻¹ * (E φ ^ k / (1 - (r : ℂ) * E φ))) =
+        Complex.I * (E φ ^ k / (D φ : ℂ)) := by
+      calc
+        _ = Complex.I * E φ ^ k * (E φ / ((1 - (r : ℂ) * E φ) * (E φ - r))) := by
+          simp only [div_eq_mul_inv, mul_inv]
+          ring
+        _ = _ := by
+          rw [← hd']
+          field_simp [Complex.ofReal_ne_zero.mpr (hd φ), show E φ ≠ 0 from Complex.exp_ne_zero _]
+    change (∫ φ in (0 : ℝ)..2 * Real.pi, E φ * Complex.I *
+      ((E φ - r)⁻¹ * (E φ ^ k / (1 - (r : ℂ) * E φ)))) = _ at H
+    simp_rw [ht] at H
+    rw [intervalIntegral.integral_const_mul] at H
+    rw [← sq] at H
+    field_simp [Real.pi_ne_zero, Complex.I_ne_zero] at H ⊢
+    linear_combination H
+  rcases n with k | k
+  · simpa [E, D] using hpos k
+  · have hc : Continuous (fun φ ↦ E φ ^ (k + 1) / (D φ : ℂ)) := by
+      apply Continuous.div (by dsimp [E]; fun_prop) (by dsimp [D, E]; fun_prop)
+      exact fun φ ↦ Complex.ofReal_ne_zero.mpr (hd φ)
+    have H := congrArg (starRingEnd ℂ) (hpos (k + 1))
+    have hconj := Complex.conjCLE.toContinuousLinearMap.intervalIntegral_comp_comm
+      (hc.intervalIntegrable (μ := volume) 0 (2 * Real.pi))
+    change (∫ φ in (0 : ℝ)..2 * Real.pi, (starRingEnd ℂ) (E φ ^ (k + 1) / (D φ : ℂ))) =
+      (starRingEnd ℂ) _ at hconj
+    rw [map_mul, ← hconj] at H
+    simp only [map_inv₀, map_mul, map_ofNat, Complex.conj_ofReal, map_div₀, map_pow, map_sub,
+      map_one, ← Complex.inv_eq_conj (hE _), inv_pow] at H
+    exact H
+
+/-- Integrating an absolutely convergent angular Fourier series against the local kernel
+multiplies its `n`-th coefficient by `r^|n| / (1-r²)`. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexCharacterSum_average
+    {ι : Type*} [Countable ι] (a : ι → ℂ) (n : ι → ℤ) (g : ℝ → ℂ) (r : ℝ) (hr : 0 < r) (hr₁ : r < 1)
+    (hs : ∀ φ : ℝ, HasSum (fun i ↦ a i * Complex.exp (φ * Complex.I) ^ n i) (g φ)) :
+    HasSum (fun i ↦ a i * ((r : ℂ) ^ (n i).natAbs / (1 - (r : ℂ) ^ 2)))
+      ((2 * Real.pi : ℂ)⁻¹ * ∫ φ in (0 : ℝ)..2 * Real.pi,
+        g φ / (‖1 - (r : ℂ) * Complex.exp (φ * Complex.I)‖ ^ 2 : ℝ)) := by
+  let E := fun φ : ℝ ↦ Complex.exp (φ * Complex.I)
+  let D := fun φ : ℝ ↦ ‖1 - (r : ℂ) * E φ‖ ^ 2
+  have ha : Summable a := by simpa using (hs 0).summable
+  have hnorm (φ) : ‖(r : ℂ) * E φ‖ = r := by
+    simp [E, abs_of_pos hr]
+  have hD (φ) : (1 - r) ^ 2 ≤ D φ := by
+    apply pow_le_pow_left₀ (by linarith)
+    simpa only [norm_one, hnorm] using norm_sub_norm_le (1 : ℂ) ((r : ℂ) * E φ)
+  have hd (φ) : 0 < D φ := (sq_pos_of_pos (sub_pos.mpr hr₁)).trans_le (hD φ)
+  let v := fun (i : ι) φ ↦ a i * E φ ^ n i / (D φ : ℂ)
+  have hcs : Summable (fun i : ι ↦ ‖a i‖ / (1 - r) ^ 2) :=
+    ha.norm.div_const _
+  have H := intervalIntegral.hasSum_integral_of_dominated_convergence
+    (a := (0 : ℝ)) (b := 2 * Real.pi) (μ := volume) (F := v)
+    (fun i _ ↦ ‖a i‖ / (1 - r) ^ 2)
+    (fun i ↦ ((continuous_const.mul ((by dsimp [E]; fun_prop : Continuous E).zpow₀ _
+          (fun _ ↦ Or.inl (Complex.exp_ne_zero _)))).div
+        (by dsimp [D, E]; fun_prop) (fun φ ↦ Complex.ofReal_ne_zero.mpr (hd φ).ne')).aestronglyMeasurable)
+    (fun i ↦ .of_forall fun φ _ ↦ by
+      dsimp only [v]
+      rw [norm_div, norm_mul, norm_zpow, Complex.norm_exp_ofReal_mul_I, one_zpow, mul_one,
+        Complex.norm_real, Real.norm_eq_abs, abs_of_pos (hd φ)]
+      exact div_le_div_of_nonneg_left (norm_nonneg _) (sq_pos_of_pos (sub_pos.mpr hr₁)) (hD φ))
+    (.of_forall fun _ _ ↦ hcs) (intervalIntegrable_const)
+    (.of_forall fun φ _ ↦ (hs φ).div_const (D φ : ℂ))
+  refine (H.mul_left (2 * Real.pi : ℂ)⁻¹).congr_fun fun i ↦ ?_
+  rw [← idelicExplicitFormula_infiniteMatching_complexCharacterSum_moment r hr hr₁ (n i)]
+  dsimp only [v, E, D]
+  rw [show (fun φ : ℝ ↦ a i * Complex.exp (φ * Complex.I) ^ n i /
+      ((‖1 - (r : ℂ) * Complex.exp (φ * Complex.I)‖ ^ 2 : ℝ) : ℂ)) =
+      (fun φ : ℝ ↦ a i * (Complex.exp (φ * Complex.I) ^ n i /
+      ((‖1 - (r : ℂ) * Complex.exp (φ * Complex.I)‖ ^ 2 : ℝ) : ℂ))) from
+        funext fun _ ↦ mul_div_assoc .., intervalIntegral.integral_const_mul]
+  ring
+
+/-- The exponential multipliers in the digamma kernel are the radial character and the
+Poisson multiplier for its angular frequency. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexCharacterSum_multiplier
+    (a : ℂ) (k : ℕ) (t : ℝ) :
+    Complex.exp (-(1 / 2 + a + (k : ℂ) / 2) * (t : ℂ)) =
+      Complex.exp (-a * t) * (Real.exp (-(t / 2)) : ℂ) ^ k * (Real.exp (-(t / 2)) : ℂ) := by
+  rw [Complex.ofReal_exp, ← Complex.exp_nat_mul, ← Complex.exp_add, ← Complex.exp_add]
+  push_cast
+  congr 1
+  ring
+
+/-- Along the radial flow, the phase-corrected profiles have summably bounded slopes.
+Differentiation along rotations bounds the angular frequency times the value at zero. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexCharacterSum_profiles
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F)) (f : 𝒟(C[F]))
+    (w : InfinitePlace F) (hw : w.IsComplex) (Φ : chartChars(τ) → 𝓢(ℝ, ℂ))
+    (hM : ∀ χ s, (∫ g, classMellinIntegrand(f, ideleClassNormTwist χ.val s, -1 / 2) g
+      ∂classMeasure) / (classVolume : ℂ) = logMellin (Φ χ) (s - 1 / 2)) :
+    let p := fun (χ : chartChars(τ)) ↦ (complexHeckeCharacter_parameters χ.val w hw).exists.choose
+    let Q := fun χ (y : ℝ) ↦ Φ χ y * Complex.exp (-(p χ).1 * y)
+    ∃ B N : chartChars(τ) → ℝ, Summable B ∧ Summable N ∧ ∀ χ,
+      0 ≤ B χ ∧ (∀ y, ‖Q χ y - Φ χ 0‖ ≤ B χ * |y|) ∧
+        (p χ).2.natAbs * ‖Φ χ 0‖ ≤ N χ := by
+  intro p Q
+  let e := Units.map (InfinitePlace.Completion.ringEquivComplexOfIsComplex hw).symm.toMonoidHom
+  let j : ℂˣ →ₜ* w.Completionˣ := ⟨e,
+    (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hw).symm.continuous.units_map _⟩
+  let i : w.Completionˣ →ₜ* C[F] := ⟨infiniteClassMap(w), continuous_ideleClass_ofCompletion F w⟩
+  let b (d : ℂ) : Multiplicative ℝ →ₜ* ℂˣ :=
+    { toFun := fun x ↦ Units.mk0 (Complex.exp ((x.toAdd : ℂ) * d)) (Complex.exp_ne_zero _)
+      map_one' := Units.ext (by simp)
+      map_mul' := fun x y ↦ Units.ext (by simp [add_mul, Complex.exp_add])
+      continuous_toFun := Units.isEmbedding_val₀.continuous_iff.mpr
+        ((Complex.continuous_exp.comp ((Complex.continuous_ofReal.comp continuous_toAdd).mul continuous_const))) }
+  let path (d : ℂ) := i.comp (j.comp (b d))
+  let V := fun d (χ : chartChars(τ)) (y : ℝ) ↦ (classVolume : ℂ)⁻¹ *
+    ∫ u, f.val (path d (Multiplicative.ofAdd y) * (u : C[F])) * (χ.val (u : C[F]) : ℂ)
+      ∂normOneIdeleClassTamagawaMeasure F
+  let avg (χ : chartChars(τ)) (z : ℂ) := (classVolume : ℂ)⁻¹ * ∫ u,
+    f.val (infiniteClassMap(w) (e (Units.mk0 (Complex.exp z) (Complex.exp_ne_zero z))) * (u : C[F])) *
+      (χ.val (u : C[F]) : ℂ) ∂normOneIdeleClassTamagawaMeasure F
+  have hV (y φ : ℝ) (χ : chartChars(τ)) : avg χ (y / 2 + φ * Complex.I) =
+      Q χ y * Complex.exp (φ * Complex.I) ^ (-(p χ).2) := by
+    obtain ⟨hn, hc⟩ := idelicExplicitFormula_infiniteMatching_complexCharacterSum_polar w hw y φ
+    dsimp only [avg]
+    rw [idelicExplicitFormula_infiniteMatching_complexCharacterSum_translate τ hτ f Φ hM χ _ y hn,
+      hc χ.val, ← mul_assoc]
+  have hR (χ) : V (1 / 2) χ = Q χ := by
+    funext y
+    change avg χ ((y : ℂ) * (1 / 2)) = Q χ y
+    simpa only [Complex.ofReal_zero, zero_mul, add_zero, Complex.exp_zero, one_zpow, mul_one,
+      div_eq_mul_inv, one_mul] using hV y 0 χ
+  have hI (χ) : V Complex.I χ = fun y : ℝ ↦ Φ χ 0 *
+      Complex.exp (((( -(p χ).2 : ℤ) : ℂ) * Complex.I) * y) := by
+    funext y
+    change avg χ ((y : ℂ) * Complex.I) = _
+    have h := hV 0 y χ
+    simp only [Complex.ofReal_zero, zero_div, zero_add, Q, mul_zero, Complex.exp_zero, mul_one,
+      ← Complex.exp_int_mul] at h
+    rw [h]
+    congr 2
+    ring
+  obtain ⟨B, hB, hR'⟩ := idelicExplicitFormula_infiniteMatching_complexCharacterSum_flow τ hτ f (path (1 / 2))
+  obtain ⟨N, hN, hI'⟩ := idelicExplicitFormula_infiniteMatching_complexCharacterSum_flow τ hτ f (path Complex.I)
+  change ∀ χ y, HasDerivAt (V _ χ) _ y ∧ ‖deriv (V _ χ) y‖ ≤ B χ at hR'
+  change ∀ χ y, HasDerivAt (V _ χ) _ y ∧ ‖deriv (V _ χ) y‖ ≤ N χ at hI'
+  refine ⟨B, N, hB, hN, fun χ ↦ ⟨(norm_nonneg _).trans (hR' χ 0).2, fun y ↦ ?_, ?_⟩⟩
+  · have h := convex_univ.norm_image_sub_le_of_norm_deriv_le
+      (fun x _ ↦ (hR' χ x).1.differentiableAt) (fun x _ ↦ (hR' χ x).2)
+      (Set.mem_univ (0 : ℝ)) (Set.mem_univ y)
+    simpa only [hR, Q, Complex.ofReal_zero, mul_zero, Complex.exp_zero, mul_one,
+      sub_zero, Real.norm_eq_abs] using h
+  · let c : ℂ := ((-(p χ).2 : ℤ) : ℂ) * Complex.I
+    have hder : HasDerivAt (V Complex.I χ) (Φ χ 0 * c) 0 := by
+      rw [hI]
+      simpa only [c, id_eq, Complex.ofReal_one, Complex.ofReal_zero, mul_zero, Complex.exp_zero, mul_one, one_mul] using
+        (((hasDerivAt_id (0 : ℝ)).ofReal_comp.const_mul c).cexp.const_mul (Φ χ 0))
+    have h := (hI' χ 0).2
+    rw [hder.deriv, norm_mul] at h
+    simpa [c, norm_mul, Complex.norm_intCast, mul_comm] using h
+
+/-- An integrable envelope for the two samples of a complex digamma kernel. Subtracting
+the central value before estimating removes the singularity of `1 / (1 - exp (-t))`. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexCharacterSum_estimate
+    (t : ℝ) (ht : 0 < t) (k : ℕ) (b x y : ℂ) (B N : ℝ)
+    (hx : ‖x - b‖ ≤ B * t) (hy : ‖y - b‖ ≤ B * t) (hk : k * ‖b‖ ≤ N) :
+    let r := Real.exp (-(t / 2))
+    ‖2 * (Real.exp (-t) : ℂ) * b / t -
+      ((r : ℂ) * (r : ℂ) ^ k * (x + y)) / (1 - (Real.exp (-t) : ℂ))‖ ≤
+      (3 * ‖b‖ + N + 2 * B) * ((1 + t) * r) := by
+  intro r
+  let d := 1 - Real.exp (-t)
+  have hd : 0 < d := sub_pos.mpr (Real.exp_lt_one_iff.mpr (by linarith))
+  have hr : 0 < r := Real.exp_pos _
+  have hr₁ : r ≤ 1 := Real.exp_le_one_iff.mpr (by linarith)
+  have hr2 : Real.exp (-t) = r * r := by
+    rw [← Real.exp_add]
+    congr 1
+    ring
+  have h₁ : 1 - r ≤ t / 2 := by linarith [Real.add_one_le_exp (-(t / 2))]
+  have h₂ : 1 - r ^ k ≤ k * t / 2 := by
+    rw [show r ^ k = Real.exp ((k : ℝ) * (-(t / 2))) from (Real.exp_nat_mul _ _).symm]
+    linarith [Real.add_one_le_exp ((k : ℝ) * (-(t / 2)))]
+  have hrem := digamma_remainder_bounds ht
+  change -1 ≤ 1 / t - 1 / d ∧ 1 / t - 1 / d ≤ 0 at hrem
+  have htd : t / d ≤ 1 + t := by
+    calc
+      _ = t * (1 / d) := by ring
+      _ ≤ t * (1 / t + 1) := mul_le_mul_of_nonneg_left (by linarith [hrem.1]) ht.le
+      _ = _ := by field_simp
+  have hbase : |Real.exp (-t) / t - r / d| ≤ r * (3 / 2) := by
+    rw [hr2, show r * r / t - r / d = r * ((r - 1) / t + (1 / t - 1 / d)) by ring,
+      abs_mul, abs_of_pos hr]
+    apply mul_le_mul_of_nonneg_left _ hr.le
+    refine (abs_add_le _ _).trans ?_
+    rw [abs_div, abs_of_pos ht, abs_of_nonpos (sub_nonpos.mpr hr₁), abs_of_nonpos hrem.2]
+    have := (div_le_iff₀ ht).mpr (show -(r - 1) ≤ 1 / 2 * t by linarith)
+    linarith [hrem.1]
+  have hk₁ := pow_le_one₀ hr.le hr₁ (n := k)
+  have herr (v : ℂ) (hv : ‖v - b‖ ≤ B * t) :
+      ‖b - (r : ℂ) ^ k * v‖ ≤ (N / 2 + B) * t := by
+    rw [show b - (r : ℂ) ^ k * v = ((1 - r ^ k : ℝ) : ℂ) * b + (r : ℂ) ^ k * (b - v) by
+      push_cast; ring]
+    refine (norm_add_le _ _).trans ?_
+    rw [norm_mul, norm_mul, Complex.norm_real, Real.norm_of_nonneg (sub_nonneg.mpr hk₁),
+      norm_pow, Complex.norm_real, Real.norm_of_nonneg hr.le, norm_sub_rev b]
+    have hpow := mul_le_mul_of_nonneg_right hk₁ (norm_nonneg (v - b))
+    have hcoef := mul_le_mul_of_nonneg_right h₂ (norm_nonneg b)
+    nlinarith [mul_le_mul_of_nonneg_right hk ht.le]
+  have hxy : ‖(b - (r : ℂ) ^ k * x) + (b - (r : ℂ) ^ k * y)‖ ≤ (N + 2 * B) * t :=
+    (norm_add_le _ _).trans (by linarith [herr x hx, herr y hy])
+  have hB : 0 ≤ B := nonneg_of_mul_nonneg_left ((norm_nonneg _).trans hx) ht
+  have hN : 0 ≤ N := (mul_nonneg (Nat.cast_nonneg k) (norm_nonneg b)).trans hk
+  have hdecomp : 2 * (Real.exp (-t) : ℂ) * b / t -
+      (r : ℂ) * (r : ℂ) ^ k * (x + y) / (1 - (Real.exp (-t) : ℂ)) =
+      ((Real.exp (-t) / t - r / d : ℝ) : ℂ) * (2 * b) +
+        ((r / d : ℝ) : ℂ) * ((b - (r : ℂ) ^ k * x) + (b - (r : ℂ) ^ k * y)) := by
+    dsimp only [d]
+    push_cast
+    ring
+  rw [hdecomp]
+  refine (norm_add_le _ _).trans ?_
+  simp only [norm_mul, Complex.norm_real, Real.norm_eq_abs, Complex.norm_ofNat,
+    abs_of_nonneg (div_nonneg hr.le hd.le)]
+  calc
+    _ ≤ (r * (3 / 2)) * (2 * ‖b‖) + r / d * ((N + 2 * B) * t) := by gcongr
+    _ = 3 * ‖b‖ * r + (N + 2 * B) * r * (t / d) := by ring
+    _ ≤ 3 * ‖b‖ * r + (N + 2 * B) * r * (1 + t) := by gcongr
+    _ ≤ _ := by nlinarith [mul_nonneg (mul_nonneg (norm_nonneg b) hr.le) ht.le]
+
+/-- Absolute integrability of the complex digamma kernels, summed over the chart
+characters. Their common radial envelope is `(1+t) exp(-t/2)`. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexCharacterSum_domination (τ : ℝ≥0ˣ →ₜ* C[F])
+    (_hτ : RightInverse τ (ideleClassNorm F)) (f : 𝒟(C[F])) (w : InfinitePlace F)
+    (hw : w.IsComplex) (Φ : chartChars(τ) → 𝓢(ℝ, ℂ))
+    (_hM : ∀ χ s, (∫ g, classMellinIntegrand(f, ideleClassNormTwist χ.val s, -1 / 2) g
+      ∂classMeasure) / (classVolume : ℂ) = logMellin (Φ χ) (s - 1 / 2))
+    (h0 : Summable (fun χ ↦ ‖Φ χ 0‖)) :
+    let K := fun (χ : chartChars(τ)) t ↦
+      let p := (complexHeckeCharacter_parameters χ.val w hw).exists.choose
+      heckeArchimedeanDigammaKernel 1 (1 / 2 + p.1 + (p.2.natAbs : ℂ) / 2)
+        (1 / 2 - p.1 + (p.2.natAbs : ℂ) / 2) (Φ χ) t
+    (∀ χ, IntegrableOn (K χ) (Ioi 0)) ∧ Summable (fun χ ↦ ∫ t in Ioi (0 : ℝ), ‖K χ t‖) := by
+  intro K
+  let p := fun (χ : chartChars(τ)) ↦ (complexHeckeCharacter_parameters χ.val w hw).exists.choose
+  let Q := fun (χ : chartChars(τ)) (y : ℝ) ↦ Φ χ y * Complex.exp (-(p χ).1 * y)
+  obtain ⟨B, N, hB, hN, h⟩ := idelicExplicitFormula_infiniteMatching_complexCharacterSum_profiles
+    τ _hτ f w hw Φ _hM
+  let C := fun χ ↦ 3 * ‖Φ χ 0‖ + N χ + 2 * B χ
+  have hC : Summable C := ((h0.mul_left 3).add hN).add (hB.mul_left 2)
+  let E := fun t : ℝ ↦ (1 + t) * Real.exp (-(t / 2))
+  have hE : IntegrableOn E (Ioi 0) := by
+    have h₁ := integrableOn_exp_mul_Ioi (a := -(1/2 : ℝ)) (by norm_num) 0
+    have h₂ := integrableOn_rpow_mul_exp_neg_mul_rpow (p := 1) (s := 1) (b := 1/2)
+      (by norm_num) one_pos (by norm_num)
+    convert h₁.add h₂ using 1
+    funext t
+    simp only [E, Pi.add_apply, Real.rpow_one, add_mul, one_mul, neg_mul]
+    ring_nf
+  have hbound (χ) (t : ℝ) (ht : 0 < t) : ‖K χ t‖ ≤ C χ * E t := by
+    obtain ⟨_, hQ, hk⟩ := h χ
+    have hxy := idelicExplicitFormula_infiniteMatching_complexCharacterSum_estimate t ht
+      (p χ).2.natAbs (Φ χ 0) (Q χ t) (Q χ (-t)) (B χ) (N χ)
+      (by simpa only [abs_of_pos ht] using hQ t)
+      (by simpa only [abs_neg, abs_of_pos ht] using hQ (-t)) hk
+    convert hxy using 2
+    simp only [K, heckeArchimedeanDigammaKernel, Complex.ofReal_one, one_mul, Q,
+      idelicExplicitFormula_infiniteMatching_complexCharacterSum_multiplier,
+      show 1 / 2 - (p χ).1 = 1 / 2 + -(p χ).1 by ring, p, Complex.ofReal_neg, neg_neg,
+      neg_mul_neg]
+    ring
+  have hi (χ) : IntegrableOn (K χ) (Ioi 0) := by
+    apply (hE.const_mul (C χ)).mono' ?_
+      ((ae_restrict_iff' measurableSet_Ioi).mpr (.of_forall fun t ht ↦ hbound χ t ht))
+    apply Measurable.aestronglyMeasurable
+    dsimp only [K, heckeArchimedeanDigammaKernel]
+    fun_prop
+  refine ⟨hi, (hC.mul_right (∫ t in Ioi (0 : ℝ), E t)).of_norm_bounded fun χ ↦ ?_⟩
+  rw [Real.norm_of_nonneg (integral_nonneg fun _ ↦ norm_nonneg _), ← integral_const_mul]
+  exact integral_mono_ae (hi χ).norm (hE.const_mul _) <|
+    (ae_restrict_iff' measurableSet_Ioi).mpr (.of_forall fun t ht ↦ hbound χ t ht)
+
 /-- Paper: Theorem B.4.4.7, pp. 625–626, footnote 27 (character sum at a complex place `w`).
 Let `Φ_χ` be the radial profiles of a test `f`, as in `idelicExplicitFormula_finiteMatching`,
 and write `g(z) = f(e^z)` for the test in logarithmic coordinates on `F_w^× = ℂ^×` (so
@@ -11554,7 +12117,65 @@ theorem idelicExplicitFormula_infiniteMatching_complexCharacterSum (τ : ℝ≥0
     HasSum (fun χ : chartChars(τ) ↦ explicitArchTerm(χ.val, w, Φ χ))
       ((∫ t in Ioi (0 : ℝ), (2 * (Real.exp (-t) : ℂ) * f.val 1 / (t : ℂ) - A t)) -
         2 * (Real.log (2 * Real.pi) : ℂ) * f.val 1) := by
-  sorry
+  intro e g A
+  let := idelicExplicitFormula_infiniteMatching_complexCharacterSum_countable τ _hτ
+  let p := fun (χ : chartChars(τ)) ↦ (complexHeckeCharacter_parameters χ.val w hw).exists.choose
+  let K := fun (χ : chartChars(τ)) ↦ heckeArchimedeanDigammaKernel 1
+    (1 / 2 + (p χ).1 + ((p χ).2.natAbs : ℂ) / 2)
+    (1 / 2 - (p χ).1 + ((p χ).2.natAbs : ℂ) / 2) (Φ χ)
+  have h0 : HasSum (fun χ ↦ Φ χ 0) (f.val 1) := by
+    simpa using idelicExplicitFormula_infiniteMatching_complexCharacterSum_shell τ _hτ f w hw Φ _hM 0 0
+  have hpt (t : ℝ) (ht : 0 < t) :
+      HasSum (fun χ ↦ K χ t) (2 * (Real.exp (-t) : ℂ) * f.val 1 / (t : ℂ) - A t) := by
+    let r := Real.exp (-(t / 2))
+    have hr₁ : r < 1 := Real.exp_lt_one_iff.mpr (by linarith)
+    let n := fun (χ : chartChars(τ)) ↦ -(p χ).2
+    let a := fun (χ : chartChars(τ)) ↦ Φ χ t * Complex.exp (-(p χ).1 * t) +
+      Φ χ (-t) * Complex.exp ((p χ).1 * t)
+    let b := fun (φ : ℝ) ↦ g (t / 2 + φ * Complex.I) + g (-(t / 2) + φ * Complex.I)
+    let D := fun (φ : ℝ) ↦ (‖1 - (r : ℂ) * Complex.exp (φ * Complex.I)‖ ^ 2 : ℝ)
+    have h (φ : ℝ) := (idelicExplicitFormula_infiniteMatching_complexCharacterSum_shell
+      τ _hτ f w hw Φ _hM t φ).add (idelicExplicitFormula_infiniteMatching_complexCharacterSum_shell
+      τ _hτ f w hw Φ _hM (-t) φ)
+    have hsum (φ : ℝ) : HasSum (fun χ ↦ a χ * Complex.exp (φ * Complex.I) ^ n χ) (b φ) := by
+      simpa only [b, a, p, n, g, e, add_mul, Complex.ofReal_neg, neg_div, neg_mul_neg] using h φ
+    have hA := (idelicExplicitFormula_infiniteMatching_complexCharacterSum_average
+      a n b r (Real.exp_pos _) hr₁ hsum).mul_left (r : ℂ)
+    have hr (φ : ℝ) : Complex.exp (-(t / 2 : ℂ) + φ * Complex.I) =
+        (r : ℂ) * Complex.exp (φ * Complex.I) := by
+      simp [r, Complex.exp_add, Complex.ofReal_exp]
+    have hav : A t = (r : ℂ) * ((2 * Real.pi : ℂ)⁻¹ *
+        ∫ φ in (0 : ℝ)..2 * Real.pi, b φ / (D φ : ℂ)) := by
+      dsimp only [A]
+      simp_rw [hr, mul_div_assoc]
+      rw [intervalIntegral.integral_const_mul]
+      change _ * ((r : ℂ) * _) = (r : ℂ) * (_ * _)
+      ring
+    rw [hav]
+    have H := ((h0.mul_left (2 * (Real.exp (-t) : ℂ))).div_const (t : ℂ)).sub hA
+    refine H.congr_fun fun χ ↦ ?_
+    have hr2 : (r : ℂ) ^ 2 = (Real.exp (-t) : ℂ) := by
+      rw [← Complex.ofReal_pow, sq, ← Real.exp_add]
+      congr 2
+      ring
+    simp only [K, heckeArchimedeanDigammaKernel, Complex.ofReal_one, one_mul,
+      idelicExplicitFormula_infiniteMatching_complexCharacterSum_multiplier (p χ).1,
+      show 1 / 2 - (p χ).1 = 1 / 2 + -(p χ).1 by ring,
+      idelicExplicitFormula_infiniteMatching_complexCharacterSum_multiplier (-(p χ).1),
+      neg_neg, hr2, a, n, Int.natAbs_neg]
+    dsimp only [r]
+    ring
+  have hdom := idelicExplicitFormula_infiniteMatching_complexCharacterSum_domination
+    τ _hτ f w hw Φ _hM h0.summable.norm
+  have hKi : ∀ χ, IntegrableOn (K χ) (Ioi 0) := hdom.1
+  have hKs : Summable (fun χ ↦ ∫ t in Ioi (0 : ℝ), ‖K χ t‖) := hdom.2
+  have hI := hasSum_integral_of_summable_integral_norm hKi hKs
+  have hsum := hI.sub (h0.mul_left (2 * (Real.log (2 * Real.pi) : ℂ)))
+  convert hsum using 1
+  · funext χ
+    exact dite_eq_right (InfinitePlace.not_isReal_iff_isComplex.mpr hw)
+  · congr 1
+    exact setIntegral_congr_fun measurableSet_Ioi (fun t ht ↦ (hpt t ht).tsum_eq.symm)
 
 /-- Paper: Theorem B.4.4.7, pp. 625–626, footnote 27 (local identity at a complex place `w`).
 For a test `f` on `F_w^× = ℂ^×`, with `g(z) = f(e^z)` and the Poisson average `A` as in
