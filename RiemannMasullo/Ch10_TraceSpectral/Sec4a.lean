@@ -9,7 +9,7 @@ public import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
 public import Mathlib.Topology.Algebra.Module.Spaces.WeakBilin
 public import Mathlib.Topology.Algebra.Module.Spaces.WeakDual
 public import Mathlib.Topology.Compactness.Compact
-import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import RiemannMasullo.AppA_AlgebraicNT.Sec3
 import Mathlib.Analysis.Normed.Operator.Extend
 import Mathlib.Analysis.SpecificLimits.Basic
 import RiemannMasullo.Ch10_TraceSpectral.Sec1

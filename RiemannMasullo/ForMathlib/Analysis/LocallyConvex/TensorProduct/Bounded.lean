@@ -1,7 +1,7 @@
 module
 
 public import RiemannMasullo.AppC_LCTVS.Sec2b
-import all RiemannMasullo.AppC_LCTVS.Sec1
+import RiemannMasullo.AppC_LCTVS.Sec1
 import all RiemannMasullo.AppC_LCTVS.Sec2a_part2
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Completion
 

@@ -13,7 +13,7 @@ import Mathlib.Analysis.Normed.Group.Tannery
 import Mathlib.Analysis.Normed.Module.Connected
 import Mathlib.Analysis.Complex.LocallyUniformLimit
 import Mathlib.MeasureTheory.Integral.DominatedConvergence
-import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import RiemannMasullo.AppA_AlgebraicNT.Sec3
 
 /-!
 # Appendix B.4: statements that are false as printed

@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Separation
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.AppB_AnalyticNT.Sec4b
 import RiemannMasullo.AppD_SchwartzBruhat.Sec1c

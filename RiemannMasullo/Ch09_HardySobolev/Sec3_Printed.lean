@@ -2,7 +2,7 @@ module
 
 public import RiemannMasullo.Ch09_HardySobolev.Sec3
 import all RiemannMasullo.Ch09_HardySobolev.Sec3
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1a
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1a
 public import RiemannMasullo.Ch12_TraceGeometric.Sec1a
 public import Mathlib.Topology.Algebra.Module.Spaces.PointwiseConvergenceCLM
 import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic

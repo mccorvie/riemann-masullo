@@ -6,7 +6,7 @@ import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec4
 import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec6
 import Mathlib.Topology.Algebra.Module.Equiv.Submodule
 
-import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import RiemannMasullo.AppA_AlgebraicNT.Sec3
 
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 

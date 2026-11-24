@@ -7,10 +7,10 @@ public import Mathlib.Geometry.Manifold.ChartedSpace
 public import Mathlib.Topology.MetricSpace.Ultra.Basic
 public import Mathlib.Topology.Instances.ZMod
 import RiemannMasullo.AppC_LCTVS.Sec2b
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1a
 import Mathlib.Algebra.Category.Grp.Injective
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
-import all RiemannMasullo.AppC_LCTVS.Sec1
+import RiemannMasullo.AppC_LCTVS.Sec1
+import RiemannMasullo.ForMathlib.Topology.Algebra.Module.OpenMapping
 import Mathlib.Analysis.LocallyConvex.ContinuousOfBounded
 import RiemannMasullo.ForMathlib.MeasureTheory.Integral.Bochner.Convex
 import RiemannMasullo.ForMathlib.Analysis.Calculus.IteratedDeriv.UnitCube
@@ -456,7 +456,7 @@ variable [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
 open scoped Pointwise in
 /-- Circle-valued characters lift to real logarithms on a simply connected chart.
 These logarithms rule out nontrivial cyclic subgroups in a smaller neighborhood. -/
-private theorem exists_nhds_one_of_isLocallyEuclidean (hG : IsLocallyEuclidean G) :
+theorem exists_nhds_one_of_isLocallyEuclidean (hG : IsLocallyEuclidean G) :
     ∃ W ∈ 𝓝 (1 : G), ∀ x : G, (∀ k : ℕ, x ^ k ∈ W) → x = 1 := by
   obtain ⟨n, ⟨charts⟩⟩ := hG
   let E := EuclideanSpace ℝ (Fin n)
@@ -791,7 +791,7 @@ theorem isLocallyEuclidean_of_discrete_torus_kernel {ι : Type*} [Finite ι]
 open scoped Pointwise in
 /-- A neighborhood containing no nontrivial cyclic subgroup lets finitely many
 characters detect the identity locally. -/
-private theorem isLocallyEuclidean_of_noSmallCyclicSubgroups
+theorem isLocallyEuclidean_of_noSmallCyclicSubgroups
     {W : Set G} (hW : W ∈ 𝓝 (1 : G))
     (hPow : ∀ x : G, (∀ k : ℕ, x ^ k ∈ W) → x = 1) : IsLocallyEuclidean G := by
   classical
@@ -1000,7 +1000,7 @@ theorem isCompactlyGeneratedGroup_quotient (hG : IsCompactlyGeneratedGroup G)
 
 omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
 /-- The real, torus and discrete factors of an elementary presentation give product charts. -/
-private theorem locallyEuclidean_of_elementaryPresentation
+theorem locallyEuclidean_of_elementaryPresentation
     (e : ElementaryLCAPresentation G) : IsLocallyEuclidean G := by
   let R := Fin e.realDim → ℝ
   let T := ModelPi (fun _ : Fin e.torusDim ↦ ℝ)
@@ -2049,7 +2049,7 @@ theorem isBruhatGoodSubgroup_bot_iff :
 
 /-- Paper: Lemma D.1.4.6(4), p. 758. An open subgroup of the dual has a
 compact annihilator in the original group. -/
-private theorem isCompact_lcaDualAnnihilator (H : Subgroup (PontryaginDual G))
+theorem isCompact_lcaDualAnnihilator (H : Subgroup (PontryaginDual G))
     (hH : IsOpen (H : Set (PontryaginDual G))) :
     IsCompact (lcaDualAnnihilator H : Set G) := by
   have hCompact := isCompact_lcaAnnihilator H hH
@@ -2060,7 +2060,7 @@ private theorem isCompact_lcaDualAnnihilator (H : Subgroup (PontryaginDual G))
 
 /-- Paper: Definition D.1.5.1, p. 760. The intersection of two good
 subgroups is good. Its annihilator is the join of their annihilators. -/
-private theorem isBruhatGoodSubgroup_inf {K L : Subgroup G}
+theorem isBruhatGoodSubgroup_inf {K L : Subgroup G}
     (hK : IsBruhatGoodSubgroup K) (hL : IsBruhatGoodSubgroup L) :
     IsBruhatGoodSubgroup (K ⊓ L) := by
   have hLc := isCompact_lcaDualAnnihilator (lcaAnnihilator L) hL.2.1
@@ -2370,7 +2370,7 @@ private theorem isBruhatGoodSubgroup_real_eq_bot {k : Subgroup (Multiplicative �
   exact (not_lt_of_ge hbound) ((div_lt_iff₀ hxpos).mp hn)
 
 /-- The interval from `-1` to `1` is a compact generating neighborhood of the real line. -/
-private theorem isCompactlyGeneratedGroup_real :
+theorem isCompactlyGeneratedGroup_real :
     IsCompactlyGeneratedGroup (Multiplicative ℝ) := by
   let U : Set (Multiplicative ℝ) := Multiplicative.toAdd ⁻¹' Icc (-1 : ℝ) 1
   refine ⟨U, ?_, ?_, eq_top_iff.mpr fun x _ ↦ ?_⟩
@@ -2766,7 +2766,7 @@ variable [hTop : IsTopologicalGroup G] [hT2 : T2Space G] [hLC : LocallyCompactSp
 /-- An LCA group has a good subgroup. The annihilator of an open compactly generated
 subgroup of the dual is compact. Evaluation gives a continuous injection from the quotient
 into a group with no small subgroups, so the quotient is locally Euclidean. -/
-private theorem exists_bruhatGoodSubgroup : ∃ k : Subgroup G, IsBruhatGoodSubgroup k := by
+theorem exists_bruhatGoodSubgroup : ∃ k : Subgroup G, IsBruhatGoodSubgroup k := by
   obtain ⟨H, _⟩ := (openCompactlyGeneratedSubgroups_colimit (G := PontryaginDual G)).2.1 1
   let k := lcaDualAnnihilator H.val
   have hk := isCompact_lcaDualAnnihilator H.val H.property.1
@@ -2850,7 +2850,7 @@ private theorem elementaryPresentation_of_open_vector_map {E B : Type*}
       ((e.continuous_invFun.prodMap continuous_id).comp assoc.symm.continuous) }
 
 /-- The cover of the identity component of an elementary group as a homomorphism. -/
-private def elementaryCoverZeroHom {m n r : ℕ} {F : Type*} [AddCommGroup F] :
+def elementaryCoverZeroHom {m n r : ℕ} {F : Type*} [AddCommGroup F] :
     EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n) →+ ElementaryLieGroup m n r F where
   toFun := fun xt ↦ elementaryCover xt 0 0
   map_zero' := Prod.ext rfl (Prod.ext (funext fun _ ↦ AddCircle.coe_zero (1 : ℝ)) rfl)
@@ -2858,7 +2858,7 @@ private def elementaryCoverZeroHom {m n r : ℕ} {F : Type*} [AddCommGroup F] :
     (Prod.ext (funext fun i ↦ AddCircle.coe_add (1 : ℝ) (x.2 i) (y.2 i)) (zero_add _).symm)
 
 /-- The cover of the identity component is continuous and open in the elementary group. -/
-private theorem elementaryCoverZeroHom_continuous_isOpenMap {m n r : ℕ} {F : Type*}
+theorem elementaryCoverZeroHom_continuous_isOpenMap {m n r : ℕ} {F : Type*}
     [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] :
     let c := elementaryCoverZeroHom (m := m) (n := n) (r := r) (F := F)
     Continuous c ∧ IsOpenMap c := by
@@ -2920,7 +2920,7 @@ theorem contDiff_comp_elementaryHom {m n r m' n' r' : ℕ} {F F' : Type*}
 
 /-- Smooth descents for a good subgroup pull back to structural quotients by
 smaller good subgroups. -/
-private theorem bruhatContDiff_descend_of_le {p : ℕ} {f : G → ℂ}
+theorem bruhatContDiff_descend_of_le {p : ℕ} {f : G → ℂ}
     {k : Subgroup G} (hk : IsBruhatGoodSubgroup k)
     (hdesc : ∀ b : BruhatStructuralPair G, OrderDual.ofDual b.val.2 = k →
       ∃ f₀ : b.quotient → ℂ, (∀ x : b.val.1, f₀ (QuotientGroup.mk x) = f x.val) ∧
@@ -3076,7 +3076,7 @@ open scoped ENNReal NNReal
 
 /-- A stage function is determined by its realization because every elementary coordinate
 is represented by a point in the open subgroup. -/
-private theorem schwartzBruhatStageRealization_injective (a : BruhatStructuralPair G)
+theorem schwartzBruhatStageRealization_injective (a : BruhatStructuralPair G)
     (e : ElementaryLCAPresentation a.quotient) :
     Function.Injective (schwartzBruhatStageRealization a e) := by
   classical
@@ -3091,7 +3091,7 @@ private theorem schwartzBruhatStageRealization_injective (a : BruhatStructuralPa
     toAdd_ofAdd] using h
 
 /-- A realized stage function is constant on cosets of its kernel. -/
-private theorem stage_realization_mul_kernel (a : BruhatStructuralPair G)
+theorem stage_realization_mul_kernel (a : BruhatStructuralPair G)
     (d : ElementaryLCAPresentation a.quotient) (s : SchwartzBruhatStage d)
     {g : G} (hg : g ∈ OrderDual.ofDual a.val.2) (x : G) :
     schwartzBruhatStageRealization a d s (g * x) = schwartzBruhatStageRealization a d s x := by
@@ -3108,7 +3108,7 @@ private theorem stage_realization_mul_kernel (a : BruhatStructuralPair G)
   · rfl
 
 /-- The zero-weight stage seminorm bounds every point of the realization. -/
-private theorem norm_stage_realization_le (a : BruhatStructuralPair G)
+theorem norm_stage_realization_le (a : BruhatStructuralPair G)
     (e : ElementaryLCAPresentation a.quotient) (f : SchwartzBruhatStage e) (x : G) :
     ‖schwartzBruhatStageRealization a e f x‖ ≤ elementarySchwartzSeminorm (0, 0, 0, 0) f := by
   rw [schwartzBruhatStageRealization_apply]
@@ -3121,7 +3121,7 @@ private theorem norm_stage_realization_le (a : BruhatStructuralPair G)
 
 /-- Point evaluation on an elementary Schwartz stage is continuous by the
 zero-order, zero-weight seminorm. -/
-private theorem continuous_schwartzBruhatStage_eval
+theorem continuous_schwartzBruhatStage_eval
     (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient) (x : G) :
     Continuous (fun f : SchwartzBruhatStage e ↦ schwartzBruhatStageRealization a e f x) := by
   let L := (LinearMap.proj x).comp (schwartzBruhatStageRealization a e)
@@ -3131,7 +3131,7 @@ private theorem continuous_schwartzBruhatStage_eval
 
 include hTop hT2 hLC in
 /-- A good subgroup is compact by double annihilation. -/
-private theorem compact_bruhat_kernel (a : BruhatStructuralPair G) :
+theorem compact_bruhat_kernel (a : BruhatStructuralPair G) :
     IsCompact ((OrderDual.ofDual a.val.2 : Subgroup G) : Set G) := by
   let k := OrderDual.ofDual a.val.2
   change IsCompact (k : Set G)
@@ -3139,7 +3139,7 @@ private theorem compact_bruhat_kernel (a : BruhatStructuralPair G) :
   exact isCompact_lcaDualAnnihilator _ a.property.2.2.1.2.1
 
 /-- A compact group has no nontrivial continuous additive real coordinate. -/
-private theorem compact_hom_real_zero {K : Type*} [AddGroup K] [TopologicalSpace K]
+theorem compact_hom_real_zero {K : Type*} [AddGroup K] [TopologicalSpace K]
     [CompactSpace K] (f : K →+ ℝ) (hf : Continuous f) (x : K) : f x = 0 := by
   obtain ⟨C, hC⟩ := isBounded_iff_forall_norm_le.mp (isCompact_range hf).isBounded
   by_contra hx
@@ -3151,7 +3151,7 @@ private theorem compact_hom_real_zero {K : Type*} [AddGroup K] [TopologicalSpace
 
 /-- An open quotient onto an elementary group has a linear lift of its vector
 cover when the source is a vector space. -/
-private theorem elementary_linear_section {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+theorem elementary_linear_section {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
     {m n r : ℕ} {F : Type*} [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
     (φ : E →+ ElementaryLieGroup m n r F) (hc : Continuous φ) (ho : IsOpenMap φ) :
     ∃ L : (EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) →L[ℝ] E,
@@ -3236,7 +3236,7 @@ private theorem elementary_open_quotient_charts {m n r m' n' r' : ℕ} {F F' : T
 
 /-- A partial after an affine lift between two vector covers is a fixed finite
 linear combination of partials in the source elementary group. -/
-private theorem elementaryPartial_comp_lift {m n r m' n' r' : ℕ} {F F' : Type*}
+theorem elementaryPartial_comp_lift {m n r m' n' r' : ℕ} {F F' : Type*}
     (L : (EuclideanSpace ℝ (Fin m') × EuclideanSpace ℝ (Fin n')) →L[ℝ]
       (EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)))
     (β : Fin m' → ℕ) (γ : Fin n' → ℕ) :
@@ -3264,7 +3264,7 @@ private theorem elementaryPartial_comp_lift {m n r m' n' r' : ℕ} {F F' : Type*
 
 /-- A continuous real character in additive coordinates is a linear polynomial
 in the real and integer coordinates of an elementary group. -/
-private theorem elementary_real_hom_polynomial {m n r : ℕ} {F : Type*} [AddCommGroup F]
+theorem elementary_real_hom_polynomial {m n r : ℕ} {F : Type*} [AddCommGroup F]
     [TopologicalSpace F] [DiscreteTopology F] [Finite F]
     (h : ElementaryLieGroup m n r F →+ ℝ) (hh : Continuous h) :
     ∃ p : MvPolynomial (Fin m ⊕ Fin r) ℂ, ∀ g : ElementaryLieGroup m n r F,
@@ -3349,7 +3349,7 @@ private theorem extend_real_hom_open {A : Type} [AddCommGroup A] [TopologicalSpa
 
 /-- On the open subgroup every target monomial agrees with a polynomial in
 the ambient real and lattice coordinates. -/
-private theorem elementary_open_quotient_weight {m n r m' n' r' : ℕ} {F F' : Type}
+theorem elementary_open_quotient_weight {m n r m' n' r' : ℕ} {F F' : Type}
     [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
     [AddCommGroup F'] [TopologicalSpace F'] [DiscreteTopology F'] [Finite F']
     (H : AddSubgroup (ElementaryLieGroup m n r F)) (hH : IsOpen (H : Set (ElementaryLieGroup m n r F)))
@@ -3426,7 +3426,7 @@ private theorem elementarySchwartz_open_quotient {m n r m' n' r' : ℕ} {F F' : 
 
 /-- Two open coordinate maps with nested kernels identify the pullback from the
 quotient with restriction to an open elementary subgroup. -/
-private theorem elementarySchwartz_of_common_pullback {m n r m' n' r' : ℕ} {F F' : Type}
+theorem elementarySchwartz_of_common_pullback {m n r m' n' r' : ℕ} {F F' : Type}
     [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
     [AddCommGroup F'] [TopologicalSpace F'] [DiscreteTopology F'] [Finite F']
     {A : Type*} [AddCommGroup A] [TopologicalSpace A]
@@ -3465,7 +3465,7 @@ include hTop in
 /-- A function supported on the smaller open subgroup and invariant under its
 kernel descends into the specified stage as soon as it is Schwartz in a
 larger stage. -/
-private theorem schwartzBruhatStage_descend_of_invariant {a c : BruhatStructuralPair G}
+theorem schwartzBruhatStage_descend_of_invariant {a c : BruhatStructuralPair G}
     (hac : a ≤ c) (e : ElementaryLCAPresentation a.quotient) (d : ElementaryLCAPresentation c.quotient)
     (s : SchwartzBruhatStage d) (f : G → ℂ) (hs : schwartzBruhatStageRealization c d s = f)
     (hsupp : ∀ x ∉ a.val.1, f x = 0)
@@ -3705,7 +3705,7 @@ section Stages
 variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
   [T2Space G] [LocallyCompactSpace G]
 /-- Range inclusion, constructed in elementary coordinates, without using a transition map. -/
-private lemma kernelStage_realization_mono {a b : BruhatStructuralPair G} (h : a ≤ b)
+lemma kernelStage_realization_mono {a b : BruhatStructuralPair G} (h : a ≤ b)
     (e : ElementaryLCAPresentation a.quotient) (d : ElementaryLCAPresentation b.quotient)
     (s : SchwartzBruhatStage e) : ∃ t : SchwartzBruhatStage d,
       schwartzBruhatStageRealization b d t = schwartzBruhatStageRealization a e s := by
@@ -3766,7 +3766,7 @@ private lemma kernelStage_realization_mono {a b : BruhatStructuralPair G} (h : a
 
 /-- The forward lift is continuous: both stages map continuously into the pointwise
 range of the second, so Fréchet factorization applies to the constant second stage. -/
-private lemma kernelStage_transitionMap {a b : BruhatStructuralPair G} (h : a ≤ b)
+lemma kernelStage_transitionMap {a b : BruhatStructuralPair G} (h : a ≤ b)
     (e : ElementaryLCAPresentation a.quotient) (d : ElementaryLCAPresentation b.quotient) :
     ∃ j : SchwartzBruhatStage e →L[ℂ] SchwartzBruhatStage d,
       ∀ s, schwartzBruhatStageRealization b d (j s) = schwartzBruhatStageRealization a e s := by
@@ -4133,7 +4133,7 @@ theorem schwartzBruhat_isBruhatSmooth (f : SchwartzBruhat G) : IsBruhatSmooth f 
 
 omit hTop hT2 hLC in
 /-- A continuous character of a real vector space is the exponential of a linear form. -/
-private theorem contDiff_vector_character {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+theorem contDiff_vector_character {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
     (χ : PontryaginDual (Multiplicative E)) {p : ℕ∞} :
     ContDiff ℝ p (fun x : E ↦ (χ (Multiplicative.ofAdd x) : ℂ)) := by
   let e := AddCircle.homeomorphCircle (one_ne_zero : (1 : ℝ) ≠ 0)
@@ -4159,7 +4159,7 @@ private theorem contDiff_vector_character {E : Type*} [NormedAddCommGroup E] [No
 omit hTop hT2 hLC in
 /-- On each discrete fiber of an elementary group a character is a constant
 multiple of its restriction to the vector cover at zero. -/
-private theorem contDiff_elementary_character {m n r : ℕ} {F : Type*} [AddCommGroup F]
+theorem contDiff_elementary_character {m n r : ℕ} {F : Type*} [AddCommGroup F]
     [TopologicalSpace F] [DiscreteTopology F] (φ' : PontryaginDual (Multiplicative
       (ElementaryLieGroup m n r F))) (z : Fin r → ℤ) (b : F) {p : ℕ∞} :
     ContDiff ℝ p (fun u ↦ (φ' (Multiplicative.ofAdd (elementaryCover u z b)) : ℂ)) := by
@@ -4226,7 +4226,7 @@ theorem schwartzBruhat_t2 [SecondCountableTopology G] : T2Space (SchwartzBruhat 
 /-- Paper: Lemma D.1.5.6, p. 763. A compact exhaustion controls the open subgroups,
 and shrinking identity neighborhoods control the kernels, since the elementary quotients
 have no small subgroups. Together they give an increasing cofinal sequence. -/
-private theorem exists_cofinal_bruhatStructuralPairs [SecondCountableTopology G] :
+theorem exists_cofinal_bruhatStructuralPairs [SecondCountableTopology G] :
     ∃ b : ℕ → BruhatStructuralPair G, Monotone b ∧ ∀ a, ∃ n, a ≤ b n := by
   classical
   let C := CompactExhaustion.choice G
@@ -4292,7 +4292,7 @@ private theorem exists_cofinal_bruhatStructuralPairs [SecondCountableTopology G]
 omit hTop hT2 hLC in
 /-- A stage function is determined by its realization because every elementary coordinate
 is represented by a point in the open subgroup. -/
-private theorem schwartzBruhatStageInclusion_injective (a : BruhatStructuralPair G)
+theorem schwartzBruhatStageInclusion_injective (a : BruhatStructuralPair G)
     (e : ElementaryLCAPresentation a.quotient) :
     Function.Injective (schwartzBruhatStageInclusion a e) := by
   exact fun _ _ h ↦ schwartzBruhatStageRealization_injective a e (congrArg Subtype.val h)
@@ -4372,14 +4372,14 @@ theorem schwartzBruhatStage_isEmbedding [SecondCountableTopology G]
 
 omit hTop hT2 hLC in
 /-- The inclusion of a stage is continuous by the definition of the generating seminorms. -/
-private theorem continuous_schwartzBruhatStageInclusion
+theorem continuous_schwartzBruhatStageInclusion
     (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient) :
     Continuous (show SchwartzBruhatStage e →ₗ[ℂ] SchwartzBruhat G from
       schwartzBruhatStageInclusion a e) := by
   exact (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp _ (fun p ↦ p.2 a e)
 
 /-- The continuous linear inclusion of an elementary stage. -/
-private def schwartzBruhatStageCLM (a : BruhatStructuralPair G)
+def schwartzBruhatStageCLM (a : BruhatStructuralPair G)
     (e : ElementaryLCAPresentation a.quotient) : SchwartzBruhatStage e →L[ℂ] SchwartzBruhat G :=
   ⟨schwartzBruhatStageInclusion a e, continuous_schwartzBruhatStageInclusion a e⟩
 
@@ -4415,7 +4415,7 @@ private theorem schwartzBruhat_isInjectiveLCLimit
     exact ((h n).comp t.continuous).congr fun x ↦ congrArg p (ht x)
 
 /-- Choose a countable cofinal presentation with closed transition maps. -/
-private theorem schwartzBruhat_exists_cofinal_system [SecondCountableTopology G] :
+theorem schwartzBruhat_exists_cofinal_system [SecondCountableTopology G] :
     ∃ (a : ℕ → BruhatStructuralPair G) (e : ∀ n, ElementaryLCAPresentation (a n).quotient)
       (j : ∀ n, SchwartzBruhatStage (e n) →L[ℂ] SchwartzBruhatStage (e (n + 1))),
       Monotone a ∧ (∀ b, ∃ n, b ≤ a n) ∧
@@ -4457,7 +4457,7 @@ variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
   [T2Space G] [LocallyCompactSpace G]
 
 /-- A seminorm continuous on all elementary stages belongs to the defining family. -/
-private theorem schwartzBruhat_continuous_seminorm (p : Seminorm ℂ (SchwartzBruhat G))
+theorem schwartzBruhat_continuous_seminorm (p : Seminorm ℂ (SchwartzBruhat G))
     (hp : ∀ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient),
       Continuous (p ∘ schwartzBruhatStageInclusion a e)) : Continuous p :=
   (withGeneratingSeminorms_spec _ (Subtype.val : {q : Seminorm ℂ (schwartzBruhatSubmodule G) //
@@ -4465,7 +4465,7 @@ private theorem schwartzBruhat_continuous_seminorm (p : Seminorm ℂ (SchwartzBr
       Continuous (q ∘ schwartzBruhatStageInclusion a e)} → _)).continuous_seminorm ⟨p, hp⟩
 
 /-- Lower semicontinuous seminorms are continuous on each barrelled elementary stage. -/
-private theorem schwartzBruhat_barrelled_of_stages : BarrelledSpace ℂ (SchwartzBruhat G) := by
+theorem schwartzBruhat_barrelled_of_stages : BarrelledSpace ℂ (SchwartzBruhat G) := by
   refine ⟨fun p hp ↦ schwartzBruhat_continuous_seminorm p ?_⟩
   intro a e
   let : BarrelledSpace ℂ (SchwartzBruhatStage e) := elementarySchwartz_barrelled
@@ -4510,7 +4510,7 @@ theorem schwartzBruhat_bornological :
 
 /-- The restrictions of a functional to the stages form a closed subspace of the
 product of the strong duals, with topology induced by bounded lifting. -/
-private theorem strongDual_closedEmbedding_of_strict_limit
+theorem strongDual_closedEmbedding_of_strict_limit
     {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [T2Space E]
     [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E]
     {X : ℕ → Type*} [∀ n, AddCommGroup (X n)] [∀ n, Module ℂ (X n)]
@@ -4561,7 +4561,7 @@ theorem schwartzBruhat_strongDual_complete [SecondCountableTopology G] :
 open scoped TensorProduct in
 /-- A topologically embedded linear subspace inherits nuclearity through the
 continuous linear equivalence with its range. -/
-private theorem schwartzBruhat_nuclear_of_embedding.{test, u} {X : Type u} {Y : Type}
+theorem schwartzBruhat_nuclear_of_embedding.{test, u} {X : Type u} {Y : Type}
     [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
     [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
     (f : X →ₗ[ℂ] Y) (hf : IsEmbedding f) (hY : IsNuclearTVS.{max test u, 0} Y) :
@@ -4597,14 +4597,14 @@ private theorem schwartzBruhat_nuclear_of_embedding.{test, u} {X : Type u} {Y : 
     ProjectiveTensor X F ≃ₜ InjectiveTensor X F).isHomeomorph
 
 /-- Elementary Schwartz spaces on level-zero finite factors are nuclear. -/
-private theorem elementarySchwartz_nuclear {m n r : ℕ} {F : Type} [AddCommGroup F]
+theorem elementarySchwartz_nuclear {m n r : ℕ} {F : Type} [AddCommGroup F]
     [TopologicalSpace F] [DiscreteTopology F] [Finite F] :
     IsNuclearTVS.{v} (ElementarySchwartz m n r F) :=
   elementarySchwartz_nuclear_of_finite
 
 /-- A strict inductive sequence of nuclear Fréchet stages is nuclear, using
 the images of its embeddings as the increasing submodule presentation. -/
-private theorem nuclear_of_injective_frechet_sequence.{u} {E : Type u} [AddCommGroup E] [Module ℂ E]
+theorem nuclear_of_injective_frechet_sequence.{u} {E : Type u} [AddCommGroup E] [Module ℂ E]
     [TopologicalSpace E] [IsTopologicalAddGroup E] [T2Space E] [PolynormableSpace ℂ E]
     {X : ℕ → Type} [∀ n, AddCommGroup (X n)] [∀ n, Module ℂ (X n)] [∀ n, TopologicalSpace (X n)]
     (hX : ∀ n, IsFrechetTVS (X n)) (hn : ∀ n, IsNuclearTVS.{max v u} (X n))
@@ -4734,7 +4734,7 @@ private theorem continuous_elementary_stage {m n r : ℕ} {F : Type*} [AddCommGr
   rw [hy]
 
 /-- Extension by zero from the clopen support subgroup preserves continuity. -/
-private theorem continuous_stage_realization (b : BruhatStructuralPair G)
+theorem continuous_stage_realization (b : BruhatStructuralPair G)
     (e : ElementaryLCAPresentation b.quotient) (s : SchwartzBruhatStage e) :
     Continuous (schwartzBruhatStageRealization b e s) := by
   classical
@@ -5011,7 +5011,7 @@ private theorem schwartzBruhat_exists_stage_above
 
 omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
 /-- Each generating seminorm is bounded on every von Neumann bounded set. -/
-private theorem schwartzBruhat_seminorm_bounded {B : Set (SchwartzBruhat G)}
+theorem schwartzBruhat_seminorm_bounded {B : Set (SchwartzBruhat G)}
     (hB : IsVonNBounded ℂ B) (p : Seminorm ℂ (schwartzBruhatSubmodule G))
     (hp : ∀ (b : BruhatStructuralPair G) (d : ElementaryLCAPresentation b.quotient),
       Continuous (p ∘ schwartzBruhatStageInclusion b d)) :
@@ -5175,7 +5175,7 @@ private theorem elementary_compact_coordinates {m n r : ℕ} {F : Type} [AddComm
 
 /-- Membership in an open subgroup of an elementary group is constant on each
 connected real-torus fiber. -/
-private theorem elementary_open_mask {m n r : ℕ} {F : Type} [AddCommGroup F]
+theorem elementary_open_mask {m n r : ℕ} {F : Type} [AddCommGroup F]
     [TopologicalSpace F] [DiscreteTopology F] [Finite F]
     (H : OpenSubgroup (Multiplicative (ElementaryLieGroup m n r F))) (y : ElementaryLieGroup m n r F) :
     Multiplicative.ofAdd y ∈ H ↔ Multiplicative.ofAdd (0, 0, y.2.2.1, y.2.2.2) ∈ H := by
@@ -5710,7 +5710,7 @@ private theorem elementary_stage_separates {m n r : ℕ} {F : Type} [AddCommGrou
   · simpa [huy hx] using (Circle.coe_ne_zero (χ (Multiplicative.ofAdd x.2.1))).symm
 /-- Tests can be nonzero at any given point and distinguish it from any other
 point by passing to an elementary quotient in which their ratio survives. -/
-private theorem schwartzBruhat_exists_test (x y : G) :
+theorem schwartzBruhat_exists_separating_function (x y : G) :
     ∃ f : SchwartzBruhat G, f x ≠ 0 ∧ (y ≠ x → f y ≠ f x) := by
   classical
   let U := if y = x then univ else ({y / x} : Set G)ᶜ
@@ -5748,7 +5748,7 @@ private theorem schwartzBruhat_exists_test (x y : G) :
 
 /-- A nuclear space is separable for each of its continuous seminorms. A
 totally bounded zero-neighborhood spans the space and has separable span. -/
-private theorem seminorm_separable_of_nuclear {E : Type*} [AddCommGroup E] [Module ℂ E]
+theorem seminorm_separable_of_nuclear {E : Type*} [AddCommGroup E] [Module ℂ E]
     [TopologicalSpace E] [IsTopologicalAddGroup E] [ContinuousSMul ℂ E]
     [PolynormableSpace ℂ E] [T2Space E]
     (h : IsNuclearTVS.{v} E) (p : Seminorm ℂ E) (hp : Continuous p) :
@@ -5837,11 +5837,11 @@ private theorem countable_tests_of_nuclear (h : IsNuclearTVS.{v} (SchwartzBruhat
   refine ⟨u, fun x ↦ ?_, fun x y hxy ↦ ?_⟩
   · by_contra! hz
     have he := hu.equalizer (hc x) (continuous_const (y := (0 : ℂ))) (funext hz)
-    obtain ⟨f, hf, _⟩ := schwartzBruhat_exists_test x x
+    obtain ⟨f, hf, _⟩ := schwartzBruhat_exists_separating_function x x
     exact hf (congrFun he f)
   · by_contra hne
     have he := hu.equalizer (hc x) (hc y) (funext fun n ↦ congrFun hxy n)
-    obtain ⟨f, _, hf⟩ := schwartzBruhat_exists_test y x
+    obtain ⟨f, _, hf⟩ := schwartzBruhat_exists_separating_function y x
     exact hf hne (congrFun he f)
 
 /-- Paper: Remark D.1.5.8, p. 764. The Schwartz–Bruhat space of a group that
@@ -6149,7 +6149,7 @@ private theorem exists_bounded_rescaling {E : Type*} [AddCommGroup E] [Module �
 omit hT2 in
 /-- In a structural stage all sufficiently small cyclic subgroups of the ambient
 group lie in the kernel of the elementary quotient. -/
-private theorem stage_kernel_contains_small_powers (a : BruhatStructuralPair G)
+theorem stage_kernel_contains_small_powers (a : BruhatStructuralPair G)
     (e : ElementaryLCAPresentation a.quotient) :
     ∃ U ∈ 𝓝 (1 : G), ∀ x : G, (∀ k : ℕ, x ^ k ∈ U) → x ∈ OrderDual.ofDual a.val.2 := by
   let : LocallyCompactSpace a.val.1 := a.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
@@ -6179,7 +6179,7 @@ private theorem schwartzBruhat_not_metrizable_of_small_powers (y : ℕ → G)
     (hsmall : ∀ U ∈ 𝓝 (1 : G), ∀ᶠ n in atTop, ∀ k : ℕ, (y n) ^ k ∈ U) :
     ¬ MetrizableSpace (SchwartzBruhat G) := by
   intro hmetric
-  choose f _ hsep using fun n ↦ schwartzBruhat_exists_test 1 (y n)
+  choose f _ hsep using fun n ↦ schwartzBruhat_exists_separating_function 1 (y n)
   have hf (n : ℕ) := hsep n (hne n)
   obtain ⟨c, hc, hbounded⟩ := exists_bounded_rescaling f
   obtain ⟨a, e, C, _, hC⟩ := schwartzBruhat_bounded_lift hbounded
@@ -6218,7 +6218,7 @@ private theorem not_metrizable_of_additive_local_embedding {L : Type*} [Nontrivi
 
 /-- At a nonarchimedean place, all positive powers of a unit close to one stay
 within the same distance of one. -/
-private theorem local_unit_pow_bound {L : Type*} [NormedField L] [IsUltrametricDist L]
+theorem local_unit_pow_bound {L : Type*} [NormedField L] [IsUltrametricDist L]
     (x : L) (hx : ‖x‖ ≤ 1) (k : ℕ) : ‖x ^ k - 1‖ ≤ ‖x - 1‖ := by
   induction k with
   | zero => simp

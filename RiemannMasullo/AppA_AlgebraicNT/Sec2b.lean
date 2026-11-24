@@ -11,9 +11,10 @@ import all Mathlib.Geometry.Manifold.Submersion
 import Mathlib.NumberTheory.NumberField.CanonicalEmbedding.PolarCoord
 import Mathlib.NumberTheory.Padics.HeightOneSpectrum
 import Mathlib.Topology.Algebra.Group.Units
+import Mathlib.Topology.Algebra.IsOpenUnits
 import Mathlib.Topology.Baire.LocallyCompactRegular
 import Mathlib.Topology.MetricSpace.ProperSpace.Lemmas
-import all RiemannMasullo.AppA_AlgebraicNT.Sec1
+import RiemannMasullo.AppA_AlgebraicNT.Sec1
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 

@@ -8,7 +8,7 @@ public import Mathlib.Analysis.LocallyConvex.WeakSpace
 public import Mathlib.Analysis.Normed.Module.Completion
 public import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
 import Mathlib.Algebra.Module.ULift
-import Mathlib.Analysis.LocallyConvex.Barrelled
+public import Mathlib.Analysis.LocallyConvex.Barrelled
 public import Mathlib.Analysis.LocallyConvex.Montel
 import Mathlib.Analysis.LocallyConvex.Separation
 import Mathlib.Analysis.InnerProductSpace.Dual
@@ -21,7 +21,7 @@ import Mathlib.Topology.Baire.CompleteMetrizable
 import Mathlib.Topology.ContinuousMap.ZeroAtInfty
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
-import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.DirectSum
+public import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.DirectSum
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.Quotient
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.WeakDual
 import RiemannMasullo.ForMathlib.Topology.Algebra.Group.Pointwise
@@ -997,7 +997,7 @@ private theorem IsInjectiveLCLimit.seminorm_extension
 
 /-- For a strict system of polynormable stages, the final locally convex topology induces the
 original topology on each stage. -/
-private theorem IsInjectiveLCLimit.isEmbedding_stage
+theorem IsInjectiveLCLimit.isEmbedding_stage
     [IsTopologicalAddGroup E] [∀ k, IsTopologicalAddGroup (X k)]
     [∀ k, PolynormableSpace ℂ (X k)]
     {j : ∀ k, X k →L[ℂ] X (k+1)} {i : ∀ k, X k →L[ℂ] E} (h : IsInjectiveLCLimit j i)
@@ -1296,7 +1296,7 @@ private theorem strictLF_of_frechet_exhaustion [T2Space E] [PolynormableSpace �
     rfl
 
 /-- A strict LF-space is complete in its additive uniformity. -/
-private theorem IsStrictLFSpace.completeSpace [IsTopologicalAddGroup E]
+theorem IsStrictLFSpace.completeSpace [IsTopologicalAddGroup E]
     (h : IsStrictLFSpace E) : @CompleteSpace E (IsTopologicalAddGroup.rightUniformSpace E) := by
   obtain ⟨_, S, hmono, hF, hcover, htop⟩ := h
   choose hadd hpoly hmetr hcomplete using hF
@@ -1907,7 +1907,7 @@ theorem isLimitSubspace_top [T2Space E] (hX : ∀ k, IsFrechetTVS (X k))
 
 /-- Lower semicontinuous seminorms on an LF-space are continuous, since their restrictions
 to its Fréchet stages are continuous by the Baire category theorem. -/
-private theorem IsLFSpace.barrelled {E : Type*} [AddCommGroup E] [Module ℂ E]
+theorem IsLFSpace.barrelled {E : Type*} [AddCommGroup E] [Module ℂ E]
     [TopologicalSpace E] (hE : IsLFSpace E) : BarrelledSpace ℂ E := by
   obtain ⟨_, X, _, _, _, hX, j, i, h⟩ := hE
   refine ⟨fun p hp ↦ ?_⟩
@@ -2414,16 +2414,16 @@ variable {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
   [∀ k, Module ℂ (X k)] [∀ k, TopologicalSpace (X k)]
 
 /-- The kernel of the map from a stage into the quotient of the limit. -/
-private abbrev limitStageKernel (i : ∀ k, X k →L[ℂ] E) (F : Submodule ℂ E) (k : ℕ) :=
+abbrev limitStageKernel (i : ∀ k, X k →L[ℂ] E) (F : Submodule ℂ E) (k : ℕ) :=
   (F.mkQL.comp (i k)).ker
 
 /-- The map from a quotient stage into the quotient of the limit. -/
-private def limitQuotientStageMap (i : ∀ k, X k →L[ℂ] E) (F : Submodule ℂ E) (k : ℕ) :
+def limitQuotientStageMap (i : ∀ k, X k →L[ℂ] E) (F : Submodule ℂ E) (k : ℕ) :
     X k ⧸ limitStageKernel i F k →L[ℂ] E ⧸ F :=
   (limitStageKernel i F k).liftQL (F.mkQL.comp (i k)) le_rfl
 
 /-- The transition map induced by the original transition between consecutive quotient stages. -/
-private def limitQuotientTransition
+def limitQuotientTransition
     {j : ∀ k, X k →L[ℂ] X (k+1)} {i : ∀ k, X k →L[ℂ] E} (h : IsInjectiveLCLimit j i)
     (F : Submodule ℂ E) (k : ℕ) :
     X k ⧸ limitStageKernel i F k →L[ℂ] X (k+1) ⧸ limitStageKernel i F (k+1) :=
@@ -2438,7 +2438,7 @@ private def limitQuotientTransition
 omit [IsTopologicalAddGroup E] in
 /-- Passing to a quotient of the limit gives the limit of the corresponding quotient stages.
 The final topology identity also holds for a non-Hausdorff quotient. -/
-private theorem isInjectiveLCLimit_quotientStages [ContinuousSMul ℂ E]
+theorem isInjectiveLCLimit_quotientStages [ContinuousSMul ℂ E]
     {j : ∀ k, X k →L[ℂ] X (k+1)} {i : ∀ k, X k →L[ℂ] E} (h : IsInjectiveLCLimit j i)
     (F : Submodule ℂ E) :
     IsInjectiveLCLimit (limitQuotientTransition h F) (limitQuotientStageMap i F) := by
@@ -2546,7 +2546,7 @@ variable {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
 
 /-- Paper: Equation (C.1.5.2), p. 667. The image of the difference map is the
 kernel of the canonical map from the direct sum to the limit. -/
-private theorem IsInjectiveLCLimit.range_directSumDifference (h : IsInjectiveLCLimit j i) :
+theorem IsInjectiveLCLimit.range_directSumDifference (h : IsInjectiveLCLimit j i) :
     range (directSumDifference j) =
       (DirectSum.toModule ℂ ℕ E (fun k ↦ (i k).toLinearMap)).ker := by
   let D := ⨁ k, X k
@@ -2611,7 +2611,7 @@ private theorem IsInjectiveLCLimit.range_directSumDifference (h : IsInjectiveLCL
 
 /-- Paper: Equation (C.1.5.2), p. 667. The canonical map from the locally convex
 direct sum to the limit is a quotient map, including for a non-Hausdorff limit. -/
-private theorem IsInjectiveLCLimit.isQuotientMap_directSum (h : IsInjectiveLCLimit j i)
+theorem IsInjectiveLCLimit.isQuotientMap_directSum (h : IsInjectiveLCLimit j i)
     [∀ k, IsTopologicalAddGroup (X k)] [∀ k, PolynormableSpace ℂ (X k)] :
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ X)
     IsQuotientMap (DirectSum.toModule ℂ ℕ E (fun k ↦ (i k).toLinearMap)) := by
@@ -2654,7 +2654,7 @@ private theorem IsInjectiveLCLimit.isQuotientMap_directSum (h : IsInjectiveLCLim
   exact homeo.isQuotientMap.comp q.ker.isQuotientMap_mkQL
 
 /-- The difference map has closed range exactly when the limit is Hausdorff. -/
-private theorem IsInjectiveLCLimit.closedRange_directSumDifference_iff (h : IsInjectiveLCLimit j i)
+theorem IsInjectiveLCLimit.closedRange_directSumDifference_iff (h : IsInjectiveLCLimit j i)
     [∀ k, IsTopologicalAddGroup (X k)] [∀ k, PolynormableSpace ℂ (X k)] :
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ X)
     IsClosed (range (directSumDifference j)) ↔ T2Space E := by
@@ -3456,7 +3456,7 @@ private theorem IsInjectiveLCLimit.lifts_nullSequence_of_acyclic (h : IsInjectiv
   exact mem_insert_of_mem _ (mem_range_self m)
 
 /-- The composite of the transition maps from stage `a` to stage `b`. -/
-private def limitStageTransition (j : ∀ k, X k →L[ℂ] X (k+1))
+def limitStageTransition (j : ∀ k, X k →L[ℂ] X (k+1))
     {a b : ℕ} (hab : a ≤ b) : X a →L[ℂ] X b :=
   Nat.leRec (ContinuousLinearMap.id ℂ (X a)) (fun {k} _ f ↦ (j k).comp f) hab
 
@@ -3571,7 +3571,7 @@ private theorem IsInjectiveLCLimit.exists_stage_tendsto_of_compact_lift
 /-- A uniform stage for null sequences yields a seminorm estimate. On the original
 stage one fixed continuous seminorm can be given an arbitrarily small coefficient,
 with the remainder controlled by a continuous seminorm on any further stage. -/
-private theorem IsInjectiveLCLimit.exists_stage_seminorm_interpolation
+theorem IsInjectiveLCLimit.exists_stage_seminorm_interpolation
     (h : IsInjectiveLCLimit j i) [T2Space E] [∀ k, FirstCountableTopology (X k)]
     [∀ k, IsTopologicalAddGroup (X k)] [∀ k, PolynormableSpace ℂ (X k)]
     (hlift : ∀ K : Set E, IsCompact K → ∃ k, ∃ C : Set (X k), IsCompact C ∧ i k '' C = K)
@@ -3633,7 +3633,7 @@ private theorem IsInjectiveLCLimit.exists_stage_seminorm_interpolation
   exact hε.ne' (tendsto_nhds_unique tendsto_const_nhds hlim)
 
 /-- A vector in a single summand contributes to that summand and its successor. -/
-private theorem directSumDifference_lof (j : ∀ k, X k →L[ℂ] X (k+1)) (k : ℕ) (z : X k) :
+theorem directSumDifference_lof (j : ∀ k, X k →L[ℂ] X (k+1)) (k : ℕ) (z : X k) :
     directSumDifference j (DirectSum.lof ℂ ℕ X k z) =
       DirectSum.lof ℂ ℕ X k z - DirectSum.lof ℂ ℕ X (k+1) (j k z) := by
   rw [directSumDifference, LinearMap.sub_apply, LinearMap.id_apply, DirectSum.toModule_lof]
@@ -3988,7 +3988,7 @@ private theorem directSumDifference_seminorm_bound_adjacent
 
 /-- Choose a cofinal subsequence whose consecutive triples satisfy the interpolation
 estimate, then apply the estimate for consecutive stages. -/
-private theorem directSumDifference_seminorm_bound_of_interpolation
+theorem directSumDifference_seminorm_bound_of_interpolation
     [∀ k, IsTopologicalAddGroup (X k)] [dec : ∀ (k : ℕ) (z : X k), Decidable (z ≠ 0)]
     (hinterp : ∀ a : ℕ,
       ∃ (m : ℕ) (ham : a ≤ m) (p : Seminorm ℂ (X a)), Continuous p ∧
@@ -4478,7 +4478,7 @@ private theorem isAcyclicSystem_iff_bounded_stage_of_montel
 /-- Paper: §C.1.5.1 (after Definition C.1.5.9), p. 667. A closed quotient of a Schwartz
 Fréchet space lifts bounded sets. Grothendieck's result gives a compact lift, by lifting
 the compact closure of the bounded set in the quotient. -/
-private theorem liftsBoundedSets_mkQL_of_schwartz_frechet
+theorem liftsBoundedSets_mkQL_of_schwartz_frechet
     {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
     (hE : IsFrechetTVS E) (hS : IsSchwartzTVS E) (F : Submodule ℂ E)
     (hF : IsClosed (F : Set E)) : LiftsBoundedSets F.mkQL := by

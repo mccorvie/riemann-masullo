@@ -6,7 +6,7 @@ import RiemannMasullo.Ch03_IdelicZeta.Sec2
 import RiemannMasullo.Ch03_IdelicZeta.Sec4
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
-import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import RiemannMasullo.AppA_AlgebraicNT.Sec3
 import RiemannMasullo.ForMathlib.Topology.Algebra.Group.AutomaticContinuity
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Separable
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
@@ -22,9 +22,8 @@ import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 import Mathlib.MeasureTheory.Integral.Pi
 
-import all RiemannMasullo.AppC_LCTVS.Sec1
+import RiemannMasullo.AppC_LCTVS.Sec1
 
-import all RiemannMasullo.AppC_LCTVS.Sec1
 
 /-! # Homogeneous theta spaces and Fourier descent
 

@@ -2,7 +2,7 @@ module
 
 public import RiemannMasullo.Ch03_IdelicZeta.Sec2
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
-import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
+import RiemannMasullo.Ch02_AdelicTheta.Sec2a
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Separation
 
 /-! # Chapter 3.2: the printed global idelic functional equation -/

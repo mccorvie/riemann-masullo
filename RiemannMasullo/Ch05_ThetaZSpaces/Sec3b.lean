@@ -12,12 +12,11 @@ import RiemannMasullo.External.TauCeti.Analysis.Complex.Pompeiu.Basic
 import RiemannMasullo.ForMathlib.Analysis.Complex.PeriodicStrip
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Algebra.Order.Archimedean.Real.Hom
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a_part2
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a_part2
 import all RiemannMasullo.Ch02_AdelicTheta.Sec1
 import RiemannMasullo.Ch03_IdelicZeta.Sec3b
@@ -2587,7 +2586,7 @@ theorem archimedeanWeightedSchwartz_empty_equiv (I : Set ℝ) :
   let a : W := (Empty.elim, Empty.elim)
   have htwist (b : W) (f : E) (u : G) : archimedeanSchwartzTwist I b f u = f.val u := by
     simp [archimedeanSchwartzTwist_apply]
-  obtain ⟨f, hf, _⟩ := schwartzBruhat_exists_test (1 : G) 1
+  obtain ⟨f, hf, _⟩ := schwartzBruhat_exists_separating_function (1 : G) 1
   let f₀ : E := ⟨f.val, by
     apply (Submodule.mem_iInf _).mpr
     intro b

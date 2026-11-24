@@ -220,7 +220,7 @@ private theorem schwartzBruhatStageRealization_apply_dite {G : Type*} [CommGroup
 
 /-- A weighted bound of an elementary Schwartz function controls its pointwise size times the
 real and lattice monomials. -/
-private theorem elementarySchwartz_monomial_bound {m n r : ℕ} {Fk : Type*} [AddCommGroup Fk]
+theorem elementarySchwartz_monomial_bound {m n r : ℕ} {Fk : Type*} [AddCommGroup Fk]
     [TopologicalSpace Fk] [DiscreteTopology Fk] [Finite Fk]
     {f : ElementaryLieGroup m n r Fk → ℂ} (hf : f ∈ elementarySchwartzSubmodule m n r Fk)
     (β : Fin m → ℕ) (δ : Fin r → ℕ) (w : ElementaryLieGroup m n r Fk) :
@@ -240,7 +240,7 @@ private theorem elementarySchwartz_monomial_bound {m n r : ℕ} {Fk : Type*} [Ad
 
 /-- An elementary Schwartz function decays faster than any power of the real and lattice
 coordinates. -/
-private theorem elementarySchwartz_decay {m n r : ℕ} {Fk : Type*} [AddCommGroup Fk]
+theorem elementarySchwartz_decay {m n r : ℕ} {Fk : Type*} [AddCommGroup Fk]
     [TopologicalSpace Fk] [DiscreteTopology Fk] [Finite Fk]
     {f : ElementaryLieGroup m n r Fk → ℂ} (hf : f ∈ elementarySchwartzSubmodule m n r Fk)
     (N : ℕ) : ∃ C : ℝ, ∀ w : ElementaryLieGroup m n r Fk,
@@ -363,7 +363,7 @@ private theorem mem_integers_of_forall_mem_adicCompletionIntegers {ξ : F}
 
 omit [NumberField F] in
 /-- The identification of the infinite adeles with the mixed space is continuous. -/
-private theorem continuous_ringEquiv_mixedSpace :
+theorem continuous_ringEquiv_mixedSpace :
     Continuous (InfiniteAdeleRing.ringEquiv_mixedSpace F) := by
   have h : ⇑(InfiniteAdeleRing.ringEquiv_mixedSpace F) = fun x =>
       ((fun (v : {w : InfinitePlace F // InfinitePlace.IsReal w}) =>
@@ -445,7 +445,7 @@ private theorem euclideanSpace_norm_le_sum_abs {m : ℕ} (x : EuclideanSpace ℝ
 
 /-- A continuous additive map from an elementary group to a real normed space grows at most
 linearly in the real and lattice coordinates. -/
-private theorem elementary_additive_norm_le {m n r : ℕ} {Fk : Type*} [AddCommGroup Fk]
+theorem elementary_additive_norm_le {m n r : ℕ} {Fk : Type*} [AddCommGroup Fk]
     [TopologicalSpace Fk] [CompactSpace Fk]
     {V : Type*} [NormedAddCommGroup V] [NormedSpace ℝ V]
     (P₀ : ElementaryLieGroup m n r Fk → V) (hP₀ : Continuous P₀)
@@ -743,7 +743,7 @@ private theorem mul_mem_integers_of_adele {b₀ b₁ b₂ : 𝓞 F} (g : IdeleGr
   exact sub_mem (mul_mem (hint _) (mul_mem e1 e0)) (mul_mem (hint _) e2)
 
 /-- Real inequality transferring decay from the elementary coordinates to the archimedean one. -/
-private theorem real_decay_aux {S M X A B C : ℝ} {N : ℕ} (hS : 0 ≤ S) (hX : 0 ≤ X) (hA : 0 ≤ A)
+theorem mul_one_add_pow_le_of_le_mul_add {S M X A B C : ℝ} {N : ℕ} (hS : 0 ≤ S) (hX : 0 ≤ X) (hA : 0 ≤ A)
     (hM0 : 0 ≤ M) (hM : M ≤ A * X + B) (hC : S * (1 + X) ^ N ≤ C) :
     S * (1 + M) ^ N ≤ (1 + A + max B 0) ^ N * max C 0 := by
   have hB : B ≤ max B 0 := le_max_left _ _
@@ -754,7 +754,7 @@ private theorem real_decay_aux {S M X A B C : ℝ} {N : ℕ} (hS : 0 ≤ S) (hX 
     _ ≤ (1 + A + max B 0) ^ N * max C 0 := by gcongr; exact hC.trans (le_max_left _ _)
 
 /-- Real inequality transferring decay from `g * (ξ + x)` to `ξ`. -/
-private theorem real_decay_aux₂ {φ t μ A₁ A₂ C₀ : ℝ} {N : ℕ} (hφ : 0 ≤ φ) (ht : 0 ≤ t) (hμ : 0 ≤ μ)
+theorem mul_one_add_pow_le_of_le_mul_add₂ {φ t μ A₁ A₂ C₀ : ℝ} {N : ℕ} (hφ : 0 ≤ φ) (ht : 0 ≤ t) (hμ : 0 ≤ μ)
     (hA₁ : 0 ≤ A₁) (hA₂ : 0 ≤ A₂) (hpt : φ * (1 + t) ^ N ≤ C₀) (hmξ : μ ≤ A₁ * t + A₂) :
     φ ≤ (1 + A₁ + A₂) ^ N * C₀ * ((1 + μ) ^ N)⁻¹ := by
   have h1 : 1 + μ ≤ (1 + A₁ + A₂) * (1 + t) := by nlinarith
@@ -780,7 +780,7 @@ private theorem realization_decay (a : BruhatStructuralPair (Multiplicative 𝔸
   refine ⟨(1 + A + max B 0) ^ N * max C 0, fun y hy => ?_⟩
   rw [schwartzBruhatStageRealization_apply_dite, dite_eq_left hy]
   have hC' := hC (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨y, hy⟩)))
-  exact real_decay_aux (norm_nonneg _)
+  exact mul_one_add_pow_le_of_le_mul_add (norm_nonneg _)
     (add_nonneg (Finset.sum_nonneg fun _ _ => abs_nonneg _)
       (Finset.sum_nonneg fun _ _ => abs_nonneg _)) hA (norm_nonneg _) (hAB y hy) hC'
 
@@ -801,7 +801,7 @@ theorem schwartzBruhatStage_exists_norm_decay {G V : Type*} [CommGroup G]
   split_ifs with hy
   · exact (mul_le_mul_of_nonneg_left
       (pow_le_pow_left₀ (norm_nonneg _) (le_add_of_nonneg_left zero_le_one) N)
-      (norm_nonneg _)).trans (real_decay_aux (norm_nonneg _)
+      (norm_nonneg _)).trans (mul_one_add_pow_le_of_le_mul_add (norm_nonneg _)
         (add_nonneg (Finset.sum_nonneg fun _ _ ↦ abs_nonneg _)
           (Finset.sum_nonneg fun _ _ ↦ abs_nonneg _)) hA (norm_nonneg _) (hAB y hy) (hC _))
   · simp only [norm_zero, zero_mul]
@@ -855,7 +855,7 @@ private theorem realization_exists_summable_bound (a : BruhatStructuralPair (Mul
       (hA₂ p hp).trans (le_max_left _ _)
     have hmξ' := hmξ.trans (add_le_add (mul_le_mul_of_nonneg_right e1 (norm_nonneg _)) e2)
     have hpt' := (hpt _ hy).trans (le_max_left C₀ 0)
-    have hfin := real_decay_aux₂ (norm_nonneg _) (norm_nonneg _) (norm_nonneg _)
+    have hfin := mul_one_add_pow_le_of_le_mul_add₂ (norm_nonneg _) (norm_nonneg _) (norm_nonneg _)
       (le_max_right A₁ 0) (le_max_right A₂ 0) hpt' hmξ'
     have hξS' : ξ ∈ {ξ : Fˣ | algebraMap (𝓞 F) F (b₀ * b₁ * b₂) * (ξ : F) ∈
         (algebraMap (𝓞 F) F).range} := hξS
@@ -971,7 +971,7 @@ private theorem continuous_elementarySchwartz {m n r : ℕ} {Fk : Type*}
   exact (fs.property.1 ab.1 ab.2).continuous
 
 /-- The Schwartz–Bruhat submodule is spanned by continuous stage functions. -/
-private theorem continuous_schwartzBruhat_apply {G : Type*} [CommGroup G] [TopologicalSpace G]
+theorem continuous_schwartzBruhat_apply {G : Type*} [CommGroup G] [TopologicalSpace G]
     [IsTopologicalGroup G] (f : SchwartzBruhat G) : Continuous f := by
   classical
   let fs : schwartzBruhatSubmodule G := f
@@ -1262,7 +1262,7 @@ private theorem infinite_realization_decay
   by_cases hy : y ∈ a.val.1
   · rw [schwartzBruhatStageRealization_apply_dite, dite_eq_left hy]
     have hC' := hC (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨y, hy⟩)))
-    exact real_decay_aux (norm_nonneg _)
+    exact mul_one_add_pow_le_of_le_mul_add (norm_nonneg _)
       (add_nonneg (Finset.sum_nonneg fun _ _ => abs_nonneg _)
         (Finset.sum_nonneg fun _ _ => abs_nonneg _)) hA (norm_nonneg _) (hAB y hy) hC'
   · rw [schwartzBruhatStageRealization_apply_dite, dite_eq_right hy, norm_zero, zero_mul]
@@ -1749,7 +1749,7 @@ private theorem schwartzBruhat_stage_comp_equiv {G H : Type*}
   exact (schwartzBruhatStageInclusion b q (j f)).property
 
 /-- Pullback along a topological group isomorphism preserves Schwartz–Bruhat membership. -/
-private theorem schwartzBruhat_mem_comp_equiv {G H : Type*}
+theorem schwartzBruhat_mem_comp_equiv {G H : Type*}
     [CommGroup G] [CommGroup H] [TopologicalSpace G] [TopologicalSpace H]
     [IsTopologicalGroup G] [IsTopologicalGroup H] [T2Space G] [T2Space H]
     [LocallyCompactSpace G] [LocallyCompactSpace H]
@@ -1765,7 +1765,7 @@ private theorem schwartzBruhat_mem_comp_equiv {G H : Type*}
 
 /-- Pullback by a topological group isomorphism is continuous because its restriction
 to every elementary stage factors continuously through a stage. -/
-private theorem exists_schwartzBruhat_comp_equivCLM {G H : Type*}
+theorem exists_schwartzBruhat_comp_equivCLM {G H : Type*}
     [CommGroup G] [CommGroup H] [TopologicalSpace G] [TopologicalSpace H]
     [IsTopologicalGroup G] [IsTopologicalGroup H] [T2Space G] [T2Space H]
     [LocallyCompactSpace G] [LocallyCompactSpace H] (e : G ≃ₜ* H) :
@@ -2009,7 +2009,7 @@ private theorem schwartzBruhatStage_integrable {G : Type*} [CommGroup G] [Topolo
     exact (schwartzBruhatStageRealization_apply a e f x).trans (dite_eq_right hx)
 
 /-- Integrability is stable under the finite sums which generate the Schwartz–Bruhat submodule. -/
-private theorem schwartzBruhat_integrable {G : Type*} [CommGroup G] [TopologicalSpace G]
+theorem schwartzBruhat_integrable {G : Type*} [CommGroup G] [TopologicalSpace G]
     [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [MeasurableSpace G] [BorelSpace G]
     (μ : Measure G) [μ.IsHaarMeasure] (f : SchwartzBruhat G) : Integrable f μ := by
   let fs : schwartzBruhatSubmodule G := f
@@ -2217,7 +2217,7 @@ private theorem compact_plancherel_count {Q : Type*} [CommGroup Q] [TopologicalS
 
 /-- Paper: Theorem 2.2.3.2, p. 82. Fourier transformation changes adelic dilation
 by an idele into inverse dilation and a factor equal to the reciprocal of its norm. -/
-private theorem adeleSchwartzFourier_dilation (f : ℬ[F]) (g : 𝕀[F]) (y : 𝔸[F]) :
+theorem adeleSchwartzFourier_dilation (f : ℬ[F]) (g : 𝕀[F]) (y : 𝔸[F]) :
     tamagawaFourier (additiveTamagawaMeasure F) (adeleStandardCharacter F)
       (fun x ↦ f (Multiplicative.ofAdd (g.val * x))) y =
     (normℝ (classOf g))⁻¹ • adeleSchwartzFourier f (Multiplicative.ofAdd (g⁻¹.val * y)) := by
@@ -2383,7 +2383,7 @@ private theorem exists_compact_idele_representatives :
 
 /-- The canonical norm section dilates the mixed archimedean space by the positive
 root of order the field degree. -/
-private theorem canonicalIdeleNormSection_smul_mixedSpace (t : ℝ≥0ˣ) (x : 𝔸[F]) :
+theorem canonicalIdeleNormSection_smul_mixedSpace (t : ℝ≥0ˣ) (x : 𝔸[F]) :
     InfiniteAdeleRing.ringEquiv_mixedSpace F ((canonicalIdeleNormSection F t).val * x).1 =
       ((t.val : ℝ) ^ (Module.finrank ℚ F : ℝ)⁻¹) •
         InfiniteAdeleRing.ringEquiv_mixedSpace F x.1 := by
@@ -3092,7 +3092,7 @@ theorem adelicTheta_decay_both (f : ℬ[F]) (hf : f zeroAdele = 0)
       _ ≤ max C₁ C₂ := le_max_right _ _
 
 /-- The generating seminorms of a Schwartz–Bruhat space are the stagewise continuous ones. -/
-private theorem schwartzBruhat_stageWithSeminorms (G : Type*) [CommGroup G] [TopologicalSpace G] :
+theorem schwartzBruhat_stageWithSeminorms (G : Type*) [CommGroup G] [TopologicalSpace G] :
     WithSeminorms (E := SchwartzBruhat G)
       (Subtype.val : {p : Seminorm ℂ (schwartzBruhatSubmodule G) //
         ∀ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient),
@@ -3100,7 +3100,7 @@ private theorem schwartzBruhat_stageWithSeminorms (G : Type*) [CommGroup G] [Top
   withGeneratingSeminorms_spec _ _
 
 /-- The norm of point evaluation is a continuous seminorm on the Schwartz–Bruhat space. -/
-private theorem schwartzBruhat_evalNorm_continuous {G : Type*} [CommGroup G]
+theorem schwartzBruhat_evalNorm_continuous {G : Type*} [CommGroup G]
     [TopologicalSpace G] (x : G) : Continuous (fun f : SchwartzBruhat G ↦ ‖f x‖) := by
   classical
   let p : Seminorm ℂ (SchwartzBruhat G) :=

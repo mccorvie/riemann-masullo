@@ -4,8 +4,8 @@ public import RiemannMasullo.Ch02_AdelicTheta.Sec2b
 public import RiemannMasullo.Ch03_IdelicZeta.Sec1
 
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2b
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
-import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+import RiemannMasullo.Ch02_AdelicTheta.Sec2a
 import Mathlib.Algebra.Module.ZLattice.Summable
 import Mathlib.Analysis.Calculus.SmoothSeries
 import Mathlib.Analysis.Normed.Group.FunctionSeries
@@ -223,7 +223,7 @@ private theorem stage_exists_decay {G V : Type*} [CommGroup G] [TopologicalSpace
     rw [hw] at hbound
     refine (mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (norm_nonneg _)
       (le_add_of_nonneg_left zero_le_one) _) (norm_nonneg (s w))).trans ?_
-    exact real_decay_aux (norm_nonneg _)
+    exact mul_one_add_pow_le_of_le_mul_add (norm_nonneg _)
       (add_nonneg (Finset.sum_nonneg fun _ _ ↦ abs_nonneg _)
         (Finset.sum_nonneg fun _ _ ↦ abs_nonneg _)) hA (norm_nonneg _) hbound (hC w)
   · simpa only [schwartzBruhatStageRealization_apply, dite_eq_right hx, norm_zero, zero_mul] using hB
@@ -891,7 +891,7 @@ private theorem sAdeleStage_arch_decay_seminorm (a : BruhatStructuralPair Gₛ)
       (schwartzBruhatStageRealization_apply a e s _).trans (dite_eq_left hx)
     have hnorm : ‖arch x.1‖ ≤ A * (∑ j, |w.1 j| + ∑ k, |(w.2.2.1 k : ℝ)|) + B :=
       (congrArg (fun z : A∞ ↦ ‖z‖) hw.symm).trans_le (hAB.2 w)
-    have hbound := real_decay_aux (norm_nonneg (s w))
+    have hbound := mul_one_add_pow_le_of_le_mul_add (norm_nonneg (s w))
       (add_nonneg (Finset.sum_nonneg fun _ _ ↦ abs_nonneg _)
         (Finset.sum_nonneg fun _ _ ↦ abs_nonneg _)) hAB.1 (norm_nonneg _) hnorm (hq.2 s w)
     calc

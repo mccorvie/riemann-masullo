@@ -619,8 +619,8 @@ private theorem criticalTraceFormula_false_shell_measure {F : Type} [Field F] [N
   exact (measure_preimage_mul μ a S).symm.trans (congrArg μ he)
 
 /-- Norms on a completion at a finite place are integral powers of the residue cardinality.
-A copy of the private lemma of the same name in `AppA_AlgebraicNT/Sec3.lean`. -/
-private theorem norm_adicCompletion_eq_zpow (F : Type) [Field F] [NumberField F]
+Specialization of `norm_adicCompletion_eq_zpow` to number fields in `Type`. -/
+private theorem norm_adicCompletion_eq_zpow_small (F : Type) [Field F] [NumberField F]
     (v : HeightOneSpectrum (𝓞 F)) {z : v.adicCompletion F} (hz : z ≠ 0) :
     ‖z‖ = (v.asIdeal.absNorm : ℝ) ^ (WithZero.log (Valued.v z)) := by
   rw [FinitePlace.norm_def, WithZeroMulInt.toNNReal_neg_apply _ ((Valuation.ne_zero_iff _).mpr hz)]
@@ -631,7 +631,7 @@ private theorem criticalTraceFormula_false_exists_shell {F : Type} [Field F] [Nu
     (v : HeightOneSpectrum (𝓞 F)) (u : (v.adicCompletion F)ˣ) (hu : 1 < ‖u.val‖) :
     ∃ k : ℕ, ‖u.val‖ = (v.asIdeal.absNorm : ℝ) ^ (k + 1) := by
   let j : ℤ := WithZero.log (Valued.v u.val)
-  have hn : ‖u.val‖ = (v.asIdeal.absNorm : ℝ) ^ j := norm_adicCompletion_eq_zpow F v u.ne_zero
+  have hn : ‖u.val‖ = (v.asIdeal.absNorm : ℝ) ^ j := norm_adicCompletion_eq_zpow_small F v u.ne_zero
   have hq : (1 : ℝ) < v.asIdeal.absNorm := by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
   have hj : 0 < j := (zpow_lt_zpow_iff_right₀ hq).mp (by simpa [← hn] using hu)
   refine ⟨j.toNat - 1, hn.trans ?_⟩

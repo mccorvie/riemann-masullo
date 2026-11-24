@@ -4,8 +4,8 @@ public import RiemannMasullo.Ch05_ThetaZSpaces.Sec1
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
 import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec1d
-import all RiemannMasullo.AppA_AlgebraicNT.Sec1
-import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import RiemannMasullo.AppA_AlgebraicNT.Sec1
+import RiemannMasullo.AppA_AlgebraicNT.Sec3
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 import all RiemannMasullo.Ch02_AdelicTheta.Sec1
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2b
@@ -16,7 +16,7 @@ import Mathlib.Data.Finset.Lattice.Union
 import Mathlib.Analysis.Distribution.SchwartzSpace.CompactSupport
 import Mathlib.NumberTheory.NumberField.CanonicalEmbedding.Basic
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.InfiniteAdeleRing
-import all RiemannMasullo.AppC_LCTVS.Sec1
+import RiemannMasullo.AppC_LCTVS.Sec1
 import RiemannMasullo.AppC_LCTVS.Sec2b
 import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
 import RiemannMasullo.ForMathlib.Analysis.Normed.Group.InfiniteSum

@@ -24,6 +24,7 @@ import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Topology.Algebra.IsOpenUnits
 
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import RiemannMasullo.ForMathlib.Topology.Algebra.Module.OpenMapping
 
 /-! # Structure Theorem V: isotypic exhaustiveness
 

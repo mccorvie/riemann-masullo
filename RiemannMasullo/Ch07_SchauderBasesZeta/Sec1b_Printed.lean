@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Separation
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
 import Mathlib.Analysis.Calculus.BumpFunction.InnerProduct
 import Mathlib.Analysis.Calculus.BumpFunction.Normed

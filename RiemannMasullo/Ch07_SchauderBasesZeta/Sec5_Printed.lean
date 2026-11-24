@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec5
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Separation
 
 /-! # False claims printed in §7.5 -/
 
