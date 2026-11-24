@@ -4,7 +4,7 @@ public import RiemannMasullo.AppB_AnalyticNT.Sec3
 public import RiemannMasullo.AppB_AnalyticNT.Sec5
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3b
 
-import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
+import RiemannMasullo.Ch02_AdelicTheta.Sec2a
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import Mathlib.Analysis.Meromorphic.Complex
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gaussian.Schwartz

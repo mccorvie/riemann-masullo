@@ -123,7 +123,7 @@ theorem exists_hasPettisIntegral_mem_smul_of_isCompact_convex {X E : Type*} [Mea
 open scoped Pointwise in
 /-- Integration of a jointly continuous family of linear operators against a finite
 positive measure concentrated on a compact set gives a continuous linear operator. -/
-private theorem existsUnique_pettisIntegral_continuousFamily {X E : Type*}
+theorem existsUnique_pettisIntegral_continuousFamily {X E : Type*}
     [TopologicalSpace X] [MeasurableSpace X] [BorelSpace X]
     [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUniformAddGroup E] [T2Space E]
     [ContinuousSMul ℂ E] [LocallyConvexSpace ℝ E] [QuasiCompleteSpace ℂ E] [SeparatingDual ℂ E]

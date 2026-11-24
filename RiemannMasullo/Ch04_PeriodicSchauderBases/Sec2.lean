@@ -4,7 +4,7 @@ public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec1
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 public import Mathlib.Analysis.Distribution.ContDiffMapSupportedIn
 import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec1
-import all RiemannMasullo.AppC_LCTVS.Sec1
+import RiemannMasullo.AppC_LCTVS.Sec1
 import all RiemannMasullo.Ch02_AdelicTheta.Sec1
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.ChangeVariables
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.TranslationDifference
@@ -18,6 +18,7 @@ import RiemannMasullo.ForMathlib.Analysis.Fourier.PaleyWiener
 import RiemannMasullo.ForMathlib.Analysis.Fourier.PoissonSummation
 import RiemannMasullo.ForMathlib.Topology.Algebra.Module.OpenMapping
 import RiemannMasullo.ForMathlib.Topology.MetricSpace.CompactQuotient
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
 
 /-!
 # Periodization and Schauder bases on the positive real axis

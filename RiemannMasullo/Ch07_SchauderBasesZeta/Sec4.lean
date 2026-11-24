@@ -23,7 +23,7 @@ import all RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import all RiemannMasullo.Ch06_LocalGlobal.Sec3
-import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import RiemannMasullo.AppA_AlgebraicNT.Sec3
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec3b
 
@@ -638,7 +638,7 @@ The section Mellin transform identifies the decay isotype with the full
 Schwartz–Bergman space and takes the norm-twisted theta image to the denominator.
 The section integral uses the quotient Haar measure dt/t of §3.2. -/
 theorem spectralNuclearityDenominator_isotypeModel (a : ℝ) :
-    let m : C𝔽 →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+    let m : C𝔽 →ₜ* ℝ≥0ˣ := continuousIdeleClassNorm F
     let E := modulatedDecayIsotype m (Set.univ : Set ℝ) (Set.mem_univ 0) (ω(χ))
     ∃ M : ↥E ≃L[ℂ] B,
       (∀ (u : E) s, (M u).val s = ∫ t : ℝ≥0ˣ,
@@ -4390,7 +4390,7 @@ private theorem exists_polarThetaNuclearityAction_test_continuous
     (F : Type*) [Field F] [NumberField F]
     (φ : BruhatCompactSupport (IdeleClassGroup (𝓞 F) F)) : Continuous φ.val := by
   let m : IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ :=
-    ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+    (continuousIdeleClassNorm F)
   have hm : IsModulation m := ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
   have hms : Surjective m := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.2.2.2.1
   let d := bruhatCompactSupportToModulatedExponentialDecay m univ hm hms φ

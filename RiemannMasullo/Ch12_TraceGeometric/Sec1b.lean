@@ -42,7 +42,7 @@ variable {F : Type*} [Field F] [NumberField F]
 local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
 local notation "μ𝔽" => ideleClassTamagawaMeasure F
 local notation "m𝔽" =>
-  (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C𝔽 →ₜ* ℝ≥0ˣ)
+  (continuousIdeleClassNorm F : C𝔽 →ₜ* ℝ≥0ˣ)
 local notation "logNorm" => (logIdeleClassNorm F)
 local notation "W(" s ")" => CompactIntervalSobolev μ𝔽 logNorm (-(0 : ℝ)) 0 s
 local notation "hline" => (le_refl (0 : ℝ))

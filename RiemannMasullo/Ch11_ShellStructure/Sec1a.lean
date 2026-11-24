@@ -1,9 +1,9 @@
 module
 
 public import RiemannMasullo.Ch02_AdelicTheta.Sec2b
-import all RiemannMasullo.AppA_AlgebraicNT.Sec1
+import RiemannMasullo.AppA_AlgebraicNT.Sec1
 
-import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import RiemannMasullo.AppA_AlgebraicNT.Sec3
 
 /-!
 # General convergence criteria for adelic theta

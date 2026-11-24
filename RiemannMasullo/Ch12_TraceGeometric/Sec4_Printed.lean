@@ -5,7 +5,7 @@ import Mathlib.NumberTheory.Padics.ProperSpace
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Gaussian
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
-import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
+import RiemannMasullo.Ch02_AdelicTheta.Sec2a
 
 /-! # Printed cutoff claims in §12.4 -/
 

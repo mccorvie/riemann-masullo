@@ -1,5 +1,6 @@
 module
 
+public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec4
 
 import RiemannMasullo.Ch05_ThetaZSpaces.Sec1

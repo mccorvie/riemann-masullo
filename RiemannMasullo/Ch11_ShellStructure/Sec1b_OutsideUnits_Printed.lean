@@ -2,7 +2,7 @@ module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
 public import RiemannMasullo.Ch11_ShellStructure.Sec1b
-import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
+import RiemannMasullo.Ch02_AdelicTheta.Sec2a
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Gaussian
 

@@ -35,91 +35,113 @@ not.
 
 ## Get involved
 
-> **New claims are paused** (since 14:10 UTC on 23 November 2026) while the open pull requests
-> are checked and merged: they were arriving faster than they could be checked. Work that is
-> already claimed is welcome, and claims will reopen when the backlog is cleared. See
-> [#6674](https://github.com/mccorvie/riemann-masullo/issues/6674).
+**What is left is open to everyone at once.** The formalization is close to its end, and the
+work now is to find repairs for the last gaps in the proof. Each open step is an issue labelled
+[`open-problem`](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aopen-problem), and [What is left: the open problems](https://github.com/mccorvie/riemann-masullo/issues/7349) lists them all: four
+statements that are in Lean and have no proof, seven steps of the paper that have no argument
+on the page, and three known theorems that have no formal proof here.
 
-Several hundred proofs are open, and each one is a single Lean statement that is already
-written. You need no special access and no knowledge of the whole paper. Give your coding agent
-(Codex, Claude Code or any agent that can run shell commands) this instruction:
+These issues are **not claimed**. Nobody holds one, several people can work on the same one, and
+a partial result posted on the issue is a contribution: a sketch, a reference, a weaker
+statement that the later pages can use, a counterexample. So is a reduction of a step to a
+classical or known result, ideally with a citation, even without a proof of that result.
+Nobody here knows whether these steps
+can be repaired. That is what there is to find out.
 
-> Help formalize a mathematics paper in Lean 4. Fork and clone the repository with
-> `gh repo fork mccorvie/riemann-masullo --clone`, run `lake exe cache get` in it, then read
-> `AGENTS.md`, `prompts/prover.md` and the section "Working efficiently" of `CONTRIBUTING.md`.
-> Pick one library file that has open issues labelled `proof` with no `claimed` or `stuck`
-> label, and take several of them, or all of them, from that one file. Comment `Claiming` on
-> each. Try to prove each statement as written. A different proof from the paper's is welcome,
-> and a proof that is too large can be split into smaller, precise lemmas as the prover guide
-> says. Never change a statement. If you find a counterexample, a mismatch between the Lean and
-> the manuscript, or a specific gap in the printed argument, report it on the issue instead:
-> give the paper item and page and say exactly what fails, with a concrete counterexample or the
-> failing step, best of all as a Lean proof of the negation. That is a successful contribution
-> in its own right, and you need not propose a repair. If you can neither prove nor refute a
-> statement, leave a short note on the issue saying what you tried and where you got stuck. Put
-> helper lemmas directly above the declaration they serve, as `private theorem`, and edit no
-> other file. While you work, build only that file
-> (`lake build RiemannMasullo.<Chapter>.<File>`), after every proof. At the end run `lake build`
-> and `scripts/lint.sh`, then open one pull request against `main` whose description has one
-> `Closes #<issue>` line per statement you proved. Comment `Releasing` on every claimed issue
-> you did not finish.
+You need no special access. Give your coding agent (Codex, Claude Code or any agent that can run
+shell commands) this instruction, with the number of the issue you want it to work on:
 
-Pick from the [open, unclaimed proofs](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aproof+-label%3Aclaimed+-label%3Astuck+-label%3Agap).
-Each issue shows the Lean statement, where it is, and the passage of the paper it comes from. To
-point your agent at a particular file or issue, add "Work on `RiemannMasullo/…`" or "Work on
-issue #N" to the instruction. (A fork is needed because GitHub only lets collaborators push
-branches to this repository; your pull request comes from your copy.)
+> Help repair a gap in a mathematics paper that has been formalized in Lean 4. Fork and clone
+> the repository with `gh repo fork mccorvie/riemann-masullo --clone`, run `lake exe cache get`
+> in it, then read `AGENTS.md`, `prompts/prover.md` and the section "Working efficiently" of
+> `CONTRIBUTING.md`. Work on issue #N, which is labelled `open-problem`. It is not claimed and
+> others may be working on it too: do not comment `Claiming`. Read the issue and all its
+> comments, the row of `ERRATA.md` it names, and the pages of the paper
+> (`scripts/paper.sh <first> <last>`), and find out what is already known: what has been tried,
+> and what the library proves around the step. Then try, in this order. If the issue has a Lean
+> statement, prove it as written. If that is out of reach, prove it from one or two smaller
+> precise statements, each written in Lean, so that it is plain what is still missing. A
+> reduction to a classical or known result is welcome even if you do not prove that result:
+> state it as a lemma of its own with `sorry`, begin its docstring with `Classical input:`, and
+> cite it, ideally with the item and page of the source. If the
+> step has no Lean statement, write the statement the later pages need and prove it. If the
+> step is false, give a counterexample, best of all as a Lean proof of the negation. Never
+> change a statement that is on `main`: propose the change on the issue. Use nothing from any
+> formalization of the Riemann hypothesis released in November 2026, and nothing derived from
+> one: this project tests the route of this paper, and such a pull request is not merged. While
+> you work, build only the file you are in (`lake build RiemannMasullo.<Chapter>.<File>`). At
+> the end run `lake build RiemannMasullo Challenge Main` and `scripts/lint.sh`. If you have
+> Lean to hand in, open a pull request against `main` and link it on the issue. If you have
+> mathematics and no Lean, post it on the issue: the paper item and page, what you claim, and
+> the argument or the reference. If you got nowhere, say on the issue what you tried and where
+> it stopped, so that the next person starts further on.
 
-Doing it by hand works the same way. A proof that is too big can be split into smaller lemmas,
-and showing that a statement is wrong, or writing down exactly where you got stuck, is a result
-too. Every pull request is built and checked
-automatically; one that only fills in proofs, and leaves every statement unchanged, is merged
-without waiting for anyone. [`CONTRIBUTING.md`](CONTRIBUTING.md) has the details, and what we
-have learned about doing this quickly.
+Doing it by hand works the same way, and mathematics without Lean is welcome on the issues: a
+sketch is enough for others to work from. (A fork is needed because GitHub only lets
+collaborators push branches to this repository; your pull request comes from your copy.) Every
+pull request is built and checked automatically, and then read by the project before it
+merges: since 24 November 2026 nothing is merged automatically. [`CONTRIBUTING.md`](CONTRIBUTING.md) has the details, and what
+we have learned about doing this quickly.
+
+A few statements of the supplementary chapters are still open as ordinary
+[`proof` issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aproof+label%3Asupplementary+-label%3Aclaimed).
+Those are taken one person at a time: comment `Claiming` on one to take it, and `Releasing` to
+give it back.
 
 ## Status
 
-**Active: every statement is in Lean; proving and refuting.** As of 22 November 2026, about 6,800
-theorems and 1,290 definitions are stated in Lean and about 6,100 of the theorems are proved.
-Some thirty people have had pull requests merged, about 1,580 pull requests in all.
+**Searching for repairs of the final gaps in the proof.** As of 24 November 2026, about 13,200
+theorems and 1,800 definitions are stated in Lean. On the paper's main line (Chapters 2–7 and
+9–13, with Appendices A–D) all but seven of the theorems are proved. About ninety people have
+had pull requests merged, some 2,660 pull requests in all.
 
-- **Wave 1** (Appendices A, C and D, Chapters 2–4 and 9) is fully stated, and most of it is
-  proved. The remaining proofs are being closed out file by file.
-- **Wave 2** (Chapters 5–7 and Appendix B) is fully stated, each statement reviewed against the
-  paper before it was merged. Its proofs are open.
-- **Wave 3** (Chapters 10–12, the trace formula, and the two pages of Chapter 13) is fully
-  stated as well, reviewed in the same way; the last section landed on 22 November. §12.3 is
-  a heading in the paper with a note to include the section, so there is nothing to state
-  there. Chapter 8 is not needed for these statements.
+- **Everything on the main line is stated, and what could be proved is proved.** Where a
+  printed argument did not work, the statement was repaired or proved by another route, and
+  [`ERRATA.md`](ERRATA.md) records it.
+- **All seven target theorems rest on one statement.** In Lean the paper's main claim, and the
+  theorems for Dedekind zeta functions, Dirichlet L-functions and the Riemann zeta function
+  that are derived from it, use exactly one statement that has no proof: the cancellation of
+  the zeros outside the strip in Theorem 12.5.1.1. It is proved in Lean that this cancellation,
+  for every width, is equivalent to the main claim, so nothing weaker can supply it.
+- **Four recorded gaps:** that cancellation, and three statements under the bases and traces of
+  Chapters 7 and 10. Each is a named Lean statement with everything else proved around it.
+- **Seven steps with no argument on the page**, in Chapters 7 and 10–12. The Lean asserts
+  nothing for them.
+- **Three classical inputs:** theorems of the literature that are stated in Lean and used, and
+  not proved there.
+- The supplementary material (Chapters 8 and 14, Appendix E, §A.4, §B.7), on which the trace
+  formula does not rest, is partly stated and proved, and is not being worked on.
 
-Every open `sorry` is an issue that anyone can take. The
-[progress map](https://claude.ai/artifact/CtQyX8qfYAF822bgHJHHE3) has the current numbers, and
-the roadmap below the order of work.
+All of these are listed in [What is left: the open problems](https://github.com/mccorvie/riemann-masullo/issues/7349). The
+[progress map](https://claude.ai/artifact/CtQyX8qfYAF822bgHJHHE3) has the current numbers.
 
 ### What the formalization has found
 
-[`ERRATA.md`](ERRATA.md) has about 750 entries: some 270 statements that are false as printed,
-400 that are imprecise, inconsistent or wrongly justified, 50 placeholders or missing pieces,
-and 25 reports about parts of the paper that are not stated in Lean. Five outside audits have
+[`ERRATA.md`](ERRATA.md) has about 790 entries: some 280 statements that are false as printed,
+430 that are imprecise, inconsistent or wrongly justified, 50 placeholders or missing pieces,
+and 30 reports about parts of the paper that are not stated in Lean. Five outside audits have
 been compared with it report by report, and it names them where they found the same thing. Those in the appendices' and early
 chapters' accounts of standard material are repaired where they occur: the Lean states the
 corrected form and says so.
 
-The second wave has reached the paper's own constructions in Chapters 5–7, and the findings
-there weigh more. Most still come with a repair. Twenty-eight steps have none so far, and later
-results use them; `ERRATA.md` lists them first. The main one in Chapter 5 is the structure
-theorem for the spaces of adelic θ-functions (Theorem 5.2.1.1): its printed proof does not
-work. One of its two central claims, that each finite stage embeds in the global space, has
-since been proved in Lean by a different route. The other, strictness, is neither proved nor
-refuted, and the rest of §5.2 is proved from it. The explicit formulas of §B.4, which
-Chapter 12 quotes, need their local terms and normalizations recomputed.
+Most findings in the paper's own constructions, in Chapters 5–7 and 10–12, also come with a
+repair. Twenty-eight steps had none when they were found, and later results use them;
+`ERRATA.md` lists them first. Sixteen of the twenty-eight have since been proved in Lean: by an
+argument that is not the paper's, from another of the steps, or, in one case, from a published
+theorem that is taken as known. Among them are the structure theorem for the spaces of adelic
+θ-functions (Theorem 5.2.1.1), the reverse inclusion of the global converse theorem (Theorem
+6.3.2.1) and the spectral and orbital Markushevich bases (§10.2, §11.2). `ERRATA.md` says for
+each by which route. The explicit formula of §B.4, which Chapter 12 quotes, is proved in full,
+with its local terms and normalizations recomputed.
 
-The third wave has reached the trace formula. Twenty of the twenty-eight steps are in Chapters
-10–12 or in the later sections of Chapter 7: the bases and nuclear presentations from which the
-spectral and orbital traces are computed (§7.3–7.4, §10.2–10.4, §11.1–11.2) are not established by the
-printed arguments, and the section that should compare the global trace with the S-local one
-(§12.3) consists of its heading and a note to include it. These are the assessments of the
-agents that checked the entries against the pages, not a specialist's.
+Twelve steps remain open, all in Chapters 7 and 10–12: the separate convergence in Theorem
+7.1.2.3 and the Paley–Wiener orbital bases of Theorem 7.3.3.4, which meet the same arithmetic
+question; the normalized bases and the trace-norm estimates of §10.2–10.4; the lifts of
+(11.3.1.3)–(11.3.1.4); and the steps of Chapter 12 that lead to the trace formula, where the
+section that should compare the global trace with the S-local one (§12.3) consists of its
+heading and a note to include it. These are the assessments of the agents that checked the
+entries against the pages, not a specialist's. Each open step is one of the
+[open problems](https://github.com/mccorvie/riemann-masullo/issues/7349).
 
 ### Concerns about the main theorem
 
@@ -179,7 +201,9 @@ and its sections go in a directory of the same name (`RiemannMasullo/Ch02_Adelic
 (Chapter 1 is the informal introduction and has no file.)
 
 Third-party formalizations we build on are vendored under
-[`RiemannMasullo/External/`](RiemannMasullo/External/README.md); nothing is vendored yet.
+[`RiemannMasullo/External/`](RiemannMasullo/External/README.md), with credits in
+[`ATTRIBUTION.md`](RiemannMasullo/External/ATTRIBUTION.md). Class field theory comes from a Lake
+dependency and is used in a library of its own, [`RiemannMasulloClassField/`](RiemannMasulloClassField/README.md).
 
 ## Roadmap
 
@@ -188,10 +212,10 @@ trace formula:
 
 | Wave | Paper | Status |
 |---|---|---|
-| 1 | Appendices A.1–A.3, A.5, C, D; then Chapters 2–3 (adelic θ-functions, idelic zeta functions) and, independently, Chapters 4 and 9 (periodic Schauder bases, Hardy–Sobolev spaces) | all stated; most proofs done, the rest being closed out file by file: [open proof issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aproof+-label%3Aclaimed) |
-| 2 | Chapters 5–7, with Appendix B.1–B.6 | Appendix B.1–B.6, §5.1–5.3, §6.1–6.2 and §7.1 stated, proofs open; the remaining [section issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Asection) (§5.4–5.5, §6.3, §7.2–7.5) are being stated in dependency order |
-| 3 | Chapters 10–12: the trace formula; then Chapter 13 | seeded as [section issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Asection); statements in progress, in dependency order |
-| later | Chapters 8 and 14, Appendix E, A.4, B.7 | only when something needs them |
+| 1 | Appendices A.1–A.3, A.5, C, D; then Chapters 2–3 (adelic θ-functions, idelic zeta functions) and, independently, Chapters 4 and 9 (periodic Schauder bases, Hardy–Sobolev spaces) | stated and proved |
+| 2 | Chapters 5–7, with Appendix B.1–B.6 | stated; proved except for the open steps of Chapter 7 ([open problems](https://github.com/mccorvie/riemann-masullo/issues/7349)) and one classical input in Chapter 5 |
+| 3 | Chapters 10–12: the trace formula; then Chapter 13 | stated; proved except for the open steps of Chapters 10–12 ([open problems](https://github.com/mccorvie/riemann-masullo/issues/7349)) |
+| later | Chapters 8 and 14, Appendix E, A.4, B.7 | partly stated and proved; the trace formula does not rest on them |
 
 An issue labelled `blocked` is waiting for the sections it builds on. The appendices are mostly
 standard mathematics, and several pieces already exist in other Lean projects (see
@@ -209,9 +233,13 @@ sweepers close the `sorry`s, and an integrator and a merger review and merge. St
 ## Building
 
 ```sh
-lake exe cache get   # download prebuilt Mathlib
-lake build
+lake exe cache get                          # download prebuilt Mathlib
+lake build RiemannMasullo Challenge Main    # the library and the target theorems
+lake build                                  # everything, with the class field theory library
 ```
+
+The plain `lake build` also compiles the class field theory dependency, once (about five hours
+of one processor core).
 
 Pinned to Lean `v4.36.0` / Mathlib `v4.36.0`.
 
@@ -247,10 +275,10 @@ appeals to the library, and the route from there back to the paper is explicit:
 
 | Step | Where | State |
 |---|---|---|
-| The seven targets from the paper's main claim: translation to Mathlib's Hecke characters, and the classical reductions (Hecke to Dedekind to zeta, and to Dirichlet characters) | [`Ch13_ZerosHecke/Targets.lean`](RiemannMasullo/Ch13_ZerosHecke/Targets.lean) | stated and reviewed; nine supporting statements open, all classical |
+| The seven targets from the paper's main claim: translation to Mathlib's Hecke characters, and the classical reductions (Hecke to Dedekind to zeta, and to Dirichlet characters) | [`Ch13_ZerosHecke/Targets.lean`](RiemannMasullo/Ch13_ZerosHecke/Targets.lean) | proved from the main claim; nothing else is open beneath them |
 | The paper's main claim, `heckeL_zero_re_eq_half`: for every number field and every unitary character of its idele class group, the zeros of the completed Hecke L-function in the open critical strip lie on the line | [`Ch01_Introduction/Sec4.lean`](RiemannMasullo/Ch01_Introduction/Sec4.lean) | derived in Lean from the steps of §1.4 of the paper |
-| The steps of §1.4: the family of test functions, the uniform bound and Montel's theorem, the logarithmic derivative, the functional equation | the same file, and `Sec4_Printed.lean` | the uniform bound of §1.4.3 is false as printed (the objection raised by Jenny Lorraine Nielsen, confirmed here with a counterexample for the trivial rational character); the holomorphic extension that §1.4.5 needs is isolated as an open statement |
-| The trace formula, Theorem 12.5.1.1 | [`Ch12_TraceGeometric/Sec5.lean`](RiemannMasullo/Ch12_TraceGeometric/Sec5.lean) | stated in corrected form; the steps behind it with no known repair are listed at the head of [`ERRATA.md`](ERRATA.md) |
+| The steps of §1.4: the family of test functions, the uniform bound and Montel's theorem, the logarithmic derivative, the functional equation | the same file, and `Sec4_Printed.lean` | the uniform bound of §1.4.3 is false as printed (the objection raised by Jenny Lorraine Nielsen, confirmed here with a counterexample for the trivial rational character); the holomorphic extension that §1.4.5 needs is proved from the cancellation in Theorem 12.5.1.1 |
+| The trace formula, Theorem 12.5.1.1 | [`Ch12_TraceGeometric/Sec5.lean`](RiemannMasullo/Ch12_TraceGeometric/Sec5.lean) | stated in corrected form; its open step, the cancellation of the zeros outside the strip, is the recorded gap `traceFormula_exteriorZeros` ([#5571](https://github.com/mccorvie/riemann-masullo/issues/5571)), on which all seven targets rest, and on nothing else that is open |
 
 The paper has no numbered statement of its main theorem: Theorem 13.3.1.2 is a title in the
 current draft, and the claim is argued in the introduction (§1.4, pp. 27–31). The two targets

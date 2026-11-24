@@ -9,11 +9,10 @@ public import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
 public import Mathlib.Topology.Algebra.Module.Spaces.WeakBilin
 public import Mathlib.Topology.Algebra.Module.Spaces.WeakDual
 public import Mathlib.Topology.Compactness.Compact
-import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import RiemannMasullo.AppA_AlgebraicNT.Sec3
 import Mathlib.Analysis.Normed.Operator.Extend
 import Mathlib.Analysis.SpecificLimits.Basic
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
-import all RiemannMasullo.Ch10_TraceSpectral.Sec3
 import all RiemannMasullo.AppC_LCTVS.Sec3a
 import all RiemannMasullo.AppC_LCTVS.Sec3a_part2
 import Mathlib.MeasureTheory.Integral.DominatedConvergence
@@ -47,7 +46,7 @@ variable {F : Type*} [Field F] [NumberField F]
 local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
 local notation "μ𝔽" => ideleClassTamagawaMeasure F
 local notation "m𝔽" =>
-  (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C𝔽 →ₜ* ℝ≥0ˣ)
+  (continuousIdeleClassNorm F : C𝔽 →ₜ* ℝ≥0ˣ)
 local notation "logNorm" => (logIdeleClassNorm F)
 local notation "hStrip(" hα ")" => (neg_nonpos.mpr hα |>.trans hα)
 local notation "W(" α ", " s ")" => CompactIntervalSobolev μ𝔽 logNorm (-α) α s
@@ -959,7 +958,7 @@ private theorem geometricTruncatedConvolution_trace_remainder_tendsto_cutoff
     (F : Type*) [Field F] [NumberField F]
     (ε : ℝ → ℝ) (ρ : ℝ → (IdeleClassGroup (𝓞 F) F) → ℝ)
     (hε : Tendsto (fun R ↦ ε R * R) atTop (𝓝 0))
-    (hρ : ∀ᶠ R in atTop, IsModulatedCutoff (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) R (ε R) (ρ R) ∧
+    (hρ : ∀ᶠ R in atTop, IsModulatedCutoff (continuousIdeleClassNorm F : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) R (ε R) (ρ R) ∧
       0 < R⁻¹ + ε R ∧ R⁻¹ + ε R < R - ε R) :
     ∀ x, Tendsto (fun R ↦ ρ R x) atTop (𝓝 1) := by
   have heps : Tendsto ε atTop (𝓝 0) := by
@@ -975,9 +974,9 @@ private theorem geometricTruncatedConvolution_trace_remainder_tendsto_cutoff
       eventually_ge_atTop (b + 1)] with R he hR
     linarith
   intro x
-  have hx : 0 < (((⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) x).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hx : 0 < (((continuousIdeleClassNorm F : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) x).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
   apply tendsto_const_nhds.congr'
-  filter_upwards [hρ, hl.eventually (gt_mem_nhds hx), hu.eventually_ge_atTop (((⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) x).val : ℝ)] with R hcut hleft hright
+  filter_upwards [hρ, hl.eventually (gt_mem_nhds hx), hu.eventually_ge_atTop (((continuousIdeleClassNorm F : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) x).val : ℝ)] with R hcut hleft hright
   exact (hcut.1.eq_one ⟨hleft.le, hright⟩).symm
 
 /-- The class measure splits as kernel Haar measure times positive-real Haar measure. -/
@@ -1013,12 +1012,12 @@ private theorem geometricTruncatedConvolution_trace_remainder_tendsto_total
     (F : Type*) [Field F] [NumberField F] {α s : ℝ} (hα : 0 ≤ α) (hs : 0 ≤ s)
     (φ : BruhatCompactSupport (IdeleClassGroup (𝓞 F) F)) (ε : ℝ → ℝ) (ρ : ℝ → (IdeleClassGroup (𝓞 F) F) → ℝ)
     (hε : Tendsto (fun R ↦ ε R * R) atTop (𝓝 0))
-    (hρ : ∀ᶠ R in atTop, IsModulatedCutoff (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) R (ε R) (ρ R) ∧
+    (hρ : ∀ᶠ R in atTop, IsModulatedCutoff (continuousIdeleClassNorm F : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) R (ε R) (ρ R) ∧
       0 < R⁻¹ + ε R ∧ R⁻¹ + ε R < R - ε R) :
     ∃ traces : ℝ → ℂ,
-      (∀ᶠ R in atTop, ∃ hcut : IsModulatedCutoff (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) R (ε R) (ρ R),
-        ∃ hT : IsNuclearOperator (((modulatedCutoffOperator (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) ((ideleClassTamagawaMeasure F).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity (-α) α s (Real.log ((ideleClassNorm F g).val : ℝ))))) hcut).comp ((hardySobolevTestAction (ideleClassTamagawaMeasure F) (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) (-α) α s ((neg_nonpos.mpr hα).trans hα) hs φ))),
-          traces R = hilbertTrace (H := (CompactIntervalSobolev (ideleClassTamagawaMeasure F) (fun g : (IdeleClassGroup (𝓞 F) F) ↦ Real.log ((ideleClassNorm F g).val : ℝ)) (-α) α s)) ⟨((modulatedCutoffOperator (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) ((ideleClassTamagawaMeasure F).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity (-α) α s (Real.log ((ideleClassNorm F g).val : ℝ))))) hcut).comp ((hardySobolevTestAction (ideleClassTamagawaMeasure F) (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) (-α) α s ((neg_nonpos.mpr hα).trans hα) hs φ)), hT⟩) ∧
+      (∀ᶠ R in atTop, ∃ hcut : IsModulatedCutoff (continuousIdeleClassNorm F : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) R (ε R) (ρ R),
+        ∃ hT : IsNuclearOperator (((modulatedCutoffOperator (continuousIdeleClassNorm F : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) ((ideleClassTamagawaMeasure F).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity (-α) α s (Real.log ((ideleClassNorm F g).val : ℝ))))) hcut).comp ((hardySobolevTestAction (ideleClassTamagawaMeasure F) (continuousIdeleClassNorm F : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) (-α) α s ((neg_nonpos.mpr hα).trans hα) hs φ))),
+          traces R = hilbertTrace (H := (CompactIntervalSobolev (ideleClassTamagawaMeasure F) (fun g : (IdeleClassGroup (𝓞 F) F) ↦ Real.log ((ideleClassNorm F g).val : ℝ)) (-α) α s)) ⟨((modulatedCutoffOperator (continuousIdeleClassNorm F : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) ((ideleClassTamagawaMeasure F).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity (-α) α s (Real.log ((ideleClassNorm F g).val : ℝ))))) hcut).comp ((hardySobolevTestAction (ideleClassTamagawaMeasure F) (continuousIdeleClassNorm F : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) (-α) α s ((neg_nonpos.mpr hα).trans hα) hs φ)), hT⟩) ∧
       Tendsto (fun R ↦ traces R - ((2 * Real.log R * (normOneIdeleClassTamagawaMeasure F).real univ : ℝ) : ℂ) * φ.val 1)
         atTop (𝓝 0) := by
   let q : (AdeleRing (𝓞 F) F)ˣ →ₜ* (IdeleClassGroup (𝓞 F) F) := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
@@ -1031,19 +1030,19 @@ private theorem geometricTruncatedConvolution_trace_remainder_tendsto_total
   have hφs : IsBruhatSmooth φ.val := (mem_bruhatSmoothSubmodule_iff _).mp φ.property.1
   have hc := continuous_of_bruhatSmooth hφs
   have hb := hc.bounded_above_of_compact_support (show HasCompactSupport φ.val from φ.property.2)
-  have hm : IsModulation (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) := ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
-  have hconv := hardySobolevConvolution_eq_testAction (ideleClassTamagawaMeasure F) (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) (-α) α s (((neg_nonpos.mpr hα).trans hα)) hs φ hc.aemeasurable hb
+  have hm : IsModulation (continuousIdeleClassNorm F : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) := ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+  have hconv := hardySobolevConvolution_eq_testAction (ideleClassTamagawaMeasure F) (continuousIdeleClassNorm F : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) (-α) α s (((neg_nonpos.mpr hα).trans hα)) hs φ hc.aemeasurable hb
   have hTotExists : ∃ traces : ℝ → ℂ,
-      (∀ᶠ R in atTop, ∃ hcut : IsModulatedCutoff (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) R (ε R) (ρ R),
-        ∃ hT : IsNuclearOperator (((modulatedCutoffOperator (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) ((ideleClassTamagawaMeasure F).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity (-α) α s (Real.log ((ideleClassNorm F g).val : ℝ))))) hcut).comp
-          (hardySobolevConvolution (ideleClassTamagawaMeasure F) (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) (-α) α s (((neg_nonpos.mpr hα).trans hα)) hs φ.val hc.aemeasurable φ.property.2 hb)),
-          traces R = hilbertTrace ⟨((modulatedCutoffOperator (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) ((ideleClassTamagawaMeasure F).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity (-α) α s (Real.log ((ideleClassNorm F g).val : ℝ))))) hcut).comp
-            (hardySobolevConvolution (ideleClassTamagawaMeasure F) (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) (-α) α s (((neg_nonpos.mpr hα).trans hα)) hs φ.val hc.aemeasurable φ.property.2 hb), hT⟩) ∧
+      (∀ᶠ R in atTop, ∃ hcut : IsModulatedCutoff (continuousIdeleClassNorm F : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) R (ε R) (ρ R),
+        ∃ hT : IsNuclearOperator (((modulatedCutoffOperator (continuousIdeleClassNorm F : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) ((ideleClassTamagawaMeasure F).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity (-α) α s (Real.log ((ideleClassNorm F g).val : ℝ))))) hcut).comp
+          (hardySobolevConvolution (ideleClassTamagawaMeasure F) (continuousIdeleClassNorm F : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) (-α) α s (((neg_nonpos.mpr hα).trans hα)) hs φ.val hc.aemeasurable φ.property.2 hb)),
+          traces R = hilbertTrace ⟨((modulatedCutoffOperator (continuousIdeleClassNorm F : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) ((ideleClassTamagawaMeasure F).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity (-α) α s (Real.log ((ideleClassNorm F g).val : ℝ))))) hcut).comp
+            (hardySobolevConvolution (ideleClassTamagawaMeasure F) (continuousIdeleClassNorm F : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) (-α) α s (((neg_nonpos.mpr hα).trans hα)) hs φ.val hc.aemeasurable φ.property.2 hb), hT⟩) ∧
       Tendsto (fun R ↦ traces R - ((2 * Real.log R * (normOneIdeleClassTamagawaMeasure F).real univ : ℝ) : ℂ) * φ.val 1)
         atTop (𝓝 0) := by
     with_unfolding_all
       exact truncatedHardySobolevConvolution_trace_tendsto
-        (ideleClassTamagawaMeasure F) (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) (-α) α s (((neg_nonpos.mpr hα).trans hα)) hs φ.val hc.aemeasurable φ.property.2 hb
+        (ideleClassTamagawaMeasure F) (continuousIdeleClassNorm F : (IdeleClassGroup (𝓞 F) F) →ₜ* ℝ≥0ˣ) (-α) α s (((neg_nonpos.mpr hα).trans hα)) hs φ.val hc.aemeasurable φ.property.2 hb
         hm hφs τ hτ (normOneIdeleClassTamagawaMeasure F) hμ ε ρ hε hρlim hρ
   simpa only [hconv] using hTotExists
 

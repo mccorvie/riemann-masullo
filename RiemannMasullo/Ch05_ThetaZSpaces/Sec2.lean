@@ -4,8 +4,8 @@ public import RiemannMasullo.Ch05_ThetaZSpaces.Sec1
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
 import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec1d
-import all RiemannMasullo.AppA_AlgebraicNT.Sec1
-import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import RiemannMasullo.AppA_AlgebraicNT.Sec1
+import RiemannMasullo.AppA_AlgebraicNT.Sec3
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 import all RiemannMasullo.Ch02_AdelicTheta.Sec1
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2b
@@ -16,7 +16,7 @@ import Mathlib.Data.Finset.Lattice.Union
 import Mathlib.Analysis.Distribution.SchwartzSpace.CompactSupport
 import Mathlib.NumberTheory.NumberField.CanonicalEmbedding.Basic
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.InfiniteAdeleRing
-import all RiemannMasullo.AppC_LCTVS.Sec1
+import RiemannMasullo.AppC_LCTVS.Sec1
 import RiemannMasullo.AppC_LCTVS.Sec2b
 import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
 import RiemannMasullo.ForMathlib.Analysis.Normed.Group.InfiniteSum
@@ -1485,7 +1485,7 @@ maximal ideals. The maps are the templates of
 `sLocalAdelicThetaSpace_strictLF_finite_idele_classes`: any other dilate differs from one
 of these by a factor fixing the template and an S-unit, which can be moved to the
 archimedean test without changing the theta function. -/
-private theorem sLocalAdelicThetaSpace_strictLF_level_generators
+theorem sLocalAdelicThetaSpace_strictLF_level_generators
     (S : Finset (HeightOneSpectrum (𝓞 F))) (n : ℕ) :
     ∃ (d : ℕ) (p : Fin d →
         (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) →L[ℂ] ℬₛ(S))),
@@ -2357,7 +2357,8 @@ theorem sLocalThetaTransition_unique (hST : S ⊆ T) :
   quotientMap_unique (Kₛ(S)) (Kₛ(T)) (sAdeleSchwartzTransition F hST)
     (sLocalThetaTransition_preserves_kernel hST)
 
-private theorem quotientMap_comp {R X Y Z : Type*} [Ring R] [AddCommGroup X] [AddCommGroup Y]
+/-- Composing the maps induced on quotients is the map induced by the composite. -/
+theorem mapQ_comp_mapQ {R X Y Z : Type*} [Ring R] [AddCommGroup X] [AddCommGroup Y]
     [AddCommGroup Z] [Module R X] [Module R Y] [Module R Z] (K : Submodule R X) (L : Submodule R Y) (M : Submodule R Z)
     (f : X →ₗ[R] Y) (g : Y →ₗ[R] Z) (h : X →ₗ[R] Z)
     (hf : K ≤ L.comap f) (hg : L ≤ M.comap g) (hh : K ≤ M.comap h) (hc : g.comp f = h) :
@@ -2378,7 +2379,7 @@ private theorem testTransition_comp (hST : S ⊆ T) (hTU : T ⊆ U) :
 Two successive theta transitions agree with the direct transition. -/
 theorem sLocalThetaTransition_comp (hST : S ⊆ T) (hTU : T ⊆ U) :
     (sLocalThetaTransition (F := F) hTU).comp (sLocalThetaTransition hST) =
-      sLocalThetaTransition (hST.trans hTU) := quotientMap_comp _ _ _ _ _ _
+      sLocalThetaTransition (hST.trans hTU) := mapQ_comp_mapQ _ _ _ _ _ _
     (sLocalThetaTransition_preserves_kernel hST) (sLocalThetaTransition_preserves_kernel hTU)
     (sLocalThetaTransition_preserves_kernel (hST.trans hTU)) (testTransition_comp hST hTU)
 
@@ -2406,7 +2407,8 @@ theorem sLocalThetaToGlobal_mk (f : ℬₛ(S)) :
     sLocalThetaToGlobal F S (Submodule.Quotient.mk f) =
       Submodule.Quotient.mk (sAdeleSchwartzToGlobal F S f) := rfl
 
-private theorem injective_mapQ_of_comap_le {R X Y : Type*} [Ring R] [AddCommGroup X]
+/-- The map induced on quotients is injective when `L` pulls back into `K`. -/
+theorem injective_mapQ_of_comap_le {R X Y : Type*} [Ring R] [AddCommGroup X]
     [AddCommGroup Y] [Module R X] [Module R Y] (K : Submodule R X) (L : Submodule R Y)
     (j : X →ₗ[R] Y) (hj : K ≤ L.comap j) (hr : L.comap j ≤ K) :
     Injective (K.mapQ L j hj) := by
@@ -2423,7 +2425,7 @@ theorem sLocalThetaToGlobal_injective : Injective (sLocalThetaToGlobal F S) :=
 The stage insertions and transitions form a compatible family in the global quotient. -/
 theorem sLocalThetaToGlobal_comp (hST : S ⊆ T) :
     (sLocalThetaToGlobal F T).comp (sLocalThetaTransition hST) = sLocalThetaToGlobal F S :=
-  quotientMap_comp _ _ _ _ _ _
+  mapQ_comp_mapQ _ _ _ _ _ _
     (sLocalThetaTransition_preserves_kernel hST) sLocalThetaToGlobal_preserves_kernel
     sLocalThetaToGlobal_preserves_kernel (sAdeleSchwartzToGlobal_comp F hST)
 
@@ -2896,7 +2898,8 @@ private theorem descendQuotientAction {G E : Type*} [Group G] [TopologicalSpace 
   obtain ⟨f, rfl⟩ := K.mkQ_surjective x
   exact hτ.2 g f
 
-private theorem globalTheta_translate_apply (g : IdeleGroup (𝓞 F) F) (f : ℬ𝔽) (a : C𝔽) :
+/-- The adelic theta function of a translate is the theta function at the translated point. -/
+theorem adelicTheta_unitTranslate (g : IdeleGroup (𝓞 F) F) (f : ℬ𝔽) (a : C𝔽) :
     adelicTheta (schwartzBruhatUnitTranslate g f) a = adelicTheta f ((QuotientGroup.mk g)⁻¹ * a) := by
   induction a using QuotientGroup.induction_on with | H x => ?_
   change _ = adelicTheta f (QuotientGroup.mk (g⁻¹ * x))
@@ -2904,7 +2907,9 @@ private theorem globalTheta_translate_apply (g : IdeleGroup (𝓞 F) F) (f : ℬ
   exact tsum_congr fun t ↦ congrArg (fun y ↦ f (Multiplicative.ofAdd y))
     (mul_left_comm g.inv (algebraMap F 𝔸[F] (t : F)) x.val)
 
-private theorem thetaAction_of_translate {G E A : Type*} [Group G] [TopologicalSpace G]
+/-- A jointly continuous action by translations, compatible with `θ` and trivial on `N` through it,
+descends to a unique continuous action of `G ⧸ N` on `E ⧸ ker θ`. -/
+theorem existsUnique_quotientAction_of_translate {G E A : Type*} [Group G] [TopologicalSpace G]
     [IsTopologicalGroup G] [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
     [IsTopologicalAddGroup E] [TopologicalSpace A] (N : Subgroup G) [N.Normal]
     (θ : E →ₗ[ℂ] C(A, ℂ)) (T : G →* Module.End ℂ E) (t : G → E → E)
@@ -2939,7 +2944,8 @@ theorem finitePlaceSchwartz_dilation_sub_valuation (w : HeightOneSpectrum (𝓞 
     (fun x hx ↦ Valued.locally_const ((Valuation.ne_zero_iff _).mpr hx))
     _ hf hc hr c
 
-private theorem sum_orbit_invariant {G E : Type*} [Group G] [AddCommMonoid E] [Module ℂ E]
+/-- The sum over a finite orbit is invariant under the action. -/
+theorem sum_orbit_invariant {G E : Type*} [Group G] [AddCommMonoid E] [Module ℂ E]
     (r : G →* Module.End ℂ E) (f : E) (hf : (range fun g ↦ r g f).Finite) (g : G) :
     r g (∑ y ∈ hf.toFinset, y) = ∑ y ∈ hf.toFinset, y := by
   classical
@@ -3019,11 +3025,11 @@ theorem existsUnique_globalThetaAction :
   let θ := adelicThetaLinearMap F
   let t := schwartzBruhatUnitTranslate (R := 𝔸[F])
   let r (g : IdeleGroup (𝓞 F) F) (a : C𝔽) := (π g)⁻¹ * a
-  have hr : ∀ g f a, θ (t g f) a = θ f (r g a) := globalTheta_translate_apply (F := F)
+  have hr : ∀ g f a, θ (t g f) a = θ f (r g a) := adelicTheta_unitTranslate (F := F)
   have hc : Continuous (fun p : IdeleGroup (𝓞 F) F × ℬ𝔽 ↦ t p.1 p.2) :=
     global_unit_joint (F := F)
   have htt : ∀ g f, Tt g f = t g f := fun _ _ ↦ rfl
-  have result := thetaAction_of_translate (G := IdeleGroup (𝓞 F) F) (E := ℬ𝔽) (A := C𝔽)
+  have result := existsUnique_quotientAction_of_translate (G := IdeleGroup (𝓞 F) F) (E := ℬ𝔽) (A := C𝔽)
     N θ Tt t htt hc r hr h
   with_reducible exact result
 
@@ -3043,7 +3049,9 @@ private theorem insert_translate_eq (u : (integralAdelesOutside F S)ˣ) (f : ℬ
   refine Eq.trans (if_congr h.symm ?_ rfl) (toGlobal_apply_integral f (g.inv * y)).symm
   exact congrArg (fun t ↦ f (Multiplicative.ofAdd t)) (map_mul (adeleProjection F S) g.inv y).symm
 
-private theorem insert_translate_of_mem_range {g : IdeleGroup (𝓞 F) F}
+/-- Passing from S-adelic to global Schwartz–Bruhat functions commutes with translation by an
+inserted integral idele. -/
+theorem sAdeleSchwartzToGlobal_unitTranslate {g : IdeleGroup (𝓞 F) F}
     (hg : g ∈ Set.range (integralIdeleInsertion F T)) (f : ℬₛ(T)) :
     sAdeleSchwartzToGlobal F T
       (schwartzBruhatUnitTranslate (Units.map (adeleProjection F T).toMonoidHom g) f) =
@@ -3051,7 +3059,8 @@ private theorem insert_translate_of_mem_range {g : IdeleGroup (𝓞 F) F}
   obtain ⟨u, rfl⟩ := hg
   exact insert_translate_eq u f
 
-private theorem localTheta_translate_apply (g x : (SAdeleRing F S)ˣ) (f : ℬₛ(S)) :
+/-- The S-local adelic theta function of a translate is the theta function at the translated point. -/
+theorem sLocalAdelicTheta_unitTranslate (g x : (SAdeleRing F S)ˣ) (f : ℬₛ(S)) :
     sLocalAdelicTheta F S (schwartzBruhatUnitTranslate g f) x = sLocalAdelicTheta F S f (g⁻¹ * x) := by
   let d := (Units.map ((adeleProjection F S).comp (integralAdelesOutside F S).subtype).toMonoidHom).comp
     (Units.map (integralAdeleDiagonal F S).toMonoidHom)
@@ -3072,7 +3081,7 @@ private theorem test_insert_translate (g : (SAdeleRing F S)ˣ) (f : ℬₛ(S)) :
   have hp : Units.map (adeleProjection F S).toMonoidHom (j g) = g := Units.ext
     (Prod.ext (sIdeleInsertion_apply F S g).1 (funext (sIdeleInsertion_apply F S g).2.1))
   exact (congrArg (fun v ↦ sAdeleSchwartzToGlobal F S (schwartzBruhatUnitTranslate v f)) hp.symm).trans
-    (insert_translate_of_mem_range (F := F) (T := S) (g := j g) hu f)
+    (sAdeleSchwartzToGlobal_unitTranslate (F := F) (T := S) (g := j g) hu f)
 
 private theorem joint_of_inducing {H G X Y : Type*} [TopologicalSpace H] [TopologicalSpace G]
     [TopologicalSpace X] [TopologicalSpace Y] (a : H → X → X) (b : G → Y → Y)
@@ -3117,11 +3126,11 @@ theorem existsUnique_sLocalThetaAction :
   let t := schwartzBruhatUnitTranslate (R := SAdeleRing F S)
   let r (g a : (SAdeleRing F S)ˣ) := g⁻¹ * a
   have hr : ∀ g f a, θ (t g f) a = θ f (r g a) :=
-    fun g f a ↦ localTheta_translate_apply (F := F) (S := S) g a f
+    fun g f a ↦ sLocalAdelicTheta_unitTranslate (F := F) (S := S) g a f
   have hc : Continuous (fun p : (SAdeleRing F S)ˣ × ℬₛ(S) ↦ t p.1 p.2) :=
     local_unit_joint (F := F) (S := S)
   have htt : ∀ g f, Tt g f = t g f := fun _ _ ↦ rfl
-  have result := thetaAction_of_translate (G := (SAdeleRing F S)ˣ) (E := ℬₛ(S)) (A := (SAdeleRing F S)ˣ)
+  have result := existsUnique_quotientAction_of_translate (G := (SAdeleRing F S)ˣ) (E := ℬₛ(S)) (A := (SAdeleRing F S)ˣ)
     N θ Tt t htt hc r hr h
   with_reducible exact result
 
@@ -3144,7 +3153,7 @@ private theorem testTransition_translate_eq (hST : S ⊆ T)
   let gT := Units.map (adeleProjection F T).toMonoidHom g
   have hTS (k : ℬₛ(S)) : sAdeleSchwartzToGlobal F T (sAdeleSchwartzTransition F hST k) =
       sAdeleSchwartzToGlobal F S k := DFunLike.congr_fun (sAdeleSchwartzToGlobal_comp F hST) k
-  have hT := insert_translate_of_mem_range (insert_mem_larger hST u) (sAdeleSchwartzTransition F hST f)
+  have hT := sAdeleSchwartzToGlobal_unitTranslate (insert_mem_larger hST u) (sAdeleSchwartzTransition F hST f)
   exact (sAdeleSchwartzToGlobal_isEmbedding F T).injective
     ((hTS _).trans ((insert_translate_eq u f).trans
         ((congrArg (schwartzBruhatUnitTranslate g) (hTS f).symm).trans hT.symm)))
@@ -3657,7 +3666,7 @@ private theorem eval_translate_slice {S : Finset V} (g : (SAdeleRing F S)ˣ) :
   let L := (K(S)).mkQL.comp tr
   refine ⟨L, fun f ↦ rfl, fun f a ↦ ?_⟩
   change sLocalAdelicTheta F S (schwartzBruhatUnitTranslate g⁻¹ f) a = _
-  exact (localTheta_translate_apply (F := F) (S := S) g⁻¹ a f).trans
+  exact (sLocalAdelicTheta_unitTranslate (F := F) (S := S) g⁻¹ a f).trans
     (congrArg (fun t ↦ sLocalAdelicTheta F S f (t * a)) (inv_inv g))
 
 private theorem old_mem_iff {S : Finset V} (v : V) (hv : v ∉ S) (t : Fˣ) :
@@ -4074,7 +4083,8 @@ private theorem exists_unit_probability (U : Type*) [CommGroup U] [TopologicalSp
   let ν := Measure.haarMeasure K
   exact ⟨ν, ⟨Measure.haarMeasure_self (K₀ := K)⟩, inferInstance⟩
 
-private theorem exists_unit_cut_parameter (v : V) : ∃ c : (v.adicCompletion F)ˣ, Valued.v c.val = WithZero.exp (1 : ℤ) := by
+/-- Every finite place has a unit of valuation `exp 1` in its completion. -/
+theorem exists_unit_cut_parameter (v : V) : ∃ c : (v.adicCompletion F)ˣ, Valued.v c.val = WithZero.exp (1 : ℤ) := by
   have h := v.valuedAdicCompletion_surjective F (WithZero.exp (1 : ℤ))
   let p := h.choose
   have hp : Valued.v p = WithZero.exp (1 : ℤ) := h.choose_spec
@@ -4598,7 +4608,7 @@ theorem globalThetaAction_eval
       (ρ q ((K𝔽).mkQ f)) = adelicTheta f (q⁻¹ * a) :=
   QuotientGroup.induction_on q fun g ↦ (congrArg
     (thetaQuotientEval (adelicThetaLinearMap F) a (adelicTheta_eval_continuous a))
-    (h g f)).trans (globalTheta_translate_apply g f a)
+    (h g f)).trans (adelicTheta_unitTranslate g f a)
 
 end CoinvariantAverages
 
@@ -4663,7 +4673,7 @@ theorem sLocalThetaAction_eval
   let π : (SAdeleRing F S)ˣ →* Jₛ(S) := QuotientGroup.mk' _
   refine QuotientGroup.induction_on q fun g ↦ (congrArg
     (thetaQuotientEval (sLocalAdelicTheta F S) a (sLocalAdelicTheta_continuous_eval a)) (h g f)).trans ?_
-  exact (localTheta_translate_apply g a f).trans
+  exact (sLocalAdelicTheta_unitTranslate g a f).trans
     ((sLocalAdelicThetaOnClasses_mk F S f (g⁻¹ * a)).symm.trans
       (congrArg (sLocalAdelicThetaOnClasses F S f) ((π.map_mul _ _).trans
         ((congrArg (· * π a) (π.map_inv g)).trans (mul_comm ((π g)⁻¹) (π a))))))

@@ -8,7 +8,7 @@ public import Mathlib.MeasureTheory.Measure.Regular
 public import Mathlib.Topology.Algebra.Module.Complement
 public import Mathlib.Topology.ContinuousMap.Bounded.Normed
 import Mathlib.Data.Set.FiniteExhaustion
-import all RiemannMasullo.AppC_LCTVS.Sec1
+import RiemannMasullo.AppC_LCTVS.Sec1
 import Mathlib.Analysis.Normed.Group.FunctionSeries
 import Mathlib.Analysis.Normed.Module.Dual
 import RiemannMasullo.ForMathlib.Analysis.Normed.Operator.AbsolutelySumming.Composition

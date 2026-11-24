@@ -32,7 +32,7 @@ attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorel
 local notation "C𝔽(" F ")" => IdeleClassGroup (𝓞 F) F
 local notation "C₁(" F ")" => (ideleClassNorm F).ker
 local notation "m𝔽(" F ")" =>
-  (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C𝔽(F) →ₜ* ℝ≥0ˣ)
+  (continuousIdeleClassNorm F : C𝔽(F) →ₜ* ℝ≥0ˣ)
 local notation "h₀" => le_rfl (a := (0 : ℝ))
 local notation "hStrip(" hα ")" => (neg_nonpos.mpr hα |>.trans hα)
 local notation "hs₀(" hs ")" => le_of_lt (zero_lt_one.trans hs)

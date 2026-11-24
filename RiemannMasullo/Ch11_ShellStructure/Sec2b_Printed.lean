@@ -42,9 +42,9 @@ local notation "C𝔽(" F ")" => IdeleClassGroup (𝓞 F) F
 local notation "C₁(" F ")" => (ideleClassNorm F).ker
 local notation "V(" F ")" => HeightOneSpectrum (𝓞 F)
 local notation "m𝔽(" F ")" =>
-  (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C𝔽(F) →ₜ* ℝ≥0ˣ)
+  (continuousIdeleClassNorm F : C𝔽(F) →ₜ* ℝ≥0ˣ)
 local notation "mₛ(" F ", " S ")" =>
-  (⟨sIdeleQuotientNorm F S, (isProperMap_sIdeleQuotientNorm F S).continuous⟩ :
+  (continuousSIdeleQuotientNorm F S :
     SIdeleQuotient F S →ₜ* ℝ≥0ˣ)
 local notation "μₛ(" F ", " S ")" => sLocalQuotientTamagawaMeasure F S
 local notation "Wω(" F ", " hs ", " ω ")" =>

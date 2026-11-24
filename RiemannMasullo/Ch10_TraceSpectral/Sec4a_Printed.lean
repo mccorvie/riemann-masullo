@@ -23,7 +23,7 @@ attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorel
 
 local notation "C𝔽(" F ")" => IdeleClassGroup (𝓞 F) F
 local notation "m𝔽(" F ")" =>
-  (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C𝔽(F) →ₜ* ℝ≥0ˣ)
+  (continuousIdeleClassNorm F : C𝔽(F) →ₜ* ℝ≥0ˣ)
 local notation "W(" F ", " s ")" => CompactIntervalSobolev (ideleClassTamagawaMeasure F)
   (fun g : C𝔽(F) ↦ Real.log ((ideleClassNorm F g).val : ℝ)) 0 0 s
 

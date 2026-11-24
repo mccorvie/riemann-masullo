@@ -55,7 +55,7 @@ local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
 local notation "C₁" => (ideleClassNorm F).ker
 local notation "μ𝔽" => ideleClassTamagawaMeasure F
 local notation "m𝔽" =>
-  (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C𝔽 →ₜ* ℝ≥0ˣ)
+  (continuousIdeleClassNorm F : C𝔽 →ₜ* ℝ≥0ˣ)
 local notation "logNorm" => (logIdeleClassNorm F)
 local notation "W(" l ", " r ", " s ")" => CompactIntervalSobolev μ𝔽 logNorm l r s
 local notation "W'(" l ", " r ", " s ")" => CompactIntervalSobolev μ𝔽 logNorm l r s true
@@ -616,7 +616,7 @@ theorem exists_spectralBasepointChoice (F : Type*) [Field F] [NumberField F] :
     ∃ χ : PontryaginDual (ideleClassNorm F).ker → PontryaginDual (IdeleClassGroup (𝓞 F) F),
       IsSpectralBasepointChoice χ := by
   let C := IdeleClassGroup (𝓞 F) F
-  let n : C →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+  let n : C →ₜ* ℝ≥0ˣ := continuousIdeleClassNorm F
   let q : IdeleGroup (𝓞 F) F →ₜ* C := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
   let σ : ℝ≥0ˣ →ₜ* C := q.comp
     ⟨canonicalIdeleNormSection F, canonicalIdeleNormSection_continuous F⟩

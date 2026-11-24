@@ -5,7 +5,7 @@ public import RiemannMasullo.AppB_AnalyticNT.Sec2
 public import RiemannMasullo.AppC_LCTVS.Sec5b
 public import Mathlib.Analysis.Distribution.SchwartzSpace.Fourier
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2b
-import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
+import RiemannMasullo.Ch02_AdelicTheta.Sec2a
 import all RiemannMasullo.Ch02_AdelicTheta.Sec3
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3
 import all RiemannMasullo.AppB_AnalyticNT.Sec2
@@ -18,6 +18,7 @@ import RiemannMasullo.ForMathlib.RingTheory.Trace.Defs
 import Mathlib.Analysis.Calculus.ParametricIntegral
 import Mathlib.Analysis.SpecialFunctions.PolarCoord
 import Mathlib.Analysis.Calculus.Taylor
+import Mathlib.Analysis.Calculus.FDeriv.Symmetric
 import Mathlib.Analysis.Complex.Liouville
 import Mathlib.Analysis.Meromorphic.RCLike
 import Mathlib.Topology.LocallyConstant.Algebra

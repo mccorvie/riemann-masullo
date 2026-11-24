@@ -12,8 +12,8 @@ import all RiemannMasullo.AppC_LCTVS.Sec2a_part2
 import RiemannMasullo.AppC_LCTVS.Sec2b
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import all RiemannMasullo.AppC_LCTVS.Sec5b
-import all RiemannMasullo.AppA_AlgebraicNT.Sec3
-import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
+import RiemannMasullo.AppA_AlgebraicNT.Sec3
+import RiemannMasullo.Ch02_AdelicTheta.Sec2a
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 import Mathlib.Topology.Homeomorph.Lemmas

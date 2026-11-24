@@ -61,7 +61,7 @@ note, not a finding: do not report a statement as false because it is hard.
 
 Put helper lemmas directly above the declaration in the same file, as `private theorem` with
 all their arguments written out, and named after the declaration they serve. A pull request that
-only fills in proofs and adds private lemmas is merged without waiting for anyone. A public
+only fills in proofs and adds private lemmas is the quickest to read and merge. A public
 lemma, a `def`, an `instance`, an attribute, or a new `variable`, `open`, `section` or
 `set_option` line makes it wait for a reader, and a new `variable` or `universe` line can also
 change the statement hashes of the declarations below it (`AGENTS.md`, "Building and checking").

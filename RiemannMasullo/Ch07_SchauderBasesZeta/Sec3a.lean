@@ -3208,7 +3208,7 @@ private local instance sLocalOrbitalQuotient_secondCountable : SecondCountableTo
     (sIdeleGroup_description F S).1.secondCountableTopology
   infer_instance
 
-local notation "mGroup" => (⟨mₛ, (isProperMap_sIdeleQuotientNorm F S).continuous⟩ : Jₛ →ₜ* ℝ≥0ˣ)
+local notation "mGroup" => (continuousSIdeleQuotientNorm F S : Jₛ →ₜ* ℝ≥0ˣ)
 local notation "ModelIndex(" p "," ω ")" =>
   {k : PontryaginDual Jₛ × ℕ // k.2 < modulatedPeriodicMultiplicity mGroup ω⁻¹
     (sLocalOrbitalDifferenceGenerator p ω) k.1}

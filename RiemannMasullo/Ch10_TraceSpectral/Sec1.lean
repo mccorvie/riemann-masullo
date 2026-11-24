@@ -8,7 +8,7 @@ public import RiemannMasullo.Ch09_HardySobolev.Sec3
 import RiemannMasullo.Ch05_ThetaZSpaces.Sec5
 
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
-import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import RiemannMasullo.AppA_AlgebraicNT.Sec3
 import all RiemannMasullo.Ch09_HardySobolev.Sec2
 import all RiemannMasullo.Ch02_AdelicTheta.Sec3
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2b
@@ -55,9 +55,9 @@ local instance instSAdeleMeasurableSpaceSec1 : MeasurableSpace (SAdeleRing F S) 
   instMeasurableSpaceSAdeleRing F S
 
 local notation "m𝔽" =>
-  (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C𝔽 →ₜ* ℝ≥0ˣ)
+  (continuousIdeleClassNorm F : C𝔽 →ₜ* ℝ≥0ˣ)
 local notation "mₛ" =>
-  (⟨sIdeleQuotientNorm F S, (isProperMap_sIdeleQuotientNorm F S).continuous⟩ :
+  (continuousSIdeleQuotientNorm F S :
     Jₛ →ₜ* ℝ≥0ˣ)
 local notation "logNorm(" m ")" => (fun g ↦ Real.log (((m) g).val : ℝ))
 local notation "W𝔽(" α ", " β ", " s ")" => CompactIntervalSobolev μ𝔽 (logIdeleClassNorm F) α β s
@@ -257,7 +257,7 @@ private theorem existsUnique_globalThetaSobolevEmbedding_integrable :
       (IdeleGroup (𝓞 F) F ⧸ IdeleGroup.principalSubgroup (𝓞 F) F))
   have : (μ𝔽).IsHaarMeasure := (ideleClassTamagawaMeasure_isWeil F).1
   have : (μ𝔽).Regular := (ideleClassTamagawaMeasure_isWeil F).2.1
-  let m : C𝔽 →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+  let m : C𝔽 →ₜ* ℝ≥0ˣ := continuousIdeleClassNorm F
   have hm : IsModulation m := ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
   let L : C𝔽 → ℝ := fun g ↦ Real.log (((ideleClassNorm F g : ℝ≥0ˣ) : ℝ≥0) : ℝ)
   have hLm : Measurable L :=
@@ -357,11 +357,11 @@ exp(-|log |g||). -/
 private theorem existsUnique_globalThetaSobolevEmbedding_pointwise (a α β s : ℝ) (hs : 0 ≤ s)
     (N : ℕ) (hN : |a| + |α| + |β| + s + 1 ≤ N) (C : ℝ) (f : (SchwartzBruhat (Multiplicative 𝔸[F])))
     (hf : ∀ g : C𝔽, ‖adelicTheta f g‖ ≤ C * Real.exp (-(N : ℝ) * |Real.log (((ideleClassNorm F g : ℝ≥0ˣ) : ℝ≥0) : ℝ)|)) (g : C𝔽) :
-    ‖modulationWeight (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ :
+    ‖modulationWeight (continuousIdeleClassNorm F :
         C𝔽 →ₜ* ℝ≥0ˣ) a (adelicTheta f) g‖ ^ 2 *
       intervalSobolevDensity α β s (Real.log (((ideleClassNorm F g : ℝ≥0ˣ) : ℝ≥0) : ℝ)) ≤ C ^ 2 * Real.exp (-|Real.log (((ideleClassNorm F g : ℝ≥0ˣ) : ℝ≥0) : ℝ)|) := by
   have hn : 0 < (((ideleClassNorm F g : ℝ≥0ˣ) : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
-  have hw : ‖modulationWeight (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ :
+  have hw : ‖modulationWeight (continuousIdeleClassNorm F :
       C𝔽 →ₜ* ℝ≥0ˣ) a (adelicTheta f) g‖ =
         Real.exp (a * Real.log (((ideleClassNorm F g : ℝ≥0ˣ) : ℝ≥0) : ℝ)) * ‖adelicTheta f g‖ := by
     change ‖(((((ideleClassNorm F g : ℝ≥0ˣ) : ℝ≥0) : ℝ) ^ a : ℝ) : ℂ) * adelicTheta f g‖ = _
@@ -1349,7 +1349,7 @@ theorem exists_sLocalThetaSobolevUnweightedAction {a α β s : ℝ} (ha : 0 < a)
     (sLocalQuotientTamagawaMeasure_isWeil (F := F) (S := S)).1
   let μ := sLocalQuotientTamagawaMeasure F S
   let m : SIdeleQuotient F S →ₜ* ℝ≥0ˣ :=
-    ⟨sIdeleQuotientNorm F S, (isProperMap_sIdeleQuotientNorm F S).continuous⟩
+    (continuousSIdeleQuotientNorm F S)
   let E := (existsUnique_sLocalThetaSobolevEmbedding (F := F) (S := S)
     a α β s ha hI hs hp).exists.choose
   let σ := (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose

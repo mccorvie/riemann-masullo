@@ -462,7 +462,7 @@ def Printed.sLocalCarving_cutoff_norm : Prop :=
       let μ := ideleClassTamagawaMeasure F
       let ν := μ.withDensity
         (fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (Real.log (norm[F] g))))
-      let m : C[F] →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+      let m : C[F] →ₜ* ℝ≥0ˣ := continuousIdeleClassNorm F
       let θ := homogeneousAdelicTheta (ω[F, χ]) f.val
       let u := (memLp_homogeneousTheta_zeroLine s (ω[F, χ]) f).toLp θ
       ‖modulatedAbsoluteCutoffOperator m ν (band[twoSided, Λ]) (bandMeasurable[twoSided, Λ]) u‖ =

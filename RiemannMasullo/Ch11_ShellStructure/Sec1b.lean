@@ -3,7 +3,9 @@ module
 public import RiemannMasullo.Ch10_TraceSpectral.Sec1
 public import RiemannMasullo.Ch11_ShellStructure.Sec1a
 
-import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import RiemannMasullo.AppA_AlgebraicNT.Sec3
+import Mathlib.MeasureTheory.Measure.Haar.DistribChar
+import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import RiemannMasullo.Ch05_ThetaZSpaces.Sec5
 import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
 import RiemannMasullo.Ch09_HardySobolev.Sec2
@@ -54,7 +56,7 @@ local notation "μ₁" => normOneIdeleClassTamagawaMeasure F
 local notation "ℬ₀" => ↥(adelePolarSubspace F)
 local notation "ℬₛ(" S ")" => SchwartzBruhat (Multiplicative (SAdeleRing F S))
 local notation "m𝔽" =>
-  (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C𝔽 →ₜ* ℝ≥0ˣ)
+  (continuousIdeleClassNorm F : C𝔽 →ₜ* ℝ≥0ˣ)
 local notation "norm𝔽" => fun g : C𝔽 ↦ ((ideleClassNorm F g).val : ℝ)
 local notation "classOf" => QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 F) F)
 

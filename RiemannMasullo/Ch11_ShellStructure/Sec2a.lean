@@ -4,9 +4,9 @@ public import RiemannMasullo.Ch10_TraceSpectral.Sec2
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import Mathlib.Analysis.SpecialFunctions.Complex.Analytic
 
-import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
+import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
+import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 public import RiemannMasullo.Ch11_ShellStructure.Sec1b
-import all RiemannMasullo.Ch11_ShellStructure.Sec1b
 
 /-! # Orbital Markushevich bases on the 0-line
 
@@ -34,7 +34,7 @@ local notation "C₁" => (ideleClassNorm F).ker
 local notation "V" => HeightOneSpectrum (𝓞 F)
 local notation "μ𝔽" => ideleClassTamagawaMeasure F
 local notation "m𝔽" =>
-  (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C𝔽 →ₜ* ℝ≥0ˣ)
+  (continuousIdeleClassNorm F : C𝔽 →ₜ* ℝ≥0ˣ)
 local notation "logNorm" => (logIdeleClassNorm F)
 local notation "W(" s ")" => CompactIntervalSobolev μ𝔽 logNorm 0 0 s
 local notation "W'(" s ")" => CompactIntervalSobolev μ𝔽 logNorm 0 0 s true

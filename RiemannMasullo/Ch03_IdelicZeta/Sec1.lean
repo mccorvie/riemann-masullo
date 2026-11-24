@@ -1047,6 +1047,17 @@ theorem isProperMap_sIdeleQuotientNorm : IsProperMap (sIdeleQuotientNorm F S) :=
   exact isProperMap_of_comp_of_surj hπ.continuous
     (hπ.continuous_comp_iff.mp hcomp.continuous) hcomp hπ.surjective
 
+/-- The idele class norm as a continuous homomorphism, the modulus `m` of Chapters 9–12.
+Named so that instance arguments over spaces built from it mention one constant: written out as
+`⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩`, every one of them carried a copy. -/
+abbrev continuousIdeleClassNorm :
+    NumberField.IdeleClassGroup (NumberField.RingOfIntegers F) F →ₜ* ℝ≥0ˣ :=
+  ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+
+/-- The norm of the S-idele quotient as a continuous homomorphism; see `continuousIdeleClassNorm`. -/
+abbrev continuousSIdeleQuotientNorm : SIdeleQuotient F S →ₜ* ℝ≥0ˣ :=
+  ⟨sIdeleQuotientNorm F S, (isProperMap_sIdeleQuotientNorm F S).continuous⟩
+
 /-- Paper: §3.1.2, p. 120. The global idelic module supplies complex exponent charts on
 the space of Hecke characters. -/
 theorem ideleClass_hasNormTwistCharts : HasNormTwistCharts (ideleClassNorm F) := by

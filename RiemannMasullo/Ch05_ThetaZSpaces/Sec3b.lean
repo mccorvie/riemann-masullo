@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
+public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
 
 import RiemannMasullo.Ch02_AdelicTheta.Sec2b
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3b
@@ -12,12 +13,11 @@ import RiemannMasullo.External.TauCeti.Analysis.Complex.Pompeiu.Basic
 import RiemannMasullo.ForMathlib.Analysis.Complex.PeriodicStrip
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Algebra.Order.Archimedean.Real.Hom
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a_part2
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a_part2
 import all RiemannMasullo.Ch02_AdelicTheta.Sec1
 import RiemannMasullo.Ch03_IdelicZeta.Sec3b
@@ -2587,7 +2587,7 @@ theorem archimedeanWeightedSchwartz_empty_equiv (I : Set ℝ) :
   let a : W := (Empty.elim, Empty.elim)
   have htwist (b : W) (f : E) (u : G) : archimedeanSchwartzTwist I b f u = f.val u := by
     simp [archimedeanSchwartzTwist_apply]
-  obtain ⟨f, hf, _⟩ := schwartzBruhat_exists_test (1 : G) 1
+  obtain ⟨f, hf, _⟩ := schwartzBruhat_exists_separating_function (1 : G) 1
   let f₀ : E := ⟨f.val, by
     apply (Submodule.mem_iInf _).mpr
     intro b
@@ -10710,9 +10710,9 @@ private theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_radial_m
     (χ : PontryaginDual Jₛ) (f : ℬₛ) (τ : ℝ≥0ˣ →ₜ* Jₛ) (hτ : RightInverse τ mₛ) (p : ℝ → ℂ)
     (hp : ∀ g : Jₛ, (χ g : ℂ) * thetaAt(χ₁(χ)) f g = p (Real.log ((mₛ g).val : ℝ))) :
     (⇑(thetaAt(χ₁(χ)) f) : Jₛ → ℂ) ∈ modulatedExponentialDecaySubmodule
-      ⟨mₛ, (isProperMap_sIdeleQuotientNorm F S).continuous⟩ univ ↔ p ∈ logExponentialDecaySubmodule univ := by
+      (continuousSIdeleQuotientNorm F S) univ ↔ p ∈ logExponentialDecaySubmodule univ := by
   obtain ⟨ht₂, hsc, hlc⟩ := sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_group (F := F) (S := S)
-  let m : Jₛ →ₜ* ℝ≥0ˣ := ⟨mₛ, (isProperMap_sIdeleQuotientNorm F S).continuous⟩
+  let m : Jₛ →ₜ* ℝ≥0ˣ := continuousSIdeleQuotientNorm F S
   obtain ⟨t₀, ht₀⟩ := exists_ne (1 : ℝ≥0ˣ)
   have hm : IsModulation m := ⟨isProperMap_sIdeleQuotientNorm F S, τ t₀, (hτ t₀).trans_ne ht₀⟩
   let v : Jₛ → ℂ := thetaAt(χ₁(χ)) f
@@ -10729,7 +10729,7 @@ norm-one isotype property already supplied by §2.3. -/
 theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay (χ : PontryaginDual Jₛ) (f : ℬₛ) :
     AnalyticOnNhd ℂ (fun s ↦ sLocalIdelicZFunction f (chartₛ(χ) s)) univ ↔
       (⇑(thetaAt(χ₁(χ)) f) : Jₛ → ℂ) ∈ modulatedExponentialDecaySubmodule
-        ⟨mₛ, (isProperMap_sIdeleQuotientNorm F S).continuous⟩ univ := by
+        (continuousSIdeleQuotientNorm F S) univ := by
   let r (w : {w : InfinitePlace F // w.IsReal}) :
       {e : w.val.Completion ≃+* ℝ // IsHomeomorph (e : w.val.Completion → ℝ)} :=
     ⟨InfinitePlace.Completion.ringEquivRealOfIsReal w.property,
