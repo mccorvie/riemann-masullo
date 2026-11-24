@@ -7340,6 +7340,123 @@ theorem introTraceApprox_archimedean_reference_tendsto (h ρ : ℕ → ℝ → �
     fun v ↦ (hlocal v).2.1, fun v ↦ (hlocal v).2.2,
     introTraceApprox_archimedean_reference_matched_sum χ h (ρ ∘ k) hAk w₀ hw₀ hmatch⟩
 
+open Classical in
+/-- Paper: §§1.4.3–1.4.5, pp. 29–30. A single admissible cutoff family gives the combined trace relative to an arbitrary
+anchor anywhere in the chart. The difference has an explicit holomorphic limit.
+Convergence at the anchor controls the original combined functions on the whole chart,
+including after restricting to any cofinal sequence. -/
+theorem introTrace_combined_cutoff_anchor :
+    ∃ h ρ : ℕ → ℝ → ℝ, IsIntroTraceApproximation h ρ ∧
+      ∀ (χ : U𝔽) (a : ℝ), 0 ≤ a → ∀ w : ℂ, a < w.re →
+        let C (n : ℕ) (z : ℂ) := archSum(χ, approx(h, ρ, n, z)) + introTraceSpectralSum χ approx(h, ρ, n, z) a
+        let K (z : ℂ) := archSum(χ, (fun t ↦ introTracePower z t - introTracePower w t)) +
+          ∑' r : windowZeros(χ, a), (zeroOrder(χ, r.val) : ℂ) *
+            (1 / (z - (r.val - 1 / 2)) - 1 / (w - (r.val - 1 / 2)))
+        AnalyticOnNhd ℂ K right(a) ∧ K w = 0 ∧
+          TendstoLocallyUniformlyOn (fun n z ↦ C n z - C n w) K atTop right(a) ∧
+          ∀ k : ℕ → ℕ, Tendsto k atTop atTop → ∀ c : ℂ,
+            (Tendsto (fun n ↦ C (k n) w) atTop (𝓝 c) ↔
+              TendstoLocallyUniformlyOn (fun n ↦ C (k n)) (fun z ↦ K z + c) atTop right(a)) := by
+  obtain ⟨h, ρ, hA, hmatch, hspec⟩ := introTraceApprox_exists_reference_spectral_matched (F := F)
+  refine ⟨h, ρ, hA, ?_⟩
+  intro χ a ha w hw C K
+  have hw' : -(1/2:ℝ) < w.re := by linarith
+  have hsub : right(a) ⊆ right(-(1/2:ℝ)) := fun z hz ↦ by
+    change -(1/2:ℝ) < z.re
+    linarith [show a < z.re from hz]
+  have hmap : MapsTo (fun _ : ℂ ↦ w) right(a) right(a) := fun _ _ ↦ hw
+  have harch := (introTraceApprox_archimedean_reference_matched_sum χ h ρ hA w hw' hmatch).mono hsub
+  have hsp := hspec χ a ha (fun _ ↦ w) hmap (differentiableOn_const w)
+  have hlocal := harch.add hsp
+  have hD : TendstoLocallyUniformlyOn (fun n z ↦ C n z - C n w) K atTop right(a) := by
+    apply hlocal.congr
+    intro n z _
+    dsimp only [C,Pi.add_apply]
+    ring
+  have h0 : K w = 0 := by
+    have hlim : Tendsto (fun _ : ℕ ↦ (0:ℂ)) atTop (𝓝 (K w)) := by simpa using hD.tendsto_at (a := w) hw
+    exact tendsto_nhds_unique hlim tendsto_const_nhds
+  have harchA := Finset.analyticOnNhd_fun_sum Finset.univ (fun v _ ↦
+    (introTraceApprox_archimedean_reference_matched χ v h ρ hA w hw' hmatch).1.mono hsub)
+  have hspA := (introTrace_spectral_referenceSub χ a _ hmap (differentiableOn_const w)).2.2.2
+  refine ⟨harchA.add hspA,h0,hD,?_⟩
+  intro k hk c
+  constructor
+  · intro hc
+    have hsubseq : TendstoLocallyUniformlyOn (fun n z ↦ C (k n) z - C (k n) w) K atTop right(a) := by
+      intro u hu z hz
+      obtain ⟨neighborhood, hV, hU⟩ := hD u hu z hz
+      exact ⟨neighborhood,hV,hk.eventually hU⟩
+    apply (hsubseq.add (hc.tendstoUniformlyOn_const (s := right(a))).tendstoLocallyUniformlyOn).congr
+    intro n z _
+    simp only [Pi.add_apply,sub_add_cancel]
+  · intro hlim
+    simpa only [h0,zero_add] using hlim.tendsto_at (a := w) hw
+
+/-- A strictly increasing reindexing of both cutoff sequences preserves admissibility. -/
+private theorem introTraceApproximation_comp_strictMono {h ρ : ℕ → ℝ → ℝ} (hA : IsIntroTraceApproximation h ρ)
+    {k : ℕ → ℕ} (hk : StrictMono k) : IsIntroTraceApproximation (h ∘ k) (ρ ∘ k) := by
+  obtain ⟨hh, hm, ht, ε, hε, hρ⟩ := hA
+  exact ⟨fun n ↦ hh (k n), hm.comp hk.monotone, fun t ht' ↦ (ht t ht').comp hk.tendsto_atTop,
+    ε ∘ k, hε.comp hk.tendsto_atTop, fun n ↦ hρ (k n)⟩
+
+open Classical in
+/-- Paper: §1.4.5, p. 30. On one matched cutoff family a cofinal holomorphic limit on the whole window
+exists exactly when the combined cutoff visits a bounded set infinitely often at
+one point of the window. The retained subsequence is itself admissible. -/
+theorem introTrace_combined_cutoff_subsequence_iff_bounded :
+    ∃ h ρ : ℕ → ℝ → ℝ, IsIntroTraceApproximation h ρ ∧
+      ∀ (χ : U𝔽) (a : ℝ), 0 ≤ a → ∀ w : ℂ, a < w.re →
+        let C (n : ℕ) (z : ℂ) := archSum(χ, approx(h, ρ, n, z)) + introTraceSpectralSum χ approx(h, ρ, n, z) a
+        (∃ R : ℝ, ∃ᶠ n in atTop, ‖C n w‖ ≤ R) ↔
+          ∃ (k : ℕ → ℕ) (H : ℂ → ℂ), StrictMono k ∧ IsIntroTraceApproximation (h ∘ k) (ρ ∘ k) ∧
+            AnalyticOnNhd ℂ H right(a) ∧ TendstoLocallyUniformlyOn (fun n ↦ C (k n)) H atTop right(a) := by
+  obtain ⟨h,ρ,hA,hanchor⟩ := introTrace_combined_cutoff_anchor (F := F)
+  refine ⟨h,ρ,hA,?_⟩
+  intro χ a ha w hw C
+  obtain ⟨hK, -, -, hconv⟩ := hanchor χ a ha w hw
+  constructor
+  · rintro ⟨R,hR⟩
+    have hball : ∃ᶠ n in atTop, C n w ∈ Metric.closedBall (0:ℂ) R := by
+      simpa only [Metric.mem_closedBall,dist_zero_right] using hR
+    obtain ⟨c,_,k,hk,hc⟩ := (isCompact_closedBall (0:ℂ) R).tendsto_subseq' hball
+    exact ⟨k,_,hk,introTraceApproximation_comp_strictMono hA hk,hK.add analyticOnNhd_const,
+      (hconv k hk.tendsto_atTop c).mp hc⟩
+  · rintro ⟨k,H,hk,-,-,hL⟩
+    have hc := (continuous_norm.tendsto (H w)).comp (hL.tendsto_at (a := w) hw)
+    refine ⟨‖H w‖+1,hk.tendsto_atTop.frequently ?_⟩
+    exact ((hc.eventually (gt_mem_nhds (lt_add_one ‖H w‖))).mono fun n hn ↦ hn.le).frequently
+
+open Classical in
+/-- Paper: §1.4.5, p. 30. For one matched cutoff family and any cofinal sequence, pointwise convergence
+to a specified holomorphic function on a set accumulating inside the chart implies
+locally uniform convergence to that same function on the whole chart. -/
+theorem introTrace_combined_cutoff_of_accumulating_set :
+    ∃ h ρ : ℕ → ℝ → ℝ, IsIntroTraceApproximation h ρ ∧
+      ∀ (χ : U𝔽) (a : ℝ), 0 ≤ a → ∀ (k : ℕ → ℕ), Tendsto k atTop atTop →
+        ∀ H : ℂ → ℂ, AnalyticOnNhd ℂ H right(a) →
+        ∀ U : Set ℂ, U ⊆ right(a) → ∀ w ∈ right(a), w ∈ closure (U \ {w}) →
+          let C (n : ℕ) (z : ℂ) := archSum(χ, approx(h, ρ, n, z)) + introTraceSpectralSum χ approx(h, ρ, n, z) a
+          (∀ z ∈ U, Tendsto (fun n ↦ C (k n) z) atTop (𝓝 (H z))) ↔
+            TendstoLocallyUniformlyOn (fun n ↦ C (k n)) H atTop right(a) := by
+  obtain ⟨h,ρ,hA,hanchor⟩ := introTrace_combined_cutoff_anchor (F := F)
+  refine ⟨h,ρ,hA,?_⟩
+  intro χ a ha k hk H hH U hU w hw hacc C
+  constructor
+  · intro hpoint
+    obtain ⟨u,hu⟩ : U.Nonempty := by
+      by_contra! he
+      simp [he] at hacc
+    obtain ⟨han, -, -, hconv⟩ := hanchor χ a ha u (hU hu)
+    have lim := (hconv k hk (H u)).mp (hpoint u hu)
+    apply lim.congr_right
+    apply (han.add analyticOnNhd_const).eqOn_of_preconnected_of_mem_closure hH
+      (convex_halfSpace_re_gt _).isPreconnected hw
+    refine (closure_mono (Set.sdiff_subset_sdiff_left ?_)) hacc
+    intro z hz
+    exact tendsto_nhds_unique (lim.tendsto_at (hU hz)) (hpoint z hz)
+  · exact fun hlim z hz ↦ hlim.tendsto_at (hU hz)
+
 /-- Changing the reference subtracts a constant independent of the running parameter z. -/
 theorem introTrace_archimedean_reference_cocycle (χ : U𝔽) (z w u : ℂ)
     (hz : -(1 / 2 : ℝ) < z.re) (hw : -(1 / 2 : ℝ) < w.re) (hu : -(1 / 2 : ℝ) < u.re) :
