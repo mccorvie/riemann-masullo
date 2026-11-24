@@ -566,11 +566,309 @@ theorem sLocalNormalizedEigendistribution_apply_pureTensor (χ : PontryaginDual 
     (Finset.prod_congr rfl fun w _ ↦ congrArg (fun T ↦ T (fArch w)) (hTA w).symm)
     (Finset.prod_congr rfl fun v _ ↦ congrArg (fun T ↦ T (fFin v)) (hTB v).symm))
 
+section
+
+/-- The pure S-local test built from the placewise tests. -/
+private theorem sLocalEigendistributions_test
+    (a : (w : InfinitePlace F) → ℬ(w.Completion)) (b : (v : S) → ℬ(v.val.adicCompletion F)) :
+    ∃ f : ℬ(Aₛ), ∀ x : Aₛ, f (Multiplicative.ofAdd x) =
+      (∏ w, a w (Multiplicative.ofAdd (x.1 w))) * ∏ v, b v (Multiplicative.ofAdd (x.2 v)) := by
+  let (w : InfinitePlace F) : SecondCountableTopology (Multiplicative w.Completion) :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  obtain ⟨g, hg⟩ := schwartzBruhat_pi_test (fun w : InfinitePlace F ↦ Multiplicative w.Completion) a
+  obtain ⟨e, he⟩ := sAdeleSchwartz_inductiveTensor_equiv F S
+  exact ⟨_, fun x ↦ (he g b x).trans (congrArg (· * _) (hg (fun w ↦ Multiplicative.ofAdd (x.1 w))))⟩
+
+/-- A pointwise continuous map from a Fréchet space into a strict LF-space of functions
+factors continuously through a stage, when the inclusion into functions is continuous. -/
+private theorem sLocalEigendistributions_continuous_of_eval
+    {E V X : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [AddCommGroup V] [Module ℂ V] [TopologicalSpace V]
+    (hE : IsFrechetTVS E) (hV : IsStrictLFSpace V)
+    (j : V →L[ℂ] (X → ℂ)) (hj : Injective j) (L : E →ₗ[ℂ] V)
+    (hL : Continuous (j ∘ L)) : Continuous L := by
+  obtain ⟨_, stages, hmono, hfrechet, hcov, _⟩ := hV
+  let inc (k : ℕ) : stages k →L[ℂ] j.range :=
+    (j.rangeRestrict).comp (stages k).subtypeL
+  let u : E →L[ℂ] j.range := ⟨j.rangeRestrict.toLinearMap.comp L, hL.subtype_mk _⟩
+  obtain ⟨k, v, hv⟩ := frechet_factorization hfrechet inc
+    (fun k _ _ h ↦ Subtype.ext (hj (congrArg Subtype.val h)))
+    (fun k _ ⟨t, ht⟩ ↦ ⟨⟨t.val, hmono (Nat.le_succ k) t.property⟩, ht⟩)
+    (fun ⟨_, t, ht⟩ ↦ (hcov t).imp fun k hk ↦ ⟨⟨t, hk⟩, Subtype.ext ht⟩) hE u
+  exact (continuous_subtype_val.comp v.continuous).congr fun x ↦
+    hj (congrArg Subtype.val (DFunLike.congr_fun hv x))
+
+/-- Varying a single factor of a product test is continuous. Point evaluations are
+continuous on elementary stages, and the S-local test space is strict LF. -/
+private theorem sLocalEigendistributions_slice
+    {G H : Type*} [CommGroup G] [TopologicalSpace G] [CommGroup H] [TopologicalSpace H]
+    (hH : IsStrictLFSpace (SchwartzBruhat H)) (p : H → G) (b : H → ℂ)
+    (f : SchwartzBruhat G → SchwartzBruhat H) (hf : ∀ k x, f k x = k (p x) * b x) :
+    ∃ L : SchwartzBruhat G →L[ℂ] SchwartzBruhat H, ∀ k, L k = f k := by
+  let L : SchwartzBruhat G →ₗ[ℂ] SchwartzBruhat H :=
+    { toFun := f
+      map_add' := fun k l ↦ Subtype.ext (funext fun x ↦ by
+        change f (k + l) x = f k x + f l x
+        simp only [hf]; exact add_mul _ _ _)
+      map_smul' := fun z k ↦ Subtype.ext (funext fun x ↦ by
+        change f (z • k) x = z * f k x
+        simp only [hf]; exact mul_assoc _ _ _) }
+  let j : SchwartzBruhat H →L[ℂ] (H → ℂ) :=
+    ⟨(schwartzBruhatSubmodule H).subtype, continuous_pi continuous_schwartzBruhat_eval⟩
+  have hj : Injective j := Subtype.val_injective
+  refine ⟨⟨L, ?_⟩, fun _ ↦ rfl⟩
+  apply (withGeneratingSeminorms_spec _ Subtype.val).continuous_of_continuous_comp L
+  rintro ⟨q, hq⟩
+  apply (withGeneratingSeminorms_spec _ Subtype.val).continuous_seminorm ⟨q.comp L, ?_⟩
+  intro a e
+  have hi : Continuous (show SchwartzBruhatStage e →ₗ[ℂ] SchwartzBruhat G from
+      schwartzBruhatStageInclusion a e) :=
+    (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp (schwartzBruhatStageInclusion a e :
+      SchwartzBruhatStage e →ₗ[ℂ] SchwartzBruhat G) (fun r ↦ r.2 a e)
+  have hc := sLocalEigendistributions_continuous_of_eval (E := SchwartzBruhatStage e)
+    elementarySchwartz_isFrechet hH j hj (L.comp (schwartzBruhatStageInclusion a e)) (by
+      apply continuous_pi
+      intro x
+      exact (((continuous_schwartzBruhat_eval (p x)).comp hi).mul_const (b x)).congr
+        fun s ↦ (hf _ x).symm)
+  exact ((withGeneratingSeminorms_spec _ Subtype.val).continuous_seminorm ⟨q, hq⟩).comp hc
+
+-- The finite induction and the normalization identity also occur in Ch03_IdelicZeta/Sec4.
+private theorem sLocalEigendistributions_replace {ι : Type*} [Fintype ι] [DecidableEq ι]
+    {E : ι → Type*} (T : (∀ i, E i) → ℂ) (D : ∀ i, E i → ℂ) (b : ∀ i, E i)
+    (h : ∀ i a, T a = D i (a i) * T (Function.update a i (b i))) (a : ∀ i, E i) :
+    T a = (∏ i, D i (a i)) * T b := by
+  let w (s : Finset ι) : ∀ j, E j := fun j ↦ if j ∈ s then a j else b j
+  have eq (s : Finset ι) : T (w s) = (∏ i ∈ s, D i (a i)) * T b := by
+    induction s using Finset.induction_on with
+    | empty => simp [w]
+    | @insert i s hi ih =>
+      have he : Function.update (w (insert i s)) i (b i) = w s := by
+        funext j
+        by_cases hj : j = i
+        · subst j; simp [w, hi]
+        · simp [w, hj]
+      rw [h i (w (insert i s)), he, ih, Finset.prod_insert hi, mul_assoc]
+      simp [w]
+  simpa [w] using eq Finset.univ
+
+private theorem sLocalEigendistributions_local_eval {E : Type*} [AddCommGroup E]
+    [Module ℂ E] [TopologicalSpace E] (W : Submodule ℂ (StrongDual ℂ E))
+    (d L : StrongDual ℂ E) (b : E) (hd : ∀ T, T = d ↔ T ∈ W ∧ T b = 1)
+    (hL : L ∈ W) (k : E) : L k = d k * L b := by
+  have hb := (hd d).mp rfl
+  have eq : L + (1 - L b) • d = d := (hd _).mpr ⟨W.add_mem hL (W.smul_mem _ hb.1), by
+    change L b + (1 - L b) * d b = 1
+    rw [hb.2, mul_one]; ring⟩
+  have h := DFunLike.congr_fun eq k
+  change L k + (1 - L b) * d k = d k at h
+  linear_combination h
+
+/-- Split off each local factor of a homogeneous functional. The function `b`
+collects the test factors at the other places and is fixed by these local units. -/
+private theorem sLocalEigendistributions_factor
+    {ι R : Type*} [Fintype ι] [CommRing R] [TopologicalSpace R] [IsTopologicalRing R]
+    (K : ι → Type*) [∀ i, CommRing (K i)] [∀ i, TopologicalSpace (K i)]
+    [∀ i, IsTopologicalRing (K i)] (hR : IsStrictLFSpace ℬ(R))
+    (p : R → ∀ i, K i) (b : R → ℂ) (ins : ∀ i, (K i)ˣ → Rˣ)
+    (hp : ∀ i u x, p ((ins i u).inv * x) i = u.inv * p x i)
+    (hq : ∀ i u x j, j ≠ i → p ((ins i u).inv * x) j = p x j)
+    (hb : ∀ i u x, b ((ins i u).inv * x) = b x)
+    (P : (∀ i, ℬ(K i)) → ℬ(R)) (hP : ∀ a x, P a (Multiplicative.ofAdd x) =
+      (∏ i, a i (Multiplicative.ofAdd (p x i))) * b x)
+    (c : Rˣ → ℂ) (T : D(ℬ(R))) (hT : ∀ u f, T (schwartzBruhatUnitTranslate u f) = c u * T f)
+    (d : ∀ i, D(ℬ(K i))) (g : ∀ i, ℬ(K i))
+    (hd : ∀ i (L : D(ℬ(K i))), (∀ u f, L (schwartzBruhatUnitTranslate u f) = c (ins i u) * L f) →
+      ∀ k, L k = d i k * L (g i)) (a : ∀ i, ℬ(K i)) :
+    T (P a) = (∏ i, d i (a i)) * T (P g) := by
+  classical
+  apply sLocalEigendistributions_replace (fun a ↦ T (P a)) (fun i ↦ d i) g _ a
+  intro i q
+  let rest (x : R) := (∏ j ∈ Finset.univ.erase i, q j (Multiplicative.ofAdd (p x j))) * b x
+  let f (k : ℬ(K i)) := P (Function.update q i k)
+  have hf (k : ℬ(K i)) (x : Multiplicative R) : f k x =
+      k (Multiplicative.ofAdd (p x.toAdd i)) * rest x.toAdd := by
+    rw [show f k x = _ from hP (Function.update q i k) x.toAdd,
+      ← Finset.mul_prod_erase _ _ (Finset.mem_univ i), Function.update_self, mul_assoc]
+    congr 2
+    exact Finset.prod_congr rfl fun j hj ↦ congrArg (fun t : ℬ(K j) ↦ t _)
+      (Function.update_of_ne (Finset.ne_of_mem_erase hj) k q)
+  obtain ⟨J, hJ⟩ := sLocalEigendistributions_slice hR _ _ f hf
+  have hval (k : ℬ(K i)) (x : R) := (congrArg (fun t : ℬ(R) ↦ t (Multiplicative.ofAdd x))
+    (hJ k)).trans (hf k (Multiplicative.ofAdd x))
+  have he (u : (K i)ˣ) (k : ℬ(K i)) :
+      J (schwartzBruhatUnitTranslate u k) = schwartzBruhatUnitTranslate (ins i u) (J k) := by
+    apply Subtype.ext
+    funext x
+    change J (schwartzBruhatUnitTranslate u k) x = J k (Multiplicative.ofAdd ((ins i u).inv * x.toAdd))
+    refine (hval _ x.toAdd).trans (Eq.trans ?_ (hval k _).symm)
+    change k (Multiplicative.ofAdd (u.inv * p x.toAdd i)) * rest x.toAdd =
+      k (Multiplicative.ofAdd (p ((ins i u).inv * x.toAdd) i)) * rest ((ins i u).inv * x.toAdd)
+    rw [hp]
+    apply congrArg (_ * ·)
+    dsimp only [rest]
+    rw [hb]
+    apply congrArg (· * _)
+    exact Finset.prod_congr rfl fun j hj ↦ congrArg (fun t ↦ q j (Multiplicative.ofAdd t))
+      (hq i u x.toAdd j (Finset.ne_of_mem_erase hj)).symm
+  have h := hd i (T.comp J) (fun u k ↦ (congrArg T (he u k)).trans (hT _ _)) (q i)
+  change T (J (q i)) = d i (q i) * T (J (g i)) at h
+  simpa only [hJ, f, Function.update_eq_self] using h
+
+/-- Equality of continuous functionals on pure tests implies equality on all tests.
+Use the uniqueness of the convergent zeta integral applied to its translate by U − V. -/
+private theorem sLocalEigendistributions_ext (U V : D(ℬ(Aₛ)))
+    (h : ∀ (f : ℬ(Aₛ)) (a : (w : InfinitePlace F) → ℬ(w.Completion))
+      (b : (v : S) → ℬ(v.val.adicCompletion F)),
+      (∀ x : Aₛ, f (Multiplicative.ofAdd x) = (∏ w, a w (Multiplicative.ofAdd (x.1 w))) *
+        ∏ v, b v (Multiplicative.ofAdd (x.2 v))) → U f = V f) : U = V := by
+  let c := chartₛ((1 : PontryaginDual Jₛ)) 1
+  have hc : ∃ (χ : PontryaginDual Jₛ) (z : ℂ), 0 < z.re ∧ c = chartₛ(χ) z :=
+    ⟨1, 1, by norm_num, rfl⟩
+  obtain ⟨Z, hZ⟩ := sLocalIdelicZetaIntegral_tempered c hc
+  ext1 f
+  have eq := sLocalIdelicZetaIntegral_eq_of_pureTensor c hc (U - V + Z)
+    (fun k a b hk ↦ by
+      change U k - V k + Z k = _
+      rw [h k a b hk, sub_self, zero_add, hZ]) f
+  change U f - V f + Z f = _ at eq
+  exact sub_eq_zero.mp (add_right_cancel (eq.trans ((hZ f).symm.trans (zero_add _).symm)))
+
+/-- Haar invariance gives the weight on the convergence half-plane. Analytic continuation
+of the normalized zeta value gives the same equation at every point of the chart. -/
+private theorem sLocalEigendistributions_generator_mem (χ : PontryaginDual Jₛ) (s : ℂ) :
+    sLocalNormalizedEigendistribution (chartₛ(χ) s) ∈ sLocalEigendistributions (chartₛ(χ) s) := by
+  intro u f
+  let t := schwartzBruhatUnitTranslate u f
+  let q := (QuotientGroup.mk u : Jₛ)
+  let N (f : ℬ(Aₛ)) (z : ℂ) := sLocalNormalizedZFunction f (chartₛ(χ) z)
+  let C (z : ℂ) := chartₛ(χ) z q
+  have hC : AnalyticOnNhd ℂ C univ := by
+    let r : ℂ := (((mₛ q : ℝ≥0) : ℝ) : ℂ)
+    have hr : r ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (mₛ q).ne_zero)
+    intro z _
+    exact analyticAt_const.mul ((differentiable_id.const_cpow (Or.inl hr)).analyticAt z)
+  have hpos : ∀ᶠ z : ℂ in 𝓝[≠] (1 : ℂ), 0 < z.re :=
+    nhdsWithin_le_nhds ((isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num))
+  have he : N t = fun z ↦ C z * N f z := by
+    apply (sLocalNormalizedZFunction_entire t χ).eq_of_frequently_eq (z₀ := 1)
+      (hC.mul (sLocalNormalizedZFunction_entire f χ))
+    apply Filter.Eventually.frequently
+    filter_upwards [hpos] with z hz
+    have hc : ∃ (ψ : PontryaginDual Jₛ) (v : ℂ), 0 < v.re ∧ chartₛ(χ) z = chartₛ(ψ) v :=
+      ⟨χ, z, hz, rfl⟩
+    have hZ := ((sLocalZetaPair_mk χ t).1 hz).symm.trans
+      (((sLocalZetaPair_translate χ u f).1 hz).trans (congrArg (C z * ·) ((sLocalZetaPair_mk χ f).1 hz)))
+    change sLocalIdelicZFunction t (chartₛ(χ) z) = C z * sLocalIdelicZFunction f (chartₛ(χ) z) at hZ
+    rw [sLocalIdelicZFunction_eq_integral t hc, sLocalIdelicZFunction_eq_integral f hc] at hZ
+    exact (sLocalNormalizedZFunction_eq_div t χ hz).trans ((congrArg (· / _) hZ).trans
+      ((mul_div_assoc _ _ _).trans (congrArg (C z * ·) (sLocalNormalizedZFunction_eq_div f χ hz).symm)))
+  let c := chartₛ(χ) s
+  let D := sLocalNormalizedEigendistribution c
+  let M : ℂ := ↑(∏ v : S, unitMass(v.val))
+  have spec (h : ℬ(Aₛ)) : M * D h = N h s :=
+    (existsUnique_sLocalNormalizedEigendistribution c).exists.choose_spec h
+  change D t = C s * D f
+  apply mul_left_cancel₀ (sLocalNormalizedEigendistribution_mass_ne_zero (F := F) (S := S))
+  exact (spec t).trans ((congrFun he s).trans ((congrArg (C s * ·) (spec f).symm).trans (mul_left_comm _ _ _)))
+
+local notation "archUnit(" w "," u ")" =>
+  (ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F) ((j : S) → HeightOneSpectrum.adicCompletion F j.val)).symm
+    (ContinuousMulEquiv.piUnits.symm (@Pi.mulSingle _ _ _ (Classical.decEq _) w u), 1)
+local notation "finUnit(" v "," u ")" =>
+  (ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F) ((j : S) → HeightOneSpectrum.adicCompletion F j.val)).symm
+    (1, ContinuousMulEquiv.piUnits.symm (@Pi.mulSingle _ _ _ (Classical.decEq _) v u))
+
+private theorem sLocalEigendistributions_arch_data (χ : PontryaginDual Jₛ) (s : ℂ) (w : InfinitePlace F) :
+    ∃ (η : PontryaginDual w.Completionˣ) (d : D(ℬ(w.Completion))),
+      (circleToComplex).comp η = sLocalInfiniteRestriction w ((circleToComplex).comp χ) ∧
+      ∀ L, L = d ↔ L ∈ schwartzBruhatEigendistributions (sLocalInfiniteRestriction w (chartₛ(χ) s)) ∧
+        L (infiniteStandardGaussian w η) = 1 := by
+  let h := sLocalInfiniteInsertion_properties (S := S) w
+  let j : w.Completionˣ →ₜ* Jₛ :=
+    ⟨{ toFun := fun u ↦ QuotientGroup.mk (archUnit(w,u)), map_one' := h.1, map_mul' := h.2.1 }, h.2.2⟩
+  let η := χ.comp j
+  have he : sLocalInfiniteRestriction w (chartₛ(χ) s) = quasiCharacterNormTwist _
+      (continuous_infiniteLocalModule w) ((circleToComplex).comp η) s := by
+    ext1 u
+    have hn := sLocalInfiniteRestriction_normTwist (S := S) w s u
+    change (1 : ℂ) * _ ^ s = _ at hn
+    rw [one_mul] at hn
+    exact congrArg ((η u : ℂ) * ·) hn
+  obtain ⟨D, _, hD, _⟩ := infiniteEigendistribution_normalized w η
+  exact ⟨η, D s, rfl, he ▸ hD s⟩
+
+private theorem sLocalEigendistributions_fin_data (χ : PontryaginDual Jₛ) (s : ℂ) (v : S) :
+    ∃ d : D(ℬ(v.val.adicCompletion F)), ∀ L, L = d ↔
+      L ∈ schwartzBruhatEigendistributions (sLocalFiniteRestriction v (chartₛ(χ) s)) ∧
+        L (finiteStandardGaussian v.val (sLocalFiniteRestriction v (chartₛ(χ) s))) = 1 := by
+  obtain ⟨η, he⟩ := sLocalNormalizedEigendistribution_gaussian_finChart χ v
+  obtain ⟨D, _, hD, _⟩ := finiteEigendistribution_normalized v.val η
+  rw [he s]
+  exact ⟨D s, hD s⟩
+
+private theorem sLocalEigendistributions_chart_span (χ : PontryaginDual Jₛ) (s : ℂ) :
+    sLocalEigendistributions (chartₛ(χ) s) ≤
+      Submodule.span ℂ {sLocalNormalizedEigendistribution (chartₛ(χ) s)} := by
+  classical
+  let c := chartₛ(χ) s
+  choose η D hη hD using sLocalEigendistributions_arch_data (F := F) (S := S) χ s
+  choose E hE using sLocalEigendistributions_fin_data (F := F) (S := S) χ s
+  let g := fun w ↦ infiniteStandardGaussian w (η w)
+  let h := fun v : S ↦ finiteStandardGaussian v.val (sLocalFiniteRestriction v c)
+  choose P hP using fun (a : (w : InfinitePlace F) → ℬ(w.Completion)) (b : (v : S) → ℬ(v.val.adicCompletion F)) ↦
+    sLocalEigendistributions_test a b
+  intro T hT
+  have ht := (mem_sLocalEigendistributions c T).mp hT
+  refine Submodule.mem_span_singleton.mpr ⟨T (P g h), ?_⟩
+  apply sLocalEigendistributions_ext
+  intro f a b hf
+  have e : P a b = f := Subtype.ext (funext fun x ↦ (hP a b x.toAdd).trans (hf x.toAdd).symm)
+  have harch : T (P a b) = (∏ w, D w (a w)) * T (P g b) := by
+    refine sLocalEigendistributions_factor (fun w : InfinitePlace F ↦ w.Completion)
+      (sAdeleSchwartz_strictLF F S) Prod.fst (fun x ↦ ∏ v, b v (Multiplicative.ofAdd (x.2 v)))
+      (fun w u ↦ archUnit(w,u)) ?_ ?_ ?_ (fun a ↦ P a b) (fun a ↦ hP a b) _ T ht D g ?_ a
+    · intro w u x
+      change (Pi.mulSingle (M := fun w : InfinitePlace F ↦ w.Completionˣ) w u w).inv * x.1 w = _
+      rw [Pi.mulSingle_eq_same]
+    · intro w u x j hj
+      change (Pi.mulSingle (M := fun w : InfinitePlace F ↦ w.Completionˣ) w u j).inv * x.1 j = _
+      rw [Pi.mulSingle_eq_of_ne hj]; exact one_mul _
+    · intro w u x
+      exact Finset.prod_congr rfl fun v _ ↦ congrArg (fun t ↦ b v (Multiplicative.ofAdd t)) (one_mul _)
+    · intro w L hL
+      exact sLocalEigendistributions_local_eval _ (D w) L (g w) (hD w) hL
+  have hfin : T (P g b) = (∏ v, E v (b v)) * T (P g h) := by
+    let : DecidableEq S := Classical.decEq _
+    refine sLocalEigendistributions_factor (fun v : S ↦ v.val.adicCompletion F)
+      (sAdeleSchwartz_strictLF F S) Prod.snd (fun x ↦ ∏ w, g w (Multiplicative.ofAdd (x.1 w)))
+      (fun v u ↦ finUnit(v,u)) ?_ ?_ ?_ (P g) (fun a x ↦ (hP g a x).trans (mul_comm _ _))
+      _ T ht E h ?_ b
+    · intro v u x
+      change (Pi.mulSingle (M := fun j : S ↦ (j.val.adicCompletion F)ˣ) v u v).inv * x.2 v = _
+      rw [Pi.mulSingle_eq_same]
+    · intro v u x j hj
+      change (Pi.mulSingle (M := fun j : S ↦ (j.val.adicCompletion F)ˣ) v u j).inv * x.2 j = _
+      rw [Pi.mulSingle_eq_of_ne hj]; exact one_mul _
+    · intro v u x
+      exact Finset.prod_congr rfl fun w _ ↦ congrArg (fun t ↦ g w (Multiplicative.ofAdd t)) (one_mul _)
+    · intro v L hL
+      exact sLocalEigendistributions_local_eval _ (E v) L (h v) (hE v) hL
+  change T (P g h) * sLocalNormalizedEigendistribution c f = T f
+  rw [sLocalNormalizedEigendistribution_apply_pureTensor χ s η hη D E
+    (fun w ↦ (hD w _).mp rfl) (fun v ↦ (hE v _).mp rfl) f a b hf, ← e, harch, hfin]
+  ring
+
+end
+
 /-- Paper: Theorem 5.5.1.2(1), p. 278.
 The normalized S-local distribution spans the eigenspace of its weight. -/
 theorem sLocalEigendistributions_eq_span (c : QuasiCharacter Jₛ) :
     sLocalEigendistributions c =
-      Submodule.span ℂ {sLocalNormalizedEigendistribution c} := by sorry
+      Submodule.span ℂ {sLocalNormalizedEigendistribution c} := by
+  obtain ⟨χ, s, rfl⟩ := sLocalNormalizedEigendistribution_chart c
+  exact le_antisymm (sLocalEigendistributions_chart_span χ s)
+    (Submodule.span_le.mpr (Set.singleton_subset_iff.mpr (sLocalEigendistributions_generator_mem χ s)))
 
 /-- On a Montel space, pointwise holomorphy of a family in the complete strong dual
 implies strong holomorphy, since every bidual functional is an evaluation. -/

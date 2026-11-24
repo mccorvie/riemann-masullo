@@ -528,6 +528,163 @@ theorem existsUnique_sLocalNormOneQuotientTransition (hST : S ⊂ T)
   exact existsUnique_sLocalNormOneQuotientTransition_uniq q.toMonoidHom q'.toMonoidHom t π
     hs hqt hq't hk x
 
+/-- The character kills the kernel of the open transition, so its algebraic descent is continuous. -/
+private theorem sLocalHomogeneousThetaTransition_descend {A B : Type*} [Group A] [Group B]
+    [TopologicalSpace A] [TopologicalSpace B] (q : A →ₜ* B) (hs : Surjective q)
+    (ho : IsOpenMap q) (χ : PontryaginDual A) (hk : q.toMonoidHom.ker ≤ χ.toMonoidHom.ker) :
+    ∃ η : PontryaginDual B, ∀ x, η (q x) = χ x := by
+  let η := q.toMonoidHom.liftOfSurjective hs ⟨χ.toMonoidHom, hk⟩
+  have h (x : A) : η (q x) = χ x := MonoidHom.liftOfRightInverse_comp_apply ..
+  refine ⟨⟨η, (ho.isQuotientMap q.continuous hs).continuous_iff.mpr ?_⟩, h⟩
+  exact χ.continuous.congr (fun x ↦ (h x).symm)
+
+/-- On classes inserted from S, equivariance on tests descends to the ordinary theta quotient. -/
+private theorem sLocalHomogeneousThetaTransition_insert_action (hST : S ⊆ T)
+    (g : Iₛ(S)) (z : Θₛ(S)) :
+    let ρT := (existsUnique_sLocalThetaAction (F := F) (S := T)).exists.choose
+    let j := sIdeleInsertion F S g
+    let gT := Units.map (adeleProjection F T).toMonoidHom j
+    let i := sLocalThetaTransition (F := F) hST
+    ρT (QuotientGroup.mk gT) (i z) = i (ρₛ(S) (QuotientGroup.mk g) z) := by
+  intro ρT j gT i
+  -- The reinsertion of g is integral outside S and projects back to g.
+  obtain ⟨v, hv⟩ : j ∈ Set.range (integralIdeleInsertion F S) := by
+    apply (mem_range_integralIdeleInsertion F S j).mpr
+    intro w hw
+    have hi : j⁻¹ = sIdeleInsertion F S g⁻¹ := (map_inv _ _).symm
+    change j.val.2 w ∈ _ ∧ (j⁻¹).val.2 w ∈ _
+    rw [hi, (sIdeleInsertion_apply F S g).2.2 w hw, (sIdeleInsertion_apply F S g⁻¹).2.2 w hw]
+    exact ⟨one_mem _, one_mem _⟩
+  have hp : Units.map (adeleProjection F S).toMonoidHom j = g :=
+    Units.ext (Prod.ext (sIdeleInsertion_apply F S g).1 (funext (sIdeleInsertion_apply F S g).2.1))
+  obtain ⟨f, rfl⟩ := (LinearMap.ker (sLocalAdelicTheta F S)).mkQ_surjective z
+  have htrans := sLocalThetaTransition_equivariant hST v f
+  dsimp only at htrans
+  rw [hv, hp] at htrans
+  have hS := (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose_spec.2 g f
+  have hT := (existsUnique_sLocalThetaAction (F := F) (S := T)).exists.choose_spec.2 gT
+    (sAdeleSchwartzTransition F hST f)
+  have hi := LinearMap.congr_fun (sLocalThetaTransition_unique (F := F) hST).1 f
+  exact (congrArg (ρT (QuotientGroup.mk gT)) hi).trans
+    (hT.trans (htrans.symm.trans (congrArg i hS.symm)))
+
+/-- On the ordinary transition image, the action of a norm-one class at T factors
+through its image at S. An inserted lift has the same action, since the two differ
+by a relative integral unit. -/
+private theorem sLocalHomogeneousThetaTransition_intertwine (hST : S ⊂ T)
+    (hPic : Subsingleton Picₛ(S)) :
+    let q := (existsUnique_sLocalNormOneQuotientTransition hST hPic).exists.choose
+    let ρT := (existsUnique_sLocalThetaAction (F := F) (S := T)).exists.choose
+    ∀ (b : J₁(T)) (z : Θₛ(S)), ρT b.val (sLocalThetaTransition hST.le z) =
+      sLocalThetaTransition hST.le (ρₛ(S) (q b).val z) := by
+  intro q ρT b z
+  obtain ⟨φ, -, hn, -, -, -, hins⟩ := existsUnique_sLocalNormOneQuotientTransition_phi hST.le hPic
+  obtain ⟨g, hg⟩ := QuotientGroup.mk_surjective (q b).val
+  have hgn : sIdeleNorm F S g = 1 := by
+    rw [← sIdeleQuotientNorm_mk, hg]
+    exact (q b).property
+  let j := sIdeleInsertion F S g
+  let gT := Units.map (adeleProjection F T).toMonoidHom j
+  let b₀ : J₁(T) := ⟨QuotientGroup.mk gT, by
+    rw [MonoidHom.mem_ker, sIdeleQuotientNorm_mk, ← hn, hins, hgn]⟩
+  have hq := (existsUnique_sLocalNormOneQuotientTransition hST hPic).exists.choose_spec
+  have hb : q b₀ = q b := hq.2.2.2 ⟨g, hgn⟩ b₀ (q b) rfl hg.symm
+  have hk : q (b₀⁻¹ * b) = 1 := by rw [map_mul, map_inv, hb, inv_mul_cancel]
+  obtain ⟨u, hu⟩ := (hq.2.2.1 _).mp hk
+  let i := sLocalThetaTransition (F := F) hST.le
+  have hfixed : i z ∈ Set.range i := Set.mem_range_self z
+  rw [sLocalThetaTransition_range_eq_invariants hST hPic] at hfixed
+  have hact : ρT (b₀⁻¹ * b).val (i z) = i z := by
+    rw [hu]
+    exact hfixed u
+  have he : ρT b.val (i z) = ρT b₀.val (i z) := by
+    refine (congrArg (fun a : J₁(T) ↦ ρT a.val (i z)) (mul_inv_cancel_left b₀ b).symm).trans ?_
+    exact (DFunLike.congr_fun (map_mul ρT b₀.val (b₀⁻¹ * b).val) (i z)).trans
+      (congrArg (ρT b₀.val) hact)
+  exact he.trans ((sLocalHomogeneousThetaTransition_insert_action hST.le g z).trans
+    (congrArg (fun a : Jₛ(S) ↦ i (ρₛ(S) a z)) hg))
+
+/-- Restrict a scaled equivariant embedding to the two character spaces. Surjectivity
+of the group quotient detects the source isotype, and the target isotype lies in the image. -/
+private theorem sLocalHomogeneousThetaTransition_isotypes {G H X Y : Type*}
+    [Group G] [Group H] [TopologicalSpace G] [TopologicalSpace H]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [ContinuousSMul ℂ Y]
+    (q : H → G) (hq : Surjective q) (η : PontryaginDual G) (χ : PontryaginDual H)
+    (hχ : ∀ b, η (q b) = χ b) (ρ : G →* (X →L[ℂ] X)) (τ : H →* (Y →L[ℂ] Y))
+    (i : X →L[ℂ] Y) (hi : IsEmbedding i) (ha : ∀ b x, τ b (i x) = i (ρ (q b) x))
+    (hr : ∀ y ∈ actionIsotype τ χ, y ∈ Set.range i) (c : ℂ) (hc : c ≠ 0) :
+    ∃ e : actionIsotype ρ η ≃L[ℂ] actionIsotype τ χ, ∀ x, (e x : Y) = c • i x := by
+  let A := actionIsotype ρ η
+  let B := actionIsotype τ χ
+  have hm (x : X) : i x ∈ B ↔ x ∈ A := by
+    rw [mem_actionIsotype, mem_actionIsotype]
+    constructor
+    · intro h g
+      obtain ⟨b, rfl⟩ := hq g
+      apply hi.injective
+      rw [← ha, h, map_smul, hχ]
+    · intro h b
+      rw [ha, h, map_smul, hχ]
+  let j : A →ₗ[ℂ] B := (c • i.toLinearMap.comp A.subtype).codRestrict B
+    fun x ↦ B.smul_mem c ((hm x).mpr x.property)
+  have hj : IsEmbedding j :=
+    (((Homeomorph.smulOfNeZero (α := Y) c hc).isEmbedding.comp hi).comp
+      IsEmbedding.subtypeVal).codRestrict (B : Set Y) _
+  have hs : Surjective j := by
+    intro y
+    obtain ⟨x, hx⟩ := hr (c⁻¹ • y.val) (B.smul_mem _ y.property)
+    have hxB : i x ∈ B := hx.symm ▸ B.smul_mem _ y.property
+    refine ⟨⟨x, (hm x).mp hxB⟩, Subtype.ext ?_⟩
+    change c • i x = y.val
+    rw [hx, smul_inv_smul₀ hc]
+  let e := LinearEquiv.ofBijective j ⟨hj.injective, hs⟩
+  exact ⟨⟨e, hj.continuous, (e.toEquiv.toHomeomorphOfIsInducing hj.isInducing).symm.continuous⟩,
+    fun _ ↦ rfl⟩
+
+/-- Pushing the T-local Haar measure through the quotient scales the S-local Haar
+measure. Testing the Pettis averages against continuous functionals gives the same
+factor on the transition image. -/
+private theorem sLocalHomogeneousThetaTransition_averages {G H X Y : Type*}
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [CompactSpace G] [T2Space G]
+    [MeasurableSpace G] [BorelSpace G]
+    [CommGroup H] [TopologicalSpace H] [IsTopologicalGroup H] [CompactSpace H]
+    [MeasurableSpace H] [BorelSpace H]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [SeparatingDual ℂ Y]
+    (q : H →ₜ* G) (hq : Surjective q) (η : PontryaginDual G) (χ : PontryaginDual H)
+    (hχ : ∀ b, η (q b) = χ b) (ρ : G →* (X →L[ℂ] X)) (τ : H →* (Y →L[ℂ] Y))
+    (hρ : ∀ x, Continuous fun g ↦ ρ g x) (i : X →L[ℂ] Y)
+    (ha : ∀ b x, τ b (i x) = i (ρ (q b) x))
+    (μ : Measure G) [μ.IsHaarMeasure] (ν : Measure H) [ν.IsHaarMeasure]
+    (P : X →L[ℂ] X) (Q : Y →L[ℂ] Y) (hP : IsPettisIsotypicAverageOn μ Set.univ ρ η P)
+    (hQ : IsPettisIsotypicAverageOn ν Set.univ τ χ Q) :
+    ∃ c : ℂ, c ≠ 0 ∧ ∀ x, Q (i x) = c • i (P x) := by
+  have : (ν.map q).IsHaarMeasure :=
+    Measure.isHaarMeasure_map_of_isFiniteMeasure ν q.toMonoidHom q.continuous hq
+  let d := Measure.haarScalarFactor (ν.map q) μ
+  have hm : ν.map q = d • μ := Measure.isMulLeftInvariant_eq_smul_of_innerRegular (ν.map q) μ
+  refine ⟨(d : ℝ), by exact_mod_cast (Measure.haarScalarFactor_pos_of_isHaarMeasure (ν.map q) μ).ne', ?_⟩
+  intro x
+  apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr
+  intro φ
+  let f (g : G) := star (η g : ℂ) * (φ.comp i) (ρ g x)
+  have hf : Continuous f :=
+    (continuous_subtype_val.comp η.continuous).star.mul ((φ.comp i).continuous.comp (hρ x))
+  -- Evaluate the two Pettis integrals on corresponding functionals, as in §4.3.3.
+  have hs := LinearMap.congr_fun (hP x).2 (φ.comp i)
+  have ht := LinearMap.congr_fun (hQ (i x)).2 φ
+  change φ (i (P x)) = ∫ g, (φ.comp i) (star (η g : ℂ) • ρ g x) ∂μ.restrict Set.univ at hs
+  change φ (Q (i x)) = ∫ b, φ (star (χ b : ℂ) • τ b (i x)) ∂ν.restrict Set.univ at ht
+  simp only [Measure.restrict_univ, map_smul, smul_eq_mul] at hs ht
+  change φ (i (P x)) = ∫ g, f g ∂μ at hs
+  rw [ht, map_smul, hs]
+  simp_rw [ha, ← hχ]
+  change ∫ b, f (q b) ∂ν = ((d : ℝ) : ℂ) • ∫ g, f g ∂μ
+  rw [← integral_map (φ := (q : H → G)) (μ := ν) q.continuous.measurable.aemeasurable
+    hf.aestronglyMeasurable, hm, integral_smul_nnreal_measure]
+  exact Complex.real_smul
+
 /-- Paper: Theorem 6.2.1.1(1), p. 295.
 For a T-local character trivial on the additional integer units, adjoining integer
 indicators gives a surjective topological linear isomorphism on homogeneous classes.
@@ -540,7 +697,60 @@ theorem sLocalHomogeneousThetaTransition_equiv_of_unramified
     ∃ (χS : PontryaginDual J₁(S)) (e : Θₛω(S, χS) ≃L[ℂ] Θₛω(T, χ)),
       (∀ x, χS (q x) = χ x) ∧
       ∀ f : ℬₛ(S), e ((Kₛω(S, χS)).mkQ f) =
-        (Kₛω(T, χ)).mkQ (sAdeleSchwartzTransition F hST.le f) := by sorry
+        (Kₛω(T, χ)).mkQ (sAdeleSchwartzTransition F hST.le f) := by
+  intro q
+  have hq := (existsUnique_sLocalNormOneQuotientTransition hST hPic).exists.choose_spec
+  obtain ⟨η, hη⟩ := sLocalHomogeneousThetaTransition_descend q hq.1 hq.2.1 χ (fun x hx ↦ by
+    obtain ⟨u, hu⟩ := (hq.2.2.1 x).mp hx
+    exact _hχ x u hu)
+  let ρ (U : Finset V) := (existsUnique_sLocalThetaAction (F := F) (S := U)).exists.choose
+  let r (U : Finset V) := (ρ U).comp (J₁(U)).subtype
+  let i : Θₛ(S) →L[ℂ] Θₛ(T) :=
+    ⟨sLocalThetaTransition hST.le, sLocalThetaTransition_continuous hST.le⟩
+  have hi : IsEmbedding i := (sLocalThetaTransition_isClosedEmbedding hST.le).isEmbedding
+  have ha (b : J₁(T)) (x : Θₛ(S)) : r T b (i x) = i (r S (q b) x) :=
+    sLocalHomogeneousThetaTransition_intertwine hST hPic b x
+  have hr (y : Θₛ(T)) (hy : y ∈ actionIsotype (r T) χ) : y ∈ Set.range i := by
+    change y ∈ Set.range (sLocalThetaTransition (F := F) hST.le)
+    rw [sLocalThetaTransition_range_eq_invariants hST hPic]
+    intro u
+    obtain ⟨φ, -, hn, -, -, hrel, -⟩ := existsUnique_sLocalNormOneQuotientTransition_phi hST.le hPic
+    let b : J₁(T) := ⟨QuotientGroup.mk u.val, by
+      rw [MonoidHom.mem_ker, sIdeleQuotientNorm_mk, ← hn, hrel u.val u.property, map_one]⟩
+    have h := (mem_actionIsotype _ _ _).mp hy b
+    rw [_hχ b u rfl, Circle.coe_one, one_smul] at h
+    exact h
+  let (U : Finset V) : MeasurableSpace J₁(U) := borel _
+  let (U : Finset V) : BorelSpace J₁(U) := ⟨rfl⟩
+  let (U : Finset V) : CompactSpace J₁(U) := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F U).isCompact_preimage (isCompact_singleton (x := 1)))
+  have hclosed := isClosed_sProjectedDiagonal (F := F) (S := S)
+  let : T2Space Jₛ(S) := inferInstanceAs (T2Space (_ ⧸ _))
+  let : T2Space J₁(S) := inferInstanceAs (T2Space ((sIdeleQuotientNorm F S).ker : Set Jₛ(S)))
+  let μ (U : Finset V) := sLocalNormOneQuotientMeasure F U
+  let (U : Finset V) : (μ U).IsHaarMeasure :=
+    (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := U)).1
+  let : T2Space Θₛ(T) :=
+    sLocalAdelicThetaSpace_t2_of_isClosed (sLocalAdelicTheta_ker_isClosed (F := F) (S := T))
+  let : PolynormableSpace ℂ Θₛ(T) := sLocalAdelicThetaSpace_polynormable
+  let : SeparatingDual ℂ Θₛ(T) := polynormableSpace_separatingDual ℂ _
+  let P (U : Finset V) (ψ : PontryaginDual J₁(U)) :=
+    (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := U) ψ).exists.choose
+  have hρ (x : Θₛ(S)) : Continuous fun g : J₁(S) ↦ r S g x :=
+    (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose_spec.1.comp
+      (continuous_subtype_val.prodMk continuous_const)
+  obtain ⟨c, hc, havg⟩ := sLocalHomogeneousThetaTransition_averages q hq.1 η χ hη
+    (r S) (r T) hρ i ha (μ S) (μ T) (P S η) (P T χ)
+    (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := S) η).exists.choose_spec
+    (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := T) χ).exists.choose_spec
+  obtain ⟨e, he⟩ := sLocalHomogeneousThetaTransition_isotypes q hq.1 η χ hη
+    (r S) (r T) i hi ha hr c hc
+  obtain ⟨eS, hS⟩ := (sLocalThetaIsotypicAverage_equiv (F := F) (S := S) η).2
+  obtain ⟨eT, hT⟩ := (sLocalThetaIsotypicAverage_equiv (F := F) (S := T) χ).2
+  refine ⟨η, (eS.trans e).trans eT.symm, hη, fun f ↦ eT.symm_apply_eq.mpr ?_⟩
+  apply Subtype.ext
+  exact (he _).trans ((congrArg (fun x ↦ c • i x) (hS f)).trans
+    ((havg _).symm.trans (hT (sAdeleSchwartzTransition F hST.le f)).symm))
 
 /-- The descended character at a larger stage kills the additional integral units:
 use the same global lift to evaluate the descent identity at both stages. -/
