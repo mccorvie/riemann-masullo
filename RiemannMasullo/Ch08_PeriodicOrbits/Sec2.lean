@@ -313,7 +313,44 @@ theorem mem_embeddedFiniteLocalUnits_iff (v : HeightOneSpectrum (𝓞 F)) (g : �
     g ∈ embeddedFiniteLocalUnits F v ↔
       g.val.1 = 1 ∧ ‖g.val.2 v‖ = 1 ∧
         ∀ w : HeightOneSpectrum (𝓞 F), w ≠ v → g.val.2 w = 1 := by
-  sorry
+  classical
+  constructor
+  · rintro ⟨u, rfl⟩
+    refine ⟨?_, ?_, fun w hw => ?_⟩
+    · change (AdeleRing.ofAdicCompletion (𝓞 F) F v
+        (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u).val).1 = 1
+      rw [AdeleRing.ofAdicCompletion_apply]
+    · have h := FiniteAdeleRing.ofAdicCompletion_apply_coe F v
+        (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u).val v
+      have hval := h.trans (Pi.mulSingle_eq_same v _)
+      refine (congrArg norm hval).trans ?_
+      rw [Valued.toNormedField.norm_eq_one_iff]
+      exact (HeightOneSpectrum.adicCompletionIntegers.isUnit_iff_valued_eq_one
+        (K := F) (v := v)).mp u.isUnit
+    · exact (FiniteAdeleRing.ofAdicCompletion_apply_coe F v
+        (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u).val w).trans
+        (Pi.mulSingle_eq_of_ne (i := v) (i' := w) hw _)
+  · rintro ⟨h1, h2, h3⟩
+    let x : v.adicCompletion F := g.val.2 v
+    have hxval : Valued.v x = 1 := Valued.toNormedField.norm_eq_one_iff.mp h2
+    have hxne : x ≠ 0 :=
+      (Valuation.ne_zero_iff Valued.v).mp (by rw [hxval]; exact one_ne_zero)
+    have hxm : x ∈ v.adicCompletionIntegers F := by
+      rw [HeightOneSpectrum.mem_adicCompletionIntegers, hxval]
+    have hxim : x⁻¹ ∈ v.adicCompletionIntegers F := by
+      rw [HeightOneSpectrum.mem_adicCompletionIntegers, map_inv₀, hxval, inv_one]
+    let u : (v.adicCompletionIntegers F)ˣ :=
+      Units.mk ⟨x, hxm⟩ ⟨x⁻¹, hxim⟩
+        (Subtype.ext (mul_inv_cancel₀ hxne)) (Subtype.ext (inv_mul_cancel₀ hxne))
+    refine ⟨u, Units.ext (Prod.ext ?_ (FiniteAdeleRing.ext F fun w => ?_))⟩
+    · change (AdeleRing.ofAdicCompletion (𝓞 F) F v
+        (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u).val).1 = g.val.1
+      rw [AdeleRing.ofAdicCompletion_apply, h1]
+    · refine (FiniteAdeleRing.ofAdicCompletion_apply_coe F v
+        (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u).val w).trans ?_
+      obtain rfl | hw := eq_or_ne w v
+      · exact Pi.mulSingle_eq_same _ _
+      · rw [Pi.mulSingle_eq_of_ne hw, h3 w hw]
 
 /-- Paper: Equation (8.2.0.9), p. 386. The S-local section at a finite place takes
 parameters in the half-open interval from 1 to the absolute prime ideal norm. -/
