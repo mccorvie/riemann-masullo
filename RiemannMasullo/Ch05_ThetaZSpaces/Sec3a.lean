@@ -19,6 +19,9 @@ import Mathlib.Topology.Covering.Quotient
 import Mathlib.Topology.Homotopy.Lifting
 import RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Real
+import Mathlib.Analysis.MellinInversion
+import RiemannMasullo.Ch03_IdelicZeta.RatEmptyFourier
+import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import Mathlib.Topology.ContinuousMap.SecondCountableSpace
 import RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 public import Mathlib.Analysis.Calculus.BumpFunction.FiniteDimension
@@ -5901,10 +5904,788 @@ private theorem sLocalMellinSchwartzBounds_meyer_single_test_from_active (T : Fi
     exact ⟨B,fun χ z hz ↦ hB χ 0 z hz⟩
   · exact sLocalMellinSchwartzBounds_meyer_single_test_angular_bound T τ hτ f hF a ha hS
 
+section
+open scoped FourierTransform
+
+/-- A uniform quadratic bound on one Mellin line controls the original
+functions with the corresponding radial weight. The estimate holds down
+to every positive radius and does not require derivatives of Mellin values. -/
+private theorem sLocalMellinSchwartzBounds_meyer_real_inverse_ray (a : ℝ) (ha : 1 ≤ a) (f : ℕ → ℝ → ℂ)
+    (hc : ∀ n, Continuous (f n)) (hM : ∀ n, MellinConvergent (f n) a)
+    (hC : ∀ n, Continuous (fun t : ℝ ↦ mellin (f n) ((a : ℂ) + (t : ℂ)*Complex.I)))
+    (M : ℝ) (hb : ∀ (n : ℕ) (t : ℝ),
+      ‖((a : ℂ) + (t : ℂ)*Complex.I)^2 * mellin (f n) ((a : ℂ) + (t : ℂ)*Complex.I)‖ ≤ M) :
+    ∀ n (x : ℝ), 0 < x → x^a * ‖f n x‖ ≤ M / 2 := by
+  let L (t : ℝ) := (a : ℂ) + (t : ℂ)*Complex.I
+  have hm : 0 ≤ M := (norm_nonneg _).trans (hb 0 0)
+  have ht (t : ℝ) : 0 < 1+t^2 := by positivity
+  have hk : Integrable (fun t : ℝ ↦ M * (1+t^2)⁻¹) :=
+    integrable_inv_one_add_sq.const_mul M
+  have hdec (n : ℕ) (t : ℝ) : ‖mellin (f n) (L t)‖ ≤ M * (1+t^2)⁻¹ := by
+    rw [← div_eq_mul_inv,le_div_iff₀ (ht t),mul_comm]
+    have hpow : 1+t^2 ≤ ‖L t‖^2 := by
+      rw [Complex.sq_norm,Complex.normSq_apply]
+      simp [L]; nlinarith
+    exact (mul_le_mul_of_nonneg_right hpow (norm_nonneg _)).trans ((by
+      simpa only [norm_mul,norm_pow,L] using hb n t) : _)
+  intro n x hx
+  have hv : Complex.VerticalIntegrable (mellin (f n)) a := by
+    apply hk.mono' (hC n).aestronglyMeasurable
+    exact .of_forall (hdec n)
+  rw [← mellinInv_mellin_eq a (f n) hx (hM n) hv (hc n).continuousAt]
+  let s := x^(-a)
+  have hs : 0 ≤ s := Real.rpow_nonneg hx.le _
+  have hi :
+      ‖∫ t : ℝ, (x : ℂ)^(-(L t)) • mellin (f n) (L t)‖ ≤ s * M * Real.pi := by
+    have hg : Integrable (fun t : ℝ ↦ s * (M * (1+t^2)⁻¹)) := hk.const_mul s
+    have h := norm_integral_le_of_norm_le hg (.of_forall fun t ↦ show
+        ‖(x : ℂ)^(-(L t)) • mellin (f n) (L t)‖ ≤ s * (M * (1+t^2)⁻¹) from by
+      rw [norm_smul,Complex.norm_cpow_eq_rpow_re_of_pos hx]
+      simpa [s,L] using mul_le_mul_of_nonneg_left (hdec n t) hs)
+    simpa only [integral_const_mul, integral_univ_inv_one_add_sq,mul_assoc] using h
+  have ha0 : 0 ≤ x^a := Real.rpow_nonneg hx.le _
+  change x^a * ‖(1 / (2 * Real.pi) : ℝ) • (∫ t : ℝ,
+    (x : ℂ)^(-(L t)) • mellin (f n) (L t))‖ ≤ M/2
+  rw [norm_smul,Real.norm_of_nonneg (by positivity)]
+  have hh : x^a * s = 1 := by
+    rw [show s = x^(-a) from rfl,← Real.rpow_add hx,add_neg_cancel,Real.rpow_zero]
+  calc
+    x^a * ((1/(2*Real.pi))*_) ≤ x^a * ((1/(2*Real.pi))*(s*M*Real.pi)) := by
+      gcongr
+    _ = M/2 := by
+      field_simp [Real.pi_ne_zero]; nlinarith [congrArg (· * M * Real.pi) hh]
+
+/-- A single weighted absolute Fourier moment bounds the corresponding
+ordinary derivative everywhere. This includes the origin, which Mellin ray
+inversion itself does not control. -/
+private theorem sLocalMellinSchwartzBounds_meyer_real_derivative_from_fourier_moment (f : SchwartzMap ℝ ℂ)
+    (j : ℕ) (M : ℝ) (h : ∫ x : ℝ, |x|^j * ‖(𝓕 f) x‖ ≤ M) :
+    ∀ x, ‖iteratedDeriv j (f : ℝ → ℂ) x‖ ≤ (2*Real.pi)^j * M := by
+  let g : SchwartzMap ℝ ℂ := 𝓕 f
+  have hi (k : ℕ) : Integrable (fun x : ℝ ↦ x^k • g x) := by
+    apply (g.integrable_pow_mul volume k).mono' (by fun_prop)
+    exact .of_forall fun x ↦ by simp [Real.norm_eq_abs]
+  have hF : (f : ℝ → ℂ) = fun x : ℝ ↦ 𝓕 (g : ℝ → ℂ) (-x) := by
+    rw [← show 𝓕⁻ g = f from FourierTransform.fourierInv_fourier_eq f]
+    funext x
+    rw [SchwartzMap.fourierInv_coe,Real.fourierInv_eq_fourier_neg]
+  intro x
+  rw [hF,iteratedDeriv_comp_neg]
+  have hforce : ‖(-1 : ℝ)^j • iteratedDeriv j (𝓕 (g : ℝ → ℂ)) (-x)‖ =
+      ‖iteratedDeriv j (𝓕 (g : ℝ → ℂ)) (-x)‖ := by simp
+  rw [hforce,Real.iteratedDeriv_fourier (N := (j : ℕ∞)) (fun k _ ↦ hi k) le_rfl]
+  refine (Real.norm_fourier_le_integral_norm _ _).trans ?_
+  have he (u : ℝ) : ‖(-2*Real.pi*Complex.I*u)^j • g u‖ =
+      (2*Real.pi)^j * (|u|^j * ‖g u‖) := by
+    simp [norm_pow,abs_of_nonneg Real.pi_pos.le,Real.norm_eq_abs,
+      mul_pow,mul_assoc]
+  simp_rw [he,integral_const_mul]
+  exact mul_le_mul_of_nonneg_left h (pow_nonneg (by positivity) j)
+
+/-- On the positive ray, Re(s)=3/2 controls every positive-order additive
+moment near zero. An arbitrarily large positive line makes the same moment
+integrable at infinity. -/
+private theorem sLocalMellinSchwartzBounds_meyer_real_positive_moments (f : ℕ → SchwartzMap ℝ ℂ)
+    (h : ∀ a : ℝ, 1 < a → ∃ M ≥ (0:ℝ), ∀ n (x : ℝ), 0 < x → x^a * ‖f n x‖ ≤ M) :
+    ∀ j : ℕ, 0 < j → ∃ M : ℝ, ∀ n, ∫ x in Ioi (0:ℝ), x^j * ‖f n x‖ ≤ M := by
+  intro j hj
+  obtain ⟨A,hA,hsmall⟩ := h (3/2) (by norm_num)
+  obtain ⟨B,hB,hlarge⟩ := h ((j:ℝ)+2) (by linarith [Nat.cast_nonneg (α := ℝ) j])
+  let e := (j:ℝ)-3/2
+  have hs : -1 < e := by
+    dsimp [e]
+    have hj' : (1:ℝ) ≤ j := by exact_mod_cast hj
+    linarith
+  let S := Ioc (0 : ℝ) 1
+  let T := Ioi (1 : ℝ)
+  have hIs : IntegrableOn (fun x : ℝ ↦ x^e) S := by
+    apply (intervalIntegral.intervalIntegrable_rpow' (a := (0:ℝ)) (b := 1) hs).1
+  have hIt : IntegrableOn (fun x : ℝ ↦ x^(-2:ℝ)) T := integrableOn_Ioi_rpow_of_lt (by norm_num) zero_lt_one
+  refine ⟨(∫ x in S, A*x^e) + (∫ x in T, B*x^(-2:ℝ)), fun n ↦ ?_⟩
+  let w (x : ℝ) := x^j * ‖f n x‖
+  have hw : IntegrableOn w (Ioi 0) := by
+    apply ((f n).integrable_pow_mul volume j).integrableOn.congr_fun _ measurableSet_Ioi
+    intro x hx; simp [w,Real.norm_of_nonneg hx.le]
+  have hT₀ : T ⊆ Ioi (0:ℝ) := fun x hx ↦ zero_lt_one.trans hx
+  have hS₀ : S ⊆ Ioi (0:ℝ) := fun x hx ↦ hx.1
+  have heq : Ioi (0:ℝ) = S ∪ T := by ext x; change 0<x ↔ (0<x ∧ x≤1) ∨ 1<x; constructor <;> intro hx <;> grind
+  change ∫ x in Ioi (0:ℝ), w x ≤ _
+  rw [heq,setIntegral_union (by apply Set.disjoint_left.mpr; intro x hx hx'; exact (not_lt_of_ge hx.2) hx')
+    measurableSet_Ioi (hw.mono_set hS₀) (hw.mono_set hT₀)]
+  apply add_le_add
+  · apply setIntegral_mono_on (hw.mono_set hS₀) (hIs.const_mul A) measurableSet_Ioc
+    intro x hx
+    have hx0 := hx.1
+    have H := mul_le_mul_of_nonneg_left (hsmall n x hx0) (Real.rpow_nonneg hx0.le e)
+    rw [← mul_assoc,← Real.rpow_add hx0,show e+(3/2:ℝ) = (j:ℝ) by dsimp [e]; ring,
+      Real.rpow_natCast,mul_comm _ A] at H
+    exact H
+  · apply setIntegral_mono_on (hw.mono_set hT₀) (hIt.const_mul B) measurableSet_Ioi
+    intro x hx
+    have hx0 := hT₀ hx
+    have H := mul_le_mul_of_nonneg_left (hlarge n x hx0) (Real.rpow_nonneg hx0.le (-2))
+    rw [← mul_assoc,← Real.rpow_add hx0,show (-2:ℝ)+((j:ℝ)+2) = (j:ℝ) by ring,
+      Real.rpow_natCast,mul_comm _ B] at H
+    exact H
+
+/-- Uniform derivative bounds at the origin and all weighted ray estimates
+at infinity give boundedness in the actual real Schwartz space. The missing
+zeroth-order estimate on the unit interval follows from the first derivative
+and the single value at the endpoint. -/
+private theorem sLocalMellinSchwartzBounds_meyer_real_bounds_suffice (f : ℕ → SchwartzMap ℝ ℂ)
+    (hd : ∀ j : ℕ, 0 < j → ∃ C : ℝ, ∀ n x, ‖iteratedDeriv j (f n : ℝ → ℂ) x‖ ≤ C)
+    (hr : ∀ k j : ℕ, ∃ C : ℝ, ∀ n x, 1 ≤ |x| →
+      |x|^k * ‖iteratedDeriv j (f n : ℝ → ℂ) x‖ ≤ C) :
+    Bornology.IsVonNBounded ℂ (range f) := by
+  obtain ⟨B,hB⟩ := hr 0 0
+  obtain ⟨D,hD⟩ := hd 1 (by decide)
+  have hB0 (n) : ‖f n 1‖ ≤ B := by simpa using hB n 1 (by norm_num)
+  have hD0 : 0 ≤ D := (norm_nonneg _).trans (hD 0 0)
+  have hon (j : ℕ) : ∃ C : ℝ, ∀ n x, |x| ≤ 1 → ‖iteratedDeriv j (f n : ℝ → ℂ) x‖ ≤ C := by
+    cases j with
+    | zero =>
+      refine ⟨B+2*D,fun n x hx ↦ ?_⟩
+      have hle := abs_le.mp hx
+      have hdiff : ∀ t ∈ Icc x 1, HasDerivWithinAt (f n : ℝ → ℂ) (deriv (f n) t) (Icc x 1) t :=
+        fun t _ ↦ ((f n).differentiable t).hasDerivAt.hasDerivWithinAt
+      have hder : ∀ t ∈ Ico x 1, ‖deriv (f n : ℝ → ℂ) t‖ ≤ D :=
+        fun t _ ↦ by simpa using hD n t
+      have h := norm_image_sub_le_of_norm_deriv_le_segment' hdiff (by
+        intro t ht; simpa using hD n t) 1 ⟨hle.2,le_rfl⟩
+      have H := norm_sub_norm_le (f n x) (f n 1)
+      rw [norm_sub_rev] at h
+      simpa only [iteratedDeriv_zero] using (show ‖f n x‖ ≤ B+2*D by
+        nlinarith [hB0 n,mul_nonneg hD0 (show 0 ≤ x+1 by linarith [hle.1])])
+    | succ j =>
+      obtain ⟨C,hC⟩ := hd _ (Nat.succ_pos j)
+      exact ⟨C,fun n x _ ↦ hC n x⟩
+  apply (schwartz_withSeminorms ℂ ℝ ℂ).isVonNBounded_iff_seminorm_bddAbove.mpr
+  rintro ⟨k,j⟩
+  obtain ⟨C,hC⟩ := hr k j
+  obtain ⟨B₀,h₀⟩ := hon j
+  refine ⟨max C B₀,?_⟩
+  rintro _ ⟨_,⟨n,rfl⟩,rfl⟩
+  refine SchwartzMap.seminorm_le_bound' ℂ k j (f n) ?_ (fun x ↦ ?_)
+  · exact ((norm_nonneg _).trans (h₀ 0 0 (by norm_num))).trans (le_max_right _ _)
+  · rcases le_total 1 |x| with h | h
+    · exact (hC n x h).trans (le_max_left _ _)
+    · have hp : |x|^k ≤ 1 := pow_le_one₀ (abs_nonneg _) h
+      exact ((mul_le_of_le_one_left (norm_nonneg _) hp).trans (h₀ n x h)).trans (le_max_right _ _)
+
+/-- A Schwartz function is `O(x^(-a))` at infinity for every `a`. -/
+private theorem sLocalMellinSchwartzBounds_meyer_real_mellin_isBigO_atTop (G : SchwartzMap ℝ ℂ) (a : ℝ) :
+    (G : ℝ → ℂ) =O[atTop] (· ^ (-a)) := by
+  have h := G.isBigO_cocompact_rpow (-a)
+  refine (h.mono atTop_le_cocompact).congr' (EventuallyEq.refl _ _) ?_
+  filter_upwards [eventually_gt_atTop (0 : ℝ)] with x hx
+  rw [Real.norm_eq_abs, abs_of_pos hx]
+
+/-- A Schwartz function is bounded near zero. -/
+private theorem sLocalMellinSchwartzBounds_meyer_real_mellin_isBigO_zero (G : SchwartzMap ℝ ℂ) :
+    (G : ℝ → ℂ) =O[𝓝[>] 0] (· ^ (-(0 : ℝ))) := by
+  have hb : (G : ℝ → ℂ) =O[⊤] (fun _ ↦ (1 : ℝ)) := by
+    obtain ⟨C, -, hC⟩ := G.decay 0 0
+    refine Asymptotics.isBigO_iff.mpr ⟨C, .of_forall fun x ↦ ?_⟩
+    simpa using hC x
+  refine (hb.mono le_top).congr' (EventuallyEq.refl _ _) (.of_forall fun x ↦ ?_)
+  simp
+
+private theorem sLocalMellinSchwartzBounds_meyer_real_mellin_convergent (G : SchwartzMap ℝ ℂ) {s : ℂ} (hs : 0 < s.re) :
+    MellinConvergent G s :=
+  mellinConvergent_of_isBigO_rpow (G.continuous.continuousOn.locallyIntegrableOn measurableSet_Ioi)
+    (sLocalMellinSchwartzBounds_meyer_real_mellin_isBigO_atTop G (s.re + 1)) (lt_add_one _) (sLocalMellinSchwartzBounds_meyer_real_mellin_isBigO_zero G) (by simpa using hs)
+
+private theorem sLocalMellinSchwartzBounds_meyer_real_mellin_differentiableAt (G : SchwartzMap ℝ ℂ) {s : ℂ} (hs : 0 < s.re) :
+    DifferentiableAt ℂ (mellin G) s :=
+  mellin_differentiableAt_of_isBigO_rpow
+    (G.continuous.continuousOn.locallyIntegrableOn measurableSet_Ioi)
+    (sLocalMellinSchwartzBounds_meyer_real_mellin_isBigO_atTop G (s.re + 1)) (lt_add_one _) (sLocalMellinSchwartzBounds_meyer_real_mellin_isBigO_zero G) (by simpa using hs)
+
+private theorem sLocalMellinSchwartzBounds_meyer_real_mellin_ibp (G : SchwartzMap ℝ ℂ) {s : ℂ} (hs : 0 < s.re) :
+    mellin G s = -(1 / s) * mellin (SchwartzMap.derivCLM ℂ ℂ G) (s + 1) := by
+  have hs0 : s ≠ 0 := fun h ↦ by simp [h] at hs
+  let G' := SchwartzMap.derivCLM ℂ ℂ G
+  let u : ℝ → ℂ := fun t ↦ (t : ℂ) ^ ((s - 1) + 1) / ((s - 1) + 1)
+  have hu_eq (t : ℝ) : u t = (t : ℂ) ^ s / s := by simp [u]
+  have hu : ∀ x ∈ Ioi (0 : ℝ), HasDerivAt u ((x : ℂ) ^ (s - 1)) x := fun x hx ↦
+    hasDerivAt_ofReal_cpow_const' (ne_of_gt hx) (fun h ↦ hs0 (by linear_combination h))
+  have hv : ∀ x ∈ Ioi (0 : ℝ), HasDerivAt (G : ℝ → ℂ) (G' x) x := fun x _ ↦
+    (G.differentiableAt).hasDerivAt
+  have hs1 : 0 < (s + 1).re := by simp; linarith
+  have hG's := sLocalMellinSchwartzBounds_meyer_real_mellin_convergent G' hs1
+  have hGs := sLocalMellinSchwartzBounds_meyer_real_mellin_convergent G hs
+  have huv' : IntegrableOn (u * (G' : ℝ → ℂ)) (Ioi 0) := by
+    refine IntegrableOn.congr_fun (hG's.const_mul (1 / s)) (fun t _ ↦ ?_) measurableSet_Ioi
+    simp only [Pi.mul_apply, hu_eq, smul_eq_mul, add_sub_cancel_right]
+    ring
+  have hu'v : IntegrableOn ((fun x : ℝ ↦ (x : ℂ) ^ (s - 1)) * (G : ℝ → ℂ)) (Ioi 0) := hGs
+  have h0 : Tendsto (u * (G : ℝ → ℂ)) (𝓝[>] 0) (𝓝 0) := by
+    have hc : ContinuousAt (fun t : ℝ ↦ (t : ℂ) ^ s / s * G t) 0 :=
+      ((Complex.continuousAt_ofReal_cpow_const 0 s (Or.inl hs)).div_const s).mul
+        G.continuous.continuousAt
+    have := hc.tendsto
+    simp only [Complex.ofReal_zero, Complex.zero_cpow hs0, zero_div, zero_mul] at this
+    refine tendsto_nhdsWithin_of_tendsto_nhds (this.congr fun t ↦ ?_)
+    simp only [Pi.mul_apply, hu_eq]
+  have hinf : Tendsto (u * (G : ℝ → ℂ)) atTop (𝓝 0) := by
+    have hub : u =O[atTop] (fun t : ℝ ↦ t ^ s.re) := by
+      refine Asymptotics.isBigO_iff.mpr ⟨‖s‖⁻¹, ?_⟩
+      filter_upwards [eventually_gt_atTop (0 : ℝ)] with t ht
+      rw [hu_eq, norm_div, Complex.norm_cpow_eq_rpow_re_of_pos ht, Real.norm_eq_abs,
+        abs_of_pos (Real.rpow_pos_of_pos ht _), div_eq_mul_inv, mul_comm]
+    have hprod := hub.mul (sLocalMellinSchwartzBounds_meyer_real_mellin_isBigO_atTop G (s.re + 1))
+    have hexp : (fun t : ℝ ↦ t ^ s.re * t ^ (-(s.re + 1))) =ᶠ[atTop] fun t ↦ t ^ (-1 : ℝ) := by
+      filter_upwards [eventually_gt_atTop (0 : ℝ)] with t ht
+      rw [← Real.rpow_add ht]
+      ring_nf
+    exact (hprod.congr' (EventuallyEq.refl _ _) hexp).trans_tendsto
+      (tendsto_rpow_neg_atTop one_pos)
+  have key := integral_Ioi_mul_deriv_eq_deriv_mul hu hv huv' hu'v h0 hinf
+  simp only [sub_zero, zero_sub] at key
+  unfold mellin
+  have hL : (∫ t in Ioi (0 : ℝ), (t : ℂ) ^ (s - 1) • G t) =
+      -∫ t in Ioi (0 : ℝ), u t * G' t := by
+    rw [key, neg_neg]
+    rfl
+  rw [hL]
+  have hR : (∫ t in Ioi (0 : ℝ), u t * G' t) =
+      (1 / s) * ∫ t in Ioi (0 : ℝ), (t : ℂ) ^ (s + 1 - 1) • G' t := by
+    rw [← MeasureTheory.integral_const_mul]
+    refine MeasureTheory.setIntegral_congr_fun measurableSet_Ioi fun t _ ↦ ?_
+    simp only [hu_eq, smul_eq_mul, add_sub_cancel_right]
+    ring
+  rw [hR]
+  ring
+
+/-- All polynomial height weights for a family of Mellin transforms pass to
+ordinary derivatives, after translating the positive line once. -/
+private theorem sLocalMellinSchwartzBounds_meyer_real_mellin_bounds_derivative (f : ℕ → SchwartzMap ℝ ℂ) (a : ℝ)
+    (ha : 1 ≤ a) (h : ∀ m : ℕ, ∃ B : ℝ, ∀ n (s : ℂ), s.re = a →
+      ‖s^m * mellin (f n) s‖ ≤ B) :
+    ∀ m : ℕ, ∃ B : ℝ, ∀ n (z : ℂ), z.re = a+1 →
+      ‖z^m * mellin (SchwartzMap.derivCLM ℂ ℂ (f n)) z‖ ≤ B := by
+  intro m
+  obtain ⟨B,hB⟩ := h (m+1)
+  refine ⟨2^m*B,fun n z hz ↦ ?_⟩
+  let s := z-1
+  have hs : s.re = a := by simp [s,hz]
+  have hpos : 0 < s.re := by linarith
+  have hne : s ≠ 0 := by intro h'; rw [h'] at hpos; exact (lt_irrefl _) hpos
+  obtain hv := sLocalMellinSchwartzBounds_meyer_real_mellin_ibp (f n) hpos
+  have hzp : s+1 = z := by simp [s]
+  rw [hzp] at hv
+  have hv' : mellin (SchwartzMap.derivCLM ℂ ℂ (f n)) z = -s * mellin (f n) s := by
+    rw [hv]; field_simp
+  have hs1 : 1 ≤ ‖s‖ := ha.trans <| hs ▸ (Complex.re_le_norm s)
+  have hzs : ‖z‖ ≤ 2*‖s‖ := by
+    have H := norm_add_le s (1:ℂ)
+    rw [hzp,norm_one] at H
+    linarith
+  rw [hv',norm_mul,norm_pow,norm_mul,norm_neg]
+  calc
+    ‖z‖^m * (‖s‖*‖mellin (f n) s‖) ≤ (2*‖s‖)^m * (‖s‖*‖mellin (f n) s‖) := by gcongr
+    _ = 2^m * ‖s^(m+1)*mellin (f n) s‖ := by rw [mul_pow,norm_mul,norm_pow,pow_succ]; ring
+    _ ≤ _ := mul_le_mul_of_nonneg_left (hB n s hs) (by positivity)
+
+private theorem sLocalMellinSchwartzBounds_meyer_real_mellin_bounds_all_derivatives (f : ℕ → SchwartzMap ℝ ℂ)
+    (h : ∀ a : ℝ, 1 < a → ∀ m : ℕ, ∃ B : ℝ, ∀ n (s : ℂ), s.re = a →
+      ‖s^m * mellin (f n) s‖ ≤ B) :
+    ∀ j : ℕ, ∀ a : ℝ, j+1 < a → ∀ m : ℕ, ∃ B : ℝ, ∀ n (s : ℂ), s.re = a →
+      ‖s^m * mellin ((SchwartzMap.derivCLM ℂ ℂ)^[j] (f n)) s‖ ≤ B := by
+  intro j
+  induction j with
+  | zero => simpa using h
+  | succ j ih =>
+    intro a ha
+    have hb : (j:ℝ)+1 < a-1 := by push_cast at ha; linarith
+    have hb' : (1:ℝ) ≤ a-1 := by linarith [Nat.cast_nonneg (α := ℝ) j]
+    have H := sLocalMellinSchwartzBounds_meyer_real_mellin_bounds_derivative (fun n ↦ (SchwartzMap.derivCLM ℂ ℂ)^[j] (f n))
+      (a-1) hb' (ih (a-1) hb)
+    simpa only [Function.iterate_succ_apply',sub_add_cancel] using H
+
+private theorem sLocalMellinSchwartzBounds_meyer_rational_units (ξ : (Set.integer ((∅ : Finset (HeightOneSpectrum (𝓞 ℚ))) : Set (HeightOneSpectrum (𝓞 ℚ))) ℚ)ˣ) :
+    ξ = 1 ∨ ξ = -1 := by
+  have hmem : ∀ x : (Set.integer ((∅ : Finset (HeightOneSpectrum (𝓞 ℚ))) : Set (HeightOneSpectrum (𝓞 ℚ))) ℚ),
+      ∃ y : 𝓞 ℚ, algebraMap (𝓞 ℚ) ℚ y = (x : ℚ) := by
+    intro x
+    have he : ((∅ : Finset (HeightOneSpectrum (𝓞 ℚ))) : Set (HeightOneSpectrum (𝓞 ℚ))).integer ℚ = ⊥ := by
+      rw [Finset.coe_empty, integer_empty]
+    have hx : (x : ℚ) ∈ (⊥ : Subalgebra (𝓞 ℚ) ℚ) := he ▸ x.property
+    exact Algebra.mem_bot.mp hx
+  obtain ⟨a, ha⟩ := hmem ξ.val
+  obtain ⟨b, hb⟩ := hmem (ξ⁻¹).val
+  have hab : a * b = 1 := by
+    apply IsFractionRing.injective (𝓞 ℚ) ℚ
+    rw [map_mul, ha, hb, map_one]
+    have h := congrArg Subtype.val ξ.mul_inv
+    exact h
+  have hu : IsUnit (Rat.ringOfIntegersEquiv a) := (IsUnit.of_mul_eq_one b hab).map _
+  rcases Int.isUnit_iff.mp hu with h | h
+  · left
+    have ha1 : a = 1 := Rat.ringOfIntegersEquiv.injective (h.trans (map_one _).symm)
+    apply Units.ext
+    apply Subtype.ext
+    rw [← ha, ha1, map_one]
+    rfl
+  · right
+    have ha1 : a = -1 := Rat.ringOfIntegersEquiv.injective (h.trans (by simp))
+    apply Units.ext
+    apply Subtype.ext
+    rw [← ha, ha1, map_neg, map_one]
+    rfl
+
+private theorem sLocalMellinSchwartzBounds_meyer_rational_one_ne_neg_one :
+    (1 : (Set.integer ((∅ : Finset (HeightOneSpectrum (𝓞 ℚ))) : Set (HeightOneSpectrum (𝓞 ℚ))) ℚ)ˣ) ≠ -1 := by
+  intro h
+  have h' := congrArg (fun u : (Set.integer ((∅ : Finset (HeightOneSpectrum (𝓞 ℚ))) : Set (HeightOneSpectrum (𝓞 ℚ))) ℚ)ˣ ↦
+    Subtype.val (Units.val u)) h
+  norm_num at h'
+
+private theorem sLocalMellinSchwartzBounds_meyer_rational_norm (x : (SAdeleRing ℚ ∅)ˣ) :
+    ((sIdeleNorm ℚ ∅ x : ℝ≥0) : ℝ) = ‖x.val.1 Rat.infinitePlace‖ := by
+  simp [sIdeleNorm]
+  rw [Unique.eq_default Rat.infinitePlace]
+
+private theorem sLocalMellinSchwartzBounds_meyer_rational_abs (z : Rat.infinitePlace.Completion) :
+    |InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace z| = ‖z‖ := by
+  rw [← Real.norm_eq_abs, ← dist_zero_right, ← dist_zero_right z,
+    ← map_zero (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace)]
+  exact (InfinitePlace.Completion.isometryEquivRealOfIsReal Rat.isReal_infinitePlace).dist_eq z 0
+
+private theorem sLocalMellinSchwartzBounds_meyer_rational_thetaClasses (f : SchwartzBruhat (Multiplicative (SAdeleRing ℚ ∅)))
+    (φ : ℝ → ℂ) (hf : ∀ x : SAdeleRing ℚ ∅, f (Multiplicative.ofAdd x) =
+      φ (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
+        (x.1 Rat.infinitePlace)))
+    (x : (SAdeleRing ℚ ∅)ˣ) :
+    sLocalAdelicThetaOnClasses ℚ ∅ f (QuotientGroup.mk x) =
+      φ (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
+        (x.val.1 Rat.infinitePlace)) +
+      φ (-(InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
+        (x.val.1 Rat.infinitePlace))) := by
+  have hU : (Units.map (RingHom.toMonoidHom (RingHom.comp (adeleProjection ℚ ∅)
+      (Subring.subtype (integralAdelesOutside ℚ ∅)))))
+      (Units.map (RingHom.toMonoidHom (integralAdeleDiagonal ℚ ∅)) (-1)) = -1 := by
+    apply Units.ext
+    change ((adeleProjection ℚ ∅).comp (integralAdelesOutside ℚ ∅).subtype)
+      (integralAdeleDiagonal ℚ ∅
+        (-1 : (Set.integer ((∅ : Finset (HeightOneSpectrum (𝓞 ℚ))) : Set (HeightOneSpectrum (𝓞 ℚ))) ℚ)ˣ).val) =
+      (-1 : (SAdeleRing ℚ ∅)ˣ).val
+    simp
+  rw [sLocalAdelicThetaOnClasses_mk, sLocalAdelicTheta_apply]
+  dsimp only
+  rw [tsum_eq_sum (s := {1, -1}) (fun ξ hξ ↦ ?_)]
+  · rw [Finset.sum_pair sLocalMellinSchwartzBounds_meyer_rational_one_ne_neg_one]
+    simp only [MonoidHom.comp_apply, hU, map_one, one_mul, hf]
+    simp only [Units.val_neg, neg_mul, one_mul]
+    rw [show ((-(x : SAdeleRing ℚ ∅)).1 Rat.infinitePlace) =
+      -((x : SAdeleRing ℚ ∅).1 Rat.infinitePlace) from rfl, map_neg]
+  · rcases sLocalMellinSchwartzBounds_meyer_rational_units ξ with h | h <;> simp_all
+
+private theorem sLocalMellinSchwartzBounds_meyer_rational_normOne_trivial (h : (sIdeleQuotientNorm ℚ ∅).ker) : h = 1 := by
+  obtain ⟨g, hg⟩ := h
+  obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective g
+  apply Subtype.ext
+  change (QuotientGroup.mk x : SIdeleQuotient ℚ ∅) = 1
+  rw [sIdeleQuotient_mk_eq_one]
+  have hn : ‖x.val.1 Rat.infinitePlace‖ = 1 := by
+    rw [← sLocalMellinSchwartzBounds_meyer_rational_norm]
+    have h1 : sIdeleNorm ℚ ∅ x = 1 := hg
+    rw [h1]
+    simp
+  rw [← sLocalMellinSchwartzBounds_meyer_rational_abs] at hn
+  rcases (abs_eq zero_le_one).mp hn with h1 | h1
+  · refine ⟨1, ?_⟩
+    simp only [map_one]
+    apply Units.ext
+    refine Prod.ext (funext fun w ↦ ?_) (Subsingleton.elim _ _)
+    obtain rfl : w = Rat.infinitePlace := Subsingleton.elim _ _
+    apply (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace).injective
+    exact h1.trans (map_one _).symm
+  · refine ⟨-1, ?_⟩
+    apply Units.ext
+    change (x : SAdeleRing ℚ ∅) = ((adeleProjection ℚ ∅).comp (integralAdelesOutside ℚ ∅).subtype)
+      (integralAdeleDiagonal ℚ ∅
+        (-1 : (Set.integer ((∅ : Finset (HeightOneSpectrum (𝓞 ℚ))) : Set (HeightOneSpectrum (𝓞 ℚ))) ℚ)ˣ).val)
+    simp only [Units.val_neg, Units.val_one, map_neg, map_one]
+    refine Prod.ext (funext fun w ↦ ?_) (Subsingleton.elim _ _)
+    obtain rfl : w = Rat.infinitePlace := Subsingleton.elim _ _
+    apply (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace).injective
+    exact h1.trans ((map_neg _ _).trans (congrArg Neg.neg (map_one _))).symm
+
+open LineDeriv in
+
+private theorem sLocalMellinSchwartzBounds_meyer_rational_mass_pos : 0 < (sLocalNormOneQuotientMeasure ℚ ∅).real univ := by
+  let : MeasurableSpace (sIdeleQuotientNorm ℚ ∅).ker := borel _
+  let : BorelSpace (sIdeleQuotientNorm ℚ ∅).ker := ⟨rfl⟩
+  have := (sLocalNormOneQuotientMeasure_normProduct (F := ℚ) (S := ∅)).1
+  have : Subsingleton (sIdeleQuotientNorm ℚ ∅).ker :=
+    ⟨fun a b ↦ (sLocalMellinSchwartzBounds_meyer_rational_normOne_trivial a).trans (sLocalMellinSchwartzBounds_meyer_rational_normOne_trivial b).symm⟩
+  have : Finite (sIdeleQuotientNorm ℚ ∅).ker := Finite.of_subsingleton
+  have : CompactSpace (sIdeleQuotientNorm ℚ ∅).ker := Finite.compactSpace
+  exact ENNReal.toReal_pos (isOpen_univ.measure_pos _ ⟨1, trivial⟩).ne'
+    isCompact_univ.measure_lt_top.ne
+
+/-- Over ℚ with `S = ∅` the homogeneous theta function is the theta function on classes
+times the total norm-one mass. -/
+private theorem sLocalMellinSchwartzBounds_meyer_rational_homTheta (χ₀ : PontryaginDual (sIdeleQuotientNorm ℚ ∅).ker)
+    (f : SchwartzBruhat (Multiplicative (SAdeleRing ℚ ∅))) (g : SIdeleQuotient ℚ ∅) :
+    sLocalHomogeneousAdelicThetaLinearMap ℚ ∅ χ₀ f g =
+      ((sLocalNormOneQuotientMeasure ℚ ∅).real univ : ℂ) * sLocalAdelicThetaOnClasses ℚ ∅ f g := by
+  let : MeasurableSpace (sIdeleQuotientNorm ℚ ∅).ker := borel _
+  let : BorelSpace (sIdeleQuotientNorm ℚ ∅).ker := ⟨rfl⟩
+  rw [sLocalHomogeneousAdelicThetaLinearMap_apply,
+    integral_congr_ae (g := fun _ ↦ sLocalAdelicThetaOnClasses ℚ ∅ f g) (ae_of_all _ fun h ↦ ?_)]
+  · rw [integral_const, Complex.real_smul]
+  · have := sLocalMellinSchwartzBounds_meyer_rational_normOne_trivial h
+    subst this
+    simp
+
+private theorem sLocalMellinSchwartzBounds_meyer_rational_test_coordinates :
+    ∃ E : SchwartzMap ℝ ℂ ≃L[ℂ] ℬ(SAdeleRing ℚ ∅),
+      ∀ (f : SchwartzMap ℝ ℂ) (x : SAdeleRing ℚ ∅),
+        E f (Multiplicative.ofAdd x) = f (InfinitePlace.Completion.ringEquivRealOfIsReal
+          Rat.isReal_infinitePlace (x.1 Rat.infinitePlace)) := by
+  let D : Type := (v : (∅ : Finset (HeightOneSpectrum (𝓞 ℚ)))) → v.val.adicCompletion ℚ
+  let _ : Unique D := uniqueOfSubsingleton 0
+  let real : Rat.infinitePlace.Completion ≃ᵢ ℝ :=
+    InfinitePlace.Completion.isometryEquivRealOfIsReal Rat.isReal_infinitePlace
+  let coord : SAdeleRing ℚ ∅ ≃ₜ ℝ := (Homeomorph.prodUnique (InfiniteAdeleRing ℚ) D).trans
+    ((Homeomorph.piUnique (fun v : InfinitePlace ℚ ↦ v.Completion)).trans real.toHomeomorph)
+  let e : Multiplicative (SAdeleRing ℚ ∅) ≃ₜ* Multiplicative ℝ :=
+    ContinuousMulEquiv.mk' coord fun x y ↦
+      (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace).map_add
+        (x.toAdd.1 Rat.infinitePlace) (y.toAdd.1 Rat.infinitePlace)
+  with_reducible refine realSchwartzBruhat_equiv.elim fun R hR ↦ ?_
+  let : T2Space (Multiplicative ℝ) := inferInstanceAs (T2Space ℝ)
+  let : LocallyCompactSpace (Multiplicative ℝ) := inferInstanceAs (LocallyCompactSpace ℝ)
+  let : T2Space (Multiplicative (SAdeleRing ℚ ∅)) := e.toHomeomorph.isEmbedding.t2Space
+  let : LocallyCompactSpace (Multiplicative (SAdeleRing ℚ ∅)) := e.toHomeomorph.isClosedEmbedding.locallyCompactSpace
+  obtain ⟨A,hA⟩ := exists_schwartzBruhat_comp_equivCLM e
+  obtain ⟨B,hB⟩ := exists_schwartzBruhat_comp_equivCLM e.symm
+  have hAB : Function.LeftInverse B A := by
+    intro f
+    apply Subtype.ext
+    funext x
+    rw [hB,hA,e.apply_symm_apply]
+  have hBA : Function.RightInverse B A := by
+    intro f
+    apply Subtype.ext
+    funext x
+    rw [hA,hB,e.symm_apply_apply]
+  refine ⟨R.trans (ContinuousLinearEquiv.equivOfInverse A B hAB hBA),fun f x ↦ ?_⟩
+  exact (hA (R f) (Multiplicative.ofAdd x)).trans (hR f (coord x))
+
+private theorem sLocalMellinSchwartzBounds_meyer_rational_ray_haar (p : ℝ → ℂ) (s : ℂ) :
+    (∫ t : ℝ≥0ˣ, p (Real.log (t.val : ℝ)) * (((t.val : ℝ) : ℂ) ^ s) ∂positiveRealHaar) =
+      mellin (fun t ↦ p (Real.log t)) s := by
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ _
+  let e : ℝ ≃ₜ ℝ≥0ˣ := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  have he (x : ℝ) : (e x).val = (Real.exp x).toNNReal := by
+    apply NNReal.eq
+    exact (Real.coe_toNNReal _ (Real.exp_pos x).le).symm
+  have hm : positiveRealHaar = volume.map e := by
+    apply congrArg (fun a : ℝ → ℝ≥0ˣ ↦ volume.map a)
+    funext x
+    exact Units.ext (he x).symm
+  rw [hm, e.measurableEmbedding.integral_map, mellin, ← integral_comp_exp]
+  apply integral_congr_ae (.of_forall fun x ↦ ?_)
+  simp only [he, Real.coe_toNNReal _ (Real.exp_pos x).le, Real.log_exp, Complex.real_smul, smul_eq_mul]
+  rw [Complex.cpow_def_of_ne_zero (by exact_mod_cast (Real.exp_pos x).ne'),
+    Complex.cpow_def_of_ne_zero (by exact_mod_cast (Real.exp_pos x).ne'),
+    ← Complex.ofReal_log (Real.exp_pos x).le, Real.log_exp]
+  simp only [Complex.ofReal_exp, ← mul_assoc, ← Complex.exp_add]
+  rw [mul_comm (p x)]
+  congr 2
+  ring
+
+
+/-- On the rational empty-place quotient the trivial Mellin coefficients are
+the classical Mellin values of the even profile up to the fixed positive
+norm-one mass. This normalization is independent of the sequence of tests. -/
+private theorem sLocalMellinSchwartzBounds_meyer_rational_theta_mellin (φ : SchwartzMap ℝ ℂ)
+    (f : ℬ(SAdeleRing ℚ ∅))
+    (hf : ∀ x : SAdeleRing ℚ ∅, f (Multiplicative.ofAdd x) =
+      φ (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
+        (x.1 Rat.infinitePlace)))
+    (z : ℂ) (hz : 0 < z.re) :
+    sLocalThetaMellinIntegral f (quasiCharacterNormTwist (sIdeleQuotientNorm ℚ ∅)
+      (isProperMap_sIdeleQuotientNorm ℚ ∅).continuous
+      (1 : SIdeleQuotient ℚ ∅ →ₜ* ℂ) z) =
+      ((sLocalNormOneQuotientMeasure ℚ ∅).real univ : ℂ) *
+        mellin (fun t : ℝ ↦ φ t + φ (-t)) z := by
+  let : MeasurableSpace (sIdeleQuotientNorm ℚ ∅).ker := borel _
+  let : BorelSpace (sIdeleQuotientNorm ℚ ∅).ker := ⟨rfl⟩
+  let μ := sLocalNormOneQuotientMeasure ℚ ∅
+  let : μ.IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := ℚ) (S := ∅)).1
+  let p (u : ℝ) := φ (Real.exp u) + φ (-Real.exp u)
+  have hm : mellin (fun t : ℝ ↦ p (Real.log t)) z = mellin (fun t : ℝ ↦ φ t+φ (-t)) z := by
+    unfold mellin
+    apply setIntegral_congr_fun measurableSet_Ioi
+    intro x hx
+    simp [p,Real.exp_log hx]
+  rw [← hm,← sLocalMellinSchwartzBounds_meyer_rational_ray_haar p z,← integral_const_mul]
+  let π := Units.map (adeleProjection ℚ (∅ : Finset (HeightOneSpectrum (𝓞 ℚ)))).toMonoidHom
+  have hπ : Continuous π := (continuous_fst.prodMk (continuous_pi fun w : (∅ : Finset (HeightOneSpectrum (𝓞 ℚ))) ↦
+    (RestrictedProduct.continuous_eval w.val).comp continuous_snd)).units_map _
+  let τ : ℝ≥0ˣ →ₜ* (SAdeleRing ℚ ∅)ˣ := ⟨π.comp (canonicalIdeleNormSection ℚ),
+    hπ.comp (canonicalIdeleNormSection_continuous ℚ)⟩
+  have hτ : RightInverse τ (sIdeleNorm ℚ ∅) := sIdeleNorm_project_canonicalSection ℚ ∅
+  let χ : PontryaginDual (SIdeleQuotient ℚ ∅) := 1
+  have hc : ((⟨Circle.coeHom,continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ) = 1 :=
+    ContinuousMonoidHom.ext (fun _ ↦ rfl)
+  rw [←hc,← sLocalRadialMellinIntegral_eq_theta τ hτ f χ z hz]
+  unfold sLocalRadialMellinIntegral
+  apply integral_congr_ae (.of_forall fun t ↦ ?_)
+  let x := τ t
+  let y := InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
+    (x.val.1 Rat.infinitePlace)
+  have hy : |y| = (t.val : ℝ) := (sLocalMellinSchwartzBounds_meyer_rational_abs _).trans ((sLocalMellinSchwartzBounds_meyer_rational_norm x).symm.trans
+    (congrArg (fun a : ℝ≥0ˣ ↦ (a.val : ℝ)) (hτ t)))
+  have hp : φ y + φ (-y) = p (Real.log (t.val : ℝ)) := by
+    rw [show p (Real.log (t.val : ℝ)) = φ (t.val : ℝ) + φ (-(t.val : ℝ)) by
+      simp [p,Real.exp_log (NNReal.coe_pos.mpr (Units.zero_lt t))],← hy]
+    rcases le_total 0 y with h | h
+    · rw [abs_of_nonneg h]
+    · rw [abs_of_nonpos h,neg_neg,add_comm]
+  have h1 := sLocalMellinSchwartzBounds_meyer_rational_homTheta (1 : PontryaginDual (sIdeleQuotientNorm ℚ ∅).ker) f
+    (QuotientGroup.mk x)
+  rw [sLocalMellinSchwartzBounds_meyer_rational_thetaClasses f φ hf] at h1
+  change sLocalHomogeneousAdelicTheta ℚ ∅ μ 1 f (QuotientGroup.mk x) *
+    ((1:ℂ)*(((sIdeleNorm ℚ ∅ x).val : ℝ) : ℂ)^z) =
+    (μ.real univ : ℂ) * (p (Real.log (t.val : ℝ)) * (((t.val : ℝ) : ℂ)^z))
+  have hh : sLocalHomogeneousAdelicTheta ℚ ∅ μ 1 f (QuotientGroup.mk x) =
+      (μ.real univ : ℂ) * (φ y + φ (-y)) := h1
+  rw [hh,hp,show sIdeleNorm ℚ ∅ x = t from hτ t,one_mul,mul_assoc]
+
+/-- Reflection commutes with the real Fourier transform and averaging the
+two reflected tests gives a representative of the original theta class. -/
+private theorem sLocalMellinSchwartzBounds_meyer_real_symmetrized_profile :
+    ∃ S : SchwartzMap ℝ ℂ →L[ℂ] SchwartzMap ℝ ℂ,
+      (∀ (φ : SchwartzMap ℝ ℂ) x, S φ x = φ x + φ (-x)) ∧
+      ∀ φ : SchwartzMap ℝ ℂ, 𝓕 (S φ) = S (𝓕 φ) := by
+  let R : SchwartzMap ℝ ℂ →L[ℂ] SchwartzMap ℝ ℂ := SchwartzMap.compCLMOfContinuousLinearEquiv ℂ
+    (LinearIsometryEquiv.neg ℝ (E := ℝ)).toContinuousLinearEquiv
+  let S := ContinuousLinearMap.id ℂ (SchwartzMap ℝ ℂ) + R
+  have hS (φ : SchwartzMap ℝ ℂ) (x : ℝ) : S φ x = φ x+φ (-x) := rfl
+  refine ⟨S,hS,fun φ ↦ ?_⟩
+  change 𝓕 (φ + R φ) = S (𝓕 φ)
+  rw [FourierTransform.fourier_add]
+  ext x
+  rw [hS]
+  change 𝓕 φ x + 𝓕 (R φ) x = _
+  congr 1
+  change 𝓕 ((φ : ℝ → ℂ) ∘ LinearIsometryEquiv.neg ℝ) x = 𝓕 (φ : ℝ → ℂ) (-x)
+  exact Real.fourier_comp_linearIsometry _ _ _
+
+private theorem sLocalMellinSchwartzBounds_meyer_inverse_real_profiles
+    (f : ℕ → SchwartzMap ℝ ℂ) (hf : ∀ n x, f n (-x) = f n x)
+    (hF : ∀ n x, 𝓕 (f n) (-x) = 𝓕 (f n) x)
+    (hM : ∀ v ∈ ({f,fun n ↦ 𝓕 (f n)} : Set (ℕ → SchwartzMap ℝ ℂ)),
+      ∀ a : ℝ, 1 < a → ∀ m : ℕ, ∃ B : ℝ, ∀ n (z : ℂ), z.re = a →
+        ‖z^m*mellin (v n) z‖ ≤ B) :
+    Bornology.IsVonNBounded ℂ (range f) := by
+  have hbd (v : ℕ → SchwartzMap ℝ ℂ) (hv : v ∈ ({f,fun n ↦ 𝓕 (f n)} : Set _))
+      (j : ℕ) (a : ℝ) (ha : (j:ℝ)+1 < a) :
+      ∃ B : ℝ, 0 ≤ B ∧ ∀ n (x : ℝ), 0 < x →
+        x^a * ‖iteratedDeriv j (v n : ℝ → ℂ) x‖ ≤ B := by
+    let D := SchwartzMap.derivCLM ℂ ℂ
+    let w (n : ℕ) := D^[j] (v n)
+    have hpoint (n i : ℕ) : ((D^[i] (v n) : SchwartzMap ℝ ℂ) : ℝ → ℂ) =
+        iteratedDeriv i (v n : ℝ → ℂ) := by
+      induction i with
+      | zero => rfl
+      | succ i ih => rw [Function.iterate_succ_apply',iteratedDeriv_succ,← ih]; rfl
+    obtain ⟨C,hC⟩ := sLocalMellinSchwartzBounds_meyer_real_mellin_bounds_all_derivatives v (hM v hv) j a ha 2
+    have ha1 : 1 ≤ a := by linarith [Nat.cast_nonneg (α := ℝ) j]
+    have hco (n) : Continuous (fun t : ℝ ↦ mellin (w n) ((a:ℂ)+(t:ℂ)*Complex.I)) := by
+      apply continuous_iff_continuousAt.mpr
+      intro x
+      let z (t : ℝ) := (a:ℂ)+(t:ℂ)*Complex.I
+      have hz : 0 < (z x).re := by simp [z]; linarith
+      exact ContinuousAt.comp (f := z) (g := mellin (w n))
+        (sLocalMellinSchwartzBounds_meyer_real_mellin_differentiableAt (w n) hz).continuousAt (by dsimp [z]; fun_prop)
+    have H := sLocalMellinSchwartzBounds_meyer_real_inverse_ray a ha1 (fun n ↦ (w n : ℝ → ℂ)) (fun n ↦ (w n).continuous)
+      (fun n ↦ sLocalMellinSchwartzBounds_meyer_real_mellin_convergent (w n) (by simp; linarith)) hco C
+      (fun n t ↦ hC n _ (by simp))
+    refine ⟨max (C/2) 0,le_max_right _ _,fun n x hx ↦ ?_⟩
+    rw [← hpoint]
+    exact (H n x hx).trans (le_max_left _ _)
+  have hfF : (fun n ↦ 𝓕 (f n)) ∈ ({f,fun n ↦ 𝓕 (f n)} : Set _) := by simp
+  have hpos := sLocalMellinSchwartzBounds_meyer_real_positive_moments (fun n ↦ 𝓕 (f n)) (by
+    intro a ha; simpa only [Nat.cast_zero,zero_add,iteratedDeriv_zero] using hbd _ hfF 0 a (by simpa))
+  apply sLocalMellinSchwartzBounds_meyer_real_bounds_suffice f
+  · intro j hj
+    obtain ⟨B,hB⟩ := hpos j hj
+    refine ⟨(2*Real.pi)^j*(2*B),fun n x ↦ ?_⟩
+    apply sLocalMellinSchwartzBounds_meyer_real_derivative_from_fourier_moment _ j _ _ x
+    have hEven (y : ℝ) : ‖𝓕 (f n) |y|‖ = ‖𝓕 (f n) y‖ := by
+      rcases le_total 0 y with h | h
+      · rw [abs_of_nonneg h]
+      · rw [abs_of_nonpos h,hF]
+    have he := integral_comp_abs (f := fun y : ℝ ↦ y^j*‖𝓕 (f n) y‖)
+    simp_rw [hEven] at he
+    exact he.trans_le (by gcongr; exact hB n)
+  · intro k j
+    let a : ℝ := max (k:ℝ) ((j:ℝ)+1)+1
+    have ha : (j:ℝ)+1 < a := (le_max_right _ _).trans_lt (lt_add_of_pos_right _ zero_lt_one)
+    obtain ⟨B,_,hB⟩ := hbd f (by simp) j a ha
+    refine ⟨B,fun n x hx ↦ ?_⟩
+    have hx0 : 0 < |x| := zero_lt_one.trans_le hx
+    have hEven : ‖iteratedDeriv j (f n : ℝ → ℂ) |x|‖ = ‖iteratedDeriv j (f n : ℝ → ℂ) x‖ := by
+      rcases le_total 0 x with h | h
+      · rw [abs_of_nonneg h]
+      · have eq : (fun t : ℝ ↦ f n (-t)) = f n := funext (hf n)
+        have hz := congrArg norm (iteratedDeriv_comp_neg j (f n : ℝ → ℂ) x)
+        rw [eq] at hz
+        simpa [norm_smul,abs_of_nonpos h] using hz.symm
+    have hp : |x|^k ≤ |x|^a := by
+      rw [← Real.rpow_natCast]
+      apply Real.rpow_le_rpow_of_exponent_le hx
+      exact (le_max_left _ _).trans (le_add_of_nonneg_right zero_le_one)
+    rw [← hEven]
+    exact (mul_le_mul_of_nonneg_right hp (norm_nonneg _)).trans (hB n _ hx0)
+
+/-- On a theta stage realized by even real Schwartz profiles compatibly with Fourier and Mellin, the weighted estimates imply boundedness. -/
+private theorem sLocalMellinSchwartzBounds_meyer_inverse_of_even_real_profiles
+    (T : Finset (HeightOneSpectrum (𝓞 F))) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (v : ℕ → SchwartzBruhat (Multiplicative (SAdeleRing F T)))
+    (hv : ∀ w ∈ ({v,fun n ↦ sAdeleSchwartzFourier (v n)} : Set (ℕ → SchwartzBruhat (Multiplicative (SAdeleRing F T)))),
+      sLocalMellinSchwartzBounds T τ w sLocalThetaMellinIntegral)
+    (c : ℝ) (hc : 0 < c)
+    (P : SchwartzBruhat (Multiplicative (SAdeleRing F T)) → SchwartzMap ℝ ℂ)
+    (L : SchwartzMap ℝ ℂ →L[ℂ] SLocalAdelicThetaSpace F T)
+    (hP : ∀ g, (∀ x : ℝ, P g (-x) = P g x) ∧
+      P (sAdeleSchwartzFourier g) = 𝓕 (P g) ∧
+      (sLocalAdelicTheta F T).ker.mkQ g = L (P g) ∧
+      ∀ z : ℂ, 1 < z.re → sLocalThetaMellinIntegral g (quasiCharacterNormTwist
+        (sIdeleQuotientNorm F T) (isProperMap_sIdeleQuotientNorm F T).continuous
+        (1 : SIdeleQuotient F T →ₜ* ℂ) z) = (c : ℂ) * mellin (P g) z) :
+    Bornology.IsVonNBounded ℂ (range fun n ↦ (sLocalAdelicTheta F T).ker.mkQ (v n)) := by
+  let f (n : ℕ) := P (v n)
+  have he (n : ℕ) (x : ℝ) : f n (-x) = f n x := (hP (v n)).1 x
+  have hFe (n : ℕ) (x : ℝ) : 𝓕 (f n) (-x) = 𝓕 (f n) x := by
+    rw [show 𝓕 (f n) = P (sAdeleSchwartzFourier (v n)) from (hP _).2.1.symm]
+    exact (hP _).1 x
+  have line (w : ℕ → SchwartzBruhat (Multiplicative (SAdeleRing F T)))
+      (hw : sLocalMellinSchwartzBounds T τ w sLocalThetaMellinIntegral)
+      (a : ℝ) (ha : 1 < a) (m : ℕ) :
+      ∃ B : ℝ, ∀ n (z : ℂ), z.re = a → ‖z^m*mellin (P (w n)) z‖ ≤ B := by
+    obtain ⟨H,_,_,hw'⟩ := (sLocalMellinSchwartzBounds_meyer_zeroth_iff T τ w).mp hw a ha
+    obtain ⟨B,hB⟩ := hw' 0 0 m
+    have htr : ((⟨Circle.coeHom,continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ((1 : H).val.val)) = 1 :=
+      ContinuousMonoidHom.ext fun _ ↦ rfl
+    refine ⟨B/c,fun n z hz ↦ ?_⟩
+    rw [le_div_iff₀ hc]
+    have h := hB 1 n z hz
+    simp only [htr,pow_zero,one_mul,(hP (w n)).2.2.2 z (hz.symm ▸ ha)] at h
+    simpa only [norm_mul,Complex.norm_real,Real.norm_of_nonneg hc.le,mul_left_comm,mul_comm,mul_assoc] using h
+  have hb : Bornology.IsVonNBounded ℂ (range f) := by
+    apply sLocalMellinSchwartzBounds_meyer_inverse_real_profiles f he hFe
+    intro w hw a ha m
+    rcases Set.mem_insert_iff.mp hw with rfl | hw
+    · exact line v (hv _ (by simp)) a ha m
+    · obtain rfl := Set.mem_singleton_iff.mp hw
+      simpa only [f,fun n ↦ (hP (v n)).2.1] using
+        line (fun n ↦ sAdeleSchwartzFourier (v n)) (hv _ (by simp)) a ha m
+  apply (hb.image L).subset
+  rintro _ ⟨n,rfl⟩
+  exact ⟨f n,⟨n,rfl⟩,(hP (v n)).2.2.1.symm⟩
+
+/-- The trivial Mellin coefficient, ordinary additive Fourier transform, and theta
+class have a common even real Schwartz model over ℚ with no finite places. -/
+private theorem sLocalMellinSchwartzBounds_meyer_rational_even_real_profiles :
+    ∃ c : ℝ, 0 < c ∧ ∃ (P : SchwartzBruhat (Multiplicative (SAdeleRing ℚ ∅)) → SchwartzMap ℝ ℂ)
+      (L : SchwartzMap ℝ ℂ →L[ℂ] SLocalAdelicThetaSpace ℚ ∅),
+      ∀ g, (∀ x : ℝ, P g (-x) = P g x) ∧
+        P (sAdeleSchwartzFourier g) = 𝓕 (P g) ∧
+        (sLocalAdelicTheta ℚ ∅).ker.mkQ g = L (P g) ∧
+        ∀ z : ℂ, 1 < z.re → sLocalThetaMellinIntegral g (quasiCharacterNormTwist
+          (sIdeleQuotientNorm ℚ ∅) (isProperMap_sIdeleQuotientNorm ℚ ∅).continuous
+          (1 : SIdeleQuotient ℚ ∅ →ₜ* ℂ) z) = (c : ℂ) * mellin (P g) z := by
+  let : MeasurableSpace (sIdeleQuotientNorm ℚ ∅).ker := borel _
+  let : BorelSpace (sIdeleQuotientNorm ℚ ∅).ker := ⟨rfl⟩
+  obtain ⟨E,hE⟩ := sLocalMellinSchwartzBounds_meyer_rational_test_coordinates
+  obtain ⟨S,hS,hSF⟩ := sLocalMellinSchwartzBounds_meyer_real_symmetrized_profile
+  let A : SchwartzMap ℝ ℂ →L[ℂ] SchwartzBruhat (Multiplicative (SAdeleRing ℚ ∅)) :=
+    (1/2 : ℂ) • E.toContinuousLinearMap
+  let L := (sLocalAdelicTheta ℚ ∅).ker.mkQL.comp A
+  let P (g : SchwartzBruhat (Multiplicative (SAdeleRing ℚ ∅))) := S (E.symm g)
+  refine ⟨_,sLocalMellinSchwartzBounds_meyer_rational_mass_pos,P,L,fun g ↦ ?_⟩
+  have coord (g : SchwartzBruhat (Multiplicative (SAdeleRing ℚ ∅))) (x : SAdeleRing ℚ ∅) :
+      g (Multiplicative.ofAdd x) = E.symm g (InfinitePlace.Completion.ringEquivRealOfIsReal
+        Rat.isReal_infinitePlace (x.1 Rat.infinitePlace)) := by rw [← hE,E.apply_symm_apply]
+  refine ⟨fun x ↦ ?_,?_,?_,fun z hz ↦ ?_⟩
+  · simp only [P,hS,neg_neg,add_comm]
+  · change S (E.symm (sAdeleSchwartzFourier g)) = 𝓕 (S (E.symm g))
+    rw [hSF]
+    apply congrArg S
+    apply E.injective
+    rw [E.apply_symm_apply]
+    apply Subtype.ext
+    funext x
+    exact (sAdeleSchwartzFourier_ratEmpty_apply (E.symm g) g (coord g) x.toAdd).trans
+      (hE _ x.toAdd).symm
+  · symm
+    change (sLocalAdelicTheta ℚ ∅).ker.mkQ (A (P g)) = (sLocalAdelicTheta ℚ ∅).ker.mkQ g
+    rw [Submodule.mkQ_apply,Submodule.mkQ_apply,Submodule.Quotient.eq,LinearMap.mem_ker,map_sub,sub_eq_zero]
+    ext x
+    rw [← sLocalAdelicThetaOnClasses_mk,← sLocalAdelicThetaOnClasses_mk]
+    have hA (y : SAdeleRing ℚ ∅) : (A (P g)) (Multiplicative.ofAdd y) =
+        (((1/2 : ℂ) • P g : SchwartzMap ℝ ℂ) : ℝ → ℂ)
+          (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace (y.1 Rat.infinitePlace)) := by
+      change (1/2 : ℂ) * E (P g) (Multiplicative.ofAdd y) = (1/2 : ℂ) * _
+      rw [hE]
+    rw [sLocalMellinSchwartzBounds_meyer_rational_thetaClasses _ _ hA,sLocalMellinSchwartzBounds_meyer_rational_thetaClasses _ _ (coord g)]
+    simp only [smul_apply,smul_eq_mul,P,hS,neg_neg]
+    ring
+  · rw [sLocalMellinSchwartzBounds_meyer_rational_theta_mellin (E.symm g) g (coord g) z (zero_lt_one.trans hz)]
+    rw [show (P g : ℝ → ℂ) = (fun t ↦ (E.symm g) t + (E.symm g) (-t)) from funext (hS _)]
+
+/-- The inverse comparison on the rational stage with no finite places holds for
+arbitrary spans of theta classes. -/
+private theorem sLocalMellinSchwartzBounds_meyer_rational_empty_inverse_from_model
+    (v : ℕ → SchwartzBruhat (Multiplicative (SAdeleRing ℚ ∅)))
+    (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient ℚ ∅)
+    (hv : sLocalMellinSchwartzBounds ∅ τ v sLocalThetaMellinIntegral)
+    (hF : sLocalMellinSchwartzBounds ∅ τ (fun n ↦ sAdeleSchwartzFourier (v n)) sLocalThetaMellinIntegral) :
+    Bornology.IsVonNBounded ℂ (range fun n ↦ (sLocalAdelicTheta ℚ ∅).ker.mkQ (v n)) := by
+  obtain ⟨c,hc,P,L,hP⟩ := sLocalMellinSchwartzBounds_meyer_rational_even_real_profiles
+  apply sLocalMellinSchwartzBounds_meyer_inverse_of_even_real_profiles ∅ τ v _ c hc P L hP
+  intro w hw
+  rcases Set.mem_insert_iff.mp hw with rfl | hw
+  · exact hv
+  · obtain rfl := Set.mem_singleton_iff.mp hw
+    exact hF
+
 /-- Classical input: the inverse bornology comparison in Meyer, Corollary 4.17, p. 34,
 and Lemma 4.20, p. 36. For a sequence of fixed conductor in a single Fréchet theta
-subspace, with infinite-dimensional linear span, the weighted Mellin values of the
+subspace, with infinite-dimensional linear span and no compatible even real Schwartz model, the weighted Mellin values of the
 tests and of their additive Fourier transforms should bound the theta classes. -/
+private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (hτ : RightInverse τ (sIdeleQuotientNorm F T)) (v : ℕ → ℬₛ(T))
+    (hreal : ¬ ∃ c : ℝ, 0 < c ∧ ∃ (P : ℬₛ(T) → SchwartzMap ℝ ℂ)
+      (L : SchwartzMap ℝ ℂ →L[ℂ] SLocalAdelicThetaSpace F T),
+      ∀ g, (∀ x : ℝ, P g (-x) = P g x) ∧
+        P (sAdeleSchwartzFourier g) = 𝓕 (P g) ∧
+        (sLocalAdelicTheta F T).ker.mkQ g = L (P g) ∧
+        ∀ z : ℂ, 1 < z.re → sLocalThetaMellinIntegral g (quasiCharacterNormTwist
+          (sIdeleQuotientNorm F T) (isProperMap_sIdeleQuotientNorm F T).continuous
+          (1 : SIdeleQuotient F T →ₜ* ℂ) z) = (c : ℂ) * mellin (P g) z)
+    (hS : ¬ FiniteDimensional ℂ (Submodule.span ℂ (range fun n ↦ (sLocalAdelicTheta F T).ker.mkQ (v n))))
+    (k : ℕ) (hk : ∀ g : (SAdeleRing F T)ˣ, g.val.1 = 1 →
+      (∀ w : T, Valued.v (g.val.2 w - 1) ≤ WithZero.exp (-(k+1 : ℤ))) → ∀ n,
+        (sLocalAdelicTheta F T).ker.mkQ (schwartzBruhatUnitTranslate g (v n)) = (sLocalAdelicTheta F T).ker.mkQ (v n))
+    (M : Submodule ℂ (SLocalAdelicThetaSpace F T)) (hM : IsFrechetTVS M)
+    (hm : (range fun n ↦ (sLocalAdelicTheta F T).ker.mkQ (v n)) ⊆ M)
+    (hw : ∀ f ∈ ({v,fun n ↦ sAdeleSchwartzFourier (v n)} : Set (ℕ → ℬₛ(T))),
+      ∀ a : ℝ, 1 < a → ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
+      (∀ χ ∉ H, ∀ n (z : ℂ), z.re = a → sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val) z) = 0) ∧
+      ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re = a →
+        (1+p χ)^k * ‖z^m*sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val.val) z)‖ ≤ B) :
+    Bornology.IsVonNBounded ℂ (range fun n ↦ (sLocalAdelicTheta F T).ker.mkQ (v n)) := by
+  sorry
+
+/-- The real Schwartz profile criterion covers the rational empty-place stage of the inverse comparison. -/
 private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_bound (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (hτ : RightInverse τ (sIdeleQuotientNorm F T)) (v : ℕ → ℬₛ(T))
     (hS : ¬ FiniteDimensional ℂ (Submodule.span ℂ (range fun n ↦ (sLocalAdelicTheta F T).ker.mkQ (v n))))
@@ -5919,7 +6700,16 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_bound (T : Finset
       ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re = a →
         (1+p χ)^k * ‖z^m*sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val.val) z)‖ ≤ B) :
     Bornology.IsVonNBounded ℂ (range fun n ↦ (sLocalAdelicTheta F T).ker.mkQ (v n)) := by
-  sorry
+  by_contra hn
+  apply hn
+  apply sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles T τ hτ v _ hS k hk M hM hm hw
+  rintro ⟨c, hc, P, L, hP⟩
+  apply hn
+  apply sLocalMellinSchwartzBounds_meyer_inverse_of_even_real_profiles T τ v _ c hc P L hP
+  intro w hw'
+  exact (sLocalMellinSchwartzBounds_meyer_zeroth_iff T τ w).mpr (hw w hw')
+
+end
 
 /-- For bounded classes, the fixed-conductor comparison only needs the weights
 across infinite angular support. Finite support has uniform radial strip bounds. -/
@@ -5949,6 +6739,21 @@ private theorem sLocalMellinSchwartzBounds_meyer_span_of_bounds (T : Finset V) (
   · obtain ⟨B,hB⟩ := hw 0 0 0
     exact ⟨B,fun n ↦ by simpa using hB ⟨χ,hχ⟩ n z hz⟩
   · exact ⟨0,fun n ↦ by rw [hs χ hχ n z hz,norm_zero]⟩
+
+/-- The full bounded-lift equivalence holds for arbitrary families on the rational
+archimedean stage, including those with infinite-dimensional theta span. -/
+private theorem sLocalMellinSchwartzBounds_meyer_rational_empty
+    (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient ℚ ∅) (hτ : RightInverse τ (sIdeleQuotientNorm ℚ ∅))
+    (v : ℕ → SchwartzBruhat (Multiplicative (SAdeleRing ℚ ∅))) :
+    (∃ A : Set (SchwartzBruhat (Multiplicative (SAdeleRing ℚ ∅))), Bornology.IsVonNBounded ℂ A ∧
+      (range fun n ↦ (sLocalAdelicTheta ℚ ∅).ker.mkQ (v n)) ⊆ (sLocalAdelicTheta ℚ ∅).ker.mkQL '' A) ↔
+      sLocalMellinSchwartzBounds ∅ τ v sLocalThetaMellinIntegral ∧
+        sLocalMellinSchwartzBounds ∅ τ (fun n ↦ sAdeleSchwartzFourier (v n)) sLocalThetaMellinIntegral := by
+  rw [sLocalMellinSchwartzBounds_meyer_lift_iff_quotient_bounded ∅ v]
+  constructor
+  · exact sLocalMellinSchwartzBounds_meyer_degree_one_forward ∅ (by simp) τ hτ v
+  · rintro ⟨hv,hF⟩
+    exact sLocalMellinSchwartzBounds_meyer_rational_empty_inverse_from_model v τ hv hF
 
 /-- Classical input: R. Meyer, *On a representation of the idele class group related to
 primes and zeros of L-functions*, Duke Math. J. 127 (2005), arXiv:math/0311468 (page numbers
