@@ -5622,15 +5622,6 @@ theorem introTraceApprox_archimedean_tendsto_atTop (χ : U𝔽) (h ρ : ℕ → 
   exact ((le_max_left _ _).trans (hn v)).trans
     (Finset.single_le_sum (fun w _ ↦ (le_max_right c 0).trans (hn w)) (Finset.mem_univ v))
 
-/-- Paper: §1.4.3, p. 29. For the trivial character of every number field, the real part
-of the full archimedean term at parameter two tends to positive infinity along every
-admissible cutoff family. -/
-theorem introTraceApprox_trivial_archimedean_tendsto_atTop (h ρ : ℕ → ℝ → ℝ)
-    (hA : IsIntroTraceApproximation h ρ) :
-    Tendsto (fun n ↦ (∑ w : InfinitePlace F,
-      introTraceArchimedean (F := F) 1 approx(h, ρ, n, (2 : ℂ)) w).re) atTop atTop :=
-  introTraceApprox_archimedean_tendsto_atTop (F := F) 1 h ρ hA
-
 /-- On a full rational window the exterior sum vanishes by the critical strip, so
 the combined real-place and spectral term has a finite limit for every family. -/
 private theorem introTraceApprox_rat_combined_limit (h ρ : ℕ → ℝ → ℝ)
@@ -7040,6 +7031,27 @@ theorem introTraceApprox_spectral_tendsto_atBot (χ : U𝔽) (h ρ : ℕ → ℝ
   change _ ≤ (∑ w, introTraceArchimedean χ (f k) w).re at harch
   linarith
 
+/-- Every positive-order completed zero belongs to every full window. -/
+private theorem introTrace_full_window_spectral_sum_eq (χ : U𝔽) (f : ℝ → ℂ) (a : ℝ) (ha : 1 / 2 ≤ a) :
+    introTraceSpectralSum χ f a = introTraceSpectralSum χ f 1 := by
+  let e : windowZeros(χ, a) ≃ windowZeros(χ, (1 : ℝ)) := {
+    toFun := fun t ↦ ⟨t.val, t.property.1, (introTrace_positive_divisor_in_critical_strip χ t.val t.property.1).trans (by norm_num)⟩
+    invFun := fun t ↦ ⟨t.val, t.property.1, (introTrace_positive_divisor_in_critical_strip χ t.val t.property.1).trans_le ha⟩
+    left_inv := fun _ ↦ rfl
+    right_inv := fun _ ↦ rfl }
+  unfold introTraceSpectralSum
+  exact e.tsum_eq (fun r : windowZeros(χ, (1 : ℝ)) ↦
+    (zeroOrder(χ, r.val) : ℂ) * introTraceMellin f (r.val - 1 / 2))
+
+/-- Paper: §1.4.3, p. 29. For every full critical-strip window the real part of the
+unregularized spectral sum at parameter two tends to negative infinity. -/
+theorem introTraceApprox_full_window_spectral_tendsto_atBot (χ : U𝔽)
+    (h ρ : ℕ → ℝ → ℝ) (hA : IsIntroTraceApproximation h ρ) (a : ℝ) (ha : 1 / 2 ≤ a) :
+    Tendsto (fun n ↦ (introTraceSpectralSum χ approx(h, ρ, n, (2 : ℂ)) a).re) atTop atBot := by
+  apply (introTraceApprox_spectral_tendsto_atBot χ h ρ hA).congr
+  intro n
+  exact congrArg Complex.re (introTrace_full_window_spectral_sum_eq χ _ a ha).symm
+
 /-- Paper: §1.4.3, p. 29. Every unitary character over a number field has infinitely
 many distinct positive-order zeros of its completed L-function. Finiteness would
 make the spectral sum a finite sum of convergent Mellin moments. -/
@@ -7073,20 +7085,6 @@ theorem introTrace_positive_divisor_infinite (χ : U𝔽) :
     simpa only [introTraceSpectralSum, tsum_fintype] using hsum
   exact Complex.continuous_re.continuousAt.tendsto.comp hspec
 
-
-/-- Paper: §1.4.3, p. 29. For the trivial character of every number field the real part
-of the unit-window spectral term at parameter two tends to negative infinity along every
-admissible cutoff family. -/
-theorem introTraceApprox_trivial_spectral_tendsto_atBot (h ρ : ℕ → ℝ → ℝ)
-    (hA : IsIntroTraceApproximation h ρ) :
-    Tendsto (fun n ↦ (introTraceSpectralSum (F := F) 1 approx(h, ρ, n, (2 : ℂ)) 1).re) atTop atBot :=
-  introTraceApprox_spectral_tendsto_atBot (F := F) 1 h ρ hA
-
-/-- Paper: §1.4.3, p. 29. The completed L-function of the trivial character over every
-number field has infinitely many distinct positive-divisor zeros. -/
-theorem introTrace_trivial_positive_divisor_infinite :
-    Infinite {z : ℂ // 0 < MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) 1) univ z} :=
-  introTrace_positive_divisor_infinite (F := F) 1
 
 /-- Paper: §1.4.5, p. 30. The completed functional equation reflects the
 zero-free region for the inverse character to the left of one half for the
