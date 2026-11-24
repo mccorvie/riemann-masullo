@@ -1,6 +1,5 @@
 module
 
-public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3b
 public import RiemannMasullo.Ch06_LocalGlobal.Sec3
 public import RiemannMasullo.AppC_LCTVS.Sec3a
 
@@ -15,7 +14,7 @@ import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.ChangeVariables
 import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec2
 import RiemannMasullo.Ch02_AdelicTheta.Sec1
-import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
+public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
 import Mathlib.Analysis.Normed.Group.Tannery
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform.Holomorphic
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
@@ -28,6 +27,10 @@ import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec3b
 
 import RiemannMasullo.ForMathlib.Analysis.Meromorphic.VerticalStripZeros
+public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec4
+public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec5
+public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec6
+public import RiemannMasullo.ForMathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
 
 /-! # §7.4 Nuclearity
 

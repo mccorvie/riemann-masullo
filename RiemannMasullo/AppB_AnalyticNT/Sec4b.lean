@@ -7169,7 +7169,7 @@ theorem finiteConnesWeilPrincipalValue_of_apply_one_zero (v : Primes(F))
 
 /-- Connes's principal value for the standard character is minus the unit mass times the
 logarithmic Fourier pairing. -/
-private theorem existsUnique_finiteWeilFourierDistribution_principalValue (v : Primes(F))
+theorem existsUnique_finiteWeilFourierDistribution_principalValue (v : Primes(F))
     (f : 𝒮ₐ(v.adicCompletion F)) :
     finiteConnesPrincipalValue v 1 f = -(V𝔭(v) : ℂ) *
       ∫ y, ((J𝔭(v) y : ℝ) : ℂ) * tamagawaFourier ν𝔭(v) ψ𝔭(v) addTest(f) y ∂ν𝔭(v) := by

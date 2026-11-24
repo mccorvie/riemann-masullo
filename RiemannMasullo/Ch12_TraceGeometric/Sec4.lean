@@ -2,7 +2,7 @@ module
 
 public import RiemannMasullo.Ch12_TraceGeometric.Sec2
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
-public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3b
+public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3b_PWLevels
 public import RiemannMasullo.Ch10_TraceSpectral.Sec1
 public import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.WeightedIntegral
 public import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Count
@@ -15,7 +15,6 @@ import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec5
 import RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Count
 import Mathlib.Analysis.SpecialFunctions.SmoothTransition
-import all RiemannMasullo.AppB_AnalyticNT.Sec4b
 import RiemannMasullo.AppA_AlgebraicNT.Sec3
 import RiemannMasullo.ForMathlib.Algebra.Module.ZLattice.Summable
 import RiemannMasullo.ForMathlib.Analysis.Fourier.Translation
@@ -27,6 +26,9 @@ import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Count
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Haar.Unique
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.InfiniteAdeleRing
 import RiemannMasullo.ForMathlib.Topology.Covering.AddCircle
+import RiemannMasullo.ForMathlib.MeasureTheory.Integral.Bochner.Regular
+import RiemannMasullo.ForMathlib.Analysis.Normed.Field.ProperSpace
+import Mathlib.Topology.MetricSpace.ProperSpace.Lemmas
 
 /-! # S-local trace calculation
 

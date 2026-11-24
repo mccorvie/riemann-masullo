@@ -21,6 +21,7 @@ import RiemannMasullo.Ch13_ZerosHecke.Targets
 import RiemannMasullo.External.ZetaLab.HardyFirstZero.FirstZero
 import Mathlib.Analysis.Normed.Operator.Banach
 import RiemannMasullo.External.ZetaLab.HardyFirstZero.FirstZero
+import RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
 
 /-! # §11.2.1–11.2.2 assertions that are false as printed -/
 

@@ -4462,7 +4462,7 @@ theorem schwartzBruhat_fourier_continuousLinear :
 
 /-- Once Fourier transforms of Schwartz–Bruhat functions are known to be Schwartz–Bruhat,
 they are integrable, so Plancherel inversion holds pointwise. -/
-private theorem schwartzBruhat_fourier_inversion (ν : Measure (PontryaginDual G))
+theorem schwartzBruhat_fourier_inversion (ν : Measure (PontryaginDual G))
     (hν : IsLCAPlancherelMeasure μ ν) (g : SchwartzBruhat G) (x : G) :
     g x = ∫ χ : PontryaginDual G, lcaFourier μ g χ * (χ x : ℂ) ∂ν := by
   let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
