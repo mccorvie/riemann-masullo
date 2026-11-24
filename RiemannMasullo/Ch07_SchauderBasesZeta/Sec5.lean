@@ -20,6 +20,7 @@ import RiemannMasullo.Ch03_IdelicZeta.Sec3
 import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3a
 import RiemannMasullo.Ch06_LocalGlobal.Sec3
 import RiemannMasullo.ForMathlib.Topology.Maps.Strict.Module
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Barrelled
 import RiemannMasullo.Ch09_HardySobolev.Sec2
 
 /-! # §7.5 Strong co-primality -/
@@ -1414,7 +1415,73 @@ private theorem exists_strongCoprimalityFourierJet_full_functional (s : ℂ) (hs
     ∃ d : StrongDual ℂ (GlobalHomogeneousThetaSpace F (ω(χ))),
       ∀ f : SchwartzBruhat (Multiplicative (𝔸[F])),
         d (q f) = iteratedDeriv k (fun z ↦ globalIdelicZFunction (adeleSchwartzFourier f)
-          (ideleClassNormTwist χ⁻¹ z)) (1 - s) := by sorry
+          (ideleClassNormTwist χ⁻¹ z)) (1 - s) := by
+  classical
+  intro q
+  let E := GlobalHomogeneousThetaSpace F (ω(χ))
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let : BarrelledSpace ℂ E := (globalHomogeneousThetaSpace_montel (F := F) (ω := ω(χ))).1
+  let c := ideleClassNormTwist χ
+  let N := ideleClassNormTwist (1 : U) 1
+  let regularSet := (c ⁻¹' ({1, N} : Set (QuasiCharacter C𝔽)))ᶜ
+  have hi : Injective c := by
+    intro z w he
+    apply trivial_normTwist_injective (F := F)
+    ext g
+    have h := DFunLike.congr_fun he g
+    change (χ g : ℂ) * _ ^ z = (χ g : ℂ) * _ ^ w at h
+    change 1 * ((((ideleClassNorm F g).val : ℝ) : ℂ) ^ z) =
+      1 * ((((ideleClassNorm F g).val : ℝ) : ℂ) ^ w)
+    exact congrArg (1 * ·) (mul_left_cancel₀ (Circle.coe_ne_zero _) h)
+  have ho : IsOpen regularSet := (((Set.finite_singleton N).insert 1).preimage hi.injOn).isClosed.isOpen_compl
+  have hnot (z : ℂ) (hz : z ∈ regularSet) : c z ≠ 1 ∧ c z ≠ N := not_or.mp hz
+  have hreg : s ∈ regularSet := by
+    refine not_or.mpr ⟨hc, fun he ↦ ?_⟩
+    have h := congrArg (quasiCharacterAbscissa (ideleClassNorm F) (isProperMap_ideleClassNorm F)
+      (ideleClassNorm_ne_one (F := F))) he
+    change quasiCharacterAbscissa _ _ _ (ideleClassNormTwist χ s) =
+      quasiCharacterAbscissa _ _ _ (ideleClassNormTwist (1 : U) 1) at h
+    rw [quasiCharacterAbscissa_ideleClassNormTwist, quasiCharacterAbscissa_ideleClassNormTwist, hs] at h
+    norm_num at h
+  let Z (f : SchwartzBruhat (Multiplicative (𝔸[F]))) (z : ℂ) := globalIdelicZFunction f (c z)
+  have hev (z : ℂ) (hz : z ∈ regularSet) : ∃ l : StrongDual ℂ E, ∀ f, l (q f) = Z f z := by
+    let Ω := {d : QuasiCharacter C𝔽 // ∀ h : C₁, d h.val = (ω(χ) h : ℂ)}
+    let v : Ω := ⟨c z, fun h ↦ by
+      change (χ h.val : ℂ) * (((ideleClassNorm F h.val).val : ℝ) : ℂ) ^ z = _
+      have ht : (((ideleClassNorm F h.val).val : ℝ) : ℂ) = 1 := by rw [h.property]; rfl
+      rw [ht, Complex.one_cpow, mul_one]
+      rfl⟩
+    let a : {d : Ω // 0 ≤ globalIdelicOrderBound d.val} := ⟨v, by
+      change 0 ≤ globalIdelicOrderBound (c z)
+      simp [globalIdelicOrderBound, (hnot z hz).1, (hnot z hz).2, N]⟩
+    obtain ⟨M, _, hM⟩ := exists_globalHomogeneousThetaMellin (F := F) (ω(χ))
+    let A := meromorphicNormOneComponent (ideleClassNorm F) (isProperMap_ideleClassNorm F).continuous
+      (ω(χ)) (globalIdelicOrderBound (F := F))
+    refine ⟨(ContinuousMap.evalCLM ℂ a).comp (A.subtypeL.comp M), fun f ↦ ?_⟩
+    exact (hM f a).trans (globalIdelicMellin_apply f _)
+  have hq : Surjective q := Submodule.mkQ_surjective _
+  choose r hr using hq
+  let Φ (x : E) := Z (r x)
+  have ha (x : E) : AnalyticOnNhd ℂ (Φ x) regularSet :=
+    fun z hz ↦ (globalIdelicZFunction_poles (r x) χ).1 z (hnot z hz)
+  have hΦ (x : E) (z : ℂ) (hz : z ∈ regularSet) :
+      (hev z hz).choose x = Φ x z := (congrArg (hev z hz).choose (hr x).symm).trans ((hev z hz).choose_spec (r x))
+  obtain ⟨d, hd⟩ := exists_continuousLinearMap_iteratedDeriv_of_analytic Φ ho ha
+    (fun z hz ↦ ⟨(hev z hz).choose, fun x ↦ hΦ x z hz⟩) k s hreg
+  refine ⟨(-1 : ℂ) ^ k • d, fun f ↦ ?_⟩
+  have hfun : Φ (q f) =ᶠ[𝓝 s] Z f :=
+    Filter.mem_of_superset (ho.mem_nhds hreg) fun z hz ↦ (hΦ (q f) z hz).symm.trans ((hev z hz).choose_spec f)
+  have hrefl : (fun z ↦ globalIdelicZFunction (adeleSchwartzFourier f) (ideleClassNormTwist χ⁻¹ z)) =
+      fun z ↦ Z f (1 - z) := by
+    funext z
+    have h := globalIdelicZFunction_functionalEquation f (ideleClassNormTwist χ (1 - z))
+    rw [dualQuasiCharacter_ideleClassNormTwist, sub_sub_cancel] at h
+    exact h.symm
+  change (-1 : ℂ) ^ k • d (q f) = _
+  rw [hd, hfun.iteratedDeriv_eq k, hrefl, iteratedDeriv_comp_const_sub]
+  dsimp only
+  rw [sub_sub_cancel]
 
 /-- Paper: Equation (7.5.0.8), p. 377.
 At each regular center on the imaginary axis the reflected jet is defined on

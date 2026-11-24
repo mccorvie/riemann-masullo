@@ -42,30 +42,24 @@ theorem heckePrimePowerTailOscillation_tendsto_at_pole
     (t₀ : ℝ) {n : ℕ} (hn : 0 < n) :
     Tendsto (heckePrimePowerTailOscillation t₀ n)
       (𝓝[≠] (⟨1, t₀⟩ : ℂ)) (𝓝 (Real.log n : ℂ)) := by
-  set w : ℂ := ⟨1, t₀⟩
-  have hn0 : (n : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr hn.ne'
-  have hd := (Complex.hasStrictDerivAt_const_cpow (x := (n : ℂ)) (y := 0)
-    (Or.inl hn0)).hasDerivAt
-  rw [Complex.cpow_zero, one_mul] at hd
-  have hs := hasDerivAt_iff_tendsto_slope.mp hd
-  have hlog : Complex.log (n : ℂ) = (Real.log n : ℂ) := by
-    rw [Complex.ofReal_log (Nat.cast_nonneg n), Complex.ofReal_natCast]
-  rw [hlog] at hs
-  have hmap : Tendsto (fun s : ℂ ↦ w - s) (𝓝[≠] w) (𝓝[≠] 0) := by
+  have hn' : (n : ℂ) ≠ 0 := by exact_mod_cast hn.ne'
+  have hd : HasDerivAt (fun z : ℂ ↦ (n : ℂ) ^ z) (Real.log n : ℂ) 0 := by
+    have h := (hasDerivAt_id (0 : ℂ)).const_cpow (c := (n : ℂ)) (Or.inl hn')
+    simpa [Complex.natCast_log] using h
+  have hmap : Tendsto (fun s : ℂ ↦ (⟨1, t₀⟩ : ℂ) - s) (𝓝[≠] (⟨1, t₀⟩ : ℂ)) (𝓝[≠] 0) := by
     refine tendsto_nhdsWithin_of_tendsto_nhds_of_eventually_within _ ?_ ?_
-    · have : Tendsto (fun s : ℂ ↦ w - s) (𝓝 w) (𝓝 (w - w)) :=
-        tendsto_const_nhds.sub tendsto_id
-      rw [sub_self] at this
-      exact this.mono_left nhdsWithin_le_nhds
+    · have h : Tendsto (fun s : ℂ ↦ (⟨1, t₀⟩ : ℂ) - s) (𝓝 (⟨1, t₀⟩ : ℂ)) (𝓝 0) := by
+        have h' :=
+          (tendsto_const_nhds (x := (⟨1, t₀⟩ : ℂ)) (f := 𝓝 (⟨1, t₀⟩ : ℂ))).sub tendsto_id
+        rw [sub_self] at h'
+        exact h'
+      exact h.mono_left nhdsWithin_le_nhds
     · filter_upwards [self_mem_nhdsWithin] with s hs
       exact sub_ne_zero.mpr (Ne.symm hs)
-  refine (hs.comp hmap).congr' ?_
+  refine ((hasDerivAt_iff_tendsto_slope.mp hd).comp hmap).congr' ?_
   filter_upwards [self_mem_nhdsWithin] with s hs
   have hs' : s ≠ ⟨1, t₀⟩ := hs
-  delta heckePrimePowerTailOscillation
-  simp only [Function.comp_apply, slope, sub_zero, Complex.cpow_zero, vsub_eq_sub, smul_eq_mul,
-    hs', ↓reduceIte]
-  ring
+  simp [heckePrimePowerTailOscillation, hs', slope_def_field]
 
 /-- Paper: Remark B.7.2.2, p. 649. Index `k` represents the positive
 exponent `k + 1`. The ideal character is zero on ramified prime powers. -/
@@ -78,8 +72,7 @@ the ordinary prime term of the Hecke Dirichlet series. -/
 theorem heckePrimePowerLogTerm_zero (χ : U[F]) (v : V[F]) (s : ℂ) :
     heckePrimePowerLogTerm χ v 0 s =
       heckeIdealValue (ideleClassNormTwist χ 0) v.asIdeal / (v.asIdeal.absNorm : ℂ) ^ s := by
-  delta heckePrimePowerLogTerm
-  simp
+  simp [heckePrimePowerLogTerm]
 
 /-- Paper: Remark B.7.2.2 and Equation (B.7.2.4), p. 649. Dividing the
 norm-grouped von Mangoldt coefficient by the logarithm of the norm gives
@@ -148,8 +141,8 @@ cutoff, the tail includes the full Dirichlet term for that norm. -/
 theorem heckePrimePowerLogTailTerm_at_cutoff (χ : U[F]) (s : ℂ) {n : ℕ} (hn : 0 < n) :
     heckePrimePowerLogTailTerm χ n s n =
       heckePrimePowerLogCoefficient χ n / (n : ℂ) ^ s := by
-  delta heckePrimePowerLogTailTerm
-  simp [LSeries.term_of_ne_zero hn.ne']
+  simp only [heckePrimePowerLogTailTerm, le_refl, ↓reduceIte]
+  rw [LSeries.term_of_ne_zero hn.ne']
 
 /-- Paper: Remark B.7.2.2, p. 649. The logarithmic tail sums the norm-grouped
 terms in increasing order of integer norm, starting at the first norm at least `x`. -/
@@ -278,9 +271,11 @@ def heckePrimesBelow (F : Type*) [Field F] [NumberField F] (x : ℝ) : Finset (V
 norm exactly `x`, including when `x` is an integer. -/
 theorem heckePrimesBelow_mem_iff (v : V[F]) (x : ℝ) :
     v ∈ heckePrimesBelow F x ↔ (v.asIdeal.absNorm : ℝ) < x := by
-  have h1 : 1 < v.asIdeal.absNorm := HeightOneSpectrum.one_lt_absNorm v
-  delta heckePrimesBelow
-  rw [Set.Finite.mem_toFinset, Set.mem_ofPred_eq, ← Nat.lt_ceil]
+  have hN : v.asIdeal.absNorm ≠ 0 := by
+    rw [Ne, Ideal.absNorm_eq_zero_iff]
+    exact v.ne_bot
+  simp only [heckePrimesBelow, Set.Finite.mem_toFinset, Set.mem_ofPred_eq]
+  rw [← Nat.lt_ceil]
   omega
 
 /-- Paper: Corollary B.7.2.3, p. 651. For a character nontrivial on the
@@ -317,11 +312,12 @@ theorem reciprocalHeckeEulerProductBelow_eq_prod (χ : U[F]) (x : ℝ) (s : ℂ)
         (1 - heckeIdealValue (ideleClassNormTwist χ 0) v.asIdeal *
           (v.asIdeal.absNorm : ℂ) ^ (-s)) := by
   classical
+  unfold reciprocalHeckeEulerProductBelow reciprocalPartialHeckeEulerProduct
   refine Finset.prod_congr rfl fun v _ ↦ ?_
-  have h := heckeIdealValue_prime_pow (ideleClassNormTwist χ 0) v one_pos
+  have h := heckeIdealValue_prime_pow (ideleClassNormTwist χ 0) v (k := 1) one_pos
   rw [pow_one] at h
   rw [h, finiteHeckeEulerFactor]
-  split_ifs <;> simp
+  by_cases hv : (ideleClassNormTwist χ 0).IsUnramifiedAt v <;> simp [hv]
 
 /-- Paper: Equation (B.7.2.19), p. 652. This is the oscillatory part of
 the logarithmic tail for a pure norm character, evaluated at ordinate `t`.

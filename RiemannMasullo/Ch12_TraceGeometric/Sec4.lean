@@ -2595,6 +2595,49 @@ private theorem sLocalTraceSharpMass_asymptotic_restrict (φ : BruhatCompactSupp
   choose b hb _ using fun v : S ↦ hfinite v.val φ
   exact ⟨a, b, ha, hb⟩
 
+/-- The unit-locus integral of the Fourier transform is the value of the
+translated test at the origin.  This is the coefficient of the logarithmic
+term in both sharp-mass subgoals below. -/
+private theorem sLocalTrace_fourier_integral_units (f : BruhatCompactSupport Iₛ) (ξ : Hₛ) :
+    ∫ w in range (Units.val : Iₛ → Aₛ), fourierₛ (sLocalTraceEta f ξ) w ∂νₛ =
+      f.val ξ.val := by
+  classical
+  let : BorelSpace Aₛ := sAdeleRing_borelSpace
+  obtain ⟨η, hη⟩ := SLocalTraceEta.eta_test f ξ
+  have hηfun : (fun x : Aₛ ↦ η (Multiplicative.ofAdd x)) = sLocalTraceEta f ξ := by
+    funext x
+    exact hη x
+  have hfun : (fun x : Aₛ ↦ sAdeleSchwartzFourier η (Multiplicative.ofAdd x)) =
+      (fun x : Aₛ ↦ fourierₛ (sLocalTraceEta f ξ) x) := by
+    funext x
+    change tamagawaFourier νₛ ψₛ (fun z : Aₛ ↦ η (Multiplicative.ofAdd z)) x =
+      tamagawaFourier νₛ ψₛ (sLocalTraceEta f ξ) x
+    rw [hηfun]
+  have hzero := sAdeleSchwartzFourier_apply_zero (F := F) (S := S)
+    (sAdeleSchwartzFourier η)
+  have hinv := sLocal_fourier_inversion (F := F) (S := S) η (0 : Aₛ)
+  have htotal : (∫ x : Aₛ, fourierₛ (sLocalTraceEta f ξ) x ∂νₛ) =
+      f.val ξ.val := by
+    rw [← integral_congr_ae (ae_of_all _ (fun x ↦ congrFun hfun x))]
+    rw [← hzero]
+    rw [hinv]
+    simpa only [neg_zero] using (hη 0).trans (sLocalTraceEta_zero_neg_one f ξ).1
+  have ho : Topology.IsOpenEmbedding (Units.val : Iₛ → Aₛ) :=
+    IsOpenUnits.isOpenEmbedding_unitsVal
+      (M := ((w : InfinitePlace F) → w.Completion) ×
+        ((v : S) → v.val.adicCompletion F))
+  have hfull : ∀ᵐ w ∂νₛ, w ∈ range (Units.val : Iₛ → Aₛ) :=
+    measure_eq_zero_iff_ae_notMem.mp sLocalTrace_nonunits_null |>.mono fun _ h ↦ not_not.mp h
+  rw [← integral_indicator ho.isOpen_range.measurableSet]
+  have hind :
+      (∫ x : Aₛ, (range (Units.val : Iₛ → Aₛ)).indicator
+          (fourierₛ (sLocalTraceEta f ξ)) x ∂νₛ) =
+        ∫ x : Aₛ, fourierₛ (sLocalTraceEta f ξ) x ∂νₛ := by
+    apply integral_congr_ae
+    filter_upwards [hfull] with x hx
+    rw [indicator_of_mem hx]
+  rw [hind, htotal]
+
 /-- Paper: (12.4.1.25)–(12.4.1.28), p. 519. Constant term of the summed sharp masses.
 For each S-unit ξ the constant term of the sharp mass is minus the pairing of the Fourier
 transform of the translated test with the logarithm of the S-norm. Only finitely many ξ
