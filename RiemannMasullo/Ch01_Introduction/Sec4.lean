@@ -19,6 +19,10 @@ import RiemannMasullo.Ch07_SchauderBasesZeta.Sec5
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 import Mathlib.Analysis.Normed.Group.Tannery
+import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
+import RiemannMasullo.ForMathlib.Analysis.Distribution.TestFunction.Schwartz
+import Mathlib.Analysis.LocallyConvex.Separation
+import Mathlib.Analysis.Calculus.Deriv.Shift
 import RiemannMasullo.External.TauCeti.Analysis.SpecialFunctions.SmoothTransition
 import RiemannMasullo.External.TauCeti.MeasureTheory.Integral.NormRpow
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform.Holomorphic
@@ -11743,6 +11747,294 @@ theorem introTrace_completedL_no_left_zeros (χ : U𝔽)
   exact ho.trans_le (_h (r s) (by change 1 / 2 < 1 - s.re; linarith))
 
 end Limits
+
+section NormOneTests
+
+open scoped Distributions
+
+/-- Paper: §1.4.6, p. 30. Every continuous functional on compact log-radial tests
+which vanishes on tests supported away from zero is a finite linear combination of
+derivatives at zero. Applied to a difference, this describes the undetermined terms
+in extending an identity from the punctured line. -/
+theorem introTrace_radial_defect_eq_finite_jet (T : StrongDual ℂ 𝓓((⊤ : TopologicalSpace.Opens ℝ), ℂ))
+    (hT : ∀ u : 𝓓((⊤ : TopologicalSpace.Opens ℝ), ℂ), (u : ℝ → ℂ) =ᶠ[𝓝 0] 0 → T u = 0) :
+    ∃ (N : ℕ) (c : Fin (N + 1) → ℂ), ∀ u : 𝓓((⊤ : TopologicalSpace.Opens ℝ), ℂ),
+      T u = ∑ j : Fin (N + 1), c j * iteratedDeriv j.val (u : ℝ → ℂ) 0 := by
+  let b : ContDiffBump (0 : ℝ) := ⟨1, 2, by norm_num, by norm_num⟩
+  let v : 𝓓((⊤ : TopologicalSpace.Opens ℝ), ℂ) := ⟨fun y ↦ ((b y : ℝ) : ℂ), Complex.ofRealCLM.contDiff.comp b.contDiff,
+    b.hasCompactSupport.comp_left Complex.ofReal_zero, by simp⟩
+  have hb : (v : ℝ → ℂ) =ᶠ[𝓝 0] 1 := by
+    filter_upwards [b.eventuallyEq_one] with x hx
+    change ((b x : ℝ) : ℂ) = 1
+    exact_mod_cast (show (b x : ℝ) = 1 from hx)
+  let B := schwartzToTestFunctionMulCLM v
+  let L := T.comp B
+  have hL : TemperedSupportedAtOrigin L := by
+    intro x hx
+    apply (Distribution.mem_dsupport_iff _).mp hx _ _ isClosed_singleton
+    intro g hg
+    apply hT (B g)
+    have h0 : 0 ∉ tsupport (g : ℝ → ℂ) := fun h ↦ (hg h) (mem_singleton _)
+    filter_upwards [notMem_tsupport_iff_eventuallyEq.mp h0] with t ht
+    change g t = 0 at ht
+    change B g t = 0
+    rw [show B g t = v t * g t from schwartzToTestFunctionMulCLM_apply _ _ _, ht, mul_zero]
+  obtain ⟨N, c, hrepr⟩ := realTemperedDistribution_eq_sum_diracDerivative L hL
+  refine ⟨N, fun j ↦ c j * (-1 : ℂ) ^ j.val, fun u ↦ ?_⟩
+  have hdiff : T (u - B (testFunctionToSchwartzCLM u)) = 0 := by
+    apply hT
+    filter_upwards [hb] with t ht
+    change u t - B (testFunctionToSchwartzCLM u) t = 0
+    rw [show B (testFunctionToSchwartzCLM u) t = v t * u t from
+      schwartzToTestFunctionMulCLM_apply _ _ _, ht, Pi.one_apply, one_mul, sub_self]
+  rw [map_sub] at hdiff
+  rw [sub_eq_zero.mp hdiff]
+  change L (testFunctionToSchwartzCLM u) = _
+  rw [hrepr, sum_apply]
+  apply Finset.sum_congr rfl
+  intro j _
+  let f := testFunctionToSchwartzCLM u
+  have hd (k : ℕ) : ⇑((SchwartzMap.derivCLM ℂ ℂ ^ k) f) = iteratedDeriv k (u : ℝ → ℂ) := by
+    induction k with
+    | zero => rfl
+    | succ k ih =>
+      rw [pow_succ', iteratedDeriv_succ]
+      change deriv (⇑((SchwartzMap.derivCLM ℂ ℂ ^ k) f)) = _
+      rw [ih]
+  change c j * ((-1 : ℂ) ^ j.val * ((SchwartzMap.derivCLM ℂ ℂ ^ j.val) f) 0) = _
+  rw [congrFun (hd j.val) 0, mul_assoc]
+
+/-- Paper: §1.4.6, p. 30. A compact log-radial test lies in the closure of the tests
+vanishing near zero if and only if every derivative at zero vanishes. -/
+theorem introTrace_radial_away_closure_iff_flat (u : 𝓓((⊤ : TopologicalSpace.Opens ℝ), ℂ)) :
+    u ∈ closure {v : 𝓓((⊤ : TopologicalSpace.Opens ℝ), ℂ) | (v : ℝ → ℂ) =ᶠ[𝓝 0] 0} ↔
+      ∀ k : ℕ, iteratedDeriv k (u : ℝ → ℂ) 0 = 0 := by
+  have : ContinuousSMul ℂ 𝓓((⊤ : TopologicalSpace.Opens ℝ), ℂ) := (testFunction_complex_polynormable (E := ℝ)).1
+  let M : Submodule ℂ 𝓓((⊤ : TopologicalSpace.Opens ℝ), ℂ) := {
+    carrier := {v | (v : ℝ → ℂ) =ᶠ[𝓝 0] 0}
+    zero_mem' := Filter.EventuallyEq.rfl
+    add_mem' := fun hf hg ↦ (hf.add hg).trans (by simp)
+    smul_mem' := fun c f hf ↦ (hf.const_smul c).trans (by simp) }
+  change u ∈ M.topologicalClosure ↔ _
+  have he (v : 𝓓((⊤ : TopologicalSpace.Opens ℝ), ℂ)) : testFunctionToSchwartzCLM v ∈ realSchwartzFlatAtOrigin ↔
+      ∀ k : ℕ, iteratedDeriv k (v : ℝ → ℂ) 0 = 0 :=
+    mem_realSchwartzFlatAtOrigin_iff _
+  constructor
+  · intro h
+    apply (he u).1
+    let J := realSchwartzFlatAtOrigin.comap testFunctionToSchwartzCLM.toLinearMap
+    have hsub : M ≤ J := by
+      intro v hv
+      apply (he v).2
+      intro k
+      have e : (v : ℝ → ℂ) =ᶠ[𝓝 0] 0 := hv
+      simpa using e.iteratedDeriv_eq k
+    exact M.topologicalClosure_minimal hsub
+      (realSchwartzFlatAtOrigin_isClosed.preimage testFunctionToSchwartzCLM.continuous) h
+  · intro hu
+    by_contra h
+    let S := M.topologicalClosure
+    obtain ⟨L, r, hr, hu'⟩ := RCLike.geometric_hahn_banach_closed_point (𝕜 := ℂ)
+      (S.restrictScalars ℝ).convex M.isClosed_topologicalClosure h
+    have hr0 : 0 < r := by simpa using hr 0 S.zero_mem
+    have hL : ∀ v ∈ S, L v = 0 := by
+      intro v hv
+      by_contra hn
+      let c : ℂ := ((r + 1 : ℝ) : ℂ) / L v
+      have hc : c * L v = ((r + 1 : ℝ) : ℂ) := div_mul_cancel₀ _ hn
+      have hh := hr (c • v) (S.smul_mem c hv)
+      rw [map_smul, smul_eq_mul, hc] at hh
+      change r + 1 < r at hh
+      linarith
+    obtain ⟨N, c, hc⟩ := introTrace_radial_defect_eq_finite_jet L
+      (fun v hv ↦ hL v (M.le_topologicalClosure hv))
+    have hv : L u = 0 := by simp [hc u, hu]
+    rw [hv] at hu'
+    exact (not_lt_of_ge hr0.le) hu'
+
+private theorem introTrace_radial_section_jet (b : Multiplicative ℝ →ₜ* C𝔽) (k : ℕ) :
+    ∃ J : D𝔽 →L[ℂ] ℂ, ∀ φ : D𝔽,
+      J φ = iteratedDeriv k (fun t : ℝ ↦ φ.val (b (Multiplicative.ofAdd t))) 0 := by
+  let m := continuousIdeleClassNorm F
+  have hm : IsModulation m := ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+  have hms : Surjective m := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.2.2.2.1
+  let I₀ : D𝔽 →L[ℂ] ModulatedExponentialDecay m {0} :=
+    ⟨bruhatCompactSupportToModulatedExponentialDecay m {0} hm hms,
+      bruhatCompactSupport_continuous_modulatedExponentialDecay m {0} hm hms
+        ordConnected_singleton (singleton_nonempty _)⟩
+  obtain ⟨e, he⟩ := modulatedExponentialDecay_singleton_schwartz m hm hms 0
+  let I := e.toContinuousLinearMap.comp I₀
+  have hI (φ : D𝔽) : (I φ : C𝔽 → ℂ) = φ.val :=
+    (he (I₀ φ)).trans (modulationWeight_zero m _)
+  let E : SchwartzBruhat C𝔽 →L[ℂ] ℂ :=
+    { toFun f := f 1, map_add' := fun _ _ ↦ rfl, map_smul' := fun _ _ ↦ rfl,
+      cont := continuous_schwartzBruhat_eval 1 }
+  obtain ⟨A, hA⟩ := bruhatFirstOrder_schwartz b
+  have h (n : ℕ) (f : SchwartzBruhat C𝔽) (x : ℝ) :
+      ((A ^ n) f) (b (Multiplicative.ofAdd x)) =
+        iteratedDeriv n (fun t : ℝ ↦ f (b (Multiplicative.ofAdd t))) x := by
+    induction n generalizing x with
+    | zero => rfl
+    | succ n ih =>
+      rw [pow_succ', iteratedDeriv_succ]
+      change A ((A ^ n) f) (b (Multiplicative.ofAdd x)) = _
+      rw [hA]
+      change deriv (fun t : ℝ ↦ ((A ^ n) f)
+        (b (Multiplicative.ofAdd x) * b (Multiplicative.ofAdd t))) 0 = _
+      have he (t : ℝ) : ((A ^ n) f) (b (Multiplicative.ofAdd x) * b (Multiplicative.ofAdd t)) =
+          iteratedDeriv n (fun t : ℝ ↦ f (b (Multiplicative.ofAdd t))) (x + t) := by
+        rw [← map_mul]
+        exact ih (x + t)
+      simp only [he, deriv_comp_const_add, add_zero]
+  refine ⟨E.comp ((A ^ k).comp I), fun φ ↦ ?_⟩
+  change ((A ^ k) (I φ)) (1 : C𝔽) = _
+  simpa [hI] using h k (I φ) 0
+
+/-- Paper: §1.4.6, p. 30. For every positive order there is a compact idèle-class test
+equal to that power of the log norm near norm one and outside the closure of tests
+supported away from norm one. Even orders give inversion-invariant witnesses. -/
+theorem introTrace_norm_one_jet_obstruction (k : ℕ) (hk : 0 < k) :
+    ∃ φ : D𝔽,
+      (∀ x, φ.val x⁻¹ = (-1 : ℂ) ^ k * φ.val x) ∧
+      (∀ x, |Real.log (N(x))| ≤ 1 →
+        φ.val x = (Real.log (N(x)) : ℂ) ^ k) ∧
+      (∀ x, ideleClassNorm F x = 1 → φ.val x = 0) ∧
+      φ ∉ closure {v : D𝔽 |
+        ∃ U ∈ 𝓝 (1 : ℝ≥0ˣ), ∀ x, ideleClassNorm F x ∈ U → v.val x = 0} := by
+  let a : ContDiffBump (0 : ℝ) := ⟨1, 2, by norm_num, by norm_num⟩
+  let g (t : ℝ) : ℂ := (t : ℂ) ^ k * (a t : ℝ)
+  obtain ⟨φ, hφ⟩ := exists_normTest (F := F) g
+    ((Complex.ofRealCLM.contDiff.pow k).mul (Complex.ofRealCLM.contDiff.comp a.contDiff))
+    ((a.hasCompactSupport.comp_left Complex.ofReal_zero).mul_left)
+  have hg (t : ℝ) (ht : |t| ≤ 1) : g t = (t : ℂ) ^ k := by
+    have h1 := a.one_of_mem_closedBall (show t ∈ Metric.closedBall 0 a.rIn by
+      simpa [Metric.mem_closedBall, Real.dist_eq, a] using ht)
+    simp [g, h1]
+  refine ⟨φ, ?_, fun x hx ↦ (hφ x).trans (hg _ hx), ?_, ?_⟩
+  · intro x
+    rw [hφ, hφ, map_inv]
+    simp only [Units.val_inv_eq_inv_val, NNReal.coe_inv, Real.log_inv, g, a.neg, Complex.ofReal_neg]
+    ring
+  · intro x hx
+    rw [hφ, hx]
+    simp [g, hk.ne']
+  · let m := ideleClassNorm F
+    let q : IdeleGroup (𝓞 F) F →ₜ* C𝔽 := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
+    let τ : ℝ≥0ˣ →ₜ* C𝔽 := q.comp
+      ⟨canonicalIdeleNormSection F, canonicalIdeleNormSection_continuous F⟩
+    have hτ : RightInverse τ m := canonicalIdeleNormSection_rightInverse F
+    let b := τ.comp (positiveRealLogEquiv.symm : Multiplicative ℝ →ₜ* ℝ≥0ˣ)
+    have hb (t : ℝ) : m (b (Multiplicative.ofAdd t)) =
+        positiveRealLogEquiv.symm (Multiplicative.ofAdd t) := hτ _
+    have hlog (t : ℝ) : Real.log ((m (b (Multiplicative.ofAdd t))).val : ℝ) = t := by
+      rw [hb, ← positiveRealLogEquiv_apply, positiveRealLogEquiv.apply_symm_apply]
+      rfl
+    obtain ⟨J, hJ⟩ := introTrace_radial_section_jet b k
+    have hz : {v : D𝔽 |
+        ∃ U ∈ 𝓝 (1 : ℝ≥0ˣ), ∀ x, m x ∈ U → v.val x = 0} ⊆ J ⁻¹' {0} := by
+      rintro v ⟨U, hU, hv⟩
+      change J v = 0
+      rw [hJ]
+      have hc : Tendsto (fun t : ℝ ↦ positiveRealLogEquiv.symm (Multiplicative.ofAdd t))
+          (𝓝 0) (𝓝 1) := by
+        have hcont : Continuous (fun t : ℝ ↦ positiveRealLogEquiv.symm (Multiplicative.ofAdd t)) :=
+          positiveRealLogEquiv.symm.continuous.comp continuous_id
+        simpa only [ofAdd_zero, map_one] using hcont.tendsto 0
+      have hv' : (fun t : ℝ ↦ v.val (b (Multiplicative.ofAdd t))) =ᶠ[𝓝 0] 0 := by
+        filter_upwards [hc hU] with t ht using hv _ ((hb t).symm ▸ ht)
+      simpa using hv'.iteratedDeriv_eq k
+    intro hmem
+    have hj0 : J φ = 0 := closure_minimal hz (isClosed_singleton.preimage J.continuous) hmem
+    have he : (fun t : ℝ ↦ φ.val (b (Multiplicative.ofAdd t))) =ᶠ[𝓝 0]
+        (fun t : ℝ ↦ (t : ℂ) ^ k) := by
+      filter_upwards [Icc_mem_nhds (show (-1 : ℝ) < 0 by norm_num)
+        (show (0 : ℝ) < 1 by norm_num)] with t ht
+      rw [hφ, show Real.log ((ideleClassNorm F (b (Multiplicative.ofAdd t))).val : ℝ) = t from hlog t]
+      exact hg t (abs_le.mpr ht)
+    have hd (j : ℕ) : iteratedDeriv j (fun t : ℝ ↦ (t : ℂ) ^ k) =
+        fun t : ℝ ↦ ((iteratedDeriv j (fun y : ℝ ↦ y ^ k) t : ℝ) : ℂ) := by
+      induction j with
+      | zero => funext t; simp
+      | succ j ih =>
+        rw [iteratedDeriv_succ, ih, iteratedDeriv_succ]
+        funext t
+        have h := (contDiff_id.pow k : ContDiff ℝ (j + 1 : ℕ) (fun y : ℝ ↦ y ^ k))
+        exact ((h.differentiable_iteratedDeriv' j t).hasDerivAt.ofReal_comp).deriv
+    rw [hJ, he.iteratedDeriv_eq k, hd] at hj0
+    change ((iteratedDeriv k (fun y : ℝ ↦ y ^ k) 0 : ℝ) : ℂ) = 0 at hj0
+    rw [iteratedDeriv_fun_pow_zero] at hj0
+    exact (Nat.factorial_ne_zero k) (by simpa using hj0)
+
+/-- Paper: §1.4.6, p. 30. In the uniform norm on a fixed compact support, tests
+vanishing near norm one approximate precisely those vanishing on the norm-one classes. -/
+theorem introTrace_norm_one_iff_uniform_approximation (φ : D𝔽) :
+    (∀ x, ideleClassNorm F x = 1 → φ.val x = 0) ↔
+      ∀ ε : ℝ, 0 < ε → ∃ v : D𝔽, tsupport v.val ⊆ tsupport φ.val ∧
+        (∃ U ∈ 𝓝 (1 : ℝ≥0ˣ), ∀ x, ideleClassNorm F x ∈ U → v.val x = 0) ∧
+        ∀ x, ‖φ.val x - v.val x‖ < ε := by
+  constructor
+  · intro hφ ε hε
+    let m := continuousIdeleClassNorm F
+    let L (x : C𝔽) : ℝ := (positiveRealLogEquiv (m x)).toAdd
+    have hL : Continuous L := continuous_toAdd.comp (positiveRealLogEquiv.continuous.comp m.continuous)
+    have hL0 (x : C𝔽) : L x = 0 ↔ m x = 1 := by
+      change positiveRealLogEquiv (m x) = 1 ↔ _
+      simp
+    let K := tsupport φ.val ∩ {x | ε ≤ ‖φ.val x‖}
+    have hc : Continuous φ.val :=
+      continuous_of_bruhatSmooth ((mem_bruhatSmoothSubmodule_iff _).1 φ.property.1)
+    have hK : IsCompact K := φ.property.2.inter_right (isClosed_le continuous_const hc.norm)
+    have hz : 0 ∉ L '' K := by
+      rintro ⟨x, hx, hx0⟩
+      have he := hφ x ((hL0 x).1 hx0)
+      have hn : ε ≤ ‖φ.val x‖ := hx.2
+      simp [he, hε.not_ge] at hn
+    obtain ⟨r, hr, hball⟩ := Metric.mem_nhds_iff.mp
+      ((hK.image hL).isClosed.isOpen_compl.mem_nhds hz)
+    let a : ContDiffBump (0 : ℝ) := ⟨r / 2, r, half_pos hr, half_lt_self hr⟩
+    obtain ⟨b, hb⟩ := exists_normTest (F := F) (fun t : ℝ ↦ (a t : ℂ))
+      (Complex.ofRealCLM.contDiff.comp a.contDiff) (a.hasCompactSupport.comp_left Complex.ofReal_zero)
+    have hb' (x : C𝔽) : b.val x = (a (L x) : ℂ) := by
+      have hx : L x = Real.log (N(x)) := positiveRealLogEquiv_apply (m x)
+      rw [hb, hx]
+    let p : D𝔽 := ⟨φ.val * b.val, (mem_bruhatSmoothSubmodule_iff _).mpr
+      (fun j ↦ isBruhatContDiff_mul ((mem_bruhatSmoothSubmodule_iff _).mp φ.property.1 j)
+        ((mem_bruhatSmoothSubmodule_iff _).mp b.property.1 j)), φ.property.2.mul_right⟩
+    refine ⟨φ - p, ?_, ?_, ?_⟩
+    · apply closure_mono
+      intro x hx he
+      apply hx
+      change φ.val x - φ.val x * b.val x = 0
+      simp [he]
+    · let U := (fun u : ℝ≥0ˣ ↦ (positiveRealLogEquiv u).toAdd) ⁻¹' Metric.ball 0 (r/2)
+      have hU : U ∈ 𝓝 (1 : ℝ≥0ˣ) := by
+        have h := (continuous_toAdd.comp positiveRealLogEquiv.continuous).tendsto (1 : ℝ≥0ˣ)
+        exact h (by simpa using Metric.ball_mem_nhds (0 : ℝ) (half_pos hr))
+      refine ⟨U, hU, fun x hx ↦ ?_⟩
+      have hx' : L x ∈ Metric.ball 0 a.rIn := hx
+      change φ.val x - φ.val x * b.val x = 0
+      rw [hb', a.one_of_mem_closedBall (Metric.ball_subset_closedBall hx')]
+      simp
+    · intro x
+      change ‖φ.val x - (φ.val x - φ.val x * b.val x)‖ < ε
+      rw [sub_sub_cancel, hb', norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_nonneg a.nonneg]
+      by_cases hx : L x ∈ Metric.ball (0 : ℝ) r
+      · have hsmall : ‖φ.val x‖ < ε := by
+          by_contra! hbad
+          have hxφ : φ.val x ≠ 0 := fun he ↦ (not_le_of_gt hε) (by simpa [he] using hbad)
+          exact hball hx ⟨x, ⟨subset_tsupport _ hxφ, hbad⟩, rfl⟩
+        exact (mul_le_of_le_one_right (norm_nonneg _) a.le_one).trans_lt hsmall
+      · have ha : a (L x) = 0 := by
+          apply notMem_support.mp
+          rwa [a.support_eq]
+        simpa [ha] using hε
+  · intro h x hx
+    by_contra hn
+    obtain ⟨v, _, ⟨U, hU, hv⟩, he⟩ := h _ (norm_pos_iff.mpr hn)
+    have hvx := hv x (hx ▸ mem_of_mem_nhds hU)
+    simpa [hvx] using he x
+
+end NormOneTests
 
 -- TODO(paper-gap): In §1.4.6, p. 30, continuity in the Bruhat test topology alone
 -- cannot extend the identity from tests supported away from norm one. In the radial
