@@ -77,10 +77,12 @@ problems: each is an issue labelled `open-problem`, which nobody holds and anyon
 and [#7349](https://github.com/mccorvie/riemann-masullo/issues/7349) lists them. For four of the
 twelve the missing step is one named Lean statement: the cancellation in Theorem 12.5.1.1, on
 which the target theorems rest in Lean, and three statements that the targets do not use. For
-three more (Theorem 7.1.2.3, §10.4 and (12.5.1.4)) the manuscript prints a precise statement,
-which is not known to hold as printed and is being added to Lean without proof, in a file that
-nothing imports. The remaining five rows are proof steps that the manuscript does not state
-precisely enough to formalize.
+two more (§10.4 and (12.5.1.4)) the part that the manuscript states precisely is in Lean
+without proof, in files that nothing imports: `Isolated.spectralStripConvolution_nuclear_of_le_one`
+and `Isolated.spectralStripGeometricKernel_cauchy` for §10.4, and
+`Isolated.exists_projectiveKernel_stripTestAction_spectralProjection` for (12.5.1.4). The
+remaining six rows are proof steps that the manuscript does not state precisely enough to
+formalize; for Theorem 7.1.2.3 the attempt to state it (#7383) shows why.
 
 | Item | Entries | What is missing | Used later on pp. |
 |---|---|---|---|

@@ -61,7 +61,10 @@ shell commands) this instruction, with the number of the issue you want it to wo
 > (`scripts/paper.sh <first> <last>`), and find out what is already known: what has been tried,
 > and what the library proves around the step. Then try, in this order. If the issue has a Lean
 > statement, prove it as written. If that is out of reach, prove it from one or two smaller
-> precise statements, each written in Lean, so that it is plain what is still missing. A
+> precise statements, each written in Lean, so that it is plain what is still missing. (For
+> the one statement that the target theorems rest on, #5571, such a proof does not replace it:
+> put the new statements and the implication in the section's isolation file, as `AGENTS.md`
+> says.) A
 > reduction to a classical or known result is welcome even if you do not prove that result:
 > state it as a lemma of its own with `sorry`, begin its docstring with `Classical input:`, and
 > cite it, ideally with the item and page of the source. If the
@@ -93,7 +96,7 @@ give it back.
 
 **Searching for repairs of the final gaps in the proof.** As of 24 November 2026, about 13,200
 theorems and 1,800 definitions are stated in Lean. In the chapters the trace formula rests on
-(Chapters 2–7 and 9–13, with Appendices A–D) all but seven of the theorems are proved. About ninety people have
+(Chapters 2–7 and 9–13, with Appendices A–D) all but ten of the theorems are proved. About ninety people have
 had pull requests merged, some 2,660 pull requests in all.
 
 - **Those chapters are stated, and what could be proved is proved.** Where a
@@ -104,17 +107,18 @@ had pull requests merged, some 2,660 pull requests in all.
   that are derived from it, use exactly one statement that has no proof: the cancellation of
   the zeros outside the strip in Theorem 12.5.1.1. It is proved in Lean that this cancellation,
   for every width, is equivalent to the main claim, so nothing weaker can supply it.
-- **Three more open statements, off the main line,** under the bases and traces of Chapters 7
-  and 10. Each is a named Lean statement, neither proved nor refuted, from which other theorems
-  of the paper are proved. The Lean proof of the targets does not use them.
-- **Printed theorems that Lean does not yet state.** Theorem 7.1.2.3, the theorems of §10.4 in
-  their printed range, and the kernel that (12.5.1.4) needs are precise in the manuscript and
-  are not known to hold as printed. They are being added to Lean as statements without proof,
-  in files that nothing imports.
-- **Four proof steps that the manuscript does not state precisely enough to formalize,** in
-  Chapters 11 and 12. They have no Lean statement.
+- **Six more open statements, off the main line.** Each is a named Lean statement, neither
+  proved nor refuted, and the Lean proof of the targets uses none of them. Three, under the
+  bases and traces of Chapters 7 and 10, are statements from which other theorems of the paper
+  are proved. Three, under §10.4 and (12.5.1.4), are used by nothing in Lean and are not known
+  to hold; they are kept in files that nothing imports.
+- **Five proof steps that the manuscript does not state precisely enough to formalize,** in
+  Chapters 7, 11 and 12. They have no Lean statement.
 - **Three classical inputs:** theorems of the literature that are stated in Lean and used, and
   not proved there. The targets do not use them either.
+- **288 statements of the manuscript are proved false as printed.** Each is kept in Lean with
+  a machine-checked proof of its negation, next to the corrected statement, which is proved.
+  Eight more such proofs rest on a statement that is itself still open.
 - The supplementary material (Chapters 8 and 14, Appendix E, §A.4, §B.7), on which the trace
   formula does not rest, is partly stated and proved, and is not being worked on.
 
