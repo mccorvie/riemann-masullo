@@ -12,6 +12,7 @@ sources we expect to draw on.
 | [`ZetaLab/`](ZetaLab/) | [Thomas Lince’s zeta-lab](https://github.com/teal-sea/zeta-lab/tree/a401821c9608526425f3d4cf7ff8e59bc37e1c79) | MIT and Apache-2.0 | Critical-line zero brackets and a rigorous count to height 50 for #5364. Includes Zeta23 and excerpts from PrimeNumberTheoremAnd. |
 | [`GaussianField/`](GaussianField/) | <https://github.com/mrdouglasny/gaussian-field> | Apache-2.0 | Vendored at `1283a27` for real one-dimensional Hermite completeness, orthonormality, and Schwartz seminorm growth |
 | [`FermatDixmierMalliavin/`](FermatDixmierMalliavin/) | [Anthropic’s Fermat formalization](https://github.com/anthropics/fermats-last-theorem/tree/6e837e75355538c7f80bab5b956861e86c4eacc2) | Apache-2.0 | One-variable and one-parameter Dixmier–Malliavin factorization used in §10.3 |
+| [`HardyCriticalLine/`](HardyCriticalLine/) | [ArtiFish26’s Hardy proof](https://github.com/artifish26/riemann-hypothesis-lean/tree/e9b20c778b19b5bba2e9a8e14a9bb4ca0afad850) | Apache-2.0 | Infinitely many critical-line zeros of the Riemann zeta function for §10.3 |
 | [`Stacks/`](Stacks/) | <https://github.com/AxiomMath/Stacks> | Apache-2.0 | under consideration |
 
 Further material found by scouting. The exact declarations and pinned commits are listed in
