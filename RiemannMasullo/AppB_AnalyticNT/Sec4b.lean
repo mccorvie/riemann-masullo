@@ -11556,6 +11556,442 @@ theorem idelicExplicitFormula_infiniteMatching_complexCharacterSum (τ : ℝ≥0
         2 * (Real.log (2 * Real.pi) : ℂ) * f.val 1) := by
   sorry
 
+/-- Fubini in polar coordinates, with the angle integrated over a full period. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexLocal_radii
+    (H : ℂ → ℂ) (hm : Measurable H) (hi : Integrable H) :
+    let J := fun r : ℝ ↦ r • ∫ φ in (0 : ℝ)..2 * Real.pi, H (circleMap 0 r φ)
+    IntegrableOn J (Ioi 0) ∧ (∫ r in Ioi (0 : ℝ), J r) = ∫ u, H u := by
+  let U := Ioo (-Real.pi) Real.pi
+  let P (p : ℝ × ℝ) := p.1 • H (Complex.polarCoord.symm p)
+  have hP : IntegrableOn P Complex.polarCoord.target := by
+    refine ⟨measurable_fst.smul (hm.comp ?_) |>.aestronglyMeasurable, ?_⟩
+    · change Measurable (fun p : ℝ × ℝ ↦ Complex.polarCoord.symm p)
+      simp only [Complex.polarCoord_symm_apply]
+      fun_prop
+    · rw [hasFiniteIntegral_iff_eNorm]
+      have hfin := hasFiniteIntegral_iff_eNorm.mp hi.hasFiniteIntegral
+      rw [← Complex.lintegral_comp_polarCoord_symm] at hfin
+      refine lt_of_le_of_lt (le_of_eq ?_) hfin
+      apply setLIntegral_congr_fun Complex.polarCoord.open_target.measurableSet
+      intro p hp
+      rw [Complex.polarCoord_target] at hp
+      simp only [P, eNorm_smul, Real.eNorm_eq_ofReal (show 0 ≤ p.1 from hp.1.le), smul_eq_mul]
+  have hP' : Integrable P ((volume.restrict (Ioi (0 : ℝ))).prod (volume.restrict U)) := by
+    rwa [Complex.polarCoord_target, IntegrableOn, Measure.volume_eq_prod, ← Measure.prod_restrict] at hP
+  have hJ (r : ℝ) : (∫ φ in U, P (r, φ)) =
+      r • ∫ φ in (0 : ℝ)..2 * Real.pi, H (circleMap 0 r φ) := by
+    have hperiod : Periodic (fun φ ↦ H (circleMap 0 r φ)) (2 * Real.pi) :=
+      fun φ ↦ congrArg H (periodic_circleMap 0 r φ)
+    have hshift := hperiod.intervalIntegral_add_eq (-Real.pi) 0
+    rw [show -Real.pi + 2 * Real.pi = Real.pi by ring, zero_add,
+      intervalIntegral.integral_of_le (by linarith [Real.pi_pos] : -Real.pi ≤ Real.pi),
+      integral_Ioc_eq_integral_Ioo] at hshift
+    simp only [P, Complex.polarCoord_symm_apply, integral_smul]
+    congr 1
+    rw [← hshift]
+    apply setIntegral_congr_fun measurableSet_Ioo
+    intro φ _
+    simp [circleMap, Complex.exp_mul_I]
+  simp only [← hJ]
+  refine ⟨hP'.integral_prod_left, ?_⟩
+  rw [← integral_prod P hP', Measure.prod_restrict, ← Measure.volume_eq_prod,
+    ← Complex.polarCoord_target]
+  exact Complex.integral_comp_polarCoord_symm H
+
+/-- Cauchy's integral formula evaluates the angular integral of one simple pole.
+Parametrizing the contour supplies the numerator `z = (z - p) + p`. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexLocal_resolvent
+    (r : ℝ) (hr : 0 < r) (p : ℂ) (hp : p ≠ 0) (hpr : ‖p‖ ≠ r) :
+    (∫ φ in (0 : ℝ)..2 * Real.pi, (circleMap 0 r φ - p)⁻¹) =
+      if ‖p‖ < r then 0 else -(2 * Real.pi : ℂ) / p := by
+  have hne (φ : ℝ) : circleMap 0 r φ - p ≠ 0 := by
+    intro h
+    exact hpr (by rw [← sub_eq_zero.mp h, norm_circleMap_zero, abs_of_pos hr])
+  let J := fun φ ↦ (circleMap 0 r φ - p)⁻¹
+  have hi : IntervalIntegrable J volume 0 (2 * Real.pi) :=
+    ((continuous_circleMap _ _ |>.sub continuous_const).inv₀ hne).intervalIntegrable ..
+  have hcontour : (∮ z in C(0, r), (z - p)⁻¹) =
+      Complex.I * ((2 * Real.pi : ℂ) + p * ∫ φ in (0 : ℝ)..2 * Real.pi, J φ) := by
+    unfold circleIntegral
+    simp only [deriv_circleMap, smul_eq_mul]
+    calc
+      _ = ∫ φ in (0 : ℝ)..2 * Real.pi, Complex.I * (1 + p * J φ) := by
+        apply intervalIntegral.integral_congr
+        intro φ _
+        dsimp only [J]
+        field_simp [hne φ]
+        ring
+      _ = _ := by
+        rw [intervalIntegral.integral_const_mul, intervalIntegral.integral_add
+          intervalIntegrable_const (hi.const_mul p), intervalIntegral.integral_const_mul,
+          intervalIntegral.integral_const]
+        simp [Complex.real_smul]
+  change (∫ φ in (0 : ℝ)..2 * Real.pi, J φ) = _
+  split_ifs with h
+  · rw [circleIntegral.integral_sub_inv_of_mem_ball (mem_ball_zero_iff.mpr h)] at hcontour
+    apply mul_left_cancel₀ hp
+    apply mul_left_cancel₀ Complex.I_ne_zero
+    linear_combination -hcontour
+  · have hdiff : DifferentiableOn ℂ (fun z : ℂ ↦ (z - p)⁻¹) (Metric.closedBall 0 r) := by
+      refine (differentiableOn_id.sub_const p).inv ?_
+      intro z hz hpz
+      exact hpr (le_antisymm (sub_eq_zero.mp hpz ▸ mem_closedBall_zero_iff.mp hz) (le_of_not_gt h))
+    rw [(hdiff.mono Metric.closure_ball_subset_closedBall).diffContOnCl.circleIntegral_eq_zero hr.le] at hcontour
+    apply (eq_div_iff hp).mpr
+    apply mul_left_cancel₀ Complex.I_ne_zero
+    linear_combination -hcontour
+
+/-- The pole at `-1` is locally integrable, and the Cauchy reference divided by
+the squared radius decays cubically at infinity. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexLocal_reference_integrable
+    (ε : ℝ) (hε : 0 < ε) :
+    IntegrableOn (fun x : ℂ ↦ (1 + x)⁻¹ / ((‖x‖ ^ 2 : ℝ) : ℂ)) {x | ε ≤ ‖x‖ ^ 2} := by
+  let b := (Metric.ball (0 : ℂ) 4).indicator (fun x : ℂ ↦ ‖x‖⁻¹)
+  have hib : Integrable b := (integrable_indicator_iff measurableSet_ball).mpr
+    complexLogFourier_finitePart_inv_norm_ball
+  have hit : Integrable (fun x : ℂ ↦ ((1 + ‖x‖) ^ 3)⁻¹) := by
+    have h := integrable_one_add_norm (E := ℂ) (μ := volume) (r := 3) (by norm_num)
+    refine h.congr (.of_forall fun x ↦ ?_)
+    change (1 + ‖x‖) ^ (-(3 : ℝ)) = _
+    rw [Real.rpow_neg (by positivity), Real.rpow_ofNat]
+  refine (((hib.comp_add_left 1).const_mul ε⁻¹).add (hit.const_mul 16)).integrableOn.mono'
+    (((measurable_const.add measurable_id).inv.div (by fun_prop)).aestronglyMeasurable) ?_
+  filter_upwards [ae_restrict_mem (measurableSet_le measurable_const (measurable_norm.pow_const _))]
+    with x (hx : ε ≤ ‖x‖ ^ 2)
+  simp only [Pi.add_apply, norm_div, norm_inv, Complex.norm_real, Real.norm_of_nonneg (sq_nonneg _)]
+  have htail : 0 ≤ 16 * ((1 + ‖x‖) ^ 3)⁻¹ := by positivity
+  by_cases h : ‖x‖ ≤ 2
+  · have hh : 1 + x ∈ Metric.ball (0 : ℂ) 4 := by
+      rw [mem_ball_zero_iff]
+      linarith [norm_add_le (1 : ℂ) x, norm_one (α := ℂ)]
+    rw [show b (1 + x) = ‖1 + x‖⁻¹ from indicator_of_mem hh _]
+    refine (le_add_of_nonneg_right htail).trans' ?_
+    rw [div_eq_mul_inv, mul_comm]
+    gcongr
+  · have h2 : 2 < ‖x‖ := lt_of_not_ge h
+    have hb : 0 ≤ ε⁻¹ * b (1 + x) := mul_nonneg (inv_nonneg.mpr hε.le)
+      (indicator_nonneg (fun z _ ↦ inv_nonneg.mpr (norm_nonneg z)) _)
+    refine (le_add_of_nonneg_left hb).trans' ?_
+    have ha : ‖x‖ ≤ 1 + ‖1 + x‖ := by
+      simpa [add_comm] using norm_sub_le (1 + x) (1 : ℂ)
+    have hn : 0 < ‖1 + x‖ := by linarith
+    rw [← one_div, div_div, ← div_eq_mul_inv, div_le_div_iff₀ (by positivity) (by positivity), one_mul]
+    calc
+      (1 + ‖x‖) ^ 3 ≤ (2 * ‖x‖) ^ 3 := by gcongr; linarith
+      _ = 8 * ‖x‖ * ‖x‖ ^ 2 := by ring
+      _ ≤ 16 * (‖1 + x‖ * ‖x‖ ^ 2) := by
+        rw [← mul_assoc]
+        exact mul_le_mul_of_nonneg_right (by linarith) (sq_nonneg _)
+
+/-- The angular mean of `1/(1+x)` vanishes outside the unit circle. Its
+integral against the cut-off reciprocal squared radius is exactly `-π log ε`. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexLocal_reference_cut
+    (ε : ℝ) (hε : 0 < ε) (hε1 : ε < 1) :
+    (∫ x in {x : ℂ | ε ≤ ‖x‖ ^ 2}, (1 + x)⁻¹ / ((‖x‖ ^ 2 : ℝ) : ℂ)) =
+      -(Real.pi : ℂ) * (Real.log ε : ℂ) := by
+  let U := {x : ℂ | ε ≤ ‖x‖ ^ 2}
+  have hU : MeasurableSet U := measurableSet_le measurable_const (measurable_norm.pow_const _)
+  let H := U.indicator fun x : ℂ ↦ (1 + x)⁻¹ / ((‖x‖ ^ 2 : ℝ) : ℂ)
+  have hm : Measurable H := Measurable.indicator (by fun_prop) hU
+  have hi : Integrable H := (integrable_indicator_iff hU).mpr
+    (idelicExplicitFormula_infiniteMatching_complexLocal_reference_integrable ε hε)
+  obtain ⟨_, hrad⟩ := idelicExplicitFormula_infiniteMatching_complexLocal_radii H hm hi
+  let s := Real.sqrt ε
+  have hs : 0 < s := Real.sqrt_pos.mpr hε
+  have hs1 : s < 1 := by simpa using (Real.sqrt_lt_sqrt hε.le hε1)
+  let q := fun r : ℝ ↦ (2 * Real.pi : ℂ) * ((r⁻¹ : ℝ) : ℂ)
+  rw [← integral_indicator hU]
+  change (∫ x, H x) = _
+  rw [← hrad]
+  calc
+    _ = ∫ r in Ioi (0 : ℝ), (Ico s 1).indicator q r := by
+      apply integral_congr_ae
+      filter_upwards [ae_restrict_mem measurableSet_Ioi, ae_restrict_of_ae (Measure.ae_ne volume (1 : ℝ))]
+        with r (hr : 0 < r) hr1
+      have hn (φ : ℝ) : ‖circleMap 0 r φ‖ = r := by rw [norm_circleMap_zero, abs_of_pos hr]
+      have hmem (φ : ℝ) : circleMap 0 r φ ∈ U ↔ s ≤ r := by
+        change ε ≤ ‖circleMap 0 r φ‖ ^ 2 ↔ s ≤ r
+        rw [hn, Real.sqrt_le_iff]; simp [hr.le]
+      by_cases hsr : s ≤ r
+      · have hH (φ : ℝ) : H (circleMap 0 r φ) = (circleMap 0 r φ - (-1))⁻¹ / ((r ^ 2 : ℝ) : ℂ) := by
+          simp [H, (hmem φ).mpr hsr, hn, add_comm]
+        simp only [hH, intervalIntegral.integral_div, Complex.real_smul]
+        have hres := idelicExplicitFormula_infiniteMatching_complexLocal_resolvent r hr (-1)
+          (by norm_num) (by simpa using hr1.symm)
+        rw [hres]; simp only [norm_neg, norm_one]
+        rcases lt_or_gt_of_ne hr1 with h | h
+        · rw [ite_eq_right h.not_gt, indicator_of_mem (show r ∈ Ico s 1 from ⟨hsr, h⟩)]
+          dsimp [q]; push_cast; field_simp
+        · rw [ite_eq_left h, indicator_of_notMem (show r ∉ Ico s 1 from fun h' ↦ h.asymm h'.2)]
+          simp
+      · have hH (φ : ℝ) : H (circleMap 0 r φ) = 0 := indicator_of_notMem (fun h ↦ hsr ((hmem φ).mp h)) _
+        simp [hH, indicator_of_notMem (show r ∉ Ico s 1 from fun h ↦ hsr h.1)]
+    _ = ∫ r in Ico s 1, q r := by
+      rw [integral_indicator measurableSet_Ico, Measure.restrict_restrict measurableSet_Ico,
+        inter_eq_left.mpr (show Ico s 1 ⊆ Ioi 0 from fun _ h ↦ hs.trans_le h.1)]
+    _ = _ := by
+      rw [integral_Ico_eq_integral_Ioc, ← intervalIntegral.integral_of_le hs1.le]
+      simp only [q, intervalIntegral.integral_const_mul, intervalIntegral.integral_ofReal,
+        integral_inv_of_pos hs zero_lt_one, one_div, Real.log_inv, s, Real.log_sqrt hε.le]
+      push_cast
+      ring
+
+/-- Subtracting `S(0)/(1+x)` from the additive test gives an integrable remainder.
+Its integral with respect to `2 dA` is the circular finite part. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexLocal_disc (S : 𝓢(ℂ, ℂ)) :
+    let K := fun x : ℂ ↦ (S x - S 0 / (1 + x)) / ((‖x‖ ^ 2 : ℝ) : ℂ)
+    Integrable K ∧ Tendsto (fun ε : ℝ ↦
+      (∫ x in {x : ℂ | ε ≤ ‖x‖ ^ 2}, S x / ((‖x‖ ^ 2 : ℝ) : ℂ) ∂(2 • volume)) +
+      ((2 * Real.pi : ℝ) : ℂ) * S 0 * (Real.log ε : ℂ))
+      (𝓝[>] 0) (𝓝 (2 * ∫ x, K x)) := by
+  intro K
+  let N := fun x : ℂ ↦ S x - S 0 / (1 + x)
+  let T := fun x : ℂ ↦ (1 + x)⁻¹ / ((‖x‖ ^ 2 : ℝ) : ℂ)
+  let U := fun ε : ℝ ↦ {x : ℂ | ε ≤ ‖x‖ ^ 2}
+  have hU (ε : ℝ) : MeasurableSet (U ε) := measurableSet_le measurable_const (measurable_norm.pow_const _)
+  have hN : DifferentiableAt ℝ N 0 := by
+    apply S.differentiableAt.sub
+    fun_prop (disch := norm_num)
+  obtain ⟨C, hC⟩ := hN.isBigO_sub.exists_pos
+  have hnear : ∀ᶠ x in 𝓝 (0 : ℂ), ‖N x‖ ≤ C * ‖x‖ := by simpa [N] using hC.2.bound
+  obtain ⟨δ, hδ, hball⟩ := Metric.mem_nhds_iff.mp hnear
+  have hm : Measurable K := (S.continuous.measurable.sub
+    (measurable_const.div (measurable_const.add measurable_id))).div (by fun_prop)
+  have hsmall : IntegrableOn K (Metric.ball 0 δ) := by
+    refine (complexLogFourier_finitePart_inv_norm_ball.const_mul C).mono' hm.aestronglyMeasurable ?_
+    filter_upwards [ae_restrict_mem measurableSet_ball, ae_restrict_of_ae (Measure.ae_ne volume (0 : ℂ))]
+      with x hx hx0
+    change ‖N x / ((‖x‖ ^ 2 : ℝ) : ℂ)‖ ≤ _
+    rw [norm_div, Complex.norm_real, Real.norm_of_nonneg (sq_nonneg _)]
+    calc
+      ‖N x‖ / ‖x‖ ^ 2 ≤ C * ‖x‖ / ‖x‖ ^ 2 := by gcongr; exact hball hx
+      _ = _ := by field_simp [norm_ne_zero_iff.mpr hx0]
+  have hK (x : ℂ) : K x = S x / ((‖x‖ ^ 2 : ℝ) : ℂ) - S 0 * T x := by
+    dsimp only [K, T]
+    ring
+  have hi : Integrable K := by
+    have hlarge : IntegrableOn K (U (δ ^ 2)) := by
+      have hS : IntegrableOn (fun x : ℂ ↦ S x / ((‖x‖ ^ 2 : ℝ) : ℂ)) (U (δ ^ 2)) := by
+        refine (S.integrable.norm.integrableOn.const_mul (δ ^ 2)⁻¹).mono'
+          ((S.continuous.measurable.div (by fun_prop)).aestronglyMeasurable) ?_
+        filter_upwards [ae_restrict_mem (hU _)] with x (hx : δ ^ 2 ≤ ‖x‖ ^ 2)
+        rw [norm_div, Complex.norm_real, Real.norm_of_nonneg (sq_nonneg _), div_eq_mul_inv, mul_comm]
+        gcongr
+      rw [show K = _ from funext hK]
+      have hT := idelicExplicitFormula_infiniteMatching_complexLocal_reference_integrable _ (sq_pos_of_pos hδ)
+      exact hS.sub (hT.const_mul _)
+    apply integrableOn_univ.mp
+    refine (integrableOn_union.mpr ⟨hsmall, hlarge⟩).mono_set fun x _ ↦ ?_
+    by_cases h : ‖x‖ < δ
+    · exact Or.inl (mem_ball_zero_iff.mpr h)
+    · exact Or.inr (pow_le_pow_left₀ hδ.le (le_of_not_gt h) 2)
+  refine ⟨hi, ?_⟩
+  have hlim : Tendsto (fun ε ↦ ∫ x in U ε, K x) (𝓝[>] 0) (𝓝 (∫ x, K x)) := by
+    simp_rw [← integral_indicator (hU _)]
+    refine tendsto_integral_filter_of_dominated_convergence _
+      (.of_forall fun ε ↦ hi.aestronglyMeasurable.indicator (hU ε))
+      (.of_forall fun ε ↦ .of_forall fun x ↦ norm_indicator_le_norm_self _ _) hi.norm ?_
+    filter_upwards [Measure.ae_ne volume (0 : ℂ)] with x hx
+    refine tendsto_const_nhds.congr' ?_
+    filter_upwards [Ioo_mem_nhdsGT (sq_pos_of_pos (norm_pos_iff.mpr hx))] with ε hε
+    exact (indicator_of_mem (show x ∈ U ε from hε.2.le) _).symm
+  refine (hlim.const_mul 2).congr' ?_
+  filter_upwards [Ioo_mem_nhdsGT (zero_lt_one : (0 : ℝ) < 1)] with ε hε
+  have hT := idelicExplicitFormula_infiniteMatching_complexLocal_reference_integrable ε hε.1
+  have hfull (x : ℂ) : S x / ((‖x‖ ^ 2 : ℝ) : ℂ) = K x + S 0 * T x := by rw [hK]; abel
+  have hsc := idelicExplicitFormula_infiniteMatching_complexLocal_reference_cut ε hε.1 hε.2
+  change (∫ x in U ε, T x) = _ at hsc
+  simp only [hfull, ← show U ε = {x : ℂ | ε ≤ ‖x‖ ^ 2} from rfl]
+  have hT' : IntegrableOn (fun x ↦ S 0 * T x) (U ε) := hT.const_mul _
+  have htotal : IntegrableOn (fun x ↦ K x + S 0 * T x) (U ε) := hi.integrableOn.add hT'
+  rw [show (2 • (volume : Measure ℂ)) = volume + volume from two_smul ℕ _,
+    Measure.restrict_add, integral_add_measure htotal htotal,
+    integral_add hi.integrableOn hT', integral_const_mul, hsc]
+  push_cast
+  ring
+
+/-- Polar integration about `1 + x = 0`, pairing the two radii `exp (±t/2)`.
+The factor of two comes from the change from log radius to log squared radius. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexLocal_polar
+    (K : ℂ → ℂ) (hm : Measurable K) (hi : Integrable K) :
+    let B := fun y : ℝ ↦ (Real.exp y : ℂ) ^ 2 * ∫ φ in (0 : ℝ)..2 * Real.pi,
+      K (Complex.exp ((y : ℂ) + φ * Complex.I) - 1)
+    IntegrableOn (fun t : ℝ ↦ B (t / 2) + B (-(t / 2))) (Ioi 0) ∧
+      (∫ t in Ioi (0 : ℝ), B (t / 2) + B (-(t / 2))) = 2 * ∫ x, K x := by
+  intro B
+  let H := fun z : ℂ ↦ K (z - 1)
+  obtain ⟨hiJ, hvJ⟩ := idelicExplicitFormula_infiniteMatching_complexLocal_radii H
+    (hm.comp (measurable_id.sub_const _)) (hi.comp_sub_right 1)
+  let J := fun r : ℝ ↦ r • ∫ φ in (0 : ℝ)..2 * Real.pi, H (circleMap 0 r φ)
+  have hB : B = fun y ↦ Real.exp y • J (Real.exp y) := by
+    funext y
+    simp only [B, J, H, circleMap, zero_add, Complex.exp_add, Complex.ofReal_exp,
+      Complex.real_smul, sq, mul_assoc]
+  have hiB : Integrable B := hB ▸ (integrable_comp_exp J).mpr hiJ
+  have hvB : (∫ y, B y) = ∫ x, K x := by
+    rw [hB, integral_comp_exp J, hvJ, integral_sub_right_eq_self]
+  let T := fun t : ℝ ↦ B (t / 2)
+  have hiT : Integrable T := by
+    simpa only [T, div_eq_inv_mul] using hiB.comp_mul_left' (inv_ne_zero two_ne_zero)
+  refine ⟨hiT.integrableOn.add hiT.comp_neg.integrableOn |>.congr_fun (fun t _ ↦ ?_) measurableSet_Ioi, ?_⟩
+  · simp only [T, Pi.add_apply, neg_div]
+  · change (∫ t in Ioi (0 : ℝ), T t + B (-(t / 2))) = _
+    simp_rw [← neg_div]
+    change (∫ t in Ioi (0 : ℝ), T t + T (-t)) = _
+    rw [integral_add hiT.integrableOn hiT.comp_neg.integrableOn, integral_comp_neg_Ioi,
+      neg_zero, add_comm, intervalIntegral.integral_Iic_add_Ioi hiT.integrableOn hiT.integrableOn]
+    simp only [T, div_eq_inv_mul, Measure.integral_comp_mul_left, inv_inv, abs_of_pos (zero_lt_two : (0 : ℝ) < 2),
+      Complex.real_smul, Complex.ofReal_ofNat, hvB]
+
+/-- The first Fourier coefficient of the Poisson kernel from its two simple poles. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexLocal_poisson
+    (r : ℝ) (hr : 0 < r) (hr1 : r < 1) :
+    let v := circleMap 0 1
+    (∫ φ in (0 : ℝ)..2 * Real.pi, (v φ)⁻¹ / ((‖1 - (r : ℂ) * v φ‖ ^ 2 : ℝ) : ℂ)) =
+      (2 * Real.pi : ℂ) * r / (1 - (r : ℂ) ^ 2) := by
+  intro v
+  have hr' : (r : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr hr.ne'
+  have hout : 1 < ‖(r : ℂ)⁻¹‖ := by
+    rw [norm_inv, Complex.norm_real, Real.norm_of_nonneg hr.le]
+    exact one_lt_inv_iff₀.mpr ⟨hr, hr1⟩
+  have hin : ‖(r : ℂ)‖ < 1 := by simpa [Real.norm_of_nonneg hr.le] using hr1
+  have hv (φ : ℝ) : ‖v φ‖ = 1 := by simp [v]
+  have hn (p : ℂ) (hp : ‖p‖ ≠ 1) (φ : ℝ) : v φ - p ≠ 0 :=
+    fun h ↦ hp (sub_eq_zero.mp h ▸ hv φ)
+  have hi (p : ℂ) (hp : ‖p‖ ≠ 1) :
+      IntervalIntegrable (fun φ ↦ (v φ - p)⁻¹) volume 0 (2 * Real.pi) :=
+    (((continuous_circleMap _ _).sub continuous_const).inv₀ (hn p hp)).intervalIntegrable ..
+  have hsq : 1 - (r : ℂ) ^ 2 ≠ 0 := by
+    exact_mod_cast (show 1 - r ^ 2 ≠ 0 by nlinarith [mul_pos (sub_pos.mpr hr1) (show 0 < 1 + r by positivity)])
+  have he (φ : ℝ) : (v φ)⁻¹ / ((‖1 - (r : ℂ) * v φ‖ ^ 2 : ℝ) : ℂ) =
+      ((v φ - r)⁻¹ - (v φ - (r : ℂ)⁻¹)⁻¹) / (1 - (r : ℂ) ^ 2) := by
+    have hv0 : v φ ≠ 0 := norm_ne_zero_iff.mp ((hv φ).trans_ne one_ne_zero)
+    have hconj : (starRingEnd ℂ) (v φ) = (v φ)⁻¹ := by
+      apply mul_right_cancel₀ hv0
+      rw [inv_mul_cancel₀ hv0]
+      rw [← Complex.normSq_eq_conj_mul_self, Complex.normSq_eq_norm_sq, hv φ]
+      norm_num
+    have h1 : 1 - (r : ℂ) * v φ ≠ 0 := by
+      intro h
+      apply hn _ hout.ne' φ
+      apply sub_eq_zero.mpr
+      apply mul_left_cancel₀ hr'
+      rw [mul_inv_cancel₀ hr']
+      exact (sub_eq_zero.mp h).symm
+    rw [Complex.sq_norm, Complex.normSq_eq_conj_mul_self, map_sub, map_one, map_mul,
+      Complex.conj_ofReal, hconj]
+    rw [show 1 - (r : ℂ) * (v φ)⁻¹ = (v φ - r) / v φ by field_simp,
+      show v φ - (r : ℂ)⁻¹ = -(1 - (r : ℂ) * v φ) / r by field_simp; ring]
+    field_simp [hv0, hr', hsq, hn _ hin.ne φ, h1]
+    ring_nf
+    field_simp [h1]
+    ring
+  simp_rw [he]
+  rw [intervalIntegral.integral_div, intervalIntegral.integral_sub (hi _ hin.ne) (hi _ hout.ne'),
+    idelicExplicitFormula_infiniteMatching_complexLocal_resolvent 1 one_pos _ hr' hin.ne,
+    idelicExplicitFormula_infiniteMatching_complexLocal_resolvent 1 one_pos _ (inv_ne_zero hr') hout.ne']
+  rw [ite_eq_left hin, ite_eq_right hout.not_gt, div_inv_eq_mul]
+  ring
+
+/-- The degree minus one circle character is the multiplicative test corresponding
+to the additive Cauchy kernel. Its Poisson average at radius `r` is `r`. -/
+private theorem idelicExplicitFormula_infiniteMatching_complexLocal_angular
+    (S : 𝓢(ℂ, ℂ)) (g : ℂ → ℂ)
+    (hg : ∀ z, g z = (‖Complex.exp z‖ : ℂ) * S (Complex.exp z - 1)) (t : ℝ) (ht : 0 < t) :
+    let K := fun x : ℂ ↦ (S x - S 0 / (1 + x)) / ((‖x‖ ^ 2 : ℝ) : ℂ)
+    let B := fun y : ℝ ↦ (Real.exp y : ℂ) ^ 2 * ∫ φ in (0 : ℝ)..2 * Real.pi,
+      K (Complex.exp ((y : ℂ) + φ * Complex.I) - 1)
+    let A := (2 * Real.pi : ℂ)⁻¹ * ∫ φ in (0 : ℝ)..2 * Real.pi,
+      (Real.exp (-(t / 2)) : ℂ) * (g (t / 2 + φ * Complex.I) + g (-(t / 2) + φ * Complex.I)) /
+        ((‖1 - Complex.exp (-(t / 2) + φ * Complex.I)‖ ^ 2 : ℝ) : ℂ)
+    A = (2 * Real.pi : ℂ)⁻¹ * (B (t / 2) + B (-(t / 2))) +
+      2 * S 0 * (Real.exp (-t) : ℂ) / (1 - (Real.exp (-t) : ℂ)) := by
+  intro K B A
+  let y := t / 2
+  let r := Real.exp (-y)
+  let R := Real.exp y
+  let v := circleMap 0 1
+  let u := fun (a : ℝ) (φ : ℝ) ↦ (a : ℂ) * v φ
+  let d := fun φ ↦ ((‖1 - u r φ‖ ^ 2 : ℝ) : ℂ)
+  have hy : 0 < y := half_pos ht
+  have hr : 0 < r := Real.exp_pos _
+  have hR : 0 < R := Real.exp_pos _
+  have hr1 : r < 1 := Real.exp_lt_one_iff.mpr (neg_lt_zero.mpr hy)
+  have hR1 : 1 < R := Real.one_lt_exp_iff.mpr hy
+  have hrR : (r : ℂ) * R = 1 := by
+    exact_mod_cast (show r * R = 1 by simp [r, R, Real.exp_neg])
+  have hv (φ : ℝ) : ‖v φ‖ = 1 := by simp [v]
+  have hu (a : ℝ) (ha : 0 < a) (φ : ℝ) : ‖u a φ‖ = a := by
+    simp [u, hv, Real.norm_of_nonneg ha.le]
+  have hExp (s φ : ℝ) : Complex.exp ((s : ℂ) + φ * Complex.I) = u (Real.exp s) φ := by
+    simp [u, v, circleMap, Complex.exp_add, Complex.ofReal_exp]
+  have hne (a : ℝ) (ha : 0 < a) (ha1 : a ≠ 1) (φ : ℝ) : u a φ - 1 ≠ 0 := by
+    intro h
+    exact ha1 ((hu a ha φ).symm.trans (by rw [sub_eq_zero.mp h, norm_one]))
+  have hd (φ : ℝ) : d φ ≠ 0 := by
+    apply Complex.ofReal_ne_zero.mpr
+    exact pow_ne_zero _ (norm_ne_zero_iff.mpr (sub_ne_zero.mpr (sub_ne_zero.mp (hne r hr hr1.ne φ)).symm))
+  have hscale (φ : ℝ) : ((‖u R φ - 1‖ ^ 2 : ℝ) : ℂ) = (R : ℂ) ^ 2 * d φ := by
+    have hc : v φ * (starRingEnd ℂ) (v φ) = 1 := by
+      rw [Complex.mul_conj, Complex.normSq_eq_norm_sq, hv]; norm_num
+    have he : u R φ - 1 = (R : ℂ) * v φ * (starRingEnd ℂ) (1 - u r φ) := by
+      simp only [u, map_sub, map_one, map_mul, Complex.conj_ofReal]
+      linear_combination (R : ℂ) * r * hc + hrR
+    rw [he, norm_mul, norm_mul, hv, mul_one, Complex.norm_real, Real.norm_of_nonneg hR.le,
+      Complex.norm_conj, mul_pow, Complex.ofReal_mul, Complex.ofReal_pow]
+  have hki (a : ℝ) (ha : 0 < a) (ha1 : a ≠ 1) :
+      IntervalIntegrable (fun φ ↦ K (u a φ - 1)) volume 0 (2 * Real.pi) := by
+    apply Continuous.intervalIntegrable
+    have huc : Continuous (u a) := continuous_const.mul (continuous_circleMap _ _)
+    have huv (φ : ℝ) : u a φ ≠ 0 := norm_ne_zero_iff.mp ((hu a ha φ).trans_ne ha.ne')
+    simp only [K, add_sub_cancel]
+    exact ((S.continuous.comp (huc.sub continuous_const)).sub (continuous_const.div huc huv)).div
+      (by fun_prop) (fun φ ↦ Complex.ofReal_ne_zero.mpr (pow_ne_zero _ (norm_ne_zero_iff.mpr (hne a ha ha1 φ))))
+  have hdcont : Continuous d := by
+    dsimp [d, u, v]; fun_prop
+  have hvi : IntervalIntegrable (fun φ ↦ (v φ)⁻¹ / d φ) volume 0 (2 * Real.pi) := by
+    exact (((continuous_circleMap _ _).inv₀ (fun φ ↦ norm_ne_zero_iff.mp ((hv φ).trans_ne one_ne_zero))).div
+      hdcont hd).intervalIntegrable ..
+  let L := fun (a φ : ℝ) ↦ (a : ℂ) ^ 2 * K (u a φ - 1)
+  have hiL (a : ℝ) (ha : 0 < a) (ha1 : a ≠ 1) :
+      IntervalIntegrable (L a) volume 0 (2 * Real.pi) := (hki a ha ha1).const_mul _
+  have hpt (φ : ℝ) : (r : ℂ) * ((R : ℂ) * S (u R φ - 1) + (r : ℂ) * S (u r φ - 1)) / d φ =
+      L R φ + L r φ + (2 * S 0 * r) * ((v φ)⁻¹ / d φ) := by
+    dsimp only [L, K]
+    rw [add_sub_cancel, add_sub_cancel, hscale, norm_sub_rev (u r φ) 1]
+    change _ = _ * ((_ - S 0 / u R φ) / (_ * d φ)) +
+      _ * ((_ - S 0 / u r φ) / d φ) + _
+    have hv0 : v φ ≠ 0 := norm_ne_zero_iff.mp ((hv φ).trans_ne one_ne_zero)
+    have hr' := Complex.ofReal_ne_zero.mpr hr.ne'
+    dsimp only [u]
+    rw [show (R : ℂ) = (r : ℂ)⁻¹ from by apply mul_left_cancel₀ hr'; rwa [mul_inv_cancel₀ hr']]
+    field_simp [hd φ, hv0, hr']
+    ring
+  have haverage := idelicExplicitFormula_infiniteMatching_complexLocal_poisson r hr hr1
+  change (∫ φ in (0 : ℝ)..2 * Real.pi, (v φ)⁻¹ / d φ) = _ at haverage
+  have hb (s : ℝ) : B s = ∫ φ in (0 : ℝ)..2 * Real.pi, L (Real.exp s) φ := by
+    simp only [B, L, hExp, intervalIntegral.integral_const_mul]
+  have ht' : (Real.exp (-t) : ℂ) = (r : ℂ) ^ 2 := by
+    rw [← Complex.ofReal_pow, ← Real.exp_nat_mul]
+    congr 2
+    dsimp [y]
+    ring
+  have hform (s φ : ℝ) : g ((s : ℂ) + φ * Complex.I) =
+      (Real.exp s : ℂ) * S (u (Real.exp s) φ - 1) := by rw [hg, hExp, hu _ (Real.exp_pos _) φ]
+  change (2 * Real.pi : ℂ)⁻¹ * (∫ φ in (0 : ℝ)..2 * Real.pi, _) = _
+  simp only [← Complex.ofReal_ofNat (n := 2), ← Complex.ofReal_div, ← Complex.ofReal_neg]
+  simp only [hform, hExp]
+  change (2 * Real.pi : ℂ)⁻¹ * (∫ φ in (0 : ℝ)..2 * Real.pi,
+    (r : ℂ) * ((R : ℂ) * S (u R φ - 1) + (r : ℂ) * S (u r φ - 1)) / d φ) = _
+  simp_rw [hpt]
+  rw [intervalIntegral.integral_add ((hiL R hR hR1.ne').add (hiL r hr hr1.ne)) (hvi.const_mul _),
+    intervalIntegral.integral_add (hiL R hR hR1.ne') (hiL r hr hr1.ne),
+    intervalIntegral.integral_const_mul (2 * S 0 * ↑r), haverage, hb, hb, ht']
+  have hc : (2 * Real.pi : ℂ) ≠ 0 := mul_ne_zero two_ne_zero (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero)
+  simp only [Complex.ofReal_ofNat]
+  change _ = (2 * Real.pi : ℂ)⁻¹ * ((∫ φ in (0 : ℝ)..2 * Real.pi, L R φ) + (∫ φ in (0 : ℝ)..2 * Real.pi, L r φ)) + _
+  field_simp [hc]
+
 /-- Paper: Theorem B.4.4.7, pp. 625–626, footnote 27 (local identity at a complex place `w`).
 For a test `f` on `F_w^× = ℂ^×`, with `g(z) = f(e^z)` and the Poisson average `A` as in
 `idelicExplicitFormula_infiniteMatching_complexCharacterSum`,
@@ -11583,7 +12019,79 @@ theorem idelicExplicitFormula_infiniteMatching_complexLocal (w : InfinitePlace F
     (∫ t in Ioi (0 : ℝ), (2 * (Real.exp (-t) : ℂ) * testI.val 1 / (t : ℂ) - A t)) -
         2 * (Real.log (2 * Real.pi) : ℂ) * testI.val 1 =
       -infiniteConnesWeilPrincipalValue w testI := by
-  sorry
+  intro e g A
+  let R := InfinitePlace.Completion.ringEquivComplexOfIsComplex hw
+  let j := InfinitePlace.Completion.isometryEquivComplexOfIsComplex hw
+  let W := (exists_infiniteWeilTestMap w).choose testI
+  obtain ⟨S, hS⟩ := complexModelSchwartz w hw W
+  have hW (z : ℂ) :
+      S z = Function.extend Units.val (testI.val : _ → ℂ) (fun _ ↦ 0) (R.symm (1 + z)) /
+        (‖1 + z‖ : ℂ) := by
+    rw [congrFun hS z, (exists_infiniteWeilTestMap w).choose_spec testI]
+    dsimp only
+    rw [map_add, map_one, hw.mult_eq_two, Real.sqrt_sq (norm_nonneg _)]
+    rw [show ‖1 + R.symm z‖ = ‖1 + z‖ by
+      rw [← map_one R.symm, ← map_add]
+      exact j.symm.isometry.norm_map_of_map_zero (map_zero R.symm) _]
+  have h0 : S 0 = testI.val 1 := by
+    rw [hW, add_zero, map_one, norm_one, Complex.ofReal_one, div_one, ← Units.val_one]
+    exact Units.val_injective.extend_apply _ _ _
+  have hg (z : ℂ) : g z = (‖Complex.exp z‖ : ℂ) * S (Complex.exp z - 1) := by
+    let u := e (Units.mk0 (Complex.exp z) (Complex.exp_ne_zero z))
+    rw [hW, add_sub_cancel]
+    change testI.val u = _ * (Function.extend Units.val _ _ u.val / _)
+    rw [Units.val_injective.extend_apply]
+    field_simp [norm_ne_zero_iff.mpr (Complex.exp_ne_zero z)]
+  -- Both regularizations integrate the same remainder after the Cauchy kernel is removed.
+  let K := fun x : ℂ ↦ (S x - S 0 / (1 + x)) / ((‖x‖ ^ 2 : ℝ) : ℂ)
+  let B := fun y : ℝ ↦ (Real.exp y : ℂ) ^ 2 * ∫ φ in (0 : ℝ)..2 * Real.pi,
+    K (Complex.exp ((y : ℂ) + φ * Complex.I) - 1)
+  obtain ⟨hKi, hdisc⟩ := idelicExplicitFormula_infiniteMatching_complexLocal_disc S
+  have hm : Measurable K := (S.continuous.measurable.sub
+    (measurable_const.div (measurable_const.add measurable_id))).div (by fun_prop)
+  obtain ⟨hBi, hpolar⟩ := idelicExplicitFormula_infiniteMatching_complexLocal_polar K hm hKi
+  let c := (2 * Real.pi : ℂ)
+  have hc : c ≠ 0 := mul_ne_zero two_ne_zero (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero)
+  let : MeasurableSpace w.Completion := borel _
+  let : BorelSpace w.Completion := ⟨rfl⟩
+  let m : ℂ ≃ᵐ w.Completion := j.symm.toHomeomorph.toMeasurableEquiv
+  have hμ : infiniteLocalAdditiveTamagawaMeasure F w = (2 • (volume : Measure ℂ)).map m :=
+    dite_eq_right (InfinitePlace.not_isReal_iff_isComplex.mpr hw)
+  have hn (z : ℂ) : ‖m z‖ = ‖z‖ := j.symm.isometry.norm_map_of_map_zero (map_zero R.symm) z
+  have hval (z : ℂ) : W (Multiplicative.ofAdd (m z)) = S z := (congrFun hS z).symm
+  have hval0 : W (Multiplicative.ofAdd 0) = S 0 := by
+    rw [← hval, show m 0 = 0 from map_zero R.symm]
+  have hF := (complexLogFourier_finitePart w hw W).2.2
+  have hPV := ((exists_infiniteConnesPrincipalValue w).choose_spec W).2
+  change infiniteConnesWeilPrincipalValue w testI = _ at hPV
+  rw [← neg_eq_iff_eq_neg.mpr hPV] at hF
+  dsimp only at hF
+  rw [hval0, hμ] at hF
+  simp only [setIntegral_map_equiv, preimage_ofPred_eq, hn, hval] at hF
+  have hfinite := tendsto_nhds_unique hdisc hF
+  -- The reference contribution is the unit-argument digamma integral.
+  have hD := heckeArchimedeanDigammaKernel_one
+  let D := heckeArchimedeanDigammaKernel 1 1 1 (fun _ ↦ 1)
+  have hInt : (∫ t in Ioi (0 : ℝ), 2 * (Real.exp (-t) : ℂ) * testI.val 1 / (t : ℂ) - A t) =
+      (∫ t in Ioi (0 : ℝ), D t * S 0 - c⁻¹ * (B (t / 2) + B (-(t / 2)))) := by
+    apply setIntegral_congr_fun measurableSet_Ioi
+    intro t ht
+    have hA := idelicExplicitFormula_infiniteMatching_complexLocal_angular S g hg t ht
+    change A t = c⁻¹ * (B (t / 2) + B (-(t / 2))) + _ at hA
+    dsimp only
+    rw [hA, ← h0]
+    simp only [D, heckeArchimedeanDigammaKernel, one_mul, neg_mul, ← Complex.ofReal_neg,
+      ← Complex.ofReal_exp, Complex.ofReal_one]
+    ring
+  rw [hInt, integral_sub (hD.1.mul_const _) (hBi.const_mul _), integral_mul_const,
+    integral_const_mul, hD.2, hpolar, ← h0]
+  change 2 * (∫ x, K x) = -((2 * Real.pi : ℝ) : ℂ) * _ at hfinite
+  rw [Complex.ofReal_mul, Complex.ofReal_ofNat] at hfinite
+  change 2 * (∫ x, K x) = -c * _ at hfinite
+  rw [hfinite]
+  push_cast
+  field_simp [hc]
+  ring
 
 /-- Paper: Theorem B.4.4.7, pp. 625–626, footnote 27 (one infinite place `w`). Let `Φ_χ` be
 the radial profiles of a test `f`, as in `idelicExplicitFormula_finiteMatching`. Summed over
