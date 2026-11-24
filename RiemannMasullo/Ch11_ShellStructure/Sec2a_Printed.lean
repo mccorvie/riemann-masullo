@@ -541,7 +541,7 @@ in the ambient negative space, with its subspace topology. -/
 def Printed.orbitalQuotientDual_missingPV : Prop :=
   ∀ (F : Type) [Field F] [NumberField F] (χ : PontryaginDual C𝔽(F)) (S : Finset V(F)),
     (∀ v ∈ S, (ideleClassNormTwist χ 0).IsUnramifiedAt v) → ∀ (s : ℝ) (hs : 0 ≤ s),
-      let ω := PontryaginDual.map (restriction(F)) χ
+      let ω := χ.comp (restriction(F))
       let Q := spectralSobolevIsotypeQuotient F 0 hI hs ω
       let N := (globalThetaSobolev F 0 hI hs).comap (Wω(F, hs, ω)).subtype
       ∃ D : StrongDual ℂ Q →L[ℂ] W'(F, s), Topology.IsEmbedding D ∧

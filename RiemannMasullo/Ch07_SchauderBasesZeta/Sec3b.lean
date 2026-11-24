@@ -5121,9 +5121,6 @@ At repeated primary centers where the Euler value has norm greater than one, wri
 The two logarithms are incommensurable, the Euler values are unbounded, and no
 translation of the height coordinate makes both phases roots of unity.
 For these shifts from infinite-order Hecke characters this is not a known theorem.
-Reconstruction: The paper does not state this. It is the project's formulation of the bound
-that the change of coefficients on p. 349 needs uniformly in the pole, and it is not known
-whether it is what the author intends.
 Gap: A polynomial lower bound for a linear form in two logarithms shifted by the phases of a
 Hecke character of infinite order. Baker's theorem covers the unshifted form only, and p. 349
 supplies no bound. -/

@@ -3921,7 +3921,7 @@ theorem sLocalThetaSobolev_halfWeight_equiv :
     let hp : (0 : ℝ) < 1 / 2 + 0 := add_pos_of_pos_of_nonneg ha le_rfl
     ∃ T : SLocalThetaL2 F S ≃ₗᵢ[ℂ] Hₛ(ha, le_refl (0 : ℝ), le_refl (0 : ℝ), hp),
       ∀ u : SLocalThetaL2 F S,
-        ((T u).val : Jₛ → ℂ) =ᵐ[μₛ] modulationWeight mₛ (1 / 2) ⇑(SLocalThetaL2.inclusion u) := by
+        ((T u).val : Jₛ → ℂ) =ᵐ[μₛ] modulationWeight mₛ (1 / 2) (⇑u.val) := by
   intro ha hp
   let j := (existsUnique_sLocalThetaWeightedL2 (F := F) (S := S)).exists.choose
   let k := Eₛ(ha, le_refl (0 : ℝ), le_refl (0 : ℝ), hp)

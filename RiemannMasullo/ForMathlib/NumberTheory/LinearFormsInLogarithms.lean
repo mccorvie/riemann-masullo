@@ -4,93 +4,12 @@ public import Mathlib.Analysis.SpecialFunctions.Complex.Log
 import Mathlib.Analysis.SpecialFunctions.Complex.LogBounds
 import Mathlib.Algebra.Polynomial.Roots
 import Mathlib.Analysis.Real.Pi.Bounds
-import Mathlib.NumberTheory.Transcendental.Liouville.Basic
 
 /-! # Separation of the exponential lattices of two integer logarithms -/
 
 @[expose] public section
 
 namespace RiemannMasullo
-
-/-- A rational ratio even allows degree zero, with explicit constant. -/
-private theorem baker_two_logarithms_dependent_degree_zero (p q k l : ℕ) (hq : 1 < q) (hk : 0 < k) (he : p ^ k = q ^ l) :
-    ∀ m n : ℤ, (m : ℝ) * Real.log p + n * Real.log q ≠ 0 →
-      1 ≤ ((k : ℝ) / Real.log q) * |(m : ℝ) * Real.log p + n * Real.log q| := by
-  intro m n h
-  have hQ : 0 < Real.log (q : ℝ) := Real.log_pos (by exact_mod_cast hq)
-  have hk' : (0 : ℝ) < k := by exact_mod_cast hk
-  have hlogs := congrArg (fun a : ℕ ↦ Real.log (a : ℝ)) he
-  simp only [Nat.cast_pow, Real.log_pow] at hlogs
-  have hlin : ((k : ℝ) / Real.log q) * ((m : ℝ) * Real.log p + n * Real.log q) =
-      ((m * l + n * k : ℤ) : ℝ) := by
-    push_cast
-    field_simp
-    linear_combination (m : ℝ) * hlogs
-  have hn : m * l + n * k ≠ (0 : ℤ) := by
-    intro h0
-    rw [h0, Int.cast_zero] at hlin
-    exact (mul_ne_zero (div_pos hk' hQ).ne' h) hlin
-  have hi : (1 : ℤ) ≤ |m * l + n * k| := by exact Int.add_one_le_iff.mpr (abs_pos.mpr hn)
-  have hh := congrArg abs hlin
-  rw [abs_mul, abs_of_pos (div_pos hk' hQ)] at hh
-  rw [hh]
-  exact_mod_cast hi
-
-/-- The non-Liouville estimate on a single ratio gives the exact target, including zero
-coefficients and both signs. Doubling denominators puts every nonzero integer slope
-in the range of Mathlib's definition. -/
-private theorem baker_two_logarithms_of_not_liouville {P Q : ℝ} (hQ : 0 < Q) (h : ¬ Liouville (P / Q)) :
-    (∃ d : ℕ, ∃ B ≥ (0 : ℝ), ∀ m n : ℤ, (m : ℝ) * P + n * Q ≠ 0 →
-      1 ≤ B * (1 + |(m : ℝ)| + |(n : ℝ)|) ^ d * |(m : ℝ) * P + n * Q|) := by
-  simp only [Liouville, not_forall, not_exists, not_and, not_lt] at h
-  obtain ⟨d, hd⟩ := h
-  refine ⟨d, 2 ^ d / Q, by positivity, ?_⟩
-  have H (m n : ℤ) (hm : 0 < m) (hn : (m : ℝ) * P + n * Q ≠ 0) :
-      1 ≤ 2 ^ d / Q * (1 + |(m : ℝ)| + |(n : ℝ)|) ^ d * |(m : ℝ) * P + n * Q| := by
-    have hm' : (0 : ℝ) < m := by exact_mod_cast hm
-    have hm1 : (1 : ℝ) ≤ m := by exact_mod_cast (show (1 : ℤ) ≤ m by omega)
-    have he : P / Q - ((-2 * n : ℤ) : ℝ) / ((2 * m : ℤ) : ℝ) =
-        ((m : ℝ) * P + n * Q) / (m * Q) := by push_cast; field_simp; ring
-    have hx : P / Q ≠ ((-2 * n : ℤ) : ℝ) / ((2 * m : ℤ) : ℝ) := by
-      rw [← sub_ne_zero, he]
-      exact div_ne_zero hn (mul_pos hm' hQ).ne'
-    have hh := hd (-2 * n) (2 * m) (by omega) hx
-    rw [he, abs_div, abs_of_pos (mul_pos hm' hQ)] at hh
-    push_cast at hh
-    have hpos : 0 < (2 * (m : ℝ)) ^ d := by positivity
-    have step : (m : ℝ) * Q ≤ (2 * (m : ℝ)) ^ d * |(m : ℝ) * P + n * Q| := by
-      apply (div_le_div_iff₀ hpos (mul_pos hm' hQ)).mp at hh
-      simpa [mul_comm] using hh
-    have hbase : (m : ℝ) ≤ 1 + |(m : ℝ)| + |(n : ℝ)| := by linarith [le_abs_self (m : ℝ), abs_nonneg (n : ℝ)]
-    have hpow : (2 * (m : ℝ)) ^ d ≤ 2 ^ d * (1 + |(m : ℝ)| + |(n : ℝ)|) ^ d := by
-      rw [← mul_pow]
-      gcongr
-    have hi := (le_mul_of_one_le_left hQ.le hm1).trans (step.trans (mul_le_mul_of_nonneg_right hpow (abs_nonneg _)))
-    convert (one_le_div hQ).mpr hi using 1; ring
-  intro m n hne
-  rcases lt_trichotomy 0 m with hm | rfl | hm
-  · exact H m n hm hne
-  · simp only [Int.cast_zero, zero_mul, zero_add, abs_zero, add_zero] at hne ⊢
-    have hn : n ≠ 0 := by intro he; simp [he] at hne
-    have hn1 : (1 : ℝ) ≤ |(n : ℝ)| := by exact_mod_cast (Int.add_one_le_iff.mpr (abs_pos.mpr hn))
-    rw [abs_mul, abs_of_pos hQ]
-    calc 1 ≤ 2 ^ d * (1 + |(n : ℝ)|) ^ d * |(n : ℝ)| := by
-           exact one_le_mul_of_one_le_of_one_le (one_le_mul_of_one_le_of_one_le
-             (one_le_pow₀ (by norm_num)) (one_le_pow₀ (by linarith [abs_nonneg (n : ℝ)]))) hn1
-         _ = 2 ^ d / Q * (1 + |(n : ℝ)|) ^ d * (|(n : ℝ)| * Q) := by field_simp
-  · have e : ((-m : ℤ) : ℝ) * P + ((-n : ℤ) : ℝ) * Q = -((m : ℝ) * P + n * Q) := by push_cast; ring
-    have h' := H (-m) (-n) (by omega) (e ▸ neg_ne_zero.mpr hne)
-    rw [e, abs_neg] at h'
-    simpa only [Int.cast_neg, abs_neg] using h'
-
-/-- Classical input: for multiplicatively independent integers `1 < p < q`, the
-ratio of their real logarithms has finite irrationality measure. This is the
-non-effective two-logarithm consequence of A. Baker and G. Wüstholz,
-*Logarithmic forms and group varieties*, J. reine angew. Math. 442 (1993), 19–62. -/
-private theorem baker_two_logarithms_not_liouville_of_independent (p q : ℕ)
-    (hp : 1 < p) (hpq : p < q) (hind : ¬ ∃ k l : ℕ, 0 < k ∧ 0 < l ∧ p ^ k = q ^ l) :
-    ¬ Liouville (Real.log p / Real.log q) := by
-  sorry
 
 /-- Classical input: the Baker–Wüstholz theorem on linear forms in logarithms,
 A. Baker and G. Wüstholz, *Logarithmic forms and group varieties*, J. reine angew.
@@ -102,19 +21,7 @@ private theorem baker_two_logarithms (p q : ℕ) (hp : 1 < p) (hq : 1 < q) :
       (m : ℝ) * Real.log p + n * Real.log q ≠ 0 →
       1 ≤ B * (1 + |(m : ℝ)| + |(n : ℝ)|) ^ d *
         |(m : ℝ) * Real.log p + n * Real.log q| := by
-  wlog hpq : p ≤ q generalizing p q
-  · obtain ⟨d, B, hB, h⟩ := this q p hq hp (by omega)
-    refine ⟨d, B, hB, fun m n hn ↦ ?_⟩
-    simpa only [add_assoc, add_left_comm, add_comm] using
-      h n m (by rwa [add_comm])
-  by_cases hdep : ∃ k l : ℕ, 0 < k ∧ 0 < l ∧ p ^ k = q ^ l
-  · obtain ⟨k, l, hk, _, he⟩ := hdep
-    refine ⟨0, (k : ℝ) / Real.log q, div_nonneg (by positivity)
-      (Real.log_pos (by exact_mod_cast hq)).le, ?_⟩
-    simpa only [pow_zero, mul_one] using baker_two_logarithms_dependent_degree_zero p q k l hq hk he
-  have hlt : p < q := lt_of_le_of_ne hpq fun h ↦ hdep ⟨1, 1, by decide, by decide, by simpa using h⟩
-  exact baker_two_logarithms_of_not_liouville (Real.log_pos (by exact_mod_cast hq))
-    (baker_two_logarithms_not_liouville_of_independent p q hp hlt hdep)
+  sorry
 
 /-- Fix a positive common order `N`. At a zero of the first exponential
 denominator, every `N`th root of the second exponential has polynomially

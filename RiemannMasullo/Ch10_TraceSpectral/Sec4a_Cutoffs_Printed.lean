@@ -342,9 +342,8 @@ def Printed.spectralStripBasisLift_uniformUpperBound : Prop :=
     let Q := spectralSobolevQuotient F a hI hs
     let res : (ideleClassNorm F).ker →ₜ* C[F] :=
       ⟨(ideleClassNorm F).ker.subtype, continuous_subtype_val⟩
-    let ω := PontryaginDual.map res χ
-    letI := instClosedSpectralIsotypeThetaSec2 (F := F) a hI hs ω
-    let B := spectralSobolevIsotypeQuotient F a hI hs ω
+    letI := instClosedSpectralIsotypeThetaSec2 (F := F) a hI hs (χ.comp res)
+    let B := spectralSobolevIsotypeQuotient F a hI hs (χ.comp res)
     let incl : B →ₗ[ℂ] Q := Submodule.mapQ _ N (Submodule.subtype _) le_rfl
     let J := {j : ℝ × ℝ × ℕ // j.1 ∈ Icc (-α) α ∧ j.2.2 <
       (meromorphicOrderAt (continuedCompletedHeckeL χ) (shift(s + j.1, j.2.1))).untop₀.toNat}

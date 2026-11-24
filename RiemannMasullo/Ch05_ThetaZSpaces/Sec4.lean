@@ -3057,37 +3057,18 @@ theorem sLocalThetaWeightedL2_norm (f : ℬₛ) :
 variable (F S) in
 /-- Paper: (5.4.2.2), p. 274.
 The weighted Hilbert completion is realized as the closure of the theta image
-in the weighted L² space. -/
-def SLocalThetaL2 :=
+in the weighted L² space.
+
+Kept as an `abbrev` for now (#5398): as a `def` with its own instances it breaks proofs and
+statements that use it, see the issue. Do not copy this pattern: a new type synonym with
+structure is a `def` with its own instances (`AGENTS.md`). -/
+abbrev SLocalThetaL2 :=
   ↥(LinearMap.range ((weightedTheta).toLinearMap)).topologicalClosure
 
-local notation "thetaClosure" => (LinearMap.range (weightedTheta).toLinearMap).topologicalClosure
-
-/-- The theta completion inherits its normed additive group from weighted L². -/
-instance instNormedAddCommGroupSLocalThetaL2 : NormedAddCommGroup (SLocalThetaL2 F S) :=
-  inferInstanceAs (NormedAddCommGroup ↥thetaClosure)
-
-/-- The complex inner product on the theta completion is the weighted L² inner product. -/
-instance instInnerProductSpaceSLocalThetaL2 : InnerProductSpace ℂ (SLocalThetaL2 F S) :=
-  inferInstanceAs (InnerProductSpace ℂ ↥thetaClosure)
-
-/-- The theta completion is complete as a closed subspace of weighted L². -/
-instance instCompleteSpaceSLocalThetaL2 : CompleteSpace (SLocalThetaL2 F S) :=
-  inferInstanceAs (CompleteSpace ↥thetaClosure)
-
-variable (F S) in
-/-- The linear map sending a theta class to its image in the weighted completion. -/
-def SLocalThetaL2.completionMap : Θₛ →ₗ[ℂ] SLocalThetaL2 F S :=
-  (weightedTheta).toLinearMap.codRestrict thetaClosure
-    (fun x ↦ Submodule.le_topologicalClosure _ (LinearMap.mem_range_self _ x))
-
-/-- The linear isometric inclusion of the theta completion into weighted L². -/
-def SLocalThetaL2.inclusion : SLocalThetaL2 F S →ₗᵢ[ℂ] L²ₛ :=
-  (thetaClosure).subtypeₗᵢ
-
-/-- Including a completed theta class in weighted L² recovers its weighted theta image. -/
-theorem SLocalThetaL2.inclusion_completionMap (x : Θₛ) :
-    inclusion (completionMap F S x) = weightedTheta x := rfl
+local notation "completionMap" => (show Θₛ →ₗ[ℂ] SLocalThetaL2 F S from
+  (weightedTheta).toLinearMap.codRestrict
+    (LinearMap.range (weightedTheta).toLinearMap).topologicalClosure
+    (fun x ↦ Submodule.le_topologicalClosure _ (LinearMap.mem_range_self _ x)))
 
 section DenseHelper
 variable {M N : Type*} [AddCommGroup M] [Module ℂ M] [AddCommGroup N] [Module ℂ N]
@@ -3105,8 +3086,8 @@ end DenseHelper
 
 /-- Paper: (5.4.2.2), p. 274.
 The test-function image is dense in the chosen model of the completion. -/
-theorem sLocalThetaL2_dense : DenseRange (SLocalThetaL2.completionMap F S) :=
-  denseRange_codRestrict_topologicalClosure (weightedTheta).toLinearMap _
+theorem sLocalThetaL2_dense : DenseRange completionMap :=
+  denseRange_codRestrict_topologicalClosure _ _
 
 /-- The Fourier transform is a linear automorphism of the S-adelic tests.
 Its fourth power is the identity by Fourier inversion. -/
@@ -3331,15 +3312,13 @@ S-local Fourier transform has a unique unitary extension to the weighted complet
 given on theta classes by Fourier transform of the test representative. -/
 theorem existsUnique_sLocalThetaL2Fourier :
     ∃! e : SLocalThetaL2 F S ≃ₗᵢ[ℂ] SLocalThetaL2 F S, ∀ f : ℬₛ,
-      e (SLocalThetaL2.completionMap F S (Submodule.Quotient.mk f)) =
-        SLocalThetaL2.completionMap F S (Submodule.Quotient.mk (Fourierₛ f)) := by
+      e (completionMap (Submodule.Quotient.mk f)) =
+        completionMap (Submodule.Quotient.mk (Fourierₛ f)) := by
   refine (existsUnique_sLocalThetaL2Fourier_testEquiv (F := F) (S := S)).elim fun T hT ↦ ?_
   let K := LinearMap.ker (sLocalAdelicTheta F S)
   exact existsUnique_sLocalThetaL2Fourier_extend (H := SLocalThetaL2 F S)
-    K (SLocalThetaL2.completionMap F S) sLocalThetaL2_dense T Fourierₛ hT (fun f ↦ by
-      simpa only [K, Submodule.mkQ_apply, ← SLocalThetaL2.inclusion_completionMap,
-        LinearIsometry.norm_map] using
-        existsUnique_sLocalThetaL2Fourier_norm f)
+    K completionMap (sLocalThetaL2_dense (F := F) (S := S)) T Fourierₛ hT
+    (fun f ↦ existsUnique_sLocalThetaL2Fourier_norm f)
 
 local notation "weightedFourier" =>
   (show SLocalThetaL2 F S ≃ₗᵢ[ℂ] SLocalThetaL2 F S from
@@ -5402,20 +5381,19 @@ injects continuously into the theta completion by its almost-everywhere values. 
 theorem existsUnique_sLocalDecayToThetaL2 (I : Set ℝ) (_hOpen : IsOpen I)
     (_hInt : OrdConnected I) (_hsub : I ⊆ overlapInterval) (_hhalf : (1 / 2 : ℝ) ∈ I) :
     ∃! j : Ẽ(I) →L[ℂ] SLocalThetaL2 F S, Injective j ∧ ∀ f : Ẽ(I),
-      ⇑(SLocalThetaL2.inclusion (j f)) =ᵐ[μweighted] f.val := by
+      (((j f).val : L²ₛ) : Jₛ → ℂ) =ᵐ[μweighted] f.val := by
   have h := sLocalDecay_ambientL2 (F := F) (S := S) I _hInt _hhalf
   let L := h.choose
   have hL := h.choose_spec
-  let j : Ẽ(I) →L[ℂ] SLocalThetaL2 F S := L.codRestrict thetaClosure
+  let j : Ẽ(I) →L[ℂ] SLocalThetaL2 F S := L.codRestrict _
     (sLocalDecay_mem_closure I _hInt ⟨_, _hhalf⟩ L hL)
   refine ⟨j, ⟨?_, hL⟩, fun j' hj' ↦ ?_⟩
   · apply (injective_iff_map_eq_zero _).mpr
     intro f hf
-    have hz : L f = 0 := (congrArg SLocalThetaL2.inclusion hf).trans (map_zero _)
+    have hz : L f = 0 := congrArg Subtype.val hf
     have ha : f.val =ᵐ[μweighted] 0 := (hL f).symm.trans (hz ▸ Lp.coeFn_zero ..)
     exact Subtype.ext (sLocalThetaWeightedL2_ae_zero f.val (sLocalDecay_continuous ⟨_, _hhalf⟩ f) ha)
-  · exact ContinuousLinearMap.ext fun f ↦ SLocalThetaL2.inclusion.injective
-      (Lp.ext ((hj'.2 f).trans (hL f).symm))
+  · exact ContinuousLinearMap.ext fun f ↦ Subtype.ext (Lp.ext ((hj'.2 f).trans (hL f).symm))
 
 local notation "mass₁" => (((sLocalNormOneQuotientMeasure F S).real univ : ℝ) : ℂ)
 
@@ -5492,11 +5470,10 @@ private theorem sLocalDecay_fourier_pure (χ : PontryaginDual Jₛ) (I : Set ℝ
     (hval.trans ((hw.2.2 g).trans (sLocalDecay_pure_eval restrict₁(χ⁻¹) (Fourierₛ r) hFr g)))
 
 private theorem sLocalDecay_class_eq (I : Set ℝ) (j : Ẽ(I) →L[ℂ] SLocalThetaL2 F S)
-    (hj : ∀ f, ⇑(SLocalThetaL2.inclusion (j f)) =ᵐ[μweighted] f.val) (u : Ẽ(I)) (r : ℬₛ)
+    (hj : ∀ f, ⇑(j f).val =ᵐ[μweighted] f.val) (u : Ẽ(I)) (r : ℬₛ)
     (hu : ∀ g, u.val g = sLocalAdelicThetaOnClasses F S r g) :
-    j u = SLocalThetaL2.completionMap F S (Submodule.Quotient.mk r) := by
-  apply SLocalThetaL2.inclusion.injective
-  rw [SLocalThetaL2.inclusion_completionMap]
+    j u = completionMap (Submodule.Quotient.mk r) := by
+  apply Subtype.ext
   have ha : u.val =ᵐ[μweighted] ⇑(sLocalAdelicThetaOnClasses F S r) := .of_forall hu
   exact Lp.ext ((hj u).trans (ha.trans
     ((existsUnique_sLocalThetaWeightedL2 (F := F) (S := S)).exists.choose_spec.2 r).symm))
@@ -5504,8 +5481,7 @@ private theorem sLocalDecay_class_eq (I : Set ℝ) (j : Ẽ(I) →L[ℂ] SLocalT
 
 private theorem sLocalDecay_fourier_on_theta (χ : PontryaginDual Jₛ) (I : Set ℝ)
     (j : Ẽ(I) →L[ℂ] SLocalThetaL2 F S) (j' : Ẽ(reflect(I)) →L[ℂ] SLocalThetaL2 F S)
-    (hj : ∀ f, ⇑(SLocalThetaL2.inclusion (j f)) =ᵐ[μweighted] f.val)
-    (hj' : ∀ f, ⇑(SLocalThetaL2.inclusion (j' f)) =ᵐ[μweighted] f.val)
+    (hj : ∀ f, ⇑(j f).val =ᵐ[μweighted] f.val) (hj' : ∀ f, ⇑(j' f).val =ᵐ[μweighted] f.val)
     (e : Eω(I, restrict₁(χ)) ≃L[ℂ] Eω(reflect(I), restrict₁(χ⁻¹)))
     (he : ∀ r : ℬₛ, ∃ (v : Eω(I, restrict₁(χ))) (w : Eω(reflect(I), restrict₁(χ⁻¹))),
       e v = w ∧ (∀ g, v.val.val g = φω(restrict₁(χ)) r g) ∧
@@ -5531,7 +5507,7 @@ theorem sLocalDecayFourier_eq_weightedFourier (χ : PontryaginDual Jₛ) (I : Se
       I hOpen hInt hsub hhalf).exists.choose
     let e := (existsUnique_sLocalDecayFourier (F := F) (S := S) χ I hOpen hInt ⟨_, hhalf⟩ hsub).exists.choose
     ∀ f : Eω(I, restrict₁(χ)),
-      ⇑(SLocalThetaL2.inclusion (weightedFourier (j f.val))) =ᵐ[μweighted] (e f).val.val := by
+      ((((weightedFourier (j f.val)).val : L²ₛ) : Jₛ → ℂ)) =ᵐ[μweighted] (e f).val.val := by
   intro j e
   have hj := (existsUnique_sLocalDecayToThetaL2 (F := F) (S := S) I hOpen hInt hsub hhalf).exists.choose_spec.2
   have he := (existsUnique_sLocalDecayFourier (F := F) (S := S) χ I hOpen hInt ⟨_, hhalf⟩ hsub).exists.choose_spec
@@ -5553,7 +5529,7 @@ theorem sLocalDecayFourier_eq_weightedFourier (χ : PontryaginDual Jₛ) (I : Se
     rintro v ⟨f, hf⟩
     exact sLocalDecay_fourier_on_theta χ I j j' hj hj' e he v f hf
   change A u = B u at hu
-  change ⇑(SLocalThetaL2.inclusion (A u)) =ᵐ[μweighted] (e u).val.val
+  change ⇑(A u).val =ᵐ[μweighted] (e u).val.val
   rw [hu]
   exact hj' (e u).val
 
