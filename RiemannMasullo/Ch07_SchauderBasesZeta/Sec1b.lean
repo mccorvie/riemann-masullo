@@ -17,6 +17,7 @@ import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Bounded
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.MittagLefflerLift
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.SplitPrimeDensity
 import all RiemannMasullo.AppB_AnalyticNT.Sec1
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 
@@ -313,20 +314,155 @@ theorem reciprocalEulerProduct_over_split_prime (χ : U𝔽) (S₀ : Finset Prim
   rw [hev, he1, hf1]
 
 /-- Paper: Remark 7.1.3.1, p. 324.
-The completely split rational primes have positive density among the rational primes.
-Deviation: Uses Mathlib's Dirichlet density. -/
+The completely split rational primes have positive density among the rational primes: the sum
+of `N(p)^(-s)` over the completely split primes, divided by the same sum over all primes, tends
+to a positive limit as `s` decreases to `1`.
+Deviation: Uses the Dirichlet density, written out as this limit. The limit is the body of
+Mathlib's `NumberField.Set.HasDirichletDensity`; the pinned Mathlib does not expose that
+definition and has no lemma that introduces it, so a statement phrased with the predicate itself
+cannot be proved outside Mathlib's own module. -/
 theorem split_rationalPrimes_pos_dirichletDensity (F : Type*) [Field F] [NumberField F] :
     ∃ δ > (0 : ℝ),
-      NumberField.Set.HasDirichletDensity {p : RatPrimes | rationalPrimeSplitsCompletely F p} δ :=
-  by sorry
+      Tendsto (fun s : ℝ ↦
+        NumberField.Set.primeIdealZetaSum {p : RatPrimes | rationalPrimeSplitsCompletely F p} s /
+          NumberField.Set.primeIdealZetaSum (univ : Set RatPrimes) s) (𝓝[>] 1) (𝓝 δ) := by
+  let L := IntermediateField.normalClosure ℚ F (AlgebraicClosure F)
+  exact ⟨_, one_div_pos.mpr (Nat.cast_pos.mpr (Module.finrank_pos (R := ℚ) (M := L))),
+    tendsto_split_primeIdealZetaSum_div F⟩
 
 -- TODO(paper-gap): The claim on p. 324 extending (7.1.3.1) to Galois type needs to
 -- translate the exponent by ix. For ℚ and χ = |·|^i the identity fails at s = 0.
 
+/-- Classical input, not a statement of the paper. A consequence of the existence theorem of
+global class field theory (Takagi 1920, Artin 1927), which Remark 7.1.3.1, p. 324, uses under
+the words "By Chebotarev". For every unitary character `χ₀` of finite order of the idele class
+group of `F` there is a number field `L` over `F` such that, at every prime `v` of `F` that
+lies under a prime of `L` of ramification index one and residue degree one, `χ₀` is unramified
+and has local value one. (Take the class field of the kernel of `χ₀`: where `L_w = F_v` the
+local norm is the identity, so all of `F_v^×` lies in the norm group.) Stated as a proposition,
+so that what is proved from it takes it as a hypothesis by name. -/
+def FiniteOrderCharacterSplitsInClassField.{u} (F : Type u) [Field F] [NumberField F] : Prop :=
+  ∀ χ₀ : PontryaginDual (IdeleClassGroup (𝓞 F) F), IsOfFinOrder χ₀ →
+    ∃ (L : Type u) (_ : Field L) (_ : NumberField L) (_ : Algebra F L),
+      ∀ (v : HeightOneSpectrum (𝓞 F)) (w : v.asIdeal.primesOver (𝓞 L)),
+        w.val.ramificationIdx (𝓞 F) = 1 → w.val.inertiaDeg (𝓞 F) = 1 →
+          (ideleClassNormTwist χ₀ 0).IsUnramifiedAt v ∧
+            (ideleClassNormTwist χ₀ 0).localValue v = 1
+
+section ClassFieldInput
+
+local notation "U" => PontryaginDual (IdeleClassGroup (𝓞 F) F)
+local notation "χ₀(" c ")" => ideleClassNormTwist c 0
+
+-- Local calculation in Ch03_IdelicZeta/Sec2, finiteHeckeL_imaginary_twist.
+private theorem eulerFactor_twist (χ ψ : U) (a : ℂ)
+    (hψ : χ₀(ψ) = ideleClassNormTwist χ a) (s : ℂ) (v : Primes) :
+    finiteHeckeEulerFactor ψ v s = finiteHeckeEulerFactor χ v (s + a) := by
+  have hval (t : (v.adicCompletion F)ˣ) :
+      χ₀(ψ).restrict v t = χ₀(χ).restrict v t * (‖(t : v.adicCompletion F)‖ : ℂ) ^ a := by
+    rw [hψ, HeckeCharacter.restrict, HeckeCharacter.restrict,
+      MulChar.ofUnitHom_coe, MulChar.ofUnitHom_coe]
+    change _ * (((ideleClassNorm F (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v t) : ℝ≥0) : ℝ) : ℂ) ^ a =
+      (_ * _ ^ (0 : ℂ)) * _
+    dsimp only
+    rw [Complex.cpow_zero, mul_one, ideleClassNorm_ofAdicCompletion]
+    rfl
+  have hu : χ₀(ψ).IsUnramifiedAt v ↔ χ₀(χ).IsUnramifiedAt v := by
+    rw [HeckeCharacter.isUnramifiedAt_iff, HeckeCharacter.isUnramifiedAt_iff]
+    apply forall_congr'
+    intro t
+    let u := Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom t
+    have hn : ‖(u : v.adicCompletion F)‖ = 1 := by
+      apply Valued.toNormedField.norm_eq_one_iff.mpr
+      exact HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp
+        (show u ∈ (v.adicCompletionIntegers F).units from ⟨t.val.property, t.inv.property⟩)
+    change χ₀(ψ).restrict v u = 1 ↔ χ₀(χ).restrict v u = 1
+    rw [hval, hn, Complex.ofReal_one, Complex.one_cpow, mul_one]
+  by_cases hx : χ₀(χ).IsUnramifiedAt v
+  · let val : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+    obtain ⟨π, hπ⟩ := val.exists_isUniformizer_of_isCyclic_of_nontrivial
+    let u := Units.mk0 (π : v.adicCompletion F) hπ.ne_zero
+    have hn := norm_uniformizer_adicCompletion v _ hπ
+    have hq : (v.asIdeal.absNorm : ℂ) ≠ 0 := by
+      exact_mod_cast (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)).ne'
+    rw [finiteHeckeEulerFactor, finiteHeckeEulerFactor, ite_eq_left hx, ite_eq_left (hu.mpr hx),
+      hx.localValue_eq u hπ, (hu.mpr hx).localValue_eq u hπ, hval]
+    change (1 - (_ * (‖(π : v.adicCompletion F)‖ : ℂ) ^ a) * _)⁻¹ = (1 - _ * _ ^ (-((s : ℂ) + a)))⁻¹
+    rw [hn, Complex.ofReal_inv, Complex.inv_cpow_ofReal_nonneg (Nat.cast_nonneg _) a,
+      ← Complex.cpow_neg, Complex.ofReal_natCast, mul_assoc, ← Complex.cpow_add _ _ hq]
+    rw [show -a + -(s : ℂ) = -((s : ℂ) + a) by ring]
+  · simp [finiteHeckeEulerFactor, hx, hu.not.mpr hx]
+
+/-- Reduction of #4049 to the local splitting criterion for a class field of the character. -/
+private theorem normTwist_of_character_field (χ χ₀ : U) (x : ℝ)
+    (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist χ₀ ((x : ℂ) * Complex.I))
+    (L : Type*) [Field L] [NumberField L] [Algebra F L]
+    (hL : ∀ (v : Primes) (w : v.asIdeal.primesOver (𝓞 L)),
+      w.val.ramificationIdx (𝓞 F) = 1 → w.val.inertiaDeg (𝓞 F) = 1 →
+      (ideleClassNormTwist χ₀ 0).IsUnramifiedAt v ∧ (ideleClassNormTwist χ₀ 0).localValue v = 1) :
+    {p : RatPrimes | rationalPrimeSplitsCompletely F p ∧
+      ∀ S₀ : Finset Primes, (∀ v : Primes, v.under (𝓞 ℚ) = p → v ∈ S₀) →
+        ∀ s : ℂ, reciprocalPartialHeckeEulerProduct χ overₚ(S₀, p) s =
+          (1 - (p.asIdeal.absNorm : ℂ) ^ (-(s + (x : ℂ) * Complex.I))) ^ Module.finrank ℚ F}.Infinite := by
+  apply (infinite_rational_primes_splitting_completely L).mono
+  intro p hp
+  have hlocal (v : Primes) (hv : v.under (𝓞 ℚ) = p) :
+      (v.asIdeal.ramificationIdx (𝓞 ℚ) = 1 ∧ v.asIdeal.inertiaDeg (𝓞 ℚ) = 1) ∧
+      (ideleClassNormTwist χ₀ 0).IsUnramifiedAt v ∧ (ideleClassNormTwist χ₀ 0).localValue v = 1 := by
+    obtain ⟨Q⟩ := (inferInstance : Nonempty (v.asIdeal.primesOver (𝓞 L)))
+    let w : HeightOneSpectrum (𝓞 L) := ⟨Q.val, Q.property.1, Ideal.ne_bot_of_mem_primesOver v.ne_bot Q.property⟩
+    have hwp : w.under (𝓞 ℚ) = p := by
+      rw [← hv]
+      apply HeightOneSpectrum.ext
+      change Q.val.under (𝓞 ℚ) = v.asIdeal.under (𝓞 ℚ)
+      rw [← Ideal.under_under (A := 𝓞 ℚ) (B := 𝓞 F) Q.val, ← Q.property.2.over]
+    obtain ⟨he, hf⟩ := hp w hwp
+    change Q.val.ramificationIdx (𝓞 ℚ) = 1 at he
+    change Q.val.inertiaDeg (𝓞 ℚ) = 1 at hf
+    rw [Ideal.ramificationIdx_tower (R := 𝓞 ℚ) v.asIdeal Q.val] at he
+    rw [Ideal.inertiaDeg_tower (R := 𝓞 ℚ) v.asIdeal Q.val] at hf
+    exact ⟨⟨(mul_eq_one.mp he).1, (mul_eq_one.mp hf).1⟩,
+      hL v Q (mul_eq_one.mp he).2 (mul_eq_one.mp hf).2⟩
+  have hpF : rationalPrimeSplitsCompletely F p := fun v hv ↦ (hlocal v hv).1
+  refine ⟨hpF, fun S₀ hS s ↦ ?_⟩
+  rw [← reciprocalEulerProduct_over_split_prime χ₀ S₀ p hpF hS (fun v hv ↦ (hlocal v hv).2)]
+  apply Finset.prod_congr rfl
+  intro v _
+  exact congrArg Inv.inv (eulerFactor_twist χ₀ χ _ hχ s v)
+
+end ClassFieldInput
+
+/-- Paper: Remark 7.1.3.1, p. 324.
+The statement `infinite_split_primes_reciprocalEulerProduct_normTwist` below, proved from the
+classical input `FiniteOrderCharacterSplitsInClassField`. The rational primes that split
+completely in the field it provides split completely in `F`, there are infinitely many of
+them, and at each of them every local factor of the character is the translated one.
+Deviation: The right side uses exponent s + ix for the character χ₀ |·|^(ix). -/
+theorem infinite_split_primes_reciprocalEulerProduct_normTwist_of_classField
+    (h : FiniteOrderCharacterSplitsInClassField F)
+    (χ χ₀ : U𝔽) (hχ₀ : IsOfFinOrder χ₀) (x : ℝ)
+    (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist χ₀ ((x : ℂ) * Complex.I)) :
+    {p : RatPrimes | rationalPrimeSplitsCompletely F p ∧
+      ∀ S₀ : Finset Primes, (∀ v : Primes, v.under (𝓞 ℚ) = p → v ∈ S₀) →
+        ∀ s : ℂ, reciprocalPartialHeckeEulerProduct χ overₚ(S₀, p) s =
+          (1 - (p.asIdeal.absNorm : ℂ) ^ (-(s + (x : ℂ) * Complex.I))) ^ degree}.Infinite := by
+  obtain ⟨L, _, _, _, hL⟩ := h χ₀ hχ₀
+  exact normTwist_of_character_field χ χ₀ x hχ L hL
+
+/-- Classical input: the consequence of the existence theorem of global class field theory
+stated in `FiniteOrderCharacterSplitsInClassField` (Takagi 1920, Artin 1927). Not a statement
+of the paper and not a gap in it: a known theorem of which this project has no formal proof.
+`infinite_split_primes_reciprocalEulerProduct_normTwist` is proved from it by name. -/
+theorem finiteOrderCharacter_splitsInClassField.{u} (F : Type u) [Field F] [NumberField F] :
+    FiniteOrderCharacterSplitsInClassField F := by
+  sorry
+
 /-- Paper: Remark 7.1.3.1, p. 324.
 For a Galois-type unitary character there are infinitely many completely split primes
 where the full reciprocal Euler polynomial is a degree power in the translated coordinate.
-Deviation: The right side uses exponent s + ix for the character χ₀ |·|^(ix). -/
+Deviation: The right side uses exponent s + ix for the character χ₀ |·|^(ix).
+The proof is `infinite_split_primes_reciprocalEulerProduct_normTwist_of_classField` applied to the
+classical input `finiteOrderCharacter_splitsInClassField`, which is open. -/
 theorem infinite_split_primes_reciprocalEulerProduct_normTwist
     (χ χ₀ : U𝔽) (hχ₀ : IsOfFinOrder χ₀) (x : ℝ)
     (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist χ₀ ((x : ℂ) * Complex.I)) :
@@ -334,7 +470,8 @@ theorem infinite_split_primes_reciprocalEulerProduct_normTwist
       ∀ S₀ : Finset Primes, (∀ v : Primes, v.under (𝓞 ℚ) = p → v ∈ S₀) →
         ∀ s : ℂ, reciprocalPartialHeckeEulerProduct χ overₚ(S₀, p) s =
           (1 - (p.asIdeal.absNorm : ℂ) ^ (-(s + (x : ℂ) * Complex.I))) ^ degree}.Infinite :=
-  by sorry
+  infinite_split_primes_reciprocalEulerProduct_normTwist_of_classField
+    (finiteOrderCharacter_splitsInClassField F) χ χ₀ hχ₀ x hχ
 
 /-- Paper: Remark 7.1.3.1, p. 323.
 There are infinitely many completely split rational primes at which the character
@@ -668,6 +805,54 @@ theorem sLocalRhoPoleOrder_le_card (s : ℂ) :
     exact_mod_cast hb
   omega
 
+/-- Off the imaginary axis the finite Euler factor of a unitary chart is analytic
+and nonzero. In the unramified case the uniformizer value has norm different from one. -/
+private theorem finiteLocalEulerFactor_regular_of_re_ne_zero (v : Primes)
+    (ξ : PontryaginDual (v.adicCompletion F)ˣ) (z : ℂ) (hz : z.re ≠ 0) :
+    let ch := quasiCharacterNormTwist (Units.map nnNormHom.toMonoidHom)
+      (continuous_finiteLocalModule v) ((⟨Circle.coeHom, continuous_subtype_val⟩ :
+        Circle →ₜ* ℂ).comp ξ)
+    let E := fun t ↦ finiteLocalEulerFactor v (ch t)
+    AnalyticAt ℂ E z ∧ E z ≠ 0 := by
+  classical
+  intro ch E
+  let hπ := (Valued.v : Valuation (v.adicCompletion F)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π : (v.adicCompletion F)ˣ := Units.mk0 hπ.choose hπ.choose_spec.ne_zero
+  let b := ‖π.val‖
+  have hb : 0 < b := norm_pos_iff.mpr π.ne_zero
+  have hb₁ : b < 1 := by
+    change ‖(hπ.choose : v.adicCompletion F)‖ < 1
+    rw [norm_uniformizer_adicCompletion v _ hπ.choose_spec]
+    exact inv_lt_one_of_one_lt₀ (by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v)
+  let ι := Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom
+  have hu (t : ℂ) (u : (v.adicCompletionIntegers F)ˣ) :
+      ch t (ι u) = (ξ (ι u) : ℂ) := by
+    have hn : ‖(ι u).val‖ = 1 := Valued.toNormedField.norm_eq_one_iff.mpr
+      ((HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one
+        (a := ι u)).mp ⟨u.val.prop, u.inv.prop⟩)
+    change (ξ (ι u) : ℂ) * (‖(ι u).val‖ : ℂ) ^ t = _
+    simp only [hn, Complex.ofReal_one, Complex.one_cpow, mul_one]
+  have hfun (t : ℂ) : E t = if ∀ u, (ξ (ι u) : ℂ) = 1 then
+      (1 - (ξ π : ℂ) * (b : ℂ) ^ t)⁻¹ else 1 := by
+    change (if ∀ u, ch t (ι u) = 1 then (1 - ch t π)⁻¹ else 1) = _
+    simp_rw [hu]
+    rfl
+  by_cases h : ∀ u, (ξ (ι u) : ℂ) = 1
+  · have heq : E = fun t ↦ (1 - (ξ π : ℂ) * (b : ℂ) ^ t)⁻¹ :=
+      funext fun t ↦ (hfun t).trans (ite_eq_left h)
+    have hn : 1 - (ξ π : ℂ) * (b : ℂ) ^ z ≠ 0 := by
+      intro he
+      have he' := congrArg norm (sub_eq_zero.mp he)
+      rw [norm_one, norm_mul, Circle.norm_coe, one_mul,
+        Complex.norm_cpow_eq_rpow_re_of_pos hb] at he'
+      exact hz ((Real.rpow_right_inj hb hb₁.ne).mp (he'.symm.trans (Real.rpow_zero _).symm))
+    have hpow := differentiable_id.const_cpow (Or.inl (Complex.ofReal_ne_zero.mpr hb.ne'))
+    rw [heq]
+    exact ⟨(((hpow.const_mul (ξ π : ℂ)).const_sub 1).analyticAt z).inv hn, inv_ne_zero hn⟩
+  · rw [show E = fun _ ↦ 1 from funext fun t ↦ (hfun t).trans (ite_eq_right h)]
+    exact ⟨analyticAt_const, one_ne_zero⟩
+
 open Classical in
 /-- Paper: Theorem 7.1.3.2(2), p. 324. No finite place of `S` contributes a pole to the
 correcting factor at an abscissa in the open left half-plane: the restricted finite Tate
@@ -677,7 +862,81 @@ private theorem sLocalRhoPoleOrder_le_archimedean_of_re_neg_finite
     (c : QuasiCharacter Jₛ) (_hc : ∀ x : Jₛ, ‖c x‖ = 1) {s : ℂ} (_hs : s.re < 0) :
     (Finset.univ.filter (fun v : S ↦ meromorphicOrderAt (fun z ↦ finiteLocalTateFactor v.val
       (sLocalFiniteRestriction v (twistₛ c z))) s < 0)).card
-      = 0 := by sorry
+      = 0 := by
+  rw [Finset.card_eq_zero, Finset.filter_eq_empty_iff]
+  intro v _
+  let ψ : PontryaginDual Jₛ :=
+    { toFun := fun x ↦ ⟨c x, mem_sphere_zero_iff_norm.mpr (_hc x)⟩
+      map_one' := Subtype.ext (map_one c)
+      map_mul' := fun x y ↦ Subtype.ext (map_mul c x y)
+      continuous_toFun := c.continuous.subtype_mk _ }
+  obtain ⟨η, hη, -⟩ := sLocalFiniteRestriction_exists_normTwistChart ψ v
+  let M := (Units.map nnNormHom.toMonoidHom : (v.val.adicCompletion F)ˣ →* ℝ≥0ˣ)
+  let twist := quasiCharacterNormTwist M (continuous_finiteLocalModule v.val)
+  let ch (ξ : PontryaginDual (v.val.adicCompletion F)ˣ) :=
+    twist ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ξ)
+  have hc (z) : sLocalFiniteRestriction v (twistₛ c z) = ch η z := hη z
+  simp_rw [hc]
+  let E (ξ : PontryaginDual (v.val.adicCompletion F)ˣ) (z : ℂ) :=
+    finiteLocalEulerFactor v.val (ch ξ z)
+  let ρ (z : ℂ) := finiteLocalTateFactor v.val (ch η z)
+  let G (t : ℂ) := (E η (t + s))⁻¹ * E η⁻¹ (1 - (t + s))
+  have hs₁ : (1 - s).re ≠ 0 := by simp only [Complex.sub_re, Complex.one_re]; linarith
+  obtain ⟨hA, hA₀⟩ : AnalyticAt ℂ (E η) s ∧ E η s ≠ 0 :=
+    finiteLocalEulerFactor_regular_of_re_ne_zero v.val η s _hs.ne
+  obtain ⟨hB, hB₀⟩ : AnalyticAt ℂ (E η⁻¹) (1 - s) ∧ E η⁻¹ (1 - s) ≠ 0 :=
+    finiteLocalEulerFactor_regular_of_re_ne_zero v.val η⁻¹ (1 - s) hs₁
+  have hG : AnalyticAt ℂ G 0 := by
+    have ha : AnalyticAt ℂ (E η) (0 + s) := by simpa only [zero_add] using hA
+    have hb : AnalyticAt ℂ (E η⁻¹) (1 - (0 + s)) := by simpa only [zero_add] using hB
+    exact ((ha.inv (by simpa only [zero_add] using hA₀)).comp (f := fun t : ℂ ↦ t + s)
+      (by fun_prop)).mul (hb.comp (f := fun t : ℂ ↦ 1 - (t + s)) (by fun_prop))
+  have hG₀ : G 0 ≠ 0 := by simpa only [G, zero_add] using mul_ne_zero (inv_ne_zero hA₀) hB₀
+  have heps := sLocalEpsilonFactor_ne_zero (twistₛ c s)
+  rw [sLocalEpsilonFactor] at heps
+  have he := Finset.prod_ne_zero_iff.mp (right_ne_zero_of_mul heps) v (Finset.mem_univ v)
+  rw [hc, finiteLocalEpsilonFactor] at he
+  -- Recenter the local epsilon factor. Its normalized value is nonzero, and the Euler
+  -- factors removed in its definition are analytic units at this point.
+  -- The chart identities are the local versions of norm_chart_twist and dual_norm_chart
+  -- in Ch03_IdelicZeta/Sec3b.
+  have hadd (t : ℂ) : twist (ch η s) t = ch η (t + s) := by
+    ext1 x
+    change (η x : ℂ) * (‖x.val‖ : ℂ) ^ s * (‖x.val‖ : ℂ) ^ t = _
+    rw [mul_assoc, ← Complex.cpow_add _ _ (by exact_mod_cast norm_ne_zero_iff.mpr x.ne_zero),
+      add_comm s t]
+    rfl
+  have hdual (z : ℂ) : dualQuasiCharacter M (continuous_finiteLocalModule v.val) (ch η z) =
+      ch η⁻¹ (1 - z) := by
+    ext1 x
+    change (‖x.val‖ : ℂ) * ch η z x⁻¹ = _
+    rw [map_inv]
+    change (‖x.val‖ : ℂ) * ((η x : ℂ) * (‖x.val‖ : ℂ) ^ z)⁻¹ =
+      (η x : ℂ)⁻¹ * (‖x.val‖ : ℂ) ^ (1 - z)
+    rw [mul_inv_rev, Complex.cpow_sub _ _ (by exact_mod_cast norm_ne_zero_iff.mpr x.ne_zero),
+      Complex.cpow_one, div_eq_mul_inv]
+    ac_rfl
+  let H := G * (ρ ∘ (· + s))
+  have heq (t : ℂ) : let d := twist (ch η s) t
+      finiteLocalTateFactor v.val d / finiteLocalEulerFactor v.val d *
+        finiteLocalEulerFactor v.val (dualQuasiCharacter M (continuous_finiteLocalModule v.val) d)
+        = H t := by
+    dsimp only
+    rw [hadd, hdual, div_eq_mul_inv]
+    change ρ (t + s) * (E η (t + s))⁻¹ * E η⁻¹ (1 - (t + s)) =
+      ((E η (t + s))⁻¹ * E η⁻¹ (1 - (t + s))) * ρ (t + s)
+    ac_rfl
+  change toMeromorphicNFOn _ univ 0 ≠ 0 at he
+  rw [funext heq] at he
+  have hm : MeromorphicOn H univ := by
+    by_contra hf
+    exact he (by rw [toMeromorphicNFOn_of_not_meromorphicOn hf]; rfl)
+  have hnf := meromorphicNFOn_toMeromorphicNFOn H univ (mem_univ (0 : ℂ))
+  have ho := hnf.meromorphicOrderAt_eq_zero_iff.mpr he
+  rw [meromorphicOrderAt_toMeromorphicNFOn hm (mem_univ 0),
+    show H = G * (ρ ∘ (· + s)) from rfl, meromorphicOrderAt_mul_of_ne_zero hG hG₀,
+    meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt, zero_add] at ho
+  exact not_lt.mpr ho.ge
 
 /-- Paper: Theorem 7.1.3.2(2), p. 324.
 In the open left half-plane the pole order is bounded by the number of infinite places.
@@ -1639,7 +1898,47 @@ private theorem sLocalHomogeneousAdelicTheta_log_bound_estimate
           C * |Real.log (normℝ g)| ^ (archCount + S.card - 1) +
             D * |Real.log (normℝ g)| ^ ((m : ℤ) - 1) := by
   intro ω normℝ
-  sorry
+  let μ := sLocalNormOneQuotientMeasure F S
+  have : CompactSpace (MonoidHom.ker mₛ) := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let : IsFiniteMeasure μ := ⟨isCompact_univ.measure_lt_top⟩
+  obtain ⟨A, B, hA, hB, hb⟩ := sLocalAdelicTheta_log_growth_bounded F S {f}
+    (Bornology.isVonNBounded_singleton (𝕜 := ℂ) f)
+  have hrank : archCount + S.card - 1 = S.card := by omega
+  simp only [hrank] at hb ⊢
+  let n := S.card
+  let V := μ.real univ
+  have hV : 0 ≤ V := ENNReal.toReal_nonneg
+  refine ⟨(A + B) * V + 1, 0, by positivity, le_rfl, ?_⟩
+  have hsmall : ∀ᶠ g in comap normℝ (𝓝[>] 0), normℝ g < Real.exp (-1) :=
+    tendsto_comap.eventually (nhdsWithin_le_nhds (gt_mem_nhds (Real.exp_pos _)))
+  filter_upwards [hsmall] with g hg
+  have hg₀ : 0 < normℝ g := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hg₁ : normℝ g < 1 := hg.trans (Real.exp_lt_one_iff.mpr (by norm_num))
+  have hlog : 1 ≤ |Real.log (normℝ g)| := by
+    have h := (Real.log_lt_iff_lt_exp hg₀).mpr hg
+    exact le_trans (by linarith : 1 ≤ -Real.log (normℝ g)) (neg_le_abs _)
+  let L := |Real.log (normℝ g)| ^ n
+  have hL : 1 ≤ L := one_le_pow₀ hlog
+  have hpoint (h : MonoidHom.ker mₛ) :
+      ‖sLocalAdelicThetaOnClasses F S f (g * h.val) * (ω h : ℂ)‖ ≤ (A + B) * L := by
+    obtain ⟨k, hk⟩ := QuotientGroup.mk_surjective (g * h.val)
+    have hn : sIdeleNorm F S k = mₛ g := by
+      rw [← sIdeleQuotientNorm_mk F S k, hk, map_mul, h.property, mul_one]
+    rw [norm_mul, Circle.norm_coe, mul_one, ← hk, sLocalAdelicThetaOnClasses_mk]
+    have he := hb f (mem_singleton f) k (by simpa only [hn] using hg₁)
+    rw [hn] at he
+    refine he.trans ?_
+    change A * L + B ≤ (A + B) * L
+    rw [add_mul]
+    exact add_le_add le_rfl (le_mul_of_one_le_right hB.le hL)
+  have hi := norm_integral_le_of_norm_le_const (μ := μ) (.of_forall hpoint)
+  change ‖∫ h, sLocalAdelicThetaOnClasses F S f (g * h.val) * (ω h : ℂ) ∂μ‖ ≤ _
+  rw [zero_mul, add_zero]
+  change _ ≤ ((A + B) * V + 1) * L
+  calc
+    _ ≤ ((A + B) * L) * V := hi
+    _ ≤ ((A + B) * V + 1) * L := by nlinarith [hL]
 
 /-- Paper: Corollary 7.1.3.3, p. 325.
 With a unique infinite place, the homogeneous theta function has the stated logarithmic
