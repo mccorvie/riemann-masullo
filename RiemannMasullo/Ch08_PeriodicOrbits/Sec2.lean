@@ -965,13 +965,219 @@ theorem sAdeleFullOrbitUnion_closure_sectionRay (v : InfinitePlace F) :
       adeleProjection F S (singlePlaceIdeleNormSection F v t).val
     closure ray ∩ sAdeleFullOrbitUnion F S =
       ray ∪ {sAdeleOrbitBasepoint F S (some (.inl v))} := by
-  sorry
+  classical
+  intro ray
+  let ψ := InfinitePlace.Completion.extensionEmbedding v
+  have hψ : Isometry ψ := InfinitePlace.Completion.isometry_extensionEmbedding v
+  let φ : v.Completion → SAdeleRing F S := fun x ↦
+    adeleProjection F S (AdeleRing.ofCompletion (𝓞 F) F v x)
+  have hp : Continuous (adeleProjection F S) :=
+    continuous_fst.prodMk (continuous_pi fun u : S ↦
+      (RestrictedProduct.continuous_eval u.val).comp continuous_snd)
+  have hφ0 : Continuous fun x : v.Completion ↦ AdeleRing.ofCompletion (𝓞 F) F v x :=
+    (continuous_mulSingle (A := InfinitePlace.Completion) v).prodMk continuous_const
+  have hφ : Continuous φ := hp.comp hφ0
+  let e : ℝ := (v.mult : ℝ)⁻¹
+  have he0 : 0 < e := inv_pos.mpr (by exact_mod_cast InfinitePlace.mult_pos)
+  let r : ℝ≥0ˣ → v.Completion := fun t ↦ (infinitePlaceRealPower F v e t).val
+  have hray : ∀ t, adeleProjection F S (singlePlaceIdeleNormSection F v t).val = φ (r t) :=
+    fun t ↦ rfl
+  have hψr : ∀ t, ψ (r t) = (((t.val : ℝ) ^ e : ℝ) : ℂ) := fun t ↦
+    infinitePlaceRealPower_apply F v e t
+  let K : Set ℂ := {z | z.im = 0 ∧ 0 ≤ z.re}
+  have hK : IsClosed K :=
+    (isClosed_eq Complex.continuous_im continuous_const).inter
+      (isClosed_le continuous_const Complex.continuous_re)
+  let C : Set (SAdeleRing F S) :=
+    {y | y.2 = 1} ∩ (⋂ w ∈ ({v}ᶜ : Set (InfinitePlace F)), {y | y.1 w = 1}) ∩
+      {y | ψ (y.1 v) ∈ K}
+  have hC0 : IsClosed {y : SAdeleRing F S | y.2 = 1} := isClosed_eq continuous_snd continuous_const
+  have hC1 : IsClosed (⋂ w ∈ ({v}ᶜ : Set (InfinitePlace F)), {y : SAdeleRing F S | y.1 w = 1}) :=
+    isClosed_biInter fun w _ ↦
+      isClosed_eq ((continuous_apply w).comp continuous_fst) continuous_const
+  have hC2 : IsClosed {y : SAdeleRing F S | ψ (y.1 v) ∈ K} :=
+    hK.preimage (hψ.continuous.comp ((continuous_apply v).comp continuous_fst))
+  have hC : IsClosed C := (hC0.inter hC1).inter hC2
+  have hrayC : ray ⊆ C := by
+    rintro _ ⟨t, rfl⟩
+    change adeleProjection F S (singlePlaceIdeleNormSection F v t).val ∈ C
+    rw [hray]
+    refine ⟨⟨rfl, Set.mem_iInter₂.mpr fun w hw ↦ ?_⟩, ?_⟩
+    · exact Pi.mulSingle_eq_of_ne hw _
+    · change ψ (Pi.mulSingle v (r t) v) ∈ K
+      rw [Pi.mulSingle_eq_same, hψr]
+      exact ⟨Complex.ofReal_im _, by rw [Complex.ofReal_re]; positivity⟩
+  have hbase : sAdeleOrbitBasepoint F S (some (.inl v)) ∈ closure ray := by
+    let tn : ℕ → ℝ≥0ˣ := fun n ↦ Units.mk0 ((n : ℝ≥0) + 1)⁻¹ (by positivity)
+    have hn : ∀ n : ℕ, ‖r (tn n)‖ = ((n : ℝ) + 1)⁻¹ ^ e := by
+      intro n
+      rw [← hψ.norm_map_of_map_zero (map_zero ψ), hψr, Complex.norm_real,
+        Real.norm_of_nonneg (by positivity)]
+      simp [tn]
+    have hlim : Filter.Tendsto (fun n ↦ r (tn n)) Filter.atTop (𝓝 0) := by
+      rw [tendsto_zero_iff_norm_tendsto_zero]
+      simp_rw [hn]
+      have h1 : Filter.Tendsto (fun n : ℕ ↦ ((n : ℝ) + 1)⁻¹) Filter.atTop (𝓝 0) :=
+        tendsto_one_div_add_atTop_nhds_zero_nat.congr fun n ↦ one_div _
+      have h0 : (0 : ℝ) ^ e = 0 := Real.zero_rpow he0.ne'
+      rw [← h0]
+      exact (Real.continuousAt_rpow_const 0 e (Or.inr he0.le)).tendsto.comp h1
+    have hlim' : Filter.Tendsto
+        (fun n ↦ adeleProjection F S (singlePlaceIdeleNormSection F v (tn n)).val)
+        Filter.atTop (𝓝 (sAdeleOrbitBasepoint F S (some (.inl v)))) := by
+      simp_rw [hray]
+      exact (hφ.tendsto 0).comp hlim
+    exact mem_closure_of_tendsto hlim' (Filter.Eventually.of_forall fun n ↦ ⟨tn n, rfl⟩)
+  ext y
+  constructor
+  · rintro ⟨hy, -⟩
+    obtain ⟨⟨h2, h1⟩, him, hre⟩ := closure_minimal hrayC hC hy
+    have hyφ : y = φ (y.1 v) := by
+      refine Prod.ext (funext fun w ↦ ?_) h2
+      change y.1 w = Pi.mulSingle v (y.1 v) w
+      obtain rfl | hw := eq_or_ne w v
+      · rw [Pi.mulSingle_eq_same]
+      · rw [Pi.mulSingle_eq_of_ne hw]
+        exact Set.mem_iInter₂.mp h1 w hw
+    have hψy : ψ (y.1 v) = (((ψ (y.1 v)).re : ℝ) : ℂ) := Complex.ext rfl (by simpa using him)
+    rcases hre.eq_or_lt with h0 | hpos
+    · right
+      have hy0 : y.1 v = 0 := by
+        apply hψ.injective
+        rw [hψy, ← h0, Complex.ofReal_zero, map_zero]
+      rw [Set.mem_singleton_iff, hyφ, hy0]
+      rfl
+    · left
+      set s := (ψ (y.1 v)).re with hs
+      let t : ℝ≥0ˣ := Units.mk0 (Real.toNNReal (s ^ (v.mult : ℝ))) (by
+        rw [ne_eq, Real.toNNReal_eq_zero, not_le]
+        positivity)
+      have ht : r t = y.1 v := by
+        apply hψ.injective
+        rw [hψr, hψy]
+        congr 1
+        change ((Real.toNNReal (s ^ (v.mult : ℝ)) : ℝ)) ^ e = s
+        rw [Real.coe_toNNReal _ (by positivity), Real.rpow_rpow_inv hpos.le
+          (by exact_mod_cast InfinitePlace.mult_pos.ne')]
+      exact ⟨t, by
+        change adeleProjection F S (singlePlaceIdeleNormSection F v t).val = y
+        rw [hray, ht, ← hyφ]⟩
+  · rintro (⟨t, rfl⟩ | hy)
+    · refine ⟨subset_closure ⟨t, rfl⟩, Set.mem_iUnion.mpr ⟨none,
+        Units.map (adeleProjection F S).toMonoidHom (singlePlaceIdeleNormSection F v t), ?_⟩⟩
+      change _ • adeleProjection F S (1 : 𝔸[F]) = _
+      rw [map_one, Units.smul_def, smul_eq_mul, mul_one]
+      rfl
+    · rw [Set.mem_singleton_iff] at hy
+      subst hy
+      exact ⟨hbase, Set.mem_iUnion.mpr ⟨some (.inl v), MulAction.mem_orbit_self _⟩⟩
 
 /-- Paper: Proposition 8.2.0.6(2), p. 387. The closure of the positive section ray
 relative to the global full-orbit union adds the single-zero base point. -/
 theorem adeleFullOrbitUnion_closure_sectionRay (v : InfinitePlace F) :
     let ray : Set 𝔸[F] := Set.range fun t : ℝ≥0ˣ ↦ (singlePlaceIdeleNormSection F v t).val
     closure ray ∩ adeleFullOrbitUnion F = ray ∪ {adeleOrbitBasepoint F (some (.inl v))} := by
-  sorry
+  classical
+  intro ray
+  let ψ := InfinitePlace.Completion.extensionEmbedding v
+  have hψ : Isometry ψ := InfinitePlace.Completion.isometry_extensionEmbedding v
+  let φ : v.Completion → 𝔸[F] := fun x ↦ AdeleRing.ofCompletion (𝓞 F) F v x
+  have hφ : Continuous φ :=
+    (continuous_mulSingle (A := InfinitePlace.Completion) v).prodMk continuous_const
+  let e : ℝ := (v.mult : ℝ)⁻¹
+  have he0 : 0 < e := inv_pos.mpr (by exact_mod_cast InfinitePlace.mult_pos)
+  let r : ℝ≥0ˣ → v.Completion := fun t ↦ (infinitePlaceRealPower F v e t).val
+  have hray : ∀ t, (singlePlaceIdeleNormSection F v t).val = φ (r t) := fun t ↦ rfl
+  have hψr : ∀ t, ψ (r t) = (((t.val : ℝ) ^ e : ℝ) : ℂ) := fun t ↦
+    infinitePlaceRealPower_apply F v e t
+  let K : Set ℂ := {z | z.im = 0 ∧ 0 ≤ z.re}
+  have hK : IsClosed K :=
+    (isClosed_eq Complex.continuous_im continuous_const).inter
+      (isClosed_le continuous_const Complex.continuous_re)
+  let C : Set 𝔸[F] :=
+    (⋂ w : HeightOneSpectrum (𝓞 F), {y | y.2 w = 1}) ∩
+      (⋂ w ∈ ({v}ᶜ : Set (InfinitePlace F)), {y | y.1 w = 1}) ∩ {y | ψ (y.1 v) ∈ K}
+  have hC0 : IsClosed (⋂ w : HeightOneSpectrum (𝓞 F), {y : 𝔸[F] | y.2 w = 1}) :=
+    isClosed_iInter fun w ↦
+      isClosed_eq ((RestrictedProduct.continuous_eval w).comp continuous_snd) continuous_const
+  have hC1 : IsClosed (⋂ w ∈ ({v}ᶜ : Set (InfinitePlace F)), {y : 𝔸[F] | y.1 w = 1}) :=
+    isClosed_biInter fun w _ ↦
+      isClosed_eq ((continuous_apply w).comp continuous_fst) continuous_const
+  have hC2 : IsClosed {y : 𝔸[F] | ψ (y.1 v) ∈ K} :=
+    hK.preimage (hψ.continuous.comp ((continuous_apply v).comp continuous_fst))
+  have hC : IsClosed C := (hC0.inter hC1).inter hC2
+  have hrayC : ray ⊆ C := by
+    rintro _ ⟨t, rfl⟩
+    change (singlePlaceIdeleNormSection F v t).val ∈ C
+    rw [hray]
+    refine ⟨⟨Set.mem_iInter.mpr fun w ↦ ?_, Set.mem_iInter₂.mpr fun w hw ↦ ?_⟩, ?_⟩
+    · rfl
+    · exact Pi.mulSingle_eq_of_ne hw _
+    · change ψ (Pi.mulSingle v (r t) v) ∈ K
+      rw [Pi.mulSingle_eq_same, hψr]
+      exact ⟨Complex.ofReal_im _, by rw [Complex.ofReal_re]; positivity⟩
+  have hbase : adeleOrbitBasepoint F (some (.inl v)) ∈ closure ray := by
+    let tn : ℕ → ℝ≥0ˣ := fun n ↦ Units.mk0 ((n : ℝ≥0) + 1)⁻¹ (by positivity)
+    have hn : ∀ n : ℕ, ‖r (tn n)‖ = ((n : ℝ) + 1)⁻¹ ^ e := by
+      intro n
+      rw [← hψ.norm_map_of_map_zero (map_zero ψ), hψr, Complex.norm_real,
+        Real.norm_of_nonneg (by positivity)]
+      simp [tn]
+    have hlim : Filter.Tendsto (fun n ↦ r (tn n)) Filter.atTop (𝓝 0) := by
+      rw [tendsto_zero_iff_norm_tendsto_zero]
+      simp_rw [hn]
+      have h1 : Filter.Tendsto (fun n : ℕ ↦ ((n : ℝ) + 1)⁻¹) Filter.atTop (𝓝 0) :=
+        tendsto_one_div_add_atTop_nhds_zero_nat.congr fun n ↦ one_div _
+      have h0 : (0 : ℝ) ^ e = 0 := Real.zero_rpow he0.ne'
+      rw [← h0]
+      exact (Real.continuousAt_rpow_const 0 e (Or.inr he0.le)).tendsto.comp h1
+    have hlim' : Filter.Tendsto (fun n ↦ (singlePlaceIdeleNormSection F v (tn n)).val) Filter.atTop
+        (𝓝 (adeleOrbitBasepoint F (some (.inl v)))) := by
+      simp_rw [hray]
+      exact (hφ.tendsto 0).comp hlim
+    exact mem_closure_of_tendsto hlim' (Filter.Eventually.of_forall fun n ↦ ⟨tn n, rfl⟩)
+  ext y
+  constructor
+  · rintro ⟨hy, -⟩
+    obtain ⟨⟨h2', h1⟩, him, hre⟩ := closure_minimal hrayC hC hy
+    have h2 : y.2 = 1 := FiniteAdeleRing.ext F fun w ↦ Set.mem_iInter.mp h2' w
+    have hyφ : y = φ (y.1 v) := by
+      refine Prod.ext (funext fun w ↦ ?_) h2
+      change y.1 w = Pi.mulSingle v (y.1 v) w
+      obtain rfl | hw := eq_or_ne w v
+      · rw [Pi.mulSingle_eq_same]
+      · rw [Pi.mulSingle_eq_of_ne hw]
+        exact Set.mem_iInter₂.mp h1 w hw
+    have hψy : ψ (y.1 v) = (((ψ (y.1 v)).re : ℝ) : ℂ) := Complex.ext rfl (by simpa using him)
+    rcases hre.eq_or_lt with h0 | hpos
+    · right
+      have hy0 : y.1 v = 0 := by
+        apply hψ.injective
+        rw [hψy, ← h0, Complex.ofReal_zero, map_zero]
+      rw [Set.mem_singleton_iff, hyφ, hy0]
+      rfl
+    · left
+      set s := (ψ (y.1 v)).re with hs
+      let t : ℝ≥0ˣ := Units.mk0 (Real.toNNReal (s ^ (v.mult : ℝ))) (by
+        rw [ne_eq, Real.toNNReal_eq_zero, not_le]
+        positivity)
+      have ht : r t = y.1 v := by
+        apply hψ.injective
+        rw [hψr, hψy]
+        congr 1
+        change ((Real.toNNReal (s ^ (v.mult : ℝ)) : ℝ)) ^ e = s
+        rw [Real.coe_toNNReal _ (by positivity), Real.rpow_rpow_inv hpos.le
+          (by exact_mod_cast InfinitePlace.mult_pos.ne')]
+      exact ⟨t, by
+        change (singlePlaceIdeleNormSection F v t).val = y
+        rw [hray, ht, ← hyφ]⟩
+  · rintro (⟨t, rfl⟩ | hy)
+    · refine ⟨subset_closure ⟨t, rfl⟩,
+        Set.mem_iUnion.mpr ⟨none, singlePlaceIdeleNormSection F v t, ?_⟩⟩
+      change singlePlaceIdeleNormSection F v t • (1 : 𝔸[F]) = _
+      rw [Units.smul_def, smul_eq_mul, mul_one]
+    · rw [Set.mem_singleton_iff] at hy
+      subst hy
+      exact ⟨hbase, Set.mem_iUnion.mpr ⟨some (.inl v), MulAction.mem_orbit_self _⟩⟩
 
 end RiemannMasullo
