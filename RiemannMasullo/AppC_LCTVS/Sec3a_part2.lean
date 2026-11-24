@@ -9,6 +9,7 @@ public import Mathlib.MeasureTheory.Measure.Prod
 public import Mathlib.MeasureTheory.Measure.Regular
 import Mathlib.Analysis.InnerProductSpace.Projection.Submodule
 import Mathlib.Analysis.Normed.Group.Tannery
+import Mathlib.Analysis.Normed.Group.Tannery
 import Mathlib.Analysis.Normed.Module.DoubleDual
 import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Abs
 import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Order
@@ -3321,6 +3322,225 @@ theorem schattenNorm_one_eq_traceNorm (T : nuclearEndomorphisms H) :
     (hasSum_subtype_iff_of_support_subset (s := {n | d.coeff n ≠ 0}) (by
       intro n hn hz; exact hn (by simp [hz]))).mp hcoeff
   simpa only [schattenNorm, Real.rpow_one, div_one, ← d.coeff_eq_approximationNumber] using hfull.tsum_eq
+
+/-- An operator-norm limit of nuclear maps with uniformly bounded trace norm
+is nuclear with the same bound. The finite partial sums of its approximation
+numbers pass to the limit separately. -/
+theorem traceNorm_le_of_tendsto {ι : Type*} {b : Filter ι} [b.NeBot]
+    (S : ι → nuclearEndomorphisms H) (T : H →L[ℂ] H)
+    (hT : Tendsto (fun i ↦ (S i).val) b (𝓝 T)) {M : ℝ} (hM : ∀ᶠ i in b, traceNorm (S i) ≤ M) :
+    ∃ h : IsNuclearOperator T, traceNorm ⟨T,h⟩ ≤ M := by
+  have hmem (i : ι) := (mem_traceClassOperators_iff_isNuclearOperator (S i).val).mpr (S i).property
+  have hcompact := isCompactOperator_of_tendsto hT (.of_forall fun i ↦ (hmem i).1)
+  have hpos (A : H →L[ℂ] H) (k : ℕ) : 0 ≤ approximationNumber A k :=
+    Real.sInf_nonneg (by rintro _ ⟨B,-,rfl⟩; exact norm_nonneg _)
+  have hpart (N : ℕ) : ∑ k ∈ Finset.range N, approximationNumber T k ≤ M := by
+    have hlim : Tendsto (fun i ↦ ∑ k ∈ Finset.range N, approximationNumber (S i).val k) b
+        (𝓝 (∑ k ∈ Finset.range N, approximationNumber T k)) := by
+      apply tendsto_finsetSum
+      intro k _
+      apply tendsto_iff_dist_tendsto_zero.mpr
+      exact squeeze_zero' (Eventually.of_forall fun _ ↦ dist_nonneg)
+        (.of_forall fun i ↦ by simpa only [Real.dist_eq] using abs_approximationNumber_sub_le (S i).val T k)
+        (tendsto_iff_norm_sub_tendsto_zero.mp hT)
+    apply le_of_tendsto hlim
+    filter_upwards [hM] with i hi
+    have hn : Summable fun n ↦ approximationNumber (S i).val n := by
+      simpa only [Real.rpow_one] using (hmem i).2
+    have he : traceNorm (S i) = ∑' k, approximationNumber (S i).val k := by
+      rw [← schattenNorm_one_eq_traceNorm]
+      simp only [schattenNorm, Real.rpow_one,div_one]
+    exact (hn.sum_le_tsum (Finset.range N) (fun k _ ↦ hpos _ k)).trans (he.symm.le.trans hi)
+  have hn : IsNuclearOperator T := (mem_traceClassOperators_iff_isNuclearOperator T).mp
+    ⟨hcompact,by simpa only [Real.rpow_one] using summable_of_sum_range_le (hpos T) hpart⟩
+  refine ⟨hn,?_⟩
+  rw [← schattenNorm_one_eq_traceNorm]
+  simpa only [schattenNorm, Real.rpow_one,div_one] using Real.tsum_le_of_sum_range_le (hpos T) hpart
+
+/-- An operator-norm sum of angular components is nuclear whenever their
+trace norms have a summable majorant. The conclusion also bounds the trace
+norm of the resulting ambient operator. -/
+theorem traceNorm_le_of_hasSum {ι : Type*} (S : ι → nuclearEndomorphisms H)
+    (T : H →L[ℂ] H) (hs : HasSum (fun i ↦ (S i).val) T) (c : ι → ℝ) (hc : Summable c)
+    (hb : ∀ i, traceNorm (S i) ≤ c i) :
+    ∃ h : IsNuclearOperator T, traceNorm ⟨T,h⟩ ≤ ∑' i, c i := by
+  classical
+  let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+  have hcore := traceNorm_normedSpaceCore (H := H)
+  have hfin (K : Finset ι) : traceNorm (∑ i ∈ K, S i) ≤ ∑ i ∈ K, c i := by
+    induction K using Finset.induction with
+    | empty => simpa using (hcore.norm_eq_zero_iff (0 : nuclearEndomorphisms H)).mpr rfl |>.le
+    | insert i K hi ih =>
+      rw [Finset.sum_insert hi,Finset.sum_insert hi]
+      exact (hcore.norm_triangle _ _).trans (add_le_add (hb i) ih)
+  apply traceNorm_le_of_tendsto (b := atTop) (fun K : Finset ι ↦ ∑ i ∈ K, S i) T
+  · convert hs using 1
+    simp only [Submodule.coe_sum]
+    rfl
+  · exact .of_forall fun K ↦ (hfin K).trans
+      (hc.sum_le_tsum K (fun i _ ↦ (hcore.norm_nonneg (S i)).trans (hb i)))
+
+/-- A summably dominated family of trace-class components can be truncated to arbitrary
+sets of indices. The omitted scalar mass bounds the trace norm of the error. Pointwise
+eventual inclusion of each index suffices for convergence, even for nonnested cutoffs. -/
+theorem traceNorm_tendsto_of_hasSum_subseries {ι κ : Type*} (S : ι → nuclearEndomorphisms H)
+    (T : H →L[ℂ] H) (hs : HasSum (fun i ↦ (S i).val) T) (c : ι → ℝ) (hc : Summable c)
+    (hb : ∀ i, traceNorm (S i) ≤ c i) (W : κ → Set ι) (l : Filter κ)
+    (hW : ∀ i, ∀ᶠ k in l, i ∈ W k) :
+    ∃ hT : IsNuclearOperator T,
+      ∃ hK : ∀ k, IsNuclearOperator (∑' i : W k, (S i.val).val),
+        (∀ k, traceNorm ((⟨T, hT⟩ : nuclearEndomorphisms H) - ⟨_, hK k⟩) ≤ ∑' i : ↥((W k)ᶜ : Set ι), c i.val) ∧
+        Tendsto (fun k ↦ traceNorm ((⟨T, hT⟩ : nuclearEndomorphisms H) - ⟨_, hK k⟩)) l (𝓝 0) := by
+  classical
+  let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+  have hn (A : nuclearEndomorphisms H) : 0 ≤ traceNorm A :=
+    (traceNorm_normedSpaceCore (H := H)).norm_nonneg A
+  have hcn (i : ι) : 0 ≤ c i := (hn (S i)).trans (hb i)
+  obtain ⟨hT, _⟩ := traceNorm_le_of_hasSum S T hs c hc hb
+  have hsub (P : Set ι) :
+      ∃ h : IsNuclearOperator (∑' i : P, (S i.val).val),
+        traceNorm ⟨_, h⟩ ≤ ∑' i : P, c i.val :=
+    traceNorm_le_of_hasSum (fun i : P ↦ S i.val) _ (hs.summable.subtype (fun i ↦ i ∈ P)).hasSum
+      (fun i : P ↦ c i.val) (hc.subtype (fun i ↦ i ∈ P)) (fun i ↦ hb i.val)
+  let hK := fun k ↦ (hsub (W k)).choose
+  have htail (k : κ) : traceNorm ((⟨T, hT⟩ : nuclearEndomorphisms H) - ⟨_, hK k⟩) ≤ ∑' i : ↥((W k)ᶜ : Set ι), c i.val := by
+    obtain ⟨hC, hbound⟩ := hsub (W k)ᶜ
+    have hsplit := hs.summable.tsum_subtype_add_tsum_subtype_compl (W k)
+    rw [hs.tsum_eq] at hsplit
+    have he : ((⟨T, hT⟩ : nuclearEndomorphisms H) - ⟨_, hK k⟩ : nuclearEndomorphisms H) = ⟨_, hC⟩ := by
+      apply Subtype.ext
+      change T - (∑' i : W k, (S i.val).val) = ∑' i : ↥((W k)ᶜ : Set ι), (S i.val).val
+      rw [← hsplit]
+      abel
+    rw [he]
+    exact hbound
+  refine ⟨hT, hK, htail, squeeze_zero (fun _ ↦ hn _) htail ?_⟩
+  have h₀ (i : ι) : Tendsto (fun k ↦ (W k)ᶜ.indicator c i) l (𝓝 (0 : ℝ)) := by
+    apply tendsto_const_nhds.congr'
+    filter_upwards [hW i] with k hk
+    simp [Set.indicator, hk]
+  have hdom : ∀ᶠ k in l, ∀ i, ‖(W k)ᶜ.indicator c i‖ ≤ c i := .of_forall fun k i ↦ by
+    by_cases h : i ∈ (W k)ᶜ
+    · simp [Set.indicator_of_mem h, abs_of_nonneg (hcn i)]
+    · simpa [Set.indicator_of_notMem h] using hcn i
+  have hlim := tendsto_tsum_of_dominated_convergence hc h₀ hdom
+  simpa only [tsum_subtype, tsum_zero] using hlim
+
+variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℂ E] [CompleteSpace E]
+
+omit [CompleteSpace E] [CompleteSpace H] in
+private theorem approximationNumber_sandwich_le (A : E →L[ℂ] E)
+    (B : H →L[ℂ] E) (C : E →L[ℂ] H) (n : ℕ) :
+    approximationNumber (C.comp (A.comp B)) n ≤ (‖C‖*‖B‖) * approximationNumber A n := by
+  apply le_mul_of_forall_lt₀
+  intro a ha b hb
+  have hn : (0 : E →L[ℂ] E).toLinearMap.rank ≤ (n : Cardinal) := by simp
+  unfold approximationNumber at hb
+  obtain ⟨_,⟨S,hS,rfl⟩,herr⟩ := exists_lt_of_csInf_lt (by exact ⟨_,0,hn,rfl⟩) hb
+  have hpre : (S.comp B).toLinearMap.rank ≤ (n : Cardinal) :=
+    (LinearMap.rank_comp_le_left B.toLinearMap S.toLinearMap).trans hS
+  have hpost : (C.comp (S.comp B)).toLinearMap.rank ≤ (n : Cardinal) := by
+    apply Cardinal.lift_le.mp
+    exact (LinearMap.lift_rank_comp_le_right (S.comp B).toLinearMap C.toLinearMap).trans
+      (by simpa only [Cardinal.lift_natCast] using Cardinal.lift_le.mpr hpre)
+  calc
+    _ ≤ ‖C.comp (S.comp B) - C.comp (A.comp B)‖ := by
+      unfold approximationNumber
+      exact csInf_le ⟨0,fun _ ⟨_,_,h⟩ ↦ h ▸ norm_nonneg _⟩ ⟨_,hpost,rfl⟩
+    _ = ‖C.comp ((S-A).comp B)‖ := by rw [ContinuousLinearMap.sub_comp,ContinuousLinearMap.comp_sub]
+    _ ≤ ‖C‖ * (‖S-A‖*‖B‖) :=
+      (C.opNorm_comp_le _).trans (mul_le_mul_of_nonneg_left ((S-A).opNorm_comp_le B) (norm_nonneg C))
+    _ = (‖C‖*‖B‖) * ‖S-A‖ := by ring
+    _ ≤ a*b := mul_le_mul ha.le herr.le (norm_nonneg _) ((mul_nonneg (norm_nonneg _) (norm_nonneg _)).trans ha.le)
+
+/-- Transport a nuclear endomorphism through two bounded maps connecting different
+Hilbert spaces. The trace norm grows by at most the product of their operator norms. -/
+theorem traceNorm_sandwich_le (A : E →L[ℂ] E) (hA : IsNuclearOperator A)
+    (B : H →L[ℂ] E) (C : E →L[ℂ] H) :
+    ∃ h : IsNuclearOperator (C.comp (A.comp B)), traceNorm ⟨C.comp (A.comp B),h⟩ ≤
+      (‖C‖*‖B‖)*traceNorm ⟨A,hA⟩ := by
+  let V := C.comp (A.comp B)
+  have ht := (mem_traceClassOperators_iff_isNuclearOperator A).mpr hA
+  have hs : Summable (approximationNumber A) := by simpa only [Real.rpow_one] using ht.2
+  have hn (n : ℕ) : 0 ≤ approximationNumber V n :=
+    Real.sInf_nonneg fun _ ⟨_,_,h⟩ ↦ h ▸ norm_nonneg _
+  have hcomp (n : ℕ) := approximationNumber_sandwich_le A B C n
+  have hv : Summable (approximationNumber V) :=
+    (hs.mul_left (‖C‖*‖B‖)).of_nonneg_of_le hn hcomp
+  have hV : IsNuclearOperator V := (mem_traceClassOperators_iff_isNuclearOperator V).mp
+    ⟨(ht.1.comp_clm B).clm_comp C,by simpa only [Real.rpow_one] using hv⟩
+  refine ⟨hV,?_⟩
+  rw [← schattenNorm_one_eq_traceNorm,← schattenNorm_one_eq_traceNorm]
+  simp only [schattenNorm,Real.rpow_one,div_one]
+  exact (hv.tsum_le_tsum hcomp (hs.mul_left _)).trans_eq (tsum_mul_left)
+
+/-- A scalar projection acting identically on the pulled-back ambient range can be
+inserted before the adjoint lift. Its trace cost then transfers to the ambient endomorphism. -/
+theorem projected_traceNorm_sandwich_le (L : E →L[ℂ] H) (A Q : E →L[ℂ] E)
+    (P : H →L[ℂ] H) (h : IsNuclearOperator (A.comp Q))
+    (hp : Q.comp (L.adjoint.comp P) = L.adjoint.comp P) :
+    ∃ hn : IsNuclearOperator ((L.comp (A.comp L.adjoint)).comp P),
+      traceNorm ⟨(L.comp (A.comp L.adjoint)).comp P,hn⟩ ≤
+        (‖L‖*(‖L‖*‖P‖))*traceNorm ⟨A.comp Q,h⟩ := by
+  have he : (L.comp (A.comp L.adjoint)).comp P = L.comp ((A.comp Q).comp (L.adjoint.comp P)) := by
+    simp only [ContinuousLinearMap.comp_assoc,hp]
+  rw [he]
+  obtain ⟨hn,hb⟩ := traceNorm_sandwich_le (A.comp Q) h (L.adjoint.comp P) L
+  refine ⟨hn,hb.trans (mul_le_mul_of_nonneg_right ?_ ?_)⟩
+  · exact mul_le_mul_of_nonneg_left ((L.adjoint.opNorm_comp_le P).trans_eq
+      (congrArg (· * ‖P‖) (ContinuousLinearMap.adjoint.norm_map L))) (norm_nonneg _)
+  · let : Norm (nuclearEndomorphisms E) := ⟨traceNorm⟩
+    exact (traceNorm_normedSpaceCore (H := E)).norm_nonneg ⟨_,h⟩
+
+/-- The Hilbert adjoint preserves the trace norm of a nuclear operator. -/
+theorem traceNorm_adjoint_eq (T : H →L[ℂ] H) (hT : IsNuclearOperator T) :
+    ∃ h : IsNuclearOperator T.adjoint, traceNorm ⟨T.adjoint,h⟩ = traceNorm ⟨T,hT⟩ := by
+  have hTc := (mem_traceClassOperators_iff_isNuclearOperator T).mpr hT
+  have hnum (n : ℕ) : approximationNumber T n = approximationNumber T.adjoint n := by
+    by_cases hn : (n : Cardinal) < Module.rank ℂ H
+    · exact approximationNumber_adjoint T hTc.1 n hn
+    · have hle : Module.rank ℂ H ≤ (n : Cardinal) := le_of_not_gt hn
+      have hzero (A : H →L[ℂ] H) : approximationNumber A n = 0 := by
+        unfold approximationNumber
+        refine le_antisymm ?_ (Real.sInf_nonneg ?_)
+        · refine csInf_le ⟨0,?_⟩ ?_
+          · rintro _ ⟨S,_,rfl⟩
+            exact norm_nonneg _
+          · exact ⟨A,(Submodule.rank_le _).trans hle, by simp⟩
+        · rintro _ ⟨S,_,rfl⟩
+          exact norm_nonneg _
+      rw [hzero T,hzero T.adjoint]
+  have hA : IsNuclearOperator T.adjoint :=
+    (mem_traceClassOperators_iff_isNuclearOperator _).mp
+      ⟨isCompactOperator_adjoint_of_compact T hTc.1,hTc.2.congr fun n ↦ congrArg (· ^ (1 : ℝ)) (hnum n)⟩
+  refine ⟨hA,?_⟩
+  rw [← schattenNorm_one_eq_traceNorm,← schattenNorm_one_eq_traceNorm]
+  simp only [schattenNorm,Real.rpow_one,div_one]
+  exact tsum_congr (fun n ↦ (hnum n).symm)
+
+/-- A compactly localized term and two bounded factors of a projected
+resolvent give an explicit trace-norm bound for their sum. -/
+theorem traceNorm_resolvent_split_le (B U R P D₁ D₂ : H →L[ℂ] H)
+    (hB : B = U.adjoint.comp P + D₁.adjoint.comp (R.adjoint.comp P) + D₂.adjoint.comp (R.adjoint.comp P))
+    (hU : IsNuclearOperator U) (hR : IsNuclearOperator (R.adjoint.comp P)) :
+    ∃ h : IsNuclearOperator B, traceNorm ⟨B,h⟩ ≤
+      ‖P‖*traceNorm ⟨U,hU⟩ + (‖D₁‖+‖D₂‖)*traceNorm ⟨R.adjoint.comp P,hR⟩ := by
+  obtain ⟨hUA,hUN⟩ := traceNorm_adjoint_eq U hU
+  let Z := (⟨U.adjoint,hUA⟩ : nuclearEndomorphisms H)
+  let V := (⟨R.adjoint.comp P,hR⟩ : nuclearEndomorphisms H)
+  let L := (⟨_,mul_mem_nuclearEndomorphisms_right P Z⟩ : nuclearEndomorphisms H)
+  let D (T : H →L[ℂ] H) := (⟨_,mul_mem_nuclearEndomorphisms_left T.adjoint V⟩ : nuclearEndomorphisms H)
+  let S := L + D D₁ + D D₂
+  have he : B = S.val := hB
+  suffices hs : traceNorm S ≤ _ from ⟨he.symm ▸ S.property, (congrArg traceNorm (Subtype.ext he)).le.trans hs⟩
+  let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+  have hc := traceNorm_normedSpaceCore (H := H)
+  have hL : traceNorm L ≤ ‖P‖*traceNorm ⟨U,hU⟩ := (traceNorm_mul_right_le P Z).trans_eq (congrArg (‖P‖ * ·) hUN)
+  have hD (T : H →L[ℂ] H) : traceNorm (D T) ≤ ‖T‖*traceNorm V :=
+    (traceNorm_mul_left_le T.adjoint V).trans_eq (congrArg (· * traceNorm V) (ContinuousLinearMap.adjoint.norm_map T))
+  have hsum : traceNorm S ≤ traceNorm L + traceNorm (D D₁) + traceNorm (D D₂) :=
+    (hc.norm_triangle (L + D D₁) (D D₂)).trans (add_le_add (hc.norm_triangle L (D D₁)) le_rfl)
+  exact hsum.trans ((add_le_add (add_le_add hL (hD D₁)) (hD D₂)).trans_eq (by dsimp [V]; ring))
 
 end TraceClassEndomorphisms
 
