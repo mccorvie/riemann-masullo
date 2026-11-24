@@ -284,7 +284,9 @@ The finite sums of the `R_z`, over arbitrary finite sets of zeros, are bounded i
 Reconstruction: The paper gives no estimate for the geometric component (p. 472). This is the
 geometric analogue of the bound that `spectralStripConvolution_traceCauchy` obtains for the
 quotient sums; with `traceClass_blockSums_tails_of_bddAbove` it implies
-`spectralStripGeometricKernel_cauchy`. It is equivalent to the summability, for every compact
+`spectralStripGeometricKernel_cauchy`. It asks for more than that statement: summability of
+the blocks in every order, where the theorem needs convergence along its rectangles only. It
+is equivalent to the summability, for every compact
 operator `U`, of `z ↦ ∑ₘ f_{z,m}(q(U(P^geom_a(A(φ)(S_a x_{z,m})))))`, by uniform boundedness.
 Gap: No bound is known for the geometric output of convolution on the biorthogonal vectors,
 that is, for the part of `A(φ)(S_a x_{z,m})` outside the spectral subspace; the bound
@@ -302,9 +304,11 @@ Deviation: For the operator in (10.4.3.45), convolution acts on the orthogonal o
 The rectangles use injections of the actual strip zeros and the strict §10.2 boundary cutoff.
 Reconstruction: This is the geometric component of the convergence claimed on pp. 472–473,
 with the operator order repaired in §10.4.3. The paper gives no separate geometric estimate.
-Gap: The quotient estimates control the spectral component only. The bound (10.4.2.34)
-on p. 464 gives no bound tending to zero for these projective tails. Nothing in the Lean uses
-this statement, and it is not known how it connects with the rest of the proof in Lean; in the
+Proved here (#7427) from the open statement `spectralStripGeometricKernel_blocks_bddAbove`
+and the classical input `traceClass_blockSums_tails_of_bddAbove`. The quotient estimates
+control the spectral component only, and the bound (10.4.2.34) on p. 464 gives no bound
+tending to zero for these projective tails. Nothing in the Lean outside this file uses this
+statement, and it is not known how it connects with the rest of the proof in Lean; in the
 paper it is used on pp. 471–474. -/
 theorem spectralStripGeometricKernel_cauchy : Cauchy (Filter.map geometricRectangles atTop) :=
   spectralStripGeometricKernel_cauchy_of_blocks

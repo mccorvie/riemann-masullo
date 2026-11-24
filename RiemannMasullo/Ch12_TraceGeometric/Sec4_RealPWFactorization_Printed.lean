@@ -5,7 +5,14 @@ import Mathlib.Analysis.Calculus.Taylor
 import Mathlib.Analysis.Distribution.SchwartzSpace.CompactSupport
 import Mathlib.Analysis.Distribution.SchwartzSpace.Fourier
 
-/-! # The printed factor through the flat Schwartz space in §12.4 -/
+/-! # The factor through the flat Schwartz space in §12.4, for the cutoff of Step II
+
+A necessary range condition for the factor through `E` that p. 515 asserts, tested in the model
+`F = ℚ`, `S = {∞}` with the spatial cutoff that Step II describes on p. 516, a smoothed ball
+equal to one near zero. The condition fails. It is the project's reconstruction of one reading
+of the proof, not a statement the paper prints: Definition 9.3.3.1(4)–(6), p. 427, gives the
+cutoff annular support, and footnote 2 on p. 514 asks for an inner radius; with a cutoff that
+vanishes near zero the counterexample here disappears. See errata entries I218 and I395. -/
 
 @[expose] public noncomputable section
 
@@ -31,15 +38,21 @@ private theorem realPW_not_flat_of_quadratic_germ (h : 𝓢(ℝ, ℂ))
   exact hq₀ (tendsto_nhds_unique (hq.mono_left nhdsWithin_le_nhds)
     ((ht₀.mono_left nhdsWithin_le_nhds).congr' heq))
 
-/-- Paper: Theorem 12.4.1.1, pp. 515–517. In the rational real-place model, the
+/-- Paper: Theorem 12.4.1.1, proof, pp. 515–517. In the rational real-place model, the
 polar-free invariant Paley–Wiener tests have flat representatives after the cutoff–dilation
 composite and removal of the half-twist.
+Reconstruction: The paper does not state this. It is a necessary range condition for the
+factor through `E` asserted on p. 515, with the upper-ball multipliers that Step II describes
+on p. 516. It is not known whether that cutoff is what the author intends: Definition
+9.3.3.1(4)–(6), p. 427, and footnote 2 on p. 514 put a positive inner radius, and a spatial
+cutoff that vanishes near zero removes the counterexample below.
 Deviation: Use positive representatives for the quotient by `±1`, so even Schwartz tests
-give the level by sign averaging, up to a scalar. The two upper cutoffs are radial bumps.
+give the level by sign averaging, up to a scalar. The two upper cutoffs are radial bumps, and
+the spatial one equals one near zero.
 The real dilation test `φ` absorbs the factor `g⁻³ᐟ²` from untwisting and Haar measure.
 Any factor through `E` would supply a flat representative almost everywhere on the positive
 ray, where the weighted measure and Lebesgue measure have the same null sets. -/
-def Printed.sLocalTrace_realPWFactorsThroughFlat : Prop :=
+def sLocalTrace_realUpperBallPWFlatRange : Prop :=
   ∀ (ρ m : ContDiffBump (0 : ℝ)) (φ : 𝓢(ℝ, ℝ)), tsupport (φ : ℝ → ℝ) ⊆ Icc 1 2 →
     (∀ g, 0 ≤ φ g) →
     ∀ (f : 𝓢(ℝ, ℂ)), Function.Even f → f 0 = 0 → (𝓕 f) 0 = 0 →
@@ -183,11 +196,13 @@ private theorem realPW_dilationTest (q : 𝓢(ℝ, ℂ)) (hq : q 0 ≠ 0) :
           norm_num)
     exact mul_ne_zero (Complex.ofReal_ne_zero.mpr hpos.ne') hq
 
-/-- Paper: Theorem 12.4.1.1, pp. 515–517. A polar-free test supported in the Fourier plateau
-has a nonzero quadratic term after convolution. The spatial upper cutoff is one near zero,
-so its output has no flat representative, even up to almost-everywhere equality. -/
-theorem Printed.sLocalTrace_realPWFactorsThroughFlat_false :
-    ¬ Printed.sLocalTrace_realPWFactorsThroughFlat := by
+/-- Paper: Theorem 12.4.1.1, proof, pp. 515–517. A polar-free test supported in the Fourier
+plateau has a nonzero quadratic term after convolution. The spatial upper cutoff is one near
+zero, so its output has no flat representative, even up to almost-everywhere equality. This
+refutes the reconstruction `sLocalTrace_realUpperBallPWFlatRange`, that is, the factor through
+`E` for the upper-ball cutoff of Step II; it does not concern a cutoff with an inner radius. -/
+theorem sLocalTrace_realUpperBallPWFlatRange_false :
+    ¬ sLocalTrace_realUpperBallPWFlatRange := by
   intro hfactor
   obtain ⟨f, q, hband, hfreq, hq₀, hf, hfe⟩ := realPW_bandlimited_quadratic_witness
   obtain ⟨φ, hφ, hφnonneg, hC, hC₀⟩ := realPW_dilationTest q hq₀

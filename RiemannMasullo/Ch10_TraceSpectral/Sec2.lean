@@ -8569,7 +8569,8 @@ theorem spectralStripJet_lowerBound (χ : PontryaginDual C₁ → PontryaginDual
     _ = ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖ :=
       Real.sqrt_sq (norm_nonneg _)
 
-/-- One integer bounds the multiplicity of every zero of every chosen completed Hecke
+/-- Paper: Proposition 10.2.2.2, pp. 446–447.
+One integer bounds the multiplicity of every zero of every chosen completed Hecke
 L-function: all components of the norm-one dual, all real parts and all ordinates at once.
 This is the half of `spectralStripJet_order_and_margin_locally_finite_multiple_zeros` that
 bounds the orders of the strip jets.
@@ -8585,7 +8586,8 @@ private theorem spectralStripJet_order_and_margin_multiplicity_bounded
     ∃ M : ℕ, ∀ (ω : PontryaginDual C₁) (σ t : ℝ), multiplicity(χ ω, shift(σ, t)) ≤ M := by
   sorry
 
-/-- The multiple zeros of the chosen completed Hecke L-functions lie on finitely many vertical
+/-- Paper: Proposition 10.2.2.2, pp. 446–447.
+The multiple zeros of the chosen completed Hecke L-functions lie on finitely many vertical
 lines, over all components of the norm-one dual and all ordinates.
 This is the half of `spectralStripJet_order_and_margin_locally_finite_multiple_zeros` that
 keeps the jets of high order away from the edges of a strip.
@@ -8610,11 +8612,11 @@ sufficiently nearby vertical lines.
 Reconstruction: The paper does not state this. It is the project's formulation of what the
 estimates of Remark 10.2.1.5 and Proposition 10.2.2.2 need, and it is not known whether it is
 what the author intends.
-Gap: Neither a bound for the multiplicities of the zeros on a vertical line nor the absence
-of multiple zeros on the nearby lines is known, and Remark 10.2.1.5 and Proposition 10.2.2.2
-supply no argument for either. Proved here from these two statements in their global form,
+Proved here (#7425) from two open statements, which are its two halves in their global form:
 `spectralStripJet_order_and_margin_multiplicity_bounded` and
-`spectralStripJet_order_and_margin_multiple_zero_lines_finite`. -/
+`spectralStripJet_order_and_margin_multiple_zero_lines_finite`. Neither a bound for the
+multiplicities of the zeros on a vertical line nor the absence of multiple zeros on the nearby
+lines is known, and Remark 10.2.1.5 and Proposition 10.2.2.2 supply no argument for either. -/
 private theorem spectralStripJet_order_and_margin_locally_finite_multiple_zeros
     (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (_hχ : IsSpectralBasepointChoice χ) (x : ℝ) :
     ∃ U ∈ 𝓝 x, {p : ℝ × ℕ | p.1 ∈ U ∧ 1 < p.2 ∧ ∃ (ω : PontryaginDual C₁) (t : ℝ),

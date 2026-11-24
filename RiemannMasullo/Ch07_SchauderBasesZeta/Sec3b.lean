@@ -5935,11 +5935,16 @@ private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_
   exact Finset.sum_le_sum fun Q _ ↦ Nat.mul_pos
     (Ideal.ramificationIdx_pos (𝓞 ℚ) Q.val) (Ideal.inertiaDeg_pos Q.val (𝓞 ℚ))
 
-/-- At repeated primary poles of an infinite-order character, keep only strict closest
+/-- Paper: Theorem 7.3.3.4, p. 360, with the coefficient change on p. 349.
+At repeated primary poles of an infinite-order character, keep only strict closest
 approaches to one among distinct centers through squared height.
 Only infinitely many such centers with unbounded inverse distances remain. A repeated
 pole also gives a character-kernel element of infinite order modulo finite units.
 No number field of degree at most two has such a pole.
+Reconstruction: The paper does not state this. It is what remains of the project's formulation
+`sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift` of the bound that the
+change of coefficients on p. 349 needs, after the cases that Lean proves (#7413), and it is not
+known whether it is what the author intends.
 Gap: For these separated record centers the phases of the Hecke character still need a
 polynomial inhomogeneous lower bound (Theorem 7.3.3.4, p. 360, using p. 349). -/
 private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_minima
@@ -5982,11 +5987,13 @@ For these shifts from infinite-order Hecke characters this is not a known theore
 Reconstruction: The paper does not state this. It is the project's formulation of the bound
 that the change of coefficients on p. 349 needs uniformly in the pole, and it is not known
 whether it is what the author intends.
-Gap: A polynomial lower bound for a linear form in two logarithms shifted by the phases of a
-Hecke character of infinite order. Baker's theorem covers the unshifted form only, and p. 349
-supplies no bound.
-Comparing two centers cancels both shifts. It suffices to bound the infinite sequence
-of strict closest approaches whose heights increase by more than squaring. -/
+Proved here (#7413) from the open statement
+`sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_minima` and the
+classical input `baker_two_logarithms_not_liouville_of_independent`. Baker's theorem covers
+the unshifted form only, and p. 349 supplies no bound for the shifted one. Comparing two
+centers cancels both shifts, so it suffices to bound the infinite sequence of strict closest
+approaches whose heights increase by more than squaring; that is the open statement. Over a
+number field of degree at most two there is no repeated primary pole and nothing is open. -/
 private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift
     {S₀ : Finset V} (hST : S ⊆ T) (_hT : T = S ∪ S₀) (_hdis : Disjoint S S₀)
     (_hsat : IsSaturatedPlaceSet (F := F) S₀) (_hPic : PicTrivial)
