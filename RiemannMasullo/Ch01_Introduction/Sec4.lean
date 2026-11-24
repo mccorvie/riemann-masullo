@@ -11515,6 +11515,302 @@ theorem introTraceApprox_exists_spectral_tendsto_completed_logDeriv :
   obtain ⟨_, _, _, hlim, _⟩ := hχ τ hτ χ hnorm
   exact (hlim a ha).congr_right (introTrace_full_reference_series_eq_completed_logDeriv τ hτ χ hnorm)
 
+/-- A reference-difference expansion determines the positive-real-part
+regularization exactly by the real anchor value. -/
+private theorem introTrace_resolvent_limit_from_reference (χ : U𝔽) (P : ℂ → ℂ) (c : ℂ)
+    (href : ∀ z ∈ right(1/2),
+      (∑' r : windowZeros(χ,1/2), (zeroOrder(χ,r.val) : ℂ) *
+        (1/(z-(r.val-1/2)) - 1/(2-(r.val-1/2)))) + c = P z) :
+    let v (r : windowZeros(χ,1/2)) (z : ℂ) := (zeroOrder(χ,r.val) : ℂ)/(z-(r.val-1/2))
+    let B := ∑' r, (v r 2).re
+    let G (z : ℂ) := P z - P 2 + (B : ℂ)
+    AnalyticOnNhd ℂ G right(1/2) ∧
+      TendstoLocallyUniformlyOn (fun (T : Finset (windowZeros(χ,1/2))) z ↦
+        ∑ r ∈ T, (v r z - ((v r 2).im : ℂ)*Complex.I)) G atTop right(1/2) ∧
+      (∀ z ∈ right(1/2), HasSum (fun r ↦ (v r z).re) (G z).re ∧ 0 < (G z).re) ∧
+      (χ⁻¹ = χ → ∃ T : ℝ → Finset (windowZeros(χ,1/2)), (∀ t r, r ∈ T t ↔ |r.val.im| ≤ t) ∧
+        TendstoLocallyUniformlyOn (fun t z ↦ ∑ r ∈ T t, v r z) G atTop right(1/2)) := by
+  classical
+  intro v B G
+  have h₂ : (2:ℂ) ∈ right(1/2) := by change (1/2:ℝ)<(2:ℂ).re; norm_num
+  have hc : c = P 2 := by simpa only [sub_self,mul_zero,tsum_zero,zero_add] using href 2 h₂
+  obtain ⟨H,han,hbase,hlim,hpos⟩ := introTrace_resolvent_imaginary_subtraction χ
+    (a := 1/2) (b := 2) (by norm_num)
+  have hcast : ((2 : ℝ) : ℂ) = 2 := by norm_num
+  rw [hcast] at hbase hlim
+  have hb : H 2 = (B : ℂ) := by
+    apply Complex.ext
+    · exact (hpos 2 h₂).1.tsum_eq.symm
+    · simpa only [Complex.ofReal_im] using hbase
+  have he (z : ℂ) (hz : z ∈ right(1/2)) : H z = G z := by
+    let k (r : windowZeros(χ,1/2)) (z : ℂ) := v r z - ((v r 2).im : ℂ)*Complex.I
+    have h1 : HasSum (fun r ↦ k r z) (H z) := hlim.tendsto_at hz
+    have h2 : HasSum (fun r ↦ k r 2) (H 2) := hlim.tendsto_at h₂
+    have hD : HasSum (fun r : windowZeros(χ,1/2) ↦ (zeroOrder(χ,r.val) : ℂ) *
+        (1/(z-(r.val-1/2)) - 1/(2-(r.val-1/2)))) (H z-H 2) := by
+      apply (h1.sub h2).congr_fun
+      intro r
+      dsimp [k,v]
+      ring
+    have eqn := href z hz
+    rw [hD.tsum_eq,hb,hc] at eqn
+    dsimp only [G]
+    linear_combination eqn
+  have hG := hlim.congr_right he
+  refine ⟨han.congr (isOpen_Ioi.preimage Complex.continuous_re) he,hG,?_,?_⟩
+  · intro z hz
+    rw [← he z hz]
+    have := introTrace_positive_divisor_infinite_from_digamma χ
+    obtain ⟨r⟩ := (inferInstance : Nonempty {s : ℂ // 0 < zeroOrder(χ,s)})
+    have hn : Nonempty (windowZeros(χ,1/2)) :=
+      ⟨⟨r.val,r.property,introTrace_positive_divisor_in_critical_strip χ r.val r.property⟩⟩
+    exact ⟨(hpos z hz).1,(hpos z hz).2.mpr hn⟩
+  intro hχ
+  obtain ⟨T,hT,_,htrunc⟩ := introTrace_selfdual_height_truncation χ hχ (1/2)
+  exact ⟨T,hT,htrunc 2 G hG⟩
+
+/-- Paper: §§1.4.3–1.4.5, pp. 29–30. The full zero resolvent with its imaginary
+part subtracted at two is the polar-corrected completed logarithmic derivative,
+normalized by its value at two and the ordinary real zero sum there. For a
+self-dual character the same formula is the ordinary symmetric-height limit. -/
+theorem introTrace_completed_logDeriv_resolvent_height_formula
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : U𝔽) (hχ : ∀ t, χ (τ t) = 1) :
+    let P (z : ℂ) := logDeriv (continuedCompletedHeckeL χ) (z+1/2) +
+      if χ = 1 then 1/(z+1/2)+1/(z-1/2) else 0
+    let v (r : windowZeros(χ,1/2)) (z : ℂ) := (zeroOrder(χ,r.val) : ℂ)/(z-(r.val-1/2))
+    let G (z : ℂ) := P z - P 2 + ((∑' r, (v r 2).re : ℝ) : ℂ)
+    AnalyticOnNhd ℂ G right(1/2) ∧
+      TendstoLocallyUniformlyOn (fun (T : Finset (windowZeros(χ,1/2))) z ↦
+        ∑ r ∈ T, (v r z - ((v r 2).im : ℂ)*Complex.I)) G atTop right(1/2) ∧
+      (∀ z ∈ right(1/2), HasSum (fun r ↦ (v r z).re) (G z).re ∧ 0 < (G z).re) ∧
+      (χ⁻¹ = χ → ∃ T : ℝ → Finset (windowZeros(χ,1/2)), (∀ t r, r ∈ T t ↔ |r.val.im| ≤ t) ∧
+        TendstoLocallyUniformlyOn (fun t z ↦ ∑ r ∈ T t, v r z) G atTop right(1/2)) := by
+  classical
+  intro P
+  apply introTrace_resolvent_limit_from_reference χ P (P 2)
+  intro z hz
+  have he := introTrace_full_reference_series_eq_completed_logDeriv τ hτ χ hχ
+  have h₂ : (2:ℂ) ∈ right(1/2) := by change (1/2:ℝ)<(2:ℂ).re; norm_num
+  have h1 := he hz
+  have h2 := he h₂
+  dsimp only at h1 h2
+  simp only [sub_self,mul_zero,tsum_zero,zero_add] at h2
+  dsimp only [P]
+  linear_combination h1-h2
+
+/-- Paper: §1.4.3, p. 29. For a normalized character and its inverse, the
+ordinary paired height sums give the sum of their explicitly normalized
+completed logarithmic derivatives on the full shifted Euler half-plane. -/
+theorem introTrace_dual_completed_logDeriv_height_formula
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : U𝔽) (hχ : ∀ t, χ (τ t) = 1) :
+    let P (η : U𝔽) (z : ℂ) := logDeriv (continuedCompletedHeckeL η) (z+1/2) +
+      if η = 1 then 1/(z+1/2)+1/(z-1/2) else 0
+    let v (η : U𝔽) (r : windowZeros(η,1/2)) (z : ℂ) := (zeroOrder(η,r.val) : ℂ)/(z-(r.val-1/2))
+    let G (η : U𝔽) (z : ℂ) := P η z - P η 2 + ((∑' r, (v η r 2).re : ℝ) : ℂ)
+    ∃ (T : ℝ → Finset (windowZeros(χ,1/2))) (U : ℝ → Finset (windowZeros(χ⁻¹,1/2))),
+      (∀ t r, r ∈ T t ↔ |r.val.im| ≤ t) ∧ (∀ t r, r ∈ U t ↔ |r.val.im| ≤ t) ∧
+      TendstoLocallyUniformlyOn (fun t z ↦ (∑ r ∈ T t, v χ r z) + ∑ r ∈ U t, v χ⁻¹ r z)
+        (fun z ↦ G χ z + G χ⁻¹ z) atTop right(1/2) ∧
+      ∀ z ∈ right(1/2), 0 < (G χ z + G χ⁻¹ z).re := by
+  classical
+  intro P v G
+  have hi (t : ℝ≥0ˣ) : χ⁻¹ (τ t) = 1 := by change (χ (τ t))⁻¹ = 1; rw [hχ,inv_one]
+  obtain ⟨_,hL,hpos,_⟩ := introTrace_completed_logDeriv_resolvent_height_formula τ hτ χ hχ
+  obtain ⟨_,hI,hipos,_⟩ := introTrace_completed_logDeriv_resolvent_height_formula τ hτ χ⁻¹ hi
+  obtain ⟨T,hT,hjoint⟩ := introTrace_dual_height_truncation (F := F) (1/2)
+  obtain ⟨_,hlim⟩ := hjoint χ 2 (G χ) (G χ⁻¹)
+    (by simpa only [Complex.ofReal_ofNat] using hL) (by simpa only [Complex.ofReal_ofNat] using hI)
+  refine ⟨T χ,T χ⁻¹,hT χ,hT χ⁻¹,hlim,?_⟩
+  intro z hz
+  exact add_pos (hpos z hz).2 (hipos z hz).2
+
+/-- A self-dual character is trivial along any norm section: every positive
+scale is a square and every value of the character squares to one. -/
+private theorem introTrace_selfdual_trivial_on_section (χ : U𝔽) (hχ : χ⁻¹ = χ)
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (t : ℝ≥0ˣ) : χ (τ t) = 1 := by
+  have hu : NNReal.sqrt t.val ≠ 0 := (NNReal.sqrt_pos.mpr (Units.zero_lt t)).ne'
+  let u : ℝ≥0ˣ := Units.mk0 (NNReal.sqrt t.val) hu
+  have ht : u*u = t := Units.ext (NNReal.mul_self_sqrt t.val)
+  have hx : (χ (τ u))⁻¹ = χ (τ u) := congrArg (fun η : U𝔽 ↦ η (τ u)) hχ
+  calc
+    χ (τ t) = χ (τ u)*χ (τ u) := by rw [← ht,map_mul,map_mul]
+    _ = (χ (τ u))⁻¹ * χ (τ u) := by rw [hx]
+    _ = 1 := inv_mul_cancel _
+
+/-- Paper: §1.4.3, p. 29. For every self-dual Hecke character of a number
+field, the ordinary symmetric-height sums equal the completed logarithmic
+derivative up to the explicit constant fixed by the real zero sum at two. -/
+theorem introTrace_selfdual_completed_logDeriv_height_formula
+    (χ : U𝔽) (hχ : χ⁻¹ = χ) :
+    let P (z : ℂ) := logDeriv (continuedCompletedHeckeL χ) (z+1/2) +
+      if χ = 1 then 1/(z+1/2)+1/(z-1/2) else 0
+    let v (r : windowZeros(χ,1/2)) (z : ℂ) := (zeroOrder(χ,r.val) : ℂ)/(z-(r.val-1/2))
+    let G (z : ℂ) := P z - P 2 + ((∑' r, (v r 2).re : ℝ) : ℂ)
+    ∃ T : ℝ → Finset (windowZeros(χ,1/2)), (∀ t r, r ∈ T t ↔ |r.val.im| ≤ t) ∧
+      TendstoLocallyUniformlyOn (fun t z ↦ ∑ r ∈ T t, v r z) G atTop right(1/2) ∧
+      ∀ z ∈ right(1/2), HasSum (fun r ↦ (v r z).re) (G z).re ∧ 0 < (G z).re := by
+  classical
+  intro P v G
+  have hsec := (ideleGroup_quotient.{_,0} F).2.2.2.2.2.2.2.2.2.2.1
+  let τ : ℝ≥0ˣ →ₜ* C𝔽 := ⟨hsec.choose,hsec.choose_spec.1⟩
+  have hτ : RightInverse τ (ideleClassNorm F) := hsec.choose_spec.2
+  obtain ⟨_,_,hreal,hheight⟩ := introTrace_completed_logDeriv_resolvent_height_formula τ hτ χ
+    (introTrace_selfdual_trivial_on_section χ hχ τ)
+  obtain ⟨T,hT,hlim⟩ := hheight hχ
+  exact ⟨T,hT,hlim,hreal⟩
+
+/-- An imaginary norm twist translates the completed logarithmic derivative
+throughout the half-plane of absolute convergence. -/
+private theorem introTrace_completed_logDeriv_translate (χ ψ : U𝔽) (a : ℂ)
+    (ha : a.re = 0) (htwist : ideleClassNormTwist ψ 0 = ideleClassNormTwist χ (-a))
+    (s : ℂ) (hs : 1 < s.re) :
+    logDeriv (continuedCompletedHeckeL χ) s = logDeriv (continuedCompletedHeckeL ψ) (s + a) := by
+  have hy : ((-a.im : ℝ) : ℂ) * Complex.I = -a := Complex.ext (by simp [ha]) (by simp)
+  have hγ (w : ℂ) : heckeGammaFactor ψ (w+a) = heckeGammaFactor χ w := by
+    have hψ (g : C𝔽) : (ψ g : ℂ) = χ g * (N(g) : ℂ) ^ (((-a.im : ℝ) : ℂ) * Complex.I) := by
+      have h := DFunLike.congr_fun htwist g
+      change (ψ g : ℂ) * (N(g) : ℂ) ^ (0 : ℂ) = (χ g : ℂ) * (N(g) : ℂ) ^ (-a) at h
+      simpa only [hy, Complex.cpow_zero, mul_one] using h
+    simpa only [hy, add_neg_cancel_right] using introTraceApprox_spectral_summable_gamma χ ψ (-a.im) hψ (w+a)
+  have he : continuedCompletedHeckeL χ =ᶠ[𝓝 s] fun w ↦ continuedCompletedHeckeL ψ (w+a) := by
+    filter_upwards [(isOpen_Ioi.preimage Complex.continuous_re).mem_nhds (show s ∈ right(1) from hs)] with w hw
+    change 1 < w.re at hw
+    have hw' : 1 < (w + a).re := by simpa only [Complex.add_re, ha, add_zero] using hw
+    have hf : finiteHeckeL ψ ⟨w+a, hw'⟩ = finiteHeckeL χ ⟨w,hw⟩ := by
+      simpa [add_assoc] using finiteHeckeL_imaginary_twist χ ψ (-a) (by simp [ha]) htwist ⟨w+a,hw'⟩
+    rw [(continuedCompletedHeckeL_spec χ).2 ⟨w,hw⟩, (continuedCompletedHeckeL_spec ψ).2 ⟨w+a,hw'⟩]
+    change _ * _ = heckeGammaFactor ψ (w+a) * finiteHeckeL ψ ⟨w+a,hw'⟩
+    rw [hγ, hf]
+    rfl
+  rw [(logDeriv_congr_nhds he).eq_of_nhds]
+  simp only [logDeriv_apply, deriv_comp_add_const]
+
+/-- Translation by the norm frequency reindexes any multiplicity-weighted sum
+over the full completed zero divisor. -/
+private theorem introTrace_zero_window_twist_tsum (χ ψ : U𝔽) (a : ℂ)
+    (ha : a.re = 0) (htwist : ideleClassNormTwist ψ 0 = ideleClassNormTwist χ (-a))
+    (f : ℂ → ℤ → ℂ) :
+    (∑' r : windowZeros(χ,1/2), f r.val (zeroOrder(χ,r.val))) =
+      ∑' r : windowZeros(ψ,1/2), f (r.val-a) (zeroOrder(ψ,r.val)) := by
+  have hpos (η : U𝔽) (s : ℂ) (hs : 0 < zeroOrder(η,s)) : 0 < s.re := by
+    linarith [(abs_lt.mp (introTrace_positive_divisor_in_critical_strip η s hs)).1]
+  have hp (r : windowZeros(χ,1/2)) : zeroOrder(χ,r.val) = zeroOrder(ψ,r.val+a) :=
+    introTraceApprox_spectral_divisor_translate χ ψ a ha htwist r.val (hpos _ _ r.property.1)
+  have hm (r : windowZeros(ψ,1/2)) : zeroOrder(χ,r.val-a) = zeroOrder(ψ,r.val) := by
+    simpa only [sub_add_cancel] using introTraceApprox_spectral_divisor_translate χ ψ a ha htwist (r.val-a)
+      (by simpa only [Complex.sub_re,ha,sub_zero] using hpos _ _ r.property.1)
+  let e : windowZeros(χ,1/2) ≃ windowZeros(ψ,1/2) := {
+    toFun := fun r ↦ ⟨r.val+a, (hp r) ▸ r.property.1, by simpa [Complex.add_re,ha] using r.property.2⟩
+    invFun := fun r ↦ ⟨r.val-a, (hm r).symm ▸ r.property.1, by simpa [Complex.sub_re,ha] using r.property.2⟩
+    left_inv := fun r ↦ Subtype.ext (add_sub_cancel_right r.val a)
+    right_inv := fun r ↦ Subtype.ext (sub_add_cancel r.val a) }
+  rw [← e.tsum_eq]
+  apply tsum_congr
+  intro r
+  change _ = f (r.val+a-a) (zeroOrder(ψ,r.val+a))
+  rw [add_sub_cancel_right, hp r]
+
+open Classical in
+/-- Removing the norm frequency shifts both the argument and the reference
+point. Subtracting the two reference expansions cancels their common anchoring
+constant and translates the exceptional poles in the trivial normalized isotype. -/
+private theorem introTrace_translated_reference_eq_completed_logDeriv
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F)) (χ ψ : U𝔽) (a : ℂ)
+    (ha : a.re = 0) (hψ : ∀ t, ψ (τ t) = 1)
+    (htwist : ideleClassNormTwist ψ 0 = ideleClassNormTwist χ (-a)) :
+    let P (w : ℂ) := logDeriv (continuedCompletedHeckeL χ) (w+1/2) +
+      if ψ = 1 then 1/(w+a+1/2)+1/(w+a-1/2) else 0
+    ∀ z ∈ right(1/2),
+      (∑' r : windowZeros(χ,1/2), (zeroOrder(χ,r.val) : ℂ) *
+        (1/(z-(r.val-1/2))-1/(2-(r.val-1/2)))) + P 2 = P z := by
+  classical
+  intro P z hz
+  have h₂ : (2 : ℂ) ∈ right(1/2) := by change (1/2 : ℝ) < (2 : ℂ).re; norm_num
+  have hshift (w : ℂ) (hw : w ∈ right(1/2)) : w+a ∈ right(1/2) := by
+    change (1/2 : ℝ) < (w+a).re
+    rwa [Complex.add_re,ha,add_zero]
+  let u (w : ℂ) (r : windowZeros(ψ,1/2)) := (zeroOrder(ψ,r.val) : ℂ) *
+    (1/(w-(r.val-1/2))-1/(2-(r.val-1/2)))
+  have hs (w : ℂ) (hw : w ∈ right(1/2)) : HasSum (u w) (∑' r, u w r) :=
+    (introTrace_spectral_referenceSub ψ (1/2) (fun _ ↦ 2)
+      (fun _ _ ↦ h₂) (differentiableOn_const _)).2.2.1.tendsto_at hw
+  have hreindex := introTrace_zero_window_twist_tsum χ ψ a ha htwist
+    (fun s m ↦ (m : ℂ) * (1/(z-(s-1/2))-1/(2-(s-1/2))))
+  have hdiff : (∑' r : windowZeros(ψ,1/2), (zeroOrder(ψ,r.val) : ℂ) *
+      (1/(z-(r.val-a-1/2))-1/(2-(r.val-a-1/2)))) =
+      (∑' r, u (z+a) r) - ∑' r, u (2+a) r := by
+    apply HasSum.tsum_eq
+    apply ((hs (z+a) (hshift z hz)).sub (hs (2+a) (hshift 2 h₂))).congr_fun
+    intro r
+    dsimp only [u]
+    rw [show z-(r.val-a-1/2) = z+a-(r.val-1/2) by ring,
+      show 2-(r.val-a-1/2) = 2+a-(r.val-1/2) by ring]
+    ring
+  have he := introTrace_full_reference_series_eq_completed_logDeriv τ hτ ψ hψ
+  have h1 := he (hshift z hz)
+  have h2 := he (hshift 2 h₂)
+  have hL (w : ℂ) (hw : w ∈ right(1/2)) :
+      logDeriv (continuedCompletedHeckeL χ) (w+1/2) =
+        logDeriv (continuedCompletedHeckeL ψ) (w+a+1/2) := by
+    change (1/2 : ℝ) < w.re at hw
+    rw [introTrace_completed_logDeriv_translate χ ψ a ha htwist (w+1/2) (by norm_num; linarith),
+      show w+1/2+a = w+a+1/2 by ring]
+  rw [hreindex,hdiff]
+  dsimp only [P,u] at *
+  rw [hL z hz,hL 2 h₂]
+  linear_combination h1 - h2
+
+/-- The inverse character has the opposite norm frequency. -/
+private theorem introTrace_inverse_normalized_twist (χ ψ : U𝔽) (a : ℂ)
+    (htwist : ideleClassNormTwist ψ 0 = ideleClassNormTwist χ (-a)) :
+    ideleClassNormTwist ψ⁻¹ 0 = ideleClassNormTwist χ⁻¹ (-(-a)) := by
+  ext1 g
+  have h := DFunLike.congr_fun htwist g
+  change (ψ g : ℂ) * (N(g) : ℂ)^(0 : ℂ) = (χ g : ℂ) * (N(g) : ℂ)^(-a) at h
+  change ((ψ g)⁻¹ : Circle) * (N(g) : ℂ)^(0 : ℂ) = ((χ g)⁻¹ : Circle) * (N(g) : ℂ)^(-(-a))
+  simp only [Complex.cpow_zero,mul_one] at h ⊢
+  rw [Circle.coe_inv,Circle.coe_inv,h,mul_inv_rev,Complex.cpow_neg,inv_inv,neg_neg,mul_comm]
+
+open Classical in
+/-- Paper: §§1.4.3–1.4.5, pp. 29–30. For every unitary character over a number
+field the completed logarithmic derivative gives both the imaginary-subtracted
+zero resolvent and the ordinary height sum paired with the inverse character.
+A pure norm twist translates the two polar terms by its norm frequency. -/
+theorem introTrace_all_characters_completed_resolvent_height_formula
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F)) (χ : U𝔽) :
+    ∃ (ψ : U𝔽) (a : ℂ), a.re = 0 ∧ (∀ t, ψ (τ t) = 1) ∧
+      ideleClassNormTwist ψ 0 = ideleClassNormTwist χ (-a) ∧
+      let P (η : U𝔽) (b z : ℂ) := logDeriv (continuedCompletedHeckeL η) (z+1/2) +
+        if ψ = 1 then 1/(z+b+1/2)+1/(z+b-1/2) else 0
+      let v (η : U𝔽) (r : windowZeros(η,1/2)) (z : ℂ) :=
+        (zeroOrder(η,r.val) : ℂ)/(z-(r.val-1/2))
+      let G (η : U𝔽) (b z : ℂ) := P η b z - P η b 2 + ((∑' r, (v η r 2).re : ℝ) : ℂ)
+      AnalyticOnNhd ℂ (G χ a) right(1/2) ∧
+        TendstoLocallyUniformlyOn (fun (T : Finset (windowZeros(χ,1/2))) z ↦
+          ∑ r ∈ T, (v χ r z - ((v χ r 2).im : ℂ)*Complex.I)) (G χ a) atTop right(1/2) ∧
+        (∀ z ∈ right(1/2), HasSum (fun r ↦ (v χ r z).re) (G χ a z).re ∧ 0 < (G χ a z).re) ∧
+        ∃ (T : ℝ → Finset (windowZeros(χ,1/2))) (U : ℝ → Finset (windowZeros(χ⁻¹,1/2))),
+          (∀ t r, r ∈ T t ↔ |r.val.im| ≤ t) ∧ (∀ t r, r ∈ U t ↔ |r.val.im| ≤ t) ∧
+          TendstoLocallyUniformlyOn (fun t z ↦ (∑ r ∈ T t, v χ r z) + ∑ r ∈ U t, v χ⁻¹ r z)
+            (fun z ↦ G χ a z + G χ⁻¹ (-a) z) atTop right(1/2) := by
+  classical
+  obtain ⟨ψ,a,ha,hψ,htwist⟩ := introTraceApprox_spectral_normalized_character τ hτ χ
+  refine ⟨ψ,a,ha,hψ,htwist,?_⟩
+  intro P v G
+  obtain ⟨han,hlim,hpos,_⟩ := introTrace_resolvent_limit_from_reference χ (P χ a) (P χ a 2)
+    (introTrace_translated_reference_eq_completed_logDeriv τ hτ χ ψ a ha hψ htwist)
+  have hi (t : ℝ≥0ˣ) : ψ⁻¹ (τ t) = 1 := by change (ψ (τ t))⁻¹ = 1; rw [hψ,inv_one]
+  have hI := introTrace_translated_reference_eq_completed_logDeriv τ hτ χ⁻¹ ψ⁻¹ (-a)
+    (by simp [ha]) hi (introTrace_inverse_normalized_twist χ ψ a htwist)
+  obtain ⟨_,hilim,_,_⟩ := introTrace_resolvent_limit_from_reference χ⁻¹
+    (P χ⁻¹ (-a)) (P χ⁻¹ (-a) 2) (by simpa only [inv_eq_one,P] using hI)
+  obtain ⟨T,hT,hjoint⟩ := introTrace_dual_height_truncation (F := F) (1/2)
+  obtain ⟨_,hsum⟩ := hjoint χ 2 (G χ a) (G χ⁻¹ (-a))
+    (by simpa only [Complex.ofReal_ofNat] using hlim) (by simpa only [Complex.ofReal_ofNat] using hilim)
+  exact ⟨han,hlim,hpos,T χ,T χ⁻¹,hT χ,hT χ⁻¹,hsum⟩
+
 end CompletedSpectralContinuation
 
 /-- Paper: §1.4.3, p. 29. Every unitary character over a number field has infinitely
