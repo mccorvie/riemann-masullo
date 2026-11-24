@@ -3134,14 +3134,16 @@ theorem existsUnique_sLocalThetaAction :
     N θ Tt t htt hc r hr h
   with_reducible exact result
 
-private theorem insert_mem_larger (hST : S ⊆ T) (u : (integralAdelesOutside F S)ˣ) :
+/-- An integral idele inserted at `S` lies in the range of the insertion at a larger `T`. -/
+theorem integralIdeleInsertion_mem_range_of_subset (hST : S ⊆ T) (u : (integralAdelesOutside F S)ˣ) :
     integralIdeleInsertion F S u ∈ Set.range (integralIdeleInsertion F T) := by
   let g := integralIdeleInsertion F S u
   have hg : g ∈ Set.range (integralIdeleInsertion F S) := ⟨u, rfl⟩
   exact (mem_range_integralIdeleInsertion F T g).mpr fun v hv ↦
     (mem_range_integralIdeleInsertion F S g).mp hg v (fun h ↦ hv (hST h))
 
-private theorem testTransition_translate_eq (hST : S ⊆ T)
+/-- The transition from `S` to `T` commutes with translation by an inserted integral idele. -/
+theorem testTransition_translate_eq (hST : S ⊆ T)
     (u : (integralAdelesOutside F S)ˣ) (f : ℬₛ(S)) :
     let g := integralIdeleInsertion F S u
     let gS := Units.map (adeleProjection F S).toMonoidHom g
@@ -3153,7 +3155,7 @@ private theorem testTransition_translate_eq (hST : S ⊆ T)
   let gT := Units.map (adeleProjection F T).toMonoidHom g
   have hTS (k : ℬₛ(S)) : sAdeleSchwartzToGlobal F T (sAdeleSchwartzTransition F hST k) =
       sAdeleSchwartzToGlobal F S k := DFunLike.congr_fun (sAdeleSchwartzToGlobal_comp F hST) k
-  have hT := sAdeleSchwartzToGlobal_unitTranslate (insert_mem_larger hST u) (sAdeleSchwartzTransition F hST f)
+  have hT := sAdeleSchwartzToGlobal_unitTranslate (integralIdeleInsertion_mem_range_of_subset hST u) (sAdeleSchwartzTransition F hST f)
   exact (sAdeleSchwartzToGlobal_isEmbedding F T).injective
     ((hTS _).trans ((insert_translate_eq u f).trans
         ((congrArg (schwartzBruhatUnitTranslate g) (hTS f).symm).trans hT.symm)))
