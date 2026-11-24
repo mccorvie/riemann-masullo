@@ -1307,7 +1307,115 @@ theorem sLocalHomogeneousThetaTransition_equivariant
 Insertion of test functions into the adeles preserves the homogeneous theta kernels. -/
 theorem sLocalHomogeneousThetaToGlobal_preserves_kernel
     (hω : NormOneCharacterUnramifiedOutside (F := F) ω S) :
-    Kₛω(S, ωₛ(S, hω)) ≤ (K𝔽ω(ω)).comap (sAdeleSchwartzToGlobal F S) := by sorry
+    Kₛω(S, ωₛ(S, hω)) ≤ (K𝔽ω(ω)).comap (sAdeleSchwartzToGlobal F S) := by
+  let ρS := (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose
+  let relS (p : J₁(S) × Θₛ(S)) := p.2 - star (ωₛ(S, hω) p.1 : ℂ) • ρS p.1.val p.2
+  let DS := (Submodule.span ℂ (Set.range relS)).topologicalClosure
+  let ρF := (existsUnique_globalThetaAction (F := F)).exists.choose
+  let relF (p : C₁ × Θ𝔽) := p.2 - star (ω p.1 : ℂ) • ρF p.1.val p.2
+  let DF := (Submodule.span ℂ (Set.range relF)).topologicalClosure
+  have hmemS (f : ℬₛ(S)) : f ∈ Kₛω(S, ωₛ(S, hω)) ↔ (Kₛ(S)).mkQ f ∈ DS := by
+    have h : ∃ e : Θₛω(S, ωₛ(S, hω)) ≃L[ℂ] (Θₛ(S) ⧸ DS),
+        ∀ k : ℬₛ(S), e (Submodule.Quotient.mk k) = DS.mkQ ((Kₛ(S)).mkQ k) := by
+      unfold DS relS ρS
+      with_reducible exact sLocalHomogeneousThetaSpace_equiv_coinvariants (F := F) (S := S) (ωₛ(S, hω))
+    refine h.elim fun e he ↦ ?_
+    have he' := congrArg (fun z : Θₛ(S) ⧸ DS ↦ z = 0) (he f)
+    have hz := ContinuousLinearEquiv.map_eq_zero_iff e (x := Submodule.Quotient.mk f)
+    exact (Submodule.Quotient.mk_eq_zero (Kₛω(S, ωₛ(S, hω)))).symm.trans
+      (hz.symm.trans (he'.to_iff.trans (Submodule.Quotient.mk_eq_zero DS)))
+  have hmemF (f : ℬ𝔽) : f ∈ K𝔽ω(ω) ↔ (K𝔽).mkQ f ∈ DF := by
+    have h : ∃ e : Θ𝔽ω(ω) ≃L[ℂ] (Θ𝔽 ⧸ DF),
+        ∀ k : ℬ𝔽, e (Submodule.Quotient.mk k) = DF.mkQ ((K𝔽).mkQ k) := by
+      unfold DF relF ρF
+      with_reducible exact globalHomogeneousThetaSpace_equiv_coinvariants (F := F) ω
+    refine h.elim fun e he ↦ ?_
+    have he' := congrArg (fun z : Θ𝔽 ⧸ DF ↦ z = 0) (he f)
+    have hz := ContinuousLinearEquiv.map_eq_zero_iff e (x := Submodule.Quotient.mk f)
+    exact (Submodule.Quotient.mk_eq_zero (K𝔽ω(ω))).symm.trans
+      (hz.symm.trans (he'.to_iff.trans (Submodule.Quotient.mk_eq_zero DF)))
+  let π := sLocalThetaToGlobal F S
+  have hmap : DS ≤ DF.comap π := by
+    apply Submodule.topologicalClosure_minimal
+    · apply Submodule.span_le.mpr
+      rintro _ ⟨⟨a, y⟩, rfl⟩
+      refine (Submodule.Quotient.mk_surjective (Kₛ(S)) y).elim fun f hy ↦ ?_
+      rw [← hy]
+      obtain ⟨g, hg⟩ := QuotientGroup.mk_surjective a.val
+      let j := sIdeleInsertion F S g
+      have hS : Units.map (adeleProjection F S).toMonoidHom j = g :=
+        Units.ext (Prod.ext (sIdeleInsertion_apply F S g).1
+          (funext (sIdeleInsertion_apply F S g).2.1))
+      have hn : ideleNorm F j = 1 := by
+        rw [ideleNorm_sIdeleInsertion, ← sIdeleQuotientNorm_mk, hg]
+        exact a.property
+      let x : C₁ := ⟨QuotientGroup.mk j, hn⟩
+      have hj : j ∈ Set.range (integralIdeleInsertion F S) := by
+        apply (mem_range_integralIdeleInsertion F S j).2
+        intro v hv
+        have hi : j⁻¹.val.2 v = 1 := by
+          change ((sIdeleInsertion F S g)⁻¹).val.2 v = 1
+          rw [← map_inv]
+          exact (sIdeleInsertion_apply F S g⁻¹).2.2 v hv
+        exact ⟨(sIdeleInsertion_apply F S g).2.2 v hv ▸ (v.adicCompletionIntegers F).one_mem,
+          hi ▸ (v.adicCompletionIntegers F).one_mem⟩
+      obtain ⟨u, hu⟩ := hj
+      have ha : a.val = QuotientGroup.mk (Units.map (adeleProjection F S).toMonoidHom
+          (integralIdeleInsertion F S u)) := by
+        rw [hu, hS]
+        exact hg.symm
+      have hx : x.val = QuotientGroup.mk (integralIdeleInsertion F S u) := by
+        change QuotientGroup.mk j = _
+        rw [hu]
+      have hχ : ωₛ(S, hω) a = ω x :=
+        sLocalNormOneCharacter_apply ω hω u x a hx ha
+      let gS := Units.map (adeleProjection F S).toMonoidHom (integralIdeleInsertion F S u)
+      let fF := sAdeleSchwartzToGlobal F S f
+      let yS : Θₛ(S) := Submodule.Quotient.mk f
+      have hρS : ρS a.val yS =
+          Submodule.Quotient.mk (schwartzBruhatUnitTranslate gS f) := by
+        have : a.val = QuotientGroup.mk gS := ha
+        rw [this]
+        change ρS (QuotientGroup.mk gS) (Submodule.Quotient.mk f) = _
+        exact (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose_spec.2 gS f
+      have hρF : ρF x.val (Submodule.Quotient.mk fF) =
+          Submodule.Quotient.mk
+            (schwartzBruhatUnitTranslate (integralIdeleInsertion F S u) fF) := by
+        have : x.val = QuotientGroup.mk (integralIdeleInsertion F S u) := hx
+        rw [this]
+        exact (existsUnique_globalThetaAction (F := F)).exists.choose_spec.2
+          (integralIdeleInsertion F S u) fF
+      have hπ : π yS = Submodule.Quotient.mk fF := by
+        unfold π yS fF sLocalThetaToGlobal
+        exact Submodule.mapQ_apply _ _ _ f
+      have heq : π (ρS a.val yS) = ρF x.val (π yS) :=
+        calc
+          π (ρS a.val yS) = π (Submodule.Quotient.mk (schwartzBruhatUnitTranslate gS f)) := by
+            rw [hρS]
+          _ = Submodule.Quotient.mk
+              (schwartzBruhatUnitTranslate (integralIdeleInsertion F S u) fF) :=
+            sLocalThetaToGlobal_equivariant u f
+          _ = ρF x.val (Submodule.Quotient.mk fF) := hρF.symm
+          _ = ρF x.val (π yS) := by rw [hπ]
+      have hχ' : star (ωₛ(S, hω) a : ℂ) = star (ω x : ℂ) :=
+        congrArg (fun z : Circle ↦ star (z : ℂ)) hχ
+      have hrel : π (relS (a, yS)) = relF (x, π yS) := by
+        unfold relS relF
+        rw [map_sub, map_smul, hχ', heq]
+      apply Submodule.mem_comap.mpr
+      rw [hrel]
+      exact Submodule.le_topologicalClosure _ (Submodule.subset_span (Set.mem_range_self (x, π yS)))
+    · have hc : IsClosed (DF : Set Θ𝔽) :=
+        (Submodule.span ℂ (Set.range relF)).isClosed_topologicalClosure
+      exact hc.preimage sLocalThetaToGlobal_continuous
+  intro f hf
+  have h2 : π ((Kₛ(S)).mkQ f) ∈ DF := hmap ((hmemS f).mp hf)
+  have h3 : (K𝔽).mkQ (sAdeleSchwartzToGlobal F S f) ∈ DF := by
+    have hπf : π ((Kₛ(S)).mkQ f) = (K𝔽).mkQ (sAdeleSchwartzToGlobal F S f) := by
+      unfold π sLocalThetaToGlobal
+      exact Submodule.mapQ_apply _ _ _ f
+    exact hπf ▸ h2
+  exact (hmemF _).mpr h3
 
 /-- Paper: (5.2.3.2), p. 233.
 The stage insertion into the global homogeneous quotient is induced by extension
@@ -2275,11 +2383,6 @@ theorem sLocalHomogeneousThetaSpace_strongDual_complete (χ : PontryaginDual (J�
     sAdeleSchwartz_strongDual_complete F S
   exact completeSpace_strongDual_quotient _
 
-/-- Paper: Theorem 5.2.3.1(2), p. 233.
-The strong dual of the S-local homogeneous quotient is nuclear. -/
-theorem sLocalHomogeneousThetaSpace_strongDual_nuclear (χ : PontryaginDual (J₁(S))) :
-    IsNuclearTVS (StrongDual ℂ (Θₛω(S, χ))) := by sorry
-
 private theorem sLocalHomogeneousThetaSpace_strongDual_montel_aux {E : Type*}
     [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
     [ContinuousSMul ℂ E] [T2Space E] [PolynormableSpace ℂ E]
@@ -2589,6 +2692,32 @@ theorem sLocalThetaIsotypicAverage_equiv (χ : PontryaginDual (J₁(S))) :
       (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose_spec.1 χ (Pₛ(S, χ))
       (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := S) χ).exists.choose_spec
       (sLocalHomogeneousThetaSpace_equiv_coinvariants (F := F) (S := S) χ)
+
+/-- Paper: Theorem 5.2.3.1(2), p. 233.
+The strong dual of the S-local homogeneous quotient is nuclear. -/
+theorem sLocalHomogeneousThetaSpace_strongDual_nuclear (χ : PontryaginDual (J₁(S))) :
+    IsNuclearTVS (StrongDual ℂ (Θₛω(S, χ))) := by
+  let E := SLocalAdelicThetaSpace F S
+  let G := J₁(S)
+  have := isClosed_sProjectedDiagonal (F := F) (S := S)
+  let : T2Space (Jₛ(S)) := inferInstanceAs (T2Space (_ ⧸ _))
+  let : T2Space G := inferInstanceAs (T2Space ((sIdeleQuotientNorm F S).ker : Set (Jₛ(S))))
+  let : MeasurableSpace G := borel _
+  let : BorelSpace G := ⟨rfl⟩
+  let : CompactSpace G := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let : T2Space E := sLocalAdelicThetaSpace_t2_of_isClosed (F := F) (S := S)
+    (sLocalAdelicTheta_ker_isClosed (F := F) (S := S))
+  let : PolynormableSpace ℂ E := sLocalAdelicThetaSpace_polynormable (F := F) (S := S)
+  let : (μₛ₁(S)).IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  let : Module ℝ E := Module.restrictScalars ℝ ℂ E
+  let : IsScalarTower ℝ ℂ E := IsScalarTower.restrictScalars ℝ ℂ E
+  let : LocallyConvexSpace ℝ E := (PolynormableSpace.withSeminorms ℂ E).toLocallyConvexSpace
+  with_reducible_and_instances
+    exact strongDual_nuclear_of_compact_isotype (μₛ₁(S)) (ρₛ₁(S)) χ (Pₛ(S, χ))
+      (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := S) χ).exists.choose_spec
+      (sLocalThetaIsotypicAverage_equiv (F := F) (S := S) χ).2.choose
+      (sLocalAdelicThetaSpace_strongDual_nuclear (F := F) (S := S))
 
 -- TODO(paper-gap): The global L² argument on p. 237 fails at norm zero for
 -- the rational Gaussian. Apply character uniqueness on each compact norm-one fibre.
@@ -3207,14 +3336,146 @@ section Fourier
 -- The identity on theta functions has a norm factor and two zero terms,
 -- as in adelicTheta_riemannRoch.
 
+/-- Testing a weighted continuous function against all characters recovers the function. -/
+private theorem existsUnique_sLocalThetaFourier_weighted {G : Type*} [CommGroup G]
+    [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    [MeasurableSpace G] [BorelSpace G] (μ : Measure G) [μ.IsHaarMeasure] [μ.Regular]
+    (θ : C(G, ℂ)) (w : QuasiCharacter G) (hi : Integrable (fun x ↦ θ x * w x) μ)
+    (hz : ∀ χ : PontryaginDual G, ∫ x, θ x * w x * (χ x : ℂ) ∂μ = 0) : θ = 0 := by
+  let ev (x : G) : PontryaginDual G →* Circle :=
+    { toFun := fun χ ↦ χ x, map_one' := rfl, map_mul' := fun _ _ ↦ rfl }
+  have hsep : Injective ev := fun _ _ h ↦
+    pontryaginDual_pairing_separates.1 (funext (DFunLike.congr_fun h))
+  have hae := ae_eq_zero_of_integral_mul_circle_eq_zero ev (fun χ ↦ χ.continuous) hsep hi hz
+  have heq := Measure.eq_of_ae_eq hae (θ.continuous.mul w.continuous) continuous_const
+  exact ContinuousMap.ext fun g ↦ (mul_eq_zero.mp (congrFun heq g)).resolve_right
+    ((Group.isUnit g).map w).ne_zero
+
+/-- Duality in a norm chart reflects the exponent in one. -/
+private theorem existsUnique_sLocalThetaFourier_dual {G : Type*} [CommGroup G]
+    [TopologicalSpace G] [IsTopologicalGroup G] (m : G →* ℝ≥0ˣ) (hm : Continuous m)
+    (χ : PontryaginDual G) (s : ℂ) :
+    let u : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+    dualQuasiCharacter m hm (quasiCharacterNormTwist m hm (u.comp χ) s) =
+      quasiCharacterNormTwist m hm (u.comp χ⁻¹) (1 - s) := by
+  intro u
+  ext1 g
+  have hp : 0 < ((m g : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  change (((m g : ℝ≥0) : ℝ) : ℂ) * (quasiCharacterNormTwist m hm (u.comp χ) s) g⁻¹ =
+    ((χ⁻¹ g : Circle) : ℂ) * (((m g : ℝ≥0) : ℝ) : ℂ) ^ (1 - s)
+  rw [map_inv]
+  change _ * ((χ g : ℂ) * (((m g : ℝ≥0) : ℝ) : ℂ) ^ s)⁻¹ = (χ g : ℂ)⁻¹ * _
+  rw [Complex.cpow_sub _ _ (Complex.ofReal_ne_zero.mpr hp.ne'), Complex.cpow_one, mul_inv_rev,
+    div_eq_mul_inv]
+  ring
+
+/-- The double S-adelic Fourier transform is reflection, and minus one is an `S`-unit,
+so it has the same theta function. -/
+private theorem existsUnique_sLocalThetaFourier_inv (f : ℬₛ(S)) :
+    sLocalAdelicTheta F S (sAdeleSchwartzFourier (sAdeleSchwartzFourier f)) =
+      sLocalAdelicTheta F S f := by
+  ext g
+  have hneg : sLocalAdelicTheta F S f (-g) = sLocalAdelicTheta F S f g := by
+    refine sLocalAdelicTheta_factorsThrough F S f ?_
+    have hm1 : (QuotientGroup.mk (-1 : (SAdeleRing F S)ˣ) : Jₛ(S)) = 1 := by
+      refine (sIdeleQuotient_mk_eq_one F S _).2 ⟨-1, ?_⟩
+      apply Units.ext
+      simp
+    rw [show -g = (-1) * g by simp, QuotientGroup.mk_mul, hm1, one_mul]
+  rw [← hneg]
+  simp only [sLocalAdelicTheta_apply]
+  refine tsum_congr fun ξ ↦ ?_
+  rw [sLocal_fourier_inversion]
+  simp [mul_neg]
+
+/-- The S-adelic Fourier transform preserves the S-local theta kernel. At the center of
+the critical strip the functional equation sends each weighted theta integral of the
+transform to one of the double transform, which has the original theta function. -/
+private theorem existsUnique_sLocalThetaFourier_ker (f : ℬₛ(S))
+    (hf : sLocalAdelicTheta F S f = 0) :
+    sLocalAdelicTheta F S (sAdeleSchwartzFourier f) = 0 := by
+  let : MeasurableSpace (Jₛ(S)) := borel _
+  let : BorelSpace (Jₛ(S)) := ⟨rfl⟩
+  let : LocallyCompactSpace (SAdeleRing F S)ˣ := (sIdeleGroup_description F S).2.2.1
+  have := isClosed_sProjectedDiagonal (F := F) (S := S)
+  let μ := sLocalQuotientTamagawaMeasure F S
+  have : μ.IsHaarMeasure := (sLocalQuotientTamagawaMeasure_isWeil (F := F) (S := S)).1
+  have : μ.Regular := (sLocalQuotientTamagawaMeasure_isWeil (F := F) (S := S)).2.1
+  let u : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  let chart (χ : PontryaginDual (Jₛ(S))) : QuasiCharacter (Jₛ(S)) :=
+    quasiCharacterNormTwist (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous
+      (u.comp χ) (1 / 2)
+  have hpos (χ : PontryaginDual (Jₛ(S))) :
+      ∃ (ψ : PontryaginDual (Jₛ(S))) (s : ℂ), 0 < s.re ∧ chart χ = quasiCharacterNormTwist
+        (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous (u.comp ψ) s :=
+    ⟨χ, 1 / 2, by norm_num, rfl⟩
+  have hclasses (h : ℬₛ(S)) (hh : sLocalAdelicTheta F S h = 0) :
+      sLocalAdelicThetaOnClasses F S h = 0 := by
+    ext g
+    induction g using QuotientGroup.induction_on with
+    | H x => rw [sLocalAdelicThetaOnClasses_mk, hh]; rfl
+  have hθff := hclasses _ ((existsUnique_sLocalThetaFourier_inv f).trans hf)
+  have hθ : sLocalAdelicThetaOnClasses F S (sAdeleSchwartzFourier f) = 0 := by
+    refine existsUnique_sLocalThetaFourier_weighted μ _ (chart 1)
+      (sLocalThetaMellinIntegral_integrable _ _ (hpos 1)) fun χ ↦ ?_
+    have hfe := sLocalIdelicZetaIntegral_functionalEquation (sAdeleSchwartzFourier f) χ (1 / 2)
+      (by norm_num)
+    dsimp only at hfe
+    rw [existsUnique_sLocalThetaFourier_dual, show (1 : ℂ) - 1 / 2 = 1 / 2 by norm_num] at hfe
+    have hc : sLocalThetaMellinIntegral (sAdeleSchwartzFourier f) (chart χ) = 0 := by
+      rw [sLocalThetaMellinIntegral_eq_zeta _ (hpos χ)]
+      change sLocalIdelicZetaIntegral _ (quasiCharacterNormTwist _ _ (u.comp χ) (1 / 2)) = 0
+      have h2 := sLocalThetaMellinIntegral_eq_zeta
+        (sAdeleSchwartzFourier (sAdeleSchwartzFourier f)) (hpos χ⁻¹)
+      rw [hfe]
+      change _ * sLocalIdelicZetaIntegral _ (chart χ⁻¹) = 0
+      rw [← h2]
+      simp [sLocalThetaMellinIntegral, hθff]
+    refine (integral_congr_ae (Filter.Eventually.of_forall fun g ↦ ?_)).trans hc
+    change sLocalAdelicThetaOnClasses F S _ g * (1 * _ ^ (1 / 2 : ℂ)) * (χ g : ℂ) =
+      sLocalAdelicThetaOnClasses F S _ g * ((χ g : ℂ) * _ ^ (1 / 2 : ℂ))
+    rw [one_mul, mul_right_comm, mul_assoc]
+  ext g
+  rw [← sLocalAdelicThetaOnClasses_mk, hθ]
+  rfl
+
 /-- Paper: Theorem 5.2.4.1(1), pp. 238–239.
 S-adelic Fourier transform descends to a unique continuous linear involution
 on the S-local theta quotient. -/
 theorem existsUnique_sLocalThetaFourier :
     ∃! e : Θₛ(S) ≃L[ℂ] Θₛ(S),
       Involutive e ∧ ∀ f : ℬₛ(S),
-        e ((Kₛ(S)).mkQ f) = (Kₛ(S)).mkQ (sAdeleSchwartzFourier (F := F) (S := S) f) :=
-  by sorry
+        e ((Kₛ(S)).mkQ f) = (Kₛ(S)).mkQ (sAdeleSchwartzFourier (F := F) (S := S) f) := by
+  obtain ⟨P, hP⟩ := sLocal_fourier_continuousLinear (F := F) (S := S)
+  have hK : Kₛ(S) ≤ (Kₛ(S)).comap P.toLinearMap := fun f hf ↦ by
+    rw [Submodule.mem_comap, LinearMap.mem_ker, ContinuousLinearMap.coe_coe, hP]
+    exact existsUnique_sLocalThetaFourier_ker f (LinearMap.mem_ker.mp hf)
+  let E₀ : Θₛ(S) →ₗ[ℂ] Θₛ(S) := (Kₛ(S)).mapQ (Kₛ(S)) P.toLinearMap hK
+  have hE₀ (f : ℬₛ(S)) : E₀ ((Kₛ(S)).mkQ f) = (Kₛ(S)).mkQ (sAdeleSchwartzFourier f) := by
+    rw [← hP]
+    rfl
+  have hcont : Continuous E₀ := by
+    refine (Kₛ(S)).isQuotientMap_mkQ.continuous_iff.mpr ?_
+    have : (E₀ ∘ (Kₛ(S)).mkQ) = (Kₛ(S)).mkQ ∘ P :=
+      funext fun f ↦ (hE₀ f).trans (by simp only [Function.comp_apply, hP])
+    rw [this]
+    exact (Kₛ(S)).isQuotientMap_mkQ.continuous.comp P.continuous
+  let E : Θₛ(S) →L[ℂ] Θₛ(S) := ⟨E₀, hcont⟩
+  have hEE (x : Θₛ(S)) : E (E x) = x := by
+    obtain ⟨f, rfl⟩ := (Kₛ(S)).mkQ_surjective x
+    change E₀ (E₀ _) = _
+    rw [hE₀, hE₀]
+    refine (sLocalAdelicThetaSpace_mk_eq_iff _ _).mpr (ContinuousMap.ext fun g ↦ ?_)
+    induction g using QuotientGroup.induction_on with
+    | H x =>
+      rw [sLocalAdelicThetaOnClasses_mk, sLocalAdelicThetaOnClasses_mk,
+        existsUnique_sLocalThetaFourier_inv]
+  refine ⟨ContinuousLinearEquiv.equivOfInverse E E hEE hEE, ⟨hEE, hE₀⟩, ?_⟩
+  rintro e' ⟨-, he'⟩
+  ext x
+  obtain ⟨f, rfl⟩ := (Kₛ(S)).mkQ_surjective x
+  exact (he' f).trans (hE₀ f).symm
+
 
 open scoped IsDedekindDomain.FiniteAdeleRing RestrictedProduct in
 /-- The adelic Fourier transform is a continuous linear operator on the global tests. It is

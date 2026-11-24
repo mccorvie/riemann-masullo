@@ -17,7 +17,6 @@ namespace RiemannMasullo
 
 set_option quotPrecheck false
 set_option maxHeartbeats 600000
-set_option Elab.async false
 
 local notation "V(" F ")" => HeightOneSpectrum (𝓞 F)
 local notation "Vℚ" => HeightOneSpectrum (𝓞 ℚ)
