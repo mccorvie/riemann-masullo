@@ -6,6 +6,7 @@ import RiemannMasullo.Ch03_IdelicZeta.RatEmptyFourier
 import RiemannMasullo.AppA_AlgebraicNT.Sec3
 import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import RiemannMasullo.Ch06_LocalGlobal.Sec2
+import Mathlib.Topology.Algebra.IsOpenUnits
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Gaussian
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gaussian.Schwartz
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Count
