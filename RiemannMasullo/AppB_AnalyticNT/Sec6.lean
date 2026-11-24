@@ -4387,4 +4387,171 @@ theorem finiteHeckeL_outside_inv_iteratedDeriv_horizontal_bound (m : ℕ) :
 
 end OutsideEulerProduct
 
+/-! ## Positive tests for the normalized logarithmic-derivative coefficients -/
+
+/-- Any weight decaying faster than an inverse first power satisfies the absolute
+summability condition for the three positive Hecke measurements, on any set of norms. -/
+theorem summable_norm_heckeLogDerivCoefficient_mul_of_le_rpow (χ : U[F]) (A : Set ℕ)
+    (w : ℕ → ℝ) {p C : ℝ} (hp : 1 < p)
+    (hw : ∀ᶠ n : ℕ in atTop, |w n| ≤ C / (n : ℝ) ^ p) :
+    Summable fun n : A ↦ ‖heckeLogDerivCoefficient (ideleClassNormTwist χ 0) n‖ * w n := by
+  let a := heckeLogDerivCoefficient (ideleClassNormTwist χ 0)
+  suffices h : Summable fun n : ℕ ↦ ‖a n‖ * w n from h.subtype (· ∈ A)
+  obtain ⟨K, hK, hcoeff⟩ := heckeLogDerivCoefficient_bound (Module.finrank ℚ F)
+  let r := (p + 1) / 2
+  have hr : 1 < r := by dsimp [r]; linarith
+  have hrp : 0 < p - r := by dsimp [r]; linarith
+  have hlog := (isLittleO_log_rpow_atTop hrp).bound (show (0 : ℝ) < 1 by norm_num)
+  have major := (Real.summable_nat_rpow_inv.mpr hr).mul_left (K * C)
+  refine major.of_norm_bounded_eventually_nat ?_
+  filter_upwards [eventually_ge_atTop 1, hcoeff F rfl, hw,
+    (tendsto_natCast_atTop_atTop (R := ℝ)).eventually hlog] with n hn hcoeff' hweight hlog'
+  have hn' : 0 < (n : ℝ) := by exact_mod_cast hn
+  have hlog'' : Real.log n ≤ (n : ℝ) ^ (p - r) := by
+    refine (le_abs_self _).trans ?_
+    simpa only [Real.norm_eq_abs, one_mul, abs_of_nonneg (Real.rpow_nonneg hn'.le _)] using hlog'
+  have ha : ‖a n‖ ≤ K * (n : ℝ) ^ (p - r) :=
+    (hcoeff' χ).trans (mul_le_mul_of_nonneg_left hlog'' hK.le)
+  calc
+    ‖‖a n‖ * w n‖ = ‖a n‖ * |w n| := by rw [Real.norm_eq_abs, abs_mul, abs_of_nonneg (norm_nonneg _)]
+    _ ≤ (K * (n : ℝ) ^ (p - r)) * (C / (n : ℝ) ^ p) :=
+      mul_le_mul ha hweight (abs_nonneg _) (mul_nonneg hK.le (Real.rpow_nonneg hn'.le _))
+    _ = K * C * ((n : ℝ) ^ r)⁻¹ := by
+      rw [Real.rpow_sub hn']
+      field_simp [(Real.rpow_pos_of_pos hn' p).ne', (Real.rpow_pos_of_pos hn' r).ne']
+
+/-- Recover a complex coordinate from the two real perturbations of the same baseline. -/
+private theorem heckeLogDerivCoefficient_positive_weights_coordinate (b z : ℂ) (g ε : ℝ) :
+    (ε : ℂ) * (b * z) =
+      b * ((g + ε * z.re : ℝ) : ℂ) + Complex.I * (b * ((g + ε * z.im : ℝ) : ℂ)) -
+        (1 + Complex.I) * (b * (g : ℂ)) := by
+  conv_lhs => rw [← Complex.re_add_im z]
+  push_cast
+  ring
+
+/-- The coordinate identity commutes with finite sampling and a linear centering term. -/
+private theorem heckeLogDerivCoefficient_positive_weights_recover {α : Type*}
+    (a : ℕ → ℂ) (S : Finset ℕ) (x : ℕ → α) (g : α → ℝ) (f : α → ℂ)
+    (ε : ℝ) (C : ℝ) (z : ℂ) :
+    let E (w : α → ℂ) (c : ℂ) := (∑ n ∈ S, a n * w (x n)) - c
+    let R (w : α → ℝ) (c : ℝ) := E (fun t ↦ (w t : ℂ)) c
+    (ε : ℂ) * E f z =
+      R (fun t ↦ g t + ε * (f t).re) (C + ε * z.re) +
+      Complex.I * R (fun t ↦ g t + ε * (f t).im) (C + ε * z.im) -
+      (1 + Complex.I) * R g C := by
+  dsimp only
+  have hs := Finset.sum_congr (s₁ := S) (s₂ := S) rfl
+    (fun n _ ↦ heckeLogDerivCoefficient_positive_weights_coordinate (a n) (f (x n)) (g (x n)) ε)
+  simp only [← Finset.mul_sum, Finset.sum_sub_distrib, Finset.sum_add_distrib] at hs
+  have hc := heckeLogDerivCoefficient_positive_weights_coordinate 1 z C ε
+  simp only [one_mul] at hc
+  linear_combination hs - hc
+
+/-- Bound the recovered complex signal by the largest of the three measurements. -/
+private theorem heckeLogDerivCoefficient_positive_weights_norm (a b c : ℂ) :
+    ‖a + Complex.I * b - (1 + Complex.I) * c‖ ≤
+      (2 + Real.sqrt 2) * max ‖c‖ (max ‖a‖ ‖b‖) := by
+  have hI : ‖(1 : ℂ) + Complex.I‖ = Real.sqrt 2 := by
+    rw [Complex.norm_eq_sqrt_sq_add_sq]
+    norm_num
+  let M := max ‖c‖ (max ‖a‖ ‖b‖)
+  have ha : ‖a‖ ≤ M := (le_max_left _ _).trans (le_max_right _ _)
+  have hb : ‖b‖ ≤ M := (le_max_right _ _).trans (le_max_right _ _)
+  have hc : ‖c‖ ≤ M := le_max_left _ _
+  calc
+    _ ≤ (‖a‖ + ‖Complex.I * b‖) + ‖(1 + Complex.I) * c‖ :=
+      (norm_sub_le _ _).trans (add_le_add (norm_add_le _ _) le_rfl)
+    _ ≤ M + M + Real.sqrt 2 * M := by
+      simpa only [norm_mul, Complex.norm_I, one_mul, hI] using
+        add_le_add (add_le_add ha hb) (mul_le_mul_of_nonneg_left hc (Real.sqrt_nonneg 2))
+    _ = _ := by dsimp [M]; ring
+
+/-- Three real, strictly positive weights control a complex test of the normalized
+logarithmic-derivative coefficients on the same finite set. The sample locations
+may be log norms at a common scale, and the set may be restricted to rational primes.
+The real and complex centering terms allow for the pole main term.
+The two perturbed weights differ relatively from the baseline by at most ε. -/
+theorem heckeLogDerivCoefficient_sum_le_three_positive_weights {α : Type*}
+    (g : α → ℝ) (f : α → ℂ) (hg : ∀ t, 0 < g t) (hf : ∀ t, ‖f t‖ ≤ g t)
+    {ε : ℝ} (hε : 0 < ε) (hε' : ε < 1) :
+    let u := fun t ↦ g t + ε * (f t).re
+    let v := fun t ↦ g t + ε * (f t).im
+    (∀ t, 0 < u t ∧ |u t - g t| ≤ ε * g t ∧ 0 < v t ∧ |v t - g t| ≤ ε * g t) ∧
+      ∀ (χ : U[F]) (S : Finset ℕ) (x : ℕ → α) (C : ℝ) (z : ℂ),
+        let E (w : α → ℂ) (c : ℂ) :=
+          (∑ n ∈ S, heckeLogDerivCoefficient (ideleClassNormTwist χ 0) n * w (x n)) - c
+        let R (w : α → ℝ) (c : ℝ) := E (fun t ↦ (w t : ℂ)) c
+        ε * ‖E f z‖ ≤ (2 + Real.sqrt 2) *
+          max ‖R g C‖ (max ‖R u (C + ε * z.re)‖ ‖R v (C + ε * z.im)‖) := by
+  dsimp only
+  constructor
+  · intro t
+    have bounds (y : ℝ) (hy : |y| ≤ g t) :
+        0 < g t + ε * y ∧ |g t + ε * y - g t| ≤ ε * g t := by
+      have hlt := mul_lt_mul_of_pos_right hε' (hg t)
+      have hlo := mul_le_mul_of_nonneg_left (abs_le.mp hy).1 hε.le
+      constructor
+      · linarith
+      · simpa only [add_sub_cancel_left, abs_mul, abs_of_pos hε] using
+          mul_le_mul_of_nonneg_left hy hε.le
+    obtain ⟨hr, hr'⟩ := bounds _ ((Complex.abs_re_le_norm _).trans (hf t))
+    obtain ⟨hi, hi'⟩ := bounds _ ((Complex.abs_im_le_norm _).trans (hf t))
+    exact ⟨hr, hr', hi, hi'⟩
+  · intro χ S x C z
+    have eq := heckeLogDerivCoefficient_positive_weights_recover
+      (heckeLogDerivCoefficient (ideleClassNormTwist χ 0)) S x g f ε C z
+    have norms := congrArg norm eq
+    simp only [norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hε] at norms
+    exact norms.trans_le (heckeLogDerivCoefficient_positive_weights_norm _ _ _)
+
+/-- The three positive measurements control the convergent Hecke sum over any set of
+norms, including all rational primes. Absolute summability of the baseline alone
+suffices for every test in the inequality. -/
+theorem heckeLogDerivCoefficient_tsum_le_three_positive_weights {α : Type*}
+    (χ : U[F]) (A : Set ℕ) (x : ℕ → α) (g : α → ℝ) (f : α → ℂ)
+    (hg : ∀ t, 0 < g t) (hf : ∀ t, ‖f t‖ ≤ g t) {ε : ℝ} (hε : 0 < ε) (hε' : ε < 1)
+    (hA : Summable fun n : A ↦ ‖heckeLogDerivCoefficient (ideleClassNormTwist χ 0) n‖ * g (x n))
+    (C : ℝ) (z : ℂ) :
+    let u := fun t ↦ g t + ε * (f t).re
+    let v := fun t ↦ g t + ε * (f t).im
+    let E (w : α → ℂ) (c : ℂ) :=
+      (∑' n : A, heckeLogDerivCoefficient (ideleClassNormTwist χ 0) n * w (x n)) - c
+    let R (w : α → ℝ) (c : ℝ) := E (fun t ↦ (w t : ℂ)) c
+    ε * ‖E f z‖ ≤ (2 + Real.sqrt 2) *
+      max ‖R g C‖ (max ‖R u (C + ε * z.re)‖ ‖R v (C + ε * z.im)‖) := by
+  classical
+  let a (n : A) := heckeLogDerivCoefficient (ideleClassNormTwist χ 0) n
+  let u := fun t ↦ g t + ε * (f t).re
+  let v := fun t ↦ g t + ε * (f t).im
+  have test := heckeLogDerivCoefficient_sum_le_three_positive_weights (F := F) g f hg hf hε hε'
+  have hlim (w : α → ℂ) (c : ℂ) (hw : ∀ t, ‖w t‖ ≤ 2 * g t) :
+      Tendsto (fun S : Finset A ↦ ‖(∑ n ∈ S, a n * w (x n)) - c‖) atTop
+        (𝓝 ‖(∑' n : A, a n * w (x n)) - c‖) := by
+    have hsum : Summable fun n : A ↦ a n * w (x n) := by
+      refine (hA.mul_left 2).of_norm_bounded fun n ↦ ?_
+      rw [norm_mul, mul_left_comm]
+      exact mul_le_mul_of_nonneg_left (hw _) (norm_nonneg _)
+    have h : Tendsto (fun S : Finset A ↦ ∑ n ∈ S, a n * w (x n)) atTop
+        (𝓝 (∑' n : A, a n * w (x n))) := hsum.hasSum
+    exact (h.sub tendsto_const_nhds).norm
+  have hreal (w : α → ℝ) (hp : ∀ t, 0 < w t) (hb : ∀ t, |w t - g t| ≤ ε * g t) :
+      ∀ t, ‖(w t : ℂ)‖ ≤ 2 * g t := by
+    intro t
+    rw [Complex.norm_real, Real.norm_eq_abs, abs_of_pos (hp t)]
+    have := (abs_le.mp (hb t)).2
+    have := mul_le_mul_of_nonneg_right hε'.le (hg t).le
+    linarith
+  have hu := hreal u (fun t ↦ (test.1 t).1) (fun t ↦ (test.1 t).2.1)
+  have hv := hreal v (fun t ↦ (test.1 t).2.2.1) (fun t ↦ (test.1 t).2.2.2)
+  have hf' := hlim f z fun t ↦ (hf t).trans (by linarith [hg t])
+  have hg' := hlim (fun t ↦ (g t : ℂ)) C fun t ↦ by
+    rw [Complex.norm_real, Real.norm_eq_abs, abs_of_pos (hg t)]
+    linarith [hg t]
+  have hu' := hlim (fun t ↦ (u t : ℂ)) (C + ε * z.re : ℝ) hu
+  have hv' := hlim (fun t ↦ (v t : ℂ)) (C + ε * z.im : ℝ) hv
+  refine le_of_tendsto_of_tendsto' (tendsto_const_nhds.mul hf')
+    (tendsto_const_nhds.mul (hg'.max (hu'.max hv'))) fun S ↦ ?_
+  simpa only [Finset.sum_map, Function.Embedding.coe_subtype, a, u, v] using
+    test.2 χ (S.map (Function.Embedding.subtype (· ∈ A))) x C z
+
 end RiemannMasullo
