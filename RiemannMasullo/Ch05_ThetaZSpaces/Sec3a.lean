@@ -2218,6 +2218,276 @@ private theorem sLocalThetaPrincipalValue_isClosedEmbedding_unitInvariant {S : F
   funext u
   simp only [sLocalThetaPrincipalValue_isClosedEmbedding_localUnit_mul, mul_inv_rev, mul_assoc]
 
+/-- Removing the value at zero times a fixed test of value one gives a local
+principal value. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_local
+    (v : V) (b φ : ℬ(v.adicCompletion F)) (hφ : φ (Multiplicative.ofAdd 0) = 1) :
+    ∃ t, finitePlacePrincipalValue v t = b - b (Multiplicative.ofAdd 0) • φ := by
+  apply (Set.ext_iff.mp (finitePlacePrincipalValue_range v) _).mpr
+  change b (Multiplicative.ofAdd 0) - b (Multiplicative.ofAdd 0) * φ (Multiplicative.ofAdd 0) = 0
+  rw [hφ, mul_one, sub_self]
+
+/-- On a pure tensor, removing its value on the face times `φ` amounts to
+performing the same subtraction on the single local factor. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_pure
+    {S : Finset V} [DecidableEq (↥S)] (v : S) (φ : ℬ(v.val.adicCompletion F))
+    (hφ : φ (Multiplicative.ofAdd 0) = 1)
+    (a : ℬ(InfiniteAdeleRing F)) (b : ∀ w : S, ℬ(w.val.adicCompletion F)) :
+    let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+    let P := sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.2)
+    let z (x : SAdeleRing F S) : SAdeleRing F S := (x.1, Function.update x.2 v 0)
+    let f := e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w))
+    (∀ x : SAdeleRing F S, x.2 v = 0 → P f (Multiplicative.ofAdd x) = 0) ∧
+      ∃ h, ∀ x : SAdeleRing F S, P h (Multiplicative.ofAdd x) =
+        f (Multiplicative.ofAdd x) - f (Multiplicative.ofAdd (z x)) * φ (Multiplicative.ofAdd (x.2 v)) := by
+  classical
+  intro e P z f
+  let pack (b : ∀ w : S, ℬ(w.val.adicCompletion F)) := e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w))
+  have pv (c : ∀ w : S, ℬ(w.val.adicCompletion F)) :
+      P (pack c) = pack (Function.update c v (finitePlacePrincipalValue v.val (c v))) := by
+    refine (sAdelePrincipalValue_tmul (Finset.singleton_subset_iff.mpr v.2) a c).trans ?_
+    apply congrArg pack
+    funext w
+    by_cases h : w = v
+    · subst w; simp
+    · simp [Function.update_of_ne h, show w.val ≠ v.val from fun he ↦ h (Subtype.ext he)]
+  let other := fun (x : SAdeleRing F S) ↦
+    a (Multiplicative.ofAdd x.1) * ∏ w ∈ Finset.univ.erase v, b w (Multiplicative.ofAdd (x.2 w))
+  have val (c : ℬ(v.val.adicCompletion F)) (x : SAdeleRing F S) :
+      pack (Function.update b v c) (Multiplicative.ofAdd x) =
+        other x * c (Multiplicative.ofAdd (x.2 v)) := by
+    rw [(sAdeleSchwartz_inductiveTensor_equiv F S).choose_spec]
+    rw [← Finset.prod_erase_mul _ _ (Finset.mem_univ v), ← mul_assoc, Function.update_self]
+    congr 2
+    exact Finset.prod_congr rfl fun w hw ↦ by rw [Function.update_of_ne (Finset.ne_of_mem_erase hw)]
+  have vo (x : SAdeleRing F S) : other (z x) = other x := by
+    apply congrArg (_ * ·)
+    exact Finset.prod_congr rfl fun w hw ↦ by
+      change b w (Multiplicative.ofAdd (Function.update x.2 v 0 w)) = _
+      rw [Function.update_of_ne (Finset.ne_of_mem_erase hw)]
+  have vb (x : SAdeleRing F S) : pack b (Multiplicative.ofAdd x) =
+      other x * b v (Multiplicative.ofAdd (x.2 v)) := by
+    simpa only [Function.update_eq_self] using val (b v) x
+  have hv (c : ℬ(v.val.adicCompletion F)) : finitePlacePrincipalValue v.val c
+      (Multiplicative.ofAdd 0) = 0 :=
+    (Set.ext_iff.mp (finitePlacePrincipalValue_range v.val) _).mp ⟨c, rfl⟩
+  obtain ⟨t, ht⟩ := sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_local (F := F)
+    v.val (b v) φ hφ
+  refine ⟨fun x hx ↦ ?_, pack (Function.update b v t), fun x ↦ ?_⟩
+  · change P (pack b) _ = 0
+    rw [pv, val, hx, hv, mul_zero]
+  · change P (pack (Function.update b v t)) _ = pack b _ - pack b _ * _
+    rw [pv, Function.update_self, ht, Function.update_idem, val, vb, vb, vo]
+    change _ * (b v _ - b v _ * φ _) = _ - (_ * b v (Multiplicative.ofAdd (Function.update x.2 v 0 v))) * _
+    rw [Function.update_self]
+    ring
+
+/-- On a single finite factor the principal-value range is the kernel of evaluation
+at zero. Tensoring gives exactly the tests that vanish on the face `x_v = 0`. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_face
+    {S : Finset V} (v : S) (f : ℬₛ(S)) :
+    f ∈ (sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.2)).range ↔
+      ∀ x : SAdeleRing F S, x.2 v = 0 → f (Multiplicative.ofAdd x) = 0 := by
+  classical
+  let P := sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.2)
+  let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+  let φ := finiteStandardGaussian v.val 1
+  have hφ : φ (Multiplicative.ofAdd 0) = 1 := by
+    change finiteStandardGaussianValue v.val 1 0 = 1
+    simp [finiteStandardGaussianValue]
+  let z (x : SAdeleRing F S) : SAdeleRing F S := (x.1, Function.update x.2 v 0)
+  let D : Submodule ℂ ℬₛ(S) :=
+    { carrier := {t | (∀ x : SAdeleRing F S, x.2 v = 0 → P t (Multiplicative.ofAdd x) = 0) ∧
+        ∃ h, ∀ x : SAdeleRing F S, P h (Multiplicative.ofAdd x) =
+          t (Multiplicative.ofAdd x) - t (Multiplicative.ofAdd (z x)) * φ (Multiplicative.ofAdd (x.2 v))}
+      zero_mem' := ⟨fun x _ ↦ by simp, 0, fun x ↦ by simp⟩
+      add_mem' := by
+        rintro a b ⟨ha, j, hj⟩ ⟨hb, k, hk⟩
+        refine ⟨fun x hx ↦ ?_, j + k, fun x ↦ ?_⟩
+        · rw [map_add]; exact (congrArg₂ (· + ·) (ha x hx) (hb x hx)).trans (add_zero 0)
+        · rw [map_add]
+          change P j _ + P k _ = (_ + _) - (_ + _) * _
+          rw [hj, hk]
+          ring
+      smul_mem' := by
+        rintro c a ⟨ha, j, hj⟩
+        refine ⟨fun x hx ↦ ?_, c • j, fun x ↦ ?_⟩
+        · rw [map_smul]; exact mul_eq_zero_of_right c (ha x hx)
+        · rw [map_smul]
+          change c * P j _ = c * _ - c * _ * _
+          rw [hj]
+          ring }
+  have pure (a : ℬ(InfiniteAdeleRing F)) (b : ∀ w : S, ℬ(w.val.adicCompletion F)) :
+      e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w)) ∈ D :=
+    sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_pure v φ hφ a b
+  have all_mem (t : ℬₛ(S)) : t ∈ D := by
+    have heq := sLocalThetaPrincipalValue_transition_ext e D.mkQ LinearMap.id 0
+      (fun a b ↦ (Submodule.Quotient.mk_eq_zero D).mpr (pure a b))
+    exact (Submodule.Quotient.mk_eq_zero D).mp (LinearMap.congr_fun heq t)
+  constructor
+  · rintro ⟨t, rfl⟩
+    exact (all_mem t).1
+  · intro hf
+    obtain ⟨t, ht⟩ := (all_mem f).2
+    refine ⟨t, SchwartzBruhat.ext fun y ↦ ?_⟩
+    change P t (Multiplicative.ofAdd y.toAdd) = f (Multiplicative.ofAdd y.toAdd)
+    rw [ht, hf (z y.toAdd) (Function.update_self ..), zero_mul, sub_zero]
+
+/-- The inverse one-place uniformizer has norm greater than one, since its norm is
+the residue cardinality. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_norm
+    {S : Finset V} (v : S) (π : (v.val.adicCompletion F)ˣ)
+    (hπ : (Valued.v : Valuation (v.val.adicCompletion F) (WithZero (Multiplicative ℤ))).IsUniformizer
+      (π : v.val.adicCompletion F)) :
+    1 < ((sIdeleNorm F S (adelicPrincipalValueLocalUnit v π)⁻¹).val : ℝ) := by
+  classical
+  have h : ((sIdeleNorm F S (adelicPrincipalValueLocalUnit v π)).val : ℝ) = ‖π.val‖ := by
+    simp [sIdeleNorm, adelicPrincipalValueLocalUnit]
+    change (∏ w : InfinitePlace F, ‖(1 : w.Completion)‖ ^ w.mult) *
+      (∏ w : S, ‖Function.update (fun j : S ↦ (1 : j.val.adicCompletion F)) v π.val w‖) = _
+    simp only [norm_one, one_pow, Finset.prod_const_one, one_mul]
+    rw [Finset.prod_eq_single v, Function.update_self]
+    · intro w _ hw
+      rw [Function.update_of_ne hw, norm_one]
+    · simp
+  rw [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv, h,
+    norm_uniformizer_adicCompletion v.val _ hπ, inv_inv]
+  exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val
+
+/-- An S-local theta function invariant under an idele of norm greater than one vanishes.
+Its values on the forward orbit are constant and tend to zero by the large-norm estimate. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_periodic
+    {S : Finset V} (a : (SAdeleRing F S)ˣ) (ha : 1 < ((sIdeleNorm F S a).val : ℝ))
+    (f : ℬₛ(S)) (hf : ∀ x, sLocalAdelicTheta F S f (a * x) = sLocalAdelicTheta F S f x) :
+    f ∈ Kₛ(S) := by
+  apply LinearMap.mem_ker.mpr
+  ext x
+  obtain ⟨C, T, _, _, h⟩ := sLocalAdelicTheta_decay_large F S f 1 le_rfl
+  let m (y : (SAdeleRing F S)ˣ) : ℝ := (sIdeleNorm F S y).val
+  have hm (n : ℕ) : m (a ^ n * x) = m a ^ n * m x := by simp [m]
+  have ht : Tendsto (fun n : ℕ ↦ m (a ^ n * x)) atTop atTop := by
+    simp_rw [hm]
+    exact (tendsto_pow_atTop_atTop_of_one_lt ha).atTop_mul_const
+      (NNReal.coe_pos.mpr (Units.zero_lt _))
+  have he (n : ℕ) : sLocalAdelicTheta F S f (a ^ n * x) = sLocalAdelicTheta F S f x := by
+    induction n with
+    | zero => simp
+    | succ n ih => rwa [pow_succ', mul_assoc, hf]
+  have hle : ∀ᶠ n : ℕ in atTop, ‖sLocalAdelicTheta F S f x‖ ≤ C * (m (a ^ n * x))⁻¹ := by
+    filter_upwards [ht.eventually_gt_atTop T] with n hn
+    simpa only [he, pow_one, m] using h (a ^ n * x) hn
+  have hzero := le_of_tendsto_of_tendsto tendsto_const_nhds
+    ((tendsto_const_nhds (x := C)).mul (tendsto_inv_atTop_zero.comp ht)) hle
+  exact norm_le_zero_iff.mp (by simpa only [mul_zero] using hzero)
+
+/-- To descend an embedding on tests it suffices to lift small boundary values of
+kernel elements to small kernel elements. Subtracting such a lift gives a small test
+in the range of the embedding, where the inverse is continuous. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_descend
+    {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    (K : Submodule ℂ E) (P : E →ₗ[ℂ] E) (T : (E ⧸ K) →ₗ[ℂ] E ⧸ K)
+    (hP : IsInducing P) (hT : Continuous T) (hi : Injective T)
+    (hcomm : ∀ f, T (K.mkQ f) = K.mkQ (P f))
+    (htrace : IsOpenMap (P.range.mkQ.comp K.subtype).rangeRestrict) :
+    IsInducing T := by
+  rw [IsTopologicalAddGroup.isInducing_iff_nhds_zero]
+  refine le_antisymm (by simpa only [map_zero] using (hT.tendsto 0).le_comap) (fun U hU ↦ ?_)
+  have hpre : K.mkQ ⁻¹' U ∈ 𝓝 (0 : E) := by
+    simpa only [map_zero] using K.isQuotientMap_mkQ.continuous.continuousAt.preimage_mem_nhds hU
+  obtain ⟨A, hA, hsub⟩ := (hP.nhds_eq_comap 0 ▸ hpre : K.mkQ ⁻¹' U ∈ comap P (𝓝 (P 0)))
+  rw [map_zero] at hA
+  obtain ⟨B, hB, C, hC, hBC⟩ := mem_prod_iff.mp
+    (show (fun z : E × E ↦ z.1 - z.2) ⁻¹' A ∈ 𝓝 0 ×ˢ 𝓝 0 by
+      rw [← nhds_prod_eq]
+      exact (continuous_fst.sub continuous_snd).continuousAt.preimage_mem_nhds (by simpa using hA))
+  let b := P.range.mkQ
+  let r := (b.comp K.subtype).rangeRestrict
+  have hCr : r '' (Subtype.val ⁻¹' C) ∈ 𝓝 (0 : (b.comp K.subtype).range) := by
+    simpa only [map_zero] using htrace.image_mem_nhds
+      (continuous_subtype_val.continuousAt (x := (0 : K)).preimage_mem_nhds hC)
+  rw [nhds_subtype_eq_comap] at hCr
+  obtain ⟨D, hD, hDC⟩ := hCr
+  have hW : B ∩ b ⁻¹' D ∈ 𝓝 (0 : E) :=
+    inter_mem hB (P.range.isQuotientMap_mkQ.continuous.continuousAt.preimage_mem_nhds
+      (by simpa [b] using hD))
+  refine ⟨K.mkQ '' (B ∩ b ⁻¹' D), ?_, ?_⟩
+  · simpa only [map_zero] using K.isOpenMap_mkQ.image_mem_nhds hW
+  · rintro x ⟨g, ⟨hg, hDg⟩, he⟩
+    obtain ⟨f, rfl⟩ := K.mkQ_surjective x
+    rw [hcomm] at he
+    have hk : g - P f ∈ K := (Submodule.Quotient.eq K).mp he
+    have hb : b (g - P f) = b g := by
+      rw [map_sub, show b (P f) = 0 from (Submodule.Quotient.mk_eq_zero P.range).mpr ⟨f, rfl⟩,
+        sub_zero]
+    have hmem : b (g - P f) ∈ D := hb.symm ▸ hDg
+    obtain ⟨k, hkC, hkD⟩ := hDC (a := r ⟨g - P f, hk⟩) hmem
+    have hz : b k.val = b g := (congrArg Subtype.val hkD).trans hb
+    obtain ⟨z, hez⟩ := (Submodule.Quotient.eq P.range).mp hz.symm
+    have hsmall : P z ∈ A := hez ▸ hBC (show (g, k.val) ∈ B ×ˢ C from ⟨hg, hkC⟩)
+    have heq : K.mkQ z = K.mkQ f := hi (by
+      rw [hcomm, hcomm, hez, map_sub, show K.mkQ k.val = 0 from
+        (Submodule.Quotient.mk_eq_zero K).mpr k.property, sub_zero, he])
+    exact heq ▸ hsub hsmall
+
+/-- On a unit-invariant theta function, the term removed by the principal value is the
+uniformizer translate. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_removed
+    {S : Finset V} (v : S) (π : (v.val.adicCompletion F)ˣ)
+    (hπ : (Valued.v : Valuation (v.val.adicCompletion F) (WithZero (Multiplicative ℤ))).IsUniformizer
+      (π : v.val.adicCompletion F)) (f : ℬₛ(S))
+    (hf : ∀ (u : (HeightOneSpectrum.adicCompletionIntegers F v.val).units) (x : (SAdeleRing F S)ˣ),
+      sLocalAdelicTheta F S f ((adelicPrincipalValueLocalUnit v u.val)⁻¹ * x) =
+        sLocalAdelicTheta F S f x) (x : (SAdeleRing F S)ˣ) :
+    sLocalAdelicTheta F S (f - sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.2) f) x =
+      sLocalAdelicTheta F S f ((adelicPrincipalValueLocalUnit v π)⁻¹ * x) := by
+  rw [sLocalThetaPrincipalValue_isClosedEmbedding_average v π hπ]
+  let U := (HeightOneSpectrum.adicCompletionIntegers F v.val).units
+  let μ := finiteLocalMultiplicativeTamagawaMeasure F v.val
+  let : BorelSpace (v.val.adicCompletion F)ˣ := ⟨rfl⟩
+  have hm : (μ.real U : ℂ) ≠ 0 := by
+    exact_mod_cast (finitePlacePrincipalValue_integrable v.val π 0 1).1.ne'
+  have hU : MeasurableSet (U : Set (v.val.adicCompletion F)ˣ) :=
+    (Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)).measurableSet
+  rw [setIntegral_congr_fun hU (g := fun _ ↦
+    sLocalAdelicTheta F S f ((adelicPrincipalValueLocalUnit v π)⁻¹ * x)) (fun u hu ↦ by
+      rw [sLocalThetaPrincipalValue_isClosedEmbedding_localUnit_mul, mul_inv_rev, mul_assoc]
+      exact hf ⟨u, hu⟩ _), setIntegral_const, Complex.real_smul, inv_mul_cancel_left₀ hm]
+
+/-- If the one-place principal value kills a theta class, its theta function equals the
+removed unit-invariant term. It is then periodic under the uniformizer and hence zero. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_injective
+    {S : Finset V} (v : S) (π : (v.val.adicCompletion F)ˣ)
+    (hπ : (Valued.v : Valuation (v.val.adicCompletion F) (WithZero (Multiplicative ℤ))).IsUniformizer
+      (π : v.val.adicCompletion F)) :
+    Injective (sLocalThetaPrincipalValue F (Finset.singleton_subset_iff.mpr v.2)) := by
+  let P := sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.2)
+  apply (injective_iff_map_eq_zero _).mpr
+  intro t ht
+  obtain ⟨f, rfl⟩ := (Kₛ(S)).mkQ_surjective t
+  have hPf : P f ∈ Kₛ(S) := (Submodule.Quotient.mk_eq_zero _).mp ht
+  have he : sLocalAdelicTheta F S (f - P f) = sLocalAdelicTheta F S f := by
+    rw [map_sub, LinearMap.mem_ker.mp hPf, sub_zero]
+  have hu := sLocalThetaPrincipalValue_isClosedEmbedding_unitInvariant v π hπ f
+  change ∀ u x, sLocalAdelicTheta F S (f - P f) _ = sLocalAdelicTheta F S (f - P f) x at hu
+  rw [he] at hu
+  apply (Submodule.Quotient.mk_eq_zero _).mpr
+  apply sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_periodic _
+    (sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_norm v π hπ) f
+  intro x
+  exact (sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_removed v π hπ f hu x).symm.trans
+    (DFunLike.congr_fun he x)
+
+/-- Paper: Lemma 5.3.1.5, p. 242.
+Restrict theta-null tests to the face `x_v = 0`, giving the space of all traces the
+quotient topology from tests. This restriction is open onto its image. Equivalently, for
+each zero-neighborhood in the theta kernel, its traces contain a relative zero-neighborhood
+among the traces of theta-null tests. -/
+private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_open
+    {S : Finset V} (v : S) (Z : Submodule ℂ ℬₛ(S))
+    (hZ : ∀ f, f ∈ Z ↔ ∀ x : SAdeleRing F S, x.2 v = 0 → f (Multiplicative.ofAdd x) = 0) :
+    IsOpenMap (Z.mkQ.comp (Kₛ(S)).subtype).rangeRestrict := by
+  sorry
+
 /-- Paper: Lemma 5.3.1.5, p. 242.
 On theta functions invariant under the integer units at one finite place, every continuous
 quotient seminorm is bounded by a continuous quotient seminorm of the difference with the
@@ -2235,7 +2505,28 @@ private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound {S 
           sLocalAdelicTheta F S f x) →
       p ((Kₛ(S)).mkQ f) ≤ q ((Kₛ(S)).mkQ
         (f - schwartzBruhatUnitTranslate (adelicPrincipalValueLocalUnit v π) f)) := by
-  sorry
+  let T := sLocalThetaPrincipalValue F (Finset.singleton_subset_iff.mpr v.2)
+  let P := sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.2)
+  let : PolynormableSpace ℂ Θₛ(S) := sLocalAdelicThetaSpace_polynormable
+  have hi : IsInducing T := sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_descend
+    (Kₛ(S)) P T (sAdelePrincipalValue_isClosedEmbedding _).isInducing
+    (sLocalThetaPrincipalValue_continuous _)
+    (sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_injective v π hπ)
+    (fun _ ↦ rfl) (sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_open v P.range
+      (sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_face v))
+  obtain ⟨q, hq, hle⟩ := Seminorm.exists_le_comp_of_isInducing hp hi
+  refine ⟨q, hq, fun f hf ↦ ?_⟩
+  have he : (Kₛ(S)).mkQ (f - schwartzBruhatUnitTranslate (adelicPrincipalValueLocalUnit v π) f) =
+      T ((Kₛ(S)).mkQ f) := by
+    apply (Submodule.Quotient.eq _).mpr
+    rw [LinearMap.mem_ker, map_sub, sub_eq_zero]
+    ext x
+    have h := sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_removed v π hπ f hf x
+    rw [map_sub, ContinuousMap.sub_apply] at h ⊢
+    rw [sAdelePrincipalValue_preserves_thetaKernel_translate, ← h]
+    exact sub_sub_cancel _ _
+  rw [he]
+  exact hle _
 
 /-- On the unit-invariant theta functions the average is a single translate. Thus the
 uniformizer difference and principal value give the same quotient class. -/
