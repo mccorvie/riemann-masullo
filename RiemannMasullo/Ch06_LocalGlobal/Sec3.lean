@@ -6,6 +6,7 @@ public import RiemannMasullo.AppB_AnalyticNT.Sec5
 public import RiemannMasullo.AppB_AnalyticNT.Sec6
 public import RiemannMasullo.AppB_AnalyticNT.Sec3
 public import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import RiemannMasullo.External.Grh.Lemmas.AnalyticGoodHeightDisk
 
 /-! # Local and global converse theorems
 
@@ -981,6 +982,352 @@ private theorem globalConverse_nontrivial_closed {g : ℂ → ℂ}
     isClosed_iInter fun i ↦ isClosed_iInter fun _ ↦
       isClosed_eq (globalConverse_nontrivial_jets z i) continuous_const
 
+/-- On a circle about `z`, reflecting the linear factors of a polynomial preserves
+their boundary moduli and gives each reflected factor modulus `r` at the center.
+The maximum principle thus divides out all the factors at a cost of `r⁻¹` per root. -/
+private theorem globalConverse_nontrivial_strip_bounds_polynomial (z : ℂ) (r : ℝ) (hr : 0 < r)
+    (A : Finset ℂ) (n : ℂ → ℕ) (v : ℂ → ℂ) (hv : AnalyticOnNhd ℂ v (Metric.closedBall z r))
+    (M : ℝ) (hb : ∀ w ∈ Metric.sphere z r, ‖(∏ ρ ∈ A, (w - ρ) ^ n ρ) * v w‖ ≤ M) :
+    r ^ (∑ ρ ∈ A, n ρ) * ‖v z‖ ≤ M := by
+  let q (ρ w : ℂ) := (r : ℂ) - starRingEnd ℂ (ρ - z) * (w - z) / r
+  have hq (w : ℂ) (hw : w ∈ Metric.sphere z r) (ρ : ℂ) : ‖q ρ w‖ = ‖w - ρ‖ := by
+    have hw' : ‖w - z‖ = r := by simpa only [Metric.mem_sphere, dist_eq_norm] using hw
+    have he : (w - z) * starRingEnd ℂ (w - z) = (r : ℂ) ^ 2 := by
+      rw [Complex.mul_conj, Complex.normSq_eq_norm_sq, hw']; push_cast; rfl
+    have hid : q ρ w * (r : ℂ) = (w - z) * starRingEnd ℂ (w - ρ) := by
+      rw [show w - ρ = (w - z) - (ρ - z) by ring, map_sub, mul_sub, he]
+      dsimp [q]
+      field_simp [Complex.ofReal_ne_zero.mpr hr.ne']
+    have hn := congrArg norm hid
+    rw [norm_mul, norm_mul, Complex.norm_real, Real.norm_of_nonneg hr.le, hw', Complex.norm_conj,
+      mul_comm r] at hn
+    exact mul_right_cancel₀ hr.ne' hn
+  let G (w : ℂ) := (∏ ρ ∈ A, q ρ w ^ n ρ) * v w
+  have hG : AnalyticOnNhd ℂ G (Metric.closedBall z r) := by
+    intro w hw
+    exact (Finset.analyticAt_fun_prod A fun ρ _ ↦
+      (show AnalyticAt ℂ (q ρ) w by dsimp [q]; fun_prop).pow _).mul (hv w hw)
+  have hd : DiffContOnCl ℂ G (Metric.ball z r) := DifferentiableOn.diffContOnCl (by
+    rw [closure_ball z hr.ne']; exact hG.differentiableOn)
+  have h := Complex.norm_le_of_forall_mem_frontier_norm_le Metric.isBounded_ball hd
+    (C := M) (fun w hw ↦ by
+      rw [frontier_ball z hr.ne'] at hw
+      simpa only [G, norm_mul, norm_prod, norm_pow, hq w hw] using hb w hw)
+    (subset_closure (Metric.mem_ball_self hr))
+  simpa [G, q, norm_mul, norm_pow, norm_prod, Complex.norm_real, abs_of_pos hr,
+    Finset.prod_pow_eq_pow_sum] using h
+
+/-- A denominator bounded by `M` on the radius-six circle and bounded away from zero
+at its center costs only a fixed power of `M` in division on a smaller disk. The
+factorization counts the zeros with multiplicity and bounds the zero-free factor. -/
+private theorem globalConverse_nontrivial_strip_bounds_disk (r δ : ℝ) (hr : 0 < r) (hr1 : r ≤ 1)
+    (hδ : 0 < δ) :
+    ∃ (k : ℕ) (K : ℝ), 0 < K ∧ ∀ (D v : ℂ → ℂ) (c z : ℂ) (M A : ℝ),
+      AnalyticOnNhd ℂ D univ → AnalyticOnNhd ℂ v (Metric.closedBall z r) →
+      dist z c ≤ 2 → 1 ≤ M → δ ≤ ‖D c‖ → (∀ w ∈ Metric.sphere c 6, ‖D w‖ ≤ M) →
+      (∀ w ∈ Metric.sphere z r, ‖D w * v w‖ ≤ A) → ‖v z‖ ≤ K * M ^ k * A := by
+  let J := Real.log (6 / 5 : ℝ)
+  have hJ : 0 < J := Real.log_pos (by norm_num)
+  let H := 8 + 9 * (Real.log 5 / J)
+  let e := H - Real.log r / J
+  have hlr : Real.log r ≤ 0 := Real.log_nonpos hr.le hr1
+  have hH : 0 ≤ H := by dsimp [H]; positivity
+  let k := ⌈e⌉₊
+  refine ⟨k, Real.exp (8 - Real.log δ - e * Real.log δ), Real.exp_pos _, ?_⟩
+  intro D v c z M A hD hv hzc hM hcenter hbd hprod
+  have hc : 0 < ‖D c‖ := hδ.trans_le hcenter
+  obtain ⟨S, n, g, hf, hn, hg⟩ := External.Grh.exists_goodHeight_disk_factorization hD
+    (norm_pos_iff.mp hc) hM hbd
+  let X := Real.log M - Real.log δ
+  have hX : Real.log (M / ‖D c‖) ≤ X := by
+    rw [Real.log_div (by linarith) hc.ne']
+    exact sub_le_sub_left (Real.log_le_log hδ hcenter) _
+  have hcount : ((∑ ρ ∈ S, n ρ : ℕ) : ℝ) ≤ X / J := by
+    push_cast
+    exact hn.trans (div_le_div_of_nonneg_right hX hJ.le)
+  let L := Real.exp (Real.log δ - 8 - H * X)
+  have hL : 0 < L := Real.exp_pos _
+  have hlow (w : ℂ) (hw : w ∈ Metric.sphere z r) : L ≤ ‖g w‖ := by
+    have hwc : w ∈ Metric.closedBall c 3 := by
+      have := dist_triangle w z c
+      rw [Metric.mem_sphere.mp hw] at this
+      exact Metric.mem_closedBall.mpr (by linarith)
+    obtain ⟨hne, hl⟩ := hg w hwc
+    rw [← Real.exp_log (norm_pos_iff.mpr hne)]
+    apply Real.exp_le_exp.mpr
+    exact (sub_le_sub (sub_le_sub_right (Real.log_le_log hδ hcenter) _)
+      (mul_le_mul_of_nonneg_left hX hH)).trans hl
+  have hpoly := globalConverse_nontrivial_strip_bounds_polynomial z r hr S n v hv (A / L)
+    (fun w hw ↦ by
+      apply (le_div_iff₀ hL).mpr
+      have h := hprod w hw
+      rw [hf, norm_mul, norm_mul] at h
+      rw [norm_mul, mul_right_comm]
+      exact (mul_le_mul_of_nonneg_right (mul_le_mul_of_nonneg_left (hlow w hw) (norm_nonneg _))
+        (norm_nonneg _)).trans h)
+  have hAn : 0 ≤ A := by
+    obtain ⟨w, hw⟩ := (NormedSpace.sphere_nonempty (x := z)).mpr hr.le
+    exact (norm_nonneg _).trans (hprod w hw)
+  let d := ∑ ρ ∈ S, n ρ
+  have hcost : (L * r ^ d)⁻¹ ≤ Real.exp (8 - Real.log δ - e * Real.log δ) * M ^ k := by
+    have hM0 : 0 < M := zero_lt_one.trans_le hM
+    have hp : 0 < L * r ^ d := mul_pos hL (pow_pos hr _)
+    rw [← Real.exp_log (inv_pos.mpr hp), Real.log_inv, Real.log_mul hL.ne' (pow_pos hr _).ne',
+      Real.log_pow, show Real.log L = _ from Real.log_exp _,
+      show M ^ k = Real.exp ((k : ℝ) * Real.log M) by rw [Real.exp_nat_mul, Real.exp_log hM0],
+      ← Real.exp_add]
+    apply Real.exp_le_exp.mpr
+    have hlog := mul_le_mul_of_nonpos_right hcount hlr
+    have hk := mul_le_mul_of_nonneg_right (Nat.le_ceil e) (Real.log_nonneg hM)
+    dsimp only [e] at hk ⊢
+    dsimp only [d, X] at *
+    linarith [show (Real.log M - Real.log δ) / J * Real.log r =
+      Real.log r / J * (Real.log M - Real.log δ) by ring]
+  calc
+    ‖v z‖ ≤ (L * r ^ d)⁻¹ * A := by
+      rw [← div_eq_inv_mul, le_div_iff₀ (mul_pos hL (pow_pos hr _))]
+      simpa only [d, mul_left_comm, mul_comm, mul_assoc] using (le_div_iff₀ hL).mp hpoly
+    _ ≤ _ := mul_le_mul_of_nonneg_right hcost hAn
+
+/-- On a positive substrip, use disks centered at the target height on or to the
+right of the line 2. Rapid decay of the product on the target disk absorbs the
+polynomial loss coming from the larger disk about the Euler-product center. -/
+private theorem globalConverse_nontrivial_strip_bounds_divide (D v : ℂ → ℂ)
+    (hD : AnalyticOnNhd ℂ D univ) (hv : AnalyticOnNhd ℂ v (Complex.re ⁻¹' Ioi 0))
+    (hlo : ∃ δ > 0, ∀ z : ℂ, 2 ≤ z.re → δ ≤ ‖D z‖)
+    (hup : ∀ b ≥ (2 : ℝ), ∃ C ≥ (1 : ℝ), ∃ m : ℕ, ∀ z : ℂ, z.re ∈ Icc (-4) (b + 6) →
+      ‖D z‖ ≤ C * (1 + |z.im|) ^ m)
+    (hprod : ∀ a b : ℝ, 0 < a → a ≤ b → ∀ n : ℕ, ∃ A : ℝ, ∀ w : ℂ, w.re ∈ Icc a b →
+      (1 + |w.im|) ^ n * ‖D w * v w‖ ≤ A)
+    (a b : ℝ) (ha : 0 < a) (hab : a ≤ b) :
+    BddAbove ((fun z ↦ ‖v z‖) '' (Complex.re ⁻¹' Icc a b)) := by
+  obtain ⟨δ, hδ, hlo⟩ := hlo
+  let r := min (a / 2) 1
+  have hr : 0 < r := lt_min (by positivity) zero_lt_one
+  have hr1 : r ≤ 1 := min_le_right _ _
+  obtain ⟨k, K, hK, hdisk⟩ := globalConverse_nontrivial_strip_bounds_disk r δ hr hr1 hδ
+  obtain ⟨C, hC, m, hM⟩ := hup (max 2 b) (le_max_left _ _)
+  obtain ⟨A, hA⟩ := hprod (a / 2) (b + 1) (by positivity) (by linarith) (m * k)
+  refine ⟨K * (C * 7 ^ m) ^ k * (2 ^ (m * k) * A), ?_⟩
+  rintro _ ⟨z, hz, rfl⟩
+  change a ≤ z.re ∧ z.re ≤ b at hz
+  let c : ℂ := ⟨max 2 z.re, z.im⟩
+  let T := 1 + |z.im|
+  have hT : 1 ≤ T := le_add_of_nonneg_right (abs_nonneg _)
+  have hc : dist z c ≤ 2 := by
+    have e : z - c = ((z.re - max 2 z.re : ℝ) : ℂ) := by apply Complex.ext <;> simp [c]
+    rw [dist_eq_norm, e, Complex.norm_real, Real.norm_eq_abs, abs_le]
+    rcases le_total 2 z.re with h | h
+    · rw [max_eq_right h]; norm_num
+    · rw [max_eq_left h]; constructor <;> linarith [hz.1]
+  have hnear (w : ℂ) (hw : w ∈ Metric.closedBall z r) :
+      w.re ∈ Icc (a / 2) (b + 1) ∧ T ≤ 2 * (1 + |w.im|) := by
+    have hd : ‖w - z‖ ≤ r := by simpa only [Metric.mem_closedBall, dist_eq_norm] using hw
+    have h₁ := (Complex.abs_re_le_norm (w - z)).trans hd
+    have h₂ := (Complex.abs_im_le_norm (w - z)).trans hd
+    rw [Complex.sub_re, abs_le] at h₁
+    rw [Complex.sub_im] at h₂
+    have hrs : r ≤ a / 2 := min_le_left _ _
+    refine ⟨⟨by linarith [hz.1], by linarith [hz.2]⟩, ?_⟩
+    have := abs_sub_abs_le_abs_sub z.im w.im
+    rw [abs_sub_comm] at this
+    dsimp only [T]; linarith [abs_nonneg w.im]
+  let M := (C * 7 ^ m) * T ^ m
+  have hM1 : 1 ≤ M := one_le_mul_of_one_le_of_one_le
+    (one_le_mul_of_one_le_of_one_le hC (one_le_pow₀ (by norm_num))) (one_le_pow₀ hT)
+  have hcircle (w : ℂ) (hw : w ∈ Metric.sphere c 6) : ‖D w‖ ≤ M := by
+    have hd : ‖w - c‖ = 6 := by simpa only [Metric.mem_sphere, dist_eq_norm] using hw
+    have h₁ := Complex.abs_re_le_norm (w - c)
+    have h₂ := Complex.abs_im_le_norm (w - c)
+    rw [hd, Complex.sub_re, abs_le] at h₁
+    rw [hd, Complex.sub_im] at h₂
+    have hcre : c.re ∈ Icc 2 (max 2 b) := ⟨le_max_left _ _, max_le_max_left _ hz.2⟩
+    refine (hM w ⟨by linarith [hcre.1], by linarith [hcre.2]⟩).trans ?_
+    have hi := abs_sub_abs_le_abs_sub w.im c.im
+    have ht : 1 + |w.im| ≤ 7 * T := by dsimp [T, c] at *; linarith [abs_nonneg z.im]
+    dsimp only [M]
+    rw [mul_assoc, ← mul_pow]
+    gcongr
+  have hTk : 0 < T ^ (m * k) := pow_pos (zero_lt_one.trans_le hT) _
+  have h := hdisk D v c z M (2 ^ (m * k) * A / T ^ (m * k)) hD
+    (hv.mono fun w hw ↦ lt_of_lt_of_le (half_pos ha) (hnear w hw).1.1) hc hM1
+    (hlo c (le_max_left _ _)) hcircle (fun w hw ↦ by
+      obtain ⟨hre, ht⟩ := hnear w (Metric.sphere_subset_closedBall hw)
+      apply (le_div_iff₀ hTk).mpr
+      rw [mul_comm]
+      calc
+        _ ≤ (2 * (1 + |w.im|)) ^ (m * k) * ‖D w * v w‖ := by gcongr
+        _ ≤ _ := by rw [mul_pow, mul_assoc]; gcongr; exact hA w hre)
+  refine h.trans (le_of_eq ?_)
+  dsimp only [M]
+  rw [mul_pow, ← pow_mul]
+  field_simp [hTk.ne']
+
+/-- Each removed Euler factor is an entire geometric denominator. Its upper and
+lower triangle inequalities are uniform in the height of the complex argument. -/
+private theorem globalConverse_nontrivial_strip_bounds_factor (χ : U) (v : V) :
+    Differentiable ℂ (fun z ↦ (finiteHeckeEulerFactor χ v z)⁻¹) ∧ ∀ z : ℂ,
+      1 - (q(v) : ℝ) ^ (-z.re) ≤ ‖(finiteHeckeEulerFactor χ v z)⁻¹‖ ∧
+      ‖(finiteHeckeEulerFactor χ v z)⁻¹‖ ≤ 1 + (q(v) : ℝ) ^ (-z.re) := by
+  let q : ℝ := q(v)
+  have hq : 1 < q := by dsimp [q]; exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have hq₀ := zero_lt_one.trans hq
+  unfold finiteHeckeEulerFactor
+  split_ifs
+  · simp only [inv_inv]
+    have hn : (q(v) : ℂ) ≠ 0 := by exact_mod_cast (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)).ne'
+    refine ⟨(differentiable_const _).sub ((differentiable_const _).mul
+      (differentiable_neg.const_cpow (Or.inl hn))), fun z ↦ ?_⟩
+    let w := χ₀(χ).localValue v * (q(v) : ℂ) ^ (-z)
+    have hw : ‖w‖ = q ^ (-z.re) := by
+      change ‖_ * (q : ℂ) ^ (-z)‖ = _
+      rw [norm_mul, norm_ideleClassNormTwist_zero_localValue, one_mul,
+        Complex.norm_cpow_eq_rpow_re_of_pos hq₀, Complex.neg_re]
+    change 1 - q ^ (-z.re) ≤ ‖1 - w‖ ∧ ‖1 - w‖ ≤ 1 + q ^ (-z.re)
+    simpa only [hw, norm_one] using And.intro (norm_sub_norm_le (1 : ℂ) w) (norm_sub_le (1 : ℂ) w)
+  · simp only [inv_one, norm_one]
+    exact ⟨differentiable_const _, fun z ↦ ⟨sub_le_self _ (Real.rpow_nonneg hq₀.le _),
+      le_add_of_nonneg_right (Real.rpow_nonneg hq₀.le _)⟩⟩
+
+/-- For a nontrivial component the finite continuation is entire. The outside
+Euler product has polynomial upper bounds on strips and a uniform positive
+lower bound at real parts at least two. Weil's identity identifies its product
+with the local zeta function throughout the positive half-plane. -/
+private theorem globalConverse_nontrivial_strip_bounds_euler (χ : U) (hχ : χ₁(χ) ≠ 1)
+    (S : Finset V) (hD : ∀ v : V, v.asIdeal ∣ differentIdeal ℤ (𝓞 F) → v ∈ S)
+    (hc : χ₀(χ) ∈ unramifiedOutside F S) (η : PontryaginDual (SIdeleQuotient F S))
+    (hη : sIdeleRestriction F S ⟨χ₀(χ), hc⟩ = normChartₛ(η) 0)
+    (g : SchwartzBruhat (Multiplicative (SAdeleRing F S))) :
+    ∃ D : ℂ → ℂ, AnalyticOnNhd ℂ D univ ∧
+      (∃ δ > 0, ∀ z : ℂ, 2 ≤ z.re → δ ≤ ‖D z‖) ∧
+      (∀ b ≥ (2 : ℝ), ∃ C ≥ (1 : ℝ), ∃ m : ℕ, ∀ z : ℂ, z.re ∈ Icc (-4) (b + 6) →
+        ‖D z‖ ≤ C * (1 + |z.im|) ^ m) ∧
+      ∀ z : ℂ, 0 < z.re → D z * sLocalIdelicZFunction g (normChartₛ(η) z) =
+        globalIdelicZFunction (sAdeleSchwartzToGlobal F S g) (ideleClassNormTwist χ z) := by
+  classical
+  have hnχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype ≠ 1 :=
+    fun h ↦ hχ (PontryaginDual.ext fun y ↦ DFunLike.congr_fun h y)
+  let L (z : ℂ) := (heckeGammaFactor χ z)⁻¹ * continuedCompletedHeckeL χ z
+  have hL := (differentiable_inv_heckeGammaFactor χ).mul (completedHeckeL_continuation_entire χ _
+    (continuedCompletedHeckeL_spec χ).1 (continuedCompletedHeckeL_spec χ).2 hnχ)
+  have hNF : MeromorphicNFOn L univ := fun z _ ↦ (hL.analyticAt z).meromorphicNFAt
+  have hs (s : halfPlane) : L s = finiteHeckeL χ s := by
+    dsimp only [L]
+    rw [(continuedCompletedHeckeL_spec χ).2 s]
+    change _ * (heckeGammaFactor χ s * _) = _
+    rw [inv_mul_cancel_left₀ (heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans s.property))]
+    rfl
+  let removedFactors (z : ℂ) := ∏ v ∈ S, (finiteHeckeEulerFactor χ v z)⁻¹
+  have hP : Differentiable ℂ removedFactors := Differentiable.fun_finsetProd fun v _ ↦
+    (globalConverse_nontrivial_strip_bounds_factor χ v).1
+  let D := removedFactors * L
+  have han : AnalyticOnNhd ℂ D univ := fun z _ ↦ (hP.mul hL).analyticAt z
+  refine ⟨D, han, ?_, ?_, ?_⟩
+  · let d := ∏ v ∈ S, (1 - (q(v) : ℝ) ^ (-(2 : ℝ)))
+    have hdv (v : V) : 0 < 1 - (q(v) : ℝ) ^ (-(2 : ℝ)) := sub_pos.mpr
+      (Real.rpow_lt_one_of_one_lt_of_neg (by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v) (by norm_num))
+    have hd : 0 < d := Finset.prod_pos (fun v _ ↦ hdv v)
+    let Z := max 1 ‖dedekindZeta F (2 : ℝ)‖
+    have hZ : 0 < Z := zero_lt_one.trans_le (le_max_left _ _)
+    refine ⟨d / Z, div_pos hd hZ, fun z hz ↦ ?_⟩
+    have h := (finiteHeckeL_zeroFreeRegion_euler F χ ⟨z, one_lt_two.trans_le hz⟩
+      (y := 2) one_lt_two hz).2
+    rw [← hs] at h
+    have hl : 1 / Z ≤ ‖L z‖ := (div_le_iff₀ hZ).mpr
+      (h.trans (mul_le_mul_of_nonneg_left (le_max_right _ _) (norm_nonneg _)))
+    have hp : d ≤ ‖removedFactors z‖ := by
+      dsimp only [removedFactors, d]; rw [norm_prod]
+      apply Finset.prod_le_prod₀ (fun v _ ↦ (hdv v).le)
+      intro v _
+      refine (sub_le_sub_left ?_ _).trans ((globalConverse_nontrivial_strip_bounds_factor χ v).2 z).1
+      exact Real.rpow_le_rpow_of_exponent_le (by exact_mod_cast (HeightOneSpectrum.one_lt_absNorm v).le) (neg_le_neg hz)
+    simpa only [D, Pi.mul_apply, norm_mul, div_eq_mul_inv, one_mul] using
+      mul_le_mul hp hl (by positivity) (norm_nonneg _)
+  · intro b hb
+    obtain ⟨p, hp, hO⟩ := finiteHeckeL_continuation_isBigO_rpow χ L hNF hs (-4) (b + 6) (by linarith)
+    obtain ⟨C, hC, hbound⟩ := Asymptotics.isBigO_iff'.mp hO
+    rw [eventually_inf_principal, eventually_comap, eventually_atTop] at hbound
+    obtain ⟨t, ht⟩ := hbound
+    let m := ⌈p⌉₊
+    let heightCutoff := max t 1
+    let rect := Complex.reProdIm (Icc (-4 : ℝ) (b + 6)) (Icc (-heightCutoff) heightCutoff)
+    obtain ⟨K, hK⟩ := (isCompact_Icc.reProdIm isCompact_Icc).bddAbove_image
+      (f := fun z : ℂ ↦ ‖L z‖) hL.continuous.norm.continuousOn (K := rect)
+    let Q := ∏ v ∈ S, (1 + (q(v) : ℝ) ^ (4 : ℝ))
+    have hQ : 1 ≤ Q := Finset.one_le_prod₀ fun v _ ↦ le_add_of_nonneg_right
+      (Real.rpow_nonneg (Nat.cast_nonneg _) _)
+    let C' := max 1 (max K C)
+    have hC' : 1 ≤ C' := le_max_left _ _
+    refine ⟨Q * C', one_le_mul_of_one_le_of_one_le hQ hC', m, fun z hz ↦ ?_⟩
+    have hpz : ‖removedFactors z‖ ≤ Q := by
+      dsimp only [removedFactors, Q]; rw [norm_prod]
+      apply Finset.prod_le_prod₀ fun _ _ ↦ norm_nonneg _
+      intro v _
+      refine ((globalConverse_nontrivial_strip_bounds_factor χ v).2 z).2.trans (add_le_add_right ?_ _)
+      exact Real.rpow_le_rpow_of_exponent_le
+        (by exact_mod_cast (HeightOneSpectrum.one_lt_absNorm v).le) (by linarith [hz.1])
+    have hbz : 1 ≤ 1 + |z.im| := le_add_of_nonneg_right (abs_nonneg _)
+    have hlz : ‖L z‖ ≤ C' * (1 + |z.im|) ^ m := by
+      by_cases hy : |z.im| ≤ heightCutoff
+      · exact (hK ⟨z, ⟨hz, abs_le.mp hy⟩, rfl⟩).trans (((le_max_left K C).trans (le_max_right _ _)).trans
+          (le_mul_of_one_le_right (zero_le_one.trans hC') (one_le_pow₀ hbz)))
+      · have ht' : t ≤ |z.im| := (le_max_left _ _).trans (le_of_not_ge hy)
+        have h := ht _ ht' z rfl hz
+        rw [Real.norm_of_nonneg (Real.rpow_nonneg (abs_nonneg _) _)] at h
+        apply h.trans
+        apply mul_le_mul ((le_max_right K C).trans (le_max_right _ _)) _ (by positivity) (zero_le_one.trans hC')
+        calc
+          _ ≤ (1 + |z.im|) ^ p := Real.rpow_le_rpow (abs_nonneg _) (by linarith) hp.le
+          _ ≤ (1 + |z.im|) ^ (m : ℝ) := Real.rpow_le_rpow_of_exponent_le hbz (Nat.le_ceil _)
+          _ = _ := Real.rpow_natCast _ _
+    simpa only [D, Pi.mul_apply, norm_mul, mul_assoc] using
+      mul_le_mul hpz hlz (norm_nonneg _) (zero_le_one.trans hQ)
+  · have hbase : sIdeleRestriction F S ⟨χ₀(χ), hc⟩ =
+        (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η := by
+      ext1 y
+      have h := DFunLike.congr_fun hη y
+      change _ = (η y : ℂ) * _ ^ (0 : ℂ) at h
+      change _ = (η y : ℂ)
+      simpa only [Complex.cpow_zero, mul_one] using h
+    have hmass : (∏ᶠ v : {v : V // v ∉ S},
+        (((finiteLocalMultiplicativeTamagawaMeasure F v.val)
+          (v.val.adicCompletionIntegers F).units).toReal : ℂ)) = 1 := by
+      apply finprod_eq_one_of_forall_eq_one
+      intro v
+      have hv := fun h ↦ v.property (hD v.val h)
+      simp [finiteLocalMultiplicativeTamagawaMeasure_integerUnits, multiplicity_eq_zero_of_not_dvd hv]
+    have hw := weilIdentity_unramifiedOutside_meromorphic S g χ hc L hNF (fun z hz ↦ hs ⟨z, hz⟩)
+    rw [hbase] at hw
+    intro z hz
+    have hloc := (sLocalIdelicZetaIntegral_analyticOn g η).differentiableOn.congr (fun w hw ↦
+      sLocalIdelicZFunction_eq_integral g ⟨η, w, hw, rfl⟩)
+    have hcont := (han z trivial).continuousAt.mul (hloc.continuousOn.continuousAt
+      ((isOpen_Ioi.preimage Complex.continuous_re).mem_nhds hz))
+    apply tendsto_nhds_unique (l := 𝓝[≠] z) (hcont.tendsto.mono_left nhdsWithin_le_nhds)
+    apply ((globalIdelicZFunction_entire_of_nontrivial _ χ hnχ z).continuousAt.tendsto.mono_left
+      nhdsWithin_le_nhds).congr'
+    filter_upwards [nhdsNE_le_codiscrete z hw] with w h
+    rw [h, hmass, one_mul]
+    change _ = (removedFactors w * L w) * _
+    ring
+
+/-- The extra imaginary-height weights needed for division are absorbed by the
+ordinary Schwartz–Bergman seminorms, also after reflecting the argument. -/
+private theorem globalConverse_nontrivial_strip_bounds_weight (f : ℂ → ℂ)
+    (hf : f ∈ schwartzBergmanSubmodule univ) (a b : ℝ) (hab : a ≤ b) (N n : ℕ) :
+    ∃ A : ℝ, ∀ z : ℂ, z.re ∈ Icc a b → (1 + |z.im|) ^ n * ‖z ^ N * f z‖ ≤ A := by
+  obtain ⟨C, hC⟩ := hf.2.2 a b hab (subset_univ _) N
+  obtain ⟨E, hE⟩ := hf.2.2 a b hab (subset_univ _) (n + N)
+  refine ⟨2 ^ n * max C E, fun z hz ↦ ?_⟩
+  have hi := Complex.abs_im_le_norm z
+  rcases le_total ‖z‖ 1 with h | h
+  · exact mul_le_mul (pow_le_pow_left₀ (by positivity) (by linarith) _)
+      ((hC (mem_image_of_mem _ hz)).trans (le_max_left _ _)) (norm_nonneg _) (by positivity)
+  · calc
+      _ ≤ (2 * ‖z‖) ^ n * ‖z ^ N * f z‖ := by gcongr; linarith
+      _ = 2 ^ n * ‖z ^ (n + N) * f z‖ := by simp only [mul_pow, pow_add, norm_mul, norm_pow]; ring
+      _ ≤ _ := mul_le_mul_of_nonneg_left ((hE (mem_image_of_mem _ hz)).trans (le_max_right _ _)) (by positivity)
+
 /-- For an entire multiplier whose product with the completed Hecke function is
 Schwartz on strips, the two multiplied local zeta coordinates of a normalized
 test have rapid decay on closed substrips of their respective half-planes.
@@ -1001,7 +1348,102 @@ private theorem globalConverse_nontrivial_strip_bounds (χ : U) (hχ : χ₁(χ)
     ∀ a b : ℝ, a ≤ b → ∀ N : ℕ,
       (0 < a → BddAbove ((fun z : ℂ ↦ ‖z ^ N * (u z * p.1.val z)‖) '' (Complex.re ⁻¹' Icc a b))) ∧
       (b < 1 → BddAbove ((fun z : ℂ ↦ ‖z ^ N * (u z * p.2.val z)‖) '' (Complex.re ⁻¹' Icc a b))) := by
-  sorry
+  let G := sAdeleSchwartzToGlobal F S g
+  let p := sLocalZetaPair η (Submodule.Quotient.mk g)
+  have hZ : (fun z ↦ globalIdelicZFunction G (ideleClassNormTwist χ z)) = continuedCompletedHeckeL χ :=
+    eq_of_agree_rightHalf (globalIdelicZFunction_meromorphic G χ) (continuedCompletedHeckeL_spec χ).1 1
+      (fun z hz ↦ (globalIdelicZFunction_eq_integral G (globalTwist_mem_rightHalf χ hz)).trans
+        ((hg ⟨z, hz⟩).trans ((continuedCompletedHeckeL_spec χ).2 ⟨z, hz⟩).symm))
+  have hop : IsOpen (Complex.re ⁻¹' Ioi 0) := isOpen_Ioi.preimage Complex.continuous_re
+  dsimp only
+  intro a b hab N
+  constructor
+  · intro ha
+    obtain ⟨D, han, hlo, hup, he⟩ := globalConverse_nontrivial_strip_bounds_euler χ hχ S hD hc η hη g
+    let v (z : ℂ) := z ^ N * (u z * p.1.val z)
+    apply globalConverse_nontrivial_strip_bounds_divide D v han _ hlo hup _ a b ha hab
+    · exact ((differentiable_id.pow N).differentiableOn.mul
+        (hu.differentiableOn.mul p.1.property.2.1)).analyticOnNhd hop
+    · intro l r hl hlr n
+      obtain ⟨A, hA⟩ := globalConverse_nontrivial_strip_bounds_weight _ hB l r hlr N n
+      refine ⟨A, fun w hw ↦ ?_⟩
+      have h := (he w (hl.trans_le hw.1)).trans (congrFun hZ w)
+      have hloc : p.1.val w = sLocalIdelicZFunction g (normChartₛ(η) w) :=
+        (sLocalZetaPair_mk η g).1 (hl.trans_le hw.1)
+      rw [← hloc] at h
+      have eq : D w * v w = w ^ N * ((continuedCompletedHeckeL χ * u) w) := by
+        change D w * (w ^ N * (u w * p.1.val w)) = w ^ N * (continuedCompletedHeckeL χ w * u w)
+        rw [← h]; ring
+      simpa only [eq] using hA w hw
+  · intro hb
+    have hi (x : C𝔽) : χ₀(χ⁻¹) x = (χ₀(χ) x)⁻¹ := by
+      change ((χ x : ℂ)⁻¹ * _ ^ (0 : ℂ)) = ((χ x : ℂ) * _ ^ (0 : ℂ))⁻¹
+      simp
+    have hci : χ₀(χ⁻¹) ∈ unramifiedOutside F S := by
+      rw [mem_unramifiedOutside_iff] at hc ⊢
+      intro v hv y
+      have h := hc v hv y
+      exact (hi _).trans (by rw [show χ₀(χ) _ = 1 from h, inv_one])
+    have hηi : sIdeleRestriction F S ⟨χ₀(χ⁻¹), hci⟩ = normChartₛ(η⁻¹) 0 := by
+      ext1 x
+      obtain ⟨t, rfl⟩ := QuotientGroup.mk_surjective x
+      have h := DFunLike.congr_fun hη (QuotientGroup.mk t)
+      rw [sIdeleRestriction_mk] at h ⊢
+      rw [hi, h]
+      change ((η _ : ℂ) * _ ^ (0 : ℂ))⁻¹ = (η _ : ℂ)⁻¹ * _ ^ (0 : ℂ)
+      simp
+    have hχi : χ₁(χ⁻¹) ≠ 1 := by
+      intro h
+      apply hχ
+      ext1 x
+      have e := DFunLike.congr_fun h x
+      change (χ x.val)⁻¹ = 1 at e
+      exact inv_eq_one.mp e
+    let g' := sAdeleSchwartzFourier g
+    obtain ⟨D, han, hlo, hup, he⟩ :=
+      globalConverse_nontrivial_strip_bounds_euler χ⁻¹ hχi S hD hci η⁻¹ hηi g'
+    have hfour : adeleSchwartzFourier G = sAdeleSchwartzToGlobal F S g' :=
+      adeleSchwartzFourier_sAdeleSchwartzToGlobal_of_different F S hD g g' rfl
+    have hzref (w : ℂ) : globalIdelicZFunction (sAdeleSchwartzToGlobal F S g') (ideleClassNormTwist χ⁻¹ w) =
+        continuedCompletedHeckeL χ (1 - w) := by
+      rw [← congrFun hZ (1 - w), globalIdelicZFunction_functionalEquation G, hfour]
+      congr 1
+      ext1 x
+      let q : ℂ := (((ideleClassNorm F x : ℝ≥0) : ℝ) : ℂ)
+      have hq : q ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (ideleClassNorm F x).ne_zero)
+      change _ = q * ideleClassNormTwist χ (1 - w) x⁻¹
+      rw [map_inv]
+      change (χ x : ℂ)⁻¹ * q ^ w = q * ((χ x : ℂ) * q ^ (1 - w))⁻¹
+      rw [Complex.cpow_sub 1 w hq, Complex.cpow_one]
+      field_simp
+    let v (w : ℂ) := (1 - w) ^ N * (u (1 - w) * p.2.val (1 - w))
+    have href (w : ℂ) (hw : 0 < w.re) : (1 - w).re < 1 := by simpa using hw
+    have hv : AnalyticOnNhd ℂ v (Complex.re ⁻¹' Ioi 0) := by
+      have h := ((differentiable_id.pow N).differentiableOn.mul
+        (hu.differentiableOn.mul p.2.property.2.1)).analyticOnNhd (isOpen_Iio.preimage Complex.continuous_re)
+      exact fun w hw ↦ (h _ (href w hw)).comp (analyticAt_const.sub analyticAt_id)
+    have bound := globalConverse_nontrivial_strip_bounds_divide D v han hv hlo hup (fun l r hl hlr n ↦ by
+      obtain ⟨A, hA⟩ := globalConverse_nontrivial_strip_bounds_weight
+        _ hB (1 - r) (1 - l) (sub_le_sub_left hlr _) N n
+      refine ⟨A, fun w hw ↦ ?_⟩
+      have h := (he w (hl.trans_le hw.1)).trans (hzref w)
+      have hloc : p.2.val (1 - w) = sLocalIdelicZFunction g' (normChartₛ(η⁻¹) (1 - (1 - w))) :=
+        (sLocalZetaPair_mk η g).2 (href w (hl.trans_le hw.1))
+      rw [sub_sub_cancel] at hloc
+      have eq : D w * v w = (1 - w) ^ N * ((continuedCompletedHeckeL χ * u) (1 - w)) := by
+        change D w * ((1 - w) ^ N * (u (1 - w) * p.2.val (1 - w))) =
+          (1 - w) ^ N * (continuedCompletedHeckeL χ (1 - w) * u (1 - w))
+        rw [← (show D w * p.2.val (1 - w) = continuedCompletedHeckeL χ (1 - w) from
+          (congrArg (D w * ·) hloc).trans h)]
+        ac_rfl
+      rw [eq]
+      simpa only [Complex.sub_im, Complex.one_im, zero_sub, abs_neg] using hA (1 - w)
+        (show (1 - w).re ∈ Icc (1 - r) (1 - l) from ⟨sub_le_sub_left hw.2 _, sub_le_sub_left hw.1 _⟩))
+      (1 - b) (1 - a) (sub_pos.mpr hb) (sub_le_sub_left hab _)
+    apply bound.mono
+    rintro _ ⟨w, hw, rfl⟩
+    refine ⟨1 - w, ⟨sub_le_sub_left hw.2 _, sub_le_sub_left hw.1 _⟩, ?_⟩
+    simp only [v, p, sub_sub_cancel]
 
 /-- Multiply both coordinates of the normalized local pair by the same entire
 function. The local functional equation survives, so the local converse supplies
