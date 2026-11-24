@@ -4263,6 +4263,666 @@ private theorem sLocalPWOrbital_bases_bounded_interpolation_fourier_synthesis
     ∃ x : Θ(T, χ), ∀ j : Iₚ(p, χ), sLocalOrbitalFourierJet j x / (j.val.2.factorial : ℂ) = a j := by
   sorry
 
+/-- Near the selected center the normalized reciprocal of a nonpolar Euler factor
+is `1 + b * (exp (L*z) - 1)`, where `b = 1 - L_v(c)`. On a disk of radius
+inversely proportional to a bound for the slopes, their product stays away from zero. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_disk
+    {ι : Type*} [Fintype ι] (b L : ι → ℂ) (M B r : ℝ)
+    (hM : 1 ≤ M) (hB : 1 ≤ B) (hL : ∀ v, ‖L v‖ ≤ M) (hb : ∀ v, ‖b v‖ ≤ B)
+    (hr : r ≤ (4 * M * B)⁻¹) :
+    let D (z : ℂ) := ∏ v, (1 + b v * (Complex.exp (L v * z) - 1))
+    ∀ z ∈ Metric.closedBall (0 : ℂ) r, D z ≠ 0 ∧ ‖(D z)⁻¹‖ ≤ 2 ^ Fintype.card ι := by
+  intro D z hz
+  have hden : 0 < 4 * M * B := by positivity
+  have hs := (le_inv_mul_iff₀' hden).mp (show ‖z‖ ≤ (4 * M * B)⁻¹ * 1 by
+    rw [mul_one]; exact (mem_closedBall_zero_iff.mp hz).trans hr)
+  have hv (v : ι) : ‖L v * z‖ ≤ M * ‖z‖ := by rw [norm_mul]; gcongr; exact hL v
+  have hx : M * ‖z‖ ≤ 1 := by
+    nlinarith [mul_nonneg (sub_nonneg.mpr hB) (mul_nonneg (by linarith : 0 ≤ M) (norm_nonneg z))]
+  have hfactor (v : ι) : (1 / 2 : ℝ) ≤ ‖1 + b v * (Complex.exp (L v * z) - 1)‖ := by
+    have he := Complex.norm_exp_sub_one_le ((hv v).trans hx)
+    have hu : ‖b v * (Complex.exp (L v * z) - 1)‖ ≤ B * (2 * (M * ‖z‖)) := by
+      rw [norm_mul]
+      exact mul_le_mul (hb v) (he.trans (by linarith [hv v])) (norm_nonneg _) (by linarith)
+    have ht := norm_sub_le (1 + b v * (Complex.exp (L v * z) - 1)) (b v * (Complex.exp (L v * z) - 1))
+    rw [add_sub_cancel_right, norm_one] at ht
+    linarith
+  refine ⟨Finset.prod_ne_zero_iff.mpr (fun v _ ↦ norm_pos_iff.mp (by linarith [hfactor v])), ?_⟩
+  change ‖(∏ v, _)⁻¹‖ ≤ _
+  rw [← Finset.prod_inv_distrib, norm_prod]
+  change _ ≤ (2 : ℝ) ^ (Finset.univ : Finset ι).card
+  rw [← Finset.prod_const]
+  exact Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _) (fun v _ ↦ by
+    rw [norm_inv]; exact (inv_le_comm₀ (by linarith [hfactor v]) (by norm_num)).mpr (by linarith [hfactor v]))
+
+/-- Cauchy's estimate on a disk where the pole has been removed bounds the ratio
+of Laurent coefficients by the normalized boundary bound times the inverse radius
+to the offset. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_cauchy
+    (ρ G : ℂ → ℂ) (m k : ℕ) (r K : ℝ) (hr : 0 < r)
+    (hG : AnalyticOnNhd ℂ G (Metric.closedBall 0 r))
+    (hgerm : G =ᶠ[𝓝[≠] (0 : ℂ)] fun z ↦ z ^ m * ρ z)
+    (hb : ∀ z ∈ Metric.sphere 0 r, ‖G z / G 0‖ ≤ K) :
+    let a (i : ℕ) := complexResidue (fun z : ℂ ↦ ρ z * z ^ ((m : ℤ) - i - 1)) 0
+    ‖a k / a 0‖ ≤ K / r ^ k := by
+  intro a
+  have h0 := hG 0 (Metric.mem_closedBall_self hr.le)
+  have hc (i : ℕ) : a i = iteratedDeriv i G 0 / (i.factorial : ℂ) := by
+    refine (sLocalPrincipalPartCoeff_translate_congr (h := fun z ↦ G z / z ^ (i + 1)) ?_).trans
+      (sLocalPrincipalPartCoeff_lower_formula_cauchy h0 i)
+    filter_upwards [hgerm, self_mem_nhdsWithin] with z hz hne
+    have hn : z ≠ 0 := hne
+    rw [hz, ← zpow_natCast z m, ← zpow_natCast z (i + 1), mul_div_right_comm,
+      ← zpow_sub₀ hn, mul_comm]
+    push_cast
+    ring_nf
+  rw [hc k, hc 0]
+  simp only [iteratedDeriv_zero, Nat.factorial_zero, Nat.cast_one, div_one]
+  have hdiff : DiffContOnCl ℂ (fun z ↦ G z / G 0) (Metric.ball 0 r) :=
+    (hG.differentiableOn.div_const _).diffContOnCl_ball Subset.rfl
+  have h := Complex.norm_iteratedDeriv_le_of_forall_mem_sphere_norm_le k hr hdiff hb
+  rw [iteratedDeriv_div_const] at h
+  rw [div_right_comm, norm_div, Complex.norm_natCast, div_le_iff₀ (by positivity : 0 < (k.factorial : ℝ))]
+  exact h.trans_eq (by ring)
+
+/-- In a fixed norm chart a finite Euler denominator is a geometric polynomial.
+The ramified case corresponds to coefficient zero. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_euler
+    (v : T) (c : QuasiCharacter J(T)) :
+    let twist := quasiCharacterNormTwist (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous
+    ∃ a : ℂ, ∀ z : ℂ, finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (twist c z)) =
+      (1 - a * Complex.exp (-(Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ) * z))⁻¹ := by
+  intro twist
+  have hval (x : (v.val.adicCompletion F)ˣ) (z : ℂ) :
+      sLocalFiniteRestriction v (twist c z) x =
+        sLocalFiniteRestriction v c x * (‖x.val‖ : ℂ) ^ z := by
+    obtain ⟨g, hg⟩ : ∃ g : J(T), ∀ d : QuasiCharacter J(T), sLocalFiniteRestriction v d x = d g :=
+      ⟨_, fun _ ↦ rfl⟩
+    have hm := sLocalFiniteRestriction_norm (S := T) v x
+    rw [hg] at hm
+    change ((1 : PontryaginDual J(T)) g : ℂ) * _ ^ (1 : ℂ) = _ at hm
+    simp only [PontryaginDual.one_apply, Circle.coe_one, Complex.cpow_one, one_mul] at hm
+    rw [hg, hg]
+    exact congrArg (fun t : ℂ ↦ c g * t ^ z) hm
+  let ι := Units.map (v.val.adicCompletionIntegers F).subtype.toMonoidHom
+  have hu (z : ℂ) : (∀ u, sLocalFiniteRestriction v (twist c z) (ι u) = 1) ↔
+      ∀ u, sLocalFiniteRestriction v c (ι u) = 1 := by
+    refine forall_congr' fun u ↦ ?_
+    have hn : ‖(ι u).val‖ = 1 := Valued.toNormedField.norm_eq_one_iff.mpr
+      ((HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one (a := ι u)).mp
+        ⟨u.val.property, u.inv.property⟩)
+    rw [hval, hn, Complex.ofReal_one, Complex.one_cpow, mul_one]
+  by_cases h : ∀ u, sLocalFiniteRestriction v c (ι u) = 1
+  · let hπ := (Valued.v : Valuation (v.val.adicCompletion F)
+        (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+    let π : (v.val.adicCompletion F)ˣ := Units.mk0 hπ.choose hπ.choose_spec.ne_zero
+    refine ⟨sLocalFiniteRestriction v c π, fun z ↦ ?_⟩
+    rw [finiteLocalEulerFactor, ite_eq_left ((hu z).mpr h)]
+    change (1 - sLocalFiniteRestriction v (twist c z) π)⁻¹ = _
+    rw [hval, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr π.ne_zero)),
+      ← Complex.ofReal_log (norm_nonneg _), show ‖π.val‖ = _ from norm_uniformizer_adicCompletion v.val _ hπ.choose_spec,
+      Real.log_inv, Complex.ofReal_neg]
+  · exact ⟨0, fun z ↦ by rw [finiteLocalEulerFactor, ite_eq_right (mt (hu z).mp h)]; simp⟩
+
+/-- A norm section gives one unitary chart for every selected center, with the
+section exponent as its coordinate. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_chart
+    (p : Vℚ) (χ : PontryaginDual J₁(T)) (τ : ℝ≥0ˣ →ₜ* J(T)) (hτ : RightInverse τ (m(T))) :
+    ∃ η : PontryaginDual J(T), ∀ j : Iₚ(p, χ),
+      quasiCharacterNormTwist (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous
+        ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η)
+        (existsUnique_complexPower (j.val.1.comp τ)).exists.choose = j.val.1 := by
+  obtain ⟨η, ⟨hη, hητ⟩, _⟩ := existsUnique_sLocalNormSectionCharacter τ hτ χ
+  obtain ⟨e, he⟩ := sIdeleQuotient_quasiCharacterParametrization F T τ hτ
+  let c := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η
+  let chart := quasiCharacterNormTwist (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous c
+  let s (j : Iₚ(p, χ)) := (existsUnique_complexPower (j.val.1.comp τ)).exists.choose
+  have hs (j : Iₚ(p, χ)) : s j = (e j.val.1).1 := (existsUnique_complexPower (j.val.1.comp τ)).unique
+    (existsUnique_complexPower (j.val.1.comp τ)).exists.choose_spec (he j.val.1).1
+  have hc (j : Iₚ(p, χ)) : chart (s j) = j.val.1 := by
+    apply e.injective
+    apply Prod.ext
+    · refine (existsUnique_complexPower ((chart (s j)).comp τ)).unique (he (chart (s j))).1 (fun t ↦ ?_)
+      change (η (τ t) : ℂ) * (((m(T) (τ t)).val : ℝ) : ℂ) ^ s j = _
+      rw [hητ, Circle.coe_one, hτ, one_mul, hs]
+    · exact ContinuousMonoidHom.ext fun u ↦ Circle.ext <| ((he _).2 u).trans <|
+        ((normOneRestriction_unitaryChart _ (isProperMap_sIdeleQuotientNorm F T).continuous η _ u).trans
+        (congrArg Subtype.val (DFunLike.congr_fun hη u))).trans <|
+        (DFunLike.congr_fun j.property.1 u).symm.trans ((he _).2 u).symm
+  exact ⟨η, hc⟩
+
+/-- Above one prime all finite Euler factors are rational functions of
+`X = exp (-s log p)`. A pole of a selected factor constrains `X` to a finite
+set of roots. In particular the totalized values of every primary Euler factor
+are bounded on the entire index set. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_primary
+    (p : Vℚ) (χ : PontryaginDual J₁(T)) (v : T) (hv : v.val ∈ sLocalPrimaryPlaces T p) :
+    ∃ C : ℝ, ∀ j : Iₚ(p, χ), ‖finiteLocalEulerFactor v.val (sLocalFiniteRestriction v j.val.1)‖ ≤ C := by
+  obtain ⟨τ, hτ⟩ := sIdeleQuotientNorm_exists_section F T
+  obtain ⟨η, hc⟩ := sLocalPWOrbital_bases_bounded_interpolation_laurent_chart p χ τ hτ
+  let c := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η
+  let chart := quasiCharacterNormTwist (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous c
+  let s (j : Iₚ(p, χ)) := (existsUnique_complexPower (j.val.1.comp τ)).exists.choose
+  change ∀ j : Iₚ(p, χ), chart (s j) = j.val.1 at hc
+  let E (w : T) (d : QuasiCharacter J(T)) := finiteLocalEulerFactor w.val (sLocalFiniteRestriction w d)
+  let f (w : T) := w.val.asIdeal.inertiaDeg (𝓞 ℚ)
+  let X (z : ℂ) := Complex.exp (-(Real.log (p.asIdeal.absNorm : ℝ) : ℂ) * z)
+  choose a ha using fun w : T ↦ sLocalPWOrbital_bases_bounded_interpolation_laurent_euler w c
+  have hpow (w : T) (hw : w.val ∈ sLocalPrimaryPlaces T p) (z : ℂ) :
+      E w (chart z) = (1 - a w * X z ^ f w)⁻¹ := by
+    let : w.val.asIdeal.IsPrime := w.val.isPrime
+    let : w.val.asIdeal.LiesOver p.asIdeal :=
+      ⟨(congrArg HeightOneSpectrum.asIdeal ((mem_sLocalPrimaryPlaces p w.val).mp hw).2).symm⟩
+    rw [show E w (chart z) = _ from ha w z, ← Ideal.absNorm_pow_inertiaDeg p.asIdeal w.val.asIdeal,
+      Nat.cast_pow, Real.log_pow]
+    dsimp only [X, f]
+    rw [← Complex.exp_nat_mul]
+    push_cast
+    ring_nf
+  let P (w : T) : Polynomial ℂ := 1 - Polynomial.C (a w) * Polynomial.X ^ f w
+  have hn (w : T) (hw : w.val ∈ sLocalPrimaryPlaces T p) : P w ≠ 0 := by
+    let : w.val.asIdeal.IsPrime := w.val.isPrime
+    have hd : f w ≠ 0 := (Ideal.inertiaDeg_pos w.val.asIdeal (𝓞 ℚ)).ne'
+    intro h
+    have := congrArg (Polynomial.eval 0) h
+    simp [P, zero_pow hd] at this
+  let W := Finset.univ.filter fun w : T ↦ w.val ∈ sLocalPrimaryPlaces T p
+  let K := W.biUnion fun w ↦ (P w).roots.toFinset
+  have hK (j : Iₚ(p, χ)) : X (s j) ∈ K := by
+    obtain ⟨w, hw⟩ := Finset.card_pos.mp (lt_of_le_of_lt (Nat.zero_le _) j.property.2)
+    obtain ⟨hpole, hw⟩ := Finset.mem_filter.mp hw
+    have hm := (sLocalPrincipalPartCoeff_leading_formula_fin_factor j.val.1 w).1
+    have ho : meromorphicOrderAt (fun z ↦ E w (quasiCharacterNormTwist (m(T))
+      (isProperMap_sIdeleQuotientNorm F T).continuous j.val.1 z)) 0 < 0 := (Finset.mem_filter.mp hpole).2
+    have he0 : E w j.val.1 = 0 := by
+      by_contra h
+      have hz : quasiCharacterNormTwist (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous j.val.1 0 = j.val.1 := by
+        ext1 x; exact (congrArg (j.val.1 x * ·) (Complex.cpow_zero _)).trans (mul_one _)
+      exact ho.ne (hm.meromorphicOrderAt_eq_zero_iff.mpr (by simpa only [hz] using h))
+    rw [← hc j, hpow w hw, inv_eq_zero] at he0
+    exact Finset.mem_biUnion.mpr ⟨w, Finset.mem_filter.mpr ⟨Finset.mem_univ _, hw⟩,
+      Multiset.mem_toFinset.mpr ((Polynomial.mem_roots (hn w hw)).mpr (by simpa [P, Polynomial.IsRoot] using he0))⟩
+  refine ⟨∑ x ∈ K, ‖(1 - a v * x ^ f v)⁻¹‖, fun j ↦ ?_⟩
+  change ‖E v j.val.1‖ ≤ _
+  rw [← hc j, hpow v hv]
+  exact Finset.single_le_sum (fun x _ ↦ norm_nonneg ((1 - a v * x ^ f v)⁻¹)) (hK j)
+
+/-- At repeated primary poles, a nonpolar Euler factor over a different rational prime
+is polynomially bounded in height. For an unramified place this asks for a lower bound on
+a single nonzero number `|1 - c(π_v)|`, where `π_v` is a uniformizer. At exact
+coincidence the totalized Euler value is zero, and at a ramified place it is one. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime
+    {S₀ : Finset V} (hST : S ⊆ T) (hT : T = S ∪ S₀) (hdis : Disjoint S S₀)
+    (hsat : IsSaturatedPlaceSet (F := F) S₀) (hPic : PicTrivial)
+    (p : Vℚ) (hp : (sLocalPrimaryPlaces (F := F) T p).Nonempty)
+    (hp₀ : sLocalPrimaryPlaces (F := F) T p ⊆ S₀)
+    (ω : PontryaginDual C₁) (hu : NormOneCharacterUnramifiedOutside ω S)
+    (χ : PontryaginDual J₁(T)) (hχ : χ = descend(hST, ω, hu)) (hω : ω ≠ 1)
+    (τ : ℝ≥0ˣ →ₜ* J(T)) (hτ : RightInverse τ (m(T))) (v : T)
+    (hv : v.val ∉ sLocalPrimaryPlaces T p) :
+    ∃ d : ℕ, ∃ C ≥ (0 : ℝ), ∀ j : Iₚ(p, χ), j.val.2 ≠ 0 →
+      ‖finiteLocalEulerFactor v.val (sLocalFiniteRestriction v j.val.1)‖ ≤
+        C * (1 + ‖(existsUnique_complexPower (j.val.1.comp τ)).exists.choose‖) ^ d := by
+  sorry
+
+/-- Removing a coincident simple Euler pole gives the same analytic factor
+`z / (1-exp(-z log q))` at every center. Each remaining Euler factor becomes
+constant after multiplication by its normalized denominator. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_finite :
+    let twist := quasiCharacterNormTwist (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous
+    let E (v : T) (c : QuasiCharacter J(T)) := finiteLocalEulerFactor v.val (sLocalFiniteRestriction v c)
+    let b (v : T) (c : QuasiCharacter J(T)) := if E v c = 0 then 0 else 1 - E v c
+    let D (v : T) (c : QuasiCharacter J(T)) (z : ℂ) :=
+      1 + b v c * (Complex.exp (-(Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ) * z) - 1)
+    ∃ R > (0 : ℝ), ∀ c : QuasiCharacter J(T), ∃ K : ℂ → ℂ,
+      AnalyticOnNhd ℂ K (Metric.closedBall 0 R) ∧
+      (K =ᶠ[𝓝[≠] (0 : ℂ)] fun z ↦ z ^ (sLocalFinitePolePlaces c).card *
+        (∏ v : T, E v (twist c z)) * ∏ v : T, D v c z) ∧
+      ∀ z ∈ Metric.closedBall 0 R, ‖K z / K 0‖ ≤ 2 ^ Fintype.card T := by
+  intro twist E b D
+  let L (v : T) : ℂ := -(Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ)
+  let g (v : T) (z : ℂ) := 1 - Complex.exp (L v * z)
+  let U (v : T) := (dslope (g v) 0)⁻¹
+  have hU (v : T) : AnalyticAt ℂ (U v) 0 ∧ U v 0 ≠ 0 := by
+    have hder : HasDerivAt (g v) (-L v) 0 := by
+      simpa [g] using (((hasDerivAt_id (0 : ℂ)).const_mul (L v)).cexp.const_sub 1)
+    have hne : deriv (g v) 0 ≠ 0 := by
+      rw [hder.deriv, neg_ne_zero, show L v = _ from rfl, neg_ne_zero, Complex.ofReal_ne_zero]
+      exact (Real.log_pos (by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val)).ne'
+    have hd : dslope (g v) 0 0 ≠ 0 := by rwa [dslope_same]
+    exact ⟨((by dsimp [g]; fun_prop : AnalyticAt ℂ (g v) 0).dslope 0).inv hd, inv_ne_zero hd⟩
+  obtain ⟨R, hR, hball⟩ := Metric.nhds_basis_closedBall.eventually_iff.mp
+    (eventually_all.mpr fun v : T ↦ (hU v).1.eventually_analyticAt.and
+      (((hU v).1.continuousAt.div_const (U v 0)).norm.eventually_lt continuousAt_const
+        (show ‖U v 0 / U v 0‖ < 2 by rw [div_self (hU v).2, norm_one]; norm_num)))
+  refine ⟨R, hR, fun c ↦ ?_⟩
+  have hz0 : twist c 0 = c := by
+    ext1 x; exact (congrArg (c x * ·) (Complex.cpow_zero _)).trans (mul_one _)
+  let P := sLocalFinitePolePlaces c
+  let k (v : T) (z : ℂ) := if v ∈ P then U v z else E v c
+  have he (v : T) : k v =ᶠ[𝓝[≠] (0 : ℂ)] fun z ↦
+      (if v ∈ P then z else 1) * E v (twist c z) * D v c z := by
+    obtain ⟨a, ha⟩ := sLocalPWOrbital_bases_bounded_interpolation_laurent_euler v c
+    have hE (z : ℂ) : E v (twist c z) = (1 - a * Complex.exp (L v * z))⁻¹ := ha z
+    have h0 : E v c = (1 - a)⁻¹ := by simpa only [hz0, mul_zero, Complex.exp_zero, mul_one] using hE 0
+    have hA : AnalyticAt ℂ (fun z : ℂ ↦ 1 - a * Complex.exp (L v * z)) 0 := by fun_prop
+    have hp : v ∈ P ↔ a = 1 := by
+      change v ∈ (Finset.univ.filter _) ↔ _
+      rw [Finset.mem_filter, and_iff_right (Finset.mem_univ _)]
+      change meromorphicOrderAt (fun z ↦ E v (twist c z)) 0 < 0 ↔ _
+      rw [funext hE]
+      by_cases h : a = 1
+      · subst a
+        have hy : g v 1 ≠ 0 := by
+          have hq : 1 < (v.val.asIdeal.absNorm : ℝ) := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val
+          have hlt := Real.exp_lt_one_iff.mpr (neg_lt_zero.mpr (Real.log_pos hq))
+          change 1 - Complex.exp (L v * 1) ≠ 0
+          rw [mul_one, sub_ne_zero, show L v = ((-Real.log (v.val.asIdeal.absNorm : ℝ) : ℝ) : ℂ) by simp [L],
+            ← Complex.ofReal_exp, ← Complex.ofReal_one, Ne, Complex.ofReal_inj]
+          exact hlt.ne'
+        simp only [one_mul, iff_true]
+        exact (sLocalRhoPoleOrder_eq_card_polePlaces_inv (G := g v) (by dsimp [g]; fun_prop) hy 0).mpr (by simp [g])
+      · have hn : 1 - a * Complex.exp (L v * 0) ≠ 0 := by simpa [sub_ne_zero] using Ne.symm h
+        exact iff_of_false (not_lt.mpr (hA.inv hn).meromorphicOrderAt_nonneg) h
+    by_cases h : v ∈ P
+    · have ha1 := hp.mp h
+      filter_upwards [self_mem_nhdsWithin] with z hz
+      have hn : z ≠ 0 := hz
+      simp [k, h, D, b, h0, ha1, hE, L, U, dslope_of_ne _ hn, slope_def_field, g,
+        div_eq_mul_inv, mul_comm]
+    · have hne : 1 - a ≠ 0 := sub_ne_zero.mpr (Ne.symm (mt hp.mpr h))
+      have hn := hA.continuousAt.eventually_ne (by simpa using hne)
+      filter_upwards [hn.filter_mono nhdsWithin_le_nhds] with z hz
+      simp only [k, h, ↓reduceIte, one_mul, D, b, h0, inv_ne_zero hne, hE]
+      change (1 - a)⁻¹ = (1 - a * Complex.exp (L v * z))⁻¹ *
+        (1 + (1 - (1 - a)⁻¹) * (Complex.exp (L v * z) - 1))
+      field_simp
+      ring
+  refine ⟨fun z ↦ ∏ v, k v z, fun z hz ↦ Finset.univ.analyticAt_fun_prod (fun v _ ↦ ?_), ?_, fun z hz ↦ ?_⟩
+  · by_cases h : v ∈ P
+    · simpa only [k, ite_eq_left h] using (hball hz v).1
+    · simpa only [k, ite_eq_right h] using (analyticAt_const (v := E v c) (x := z) (𝕜 := ℂ))
+  · filter_upwards [eventually_all.mpr he] with z hz
+    simp only [hz, Finset.prod_mul_distrib, Finset.prod_ite_mem_eq, Finset.prod_const, P]
+  · rw [← Finset.prod_div_distrib, norm_prod]
+    change _ ≤ (2 : ℝ) ^ (Finset.univ : Finset T).card
+    rw [← Finset.prod_const]
+    apply Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _)
+    intro v _
+    by_cases h : v ∈ P
+    · simpa only [k, ite_eq_left h] using (hball hz v).2.le
+    · simp only [k, ite_eq_right h]
+      by_cases he : E v c = 0 <;> simp [he]
+
+/-- The selected centers lie on the imaginary axis. Only finitely many occur in a
+bounded disk, since each is a pole of the one meromorphic function on the chart. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_centers
+    (p : Vℚ) (χ : PontryaginDual J₁(T)) (η : PontryaginDual J(T))
+    (s : Iₚ(p, χ) → ℂ) (hs : ∀ j, quasiCharacterNormTwist (m(T))
+      (isProperMap_sIdeleQuotientNorm F T).continuous
+      ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η) (s j) = j.val.1) :
+    (∀ j, (s j).re = 0) ∧ ∀ B : ℝ, (range s ∩ Metric.closedBall 0 B).Finite := by
+  let chart := quasiCharacterNormTwist (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous
+    ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η)
+  have hpole (j : Iₚ(p, χ)) : 0 < sLocalRhoPoleOrder j.val.1 :=
+    lt_of_le_of_lt (Nat.zero_le _) (j.property.2.trans_le (by
+      rw [sLocalRhoPoleOrder_eq_card_polePlaces]
+      exact (Finset.card_filter_le _ _).trans (Nat.le_add_left _ _)))
+  have hord (j : Iₚ(p, χ)) : meromorphicOrderAt (sLocalRhoFactor ∘ chart) (s j) =
+      ((-(sLocalRhoPoleOrder j.val.1 : ℤ) : ℤ) : WithTop ℤ) := by
+    have h := sLocalIdelicOrderBound_eq_neg_poleOrder j.val.1
+    rw [← hs j, sLocalOrderBound_chart, hs j] at h
+    have hn : ((-(sLocalRhoPoleOrder j.val.1 : ℤ) : ℤ) : WithTop ℤ) < 0 := by exact_mod_cast
+      (neg_neg_of_pos (Int.natCast_pos.mpr (hpole j)))
+    exact (min_eq_right ((min_lt_iff.mp (h.trans_lt hn)).resolve_left (lt_irrefl _)).le).symm.trans h
+  refine ⟨fun j ↦ ?_, fun B ↦ ?_⟩
+  · obtain ⟨v, hv⟩ := Finset.card_pos.mp (lt_of_le_of_lt (Nat.zero_le _) j.property.2)
+    have hneg := (Finset.mem_filter.mp (Finset.mem_filter.mp hv).1).2
+    let E (z : ℂ) := finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (chart z))
+    have ht : meromorphicOrderAt E (s j) < 0 := by
+      have he : (fun z ↦ finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (quasiCharacterNormTwist
+        (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous j.val.1 z))) = E ∘ (· + s j) := by
+        funext z; dsimp only [Function.comp_apply, E, chart]; rw [← hs j, normTwist_normTwist]
+      rw [he, meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt, zero_add] at hneg
+      exact hneg
+    obtain ⟨π, hπ, h⟩ := sLocalRhoFactor_poles_iff_finite η v
+    obtain ⟨_, he⟩ := ((h (s j)).2.1).mp ((sLocalRhoPoleOrder_eq_card_polePlaces_finite η v _).mp ht)
+    have hn := congrArg norm he
+    change ‖(((η _ : Circle) : ℂ) * (_ : ℂ) ^ (0 : ℂ)) * (‖π.val‖ : ℂ) ^ s j‖ = ‖(1 : ℂ)‖ at hn
+    have hreal := norm_pos_iff.mpr π.ne_zero
+    rw [Complex.cpow_zero, mul_one, norm_mul, Circle.norm_coe, one_mul,
+      Complex.norm_cpow_eq_rpow_re_of_pos hreal, norm_one] at hn
+    have hlt : ‖π.val‖ < 1 := hπ.trans_lt (inv_lt_one_of_one_lt₀ (by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val))
+    have hl := congrArg Real.log hn
+    rw [Real.log_rpow hreal, Real.log_one, mul_eq_zero] at hl
+    exact hl.resolve_right (Real.log_neg hreal hlt).ne
+  · let K := Metric.closedBall (0 : ℂ) B
+    let f := sLocalRhoFactor ∘ chart
+    refine ((MeromorphicOn.divisor f K).finiteSupport (isCompact_closedBall _ _)).subset ?_
+    rintro _ ⟨⟨j, rfl⟩, hj⟩
+    change MeromorphicOn.divisor f K (s j) ≠ 0
+    have hmer : MeromorphicOn f K := fun z _ ↦ sLocalRhoFactor_meromorphic η z
+    rw [MeromorphicOn.divisor_apply hmer hj]
+    change (meromorphicOrderAt (sLocalRhoFactor ∘ chart) (s j)).untop₀ ≠ 0
+    rw [hord j]
+    simpa using (hpole j).ne'
+
+/-- Finite local epsilon factors are continuous, nonzero, and periodic on a fixed
+unitary chart. This bounds the reciprocal of their product on the imaginary axis. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_epsilon
+    (η : PontryaginDual J(T)) :
+    let chart := quasiCharacterNormTwist (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous
+      ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η)
+    ∃ C ≥ (0 : ℝ), ∀ z : ℂ, z.re = 0 → ‖(sLocalEpsilonFactor (chart z))⁻¹‖ ≤ C := by
+  intro chart
+  let E (v : T) (z : ℂ) := finiteLocalEpsilonFactor v.val (sLocalFiniteRestriction v (chart z))
+  have hne (v : T) (z : ℂ) : E v z ≠ 0 :=
+    Finset.prod_ne_zero_iff.mp (right_ne_zero_of_mul (sLocalEpsilonFactor_ne_zero (chart z))) v (Finset.mem_univ v)
+  have hv (v : T) : ∃ C ≥ (0 : ℝ), ∀ z : ℂ, z.re ∈ Icc 0 0 → ‖(E v z)⁻¹‖ ≤ C := by
+    obtain ⟨ξ, hξ, _⟩ := sLocalFiniteRestriction_exists_normTwistChart η v
+    obtain ⟨P, hP, hper⟩ := finiteLocal_chart_periodic v.val ξ
+    apply norm_bounded_on_strip_of_periodic (p := fun z ↦ (E v z)⁻¹) hP
+    · intro z
+      dsimp only [E, chart]
+      rw [hξ, hξ, hper]
+    · refine (continuous_iff_continuousAt.mpr fun z ↦ ?_).inv₀ (hne v)
+      dsimp only [E, chart]
+      simp_rw [hξ]
+      exact ((finiteLocalEpsilonFactor_entire v.val ξ) z trivial).continuousAt
+  choose C hC hb using hv
+  refine ⟨∏ v, C v, Finset.prod_nonneg (fun v _ ↦ hC v), fun z hz ↦ ?_⟩
+  have ha (w : InfinitePlace F) : ‖infiniteLocalEpsilonFactor w (sLocalInfiniteRestriction w (chart z))‖ = 1 := by
+    unfold infiniteLocalEpsilonFactor
+    split <;> rw [norm_pow, Complex.norm_I, one_pow]
+  rw [sLocalEpsilonFactor, mul_inv, norm_mul, norm_inv, norm_prod]
+  simp only [ha, Finset.prod_const_one, inv_one, one_mul, ← Finset.prod_inv_distrib, norm_prod]
+  exact Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _) (fun v _ ↦ hb v z ⟨hz.ge, hz.le⟩)
+
+/-- On the line of real part one, each reflected finite Euler factor has norm at most two. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_reflected
+    (ξ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (z : ℂ) (hz : z.re = 1) :
+    ‖∏ v : T, finiteHeckeEulerFactor ξ v.val z‖ ≤ 2 ^ Fintype.card T := by
+  rw [norm_prod]
+  change _ ≤ (2 : ℝ) ^ (Finset.univ : Finset T).card
+  rw [← Finset.prod_const]
+  apply Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _)
+  intro v _
+  unfold finiteHeckeEulerFactor
+  split
+  · let q : ℝ := v.val.asIdeal.absNorm
+    have hq : 2 ≤ q := by
+      dsimp only [q]
+      exact_mod_cast NumberField.HeightOneSpectrum.two_le_absNorm_nnreal v.val
+    let u := (ideleClassNormTwist ξ 0).localValue v.val * (q : ℂ) ^ (-z)
+    have hu : ‖u‖ ≤ 1/2 := by
+      rw [show ‖u‖ = _ from norm_mul _ _, norm_ideleClassNormTwist_zero_localValue, one_mul,
+        Complex.norm_cpow_eq_rpow_re_of_pos (by linarith : 0 < q), Complex.neg_re, hz, Real.rpow_neg_one]
+      exact (inv_le_comm₀ (by linarith) (by norm_num)).mpr (by simpa using hq)
+    change ‖(1 - u)⁻¹‖ ≤ 2
+    have h := norm_sub_norm_le (1 : ℂ) u
+    rw [norm_one] at h
+    rw [norm_inv]
+    exact (inv_le_comm₀ (by linarith) (by norm_num)).mpr (by linarith)
+  · norm_num
+
+/-- The shifted archimedean gamma functions have poles at only finitely many
+imaginary parts, one for each infinite place. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_gamma
+    (ξ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) :
+    ∀ᶠ z in comap (fun z : ℂ ↦ |z.im|) atTop, heckeGammaFactor ξ z ≠ 0 := by
+  have hγ {z : ℂ} (h : z.im ≠ 0) : Complex.Gammaℝ z ≠ 0 := by
+    intro hz
+    obtain ⟨n, rfl⟩ := Complex.Gammaℝ_eq_zero_iff.mp hz
+    exact h (by simp)
+  have him (a : ℂ) : ∀ᶠ z in comap (fun z : ℂ ↦ |z.im|) atTop, z.im + a.im ≠ 0 := by
+    filter_upwards [tendsto_comap.eventually_gt_atTop |a.im|] with z hz he
+    rw [eq_neg_of_add_eq_zero_left he, abs_neg] at hz
+    exact lt_irrefl _ hz
+  unfold heckeGammaFactor
+  simp only [Finset.prod_ne_zero_iff, Finset.mem_univ, forall_const, eventually_all]
+  intro w
+  by_cases hw : w.IsReal
+  · simp only [dite_eq_left hw]
+    apply (him (realHeckeCharacter_parameters ξ w hw).exists.choose.1).mono
+    intro z hz
+    exact hγ (by simpa using hz)
+  · let a := (complexHeckeCharacter_parameters ξ w (InfinitePlace.not_isReal_iff_isComplex.mp hw)).exists.choose
+    filter_upwards [him a.1] with z hz
+    simp only [dite_eq_right hw]
+    change Complex.Gammaℂ (z + a.1 + (a.2.natAbs : ℂ) / 2) / 2 ≠ 0
+    rw [← Complex.Gammaℝ_mul_Gammaℝ_add_one]
+    exact div_ne_zero (mul_ne_zero (hγ (by simpa using hz)) (hγ (by simpa using hz))) two_ne_zero
+
+/-- At large height, the forward gamma ratio is bounded on a neighborhood of
+the imaginary axis and its reciprocal on the axis costs at most a power of the height. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_strip
+    (η : PontryaginDual J(T)) :
+    let chart := quasiCharacterNormTwist (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous
+      ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η)
+    let dual := dualQuasiCharacter (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous
+    let A (c : QuasiCharacter J(T)) := sLocalEpsilonFactor c *
+      ((∏ w : InfinitePlace F, infiniteLocalEulerFactor w (sLocalInfiniteRestriction w c)) / sLocalHeckeL (dual c))
+    ∃ Y : ℝ, ∃ e : ℕ, ∃ B ≥ (0 : ℝ), ∀ s : ℂ, s.re = 0 → Y ≤ |s.im| →
+      (sLocalArchPolePlaces (chart s)).card = 0 ∧
+      AnalyticOnNhd ℂ (fun z ↦ A (chart (z+s))) (Metric.closedBall 0 (1/2)) ∧
+      ∀ z ∈ Metric.closedBall (0 : ℂ) (1/2), ‖A (chart (z+s)) / A (chart s)‖ ≤ B * (1 + ‖s‖)^e := by
+  intro chart dual A
+  obtain ⟨ξ, hr, he, _⟩ := sLocal_character_extension η
+  have harch (z : ℂ) : (∏ w : InfinitePlace F, infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (chart z))) =
+      heckeGammaFactor ξ z := by
+    rw [← prod_infiniteLocalEulerFactor_eq_heckeGammaFactor ξ z]
+    apply Finset.prod_congr rfl
+    intro w _
+    congr 1
+    ext1 x
+    let i : (SAdeleRing F T)ˣ := (ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F)
+      ((v : T) → v.val.adicCompletion F)).symm
+      (ContinuousMulEquiv.piUnits.symm (@Pi.mulSingle _ _ _ (Classical.decEq _) w x), 1)
+    have hi : sIdeleInsertion F T i = IdeleGroup.ofCompletion (𝓞 F) F w x := sIdeleInsertion_infiniteUnit w x
+    have hbase := DFunLike.congr_fun he (QuotientGroup.mk i)
+    rw [sIdeleRestriction_mk] at hbase
+    change (ξ (QuotientGroup.mk (sIdeleInsertion F T i)) : ℂ) * _ ^ (0 : ℂ) =
+      (η (QuotientGroup.mk i) : ℂ) * _ ^ (0 : ℂ) at hbase
+    simp only [Complex.cpow_zero, mul_one] at hbase
+    change chart z (QuotientGroup.mk i) = ideleClassNormTwist ξ z (QuotientGroup.mk (IdeleGroup.ofCompletion (𝓞 F) F w x))
+    rw [← hi]
+    change (η (QuotientGroup.mk i) : ℂ) * (((m(T) (QuotientGroup.mk i) : ℝ≥0) : ℝ) : ℂ) ^ z =
+      (ξ (QuotientGroup.mk (sIdeleInsertion F T i)) : ℂ) * _ ^ z
+    rw [← hbase, sIdeleQuotientNorm_mk, ← ideleNorm_sIdeleInsertion]
+    rfl
+  let eps (z : ℂ) := sLocalEpsilonFactor (chart z)
+  let Γ := heckeGammaFactor ξ
+  let Γ' (z : ℂ) := heckeGammaFactor ξ⁻¹ (1-z)
+  let D (z : ℂ) := ∏ v : T, finiteHeckeEulerFactor ξ⁻¹ v.val (1-z)
+  have hval (z : ℂ) : A (chart z) = eps z * (Γ z / Γ' z) * (D z)⁻¹ := by
+    dsimp only [A, eps, Γ, Γ', D, dual, chart]
+    rw [harch, sLocalNormTwistChart_dual, cleared_inverse_factors η ξ hr he]
+    simp only [div_eq_mul_inv, mul_inv]; ring
+  obtain ⟨E, hE, hε⟩ := sLocalEpsilonFactor_bounded_on_strip η (-1) (1/2)
+  obtain ⟨E', hE', hε'⟩ := sLocalPWOrbital_bases_bounded_interpolation_laurent_epsilon η
+  obtain ⟨G, Y, hG, hγ⟩ := cleared_gamma_bound ξ (-1)
+  obtain ⟨G', Y', hG', _, hγ'⟩ := heckeGamma_reflection_bound ξ 0 0
+  obtain ⟨D₀, hD₀, hD⟩ := cleared_finite_positive_bound (S := T) ξ⁻¹
+  obtain ⟨Y₀, hY₀⟩ := eventually_atTop.mp
+    ((eventually_comap (f := fun z : ℂ ↦ |z.im|) (p := fun z ↦ Γ z ≠ 0)).mp
+      (sLocalPWOrbital_bases_bounded_interpolation_laurent_gamma ξ))
+  let n := Module.finrank ℚ F
+  refine ⟨max (max Y Y') (max Y₀ 1) + 1, n, (E * G * D₀) * (E' * G' * 2 ^ Fintype.card T),
+    by positivity, fun s hs hys ↦ ?_⟩
+  have hy : Y + 1 ≤ |s.im| ∧ Y' ≤ |s.im| ∧ Y₀ + 1 ≤ |s.im| ∧ 1 ≤ |s.im| := by
+    grind
+  have near (z : ℂ) (hz : z ∈ Metric.closedBall 0 (1/2)) :
+      (z+s).re ∈ Icc (-1) (1/2) ∧ Y ≤ |(z+s).im| ∧ Γ (z+s) ≠ 0 := by
+    have hn := mem_closedBall_zero_iff.mp hz
+    have hb := (abs_le.mp ((Complex.abs_re_le_norm z).trans hn))
+    have hi := (Complex.abs_im_le_norm z).trans hn
+    have ht : |s.im| ≤ |(z+s).im| + |z.im| := by simpa [Complex.add_im] using abs_sub (z.im+s.im) z.im
+    refine ⟨by rw [Complex.add_re, hs, add_zero]; constructor <;> linarith, by linarith [hy.1],
+      hY₀ |(z+s).im| (by linarith [hy.2.2.1]) (z+s) rfl⟩
+  have hΓs : Γ s ≠ 0 := hY₀ |s.im| (by linarith [hy.2.2.1]) s rfl
+  have hzero : (sLocalArchPolePlaces (chart s)) = ∅ := by
+    apply Finset.eq_empty_iff_forall_notMem.mpr
+    intro w hw
+    have hwne := Finset.prod_ne_zero_iff.mp ((harch s).trans_ne hΓs) w (Finset.mem_univ w)
+    have ht : quasiCharacterNormTwist (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous (chart s) 0 = chart s := by
+      ext1 x; exact (congrArg (chart s x * ·) (Complex.cpow_zero _)).trans (mul_one _)
+    exact (Finset.mem_filter.mp hw).2.ne ((sLocalPrincipalPartCoeff_leading_formula_arch_factor (chart s) w).1.meromorphicOrderAt_eq_zero_iff.mpr
+      (by simpa only [ht] using hwne))
+  refine ⟨by rw [hzero, Finset.card_empty], fun z hz ↦ ?_, fun z hz ↦ ?_⟩
+  · have hGz : AnalyticAt ℂ Γ (z+s) := by
+      simpa only [Pi.inv_def, inv_inv, Γ] using ((differentiable_inv_heckeGammaFactor ξ).analyticAt (z+s)).inv
+        (inv_ne_zero (near z hz).2.2)
+    have hzeta := ((differentiable_inv_sLocalHeckeL η⁻¹).analyticAt (1-(z+s))).comp
+      (f := fun w : ℂ ↦ 1-w) (analyticAt_const.sub analyticAt_id)
+    have hA : AnalyticAt ℂ (fun w ↦ A (chart w)) (z+s) := by
+      dsimp only [A]
+      simp only [harch, chart, dual, sLocalNormTwistChart_dual, div_eq_mul_inv]
+      exact ((sLocalEpsilonFactor_entire η) (z+s) trivial).mul (hGz.mul hzeta)
+    exact hA.comp (f := fun w : ℂ ↦ w + s) (analyticAt_id.add analyticAt_const)
+  · obtain ⟨hzr, hzy, _⟩ := near z hz
+    have hf : ‖(D (z+s))⁻¹‖ ≤ D₀ := by
+      simpa only [D, Finset.prod_inv_distrib] using hD (1-(z+s)) (by rw [Complex.sub_re, Complex.one_re]; linarith [hzr.2])
+    have hF : ‖D s‖ ≤ 2 ^ Fintype.card T := sLocalPWOrbital_bases_bounded_interpolation_laurent_reflected ξ⁻¹ _ (by simp [hs])
+    have hforward : ‖A (chart (z+s))‖ ≤ E * G * D₀ := by
+      rw [hval, norm_mul, norm_mul]
+      exact mul_le_mul (mul_le_mul (hε _ hzr) (hγ _ hzr.1 hzr.2 hzy) (norm_nonneg _) hE)
+        hf (norm_nonneg _) (by positivity)
+    have hinverse : ‖(A (chart s))⁻¹‖ ≤ E' * (G' * (1 + ‖s‖)^n) * 2 ^ Fintype.card T := by
+      rw [hval, mul_inv, mul_inv, inv_inv, inv_div, norm_mul, norm_mul]
+      apply mul_le_mul _ hF (norm_nonneg _) (by positivity)
+      apply mul_le_mul (hε' s hs) _ (norm_nonneg _) hE'
+      have h := hγ' s hs.ge hs.le (hy.2.1)
+      refine h.trans (mul_le_mul_of_nonneg_left ?_ hG'.le)
+      rw [hs, sub_zero]
+      have hexp : (n : ℝ) * (1 / 2) ≤ (n : ℝ) := by linarith [Nat.cast_nonneg (α := ℝ) n]
+      refine (Real.rpow_le_rpow_of_exponent_le hy.2.2.2 hexp).trans ?_
+      rw [Real.rpow_natCast]
+      exact pow_le_pow_left₀ (abs_nonneg _) ((Complex.abs_im_le_norm s).trans (le_add_of_nonneg_left zero_le_one)) _
+    rw [div_eq_mul_inv, norm_mul]
+    exact (mul_le_mul hforward hinverse (norm_nonneg _) (by positivity)).trans_eq (by ring)
+
+/-- The archimedean Euler product divided by the reflected Euler product and multiplied
+by epsilon has polynomial relative growth on disks about the primary centers, after
+removing the archimedean poles there. The reflected argument is on the line of real
+part one, so none of its finite denominators can be small. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_arch
+    (p : Vℚ) (χ : PontryaginDual J₁(T)) (τ : ℝ≥0ˣ →ₜ* J(T)) (hτ : RightInverse τ (m(T))) :
+    let twist := quasiCharacterNormTwist (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous
+    let dual := dualQuasiCharacter (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous
+    let A (c : QuasiCharacter J(T)) := sLocalEpsilonFactor c *
+      ((∏ w : InfinitePlace F, infiniteLocalEulerFactor w (sLocalInfiniteRestriction w c)) /
+        sLocalHeckeL (dual c))
+    ∃ R > (0 : ℝ), ∃ e : ℕ, ∃ B ≥ (0 : ℝ), ∀ j : Iₚ(p, χ),
+      ∃ G : ℂ → ℂ, AnalyticOnNhd ℂ G (Metric.closedBall 0 R) ∧
+        (G =ᶠ[𝓝[≠] (0 : ℂ)] fun z ↦ z ^ (sLocalArchPolePlaces j.val.1).card * A (twist j.val.1 z)) ∧
+        ∀ z ∈ Metric.closedBall 0 R, ‖G z / G 0‖ ≤
+          B * (1 + ‖(existsUnique_complexPower (j.val.1.comp τ)).exists.choose‖) ^ e := by
+  intro twist dual A
+  let s (j : Iₚ(p, χ)) := (existsUnique_complexPower (j.val.1.comp τ)).exists.choose
+  obtain ⟨η, hchart⟩ := sLocalPWOrbital_bases_bounded_interpolation_laurent_chart p χ τ hτ
+  let chart := twist ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η)
+  change ∀ j : Iₚ(p, χ), chart (s j) = j.val.1 at hchart
+  have hshift (t z : ℂ) : twist (chart t) z = chart (z+t) := normTwist_normTwist _ _ _ _ _
+  obtain ⟨hre, hfinite⟩ := sLocalPWOrbital_bases_bounded_interpolation_laurent_centers p χ η s hchart
+  obtain ⟨Y, e, B, hB, hstrip⟩ := sLocalPWOrbital_bases_bounded_interpolation_laurent_strip η
+  let J := range s ∩ Metric.closedBall 0 Y
+  let : Finite J := (hfinite Y).to_subtype
+  have low (t : J) :
+      ∃ G : ℂ → ℂ, AnalyticAt ℂ G 0 ∧ G =ᶠ[𝓝[≠] (0 : ℂ)] fun z ↦
+        z ^ (sLocalArchPolePlaces (chart t)).card * A (twist (chart t) z) := by
+    let c := chart t
+    let P := sLocalArchPolePlaces c
+    let L (w : InfinitePlace F) (z : ℂ) := infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (twist c z))
+    obtain ⟨K, hK, _, he⟩ := sLocalPrincipalPartCoeff_leading_formula_finite_product P L
+      (fun w ↦ by simp [P, sLocalArchPolePlaces, L, twist]) (sLocalPrincipalPartCoeff_leading_formula_arch_factor c)
+    let ε (z : ℂ) := sLocalEpsilonFactor (chart (z+t))
+    let D (z : ℂ) := (sLocalHeckeL (dual (chart (z+t))))⁻¹
+    have hε : AnalyticAt ℂ ε 0 :=
+      ((sLocalEpsilonFactor_entire η) _ trivial).comp (analyticAt_id.add analyticAt_const)
+    have hD : AnalyticAt ℂ D 0 := by
+      dsimp only [D, dual, chart, twist]
+      simp only [sLocalNormTwistChart_dual]
+      exact ((differentiable_inv_sLocalHeckeL η⁻¹).analyticAt _).comp
+        (analyticAt_const.sub (analyticAt_id.add analyticAt_const))
+    refine ⟨fun z ↦ ε z * K z * D z, (hε.mul hK).mul hD, ?_⟩
+    filter_upwards [he] with z hz
+    rw [hz]
+    dsimp only [A, ε, D, L, P, c]
+    rw [hshift, div_eq_mul_inv]
+    ring
+  choose G hG hGe using low
+  have hnear (t : J) : ∀ᶠ z in 𝓝 (0 : ℂ), AnalyticAt ℂ (G t) z ∧ ‖G t z / G t 0‖ < 2 := by
+    apply (hG t).eventually_analyticAt.and
+    apply ((hG t).continuousAt.div_const _).norm.eventually_lt continuousAt_const
+    by_cases h : G t 0 = 0 <;> simp [h]
+  obtain ⟨R, hR, hlow⟩ := Metric.nhds_basis_closedBall.eventually_iff.mp (eventually_all.mpr hnear)
+  refine ⟨min R (1/2), lt_min hR (by norm_num), e, max 2 B, by positivity, fun j ↦ ?_⟩
+  change ∃ K : ℂ → ℂ, AnalyticOnNhd ℂ K _ ∧
+    (K =ᶠ[𝓝[≠] (0 : ℂ)] fun z ↦ z ^ (sLocalArchPolePlaces j.val.1).card * A (twist j.val.1 z)) ∧
+    ∀ z ∈ _, ‖K z / K 0‖ ≤ max 2 B * (1 + ‖s j‖) ^ e
+  rw [← hchart j]
+  by_cases h : Y ≤ |(s j).im|
+  · obtain ⟨hm, ha, hb⟩ := hstrip (s j) (hre j) h
+    change (sLocalArchPolePlaces (chart (s j))).card = 0 at hm
+    refine ⟨fun z ↦ A (chart (z+s j)), ha.mono (Metric.closedBall_subset_closedBall (min_le_right _ _)),
+      .of_forall (fun z ↦ by simp only [hm, pow_zero, one_mul, hshift]), fun z hz ↦ ?_⟩
+    simp only [zero_add]
+    exact (hb z (Metric.closedBall_subset_closedBall (min_le_right _ _) hz)).trans
+      (mul_le_mul_of_nonneg_right (le_max_right _ _) (by positivity))
+  · have ht : s j ∈ J := ⟨mem_range_self j, mem_closedBall_zero_iff.mpr (by
+      have hb := Complex.norm_le_abs_re_add_abs_im (s j)
+      rw [hre j, abs_zero, zero_add] at hb
+      exact hb.trans (le_of_not_ge h))⟩
+    let t : J := ⟨s j, ht⟩
+    refine ⟨G t, fun z hz ↦ (hlow (Metric.closedBall_subset_closedBall (min_le_left _ _) hz) t).1,
+      hGe t, fun z hz ↦ ?_⟩
+    exact (hlow (Metric.closedBall_subset_closedBall (min_le_left _ _) hz) t).2.le.trans
+      ((le_max_left _ _).trans (le_mul_of_one_le_right (by positivity) (one_le_pow₀ (le_add_of_nonneg_right (norm_nonneg _)))))
+
+/-- After canceling the nonpolar finite Euler denominators and removing the central pole,
+the remaining germ, divided by its value at zero, has polynomial growth on a fixed disk.
+The canceled factors are normalized to one at zero. The finite factors polar at the center
+have fixed shape `z / (1 - exp (-log(q_v) * z))`. -/
+private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_cleared
+    (p : Vℚ) (χ : PontryaginDual J₁(T)) (τ : ℝ≥0ˣ →ₜ* J(T)) (hτ : RightInverse τ (m(T))) :
+    let twist := quasiCharacterNormTwist (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous
+    let b (j : Iₚ(p, χ)) (v : T) :=
+      let E := finiteLocalEulerFactor v.val (sLocalFiniteRestriction v j.val.1)
+      if E = 0 then 0 else 1 - E
+    let D (j : Iₚ(p, χ)) (z : ℂ) := ∏ v : T, (1 + b j v *
+      (Complex.exp (-(Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ) * z) - 1))
+    ∃ R > (0 : ℝ), ∃ e : ℕ, ∃ A ≥ (0 : ℝ), ∀ j : Iₚ(p, χ),
+      ∃ G : ℂ → ℂ, AnalyticOnNhd ℂ G (Metric.closedBall 0 R) ∧
+        (G =ᶠ[𝓝[≠] (0 : ℂ)] fun z ↦ z ^ sLocalRhoPoleOrder j.val.1 *
+          sLocalRhoFactor (twist j.val.1 z) * D j z) ∧
+        ∀ z ∈ Metric.closedBall 0 R, ‖G z / G 0‖ ≤
+          A * (1 + ‖(existsUnique_complexPower (j.val.1.comp τ)).exists.choose‖) ^ e := by
+  intro twist b D
+  obtain ⟨r, hr, e, B, hB, harch⟩ :=
+    sLocalPWOrbital_bases_bounded_interpolation_laurent_arch p χ τ hτ
+  obtain ⟨u, hu, hfin⟩ := sLocalPWOrbital_bases_bounded_interpolation_laurent_finite (F := F) (T := T)
+  refine ⟨min r u, lt_min hr hu, e, B * 2 ^ Fintype.card T, by positivity, fun j ↦ ?_⟩
+  obtain ⟨A, hA, hAe, hAb⟩ := harch j
+  obtain ⟨K, hK, hKe, hKb⟩ := hfin j.val.1
+  refine ⟨A * K, (hA.mono (Metric.closedBall_subset_closedBall (min_le_left _ _))).mul
+    (hK.mono (Metric.closedBall_subset_closedBall (min_le_right _ _))), ?_, fun z hz ↦ ?_⟩
+  · obtain ⟨η, s, hs⟩ := exists_sLocalNormTwist (F := F) (S := T) j.val.1
+    have ht : Tendsto (fun z : ℂ ↦ z + s) (𝓝[≠] 0) (𝓝[≠] (0+s)) :=
+      ((Homeomorph.addRight s).map_punctured_nhds_eq (0 : ℂ)).le
+    filter_upwards [hAe, hKe, ht.eventually (nhdsNE_le_codiscrete (0+s) (sLocalRhoFactor_eq_epsilon_mul η))]
+      with z h₁ h₂ h₃
+    have hρ : sLocalRhoFactor (twist j.val.1 z) = sLocalEpsilonFactor (twist j.val.1 z) *
+        (sLocalHeckeL (twist j.val.1 z) / sLocalHeckeL (dualQuasiCharacter (m(T))
+          (isProperMap_sIdeleQuotientNorm F T).continuous (twist j.val.1 z))) := by
+      simpa only [twist, ← hs, normTwist_normTwist] using h₃
+    rw [Pi.mul_apply, h₁, h₂, hρ, sLocalRhoPoleOrder_eq_card_polePlaces, pow_add]
+    dsimp only [sLocalHeckeL, D, b, twist]
+    ring
+  · rw [Pi.mul_apply, Pi.mul_apply, mul_div_mul_comm, norm_mul]
+    exact (mul_le_mul (hAb z (Metric.closedBall_subset_closedBall (min_le_left _ _) hz))
+      (hKb z (Metric.closedBall_subset_closedBall (min_le_right _ _) hz)) (norm_nonneg _) (by positivity)).trans_eq
+        (by ring)
+
 /-- At a repeated selected pole, bound each lower Laurent coefficient of the correcting
 factor relative to its leading coefficient by a polynomial in the height of the pole.
 Only offsets below the multiplicity at the selected prime enter the estimate. -/
@@ -4280,7 +4940,81 @@ private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_growth
     ∃ d : ℕ, ∃ C ≥ (0 : ℝ), ∀ j : Iₚ(p, χ), j.val.2 ≠ 0 →
       ‖coeff j.val.1 j.val.2 / coeff j.val.1 0‖ ≤
         C * (1 + ‖(existsUnique_complexPower (j.val.1.comp τ)).exists.choose‖) ^ d := by
-  sorry
+  let W (j : Iₚ(p, χ)) := 1 + ‖(existsUnique_complexPower (j.val.1.comp τ)).exists.choose‖
+  let E (j : Iₚ(p, χ)) (v : T) := finiteLocalEulerFactor v.val (sLocalFiniteRestriction v j.val.1)
+  let b (j : Iₚ(p, χ)) (v : T) := if E j v = 0 then 0 else 1 - E j v
+  let L (v : T) : ℂ := -(Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ)
+  let D (j : Iₚ(p, χ)) (z : ℂ) := ∏ v : T, (1 + b j v * (Complex.exp (L v * z) - 1))
+  have hW (j : Iₚ(p, χ)) : 1 ≤ W j := le_add_of_nonneg_right (norm_nonneg _)
+  have place (v : T) : ∃ d : ℕ, ∃ C ≥ (0 : ℝ), ∀ j : Iₚ(p, χ), j.val.2 ≠ 0 →
+      ‖E j v‖ ≤ C * W j ^ d := by
+    by_cases hv : v.val ∈ sLocalPrimaryPlaces T p
+    · obtain ⟨C, hC⟩ := sLocalPWOrbital_bases_bounded_interpolation_laurent_primary p χ v hv
+      exact ⟨0, max C 0, le_max_right _ _, fun j _ ↦ by simpa using (hC j).trans (le_max_left C 0)⟩
+    · exact sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime hST hT hdis hsat hPic
+        p hp hp₀ ω hu χ hχ hω τ hτ v hv
+  choose d C hC hE using place
+  let n := Finset.univ.sup d
+  let B := 1 + ∑ v, C v
+  let M := 1 + ∑ v, ‖L v‖
+  have hB : 1 ≤ B := le_add_of_nonneg_right (Finset.sum_nonneg fun v _ ↦ hC v)
+  have hM : 1 ≤ M := le_add_of_nonneg_right (Finset.sum_nonneg fun _ _ ↦ norm_nonneg _)
+  obtain ⟨R, hR, e, A, hA, hreg⟩ :=
+    sLocalPWOrbital_bases_bounded_interpolation_laurent_cleared p χ τ hτ
+  let q := max R⁻¹ (4 * M * B)
+  have hq : 1 ≤ q := (show 1 ≤ 4 * M * B by nlinarith [one_le_mul_of_one_le_of_one_le hM hB]).trans
+    (le_max_right _ _)
+  let N := Fintype.card T
+  refine ⟨e + n * N, A * 2 ^ N * q ^ N, by positivity, fun j hj ↦ ?_⟩
+  obtain ⟨G, hG, hGe, hGb⟩ := hreg j
+  let H := W j ^ n
+  have hH : 1 ≤ H := one_le_pow₀ (hW j)
+  let r := (q * H)⁻¹
+  have hq0 : 0 < q := zero_lt_one.trans_le hq
+  have hr : 0 < r := inv_pos.mpr (mul_pos hq0 (zero_lt_one.trans_le hH))
+  have hrR : r ≤ R := (inv_le_comm₀ (by positivity : 0 < q * H) hR).mpr
+    ((le_max_left _ _).trans (le_mul_of_one_le_right hq0.le hH))
+  have hdisk := sLocalPWOrbital_bases_bounded_interpolation_laurent_disk (b j) L M (B * H) r
+    hM (one_le_mul_of_one_le_of_one_le hB hH)
+    (fun v ↦ (Finset.single_le_sum (fun w _ ↦ norm_nonneg (L w)) (Finset.mem_univ v)).trans
+      (le_add_of_nonneg_left zero_le_one))
+    (fun v ↦ by
+      have hev := hE v j hj
+      have hv : C v ≤ ∑ w, C w := Finset.single_le_sum (fun w _ ↦ hC w) (Finset.mem_univ v)
+      have hpow : W j ^ d v ≤ H := pow_le_pow_right₀ (hW j) (Finset.le_sup (Finset.mem_univ v))
+      have hterm : ‖E j v‖ ≤ (∑ w, C w) * H := hev.trans (mul_le_mul hv hpow (by positivity) (Finset.sum_nonneg fun w _ ↦ hC w))
+      dsimp only [b]
+      split
+      · simpa using (zero_le_one.trans (one_le_mul_of_one_le_of_one_le hB hH))
+      · rw [show B * H = H + (∑ w, C w) * H by simp [B, add_mul]]
+        exact (norm_sub_le _ _).trans (add_le_add (norm_one.trans_le hH) hterm))
+    (by
+      apply inv_anti₀ (by positivity : 0 < 4 * M * (B * H))
+      rw [← mul_assoc]
+      exact mul_le_mul_of_nonneg_right (le_max_right _ _) (by positivity))
+  have hD0 : D j 0 = 1 := by simp [D]
+  have hGD : AnalyticOnNhd ℂ (G / D j) (Metric.closedBall 0 r) := by
+    intro z hz
+    exact (hG z (Metric.closedBall_subset_closedBall hrR hz)).div
+      (Finset.univ.analyticAt_fun_prod (fun v _ ↦ by fun_prop)) (hdisk z hz).1
+  have hnear := Metric.closedBall_mem_nhds (0 : ℂ) hr
+  have heq : G / D j =ᶠ[𝓝[≠] (0 : ℂ)] fun z ↦ z ^ sLocalRhoPoleOrder j.val.1 *
+      sLocalRhoFactor (quasiCharacterNormTwist (m(T)) (isProperMap_sIdeleQuotientNorm F T).continuous j.val.1 z) := by
+    filter_upwards [hGe, nhdsWithin_le_nhds hnear] with z he hz
+    exact (congrArg (· / D j z) he).trans (mul_div_cancel_right₀ _ (hdisk z hz).1)
+  have hg := sLocalPWOrbital_bases_bounded_interpolation_laurent_cauchy _ (G / D j) _ j.val.2 r
+    (A * W j ^ e * 2 ^ N) hr hGD heq (fun z hz ↦ by
+      simp only [Pi.div_apply, hD0, div_one]
+      rw [div_right_comm, div_eq_mul_inv _ (D j z), norm_mul]
+      exact mul_le_mul (hGb z (Metric.closedBall_subset_closedBall hrR (Metric.sphere_subset_closedBall hz)))
+        (hdisk z (Metric.sphere_subset_closedBall hz)).2 (norm_nonneg _) (by positivity))
+  have hk : j.val.2 ≤ N := j.property.2.le.trans (Finset.card_le_univ _)
+  refine hg.trans ?_
+  rw [div_eq_mul_inv, ← inv_pow, inv_inv]
+  calc
+    _ ≤ (A * W j ^ e * 2 ^ N) * (q * H) ^ N := by
+      exact mul_le_mul_of_nonneg_left (pow_le_pow_right₀ (one_le_mul_of_one_le_of_one_le hq hH) hk) (by positivity)
+    _ = _ := by dsimp only [H]; rw [mul_pow, pow_add, pow_mul]; ring
 
 /-- The leading coefficient of the correcting factor is nonzero. Multiplying the two
 regular germs in the functional equation gives the leading row of the triangular system. -/
