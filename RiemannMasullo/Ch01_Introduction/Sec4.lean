@@ -14,6 +14,11 @@ import Mathlib.Analysis.Complex.Poisson
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gamma.DigammaIntegral
 import Mathlib.Analysis.Calculus.BumpFunction.Normed
 import Mathlib.Analysis.Calculus.ContDiff.Convolution
+import Mathlib.Analysis.Calculus.SmoothSeries
+import Mathlib.Analysis.SpecialFunctions.FrullaniIntegral
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gamma.Digamma
+import Mathlib.Analysis.Calculus.Deriv.Star
+import Mathlib.Probability.Distributions.Cauchy
 
 import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec5
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
@@ -11719,6 +11724,676 @@ theorem introTrace_full_resolvent_not_summable (χ : U𝔽) (a : ℝ) (ha : 1/2 
     ¬ Summable (fun r : windowZeros(χ,a) ↦ (zeroOrder(χ,r.val) : ℂ) / (z-(r.val-1/2))) :=
   fun h ↦ introTrace_completed_zeros_not_summable_reciprocal_height χ a ha
     ((introTrace_resolvent_summable_iff_reciprocal_height χ (fun r ↦ |r.re-1/2| < a) z).mp h)
+
+/-- Termwise integration of an absolutely summable Fourier series keeps the primitive
+uniformly bounded when its nonzero frequencies are bounded away from zero. -/
+private theorem introTrace_vertical_series_bounded_primitive {ι : Type*} (a : ι → ℂ)
+    (u : ι → ℝ) (ha : Summable a) {d : ℝ} (hd : 0 < d)
+    (hgap : ∀ i, a i = 0 ∨ d ≤ u i) :
+    ∃ P : ℝ → ℝ, ∃ C : ℝ, (∀ t, |P t| ≤ C) ∧ ∀ t : ℝ,
+      HasDerivAt P (∑' i, a i * Complex.exp (((-t * u i : ℝ) : ℂ) * Complex.I)).re t := by
+  let k (i : ι) : ℂ := -(u i : ℂ) * Complex.I
+  let E (i : ι) (t : ℝ) := Complex.exp (((-t * u i : ℝ) : ℂ) * Complex.I)
+  let b (i : ι) (t : ℝ) := (a i / k i) * E i t
+  have hE (i : ι) (t : ℝ) : ‖E i t‖ = 1 := by
+    dsimp only [E]
+    rw [Complex.norm_exp]
+    simp [Complex.mul_re]
+  have hkn (i : ι) : ‖k i‖ = |u i| := by simp [k]
+  have hB (i : ι) (t : ℝ) : ‖b i t‖ ≤ ‖a i‖ / d := by
+    simp only [b, norm_mul, hE, mul_one, norm_div, hkn]
+    rcases hgap i with h | h
+    · simp [h]
+    · exact div_le_div_of_nonneg_left (norm_nonneg _) hd (h.trans (le_abs_self _))
+  have hdE (i : ι) (t : ℝ) : HasDerivAt (E i) (E i t * k i) t := by
+    have h := ((hasDerivAt_id (t : ℂ)).mul_const (k i)).cexp.comp_ofReal
+    convert h using 1
+    · ext y
+      dsimp [E, k]
+      push_cast
+      ring_nf
+    · dsimp [E, k]
+      push_cast
+      congr 1 <;> ring_nf
+  have hdb (i : ι) (t : ℝ) : HasDerivAt (b i) (a i * E i t) t := by
+    rcases hgap i with h | h
+    · simpa [b, h] using (hasDerivAt_const t (0 : ℂ))
+    have hk : k i ≠ 0 := mul_ne_zero (neg_ne_zero.mpr (Complex.ofReal_ne_zero.mpr (hd.trans_le h).ne')) Complex.I_ne_zero
+    convert (hdE i t).const_mul (a i / k i) using 1
+    field_simp
+  have hmaj := ha.norm.div_const d
+  have hbsum (t : ℝ) := hmaj.of_norm_bounded (hB · t)
+  refine ⟨fun t ↦ (∑' i, b i t).re, ∑' i, ‖a i‖ / d, fun t ↦ ?_, fun t ↦ ?_⟩
+  · exact (Complex.abs_re_le_norm _).trans ((norm_tsum_le_tsum_norm (hbsum t).norm).trans
+      ((hbsum t).norm.tsum_le_tsum (hB · t) hmaj))
+  · apply Complex.reCLM.hasFDerivAt.comp_hasDerivAt t
+    exact hasDerivAt_tsum ha.norm hdb (fun i y ↦ by rw [norm_mul, hE, mul_one])
+      (hbsum 0) t
+
+/-- Paper: §1.4.3, p. 29. On every vertical line in the Euler half-plane, the real part
+of the finite Hecke logarithmic derivative has a bounded real primitive. -/
+theorem introTrace_finite_logDeriv_vertical_re_bounded_primitive
+    (χ : U𝔽) (σ : ℝ) (hσ : 1 < σ) :
+    ∃ P : ℝ → ℝ, ∃ C : ℝ, (∀ t, |P t| ≤ C) ∧ ∀ t : ℝ,
+      HasDerivAt P (logDeriv finiteL(χ) ((σ : ℂ) + t * Complex.I)).re t := by
+  classical
+  let J := {I : Ideal (𝓞 F) // I ≠ ⊥}
+  let N (j : J) : ℝ := j.val.absNorm
+  let w (j : J) := heckeIdealVonMangoldt (ideleClassNormTwist χ 0) j.val
+  let a (j : J) := -w j / (N j : ℂ) ^ (σ : ℂ)
+  let u (j : J) := Real.log (N j)
+  have hN (j : J) : 0 < N j := by
+    dsimp [N]
+    exact_mod_cast Nat.pos_of_ne_zero (Ideal.absNorm_eq_zero_iff.not.mpr j.property)
+  have he (s : ℂ) (hs : 1 < s.re) := (finiteHeckeL_logDeriv_hasSum_ideals χ finiteL(χ)
+    (finiteHeckeL_exists_continuation χ).choose_spec.1 (finiteHeckeL_exists_continuation χ).choose_spec.2 ⟨s, hs⟩).2.2
+  have ha : Summable a := by
+    simpa only [a, w, N, Complex.ofReal_natCast] using (he σ hσ).summable
+  have hgap (j : J) : a j = 0 ∨ Real.log 2 ≤ u j := by
+    by_cases h : 2 ≤ j.val.absNorm
+    · exact Or.inr (Real.log_le_log (by norm_num) (by dsimp only [u, N]; exact_mod_cast h))
+    have habs : j.val.absNorm = 1 := by
+      have hj := Nat.pos_of_ne_zero (Ideal.absNorm_eq_zero_iff.not.mpr j.property)
+      omega
+    have none : ¬ ∃ v : HeightOneSpectrum (𝓞 F), ∃ k : ℕ, 0 < k ∧ j.val = v.asIdeal ^ k := by
+      rintro ⟨v, k, hk, heq⟩
+      have hn : 1 < v.asIdeal.absNorm ^ k := one_lt_pow₀ (NumberField.HeightOneSpectrum.one_lt_absNorm v) hk.ne'
+      rw [← map_pow, ← heq, habs] at hn
+      exact hn.false
+    exact Or.inl (by simp [a, w, heckeIdealVonMangoldt, idealVonMangoldt, none])
+  obtain ⟨P, C, hP, hD⟩ := introTrace_vertical_series_bounded_primitive a u ha (Real.log_pos (by norm_num)) hgap
+  refine ⟨P, C, hP, fun t ↦ ?_⟩
+  have h := he ((σ : ℂ) + t * Complex.I) (by simpa using hσ)
+  have heq (j : J) : a j * Complex.exp (((-t * u j : ℝ) : ℂ) * Complex.I) =
+      -w j / (N j : ℂ) ^ ((σ : ℂ) + t * Complex.I) := by
+    have hn : (N j : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (hN j).ne'
+    rw [Complex.cpow_add _ _ hn]
+    have hu : (N j : ℂ) ^ ((t : ℂ) * Complex.I) =
+        Complex.exp (-((((-t * u j : ℝ) : ℂ) * Complex.I))) := by
+      rw [Complex.cpow_def_of_ne_zero hn, ← Complex.ofReal_log (hN j).le]
+      congr 1
+      dsimp [u]
+      push_cast
+      ring
+    rw [hu, Complex.exp_neg]
+    dsimp only [a]
+    rw [← div_div, div_inv_eq_mul]
+  have hsum : (∑' j : J, a j * Complex.exp (((-t * u j : ℝ) : ℂ) * Complex.I)) =
+      logDeriv finiteL(χ) ((σ : ℂ) + t * Complex.I) := by
+    rw [tsum_congr heq]
+    simpa only [w, N, Complex.ofReal_natCast] using h.tsum_eq
+  rw [← hsum]
+  exact hD t
+
+private theorem introTrace_oddKernel_even_integral (f : ℝ → ℝ) (he : ∀ t, f (-t) = f t) (T : ℝ) :
+    ∫ t in -T..T, t / (1 + t ^ 2) * f t = 0 := by
+  let g (t : ℝ) := t / (1 + t ^ 2) * f t
+  have e : (fun t ↦ g (-t)) = fun t ↦ -g t := by funext t; simp [g, he, neg_div]
+  have h := intervalIntegral.integral_comp_neg (a := -T) (b := T) g
+  rw [e, intervalIntegral.integral_neg, neg_neg] at h
+  change ∫ t in -T..T, g t = 0
+  linarith
+
+/-- An odd Cauchy kernel pairs convergently with a derivative whose primitive
+grows at most as the square root of the absolute height. -/
+private theorem introTrace_oddKernel_sublinear_primitive
+    (f P : ℝ → ℝ) (hf : Continuous f) (C : ℝ)
+    (hP : ∀ t, |P t| ≤ C * (1 + t ^ 2) ^ (1 / 4 : ℝ)) (hdP : ∀ t, HasDerivAt P (f t) t) :
+    ∃ B : ℝ, Tendsto (fun T : ℝ ↦ ∫ t in -T..T, t / (1 + t ^ 2) * f t) atTop (𝓝 B) := by
+  let D (t : ℝ) := 1 + t ^ 2
+  let w (t : ℝ) := t / D t
+  let v (t : ℝ) := (1 - t ^ 2) / (D t) ^ 2
+  have hD (t : ℝ) : 0 < D t := by dsimp [D]; positivity
+  have hderiv (t : ℝ) : HasDerivAt w (v t) t := by
+    convert (hasDerivAt_id t).div ((hasDerivAt_const t (1 : ℝ)).add ((hasDerivAt_id t).pow 2))
+      (hD t).ne' using 1
+    · rfl
+    · dsimp [v, D]; ring
+  have hw : Continuous w := continuous_iff_continuousAt.mpr fun t ↦ (hderiv t).continuousAt
+  have hv : Continuous v := by dsimp [v, D]; fun_prop (disch := intro t; positivity)
+  have hpc : Continuous P := continuous_iff_continuousAt.mpr fun t ↦ (hdP t).continuousAt
+  have hit : Integrable (fun t : ℝ ↦ (D t) ^ (-(3 : ℝ) / 4)) := by
+    have h := integrable_rpow_neg_one_add_norm_sq (E := ℝ) (μ := volume) (r := 3 / 2) (by norm_num)
+    simpa [D, Real.norm_eq_abs, sq_abs, show -(3 / 2 : ℝ) / 2 = -3 / 4 by norm_num] using h
+  have hi : Integrable (fun t ↦ v t * P t) := by
+    apply (hit.const_mul C).mono' (hv.mul hpc).aestronglyMeasurable (Eventually.of_forall fun t ↦ ?_)
+    change ‖v t * P t‖ ≤ C * D t ^ (-3 / 4 : ℝ)
+    rw [Real.norm_eq_abs, abs_mul]
+    have hvb : |v t| ≤ (D t)⁻¹ := by
+      dsimp only [v]
+      rw [abs_div, abs_of_pos (sq_pos_of_pos (hD t)), div_le_iff₀ (sq_pos_of_pos (hD t))]
+      rw [show (D t)⁻¹ * D t ^ 2 = D t by field_simp]
+      exact abs_le.mpr ⟨by dsimp [D]; linarith, by dsimp [D]; linarith [sq_nonneg t]⟩
+    calc
+      _ ≤ (D t)⁻¹ * (C * (D t) ^ (1 / 4 : ℝ)) := mul_le_mul hvb (hP t) (abs_nonneg _) (inv_nonneg.mpr (hD t).le)
+      _ = C * (D t) ^ (-(3 : ℝ) / 4) := by
+        rw [← Real.rpow_neg_one, show -(3 : ℝ) / 4 = -1 + 1 / 4 by norm_num, Real.rpow_add (hD t)]
+        ring
+  have hbound (t : ℝ) : |w t * P t| ≤ C * (D t) ^ (-(1 : ℝ) / 4) := by
+    have ht : |t| ≤ (D t) ^ (1 / 2 : ℝ) := by
+      rw [← Real.sqrt_eq_rpow]
+      exact (Real.le_sqrt (abs_nonneg _) (hD t).le).mpr (by simp [D, sq_abs])
+    have h := mul_le_mul (div_le_div_of_nonneg_right ht (hD t).le) (hP t)
+      (abs_nonneg _) (div_nonneg (Real.rpow_nonneg (hD t).le _) (hD t).le)
+    rw [abs_mul, show |w t| = |t|/(D t) by dsimp only [w]; rw [abs_div, abs_of_pos (hD t)]]
+    apply h.trans_eq
+    rw [div_eq_mul_inv, ← Real.rpow_neg_one]
+    calc
+      _ = C * ((D t) ^ (1 / 2 : ℝ) * (D t) ^ (-1 : ℝ) * (D t) ^ (1 / 4 : ℝ)) := by ring
+      _ = _ := by rw [← Real.rpow_add (hD t), ← Real.rpow_add (hD t)]; norm_num
+  have hDt : Tendsto D atTop atTop := tendsto_atTop_mono (fun t ↦ (by dsimp [D]; linarith : t ^ 2 ≤ D t)) (tendsto_pow_atTop (by norm_num : 2 ≠ 0))
+  have hlim : Tendsto (fun t : ℝ ↦ C * (D t) ^ (-(1 : ℝ) / 4)) atTop (𝓝 0) := by
+    simpa only [Function.comp_apply, neg_div, mul_zero] using (((tendsto_rpow_neg_atTop (by norm_num : 0 < (1 / 4 : ℝ))).comp hDt).const_mul C)
+  have hb (U : ℝ → ℝ) (hU : ∀ t, D (U t) = D t) :
+      Tendsto (fun t ↦ w (U t) * P (U t)) atTop (𝓝 0) := by
+    apply squeeze_zero_norm' _ hlim
+    exact Eventually.of_forall fun t ↦ by simpa [Real.norm_eq_abs, hU] using hbound (U t)
+  have hR := hb id (fun _ ↦ rfl)
+  have hL := hb Neg.neg (by intro t; simp [D])
+  have hI := intervalIntegral_tendsto_integral hi tendsto_neg_atTop_atBot tendsto_id
+  refine ⟨-∫ t, v t * P t, (show Tendsto (fun T : ℝ ↦ w T * P T - w (-T) * P (-T) - ∫ t in -T..T, v t * P t)
+      atTop (𝓝 (-∫ t, v t * P t)) by simpa using (hR.sub hL).sub hI).congr ?_⟩
+  intro T
+  exact (intervalIntegral.integral_mul_deriv_eq_deriv_mul_of_hasDerivAt hw.continuousOn hpc.continuousOn
+    (fun t _ ↦ hderiv t) (fun t _ ↦ hdP t) (hv.intervalIntegrable _ _) (hf.intervalIntegrable _ _)).symm
+
+/-- The odd-kernel pairing with the real finite logarithmic derivative converges
+under symmetric truncation on every Euler line for every unitary character. -/
+private theorem introTrace_finite_logDeriv_oddKernel_tendsto
+    (χ : U𝔽) (σ : ℝ) (hσ : 1 < σ) :
+    let f (t : ℝ) := (logDeriv finiteL(χ) ((σ : ℂ) + (t : ℂ) * Complex.I)).re
+    Continuous f ∧ ∃ B : ℝ, Tendsto (fun T : ℝ ↦ ∫ t in -T..T, t / (1 + t ^ 2) * f t) atTop (𝓝 B) := by
+  intro f
+  have hc : Continuous f := by
+    apply continuous_iff_continuousAt.mpr
+    intro t
+    let s := (σ : ℂ) + (t : ℂ) * Complex.I
+    have hs : 1 < s.re := by simpa [s] using hσ
+    obtain ⟨hL, hn, _⟩ := finiteHeckeL_logDeriv_hasSum_ideals χ finiteL(χ)
+      (finiteHeckeL_exists_continuation χ).choose_spec.1 (finiteHeckeL_exists_continuation χ).choose_spec.2 ⟨s, hs⟩
+    exact Complex.continuous_re.continuousAt.comp ((hL.deriv.div hL hn).continuousAt.comp
+      (f := fun t : ℝ ↦ (σ : ℂ) + (t : ℂ) * Complex.I) (by fun_prop))
+  obtain ⟨P, C, hP, hdP⟩ := introTrace_finite_logDeriv_vertical_re_bounded_primitive χ σ hσ
+  refine ⟨hc, introTrace_oddKernel_sublinear_primitive f P hc C (fun t ↦ ?_) hdP⟩
+  have hC : 0 ≤ C := (abs_nonneg (P 0)).trans (hP 0)
+  exact (hP t).trans (le_mul_of_one_le_right hC (Real.one_le_rpow (by nlinarith [sq_nonneg t]) (by norm_num)))
+
+/-- Translating an even continuous profile of logarithmic growth has a convergent
+symmetric pairing with the odd Cauchy kernel. -/
+private theorem introTrace_oddKernel_log_even_translate (f : ℝ → ℝ) (hf : Continuous f)
+    (he : ∀ t, f (-t) = f t) (A c : ℝ) (hA : ∀ t, |f t| ≤ A + 4 * Real.log (1 + |t|)) :
+    ∃ B : ℝ, Tendsto (fun T : ℝ ↦ ∫ t in -T..T, t / (1 + t ^ 2) * f (t + c)) atTop (𝓝 B) := by
+  let J (x : ℝ) := ∫ t in (0 : ℝ)..x, f t
+  let P (t : ℝ) := J (t + c) - J t
+  have hJ (t : ℝ) : HasDerivAt J (f t) t := intervalIntegral.integral_hasDerivAt_right
+    (hf.intervalIntegrable 0 t) hf.aestronglyMeasurable.stronglyMeasurableAtFilter hf.continuousAt
+  have hd (t : ℝ) : HasDerivAt P (f (t + c) - f t) t := by
+    simpa [P, Function.comp_def] using ((hJ (t + c)).comp t ((hasDerivAt_id' t).add_const c)).fun_sub (hJ t)
+  let C := |A|+4 * |Real.log (2 + |c|)|+16
+  have hP (t : ℝ) : |P t| ≤ (C * |c|) * (1 + t ^ 2) ^ (1 / 4 : ℝ) := by
+    have hEq : P t = ∫ x in t..t + c, f x :=
+      (eq_sub_of_add_eq' (intervalIntegral.integral_add_adjacent_intervals (hf.intervalIntegrable 0 t) (hf.intervalIntegrable t (t + c)))).symm
+    rw [hEq, ← Real.norm_eq_abs]
+    have hh := intervalIntegral.norm_integral_le_of_norm_le_const (a := t) (b := t + c) (f := f)
+      (C := C * (1 + t ^ 2) ^ (1 / 4 : ℝ)) (fun x hx ↦ ?_)
+    · simpa [add_sub_cancel_left, mul_right_comm] using hh
+    have hx' : |x| ≤ |t|+|c| := by
+      rcases le_total t (t + c) with h|h
+      · rw [Set.uIoc_of_le h] at hx
+        exact abs_le.mpr ⟨by linarith [hx.1, neg_abs_le t, abs_nonneg c],
+          by linarith [hx.2, le_abs_self t, le_abs_self c]⟩
+      · rw [Set.uIoc_of_ge h] at hx
+        exact abs_le.mpr ⟨by linarith [hx.1, neg_abs_le t, neg_abs_le c],
+          by linarith [hx.2, le_abs_self t, abs_nonneg c]⟩
+    have hbase : (1 : ℝ) ≤ 1 + t ^ 2 := by linarith [sq_nonneg t]
+    have hmain : 1 + |x| ≤ (2 + |c|) * (1 + t ^ 2) := by
+      have ht : |t| ≤ 1 + t ^ 2 := by
+        rw [abs_le]; constructor <;> nlinarith [sq_nonneg (t + 1), sq_nonneg (t - 1)]
+      nlinarith [mul_nonneg (abs_nonneg c) (sq_nonneg t)]
+    have hlog := Real.log_le_log (by positivity : 0 < 1 + |x|) hmain
+    rw [Real.log_mul (by positivity) (by positivity)] at hlog
+    have hr := Real.log_le_rpow_div (x := 1 + t ^ 2) (by positivity) (by norm_num : (0 : ℝ)<1 / 4)
+    have ho := Real.one_le_rpow hbase (by norm_num : (0 : ℝ) ≤ 1 / 4)
+    rw [Real.norm_eq_abs]
+    dsimp only [C]
+    nlinarith [hA x, le_abs_self A, le_abs_self (Real.log (2 + |c|)),
+      mul_nonneg (abs_nonneg A) (sub_nonneg.mpr ho),
+      mul_nonneg (abs_nonneg (Real.log (2 + |c|))) (sub_nonneg.mpr ho)]
+  have hc : Continuous (fun t ↦ f (t + c) - f t) := (hf.comp (continuous_id.add_const c)).sub hf
+  obtain ⟨B, hB⟩ := introTrace_oddKernel_sublinear_primitive _ P hc _ hP hd
+  refine ⟨B, hB.congr ?_⟩
+  intro T
+  simp_rw [mul_sub]
+  have hq : Continuous (fun t : ℝ ↦ t / (1 + t ^ 2)) := by fun_prop (disch := intro t; positivity)
+  rw [intervalIntegral.integral_sub (f := fun t : ℝ ↦ t / (1 + t ^ 2) * f (t + c)) (g := fun t : ℝ ↦ t / (1 + t ^ 2) * f t) ((hq.mul (hf.comp (continuous_id.add_const c))).intervalIntegrable _ _)
+    ((hq.mul hf).intervalIntegrable _ _), introTrace_oddKernel_even_integral f he T, sub_zero]
+
+/-- The positive Frullani kernel for a change of the real Laplace parameter is
+integrable, and its mass is the logarithm of the ratio of the parameters. -/
+private theorem introTrace_frullani_height_increment (u v : ℝ) (hu : 0 < u) (hV : 0 ≤ v) :
+    let f (x : ℝ) := x⁻¹ * (Real.exp (-u * x) - Real.exp (-(u + v) * x))
+    IntegrableOn f (Ioi 0) ∧ ∫ x in Ioi 0, f x = Real.log ((u + v) / u) := by
+  intro f
+  have hd : IntegrableOn (fun x : ℝ ↦ v * Real.exp (-u * x)) (Ioi 0) :=
+    (integrableOn_exp_mul_Ioi (neg_neg_of_pos hu) 0).const_mul v
+  have hf : IntegrableOn f (Ioi 0) := by
+    apply hd.mono' (by dsimp [f]; fun_prop)
+    filter_upwards [ae_restrict_mem (μ := volume) measurableSet_Ioi] with x (hx : 0 < x)
+    have he := Real.add_one_le_exp (-v * x)
+    have hp : Real.exp (-v * x) ≤ 1 := Real.exp_le_one_iff.mpr (by nlinarith)
+    have hE := Real.exp_pos (-u * x)
+    have hmul : Real.exp (-(u + v) * x) = Real.exp (-u * x) * Real.exp (-v * x) := by
+      rw [← Real.exp_add]; congr 1; ring
+    change ‖x⁻¹ * (Real.exp (-u * x) - Real.exp (-(u + v) * x))‖ ≤ _
+    rw [hmul, ← mul_one_sub, Real.norm_of_nonneg (by positivity), inv_mul_le_iff₀ hx]
+    calc
+      _ ≤ Real.exp (-u * x) * (v * x) := mul_le_mul_of_nonneg_left (by linarith) hE.le
+      _ = _ := by ring
+  refine ⟨hf, ?_⟩
+  have h := Frullani.integral_Ioi_eq (f := fun x : ℝ ↦ Real.exp (-x)) (L := 1) (R := 0)
+    ((by fun_prop : Continuous fun x : ℝ ↦ Real.exp (-x)).locallyIntegrable.locallyIntegrableOn _)
+    hu (show 0 < u + v by linarith)
+    (by simpa using ((by fun_prop : Continuous fun x : ℝ ↦ Real.exp (-x)).tendsto 0).mono_left nhdsWithin_le_nhds)
+    (by simpa only [Function.comp_def] using Real.tendsto_exp_atBot.comp tendsto_neg_atTop_atBot)
+    (by simpa only [smul_eq_mul, neg_mul, f] using hf)
+  simpa only [smul_eq_mul, sub_zero, mul_one, neg_mul, f] using h
+
+/-- Uniformly in the frequency, an oscillatory difference is bounded by a
+positive exponentially damped difference at the absolute frequency. -/
+private theorem introTrace_norm_oscillation_le_exp_loss (y : ℝ) :
+    ‖Complex.exp (Complex.I * (y : ℂ)) - 1‖ ≤ 4 * (1 - Real.exp (-|y|)) := by
+  let q := Real.exp (-|y|)
+  have hq : 0 < q := Real.exp_pos _
+  have hq₁ : q ≤ 1 := Real.exp_le_one_iff.mpr (neg_nonpos.mpr (abs_nonneg y))
+  have he : (1 + |y|) * q ≤ 1 := by
+    calc
+      _ ≤ Real.exp |y| * q := mul_le_mul_of_nonneg_right (by linarith [Real.add_one_le_exp |y|]) hq.le
+      _ = 1 := by rw [show q = Real.exp (-|y|) from rfl, ← Real.exp_add]; simp
+  change _ ≤ 4 * (1 - q)
+  by_cases h : |y| ≤ 1
+  · have hle := mul_le_mul_of_nonneg_right (show 1 + |y| ≤ 2 by linarith) (sub_nonneg.mpr hq₁)
+    exact (Real.norm_exp_I_mul_ofReal_sub_one_le (x := y)).trans (by rw [Real.norm_eq_abs]; nlinarith)
+  have hb := mul_le_mul_of_nonneg_right (show 2 ≤ 1 + |y| by linarith) hq.le
+  calc
+    _ ≤ ‖Complex.exp (Complex.I * (y : ℂ))‖ + ‖(1 : ℂ)‖ := norm_sub_le _ _
+    _ = 2 := by norm_num [Complex.norm_exp]
+    _ ≤ _ := by linarith
+
+/-- The difference between the vertical and real Gauss digamma kernels is
+bounded by two positive Laplace kernels, one of Frullani type. -/
+private theorem introTrace_digamma_vertical_kernel_bound (u v x : ℝ) (hx : 0 < x) :
+    ‖gaussDigammaDifferenceKernel 1 ((u : ℂ) + (v : ℂ) * Complex.I) x -
+      gaussDigammaDifferenceKernel 1 (u : ℂ) x‖ ≤
+      4 * ((Real.exp (-u * x) - Real.exp (-(u + |v|) * x)) +
+        x⁻¹ * (Real.exp (-u * x) - Real.exp (-(u + |v|) * x))) := by
+  let E := Real.exp (-u * x)
+  let D := 1 - Real.exp (-x)
+  have hE : 0 < E := Real.exp_pos _
+  have hD : 0 < D := sub_pos.mpr (Real.exp_lt_one_iff.mpr (neg_neg_of_pos hx))
+  have hi : D⁻¹ ≤ 1 + x⁻¹ := by
+    have h := mul_le_mul_of_nonneg_right (Real.add_one_le_exp x) (Real.exp_pos (-x)).le
+    rw [← Real.exp_add, add_neg_cancel, Real.exp_zero] at h
+    rw [inv_le_iff_one_le_mul₀ hD, add_mul, one_mul]
+    dsimp only [D]
+    field_simp
+    nlinarith
+  have hf : E * (1 - Real.exp (-|v * x|)) =
+      Real.exp (-u * x) - Real.exp (-(u + |v|) * x) := by
+    dsimp only [E]
+    rw [mul_sub, mul_one, ← Real.exp_add, abs_mul, abs_of_pos hx]
+    congr 2
+    ring_nf
+  have hfactor : gaussDigammaDifferenceKernel 1 ((u : ℂ) + (v : ℂ) * Complex.I) x -
+      gaussDigammaDifferenceKernel 1 (u : ℂ) x =
+      (E : ℂ) * (1 - Complex.exp (Complex.I * ((-(v * x) : ℝ) : ℂ))) / (D : ℂ) := by
+    dsimp only [gaussDigammaDifferenceKernel, E, D]
+    push_cast
+    rw [show -((u : ℂ) + (v : ℂ) * Complex.I) * (x : ℂ) =
+        -(u : ℂ) * (x : ℂ) + Complex.I * (-((v : ℂ) * (x : ℂ))) by ring_nf, Complex.exp_add]
+    ring_nf
+  rw [hfactor, norm_div, norm_mul, Complex.norm_real, Complex.norm_real,
+    Real.norm_of_nonneg hE.le, Real.norm_of_nonneg hD.le, norm_sub_rev, div_eq_mul_inv]
+  have hp := introTrace_norm_oscillation_le_exp_loss (-(v * x))
+  rw [abs_neg] at hp
+  have hn := sub_nonneg.mpr (Real.exp_le_one_iff.mpr (neg_nonpos.mpr (abs_nonneg (v * x))))
+  calc
+    _ ≤ (E * (4 * (1 - Real.exp (-|v * x|)))) * (1 + x⁻¹) := by gcongr
+    _ = 4 * (E * (1 - Real.exp (-|v * x|)) + x⁻¹ * (E * (1 - Real.exp (-|v * x|)))) := by ring_nf
+    _ = _ := by rw [hf]
+
+/-- A fixed vertical line in the right half-plane has an explicit logarithmic
+digamma bound, uniform in both signs of the imaginary part. -/
+private theorem introTrace_digamma_vertical_log_bound (u v : ℝ) (hu : 0 < u) :
+    ‖Complex.digamma ((u : ℂ) + (v : ℂ) * Complex.I) - Complex.digamma (u : ℂ)‖ ≤
+      4 * (u⁻¹ + Real.log ((u + |v|) / u)) := by
+  let w : ℂ := (u : ℂ) + (v : ℂ) * Complex.I
+  have hk (s : ℂ) (hs : 0 < s.re) : IntegrableOn (gaussDigammaDifferenceKernel 1 s) (Ioi 0) ∧
+      (∫ x in Ioi 0, gaussDigammaDifferenceKernel 1 s x) = Complex.digamma s - Complex.digamma 1 := by
+    simpa only [Complex.ofReal_one, div_one] using
+      integral_gaussDigammaDifferenceKernel (d := 1) (w := s) one_pos (by simpa using hs)
+  obtain ⟨hw, ew⟩ := hk w (by simpa [w] using hu)
+  obtain ⟨hreal, er⟩ := hk (u : ℂ) (by simpa using hu)
+  let f (x : ℝ) := x⁻¹ * (Real.exp (-u * x) - Real.exp (-(u + |v|) * x))
+  obtain ⟨hf, ef⟩ := introTrace_frullani_height_increment u |v| hu (abs_nonneg _)
+  have hU : IntegrableOn (fun x : ℝ ↦ Real.exp (-u * x)) (Ioi 0) :=
+    integrableOn_exp_mul_Ioi (neg_neg_of_pos hu) 0
+  have eqn : Complex.digamma w - Complex.digamma (u : ℂ) =
+      ∫ x in Ioi 0, gaussDigammaDifferenceKernel 1 w x - gaussDigammaDifferenceKernel 1 (u : ℂ) x := by
+    rw [integral_sub hw hreal, ew, er]
+    ring
+  change ‖Complex.digamma w - Complex.digamma (u : ℂ)‖ ≤ _
+  rw [eqn]
+  calc
+    _ ≤ ∫ x in Ioi (0 : ℝ), 4 * (Real.exp (-u * x) + f x) := by
+      apply norm_integral_le_of_norm_le ((hU.add hf).const_mul 4)
+      filter_upwards [ae_restrict_mem (μ := volume) measurableSet_Ioi] with x (hx : 0 < x)
+      apply (introTrace_digamma_vertical_kernel_bound u v x hx).trans
+      exact mul_le_mul_of_nonneg_left (add_le_add_left (sub_le_self _ (Real.exp_pos _).le) _) (by norm_num)
+    _ = _ := by
+      rw [integral_const_mul, integral_add hU hf, ef, integral_exp_mul_Ioi (neg_neg_of_pos hu)]
+      simp [div_eq_mul_inv]
+
+/-- Fixed affine changes of height preserve the logarithmic bound on a
+positive vertical line. -/
+private theorem introTrace_digamma_affine_height_bound (u k b : ℝ) (hu : 0 < u) :
+    ∃ A : ℝ, ∀ t : ℝ, ‖Complex.digamma ((u : ℂ) + ((k * t + b : ℝ) : ℂ) * Complex.I)‖ ≤
+      A + 4 * Real.log (1 + |t|) := by
+  let c := (u + |k|+|b|) / u
+  have hc : 0 < c := by dsimp only [c]; positivity
+  refine ⟨‖Complex.digamma (u : ℂ)‖ + 4 * (u⁻¹ + Real.log c), fun t ↦ ?_⟩
+  have ht : 0 < 1 + |t| := by positivity
+  have harg : (u + |k * t + b|) / u ≤ c * (1 + |t|) := by
+    dsimp only [c]
+    rw [div_mul_eq_mul_div, div_le_div_iff_of_pos_right hu]
+    have hkb := abs_add_le (k * t) b
+    rw [abs_mul] at hkb
+    nlinarith [mul_nonneg hu.le (abs_nonneg t), mul_nonneg (abs_nonneg b) (abs_nonneg t), abs_nonneg k]
+  have hlog := Real.log_le_log (by positivity : 0 < (u + |k * t + b|) / u) harg
+  rw [Real.log_mul hc.ne' ht.ne'] at hlog
+  have h := introTrace_digamma_vertical_log_bound u (k * t + b) hu
+  calc
+    _ ≤ ‖Complex.digamma ((u : ℂ) + ((k * t + b : ℝ) : ℂ) * Complex.I) - Complex.digamma (u : ℂ)‖ +
+        ‖Complex.digamma (u : ℂ)‖ := (norm_le_insert' _ _).trans_eq (add_comm _ _)
+    _ ≤ _ := by linarith
+
+/-- The digamma function commutes with complex conjugation. -/
+private theorem introTrace_digamma_conj (z : ℂ) :
+    Complex.digamma ((starRingEnd ℂ) z) = (starRingEnd ℂ) (Complex.digamma z) := by
+  have hg : (starRingEnd ℂ) ∘ Complex.Gamma ∘ (starRingEnd ℂ) = Complex.Gamma := by
+    funext w
+    simp only [Function.comp_apply, Complex.Gamma_conj, Complex.conj_conj]
+  have hd : deriv Complex.Gamma ((starRingEnd ℂ) z) =
+      (starRingEnd ℂ) (deriv Complex.Gamma z) := by
+    conv_lhs => rw [← hg, deriv_conj_conj]
+    simp only [Function.comp_apply, Complex.conj_conj]
+  simp only [Complex.digamma_def, logDeriv_apply, hd, Complex.Gamma_conj, map_div₀]
+
+/-- Each affine shift of the real digamma profile has a symmetric odd-kernel
+pairing on every fixed positive vertical line. -/
+private theorem introTrace_oddKernel_affine_digamma (u k c : ℝ) (hu : 0 < u) :
+    let f (t : ℝ) := (Complex.digamma ((u : ℂ) + ((k * (t + c) : ℝ) : ℂ) * Complex.I)).re
+    Continuous f ∧ ∃ B : ℝ, Tendsto (fun T : ℝ ↦ ∫ t in -T..T, t / (1 + t ^ 2) * f t) atTop (𝓝 B) := by
+  let f (t : ℝ) := (Complex.digamma ((u : ℂ) + ((k * t : ℝ) : ℂ) * Complex.I)).re
+  have hf : Continuous f := by
+    apply continuous_iff_continuousAt.mpr
+    intro t
+    let z (y : ℝ) : ℂ := (u : ℂ) + ((k * y : ℝ) : ℂ) * Complex.I
+    have hz : 0 < (z t).re := by simpa [z] using hu
+    have hGa : AnalyticOnNhd ℂ Complex.Gamma {z | 0 < z.re} :=
+      (show DifferentiableOn ℂ Complex.Gamma {z | 0 < z.re} from fun s hs ↦
+        (Complex.hasDerivAt_Gamma_of_re_pos hs).differentiableAt.differentiableWithinAt).analyticOnNhd
+          (isOpen_lt continuous_const Complex.continuous_re)
+    have hp : AnalyticAt ℂ Complex.digamma (z t) :=
+      (hGa _ hz).deriv.div (hGa _ hz) (Complex.Gamma_ne_zero_of_re_pos hz)
+    exact Complex.continuous_re.continuousAt.comp (hp.continuousAt.comp (show ContinuousAt z t by dsimp [z]; fun_prop))
+  have he (t : ℝ) : f (-t) = f t := by
+    have e : (u : ℂ) + ((k * (-t) : ℝ) : ℂ) * Complex.I =
+        (starRingEnd ℂ) ((u : ℂ) + ((k * t : ℝ) : ℂ) * Complex.I) := by
+      apply Complex.ext <;> simp [Complex.mul_re, Complex.mul_im]
+    simp only [f, e, introTrace_digamma_conj, Complex.conj_re]
+  obtain ⟨A, hA⟩ := introTrace_digamma_affine_height_bound u k 0 hu
+  have hb (t : ℝ) : |f t| ≤ A + 4 * Real.log (1 + |t|) := by
+    exact (Complex.abs_re_le_norm _).trans (by simpa [add_zero] using hA t)
+  exact ⟨hf.comp (continuous_id.add_const c), introTrace_oddKernel_log_even_translate f hf he A c hb⟩
+
+/-- The finite sum of all archimedean logarithmic derivatives has a convergent
+symmetric odd-kernel integral on every positive vertical line. -/
+private theorem introTrace_heckeGamma_oddKernel_tendsto (χ : U𝔽) (σ : ℝ) (hσ : 0 < σ) :
+    let f (t : ℝ) := (logDeriv (heckeGammaFactor χ) ((σ : ℂ) + (t : ℂ) * Complex.I)).re
+    Continuous f ∧ ∃ B : ℝ, Tendsto (fun T : ℝ ↦ ∫ t in -T..T, t / (1 + t ^ 2) * f t) atTop (𝓝 B) := by
+  classical
+  let q (t : ℝ) := t / (1 + t ^ 2)
+  have hq : Continuous q := by dsimp [q]; fun_prop (disch := intro t; positivity)
+  let s (t : ℝ) : ℂ := (σ : ℂ) + (t : ℂ) * Complex.I
+  have hs (t : ℝ) : 0 < (s t).re := by simpa [s] using hσ
+  let shift (v : InfinitePlace F) : ℂ :=
+    if hv : v.IsReal then
+      let p := (realHeckeCharacter_parameters χ v hv).exists.choose
+      p.1 + (p.2.val : ℂ)
+    else
+      let p := (complexHeckeCharacter_parameters χ v
+        (InfinitePlace.not_isReal_iff_isComplex.mp hv)).exists.choose
+      p.1 + (p.2.natAbs : ℂ) / 2
+  let g (v : InfinitePlace F) (t : ℝ) :=
+    (logDeriv (fun z ↦ if v.IsReal then Complex.Gammaℝ (z + shift v)
+      else Complex.Gammaℂ (z + shift v) / 2) (s t)).re
+  have hlocal (v : InfinitePlace F) : Continuous (g v) ∧ ∃ B : ℝ,
+      Tendsto (fun T : ℝ ↦ ∫ t in -T..T, q t * g v t) atTop (𝓝 B) := by
+    let k : ℝ := if v.IsReal then 1 / 2 else 1
+    let b := shift v
+    let D : ℂ := if v.IsReal then (Real.pi : ℂ) else 2 * (Real.pi : ℂ)
+    have hk : 0 < k := by dsimp [k]; split_ifs <;> norm_num
+    have hb : 0 ≤ b.re := by
+      dsimp only [b, shift]; split_ifs with hv
+      · have h := (realHeckeCharacter_parameters χ v hv).exists.choose_spec.1
+        simp only [Complex.add_re, h, zero_add, Complex.natCast_re]; positivity
+      · have h := (complexHeckeCharacter_parameters χ v (InfinitePlace.not_isReal_iff_isComplex.mp hv)).exists.choose_spec.1
+        simp only [Complex.add_re, h, zero_add, Complex.div_ofNat_re, Complex.natCast_re]; positivity
+    let u := k * (σ + b.re)
+    let d (t : ℝ) := (Complex.digamma ((u : ℂ) + ((k * (t + b.im) : ℝ) : ℂ) * Complex.I)).re
+    let c := (Complex.log D).re
+    obtain ⟨hd, B, hB⟩ := introTrace_oddKernel_affine_digamma u k b.im (mul_pos hk (add_pos_of_pos_of_nonneg hσ hb))
+    change Continuous d at hd
+    change Tendsto (fun T : ℝ ↦ ∫ t in -T..T, q t * d t) atTop (𝓝 B) at hB
+    have e : g v = fun t ↦ k * (d t - c) := by
+      funext t
+      have he : (k : ℂ) * (s t + b) = (u : ℂ) + ((k * (t + b.im) : ℝ) : ℂ) * Complex.I := by
+        apply Complex.ext <;> simp [s, u, Complex.mul_re, Complex.mul_im]
+      dsimp only [g]
+      rw [introTrace_logDeriv_local_gamma χ v (s t) (hs t)]
+      change ((k : ℂ) * (Complex.digamma ((k : ℂ) * (s t + b)) - Complex.log D)).re = _
+      rw [Complex.re_ofReal_mul, he, Complex.sub_re]
+    rw [e]
+    refine ⟨continuous_const.mul (hd.sub continuous_const), k * B, (hB.const_mul k).congr ?_⟩
+    intro T
+    have hfun t : q t * (k * (d t - c)) = k * (q t * d t - q t * c) := by ring
+    simp_rw [hfun, intervalIntegral.integral_const_mul]
+    rw [intervalIntegral.integral_sub (f := fun t ↦ q t * d t) (g := fun t ↦ q t * c)
+      ((hq.mul hd).intervalIntegrable _ _) ((hq.mul continuous_const).intervalIntegrable _ _),
+      introTrace_oddKernel_even_integral (fun _ ↦ c) (fun _ ↦ rfl) T, sub_zero]
+  have he : (fun t ↦ (logDeriv (heckeGammaFactor χ) (s t)).re) = fun t ↦ ∑ v, g v t := by
+    funext t
+    simp only [introTrace_heckeGamma_logDeriv_eq_sum χ (s t) (hs t), Complex.re_sum, g, shift]
+  change Continuous (fun t ↦ (logDeriv (heckeGammaFactor χ) (s t)).re) ∧ _
+  rw [he]
+  choose B hB using fun v ↦ (hlocal v).2
+  refine ⟨continuous_finsetSum _ (fun v _ ↦ (hlocal v).1), ∑ v, B v, (tendsto_finsetSum _ (fun v _ ↦ hB v)).congr ?_⟩
+  intro T
+  simp_rw [Finset.mul_sum]
+  exact (intervalIntegral.integral_finsetSum
+    (f := fun v t ↦ q t * g v t) (fun v _ ↦ (hq.mul (hlocal v).1).intervalIntegrable _ _)).symm
+
+/-- The odd Cauchy kernel paired with a translated Poisson kernel increases
+its width by one. -/
+private theorem introTrace_oddKernel_poisson_single (δ γ : ℝ) (hδ : 0 < δ) :
+    let f (t : ℝ) := t / (1 + t ^ 2) * (δ / (δ ^ 2 + (t - γ) ^ 2))
+    Integrable f ∧ ∫ t, f t = Real.pi * γ / ((1 + δ) ^ 2 + γ ^ 2) := by
+  intro f
+  let p (t : ℝ) := 1 + t ^ 2
+  let r (t : ℝ) := δ ^ 2 + (t - γ) ^ 2
+  have hp (t : ℝ) : 0 < p t := by dsimp [p]; positivity
+  have hr (t : ℝ) : 0 < r t := by dsimp [r]; positivity
+  let d : ℝ≥0 := ⟨δ, hδ.le⟩
+  have hK : Integrable (fun t ↦ δ / r t) := by
+    refine ((ProbabilityTheory.integrable_cauchyPDFReal γ (γ := d)).const_mul Real.pi).congr
+      (Eventually.of_forall fun t ↦ ?_)
+    change Real.pi * ProbabilityTheory.cauchyPDFReal γ d t = _
+    rw [ProbabilityTheory.cauchyPDFReal_def]
+    change Real.pi * (Real.pi⁻¹ * δ * ((t - γ) ^ 2 + δ ^ 2)⁻¹) = δ / (δ ^ 2 + (t - γ) ^ 2)
+    rw [add_comm ((t - γ) ^ 2)]
+    field_simp [Real.pi_ne_zero, (hr t).ne']
+  have hI : Integrable f := by
+    apply hK.mono' (by dsimp [f]; fun_prop)
+    apply Eventually.of_forall
+    intro t
+    change ‖(t / p t) * (δ / r t)‖ ≤ δ / r t
+    rw [norm_mul, Real.norm_of_nonneg (div_nonneg hδ.le (hr t).le)]
+    apply mul_le_of_le_one_left (div_nonneg hδ.le (hr t).le)
+    rw [Real.norm_eq_abs, abs_div, abs_of_pos (hp t), div_le_one (hp t)]
+    dsimp [p]; rw [abs_le]; constructor <;> nlinarith [sq_nonneg (t + 1), sq_nonneg (t - 1)]
+  refine ⟨hI, ?_⟩
+  by_cases hz : γ = 0
+  · subst γ
+    have e : (fun t ↦ f (-t)) = fun t ↦ -f t := by funext t; simp [f, neg_div]
+    have h := integral_neg_eq_self (μ := volume) (f := f)
+    rw [e, integral_neg] at h
+    simp only [mul_zero, zero_div]
+    linarith
+  let X := γ ^ 2 + δ ^ 2 - 1
+  let M := X ^ 2 + (2 * γ) ^ 2
+  let A := δ * X / M
+  let B := -δ * (2 * γ) / M
+  let D := A * γ - B
+  have hM : 0 < M := add_pos_of_nonneg_of_pos (sq_nonneg _) (sq_pos_of_ne_zero (mul_ne_zero (by norm_num) hz))
+  let H (t : ℝ) := (A / 2) * (Real.log (p t) - Real.log (r t)) +
+    B * Real.arctan t + (D / δ) * Real.arctan ((t - γ) / δ)
+  have hDer (t : ℝ) : HasDerivAt H (f t) t := by
+    have dp : HasDerivAt p (2 * t) t := by
+      simpa [p] using ((hasDerivAt_id' t).pow 2).const_add 1
+    have dr : HasDerivAt r (2 * (t - γ)) t := by
+      simpa [r] using (((hasDerivAt_id' t).sub_const γ).pow 2).const_add (δ ^ 2)
+    have h := (((dp.log (hp t).ne').fun_sub (dr.log (hr t).ne')).const_mul (A / 2)).fun_add
+      ((Real.hasDerivAt_arctan t).const_mul B)
+    have he := h.fun_add ((((hasDerivAt_id' t).sub_const γ).div_const δ).arctan.const_mul (D / δ))
+    convert he using 1
+    dsimp only [H, f, p, r, A, B, D, M, X]
+    have hstar : 0 < 1 + ((t - γ) / δ) ^ 2 := by positivity
+    field_simp [hδ.ne', (hp t).ne', (hr t).ne', hstar.ne', hM.ne']
+    ring
+  have hrlim {l : Filter ℝ} (hinv : Tendsto (fun t : ℝ ↦ t⁻¹) l (𝓝 0)) (hne : ∀ᶠ t in l, t ≠ 0) :
+      Tendsto (fun t ↦ Real.log (p t) - Real.log (r t)) l (𝓝 0) := by
+    let R (u : ℝ) := (u ^ 2 + 1) / ((δ * u) ^ 2 + (1 - γ * u) ^ 2)
+    have hR : ContinuousAt R 0 := by dsimp only [R]; fun_prop (disch := norm_num)
+    have h₁ : Tendsto (fun t : ℝ ↦ p t / r t) l (𝓝 1) := by
+      have h := hR.tendsto.comp hinv
+      rw [show R 0 = 1 by simp [R]] at h
+      apply h.congr'
+      filter_upwards [hne] with t ht
+      dsimp [R, p, r, Function.comp_apply]
+      field_simp [ht]
+    have hlog : Tendsto (fun t ↦ Real.log (p t / r t)) l (𝓝 0) := by
+      simpa [Function.comp_def] using (Real.continuousAt_log one_ne_zero).tendsto.comp h₁
+    exact hlog.congr (fun t ↦ Real.log_div (hp t).ne' (hr t).ne')
+  have htop := hrlim (l := atTop) tendsto_inv_atTop_zero (eventually_ne_atTop 0)
+  have hbot := hrlim (l := atBot) tendsto_inv_atBot_zero (eventually_ne_atBot 0)
+  have haT : Tendsto (fun t : ℝ ↦ (t - γ) / δ) atTop atTop :=
+    (tendsto_atTop_add_const_right atTop (-γ) tendsto_id).atTop_div_const hδ
+  have haB : Tendsto (fun t : ℝ ↦ (t - γ) / δ) atBot atBot :=
+    (tendsto_atBot_add_const_right atBot (-γ) tendsto_id).atBot_div_const hδ
+  have hAT := tendsto_nhds_of_tendsto_nhdsWithin Real.tendsto_arctan_atTop
+  have hAB := tendsto_nhds_of_tendsto_nhdsWithin Real.tendsto_arctan_atBot
+  have hplus := ((htop.const_mul (A / 2)).add (hAT.const_mul B)).add
+    ((hAT.comp haT).const_mul (D / δ))
+  have hminus := ((hbot.const_mul (A / 2)).add (hAB.const_mul B)).add
+    ((hAB.comp haB).const_mul (D / δ))
+  rw [integral_of_hasDerivAt_of_tendsto hDer hI hminus hplus]
+  dsimp only [A, B, D]
+  have hd' : 0 < (1 + δ) ^ 2 + γ ^ 2 := by positivity
+  field_simp [hM.ne', hd'.ne', hδ.ne']
+  dsimp only [M, X]
+  ring
+
+/-- The symmetric odd pairing with the real part of a pure-imaginary translate
+of the two rational corrections is absolutely convergent, with an explicit value. -/
+private theorem introTrace_oddKernel_shifted_poles (a : ℂ) (ha : a.re = 0) :
+    let f (t : ℝ) := (t / (1 + t ^ 2)) * ((1 / ((2 : ℂ) + (t : ℂ) * Complex.I + a + 1 / 2) +
+      1 / ((2 : ℂ) + (t : ℂ) * Complex.I + a - 1 / 2))).re
+    Integrable f ∧ ∫ t, f t = (Real.pi * (-a.im) / ((7 / 2 : ℝ) ^ 2 + a.im ^ 2) +
+        Real.pi * (-a.im) / ((5 / 2 : ℝ) ^ 2 + a.im ^ 2)) := by
+  intro f
+  let k (δ t : ℝ) := (t / (1 + t ^ 2)) * (δ / (δ ^ 2 + (t - (-a.im)) ^ 2))
+  obtain ⟨h₁, e₁⟩ := introTrace_oddKernel_poisson_single (5 / 2) (-a.im) (by norm_num)
+  obtain ⟨h₂, e₂⟩ := introTrace_oddKernel_poisson_single (3 / 2) (-a.im) (by norm_num)
+  change Integrable (k (5 / 2)) at h₁
+  change Integrable (k (3 / 2)) at h₂
+  have he : f = fun t ↦ k (5 / 2) t + k (3 / 2) t := by
+    funext t
+    dsimp only [f, k]
+    rw [Complex.add_re, mul_add]
+    simp [Complex.normSq_apply, ha, Complex.mul_re, Complex.mul_im, sub_neg_eq_add]
+    ring
+  rw [he]
+  refine ⟨h₁.add h₂, ?_⟩
+  rw [integral_add h₁ h₂]
+  change (∫ t, k (5 / 2) t) = _ at e₁
+  change (∫ t, k (3 / 2) t) = _ at e₂
+  rw [e₁, e₂]
+  norm_num
+
+open Classical in
+/-- Paper: §1.4.3, p. 29. On the reference line the real part of the pole-corrected
+completed logarithmic derivative has a convergent symmetric integral against
+`t / (1 + t²)`. The two poles of a shifted trivial character contribute the displayed
+correction to the common value of the uncorrected integral. -/
+theorem introTrace_raw_completed_oddKernel_tendsto (χ : U𝔽) :
+    ∃ B : ℝ, ∀ (ψ : U𝔽) (a : ℂ), a.re = 0 →
+      let P (z : ℂ) := logDeriv (continuedCompletedHeckeL χ) (z + 1 / 2) +
+        if ψ = 1 then 1 / (z + a + 1 / 2) + 1 / (z + a - 1 / 2) else 0
+      Tendsto (fun T : ℝ ↦ ∫ t in -T..T, t / (1 + t ^ 2) * (P (2 + (t : ℂ) * Complex.I)).re)
+        atTop (𝓝 (B + if ψ = 1 then
+          Real.pi * (-a.im) / ((7 / 2 : ℝ) ^ 2 + a.im ^ 2) +
+          Real.pi * (-a.im) / ((5 / 2 : ℝ) ^ 2 + a.im ^ 2) else 0)) := by
+  classical
+  let s (t : ℝ) := ((5 / 2 : ℝ) : ℂ) + (t : ℂ) * Complex.I
+  let e (t : ℝ) := (logDeriv finiteL(χ) (s t)).re
+  let g (t : ℝ) := (logDeriv (heckeGammaFactor χ) (s t)).re
+  let q (t : ℝ) := t / (1 + t ^ 2)
+  have hq : Continuous q := by dsimp only [q]; fun_prop (disch := intro t; positivity)
+  obtain ⟨hg, G, hG⟩ := introTrace_heckeGamma_oddKernel_tendsto χ (5 / 2) (by norm_num)
+  obtain ⟨hc, E, hE⟩ := introTrace_finite_logDeriv_oddKernel_tendsto χ (5 / 2) (by norm_num)
+  change Continuous g at hg
+  change Continuous e at hc
+  change Tendsto (fun T : ℝ ↦ ∫ t in -T..T, q t * g t) atTop (𝓝 G) at hG
+  change Tendsto (fun T : ℝ ↦ ∫ t in -T..T, q t * e t) atTop (𝓝 E) at hE
+  refine ⟨G + E, fun ψ a ha ↦ ?_⟩
+  intro P
+  let b (t : ℝ) := q t * (if ψ = 1 then (1 / ((2 : ℂ) + (t : ℂ) * Complex.I + a + 1 / 2) +
+      1 / ((2 : ℂ) + (t : ℂ) * Complex.I + a - 1 / 2)) else (0 : ℂ)).re
+  have hb : Integrable b ∧ Tendsto (fun T : ℝ ↦ ∫ t in -T..T, b t) atTop
+      (𝓝 (if ψ = 1 then
+        Real.pi * (-a.im) / ((7 / 2 : ℝ) ^ 2 + a.im ^ 2) +
+        Real.pi * (-a.im) / ((5 / 2 : ℝ) ^ 2 + a.im ^ 2) else 0)) := by
+    by_cases h : ψ = 1
+    · obtain ⟨hi, he⟩ := introTrace_oddKernel_shifted_poles a ha
+      simp only [b, h, ite_true]
+      refine ⟨hi, ?_⟩
+      rw [← he]
+      exact intervalIntegral_tendsto_integral hi tendsto_neg_atTop_atBot tendsto_id
+    · simp [b, h]
+  apply ((hG.add hE).add hb.2).congr
+  intro T
+  rw [← intervalIntegral.integral_add (f := fun t ↦ q t * g t) (g := fun t ↦ q t * e t)
+      ((hq.mul hg).intervalIntegrable _ _) ((hq.mul hc).intervalIntegrable _ _),
+    ← intervalIntegral.integral_add (f := fun t ↦ q t * g t + q t * e t) (g := b)
+      (((hq.mul hg).add (hq.mul hc)).intervalIntegrable _ _) hb.1.intervalIntegrable]
+  apply intervalIntegral.integral_congr
+  intro t _
+  have he : (2 + (t : ℂ) * Complex.I) + 1 / 2 = s t := by dsimp only [s]; push_cast; ring
+  change q t * g t + q t * e t + b t = q t * (P (2 + (t : ℂ) * Complex.I)).re
+  dsimp only [P, g, e, b]
+  rw [he, introTrace_completed_logDeriv_euler χ (s := s t) (by norm_num [s, Complex.add_re, Complex.mul_re])]
+  simp only [Complex.add_re]
+  ring
 
 /-- Paper: §1.4.5, p. 30. The completed functional equation reflects the
 zero-free region for the inverse character to the left of one half for the
