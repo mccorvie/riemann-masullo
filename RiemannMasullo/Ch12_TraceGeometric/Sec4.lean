@@ -4,8 +4,14 @@ public import RiemannMasullo.Ch12_TraceGeometric.Sec2
 public import RiemannMasullo.Ch11_ShellStructure.Sec2b
 public import RiemannMasullo.AppB_AnalyticNT.Sec4b
 public import RiemannMasullo.Ch06_LocalGlobal.Sec1
-import all RiemannMasullo.AppB_AnalyticNT.Sec4b
+import RiemannMasullo.AppA_AlgebraicNT.Sec3
 import Mathlib.Analysis.SpecialFunctions.Exponential
+import Mathlib.Topology.Algebra.IsOpenUnits
+import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.WeightedIntegral
+import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Count
+import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Haar.Unique
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.InfiniteAdeleRing
+import RiemannMasullo.ForMathlib.Topology.Covering.AddCircle
 
 /-! # S-local trace calculation
 
@@ -354,6 +360,30 @@ private theorem sLocalTraceCutoffKernel_eq_comp_fubini
     exact ae_of_all _ fun p ↦ by simp [uncurry, hunit]
   simp_rw [← integral_const_mul]
   simpa only [mul_assoc, mul_left_comm] using integral_integral_swap hprod
+
+/-- Local copy of the frozen `AppA_AlgebraicNT/Sec3` private helper: the archimedean
+additive Tamagawa factors are Haar measures by transport from the real and complex lines. -/
+private theorem infiniteLocalAdditiveTamagawaMeasure_haar (F : Type*) [Field F]
+    (v : InfinitePlace F) :
+    letI : MeasurableSpace v.Completion := borel _
+    (infiniteLocalAdditiveTamagawaMeasure F v).IsAddHaarMeasure := by
+  letI : MeasurableSpace v.Completion := borel _
+  let : BorelSpace v.Completion := ⟨rfl⟩
+  by_cases h : v.IsReal
+  · rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_left h]
+    exact (InfinitePlace.Completion.ringEquivRealOfIsReal
+      h).symm.toAddEquiv.isAddHaarMeasure_map volume
+      (InfinitePlace.Completion.isometryEquivRealOfIsReal h).symm.continuous
+      (InfinitePlace.Completion.isometryEquivRealOfIsReal h).continuous
+  · let hc := InfinitePlace.not_isReal_iff_isComplex.mp h
+    rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_right h]
+    have : (2 • (volume : Measure ℂ)).IsAddHaarMeasure := by
+      rw [show 2 • (volume : Measure ℂ) = (2 : ℝ≥0∞) • volume by simp [two_smul]]
+      exact Measure.IsAddHaarMeasure.smul (μ := (volume : Measure ℂ)) (by norm_num) (by simp)
+    exact (InfinitePlace.Completion.ringEquivComplexOfIsComplex
+      hc).symm.toAddEquiv.isAddHaarMeasure_map _
+      (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hc).symm.continuous
+      (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hc).continuous
 
 /-- Paper: Step II, p. 517. For an integrable symbol the composed kernel
 agrees with the dilation average of the inverse Fourier kernel, multiplied by the
