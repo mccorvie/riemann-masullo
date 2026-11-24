@@ -116,9 +116,9 @@ had pull requests merged, some 2,660 pull requests in all.
   Chapters 7, 11 and 12. They have no Lean statement.
 - **Four classical inputs:** theorems of the literature that are stated in Lean and used, and
   not proved there. The targets do not use them either.
-- **288 statements of the manuscript are proved false as printed.** Each is kept in Lean with
+- **290 statements of the manuscript are proved false as printed.** Each is kept in Lean with
   a machine-checked proof of its negation, next to the corrected statement, which is proved.
-  Eight more such proofs rest on a statement that is itself still open.
+  Six more such proofs rest on a statement that is itself still open.
 - The supplementary material (Chapters 8 and 14, Appendix E, §A.4, §B.7), on which the trace
   formula does not rest, is partly stated and proved, and is not being worked on.
 
