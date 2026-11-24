@@ -3384,8 +3384,8 @@ private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_tra
           (∀ w : S, Valued.v (h.val.2 w - 1) ≤ WithZero.exp (-(n + 1 : ℤ))) →
           sLocalAdelicTheta F S f (h * g) = sLocalAdelicTheta F S f g) →
         ∃ a : Fin d → SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)),
-          sLocalAdelicTheta F S (∑ j, p j (a j)) = sLocalAdelicTheta F S f := by
-  sorry
+          sLocalAdelicTheta F S (∑ j, p j (a j)) = sLocalAdelicTheta F S f :=
+  sLocalAdelicThetaSpace_strictLF_level_generators (F := F) S n
 
 /-- Decompose theta classes by their finite unit conductors. Differences of the normalized
 averages over successive principal congruence subgroups give commuting projections. Each
