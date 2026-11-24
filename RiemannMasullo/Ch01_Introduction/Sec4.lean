@@ -13043,6 +13043,239 @@ end Limits
 
 section Boundary
 
+section NormOneGeometric
+
+open Classical
+
+attribute [local instance] instFiniteCompletionUnitsLocallyCompactSec4b
+
+private theorem introTrace_finite_norm_gap (v : V) (u : (v.adicCompletion F)ˣ) :
+    ‖u.val‖ = 1 ∨ 1 / 2 ≤ |‖u.val‖ - 1| := by
+  let q := (v.asIdeal.absNorm : ℝ)
+  let k := WithZero.log (Valued.v u.val)
+  have hq : (2 : ℝ) ≤ q := by
+    change (2 : ℝ) ≤ (v.asIdeal.absNorm : ℝ)
+    exact_mod_cast (show 2 ≤ v.asIdeal.absNorm from HeightOneSpectrum.one_lt_absNorm v)
+  have hq1 : (1 : ℝ) ≤ q := by linarith
+  have hN : ‖u.val‖ = q ^ k := norm_adicCompletion_eq_zpow F v u.ne_zero
+  rcases lt_trichotomy k 0 with hk | hk | hk
+  · right
+    have hh := zpow_le_zpow_right₀ hq1 (show k ≤ -1 by omega)
+    rw [zpow_neg_one] at hh
+    have h' : q⁻¹ ≤ 1 / 2 := by simpa only [one_div] using inv_anti₀ (by norm_num : (0 : ℝ) < 2) hq
+    rw [hN, abs_of_nonpos (by linarith : q ^ k - 1 ≤ 0)]
+    linarith
+  · left
+    simp [hN, hk]
+  · right
+    have hh := zpow_le_zpow_right₀ hq1 (show (1 : ℤ) ≤ k by omega)
+    rw [zpow_one] at hh
+    rw [hN, abs_of_nonneg (by linarith : 0 ≤ q ^ k - 1)]
+    linarith
+
+/-- Paper: §1.4.6, p. 30. The shrinking norm-one residual vanishes identically on
+the image of every finite completion. This gives exact equality of the finite-place
+Connes–Weil terms at every cutoff. -/
+theorem introTrace_cutoff_finite_restriction (φ : D𝔽)
+    (hφ : ∀ g : (ideleClassNorm F).ker, φ.val g = 0)
+    (b : ℝ → ℂ) (hs : tsupport b ⊆ Ioo (-1 : ℝ) 1) (n : ℕ)
+    (v : V) (u : (v.adicCompletion F)ˣ) :
+    φ.val (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u) * b (((n : ℝ) + 4) * (N(IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u) - 1)) = 0 := by
+  have hN : N(IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u) = ‖u.val‖ := by rw [ideleClassNorm_ofAdicCompletion]; rfl
+  rcases introTrace_finite_norm_gap v u with hu | hu
+  · have hm : ideleClassNorm F (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u) = 1 := by
+      apply Units.ext
+      apply NNReal.eq
+      exact hN.trans hu
+    rw [hφ ⟨_, hm⟩, zero_mul]
+  · apply mul_eq_zero_of_right
+    apply image_eq_zero_of_notMem_tsupport
+    intro h
+    have hh := abs_lt.mpr (hs h)
+    rw [abs_mul, hN, abs_of_nonneg (by positivity : (0 : ℝ) ≤ n + 4)] at hh
+    have hn : 0 ≤ (n : ℝ) * |‖u.val‖ - 1| := by positivity
+    linarith [show ((n : ℝ) + 4) * |‖u.val‖ - 1| = (n : ℝ) * |‖u.val‖ - 1| + 4 * |‖u.val‖ - 1| by ring]
+
+private theorem introTrace_cutoff_pointwise (b : ℝ → ℂ) (hs : tsupport b ⊆ Ioo (-1 : ℝ) 1)
+    {r : ℝ} (hr : r ≠ 1) : ∀ᶠ n : ℕ in atTop, b (((n : ℝ) + 4) * (r - 1)) = 0 := by
+  obtain ⟨k : ℕ, hk⟩ := exists_nat_ge (1 / |r - 1|)
+  filter_upwards [eventually_ge_atTop k] with n hn
+  have hp := abs_pos.mpr (sub_ne_zero.mpr hr)
+  have hk' : 1 ≤ (n : ℝ) * |r - 1| := (div_le_iff₀ hp).mp (hk.trans (by exact_mod_cast hn))
+  apply image_eq_zero_of_notMem_tsupport
+  intro hm
+  have hm' := abs_lt.mpr (hs hm)
+  rw [abs_mul, abs_of_nonneg (by positivity : (0 : ℝ) ≤ n + 4)] at hm'
+  nlinarith
+
+private theorem introTrace_cutoff_integral_norm {X : Type*} [MeasurableSpace X]
+    (μ : Measure X) (R : X → ℝ) (hR : Measurable R) (K : X → ℂ) (hK : Integrable K μ)
+    (hK1 : ∀ x, R x = 1 → K x = 0) (b : ℝ → ℂ) (hb : Measurable b)
+    (hs : tsupport b ⊆ Ioo (-1 : ℝ) 1) {Q : ℝ} (hQ : ∀ x, ‖b x‖ ≤ Q) :
+    Tendsto (fun n : ℕ ↦ ∫ x, ‖K x * b (((n : ℝ) + 4) * (R x - 1))‖ ∂μ) atTop (𝓝 0) := by
+  let s (n : ℕ) (x : X) := b (((n : ℝ) + 4) * (R x - 1))
+  have hsm (n : ℕ) : Measurable (s n) := hb.comp (measurable_const.mul (hR.sub measurable_const))
+  have hcon := tendsto_integral_filter_of_dominated_convergence (fun x ↦ ‖K x‖ * Q)
+    (μ := μ) (l := atTop) (F := fun n x ↦ ‖K x * s n x‖) (f := fun _ ↦ (0 : ℝ))
+    (.of_forall fun n ↦ (hK.aestronglyMeasurable.mul (hsm n).aestronglyMeasurable).norm)
+    (.of_forall fun n ↦ .of_forall fun x ↦ by
+      simp only [Real.norm_of_nonneg (norm_nonneg _), norm_mul]
+      exact mul_le_mul_of_nonneg_left (hQ _) (norm_nonneg _))
+    (hK.norm.mul_const Q) (.of_forall fun x ↦ ?_)
+  · simpa only [s, integral_zero] using hcon
+  · by_cases hx : R x = 1
+    · simp [hK1 x hx]
+    · apply tendsto_const_nhds.congr'
+      filter_upwards [introTrace_cutoff_pointwise b hs hx] with n hn
+      simp [s, hn]
+
+private theorem introTrace_archimedean_test_kernel (w : InfinitePlace F)
+    (f : BruhatCompactSupport w.Completionˣ) (hf : f.val 1 = 0) :
+    let K := fun u : w.Completionˣ ↦ f.val u * (Real.sqrt (‖u.val‖ ^ w.mult) : ℂ) /
+      ((‖1 - u.val‖ ^ w.mult : ℝ) : ℂ)
+    Integrable K (infiniteLocalMultiplicativeTamagawaMeasure F w) ∧
+      infiniteConnesWeilPrincipalValue w f =
+        (if w.IsReal then (1 / 2 : ℂ) else 1 / (2 * (Real.pi : ℂ))) *
+          ∫ u, K u ∂infiniteLocalMultiplicativeTamagawaMeasure F w := by
+  intro K
+  by_cases hr : w.IsReal
+  · simpa only [K, hr.mult_eq_one, pow_one, ite_eq_left hr] using
+      And.intro (introTraceArchimedean_real_integrable w hr f hf)
+        (realConnesWeilPrincipalValue_of_apply_one_zero w hr f hf)
+  · simpa only [K, ite_eq_right hr] using
+      introTrace_characterTrace_complex_place w (InfinitePlace.not_isReal_iff_isComplex.mp hr) f hf
+
+/-- Paper: §1.4.6, p. 30. At every archimedean place the shrinking norm-one
+residual tends to zero in the integral of the absolute value of the normalized
+local kernel. The corresponding local Connes–Weil principal values converge. -/
+theorem introTrace_cutoff_archimedean (φ : D𝔽) (hφ : ∀ g : (ideleClassNorm F).ker, φ.val g = 0)
+    (b : ℝ → ℂ) (hb : Measurable b) (hs : tsupport b ⊆ Ioo (-1 : ℝ) 1)
+    {Q : ℝ} (hQ : ∀ x, ‖b x‖ ≤ Q) (v : ℕ → D𝔽)
+    (hv : ∀ n g, (v n).val g = φ.val g * (1 - b (((n : ℝ) + 4) * (N(g) - 1))))
+    (w : InfinitePlace F) :
+    let R := (idelicExplicitFormula_infiniteTestMap (F := F) w).choose
+    let μ := infiniteLocalMultiplicativeTamagawaMeasure F w
+    let K := fun (f : D𝔽) (u : w.Completionˣ) ↦
+      f.val (archClass(w) u) * (Real.sqrt (‖u.val‖ ^ w.mult) : ℂ) /
+        ((‖1 - u.val‖ ^ w.mult : ℝ) : ℂ)
+    Tendsto (fun n ↦ ∫ u, ‖K φ u - K (v n) u‖ ∂μ) atTop (𝓝 0) ∧
+      Tendsto (fun n ↦ infiniteConnesWeilPrincipalValue w (R (v n))) atTop
+        (𝓝 (infiniteConnesWeilPrincipalValue w (R φ))) := by
+  intro R μ K
+  let : MeasurableSpace w.Completion := instMeasurableSpaceCompletion_riemannMasullo F w
+  let : BorelSpace w.Completion := ⟨rfl⟩
+  let : BorelSpace w.Completionˣ := borelSpace_units_of_continuousInv₀ _
+  let Nw := fun u : w.Completionˣ ↦ ‖u.val‖ ^ w.mult
+  have hN (u : w.Completionˣ) : N(archClass(w) u) = Nw u := by
+    rw [ideleClassNorm_ofCompletion]; rfl
+  have hR (f : D𝔽) (u : w.Completionˣ) : (R f).val u = f.val (archClass(w) u) :=
+    (idelicExplicitFormula_infiniteTestMap (F := F) w).choose_spec f u
+  have hφ1 : φ.val 1 = 0 := hφ 1
+  have hPV (f : D𝔽) (hf : f.val 1 = 0) : Integrable (K f) μ ∧
+      infiniteConnesWeilPrincipalValue w (R f) =
+        (if w.IsReal then (1 / 2 : ℂ) else 1 / (2 * (Real.pi : ℂ))) * ∫ u, K f u ∂μ := by
+    simpa only [K, hR] using introTrace_archimedean_test_kernel w (R f) (by simp [hR, hf])
+  have hK1 (u : w.Completionˣ) (hu : Nw u = 1) : K φ u = 0 := by
+    have hmem : ideleClassNorm F (archClass(w) u) = 1 := by
+      apply Units.ext
+      apply NNReal.eq
+      exact (hN u).trans hu
+    simp only [K, hφ ⟨_, hmem⟩, zero_mul, zero_div]
+  have hEq (n : ℕ) (u : w.Completionˣ) : K φ u - K (v n) u =
+      K φ u * b (((n : ℝ) + 4) * (Nw u - 1)) := by
+    simp only [K, hv, hN]
+    ring
+  have h := introTrace_cutoff_integral_norm μ Nw (by dsimp [Nw]; fun_prop) _ (hPV φ hφ1).1
+    hK1 b hb hs hQ
+  have habs : Tendsto (fun n ↦ ∫ u, ‖K φ u - K (v n) u‖ ∂μ) atTop (𝓝 0) := by
+    simpa only [hEq] using h
+  refine ⟨habs, ?_⟩
+  have h0 : Tendsto (fun n ↦ ∫ u, K φ u - K (v n) u ∂μ) atTop (𝓝 0) :=
+    tendsto_zero_iff_norm_tendsto_zero.mpr (squeeze_zero (fun _ ↦ norm_nonneg _)
+      (fun n ↦ norm_integral_le_integral_norm _) habs)
+  have hV (n : ℕ) := hPV (v n) (by simp [hv, hφ1])
+  have hV' := (tendsto_const_nhds (x := ∫ u, K φ u ∂μ)).sub h0
+  simp only [integral_sub (hPV φ hφ1).1 (hV _).1, sub_sub_cancel, sub_zero] at hV'
+  simpa only [(hPV φ hφ1).2, fun n ↦ (hV n).2] using
+    hV'.const_mul (if w.IsReal then (1 / 2 : ℂ) else 1 / (2 * (Real.pi : ℂ)))
+
+/-- Paper: §1.4.6, p. 30. The Mellin residual of the shrinking cutoff converges
+absolutely at any fixed quasi-character. In particular this applies at both
+polar characters in the geometric trace formula. -/
+theorem introTrace_cutoff_mellin (φ : D𝔽) (hφ : ∀ g : (ideleClassNorm F).ker, φ.val g = 0)
+    (b : ℝ → ℂ) (hb : Measurable b) (hs : tsupport b ⊆ Ioo (-1 : ℝ) 1)
+    {Q : ℝ} (hQ : ∀ x, ‖b x‖ ≤ Q) (c : C𝔽 → ℂ) (hc : Continuous c)
+    (v : ℕ → D𝔽) (hv : ∀ n g, (v n).val g = φ.val g * (1 - b (((n : ℝ) + 4) * (N(g) - 1)))) :
+    Tendsto (fun n ↦ ∫ g, ‖(φ.val g - (v n).val g) * c g‖ ∂ideleClassTamagawaMeasure F)
+      atTop (𝓝 0) ∧
+      Tendsto (fun n ↦ ∫ g, (v n).val g * c g ∂ideleClassTamagawaMeasure F) atTop
+        (𝓝 (∫ g, φ.val g * c g ∂ideleClassTamagawaMeasure F)) := by
+  let K (f : D𝔽) (g : C𝔽) := f.val g * c g
+  have hI (f : D𝔽) : Integrable (K f) (ideleClassTamagawaMeasure F) :=
+    ((schwartzBruhat_continuous (⟨f.val, bruhatCompactSupport_mem_schwartz f.property⟩ :
+      SchwartzBruhat C𝔽)).mul hc).integrable_of_hasCompactSupport f.property.2.mul_right
+  have hN : Measurable fun g : C𝔽 ↦ N(g) := (NNReal.continuous_coe.comp
+    (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)).measurable
+  have h1 (g : C𝔽) (hg : N(g) = 1) : K φ g = 0 := by
+    have hm : ideleClassNorm F g = 1 := Units.ext (NNReal.eq hg)
+    exact mul_eq_zero_of_left (hφ ⟨g, hm⟩) _
+  have habs := introTrace_cutoff_integral_norm _ _ hN _ (hI φ) h1 b hb hs hQ
+  have hEq (n : ℕ) (g : C𝔽) : (φ.val g - (v n).val g) * c g =
+      K φ g * b (((n : ℝ) + 4) * (N(g) - 1)) := by rw [hv]; dsimp only [K]; ring
+  refine ⟨by simpa only [hEq] using habs, ?_⟩
+  have h0 : Tendsto (fun n ↦ ∫ g, K φ g - K (v n) g ∂ideleClassTamagawaMeasure F) atTop (𝓝 0) := by
+    apply tendsto_zero_iff_norm_tendsto_zero.mpr
+    apply squeeze_zero (fun _ ↦ norm_nonneg _) (fun n ↦ norm_integral_le_integral_norm _)
+    simpa only [K, ← sub_mul, hEq] using habs
+  have h := (tendsto_const_nhds (x := ∫ g, K φ g ∂ideleClassTamagawaMeasure F)).sub h0
+  simpa only [integral_sub (hI φ) (hI _), sub_sub_cancel, sub_zero] using h
+
+/-- Paper: §1.4.6, p. 30, and Theorem 12.5.1.1, pp. 519–520. For a compact Bruhat
+test vanishing on the norm-one subgroup, removing a shrinking neighborhood of that
+subgroup preserves every finite-place term exactly. The two polar Mellin terms and
+the normalized archimedean principal values converge to those of the original test,
+so the entire geometric side converges. -/
+theorem introTrace_norm_one_geometric_cutoff (φ : D𝔽) (hφ : ∀ g : (ideleClassNorm F).ker, φ.val g = 0)
+    (b : ℝ → ℂ) (hb : Measurable b) (hs : tsupport b ⊆ Ioo (-1 : ℝ) 1)
+    {Q : ℝ} (hQ : ∀ x, ‖b x‖ ≤ Q) (v : ℕ → D𝔽)
+    (hv : ∀ n g, (v n).val g = φ.val g * (1 - b (((n : ℝ) + 4) * (N(g) - 1)))) :
+    let pole (f : D𝔽) (s : ℂ) := ∫ g, f.val g * ideleClassNormTwist 1 s g ∂ideleClassTamagawaMeasure F
+    let arch (f : D𝔽) := ∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w
+      ((idelicExplicitFormula_infiniteTestMap (F := F) w).choose f)
+    let prime (f : D𝔽) (p : V) := ((Real.log (p.asIdeal.absNorm : ℝ) /
+      ((finiteLocalMultiplicativeTamagawaMeasure F p) (p.adicCompletionIntegers F).units).toReal : ℝ) : ℂ) *
+        finiteConnesWeilPrincipalValue p 1 ((idelicExplicitFormula_finiteTestMap (F := F) p).choose f)
+    let geom (f : D𝔽) := pole f (1 / 2) + pole f (-1 / 2) -
+      (((normOneIdeleClassTamagawaMeasure F) univ).toReal : ℂ) * (arch f + ∑' p, prime f p)
+    (∀ n p, prime (v n) p = prime φ p) ∧ Tendsto (geom ∘ v) atTop (𝓝 (geom φ)) := by
+  intro pole arch prime geom
+  have hP (n : ℕ) (p : V) : prime (v n) p = prime φ p := by
+    let R := (idelicExplicitFormula_finiteTestMap (F := F) p).choose
+    have he (f : D𝔽) (u : (p.adicCompletion F)ˣ) :
+        (R f).val u = f.val (IdeleClassGroup.ofAdicCompletion (𝓞 F) F p u) :=
+      (idelicExplicitFormula_finiteTestMap (F := F) p).choose_spec f u
+    have hr : R (v n) = R φ := by
+      apply Subtype.ext
+      funext u
+      rw [he, he, hv, mul_sub, mul_one, introTrace_cutoff_finite_restriction φ hφ b hs n p u, sub_zero]
+    change _ * finiteConnesWeilPrincipalValue p 1 (R (v n)) =
+      _ * finiteConnesWeilPrincipalValue p 1 (R φ)
+    rw [hr]
+  have hPole (s : ℂ) : Tendsto (fun n ↦ pole (v n) s) atTop (𝓝 (pole φ s)) :=
+    (introTrace_cutoff_mellin φ hφ b hb hs hQ _ (ideleClassNormTwist (F := F) 1 s).continuous v hv).2
+  have hA : Tendsto (fun n ↦ arch (v n)) atTop (𝓝 (arch φ)) := by
+    apply tendsto_finsetSum
+    intro w _
+    exact (introTrace_cutoff_archimedean φ hφ b hb hs hQ v hv w).2
+  refine ⟨hP, ?_⟩
+  have hfin (n : ℕ) : (∑' p, prime (v n) p) = ∑' p, prime φ p := tsum_congr (hP n)
+  change Tendsto (fun n ↦ geom (v n)) atTop (𝓝 (geom φ))
+  simpa only [geom, hfin] using
+    ((hPole (1 / 2)).add (hPole (-1 / 2))).sub ((hA.add_const (∑' p, prime φ p)).const_mul
+      (((normOneIdeleClassTamagawaMeasure F) univ).toReal : ℂ))
+
+end NormOneGeometric
+
 local notation "outside(" χ ", " S ")" =>
   toMeromorphicNFOn (fun s ↦ reciprocalPartialHeckeEulerProduct χ S s * finiteL(χ) s) univ
 local notation "outsideMass(" S ")" =>
