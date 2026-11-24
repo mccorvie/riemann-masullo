@@ -14,6 +14,11 @@ sources we expect to draw on.
 | [`FermatDixmierMalliavin/`](FermatDixmierMalliavin/) | [Anthropic’s Fermat formalization](https://github.com/anthropics/fermats-last-theorem/tree/6e837e75355538c7f80bab5b956861e86c4eacc2) | Apache-2.0 | One-variable and one-parameter Dixmier–Malliavin factorization used in §10.3 |
 | [`Stacks/`](Stacks/) | <https://github.com/AxiomMath/Stacks> | Apache-2.0 | under consideration |
 
+One outside development is used without being copied here: Naganori Yamaguchi's class field
+theory ([n-yamaguchi-0729/ClassFieldTheory](https://github.com/n-yamaguchi-0729/ClassFieldTheory),
+Apache-2.0) is a Lake dependency of the package, pinned in `lakefile.toml`. Only
+[`RiemannMasulloClassField/`](../../RiemannMasulloClassField/README.md) imports it.
+
 Further material found by scouting. The exact declarations and pinned commits are listed in
 [issue #3](https://github.com/mccorvie/riemann-masullo/issues/3).
 
