@@ -11,6 +11,8 @@
 | Prover | [`prover.md`](prover.md) | one `proof` issue | a pull request that proves or splits it |
 | Sweeper | [`sweeper.md`](sweeper.md) | every open proof issue of one file | one pull request that closes the ones it proved |
 
+To write or change a prompt here, or `AGENTS.md`, follow [`writing-agents-md.md`](writing-agents-md.md).
+
 Launch scouts, digesters and provers with the launcher. It gives each agent its own worktree
 (sharing the built Mathlib), appends the issue to the prompt, and hands in the result:
 
