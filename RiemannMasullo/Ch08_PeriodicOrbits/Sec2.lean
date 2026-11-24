@@ -286,6 +286,148 @@ theorem adeleNormOneOrbitMap_surjective : Surjective (adeleNormOneOrbitMap F) :=
   obtain ⟨g, hg⟩ := hi
   exact ⟨(g, ⟨adeleOrbitBasepoint F i, Set.mem_range_self i⟩), Subtype.ext hg⟩
 
+/-- The coordinates of a unit adele are nonzero. -/
+private theorem adeleNormOneOrbitMap_isOpenQuotientMap_ne_zero (u : 𝔸[F]ˣ) :
+    (∀ w : InfinitePlace F, u.val.1 w ≠ 0) ∧ ∀ w : HeightOneSpectrum (𝓞 F), u.val.2 w ≠ 0 := by
+  constructor
+  · intro w h
+    have hc : u.val.1 w * u.inv.1 w = 1 := congrArg (fun a : 𝔸[F] ↦ a.1 w) u.val_inv
+    rw [h, zero_mul] at hc
+    exact zero_ne_one hc
+  · intro w h
+    have hc : u.val.2 w * u.inv.2 w = 1 := congrArg (fun a : 𝔸[F] ↦ a.2 w) u.val_inv
+    rw [h, zero_mul] at hc
+    exact zero_ne_one hc
+
+/-- The coordinates of a base point are zero at its own place and one elsewhere. -/
+private theorem adeleNormOneOrbitMap_isOpenQuotientMap_coord
+    (k : Option (InfinitePlace F ⊕ HeightOneSpectrum (𝓞 F))) :
+    (∀ w : InfinitePlace F, (k = some (.inl w) → (adeleOrbitBasepoint F k).1 w = 0) ∧
+      (k ≠ some (.inl w) → (adeleOrbitBasepoint F k).1 w = 1)) ∧
+    ∀ w : HeightOneSpectrum (𝓞 F), (k = some (.inr w) → (adeleOrbitBasepoint F k).2 w = 0) ∧
+      (k ≠ some (.inr w) → (adeleOrbitBasepoint F k).2 w = 1) := by
+  classical
+  rcases k with _ | v | v
+  · exact ⟨fun w ↦ ⟨fun h ↦ (by cases h), fun _ ↦ rfl⟩, fun w ↦ ⟨fun h ↦ (by cases h), fun _ ↦ rfl⟩⟩
+  · refine ⟨fun w ↦ ⟨fun h ↦ ?_, fun h ↦ ?_⟩, fun w ↦ ⟨fun h ↦ (by cases h), fun _ ↦ rfl⟩⟩
+    · cases h
+      exact Pi.mulSingle_eq_same (M := fun u : InfinitePlace F ↦ u.Completion) _ _
+    · have hvw : w ≠ v := fun e ↦ h (e ▸ rfl)
+      exact Pi.mulSingle_eq_of_ne (M := fun u : InfinitePlace F ↦ u.Completion) hvw _
+  · refine ⟨fun w ↦ ⟨fun h ↦ (by cases h), fun _ ↦ rfl⟩, fun w ↦ ⟨fun h ↦ ?_, fun h ↦ ?_⟩⟩
+    · cases h
+      exact (FiniteAdeleRing.ofAdicCompletion_apply_coe F v 0 v).trans (Pi.mulSingle_eq_same _ _)
+    · have hvw : w ≠ v := fun e ↦ h (e ▸ rfl)
+      exact (FiniteAdeleRing.ofAdicCompletion_apply_coe F v 0 w).trans
+        (Pi.mulSingle_eq_of_ne hvw _)
+
+/-- Two base points in the same idele orbit are equal. -/
+private theorem adeleNormOneOrbitMap_isOpenQuotientMap_eq (u : 𝔸[F]ˣ)
+    (i j : Option (InfinitePlace F ⊕ HeightOneSpectrum (𝓞 F)))
+    (h : u • adeleOrbitBasepoint F i = adeleOrbitBasepoint F j) : i = j := by
+  obtain ⟨hu1, hu2⟩ := adeleNormOneOrbitMap_isOpenQuotientMap_ne_zero F u
+  have hco := adeleNormOneOrbitMap_isOpenQuotientMap_coord F
+  have k1 : ∀ w, (adeleOrbitBasepoint F j).1 w = u.val.1 w * (adeleOrbitBasepoint F i).1 w :=
+    fun w ↦ by rw [← h]; rfl
+  have k2 : ∀ w, (adeleOrbitBasepoint F j).2 w = u.val.2 w * (adeleOrbitBasepoint F i).2 w :=
+    fun w ↦ by rw [← h]; rfl
+  rcases j with _ | w | w
+  · rcases i with _ | v | v
+    · rfl
+    · exfalso
+      have hc := k1 v
+      rw [((hco none).1 v).2 (by simp), ((hco _).1 v).1 rfl, mul_zero] at hc
+      exact one_ne_zero hc
+    · exfalso
+      have hc := k2 v
+      rw [((hco none).2 v).2 (by simp), ((hco _).2 v).1 rfl, mul_zero] at hc
+      exact one_ne_zero hc
+  · have hc := k1 w
+    rw [((hco _).1 w).1 rfl] at hc
+    by_contra hne
+    rw [((hco i).1 w).2 hne, mul_one] at hc
+    exact hu1 w hc.symm
+  · have hc := k2 w
+    rw [((hco _).2 w).1 rfl] at hc
+    by_contra hne
+    rw [((hco i).2 w).2 hne, mul_one] at hc
+    exact hu2 w hc.symm
+
+/-- The saturation of an open set under the norm-one orbit relation is open. -/
+private theorem adeleNormOneOrbitMap_isOpenQuotientMap_sat (U : Set (N₁ × adeleOrbitBasepoints F))
+    (hU : IsOpen U) :
+    IsOpen {p : N₁ × adeleOrbitBasepoints F | ∃ q ∈ U, q.1 • q.2.val = p.1 • p.2.val} := by
+  classical
+  rw [isOpen_iff_mem_nhds]
+  rintro p ⟨q, hqU, hqp⟩
+  obtain ⟨i, hi⟩ := p.2.prop
+  obtain ⟨j, hj⟩ := q.2.prop
+  have hk : (p.1.val⁻¹ * q.1.val) • q.2.val = p.2.val := by
+    rw [mul_smul]
+    change p.1.val⁻¹ • (q.1 • q.2.val) = _
+    rw [hqp]
+    exact inv_smul_smul p.1.val _
+  have hji : j = i := adeleNormOneOrbitMap_isOpenQuotientMap_eq F _ j i (by rw [hj, hi]; exact hk)
+  have hq2 : q.2 = p.2 := Subtype.ext (by rw [← hj, ← hi, hji])
+  have hfix := hk
+  rw [hq2] at hfix
+  rcases i with _ | pl
+  · have h1 : ((p.1.val⁻¹ * q.1.val : 𝔸[F]ˣ) : 𝔸[F]) * 1 = 1 := by
+      rw [← hi] at hfix
+      exact hfix
+    rw [mul_one] at h1
+    have hpq : q = p := Prod.ext (Subtype.ext (inv_mul_eq_one.mp (Units.ext h1)).symm) hq2
+    exact Filter.mem_of_superset (hU.mem_nhds (hpq ▸ hqU)) fun u hu ↦ ⟨u, hu, rfl⟩
+  · obtain ⟨O, hOo, hpO, hOu⟩ : ∃ O : Set 𝔸[F], IsOpen O ∧ p.2.val ∈ O ∧
+        ∀ y : adeleOrbitBasepoints F, y.val ∈ O → y = p.2 := by
+      rcases pl with w | w
+      · refine ⟨{y | y.1 w ≠ 1},
+          isOpen_ne_fun ((continuous_apply w).comp continuous_fst) continuous_const, ?_, ?_⟩
+        · show (p.2.val).1 w ≠ 1
+          rw [← hi, ((adeleNormOneOrbitMap_isOpenQuotientMap_coord F _).1 w).1 rfl]
+          exact zero_ne_one
+        · intro y hy
+          obtain ⟨k, hk⟩ := y.prop
+          have hy' : (adeleOrbitBasepoint F k).1 w ≠ 1 := by
+            rw [hk]
+            exact hy
+          have hkw : k = some (.inl w) := by
+            by_contra hne
+            exact hy' (((adeleNormOneOrbitMap_isOpenQuotientMap_coord F k).1 w).2 hne)
+          exact Subtype.ext (by rw [← hk, ← hi, hkw])
+      · refine ⟨{y | y.2 w ≠ 1}, isOpen_ne_fun
+          ((RestrictedProduct.continuous_eval w).comp continuous_snd) continuous_const, ?_, ?_⟩
+        · show (p.2.val).2 w ≠ 1
+          rw [← hi, ((adeleNormOneOrbitMap_isOpenQuotientMap_coord F _).2 w).1 rfl]
+          exact zero_ne_one
+        · intro y hy
+          obtain ⟨k, hk⟩ := y.prop
+          have hy' : (adeleOrbitBasepoint F k).2 w ≠ 1 := by
+            rw [hk]
+            exact hy
+          have hkw : k = some (.inr w) := by
+            by_contra hne
+            exact hy' (((adeleNormOneOrbitMap_isOpenQuotientMap_coord F k).2 w).2 hne)
+          exact Subtype.ext (by rw [← hk, ← hi, hkw])
+    let k : N₁ := p.1⁻¹ * q.1
+    have hcont : Continuous fun x : N₁ × adeleOrbitBasepoints F ↦ (x.1 * k, x.2) := by
+      refine Continuous.prodMk ?_ continuous_snd
+      refine Topology.IsInducing.subtypeVal.continuous_iff.mpr ?_
+      show Continuous fun x : N₁ × adeleOrbitBasepoints F ↦ x.1.val * k.val
+      exact (continuous_subtype_val.comp continuous_fst).mul continuous_const
+    have hV : IsOpen ((fun x : N₁ × adeleOrbitBasepoints F ↦ (x.1 * k, x.2)) ⁻¹' U ∩
+        {x | x.2.val ∈ O}) :=
+      (hU.preimage hcont).inter (hOo.preimage (continuous_subtype_val.comp continuous_snd))
+    refine Filter.mem_of_superset (hV.mem_nhds ⟨?_, hpO⟩) ?_
+    · show (p.1 * k, p.2) ∈ U
+      rw [show p.1 * k = q.1 from mul_inv_cancel_left p.1 q.1, ← hq2]
+      exact hqU
+    · rintro x ⟨hxU, hxO⟩
+      have hx2 : x.2 = p.2 := hOu x.2 hxO
+      refine ⟨(x.1 * k, x.2), hxU, ?_⟩
+      change (x.1.val * k.val) • x.2.val = x.1.val • x.2.val
+      rw [mul_smul, hx2, show (k : 𝔸[F]ˣ) • p.2.val = p.2.val from hfix]
+
 /-- Paper: Lemma 8.2.0.3(2), p. 385. The global orbit map is an open quotient map
 for its coinduced topology.
 Deviation: The target carries the quotient topology of the global orbit map.
@@ -294,7 +436,17 @@ theorem adeleNormOneOrbitMap_isOpenQuotientMap :
     @IsOpenQuotientMap _ _ inferInstance
       (TopologicalSpace.coinduced (adeleNormOneOrbitMap F) inferInstance)
       (adeleNormOneOrbitMap F) := by
-  sorry
+  refine @IsOpenQuotientMap.mk _ _ _
+    (TopologicalSpace.coinduced (adeleNormOneOrbitMap F) inferInstance) (adeleNormOneOrbitMap F)
+    (adeleNormOneOrbitMap_surjective F) continuous_coinduced_rng fun U hU ↦ ?_
+  rw [isOpen_coinduced]
+  convert adeleNormOneOrbitMap_isOpenQuotientMap_sat F U hU using 1
+  ext p
+  constructor
+  · rintro ⟨q, hq, hqp⟩
+    exact ⟨q, hq, congrArg Subtype.val hqp⟩
+  · rintro ⟨q, hq, hqp⟩
+    exact ⟨q, hq, Subtype.ext hqp⟩
 
 /-- The S-adele ring is Hausdorff: it is a product of Hausdorff completions of `F`.
 The instance has to be routed through the definition, exactly as in
