@@ -9592,6 +9592,149 @@ theorem idelicExplicitFormula_summable_spectral_fiber (f : 𝒟(C[F])) (χ : U[F
   exact mul_le_mul_of_nonneg_left
     (hK s.val (explicitFormulaCompletedHeckeL_zero_re_mem χ s.property)) hd
 
+/-- A nonzero Mellin coefficient of a test invariant under `k` has frequency trivial on
+`k`. Translation by any element of `k` multiplies the coefficient by its character value. -/
+private theorem idelicExplicitFormula_summable_spectral_characters_annihilator
+    (k : Subgroup C[F]) (f : 𝒟(C[F])) (hinv : ∀ u : k, ∀ x, f.val (u.val * x) = f.val x)
+    (c : QuasiCharacter C[F]) (h : (∫ x, f.val x * c x ∂classMeasure) ≠ 0) (u : k) :
+    c u.val = 1 := by
+  let : BorelSpace C[F] := ⟨rfl⟩
+  let : (classMeasure).IsHaarMeasure := (ideleClassTamagawaMeasure_isWeil F).1
+  apply (mul_eq_left₀ h).mp
+  rw [← integral_mul_const]
+  calc ∫ x, f.val x * c x * c u.val ∂classMeasure
+      = ∫ x, f.val (u.val * x) * c (u.val * x) ∂classMeasure := by
+          simp only [hinv, map_mul]
+          congr 1
+          funext x
+          ring
+    _ = _ := integral_mul_left_eq_self (fun x ↦ f.val x * c x) u.val
+
+/-- Uniform integration by parts in finitely many one-parameter subgroups. At each zero,
+the direction attaining the largest frequency gains one power of its height. -/
+private theorem idelicExplicitFormula_summable_spectral_characters_decay
+    {Z : Type*} {n : ℕ} (X : Fin (n + 1) → LCATopologicalLie C[F])
+    (c : Z → QuasiCharacter C[F]) (W : C[F] → ℝ) (hW : Continuous W)
+    (hbound : ∀ z x, ‖c z x‖ ≤ W x) (level : Z → ℕ)
+    (hlevel : ∀ z, ∃ i, (level z : ℝ) ≤ ‖bruhatDirectionalDeriv (X i) (c z) 1‖)
+    (N : ℕ) (f : 𝒟(C[F])) :
+    ∃ B : ℝ, 0 ≤ B ∧ ∀ z, ‖∫ x, f.val x * c z x ∂classMeasure‖ ≤
+      B / ((level z : ℝ) + 1) ^ N := by
+  let : BorelSpace C[F] := ⟨rfl⟩
+  let : (classMeasure).IsHaarMeasure := (ideleClassTamagawaMeasure_isWeil F).1
+  let M (φ : 𝒟(C[F])) (z : Z) := ‖∫ x, φ.val x * c z x ∂classMeasure‖
+  suffices ∀ φ : 𝒟(C[F]), ∃ B : ℝ, ∀ z, M φ z * ((level z : ℝ) + 1) ^ N ≤ B by
+    obtain ⟨B, hB⟩ := this f
+    exact ⟨max 0 B, le_max_left .., fun z ↦ (le_div_iff₀ (by positivity)).2
+      ((hB z).trans (le_max_right ..))⟩
+  induction N with
+  | zero =>
+    intro φ
+    refine ⟨∫ x, ‖φ.val x‖ * W x ∂classMeasure, fun z ↦ ?_⟩
+    simp only [pow_zero, mul_one, M]
+    apply norm_integral_le_of_norm_le
+      (((explicitTest_continuous φ).norm.mul hW).integrable_of_hasCompactSupport
+        φ.property.2.norm.mul_right)
+    exact .of_forall fun x ↦ (norm_mul _ _).le.trans
+      (mul_le_mul_of_nonneg_left (hbound z x) (norm_nonneg _))
+  | succ N ih =>
+    intro φ
+    let D (i : Fin (n + 1)) : 𝒟(C[F]) :=
+      ⟨bruhatDirectionalDeriv (X i) φ.val, explicitFormula_flowDeriv_mem (X i) φ⟩
+    choose B hB using fun i ↦ ih (D i)
+    obtain ⟨A, hA⟩ := Finite.exists_le B
+    obtain ⟨B₀, h₀⟩ := ih φ
+    refine ⟨A + B₀, fun z ↦ ?_⟩
+    obtain ⟨i, hi⟩ := hlevel z
+    have hd := hasDerivAt_bruhatDirectionalDeriv (X i)
+      ((mem_bruhatSmoothSubmodule_iff _).mp (quasiCharacter_mem_bruhatSmooth (c z)) 1) 1
+    simp only [one_mul] at hd
+    have hmul : ‖bruhatDirectionalDeriv (X i) (c z) 1‖ * M φ z = M (D i) z := by
+      simp only [M, D, explicitFormula_integral_flowDeriv_mul (X i) (c z) hd φ, norm_neg, norm_mul]
+    have hgain := (mul_le_mul_of_nonneg_right hi (norm_nonneg _)).trans_eq hmul
+    calc M φ z * ((level z : ℝ) + 1) ^ (N + 1)
+        = (level z * M φ z) * ((level z : ℝ) + 1) ^ N + M φ z * ((level z : ℝ) + 1) ^ N := by ring
+      _ ≤ A + B₀ := add_le_add ((mul_le_mul_of_nonneg_right hgain (by positivity)).trans
+        ((hB i z).trans (hA i))) (h₀ z)
+
+/-- The shell estimate of Lemma B.4.4.8 with weights. A shell of total multiplicity
+at most `C (j+1)^d` and decay of order `d+2` contributes at most `C B / (j+1)^2`. -/
+private theorem idelicExplicitFormula_summable_spectral_characters_shells
+    {Z : Type*} (level : Z → ℕ) (w M : Z → ℝ) (hw : ∀ z, 0 ≤ w z) (hM : ∀ z, 0 ≤ M z)
+    (C B : ℝ) (hB : 0 ≤ B) (d : ℕ)
+    (hcount : ∀ j : ℕ, ∀ u : Finset Z, (∀ z ∈ u, M z ≠ 0 ∧ level z = j) →
+      ∑ z ∈ u, w z ≤ C * ((j : ℝ) + 1) ^ d)
+    (hdecay : ∀ z, M z ≤ B / ((level z : ℝ) + 1) ^ (d + 2)) :
+    Summable (fun z ↦ w z * M z) := by
+  classical
+  have hseries : Summable (fun j : ℕ ↦ 1 / ((j : ℝ) + 1) ^ 2) := by
+    simpa using (summable_nat_add_iff 1).mpr (Real.summable_one_div_nat_pow.mpr one_lt_two)
+  have hC : 0 ≤ C := by simpa using hcount 0 ∅ (by simp)
+  refine summable_of_sum_le (fun z ↦ mul_nonneg (hw z) (hM z))
+    (c := C * B * ∑' j : ℕ, 1 / ((j : ℝ) + 1) ^ 2) fun s ↦ ?_
+  let u := s.filter (fun z ↦ M z ≠ 0)
+  have hsu : ∑ z ∈ u, w z * M z = ∑ z ∈ s, w z * M z :=
+    Finset.sum_subset (Finset.filter_subset ..) fun z hz hzu ↦ by
+      simp_all [u]
+  rw [← hsu, ← Finset.sum_fiberwise_of_maps_to (t := u.image level) (g := level)
+    (fun z hz ↦ Finset.mem_image_of_mem _ hz)]
+  calc ∑ j ∈ u.image level, ∑ z ∈ u with level z = j, w z * M z
+      ≤ ∑ j ∈ u.image level, C * B * (1 / ((j : ℝ) + 1) ^ 2) := by
+        apply Finset.sum_le_sum
+        intro j _
+        let v := u.filter (fun z ↦ level z = j)
+        have hv (z) (hz : z ∈ v) : M z ≠ 0 ∧ level z = j :=
+          ⟨(Finset.mem_filter.mp (Finset.mem_filter.mp hz).1).2, (Finset.mem_filter.mp hz).2⟩
+        calc ∑ z ∈ v, w z * M z ≤ ∑ z ∈ v, w z * (B / ((j : ℝ) + 1) ^ (d + 2)) := by
+              refine Finset.sum_le_sum fun z hz ↦ mul_le_mul_of_nonneg_left ?_ (hw z)
+              simpa only [(hv z hz).2] using hdecay z
+          _ = (∑ z ∈ v, w z) * (B / ((j : ℝ) + 1) ^ (d + 2)) := (Finset.sum_mul ..).symm
+          _ ≤ (C * ((j : ℝ) + 1) ^ d) * (B / ((j : ℝ) + 1) ^ (d + 2)) :=
+            mul_le_mul_of_nonneg_right (hcount j v hv) (by positivity)
+          _ = _ := by rw [pow_add]; field_simp
+    _ ≤ _ := by
+      rw [← Finset.mul_sum]
+      exact mul_le_mul_of_nonneg_left (hseries.sum_le_tsum _ fun j _ ↦ by positivity) (mul_nonneg hC hB)
+
+/-- Along the given log-norm section, a centered zero character has multiplier
+`ρ - 1/2`, since its unitary part is trivial on that section. -/
+private theorem idelicExplicitFormula_summable_spectral_characters_radial
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F)) (z : chartZeros(τ)) :
+    bruhatDirectionalDeriv (τ.comp (positiveRealLogEquiv.symm : _ →ₜ* _))
+      (ideleClassNormTwist z.val.1.val (z.val.2 - 1 / 2)) 1 = z.val.2 - 1 / 2 := by
+  let w := z.val.2 - 1 / 2
+  have he : HasDerivAt (fun t : ℝ ↦ Complex.exp ((t : ℂ) * w)) w 0 := by
+    simpa using ((hasDerivAt_id (0 : ℝ)).ofReal_comp.mul_const w).cexp
+  apply HasDerivAt.deriv (he.congr_of_eventuallyEq (.of_forall fun t ↦ ?_))
+  let u := positiveRealLogEquiv.symm (Multiplicative.ofAdd t)
+  have hu : (u.val : ℝ) = Real.exp t := by
+    have h := positiveRealLogEquiv_apply u
+    rw [ContinuousMulEquiv.apply_symm_apply, toAdd_ofAdd] at h
+    exact (Real.exp_log (NNReal.coe_pos.mpr (Units.zero_lt u))).symm.trans (congrArg Real.exp h.symm)
+  simp only [one_mul]
+  change ((z.val.1.val (τ u) : Circle) : ℂ) * (((ideleClassNorm F (τ u)).val : ℝ) : ℂ) ^ w = _
+  rw [z.val.1.property, Circle.coe_one, one_mul, hτ, hu, Complex.ofReal_exp,
+    Complex.cpow_def_of_ne_zero (Complex.exp_ne_zero _),
+    Complex.log_exp (by simp [Real.pi_pos]) (by simp [Real.pi_pos.le])]
+
+/-- Classical input: the uniform local zero count for Hecke L-functions
+(Lagarias–Odlyzko, 1977, Lemma 5.4 for finite-order characters, and
+Iwaniec–Kowalski, *Analytic Number Theory*, Proposition 5.7 in general).
+On a fixed Bruhat quotient the finite conductor is bounded. In torus coordinates the
+derivatives of the unitary character along lifted angular directions have norms `|n_j|`.
+Zeros with these frequencies and `|Im ρ|` below `T+1` have polynomially bounded total
+multiplicity. Finite subsums express this before local finiteness has been proved.
+This known theorem is an external arithmetic input whose formal proof is missing here. -/
+private theorem idelicExplicitFormula_summable_spectral_characters_polynomialCount
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (_hτ : RightInverse τ (ideleClassNorm F))
+    (k : Subgroup C[F]) (_hk : IsBruhatGoodSubgroup k) :
+    ∃ (n : ℕ) (Y : Fin n → LCATopologicalLie (ideleClassNorm F).ker) (C : ℝ) (d : ℕ),
+      ∀ T : ℕ, ∀ S : Finset (chartZeros(τ)),
+        (∀ z ∈ S, (∀ u : k, z.val.1.val u.val = 1) ∧ |z.val.2.im| < (T : ℝ) + 1 ∧
+          ∀ i, ‖bruhatDirectionalDeriv (Y i) (fun u ↦ (z.val.1.val u.val : ℂ)) 1‖ < (T : ℝ) + 1) →
+        ∑ z ∈ S, ‖zeroMultiplicity(z)‖ ≤ C * ((T : ℝ) + 1) ^ d := by
+  sorry
+
 /-- Paper: Lemma B.4.4.9, pp. 624–625, summed over characters. Over the unitary characters
 trivial on the image of the norm section `τ`, the per-character sums of the absolute spectral
 terms of the idelic explicit formula at a fixed test are summable. This is the uniform half of
@@ -9606,7 +9749,89 @@ theorem idelicExplicitFormula_summable_spectral_characters (τ : ℝ≥0ˣ →�
         ‖(MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ.val) univ s.val : ℂ) *
           ∫ g, classMellinIntegrand(f, ideleClassNormTwist χ.val s.val, -1 / 2) g
             ∂classMeasure‖) := by
-  sorry
+  classical
+  let Z := chartZeros(τ)
+  let c (z : Z) := ideleClassNormTwist z.val.1.val (z.val.2 - 1 / 2)
+  let M (z : Z) := ‖∫ x, f.val x * c z x ∂classMeasure‖
+  obtain ⟨k, hk, hinv, _⟩ := (mem_bruhatSmoothSubmodule_iff _).mp f.property.1 0
+  obtain ⟨n, Y, C, d, hcount⟩ :=
+    idelicExplicitFormula_summable_spectral_characters_polynomialCount τ _hτ k hk
+  let incl : (ideleClassNorm F).ker →ₜ* C[F] := ⟨(ideleClassNorm F).ker.subtype, continuous_subtype_val⟩
+  -- The radial flow and the norm-one flows measure all frequencies in the counting box.
+  let X : Fin (n + 1) → LCATopologicalLie C[F] :=
+    Fin.cons (τ.comp (positiveRealLogEquiv.symm : _ →ₜ* _)) (fun i ↦ incl.comp (Y i))
+  let freq (i : Fin (n + 1)) (z : Z) := ‖bruhatDirectionalDeriv (X i) (c z) 1‖
+  let level (z : Z) := Finset.univ.sup (fun i ↦ ⌊freq i z⌋₊)
+  have hlevel (z : Z) : ∃ i, (level z : ℝ) ≤ freq i z := by
+    obtain ⟨i, _, hi⟩ := Finset.univ.exists_mem_eq_sup Finset.univ_nonempty (fun i ↦ ⌊freq i z⌋₊)
+    exact ⟨i, by simpa only [level, hi] using Nat.floor_le (norm_nonneg _)⟩
+  let r (x : C[F]) : ℝ := ((ideleClassNorm F x).val : ℝ)
+  have hr (x : C[F]) : 0 < r x := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hrc : Continuous r := NNReal.continuous_coe.comp
+    (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)
+  let W (x : C[F]) := r x ^ (-(1 / 2) : ℝ) + r x ^ (1 / 2 : ℝ)
+  have hW : Continuous W := (hrc.rpow_const fun x ↦ Or.inl (hr x).ne').add
+    (hrc.rpow_const fun x ↦ Or.inl (hr x).ne')
+  have hbound (z : Z) (x : C[F]) : ‖c z x‖ ≤ W x := by
+    have hs := explicitFormulaCompletedHeckeL_zero_re_mem z.val.1.val z.property
+    have hre : (z.val.2 - (1 / 2 : ℂ)).re = z.val.2.re - 1 / 2 := by simp
+    change ‖((z.val.1.val x : Circle) : ℂ) * (r x : ℂ) ^ (z.val.2 - 1 / 2)‖ ≤ _
+    rw [norm_mul, Circle.norm_coe, one_mul, Complex.norm_cpow_eq_rpow_re_of_pos (hr x), hre]
+    rcases le_total (r x) 1 with h | h
+    · exact (Real.rpow_le_rpow_of_exponent_ge (hr x) h (by linarith [hs.1])).trans
+        (le_add_of_nonneg_right (Real.rpow_nonneg (hr x).le _))
+    · exact (Real.rpow_le_rpow_of_exponent_le h (by linarith [hs.2])).trans
+        (le_add_of_nonneg_left (Real.rpow_nonneg (hr x).le _))
+  obtain ⟨B, hB, hdecay⟩ := idelicExplicitFormula_summable_spectral_characters_decay X c W hW
+    hbound level hlevel (d + 2) f
+  have hker : k ≤ (ideleClassNorm F).ker := by
+    obtain ⟨m, hm, _, _⟩ := exists_ideleClassModulation F
+    rw [← hm]
+    exact compactSubgroup_le_modulation_ker m k hk.isCompact
+  have hrestrict (z : Z) (g : C[F]) (hg : ideleClassNorm F g = 1) :
+      c z g = (z.val.1.val g : ℂ) := by
+    change ((z.val.1.val g : Circle) : ℂ) *
+      (((ideleClassNorm F g).val : ℝ) : ℂ) ^ (z.val.2 - 1 / 2) = _
+    simp [hg]
+  have hsum : Summable (fun z : Z ↦ ‖zeroMultiplicity(z)‖ * M z) := by
+    apply idelicExplicitFormula_summable_spectral_characters_shells level _ M (fun _ ↦ norm_nonneg _)
+      (fun _ ↦ norm_nonneg _) C B hB d _ hdecay
+    intro j S hS
+    apply hcount j S
+    intro z hz
+    obtain ⟨hne, hj⟩ := hS z hz
+    have hsmall (i : Fin (n + 1)) : freq i z < (j : ℝ) + 1 := by
+      have hi : ⌊freq i z⌋₊ ≤ level z := Finset.le_sup (f := fun i ↦ ⌊freq i z⌋₊) (Finset.mem_univ i)
+      exact (Nat.lt_floor_add_one (freq i z)).trans_le (by exact_mod_cast Nat.succ_le_succ (hj ▸ hi))
+    refine ⟨fun u ↦ Circle.coe_injective ?_, ?_, fun i ↦ ?_⟩
+    · rw [← hrestrict z u.val (hker u.property), Circle.coe_one]
+      exact idelicExplicitFormula_summable_spectral_characters_annihilator k f hinv (c z)
+        (norm_ne_zero_iff.mp hne) u
+    · have h0 := hsmall 0
+      simp only [freq, X, Fin.cons_zero, c,
+        idelicExplicitFormula_summable_spectral_characters_radial τ _hτ] at h0
+      simpa using (Complex.abs_im_le_norm (z.val.2 - 1 / 2)).trans_lt h0
+    · have he : bruhatDirectionalDeriv (X i.succ) (c z) 1 =
+          bruhatDirectionalDeriv (Y i) (fun u ↦ (z.val.1.val u.val : ℂ)) 1 := by
+        simp only [bruhatDirectionalDeriv, one_mul, X, Fin.cons_succ]
+        exact congrArg (fun g : ℝ → ℂ ↦ deriv g 0)
+          (funext fun t ↦ hrestrict z _ (Y i (Multiplicative.ofAdd t)).property)
+      simpa only [freq, he] using hsmall i.succ
+  have hcenter (z : Z) (x : C[F]) : zeroCharacter(z) x * classWeight(x, -1 / 2) = c z x := by
+    change ((z.val.1.val x : Circle) : ℂ) * (r x : ℂ) ^ z.val.2 * (r x : ℂ) ^ (-1 / 2 : ℂ) =
+      ((z.val.1.val x : Circle) : ℂ) * (r x : ℂ) ^ (z.val.2 - 1 / 2)
+    rw [mul_assoc, ← Complex.cpow_add _ _ (Complex.ofReal_ne_zero.mpr (hr x).ne')]
+    congr 2
+    ring
+  have hflat : Summable (fun z : Z ↦ ‖zeroMultiplicity(z) *
+      ∫ x, classMellinIntegrand(f, zeroCharacter(z), -1 / 2) x ∂classMeasure‖) := by
+    simpa only [norm_mul, mul_assoc, hcenter, M] using hsum
+  -- Regroup the weighted zero sum using the fixed-character convergence theorem.
+  let P (χ : {χ : U[F] // ∀ t : ℝ≥0ˣ, χ (τ t) = 1}) (s : ℂ) :=
+    0 < MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ.val) univ s
+  let e := Equiv.subtypeProdEquivSigmaSubtype P
+  exact ((e.symm.hasSum_iff.mpr hflat.hasSum).sigma fun χ ↦
+    (idelicExplicitFormula_summable_spectral_fiber f χ.val).hasSum).summable
 
 /-- Paper: Theorem B.4.4.7, pp. 623–626, and Lemma B.4.4.9, pp. 624–625. The spectral terms
 of the idelic explicit formula are absolutely summable at every test. -/
