@@ -277,6 +277,146 @@ private theorem exteriorZeros_isEmpty_of_half_le (τ : ℝ≥0ˣ →ₜ* C𝔽) 
   rw [Complex.sub_re, Complex.one_re] at hl
   exact (not_le.mpr (abs_lt.mpr ⟨by linarith, by linarith⟩)) (hα.trans hbound)
 
+/-- A rational Gaussian modulation separates the real exponents on a finite set
+of possible zeros with nonnegative real part, in any prescribed open interval. -/
+private theorem exists_rat_injOn_gaussianModulation (s : Finset ℂ)
+    (hs : ∀ z ∈ s, 0 ≤ z.re) (a b : ℝ) (hab : a < b) :
+    ∃ q : ℚ, a < (q : ℝ) ∧ (q : ℝ) < b ∧
+      Set.InjOn (fun z : ℂ => z.re + ((z.re - 1 / 2) ^ 2 - (z.im - q) ^ 2) / 2)
+        (s : Set ℂ) := by
+  classical
+  let c (z : ℂ) : ℝ := z.re + ((z.re - 1 / 2) ^ 2 - z.im ^ 2) / 2
+  let bad : Finset ℝ := (s ×ˢ s).image fun v =>
+    (c v.2 - c v.1) / (v.1.im - v.2.im)
+  have hpre : (Rat.cast ⁻¹' (bad : Set ℝ) : Set ℚ).Finite :=
+    bad.finite_toSet.preimage Rat.cast_injective.injOn
+  obtain ⟨l, hal, hlb⟩ := exists_rat_btwn hab
+  obtain ⟨r, hlr, hrb⟩ := exists_rat_btwn hlb
+  have hlr' : l < r := by exact_mod_cast hlr
+  obtain ⟨q, hq, havoids⟩ := (Set.Ioo_infinite hlr').exists_notMem_finset hpre.toFinset
+  have hql : (l : ℝ) < q := by exact_mod_cast hq.1
+  have hqr : (q : ℝ) < r := by exact_mod_cast hq.2
+  have hnot : (q : ℝ) ∉ bad := by
+    intro h
+    exact havoids (hpre.mem_toFinset.mpr h)
+  refine ⟨q, hal.trans hql, hqr.trans hrb, ?_⟩
+  intro z hz w hw heq
+  dsimp only at heq
+  by_cases him : z.im = w.im
+  · apply Complex.ext _ him
+    rw [him] at heq
+    have hmul : (z.re - w.re) * (z.re + w.re + 1) = 0 := by nlinarith [heq]
+    have hpos : 0 < z.re + w.re + 1 := by linarith [hs z hz, hs w hw]
+    exact sub_eq_zero.mp ((mul_eq_zero.mp hmul).resolve_right hpos.ne')
+  · exfalso
+    apply hnot
+    have hcentre : (q : ℝ) = (c w - c z) / (z.im - w.im) := by
+      apply (eq_div_iff (sub_ne_zero.mpr him)).mpr
+      dsimp [c]
+      nlinarith [heq]
+    rw [hcentre]
+    exact Finset.mem_image.mpr ⟨(z, w), Finset.mem_product.mpr ⟨hz, hw⟩, rfl⟩
+
+/-- A point strictly to the right of the critical line forces a unique leading
+Gaussian exponent at some rational modulation. Only local finiteness near the
+candidate's ordinate and containment in the closed critical strip are needed. -/
+private theorem exists_rat_unique_max_gaussianModulation (Z : Set ℂ) {ρ : ℂ}
+    (hstrip : ∀ z ∈ Z, z.re ∈ Set.Icc (0 : ℝ) 1)
+    (hfin : {z ∈ Z | |z.im - ρ.im| ≤ 3}.Finite)
+    (hρ : ρ ∈ Z) (hβ : 1 / 2 < ρ.re) :
+    ∃ (q : ℚ) (z : ℂ), z ∈ Z ∧
+      let score := fun w : ℂ => w.re + ((w.re - 1 / 2) ^ 2 - (w.im - q) ^ 2) / 2
+      ρ.re < score z ∧ ∃ gap > 0, ∀ w ∈ Z, w ≠ z → score w + gap ≤ score z := by
+  classical
+  let S := hfin.toFinset
+  have hS (z : ℂ) : z ∈ S ↔ z ∈ Z ∧ |z.im - ρ.im| ≤ 3 := hfin.mem_toFinset
+  have hρS : ρ ∈ S := (hS ρ).mpr ⟨hρ, by simp⟩
+  have hδ : 0 < ρ.re - 1 / 2 := by linarith
+  obtain ⟨q, hl, hr, hinj⟩ := exists_rat_injOn_gaussianModulation S
+    (fun z hz => (hstrip z ((hS z).mp hz).1).1)
+    (ρ.im - (ρ.re - 1 / 2)) (ρ.im + (ρ.re - 1 / 2)) (by linarith)
+  let score (w : ℂ) := w.re + ((w.re - 1 / 2) ^ 2 - (w.im - q) ^ 2) / 2
+  have hρscore : ρ.re < score ρ := by
+    dsimp [score]
+    nlinarith [sq_lt_sq' (a := ρ.im - q) (b := ρ.re - 1 / 2) (by linarith) (by linarith)]
+  obtain ⟨z, hz, hmax⟩ := S.exists_max_image score ⟨ρ, hρS⟩
+  have hzρ : ρ.re < score z := hρscore.trans_le (hmax ρ hρS)
+  have hnearLt {w : ℂ} (hwS : w ∈ S) (hwz : w ≠ z) : score w < score z :=
+    lt_of_le_of_ne (hmax w hwS) (fun heq => hwz (hinj hwS hz heq))
+  have hremote {w : ℂ} (hw : w ∈ Z) (hwS : w ∉ S) : score w < ρ.re := by
+    have hout : 3 < |w.im - ρ.im| :=
+      lt_of_not_ge (fun h => hwS ((hS w).mpr ⟨hw, h⟩))
+    have hdist : |w.im - ρ.im| ≤ |w.im - (q : ℝ)| + |(q : ℝ) - ρ.im| :=
+      abs_sub_le _ _ _
+    have hnear : |(q : ℝ) - ρ.im| < ρ.re - 1 / 2 := abs_lt.mpr ⟨by linarith, by linarith⟩
+    have hfar : 2 < |w.im - (q : ℝ)| := by linarith [(hstrip ρ hρ).2]
+    have hsquare : 2 ^ 2 < (w.im - (q : ℝ)) ^ 2 :=
+      sq_lt_sq.mpr (by simpa using hfar)
+    have hsre : (w.re - 1 / 2) ^ 2 ≤ (1 / 2 : ℝ) ^ 2 :=
+      sq_le_sq' (by linarith [(hstrip w hw).1]) (by linarith [(hstrip w hw).2])
+    dsimp [score]
+    nlinarith [(hstrip w hw).2]
+  let other := insert ρ.re ((S.erase z).image score)
+  have hρother : ρ.re ∈ other := Finset.mem_insert_self _ _
+  let m := other.max' ⟨ρ.re, hρother⟩
+  have hmem : m ∈ other := other.max'_mem _
+  have hlt : m < score z := by
+    rcases Finset.mem_insert.mp hmem with he | hm
+    · simpa [he] using hzρ
+    · obtain ⟨w, hw, hwv⟩ := Finset.mem_image.mp hm
+      rw [← hwv]
+      exact hnearLt (Finset.mem_erase.mp hw).2 (Finset.mem_erase.mp hw).1
+  refine ⟨q, z, ((hS z).mp hz).1, hzρ, score z - m, sub_pos.mpr hlt, ?_⟩
+  intro w hw hwz
+  have hwle : score w ≤ m := by
+    by_cases hwS : w ∈ S
+    · exact other.le_max' _ (Finset.mem_insert_of_mem
+        (Finset.mem_image.mpr ⟨w, Finset.mem_erase.mpr ⟨hwz, hwS⟩, rfl⟩))
+    · exact (hremote hw hwS).le.trans (other.le_max' _ hρother)
+  change score w + (score z - m) ≤ score z
+  linarith
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520, and the completed divisor in Theorem B.4.4.7.
+A zero of one normalized character to the right of the critical line gives a rational
+Gaussian modulation with a unique largest transformed real exponent among its zeros.
+The exponent exceeds the original zero's real part and has a positive gap to all others.
+Reconstruction: The displayed score is the real part of the exponent obtained by
+testing with a Gaussian of variance `log X` in the logarithmic norm coordinate. -/
+theorem continuedCompletedHeckeL_exists_rat_unique_max_gaussianModulation
+    (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (χ : PontryaginDual C𝔽) (hn : ∀ t, χ (τ t) = 1)
+    {ρ : ℂ} (hρ : 0 < ord(χ, ρ))
+    (hβ : 1 / 2 < ρ.re) :
+    ∃ (q : ℚ) (z : ℂ), 0 < ord(χ, z) ∧
+      let score := fun w : ℂ => w.re + ((w.re - 1 / 2) ^ 2 - (w.im - q) ^ 2) / 2
+      ρ.re < score z ∧ ∃ gap > 0, ∀ w, 0 < ord(χ, w) →
+        w ≠ z → score w + gap ≤ score z := by
+  let L := continuedCompletedHeckeL χ
+  let Z := {z : ℂ | 0 < MeromorphicOn.divisor L univ z}
+  have hstrip (z : ℂ) (hz : z ∈ Z) : z.re ∈ Set.Icc (0 : ℝ) 1 := by
+    by_contra hbad
+    have hb : 1 / 2 ≤ |z.re - 1 / 2| := by
+      by_contra! h
+      obtain ⟨hl, hr⟩ := abs_lt.mp h
+      exact hbad ⟨by linarith, by linarith⟩
+    exact (exteriorZeros_isEmpty_of_half_le (F := F) τ (α := 1 / 2) le_rfl).false
+      ⟨(⟨χ, hn⟩, z), hz, hb⟩
+  let K := Complex.reProdIm (Set.Icc (0 : ℝ) 1) (Set.Icc (ρ.im - 3) (ρ.im + 3))
+  have hK : IsCompact K := isCompact_Icc.reProdIm isCompact_Icc
+  have hmer := (continuedCompletedHeckeL_spec χ).1.meromorphicOn
+  have hmerK : MeromorphicOn L K := fun z _ => hmer z (Set.mem_univ z)
+  have hfin : {z ∈ Z | |z.im - ρ.im| ≤ 3}.Finite := by
+    apply ((MeromorphicOn.divisor L K).finiteSupport hK).subset
+    intro z ⟨hz, hd⟩
+    have hzK : z ∈ K := ⟨hstrip z hz,
+      by obtain ⟨hl, hr⟩ := abs_le.mp hd; exact ⟨by linarith, by linarith⟩⟩
+    change MeromorphicOn.divisor L K z ≠ 0
+    change 0 < MeromorphicOn.divisor L univ z at hz
+    rw [MeromorphicOn.divisor_apply hmerK hzK]
+    rw [MeromorphicOn.divisor_apply (show MeromorphicOn L univ from hmer) (mem_univ _)] at hz
+    exact hz.ne'
+  exact exists_rat_unique_max_gaussianModulation Z hstrip hfin hρ hβ
+
 /-- Paper: Theorem 12.5.1.1, pp. 519–520. The exterior-zero sum vanishes for every
 test when the open strip contains the entire critical strip.
 Deviation: The half-width is at least one half. The exterior is empty, so the test
