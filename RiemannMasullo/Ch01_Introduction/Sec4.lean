@@ -9799,6 +9799,218 @@ theorem introTraceApprox_exists_common_counterterm_limits :
     intro n
     ring
 
+section CompletedSpectralContinuation
+
+open Classical
+
+local notation "completedSpectral(" χ ", " z ")" =>
+  (logDeriv (continuedCompletedHeckeL (F := F) χ) ((z : ℂ) + 1 / 2) +
+    (if χ = (1 : U𝔽) then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) -
+    logDeriv (heckeGammaFactor (1 : U𝔽)) (5 / 2))
+
+/-- In the shifted Euler half-plane each term of the renormalized completed logarithmic
+derivative is analytic. -/
+private theorem introTrace_completed_spectral_analytic (χ : U𝔽) :
+    AnalyticOnNhd ℂ (fun z ↦ completedSpectral(χ, z)) right(1 / 2) := by
+  classical
+  intro z hz
+  change (1 / 2 : ℝ) < z.re at hz
+  have hs : 1 < (z + 1 / 2).re := by norm_num; linarith
+  obtain ⟨hΛ, he⟩ := continuedCompletedHeckeL_spec χ
+  have hn : continuedCompletedHeckeL χ (z + 1 / 2) ≠ 0 := by
+    rw [he ⟨_, hs⟩]
+    exact mul_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans hs))
+      (finiteHeckeL_ne_zero_of_one_lt_re χ _)
+  have hnormal := hΛ (mem_univ (z + 1 / 2))
+  have hΛa := hnormal.meromorphicOrderAt_nonneg_iff_analyticAt.mp
+    (hnormal.meromorphicOrderAt_eq_zero_iff.mpr hn).ge
+  have ha := (hΛa.deriv.div hΛa hn).comp (f := fun w : ℂ ↦ w + 1 / 2) (x := z) (by fun_prop)
+  have hp : z + 1 / 2 ≠ 0 := by intro h; rw [h] at hs; norm_num at hs
+  have hm : z - 1 / 2 ≠ 0 := by intro h; rw [sub_eq_zero.mp h] at hz; norm_num at hz
+  apply AnalyticAt.sub _ analyticAt_const
+  apply ha.add
+  split_ifs
+  · have hplus : AnalyticAt ℂ (fun w : ℂ ↦ w + 1 / 2) z := by fun_prop
+    have hminus : AnalyticAt ℂ (fun w : ℂ ↦ w - 1 / 2) z := by fun_prop
+    have hone : AnalyticAt ℂ (fun _ : ℂ ↦ (1 : ℂ)) z := analyticAt_const
+    exact (hone.div hplus hp).add (hone.div hminus hm)
+  · exact analyticAt_const
+
+/-- A logarithmic derivative has principal part equal to the order divided by the
+local coordinate. This also covers a locally zero meromorphic function. -/
+private theorem introTrace_logDeriv_principalPart {f : ℂ → ℂ} {p : ℂ} (hf : MeromorphicAt f p) :
+    ∃ g : ℂ → ℂ, AnalyticAt ℂ g p ∧ logDeriv f =ᶠ[𝓝[≠] p]
+      fun z ↦ ((meromorphicOrderAt f p).untop₀ : ℂ) / (z - p) + g z := by
+  by_cases ht : meromorphicOrderAt f p = ⊤
+  · refine ⟨0, analyticAt_const, ?_⟩
+    filter_upwards [logDeriv_congr_nhdsNE (meromorphicOrderAt_eq_top_iff.mp ht)] with z hz
+    simpa [ht, logDeriv, Pi.div_apply] using hz
+  obtain ⟨g, hg, hgp, he⟩ := (meromorphicOrderAt_ne_top_iff hf).mp ht
+  set n := (meromorphicOrderAt f p).untop₀
+  refine ⟨logDeriv g, hg.deriv.div hg hgp, ?_⟩
+  filter_upwards [logDeriv_congr_nhdsNE he, (hg.continuousAt.eventually_ne hgp).filter_mono nhdsWithin_le_nhds,
+    hg.eventually_analyticAt.filter_mono nhdsWithin_le_nhds, self_mem_nhdsWithin] with z hz hgz hga hzp
+  have hd := sub_ne_zero.mpr hzp
+  have hpow := logDeriv_comp (f := fun w : ℂ ↦ w ^ n) (g := fun w : ℂ ↦ w - p) (x := z)
+    (differentiableAt_zpow.mpr (Or.inl hd)) (differentiableAt_id.sub_const p)
+  simp only [Function.comp_def, logDeriv_zpow, deriv_sub_const, deriv_id'', mul_one] at hpow
+  simp only [smul_eq_mul] at hz
+  rw [hz, ← hpow]
+  exact logDeriv_fun_mul z (zpow_ne_zero n hd) hgz
+    ((differentiableAt_id.sub_const p).zpow (Or.inl hd)) hga.differentiableAt
+
+/-- The polar correction with pole at a fixed point contributes residue one precisely there. -/
+private theorem introTrace_reciprocal_principalPart (a p : ℂ) :
+    ∃ g : ℂ → ℂ, AnalyticAt ℂ g p ∧ ∀ z : ℂ,
+      1 / (z - a) = (if p = a then 1 else 0) / (z - p) + g z := by
+  by_cases h : p = a
+  · exact ⟨0, analyticAt_const, by simp [h]⟩
+  · have hone : AnalyticAt ℂ (fun _ : ℂ ↦ (1 : ℂ)) p := analyticAt_const
+    have hsub : AnalyticAt ℂ (fun z : ℂ ↦ z - a) p := by fun_prop
+    exact ⟨fun z ↦ 1 / (z - a), hone.div hsub (sub_ne_zero.mpr h), by simp [h]⟩
+
+/-- Adding the two polar corrections in the normalized trivial chart cancels its
+simple poles at zero and one. In every chart the remaining residues are the
+positive part of the completed divisor. -/
+private theorem introTrace_completed_spectral_principalPart
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : U𝔽) (hχ : ∀ t, χ (τ t) = 1) (p : ℂ) :
+    ∃ g : ℂ → ℂ, AnalyticAt ℂ g p ∧ (fun z ↦ completedSpectral(χ, z)) =ᶠ[𝓝[≠] p]
+      fun z ↦ (max zeroOrder(χ, p + 1 / 2) 0 : ℤ) / (z - p) + g z := by
+  classical
+  let s := p + 1 / 2
+  let m := zeroOrder(χ, s)
+  have hΛ := (continuedCompletedHeckeL_spec χ).1
+  obtain ⟨g, hg, he⟩ := introTrace_logDeriv_principalPart (hΛ (mem_univ s)).meromorphicAt
+  have ht : Tendsto (fun w : ℂ ↦ w + 1 / 2) (𝓝[≠] p) (𝓝[≠] s) := by
+    apply tendsto_nhdsWithin_iff.mpr
+    refine ⟨(continuousAt_id.add_const _).continuousWithinAt,
+      ?_⟩
+    filter_upwards [self_mem_nhdsWithin] with z hz
+    exact fun h ↦ hz (add_right_cancel h)
+  have he' : (fun z : ℂ ↦ logDeriv (continuedCompletedHeckeL χ) (z + 1 / 2)) =ᶠ[𝓝[≠] p]
+      fun z ↦ (m : ℂ) / (z - p) + g (z + 1 / 2) := by
+    filter_upwards [ht.eventually he] with z hz
+    simpa [m, MeromorphicOn.divisor_apply hΛ.meromorphicOn (mem_univ s), s] using hz
+  have hgt := hg.comp (f := fun z : ℂ ↦ z + 1 / 2) (x := p) (by fun_prop)
+  set c := logDeriv (heckeGammaFactor (1 : U𝔽)) (5 / 2)
+  by_cases hc : χ = 1
+  · obtain ⟨u, hu, heu⟩ := introTrace_reciprocal_principalPart (-(1 / 2)) p
+    obtain ⟨v, hv, hev⟩ := introTrace_reciprocal_principalPart (1 / 2) p
+    refine ⟨fun z ↦ g (z + 1 / 2) + u z + v z - c, ((hgt.add hu).add hv).sub analyticAt_const, ?_⟩
+    have hm : m + (if p = -(1 / 2) then 1 else 0) + (if p = 1 / 2 then 1 else 0) = max m 0 := by
+      obtain ⟨h₀, h₁⟩ := idelicExplicitFormula_trivial_poles (F := F)
+      by_cases h : p = -(1 / 2)
+      · have hs : s = 0 := by dsimp [s]; rw [h]; ring
+        have hm : m = -1 := by dsimp only [m]; rw [hc, hs]; exact h₀
+        have hn : p ≠ 1 / 2 := by rw [h]; norm_num
+        rw [ite_eq_left h, ite_eq_right hn, hm]; decide
+      by_cases h' : p = 1 / 2
+      · have hs : s = 1 := by dsimp [s]; rw [h']; norm_num
+        have hm : m = -1 := by dsimp only [m]; rw [hc, hs]; exact h₁
+        rw [ite_eq_right h, ite_eq_left h', hm]; decide
+      have hm : 0 ≤ m := by
+        by_contra! hn
+        obtain ⟨_, hs | hs⟩ := idelicExplicitFormula_chart_poles τ hτ χ hχ s hn
+        · exact h (by dsimp [s] at hs; linear_combination hs)
+        · exact h' (by dsimp [s] at hs; linear_combination hs)
+      rw [ite_eq_right h, ite_eq_right h', max_eq_left hm]; omega
+    have hmc := congrArg (fun x : ℤ ↦ (x : ℂ)) hm
+    push_cast at hmc
+    filter_upwards [he'] with z hz
+    rw [hz, ite_eq_left hc, ← sub_neg_eq_add z (1 / 2), heu z, hev z]
+    change _ = (max m 0 : ℤ) / (z - p) + _
+    rw [← hmc]
+    ring
+  · have hm : 0 ≤ m := by
+      by_contra! hn
+      exact hc (idelicExplicitFormula_chart_poles τ hτ χ hχ s hn).1
+    refine ⟨fun z ↦ g (z + 1 / 2) - c, hgt.sub analyticAt_const, ?_⟩
+    filter_upwards [he'] with z hz
+    rw [hz, ite_eq_right hc]
+    change _ = (max m 0 : ℤ) / (z - p) + _
+    rw [max_eq_left hm]
+    ring
+
+/-- Circle residues depend only on the germ on a punctured neighborhood. -/
+private theorem introTrace_complexResidue_congr {f g : ℂ → ℂ} {p : ℂ}
+    (he : f =ᶠ[𝓝[≠] p] g) : complexResidue f p = complexResidue g p := by
+  obtain ⟨R, hR, hEq⟩ := Metric.nhdsWithin_basis_ball.eventually_iff.mp he
+  unfold complexResidue Filter.limUnder
+  apply congrArg Filter.lim
+  apply Filter.map_congr
+  filter_upwards [Ioo_mem_nhdsGT hR] with r hr
+  congr 1
+  apply circleIntegral.integral_congr hr.1.le
+  intro z hz
+  have hd := Metric.mem_sphere.mp hz
+  refine hEq ⟨Metric.mem_ball.mpr (hd.trans_lt hr.2), mem_compl_singleton_iff.mpr ?_⟩
+  rintro rfl
+  exact hr.1.ne (by simpa using hd)
+
+/-- Paper: §1.4.3, p. 29, and §B.4.2, pp. 614–615. Take the logarithmic derivative of
+the completed Hecke function at `z + 1/2`, add the two polar fractions for the trivial
+character, and subtract the trivial gamma logarithmic derivative at `5/2`. Its meromorphic
+normal form agrees with this expression on `Re z > 1/2`. Its poles are simple, exactly at
+the translated positive-order zeros, and the circle residues are the multiplicities.
+The trivial chart's completed poles at zero and one cancel. -/
+theorem introTrace_completed_logDeriv_poles_residues
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : U𝔽) (hχ : ∀ t, χ (τ t) = 1) :
+    let R := toMeromorphicNFOn (fun z ↦ completedSpectral(χ, z)) univ
+    MeromorphicNFOn R univ ∧ EqOn R (fun z ↦ completedSpectral(χ, z)) right(1 / 2) ∧
+      ∀ p : ℂ, (AnalyticAt ℂ R p ↔ zeroOrder(χ, p + 1 / 2) ≤ 0) ∧
+        (0 < zeroOrder(χ, p + 1 / 2) → meromorphicOrderAt R p = -1) ∧
+        complexResidue R p = (max zeroOrder(χ, p + 1 / 2) 0 : ℤ) := by
+  classical
+  let H := fun z ↦ completedSpectral(χ, z)
+  have herr := introTrace_completed_spectral_principalPart τ hτ χ hχ
+  have hmer : MeromorphicOn H univ := by
+    intro p _
+    obtain ⟨g, hg, he⟩ := herr p
+    apply MeromorphicAt.congr _ he.symm
+    have hn : MeromorphicAt (fun _ : ℂ ↦ ((max zeroOrder(χ, p + 1/2) 0 : ℤ) : ℂ)) p := by fun_prop
+    have hd : MeromorphicAt (fun z : ℂ ↦ z - p) p := by fun_prop
+    exact (hn.div hd).add hg.meromorphicAt
+  intro R
+  have hnf : MeromorphicNFOn R univ := meromorphicNFOn_toMeromorphicNFOn _ _
+  refine ⟨hnf, fun z hz ↦ ?_, fun p ↦ ?_⟩
+  · exact (toMeromorphicNFOn_eq_toMeromorphicNFAt hmer (mem_univ z)).trans
+      (congrFun (toMeromorphicNFAt_eq_self.mpr ((introTrace_completed_spectral_analytic χ z hz).meromorphicNFAt)) z)
+  · let m := zeroOrder(χ, p + 1 / 2)
+    let c : ℂ := (max m 0 : ℤ)
+    obtain ⟨g, hg, he⟩ := herr p
+    have he' : R =ᶠ[𝓝[≠] p] fun z ↦ c / (z - p) + g z :=
+      (hmer.toMeromorphicNFOn_eq_self_on_nhdsNE (mem_univ p)).trans he
+    let B := fun z : ℂ ↦ c + (z - p) * g z
+    have hB : AnalyticAt ℂ B p := analyticAt_const.add ((analyticAt_id.sub analyticAt_const).mul hg)
+    have hBp : B p = c := by simp [B]
+    have hfrac : R =ᶠ[𝓝[≠] p] fun z ↦ B z / (z - p) := by
+      filter_upwards [he', self_mem_nhdsWithin] with z hz hzp
+      rw [hz]
+      dsimp only [B]
+      field_simp [sub_ne_zero.mpr hzp]
+    have hpole (h : 0 < m) : meromorphicOrderAt R p = -1 := by
+      have hc : c ≠ 0 := by
+        dsimp [c]; rw [max_eq_left h.le]; exact_mod_cast h.ne'
+      apply (meromorphicOrderAt_eq_int_iff (n := -1) (hnf (mem_univ p)).meromorphicAt).mpr
+      refine ⟨B, hB, hBp ▸ hc, ?_⟩
+      filter_upwards [hfrac] with z hz
+      simpa [zpow_neg_one, smul_eq_mul, div_eq_inv_mul] using hz
+    refine ⟨⟨fun ha ↦ ?_, fun hn ↦ ?_⟩, hpole, (introTrace_complexResidue_congr hfrac).trans
+      ((complexResidue_div_sub hB).trans hBp)⟩
+    · by_contra! hp
+      have hoch := ha.meromorphicOrderAt_nonneg
+      rw [hpole hp] at hoch
+      exact (by decide : ¬ (0 : WithTop ℤ) ≤ -1) hoch
+    · have hc : c = 0 := by simp [c, max_eq_right (show m ≤ 0 from hn)]
+      have he₀ : R =ᶠ[𝓝[≠] p] g := by simpa [hc] using he'
+      apply (hnf (mem_univ p)).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+      rw [meromorphicOrderAt_congr he₀]
+      exact hg.meromorphicOrderAt_nonneg
+
+end CompletedSpectralContinuation
+
 /-- Paper: §1.4.3, p. 29. Every unitary character over a number field has infinitely
 many distinct positive-order zeros of its completed L-function. Finiteness would
 make the spectral sum a finite sum of convergent Mellin moments. -/

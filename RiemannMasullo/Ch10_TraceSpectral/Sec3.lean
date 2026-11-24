@@ -5,6 +5,7 @@ public import RiemannMasullo.AppC_LCTVS.Sec3a_part2
 public import RiemannMasullo.Ch09_HardySobolev.Sec3
 public import Mathlib.Analysis.InnerProductSpace.ProdL2
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.External.FermatDixmierMalliavin.OneParameter
 
 import all RiemannMasullo.Ch09_HardySobolev.Sec3
 
@@ -1111,6 +1112,70 @@ local notation "homTest(" ω ", " φ ")" =>
   ∀ (k : C₁) (x : C𝔽), (φ : BruhatCompactSupport C𝔽).val (k.val⁻¹ * x) =
     (ω k : ℂ) * (φ : BruhatCompactSupport C𝔽).val x
 
+/-- Extend a real test to the positive half-line through the logarithm. Its support lies
+in the exponential image of the original support, so the zero extension is smooth at zero. -/
+private theorem spectralHomogeneousTest_real_factorization_log (f : ℝ → ℂ)
+    (hf : ContDiff ℝ (⊤ : ℕ∞) f) (hc : HasCompactSupport f) :
+    ∃ Φ : ℝ → ℂ, ContDiff ℝ (⊤ : ℕ∞) Φ ∧ tsupport Φ ⊆ Real.exp '' tsupport f ∧
+      ∀ s, Φ (Real.exp s) = f s := by
+  let Φ (y : ℝ) := if 0 < y then f (Real.log y) else 0
+  have hK := hc.isCompact.image Real.continuous_exp
+  have hs : tsupport Φ ⊆ Real.exp '' tsupport f := by
+    apply closure_minimal _ hK.isClosed
+    intro y hy
+    by_cases h : 0 < y
+    · exact ⟨Real.log y, subset_tsupport f (by simpa [Φ, h, mem_support] using hy), Real.exp_log h⟩
+    · exact ((mem_support.mp hy) (ite_eq_right h)).elim
+  refine ⟨Φ, contDiff_iff_contDiffAt.mpr fun y ↦ ?_, hs, fun s ↦ by simp [Φ, Real.exp_pos]⟩
+  by_cases h : 0 < y
+  · apply (hf.contDiffAt.comp y (Real.contDiffAt_log.mpr h.ne')).congr_of_eventuallyEq
+    filter_upwards [lt_mem_nhds h] with z hz using ite_eq_left hz
+  · have hy : y ∉ tsupport Φ := fun hy ↦ by
+      obtain ⟨s, _, rfl⟩ := hs hy
+      exact h (Real.exp_pos s)
+    exact contDiffAt_const.congr_of_eventuallyEq (notMem_tsupport_iff_eventuallyEq.mp hy)
+
+/-- Reflect the kernel of a translation integral and put the Haar normalization into it.
+The resulting convolution is itself a smooth compactly supported test. -/
+private theorem spectralHomogeneousTest_real_factorization_term
+    (ν : Measure (Multiplicative ℝ)) [ν.IsHaarMeasure] (φ g : ℝ → ℂ)
+    (hφ : ContDiff ℝ (⊤ : ℕ∞) φ) (hcφ : HasCompactSupport φ)
+    (hg : ContDiff ℝ (⊤ : ℕ∞) g) (hcg : HasCompactSupport g) :
+    ∃ h : BruhatCompactSupport (Multiplicative ℝ),
+      h ∈ AddSubmonoid.closure {h | ∃ u v : BruhatCompactSupport (Multiplicative ℝ),
+        h.val = lcaConvolution ν u.val v.val} ∧
+      ∀ s : ℝ, h.val (Multiplicative.ofAdd s) = ∫ t, φ t * g (s + t) := by
+  let μ : Measure (Multiplicative ℝ) := (volume : Measure ℝ)
+  let : IsFiniteMeasureOnCompacts μ :=
+    inferInstanceAs (IsFiniteMeasureOnCompacts (volume : Measure ℝ))
+  let : μ.IsMulLeftInvariant :=
+    ⟨fun y ↦ (measurePreserving_add_left (volume : Measure ℝ) y.toAdd).map_eq⟩
+  let c := μ.haarScalarFactor ν
+  have hμ : μ = c • ν := Measure.isMulLeftInvariant_eq_smul μ ν
+  let k (t : ℝ) := φ (-t)
+  have hk : ContDiff ℝ (⊤ : ℕ∞) k := hφ.comp contDiff_neg
+  have hck : HasCompactSupport k := hcφ.comp_homeomorph (Homeomorph.neg ℝ)
+  let L := ContinuousLinearMap.mul ℝ ℂ
+  let w := MeasureTheory.convolution k g L volume
+  have hw : ContDiff ℝ (⊤ : ℕ∞) w := hcg.contDiff_convolution_right L hk.continuous.locallyIntegrable hg
+  have hcw : HasCompactSupport w := hck.convolution L hcg
+  let h : BruhatCompactSupport (Multiplicative ℝ) :=
+    ⟨w ∘ Multiplicative.toAdd, (mem_bruhatCompactSupportSubmodule_real_iff _).mpr ⟨hw, hcw⟩⟩
+  let u : BruhatCompactSupport (Multiplicative ℝ) :=
+    ⟨fun y ↦ (c : ℂ) * k y.toAdd, (mem_bruhatCompactSupportSubmodule_real_iff _).mpr
+      ⟨contDiff_const.mul hk, hck.mul_left⟩⟩
+  let v : BruhatCompactSupport (Multiplicative ℝ) :=
+    ⟨g ∘ Multiplicative.toAdd, (mem_bruhatCompactSupportSubmodule_real_iff _).mpr ⟨hg, hcg⟩⟩
+  refine ⟨h, AddSubmonoid.subset_closure ⟨u, v, funext fun s ↦ ?_⟩, fun s ↦ ?_⟩
+  · let b (t : Multiplicative ℝ) := k t.toAdd * g (s.toAdd - t.toAdd)
+    change (∫ t, b t ∂μ) = ∫ t, (c : ℂ) * k t.toAdd * g (-t.toAdd + s.toAdd) ∂ν
+    rw [hμ, integral_smul_nnreal_measure, NNReal.smul_def, Complex.real_smul, ← integral_const_mul]
+    apply integral_congr_ae
+    exact .of_forall fun t ↦ by simp only [b, sub_eq_neg_add, mul_assoc]
+  · change (∫ t : ℝ, φ (-t) * g (s - t)) = _
+    simpa only [sub_eq_add_neg] using
+      integral_neg_eq_self (fun t : ℝ ↦ φ t * g (s + t)) volume
+
 /-- Classical input: the Dixmier–Malliavin factorization theorem on the additive real line,
 from J. Dixmier and P. Malliavin, *Factorisations de fonctions et de vecteurs indéfiniment
 différentiables*, Bull. Sci. Math. 102 (1978), 307–330. Every smooth compactly supported
@@ -1121,7 +1186,33 @@ private theorem spectralHomogeneousTest_real_factorization
     (f : BruhatCompactSupport (Multiplicative ℝ)) :
     f ∈ AddSubmonoid.closure {h | ∃ u v : BruhatCompactSupport (Multiplicative ℝ),
       h.val = lcaConvolution ν u.val v.val} := by
-  sorry
+  let g := f.val ∘ Multiplicative.ofAdd
+  obtain ⟨hg, hc⟩ := (mem_bruhatCompactSupportSubmodule_real_iff _).mp f.property
+  obtain ⟨Φ, hΦ, hΦs, hΦexp⟩ := spectralHomogeneousTest_real_factorization_log g hg hc
+  have hΦc : HasCompactSupport Φ :=
+    (hc.isCompact.image Real.continuous_exp).of_isClosed_subset (isClosed_tsupport _) hΦs
+  obtain ⟨Φ₁, φ, ψ, h₁, hs₁, hφ, hψ, hsφ, hsψ, heq⟩ :=
+    DixmierMalliavin.exists_eq_integral_mul_comp_mul_exp_smul_add (1 : ℝ) 1 zero_lt_one Φ hΦ hΦc
+  have hc₁ : HasCompactSupport (Φ₁ ∘ Real.exp) := by
+    apply HasCompactSupport.intro hc
+    intro s hs
+    change Φ₁ (Real.exp s) = 0
+    apply image_eq_zero_of_notMem_tsupport
+    intro h
+    obtain ⟨r, hr, he⟩ := hΦs (hs₁ h)
+    exact hs (Real.exp_injective he ▸ hr)
+  obtain ⟨u, hu, heu⟩ := spectralHomogeneousTest_real_factorization_term ν φ (Φ₁ ∘ Real.exp)
+    hφ (isCompact_Icc.of_isClosed_subset (isClosed_tsupport _) hsφ) (h₁.comp Real.contDiff_exp) hc₁
+  obtain ⟨v, hv, hev⟩ := spectralHomogeneousTest_real_factorization_term ν ψ g
+    hψ (isCompact_Icc.of_isClosed_subset (isClosed_tsupport _) hsψ) hg hc
+  have hf : f = u + v := by
+    apply Subtype.ext
+    funext s
+    change g s.toAdd = u.val (Multiplicative.ofAdd s.toAdd) + v.val (Multiplicative.ofAdd s.toAdd)
+    rw [heu, hev]
+    simpa only [smul_eq_mul, mul_one, ← Real.exp_eq_exp_ℝ, ← Real.exp_add, hΦexp, comp_apply]
+      using heq (Real.exp s.toAdd)
+  exact hf ▸ AddSubmonoid.add_mem _ hu hv
 
 /-- Restriction to a one-parameter subgroup is smooth in the real parameter. -/
 private theorem spectralHomogeneousTest_section_smooth (σ : Multiplicative ℝ →ₜ* C𝔽)

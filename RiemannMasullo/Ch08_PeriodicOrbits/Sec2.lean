@@ -93,8 +93,8 @@ def adeleOrbitBasepoints : Set 𝔸[F] :=
   Set.range (adeleOrbitBasepoint F)
 
 /-- Paper: Definition 8.2.0.1(1), p. 384. The ordinary base point lies in $Z_F$. -/
-theorem one_mem_adeleOrbitBasepoints : 1 ∈ adeleOrbitBasepoints F := by
-  sorry
+theorem one_mem_adeleOrbitBasepoints : 1 ∈ adeleOrbitBasepoints F :=
+  ⟨none, rfl⟩
 
 /-- Paper: Definition 8.2.0.1(2), p. 384. The family in (8.2.0.3) consists of the
 S-local full-idele orbits with their adelic subspace topologies. -/
@@ -720,7 +720,11 @@ def sAdeleFiniteOrbitSection (v : S) (τ : ℝ≥0ˣ →* 𝕀ₛ) : Set Aₛ :=
 single-zero base point. -/
 theorem sAdeleOrbitBasepoint_mem_finiteOrbitSection (v : S) (τ : ℝ≥0ˣ →* 𝕀ₛ) :
     sAdeleOrbitBasepoint F S (some (.inr v)) ∈ sAdeleFiniteOrbitSection F S v τ := by
-  sorry
+  have hN : (1 : ℝ≥0) < (v.val.asIdeal.absNorm : ℝ≥0) := by
+    exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v.val
+  refine ⟨1, ⟨by rw [Units.val_one], by rw [Units.val_one]; exact hN⟩, ?_⟩
+  change τ 1 • sAdeleOrbitBasepoint F S (some (.inr v)) = _
+  rw [map_one, one_smul]
 
 /-- Paper: Equation (8.2.0.10), p. 386. The global section at a finite place takes
 parameters in the half-open interval from 1 to the absolute prime ideal norm. -/
@@ -734,7 +738,11 @@ single-zero base point. -/
 theorem adeleOrbitBasepoint_mem_finiteOrbitSection (v : HeightOneSpectrum (𝓞 F))
     (τ : ℝ≥0ˣ →* 𝔸[F]ˣ) :
     adeleOrbitBasepoint F (some (.inr v)) ∈ adeleFiniteOrbitSection F v τ := by
-  sorry
+  have hN : (1 : ℝ≥0) < (v.asIdeal.absNorm : ℝ≥0) := by
+    exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  refine ⟨1, ⟨by rw [Units.val_one], by rw [Units.val_one]; exact hN⟩, ?_⟩
+  change τ 1 • adeleOrbitBasepoint F (some (.inr v)) = _
+  rw [map_one, one_smul]
 
 /-- A uniformizer at a finite place, as a unit, with norm the reciprocal of the absolute norm. -/
 private theorem sAdeleFiniteOrbit_transporter_uniformizer (v : HeightOneSpectrum (𝓞 F)) :
