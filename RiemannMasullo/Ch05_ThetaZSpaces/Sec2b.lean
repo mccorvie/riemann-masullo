@@ -6,8 +6,7 @@ public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 
 import RiemannMasullo.Ch03_IdelicZeta.Sec2
 import RiemannMasullo.Ch03_IdelicZeta.Sec4
-import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import RiemannMasullo.AppA_AlgebraicNT.Sec3
 import RiemannMasullo.ForMathlib.Topology.Algebra.Group.AutomaticContinuity
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Separable
@@ -17,7 +16,6 @@ import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
 
-import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 import RiemannMasullo.ForMathlib.Topology.ContinuousMap.Sigma
 import RiemannMasullo.ForMathlib.MeasureTheory.Integral.Bochner.Regular
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace

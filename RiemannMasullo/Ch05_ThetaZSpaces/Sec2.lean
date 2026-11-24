@@ -1735,7 +1735,8 @@ private theorem isEmbedding_transpose_quotient_of_strictLF {E : Type*} [AddCommG
 
 universe v
 
-private theorem nuclear_of_linear_embedding {X Y : Type*}
+/-- A space with a continuous linear topological embedding into a nuclear space is nuclear. -/
+theorem nuclear_of_linear_embedding {X Y : Type*}
     [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
     [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] (i : X →L[ℂ] Y)
     (hi : IsEmbedding i) (hY : IsNuclearTVS.{v} Y) : IsNuclearTVS.{v} X := by
@@ -1755,7 +1756,8 @@ theorem sLocalAdelicThetaSpace_strongDual_nuclear : IsNuclearTVS (StrongDual ℂ
       (sAdeleSchwartz_nuclear F S) sLocalAdelicTheta_ker_isClosed sLocalAdelicThetaSpace_strictLF
   · exact (sAdeleSchwartz_strongDual_nuclear F S)
 
-private theorem barrelled_strongDual_of_montel {E : Type*} [AddCommGroup E] [Module ℂ E]
+/-- The strong dual of a Hausdorff polynormable Montel space is barrelled. -/
+theorem barrelled_strongDual_of_montel {E : Type*} [AddCommGroup E] [Module ℂ E]
     [TopologicalSpace E] [IsTopologicalAddGroup E] [ContinuousSMul ℂ E]
     [PolynormableSpace ℂ E] [T2Space E] [MontelSpace ℂ E] : BarrelledSpace ℂ (StrongDual ℂ E) := by
   let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
