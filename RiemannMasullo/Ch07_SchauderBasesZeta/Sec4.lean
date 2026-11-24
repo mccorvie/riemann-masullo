@@ -6554,13 +6554,573 @@ theorem archNuclearityQuotient_jetEquiv_coefficients :
   exact Submodule.liftQ_apply (p := archNuclearityDenominator χ)
     (f := (archNuclearityJet χ τ hτ j).toLinearMap) (h := hker j) (x := x)
 
+/-- Adapted from `globalPrincipalValueConverse_mellin_insertion` in §6.3.
+Insertion through the stage agrees with insertion at the chosen finite place. -/
+private theorem archNuclearityQuotient_jetEquiv_separating_insertion {T : Finset V}
+    (v : T) (x : (v.val.adicCompletion F)ˣ) :
+    sIdeleInsertion F T ((ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F)
+        ((w : T) → w.val.adicCompletion F)).symm
+      (1, ContinuousMulEquiv.piUnits.symm (@Pi.mulSingle _ _ _ (Classical.decEq _) v x))) =
+      IdeleGroup.ofAdicCompletion (𝓞 F) F v.val x := by
+  classical
+  let : DecidableEq T := Classical.decEq _
+  let g : (SAdeleRing F T)ˣ := (ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F) _).symm
+    (1, ContinuousMulEquiv.piUnits.symm (@Pi.mulSingle _ _ _ (Classical.decEq _) v x))
+  obtain ⟨ha, hf, ho⟩ := sIdeleInsertion_apply F T g
+  apply Units.ext
+  apply Prod.ext
+  · exact ha
+  · apply RestrictedProduct.ext
+    intro u
+    change (sIdeleInsertion F T g).val.2 u =
+      RestrictedProduct.mulSingle (fun w : V ↦ w.adicCompletionIntegers F) v.val x.val u
+    by_cases hu : u = v.val
+    · subst u
+      rw [hf v, RestrictedProduct.mulSingle_eq_same]
+      change ((Pi.mulSingle (M := fun t : T ↦ (t.val.adicCompletion F)ˣ) v x v :
+        (v.val.adicCompletion F)ˣ) : v.val.adicCompletion F) = _
+      rw [Pi.mulSingle_eq_same]
+    · rw [RestrictedProduct.mulSingle_eq_of_ne _ _ hu]
+      by_cases hm : u ∈ T
+      · rw [hf ⟨u, hm⟩]
+        change ((Pi.mulSingle (M := fun t : T ↦ (t.val.adicCompletion F)ˣ) v x ⟨u, hm⟩ :
+          (u.adicCompletion F)ˣ) : u.adicCompletion F) = 1
+        rw [Pi.mulSingle_eq_of_ne (fun e ↦ hu (congrArg Subtype.val e)), Units.val_one]
+      · exact ho u hm
+
+/-- Adapted from `globalPrincipalValueConverse_mellin_factor` in §6.3.
+The finite Euler factors in the local and global conventions agree. -/
+private theorem archNuclearityQuotient_jetEquiv_separating_factor
+    (χ' : U) (v : V) (s : ℂ) :
+    finiteLocalEulerFactor v (finitePlaceRestriction F v (ideleClassNormTwist χ' s)) =
+      finiteHeckeEulerFactor χ' v s := by
+  classical
+  let c := finitePlaceRestriction F v (ideleClassNormTwist χ' s)
+  let c₀ := finitePlaceRestriction F v (ideleClassNormTwist χ' 0)
+  have htwist (x : (v.adicCompletion F)ˣ) :
+      c x = c₀ x * (‖x.val‖ : ℂ) ^ s := by
+    let g := IdeleClassGroup.ofAdicCompletion (𝓞 F) F v x
+    change (χ' g : ℂ) * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ s =
+      (χ' g : ℂ) * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ (0 : ℂ) * _
+    rw [Complex.cpow_zero, mul_one, ideleClassNorm_ofAdicCompletion]
+    rfl
+  have hrestrict (x : (v.adicCompletion F)ˣ) :
+      (ideleClassNormTwist χ' 0).restrict v x.val = c₀ x := by
+    rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    rfl
+  have hunram : (∀ u : (v.adicCompletionIntegers F)ˣ,
+      c (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) = 1) ↔
+        (ideleClassNormTwist χ' 0).IsUnramifiedAt v := by
+    rw [HeckeCharacter.isUnramifiedAt_iff]
+    refine forall_congr' fun u ↦ ?_
+    let x := Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u
+    change c x = 1 ↔ (ideleClassNormTwist χ' 0).restrict v x.val = 1
+    have hn : ‖x.val‖ = 1 :=
+      Valued.toNormedField.norm_eq_one_iff.mpr
+        ((HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one (a := x)).mp
+          ⟨u.val.property, u.inv.property⟩)
+    rw [htwist, hn, Complex.ofReal_one, Complex.one_cpow, mul_one, hrestrict]
+  change finiteLocalEulerFactor v c = finiteHeckeEulerFactor χ' v s
+  by_cases hv : (ideleClassNormTwist χ' 0).IsUnramifiedAt v
+  · rw [finiteLocalEulerFactor, ite_eq_left (hunram.mpr hv), finiteHeckeEulerFactor, ite_eq_left hv]
+    let val : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+    let hπ := val.exists_isUniformizer_of_isCyclic_of_nontrivial.choose_spec
+    let π := Units.mk0 _ hπ.ne_zero
+    change (1 - c π)⁻¹ = _
+    have hn := norm_uniformizer_adicCompletion v π.val hπ
+    rw [htwist, hv.localValue_eq π.val hπ, hrestrict, hn,
+      Complex.ofReal_inv, Complex.inv_cpow_ofReal_nonneg (Nat.cast_nonneg _) s,
+      Complex.cpow_neg, Complex.ofReal_natCast]
+  · rw [finiteLocalEulerFactor, ite_eq_right (mt hunram.mp hv), finiteHeckeEulerFactor,
+      ite_eq_right hv]
+
+/-- Adapted from `globalPrincipalValueConverse_mellin_localFactor` in §6.3.
+Restriction to the local stage preserves each selected Euler factor. -/
+private theorem archNuclearityQuotient_jetEquiv_separating_localFactor {T : Finset V} (χ : U)
+    (hc : ideleClassNormTwist χ 0 ∈ unramifiedOutside F T) (η : PontryaginDual (SIdeleQuotient F T))
+    (hχ : sIdeleRestriction F T ⟨ideleClassNormTwist χ 0, hc⟩ =
+      (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η) (v : T) (s : ℂ) :
+    let chart := quasiCharacterNormTwist (sIdeleQuotientNorm F T)
+      (isProperMap_sIdeleQuotientNorm F T).continuous
+      ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η)
+    finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (chart s)) = finiteHeckeEulerFactor χ v.val s := by
+  intro chart
+  have htwist (g : (SAdeleRing F T)ˣ) :
+      chart s (QuotientGroup.mk g) =
+        ideleClassNormTwist χ s (QuotientGroup.mk (sIdeleInsertion F T g)) := by
+    have hbase := DFunLike.congr_fun hχ (QuotientGroup.mk g)
+    rw [sIdeleRestriction_mk] at hbase
+    change (χ (QuotientGroup.mk (sIdeleInsertion F T g)) : ℂ) * _ ^ (0 : ℂ) =
+      (η (QuotientGroup.mk g) : ℂ) at hbase
+    simp only [Complex.cpow_zero, mul_one] at hbase
+    change (η (QuotientGroup.mk g) : ℂ) *
+        ((((sIdeleQuotientNorm F T) (QuotientGroup.mk g) : ℝ≥0) : ℝ) : ℂ) ^ s =
+      (χ (QuotientGroup.mk (sIdeleInsertion F T g)) : ℂ) * _ ^ s
+    rw [← hbase, sIdeleQuotientNorm_mk, ← ideleNorm_sIdeleInsertion]
+    rfl
+  have hfinite (v : T) : sLocalFiniteRestriction v (chart s) =
+      finitePlaceRestriction F v.val (ideleClassNormTwist χ s) := by
+    ext1 x
+    change chart s (QuotientGroup.mk ((ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F)
+        ((w : T) → w.val.adicCompletion F)).symm
+      (1, ContinuousMulEquiv.piUnits.symm (@Pi.mulSingle _ _ _ (Classical.decEq _) v x)))) =
+      ideleClassNormTwist χ s (QuotientGroup.mk (IdeleGroup.ofAdicCompletion (𝓞 F) F v.val x))
+    rw [htwist, archNuclearityQuotient_jetEquiv_separating_insertion]
+  rw [hfinite, archNuclearityQuotient_jetEquiv_separating_factor]
+
+/-- Removing the finite Euler factors at the stage gives the local principal-value chart.
+Multiplying it by the finite Hecke continuation and the outside unit masses recovers
+the global transform of every inserted test. -/
+private theorem archNuclearityQuotient_jetEquiv_separating_stage (χ : U) (S : Finset V)
+    (hS : ideleClassNormTwist χ 0 ∈ unramifiedOutside F S) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (hseries : ∀ s : {s : ℂ // 1 < s.re}, L s = finiteHeckeL χ s) :
+    ∃ (η : PontryaginDual (SIdeleQuotient F S)) (c : ℂ), c ≠ 0 ∧
+      sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hS⟩ =
+        (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η ∧
+      ∀ f : ℬ(SAdeleRing F S),
+        (fun z ↦ globalIdelicZFunction (sAdeleSchwartzToGlobal F S f) (ideleClassNormTwist χ z))
+          =ᶠ[Filter.codiscrete ℂ] fun z ↦ c * sLocalIdelicZFunction
+            (sAdelePrincipalValue F (Finset.Subset.refl S) f)
+            (quasiCharacterNormTwist (sIdeleQuotientNorm F S)
+              (isProperMap_sIdeleQuotientNorm F S).continuous
+              ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η) z) * L z := by
+  classical
+  -- Restrict the unitary character as in §6.3, heckeEulerProductOutside_eq_finite_unitary.
+  let unitary := sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hS⟩
+  have hunitary (x : SIdeleQuotient F S) : ‖unitary x‖ = 1 := by
+    obtain ⟨g, rfl⟩ := QuotientGroup.mk_surjective x
+    rw [show unitary (QuotientGroup.mk g) = ideleClassNormTwist χ 0
+      (QuotientGroup.mk (sIdeleInsertion F S g)) from sIdeleRestriction_mk F S _ g]
+    change ‖(χ _ : ℂ) * _ ^ (0 : ℂ)‖ = 1
+    simp
+  let η : PontryaginDual (SIdeleQuotient F S) :=
+    { toFun := fun x ↦ ⟨unitary x, mem_sphere_zero_iff_norm.mpr (hunitary x)⟩
+      map_one' := Subtype.ext (map_one unitary)
+      map_mul' x y := Subtype.ext (map_mul unitary x y)
+      continuous_toFun := unitary.continuous.subtype_mk _ }
+  have hb : sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hS⟩ =
+      (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η := rfl
+  let c := ∏ᶠ v : {v : V // v ∉ S}, (((finiteLocalMultiplicativeTamagawaMeasure F v.val)
+    (v.val.adicCompletionIntegers F).units).toReal : ℂ)
+  have hc : c ≠ 0 := by
+    apply finprod_ne_zero
+    intro v
+    rw [finiteLocalMultiplicativeTamagawaMeasure_integerUnits, ENNReal.toReal_inv,
+      ENNReal.toReal_ofReal (Real.sqrt_nonneg _)]
+    exact Complex.ofReal_ne_zero.mpr (inv_ne_zero (Real.sqrt_ne_zero'.mpr
+      (pow_pos (Nat.cast_pos.mpr (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v.val))) _)))
+  refine ⟨η, c, hc, hb, fun f ↦ ?_⟩
+  have hw := weilIdentity_unramifiedOutside_meromorphic S f χ hS L hL fun s hs ↦ hseries ⟨s, hs⟩
+  dsimp only at hw
+  rw [hb] at hw
+  filter_upwards [hw, sLocalIdelicZFunction_principalValue S (Finset.Subset.refl S) f η] with z hz hp
+  dsimp only at hp
+  rw [hp, hz]
+  simp_rw [archNuclearityQuotient_jetEquiv_separating_localFactor χ hS η hb,
+    fun v : S ↦ ite_eq_left_iff.mpr (fun h ↦ (h v.property).elim :
+      ¬v.val ∈ S → (1 : ℂ) = finiteHeckeEulerFactor χ v.val z)]
+  rw [Finset.prod_coe_sort S (fun v ↦ finiteHeckeEulerFactor χ v z),
+    div_eq_mul_inv, ← Finset.prod_inv_distrib]
+  simp only [mul_assoc, c]
+
+/-- At the exceptional point the simple pole of the completed function accounts
+for the one jet omitted from the archimedean multiplicity. -/
+private theorem archNuclearityQuotient_jetEquiv_separating_pole (χ : U)
+    (τ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 F) F) (hτ : RightInverse τ (ideleNorm F)) (hω : ω(χ) = 1) :
+    meromorphicOrderAt (continuedCompletedHeckeL χ) atZeroPole(χ, τ, hτ) = -1 := by
+  have htriv : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1 := by
+    ext g
+    exact congrArg Subtype.val (DFunLike.congr_fun hω g)
+  obtain ⟨t, ⟨hc, hzero, -, -⟩, -⟩ := completedHeckeL_continuation_simplePoles χ _
+    (continuedCompletedHeckeL_spec χ).1 (continuedCompletedHeckeL_spec χ).2 htriv
+  have hphase := existsUnique_ideleNormSection_character_phase χ τ hτ
+  have hx : -t = hphase.exists.choose := by
+    apply hphase.unique _ hphase.exists.choose_spec
+    intro u
+    have he := DFunLike.congr_fun hc (QuotientGroup.mk (τ u))
+    change (χ (QuotientGroup.mk (τ u)) : ℂ) * _ ^ (0 : ℂ) =
+      1 * ((((ideleNorm F (τ u)).val : ℝ) : ℂ) ^ (-Complex.I * (t : ℂ))) at he
+    rw [Complex.cpow_zero, mul_one, one_mul, hτ u] at he
+    simpa only [Complex.ofReal_neg, neg_mul, mul_comm (t : ℂ) Complex.I] using he
+  change meromorphicOrderAt _ (-(hphase.exists.choose : ℂ) * Complex.I) = _
+  rwa [← hx, Complex.ofReal_neg, neg_neg, mul_comm (t : ℂ) Complex.I]
+
+/-- An entire global transform with the adjusted vanishing orders has a holomorphic
+finite-principal-value chart. On the left half-plane the completed function has no zeros,
+and its simple pole on a norm-twist component lowers the required order by one. -/
+private theorem archNuclearityQuotient_jetEquiv_separating_analytic (χ : U)
+    (τ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 F) F) (hτ : RightInverse τ (ideleNorm F))
+    (u Φ : ℂ → ℂ) (hu : MeromorphicNFOn u univ) (hΦ : Differentiable ℂ Φ)
+    (hpos : ∀ z : ℂ, 0 < z.re → 0 ≤ meromorphicOrderAt u z)
+    (hjets : ∀ z, (archNuclearityMultiplicity χ τ hτ z : ℕ∞) ≤ analyticOrderAt Φ z)
+    (c : ℂ) (hc : c ≠ 0)
+    (he : Φ =ᶠ[Filter.codiscrete ℂ] fun z ↦
+      c * u z * ((heckeGammaFactor χ z)⁻¹ * continuedCompletedHeckeL χ z)) :
+    AnalyticOnNhd ℂ u univ := by
+  intro z hz
+  apply (hu hz).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+  by_cases hp : 0 < z.re
+  · exact hpos z hp
+  let R := fun s ↦ (heckeGammaFactor χ s)⁻¹
+  let L := continuedCompletedHeckeL χ
+  have hR := (differentiable_inv_heckeGammaFactor χ).analyticAt z
+  have hL := (continuedCompletedHeckeL_spec χ).1 hz
+  have ho := meromorphicOrderAt_congr (he.filter_mono (nhdsNE_le_codiscrete z))
+  change meromorphicOrderAt Φ z = meromorphicOrderAt (((fun _ ↦ c) * u) * (R * L)) z at ho
+  rw [meromorphicOrderAt_mul (analyticAt_const.meromorphicAt.mul (hu hz).meromorphicAt)
+    (hR.meromorphicAt.mul hL.meromorphicAt), meromorphicOrderAt_mul_of_ne_zero analyticAt_const hc,
+    meromorphicOrderAt_mul hR.meromorphicAt hL.meromorphicAt, hR.meromorphicOrderAt_eq,
+    (hΦ.analyticAt z).meromorphicOrderAt_eq] at ho
+  have hn := hjets z
+  have hleft := archJet_completed_order_nonpos χ (le_of_not_gt hp)
+  change meromorphicOrderAt L z ≤ 0 at hleft
+  cases hU : meromorphicOrderAt u z with
+  | top => exact le_top
+  | coe k =>
+    rw [hU] at ho
+    obtain ⟨l, hl⟩ := WithTop.ne_top_iff_exists.mp (ne_top_of_le_ne_top (by simp) hleft)
+    rw [← hl] at ho hleft
+    have hl' : l ≤ 0 := by exact_mod_cast hleft
+    have hRfin : analyticOrderAt R z ≠ ⊤ := by
+      have ha : AnalyticOnNhd ℂ R univ := fun s _ ↦ (differentiable_inv_heckeGammaFactor χ).analyticAt s
+      exact fun h ↦ inv_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ (by norm_num : 0 < (1 : ℂ).re))
+        (ha.eqOn_zero_of_preconnected_of_eventuallyEq_zero isPreconnected_univ hz
+          (analyticOrderAt_eq_top.mp h) (mem_univ 1))
+    obtain ⟨r, hr⟩ := ENat.ne_top_iff_exists.mp hRfin
+    change (r : ℕ∞) = analyticOrderAt (fun s ↦ (heckeGammaFactor χ s)⁻¹) z at hr
+    rw [← hr] at ho
+    simp only [archNuclearityMultiplicity, ← hr, ENat.toNat_natCast] at hn
+    cases hφ : analyticOrderAt Φ z with
+    | top =>
+      rw [hφ] at ho
+      exact ((WithTop.coe_ne_top (a := k + ((r : ℤ) + l))) ho.symm).elim
+    | coe n =>
+      rw [hφ] at ho hn
+      have heq : (n : ℤ) = k + (r + l) := WithTop.coe_inj.mp ho
+      by_cases h : ω(χ) = 1 ∧ z = atZeroPole(χ, τ, hτ)
+      · have hLpole := archNuclearityQuotient_jetEquiv_separating_pole χ τ hτ h.1
+        rw [← h.2] at hLpole
+        change meromorphicOrderAt L z = -1 at hLpole
+        have hlone : l = -1 := WithTop.coe_inj.mp (hl.trans hLpole)
+        have hnr : r - 1 ≤ n := by
+          rw [ite_eq_left h] at hn
+          exact_mod_cast hn
+        exact WithTop.coe_le_coe.mpr (by omega)
+      · have hnr : r ≤ n := by
+          rw [ite_eq_right h, Nat.sub_zero] at hn
+          exact_mod_cast hn
+        exact WithTop.coe_le_coe.mpr (by omega)
+
+/-- Inserting a pure local tensor preserves its archimedean factor. A nonzero
+value of that factor extracts the inserted finite test by taking an adelic slice. -/
+private theorem archNuclearityQuotient_jetEquiv_separating_insert (S : Finset V)
+    (a : ℬ(InfiniteAdeleRing F)) (b : ∀ v : S, ℬ(v.val.adicCompletion F))
+    (ha : a ∈ archNuclearity_flatFactors) :
+    sAdeleSchwartzToGlobal F S ((sAdeleSchwartz_inductiveTensor_equiv F S).choose
+      (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, b v))) ∈ globalArchimedeanFlatTests F := by
+  classical
+  let ins := sAdeleSchwartzToGlobal F S ((sAdeleSchwartz_inductiveTensor_equiv F S).choose
+    (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, b v)))
+  let k (y : FiniteAdeleRing (𝓞 F) F) := if ∀ v ∉ S, y v ∈ v.adicCompletionIntegers F
+    then ∏ v : S, b v (Multiplicative.ofAdd (y v.val)) else 0
+  have hv (x : 𝔸[F]) : ins (Multiplicative.ofAdd x) = a (Multiplicative.ofAdd x.1) * k x.2 := by
+    dsimp only [ins]
+    rw [sAdeleSchwartzToGlobal_apply, (sAdeleSchwartz_inductiveTensor_equiv F S).choose_spec]
+    dsimp only [k]
+    split_ifs
+    · rfl
+    · exact (mul_zero _).symm
+  change ins ∈ _
+  by_cases haz : a = 0
+  · have hzero : ins = 0 := Subtype.ext (funext fun x ↦ (hv x.toAdd).trans (by
+        rw [haz]
+        exact zero_mul _))
+    rw [hzero]
+    exact Submodule.zero_mem _
+  obtain ⟨p, hp⟩ : ∃ p : InfiniteAdeleRing F, a (Multiplicative.ofAdd p) ≠ 0 := by
+    by_contra! h
+    exact haz (Subtype.ext (funext fun x ↦ h x.toAdd))
+  let e := (adeleSchwartz_inductiveTensor_equiv F).choose
+  have slice (w : InductiveTensor ℬ(InfiniteAdeleRing F) ℬ(FiniteAdeleRing (𝓞 F) F)) :
+      ∃ d : ℬ(FiniteAdeleRing (𝓞 F) F), ∀ y, d (Multiplicative.ofAdd y) =
+        e w (Multiplicative.ofAdd (p, y)) := by
+    induction w using TensorProduct.inductionOn with
+    | tmul v d => exact ⟨v (Multiplicative.ofAdd p) • d,
+        fun y ↦ ((adeleSchwartz_inductiveTensor_equiv F).choose_spec v d (p, y)).symm⟩
+    | add w t hw ht =>
+      obtain ⟨d, hd⟩ := hw
+      obtain ⟨b, hb⟩ := ht
+      exact ⟨d + b, fun y ↦ (congrArg₂ (· + ·) (hd y) (hb y)).trans
+        (congrArg (fun q : ℬ(𝔸[F]) ↦ q (Multiplicative.ofAdd (p, y))) (e.map_add w t).symm)⟩
+  obtain ⟨d, hd⟩ := slice (e.symm ins)
+  rw [e.apply_symm_apply] at hd
+  obtain ⟨f₀, hf₀⟩ := ha
+  refine Submodule.subset_span ⟨a, (a (Multiplicative.ofAdd p))⁻¹ • d, f₀, hf₀, False.elim, ?_⟩
+  apply Subtype.ext
+  funext x
+  refine ((adeleSchwartz_inductiveTensor_equiv F).choose_spec a _ x.toAdd).trans ?_
+  change a (Multiplicative.ofAdd x.toAdd.1) *
+    ((a (Multiplicative.ofAdd p))⁻¹ * d (Multiplicative.ofAdd x.toAdd.2)) = _
+  change _ = ins (Multiplicative.ofAdd x.toAdd)
+  rw [hd x.toAdd.2, hv (p, x.toAdd.2), hv x.toAdd]
+  exact congrArg (a (Multiplicative.ofAdd x.toAdd.1) * ·) (inv_mul_cancel_left₀ hp _)
+
+/-- Undoing the finite principal values on a polar-free local test leaves its
+archimedean factors flat. The resulting test still has flat archimedean factors
+after extension by the integer indicators outside the stage. -/
+private theorem archNuclearityQuotient_jetEquiv_separating_lift (S : Finset V)
+    (η : PontryaginDual (SIdeleQuotient F S)) (u : ℬ(SAdeleRing F S)) :
+    let chart := quasiCharacterNormTwist (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous
+      ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η)
+    AnalyticOnNhd ℂ (fun z ↦ sLocalIdelicZFunction u (chart z)) univ →
+      ∃ h : ℬ(SAdeleRing F S), (∀ z, sLocalIdelicZFunction u (chart z) =
+        sLocalIdelicZFunction (sAdelePrincipalValue F (Finset.Subset.refl S) h) (chart z)) ∧
+        sAdeleSchwartzToGlobal F S h ∈ globalArchimedeanFlatTests F := by
+  classical
+  intro chart hu
+  let r (w : RealPlaces) : {e : w.val.Completion ≃+* ℝ // IsHomeomorph (e : w.val.Completion → ℝ)} :=
+    ⟨InfinitePlace.Completion.ringEquivRealOfIsReal w.2,
+      (InfinitePlace.Completion.isometryEquivRealOfIsReal w.2).toHomeomorph.isHomeomorph⟩
+  let c (w : ComplexPlaces) : {e : w.val.Completion ≃+* ℂ // IsHomeomorph (e : w.val.Completion → ℂ)} :=
+    ⟨InfinitePlace.Completion.ringEquivComplexOfIsComplex w.2,
+      (InfinitePlace.Completion.isometryEquivComplexOfIsComplex w.2).toHomeomorph.isHomeomorph⟩
+  obtain ⟨g, hg⟩ := (sLocalIdelicZFunction_entire_iff_eq_polarFree r c η u).mp hu
+  let pv := sAdelePrincipalValue F (Finset.Subset.refl S)
+  let A := (globalArchimedeanFlatTests F).comap (sAdeleSchwartzToGlobal F S)
+  suffices incl : sAdelePolarFree S r c ≤ A.map pv by
+    obtain ⟨h, hh, he⟩ := incl g.property
+    exact ⟨h, fun z ↦ (hg z).trans (congrArg (fun q ↦ sLocalIdelicZFunction q (chart z)) he.symm), hh⟩
+  rw [sAdelePolarFree_eq_span_tmul]
+  apply Submodule.span_le.mpr
+  rintro _ ⟨a, b, ⟨f₀, h₀⟩, hb, rfl⟩
+  have ha : a ∈ archNuclearity_flatFactors := by
+    refine ⟨f₀, fun x ↦ ?_⟩
+    let y := InfiniteAdeleRing.ringEquiv_mixedSpace F x
+    have he := h₀ y
+    refine Eq.trans ?_ he.symm
+    apply congrArg (fun t : InfiniteAdeleRing F ↦ a (Multiplicative.ofAdd t))
+    funext w
+    split_ifs with hw
+    · exact ((r ⟨w, hw⟩).val.symm_apply_apply (x w)).symm
+    · exact ((c ⟨w, InfinitePlace.not_isReal_iff_isComplex.mp hw⟩).val.symm_apply_apply (x w)).symm
+  choose t ht using fun v ↦ (Set.ext_iff.mp (finitePlacePrincipalValue_range v.val) (b v)).mpr (hb v)
+  let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+  refine ⟨e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, t v)), archNuclearityQuotient_jetEquiv_separating_insert S a t ha, ?_⟩
+  refine (sAdelePrincipalValue_tmul (Finset.Subset.refl S) a t).trans ?_
+  apply congrArg (fun q : ∀ v : S, ℬ(v.val.adicCompletion F) ↦ e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, q v)))
+  funext v
+  exact (ite_eq_left v.property).trans (ht v)
+
+/-- Unit translates preserve the span of global tensors with flat archimedean factor. -/
+private theorem archNuclearityQuotient_jetEquiv_separating_translate
+    (w : IdeleGroup (𝓞 F) F) (g : ℬ(𝔸[F])) (hg : g ∈ globalArchimedeanFlatTests F) :
+    schwartzBruhatUnitTranslate w g ∈ globalArchimedeanFlatTests F := by
+  obtain ⟨u, v, rfl⟩ := archNuclearity_unit_arch_finite w
+  refine (show globalArchimedeanFlatTests F ≤ (globalArchimedeanFlatTests F).comap
+    (archNuclearity_translateLinear (archNuclearity_archUnit u * archNuclearity_finiteUnit v)) from ?_) hg
+  apply Submodule.span_le.mpr
+  rintro _ ⟨a, b, f₀, ha, -, rfl⟩
+  change schwartzBruhatUnitTranslate (archNuclearity_archUnit u * archNuclearity_finiteUnit v)
+    ((adeleSchwartz_inductiveTensor_equiv F).choose (a ⊗ₜ[ℂ] b)) ∈ globalArchimedeanFlatTests F
+  rw [archNuclearity_translate_pure]
+  obtain ⟨f₁, h₁⟩ := archNuclearity_flatFactors_translate u a ⟨f₀, ha⟩
+  exact Submodule.subset_span ⟨_, _, f₁, h₁, False.elim, rfl⟩
+
+/-- Every character with the prescribed norm-one restriction belongs to the given norm chart.
+The two characters agree on the kernel, and their quotient on the section is a complex power.
+Adapted from the component calculation in §7.2, `sLocalPrincipalValue_chart`. -/
+private theorem archNuclearityQuotient_jetEquiv_separating_chart (χ : U)
+    (τ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 F) F) (hτ : RightInverse τ (ideleNorm F))
+    (c : QuasiCharacter C𝔽) (hc : ∀ k : (ideleClassNorm F).ker, c k.val = (ω(χ) k : ℂ)) :
+    ∃ z : ℂ, ideleClassNormTwist χ z = c := by
+  let q : IdeleGroup (𝓞 F) F →ₜ* C𝔽 := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
+  let σ := q.comp τ
+  have hσ : RightInverse σ (ideleClassNorm F) := hτ
+  let d := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ
+  obtain ⟨z, hz, -⟩ := existsUnique_complexPower (c.comp σ)
+  obtain ⟨w, hw, -⟩ := existsUnique_complexPower (d.comp σ)
+  refine ⟨z - w, ContinuousMonoidHom.ext fun g ↦ ?_⟩
+  let t := ideleClassNorm F g
+  let k : (ideleClassNorm F).ker := ⟨g / σ t, by
+    change ideleClassNorm F (g / σ t) = 1
+    rw [map_div, hσ]
+    exact div_self' _⟩
+  have hg : k.val * σ t = g := div_mul_cancel _ _
+  let N : ℂ := ((t.val : ℝ) : ℂ)
+  have hN : N ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr t.ne_zero)
+  have hval : d (σ t) * N ^ (z - w) = c (σ t) := by
+    rw [show d (σ t) = N ^ w from hw t, show c (σ t) = N ^ z from hz t,
+      ← Complex.cpow_add _ _ hN, show w + (z - w) = z by ring]
+  change d g * N ^ (z - w) = c g
+  calc
+    d g * N ^ (z - w) = d k.val * (d (σ t) * N ^ (z - w)) := by rw [← mul_assoc, ← map_mul, hg]
+    _ = c g := by rw [hval, ← (show c k.val = d k.val from hc k), ← map_mul, hg]
+
+/-- A flat test with the same Mellin chart as a polar test can be chosen polar.
+On the trivial isotype their signed polar values agree. On any other isotype
+a normalized difference of norm-one translates kills both polar values. -/
+private theorem archNuclearityQuotient_jetEquiv_separating_polar (χ : U)
+    (τ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 F) F) (hτ : RightInverse τ (ideleNorm F))
+    (f : P) (g : ℬ(𝔸[F])) (hg : g ∈ globalArchimedeanFlatTests F)
+    (he : ∀ z, globalIdelicZFunction g (ideleClassNormTwist χ z) =
+      globalIdelicZFunction f.val (ideleClassNormTwist χ z)) :
+    mkΘ(χ, f) ∈ archNuclearityDenominator χ := by
+  apply (mem_archNuclearityDenominator_iff_flatPolarImage χ _).mpr
+  have hcomp (c : QuasiCharacter C𝔽) (hc : ∀ k : (ideleClassNorm F).ker, c k.val = (ω(χ) k : ℂ)) :
+      globalIdelicZFunction g c = globalIdelicZFunction f.val c := by
+    obtain ⟨z, rfl⟩ := archNuclearityQuotient_jetEquiv_separating_chart χ τ hτ c hc
+    exact he z
+  let M := globalIdelicMellin (F := F)
+  have mk (b : P) (hb : ∀ (c : {c : QuasiCharacter C𝔽 // 0 ≤ globalIdelicOrderBound c}),
+      (∀ k : (ideleClassNorm F).ker, c.val k.val = (ω(χ) k : ℂ)) →
+      (M b.val).val c = (M g).val c) : mkΘ(χ, f) = mkΘ(χ, b) := by
+    apply (Submodule.Quotient.eq (Π(χ))).mpr
+    change f.val - b.val ∈ (homogeneousAdelicThetaLinearMap F (ω(χ))).ker
+    apply (mem_homogeneousAdelicTheta_ker_iff (ω(χ)) _).mpr
+    intro c hc
+    rw [map_sub]
+    change (M f.val).val c - (M b.val).val c = 0
+    exact sub_eq_zero.mpr ((hcomp c.val hc).symm.trans (hb c hc).symm)
+  by_cases hω : ω(χ) = 1
+  · have htriv (s : ℂ) : globalIdelicZFunction g (ideleClassNormTwist (1 : U) s) =
+        globalIdelicZFunction f.val (ideleClassNormTwist (1 : U) s) :=
+      hcomp _ fun k ↦ (normOneRestriction_unitaryChart (ideleClassNorm F)
+        (isProperMap_ideleClassNorm F).continuous (1 : U) s k).trans (by rw [hω]; rfl)
+    have hzero := tendsto_nhds_unique ((globalIdelicZFunction_residue_zero g).congr
+      (fun s ↦ congrArg (s * ·) (htriv s))) (globalIdelicZFunction_residue_zero f.val)
+    have hone := tendsto_nhds_unique ((globalIdelicZFunction_residue_one g).congr
+      (fun s ↦ congrArg ((s - 1) * ·) (htriv s))) (globalIdelicZFunction_residue_one f.val)
+    have hmass : ((normOneIdeleClassTamagawaMeasure F univ).toReal : ℂ) ≠ 0 := by
+      let : CompactSpace (ideleClassNorm F).ker := (ideleClassGroup_finiteness F).2.1
+      let : (normOneIdeleClassTamagawaMeasure F).IsHaarMeasure :=
+        (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+      exact Complex.ofReal_ne_zero.mpr (ENNReal.toReal_ne_zero.mpr
+        ⟨(Measure.measure_univ_pos.mpr (NeZero.ne _)).ne', isCompact_univ.measure_ne_top⟩)
+    obtain ⟨h₀, h₁⟩ := (mem_adelePolarSubspace _).mp f.property
+    have hpol : g ∈ P := (mem_adelePolarSubspace g).mpr
+      ⟨(mul_left_cancel₀ (neg_ne_zero.mpr hmass) hzero).trans h₀,
+       (mul_left_cancel₀ hmass hone).trans h₁⟩
+    exact ⟨⟨g, hpol⟩, hg, mk _ fun _ _ ↦ rfl⟩
+  · obtain ⟨h, hh⟩ : ∃ h : (ideleClassNorm F).ker, (ω(χ) h : ℂ) ≠ 1 :=
+      not_forall.mp fun hall ↦ hω (PontryaginDual.ext fun u ↦ Subtype.ext (hall u))
+    obtain ⟨w, hw⟩ := QuotientGroup.mk_surjective h.val
+    have hw1 : ideleNorm F w = 1 := by
+      change ideleClassNorm F (QuotientGroup.mk w) = 1
+      rw [hw, MonoidHom.mem_ker.mp h.property]
+    let c := (ω(χ) h : ℂ) - 1
+    let b := c⁻¹ • (schwartzBruhatUnitTranslate w g - g)
+    have hb : b ∈ P := by
+      have hp : adelePolarValues (schwartzBruhatUnitTranslate w g) = adelePolarValues g := by
+        apply Prod.ext
+        · change g (Multiplicative.ofAdd (w.inv * 0)) = g (Multiplicative.ofAdd 0)
+          rw [mul_zero]
+        · have hd := archNuclearity_hatC_translate w g
+          change (adelePolarValues (schwartzBruhatUnitTranslate w g)).2 =
+            ((((ideleNorm F w).val : ℝ) : ℂ) * (adelePolarValues g).2) at hd
+          simpa only [hw1, Units.val_one, NNReal.coe_one, Complex.ofReal_one, one_mul] using hd
+      change (adelePolarValues (F := F)) (c⁻¹ • (schwartzBruhatUnitTranslate w g - g)) = 0
+      rw [map_smul, map_sub]
+      change c⁻¹ • (adelePolarValues (schwartzBruhatUnitTranslate w g) - adelePolarValues g) = 0
+      rw [hp, sub_self, smul_zero]
+    refine ⟨⟨b, hb⟩, (globalArchimedeanFlatTests F).smul_mem _
+      ((globalArchimedeanFlatTests F).sub_mem
+        (archNuclearityQuotient_jetEquiv_separating_translate w g hg) hg), mk _ ?_⟩
+    intro z hz
+    change (M (c⁻¹ • (schwartzBruhatUnitTranslate w g - g))).val z = _
+    rw [map_smul, map_sub]
+    change c⁻¹ * ((M (schwartzBruhatUnitTranslate w g)).val z - (M g).val z) = (M g).val z
+    rw [show (M (schwartzBruhatUnitTranslate w g)).val z = _ from globalIdelicMellin_unitTranslate w g z,
+      hw, hz h, show (ω(χ) h : ℂ) * (M g).val z - (M g).val z = c * (M g).val z by
+        rw [show c = _ from rfl, sub_mul, one_mul]]
+    exact inv_mul_cancel_left₀ (sub_ne_zero.mpr hh) _
+
+/-- On a finite stage containing the ramification, vanishing of the adjusted global
+jets removes every pole of the local principal-value chart. Replace that chart by
+a polar-free local test, then undo the finite principal values before insertion. -/
+private theorem archNuclearityQuotient_jetEquiv_separating_at_stage (χ : U)
+    (τ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 F) F) (hτ : RightInverse τ (ideleNorm F))
+    (S : Finset V) (hS : ideleClassNormTwist χ 0 ∈ unramifiedOutside F S)
+    (a : ℬ(SAdeleRing F S)) (f : P) (hf : sAdeleSchwartzToGlobal F S a = f.val)
+    (hjets : ∀ z, (archNuclearityMultiplicity χ τ hτ z : ℕ∞) ≤
+      analyticOrderAt (fun s ↦ globalIdelicZFunction f.val (ideleClassNormTwist χ s)) z) :
+    mkΘ(χ, f) ∈ archNuclearityDenominator χ := by
+  let R (s : ℂ) := (heckeGammaFactor χ s)⁻¹
+  let Λ := continuedCompletedHeckeL χ
+  let L := toMeromorphicNFOn (R * Λ) univ
+  have hΛ := (continuedCompletedHeckeL_spec χ).1
+  have hR := differentiable_inv_heckeGammaFactor χ
+  have hm : MeromorphicOn (R * Λ) univ := fun s hs ↦
+    ((hR.analyticAt s).meromorphicAt.mul (hΛ hs).meromorphicAt)
+  have hseries (s : {s : ℂ // 1 < s.re}) : L s = finiteHeckeL χ s := by
+    have hn := heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans s.property)
+    have hnf : MeromorphicNFAt (R * Λ) s :=
+      (meromorphicNFAt_mul_iff_right (hR.analyticAt _) (inv_ne_zero hn)).mpr (hΛ (mem_univ _))
+    rw [show L s = _ from toMeromorphicNFOn_eq_toMeromorphicNFAt hm (mem_univ s.val),
+      toMeromorphicNFAt_eq_self.mpr hnf]
+    change (heckeGammaFactor χ s)⁻¹ * continuedCompletedHeckeL χ s = _
+    rw [(continuedCompletedHeckeL_spec χ).2 s]
+    exact inv_mul_cancel_left₀ hn _
+  obtain ⟨η, c, hc, hη, hstage⟩ := archNuclearityQuotient_jetEquiv_separating_stage χ S
+    hS L (meromorphicNFOn_toMeromorphicNFOn _ _) hseries
+  let chart := quasiCharacterNormTwist (sIdeleQuotientNorm F S)
+    (isProperMap_sIdeleQuotientNorm F S).continuous
+    ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η)
+  let pv := sAdelePrincipalValue F (Finset.Subset.refl S)
+  let u (z : ℂ) := sLocalIdelicZFunction (pv a) (chart z)
+  have hu : MeromorphicNFOn u univ := sLocalIdelicZFunction_meromorphic (pv a) η
+  have hpos (z : ℂ) (hz : 0 < z.re) : 0 ≤ meromorphicOrderAt u z := by
+    have hbound := sLocalIdelicZFunction_principalValue_pole_bound a η z
+    rw [← archNuclearityGammaOrder_eq_sLocal χ S η hS hη z,
+      ((hR.analyticAt z).analyticOrderAt_eq_zero.mpr
+        (inv_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ hz)))] at hbound
+    simpa only [ENat.toNat_zero, Nat.cast_zero, neg_zero, WithTop.coe_zero] using hbound
+  have hfac := hstage a
+  rw [hf] at hfac
+  have hd := globalIdelicZFunction_entire_of_vanishing f.val f.property χ
+  have han : AnalyticOnNhd ℂ u univ := by
+    apply archNuclearityQuotient_jetEquiv_separating_analytic χ τ hτ u _ hu hd hpos hjets c hc
+    have hL : R * Λ =ᶠ[Filter.codiscrete ℂ] L := toMeromorphicNFOn_eqOn_codiscrete hm
+    filter_upwards [hfac, hL] with s hs hLs
+    exact hs.trans (congrArg (c * u s * ·) hLs.symm)
+  obtain ⟨b, hb, hflat⟩ := archNuclearityQuotient_jetEquiv_separating_lift S η (pv a) han
+  apply archNuclearityQuotient_jetEquiv_separating_polar χ τ hτ f (sAdeleSchwartzToGlobal F S b) hflat
+  have eqZ : (fun z ↦ globalIdelicZFunction (sAdeleSchwartzToGlobal F S b) (ideleClassNormTwist χ z))
+      =ᶠ[Filter.codiscrete ℂ] fun z ↦ globalIdelicZFunction f.val (ideleClassNormTwist χ z) := by
+    filter_upwards [hstage b, hfac] with z hz hz'
+    change _ = c * sLocalIdelicZFunction (pv b) (chart z) * L z at hz
+    rw [← hb z] at hz
+    exact hz.trans hz'.symm
+  intro z
+  exact (((globalIdelicZFunction_meromorphic _ χ (mem_univ z)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds
+    (globalIdelicZFunction_meromorphic f.val χ (mem_univ z))).mp
+    (eqZ.filter_mono (nhdsNE_le_codiscrete z))).eq_of_nhds
+
 /-- Paper: Equation (7.4.3.13), p. 372.
 The adjusted jets separate the classes of the archimedean orbital quotient: a class
 on which every jet vanishes is the class of a flat test, that is, it lies in the
 denominator. -/
 theorem archNuclearityQuotient_jetEquiv_separating (x : Θ₀(χ))
     (hx : ∀ j, archNuclearityJet χ τ hτ j x = 0) : x ∈ archNuclearityDenominator χ := by
-  sorry
+  classical
+  obtain ⟨f, rfl⟩ := Submodule.Quotient.mk_surjective (Π(χ)) x
+  obtain ⟨A, a, ha⟩ := sAdeleSchwartzToGlobal_exhaustive F f.val
+  obtain ⟨T, hT⟩ : ∃ T : Finset V, ideleClassNormTwist χ 0 ∈ unramifiedOutside F T := by
+    apply Set.mem_iUnion.mp
+    rw [iUnion_unramifiedOutside]
+    trivial
+  let S := A ∪ T
+  have hAS : A ⊆ S := Finset.subset_union_left
+  have hS : ideleClassNormTwist χ 0 ∈ unramifiedOutside F S := fun v hv ↦
+    hT v (fun h ↦ hv (Finset.mem_union_right _ h))
+  apply archNuclearityQuotient_jetEquiv_separating_at_stage χ τ hτ S hS
+    (sAdeleSchwartzTransition F hAS a) f ((LinearMap.congr_fun (sAdeleSchwartzToGlobal_comp F hAS) a).trans ha)
+  intro z
+  apply (natCast_le_analyticOrderAt_iff_iteratedDeriv_eq_zero
+    ((globalIdelicZFunction_entire_of_vanishing f.val f.property χ).analyticAt z)).mpr
+  intro k hk
+  let j : ArchNuclearityJetIndex χ τ hτ := ⟨(z, k), hk⟩
+  exact (archNuclearityJet_apply χ τ hτ j f).2.2.1.symm.trans (hx j)
 
 /-- Entire divisibility is equivalent to the corresponding pointwise inequalities of vanishing orders. -/
 private theorem archNuclearityMellin_range_entire_dvd
