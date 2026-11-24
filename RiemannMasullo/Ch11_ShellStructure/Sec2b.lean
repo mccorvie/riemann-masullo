@@ -7,12 +7,13 @@ import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.AppA_AlgebraicNT.Sec1
 import RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
 import RiemannMasullo.Ch06_LocalGlobal.Sec2
-import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3b
+public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3b_PWLevels
 import all RiemannMasullo.AppC_LCTVS.Sec3a_part2
 import RiemannMasullo.Ch09_HardySobolev.Sec3
 
 import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
 import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
+import RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
 
 /-! # Sobolev Paley–Wiener levels and orbital nuclearity
 
