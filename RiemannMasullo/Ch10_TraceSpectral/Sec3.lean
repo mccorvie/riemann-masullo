@@ -333,11 +333,8 @@ On an isotypic representative the restricted operator takes the class of its con
 theorem spectralIsotypeConvolution_mkQ (ω : PontryaginDual C₁) (φ : BruhatCompactSupport C𝔽)
     (v : Wω(hI, hs, ω)) :
     spectralIsotypeConvolution (F := F) a hI hs ω φ ((Nω(ω)).mkQ v) =
-      (Nω(ω)).mkQ (Aω(ω, φ) v) := by
-  unfold spectralIsotypeConvolution
-  have h := (liftQL_mkQ_aux (Nω(ω)) ((Nω(ω)).mkQL.comp Aω(ω, φ))
-    (hardySobolevTestAction_preserves_spectralIsotypeTheta (F := F) a hI hs ω φ) v)
-  with_reducible_and_instances exact h.trans (Submodule.mkQL_apply _ _)
+      (Nω(ω)).mkQ (Aω(ω, φ) v) :=
+  rfl
 
 private theorem spectralConvolution_range_isotype_aux {X V : Type*}
     [CommGroup X] [TopologicalSpace X] [IsTopologicalGroup X] [MeasurableSpace X]
@@ -1032,15 +1029,14 @@ private theorem spectralApprox_isotype_nuclear (a : ℝ) {l r s : ℝ} (hI : l �
   with_reducible obtain ⟨ρ, _, _, U, hU⟩ := hiso
   let S := actionIsotype (ρ.comp (ideleClassNorm F).ker.subtype) ω
   let _ : CompleteSpace S := (isClosed_actionIsotype _ _).completeSpace_coe
-  let E := Wω(hI, hs, ω)
   let N := Θ(a, hI, hs)
   let B := (testAction(l, r, s, hI, hs) φ).restrict
     (hardySobolevTestAction_preserves_spectralIsotype (F := F) hI hs ω φ)
-  with_reducible_and_instances
-    exact spectralApprox_nuclear_representatives _ _ hn S U (N.comap E.subtype).mkQ N.mkQ
-      Subtype.val B (testAction(l, r, s, hI, hs) φ) (N.comap E.subtype).mkQ_surjective hU
-      (spectralIsotypeConvolution_mkQ (F := F) a hI hs ω φ)
-      (spectralConvolution_mkQ (F := F) a hI hs φ) (fun _ ↦ rfl)
+  exact spectralApprox_nuclear_representatives _ _ hn S U
+    (spectralSobolevIsotypeQuotient_mk a hI hs ω) N.mkQ Subtype.val B
+    (testAction(l, r, s, hI, hs) φ) (spectralSobolevIsotypeQuotient_mk_surjective a hI hs ω) hU
+    (spectralIsotypeConvolution_mkQ (F := F) a hI hs ω φ)
+    (spectralConvolution_mkQ (F := F) a hI hs φ) (fun _ ↦ rfl)
 
 /-- Equality of descended convolutions can be checked on representatives. -/
 private theorem spectralApprox_descend {H K V W : Type*}
@@ -1082,14 +1078,13 @@ private theorem spectralApprox_isotype_laws (a : ℝ) {l r s : ℝ} (hI : l ≤ 
     D 0 = 0 ∧ (∀ u v, D (u + v) = D u + D v) ∧
       ∀ t u v : BruhatCompactSupport C𝔽,
         t.val = lcaConvolution μ𝔽 u.val v.val → D t = (D u).comp (D v) := by
-  let N := Θ(a, hI, hs)
   let E := Wω(hI, hs, ω)
-  let q := (N.comap E.subtype).mkQ
+  let q := spectralSobolevIsotypeQuotient_mk (F := F) a hI hs ω
   let b (φ : BruhatCompactSupport C𝔽) := (testAction(l, r, s, hI, hs) φ).restrict
     (hardySobolevTestAction_preserves_spectralIsotype (F := F) hI hs ω φ)
-  have laws := spectralApprox_descend q (N.comap E.subtype).mkQ_surjective E.subtype
-    Subtype.val_injective (spectralIsotypeConvolution (F := F) a hI hs ω)
-    (fun φ ↦ testAction(l, r, s, hI, hs) φ)
+  have laws := spectralApprox_descend q.toLinearMap
+    (spectralSobolevIsotypeQuotient_mk_surjective a hI hs ω) E.subtype Subtype.val_injective
+    (spectralIsotypeConvolution (F := F) a hI hs ω) (fun φ ↦ testAction(l, r, s, hI, hs) φ)
     (fun φ v ↦ b φ v) (spectralIsotypeConvolution_mkQ (F := F) a hI hs ω) (fun _ _ ↦ rfl)
   refine ⟨laws.1 0 (map_zero _), fun u v ↦ laws.2.1 _ u v (map_add _ _ _), ?_⟩
   intro t u v ht
@@ -2883,18 +2878,17 @@ private theorem spectralIsotype_trace_eq (a : ℝ) {l r s : ℝ} (hI : l ≤ r) 
   let : CompleteSpace S := (isClosed_actionIsotype _ _).completeSpace_coe
   let : PolynormableSpace ℂ Qω(a, hI, hs, ω) :=
     (norm_withSeminorms ℂ Qω(a, hI, hs, ω)).toPolynormableSpace
-  let E := Wω(hI, hs, ω)
+  let q := spectralSobolevIsotypeQuotient_mk (F := F) a hI hs ω
   let N := Θ(a, hI, hs)
   let B := (testAction(l, r, s, hI, hs) φ).restrict
     (hardySobolevTestAction_preserves_spectralIsotype (F := F) hI hs ω φ)
-  with_reducible_and_instances
-    refine spectralIsotype_trace_representatives _ D S U (N.comap E.subtype).mkQ N.mkQ
-      Subtype.val B (testAction(l, r, s, hI, hs) φ) (N.comap E.subtype).mkQ_surjective hU
-      (spectralConvolution_range_isotype (F := F) a hI hs ω φ hφ) ?_
-      (spectralConvolution_mkQ (F := F) a hI hs φ) (fun _ ↦ rfl)
+  refine spectralIsotype_trace_representatives _ D S U q N.mkQ Subtype.val B
+    (testAction(l, r, s, hI, hs) φ) (spectralSobolevIsotypeQuotient_mk_surjective a hI hs ω) hU
+    (spectralConvolution_range_isotype (F := F) a hI hs ω φ hφ) ?_
+    (spectralConvolution_mkQ (F := F) a hI hs φ) (fun _ ↦ rfl)
   intro v
   exact (congrArg (fun L : Qω(a, hI, hs, ω) →L[ℂ] Qω(a, hI, hs, ω) ↦
-    L ((N.comap E.subtype).mkQ v)) hD).trans
+    L (q v)) hD).trans
     (spectralIsotypeConvolution_mkQ (F := F) a hI hs ω φ v)
 
 /-- Haar translation forces the Mellin transform of a homogeneous test to vanish off its character. -/

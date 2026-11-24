@@ -110,14 +110,48 @@ theorem spectralSobolevQuotient_eq_zero (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (
 
 variable (F) in
 /-- Paper: (10.2.1.2), p. 439, and (10.2.2.2), p. 445. Divide the ambient
-norm-one isotype by its closed weighted theta subspace.
-
-Kept as an `abbrev` for now (#5398): as a `def` with its own instances it breaks proofs and
-statements that use it, see the issue. Do not copy this pattern: a new type synonym with
-structure is a `def` with its own instances (`AGENTS.md`). -/
-abbrev spectralSobolevIsotypeQuotient (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (hs : 0 ≤ s)
+norm-one isotype by its closed weighted theta subspace. -/
+def spectralSobolevIsotypeQuotient (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (hs : 0 ≤ s)
     (ω : PontryaginDual C₁) :=
   ↥(Wω(hI, hs, ω)) ⧸ (Θ(a, hI, hs)).comap (Wω(hI, hs, ω)).subtype
+
+section IsotypeQuotient
+
+variable (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (hs : 0 ≤ s)
+
+local notation "Nω(" ω ")" => (Θ(a, hI, hs)).comap (Wω(hI, hs, ω)).subtype
+
+/-- The isotype quotient carries the quotient norm. -/
+instance instNormedAddCommGroupSpectralSobolevIsotypeQuotient (ω : PontryaginDual C₁) :
+    NormedAddCommGroup (spectralSobolevIsotypeQuotient F a hI hs ω) :=
+  inferInstanceAs (NormedAddCommGroup (↥(Wω(hI, hs, ω)) ⧸ Nω(ω)))
+
+/-- The closed isotypic theta subspace gives the quotient its complex inner product. -/
+instance instInnerProductSpaceSpectralSobolevIsotypeQuotient (ω : PontryaginDual C₁) :
+    InnerProductSpace ℂ (spectralSobolevIsotypeQuotient F a hI hs ω) :=
+  inferInstanceAs (InnerProductSpace ℂ (↥(Wω(hI, hs, ω)) ⧸ Nω(ω)))
+
+/-- The quotient of the closed Sobolev isotype is complete. -/
+instance instCompleteSpaceSpectralSobolevIsotypeQuotient (ω : PontryaginDual C₁) :
+    CompleteSpace (spectralSobolevIsotypeQuotient F a hI hs ω) :=
+  inferInstanceAs (CompleteSpace (↥(Wω(hI, hs, ω)) ⧸ Nω(ω)))
+
+/-- The continuous linear map sending an isotypic Sobolev vector to its spectral class. -/
+def spectralSobolevIsotypeQuotient_mk (ω : PontryaginDual C₁) :
+    Wω(hI, hs, ω) →L[ℂ] spectralSobolevIsotypeQuotient F a hI hs ω :=
+  (Nω(ω)).mkQL
+
+/-- An isotypic vector has zero spectral class exactly when it belongs to the theta subspace. -/
+theorem spectralSobolevIsotypeQuotient_mk_eq_zero_iff (ω : PontryaginDual C₁) (f : Wω(hI, hs, ω)) :
+    spectralSobolevIsotypeQuotient_mk a hI hs ω f = 0 ↔ f.val ∈ Θ(a, hI, hs) :=
+  Submodule.Quotient.mk_eq_zero (Nω(ω))
+
+/-- Every spectral class has an isotypic Sobolev representative. -/
+theorem spectralSobolevIsotypeQuotient_mk_surjective (ω : PontryaginDual C₁) :
+    Surjective (spectralSobolevIsotypeQuotient_mk (F := F) a hI hs ω) :=
+  (Nω(ω)).mkQ_surjective
+
+end IsotypeQuotient
 
 /-- Testing an isotypic Pettis average against a functional gives its scalar integral. -/
 private theorem spectralSobolevIsotypeQuotient_isometry_dual {K W : Type*} [Group K]
@@ -1234,8 +1268,9 @@ theorem spectralLineIsotypeDual_pullback (a : ℝ) {s : ℝ} (hs : 0 ≤ s) (ω 
   intro hI N i D
   have hi := (existsUnique_spectralLineTestCompletion (F := F) a hs ω).exists.choose_spec
   constructor
-  · have hd : DenseRange (N.mkQL.comp i) :=
-      N.mkQ_surjective.denseRange.comp hi.2.1 N.mkQL.continuous
+  · let q := spectralSobolevIsotypeQuotient_mk (F := F) a hI hs ω
+    have hd : DenseRange (q.comp i) :=
+      (spectralSobolevIsotypeQuotient_mk_surjective a hI hs ω).denseRange.comp hi.2.1 q.continuous
     intro Λ₁ Λ₂ hΛ
     apply DFunLike.coe_injective
     exact hd.equalizer Λ₁.continuous Λ₂.continuous
@@ -1254,12 +1289,11 @@ theorem spectralLineIsotypeDual_pullback (a : ℝ) {s : ℝ} (hs : 0 ≤ s) (ω 
           modulationWeight m𝔽 a (homogeneousAdelicTheta ω f.val) :=
         Filter.Eventually.of_forall (congrFun (congrArg (modulationWeight m𝔽 a) hφ))
       exact (hi.1 φ).trans (hw.trans (hj f x rfl).2.symm)
-    have hn : i φ ∈ N := by
-      change (i φ).val ∈ Θ(a, hI, hs)
+    have hn : (i φ).val ∈ Θ(a, hI, hs) := by
       rw [he]
       exact (j x).val.property
-    change Λ (N.mkQ (i φ)) = 0
-    exact (congrArg Λ ((Submodule.Quotient.mk_eq_zero N).mpr hn)).trans (map_zero Λ)
+    exact (congrArg Λ ((spectralSobolevIsotypeQuotient_mk_eq_zero_iff a hI hs ω (i φ)).mpr hn)).trans
+      (map_zero Λ)
 
 end TestDuality
 
@@ -2007,7 +2041,7 @@ Deviation: The Fourier bands use the inverse lift for left translation. -/
 theorem spectralLineIsotype_bandProjections (χ : PontryaginDual C𝔽) (a : ℝ)
     {s : ℝ} (hs : 0 ≤ s) (ν : Measure (PontryaginDual C𝔽)) (hν : IsLCAPlancherelMeasure μ𝔽 ν) :
     let hI : (0 : ℝ) ≤ 0 := le_rfl
-    let ω := χ.comp restriction
+    let ω := PontryaginDual.map restriction χ
     let E := Wω(hI, hs, ω)
     let N := (Θ(a, hI, hs)).comap E.subtype
     let Q := spectralSobolevIsotypeQuotient F a hI hs ω
@@ -2039,17 +2073,12 @@ theorem spectralLineIsotype_bandProjections (χ : PontryaginDual C𝔽) (a : ℝ
     filter_upwards [hsupp] with ψ hψ
     intro hψband
     exact hψ (fun hψsupp ↦ hψband (hband n hψsupp))
-  let hEclosed : IsClosed (E : Set W(0, 0, s)) :=
-    instClosedSpectralIsotypeSec2 (F := F) hI hs ω
-  let : CompleteSpace E := hEclosed.completeSpace_coe
-  let hNclosed : IsClosed (N : Set E) :=
-    instClosedSpectralIsotypeThetaSec2 (F := F) a hI hs ω
-  let : CompleteSpace N := hNclosed.completeSpace_coe
   exact spectralLineIsotype_bandProjections_of_supported_approximants
     (X := C𝔽) (Y := PontryaginDual C𝔽) (E := E) (Q := Q)
     μ𝔽 ν (fun f : E ↦ (f.val : C𝔽 → ℂ))
     (J.toLinearMap.comp E.subtype) (fun f ↦ hJ f.val)
-    N.mkQL N.mkQ_surjective U.toLinearEquiv.toLinearMap
+    (spectralSobolevIsotypeQuotient_mk a hI hs ω)
+    (spectralSobolevIsotypeQuotient_mk_surjective a hI hs ω) U.toLinearEquiv.toLinearMap
     (fun n ↦ modulatedFrequencyBand m𝔽 χ⁻¹ (-(n : ℝ)) n)
     (fun n f ↦ R n f) hsupported hlim
 
