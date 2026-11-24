@@ -7,6 +7,7 @@ import Mathlib.Analysis.Complex.HasPrimitives
 import Mathlib.Analysis.Normed.Group.Tannery
 import Mathlib.NumberTheory.LSeries.Dirichlet
 import Mathlib.Topology.Algebra.InfiniteSum.TsumUniformlyOn
+import Mathlib.Topology.ContinuousMap.Weierstrass
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-!
@@ -3759,6 +3760,608 @@ theorem reciprocalHeckeEulerProductBelow_at_pole_eq_prod (χ : U[F]) (t₀ x : �
   rw [reciprocalHeckeEulerProductBelow_at_pole_eq_prod_factor χ _ hχ, inv_inv, h1,
     Complex.cpow_neg_one]
 
+/-- A bounded continuous test preserves summability of positive weights. -/
+private theorem reciprocalHeckeEulerProductBelow_mertens_test_summable
+    {ι : Type*} (w z : ι → ℝ) (hw : Summable w) (hw₀ : ∀ i, 0 ≤ w i)
+    (hz : ∀ i, z i ∈ Icc 0 1) (g : ℝ → ℝ) (hg : ContinuousOn g (Icc 0 1)) :
+    Summable (fun i ↦ w i * g (z i)) := by
+  obtain ⟨D, hD⟩ := isCompact_Icc.exists_bound_of_continuousOn hg
+  refine (hw.mul_right D).of_norm_bounded fun i ↦ ?_
+  rw [Real.norm_eq_abs, abs_mul, abs_of_nonneg (hw₀ i)]
+  exact mul_le_mul_of_nonneg_left (hD _ (hz i)) (hw₀ i)
+
+/-- Uniform error in a test is bounded by the total mass times the uniform error. -/
+private theorem reciprocalHeckeEulerProductBelow_mertens_test_error
+    {f : ℝ → ℝ} {p : Polynomial ℝ} {δ : ℝ} (hf : ContinuousOn f (Icc 0 1))
+  (hp' : ∀ x ∈ Icc 0 1, |p.eval x - f x| < δ) {ι : Type*} (w z : ι → ℝ) (hw : Summable w) (hw₀ : ∀ i, 0 ≤ w i)
+    (hz : ∀ i, z i ∈ Icc 0 1) :
+    |(∑' i, w i * f (z i)) - ∑' i, w i * p.eval (z i)| ≤ (∑' i, w i) * δ := by
+  have h₁ := reciprocalHeckeEulerProductBelow_mertens_test_summable w z hw hw₀ hz _ hf
+  have h₂ := reciprocalHeckeEulerProductBelow_mertens_test_summable w z hw hw₀ hz _ p.continuous.continuousOn
+  rw [← h₁.tsum_sub h₂]
+  calc |∑' i, (w i * f (z i) - w i * p.eval (z i))| ≤
+      ∑' i, |w i * f (z i) - w i * p.eval (z i)| := by
+        simpa only [Real.norm_eq_abs]
+          using norm_tsum_le_tsum_norm (f := fun i ↦ w i * f (z i) - w i * p.eval (z i))
+            (by simpa only [Real.norm_eq_abs] using (h₁.sub h₂).abs)
+    _ ≤ ∑' i, w i * δ := by
+      apply Summable.tsum_le_tsum _ (h₁.sub h₂).abs (hw.mul_right δ)
+      intro i
+      rw [← mul_sub, abs_mul, abs_of_nonneg (hw₀ i), abs_sub_comm]
+      exact mul_le_mul_of_nonneg_left (hp' _ (hz i)).le (hw₀ i)
+    _ = _ := tsum_mul_right
+
+/-- Uniform polynomial approximation transfers convergence of nonnegative weighted rows
+on monomials to every continuous test on the interval. -/
+private theorem reciprocalHeckeEulerProductBelow_mertens_continuous_tests {T ι κ : Type*} (l : Filter T)
+    (a : T → ι → ℝ) (b : T → κ → ℝ) (x : T → ι → ℝ) (y : T → κ → ℝ)
+    (ha : ∀ t i, 0 ≤ a t i) (hb : ∀ t j, 0 ≤ b t j)
+    (hs : ∀ t, Summable (a t)) (hr : ∀ t, Summable (b t))
+    (hx : ∀ t i, x t i ∈ Icc 0 1) (hy : ∀ t j, y t j ∈ Icc 0 1)
+    {C : ℝ} (hC : ∀ᶠ t in l, (∑' i, a t i) + (∑' j, b t j) ≤ C)
+    (hm : ∀ n : ℕ, Tendsto (fun t ↦ (∑' i, a t i * x t i ^ n) -
+      (∑' j, b t j * y t j ^ n)) l (𝓝 0))
+    {f : ℝ → ℝ} (hf : ContinuousOn f (Icc 0 1)) :
+    Tendsto (fun t ↦ (∑' i, a t i * f (x t i)) - (∑' j, b t j * f (y t j))) l (𝓝 0) := by
+  classical
+  have hp (p : Polynomial ℝ) : Tendsto (fun t ↦
+      (∑' i, a t i * p.eval (x t i)) - (∑' j, b t j * p.eval (y t j))) l (𝓝 0) := by
+    induction p using Polynomial.induction_on' with
+    | add p q hp hq =>
+      convert hp.add hq using 1
+      · funext t
+        simp only [Polynomial.eval_add, mul_add]
+        have hA := reciprocalHeckeEulerProductBelow_mertens_test_summable
+          (a t) (x t) (hs t) (ha t) (hx t)
+        have hB := reciprocalHeckeEulerProductBelow_mertens_test_summable
+          (b t) (y t) (hr t) (hb t) (hy t)
+        rw [(hA _ p.continuous.continuousOn).tsum_add (hA _ q.continuous.continuousOn),
+          (hB _ p.continuous.continuousOn).tsum_add (hB _ q.continuous.continuousOn)]
+        ring
+      · simp
+    | monomial n c =>
+      convert (hm n).const_mul c using 1
+      · funext t
+        simp only [Polynomial.eval_monomial, mul_sub, ← tsum_mul_left]
+        congr 1 <;> apply tsum_congr <;> intro i <;> ring
+      · simp
+  rw [Metric.tendsto_nhds]
+  intro ε hε
+  let δ := ε / (2 * (max 0 C + 1))
+  have hδ : 0 < δ := div_pos hε (by positivity)
+  obtain ⟨p, hp'⟩ := exists_polynomial_near_of_continuousOn 0 1 f hf δ hδ
+  have hε₂ : 0 < ε / 2 := half_pos hε
+  filter_upwards [hC, (Metric.tendsto_nhds.mp (hp p)) (ε / 2) hε₂] with t ht h
+  rw [Real.dist_eq, sub_zero] at h ⊢
+  have h₁ := reciprocalHeckeEulerProductBelow_mertens_test_error hf hp' _ _ (hs t) (ha t) (hx t)
+  have h₂ := reciprocalHeckeEulerProductBelow_mertens_test_error hf hp' _ _ (hr t) (hb t) (hy t)
+  have hbound : C * δ < ε / 2 := by
+    have hz : 0 < max 0 C + 1 := by positivity
+    dsimp [δ]
+    rw [← mul_div_assoc, div_lt_div_iff₀ (by positivity) (by norm_num)]
+    nlinarith [mul_le_mul_of_nonneg_right (le_max_right 0 C) hε.le]
+  rw [abs_le] at h₁ h₂
+  rw [abs_lt] at h ⊢
+  have reciprocalHeckeEulerProductBelow_mertens_power_summable := (mul_le_mul_of_nonneg_right ht hδ.le).trans_lt hbound
+  rw [add_mul] at reciprocalHeckeEulerProductBelow_mertens_power_summable
+  constructor <;> linarith
+/-- Every positive integral power of a Laplace weight is dominated by its first power. -/
+private theorem reciprocalHeckeEulerProductBelow_mertens_power_summable
+    {I : Type*} (w q : I → ℝ) (h : Summable (fun i ↦ w i * q i))
+    (hw : ∀ i, 0 ≤ w i) (hq : ∀ i, q i ∈ Ioo 0 1) (n : ℕ) :
+    Summable (fun i ↦ w i * q i ^ (n + 1)) := by
+  apply Summable.of_nonneg_of_le (fun i ↦ mul_nonneg (hw _) (pow_nonneg (hq i).1.le _)) _ h
+  intro i
+  rw [pow_succ]
+  exact mul_le_mul_of_nonneg_left (mul_le_of_le_one_left (hq i).1.le (pow_le_one₀ (hq i).1.le (hq i).2.le)) (hw i)
+
+/-- A monomial moment of the weighted row is the difference of two successive Laplace sums. -/
+private theorem reciprocalHeckeEulerProductBelow_mertens_moment_eq
+    {I : Type*} (w q : I → ℝ) (h : Summable (fun i ↦ w i * q i))
+    (hw : ∀ i, 0 ≤ w i) (hq : ∀ i, q i ∈ Ioo 0 1) (n : ℕ) :
+    (∑' i, (w i * q i * (1 - q i)) * q i ^ n) =
+      (∑' i, w i * q i ^ (n + 1)) - (∑' i, w i * q i ^ (n + 2)) := by
+  rw [← (reciprocalHeckeEulerProductBelow_mertens_power_summable w q h hw hq n).tsum_sub
+      (reciprocalHeckeEulerProductBelow_mertens_power_summable w q h hw hq (n + 1))]
+  apply tsum_congr
+  intro i
+  ring
+
+/-- The damping factor q(1−q) gives each weighted row finite mass. -/
+private theorem reciprocalHeckeEulerProductBelow_mertens_damped_summable
+    {I : Type*} (w q : I → ℝ) (h : Summable (fun i ↦ w i * q i))
+    (hw : ∀ i, 0 ≤ w i) (hq : ∀ i, q i ∈ Ioo 0 1) :
+    Summable (fun i ↦ w i * q i * (1 - q i)) :=
+  Summable.of_nonneg_of_le (fun i ↦ by have := hw i; have := (hq i).1; have := (hq i).2; positivity)
+    (fun i ↦ mul_le_of_le_one_right (mul_nonneg (hw i) (hq i).1.le) (by linarith [(hq i).1])) h
+
+/-- A ramp test places its weighted sum between two neighboring sharp cutoffs. -/
+private theorem reciprocalHeckeEulerProductBelow_mertens_ramp_bounds
+    {I : Type*} (w q : I → ℝ) (hw : ∀ i, 0 ≤ w i) (hq : ∀ i, q i ∈ Ioo 0 1)
+    (h : Summable (fun i ↦ w i * q i)) {r r' : ℝ} (hr : 0 < r) (hr' : 0 < r')
+    (f : ℝ → ℝ) (hf : Continuous f) (htest : ∀ z ∈ Ioo (0 : ℝ) 1,
+      (if r' < z then 1 else 0) - z ≤ z * (1 - z) * f z ∧
+      z * (1 - z) * f z ≤ (if r < z then 1 else 0) - z) :
+    (∑' i, if r' < q i then w i else 0) - (∑' i, w i * q i) ≤
+      (∑' i, (w i * q i * (1 - q i)) * f (q i)) ∧
+    (∑' i, (w i * q i * (1 - q i)) * f (q i)) ≤
+      (∑' i, if r < q i then w i else 0) - (∑' i, w i * q i) := by
+  have hcut (u : ℝ) (hu : 0 < u) : Summable (fun i ↦ if u < q i then w i else 0) := by
+    apply Summable.of_nonneg_of_le (fun i ↦ by split_ifs <;> simp [hw i]) _ (h.mul_right u⁻¹)
+    intro i
+    split_ifs with e
+    · simpa [div_eq_mul_inv, mul_assoc] using mul_le_mul_of_nonneg_left ((one_le_div hu).mpr e.le) (hw i)
+    · exact mul_nonneg (mul_nonneg (hw i) (hq i).1.le) (inv_nonneg.mpr hu.le)
+  have hrow := reciprocalHeckeEulerProductBelow_mertens_test_summable (fun i ↦ w i * q i * (1 - q i)) q
+      (reciprocalHeckeEulerProductBelow_mertens_damped_summable w q h hw hq)
+    (fun i ↦ mul_nonneg (mul_nonneg (hw i) (hq i).1.le) (sub_nonneg.mpr (hq i).2.le))
+    (fun i ↦ Ioo_subset_Icc_self (hq i)) f hf.continuousOn
+  rw [← (hcut r' hr').tsum_sub h, ← (hcut r hr).tsum_sub h]
+  constructor
+  · apply Summable.tsum_le_tsum _ ((hcut r' hr').sub h) hrow
+    intro i
+    have hh := mul_le_mul_of_nonneg_left (htest _ (hq i)).1 (hw i)
+    split_ifs at hh ⊢ <;> nlinarith only [hh]
+  · apply Summable.tsum_le_tsum _ hrow ((hcut r hr).sub h)
+    intro i
+    have hh := mul_le_mul_of_nonneg_left (htest _ (hq i)).2 (hw i)
+    split_ifs at hh ⊢ <;> nlinarith only [hh]
+
+/-- Continuous majorants and minorants of the sharp cutoff after subtracting its Laplace weight. -/
+private theorem reciprocalHeckeEulerProductBelow_mertens_ramp {a b : ℝ} (ha : 0 < a) (hab : a < b) (hb : b < 1) :
+    ∃ f : ℝ → ℝ, Continuous f ∧ ∀ q ∈ Ioo (0 : ℝ) 1,
+      (if b < q then 1 else 0) - q ≤ q * (1 - q) * f q ∧
+      q * (1 - q) * f q ≤ (if a < q then 1 else 0) - q := by
+  let z (q : ℝ) := min 1 (max 0 ((q - a) / (b - a)))
+  let A (q : ℝ) := -(max (1 - q) (1 - b))⁻¹
+  let B (q : ℝ) := (max q a)⁻¹
+  let f (q : ℝ) := (1 - z q) * A q + z q * B q
+  refine ⟨f, ?_, ?_⟩
+  · have hA : Continuous A :=
+      (((continuous_const.sub continuous_id).max continuous_const).inv₀
+        (fun q ↦ ne_of_gt ((sub_pos.mpr hb).trans_le (le_max_right _ _)))).neg
+    have hB : Continuous B :=
+      ((continuous_id.max continuous_const).inv₀ (fun q ↦ ne_of_gt (ha.trans_le (le_max_right _ _))))
+    have hz : Continuous z := by dsimp [z]; fun_prop
+    exact ((continuous_const.sub hz).mul hA).add (hz.mul hB)
+  intro q hq
+  have hq₁ := sub_pos.mpr hq.2
+  by_cases hqa : q ≤ a
+  · have hza : z q = 0 := by simp [z, max_eq_left (div_nonpos_of_nonpos_of_nonneg (sub_nonpos.mpr hqa) (sub_pos.mpr hab).le)]
+    have haq : 1 - b ≤ 1 - q := by linarith
+    simp [f, hza, A, max_eq_left haq, not_lt.mpr hqa, not_lt.mpr (hqa.trans hab.le), hq₁.ne']
+  · have hqa' := lt_of_not_ge hqa
+    by_cases hqb : b ≤ q
+    · have hzb : z q = 1 := by
+        have h : 1 ≤ (q - a) / (b - a) := (one_le_div (sub_pos.mpr hab)).mpr (by linarith)
+        exact min_eq_left (h.trans (le_max_right _ _))
+      have hval : q * (1 - q) * f q = 1 - q := by
+        simp [f, hzb, B, max_eq_left hqa'.le, hq.1.ne', mul_comm]
+      rw [hval, ite_eq_left hqa']
+      split_ifs <;> constructor <;> linarith
+    · have hqb' := lt_of_not_ge hqb
+      have ha' : 1 - b ≤ 1 - q := by linarith
+      have hz₀ : 0 ≤ z q := le_min zero_le_one (le_max_left _ _)
+      have hz₁ : z q ≤ 1 := min_le_left _ _
+      have hval : q * (1 - q) * f q = z q - q := by
+        dsimp only [f, A, B]
+        rw [max_eq_left ha', max_eq_left hqa'.le]
+        field_simp [hq₁.ne', hq.1.ne']
+        ring
+      rw [hval, ite_eq_right (not_lt.mpr hqb'.le), ite_eq_left hqa']
+      constructor <;> linarith
+
+/-- Subtraction of the Laplace weight makes a sharply truncated sum testable by continuous
+functions up to an arbitrarily small change in its cutoff. -/
+private theorem reciprocalHeckeEulerProductBelow_mertens_transfer {T ι κ : Type*} (l : Filter T)
+    (a : ι → ℝ) (b : κ → ℝ) (x : T → ι → ℝ) (y : T → κ → ℝ)
+    (ha : ∀ i, 0 ≤ a i) (hb : ∀ j, 0 ≤ b j)
+    (hx : ∀ t i, x t i ∈ Ioo 0 1) (hy : ∀ t j, y t j ∈ Ioo 0 1)
+    (hs : ∀ t, Summable (fun i ↦ a i * x t i))
+    (hr : ∀ t, Summable (fun j ↦ b j * y t j))
+    {D E C : ℝ}
+    (hm : ∀ n : ℕ, Tendsto (fun t ↦ (∑' i, a i * x t i ^ (n + 1)) -
+      (∑' j, b j * y t j ^ (n + 1))) l (𝓝 D))
+    (hbounded : ∀ᶠ t in l, (∑' j, b j * y t j) - (∑' j, b j * y t j ^ 2) ≤ E)
+    (hc : ∀ u : ℝ, 0 < u → Tendsto (fun t ↦
+      (∑' j, if Real.exp (-u) < y t j then b j else 0) - (∑' j, b j * y t j))
+      l (𝓝 (C + Real.log u))) :
+    Tendsto (fun t ↦ (∑' i, if Real.exp (-1) < x t i then a i else 0) -
+      (∑' i, a i * x t i)) l (𝓝 C) := by
+  classical
+  let A t i := a i * x t i * (1 - x t i)
+  let B t j := b j * y t j * (1 - y t j)
+
+  have hA (t i) : 0 ≤ A t i := mul_nonneg (mul_nonneg (ha i) (hx t i).1.le) (sub_nonneg.mpr (hx t i).2.le)
+  have hB (t j) : 0 ≤ B t j := mul_nonneg (mul_nonneg (hb j) (hy t j).1.le) (sub_nonneg.mpr (hy t j).2.le)
+  have hnm (n : ℕ) : Tendsto (fun t ↦ (∑' i, A t i * x t i ^ n) -
+      (∑' j, B t j * y t j ^ n)) l (𝓝 0) := by
+    convert (hm n).sub (hm (n + 1)) using 1
+    · funext t
+      rw [show (∑' i, A t i * x t i ^ n) = _ from
+          reciprocalHeckeEulerProductBelow_mertens_moment_eq a (x t) (hs t) ha (hx t) n,
+        show (∑' j, B t j * y t j ^ n) = _ from
+          reciprocalHeckeEulerProductBelow_mertens_moment_eq b (y t) (hr t) hb (hy t) n]
+      ring
+    · simp
+  have hf (f : ℝ → ℝ) (hf : Continuous f) : Tendsto
+      (fun t ↦ (∑' i, A t i * f (x t i)) - (∑' j, B t j * f (y t j))) l (𝓝 0) := by
+    apply reciprocalHeckeEulerProductBelow_mertens_continuous_tests l A B x y hA hB
+      (fun t ↦ reciprocalHeckeEulerProductBelow_mertens_damped_summable a _ (hs t) ha (hx t))
+      (fun t ↦ reciprocalHeckeEulerProductBelow_mertens_damped_summable b _ (hr t) hb (hy t))
+      (fun t i ↦ Ioo_subset_Icc_self (hx t i))
+      (fun t j ↦ Ioo_subset_Icc_self (hy t j)) (C := 2 * E + 1) _ hnm hf.continuousOn
+    have h₀ : Tendsto (fun t ↦ (∑' i, A t i) - ∑' j, B t j) l (𝓝 0) := by simpa using hnm 0
+    filter_upwards [hbounded, h₀.eventually_lt_const zero_lt_one] with t ht ht'
+    have he : (∑' j, B t j) = (∑' j, b j * y t j) - ∑' j, b j * y t j ^ 2 := by
+      simpa using reciprocalHeckeEulerProductBelow_mertens_moment_eq b (y t) (hr t) hb (hy t) 0
+    linarith
+  -- A weighted cutoff test is squeezed between the two neighboring sharp cutoffs.
+
+  rw [Metric.tendsto_nhds]
+  intro ε hε
+  let u := Real.exp (-(ε / 2))
+  let v := Real.exp (ε / 2)
+  have hExp (t : ℝ) := Real.exp_pos (-t)
+  have h₁ : u < 1 := Real.exp_lt_one_iff.mpr (by linarith)
+  have h₂ : 1 < v := Real.one_lt_exp_iff.mpr (by linarith)
+  obtain ⟨f, hfc, hfb⟩ := reciprocalHeckeEulerProductBelow_mertens_ramp (hExp 1) (Real.exp_lt_exp.mpr (neg_lt_neg h₁))
+    (Real.exp_lt_one_iff.mpr (neg_lt_zero.mpr (Real.exp_pos _)))
+  obtain ⟨g, hgc, hgb⟩ := reciprocalHeckeEulerProductBelow_mertens_ramp (hExp v) (Real.exp_lt_exp.mpr (neg_lt_neg h₂))
+    (Real.exp_lt_one_iff.mpr (by norm_num))
+  have hlo := (hc u (Real.exp_pos _)).add (hf f hfc)
+  have hhi := (hc v (Real.exp_pos _)).add (hf g hgc)
+  have hlow : C - ε < C + Real.log u + 0 := by
+    simp [u]
+    linarith
+  have hhigh : C + Real.log v + 0 < C + ε := by
+    simp [v]
+    linarith
+  filter_upwards [hlo.eventually_const_lt hlow, hhi.eventually_lt_const hhigh] with t ht₁ ht₂
+  have A₁ := (reciprocalHeckeEulerProductBelow_mertens_ramp_bounds a _ ha (hx t) (hs t) (hExp 1) (hExp u) f hfc hfb).2
+  have A₂ := (reciprocalHeckeEulerProductBelow_mertens_ramp_bounds a _ ha (hx t) (hs t) (hExp v) (hExp 1) g hgc hgb).1
+  have B₁ := (reciprocalHeckeEulerProductBelow_mertens_ramp_bounds b _ hb (hy t) (hr t) (hExp 1) (hExp u) f hfc hfb).1
+  have B₂ := (reciprocalHeckeEulerProductBelow_mertens_ramp_bounds b _ hb (hy t) (hr t) (hExp v) (hExp 1) g hgc hgb).2
+  rw [Real.dist_eq, abs_lt]
+  simp only [A, B] at ht₁ ht₂
+  constructor <;> linarith
+
+/-- The Laplace transform of the harmonic model is −log(1−exp(−s)). -/
+private theorem reciprocalHeckeEulerProductBelow_mertens_model_laplace {s : ℝ} (hs : 0 < s) :
+    HasSum (fun j : ℕ ↦ (j + 1 : ℝ)⁻¹ * Real.exp (-s * (j + 1))) (-Real.log (1 - Real.exp (-s))) := by
+  have h := Real.hasSum_pow_div_log_of_abs_lt_one
+    (by rw [abs_of_pos (Real.exp_pos _)]; exact Real.exp_lt_one_iff.mpr (neg_lt_zero.mpr hs))
+  apply h.congr_fun
+  intro j
+  rw [mul_comm (-s), add_comm (j:ℝ) 1, add_comm (1 : ℝ) j, show (j : ℝ) + 1 = (j + 1 : ℕ) from by norm_cast, Real.exp_nat_mul]
+  ring
+
+/-- The harmonic transform has the same leading singularity as −log s. -/
+private theorem reciprocalHeckeEulerProductBelow_mertens_scale_laplace :
+    Tendsto (fun s : ℝ ↦ (1 - Real.exp (-s)) / s) (𝓝[>] 0) (𝓝 1) := by
+  have h : HasDerivAt (fun s : ℝ ↦ 1 - Real.exp (-s)) 1 0 := by
+    simpa using ((hasDerivAt_neg (0 : ℝ)).exp.const_sub 1)
+  refine (h.tendsto_slope.mono_left (nhdsGT_le_nhdsNE 0)).congr fun x ↦ ?_
+  simp [slope_def_field]
+
+/-- The class number formula fixes the limiting difference of the two Laplace transforms. -/
+private theorem reciprocalHeckeEulerProductBelow_mertens_log_compare (F : Type*) [Field F] [NumberField F] :
+    Tendsto (fun s : ℝ ↦ Real.log ‖dedekindZeta F ((1 + s : ℝ) : ℂ)‖ +
+      Real.log (1 - Real.exp (-s))) (𝓝[>] 0) (𝓝 (Real.log (dedekindZeta_residue F))) := by
+  have hshift : Tendsto (fun s : ℝ ↦ 1 + s) (𝓝[>] 0) (𝓝[>] 1) := by
+    apply tendsto_nhdsWithin_iff.mpr
+    refine ⟨?_, ?_⟩
+    · simpa using (tendsto_const_nhds (x := (1 : ℝ))).add
+        (show Tendsto id (𝓝[>] (0 : ℝ)) (𝓝 0) from nhdsWithin_le_nhds)
+    · filter_upwards [self_mem_nhdsWithin] with s hs using show 1 < 1 + s by simpa using hs
+  have hz : Tendsto (fun s : ℝ ↦ s * ‖dedekindZeta F ((1 + s : ℝ) : ℂ)‖)
+      (𝓝[>] 0) (𝓝 (dedekindZeta_residue F)) := by
+    rw [← Real.norm_of_nonneg (dedekindZeta_residue_pos F).le, ← Complex.norm_real]
+    apply ((tendsto_sub_one_mul_dedekindZeta_nhdsGT F).norm.comp hshift).congr'
+    filter_upwards [self_mem_nhdsWithin] with s hs
+    simp [abs_of_pos (show 0 < s from hs), Complex.norm_real]
+  have hpos := dedekindZeta_residue_pos F
+  have hm := (hz.mul reciprocalHeckeEulerProductBelow_mertens_scale_laplace)
+  rw [mul_one] at hm
+  apply ((Real.continuousAt_log hpos.ne').tendsto.comp hm).congr'
+  filter_upwards [self_mem_nhdsWithin, hz.eventually_const_lt hpos] with s hs hn
+  have hs' : 0 < s := hs
+  have he : 0 < 1 - Real.exp (-s) := sub_pos.mpr (Real.exp_lt_one_iff.mpr (neg_lt_zero.mpr hs'))
+  have hn' : 0 < ‖dedekindZeta F ((1 + s : ℝ) : ℂ)‖ := pos_of_mul_pos_right hn hs'.le
+  dsimp only [Function.comp_apply]
+  rw [← Real.log_mul hn'.ne' he.ne']
+  congr 1
+  field_simp
+
+/-- A strict cutoff in the harmonic model gives harmonic(⌈ut⌉−1), including at integer endpoints. -/
+private theorem reciprocalHeckeEulerProductBelow_mertens_model_cut (u : ℝ) (hu : 0 < u) :
+    Tendsto (fun t : ℝ ↦ (∑' j : ℕ, if Real.exp (-u) < Real.exp (-(max 1 t)⁻¹ * (j + 1))
+      then (j + 1 : ℝ)⁻¹ else 0) - Real.log (max 1 t)) atTop (𝓝 (Real.eulerMascheroniConstant + Real.log u)) := by
+  classical
+  let N (t : ℝ) := ⌈u * t⌉₊ - 1
+  have hN : Tendsto N atTop atTop :=
+    (tendsto_sub_atTop_nat 1).comp (tendsto_nat_ceil_atTop.comp (tendsto_id.const_mul_atTop hu))
+  have hratio : Tendsto (fun t : ℝ ↦ (N t : ℝ) / t) atTop (𝓝 u) := by
+    have hc := (tendsto_nat_ceil_div_atTop (R := ℝ)).comp (tendsto_id.const_mul_atTop hu)
+    have he := (hc.const_mul u).sub (tendsto_inv_atTop_zero (𝕜 := ℝ))
+    rw [mul_one, sub_zero] at he
+    refine he.congr' ?_
+    filter_upwards [eventually_gt_atTop (0 : ℝ)] with t ht
+    simp only [N, Function.comp_apply, id_eq]
+    rw [Nat.cast_sub (show 1 ≤ ⌈u * t⌉₊ from Nat.ceil_pos.mpr (mul_pos hu ht)), Nat.cast_one]
+    field_simp
+  have hh := (Real.tendsto_harmonic_sub_log.comp hN).add ((Real.continuousAt_log hu.ne').tendsto.comp hratio)
+  apply hh.congr'
+  filter_upwards [eventually_gt_atTop (1 : ℝ), hN.eventually (eventually_ge_atTop 1)] with t ht hn
+  have ht' : 0 < t := zero_lt_one.trans ht
+  have hn' : (0 : ℝ) < N t := by exact_mod_cast (show 0 < N t from hn)
+  have he (j : ℕ) : Real.exp (-u) < Real.exp (-t⁻¹ * (j + 1)) ↔ j < N t := by
+    rw [Real.exp_lt_exp, neg_mul, neg_lt_neg_iff, inv_mul_eq_div, div_lt_iff₀ ht']
+    change (j:ℝ) + 1 < u * t ↔ j < ⌈u * t⌉₊-1
+    rw [show (j:ℝ) + 1 = (j + 1 : ℕ) from by norm_cast, ← Nat.lt_ceil]
+    omega
+  dsimp only [Function.comp_apply]
+  rw [max_eq_right ht.le,
+    show (∑' j : ℕ, if Real.exp (-u) < Real.exp (-t⁻¹ * (j + 1))
+      then (j + 1 : ℝ)⁻¹ else 0) = (harmonic (N t) : ℝ) from ?_,
+    Real.log_div hn'.ne' ht'.ne']
+  · ring
+  · simp_rw [he]
+    rw [tsum_eq_sum (s := Finset.range (N t)) fun j hj ↦ ite_eq_right (fun e ↦ hj (Finset.mem_range.mpr e))]
+    simp [harmonic, Finset.sum_congr rfl (fun i hi ↦ ite_eq_left (Finset.mem_range.mp hi))]
+
+/-- For the trivial character the Euler logarithm has positive Laplace weights indexed by prime powers. -/
+private theorem reciprocalHeckeEulerProductBelow_mertens_exp_term (a : V[F] × ℕ) (s : ℝ) :
+    let height := Real.log (((a.1.asIdeal ^ (a.2 + 1)).absNorm : ℕ) : ℝ)
+    heckePrimePowerLogTerm (1 : U[F]) a.1 a.2 ((1 + s : ℝ) : ℂ) =
+      ((Real.exp (-height) / (a.2 + 1 : ℝ) * Real.exp (-s * height) : ℝ) : ℂ) := by
+  dsimp only
+  classical
+  have hnon (g) : ideleClassNormTwist (1 : U[F]) 0 g = 1 := by
+    change 1 * (_ : ℂ) ^ (0 : ℂ) = 1
+    simp
+  have hres (v : V[F]) (z : v.adicCompletion F) (hz : z ≠ 0) :
+      (ideleClassNormTwist (1 : U[F]) 0).restrict v z = 1 := by
+    have hu := isUnit_iff_ne_zero.mpr hz
+    rw [← hu.unit_spec, HeckeCharacter.restrict_apply]
+    simp [hnon, hz]
+  have hu := HeckeCharacter.isUnramifiedAt_iff.mpr
+    (fun x ↦ hres a.1 _ (by simp))
+  have hloc : (ideleClassNormTwist (1 : U[F]) 0).localValue a.1 = 1 := by
+    rw [HeckeCharacter.localValue]
+    exact hres _ _ (by simpa using (Valued.v.exists_isUniformizer_of_isCyclic_of_nontrivial.choose_spec.ne_zero))
+  have hn : 0 < (((a.1.asIdeal ^ (a.2 + 1)).absNorm : ℕ) : ℝ) := by
+    exact_mod_cast Nat.pos_of_ne_zero (Ideal.absNorm_eq_zero_iff.not.mpr (pow_ne_zero _ a.1.ne_bot))
+  rw [heckePrimePowerLogTerm, heckeIdealValue_prime_pow _ _ (Nat.succ_pos _), ite_eq_left hu, hloc, one_pow]
+  rw [← Complex.ofReal_natCast ((a.1.asIdeal ^ (a.2 + 1)).absNorm), ← Complex.ofReal_cpow hn.le]
+  push_cast
+  rw [Real.rpow_def_of_pos hn]
+  norm_cast
+  rw [div_mul_eq_mul_div, ← Real.exp_add, one_div, mul_inv_rev]
+  rw [← Real.exp_neg]
+  congr 1
+  ring_nf
+/-- The Laplace transform of the prime-power weights is the logarithm of the zeta value on the positive real axis. -/
+private theorem reciprocalHeckeEulerProductBelow_mertens_laplace (s : ℝ) (hs : 0 < s) :
+    let height (p : V[F] × ℕ) := Real.log (((p.1.asIdeal ^ (p.2 + 1)).absNorm : ℕ) : ℝ)
+    let weight (p : V[F] × ℕ) := Real.exp (-height p) / (p.2 + 1 : ℝ)
+    HasSum (fun a : V[F] × ℕ ↦ weight a * Real.exp (-s * height a))
+      (Real.log ‖dedekindZeta F ((1 + s : ℝ) : ℂ)‖) := by
+  intro height weight
+  let z : Complex.re ⁻¹' Ioi (1 : ℝ) := ⟨((1 + s : ℝ) : ℂ), by simpa using hs⟩
+  obtain ⟨w, hw, he⟩ := reciprocalHeckeEulerProductBelow_mul_of_nontrivial_on_normOne_primes (1 : U[F]) 0 z
+  have hn : heckePrimesBelow F 0 = ∅ := by
+    ext v
+    simp [heckePrimesBelow, v.ne_bot]
+  have hp : reciprocalHeckeEulerProductBelow (1 : U[F]) 0 z = 1 := by
+    simp [reciprocalHeckeEulerProductBelow, reciprocalPartialHeckeEulerProduct, hn]
+  have hz : finiteHeckeL (1 : U[F]) z = dedekindZeta F z := by
+    have h := completedHeckeL_one_eq_dedekindZeta (F := F) z
+    rw [← heckeGammaFactor_one] at h
+    change heckeGammaFactor (1 : U[F]) z * finiteHeckeL (1 : U[F]) z = _ at h
+    exact mul_left_cancel₀ (heckeGammaFactor_ne_zero_of_re_pos (1 : U[F]) (zero_lt_one.trans z.property)) h
+  rw [hp, one_mul, hz] at he
+  rw [show ((1 + s : ℝ) : ℂ) = z from rfl, he, Complex.norm_exp, Real.log_exp]
+  apply (Complex.hasSum_re hw).congr_fun
+  intro a
+  rw [ite_eq_left (Nat.cast_nonneg _), show (z : ℂ) = ((1 + s : ℝ) : ℂ) from rfl,
+    reciprocalHeckeEulerProductBelow_mertens_exp_term a s]
+  rfl
+
+/-- Compare the zeta transform with the harmonic model to obtain the constant for the sharp prime-power cutoff. -/
+private theorem reciprocalHeckeEulerProductBelow_mertens_cutoff_height :
+    let height (p : V[F] × ℕ) := Real.log (((p.1.asIdeal ^ (p.2 + 1)).absNorm : ℕ) : ℝ)
+    let weight (p : V[F] × ℕ) := Real.exp (-height p) / (p.2 + 1 : ℝ)
+    Tendsto (fun t : ℝ ↦ (∑' a : V[F] × ℕ, if height a < max 1 t then weight a else 0) -
+      Real.log (max 1 t)) atTop (𝓝 (Real.eulerMascheroniConstant + Real.log (dedekindZeta_residue F))) := by
+  intro height weight
+  let X (t : ℝ) := max 1 t
+  let s (t : ℝ) := (X t)⁻¹
+  let Z (v : ℝ) := Real.log ‖dedekindZeta F ((1 + v : ℝ) : ℂ)‖
+  let G (v : ℝ) := -Real.log (1 - Real.exp (-v))
+  let x (t : ℝ) (a : V[F] × ℕ) := Real.exp (-s t * height a)
+  let y (t : ℝ) (j : ℕ) := Real.exp (-s t * (j + 1))
+  let a (p : V[F] × ℕ) := weight p
+  let b (j : ℕ) := (j + 1 : ℝ)⁻¹
+  have hX (t) : 0 < X t := zero_lt_one.trans_le (le_max_left _ _)
+  have hs (t) : 0 < s t := inv_pos.mpr (hX t)
+  have hXtop : Tendsto X atTop atTop := tendsto_atTop_mono (fun t ↦ le_max_right 1 t) tendsto_id
+  have hs0 : Tendsto s atTop (𝓝[>] 0) := tendsto_nhdsWithin_iff.mpr
+    ⟨tendsto_inv_atTop_zero.comp hXtop, Eventually.of_forall hs⟩
+  have hp (v : V[F] × ℕ) : 0 < height v := by
+    apply Real.log_pos
+    rw [map_pow]
+    exact_mod_cast Nat.one_lt_pow (by omega : v.2 + 1 ≠ 0) (HeightOneSpectrum.one_lt_absNorm v.1)
+  have hg0 : Tendsto (fun v : ℝ ↦ G v + Real.log v) (𝓝[>] 0) (𝓝 0) := by
+    have h := ((Real.continuousAt_log one_ne_zero).tendsto.comp reciprocalHeckeEulerProductBelow_mertens_scale_laplace).neg
+    rw [Real.log_one, neg_zero] at h
+    refine h.congr' ?_
+    filter_upwards [self_mem_nhdsWithin] with v hv
+    have hv' : 0 < v := hv
+    dsimp [G]
+    rw [Real.log_div (sub_pos.mpr (Real.exp_lt_one_iff.mpr (neg_lt_zero.mpr hv'))).ne' hv'.ne']
+    ring
+  have hGX : Tendsto (fun t ↦ G (s t) - Real.log (X t)) atTop (𝓝 0) := by
+    simpa [Function.comp_def, s, Real.log_inv, sub_eq_add_neg] using hg0.comp hs0
+  have hAs (t) (n : ℕ) : HasSum (fun i ↦ a i * x t i ^ (n + 1)) (Z ((n + 1) * s t)) := by
+    have hn : 0 < ((n:ℝ) + 1) * s t := mul_pos (by positivity) (hs t)
+    apply (reciprocalHeckeEulerProductBelow_mertens_laplace (F := F) _ hn).congr_fun
+    intro i
+    dsimp [a, x]
+    rw [← Real.exp_nat_mul]
+    push_cast
+    congr 2
+    ring
+  have hBs (t) (n : ℕ) : HasSum (fun j ↦ b j * y t j ^ (n + 1)) (G ((n + 1) * s t)) := by
+    have hn : 0 < ((n:ℝ) + 1) * s t := mul_pos (by positivity) (hs t)
+    apply (reciprocalHeckeEulerProductBelow_mertens_model_laplace hn).congr_fun
+    intro j
+    dsimp [b, y]
+    rw [← Real.exp_nat_mul]
+    push_cast
+    congr 2
+    ring
+  have hm (n : ℕ) : Tendsto (fun t ↦ (∑' i, a i * x t i ^ (n + 1)) -
+      (∑' j, b j * y t j ^ (n + 1))) atTop (𝓝 (Real.log (dedekindZeta_residue F))) := by
+    simp_rw [(hAs _ _).tsum_eq, (hBs _ _).tsum_eq]
+    have hh : Tendsto (fun t ↦ ((n:ℝ) + 1) * s t) atTop (𝓝[>] 0) := by
+      apply tendsto_nhdsWithin_iff.mpr
+      refine ⟨?_, Eventually.of_forall fun t ↦ mul_pos (by positivity) (hs t)⟩
+      simpa using ((tendsto_nhds_of_tendsto_nhdsWithin hs0).const_mul ((n:ℝ) + 1))
+    simpa [Function.comp_def, Z, G, sub_neg_eq_add] using (reciprocalHeckeEulerProductBelow_mertens_log_compare F).comp hh
+  have hbdd : ∀ᶠ t in atTop, (∑' j, b j * y t j) - (∑' j, b j * y t j ^ 2) ≤ Real.log 2 := by
+    apply Eventually.of_forall
+    intro t
+    have h₁ := (hBs t 0).tsum_eq
+    have h₂ := (hBs t 1).tsum_eq
+    simp [G] at h₁ h₂
+    rw [h₁, h₂, neg_sub_neg, ← Real.log_div]
+    · apply Real.log_le_log (div_pos (sub_pos.mpr (Real.exp_lt_one_iff.mpr (by linarith [hs t])))
+        (sub_pos.mpr (Real.exp_lt_one_iff.mpr (by linarith [hs t]))))
+      rw [div_le_iff₀ (sub_pos.mpr (Real.exp_lt_one_iff.mpr (by linarith [hs t])))]
+      rw [show -((1 + 1) * s t) = -s t + -s t by ring, Real.exp_add]
+      nlinarith [sq_nonneg (1 - Real.exp (-s t))]
+    · exact (sub_pos.mpr (Real.exp_lt_one_iff.mpr (by linarith [hs t]))).ne'
+    · exact (sub_pos.mpr (Real.exp_lt_one_iff.mpr (by linarith [hs t]))).ne'
+  have hmodel (u) (hu : 0 < u) : Tendsto (fun t ↦
+      (∑' j, if Real.exp (-u) < y t j then b j else 0) - (∑' j, b j * y t j))
+      atTop (𝓝 (Real.eulerMascheroniConstant + Real.log u)) := by
+    have he (t : ℝ) : (∑' j, b j * y t j) = G (s t) := by simpa using (hBs t 0).tsum_eq
+    simp_rw [he]
+    have h := (reciprocalHeckeEulerProductBelow_mertens_model_cut u hu).sub hGX
+    rw [sub_zero] at h
+    refine h.congr fun t ↦ ?_
+    dsimp [b, y, s, X]
+    ring
+  have ht := reciprocalHeckeEulerProductBelow_mertens_transfer atTop a b x y
+    (fun i ↦ by dsimp [a]; positivity) (fun j ↦ by dsimp [b]; positivity)
+    (fun t i ↦ ⟨Real.exp_pos _, Real.exp_lt_one_iff.mpr (mul_neg_of_neg_of_pos (neg_lt_zero.mpr (hs t)) (hp i))⟩)
+    (fun t j ↦ ⟨Real.exp_pos _, Real.exp_lt_one_iff.mpr (mul_neg_of_neg_of_pos (neg_lt_zero.mpr (hs t)) (by positivity))⟩)
+    (fun t ↦ by simpa using (hAs t 0).summable) (fun t ↦ by simpa using (hBs t 0).summable)
+    hm hbdd hmodel
+  have he (t : ℝ) : (∑' i, a i * x t i) = Z (s t) := by simpa using (hAs t 0).tsum_eq
+  simp_rw [he] at ht
+  have hz := ((reciprocalHeckeEulerProductBelow_mertens_log_compare F).comp hs0).add hGX
+  rw [add_zero] at hz
+  refine (ht.add hz).congr fun t ↦ ?_
+  have heq (i : V[F] × ℕ) : Real.exp (-1) < x t i ↔ height i < X t := by
+    have he : x t i = Real.exp (-(height i / X t)) := by
+      dsimp [x, s]
+      congr 1
+      ring
+    rw [he, Real.exp_lt_exp, neg_lt_neg_iff,
+      div_lt_iff₀ (hX t), one_mul]
+  simp only [Function.comp_apply, heq, Z, G, X, a]
+  ring
+
+/-- Removing the cutoff on the powers of each retained prime adds exactly minus the
+logarithmic correction from (B.7.2.18). -/
+private theorem reciprocalHeckeEulerProductBelow_mertens_product_log (x : ℝ) (hx : 0 < x) :
+    let height (p : V[F] × ℕ) := Real.log (((p.1.asIdeal ^ (p.2 + 1)).absNorm : ℕ) : ℝ)
+    let weight (p : V[F] × ℕ) := Real.exp (-height p) / (p.2 + 1 : ℝ)
+    (∏ v ∈ heckePrimesBelow F x, (1 - (v.asIdeal.absNorm : ℝ)⁻¹)) =
+      Real.exp (- (∑' a : V[F] × ℕ, if height a < Real.log x then weight a else 0) +
+        (heckeEulerProductLogCorrection (1 : U[F]) x 1).re) := by
+  intro height weight
+  classical
+  let P := heckePrimesBelow F x
+  let f (p : V[F] × ℕ) := if p.1 ∈ P then weight p else 0
+  let d (v : V[F]) := -Real.log (1 - (v.asIdeal.absNorm : ℝ)⁻¹)
+  have hn (v : V[F]) : 1 < (v.asIdeal.absNorm : ℝ) := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have hpos (v : V[F]) : 0 < 1 - (v.asIdeal.absNorm : ℝ)⁻¹ :=
+    sub_pos.mpr (inv_lt_one_of_one_lt₀ (hn v))
+  have hLocalSum (v : V[F]) : HasSum (fun j : ℕ ↦ f (v, j)) (if v ∈ P then d v else 0) := by
+    by_cases hv : v ∈ P
+    · simp only [f, hv, ↓reduceIte]
+      have hlog := Real.hasSum_pow_div_log_of_abs_lt_one
+        (show |(v.asIdeal.absNorm : ℝ)⁻¹| < 1 by
+          rw [abs_of_nonneg (by positivity)]; exact inv_lt_one_of_one_lt₀ (hn v))
+      apply hlog.congr_fun
+      intro j
+      have hp : 0 < (((v.asIdeal ^ (j + 1)).absNorm : ℕ) : ℝ) := by
+        exact_mod_cast Nat.pos_of_ne_zero (Ideal.absNorm_eq_zero_iff.not.mpr (pow_ne_zero _ v.ne_bot))
+      dsimp only [weight, height]
+      rw [Real.exp_neg, Real.exp_log hp, map_pow, Nat.cast_pow, inv_pow]
+    · simp [f, hv]
+  have hfin : HasSum (fun v : V[F] ↦ if v ∈ P then d v else 0) (∑ v ∈ P, d v) := by
+    simpa using hasSum_sum_of_ne_finset_zero (f := fun v : V[F] ↦ if v ∈ P then d v else 0)
+      (s := P) (fun v hv ↦ ite_eq_right hv)
+  have hfs : Summable f := by
+    apply (summable_prod_of_nonneg ?_).mpr
+    · refine ⟨fun v ↦ (hLocalSum v).summable, ?_⟩
+      simpa only [(hLocalSum _).tsum_eq] using hfin.summable
+    · intro i
+      dsimp only [f]
+      split_ifs <;> positivity
+  have he : (∑' i, f i) = ∑ v ∈ P, d v := (hfs.hasSum.prod_fiberwise hLocalSum).unique hfin
+  have hc := Complex.hasSum_re (reciprocalHeckeEulerProductBelow_mul_of_nontrivial_on_normOne_hasSum
+    (1 : U[F]) x (1 : ℂ) (by norm_num))
+  let g (i : V[F] × ℕ) :=
+    if (i.1.asIdeal.absNorm : ℝ) < x ∧ x ≤ ((i.1.asIdeal ^ (i.2 + 1)).absNorm : ℝ)
+      then weight i else 0
+  have hg : HasSum g (-(heckeEulerProductLogCorrection (1 : U[F]) x 1).re) := by
+    apply hc.congr_fun
+    intro i
+    have hm : heckePrimePowerLogTerm (1 : U[F]) i.1 i.2 1 = ((weight i : ℝ) : ℂ) := by
+      simpa [weight, height] using reciprocalHeckeEulerProductBelow_mertens_exp_term i 0
+    dsimp only [g]
+    simp only [← map_pow, hm]
+    split_ifs <;> rfl
+  have hsharp : HasSum (fun i : V[F] × ℕ ↦ if height i < Real.log x then weight i else 0)
+      ((∑ v ∈ P, d v) + (heckeEulerProductLogCorrection (1 : U[F]) x 1).re) := by
+    rw [←he, ←sub_neg_eq_add]
+    apply (hfs.hasSum.sub hg).congr_fun
+    intro i
+    have hpower : 0 < (((i.1.asIdeal ^ (i.2 + 1)).absNorm : ℕ) : ℝ) := by
+      exact_mod_cast Nat.pos_of_ne_zero (Ideal.absNorm_eq_zero_iff.not.mpr (pow_ne_zero _ i.1.ne_bot))
+    have hle : (i.1.asIdeal.absNorm : ℝ) ≤ ((i.1.asIdeal ^ (i.2 + 1)).absNorm : ℝ) := by
+      rw [map_pow]
+      exact_mod_cast Nat.le_self_pow (Nat.succ_ne_zero _) _
+    simp only [f, g, P, height, heckePrimesBelow_mem_iff, Real.log_lt_log_iff hpower hx]
+    by_cases h : ((i.1.asIdeal ^ (i.2 + 1)).absNorm : ℝ) < x
+    · have hn : ¬ ((i.1.asIdeal.absNorm : ℝ) < x ∧ x ≤ ((i.1.asIdeal ^ (i.2 + 1)).absNorm : ℝ)) := fun e ↦ (not_le.mpr h) e.2
+      simp only [ite_eq_left h, ite_eq_left (hle.trans_lt h), ite_eq_right hn, sub_zero]
+    · by_cases e : (i.1.asIdeal.absNorm : ℝ) < x
+      · simp only [ite_eq_right h, ite_eq_left e, ite_eq_left (And.intro e (le_of_not_gt h)), sub_self]
+      · have hn : ¬ ((i.1.asIdeal.absNorm : ℝ) < x ∧ x ≤ ((i.1.asIdeal ^ (i.2 + 1)).absNorm : ℝ)) := fun h ↦ e h.1
+        simp only [ite_eq_right h, ite_eq_right e, ite_eq_right hn, sub_zero]
+  rw [hsharp.tsum_eq,
+    show -((∑ v ∈ P, d v) + (heckeEulerProductLogCorrection (1 : U[F]) x 1).re) + _ = -(∑ v ∈ P, d v) by ring,
+    ← Finset.sum_neg_distrib, Real.exp_sum]
+  refine Finset.prod_congr rfl fun v _ ↦ ?_
+  simp [d, Real.exp_log (hpos v)]
+
+/-- The stated norm-one class volume equals the Dedekind residue in the class number formula. -/
+private theorem reciprocalHeckeEulerProductBelow_mertens_volume (F : Type*) [Field F] [NumberField F] :
+    (normOneIdeleClassTamagawaMeasure F univ).toReal = dedekindZeta_residue F := by
+  rw [normOneIdeleClassTamagawaMeasure_volume]
+  suffices hform : (2 : ℝ) ^ InfinitePlace.nrRealPlaces F * (2 * Real.pi) ^ InfinitePlace.nrComplexPlaces F *
+      (NumberField.classNumber F : ℝ) * Units.regulator F /
+      (Real.sqrt ((NumberField.discr F).natAbs : ℝ) * (Units.torsionOrder F : ℝ)) = dedekindZeta_residue F by
+    rw [hform, ENNReal.toReal_ofReal (dedekindZeta_residue_pos F).le]
+  rw [dedekindZeta_residue_def, Nat.cast_natAbs, Int.cast_abs]
+  ring
+
 /-- Paper: Remark B.7.2.6, Equation (B.7.2.25), p. 653. Multiplying
 the Mertens product at the pole ordinate by the logarithm of the cutoff gives
 a limit of `exp (-γ)` divided by the norm-one class volume. -/
@@ -3767,7 +4370,26 @@ theorem reciprocalHeckeEulerProductBelow_mertens (χ : U[F]) (t₀ : ℝ)
     Tendsto (fun x : ℝ ↦ (Real.log x : ℂ) * reciprocalHeckeEulerProductBelow χ x ⟨1, t₀⟩)
       atTop (𝓝 ((Real.exp (-Real.eulerMascheroniConstant) /
         (normOneIdeleClassTamagawaMeasure F univ).toReal : ℝ) : ℂ)) := by
-  sorry
+  have h := (reciprocalHeckeEulerProductBelow_mertens_cutoff_height (F := F)).comp Real.tendsto_log_atTop
+  have hcorr : Tendsto (fun x : ℝ ↦ (heckeEulerProductLogCorrection (1 : U[F]) x 1).re) atTop (𝓝 0) :=
+    (Complex.continuous_re.tendsto (0 : ℂ)).comp
+      ((heckeEulerProductLogCorrection_tendstoUniformly (1 : U[F])).tendsto_at (0 : ℝ))
+  have he := Real.continuous_exp.continuousAt.tendsto.comp (h.neg.add hcorr)
+  rw [add_zero, neg_add, Real.exp_add, Real.exp_neg (Real.log _),
+    Real.exp_log (dedekindZeta_residue_pos F), ←div_eq_mul_inv] at he
+  have hreal : Tendsto (fun x : ℝ ↦ Real.log x * ∏ v ∈ heckePrimesBelow F x, (1 - (v.asIdeal.absNorm : ℝ)⁻¹)) atTop
+      (𝓝 (Real.exp (-Real.eulerMascheroniConstant) / dedekindZeta_residue F)) := by
+    refine he.congr' ?_
+    filter_upwards [Real.tendsto_log_atTop.eventually (eventually_gt_atTop 1), eventually_gt_atTop (0 : ℝ)] with x hx hx'
+    dsimp only [Function.comp_apply]
+    rw [max_eq_right hx.le, reciprocalHeckeEulerProductBelow_mertens_product_log x hx',
+      neg_sub, sub_eq_add_neg, add_assoc, Real.exp_add, Real.exp_log (zero_lt_one.trans hx)]
+  rw [reciprocalHeckeEulerProductBelow_mertens_volume F]
+  apply ((Complex.continuous_ofReal.tendsto _).comp hreal).congr
+  intro x
+  rw [reciprocalHeckeEulerProductBelow_at_pole_eq_prod χ t₀ x hχ]
+  simp
+
 
 /-- One Euler polynomial compared with the same polynomial at a point further to the right:
 the loss is at most a sixth power of a quotient of real Euler polynomials. -/
