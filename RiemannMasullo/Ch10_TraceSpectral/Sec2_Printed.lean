@@ -662,7 +662,7 @@ def Printed.spectralLineIsotype_bandAdjoint_contains_jets : Prop :=
       let hI := le_rfl (a := (0 : ℝ))
       let hs₀ := le_of_lt (zero_lt_one.trans hs)
       let normMap : C𝔽(F) →ₜ* ℝ≥0ˣ :=
-        ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+        (continuousIdeleClassNorm F)
       let E := actionIsotype ((hardySobolevTranslation μ normMap 0 0 s hI hs₀).comp
         (ideleClassNorm F).ker.subtype) ω
       let N := (globalThetaSobolev F a hI hs₀).comap E.subtype

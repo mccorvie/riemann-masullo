@@ -24,7 +24,7 @@ attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorel
 local notation "C𝔽(" F ")" => IdeleClassGroup (𝓞 F) F
 local notation "C₁(" F ")" => (ideleClassNorm F).ker
 local notation "m𝔽(" F ")" =>
-  (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C𝔽(F) →ₜ* ℝ≥0ˣ)
+  (continuousIdeleClassNorm F : C𝔽(F) →ₜ* ℝ≥0ˣ)
 local notation "shift(" b ", " t ")" => ((b : ℝ) : ℂ) + (t : ℂ) * Complex.I
 local notation "orderAt(" χ ", " z ")" => meromorphicOrderAt (continuedCompletedHeckeL χ) z
 

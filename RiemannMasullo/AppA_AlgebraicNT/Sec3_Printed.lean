@@ -1,7 +1,6 @@
 module
 
 public import RiemannMasullo.AppA_AlgebraicNT.Sec3
-import all RiemannMasullo.AppA_AlgebraicNT.Sec3
 import Mathlib.NumberTheory.NumberField.Cyclotomic.Basic
 import Mathlib.NumberTheory.NumberField.Discriminant.Different
 

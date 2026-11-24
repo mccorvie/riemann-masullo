@@ -40,7 +40,7 @@ local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
 local notation "C₁" => (ideleClassNorm F).ker
 local notation "μ𝔽" => ideleClassTamagawaMeasure F
 local notation "m𝔽" =>
-  (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C𝔽 →ₜ* ℝ≥0ˣ)
+  (continuousIdeleClassNorm F : C𝔽 →ₜ* ℝ≥0ˣ)
 local notation "logNorm" => (logIdeleClassNorm F)
 local notation "hStrip(" hα ")" => (neg_nonpos.mpr hα |>.trans hα)
 local notation "hs₀(" hs ")" => (le_of_lt (zero_lt_one.trans hs))
@@ -776,7 +776,7 @@ private theorem sobolevProjectiveKernel_l2_tmul_integrates
   have hw : Measurable ((fun g : IdeleClassGroup (𝓞 F) F ↦ intervalSobolevDensity (-α) α s (Real.log
       ((ideleClassNorm F g).val : ℝ)))) :=
     ((continuous_intervalSobolevDensity (-α) α s).comp
-      (continuous_logModule' (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ :
+      (continuous_logModule' (continuousIdeleClassNorm F :
           IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ))).measurable
   have hp (x : (IdeleClassGroup (𝓞 F) F)) : 0 < (fun g : IdeleClassGroup (𝓞 F) F ↦
       intervalSobolevDensity (-α) α s (Real.log ((ideleClassNorm F g).val : ℝ))) x :=

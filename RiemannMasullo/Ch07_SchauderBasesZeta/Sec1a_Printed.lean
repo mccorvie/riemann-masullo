@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1a
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Separation
 import Mathlib.Algebra.Field.ULift
 import Mathlib.NumberTheory.NumberField.Cyclotomic.Embeddings
 import Mathlib.Analysis.Real.Pi.Irrational
@@ -9,12 +10,11 @@ import Mathlib.Analysis.Meromorphic.RCLike
 
 import Mathlib.Algebra.Field.ULift
 import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec1a
-import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
+import RiemannMasullo.Ch02_AdelicTheta.Sec2a
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gaussian.Schwartz
 
 import Mathlib.Algebra.Field.ULift
 import all RiemannMasullo.AppB_AnalyticNT.Sec3
-import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
 
 /-! # §7.1.1–7.1.2 Statements that are false as printed -/

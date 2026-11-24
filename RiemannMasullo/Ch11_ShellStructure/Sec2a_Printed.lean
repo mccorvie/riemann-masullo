@@ -11,6 +11,7 @@ import Mathlib.Analysis.SpecialFunctions.Gaussian.GaussianIntegral
 import Mathlib.NumberTheory.MulChar.Duality
 import Mathlib.RingTheory.RootsOfUnity.AlgebraicallyClosed
 import Mathlib.NumberTheory.DirichletCharacter.Bounds
+import Mathlib.RingTheory.RootsOfUnity.AlgebraicallyClosed
 
 /-! # §11.2.0 assertions that are false as printed -/
 
@@ -43,7 +44,7 @@ local notation "hI" => (le_rfl (a := (0 : ℝ)))
 local notation "H(" F ", " hs ")" => globalThetaSobolev F 0 hI hs
 local notation "ρ(" F ", " hs ")" =>
   hardySobolevTranslation (μ(F))
-    (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C𝔽(F) →ₜ* ℝ≥0ˣ) 0 0 _ hI hs
+    (continuousIdeleClassNorm F : C𝔽(F) →ₜ* ℝ≥0ˣ) 0 0 _ hI hs
 local notation "Wω(" F ", " hs ", " ω ")" =>
   actionIsotype ((ρ(F, hs)).comp (ideleClassNorm F).ker.subtype) ω
 local notation "frequency(" t ")" => ((t : ℝ) : ℂ) * Complex.I

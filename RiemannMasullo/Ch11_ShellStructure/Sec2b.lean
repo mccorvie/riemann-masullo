@@ -3,7 +3,7 @@ module
 public import RiemannMasullo.Ch11_ShellStructure.Sec2a
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4a
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec4
-import all RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.AppA_AlgebraicNT.Sec1
 import RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
 import RiemannMasullo.Ch06_LocalGlobal.Sec2
@@ -11,7 +11,8 @@ import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3b
 import all RiemannMasullo.AppC_LCTVS.Sec3a_part2
 import RiemannMasullo.Ch09_HardySobolev.Sec3
 
-import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
+import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
+import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 
 /-! # Sobolev Paley–Wiener levels and orbital nuclearity
 
@@ -41,9 +42,9 @@ local notation "C₁" => (ideleClassNorm F).ker
 local notation "V" => HeightOneSpectrum (𝓞 F)
 local notation "μ𝔽" => ideleClassTamagawaMeasure F
 local notation "m𝔽" =>
-  (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C𝔽 →ₜ* ℝ≥0ˣ)
+  (continuousIdeleClassNorm F : C𝔽 →ₜ* ℝ≥0ˣ)
 local notation "mₛ(" S ")" =>
-  (⟨sIdeleQuotientNorm F S, (isProperMap_sIdeleQuotientNorm F S).continuous⟩ :
+  (continuousSIdeleQuotientNorm F S :
     SIdeleQuotient F S →ₜ* ℝ≥0ˣ)
 local notation "logNorm(" m ")" => (fun g ↦ Real.log (((m) g).val : ℝ))
 local notation "h₀" => (le_rfl (a := (0 : ℝ)))

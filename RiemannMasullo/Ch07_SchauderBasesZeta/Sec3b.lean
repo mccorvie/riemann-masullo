@@ -5120,7 +5120,10 @@ At repeated primary centers where the Euler value has norm greater than one, wri
 `w` is `b exp(-s log q_w) = 1` and `z = a exp(-s log q_v)`.
 The two logarithms are incommensurable, the Euler values are unbounded, and no
 translation of the height coordinate makes both phases roots of unity.
-For these shifts from infinite-order Hecke characters this is not a known theorem. -/
+For these shifts from infinite-order Hecke characters this is not a known theorem.
+Gap: A polynomial lower bound for a linear form in two logarithms shifted by the phases of a
+Hecke character of infinite order. Baker's theorem covers the unshifted form only, and p. 349
+supplies no bound. -/
 private theorem sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift
     {S₀ : Finset V} (hST : S ⊆ T) (_hT : T = S ∪ S₀) (_hdis : Disjoint S S₀)
     (_hsat : IsSaturatedPlaceSet (F := F) S₀) (_hPic : PicTrivial)

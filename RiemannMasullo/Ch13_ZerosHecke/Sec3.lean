@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Separation
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.AppB_AnalyticNT.Sec4b
 import RiemannMasullo.AppD_SchwartzBruhat.Sec1c
@@ -647,7 +648,7 @@ theorem criticalTraceSpectral_converges (τ : ℝ≥0ˣ →ₜ* C𝔽)
       ∀ φ : criticalTraceTestSubmodule τ,
         HasSum (fun z : lineZeros(τ) ↦ zeroTerm(φ.val, z)) (L φ) := by
   classical
-  let n : C𝔽 →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+  let n : C𝔽 →ₜ* ℝ≥0ˣ := continuousIdeleClassNorm F
   let ι : C₁ →ₜ* C𝔽 := ⟨(ideleClassNorm F).ker.subtype, continuous_subtype_val⟩
   let p : C𝔽 →ₜ* C𝔽 := ContinuousMonoidHom.id C𝔽 / τ.comp n
   have hp (x : C𝔽) : p x ∈ (ideleClassNorm F).ker := by

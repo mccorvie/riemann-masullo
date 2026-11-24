@@ -491,7 +491,7 @@ theorem lcaConvolution_integrable {f g : G → ℂ} (hf : Integrable f μ) (hg :
 
 omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [μ.IsHaarMeasure] [μ.Regular] in
 /-- Multiplication by a conjugated character preserves integrability. -/
-private theorem integrable_fourierIntegrand {f : G → ℂ} (hf : Integrable f μ)
+theorem integrable_fourierIntegrand {f : G → ℂ} (hf : Integrable f μ)
     (χ : PontryaginDual G) : Integrable (fun x ↦ f x * star (χ x : ℂ)) μ := by
   exact hf.mul_bdd (c := 1) ((continuous_subtype_val.comp χ.continuous).star.aestronglyMeasurable)
     (.of_forall fun x ↦ by simp)
@@ -499,7 +499,7 @@ private theorem integrable_fourierIntegrand {f : G → ℂ} (hf : Integrable f �
 omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [BorelSpace G]
     [μ.IsHaarMeasure] [μ.Regular] in
 /-- The Fourier integral is bounded by the integral of the absolute value. -/
-private theorem norm_lcaFourier_le_integral_norm (f : G → ℂ) (χ : PontryaginDual G) :
+theorem norm_lcaFourier_le_integral_norm (f : G → ℂ) (χ : PontryaginDual G) :
     ‖lcaFourier μ f χ‖ ≤ ∫ x, ‖f x‖ ∂μ := by
   simpa only [lcaFourier, norm_mul, norm_star, Circle.norm_coe, mul_one] using
     norm_integral_le_integral_norm (μ := μ) (fun x ↦ f x * star (χ x : ℂ))
@@ -507,7 +507,7 @@ private theorem norm_lcaFourier_le_integral_norm (f : G → ℂ) (χ : Pontryagi
 omit [IsTopologicalGroup G] [μ.IsHaarMeasure] in
 /-- Uniform convergence of characters on compact sets controls the integral, since
 the integral of the norm of an L¹ function outside a suitable compact set is small. -/
-private theorem continuous_lcaFourier {f : G → ℂ} (hf : Integrable f μ) :
+theorem continuous_lcaFourier {f : G → ℂ} (hf : Integrable f μ) :
     Continuous (lcaFourier μ f) := by
   rw [continuous_iff_continuousAt]
   intro ψ
@@ -568,7 +568,7 @@ private theorem continuous_lcaFourier {f : G → ℂ} (hf : Integrable f μ) :
 
 omit [T2Space G] [LocallyCompactSpace G] [μ.Regular] in
 /-- Left translation multiplies the Fourier transform by the corresponding character value. -/
-private theorem lcaFourier_translate (f : G → ℂ) (a : G) (χ : PontryaginDual G) :
+theorem lcaFourier_translate (f : G → ℂ) (a : G) (χ : PontryaginDual G) :
     lcaFourier μ (fun x ↦ f (a * x)) χ = (χ a : ℂ) * lcaFourier μ f χ := by
   have hUnit : (χ a : ℂ) * star (χ a : ℂ) = 1 := by
     rw [Complex.star_def, Complex.mul_conj, Complex.normSq_eq_norm_sq, Circle.norm_coe]
@@ -664,7 +664,7 @@ theorem lcaFourier_zeroAtInfty {f : G → ℂ} (hf : Integrable f μ) :
 
 omit [μ.IsHaarMeasure] in
 /-- An integrable function whose Fourier transform is zero vanishes almost everywhere. -/
-private theorem ae_eq_zero_of_lcaFourier_eq_zero {f : G → ℂ} (hf : Integrable f μ)
+theorem ae_eq_zero_of_lcaFourier_eq_zero {f : G → ℂ} (hf : Integrable f μ)
     (h : ∀ χ, lcaFourier μ f χ = 0) : f =ᵐ[μ] 0 := by
   let e (x : G) : PontryaginDual G →* Circle :=
     { toFun := fun χ ↦ χ x
@@ -1811,7 +1811,7 @@ theorem lcaFourier_unitary (ν : Measure (PontryaginDual G))
 -- the real line has zero transform, and its double transform is everywhere zero.
 
 /-- The integral of an L¹ convolution is the product of the integrals of its factors. -/
-private theorem integral_lcaConvolution {f g : G → ℂ} (hf : Integrable f μ)
+theorem integral_lcaConvolution {f g : G → ℂ} (hf : Integrable f μ)
     (hg : Integrable g μ) :
     (∫ x, lcaConvolution μ f g x ∂μ) = (∫ y, f y ∂μ) * (∫ z, g z ∂μ) := by
   obtain ⟨S, k, hσ, hk, hs, hrow, hcol⟩ := lcaConvolution_kernel μ hf hg
@@ -2633,7 +2633,7 @@ theorem weilQuotientIntegral_L1 (ν : Measure (G ⧸ H)) (hν : IsWeilQuotientMe
 include hH in
 /-- Integrating the translated subgroup measures against the normalized quotient measure
 recovers the group measure. -/
-private theorem weilMeasure_eq_bind [SigmaFinite μ] (ν : Measure (G ⧸ H))
+theorem weilMeasure_eq_bind [SigmaFinite μ] (ν : Measure (G ⧸ H))
     (hν : IsWeilQuotientMeasure H μ μH ν) :
     let κ : G ⧸ H → Measure G := fun q ↦ μH.map (fun h : H ↦ q.out * (h : G))
     Measurable κ ∧ ν.bind κ = μ := by
@@ -3885,7 +3885,7 @@ private theorem elementaryCover_pullback_affine
     rw [hDiscrete, zero_add]
 
 /-- Paper: (D.1.3.7), p. 750. The monomial weight in the real and integer coordinates. -/
-private def elementarySchwartzMonomial (α : Fin m → ℕ) (δ : Fin r → ℕ)
+def elementarySchwartzMonomial (α : Fin m → ℕ) (δ : Fin r → ℕ)
     (x : EuclideanSpace ℝ (Fin m)) (a : Fin r → ℤ) : ℂ :=
   (∏ k, (x k : ℂ) ^ α k) * (∏ k, (a k : ℂ) ^ δ k)
 
@@ -4626,7 +4626,7 @@ theorem elementarySchwartz_withSeminorms_P1 :
 
 /-- Evaluating a fixed mixed partial derivative at a fixed point is a continuous linear functional
 on the elementary Schwartz space: it is dominated by one defining seminorm. -/
-private theorem elementaryPartial_evaluation_continuousLinear
+theorem elementaryPartial_evaluation_continuousLinear
     (β : Fin m → ℕ) (γ : Fin n → ℕ)
     (x : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) (a : Fin r → ℤ) (b : F) :
     ∃ L : ElementarySchwartz m n r F →L[ℂ] ℂ,
@@ -4675,7 +4675,7 @@ private theorem elementaryPartial_evaluation_continuousLinear
 omit [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F] in
 /-- A polynomial weight times a mixed partial is bounded by the sum, over the monomials of the
 polynomial, of the coefficient norms times the corresponding defining seminorms. -/
-private theorem elementarySchwartz_polynomial_weight_le_monomial_sum
+theorem elementarySchwartz_polynomial_weight_le_monomial_sum
     (p : MvPolynomial (Fin m ⊕ Fin r) ℂ) (f : ElementarySchwartz m n r F)
     (β : Fin m → ℕ) (γ : Fin n → ℕ)
     (xt : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) (a : Fin r → ℤ) (b : F) :
@@ -4713,7 +4713,7 @@ private theorem elementarySchwartz_polynomial_weight_le_monomial_sum
 
 /-- For a polynomial weight and a fixed mixed partial, the supremum of the weighted partial is a
 continuous seminorm on the elementary Schwartz space. -/
-private theorem elementarySchwartz_polynomial_weight_continuous_seminorm
+theorem elementarySchwartz_polynomial_weight_continuous_seminorm
     (p : MvPolynomial (Fin m ⊕ Fin r) ℂ) (β : Fin m → ℕ) (γ : Fin n → ℕ) :
     ∃ q : Seminorm ℂ (ElementarySchwartz m n r F), Continuous q ∧
       ∀ f, ENNReal.ofReal (q f) =
@@ -5052,7 +5052,7 @@ theorem elementarySchwartz_withSeminorms_sum :
 
 /-- A multilinear map is bounded by its values on tuples from a finite spanning family whose
 coefficient functions are bounded by the norm. -/
-private theorem norm_multilinear_le_sum_of_repr {ι κ X G : Type*} [Fintype ι] [Fintype κ]
+theorem norm_multilinear_le_sum_of_repr {ι κ X G : Type*} [Fintype ι] [Fintype κ]
     [DecidableEq ι] [NormedAddCommGroup X] [NormedSpace ℝ X] [NormedAddCommGroup G] [NormedSpace ℝ G]
     (e : κ → X) (c : X → κ → ℝ) (hrepr : ∀ v, ∑ j, c v j • e j = v)
     (hc : ∀ v j, ‖c v j‖ ≤ ‖v‖)
@@ -5077,7 +5077,7 @@ private theorem norm_multilinear_le_sum_of_repr {ι κ X G : Type*} [Fintype ι]
 omit [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F] in
 /-- An iterated derivative of a fibre along a tuple of coordinate vectors is the mixed partial
 whose exponents count how often each coordinate vector occurs. -/
-private theorem elementary_iteratedFDeriv_coord_eq (k : ℕ) (t : Fin k → Fin m ⊕ Fin n) :
+theorem elementary_iteratedFDeriv_coord_eq (k : ℕ) (t : Fin k → Fin m ⊕ Fin n) :
     ∃ (β : Fin m → ℕ) (γ : Fin n → ℕ), ∀ (f : ElementaryLieGroup m n r F → ℂ) a b,
       ContDiff ℝ ∞ (fun x ↦ f (elementaryCover x a b)) → ∀ x,
       iteratedFDeriv ℝ k (fun z ↦ f (elementaryCover z a b)) x
@@ -5148,7 +5148,7 @@ private theorem elementary_iteratedFDeriv_coord_eq (k : ℕ) (t : Fin k → Fin 
 
 omit [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F] in
 /-- A point of the cover is the sum of its coordinates times the coordinate vectors. -/
-private theorem elementary_coord_repr (v : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) :
+theorem elementary_coord_repr (v : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) :
     ∑ j : Fin m ⊕ Fin n, Sum.elim (fun j ↦ v.1 j) (fun j ↦ v.2 j) j •
       Sum.elim (fun j ↦ ((EuclideanSpace.single j 1 : EuclideanSpace ℝ (Fin m)),
         (0 : EuclideanSpace ℝ (Fin n))))
@@ -7154,7 +7154,7 @@ open Function
 variable [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F]
 
 /-- Evaluation at any point of the elementary group is continuous. -/
-private theorem elementarySchwartz_eval (g : ElementaryLieGroup m n r F) :
+theorem elementarySchwartz_eval (g : ElementaryLieGroup m n r F) :
     ∃ L : StrongDual ℂ (ElementarySchwartz m n r F), ∀ f, L f = f g := by
   obtain ⟨t, ht⟩ := elementaryCover_surjective g.2.2.1 g.2.2.2 g.1 g.2.1
   simpa only [elementaryPartial_zero, ht] using

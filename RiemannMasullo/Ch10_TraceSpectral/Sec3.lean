@@ -138,7 +138,7 @@ local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
 local notation "C₁" => (ideleClassNorm F).ker
 local notation "μ𝔽" => ideleClassTamagawaMeasure F
 local notation "m𝔽" =>
-  (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C𝔽 →ₜ* ℝ≥0ˣ)
+  (continuousIdeleClassNorm F : C𝔽 →ₜ* ℝ≥0ˣ)
 local notation "W(" l ", " r ", " s ")" =>
   CompactIntervalSobolev μ𝔽 (fun g : C𝔽 ↦ Real.log ((ideleClassNorm F g).val : ℝ)) l r s
 local notation "Θ(" a ", " hI ", " hs ")" => globalThetaSobolev F a hI hs
@@ -1823,7 +1823,9 @@ operator on the biorthogonal vectors, the scalar traces of the individual zero
 blocks are summable. The jets at each zero are summed before testing summability.
 The estimates for (10.3.2.7) involve only Mellin derivatives and give no bound for these
 pairings with a compact operator. A summable majorant for the absolute block
-traces, allowed to depend on the operator and test, would suffice. -/
+traces, allowed to depend on the operator and test, would suffice.
+Gap: The estimates on pp. 454–455 bound Mellin derivatives only. No bound for the block traces
+against an arbitrary compact operator, allowing clusters of zeros, is supplied or known to us. -/
 private theorem spectralStripConvolution_traceCauchy_compact_block_series (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
     (_hχ : IsSpectralBasepointChoice (F := F) (fun ω ↦ χ ω))
     {α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s) (φ : BruhatCompactSupport C𝔽)

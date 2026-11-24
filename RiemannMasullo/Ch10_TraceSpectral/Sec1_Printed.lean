@@ -3,13 +3,16 @@ module
 public import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.Ch03_IdelicZeta.RatEmptyFourier
 
-import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import RiemannMasullo.AppA_AlgebraicNT.Sec3
+import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import RiemannMasullo.Ch06_LocalGlobal.Sec2
+import Mathlib.Topology.Algebra.IsOpenUnits
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Gaussian
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gaussian.Schwartz
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Count
 import Mathlib.Analysis.Calculus.BumpFunction.FiniteDimension
 import Mathlib.MeasureTheory.Function.L2Space
+import Mathlib.MeasureTheory.Measure.Lebesgue.VolumeOfBalls
 import Mathlib.NumberTheory.NumberField.Cyclotomic.Basic
 import Mathlib.NumberTheory.NumberField.Cyclotomic.Embeddings
 import Mathlib.NumberTheory.NumberField.Cyclotomic.PID
@@ -41,7 +44,7 @@ def Printed.globalThetaSobolev_closedIntervals_finite : Prop :=
   ∀ (F : Type) [Field F] [NumberField F] (a s : ℝ), 0 ≤ s →
     ∀ I : Set ℝ, IsClosed I → OrdConnected I → (interior I).Nonempty →
     ∀ f : adelePolarSubspace F,
-      let m := (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ :
+      let m := (continuousIdeleClassNorm F :
         IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ)
       intervalSobolevENorm (ideleClassTamagawaMeasure F) (fun g ↦ Real.log ((m g).val : ℝ))
         I s (modulationWeight m a (adelicTheta f.val)) ≠ ⊤
@@ -327,7 +330,7 @@ test is asserted to belong to the Sobolev space for the whole half-line (-a,∞)
 def Printed.sLocalThetaSobolev_openHalfLine_finite : Prop :=
   ∀ (F : Type) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F)))
     (a s : ℝ), 0 < a → 0 ≤ s → ∀ f : SchwartzBruhat (Multiplicative (SAdeleRing F S)),
-      let m := (⟨sIdeleQuotientNorm F S, (isProperMap_sIdeleQuotientNorm F S).continuous⟩ :
+      let m := (continuousSIdeleQuotientNorm F S :
         SIdeleQuotient F S →ₜ* ℝ≥0ˣ)
       intervalSobolevENorm (sLocalQuotientTamagawaMeasure F S)
         (fun g ↦ Real.log ((m g).val : ℝ)) (Ioi (-a)) s
@@ -797,7 +800,7 @@ The factors carry the norm of their weighted homogeneous functions. -/
 def Printed.globalThetaSobolev_rawIsotypeDecomposition : Prop :=
   ∀ (F : Type) [Field F] [NumberField F] (a α β s : ℝ), α ≤ β → 0 ≤ s →
     let G := IdeleClassGroup (𝓞 F) F
-    let m : G →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+    let m : G →ₜ* ℝ≥0ˣ := continuousIdeleClassNorm F
     let μ := ideleClassTamagawaMeasure F
     let W := CompactIntervalSobolev μ (fun g ↦ Real.log ((m g).val : ℝ)) α β s
     Printed.HasHomogeneousSobolevFactorization (X := GlobalAdelicThetaSpace F)
@@ -1053,9 +1056,9 @@ private theorem Printed.rawIsotype_global_aux (F : Type) [Field F] [NumberField 
       (fun u : CompactIntervalSobolev (ideleClassTamagawaMeasure F)
           (fun g ↦ Real.log ((ideleClassNorm F g).val : ℝ)) 0 0 0 ↦ ⇑u)
       Submodule.Quotient.mk (fun _ ↦ Submodule.Quotient.mk)
-      (fun f ↦ modulationWeight (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ :
+      (fun f ↦ modulationWeight (continuousIdeleClassNorm F :
           IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ) 0 (adelicTheta f))
-      (fun ω f ↦ modulationWeight (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ :
+      (fun ω f ↦ modulationWeight (continuousIdeleClassNorm F :
           IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ) 0 (homogeneousAdelicTheta ω f))) : False := by
   obtain ⟨f, _, hg0⟩ := globalTheta_zero_eval_theta_one F
   have hF := Printed.rawIsotype_factorization_norm h
@@ -1096,7 +1099,7 @@ def Printed.sLocalThetaSobolev_rawIsotypeDecomposition : Prop :=
   ∀ (F : Type) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F)))
     (a α β s : ℝ), 0 < a → α ≤ β → 0 ≤ s → 0 < α →
     let G := SIdeleQuotient F S
-    let m : G →ₜ* ℝ≥0ˣ := ⟨sIdeleQuotientNorm F S, (isProperMap_sIdeleQuotientNorm F S).continuous⟩
+    let m : G →ₜ* ℝ≥0ˣ := continuousSIdeleQuotientNorm F S
     let μ := sLocalQuotientTamagawaMeasure F S
     let W := CompactIntervalSobolev μ (fun g ↦ Real.log ((m g).val : ℝ)) α β s
     Printed.HasHomogeneousSobolevFactorization (X := SLocalAdelicThetaSpace F S)
@@ -1202,11 +1205,9 @@ private theorem Printed.rawIsotype_sLocal_aux (F : Type) [Field F] [NumberField 
       (fun u : CompactIntervalSobolev (sLocalQuotientTamagawaMeasure F S)
           (fun g ↦ Real.log ((sIdeleQuotientNorm F S g).val : ℝ)) 1 1 0 ↦ ⇑u)
       Submodule.Quotient.mk (fun _ ↦ Submodule.Quotient.mk)
-      (fun f ↦ modulationWeight (⟨sIdeleQuotientNorm F S,
-          (isProperMap_sIdeleQuotientNorm F S).continuous⟩ : SIdeleQuotient F S →ₜ* ℝ≥0ˣ) 1
+      (fun f ↦ modulationWeight (continuousSIdeleQuotientNorm F S : SIdeleQuotient F S →ₜ* ℝ≥0ˣ) 1
             (sLocalAdelicThetaOnClasses F S f))
-      (fun ω f ↦ modulationWeight (⟨sIdeleQuotientNorm F S,
-          (isProperMap_sIdeleQuotientNorm F S).continuous⟩ : SIdeleQuotient F S →ₜ* ℝ≥0ˣ) 1
+      (fun ω f ↦ modulationWeight (continuousSIdeleQuotientNorm F S : SIdeleQuotient F S →ₜ* ℝ≥0ˣ) 1
             (sLocalHomogeneousAdelicThetaLinearMap F S ω f))) : False := by
   have hF := Printed.rawIsotype_factorization_norm' h (withDensity_absolutelyContinuous _ _) f
   have : CompactSpace (sIdeleQuotientNorm F S).ker := isCompact_iff_compactSpace.mp
@@ -1230,8 +1231,7 @@ private theorem Printed.rawIsotype_sLocal_aux (F : Type) [Field F] [NumberField 
   have hmc : Continuous fun g : SIdeleQuotient F S ↦ ((sIdeleQuotientNorm F S g).val : ℝ) :=
     NNReal.continuous_coe.comp (Units.continuous_val.comp
       (isProperMap_sIdeleQuotientNorm F S).continuous)
-  have hvc : Continuous (modulationWeight (⟨sIdeleQuotientNorm F S,
-      (isProperMap_sIdeleQuotientNorm F S).continuous⟩ : SIdeleQuotient F S →ₜ* ℝ≥0ˣ) 1
+  have hvc : Continuous (modulationWeight (continuousSIdeleQuotientNorm F S : SIdeleQuotient F S →ₜ* ℝ≥0ˣ) 1
         (sLocalAdelicThetaOnClasses F S f)) := by
     change Continuous fun g ↦ ((((sIdeleQuotientNorm F S g).val : ℝ) ^ (1 : ℝ) : ℝ) : ℂ) *
       sLocalAdelicThetaOnClasses F S f g

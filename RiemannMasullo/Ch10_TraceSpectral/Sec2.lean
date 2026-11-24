@@ -55,7 +55,7 @@ local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
 local notation "C₁" => (ideleClassNorm F).ker
 local notation "μ𝔽" => ideleClassTamagawaMeasure F
 local notation "m𝔽" =>
-  (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C𝔽 →ₜ* ℝ≥0ˣ)
+  (continuousIdeleClassNorm F : C𝔽 →ₜ* ℝ≥0ˣ)
 local notation "logNorm" => (logIdeleClassNorm F)
 local notation "W(" l ", " r ", " s ")" => CompactIntervalSobolev μ𝔽 logNorm l r s
 local notation "W'(" l ", " r ", " s ")" => CompactIntervalSobolev μ𝔽 logNorm l r s true
@@ -616,7 +616,7 @@ theorem exists_spectralBasepointChoice (F : Type*) [Field F] [NumberField F] :
     ∃ χ : PontryaginDual (ideleClassNorm F).ker → PontryaginDual (IdeleClassGroup (𝓞 F) F),
       IsSpectralBasepointChoice χ := by
   let C := IdeleClassGroup (𝓞 F) F
-  let n : C →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+  let n : C →ₜ* ℝ≥0ˣ := continuousIdeleClassNorm F
   let q : IdeleGroup (𝓞 F) F →ₜ* C := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
   let σ : ℝ≥0ˣ →ₜ* C := q.comp
     ⟨canonicalIdeleNormSection F, canonicalIdeleNormSection_continuous F⟩
@@ -8544,7 +8544,10 @@ theorem spectralStripJet_lowerBound (χ : PontryaginDual C₁ → PontryaginDual
 multiplicity among multiple completed Hecke zeros, over all ordinates and chosen characters.
 The norm integral on p. 447 gives no such restriction. It would suffice to bound the
 multiplicities on the line with that real part and exclude multiple zeros on all other
-sufficiently nearby vertical lines. -/
+sufficiently nearby vertical lines.
+Gap: Neither a bound for the multiplicities of the zeros on a vertical line nor the absence
+of multiple zeros on the nearby lines is known, and Remark 10.2.1.5 and Proposition 10.2.2.2
+supply no argument for either. -/
 private theorem spectralStripJet_order_and_margin_locally_finite_multiple_zeros
     (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (_hχ : IsSpectralBasepointChoice χ) (x : ℝ) :
     ∃ U ∈ 𝓝 x, {p : ℝ × ℕ | p.1 ∈ U ∧ 1 < p.2 ∧ ∃ (ω : PontryaginDual C₁) (t : ℝ),

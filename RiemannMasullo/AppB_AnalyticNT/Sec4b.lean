@@ -1,6 +1,6 @@
 module
 
-import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import RiemannMasullo.AppA_AlgebraicNT.Sec3
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2a
 import RiemannMasullo.ForMathlib.Analysis.Normed.Field.ProperSpace
 import RiemannMasullo.AppB_AnalyticNT.Sec1
@@ -11,7 +11,7 @@ import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import RiemannMasullo.ForMathlib.Analysis.Complex.LandauLemma
 import RiemannMasullo.ForMathlib.Analysis.Fourier.Log
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.WeightedIntegral
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec2a
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3b
@@ -27,6 +27,7 @@ import Mathlib.Analysis.SpecialFunctions.FrullaniIntegral
 import Mathlib.Topology.Algebra.IsOpenUnits
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 import RiemannMasullo.External.Grh.Props.HeckeContourReflection
+import Mathlib.Algebra.Order.Chebyshev
 
 /-!
 # Explicit formulas for Hecke L-functions

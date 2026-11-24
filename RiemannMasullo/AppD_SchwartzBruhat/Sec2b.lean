@@ -3,7 +3,7 @@ module
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec1d
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 public import Mathlib.Topology.MetricSpace.ProperSpace.Real
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1a
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1a
 import Mathlib.MeasureTheory.Measure.Haar.Unique
 import Mathlib.Topology.Algebra.LinearMapCompletion
 import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Extend

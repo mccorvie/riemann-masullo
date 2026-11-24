@@ -1,12 +1,13 @@
 module
 
+public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec4
 import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec2
 import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec4
 import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec6
 import Mathlib.Topology.Algebra.Module.Equiv.Submodule
 
-import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import RiemannMasullo.AppA_AlgebraicNT.Sec3
 
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 
@@ -44,7 +45,7 @@ local notation "C₁" => (ideleClassNorm F).ker
 local notation "ω(" χ ")" => (χ : U).comp
   (⟨(ideleClassNorm F).ker.subtype, continuous_subtype_val⟩ : C₁ →ₜ* C𝔽)
 local notation "m𝔽" =>
-  (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C𝔽 →ₜ* ℝ≥0ˣ)
+  (continuousIdeleClassNorm F : C𝔽 →ₜ* ℝ≥0ˣ)
 local notation "P" => adelePolarSubspace F
 local notation "K(" ω ")" => LinearMap.ker ((homogeneousAdelicThetaLinearMap F ω).domRestrict P)
 local notation "B" => SchwartzBergman (univ : Set ℝ)
@@ -4262,7 +4263,7 @@ private theorem strongCoprimalityPrimaryQuotient_sequence_decay {F : Type*} [Fie
   let : BorelSpace G := ⟨rfl⟩
   let μ := ideleClassTamagawaMeasure F
   let : μ.IsHaarMeasure := (ideleClassTamagawaMeasure_isWeil F).1
-  let m : G →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+  let m : G →ₜ* ℝ≥0ˣ := continuousIdeleClassNorm F
   have hmod := strongCoprimalityNorm_isModulation_surjective (F := F)
   let a (v : HeightOneSpectrum (𝓞 F)) := (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v (π v))⁻¹
   let γs (k : Fin S.toList.length) := a (S.toList.get k)
@@ -4342,7 +4343,7 @@ private theorem strongCoprimalityPrimaryQuotient_sequence_lift {F : Type*} [Fiel
     let : SecondCountableTopology (IdeleGroup (𝓞 F) F) := idele_secondCountable F
     exact (ideleGroup_quotient.{_,0} F).2.2.2.2.1.secondCountableTopology
   let m : IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ :=
-    ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+    (continuousIdeleClassNorm F)
   have hmod := strongCoprimalityNorm_isModulation_surjective (F := F)
   obtain ⟨σ, hσ⟩ := exists_surjectiveModulation_section m hmod.1 hmod.2
   have hk (g : IdeleClassGroup (𝓞 F) F) : g / σ (m g) ∈ (ideleClassNorm F).ker := by

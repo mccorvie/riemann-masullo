@@ -20,6 +20,8 @@ import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.SplitPrimeDensity
 import all RiemannMasullo.AppB_AnalyticNT.Sec1
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 
 /-!
 # §7.1.3–7.1.4 Polar multiplicities and spectral biorthogonal sequences

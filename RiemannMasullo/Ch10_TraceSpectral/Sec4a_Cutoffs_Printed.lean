@@ -25,7 +25,7 @@ attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorel
 
 local notation "C[" F "]" => IdeleClassGroup (𝓞 F) F
 local notation "m[" F "]" =>
-  (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C[F] →ₜ* ℝ≥0ˣ)
+  (continuousIdeleClassNorm F : C[F] →ₜ* ℝ≥0ˣ)
 local notation "μ[" F "]" => ideleClassTamagawaMeasure F
 local notation "logNorm[" F "]" => (logIdeleClassNorm F)
 
