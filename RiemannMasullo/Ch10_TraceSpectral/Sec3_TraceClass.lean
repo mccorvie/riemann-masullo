@@ -6,7 +6,8 @@ import RiemannMasullo.Ch10_TraceSpectral.Sec3_BasepointChoice
 import RiemannMasullo.Ch10_TraceSpectral.Sec3_MellinDecay
 import RiemannMasullo.Ch10_TraceSpectral.Sec2_Basepoint
 import RiemannMasullo.Ch10_TraceSpectral.Sec3_ArchimedeanFlows
-import RiemannMasullo.ForMathlib.Analysis.Complex.GoodHeightFamily
+import Mathlib.Analysis.Complex.AbsMax
+import Mathlib.Analysis.Complex.RemovableSingularity
 import RiemannMasullo.ForMathlib.Topology.Algebra.InfiniteSum.PolynomialCount
 
 /-! # Trace class of the spectral convolution, for every number field and every test
@@ -25,11 +26,11 @@ that data, with every constant uniform in the component, and sums over the compo
 (`spectralStripConvolution_exists_clusterBoundaryData`,
 `spectralStripConvolution_summable_clusterTraceNorms`).
 
-The pieces, each from another file:
+The construction uses the following inputs.
 * the entire multipliers `ϑ ω`, bounded by one on a wide strip and bounded below on the two
   vertical sides (`Sec3_HeckeMultipliers`);
 * heights `T ω k ∈ [2k, 2k + 1]` with a lower bound on the horizontal sides
-  (`exists_goodHeight_windows_of_norm_le_one` of `ForMathlib/Analysis/Complex/GoodHeightFamily`);
+  from finite interpolation on equally spaced heights (`HorizontalWindow.windows`);
 * the number of zeros between two heights, by Jensen's inequality (`Sec3_HeckeMultipliers`);
 * the decay of the Mellin transform of the test along one-parameter subgroups, uniform in the
   character (`Sec3_MellinDecay`);
@@ -61,6 +62,325 @@ local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
 local notation "C₁" => (ideleClassNorm F).ker
 local notation "μ𝔽" => ideleClassTamagawaMeasure F
 
+namespace HorizontalWindow
+
+open Metric
+
+/-- Neville interpolation on consecutive nodes. -/
+private def interpolate (z v : ℕ → ℂ) : ℕ → ℕ → ℂ → ℂ
+  | 0, i, _ => v i
+  | m + 1, i, w =>
+    ((w - z i) * interpolate z v m (i + 1) w -
+      (w - z (i + (m + 1))) * interpolate z v m i w) /
+        (z (i + (m + 1)) - z i)
+
+private theorem interpolate_diff (z v : ℕ → ℂ) (m i : ℕ) :
+    Differentiable ℂ (interpolate z v m i) := by
+  induction m generalizing i with
+  | zero => exact differentiable_const _
+  | succ m ih =>
+    change Differentiable ℂ (fun w ↦ ((w - z i) * interpolate z v m (i + 1) w -
+      (w - z (i + (m + 1))) * interpolate z v m i w) / (z (i + (m+1)) - z i))
+    fun_prop (disch := exact ih _)
+
+private theorem interpolate_node {z v : ℕ → ℂ} (hz : Function.Injective z) (m i j : ℕ)
+    (hj : j ≤ m) : interpolate z v m i (z (i + j)) = v (i + j) := by
+  induction m generalizing i j with
+  | zero =>
+    obtain rfl : j = 0 := by omega
+    simp [interpolate]
+  | succ m ih =>
+    unfold interpolate
+    have hne : z (i + (m + 1)) - z i ≠ 0 := sub_ne_zero.mpr (hz.ne (by omega))
+    by_cases hj₀ : j = 0
+    · subst j
+      simp only [Nat.add_zero, sub_self, zero_mul, zero_sub]
+      rw [show interpolate z v m i (z i) = v i by simpa using ih i 0 (Nat.zero_le _)]
+      field_simp
+      ring
+    · obtain ⟨j, rfl⟩ := Nat.exists_eq_succ_of_ne_zero hj₀
+      have hfirst : interpolate z v m (i + 1) (z (i + (j + 1))) = v (i + (j + 1)) := by
+        simpa only [show i + 1 + j = i + (j + 1) by omega] using ih (i + 1) j (by omega)
+      rw [hfirst]
+      by_cases heq : j = m
+      · subst j
+        simp only [sub_self, zero_mul, sub_zero]
+        field_simp
+      · rw [ih i (j + 1) (by omega)]
+        field_simp
+        ring
+
+/-- Across equally spaced imaginary coordinates, the denominator at depth m is at least m/D.
+The factorial compensates for grid refinement. -/
+private theorem interpolate_norm {z v : ℕ → ℂ} {N : ℕ} {D L E : ℝ} {w : ℂ}
+    (hD : 0 < D) (hL : 0 ≤ L) (hE : 0 ≤ E)
+    (hs : ∀ i m : ℕ, i + (m + 1) ≤ N →
+      ((m : ℝ) + 1) / D ≤ ‖z (i + (m + 1)) - z i‖)
+    (hz : ∀ i ≤ N, ‖w - z i‖ ≤ L) (hv : ∀ i ≤ N, ‖v i‖ ≤ E)
+    (m i : ℕ) (hi : i + m ≤ N) :
+    ‖interpolate z v m i w‖ ≤ E * (2 * L * D) ^ m / (m.factorial : ℝ) := by
+  induction m generalizing i with
+  | zero => simpa [interpolate] using hv i (by omega)
+  | succ m ih =>
+    let A := E * (2 * L * D) ^ m / (m.factorial : ℝ)
+    have hb₁ : ‖interpolate z v m (i + 1) w‖ ≤ A := ih (i+1) (by omega)
+    have hb₂ : ‖interpolate z v m i w‖ ≤ A := ih i (by omega)
+    have hd : 0 < ((m : ℝ) + 1) / D := by positivity
+    rw [interpolate, norm_div]
+    calc
+      _ ≤ (‖(w - z i) * interpolate z v m (i + 1) w‖ +
+            ‖(w - z (i + (m + 1))) * interpolate z v m i w‖) /
+          ‖z (i + (m + 1)) - z i‖ :=
+        div_le_div_of_nonneg_right (norm_sub_le _ _) (norm_nonneg _)
+      _ ≤ (L * A + L * A) / (((m : ℝ) + 1) / D) := by
+        rw [norm_mul, norm_mul]
+        gcongr
+        · exact hz _ (by omega)
+        · exact hz _ hi
+        · exact hs i m hi
+      _ = _ := by
+        dsimp [A]
+        rw [Nat.factorial_succ, Nat.cast_mul, Nat.cast_add_one, pow_succ]
+        field_simp
+        ring
+
+/-- Each specified zero reduces the central modulus by r/(R-r). The divided slope removes
+one known zero at a time without factoring the original function into all of its zeros. -/
+private theorem norm_center_of_zeros {c : ℂ} {R r : ℝ} (hr : 0 ≤ r) (hrR : r < R)
+    (z : ℕ → ℂ) (hinj : Function.Injective z) (n : ℕ) {f : ℂ → ℂ} {M : ℝ}
+    (hf : Differentiable ℂ f) (hb : ∀ w ∈ sphere c R, ‖f w‖ ≤ M)
+    (hnodes : ∀ j < n, ‖z j - c‖ ≤ r) (hzeros : ∀ j < n, f (z j) = 0) :
+    ‖f c‖ ≤ M * (r / (R-r)) ^ n := by
+  have hR : 0 < R := lt_of_le_of_lt hr hrR
+  induction n generalizing f M with
+  | zero =>
+    simp only [pow_zero, mul_one]
+    exact Complex.norm_le_of_forall_mem_frontier_norm_le isBounded_ball hf.diffContOnCl
+      (fun w hw ↦ hb w (frontier_ball_subset_sphere hw)) (subset_closure (mem_ball_self hR))
+  | succ n ih =>
+    let g := dslope f (z n)
+    have hg : Differentiable ℂ g :=
+      differentiableOn_univ.mp ((Complex.differentiableOn_dslope Filter.univ_mem).mpr hf.differentiableOn)
+    have hfn := hzeros n (by omega)
+    have hfg (w : ℂ) : (w - z n) * g w = f w := by
+      simpa only [g, smul_eq_mul, hfn, sub_zero] using sub_smul_dslope f (z n) w
+    have hgb (w : ℂ) (hw : w ∈ sphere c R) : ‖g w‖ ≤ M / (R-r) := by
+      apply (le_div_iff₀ (by linarith)).mpr
+      have hdist : R-r ≤ ‖w - z n‖ := by
+        have htri := norm_sub_le (w-z n) (c-z n)
+        rw [show w-z n-(c-z n) = w-c by ring, mem_sphere_iff_norm.mp hw,
+          norm_sub_rev c (z n)] at htri
+        linarith [hnodes n (by omega)]
+      calc
+        _ ≤ ‖g w‖ * ‖w - z n‖ := mul_le_mul_of_nonneg_left hdist (norm_nonneg _)
+        _ = ‖f w‖ := by rw [mul_comm, ← norm_mul, hfg]
+        _ ≤ M := hb w hw
+    have hg0 (j : ℕ) (hj : j < n) : g (z j) = 0 := by
+      have heq := hfg (z j)
+      rw [hzeros j (by omega)] at heq
+      exact (mul_eq_zero.mp heq).resolve_left (sub_ne_zero.mpr (hinj.ne (by omega)))
+    have hc := ih hg hgb (fun j hj ↦ hnodes j (by omega)) hg0
+    calc
+      ‖f c‖ = ‖c - z n‖ * ‖g c‖ := by rw [← hfg c, norm_mul]
+      _ ≤ r * (M / (R-r) * (r/(R-r))^n) :=
+        mul_le_mul (by rw [norm_sub_rev]; exact hnodes n (by omega)) hc (norm_nonneg _) hr
+      _ = _ := by rw [pow_succ]; ring
+
+private theorem grid_factorial_le (n : ℕ) {L : ℝ} (hL : 0 ≤ L) :
+    (2 * L * (4 * ((n : ℝ) + 1)))^n / (n.factorial : ℝ) ≤
+      (8 * L * Real.exp 2)^n := by
+  rcases n with _ | n
+  · simp
+  have hn : 1 ≤ ((n + 1 : ℕ) : ℝ) := by exact_mod_cast Nat.succ_pos n
+  have he := Real.pow_div_factorial_le_exp _ (by positivity : 0 ≤ ((n+1 : ℕ) : ℝ) + 1) (n+1)
+  have h2 : Real.exp (((n+1 : ℕ) : ℝ) + 1) ≤ Real.exp 2 ^ (n+1) := by
+    rw [← Real.exp_nat_mul]
+    apply Real.exp_le_exp.mpr
+    linarith
+  calc
+    _ = (8 * L)^(n+1) * ((((n+1 : ℕ) : ℝ) + 1)^(n+1) / ((n+1).factorial : ℝ)) := by
+      rw [← mul_div_assoc, ← mul_pow]
+      ring
+    _ ≤ (8 * L)^(n+1) * Real.exp 2^(n+1) :=
+      mul_le_mul_of_nonneg_left (he.trans h2) (by positivity)
+    _ = _ := (mul_pow _ _ _).symm
+
+private theorem grid_center_bound {z : ℕ → ℂ} {f : ℂ → ℂ} {c : ℂ} {R r L E : ℝ} {n : ℕ}
+    (hf : Differentiable ℂ f) (hb : ∀ w ∈ sphere c R, ‖f w‖ ≤ 1)
+    (hr : 0 ≤ r) (hrR : r < R) (hL : 0 ≤ L) (hE : 0 ≤ E)
+    (hRL : R + r ≤ L) (hinj : Function.Injective z)
+    (hnodes : ∀ i ≤ n, ‖z i - c‖ ≤ r)
+    (hsep : ∀ i m : ℕ, i + (m + 1) ≤ n →
+      ((m : ℝ) + 1) / (4*((n : ℝ)+1)) ≤ ‖z (i + (m + 1)) - z i‖)
+    (hsmall : ∀ i ≤ n, ‖f (z i)‖ ≤ E) :
+    ‖f c‖ ≤ E * (8 * L * Real.exp 2)^n +
+      (1 + E * (8 * L * Real.exp 2)^n) * (r / (R-r))^(n+1) := by
+  let P := interpolate z (f ∘ z) n 0
+  have hP (w : ℂ) (hw : ‖w-c‖ ≤ R) : ‖P w‖ ≤ E * (8 * L * Real.exp 2)^n := by
+    have hz (i : ℕ) (hi : i ≤ n) : ‖w - z i‖ ≤ L := by
+      calc
+        _ ≤ ‖w - c‖ + ‖c - z i‖ := by
+          simpa only [sub_add_sub_cancel] using norm_add_le (w - c) (c - z i)
+        _ ≤ L := by rw [norm_sub_rev c (z i)]; linarith [hnodes i hi]
+    calc
+      _ ≤ E * (2 * L * (4*((n : ℝ)+1)))^n / (n.factorial : ℝ) :=
+        interpolate_norm (by positivity) hL hE hsep hz hsmall n 0 (by omega)
+      _ = E * ((2 * L * (4*((n : ℝ)+1)))^n / (n.factorial : ℝ)) := by ring
+      _ ≤ _ := mul_le_mul_of_nonneg_left (grid_factorial_le n hL) hE
+  let g := f - P
+  have hg : Differentiable ℂ g := hf.sub (interpolate_diff z (f ∘ z) n 0)
+  have hgb (w : ℂ) (hw : w ∈ sphere c R) :
+      ‖g w‖ ≤ 1 + E * (8 * L * Real.exp 2)^n :=
+    (norm_sub_le (f w) (P w)).trans (add_le_add (hb w hw) (hP w (mem_sphere_iff_norm.mp hw).le))
+  have hzeros (j : ℕ) (hj : j < n+1) : g (z j) = 0 := by
+    change f (z j) - interpolate z (f ∘ z) n 0 (z j) = 0
+    rw [show interpolate z (f ∘ z) n 0 (z j) = f (z j) by
+      simpa using interpolate_node (v := f ∘ z) hinj n 0 j (by omega)]
+    exact sub_self _
+  have hg0 := norm_center_of_zeros hr hrR z hinj (n+1) hg hgb (fun j hj ↦ hnodes j (by omega)) hzeros
+  calc
+    ‖f c‖ = ‖P c + g c‖ := by simp [g]
+    _ ≤ ‖P c‖ + ‖g c‖ := norm_add_le _ _
+    _ ≤ _ := add_le_add (hP c (by simp; linarith)) hg0
+
+private theorem small_grid_error {δ B q : ℝ} {e n : ℕ} (hd : 0 < δ) (hq : 0 < q)
+    (hB : 0 ≤ B) (he : q^e * B ≤ 1) (hn : δ/4 ≤ q^n) :
+    (δ/4)^(e+1) * B^n ≤ δ/4 := by
+  have hpower := pow_le_pow_left₀ (by positivity : 0 ≤ δ/4) hn e
+  calc
+    _ = (δ/4) * ((δ/4)^e * B^n) := by rw [pow_succ]; ring
+    _ ≤ (δ/4) * ((q^n)^e * B^n) := by gcongr
+    _ = (δ/4) * (q^e*B)^n := by rw [mul_pow, ← pow_mul, ← pow_mul, Nat.mul_comm n e]
+    _ ≤ (δ/4) * 1 := by
+      gcongr
+      simpa only [one_pow] using pow_le_pow_left₀ (by positivity) he n
+    _ = _ := mul_one _
+
+/-- A polynomial central lower bound on one point gives a power lower bound along an entire
+horizontal segment at some height of the unit interval. -/
+private theorem exists_height {ρ : ℝ} (hρ : 1 ≤ ρ) :
+    ∃ e : ℕ, ∀ {f : ℂ → ℂ} {x T δ : ℝ}, Differentiable ℂ f → 0 < δ →
+      δ ≤ ‖f ⟨x,T⟩‖ → (∀ w : ℂ, x - 6*ρ ≤ w.re → w.re ≤ x + 6*ρ → ‖f w‖ ≤ 1) →
+      ∃ t ∈ Icc T (T+1), ∀ σ ∈ Icc (x-5/2*ρ) (x+5/2*ρ), (δ/4)^e ≤ ‖f ⟨σ,t⟩‖ := by
+  let q : ℝ := 11/13
+  let L := 9*ρ
+  let B := 8 * L * Real.exp 2
+  have hq : 0 < q := by norm_num [q]
+  have hq1 : q < 1 := by norm_num [q]
+  have hL : 0 < L := by dsimp [L]; linarith
+  have hB : 0 < B := by dsimp [B]; positivity
+  obtain ⟨e, he⟩ : ∃ e : ℕ, q^e < 1/B := exists_pow_lt_of_lt_one (by positivity) hq1
+  refine ⟨e+1, ?_⟩
+  intro f x T δ hf hd hfc hfstrip
+  let c : ℂ := ⟨x,T⟩
+  have hδ1 : δ ≤ 1 := hfc.trans (hfstrip c (by dsimp [c]; linarith) (by dsimp [c]; linarith))
+  obtain ⟨n,hn₁,hn₂⟩ := exists_nat_pow_near_of_lt_one (by positivity : 0 < δ/4)
+    (by linarith : δ/4 ≤ 1) hq hq1
+  let D := 4*((n : ℝ)+1)
+  let t (i : ℕ) : ℝ := T + i/D
+  have hD : 0 < D := by dsimp [D]; positivity
+  have ht (i : ℕ) (hi : i ≤ n) : 0 ≤ (i : ℝ)/D ∧ (i : ℝ)/D ≤ 1/4 := by
+    refine ⟨by positivity, (div_le_iff₀ hD).mpr ?_⟩
+    dsimp [D]
+    linarith [show (i : ℝ) ≤ n by exact_mod_cast hi]
+  by_contra! hbad
+  have hchoice (i : ℕ) : ∃ σ : ℝ, i ≤ n → σ ∈ Icc (x-5/2*ρ) (x+5/2*ρ) ∧
+      ‖f ⟨σ,t i⟩‖ < (δ/4)^(e+1) := by
+    by_cases hi : i ≤ n
+    · have hti : t i ∈ Icc T (T+1) := by
+        dsimp [t]
+        exact ⟨by linarith [(ht i hi).1], by linarith [(ht i hi).2]⟩
+      obtain ⟨σ,hσ,hv⟩ := hbad (t i) hti
+      exact ⟨σ,fun _ ↦ ⟨hσ,hv⟩⟩
+    · exact ⟨x,fun h ↦ (hi h).elim⟩
+  choose σ hσ using hchoice
+  let z (i : ℕ) : ℂ := ⟨σ i, t i⟩
+  have hsep (i m : ℕ) : ((m : ℝ)+1)/D ≤ ‖z (i+(m+1)) - z i‖ := by
+    calc
+      _ = (z (i+(m+1)) - z i).im := by simp [z,t]; ring
+      _ ≤ _ := Complex.im_le_norm _
+  have hinj : Function.Injective z := by
+    intro i j hij
+    have him := congrArg Complex.im hij
+    change T + i/D = T + j/D at him
+    exact_mod_cast (div_left_inj₀ hD.ne').mp (add_left_cancel him)
+  let r := 11*ρ/4
+  have hr : 0 ≤ r := by dsimp [r]; linarith
+  have hrR : r < 6*ρ := by dsimp [r]; linarith
+  have hinterior (i : ℕ) (hi : i ≤ n) : ‖z i - c‖ ≤ r := by
+    apply (Complex.norm_le_abs_re_add_abs_im _).trans
+    change |σ i - x| + |T + i/D - T| ≤ r
+    have hreal := (hσ i hi).1
+    rw [add_sub_cancel_left, abs_of_nonneg (ht i hi).1]
+    have : |σ i-x| ≤ 5/2*ρ := abs_le.mpr ⟨by linarith [hreal.1],by linarith [hreal.2]⟩
+    dsimp [r]
+    linarith [(ht i hi).2]
+  have hb (w : ℂ) (hw : w ∈ sphere c (6*ρ)) : ‖f w‖ ≤ 1 := by
+    have ha := (Complex.abs_re_le_norm (w-c)).trans_eq (mem_sphere_iff_norm.mp hw)
+    change |w.re-x| ≤ 6*ρ at ha
+    exact hfstrip _ (by linarith [(abs_le.mp ha).1]) (by linarith [(abs_le.mp ha).2])
+  have hcenter := grid_center_bound hf hb hr hrR hL.le (by positivity : 0 ≤ (δ/4)^(e+1))
+    (by dsimp [r,L]; linarith) hinj hinterior (fun i m _ ↦ hsep i m)
+    (fun i hi ↦ (hσ i hi).2.le)
+  have hratio : r / (6*ρ-r) = q := by
+    apply (div_eq_iff (by linarith : 6*ρ-r ≠ 0)).mpr
+    dsimp [r,q]; ring
+  rw [hratio] at hcenter
+  change ‖f c‖ ≤ (δ/4)^(e+1) * B^n + (1+(δ/4)^(e+1)*B^n)*q^(n+1) at hcenter
+  have herr := small_grid_error hd hq hB.le ((lt_div_iff₀ hB).mp he).le hn₂
+  have ha : 1+(δ/4)^(e+1)*B^n ≤ 2 := by linarith
+  have hc := mul_le_mul_of_nonneg_right ha (pow_nonneg hq.le (n+1))
+  change δ ≤ ‖f c‖ at hfc
+  linarith
+
+/-- A family of unit height windows with polynomial lower bounds on horizontal segments. -/
+private theorem windows {x₀ ρ c : ℝ} {n : ℕ} (hρ : 1 ≤ ρ) (hc : 0 < c) :
+    ∃ (c' : ℝ) (n' : ℕ), 0 < c' ∧ ∀ (ϑ : ℂ → ℂ) (X : ℝ), Differentiable ℂ ϑ → 1 ≤ X →
+      (∀ s : ℂ, x₀ - 6 * ρ ≤ s.re → s.re ≤ x₀ + 6 * ρ → ‖ϑ s‖ ≤ 1) →
+      (∀ s : ℂ, s.re = x₀ → c / (‖s‖ + X) ^ n ≤ ‖ϑ s‖) →
+      ∃ T : ℤ → ℝ, (∀ k : ℤ, T k ∈ Icc (2 * (k : ℝ)) (2 * k + 1)) ∧
+        ∀ k : ℤ, ∀ σ ∈ Icc (x₀ - 5 / 2 * ρ) (x₀ + 5 / 2 * ρ),
+          c' / (X + |T k| + 2) ^ n' ≤ ‖ϑ ⟨σ, T k⟩‖ := by
+  obtain ⟨e, he⟩ := exists_height hρ
+  let C := |x₀| + 2
+  have hC : 0 < C := by dsimp [C]; positivity
+  refine ⟨((c/4)/C^n)^e,n*e,by positivity,?_⟩
+  intro ϑ X hf hX hstrip hline
+  let a (k : ℤ) : ℂ := ⟨x₀, 2*(k:ℝ)⟩
+  have hpos (k : ℤ) : 0 < ‖a k‖ + X := by linarith [norm_nonneg (a k)]
+  have h (k : ℤ) := he hf (div_pos hc (pow_pos (hpos k) n)) (hline (a k) rfl) hstrip
+  choose T hT hlower using h
+  refine ⟨T,hT,?_⟩
+  intro k σ hσ
+  let Y := X + |T k| + 2
+  have hY : 1 ≤ Y := by dsimp [Y]; linarith [abs_nonneg (T k)]
+  have hYpos : 0 < Y := by linarith
+  have him : |2*(k:ℝ)| ≤ |T k|+1 := by
+    have ha : |2*(k : ℝ)-T k| ≤ 1 := abs_le.mpr ⟨by linarith [(hT k).2],by linarith [(hT k).1]⟩
+    calc
+      _ = |(2*(k:ℝ)-T k) + T k| := by rw [sub_add_cancel]
+      _ ≤ |2*(k:ℝ)-T k| + |T k| := abs_add_le _ _
+      _ ≤ _ := by linarith
+  have hnorm : ‖a k‖ + X ≤ C*Y := by
+    have hs := Complex.norm_le_abs_re_add_abs_im (a k)
+    change ‖a k‖ ≤ |x₀| + |2*(k:ℝ)| at hs
+    have haux := mul_nonneg (abs_nonneg x₀) (sub_nonneg.mpr hY)
+    dsimp [C,Y] at *
+    nlinarith [abs_nonneg (T k)]
+  have hbase : ((c/4)/C^n) / Y^n ≤ (c/(‖a k‖+X)^n)/4 := by
+    calc
+      _ = (c/4) / (C*Y)^n := by rw [div_div, mul_pow]
+      _ ≤ (c/4) / (‖a k‖+X)^n :=
+        div_le_div_of_nonneg_left (by positivity) (pow_pos (hpos k) n)
+          (pow_le_pow_left₀ (hpos k).le hnorm n)
+      _ = _ := by ring
+  calc
+    _ = (((c/4)/C^n)/Y^n)^e := by simp only [div_pow, ← pow_mul, Y]
+    _ ≤ ((c/(‖a k‖+X)^n)/4)^e := pow_le_pow_left₀ (by positivity) hbase e
+    _ ≤ _ := hlower k σ hσ
+
+end HorizontalWindow
+
 section BoundaryData
 
 /-- A weaker lower bound: a smaller constant and a larger exponent over a base at least one. -/
@@ -83,10 +403,9 @@ parameters, there are an entire function `ϑ` and heights `T k ∈ [2k, 2k + 1]`
 the rectangle `[-X, X] × [T k, T (k + 1)]`, for every integer `k`.
 The lower bound is for the multiplier `ϑ`, which is built from `Λ(s, ψ) Λ(s, ψ⁻¹)` over shifted
 gamma factors (`Sec3_HeckeMultipliers`), not for the L-function itself.
-Reconstruction: The paper does not state this. It is the classical lower bound at well-chosen
-heights (`ForMathlib/Analysis/Complex/GoodHeightFamily`), applied to `ϑ`, with the dependence
-on the character made explicit, in the form of the hypotheses `hgrowth`, `hord`, `hT`, `hlow`
-of `spectralStripConvolution_summable_clusterTraceNorms_of_boundaryData_on`. -/
+Reconstruction: Finite interpolation on each height window and the maximum modulus principle
+give the horizontal lower bound for `ϑ`. The bounds on the two vertical sides complete the
+rectangle data for `spectralStripConvolution_summable_clusterTraceNorms_of_boundaryData_on`. -/
 theorem exists_uniform_heckeMultiplier_rectBoundary (F : Type*) [Field F] [NumberField F]
     (a α : ℝ) :
     ∃ β X : ℝ, α < β ∧ β < X ∧ ∀ A₀ : ℝ, ∃ (c : ℝ) (n : ℕ), 0 < c ∧
@@ -126,7 +445,7 @@ theorem exists_uniform_heckeMultiplier_rectBoundary (F : Type*) [Field F] [Numbe
   let cs : ℝ := min c₁ c₂
   have hcs : 0 < cs := lt_min hc₁ hc₂
   let ns : ℕ := n₁ + n₂
-  obtain ⟨c', n', hc', hgood⟩ := exists_goodHeight_windows_of_norm_le_one (x₀ := X)
+  obtain ⟨c', n', hc', hgood⟩ := HorizontalWindow.windows (x₀ := X)
     (ρ := X + 1) (c := cs) (n := ns) (by linarith) hcs
   let c : ℝ := min (cs / (X + 6) ^ ns) (c' / 7 ^ n')
   have hc : 0 < c := lt_min (by positivity) (by positivity)
