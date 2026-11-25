@@ -1,6 +1,6 @@
 module
 
-public import RiemannMasullo.Ch12_TraceGeometric.Sec4
+public import RiemannMasullo.AppD_SchwartzBruhat.ContinuousHom
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_RealPWLevelBridge
 import RiemannMasullo.ForMathlib.Analysis.Normed.Field.ProperSpace
 
