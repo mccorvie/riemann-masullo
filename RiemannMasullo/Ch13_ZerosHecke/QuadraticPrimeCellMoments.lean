@@ -14,7 +14,7 @@ namespace RiemannMasullo
 
 /-- A normalized k-th absolute moment bounds any common lower bound on a positive
 fraction of the population. The loss at density δ is δ^(-1/k). -/
-private theorem quadraticPrime_density_loss {ι : Type*} {Ω G : Finset ι}
+theorem quadraticPrime_density_loss {ι : Type*} {Ω G : Finset ι}
     (hΩ : Ω.Nonempty) (hG : G ⊆ Ω) {k : ℕ} (hk : 0 < k) {δ L D : ℝ}
     (hδ : 0 < δ) (hL : 0 ≤ L) (hdensity : δ * (Ω.card : ℝ) ≤ (G.card : ℝ))
     {v : ι → ℝ} (hv : ∀ i ∈ Ω, 0 ≤ v i)
@@ -38,7 +38,8 @@ private theorem quadraticPrime_density_loss {ι : Type*} {Ω G : Finset ι}
     exact hprod
   · exact (le_of_not_ge hd).trans hr
 
-private theorem quadraticPrime_deficit_contraction {ι : Type*} (I : Finset ι)
+/-- Taking a cumulative positive-part deficit at a common center contracts the sum of absolute pointwise differences. -/
+theorem quadraticPrime_deficit_contraction {ι : Type*} (I : Finset ι)
     (c a b : ι → ℝ) :
     |(∑ j ∈ I, max (c j - a j) 0) - ∑ j ∈ I, max (c j - b j) 0| ≤
       ∑ j ∈ I, |a j - b j| := by
@@ -103,7 +104,7 @@ theorem quadraticPrimePowerCell_fourthPower_deficit_moment_transfer
 
 /-- Summing a finite family of observations with one common normalized moment
 radius multiplies the radius by the number of observations. -/
-private theorem quadraticPrime_uniform_sum_moment {ι α : Type*} (Ω : Finset α)
+theorem quadraticPrime_uniform_sum_moment {ι α : Type*} (Ω : Finset α)
     (I : Finset ι) {k : ℕ} (hk : 0 < k) (x : ι → α → ℝ) (R : ℝ)
     (hx : ∀ i ∈ I, ∀ w ∈ Ω, 0 ≤ x i w)
     (hM : ∀ i ∈ I, ∑ w ∈ Ω, (x i w)^k ≤ Ω.card * R^k) :
