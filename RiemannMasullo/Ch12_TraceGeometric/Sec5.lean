@@ -1180,6 +1180,52 @@ theorem hasSum_exteriorZeros_iff_isEmpty (τ : ℝ≥0ˣ →ₜ* C𝔽)
     have := h
     exact hasSum_empty⟩
 
+/-- Integration by parts against an exponential: for a smooth compactly supported `h`,
+`∫ h' e^{wx} = -w ∫ h e^{wx}`. -/
+private theorem integral_deriv_mul_cexp_mul (h : ℝ → ℂ) (hh : ContDiff ℝ (∞) h)
+    (hc : HasCompactSupport h) (w : ℂ) :
+    ∫ x : ℝ, deriv h x * Complex.exp (w * x) = -(w * ∫ x : ℝ, h x * Complex.exp (w * x)) := by
+  have he (x : ℝ) :
+      HasDerivAt (fun x : ℝ ↦ Complex.exp (w * x)) (w * Complex.exp (w * x)) x := by
+    convert (((hasDerivAt_id' (x : ℂ)).const_mul w).cexp).comp_ofReal using 1
+    ring
+  have hce : Continuous fun x : ℝ ↦ Complex.exp (w * x) := by fun_prop
+  have key := integral_mul_deriv_eq_deriv_mul_of_integrable
+    (u := fun x : ℝ ↦ Complex.exp (w * x)) (u' := fun x ↦ w * Complex.exp (w * x))
+    (v := h) (v' := deriv h) (fun x _ ↦ he x)
+    (fun x _ ↦ ((hh.differentiable (by simp)) x).hasDerivAt)
+    ((hce.mul (hh.continuous_deriv (by simp))).integrable_of_hasCompactSupport hc.deriv.mul_left)
+    (((continuous_const.mul hce).mul hh.continuous).integrable_of_hasCompactSupport
+      hc.mul_left)
+    ((hce.mul hh.continuous).integrable_of_hasCompactSupport hc.mul_left)
+  calc ∫ x : ℝ, deriv h x * Complex.exp (w * x)
+      = ∫ x : ℝ, Complex.exp (w * x) * deriv h x := by
+        congr 1; funext x; ring
+    _ = -∫ x : ℝ, w * Complex.exp (w * x) * h x := key
+    _ = -(w * ∫ x : ℝ, h x * Complex.exp (w * x)) := by
+        rw [← integral_const_mul]; congr 2; funext x; ring
+
+/-- The polar filter `h ↦ h'' - h/4` multiplies `∫ h e^{wx}` by `w² - 1/4`, which vanishes at
+the two polar exponents `w = ±1/2`. -/
+private theorem integral_polarFilter_mul_cexp (h : ℝ → ℂ) (hh : ContDiff ℝ (∞) h)
+    (hc : HasCompactSupport h) (w : ℂ) :
+    ∫ x : ℝ, (deriv (deriv h) x - 1 / 4 * h x) * Complex.exp (w * x) =
+      (w ^ 2 - 1 / 4) * ∫ x : ℝ, h x * Complex.exp (w * x) := by
+  have hh' : ContDiff ℝ (∞) (deriv h) := (contDiff_infty_iff_deriv.mp hh).2
+  have hce : Continuous fun x : ℝ ↦ Complex.exp (w * x) := by fun_prop
+  have i1 : Integrable (fun x : ℝ ↦ deriv (deriv h) x * Complex.exp (w * x)) :=
+    ((hh'.continuous_deriv (by simp)).mul hce).integrable_of_hasCompactSupport
+      hc.deriv.deriv.mul_right
+  have i0 : Integrable (fun x : ℝ ↦ h x * Complex.exp (w * x)) :=
+    (hh.continuous.mul hce).integrable_of_hasCompactSupport hc.mul_right
+  have hsplit : (fun x : ℝ ↦ (deriv (deriv h) x - 1 / 4 * h x) * Complex.exp (w * x)) =
+      fun x ↦ deriv (deriv h) x * Complex.exp (w * x) -
+        1 / 4 * (h x * Complex.exp (w * x)) := by
+    funext x; ring
+  rw [hsplit, integral_sub i1 (i0.const_mul _), integral_const_mul,
+    integral_deriv_mul_cexp_mul _ hh' hc.deriv, integral_deriv_mul_cexp_mul _ hh hc]
+  ring
+
 open Classical in
 /-- The translates of a test isolating one character, in one direction: if their exterior sums
 have a majorant `D` with `D y · exp (-σ · |y|)` integrable for every `σ > c`, the zeros of that
@@ -1188,12 +1234,14 @@ private theorem exteriorZeros_coeff_eq_zero_of_integrable (τ : ℝ≥0ˣ →ₜ
     (hτ : RightInverse τ (ideleClassNorm F)) (α : ℝ) (χ₀ : PontryaginDual C𝔽)
     (hχ₀ : ∀ t, χ₀ (τ t) = 1) {e : ℝ} (he : e = 1 ∨ e = -1) (H₀ : ℝ → ℂ)
     (hH₀ : ContDiff ℝ (∞) H₀) (hH₀c : HasCompactSupport H₀)
-    (hH₀v : ∀ u : ℝ, 0 ≤ u → H₀ (-(e * u)) = 0) {c : ℝ} (D : ℝ → ℝ)
+    (hH₀v : ∀ u : ℝ, 0 ≤ u → H₀ (-(e * u)) = 0)
+    (hpol₁ : ∫ x : ℝ, H₀ x * Complex.exp ((1 / 2 : ℂ) * x) = 0)
+    (hpol₂ : ∫ x : ℝ, H₀ x * Complex.exp ((-1 / 2 : ℂ) * x) = 0) {c : ℝ} (D : ℝ → ℝ)
     (hDi : ∀ σ, c < σ → Integrable (fun y ↦ D y * Real.exp (-σ * |y|)))
     (hT : ∀ (y : ℝ) (φ : BruhatCompactSupport C𝔽),
       (∀ x, φ.val x = ((χ₀⁻¹ : PontryaginDual C𝔽) x : ℂ) *
         H₀ (Real.log ((ideleClassNorm F x : ℝ≥0) : ℝ) - y)) →
-      (∀ g : C₁, φ.val g = 0) →
+      (∀ g : C₁, φ.val g = 0) → M(φ, twist(1, 1 / 2)) = 0 → M(φ, twist(1, -1 / 2)) = 0 →
       ∃ S : ℂ, HasSum (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z)) S ∧ ‖S‖ ≤ D y)
     (z₀ : exteriorZeros(τ, α)) (hz₀ : z₀.val.1.val = χ₀)
     (hc : c < e * (z₀.val.2.re - 1 / 2)) :
@@ -1223,6 +1271,17 @@ private theorem exteriorZeros_coeff_eq_zero_of_integrable (τ : ℝ≥0ˣ →ₜ
       ring
     · rw [ite_eq_right hχ, ite_eq_right (fun h1 ↦ hχ (grh_character_eq τ hτ z.val.1.property
         hχ₀ h1)), zero_mul, mul_zero]
+  -- the polar terms of the test `φ y` vanish with the polar moments of `H₀`
+  have hpolar (y : ℝ) (s : ℂ) (hs : ∫ x : ℝ, H₀ x * Complex.exp (s * x) = 0) :
+      M(φ y, twist(1, s)) = 0 := by
+    rw [characterNormTest_mellin _ (hg y) (hgc y) χ₀⁻¹ (φ y) (hφ y)]
+    by_cases hχ : (1 : PontryaginDual C𝔽) = χ₀
+    · have hone : (1 : PontryaginDual C𝔽) * χ₀⁻¹ = 1 := by rw [← hχ, mul_inv_cancel]
+      beta_reduce
+      rw [grh_shift_integral H₀ hH₀.continuous _ (fun t ↦ by rw [hone]; rfl) y, hs, mul_zero,
+        mul_zero]
+    · rw [ite_eq_right (fun h1 ↦ hχ (grh_character_eq τ hτ
+        (fun _ ↦ PontryaginDual.one_apply _) hχ₀ h1)), zero_mul]
   let ι := {z : exteriorZeros(τ, α) // z.val.1.val = χ₀}
   let w : ι → ℂ := fun i ↦ (e : ℂ) * (i.val.val.2 - 1 / 2)
   let b : ι → ℂ := fun i ↦
@@ -1230,6 +1289,7 @@ private theorem exteriorZeros_coeff_eq_zero_of_integrable (τ : ℝ≥0ˣ →ₜ
   have hsum (u : ℝ) (hu : 0 ≤ u) : ∃ S : ℂ,
       HasSum (fun i : ι ↦ b i * Complex.exp (w i * u)) S ∧ ‖S‖ ≤ D (e * u) := by
     obtain ⟨S, hS, hSb⟩ := hT (e * u) (φ (e * u)) (hφ (e * u)) (hvan u hu)
+      (hpolar (e * u) _ hpol₁) (hpolar (e * u) _ hpol₂)
     refine ⟨S, ?_, hSb⟩
     have hsupp : Function.support (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ (e * u), z)) ⊆
         {z | z.val.1.val = χ₀} := by
@@ -1296,21 +1356,24 @@ private theorem exteriorZeros_coeff_eq_zero_of_integrable (τ : ℝ≥0ˣ →ₜ
 
 /-- Paper: Theorem 12.5.1.1, pp. 519–520, and §1.4, p. 30. The cancellation in
 `traceFormula_exteriorZeros` needs to hold only up to an error growing more slowly than the
-strip, on average. Fix a norm section τ and a half-width α. Suppose that for every unitary
-character ψ and every smooth compactly supported profile H there are c < α and a function D,
-with D(y) · exp(−σ |y|) integrable on the line for every σ > c, such that for every real y for
-which the test ψ · H(log|·| − y) vanishes on the norm-one classes, its exterior zero terms sum to
-a value of modulus at most D(y). Then no completed Hecke L-function of a character trivial on τ
-has a zero with |Re s − 1/2| ≥ α, so the exterior sums all vanish. Translation toward large
-norms detects the zeros right of the critical line, toward small norms those left of it
-(`eq_zero_of_hasSum_exp_of_integrable`). -/
+strip, on average, and only for tests whose two polar Mellin terms vanish. Fix a norm section τ
+and a half-width α. Suppose that for every unitary character ψ and every smooth compactly
+supported profile H there are c < α and a function D, with D(y) · exp(−σ |y|) integrable on the
+line for every σ > c, such that for every real y for which the test ψ · H(log|·| − y) vanishes on
+the norm-one classes and has vanishing polar Mellin terms at ±1/2, its exterior zero terms sum
+to a value of modulus at most D(y). Then no completed Hecke L-function of a character trivial on
+τ has a zero with |Re s − 1/2| ≥ α, so the exterior sums all vanish. The detecting profile is
+the polar filter h'' − h/4 of a modulated bump, whose transform is (w² − 1/4) times that of the
+bump and so vanishes at the poles but not at any zero in the open critical strip. Translation
+toward large norms detects the zeros right of the critical line, toward small norms those left
+of it (`eq_zero_of_hasSum_exp_of_integrable`). -/
 theorem isEmpty_exteriorZeros_of_integrable (τ : ℝ≥0ˣ →ₜ* C𝔽)
     (hτ : RightInverse τ (ideleClassNorm F)) (α : ℝ)
     (hT : ∀ (ψ : PontryaginDual C𝔽) (H : ℝ → ℂ), ContDiff ℝ (∞) H → HasCompactSupport H →
       ∃ c < α, ∃ D : ℝ → ℝ, (∀ σ, c < σ → Integrable (fun y ↦ D y * Real.exp (-σ * |y|))) ∧
         ∀ (y : ℝ) (φ : BruhatCompactSupport C𝔽),
           (∀ x, φ.val x = (ψ x : ℂ) * H (Real.log ((ideleClassNorm F x : ℝ≥0) : ℝ) - y)) →
-          (∀ g : C₁, φ.val g = 0) →
+          (∀ g : C₁, φ.val g = 0) → M(φ, twist(1, 1 / 2)) = 0 → M(φ, twist(1, -1 / 2)) = 0 →
           ∃ S : ℂ, HasSum (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z)) S ∧ ‖S‖ ≤ D y) :
     IsEmpty exteriorZeros(τ, α) := by
   by_contra hne
@@ -1322,27 +1385,73 @@ theorem isEmpty_exteriorZeros_of_integrable (τ : ℝ≥0ˣ →ₜ* C𝔽)
     · exact ⟨1, Or.inl rfl, by rw [one_mul, abs_of_nonneg h]⟩
     · exact ⟨-1, Or.inr rfl, by rw [neg_one_mul, abs_of_neg h]⟩
   let β : ContDiffBump (e / 2 : ℝ) := ⟨1 / 8, 1 / 4, by norm_num, by norm_num⟩
-  let H₀ : ℝ → ℂ := fun x ↦ (β x : ℂ) * Complex.exp (-(w₀ * x))
-  have hH₀ : ContDiff ℝ (∞) H₀ :=
+  let h₀ : ℝ → ℂ := fun x ↦ (β x : ℂ) * Complex.exp (-(w₀ * x))
+  have hh₀ : ContDiff ℝ (∞) h₀ :=
     (Complex.ofRealCLM.contDiff.comp β.contDiff).mul
       (Complex.contDiff_exp.comp (contDiff_const.mul Complex.ofRealCLM.contDiff).neg)
-  have hH₀c : HasCompactSupport H₀ :=
+  have hh₀c : HasCompactSupport h₀ :=
     (β.hasCompactSupport.comp_left Complex.ofReal_zero).mul_right
+  -- the polar filter of `h₀`
+  let H₀ : ℝ → ℂ := fun x ↦ deriv (deriv h₀) x - 1 / 4 * h₀ x
+  have hoff : ∀ x, x ∉ tsupport h₀ → H₀ x = 0 := fun x hx ↦ by
+    have h1 : deriv (deriv h₀) x = 0 :=
+      deriv_of_notMem_tsupport fun h ↦ hx (tsupport_deriv_subset h)
+    simp only [H₀, h1, image_eq_zero_of_notMem_tsupport hx, mul_zero, sub_zero]
+  have hH₀ : ContDiff ℝ (∞) H₀ :=
+    (contDiff_infty_iff_deriv.mp (contDiff_infty_iff_deriv.mp hh₀).2).2.sub
+      (contDiff_const.mul hh₀)
+  have hH₀c : HasCompactSupport H₀ := HasCompactSupport.intro hh₀c hoff
   have hH₀v : ∀ u : ℝ, 0 ≤ u → H₀ (-(e * u)) = 0 := fun u hu ↦ by
     have hd : dist (-(e * u)) (e / 2) = u + 1 / 2 := by
       rw [Real.dist_eq]
       rcases he with rfl | rfl
       · rw [show -(1 * u) - 1 / 2 = -(u + 1 / 2) by ring, abs_neg, abs_of_pos (by linarith)]
       · rw [show -(-1 * u) - -1 / 2 = u + 1 / 2 by ring, abs_of_pos (by linarith)]
-    have : β (-(e * u)) = 0 := β.zero_of_le_dist (by rw [hd]; change (1 / 4 : ℝ) ≤ _; linarith)
-    simp only [H₀, this, Complex.ofReal_zero, zero_mul]
+    apply hoff
+    rw [notMem_tsupport_iff_eventuallyEq]
+    filter_upwards [Metric.ball_mem_nhds (-(e * u)) (by norm_num : (0 : ℝ) < 1 / 8)] with x hx
+    have hb : β x = 0 := β.zero_of_le_dist (by
+      have htri := dist_triangle (-(e * u)) x (e / 2)
+      rw [hd] at htri
+      rw [Metric.mem_ball, dist_comm] at hx
+      change (1 / 4 : ℝ) ≤ dist x (e / 2)
+      linarith)
+    simp only [h₀, hb, Complex.ofReal_zero, zero_mul, Pi.zero_apply]
+  have hfilt (s : ℂ) : ∫ x : ℝ, H₀ x * Complex.exp (s * x) =
+      (s ^ 2 - 1 / 4) * ∫ x : ℝ, h₀ x * Complex.exp (s * x) :=
+    integral_polarFilter_mul_cexp h₀ hh₀ hh₀c s
+  have hpol₁ : ∫ x : ℝ, H₀ x * Complex.exp ((1 / 2 : ℂ) * x) = 0 := by
+    rw [hfilt]; norm_num
+  have hpol₂ : ∫ x : ℝ, H₀ x * Complex.exp ((-1 / 2 : ℂ) * x) = 0 := by
+    rw [hfilt]; norm_num
   obtain ⟨c, hcα, D, hDi, hC⟩ := hT (z₀.val.1.val)⁻¹ H₀ hH₀ hH₀c
   have hK := exteriorZeros_coeff_eq_zero_of_integrable τ hτ α z₀.val.1.val z₀.val.1.property he
-    H₀ hH₀ hH₀c hH₀v D hDi hC z₀ rfl (by rw [hew]; exact hcα.trans_le z₀.property.2)
-  have hK' : ∫ x : ℝ, H₀ x * Complex.exp (w₀ * x) = ((∫ x, β x : ℝ) : ℂ) := by
+    H₀ hH₀ hH₀c hH₀v hpol₁ hpol₂ D hDi hC z₀ rfl
+    (by rw [hew]; exact hcα.trans_le z₀.property.2)
+  have hK' : ∫ x : ℝ, h₀ x * Complex.exp (w₀ * x) = ((∫ x, β x : ℝ) : ℂ) := by
     rw [← integral_complex_ofReal]
     exact integral_congr_ae (Filter.Eventually.of_forall fun x ↦ grh_bump_mul_exp _ _)
-  exact Complex.ofReal_ne_zero.mpr β.integral_pos.ne' (hK'.symm.trans hK)
+  -- the zero lies strictly inside the critical strip, so `w₀ ≠ ±1/2`
+  have hstrip : |z₀.val.2.re - 1 / 2| < 1 / 2 := lt_of_not_ge fun h ↦
+    (exteriorZeros_isEmpty_of_half_le τ (le_refl (1 / 2 : ℝ))).false
+      ⟨z₀.val, z₀.property.1, h⟩
+  have hw₀ : w₀ ^ 2 - 1 / 4 ≠ 0 := by
+    intro h
+    have h' : (w₀ - 1 / 2) * (w₀ + 1 / 2) = 0 := by linear_combination h
+    have hre : w₀.re = z₀.val.2.re - 1 / 2 := by simp only [w₀, Complex.sub_re]; norm_num
+    rcases mul_eq_zero.mp h' with h'' | h''
+    · have := congrArg Complex.re h''
+      simp only [Complex.sub_re, Complex.zero_re] at this
+      norm_num at this
+      rw [abs_lt] at hstrip
+      linarith [hstrip.2]
+    · have := congrArg Complex.re h''
+      simp only [Complex.add_re, Complex.zero_re] at this
+      norm_num at this
+      rw [abs_lt] at hstrip
+      linarith [hstrip.1]
+  rw [hfilt, hK'] at hK
+  exact mul_ne_zero hw₀ (Complex.ofReal_ne_zero.mpr β.integral_pos.ne') hK
 
 /-- `C · exp(c |y|) · exp(−σ |y|)` is integrable on the line for `σ > c`. -/
 private theorem integrable_mul_exp_mul_abs_mul_exp_neg_mul_abs (C : ℝ) {c σ : ℝ} (h : c < σ) :
@@ -1370,15 +1479,15 @@ private theorem integrable_mul_exp_mul_abs_mul_exp_neg_mul_abs (C : ℝ) {c σ :
 /-- Paper: Theorem 12.5.1.1, pp. 519–520, and §1.4, p. 30. The pointwise form of
 `isEmpty_exteriorZeros_of_integrable`: if for every unitary character ψ and every smooth compactly
 supported profile H there are c < α and C such that the exterior zero terms of the test
-ψ · H(log|·| − y), whenever it vanishes on the norm-one classes, sum to a value of modulus at
-most C · exp(c |y|), then no completed Hecke L-function of a character trivial on τ has a zero
+ψ · H(log|·| − y), whenever it vanishes on the norm-one classes and its polar Mellin terms
+vanish, sum to a value of modulus at most C · exp(c |y|), then no completed Hecke L-function of a character trivial on τ has a zero
 with |Re s − 1/2| ≥ α. -/
 theorem isEmpty_exteriorZeros_of_norm_le (τ : ℝ≥0ˣ →ₜ* C𝔽)
     (hτ : RightInverse τ (ideleClassNorm F)) (α : ℝ)
     (hT : ∀ (ψ : PontryaginDual C𝔽) (H : ℝ → ℂ), ContDiff ℝ (∞) H → HasCompactSupport H →
       ∃ c < α, ∃ C : ℝ, ∀ (y : ℝ) (φ : BruhatCompactSupport C𝔽),
         (∀ x, φ.val x = (ψ x : ℂ) * H (Real.log ((ideleClassNorm F x : ℝ≥0) : ℝ) - y)) →
-        (∀ g : C₁, φ.val g = 0) →
+        (∀ g : C₁, φ.val g = 0) → M(φ, twist(1, 1 / 2)) = 0 → M(φ, twist(1, -1 / 2)) = 0 →
         ∃ S : ℂ, HasSum (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z)) S ∧
           ‖S‖ ≤ C * Real.exp (c * |y|)) :
     IsEmpty exteriorZeros(τ, α) :=
@@ -1881,8 +1990,9 @@ on the Sobolev order 3 strip space has a projective tensor kernel (`hK` of (12.5
 test vanishing on the norm-one classes. Suppose also that for every unitary character ψ and every
 smooth compactly supported profile H there are c < β and a function D, with D(y) · exp(−σ |y|)
 integrable on the line for every σ > c, such that for every real y for which the test
-ψ · H(log|·| − y) vanishes on the norm-one classes, the trace of its strip action differs from its
-local terms by at most D(y). Then the conclusion of `traceFormula_exteriorZeros` holds. This
+ψ · H(log|·| − y) vanishes on the norm-one classes and has vanishing polar Mellin terms at ±1/2,
+the trace of its strip action differs from its local terms, which then contain no polar terms,
+by at most D(y). Then the conclusion of `traceFormula_exteriorZeros` holds. This
 weakens the exact identity assumed in `traceFormula_exteriorZeros_of_stripTrace` to a bound on
 one family of tests. At a width whose edges carry no zeros the difference is minus the exterior
 sum, and `isEmpty_exteriorZeros_of_integrable` applies. -/
@@ -1895,7 +2005,7 @@ theorem traceFormula_exteriorZeros_of_stripTrace_integrable (τ : ℝ≥0ˣ →�
       ∃ c < β, ∃ D : ℝ → ℝ, (∀ σ, c < σ → Integrable (fun y ↦ D y * Real.exp (-σ * |y|))) ∧
         ∀ (y : ℝ) (φ : BruhatCompactSupport C𝔽),
           (∀ x, φ.val x = (ψ x : ℂ) * H (Real.log ((ideleClassNorm F x : ℝ≥0) : ℝ) - y)) →
-          (∀ g : C₁, φ.val g = 0) →
+          (∀ g : C₁, φ.val g = 0) → M(φ, twist(1, 1 / 2)) = 0 → M(φ, twist(1, -1 / 2)) = 0 →
           ∀ (a : archTest) (b : finiteTest), archRestricts(φ, a) → finiteRestricts(φ, b) →
           ∀ T : nuclearEndomorphisms stripQuot(hβ.le, three),
             T.val = stripConv(hβ.le, three, φ) →
@@ -1909,11 +2019,11 @@ theorem traceFormula_exteriorZeros_of_stripTrace_integrable (τ : ℝ≥0ˣ →�
     hedge (ψ.comp restriction) z (by rw [hlift ψ hψ]; exact (exteriorZeros_ord_pos_iff _ _).mp hz)
   have hE := isEmpty_exteriorZeros_of_integrable τ hτ β fun ψ H hH hHc ↦ by
     obtain ⟨c, hcβ, D, hDi, hC⟩ := hdefect hβ ψ H hH hHc
-    refine ⟨c, hcβ, D, hDi, fun y φ' hφ' hvan ↦ ?_⟩
+    refine ⟨c, hcβ, D, hDi, fun y φ' hφ' hvan hp₁ hp₂ ↦ ?_⟩
     obtain ⟨a, b, ha, hb, hsum⟩ := exteriorZeros_hasSum_sub_of_width τ hτ hβ three hedge' φ'
       ⟨_, spectralStripConvolution_nuclear_of_projectiveKernel hβ.le three φ' (hK hβ φ' hvan)⟩
       rfl
-    exact ⟨_, hsum, by rw [norm_sub_rev]; exact hC y φ' hφ' hvan a b ha hb _ rfl⟩
+    exact ⟨_, hsum, by rw [norm_sub_rev]; exact hC y φ' hφ' hvan hp₁ hp₂ a b ha hb _ rfl⟩
   have : IsEmpty exteriorZeros(τ, α) :=
     ⟨fun z ↦ hE.false ⟨z.val, z.property.1, hβα.trans z.property.2⟩⟩
   exact hasSum_empty
@@ -1923,8 +2033,8 @@ open scoped ContDiff in
 pointwise form of `traceFormula_exteriorZeros_of_stripTrace_integrable`: given `hK`, if for
 every positive half-width β, every unitary character ψ and every smooth compactly supported
 profile H there are c < β and C such that the trace of the strip action of the test
-ψ · H(log|·| − y), whenever it vanishes on the norm-one classes, differs from its local terms by
-at most C · exp(c |y|), then the conclusion of `traceFormula_exteriorZeros` holds. -/
+ψ · H(log|·| − y), whenever it vanishes on the norm-one classes and its polar Mellin terms vanish,
+differs from its local terms by at most C · exp(c |y|), then the conclusion of `traceFormula_exteriorZeros` holds. -/
 theorem traceFormula_exteriorZeros_of_stripTrace_norm_le (τ : ℝ≥0ˣ →ₜ* C𝔽)
     (hτ : RightInverse τ (ideleClassNorm F))
     (hK : ∀ {β : ℝ} (hβ : 0 < β) (φ : BruhatCompactSupport C𝔽), (∀ g : C₁, φ.val g = 0) →
@@ -1933,7 +2043,7 @@ theorem traceFormula_exteriorZeros_of_stripTrace_norm_le (τ : ℝ≥0ˣ →ₜ*
       ContDiff ℝ (∞) H → HasCompactSupport H →
       ∃ c < β, ∃ C : ℝ, ∀ (y : ℝ) (φ : BruhatCompactSupport C𝔽),
         (∀ x, φ.val x = (ψ x : ℂ) * H (Real.log ((ideleClassNorm F x : ℝ≥0) : ℝ) - y)) →
-        (∀ g : C₁, φ.val g = 0) →
+        (∀ g : C₁, φ.val g = 0) → M(φ, twist(1, 1 / 2)) = 0 → M(φ, twist(1, -1 / 2)) = 0 →
         ∀ (a : archTest) (b : finiteTest), archRestricts(φ, a) → finiteRestricts(φ, b) →
         ∀ T : nuclearEndomorphisms stripQuot(hβ.le, three),
           T.val = stripConv(hβ.le, three, φ) →
