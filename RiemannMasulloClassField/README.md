@@ -1,17 +1,25 @@
-# The class field theory input of Remark 7.1.3.1
+# Class field theory for idèle-class characters
 
 This directory is a Lake library of its own, `RiemannMasulloClassField`, and one of the default
 targets of the package: `lake build` builds it with everything else.
 
-It proves the one statement of the project that needs global class field theory. For a unitary
-character of finite order of the idele class group of a number field `F`, there is a number
-field `L` over `F` such that the character is unramified, with local value one, at every prime
+For a finite-order unitary character of the idele class group of a number field `F`, there is
+a number field `L` over `F` such that the character is unramified, with local value one, at every prime
 of `F` under a prime of `L` of ramification index and residue degree one
 (`RiemannMasullo.FiniteOrderCharacterSplitsInClassField`, stated in
 `RiemannMasullo/Ch07_SchauderBasesZeta/Sec1b.lean`). Remark 7.1.3.1, p. 324, of the paper says
 "By Chebotarev" at this point. The main library proves the remark from that statement as a
 named hypothesis; [`Remark7131.lean`](Remark7131.lean) proves the statement, and with it the
 remark outright.
+
+For a finite Galois extension `L/K`, pull back finite-order characters by the relative norm
+and restrict them to the norm-one idèle classes. Each nonempty fibre of this map has exactly
+`|Gal(L/K)ᵃᵇ|` elements.
+The value is two for the splitting field of `X³ − 2`, the field in the cubic application of
+Proposition 10.2.2.2 (pp. 446–447).
+[General fibre theorem](AngularNormPullback.lean) ·
+[fpet19's cubic argument](https://github.com/mccorvie/riemann-masullo/issues/7485#issuecomment-7148696977) ·
+[mlyle's cubic formalization](https://github.com/mccorvie/riemann-masullo/issues/7485#issuecomment-7149418849)
 
 ## Where the proof comes from
 
