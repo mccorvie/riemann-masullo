@@ -684,4 +684,279 @@ theorem quadraticPrimePowerCell_fourthPower_deficit_transfer {F : Type*} [Field 
          rw [sum_product]
          exact hm c e f he hf
 
+open Classical in
+/-- Ordered pairs for which some quadratic sign class contains at most one eighth of P. -/
+def quadraticPrimeSparsePairs (U P : Finset ℕ) : Finset (ℕ × ℕ) :=
+  (U ×ˢ U).filter fun (q,d) ↦ ∃ e f : ℝ, |e| = 1 ∧ |f| = 1 ∧
+    8 * (P.filter fun p ↦ (jacobiSym q p : ℝ) = e ∧ (jacobiSym d p : ℝ) = f).card ≤ P.card
+
+
+private theorem quadraticPrime_count_energy (P U : Finset ℕ) (T M : ℕ)
+    (hP : P ⊆ Nat.primesLE T) (hU : U ⊆ range M)
+    (u : ℕ → ℝ) (hu : ∀ p ∈ P, |u p| ≤ 1) :
+    ∑ q ∈ U, (∑ p ∈ P, u p * (jacobiSym q p : ℝ))^2 ≤
+      (M + (T : ℝ)^3) * P.card := by
+  have hc : (P.card : ℝ) ≤ T := by
+    exact_mod_cast (card_le_card hP).trans (quadraticPrime_prime_card_le T)
+  have he : ∑ p ∈ P, u p ^ 2 ≤ (P.card : ℝ) := by
+    calc _ ≤ ∑ _ ∈ P, (1 : ℝ) := sum_le_sum fun p hp ↦ by
+           simpa only [sq_abs, one_pow] using pow_le_pow_left₀ (abs_nonneg _) (hu p hp) 2
+         _ = _ := by simp
+  have h := quadraticPrimeTwist_secondMoment P T 0 M hP u
+  simp only [zero_add] at h
+  apply (sum_le_sum_of_subset_of_nonneg hU (fun _ _ _ ↦ sq_nonneg _)).trans
+  apply h.trans
+  apply mul_le_mul _ he (sum_nonneg fun _ _ ↦ sq_nonneg _) (by positivity)
+  calc (M:ℝ)+T^2*P.card ≤ M+(T:ℝ)^2*T := by gcongr
+       _ = _ := by ring
+
+/-- A lower-tail bound simultaneous in the four quadratic sign classes. -/
+theorem quadraticPrimeSparsePairs_card_mul (P U : Finset ℕ) (T M : ℕ)
+    (hP : P ⊆ Nat.primesLE T) (hU : U ⊆ range M)
+    (hc : ∀ q ∈ U, ∀ p ∈ P, Nat.Coprime q p) :
+    ((quadraticPrimeSparsePairs U P).card : ℝ) * P.card^2 ≤
+      36 * U.card * (M + (T : ℝ)^3) * P.card := by
+  classical
+  let A (q : ℕ) := ∑ p ∈ P, (jacobiSym q p : ℝ)
+  let B (q d : ℕ) := ∑ p ∈ P, (jacobiSym q p : ℝ)*(jacobiSym d p : ℝ)
+  let K := (M+(T:ℝ)^3)*P.card
+  have ha : ∑ q ∈ U, (A q)^2 ≤ K := by
+    simpa [A,K] using quadraticPrime_count_energy P U T M hP hU (fun _ ↦ 1) (by simp)
+  have hb (q : ℕ) : ∑ d ∈ U, (B q d)^2 ≤ K :=
+    quadraticPrime_count_energy P U T M hP hU (fun p ↦ (jacobiSym q p : ℝ))
+      (fun p _ ↦ by exact_mod_cast quadraticPrime_abs_symbol q p)
+  let W (z : ℕ × ℕ) := 12*((A z.1)^2 + (A z.2)^2 + (B z.1 z.2)^2)
+  have hpt (z : ℕ × ℕ) (hz : z ∈ quadraticPrimeSparsePairs U P) : (P.card:ℝ)^2 ≤ W z := by
+    obtain ⟨hz, e, f, he, hf, hs⟩ := mem_filter.mp hz
+    obtain ⟨hq,hd⟩ := mem_product.mp hz
+    let C := (P.filter fun p ↦ (jacobiSym z.1 p : ℝ) = e ∧ (jacobiSym z.2 p : ℝ) = f).card
+    have hsmall : 8*(C:ℝ) ≤ P.card := by exact_mod_cast hs
+    have h := quadraticPrime_cell_error P (fun _ ↦ 1) (fun p ↦ (jacobiSym z.1 p : ℝ))
+      (fun p ↦ (jacobiSym z.2 p : ℝ)) he hf
+      (fun p hp ↦ quadraticPrime_sign_of_coprime (hc _ hq _ hp))
+      (fun p hp ↦ quadraticPrime_sign_of_coprime (hc _ hd _ hp))
+    simp only [sum_const, nsmul_eq_mul, mul_one, one_mul] at h
+    change |4*(C:ℝ)-P.card| ≤ |A z.1| + |A z.2| + |B z.1 z.2| at h
+    have hcard : (P.card:ℝ) ≤ 2*(|A z.1|+|A z.2|+|B z.1 z.2|) := by
+      linarith [neg_le_abs (4*(C:ℝ)-P.card)]
+    apply (pow_le_pow_left₀ (Nat.cast_nonneg _) hcard 2).trans
+    dsimp only [W]
+    nlinarith only [sq_nonneg (|A z.1|-|A z.2|), sq_nonneg (|A z.2|-|B z.1 z.2|),
+      sq_nonneg (|B z.1 z.2|-|A z.1|), sq_abs (A z.1), sq_abs (A z.2), sq_abs (B z.1 z.2)]
+  calc _ = ∑ _z ∈ quadraticPrimeSparsePairs U P, (P.card:ℝ)^2 := by simp
+       _ ≤ ∑ z ∈ quadraticPrimeSparsePairs U P, W z := sum_le_sum hpt
+       _ ≤ ∑ z ∈ U ×ˢ U, W z := sum_le_sum_of_subset_of_nonneg (filter_subset ..)
+           (fun z _ _ ↦ by dsimp only [W]; positivity)
+       _ = 12*(U.card*(∑ q ∈ U, (A q)^2)+U.card*(∑ d ∈ U, (A d)^2)+
+           ∑ q ∈ U, ∑ d ∈ U, (B q d)^2) := by
+           rw [sum_product]
+           dsimp only [W]
+           simp_rw [← mul_sum]
+           congr 1
+           simp only [sum_add_distrib,sum_const,nsmul_eq_mul,mul_sum]
+       _ ≤ 12*(U.card*K+U.card*K+∑ _q ∈ U, K) := by gcongr; exact hb _
+       _ = _ := by simp only [sum_const,nsmul_eq_mul,K]; ring
+
+
+open Filter Topology in
+private theorem quadraticPrime_progression_card {a : ℕ} (ha : a.Coprime 4) :
+    ∀ᶠ R : ℕ in atTop, (R:ℝ) ≤ 4 *
+      (((Ioc R (2*R)).filter (fun p ↦ p.Prime ∧ p ≡ a [MOD 4])).card : ℝ) *
+        Real.log (2*R) := by
+  let S (n : ℕ) := (Ioc 0 n).filter fun p ↦ p.Prime ∧ p ≡ a [MOD 4]
+  let θ (n : ℕ) := ∑ p ∈ S n, Real.log p
+  have ht : Tendsto (fun n : ℕ ↦ θ n / n) atTop (𝓝 (1/2:ℝ)) := by
+    simpa [θ,S,Function.comp_def,show (4:ℕ).totient = 2 by decide,one_div] using
+      (Chebyshev.tendsto_sum_log_prime_modEq_div_atTop ha).comp
+        (tendsto_natCast_atTop_atTop (R := ℝ))
+  obtain ⟨N,hN⟩ := eventually_atTop.mp (ht.eventually
+    (lt_mem_nhds (by norm_num : (7/16:ℝ) < 1/2)))
+  filter_upwards [eventually_ge_atTop (max 1 N), ht.eventually
+    (gt_mem_nhds (by norm_num : (1/2:ℝ) < 9/16))] with R hR hhigh
+  have hr : 0 < (R:ℝ) := by exact_mod_cast (show 0 < R by omega)
+  have h₁ := (div_lt_iff₀ hr).mp hhigh
+  have h := hN (2*R) (by omega)
+  change (7/16:ℝ) < θ (2*R) / ((2*R:ℕ):ℝ) at h
+  push_cast at h
+  have h₂ := (lt_div_iff₀ (by positivity)).mp h
+  let P := (Ioc R (2*R)).filter fun p ↦ p.Prime ∧ p ≡ a [MOD 4]
+  have hu : S R ∪ P = S (2*R) := by
+    dsimp only [S,P]
+    rw [← filter_union, Ioc_union_Ioc_eq_Ioc (Nat.zero_le _) (by omega)]
+  have hd : Disjoint (S R) P :=
+    (Ioc_disjoint_Ioc_of_le (a := 0) (d := 2*R) (le_refl R)).mono (filter_subset ..) (filter_subset ..)
+  have he : θ (2*R) = θ R + ∑ p ∈ P, Real.log p := by
+    dsimp only [θ]
+    rw [← hu, sum_union hd]
+  have hc : ∑ p ∈ P, Real.log p ≤ P.card * Real.log (2*R) := by
+    calc _ ≤ ∑ _ ∈ P, Real.log (2*R) := sum_le_sum fun p hp ↦ by
+           obtain ⟨hbound,hp,_⟩ := mem_filter.mp hp
+           exact Real.log_le_log (by exact_mod_cast hp.pos) (by exact_mod_cast (mem_Ioc.mp hbound).2)
+         _ = _ := by simp
+  change (R:ℝ) ≤ 4 * (P.card:ℝ) * Real.log (2*R)
+  linarith
+
+
+open Filter in
+/-- At the coupled scale Q = T³, the fraction of auxiliary prime pairs for which any
+cell is sparse in either odd residue class modulo four is O(log²(2T)/T). The
+tested primes lie between ⌊T/4⌋ and 2⌊T/4⌋, where the first Riesz weight at T
+is bounded below by T/2. Taking T = J⁴ gives the fourth-power sampling scale. -/
+theorem quadraticPrimeSparsePairs_modFour :
+    ∀ᶠ T : ℕ in atTop, let R := T / 4
+      let U := Nat.primesLE (2*T^3) \ Nat.primesLE (T^3)
+      let P (a : ℕ) := (Ioc R (2*R)).filter (fun p ↦ p.Prime ∧ p ≡ a [MOD 4])
+      (((quadraticPrimeSparsePairs U (P 1) ∪ quadraticPrimeSparsePairs U (P 3)).card : ℝ) * T) ≤
+        40000 * (U.card:ℝ)^2 * Real.log (2*T)^2 := by
+  obtain ⟨N,hN⟩ := eventually_atTop.mp quadraticPrime_dyadic_card
+  obtain ⟨N₁,h₁⟩ := eventually_atTop.mp (quadraticPrime_progression_card (a := 1) (by decide))
+  obtain ⟨N₃,h₃⟩ := eventually_atTop.mp (quadraticPrime_progression_card (a := 3) (by decide))
+  filter_upwards [eventually_ge_atTop (max (max N 20) (4*max N₁ N₃))] with T hT
+  let R := T/4
+  let U := Nat.primesLE (2*T^3) \ Nat.primesLE (T^3)
+  let P (a : ℕ) := (Ioc R (2*R)).filter (fun p ↦ p.Prime ∧ p ≡ a [MOD 4])
+  let L := Real.log (2*T)
+  change ((quadraticPrimeSparsePairs U (P 1) ∪ quadraticPrimeSparsePairs U (P 3)).card:ℝ)*T ≤
+    40000*(U.card:ℝ)^2*L^2
+  have hR : 1 ≤ R ∧ N₁ ≤ R ∧ N₃ ≤ R ∧ 2*R ≤ T ∧ T ≤ 5*R := by dsimp [R]; omega
+  have ht₁ : 1 ≤ T := by omega
+  have ht₃ : T ≤ T^3 := le_self_pow₀ ht₁ (by decide)
+  have ht : 1 ≤ (T:ℝ) := by exact_mod_cast ht₁
+  have hpos : 0 < (T:ℝ) := by linarith
+  have hL : 0 ≤ L := Real.log_nonneg (by linarith : (1:ℝ) ≤ 2*T)
+  have hcard := hN (T^3) (by omega)
+  change ((T^3:ℕ):ℝ) ≤ 2*(U.card:ℝ)*Real.log (2*((T^3:ℕ):ℝ)) at hcard
+  push_cast at hcard
+  have hlog : Real.log (2*(T:ℝ)^3) ≤ 3*L := by
+    calc _ ≤ Real.log ((2*(T:ℝ))^3) := by
+           apply Real.log_le_log (by positivity)
+           nlinarith only [show 0 ≤ (T:ℝ)^3 by positivity]
+         _ = _ := by simp [Real.log_pow,L]
+  have hQ : (T:ℝ)^3 ≤ 6*U.card*L := by
+    calc _ ≤ _ := hcard
+         _ ≤ 2*(U.card:ℝ)*(3*L) := by gcongr
+         _ = _ := by ring
+  have hU : U ⊆ range (2*T^3+1) := fun q hq ↦ mem_range.mpr
+    (Nat.lt_succ_of_le (Nat.le_of_mem_primesLE (mem_sdiff.mp hq).1))
+  have estimate (a : ℕ) (ha : (R:ℝ) ≤ 4*((P a).card:ℝ)*Real.log (2*R)) :
+      ((quadraticPrimeSparsePairs U (P a)).card:ℝ)*T ≤ 20000*(U.card:ℝ)^2*L^2 := by
+    have hrpos : 0 < (R:ℝ) := by exact_mod_cast (show 0 < R by omega)
+    have hrlog : Real.log (2*(R:ℝ)) ≤ L := by
+      apply Real.log_le_log (by positivity)
+      exact_mod_cast (show 2*R ≤ 2*T by omega)
+    have hpop : (T:ℝ) ≤ 20*((P a).card:ℝ)*L := by
+      calc _ ≤ 5*(R:ℝ) := by exact_mod_cast hR.2.2.2.2
+           _ ≤ 5*(4*((P a).card:ℝ)*Real.log (2*R)) := by gcongr
+           _ ≤ 5*(4*((P a).card:ℝ)*L) := by gcongr
+           _ = _ := by ring
+    have hp : 0 < ((P a).card:ℝ) := by
+      by_contra! h
+      have hz := le_antisymm h (Nat.cast_nonneg _)
+      rw [hz] at hpop
+      linarith
+    have sub : P a ⊆ Nat.primesLE T := fun p h ↦ by
+      obtain ⟨hpr,hprime,_⟩ := mem_filter.mp h
+      exact Nat.mem_primesLE.mpr ⟨(mem_Ioc.mp hpr).2.trans hR.2.2.2.1,hprime⟩
+    have cop (q : ℕ) (hq : q ∈ U) (p : ℕ) (hp : p ∈ P a) : q.Coprime p := by
+      obtain ⟨hin,hout⟩ := mem_sdiff.mp hq
+      have hqprime := Nat.prime_of_mem_primesLE hin
+      obtain ⟨hpt,hpprime⟩ := Nat.mem_primesLE.mp (sub hp)
+      exact (Nat.coprime_primes hqprime hpprime).mpr fun heq ↦
+        hout (Nat.mem_primesLE.mpr ⟨heq ▸ hpt.trans ht₃,hqprime⟩)
+    have hbad := quadraticPrimeSparsePairs_card_mul (P a) U T (2*T^3+1) sub hU cop
+    push_cast at hbad
+    rw [pow_two, ← mul_assoc] at hbad
+    have hbad' := (mul_le_mul_iff_left₀ hp).mp hbad
+    have hM : 2*(T:ℝ)^3+1+T^3 ≤ 4*(T:ℝ)^3 := by linarith [one_le_pow₀ ht (n := 3)]
+    calc _ ≤ ((quadraticPrimeSparsePairs U (P a)).card:ℝ)*(20*((P a).card:ℝ)*L) := by gcongr
+         _ = (((quadraticPrimeSparsePairs U (P a)).card:ℝ)*(P a).card)*(20*L) := by ring
+         _ ≤ (36*(U.card:ℝ)*(2*T^3+1+T^3))*(20*L) := by gcongr
+         _ ≤ (36*(U.card:ℝ)*(4*(6*U.card*L)))*(20*L) := by
+           gcongr
+           exact hM.trans (mul_le_mul_of_nonneg_left hQ (by norm_num))
+         _ ≤ _ := by nlinarith only [show 0 ≤ (U.card:ℝ)^2*L^2 by positivity]
+  have hsum := add_le_add (estimate 1 (h₁ R hR.2.1)) (estimate 3 (h₃ R hR.2.2.1))
+  have hu := card_union_le (quadraticPrimeSparsePairs U (P 1)) (quadraticPrimeSparsePairs U (P 3))
+  have hur : ((quadraticPrimeSparsePairs U (P 1) ∪ quadraticPrimeSparsePairs U (P 3)).card:ℝ) ≤
+      (quadraticPrimeSparsePairs U (P 1)).card + (quadraticPrimeSparsePairs U (P 3)).card := by
+    exact_mod_cast hu
+  calc _ ≤ _ := mul_le_mul_of_nonneg_right hur hpos.le
+       _ ≤ _ := by rw [add_mul]; linarith only [hsum]
+
+
+open Filter in
+/-- Outside an explicitly bounded exceptional set, each of the four quadratic classes
+carries first Riesz mass at least T²/640 from primes of each odd residue modulo four.
+Thus the character χ₋₄ has substantial contributions of both signs at this cutoff. -/
+theorem quadraticPrimeCell_modFour_riesz_mass :
+    ∀ᶠ T : ℕ in atTop, let U := Nat.primesLE (2*T^3) \ Nat.primesLE (T^3)
+      ∃ E ⊆ U ×ˢ U, (E.card:ℝ)*T ≤ 40000*(U.card:ℝ)^2*Real.log (2*T)^2 ∧
+        ∀ z ∈ (U ×ˢ U) \ E, ∀ e f : ℝ, |e| = 1 → |f| = 1 → ∀ a ∈ ({1,3}:Finset ℕ),
+          (T:ℝ)^2 ≤ 640 * ∑ p ∈ (Nat.primesLE T).filter (fun p ↦ p ≡ a [MOD 4] ∧
+            (jacobiSym z.1 p : ℝ) = e ∧ (jacobiSym z.2 p : ℝ) = f),
+            Real.log p * max ((T:ℝ)-p) 0 := by
+  classical
+  obtain ⟨N₁,h₁⟩ := eventually_atTop.mp (quadraticPrime_progression_card (a := 1) (by decide))
+  obtain ⟨N₃,h₃⟩ := eventually_atTop.mp (quadraticPrime_progression_card (a := 3) (by decide))
+  filter_upwards [quadraticPrimeSparsePairs_modFour,
+    eventually_ge_atTop (max 20 (4*max N₁ N₃))] with T hex hT
+  let U := Nat.primesLE (2*T^3) \ Nat.primesLE (T^3)
+  let R := T/4
+  let P (a : ℕ) := (Ioc R (2*R)).filter (fun p ↦ p.Prime ∧ p ≡ a [MOD 4])
+  let E := quadraticPrimeSparsePairs U (P 1) ∪ quadraticPrimeSparsePairs U (P 3)
+  refine ⟨E, union_subset (filter_subset ..) (filter_subset ..), hex, ?_⟩
+  intro z hz e f he hf a ha
+  obtain ⟨hzU,hzE⟩ := mem_sdiff.mp hz
+  have hR : 2 ≤ R ∧ N₁ ≤ R ∧ N₃ ≤ R ∧ T ≤ 5*R ∧ 4*R ≤ T := by dsimp [R]; omega
+  have hr : (2:ℝ) ≤ R := by exact_mod_cast hR.1
+  have hlog : 0 ≤ Real.log R := Real.log_nonneg (by linarith)
+  have ha' : a = 1 ∨ a = 3 := by simpa using ha
+  have hnot : z ∉ quadraticPrimeSparsePairs U (P a) := by
+    rcases ha' with rfl | rfl
+    · exact fun h ↦ hzE (mem_union_left _ h)
+    · exact fun h ↦ hzE (mem_union_right _ h)
+  have hca : (R:ℝ) ≤ 4*((P a).card:ℝ)*Real.log (2*R) := by
+    rcases ha' with rfl | rfl
+    · exact h₁ R hR.2.1
+    · exact h₃ R hR.2.2.1
+  let A := (P a).filter fun p ↦ (jacobiSym z.1 p : ℝ) = e ∧ (jacobiSym z.2 p : ℝ) = f
+  let S := (Nat.primesLE T).filter fun p ↦ p ≡ a [MOD 4] ∧
+    (jacobiSym z.1 p : ℝ) = e ∧ (jacobiSym z.2 p : ℝ) = f
+  have hAc : ((P a).card:ℝ) ≤ 8*A.card := by
+    have hnat : ¬ 8*A.card ≤ (P a).card := fun h ↦ hnot (mem_filter.mpr ⟨hzU,e,f,he,hf,h⟩)
+    exact_mod_cast (le_of_lt (lt_of_not_ge hnat))
+  have hlog₂ : Real.log (2*(R:ℝ)) ≤ 2*Real.log R := by
+    rw [Real.log_mul (by norm_num) (by linarith)]
+    linarith [Real.log_le_log (by norm_num : (0:ℝ)<2) hr]
+  have hsize : (T:ℝ) ≤ 320*(A.card:ℝ)*Real.log R := by
+    calc _ ≤ 5*(R:ℝ) := by exact_mod_cast hR.2.2.2.1
+         _ ≤ 5*(4*((P a).card:ℝ)*Real.log (2*R)) := by gcongr
+         _ ≤ 5*(4*(8*(A.card:ℝ))*(2*Real.log R)) := by
+           gcongr
+           exact Real.log_nonneg (by linarith)
+         _ = _ := by ring
+  have sub : A ⊆ S := by
+    intro p hp
+    obtain ⟨hp,hs⟩ := mem_filter.mp hp
+    obtain ⟨hi,hp,hmod⟩ := mem_filter.mp hp
+    exact mem_filter.mpr ⟨Nat.mem_primesLE.mpr ⟨by have := (mem_Ioc.mp hi).2; omega,hp⟩,hmod,hs⟩
+  have lower : (A.card:ℝ)*(Real.log R*((T:ℝ)/2)) ≤
+      ∑ p ∈ S, Real.log p * max ((T:ℝ)-p) 0 := by
+    calc _ = ∑ _ ∈ A, Real.log R*((T:ℝ)/2) := by simp
+         _ ≤ ∑ p ∈ A, Real.log p * max ((T:ℝ)-p) 0 := by
+           apply sum_le_sum
+           intro p hp
+           obtain ⟨hi,_⟩ := mem_filter.mp (mem_filter.mp hp).1
+           obtain ⟨hl,hh⟩ := mem_Ioc.mp hi
+           apply mul_le_mul (Real.log_le_log (by linarith) (by exact_mod_cast hl.le)) _
+             (by positivity) (hlog.trans (Real.log_le_log (by linarith) (by exact_mod_cast hl.le)))
+           apply le_trans _ (le_max_left ..)
+           have : 2*p ≤ T := by omega
+           linarith [show 2*(p:ℝ) ≤ T by exact_mod_cast this]
+         _ ≤ _ := sum_le_sum_of_subset_of_nonneg sub fun p hp _ ↦
+           mul_nonneg (Real.log_nonneg (by
+             exact_mod_cast (Nat.prime_of_mem_primesLE (mem_filter.mp hp).1).one_le)) (le_max_right ..)
+  change (T:ℝ)^2 ≤ 640*∑ p ∈ S, Real.log p * max ((T:ℝ)-p) 0
+  nlinarith only [mul_le_mul_of_nonneg_right hsize (Nat.cast_nonneg T), lower]
+
 end RiemannMasullo
