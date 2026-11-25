@@ -1783,3 +1783,248 @@ theorem exists_measurableSequence_archConductor_linePA_iff_exteriorZeros_of_weil
 
 
 end RiemannMasullo.Isolated.OutputOrderGeometry
+
+namespace RiemannMasullo.Isolated
+
+section GammaConductorComparison
+
+open Complex Filter Function IsDedekindDomain MeasureTheory NumberField Set
+open scoped Asymptotics ContDiff NNReal NumberField.AdeleRing _root_.SchwartzMap Topology
+
+set_option quotPrecheck false
+
+attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorelSpaceSec1
+  instIdeleClassT2Sec1 instIdeleClassLocallyCompactSec1 instIdeleClassSecondCountableSec1
+  instIdeleClassHaarMeasureSec1
+
+variable {F : Type*} [Field F] [NumberField F]
+
+local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
+local notation "C₁" => (ideleClassNorm F).ker
+local notation "Charts(" τ ")" => {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1}
+local notation "D(" χ ", " z ")" => MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ z
+local notation "Sites(" χ ")" => {z : ℂ // 0 < D(χ, z)}
+local notation "BL(" H ", " w ")" => bilateralLaplace (fun x : ℝ ↦ ((H : ℝ → ℝ) x : ℂ)) (w : ℂ)
+local notation "grid(" χ ", " g ")" => AnalyticLattice.sampleSum (fun t : ℝ ↦
+  (finiteHeckeL_exists_continuation (F := F) χ).choose ((1/2 : ℂ) + (t : ℂ)*I)) g
+local notation "densityMass(" χ ", " g ")" => (limUnder (𝓝[>] (0 : ℝ))
+  (fun η : ℝ ↦ ∫ t : ℝ, (g : ℝ → ℝ) t * analyticZeroDensity (criticalFiniteHeckeL χ) η t))
+local notation "M(" φ ", " χ ", " z ")" => modulatedFourierMellin (continuousIdeleClassNorm F) univ
+  ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ (ideleClassTamagawaMeasure F)
+  (φ : BruhatCompactSupport C𝔽).val (ideleClassNormTwist (F := F) χ ((z : ℂ) - 1/2))
+local notation "outside(" τ ", " α ")" => {p : Charts(τ) × ℂ //
+  0 < D(p.1.val, p.2) ∧ α ≤ |p.2.re - 1/2|}
+local notation "exterior(" τ ")" => (∀ (α : ℝ), 0 < α → ∀ f : BruhatCompactSupport C𝔽,
+  (∀ g : C₁, f.val g = 0) → HasSum (fun p : outside(τ, α) ↦
+    ((D(p.val.1.val, p.val.2) : ℤ) : ℂ) * M(f, p.val.1.val, p.val.2)) 0)
+
+/-- Pair the gamma logarithmic derivatives on the Euler line of abscissa three halves,
+take their normalized real part, then add the discriminant-conductor contribution. -/
+def gammaConductorScalar (χ : PontryaginDual C𝔽) (H : ℝ → ℝ) : ℝ :=
+  ((verticalLineIntegral (fun s ↦ BL(H, s-1/2) * logDeriv (heckeGammaFactor χ) s) (3/2) +
+    verticalLineIntegral (fun s ↦ BL(H, 1/2-s) * logDeriv (heckeGammaFactor χ⁻¹) s) (3/2)) /
+      (2 * (Real.pi : ℂ) * I)).re + H 0 * heckeLogDiscriminantConductor χ
+
+private theorem gammaScalar_mellin_eq (h : ℝ → ℂ) (s : ℂ) :
+    mellin (fun t ↦ h (Real.log t)) s = bilateralLaplace h s := by
+  rw [mellin, bilateralLaplace, ← integral_comp_exp]
+  refine integral_congr_ae (ae_of_all _ fun y ↦ ?_)
+  show Real.exp y • (((Real.exp y : ℝ) : ℂ) ^ (s-1) • h (Real.log (Real.exp y))) =
+    h y * Complex.exp (s * (y : ℂ))
+  have he : (y : ℂ) + (y : ℂ) * (s-1) = s * (y : ℂ) := by ring
+  rw [Real.log_exp, Complex.real_smul, smul_eq_mul,
+    Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (Real.exp_pos y).ne'),
+    ← Complex.ofReal_log (Real.exp_pos y).le, Real.log_exp, Complex.ofReal_exp, ← mul_assoc,
+    ← Complex.exp_add, he, mul_comm]
+
+private theorem gammaScalar_decay (f : 𝓢(ℝ, ℂ)) (h : HasCompactSupport (f : ℝ → ℂ)) :
+    ExponentialDecay f := by
+  have hder (j : ℕ) : HasCompactSupport (iteratedDeriv j (f : ℝ → ℂ)) := by
+    induction j with
+    | zero => simpa only [iteratedDeriv_zero] using h
+    | succ j ih => simpa only [iteratedDeriv_succ] using ih.deriv
+  have decay {l : Filter ℝ} (hl : l ≤ cocompact ℝ) (j : ℕ) (g : ℝ → ℝ) :
+      (iteratedDeriv j (f : ℝ → ℂ)) =O[l] g := by
+    apply Asymptotics.IsBigO.of_bound 1
+    filter_upwards [(hasCompactSupport_iff_eventuallyEq.mp (hder j)).filter_mono
+      (hl.trans cocompact_le_coclosedCompact)] with t ht
+    simpa only [ht, Pi.zero_apply, norm_zero, one_mul] using norm_nonneg (g t)
+  exact ⟨fun j A _ ↦ decay atTop_le_cocompact j _, fun j A _ ↦ decay atBot_le_cocompact j _⟩
+
+private theorem gammaScalar_complex_smooth {H : ℝ → ℝ} (hs : ContDiff ℝ (∞) H) :
+    ContDiff ℝ (∞) (fun x ↦ (H x : ℂ)) := Complex.ofRealCLM.contDiff.comp hs
+
+private theorem gammaScalar_complex_compact {H : ℝ → ℝ} (hc : HasCompactSupport H) :
+    HasCompactSupport (fun x ↦ (H x : ℂ)) := hc.comp_left Complex.ofReal_zero
+
+/-- Both contours in the scalar are vertically integrable, also at every positive
+abscissa, for a smooth compact physical profile. -/
+theorem gammaConductorScalar_verticalIntegrable
+    (χ : PontryaginDual C𝔽) (H : ℝ → ℝ) (hs : ContDiff ℝ (∞) H) (hc : HasCompactSupport H)
+    (a : ℝ) (ha : 0 < a) :
+    Complex.VerticalIntegrable (fun s ↦ BL(H, s-1/2) * logDeriv (heckeGammaFactor χ) s) a ∧
+      Complex.VerticalIntegrable (fun s ↦ BL(H, 1/2-s) * logDeriv (heckeGammaFactor χ⁻¹) s) a := by
+  let f : 𝓢(ℝ, ℂ) := (gammaScalar_complex_compact hc).toSchwartzMap (gammaScalar_complex_smooth hs)
+  have hf : ExponentialDecay f := gammaScalar_decay f (gammaScalar_complex_compact hc)
+  have h := heckeExplicitFormula_gammaLines_verticalIntegrable χ f hf a ha
+  have hfcoe : (f : ℝ → ℂ) = (fun x : ℝ ↦ (H x : ℂ)) := rfl
+  simp only [gammaScalar_mellin_eq (f : ℝ → ℂ)] at h
+  simpa only [hfcoe] using h
+
+/-- The arithmetic scalar is the sum over all positive sites. Short support kills
+every finite prime power, and the profile's two vanishing moments kill all possible
+negative divisor sites of a normalized character. -/
+theorem hasSum_positiveSites_gammaConductorScalar
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F)) (χ : Charts(τ))
+    (H : ℝ → ℝ) (hs : ContDiff ℝ (∞) H) (hc : HasCompactSupport H)
+    (hshort : tsupport H ⊆ Ioo (-Real.log 2) (Real.log 2))
+    (hplus : BL(H, (1/2 : ℂ)) = 0) (hminus : BL(H, -(1/2 : ℂ)) = 0) :
+    HasSum (fun z : Sites(χ.val) ↦ ((D(χ.val, z.val)).toNat : ℝ) * (BL(H, z.val-1/2)).re)
+      (gammaConductorScalar χ.val H) := by
+  classical
+  let f : 𝓢(ℝ, ℂ) := (gammaScalar_complex_compact hc).toSchwartzMap (gammaScalar_complex_smooth hs)
+  have hf : ExponentialDecay f := gammaScalar_decay f (gammaScalar_complex_compact hc)
+  have hcut (x : ℝ) (hx : Real.log 2 ≤ |x|) : f x = 0 := by
+    change (H x : ℂ) = 0
+    apply ofReal_eq_zero.mpr
+    by_contra hn
+    exact (not_lt_of_ge hx) (abs_lt.mpr (hshort (subset_tsupport H hn)))
+  let L := continuedCompletedHeckeL (F := F) χ.val
+  obtain ⟨hL, hAgree⟩ := continuedCompletedHeckeL_spec χ.val
+  let term (z : ℂ) : ℂ := (D(χ.val, z) : ℂ) * BL(H, z-1/2)
+  let A : ℂ := (heckeLogDiscriminantConductor χ.val : ℂ) * (H 0 : ℂ) +
+    (verticalLineIntegral (fun s ↦ BL(H, s-1/2) * logDeriv (heckeGammaFactor χ.val) s) (3/2) +
+      verticalLineIntegral (fun s ↦ BL(H, 1/2-s) * logDeriv (heckeGammaFactor χ.val⁻¹) s) (3/2)) /
+      (2 * (Real.pi : ℂ) * I)
+  have hall : HasSum term A := by
+    have h := hasSum_heckeExplicitFormula_gammaLines_of_shortSupport χ.val f hf hcut L hL hAgree
+    have hfcoe : (f : ℝ → ℂ) = (fun x : ℝ ↦ (H x : ℂ)) := rfl
+    simp only [gammaScalar_mellin_eq (f : ℝ → ℂ)] at h
+    simpa only [hfcoe, term, A, L] using h
+  have hsupp : support term ⊆ {z : ℂ | 0 < D(χ.val, z)} := by
+    intro z hz
+    by_contra hp
+    have hn : D(χ.val, z) ≤ 0 := le_of_not_gt hp
+    rcases lt_or_eq_of_le hn with hneg | hzero
+    · obtain ⟨_, hpol⟩ := idelicExplicitFormula_chart_poles τ hτ χ.val χ.property z hneg
+      rcases hpol with rfl | rfl
+      · exact hz (by simp only [term, zero_sub, hminus, mul_zero])
+      · exact hz (by simp only [term, show (1 : ℂ)-1/2=1/2 by norm_num, hplus, mul_zero])
+    · exact hz (by simp only [term, hzero, Int.cast_zero, zero_mul])
+  have hreal := Complex.hasSum_re ((hasSum_subtype_iff_of_support_subset hsupp).mpr hall)
+  have hA : A.re = gammaConductorScalar χ.val H := by
+    dsimp only [A, gammaConductorScalar]
+    rw [add_re, ← ofReal_mul, ofReal_re]
+    ring
+  rw [← hA]
+  refine hreal.congr_fun fun z ↦ ?_
+  change ((D(χ.val, z.val)).toNat : ℝ) * (BL(H, z.val-1/2)).re =
+    (((D(χ.val, z.val) : ℤ) : ℂ) * BL(H, z.val-1/2)).re
+  have hnat : ((D(χ.val, z.val)).toNat : ℝ) = (D(χ.val, z.val) : ℝ) := by
+    exact_mod_cast Int.toNat_of_nonneg z.property.le
+  simp only [hnat, mul_re, intCast_re, intCast_im, zero_mul, sub_zero]
+
+private theorem gammaScalar_site_strict
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : Charts(τ)) (z : Sites(χ.val)) : |(z.val-(1/2 : ℂ)).re| < 1/2 := by
+  have he := (hasSum_exteriorZeros_iff_isEmpty τ hτ (1/2)).mp
+    (fun φ _ ↦ traceFormula_exteriorZeros_of_half_le τ φ le_rfl)
+  have h : |z.val.re - 1/2| < 1/2 := lt_of_not_ge fun hz ↦ he.false ⟨(χ, z.val), z.property, hz⟩
+  simpa only [sub_re, div_ofNat_re, one_re] using h
+
+local notation "comparisons(" τ ", " g ", " H ")" =>
+  ((∀ χ : Charts(τ), limUnder atTop grid(χ.val, g) ≤ gammaConductorScalar χ.val H) ∧
+    ((∀ (χ : Charts(τ)) (δ : ℝ), 0 < δ → ∀ N : ℕ, ∃ n : ℕ,
+      N ≤ n ∧ gammaConductorScalar χ.val H - δ ≤ grid(χ.val, g) n) ↔ exterior(τ))) ∧
+  ((∀ χ : Charts(τ), densityMass(χ.val, g) ≤ gammaConductorScalar χ.val H) ∧
+    ((∀ χ : Charts(τ), gammaConductorScalar χ.val H ≤ densityMass(χ.val, g)) ↔ exterior(τ)))
+
+/-- Reconstruction: compare the exterior sum of Theorem 12.5.1.1, pp. 519–520, with
+the signed completed formula for a supplied compact test.
+The two actual critical-line measurements compare with the same gamma and conductor
+scalar. For either measurement its converse lower comparison is equivalent to the
+exterior-zero assertion of Theorem 12.5.1.1 at all positive widths. -/
+theorem gammaConductorScalar_comparisons
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (H : ℝ → ℝ) (hs : ContDiff ℝ (∞) H) (hc : HasCompactSupport H)
+    (hshort : tsupport H ⊆ Ioo (-Real.log 2) (Real.log 2))
+    (hplus : BL(H, (1/2 : ℂ)) = 0) (hminus : BL(H, -(1/2 : ℂ)) = 0)
+    (hpos : ∀ w : ℂ, |w.re| < 1/2 → 0 < (BL(H, w)).re)
+    (g : 𝓢(ℝ, ℝ)) (hg : ∀ t : ℝ, g t = (BL(H, (t : ℂ) * I)).re) :
+    comparisons(τ, g, H) := by
+  let W (χ : Charts(τ)) (z : Sites(χ.val)) :=
+    ((D(χ.val, z.val)).toNat : ℝ) * (BL(H, z.val-1/2)).re
+  let S (χ : Charts(τ)) := gammaConductorScalar χ.val H
+  have hsum (χ : Charts(τ)) : HasSum (W χ) (S χ) :=
+    hasSum_positiveSites_gammaConductorScalar τ hτ χ H hs hc hshort hplus hminus
+  have hweight (χ : Charts(τ)) (z : Sites(χ.val)) : 0 < W χ z := by
+    apply mul_pos
+    · have hz := z.property
+      have hnat : 0 < (D(χ.val, z.val)).toNat := by omega
+      exact_mod_cast hnat
+    · exact hpos _ (gammaScalar_site_strict τ hτ χ z)
+  have hline (χ : Charts(τ)) (z : Sites(χ.val)) (hz : z.val.re = 1/2) :
+      W χ z = ((D(χ.val, z.val)).toNat : ℝ) * g z.val.im := by
+    have he : (z.val.im : ℂ) * I = z.val - 1/2 := by
+      apply Complex.ext <;> norm_num [Complex.mul_re, Complex.mul_im, hz]
+    dsimp only [W]
+    rw [hg, he]
+  exact ⟨finiteCriticalSamples_iff_exteriorZeros_of_hasSum τ hτ g W S hsum hweight hline,
+    criticalDensity_iff_exteriorZeros_of_hasSum τ hτ g W S hsum hweight hline⟩
+
+/-- Every supplied profile satisfying the short-support, two polar-moment, and strip
+conditions supplies its own real Schwartz measurement on the critical line. -/
+theorem exists_axis_gammaConductorScalar_comparisons
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (H : ℝ → ℝ) (hs : ContDiff ℝ (∞) H) (hc : HasCompactSupport H)
+    (hshort : tsupport H ⊆ Ioo (-Real.log 2) (Real.log 2))
+    (hplus : BL(H, (1/2 : ℂ)) = 0) (hminus : BL(H, -(1/2 : ℂ)) = 0)
+    (hpos : ∀ w : ℂ, |w.re| < 1/2 → 0 < (BL(H, w)).re) :
+    ∃ g : 𝓢(ℝ, ℝ), (∀ t : ℝ, g t = (BL(H, (t : ℂ) * I)).re) ∧ comparisons(τ, g, H) := by
+  obtain ⟨g, hg⟩ := exists_realSchwartz_eq_bilateralLaplace_axis_re
+    (gammaScalar_complex_compact hc) (gammaScalar_complex_smooth hs)
+  exact ⟨g, hg, gammaConductorScalar_comparisons τ hτ H hs hc hshort hplus hminus hpos g hg⟩
+
+local notation "profileConditions(" H ")" => ContDiff ℝ (∞) (H : ℝ → ℝ) ∧
+  HasCompactSupport H ∧ tsupport H ⊆ Ioo (-Real.log 2) (Real.log 2) ∧
+  (∀ x : ℝ, H (-x) = H x) ∧ 0 < H 0 ∧ BL(H, (1/2 : ℂ)) = 0 ∧
+  BL(H, -(1/2 : ℂ)) = 0 ∧ ∀ w : ℂ, |w.re| < 1/2 → 0 < (BL(H, w)).re
+
+/-- The same short physical profile as in the centered line comparison of §12.5. -/
+def gammaComparisonProfile : ℝ → ℝ := OutputOrderGeometry.primeFreeProfile
+
+/-- Smoothness, strict short support, parity, positivity at zero, the two vanishing
+polar moments, and strict transform positivity on the open strip. -/
+theorem gammaComparisonProfile_spec : profileConditions(gammaComparisonProfile) :=
+  OutputOrderGeometry.primeFreeProfile_properties
+
+/-- The real part of the chosen profile on the imaginary axis is a Schwartz function. -/
+theorem exists_gammaComparisonAxis :
+    ∃ g : 𝓢(ℝ, ℝ), ∀ t : ℝ, g t = (BL(gammaComparisonProfile, (t : ℂ) * I)).re :=
+  exists_realSchwartz_eq_bilateralLaplace_axis_re
+    (gammaScalar_complex_compact gammaComparisonProfile_spec.2.1)
+    (gammaScalar_complex_smooth gammaComparisonProfile_spec.1)
+
+/-- The real Schwartz restriction of the fixed profile's transform to the imaginary axis. -/
+def gammaComparisonAxis : 𝓢(ℝ, ℝ) := exists_gammaComparisonAxis.choose
+
+/-- On the critical line the Schwartz weight takes the real part of the centered transform. -/
+theorem gammaComparisonAxis_apply (t : ℝ) :
+    gammaComparisonAxis t = (BL(gammaComparisonProfile, (t : ℂ) * I)).re :=
+  exists_gammaComparisonAxis.choose_spec t
+
+/-- Reconstruction: compare the full sum of Theorem 12.5.1.1, pp. 519–520, with its
+critical-line measurements using the ordinary gamma-factor formula.
+For every number field and norm section, both finite-Hecke measurements have
+arithmetic upper bound given by the same fixed profile and the gamma-conductor scalar.
+The reverse comparisons each characterize Theorem 12.5.1.1 at every positive width. -/
+theorem fixedGammaConductorScalar_comparisons
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F)) :
+    comparisons(τ, gammaComparisonAxis, gammaComparisonProfile) := by
+  obtain ⟨hs, hc, hshort, _, _, hp, hm, hpos⟩ := gammaComparisonProfile_spec
+  exact gammaConductorScalar_comparisons τ hτ gammaComparisonProfile hs hc hshort hp hm hpos
+    gammaComparisonAxis gammaComparisonAxis_apply
+
+end GammaConductorComparison
+
+end RiemannMasullo.Isolated
