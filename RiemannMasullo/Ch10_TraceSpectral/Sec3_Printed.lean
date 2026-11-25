@@ -3727,6 +3727,659 @@ theorem spectralLineJet_selbergSieveEnergy_composite_remainder :
     apply div_le_div_of_nonneg_right _ hH0.le
     nlinarith only [hE,mul_nonneg hA.le hW,mul_nonneg hB.le hW]
 
+private theorem spectralLineJet_selberg_product_dvd {i j k : ℕ} (hk : 0 < k) :
+    k ∣ i*j ↔ k/(i.gcd k) ∣ j := by
+  let g := i.gcd k
+  have hg : 0 < g := Nat.gcd_pos_of_pos_right i hk
+  have hi : g*(i/g)=i := Nat.mul_div_cancel' (Nat.gcd_dvd_left i k)
+  have he : g*(k/g)=k := Nat.mul_div_cancel' (Nat.gcd_dvd_right i k)
+  have hc : (k/g).Coprime (i/g) := (Nat.coprime_div_gcd_div_gcd hg).symm
+  change k ∣ i*j ↔ k/g ∣ j
+  calc _ ↔ g*(k/g) ∣ g*((i/g)*j) := by rw [← Nat.mul_assoc,hi,he]
+       _ ↔ k/g ∣ (i/g)*j := Nat.mul_dvd_mul_iff_left hg
+       _ ↔ _ := ⟨hc.dvd_of_dvd_mul_left, fun h ↦ dvd_mul_of_dvd_right h _⟩
+
+private theorem spectralLineJet_selberg_gcd_rows (N : ℕ) {k : ℕ} (hk : 0 < k) :
+    let D := Finset.Icc 1 N
+    let u (i : ℕ) := spectralLineJet_selbergHalfMoebius i/i
+    (∑ m ∈ Finset.Icc 1 (N*N) with k ∣ m, spectralLineJet_selbergSquareWeight N m/m) =
+      ∑ d ∈ k.divisors, (∑ i ∈ D with i.gcd k=d, u i)*(∑ j ∈ D with k/d ∣ j, u j) := by
+  classical
+  intro D u
+  let M := Finset.Icc 1 (N*N)
+  let S := D ×ˢ D
+  let idx (z : ℕ×ℕ) := z.1*z.2
+  let f (z : ℕ×ℕ) := if k ∣ idx z then u z.1*u z.2 else 0
+  have hmap (z : ℕ×ℕ) (hz : z∈S) : idx z∈M := by
+    obtain ⟨h1,h2⟩ := Finset.mem_product.mp hz
+    exact Finset.mem_Icc.mpr ⟨Nat.mul_pos (Finset.mem_Icc.mp h1).1 (Finset.mem_Icc.mp h2).1,
+      Nat.mul_le_mul (Finset.mem_Icc.mp h1).2 (Finset.mem_Icc.mp h2).2⟩
+  let v (i : ℕ) := u i*(∑ j ∈ D with k/(i.gcd k) ∣ j, u j)
+  have hg (i : ℕ) (_ : i∈D) : i.gcd k ∈ k.divisors :=
+    Nat.mem_divisors.mpr ⟨Nat.gcd_dvd_right i k,hk.ne'⟩
+  calc _ = ∑ m ∈ M, ∑ z ∈ S with idx z=m, f z := by
+         rw [Finset.sum_filter]
+         refine Finset.sum_congr rfl fun m hm ↦ ?_
+         by_cases hkm : k ∣ m
+         · simp only [ite_eq_left hkm]
+           rw [spectralLineJet_selberg_square_fiber N (Finset.mem_Icc.mp hm).1,Finset.sum_div]
+           refine Finset.sum_congr rfl fun z hz ↦ ?_
+           have he : idx z=m := (Finset.mem_filter.mp hz).2
+           obtain ⟨h1,h2⟩ := Finset.mem_product.mp (Finset.mem_filter.mp hz).1
+           have hz : k ∣ idx z := he ▸ hkm
+           simp only [f,ite_eq_left hz,u]
+           change (if z.1 ∈ D then _ else 0)*(if z.2 ∈ D then _ else 0)/_ = _
+           rw [ite_eq_left h1,ite_eq_left h2,← he]
+           simp [idx,div_mul_div_comm]
+         · rw [ite_eq_right hkm,Finset.sum_eq_zero]
+           intro z hz
+           simp [f,(Finset.mem_filter.mp hz).2,hkm]
+       _ = ∑ z ∈ S, f z := Finset.sum_fiberwise_of_maps_to hmap f
+       _ = ∑ i ∈ D, v i := by
+         rw [Finset.sum_product]
+         refine Finset.sum_congr rfl fun i _ ↦ ?_
+         simp only [v,Finset.sum_filter,Finset.mul_sum,f,idx,spectralLineJet_selberg_product_dvd hk]
+         exact Finset.sum_congr rfl fun j _ ↦ by split <;> simp
+       _ = _ := by
+         rw [← Finset.sum_fiberwise_of_maps_to hg v]
+         refine Finset.sum_congr rfl fun d _ ↦ ?_
+         rw [Finset.sum_mul]
+         exact Finset.sum_congr rfl fun i hi ↦ by simp [v,(Finset.mem_filter.mp hi).2]
+
+private theorem spectralLineJet_selberg_scale_multiples (N : ℕ) {d : ℕ} (hd : 0<d)
+    (f : ℕ → ℝ) :
+    (d:ℝ)*(∑ i ∈ Finset.Icc 1 N with d ∣ i, f i/i) =
+      ∑ m ∈ Finset.Icc 1 (N/d), f (d*m)/m := by
+  classical
+  let S := Finset.Icc 1 (N/d)
+  have he : (Finset.Icc 1 N).filter (d ∣ ·) = S.image (d*·) := by
+    ext i
+    constructor
+    · intro hi
+      obtain ⟨hiD,hdi⟩ := Finset.mem_filter.mp hi
+      exact Finset.mem_image.mpr ⟨i/d,Finset.mem_Icc.mpr ⟨Nat.div_pos
+        (Nat.le_of_dvd (Finset.mem_Icc.mp hiD).1 hdi) hd,Nat.div_le_div_right (Finset.mem_Icc.mp hiD).2⟩,
+        Nat.mul_div_cancel' hdi⟩
+    · rintro hi
+      obtain ⟨m,hm,rfl⟩ := Finset.mem_image.mp hi
+      exact Finset.mem_filter.mpr ⟨Finset.mem_Icc.mpr ⟨Nat.mul_pos hd (Finset.mem_Icc.mp hm).1,
+        by simpa [Nat.mul_comm] using (Nat.le_div_iff_mul_le hd).mp (Finset.mem_Icc.mp hm).2⟩,dvd_mul_right _ _⟩
+  rw [he,Finset.sum_image (fun _ _ _ _ h ↦ Nat.eq_of_mul_eq_mul_left hd h),Finset.mul_sum]
+  refine Finset.sum_congr rfl fun m _ ↦ ?_
+  push_cast
+  field_simp [show (d:ℝ)≠0 by exact_mod_cast hd.ne']
+
+private theorem spectralLineJet_selberg_uncoprime_mass (Y : ℕ) {k : ℕ} (hk : 0<k) :
+    (∑ m ∈ Finset.Icc 1 Y with ¬m.Coprime k, 1/(m:ℝ)) ≤
+      (harmonic Y:ℝ)*∑ p ∈ k.primeFactors, 1/(p:ℝ) := by
+  classical
+  let D := Finset.Icc 1 Y
+  calc _ ≤ ∑ m ∈ D, ∑ p ∈ k.primeFactors with p ∣ m, 1/(m:ℝ) := by
+         rw [Finset.sum_filter]
+         refine Finset.sum_le_sum fun m _ ↦ ?_
+         split
+         · rename_i h
+           obtain ⟨p,hp,hpm,hpk⟩ := Nat.Prime.not_coprime_iff_dvd.mp h
+           apply Finset.single_le_sum (f := fun _ ↦ 1/(m:ℝ)) (fun _ _ ↦ by positivity)
+           exact Finset.mem_filter.mpr ⟨Nat.mem_primeFactors.mpr ⟨hp,hpk,hk.ne'⟩,hpm⟩
+         · exact Finset.sum_nonneg fun _ _ ↦ by positivity
+       _ = ∑ p ∈ k.primeFactors, ∑ m ∈ D with p ∣ m, 1/(m:ℝ) := by
+         simp_rw [Finset.sum_filter]
+         rw [Finset.sum_comm]
+       _ ≤ _ := by
+         rw [Finset.mul_sum]
+         refine Finset.sum_le_sum fun p hp ↦ ?_
+         have h := spectralLineJet_selberg_divisor_row_bound (M := Y) (Nat.mem_primeFactors.mp hp).1.pos
+           (fun _ ↦ 1) (by simp)
+         have hh : (harmonic (Y/p):ℝ) ≤ (harmonic Y:ℝ) := by
+           simp only [harmonic_eq_sum_Icc,Rat.cast_sum,Rat.cast_inv,Rat.cast_natCast]
+           exact Finset.sum_le_sum_of_subset_of_nonneg (Finset.Icc_subset_Icc_right (Nat.div_le_self Y p))
+             fun _ _ _ ↦ by positivity
+         exact (show (∑ m ∈ D with p ∣ m, 1/(m:ℝ)) ≤ (harmonic (Y/p):ℝ)/p by simpa [D] using h).trans
+           ((div_le_div_of_nonneg_right hh (Nat.cast_nonneg _)).trans_eq (by ring))
+
+private theorem spectralLineJet_selberg_mask_error (Y : ℕ) {d k : ℕ} (hk : 0<k) (f : ℕ → ℝ)
+    (hf : ∀ m, |f m|≤1)
+    (hgood : ∀ m, m.Coprime k → f m=spectralLineJet_selbergHalfMoebius d*spectralLineJet_selbergHalfMoebius m) :
+    |(∑ m ∈ Finset.Icc 1 Y, f m/m)-spectralLineJet_selbergHalfMoebius d*
+      (∑ m ∈ Finset.Icc 1 Y, spectralLineJet_selbergHalfMoebius m/m)| ≤
+      2*(harmonic Y:ℝ)*∑ p ∈ k.primeFactors, 1/(p:ℝ) := by
+  classical
+  let b := spectralLineJet_selbergHalfMoebius
+  let D := Finset.Icc 1 Y
+  let g (m : ℕ) := f m-b d*b m
+  have he : (∑ m ∈ D, f m/m) - b d*(∑ m ∈ D, b m/m) = ∑ m ∈ D, g m/m := by
+    rw [Finset.mul_sum,←Finset.sum_sub_distrib]
+    exact Finset.sum_congr rfl fun m _ ↦ by dsimp [g]; ring
+  rw [he]
+  calc _ ≤ ∑ m ∈ D, |g m/m| := Finset.abs_sum_le_sum_abs _ _
+       _ ≤ 2*(∑ m ∈ D with ¬m.Coprime k, 1/(m:ℝ)) := by
+         rw [Finset.sum_filter,Finset.mul_sum]
+         refine Finset.sum_le_sum fun m _ ↦ ?_
+         by_cases h : m.Coprime k
+         · simp [g,h,hgood m h,b]
+         · simp only [ite_eq_left h,abs_div,Nat.abs_cast]
+           have hb := spectralLineJet_selbergHalfMoebius_spec.2.1
+           have hbd : |b d*b m|≤1 := by rw [abs_mul]; exact (mul_le_mul (hb d) (hb m) (abs_nonneg _) (by norm_num)).trans_eq (by ring)
+           have herr : |g m|≤2 := (abs_sub _ _).trans (by linarith only [hf m,hbd])
+           exact (div_le_div_of_nonneg_right herr (Nat.cast_nonneg m)).trans_eq (by ring)
+       _ ≤ _ := (mul_le_mul_of_nonneg_left (spectralLineJet_selberg_uncoprime_mass Y hk) (by norm_num : (0:ℝ)≤2)).trans_eq (by ring)
+
+/-- A divisor slice of the sharp half-Möbius weights differs from a rescaled
+unrestricted sum only at integers sharing a prime with the modulus. The same
+bound applies when the slice specifies the exact gcd. -/
+theorem spectralLineJet_selbergHalfMoebius_divisor_slice (N : ℕ) {k d : ℕ} (hk : 0<k)
+    (hd : d ∣ k) (exactGcd : Bool) :
+    let b := spectralLineJet_selbergHalfMoebius
+    let T := (Finset.Icc 1 N).filter (fun i ↦ d ∣ i ∧ (exactGcd=true → i.gcd k=d))
+    |(d:ℝ)*(∑ i ∈ T, b i/i) - b d*(∑ m ∈ Finset.Icc 1 (N/d), b m/m)| ≤
+      2*(harmonic (N/d):ℝ)*∑ p ∈ k.primeFactors, 1/(p:ℝ) := by
+  classical
+  intro b T
+  have hd' := Nat.pos_of_dvd_of_pos hd hk
+  let f (i : ℕ) := if exactGcd=true → i.gcd k=d then b i else 0
+  have he : (∑ i ∈ T,b i/i) = ∑ i ∈ Finset.Icc 1 N with d ∣ i, f i/i := by
+    simp only [T,Finset.sum_filter,f]
+    exact Finset.sum_congr rfl fun i _ ↦ by
+      cases exactGcd <;> by_cases hi : d∣i <;> by_cases hg : i.gcd k=d <;> simp [hi,hg]
+  rw [he,spectralLineJet_selberg_scale_multiples N hd']
+  apply spectralLineJet_selberg_mask_error _ hk
+  · intro m
+    dsimp [f]
+    split
+    · exact spectralLineJet_selbergHalfMoebius_spec.2.1 _
+    · norm_num
+  · intro m hm
+    have hc := Nat.Coprime.coprime_dvd_right hd hm
+    have hq : k/d ∣ k := Nat.div_dvd_of_dvd hd
+    have hg : (d*m).gcd k=d := by
+      conv_lhs => rhs; rw [←Nat.mul_div_cancel' hd]
+      rw [Nat.gcd_mul_left,show m.gcd (k/d)=1 from Nat.Coprime.coprime_dvd_right hq hm,mul_one]
+    simp [f,hg,b,spectralLineJet_selbergHalfMoebius_mult.map_mul_of_coprime hc.symm]
+
+private theorem spectralLineJet_selberg_rough_divisors {k R L : ℕ} (hk : 0<k) (hR : 0<R)
+    (hbound : k ≤ (R+1)^L) (hrough : ∀ d, d ≤ R → 0<d → d.Coprime k) :
+    k.divisors.card ≤ 2^L ∧ (∑ p ∈ k.primeFactors, 1/(p:ℝ)) ≤ (2:ℝ)^L/(R+1) := by
+  classical
+  let P := k.primeFactors
+  have hpR (p : ℕ) (hp : p∈P) : R+1≤p := by
+    obtain ⟨hprime,hpk,_⟩ := Nat.mem_primeFactors.mp hp
+    by_contra! h
+    have hc := hrough p (by omega) hprime.pos
+    exact Nat.Prime.not_coprime_iff_dvd.mpr ⟨p,hprime,dvd_rfl,hpk⟩ hc
+  let e := ∑ p ∈ P, k.factorization p
+  have he : e ≤ L := by
+    apply (Nat.pow_le_pow_iff_right (by omega : 1<R+1)).mp
+    calc (R+1)^e = ∏ p ∈ P, (R+1)^k.factorization p := (Finset.prod_pow_eq_pow_sum _ _ _).symm
+         _ ≤ ∏ p ∈ P, p^k.factorization p :=
+           Finset.prod_le_prod fun p hp ↦ Nat.pow_le_pow_left (hpR p hp) _
+         _ = k := (Nat.prod_primeFactors_pow_factorization hk.ne').symm
+         _ ≤ _ := hbound
+  have hdiv : k.divisors.card ≤ 2^L := by
+    calc _ = ∏ p ∈ P, (k.factorization p+1) := Nat.card_divisors hk.ne'
+         _ ≤ ∏ p ∈ P, 2^k.factorization p := Finset.prod_le_prod fun p _ ↦ (k.factorization p).lt_two_pow_self
+         _ = 2^e := Finset.prod_pow_eq_pow_sum _ _ _
+         _ ≤ _ := Nat.pow_le_pow_right (by decide) he
+  refine ⟨hdiv,?_⟩
+  have hcard : P.card ≤ 2^L := (Finset.card_le_card (show P ⊆ k.divisors from fun p hp ↦
+    Nat.mem_divisors.mpr ⟨(Nat.mem_primeFactors.mp hp).2.1,hk.ne'⟩)).trans hdiv
+  calc _ ≤ ∑ _p ∈ P, 1/((R:ℝ)+1) := Finset.sum_le_sum fun p hp ↦
+         one_div_le_one_div_of_le (by positivity) (by exact_mod_cast hpR p hp)
+       _ = (P.card:ℝ)/((R:ℝ)+1) := by simp [div_eq_mul_inv]
+       _ ≤ _ := div_le_div_of_nonneg_right (by exact_mod_cast hcard) (by positivity)
+
+private theorem spectralLineJet_selberg_slice_scale {N R A : ℕ} (hN : 0<N)
+    (hNR : N≤(R+1)^A) :
+    (1+Real.log N)^2 ≤ (1+2*(A:ℝ))^2*((R:ℝ)+1) := by
+  let x : ℝ := ↑(R+1)
+  have hx : 1≤x := by dsimp [x]; exact_mod_cast Nat.le_add_left 1 R
+  have hxp := zero_lt_one.trans_le hx
+  have hs : 1 ≤ Real.sqrt x := by simpa using Real.sqrt_le_sqrt hx
+  have hn : 0 ≤ Real.log N := Real.log_nonneg (by exact_mod_cast hN)
+  have hl : Real.log N ≤ (A:ℝ)*Real.log x := by
+    have h := Real.log_le_log (by exact_mod_cast hN) (by dsimp [x]; exact_mod_cast hNR : (N:ℝ)≤x^A)
+    rwa [Real.log_pow] at h
+  have hv := Real.log_le_rpow_div hxp.le (by norm_num : (0:ℝ)<1/2)
+  rw [←Real.sqrt_eq_rpow] at hv
+  have hlog : Real.log x ≤ 2*Real.sqrt x := by linarith
+  have hle : 1+Real.log N ≤ (1+2*(A:ℝ))*Real.sqrt x := by
+    linarith only [hs,hl,mul_le_mul_of_nonneg_left hlog (Nat.cast_nonneg (α := ℝ) A)]
+  have h₂ := pow_le_pow_left₀ (by linarith only [hn]) hle 2
+  rw [mul_pow,Real.sq_sqrt hxp.le] at h₂
+  simpa [x] using h₂
+
+private theorem spectralLineJet_selberg_slice_error_uniform (A : ℕ) :
+    ∃ C > (0:ℝ), ∀ {N R k Y : ℕ}, 0<N → 0<R → N≤(R+1)^A → 0<k → k≤N*N →
+      (∀ d, d≤R → 0<d → d.Coprime k) → Y≤N →
+      (2*(harmonic Y:ℝ)*∑ p ∈ k.primeFactors, 1/(p:ℝ))*Real.sqrt (1+Real.log N) ≤ C := by
+  let L := 2*A
+  let e := (2:ℝ)^L
+  let c := (1+2*(A:ℝ))^2
+  refine ⟨2*c*e,by dsimp [c,e]; positivity,?_⟩
+  intro N R k Y hN hR hNR hk hkN hr hY
+  have hbd : k≤(R+1)^L := by
+    apply hkN.trans
+    simpa [L,Nat.mul_comm 2 A,pow_mul,pow_two] using Nat.mul_le_mul hNR hNR
+  have hmass := (spectralLineJet_selberg_rough_divisors hk hR hbd hr).2
+  let H := 1+Real.log N
+  have h1 : 1≤H := by dsimp [H]; linarith [Real.log_nonneg (by exact_mod_cast hN : (1:ℝ)≤N)]
+  have hH : 0≤H := by linarith
+  have hQ : Real.sqrt H ≤ H := Real.sqrt_le_iff.mpr ⟨hH,by nlinarith only [mul_nonneg hH (sub_nonneg.mpr h1)]⟩
+  have hh : (harmonic Y:ℝ)≤H := by
+    apply le_trans _ (harmonic_le_one_add_log N)
+    simp only [harmonic_eq_sum_Icc,Rat.cast_sum,Rat.cast_inv,Rat.cast_natCast]
+    exact Finset.sum_le_sum_of_subset_of_nonneg (Finset.Icc_subset_Icc_right hY) fun _ _ _ ↦ by positivity
+  have hlog : H^2≤c*((R:ℝ)+1) := spectralLineJet_selberg_slice_scale hN hNR
+  have hE : 0≤e/((R:ℝ)+1) := by dsimp [e]; positivity
+  calc _ ≤ (2*H*(e/((R:ℝ)+1)))*H := by
+         apply mul_le_mul _ hQ (Real.sqrt_nonneg _) (by positivity)
+         exact mul_le_mul (mul_le_mul_of_nonneg_left hh (by norm_num)) hmass
+           (Finset.sum_nonneg fun _ _ ↦ by positivity) (by positivity)
+       _ = (2*e)*H^2/((R:ℝ)+1) := by ring
+       _ ≤ _ := by
+         apply (div_le_iff₀ (by positivity : (0:ℝ)<R+1)).mpr
+         calc _ ≤ (2*e)*(c*((R:ℝ)+1)) := mul_le_mul_of_nonneg_left hlog (by dsimp [e]; positivity)
+              _ = _ := by ring
+
+private theorem spectralLineJet_selberg_rough_mass_polynomial {X R A : ℕ} (hR : 0<R)
+    (hXR : X≤(R+1)^A) (S : Finset ℕ) (hS : S ⊆ Finset.Icc 1 X)
+    (hr : ∀ k ∈ S, ∀ j, j≤R → 0<j → j.Coprime k) :
+    (∑ k ∈ S, (k:ℝ)⁻¹) ≤ (A:ℝ)+3 := by
+  apply (spectralLineJet_selberg_rough_mass hR S hS hr).trans
+  let x : ℝ := ↑(R+1)
+  have hx : 2≤x := by dsimp [x]; exact_mod_cast (by omega : 2≤R+1)
+  have hxp : 0<x := by linarith
+  have hlog : (1/2:ℝ)≤Real.log x := by
+    have hinv := inv_anti₀ (by norm_num : (0:ℝ)<2) hx
+    linarith [Real.one_sub_inv_le_log_of_pos hxp]
+  change (1+Real.log (R*X:ℕ))/Real.log x ≤ _
+  apply (div_le_iff₀ (by linarith only [hlog] : 0<Real.log x)).mpr
+  rcases Nat.eq_zero_or_pos X with rfl | hX
+  · simp only [mul_zero,Nat.cast_zero,Real.log_zero,add_zero]
+    nlinarith only [hlog,mul_nonneg (Nat.cast_nonneg (α := ℝ) A) (show 0≤Real.log x by linarith)]
+  have hmax : R*X ≤ (R+1)^(A+1) := by rw [pow_succ,Nat.mul_comm]; exact Nat.mul_le_mul hXR (by omega)
+  have hl := Real.log_le_log (by exact_mod_cast Nat.mul_pos hR hX) (Nat.cast_le (α := ℝ).mpr hmax)
+  simp only [Nat.cast_pow,Real.log_pow,Nat.cast_add,Nat.cast_one] at hl
+  dsimp [x] at *
+  push_cast at *
+  linarith only [hlog,hl]
+
+private theorem spectralLineJet_selberg_rough_count (A : ℕ) :
+    ∃ C > (0:ℝ), ∀ {X R : ℕ}, 0<R → X≤(R+1)^A → ∀ S : Finset ℕ,
+      S ⊆ Finset.Icc 2 X → (∀ k ∈ S, ∀ j, j≤R → 0<j → j.Coprime k) →
+      (S.card:ℝ)*Real.log (R+1:ℕ) ≤ C*X := by
+  classical
+  let K := Real.log 4+4
+  have hK : 0<K := by dsimp [K]; positivity
+  refine ⟨K*((A:ℝ)+3),by positivity,?_⟩
+  intro X R hR hXR S hS hr
+  let f (n : ℕ) := n/n.minFac
+  let M := S.image f
+  have hp (n : ℕ) (hn : n∈S) : n.minFac.Prime := Nat.minFac_prime (by have := (Finset.mem_Icc.mp (hS hn)).1; omega)
+  have hn' (n : ℕ) (hn : n∈S) : 0<n := by have := (Finset.mem_Icc.mp (hS hn)).1; omega
+  have hmul (n : ℕ) : f n*n.minFac=n := Nat.div_mul_cancel (Nat.minFac_dvd n)
+  have hm (n : ℕ) (hn : n∈S) : 0<f n := Nat.div_pos (Nat.minFac_le (hn' n hn)) (hp n hn).pos
+  have hpos (m : ℕ) (hm' : m∈M) : 0<m := by obtain ⟨n,hn,rfl⟩ := Finset.mem_image.mp hm'; exact hm n hn
+  have hmS : M ⊆ Finset.Icc 1 X := by
+    rintro m hm'
+    obtain ⟨n,hn,rfl⟩ := Finset.mem_image.mp hm'
+    exact Finset.mem_Icc.mpr ⟨hm n hn,(Nat.div_le_self ..).trans (Finset.mem_Icc.mp (hS hn)).2⟩
+  have hrough (m : ℕ) (hm' : m∈M) (j : ℕ) (hj : j≤R) (hj' : 0<j) : j.Coprime m := by
+    obtain ⟨n,hn,rfl⟩ := Finset.mem_image.mp hm'
+    exact Nat.Coprime.coprime_dvd_right (Nat.div_dvd_of_dvd (Nat.minFac_dvd _)) (hr n hn j hj hj')
+  let Λ := ArithmeticFunction.vonMangoldt
+  have hl (n : ℕ) (hn : n∈S) : Real.log (R+1:ℕ)≤Λ n.minFac := by
+    have hR' : R+1≤n.minFac := by
+      by_contra! hh
+      exact Nat.Prime.not_coprime_iff_dvd.mpr ⟨_,hp n hn,dvd_rfl,Nat.minFac_dvd _⟩ (hr n hn _ (by omega) (hp n hn).pos)
+    rw [show Λ n.minFac=Real.log n.minFac from ArithmeticFunction.vonMangoldt_apply_prime (hp n hn)]
+    exact Real.log_le_log (by positivity) (by exact_mod_cast hR')
+  have hbound (m : ℕ) (hm' : m∈M) :
+      (∑ n ∈ S with f n=m, Λ n.minFac) ≤ K*((X:ℝ)/m) := by
+    let U := S.filter (fun n ↦ f n=m)
+    have hkey (n : ℕ) (hn : n∈U) : m*n.minFac=n := (Finset.mem_filter.mp hn).2 ▸ hmul n
+    have hinj : Set.InjOn Nat.minFac (↑U : Set ℕ) := by
+      intro n hn j hj he; exact (hkey n hn).symm.trans ((congrArg (m*·) he).trans (hkey j hj))
+    have hsub : U.image Nat.minFac ⊆ Finset.Icc 1 (X/m) := by
+      rintro p hp'
+      obtain ⟨n,hn,rfl⟩ := Finset.mem_image.mp hp'
+      exact Finset.mem_Icc.mpr ⟨(hp n (Finset.mem_filter.mp hn).1).pos,
+        (Nat.le_div_iff_mul_le (hpos m hm')).mpr (by rw [Nat.mul_comm,hkey n hn]; exact (Finset.mem_Icc.mp (hS (Finset.mem_filter.mp hn).1)).2)⟩
+    calc _ = ∑ p ∈ U.image Nat.minFac, Λ p := (Finset.sum_image (f := Λ) hinj).symm
+         _ ≤ ∑ p ∈ Finset.Icc 1 (X/m), Λ p :=
+           Finset.sum_le_sum_of_subset_of_nonneg hsub fun _ _ _ ↦ ArithmeticFunction.vonMangoldt_nonneg
+         _ ≤ K*(X/m:ℕ) := by
+           have h := Chebyshev.psi_le_const_mul_self (Nat.cast_nonneg (α := ℝ) (X/m))
+           simp only [Chebyshev.psi,Nat.floor_natCast,←Finset.Icc_succ_left_eq_Ioc] at h
+           exact h
+         _ ≤ _ := mul_le_mul_of_nonneg_left Nat.cast_div_le hK.le
+  calc _ = ∑ _n ∈ S, Real.log (R+1:ℕ) := by simp
+       _ ≤ ∑ n ∈ S, Λ n.minFac := Finset.sum_le_sum hl
+       _ = ∑ m ∈ M, ∑ n ∈ S with f n=m, Λ n.minFac :=
+         (Finset.sum_fiberwise_of_maps_to (fun n hn ↦ Finset.mem_image_of_mem f hn) _).symm
+       _ ≤ ∑ m ∈ M, K*((X:ℝ)/m) := Finset.sum_le_sum hbound
+       _ = (K*X)*(∑ m ∈ M,(m:ℝ)⁻¹) := by rw [Finset.mul_sum]; exact Finset.sum_congr rfl fun _ _ ↦ by ring
+       _ ≤ _ := (mul_le_mul_of_nonneg_left (spectralLineJet_selberg_rough_mass_polynomial hR hXR M hmS hrough)
+         (by positivity : 0≤K*X)).trans_eq (by ring)
+
+private theorem spectralLineJet_selberg_sqrt_log_harmonic (N : ℕ) :
+    (∑ m ∈ Finset.Icc 1 N, 1/((m:ℝ)*Real.sqrt (1+Real.log m))) ≤
+      2*Real.sqrt (1+Real.log N) := by
+  let H (n : ℕ) := (harmonic n:ℝ)
+  have hh (n : ℕ) : 0≤H n := by
+    simp [H,harmonic_eq_sum_Icc]
+    exact Finset.sum_nonneg fun _ _ ↦ by positivity
+  have hb (n : ℕ) : (∑ m ∈ Finset.Icc 1 n, 1/((m:ℝ)*Real.sqrt (1+Real.log m))) ≤ 2*Real.sqrt (H n) := by
+    induction n with
+    | zero => simp [H]
+    | succ n ih =>
+      rw [Finset.sum_Icc_succ_top (by omega : 1≤n+1)]
+      let a : ℝ := ↑(n+1:ℕ)
+      have ha : 0<a := by dsimp [a]; positivity
+      have he : H (n+1)=H n+1/a := by simp [H,harmonic_succ,a,one_div]
+      have hp : 0<H (n+1) := he ▸ add_pos_of_nonneg_of_pos (hh n) (by positivity)
+      have hs := Real.sq_sqrt (hh n)
+      have hs' := Real.sq_sqrt hp.le
+      have hroot := Real.sqrt_pos.mpr hp
+      have hscale := Real.sqrt_le_sqrt (harmonic_le_one_add_log (n+1))
+      have herr : 1/(a*Real.sqrt (1+Real.log (n+1:ℕ))) ≤ 1/(a*Real.sqrt (H (n+1))) :=
+        one_div_le_one_div_of_le (mul_pos ha hroot) (mul_le_mul_of_nonneg_left hscale ha.le)
+      have he' : 1/(a*Real.sqrt (H (n+1))) ≤ 2*(Real.sqrt (H (n+1))-Real.sqrt (H n)) := by
+        rw [←div_div,div_le_iff₀ hroot]
+        nlinarith only [hs,hs',he,sq_nonneg (Real.sqrt (H (n+1))-Real.sqrt (H n))]
+      change _ + 1/(a*Real.sqrt (1+Real.log (n+1:ℕ))) ≤ _
+      linarith only [ih,herr,he']
+  exact (hb N).trans (mul_le_mul_of_nonneg_left (Real.sqrt_le_sqrt (harmonic_le_one_add_log N)) (by norm_num))
+
+private theorem spectralLineJet_selberg_rough_weighted_mass (A : ℕ) :
+    ∃ C > (0:ℝ), ∀ {N R : ℕ}, 0<N → 0<R → N≤(R+1)^A → ∀ S : Finset ℕ,
+      S ⊆ Finset.Icc 1 N → (∀ d ∈ S, ∀ j, j≤R → 0<j → j.Coprime d) →
+      (∑ d ∈ S, 1/((d:ℝ)*Real.sqrt (1+Real.log (N/d:ℕ))))*Real.sqrt (1+Real.log N) ≤ C := by
+  classical
+  obtain ⟨K,hK,hcount⟩ := spectralLineJet_selberg_rough_count A
+  refine ⟨1+4*K*((A:ℝ)+2),by positivity,?_⟩
+  intro N R hN hR hNR S hS hr
+  let H (n : ℕ) := Real.sqrt (1+Real.log n)
+  let w (d : ℕ) := 1/((d:ℝ)*H (N/d))
+  let L := Real.log (R+1:ℕ)
+  let U := S.erase 1
+  let D := Finset.Icc 1 N
+  have hn : 0<(N:ℝ) := by exact_mod_cast hN
+  have hH (m : ℕ) (hm : 0<m) : 0<H m := Real.sqrt_pos.mpr (by linarith [Real.log_nonneg (by exact_mod_cast hm : (1:ℝ)≤m)])
+  have hsL : (1/2:ℝ)≤L := by
+    have hx : (2:ℝ)≤(R+1:ℕ) := by exact_mod_cast (by omega : 2≤R+1)
+    have hinv := inv_anti₀ (by norm_num : (0:ℝ)<2) hx
+    dsimp [L]; linarith [Real.one_sub_inv_le_log_of_pos (show (0:ℝ)<(R+1:ℕ) by positivity)]
+  have hL : 0<L := by linarith
+  have hscale : (H N)^2≤((A:ℝ)+2)*L := by
+    rw [show (H N)^2=1+Real.log N from Real.sq_sqrt (by linarith [Real.log_nonneg (by exact_mod_cast hN : (1:ℝ)≤N)])]
+    have hl := Real.log_le_log hn (Nat.cast_le (α := ℝ).mpr hNR)
+    simp only [Nat.cast_pow,Real.log_pow] at hl
+    change Real.log N ≤ (A:ℝ)*L at hl
+    linarith only [hl,hsL]
+  have hU : U ⊆ Finset.Icc 2 N := by
+    intro d hd
+    obtain ⟨hne,hS'⟩ := Finset.mem_erase.mp hd
+    obtain ⟨hd1,hdN⟩ := Finset.mem_Icc.mp (hS hS')
+    exact Finset.mem_Icc.mpr ⟨by omega,hdN⟩
+  have hrow (d : ℕ) (hd : d∈U) :
+      (N:ℝ)*w d ≤ 2*∑ m ∈ D with m*d≤N, 1/H m := by
+    obtain ⟨hd2,hdN⟩ := Finset.mem_Icc.mp (hU hd)
+    have hd0 : 0<d := by omega
+    have hd' : 0<(d:ℝ) := by exact_mod_cast hd0
+    let y := N/d
+    have hy : 0<y := Nat.div_pos hdN hd0
+    have hcut : D.filter (fun m ↦ m*d≤N)=Finset.Icc 1 y := by
+      ext m
+      simp only [D,Finset.mem_filter,Finset.mem_Icc]
+      exact ⟨fun h ↦ ⟨h.1.1,(Nat.le_div_iff_mul_le hd0).mpr h.2⟩,fun h ↦
+        ⟨⟨h.1,h.2.trans (Nat.div_le_self ..)⟩,(Nat.le_div_iff_mul_le hd0).mp h.2⟩⟩
+    have hsize : N≤2*y*d := by
+      have he := Nat.div_add_mod N d
+      change d*y+N%d=N at he
+      nlinarith only [he,Nat.mod_lt N hd0,Nat.mul_le_mul_left d hy]
+    have hc : (N:ℝ)/d≤2*y := (div_le_iff₀ hd').mpr (by exact_mod_cast hsize)
+    rw [hcut]
+    calc (N:ℝ)*w d = ((N:ℝ)/d)*(1/H y) := by dsimp [w,y]; ring
+         _ ≤ (2*y)*(1/H y) := mul_le_mul_of_nonneg_right hc (by positivity [hH y hy])
+         _ = 2*∑ _m ∈ Finset.Icc 1 y, 1/H y := by simp [mul_assoc]
+         _ ≤ _ := by
+           apply mul_le_mul_of_nonneg_left _ (by norm_num)
+           refine Finset.sum_le_sum fun m hm ↦ one_div_le_one_div_of_le (hH m (Finset.mem_Icc.mp hm).1) ?_
+           apply Real.sqrt_le_sqrt
+           exact add_le_add (le_refl 1) (Real.log_le_log (by exact_mod_cast (Finset.mem_Icc.mp hm).1 : 0<(m:ℝ)) (by exact_mod_cast (Finset.mem_Icc.mp hm).2 : (m:ℝ)≤y))
+  have hcount' (m : ℕ) (hm : m∈D) :
+      (((U.filter (fun d ↦ m*d≤N)).card:ℝ)*L)*(1/H m) ≤ K*N*(1/((m:ℝ)*H m)) := by
+    let W := U.filter (fun d ↦ m*d≤N)
+    have hm0 : 0<m := (Finset.mem_Icc.mp hm).1
+    have hW : W ⊆ Finset.Icc 2 (N/m) := by
+      intro d hd
+      obtain ⟨hu,hmul⟩ := Finset.mem_filter.mp hd
+      exact Finset.mem_Icc.mpr ⟨(Finset.mem_Icc.mp (hU hu)).1,(Nat.le_div_iff_mul_le hm0).mpr (by simpa [Nat.mul_comm] using hmul)⟩
+    have hbd := hcount hR ((Nat.div_le_self N m).trans hNR) W hW
+      (fun d hd ↦ hr d (Finset.mem_of_mem_erase (Finset.mem_filter.mp hd).1))
+    calc _ ≤ (K*(N/m:ℕ))*(1/H m) := mul_le_mul_of_nonneg_right hbd (by positivity [hH m hm0])
+         _ ≤ (K*((N:ℝ)/m))*(1/H m) := by gcongr; exact Nat.cast_div_le
+         _ = _ := by ring
+  have hall : ((N:ℝ)*∑ d ∈ U,w d)*L ≤ (2*K*N)*(2*H N) := by
+    calc _ ≤ (2*∑ d ∈ U, ∑ m ∈ D with m*d≤N, 1/H m)*L := by
+           apply mul_le_mul_of_nonneg_right _ hL.le
+           rw [Finset.mul_sum,Finset.mul_sum]
+           exact Finset.sum_le_sum hrow
+         _ = 2*∑ m ∈ D, (((U.filter (fun d ↦ m*d≤N)).card:ℝ)*L)*(1/H m) := by
+           simp_rw [Finset.sum_filter]
+           rw [Finset.sum_comm]
+           rw [mul_assoc,Finset.sum_mul]
+           congr 1
+           refine Finset.sum_congr rfl fun m _ ↦ ?_
+           rw [←Finset.sum_filter,Finset.sum_const,nsmul_eq_mul]; ring
+         _ ≤ 2*∑ m ∈ D, K*N*(1/((m:ℝ)*H m)) := mul_le_mul_of_nonneg_left (Finset.sum_le_sum hcount') (by norm_num)
+         _ ≤ _ := by
+           rw [←Finset.mul_sum]
+           exact (mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_left (spectralLineJet_selberg_sqrt_log_harmonic N)
+             (by positivity : 0≤K*N)) (by norm_num : (0:ℝ)≤2)).trans_eq (by ring)
+  have hsum : (∑ d ∈ U,w d)*L ≤ 4*K*H N := by
+    apply (mul_le_mul_iff_right₀ hn).mp
+    linarith only [hall]
+  have hfinal : (∑ d ∈ U,w d)*H N ≤ 4*K*((A:ℝ)+2) := by
+    apply (mul_le_mul_iff_left₀ hL).mp
+    calc _ = ((∑ d ∈ U,w d)*L)*H N := by ring
+         _ ≤ (4*K*H N)*H N := mul_le_mul_of_nonneg_right hsum (hH N hN).le
+         _ ≤ _ := by nlinarith only [mul_le_mul_of_nonneg_left hscale (by positivity : (0:ℝ)≤4*K)]
+  have hsub : S ⊆ insert 1 U := by intro d hd; by_cases h : d=1 <;> simp [U,h,hd]
+  have he : (∑ d ∈ S,w d) ≤ w 1 + ∑ d ∈ U,w d := by
+    apply (Finset.sum_le_sum_of_subset_of_nonneg hsub (f := w) (fun d _ _ ↦ by dsimp [w,H]; positivity)).trans_eq
+    rw [Finset.sum_insert (by simp [U])]
+  change (∑ d ∈ S,w d)*H N ≤ _
+  calc _ ≤ (w 1+∑ d ∈ U,w d)*H N := mul_le_mul_of_nonneg_right he (hH N hN).le
+       _ = 1+(∑ d ∈ U,w d)*H N := by rw [add_mul]; simp [w,(hH N hN).ne']
+       _ ≤ _ := add_le_add le_rfl hfinal
+
+private def spectralLineJet_selbergSliceMajorant (N d : ℕ) : ℝ :=
+  if d ∈ Finset.Icc 1 N then 1/((d:ℝ)*Real.sqrt (1+Real.log (N/d:ℕ))) else 0
+
+private theorem spectralLineJet_selberg_slice_majorant_spec (N d : ℕ) :
+    0≤spectralLineJet_selbergSliceMajorant N d ∧ (d:ℝ)*spectralLineJet_selbergSliceMajorant N d≤1 := by
+  unfold spectralLineJet_selbergSliceMajorant
+  split
+  · rename_i h
+    obtain ⟨hd,hdN⟩ := Finset.mem_Icc.mp h
+    have hp : 0<(d:ℝ) := by exact_mod_cast hd
+    have hy := Nat.div_pos hdN hd
+    have hs : 1≤Real.sqrt (1+Real.log (N/d:ℕ)) := Real.le_sqrt_of_sq_le (by
+      linarith [Real.log_nonneg (by exact_mod_cast hy : (1:ℝ)≤(N/d:ℕ))])
+    refine ⟨by positivity,?_⟩
+    rw [one_div,mul_inv,←mul_assoc,mul_inv_cancel₀ hp.ne',one_mul]
+    exact (inv_le_one₀ (by linarith)).mpr hs
+  · simp
+
+private theorem spectralLineJet_selberg_slice_majorant (A : ℕ) :
+    ∃ C > (0:ℝ), ∀ {N R k d : ℕ}, 0<N → 0<R → N≤(R+1)^A → 0<k → k≤N*N →
+      (∀ j, j≤R → 0<j → j.Coprime k) → d∣k → ∀ e : Bool,
+        let T := (Finset.Icc 1 N).filter (fun i ↦ d ∣ i ∧ (e=true → i.gcd k=d))
+        |∑ i ∈ T,spectralLineJet_selbergHalfMoebius i/i| ≤ C*spectralLineJet_selbergSliceMajorant N d := by
+  classical
+  obtain ⟨E,hE,herr⟩ := spectralLineJet_selberg_slice_error_uniform A
+  obtain ⟨K,hK,hV⟩ := spectralLineJet_selbergHalfMoebius_reciprocal_sum
+  refine ⟨K+E,by positivity,?_⟩
+  intro N R k d hN hR hNR hk hkN hr hd e T
+  let b := spectralLineJet_selbergHalfMoebius
+  let s := ∑ i ∈ T,b i/i
+  let H (n : ℕ) := Real.sqrt (1+Real.log n)
+  have hd' := Nat.pos_of_dvd_of_pos hd hk
+  have hd0 : 0<(d:ℝ) := by exact_mod_cast hd'
+  by_cases hdN : d≤N
+  · let y := N/d
+    let V := ∑ m ∈ Finset.Icc 1 y,b m/m
+    let err := 2*(harmonic y:ℝ)*∑ p ∈ k.primeFactors, 1/(p:ℝ)
+    have hy : 0<y := Nat.div_pos hdN hd'
+    have hy' : 0<(y:ℝ) := by exact_mod_cast hy
+    have hY : 0<H y := Real.sqrt_pos.mpr (by linarith [Real.log_nonneg (by exact_mod_cast hy : (1:ℝ)≤y)])
+    have hYN : H y≤H N := Real.sqrt_le_sqrt (add_le_add le_rfl (Real.log_le_log hy' (by exact_mod_cast Nat.div_le_self N d)))
+    have he0 : 0≤err := by
+      have hh : (0:ℝ)≤(harmonic y:ℝ) := by simp [harmonic_eq_sum_Icc]; exact Finset.sum_nonneg fun _ _ ↦ by positivity
+      dsimp [err]; positivity
+    have he : err*H y≤E := (mul_le_mul_of_nonneg_left hYN he0).trans (herr hN hR hNR hk hkN hr (Nat.div_le_self N d))
+    have hv : |V| * H y≤K := (le_div_iff₀ hY).mp (hV y hy)
+    have hbase : |(d:ℝ)*s-b d*V|≤err := spectralLineJet_selbergHalfMoebius_divisor_slice N hk hd e
+    have hb : |b d*V|≤|V| := by rw [abs_mul]; exact mul_le_of_le_one_left (abs_nonneg _) (spectralLineJet_selbergHalfMoebius_spec.2.1 _)
+    have hs : |(d:ℝ)*s|≤err+|V| :=
+      (by simpa only [sub_add_cancel] using abs_add_le ((d:ℝ)*s-b d*V) (b d*V) : |(d:ℝ)*s|≤_).trans (add_le_add hbase hb)
+    rw [abs_mul,abs_of_pos hd0] at hs
+    rw [spectralLineJet_selbergSliceMajorant,ite_eq_left (Finset.mem_Icc.mpr ⟨hd',hdN⟩),←div_eq_mul_one_div]
+    apply (le_div_iff₀ (mul_pos hd0 hY)).mpr
+    calc |s| *((d:ℝ)*H y) = ((d:ℝ)*|s|)*H y := by ring
+         _ ≤ (err+|V|)*H y := mul_le_mul_of_nonneg_right hs hY.le
+         _ ≤ _ := by linarith only [he,hv]
+  · have hempty : T=∅ := by
+      apply Finset.eq_empty_iff_forall_notMem.mpr
+      intro i hi
+      obtain ⟨hiD,hdi,_⟩ := Finset.mem_filter.mp hi
+      exact hdN ((Nat.le_of_dvd (Finset.mem_Icc.mp hiD).1 hdi).trans (Finset.mem_Icc.mp hiD).2)
+    simp [hempty,spectralLineJet_selbergSliceMajorant,hdN]
+
+private theorem spectralLineJet_selberg_rough_row_domination (A : ℕ) :
+    ∃ K > (0:ℝ), ∀ {N R k : ℕ}, 0<N → 0<R → N≤(R+1)^A → 0<k → k≤N*N →
+      (∀ j, j≤R → 0<j → j.Coprime k) →
+      let W := spectralLineJet_selbergSliceMajorant N
+      let V := ∑ d ∈ k.divisors,W d*W (k/d)
+      (k.totient:ℝ)*(∑ i ∈ Finset.Icc 1 (N*N) with k ∣ i, spectralLineJet_selbergSquareWeight N i/i)^2 ≤ K*V := by
+  classical
+  obtain ⟨C,hC,hs⟩ := spectralLineJet_selberg_slice_majorant A
+  let L := (2:ℝ)^(2*A)
+  refine ⟨L*C^4,by dsimp [L]; positivity,?_⟩
+  intro N R k hN hR hNR hk hkN hr W V
+  let t := ∑ i ∈ Finset.Icc 1 (N*N) with k ∣ i, spectralLineJet_selbergSquareWeight N i/i
+  let D := Finset.Icc 1 N
+  let u (i : ℕ) := spectralLineJet_selbergHalfMoebius i/i
+  have hW := spectralLineJet_selberg_slice_majorant_spec N
+  have hbd : |t|≤C^2*V := by
+    dsimp [t]; rw [spectralLineJet_selberg_gcd_rows N hk]
+    apply (Finset.abs_sum_le_sum_abs _ _).trans
+    rw [Finset.mul_sum]
+    refine Finset.sum_le_sum fun d hd ↦ ?_
+    have hdv := (Nat.mem_divisors.mp hd).1
+    have hq := Nat.div_dvd_of_dvd hdv
+    have hg : D.filter (fun i ↦ d ∣ i ∧ (true=true → i.gcd k=d)) = D.filter (fun i ↦ i.gcd k=d) := by
+      ext i; simp only [Finset.mem_filter,true_implies]
+      exact and_congr_right fun _ ↦ ⟨And.right,fun h ↦ ⟨h ▸ Nat.gcd_dvd_left i k,h⟩⟩
+    have hf : D.filter (fun i ↦ k/d ∣ i ∧ (false=true → i.gcd k=k/d)) = D.filter (k/d ∣ ·) := by ext i; simp
+    have he := hs hN hR hNR hk hkN hr hdv true
+    have hm := hs hN hR hNR hk hkN hr hq false
+    change |∑ i ∈ D.filter _, u i|≤C*W d at he
+    change |∑ i ∈ D.filter _, u i|≤C*W (k/d) at hm
+    rw [hg] at he
+    rw [hf] at hm
+    rw [abs_mul]
+    exact (mul_le_mul he hm (abs_nonneg _) (mul_nonneg hC.le (hW d).1)).trans_eq (by ring)
+  have hb : k≤(R+1)^(2*A) := hkN.trans (by simpa [Nat.mul_comm 2 A,pow_mul,pow_two] using Nat.mul_le_mul hNR hNR)
+  have hc := (spectralLineJet_selberg_rough_divisors hk hR hb hr).1
+  have hV : (k:ℝ)*V≤L := by
+    rw [Finset.mul_sum]
+    calc _ ≤ ∑ _d ∈ k.divisors,(1:ℝ) := by
+           refine Finset.sum_le_sum fun d hd ↦ ?_
+           have he : (d:ℝ)*(k/d:ℕ)=k := by exact_mod_cast Nat.mul_div_cancel' (Nat.mem_divisors.mp hd).1
+           calc _ = ((d:ℝ)*W d)*((k/d:ℕ)*W (k/d)) := by rw [←he]; ring
+                _ ≤ 1 := (mul_le_mul (hW d).2 (hW (k/d)).2 (mul_nonneg (Nat.cast_nonneg _) (hW _).1) zero_le_one).trans_eq (by ring)
+         _ ≤ _ := by simp only [Finset.sum_const,nsmul_eq_mul,mul_one]; dsimp [L]; exact_mod_cast hc
+  have hlin : (k:ℝ)*|t|≤L*C^2 := by
+    calc _ ≤ (k:ℝ)*(C^2*V) := mul_le_mul_of_nonneg_left hbd (Nat.cast_nonneg _)
+         _ = ((k:ℝ)*V)*C^2 := by ring
+         _ ≤ _ := mul_le_mul_of_nonneg_right hV (sq_nonneg _)
+  have ht : (k.totient:ℝ)≤k := by exact_mod_cast Nat.totient_le k
+  calc (k.totient:ℝ)*t^2 ≤ (k:ℝ)*t^2 := mul_le_mul_of_nonneg_right ht (sq_nonneg _)
+       _ = ((k:ℝ)*|t|)*|t| := by rw [mul_assoc,←sq,sq_abs]
+       _ ≤ (L*C^2)*(C^2*V) := mul_le_mul hlin hbd (abs_nonneg _) (by dsimp [L]; positivity)
+       _ = _ := by ring
+
+private theorem spectralLineJet_selberg_rough_convolution {N R : ℕ} (S : Finset ℕ)
+    (hS : S ⊆ Finset.Icc 1 (N*N)) (hr : ∀ k ∈ S, ∀ j, j≤R → 0<j → j.Coprime k) :
+    let W := spectralLineJet_selbergSliceMajorant N
+    let D := (Finset.Icc 1 N).filter (fun d ↦ ∀ j, j≤R → 0<j → j.Coprime d)
+    (∑ k ∈ S, ∑ d ∈ k.divisors,W d*W (k/d)) ≤ (∑ d ∈ D,W d)^2 := by
+  classical
+  intro W D
+  let P := D ×ˢ D
+  let idx (z : ℕ×ℕ) := z.1*z.2
+  let f (z : ℕ×ℕ) := W z.1*W z.2
+  have he (k : ℕ) (hk : k∈S) :
+      (∑ d ∈ k.divisors, W d*W (k/d)) = ∑ z ∈ P with idx z=k, f z := by
+    rw [← Nat.sum_divisorsAntidiagonal (fun d q ↦ W d*W q)]
+    symm
+    have hk0 : 0<k := (Finset.mem_Icc.mp (hS hk)).1
+    apply Finset.sum_subset (show P.filter (fun z ↦ idx z=k) ⊆ k.divisorsAntidiagonal from fun z hz ↦
+      Nat.mem_divisorsAntidiagonal.mpr ⟨(Finset.mem_filter.mp hz).2,hk0.ne'⟩)
+    intro z hz hno
+    have heq := (Nat.mem_divisorsAntidiagonal.mp hz).1
+    have h1 : z.1 ∣ k := heq ▸ dvd_mul_right _ _
+    have h2 : z.2 ∣ k := heq ▸ dvd_mul_left _ _
+    have hzero (d : ℕ) (hd : d∣k) (hnd : d∉D) : W d=0 := by
+      apply ite_eq_right
+      exact fun hin ↦ hnd (Finset.mem_filter.mpr ⟨hin,fun j hj hj' ↦ Nat.Coprime.coprime_dvd_right hd (hr k hk j hj hj')⟩)
+    change W z.1*W z.2=0
+    by_cases h : z.1∈D
+    · have hz2 : z.2∉D := fun h₂ ↦ hno (Finset.mem_filter.mpr ⟨Finset.mem_product.mpr ⟨h,h₂⟩,heq⟩)
+      simp [hzero z.2 h2 hz2]
+    · simp [hzero z.1 h1 h]
+  calc _ = ∑ k ∈ S, ∑ z ∈ P with idx z=k, f z := Finset.sum_congr rfl he
+       _ = ∑ z ∈ P with idx z∈S, f z := Finset.sum_fiberwise_eq_sum_filter P S idx f
+       _ ≤ ∑ z ∈ P, f z := Finset.sum_le_sum_of_subset_of_nonneg (Finset.filter_subset _ _) fun z _ _ ↦
+         mul_nonneg (spectralLineJet_selberg_slice_majorant_spec N z.1).1 (spectralLineJet_selberg_slice_majorant_spec N z.2).1
+       _ = _ := by rw [sq,Finset.sum_mul_sum,Finset.sum_product]
+
+/-- The total Selberg energy of the sharp squared mollifier on rough moduli
+is at most a constant times the reciprocal logarithm of the cutoff. This covers
+every row through the square of the cutoff, including repeated prime factors.
+The constant depends only on the fixed exponent relating the roughness threshold
+to the cutoff. -/
+theorem spectralLineJet_selbergSieveEnergy_all_rough_rows (A : ℕ) :
+    ∃ C > (0:ℝ), ∀ {N R : ℕ}, 0<N → 0<R → N≤(R+1)^A → ∀ S : Finset ℕ,
+      S ⊆ Finset.Icc 1 (N*N) → (∀ k ∈ S, ∀ j, j≤R → 0<j → j.Coprime k) →
+      (∑ k ∈ S, (k.totient:ℝ)*
+        (∑ d ∈ Finset.Icc 1 (N*N) with k ∣ d, spectralLineJet_selbergSquareWeight N d/d)^2) ≤
+        C/(1+Real.log N) := by
+  classical
+  obtain ⟨K,hK,hrow⟩ := spectralLineJet_selberg_rough_row_domination A
+  obtain ⟨C,hC,hweight⟩ := spectralLineJet_selberg_rough_weighted_mass A
+  refine ⟨K*C^2,by positivity,?_⟩
+  intro N R hN hR hNR S hS hr
+  let W := spectralLineJet_selbergSliceMajorant N
+  let D := (Finset.Icc 1 N).filter (fun d ↦ ∀ j, j≤R → 0<j → j.Coprime d)
+  let H := 1+Real.log N
+  have hH : 0<H := by dsimp [H]; linarith [Real.log_nonneg (by exact_mod_cast hN : (1:ℝ)≤N)]
+  have hm := hweight hN hR hNR D (Finset.filter_subset _ _) (fun d hd ↦ (Finset.mem_filter.mp hd).2)
+  have he : (∑ d ∈ D,W d) = ∑ d ∈ D,1/((d:ℝ)*Real.sqrt (1+Real.log (N/d:ℕ))) :=
+    Finset.sum_congr rfl fun d hd ↦ ite_eq_left (Finset.mem_filter.mp hd).1
+  rw [← he] at hm
+  have hpos : 0≤(∑ d ∈ D,W d)*Real.sqrt H := mul_nonneg
+    (Finset.sum_nonneg fun d _ ↦ (spectralLineJet_selberg_slice_majorant_spec N d).1) (Real.sqrt_nonneg _)
+  have hsq := pow_le_pow_left₀ hpos hm 2
+  rw [mul_pow,Real.sq_sqrt hH.le] at hsq
+  calc _ ≤ ∑ k ∈ S, K*∑ d ∈ k.divisors, W d*W (k/d) := Finset.sum_le_sum fun k hk ↦
+         hrow hN hR hNR (Finset.mem_Icc.mp (hS hk)).1 (Finset.mem_Icc.mp (hS hk)).2 (hr k hk)
+       _ ≤ K*(∑ d ∈ D,W d)^2 := by rw [← Finset.mul_sum]; exact mul_le_mul_of_nonneg_left (spectralLineJet_selberg_rough_convolution S hS hr) hK.le
+       _ ≤ _ := (le_div_iff₀ hH).mpr (by rw [mul_assoc]; exact mul_le_mul_of_nonneg_left hsq hK.le)
+
 end SelbergBulk
 
 /-- A grid of width 1/(k+1) forces two distinct ordinates in the same cell. -/
