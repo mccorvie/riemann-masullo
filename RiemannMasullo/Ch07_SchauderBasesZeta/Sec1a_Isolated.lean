@@ -83,6 +83,15 @@ def sLocalPoleContributes (χ : PontryaginDual Jₛ) : Places → ℂ → Prop :
               ((‖(x : v.val.adicCompletion F)‖ : ℝ) : ℂ) ^ ((t : ℂ) * Complex.I)) ∧
           a = (((m : ℝ) * period - t : ℝ) : ℂ) * Complex.I)
 
+/-- Paper: Lemma 7.1.2.2(2), p. 317. The distinct finite pole centers of a unitary character
+are separated by an inverse power of the height.
+Deviation: This is the quantitative hypothesis proposed for the separate sums in Theorem
+7.1.2.3 on #7279. Several places may contribute the same center. -/
+def sLocalFinitePolePolynomialSeparation (χ : PontryaginDual Jₛ) : Prop :=
+  ∃ c > (0 : ℝ), ∃ d : ℕ, ∀ a b : ℂ, (∃ v : S, sLocalPoleContributes χ (Sum.inr v) a) →
+    (∃ w : S, sLocalPoleContributes χ (Sum.inr w) b) → a ≠ b →
+      c / (1 + |a.im|) ^ d ≤ ‖b - a‖
+
 /-- Paper: Lemma 7.1.2.2, pp. 316–317. A complex point is a pole of the S-local correcting
 factor if and only if at least one place in `InfinitePlace F ⊕ S` contributes it. -/
 theorem sLocalPoleContributes_exists_iff (χ : PontryaginDual Jₛ) (a : ℂ) :
