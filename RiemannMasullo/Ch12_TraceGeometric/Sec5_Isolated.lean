@@ -17,6 +17,7 @@ public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeGreenExterior
 public import RiemannMasullo.AppB_AnalyticNT.Sec4b_BoundaryHeckeGreen
 public import RiemannMasullo.AppB_AnalyticNT.HeckeFiniteLogGreen
 public import RiemannMasullo.AppB_AnalyticNT.HeckeFiniteHardyGreen
+public import RiemannMasullo.AppB_AnalyticNT.HeckeHardyGridRate
 
 /-! # Isolated statements of §12.5
 
@@ -1566,6 +1567,46 @@ theorem exists_hasSum_absolute_exterior_le_finiteHardyUpper (τ : ℝ≥0ˣ →�
   refine ⟨A, hA, ?_⟩
   filter_upwards [(HeckeHardyGreen.grid_upper_recovers_green τ hτ χ hχ hN).1] with n hn
   exact ⟨hn.1, hb.trans (mul_le_mul_of_nonneg_left hn.2 (by positivity))⟩
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520.
+Reconstruction: all positive widths satisfy exterior cancellation exactly when each
+normalized character passes a finite Hardy grid test at arbitrarily late indices for
+arbitrarily large fixed disk exponents. Both the exponent and the cutoff are integers.
+The threshold exp(−(log n)^(1/4)) is the same for every field and character. -/
+theorem all_widths_iff_cofinal_finiteHardyGrid_quarterLog (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) :
+    allWidths(τ) ↔ ∀ (χ : U𝔽), (∀ u : ℝ≥0ˣ, χ (τ u) = 1) →
+      ∀ M : ℕ, ∃ N ≥ M, ∀ k : ℕ, ∃ n ≥ k,
+        HeckeHardyGreen.gridUpperArgument χ N n ≤ Real.exp (-Real.sqrt (meshScale n)) := by
+  rw [all_widths_iff_criticalLogDifference_nonpos τ hτ]
+  constructor
+  · intro h χ hχ M
+    let N := max M (HeckeHardyGreen.tableExponent τ hτ χ hχ)
+    have hN : HeckeHardyGreen.tableExponent τ hτ χ hχ ≤ N := le_max_right _ _
+    have hn : 0 ≤ criticalLogDifference χ :=
+      (criticalLogDifference_eq_mass τ hτ χ hχ) ▸ rightGreenMass_nonneg χ
+    have hz := le_antisymm (h χ hχ) hn
+    have hrate := (HeckeHardyGreen.gridUpperArgument_rate τ hτ χ hχ hN).2
+    have hsmall : ∀ᶠ n : ℕ in atTop,
+        HeckeHardyGreen.gridUpperArgument χ N n ≤ Real.exp (-Real.sqrt (meshScale n)) := by
+      simpa [hz] using hrate.eventually_le_exp_neg_sqrt_meshScale
+    refine ⟨N, le_max_left _ _, fun k ↦ ?_⟩
+    exact ((eventually_ge_atTop k).and hsmall).exists
+  · intro h χ hχ
+    by_contra! hpos
+    obtain ⟨N, hN, hpass⟩ := h χ hχ (HeckeHardyGreen.tableExponent τ hτ χ hχ)
+    let R := 1 - Real.exp (-2 * criticalLogDifference χ)
+    have hR : 0 < R := sub_pos.mpr (Real.exp_lt_one_iff.mpr (by linarith))
+    have ht : Tendsto (fun n : ℕ ↦ Real.exp (-Real.sqrt (meshScale n))) atTop (𝓝 0) :=
+      Real.tendsto_exp_neg_atTop_nhds_zero.comp (Real.tendsto_sqrt_atTop.comp meshScale_atTop)
+    have hlate : ∀ᶠ n : ℕ in atTop,
+        Real.exp (-Real.sqrt (meshScale n)) < HeckeHardyGreen.gridUpperArgument χ N n := by
+      filter_upwards [ht.eventually_lt_const hR,
+        (HeckeHardyGreen.gridUpperArgument_rate τ hτ χ hχ hN).1] with n hs hu
+      exact hs.trans_le hu
+    obtain ⟨k, hk⟩ := eventually_atTop.1 hlate
+    obtain ⟨n, hnk, hn⟩ := hpass k
+    exact (hk n hnk).not_ge hn
 
 end CompactGreen
 
