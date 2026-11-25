@@ -5,6 +5,10 @@ public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1a
 import Mathlib.Analysis.PSeries
 import Mathlib.RingTheory.RamificationInertia.Inertia
 import Mathlib.RingTheory.RamificationInertia.Ramification
+import Mathlib.Algebra.Polynomial.RingDivision
+import Mathlib.Analysis.Calculus.DSlope
+import Mathlib.RingTheory.Coprime.Lemmas
+import Mathlib.RingTheory.Ideal.Int
 
 /-!
 # Isolated statements for the separate place sums in §7.1.2
@@ -1167,5 +1171,647 @@ theorem rapidDecay_div_summable_iff_polyLowerBound (D : ℤ → ℂ) :
         _ = (C / c) * ((1 + |(m : ℝ)|) ^ 2)⁻¹ := by
             rw [pow_add]
             field_simp [hc.ne', hbase.ne']
+
+/-! ## Separate place sums for a single residue characteristic -/
+
+section
+
+open scoped Classical
+
+/-- Paper: Lemma 7.1.2.2, pp. 316–317. At a finite place of norm `p ^ f`, the pole
+condition depends only on `exp (log p * a)`. The allowed phases are the `f`-th roots
+of the character value on a uniformizer at an unramified place and are empty at a
+ramified place.
+Deviation: The phase is taken with the sign dictated by the shifted Euler factor. -/
+theorem sLocalPoleContributes_finite_phase_finset (χ : PontryaginDual Jₛ) (v : S)
+    {p f : ℕ} (hf : 0 < f) (hN : v.val.asIdeal.absNorm = p ^ f) :
+    ∃ Q : Finset ℂ, ∀ a : ℂ, sLocalPoleContributes χ (Sum.inr v) a ↔
+      Complex.exp ((Real.log (p : ℝ) : ℂ) * a) ∈ Q := by
+  classical
+  obtain ⟨π, hπ, h⟩ := sLocalRhoFactor_poles_iff_finite χ v
+  let ψ := sLocalFiniteRestriction v (chart(χ) 0)
+  let U := ∀ u : (v.val.adicCompletionIntegers F)ˣ,
+    ψ (Units.map (v.val.adicCompletionIntegers F).subtype.toMonoidHom u) = 1
+  let z (a : ℂ) := Complex.exp ((Real.log (p : ℝ) : ℂ) * a)
+  have hpow (a : ℂ) : ((‖π.val‖ : ℝ) : ℂ) ^ a = (z a ^ f)⁻¹ := by
+    have hb : 0 < ‖π.val‖ := norm_pos_iff.mpr π.ne_zero
+    dsimp only [z]
+    rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hb.ne'),
+      ← Complex.ofReal_log hb.le, hπ, Real.log_inv, hN, Nat.cast_pow, Real.log_pow,
+      ← Complex.exp_nat_mul, ← Complex.exp_neg]
+    push_cast
+    congr 1
+    ring
+  have hpole (a : ℂ) :
+      sLocalPoleContributes χ (Sum.inr v) a ↔ U ∧ ψ π = z a ^ f := by
+    rw [sLocalPoleContributes_finite_iff_tateFactor, (h a).2.1]
+    change (U ∧ ψ π * ((‖π.val‖ : ℝ) : ℂ) ^ a = 1) ↔ _
+    rw [hpow, mul_inv_eq_one₀ (pow_ne_zero f (Complex.exp_ne_zero _))]
+  by_cases hU : U
+  · refine ⟨Polynomial.nthRootsFinset f (ψ π), fun a ↦ ?_⟩
+    rw [hpole, Polynomial.mem_nthRootsFinset hf, and_iff_right hU]
+    exact eq_comm
+  · refine ⟨∅, fun a ↦ ?_⟩
+    simp [hpole, hU]
+
+/-- A finite stage whose places lie over one rational prime admits a common norm base,
+including the empty stage. -/
+private theorem exists_prime_pow_norms_of_same_prime
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ)) :
+    ∃ p : ℕ, p.Prime ∧ ∀ v : S, ∃ f : ℕ, 0 < f ∧ v.val.asIdeal.absNorm = p ^ f := by
+  classical
+  by_cases hSne : S.Nonempty
+  · let v₀ : S := ⟨hSne.choose, hSne.choose_spec⟩
+    let P := v₀.val.asIdeal.under ℤ
+    have : NeZero v₀.val.asIdeal := ⟨v₀.val.ne_bot⟩
+    refine ⟨P.absNorm, Nat.absNorm_under_prime v₀.val.asIdeal, fun v ↦ ?_⟩
+    have hPv : v.val.asIdeal.under ℤ = P := by
+      have h := congrArg (fun q : HeightOneSpectrum (𝓞 ℚ) ↦ q.asIdeal.under ℤ) (hsame v v₀)
+      simpa [HeightOneSpectrum.under, Ideal.under_under, P] using h
+    have : v.val.asIdeal.LiesOver P := ⟨hPv.symm⟩
+    exact ⟨_, Ideal.inertiaDeg_pos v.val.asIdeal ℤ, (Ideal.absNorm_pow_inertiaDeg P _).symm⟩
+  · exact ⟨2, Nat.prime_two, fun v ↦ (hSne ⟨v.val, v.property⟩).elim⟩
+
+/-- A finite set of possible phases at each finite place determines a global valid
+assignment. Each realized phase is assigned to one finite place at every center in its
+class. In any closed vertical strip only finitely many poles have no finite contribution. -/
+private theorem exists_isValidPoleAssignment_of_phase_finsets (χ : PontryaginDual Jₛ)
+    (z : ℂ → ℂ) (Q : S → Finset ℂ)
+    (hQ : ∀ (v : S) (a : ℂ), sLocalPoleContributes χ (Sum.inr v) a ↔ z a ∈ Q v) :
+    ∃ (E : Finset ℂ) (σ assign : ℂ → Places),
+      (∀ u : ℂ, u ∈ E ↔ ∃ (a : ℂ) (v : S),
+        z a = u ∧ sLocalPoleContributes χ (Sum.inr v) a) ∧
+      (∀ u ∈ E, ∃ v : S, σ u = Sum.inr v ∧
+        ∀ a : ℂ, z a = u → sLocalPoleContributes χ (Sum.inr v) a) ∧
+      IsValidPoleAssignment χ assign ∧
+      (∀ a : ℂ, z a ∈ E → assign a = σ (z a)) ∧
+      (∀ A : ℝ, {a : ℂ | a.re ∈ Icc (-A) 1 ∧
+        meromorphicOrderAt (fun s ↦ sLocalRhoFactor (chart(χ) s)) a < 0 ∧ z a ∉ E}.Finite) := by
+  classical
+  let E := (Finset.univ.biUnion Q).filter fun u ↦ ∃ a : ℂ, z a = u
+  have hE (u : ℂ) : u ∈ E ↔ ∃ (a : ℂ) (v : S),
+      z a = u ∧ sLocalPoleContributes χ (Sum.inr v) a := by
+    simp only [E, Finset.mem_filter, Finset.mem_biUnion, Finset.mem_univ, true_and]
+    constructor
+    · rintro ⟨⟨v, hv⟩, a, rfl⟩
+      exact ⟨a, v, rfl, (hQ v a).mpr hv⟩
+    · rintro ⟨a, v, rfl, hv⟩
+      exact ⟨⟨v, (hQ v a).mp hv⟩, a, rfl⟩
+  have hplaces {u : ℂ} (hu : u ∈ E) : ∃ v : S, u ∈ Q v := by
+    obtain ⟨a, v, rfl, hv⟩ := (hE u).mp hu
+    exact ⟨v, (hQ v a).mp hv⟩
+  let σ (u : ℂ) : Places := if h : u ∈ E then Sum.inr (hplaces h).choose
+    else Sum.inl (Classical.arbitrary (InfinitePlace F))
+  have hσ (u : ℂ) (hu : u ∈ E) : ∃ v : S, σ u = Sum.inr v ∧
+      ∀ a : ℂ, z a = u → sLocalPoleContributes χ (Sum.inr v) a := by
+    refine ⟨(hplaces hu).choose, dite_eq_left hu, fun a ha ↦ (hQ _ a).mpr ?_⟩
+    rw [ha]
+    exact (hplaces hu).choose_spec
+  obtain ⟨fallback, hvalid⟩ := exists_isValidPoleAssignment χ
+  let assign (a : ℂ) := if z a ∈ E then σ (z a) else fallback a
+  refine ⟨E, σ, assign, hE, hσ, ?_, fun a ha ↦ ite_eq_left ha, fun A ↦ ?_⟩
+  · intro a ha
+    by_cases he : z a ∈ E
+    · obtain ⟨v, hv, hc⟩ := hσ (z a) he
+      rw [show assign a = Sum.inr v from (ite_eq_left he).trans hv]
+      exact hc a rfl
+    · rw [show assign a = fallback a from ite_eq_right he]
+      exact hvalid a ha
+  · refine (sLocalPoleContributes_archimedean_finite_in_strip χ A).subset ?_
+    rintro a ⟨hre, ha, he⟩
+    obtain ⟨w | v, hv⟩ := (sLocalPoleContributes_exists_iff χ a).mp ha
+    · exact ⟨hre, w, hv⟩
+    · exact (he ((hE _).mpr ⟨a, v, rfl, hv⟩)).elim
+
+/-- Paper: Theorem 7.1.2.3, pp. 317–323. If all finite places lie over a single rational
+prime, there is a valid assignment constant on each realized finite pole phase. Every strip
+contains only finitely many poles outside those classes.
+Deviation: A shared pole is assigned once, with every pole in a given phase class assigned
+to the same contributing place. -/
+theorem exists_isValidPoleAssignment_of_same_prime_phases (χ : PontryaginDual Jₛ)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ)) :
+    ∃ p : ℕ, p.Prime ∧
+      let z (a : ℂ) := Complex.exp ((Real.log (p : ℝ) : ℂ) * a)
+      ∃ (Q : S → Finset ℂ) (E : Finset ℂ) (σ assign : ℂ → Places),
+        (∀ (v : S) (a : ℂ), sLocalPoleContributes χ (Sum.inr v) a ↔ z a ∈ Q v) ∧
+        (∀ u : ℂ, u ∈ E ↔ ∃ (a : ℂ) (v : S),
+          z a = u ∧ sLocalPoleContributes χ (Sum.inr v) a) ∧
+        (∀ u ∈ E, ∃ v : S, σ u = Sum.inr v ∧
+          ∀ a : ℂ, z a = u → sLocalPoleContributes χ (Sum.inr v) a) ∧
+        IsValidPoleAssignment χ assign ∧
+        (∀ a : ℂ, z a ∈ E → assign a = σ (z a)) ∧
+        (∀ A : ℝ, {a : ℂ | a.re ∈ Icc (-A) 1 ∧
+          meromorphicOrderAt (fun s ↦ sLocalRhoFactor (chart(χ) s)) a < 0 ∧ z a ∉ E}.Finite) := by
+  classical
+  obtain ⟨p, hp, hdegs⟩ := exists_prime_pow_norms_of_same_prime hsame
+  refine ⟨p, hp, ?_⟩
+  let z (a : ℂ) := Complex.exp ((Real.log (p : ℝ) : ℂ) * a)
+  have hsets (v : S) : ∃ Q : Finset ℂ, ∀ a : ℂ,
+      sLocalPoleContributes χ (Sum.inr v) a ↔ z a ∈ Q := by
+    obtain ⟨f, hf, hN⟩ := hdegs v
+    exact sLocalPoleContributes_finite_phase_finset χ v hf hN
+  choose Q hQ using hsets
+  obtain ⟨E, σ, assign, h⟩ := exists_isValidPoleAssignment_of_phase_finsets χ z Q hQ
+  exact ⟨Q, E, σ, assign, hQ, h⟩
+
+/-- The order of the actual local zeta integral is bounded below by minus the
+number of local places, independently of the test vector and the center. -/
+theorem sLocalIdelicZFunction_order_ge_neg_card_places
+    (χ : PontryaginDual Jₛ) (f : Tests) (a : ℂ) :
+    ((-((S.card + Fintype.card (InfinitePlace F) : ℕ) : ℤ) : ℤ) : WithTop ℤ) ≤
+      meromorphicOrderAt (fun z ↦ sLocalIdelicZFunction f (chart(χ) z)) a := by
+  classical
+  apply le_trans _ (sLocalIdelicZFunction_poles f χ a)
+  refine le_min ?_ ?_
+  · exact_mod_cast neg_nonpos.mpr (Int.natCast_nonneg _)
+  · by_cases h : meromorphicOrderAt (fun z ↦ sLocalRhoFactor (chart(χ) z)) a < 0
+    · rw [sLocalRhoFactor_orderAt_pole χ a h]
+      apply WithTop.coe_le_coe.mpr
+      apply neg_le_neg
+      norm_cast
+      rw [Nat.add_comm S.card]
+      exact Nat.add_le_add (Finset.card_filter_le _ _ |>.trans_eq Finset.card_univ)
+        (Finset.card_filter_le _ _ |>.trans_eq (by simp))
+    · exact le_trans (by exact_mod_cast neg_nonpos.mpr (Int.natCast_nonneg _)) (le_of_not_gt h)
+
+/-- The norm dilation is an entire unit in the twist coordinate, including at a pole. -/
+private theorem normPower_mul_sLocalIdelicZFunction_order
+    (χ : PontryaginDual Jₛ) (f : Tests) (a : ℂ) (r : ℝ) (hr : 0 < r) :
+    meromorphicOrderAt (fun z ↦ (r : ℂ) ^ (-z) * sLocalIdelicZFunction f (chart(χ) z)) a =
+      meromorphicOrderAt (fun z ↦ sLocalIdelicZFunction f (chart(χ) z)) a := by
+  have hrC : (r : ℂ) ≠ 0 := by exact_mod_cast hr.ne'
+  have hu : AnalyticAt ℂ (fun z : ℂ ↦ (r : ℂ) ^ (-z)) a :=
+    (differentiable_neg.const_cpow (Or.inl hrC)).analyticAt a
+  have hzero := hu.meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mpr
+    (Complex.cpow_ne_zero_iff.mpr (Or.inl hrC))
+  exact (meromorphicOrderAt_mul hu.meromorphicAt ((sLocalIdelicZFunction_meromorphic f χ)
+    (mem_univ a)).meromorphicAt).trans ((congrArg (· + _) hzero).trans (zero_add _))
+
+/-- A single jet budget works for all norm dilations, centers and test vectors. -/
+private theorem normPower_mul_sLocalIdelicZFunction_order_ge_neg_card_places
+    (χ : PontryaginDual Jₛ) (f : Tests) (a : ℂ) (r : ℝ) (hr : 0 < r) :
+    ((-((S.card + Fintype.card (InfinitePlace F) : ℕ) : ℤ) : ℤ) : WithTop ℤ) ≤
+      meromorphicOrderAt (fun z ↦ (r : ℂ) ^ (-z) * sLocalIdelicZFunction f (chart(χ) z)) a := by
+  rw [normPower_mul_sLocalIdelicZFunction_order χ f a r hr]
+  exact sLocalIdelicZFunction_order_ge_neg_card_places χ f a
+
+section
+
+open Polynomial
+
+open Classical in
+/-- Hermite interpolation of a finite set indicator, with all positive jets through order
+`M - 1` zero. The same polynomial works at every point of `E`. -/
+private theorem exists_hermiteResiduePolynomial (E A : Finset ℂ) (M : ℕ) :
+    ∃ P : ℂ[X], ∀ α ∈ E, (X - C α) ^ M ∣ P - C (if α ∈ A then 1 else 0) := by
+  classical
+  let F (α : ℂ) : ℂ[X] := (X - C α) ^ M
+  let p := ∏ α ∈ E.filter (· ∈ A), F α
+  let q := ∏ α ∈ E.filter (· ∉ A), F α
+  have hpq : IsCoprime p q := by
+    apply IsCoprime.prod_left
+    intro α hα
+    apply IsCoprime.prod_right
+    intro β hβ
+    have hne : α ≠ β := fun h ↦ (Finset.mem_filter.mp hβ).2 (h ▸ (Finset.mem_filter.mp hα).2)
+    exact (isCoprime_X_sub_C_of_isUnit_sub (sub_ne_zero.mpr hne).isUnit).pow
+  obtain ⟨u, v, huv⟩ := hpq
+  refine ⟨v * q, fun α hα ↦ ?_⟩
+  by_cases h : α ∈ A
+  · have hdiv : F α ∣ p := Finset.dvd_prod_of_mem F (Finset.mem_filter.mpr ⟨hα, h⟩)
+    have hid : v * q - 1 = -(u * p) := by linear_combination huv
+    simpa only [ite_eq_left h, map_one, hid, dvd_neg] using dvd_mul_of_dvd_right hdiv u
+  · have hdiv : F α ∣ q := Finset.dvd_prod_of_mem F (Finset.mem_filter.mpr ⟨hα, h⟩)
+    simpa only [ite_eq_right h, map_zero, sub_zero] using dvd_mul_of_dvd_right hdiv v
+
+/-- On a sufficiently small circle the normalized integral of a meromorphic germ is constant. -/
+private theorem eventually_circleIntegral_eq_residue {W : ℂ → ℂ} {a : ℂ}
+    (hW : MeromorphicAt W a) :
+    ∀ᶠ r in 𝓝[>] (0 : ℝ), circleIntegral W a r / (2 * (Real.pi : ℂ) * Complex.I) =
+      complexResidue W a := by
+  obtain ⟨R, hR, h⟩ := Metric.nhdsWithin_basis_ball.eventually_iff.mp hW.eventually_analyticAt
+  have key (r s : ℝ) (hr : 0 < r) (hrs : r ≤ s) (hsR : s < R) :
+      circleIntegral W a s = circleIntegral W a r := by
+    apply Complex.circleIntegral_eq_of_differentiable_on_annulus_off_countable hr hrs
+      Set.countable_empty
+    · intro z hz
+      have hzR := Metric.mem_ball.mpr ((Metric.mem_closedBall.mp hz.1).trans_lt hsR)
+      have hza : z ≠ a := fun he ↦ hz.2 (he ▸ Metric.mem_ball_self hr)
+      exact (h ⟨hzR, hza⟩).continuousAt.continuousWithinAt
+    · intro z hz
+      have hzR := Metric.mem_ball.mpr ((Metric.mem_ball.mp hz.1.1).trans hsR)
+      have hza : z ≠ a := fun he ↦ hz.1.2 (he ▸ Metric.mem_closedBall_self hr.le)
+      exact (h ⟨hzR, hza⟩).differentiableAt
+  have hev : ∀ᶠ r in 𝓝[>] (0 : ℝ), circleIntegral W a r = circleIntegral W a (R / 2) := by
+    filter_upwards [Ioo_mem_nhdsGT hR] with r hr
+    rcases le_total (R / 2) r with hr' | hr'
+    · exact key _ _ (half_pos hR) hr' hr.2
+    · exact (key _ _ hr.1 hr' (half_lt_self hR)).symm
+  have hfix : complexResidue W a =
+      circleIntegral W a (R / 2) / (2 * (Real.pi : ℂ) * Complex.I) := by
+    apply (tendsto_const_nhds.congr' ?_).limUnder_eq
+    filter_upwards [hev] with r hr
+    rw [hr]
+  filter_upwards [hev] with r hr
+  rw [hfix, hr]
+
+private theorem eventually_circleIntegrable_of_meromorphicAt {W : ℂ → ℂ} {a : ℂ}
+    (hW : MeromorphicAt W a) :
+    ∀ᶠ r in 𝓝[>] (0 : ℝ), CircleIntegrable W a r := by
+  obtain ⟨R, hR, h⟩ := Metric.nhdsWithin_basis_ball.eventually_iff.mp hW.eventually_analyticAt
+  filter_upwards [Ioo_mem_nhdsGT hR] with r hr
+  refine ContinuousOn.circleIntegrable hr.1.le
+    (fun z hz ↦ (h ⟨?_, ?_⟩).continuousAt.continuousWithinAt)
+  · exact Metric.mem_ball.mpr ((Metric.mem_sphere.mp hz).trans_lt hr.2)
+  · rintro rfl
+    exact hr.1.ne (by simpa using Metric.mem_sphere.mp hz)
+
+/-- The circle residue is linear on meromorphic germs at an arbitrary center. -/
+private theorem complexResidue_const_mul_add {F G : ℂ → ℂ} {a : ℂ} (c : ℂ)
+    (hF : MeromorphicAt F a) (hG : MeromorphicAt G a) :
+    complexResidue (fun z ↦ c * F z + G z) a = c * complexResidue F a + complexResidue G a := by
+  have hcF : MeromorphicAt (fun z ↦ c * F z) a := (MeromorphicAt.const c a).mul hF
+  have hsum : MeromorphicAt (fun z ↦ c * F z + G z) a := hcF.add hG
+  apply (Filter.eventually_const (f := 𝓝[>] (0 : ℝ))).mp
+  filter_upwards [eventually_circleIntegral_eq_residue hsum, eventually_circleIntegral_eq_residue hF,
+    eventually_circleIntegral_eq_residue hG, eventually_circleIntegrable_of_meromorphicAt hcF,
+    eventually_circleIntegrable_of_meromorphicAt hG] with r hs hf hg hcf hgi
+  rw [← hs, ← hf, ← hg, circleIntegral.integral_add hcf hgi, circleIntegral.integral_const_mul]
+  ring
+
+private theorem complexResidue_germ_congr {F G : ℂ → ℂ} {a : ℂ}
+    (he : F =ᶠ[𝓝[≠] a] G) : complexResidue F a = complexResidue G a := by
+  obtain ⟨R, hR, h⟩ := Metric.nhdsWithin_basis_ball.eventually_iff.mp he
+  unfold complexResidue limUnder
+  refine congrArg lim (Filter.map_congr ?_)
+  filter_upwards [Ioo_mem_nhdsGT hR] with r hr
+  rw [circleIntegral.integral_congr hr.1.le fun z hz ↦ h ⟨?_, ?_⟩]
+  · exact Metric.mem_ball.mpr ((Metric.mem_sphere.mp hz).trans_lt hr.2)
+  · rintro rfl
+    exact hr.1.ne (by simpa using Metric.mem_sphere.mp hz)
+
+private theorem complexResidue_zero_of_analytic_germ {W H : ℂ → ℂ} {a : ℂ}
+    (hH : AnalyticAt ℂ H a) (he : W =ᶠ[𝓝[≠] a] H) :
+    complexResidue W a = 0 := by
+  have he' : W =ᶠ[𝓝[≠] a] (fun z ↦ ((z - a) * H z) / (z - a)) := by
+    filter_upwards [he, self_mem_nhdsWithin] with z hz hza
+    exact hz.trans (mul_div_cancel_left₀ _ (sub_ne_zero.mpr (mem_compl_singleton_iff.mp hza))).symm
+  rw [complexResidue_germ_congr he', complexResidue_div_sub (g := fun z ↦ (z - a) * H z)
+    ((analyticAt_id.sub analyticAt_const).mul hH), sub_self, zero_mul]
+
+/-- A correction divisible by the pole bound changes a weighted residue by its constant factor
+only. The analytic map may be ramified or even constant at the center. -/
+private theorem complexResidue_polynomial_mul_of_pow_dvd_sub {W φ : ℂ → ℂ} {a c : ℂ} {M : ℕ}
+    (P : ℂ[X]) (hφ : AnalyticAt ℂ φ a) (hW : MeromorphicAt W a)
+    (hord : ((-(M : ℤ) : ℤ) : WithTop ℤ) ≤ meromorphicOrderAt W a)
+    (hdiv : (X - C (φ a)) ^ M ∣ P - C c) :
+    complexResidue (fun z ↦ P.eval (φ z) * W z) a = c * complexResidue W a := by
+  obtain ⟨Q, hQ⟩ := hdiv
+  have hpol (z : ℂ) : P.eval (φ z) - c = (φ z - φ a) ^ M * Q.eval (φ z) := by
+    simpa using congrArg (Polynomial.eval (φ z)) hQ
+  let B (z : ℂ) := (z - a) ^ M * W z
+  have hPow : MeromorphicAt (fun z : ℂ ↦ (z - a) ^ M) a := by fun_prop
+  have hB : MeromorphicAt B a := hPow.mul hW
+  have hBo : 0 ≤ meromorphicOrderAt B a := by
+    change 0 ≤ meromorphicOrderAt ((fun z : ℂ ↦ (z - a) ^ M) * W) a
+    have hmono : meromorphicOrderAt (fun z : ℂ ↦ (z - a) ^ M) a = M :=
+      meromorphicOrderAt_pow_id_sub_const
+    rw [meromorphicOrderAt_mul hPow hW, hmono]
+    have h := add_le_add_right hord (M : WithTop ℤ)
+    simpa [← WithTop.coe_add] using h
+  obtain ⟨H, hH, he⟩ := hB.meromorphicOrderAt_nonneg_iff.mp hBo
+  let D (z : ℂ) := (P.eval (φ z) - c) * W z
+  have hfactor : D =ᶠ[𝓝[≠] a] (fun z ↦ (dslope φ a z) ^ M * Q.eval (φ z) * H z) := by
+    filter_upwards [he] with z hz
+    have hs : φ z - φ a = (z - a) * dslope φ a z := (sub_smul_dslope φ a z).symm
+    change (P.eval (φ z) - c) * W z = _
+    rw [← hz, hpol, hs, mul_pow]
+    dsimp [B]
+    ring
+  have hD : MeromorphicAt D a :=
+    (((P.differentiable.analyticAt _).comp hφ).sub analyticAt_const).meromorphicAt.mul hW
+  have hzero : complexResidue D a = 0 :=
+    complexResidue_zero_of_analytic_germ
+      (((hφ.dslope a).pow M).mul ((Q.differentiable.analyticAt _).comp hφ) |>.mul hH) hfactor
+  have heq : (fun z ↦ P.eval (φ z) * W z) = (fun z ↦ c * W z + D z) := by
+    funext z
+    dsimp [D]
+    ring
+  rw [heq, complexResidue_const_mul_add c hW hD, hzero, add_zero]
+
+/-- A finite polynomial in an analytic multiplier extracts a finite linear combination of
+the residues after multiplication by its powers. -/
+private theorem complexResidue_polynomial_mul_eq_sum {W φ : ℂ → ℂ} {a : ℂ} (P : ℂ[X])
+    (hφ : AnalyticAt ℂ φ a) (hW : MeromorphicAt W a) :
+    complexResidue (fun z ↦ P.eval (φ z) * W z) a =
+      ∑ j ∈ P.support, P.coeff j * complexResidue (fun z ↦ (φ z) ^ j * W z) a := by
+  classical
+  let F (j : ℕ) (z : ℂ) := (φ z) ^ j * W z
+  have hm (j : ℕ) : MeromorphicAt (F j) a := (hφ.pow j).meromorphicAt.mul hW
+  have hsum (s : Finset ℕ) : complexResidue (fun z ↦ ∑ j ∈ s, P.coeff j * F j z) a =
+      ∑ j ∈ s, P.coeff j * complexResidue (F j) a := by
+    induction s using Finset.induction_on with
+    | empty =>
+      simpa only [Finset.sum_empty] using
+        complexResidue_zero_of_analytic_germ (a := a) (H := fun _ ↦ 0) analyticAt_const
+          Filter.EventuallyEq.rfl
+    | @insert j s hjs ih =>
+      simp only [Finset.sum_insert hjs]
+      rw [complexResidue_const_mul_add (P.coeff j) (hm j) ?_, ih]
+      fun_prop (disch := exact hm _)
+  rw [show (fun z ↦ P.eval (φ z) * W z) = (fun z ↦ ∑ j ∈ P.support, P.coeff j * F j z) by
+    funext z
+    rw [Polynomial.eval_eq_sum, Polynomial.sum, Finset.sum_mul]
+    exact Finset.sum_congr rfl (fun j _ ↦ mul_assoc _ _ _)]
+  exact hsum P.support
+
+open Classical in
+/-- The indicator at a pole equals a finite linear combination of residues of analytic
+multipliers. One polynomial works simultaneously at all fibers above the finite phase set. -/
+private theorem exists_hermiteResiduePolynomial_eq_sum (E A : Finset ℂ) (M : ℕ) :
+    ∃ P : ℂ[X], ∀ {a : ℂ} {φ W : ℂ → ℂ}, φ a ∈ E → AnalyticAt ℂ φ a → MeromorphicAt W a →
+      ((-(M : ℤ) : ℤ) : WithTop ℤ) ≤ meromorphicOrderAt W a →
+      (if φ a ∈ A then complexResidue W a else 0) =
+        ∑ j ∈ P.support, P.coeff j * complexResidue (fun z ↦ (φ z) ^ j * W z) a := by
+  classical
+  obtain ⟨P, hP⟩ := exists_hermiteResiduePolynomial E A M
+  refine ⟨P, fun {a φ W} hE hφ hW hord ↦ ?_⟩
+  rw [← complexResidue_polynomial_mul_eq_sum P hφ hW,
+    complexResidue_polynomial_mul_of_pow_dvd_sub P hφ hW hord (hP _ hE)]
+  split <;> simp
+
+open Classical in
+/-- A single polynomial filters the higher-order residues above a finite exponential phase set,
+with no restriction on the period parameter. -/
+private theorem exists_hermiteResiduePolynomial_exp_sum (E A : Finset ℂ) (M : ℕ) :
+    ∃ P : ℂ[X], ∀ {a L : ℂ} {W : ℂ → ℂ}, Complex.exp (L * a) ∈ E → MeromorphicAt W a →
+      ((-(M : ℤ) : ℤ) : WithTop ℤ) ≤ meromorphicOrderAt W a →
+      (if Complex.exp (L * a) ∈ A then complexResidue W a else 0) =
+        ∑ j ∈ P.support, P.coeff j * complexResidue (fun z ↦ Complex.exp (L * z) ^ j * W z) a := by
+  obtain ⟨P, hP⟩ := exists_hermiteResiduePolynomial_eq_sum E A M
+  refine ⟨P, fun {a L W} hE hW hord ↦ ?_⟩
+  exact hP (φ := fun z ↦ Complex.exp (L * z)) hE (by fun_prop) hW hord
+
+end
+
+private theorem inverseNorm_dilation_cpow (p r : ℝ) (hp : 0 < p) (hr : 0 < r)
+    (j : ℕ) (s : ℂ) :
+    Complex.exp ((Real.log p : ℂ) * s) ^ j * (r : ℂ) ^ (-s) =
+      ((p⁻¹ ^ j * r : ℝ) : ℂ) ^ (-s) := by
+  have hpr : 0 < p⁻¹ ^ j * r := mul_pos (pow_pos (inv_pos.mpr hp) _) hr
+  rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hr.ne'),
+    Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hpr.ne'),
+    ← Complex.ofReal_log hr.le, ← Complex.ofReal_log hpr.le,
+    Real.log_mul (pow_ne_zero j (inv_ne_zero hp.ne')) hr.ne', Real.log_pow, Real.log_inv,
+    ← Complex.exp_nat_mul, ← Complex.exp_add]
+  congr 1
+  push_cast
+  ring
+
+private theorem inverseNorm_dilation_character {G : Type*} [CommGroup G] [TopologicalSpace G]
+    (χ : PontryaginDual G) (u g : G) (j : ℕ) :
+    (χ u : ℂ)^j * star (χ (u ^ j * g) : ℂ) = star (χ g : ℂ) := by
+  have hh (y : Circle) : star (y : ℂ) = (y⁻¹ : Circle) := (Circle.coe_inv_eq_conj y).symm
+  rw [hh, hh, map_mul, map_pow, ← Circle.coe_pow, ← Circle.coe_mul]
+  congr 1
+  simp
+  rfl
+
+private theorem inverseNorm_dilation_sum {X : Type*} {σ : Type*} [DecidableEq σ]
+    (Q D : Finset ℂ) (hD : D ⊆ Q) (assign : ℂ → σ) (v : σ)
+    (T : ℂ → X → ℂ) (joints : ℕ → ℂ → X → ℂ) (support : Finset ℕ) (c : ℕ → ℂ)
+    (hfilter : ∀ a ∈ Q, a ∉ D → ∀ x,
+      (if assign a = v then T a x else 0) = ∑ j ∈ support, c j * joints j a x) (x : X) :
+    ∑ a ∈ Q.filter (assign · = v), T a x =
+      (∑ j ∈ support, c j * ∑ a ∈ Q, joints j a x) +
+        ∑ a ∈ D, ((if assign a = v then T a x else 0) - ∑ j ∈ support, c j * joints j a x) := by
+  classical
+  rw [Finset.sum_filter]
+  simp_rw [Finset.mul_sum]
+  rw [Finset.sum_comm (s := support)]
+  let diff (a : ℂ) := (if assign a = v then T a x else 0) - ∑ j ∈ support, c j * joints j a x
+  have he : ∑ a ∈ D, diff a = ∑ a ∈ Q, diff a := by
+    apply Finset.sum_subset hD
+    intro a ha hna
+    exact sub_eq_zero.mpr (hfilter a ha hna x)
+  change _ = _ + ∑ a ∈ D, diff a
+  rw [he]
+  simp only [diff, Finset.sum_sub_distrib]
+  abel
+
+private theorem finiteDilation_tendstoUniformlyOn {X ι : Type*} {l : Filter ι} (K : Set X)
+    (s : Finset ℕ) (c : ℕ → ℂ) (U : ℕ → ι → X → ℂ) (L : ℕ → X → ℂ)
+    (corr : X → ℂ) (h : ∀ j ∈ s, TendstoUniformlyOn (U j) (L j) l K) :
+    TendstoUniformlyOn (fun h x ↦ (∑ j ∈ s, c j * U j h x) + corr x)
+      (fun x ↦ (∑ j ∈ s, c j * L j x) + corr x) l K := by
+  have hsum : TendstoUniformlyOn (fun h x ↦ ∑ j ∈ s, c j * U j h x)
+      (fun x ↦ ∑ j ∈ s, c j * L j x) l K := by
+    induction s using Finset.cons_induction_on with
+    | empty =>
+      simp only [Finset.sum_empty, Metric.tendstoUniformlyOn_iff, dist_self]
+      exact fun ε hε ↦ Eventually.of_forall (fun _ _ _ ↦ hε)
+    | cons a t hat ih =>
+      simp only [Finset.sum_cons]
+      have ha := (uniformContinuous_const_smul (c a)).comp_tendstoUniformlyOn
+        (h a (Finset.mem_cons_self _ _))
+      exact ha.add (ih (fun j hj ↦ h j (Finset.mem_cons_of_mem hj)))
+  rw [Metric.tendstoUniformlyOn_iff] at hsum ⊢
+  intro ε hε
+  filter_upwards [hsum ε hε] with h hh x hx
+  simpa only [dist_add_right] using hh x hx
+
+open Classical in
+/-- The distinct poles of the S-local correcting factor in the open horizontal window
+of the separately indexed expansion. -/
+def sLocalStripPoleWindow (χ : PontryaginDual Jₛ) (A : ℝ) (h : ℝ × ℝ) : Finset ℂ :=
+  (finite_rectanglePoles (f := fun z ↦ sLocalRhoFactor (chart(χ) z))
+    (a := -A - 1) (b := 2) (σ₁ := -A) (σ₂ := 1) (t₁ := h.1) (t₂ := h.2)
+    (sLocalRhoFactor_meromorphic χ).meromorphicOn (by linarith) (by norm_num)).toFinset
+
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322. The contribution at one center, retaining
+the full Mellin residue and the conjugate character. -/
+def sLocalMellinPoleTerm (χ : PontryaginDual Jₛ) (f : Tests) (g : Jₛ) (a : ℂ) : ℂ :=
+  star (χ g : ℂ) * complexResidue (fun z ↦ ((((normₛ g).val : ℝ) : ℂ) ^ (-z)) *
+    sLocalIdelicZFunction f (chart(χ) z)) a
+
+private theorem mem_sLocalStripPoleWindow {χ : PontryaginDual Jₛ} {A : ℝ} {h : ℝ × ℝ} {a : ℂ} :
+    a ∈ sLocalStripPoleWindow χ A h ↔ a.re ∈ Ioo (-A) 1 ∧
+      a.im ∈ Ioo h.1 h.2 ∧ meromorphicOrderAt (fun z ↦ sLocalRhoFactor (chart(χ) z)) a < 0 := by
+  exact Set.Finite.mem_toFinset _
+
+private theorem exists_inverseNorm_dilation (p : ℕ) (hp : p.Prime) :
+    ∃ u : Jₛ, ((normₛ u).val : ℝ) = (p : ℝ)⁻¹ := by
+  obtain ⟨t, ht⟩ := sIdeleQuotientNorm_exists_section F S
+  let r : ℝ≥0ˣ := Units.mk0 (p : ℝ≥0) (Nat.cast_ne_zero.mpr hp.ne_zero)
+  refine ⟨t r⁻¹, ?_⟩
+  rw [ht]
+  rfl
+
+private theorem inverseNorm_dilation_rate (u : Jₛ) (hu : ((normₛ u).val : ℝ) ≤ 1)
+    (g : Jₛ) (hg : ((normₛ g).val : ℝ) < 1) (j : ℕ) : ((normₛ (u ^ j * g)).val : ℝ) < 1 := by
+  rw [map_mul, map_pow, Units.val_mul, Units.val_pow_eq_pow_val, NNReal.coe_mul, NNReal.coe_pow]
+  calc
+    _ ≤ 1 * ((normₛ g).val : ℝ) :=
+      mul_le_mul_of_nonneg_right (pow_le_one₀ (by positivity) hu) (by positivity)
+    _ < 1 := by simpa using hg
+
+private theorem singlePrime_monomial_residue (χ : PontryaginDual Jₛ) (f : Tests) (p : ℕ)
+    (hp : p.Prime) (u : Jₛ) (hu : ((normₛ u).val : ℝ) = (p : ℝ)⁻¹) (g : Jₛ) (a : ℂ) (j : ℕ) :
+    star (χ g : ℂ) * complexResidue (fun z ↦
+      Complex.exp ((Real.log (p : ℝ) : ℂ) * z) ^ j *
+        ((((normₛ g).val : ℝ) : ℂ) ^ (-z) * sLocalIdelicZFunction f (chart(χ) z))) a =
+      (χ u : ℂ) ^ j * sLocalMellinPoleTerm χ f (u ^ j * g) a := by
+  have hpos : 0 < ((normₛ g).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hnorm : ((normₛ (u ^ j * g)).val : ℝ) = (p : ℝ)⁻¹ ^ j * ((normₛ g).val : ℝ) := by
+    rw [map_mul, map_pow, Units.val_mul, Units.val_pow_eq_pow_val, NNReal.coe_mul, NNReal.coe_pow, hu]
+  have he (z : ℂ) := inverseNorm_dilation_cpow (p : ℝ) ((normₛ g).val : ℝ)
+    (Nat.cast_pos.mpr hp.pos) hpos j z
+  simp only [sLocalMellinPoleTerm, ← mul_assoc, hnorm, he, inverseNorm_dilation_character]
+
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323. Over one rational prime a fixed, valid
+assignment gives each place's complete residue sum as a finite combination of dilated joint
+sums, up to the contribution of finitely many archimedean centers. The coefficients,
+dilations and cutoff are independent of the test and the idèle. -/
+theorem exists_sLocalSinglePrime_placeSum_dilations (χ : PontryaginDual Jₛ) (A : ℝ)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ)) :
+    ∃ assign : ℂ → Places, IsValidPoleAssignment χ assign ∧
+      ∃ u : Jₛ, ((normₛ u).val : ℝ) ≤ 1 ∧
+      ∀ v : Places, ∃ (J : Finset ℕ) (c : ℕ → ℂ) (corr : Tests → Jₛ → ℂ),
+      ∀ᶠ h : ℝ × ℝ in atBot ×ˢ atTop, ∀ (f : Tests) (g : Jₛ),
+        ∑ a ∈ (sLocalStripPoleWindow χ A h).filter (assign · = v), sLocalMellinPoleTerm χ f g a =
+          (∑ j ∈ J, c j * ∑ a ∈ sLocalStripPoleWindow χ A h,
+            sLocalMellinPoleTerm χ f (u ^ j * g) a) + corr f g := by
+  classical
+  obtain ⟨p, hp, _, E, σ, assign, _, _, _, hvalid, hagree, hfin⟩ :=
+    exists_isValidPoleAssignment_of_same_prime_phases χ hsame
+  let phase (z : ℂ) := Complex.exp ((Real.log (p : ℝ) : ℂ) * z)
+  obtain ⟨u, hu⟩ := exists_inverseNorm_dilation (F := F) (S := S) p hp
+  have hsmall : ((normₛ u).val : ℝ) ≤ 1 := by
+    rw [hu]
+    exact inv_le_one_of_one_le₀ (by exact_mod_cast hp.one_le)
+  refine ⟨assign, hvalid, u, hsmall, fun v ↦ ?_⟩
+  let phases := E.filter (σ · = v)
+  let M := S.card + Fintype.card (InfinitePlace F)
+  obtain ⟨P, hP⟩ := exists_hermiteResiduePolynomial_exp_sum E phases M
+  let c (j : ℕ) := P.coeff j * (χ u : ℂ) ^ j
+  have hfinite : {a : ℂ | a.re ∈ Ioo (-A) 1 ∧
+      meromorphicOrderAt (fun z ↦ sLocalRhoFactor (chart(χ) z)) a < 0 ∧ phase a ∉ E}.Finite :=
+    (hfin A).subset fun _ ha ↦ ⟨Ioo_subset_Icc_self ha.1, ha.2⟩
+  let D := hfinite.toFinset
+  let corr (f : Tests) (g : Jₛ) := ∑ a ∈ D,
+    ((if assign a = v then sLocalMellinPoleTerm χ f g a else 0) -
+      ∑ j ∈ P.support, c j * sLocalMellinPoleTerm χ f (u ^ j * g) a)
+  refine ⟨P.support, c, corr, ?_⟩
+  filter_upwards [eventually_im_mem_Ioo_of_finset D] with h hh f g
+  have hD : D ⊆ sLocalStripPoleWindow χ A h := fun a ha ↦ by
+    have hm := hfinite.mem_toFinset.mp ha
+    exact mem_sLocalStripPoleWindow.mpr ⟨hm.1, hh a ha, hm.2.1⟩
+  refine inverseNorm_dilation_sum (X := Jₛ) _ D hD assign v
+    (fun a g ↦ sLocalMellinPoleTerm χ f g a)
+    (fun j a g ↦ sLocalMellinPoleTerm χ f (u ^ j * g) a) P.support c ?_ g
+  intro a ha hna g
+  have ha' := mem_sLocalStripPoleWindow.mp ha
+  have hE : phase a ∈ E := by
+    by_contra hphase
+    exact hna (hfinite.mem_toFinset.mpr ⟨ha'.1, ha'.2.2, hphase⟩)
+  have hiff : assign a = v ↔ phase a ∈ phases := by
+    rw [hagree a hE]
+    change σ (phase a) = v ↔ phase a ∈ E.filter (σ · = v)
+    simp only [Finset.mem_filter, hE, true_and]
+  let r : ℝ := (normₛ g).val
+  let W (z : ℂ) := (r : ℂ) ^ (-z) * sLocalIdelicZFunction f (chart(χ) z)
+  have hr : 0 < r := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hW : MeromorphicAt W a := by
+    have hpow := (differentiable_neg.const_cpow
+      (c := (r : ℂ)) (Or.inl (Complex.ofReal_ne_zero.mpr hr.ne'))).analyticAt a
+    exact hpow.meromorphicAt.mul ((sLocalIdelicZFunction_meromorphic f χ) (mem_univ a)).meromorphicAt
+  have hfilt := hP (a := a) (L := (Real.log (p : ℝ) : ℂ)) (W := W) hE hW
+    (normPower_mul_sLocalIdelicZFunction_order_ge_neg_card_places χ f a r hr)
+  calc
+    _ = star (χ g : ℂ) * (if phase a ∈ phases then complexResidue W a else 0) := by
+      by_cases h : assign a = v
+      · simp only [ite_eq_left h, ite_eq_left (hiff.mp h)]; rfl
+      · simp only [ite_eq_right h, ite_eq_right (fun h' ↦ h (hiff.mpr h')), mul_zero]
+    _ = _ := by
+      rw [hfilt, Finset.mul_sum]
+      apply Finset.sum_congr rfl
+      intro j _
+      calc
+        _ = P.coeff j * (star (χ g : ℂ) * complexResidue
+              (fun z ↦ Complex.exp ((Real.log (p : ℝ) : ℂ) * z) ^ j * W z) a) := by ring
+        _ = _ := by rw [singlePrime_monomial_residue χ f p hp u hu g a j]; exact (mul_assoc _ _ _).symm
+
+private theorem placeWindow_uniform_of_dilations
+    {χ : PontryaginDual Jₛ} {A : ℝ} {assign : ℂ → Places} {v : Places} {u : Jₛ}
+    {J : Finset ℕ} {c : ℕ → ℂ} {corr : Tests → Jₛ → ℂ}
+    (hid : ∀ᶠ h : ℝ × ℝ in atBot ×ˢ atTop, ∀ (f : Tests) (g : Jₛ),
+      ∑ a ∈ (sLocalStripPoleWindow χ A h).filter (assign · = v), sLocalMellinPoleTerm χ f g a =
+        (∑ j ∈ J, c j * ∑ a ∈ sLocalStripPoleWindow χ A h,
+          sLocalMellinPoleTerm χ f (u ^ j * g) a) + corr f g)
+    {ι X : Type*} {l : Filter ι} {H : ι → ℝ × ℝ} (hH : Tendsto H l (atBot ×ˢ atTop))
+    (K : Set X) (f : X → Tests) (g : X → Jₛ) (L : ℕ → X → ℂ)
+    (hjoint : ∀ j ∈ J, TendstoUniformlyOn
+      (fun i x ↦ ∑ a ∈ sLocalStripPoleWindow χ A (H i), sLocalMellinPoleTerm χ (f x) (u ^ j * g x) a)
+      (L j) l K) :
+    TendstoUniformlyOn (fun i x ↦ ∑ a ∈ (sLocalStripPoleWindow χ A (H i)).filter (assign · = v),
+      sLocalMellinPoleTerm χ (f x) (g x) a)
+      (fun x ↦ (∑ j ∈ J, c j * L j x) + corr (f x) (g x)) l K := by
+  have he := hH.eventually hid
+  apply (finiteDilation_tendstoUniformlyOn K J c _ L (fun x ↦ corr (f x) (g x)) hjoint).congr
+  exact he.mono (fun _ hi x _ ↦ (hi (f x) (g x)).symm)
+
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323. A single valid assignment over one rational
+prime transfers joint convergence to separate convergence along the same height cutoff.
+Each mode transfers on its own: pointwise, uniform on compact sets of idèles, or uniform on
+bounded sets of tests at fixed norm less than one. The separate pointwise limits sum to
+the joint limit. This result concerns ordered residue sums and does not assert the absolute
+summability invoked on p. 389. -/
+theorem sLocalSinglePrime_placeLimits_of_joint (χ : PontryaginDual Jₛ) (A : ℝ)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ)) :
+    ∃ assign : ℂ → Places, IsValidPoleAssignment χ assign ∧
+    ∀ (L : Tests → Jₛ → ℂ), ∃ limits : Places → Tests → Jₛ → ℂ,
+    ∀ {ι : Type*} (l : Filter ι) [l.NeBot] (H : ι → ℝ × ℝ), Tendsto H l (atBot ×ˢ atTop) →
+      let joint (i : ι) (f : Tests) (g : Jₛ) := ∑ a ∈ sLocalStripPoleWindow χ A (H i),
+        sLocalMellinPoleTerm χ f g a
+      let place (v : Places) (i : ι) (f : Tests) (g : Jₛ) :=
+        ∑ a ∈ (sLocalStripPoleWindow χ A (H i)).filter (assign · = v), sLocalMellinPoleTerm χ f g a
+      ((∀ f g, Tendsto (fun i ↦ joint i f g) l (𝓝 (L f g))) →
+        (∀ v f g, Tendsto (fun i ↦ place v i f g) l (𝓝 (limits v f g))) ∧
+        ∀ f g, ∑ v, limits v f g = L f g) ∧
+      ((∀ f K, IsCompact K → TendstoUniformlyOn (fun i g ↦ joint i f g) (L f) l K) →
+        ∀ v f K, IsCompact K → TendstoUniformlyOn (fun i g ↦ place v i f g) (limits v f) l K) ∧
+      ((∀ g, ((normₛ g).val : ℝ) < 1 → ∀ B : Set Tests, Bornology.IsVonNBounded ℂ B →
+        TendstoUniformlyOn (fun i f ↦ joint i f g) (fun f ↦ L f g) l B) →
+        ∀ v g, ((normₛ g).val : ℝ) < 1 → ∀ B : Set Tests, Bornology.IsVonNBounded ℂ B →
+        TendstoUniformlyOn (fun i f ↦ place v i f g) (fun f ↦ limits v f g) l B) := by
+  classical
+  obtain ⟨assign, hvalid, u, hu, h⟩ := exists_sLocalSinglePrime_placeSum_dilations χ A hsame
+  choose J c corr hsum using h
+  refine ⟨assign, hvalid, fun L ↦ ⟨fun v f g ↦
+    (∑ j ∈ J v, c v j * L f (u ^ j * g)) + corr v f g, ?_⟩⟩
+  intro ι l _ H hH joint place
+  refine ⟨?_, ?_, ?_⟩
+  · intro hpoint
+    have hv (v : Places) (f : Tests) (g : Jₛ) : Tendsto (fun i ↦ place v i f g) l
+        (𝓝 ((∑ j ∈ J v, c v j * L f (u ^ j * g)) + corr v f g)) := by
+      have hcomb := (tendsto_finsetSum (J v) (fun j _ ↦
+        (hpoint f (u ^ j * g)).const_mul (c v j))).add_const (corr v f g)
+      exact hcomb.congr' ((hH.eventually (hsum v)).mono (fun i hi ↦ (hi f g).symm))
+    refine ⟨hv, fun f g ↦ ?_⟩
+    have ht := tendsto_finsetSum Finset.univ (fun v _ ↦ hv v f g)
+    exact tendsto_nhds_unique (ht.congr (fun i ↦ Finset.sum_fiberwise
+      (sLocalStripPoleWindow χ A (H i)) assign (sLocalMellinPoleTerm χ f g))) (hpoint f g)
+  · intro hcompact v f K hK
+    apply placeWindow_uniform_of_dilations (hsum v) hH K (fun _ ↦ f) id _
+    intro j _
+    let d (g : Jₛ) := u ^ j * g
+    exact ((hcompact f (d '' K) (hK.image (continuous_const.mul continuous_id))).comp d).mono
+      (fun x hx ↦ mem_image_of_mem d hx)
+  · intro hbounded v g hg B hB
+    apply placeWindow_uniform_of_dilations (hsum v) hH B id (fun _ ↦ g) _
+    intro j _
+    exact hbounded (u ^ j * g) (inverseNorm_dilation_rate u hu g hg j) B hB
+
+end
 
 end RiemannMasullo.Isolated
