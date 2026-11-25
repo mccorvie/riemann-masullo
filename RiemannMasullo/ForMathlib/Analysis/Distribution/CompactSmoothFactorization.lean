@@ -22,6 +22,16 @@ reduces the last step to a finite sum of single fibers. -/
 open Set Function Filter MeasureTheory
 open scoped Topology
 
+namespace RiemannMasullo
+
+namespace DixmierMalliavin.Torus
+
+/-- The real cover of a Euclidean factor times an indexed unit torus. -/
+def cover {E ι : Type*} (x : E × (ι → ℝ)) : E × UnitAddTorus ι :=
+  (x.1, fun i ↦ x.2 i)
+
+end DixmierMalliavin.Torus
+
 namespace DixmierMalliavin
 
 /-- Compactly supported two-term factorization along one Euclidean coordinate. -/
@@ -67,7 +77,7 @@ private theorem exists_coordinate_factorization {ι : Type*} [Fintype ι] [Decid
       exact contDiffAt_const.congr_of_eventuallyEq (notMem_tsupport_iff_eventuallyEq.mp hy)
   let X : ι → ℝ := Pi.single i 1
   obtain ⟨G, k, l, hG, hsG, hk, hl, hsk, hsl, heq⟩ :=
-    exists_eq_integral_mul_comp_mul_exp_smul_add (-X) ε hε Φ hΦ
+    _root_.DixmierMalliavin.exists_eq_integral_mul_comp_mul_exp_smul_add (-X) ε hε Φ hΦ
       (hK.of_isClosed_subset (isClosed_tsupport _) hs)
   have hflow (x : ι → ℝ) (t : ℝ) : E x * NormedSpace.exp (t • -X) = E (x - t • X) := by
     funext j
@@ -381,16 +391,15 @@ private theorem hasSum_window (t : ι → ℝ) : HasSum (fun n : ι → ℤ ↦ 
 
 variable {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
 
-private abbrev Torus (ι : Type*) := ι → AddCircle (1 : ℝ)
+open DixmierMalliavin.Torus
 
-private def cover (u : E × (ι → ℝ)) : E × Torus ι := (u.1, fun i ↦ (u.2 i : AddCircle (1 : ℝ)))
+private def lift (f : E × UnitAddTorus ι → ℂ) (u : E × (ι → ℝ)) : ℂ :=
+  window u.2 • f (cover u)
 
-private def lift (f : E × Torus ι → ℂ) (u : E × (ι → ℝ)) : ℂ := window u.2 • f (cover u)
-
-private theorem lift_smooth {f : E × Torus ι → ℂ} (hf : ContDiff ℝ ∞ (f ∘ cover)) :
+private theorem lift_smooth {f : E × UnitAddTorus ι → ℂ} (hf : ContDiff ℝ ∞ (f ∘ cover)) :
     ContDiff ℝ ∞ (lift f) := (window_smooth.comp contDiff_snd).smul hf
 
-private theorem lift_compact {f : E × Torus ι → ℂ} (hf : HasCompactSupport f) :
+private theorem lift_compact {f : E × UnitAddTorus ι → ℂ} (hf : HasCompactSupport f) :
     HasCompactSupport (lift f) := by
   apply HasCompactSupport.of_support_subset_isCompact ((hf.image continuous_fst).prod
     (isCompact_univ_pi (fun _ : ι ↦ isCompact_Icc (α := ℝ) (a := -1) (b := 1))))
@@ -405,7 +414,7 @@ private theorem circle_cast_shift (t : ℝ) (n : ℤ) :
   rw [AddCircle.coe_add, show (n : ℝ) = n • (1 : ℝ) by simp [zsmul_eq_mul],
     AddCircle.coe_zsmul, AddCircle.coe_period, smul_zero, add_zero]
 
-private theorem hasSum_lift (f : E × Torus ι → ℂ) (x : E) (t : ι → ℝ) :
+private theorem hasSum_lift (f : E × UnitAddTorus ι → ℂ) (x : E) (t : ι → ℝ) :
     HasSum (fun n : ι → ℤ ↦ lift f (x, fun i ↦ t i + n i)) (f (cover (x, t))) := by
   simpa only [lift, cover, circle_cast_shift, one_smul] using
     (hasSum_window t).smul_const (f (cover (x, t)))
@@ -480,7 +489,6 @@ private theorem integral_periodization {f : (ι → ℝ) → ℂ} {F : UnitAddTo
 
 variable {E : Type*}
 
-def cover (x : E × (ι → ℝ)) : E × UnitAddTorus ι := (x.1, fun i ↦ x.2 i)
 private def shift (x : E × (ι → ℝ)) (n : ι → ℤ) : E × (ι → ℝ) :=
   (x.1, fun i ↦ x.2 i + n i)
 
@@ -890,3 +898,5 @@ theorem compact_euclidean_torus_factorization (m n : ℕ)
 
 
 end DixmierMalliavin.Torus
+
+end RiemannMasullo

@@ -5326,6 +5326,13 @@ private theorem elementarySchwartz_of_compactSupport {f : ElementaryLieGroup m n
   rw [hd] at h
   exact h
 
+/-- On an elementary Lie group, compact support and smoothness on each continuous fiber
+imply membership in the Schwartz submodule. -/
+theorem mem_elementarySchwartzSubmodule_of_fiberwise_contDiff (f : ElementaryLieGroup m n r F → ℂ)
+    (hf : ∀ a b, ContDiff ℝ ∞ (fun xt ↦ f (elementaryCover xt a b))) (hc : HasCompactSupport f) :
+    f ∈ elementarySchwartzSubmodule m n r F :=
+  elementarySchwartz_of_compactSupport hf hc
+
 end
 
 private theorem elementary_orbit_deriv_comp {m n r m' n' r' : ℕ} {F F' : Type}

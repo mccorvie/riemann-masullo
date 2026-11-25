@@ -4,8 +4,8 @@ public import RiemannMasullo.Ch10_TraceSpectral.Sec4a
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.AppC_LCTVS.Sec3b_HilbertSchmidtProduct
 import RiemannMasullo.ForMathlib.Analysis.Distribution.CompactSmoothFactorization
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1d
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1c
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1d
 
 /-! # The spectral trace statements of §10.4.2 at orders between zero and one -/
 
@@ -389,9 +389,10 @@ private theorem elementaryFactorization_of_productDM (hDM : ProductDM e)
   · rintro h ⟨u, v, hu, hcu, hv, hcv, rfl⟩
     let u' : H → ℂ := fun y ↦ (k : ℂ) * u y
     have hcu' : HasCompactSupport u' := hcu.mul_left (f := fun _ ↦ (k : ℂ))
-    let U : SchwartzBruhatStage e := ⟨u', elementarySchwartz_of_compactSupport
+    let U : SchwartzBruhatStage e := ⟨u', mem_elementarySchwartzSubmodule_of_fiberwise_contDiff u'
       (fun a b ↦ contDiff_const.mul (hu a b)) hcu'⟩
-    let Vstage : SchwartzBruhatStage e := ⟨v, elementarySchwartz_of_compactSupport hv hcv⟩
+    let Vstage : SchwartzBruhatStage e :=
+      ⟨v, mem_elementarySchwartzSubmodule_of_fiberwise_contDiff v hv hcv⟩
     apply AddSubmonoid.subset_closure
     refine ⟨U, Vstage, hcu'.comp_homeomorph e.equiv.toHomeomorph,
       hcv.comp_homeomorph e.equiv.toHomeomorph, ?_⟩

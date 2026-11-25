@@ -3364,7 +3364,7 @@ local notation "Dsc" => (Fin r → ℤ) × F
 local notation "Torus" => Fin n → AddCircle (1 : ℝ)
 local notation "Idx" => Fin m ⊕ Fin n
 /-- Lebesgue measure on the real factor, normalized volume on the torus, and counting measure on the discrete factors. -/
-private def elementaryProductMeasure : Measure H :=
+def elementaryProductMeasure : Measure H :=
   (volume : Measure (EuclideanSpace ℝ (Fin m))).prod ((volume : Measure Torus).prod (Measure.count : Measure Dsc))
 
 private theorem elementaryProductMeasure_isHaar :
@@ -3689,10 +3689,12 @@ private local instance : BorelSpace (Multiplicative H) := by
   have : BorelSpace ((Fin e.torusDim → AddCircle (1 : ℝ)) × (Fin e.latticeRank → ℤ) × e.finiteFactor) := inferInstance
   exact inferInstanceAs (BorelSpace H)
 
-private def productHaar : Measure (Multiplicative H) :=
+/-- The product Haar measure in the multiplicative coordinates of an elementary presentation. -/
+def productHaar : Measure (Multiplicative H) :=
   elementaryProductMeasure
 
-private theorem productHaar_isHaar : (productHaar e).IsHaarMeasure := by
+/-- The standard product measure is Haar in multiplicative elementary coordinates. -/
+theorem productHaar_isHaar : (productHaar e).IsHaarMeasure := by
   let ν := elementaryProductMeasure (m := e.realDim) (n := e.torusDim)
     (r := e.latticeRank) (F := e.finiteFactor)
   have : ν.IsAddHaarMeasure := elementaryProductMeasure_isHaar
