@@ -2123,11 +2123,410 @@ private theorem norm_log_unit_le_pi {w : ℂ} (hw : ‖w‖ = 1) : ‖Complex.lo
   simpa [Complex.log, hw, Complex.norm_mul, Complex.norm_I, Complex.norm_real, Real.norm_eq_abs]
     using Complex.abs_arg_le_pi w
 
+namespace LogarithmicForm
+
+/-- An inverse-polynomial lower bound for the nonidentity mixed powers of two fixed bases. -/
+private def PowerSeparation (a b : ℂ) : Prop :=
+  ∃ C > (0 : ℝ), ∃ d : ℕ, 0 < d ∧ ∀ m n : ℤ, a ^ m / b ^ n ≠ 1 →
+    C / (1 + |(m : ℝ)| + |(n : ℝ)|) ^ d ≤ ‖a ^ m / b ^ n - 1‖
+
+/-- The winding integer disappears upon exponentiating the logarithmic form. -/
+private theorem exp_form {a b : ℂ} (ha : a ≠ 0) (hb : b ≠ 0) (m n k : ℤ) :
+    Complex.exp ((m : ℂ) * Complex.log a - (n : ℂ) * Complex.log b -
+      (2 * (k : ℂ)) * Complex.log (-1)) = a ^ m / b ^ n := by
+  rw [show (2 * (k : ℂ)) * Complex.log (-1) = (k : ℂ) * (2 * Real.pi * Complex.I) by
+    rw [Complex.log_neg_one]; ring]
+  simp [Complex.exp_sub, Complex.exp_int_mul, Complex.exp_two_pi_mul_I, Complex.exp_log ha,
+    Complex.exp_log hb]
+
+/-- If both projections of the form exponentiate to one, every nonzero form has norm at least π. -/
+private theorem period_gap {z : ℂ} (hz : z ≠ 0) (he : Complex.exp (z + z) = 1) :
+    Real.pi ≤ ‖z‖ := by
+  obtain ⟨t, ht⟩ := Complex.exp_eq_one_iff.mp he
+  have ht0 : t ≠ 0 := by
+    rintro rfl
+    simp at ht
+    exact hz ht
+  have h1 : (1 : ℝ) ≤ |(t : ℝ)| := by
+    exact_mod_cast (Int.add_one_le_iff.mpr (abs_pos.mpr ht0))
+  have hn := congrArg norm ht
+  rw [← two_mul, norm_mul] at hn
+  simp only [Complex.norm_ofNat, norm_mul, Complex.norm_intCast, Complex.norm_real,
+    Real.norm_eq_abs, abs_of_pos Real.pi_pos, Complex.norm_I, mul_one] at hn
+  nlinarith [mul_le_mul_of_nonneg_right h1 Real.pi_pos.le]
+
+/-- Multiplication and division by the complex conjugate give the radial and angular products. -/
+private theorem projected_product {a b : ℂ} (m n : ℤ) :
+    a ^ m / b ^ n * conj (a ^ m / b ^ n) =
+        (a * conj a) ^ m / (b * conj b) ^ n ∧
+      a ^ m / b ^ n / conj (a ^ m / b ^ n) =
+        (a / conj a) ^ m / (b / conj b) ^ n := by
+  simp only [map_div₀, map_zpow₀, mul_zpow, div_zpow]
+  constructor <;> simp [div_eq_mul_inv, mul_assoc, mul_left_comm, mul_comm]
+
+/-- Two bounds for mixed powers, one radial and one angular, control every winding of the original form. -/
+private theorem lower_bound_of_projections {a b : ℂ} (ha : a ≠ 0) (hb : b ≠ 0)
+    (hp : PowerSeparation (a * conj a) (b * conj b))
+    (hu : PowerSeparation (a / conj a) (b / conj b)) :
+    ∃ C > (0 : ℝ), ∃ d : ℕ, 0 < d ∧ ∀ m n k : ℤ,
+      (m : ℂ) * Complex.log a - (n : ℂ) * Complex.log b -
+          (2 * (k : ℂ)) * Complex.log (-1) ≠ 0 →
+      C / (1 + |(m : ℝ)| + |(n : ℝ)| + |(k : ℝ)|) ^ d ≤
+        ‖(m : ℂ) * Complex.log a - (n : ℂ) * Complex.log b -
+          (2 * (k : ℂ)) * Complex.log (-1)‖ := by
+  obtain ⟨Cp, hCp, dp, hdp, hp⟩ := hp
+  obtain ⟨Cu, hCu, du, hdu, hu⟩ := hu
+  let C := min (1 / 2 : ℝ) (min Cp Cu / 4)
+  let d := max dp du
+  have hC : 0 < C := by dsimp [C]; positivity
+  refine ⟨C, hC, d, hdp.trans_le (le_max_left _ _), ?_⟩
+  intro m n k hL
+  let L := (m : ℂ) * Complex.log a - (n : ℂ) * Complex.log b -
+    (2 * (k : ℂ)) * Complex.log (-1)
+  let H := 1 + |(m : ℝ)| + |(n : ℝ)|
+  let B := H + |(k : ℝ)|
+  change C / B ^ d ≤ ‖L‖
+  have hH : 1 ≤ H := by dsimp [H]; linarith [abs_nonneg (m : ℝ), abs_nonneg (n : ℝ)]
+  have hHB : H ≤ B := le_add_of_nonneg_right (abs_nonneg _)
+  have hB : 1 ≤ B := hH.trans hHB
+  have htr : C / B ^ d ≤ 1 / 2 := (div_le_self hC.le (one_le_pow₀ hB)).trans (min_le_left _ _)
+  by_cases hsmall : ‖L‖ < 1 / 2
+  · have he : Complex.exp L = a ^ m / b ^ n := exp_form ha hb m n k
+    have hplus : Complex.exp (L + conj L) = (a * conj a) ^ m / (b * conj b) ^ n := by
+      rw [Complex.exp_add, Complex.exp_conj, he, (projected_product (a := a) (b := b) m n).1]
+    have hminus : Complex.exp (L - conj L) = (a / conj a) ^ m / (b / conj b) ^ n := by
+      rw [Complex.exp_sub, Complex.exp_conj, he, (projected_product (a := a) (b := b) m n).2]
+    have bound (x : ℂ) (hx : ‖x‖ ≤ 2 * ‖L‖) (c : ℝ) (hc : 0 < c) (e : ℕ) (hed : e ≤ d)
+        (hC' : C ≤ c / 4) (hchord : c / H ^ e ≤ ‖Complex.exp x - 1‖) :
+        C / B ^ d ≤ ‖L‖ := by
+      have hden : H ^ e ≤ B ^ d := (pow_le_pow_left₀ (by positivity : 0 ≤ H) hHB _).trans
+        (pow_le_pow_right₀ hB hed)
+      have h1 := div_le_div_of_nonneg_left hc.le (pow_pos (by linarith : 0 < H) e) hden
+      have h2 := Complex.norm_exp_sub_one_le (x := x) (by linarith)
+      have h3 : C / B ^ d ≤ (c / B ^ d) / 4 := by
+        rw [div_right_comm]
+        exact div_le_div_of_nonneg_right hC' (by positivity)
+      linarith
+    by_cases hr : (a * conj a) ^ m / (b * conj b) ^ n = 1
+    · by_cases ht : (a / conj a) ^ m / (b / conj b) ^ n = 1
+      · have hper : Complex.exp (L + L) = 1 := by
+          rw [show L + L = (L + conj L) + (L - conj L) by ring, Complex.exp_add,
+            hplus, hminus, hr, ht, mul_one]
+        exact htr.trans (by linarith [period_gap hL hper, Real.pi_gt_three])
+      · apply bound (L - conj L) (by simpa [two_mul] using norm_sub_le L (conj L))
+          Cu hCu du (le_max_right _ _) (show C ≤ Cu / 4 from (min_le_right _ _).trans
+            (div_le_div_of_nonneg_right (min_le_right Cp Cu) (by norm_num : (0 : ℝ) ≤ 4)))
+        rw [hminus]
+        exact hu m n ht
+    · apply bound (L + conj L) (by simpa [two_mul] using norm_add_le L (conj L))
+        Cp hCp dp (le_max_left _ _) (show C ≤ Cp / 4 from (min_le_right _ _).trans
+          (div_le_div_of_nonneg_right (min_le_left Cp Cu) (by norm_num : (0 : ℝ) ≤ 4)))
+      rw [hplus]
+      exact hp m n hr
+  · exact htr.trans (le_of_not_gt hsmall)
+
+/-- Among the roots of unity of bounded order, the nonidentity roots have positive distance from one. -/
+private theorem fixed_root_gap (N : ℕ) (hN : 0 < N) :
+    ∃ c > (0 : ℝ), ∀ z : ℂ, z ^ N = 1 → z ≠ 1 → c ≤ ‖1 - z‖ := by
+  classical
+  let S := Polynomial.nthRootsFinset N (1 : ℂ)
+  have hne : S.Nonempty := ⟨1, (Polynomial.mem_nthRootsFinset hN 1).mpr (one_pow _)⟩
+  let f (z : ℂ) := if z = 1 then (1 : ℝ) else ‖1 - z‖
+  have hf (z : ℂ) : 0 < f z := by
+    by_cases hz : z = 1
+    · simp [f, hz]
+    · simpa [f, hz] using (norm_pos_iff.mpr (sub_ne_zero.mpr (Ne.symm hz)) : 0 < ‖1 - z‖)
+  obtain ⟨w, _, hw⟩ := S.exists_min_image f hne
+  exact ⟨f w, hf w, fun z hz h ↦ by
+    simpa [f, h] using hw z ((Polynomial.mem_nthRootsFinset hN 1).mpr hz)⟩
+
+/-- Two finite-order generators take values in a single finite group of roots of unity. -/
+private theorem torsion_powerSeparation {a b : ℂ} (ha : IsOfFinOrder a) (hb : IsOfFinOrder b) :
+    PowerSeparation a b := by
+  classical
+  let N := orderOf a * orderOf b
+  have hN : 0 < N := Nat.mul_pos ha.orderOf_pos hb.orderOf_pos
+  have haN : a ^ N = 1 := by simp [N, pow_mul, pow_orderOf_eq_one]
+  have hbN : b ^ N = 1 := by rw [show N = orderOf b * orderOf a from Nat.mul_comm _ _,
+      pow_mul, pow_orderOf_eq_one, one_pow]
+  have hpow (z : ℂ) (hz : z ^ N = 1) (m : ℤ) : (z ^ m) ^ N = 1 := by
+    calc
+      (z ^ m) ^ N = (z ^ (N : ℤ)) ^ m := by
+        rw [← zpow_natCast, ← zpow_mul, ← zpow_mul, mul_comm]
+      _ = 1 := by simp [hz]
+  obtain ⟨c, hc, hgap⟩ := fixed_root_gap N hN
+  refine ⟨c, hc, 1, by decide, ?_⟩
+  intro m n h
+  have hz : (a ^ m / b ^ n) ^ N = 1 := by rw [div_pow, hpow a haN, hpow b hbN, div_one]
+  have hh : 1 ≤ 1 + |(m : ℝ)| + |(n : ℝ)| := by
+    linarith [abs_nonneg (m : ℝ), abs_nonneg (n : ℝ)]
+  rw [norm_sub_rev]
+  exact (div_le_self hc.le (by simpa using hh)).trans (hgap _ hz h)
+
+/-- The nonidentity elements in a positive real cyclic group with generator greater than one stay
+away from one. -/
+private theorem cyclic_positive_powerSeparation {r : ℝ} (hr : 1 < r) (u v : ℤ) :
+    PowerSeparation ((r : ℂ) ^ u) ((r : ℂ) ^ v) := by
+  have hr0 : 0 < r := zero_lt_one.trans hr
+  have hri : r⁻¹ < 1 := inv_lt_one_of_one_lt₀ hr
+  let C := min (r - 1) (1 - r⁻¹)
+  have hc : 0 < C := lt_min (sub_pos.mpr hr) (sub_pos.mpr hri)
+  refine ⟨C, hc, 1, by decide, ?_⟩
+  intro m n h
+  let j := u * m - v * n
+  have he : ((r : ℂ) ^ u) ^ m / ((r : ℂ) ^ v) ^ n = ((r ^ j : ℝ) : ℂ) := by
+    rw [Complex.ofReal_zpow, zpow_sub₀ (by exact_mod_cast hr0.ne'), zpow_mul, zpow_mul]
+  rw [he] at h ⊢
+  have hj : j ≠ 0 := by intro h0; simp [h0] at h
+  have hh : 1 ≤ 1 + |(m : ℝ)| + |(n : ℝ)| := by
+    linarith [abs_nonneg (m : ℝ), abs_nonneg (n : ℝ)]
+  apply (div_le_self hc.le (by simpa using hh)).trans
+  rw [← Complex.ofReal_one, ← Complex.ofReal_sub, Complex.norm_real, Real.norm_eq_abs]
+  by_cases hj' : 0 < j
+  · have hj1 : r ≤ r ^ j := by simpa using zpow_le_zpow_right₀ hr.le (show (1 : ℤ) ≤ j by omega)
+    exact (min_le_left _ _).trans ((sub_le_sub_right hj1 1).trans (le_abs_self _))
+  · have hj1 : r ^ j ≤ r⁻¹ := by simpa using zpow_le_zpow_right₀ hr.le (show j ≤ (-1 : ℤ) by omega)
+    exact (min_le_right _ _).trans (by linarith [neg_le_abs (r ^ j - 1)])
+
+private theorem common_positive_powerSeparation {r : ℝ} (hr : 0 < r) (u v : ℤ) :
+    PowerSeparation ((r : ℂ) ^ u) ((r : ℂ) ^ v) := by
+  rcases lt_trichotomy 1 r with h | he | h
+  · exact cyclic_positive_powerSeparation h u v
+  · subst r
+    refine ⟨1, by norm_num, 1, by decide, ?_⟩
+    simp
+  · have h' : 1 < r⁻¹ := one_lt_inv_iff₀.mpr ⟨hr, h⟩
+    simpa using cyclic_positive_powerSeparation h' (-u) (-v)
+
+/-- A nontrivial relation between positive real generators places both in a common real cyclic group. -/
+private theorem dependent_positive_powerSeparation {p q : ℝ} (hp : 0 < p) (hq : 0 < q)
+    (u v : ℤ) (hn : ¬ (u = 0 ∧ v = 0)) (he : p ^ u = q ^ v) :
+    PowerSeparation (p : ℂ) (q : ℂ) := by
+  have he' := congrArg Real.log he
+  simp only [Real.log_zpow] at he'
+  by_cases hu : u = 0
+  · subst u
+    have hv : v ≠ 0 := fun h ↦ hn ⟨rfl, h⟩
+    have hv' : (v : ℝ) ≠ 0 := by exact_mod_cast hv
+    have hq1 : q = 1 := by
+      have hg : Real.log q = 0 := by simpa [hv'] using he'.symm
+      simpa [hg] using (Real.exp_log hq).symm
+    subst q
+    simpa using common_positive_powerSeparation hp (1 : ℤ) 0
+  · have hu' : (u : ℝ) ≠ 0 := by exact_mod_cast hu
+    let t := Real.log q / (u : ℝ)
+    have hp' : Real.exp t ^ v = p := by
+      apply Real.log_injOn_pos (zpow_pos (Real.exp_pos _) _) hp
+      rw [Real.log_zpow, Real.log_exp]
+      dsimp [t]
+      field_simp
+      linarith
+    have hq' : Real.exp t ^ u = q := by
+      apply Real.log_injOn_pos (zpow_pos (Real.exp_pos _) _) hq
+      rw [Real.log_zpow, Real.log_exp]
+      dsimp [t]
+      field_simp
+    have hh := common_positive_powerSeparation (Real.exp_pos t) v u
+    rwa [← Complex.ofReal_zpow, ← Complex.ofReal_zpow, hp', hq'] at hh
+
+private theorem normalized_algebraic {a : ℂ} (ha : IsAlgebraic ℚ a) :
+    IsAlgebraic ℚ (a * conj a) ∧ IsAlgebraic ℚ (a / conj a) := by
+  let e := Complex.conjAe.restrictScalars ℚ
+  have hc : IsAlgebraic ℚ (conj a) := (isAlgebraic_algHom_iff e.toAlgHom e.injective).mpr ha
+  exact ⟨ha.mul hc, mem_algebraicClosure_iff.mp ((algebraicClosure ℚ ℂ).div_mem
+    (mem_algebraicClosure_iff.mpr ha) (mem_algebraicClosure_iff.mpr hc))⟩
+
+private def IndependentPowers (a b : ℂ) : Prop :=
+  ∀ m n : ℤ, a ^ m = b ^ n → m = 0 ∧ n = 0
+
+private theorem pow_natAbs_eq_one {z : ℂ} {k : ℤ} (h : z ^ k = 1) : z ^ k.natAbs = 1 := by
+  cases k with
+  | ofNat n => simpa using h
+  | negSucc n => simpa [zpow_negSucc] using h
+
+private theorem infinite_order_zpow {z : ℂ} (hz : ¬ IsOfFinOrder z) {m : ℤ}
+    (hm : z ^ m = 1) : m = 0 := by
+  by_contra hm0
+  exact hz (isOfFinOrder_iff_pow_eq_one.mpr ⟨m.natAbs, Int.natAbs_pos.mpr hm0,
+    pow_natAbs_eq_one hm⟩)
+
+/-- An infinite-order phase is multiplicatively independent of at least one member of an
+independent pair. -/
+private theorem independent_partner {z P Q : ℂ} (hz : ¬ IsOfFinOrder z)
+    (hind : IndependentPowers P Q) : IndependentPowers z P ∨ IndependentPowers z Q := by
+  by_contra! h
+  obtain ⟨hP, hQ⟩ := h
+  simp only [IndependentPowers, not_forall] at hP hQ
+  obtain ⟨r, s, he⟩ := hP
+  obtain ⟨t, u, hf⟩ := hQ
+  push Not at he hf
+  obtain ⟨he, hn⟩ := he
+  obtain ⟨hf, hm⟩ := hf
+  have hs : s ≠ 0 := by
+    rintro rfl
+    exact hn (infinite_order_zpow hz (by simpa using he)) rfl
+  have ht : t ≠ 0 := by
+    rintro rfl
+    have hu := (hind 0 u (by simpa using hf)).2
+    exact hm rfl hu
+  have hl : P ^ (s * t) = Q ^ (u * r) := by
+    rw [zpow_mul, zpow_mul, ← he, ← hf, ← zpow_mul, ← zpow_mul, mul_comm]
+  exact (mul_ne_zero hs ht) (hind _ _ hl).1
+
+/-- The two independent algebraic phases already exhibited over seventeen provide a partner for a
+single phase. -/
+private theorem single_phase_of_independent_bounds
+    (hI : ∀ a b : ℂ, IsAlgebraic ℚ a → IsAlgebraic ℚ b → ‖a‖ = 1 → ‖b‖ = 1 →
+      IndependentPowers a b → PowerSeparation a b)
+    {z : ℂ} (ha : IsAlgebraic ℚ z) (hz : ‖z‖ = 1) : PowerSeparation z 1 := by
+  by_cases ht : IsOfFinOrder z
+  · exact torsion_powerSeparation ht (isOfFinOrder_iff_pow_eq_one.mpr ⟨1, by decide, one_pow _⟩)
+  · have hind : IndependentPowers quarticPhasePlus quarticPhaseMinus := by
+      intro m n h
+      obtain ⟨h1, h2⟩ := quarticPhases_independent m (-n) (by
+        rw [zpow_neg, ← div_eq_mul_inv, h, div_self]
+        apply zpow_ne_zero
+        exact norm_ne_zero_iff.mp (by rw [norm_quarticPhaseMinus]; exact one_ne_zero))
+      exact ⟨h1, neg_eq_zero.mp h2⟩
+    have take (w : ℂ) (hw : PowerSeparation z w) : PowerSeparation z 1 := by
+      obtain ⟨C, hC, d, hd, h⟩ := hw
+      refine ⟨C, hC, d, hd, ?_⟩
+      intro m n hn
+      simp only [one_zpow, div_one] at hn ⊢
+      have h' := h m 0 (by simpa using hn)
+      simp only [Int.cast_zero, abs_zero, add_zero, zpow_zero, div_one] at h'
+      exact (div_le_div_of_nonneg_left hC.le (by positivity)
+        (pow_le_pow_left₀ (by positivity) (le_add_of_nonneg_right (abs_nonneg _)) _)).trans h'
+    rcases independent_partner ht hind with h | h
+    · exact take _ (hI _ _ ha algebraic_quarticPhasePlus hz norm_quarticPhasePlus h)
+    · exact take _ (hI _ _ ha algebraic_quarticPhaseMinus hz norm_quarticPhaseMinus h)
+
+/-- After a fixed power, every mixed product in a dependent pair is a power of one phase. The
+kernel has a uniform gap. -/
+private theorem relation_powerSeparation {a b z : ℂ} (ha : ‖a‖ = 1) (hb : ‖b‖ = 1)
+    (D r s : ℤ) (hD : D ≠ 0) (hrel : ∀ m n : ℤ, (a ^ m / b ^ n) ^ D = z ^ (r * m - s * n))
+    (hS : PowerSeparation z 1) : PowerSeparation a b := by
+  obtain ⟨U, hU, d, hd, h⟩ := hS
+  obtain ⟨q, hq, hroots⟩ := fixed_root_gap D.natAbs (Int.natAbs_pos.mpr hD)
+  let K := 1 + |(r : ℝ)| + |(s : ℝ)|
+  let B := |(D : ℝ)| * K ^ d
+  have hK : 0 < K := by dsimp [K]; positivity
+  have hD' : 0 < |(D : ℝ)| := abs_pos.mpr (by exact_mod_cast hD)
+  have hB : 0 < B := mul_pos hD' (pow_pos hK d)
+  refine ⟨min q (U / B), lt_min hq (div_pos hU hB), d, hd, ?_⟩
+  intro m n hne
+  let w := a ^ m / b ^ n
+  let H := 1 + |(m : ℝ)| + |(n : ℝ)|
+  have hH : 1 ≤ H := by dsimp [H]; linarith [abs_nonneg (m : ℝ), abs_nonneg (n : ℝ)]
+  have hw : ‖w‖ = 1 := by simp [w, norm_zpow, ha, hb]
+  rw [norm_sub_rev]
+  change min q (U / B) / H ^ d ≤ ‖1 - w‖
+  by_cases he : w ^ D = 1
+  · exact (div_le_self (le_min hq.le (div_nonneg hU.le hB.le)) (one_le_pow₀ hH)).trans
+      ((min_le_left _ _).trans (hroots w (pow_natAbs_eq_one he) hne))
+  · have hne' : z ^ (r * m - s * n) ≠ 1 := fun h0 ↦ he ((hrel m n).trans h0)
+    have hz' := h (r * m - s * n) 0 (by simpa using hne')
+    simp only [Int.cast_zero, abs_zero, add_zero, one_zpow, div_one, Int.cast_sub, Int.cast_mul] at hz'
+    rw [norm_sub_rev, ← hrel] at hz'
+    have hcoef : 1 + |(r : ℝ) * m - s * n| ≤ K * H := by
+      have hu := abs_sub ((r : ℝ) * m) ((s : ℝ) * n)
+      simp only [abs_mul] at hu
+      dsimp [K, H]
+      nlinarith [mul_nonneg (abs_nonneg (r : ℝ)) (abs_nonneg (n : ℝ)),
+        mul_nonneg (abs_nonneg (s : ℝ)) (abs_nonneg (m : ℝ)), abs_nonneg (m : ℝ),
+        abs_nonneg (n : ℝ), abs_nonneg (r : ℝ), abs_nonneg (s : ℝ)]
+    have hcut : U / (K * H) ^ d ≤ U / (1 + |(r : ℝ) * m - s * n|) ^ d :=
+      div_le_div_of_nonneg_left hU.le (by positivity) (pow_le_pow_left₀ (by positivity) hcoef _)
+    have hpow := norm_one_sub_zpow_le hw D
+    have hc : U / (K * H) ^ d ≤ |(D : ℝ)| * ‖1 - w‖ := hcut.trans (hz'.trans hpow)
+    calc
+      min q (U / B) / H ^ d ≤ (U / B) / H ^ d := by gcongr; exact min_le_right _ _
+      _ = (U / (K * H) ^ d) / |(D : ℝ)| := by dsimp [B]; rw [mul_pow]; ring
+      _ ≤ ‖1 - w‖ := (div_le_iff₀ hD').mpr (by simpa [mul_comm] using hc)
+
+/-- It suffices to bound pairs of multiplicatively independent phases on the unit circle. -/
+private theorem circle_powerSeparation_of_independent
+    (hI : ∀ a b : ℂ, IsAlgebraic ℚ a → IsAlgebraic ℚ b → ‖a‖ = 1 → ‖b‖ = 1 →
+      IndependentPowers a b → PowerSeparation a b)
+    (a b : ℂ) (haA : IsAlgebraic ℚ a) (hbA : IsAlgebraic ℚ b) (ha : ‖a‖ = 1) (hb : ‖b‖ = 1) :
+    PowerSeparation a b := by
+  by_cases hind : IndependentPowers a b
+  · exact hI a b haA hbA ha hb hind
+  · simp only [IndependentPowers, not_forall] at hind
+    obtain ⟨r, s, h⟩ := hind
+    push Not at h
+    obtain ⟨he, hn⟩ := h
+    have ha₀ : a ≠ 0 := norm_ne_zero_iff.mp (ha ▸ one_ne_zero)
+    have hb₀ : b ≠ 0 := norm_ne_zero_iff.mp (hb ▸ one_ne_zero)
+    by_cases hr : r = 0
+    · have hs : s ≠ 0 := hn hr
+      apply relation_powerSeparation ha hb s s r hs _ (single_phase_of_independent_bounds hI haA ha)
+      intro m n
+      rw [div_zpow, ← zpow_mul, mul_comm m s, ← zpow_mul, mul_comm n s, zpow_mul b s n,
+        ← he, ← zpow_mul, zpow_sub₀ ha₀]
+    · apply relation_powerSeparation ha hb r s r hr _ (single_phase_of_independent_bounds hI hbA hb)
+      intro m n
+      rw [div_zpow, ← zpow_mul, mul_comm m r, zpow_mul a r m, he, ← zpow_mul,
+        ← zpow_mul, mul_comm n r, zpow_sub₀ hb₀]
+
+/-- Only multiplicatively independent positive real pairs and multiplicatively independent unit
+phases require an arithmetic estimate. -/
+private theorem fixed_three_of_powerSeparation
+    (hR : ∀ (p q : ℝ), 0 < p → 0 < q → IsAlgebraic ℚ (p : ℂ) → IsAlgebraic ℚ (q : ℂ) →
+      (∀ u v : ℤ, p ^ u = q ^ v → u = 0 ∧ v = 0) → PowerSeparation (p : ℂ) (q : ℂ))
+    (hU : ∀ (u v : ℂ), IsAlgebraic ℚ u → IsAlgebraic ℚ v → ‖u‖ = 1 → ‖v‖ = 1 →
+      IndependentPowers u v → PowerSeparation u v)
+    (a b : ℂ) (ha : IsAlgebraic ℚ a) (hb : IsAlgebraic ℚ b) (ha₀ : a ≠ 0) (hb₀ : b ≠ 0) :
+    ∃ C > (0 : ℝ), ∃ d : ℕ, 0 < d ∧ ∀ m n k : ℤ,
+      (m : ℂ) * Complex.log a - (n : ℂ) * Complex.log b -
+          (2 * (k : ℂ)) * Complex.log (-1) ≠ 0 →
+      C / (1 + |(m : ℝ)| + |(n : ℝ)| + |(k : ℝ)|) ^ d ≤
+        ‖(m : ℂ) * Complex.log a - (n : ℂ) * Complex.log b -
+          (2 * (k : ℂ)) * Complex.log (-1)‖ := by
+  obtain ⟨haR, haU⟩ := normalized_algebraic ha
+  obtain ⟨hbR, hbU⟩ := normalized_algebraic hb
+  apply lower_bound_of_projections ha₀ hb₀
+  · simp only [Complex.mul_conj] at haR hbR ⊢
+    have hp := Complex.normSq_pos.mpr ha₀
+    have hq := Complex.normSq_pos.mpr hb₀
+    by_cases hind : ∀ m n : ℤ, Complex.normSq a ^ m = Complex.normSq b ^ n → m = 0 ∧ n = 0
+    · exact hR _ _ hp hq haR hbR hind
+    · push Not at hind
+      obtain ⟨m, n, he, hn⟩ := hind
+      exact dependent_positive_powerSeparation hp hq m n (by tauto) he
+  · exact circle_powerSeparation_of_independent hU _ _ haU hbU (by simp [ha₀]) (by simp [hb₀])
+
+/-- Classical input: the multiplicatively independent, positive-real two-logarithm case
+of Baker and Wüstholz, *Logarithmic forms and group varieties*, J. reine angew. Math. 442
+(1993), 19–62. For two fixed positive algebraic numbers, nonidentity power quotients stay
+an inverse-polynomial distance from one. Near one the real logarithm is Lipschitz. -/
+private theorem positive_independent_power_separation (p q : ℝ) (hp : 0 < p) (hq : 0 < q)
+    (hpA : IsAlgebraic ℚ p) (hqA : IsAlgebraic ℚ q)
+    (hind : ∀ m n : ℤ, p ^ m = q ^ n → m = 0 ∧ n = 0) :
+    ∃ C > (0 : ℝ), ∃ d : ℕ, 0 < d ∧ ∀ m n : ℤ, p ^ m / q ^ n ≠ 1 →
+      C / (1 + |(m : ℝ)| + |(n : ℝ)|) ^ d ≤ |p ^ m / q ^ n - 1| := by
+  sorry
+
+/-- Classical input: for two multiplicatively independent algebraic numbers on the unit
+circle, each nonidentity power quotient has an inverse-polynomial distance from one.
+This is the unit-circle consequence of Baker and Wüstholz, *Logarithmic forms and group
+varieties*, J. reine angew. Math. 442 (1993), 19–62, applied to the principal logarithms of
+the two phases and of `-1`. The distance here is the ordinary complex chord length. -/
+private theorem circle_independent_power_separation (a b : ℂ)
+    (haA : IsAlgebraic ℚ a) (hbA : IsAlgebraic ℚ b) (ha : ‖a‖ = 1) (hb : ‖b‖ = 1)
+    (hind : ∀ m n : ℤ, a ^ m = b ^ n → m = 0 ∧ n = 0) :
+    ∃ C > (0 : ℝ), ∃ d : ℕ, 0 < d ∧ ∀ m n : ℤ, a ^ m / b ^ n ≠ 1 →
+      C / (1 + |(m : ℝ)| + |(n : ℝ)|) ^ d ≤ ‖a ^ m / b ^ n - 1‖ := by
+  sorry
+
+end LogarithmicForm
+
 /-- Classical input: Baker–Wüstholz for three fixed complex logarithms, including the
 principal logarithm of `-1`. See A. Baker and G. Wüstholz, *Logarithmic forms and group
 varieties*, J. reine angew. Math. 442 (1993), 19–62, doi:10.1515/crll.1993.442.19,
 and G. Wüstholz, *One Century of Logarithmic Forms*, §3, pp. 5–6.
-Zero principal logarithms can be dropped. The constants depend on the fixed numbers. -/
+The constants depend on the fixed numbers. The reduction uses the radial and angular power
+quotients, and separates multiplicatively dependent pairs on each one-dimensional group. -/
 private theorem bakerWustholz_fixedThreeLogs (a b : ℂ) (ha : IsAlgebraic ℚ a)
     (hb : IsAlgebraic ℚ b) (ha₀ : a ≠ 0) (hb₀ : b ≠ 0) :
     ∃ C > (0 : ℝ), ∃ d : ℕ, 0 < d ∧ ∀ m n k : ℤ,
@@ -2136,74 +2535,29 @@ private theorem bakerWustholz_fixedThreeLogs (a b : ℂ) (ha : IsAlgebraic ℚ a
       C / (1 + |(m : ℝ)| + |(n : ℝ)| + |(k : ℝ)|) ^ d ≤
         ‖(m : ℂ) * Complex.log a - (n : ℂ) * Complex.log b -
           (2 * (k : ℂ)) * Complex.log (-1)‖ := by
-  sorry
+  apply LogarithmicForm.fixed_three_of_powerSeparation ?_
+    LogarithmicForm.circle_independent_power_separation a b ha hb ha₀ hb₀
+  intro p q hp hq hpA hqA hind
+  have alg (r : ℝ) (h : IsAlgebraic ℚ (r : ℂ)) : IsAlgebraic ℚ r :=
+    (isAlgebraic_algHom_iff (IsScalarTower.toAlgHom ℚ ℝ ℂ) Complex.ofReal_injective).mp h
+  obtain ⟨c, hc, d, hd, h⟩ := LogarithmicForm.positive_independent_power_separation
+    p q hp hq (alg p hpA) (alg q hqA) hind
+  refine ⟨c, hc, d, hd, fun m n hn ↦ ?_⟩
+  have he : p ^ m / q ^ n ≠ 1 := fun h0 ↦ hn (by exact_mod_cast h0)
+  rw [← Complex.ofReal_zpow, ← Complex.ofReal_zpow, ← Complex.ofReal_div,
+    ← Complex.ofReal_one, ← Complex.ofReal_sub, Complex.norm_real, Real.norm_eq_abs]
+  exact h m n he
 
-/-- A three-logarithm bound controls the chord of the mixed product. -/
+/-- The unit-circle input alone controls the chord of the mixed product. -/
 private theorem polynomialMixedChordBound (a b : ℂ) (ha : ‖a‖ = 1) (hb : ‖b‖ = 1)
     (haAlg : IsAlgebraic ℚ a) (hbAlg : IsAlgebraic ℚ b) :
     ∃ C > (0 : ℝ), ∃ d : ℕ, 0 < d ∧ ∀ m n : ℤ, a ^ m * b ^ (-n) ≠ 1 →
       C / (1 + |(m : ℝ)| + |(n : ℝ)|) ^ d ≤ ‖1 - a ^ m * b ^ (-n)‖ := by
-  have ha0 : a ≠ 0 := by intro h; simp [h] at ha
-  have hb0 : b ≠ 0 := by intro h; simp [h] at hb
-  obtain ⟨C, hC, d, hd, hBW⟩ := bakerWustholz_fixedThreeLogs a b haAlg hbAlg ha0 hb0
-  refine ⟨(2 / Real.pi) * (C / 2 ^ d), by positivity, d, hd, ?_⟩
-  intro m n hne
-  let w : ℂ := a ^ m * b ^ (-n)
-  let L : ℂ := (m : ℂ) * Complex.log a - (n : ℂ) * Complex.log b
-  let H : ℝ := 1 + |(m : ℝ)| + |(n : ℝ)|
-  have hw : ‖w‖ = 1 := by simp [w, norm_zpow, ha, hb]
-  have hL : Complex.exp L = w := by
-    dsimp [L, w]
-    rw [sub_eq_add_neg, Complex.exp_add, ← neg_mul, ← Int.cast_neg, Complex.exp_int_mul,
-      Complex.exp_int_mul, Complex.exp_log ha0, Complex.exp_log hb0]
-  have hw0 : w ≠ 0 := by intro h; simp [h] at hw
-  obtain ⟨k, hk⟩ := Complex.exp_eq_exp_iff_exists_int.mp (hL.trans (Complex.exp_log hw0).symm)
-  have heq : L - (2 * (k : ℂ)) * Complex.log (-1) = Complex.log w := by
-    rw [hk, Complex.log_neg_one]
-    ring
-  have hwlog : Complex.log w ≠ 0 := by
-    intro h
-    apply hne
-    change w = 1
-    simpa [h] using (Complex.exp_log hw0).symm
-  have hk' : (k : ℂ) * (2 * Real.pi * Complex.I) = L - Complex.log w := by
-    rw [hk]
-    ring
-  have hkabs : (2 * Real.pi) * |(k : ℝ)| ≤ Real.pi * H := by
-    calc
-      _ = ‖(k : ℂ) * (2 * Real.pi * Complex.I)‖ := by
-        simp [Complex.norm_intCast, Complex.norm_real, Real.norm_eq_abs,
-          abs_of_pos Real.pi_pos, mul_comm, mul_left_comm]
-      _ = ‖L - Complex.log w‖ := congrArg norm hk'
-      _ ≤ ‖L‖ + ‖Complex.log w‖ := norm_sub_le _ _
-      _ ≤ (|(m : ℝ)| * ‖Complex.log a‖ + |(n : ℝ)| * ‖Complex.log b‖) + Real.pi :=
-        add_le_add (by
-          simpa only [L, norm_mul, Complex.norm_intCast] using
-            (norm_sub_le ((m : ℂ) * Complex.log a) ((n : ℂ) * Complex.log b)))
-          (norm_log_unit_le_pi hw)
-      _ ≤ Real.pi * H := by
-        have ha' := mul_le_mul_of_nonneg_left (norm_log_unit_le_pi ha) (abs_nonneg (m : ℝ))
-        have hb' := mul_le_mul_of_nonneg_left (norm_log_unit_le_pi hb) (abs_nonneg (n : ℝ))
-        dsimp [H]
-        linarith
-  have hkH : |(k : ℝ)| ≤ H := by
-    exact le_of_mul_le_mul_left (by
-      linarith [mul_nonneg Real.pi_pos.le (abs_nonneg (k : ℝ))]) Real.pi_pos
-  have hBw : C / (H + |(k : ℝ)|) ^ d ≤ ‖Complex.log w‖ := by
-    have hneL : L - (2 * (k : ℂ)) * Complex.log (-1) ≠ 0 := by rwa [heq]
-    have hraw := hBW m n k hneL
-    change C / (H + |(k : ℝ)|) ^ d ≤ ‖L - (2 * (k : ℂ)) * Complex.log (-1)‖ at hraw
-    simpa only [heq] using hraw
-  have hHs : 0 < H := by dsimp [H]; positivity
-  have hcomp : C / (2 * H) ^ d ≤ ‖Complex.log w‖ := by
-    refine le_trans ?_ hBw
-    gcongr
-    linarith
-  change (2 / Real.pi) * (C / 2 ^ d) / H ^ d ≤ ‖1 - w‖
-  calc
-    _ = (2 / Real.pi) * (C / (2 * H) ^ d) := by rw [mul_pow]; ring
-    _ ≤ (2 / Real.pi) * ‖Complex.log w‖ := mul_le_mul_of_nonneg_left hcomp (by positivity)
-    _ ≤ _ := norm_log_le_chord hw
+  obtain ⟨C, hC, d, hd, h⟩ := LogarithmicForm.circle_powerSeparation_of_independent
+    LogarithmicForm.circle_independent_power_separation a b haAlg hbAlg ha hb
+  refine ⟨C, hC, d, hd, fun m n hne ↦ ?_⟩
+  rw [zpow_neg, ← div_eq_mul_inv, norm_sub_rev]
+  exact h m n (by simpa only [zpow_neg, div_eq_mul_inv] using hne)
 
 /-- On the primary pole lattice the two secondary chords satisfy a mixed inverse-polynomial
 lower bound. The common rotation cancels in the middle expression. -/
