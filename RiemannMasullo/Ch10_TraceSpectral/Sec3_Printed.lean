@@ -2017,6 +2017,693 @@ theorem spectralLineJet_selbergGrouped_near_dyadic (U : ℕ) :
          mul_le_mul_of_nonneg_left (spectralLineJet_selbergFlat_near_diagonal hN hX R hR) (by positivity)
        _ = _ := by ring
 
+/-- Coefficients of the square of the length-`N` inverse-square-root mollifier,
+before convolution with the flat zeta packet. -/
+def spectralLineJet_selbergSquareWeight (N : ℕ) : ArithmeticFunction ℝ :=
+  let B := spectralLineJet_selbergCut N spectralLineJet_selbergHalfMoebius
+  B * B
+
+private theorem spectralLineJet_selberg_weight_mass (N : ℕ) :
+    ∑ d ∈ Finset.Icc 1 (N*N), |spectralLineJet_selbergSquareWeight N d| ≤ (N:ℝ)^2 := by
+  classical
+  let B := spectralLineJet_selbergCut N spectralLineJet_selbergHalfMoebius
+  let S := Finset.Icc 1 N ×ˢ Finset.Icc 1 N
+  let idx (p : ℕ × ℕ) := p.1*p.2
+  have hb (i : ℕ) : |B i| ≤ 1 := by
+    change |if i ∈ Finset.Icc 1 N then spectralLineJet_selbergHalfMoebius i else 0| ≤ 1
+    split <;> simp [spectralLineJet_selbergHalfMoebius_spec.2.1]
+  have hmap (p : ℕ × ℕ) (hp : p ∈ S) : idx p ∈ Finset.Icc 1 (N*N) := by
+    obtain ⟨ha,hb⟩ := Finset.mem_product.mp hp
+    exact Finset.mem_Icc.mpr ⟨Nat.mul_pos (Finset.mem_Icc.mp ha).1 (Finset.mem_Icc.mp hb).1,
+      Nat.mul_le_mul (Finset.mem_Icc.mp ha).2 (Finset.mem_Icc.mp hb).2⟩
+  have hbound (d : ℕ) (hd : d ∈ Finset.Icc 1 (N*N)) :
+      |spectralLineJet_selbergSquareWeight N d| ≤ ∑ _p ∈ S with idx _p=d, (1:ℝ) := by
+    let U := S.filter (fun p ↦ idx p=d)
+    have hsub : U ⊆ d.divisorsAntidiagonal := fun p hp ↦
+      Nat.mem_divisorsAntidiagonal.mpr ⟨(Finset.mem_filter.mp hp).2,by have := (Finset.mem_Icc.mp hd).1; omega⟩
+    change |(B*B) d| ≤ _
+    rw [ArithmeticFunction.mul_apply, ← Finset.sum_subset hsub]
+    · apply (Finset.abs_sum_le_sum_abs _ _).trans
+      apply Finset.sum_le_sum
+      intro p _
+      simpa [abs_mul] using mul_le_mul (hb p.1) (hb p.2) (abs_nonneg _) zero_le_one
+    · intro p hp hno
+      have hne : p ∉ S := fun hs ↦ hno (Finset.mem_filter.mpr ⟨hs,(Nat.mem_divisorsAntidiagonal.mp hp).1⟩)
+      have hf : p.1 ∉ Finset.Icc 1 N ∨ p.2 ∉ Finset.Icc 1 N := not_and_or.mp (fun h ↦ hne (Finset.mem_product.mpr h))
+      have hz (i : ℕ) (h : i ∉ Finset.Icc 1 N) : B i = 0 := ite_eq_right h
+      rcases hf with h | h
+      · rw [hz _ h,zero_mul]
+      · rw [hz _ h,mul_zero]
+  calc _ ≤ ∑ d ∈ Finset.Icc 1 (N*N), ∑ _p ∈ S with idx _p=d, (1:ℝ) := Finset.sum_le_sum hbound
+       _ = _ := by rw [Finset.sum_fiberwise_of_maps_to hmap]; simp [S, sq]
+
+private theorem spectralLineJet_selberg_flat_divisors (N : ℕ) {m : ℕ} (hm : 0 < m) :
+    spectralLineJet_selbergFlatCoefficient N m = ∑ d ∈ Finset.Icc 1 (N*N),
+      if d ∣ m then spectralLineJet_selbergSquareWeight N d else 0 := by
+  let b := spectralLineJet_selbergHalfMoebius
+  let B := spectralLineJet_selbergCut N b
+  have ht : ∀ i, N < i → B i = 0 := by
+    intro i hi
+    simp [B,spectralLineJet_selbergCut,show ¬i≤N by omega]
+  change (B*(B*(ArithmeticFunction.zeta : ArithmeticFunction ℝ))) m = _
+  rw [← mul_assoc, ArithmeticFunction.coe_mul_zeta_apply]
+  let S := (Finset.Icc 1 (N*N)).filter (· ∣ m)
+  have hsub : S ⊆ m.divisors := fun d hd ↦ Nat.mem_divisors.mpr ⟨(Finset.mem_filter.mp hd).2,hm.ne'⟩
+  rw [← Finset.sum_subset hsub]
+  · exact Finset.sum_filter _ _
+  · intro d hd hn
+    have hdpos := Nat.pos_of_mem_divisors hd
+    have hgt : N*N < d := by
+      by_contra! hh
+      exact hn (Finset.mem_filter.mpr ⟨Finset.mem_Icc.mpr ⟨hdpos,hh⟩,(Nat.mem_divisors.mp hd).1⟩)
+    exact spectralLineJet_selberg_cut_tail N N B B ht ht d hgt
+
+/-- Selberg's quadratic form for the actual squared mollifier weights. Its
+kernel is the density of the common multiples of the two divisor indices. -/
+def spectralLineJet_selbergSieveEnergy (N : ℕ) : ℝ :=
+  let D := Finset.Icc 1 (N*N)
+  let a := spectralLineJet_selbergSquareWeight N
+  ∑ d ∈ D, ∑ e ∈ D, a d * a e / Nat.lcm d e
+
+private theorem spectralLineJet_selberg_flat_square_count (N X : ℕ) :
+    ∑ m ∈ Finset.Ioc 0 X, (spectralLineJet_selbergFlatCoefficient N m)^2 =
+      ∑ d ∈ Finset.Icc 1 (N*N), ∑ e ∈ Finset.Icc 1 (N*N),
+        spectralLineJet_selbergSquareWeight N d * spectralLineJet_selbergSquareWeight N e *
+          (X / Nat.lcm d e : ℕ) := by
+  classical
+  let D := Finset.Icc 1 (N*N)
+  let a := spectralLineJet_selbergSquareWeight N
+  let F (m d e : ℕ) := if d.lcm e ∣ m then a d * a e else 0
+  calc _ = ∑ m ∈ Finset.Ioc 0 X, ∑ d ∈ D, ∑ e ∈ D, F m d e := by
+         refine Finset.sum_congr rfl fun m hm ↦ ?_
+         rw [spectralLineJet_selberg_flat_divisors N (Finset.mem_Ioc.mp hm).1, sq, Finset.sum_mul_sum]
+         refine Finset.sum_congr rfl fun d _ ↦ Finset.sum_congr rfl fun e _ ↦ ?_
+         by_cases hd : d ∣ m <;> by_cases he : e ∣ m <;> simp [F,a,Nat.lcm_dvd_iff,hd,he]
+       _ = ∑ d ∈ D, ∑ e ∈ D, ∑ m ∈ Finset.Ioc 0 X, F m d e := by
+         rw [Finset.sum_comm]
+         exact Finset.sum_congr rfl fun _ _ ↦ Finset.sum_comm
+       _ = _ := by
+         refine Finset.sum_congr rfl fun d _ ↦ Finset.sum_congr rfl fun e _ ↦ ?_
+         simp only [F,← Finset.sum_filter,Finset.sum_const,nsmul_eq_mul,Nat.Ioc_filter_dvd_card_eq_div]
+         exact mul_comm _ _
+
+/-- The mean square of every flat coefficient up to `X` is `X` times the
+sieve energy, with an absolute discrepancy at most `N⁴`. No restriction on
+prime factors or on the relative sizes of the cutoffs is needed. -/
+theorem spectralLineJet_selbergFlat_square_discrepancy (N X : ℕ) :
+    |(∑ m ∈ Finset.Ioc 0 X, (spectralLineJet_selbergFlatCoefficient N m)^2) -
+      X * spectralLineJet_selbergSieveEnergy N| ≤ (N:ℝ)^4 := by
+  let D := Finset.Icc 1 (N*N)
+  let a := spectralLineJet_selbergSquareWeight N
+  let err (k : ℕ) : ℝ := (X/k : ℕ) - (X:ℝ)/k
+  have herr (k : ℕ) (hk : 0 < k) : |err k| ≤ 1 := by
+    have hk' : 0 < (k:ℝ) := by exact_mod_cast hk
+    have hdiv : (k:ℝ)*(X/k : ℕ)+(X%k : ℕ)=X := by exact_mod_cast Nat.div_add_mod X k
+    have hmod : ((X%k : ℕ):ℝ) < k := by exact_mod_cast Nat.mod_lt X hk
+    dsimp [err]
+    rw [abs_of_nonpos (sub_nonpos.mpr Nat.cast_div_le)]
+    have h := (div_le_iff₀ hk').mpr (by nlinarith only [hdiv,hmod] : (X:ℝ) ≤ (((X/k : ℕ):ℝ)+1)*k)
+    linarith
+  have hdiff : (∑ m ∈ Finset.Ioc 0 X, (spectralLineJet_selbergFlatCoefficient N m)^2) -
+      X * spectralLineJet_selbergSieveEnergy N = ∑ d ∈ D, ∑ e ∈ D, a d*a e*err (d.lcm e) := by
+    rw [spectralLineJet_selberg_flat_square_count]
+    simp only [spectralLineJet_selbergSieveEnergy,Finset.mul_sum,← Finset.sum_sub_distrib]
+    refine Finset.sum_congr rfl fun d _ ↦ Finset.sum_congr rfl fun e _ ↦ ?_
+    dsimp [a,err]; ring
+  rw [hdiff]
+  calc _ ≤ ∑ d ∈ D, ∑ e ∈ D, |a d| * |a e| := by
+         apply (Finset.abs_sum_le_sum_abs _ _).trans
+         refine Finset.sum_le_sum fun d hd ↦ (Finset.abs_sum_le_sum_abs _ _).trans ?_
+         refine Finset.sum_le_sum fun e he ↦ ?_
+         rw [abs_mul,abs_mul]
+         exact mul_le_of_le_one_right (by positivity) (herr _ (Nat.lcm_pos (Finset.mem_Icc.mp hd).1 (Finset.mem_Icc.mp he).1))
+       _ = (∑ d ∈ D, |a d|)^2 := by rw [sq,Finset.sum_mul_sum]
+       _ ≤ _ := by
+         calc _ ≤ ((N:ℝ)^2)^2 := pow_le_pow_left₀ (Finset.sum_nonneg fun _ _ ↦ abs_nonneg _)
+                   (spectralLineJet_selberg_weight_mass N) 2
+              _ = _ := by ring
+
+/-- An absolute bound for the counting discrepancy gives a uniform harmonic
+tail bound by summation by parts, including both endpoints of the window. -/
+private theorem spectralLineJet_selberg_weighted_discrepancy (f : ℕ → ℝ) {E B : ℝ}
+    (hB : 0 ≤ B) (hcount : ∀ x : ℕ, |(∑ m ∈ Finset.Ioc 0 x, f m) - x*E| ≤ B)
+    {Y X : ℕ} (hYX : Y ≤ X) :
+    |(∑ m ∈ Finset.Ioc Y X, f m/m) -
+      E * ∑ m ∈ Finset.Ioc Y X, (m:ℝ)⁻¹| ≤ 2*B/(Y+1) := by
+  classical
+  let w (i : ℕ) := (i:ℝ)⁻¹
+  let g (i : ℕ) := if i=0 then 0 else f i-E
+  let P (i : ℕ) := ∑ j ∈ Finset.range (i+1), g j
+  have hP (i : ℕ) : |P i| ≤ B := by
+    have hi : (Finset.range (i+1)).filter (· ≠ 0) = Finset.Ioc 0 i := by ext j; simp; omega
+    have hsum : P i = ∑ j ∈ Finset.Ioc 0 i, (f j-E) := by
+      dsimp [P,g]
+      rw [← hi,Finset.sum_filter]
+      exact Finset.sum_congr rfl fun j _ ↦ by by_cases hj : j=0 <;> simp [hj]
+    simpa [hsum,Finset.sum_sub_distrib] using hcount i
+  have heq : (∑ m ∈ Finset.Ioc Y X, f m/m)-E*(∑ m ∈ Finset.Ioc Y X, (m:ℝ)⁻¹) =
+      ∑ m ∈ Finset.Ioc Y X, w m • g m := by
+    rw [Finset.mul_sum,← Finset.sum_sub_distrib]
+    refine Finset.sum_congr rfl fun m hm ↦ ?_
+    have hm0 : m ≠ 0 := by have := (Finset.mem_Ioc.mp hm).1; omega
+    simp [w,g,hm0,div_eq_mul_inv,smul_eq_mul]; ring
+  rw [heq]
+  rcases hYX.eq_or_lt with rfl | hYX'
+  · simp; positivity
+  have hpos : 0 < X := by omega
+  let I := Finset.Ioc Y (X-1)
+  have hI : I = Finset.Ico (Y+1) X := by ext i; simp [I]; omega
+  have dec (i : ℕ) (hi : i ∈ I) : w (i+1) ≤ w i := by
+    have hip : 0 < i := by have := (Finset.mem_Ioc.mp hi).1; omega
+    apply inv_anti₀ (by exact_mod_cast hip)
+    exact_mod_cast Nat.le_succ i
+  have hsum : (∑ i ∈ I, |w (i+1)-w i|) = w (Y+1)-w X := by
+    calc _ = -∑ i ∈ I, (w (i+1)-w i) := by
+           rw [← Finset.sum_neg_distrib]
+           exact Finset.sum_congr rfl fun i hi ↦ abs_of_nonpos (sub_nonpos.mpr (dec i hi))
+         _ = _ := by rw [hI,Finset.sum_Ico_sub w (by omega)]; ring
+  have hmid : |∑ i ∈ I, (w (i+1)-w i) * P i| ≤ (w (Y+1)-w X)*B := by
+    apply (Finset.abs_sum_le_sum_abs _ _).trans
+    rw [← hsum,Finset.sum_mul]
+    exact Finset.sum_le_sum fun i _ ↦ (abs_mul _ _).le.trans (mul_le_mul_of_nonneg_left (hP _) (abs_nonneg _))
+  have hend (i j : ℕ) : |w i*P j| ≤ w i*B := by
+    rw [abs_mul,abs_of_nonneg (by dsimp [w]; positivity : 0 ≤ w i)]
+    exact mul_le_mul_of_nonneg_left (hP j) (by dsimp [w]; positivity)
+  rw [Finset.sum_Ioc_by_parts w g hYX']
+  change |w X*P X-w (Y+1)*P Y-∑ i ∈ I, (w (i+1)-w i)*P i| ≤ _
+  calc _ ≤ |w X*P X| + |w (Y+1)*P Y| + |∑ i ∈ I, (w (i+1)-w i)*P i| :=
+         (abs_sub _ _).trans (add_le_add (abs_sub _ _) le_rfl)
+       _ ≤ w X*B+w (Y+1)*B+(w (Y+1)-w X)*B := add_le_add (add_le_add (hend X X) (hend (Y+1) Y)) hmid
+       _ = _ := by simp [w,div_eq_mul_inv]; ring
+
+/-- The complete high flat diagonal has one arithmetic leading coefficient,
+with a power-saving error once the lower endpoint exceeds the fourth power
+of the mollifier length. The estimate includes all smooth frequencies. -/
+theorem spectralLineJet_selbergFlat_high_diagonal (N : ℕ) {Y X : ℕ} (hYX : Y ≤ X) :
+    |(∑ m ∈ Finset.Ioc Y X, (spectralLineJet_selbergFlatCoefficient N m)^2/m) -
+      spectralLineJet_selbergSieveEnergy N * ∑ m ∈ Finset.Ioc Y X, (m:ℝ)⁻¹| ≤
+      2*(N:ℝ)^4/(Y+1) :=
+  spectralLineJet_selberg_weighted_discrepancy _ (by positivity)
+    (spectralLineJet_selbergFlat_square_discrepancy N) hYX
+
+/-- Diagonalizing the common-multiple kernel by the divisor sum for Euler's
+totient expresses the leading coefficient as a sum of nonnegative squares. -/
+theorem spectralLineJet_selbergSieveEnergy_totient (N : ℕ) :
+    spectralLineJet_selbergSieveEnergy N =
+      ∑ k ∈ Finset.Icc 1 (N*N), (k.totient:ℝ) *
+        (∑ d ∈ Finset.Icc 1 (N*N) with k ∣ d, spectralLineJet_selbergSquareWeight N d/d)^2 := by
+  classical
+  let D := Finset.Icc 1 (N*N)
+  let a := spectralLineJet_selbergSquareWeight N
+  let v (k d : ℕ) : ℝ := if k ∣ d then a d/d else 0
+  have hterm (d : ℕ) (hd : d ∈ D) (e : ℕ) (he : e ∈ D) :
+      a d*a e/d.lcm e = ∑ k ∈ D, (k.totient:ℝ)*v k d*v k e := by
+    obtain ⟨hd0,hdN⟩ := Finset.mem_Icc.mp hd
+    obtain ⟨he0,_⟩ := Finset.mem_Icc.mp he
+    change 0 < d at hd0
+    change 0 < e at he0
+    have hg : 0 < d.gcd e := Nat.gcd_pos_of_pos_left e hd0
+    have hdvs : D.filter (fun k ↦ k ∣ d ∧ k ∣ e) = (d.gcd e).divisors := by
+      ext k
+      simp only [Finset.mem_filter,Nat.mem_divisors,Nat.dvd_gcd_iff]
+      constructor
+      · exact fun h ↦ ⟨h.2,hg.ne'⟩
+      · exact fun h ↦ ⟨Finset.mem_Icc.mpr ⟨Nat.pos_of_dvd_of_pos h.1.1 hd0,(Nat.le_of_dvd hd0 h.1.1).trans hdN⟩,h.1⟩
+    have htot : (∑ k ∈ D, if k ∣ d ∧ k ∣ e then (k.totient:ℝ) else 0) = d.gcd e := by
+      rw [← Finset.sum_filter,hdvs]
+      exact_mod_cast Nat.sum_totient (d.gcd e)
+    symm
+    calc _ = (∑ k ∈ D, if k ∣ d ∧ k ∣ e then (k.totient:ℝ) else 0)*(a d/d)*(a e/e) := by
+           simp only [Finset.sum_mul]
+           exact Finset.sum_congr rfl fun k _ ↦ by by_cases hk : k∣d <;> by_cases hj : k∣e <;> simp [v,hk,hj]
+         _ = _ := by
+           rw [htot]
+           have hl := Nat.lcm_pos hd0 he0
+           have hgcd : (d.gcd e:ℝ)*(d.lcm e:ℝ)=d*e := by exact_mod_cast Nat.gcd_mul_lcm d e
+           field_simp [show (d:ℝ)≠0 by exact_mod_cast hd0.ne',show (e:ℝ)≠0 by exact_mod_cast he0.ne',
+             show ((d.lcm e:ℕ):ℝ)≠0 by exact_mod_cast hl.ne']
+           linear_combination (a d*a e)*hgcd
+  change (∑ d ∈ D, ∑ e ∈ D, a d*a e/d.lcm e) = _
+  calc _ = ∑ d ∈ D, ∑ e ∈ D, ∑ k ∈ D, (k.totient:ℝ)*v k d*v k e :=
+         Finset.sum_congr rfl fun d hd ↦ Finset.sum_congr rfl fun e he ↦ hterm d hd e he
+       _ = ∑ k ∈ D, ∑ d ∈ D, ∑ e ∈ D, (k.totient:ℝ)*v k d*v k e := by
+         rw [Finset.sum_comm (s := D) (t := D) (f := fun k d ↦ ∑ e ∈ D, (k.totient:ℝ)*v k d*v k e)]
+         exact Finset.sum_congr rfl fun _ _ ↦ Finset.sum_comm
+       _ = _ := by
+         refine Finset.sum_congr rfl fun k _ ↦ ?_
+         rw [Finset.sum_filter,sq,Finset.sum_mul_sum,Finset.mul_sum]
+         refine Finset.sum_congr rfl fun d _ ↦ ?_
+         rw [Finset.mul_sum]
+         exact Finset.sum_congr rfl fun e _ ↦ mul_assoc _ _ _
+
+private theorem spectralLineJet_selbergSieveEnergy_bounds (N : ℕ) :
+    0 ≤ spectralLineJet_selbergSieveEnergy N ∧ spectralLineJet_selbergSieveEnergy N ≤ (N:ℝ)^4 := by
+  constructor
+  · rw [spectralLineJet_selbergSieveEnergy_totient]
+    exact Finset.sum_nonneg fun _ _ ↦ by positivity
+  · let D := Finset.Icc 1 (N*N)
+    let a := spectralLineJet_selbergSquareWeight N
+    calc _ ≤ ∑ d ∈ D, ∑ e ∈ D, |a d| * |a e| := by
+           refine Finset.sum_le_sum fun d hd ↦ Finset.sum_le_sum fun e he ↦ ?_
+           have hl : (1:ℝ) ≤ d.lcm e := by exact_mod_cast
+             (Nat.lcm_pos (Finset.mem_Icc.mp hd).1 (Finset.mem_Icc.mp he).1 : 0 < d.lcm e)
+           calc _ ≤ |a d*a e/(d.lcm e:ℝ)| := le_abs_self _
+                _ ≤ _ := by rw [abs_div,abs_mul,abs_of_nonneg (by positivity : 0 ≤ (d.lcm e:ℝ))]
+                            exact div_le_self (by positivity) hl
+         _ = (∑ d ∈ D, |a d|)^2 := by rw [sq,Finset.sum_mul_sum]
+         _ ≤ _ := by
+           calc _ ≤ ((N:ℝ)^2)^2 := pow_le_pow_left₀ (Finset.sum_nonneg fun _ _ ↦ abs_nonneg _)
+                    (spectralLineJet_selberg_weight_mass N) 2
+                _ = _ := by ring
+
+private theorem spectralLineJet_selberg_harmonic_log {Y X : ℕ} (hY : 0 < Y) (hYX : Y ≤ X) :
+    |(∑ m ∈ Finset.Ioc Y X, (m:ℝ)⁻¹) - Real.log ((X:ℝ)/Y)| ≤ (Y:ℝ)⁻¹ := by
+  let r (n : ℕ) := (harmonic n:ℝ) - Real.log n - Real.eulerMascheroniConstant
+  have hr (n : ℕ) (hn : 0 < n) : 0 ≤ r n ∧ r n ≤ (n:ℝ)⁻¹ := by
+    have hn' : 0 < (n:ℝ) := by exact_mod_cast hn
+    have hlo := Real.eulerMascheroniConstant_lt_eulerMascheroniSeq' n
+    simp only [Real.eulerMascheroniSeq',hn.ne',ite_false] at hlo
+    have hhi := Real.eulerMascheroniSeq_lt_eulerMascheroniConstant n
+    change (harmonic n:ℝ) - Real.log ((n:ℝ)+1) < _ at hhi
+    have hlog := Real.log_le_sub_one_of_pos (by positivity : 0 < ((n:ℝ)+1)/n)
+    rw [Real.log_div (by positivity) hn'.ne',add_div,div_self hn'.ne',one_div] at hlog
+    dsimp [r]
+    exact ⟨by linarith,by linarith⟩
+  have hh (n : ℕ) : ∑ m ∈ Finset.Ioc 0 n, (m:ℝ)⁻¹ = (harmonic n:ℝ) := by
+    simp [harmonic_eq_sum_Icc,← Finset.Icc_succ_left_eq_Ioc]
+  have hsum := Finset.sum_Ioc_consecutive (fun m : ℕ ↦ (m:ℝ)⁻¹) (Nat.zero_le Y) hYX
+  rw [hh,hh] at hsum
+  have hX := hY.trans_le hYX
+  have hid : (∑ m ∈ Finset.Ioc Y X, (m:ℝ)⁻¹) - Real.log ((X:ℝ)/Y) = r X-r Y := by
+    rw [Real.log_div (by exact_mod_cast hX.ne') (by exact_mod_cast hY.ne')]
+    dsimp [r]; linarith
+  rw [hid,abs_le]
+  have hcomp : (X:ℝ)⁻¹ ≤ (Y:ℝ)⁻¹ := inv_anti₀ (by exact_mod_cast hY) (by exact_mod_cast hYX)
+  exact ⟨by linarith [(hr Y hY).2,(hr X hX).1],by linarith [(hr X hX).2,(hr Y hY).1]⟩
+
+/-- On the full unsieved interval `Y < m ≤ X`, the diagonal has the explicit
+main term `log (X/Y)` times Selberg's nonnegative sieve energy. In particular
+the absolute error tends to zero whenever `N⁴/Y` does. -/
+theorem spectralLineJet_selbergFlat_high_log (N : ℕ) {Y X : ℕ} (hY : 0 < Y) (hYX : Y ≤ X) :
+    |(∑ m ∈ Finset.Ioc Y X, (spectralLineJet_selbergFlatCoefficient N m)^2/m) -
+      spectralLineJet_selbergSieveEnergy N * Real.log ((X:ℝ)/Y)| ≤ 3*(N:ℝ)^4/Y := by
+  let E := spectralLineJet_selbergSieveEnergy N
+  let H := ∑ m ∈ Finset.Ioc Y X, (m:ℝ)⁻¹
+  let D := ∑ m ∈ Finset.Ioc Y X, (spectralLineJet_selbergFlatCoefficient N m)^2/m
+  let L := Real.log ((X:ℝ)/Y)
+  obtain ⟨hE,he⟩ := spectralLineJet_selbergSieveEnergy_bounds N
+  have hY' : 0 < (Y:ℝ) := by exact_mod_cast hY
+  have h1 : |D-E*H| ≤ 2*(N:ℝ)^4/Y := (spectralLineJet_selbergFlat_high_diagonal N hYX).trans
+    (div_le_div_of_nonneg_left (by positivity) hY' (by linarith))
+  have h2 : |E*(H-L)| ≤ (N:ℝ)^4/Y := by
+    rw [abs_mul,abs_of_nonneg hE,div_eq_mul_inv]
+    exact mul_le_mul he (spectralLineJet_selberg_harmonic_log hY hYX) (abs_nonneg _) (by positivity)
+  change |D-E*L| ≤ _
+  calc _ = |(D-E*H)+E*(H-L)| := by congr 1; ring
+       _ ≤ |D-E*H|+|E*(H-L)| := abs_add_le _ _
+       _ ≤ 2*(N:ℝ)^4/Y+(N:ℝ)^4/Y := add_le_add h1 h2
+       _ = _ := by ring
+
+/-- Normalize the divisor sums by Möbius inversion. The squared mollifier
+has first coefficient one, so these transformed weights cannot all vanish. -/
+private theorem spectralLineJet_selberg_sieve_normalization {N : ℕ} (hN : 0 < N) :
+    (∑ k ∈ Finset.Icc 1 (N*N), (ArithmeticFunction.moebius k:ℝ) *
+      ∑ d ∈ Finset.Icc 1 (N*N) with k ∣ d, spectralLineJet_selbergSquareWeight N d/d) = 1 := by
+  classical
+  let D := Finset.Icc 1 (N*N)
+  let a := spectralLineJet_selbergSquareWeight N
+  let M (k : ℕ) : ℝ := ArithmeticFunction.moebius k
+  have hdiv (d : ℕ) (hd : d ∈ D) : D.filter (· ∣ d) = d.divisors := by
+    obtain ⟨hd0,hdN⟩ := Finset.mem_Icc.mp hd
+    change 0 < d at hd0
+    ext k
+    rw [Finset.mem_filter,Nat.mem_divisors]
+    exact ⟨fun h ↦ ⟨h.2,hd0.ne'⟩,fun h ↦
+      ⟨Finset.mem_Icc.mpr ⟨Nat.pos_of_dvd_of_pos h.1 hd0,(Nat.le_of_dvd hd0 h.1).trans hdN⟩,h.1⟩⟩
+  have hinv (d : ℕ) : (∑ k ∈ d.divisors, M k) = if d=1 then 1 else 0 := by
+    have hid := congrArg (fun f : ArithmeticFunction ℝ ↦ f d)
+      (ArithmeticFunction.coe_moebius_mul_coe_zeta (R := ℝ))
+    change ((ArithmeticFunction.moebius : ArithmeticFunction ℝ)*ArithmeticFunction.zeta) d = _ at hid
+    rw [ArithmeticFunction.coe_mul_zeta_apply] at hid
+    exact hid
+  have h1 : 1 ∈ D := Finset.mem_Icc.mpr ⟨le_rfl,Nat.mul_pos hN hN⟩
+  have ha : a 1 = 1 := by
+    have hcut : spectralLineJet_selbergCut N spectralLineJet_selbergHalfMoebius 1 = 1 := by
+      change (if 1 ∈ Finset.Icc 1 N then _ else 0) = 1
+      rw [ite_eq_left (Finset.mem_Icc.mpr ⟨le_rfl,hN⟩)]
+      exact spectralLineJet_selbergHalfMoebius_spec.1
+    simp [a,spectralLineJet_selbergSquareWeight,hcut]
+  calc _ = ∑ d ∈ D, ∑ k ∈ D, if k ∣ d then M k*(a d/d) else 0 := by
+         rw [Finset.sum_comm]
+         refine Finset.sum_congr rfl fun k _ ↦ ?_
+         rw [Finset.mul_sum,Finset.sum_filter]
+       _ = ∑ d ∈ D, (if d=1 then 1 else 0)*(a d/d) := by
+         refine Finset.sum_congr rfl fun d hd ↦ ?_
+         rw [← Finset.sum_filter,← Finset.sum_mul,hdiv _ hd,hinv]
+       _ = _ := by
+         rw [Finset.sum_eq_single_of_mem 1 h1]
+         · simp [ha]
+         · intro d _ hd; simp [hd]
+
+/-- The normalizing denominator in Selberg's diagonal quadratic form. The
+sum stops at the square of the original mollifier length. -/
+def spectralLineJet_selbergSieveDenominator (N : ℕ) : ℝ :=
+  ∑ k ∈ Finset.Icc 1 (N*N), (ArithmeticFunction.moebius k:ℝ)^2/k.totient
+
+/-- The energy of the actual squared mollifier is the Selberg minimum
+`1 / G` plus the explicitly measured departure of its divisor sums from
+the optimal weights. Every term in this excess is nonnegative. -/
+theorem spectralLineJet_selbergSieveEnergy_excess {N : ℕ} (hN : 0 < N) :
+    let G := spectralLineJet_selbergSieveDenominator N
+    spectralLineJet_selbergSieveEnergy N = G⁻¹ +
+      ∑ k ∈ Finset.Icc 1 (N*N), (k.totient:ℝ) *
+        ((∑ d ∈ Finset.Icc 1 (N*N) with k ∣ d, spectralLineJet_selbergSquareWeight N d/d) -
+          (ArithmeticFunction.moebius k:ℝ)/(k.totient*G))^2 := by
+  classical
+  let D := Finset.Icc 1 (N*N)
+  let M (k : ℕ) : ℝ := ArithmeticFunction.moebius k
+  let t (k : ℕ) := ∑ d ∈ D with k ∣ d, spectralLineJet_selbergSquareWeight N d/d
+  let G := spectralLineJet_selbergSieveDenominator N
+  have h1 : 1 ∈ D := Finset.mem_Icc.mpr ⟨le_rfl,Nat.mul_pos hN hN⟩
+  have hG : 0 < G := by
+    apply Finset.sum_pos' (fun _ _ ↦ div_nonneg (sq_nonneg _) (by positivity))
+    exact ⟨1,h1,by simp⟩
+  have heach (k : ℕ) (hk : k ∈ D) :
+      (k.totient:ℝ)*(t k-M k/(k.totient*G))^2 =
+        k.totient*(t k)^2-2/G*(M k*t k)+1/G^2*((M k)^2/k.totient) := by
+    have hp : 0 < (k.totient:ℝ) := by exact_mod_cast Nat.totient_pos.mpr (Finset.mem_Icc.mp hk).1
+    field_simp [hp.ne',hG.ne']; ring
+  change _ = G⁻¹+∑ k ∈ D, (k.totient:ℝ)*(t k-M k/(k.totient*G))^2
+  rw [Finset.sum_congr rfl heach,Finset.sum_add_distrib,Finset.sum_sub_distrib,← Finset.mul_sum,← Finset.mul_sum]
+  have hnorm : (∑ k ∈ D, M k*t k)=1 := spectralLineJet_selberg_sieve_normalization hN
+  have hspec : (∑ k ∈ D, (k.totient:ℝ)*(t k)^2) = spectralLineJet_selbergSieveEnergy N :=
+    (spectralLineJet_selbergSieveEnergy_totient N).symm
+  rw [hnorm,hspec]
+  change _ = _ + ((_ - _ * 1) + (1/G^2)*G)
+  field_simp [hG.ne']; ring
+
+/-- Every flat mode above `Y`, with no restriction on its divisors, obeys
+the short-window estimate with the single finite sieve energy and an explicit
+error. This includes the interval up to the actual linear taper cutoff. -/
+theorem spectralLineJet_selbergGrouped_high_dyadic :
+    ∃ K > (0:ℝ), ∀ {H T h : ℝ} (_ : 0 < H) (_ : 1 ≤ T) (_ : 0 ≤ h) (_ : h ≤ T)
+      {L N Y X : ℕ} (_ : 0 < Y) (_ : Y ≤ X) (_ : X ≤ L) (_ : (X:ℝ) ≤ 3*T/Real.pi),
+      (∫ t in T..2*T, (∫ u in t..t+h, ‖Complex.Gamma (1/4 + ((u/2:ℝ):ℂ)*Complex.I)‖ *
+          Real.exp ((Real.pi/4-1/(2*H))*u) *
+          ‖∑ m ∈ Finset.Ioc Y X, (spectralLineJet_selbergGroupedCoefficient L N u m : ℂ)*mode(m,u)‖)^2) ≤
+      K*h^2*Real.sqrt T *
+        (spectralLineJet_selbergSieveEnergy N*Real.log ((X:ℝ)/Y)+3*(N:ℝ)^4/Y) := by
+  obtain ⟨K,hK,hmean⟩ := spectralLineJet_selbergGrouped_flat_dyadic
+  refine ⟨K,hK,?_⟩
+  intro H T h hH hT hh hhT L N Y X hY hYX hL hflat
+  have hsub : Finset.Ioc Y X ⊆ Finset.Icc 1 X := by
+    intro m hm
+    obtain ⟨hlo,hhi⟩ := Finset.mem_Ioc.mp hm
+    exact Finset.mem_Icc.mpr ⟨by omega,hhi⟩
+  apply (hmean hH hT hh hhT _ hsub hL hflat).trans
+  apply mul_le_mul_of_nonneg_left _ (by positivity)
+  have hi := (abs_le.mp (spectralLineJet_selbergFlat_high_log N hY hYX)).2
+  linarith
+
+private theorem spectralLineJet_selberg_reciprocal_squares (M : ℕ) :
+    ∑ i ∈ Finset.Icc 1 M, ((i:ℝ)⁻¹)^2 ≤ 2 := by
+  have h (n : ℕ) : (∑ i ∈ Finset.Icc 1 (n+1), ((i:ℝ)⁻¹)^2) ≤ 2-((n+1:ℕ):ℝ)⁻¹ := by
+    induction n with
+    | zero => norm_num
+    | succ n ih =>
+      rw [Finset.sum_Icc_succ_top (by omega : 1 ≤ (n+1)+1)]
+      have hp : 0 < ((n+1:ℕ):ℝ) := by positivity
+      have hq : 0 < ((n+2:ℕ):ℝ) := by positivity
+      have hs : (((n+2:ℕ):ℝ)⁻¹)^2 ≤ ((n+1:ℕ):ℝ)⁻¹-((n+2:ℕ):ℝ)⁻¹ := by
+        field_simp [hp.ne',hq.ne']
+        push_cast
+        nlinarith
+      linarith
+  cases M with
+  | zero => simp
+  | succ n => exact (h n).trans (sub_le_self _ (by positivity))
+
+/-- The Dirichlet hyperbola for nonnegative functions is contained in the
+product of the two full intervals. -/
+private theorem spectralLineJet_selberg_divisor_majorant (M : ℕ) (f g : ℕ → ℝ)
+    (hf : ∀ n, 0 ≤ f n) (hg : ∀ n, 0 ≤ g n) :
+    (∑ n ∈ Finset.Icc 1 M, ∑ d ∈ n.divisors, f d*g (n/d)) ≤
+      (∑ d ∈ Finset.Icc 1 M, f d)*(∑ e ∈ Finset.Icc 1 M, g e) := by
+  classical
+  let D := Finset.Icc 1 M
+  let S := D ×ˢ D
+  let idx (p : ℕ × ℕ) := p.1*p.2
+  let w (p : ℕ × ℕ) := f p.1*g p.2
+  have he (n : ℕ) (hn : n ∈ D) : S.filter (fun p ↦ idx p=n) = n.divisorsAntidiagonal := by
+    obtain ⟨hn0,hnM⟩ := Finset.mem_Icc.mp hn
+    change 0 < n at hn0
+    ext p
+    rw [Finset.mem_filter,Nat.mem_divisorsAntidiagonal]
+    refine ⟨fun h ↦ ⟨h.2,hn0.ne'⟩,fun h ↦ ⟨?_,h.1⟩⟩
+    obtain ⟨heq,_⟩ := h
+    have ha : p.1 ∣ n := heq ▸ dvd_mul_right _ _
+    have hb : p.2 ∣ n := heq ▸ dvd_mul_left _ _
+    exact Finset.mem_product.mpr
+      ⟨Finset.mem_Icc.mpr ⟨Nat.pos_of_dvd_of_pos ha hn0,(Nat.le_of_dvd hn0 ha).trans hnM⟩,
+       Finset.mem_Icc.mpr ⟨Nat.pos_of_dvd_of_pos hb hn0,(Nat.le_of_dvd hn0 hb).trans hnM⟩⟩
+  calc _ = ∑ n ∈ D, ∑ p ∈ S with idx p=n, w p := by
+         refine Finset.sum_congr rfl fun n hn ↦ ?_
+         rw [he n hn,← Nat.map_div_right_divisors,Finset.sum_map]
+         rfl
+       _ = ∑ p ∈ S with idx p ∈ D, w p := Finset.sum_fiberwise_eq_sum_filter S D idx w
+       _ ≤ ∑ p ∈ S, w p := Finset.sum_le_sum_of_subset_of_nonneg (Finset.filter_subset _ _)
+         fun _ _ _ ↦ mul_nonneg (hf _) (hg _)
+       _ = _ := by rw [Finset.sum_mul_sum]; simp [S,D,w,Finset.sum_product]
+
+/-- Every positive integer has a squarefree part. Summing its reciprocal over
+the resulting square-times-squarefree indices bounds an entire harmonic sum
+by twice the squarefree harmonic mass. -/
+private theorem spectralLineJet_selberg_squarefree_mass (M : ℕ) :
+    (∑ n ∈ Finset.Icc 1 M, (n:ℝ)⁻¹) ≤
+      2*(∑ n ∈ Finset.Icc 1 M with Squarefree n, (n:ℝ)⁻¹) := by
+  classical
+  choose r s hrs using fun n : ℕ ↦ exists_sq_mul_squarefree n
+  let D := Finset.Icc 1 M
+  let S := D ×ˢ D.filter Squarefree
+  let pair (n : ℕ) := (r n,s n)
+  let w (p : ℕ × ℕ) := ((p.1:ℝ)⁻¹)^2*(p.2:ℝ)⁻¹
+  have hinj : Set.InjOn pair (↑D : Set ℕ) := by
+    intro n _ m _ h
+    have hr : r n=r m := congrArg Prod.fst h
+    have hs : s n=s m := congrArg Prod.snd h
+    rw [← (hrs n).1,hr,hs,(hrs m).1]
+  have hsub : D.image pair ⊆ S := by
+    rintro p hp
+    obtain ⟨n,hn,rfl⟩ := Finset.mem_image.mp hp
+    obtain ⟨hn0,hnM⟩ := Finset.mem_Icc.mp hn
+    change 0 < n at hn0
+    have hr : r n ∣ n := ⟨r n*s n,by calc n = r n^2*s n := (hrs n).1.symm
+                                      _ = _ := by ring⟩
+    have hs : s n ∣ n := ⟨r n^2,by rw [mul_comm]; exact (hrs n).1.symm⟩
+    exact Finset.mem_product.mpr
+      ⟨Finset.mem_Icc.mpr ⟨Nat.pos_of_dvd_of_pos hr hn0,(Nat.le_of_dvd hn0 hr).trans hnM⟩,
+       Finset.mem_filter.mpr ⟨Finset.mem_Icc.mpr ⟨Nat.pos_of_dvd_of_pos hs hn0,(Nat.le_of_dvd hn0 hs).trans hnM⟩,(hrs n).2⟩⟩
+  calc _ = ∑ n ∈ D, w (pair n) := by
+         refine Finset.sum_congr rfl fun n _ ↦ ?_
+         change (n:ℝ)⁻¹ = ((r n:ℝ)⁻¹)^2 * (s n:ℝ)⁻¹
+         conv_lhs => rw [← (hrs n).1]
+         simp [mul_comm]
+       _ = ∑ p ∈ D.image pair, w p := (Finset.sum_image hinj).symm
+       _ ≤ ∑ p ∈ S, w p := Finset.sum_le_sum_of_subset_of_nonneg hsub fun _ _ _ ↦ by dsimp [w]; positivity
+       _ = (∑ i ∈ D, ((i:ℝ)⁻¹)^2)*(∑ j ∈ D with Squarefree j, (j:ℝ)⁻¹) := by
+         rw [Finset.sum_mul_sum]; simp [S,w,Finset.sum_product]
+       _ ≤ _ := mul_le_mul_of_nonneg_right (spectralLineJet_selberg_reciprocal_squares M)
+         (Finset.sum_nonneg fun _ _ ↦ by positivity)
+
+private theorem spectralLineJet_selberg_reciprocal_totient (n : ℕ) (hn : 0 < n) :
+    (n.totient:ℝ)⁻¹ ≤ n.divisors.card/n := by
+  have hφ := Nat.totient_pos.mpr hn
+  have hcount : n ≤ n.divisors.card*n.totient := by
+    calc n = ∑ d ∈ n.divisors, d.totient := (Nat.sum_totient _).symm
+         _ ≤ ∑ _d ∈ n.divisors, n.totient := Finset.sum_le_sum fun d hd ↦
+           Nat.le_of_dvd hφ (Nat.totient_dvd_of_dvd (Nat.mem_divisors.mp hd).1)
+         _ = _ := by simp
+  rw [← one_div,div_le_div_iff₀ (by exact_mod_cast hφ) (by exact_mod_cast hn)]
+  simpa using (Nat.cast_le (α := ℝ)).mpr hcount
+
+private theorem spectralLineJet_selberg_squarefree_totient (n : ℕ) (hn : Squarefree n) :
+    (n.totient:ℝ)⁻¹ = (∑ d ∈ n.divisors, (d.totient:ℝ)⁻¹)/n := by
+  have hn0 := Nat.pos_of_ne_zero hn.ne_zero
+  have hφ := Nat.totient_pos.mpr hn0
+  have htot : (n:ℝ) = ∑ d ∈ n.divisors, ((n/d).totient:ℝ) := by
+    rw [Nat.sum_div_divisors n (fun x : ℕ ↦ (x.totient:ℝ))]
+    exact_mod_cast (Nat.sum_totient n).symm
+  rw [eq_div_iff (by exact_mod_cast hn.ne_zero)]
+  conv_lhs => rhs; rw [htot]
+  rw [Finset.mul_sum]
+  refine Finset.sum_congr rfl fun d hd ↦ ?_
+  have hdv := (Nat.mem_divisors.mp hd).1
+  have hd0 := Nat.pos_of_mem_divisors hd
+  have hde : n/d*d=n := Nat.div_mul_cancel hdv
+  have hc := Nat.coprime_of_squarefree_mul (show Squarefree (n/d*d) by rw [hde]; exact hn)
+  have he : ((n/d).totient:ℝ)*d.totient=n.totient := by exact_mod_cast (Nat.totient_mul hc).symm.trans (congrArg Nat.totient hde)
+  field_simp [show (n.totient:ℝ)≠0 by exact_mod_cast hφ.ne',
+    show (d.totient:ℝ)≠0 by exact_mod_cast (Nat.totient_pos.mpr hd0).ne']
+  linarith
+
+private theorem spectralLineJet_selberg_divisor_series (M : ℕ) :
+    (∑ n ∈ Finset.Icc 1 M, (n.divisors.card:ℝ)/(n:ℝ)^2) ≤ 4 := by
+  let v (d : ℕ) := ((d:ℝ)⁻¹)^2
+  have h (n : ℕ) : (n.divisors.card:ℝ)/(n:ℝ)^2 = ∑ d ∈ n.divisors, v d*v (n/d) := by
+    calc _ = ∑ _d ∈ n.divisors, ((n:ℝ)⁻¹)^2 := by simp [div_eq_mul_inv]
+         _ = _ := by
+           refine Finset.sum_congr rfl fun d hd ↦ ?_
+           have he : n = d*(n/d) := (Nat.mul_div_cancel' (Nat.mem_divisors.mp hd).1).symm
+           conv_lhs => rw [he]
+           simp [v,mul_pow,mul_comm]
+  calc _ = ∑ n ∈ Finset.Icc 1 M, ∑ d ∈ n.divisors, v d*v (n/d) := Finset.sum_congr rfl fun n _ ↦ h n
+       _ ≤ (∑ d ∈ Finset.Icc 1 M, v d)*(∑ d ∈ Finset.Icc 1 M, v d) :=
+         spectralLineJet_selberg_divisor_majorant M v v (fun _ ↦ sq_nonneg _) (fun _ ↦ sq_nonneg _)
+       _ ≤ (2:ℝ)*2 := mul_le_mul (spectralLineJet_selberg_reciprocal_squares M) (spectralLineJet_selberg_reciprocal_squares M)
+         (Finset.sum_nonneg fun _ _ ↦ sq_nonneg _) (by norm_num)
+       _ = _ := by norm_num
+
+/-- The Selberg denominator for the full interval has logarithmic size with
+explicit constants. Thus its reciprocal has exactly the size needed for
+polynomially separated endpoints of the high-frequency band. -/
+theorem spectralLineJet_selbergSieveDenominator_harmonic (N : ℕ) :
+    (harmonic (N*N):ℝ)/2 ≤ spectralLineJet_selbergSieveDenominator N ∧
+      spectralLineJet_selbergSieveDenominator N ≤ 4*(harmonic (N*N):ℝ) := by
+  classical
+  let M := N*N
+  let D := Finset.Icc 1 M
+  let v (d : ℕ) := (d.divisors.card:ℝ)/(d:ℝ)^2
+  have hh : (harmonic (N*N):ℝ) = ∑ n ∈ D, (n:ℝ)⁻¹ := by simp [M,D,harmonic_eq_sum_Icc]
+  have hmob (n : ℕ) (hn : Squarefree n) : (ArithmeticFunction.moebius n:ℝ)^2 = 1 := by
+    exact_mod_cast ArithmeticFunction.moebius_sq_eq_one_of_squarefree hn
+  constructor
+  · have hs : (∑ n ∈ D with Squarefree n, (n:ℝ)⁻¹) ≤ spectralLineJet_selbergSieveDenominator N := by
+      calc _ ≤ ∑ n ∈ D with Squarefree n, (ArithmeticFunction.moebius n:ℝ)^2/n.totient := by
+             refine Finset.sum_le_sum fun n hn ↦ ?_
+             obtain ⟨hd,hfree⟩ := Finset.mem_filter.mp hn
+             rw [hmob n hfree,one_div]
+             exact inv_anti₀ (by exact_mod_cast Nat.totient_pos.mpr (Finset.mem_Icc.mp hd).1) (by exact_mod_cast n.totient_le)
+           _ ≤ _ := Finset.sum_le_sum_of_subset_of_nonneg (Finset.filter_subset _ _) fun _ _ _ ↦ by positivity
+    rw [hh]
+    linarith only [spectralLineJet_selberg_squarefree_mass M,hs]
+  · have hb (n : ℕ) (hn : n ∈ D) :
+        (ArithmeticFunction.moebius n:ℝ)^2/n.totient ≤ ∑ d ∈ n.divisors, v d*((n/d:ℕ):ℝ)⁻¹ := by
+      by_cases hf : Squarefree n
+      · rw [hmob n hf,one_div,spectralLineJet_selberg_squarefree_totient _ hf,Finset.sum_div]
+        refine Finset.sum_le_sum fun d hd ↦ ?_
+        have hdv := (Nat.mem_divisors.mp hd).1
+        have hn0 : 0<n := (Finset.mem_Icc.mp hn).1
+        have hd0 := Nat.pos_of_mem_divisors hd
+        have he : d*(n/d)=n := Nat.mul_div_cancel' hdv
+        calc _ ≤ ((d.divisors.card:ℝ)/d)/n := by
+               exact div_le_div_of_nonneg_right (spectralLineJet_selberg_reciprocal_totient d hd0) (by positivity)
+             _ = _ := by
+               have hcast : (d:ℝ)*(n/d:ℕ)=n := by exact_mod_cast he
+               have he0 : (0:ℝ) < (n/d:ℕ) := by exact_mod_cast Nat.div_pos (Nat.le_of_dvd hn0 hdv) hd0
+               dsimp [v]
+               rw [← hcast]
+               field_simp
+      · rw [ArithmeticFunction.moebius_eq_zero_of_not_squarefree hf]
+        simp only [Int.cast_zero,zero_pow (by decide : 2≠0),zero_div]
+        exact Finset.sum_nonneg fun _ _ ↦ by dsimp [v]; positivity
+    rw [hh]
+    calc _ ≤ ∑ n ∈ D, ∑ d ∈ n.divisors, v d*((n/d:ℕ):ℝ)⁻¹ := Finset.sum_le_sum hb
+         _ ≤ (∑ d ∈ D, v d)*(∑ e ∈ D, (e:ℝ)⁻¹) := spectralLineJet_selberg_divisor_majorant M v (fun e : ℕ ↦ (e:ℝ)⁻¹)
+           (fun _ ↦ by dsimp [v]; positivity) (fun _ ↦ by positivity)
+         _ ≤ _ := mul_le_mul_of_nonneg_right (spectralLineJet_selberg_divisor_series M)
+           (Finset.sum_nonneg fun _ _ ↦ by positivity)
+
+private theorem spectralLineJet_selberg_floor_log {N : ℕ} (hN : 0 < N) :
+    0 < spectralLineJet_selbergSieveDenominator N ∧
+      Real.log N ≤ (harmonic (N*N):ℝ) ∧
+      (spectralLineJet_selbergSieveDenominator N)⁻¹*Real.log N ≤ 2 := by
+  let G := spectralLineJet_selbergSieveDenominator N
+  have hH := log_add_one_le_harmonic (N*N)
+  have hpos : 1 < N*N+1 := Nat.succ_lt_succ (Nat.mul_pos hN hN)
+  have hp : 0 < Real.log ((N*N+1:ℕ):ℝ) := Real.log_pos (by exact_mod_cast hpos)
+  have hG : 0 < G := by
+    have h := (spectralLineJet_selbergSieveDenominator_harmonic N).1
+    dsimp [G]; linarith
+  have hlog : Real.log N ≤ (harmonic (N*N):ℝ) := by
+    apply le_trans _ hH
+    apply Real.log_le_log (by exact_mod_cast hN)
+    have hn : N ≤ N*N+1 := by nlinarith only [Nat.mul_le_mul_left N hN]
+    exact_mod_cast hn
+  refine ⟨hG,hlog,?_⟩
+  have hl : Real.log N ≤ 2*G := by linarith only [hlog,(spectralLineJet_selbergSieveDenominator_harmonic N).1]
+  calc _ = Real.log N/G := by change G⁻¹*_ = _; ring
+       _ ≤ _ := (div_le_iff₀ hG).mpr hl
+
+/-- On the full polynomial band from `N⁵` to `N⁶`, the departure of the
+actual diagonal from the normalized sieve excess is bounded absolutely.
+Consequently boundedness of either quantity along a sequence of mollifier
+lengths is equivalent to boundedness of the other. -/
+theorem spectralLineJet_selbergFlat_power_band_excess {N : ℕ} (hN : 0 < N) :
+    |(∑ m ∈ Finset.Ioc (N^5) (N^6), (spectralLineJet_selbergFlatCoefficient N m)^2/m) -
+      (spectralLineJet_selbergSieveEnergy N-(spectralLineJet_selbergSieveDenominator N)⁻¹)*Real.log N|
+      ≤ 2+3/(N:ℝ) := by
+  let D := ∑ m ∈ Finset.Ioc (N^5) (N^6), (spectralLineJet_selbergFlatCoefficient N m)^2/m
+  let Q := spectralLineJet_selbergSieveEnergy N
+  let G := spectralLineJet_selbergSieveDenominator N
+  have hp : (0:ℝ) < N := by exact_mod_cast hN
+  obtain ⟨hg,_,hmin⟩ := spectralLineJet_selberg_floor_log hN
+  have hlog : 0 ≤ Real.log N := Real.log_nonneg (by exact_mod_cast hN : (1:ℝ) ≤ N)
+  have hband : |D-Q*Real.log N| ≤ 3/(N:ℝ) := by
+    have hpow : N^5 ≤ N^6 := Nat.pow_le_pow_right hN (by decide)
+    have h := spectralLineJet_selbergFlat_high_log N (pow_pos hN 5) hpow
+    simp only [Nat.cast_pow] at h
+    have hr : ((N:ℝ)^6)/(N:ℝ)^5 = N := by field_simp
+    have he : 3*(N:ℝ)^4/(N:ℝ)^5 = 3/N := by field_simp
+    simpa only [hr,he] using h
+  change |D-(Q-G⁻¹)*Real.log N| ≤ _
+  calc _ = |(D-Q*Real.log N)+G⁻¹*Real.log N| := by congr 1; ring
+       _ ≤ |D-Q*Real.log N| + |G⁻¹*Real.log N| := abs_add_le _ _
+       _ ≤ _ := by
+         rw [abs_of_nonneg (mul_nonneg (inv_nonneg.mpr hg.le) hlog)]
+         linarith only [hband,hmin]
+
+/-- If the actual squared mollifier's sieve excess is of reciprocal harmonic
+size, the required absolute short-window scale follows on the complete high
+flat band, without any smoothness or roughness condition on its indices. -/
+theorem spectralLineJet_selbergGrouped_high_of_sieve_excess (A : ℕ) :
+    ∃ K > (0:ℝ), ∀ {H T h C : ℝ} (_ : 0 < H) (_ : 1 ≤ T) (_ : 0 ≤ h) (_ : h ≤ T)
+      {L N Y X : ℕ} (_ : 0 < N) (_ : N^4 ≤ Y) (_ : Y ≤ X) (_ : X ≤ N^A)
+      (_ : X ≤ L) (_ : (X:ℝ) ≤ 3*T/Real.pi),
+      (spectralLineJet_selbergSieveEnergy N-(spectralLineJet_selbergSieveDenominator N)⁻¹)*
+        (harmonic (N*N):ℝ) ≤ C →
+      (∫ t in T..2*T, (∫ u in t..t+h, ‖Complex.Gamma (1/4 + ((u/2:ℝ):ℂ)*Complex.I)‖ *
+          Real.exp ((Real.pi/4-1/(2*H))*u) *
+          ‖∑ m ∈ Finset.Ioc Y X, (spectralLineJet_selbergGroupedCoefficient L N u m : ℂ)*mode(m,u)‖)^2) ≤
+      K*h^2*Real.sqrt T*((A:ℝ)*(2+C)+3) := by
+  obtain ⟨K,hK,hmean⟩ := spectralLineJet_selbergGrouped_high_dyadic
+  refine ⟨K,hK,?_⟩
+  intro H T h C hH hT hh hhT L N Y X hN hY hYX hX hL hflat hC
+  let Q := spectralLineJet_selbergSieveEnergy N
+  let G := spectralLineJet_selbergSieveDenominator N
+  have hY0 := (pow_pos hN 4).trans_le hY
+  have hX0 := hY0.trans_le hYX
+  have hQ : 0 ≤ Q := (spectralLineJet_selbergSieveEnergy_bounds N).1
+  have hexc : 0 ≤ Q-G⁻¹ := by
+    rw [show Q= _ from spectralLineJet_selbergSieveEnergy_excess hN]
+    simp only [G,add_sub_cancel_left]
+    exact Finset.sum_nonneg fun _ _ ↦ by positivity
+  obtain ⟨hG,hlog,hsmall⟩ := spectralLineJet_selberg_floor_log hN
+  have hxlog : Real.log ((X:ℝ)/Y) ≤ (A:ℝ)*Real.log N := by
+    calc _ ≤ Real.log X := Real.log_le_log (by positivity) (div_le_self (by positivity) (by exact_mod_cast hY0))
+         _ ≤ Real.log ((N:ℝ)^A) := Real.log_le_log (by exact_mod_cast hX0) (by exact_mod_cast hX)
+         _ = _ := Real.log_pow _ _
+  have hmain : Q*Real.log N ≤ 2+C := by
+    have hx := (mul_le_mul_of_nonneg_left hlog hexc).trans hC
+    change G⁻¹*Real.log N ≤ 2 at hsmall
+    nlinarith only [hsmall,hx]
+  have hrem : 3*(N:ℝ)^4/Y ≤ 3 := (div_le_iff₀ (by exact_mod_cast hY0)).mpr
+    (mul_le_mul_of_nonneg_left (by exact_mod_cast hY) (by norm_num))
+  apply (hmean hH hT hh hhT hY0 hYX hL hflat).trans
+  apply mul_le_mul_of_nonneg_left _ (by positivity)
+  calc _ ≤ Q*((A:ℝ)*Real.log N)+3 := add_le_add (mul_le_mul_of_nonneg_left hxlog hQ) hrem
+       _ = (A:ℝ)*(Q*Real.log N)+3 := by ring
+       _ ≤ _ := by gcongr
+
 end SelbergBulk
 
 /-- A grid of width 1/(k+1) forces two distinct ordinates in the same cell. -/
