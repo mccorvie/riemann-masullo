@@ -1168,81 +1168,6 @@ theorem spectralStripConvolution_nuclear_iff_finite_jet_bound_adjoint
   exact sum_sq_orthonormal_le_tsum_sq_basis e
     ((A(ψ)).adjoint.comp (globalThetaSobolev F a hI hs)ᗮ.subtypeL) hsum v hv
 
-/-- Paper: Theorem 10.4.2.1, p. 459. Spectral projection after convolution is nuclear.
-This follows from the open statement `spectralStripConvolution_nuclear_of_le_one` by (10.4.2.5).
-Deviation: This is the part of the printed range with `0 ≤ s ≤ 1`. The operator is independent
-of the cutoff. -/
-theorem spectralProjection_convolution_nuclear_of_le_one (_hs₁ : s ≤ 1) (φ : BruhatCompactSupport C𝔽) :
-    IsNuclearOperator ((spectralProjection (F := F) a hα hs).comp (A(φ))) :=
-  spectralProjection_convolution_nuclear a hα hs φ
-    (spectralStripConvolution_nuclear_of_le_one a hα hs _hs₁ φ)
-
-/-- Paper: Theorem 10.4.2.1, p. 459. Spectral projection after convolution is nuclear.
-Deviation: This checks the uncut conclusion on the range `1 < s` of the strip theorem. -/
-theorem spectralProjection_convolution_nuclear_of_one_lt (hs₁ : 1 < s) (φ : BruhatCompactSupport C𝔽) :
-    IsNuclearOperator ((spectralProjection (F := F) a hα hs).comp (A(φ))) :=
-  RiemannMasullo.spectralProjection_convolution_nuclear_of_one_lt a hα hs₁ φ
-
-/-- Paper: Theorem 10.4.2.1, p. 459. At each admissible cutoff, spectral truncation
-after convolution is nuclear. This follows from the open `spectralStripConvolution_nuclear_of_le_one`
-by composing the projected convolution with cutoff multiplication.
-Deviation: The range here is `0 ≤ s ≤ 1`. The real cutoff uses the profile of Definition 9.3.3.1. -/
-theorem spectralTruncatedConvolution_nuclear_of_le_one (_hs₁ : s ≤ 1)
-    (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (_hband : band(Λ, ε)) (φ : BruhatCompactSupport C𝔽) :
-    IsNuclearOperator (spectralTruncatedConvolution a hα hs hρ φ) :=
-  spectralTruncatedConvolution_nuclear a hα hs hρ φ
-    (spectralStripConvolution_nuclear_of_le_one a hα hs _hs₁ φ)
-
-/-- Paper: Theorem 10.4.2.1, p. 459. Spectral truncation after convolution is nuclear.
-Deviation: At `1 < s` the existing theorem applies to real cutoffs even without the inner-band inequality. -/
-theorem spectralTruncatedConvolution_nuclear_of_one_lt (hs₁ : 1 < s)
-    (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (φ : BruhatCompactSupport C𝔽) :
-    IsNuclearOperator (spectralTruncatedConvolution a hα hs hρ φ) :=
-  RiemannMasullo.spectralTruncatedConvolution_nuclear_of_one_lt a hα hs₁ hρ φ
-
-/-- Paper: Theorem 10.4.2.1, p. 459. At each admissible cutoff, geometric truncation
-after convolution is nuclear. Given the open `spectralStripConvolution_nuclear_of_le_one`,
-this follows by subtracting the spectral summand from cutoff convolution.
-Deviation: The range here is `0 ≤ s ≤ 1`, with the real cutoff of Definition 9.3.3.1. -/
-theorem geometricTruncatedConvolution_nuclear_of_le_one (_hs₁ : s ≤ 1)
-    (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (hband : band(Λ, ε)) (φ : BruhatCompactSupport C𝔽) :
-    IsNuclearOperator (geometricTruncatedConvolution a hα hs hρ φ) :=
-  geometricTruncatedConvolution_nuclear a hα hs hρ hband φ
-    (spectralStripConvolution_nuclear_of_le_one a hα hs _hs₁ φ)
-
-/-- Paper: Theorem 10.4.2.1, p. 459. Geometric truncation after convolution is nuclear.
-Deviation: This checks the real-cutoff conclusion at `1 < s` using the strip theorem. -/
-theorem geometricTruncatedConvolution_nuclear_of_one_lt (hs₁ : 1 < s)
-    (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (hband : band(Λ, ε)) (φ : BruhatCompactSupport C𝔽) :
-    IsNuclearOperator (geometricTruncatedConvolution a hα hs hρ φ) :=
-  RiemannMasullo.geometricTruncatedConvolution_nuclear_of_one_lt a hα hs₁ hρ hband φ
-
-local notation "traceSplit(" hρ ", " φ ")" =>
-  (let T := (M(hρ)).comp (A(φ))
-   let G := geometricTruncatedConvolution a hα hs hρ φ
-   let S := spectralTruncatedConvolution a hα hs hρ φ
-   ∃ (hT : IsNuclearOperator T) (hG : IsNuclearOperator G) (hS : IsNuclearOperator S),
-     hilbertTrace (H := W) ⟨T, hT⟩ =
-       hilbertTrace (H := W) ⟨G, hG⟩ + hilbertTrace (H := W) ⟨S, hS⟩)
-
-/-- Paper: Theorem 10.4.2.1, p. 459. At an admissible cutoff the trace of cutoff convolution
-is the sum of the geometric and spectral traces, as in (10.4.2.3). The open statement
-`spectralStripConvolution_nuclear_of_le_one` supplies the hypothesis for the trace split.
-Deviation: The order is restricted to `0 ≤ s ≤ 1` and the three nuclearity witnesses are
-part of the conclusion for the real cutoff. -/
-theorem truncatedConvolution_trace_split_of_le_one (_hs₁ : s ≤ 1)
-    (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (hband : band(Λ, ε)) (φ : BruhatCompactSupport C𝔽) :
-    traceSplit(hρ, φ) :=
-  truncatedConvolution_trace_split a hα hs hρ hband φ
-    (spectralStripConvolution_nuclear_of_le_one a hα hs _hs₁ φ)
-
-/-- Paper: Theorem 10.4.2.1, p. 459. The nuclear trace splits as in (10.4.2.3).
-Deviation: This checks the identity with real cutoffs and all three nuclearity witnesses at `1 < s`. -/
-theorem truncatedConvolution_trace_split_of_one_lt (hs₁ : 1 < s)
-    (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (hband : band(Λ, ε)) (φ : BruhatCompactSupport C𝔽) :
-    traceSplit(hρ, φ) :=
-  RiemannMasullo.truncatedConvolution_trace_split_of_one_lt a hα hs₁ hρ hband φ
-
 /-- The logarithm of the idele class norm is continuous. -/
 private theorem continuous_logIdeleClassNorm_isolated :
     Continuous (fun g : C𝔽 ↦ Real.log ((m𝔽 g).val : ℝ)) :=
@@ -1473,6 +1398,81 @@ theorem spectralStripJet_adjoint_testAction_mem_span
     exact Submodule.sum_mem _ fun i _ ↦ Submodule.smul_mem _ _
       (Submodule.subset_span ⟨_, hS j hj i.val (Nat.le_of_lt_succ i.isLt), rfl⟩)
   exact hle hx
+
+/-- Paper: Theorem 10.4.2.1, p. 459. Spectral projection after convolution is nuclear.
+This follows from the open statement `spectralStripConvolution_nuclear_of_le_one` by (10.4.2.5).
+Deviation: This is the part of the printed range with `0 ≤ s ≤ 1`. The operator is independent
+of the cutoff. -/
+theorem spectralProjection_convolution_nuclear_of_le_one (_hs₁ : s ≤ 1) (φ : BruhatCompactSupport C𝔽) :
+    IsNuclearOperator ((spectralProjection (F := F) a hα hs).comp (A(φ))) :=
+  spectralProjection_convolution_nuclear a hα hs φ
+    (spectralStripConvolution_nuclear_of_le_one a hα hs _hs₁ φ)
+
+/-- Paper: Theorem 10.4.2.1, p. 459. Spectral projection after convolution is nuclear.
+Deviation: This checks the uncut conclusion on the range `1 < s` of the strip theorem. -/
+theorem spectralProjection_convolution_nuclear_of_one_lt (hs₁ : 1 < s) (φ : BruhatCompactSupport C𝔽) :
+    IsNuclearOperator ((spectralProjection (F := F) a hα hs).comp (A(φ))) :=
+  RiemannMasullo.spectralProjection_convolution_nuclear_of_one_lt a hα hs₁ φ
+
+/-- Paper: Theorem 10.4.2.1, p. 459. At each admissible cutoff, spectral truncation
+after convolution is nuclear. This follows from the open `spectralStripConvolution_nuclear_of_le_one`
+by composing the projected convolution with cutoff multiplication.
+Deviation: The range here is `0 ≤ s ≤ 1`. The real cutoff uses the profile of Definition 9.3.3.1. -/
+theorem spectralTruncatedConvolution_nuclear_of_le_one (_hs₁ : s ≤ 1)
+    (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (_hband : band(Λ, ε)) (φ : BruhatCompactSupport C𝔽) :
+    IsNuclearOperator (spectralTruncatedConvolution a hα hs hρ φ) :=
+  spectralTruncatedConvolution_nuclear a hα hs hρ φ
+    (spectralStripConvolution_nuclear_of_le_one a hα hs _hs₁ φ)
+
+/-- Paper: Theorem 10.4.2.1, p. 459. Spectral truncation after convolution is nuclear.
+Deviation: At `1 < s` the existing theorem applies to real cutoffs even without the inner-band inequality. -/
+theorem spectralTruncatedConvolution_nuclear_of_one_lt (hs₁ : 1 < s)
+    (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (φ : BruhatCompactSupport C𝔽) :
+    IsNuclearOperator (spectralTruncatedConvolution a hα hs hρ φ) :=
+  RiemannMasullo.spectralTruncatedConvolution_nuclear_of_one_lt a hα hs₁ hρ φ
+
+/-- Paper: Theorem 10.4.2.1, p. 459. At each admissible cutoff, geometric truncation
+after convolution is nuclear. Given the open `spectralStripConvolution_nuclear_of_le_one`,
+this follows by subtracting the spectral summand from cutoff convolution.
+Deviation: The range here is `0 ≤ s ≤ 1`, with the real cutoff of Definition 9.3.3.1. -/
+theorem geometricTruncatedConvolution_nuclear_of_le_one (_hs₁ : s ≤ 1)
+    (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (hband : band(Λ, ε)) (φ : BruhatCompactSupport C𝔽) :
+    IsNuclearOperator (geometricTruncatedConvolution a hα hs hρ φ) :=
+  geometricTruncatedConvolution_nuclear a hα hs hρ hband φ
+    (spectralStripConvolution_nuclear_of_le_one a hα hs _hs₁ φ)
+
+/-- Paper: Theorem 10.4.2.1, p. 459. Geometric truncation after convolution is nuclear.
+Deviation: This checks the real-cutoff conclusion at `1 < s` using the strip theorem. -/
+theorem geometricTruncatedConvolution_nuclear_of_one_lt (hs₁ : 1 < s)
+    (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (hband : band(Λ, ε)) (φ : BruhatCompactSupport C𝔽) :
+    IsNuclearOperator (geometricTruncatedConvolution a hα hs hρ φ) :=
+  RiemannMasullo.geometricTruncatedConvolution_nuclear_of_one_lt a hα hs₁ hρ hband φ
+
+local notation "traceSplit(" hρ ", " φ ")" =>
+  (let T := (M(hρ)).comp (A(φ))
+   let G := geometricTruncatedConvolution a hα hs hρ φ
+   let S := spectralTruncatedConvolution a hα hs hρ φ
+   ∃ (hT : IsNuclearOperator T) (hG : IsNuclearOperator G) (hS : IsNuclearOperator S),
+     hilbertTrace (H := W) ⟨T, hT⟩ =
+       hilbertTrace (H := W) ⟨G, hG⟩ + hilbertTrace (H := W) ⟨S, hS⟩)
+
+/-- Paper: Theorem 10.4.2.1, p. 459. At an admissible cutoff the trace of cutoff convolution
+is the sum of the geometric and spectral traces, as in (10.4.2.3). The open statement
+`spectralStripConvolution_nuclear_of_le_one` supplies the hypothesis for the trace split.
+Deviation: The order is restricted to `0 ≤ s ≤ 1` and the three nuclearity witnesses are
+part of the conclusion for the real cutoff. -/
+theorem truncatedConvolution_trace_split_of_le_one (_hs₁ : s ≤ 1)
+    (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (hband : band(Λ, ε)) (φ : BruhatCompactSupport C𝔽) :
+    traceSplit(hρ, φ) :=
+  truncatedConvolution_trace_split a hα hs hρ hband φ
+    (spectralStripConvolution_nuclear_of_le_one a hα hs _hs₁ φ)
+
+/-- Paper: Theorem 10.4.2.1, p. 459. The nuclear trace splits as in (10.4.2.3).
+Deviation: This checks the identity with real cutoffs and all three nuclearity witnesses at `1 < s`. -/
+theorem truncatedConvolution_trace_split_of_one_lt (hs₁ : 1 < s)
+    (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (hband : band(Λ, ε)) (φ : BruhatCompactSupport C𝔽) :
+    traceSplit(hρ, φ) :=
+  RiemannMasullo.truncatedConvolution_trace_split_of_one_lt a hα hs₁ hρ hband φ
 
 section Limits
 
