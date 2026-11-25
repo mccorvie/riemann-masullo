@@ -19,8 +19,10 @@ integral of the profile's derivative against `θ(t) - t`. The prime number theor
 then gives
 `e^{-y/2} ∑_p (log p) p^{-1/2} H(log p - y) → ∫ H(u) e^{u/2} du`.
 This is the partial-summation step for the rational local terms of Theorem 12.5.1.1,
-pp. 519–520. Mathlib's prime number theorem has no rate, so the `O(y^{-2})` form is not
-claimed here.
+pp. 519–520. When the half-moment of `H` vanishes, the same identity says that the
+degree-one sum is the integral against Chebyshev's error `θ(t) - t`, and the prime
+number theorem makes it `o(e^{y/2})`. Mathlib's prime number theorem has no rate, so
+no power saving is claimed.
 -/
 
 @[expose] public section
@@ -543,5 +545,25 @@ theorem tendsto_exp_neg_mul_radialPrimeProfile {H : ℝ → ℝ} {b : ℝ}
       _ < ε * 1 := mul_lt_mul_of_pos_left hlt hε
       _ = ε := by ring
   exact lt_of_le_of_lt hbound hδC
+
+/-- With a vanishing half-moment, the degree-one sum is exactly the integral against
+`θ(t) - t`. For a radial test on the idèles of `ℚ`, this moment is the main term at
+the pole `|·|^{1/2}` of (12.5.1.2)–(12.5.1.3), pp. 519–520. -/
+theorem radialPrimeProfile_eq_neg_chebyshev_error_of_moment_zero {H : ℝ → ℝ} {b y : ℝ}
+    (hy : 1 ≤ y) (hb : 0 < b) (hsupp : tsupport H ⊆ Set.Ioo 0 b) (hH : ContDiff ℝ 1 H)
+    (hmoment : ∫ u in (0 : ℝ)..b, H u * Real.exp (u / 2) = 0) :
+    radialPrimeProfile H b y =
+      -∫ t in Real.exp y..Real.exp (y + b),
+        deriv (halfProfile H y) t * (θ t - t) := by
+  have h := radialPrimeProfile_eq_moment_sub_chebyshev hy hb hsupp hH
+  simpa [hmoment] using h
+
+/-- With a vanishing half-moment, scaling by `e^{-y/2}` sends the signed prime sum to zero.
+This is `o(e^{y/2})`. Mathlib's prime number theorem gives no rate. -/
+theorem tendsto_exp_neg_mul_radialPrimeProfile_of_moment_zero {H : ℝ → ℝ} {b : ℝ}
+    (hb : 0 < b) (hsupp : tsupport H ⊆ Set.Ioo 0 b) (hH : ContDiff ℝ 1 H)
+    (hmoment : ∫ u in (0 : ℝ)..b, H u * Real.exp (u / 2) = 0) :
+    Tendsto (fun y : ℝ => Real.exp (-y / 2) * radialPrimeProfile H b y) atTop (𝓝 0) := by
+  simpa [hmoment] using tendsto_exp_neg_mul_radialPrimeProfile hb hsupp hH
 
 end RiemannMasullo
