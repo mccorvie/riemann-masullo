@@ -130,17 +130,14 @@ private theorem integerFirstRieszMean_fourth_comparisons {j x : ℝ}
     have hu : 2*(j+1)^4 ≤ (2*x)^5 := by nlinarith only [h4, hl, hx5]
     exact (Real.log_le_log (by positivity) hu).trans_eq (by rw [Real.log_pow]; norm_num)
 
-/-- Sampling the centered sum at every positive fourth power suffices for a real lower
-bound at every cutoff. The coefficient bound only enters on the intervening integers. -/
-theorem integerFirstRieszMean_lower_of_fourth_powers (a : ℕ → ℝ) {c C D : ℝ}
-    (hc : 0 ≤ c) (hC : 0 ≤ C) (hD : 0 ≤ D)
-    (ha : ∀ n : ℕ, 0 < n → |a n| ≤ D*Real.log (2*n))
-    (hsample : ∀ j : ℕ, 1 ≤ j → -(C*(j:ℝ)^6*Real.log (2*(j:ℝ)^4)) ≤
-      integerFirstRieszMean a ((j:ℝ)^4) - c*((j:ℝ)^4)^2/2) :
-    ∀ x : ℝ, 1 ≤ x → -((320*C+1125*D)*(x*Real.sqrt x)*Real.log (2*x)) ≤
-      integerFirstRieszMean a x-c*x^2/2 := by
-  intro x hx
-  obtain ⟨j, hj, hu, hv⟩ := integerFirstRieszMean_fourth_window hx
+private theorem integerFirstRieszMean_lower_on_fourth_interval (a : ℕ → ℝ) {c D : ℝ}
+    (hc : 0 ≤ c) (hD : 0 ≤ D) (ha : ∀ n : ℕ, 0 < n → |a n| ≤ D*Real.log (2*n))
+    {j : ℕ} (hj : 1 ≤ j) {x B : ℝ} (hu : (j:ℝ)^4 ≤ x) (hv : x ≤ ((j:ℝ)+1)^4)
+    (hl : B ≤ integerFirstRieszMean a ((j:ℝ)^4)-c*((j:ℝ)^4)^2/2)
+    (hr : B ≤ integerFirstRieszMean a (((j:ℝ)+1)^4)-c*(((j:ℝ)+1)^4)^2/2) :
+    B-1125*D*((x*Real.sqrt x)*Real.log (2*x)) ≤ integerFirstRieszMean a x-c*x^2/2 := by
+  have hj' : (1:ℝ) ≤ j := by exact_mod_cast hj
+  have hx : 1 ≤ x := (one_le_pow₀ hj').trans hu
   let k : ℝ := j
   let u := k^4
   let v := (k+1)^4
@@ -156,7 +153,55 @@ theorem integerFirstRieszMean_lower_of_fourth_powers (a : ℕ → ℝ) {c C D : 
     field_simp [sub_ne_zero.mpr huv.ne']
     ring
   have hs := integerFirstRieszMean_fourth_comparisons hk hu
-  obtain ⟨h6, h6x, hgap, hlog⟩ := hs
+  obtain ⟨_, h6x, hgap, hlog⟩ := hs
+  let W := (x*Real.sqrt x)*Real.log (2*x)
+  have hlog₀ : 0 ≤ Real.log (2*v) := Real.log_nonneg (by linarith)
+  have hweight : k^6*Real.log (2*v) ≤ 5*W := by
+    dsimp [W]
+    convert mul_le_mul h6x hlog hlog₀ (by positivity : 0 ≤ x*Real.sqrt x) using 1; ring
+  have hcoeff (n : ℕ) (hn : n ∈ Finset.Ioc (j^4) ((j+1)^4)) : |a n| ≤ D*Real.log (2*v) := by
+    have hnv : (n:ℝ) ≤ v := by dsimp only [v,k]; exact_mod_cast (Finset.mem_Ioc.mp hn).2
+    have hn₀ := Nat.zero_lt_of_lt (Finset.mem_Ioc.mp hn).1
+    exact (ha n hn₀).trans (mul_le_mul_of_nonneg_left (Real.log_le_log (by positivity) (by linarith)) hD)
+  have hnatU : ((j^4:ℕ):ℝ) = u := by push_cast; rfl
+  have hnatV : (((j+1)^4:ℕ):ℝ) = v := by push_cast; rfl
+  have herr := integerFirstRieszMean_chord_error a (u := j^4) (v := (j+1)^4) (x := x) (t := t)
+    (hnatU.symm ▸ hu) (hnatV.symm ▸ hv) ht ht' (by rw [hnatU,hnatV]; exact hx')
+    (mul_nonneg hD hlog₀) hcoeff
+  rw [hnatU,hnatV, abs_le] at herr
+  have he := mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_right hgap hlog₀) hD
+  have hw := mul_le_mul_of_nonneg_left hweight hD
+  have hconv : x^2 ≤ (1-t)*u^2+t*v^2 := by
+    calc
+      _ ≤ x^2 + (1-t)*t*(v-u)^2 := le_add_of_nonneg_right (by positivity)
+      _ = _ := by rw [hx']; ring
+  have hcc := mul_le_mul_of_nonneg_left hconv hc
+  have h₁ := mul_le_mul_of_nonneg_left (show B ≤ integerFirstRieszMean a u-c*u^2/2 from hl) (sub_nonneg.mpr ht')
+  have h₂ := mul_le_mul_of_nonneg_left (show B ≤ integerFirstRieszMean a v-c*v^2/2 from hr) ht
+  change B-1125*D*W ≤ integerFirstRieszMean a x-c*x^2/2
+  change (v-u)^2 ≤ 225*k^6 at hgap
+  change D*(((k+1)^4-k^4)^2*Real.log (2*v)) ≤ _ at he
+  change D*((v-u)^2*Real.log (2*v)) ≤ _ at he
+  nlinarith only [h₁,h₂,hcc,herr.1,he,hw]
+
+/-- Sampling the centered sum at every positive fourth power suffices for a real lower
+bound at every cutoff. The coefficient bound only enters on the intervening integers. -/
+theorem integerFirstRieszMean_lower_of_fourth_powers (a : ℕ → ℝ) {c C D : ℝ}
+    (hc : 0 ≤ c) (hC : 0 ≤ C) (hD : 0 ≤ D)
+    (ha : ∀ n : ℕ, 0 < n → |a n| ≤ D*Real.log (2*n))
+    (hsample : ∀ j : ℕ, 1 ≤ j → -(C*(j:ℝ)^6*Real.log (2*(j:ℝ)^4)) ≤
+      integerFirstRieszMean a ((j:ℝ)^4) - c*((j:ℝ)^4)^2/2) :
+    ∀ x : ℝ, 1 ≤ x → -((320*C+1125*D)*(x*Real.sqrt x)*Real.log (2*x)) ≤
+      integerFirstRieszMean a x-c*x^2/2 := by
+  intro x hx
+  obtain ⟨j, hj, hu, hv⟩ := integerFirstRieszMean_fourth_window hx
+  let k : ℝ := j
+  let u := k^4
+  let v := (k+1)^4
+  have hk : 1 ≤ k := by dsimp only [k]; exact_mod_cast hj
+  have huv : u ≤ v := hu.trans hv
+  have hs := integerFirstRieszMean_fourth_comparisons hk hu
+  obtain ⟨h6, h6x, _, hlog⟩ := hs
   let W := (x*Real.sqrt x)*Real.log (2*x)
   have hlog₀ : 0 ≤ Real.log (2*v) := Real.log_nonneg (by linarith)
   have hweight : k^6*Real.log (2*v) ≤ 5*W := by
@@ -178,31 +223,10 @@ theorem integerFirstRieszMean_lower_of_fourth_powers (a : ℕ → ℝ) {c C D : 
     have hle := mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_right h6 hlog₀) hC
     have hw := mul_le_mul_of_nonneg_left hweight hC
     nlinarith only [hle,hw,hend₂]
-  have hcoeff (n : ℕ) (hn : n ∈ Finset.Ioc (j^4) ((j+1)^4)) : |a n| ≤ D*Real.log (2*v) := by
-    have hnv : (n:ℝ) ≤ v := by dsimp only [v,k]; exact_mod_cast (Finset.mem_Ioc.mp hn).2
-    have hn₀ := Nat.zero_lt_of_lt (Finset.mem_Ioc.mp hn).1
-    exact (ha n hn₀).trans (mul_le_mul_of_nonneg_left (Real.log_le_log (by positivity) (by linarith)) hD)
-  have hnatU : ((j^4:ℕ):ℝ) = u := by push_cast; rfl
-  have hnatV : (((j+1)^4:ℕ):ℝ) = v := by push_cast; rfl
-  have herr := integerFirstRieszMean_chord_error a (u := j^4) (v := (j+1)^4) (x := x) (t := t)
-    (hnatU.symm ▸ hu) (hnatV.symm ▸ hv) ht ht' (by rw [hnatU,hnatV]; exact hx')
-    (mul_nonneg hD hlog₀) hcoeff
-  rw [hnatU,hnatV, abs_le] at herr
-  have he := mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_right hgap hlog₀) hD
-  have hw := mul_le_mul_of_nonneg_left hweight hD
-  have hconv : x^2 ≤ (1-t)*u^2+t*v^2 := by
-    calc
-      _ ≤ x^2 + (1-t)*t*(v-u)^2 := le_add_of_nonneg_right (by positivity)
-      _ = _ := by rw [hx']; ring
-  have hcc := mul_le_mul_of_nonneg_left hconv hc
-  have h₁ := mul_le_mul_of_nonneg_left h1 (sub_nonneg.mpr ht')
-  have h₂ := mul_le_mul_of_nonneg_left h2 ht
-  rw [mul_assoc (320*C+1125*D)]
-  change -((320*C+1125*D)*W) ≤ integerFirstRieszMean a x-c*x^2/2
-  change (v-u)^2 ≤ 225*k^6 at hgap
-  change D*(((k+1)^4-k^4)^2*Real.log (2*v)) ≤ _ at he
-  change D*((v-u)^2*Real.log (2*v)) ≤ _ at he
-  nlinarith only [h₁,h₂,hcc,herr.1,he,hw]
+  have hloc := integerFirstRieszMean_lower_on_fourth_interval a hc hD ha hj hu hv h1 h2
+  convert hloc using 1
+  dsimp only [W]
+  ring
 
 private theorem fourth_power_absorb_initial {S : ℕ → ℝ} {C : ℝ}
     (hs : ∀ᶠ j : ℕ in Filter.atTop, -(C*(j:ℝ)^6*Real.log (2*(j:ℝ)^4)) ≤ S j) :
@@ -244,6 +268,42 @@ private theorem degreeOnePrimeFirstRieszMean_eq_integer (χ : U) (x : ℝ) :
   rw [Finset.sum_filter]
   exact Finset.sum_congr rfl fun p _ ↦ by by_cases hp : p.Prime <;> simp [hp]
 
+private theorem degreeOnePrimeFirstRieszMean_coeff_bound (χ : U) :
+    ∀ n : ℕ, 0 < n → |(if n.Prime then (a(χ) n).re else 0)| ≤
+      (Module.finrank ℚ K : ℝ)*Real.log (2*n) := by
+  intro n hn
+  have hn' : 0 < (n:ℝ) := by exact_mod_cast hn
+  have hlog : Real.log (n:ℝ) ≤ Real.log (2*n) := Real.log_le_log hn' (by linarith)
+  by_cases hp : n.Prime
+  · rw [ite_eq_left hp]
+    exact (Complex.abs_re_le_norm _).trans ((heckeLogDerivCoefficient_le_vonMangoldt χ n).trans
+      (mul_le_mul_of_nonneg_left (ArithmeticFunction.vonMangoldt_le_log.trans hlog) (Nat.cast_nonneg _)))
+  · rw [ite_eq_right hp, abs_zero]
+    have hn₁ : 1 ≤ (n : ℝ) := by exact_mod_cast hn
+    exact mul_nonneg (Nat.cast_nonneg _) (Real.log_nonneg (by linarith))
+
+/-- The negative of the genuine centered degree-one prime sum on a single fourth-power
+interval is bounded by the larger endpoint deficit and the local interpolation error. -/
+theorem degreeOnePrimeFirstRieszMean_neg_le_fourth_endpoints (χ : U) {c : ℝ} (hc : 0 ≤ c)
+    {j : ℕ} (hj : 1 ≤ j) {x : ℝ} (hu : (j:ℝ)^4 ≤ x) (hv : x ≤ ((j:ℝ)+1)^4) :
+    let S (t : ℝ) := degreeOnePrimeFirstRieszMean χ t-c*t^2/2
+    (-S x) ≤ max (-S ((j:ℝ)^4)) (-S (((j:ℝ)+1)^4)) +
+      1125*(Module.finrank ℚ K:ℝ)*((x*Real.sqrt x)*Real.log (2*x)) := by
+  intro S
+  let B := min (S ((j:ℝ)^4)) (S (((j:ℝ)+1)^4))
+  have hl : B ≤ S ((j:ℝ)^4) := min_le_left _ _
+  have hr : B ≤ S (((j:ℝ)+1)^4) := min_le_right _ _
+  simp only [S, degreeOnePrimeFirstRieszMean_eq_integer] at hl hr
+  have h := integerFirstRieszMean_lower_on_fourth_interval _ hc (Nat.cast_nonneg _)
+    (degreeOnePrimeFirstRieszMean_coeff_bound χ) hj hu hv hl hr
+  have hx : B-1125*(Module.finrank ℚ K:ℝ)*((x*Real.sqrt x)*Real.log (2*x)) ≤ S x := by
+    simpa only [S, degreeOnePrimeFirstRieszMean_eq_integer] using h
+  have hb : -B ≤ max (-S ((j:ℝ)^4)) (-S (((j:ℝ)+1)^4)) := by
+    rcases le_total (S ((j:ℝ)^4)) (S (((j:ℝ)+1)^4)) with hh | hh
+    · simp [B, min_eq_left hh]
+    · simp [B, min_eq_right hh]
+  linarith
+
 /-- An eventual lower bound at fourth powers gives a lower bound for the signed
 degree-one prime sum at every real cutoff, including cutoffs between samples. -/
 theorem degreeOnePrimeFirstRieszMean_lower_of_fourth_powers (χ : U) {c C : ℝ} (hc : 0 ≤ c)
@@ -256,17 +316,7 @@ theorem degreeOnePrimeFirstRieszMean_lower_of_fourth_powers (χ : U) {c C : ℝ}
   have hD : 0 ≤ D := Nat.cast_nonneg _
   refine ⟨320*C'+1125*D, by positivity, ?_⟩
   simp only [degreeOnePrimeFirstRieszMean_eq_integer] at hS ⊢
-  apply integerFirstRieszMean_lower_of_fourth_powers _ hc hC hD _ hS
-  intro n hn
-  have hn' : 0 < (n:ℝ) := by exact_mod_cast hn
-  have hlog : Real.log (n:ℝ) ≤ Real.log (2*n) := Real.log_le_log hn' (by linarith)
-  by_cases hp : n.Prime
-  · rw [ite_eq_left hp]
-    exact (Complex.abs_re_le_norm _).trans ((heckeLogDerivCoefficient_le_vonMangoldt χ n).trans
-      (mul_le_mul_of_nonneg_left (ArithmeticFunction.vonMangoldt_le_log.trans hlog) hD))
-  · rw [ite_eq_right hp, abs_zero]
-    have hn₁ : 1 ≤ (n : ℝ) := by exact_mod_cast hn
-    exact mul_nonneg hD (Real.log_nonneg (by linarith))
+  exact integerFirstRieszMean_lower_of_fourth_powers _ hc hC hD (degreeOnePrimeFirstRieszMean_coeff_bound χ) hS
 
 /-- The interpolation weight is absorbed by every power strictly above three halves. -/
 theorem firstRieszSamplingWeight_le_rpow {b : ℝ} (hb : 1/2 < b) :
