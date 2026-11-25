@@ -13,9 +13,11 @@ import RiemannMasullo.AppB_AnalyticNT.Sec4b
 import RiemannMasullo.ForMathlib.Analysis.Analytic.CauchyWindow
 
 public import RiemannMasullo.Ch01_Introduction.Sec4_PoissonCertificate
+public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeSignedCoefficients
 public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeGreenExterior
 public import RiemannMasullo.AppB_AnalyticNT.Sec4b_BoundaryHeckeGreen
 public import RiemannMasullo.AppB_AnalyticNT.HeckeFiniteLogGreen
+public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeFiniteSignedCoefficients
 
 /-! # Isolated statements of §12.5
 
@@ -1438,6 +1440,22 @@ theorem all_widths_iff_criticalLogDifference_nonpos (τ : ℝ≥0ˣ →ₜ* C�
     rw [criticalLogDifference_eq_mass τ hτ χ hχ] at hh
     exact (rightGreenMass_eq_zero_iff χ).mp (le_antisymm hh (rightGreenMass_nonneg χ))
 
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The exterior cancellation at every width is equivalent
+to subexponential signed prefix growth along arbitrarily late integer cutoffs for every
+normalized character. The sign may vary with both the character and the cutoff. -/
+theorem all_widths_iff_cofinal_signedCoefficients (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) (negative : U𝔽 → ℕ → Bool) :
+    allWidths(τ) ↔ ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (τ u) = 1) →
+      ∀ ε : ℝ, 0 < ε → ∀ J : ℕ, ∃ N ≥ J,
+        Real.log (SignedFrequency.chosenPrefix (HeckeLaguerre.measuredCoeff χ) (negative χ) N) /
+          (N : ℝ) ≤ ε := by
+  rw [allWidths_iff_critical τ hτ]
+  constructor <;> intro h χ hχ
+  · exact (HeckeLaguerre.isEmpty_rightSite_iff_cofinal_signed τ hτ χ hχ (negative χ)).mp
+      ((HeckeLaguerre.isEmpty_rightSite_iff_central χ).mpr (h χ hχ))
+  · exact (HeckeLaguerre.isEmpty_rightSite_iff_central χ).mp
+      ((HeckeLaguerre.isEmpty_rightSite_iff_cofinal_signed τ hτ χ hχ (negative χ)).mpr (h χ hχ))
+
 /-- Paper: Theorem 12.5.1.1, pp. 519–520. For each compact test and normalized character, the
 absolute omitted Mellin sum, including both edges of any positive strip, is bounded by the
 actual critical-line logarithmic difference times a test constant divided by the width. -/
@@ -1525,6 +1543,24 @@ theorem exists_hasSum_absolute_exterior_le_finiteLogDifference (τ : ℝ≥0ˣ �
     ht.eventually (Ioi_mem_nhds (by linarith))
   filter_upwards [hl] with n hn
   exact hb.trans (mul_le_mul_of_nonneg_left (by linarith) (by positivity))
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. All-width exterior cancellation is equivalent to
+arbitrarily late subexponential signed prefixes computed from finite ideal sums for every
+normalized character. The sign can depend on the character and the cutoff. Each character
+may use either the finite real sums or their integer floors. -/
+theorem all_widths_iff_cofinal_finiteIdealSignedCoefficients (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F))
+    (useFloor : U𝔽 → Bool) (negative : U𝔽 → ℕ → Bool) :
+    allWidths(τ) ↔ ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (τ u) = 1) →
+      ∀ ε : ℝ, 0 < ε → ∀ J : ℕ, ∃ N ≥ J,
+        Real.log (SignedFrequency.chosenPrefix
+          (FiniteIdealSigned.prefixCoeff χ (useFloor χ)) (negative χ) N)/(N:ℝ) ≤ ε := by
+  rw [allWidths_iff_critical τ hτ]
+  constructor <;> intro h χ hχ
+  · exact (FiniteIdealSigned.isEmpty_rightSite_iff_cofinal τ hτ χ hχ (useFloor χ) (negative χ)).mp
+      ((HeckeLaguerre.isEmpty_rightSite_iff_central χ).mpr (h χ hχ))
+  · exact (HeckeLaguerre.isEmpty_rightSite_iff_central χ).mp
+      ((FiniteIdealSigned.isEmpty_rightSite_iff_cofinal τ hτ χ hχ (useFloor χ) (negative χ)).mpr (h χ hχ))
 
 end CompactGreen
 
