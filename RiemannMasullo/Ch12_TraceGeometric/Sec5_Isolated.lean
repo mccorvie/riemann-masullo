@@ -182,28 +182,34 @@ private theorem widthJump_strict_critical (τ : ℝ≥0ˣ →ₜ* C)
     (fun φ _ ↦ traceFormula_exteriorZeros_of_half_le τ φ le_rfl)
   exact lt_of_not_ge fun h ↦ no.false ⟨(χ,z.val),z.property,h⟩
 
-/-- The wide-strip explicit formula already supplies the absolute bound used by
-left convergence, separately for any normalized character and any compact Bruhat test. -/
+/-- The single-character spectral summability bound supplies full-order real Mellin
+summability for every compact Bruhat test. -/
 theorem summable_heckeRealMoments_fullOrder (τ : ℝ≥0ˣ →ₜ* C)
     (hτ : RightInverse τ (ideleClassNorm F)) (χ : Chars(τ)) (f : BruhatCompactSupport C) :
     Summable (fun z : Sites(χ.val) ↦ (m(χ.val,z) : ℝ) * |(M(f,χ.val,z)).re|) := by
-  obtain ⟨_, _, _, _, _, hsum⟩ := traceFormula_of_half_le τ hτ f (le_refl (1/2))
-  let w (z : Sites(χ.val)) : {p : Chars(τ) × ℂ //
-      0 < ord(p.1.val, p.2) ∧ |p.2.re - 1/2| < 1/2} :=
-    ⟨(χ,z.val), z.property, widthJump_strict_critical τ hτ χ z⟩
-  have hw : Injective w := fun i j e ↦ Subtype.ext (congrArg (fun p ↦ p.val.2) e)
-  have habs := (hsum.summable.comp_injective hw).norm
-  apply habs.of_norm_bounded
-  intro z
-  change ‖(m(χ.val,z) : ℝ) * |(M(f,χ.val,z)).re|‖ ≤
-    ‖((ord(χ.val,z.val) : ℤ) : ℂ) * M(f,χ.val,z)‖
-  have hcast : ((m(χ.val,z) : ℕ) : ℂ) = ((ord(χ.val,z.val) : ℤ) : ℂ) := by
+  let N (g : C) : ℂ := (((ideleClassNorm F g).val : ℝ) : ℂ)
+  let moment (z : ℂ) := ∫ g, f.val g * ideleClassNormTwist χ.val z g *
+    N g ^ (-1/2 : ℂ) ∂(ideleClassTamagawaMeasure F)
+  have hsum : Summable (fun z : Sites(χ.val) ↦ ‖(ord(χ.val,z.val) : ℂ) * moment z.val‖) :=
+    idelicExplicitFormula_summable_spectral_fiber f χ.val
+  refine Summable.of_nonneg_of_le (fun z ↦ mul_nonneg (Nat.cast_nonneg _) (abs_nonneg _))
+    (fun z ↦ ?_) hsum
+  have he : M(f,χ.val,z) = moment z.val := by
+    have hu : M(f,χ.val,z) = ∫ g, f.val g * ideleClassNormTwist χ.val (z.val - 1/2) g
+        ∂(ideleClassTamagawaMeasure F) := Set.indicator_of_mem (Set.mem_univ _) _
+    rw [hu]
+    apply integral_congr_ae
+    filter_upwards with g
+    have hn : N g ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+    change f.val g * ((χ.val g : ℂ) * N g ^ (z.val - 1/2)) =
+      f.val g * ((χ.val g : ℂ) * N g ^ z.val) * N g ^ (-1/2 : ℂ)
+    rw [show (z.val - 1/2) = z.val + (-1/2) by ring, Complex.cpow_add _ _ hn]
+    ring
+  have hpos : (0 : ℝ) ≤ (ord(χ.val,z.val) : ℝ) := by exact_mod_cast z.property.le
+  have hm : (m(χ.val,z) : ℝ) = (ord(χ.val,z.val) : ℝ) := by
     exact_mod_cast Int.toNat_of_nonneg z.property.le
-  have hbound (n : ℕ) (v : ℂ) : ‖(n : ℝ)*|v.re|‖ ≤ ‖(n : ℂ)*v‖ := by
-    simp only [norm_mul, Complex.norm_natCast, Real.norm_eq_abs, Nat.abs_cast, abs_abs]
-    exact mul_le_mul_of_nonneg_left (Complex.abs_re_le_norm _) (Nat.cast_nonneg _)
-  rw [← hcast]
-  exact hbound _ _
+  rw [he, hm, norm_mul, Complex.norm_intCast, abs_of_nonneg hpos]
+  exact mul_le_mul_of_nonneg_left (Complex.abs_re_le_norm _) hpos
 
 /-- Paper: Theorem 12.5.1.1, pp. 519–520. A one-sided comparison at each possible boundary
 radius at or beyond the requested width gives the original exterior cancellation.
