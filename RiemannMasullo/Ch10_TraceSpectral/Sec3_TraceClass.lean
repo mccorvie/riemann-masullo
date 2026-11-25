@@ -12,11 +12,13 @@ import RiemannMasullo.ForMathlib.Topology.Algebra.InfiniteSum.PolynomialCount
 /-! # Trace class of the spectral convolution, for every number field and every test
 
 Theorems 10.3.1.1(2) and 10.3.2.1(2), pp. 448 and 454, say that convolution by a test on the
-line and strip spectral quotients is trace class. `Sec3` proves them from the recorded gap
-`spectralStripConvolution_traceCauchy_compact_block_series` (#7241). This file proves the same
-two statements without it: `spectralStripConvolution_nuclear_of_summable_clusterTraceNorms` and
+line and strip spectral quotients is trace class. This file proves the two statements without
+the recorded gap `spectralStripConvolution_traceCauchy_compact_block_series` of `Sec3` (#7241):
+`spectralStripConvolution_nuclear_of_summable_clusterTraceNorms` and
 `spectralLineConvolution_nuclear_of_summable_clusterTraceNorms`. The zeros are summed in clusters
 between well-chosen heights and not one at a time, so no distance between two zeros enters.
+The theorems of the paper, `spectralStripConvolution_nuclear` and
+`spectralLineConvolution_nuclear` of `Sec3_Nuclear`, are proved from these two.
 
 `Sec3_Clusters` proves that the convolution on the strip spectral quotient is trace class from
 data on rectangle boundaries for the angular components that see the test
@@ -886,8 +888,8 @@ theorem spectralStripConvolution_summable_clusterTraceNorms_forall
     (spectralStripConvolution_summable_clusterTraceNorms a hα hs φ) χ hχ x Λ hb hj
 
 /-- Paper: Theorem 10.3.2.1(2), p. 454. The statement of `spectralStripConvolution_nuclear` of
-`Sec3`, for every number field, every test and every Sobolev order `s ≥ 0`: convolution on the
-strip spectral quotient is trace class. It is proved from the clustered statement
+`Sec3_Nuclear`, for every number field, every test and every Sobolev order `s ≥ 0`: convolution
+on the strip spectral quotient is trace class. It is proved from the clustered statement
 `spectralStripConvolution_summable_clusterTraceNorms`, without the recorded gap
 `spectralStripConvolution_traceCauchy_compact_block_series` of `Sec3` (#7241) and with no
 hypothesis on the zeros: the zeros are summed by clusters between well-chosen heights, and the
@@ -895,7 +897,8 @@ estimates of the classical kind are proved for multipliers built from the Hecke 
 (`Sec3_HeckeMultipliers`), with constants uniform in the character.
 Deviation: Theorem 10.3.2.1 and §10.3 assume `s > 1` (p. 455); here `s ≥ 0`. This includes the
 orders `0 ≤ s ≤ 1` at which Theorems 10.4.2.1, 10.4.2.2 and 10.4.2.8 (pp. 459–463) use trace
-class. The statement of `Sec3`, for `s > 1`, is the case checked after the line theorem below. -/
+class. The statement of the paper, for `s > 1`, is `spectralStripConvolution_nuclear` of
+`Sec3_Nuclear`. -/
 theorem spectralStripConvolution_nuclear_of_summable_clusterTraceNorms {α s : ℝ} (hα : 0 ≤ α)
     (hs : 0 ≤ s) (φ : BruhatCompactSupport C𝔽) :
     let H := Q(a, hStrip(hα), hs)
@@ -908,14 +911,14 @@ theorem spectralStripConvolution_nuclear_of_summable_clusterTraceNorms {α s : �
 local notation "h₀" => le_rfl (a := (0 : ℝ))
 
 /-- Paper: Theorem 10.3.1.1(2), p. 448. The statement of `spectralLineConvolution_nuclear` of
-`Sec3`, for every number field and every test: for every real `a` and every `s ≥ 0`,
+`Sec3_Nuclear`, for every number field and every test: for every real `a` and every `s ≥ 0`,
 convolution on the `a`-line spectral quotient is trace class. It is the strip statement
 `spectralStripConvolution_nuclear_of_summable_clusterTraceNorms` at half-width zero, carried
 along `-0 = 0`; so it is proved without the recorded gap #7241 and with no hypothesis on the
 zeros.
 Deviation: Theorem 10.3.1.1 assumes `s > 1` (p. 448); here `s ≥ 0`. For `s ≤ 1` the line quotient
 is zero (`globalThetaSobolev_line_eq_top_of_le_one`), so only `s > 1` has content. The statement
-of `Sec3`, for `s > 1`, is the case checked below. -/
+of the paper, for `s > 1`, is `spectralLineConvolution_nuclear` of `Sec3_Nuclear`. -/
 theorem spectralLineConvolution_nuclear_of_summable_clusterTraceNorms {s : ℝ} (hs : 0 ≤ s)
     (φ : BruhatCompactSupport C𝔽) :
     let H := Q(a, h₀, hs)
@@ -927,16 +930,6 @@ theorem spectralLineConvolution_nuclear_of_summable_clusterTraceNorms {s : ℝ} 
     subst hl
     exact spectralStripConvolution_nuclear_of_summable_clusterTraceNorms a hr hs φ
   exact key 0 0 le_rfl neg_zero.symm le_rfl
-
--- The two theorems above give the statements `spectralStripConvolution_nuclear` and
--- `spectralLineConvolution_nuclear` of `Sec3`, stated there for `1 < s`.
-example : type_of% @spectralStripConvolution_nuclear :=
-  @fun _ _ _ a _ _ hα hs φ ↦
-    spectralStripConvolution_nuclear_of_summable_clusterTraceNorms a hα (zero_lt_one.trans hs).le φ
-
-example : type_of% @spectralLineConvolution_nuclear :=
-  @fun _ _ _ a _ hs φ ↦
-    spectralLineConvolution_nuclear_of_summable_clusterTraceNorms a (zero_lt_one.trans hs).le φ
 
 end Assembly
 
