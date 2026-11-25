@@ -15858,7 +15858,7 @@ multiplicity of zeros with height and angular frequencies below `T+1` is
 polynomial in `T+1`. The finite-subsum formulation needs no local finiteness
 assumption. Compare Iwaniec–Kowalski, Proposition 5.7(1), and, for finite-order
 characters, Lagarias–Odlyzko, Lemma 5.4. -/
-private theorem idelicExplicitFormula_summable_spectral_characters_polynomialCount
+theorem idelicExplicitFormula_summable_spectral_characters_polynomialCount
     (τ : ℝ≥0ˣ →ₜ* C[F]) (_hτ : RightInverse τ (ideleClassNorm F))
     (k : Subgroup C[F]) (_hk : IsBruhatGoodSubgroup k) :
     ∃ (n : ℕ) (Y : Fin n → LCATopologicalLie (ideleClassNorm F).ker) (C : ℝ) (d : ℕ),

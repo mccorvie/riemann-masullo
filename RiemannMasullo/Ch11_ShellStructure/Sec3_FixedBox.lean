@@ -277,24 +277,15 @@ private theorem primaryDivisorialAbsolutePW_detect {E : Type*} [NormedAddCommGro
   exact Submodule.topologicalClosure_minimal _ (iSup_le fun X ↦ Submodule.comap_mono (hL X))
     (hK.preimage continuous_subtype_val) hv
 
-private theorem primaryDivisorialAbsolutePW_exists_outside_uncut {S T : Finset V}
+private theorem primaryDivisorialAbsolutePW_zeroLine_closure {S : Finset V}
     (ω : PontryaginDual C₁) (hω : NormOneCharacterUnramifiedOutside ω S)
-    (hPic : Subsingleton (CommRing.Pic ((S : Set V).integer F)))
-    {d : ℝ} (hd : 0 ≤ d)
-    (hlt : sLocalUncutCarving d ω T < sLocalUncutCarving d ω ∅) :
-    ∃ X > (0 : ℝ), ∃ f : sAdelePolarSubspace F S,
-      f.val ∈ sLocalPWTests (S := S) le_rfl (sLocalPWBox S X) ∧
-      let g : adelePolarSubspace F := ⟨sAdeleSchwartzToGlobal F S f.val,
-        sAdeleSchwartzToGlobal_mem_polarSubspace f⟩
-      (memLp_homogeneousTheta_zeroLine d ω g).toLp _ ∉ sLocalUncutCarving d ω T := by
-  classical
-  by_contra! h
-  apply hlt.not_ge
+    (hPic : Subsingleton (CommRing.Pic ((S : Set V).integer F))) {d : ℝ} (hd : 0 ≤ d)
+    (K : Submodule ℂ (IdeleClassZeroLineSobolev F d)) (hK : IsClosed (K : Set (IdeleClassZeroLineSobolev F d)))
+    (htest : ∀ (X : ℝ) (f : sAdelePolarSubspace F S), f.val ∈ sLocalPWTests (S := S) le_rfl
+      (sLocalPWBox S X) → ∀ hf : MemLp (homogeneousAdelicTheta ω (sAdeleSchwartzToGlobal F S f.val))
+        2 (intervalSobolevMeasure μ𝔽 (logIdeleClassNorm F) 0 0 d false), hf.toLp _ ∈ K) :
+    sLocalUncutCarving d ω ∅ ≤ K := by
   rw [sLocalUncutCarving_empty_eq_globalThetaSobolev d hd ω]
-  let K := sLocalUncutCarving d ω T
-  have hK : IsClosed (K : Set (IdeleClassZeroLineSobolev F d)) := by
-    unfold K sLocalUncutCarving
-    exact Submodule.isClosed_topologicalClosure _
   have hD := globalThetaSobolev_isotype_le_closure_absLevel (F := F) (S := S) hd 0 ω hω hPic
   unfold globalAbsolutePWSobolev globalPWThetaSobolevMap at hD
   simp only [modulationWeight_zero] at hD
@@ -318,7 +309,26 @@ private theorem primaryDivisorialAbsolutePW_exists_outside_uncut {S T : Finset V
       rintro _ ⟨f, rfl⟩
       exact hg X f.val f.property _)) hc
   have hbar₀ : barrier 0 := Eq.mp (congrArg barrier (neg_zero : -(0 : ℝ) = 0)) hbar
-  apply hbar₀ le_rfl K hK
+  exact hbar₀ le_rfl K hK htest
+
+private theorem primaryDivisorialAbsolutePW_exists_outside_uncut {S T : Finset V}
+    (ω : PontryaginDual C₁) (hω : NormOneCharacterUnramifiedOutside ω S)
+    (hPic : Subsingleton (CommRing.Pic ((S : Set V).integer F)))
+    {d : ℝ} (hd : 0 ≤ d)
+    (hlt : sLocalUncutCarving d ω T < sLocalUncutCarving d ω ∅) :
+    ∃ X > (0 : ℝ), ∃ f : sAdelePolarSubspace F S,
+      f.val ∈ sLocalPWTests (S := S) le_rfl (sLocalPWBox S X) ∧
+      let g : adelePolarSubspace F := ⟨sAdeleSchwartzToGlobal F S f.val,
+        sAdeleSchwartzToGlobal_mem_polarSubspace f⟩
+      (memLp_homogeneousTheta_zeroLine d ω g).toLp _ ∉ sLocalUncutCarving d ω T := by
+  classical
+  by_contra! h
+  apply hlt.not_ge
+  let K := sLocalUncutCarving d ω T
+  have hK : IsClosed (K : Set (IdeleClassZeroLineSobolev F d)) := by
+    unfold K sLocalUncutCarving
+    exact Submodule.isClosed_topologicalClosure _
+  apply primaryDivisorialAbsolutePW_zeroLine_closure ω hω hPic hd K hK
   intro X f hf _
   let Y := max X 1
   have hXY : X ≤ Y := le_max_left _ _
@@ -981,5 +991,363 @@ theorem primaryDivisorialAbsolutePW_stage_noncollapse (S : Finset V) (k : ℕ) (
     (primaryDivisorialAbsolutePW_new_uncut_lt S k χ hχ hPic d le_rfl)
 
 end
+
+section FiniteOrbitalInterpolation
+
+/-! ### Finite orbital interpolation by polar tests
+
+A finite set of admitted orbital jets can be interpolated by polar adelic tests in
+one absolute Fourier box. The box may depend on the family. For the rational
+packet, marcopetterson gave a direct periodization argument in
+[the discussion of #7351](https://github.com/mccorvie/riemann-masullo/issues/7351#issuecomment-7147297911).
+Here finite-dimensional closed range gives interpolation over every number field.
+-/
+
+local notation "m𝔽" => (continuousIdeleClassNorm F : C𝔽 →ₜ* ℝ≥0ˣ)
+local notation "L" => logIdeleClassNorm F
+local notation "P₀" => adelePolarSubspace F
+local notation "W(" s ")" => CompactIntervalSobolev μ𝔽 L 0 0 s
+local notation "iso(" hs ", " ω ")" =>
+  actionIsotype ((hardySobolevTranslation μ𝔽 m𝔽 0 0 _ le_rfl hs).comp
+    (ideleClassNorm F).ker.subtype) ω
+local notation "res" => (⟨(ideleClassNorm F).ker.subtype, continuous_subtype_val⟩ : C₁ →ₜ* C𝔽)
+
+private theorem finitePacketTests_mono (S : Finset V) :
+    Monotone (primaryDivisorialAbsolutePWTests (F := F) S) := by
+  intro X Y h
+  apply Submodule.comap_mono
+  apply Submodule.map_mono
+  intro f hf
+  obtain ⟨g, he, hc, hg⟩ := (mem_sLocalPWTests le_rfl _ _).mp hf
+  exact (mem_sLocalPWTests le_rfl _ _).mpr ⟨g, he, hc, hg.trans (Set.preimage_mono
+    (fun _ x ↦ ⟨fun w ↦ (x.1 w).trans h, fun v ↦ (x.2 v).trans h⟩))⟩
+
+/-- Restricting a dense set of observations to finitely many coordinates loses no
+range: every subspace of the finite-dimensional target is closed. Directedness
+then puts a preimage of every coordinate vector in one level. -/
+private theorem finitePacketTests_interpolate {E H J : Type*} [AddCommGroup E] [Module ℂ E]
+    [NormedAddCommGroup H] [NormedSpace ℂ H] [Fintype J] [DecidableEq J]
+    (B : ℝ → Submodule ℂ E) (hB : Monotone B) (u : E →ₗ[ℂ] H) (I : Submodule ℂ H)
+    (hI : ∀ D : Submodule ℂ H, IsClosed (D : Set H) →
+      (∀ X, (B X).map u ≤ D) → I ≤ D)
+    (A : H →L[ℂ] (J → ℂ))
+    (hA : ∀ j : J, ∃ v ∈ I, A v = fun i ↦ if i = j then 1 else 0) :
+    ∃ X > (0 : ℝ), ∃ f : J → B X, ∀ i j, A (u (f j)) i = if i = j then 1 else 0 := by
+  let U := ⨆ X : ℝ, B X
+  let R := U.map (A.toLinearMap.comp u)
+  have hD : I ≤ R.comap A.toLinearMap := hI _ (R.isClosed_of_finiteDimensional.preimage A.continuous)
+    (fun X _ ⟨f, hf, he⟩ ↦ he ▸ ⟨f, le_iSup B X hf, rfl⟩)
+  have he (j : J) : ∃ X : ℝ, ∃ f ∈ B X, A (u f) = fun i ↦ if i = j then 1 else 0 := by
+    obtain ⟨v, hv, ha⟩ := hA j
+    obtain ⟨f, hf, he⟩ := hD hv
+    obtain ⟨X, hb⟩ := (Submodule.mem_iSup_of_directed B hB.directed_le).mp hf
+    exact ⟨X, f, hb, he.trans ha⟩
+  choose Y f hf ha using he
+  let X := 1 + ∑ j : J, |Y j|
+  have hX : 0 < X := by dsimp only [X]; positivity
+  have hYX (j : J) : Y j ≤ X := by
+    have := Finset.single_le_sum (f := fun k : J ↦ |Y k|) (fun k _ ↦ abs_nonneg _) (Finset.mem_univ j)
+    dsimp only [X]
+    linarith [le_abs_self (Y j)]
+  exact ⟨X, hX, fun j ↦ ⟨f j, hB (hYX j) (hf j)⟩, fun i j ↦ congrFun (ha j) i⟩
+
+private theorem finitePacketTests_dense (S : Finset V)
+    (hPic : Subsingleton (CommRing.Pic ((S : Set V).integer F))) (ω : PontryaginDual C₁)
+    (hω : NormOneCharacterUnramifiedOutside ω S) {d : ℝ} (hd : 0 ≤ d)
+    (u : P₀ →ₗ[ℂ] W(d)) (hu : ∀ f : P₀,
+       ((u f) : C𝔽 → ℂ) =ᵐ[μ𝔽] homogeneousAdelicTheta ω f.val) (D : Submodule ℂ W(d))
+    (hD : IsClosed (D : Set W(d)))
+    (hg : ∀ X, (primaryDivisorialAbsolutePWTests (F := F) S X).map u ≤ D) :
+    iso(hd, ω) ≤ D := by
+  have hz : sLocalUncutCarving d ω ∅ ≤ D := by
+    apply primaryDivisorialAbsolutePW_zeroLine_closure ω hω hPic hd D hD
+    intro X f hf hmem
+    let g : P₀ := ⟨sAdeleSchwartzToGlobal F S f.val, sAdeleSchwartzToGlobal_mem_polarSubspace f⟩
+    have hbox : g ∈ primaryDivisorialAbsolutePWTests (F := F) S X :=
+      Submodule.mem_map.mpr ⟨_, hf, rfl⟩
+    have he : u g = hmem.toLp _ := Lp.ext
+      (((hu g).filter_mono (withDensity_absolutelyContinuous _ _).ae_le).trans hmem.coeFn_toLp.symm)
+    exact he ▸ hg X (Submodule.mem_map.mpr ⟨g, hbox, rfl⟩)
+  rw [sLocalUncutCarving_empty_eq_globalThetaSobolev d hd ω] at hz
+  exact fun y hy ↦ hz ⟨denseRange_globalTheta_zeroLine hd y, hy⟩
+
+private theorem finitePacketTests_rows (T : Finset V) (χ : PontryaginDual C𝔽)
+    {d : ℝ} (hd : 0 ≤ d) (j : OrbitalJetIndex χ T d) :
+    ∃ A : StrongDual ℂ W(d), (∀ v : W(d), A v = spectralSobolevPairing v
+      ((orbitalJet_memLp χ T hd j).toLp _)) ∧ ∀ (v : W(d)) (f : C𝔽 → ℂ),
+      (v : C𝔽 → ℂ) =ᵐ[μ𝔽] f → A v = ∫ g, f g * spectralZeroJet χ 0 j.val.1 j.val.2 g ∂μ𝔽 := by
+  let hm : IsModulation m𝔽 := ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+  let D := (modulatedIntervalSobolev_dual m𝔽 hm μ𝔽 0 0 d le_rfl hd).exists.choose
+  let η := (orbitalJet_memLp χ T hd j).toLp _
+  let A := D.symm η
+  have hA (v : W(d)) : A v = spectralSobolevPairing v η :=
+    (spectralSobolevPairing_dual le_rfl hd (A) v).2.trans
+      (congrArg (spectralSobolevPairing v) (D.apply_symm_apply η))
+  have hη : (η : C𝔽 → ℂ) =ᵐ[μ𝔽] spectralZeroJet χ 0 j.val.1 j.val.2 := by
+    have he := (ae_withDensity_iff (orbitalJet_density_continuous (F := F) d).measurable.ennreal_ofReal).mp
+      (orbitalJet_memLp χ T hd j).coeFn_toLp
+    filter_upwards [he] with g hg
+    apply hg
+    exact (ENNReal.ofReal_pos.mpr (inv_pos.mpr (by
+      unfold intervalSobolevDensity
+      positivity))).ne'
+  exact ⟨A, hA, fun v f hf ↦ (hA v).trans (integral_congr_ae (hf.mul hη))⟩
+
+open Classical in
+/-- Paper: (11.3.1.3) and the finite rank expansion on pp. 494–496.
+For every finite set of admitted orbital jets, one finite Fourier box contains
+genuine global polar tests whose ordinary theta moments form the identity matrix.
+The box and tests are chosen before any half-twisted strip is specified.
+Reconstruction: this is finite interpolation. Coordinates outside the chosen set
+and the size of the box as the finite set grows are unrestricted. -/
+theorem primaryDivisorialAbsolutePW_finiteOrbitalLifts (S T : Finset V)
+    (hPic : Subsingleton (CommRing.Pic ((S : Set V).integer F))) (χ : PontryaginDual C𝔽)
+    (hω : NormOneCharacterUnramifiedOutside (χ.comp res) S)
+    (hχ : ∀ v ∈ T, (ideleClassNormTwist χ 0).IsUnramifiedAt v)
+    {d : ℝ} (hd : 0 ≤ d) (hcard : 2 * (T.card : ℝ) ≤ d)
+    (J : Finset (OrbitalJetIndex χ T d)) :
+    ∃ X > (0 : ℝ), ∃ f : J → primaryDivisorialAbsolutePWTests (F := F) S X,
+      ∀ i j : J, (∫ g, homogeneousAdelicTheta (χ.comp res) (f j).val.val g *
+        spectralZeroJet χ 0 i.val.val.1 i.val.val.2 g ∂μ𝔽) = if i = j then 1 else 0 := by
+  classical
+  let ω := χ.comp res
+  choose A hpair hrow using finitePacketTests_rows T χ hd
+  obtain ⟨u, hu₀⟩ := primaryDivisorialAbsolutePW_stripMap (F := F) ω 0 (le_rfl (a := (0 : ℝ))) hd
+  have hu (f : P₀) : ((u f) : C𝔽 → ℂ) =ᵐ[μ𝔽] homogeneousAdelicTheta ω f.val := by
+    simpa only [Real.rpow_zero, Complex.ofReal_one, one_mul] using hu₀ f
+  let π : W(d) →L[ℂ] (J → ℂ) := ContinuousLinearMap.pi (fun i : J ↦ A i.val)
+  let I := iso(hd, ω)
+  have he (j : J) : ∃ v ∈ I, π v = fun i ↦ if i = j then 1 else 0 := by
+    obtain ⟨x, Λ, hb, hΛ⟩ := (orbitalMarkushevichBasis χ T hd hcard hχ).2
+    let N := orbitalSobolevSubmodule F T hd ω
+    obtain ⟨v, hv⟩ := N.mkQ_surjective (x j.val)
+    refine ⟨v.val, v.property, funext fun i ↦ ?_⟩
+    change A i.val v.val = _
+    rw [hpair, ← hΛ i.val v]
+    by_cases hij : i = j
+    · subst i
+      simpa using (congrArg (Λ j.val) hv).trans (hb.1 j.val)
+    · simpa only [ite_eq_right hij] using (congrArg (Λ i.val) hv).trans
+        (hb.2.1 j.val i.val (fun h ↦ hij (Subtype.ext h.symm)))
+  obtain ⟨X, hX, f, hf⟩ := finitePacketTests_interpolate _ (finitePacketTests_mono S) u I
+    (finitePacketTests_dense S hPic ω hω hd u hu) π he
+  exact ⟨X, hX, f, fun i j ↦ (hrow i.val _ _ (hu (f j).val)).symm.trans (hf i j)⟩
+
+local notation "ξ(" t ")" => ((-(1/2) : ℂ) + (t : ℂ) * Complex.I)
+local notation "coeff(" H ", " t ", " y ")" =>
+  (∫ x : ℝ, H (x - y) * Complex.exp (ξ(t) * (x : ℂ)))
+
+private theorem finitePacketTests_translate (H : ℝ → ℂ) (t y : ℝ) :
+    coeff(H, t, y) = Complex.exp (ξ(t) * (y : ℂ)) * coeff(H, t, 0) := by
+  simp only [sub_zero]
+  rw [← integral_const_mul, ← integral_sub_right_eq_self (μ := volume)
+    (fun x : ℝ ↦ Complex.exp (ξ(t) * (y : ℂ)) * (H x * Complex.exp (ξ(t) * (x : ℂ)))) y]
+  apply integral_congr_ae
+  exact .of_forall fun x ↦ by
+    dsimp only
+    rw [mul_left_comm (Complex.exp _) (H _) _, ← Complex.exp_add]
+    congr 2
+    push_cast
+    ring
+
+local notation "block(" A ", " v ", " c ")" =>
+  (∑ i, (⟨(A i).smulRight ((c i : ℂ) • v i), smulRight_mem_nuclearEndomorphisms _ _⟩ :
+    nuclearEndomorphisms _))
+
+private theorem finitePacketTests_trace {E J : Type*} [NormedAddCommGroup E] [InnerProductSpace ℂ E]
+    [CompleteSpace E] [Fintype J] (u : J → E) (A : J → StrongDual ℂ E)
+    (hdiag : ∀ i, A i (u i) = 1) (t : J → ℝ) (H : ℝ → ℂ) (y C : ℝ)
+    (hC : ∀ i, ‖A i‖ ≤ C) :
+    let c := fun i z ↦ coeff(H, t i, z)
+    let R := block(A, u, (fun i ↦ c i y))
+    hilbertTrace R = ∑ i, c i y ∧
+      traceNorm R ≤ Real.exp (-y / 2) * C * ∑ i, ‖c i 0‖ * ‖u i‖ := by
+  intro c
+  let B (i : J) : nuclearEndomorphisms E :=
+    ⟨(A i).smulRight (c i y • u i), smulRight_mem_nuclearEndomorphisms _ _⟩
+  change hilbertTrace (∑ i, B i) = _ ∧ traceNorm (∑ i, B i) ≤ _
+  constructor
+  · obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := E)
+    rw [← htr, map_sum]
+    exact Finset.sum_congr rfl fun i _ ↦ by
+      rw [htr]
+      dsimp only [B]
+      rw [hilbertTrace_smulRight, map_smul, hdiag, smul_eq_mul, mul_one]
+  · let : Norm (nuclearEndomorphisms E) := ⟨traceNorm⟩
+    have hc := traceNorm_normedSpaceCore (H := E)
+    have h₀ : traceNorm (0 : nuclearEndomorphisms E) = 0 := (hc.norm_eq_zero_iff 0).mpr rfl
+    apply (Finset.univ.le_sum_of_subadditive traceNorm h₀.le hc.toCore.norm_triangle B).trans
+    rw [Finset.mul_sum]
+    apply Finset.sum_le_sum
+    intro i _
+    have he : ‖c i y‖ = Real.exp (-y / 2) * ‖c i 0‖ := by
+      change ‖coeff(H, t i, y)‖ = _
+      rw [finitePacketTests_translate, norm_mul, Complex.norm_exp]
+      congr 2
+      simp
+      ring
+    dsimp only [B]
+    rw [traceNorm_smulRight, norm_smul, he]
+    calc
+      _ ≤ C * (Real.exp (-y / 2) * ‖c i 0‖ * ‖u i‖) :=
+        mul_le_mul_of_nonneg_right (hC i) (by positivity)
+      _ = _ := by ring
+
+open Classical in
+/-- Paper: (11.3.1.3)–(11.3.1.4), pp. 494–496. For a finite set of order-zero
+orbital modes, choose one Fourier box and genuine tests before choosing the strip.
+On every nonnegative-width half-twisted strip the cutoff coefficient rows interpolate
+the lifted vectors. The finite diagonal operator for a translated radial probe has
+the sum of its orbital samples as trace. Its trace-norm bound decays by exactly
+the factor exp(−y/2) in the log translation y.
+Reconstruction: this estimates the finite orbital expansion. Identifying it with
+the sampled geometric shell and controlling the costs as the finite set grows
+are additional steps. See marcopetterson's first-rational-packet argument in #7351. -/
+theorem primaryDivisorialAbsolutePW_translatedFiniteTrace (S T : Finset V)
+    (hPic : Subsingleton (CommRing.Pic ((S : Set V).integer F))) (χ : PontryaginDual C𝔽)
+    (hω : NormOneCharacterUnramifiedOutside (χ.comp res) S)
+    (hχ : ∀ v ∈ T, (ideleClassNormTwist χ 0).IsUnramifiedAt v)
+    {d : ℝ} (hd : 0 ≤ d) (hcard : 2 * (T.card : ℝ) ≤ d)
+    (J : Finset (OrbitalJetIndex χ T d)) (hzero : ∀ i : J, i.val.val.2 = 0) :
+    let ω := χ.comp res
+    ∃ X > (0 : ℝ), ∃ f : J → primaryDivisorialAbsolutePWTests (F := F) S X,
+      ∀ {α s : ℝ}, 0 ≤ α → 0 ≤ s →
+      let W := CompactIntervalSobolev μ𝔽 L (-α) α s
+      ∃ (u : P₀ →ₗ[ℂ] W) (A : J → StrongDual ℂ W) (C : ℝ),
+        (∀ b, (u b : C𝔽 → ℂ) =ᵐ[μ𝔽] modulationWeight m𝔽 (1/2) (homogeneousAdelicTheta ω b.val)) ∧
+        0 ≤ C ∧ (∀ i, ‖A i‖ ≤ C) ∧
+        (∀ (i : J) (b : primaryDivisorialAbsolutePWTests (F := F) S X),
+          A i (u b.val) = ∫ g, homogeneousAdelicTheta ω b.val.val g *
+            spectralZeroJet χ 0 i.val.val.1 0 g ∂μ𝔽) ∧
+        (∀ i j : J, A i (u (f j).val) = if i = j then 1 else 0) ∧
+        ∀ (H : ℝ → ℂ) (y : ℝ), let c := fun (i : J) z ↦ coeff(H, i.val.val.1, z)
+          let R := block(A, (fun i ↦ u (f i).val), (fun i ↦ c i y))
+          hilbertTrace R = ∑ i, c i y ∧
+            traceNorm R ≤ Real.exp (-y / 2) * C * ∑ i, ‖c i 0‖ * ‖u (f i).val‖ := by
+  classical
+  intro ω
+  obtain ⟨X, hX, f, hf⟩ := primaryDivisorialAbsolutePW_finiteOrbitalLifts S T hPic χ hω hχ hd hcard J
+  refine ⟨X, hX, f, fun {α s} hα hs ↦ ?_⟩
+  intro W
+  obtain ⟨u, hu⟩ := primaryDivisorialAbsolutePW_stripMap (F := F) ω (1/2) (neg_le_self hα) hs
+  obtain ⟨B, hB, hbox⟩ := primaryDivisorialAbsolutePW_support S hPic ω hω hX
+  let b₀ := Real.log B⁻¹
+  let E := L ⁻¹' Ici b₀
+  have hE : MeasurableSet E := orbitalJet_logNorm_continuous.measurable measurableSet_Ici
+  obtain ⟨C, hC⟩ := primaryDivisorial_cutoffOrbitalJet (F := F) b₀ 0 hα hs
+  choose A hA hrow using fun i : J ↦ hC χ i.val.val.1
+  have hrep (i : J) (b : primaryDivisorialAbsolutePWTests (F := F) S X) :
+      A i (u b.val) = ∫ g, homogeneousAdelicTheta ω b.val.val g * spectralZeroJet χ 0 i.val.val.1 0 g ∂μ𝔽 := by
+    rw [hrow, ← integral_indicator hE]
+    apply integral_congr_ae
+    filter_upwards [hu b.val] with g hg
+    by_cases h : g ∈ E
+    · rw [indicator_of_mem h, hg]
+      exact fixedBoxRow_cancel χ _ 0 _ g
+    · rw [indicator_of_notMem h]
+      have hz : homogeneousAdelicTheta ω b.val.val g = 0 := not_not.mp fun hn ↦ h
+        (Real.log_le_log (inv_pos.mpr hB) (hbox b.val b.property (subset_tsupport _ hn)))
+      rw [hz, zero_mul]
+  have hdelta (i j : J) : A i (u (f j).val) = if i = j then 1 else 0 := by
+    rw [hrep, ← hzero i]
+    exact hf i j
+  have hbound (i : J) : ‖A i‖ ≤ max C 0 := (hA i).trans (le_max_left _ _)
+  exact ⟨u, A, max C 0, hu, le_max_right _ _, hbound, hrep, hdelta, fun H y ↦ finitePacketTests_trace
+    (fun i ↦ u (f i).val) A (fun i ↦ (hdelta i i).trans (ite_eq_left rfl))
+    (fun i ↦ i.val.val.1) H y (max C 0) hbound⟩
+
+section Rational
+
+local notation "Vℚ" => HeightOneSpectrum (𝓞 ℚ)
+local notation "Cℚ" => IdeleClassGroup (𝓞 ℚ) ℚ
+local notation "oneχ" => (1 : PontryaginDual Cℚ)
+local notation "freq(" v ", " n ")" => ((n : ℤ) : ℝ) * (2 * Real.pi / Real.log (Ideal.absNorm (v : Vℚ).asIdeal : ℝ))
+
+open Classical in
+/-- Paper: (11.3.1.3), p. 494. For the rational field, trivial character and
+integer indicators at all finite places, genuine tests in a common Fourier box
+interpolate any finite set of integer frequencies of a prime, including zero.
+Taking the place above 2 gives the first rational packet.
+Reconstruction: these are the order-zero entries of the finite orbital interpolation
+matrix for the rational packet discussed on pp. 494–496. -/
+theorem ratPrimaryDivisorialAbsolutePW_finiteModes (p : Vℚ) (M : Finset ℤ) :
+    ∃ X > (0 : ℝ), ∃ f : M → primaryDivisorialAbsolutePWTests (F := ℚ) ∅ X,
+      ∀ i j : M, (∫ g, homogeneousAdelicTheta 1 (f j).val.val g *
+        spectralZeroJet oneχ 0 (freq(p, i.val)) 0 g ∂ideleClassTamagawaMeasure ℚ) =
+          if i = j then 1 else 0 := by
+  classical
+  let q := (p.asIdeal.absNorm : ℝ)
+  have hq : 1 < q := by
+    dsimp only [q]
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm p
+  have hlog := Real.log_pos hq
+  have hχ : ideleClassNormTwist oneχ 0 = 1 := by
+    ext g
+    change (1 : ℂ) * _ ^ (0 : ℂ) = 1
+    simp
+  have hur : (ideleClassNormTwist oneχ 0).IsUnramifiedAt p := by
+    rw [hχ, HeckeCharacter.isUnramifiedAt_iff]
+    intro u
+    simp
+  have hv : (ideleClassNormTwist oneχ 0).localValue p = 1 := by
+    let v : Valuation (p.adicCompletion ℚ) (WithZero (Multiplicative ℤ)) := Valued.v
+    let π := Units.mk0 (v.exists_isUniformizer_of_isCyclic_of_nontrivial.choose : p.adicCompletion ℚ)
+      v.exists_isUniformizer_of_isCyclic_of_nontrivial.choose_spec.ne_zero
+    change (ideleClassNormTwist oneχ 0).restrict p π = 1
+    rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    change (1 : ℂ) * _ ^ (0 : ℂ) = 1
+    simp
+  let t (n : ℤ) := freq(p, n)
+  have hpow (n : ℤ) : (p.asIdeal.absNorm : ℂ) ^ (-((t n : ℂ) * Complex.I)) = 1 := by
+    change (q : ℂ) ^ _ = 1
+    rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (zero_lt_one.trans hq).ne'),
+      ← Complex.ofReal_log (zero_lt_one.trans hq).le]
+    convert Complex.exp_int_mul_two_pi_mul_I (-n) using 1
+    congr 1
+    change (Real.log q : ℂ) * (-((((n : ℝ) * (2 * Real.pi / Real.log q) : ℝ) : ℂ) * Complex.I)) = _
+    push_cast
+    field_simp [Complex.ofReal_ne_zero.mpr hlog.ne']
+  have hmem (n : ℤ) : 0 < spectralBoundaryMultiplicity 2
+      (orbitalEulerMultiplicity oneχ {p} ((t n : ℂ) * Complex.I)) := by
+    have hroot : (finiteHeckeEulerFactor oneχ p ((t n : ℂ) * Complex.I))⁻¹ = 0 := by
+      simp [finiteHeckeEulerFactor, hur, hv, hpow]
+    rw [orbitalEulerMultiplicity_eq_card, lt_spectralBoundaryMultiplicity]
+    exact ⟨Finset.card_pos.mpr ⟨p, Finset.mem_filter.mpr ⟨by simp, hroot⟩⟩, by norm_num⟩
+  let ι : ℤ ↪ OrbitalJetIndex oneχ {p} 2 := {
+    toFun := fun n ↦ ⟨(t n, 0), hmem n⟩
+    inj' := by
+      intro m n h
+      have ht : t m = t n := congrArg (fun z : OrbitalJetIndex oneχ {p} 2 ↦ z.val.1) h
+      have hstep : 0 < 2 * Real.pi / Real.log q := by positivity
+      exact_mod_cast (mul_right_cancel₀ hstep.ne' ht : (m : ℝ) = n) }
+  have hPic : Subsingleton (CommRing.Pic (((∅ : Finset Vℚ) : Set Vℚ).integer ℚ)) := by
+    rw [Finset.coe_empty, integer_empty]
+    let e := (Algebra.botEquivOfInjective (IsFractionRing.injective (𝓞 ℚ) ℚ)).toRingEquiv
+    let i := Rat.ringOfIntegersEquiv.symm.trans e.symm
+    let := IsPrincipalIdealRing.of_surjective i i.surjective
+    infer_instance
+  let ω := (oneχ).comp (⟨(ideleClassNorm ℚ).ker.subtype, continuous_subtype_val⟩ : _ →ₜ* Cℚ)
+  have hω : NormOneCharacterUnramifiedOutside ω ∅ :=
+    ⟨⟨1, (mem_unramifiedOutside_iff ℚ ∅ 1).mpr (fun _ _ _ ↦ rfl)⟩, fun _ ↦ rfl⟩
+  let j (n : M) : M.map ι := ⟨ι n, Finset.mem_map.mpr ⟨n.val, n.property, rfl⟩⟩
+  obtain ⟨X, hX, f, hf⟩ := primaryDivisorialAbsolutePW_finiteOrbitalLifts ∅ {p} hPic oneχ
+    hω (fun v hv ↦ Finset.mem_singleton.mp hv ▸ hur) (d := 2) (by norm_num) (by simp) (M.map ι)
+  refine ⟨X, hX, fun n ↦ f (j n), fun m n ↦ ?_⟩
+  have hω' : ω = 1 := rfl
+  have hmn : j m = j n ↔ m = n :=
+    ⟨fun h ↦ Subtype.ext (ι.injective (congrArg Subtype.val h)), congrArg j⟩
+  have he := hf (j m) (j n)
+  change (∫ g, homogeneousAdelicTheta ω (f (j n)).val.val g *
+      spectralZeroJet oneχ 0 (t m.val) 0 g ∂ideleClassTamagawaMeasure ℚ) =
+      (if j m = j n then 1 else 0) at he
+  simp only [hω', hmn, t] at he
+  convert he using 1
+  apply integral_congr_ae
+  filter_upwards [] with g
+  congr 1
+
+end Rational
+
+end FiniteOrbitalInterpolation
 
 end RiemannMasullo
