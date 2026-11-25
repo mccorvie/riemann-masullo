@@ -388,4 +388,72 @@ theorem lintegral_strip_enorm_sq_deriv_bilateralLaplace
   rw [lintegral_const_mul'' _ h3]
   ring
 
+/-- The weighted `L²` integral of the two-sided Laplace transform over the open strip, in terms
+of the original function: for a measurable weight `w` depending on the real part only,
+`∫_{|σ| < α} w σ ∫ ‖F(σ + it)‖² dt dσ = 2π ∫ ‖f x‖² (∫_{|σ| < α} w σ exp (2σx) dσ) dx`. -/
+theorem lintegral_strip_enorm_sq_bilateralLaplace
+    (hf : MemLp (fun x : ℝ ↦ Real.exp (α * |x|) • f x) 2) {w : ℝ → ℝ≥0∞} (hw : Measurable w) :
+    ∫⁻ σ in Ioo (-α) α, w σ * ∫⁻ t : ℝ, ‖bilateralLaplace f (σ + t * I)‖ₑ ^ 2 =
+      ENNReal.ofReal (2 * π) * ∫⁻ x : ℝ, ‖f x‖ₑ ^ 2 *
+        ∫⁻ σ in Ioo (-α) α, w σ * ENNReal.ofReal (Real.exp (2 * σ * x)) := by
+  have hfm := aestronglyMeasurable_of_exp_abs_smul hf.aestronglyMeasurable
+  have hφ : AEMeasurable fun x : ℝ ↦ ‖f x‖ₑ ^ 2 := hfm.eNorm.pow_const 2
+  let K : ℝ → ℝ → ℝ≥0∞ := fun σ x ↦ w σ * (ENNReal.ofReal (2 * π) *
+    (‖f x‖ₑ ^ 2 * ENNReal.ofReal (Real.exp (2 * σ * x))))
+  have hmeas (σ : ℝ) : AEMeasurable fun x : ℝ ↦
+      ‖f x‖ₑ ^ 2 * ENNReal.ofReal (Real.exp (2 * σ * x)) :=
+    hφ.mul (by fun_prop : Measurable fun x : ℝ ↦
+      ENNReal.ofReal (Real.exp (2 * σ * x))).aemeasurable
+  have hK : AEMeasurable (Function.uncurry K) ((volume.restrict (Ioo (-α) α)).prod volume) :=
+    (hw.comp measurable_fst).aemeasurable.mul (aemeasurable_const.mul
+      ((hφ.comp_quasiMeasurePreserving Measure.quasiMeasurePreserving_snd).mul
+        (by fun_prop : Measurable fun p : ℝ × ℝ ↦
+          ENNReal.ofReal (Real.exp (2 * p.1 * p.2))).aemeasurable))
+  have h1 : ∫⁻ σ in Ioo (-α) α, w σ * ∫⁻ t : ℝ, ‖bilateralLaplace f (σ + t * I)‖ₑ ^ 2 =
+      ∫⁻ σ in Ioo (-α) α, ∫⁻ x : ℝ, K σ x := by
+    refine setLIntegral_congr_fun measurableSet_Ioo fun σ hσ ↦ ?_
+    simp only [K]
+    rw [lintegral_enorm_sq_bilateralLaplace hf (abs_lt.mpr hσ),
+      lintegral_const_mul'' _ ((hmeas σ).const_mul _), lintegral_const_mul'' _ (hmeas σ)]
+  rw [h1, lintegral_lintegral_swap hK, ← lintegral_const_mul' _ _ ENNReal.ofReal_ne_top]
+  refine lintegral_congr fun x ↦ ?_
+  have h2 (σ : ℝ) : K σ x = ENNReal.ofReal (2 * π) * ‖f x‖ₑ ^ 2 *
+      (w σ * ENNReal.ofReal (Real.exp (2 * σ * x))) := by
+    simp only [K]
+    ring
+  simp_rw [h2]
+  have h3 : AEMeasurable (fun σ : ℝ ↦ w σ * ENNReal.ofReal (Real.exp (2 * σ * x)))
+      (volume.restrict (Ioo (-α) α)) :=
+    (hw.mul (by fun_prop : Measurable fun σ : ℝ ↦
+      ENNReal.ofReal (Real.exp (2 * σ * x)))).aemeasurable
+  rw [lintegral_const_mul'' _ h3]
+  ring
+
+/-- The weighted area norm of the two-sided Laplace transform on the open strip, in terms of
+the original function: with `m x = ∫_{|σ| < α} w σ exp (2σx) dσ`,
+`∫_{|σ| < α} w σ ∫ (‖F‖² + ‖F'‖²)(σ + it) dt dσ = 2π ∫ ‖f x‖² (1 + x²) m x dx`. -/
+theorem lintegral_strip_enorm_sq_add_deriv_bilateralLaplace
+    (hf : MemLp (fun x : ℝ ↦ Real.exp (α * |x|) • f x) 2) {w : ℝ → ℝ≥0∞} (hw : Measurable w) :
+    (∫⁻ σ in Ioo (-α) α, w σ * ∫⁻ t : ℝ, ‖bilateralLaplace f (σ + t * I)‖ₑ ^ 2) +
+        (∫⁻ σ in Ioo (-α) α, w σ * ∫⁻ t : ℝ, ‖deriv (bilateralLaplace f) (σ + t * I)‖ₑ ^ 2) =
+      ENNReal.ofReal (2 * π) * ∫⁻ x : ℝ, ‖f x‖ₑ ^ 2 * (ENNReal.ofReal (1 + x ^ 2) *
+        ∫⁻ σ in Ioo (-α) α, w σ * ENNReal.ofReal (Real.exp (2 * σ * x))) := by
+  have hfm := aestronglyMeasurable_of_exp_abs_smul hf.aestronglyMeasurable
+  have hφ : AEMeasurable fun x : ℝ ↦ ‖f x‖ₑ ^ 2 := hfm.eNorm.pow_const 2
+  have hm : Measurable fun x : ℝ ↦
+      ∫⁻ σ in Ioo (-α) α, w σ * ENNReal.ofReal (Real.exp (2 * σ * x)) :=
+    Measurable.lintegral_prod_right' (f := fun p : ℝ × ℝ ↦
+      w p.2 * ENNReal.ofReal (Real.exp (2 * p.2 * p.1)))
+      ((hw.comp measurable_snd).mul (by fun_prop))
+  have hA : AEMeasurable fun x : ℝ ↦ ‖f x‖ₑ ^ 2 *
+      ∫⁻ σ in Ioo (-α) α, w σ * ENNReal.ofReal (Real.exp (2 * σ * x)) :=
+    hφ.mul hm.aemeasurable
+  rw [lintegral_strip_enorm_sq_bilateralLaplace hf hw,
+    lintegral_strip_enorm_sq_deriv_bilateralLaplace hf hw, ← mul_add,
+    ← lintegral_add_left' hA]
+  congr 1
+  refine lintegral_congr fun x ↦ ?_
+  rw [ENNReal.ofReal_add zero_le_one (sq_nonneg x), ENNReal.ofReal_one]
+  ring
+
 end RiemannMasullo
