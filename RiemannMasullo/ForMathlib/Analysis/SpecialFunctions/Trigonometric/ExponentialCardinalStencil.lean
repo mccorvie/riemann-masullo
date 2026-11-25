@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Trigonometric.HyperbolicCardinal
+public import Mathlib.Order.SuccPred.Basic
 import Mathlib.Tactic.FieldSimp
 import Mathlib.Tactic.LinearCombination
 import Mathlib.Tactic.Ring
@@ -238,6 +239,64 @@ theorem cardinalHat_at_node {sites : Set ℝ} {z : ℝ} {left right : Option (Se
       have he := cardinalHat_right z left right d.property.le
       rw [hd] at he
       exact he.trans (hr.sideProfile_eq_zero (r := d) (show z + d.1 ∈ sites by rwa [hd]))
+
+section OrderedSites
+
+variable {ι : Type*} [LinearOrder ι] (t : ι → ℝ) (ht : StrictMono t)
+
+/-- Actual predecessor distance for an ordered site family, or no gap at its minimum. -/
+def leftSiteGap [PredOrder ι] (i : ι) : Option (Set.Ioi (0 : ℝ)) :=
+  if h : Order.pred i < i then some ⟨t i - t (Order.pred i), sub_pos.mpr (ht h)⟩ else none
+
+/-- Actual successor distance for an ordered site family, or no gap at its maximum. -/
+def rightSiteGap [SuccOrder ι] (i : ι) : Option (Set.Ioi (0 : ℝ)) :=
+  if h : i < Order.succ i then some ⟨t (Order.succ i) - t i, sub_pos.mpr (ht h)⟩ else none
+
+/-- The predecessor gives the nearest occupied distance on the left. -/
+theorem leftSiteGap_isNearest [PredOrder ι] (i : ι) :
+    IsNearestGap {d | t i - d.1 ∈ Set.range t} (leftSiteGap t ht i) := by
+  unfold leftSiteGap
+  split
+  next h =>
+    constructor
+    · exact ⟨Order.pred i, (sub_sub_cancel _ _).symm⟩
+    · rintro ⟨r, hpos⟩ ⟨j, hj⟩
+      change t j = t i - r at hj
+      change 0 < r at hpos
+      have hij : j < i := ht.lt_iff_lt.mp (by linarith only [hj, hpos])
+      change t i - t (Order.pred i) ≤ r
+      linarith only [ht.monotone (Order.le_pred_of_lt hij), hj]
+  next h =>
+    apply Set.eq_empty_iff_forall_notMem.mpr
+    rintro ⟨r, hpos⟩ ⟨j, hj⟩
+    change t j = t i - r at hj
+    change 0 < r at hpos
+    have hij : j < i := ht.lt_iff_lt.mp (by linarith only [hj, hpos])
+    exact h (Order.pred_lt_of_not_isMin hij.not_isMin)
+
+/-- The successor gives the nearest occupied distance on the right. -/
+theorem rightSiteGap_isNearest [SuccOrder ι] (i : ι) :
+    IsNearestGap {d | t i + d.1 ∈ Set.range t} (rightSiteGap t ht i) := by
+  unfold rightSiteGap
+  split
+  next h =>
+    constructor
+    · exact ⟨Order.succ i, (add_sub_cancel _ _).symm⟩
+    · rintro ⟨r, hpos⟩ ⟨j, hj⟩
+      change t j = t i + r at hj
+      change 0 < r at hpos
+      have hij : i < j := ht.lt_iff_lt.mp (by linarith only [hj, hpos])
+      change t (Order.succ i) - t i ≤ r
+      linarith only [ht.monotone (Order.succ_le_of_lt hij), hj]
+  next h =>
+    apply Set.eq_empty_iff_forall_notMem.mpr
+    rintro ⟨r, hpos⟩ ⟨j, hj⟩
+    change t j = t i + r at hj
+    change 0 < r at hpos
+    have hij : i < j := ht.lt_iff_lt.mp (by linarith only [hj, hpos])
+    exact h (Order.lt_succ_of_not_isMax hij.not_isMax)
+
+end OrderedSites
 
 section Vectors
 
