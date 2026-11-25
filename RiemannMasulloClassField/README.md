@@ -15,9 +15,10 @@ remark outright.
 For a finite Galois extension `L/K`, pull back finite-order characters by the relative norm
 and restrict them to the norm-one idèle classes. Each nonempty fibre of this map has exactly
 `|Gal(L/K)ᵃᵇ|` elements.
-The value is two for the splitting field of `X³ − 2`, the field in the cubic application of
+On the splitting field of `X³ − 2`, each nonempty fibre contains exactly two primitive
+Dirichlet characters across all conductors. This counts the exceptional twists in the application of
 Proposition 10.2.2.2 (pp. 446–447).
-[General fibre theorem](AngularNormPullback.lean) ·
+[General fibre theorem](AngularNormPullback.lean) · [Primitive cubic fibres](PrimitiveCubicNorm.lean) ·
 [fpet19's cubic argument](https://github.com/mccorvie/riemann-masullo/issues/7485#issuecomment-7148696977) ·
 [mlyle's cubic formalization](https://github.com/mccorvie/riemann-masullo/issues/7485#issuecomment-7149418849)
 
