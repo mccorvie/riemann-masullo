@@ -9,6 +9,7 @@ import RiemannMasullo.Ch10_TraceSpectral.Sec4a
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2b
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import all RiemannMasullo.Ch09_HardySobolev.Sec3
+import RiemannMasullo.ForMathlib.Analysis.Complex.ExpSumGrowth
 import RiemannMasullo.ForMathlib.Analysis.Complex.ExpSumUniqueness
 import Mathlib.Analysis.Calculus.BumpFunction.Normed
 
