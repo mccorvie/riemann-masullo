@@ -13184,6 +13184,110 @@ theorem idelicExplicitFormula_finiteMatching (τ : ℝ≥0ˣ →ₜ* C[F])
       tsum_mul_right, ← Complex.ofReal_tsum, hD]
     ring
 
+section FiniteCharacterPrincipalValues
+
+local notation "localConductor(" χ ", " v ")" => (sInf (conductorExponents(χ, v)) : ℕ)
+local notation "inverseCharacter(" χ ", " g ")" => ((((χ : U[F]) g)⁻¹ : Circle) : ℂ)
+
+/-- On the first-shell gap, the finite principal value has only the different and the
+unit-character conductor contributions. -/
+private theorem finitePrincipalValue_characterLogProfile_local (χ : U[F]) (H : ℝ → ℂ)
+    (hH : tsupport H ⊆ Ioo (-Real.log 2) (Real.log 2)) (v : Primes(F))
+    (b : 𝒟((v.adicCompletion F)ˣ))
+    (hb : ∀ u, b.val u = inverseCharacter(χ, finiteClassMap(v) u) * H (Real.log ‖u.val‖)) :
+    finiteWeilScale(v) * finiteConnesWeilPrincipalValue v 1 b =
+      -H 0 * (((multiplicity v.asIdeal (differentIdeal ℤ (𝓞 F)) : ℝ) * Real.log q(v) +
+        Real.log q(v) * (localConductor(χ, v) : ℝ) : ℝ) : ℂ) := by
+  let U : Set (v.adicCompletion F)ˣ := (O(v)).units
+  let : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+  have hUm : MeasurableSet U :=
+    (Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)).measurableSet
+  have hq : (2 : ℝ) ≤ q(v) := by
+    exact_mod_cast (show 2 ≤ v.asIdeal.absNorm from HeightOneSpectrum.one_lt_absNorm v)
+  have hV : V𝔭(v) ≠ 0 := by
+    rw [finiteLocalMultiplicativeTamagawaMeasure_integerUnits, ENNReal.toReal_ne_zero]
+    refine ⟨ENNReal.inv_ne_zero.mpr ENNReal.ofReal_ne_top, ENNReal.inv_ne_top.mpr ?_⟩
+    exact (ENNReal.ofReal_pos.mpr (Real.sqrt_pos.mpr (pow_pos (by linarith : 0 < q(v)) _))).ne'
+  have h1 : b.val 1 = H 0 := by simpa using hb 1
+  have hunit (u : (v.adicCompletion F)ˣ) (hu : u ∈ U) : ‖u.val‖ = 1 :=
+    Valued.toNormedField.norm_eq_one_iff.mpr
+      (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp hu)
+  have hout (u : (v.adicCompletion F)ˣ) (hu : u ∉ U) : b.val u = 0 := by
+    rw [hb, show H (Real.log ‖u.val‖) = 0 from ?_, mul_zero]
+    apply image_eq_zero_of_notMem_tsupport
+    intro ht
+    have hl := hH ht
+    rcases explicitFormula_finiteUnits_norm_shell v u hu with h | h
+    · exact (not_le_of_gt hl.2) (Real.log_le_log (by norm_num) (hq.trans h))
+    · have hc := Real.log_le_log (norm_pos_iff.mpr u.ne_zero) h
+      rw [Real.log_inv] at hc
+      exact (not_le_of_gt hl.1) (hc.trans (neg_le_neg (Real.log_le_log (by norm_num) hq)))
+  have ho : (∫ u in Uᶜ, b.val u * (Real.sqrt ‖u.val‖ : ℂ) /
+      ((‖1 - u.val‖ : ℝ) : ℂ) ∂μ𝔭(v)) = 0 :=
+    setIntegral_eq_zero_of_forall_eq_zero fun u hu ↦ by rw [hout u hu, zero_mul, zero_div]
+  have hi : (∫ u in U, (b.val u - b.val 1) * (Real.sqrt ‖u.val‖ : ℂ) /
+      ((‖1 - u.val‖ : ℝ) : ℂ) ∂μ𝔭(v)) =
+      H 0 * (-((localConductor(χ, v) : ℂ) * (V𝔭(v) : ℂ))) := by
+    calc
+      _ = ∫ u in U, H 0 * ((inverseCharacter(χ, finiteClassMap(v) u) - 1) *
+            ((Real.sqrt ‖u.val‖ : ℂ) / ((‖1 - u.val‖ : ℝ) : ℂ))) ∂μ𝔭(v) := by
+        apply setIntegral_congr_fun hUm
+        intro u hu
+        have hbu : b.val u = inverseCharacter(χ, finiteClassMap(v) u) * H 0 := by
+          rw [hb, hunit u hu, Real.log_one]
+        change (b.val u - b.val 1) * _ / _ = _
+        rw [h1, hbu]
+        ring
+      _ = _ := by rw [integral_const_mul, idelicExplicitFormula_conductorLocal_character v χ]
+  rw [(finiteConnesWeilPrincipalValue_eq_finitePart v b).2.2, ho, zero_add, hi, h1]
+  push_cast
+  field_simp [Complex.ofReal_ne_zero.mpr hV]
+  ring
+
+/-- Specializing the finite terms of Theorem B.4.4.7 (pp. 625–626) to the inverse character
+times a log-norm profile supported strictly between the first prime shells gives a finite
+sum equal to minus the value of the profile at zero times the log discriminant-conductor. -/
+theorem hasSum_finitePrincipalValues_characterLogProfile (χ : U[F]) (H : ℝ → ℂ)
+    (hH : tsupport H ⊆ Ioo (-Real.log 2) (Real.log 2))
+    (φ : 𝒟(C[F])) (hφ : ∀ g, φ.val g = inverseCharacter(χ, g) *
+      H (Real.log ((ideleClassNorm F g : ℝ≥0) : ℝ)))
+    (B : ∀ v : Primes(F), 𝒟((v.adicCompletion F)ˣ))
+    (hB : ∀ v u, (B v).val u = φ.val (finiteClassMap(v) u)) :
+    (Function.support (fun v ↦ finiteWeilScale(v) * finiteConnesWeilPrincipalValue v 1 (B v))).Finite ∧
+      HasSum (fun v ↦ finiteWeilScale(v) * finiteConnesWeilPrincipalValue v 1 (B v))
+        (-H 0 * (heckeLogDiscriminantConductor χ : ℂ)) := by
+  classical
+  have hfin := idelicExplicitFormula_finite_support φ B hB
+  refine ⟨hfin.subset (fun v hv ↦ ?_), ?_⟩
+  · change finiteConnesWeilPrincipalValue v 1 (B v) ≠ 0
+    intro hzero
+    exact hv (by simp [hzero])
+  let c (v : Primes(F)) : ℝ := Real.log q(v) * (localConductor(χ, v) : ℝ)
+  obtain ⟨n, hn, hleast⟩ := exists_heckeConductorExponents χ
+  have hcfin : (Function.support c).Finite := by
+    refine hn.subset fun v hv ↦ ?_
+    change n v ≠ 0
+    intro hzero
+    apply hv
+    simp only [c, (hleast v).csInf_eq, hzero, Nat.cast_zero, mul_zero]
+  have hc : HasSum c (∑ᶠ v, c v) := by
+    rw [← tsum_eq_finsum (L := SummationFilter.unconditional _) hcfin]
+    exact (summable_of_hasFiniteSupport hcfin).hasSum
+  obtain ⟨hd, hdval⟩ := explicitFormula_log_discr_eq_tsum (F := F)
+  have hdisc := hd.hasSum
+  rw [hdval] at hdisc
+  have hh := (Complex.hasSum_ofReal.mpr (hdisc.add hc)).mul_left (-H 0)
+  refine hh.congr_fun (fun v ↦ ?_)
+  apply finitePrincipalValue_characterLogProfile_local χ H hH v (B v)
+  intro u
+  rw [hB, hφ]
+  have hnorm : ((ideleClassNorm F (finiteClassMap(v) u) : ℝ≥0) : ℝ) = ‖u.val‖ := by
+    rw [ideleClassNorm_ofAdicCompletion]
+    rfl
+  rw [hnorm]
+
+end FiniteCharacterPrincipalValues
+
 section ExplicitFormulaRealPlace
 
 /-- At a real place, the class of a real unit has class norm its absolute value. -/
