@@ -8655,14 +8655,13 @@ unramified. These cancel the poles of the Tate factor in `Re z > -2`. On the lin
 `Re z = -1/2` the functional equation of the Gamma function gives the modulus of the product
 up to the ε-factors, which are bounded there because the conductors are bounded on a finitely
 generated group; on the line `Re z = 1/2` the Tate factor has modulus one; the bound between
-the two lines follows by Phragmén–Lindelöf. The hypothesis `hτ` is not used.
+the two lines follows by Phragmén–Lindelöf.
 Deviation: The paper states the lemma for an operator `h` on the Schwartz–Bruhat functions of
 the S-ideles (Euler operators `x^n (d/dx)^n` at the infinite places, the isomorphism of
 Lemma 4.18 at the finite places) and proves by an abstract argument that `h ∘ F` is bounded
 on weighted spaces. Here the statement is about the Mellin symbols of `h` and of `h ∘ F`. -/
 private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
-    (hτ : RightInverse τ (sIdeleQuotientNorm F T))
     (H : Subgroup (PontryaginDual.map τ).ker) (hH : H.FG) :
     ∃ (h g : H → ℂ → ℂ) (p₀ : GroupSeminorm H) (N : ℕ) (C : ℝ), 0 ≤ C ∧
       (∀ χ : H, Differentiable ℂ (h χ)) ∧
@@ -8764,7 +8763,7 @@ private theorem meyerCriticalStrip_line
   have hf'K : Hf' ≤ Hf ⊔ Hf' := le_sup_right
   refine Exists.elim
     (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier
-      T τ hτ (Hf ⊔ Hf') (hHf.sup hHf')) fun h hx ↦ ?_
+      T τ (Hf ⊔ Hf') (hHf.sup hHf')) fun h hx ↦ ?_
   refine Exists.elim hx fun g hx ↦ ?_
   refine Exists.elim hx fun p₀ hx ↦ ?_
   refine Exists.elim hx fun N hx ↦ ?_
@@ -11029,8 +11028,7 @@ private theorem meyerDecomposition_algebra
 /-- The theta Mellin transforms of a sequence with the bounds on all positive lines are a
 sum of an entire part and the reflection of an entire part. -/
 private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition
-    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
-    (hτ : RightInverse τ (sIdeleQuotientNorm F T)) (v : ℕ → ℬₛ(T))
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T) (v : ℕ → ℬₛ(T))
     (hw : ∀ f ∈ ({v,fun n ↦ sAdeleSchwartzFourier (v n)} : Set (ℕ → ℬₛ(T))),
       ∀ a : ℝ, 0 < a → ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
       (∀ χ ∉ H, ∀ n (z : ℂ), z.re = a → sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val) z) = 0) ∧
@@ -14311,7 +14309,6 @@ characters times the profiles are a bounded sequence of Schwartz functions on th
 with the values of the cutoff times the normalized theta series at the corresponding S-ideles. -/
 private theorem meyerFlatLift_arch_sum
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
-    (hτ : Function.RightInverse τ (sIdeleQuotientNorm F T))
     (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ)
     (hφb : ∀ (ν : GroupSeminorm (PontryaginDual.map τ).ker) (K : ℕ)
       (i : ↥(univ : Set ℝ) × ℕ × ℕ),
@@ -14792,7 +14789,7 @@ private theorem meyerFlatLift_tests
   obtain ⟨R, hR⟩ := hβs
   obtain ⟨k₀, hk₀⟩ := sLocalMellinSchwartzBounds_meyer_common_angular_conductor T τ H₀ hH₀
   obtain ⟨K, b, hb1, hb2⟩ := meyerFlatLift_finite_cover (F := F) T k₀ R
-  choose A hAb hAv using fun κ ↦ meyerFlatLift_arch_sum T τ hτ φ hφb β hβ hβd ⟨R, hR⟩ κ
+  choose A hAb hAv using fun κ ↦ meyerFlatLift_arch_sum T τ φ hφb β hβ hβd ⟨R, hR⟩ κ
   obtain ⟨J, hJ⟩ := archimedeanSchwartzBruhat_equiv (F := F)
   obtain ⟨e, he⟩ := sAdeleSchwartz_inductiveTensor_equiv F T
   exact meyerFlatLift_tests_of_data T τ H₀ φ hφ0 β R hR k₀ hk₀ K b hb1 hb2 A hAb hAv J hJ e he
@@ -14963,33 +14960,23 @@ Proved here from
 `sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift`
 and
 `sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition`.
-Deviation: The cases excluded by `hreal` and `hS`, the hypotheses `hk`, `hM` and `hm`, and
-what the project added in writing the paper's statement for this library are as in
-`sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles`. -/
+Deviation: The lemma needs neither of the two exclusions `hreal` and `hS` of
+`sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles`, nor its hypotheses
+`hk`, `hM` and `hm`. What the project added in writing the paper's statement for this
+library is as there. -/
 private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (hτ : RightInverse τ (sIdeleQuotientNorm F T)) (v : ℕ → ℬₛ(T))
-    (hreal : ¬ ∃ c : ℝ, 0 < c ∧ ∃ (P : ℬₛ(T) → SchwartzMap ℝ ℂ)
-      (L : SchwartzMap ℝ ℂ →L[ℂ] SLocalAdelicThetaSpace F T),
-      ∀ g, (∀ x : ℝ, P g (-x) = P g x) ∧
-        P (sAdeleSchwartzFourier g) = 𝓕 (P g) ∧
-        (sLocalAdelicTheta F T).ker.mkQ g = L (P g) ∧
-        ∀ z : ℂ, 1 < z.re → sLocalThetaMellinIntegral g (quasiCharacterNormTwist
-          (sIdeleQuotientNorm F T) (isProperMap_sIdeleQuotientNorm F T).continuous
-          (1 : SIdeleQuotient F T →ₜ* ℂ) z) = (c : ℂ) * mellin (P g) z)
-    (hS : ¬ FiniteDimensional ℂ (Submodule.span ℂ (range fun n ↦ (sLocalAdelicTheta F T).ker.mkQ (v n))))
-    (k : ℕ) (hk : ∀ g : (SAdeleRing F T)ˣ, g.val.1 = 1 →
-      (∀ w : T, Valued.v (g.val.2 w - 1) ≤ WithZero.exp (-(k+1 : ℤ))) → ∀ n,
-        (sLocalAdelicTheta F T).ker.mkQ (schwartzBruhatUnitTranslate g (v n)) = (sLocalAdelicTheta F T).ker.mkQ (v n))
-    (M : Submodule ℂ (SLocalAdelicThetaSpace F T)) (hM : IsFrechetTVS M)
-    (hm : (range fun n ↦ (sLocalAdelicTheta F T).ker.mkQ (v n)) ⊆ M)
+    (k : ℕ) (M : Submodule ℂ (SLocalAdelicThetaSpace F T))
     (hw : ∀ f ∈ ({v,fun n ↦ sAdeleSchwartzFourier (v n)} : Set (ℕ → ℬₛ(T))),
       ∀ a : ℝ, 0 < a → ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
       (∀ χ ∉ H, ∀ n (z : ℂ), z.re = a → sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val) z) = 0) ∧
       ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re = a →
         (1+p χ)^k * ‖z^m*sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val.val) z)‖ ≤ B) :
     Bornology.IsVonNBounded ℂ (range fun n ↦ (sLocalAdelicTheta F T).ker.mkQ (v n)) := by
-  refine Exists.elim (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition T τ hτ v hw) fun Φ₁ h1 ↦ Exists.elim h1 fun Φ₂ hΦ ↦ ?_
+  refine Exists.elim
+    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition
+      T τ v hw) fun Φ₁ h1 ↦ Exists.elim h1 fun Φ₂ hΦ ↦ ?_
   refine Exists.elim
     (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift
       T τ hτ Φ₁ hΦ.1 hΦ.2.2.1) fun W₁ hW₁ ↦ ?_
@@ -15040,7 +15027,9 @@ classes span a finite-dimensional space (`hS`), and the case in which they are g
 real Schwartz profiles (`hreal`; it covers ℚ with no finite place). The other direction of the
 criterion is proved in Lean as well (`sLocalMellinSchwartzBounds_meyer_general_forward`). The
 hypotheses `hk`, `hM` and `hm` follow from the bounds and are proved before this statement is
-applied. The bounds are written without derivatives, which is equivalent
+applied. The proof uses neither of the two exclusions (`hreal`, `hS`) nor `hk`, `hM` and `hm`,
+so this direction holds in all cases; the hypotheses stay because a proof does not change the
+statement. The bounds are written without derivatives, which is equivalent
 (`sLocalMellinSchwartzBounds_meyer_zeroth_iff`), and the conclusion is boundedness in the
 quotient, which is equivalent to representatives in one bounded set
 (`sLocalMellinSchwartzBounds_meyer_lift_iff_quotient_bounded`).
@@ -15075,9 +15064,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re = a →
         (1+p χ)^k * ‖z^m*sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val.val) z)‖ ≤ B) :
     Bornology.IsVonNBounded ℂ (range fun n ↦ (sLocalAdelicTheta F T).ker.mkQ (v n)) :=
-  sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines T τ hτ v hreal hS k
-    hk M hM hm
-    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip T τ hτ v hw)
+  sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines T τ hτ v k M
+    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip
+      T τ hτ v hw)
 
 /-- The real Schwartz profile criterion covers the rational empty-place stage of the inverse comparison. -/
 private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_bound (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
