@@ -63,7 +63,7 @@ private theorem pullback_isBruhatContDiff {G H : Type*}
 
 /-- Pulling a Bruhat-smooth complex function back by a continuous homomorphism
 of locally compact abelian groups preserves Bruhat smoothness. -/
-theorem isBruhatSmooth_comp_continuousMonoidHom {G H : Type*}
+theorem isBruhatSmooth_comp_continuousMonoidHom.{u_2, u_3} {G : Type u_2} {H : Type u_3}
     [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
     [CommGroup H] [TopologicalSpace H] [IsTopologicalGroup H] [T2Space H] [LocallyCompactSpace H]
     (π : G →ₜ* H) {f : H → ℂ} (hf : IsBruhatSmooth f) :
