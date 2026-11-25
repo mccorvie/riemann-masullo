@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3b
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 public import Mathlib.Analysis.SpecialFunctions.Complex.Circle
+public import Mathlib.NumberTheory.Height.NumberField
 public import Mathlib.NumberTheory.NumberField.Cyclotomic.Ideal
 public import Mathlib.NumberTheory.Real.Irrational
 public import Mathlib.RingTheory.PicardGroup
@@ -2099,6 +2100,282 @@ private theorem mixedChordBound (a b t : ℂ) (ha : ‖a‖ = 1) (hb : ‖b‖ =
     (by rw [norm_zpow, hleft, one_zpow])
   exact h.trans (add_le_add (norm_one_sub_zpow_le hleft m)
     (by simpa only [Int.cast_neg, abs_neg] using norm_one_sub_zpow_le hright (-n)))
+
+/-- Powers of a quadratic phase retain integral coordinates after multiplication
+by the corresponding power of its denominator. -/
+private theorem integer_re_quadraticPhase_zpow {z : ℂ} {s : ℝ} (D p q : ℤ) (d : ℕ)
+    (hs : s * s = (D : ℝ)) (hz : ‖z‖ = 1)
+    (hp : (d : ℝ) * z.re = (p : ℝ)) (hq : (d : ℝ) * z.im = (q : ℝ) * s) (m : ℤ) :
+    ∃ u : ℤ, (d : ℝ) ^ m.natAbs * (z ^ m).re = u := by
+  have coord (n : ℕ) : ∃ u v : ℤ, (d : ℝ) ^ n * (z ^ n).re = u ∧
+      (d : ℝ) ^ n * (z ^ n).im = (v : ℝ) * s := by
+    induction n with
+    | zero => exact ⟨1, 0, by simp, by simp⟩
+    | succ n ih =>
+      obtain ⟨u, v, hu, hv⟩ := ih
+      refine ⟨u * p - v * q * D, u * q + v * p, ?_, ?_⟩
+      · rw [pow_succ, pow_succ z, Complex.mul_re]
+        push_cast
+        calc
+          _ = ((d : ℝ) ^ n * (z ^ n).re) * ((d : ℝ) * z.re) -
+              ((d : ℝ) ^ n * (z ^ n).im) * ((d : ℝ) * z.im) := by ring
+          _ = _ := by rw [hu, hv, hp, hq, ← hs]; ring
+      · rw [pow_succ, pow_succ z, Complex.mul_im]
+        push_cast
+        calc
+          _ = ((d : ℝ) ^ n * (z ^ n).re) * ((d : ℝ) * z.im) +
+              ((d : ℝ) ^ n * (z ^ n).im) * ((d : ℝ) * z.re) := by ring
+          _ = _ := by rw [hu, hv, hp, hq]; ring
+  cases m with
+  | ofNat n =>
+    obtain ⟨u, _, hu, _⟩ := coord n
+    exact ⟨u, by simpa using hu⟩
+  | negSucc n =>
+    obtain ⟨u, _, hu, _⟩ := coord (n + 1)
+    refine ⟨u, ?_⟩
+    rw [zpow_negSucc, Complex.inv_eq_conj (by simp [norm_pow, hz]), Complex.conj_re]
+    exact hu
+
+/-- On the circle, equal real parts force equality up to conjugation. The two
+independent quadratic phases therefore have different real parts at nontrivial
+pairs of powers. -/
+private theorem quarticPhase_powers_re_ne {r s : ℤ} (hrs : r ≠ 0 ∨ s ≠ 0) :
+    (quarticPhaseU ^ r).re ≠ (quarticPhaseV ^ s).re := by
+  intro h
+  let x := quarticPhaseU ^ r
+  let y := quarticPhaseV ^ s
+  have hx : ‖x‖ = 1 := by simp [x, norm_zpow, norm_quarticPhaseU]
+  have hy : ‖y‖ = 1 := by simp [y, norm_zpow, norm_quarticPhaseV]
+  have unit {z : ℂ} (hz : ‖z‖ = 1) : z.re * z.re + z.im * z.im = 1 := by
+    simp [← Complex.normSq_apply, Complex.normSq_eq_norm_sq, hz]
+  have hre : x.re = y.re := h
+  have him : x.im = y.im ∨ x.im = -y.im := by
+    have H : (x.im - y.im) * (x.im + y.im) = 0 := by
+      nlinarith [unit hx, unit hy, congrArg (fun t : ℝ ↦ t * t) hre]
+    rcases mul_eq_zero.mp H with H | H
+    · exact Or.inl (by linarith)
+    · exact Or.inr (by linarith)
+  rcases him with he | he
+  · obtain ⟨hr, hs⟩ := quarticPhaseU_zpow_eq_quarticPhaseV_zpow (Complex.ext hre he)
+    exact hrs.elim (· hr) (· hs)
+  · have heq : x = y⁻¹ := by
+      rw [Complex.inv_eq_conj hy]
+      exact Complex.ext hre he
+    have heq' : quarticPhaseU ^ r = quarticPhaseV ^ (-s) := by simpa [zpow_neg] using heq
+    obtain ⟨hr, hs⟩ := quarticPhaseU_zpow_eq_quarticPhaseV_zpow heq'
+    exact hrs.elim (· hr) (fun hn ↦ hn (by omega))
+
+/-- Two distinct reals with denominators dividing powers of a common base have
+separation at least the reciprocal of the larger denominator. -/
+private theorem inv_pow_max_le_abs_sub {d : ℕ} (hd : 0 < d) {a b : ℝ}
+    (p q : ℕ) (ha : ∃ u : ℤ, (d : ℝ) ^ p * a = u)
+    (hb : ∃ v : ℤ, (d : ℝ) ^ q * b = v) (hne : a ≠ b) :
+    1 / (d : ℝ) ^ max p q ≤ |a - b| := by
+  let e := max p q
+  have extend {k : ℕ} {x : ℝ} (hk : k ≤ e) (hx : ∃ i : ℤ, (d : ℝ) ^ k * x = i) :
+      ∃ j : ℤ, (d : ℝ) ^ e * x = j := by
+    obtain ⟨i, hi⟩ := hx
+    refine ⟨(d : ℤ) ^ (e - k) * i, ?_⟩
+    push_cast
+    rw [← hi, ← mul_assoc, ← pow_add, Nat.sub_add_cancel hk]
+  obtain ⟨u, hu⟩ := extend (le_max_left p q) ha
+  obtain ⟨v, hv⟩ := extend (le_max_right p q) hb
+  have hpos : 0 < (d : ℝ) ^ e := by positivity
+  have hdif : (d : ℝ) ^ e * (a - b) = ((u - v : ℤ) : ℝ) := by
+    rw [mul_sub, hu, hv, Int.cast_sub]
+  have hne' : u - v ≠ 0 := by
+    intro h
+    rw [h, Int.cast_zero] at hdif
+    exact hne (sub_eq_zero.mp ((mul_eq_zero.mp hdif).resolve_left hpos.ne'))
+  have hlow : (1 : ℝ) ≤ |((u - v : ℤ) : ℝ)| := by
+    exact_mod_cast (show (1 : ℤ) ≤ |u - v| by have := abs_pos.mpr hne'; omega)
+  change 1 / (d : ℝ) ^ e ≤ _
+  apply (div_le_iff₀ hpos).mpr
+  rw [← hdif, abs_mul, abs_of_pos hpos, mul_comm] at hlow
+  exact hlow
+
+/-- Explicit separation for the independent phases above seventeen, uniform in
+all integer pairs in a finite height range. The denominator exponent retains
+the sizes of the two quadratic coordinates separately. -/
+theorem quarticPhases_mixedChord_explicit (m n : ℤ) (hmn : m ≠ 0 ∨ n ≠ 0) :
+    1 / (17 : ℝ) ^ max (2 * (m - n).natAbs) (m + n).natAbs ≤
+      ‖1 - quarticPhasePlus ^ m * quarticPhaseMinus ^ (-n)‖ := by
+  let r := m - n
+  let s := -(m + n)
+  have hrs : r ≠ 0 ∨ s ≠ 0 := by dsimp [r, s]; omega
+  have hu := integer_re_quadraticPhase_zpow (z := quarticPhaseU) (s := 1) 1 161 (-240)
+    289 (by norm_num) norm_quarticPhaseU (by norm_num [quarticPhaseU])
+    (by norm_num [quarticPhaseU]) r
+  have hv := integer_re_quadraticPhase_zpow (z := quarticPhaseV) (s := Real.sqrt 2) 2 1 12
+    17 (by rw [← sq]; norm_num) norm_quarticPhaseV (by norm_num [quarticPhaseV])
+    (by norm_num [quarticPhaseV]; ring) s
+  have hu' : ∃ u : ℤ, (17 : ℝ) ^ (2 * r.natAbs) * (quarticPhaseU ^ r).re = u := by
+    rw [pow_mul]
+    norm_num at hu ⊢
+    exact hu
+  have hbound := inv_pow_max_le_abs_sub (d := 17) (by decide) _ _ hu' hv
+    (quarticPhase_powers_re_ne hrs)
+  have hu₀ : quarticPhaseU ≠ 0 := norm_ne_zero_iff.mp (by rw [norm_quarticPhaseU]; exact one_ne_zero)
+  have hv₀ : quarticPhaseV ≠ 0 := norm_ne_zero_iff.mp (by rw [norm_quarticPhaseV]; exact one_ne_zero)
+  have heq : quarticPhasePlus ^ m * quarticPhaseMinus ^ (-n) =
+      quarticPhaseU ^ r / quarticPhaseV ^ s := by
+    simp only [quarticPhasePlus, quarticPhaseMinus, mul_zpow, div_zpow, r, s, zpow_neg,
+      zpow_sub₀ hu₀, zpow_add₀ hv₀]
+    group
+  have hdist : ‖1 - quarticPhasePlus ^ m * quarticPhaseMinus ^ (-n)‖ =
+      ‖quarticPhaseU ^ r - quarticPhaseV ^ s‖ := by
+    rw [heq, sub_div' (zpow_ne_zero s hv₀), one_mul, norm_div,
+      norm_zpow, norm_quarticPhaseV, one_zpow, div_one, norm_sub_rev]
+  rw [hdist]
+  have hle := hbound.trans (Complex.abs_re_le_norm (quarticPhaseU ^ r - quarticPhaseV ^ s))
+  simpa only [s, r, Int.natAbs_neg, Nat.cast_ofNat] using hle
+
+/-- A numeric certificate over the full coefficient diamond of radius H for
+the quartic benchmark. It uses no estimate for linear forms in logarithms. -/
+theorem quarticPhases_mixedChord_finiteHeight (H : ℕ) (m n : ℤ)
+    (hmn : m ≠ 0 ∨ n ≠ 0) (hH : m.natAbs + n.natAbs ≤ H) :
+    1 / (17 : ℝ) ^ (2 * H) ≤ ‖1 - quarticPhasePlus ^ m * quarticPhaseMinus ^ (-n)‖ := by
+  refine le_trans ?_ (quarticPhases_mixedChord_explicit m n hmn)
+  apply one_div_le_one_div_of_le (by positivity)
+  apply pow_le_pow_right₀ (by norm_num : (1 : ℝ) ≤ 17)
+  have hp := Int.natAbs_add_le m n
+  have hq := Int.natAbs_add_le m (-n)
+  rw [Int.natAbs_neg, ← sub_eq_add_neg] at hq
+  omega
+
+/-- On the coefficient diamond of radius H, at least one of the actual two
+shifted quartic Euler denominators is at least the specified rational bound. -/
+theorem quarticBenchmark_twoPlace_finiteHeight (H : ℕ) (m n : ℤ)
+    (hmn : m ≠ 0 ∨ n ≠ 0) (hH : m.natAbs + n.natAbs ≤ H) :
+    1 / ((H : ℝ) * 17 ^ (2 * H)) ≤
+      max ‖1 - quarticPoleValue quarticPhasePlus n‖ ‖1 - quarticPoleValue quarticPhaseMinus m‖ := by
+  let a := ‖1 - quarticPoleValue quarticPhasePlus n‖
+  let b := ‖1 - quarticPoleValue quarticPhaseMinus m‖
+  have h : 1 / (17 : ℝ) ^ (2 * H) ≤ |(m : ℝ)| * a + |(n : ℝ)| * b :=
+    (quarticPhases_mixedChord_finiteHeight H m n hmn hH).trans
+      (mixedChordBound _ _ _ norm_quarticPhasePlus norm_quarticPhaseMinus
+        (Circle.norm_coe quarticRotation) m n)
+  have hZ : |m| + |n| ≤ (H : ℤ) := by
+    simpa only [Int.natCast_add, Int.natCast_natAbs] using (Int.ofNat_le.mpr hH)
+  have hH' : |(m : ℝ)| + |(n : ℝ)| ≤ H := by exact_mod_cast hZ
+  have hpos : 0 < (H : ℝ) := by exact_mod_cast (show 0 < H by omega)
+  have hab : 0 ≤ max a b := (norm_nonneg _).trans (le_max_left _ _)
+  have hmax : |(m : ℝ)| * a + |(n : ℝ)| * b ≤ H * max a b := calc
+    _ ≤ |(m : ℝ)| * max a b + |(n : ℝ)| * max a b := by gcongr <;> simp
+    _ = (|(m : ℝ)| + |(n : ℝ)|) * max a b := (add_mul _ _ _).symm
+    _ ≤ _ := mul_le_mul_of_nonneg_right hH' hab
+  rw [mul_comm (H : ℝ), ← div_div]
+  exact (div_le_iff₀ hpos).mpr (by simpa [mul_comm] using h.trans hmax)
+
+private theorem embedding_norm_le_height {K : Type*} [Field K] [NumberField K]
+    (φ : K →+* ℂ) (x : K) : ‖φ x‖ ≤ Height.mulHeight₁ x := by
+  classical
+  let v := NumberField.InfinitePlace.mk φ
+  let f (w : NumberField.InfinitePlace K) := max (w x) 1 ^ w.mult
+  have h1 (w : NumberField.InfinitePlace K) : 1 ≤ f w := one_le_pow₀ (le_max_right _ _)
+  have hfinite : 1 ≤ ∏ᶠ w : NumberField.FinitePlace K, max (w x) 1 :=
+    one_le_finprod fun _ ↦ le_max_right _ _
+  rw [NumberField.mulHeight₁_eq]
+  change v x ≤ (∏ w, f w) * _
+  calc
+    _ ≤ max (v x) 1 := le_max_left _ _
+    _ ≤ f v := by
+      simpa [f] using pow_le_pow_right₀ (le_max_right (v x) 1)
+        (Nat.one_le_iff_ne_zero.mpr v.mult_ne_zero)
+    _ ≤ ∏ w, f w := by
+      rw [← Finset.mul_prod_erase Finset.univ f (Finset.mem_univ v)]
+      apply le_mul_of_one_le_right ((h1 v).trans' zero_le_one)
+      exact Finset.one_le_prod₀ fun w _ ↦ h1 w
+    _ ≤ _ := le_mul_of_one_le_right (Finset.prod_nonneg fun w _ ↦ (h1 w).trans' zero_le_one) hfinite
+
+/-- The product formula gives an unconditional lower bound at each complex
+embedding, in terms of the field degree and the multiplicative heights of both bases. -/
+theorem numberField_powerQuotient_chord_lowerBound {K : Type*} [Field K] [NumberField K]
+    (φ : K →+* ℂ) (a b : K) (m n : ℤ) (hne : a ^ m / b ^ n ≠ 1) :
+    1 / (2 ^ Module.finrank ℚ K * Height.mulHeight₁ a ^ m.natAbs *
+      Height.mulHeight₁ b ^ n.natAbs) ≤ ‖φ a ^ m / φ b ^ n - 1‖ := by
+  let x := a ^ m / b ^ n - 1
+  have hx : φ x ≠ 0 := (map_ne_zero φ).mpr (sub_ne_zero.mpr hne)
+  have h₁ := embedding_norm_le_height φ x⁻¹
+  rw [map_inv₀, norm_inv, Height.mulHeight₁_inv] at h₁
+  have h₂ : Height.mulHeight₁ x ≤ 2 ^ Module.finrank ℚ K * Height.mulHeight₁ a ^ m.natAbs *
+      Height.mulHeight₁ b ^ n.natAbs := calc
+    _ ≤ 2 ^ Height.totalWeight K * Height.mulHeight₁ (a ^ m / b ^ n) * Height.mulHeight₁ (1 : K) :=
+      Height.mulHeight₁_sub_le _ _
+    _ ≤ _ := by
+      rw [NumberField.totalWeight_eq_finrank, Height.mulHeight₁_one, mul_one, div_eq_mul_inv, mul_assoc]
+      gcongr
+      simpa only [Height.mulHeight₁_inv, Height.mulHeight₁_zpow] using
+        Height.mulHeight₁_mul_le (a ^ m) (b ^ n)⁻¹
+  have hpos : 0 < 2 ^ Module.finrank ℚ K * Height.mulHeight₁ a ^ m.natAbs * Height.mulHeight₁ b ^ n.natAbs :=
+    by positivity
+  have h := (one_div_le hpos (norm_pos_iff.mpr hx)).mpr (by simpa [one_div] using h₁.trans h₂)
+  simpa [x, map_zpow₀] using h
+
+/-- For every fixed algebraic pair (including an independent pair on the unit
+circle), the distances of nonidentity power quotients from one have a uniform
+exponential lower bound. This also bounds every finite coefficient range. -/
+theorem algebraic_powerQuotient_exponential_separation {a b : ℂ}
+    (ha : IsAlgebraic ℚ a) (hb : IsAlgebraic ℚ b) :
+    ∃ C > (0 : ℝ), ∃ B ≥ (1 : ℝ), ∀ m n : ℤ, a ^ m / b ^ n ≠ 1 →
+      C / B ^ (m.natAbs + n.natAbs) ≤ ‖a ^ m / b ^ n - 1‖ := by
+  let K := IntermediateField.adjoin ℚ ({a, b} : Set ℂ)
+  let : FiniteDimensional ℚ K := IntermediateField.finiteDimensional_adjoin_pair ha.isIntegral hb.isIntegral
+  let : NumberField K := ⟨⟩
+  let p : K := ⟨a, IntermediateField.subset_adjoin ℚ _ (by simp)⟩
+  let q : K := ⟨b, IntermediateField.subset_adjoin ℚ _ (by simp)⟩
+  let φ : K →+* ℂ := K.val.toRingHom
+  let B := max (Height.mulHeight₁ p) (Height.mulHeight₁ q)
+  have hp : Height.mulHeight₁ p ≤ B := le_max_left _ _
+  have hq : Height.mulHeight₁ q ≤ B := le_max_right _ _
+  have hB := (Height.one_le_mulHeight₁ p).trans hp
+  refine ⟨1 / (2 : ℝ) ^ Module.finrank ℚ K, by positivity, B, hB, ?_⟩
+  intro m n h
+  have hne : p ^ m / q ^ n ≠ 1 := fun e ↦ h (by simpa [φ, p, q, map_zpow₀] using congrArg φ e)
+  have H := numberField_powerQuotient_chord_lowerBound φ p q m n hne
+  refine le_trans ?_ H
+  rw [div_div, pow_add, ← mul_assoc]
+  apply one_div_le_one_div_of_le (by positivity)
+  gcongr
+
+/-- Every nonzero winding of the original three-logarithm form satisfies an
+exponential height bound. The constants are uniform in the winding integer. -/
+theorem algebraic_threeLogs_exponential_separation {a b : ℂ}
+    (ha : IsAlgebraic ℚ a) (hb : IsAlgebraic ℚ b) (ha₀ : a ≠ 0) (hb₀ : b ≠ 0) :
+    ∃ C > (0 : ℝ), ∃ B ≥ (1 : ℝ), ∀ m n k : ℤ,
+      let L := (m : ℂ) * Complex.log a - (n : ℂ) * Complex.log b - (2 * (k : ℂ)) * Complex.log (-1)
+      L ≠ 0 → C / B ^ (m.natAbs + n.natAbs) ≤ ‖L‖ := by
+  obtain ⟨C, hC, B, hB, sep⟩ := algebraic_powerQuotient_exponential_separation ha hb
+  refine ⟨min 1 (C / 2), by positivity, B, hB, ?_⟩
+  intro m n k L hn
+  have hden : 1 ≤ B ^ (m.natAbs + n.natAbs) := one_le_pow₀ hB
+  have htr : min 1 (C / 2) / B ^ (m.natAbs + n.natAbs) ≤ 1 :=
+    (div_le_self (by positivity) hden).trans (min_le_left _ _)
+  by_cases hs : ‖L‖ ≤ 1
+  · have he : Complex.exp L = a ^ m / b ^ n := by
+      dsimp [L]
+      rw [show 2 * (k : ℂ) * Complex.log (-1) = (k : ℂ) * (2 * Real.pi * Complex.I) by
+        rw [Complex.log_neg_one]; ring]
+      simp [Complex.exp_sub, Complex.exp_int_mul, Complex.exp_two_pi_mul_I,
+        Complex.exp_log ha₀, Complex.exp_log hb₀]
+    have hne : a ^ m / b ^ n ≠ 1 := by
+      intro e
+      obtain ⟨j, hj⟩ := Complex.exp_eq_one_iff.mp (he.trans e)
+      have hj₀ : j ≠ 0 := by rintro rfl; simp at hj; exact hn hj
+      have hj₁ : 1 ≤ |(j : ℝ)| := by exact_mod_cast Int.add_one_le_iff.mpr (abs_pos.mpr hj₀)
+      have hnrm := congrArg norm hj
+      simp only [norm_mul, Complex.norm_intCast, Complex.norm_real, Real.norm_eq_abs,
+        abs_of_pos Real.pi_pos, Complex.norm_I, Complex.norm_ofNat, mul_one] at hnrm
+      nlinarith [mul_le_mul_of_nonneg_right hj₁ Real.pi_pos.le, Real.pi_gt_three]
+    have hc := sep m n hne
+    rw [← he] at hc
+    have h := Complex.norm_exp_sub_one_le hs
+    calc
+      _ ≤ (C / 2) / B ^ (m.natAbs + n.natAbs) :=
+        div_le_div_of_nonneg_right (min_le_right _ _) (by positivity)
+      _ = (C / B ^ (m.natAbs + n.natAbs)) / 2 := div_right_comm _ _ _
+      _ ≤ _ := by linarith
+  · exact htr.trans (le_of_not_ge hs)
 
 /-- The principal logarithm on the unit circle is bounded by the chord length. -/
 private theorem norm_log_le_chord {w : ℂ} (hw : ‖w‖ = 1) :
