@@ -6,6 +6,7 @@ public import RiemannMasullo.Ch10_TraceSpectral.Sec3_TraceClass
 public import RiemannMasullo.AppA_AlgebraicNT.Sec5a_IdeleClassDPrime
 public import RiemannMasullo.ForMathlib.Analysis.Fourier.StripLaplace
 public import RiemannMasullo.ForMathlib.Analysis.Fourier.PositiveLaplaceEdges
+public import RiemannMasullo.Ch12_TraceGeometric.Sec4_UpperFrequencyGate
 import RiemannMasullo.Ch01_Introduction.Sec4
 import RiemannMasullo.ForMathlib.Analysis.Fourier.PositiveLocalPolar
 import RiemannMasullo.ForMathlib.Analysis.Fourier.DiscreteStripProbe
@@ -1999,6 +2000,54 @@ theorem primeFreeProfile_minPower_pos :
   intro t
   apply hstrip
   simp
+
+section UpperFrequencyGates
+
+open RationalUpperGate
+
+/-- The centered test of §12.5 gives a positive lower bound for the compensated
+rank-one defect of every normalized rational upper frequency gate at fixed spatial scale. -/
+theorem primeFreeProfile_upperGate {Q : ℝ → ℝ} (hQ : Measurable Q)
+    (hbound : ∀ u ∈ Ioc (0 : ℝ) 1, Q u ∈ Icc 0 1)
+    (hplateau : ∃ δ > 0, ∀ u ∈ Ioc 0 δ, Q u = 1) :
+    0 < rankOneDefect primeFreeProfile (fun _ ↦ 1) ∧
+    rankOneDefect primeFreeProfile (fun _ ↦ 1) +
+      (1 - 1 / Real.sqrt 2) * primeFreeProfile 0 * logLoss Q ≤
+      rankOneDefect primeFreeProfile Q + primeFreeProfile 0 * logLoss Q ∧
+    0 < rankOneDefect primeFreeProfile Q + primeFreeProfile 0 * logLoss Q := by
+  obtain ⟨hs, _, hS, heven, _, _, _, hstrip⟩ := primeFreeProfile_properties
+  apply compensated_defect_of_positive_spectrum hs hS heven _ hQ hbound hplateau
+  intro t
+  apply hstrip
+  simp
+
+private theorem primeFreeProfile_negHalfMoment :
+    (∫ x : ℝ, primeFreeProfile x * Real.exp (-x / 2)) = 0 := by
+  obtain ⟨_, _, _, _, _, _, hpolar, _⟩ := primeFreeProfile_properties
+  rw [halfMoment_eq_re_bilateralLaplace]
+  simpa only [neg_div, Complex.zero_re] using congrArg Complex.re hpolar
+
+/-- A forward translate by at least `log 2` kills the actual short test's rank-one
+gate term for every gate and its physical value at norm one. -/
+theorem primeFreeProfile_translated_upperGate (Q : ℝ → ℝ) {y : ℝ} (hy : Real.log 2 ≤ y) :
+    rankOneDefect (fun x ↦ primeFreeProfile (x - y)) Q = 0 ∧ primeFreeProfile (-y) = 0 := by
+  obtain ⟨_, _, hS, _⟩ := primeFreeProfile_properties
+  simpa only [primeFreeProfile_negHalfMoment, mul_zero] using
+    rankOneDefect_translate_of_le Q hS hy
+
+/-- At the half-width frequency gate and reciprocal spatial scale two, the chosen
+test has zero rank-one term and its total local scale correction is zero. -/
+theorem primeFreeProfile_balancedHalfGate :
+    rankOneDefect primeFreeProfile (upperStep (1/2)) = 0 ∧
+    logLoss (upperStep (1/2)) = Real.log 2 ∧
+    ∀ P : ℂ, P + ((primeFreeProfile 0 * (Real.log 2 - logLoss (upperStep (1/2))) -
+      rankOneDefect primeFreeProfile (upperStep (1/2)) : ℝ) : ℂ) = P := by
+  obtain ⟨_, _, hS, _, _, _, hpolar, _⟩ := primeFreeProfile_properties
+  obtain ⟨hD, hL⟩ := upperStep_half_of_polar (fun x hx ↦ (hS hx).1.le) hpolar
+  refine ⟨hD, hL, fun P ↦ ?_⟩
+  rw [hD, hL, sub_self, mul_zero, sub_zero, Complex.ofReal_zero, add_zero]
+
+end UpperFrequencyGates
 
 local notation "T(" χ ", " A ")" => ((normOneIdeleClassTamagawaMeasure F) univ).toReal *
   ((∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (A w)).re -
