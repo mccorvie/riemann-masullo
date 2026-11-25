@@ -16,6 +16,7 @@ public import RiemannMasullo.Ch01_Introduction.Sec4_PoissonCertificate
 public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeGreenExterior
 public import RiemannMasullo.AppB_AnalyticNT.Sec4b_BoundaryHeckeGreen
 public import RiemannMasullo.AppB_AnalyticNT.HeckeFiniteLogGreen
+public import RiemannMasullo.AppB_AnalyticNT.HeckeFiniteHardyGreen
 
 /-! # Isolated statements of §12.5
 
@@ -1525,6 +1526,46 @@ theorem exists_hasSum_absolute_exterior_le_finiteLogDifference (τ : ℝ≥0ˣ �
     ht.eventually (Ioi_mem_nhds (by linarith))
   filter_upwards [hl] with n hn
   exact hb.trans (mul_le_mul_of_nonneg_left (by linarith) (by positivity))
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. All-width exterior cancellation is equivalent to
+vanishing in the limit of one sequence of measured finite-ideal least-squares residuals per
+normalized character. The scalar-one exponent is fixed before taking that character's row limit. -/
+theorem all_widths_iff_finiteIdealResidual_tendsto_zero (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) :
+    allWidths(τ) ↔ ∀ (χ : U𝔽) (hχ : ∀ u : ℝ≥0ˣ, χ (τ u) = 1),
+      Tendsto (HeckeHardyGreen.idealResidual χ (HeckeHardyGreen.tableExponent τ hτ χ hχ)) atTop (𝓝 0) := by
+  rw [all_widths_iff_criticalLogDifference_nonpos τ hτ]
+  constructor
+  · intro h χ hχ
+    have hnon : 0 ≤ criticalLogDifference χ := (criticalLogDifference_eq_mass τ hτ χ hχ) ▸ rightGreenMass_nonneg χ
+    have hz := le_antisymm (h χ hχ) hnon
+    simpa [hz] using HeckeHardyGreen.idealResidual_tendsto τ hτ χ hχ le_rfl
+  · intro h χ hχ
+    have hid := tendsto_nhds_unique (HeckeHardyGreen.idealResidual_tendsto τ hτ χ hχ le_rfl) (h χ hχ)
+    have hexp : Real.exp (-2*criticalLogDifference χ) = 1 := by linarith
+    have hlog := congrArg Real.log hexp
+    rw [Real.log_exp,Real.log_one] at hlog
+    linarith
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. Each sufficiently late corrected Hardy table
+bounds the absolute exterior Mellin sum at the given width, including sites on its edges. -/
+theorem exists_hasSum_absolute_exterior_le_finiteHardyUpper (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) (χ : U𝔽)
+    (hχ : ∀ u : ℝ≥0ˣ, χ (τ u) = 1) {N : ℕ} (hN : HeckeHardyGreen.tableExponent τ hτ χ hχ ≤ N)
+    (φ : BruhatCompactSupport C𝔽) :
+    ∃ W : ℝ, 0 ≤ W ∧ ∀ α : ℝ, 0 < α → ∃ A : ℝ,
+      HasSum (fun z : {p : ℂ // 0 < ord(χ, p) ∧ α ≤ |p.re-1/2|} ↦
+        ‖(ord(χ, z.val) : ℂ) *
+          modulatedFourierMellin m𝔽 univ ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+            μ𝔽 φ.val (ideleClassNormTwist χ (z.val - 1/2))‖) A ∧
+      ∀ᶠ n : ℕ in atTop, HeckeHardyGreen.gridUpperArgument χ N n < 1 ∧
+        A ≤ (3 * W / (2 * α)) * (-Real.log (1 - HeckeHardyGreen.gridUpperArgument χ N n) / 2) := by
+  obtain ⟨W, hW, h⟩ := exists_hasSum_absolute_exterior_le_criticalLogDifference τ hτ χ hχ φ
+  refine ⟨W, hW, fun α hα ↦ ?_⟩
+  obtain ⟨A, hA, hb⟩ := h α hα
+  refine ⟨A, hA, ?_⟩
+  filter_upwards [(HeckeHardyGreen.grid_upper_recovers_green τ hτ χ hχ hN).1] with n hn
+  exact ⟨hn.1, hb.trans (mul_le_mul_of_nonneg_left hn.2 (by positivity))⟩
 
 end CompactGreen
 
