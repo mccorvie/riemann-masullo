@@ -15,6 +15,7 @@ import RiemannMasullo.ForMathlib.Analysis.Analytic.CauchyWindow
 public import RiemannMasullo.Ch01_Introduction.Sec4_PoissonCertificate
 public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeGreenExterior
 public import RiemannMasullo.AppB_AnalyticNT.Sec4b_BoundaryHeckeGreen
+public import RiemannMasullo.AppB_AnalyticNT.HeckeFiniteLogGreen
 
 /-! # Isolated statements of §12.5
 
@@ -1452,6 +1453,55 @@ theorem exists_hasSum_absolute_exterior_le_criticalLogDifference (τ : ℝ≥0ˣ
   rw [criticalLogDifference_eq_mass τ hτ χ hχ,
     ← (tendsto_corrected_circle_mean_rightGreenMass τ hτ χ hχ).2.limUnder_eq]
   exact exists_hasSum_absolute_exterior_le_circleLimit τ hτ χ hχ φ
+
+open LogQuadrature
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520.
+Reconstruction: the all-width exterior cancellation is equivalent to reaching every
+positive upper tolerance cofinally with the finite, pole-corrected ideal measurements. -/
+theorem all_widths_iff_cofinal_finiteLogDifference (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) :
+    allWidths(τ) ↔ ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (τ u) = 1) →
+      ∀ ε : ℝ, 0 < ε → ∀ N : ℕ, ∃ n ≥ N, finiteLogDifference χ n ≤ ε := by
+  rw [all_widths_iff_criticalLogDifference_nonpos τ hτ]
+  constructor
+  · intro h χ hχ ε hε N
+    have ht := tendsto_finiteLogDifference_criticalLogDifference τ hτ χ hχ
+    obtain ⟨n, hn, hv⟩ := ((eventually_ge_atTop N).and
+      (ht.eventually (Iio_mem_nhds ((h χ hχ).trans_lt hε)))).exists
+    exact ⟨n, hn, le_of_lt hv⟩
+  · intro h χ hχ
+    by_contra! hpos
+    have ht := tendsto_finiteLogDifference_criticalLogDifference τ hτ χ hχ
+    have hv : ∀ᶠ n : ℕ in atTop, criticalLogDifference χ / 2 < finiteLogDifference χ n :=
+      ht.eventually (Ioi_mem_nhds (by linarith))
+    obtain ⟨N, hN⟩ := eventually_atTop.1 hv
+    obtain ⟨n, hn, ha⟩ := h χ hχ (criticalLogDifference χ / 2) (by linarith) N
+    exact (hN n hn).not_ge ha
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520.
+For each normalized character and compact test, the absolute exterior sum at each
+positive width is bounded by the measured limit. With any positive tolerance, each
+sufficiently late finite table gives the same upper bound with that tolerance added. -/
+theorem exists_hasSum_absolute_exterior_le_finiteLogDifference (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) (χ : U𝔽)
+    (hχ : ∀ u : ℝ≥0ˣ, χ (τ u) = 1) (φ : BruhatCompactSupport C𝔽) :
+    ∃ W : ℝ, 0 ≤ W ∧ ∀ α : ℝ, 0 < α → ∃ A : ℝ,
+      HasSum (fun z : {p : ℂ // 0 < ord(χ, p) ∧ α ≤ |p.re-1/2|} ↦
+        ‖(ord(χ, z.val) : ℂ) *
+          modulatedFourierMellin m𝔽 univ ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+            μ𝔽 φ.val (ideleClassNormTwist χ (z.val - 1/2))‖) A ∧
+      A ≤ (3*W/(2*α)) * limUnder atTop (finiteLogDifference χ) ∧
+      ∀ ε : ℝ, 0 < ε → ∀ᶠ n : ℕ in atTop, A ≤ (3*W/(2*α)) * (finiteLogDifference χ n + ε) := by
+  obtain ⟨W, hW, h⟩ := exists_hasSum_absolute_exterior_le_criticalLogDifference τ hτ χ hχ φ
+  have ht := tendsto_finiteLogDifference_criticalLogDifference τ hτ χ hχ
+  refine ⟨W, hW, fun α hα ↦ ?_⟩
+  obtain ⟨A, hA, hb⟩ := h α hα
+  refine ⟨A, hA, ht.limUnder_eq.symm ▸ hb, fun ε hε ↦ ?_⟩
+  have hl : ∀ᶠ n : ℕ in atTop, criticalLogDifference χ - ε < finiteLogDifference χ n :=
+    ht.eventually (Ioi_mem_nhds (by linarith))
+  filter_upwards [hl] with n hn
+  exact hb.trans (mul_le_mul_of_nonneg_left (by linarith) (by positivity))
 
 end CompactGreen
 
