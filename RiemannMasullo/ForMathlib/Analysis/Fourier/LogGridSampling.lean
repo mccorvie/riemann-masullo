@@ -124,4 +124,3 @@ theorem abs_sum_sub_integral_fourthPowerLog {f : ℝ → ℝ} {p M : ℝ} {K : �
     exact hcombine.trans <| (add_le_add (hprefix n) hlast).trans (by linarith)
 
 end RiemannMasullo
-
