@@ -420,4 +420,118 @@ theorem exists_compact_polar_free_positive_laplace_strip {B : ℝ} (hB : 0 < B) 
     rw [edge B Real.pi (abs_of_pos hB), Real.cos_pi]
     exact mul_pos (by norm_num) (hpos _)
 
+
+private theorem cosineTransform_dilate (f : ℝ → ℝ) {a : ℝ} (ha : 0 < a) (t : ℝ) :
+    (∫ x : ℝ, f (a*x) * Real.cos (t*x)) =
+      a⁻¹ * ∫ x : ℝ, f x * Real.cos ((t/a)*x) := by
+  have he (x : ℝ) : t*x = (t/a)*(a*x) := by field_simp
+  simpa only [abs_of_pos (inv_pos.mpr ha), smul_eq_mul, ← he] using
+    (Measure.integral_comp_mul_left (fun x : ℝ ↦ f x * Real.cos ((t/a)*x)) a)
+
+/-- One real even polar-free test in any prescribed physical neighborhood of zero has
+positive transform on the full open strip. Its physical value at zero is positive. -/
+theorem exists_smallSupport_polarFree_positiveLaplace {B R : ℝ} (hB : 0 < B) (hR : 0 < R) :
+    ∃ H : ℝ → ℝ, ContDiff ℝ ∞ H ∧ HasCompactSupport H ∧
+      tsupport H ⊆ Ioo (-R) R ∧ (∀ x, H (-x) = H x) ∧ 0 < H 0 ∧
+      bilateralLaplace (fun x ↦ (H x : ℂ)) B = 0 ∧
+      bilateralLaplace (fun x ↦ (H x : ℂ)) (-B) = 0 ∧
+      ∀ w : ℂ, |w.re| < B → 0 < (bilateralLaplace (fun x ↦ (H x : ℂ)) w).re := by
+  obtain ⟨K, hs, hc, he, h₀, hpos⟩ := exists_compact_pos_cosineTransform
+  obtain ⟨M, hM⟩ := hc.isBounded.exists_norm_le
+  let b := |M| + 1
+  have hb : 0 < b := by dsimp [b]; positivity
+  have hMb : M < b := by dsimp [b]; linarith [le_abs_self M]
+  let k (x : ℝ) := K (b*x)
+  have hks : ContDiff ℝ ∞ k := hs.comp (contDiff_const.mul contDiff_id)
+  have hkc : HasCompactSupport k := hc.comp_homeomorph (Homeomorph.mulLeft₀ b hb.ne')
+  have hke (x : ℝ) : k (-x) = k x := by simp [k, he]
+  have hk0 : 0 < k 0 := by simpa [k] using h₀
+  have hkz {x : ℝ} (hx : 1 ≤ |x|) : k x = 0 := by
+    by_contra hn
+    have h := hM (b*x) (subset_tsupport K hn)
+    rw [Real.norm_eq_abs, abs_mul, abs_of_pos hb] at h
+    have hle := mul_le_mul_of_nonneg_left hx hb.le
+    linarith
+  have hcos (t : ℝ) : 0 < ∫ x : ℝ, k x * Real.cos (t*x) := by
+    rw [show (∫ x : ℝ, k x * Real.cos (t*x)) = _ from cosineTransform_dilate K hb t]
+    exact mul_pos (inv_pos.mpr hb) (hpos _)
+  let P (x : ℝ) := 2*k x - k (x-1) - k (x+1)
+  have hPs : ContDiff ℝ ∞ P := ((contDiff_const.mul hks).sub
+    (hks.comp (contDiff_id.sub contDiff_const))).sub (hks.comp (contDiff_id.add contDiff_const))
+  have hPc : HasCompactSupport P := ((hkc.mul_left).sub (hkc.comp_homeomorph (Homeomorph.subRight 1))).sub
+    (hkc.comp_homeomorph (Homeomorph.addRight 1))
+  have hPe (x : ℝ) : P (-x) = P x := by
+    simp only [P, show -x-1 = -(x+1) by ring, show -x+1 = -(x-1) by ring, hke]
+    ring
+  have hp0 : 0 < P 0 := by
+    simpa [P,hkz (x := -1) (by norm_num),hkz (x := 1) (by norm_num)]
+      using (mul_pos (by norm_num : (0:ℝ)<2) hk0)
+  have hPz {x : ℝ} (hx : 2 ≤ |x|) : P x = 0 := by
+    have h₁ : 1 ≤ |x-1| := by
+      have h := abs_add_le (x-1) (1:ℝ)
+      rw [sub_add_cancel,abs_one] at h
+      linarith
+    have h₂ : 1 ≤ |x+1| := by
+      have h := abs_add_le (x+1) (-1:ℝ)
+      rw [show x+1+(-1) = x by ring, abs_neg, abs_one] at h
+      linarith
+    simp [P,hkz (by linarith : 1 ≤ |x|),hkz h₁,hkz h₂]
+  let a := 4/R
+  have ha : 0 < a := div_pos (by norm_num) hR
+  let H (x : ℝ) := P (a*x) / Real.cosh (B*x)
+  have hHs : ContDiff ℝ ∞ H := (hPs.comp (contDiff_const.mul contDiff_id)).div
+    (by simp only [Real.cosh_eq]; fun_prop) (fun x ↦ (Real.cosh_pos _).ne')
+  have hHc : HasCompactSupport H := by
+    simp only [H, div_eq_mul_inv]
+    exact (hPc.comp_homeomorph (Homeomorph.mulLeft₀ a ha.ne')).mul_right
+  have hHe (x : ℝ) : H (-x) = H x := by simp [H, hPe]
+  have hHH : tsupport H ⊆ Icc (-R/2) (R/2) := by
+    apply closure_minimal _ isClosed_Icc
+    intro x hx
+    by_contra hxi
+    have hn : R/2 < |x| := by
+      by_contra! hn
+      exact hxi ⟨by linarith [(abs_le.mp hn).1], (abs_le.mp hn).2⟩
+    have hax : 2 ≤ |a*x| := by
+      rw [abs_mul,abs_of_pos ha]
+      have hmul := mul_le_mul_of_nonneg_left hn.le ha.le
+      have hea : a*(R/2) = 2 := by dsimp [a]; field_simp; norm_num
+      linarith
+    exact hx (by simp [H,hPz hax])
+  let L := bilateralLaplace (fun x ↦ (H x : ℂ))
+  have edge (r t : ℝ) (hr : |r| = B) :
+      (L ((r:ℂ) + t*Complex.I)).re = a⁻¹ * (2*(1-Real.cos (t/a)) *
+        ∫ x : ℝ, k x * Real.cos ((t/a)*x)) := by
+    have hcosh (x : ℝ) : Real.cosh (r*x) = Real.cosh (B*x) := by
+      rcases abs_eq_abs.mp (hr.trans (abs_of_pos hB).symm) with h | h
+      · rw [h]
+      · rw [h,neg_mul,Real.cosh_neg]
+    rw [show (L ((r:ℂ) + t*Complex.I)).re = _ from laplace_re_even hHs.continuous hHc hHe r t]
+    simp only [H,hcosh,div_mul_cancel₀ _ (Real.cosh_pos _).ne']
+    rw [cosineTransform_dilate P ha t, show (∫ x : ℝ, P x*Real.cos ((t/a)*x)) = _ from
+      cosine_second_difference k hks.continuous hkc (t/a)]
+  have polar (r : ℝ) (hr : |r| = B) : L r = 0 := by
+    apply Complex.ext
+    · simpa using edge r 0 hr
+    · change (∫ x : ℝ, (H x : ℂ) * Complex.exp ((r : ℂ) * x)).im = _
+      have ht : (fun x : ℝ ↦ (H x : ℂ)*Complex.exp ((r:ℂ)*x)) =
+          (fun x : ℝ ↦ ((H x*Real.exp (r*x):ℝ):ℂ)) := by funext x; push_cast; rfl
+      rw [ht,integral_complex_ofReal]
+      simp
+  refine ⟨H,hHs,hHc,hHH.trans (fun x hx ↦ ⟨by linarith [hx.1],by linarith [hx.2]⟩),hHe,
+    by simpa [H] using hp0,polar B (abs_of_pos hB),by simpa only [Complex.ofReal_neg] using polar (-B) (by simp [abs_of_pos hB]),?_⟩
+  apply bilateralLaplace_re_pos_of_nonneg_edges (Complex.continuous_ofReal.comp hHs.continuous)
+    (hHc.comp_left Complex.ofReal_zero) hB
+  · intro w hw
+    have h := edge w.re w.im hw
+    rw [Complex.re_add_im] at h
+    change 0 ≤ (L w).re
+    rw [h]
+    exact mul_nonneg (inv_pos.mpr ha).le
+      (mul_nonneg (mul_nonneg (by norm_num) (sub_nonneg.mpr (Real.cos_le_one _))) (hcos _).le)
+  · refine ⟨(B:ℂ) + ((a*Real.pi:ℝ):ℂ)*Complex.I, ?_⟩
+    change 0 < (L _).re
+    rw [edge B (a*Real.pi) (abs_of_pos hB),show a*Real.pi/a = Real.pi by field_simp,Real.cos_pi]
+    exact mul_pos (inv_pos.mpr ha) (mul_pos (by norm_num) (hcos _))
+
 end RiemannMasullo

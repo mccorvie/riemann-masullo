@@ -765,6 +765,103 @@ theorem geometricDiagonal_eq_neg_quotient (a : ℝ) {s : ℝ} (hs : 0 ≤ s)
   rw [hneg]
   exact ⟨hint.neg,(integral_neg _).trans (congrArg Neg.neg (htrace.trans (trace_eq_quotient a hs φ hQ)))⟩
 
+open Topology in
+open scoped Pointwise in
+/-- At a regular center, the averages of convolution minus the Haar kernel converge
+to the value at one minus the regular spectral value. -/
+private theorem centered_convolution_sub_of_regular (φ : BruhatCompactSupport C𝔽)
+    (K : C𝔽 × C𝔽 → ℂ) (hK : LocallyIntegrable K ((μ𝔽).prod μ𝔽))
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n))
+    (x : C𝔽) (hreg : (x,x) ∈ dSequenceRegularSet ((μ𝔽).prod μ𝔽) (fun n ↦ U n ×ˢ U n) K) :
+    dSequenceKernelSmoothening μ𝔽 U (fun p ↦ φ.val (p.1*p.2⁻¹) - K p) (x,x) - φ.val 1 =
+      -dSequenceKernelSmoothening μ𝔽 U K (x,x) := by
+  let μ := (μ𝔽).prod μ𝔽
+  let rects (n : ℕ) := U n ×ˢ U n
+  let p := (x,x)
+  let f (q : C𝔽 × C𝔽) := φ.val (q.1*q.2⁻¹)
+  obtain ⟨W, hW, hint⟩ := hK p
+  have hpre : (fun y : C𝔽 × C𝔽 ↦ p * y) ⁻¹' W ∈ 𝓝 (1 : C𝔽 × C𝔽) :=
+    (continuous_const_mul p).continuousAt.preimage_mem_nhds (by simpa only [mul_one] using hW)
+  obtain ⟨A,hA,B,hB,hAB⟩ := mem_nhds_prod_iff.mp hpre
+  obtain ⟨N,hN⟩ := hU.2 _ (inter_mem hA hB)
+  have hi : ∀ᶠ n in atTop, IntegrableOn K (p • rects n) μ := by
+    filter_upwards [eventually_ge_atTop N] with n hn
+    have hsmall := (hU.1.2.1 hn).trans hN
+    exact hint.mono_set (Set.smul_set_subset_iff.mpr ((Set.prod_mono
+      (hsmall.trans inter_subset_left) (hsmall.trans inter_subset_right)).trans hAB))
+  obtain ⟨hfi,hf⟩ := diagonal_mem_convolutionKernelRegularSet_averages hU hBorel φ x
+  obtain ⟨v,hv⟩ := hreg
+  change Tendsto (fun n ↦ dSequenceAverage μ (rects n) K p) atTop (𝓝 v) at hv
+  have hlim : Tendsto (fun n ↦ dSequenceAverage μ (rects n) (fun q ↦ f q - K q) p)
+      atTop (𝓝 (φ.val 1 - v)) := by
+    apply (hf.sub hv).congr'
+    filter_upwards [hfi,hi] with n hn hk
+    exact (setAverage_fun_sub hn hk).symm
+  have hfg : p ∈ dSequenceRegularSet μ rects (fun q ↦ f q - K q) := ⟨_,hlim⟩
+  have hg : p ∈ dSequenceRegularSet μ rects K := ⟨_,hv⟩
+  change dSequenceSmootheningOrZero μ rects (fun q ↦ f q - K q) p - φ.val 1 =
+    -dSequenceSmootheningOrZero μ rects K p
+  simp only [dSequenceSmootheningOrZero, dite_eq_left hfg, dite_eq_left hg,
+    dSequenceSmoothening, hlim.limUnder_eq, hv.limUnder_eq]
+  abel
+
+/-- Paper: Theorem 12.1.1.3, pp. 502–503. Subtracting the value of an arbitrary
+Bruhat test at one from the smoothened geometric diagonal gives an integrable
+Haar function with integral equal to the negative quotient trace. -/
+theorem geometricDiagonal_sub_atOne_eq_neg_quotient (a : ℝ) {s : ℝ} (hs : 0 ≤ s)
+    (φ : BruhatCompactSupport C𝔽) (hQ : IsNuclearOperator (Aq(a,hs,φ)))
+    (k : L²(s)) (hk : rows(s,PA(a,hs,φ),k)) (U : ℕ → Set C𝔽)
+    (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    let G (x : C𝔽) := dSequenceKernelSmoothening μ𝔽 U
+      (fun p ↦ φ.val (p.1*p.2⁻¹) - k p) (x,x) - φ.val 1
+    Integrable G μ𝔽 ∧ (∫ x, G x ∂μ𝔽) = -hilbertTrace ⟨Aq(a,hs,φ),hQ⟩ := by
+  let w := weight(s)
+  have hw : Continuous w := (continuous_intervalSobolevDensity (-(0:ℝ)) 0 s).comp (continuous_logModule' m𝔽)
+  have hp (x : C𝔽) : 0 < w x := intervalSobolevDensity_pos' _ _ _ _
+  let wNN (x : C𝔽) : ℝ≥0 := ⟨w x,(hp x).le⟩
+  have hwNN : Continuous wNN := hw.subtype_mk _
+  have hν : ν(s) = (μ𝔽).withDensity (fun x ↦ (wNN x : ℝ≥0∞)) :=
+    congrArg (μ𝔽).withDensity (funext fun x ↦ ENNReal.ofReal_eq_coe_nnreal (hp x).le)
+  let : IsLocallyFiniteMeasure (ν(s)) := sobolevKernelWeight_locallyFinite (F := F) 0 s
+  have hn := spectralProjection_convolution_nuclear (F := F) a line hs φ hQ
+  have hweighted := sobolevHilbertSchmidtKernel_of_haarRows (F := F) (PA(a,hs,φ)) k
+    (fun u ↦ (hk u).mono fun _ hx ↦ hx.2)
+  obtain ⟨hint,htrace⟩ := stripDiagonal_of_weightedKernel hU hBorel hwNN hp hν k (PA(a,hs,φ)) hn hweighted
+  let κ (p : C𝔽 × C𝔽) := (w p.2)⁻¹ • k p
+  obtain ⟨hκ,hop⟩ := hweighted
+  have hrep : κ =ᵐ[(ν(s)).prod (ν(s))] hκ.toLp κ := hκ.coeFn_toLp.symm
+  have hN : IsNuclearOperator (integralKernelOperator (ν(s)) (hκ.toLp κ)).val :=
+    (congrArg (fun T : W(s) →L[ℂ] W(s) ↦ IsNuclearOperator T) hop).mpr hn
+  have hmul : (fun p : C𝔽 × C𝔽 ↦ (w p.2 : ℂ) * κ p) = (k : C𝔽 × C𝔽 → ℂ) := by
+    funext p
+    simp only [κ, Complex.real_smul, Complex.ofReal_inv]
+    exact mul_inv_cancel_left₀ (Complex.ofReal_ne_zero.mpr (hp p.2).ne') _
+  have hμ : μ𝔽 ≤ ν(s) := by
+    calc
+      μ𝔽 = (μ𝔽).withDensity 1 := withDensity_one.symm
+      _ ≤ _ := withDensity_mono (.of_forall fun x ↦ by
+        change 1 ≤ ENNReal.ofReal (w x)
+        rw [ENNReal.one_le_ofReal]
+        simpa [w,intervalSobolevDensity] using Real.one_le_rpow
+          (le_add_of_nonneg_right (sq_nonneg (logIdeleClassNorm F x))) (by linarith : 0 ≤ s / 2))
+  have hlocκ : LocallyIntegrable κ ((μ𝔽).prod μ𝔽) :=
+    (hκ.mono_measure (Measure.prod_mono hμ hμ)).locallyIntegrable one_le_two
+  have hloc : LocallyIntegrable (k : C𝔽 × C𝔽 → ℂ) ((μ𝔽).prod μ𝔽) := by
+    rw [← hmul]
+    have hcont : Continuous (fun p : C𝔽 × C𝔽 ↦ (w p.2 : ℂ)) :=
+      Complex.continuous_ofReal.comp (hw.comp continuous_snd)
+    simpa only [smul_eq_mul] using hlocκ.continuous_smul hcont
+  have hreg := dSequenceKernelSmoothening_mul_continuous_snd_diagonal hU hBorel hwNN hp hν
+    hrep hN (fun x ↦ (w x : ℂ)) (Complex.continuous_ofReal.comp hw)
+  rw [hmul] at hreg
+  have hae : (fun x : C𝔽 ↦ dSequenceKernelSmoothening μ𝔽 U
+      (fun p ↦ φ.val (p.1*p.2⁻¹) - k p) (x,x) - φ.val 1) =ᵐ[μ𝔽]
+      fun x ↦ -dSequenceKernelSmoothening μ𝔽 U k (x,x) :=
+    hreg.mono fun x hx ↦ centered_convolution_sub_of_regular φ k hloc U hU hBorel x hx.1
+  exact ⟨hint.neg.congr hae.symm,
+    (integral_congr_ae hae).trans ((integral_neg _).trans
+      (congrArg Neg.neg (htrace.trans (trace_eq_quotient a hs φ hQ))))⟩
+
 end OutputProjectedLine
 
 section ExteriorZerosGRH
