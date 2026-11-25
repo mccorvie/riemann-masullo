@@ -3831,7 +3831,7 @@ theorem globalIdelicZFunction_poles (f : ℬ[F]) (χ : U[F]) :
       (meromorphicOrderAt_add ((hE.analyticAt x).meromorphicAt.add (hP x)) (hQ x))
 
 /-- Product decomposition of the class Haar measure for a section of the norm. -/
-private theorem classTamagawa_normProduct (σ : ℝ≥0ˣ → C[F]) (hσ : Continuous σ)
+theorem classTamagawa_normProduct (σ : ℝ≥0ˣ → C[F]) (hσ : Continuous σ)
     (hr : RightInverse σ (ideleClassNorm F)) :
     (positiveRealHaar.prod (normOneIdeleClassTamagawaMeasure F)).map
       (fun p : ℝ≥0ˣ × (ideleClassNorm F).ker ↦ σ p.1 * p.2.val) = ideleClassTamagawaMeasure F := by

@@ -1741,7 +1741,7 @@ private theorem exists_schwartzBruhat_pullback {A B : Type*} [CommGroup A] [Comm
 omit hm hE hμ₁ hρ hi hd hcomm in
 /-- On the Schwartz–Bruhat space, multiplication by a unitary character is
 conjugate to translation on the dual via the Fourier transform. -/
-private theorem exists_schwartzBruhat_characterEquiv (η : PontryaginDual G) :
+theorem exists_schwartzBruhat_characterEquiv (η : PontryaginDual G) :
     ∃ M : S ≃L[ℂ] S, ∀ (f : S) (x : G), M f x = (η x : ℂ) * f x := by
   let μ : Measure G := Measure.haar
   have : μ.IsHaarMeasure := inferInstanceAs ((Measure.haar (G := G)).IsHaarMeasure)

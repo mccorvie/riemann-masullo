@@ -76,15 +76,6 @@ Deviation: The probes have carriers in a fixed universe `u`. -/
 def IsKClosed (s : Set X) : Prop :=
   ∀ (K : CompHaus.{u}) (g : C(K, X)), IsClosed (g ⁻¹' s)
 
-/-- Paper: Definition E.1.1.1(2), p. 828.
-Mathlib's compactly generated topology on the original carrier is the coarsest topology
-in which every k-closed subset is closed.
-Deviation: The probes have carriers in a fixed universe `u`. -/
-theorem isCoarsest_compactlyGenerated :
-    IsGreatest {t : TopologicalSpace X | ∀ s : Set X, IsKClosed.{u} s → IsClosed[t] s}
-      (TopologicalSpace.compactlyGenerated.{u} X) := by
-  sorry
-
 /-- Paper: Remark E.1.1.2(1), p. 828.
 The identity from the k-topology to the original topology is continuous.
 Deviation: The k-topology uses probes in universe `u`. -/
@@ -100,6 +91,28 @@ theorem isClosed_compactlyGenerated_iff (s : Set X) :
     IsClosed[TopologicalSpace.compactlyGenerated.{u} X] s ↔ IsKClosed.{u} s := by
   rw [TopologicalSpace.compactlyGenerated, isClosed_coinduced, isClosed_sigma_iff]
   exact ⟨fun h K g => h ⟨K, g⟩, fun h i => h i.1 i.2⟩
+
+/-- Paper: Definition E.1.1.1(2), p. 828.
+Mathlib's compactly generated topology on the original carrier is the coarsest topology
+in which every k-closed subset of the original space is closed.
+Deviation: The probes have carriers in a fixed universe `u`. The k-closed subsets are those of
+the original topology `tX`, written explicitly: inside the set of candidate topologies the
+candidate is the instance Lean would otherwise use. An earlier Lean statement made that slip
+and was false (`isCoarsest_compactlyGenerated_candidateProbes_false` in `Sec1a_Printed.lean`,
+#7528, which also found this proof). -/
+theorem isCoarsest_compactlyGenerated :
+    IsGreatest
+      {t : TopologicalSpace X | ∀ s : Set X, @IsKClosed.{u, w} X tX s → IsClosed[t] s}
+      (@TopologicalSpace.compactlyGenerated.{u, w} X tX) := by
+  have key (s : Set X) :
+      IsClosed[@TopologicalSpace.compactlyGenerated.{u, w} X tX] s ↔ @IsKClosed.{u, w} X tX s :=
+    isClosed_compactlyGenerated_iff s
+  refine ⟨fun s hs => (key s).2 hs, fun t' ht => ?_⟩
+  rw [TopologicalSpace.le_def]
+  intro s hs
+  have hc : IsClosed[@TopologicalSpace.compactlyGenerated.{u, w} X tX] sᶜ :=
+    (@isClosed_compl_iff X (@TopologicalSpace.compactlyGenerated.{u, w} X tX) s).2 hs
+  exact (@isClosed_compl_iff X t' s).1 (ht sᶜ ((key sᶜ).1 hc))
 
 /-- Paper: Lemma E.1.1.3(1), p. 828.
 A function out of the space is continuous exactly when its composites with all compact
