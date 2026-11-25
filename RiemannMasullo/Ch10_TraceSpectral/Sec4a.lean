@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec3
+public import RiemannMasullo.Ch10_TraceSpectral.Sec3_Nuclear
 public import Mathlib.Analysis.Normed.Module.Bases
 public import Mathlib.Analysis.Normed.Module.DoubleDual
 public import Mathlib.Algebra.Order.Archimedean.Basic

@@ -552,10 +552,12 @@ private theorem globalLineSpectralKernel_diagonal_setup (_ha : 0 < a) :
   exact ⟨hloc_spec, hae⟩
 
 open scoped Pointwise in
-private theorem ae_diagonal_globalLineGeometricKernel_eq_sub (_ha : 0 < a) :
-    ∀ᵐ x ∂μ𝔽, (x, x) ∈ regular(kgeom) ∧ diagonal(kgeom) x = φ.val 1 - diagonal(kspec) x := by
-  obtain ⟨hloc_spec, hae_spec⟩ :=
-    globalLineSpectralKernel_diagonal_setup hU hBorel a hs φ _ha
+private theorem ae_diagonal_convolution_sub (K : C𝔽 × C𝔽 → ℂ)
+    (hloc_spec : LocallyIntegrable K ((μ𝔽).prod μ𝔽))
+    (hae_spec : ∀ᵐ x ∂μ𝔽, (x, x) ∈ regular(K)) :
+    let L := fun p ↦ convKernel(φ) p - K p
+    ∀ᵐ x ∂μ𝔽, (x, x) ∈ regular(L) ∧ diagonal(L) x = φ.val 1 - diagonal(K) x := by
+  intro L
   have rectSeq [m : MeasurableSpace (C𝔽 × C𝔽)] (hm : m = borel _)
       (η : Measure (C𝔽 × C𝔽)) [η.IsHaarMeasure]
       (hrect : ∀ v w : Set C𝔽, MeasurableSet v → MeasurableSet w →
@@ -565,36 +567,89 @@ private theorem ae_diagonal_globalLineGeometricKernel_eq_sub (_ha : 0 < a) :
     exact IsDPrimeSequence.prod hrect hU hU
   have hseq : IsDPrimeSequence ((μ𝔽).prod μ𝔽) (fun n ↦ U n ×ˢ U n) :=
     rectSeq BorelSpace.measurable_eq _ (fun v w _ _ ↦ Measure.prod_prod v w)
-  filter_upwards [hae_spec] with x ⟨hxreg, _⟩
+  filter_upwards [hae_spec] with x hxreg
   obtain ⟨hconv_int, hconv_lim⟩ := diagonal_mem_convolutionKernelRegularSet_averages hU hBorel φ x
   obtain ⟨W, hW, hiW⟩ := hloc_spec (x, x)
   have hpre : (fun y : C𝔽 × C𝔽 ↦ (x, x) * y) ⁻¹' W ∈ 𝓝 (1 : C𝔽 × C𝔽) :=
     (continuous_const.mul continuous_id).continuousAt.preimage_mem_nhds (by simpa using hW)
   obtain ⟨N, hN⟩ := hseq.2 _ hpre
-  have hspec_int : ∀ᶠ n in atTop, IntegrableOn kspec ((x, x) • (U n ×ˢ U n)) ((μ𝔽).prod μ𝔽) := by
+  have hspec_int : ∀ᶠ n in atTop, IntegrableOn K ((x, x) • (U n ×ˢ U n)) ((μ𝔽).prod μ𝔽) := by
     filter_upwards [eventually_ge_atTop N] with n hn
     exact hiW.mono_set (Set.smul_set_subset_iff.mpr fun _ hy ↦ hN (hseq.1.2.1 hn hy))
   obtain ⟨v, hv⟩ := hxreg
-  have hreg0 : (x, x) ∈ regular(kspec) := ⟨v, hv⟩
-  have hv_eq : dSequenceKernelSmoothening μ𝔽 U kspec (x, x) = v := by
+  have hreg0 : (x, x) ∈ regular(K) := ⟨v, hv⟩
+  have hv_eq : dSequenceKernelSmoothening μ𝔽 U K (x, x) = v := by
     simpa only [dSequenceKernelSmoothening, dSequenceSmootheningOrZero, dite_eq_left hreg0,
       dSequenceSmoothening] using hv.limUnder_eq
   have hsub_avg : ∀ᶠ n in atTop,
-      dSequenceAverage ((μ𝔽).prod μ𝔽) (U n ×ˢ U n) kgeom (x, x) =
+      dSequenceAverage ((μ𝔽).prod μ𝔽) (U n ×ˢ U n) L (x, x) =
         dSequenceAverage ((μ𝔽).prod μ𝔽) (U n ×ˢ U n) convKernel(φ) (x, x) -
-          dSequenceAverage ((μ𝔽).prod μ𝔽) (U n ×ˢ U n) kspec (x, x) := by
+          dSequenceAverage ((μ𝔽).prod μ𝔽) (U n ×ˢ U n) K (x, x) := by
     filter_upwards [hconv_int, hspec_int] with n h1 h2
     exact setAverage_fun_sub h1 h2
-  have hlim : Tendsto (fun n ↦ dSequenceAverage ((μ𝔽).prod μ𝔽) (U n ×ˢ U n) kgeom (x, x))
+  have hlim : Tendsto (fun n ↦ dSequenceAverage ((μ𝔽).prod μ𝔽) (U n ×ˢ U n) L (x, x))
       atTop (𝓝 (φ.val 1 - v)) :=
     (hconv_lim.sub hv).congr' (hsub_avg.mono fun _ h ↦ h.symm)
-  have hreg_g : (x, x) ∈ regular(kgeom) := ⟨φ.val 1 - v, hlim⟩
+  have hreg_g : (x, x) ∈ regular(L) := ⟨φ.val 1 - v, hlim⟩
   refine ⟨hreg_g, ?_⟩
-  change dSequenceKernelSmoothening μ𝔽 U kgeom (x, x) =
-    φ.val 1 - dSequenceKernelSmoothening μ𝔽 U kspec (x, x)
   rw [hv_eq]
   simpa only [dSequenceKernelSmoothening, dSequenceSmootheningOrZero, dite_eq_left hreg_g,
     dSequenceSmoothening] using hlim.limUnder_eq
+
+open scoped Pointwise in
+private theorem ae_diagonal_globalLineGeometricKernel_eq_sub (_ha : 0 < a) :
+    ∀ᵐ x ∂μ𝔽, (x, x) ∈ regular(kgeom) ∧ diagonal(kgeom) x = φ.val 1 - diagonal(kspec) x := by
+  obtain ⟨hloc, hreg⟩ := globalLineSpectralKernel_diagonal_setup hU hBorel a hs φ _ha
+  exact ae_diagonal_convolution_sub hU hBorel φ kspec hloc (hreg.mono fun _ h ↦ h.1)
+
+/-- Paper: Theorems 12.1.1.2–3, pp. 499–502. Let a nuclear operator have weighted
+Hilbert–Schmidt kernel κ for dν = w dμ. Subtracting its Haar kernel w(y)κ(x,y) from a
+convolution kernel and centering the smoothed diagonal at the test value gives a Haar
+integrable function with integral minus the nuclear trace. -/
+theorem integral_centered_convolution_sub_weightedKernel_diagonal
+    {ν : Measure C𝔽} [IsFiniteMeasureOnCompacts ν] [ν.InnerRegular] {w : C𝔽 → ℝ≥0}
+    (hw : Continuous w) (hp : ∀ x, 0 < w x) (hν : ν = (μ𝔽).withDensity (fun x ↦ ↑(w x)))
+    (K : C𝔽 × C𝔽 → ℂ) (T : Lp ℂ 2 ν →L[ℂ] Lp ℂ 2 ν) (hT : IsNuclearOperator T)
+    (hk : let κ := fun p : C𝔽 × C𝔽 ↦ ((w p.2 : ℝ)⁻¹ : ℝ) • K p
+      ∃ h : MemLp κ 2 (ν.prod ν), (integralKernelOperator ν (h.toLp κ)).val = T) :
+    let D := diagonal(fun p ↦ convKernel(φ) p - K p)
+    Integrable (fun x ↦ D x - φ.val 1) μ𝔽 ∧
+      (∫ x, D x - φ.val 1 ∂μ𝔽) = -hilbertTrace (H := Lp ℂ 2 ν) ⟨T, hT⟩ := by
+  intro D
+  let κ (p : C𝔽 × C𝔽) := ((w p.2 : ℝ)⁻¹ : ℝ) • K p
+  have hκ : κ =ᵐ[ν.prod ν] hk.choose.toLp κ := hk.choose.coeFn_toLp.symm
+  have hN : IsNuclearOperator (integralKernelOperator ν (hk.choose.toLp κ)).val :=
+    (congrArg (fun A : Lp ℂ 2 ν →L[ℂ] Lp ℂ 2 ν ↦ IsNuclearOperator A) hk.choose_spec).mpr hT
+  have hK (p : C𝔽 × C𝔽) : K p = (w p.2 : ℂ) * κ p := by
+    change K p = (w p.2 : ℂ) * (((w p.2 : ℝ)⁻¹ : ℝ) • K p)
+    rw [Complex.real_smul, Complex.ofReal_inv,
+      mul_inv_cancel_left₀ (Complex.ofReal_ne_zero.mpr (NNReal.coe_pos.mpr (hp p.2)).ne')]
+  have hwC : Continuous (fun x ↦ (w x : ℂ)) :=
+    Complex.continuous_ofReal.comp (NNReal.continuous_coe.comp hw)
+  have hloc : LocallyIntegrable K ((μ𝔽).prod μ𝔽) := by
+    rw [funext hK]
+    have hcont : Continuous (fun p : C𝔽 × C𝔽 ↦ (w p.2 : ℂ)) := hwC.comp continuous_snd
+    simpa only [smul_eq_mul] using
+      (locallyIntegrable_of_weighted_memLp_prod_sec1b hκ hw hp hν).continuous_smul hcont
+  have hdiag := dSequenceKernelSmoothening_mul_continuous_snd_diagonal hU hBorel hw hp hν hκ hN
+    (fun x ↦ (w x : ℂ)) hwC
+  rw [← funext hK] at hdiag
+  have hsub := ae_diagonal_convolution_sub hU hBorel φ K hloc (hdiag.mono fun _ h ↦ h.1)
+  have heq : (fun x ↦ D x - φ.val 1) =ᵐ[μ𝔽] fun x ↦ -(w x • diagonal(κ) x) := by
+    filter_upwards [hsub, hdiag] with x hx hKx
+    calc
+      D x - φ.val 1 = (φ.val 1 - diagonal(K) x) - φ.val 1 := congrArg (· - φ.val 1) hx.2
+      _ = -diagonal(K) x := by abel
+      _ = -((w x : ℂ) * diagonal(κ) x) := congrArg Neg.neg hKx.2
+      _ = -(w x • diagonal(κ) x) := congrArg Neg.neg (Complex.real_smul ..).symm
+  obtain ⟨hi, ht⟩ := integral_dSequenceKernelSmoothening_diagonal hκ hU hBorel hw hp hν hN
+  rw [hν, integrable_withDensity_iff_integrable_smul hw.measurable] at hi
+  have hwInt : (∫ x, w x • diagonal(κ) x ∂μ𝔽) = ∫ x, diagonal(κ) x ∂ν := by
+    rw [hν, integral_withDensity_eq_integral_smul hw.measurable]
+  have htrace : hilbertTrace ⟨(integralKernelOperator ν (hk.choose.toLp κ)).val, hN⟩ =
+      hilbertTrace (H := Lp ℂ 2 ν) ⟨T, hT⟩ := congrArg hilbertTrace (Subtype.ext hk.choose_spec)
+  exact ⟨hi.neg.congr heq.symm, (integral_congr_ae heq).trans
+    ((integral_neg _).trans (congrArg Neg.neg (hwInt.trans (ht.trans htrace))))⟩
 
 /-- Paper: Theorem 12.1.1.3(1), p. 502. The diagonal of the global spectral
 kernel is regular for Haar-almost every center.
