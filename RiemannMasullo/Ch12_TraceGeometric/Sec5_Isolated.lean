@@ -230,370 +230,6 @@ theorem traceFormula_exteriorZeros_of_signedWidthComparison (τ : ℝ≥0ˣ →�
 
 end HeckeWidthJump
 
-/-! ### Positive edge probes vanishing on norm-one classes
-
-The compact positive cosine transform supplies a numerator with a scaled
-second-derivative correction. Its radial lift gives the sign hypothesis
-of the preceding comparison, including for the principal character. -/
-
-section PositiveEdgeProbes
-
-open Complex Filter Function
-open scoped ContDiff NNReal NumberField.AdeleRing Topology
-
-private theorem cosine_deriv (f : ℝ → ℝ) (hs : ContDiff ℝ (∞) f)
-    (hc : HasCompactSupport f) (t : ℝ) :
-    ∫ x, deriv f x * Real.cos (t*x) = t * ∫ x, f x * Real.sin (t*x) := by
-  have hI : Integrable (fun x ↦ f x * Real.cos (t*x)) :=
-    (hs.continuous.mul (by fun_prop)).integrable_of_hasCompactSupport hc.mul_right
-  have hD : Integrable (fun x ↦ deriv f x * Real.cos (t*x)) :=
-    ((hs.continuous_deriv (by simp)).mul (by fun_prop)).integrable_of_hasCompactSupport hc.deriv.mul_right
-  have hS : Integrable (fun x ↦ f x * Real.sin (t*x)) :=
-    (hs.continuous.mul (by fun_prop)).integrable_of_hasCompactSupport hc.mul_right
-  have hprod (x : ℝ) : HasDerivAt (fun y ↦ f y * Real.cos (t*y))
-      (deriv f x * Real.cos (t*x) - t*(f x * Real.sin (t*x))) x := by
-    convert ((hs.differentiable (by simp) x).hasDerivAt.mul
-      ((Real.hasDerivAt_cos (t*x)).comp x ((hasDerivAt_id x).const_mul t))) using 1
-    · rfl
-    · dsimp
-      ring
-  have hz := integral_eq_zero_of_hasDerivAt_of_integrable hprod (hD.sub (hS.const_mul t)) hI
-  rw [integral_sub hD (hS.const_mul t), integral_const_mul] at hz
-  exact sub_eq_zero.mp hz
-
-private theorem sine_deriv (f : ℝ → ℝ) (hs : ContDiff ℝ (∞) f)
-    (hc : HasCompactSupport f) (t : ℝ) :
-    ∫ x, deriv f x * Real.sin (t*x) = -(t * ∫ x, f x * Real.cos (t*x)) := by
-  have hI : Integrable (fun x ↦ f x * Real.sin (t*x)) :=
-    (hs.continuous.mul (by fun_prop)).integrable_of_hasCompactSupport hc.mul_right
-  have hD : Integrable (fun x ↦ deriv f x * Real.sin (t*x)) :=
-    ((hs.continuous_deriv (by simp)).mul (by fun_prop)).integrable_of_hasCompactSupport hc.deriv.mul_right
-  have hC : Integrable (fun x ↦ f x * Real.cos (t*x)) :=
-    (hs.continuous.mul (by fun_prop)).integrable_of_hasCompactSupport hc.mul_right
-  have hprod (x : ℝ) : HasDerivAt (fun y ↦ f y * Real.sin (t*y))
-      (deriv f x * Real.sin (t*x) + t*(f x * Real.cos (t*x))) x := by
-    convert ((hs.differentiable (by simp) x).hasDerivAt.mul
-      ((Real.hasDerivAt_sin (t*x)).comp x ((hasDerivAt_id x).const_mul t))) using 1
-    · rfl
-    · dsimp
-      ring
-  have hz := integral_eq_zero_of_hasDerivAt_of_integrable hprod (hD.add (hC.const_mul t)) hI
-  rw [integral_add hD (hC.const_mul t), integral_const_mul] at hz
-  exact eq_neg_of_add_eq_zero_left hz
-
-private theorem secondDeriv_even (K : ℝ → ℝ) (hs : ContDiff ℝ (∞) K) (he : ∀ x, K (-x) = K x)
-    (x : ℝ) : deriv (deriv K) (-x) = deriv (deriv K) x := by
-  have hD (x : ℝ) := (hs.differentiable (by simp) x).hasDerivAt
-  have hD' (x : ℝ) := ((contDiff_infty_iff_deriv.mp hs).2.differentiable (by simp) x).hasDerivAt
-  have hodd (x : ℝ) : deriv K (-x) = -deriv K x := by
-    have h := (hD (-x)).comp x (hasDerivAt_neg x)
-    change HasDerivAt (fun y ↦ K (-y)) _ x at h
-    simp_rw [he] at h
-    simpa using (congrArg Neg.neg (hD x |>.unique h)).symm
-  have h := (hD' (-x)).comp x (hasDerivAt_neg x)
-  change HasDerivAt (fun y ↦ deriv K (-y)) _ x at h
-  simp_rw [hodd] at h
-  simpa using ((hD' x).neg.unique h).symm
-
-/-- From a compact, smooth, even kernel having positive value at the origin and strictly
-positive cosine transform, produce a compact smooth even numerator vanishing at the origin
-whose cosine transform is positive outside any prescribed interval about zero. -/
-private theorem exists_stripEdgeNumerator_of_kernel (K : ℝ → ℝ) (hs : ContDiff ℝ (∞) K)
-    (hc : HasCompactSupport K) (he : ∀ x, K (-x) = K x) (h0 : 0 < K 0)
-    (hF : ∀ t : ℝ, 0 < ∫ x, K x * Real.cos (t*x)) {δ : ℝ} (hδ : 0 < δ) :
-    ∃ u : ℝ → ℝ, ContDiff ℝ (∞) u ∧ HasCompactSupport u ∧ (∀ x, u (-x) = u x) ∧
-      u 0 = 0 ∧ ∀ t : ℝ, δ ≤ |t| → 0 < ∫ x, u x * Real.cos (t*x) := by
-  let c := -(deriv (deriv K) 0)/K 0
-  let U (x : ℝ) := -(deriv (deriv K) x) - c*K x
-  have hsd : ContDiff ℝ (∞) (deriv K) := (contDiff_infty_iff_deriv.mp hs).2
-  have hsdd : ContDiff ℝ (∞) (deriv (deriv K)) := (contDiff_infty_iff_deriv.mp hsd).2
-  have hsU : ContDiff ℝ (∞) U := hsdd.neg.sub (contDiff_const.mul hs)
-  have hcU : HasCompactSupport U := hc.deriv.deriv.neg.sub hc.mul_left
-  have heU (x : ℝ) : U (-x) = U x := by simp [U, he, secondDeriv_even K hs he]
-  have hU0 : U 0 = 0 := by dsimp [U, c]; field_simp; ring
-  have hU (t : ℝ) : ∫ x, U x * Real.cos (t*x) = (t^2-c) * ∫ x, K x * Real.cos (t*x) := by
-    have hI (g : ℝ → ℝ) (hg : Continuous g) (hc : HasCompactSupport g) :
-        Integrable (fun x ↦ g x * Real.cos (t*x)) :=
-      (hg.mul (by fun_prop)).integrable_of_hasCompactSupport hc.mul_right
-    simp only [U, sub_mul, neg_mul, mul_assoc]
-    rw [integral_sub (f := fun x ↦ -(deriv (deriv K) x * Real.cos (t*x)))
-      (g := fun x ↦ c*(K x * Real.cos (t*x)))
-      (hI _ hsdd.continuous hc.deriv.deriv).neg ((hI _ hs.continuous hc).const_mul c),
-      integral_neg, integral_const_mul]
-    rw [cosine_deriv _ hsd hc.deriv, sine_deriv K hs hc]
-    ring
-  let R := (|c|+1)/δ
-  have hR : 0 < R := by dsimp [R]; positivity
-  refine ⟨fun x ↦ U (x/R), hsU.comp (by fun_prop), ?_, ?_, by simpa using hU0, ?_⟩
-  · simpa only [Function.comp_def, Homeomorph.coe_mulRight₀, div_eq_mul_inv] using
-      hcU.comp_homeomorph (Homeomorph.mulRight₀ R⁻¹ (inv_ne_zero hR.ne'))
-  · intro x
-    simpa only [neg_div] using heU (x/R)
-  · intro t ht
-    have hscale : (∫ x, U (x/R) * Real.cos (t*x)) = R * ∫ x, U x * Real.cos ((R*t)*x) := by
-      convert Measure.integral_comp_div (fun x : ℝ ↦ U x * Real.cos ((R*t)*x)) R using 1
-      · apply integral_congr_ae
-        filter_upwards with x
-        congr 2
-        field_simp
-      · simp [abs_of_pos hR, smul_eq_mul]
-    rw [hscale, hU]
-    apply mul_pos hR (mul_pos _ (hF _))
-    have hRT : |c| + 1 ≤ |R*t| := by
-      rw [abs_mul, abs_of_pos hR]
-      calc
-        _ = R*δ := by dsimp [R]; field_simp
-        _ ≤ _ := mul_le_mul_of_nonneg_left ht hR.le
-    nlinarith [sq_abs (R*t), sq_nonneg (|R*t| - 1), le_abs_self c]
-
-/-- A radial test which removes the hyperbolic cosine in the real moment on either edge. -/
-private def stripEdgeProfile (u : ℝ → ℝ) (b t₀ x : ℝ) : ℂ :=
-  (u x / Real.cosh (b*x) : ℝ) * Complex.exp (-(t₀ : ℂ) * Complex.I * x)
-
-private theorem stripEdgeProfile_support {u : ℝ → ℝ} (hc : HasCompactSupport u) (b t₀ : ℝ) :
-    HasCompactSupport (stripEdgeProfile u b t₀) := by
-  apply hc.mono
-  intro x hx hz
-  exact hx (by simp [stripEdgeProfile, hz])
-
-/-- The test attached to a compact smooth numerator is a compact smooth radial test, and
-vanishes at zero when the numerator does. -/
-private theorem stripEdgeProfile_admissible {u : ℝ → ℝ} (hu : ContDiff ℝ (∞) u)
-    (hc : HasCompactSupport u) (hz : u 0 = 0) (b t₀ : ℝ) :
-    ContDiff ℝ (∞) (stripEdgeProfile u b t₀) ∧ HasCompactSupport (stripEdgeProfile u b t₀) ∧
-      stripEdgeProfile u b t₀ 0 = 0 := by
-  refine ⟨?_, stripEdgeProfile_support hc b t₀, by simp [stripEdgeProfile, hz]⟩
-  unfold stripEdgeProfile
-  have hcosh (x : ℝ) : Real.cosh (b*x) ≠ 0 := (Real.cosh_pos _).ne'
-  have hquot : ContDiff ℝ (∞) (fun x ↦ u x / Real.cosh (b*x)) :=
-    hu.div (by simp_rw [Real.cosh_eq]; fun_prop) hcosh
-  exact (Complex.ofRealCLM.contDiff.comp hquot).mul
-    (Complex.contDiff_exp.comp (contDiff_const.mul Complex.ofRealCLM.contDiff))
-
-private theorem stripEdgeProfile_integrand (u : ℝ → ℝ) (b r t₀ γ x : ℝ) :
-    (stripEdgeProfile u b t₀ x * Complex.exp (((r : ℂ) + (γ : ℂ)*Complex.I) * x)).re =
-      u x / Real.cosh (b*x) * Real.exp (r*x) * Real.cos ((γ-t₀)*x) := by
-  rw [stripEdgeProfile, mul_assoc, ← Complex.exp_add]
-  rw [Complex.re_ofReal_mul, Complex.exp_re]
-  simp only [Complex.add_re, Complex.add_im, Complex.mul_re, Complex.mul_im, Complex.neg_re,
-    Complex.neg_im, Complex.ofReal_re, Complex.ofReal_im, Complex.I_re, Complex.I_im]
-  ring_nf
-
-private theorem stripEdgeProfile_symm (u : ℝ → ℝ) (hu : Continuous u) (hc : HasCompactSupport u)
-    (he : ∀ x, u (-x) = u x) (b t : ℝ) :
-    ∫ x, u x / Real.cosh (b*x) * Real.exp (b*x) * Real.cos (t*x) =
-      ∫ x, u x * Real.cos (t*x) := by
-  let f (r x : ℝ) := u x / Real.cosh (b*x) * Real.exp (r*x) * Real.cos (t*x)
-  have hint (r : ℝ) : Integrable (f r) := by
-    apply Continuous.integrable_of_hasCompactSupport
-    · dsimp [f]
-      have hcosh (x : ℝ) : Real.cosh (b*x) ≠ 0 := (Real.cosh_pos _).ne'
-      fun_prop (disch := first | exact hcosh | exact hcosh _)
-    · apply hc.mono
-      intro x hx hz
-      exact hx (by simp [f, hz])
-  have heq : (∫ x, f (-b) x) = ∫ x, f b x := by
-    conv_rhs => rw [← integral_neg_eq_self (f b) volume]
-    apply integral_congr_ae
-    filter_upwards with x
-    simp [f, he, neg_mul, mul_neg]
-  have hsum : (∫ x, f b x) + (∫ x, f (-b) x) = 2 * ∫ x, u x * Real.cos (t*x) := by
-    rw [← integral_add (hint _) (hint _), ← integral_const_mul]
-    apply integral_congr_ae
-    filter_upwards with x
-    dsimp [f]
-    have h0 := (Real.cosh_pos (b*x)).ne'
-    rw [neg_mul]
-    have hsumexp : Real.exp (b*x) + Real.exp (-(b*x)) = 2 * Real.cosh (b*x) := by
-      rw [Real.cosh_eq]
-      ring
-    calc
-      _ = u x / Real.cosh (b*x) * Real.cos (t*x) *
-          (Real.exp (b*x) + Real.exp (-(b*x))) := by ring
-      _ = _ := by rw [hsumexp]; field_simp
-  rw [heq] at hsum
-  change (∫ x, f b x) = _
-  linarith
-
-/-- At either edge the real Mellin value is the same cosine transform. No symmetry of
-the zero ordinates, or of the character defining the angular component, is required. -/
-private theorem stripEdgeProfile_moment_re (u : ℝ → ℝ) (hu : Continuous u) (hc : HasCompactSupport u)
-    (he : ∀ x, u (-x) = u x) (b r t₀ γ : ℝ) (hr : r = b ∨ r = -b) :
-    (∫ x, stripEdgeProfile u b t₀ x * Complex.exp (((r : ℂ) + (γ : ℂ)*Complex.I) * x)).re =
-      ∫ x, u x * Real.cos ((γ-t₀)*x) := by
-  have h0 (x : ℝ) : Real.cosh (b*x) ≠ 0 := (Real.cosh_pos _).ne'
-  have hI : Integrable (fun x ↦ stripEdgeProfile u b t₀ x *
-      Complex.exp (((r : ℂ) + (γ : ℂ)*Complex.I) * x)) := by
-    apply Continuous.integrable_of_hasCompactSupport
-    · unfold stripEdgeProfile
-      fun_prop (disch := first | exact h0 | exact h0 _)
-    · exact (stripEdgeProfile_support hc b t₀).mul_right
-  change RCLike.re (∫ x, stripEdgeProfile u b t₀ x * _) = _
-  rw [← integral_re hI]
-  change (∫ x, (stripEdgeProfile u b t₀ x * _).re) = _
-  simp_rw [stripEdgeProfile_integrand]
-  rcases hr with h | h
-  · rw [h]
-    exact stripEdgeProfile_symm u hu hc he b (γ-t₀)
-  · rw [h]
-    simpa only [neg_mul, Real.cosh_neg] using stripEdgeProfile_symm u hu hc he (-b) (γ-t₀)
-
-/-- Given any gap around a chosen ordinate, the same smooth compact radial probe
-vanishes at zero and has strictly positive real transform at every remaining
-ordinate on either vertical edge. -/
-private theorem exists_positiveStripEdgeProfile {δ : ℝ} (hδ : 0 < δ) (b t₀ : ℝ) :
-    ∃ H : ℝ → ℂ, ContDiff ℝ (∞) H ∧ HasCompactSupport H ∧ H 0 = 0 ∧
-      ∀ r γ : ℝ, (r = b ∨ r = -b) → δ ≤ |γ-t₀| →
-        0 < (bilateralLaplace H ((r : ℂ) + (γ : ℂ)*Complex.I)).re := by
-  obtain ⟨K, hs, hc, he, h0, hF⟩ := exists_compact_pos_cosineTransform
-  obtain ⟨u, hus, huc, hue, hu0, huF⟩ :=
-    exists_stripEdgeNumerator_of_kernel K hs hc he h0 hF hδ
-  obtain ⟨hhs, hhc, hh0⟩ := stripEdgeProfile_admissible hus huc hu0 b t₀
-  refine ⟨stripEdgeProfile u b t₀, hhs, hhc, hh0, fun r γ hedge hgap ↦ ?_⟩
-  rw [bilateralLaplace, stripEdgeProfile_moment_re u hus.continuous huc hue b r t₀ γ hedge]
-  exact huF _ hgap
-
-private theorem logTest_mellin (H : ℝ → ℂ) (s : ℂ) :
-    introTraceMellin (fun r ↦ H (Real.log r)) s = bilateralLaplace H s := by
-  rw [introTraceMellin, mellin, ← integral_comp_exp, bilateralLaplace]
-  apply integral_congr_ae
-  filter_upwards with x
-  simp only [Real.log_exp, Complex.real_smul, smul_eq_mul]
-  rw [Complex.cpow_def_of_ne_zero (by exact_mod_cast (Real.exp_pos x).ne'),
-    ← Complex.ofReal_log (Real.exp_pos x).le, Real.log_exp, Complex.ofReal_exp,
-    ← mul_assoc, ← Complex.exp_add, mul_comm]
-  congr 1
-  ring_nf
-
-
-set_option quotPrecheck false
-attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorelSpaceSec1
-  instIdeleClassT2Sec1 instIdeleClassLocallyCompactSec1 instIdeleClassSecondCountableSec1
-  instIdeleClassHaarMeasureSec1
-
-variable {F : Type*} [Field F] [NumberField F]
-local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
-local notation "ord(" χ ", " z ")" =>
-  MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ z
-local notation "vol₁" => ((normOneIdeleClassTamagawaMeasure F) univ).toReal
-local notation "M(" φ ", " χ ", " z ")" => modulatedFourierMellin
-  (continuousIdeleClassNorm F) univ
-  ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
-  (ideleClassTamagawaMeasure F) (φ : BruhatCompactSupport C𝔽).val
-  (ideleClassNormTwist (F := F) χ ((z : ℂ) - 1/2))
-
-private theorem exists_ordinate_gap (χ : PontryaginDual C𝔽) (R : ℝ) :
-    ∃ t δ : ℝ, 0 < δ ∧ ∀ z : ℂ, 0 < ord(χ,z) → |z.re| ≤ R → δ ≤ |z.im - t| := by
-  let D := MeromorphicOn.divisor (continuedCompletedHeckeL χ) univ
-  let K := Metric.closedBall (0 : ℂ) (R + 2) ∩ (fun z ↦ D z).support
-  have hloc : LocallyFiniteSupport (fun z ↦ D z) :=
-    fun z ↦ D.supportLocallyFiniteWithinDomain z (mem_univ z)
-  have hfin : (Complex.im '' K).Finite :=
-    (hloc.finite_inter_support_of_isCompact (isCompact_closedBall _ _)).image _
-  obtain ⟨t, ht, hnot⟩ := (Ioo_infinite (zero_lt_one : (0:ℝ) < 1)).exists_notMem_finite hfin
-  obtain ⟨η, hη, hball⟩ := Metric.isOpen_iff.mp hfin.isClosed.isOpen_compl t hnot
-  refine ⟨t, min 1 η, lt_min zero_lt_one hη, fun z hz hR ↦ ?_⟩
-  by_contra! hsmall
-  have hsmall₁ := abs_lt.mp (hsmall.trans_le (min_le_left 1 η))
-  have him : |z.im| ≤ 2 := abs_le.mpr ⟨by linarith [ht.1, hsmall₁.1],
-    by linarith [ht.2, hsmall₁.2]⟩
-  have hnear : z.im ∈ Metric.ball t η := by
-    rw [Metric.mem_ball, Real.dist_eq]
-    exact hsmall.trans_le (min_le_right 1 η)
-  apply hball hnear
-  refine ⟨z, ⟨?_, hz.ne'⟩, rfl⟩
-  rw [Metric.mem_closedBall, dist_zero_right]
-  exact (Complex.norm_le_abs_re_add_abs_im _).trans (add_le_add hR him)
-
-private theorem normOneVolume_pos : 0 < vol₁ := by
-  rw [normOneIdeleClassTamagawaMeasure_volume]
-  have := NumberField.Units.regulator_pos F
-  have := NumberField.classNumber_pos F
-  have := NumberField.Units.torsionOrder_pos F
-  have : (0 : ℝ) < Real.sqrt (Int.natAbs (NumberField.discr F) : ℝ) :=
-    Real.sqrt_pos.mpr (by exact_mod_cast Int.natAbs_pos.mpr (NumberField.discr_ne_zero F))
-  exact (ENNReal.toReal_pos (ENNReal.ofReal_pos.mpr (by positivity)).ne' ENNReal.ofReal_ne_top)
-
-/-- A real-positive transform at every actual zero of either specified edge in one
-character is attained by a genuine compact Bruhat test vanishing on norm-one classes. -/
-theorem exists_heckePositiveStripEdgeTest (χ : PontryaginDual C𝔽) (b : ℝ) :
-    ∃ φ : BruhatCompactSupport C𝔽, (∀ g : (ideleClassNorm F).ker, φ.val g = 0) ∧
-      ∀ z : ℂ, 0 < ord(χ,z) → |z.re - 1/2| = b → 0 < (M(φ,χ,z)).re := by
-  obtain ⟨t, δ, hδ, hg⟩ := exists_ordinate_gap χ (|b| + 1)
-  obtain ⟨H, hs, hc, h₀, hedge⟩ := exists_positiveStripEdgeProfile hδ b t
-  obtain ⟨φ, hφ⟩ := exists_characterNormTest (F := F) χ⁻¹ H hs hc
-  let f (r : ℝ) := H (Real.log r)
-  have htest (g : C𝔽) : φ.val g = introTraceTest χ f g := by
-    rw [hφ g, introTraceTest]
-    rw [show χ⁻¹ g = (χ g)⁻¹ from rfl, Circle.coe_inv_eq_conj]
-    rfl
-  refine ⟨φ, ?_, fun z hz hb ↦ ?_⟩
-  · intro g
-    simp only [hφ, show ideleClassNorm F g.val = 1 from g.property,
-      Units.val_one, NNReal.coe_one, Real.log_one, h₀, mul_zero]
-  have hside : z.re-1/2 = b ∨ z.re-1/2 = -b := by
-    rcases le_total 0 (z.re-1/2) with h | h
-    · rw [abs_of_nonneg h] at hb
-      exact Or.inl hb
-    · exact Or.inr (by rw [abs_of_nonpos h] at hb; linarith)
-  have hR : |z.re| ≤ |b| + 1 := calc
-    |z.re| = |(z.re - 1/2) + 1/2| := by ring_nf
-    _ ≤ |z.re - 1/2| + |(1/2:ℝ)| := abs_add_le _ _
-    _ ≤ |b| + 1 := by rw [hb]; norm_num; linarith [le_abs_self b]
-  have hh := hedge (z.re-1/2) z.im hside (hg z hz hR)
-  have hw : (((z.re-1/2 : ℝ) : ℂ) + (z.im : ℂ)*Complex.I) = z - 1/2 := by
-    apply Complex.ext <;> simp
-  rw [hw] at hh
-  have hm : introTraceMellin f (z-1/2) = bilateralLaplace H (z-1/2) := by
-    exact logTest_mellin H (z-1/2)
-  have hf := (introTraceTest_mellin χ f φ htest (z-1/2)).2
-  simp only [modulatedFourierMellin, relativeVerticalStrip, Set.preimage_univ, Set.indicator_univ]
-  rw [hf, hm, Complex.re_ofReal_mul]
-  exact mul_pos (normOneVolume_pos (F := F)) hh
-
-/-- One compact, norm-one-vanishing probe of the chosen character and edge radius
-for the signed-width comparison in Theorem 12.5.1.1, pp. 519–520. -/
-def heckePositiveStripEdgeProbe (χ : PontryaginDual C𝔽) (b : ℝ) : BruhatCompactSupport C𝔽 :=
-  (exists_heckePositiveStripEdgeTest χ b).choose
-
-/-- The chosen probe is admissible at the identity and has strictly positive real
-Mellin value at every occupied site of the two prescribed strip edges. -/
-theorem heckePositiveStripEdgeProbe_spec (χ : PontryaginDual C𝔽) (b : ℝ) :
-    (∀ g : (ideleClassNorm F).ker, (heckePositiveStripEdgeProbe χ b).val g = 0) ∧
-    ∀ z : ℂ, 0 < ord(χ,z) → |z.re - 1/2| = b →
-      0 < (M(heckePositiveStripEdgeProbe χ b,χ,z)).re :=
-  (exists_heckePositiveStripEdgeTest χ b).choose_spec
-
-local notation "edgeChars(" τ ")" => {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1}
-local notation "edgeSites(" χ ")" => {z : ℂ // 0 < ord(χ,z)}
-local notation "edgeExterior(" τ ", " α ")" => {p : edgeChars(τ) × ℂ //
-  0 < ord(p.1.val,p.2) ∧ α ≤ |p.2.re - 1/2|}
-local notation "edgeOff(" z ")" => ((z : ℂ).re - 1/2)
-local notation "edgeOrder(" χ ", " z ")" => (ord(χ, (z : ℂ))).toNat
-local notation "edgeReal(" χ ", " b ", " z ")" =>
-  (M(heckePositiveStripEdgeProbe χ b,χ,z)).re
-
-/-- Paper: Theorem 12.5.1.1, pp. 519–520. The indicated one-sided comparison on
-a concrete norm-one-vanishing probe for each character and candidate radius gives
-the exterior-zero formula. The comparison is the remaining hypothesis. -/
-theorem traceFormula_exteriorZeros_of_positiveEdgeProbeComparison
-    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
-    {α s : ℝ} (hα : 0 < α) (hs : 1 < s)
-    (hcomparison : ∀ (χ : edgeChars(τ)) (b : ℝ), α ≤ b → b < 1/2 →
-      -(∑' z : edgeSites(χ.val), if |edgeOff(z)| < b then
-        (edgeOrder(χ.val,z) : ℝ) * edgeReal(χ.val,b,z) else 0) ≤
-      -(∑' z : edgeSites(χ.val),
-        (spectralStripMultiplicity b s edgeOff(z) edgeOrder(χ.val,z) : ℝ) * edgeReal(χ.val,b,z)))
-    (φ : BruhatCompactSupport C𝔽) :
-    HasSum (fun p : edgeExterior(τ,α) ↦ ((ord(p.val.1.val,p.val.2) : ℤ) : ℂ) *
-      M(φ,p.val.1.val,p.val.2)) 0 :=
-  traceFormula_exteriorZeros_of_signedWidthComparison τ hτ hα hs
-    (fun χ b ↦ heckePositiveStripEdgeProbe χ.val b)
-    (fun χ b _ _ z hz ↦ (heckePositiveStripEdgeProbe_spec χ.val b).2 z.val z.property hz)
-    hcomparison φ
-
-end PositiveEdgeProbes
-
 set_option quotPrecheck false
 
 attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorelSpaceSec1
@@ -1053,5 +689,373 @@ theorem exists_projectiveKernel_stripTestAction_spectralProjection_iff_support_i
   simp at hx
 
 end KernelLocalization
+
+end RiemannMasullo.Isolated
+
+namespace RiemannMasullo.Isolated
+
+/-! ### Positive edge probes vanishing on norm-one classes
+
+The compact positive cosine transform supplies a numerator with a scaled
+second-derivative correction. Its radial lift gives the sign hypothesis
+of the preceding comparison, including for the principal character. -/
+
+section PositiveEdgeProbes
+
+open Complex Filter Function
+open scoped ContDiff NNReal NumberField.AdeleRing Topology
+
+private theorem cosine_deriv (f : ℝ → ℝ) (hs : ContDiff ℝ (∞) f)
+    (hc : HasCompactSupport f) (t : ℝ) :
+    ∫ x, deriv f x * Real.cos (t*x) = t * ∫ x, f x * Real.sin (t*x) := by
+  have hI : Integrable (fun x ↦ f x * Real.cos (t*x)) :=
+    (hs.continuous.mul (by fun_prop)).integrable_of_hasCompactSupport hc.mul_right
+  have hD : Integrable (fun x ↦ deriv f x * Real.cos (t*x)) :=
+    ((hs.continuous_deriv (by simp)).mul (by fun_prop)).integrable_of_hasCompactSupport hc.deriv.mul_right
+  have hS : Integrable (fun x ↦ f x * Real.sin (t*x)) :=
+    (hs.continuous.mul (by fun_prop)).integrable_of_hasCompactSupport hc.mul_right
+  have hprod (x : ℝ) : HasDerivAt (fun y ↦ f y * Real.cos (t*y))
+      (deriv f x * Real.cos (t*x) - t*(f x * Real.sin (t*x))) x := by
+    convert ((hs.differentiable (by simp) x).hasDerivAt.mul
+      ((Real.hasDerivAt_cos (t*x)).comp x ((hasDerivAt_id x).const_mul t))) using 1
+    · rfl
+    · dsimp
+      ring
+  have hz := integral_eq_zero_of_hasDerivAt_of_integrable hprod (hD.sub (hS.const_mul t)) hI
+  rw [integral_sub hD (hS.const_mul t), integral_const_mul] at hz
+  exact sub_eq_zero.mp hz
+
+private theorem sine_deriv (f : ℝ → ℝ) (hs : ContDiff ℝ (∞) f)
+    (hc : HasCompactSupport f) (t : ℝ) :
+    ∫ x, deriv f x * Real.sin (t*x) = -(t * ∫ x, f x * Real.cos (t*x)) := by
+  have hI : Integrable (fun x ↦ f x * Real.sin (t*x)) :=
+    (hs.continuous.mul (by fun_prop)).integrable_of_hasCompactSupport hc.mul_right
+  have hD : Integrable (fun x ↦ deriv f x * Real.sin (t*x)) :=
+    ((hs.continuous_deriv (by simp)).mul (by fun_prop)).integrable_of_hasCompactSupport hc.deriv.mul_right
+  have hC : Integrable (fun x ↦ f x * Real.cos (t*x)) :=
+    (hs.continuous.mul (by fun_prop)).integrable_of_hasCompactSupport hc.mul_right
+  have hprod (x : ℝ) : HasDerivAt (fun y ↦ f y * Real.sin (t*y))
+      (deriv f x * Real.sin (t*x) + t*(f x * Real.cos (t*x))) x := by
+    convert ((hs.differentiable (by simp) x).hasDerivAt.mul
+      ((Real.hasDerivAt_sin (t*x)).comp x ((hasDerivAt_id x).const_mul t))) using 1
+    · rfl
+    · dsimp
+      ring
+  have hz := integral_eq_zero_of_hasDerivAt_of_integrable hprod (hD.add (hC.const_mul t)) hI
+  rw [integral_add hD (hC.const_mul t), integral_const_mul] at hz
+  exact eq_neg_of_add_eq_zero_left hz
+
+private theorem secondDeriv_even (K : ℝ → ℝ) (hs : ContDiff ℝ (∞) K) (he : ∀ x, K (-x) = K x)
+    (x : ℝ) : deriv (deriv K) (-x) = deriv (deriv K) x := by
+  have hD (x : ℝ) := (hs.differentiable (by simp) x).hasDerivAt
+  have hD' (x : ℝ) := ((contDiff_infty_iff_deriv.mp hs).2.differentiable (by simp) x).hasDerivAt
+  have hodd (x : ℝ) : deriv K (-x) = -deriv K x := by
+    have h := (hD (-x)).comp x (hasDerivAt_neg x)
+    change HasDerivAt (fun y ↦ K (-y)) _ x at h
+    simp_rw [he] at h
+    simpa using (congrArg Neg.neg (hD x |>.unique h)).symm
+  have h := (hD' (-x)).comp x (hasDerivAt_neg x)
+  change HasDerivAt (fun y ↦ deriv K (-y)) _ x at h
+  simp_rw [hodd] at h
+  simpa using ((hD' x).neg.unique h).symm
+
+/-- From a compact, smooth, even kernel having positive value at the origin and strictly
+positive cosine transform, produce a compact smooth even numerator vanishing at the origin
+whose cosine transform is positive outside any prescribed interval about zero. -/
+private theorem exists_stripEdgeNumerator_of_kernel (K : ℝ → ℝ) (hs : ContDiff ℝ (∞) K)
+    (hc : HasCompactSupport K) (he : ∀ x, K (-x) = K x) (h0 : 0 < K 0)
+    (hF : ∀ t : ℝ, 0 < ∫ x, K x * Real.cos (t*x)) {δ : ℝ} (hδ : 0 < δ) :
+    ∃ u : ℝ → ℝ, ContDiff ℝ (∞) u ∧ HasCompactSupport u ∧ (∀ x, u (-x) = u x) ∧
+      u 0 = 0 ∧ ∀ t : ℝ, δ ≤ |t| → 0 < ∫ x, u x * Real.cos (t*x) := by
+  let c := -(deriv (deriv K) 0)/K 0
+  let U (x : ℝ) := -(deriv (deriv K) x) - c*K x
+  have hsd : ContDiff ℝ (∞) (deriv K) := (contDiff_infty_iff_deriv.mp hs).2
+  have hsdd : ContDiff ℝ (∞) (deriv (deriv K)) := (contDiff_infty_iff_deriv.mp hsd).2
+  have hsU : ContDiff ℝ (∞) U := hsdd.neg.sub (contDiff_const.mul hs)
+  have hcU : HasCompactSupport U := hc.deriv.deriv.neg.sub hc.mul_left
+  have heU (x : ℝ) : U (-x) = U x := by simp [U, he, secondDeriv_even K hs he]
+  have hU0 : U 0 = 0 := by dsimp [U, c]; field_simp; ring
+  have hU (t : ℝ) : ∫ x, U x * Real.cos (t*x) = (t^2-c) * ∫ x, K x * Real.cos (t*x) := by
+    have hI (g : ℝ → ℝ) (hg : Continuous g) (hc : HasCompactSupport g) :
+        Integrable (fun x ↦ g x * Real.cos (t*x)) :=
+      (hg.mul (by fun_prop)).integrable_of_hasCompactSupport hc.mul_right
+    simp only [U, sub_mul, neg_mul, mul_assoc]
+    rw [integral_sub (f := fun x ↦ -(deriv (deriv K) x * Real.cos (t*x)))
+      (g := fun x ↦ c*(K x * Real.cos (t*x)))
+      (hI _ hsdd.continuous hc.deriv.deriv).neg ((hI _ hs.continuous hc).const_mul c),
+      integral_neg, integral_const_mul]
+    rw [cosine_deriv _ hsd hc.deriv, sine_deriv K hs hc]
+    ring
+  let R := (|c|+1)/δ
+  have hR : 0 < R := by dsimp [R]; positivity
+  refine ⟨fun x ↦ U (x/R), hsU.comp (by fun_prop), ?_, ?_, by simpa using hU0, ?_⟩
+  · simpa only [Function.comp_def, Homeomorph.coe_mulRight₀, div_eq_mul_inv] using
+      hcU.comp_homeomorph (Homeomorph.mulRight₀ R⁻¹ (inv_ne_zero hR.ne'))
+  · intro x
+    simpa only [neg_div] using heU (x/R)
+  · intro t ht
+    have hscale : (∫ x, U (x/R) * Real.cos (t*x)) = R * ∫ x, U x * Real.cos ((R*t)*x) := by
+      convert Measure.integral_comp_div (fun x : ℝ ↦ U x * Real.cos ((R*t)*x)) R using 1
+      · apply integral_congr_ae
+        filter_upwards with x
+        congr 2
+        field_simp
+      · simp [abs_of_pos hR, smul_eq_mul]
+    rw [hscale, hU]
+    apply mul_pos hR (mul_pos _ (hF _))
+    have hRT : |c| + 1 ≤ |R*t| := by
+      rw [abs_mul, abs_of_pos hR]
+      calc
+        _ = R*δ := by dsimp [R]; field_simp
+        _ ≤ _ := mul_le_mul_of_nonneg_left ht hR.le
+    nlinarith [sq_abs (R*t), sq_nonneg (|R*t| - 1), le_abs_self c]
+
+/-- A radial test which removes the hyperbolic cosine in the real moment on either edge. -/
+private def stripEdgeProfile (u : ℝ → ℝ) (b t₀ x : ℝ) : ℂ :=
+  (u x / Real.cosh (b*x) : ℝ) * Complex.exp (-(t₀ : ℂ) * Complex.I * x)
+
+private theorem stripEdgeProfile_support {u : ℝ → ℝ} (hc : HasCompactSupport u) (b t₀ : ℝ) :
+    HasCompactSupport (stripEdgeProfile u b t₀) := by
+  apply hc.mono
+  intro x hx hz
+  exact hx (by simp [stripEdgeProfile, hz])
+
+/-- The test attached to a compact smooth numerator is a compact smooth radial test, and
+vanishes at zero when the numerator does. -/
+private theorem stripEdgeProfile_admissible {u : ℝ → ℝ} (hu : ContDiff ℝ (∞) u)
+    (hc : HasCompactSupport u) (hz : u 0 = 0) (b t₀ : ℝ) :
+    ContDiff ℝ (∞) (stripEdgeProfile u b t₀) ∧ HasCompactSupport (stripEdgeProfile u b t₀) ∧
+      stripEdgeProfile u b t₀ 0 = 0 := by
+  refine ⟨?_, stripEdgeProfile_support hc b t₀, by simp [stripEdgeProfile, hz]⟩
+  unfold stripEdgeProfile
+  have hcosh (x : ℝ) : Real.cosh (b*x) ≠ 0 := (Real.cosh_pos _).ne'
+  have hquot : ContDiff ℝ (∞) (fun x ↦ u x / Real.cosh (b*x)) :=
+    hu.div (by simp_rw [Real.cosh_eq]; fun_prop) hcosh
+  exact (Complex.ofRealCLM.contDiff.comp hquot).mul
+    (Complex.contDiff_exp.comp (contDiff_const.mul Complex.ofRealCLM.contDiff))
+
+private theorem stripEdgeProfile_integrand (u : ℝ → ℝ) (b r t₀ γ x : ℝ) :
+    (stripEdgeProfile u b t₀ x * Complex.exp (((r : ℂ) + (γ : ℂ)*Complex.I) * x)).re =
+      u x / Real.cosh (b*x) * Real.exp (r*x) * Real.cos ((γ-t₀)*x) := by
+  rw [stripEdgeProfile, mul_assoc, ← Complex.exp_add]
+  rw [Complex.re_ofReal_mul, Complex.exp_re]
+  simp only [Complex.add_re, Complex.add_im, Complex.mul_re, Complex.mul_im, Complex.neg_re,
+    Complex.neg_im, Complex.ofReal_re, Complex.ofReal_im, Complex.I_re, Complex.I_im]
+  ring_nf
+
+private theorem stripEdgeProfile_symm (u : ℝ → ℝ) (hu : Continuous u) (hc : HasCompactSupport u)
+    (he : ∀ x, u (-x) = u x) (b t : ℝ) :
+    ∫ x, u x / Real.cosh (b*x) * Real.exp (b*x) * Real.cos (t*x) =
+      ∫ x, u x * Real.cos (t*x) := by
+  let f (r x : ℝ) := u x / Real.cosh (b*x) * Real.exp (r*x) * Real.cos (t*x)
+  have hint (r : ℝ) : Integrable (f r) := by
+    apply Continuous.integrable_of_hasCompactSupport
+    · dsimp [f]
+      have hcosh (x : ℝ) : Real.cosh (b*x) ≠ 0 := (Real.cosh_pos _).ne'
+      fun_prop (disch := first | exact hcosh | exact hcosh _)
+    · apply hc.mono
+      intro x hx hz
+      exact hx (by simp [f, hz])
+  have heq : (∫ x, f (-b) x) = ∫ x, f b x := by
+    conv_rhs => rw [← integral_neg_eq_self (f b) volume]
+    apply integral_congr_ae
+    filter_upwards with x
+    simp [f, he, neg_mul, mul_neg]
+  have hsum : (∫ x, f b x) + (∫ x, f (-b) x) = 2 * ∫ x, u x * Real.cos (t*x) := by
+    rw [← integral_add (hint _) (hint _), ← integral_const_mul]
+    apply integral_congr_ae
+    filter_upwards with x
+    dsimp [f]
+    have h0 := (Real.cosh_pos (b*x)).ne'
+    rw [neg_mul]
+    have hsumexp : Real.exp (b*x) + Real.exp (-(b*x)) = 2 * Real.cosh (b*x) := by
+      rw [Real.cosh_eq]
+      ring
+    calc
+      _ = u x / Real.cosh (b*x) * Real.cos (t*x) *
+          (Real.exp (b*x) + Real.exp (-(b*x))) := by ring
+      _ = _ := by rw [hsumexp]; field_simp
+  rw [heq] at hsum
+  change (∫ x, f b x) = _
+  linarith
+
+/-- At either edge the real Mellin value is the same cosine transform. No symmetry of
+the zero ordinates, or of the character defining the angular component, is required. -/
+private theorem stripEdgeProfile_moment_re (u : ℝ → ℝ) (hu : Continuous u) (hc : HasCompactSupport u)
+    (he : ∀ x, u (-x) = u x) (b r t₀ γ : ℝ) (hr : r = b ∨ r = -b) :
+    (∫ x, stripEdgeProfile u b t₀ x * Complex.exp (((r : ℂ) + (γ : ℂ)*Complex.I) * x)).re =
+      ∫ x, u x * Real.cos ((γ-t₀)*x) := by
+  have h0 (x : ℝ) : Real.cosh (b*x) ≠ 0 := (Real.cosh_pos _).ne'
+  have hI : Integrable (fun x ↦ stripEdgeProfile u b t₀ x *
+      Complex.exp (((r : ℂ) + (γ : ℂ)*Complex.I) * x)) := by
+    apply Continuous.integrable_of_hasCompactSupport
+    · unfold stripEdgeProfile
+      fun_prop (disch := first | exact h0 | exact h0 _)
+    · exact (stripEdgeProfile_support hc b t₀).mul_right
+  change RCLike.re (∫ x, stripEdgeProfile u b t₀ x * _) = _
+  rw [← integral_re hI]
+  change (∫ x, (stripEdgeProfile u b t₀ x * _).re) = _
+  simp_rw [stripEdgeProfile_integrand]
+  rcases hr with h | h
+  · rw [h]
+    exact stripEdgeProfile_symm u hu hc he b (γ-t₀)
+  · rw [h]
+    simpa only [neg_mul, Real.cosh_neg] using stripEdgeProfile_symm u hu hc he (-b) (γ-t₀)
+
+/-- Given any gap around a chosen ordinate, the same smooth compact radial probe
+vanishes at zero and has strictly positive real transform at every remaining
+ordinate on either vertical edge. -/
+private theorem exists_positiveStripEdgeProfile {δ : ℝ} (hδ : 0 < δ) (b t₀ : ℝ) :
+    ∃ H : ℝ → ℂ, ContDiff ℝ (∞) H ∧ HasCompactSupport H ∧ H 0 = 0 ∧
+      ∀ r γ : ℝ, (r = b ∨ r = -b) → δ ≤ |γ-t₀| →
+        0 < (bilateralLaplace H ((r : ℂ) + (γ : ℂ)*Complex.I)).re := by
+  obtain ⟨K, hs, hc, he, h0, hF⟩ := exists_compact_pos_cosineTransform
+  obtain ⟨u, hus, huc, hue, hu0, huF⟩ :=
+    exists_stripEdgeNumerator_of_kernel K hs hc he h0 hF hδ
+  obtain ⟨hhs, hhc, hh0⟩ := stripEdgeProfile_admissible hus huc hu0 b t₀
+  refine ⟨stripEdgeProfile u b t₀, hhs, hhc, hh0, fun r γ hedge hgap ↦ ?_⟩
+  rw [bilateralLaplace, stripEdgeProfile_moment_re u hus.continuous huc hue b r t₀ γ hedge]
+  exact huF _ hgap
+
+private theorem logTest_mellin (H : ℝ → ℂ) (s : ℂ) :
+    introTraceMellin (fun r ↦ H (Real.log r)) s = bilateralLaplace H s := by
+  rw [introTraceMellin, mellin, ← integral_comp_exp, bilateralLaplace]
+  apply integral_congr_ae
+  filter_upwards with x
+  simp only [Real.log_exp, Complex.real_smul, smul_eq_mul]
+  rw [Complex.cpow_def_of_ne_zero (by exact_mod_cast (Real.exp_pos x).ne'),
+    ← Complex.ofReal_log (Real.exp_pos x).le, Real.log_exp, Complex.ofReal_exp,
+    ← mul_assoc, ← Complex.exp_add, mul_comm]
+  congr 1
+  ring_nf
+
+
+set_option quotPrecheck false
+attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorelSpaceSec1
+  instIdeleClassT2Sec1 instIdeleClassLocallyCompactSec1 instIdeleClassSecondCountableSec1
+  instIdeleClassHaarMeasureSec1
+
+variable {F : Type*} [Field F] [NumberField F]
+local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
+local notation "ord(" χ ", " z ")" =>
+  MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ z
+local notation "vol₁" => ((normOneIdeleClassTamagawaMeasure F) univ).toReal
+local notation "M(" φ ", " χ ", " z ")" => modulatedFourierMellin
+  (continuousIdeleClassNorm F) univ
+  ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+  (ideleClassTamagawaMeasure F) (φ : BruhatCompactSupport C𝔽).val
+  (ideleClassNormTwist (F := F) χ ((z : ℂ) - 1/2))
+
+private theorem exists_ordinate_gap (χ : PontryaginDual C𝔽) (R : ℝ) :
+    ∃ t δ : ℝ, 0 < δ ∧ ∀ z : ℂ, 0 < ord(χ,z) → |z.re| ≤ R → δ ≤ |z.im - t| := by
+  let D := MeromorphicOn.divisor (continuedCompletedHeckeL χ) univ
+  let K := Metric.closedBall (0 : ℂ) (R + 2) ∩ (fun z ↦ D z).support
+  have hloc : LocallyFiniteSupport (fun z ↦ D z) :=
+    fun z ↦ D.supportLocallyFiniteWithinDomain z (mem_univ z)
+  have hfin : (Complex.im '' K).Finite :=
+    (hloc.finite_inter_support_of_isCompact (isCompact_closedBall _ _)).image _
+  obtain ⟨t, ht, hnot⟩ := (Ioo_infinite (zero_lt_one : (0:ℝ) < 1)).exists_notMem_finite hfin
+  obtain ⟨η, hη, hball⟩ := Metric.isOpen_iff.mp hfin.isClosed.isOpen_compl t hnot
+  refine ⟨t, min 1 η, lt_min zero_lt_one hη, fun z hz hR ↦ ?_⟩
+  by_contra! hsmall
+  have hsmall₁ := abs_lt.mp (hsmall.trans_le (min_le_left 1 η))
+  have him : |z.im| ≤ 2 := abs_le.mpr ⟨by linarith [ht.1, hsmall₁.1],
+    by linarith [ht.2, hsmall₁.2]⟩
+  have hnear : z.im ∈ Metric.ball t η := by
+    rw [Metric.mem_ball, Real.dist_eq]
+    exact hsmall.trans_le (min_le_right 1 η)
+  apply hball hnear
+  refine ⟨z, ⟨?_, hz.ne'⟩, rfl⟩
+  rw [Metric.mem_closedBall, dist_zero_right]
+  exact (Complex.norm_le_abs_re_add_abs_im _).trans (add_le_add hR him)
+
+private theorem normOneVolume_pos : 0 < vol₁ := by
+  rw [normOneIdeleClassTamagawaMeasure_volume]
+  have := NumberField.Units.regulator_pos F
+  have := NumberField.classNumber_pos F
+  have := NumberField.Units.torsionOrder_pos F
+  have : (0 : ℝ) < Real.sqrt (Int.natAbs (NumberField.discr F) : ℝ) :=
+    Real.sqrt_pos.mpr (by exact_mod_cast Int.natAbs_pos.mpr (NumberField.discr_ne_zero F))
+  exact (ENNReal.toReal_pos (ENNReal.ofReal_pos.mpr (by positivity)).ne' ENNReal.ofReal_ne_top)
+
+/-- A real-positive transform at every actual zero of either specified edge in one
+character is attained by a genuine compact Bruhat test vanishing on norm-one classes. -/
+theorem exists_heckePositiveStripEdgeTest (χ : PontryaginDual C𝔽) (b : ℝ) :
+    ∃ φ : BruhatCompactSupport C𝔽, (∀ g : (ideleClassNorm F).ker, φ.val g = 0) ∧
+      ∀ z : ℂ, 0 < ord(χ,z) → |z.re - 1/2| = b → 0 < (M(φ,χ,z)).re := by
+  obtain ⟨t, δ, hδ, hg⟩ := exists_ordinate_gap χ (|b| + 1)
+  obtain ⟨H, hs, hc, h₀, hedge⟩ := exists_positiveStripEdgeProfile hδ b t
+  obtain ⟨φ, hφ⟩ := exists_characterNormTest (F := F) χ⁻¹ H hs hc
+  let f (r : ℝ) := H (Real.log r)
+  have htest (g : C𝔽) : φ.val g = introTraceTest χ f g := by
+    rw [hφ g, introTraceTest]
+    rw [show χ⁻¹ g = (χ g)⁻¹ from rfl, Circle.coe_inv_eq_conj]
+    rfl
+  refine ⟨φ, ?_, fun z hz hb ↦ ?_⟩
+  · intro g
+    simp only [hφ, show ideleClassNorm F g.val = 1 from g.property,
+      Units.val_one, NNReal.coe_one, Real.log_one, h₀, mul_zero]
+  have hside : z.re-1/2 = b ∨ z.re-1/2 = -b := by
+    rcases le_total 0 (z.re-1/2) with h | h
+    · rw [abs_of_nonneg h] at hb
+      exact Or.inl hb
+    · exact Or.inr (by rw [abs_of_nonpos h] at hb; linarith)
+  have hR : |z.re| ≤ |b| + 1 := calc
+    |z.re| = |(z.re - 1/2) + 1/2| := by ring_nf
+    _ ≤ |z.re - 1/2| + |(1/2:ℝ)| := abs_add_le _ _
+    _ ≤ |b| + 1 := by rw [hb]; norm_num; linarith [le_abs_self b]
+  have hh := hedge (z.re-1/2) z.im hside (hg z hz hR)
+  have hw : (((z.re-1/2 : ℝ) : ℂ) + (z.im : ℂ)*Complex.I) = z - 1/2 := by
+    apply Complex.ext <;> simp
+  rw [hw] at hh
+  have hm : introTraceMellin f (z-1/2) = bilateralLaplace H (z-1/2) := by
+    exact logTest_mellin H (z-1/2)
+  have hf := (introTraceTest_mellin χ f φ htest (z-1/2)).2
+  simp only [modulatedFourierMellin, relativeVerticalStrip, Set.preimage_univ, Set.indicator_univ]
+  rw [hf, hm, Complex.re_ofReal_mul]
+  exact mul_pos (normOneVolume_pos (F := F)) hh
+
+/-- One compact, norm-one-vanishing probe of the chosen character and edge radius
+for the signed-width comparison in Theorem 12.5.1.1, pp. 519–520. -/
+def heckePositiveStripEdgeProbe (χ : PontryaginDual C𝔽) (b : ℝ) : BruhatCompactSupport C𝔽 :=
+  (exists_heckePositiveStripEdgeTest χ b).choose
+
+/-- The chosen probe is admissible at the identity and has strictly positive real
+Mellin value at every occupied site of the two prescribed strip edges. -/
+theorem heckePositiveStripEdgeProbe_spec (χ : PontryaginDual C𝔽) (b : ℝ) :
+    (∀ g : (ideleClassNorm F).ker, (heckePositiveStripEdgeProbe χ b).val g = 0) ∧
+    ∀ z : ℂ, 0 < ord(χ,z) → |z.re - 1/2| = b →
+      0 < (M(heckePositiveStripEdgeProbe χ b,χ,z)).re :=
+  (exists_heckePositiveStripEdgeTest χ b).choose_spec
+
+local notation "edgeChars(" τ ")" => {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1}
+local notation "edgeSites(" χ ")" => {z : ℂ // 0 < ord(χ,z)}
+local notation "edgeExterior(" τ ", " α ")" => {p : edgeChars(τ) × ℂ //
+  0 < ord(p.1.val,p.2) ∧ α ≤ |p.2.re - 1/2|}
+local notation "edgeOff(" z ")" => ((z : ℂ).re - 1/2)
+local notation "edgeOrder(" χ ", " z ")" => (ord(χ, (z : ℂ))).toNat
+local notation "edgeReal(" χ ", " b ", " z ")" =>
+  (M(heckePositiveStripEdgeProbe χ b,χ,z)).re
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The indicated one-sided comparison on
+a concrete norm-one-vanishing probe for each character and candidate radius gives
+the exterior-zero formula. The comparison is the remaining hypothesis. -/
+theorem traceFormula_exteriorZeros_of_positiveEdgeProbeComparison
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    {α s : ℝ} (hα : 0 < α) (hs : 1 < s)
+    (hcomparison : ∀ (χ : edgeChars(τ)) (b : ℝ), α ≤ b → b < 1/2 →
+      -(∑' z : edgeSites(χ.val), if |edgeOff(z)| < b then
+        (edgeOrder(χ.val,z) : ℝ) * edgeReal(χ.val,b,z) else 0) ≤
+      -(∑' z : edgeSites(χ.val),
+        (spectralStripMultiplicity b s edgeOff(z) edgeOrder(χ.val,z) : ℝ) * edgeReal(χ.val,b,z)))
+    (φ : BruhatCompactSupport C𝔽) :
+    HasSum (fun p : edgeExterior(τ,α) ↦ ((ord(p.val.1.val,p.val.2) : ℤ) : ℂ) *
+      M(φ,p.val.1.val,p.val.2)) 0 :=
+  traceFormula_exteriorZeros_of_signedWidthComparison τ hτ hα hs
+    (fun χ b ↦ heckePositiveStripEdgeProbe χ.val b)
+    (fun χ b _ _ z hz ↦ (heckePositiveStripEdgeProbe_spec χ.val b).2 z.val z.property hz)
+    hcomparison φ
+
+end PositiveEdgeProbes
 
 end RiemannMasullo.Isolated
