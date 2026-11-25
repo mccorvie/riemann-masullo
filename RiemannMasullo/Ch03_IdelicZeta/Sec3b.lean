@@ -6199,6 +6199,67 @@ private theorem cleared_extend_bound (q : ℂ → ℂ) (hq : Continuous q) (a b 
     (hnear z hz (lt_of_not_ge ht)).filter_mono nhdsWithin_le_nhds] with w hw hnear
   exact hw hnear.1 hnear.2
 
+private theorem cleared_tail_codiscrete (χ : PontryaginDual G) (η : U) (f : B)
+    (h : ideleClassNormTwist η 0 ∈ unramifiedOutside F S)
+    (he : sIdeleRestriction F S ⟨ideleClassNormTwist η 0,h⟩ = chart(χ) 0)
+    (a b : ℝ) (N : ℕ) :
+    ∃ C ≥ (0 : ℝ), ∃ T : ℝ, ∀ᶠ z : ℂ in codiscrete ℂ,
+      z.re ∈ Icc a b → T ≤ |z.im| → |z.im|^N * ‖Poly(η,z) * Z(f,χ,z)‖ ≤ C := by
+  let m := 3 + |a| + |b|
+  have hm : 1/2 < m := by dsimp only [m]; linarith [abs_nonneg a, abs_nonneg b]
+  obtain ⟨C, T, hC, hp⟩ := cleared_positive_height χ η f m hm N
+  obtain ⟨D, U₀, hD, hd⟩ := cleared_positive_height χ⁻¹ η⁻¹ (sAdeleSchwartzFourier f) m hm N
+  obtain ⟨G₀, Y, hG, hg⟩ := cleared_gamma_bound η a
+  obtain ⟨E, hE, hε⟩ := sLocalEpsilonFactor_bounded_on_strip χ a b
+  refine ⟨max C (E*G₀*D), hC.trans (le_max_left _ _), max (max T U₀) Y, ?_⟩
+  filter_upwards [cleared_reflection χ η f h he] with z hz
+  intro hr ht
+  have ht₁ : T ≤ |z.im| := (le_max_left T U₀).trans ((le_max_left _ _).trans ht)
+  have ht₂ : U₀ ≤ |z.im| := (le_max_right T U₀).trans ((le_max_left _ _).trans ht)
+  have ht₃ : Y ≤ |z.im| := (le_max_right _ _).trans ht
+  by_cases hh : 1/2 ≤ z.re
+  · exact (hp z ⟨hh, by dsimp only [m]; linarith [hr.2, le_abs_self b, abs_nonneg a]⟩ ht₁).trans
+      (le_max_left _ _)
+  · have hw : (1-z).re ∈ Icc (1/2) m := by
+      change 1/2 ≤ 1-z.re ∧ 1-z.re ≤ m
+      dsimp only [m]; constructor <;> linarith [hr.1, neg_abs_le a, abs_nonneg b]
+    have him : |(1-z).im| = |z.im| := by simp
+    have hhD := hd (1-z) hw (him ▸ ht₂)
+    rw [him] at hhD
+    rw [hz, norm_mul, norm_mul, mul_left_comm]
+    exact (mul_le_mul (mul_le_mul (hε z hr) (hg z hr.1 (le_of_not_ge hh) ht₃)
+      (norm_nonneg _) hE) hhD (by positivity) (mul_nonneg hE hG)).trans (le_max_right _ _)
+
+/-- On the tails of every bounded vertical strip, multiplying the actual meromorphic
+zeta integral by the reciprocal finite Euler factors yields rapid decay for each test.
+At a pole this pointwise statement uses the project's normal-form value. -/
+theorem sLocalIdelicZFunction_cleared_strip_tails
+    (χ : PontryaginDual G) (η : U) (f : B)
+    (h : ideleClassNormTwist η 0 ∈ unramifiedOutside F S)
+    (he : sIdeleRestriction F S ⟨ideleClassNormTwist η 0,h⟩ = chart(χ) 0)
+    (a b : ℝ) (N : ℕ) :
+    ∃ C ≥ (0 : ℝ), ∃ T : ℝ, ∀ z : ℂ, z.re ∈ Icc a b → T < |z.im| →
+      |z.im|^N * ‖Poly(η,z) * Z(f,χ,z)‖ ≤ C := by
+  obtain ⟨C, hC, T, hb⟩ := cleared_tail_codiscrete χ η f h he (a-1) (b+1) N
+  refine ⟨C, hC, T, fun z hz ht ↦ ?_⟩
+  by_cases hz0 : Z(f,χ,z) = 0
+  · simpa only [hz0, mul_zero, norm_zero] using hC
+  have hNF := sLocalIdelicZFunction_meromorphic f χ (mem_univ z)
+  have hZa := hNF.meromorphicOrderAt_nonneg_iff_analyticAt.mp
+    (hNF.meromorphicOrderAt_eq_zero_iff.mpr hz0).ge
+  have hcon : ContinuousAt (fun w : ℂ ↦ |w.im|^N * ‖Poly(η,w) * Z(f,χ,w)‖) z :=
+    ((Complex.continuous_im.abs.pow N).continuousAt).mul
+      (((cleared_finite_continuous (S := S) η).continuousAt.mul hZa.continuousAt).norm)
+  apply le_of_tendsto (hcon.continuousWithinAt (s := {z}ᶜ))
+  have hl : ∀ᶠ w : ℂ in 𝓝 z, a - 1 < w.re := (isOpen_lt continuous_const Complex.continuous_re).mem_nhds
+    (show a-1 < z.re by linarith [hz.1])
+  have hu : ∀ᶠ w : ℂ in 𝓝 z, w.re < b + 1 := (isOpen_lt Complex.continuous_re continuous_const).mem_nhds
+    (show z.re < b+1 by linarith [hz.2])
+  have hhi : ∀ᶠ w : ℂ in 𝓝 z, T < |w.im| := (isOpen_lt continuous_const Complex.continuous_im.abs).mem_nhds ht
+  filter_upwards [hb.filter_mono (nhdsNE_le_codiscrete z),
+    (hl.and (hu.and hhi)).filter_mono nhdsWithin_le_nhds] with w hw hn
+  exact hw ⟨hn.1.le, hn.2.1.le⟩ hn.2.2.le
+
 /-- An entire S-local zeta chart has rapid decay on bounded vertical strips after
 multiplication by the finite reciprocal Euler factors of a unitary global lift. -/
 theorem sLocalIdelicZFunction_cleared_strips
@@ -6206,49 +6267,27 @@ theorem sLocalIdelicZFunction_cleared_strips
     ∃ η : U, ∀ (a b : ℝ) (N : ℕ), ∃ C : ℝ, ∀ z : ℂ, z.re ∈ Icc a b →
       ‖z ^ N * (Poly(η,z) * Z(f,χ,z))‖ ≤ C := by
   obtain ⟨η,h,he,_⟩ := sLocal_character_extension χ
-  refine ⟨η,fun a b N ↦ ?_⟩
+  refine ⟨η, fun a b N ↦ ?_⟩
+  obtain ⟨C, _, T, hb⟩ := cleared_tail_codiscrete χ η f h he (a-1) (b+1) N
   let m := 3 + |a| + |b|
-  have hm : 1/2 < m := by dsimp only [m]; linarith [abs_nonneg a,abs_nonneg b]
-  obtain ⟨C,T,hC,hp⟩ := cleared_positive_height χ η f m hm N
-  obtain ⟨D,T',hD,hd⟩ := cleared_positive_height χ⁻¹ η⁻¹ (sAdeleSchwartzFourier f) m hm N
-  obtain ⟨A,Tg,hA,hg⟩ := cleared_gamma_bound η (a-1)
-  obtain ⟨E,hE,heps⟩ := sLocalEpsilonFactor_bounded_on_strip χ (a - 1) (b + 1)
-  let T₀ := max (max T T') (max Tg (max m 1))
   let Q (z : ℂ) := z ^ N * (Poly(η,z) * Z(f,χ,z))
-  have hQ : Continuous Q := (continuous_id.pow N).mul
-    ((cleared_finite_continuous (S := S) η).mul (continuous_iff_continuousAt.mpr fun z ↦ (hZ z trivial).continuousAt))
-  apply cleared_extend_bound Q hQ a b (2 ^ N * max C (E * A * D)) T₀
-  filter_upwards [cleared_reflection χ η f h he] with z hz
+  have hQ : Continuous Q := (continuous_id.pow N).mul ((cleared_finite_continuous (S := S) η).mul
+    (continuous_iff_continuousAt.mpr fun z ↦ (hZ z trivial).continuousAt))
+  apply cleared_extend_bound Q hQ a b (2 ^ N * C) (max T m)
+  filter_upwards [hb] with z hz
   intro hr ht
-  have ht₁ : T ≤ |z.im| := (le_max_left T T').trans ((le_max_left _ _).trans ht)
-  have ht₂ : T' ≤ |z.im| := (le_max_right T T').trans ((le_max_left _ _).trans ht)
-  have ht₃ : Tg ≤ |z.im| := (le_max_left Tg _).trans ((le_max_right _ _).trans ht)
-  have ht₄ : m ≤ |z.im| := (le_max_left m _).trans ((le_max_right _ _).trans ((le_max_right _ _).trans ht))
-  have hweighted : |z.im| ^ N * ‖Poly(η,z) * Z(f,χ,z)‖ ≤ max C (E * A * D) := by
-    by_cases hh : 1/2 ≤ z.re
-    · exact (hp z ⟨hh, by dsimp only [m]; linarith [hr.2, le_abs_self b, abs_nonneg a]⟩ ht₁).trans (le_max_left _ _)
-    · have hw : (1-z).re ∈ Icc (1/2) m := by
-        change 1/2 ≤ 1-z.re ∧ 1-z.re ≤ m
-        dsimp only [m]; constructor <;> linarith [hr.1, neg_abs_le a, abs_nonneg b]
-      have him : |(1-z).im| = |z.im| := by simp
-      have hhD := hd (1-z) hw (him ▸ ht₂)
-      rw [him] at hhD
-      rw [hz,norm_mul,norm_mul,mul_left_comm]
-      exact (mul_le_mul (mul_le_mul (heps z hr) (hg z hr.1 (le_of_not_ge hh) ht₃)
-        (norm_nonneg _) hE) hhD (by positivity) (mul_nonneg hE hA)).trans (le_max_right _ _)
-  have hnorm : ‖z‖ ≤ 2 * |z.im| := by
-    apply z.norm_le_abs_re_add_abs_im.trans
-    have : |z.re| ≤ m := by
-      rw [abs_le]; dsimp only [m]
-      constructor <;> linarith [hr.1, hr.2, neg_abs_le a, le_abs_self b, abs_nonneg a, abs_nonneg b]
-    linarith
+  have habs : |z.re| ≤ m := by
+    rw [abs_le]; dsimp only [m]
+    constructor <;> linarith [hr.1, hr.2, neg_abs_le a, le_abs_self b, abs_nonneg a, abs_nonneg b]
+  have hnorm : ‖z‖ ≤ 2 * |z.im| := z.norm_le_abs_re_add_abs_im.trans
+    (by linarith [(le_max_right T m).trans ht])
   change ‖z ^ N * _‖ ≤ _
   rw [norm_mul, norm_pow]
   calc
     _ ≤ (2 * |z.im|)^N * ‖Poly(η,z) * Z(f,χ,z)‖ :=
       mul_le_mul_of_nonneg_right (pow_le_pow_left₀ (norm_nonneg _) hnorm N) (norm_nonneg _)
-    _ = 2 ^ N * (|z.im| ^ N * ‖Poly(η,z) * Z(f,χ,z)‖) := by rw [mul_pow,mul_assoc]
-    _ ≤ _ := mul_le_mul_of_nonneg_left hweighted (by positivity)
+    _ = 2^N * (|z.im| ^ N * ‖Poly(η,z) * Z(f,χ,z)‖) := by rw [mul_pow, mul_assoc]
+    _ ≤ _ := mul_le_mul_of_nonneg_left (hz hr ((le_max_left T m).trans ht)) (by positivity)
 
 end ClearedEulerStrips
 

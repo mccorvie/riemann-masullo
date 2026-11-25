@@ -2,6 +2,11 @@ module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1a
 
+import RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
+import Mathlib.Analysis.Analytic.IsolatedZeros
+import Mathlib.Analysis.MellinInversion
+import RiemannMasullo.ForMathlib.Analysis.MellinTransform
+import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import Mathlib.Analysis.PSeries
 import Mathlib.RingTheory.RamificationInertia.Inertia
 import Mathlib.RingTheory.RamificationInertia.Ramification
@@ -24,7 +29,8 @@ share the same total and agree with the contour shift, classify when convergence
 of the assignment (including unconditionally over `ℚ`), prove uniform convergence for every
 assignment under a summable majorant, establish uniform pole discreteness over any single
 rational prime, and prove the exact lattice arithmetic equivalence behind the Gaussian-field
-obstruction in #7279.
+obstruction in #7279. For a single residue characteristic the sections below split common
+residue windows by finite interpolation and prove absolute convergence of the place sums.
 -/
 
 @[expose] public noncomputable section
@@ -1811,6 +1817,1506 @@ theorem sLocalSinglePrime_placeLimits_of_joint (χ : PontryaginDual Jₛ) (A : �
     apply placeWindow_uniform_of_dilations (hsum v) hH B id (fun _ ↦ g) _
     intro j _
     exact hbounded (u ^ j * g) (inverseNorm_dilation_rate u hu g hg j) B hB
+
+end
+
+/-! ## Absolute convergence of the place sums -/
+
+section
+
+open scoped Classical
+
+local notation "U" => PontryaginDual (IdeleClassGroup (𝓞 F) F)
+local notation "P(" η "," z ")" => ∏ v : S, (finiteHeckeEulerFactor η v.val z)⁻¹
+local notation "Z(" f "," χ "," z ")" => sLocalIdelicZFunction f (chart(χ) z)
+local notation "strip(" χ "," A ")" => {a : ℂ // a.re ∈ Ioo (-A) 1 ∧
+  meromorphicOrderAt (fun z ↦ sLocalRhoFactor (chart(χ) z)) a < 0}
+local notation "twistₛ" => quasiCharacterNormTwist (G := Jₛ) normₛ (isProperMap_sIdeleQuotientNorm F S).continuous
+
+/-- Distinct separated heights have distinct floor indices after division by the separation. -/
+private theorem injective_floor_scaled_of_separated {ι : Type*} (y : ι → ℝ) {d : ℝ}
+    (hd : 0 < d) (hsep : ∀ i j, i ≠ j → d ≤ |y i - y j|) :
+    Injective (fun i ↦ ⌊y i / d⌋) := by
+  intro i j hij
+  by_contra hne
+  have hfi := Int.floor_le (y i / d)
+  have hfj := Int.floor_le (y j / d)
+  have hci := Int.lt_floor_add_one (y i / d)
+  have hcj := Int.lt_floor_add_one (y j / d)
+  change ⌊y i / d⌋ = ⌊y j / d⌋ at hij
+  rw [hij] at hfi hci
+  have h : |y i / d - y j / d| < 1 := abs_lt.mpr ⟨by linarith, by linarith⟩
+  rw [← sub_div, abs_div, abs_of_pos hd, div_lt_one hd] at h
+  exact (hsep i j hne).not_gt h
+
+/-- The inverse-square height weight is summable over every uniformly separated family of
+real heights. -/
+private theorem summable_inv_sq_of_separated_heights {ι : Type*} (y : ι → ℝ) {d : ℝ}
+    (hd : 0 < d) (hsep : ∀ i j, i ≠ j → d ≤ |y i - y j|) :
+    Summable (fun i ↦ 1 / (1 + |y i|) ^ 2) := by
+  have hnat : Summable (fun n : ℕ ↦ 1 / (1 + (n : ℝ)) ^ 2) := by
+    have h := (Real.summable_one_div_nat_pow.mpr (show 1 < 2 by decide)).comp_injective
+      Nat.succ_injective
+    exact h.congr (fun n ↦ by simp [add_comm])
+  have hint : Summable (fun n : ℤ ↦ 1 / (1 + |(n : ℝ)|) ^ 2) := by
+    rw [summable_int_iff_summable_nat_and_neg]
+    constructor <;> exact hnat.congr (fun n ↦ by simp)
+  let k (i : ι) := ⌊y i / d⌋
+  let B := 2 + d⁻¹
+  have hB (i : ι) : 1 + |(k i : ℝ)| ≤ B * (1 + |y i|) := by
+    have hci := Int.lt_floor_add_one (y i / d)
+    have hfi := Int.floor_le (y i / d)
+    have hneg := neg_abs_le (y i / d)
+    have hpos := le_abs_self (y i / d)
+    rw [abs_div, abs_of_pos hd] at hneg hpos
+    have hk : |(k i : ℝ)| ≤ |y i| / d + 1 := by
+      rw [abs_le]
+      dsimp [k]
+      constructor <;> linarith
+    rw [div_eq_mul_inv] at hk
+    dsimp [B]
+    nlinarith [abs_nonneg (y i), inv_pos.mpr hd]
+  have hk := hint.comp_injective (injective_floor_scaled_of_separated y hd hsep)
+  apply Summable.of_nonneg_of_le (fun i ↦ by positivity) _ (hk.mul_left (B ^ 2))
+  intro i
+  change 1 / (1 + |y i|) ^ 2 ≤ B ^ 2 * (1 / (1 + |(k i : ℝ)|) ^ 2)
+  rw [mul_one_div, div_le_div_iff₀ (by positivity) (by positivity), one_mul]
+  simpa only [mul_pow] using pow_le_pow_left₀ (by positivity) (hB i) 2
+
+/-- A separated set of complex points with only finitely many points off the imaginary axis
+has a summable inverse-square height weight. -/
+private theorem summable_inv_sq_of_separated_axis {P : Set ℂ} {d : ℝ} (hd : 0 < d)
+    (hsep : ∀ a ∈ P, ∀ b ∈ P, a ≠ b → d ≤ ‖a - b‖)
+    (hoff : {a ∈ P | a.re ≠ 0}.Finite) :
+    Summable (fun a : P ↦ 1 / (1 + |a.val.im|) ^ 2) := by
+  classical
+  let S : Set P := {a | a.val.re = 0}
+  apply (summable_subtype_and_compl (s := S)).mp
+  constructor
+  · refine summable_inv_sq_of_separated_heights (fun a : S ↦ a.val.val.im) hd ?_
+    intro a b hab
+    have hne : a.val.val ≠ b.val.val := fun h ↦ hab (Subtype.ext (Subtype.ext h))
+    have h := hsep _ a.val.property _ b.val.property hne
+    have ha : a.val.val.re = 0 := a.property
+    have hb : b.val.val.re = 0 := b.property
+    have he : (a.val.val - b.val.val) = ((a.val.val.im - b.val.val.im : ℝ) : ℂ) * Complex.I := by
+      apply Complex.ext <;> simp [ha, hb]
+    rwa [he, norm_mul, Complex.norm_I, mul_one, Complex.norm_real, Real.norm_eq_abs] at h
+  · have hs : Sᶜ.Finite := (hoff.preimage Subtype.val_injective.injOn).subset
+      (fun a ha ↦ ⟨a.prop, ha⟩)
+    let _ := hs.fintype
+    exact (hasSum_fintype _).summable
+
+/-- Cauchy's estimate for the residue on a fixed isolating circle, valid at a pole of any
+multiplicity and with no regularity assumption at its center. -/
+theorem norm_complexResidue_le_circle {W : ℂ → ℂ} {a : ℂ} {r C : ℝ} (hr : 0 < r)
+    (hW : ∀ z ∈ Metric.closedBall a r, z ≠ a → AnalyticAt ℂ W z)
+    (hcircle : ∀ z ∈ Metric.sphere a r, ‖W z‖ ≤ C) : ‖complexResidue W a‖ ≤ r * C := by
+  have hfix : complexResidue W a = circleIntegral W a r / (2 * (Real.pi : ℂ) * Complex.I) := by
+    refine (tendsto_const_nhds.congr' ?_).limUnder_eq
+    filter_upwards [Ioo_mem_nhdsGT hr] with s hs
+    congr 1
+    apply Complex.circleIntegral_eq_of_differentiable_on_annulus_off_countable hs.1 hs.2.le
+      Set.countable_empty
+    · intro z hz
+      have hza : z ≠ a := fun he ↦ hz.2 (he ▸ Metric.mem_ball_self hs.1)
+      exact (hW z hz.1 hza).continuousAt.continuousWithinAt
+    · intro z hz
+      have hza : z ≠ a := fun he ↦ hz.1.2 (he ▸ Metric.mem_closedBall_self hs.1.le)
+      exact (hW z (Metric.ball_subset_closedBall hz.1.1) hza).differentiableAt
+  rw [hfix, div_eq_inv_mul]
+  exact circleIntegral.norm_two_pi_i_inv_smul_integral_le_of_norm_le_const hr.le hcircle
+
+/-- In the one-prime case the inverse-square height weight is summable over the actual
+open-strip pole set used in the separate-place rectangle sums. -/
+theorem summable_sLocalStripPoles_inv_height_sq (χ : PontryaginDual Jₛ) (A : ℝ)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ)) :
+    Summable (fun a : strip(χ, A) ↦ 1 / (1 + |a.val.im|) ^ 2) := by
+  obtain ⟨d, hd, hsep⟩ := sLocalStripPoles_uniformly_discrete_of_same_prime χ A hsame
+  apply summable_inv_sq_of_separated_axis (P := {a : ℂ | a.re ∈ Ioo (-A) 1 ∧
+    meromorphicOrderAt (fun z ↦ sLocalRhoFactor (chart(χ) z)) a < 0}) hd
+  · rintro a ⟨ha, ha'⟩ b ⟨hb, hb'⟩ hab
+    exact hsep a ⟨⟨ha.1.le, ha.2.le⟩, ha'⟩ b ⟨⟨hb.1.le, hb.2.le⟩, hb'⟩ hab
+  · apply (sLocalPoleContributes_archimedean_finite_in_strip χ A).subset
+    rintro a ⟨⟨ha, hpole⟩, haoff⟩
+    refine ⟨⟨ha.1.le, ha.2.le⟩, ?_⟩
+    obtain ⟨w | v, hv⟩ := (sLocalPoleContributes_exists_iff χ a).mp hpole
+    · exact ⟨w, hv⟩
+    · obtain ⟨m, t, _, _, he⟩ := hv
+      exact (haoff (by rw [he, Complex.mul_I_re, Complex.ofReal_im, neg_zero])).elim
+
+/-- Every bounded height range contains only finitely many actual open-strip poles. -/
+private theorem eventually_sLocalStripPoles_abs_im_gt (χ : PontryaginDual Jₛ) (A T : ℝ) :
+    ∀ᶠ a : strip(χ, A) in cofinite, T < |a.val.im| := by
+  rw [eventually_cofinite]
+  have hf := finite_rectanglePoles (f := fun z ↦ sLocalRhoFactor (chart(χ) z))
+    (a := -A - 1) (b := 2) (σ₁ := -A) (σ₂ := 1) (t₁ := -T - 1) (t₂ := T + 1)
+    (sLocalRhoFactor_meromorphic χ).meromorphicOn (by linarith) (by norm_num)
+  refine (hf.preimage (f := fun a : strip(χ, A) ↦ a.val) Subtype.val_injective.injOn).subset ?_
+  intro a ha
+  have hl := abs_le.mp (not_lt.mp ha)
+  exact ⟨a.property.1, ⟨by linarith [hl.1], by linarith [hl.2]⟩, a.property.2⟩
+
+open Classical in
+/-- A summable bound on all but finitely many strip poles yields uniform convergence of each
+assigned rectangle sum. The exceptional terms can be arbitrary functions of the parameter. -/
+private theorem tendstoUniformlyOn_separatePlacePartialSum_of_cofinite_bound {ι X Y : Type*}
+    [NormedAddCommGroup Y] [CompleteSpace Y] {f : ℂ → ℂ} {a b σ₁ σ₂ : ℝ} (hf : MeromorphicOn f (Complex.re ⁻¹' Ioo a b))
+    (hσ₁ : a < σ₁) (hσ₂ : σ₂ < b) (assign : ℂ → ι) (term : ℂ → X → Y) (K : Set X)
+    (M : {z : ℂ // z.re ∈ Ioo σ₁ σ₂ ∧ meromorphicOrderAt f z < 0} → ℝ) (hM : Summable M)
+    (hbound : ∀ᶠ z in cofinite, ∀ x ∈ K, ‖term z.val x‖ ≤ M z) (v : ι) :
+    let P := {z : ℂ // z.re ∈ Ioo σ₁ σ₂ ∧ meromorphicOrderAt f z < 0}
+    let rect (h : ℝ × ℝ) := (finite_rectanglePoles (t₁ := h.1) (t₂ := h.2) hf hσ₁ hσ₂).toFinset
+    TendstoUniformlyOn (fun h x ↦ ∑ z ∈ (rect h).filter (assign · = v), term z x)
+      (fun x ↦ ∑' z : P, if assign z.val = v then term z.val x else 0) (atBot ×ˢ atTop) K := by
+  classical
+  intro P rect
+  let lift (h : ℝ × ℝ) : ↥(rect h) ↪ P := ⟨fun z ↦ ⟨z.val, by
+    have hz := (finite_rectanglePoles (t₁ := h.1) (t₂ := h.2) hf hσ₁ hσ₂).mem_toFinset.mp z.prop
+    exact ⟨hz.1, hz.2.2⟩⟩, fun _ _ he ↦ Subtype.ext (congrArg (fun z : P ↦ z.val) he)⟩
+  let t (h : ℝ × ℝ) : Finset P := (rect h).attach.map (lift h)
+  have ht : Tendsto t (atBot ×ˢ atTop) atTop := by
+    refine tendsto_atTop.mpr fun E ↦ ?_
+    have hwin (z : P) : ∀ᶠ h : ℝ × ℝ in atBot ×ˢ atTop, z.val.im ∈ Ioo h.1 h.2 :=
+      (eventually_lt_atBot z.val.im).prod_mk (eventually_gt_atTop z.val.im)
+    filter_upwards [(eventually_all_finset E).mpr (fun z _ ↦ hwin z)] with h hh z hz
+    have hrect : z.val ∈ rect h :=
+      (finite_rectanglePoles (t₁ := h.1) (t₂ := h.2) hf hσ₁ hσ₂).mem_toFinset.mpr
+        ⟨z.property.1, hh z hz, z.property.2⟩
+    exact Finset.mem_map.mpr ⟨⟨z.val, hrect⟩, Finset.mem_attach _ _, Subtype.ext rfl⟩
+  let G (z : P) (x : X) := if assign z.val = v then term z.val x else 0
+  have hg : ∀ᶠ z in cofinite, ∀ x ∈ K, ‖G z x‖ ≤ M z := by
+    filter_upwards [hbound] with z hz x hx
+    by_cases he : assign z.val = v
+    · simpa [G, he] using hz x hx
+    · simpa [G, he] using (norm_nonneg _).trans (hz x hx)
+  have hpart (h : ℝ × ℝ) (x : X) :
+      (∑ z ∈ (rect h).filter (assign · = v), term z x) = ∑ z ∈ t h, G z x := by
+    dsimp only [t, G]
+    rw [Finset.sum_map]
+    change _ = ∑ z ∈ (rect h).attach, if assign z.val = v then term z.val x else 0
+    rw [Finset.sum_attach (rect h) (fun z ↦ if assign z = v then term z x else 0),
+      ← Finset.sum_filter]
+  intro V hU
+  filter_upwards [ht.eventually (tendstoUniformlyOn_tsum_of_cofinite_eventually hM hg V hU)]
+    with h hh x hx
+  rw [hpart]
+  exact hh x hx
+
+/-- For finitely many translates of one nonzero entire function, every sufficiently
+small circle radius admits a positive lower bound common to all the translates. -/
+private theorem finite_translates_lower_bound_on_small_circles (D : Finset ℂ) (Q : ℂ → ℂ)
+    (hQ : Differentiable ℂ Q) (hq : ∃ w : ℂ, Q w ≠ 0) :
+    ∃ r > (0 : ℝ), ∀ δ : ℝ, 0 < δ → δ < r → ∃ ε > (0 : ℝ),
+      ∀ a ∈ D, ∀ u : ℂ, ‖u‖ = δ → ε ≤ ‖Q (a + u)‖ := by
+  classical
+  obtain ⟨w, hw⟩ := hq
+  have hlocal (a : ℂ) : ∀ᶠ u in 𝓝[≠] (0 : ℂ), Q (a + u) ≠ 0 := by
+    have hdiff : Differentiable ℂ (fun u : ℂ ↦ Q (a + u)) :=
+      hQ.comp ((differentiable_const a).add differentiable_id)
+    have ha : AnalyticOnNhd ℂ (fun u : ℂ ↦ Q (a + u)) univ :=
+      fun u _ ↦ hdiff.analyticAt u
+    refine ((ha 0 trivial).eventually_eq_zero_or_eventually_ne_zero).resolve_left ?_
+    intro hz
+    have hall := ha.eqOn_zero_of_preconnected_of_eventuallyEq_zero isPreconnected_univ
+      (mem_univ (0 : ℂ)) hz
+    exact hw (by simpa using hall (mem_univ (w - a)))
+  have hall : ∀ᶠ u in 𝓝[≠] (0 : ℂ), ∀ a ∈ D, Q (a + u) ≠ 0 :=
+    (Filter.eventually_all_finset D).mpr fun a _ ↦ hlocal a
+  obtain ⟨r, hr, hball⟩ := Metric.mem_nhdsWithin_iff.mp hall
+  refine ⟨r, hr, fun δ hδ hδr ↦ ?_⟩
+  let K : Set (ℂ × ℂ) := (D : Set ℂ) ×ˢ Metric.sphere 0 δ
+  have hK : IsCompact K := D.finite_toSet.isCompact.prod (isCompact_sphere _ _)
+  have hbound (q : ℂ × ℂ) (hqK : q ∈ K) : Q (q.1 + q.2) ≠ 0 := by
+    have hnorm := mem_sphere_zero_iff_norm.mp hqK.2
+    apply hball (a := q.2) _ q.1 hqK.1
+    refine ⟨Metric.mem_ball.mpr (by simpa [hnorm] using hδr), ?_⟩
+    rintro hzero
+    have he : q.2 = 0 := hzero
+    exact hδ.ne' (hnorm.symm.trans (by simp [he]))
+  by_cases hn : K.Nonempty
+  · obtain ⟨q, hqK, hmin⟩ := hK.exists_isMinOn hn
+      ((hQ.continuous.comp (continuous_fst.add continuous_snd)).norm.continuousOn)
+    refine ⟨‖Q (q.1 + q.2)‖, norm_pos_iff.mpr (hbound q hqK), fun a ha u hu ↦ ?_⟩
+    exact hmin (show (a, u) ∈ K from ⟨ha, mem_sphere_zero_iff_norm.mpr hu⟩)
+  · exact ⟨1, zero_lt_one, fun a ha u hu ↦
+      (hn ⟨(a, u), ha, mem_sphere_zero_iff_norm.mpr hu⟩).elim⟩
+
+/-- The reciprocal finite Euler product is entire and is nonzero at exponent one. -/
+private theorem reciprocal_euler_product_entire_nonzero (η : U) :
+    Differentiable ℂ (fun s : ℂ ↦ P(η,s)) ∧ P(η,1) ≠ 0 := by
+  classical
+  constructor
+  · apply Differentiable.fun_finsetProd
+    intro v _
+    unfold finiteHeckeEulerFactor
+    split_ifs
+    · simp only [inv_inv]
+      have hq : (v.val.asIdeal.absNorm : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr
+        ((Ideal.absNorm_eq_zero_iff).not.mpr v.val.ne_bot)
+      exact (differentiable_const _).sub ((differentiable_const _).mul
+        (differentiable_neg.const_cpow (Or.inl hq)))
+    · exact differentiable_const _
+  · apply Finset.prod_ne_zero_iff.mpr
+    intro v _
+    unfold finiteHeckeEulerFactor
+    split_ifs
+    · rw [inv_inv]
+      have hq : (1 : ℝ) < v.val.asIdeal.absNorm := by
+        exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v.val
+      have hlt : ‖(ideleClassNormTwist η 0).localValue v.val *
+          (v.val.asIdeal.absNorm : ℂ) ^ (-(1 : ℂ))‖ < 1 := by
+        rw [norm_mul, norm_ideleClassNormTwist_zero_localValue, one_mul,
+          ← Complex.ofReal_natCast, Complex.norm_cpow_eq_rpow_re_of_pos (zero_lt_one.trans hq)]
+        exact Real.rpow_lt_one_of_one_lt_of_neg hq (by norm_num)
+      exact fun he ↦ hlt.ne (by rw [← sub_eq_zero.mp he, norm_one])
+    · simp
+
+/-- At places of norm a power of a common base, equality of two phases identifies the
+whole corresponding translates of the pole-clearing product. -/
+private theorem reciprocal_euler_product_add_eq_of_phase_eq (η : U) (p : ℕ)
+    (hdegs : ∀ v : S, ∃ f : ℕ, 0 < f ∧ v.val.asIdeal.absNorm = p ^ f)
+    {a b : ℂ} (hab : Complex.exp ((Real.log (p : ℝ) : ℂ) * a) =
+      Complex.exp ((Real.log (p : ℝ) : ℂ) * b)) (u : ℂ) :
+    P(η,a + u) = P(η,b + u) := by
+  classical
+  have hphase : Complex.exp ((Real.log (p : ℝ) : ℂ) * (a + u)) =
+      Complex.exp ((Real.log (p : ℝ) : ℂ) * (b + u)) := by
+    simp only [mul_add, Complex.exp_add, hab]
+  apply Finset.prod_congr rfl
+  intro v _
+  obtain ⟨f, _, hf⟩ := hdegs v
+  have hq : 0 < (v.val.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast Nat.zero_lt_of_lt (HeightOneSpectrum.one_lt_absNorm v.val)
+  have hpow (x : ℂ) : (v.val.asIdeal.absNorm : ℂ) ^ (-x) =
+      (Complex.exp ((Real.log (p : ℝ) : ℂ) * x) ^ f)⁻¹ := by
+    rw [← Complex.ofReal_natCast, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hq.ne'),
+      ← Complex.ofReal_log hq.le, hf, Nat.cast_pow, Real.log_pow,
+      ← Complex.exp_nat_mul, ← Complex.exp_neg]
+    push_cast
+    congr 1
+    ring
+  simp only [finiteHeckeEulerFactor, hpow, hphase]
+
+/-- A finite set of exponential phases admits a uniform positive lower bound for the
+reciprocal Euler product on circles about all centers with those phases. Every sufficiently
+small positive radius is admissible, with a bound depending on the chosen radius. -/
+private theorem reciprocal_euler_product_lower_bound_on_phase_circles (η : U) (p : ℕ)
+    (hdegs : ∀ v : S, ∃ f : ℕ, 0 < f ∧ v.val.asIdeal.absNorm = p ^ f) (E : Finset ℂ) :
+    ∃ r > (0 : ℝ), ∀ δ : ℝ, 0 < δ → δ < r → ∃ ε > (0 : ℝ), ∀ a : ℂ,
+      Complex.exp ((Real.log (p : ℝ) : ℂ) * a) ∈ E →
+      ∀ u : ℂ, ‖u‖ = δ → ε ≤ ‖P(η,a + u)‖ := by
+  classical
+  let phase (a : ℂ) := Complex.exp ((Real.log (p : ℝ) : ℂ) * a)
+  let D := E.image (Function.invFun phase)
+  obtain ⟨hd, h₁⟩ := reciprocal_euler_product_entire_nonzero (S := S) η
+  obtain ⟨r, hr, h⟩ := finite_translates_lower_bound_on_small_circles D
+    (fun s : ℂ ↦ P(η,s)) hd ⟨1, h₁⟩
+  refine ⟨r, hr, fun δ hδ hδr ↦ ?_⟩
+  obtain ⟨ε, hε, hb⟩ := h δ hδ hδr
+  refine ⟨ε, hε, fun a ha u hu ↦ ?_⟩
+  have he : phase a = phase (Function.invFun phase (phase a)) :=
+    Function.apply_invFun_apply.symm
+  rw [reciprocal_euler_product_add_eq_of_phase_eq η p hdegs he u]
+  exact hb _ (Finset.mem_image_of_mem _ ha) u hu
+
+/-- Paper: Theorem 7.1.2.3, pp. 317–323. If all finite places in the stage lie over
+one rational prime, every sufficiently small fixed circle radius gives a uniform positive
+lower bound on the product of reciprocal finite Euler factors around all genuine finite
+pole centers. This applies to any global unitary lift of the stage character.
+Deviation: The lower bound concerns the actual shifted finite Euler denominators. -/
+theorem reciprocal_finite_euler_product_lower_bound_on_single_prime_circles
+    (χ : PontryaginDual (SIdeleQuotient F S)) (η : U)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ)) :
+    ∃ r > (0 : ℝ), ∀ δ : ℝ, 0 < δ → δ < r → ∃ ε > (0 : ℝ), ∀ a : ℂ,
+      (∃ v : S, sLocalPoleContributes χ (Sum.inr v) a) →
+      ∀ u : ℂ, ‖u‖ = δ → ε ≤ ‖P(η,a + u)‖ := by
+  classical
+  obtain ⟨p, _, hd⟩ := exists_prime_pow_norms_of_same_prime hsame
+  let phase (a : ℂ) := Complex.exp ((Real.log (p : ℝ) : ℂ) * a)
+  have hsets (v : S) : ∃ E : Finset ℂ, ∀ a : ℂ,
+      sLocalPoleContributes χ (Sum.inr v) a ↔ phase a ∈ E := by
+    obtain ⟨f, hf, hn⟩ := hd v
+    exact sLocalPoleContributes_finite_phase_finset χ v hf hn
+  choose E hE using hsets
+  obtain ⟨r, hr, h⟩ := reciprocal_euler_product_lower_bound_on_phase_circles η p hd
+    (Finset.univ.biUnion E)
+  refine ⟨r, hr, fun δ hδ hδr ↦ ?_⟩
+  obtain ⟨ε, hε, hb⟩ := h δ hδ hδr
+  refine ⟨ε, hε, fun a ha ↦ ?_⟩
+  obtain ⟨v, hv⟩ := ha
+  exact hb a (Finset.mem_biUnion.mpr ⟨v, Finset.mem_univ _, (hE v a).mp hv⟩)
+
+/-- Every sufficiently high strip pole is contributed by a finite place. -/
+private theorem sLocalStripPoles_high_finite_place (χ : PontryaginDual Jₛ) (A : ℝ) :
+    ∃ T : ℝ, ∀ a : strip(χ,A), T < |a.val.im| →
+      ∃ v : S, sLocalPoleContributes χ (Sum.inr v) a.val := by
+  let B := {a : ℂ | a.re ∈ Icc (-A) 1 ∧ ∃ w : InfinitePlace F,
+    sLocalPoleContributes χ (Sum.inl w) a}
+  have hB : B.Finite := sLocalPoleContributes_archimedean_finite_in_strip χ A
+  obtain ⟨T, hT⟩ := hB.isCompact.bddAbove_image Complex.continuous_im.abs.continuousOn
+  refine ⟨T, fun a ha ↦ ?_⟩
+  obtain ⟨w | v, hv⟩ := (sLocalPoleContributes_exists_iff χ a.val).mp a.prop.2
+  · have he : a.val ∈ B := ⟨⟨a.prop.1.1.le, a.prop.1.2.le⟩, w, hv⟩
+    exact (ha.not_ge (hT ⟨a.val, he, rfl⟩)).elim
+  · exact ⟨v, hv⟩
+
+/-- One radius isolates all finite centers, and the product clearing the finite poles
+is bounded below on every circle of that radius. -/
+private theorem sLocalFinitePoles_isolating_circles (χ : PontryaginDual Jₛ) (η : U)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ)) :
+    ∃ r ∈ Ioo (0 : ℝ) 1, ∃ ε > (0 : ℝ), ∀ a : ℂ,
+      (∃ v : S, sLocalPoleContributes χ (Sum.inr v) a) →
+      a.re = 0 ∧
+      (∀ z ∈ Metric.closedBall a r, z ≠ a →
+        0 ≤ meromorphicOrderAt (fun s ↦ sLocalRhoFactor (chart(χ) s)) z) ∧
+      ∀ z ∈ Metric.sphere a r, ε ≤ ‖P(η,z)‖ := by
+  obtain ⟨d, hd, hsep⟩ := sLocalStripPoles_uniformly_discrete_of_same_prime χ 1 hsame
+  obtain ⟨R, hR, hcircle⟩ :=
+    reciprocal_finite_euler_product_lower_bound_on_single_prime_circles χ η hsame
+  let r := min 1 (min d R) / 2
+  have hr : 0 < r := by dsimp [r]; positivity
+  have hlt : r < min 1 (min d R) := half_lt_self (lt_min zero_lt_one (lt_min hd hR))
+  have hr1 : r < 1 := hlt.trans_le (min_le_left _ _)
+  have hrd : r < d := hlt.trans_le ((min_le_right _ _).trans (min_le_left _ _))
+  have hrR : r < R := hlt.trans_le ((min_le_right _ _).trans (min_le_right _ _))
+  obtain ⟨ε, hε, heuler⟩ := hcircle r hr hrR
+  refine ⟨r, ⟨hr, hr1⟩, ε, hε, fun a ha ↦ ?_⟩
+  obtain ⟨v, hv⟩ := ha
+  have har : a.re = 0 := by
+    obtain ⟨m, t, _, _, he⟩ := hv
+    rw [he, Complex.mul_I_re, Complex.ofReal_im, neg_zero]
+  have hap := (sLocalPoleContributes_exists_iff χ a).mpr ⟨Sum.inr v, hv⟩
+  refine ⟨har, fun z hz hne ↦ ?_, fun z hz ↦ ?_⟩
+  · have hdist : ‖z - a‖ ≤ r := by simpa [dist_eq_norm] using Metric.mem_closedBall.mp hz
+    have hre : |z.re| ≤ r := by simpa [Complex.sub_re, har] using (Complex.abs_re_le_norm (z-a)).trans hdist
+    apply le_of_not_gt
+    intro hpole
+    have hza := hsep z ⟨⟨by linarith [(abs_le.mp hre).1], by linarith [(abs_le.mp hre).2]⟩, hpole⟩
+      a ⟨by simp [har], hap⟩ hne
+    exact hrd.not_ge (hza.trans hdist)
+  · have hdist : ‖z - a‖ = r := by simpa [dist_eq_norm] using Metric.mem_sphere.mp hz
+    simpa only [add_sub_cancel] using heuler a ⟨v, hv⟩ (z-a) hdist
+
+/-- On a compact set of ideles the Mellin kernel is bounded throughout the vertical
+strip containing the isolating circles of finite poles. -/
+private theorem sLocalNormPower_bounded_on_compact_strip (K : Set Jₛ) (hK : IsCompact K)
+    (lo hi : ℝ) :
+    ∃ D ≥ (0 : ℝ), ∀ g ∈ K, ∀ z : ℂ, z.re ∈ Icc lo hi →
+      ‖(((normₛ g).val : ℝ) : ℂ) ^ (-z)‖ ≤ D := by
+  let n (g : Jₛ) : ℝ := (normₛ g).val
+  have hn (g : Jₛ) : 0 < n g := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hcn : Continuous n := NNReal.continuous_coe.comp
+    (Units.continuous_val.comp (isProperMap_sIdeleQuotientNorm F S).continuous)
+  have hcont : Continuous (fun gx : Jₛ × ℝ ↦ (n gx.1) ^ (-gx.2)) :=
+    (hcn.comp continuous_fst).rpow (continuous_snd.neg) (fun gx ↦ Or.inl (hn gx.1).ne')
+  obtain ⟨D, hD⟩ := (hK.prod (isCompact_Icc (a := lo) (b := hi))).bddAbove_image hcont.continuousOn
+  refine ⟨max 0 D, le_max_left _ _, fun g hg z hz ↦ ?_⟩
+  rw [Complex.norm_cpow_eq_rpow_re_of_pos (hn g), Complex.neg_re]
+  exact (hD ⟨(g, z.re), ⟨hg, hz⟩, rfl⟩).trans (le_max_right _ _)
+
+/-- Paper: Theorem 7.1.2.3, pp. 317–323. Above a fixed height the true weighted Mellin
+integrand decays to arbitrary polynomial order on a common circle about each strip pole,
+uniformly over a compact set of ideles for each fixed test.
+Deviation: The punctured disk isolates a whole pole, including all of its principal part. -/
+theorem sLocalStripPoles_mellin_circle_decay_of_same_prime
+    (χ : PontryaginDual Jₛ) (A : ℝ)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ))
+    (f : Tests) (K : Set Jₛ) (hK : IsCompact K) (N : ℕ) :
+    ∃ r > (0 : ℝ), ∃ C ≥ (0 : ℝ), ∃ T : ℝ, ∀ a : strip(χ,A), T < |a.val.im| →
+      ∀ g ∈ K,
+      (∀ z ∈ Metric.closedBall a.val r, z ≠ a.val →
+        AnalyticAt ℂ (fun s ↦ ((((normₛ g).val : ℝ) : ℂ) ^ (-s)) * Z(f,χ,s)) z) ∧
+      ∀ z ∈ Metric.sphere a.val r,
+        ‖((((normₛ g).val : ℝ) : ℂ) ^ (-z)) * Z(f,χ,z)‖ ≤ C / (1 + |a.val.im|) ^ N := by
+  classical
+  obtain ⟨η, he, heq, _⟩ := sLocal_character_extension χ
+  obtain ⟨r, hr, ε, hε, hgeom⟩ := sLocalFinitePoles_isolating_circles χ η hsame
+  obtain ⟨H, hhigh⟩ := sLocalStripPoles_high_finite_place χ A
+  obtain ⟨D, hD, hkernel⟩ := sLocalNormPower_bounded_on_compact_strip K hK (-1) 1
+  obtain ⟨L, hL, Y, htail⟩ := RiemannMasullo.sLocalIdelicZFunction_cleared_strip_tails χ η f he heq (-1) 1 N
+  refine ⟨r, hr.1, (D * (2 : ℝ) ^ N) * (L / ε), by positivity, max H (max (Y+1) 3), ?_⟩
+  intro a ha g hg
+  obtain ⟨har, hreg, hcircle⟩ := hgeom a.val (hhigh a ((le_max_left _ _).trans_lt ha))
+  constructor
+  · intro z hz hne
+    have hp := sLocalIdelicZFunction_poles f χ z
+    rw [min_eq_left (hreg z hz hne)] at hp
+    have hzeta := ((sLocalIdelicZFunction_meromorphic f χ) (mem_univ z)).meromorphicOrderAt_nonneg_iff_analyticAt.mp hp
+    have hpos : 0 < ((normₛ g).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+    exact ((differentiable_neg.const_cpow (Or.inl (Complex.ofReal_ne_zero.mpr hpos.ne'))).analyticAt z).mul hzeta
+  · intro z hz
+    have hdist : ‖z - a.val‖ = r := by simpa [dist_eq_norm] using Metric.mem_sphere.mp hz
+    have hre : |z.re| ≤ r := by simpa [Complex.sub_re, har, hdist] using Complex.abs_re_le_norm (z - a.val)
+    have hzre : z.re ∈ Icc (-1 : ℝ) 1 := ⟨by linarith [(abs_le.mp hre).1, hr.2],
+      by linarith [(abs_le.mp hre).2, hr.2]⟩
+    have him : |a.val.im| ≤ |z.im| + r := by
+      calc
+        |a.val.im| = |(a.val-z).im + z.im| := by rw [Complex.sub_im, sub_add_cancel]
+        _ ≤ |(a.val-z).im| + |z.im| := abs_add_le _ _
+        _ ≤ |z.im| + r := by linarith [Complex.abs_im_le_norm (a.val-z), norm_sub_rev a.val z]
+    have hY : Y + 1 < |a.val.im| := ((le_max_left _ _).trans (le_max_right _ _)).trans_lt ha
+    have h3 : 3 < |a.val.im| := ((le_max_right _ _).trans (le_max_right _ _)).trans_lt ha
+    have hT := htail z hzre (show Y < |z.im| by linarith [hr.2])
+    have hZ : |z.im| ^ N * ‖Z(f,χ,z)‖ ≤ L / ε := by
+      apply (le_div_iff₀ hε).mpr
+      calc
+        _ = |z.im| ^ N * (ε * ‖Z(f,χ,z)‖) := by ring
+        _ ≤ |z.im| ^ N * (‖P(η,z)‖ * ‖Z(f,χ,z)‖) :=
+          mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_right (hcircle z hz) (norm_nonneg _)) (by positivity)
+        _ ≤ L := by simpa only [norm_mul] using hT
+    have hheight : (1+|a.val.im|) ^ N ≤ (2 : ℝ)^N * |z.im|^N := by
+      rw [← mul_pow]
+      exact pow_le_pow_left₀ (by positivity) (by linarith [hr.2]) N
+    apply (le_div_iff₀ (pow_pos (by positivity) N)).mpr
+    rw [norm_mul]
+    calc
+      _ ≤ (D * ‖Z(f,χ,z)‖) * ((2 : ℝ)^N * |z.im|^N) := mul_le_mul
+        (mul_le_mul_of_nonneg_right (hkernel g hg z hzre) (norm_nonneg _)) hheight
+        (by positivity) (mul_nonneg hD (norm_nonneg _))
+      _ = (D * (2 : ℝ)^N) * (|z.im|^N * ‖Z(f,χ,z)‖) := by ring
+      _ ≤ _ := mul_le_mul_of_nonneg_left hZ (by positivity)
+
+/-- Paper: Theorem 7.1.2.3, pp. 317–323. At one rational prime the actual residue term
+decays to every polynomial order in the height of a strip pole, uniformly on a compact
+set of ideles for a fixed Schwartz–Bruhat test.
+Deviation: A residue includes the full contribution of a pole of any multiplicity. -/
+private theorem sLocalStripPoles_weighted_residue_decay_of_same_prime
+    (χ : PontryaginDual Jₛ) (A : ℝ)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ))
+    (f : Tests) (K : Set Jₛ) (hK : IsCompact K) (N : ℕ) :
+    ∃ C ≥ (0 : ℝ), ∃ T : ℝ, ∀ a : strip(χ,A), T < |a.val.im| → ∀ g ∈ K,
+      ‖star (χ g : ℂ) * complexResidue (fun z ↦ ((((normₛ g).val : ℝ) : ℂ) ^ (-z)) *
+        Z(f,χ,z)) a.val‖ ≤ C / (1 + |a.val.im|) ^ N := by
+  obtain ⟨r, hr, C, hC, T, hc⟩ := sLocalStripPoles_mellin_circle_decay_of_same_prime
+    χ A hsame f K hK N
+  refine ⟨r*C, mul_nonneg hr.le hC, T, fun a ha g hg ↦ ?_⟩
+  obtain ⟨hreg, hcircle⟩ := hc a ha g hg
+  rw [norm_mul, norm_star, Circle.norm_coe, one_mul]
+  simpa only [mul_div_assoc] using norm_complexResidue_le_circle hr hreg hcircle
+
+/-- A fixed Mellin residue is bounded over a compact set of ideles, at any center. -/
+private theorem sLocal_weighted_residue_bounded_at (χ : PontryaginDual Jₛ) (f : Tests)
+    (K : Set Jₛ) (hK : IsCompact K) (a : ℂ) :
+    ∃ B ≥ (0 : ℝ), ∀ g ∈ K, ‖star (χ g : ℂ) * complexResidue
+      (fun z ↦ ((((normₛ g).val : ℝ) : ℂ) ^ (-z)) * Z(f,χ,z)) a‖ ≤ B := by
+  have hm := ((sLocalIdelicZFunction_meromorphic f χ) (mem_univ a)).meromorphicAt
+  obtain ⟨R, hR, h⟩ := Metric.nhdsWithin_basis_ball.eventually_iff.mp hm.eventually_analyticAt
+  let r := R / 2
+  have hr : 0 < r := half_pos hR
+  have hrR : r < R := half_lt_self hR
+  have hZ (z : ℂ) (hz : z ∈ Metric.closedBall a r) (hne : z ≠ a) :
+      AnalyticAt ℂ (fun s ↦ Z(f,χ,s)) z :=
+    h ⟨Metric.mem_ball.mpr ((Metric.mem_closedBall.mp hz).trans_lt hrR), hne⟩
+  have hcon : ContinuousOn (fun z ↦ Z(f,χ,z)) (Metric.sphere a r) := by
+    intro z hz
+    apply (hZ z (Metric.sphere_subset_closedBall hz) ?_).continuousAt.continuousWithinAt
+    intro hza
+    have hd := Metric.mem_sphere.mp hz
+    rw [hza, dist_self] at hd
+    exact hr.ne' hd.symm
+  obtain ⟨M, hM⟩ := (isCompact_sphere a r).bddAbove_image hcon.norm
+  obtain ⟨D, hD, hk⟩ := sLocalNormPower_bounded_on_compact_strip K hK (a.re-r) (a.re+r)
+  refine ⟨r * (D * max 0 M), by positivity, fun g hg ↦ ?_⟩
+  rw [norm_mul, norm_star, Circle.norm_coe, one_mul]
+  apply norm_complexResidue_le_circle hr
+  · intro z hz hne
+    have hpos : 0 < ((normₛ g).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+    exact ((differentiable_neg.const_cpow (Or.inl (Complex.ofReal_ne_zero.mpr hpos.ne'))).analyticAt z).mul
+      (hZ z hz hne)
+  · intro z hz
+    have hd : ‖z-a‖ = r := by simpa [dist_eq_norm] using Metric.mem_sphere.mp hz
+    have hdre := Complex.abs_re_le_norm (z-a)
+    rw [Complex.sub_re, hd, abs_le] at hdre
+    rw [norm_mul]
+    exact mul_le_mul (hk g hg z ⟨by linarith [hdre.1], by linarith [hdre.2]⟩)
+      ((hM ⟨z, hz, rfl⟩).trans (le_max_right _ _)) (norm_nonneg _) hD
+
+/-- Paper: Theorem 7.1.2.3, pp. 317–323. For a fixed test at one rational prime, one
+constant bounds the weighted residues at all strip poles by any prescribed inverse
+power of their height, uniformly on a compact set of ideles.
+Deviation: Each distinct pole carries its full weighted Mellin residue. -/
+private theorem sLocalStripPoles_weighted_residue_bound_of_same_prime
+    (χ : PontryaginDual Jₛ) (A : ℝ)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ))
+    (f : Tests) (K : Set Jₛ) (hK : IsCompact K) (N : ℕ) :
+    ∃ C ≥ (0 : ℝ), ∀ a : strip(χ,A), ∀ g ∈ K,
+      ‖star (χ g : ℂ) * complexResidue (fun z ↦ ((((normₛ g).val : ℝ) : ℂ) ^ (-z)) *
+        Z(f,χ,z)) a.val‖ ≤ C / (1 + |a.val.im|) ^ N := by
+  classical
+  obtain ⟨L, hL, T, htail⟩ := sLocalStripPoles_weighted_residue_decay_of_same_prime χ A hsame f K hK N
+  let low := {a : strip(χ,A) | |a.val.im| ≤ T}
+  have hlow : low.Finite := by
+    have hrect := finite_rectanglePoles (f := fun z ↦ sLocalRhoFactor (chart(χ) z))
+      (a := -A - 1) (b := 2) (σ₁ := -A) (σ₂ := 1) (t₁ := -T-1) (t₂ := T+1)
+      (sLocalRhoFactor_meromorphic χ).meromorphicOn (by linarith) (by norm_num)
+    apply (hrect.preimage (f := fun a : strip(χ,A) ↦ a.val) Subtype.val_injective.injOn).subset
+    intro a ha
+    have him := abs_le.mp (show |a.val.im| ≤ T from ha)
+    exact ⟨a.prop.1, ⟨by linarith [him.1], by linarith [him.2]⟩, a.prop.2⟩
+  choose B _ hB using fun a : strip(χ,A) ↦ sLocal_weighted_residue_bounded_at χ f K hK a.val
+  obtain ⟨D, hD⟩ := (hlow.image (fun a : strip(χ,A) ↦ B a * (1 + |a.val.im|)^N)).bddAbove
+  refine ⟨max L D, hL.trans (le_max_left _ _), fun a g hg ↦ ?_⟩
+  by_cases ht : T < |a.val.im|
+  · exact (htail a ht g hg).trans (div_le_div_of_nonneg_right (le_max_left _ _) (by positivity))
+  · apply (le_div_iff₀ (pow_pos (by positivity) N)).mpr
+    exact (mul_le_mul_of_nonneg_right (hB a g hg) (by positivity)).trans
+      ((hD ⟨a, le_of_not_gt ht, rfl⟩).trans (le_max_right _ _))
+
+private theorem unitaryChart_normTwist_add (χ : PontryaginDual Jₛ) (a z : ℂ) :
+    twistₛ (chart(χ) a) z = chart(χ) (z + a) := by
+  ext1 g
+  let n : ℂ := (((normₛ g).val : ℝ) : ℂ)
+  change (χ g : ℂ) * n ^ a * n ^ z = (χ g : ℂ) * n ^ (z + a)
+  rw [add_comm, Complex.cpow_add _ _ (Complex.ofReal_ne_zero.mpr
+    (NNReal.coe_ne_zero.mpr (normₛ g).ne_zero)), mul_assoc]
+
+private theorem complexResidue_add_center (V : ℂ → ℂ) (a : ℂ) :
+    complexResidue (fun z ↦ V (z + a)) 0 = complexResidue V a := by
+  simp only [complexResidue, circleIntegral, deriv_circleMap]
+  simp only [circleMap, zero_add, add_comm _ a]
+
+private theorem exists_sLocalMellinPoleTerm_continuousLinearMap (χ : PontryaginDual Jₛ) (a : ℂ) (g : Jₛ) :
+    ∃ ℓ : StrongDual ℂ Tests, ∀ f, ℓ f = sLocalMellinPoleTerm χ f g a := by
+  obtain ⟨u, hu⟩ := (QuotientGroup.mk_surjective g⁻¹)
+  let T : Tests →L[ℂ] Tests :=
+    ⟨unitTranslateEnd u, continuous_sAdeleSchwartz_unitTranslate.comp (continuous_const.prodMk continuous_id)⟩
+  refine ⟨(sLocalPrincipalPartCoeff (chart(χ) a) 1).comp T, fun f ↦ ?_⟩
+  let r : ℝ := (normₛ g).val
+  let W (z : ℂ) := (r : ℂ) ^ (-z) * sLocalIdelicZFunction f (chart(χ) z)
+  have hr : 0 < r := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hW : MeromorphicAt W a :=
+    ((differentiable_neg.const_cpow (c := (r : ℂ))
+      (Or.inl (Complex.ofReal_ne_zero.mpr hr.ne'))).analyticAt a).meromorphicAt.mul
+      ((sLocalIdelicZFunction_meromorphic f χ) (mem_univ a)).meromorphicAt
+  have hunit (z : ℂ) : chart(χ) z g⁻¹ = star (χ g : ℂ) * (r : ℂ) ^ (-z) := by
+    rw [map_inv]
+    change ((χ g : ℂ) * (r : ℂ) ^ z)⁻¹ = _
+    rw [mul_inv, Complex.cpow_neg, ← Circle.coe_inv, Circle.coe_inv_eq_conj]
+    rfl
+  change sLocalZLaurentCoeff (schwartzBruhatUnitTranslate u f) (chart(χ) a) (- (1 : ℤ)) = _
+  unfold sLocalZLaurentCoeff
+  simp only [neg_add_cancel, zpow_zero, div_one]
+  have hshift := unitaryChart_normTwist_add χ a
+  simp_rw [hshift]
+  rw [complexResidue_add_center (fun z ↦ sLocalIdelicZFunction (schwartzBruhatUnitTranslate u f) (chart(χ) z)) a]
+  have hfun : (fun z ↦ sLocalIdelicZFunction (schwartzBruhatUnitTranslate u f) (chart(χ) z)) =
+      fun z ↦ star (χ g : ℂ) * W z + 0 := by
+    funext z
+    rw [sLocalPrincipalPartCoeff_translate_zeta, hu, hunit]
+    simp only [W, add_zero, mul_assoc]
+  rw [hfun, complexResidue_const_mul_add (G := fun _ ↦ 0) (star (χ g : ℂ)) hW analyticAt_const.meromorphicAt]
+  have hz : complexResidue (fun _ ↦ (0 : ℂ)) a = 0 :=
+    complexResidue_zero_of_analytic_germ (H := fun _ ↦ 0) analyticAt_const (.of_forall fun _ ↦ rfl)
+  rw [hz, add_zero]
+  rfl
+
+private theorem strongDual_family_bounded_on_bounded_set {X ι : Type*} [AddCommGroup X] [Module ℂ X]
+    [UniformSpace X] [IsUniformAddGroup X] [PolynormableSpace ℂ X] [BarrelledSpace ℂ X]
+    (L : ι → StrongDual ℂ X) (hb : ∀ x, ∃ C : ℝ, ∀ i, ‖L i x‖ ≤ C)
+    {B : Set X} (hB : Bornology.IsVonNBounded ℂ B) :
+    ∃ C : ℝ, ∀ i, ∀ x ∈ B, ‖L i x‖ ≤ C := by
+  have hpoint (x : X) : Bornology.IsVonNBounded ℂ (range fun i ↦ L i x) := by
+    obtain ⟨C, hC⟩ := hb x
+    exact (NormedSpace.isVonNBounded_iff' ℂ).2 ⟨C, forall_mem_range.mpr hC⟩
+  have heq := PolynormableSpace.banach_steinhaus (𝓕 := L) hpoint
+  obtain ⟨q, hq, hle⟩ := (norm_withSeminorms ℂ ℂ).uniformEquicontinuous_iff_exists_continuous_seminorm
+    (fun i ↦ (L i).toLinearMap) |>.mp heq ()
+  obtain ⟨C, _, hC⟩ := (PolynormableSpace.withSeminorms ℂ X).isVonNBounded_iff_seminorm_bounded.mp
+    hB ⟨q, hq⟩
+  exact ⟨C, fun i x hx ↦ (hle i x).trans (hC x hx).le⟩
+
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323. At every one-prime strip pole the complete
+Mellin residue decays to every polynomial order, simultaneously over a bounded set of
+Schwartz–Bruhat tests and a compact set of idèles. -/
+theorem sLocalSinglePrime_residue_bound_on_bounded_compact (χ : PontryaginDual Jₛ) (A : ℝ)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ))
+    (B : Set Tests) (hB : Bornology.IsVonNBounded ℂ B) (K : Set Jₛ) (hK : IsCompact K) (N : ℕ) :
+    ∃ C ≥ (0 : ℝ), ∀ a : strip(χ,A), ∀ f ∈ B, ∀ g ∈ K,
+      ‖sLocalMellinPoleTerm χ f g a.val‖ ≤ C / (1 + |a.val.im|) ^ N := by
+  classical
+  let : BarrelledSpace ℂ Tests := (sAdeleSchwartz_montel (F := F) S).1
+  let I := strip(χ,A) × K
+  let h (i : I) : ℝ := (1 + |i.1.val.im|) ^ N
+  have hpos (i : I) : 0 < h i := by dsimp only [h]; positivity
+  choose R hR using fun i : I ↦ exists_sLocalMellinPoleTerm_continuousLinearMap χ i.1.val i.2.val
+  let weighted (i : I) : StrongDual ℂ Tests := (h i : ℂ) • R i
+  have hU (i : I) (f : Tests) : ‖weighted i f‖ = h i * ‖sLocalMellinPoleTerm χ f i.2.val i.1.val‖ := by
+    simp only [weighted, smul_apply, norm_smul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos (hpos i), hR]
+  have hb (f : Tests) : ∃ C : ℝ, ∀ i : I, ‖weighted i f‖ ≤ C := by
+    obtain ⟨C, _, hC⟩ := sLocalStripPoles_weighted_residue_bound_of_same_prime χ A hsame f K hK N
+    refine ⟨C, fun i ↦ ?_⟩
+    rw [hU, mul_comm]
+    exact (le_div_iff₀ (hpos i)).mp (by simpa only [sLocalMellinPoleTerm] using hC i.1 i.2.val i.2.property)
+  obtain ⟨C, hC⟩ := strongDual_family_bounded_on_bounded_set weighted hb hB
+  refine ⟨max C 0, le_max_right _ _, fun a f hf g hg ↦ ?_⟩
+  let i : I := (a, ⟨g, hg⟩)
+  apply (le_div_iff₀ (hpos i)).mpr
+  change ‖sLocalMellinPoleTerm χ f i.2.val i.1.val‖ * h i ≤ _
+  rw [mul_comm, ← hU]
+  exact (hC i f hf).trans (le_max_left _ _)
+
+/-- The unconditional sum of the actual Mellin residues assigned to a given place or block. -/
+def sLocalAssignedMellinPoleSum {ι : Type*} (χ : PontryaginDual Jₛ) (A : ℝ)
+    (assign : ℂ → ι) (v : ι) (f : Tests) (g : Jₛ) : ℂ :=
+  ∑' a : strip(χ,A), if assign a.val = v then sLocalMellinPoleTerm χ f g a.val else 0
+
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323; absolute sums on p. 389. For a single
+residue characteristic, the full weighted residues are absolutely summable over all strip
+poles. For every assignment both the complex sums and the sums of their norms converge
+uniformly on each product of a bounded set of tests and a compact set of idèles, with the
+upper and lower heights tending independently to infinity. -/
+theorem sLocalSinglePrime_separatePlace_absolute {ι : Type*}
+    (χ : PontryaginDual Jₛ) (A : ℝ)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ)) (assign : ℂ → ι) :
+    (∀ f g, Summable (fun a : strip(χ,A) ↦ ‖sLocalMellinPoleTerm χ f g a.val‖)) ∧
+    ∀ (v : ι) (B : Set Tests), Bornology.IsVonNBounded ℂ B → ∀ K : Set Jₛ, IsCompact K →
+      TendstoUniformlyOn (fun h fg ↦ ∑ a ∈ (sLocalStripPoleWindow χ A h).filter (assign · = v),
+        sLocalMellinPoleTerm χ fg.1 fg.2 a)
+        (fun fg ↦ sLocalAssignedMellinPoleSum χ A assign v fg.1 fg.2) (atBot ×ˢ atTop) (B ×ˢ K) ∧
+      TendstoUniformlyOn (fun h fg ↦ ∑ a ∈ (sLocalStripPoleWindow χ A h).filter (assign · = v),
+        ‖sLocalMellinPoleTerm χ fg.1 fg.2 a‖)
+        (fun fg ↦ ∑' a : strip(χ,A),
+          if assign a.val = v then ‖sLocalMellinPoleTerm χ fg.1 fg.2 a.val‖ else 0)
+        (atBot ×ˢ atTop) (B ×ˢ K) := by
+  let w (a : strip(χ,A)) := 1 / (1 + |a.val.im|) ^ 2
+  have hw : Summable w := summable_sLocalStripPoles_inv_height_sq χ A hsame
+  constructor
+  · intro f g
+    obtain ⟨C, _, hC⟩ := sLocalStripPoles_weighted_residue_bound_of_same_prime
+      χ A hsame f {g} isCompact_singleton 2
+    refine (hw.mul_left C).of_norm_bounded ?_
+    intro a
+    rw [Real.norm_of_nonneg (norm_nonneg _)]
+    simpa only [sLocalMellinPoleTerm, w, div_eq_mul_inv, one_mul] using hC a g (mem_singleton g)
+  · intro v B hB K hK
+    obtain ⟨C, _, hC⟩ := sLocalSinglePrime_residue_bound_on_bounded_compact χ A hsame B hB K hK 2
+    let M (a : strip(χ,A)) := C * w a
+    have hM : Summable M := hw.mul_left C
+    have hb (a : strip(χ,A)) (fg : Tests × Jₛ) (hfg : fg ∈ B ×ˢ K) :
+        ‖sLocalMellinPoleTerm χ fg.1 fg.2 a.val‖ ≤ M a := by
+      simpa only [M, w, div_eq_mul_inv, one_mul] using hC a fg.1 hfg.1 fg.2 hfg.2
+    have he : MeromorphicOn (fun z ↦ sLocalRhoFactor (chart(χ) z)) (Complex.re ⁻¹' Ioo (-A - 1) 2) :=
+      (sLocalRhoFactor_meromorphic χ).meromorphicOn
+    constructor
+    · simpa only [sLocalStripPoleWindow, sLocalAssignedMellinPoleSum] using
+        tendstoUniformlyOn_separatePlacePartialSum_of_cofinite_bound
+        (a := -A-1) (b := 2) (σ₁ := -A) (σ₂ := 1) he (by linarith) (by norm_num)
+        assign (fun a fg ↦ sLocalMellinPoleTerm χ fg.1 fg.2 a) (B ×ˢ K) M hM (.of_forall hb) v
+    · have hn (a : strip(χ,A)) (fg : Tests × Jₛ) (hfg : fg ∈ B ×ˢ K) :
+          ‖‖sLocalMellinPoleTerm χ fg.1 fg.2 a.val‖‖ ≤ M a :=
+        (Real.norm_of_nonneg (norm_nonneg _)).le.trans (hb a fg hfg)
+      simpa only [sLocalStripPoleWindow] using
+        tendstoUniformlyOn_separatePlacePartialSum_of_cofinite_bound
+          (a := -A-1) (b := 2) (σ₁ := -A) (σ₂ := 1) he (by linarith) (by norm_num)
+          assign (fun a fg ↦ ‖sLocalMellinPoleTerm χ fg.1 fg.2 a‖) (B ×ˢ K) M hM (.of_forall hn) v
+
+/-- The coefficient of order `-(j+1)` at the chart center is the residue of the zeta
+integral multiplied by the corresponding nonnegative power of the centered variable. -/
+private theorem sLocalZLaurentCoeff_neg_succ_eq_residue (χ : PontryaginDual Jₛ) (f : Tests)
+    (a : ℂ) (j : ℕ) :
+    sLocalZLaurentCoeff f (chart(χ) a) (-(j.succ : ℤ)) =
+      complexResidue (fun z ↦ (z-a)^j * sLocalIdelicZFunction f (chart(χ) z)) a := by
+  have hshift := unitaryChart_normTwist_add χ a
+  unfold sLocalZLaurentCoeff
+  rw [← complexResidue_add_center (fun z ↦ (z-a)^j * sLocalIdelicZFunction f (chart(χ) z)) a]
+  congr 1
+  funext z
+  simp [hshift, zpow_neg, div_eq_mul_inv, mul_comm]
+
+/-- Paper: Definition 7.1.2.1, p. 316, and (8.4.0.2), p. 389. Each principal Laurent
+coefficient of fixed order decays to all polynomial orders along the high strip poles
+above one rational prime.
+Deviation: Principal coefficients have negative Laurent indices. -/
+theorem sLocalZLaurentCoeff_neg_decay_of_same_prime (χ : PontryaginDual Jₛ) (A : ℝ)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ))
+    (f : Tests) (k N : ℕ) (hk : 0 < k) :
+    ∃ D ≥ (0 : ℝ), ∀ᶠ a : strip(χ,A) in cofinite,
+      ‖sLocalZLaurentCoeff f (chart(χ) a.val) (-(k : ℤ))‖ ≤ D / (1 + |a.val.im|)^N := by
+  classical
+  cases k with
+  | zero => exact (Nat.lt_irrefl _ hk).elim
+  | succ j =>
+    obtain ⟨r, hr, C, hC, T, h⟩ := sLocalStripPoles_mellin_circle_decay_of_same_prime χ A hsame
+      f {1} isCompact_singleton N
+    refine ⟨r * r^j * C, by positivity, ?_⟩
+    filter_upwards [eventually_sLocalStripPoles_abs_im_gt χ A T] with a ha
+    obtain ⟨hreg, hcircle⟩ := h a ha 1 (mem_singleton _)
+    have hZ (z : ℂ) (hz : z ∈ Metric.closedBall a.val r) (hne : z ≠ a.val) :
+        AnalyticAt ℂ (fun s ↦ sLocalIdelicZFunction f (chart(χ) s)) z := by
+      simpa using hreg z hz hne
+    have hZc (z : ℂ) (hz : z ∈ Metric.sphere a.val r) :
+        ‖sLocalIdelicZFunction f (chart(χ) z)‖ ≤ C / (1 + |a.val.im|)^N := by
+      simpa using hcircle z hz
+    rw [sLocalZLaurentCoeff_neg_succ_eq_residue]
+    calc
+      _ ≤ r * (r^j * (C / (1 + |a.val.im|)^N)) := by
+        apply norm_complexResidue_le_circle hr
+        · intro z hz hne
+          exact ((analyticAt_id.sub analyticAt_const).pow j).mul (hZ z hz hne)
+        · intro z hz
+          have hd : ‖z-a.val‖ = r := by simpa [dist_eq_norm] using Metric.mem_sphere.mp hz
+          rw [norm_mul, norm_pow, hd]
+          exact mul_le_mul_of_nonneg_left (hZc z hz) (by positivity)
+      _ = _ := by ring
+
+/-- Paper: Equation (8.4.0.2), p. 389. When the finite places lie over a single rational
+prime, the absolute values of each fixed principal Laurent coefficient are summable over
+all distinct strip poles for every Schwartz–Bruhat test.
+Deviation: The coefficient of the term of logarithmic degree `k-1` has Laurent index `-k`. -/
+theorem summable_sLocalZLaurentCoeff_neg_of_same_prime (χ : PontryaginDual Jₛ) (A : ℝ)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ))
+    (f : Tests) (k : ℕ) (hk : 0 < k) :
+    Summable (fun a : strip(χ,A) ↦ ‖sLocalZLaurentCoeff f (chart(χ) a.val) (-(k : ℤ))‖) := by
+  obtain ⟨C, _, hc⟩ := sLocalZLaurentCoeff_neg_decay_of_same_prime χ A hsame f k 2 hk
+  apply ((summable_sLocalStripPoles_inv_height_sq χ A hsame).mul_left C).of_norm_bounded_eventually
+  filter_upwards [hc] with a ha
+  simpa [div_eq_mul_inv] using ha
+
+end
+
+/-! ## Common-height contour on an admissible left line -/
+
+section CommonHeightContour
+
+local notation "U" => PontryaginDual (IdeleClassGroup (𝓞 F) F)
+local notation "P(" η "," z ")" => ∏ v : S, (finiteHeckeEulerFactor η v.val z)⁻¹
+local notation "Z(" f "," χ "," z ")" => sLocalIdelicZFunction f (chart(χ) z)
+local notation "vz(" σ "," y ")" => ((σ : ℝ) : ℂ) + ((y : ℝ) : ℂ) * Complex.I
+
+private theorem euler_reciprocal_lower_on_line (η : U) (σ : ℝ) (hσ : σ ≠ 0) :
+    ∃ c > (0 : ℝ), ∀ y : ℝ, c ≤ ‖P(η,vz(σ,y))‖ := by
+  classical
+  let c (v : S) : ℝ := min 1 |1 - (v.val.asIdeal.absNorm : ℝ) ^ (-σ)|
+  have hq (v : S) : 1 < (v.val.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val
+  have hpos (v : S) : 0 < c v := by
+    apply lt_min one_pos (abs_pos.mpr (sub_ne_zero.mpr ?_))
+    rcases lt_or_gt_of_ne hσ with hs | hs
+    · exact (Real.one_lt_rpow (hq v) (neg_pos.mpr hs)).ne
+    · exact (Real.rpow_lt_one_of_one_lt_of_neg (hq v) (neg_neg_of_pos hs)).ne'
+  refine ⟨∏ v, c v, Finset.prod_pos (fun v _ ↦ hpos v), fun y ↦ ?_⟩
+  rw [norm_prod]
+  apply Finset.prod_le_prod₀ (fun v _ ↦ (hpos v).le)
+  intro v _
+  unfold finiteHeckeEulerFactor
+  split_ifs
+  · rw [inv_inv]
+    apply (min_le_right _ _).trans
+    have h := abs_norm_sub_norm_le (1 : ℂ)
+      ((ideleClassNormTwist η 0).localValue v.val * (v.val.asIdeal.absNorm : ℂ) ^ (-(vz(σ,y))))
+    rw [norm_one, norm_mul, norm_ideleClassNormTwist_zero_localValue, one_mul,
+      ← Complex.ofReal_natCast, Complex.norm_cpow_eq_rpow_re_of_pos (zero_lt_one.trans (hq v))] at h
+    simpa using h
+  · simpa only [inv_one, norm_one] using min_le_left (1 : ℝ) _
+
+private theorem normPower_mul_verticalIntegrable_of_order
+    (χ : PontryaginDual Jₛ) (f : Tests) (r : ℝ) (hr : 0 < r) (σ : ℝ) (hσ : σ ≠ 0)
+    (hreg : ∀ y : ℝ, 0 ≤ meromorphicOrderAt (fun z ↦ Z(f,χ,z)) (vz(σ,y))) :
+    Complex.VerticalIntegrable (fun z ↦ (r : ℂ) ^ (-z) * Z(f,χ,z)) σ := by
+  obtain ⟨η, he, heq, -⟩ := sLocal_character_extension χ
+  obtain ⟨C, hC, T, htail⟩ := sLocalIdelicZFunction_cleared_strip_tails χ η f he heq σ σ 2
+  obtain ⟨c, hc, hP⟩ := euler_reciprocal_lower_on_line (S := S) η σ hσ
+  let trace (y : ℝ) := (r : ℂ) ^ (-(vz(σ,y))) * Z(f,χ,vz(σ,y))
+  have hrC : (r : ℂ) ≠ 0 := by exact_mod_cast hr.ne'
+  have htrace : Continuous trace := by
+    apply continuous_iff_continuousAt.mpr
+    intro y
+    have hf := ((sLocalIdelicZFunction_meromorphic f χ) (mem_univ (vz(σ,y)))).meromorphicOrderAt_nonneg_iff_analyticAt.mp (hreg y)
+    have hu : AnalyticAt ℂ (fun z : ℂ ↦ (r : ℂ)^(-z)) (vz(σ,y)) :=
+      (differentiable_neg.const_cpow (Or.inl hrC)).analyticAt _
+    exact ContinuousAt.comp (g := fun z ↦ (r : ℂ)^(-z) * Z(f,χ,z)) (f := fun x : ℝ ↦ vz(σ,x)) (hu.mul hf).continuousAt (by fun_prop)
+  change Integrable trace
+  apply htrace.locallyIntegrable.integrable_of_isBigO_cocompact _
+    (integrable_inv_one_add_sq.integrableAtFilter _)
+  rw [cocompact_eq_atBot_atTop, ← comap_abs_atTop]
+  apply Asymptotics.IsBigO.of_bound (2 * (r ^ (-σ) * C / c))
+  have hylarge : ∀ᶠ y : ℝ in comap abs atTop, max T 1 < |y| :=
+    tendsto_comap.eventually_gt_atTop _
+  filter_upwards [hylarge] with y hy
+  have h₁ : 1 < |y| := (le_max_right T 1).trans_lt hy
+  have hT : T < |y| := (le_max_left T 1).trans_lt hy
+  have hb := htail (vz(σ,y)) (by simp) (by simpa using hT)
+  simp only [Complex.add_im, Complex.ofReal_im, Complex.mul_I_im, Complex.ofReal_re,
+    zero_add, norm_mul] at hb
+  have hsize : |y|^2 * ‖Z(f,χ,vz(σ,y))‖ ≤ C / c := by
+    apply (le_div_iff₀ hc).mpr
+    calc
+      |y|^2 * ‖Z(f,χ,vz(σ,y))‖ * c ≤ |y|^2 * ‖Z(f,χ,vz(σ,y))‖ * ‖P(η,vz(σ,y))‖ :=
+        mul_le_mul_of_nonneg_left (hP y) (by positivity)
+      _ = _ := by ring
+      _ ≤ _ := hb
+  have hy2 : 1 ≤ y^2 := by rw [← sq_abs]; exact one_le_pow₀ h₁.le
+  have hpow : ‖(r : ℂ)^(-(vz(σ,y)))‖ = r^(-σ) := by
+    rw [Complex.norm_cpow_eq_rpow_re_of_pos hr]
+    simp
+  simp only [trace, norm_mul, hpow, Real.norm_of_nonneg (by positivity : 0 ≤ (1 + y^2)⁻¹)]
+  rw [← div_eq_mul_inv]
+  apply (le_div_iff₀ (by positivity : 0 < 1 + y^2)).mpr
+  have hscale := mul_le_mul_of_nonneg_left hsize (Real.rpow_nonneg hr.le (-σ))
+  rw [sq_abs] at hscale
+  rw [mul_div_assoc]
+  calc
+    _ ≤ (r ^ (-σ) * ‖Z(f,χ,vz(σ,y))‖) * (2 * y ^ 2) :=
+      mul_le_mul_of_nonneg_left (by linarith) (by positivity)
+    _ = 2 * (r ^ (-σ) * (y ^ 2 * ‖Z(f,χ,vz(σ,y))‖)) := by ring
+    _ ≤ _ := mul_le_mul_of_nonneg_left hscale (by norm_num)
+
+private theorem nonpole_on_large_euler_lines
+    (χ : PontryaginDual Jₛ) (η : U) (f : Tests)
+    (h : ideleClassNormTwist η 0 ∈ unramifiedOutside F S)
+    (he : sIdeleRestriction F S ⟨ideleClassNormTwist η 0,h⟩ = chart(χ) 0)
+    (a b : ℝ) :
+    ∃ T : ℝ, ∀ z : ℂ, z.re ∈ Icc a b → T < |z.im| → P(η,z) ≠ 0 →
+      0 ≤ meromorphicOrderAt (fun z ↦ Z(f,χ,z)) z := by
+  obtain ⟨C, _, T, hbound⟩ := sLocalIdelicZFunction_cleared_strip_tails χ η f h he (a-1) (b+1) 0
+  refine ⟨T, fun z hz ht hP ↦ ?_⟩
+  by_contra! ho
+  have hc := norm_pos_iff.mpr hP
+  let c := ‖P(η,z)‖/2
+  have hc' : 0 < c := half_pos hc
+  have hr : ∀ᶠ w : ℂ in 𝓝 z, a-1 < w.re := (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (show a-1 < z.re by linarith [hz.1])
+  have hr' : ∀ᶠ w : ℂ in 𝓝 z, w.re < b+1 := (isOpen_lt Complex.continuous_re continuous_const).mem_nhds (show z.re < b+1 by linarith [hz.2])
+  have ht' : ∀ᶠ w : ℂ in 𝓝 z, T < |w.im| := (isOpen_lt continuous_const Complex.continuous_im.abs).mem_nhds ht
+  have hpcont : Continuous (fun w : ℂ ↦ P(η,w)) := by
+    classical
+    apply continuous_finsetProd
+    intro v _
+    unfold finiteHeckeEulerFactor
+    split_ifs
+    · simp only [inv_inv]
+      have hq : (v.val.asIdeal.absNorm : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr
+        ((Ideal.absNorm_eq_zero_iff).not.mpr v.val.ne_bot)
+      exact continuous_const.sub (continuous_const.mul (continuous_neg.const_cpow (Or.inl hq)))
+    · exact continuous_const
+  have hcnear : ∀ᶠ w : ℂ in 𝓝 z, c < ‖P(η,w)‖ :=
+    (isOpen_lt continuous_const hpcont.norm).mem_nhds (half_lt_self hc)
+  have hover := (tendsto_norm_atTop_iff_cobounded.mpr (tendsto_cobounded_of_meromorphicOrderAt_neg ho)).eventually_gt_atTop (C/c)
+  obtain ⟨w, ⟨hrw, hrw', htw, hcw⟩, hw⟩ :=
+    (((hr.and (hr'.and (ht'.and hcnear))).filter_mono nhdsWithin_le_nhds).and hover).exists
+  have hsmall := hbound w ⟨hrw.le, hrw'.le⟩ htw
+  simp only [pow_zero, one_mul, norm_mul] at hsmall
+  have hbig := (div_lt_iff₀ hc').mp hw
+  exact (not_lt_of_ge ((mul_le_mul_of_nonneg_right hcw.le (norm_nonneg _)).trans hsmall))
+    (by simpa only [mul_comm c] using hbig)
+
+private theorem contour_horizontal_tendsto
+    (χ : PontryaginDual Jₛ) (η : U) (f : Tests)
+    (h : ideleClassNormTwist η 0 ∈ unramifiedOutside F S)
+    (he : sIdeleRestriction F S ⟨ideleClassNormTwist η 0,h⟩ = chart(χ) 0)
+    (r : ℝ) (hr : 0 < r) {a b : ℝ} (hab : a ≤ b)
+    (t : ℕ → ℝ) (ht : Tendsto (fun n ↦ |t n|) atTop atTop)
+    (c : ℝ) (hc : 0 < c) (hP : ∀ n : ℕ, ∀ x ∈ Icc a b, c ≤ ‖P(η,vz(x,t n))‖) :
+    Tendsto (fun n ↦ ∫ x in a..b, (r : ℂ)^(-(vz(x,t n))) * Z(f,χ,vz(x,t n))) atTop (𝓝 0) := by
+  obtain ⟨C, _, T, htail⟩ := sLocalIdelicZFunction_cleared_strip_tails χ η f h he a b 1
+  obtain ⟨D, hD⟩ := isCompact_Icc.exists_bound_of_continuousOn
+    (f := fun x : ℝ ↦ r^(-x)) (s := Icc a b) (by fun_prop (disch := positivity))
+  have hDn : 0 ≤ D := (norm_nonneg _).trans (hD a ⟨le_rfl, hab⟩)
+  apply squeeze_zero_norm' (a := fun n : ℕ ↦ (D * (C / c) * |b-a|) / |t n|) _
+    (ht.const_div_atTop _)
+  filter_upwards [ht.eventually_gt_atTop (max T 0)] with n hn
+  have htn : 0 < |t n| := (le_max_right T 0).trans_lt hn
+  have hpoint (x : ℝ) (hx : x ∈ uIcc a b) :
+      ‖(r : ℂ)^(-(vz(x,t n))) * Z(f,χ,vz(x,t n))‖ ≤ D * (C/c) / |t n| := by
+    rw [uIcc_of_le hab] at hx
+    have hpow : ‖(r : ℂ)^(-(vz(x,t n)))‖ = r^(-x) := by rw [Complex.norm_cpow_eq_rpow_re_of_pos hr]; simp
+    have hDX : r^(-x) ≤ D := (le_abs_self _).trans (hD x hx)
+    have hb := htail (vz(x,t n)) (by simpa using hx) (by simpa using (le_max_left T 0).trans_lt hn)
+    simp only [Complex.add_im, Complex.ofReal_im, Complex.mul_I_im, Complex.ofReal_re,
+      zero_add, pow_one, norm_mul] at hb
+    have hsize : ‖Z(f,χ,vz(x,t n))‖ * |t n| ≤ C/c := by
+      apply (le_div_iff₀ hc).mpr
+      calc
+        _ ≤ ‖Z(f,χ,vz(x,t n))‖ * |t n| * ‖P(η,vz(x,t n))‖ :=
+          mul_le_mul_of_nonneg_left (hP n x hx) (by positivity)
+        _ = _ := by ring
+        _ ≤ _ := hb
+    rw [norm_mul, hpow]
+    apply (le_div_iff₀ htn).mpr
+    rw [mul_assoc]
+    exact mul_le_mul hDX hsize (by positivity) hDn
+  calc
+    _ ≤ _ := intervalIntegral.norm_integral_le_of_norm_le_const (a := a) (b := b)
+      (fun x hx ↦ hpoint x (uIoc_subset_uIcc hx))
+    _ = _ := by ring
+
+private theorem reciprocal_euler_upper_on_halfPlane (η : U) (W : Finset (HeightOneSpectrum (𝓞 F))) (a : ℝ) :
+    ∃ D > (0 : ℝ), ∀ z : ℂ, a ≤ z.re → ‖reciprocalPartialHeckeEulerProduct η W z‖ ≤ D := by
+  classical
+  let m (v : HeightOneSpectrum (𝓞 F)) := 1 + (v.asIdeal.absNorm : ℝ) ^ (-a)
+  have hq (v : HeightOneSpectrum (𝓞 F)) : 1 < (v.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have hpos (v : HeightOneSpectrum (𝓞 F)) : 0 < m v :=
+    add_pos one_pos (Real.rpow_pos_of_pos (zero_lt_one.trans (hq v)) _)
+  refine ⟨∏ v ∈ W, m v, Finset.prod_pos (fun v _ ↦ hpos v), fun z hz ↦ ?_⟩
+  rw [reciprocalPartialHeckeEulerProduct, norm_prod]
+  apply Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _)
+  intro v _
+  unfold finiteHeckeEulerFactor
+  split_ifs
+  · rw [inv_inv]
+    apply (norm_sub_le _ _).trans
+    rw [norm_one, norm_mul, norm_ideleClassNormTwist_zero_localValue, one_mul,
+      ← Complex.ofReal_natCast, Complex.norm_cpow_eq_rpow_re_of_pos (zero_lt_one.trans (hq v))]
+    exact add_le_add_right (Real.rpow_le_rpow_of_exponent_le (hq v).le (by simpa using neg_le_neg hz)) _
+  · simpa [m] using (Real.rpow_nonneg (zero_lt_one.trans (hq v)).le (-a))
+
+private theorem exists_sLocal_contour_heights (χ : PontryaginDual Jₛ) (A : ℝ) (hA : 0 < A) :
+    ∃ (η : U) (hη : ideleClassNormTwist η 0 ∈ unramifiedOutside F S),
+      sIdeleRestriction F S ⟨ideleClassNormTwist η 0,hη⟩ = chart(χ) 0 ∧
+      ∃ (lo hi : ℕ → ℝ) (c : ℝ), 0 < c ∧ Tendsto lo atTop atBot ∧ Tendsto hi atTop atTop ∧
+        ∀ n : ℕ, ∀ x ∈ Icc (-A) 1,
+          c ≤ ‖P(η,vz(x,lo n))‖ ∧ c ≤ ‖P(η,vz(x,hi n))‖ := by
+  classical
+  obtain ⟨η, hs, he, W, hSW, hW⟩ := sLocal_character_extension χ
+  have hw : ideleClassNormTwist η 0 ∈ unramifiedOutside F W :=
+    (mem_unramifiedOutside_iff F W _).mpr fun v hv ↦ (mem_unramifiedOutside_iff F S _).mp hs v (fun hm ↦ hv (hSW hm))
+  obtain ⟨c, T, hc, -, hpos, hneg, hlim, hlow⟩ :=
+    exists_heights_reciprocalPartialHeckeEulerProduct_strip_boundedBelow W hW η hw hA
+  obtain ⟨D, hD, hupper⟩ := reciprocal_euler_upper_on_halfPlane η (W \ S) (-A)
+  have hrow (k : ℤ) (x : ℝ) (hx : x ∈ Icc (-A) 1) : c/D ≤ ‖P(η,vz(x,T k))‖ := by
+    have hlow' := hlow k x ⟨hx.1, by linarith [hx.2]⟩
+    have hu := hupper (vz(x,T k)) (by simpa using hx.1)
+    rw [reciprocalPartialHeckeEulerProduct, ← Finset.prod_sdiff hSW, norm_mul] at hlow'
+    rw [reciprocalPartialHeckeEulerProduct] at hu
+    rw [Finset.prod_coe_sort (f := fun v : HeightOneSpectrum (𝓞 F) ↦ (finiteHeckeEulerFactor η v (vz(x,T k)))⁻¹) (s := S)]
+    exact (div_le_iff₀ hD).mpr
+      (hlow'.trans (by simpa only [mul_comm D] using mul_le_mul_of_nonneg_right hu (norm_nonneg _)))
+  have hIndex : Tendsto (fun k : ℕ ↦ (k : ℤ)) atTop (comap abs atTop) := by
+    apply tendsto_comap_iff.mpr
+    simpa [Function.comp_def, abs_of_nonneg (Int.natCast_nonneg _)] using (tendsto_natCast_atTop_atTop (R := ℤ))
+  have hNegIndex : Tendsto (fun k : ℕ ↦ -(k : ℤ)) atTop (comap abs atTop) := by
+    apply tendsto_comap_iff.mpr
+    simpa only [Function.comp_def, abs_neg] using tendsto_comap_iff.mp hIndex
+  refine ⟨η, hs, he, fun n ↦ T (-(n:ℤ)), fun n ↦ T (n:ℤ), c/D, div_pos hc hD, ?_, ?_,
+    fun n x hx ↦ ⟨hrow _ x hx, hrow _ x hx⟩⟩
+  · apply (tendsto_neg_atTop_atBot.comp (hlim.comp hNegIndex)).congr'
+    filter_upwards [eventually_gt_atTop (0 : ℕ)] with n hn
+    exact neg_eq_iff_eq_neg.mpr (abs_of_nonpos (hneg (-(n : ℤ)) (neg_neg_of_pos (by exact_mod_cast hn))))
+  · exact (hlim.comp hIndex).congr (fun n ↦ abs_of_nonneg (hpos _ (Int.natCast_nonneg _)))
+
+local notation "rho(" χ ")" => (fun z : ℂ ↦ sLocalRhoFactor (chart(χ) z))
+
+open Classical in
+/-- On admissible vertical sides, a common pair of escaping height sequences works
+for every test and every positive norm dilation. The residue sum is over the
+geometric poles of the correcting factor, with each center counted once. -/
+theorem sLocalIdelicZFunction_commonHeight_residue_limit
+    (χ : PontryaginDual Jₛ) (A : ℝ) (hA : 0 < A)
+    (hLeft : ∀ a : ℂ, a.re = -A → 0 ≤ meromorphicOrderAt (rho(χ)) a) :
+    ∃ lo hi : ℕ → ℝ, Tendsto lo atTop atBot ∧ Tendsto hi atTop atTop ∧
+      ∀ (f : Tests) (r : ℝ), 0 < r →
+        let g := fun z : ℂ ↦ (r : ℂ)^(-z) * Z(f,χ,z)
+        Complex.VerticalIntegrable g (-A) ∧ Complex.VerticalIntegrable g 1 ∧
+          Tendsto (fun n : ℕ ↦ ∑ a ∈ sLocalStripPoleWindow χ A (lo n, hi n), complexResidue g a) atTop
+            (𝓝 ((verticalLineIntegral g 1 - verticalLineIntegral g (-A)) /
+              (2 * (Real.pi : ℂ) * Complex.I))) := by
+  obtain ⟨η, he, heq, lo, hi, c, hc, hlo, hhi, hP⟩ := exists_sLocal_contour_heights χ A hA
+  refine ⟨lo, hi, hlo, hhi, fun f r hr ↦ ?_⟩
+  let G (z : ℂ) := (r : ℂ)^(-z) * Z(f,χ,z)
+  let Z₀ (z : ℂ) := Z(f,χ,z)
+  let I₂ : ℂ := 2 * (Real.pi : ℂ) * Complex.I
+  have hI : I₂ ≠ 0 := by simp [I₂, Real.pi_ne_zero, Complex.I_ne_zero]
+  have hrC : (r : ℂ) ≠ 0 := by exact_mod_cast hr.ne'
+  have unitAn (z : ℂ) : AnalyticAt ℂ (fun w : ℂ ↦ (r : ℂ)^(-w)) z :=
+    (differentiable_neg.const_cpow (Or.inl hrC)).analyticAt _
+  have hZ (z : ℂ) := (sLocalIdelicZFunction_meromorphic f χ) (mem_univ z)
+  have hMG (z : ℂ) : MeromorphicAt G z := (unitAn z).meromorphicAt.mul (hZ z).meromorphicAt
+  have hOrder (z : ℂ) : meromorphicOrderAt G z = meromorphicOrderAt Z₀ z :=
+    normPower_mul_sLocalIdelicZFunction_order χ f z r hr
+  have hcovered (z : ℂ) (hz : 0 ≤ meromorphicOrderAt (rho(χ)) z) :
+      0 ≤ meromorphicOrderAt Z₀ z := by
+    simpa only [min_eq_left hz] using sLocalIdelicZFunction_poles f χ z
+  have hRight (z : ℂ) (hz : z.re = 1) : 0 ≤ meromorphicOrderAt Z₀ z := by
+    have hh := sLocalIdelicZFunction_schwartzOnStrip f χ (1/2) (3/2) (by norm_num) (by norm_num) 0
+    have H : DifferentiableOn ℂ Z₀ (Complex.re ⁻¹' Ioo (1/2) (3/2)) := by
+      simpa only [iteratedDeriv_zero] using hh.2.1
+    exact (H.analyticAt ((isOpen_Ioo.preimage Complex.continuous_re).mem_nhds
+      (by change 1/2 < z.re ∧ z.re < 3/2; rw [hz]; norm_num))).meromorphicOrderAt_nonneg
+  have hVa : Complex.VerticalIntegrable G (-A) := normPower_mul_verticalIntegrable_of_order
+    χ f r hr (-A) (neg_ne_zero.mpr hA.ne') (fun y ↦ hcovered _ (hLeft _ (by simp)))
+  have hVb : Complex.VerticalIntegrable G 1 := normPower_mul_verticalIntegrable_of_order
+    χ f r hr 1 one_ne_zero (fun y ↦ hRight _ (by simp))
+  refine ⟨hVa, hVb, ?_⟩
+  let hor (h : ℝ) := ∫ x in (-A)..1, G (vz(x,h))
+  let vert (σ : ℝ) (n : ℕ) := Complex.I * ∫ y in lo n..hi n, G (vz(σ,y))
+  have hvA : Tendsto (vert (-A)) atTop (𝓝 (verticalLineIntegral G (-A))) :=
+    (intervalIntegral_tendsto_integral hVa hlo hhi).const_mul Complex.I
+  have hvB : Tendsto (vert 1) atTop (𝓝 (verticalLineIntegral G 1)) :=
+    (intervalIntegral_tendsto_integral hVb hlo hhi).const_mul Complex.I
+  have hab : -A < 1 := by linarith
+  have hlabs := tendsto_abs_atBot_atTop.comp hlo
+  have huabs := tendsto_abs_atTop_atTop.comp hhi
+  have hLo : Tendsto (fun n ↦ hor (lo n)) atTop (𝓝 0) :=
+    contour_horizontal_tendsto χ η f he heq r hr hab.le lo hlabs c hc (fun n x hx ↦ (hP n x hx).1)
+  have hHi : Tendsto (fun n ↦ hor (hi n)) atTop (𝓝 0) :=
+    contour_horizontal_tendsto χ η f he heq r hr hab.le hi huabs c hc (fun n x hx ↦ (hP n x hx).2)
+  obtain ⟨T, hReg⟩ := nonpole_on_large_euler_lines χ η f he heq (-A) 1
+  have hid : ∀ᶠ n : ℕ in atTop, (hor (lo n) - hor (hi n) + vert 1 n - vert (-A) n)/I₂ =
+      ∑ z ∈ sLocalStripPoleWindow χ A (lo n, hi n), complexResidue G z := by
+    filter_upwards [hlabs.eventually_gt_atTop T, huabs.eventually_gt_atTop T,
+      hlo.eventually_lt_atBot 0, hhi.eventually_gt_atTop 0] with n htl hth hnl hnh
+    let D := sLocalStripPoleWindow χ A (lo n, hi n)
+    have hD (z : ℂ) : z ∈ D ↔
+        z.re ∈ Ioo (-A) 1 ∧ z.im ∈ Ioo (lo n) (hi n) ∧ meromorphicOrderAt (rho(χ)) z < 0 :=
+      mem_sLocalStripPoleWindow
+    have hrect := rectangleIntegral_eq_sum_complexResidue (g := G) hab (hnl.trans hnh) D
+      (fun z _ ↦ hMG z) (fun z hz ↦ ⟨((hD z).mp hz).1, ((hD z).mp hz).2.1⟩) ?_
+    · apply (div_eq_iff hI).mpr
+      simpa only [mul_comm _ I₂] using hrect
+    · rintro z ⟨⟨hr₁,hr₂⟩,⟨hi₁,hi₂⟩⟩ hn
+      rw [hOrder]
+      rcases hr₁.eq_or_lt with h | h₁
+      · exact hcovered _ (hLeft _ h.symm)
+      rcases hr₂.eq_or_lt with h | h₂
+      · exact hRight _ h
+      have key (y : ℝ) (hy : z.im = y) (ht : T < |y|)
+          (hE : c ≤ ‖P(η,vz(z.re,y))‖) : 0 ≤ meromorphicOrderAt Z₀ z := by
+        have heq' : vz(z.re,y) = z := by rw [← hy, Complex.re_add_im]
+        exact hReg z ⟨h₁.le,h₂.le⟩ (hy ▸ ht) (norm_pos_iff.mp (hc.trans_le (heq' ▸ hE)))
+      rcases hi₁.eq_or_lt with h | h₃
+      · exact key _ h.symm htl (hP n z.re ⟨h₁.le,h₂.le⟩).1
+      rcases hi₂.eq_or_lt with h | h₄
+      · exact key _ h hth (hP n z.re ⟨h₁.le,h₂.le⟩).2
+      exact hcovered _ (le_of_not_gt fun h ↦ hn ((hD z).mpr ⟨⟨h₁,h₂⟩,⟨h₃,h₄⟩,h⟩))
+  simpa only [sub_self, zero_add] using ((((hLo.sub hHi).add hvB).sub hvA).div_const I₂).congr' hid
+
+open Classical in
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323. At admissible cutoffs the genuine
+Mellin pole sums over a common rectangle converge pointwise to the difference
+of the two normalized vertical integrals, with the character conjugated. -/
+theorem sLocalMellinPoleTerm_commonHeight_limit
+    (χ : PontryaginDual Jₛ) (A : ℝ) (hA : 0 < A)
+    (hLeft : ∀ a : ℂ, a.re = -A → 0 ≤ meromorphicOrderAt (rho(χ)) a) :
+    ∃ lo hi : ℕ → ℝ, Tendsto lo atTop atBot ∧ Tendsto hi atTop atTop ∧
+      ∀ (f : Tests) (g : Jₛ),
+        let W := fun z : ℂ ↦ ((((normₛ g).val : ℝ) : ℂ)^(-z)) * Z(f,χ,z)
+        Tendsto (fun n : ℕ ↦ ∑ a ∈ sLocalStripPoleWindow χ A (lo n, hi n),
+          sLocalMellinPoleTerm χ f g a) atTop
+          (𝓝 (star (χ g : ℂ) * ((verticalLineIntegral W 1 - verticalLineIntegral W (-A)) /
+            (2 * (Real.pi : ℂ) * Complex.I)))) := by
+  obtain ⟨lo, hi, hlo, hhi, hlim⟩ := sLocalIdelicZFunction_commonHeight_residue_limit χ A hA hLeft
+  refine ⟨lo, hi, hlo, hhi, fun f g ↦ ?_⟩
+  have hr : 0 < (((normₛ g).val : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  simpa only [sLocalMellinPoleTerm, ← Finset.mul_sum] using
+    ((hlim f _ hr).2.2.const_mul (star (χ g : ℂ)))
+
+
+end CommonHeightContour
+
+section
+
+open scoped Classical
+
+local notation "U" => PontryaginDual (IdeleClassGroup (𝓞 F) F)
+local notation "P(" η "," z ")" => ∏ v : S, (finiteHeckeEulerFactor η v.val z)⁻¹
+local notation "Z(" f "," χ "," z ")" => sLocalIdelicZFunction f (chart(χ) z)
+local notation "strip(" χ "," A ")" => {a : ℂ // a.re ∈ Ioo (-A) 1 ∧
+  meromorphicOrderAt (fun z ↦ sLocalRhoFactor (chart(χ) z)) a < 0}
+local notation "twistₛ" => quasiCharacterNormTwist (G := Jₛ) normₛ (isProperMap_sIdeleQuotientNorm F S).continuous
+
+/-- Paper: Theorem 7.1.2.3, p. 322. At a pole-free left boundary, the sum over any finite
+assignment of one-prime poles equals the normalized contour difference for the actual
+Mellin chart. Each assigned sum is its unconditional sum in the open strip. -/
+theorem sLocalSinglePrime_sum_assigned_eq_verticalLineIntegral_sub {ι : Type*} [Fintype ι]
+    (χ : PontryaginDual Jₛ) (A : ℝ) (hA : 0 < A)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ))
+    (hLeft : ∀ a : ℂ, a.re = -A → 0 ≤ meromorphicOrderAt (fun z ↦ sLocalRhoFactor (chart(χ) z)) a)
+    (assign : ℂ → ι) (f : Tests) (g : Jₛ) :
+    let W (z : ℂ) := ((((normₛ g).val : ℝ) : ℂ) ^ (-z)) * Z(f,χ,z)
+    ∑ v, sLocalAssignedMellinPoleSum χ A assign v f g =
+      star (χ g : ℂ) * ((verticalLineIntegral W 1 - verticalLineIntegral W (-A)) /
+        (2 * (Real.pi : ℂ) * Complex.I)) := by
+  obtain ⟨lo, hi, hlo, hhi, hcontour⟩ := sLocalMellinPoleTerm_commonHeight_limit χ A hA hLeft
+  have hpoint (v : ι) : Tendsto (fun h ↦ ∑ a ∈ (sLocalStripPoleWindow χ A h).filter (assign · = v),
+      sLocalMellinPoleTerm χ f g a) (atBot ×ˢ atTop) (𝓝 (sLocalAssignedMellinPoleSum χ A assign v f g)) := by
+    have hv := ((sLocalSinglePrime_separatePlace_absolute χ A hsame assign).2 v
+      {f} (Bornology.isVonNBounded_singleton _) {g} isCompact_singleton).1
+    exact hv.tendsto_at (x := (f, g)) ⟨mem_singleton _, mem_singleton _⟩
+  have htot := tendsto_finsetSum Finset.univ (fun v _ ↦ (hpoint v).comp (hlo.prodMk hhi))
+  exact tendsto_nhds_unique (htot.congr (fun n ↦ Finset.sum_fiberwise
+    (sLocalStripPoleWindow χ A (lo n, hi n)) assign (sLocalMellinPoleTerm χ f g))) (hcontour f g)
+
+section BoundedVerticalLine
+
+local notation "vz(" σ "," y ")" => ((σ : ℝ) : ℂ) + ((y : ℝ) : ℂ) * Complex.I
+local notation "rho(" χ ")" => (fun z : ℂ ↦ sLocalRhoFactor (chart(χ) z))
+
+private theorem sLocalIdelicZFunction_weighted_regular_line
+    (χ : PontryaginDual Jₛ) (σ : ℝ) (hσ : σ ≠ 0)
+    (hreg : ∀ y : ℝ, 0 ≤ meromorphicOrderAt (rho(χ)) (vz(σ,y))) (f : Tests) :
+    ∃ C : ℝ, ∀ y : ℝ, (1 + y^2) * ‖Z(f,χ,vz(σ,y))‖ ≤ C := by
+  obtain ⟨η, hη, he, -⟩ := sLocal_character_extension χ
+  obtain ⟨C, _, T, htail⟩ := sLocalIdelicZFunction_cleared_strip_tails χ η f hη he σ σ 2
+  obtain ⟨c, hc, hP⟩ := euler_reciprocal_lower_on_line (S := S) η σ hσ
+  let M := max T 1
+  let W (y : ℝ) := (1 + y^2) * ‖Z(f,χ,vz(σ,y))‖
+  have hZ (y : ℝ) := ((sLocalIdelicZFunction_meromorphic f χ) (mem_univ (vz(σ,y)))).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+    ((le_min le_rfl (hreg y)).trans (sLocalIdelicZFunction_poles f χ _))
+  have hW : Continuous W := by
+    apply continuous_iff_continuousAt.mpr
+    intro y
+    exact (continuous_const.add (continuous_id.pow 2)).continuousAt.mul
+      ((ContinuousAt.comp (f := fun x : ℝ ↦ vz(σ,x)) (g := fun z ↦ Z(f,χ,z))
+        (hZ y).continuousAt (by fun_prop)).norm)
+  obtain ⟨D, hD⟩ := isCompact_Icc.exists_bound_of_continuousOn
+    (s := Icc (-M) M) (f := W) hW.continuousOn
+  refine ⟨max D (2*(C/c)), fun y ↦ ?_⟩
+  by_cases hy : |y| ≤ M
+  · exact ((le_abs_self (W y)).trans (hD y (abs_le.mp hy))).trans (le_max_left _ _)
+  have hyM := lt_of_not_ge hy
+  have hyT := (le_max_left T 1).trans_lt hyM
+  have hy1 : 1 ≤ |y| := ((le_max_right T 1).trans_lt hyM).le
+  have hb := htail (vz(σ,y)) (by simp) (by simpa using hyT)
+  simp only [Complex.add_im, Complex.ofReal_im, Complex.mul_I_im, Complex.ofReal_re,
+    zero_add, sq_abs, norm_mul] at hb
+  have hsize : y^2 * ‖Z(f,χ,vz(σ,y))‖ ≤ C/c := by
+    apply (le_div_iff₀ hc).mpr
+    calc
+      _ ≤ y^2 * ‖Z(f,χ,vz(σ,y))‖ * ‖P(η,vz(σ,y))‖ :=
+        mul_le_mul_of_nonneg_left (hP y) (by positivity)
+      _ = _ := by ring
+      _ ≤ _ := hb
+  have hy2 : 1 ≤ y^2 := by rw [← sq_abs]; exact one_le_pow₀ hy1
+  apply (le_max_right _ _).trans'
+  calc
+    (1 + y^2) * _ ≤ (2 * y^2) * ‖Z(f,χ,vz(σ,y))‖ :=
+      mul_le_mul_of_nonneg_right (by linarith) (norm_nonneg _)
+    _ = 2 * (y^2 * ‖Z(f,χ,vz(σ,y))‖) := mul_assoc _ _ _
+    _ ≤ _ := mul_le_mul_of_nonneg_left hsize (by norm_num)
+
+/-- Paper: Theorem 7.1.2.3, pp. 322–323. On any pole-free vertical line of
+nonzero real part, the L¹ norms of the actual zeta integrals are bounded
+uniformly on each von Neumann bounded set of test functions. -/
+theorem sLocalIdelicZFunction_vertical_L1_bounded
+    (χ : PontryaginDual Jₛ) (σ : ℝ) (hσ : σ ≠ 0)
+    (hreg : ∀ y : ℝ, 0 ≤ meromorphicOrderAt (rho(χ)) (vz(σ,y)))
+    (B : Set Tests) (hB : Bornology.IsVonNBounded ℂ B) :
+    ∃ C ≥ (0 : ℝ), ∀ f ∈ B, (∫ y : ℝ, ‖Z(f,χ,vz(σ,y))‖) ≤ C := by
+  classical
+  let : BarrelledSpace ℂ Tests := (sAdeleSchwartz_montel (F := F) S).1
+  have horder (y : ℝ) : 0 ≤ sLocalIdelicOrderBound (chart(χ) (vz(σ,y))) := by
+    let t := vz(σ,y)
+    have hshift := unitaryChart_normTwist_add χ t
+    change 0 ≤ min 0 (meromorphicOrderAt (fun z ↦ sLocalRhoFactor
+      (quasiCharacterNormTwist normₛ (isProperMap_sIdeleQuotientNorm F S).continuous
+        (chart(χ) t) z)) 0)
+    simp only [hshift]
+    change 0 ≤ min 0 (meromorphicOrderAt (fun z ↦ (rho(χ)) (z + t)) 0)
+    rw [meromorphicOrderAt_fun_comp_add_const_eq_meromorphicOrderAt (f := rho(χ)) (c := t) (x := (0 : ℂ)), zero_add]
+    exact le_min le_rfl (hreg y)
+  let E (y : ℝ) : StrongDual ℂ Tests := ((1+y^2 : ℝ) : ℂ) •
+    ((ContinuousMap.evalCLM ℂ ⟨chart(χ) (vz(σ,y)), horder y⟩).comp
+      ((Submodule.subtypeL _).comp ⟨sLocalIdelicMellin,sLocalIdelicMellin_continuous⟩))
+  have hE (y : ℝ) (f : Tests) : ‖E y f‖ = (1+y^2) * ‖Z(f,χ,vz(σ,y))‖ := by
+    change ‖((1+y^2 : ℝ) : ℂ) * Z(f,χ,vz(σ,y))‖ = _
+    rw [norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_nonneg (by positivity)]
+  have hb (f : Tests) : ∃ C : ℝ, ∀ y : ℝ, ‖E y f‖ ≤ C := by
+    simpa only [hE] using sLocalIdelicZFunction_weighted_regular_line χ σ hσ hreg f
+  obtain ⟨C, hC⟩ := strongDual_family_bounded_on_bounded_set E hb hB
+  let D := max C 0
+  have hD : 0 ≤ D := le_max_right _ _
+  refine ⟨D * Real.pi, mul_nonneg hD Real.pi_pos.le, fun f hf ↦ ?_⟩
+  have hline := normPower_mul_verticalIntegrable_of_order χ f 1 one_pos σ hσ
+    (fun y ↦ (le_min le_rfl (hreg y)).trans (sLocalIdelicZFunction_poles f χ _))
+  have hZ : Integrable (fun y : ℝ ↦ ‖Z(f,χ,vz(σ,y))‖) := by
+    simpa only [Complex.VerticalIntegrable, Complex.ofReal_one, Complex.one_cpow, one_mul] using hline.norm
+  calc
+    (∫ y : ℝ, ‖Z(f,χ,vz(σ,y))‖) ≤ ∫ y : ℝ, D * (1 + y^2)⁻¹ := by
+      apply integral_mono hZ (integrable_inv_one_add_sq.const_mul D)
+      intro y
+      change ‖Z(f,χ,vz(σ,y))‖ ≤ D * (1+y^2)⁻¹
+      rw [← div_eq_mul_inv]
+      apply (le_div_iff₀ (by positivity : 0 < 1 + y^2)).mpr
+      rw [mul_comm, ← hE]
+      exact (hC y f hf).trans (le_max_left _ _)
+    _ = _ := by rw [integral_const_mul, integral_univ_inv_one_add_sq]
+
+/-- The left vertical integral has the exact norm weight of the repaired theta
+remainder. The coefficient is finite on every admissible line. -/
+private theorem norm_verticalLineIntegral_normPower_mul_le
+    (Z : ℂ → ℂ) (r : ℝ) (hr : 0 < r) (A : ℝ) :
+    ‖verticalLineIntegral (fun z ↦ (r : ℂ)^(-z) * Z z) (-A) / (2 * (Real.pi : ℂ) * Complex.I)‖ ≤
+      ((∫ y : ℝ, ‖Z (vz(-A,y))‖) / (2 * Real.pi)) * r ^ A := by
+  have hp : 0 < 2 * Real.pi := by positivity
+  have hpC : ‖(2 * (Real.pi : ℂ) * Complex.I)‖ = 2 * Real.pi := by
+    rw [norm_mul, norm_mul, Complex.norm_I, mul_one, Complex.norm_two, Complex.norm_real,
+      Real.norm_eq_abs, abs_of_pos Real.pi_pos]
+  rw [norm_div, hpC, verticalLineIntegral, norm_mul, Complex.norm_I, one_mul]
+  calc
+    _ ≤ (∫ y : ℝ, ‖(r : ℂ)^(-(vz(-A,y))) * Z (vz(-A,y))‖) / (2 * Real.pi) :=
+      div_le_div_of_nonneg_right (norm_integral_le_integral_norm _) hp.le
+    _ = _ := by
+      have he (y : ℝ) : ‖(r : ℂ)^(-(vz(-A,y))) * Z (vz(-A,y))‖ =
+          r ^ A * ‖Z (vz(-A,y))‖ := by
+        rw [norm_mul, Complex.norm_cpow_eq_rpow_re_of_pos hr]
+        simp
+      simp only [he, integral_const_mul]
+      ring
+
+/-- The normalized left-line remainder is uniformly O(rᴬ) on every bounded
+set of test functions, with a constant independent of the positive norm r. -/
+theorem sLocalIdelicZFunction_leftIntegral_bounded_remainder
+    (χ : PontryaginDual Jₛ) (A : ℝ) (hA : 0 < A)
+    (hLeft : ∀ a : ℂ, a.re = -A → 0 ≤ meromorphicOrderAt (rho(χ)) a)
+    (B : Set Tests) (hB : Bornology.IsVonNBounded ℂ B) :
+    ∃ C ≥ (0 : ℝ), ∀ f ∈ B, ∀ r : ℝ, 0 < r →
+      ‖verticalLineIntegral (fun z ↦ (r : ℂ)^(-z) * Z(f,χ,z)) (-A) /
+        (2 * (Real.pi : ℂ) * Complex.I)‖ ≤ C * r^A := by
+  obtain ⟨D, hD, hb⟩ := sLocalIdelicZFunction_vertical_L1_bounded χ (-A)
+    (neg_ne_zero.mpr hA.ne') (fun y ↦ hLeft _ (by simp)) B hB
+  refine ⟨D/(2*Real.pi), by positivity, fun f hf r hr ↦ ?_⟩
+  apply (norm_verticalLineIntegral_normPower_mul_le (fun z ↦ Z(f,χ,z)) r hr A).trans
+  exact mul_le_mul_of_nonneg_right (div_le_div_of_nonneg_right (hb f hf) (by positivity))
+    (Real.rpow_nonneg hr.le _)
+
+end BoundedVerticalLine
+
+section ThetaInversion
+
+/-- The normalized, upward-oriented vertical integral has Mathlib's inverse Mellin
+normalization. -/
+private theorem normalizedVerticalLineIntegral_normPower_eq_mellinInv (Z : ℂ → ℂ) (σ r : ℝ) :
+    verticalLineIntegral (fun z ↦ (r : ℂ) ^ (-z) * Z z) σ /
+      (2 * (Real.pi : ℂ) * Complex.I) = mellinInv σ Z r := by
+  unfold verticalLineIntegral mellinInv
+  simp only [Complex.real_smul, smul_eq_mul, Complex.ofReal_div, Complex.ofReal_one,
+    Complex.ofReal_mul, Complex.ofReal_ofNat]
+  field_simp [Complex.I_ne_zero, Real.pi_ne_zero]
+
+/-- Mellin inversion for the specific positive-real Haar measure used in the S-local norm
+decomposition. The logarithmic change of variables fixes its normalization. -/
+private theorem mellinInv_positiveRealHaar {H : ℝ≥0ˣ → ℂ} (hH : Continuous H)
+    (Z : ℂ → ℂ) (σ : ℝ) (u : ℝ≥0ˣ)
+    (hM : ∀ s : ℂ, s.re = σ → Z s =
+      ∫ t : ℝ≥0ˣ, H t * ((((t : ℝ≥0) : ℝ) : ℂ) ^ s) ∂positiveRealHaar)
+    (hI : Integrable (fun t : ℝ≥0ˣ ↦ H t * ((((t : ℝ≥0) : ℝ) : ℂ) ^ (σ : ℂ))) positiveRealHaar)
+    (hV : Complex.VerticalIntegrable Z σ) : mellinInv σ Z (u.val : ℝ) = H u := by
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  let e : ℝ ≃ₜ ℝ≥0ˣ := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  let f (t : ℝ) := H (e (Real.log t))
+  have hmeasure : positiveRealHaar = volume.map e := by
+    apply congrArg (fun h : ℝ → ℝ≥0ˣ ↦ volume.map h)
+    funext x
+    exact Units.ext (NNReal.eq (Real.coe_toNNReal _ (Real.exp_pos x).le))
+  have hp (x : ℝ) (s : ℂ) : ((((e x : ℝ≥0ˣ) : ℝ≥0) : ℝ) : ℂ) ^ s = Complex.exp (s * x) := by
+    change (Real.exp x : ℂ) ^ s = _
+    rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (Real.exp_pos x).ne'),
+      ← Complex.ofReal_log (Real.exp_pos x).le, Real.log_exp, mul_comm]
+  have htrans (s : ℂ) :
+      mellin f s = ∫ t : ℝ≥0ˣ, H t * ((((t : ℝ≥0) : ℝ) : ℂ) ^ s) ∂positiveRealHaar := by
+    rw [hmeasure, e.measurableEmbedding.integral_map, mellin, ← integral_comp_exp]
+    apply integral_congr_ae
+    filter_upwards with x
+    simp only [f, Real.log_exp, Complex.real_smul, smul_eq_mul, hp]
+    rw [Complex.cpow_def_of_ne_zero (by exact_mod_cast (Real.exp_pos x).ne'),
+      ← Complex.ofReal_log (Real.exp_pos x).le, Real.log_exp]
+    simp only [Complex.ofReal_exp, ← mul_assoc, ← Complex.exp_add]
+    rw [mul_comm (H (e x))]
+    congr 2
+    ring
+  have hconv : MellinConvergent f (σ : ℂ) := by
+    apply mellinConvergent_of_integrable_logWeight (fun x ↦ H (e x))
+    rw [hmeasure] at hI
+    apply (e.measurableEmbedding.integrable_map_iff.mp hI).congr
+    filter_upwards with x
+    change H (e x) * _ = _
+    rw [hp, mul_comm (H (e x))]
+    simp
+  have hz (y : ℝ) : Z ((σ : ℂ) + y * Complex.I) = mellin f ((σ : ℂ) + y * Complex.I) :=
+    (hM _ (by simp)).trans (htrans _).symm
+  have hv : Complex.VerticalIntegrable (mellin f) σ := hV.congr (.of_forall hz)
+  have hu : 0 < (u.val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt u)
+  have hf : ContinuousAt f (u.val : ℝ) :=
+    hH.continuousAt.comp (e.continuous.continuousAt.comp (Real.continuousAt_log hu.ne'))
+  have he : e (Real.log (u.val : ℝ)) = u := Units.ext (NNReal.eq (Real.exp_log hu))
+  calc
+    mellinInv σ Z (u.val : ℝ) = mellinInv σ (mellin f) (u.val : ℝ) := by
+      simp only [mellinInv, hz]
+    _ = f (u.val : ℝ) := mellinInv_mellin_eq _ _ hu hconv hv hf
+    _ = H u := congrArg H he
+
+local notation "Iₛ" => (SAdeleRing F S)ˣ
+local notation "J₁" => (normₛ).ker
+local notation "μ" => sLocalNormOneQuotientMeasure F S
+
+local notation "ω(" χ ")" => (χ : PontryaginDual Jₛ).comp
+  (⟨(normₛ).ker.subtype, continuous_subtype_val⟩ : J₁ →ₜ* Jₛ)
+
+/-- On every positive line, inverse Mellin of the actual S-local zeta function recovers
+the genuine homogeneous theta multiplied by the unitary character. -/
+private theorem sLocal_mellinInv_eq_character_mul_theta (χ : PontryaginDual Jₛ) (f : Tests)
+    (g : Jₛ) {σ : ℝ} (hσ : 0 < σ) :
+    mellinInv σ (fun z ↦ sLocalIdelicZFunction f (chart(χ) z)) ((normₛ g).val : ℝ) =
+      (χ g : ℂ) * sLocalHomogeneousAdelicTheta F S μ (ω(χ)) f g := by
+  let p := Units.map (adeleProjection F S).toMonoidHom
+  have hp : Continuous p := (continuous_fst.prodMk (continuous_pi fun v : S ↦
+    (RestrictedProduct.continuous_eval v.val).comp continuous_snd)).units_map _
+  let τ : ℝ≥0ˣ →ₜ* Iₛ := ⟨p.comp (canonicalIdeleNormSection F),
+    hp.comp (canonicalIdeleNormSection_continuous F)⟩
+  have hτ : RightInverse τ (sIdeleNorm F S) := sIdeleNorm_project_canonicalSection F S
+  let q : ℝ≥0ˣ →ₜ* Jₛ := (⟨QuotientGroup.mk' _, QuotientGroup.continuous_mk⟩ : Iₛ →ₜ* Jₛ).comp τ
+  have hq (t : ℝ≥0ˣ) : normₛ (q t) = t := hτ t
+  let θ := sLocalHomogeneousAdelicTheta F S μ (ω(χ)) f
+  let H (t : ℝ≥0ˣ) := (χ (q t) : ℂ) * θ (q t)
+  let R (t : ℝ≥0ˣ) : ℂ := (((t.val : ℝ≥0) : ℝ) : ℂ)
+  let Z (z : ℂ) := sLocalIdelicZFunction f (chart(χ) z)
+  have hH : Continuous H :=
+    (continuous_subtype_val.comp (χ.continuous.comp q.continuous)).mul (θ.continuous.comp q.continuous)
+  have hraw (s : ℂ) : (fun t : ℝ≥0ˣ ↦ θ (q t) * chart(χ) s (q t)) =
+      (fun t : ℝ≥0ˣ ↦ H t * R t ^ s) := by
+    funext t
+    change θ (q t) * ((χ (q t) : ℂ) * R (normₛ (q t)) ^ s) = ((χ (q t) : ℂ) * θ (q t)) * R t ^ s
+    rw [hq]
+    ring
+  have hM (s : ℂ) (hs : s.re = σ) :
+      Z s = ∫ t : ℝ≥0ˣ, H t * R t ^ s ∂positiveRealHaar := by
+    have hs' : 0 < s.re := hs ▸ hσ
+    have hc : ∃ (η : PontryaginDual Jₛ) (w : ℂ), 0 < w.re ∧ chart(χ) s = chart(η) w :=
+      ⟨χ, s, hs', rfl⟩
+    change sLocalIdelicZFunction f (chart(χ) s) = _
+    rw [sLocalIdelicZFunction_eq_integral f hc, ← sLocalThetaMellinIntegral_eq_zeta f hc,
+      ← sLocalRadialMellinIntegral_eq_theta τ hτ f χ s hs']
+    change (∫ t : ℝ≥0ˣ, θ (q t) * chart(χ) s (q t) ∂positiveRealHaar) = _
+    rw [hraw]
+  have hI : Integrable (fun t : ℝ≥0ˣ ↦ H t * R t ^ (σ : ℂ)) positiveRealHaar := by
+    rw [← hraw]
+    exact sLocalRadialMellinIntegral_integrable τ hτ f χ (σ : ℂ) hσ
+  have hs := sLocalIdelicZFunction_schwartzOnStrip f χ (σ / 2) (σ + 1) (half_pos hσ) (by linarith) 0
+  have hV : Complex.VerticalIntegrable Z σ :=
+    (show UniformlySchwartzOnStrip Z (σ / 2) (σ + 1) by simpa only [iteratedDeriv_zero] using hs).verticalIntegrable
+      σ ⟨by linarith, by linarith⟩
+  have hi := mellinInv_positiveRealHaar hH Z σ (normₛ g) hM hI hV
+  change mellinInv σ Z ((normₛ g).val : ℝ) = (χ g : ℂ) * θ g
+  rw [hi]
+  let k : J₁ := ⟨g / q (normₛ g), by rw [MonoidHom.mem_ker, map_div, hq, div_self']⟩
+  have hk : k.val⁻¹ * g = q (normₛ g) := (inv_mul_eq_iff_eq_mul).mpr (div_mul_cancel _ _).symm
+  have hθ := sLocalHomogeneousAdelicTheta_homogeneous F S μ (ω(χ)) f k g
+  change θ (k.val⁻¹ * g) = (χ k.val : ℂ) * θ g at hθ
+  change (χ (q (normₛ g)) : ℂ) * θ (q (normₛ g)) = _
+  rw [hk] at hθ
+  rw [hθ, ← mul_assoc, ← Circle.coe_mul, ← map_mul]
+  congr 3
+  change q (normₛ g) * (g / q (normₛ g)) = g
+  rw [mul_comm (q (normₛ g)) (g / q (normₛ g)), div_mul_cancel]
+
+/-- The packaged theta is the conjugate-character multiple of the normalized right
+vertical integral, with no choice of section or measure left in the statement. -/
+theorem sLocal_theta_eq_normalized_right_line (χ : PontryaginDual Jₛ) (f : Tests) (g : Jₛ)
+    {σ : ℝ} (hσ : 0 < σ) :
+    sLocalHomogeneousAdelicTheta F S μ (ω(χ)) f g =
+      star (χ g : ℂ) * (verticalLineIntegral (fun z ↦
+        ((((normₛ g).val : ℝ) : ℂ) ^ (-z)) * sLocalIdelicZFunction f (chart(χ) z)) σ /
+          (2 * (Real.pi : ℂ) * Complex.I)) := by
+  have hi : star (χ g : ℂ) = ((χ g)⁻¹ : Circle) := (Circle.coe_inv_eq_conj _).symm
+  rw [normalizedVerticalLineIntegral_normPower_eq_mellinInv, sLocal_mellinInv_eq_character_mul_theta χ f g hσ,
+    ← mul_assoc, hi, ← Circle.coe_mul, inv_mul_cancel, Circle.coe_one, one_mul]
+
+/-- Subtracting the value of the shifted contour from the genuine theta leaves exactly
+the norm of the normalized left line. -/
+private theorem norm_sLocalTheta_sub_normalizedContour_eq_left (χ : PontryaginDual Jₛ) (f : Tests)
+    (g : Jₛ) (A : ℝ) :
+    let W (z : ℂ) := ((((normₛ g).val : ℝ) : ℂ) ^ (-z)) * sLocalIdelicZFunction f (chart(χ) z)
+    ‖sLocalHomogeneousAdelicTheta F S μ (ω(χ)) f g -
+      star (χ g : ℂ) * ((verticalLineIntegral W 1 - verticalLineIntegral W (-A)) /
+        (2 * (Real.pi : ℂ) * Complex.I))‖ =
+      ‖verticalLineIntegral W (-A) / (2 * (Real.pi : ℂ) * Complex.I)‖ := by
+  intro W
+  rw [sLocal_theta_eq_normalized_right_line χ f g (σ := 1) zero_lt_one]
+  change ‖star (χ g : ℂ) * (verticalLineIntegral W 1 / _) -
+    star (χ g : ℂ) * ((verticalLineIntegral W 1 - verticalLineIntegral W (-A)) / _)‖ = _
+  have he : verticalLineIntegral W 1 - (verticalLineIntegral W 1 - verticalLineIntegral W (-A)) =
+      verticalLineIntegral W (-A) := by ring
+  rw [← mul_sub, ← sub_div, he, norm_mul, norm_star, Circle.norm_coe, one_mul]
+
+end ThetaInversion
+
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323, and (8.4.0.1)–(8.4.0.3), p. 389. When the
+finite places lie over one rational prime and the left boundary is free of correcting-factor
+poles, the repaired separate-place theta expansion holds for every assignment. In particular,
+a shared pole can be assigned to any one of its contributing places. -/
+theorem sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor_of_same_prime
+    (χ : PontryaginDual Jₛ) (A : ℝ) (hA : 0 < A)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ))
+    (hLeft : ∀ a : ℂ, a.re = -A → 0 ≤ meromorphicOrderAt (fun z ↦ sLocalRhoFactor (chart(χ) z)) a)
+    (assign : ℂ → Places) : sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor χ A hA assign := by
+  have hlimits := (sLocalSinglePrime_separatePlace_absolute χ A hsame assign).2
+  obtain ⟨_, _, _, _, hvertical⟩ := sLocalIdelicZFunction_commonHeight_residue_limit χ A hA hLeft
+  refine ⟨fun v f g ↦ sLocalAssignedMellinPoleSum χ A assign v f g, ?_, ?_, ?_, ?_⟩
+  · intro v f K hK
+    have hu := (hlimits v {f} (Bornology.isVonNBounded_singleton _) K hK).1
+    have hK' := (hu.comp (fun g ↦ (f, g))).mono (s' := K) (fun g hg ↦ ⟨mem_singleton _, hg⟩)
+    apply hK'.congr
+    filter_upwards with h g _
+    apply Finset.sum_congr ?_ (fun _ _ ↦ rfl)
+    ext a
+    simp only [Finset.mem_filter, sLocalStripPoleWindow]
+  · intro v g _ B hB
+    have hu := (hlimits v B hB {g} isCompact_singleton).1
+    have hB' := (hu.comp (fun f ↦ (f, g))).mono (s' := B) (fun f hf ↦ ⟨hf, mem_singleton _⟩)
+    apply hB'.congr
+    filter_upwards with h f _
+    apply Finset.sum_congr ?_ (fun _ _ ↦ rfl)
+    ext a
+    simp only [Finset.mem_filter, sLocalStripPoleWindow]
+  · intro f
+    refine ⟨?_, fun g _ ↦ ?_⟩
+    · simpa only [Complex.ofReal_one, Complex.one_cpow, one_mul] using (hvertical f 1 zero_lt_one).1
+    · rw [sLocalSinglePrime_sum_assigned_eq_verticalLineIntegral_sub χ A hA hsame hLeft assign f g,
+        norm_sLocalTheta_sub_normalizedContour_eq_left]
+      exact norm_verticalLineIntegral_normPower_mul_le (fun z ↦ Z(f,χ,z)) _ (NNReal.coe_pos.mpr (Units.zero_lt _)) A
+  · intro B hB
+    obtain ⟨C, hC, hb⟩ := sLocalIdelicZFunction_leftIntegral_bounded_remainder χ A hA hLeft B hB
+    refine ⟨C, hC, fun f hf g _ ↦ ?_⟩
+    rw [sLocalSinglePrime_sum_assigned_eq_verticalLineIntegral_sub χ A hA hsame hLeft assign f g,
+      norm_sLocalTheta_sub_normalizedContour_eq_left]
+    exact hb f hf _ (NNReal.coe_pos.mpr (Units.zero_lt _))
+
+/-- Every one-prime datum at an admissible cutoff has a valid assignment realizing the
+full separate-place expansion of Theorem 7.1.2.3. -/
+theorem exists_sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor_of_same_prime
+    (χ : PontryaginDual Jₛ) (A : ℝ) (hA : 0 < A)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ))
+    (hLeft : ∀ a : ℂ, a.re = -A → 0 ≤ meromorphicOrderAt (fun z ↦ sLocalRhoFactor (chart(χ) z)) a) :
+    ∃ assign : ℂ → Places, IsValidPoleAssignment χ assign ∧
+      sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor χ A hA assign := by
+  obtain ⟨assign, hvalid⟩ := exists_isValidPoleAssignment χ
+  exact ⟨assign, hvalid, sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor_of_same_prime
+    χ A hA hsame hLeft assign⟩
+
+/-- Every positive cutoff has a right neighborhood of admissible cutoffs. Equivalently the
+left contour can move a little farther left, with only possible boundary poles at the
+original abscissa. -/
+theorem eventually_sLocal_leftBoundary_regular (χ : PontryaginDual Jₛ) (A : ℝ) (hA : 0 < A) :
+    ∀ᶠ B : ℝ in 𝓝[>] A, ∀ a : ℂ, a.re = -B →
+      0 ≤ meromorphicOrderAt (fun z ↦ sLocalRhoFactor (chart(χ) z)) a := by
+  let E := {a : ℂ | a.re ∈ Icc (-(A + 1)) 1 ∧
+    ∃ w : InfinitePlace F, sLocalPoleContributes χ (.inl w) a}
+  have hfin : E.Finite := sLocalPoleContributes_archimedean_finite_in_strip χ (A + 1)
+  let bad := ((fun a : ℂ ↦ -a.re) '' E) \ {A}
+  have hbad : bad.Finite := (hfin.image _).sdiff
+  have hnb : badᶜ ∈ 𝓝 A := hbad.isClosed.isOpen_compl.mem_nhds
+    (show A ∈ badᶜ from fun h ↦ h.2 (mem_singleton A))
+  filter_upwards [Ioo_mem_nhdsGT (show A < A + 1 by linarith),
+    mem_nhdsWithin_of_mem_nhds hnb] with B hB hb a ha
+  by_contra hn
+  obtain ⟨w | v, hv⟩ := (sLocalPoleContributes_exists_iff χ a).mp (lt_of_not_ge hn)
+  · have haE : a ∈ E := ⟨by rw [ha]; constructor <;> linarith [hB.1, hB.2], w, hv⟩
+    exact hb ⟨⟨a, haE, by change -a.re = B; rw [ha, neg_neg]⟩, fun h ↦ hB.1.ne' (mem_singleton_iff.mp h)⟩
+  · obtain ⟨m, t, _, _, he⟩ := hv
+    rw [he, Complex.mul_I_re, Complex.ofReal_im, neg_zero] at ha
+    linarith [hB.1]
+
+/-- For any requested positive cutoff, every sufficiently small shift of the left contour
+farther left gives a cutoff at which the full one-prime separate-place expansion holds. -/
+theorem eventually_sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor_of_same_prime
+    (χ : PontryaginDual Jₛ) (A : ℝ) (hA : 0 < A)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ)) :
+    ∀ᶠ B : ℝ in 𝓝[>] A, ∃ hB : 0 < B, ∀ assign : ℂ → Places,
+      sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor χ B hB assign := by
+  filter_upwards [eventually_sLocal_leftBoundary_regular χ A hA, self_mem_nhdsWithin] with B hreg hB
+  have hpos : 0 < B := hA.trans hB
+  exact ⟨hpos, sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor_of_same_prime χ B hpos hsame hreg⟩
 
 end
 
