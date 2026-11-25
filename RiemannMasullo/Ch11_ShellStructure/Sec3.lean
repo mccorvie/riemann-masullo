@@ -7,7 +7,8 @@ import RiemannMasullo.AppA_AlgebraicNT.Sec2
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.Ch11_ShellStructure.Sec1a
 
-import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec5
+import RiemannMasullo.Ch07_SchauderBasesZeta.Sec5
+import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import Mathlib.Analysis.Fourier.PoissonSummation
 
 /-!
