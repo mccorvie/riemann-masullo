@@ -256,9 +256,35 @@ private theorem quadraticParity_sum_offDiag (U : Finset ℕ) (f : Finset ℕ →
          intro s hs
          simp only [sum_const, nsmul_eq_mul, hfiber s hs, Nat.cast_ofNat]
 
+private theorem quadraticParity_card_offDiag (U : Finset ℕ) :
+    (U.offDiag.card : ℝ) = 2 * ((U.powersetCard 2).card : ℝ) := by
+  simpa only [sum_const, nsmul_eq_mul, mul_one] using quadraticParity_sum_offDiag U (fun _ ↦ (1 : ℝ))
+
+/-- The same normalized cumulative moment holds on the ordered distinct pairs, including
+when the population is empty. Each two-element set has exactly two orderings. -/
+theorem QuadraticParityProductFourthPowerMoment.ordered_pair_moment
+    {F : Type*} [Field F] [NumberField F] {χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)}
+    {J k : ℕ} {U : Finset ℕ} {L : ℝ}
+    (hmoment : QuadraticParityProductFourthPowerMoment χ J k (U.powersetCard 2) L) :
+    ∑ w ∈ U.offDiag, (∑ j ∈ Ioc 0 J, |degreeOnePrimeRieszSumWith χ (J^4) ((j : ℝ)^4)
+      (fun p ↦ (jacobiSym (w.1*w.2 : ℕ) p : ℝ))|)^k ≤ (U.offDiag.card : ℝ) * L^k := by
+  let E (m : ℕ) := (∑ j ∈ Ioc 0 J, |degreeOnePrimeRieszSumWith χ (J^4) ((j : ℝ)^4)
+    (fun p ↦ (jacobiSym m p : ℝ))|)^k
+  change ∑ w ∈ U.offDiag, E (w.1*w.2) ≤ _
+  calc _ = ∑ w ∈ U.offDiag, E (({w.1,w.2} : Finset ℕ).prod id) := by
+         apply sum_congr rfl
+         intro w hw
+         rw [Finset.prod_pair (mem_offDiag.mp hw).2.2]
+         rfl
+       _ = 2 * ∑ s ∈ U.powersetCard 2, E (s.prod id) :=
+         quadraticParity_sum_offDiag U (fun s ↦ E (s.prod id))
+       _ ≤ _ := by
+         rw [quadraticParity_card_offDiag, mul_assoc]
+         exact mul_le_mul_of_nonneg_left hmoment (by norm_num)
+
 /-- The complete deficit on any selected collection of ordered distinct auxiliary
 pairs transfers at its ordered density. The moment comes from unordered products.
-The selected set need not be closed under swapping its two coordinates. -/
+The selected set may contain either ordering of a pair independently. -/
 theorem QuadraticParityProductFourthPowerMoment.ordered_pair_complete_deficit_transfer
     {F : Type*} [Field F] [NumberField F] {χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)}
     {J k : ℕ} {U : Finset ℕ} {L : ℝ}
@@ -272,30 +298,15 @@ theorem QuadraticParityProductFourthPowerMoment.ordered_pair_complete_deficit_tr
     ∑ j ∈ Ioc 0 J, max (c j - degreeOnePrimeRieszSumWith χ (J^4) ((j : ℝ)^4) 1) 0 ≤
       H + 4*(Module.finrank ℚ F : ℝ)*(Real.log 4+4)*(J : ℝ)^(19/3 : ℝ) +
         L * δ ^ (-(k : ℝ)⁻¹) := by
-  let E (m : ℕ) := (∑ j ∈ Ioc 0 J, |degreeOnePrimeRieszSumWith χ (J^4) ((j : ℝ)^4)
-    (fun p ↦ (jacobiSym m p : ℝ))|)^k
-  have hcard : (U.offDiag.card : ℝ) = 2 * ((U.powersetCard 2).card : ℝ) := by
-    simpa only [sum_const, nsmul_eq_mul, mul_one] using quadraticParity_sum_offDiag U (fun _ ↦ (1 : ℝ))
   have hpos : 0 < ((U.powersetCard 2).card : ℝ) := by
     exact_mod_cast card_pos.mpr (powersetCard_nonempty.mpr hsize)
   have hO : U.offDiag.Nonempty := by
     apply card_pos.mp
-    exact_mod_cast (show 0 < (U.offDiag.card : ℝ) by rw [hcard]; positivity)
+    exact_mod_cast (show 0 < (U.offDiag.card : ℝ) by rw [quadraticParity_card_offDiag]; positivity)
   apply quadraticParity_complete_transfer χ hJ hk U.offDiag G hO hG (fun w ↦ w.1*w.2) c
-    hL hδ hdensity ?_ ?_ hcomplete
-  · change ∑ w ∈ U.offDiag, E (w.1*w.2) ≤ _
-    calc _ = ∑ w ∈ U.offDiag, E (({w.1,w.2} : Finset ℕ).prod id) := by
-           apply sum_congr rfl
-           intro w hw
-           rw [Finset.prod_pair (mem_offDiag.mp hw).2.2]
-           rfl
-         _ = 2 * ∑ s ∈ U.powersetCard 2, E (s.prod id) :=
-           quadraticParity_sum_offDiag U (fun s ↦ E (s.prod id))
-         _ ≤ _ := by
-           rw [hcard, mul_assoc]
-           exact mul_le_mul_of_nonneg_left hmoment (by norm_num)
-  · intro w hw p hp
-    obtain ⟨hq, hd, _⟩ := mem_offDiag.mp (hG hw)
-    exact (hcoprime w.1 hq p hp).mul_left (hcoprime w.2 hd p hp)
+    hL hδ hdensity hmoment.ordered_pair_moment ?_ hcomplete
+  intro w hw p hp
+  obtain ⟨hq, hd, _⟩ := mem_offDiag.mp (hG hw)
+  exact (hcoprime w.1 hq p hp).mul_left (hcoprime w.2 hd p hp)
 
 end RiemannMasullo
