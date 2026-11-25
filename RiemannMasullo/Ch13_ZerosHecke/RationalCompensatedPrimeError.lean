@@ -27,14 +27,24 @@ open ArithmeticFunction
 namespace RiemannMasullo
 
 /-- The two-frequency nonnegative weight in logarithmic norm coordinates. -/
-def rationalPrimeCosineWeight (x : ℝ) : ℝ :=
+@[expose] def rationalPrimeCosineWeight (x : ℝ) : ℝ :=
   2 - Real.cos x - Real.cos (Real.sqrt 2 * x)
+
+/-- The explicit cosine weight at any real logarithmic norm. -/
+theorem rationalPrimeCosineWeight_apply (x : ℝ) :
+    rationalPrimeCosineWeight x = 2 - Real.cos x - Real.cos (Real.sqrt 2 * x) := rfl
 
 /-- The prime sum for the two-frequency weight, with a unit mass subtracted
 at each positive integer up to the same cutoff. -/
-def rationalCompensatedPrimeError (N : ℕ) : ℝ :=
+@[expose] def rationalCompensatedPrimeError (N : ℕ) : ℝ :=
   ∑ n ∈ Finset.Icc 1 N, ((if n.Prime then Real.log n else 0) - 1) *
     rationalPrimeCosineWeight (Real.log n)
+
+/-- The discrete counting error as a finite sum over the positive integers. -/
+theorem rationalCompensatedPrimeError_apply (N : ℕ) :
+    rationalCompensatedPrimeError N =
+      ∑ n ∈ Finset.Icc 1 N, ((if n.Prime then Real.log n else 0) - 1) *
+        rationalPrimeCosineWeight (Real.log n) := rfl
 
 private def fourShift (f : ℂ → ℂ) (z : ℂ) : ℂ :=
   2 * f z - (f (z + Complex.I) + f (z - Complex.I) +
