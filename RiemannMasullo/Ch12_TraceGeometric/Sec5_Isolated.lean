@@ -5,6 +5,7 @@ public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 
 public import RiemannMasullo.Ch01_Introduction.Sec4_PoissonCertificate
 public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeSignedCoefficients
+public import RiemannMasullo.Ch01_Introduction.Sec4_HeckePrimeLaguerre
 public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeGreenExterior
 public import RiemannMasullo.AppB_AnalyticNT.Sec4b_BoundaryHeckeGreen
 
@@ -515,6 +516,23 @@ theorem all_widths_iff_cofinal_signedCoefficients (τ : ℝ≥0ˣ →ₜ* C𝔽)
       ((HeckeLaguerre.isEmpty_rightSite_iff_central χ).mpr (h χ hχ))
   · exact (HeckeLaguerre.isEmpty_rightSite_iff_central χ).mp
       ((HeckeLaguerre.isEmpty_rightSite_iff_cofinal_signed τ hτ χ hχ (negative χ)).mpr (h χ hχ))
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. Exterior cancellation at every positive
+width is equivalent to cofinally subexponential signed prefixes of the finite
+prime-power Laguerre sums. At a prefix of length `N`, all participating ideal norms
+are at most `25^N`. Each character and cutoff may choose either sign. -/
+theorem all_widths_iff_cofinal_primePowerLaguerre (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) (negative : U𝔽 → ℕ → Bool) :
+    allWidths(τ) ↔ ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (τ u) = 1) →
+      ∀ ε : ℝ, 0 < ε → ∀ J : ℕ, ∃ N ≥ J,
+        Real.log (SignedFrequency.chosenPrefix
+          (fun n ↦ HeckeLaguerre.finiteMoment χ n (25^n)) (negative χ) N) / (N : ℝ) ≤ ε := by
+  rw [allWidths_iff_critical τ hτ]
+  constructor <;> intro h χ hχ
+  · exact (HeckeLaguerre.all_sites_central_iff_cofinal_raw_ideal τ hτ χ hχ
+      (fun n ↦ 25^n) (fun _ _ ↦ le_rfl) (negative χ)).mp (h χ hχ)
+  · exact (HeckeLaguerre.all_sites_central_iff_cofinal_raw_ideal τ hτ χ hχ
+      (fun n ↦ 25^n) (fun _ _ ↦ le_rfl) (negative χ)).mpr (h χ hχ)
 
 /-- Paper: Theorem 12.5.1.1, pp. 519–520. For each compact test and normalized character, the
 absolute omitted Mellin sum, including both edges of any positive strip, is bounded by the
