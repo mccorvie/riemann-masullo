@@ -4,7 +4,7 @@ public import RiemannMasullo.Ch10_TraceSpectral.Sec3_LineWindows
 public import RiemannMasullo.Ch10_TraceSpectral.Sec3_LineQuarticActions
 public import RiemannMasullo.AppC_LCTVS.Sec3a_SchwartzWindows
 public import RiemannMasullo.AppB_AnalyticNT.Sec4b
-import all RiemannMasullo.Ch09_HardySobolev.Sec3
+import RiemannMasullo.Ch09_HardySobolev.Sec3
 import Mathlib.Analysis.Calculus.IteratedDeriv.Lemmas
 
 /-! # Homogeneous convolution on the line quotient
@@ -161,7 +161,7 @@ theorem spectralLineQuotient_window_rank_le (a : ℝ) {s : ℝ} (hs : 1 < s)
   let m : Fin (spectralBoundaryMultiplicity s
       (meromorphicOrderAt (continuedCompletedHeckeL (χ z.val.1)) (shift(a,z.val.2))).untop₀.toNat) :=
     ⟨j.val.2.2,j.property⟩
-  have hpol := integrable_schwartz_log_weight μ𝔽 m𝔽 k (s / 2)
+  have hpol := SchwartzBruhat.integrable_norm_mul_logWeight μ𝔽 m𝔽 k (s / 2)
   have hk := (continuous_schwartzBruhat k).aemeasurable (μ := μ𝔽)
   have hscalar (δ : StrongDual ℂ W(s)) v :
       δ (A v) = ∫ g, k g * δ (τ(s,hs) g v) ∂μ𝔽 := by
@@ -210,7 +210,7 @@ theorem spectralLineConvolution_homogeneous_nuclear (a : ℝ) {s : ℝ} (hs : 1 
     let S := {j : SpectralLineJetIndex χ a s | j.val.1 = ω ∧ |j.val.2.1| ≤ R}
     have hSR : S.Finite ∧ (S.ncard : ℝ) ≤ C * (1 + R) ^ 2 := hcount a s R hR
     obtain ⟨hS,hr⟩ := hSR
-    have hpol := integrable_schwartz_log_weight μ𝔽 m𝔽 (P f) (s / 2)
+    have hpol := SchwartzBruhat.integrable_norm_mul_logWeight μ𝔽 m𝔽 (P f) (s / 2)
     have hk := (continuous_schwartzBruhat (P f)).aemeasurable (μ := μ𝔽)
     have hm (ζ : Ω) (t : ℝ) :
         Isolated.spectralLineWindowMultiplier (P f) (χ ζ) t = if ζ = ω then f t else 0 := by
