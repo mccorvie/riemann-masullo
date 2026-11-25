@@ -62,7 +62,8 @@ theorem packetRow_divisor_eq {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q
 def rowZeroSites (ψ : PontryaginDual Cℚ) : Set ℂ :=
   {z | 0 < MeromorphicOn.divisor (continuedCompletedHeckeL ψ) univ z}
 
-private theorem row_site_in_strip (ψ : PontryaginDual Cℚ) (z : rowZeroSites ψ) :
+/-- Every positive completed idelic divisor site lies in the open critical strip. -/
+theorem row_site_in_strip (ψ : PontryaginDual Cℚ) (z : rowZeroSites ψ) :
     z.val.re ∈ Ioo (0 : ℝ) 1 := by
   have hlt (χ : PontryaginDual Cℚ) (w : ℂ) (hw : 0 < meromorphicOrderAt (continuedCompletedHeckeL χ) w) :
       w.re < 1 := by

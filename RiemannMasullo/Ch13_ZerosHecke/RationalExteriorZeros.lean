@@ -381,7 +381,7 @@ private theorem ideleClassNorm_decomposition (e : (ℝ≥0ˣ × Uℚ) ≃ₜ* C�
 
 /-- A character trivial on a norm section is trivial on the kernel of the residue map modulo
 some `N`: the product of the local conductors. -/
-private theorem exists_level_of_trivial_on_section (τ : ℝ≥0ˣ →ₜ* Cℚ)
+theorem exists_level_of_trivial_on_section (τ : ℝ≥0ˣ →ₜ* Cℚ)
     (hτ : Function.RightInverse τ (ideleClassNorm ℚ)) (ψ : PontryaginDual Cℚ)
     (hψ : ∀ t : ℝ≥0ˣ, ψ (τ t) = 1) :
     ∃ (N : ℕ) (_ : NeZero N), ∀ x : IdQ, resMod N x = 1 → ψ (QuotientGroup.mk x) = 1 := by
