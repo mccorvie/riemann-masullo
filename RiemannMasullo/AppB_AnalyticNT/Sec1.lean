@@ -1934,6 +1934,12 @@ private theorem finiteHeckeL_disc_center_lower (χ : U[F]) (x : ℝ) (hx : 1 < x
   · rw [norm_one, one_mul]
     exact (one_le_inv₀ (sub_pos.mpr hb₁)).2 (sub_le_self _ hb)
 
+/-- On each vertical line of absolute convergence, the fixed Dedekind zeta value
+controls the reciprocal norm of every finite Hecke Euler product. -/
+theorem one_le_norm_finiteHeckeL_mul_dedekindZeta (χ : U[F]) (s : halfPlane) :
+    1 ≤ ‖finiteHeckeL χ s‖ * ‖dedekindZeta F ((s : ℂ).re : ℂ)‖ :=
+  finiteHeckeL_disc_center_lower χ _ s.property s rfl
+
 /-- On any disc of fixed radius centred on a line to the right of one, the ratio of
 the completed continuation to its value at the centre grows at most exponentially
 at large absolute heights. -/

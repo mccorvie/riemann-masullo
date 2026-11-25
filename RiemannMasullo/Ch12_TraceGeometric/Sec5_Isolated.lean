@@ -7,6 +7,8 @@ public import RiemannMasullo.Ch01_Introduction.Sec4_PoissonCertificate
 public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeGreenExterior
 public import RiemannMasullo.AppB_AnalyticNT.Sec4b_BoundaryHeckeGreen
 
+public import RiemannMasullo.AppB_AnalyticNT.Sec4b_HeckeStripJensen
+
 /-! # Isolated statements of §12.5
 
 Statements of the section that are neither proved nor refuted and that nothing else in Lean
@@ -514,6 +516,22 @@ theorem exists_hasSum_absolute_exterior_le_criticalLogDifference (τ : ℝ≥0ˣ
   rw [criticalLogDifference_eq_mass τ hτ χ hχ,
     ← (tendsto_corrected_circle_mean_rightGreenMass τ hτ χ hχ).2.limUnder_eq]
   exact exists_hasSum_absolute_exterior_le_circleLimit τ hτ χ hχ φ
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. At any fixed interior Euler evaluation, the
+all-width exterior cancellation is equivalent to nonpositivity of the two-boundary
+strip logarithmic difference of every section-normalized ordinary Hecke L-function. -/
+theorem all_widths_iff_stripLogDifference_nonpos (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) {w b : ℝ} (hb : 1/2 < b) (hbw : b < w) :
+    allWidths(τ) ↔ ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (τ u) = 1) → HeckeStripJensen.logDifference χ w b ≤ 0 := by
+  rw [allWidths_iff_critical τ hτ]
+  constructor <;> intro h χ hχ
+  · apply (HeckeStripJensen.logDifference_nonpos_iff τ hτ χ hχ hb hbw).mpr
+    refine ⟨fun z ↦ ?_⟩
+    exact z.property.2.ne' (h χ hχ ⟨z.val,z.property.1⟩)
+  · have he := (HeckeStripJensen.logDifference_nonpos_iff τ hτ χ hχ hb hbw).mp (h χ hχ)
+    let := he
+    apply (rightGreenMass_eq_zero_iff χ).mp
+    simp [rightGreenMass]
 
 end CompactGreen
 
