@@ -1,6 +1,12 @@
 module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1a
+public import RiemannMasullo.ForMathlib.Analysis.Fourier.StripLaplace
+import RiemannMasullo.Ch03_IdelicZeta.Sec4
+import RiemannMasullo.ForMathlib.Analysis.Fourier.CompactLatticeInterpolation
+import RiemannMasullo.ForMathlib.Analysis.MellinTransform.Gaussian
+import RiemannMasullo.ForMathlib.Analysis.MellinTransform.Weighted
+import Mathlib.Analysis.Meromorphic.IsolatedZeros
 
 import Mathlib.Analysis.PSeries
 import Mathlib.RingTheory.RamificationInertia.Inertia
@@ -1167,5 +1173,571 @@ theorem rapidDecay_div_summable_iff_polyLowerBound (D : ℤ → ℂ) :
         _ = (C / c) * ((1 + |(m : ℝ)|) ^ 2)⁻¹ := by
             rw [pow_add]
             field_simp [hc.ne', hbase.ne']
+
+end RiemannMasullo.Isolated
+
+/-! ## Gaussian two-place converse for the separate residue sums
+
+The Gaussian character and the compact Fourier interpolation argument come from
+mccorvie's #7279 report (comment 7125686485). Aadrianvv independently identified
+the fixed-character necessity (comment 7127211257). The lattice sequence criterion
+above is due to dishank-hai (#7458).
+-/
+
+namespace RiemannMasullo.Isolated
+
+open scoped Real ContDiff
+set_option quotPrecheck false
+
+/-- The norm-nine poles of the fourth-power angular character over the Gaussian field. -/
+def gaussianPrimaryCenter (m : ℤ) : ℂ :=
+  (m : ℂ) * (2 * Real.pi * Complex.I) / (Real.log 9 : ℂ)
+
+/-- The reciprocal norm-five Euler factor in the Gaussian example of #7279. -/
+def gaussianSecondaryFactor (s : ℂ) : ℂ :=
+  1 - ((-7 - 24 * Complex.I) / 25) * Complex.exp (-(Real.log 5 : ℂ) * s)
+
+/-- The two-Euler-factor meromorphic function of a compact logarithmic test in #7279. -/
+def gaussianTwoFactorZeta (h : ℝ → ℂ) (s : ℂ) : ℂ :=
+  bilateralLaplace h s /
+    ((1 - Complex.exp (-(Real.log 9 : ℂ) * s)) * gaussianSecondaryFactor s)
+
+private theorem gaussianProfile_analytic {h : ℝ → ℂ} (hh : Continuous h)
+    (hc : HasCompactSupport h) (s : ℂ) : AnalyticAt ℂ (bilateralLaplace h) s := by
+  have hp (z : ℂ) (x : ℝ) : (Real.exp x : ℂ) ^ z = Complex.exp (z * x) := by
+    rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (Real.exp_pos x).ne'),
+      ← Complex.ofReal_log (Real.exp_pos x).le, Real.log_exp, mul_comm]
+  have hA := analyticOnNhd_integral_mul_cpow volume h Real.exp hh.measurable
+    Real.continuous_exp.measurable Real.exp_pos (U := univ) isOpen_univ
+    (fun a _ ↦ Continuous.integrable_of_hasCompactSupport
+      (hh.norm.mul (Real.continuous_exp.rpow_const (fun x ↦ Or.inl (Real.exp_pos x).ne')))
+      hc.norm.mul_right)
+  change AnalyticAt ℂ (fun z : ℂ ↦ ∫ x : ℝ, h x * Complex.exp (z * x)) s
+  simpa only [hp] using hA s (mem_univ _)
+
+private theorem gaussianPrimary_exp (m : ℤ) :
+    Complex.exp (-(Real.log 9 : ℂ) * gaussianPrimaryCenter m) = 1 := by
+  have hL : (Real.log 9 : ℂ) ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (Real.log_pos (by norm_num)).ne'
+  rw [gaussianPrimaryCenter, show -(Real.log 9 : ℂ) *
+      ((m : ℂ) * (2 * Real.pi * Complex.I) / (Real.log 9 : ℂ)) =
+      ((-m : ℤ) : ℂ) * (2 * Real.pi * Complex.I) by push_cast; field_simp]
+  exact Complex.exp_int_mul_two_pi_mul_I _
+
+private theorem gaussianSecondaryFactor_analytic (s : ℂ) :
+    AnalyticAt ℂ gaussianSecondaryFactor s := by
+  unfold gaussianSecondaryFactor
+  fun_prop
+
+/-- Paper: Theorem 7.1.2.3, p. 318, and the separate absolute sum on p. 389.
+At a norm-nine pole away from the norm-five lattice, the residue is the sampled
+bilateral Laplace transform divided by the derivative and the surviving Euler factor.
+This also covers samples at which the numerator vanishes. -/
+theorem gaussianTwoFactorZeta_residue {h : ℝ → ℂ} (hh : Continuous h) (hc : HasCompactSupport h)
+    {t : ℝ} (ht : 0 < t) (m : ℤ) (hD : gaussianSecondaryFactor (gaussianPrimaryCenter m) ≠ 0) :
+    complexResidue (fun z ↦ (t : ℂ) ^ (-z) * gaussianTwoFactorZeta h z) (gaussianPrimaryCenter m) =
+      (t : ℂ) ^ (-gaussianPrimaryCenter m) * bilateralLaplace h (gaussianPrimaryCenter m) /
+        ((Real.log 9 : ℂ) * gaussianSecondaryFactor (gaussianPrimaryCenter m)) := by
+  let a := gaussianPrimaryCenter m
+  let L : ℂ := Real.log 9
+  let E (z : ℂ) := 1 - Complex.exp (-L * z)
+  have hL : L ≠ 0 := Complex.ofReal_ne_zero.mpr (Real.log_pos (by norm_num)).ne'
+  have h0 : E a = 0 := sub_eq_zero.mpr (gaussianPrimary_exp m).symm
+  have hder : HasDerivAt E L a := by
+    have hd := (((hasDerivAt_id a).const_mul (-L)).cexp).const_sub 1
+    simpa only [id_eq, mul_one, E, a, L, gaussianPrimary_exp, one_mul, neg_neg] using hd
+  have hE : AnalyticAt ℂ E a := by dsimp [E]; fun_prop
+  have hn : dslope E a a ≠ 0 := by rw [dslope_same, hder.deriv]; exact hL
+  have hW : AnalyticAt ℂ (fun z : ℂ ↦ (t : ℂ) ^ (-z)) a := by
+    simp_rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr ht.ne')]
+    fun_prop
+  have hf (z : ℂ) : (z - a) * dslope E a z = E z := by
+    simpa only [smul_eq_mul, h0, sub_zero] using sub_smul_dslope E a z
+  have heq : (fun z ↦ (t : ℂ) ^ (-z) * gaussianTwoFactorZeta h z) =
+      fun z ↦ ((t : ℂ) ^ (-z) * bilateralLaplace h z /
+        (dslope E a z * gaussianSecondaryFactor z)) / (z - a) := by
+    funext z
+    change _ * (_ / (E z * _)) = _
+    rw [← hf z]
+    simp only [div_eq_mul_inv, mul_inv_rev]
+    ring
+  rw [heq]
+  have hG : AnalyticAt ℂ (fun z ↦ (t : ℂ) ^ (-z) * bilateralLaplace h z /
+      (dslope E a z * gaussianSecondaryFactor z)) a :=
+    (hW.mul (gaussianProfile_analytic hh hc a)).div
+      ((hE.dslope a).mul (gaussianSecondaryFactor_analytic a)) (mul_ne_zero hn hD)
+  change complexResidue _ a = _
+  rw [complexResidue_div_sub hG, dslope_same, hder.deriv]
+
+private theorem gaussianPrimaryCenter_re (m : ℤ) : (gaussianPrimaryCenter m).re = 0 := by
+  rw [gaussianPrimaryCenter, Complex.div_ofReal_re, Complex.mul_re, Complex.mul_I_re]
+  simp
+
+open Classical in
+/-- Paper: Theorem 7.1.2.3, p. 318, and the absolute prime sum on p. 389.
+Absolute summability for all compact smooth logarithmic tests, at one fixed norm
+and outside any finite set of indices, forces an inverse-polynomial lower bound
+at every noncolliding index in the Gaussian example. -/
+theorem gaussianTwoFactorZeta_polyLowerBound_of_absoluteResidues {t : ℝ} (ht : 0 < t)
+    (excluded : Finset ℤ)
+    (habs : ∀ h : ℝ → ℂ, ContDiff ℝ ∞ h → Function.support h ⊆ Icc 0 (2 * Real.log 9) → Summable (fun m : ℤ ↦
+      if m ∈ excluded ∨ gaussianSecondaryFactor (gaussianPrimaryCenter m) = 0 then 0 else
+        ‖complexResidue (fun z ↦ (t : ℂ) ^ (-z) * gaussianTwoFactorZeta h z)
+          (gaussianPrimaryCenter m)‖)) :
+    ∃ (c : ℝ) (d : ℕ), 0 < c ∧ ∀ m : ℤ, gaussianSecondaryFactor (gaussianPrimaryCenter m) ≠ 0 →
+      c / (1 + |(m : ℝ)|) ^ d ≤ ‖gaussianSecondaryFactor (gaussianPrimaryCenter m)‖ := by
+  apply (rapidDecay_div_summable_iff_polyLowerBound _).mp
+  intro b hb
+  have hL : 0 < Real.log 9 := Real.log_pos (by norm_num)
+  obtain ⟨h, hh, hsupp, hsample⟩ := exists_compactSmooth_logFourier_samples _ hL b hb
+  have hc := HasCompactSupport.of_support_subset_isCompact isCompact_Icc hsupp
+  have hs (m : ℤ) : bilateralLaplace h (gaussianPrimaryCenter m) = b m := by
+    simpa only [bilateralLaplace, gaussianPrimaryCenter, mul_comm (m : ℂ) (2 * Real.pi * Complex.I)]
+      using hsample m
+  apply Summable.of_norm
+  apply ((habs h hh hsupp).mul_left (Real.log 9)).congr_cofinite
+  filter_upwards [excluded.eventually_cofinite_notMem] with m hm
+  by_cases hD : gaussianSecondaryFactor (gaussianPrimaryCenter m) = 0
+  · simp [hD]
+  · have hW : ‖(t : ℂ) ^ (-gaussianPrimaryCenter m)‖ = 1 := by
+      rw [Complex.norm_cpow_eq_rpow_re_of_pos ht, Complex.neg_re, gaussianPrimaryCenter_re,
+        neg_zero, Real.rpow_zero]
+    simp only [hm, hD, or_self, ite_false, gaussianTwoFactorZeta_residue hh.continuous hc ht m hD,
+      hs, norm_div, norm_mul, hW, one_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hL]
+    field_simp
+
+
+open Classical in
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323. For the two Gaussian Euler factors
+even boundedness above of the real parts of the symmetric residue sums, for every
+compact smooth profile on one fixed interval, forces the same polynomial lower bound.
+The test can prescribe the phases as well as the sizes of its Fourier samples. -/
+theorem gaussianTwoFactorZeta_polyLowerBound_of_bounded_symmetricResidues
+    {t : ℝ} (ht : 0 < t) (excluded : Finset ℤ)
+    (hbdd : ∀ h : ℝ → ℂ, ContDiff ℝ ∞ h → support h ⊆ Icc 0 (2 * Real.log 9) →
+      ∃ A : ℝ, ∀ N : ℕ, (∑ m ∈ Finset.Icc (-(N : ℤ)) (N : ℤ),
+        if m ∈ excluded ∨ gaussianSecondaryFactor (gaussianPrimaryCenter m) = 0 then 0 else
+          complexResidue (fun z ↦ (t : ℂ) ^ (-z) * gaussianTwoFactorZeta h z)
+            (gaussianPrimaryCenter m)).re ≤ A) :
+    ∃ (c : ℝ) (d : ℕ), 0 < c ∧ ∀ m : ℤ, gaussianSecondaryFactor (gaussianPrimaryCenter m) ≠ 0 →
+      c / (1 + |(m : ℝ)|) ^ d ≤ ‖gaussianSecondaryFactor (gaussianPrimaryCenter m)‖ := by
+  let D (m : ℤ) := gaussianSecondaryFactor (gaussianPrimaryCenter m)
+  let W (m : ℤ) := (t : ℂ) ^ (-gaussianPrimaryCenter m)
+  have hL : 0 < Real.log 9 := Real.log_pos (by norm_num)
+  have hW (m : ℤ) : ‖W m‖ = 1 := by
+    dsimp only [W]
+    rw [Complex.norm_cpow_eq_rpow_re_of_pos ht, Complex.neg_re, gaussianPrimaryCenter_re,
+      neg_zero, Real.rpow_zero]
+  have hnW (m : ℤ) : W m ≠ 0 := by
+    apply norm_ne_zero_iff.mp
+    rw [hW]
+    exact one_ne_zero
+  apply (rapidDecay_div_summable_iff_polyLowerBound D).mp
+  intro b hb
+  let a (m : ℤ) := (‖b m‖ : ℂ) * D m / (‖D m‖ : ℂ) / W m
+  have ha (m : ℤ) : ‖a m‖ ≤ ‖b m‖ := by
+    by_cases hd : D m = 0
+    · simp [a, hd]
+    · simp only [a, norm_div, norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_norm, hW, div_one]
+      exact (mul_div_cancel_right₀ _ (norm_ne_zero_iff.mpr hd)).le
+  obtain ⟨h, hh, hsupp, hsample⟩ := exists_compactSmooth_logFourier_samples _ hL a
+    (fun k ↦ (hb k).imp fun C hC m ↦ (mul_le_mul_of_nonneg_left (ha m) (by positivity)).trans (hC m))
+  have hc := HasCompactSupport.of_support_subset_isCompact isCompact_Icc hsupp
+  have hs (m : ℤ) : bilateralLaplace h (gaussianPrimaryCenter m) = a m := by
+    simpa only [bilateralLaplace, gaussianPrimaryCenter, mul_comm (m : ℂ) (2 * Real.pi * Complex.I)]
+      using hsample m
+  let u (m : ℤ) := if m ∈ excluded then 0 else ‖b m / D m‖ / Real.log 9
+  have hu (m : ℤ) : 0 ≤ u m := by dsimp [u]; split_ifs <;> positivity
+  have hterm (m : ℤ) :
+      (if m ∈ excluded ∨ D m = 0 then 0 else complexResidue
+        (fun z ↦ (t : ℂ) ^ (-z) * gaussianTwoFactorZeta h z) (gaussianPrimaryCenter m)) = (u m : ℂ) := by
+    by_cases hm : m ∈ excluded
+    · simp [hm, u]
+    · by_cases hd : D m = 0
+      · simp [hm, hd, u]
+      · simp only [hm, hd, or_self, ite_false, u, gaussianTwoFactorZeta_residue hh.continuous hc ht m hd, hs,
+          norm_div, Complex.ofReal_div, a]
+        change W m * (↑‖b m‖ * D m / (‖D m‖ : ℂ) / W m) / ((Real.log 9 : ℂ) * D m) = _
+        field_simp [hnW m, hd]
+  obtain ⟨A, hA⟩ := hbdd h hh hsupp
+  have hsum : Summable u := by
+    refine summable_of_sum_le (c := A) hu (fun T ↦ ?_)
+    let N := T.sup Int.natAbs
+    have hsub : T ⊆ Finset.Icc (-(N : ℤ)) (N : ℤ) := by
+      intro m hm
+      have hx : m.natAbs ≤ N := Finset.le_sup hm
+      rw [Finset.mem_Icc]
+      omega
+    apply (Finset.sum_le_sum_of_subset_of_nonneg hsub (fun m _ _ ↦ hu m)).trans
+    have hA' := hA N
+    change (∑ m ∈ Finset.Icc (-(N : ℤ)) (N : ℤ), if m ∈ excluded ∨ D m = 0 then (0 : ℂ) else _).re ≤ A at hA'
+    simpa only [hterm, ← Complex.ofReal_sum, Complex.ofReal_re] using hA'
+  apply Summable.of_norm
+  apply (hsum.mul_right (Real.log 9)).congr_cofinite
+  filter_upwards [excluded.eventually_cofinite_notMem] with m hm
+  simp [u, hm, hL.ne']
+
+private theorem gaussianTwoFactorZeta_meromorphic {h : ℝ → ℂ} (hh : Continuous h)
+    (hc : HasCompactSupport h) (z : ℂ) : MeromorphicAt (gaussianTwoFactorZeta h) z :=
+  (gaussianProfile_analytic hh hc z).meromorphicAt.div
+    (((by fun_prop : AnalyticAt ℂ (fun s : ℂ ↦ 1 - Complex.exp (-(Real.log 9 : ℂ) * s)) z).mul
+      (gaussianSecondaryFactor_analytic z)).meromorphicAt)
+
+private theorem gaussianResidue_congr {f g : ℂ → ℂ} {a : ℂ} (h : f =ᶠ[𝓝[≠] a] g) :
+    complexResidue f a = complexResidue g a := by
+  obtain ⟨δ, hδ, hEq⟩ := Metric.nhdsWithin_basis_ball.eventually_iff.mp h
+  unfold complexResidue limUnder
+  refine congrArg lim (Filter.map_congr ?_)
+  filter_upwards [Ioo_mem_nhdsGT hδ] with r hr
+  rw [circleIntegral.integral_congr hr.1.le fun z hz ↦ hEq ⟨?_, ?_⟩]
+  · rw [Metric.mem_ball, Metric.mem_sphere.mp hz]
+    exact hr.2
+  · rintro rfl
+    exact hr.1.ne (by simpa using hz)
+
+/-- Equality on the positive real Mellin axis determines the continued germs. -/
+private theorem gaussianResidue_identity {f g : ℂ → ℂ}
+    (hf : Meromorphic f) (hg : Meromorphic g) (h : ∀ r : ℝ, 0 < r → f r = g r) (a : ℂ) :
+    f =ᶠ[𝓝[≠] a] g := by
+  have hlim : Tendsto (fun r : ℝ ↦ (r : ℂ)) (𝓝[>] (1 : ℝ)) (𝓝[≠] (1 : ℂ)) := by
+    apply tendsto_nhdsWithin_iff.mpr
+    refine ⟨?_, ?_⟩
+    · exact_mod_cast (Complex.continuous_ofReal.continuousAt.tendsto.mono_left
+        (nhdsWithin_le_nhds (a := (1 : ℝ)) (s := Ioi 1)))
+    · filter_upwards [self_mem_nhdsWithin] with r hr
+      have hr' : 1 < r := hr
+      intro he
+      change (r : ℂ) = 1 at he
+      exact hr'.ne' (by exact_mod_cast he)
+  have hfreq : ∃ᶠ z in 𝓝[≠] (1 : ℂ), f z = g z :=
+    hlim.frequently (Filter.Eventually.frequently
+      (Filter.Eventually.mono self_mem_nhdsWithin (fun r hr ↦ h r (lt_trans zero_lt_one hr))))
+  have hΔ : MeromorphicOn (f - g) univ := fun x _ ↦ (hf x).sub (hg x)
+  have hO : meromorphicOrderAt (f - g) (1 : ℂ) = ⊤ := by
+    apply meromorphicOrderAt_eq_top_iff.mpr
+    exact (((hf 1).frequently_eq_iff_eventuallyEq (hg 1)).mp hfreq).mono fun z hz ↦ sub_eq_zero.mpr hz
+  exact (meromorphicOrderAt_eq_top_iff.mp (hΔ.meromorphicOrderAt_eq_top_of_isPreconnected
+    isPreconnected_univ (mem_univ _) (mem_univ a) hO)).mono fun z hz ↦ sub_eq_zero.mp hz
+/-- The inverse fourth angular power of the Gaussian prime `2 + i` gives the
+norm-five phase in the local character profile. -/
+theorem gaussianAngularPhase_two_add_I :
+    ((‖(2 + Complex.I : ℂ)‖ : ℂ) / (2 + Complex.I)) ^ 4 = (-7 - 24 * Complex.I) / 25 := by
+  have h : ‖(2 + Complex.I : ℂ)‖ ^ 2 = 5 := by
+    rw [Complex.sq_norm]
+    norm_num [Complex.normSq_apply]
+  have h4 : (‖(2 + Complex.I : ℂ)‖ : ℂ) ^ 4 = 25 := by
+    rw [show (4 : ℕ) = 2 * 2 by decide, pow_mul, ← Complex.ofReal_pow, h]
+    norm_num
+  rw [div_pow, h4]
+  norm_num [Complex.ext_iff, Complex.div_re, Complex.div_im, Complex.normSq_apply,
+    pow_succ, Complex.mul_re, Complex.mul_im]
+
+/-- An annular archimedean test with the inverse of the fourth-power angular character. -/
+def gaussianArchLogTest (h : ℝ → ℂ) (z : ℂ) : ℂ :=
+  ((‖z‖ : ℂ) / z) ^ 4 * h (2 * Real.log ‖z‖)
+
+private theorem gaussianArchLogTest_zero {h : ℝ → ℂ}
+    (hs : support h ⊆ Icc 0 (2 * Real.log 9)) {z : ℂ} (hz : ‖z‖ < 1) :
+    gaussianArchLogTest h z = 0 := by
+  by_cases hz' : z = 0
+  · simp [hz', gaussianArchLogTest]
+  have h0 : h (2 * Real.log ‖z‖) = 0 := by
+    by_contra ha
+    have := (hs ha).1
+    linarith [Real.log_neg (norm_pos_iff.mpr hz') hz]
+  simp [gaussianArchLogTest, h0]
+
+/-- The lifted test is a genuine Schwartz function supported on the common annulus
+`1 ≤ ‖z‖ ≤ 9`, independently of the compact smooth logarithmic profile. -/
+theorem gaussianArchLogTest_schwartz {h : ℝ → ℂ} (hh : ContDiff ℝ ∞ h)
+    (hs : support h ⊆ Icc 0 (2 * Real.log 9)) :
+    ∃ f : SchwartzMap ℂ ℂ, (f : ℂ → ℂ) = gaussianArchLogTest h ∧
+      support (f : ℂ → ℂ) ⊆ {z | 1 ≤ ‖z‖ ∧ ‖z‖ ≤ 9} := by
+  have hS {z : ℂ} (hz : gaussianArchLogTest h z ≠ 0) : 1 ≤ ‖z‖ ∧ ‖z‖ ≤ 9 := by
+    refine ⟨le_of_not_gt (fun hn ↦ hz (gaussianArchLogTest_zero hs hn)), ?_⟩
+    by_contra! hgt
+    have hnon : h (2 * Real.log ‖z‖) ≠ 0 := by
+      intro h0
+      exact hz (by simp [gaussianArchLogTest, h0])
+    have hlog := (hs hnon).2
+    linarith [Real.log_lt_log (by norm_num : 0 < (9 : ℝ)) hgt]
+  have hcomp : HasCompactSupport (gaussianArchLogTest h) := by
+    apply HasCompactSupport.of_support_subset_isCompact (K := Metric.closedBall (0 : ℂ) 9) (isCompact_closedBall _ _)
+    exact fun z hz ↦ Metric.mem_closedBall.mpr (by simpa only [dist_zero_right] using (hS hz).2)
+  have hsm : ContDiff ℝ ∞ (gaussianArchLogTest h) := by
+    apply contDiff_iff_contDiffAt.mpr
+    intro z
+    by_cases hz : z = 0
+    · subst z
+      apply (contDiffAt_const (c := (0 : ℂ))).congr_of_eventuallyEq
+      filter_upwards [Metric.ball_mem_nhds (0 : ℂ) zero_lt_one] with z hz
+      exact gaussianArchLogTest_zero hs (by simpa only [Metric.mem_ball, dist_zero_right] using hz)
+    · have hn := contDiffAt_norm (n := ∞) ℝ hz
+      unfold gaussianArchLogTest
+      simp only [div_eq_mul_inv]
+      exact (((Complex.ofRealCLM.contDiff.contDiffAt.comp z hn).mul
+        ((contDiffAt_id (𝕜 := ℝ)).inv hz)).pow 4).mul
+        (hh.contDiffAt.comp z (contDiffAt_const.mul (hn.log (norm_ne_zero_iff.mpr hz))))
+  exact ⟨hcomp.toSchwartzMap hsm, rfl, fun _ hz ↦ hS hz⟩
+
+/-- With Euclidean area and the multiplicative density `‖z‖⁻²`, the fourth-power
+angular Mellin integral of the test is `π` times its logarithmic Laplace transform. -/
+theorem gaussianArchLogTest_mellin (h : ℝ → ℂ) (s : ℂ) :
+    (∫ z : ℂ, ((‖z‖ : ℂ)^2)⁻¹ * (gaussianArchLogTest h z *
+      (z / (‖z‖ : ℂ))^4 * Complex.exp (s * (2 * (Real.log ‖z‖ : ℂ))))) =
+      (Real.pi : ℂ) * bilateralLaplace h s := by
+  let M (r : ℝ) := h (2 * Real.log r) * Complex.exp (s * (2 * (Real.log r : ℂ)))
+  have hrad (z : ℂ) : ((‖z‖ : ℂ)^2)⁻¹ * (gaussianArchLogTest h z *
+      (z / (‖z‖ : ℂ))^4 * Complex.exp (s * (2 * (Real.log ‖z‖ : ℂ)))) =
+      ((‖z‖ : ℂ)^2)⁻¹ * M ‖z‖ := by
+    by_cases hz : z = 0
+    · simp [hz]
+    · have hn : (‖z‖ : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr hz)
+      simp only [gaussianArchLogTest, M]
+      field_simp
+  simp_rw [hrad]
+  rw [Complex.integral_radial (fun r : ℝ ↦ ((r : ℂ)^2)⁻¹ * M r), ← integral_comp_exp]
+  have hlog (x : ℝ) : Real.exp x • ((Real.exp x : ℂ) * (((Real.exp x : ℂ)^2)⁻¹ * M (Real.exp x))) =
+      (fun y : ℝ ↦ h y * Complex.exp (s * y)) (2 * x) := by
+    have hn : (Real.exp x : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (Real.exp_pos x).ne'
+    simp only [M, Real.log_exp, Complex.real_smul, Complex.ofReal_mul, Complex.ofReal_ofNat]
+    field_simp
+  simp_rw [hlog]
+  rw [Measure.integral_comp_mul_left (fun y : ℝ ↦ h y * Complex.exp (s * y)) 2,
+    Complex.real_smul, ← bilateralLaplace]
+  norm_num
+  ring
+
+
+section GaussianCharacter
+
+open IsDedekindDomain NumberField
+open scoped NNReal TensorProduct
+
+variable {F : Type*} [Field F] [NumberField F] {S : Finset (HeightOneSpectrum (𝓞 F))}
+local notation "GJ" => SIdeleQuotient F S
+local notation "ATest" => SchwartzBruhat (Multiplicative (SAdeleRing F S))
+local notation "gchart(" χ ")" => quasiCharacterNormTwist (sIdeleQuotientNorm F S)
+  (isProperMap_sIdeleQuotientNorm F S).continuous ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ)
+local notation "cm(" hw ")" => InfinitePlace.Completion.ringEquivComplexOfIsComplex hw
+
+local instance (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+local instance (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F)ˣ := borel _
+
+private theorem gaussianArchLocal_realization (χ : PontryaginDual GJ) (w : InfinitePlace F)
+    (hw : w.IsComplex)
+    (hχ : ∀ u : w.Completionˣ, sLocalInfiniteRestriction w (gchart(χ) 0) u =
+      (cm(hw) u.val / (‖cm(hw) u.val‖ : ℂ)) ^ 4)
+    {h : ℝ → ℂ} (hh : ContDiff ℝ ∞ h) (hs : support h ⊆ Icc 0 (2 * Real.log 9)) :
+    ∃ g : SchwartzBruhat (Multiplicative w.Completion), ∀ s : ℂ,
+      localIdelicZetaIntegral (infiniteLocalMultiplicativeTamagawaMeasure F w)
+        (fun x ↦ g (Multiplicative.ofAdd x)) (sLocalInfiniteRestriction w (gchart(χ) s)) =
+        (2 * (Real.pi : ℂ)) * bilateralLaplace h s := by
+  let e := cm(hw)
+  obtain ⟨f, hf, _⟩ := gaussianArchLogTest_schwartz hh hs
+  let g : SchwartzBruhat (Multiplicative w.Completion) :=
+    ⟨fun x ↦ gaussianArchLogTest h (e x.toAdd),
+      (complexCompletion_mem_schwartzBruhat_iff w hw _).mpr ⟨f, hf⟩⟩
+  refine ⟨g, fun s ↦ ?_⟩
+  have he (u : w.Completionˣ) : ‖e u.val‖ = ‖u.val‖ :=
+    (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hw).isometry.norm_map_of_map_zero (map_zero e) _
+  have hc (u : w.Completionˣ) : sLocalInfiniteRestriction w (gchart(χ) s) u =
+      (e u.val / (‖e u.val‖ : ℂ)) ^ 4 * Complex.exp (s * (2 * (Real.log ‖e u.val‖ : ℂ))) := by
+    have ht : sLocalInfiniteRestriction w (gchart(χ) s) u =
+        sLocalInfiniteRestriction w (gchart(χ) 0) u *
+          sLocalInfiniteRestriction w (gchart((1 : PontryaginDual GJ)) s) u := by
+      have fact (g : GJ) : gchart(χ) s g = gchart(χ) 0 g * gchart((1 : PontryaginDual GJ)) s g := by
+        change _ * _ = ((_ : ℂ) * (_ : ℂ) ^ (0 : ℂ)) * (((1 : PontryaginDual GJ) g : ℂ) * _)
+        simp
+      exact fact _
+    rw [ht, hχ, sLocalInfiniteRestriction_normTwist]
+    congr 1
+    change ((‖u.val‖ ^ w.mult : ℝ) : ℂ) ^ s = _
+    rw [hw.mult_eq_two, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (pow_pos
+      (norm_pos_iff.mpr u.ne_zero) 2).ne'), ← Complex.ofReal_log (sq_nonneg _), Real.log_pow,
+      he, Complex.ofReal_mul, mul_comm]
+    norm_num
+  let H (z : ℂ) := gaussianArchLogTest h z * (z / (‖z‖ : ℂ)) ^ 4 *
+    Complex.exp (s * (2 * (Real.log ‖z‖ : ℂ)))
+  have hfun (u : w.Completionˣ) :
+      g (Multiplicative.ofAdd u.val) * sLocalInfiniteRestriction w (gchart(χ) s) u = H (e u.val) := by
+    rw [hc]
+    exact (mul_assoc _ _ _).symm
+  rw [localIdelicZetaIntegral, integral_congr_ae (.of_forall hfun),
+    infiniteLocalMultiplicativeTamagawaMeasure_integral_complex w hw H,
+    show (∫ z : ℂ, ((‖z‖ : ℂ) ^ 2)⁻¹ * H z) = (Real.pi : ℂ) * bilateralLaplace h s from
+      gaussianArchLogTest_mellin h s, mul_assoc]
+
+private theorem gaussianArchFinTensor
+    (a : (w : InfinitePlace F) → SchwartzBruhat (Multiplicative w.Completion))
+    (b : (v : S) → SchwartzBruhat (Multiplicative (v.val.adicCompletion F))) :
+    ∃ f : SchwartzBruhat (Multiplicative (SAdeleRing F S)), ∀ x : SAdeleRing F S,
+      f (Multiplicative.ofAdd x) =
+        (∏ w, a w (Multiplicative.ofAdd (x.1 w))) * ∏ v, b v (Multiplicative.ofAdd (x.2 v)) := by
+  classical
+  let G (w : InfinitePlace F) := Multiplicative w.Completion
+  let (w : InfinitePlace F) : T2Space (G w) := (inferInstance : T2Space w.Completion)
+  let (w : InfinitePlace F) : LocallyCompactSpace (G w) :=
+    (inferInstance : LocallyCompactSpace w.Completion)
+  let (w : InfinitePlace F) : SecondCountableTopology (G w) :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  obtain ⟨a₀, ha⟩ := schwartzBruhat_pi_test G a
+  let e : Multiplicative (InfiniteAdeleRing F) ≃ₜ* ((w : InfinitePlace F) → G w) :=
+    { toFun := fun x w ↦ Multiplicative.ofAdd (x.toAdd w)
+      invFun := fun x ↦ Multiplicative.ofAdd (fun w ↦ (x w).toAdd)
+      left_inv := fun _ ↦ rfl
+      right_inv := fun _ ↦ rfl
+      map_mul' := fun _ _ ↦ rfl
+      continuous_toFun := continuous_id
+      continuous_invFun := continuous_id }
+  let : T2Space (Multiplicative (InfiniteAdeleRing F)) := e.toHomeomorph.isEmbedding.t2Space
+  let : LocallyCompactSpace (Multiplicative (InfiniteAdeleRing F)) :=
+    e.toHomeomorph.isOpenEmbedding.locallyCompactSpace
+  let arch : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) :=
+    ⟨a₀.val ∘ e, schwartzBruhat_mem_comp_equiv e a₀.property⟩
+  obtain ⟨t, ht⟩ := sAdeleSchwartz_inductiveTensor_equiv F S
+  refine ⟨t (arch ⊗ₜ[ℂ] (⨂ₜ[ℂ] v : S, b v)), fun x ↦ ?_⟩
+  rw [ht arch b x]
+  exact congrArg (· * _) (ha (e (Multiplicative.ofAdd x.1)))
+
+
+/-- In the Gaussian example of #7279 the unique complex place has fourth-power angular
+character, and places of norms nine and five are unramified with the indicated
+uniformizer values. These assumptions refer only to the character and its places. -/
+def HasGaussianTwoPlaceProfile (χ : PontryaginDual GJ) : Prop :=
+  let atFinite (q : ℕ) (phase : ℂ) := ∃ (v : S) (p : (v.val.adicCompletion F)ˣ),
+    v.val.asIdeal.absNorm = q ∧ ‖p.val‖ = (v.val.asIdeal.absNorm : ℝ)⁻¹ ∧
+      (∀ u ∈ (v.val.adicCompletionIntegers F).units, sLocalFiniteRestriction v (gchart(χ) 0) u = 1) ∧
+      sLocalFiniteRestriction v (gchart(χ) 0) p = phase
+  (∃ (w : InfinitePlace F) (hw : w.IsComplex), (∀ u : InfinitePlace F, u = w) ∧
+    ∀ u : w.Completionˣ, sLocalInfiniteRestriction w (gchart(χ) 0) u =
+      (cm(hw) u.val / (‖cm(hw) u.val‖ : ℂ)) ^ 4) ∧
+    atFinite 9 1 ∧ atFinite 5 ((-7 - 24 * Complex.I) / 25)
+
+/-- Paper: Theorem 7.1.2.3, p. 318. A character with one complex place of angular
+weight four and the specified unramified uniformizer values at places of norms nine and five
+realizes the Gaussian two-factor function by actual Schwartz–Bruhat tests. At every
+other finite place a compact unit test removes its Euler factor. The equality here is for
+ordinary convergent Tate integrals on the positive real axis. -/
+theorem gaussianTwoFactorZeta_realized_of_character
+    (χ : PontryaginDual GJ) (hχ : HasGaussianTwoPlaceProfile χ)
+    {h : ℝ → ℂ} (hh : ContDiff ℝ ∞ h) (hs : support h ⊆ Icc 0 (2 * Real.log 9)) :
+    ∃ f : ATest, ∀ r : ℝ, 0 < r → sLocalIdelicZetaIntegral f (gchart(χ) (r : ℂ)) =
+      gaussianTwoFactorZeta h r := by
+  classical
+  obtain ⟨⟨w, hw, huniq, harch⟩, ⟨v₉, p₉, hq₉, hp₉, hu₉, hχ₉⟩, ⟨v₅, p₅, hq₅, hp₅, hu₅, hχ₅⟩⟩ := hχ
+  have hne : v₅ ≠ v₉ := by
+    rintro rfl
+    omega
+  let P (s : ℂ) := 1 - Complex.exp (-(Real.log 9 : ℂ) * s)
+  let d (u : S) (s : ℂ) :=
+    (if u = v₉ then P s else 1) * (if u = v₅ then gaussianSecondaryFactor s else 1)
+  have hfin (u : S) : ∃ (g : SchwartzBruhat (Multiplicative (u.val.adicCompletion F))) (C : ℂ), C ≠ 0 ∧
+      ∀ s : ℂ, 0 < s.re → localIdelicZetaIntegral (finiteLocalMultiplicativeTamagawaMeasure F u.val)
+        (fun x ↦ g (Multiplicative.ofAdd x)) (sLocalFiniteRestriction u (gchart(χ) s)) = C / d u s := by
+    by_cases hv : u = v₉
+    · subst u
+      obtain ⟨g, C, hC, hg⟩ := exists_sLocalFinite_unramified_zeta_test χ v₉ p₉ hp₉ hu₉
+      exact ⟨g, C, hC, fun s hz ↦ by simpa [d, P, hne.symm, hχ₉, hq₉] using hg s hz⟩
+    by_cases hv' : u = v₅
+    · subst u
+      obtain ⟨g, C, hC, hg⟩ := exists_sLocalFinite_unramified_zeta_test χ v₅ p₅ hp₅ hu₅
+      exact ⟨g, C, hC, fun s hz ↦ by simpa [d, gaussianSecondaryFactor, hne, hχ₅, hq₅] using hg s hz⟩
+    obtain ⟨g, C, hC, hg⟩ := exists_sLocalFinite_constant_zeta_test χ u
+    exact ⟨g, C, hC, fun s _ ↦ by simpa [d, hv, hv'] using hg s⟩
+  choose b C hC hb using hfin
+  obtain ⟨a₀, ha₀⟩ := gaussianArchLocal_realization χ w hw harch hh hs
+  let a (u : InfinitePlace F) : SchwartzBruhat (Multiplicative u.Completion) := (huniq u).symm ▸ a₀
+  have ha (s : ℂ) : (∏ u : InfinitePlace F, localIdelicZetaIntegral
+      (infiniteLocalMultiplicativeTamagawaMeasure F u) (fun x ↦ a u (Multiplicative.ofAdd x))
+      (sLocalInfiniteRestriction u (gchart(χ) s))) = (2 * (Real.pi : ℂ)) * bilateralLaplace h s := by
+    let : Subsingleton (InfinitePlace F) := ⟨fun i j ↦ (huniq i).trans (huniq j).symm⟩
+    rw [Fintype.prod_subsingleton _ w]
+    exact ha₀ s
+  obtain ⟨f, hf⟩ := gaussianArchFinTensor a b
+  let c := (2 * (Real.pi : ℂ)) * ∏ u, C u
+  have hcn : c ≠ 0 := mul_ne_zero (mul_ne_zero (by norm_num) (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero))
+    (Finset.prod_ne_zero_iff.mpr fun u _ ↦ hC u)
+  refine ⟨c⁻¹ • f, fun r hr ↦ ?_⟩
+  obtain ⟨Z, hZ⟩ := sLocalIdelicZetaIntegral_tempered (gchart(χ) (r : ℂ)) ⟨χ, r, hr, rfl⟩
+  rw [← hZ, map_smul, hZ, smul_eq_mul, sLocalIdelicZetaIntegral_pureTensor _ ⟨χ, r, hr, rfl⟩ f a b hf, ha]
+  simp_rw [hb _ (r : ℂ) hr]
+  rw [Finset.prod_div_distrib]
+  have hprod : (∏ u, d u (r : ℂ)) = P r * gaussianSecondaryFactor r := by
+    simp only [d, Finset.prod_mul_distrib, Finset.prod_ite_eq', Finset.mem_univ, ite_true]
+  rw [hprod]
+  change c⁻¹ * _ = bilateralLaplace h r / (P r * gaussianSecondaryFactor r)
+  rw [show (2 * (Real.pi : ℂ) * bilateralLaplace h r) * ((∏ u, C u) / (P r * gaussianSecondaryFactor r)) =
+    c * (bilateralLaplace h r / (P r * gaussianSecondaryFactor r)) by dsimp [c]; ring,
+    ← mul_assoc, inv_mul_cancel₀ hcn, one_mul]
+
+end GaussianCharacter
+
+section
+
+open IsDedekindDomain NumberField
+open scoped NNReal
+
+set_option quotPrecheck false
+
+variable {F : Type*} [Field F] [NumberField F] {S : Finset (HeightOneSpectrum (𝓞 F))}
+local notation "Jₛ" => SIdeleQuotient F S
+local notation "Test" => SchwartzBruhat (Multiplicative (SAdeleRing F S))
+local notation "χs(" χ ", " z ")" => quasiCharacterNormTwist (G := Jₛ) (sIdeleQuotientNorm F S)
+  (isProperMap_sIdeleQuotientNorm F S).continuous
+  ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ) z
+
+
+private theorem gaussian_realizes_weighted_residues (χ : PontryaginDual Jₛ)
+    (hχ : HasGaussianTwoPlaceProfile χ) (t : ℝ) {h : ℝ → ℂ} (hh : ContDiff ℝ ∞ h)
+    (hsupp : support h ⊆ Icc 0 (2 * Real.log 9)) :
+    ∃ f : Test, ∀ a : ℂ, complexResidue (fun z ↦ (t : ℂ) ^ (-z) * sLocalIdelicZFunction f (χs(χ,z))) a =
+      complexResidue (fun z ↦ (t : ℂ) ^ (-z) * gaussianTwoFactorZeta h z) a := by
+  obtain ⟨f, hf⟩ := gaussianTwoFactorZeta_realized_of_character χ hχ hh hsupp
+  have hc := HasCompactSupport.of_support_subset_isCompact isCompact_Icc hsupp
+  refine ⟨f, fun a ↦ ?_⟩
+  have hg : (fun z ↦ sLocalIdelicZFunction f (χs(χ,z))) =ᶠ[𝓝[≠] a] gaussianTwoFactorZeta h := by
+    apply gaussianResidue_identity (fun z ↦ (sLocalIdelicZFunction_meromorphic f χ).meromorphicOn z trivial)
+      (gaussianTwoFactorZeta_meromorphic hh.continuous hc)
+    exact fun r hr ↦ (sLocalIdelicZFunction_eq_integral f ⟨χ, r, hr, rfl⟩).trans (hf r hr)
+  exact gaussianResidue_congr ((Filter.EventuallyEq.rfl (f := fun z : ℂ ↦ (t : ℂ) ^ (-z))).mul hg)
+
+open Classical in
+/-- Paper: Equation (8.4.0.2), p. 389. For a character with the Gaussian local data,
+absolute summability of the separate norm-nine residues for all actual S-adelic tests at
+one norm implies the polynomial lower bound at every noncolliding integer.
+A finite number of indices can be omitted from the convergence hypothesis. -/
+theorem gaussian_polyLowerBound_of_sLocal_absoluteResidues
+    (χ : PontryaginDual Jₛ) (hχ : HasGaussianTwoPlaceProfile χ) {t : ℝ} (ht : 0 < t) (excluded : Finset ℤ)
+    (habs : ∀ f : Test, Summable (fun m : ℤ ↦
+      if m ∈ excluded ∨ gaussianSecondaryFactor (gaussianPrimaryCenter m) = 0 then 0 else
+        ‖complexResidue (fun z ↦ (t : ℂ) ^ (-z) * sLocalIdelicZFunction f (χs(χ,z)))
+          (gaussianPrimaryCenter m)‖)) :
+    ∃ (c : ℝ) (d : ℕ), 0 < c ∧ ∀ m : ℤ, gaussianSecondaryFactor (gaussianPrimaryCenter m) ≠ 0 →
+      c / (1 + |(m : ℝ)|) ^ d ≤ ‖gaussianSecondaryFactor (gaussianPrimaryCenter m)‖ := by
+  apply gaussianTwoFactorZeta_polyLowerBound_of_absoluteResidues ht excluded
+  intro h hh hsupp
+  obtain ⟨f, hf⟩ := gaussian_realizes_weighted_residues χ hχ t hh hsupp
+  simpa only [hf] using habs f
+
+open Classical in
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323. For the genuine S-local transform,
+even upper bounds on the real parts of the symmetric norm-nine residue sums force the
+polynomial lower bound. Failure of the latter gives one adelic test with unbounded
+real parts of the symmetric sums, for the chosen norm and finite exceptional set. -/
+theorem gaussian_polyLowerBound_of_sLocal_bounded_symmetricResidues
+    (χ : PontryaginDual Jₛ) (hχ : HasGaussianTwoPlaceProfile χ) {t : ℝ} (ht : 0 < t) (excluded : Finset ℤ)
+    (hbdd : ∀ f : Test, ∃ A : ℝ, ∀ N : ℕ, (∑ m ∈ Finset.Icc (-(N : ℤ)) (N : ℤ),
+      if m ∈ excluded ∨ gaussianSecondaryFactor (gaussianPrimaryCenter m) = 0 then 0 else
+        complexResidue (fun z ↦ (t : ℂ) ^ (-z) * sLocalIdelicZFunction f (χs(χ,z)))
+          (gaussianPrimaryCenter m)).re ≤ A) :
+    ∃ (c : ℝ) (d : ℕ), 0 < c ∧ ∀ m : ℤ, gaussianSecondaryFactor (gaussianPrimaryCenter m) ≠ 0 →
+      c / (1 + |(m : ℝ)|) ^ d ≤ ‖gaussianSecondaryFactor (gaussianPrimaryCenter m)‖ := by
+  apply gaussianTwoFactorZeta_polyLowerBound_of_bounded_symmetricResidues ht excluded
+  intro h hh hsupp
+  obtain ⟨f, hf⟩ := gaussian_realizes_weighted_residues χ hχ t hh hsupp
+  simpa only [hf] using hbdd f
+
+end
 
 end RiemannMasullo.Isolated
