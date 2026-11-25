@@ -6723,11 +6723,11 @@ private theorem meyerCriticalStrip_glue
     (z : ℂ) (hz0 : 0 < z.re) (hz2 : z.re ≤ 3 / 2) : A * ‖z ^ m * (h z * U z)‖ ≤ B := by
   classical
   let E (w : ℂ) : ℂ := if 0 < w.re then h w * U w else g w * U' (1 - w)
-  have hE1 (w : ℂ) (hw : 0 < w.re) : E w = h w * U w := if_pos hw
+  have hE1 (w : ℂ) (hw : 0 < w.re) : E w = h w * U w := ite_eq_left hw
   have hE2 (w : ℂ) (hw : w.re < 1) : E w = g w * U' (1 - w) := by
     by_cases hp : 0 < w.re
     · rw [hE1 w hp, heq w hp hw]
-    · exact if_neg hp
+    · exact ite_eq_right hp
   have hD : DifferentiableOn ℂ E (Complex.re ⁻¹' Ioi (-1)) := by
     intro w hw
     apply DifferentiableAt.differentiableWithinAt
@@ -11211,7 +11211,7 @@ private theorem meyerFlatLift_cone_schwartz
     rw [((hloc x hx).iteratedFDeriv ℝ k).eq_of_nhds]
     rcases k with _ | k
     · ext m; simp
-    · simp [iteratedFDeriv_const_of_ne]
+    · simp
   have hsmooth : ContDiffOn ℝ (∞) a {0}ᶜ := by
     intro x hx
     by_cases hxC : x ∈ Cn
@@ -11312,9 +11312,8 @@ private theorem meyerFlatLift_L_smul
   · simp only [meyerFlatLift_L, map_smul, norm_smul, Real.norm_eq_abs, abs_of_pos hc, Prod.fst_add,
       Pi.add_apply]
     rw [Real.log_mul hc.ne' (hpos j).ne', add_comm]
-  · simp only [meyerFlatLift_L, map_smul, norm_smul, Real.norm_eq_abs, abs_of_pos hc, Prod.snd_add,
-      Pi.add_apply, Prod.snd_zero, Pi.zero_apply, add_zero, Complex.real_smul,
-      Complex.ofReal_mul, mul_inv]
+  · simp only [meyerFlatLift_L, map_smul, Prod.snd_add, Pi.add_apply, Pi.zero_apply, add_zero,
+      Complex.real_smul]
     have : (c : ℂ) ≠ 0 := by exact_mod_cast hc.ne'
     have : ((‖π j x‖ : ℝ) : ℂ) ≠ 0 := by exact_mod_cast (hpos j).ne'
     rw [norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hc, Complex.ofReal_mul]
@@ -11898,7 +11897,7 @@ private theorem meyerFlatLift_arch_bound
     · simp only [iteratedFDeriv_zero_eq_comp, comp_apply]
       simp
       positivity
-    · simp [iteratedFDeriv_const_of_ne]
+    · simp
       positivity
 
 /-- The archimedean test of a profile with all exponential weights is a Schwartz function, with
@@ -12142,7 +12141,7 @@ private noncomputable def meyerFlatLift_posR :
     refine Units.continuous_iff.mpr ⟨NNReal.continuous_coe.comp Units.continuous_val, ?_⟩
     simp only [Units.val_inv_eq_inv_val, Units.val_mk0]
     exact (NNReal.continuous_coe.comp Units.continuous_val).inv₀
-      fun t ↦ by simp [Function.comp_def, Units.ne_zero]
+      fun t ↦ by simp [Units.ne_zero]
 
 /-- The radial parameter of a continuous character of `ℝˣ`. -/
 private noncomputable def meyerFlatLift_αR
@@ -12704,7 +12703,7 @@ private theorem meyerFlatLift_orthogonal
         rw [mul_comm, Complex.mul_conj, Complex.normSq_eq_norm_sq, Circle.norm_coe]; simp
       have : starRingEnd ℂ (χ.val k₀.val : ℂ) * (χ'.val k₀.val : ℂ) =
           starRingEnd ℂ (χ.val k₀.val : ℂ) * (χ.val k₀.val : ℂ) := by rw [h2]; exact h
-      have hcc : starRingEnd ℂ (χ.val k₀.val : ℂ) ≠ 0 := by simpa using hc
+      have hcc : starRingEnd ℂ (χ.val k₀.val : ℂ) ≠ 0 := by simp
       exact (mul_left_cancel₀ hcc this).symm
     have hinv := integral_mul_left_eq_self (μ := μ) η k₀
     simp_rw [hη, integral_const_mul] at hinv
