@@ -1973,21 +1973,20 @@ open scoped ContDiff in
 /-- Paper: Theorem 12.5.1.1, pp. 519–520, with (12.5.1.4) and Theorem B.4.4.7, p. 623. The trace
 identity on the strip quotient is needed only up to an error growing more slowly than the strip,
 on average, and only for tests supported above norm one with no polar terms. Suppose that for
-every positive half-width β, convolution after spectral projection on the Sobolev order 3 strip
-space has a projective tensor kernel (`hK` of (12.5.1.4)) for every test vanishing on the
-norm-one classes. Suppose also that for every unitary character ψ and every smooth compactly
-supported profile H vanishing on (−∞, 0] there are c < β and a function D, with D(y) · exp(−σ y)
-integrable on (0, ∞) for every σ > c, such that for every y ≥ 0 for which the test
-ψ · H(log|·| − y), which is supported above norm one, has vanishing polar Mellin terms at ±1/2,
-the trace of its strip action differs from its local terms, which then contain no polar terms, by
-at most D(y). Then the conclusion of `traceFormula_exteriorZeros` holds. This weakens the exact
-identity assumed in `traceFormula_exteriorZeros_of_stripTrace` to a bound on one family of tests.
-At a width whose edges carry no zeros the difference is minus the exterior sum, and
-`isEmpty_exteriorZeros_of_integrable` applies. -/
+every positive half-width β, every unitary character ψ and every smooth compactly supported
+profile H vanishing on (−∞, 0] there are c < β and a function D, with D(y) · exp(−σ y) integrable
+on (0, ∞) for every σ > c, such that for every y ≥ 0 for which the test ψ · H(log|·| − y), which
+is supported above norm one, has vanishing polar Mellin terms at ±1/2, its action on the Sobolev
+order 3 strip quotient is nuclear and its trace differs from its local terms, which then contain
+no polar terms, by at most D(y). Then the conclusion of `traceFormula_exteriorZeros` holds. The
+nuclearity follows from the kernel `hK` of (12.5.1.4)
+(`spectralStripConvolution_nuclear_of_projectiveKernel`) or from Theorem 10.3.2.1(1)
+(`spectralStripConvolution_nuclear`). This weakens both hypotheses of
+`traceFormula_exteriorZeros_of_stripTrace`, the kernel for every test and the exact identity for
+every test, to one bound on one family of tests. At a width whose edges carry no zeros the
+difference is minus the exterior sum, and `isEmpty_exteriorZeros_of_integrable` applies. -/
 theorem traceFormula_exteriorZeros_of_stripTrace_integrable (τ : ℝ≥0ˣ →ₜ* C𝔽)
     (hτ : RightInverse τ (ideleClassNorm F))
-    (hK : ∀ {β : ℝ} (hβ : 0 < β) (φ : BruhatCompactSupport C𝔽), (∀ g : C₁, φ.val g = 0) →
-      stripTensorExists(hβ.le, three, φ))
     (hdefect : ∀ {β : ℝ} (hβ : 0 < β) (ψ : PontryaginDual C𝔽) (H : ℝ → ℂ),
       ContDiff ℝ (∞) H → HasCompactSupport H → (∀ x ≤ 0, H x = 0) →
       ∃ c < β, ∃ D : ℝ → ℝ,
@@ -1995,10 +1994,10 @@ theorem traceFormula_exteriorZeros_of_stripTrace_integrable (τ : ℝ≥0ˣ →�
         ∀ y : ℝ, 0 ≤ y → ∀ φ : BruhatCompactSupport C𝔽,
           (∀ x, φ.val x = (ψ x : ℂ) * H (Real.log ((ideleClassNorm F x : ℝ≥0) : ℝ) - y)) →
           M(φ, twist(1, 1 / 2)) = 0 → M(φ, twist(1, -1 / 2)) = 0 →
-          ∀ (a : archTest) (b : finiteTest), archRestricts(φ, a) → finiteRestricts(φ, b) →
-          ∀ T : nuclearEndomorphisms stripQuot(hβ.le, three),
-            T.val = stripConv(hβ.le, three, φ) →
-            ‖hilbertTrace T - localTerms(φ, a, b)‖ ≤ D y)
+          ∃ T : nuclearEndomorphisms stripQuot(hβ.le, three),
+            T.val = stripConv(hβ.le, three, φ) ∧
+            ∀ (a : archTest) (b : finiteTest), archRestricts(φ, a) → finiteRestricts(φ, b) →
+              ‖hilbertTrace T - localTerms(φ, a, b)‖ ≤ D y)
     (φ : BruhatCompactSupport C𝔽) {α : ℝ} (hα : 0 < α) :
     HasSum (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z)) 0 := by
   obtain ⟨χ, -, -, hlift⟩ := exteriorZeros_basepoint τ hτ
@@ -2009,44 +2008,13 @@ theorem traceFormula_exteriorZeros_of_stripTrace_integrable (τ : ℝ≥0ˣ →�
   have hE := isEmpty_exteriorZeros_of_integrable τ hτ β fun ψ H hH hHc hHv ↦ by
     obtain ⟨c, hcβ, D, hDi, hC⟩ := hdefect hβ ψ H hH hHc hHv
     refine ⟨c, hcβ, D, hDi, fun y hy φ' hφ' hp₁ hp₂ ↦ ?_⟩
-    have hvan : ∀ g : C₁, φ'.val g = 0 := fun g ↦ by
-      rw [hφ' g, MonoidHom.mem_ker.mp g.property, Units.val_one, NNReal.coe_one, Real.log_one,
-        zero_sub, hHv _ (neg_nonpos.mpr hy), mul_zero]
-    obtain ⟨a, b, ha, hb, hsum⟩ := exteriorZeros_hasSum_sub_of_width τ hτ hβ three hedge' φ'
-      ⟨_, spectralStripConvolution_nuclear_of_projectiveKernel hβ.le three φ' (hK hβ φ' hvan)⟩
-      rfl
-    exact ⟨_, hsum, by rw [norm_sub_rev]; exact hC y hy φ' hφ' hp₁ hp₂ a b ha hb _ rfl⟩
+    obtain ⟨T, hT, hTb⟩ := hC y hy φ' hφ' hp₁ hp₂
+    obtain ⟨a, b, ha, hb, hsum⟩ :=
+      exteriorZeros_hasSum_sub_of_width τ hτ hβ three hedge' φ' T hT
+    exact ⟨_, hsum, by rw [norm_sub_rev]; exact hTb a b ha hb⟩
   have : IsEmpty exteriorZeros(τ, α) :=
     ⟨fun z ↦ hE.false ⟨z.val, z.property.1, hβα.trans z.property.2⟩⟩
   exact hasSum_empty
-
-open scoped ContDiff in
-/-- Paper: Theorem 12.5.1.1, pp. 519–520, with (12.5.1.4) and Theorem B.4.4.7, p. 623. The
-pointwise form of `traceFormula_exteriorZeros_of_stripTrace_integrable`: given `hK`, if for every
-positive half-width β, every unitary character ψ and every smooth compactly supported profile H
-vanishing on (−∞, 0] there are c < β and C such that, for y ≥ 0, the trace of the strip action of
-the test ψ · H(log|·| − y), whenever its polar Mellin terms vanish, differs from its local terms
-by at most C · exp(c y), then the conclusion of `traceFormula_exteriorZeros` holds. -/
-theorem traceFormula_exteriorZeros_of_stripTrace_norm_le (τ : ℝ≥0ˣ →ₜ* C𝔽)
-    (hτ : RightInverse τ (ideleClassNorm F))
-    (hK : ∀ {β : ℝ} (hβ : 0 < β) (φ : BruhatCompactSupport C𝔽), (∀ g : C₁, φ.val g = 0) →
-      stripTensorExists(hβ.le, three, φ))
-    (hdefect : ∀ {β : ℝ} (hβ : 0 < β) (ψ : PontryaginDual C𝔽) (H : ℝ → ℂ),
-      ContDiff ℝ (∞) H → HasCompactSupport H → (∀ x ≤ 0, H x = 0) →
-      ∃ c < β, ∃ C : ℝ, ∀ y : ℝ, 0 ≤ y → ∀ φ : BruhatCompactSupport C𝔽,
-        (∀ x, φ.val x = (ψ x : ℂ) * H (Real.log ((ideleClassNorm F x : ℝ≥0) : ℝ) - y)) →
-        M(φ, twist(1, 1 / 2)) = 0 → M(φ, twist(1, -1 / 2)) = 0 →
-        ∀ (a : archTest) (b : finiteTest), archRestricts(φ, a) → finiteRestricts(φ, b) →
-        ∀ T : nuclearEndomorphisms stripQuot(hβ.le, three),
-          T.val = stripConv(hβ.le, three, φ) →
-          ‖hilbertTrace T - localTerms(φ, a, b)‖ ≤ C * Real.exp (c * y))
-    (φ : BruhatCompactSupport C𝔽) {α : ℝ} (hα : 0 < α) :
-    HasSum (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z)) 0 :=
-  traceFormula_exteriorZeros_of_stripTrace_integrable τ hτ hK
-    (fun hβ ψ H hH hHc hHv ↦ by
-      obtain ⟨c, hcβ, C, hC⟩ := hdefect hβ ψ H hH hHc hHv
-      exact ⟨c, hcβ, fun y ↦ C * Real.exp (c * y),
-        fun σ hσ ↦ integrableOn_mul_exp_mul_mul_exp_neg_mul C hσ, hC⟩) φ hα
 
 end GlobalDiagonal
 
