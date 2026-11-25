@@ -9401,6 +9401,16 @@ private theorem introTrace_heckeGamma_logDeriv_eq_sum (χ : U𝔽) (s : ℂ) (hs
     simpa [b,hv,Function.comp_def] using (hg'.comp s ((differentiableAt_id (x:=s)).add_const b)).div_const 2
 
 open Classical in
+/-- On the positive half-plane the logarithmic derivative of the completed Hecke gamma
+factor is the finite sum of the scaled digamma terms at its archimedean parameters. -/
+theorem heckeGammaFactor_logDeriv_eq_sum_digamma (χ : U𝔽) (s : ℂ) (hs : 0 < s.re) :
+    logDeriv (heckeGammaFactor χ) s = ∑ v : InfinitePlace F,
+      (archScale(v) : ℂ) * (Complex.digamma ((archScale(v) : ℂ) * (s + archShift(χ,v))) -
+        Complex.log (if v.IsReal then (Real.pi : ℂ) else 2 * (Real.pi : ℂ))) := by
+  rw [introTrace_heckeGamma_logDeriv_eq_sum χ s hs]
+  exact Finset.sum_congr rfl fun v _ ↦ introTrace_logDeriv_local_gamma χ v s hs
+
+open Classical in
 /-- Paper: §1.4.3, p. 29, and §3.2.1, pp. 123–124. The analytic archimedean term in the
 common-counterterm limit is the difference of the logarithmic derivatives of two Hecke gamma factors. -/
 theorem introTrace_archimedean_sub_sum_eq_heckeGamma_logDeriv (χ : U𝔽) (z : ℂ) (hz : -(1/2:ℝ) < z.re) :
