@@ -1347,17 +1347,16 @@ theorem spectralStripTrace_norm_le_of_translate (χ : PontryaginDual C₁ → Po
 
 open scoped ContDiff in
 /-- A translated-test comparison for Theorem 12.5.1.1, pp. 519–520. For a fixed profile,
-comparison with the actual strip trace at any coinitial family of
-positive widths gives a weighted-integrable bound on the local terms at every positive rate.
-The widths may meet completed zeros. Both the tensor kernel and the comparison are needed only
-at the listed widths, and the bound at rate ε uses just one width below ε. -/
+fix a sequence of positive strip widths. If for each rate ε > 0 the translated trace defect
+has an ε-weighted integrable majorant at some listed width below ε, the local terms have an
+ε-weighted integrable majorant at every positive rate. The widths may meet completed zeros. -/
 theorem localTerms_integrableMajorant_of_cofinal_stripTrace (τ : ℝ≥0ˣ →ₜ* C𝔽)
     (hτ : RightInverse τ (ideleClassNorm F)) (ψ : PontryaginDual C𝔽) (H : ℝ → ℂ)
     (hH : ContDiff ℝ (∞) H) (hHc : HasCompactSupport H) (hHv : ∀ x ≤ 0, H x = 0)
-    (β : ℕ → ℝ) (hβ : ∀ n, 0 < β n) (hsmall : ∀ ε, 0 < ε → ∃ n, β n < ε)
+    (β : ℕ → ℝ) (hβ : ∀ n, 0 < β n)
     (hK : ∀ n (φ : BruhatCompactSupport C𝔽), (∀ g : C₁, φ.val g = 0) →
       stripTensorExists((hβ n).le, three, φ))
-    (hcmp : ∀ n (ε : ℝ), β n < ε → ∃ D : ℝ → ℝ,
+    (hcmp : ∀ ε : ℝ, 0 < ε → ∃ n, β n < ε ∧ ∃ D : ℝ → ℝ,
       IntegrableOn (fun y ↦ D y * Real.exp (-ε * y)) (Ioi (0 : ℝ)) ∧
       ∀ y : ℝ, 0 ≤ y → ∀ φ : BruhatCompactSupport C𝔽,
         (∀ x, φ.val x = (ψ x : ℂ) * H (Real.log ((ideleClassNorm F x : ℝ≥0) : ℝ) - y)) →
@@ -1373,8 +1372,7 @@ theorem localTerms_integrableMajorant_of_cofinal_stripTrace (τ : ℝ≥0ˣ →�
         M(φ, twist(1, 1 / 2)) = 0 → M(φ, twist(1, -1 / 2)) = 0 →
         ∀ (a : archTest) (b : finiteTest), archRestricts(φ, a) → finiteRestricts(φ, b) →
           ‖localTerms(φ, a, b)‖ ≤ D y := by
-  obtain ⟨n, hn⟩ := hsmall ε hε
-  obtain ⟨D, hD, hcomp⟩ := hcmp n ε hn
+  obtain ⟨n, hn, D, hD, hcomp⟩ := hcmp ε hε
   obtain ⟨χ, hχ, -, -⟩ := exteriorZeros_basepoint τ hτ
   obtain ⟨φ₀, hφ₀⟩ := exists_characterNormTest (F := F) ψ H hH hHc
   have hv₀ (g : C₁) : φ₀.val g = 0 := by
