@@ -20,6 +20,9 @@ import Mathlib.Topology.MetricSpace.Ultra.TotallySeparated
 Formalizes willzh0's restriction on repeated primary poles in the setting of
 Theorem 7.3.3.4, pp. 360–363 (issue #7336).
 
+The fixed-pair result extends Daniel Knapp's proof of uniqueness for a fixed character
+in PR #7479. Both arguments use the same Six Exponentials input.
+
 Source: https://github.com/mccorvie/riemann-masullo/issues/7336#issuecomment-7145955656
 -/
 
@@ -537,14 +540,14 @@ theorem primitiveQuartic_finite_unit_character_exponent (ω : PontryaginDual C�
   rw [← map_pow]
   exact hker _ (H.toSubgroup.pow_index_mem x)
 
-/-- A norm-one character trivial on a purely finite idele has torsion value on
-  the archimedean projection of a generator principalizing that idele. -/
-theorem primitiveQuartic_principalize_character (ω : PontryaginDual C₁) (g : N₁)
-    (hg : ω (primitiveQuarticNormOneClass F g) = 1) (harchg : atInfinity g.val = 1) :
-    ∃ a : Fˣ, ∃ b : (infiniteIdeleNorm F).ker, b.val = atInfinity (principal a) ∧
-      IsOfFinOrder (ω (primitiveQuarticNormOneClass F (primitiveQuarticArchIdele F b))) ∧
-      ∀ v : Primes(F), v.valuation F (a : F) = 1 ↔ Valued.v (g.val.val.2 v) = (1 : ℤᵐ⁰) := by
-  obtain ⟨n, hn, a, u, hu, he⟩ := primitiveQuartic_principalize_ratio F g
+/-- Keeping the principalization data fixed allows it to be tested against
+several characters at once. -/
+private theorem primitiveQuartic_torsion_of_principalization
+    (ω : PontryaginDual C₁) (g : N₁)
+    (hg : ω (primitiveQuarticNormOneClass F g) = 1) (harchg : atInfinity g.val = 1)
+    {n : ℕ} {a : Fˣ} {u : 𝕀[F]} (hu : u ∈ integralUnits) (he : g.val ^ n = principal a * u) :
+    ∃ b : (infiniteIdeleNorm F).ker, b.val = atInfinity (principal a) ∧
+      IsOfFinOrder (ω (primitiveQuarticNormOneClass F (primitiveQuarticArchIdele F b))) := by
   let N := (ideleNorm F).ker
   let p : Fˣ →* N := (principal).codRestrict _ fun x ↦ (ideleNorm_spec F).2 (Set.mem_range_self x)
   have hnu : ideleNorm F u = 1 := by
@@ -597,22 +600,44 @@ theorem primitiveQuartic_principalize_character (ω : PontryaginDual C₁) (g : 
     change ω (q U) = ω (q V) * ω (q (ins B)) at h
     rw [hωu] at h
     rw [map_inv, map_inv, map_inv, eq_inv_of_mul_eq_one_left h.symm]
-  refine ⟨a, B⁻¹, hBa, isOfFinOrder_iff_pow_eq_one.mpr ⟨m, hm, ?_⟩,
-    primitiveQuartic_principalize_support F hn hu he⟩
+  refine ⟨B⁻¹, hBa, isOfFinOrder_iff_pow_eq_one.mpr ⟨m, hm, ?_⟩⟩
   rw [hωB]
   exact hωm V hV hVarch
 
+/-- A norm-one character trivial on a purely finite idele has torsion value on
+  the archimedean projection of a generator principalizing that idele. -/
+theorem primitiveQuartic_principalize_character (ω : PontryaginDual C₁) (g : N₁)
+    (hg : ω (primitiveQuarticNormOneClass F g) = 1) (harchg : atInfinity g.val = 1) :
+    ∃ a : Fˣ, ∃ b : (infiniteIdeleNorm F).ker, b.val = atInfinity (principal a) ∧
+      IsOfFinOrder (ω (primitiveQuarticNormOneClass F (primitiveQuarticArchIdele F b))) ∧
+      ∀ v : Primes(F), v.valuation F (a : F) = 1 ↔ Valued.v (g.val.val.2 v) = (1 : ℤᵐ⁰) := by
+  obtain ⟨n, hn, a, u, hu, he⟩ := primitiveQuartic_principalize_ratio F g
+  obtain ⟨b, hb, hω⟩ := primitiveQuartic_torsion_of_principalization F ω g hg harchg hu he
+  exact ⟨a, b, hb, hω, primitiveQuartic_principalize_support F hn hu he⟩
+
 variable {S : Finset (Primes(F))}
 
-/-- At a finite pole the local character is one on the chosen uniformizer. -/
-private theorem primitiveQuartic_pole_uniformizer
+private noncomputable def primitiveQuarticUniformizer (v : Primes(F)) : (v.adicCompletion F)ˣ :=
+  let π := (Valued.v : Valuation (v.adicCompletion F) ℤᵐ⁰)
+    |>.exists_isUniformizer_of_isCyclic_of_nontrivial
+  Units.mk0 π.choose π.choose_spec.ne_zero
+
+/-- The ordered pair determines a global idele independently of the finite
+stage and the character. -/
+private noncomputable def primitiveQuarticPoleIdele (v w : Primes(F)) : 𝕀[F] :=
+  (IdeleGroup.ofAdicCompletion (𝓞 F) F v (primitiveQuarticUniformizer F v)) ^
+      w.asIdeal.inertiaDeg (𝓞 ℚ) /
+    (IdeleGroup.ofAdicCompletion (𝓞 F) F w (primitiveQuarticUniformizer F w)) ^
+      v.asIdeal.inertiaDeg (𝓞 ℚ)
+
+private theorem primitiveQuartic_pole_uniformizer_spec
     (c : QuasiCharacter (SIdeleQuotient F S)) (w : S) (hw : w ∈ sLocalFinitePolePlaces c) :
-    ∃ u : (w.val.adicCompletion F)ˣ,
-      ‖u.val‖ = (w.val.asIdeal.absNorm : ℝ)⁻¹ ∧ sLocalFiniteRestriction w c u = 1 := by
+    ‖(primitiveQuarticUniformizer F w.val).val‖ = (w.val.asIdeal.absNorm : ℝ)⁻¹ ∧
+      sLocalFiniteRestriction w c (primitiveQuarticUniformizer F w.val) = 1 := by
   let π := (Valued.v : Valuation (w.val.adicCompletion F) ℤᵐ⁰)
     |>.exists_isUniformizer_of_isCyclic_of_nontrivial
   let u : (w.val.adicCompletion F)ˣ := Units.mk0 π.choose π.choose_spec.ne_zero
-  refine ⟨u, norm_uniformizer_adicCompletion w.val _ π.choose_spec, ?_⟩
+  refine ⟨norm_uniformizer_adicCompletion w.val _ π.choose_spec, ?_⟩
   have hzero : finiteLocalEulerFactor w.val (sLocalFiniteRestriction w c) = 0 := by
     have hm := (sLocalPrincipalPartCoeff_leading_formula_fin_factor c w).1
     have ho := (Finset.mem_filter.mp hw).2
@@ -628,9 +653,16 @@ private theorem primitiveQuartic_pole_uniformizer
     exact (sub_eq_zero.mp (inv_eq_zero.mp hzero)).symm
   · exact False.elim (one_ne_zero hzero)
 
+/-- At a finite pole the local character is one on the chosen uniformizer. -/
+private theorem primitiveQuartic_pole_uniformizer
+    (c : QuasiCharacter (SIdeleQuotient F S)) (w : S) (hw : w ∈ sLocalFinitePolePlaces c) :
+    ∃ u : (w.val.adicCompletion F)ˣ,
+      ‖u.val‖ = (w.val.asIdeal.absNorm : ℝ)⁻¹ ∧ sLocalFiniteRestriction w c u = 1 := by
+  exact ⟨primitiveQuarticUniformizer F w.val, primitiveQuartic_pole_uniformizer_spec F c w hw⟩
+
 /-- Two distinct finite poles over one rational prime give a character-trivial norm-one
 idele with exactly those two places in its valuation support. -/
-theorem primitiveQuartic_pole_ratio (ω : PontryaginDual C₁)
+private theorem primitiveQuartic_pole_ratio_spec (ω : PontryaginDual C₁)
     (hω : NormOneCharacterUnramifiedOutside ω S) (p : HeightOneSpectrum (𝓞 ℚ))
     (c : QuasiCharacter (SIdeleQuotient F S))
     (hc : ∀ x : (sIdeleQuotientNorm F S).ker,
@@ -638,7 +670,8 @@ theorem primitiveQuartic_pole_ratio (ω : PontryaginDual C₁)
     (v w : S) (hne : v ≠ w) (hvp : v.val ∈ sLocalPrimaryPlaces S p)
     (hwp : w.val ∈ sLocalPrimaryPlaces S p)
     (hv : v ∈ sLocalFinitePolePlaces c) (hw : w ∈ sLocalFinitePolePlaces c) :
-    ∃ g : N₁, ω (primitiveQuarticNormOneClass F g) = 1 ∧ atInfinity g.val = 1 ∧
+    ∃ g : N₁, g.val = primitiveQuarticPoleIdele F v.val w.val ∧
+      ω (primitiveQuarticNormOneClass F g) = 1 ∧ atInfinity g.val = 1 ∧
       ∀ x : Primes(F), Valued.v (g.val.val.2 x) ≠ (1 : ℤᵐ⁰) ↔ x = v.val ∨ x = w.val := by
   classical
   let f (i : S) := i.val.asIdeal.inertiaDeg (𝓞 ℚ)
@@ -652,8 +685,10 @@ theorem primitiveQuartic_pole_ratio (ω : PontryaginDual C₁)
     change p.asIdeal.absNorm ^ f i = i.val.asIdeal.absNorm at h
     rw [h0, pow_zero] at h
     exact (HeightOneSpectrum.one_lt_absNorm i.val).ne h
-  obtain ⟨u, hu, hzu⟩ := primitiveQuartic_pole_uniformizer F c v hv
-  obtain ⟨t, ht, hzt⟩ := primitiveQuartic_pole_uniformizer F c w hw
+  let u := primitiveQuarticUniformizer F v.val
+  let t := primitiveQuarticUniformizer F w.val
+  obtain ⟨hu, hzu⟩ := primitiveQuartic_pole_uniformizer_spec F c v hv
+  obtain ⟨ht, hzt⟩ := primitiveQuartic_pole_uniformizer_spec F c w hw
   let q : (SAdeleRing F S)ˣ →* SIdeleQuotient F S := QuotientGroup.mk' _
   let ins (i : S) (z : (i.val.adicCompletion F)ˣ) : (SAdeleRing F S)ˣ :=
     (ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F) ((s : S) → s.val.adicCompletion F)).symm
@@ -679,7 +714,31 @@ theorem primitiveQuartic_pole_ratio (ω : PontryaginDual C₁)
     rw [ideleNorm_sIdeleInsertion, ← sIdeleQuotientNorm_mk]
     exact hn
   let A : N₁ := ⟨a, ha⟩
-  refine ⟨A, ?_, ?_, ?_⟩
+  refine ⟨A, ?_, ?_, ?_, ?_⟩
+  · have axis (i : S) (z : (i.val.adicCompletion F)ˣ) :
+        sIdeleInsertion F S (ins i z) = IdeleGroup.ofAdicCompletion (𝓞 F) F i.val z := by
+      let : DecidableEq S := Classical.decEq _
+      obtain ⟨hi, hin, hout⟩ := sIdeleInsertion_apply F S (ins i z)
+      apply Units.ext
+      refine Prod.ext hi ?_
+      apply RestrictedProduct.ext
+      intro x
+      change (sIdeleInsertion F S (ins i z)).val.2 x =
+        RestrictedProduct.mulSingle (fun v : Primes(F) ↦ v.adicCompletionIntegers F) i.val z.val x
+      by_cases hxi : x = i.val
+      · subst x
+        rw [hin i, RestrictedProduct.mulSingle_eq_same]
+        change ((Pi.mulSingle (M := fun v : S ↦ (v.val.adicCompletion F)ˣ) i z i).val) = _
+        rw [Pi.mulSingle_eq_same]
+      · rw [RestrictedProduct.mulSingle_eq_of_ne _ _ hxi]
+        by_cases hx : x ∈ S
+        · rw [hin ⟨x, hx⟩]
+          change (Pi.mulSingle (M := fun v : S ↦ (v.val.adicCompletion F)ˣ) i z ⟨x, hx⟩).val = 1
+          rw [Pi.mulSingle_eq_of_ne (fun e ↦ hxi (congrArg Subtype.val e)), Units.val_one]
+        · exact hout x hx
+    change sIdeleInsertion F S (ins v u ^ f w / ins w t ^ f v) = _
+    rw [map_div, map_pow, map_pow, axis, axis]
+    rfl
   · have hχ : (sLocalNormOneCharacter S ω hω ⟨q g, hn⟩ : ℂ) = 1 := by
       rw [← hc]
       change c (q (ins v u ^ f w / ins w t ^ f v)) = 1
@@ -747,6 +806,22 @@ theorem primitiveQuartic_pole_ratio (ω : PontryaginDual C₁)
       rw [(sIdeleInsertion_apply F S g).2.2 x hx, map_one]
       simp [show x ≠ v.val from fun h ↦ hx (h ▸ v.property),
         show x ≠ w.val from fun h ↦ hx (h ▸ w.property)]
+
+/-- Two distinct finite poles over one rational prime give a character-trivial norm-one
+idele with exactly those two places in its valuation support. -/
+theorem primitiveQuartic_pole_ratio (ω : PontryaginDual C₁)
+    (hω : NormOneCharacterUnramifiedOutside ω S) (p : HeightOneSpectrum (𝓞 ℚ))
+    (c : QuasiCharacter (SIdeleQuotient F S))
+    (hc : ∀ x : (sIdeleQuotientNorm F S).ker,
+      c x.val = (sLocalNormOneCharacter S ω hω x : ℂ))
+    (v w : S) (hne : v ≠ w) (hvp : v.val ∈ sLocalPrimaryPlaces S p)
+    (hwp : w.val ∈ sLocalPrimaryPlaces S p)
+    (hv : v ∈ sLocalFinitePolePlaces c) (hw : w ∈ sLocalFinitePolePlaces c) :
+    ∃ g : N₁, ω (primitiveQuarticNormOneClass F g) = 1 ∧ atInfinity g.val = 1 ∧
+      ∀ x : Primes(F), Valued.v (g.val.val.2 x) ≠ (1 : ℤᵐ⁰) ↔ x = v.val ∨ x = w.val := by
+  obtain ⟨g, _, hg, ha, hs⟩ :=
+    primitiveQuartic_pole_ratio_spec F ω hω p c hc v w hne hvp hwp hv hw
+  exact ⟨g, hg, ha, hs⟩
 
 end
 
@@ -1450,6 +1525,51 @@ private theorem primitiveQuartic_pole_torsion_diagonal {T : Finset Prime}
   rw [InfiniteAdeleRing.algebraMap_apply, extensionEmbedding_coe]
   rfl
 
+/-- A fixed unordered pair at two actual pole centers has one principal
+generator whose archimedean diagonal is torsion for both norm-one characters.
+The stages and centers may differ. -/
+private theorem primitiveQuartic_common_pole_torsion_diagonal {T U : Finset Prime}
+    (ω η : PontryaginDual C₁)
+    (hT : NormOneCharacterUnramifiedOutside ω T) (hU : NormOneCharacterUnramifiedOutside η U)
+    (p q : HeightOneSpectrum (𝓞 ℚ))
+    (c : QuasiCharacter (SIdeleQuotient F T)) (d : QuasiCharacter (SIdeleQuotient F U))
+    (hc : ∀ x : (sIdeleQuotientNorm F T).ker, c x.val = (sLocalNormOneCharacter T ω hT x : ℂ))
+    (hd : ∀ x : (sIdeleQuotientNorm F U).ker, d x.val = (sLocalNormOneCharacter U η hU x : ℂ))
+    (v w : T) (v' w' : U) (hvw : v ≠ w) (hvw' : v' ≠ w')
+    (hvp : v.val ∈ sLocalPrimaryPlaces T p) (hwp : w.val ∈ sLocalPrimaryPlaces T p)
+    (hvq : v'.val ∈ sLocalPrimaryPlaces U q) (hwq : w'.val ∈ sLocalPrimaryPlaces U q)
+    (hv : v ∈ sLocalFinitePolePlaces c) (hw : w ∈ sLocalFinitePolePlaces c)
+    (hv' : v' ∈ sLocalFinitePolePlaces d) (hw' : w' ∈ sLocalFinitePolePlaces d)
+    (hpair : ({v.val, w.val} : Finset Prime) = {v'.val, w'.val}) :
+    ∃ a : Fˣ, v.val.valuation F (a : F) ≠ 1 ∧
+      PrimitiveQuarticTorsionDiagonal ω a ∧ PrimitiveQuarticTorsionDiagonal η a := by
+  obtain ⟨G, hGval, hGω, hGarch, hsupp⟩ :=
+    primitiveQuartic_pole_ratio_spec F ω hT p c hc v w hvw hvp hwp hv hw
+  have align (i j : U) (hij : i ≠ j) (hi : v.val = i.val) (hj : w.val = j.val)
+      (hip : i.val ∈ sLocalPrimaryPlaces U q) (hjp : j.val ∈ sLocalPrimaryPlaces U q)
+      (hi' : i ∈ sLocalFinitePolePlaces d) (hj' : j ∈ sLocalFinitePolePlaces d) :
+      η (primitiveQuarticNormOneClass F G) = 1 := by
+    obtain ⟨G', he, hη, _, _⟩ := primitiveQuartic_pole_ratio_spec F η hU q d hd i j hij hip hjp hi' hj'
+    have heq : G = G' := Subtype.ext (hGval.trans ((congrArg₂ (primitiveQuarticPoleIdele F) hi hj).trans he.symm))
+    exact heq ▸ hη
+  have hset : ({v.val, w.val} : Set Prime) = {v'.val, w'.val} := by
+    simpa using congrArg (fun s : Finset Prime ↦ (s : Set Prime)) hpair
+  have hGη : η (primitiveQuarticNormOneClass F G) = 1 := by
+    rcases Set.pair_eq_pair_iff.mp hset with ⟨hi, hj⟩ | ⟨hi, hj⟩
+    · exact align v' w' hvw' hi hj hvq hwq hv' hw'
+    · exact align w' v' hvw'.symm hi hj hwq hvq hw' hv'
+  obtain ⟨n, hn, a, u, hu, he⟩ := primitiveQuartic_principalize_ratio F G
+  have torsion (ψ : PontryaginDual C₁) (hψ : ψ (primitiveQuarticNormOneClass F G) = 1) :
+      PrimitiveQuarticTorsionDiagonal ψ a := by
+    obtain ⟨b, hb, ht⟩ := primitiveQuartic_torsion_of_principalization F ψ G hψ hGarch hu he
+    refine ⟨b, fun v ↦ ?_, ht⟩
+    rw [hb]
+    change extensionEmbedding v (algebraMap F (InfiniteAdeleRing F) (a : F) v) = _
+    rw [InfiniteAdeleRing.algebraMap_apply, extensionEmbedding_coe]
+    rfl
+  exact ⟨a, (not_congr (primitiveQuartic_principalize_support F hn hu he v.val)).mpr
+    ((hsupp v.val).mpr (Or.inl rfl)), torsion ω hGω, torsion η hGη⟩
+
 /-- A nontorsion norm-one character of a primitive totally imaginary quartic has at
 most one unordered pair of distinct finite poles above the same rational prime. The
 two stages and rational primes can be chosen independently, and the quasi-characters
@@ -1504,5 +1624,375 @@ public theorem primitiveQuartic_primaryPoleMultiplicity_le_two [IsTotallyComplex
 
 end
 
+
+/-! ### Characters at a fixed pair of primary places -/
+
+section
+
+variable {F : Type*} [Field F] [NumberField F]
+
+local notation "Prime" => HeightOneSpectrum (𝓞 F)
+local notation "C₁" => MonoidHom.ker (ideleClassNorm F)
+
+/-- The radial and angular parameters of the restriction of a global character
+to the two complex places on norm-one archimedean ideles. -/
+private def PrimitiveQuarticArchParameters (ω : PontryaginDual C₁)
+    (w₁ w₂ : InfinitePlace F) (t : ℝ) (m₁ m₂ : ℤ) : Prop :=
+  ∀ g : (infiniteIdeleNorm F).ker,
+    let z₁ := extensionEmbedding w₁ (g.val.val w₁)
+    let z₂ := extensionEmbedding w₂ (g.val.val w₂)
+    (ω (primitiveQuarticArchClass F g) : ℂ) =
+      Complex.exp ((t : ℂ) * Complex.I * (Real.log ‖z₁‖ : ℂ)) *
+        (z₁ / (‖z₁‖ : ℂ)) ^ m₁ * (z₂ / (‖z₂‖ : ℂ)) ^ m₂
+
+private theorem primitiveQuartic_archFactors_radial_relation
+    (x y : ℂ) (hx : x ≠ 0) (hy : y ≠ 0) (L t s : ℝ) (m n r q a b : ℤ)
+    (hrel : (a : ℝ) * t + (b : ℝ) * s = 0) :
+    (Complex.exp ((t : ℂ) * Complex.I * (L : ℂ)) * x ^ m * y ^ n) ^ a *
+      (Complex.exp ((s : ℂ) * Complex.I * (L : ℂ)) * x ^ r * y ^ q) ^ b =
+      x ^ (m * a + r * b) * y ^ (n * a + q * b) := by
+  have hc : (a : ℂ) * (t : ℂ) + (b : ℂ) * (s : ℂ) = 0 := by exact_mod_cast hrel
+  have hexp : Complex.exp ((t : ℂ) * Complex.I * (L : ℂ)) ^ a *
+      Complex.exp ((s : ℂ) * Complex.I * (L : ℂ)) ^ b = 1 := by
+    rw [← Complex.exp_int_mul, ← Complex.exp_int_mul, ← Complex.exp_add]
+    rw [show (a : ℂ) * ((t : ℂ) * Complex.I * L) + (b : ℂ) * ((s : ℂ) * Complex.I * L) =
+      ((a : ℂ) * t + (b : ℂ) * s) * Complex.I * L by ring, hc]
+    simp
+  simp only [mul_zpow, zpow_add₀ hx, zpow_add₀ hy, zpow_mul]
+  calc
+    _ = (Complex.exp ((t : ℂ) * Complex.I * (L : ℂ)) ^ a *
+        Complex.exp ((s : ℂ) * Complex.I * (L : ℂ)) ^ b) *
+        (x ^ m) ^ a * (x ^ r) ^ b * ((y ^ n) ^ a * (y ^ q) ^ b) := by ac_rfl
+    _ = _ := by rw [hexp, one_mul]
+
+/-- An integral relation between the radial frequencies makes the corresponding
+product of global norm-one characters finite order. -/
+private theorem primitiveQuartic_finiteOrder_of_radial_relation [IsTotallyComplex F]
+    (hdegree : Module.finrank ℚ F = 4) (hGalois : QuarticNormalClosurePairTransitive F)
+    (w₁ w₂ : InfinitePlace F) (hne : w₁ ≠ w₂)
+    (hall : ∀ w : InfinitePlace F, w = w₁ ∨ w = w₂)
+    (ω η : PontryaginDual C₁) {t s : ℝ} {m₁ m₂ n₁ n₂ : ℤ}
+    (hω : PrimitiveQuarticArchParameters ω w₁ w₂ t m₁ m₂)
+    (hη : PrimitiveQuarticArchParameters η w₁ w₂ s n₁ n₂)
+    (a b : ℤ) (hrel : (a : ℝ) * t + (b : ℝ) * s = 0) :
+    IsOfFinOrder (ω ^ a * η ^ b) := by
+  let ψ := ω ^ a * η ^ b
+  apply primitiveQuarticArch_trivial_finiteOrder F ψ
+  by_contra hn
+  obtain ⟨u, hu⟩ := primitiveQuarticArch_exists_unit F (primitiveQuartic_two_infinite_places hdegree)
+  let U := Units.map (algebraMap (𝓞 F) F).toMonoidHom u
+  have hU : ¬ IsOfFinOrder U := fun h ↦ hu ((CommGroup.mem_torsion u).mpr
+    ((Units.map_injective (FaithfulSMul.algebraMap_injective (𝓞 F) F)).isOfFinOrder_iff.mp h))
+  have hψ : PrimitiveQuarticArchParameters ψ w₁ w₂ 0 (m₁ * a + n₁ * b) (m₂ * a + n₂ * b) := by
+    intro g
+    let ev : PontryaginDual C₁ →* Circle :=
+      { toFun := fun χ ↦ χ (primitiveQuarticArchClass F g)
+        map_one' := rfl
+        map_mul' := fun _ _ ↦ rfl }
+    change (ev (ω ^ a * η ^ b) : ℂ) = _
+    rw [map_mul, map_zpow, map_zpow, Circle.coe_mul, Circle.coe_zpow, Circle.coe_zpow]
+    change (ω (primitiveQuarticArchClass F g) : ℂ) ^ a *
+      (η (primitiveQuarticArchClass F g) : ℂ) ^ b = _
+    rw [hω g, hη g]
+    simp only [Complex.ofReal_zero, zero_mul, Complex.exp_zero, one_mul]
+    have hphase (w : InfinitePlace F) : extensionEmbedding w (g.val.val w) /
+        (‖extensionEmbedding w (g.val.val w)‖ : ℂ) ≠ 0 := by
+      have hz : extensionEmbedding w (g.val.val w) ≠ 0 :=
+        (map_ne_zero _).mpr (primitiveQuarticArchUnit F w g.val).ne_zero
+      exact div_ne_zero hz (Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr hz))
+    exact primitiveQuartic_archFactors_radial_relation _ _ (hphase w₁) (hphase w₂) _ _ _
+      m₁ m₂ n₁ n₂ a b hrel
+  exact primitiveQuartic_radial_ne_zero hdegree hGalois ψ hn U hU
+    (primitiveQuartic_unit_torsion_diagonal ψ u) w₁ w₂ hne hall 0 _ _ hψ rfl
+
+private theorem primitiveQuartic_fixedPair_logIndependent [IsTotallyComplex F]
+    (hdegree : Module.finrank ℚ F = 4) (hGalois : QuarticNormalClosurePairTransitive F)
+    (σ : F →+* ℂ) (u : (𝓞 F)ˣ) (hu : u ∉ NumberField.Units.torsion F)
+    (a : Fˣ) (v : Prime) (ha : v.valuation F (a : F) ≠ 1) :
+    LinearIndependent ℚ ![logAbsEmbedding σ
+      (Additive.ofMul (Units.map (algebraMap (𝓞 F) F).toMonoidHom u)),
+      logAbsEmbedding σ (Additive.ofMul a)] := by
+  let U := Units.map (algebraMap (𝓞 F) F).toMonoidHom u
+  have hU : ¬ IsOfFinOrder U := by
+    intro h
+    apply hu
+    apply (CommGroup.mem_torsion u).mpr
+    exact (Units.map_injective (FaithfulSMul.algebraMap_injective (𝓞 F) F)).isOfFinOrder_iff.mp h
+  apply (LinearIndependent.iff_fractionRing ℤ ℚ).mp
+  apply Fintype.linearIndependent_iff.mpr
+  intro c hc i
+  rw [Fin.sum_univ_two] at hc
+  let y : Fˣ := U ^ c 0 * a ^ c 1
+  have hy : logAbsEmbedding σ (Additive.ofMul y) = 0 := by
+    change logAbsEmbedding σ (c 0 • Additive.ofMul U + c 1 • Additive.ofMul a) = 0
+    rw [map_add, map_zsmul, map_zsmul]
+    exact hc
+  have htor := primitiveQuartic_log_zero_torsion hdegree hGalois σ y hy
+  have hv : primitiveOrd v a ^ c 1 = 1 := by
+    simpa only [y, map_mul, map_zpow, primitiveOrd_unit v u, one_zpow, one_mul, U] using
+      ((primitiveOrd v).isOfFinOrder htor).eq_one'
+  have hprod : c 1 * (primitiveOrd v a).toAdd = 0 := congrArg Multiplicative.toAdd hv
+  have h1 : c 1 = 0 := (mul_eq_zero.mp hprod).resolve_right ((not_congr (primitiveOrd_eq_one v a)).mpr ha)
+  have h0 : c 0 = 0 := zpow_infinite_order hU (by simpa only [y, h1, zpow_zero, mul_one] using htor)
+  fin_cases i
+  · exact h0
+  · exact h1
+
+/-- Interchanging the roles of the two rows and the three columns of Six Exponentials
+forces an integral relation between the two radial frequencies. -/
+private theorem primitiveQuartic_twoRadial_relation
+    (ell : Fin 2 → ℝ) (hell : LinearIndependent ℚ ell) (t s : ℝ)
+    (hbase : ∀ i, IsAlgebraic ℚ (Real.exp (ell i) : ℂ))
+    (ht : ∀ i, IsAlgebraic ℚ (Complex.exp ((t : ℂ) * Complex.I * (ell i : ℂ))))
+    (hs : ∀ i, IsAlgebraic ℚ (Complex.exp ((s : ℂ) * Complex.I * (ell i : ℂ)))) :
+    ∃ a b : ℤ, (a ≠ 0 ∨ b ≠ 0) ∧ (a : ℝ) * t + (b : ℝ) * s = 0 := by
+  classical
+  by_contra hr
+  let y : Fin 3 → ℂ := ![1, (t : ℂ) * Complex.I, (s : ℂ) * Complex.I]
+  have hy : LinearIndependent ℚ y := by
+    apply (LinearIndependent.iff_fractionRing ℤ ℚ).mp
+    apply Fintype.linearIndependent_iff.mpr
+    intro c hc i
+    rw [Fin.sum_univ_three] at hc
+    change c 0 • (1 : ℂ) + c 1 • ((t : ℂ) * Complex.I) + c 2 • ((s : ℂ) * Complex.I) = 0 at hc
+    have h0 : c 0 = 0 := by
+      have he := congrArg Complex.re hc
+      simpa using he
+    have he : (c 1 : ℝ) * t + (c 2 : ℝ) * s = 0 := by
+      have h := congrArg Complex.im hc
+      simpa [zsmul_eq_mul, Complex.mul_im] using h
+    have h12 : c 1 = 0 ∧ c 2 = 0 := by
+      by_contra hn
+      exact hr ⟨c 1, c 2, not_and_or.mp hn, he⟩
+    fin_cases i
+    · exact h0
+    · exact h12.1
+    · exact h12.2
+  let f : ℝ →ₗ[ℚ] ℂ := Complex.ofRealCLM.toLinearMap.restrictScalars ℚ
+  have hf : f.ker = ⊥ := LinearMap.ker_eq_bot.mpr Complex.ofReal_injective
+  obtain ⟨i, j, hbad⟩ := sixExponentials (fun i ↦ (ell i : ℂ)) y (hell.map' f hf) hy
+  apply hbad
+  fin_cases j
+  · simpa [y, Complex.ofReal_exp] using hbase i
+  · change IsAlgebraic ℚ (Complex.exp ((ell i : ℂ) * ((t : ℂ) * Complex.I)))
+    rw [mul_comm]
+    exact ht i
+  · change IsAlgebraic ℚ (Complex.exp ((ell i : ℂ) * ((s : ℂ) * Complex.I)))
+    rw [mul_comm]
+    exact hs i
+
+private theorem primitiveQuartic_radial_algebraic_of_diagonal
+    (ω : PontryaginDual C₁) (w₁ w₂ : InfinitePlace F) {t : ℝ} {m₁ m₂ : ℤ}
+    (hω : PrimitiveQuarticArchParameters ω w₁ w₂ t m₁ m₂)
+    (a : Fˣ) (ha : PrimitiveQuarticTorsionDiagonal ω a) :
+    IsAlgebraic ℚ (Complex.exp ((t : ℂ) * Complex.I *
+      (logAbsEmbedding w₁.embedding (Additive.ofMul a) : ℂ))) := by
+  obtain ⟨g, hg, htor⟩ := ha
+  have h := Circle.coeHom.isOfFinOrder htor
+  change IsOfFinOrder (ω (primitiveQuarticArchClass F g) : ℂ) at h
+  rw [hω g, hg w₁, hg w₂] at h
+  exact exp_radial_algebraic
+    ((Algebra.IsAlgebraic.isAlgebraic (R := ℚ) (a : F)).algHom w₁.embedding.toRatAlgHom)
+    ((Algebra.IsAlgebraic.isAlgebraic (R := ℚ) (a : F)).algHom w₂.embedding.toRatAlgHom)
+    ((map_ne_zero w₁.embedding).mpr a.ne_zero) ((map_ne_zero w₂.embedding).mpr a.ne_zero)
+    m₁ m₂ t _ h
+
+/-- Two characters whose archimedean diagonals are both torsion on the same
+nonunit of nontrivial valuation are dependent modulo finite-order characters. -/
+private theorem primitiveQuartic_dependent_of_common_diagonal [IsTotallyComplex F]
+    (hdegree : Module.finrank ℚ F = 4) (hGalois : QuarticNormalClosurePairTransitive F)
+    (ω η : PontryaginDual C₁) (a : Fˣ) (v : Prime) (ha : v.valuation F (a : F) ≠ 1)
+    (hω : PrimitiveQuarticTorsionDiagonal ω a) (hη : PrimitiveQuarticTorsionDiagonal η a) :
+    ∃ k l : ℤ, (k ≠ 0 ∨ l ≠ 0) ∧ IsOfFinOrder (ω ^ k * η ^ l) := by
+  have hcard := primitiveQuartic_two_infinite_places hdegree
+  let e := Fintype.equivFinOfCardEq hcard
+  let w₁ := e.symm 0
+  let w₂ := e.symm 1
+  have hne : w₁ ≠ w₂ := e.symm.injective.ne (by decide)
+  have hall (w : InfinitePlace F) : w = w₁ ∨ w = w₂ := by
+    have hor : e w = 0 ∨ e w = 1 := (show ∀ j : Fin 2, j = 0 ∨ j = 1 from by decide) (e w)
+    exact hor.imp (fun h ↦ e.injective (by simpa [w₁] using h))
+      (fun h ↦ e.injective (by simpa [w₂] using h))
+  obtain ⟨t, m₁, m₂, ht⟩ := primitiveQuarticArchCharacter_parameters F ω w₁ w₂
+    (IsTotallyComplex.isComplex w₁) (IsTotallyComplex.isComplex w₂) hne hall
+  obtain ⟨s, n₁, n₂, hs⟩ := primitiveQuarticArchCharacter_parameters F η w₁ w₂
+    (IsTotallyComplex.isComplex w₁) (IsTotallyComplex.isComplex w₂) hne hall
+  change PrimitiveQuarticArchParameters ω w₁ w₂ t m₁ m₂ at ht
+  change PrimitiveQuarticArchParameters η w₁ w₂ s n₁ n₂ at hs
+  obtain ⟨u, hu⟩ := primitiveQuarticArch_exists_unit F hcard
+  let U := Units.map (algebraMap (𝓞 F) F).toMonoidHom u
+  let x : Fin 2 → Fˣ := ![U, a]
+  let ell (i : Fin 2) := logAbsEmbedding w₁.embedding (Additive.ofMul (x i))
+  have hind : LinearIndependent ℚ ell := by
+    have he : ell = ![logAbsEmbedding w₁.embedding (Additive.ofMul U),
+        logAbsEmbedding w₁.embedding (Additive.ofMul a)] := by
+      funext i
+      fin_cases i <;> rfl
+    rw [he]
+    exact primitiveQuartic_fixedPair_logIndependent hdegree hGalois _ u hu a v ha
+  have hdiag (χ : PontryaginDual C₁) (hc : PrimitiveQuarticTorsionDiagonal χ a)
+      (i : Fin 2) : PrimitiveQuarticTorsionDiagonal χ (x i) := by
+    fin_cases i
+    · exact primitiveQuartic_unit_torsion_diagonal χ u
+    · exact hc
+  obtain ⟨k, l, hkl, hrel⟩ := primitiveQuartic_twoRadial_relation ell hind t s
+    (fun i ↦ algebraic_exp_logAbsEmbedding _ (x i))
+    (fun i ↦ primitiveQuartic_radial_algebraic_of_diagonal ω w₁ w₂ ht _ (hdiag _ hω i))
+    (fun i ↦ primitiveQuartic_radial_algebraic_of_diagonal η w₁ w₂ hs _ (hdiag _ hη i))
+  exact ⟨k, l, hkl, primitiveQuartic_finiteOrder_of_radial_relation hdegree hGalois w₁ w₂ hne
+    hall ω η ht hs k l hrel⟩
+
+/-- A finite set is the underlying unordered pair of distinct primary pole places
+of a center lying over a given global norm-one character. The finite stage,
+rational prime and quasi-character witnessing the common pole may all vary. -/
+public def HasRepeatedPrimaryPoleAtPair (ω : PontryaginDual C₁) (P : Finset Prime) : Prop :=
+  ∃ (T : Finset Prime) (hT : NormOneCharacterUnramifiedOutside ω T)
+    (p : HeightOneSpectrum (𝓞 ℚ)) (c : QuasiCharacter (SIdeleQuotient F T)) (v w : T),
+    (∀ x : (sIdeleQuotientNorm F T).ker, c x.val = (sLocalNormOneCharacter T ω hT x : ℂ)) ∧
+    v ≠ w ∧ ({v.val, w.val} : Finset Prime) = P ∧
+    v.val ∈ sLocalPrimaryPlaces T p ∧ w.val ∈ sLocalPrimaryPlaces T p ∧
+    v ∈ sLocalFinitePolePlaces c ∧ w ∈ sLocalFinitePolePlaces c
+
+/-- A positive orbital offset witnesses a repeated primary pole for the global
+norm-one character that defines the index. -/
+public theorem exists_hasRepeatedPrimaryPoleAtPair_of_nonzero_offset
+    {T : Finset Prime} (ω : PontryaginDual C₁) (hT : NormOneCharacterUnramifiedOutside ω T)
+    (p : HeightOneSpectrum (𝓞 ℚ))
+    (j : SLocalOrbitalIndex (F := F) (S := T) (sLocalPrimaryPlaces T p)
+      (sLocalNormOneCharacter T ω hT)) (hj : j.val.2 ≠ 0) :
+    let Q := (sLocalFinitePolePlaces j.val.1).filter (fun w ↦ w.val ∈ sLocalPrimaryPlaces T p)
+    ∃ v ∈ Q, ∃ w ∈ Q, v ≠ w ∧ HasRepeatedPrimaryPoleAtPair ω {v.val, w.val} := by
+  classical
+  let Q := (sLocalFinitePolePlaces j.val.1).filter (fun w ↦ w.val ∈ sLocalPrimaryPlaces T p)
+  have hQ : 1 < Q.card := by
+    have h := j.property.2
+    change j.val.2 < Q.card at h
+    omega
+  obtain ⟨v, hv, w, hw, hvw⟩ := Finset.one_lt_card.mp hQ
+  refine ⟨v, hv, w, hw, hvw, T, hT, p, j.val.1, v, w, ?_, hvw, rfl,
+    (Finset.mem_filter.mp hv).2, (Finset.mem_filter.mp hw).2,
+    (Finset.mem_filter.mp hv).1, (Finset.mem_filter.mp hw).1⟩
+  exact fun x ↦ DFunLike.congr_fun j.property.1 x
+
+/-- Paper: Theorem 7.3.3.4, pp. 360–363, with the coefficient change on p. 349.
+For a fixed unordered candidate pair in a primitive totally imaginary quartic, any
+two global norm-one characters giving a repeated pole satisfy a nontrivial integral
+relation modulo finite-order characters. The stages and pole centers can differ.
+This is item 2 of willzh0's argument on #7336, using Daniel Knapp's principalization
+and the Six Exponentials input from #7479. The individual shifted two-logarithm
+lower bound along record pole centers in
+`sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_minima` remains open. -/
+public theorem primitiveQuartic_fixedPair_characters_dependent [IsTotallyComplex F]
+    (hdegree : Module.finrank ℚ F = 4)
+    (hprimitive : ∀ K : IntermediateField ℚ F, K = ⊥ ∨ K = ⊤)
+    (P : Finset Prime) (ω η : PontryaginDual C₁)
+    (hω : HasRepeatedPrimaryPoleAtPair ω P) (hη : HasRepeatedPrimaryPoleAtPair η P) :
+    ∃ k l : ℤ, (k ≠ 0 ∨ l ≠ 0) ∧ IsOfFinOrder (ω ^ k * η ^ l) := by
+  obtain ⟨T, hT, p, c, v, w, hc, hvw, hP, hvp, hwp, hv, hw⟩ := hω
+  obtain ⟨U, hU, q, d, v', w', hd, hvw', hQ, hvq, hwq, hv', hw'⟩ := hη
+  obtain ⟨a, ha, haω, haη⟩ := primitiveQuartic_common_pole_torsion_diagonal
+    ω η hT hU p q c d hc hd v w v' w' hvw hvw' hvp hwp hvq hwq hv hw hv' hw' (hP.trans hQ.symm)
+  exact primitiveQuartic_dependent_of_common_diagonal hdegree
+    (quarticNormalClosurePairTransitive_of_primitive hdegree hprimitive) ω η a v.val ha haω haη
+
+/-- A coordinate that is nonzero at one vector separates all the nonzero
+vectors in a set of pairwise dependent integer vectors. -/
+private theorem primitiveQuartic_dependentBox_nonzero_card_le (B : ℕ)
+    (s : Finset (Fin 3 → ℤ)) (hbox : ∀ x ∈ s, ∀ i, -(B : ℤ) ≤ x i ∧ x i ≤ B)
+    (hrel : ∀ x ∈ s, ∀ y ∈ s, ∃ a b : ℤ, (a ≠ 0 ∨ b ≠ 0) ∧ a • x + b • y = 0) :
+    (s.erase 0).card ≤ 2 * B := by
+  classical
+  rcases (s.erase 0).eq_empty_or_nonempty with h | ⟨p, hp⟩
+  · simp [h]
+  obtain ⟨i, hi⟩ := Function.ne_iff.mp (Finset.mem_erase.mp hp).1
+  change p i ≠ 0 at hi
+  have prop (y : Fin 3 → ℤ) (hy : y ∈ s) (j : Fin 3) : p i * y j = p j * y i := by
+    obtain ⟨a, b, hab, h⟩ := hrel p (Finset.mem_of_mem_erase hp) y hy
+    have hcoord (k : Fin 3) : a * p k + b * y k = 0 := by
+      have hk := congrFun h k
+      change a • p k + b • y k = (0 : ℤ) at hk
+      simpa using hk
+    have hb : b ≠ 0 := by
+      intro hb
+      have ha : a = 0 := (mul_eq_zero.mp (by simpa [hb] using hcoord i)).resolve_right hi
+      exact hab.elim (fun hn ↦ hn ha) (fun hn ↦ hn hb)
+    apply sub_eq_zero.mp
+    apply (mul_eq_zero.mp (?_ : b * (p i * y j - p j * y i) = 0)).resolve_left hb
+    linear_combination p i * hcoord j - p j * hcoord i
+  let coords := (Finset.Icc (-(B : ℤ)) (B : ℤ)).erase 0
+  have bound : (s.erase 0).card ≤ coords.card := by
+    apply Finset.card_le_card_of_injOn (fun x : Fin 3 → ℤ ↦ x i)
+    · intro y hy
+      obtain ⟨hy0, hys⟩ := Finset.mem_erase.mp hy
+      refine Finset.mem_erase.mpr ⟨?_, Finset.mem_Icc.mpr (hbox y hys i)⟩
+      intro h
+      apply hy0
+      funext j
+      exact (mul_eq_zero.mp (by simpa [h] using prop y hys j)).resolve_left hi
+    · intro y hy z hz hyz
+      change y i = z i at hyz
+      funext j
+      apply mul_left_cancel₀ hi
+      rw [prop y (Finset.mem_of_mem_erase hy), prop z (Finset.mem_of_mem_erase hz), hyz]
+  have hzero : (0 : ℤ) ∈ Finset.Icc (-(B : ℤ)) (B : ℤ) := Finset.mem_Icc.mpr ⟨by omega, by omega⟩
+  dsimp only [coords] at bound
+  rw [Finset.card_erase_of_mem hzero, Int.card_Icc] at bound
+  omega
+
+/-- In a finite family of rational lines in a box of independent integer
+character exponents, the origin is counted only once. -/
+private theorem primitiveQuartic_dependentFamily_card_le {G I : Type*} [CommGroup G]
+    (χ : Multiplicative (Fin 3 → ℤ) →* G)
+    (hind : ∀ x : Fin 3 → ℤ, IsOfFinOrder (χ (Multiplicative.ofAdd x)) → x = 0)
+    (B : ℕ) (pairs : Finset I) (bad : G → I → Prop)
+    (hrel : ∀ P ∈ pairs, ∀ ω η : G, bad ω P → bad η P →
+      ∃ a b : ℤ, (a ≠ 0 ∨ b ≠ 0) ∧ IsOfFinOrder (ω ^ a * η ^ b)) :
+    ((Fintype.piFinset (fun _ : Fin 3 ↦ Finset.Icc (-(B : ℤ)) (B : ℤ))).filter
+      (fun x ↦ ∃ P ∈ pairs, bad (χ (Multiplicative.ofAdd x)) P)).card ≤
+        1 + 2 * B * pairs.card := by
+  classical
+  let box := Fintype.piFinset (fun _ : Fin 3 ↦ Finset.Icc (-(B : ℤ)) (B : ℤ))
+  let E (P : I) := box.filter (fun x ↦ bad (χ (Multiplicative.ofAdd x)) P)
+  let A := box.filter (fun x ↦ ∃ P ∈ pairs, bad (χ (Multiplicative.ofAdd x)) P)
+  have h (P : I) (hP : P ∈ pairs) : ((E P).erase 0).card ≤ 2 * B := by
+    apply primitiveQuartic_dependentBox_nonzero_card_le B (E P)
+    · intro x hx i
+      have hxbox : x ∈ box := (Finset.mem_filter.mp hx).1
+      exact Finset.mem_Icc.mp (Fintype.mem_piFinset.mp hxbox i)
+    · intro x hx y hy
+      obtain ⟨a, b, hab, htors⟩ :=
+        hrel P hP _ _ (Finset.mem_filter.mp hx).2 (Finset.mem_filter.mp hy).2
+      refine ⟨a, b, hab, hind _ ?_⟩
+      simpa only [ofAdd_add, ofAdd_zsmul, map_mul, map_zpow] using htors
+  have hsub : A.erase 0 ⊆ pairs.biUnion (fun P ↦ (E P).erase 0) := by
+    intro x hx
+    obtain ⟨hx0, hx⟩ := Finset.mem_erase.mp hx
+    obtain ⟨hxbox, P, hp, hxp⟩ := Finset.mem_filter.mp hx
+    exact Finset.mem_biUnion.mpr ⟨P, hp, Finset.mem_erase.mpr
+      ⟨hx0, Finset.mem_filter.mpr ⟨hxbox, hxp⟩⟩⟩
+  have hcard := (Finset.card_le_card hsub).trans
+    (Finset.card_biUnion_le_card_mul pairs (fun P ↦ (E P).erase 0) (2 * B) h)
+  rw [Nat.mul_comm pairs.card] at hcard
+  have hpred := Finset.pred_card_le_card_erase (s := A) (a := 0)
+  change A.card ≤ _
+  omega
+
+/-- Paper: Theorem 7.3.3.4, pp. 360–363. In a box of products of three norm-one
+characters independent modulo torsion, at most one plus twice the radius times the
+number of candidate pairs give a repeated primary pole at one of those pairs.
+Each pole may occur at its own stage and center. -/
+public theorem primitiveQuartic_repeatedPoleCharacters_box_card_le [IsTotallyComplex F]
+    (hdegree : Module.finrank ℚ F = 4)
+    (hprimitive : ∀ K : IntermediateField ℚ F, K = ⊥ ∨ K = ⊤)
+    (χ : Multiplicative (Fin 3 → ℤ) →* PontryaginDual (ideleClassNorm F).ker)
+    (hind : ∀ x : Fin 3 → ℤ, IsOfFinOrder (χ (Multiplicative.ofAdd x)) → x = 0)
+    (B : ℕ) (pairs : Finset (Finset (HeightOneSpectrum (𝓞 F)))) :
+    ((Fintype.piFinset (fun _ : Fin 3 ↦ Finset.Icc (-(B : ℤ)) (B : ℤ))).filter
+      (fun x ↦ ∃ P ∈ pairs, HasRepeatedPrimaryPoleAtPair (χ (Multiplicative.ofAdd x)) P)).card
+      ≤ 1 + 2 * B * pairs.card := by
+  exact primitiveQuartic_dependentFamily_card_le χ hind B pairs HasRepeatedPrimaryPoleAtPair
+    (fun P _ ω η ↦ primitiveQuartic_fixedPair_characters_dependent (F := F) hdegree hprimitive P ω η)
+
+end
 
 end RiemannMasullo.Isolated
