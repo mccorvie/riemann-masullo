@@ -14399,6 +14399,15 @@ private theorem idelicExplicitFormula_infiniteMatching_complexCharacterSum_count
   exact fun χ ψ he ↦
     explicitFormula_chartChar_ext τ hτ χ ψ (fun u ↦ DFunLike.congr_fun he u)
 
+/-- A norm section admits a countable enumeration of all normalized unitary Hecke
+characters. The enumeration may repeat characters. -/
+theorem exists_surjective_normalizedHeckeCharacters
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F)) :
+    ∃ e : ℕ → chartChars(τ), Surjective e := by
+  letI : Nonempty chartChars(τ) := ⟨⟨1, fun _ ↦ by simp⟩⟩
+  exact countable_iff_exists_surjective.mp
+    (idelicExplicitFormula_infiniteMatching_complexCharacterSum_countable τ hτ)
+
 /-- The norm and the inverse character of a complex local unit in log-polar coordinates. -/
 private theorem idelicExplicitFormula_infiniteMatching_complexCharacterSum_polar
     (w : InfinitePlace F) (hw : w.IsComplex) (y φ : ℝ) :

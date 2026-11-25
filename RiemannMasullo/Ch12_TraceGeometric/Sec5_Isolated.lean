@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.ForMathlib.Analysis.Fourier.PositiveLaplaceEdges
+public import RiemannMasullo.ForMathlib.Analysis.SpecificLimits.TriangularComparison
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_UpperFrequencyGate
 public import RiemannMasullo.AppA_AlgebraicNT.Sec5a_IdeleClassDPrime
 import RiemannMasullo.Ch01_Introduction.Sec4
@@ -2066,6 +2067,149 @@ theorem fixedGammaConductorScalar_comparisons
   obtain ⟨hs, hc, hshort, _, _, hp, hm, hpos⟩ := gammaComparisonProfile_spec
   exact gammaConductorScalar_comparisons τ hτ gammaComparisonProfile hs hc hshort hp hm hpos
     gammaComparisonAxis gammaComparisonAxis_apply
+
+/-- At resolution `n`, compare each of the first `n` characters' arithmetic totals with
+its finite sample at that same resolution. -/
+def aggregateGammaSampleDeficit (τ : ℝ≥0ˣ →ₜ* C𝔽) (e : ℕ → Charts(τ)) : ℕ → ℝ :=
+  TriangularComparison.weighted (fun j n ↦
+    gammaConductorScalar (e j).val gammaComparisonProfile - grid((e j).val, gammaComparisonAxis) n)
+
+/-- Sum of the geometrically weighted clipped limiting deficits for a fixed enumeration. -/
+def aggregateGammaDeficitLimit (τ : ℝ≥0ˣ →ₜ* C𝔽) (e : ℕ → Charts(τ)) : ℝ :=
+  ∑' j : ℕ, (1/2 : ℝ)^j * TriangularComparison.clip
+    (gammaConductorScalar (e j).val gammaComparisonProfile -
+      limUnder atTop grid((e j).val, gammaComparisonAxis))
+
+local notation "aggregateComparison(" τ ", " W ", " L ")" =>
+  ((L : ℝ) ∈ Icc (0 : ℝ) 2 ∧ Tendsto (W : ℕ → ℝ) atTop (𝓝 L)) ∧
+    ((∀ δ : ℝ, 0 < δ → ∃ᶠ n : ℕ in atTop, W n < δ) ↔ exterior(τ)) ∧
+    (∀ I : Set ℕ, (∀ N : ℕ, ∃ n ∈ I, N ≤ n) →
+      ((∀ δ : ℝ, 0 < δ → ∀ N : ℕ, ∃ n ∈ I, N ≤ n ∧ W n < δ) ↔ exterior(τ)))
+
+/-- A family of finite measurements with the same characterwise central limits as the
+genuine finite-Hecke samples gives the same aggregate comparison for Theorem 12.5.1.1.
+No uniform rate in the character is required. -/
+theorem aggregateGammaComparison_of_tendsto
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (e : ℕ → Charts(τ)) (he : Surjective e) (a : Charts(τ) → ℕ → ℝ)
+    (ha : ∀ χ, Tendsto (a χ) atTop (𝓝 (limUnder atTop grid(χ.val, gammaComparisonAxis)))) :
+    let W := TriangularComparison.weighted (fun j n ↦
+      gammaConductorScalar (e j).val gammaComparisonProfile - a (e j) n)
+    aggregateComparison(τ, W, aggregateGammaDeficitLimit τ e) := by
+  let S (χ : Charts(τ)) := gammaConductorScalar χ.val gammaComparisonProfile
+  let C (χ : Charts(τ)) := limUnder atTop grid(χ.val, gammaComparisonAxis)
+  let u (j n : ℕ) := S (e j) - a (e j) n
+  let D (j : ℕ) := S (e j) - C (e j)
+  have hrow (j : ℕ) : Tendsto (u j) atTop (𝓝 (D j)) := tendsto_const_nhds.sub (ha (e j))
+  have hc := (fixedGammaConductorScalar_comparisons τ hτ).1
+  have hle (χ : Charts(τ)) : C χ ≤ S χ := hc.1 χ
+  have hnonneg (j : ℕ) : 0 ≤ D j := sub_nonneg.mpr (hle (e j))
+  have hz : (∀ j, D j = 0) ↔ exterior(τ) := by
+    refine Iff.trans ?_ hc.2
+    have hsingle (χ : Charts(τ)) :
+        (S χ - C χ = 0) ↔ (∀ δ : ℝ, 0 < δ → ∀ N : ℕ, ∃ n : ℕ,
+          N ≤ n ∧ S χ - δ ≤ grid(χ.val, gammaComparisonAxis) n) := by
+      have h := tendsto_sampleSum_chosenFiniteHeckeL τ χ gammaComparisonAxis
+      have hgrid : Tendsto grid(χ.val, gammaComparisonAxis) atTop (𝓝 (C χ)) := by
+        dsimp only [C]
+        rw [h.limUnder_eq]
+        exact h
+      rw [lowerBound_iff_cofinal_samples hgrid, sub_eq_zero]
+      exact ⟨fun heq ↦ heq.le, fun hl ↦ le_antisymm hl (hle χ)⟩
+    constructor
+    · intro h χ
+      obtain ⟨j, rfl⟩ := he χ
+      exact (hsingle _).mp (h j)
+    · intro h j
+      exact (hsingle _).mpr (h (e j))
+  exact ⟨⟨(TriangularComparison.summable_clip_and_tsum_mem_Icc D).2,
+      TriangularComparison.tendsto_weighted u D hrow⟩,
+    (TriangularComparison.frequently_weighted_small_iff hrow hnonneg).trans hz,
+    fun I hI ↦ (TriangularComparison.cofinal_weighted_small_along_iff hrow hnonneg I hI).trans hz⟩
+
+/-- For every surjective enumeration, one triangular sequence of genuine finite critical-line
+samples converges. Arbitrarily small deficits at arbitrarily large resolutions characterize the
+original all-width exterior sum, also within any prescribed unbounded set of resolutions. -/
+theorem aggregateGammaSampleDeficit_comparisons
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (e : ℕ → Charts(τ)) (he : Surjective e) :
+    aggregateComparison(τ, aggregateGammaSampleDeficit τ e, aggregateGammaDeficitLimit τ e) := by
+  apply aggregateGammaComparison_of_tendsto τ hτ e he (fun χ ↦ grid(χ.val, gammaComparisonAxis))
+  intro χ
+  have h := tendsto_sampleSum_chosenFiniteHeckeL τ χ gammaComparisonAxis
+  rw [h.limUnder_eq]
+  exact h
+
+/-- The limiting aggregate vanishes exactly when the original exterior sum holds at
+every positive width. In that case every subsequence tending to infinity converges to zero. -/
+theorem aggregateGammaDeficitLimit_eq_zero_iff
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (e : ℕ → Charts(τ)) (he : Surjective e) :
+    aggregateGammaDeficitLimit τ e = 0 ↔ exterior(τ) := by
+  obtain ⟨⟨hb, hl⟩, hc, _⟩ := aggregateGammaSampleDeficit_comparisons τ hτ e he
+  constructor
+  · intro hz
+    rw [hz] at hl
+    exact hc.mp (fun δ hδ ↦ (hl.eventually_lt_const hδ).frequently)
+  · intro hext
+    by_contra hz
+    have hp : 0 < aggregateGammaDeficitLimit τ e := hb.1.lt_of_ne (Ne.symm hz)
+    have hsmall := hc.mpr hext _ (half_pos hp)
+    obtain ⟨_, hx, hy⟩ := (hsmall.and_eventually (hl.eventually_const_lt (half_lt_self hp))).exists
+    exact lt_asymm hx hy
+
+/-- For each field and norm section there exists such an enumeration and a convergent finite
+comparison for Theorem 12.5.1.1 at every positive width. -/
+theorem exists_aggregateGammaSampleDeficit_comparisons
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F)) :
+    ∃ e : ℕ → Charts(τ), Surjective e ∧
+      aggregateComparison(τ, aggregateGammaSampleDeficit τ e, aggregateGammaDeficitLimit τ e) := by
+  obtain ⟨e, he⟩ := exists_surjective_normalizedHeckeCharacters τ hτ
+  exact ⟨e, he, aggregateGammaSampleDeficit_comparisons τ hτ e he⟩
+
+/-- Replace the central measurements by the certified observations of actual finite sums
+over integral ideals, using the same arithmetic totals, common resolution, and fixed profile. -/
+def aggregateGammaIdealDeficit (τ : ℝ≥0ˣ →ₜ* C𝔽) (e : ℕ → Charts(τ)) : ℕ → ℝ :=
+  TriangularComparison.weighted (fun j n ↦ gammaConductorScalar (e j).val gammaComparisonProfile -
+    AnalyticLattice.certifiedSum (polynomialIdealSampleMagnitude (e j).val) gammaComparisonAxis n)
+
+/-- The finite-ideal aggregate has the same limiting deficit as the genuine-value
+aggregate. Each of their arbitrarily late lower comparisons characterizes the
+all-width exterior sum of Theorem 12.5.1.1. -/
+theorem aggregateGammaIdealDeficit_comparisons
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (e : ℕ → Charts(τ)) (he : Surjective e) :
+    aggregateComparison(τ, aggregateGammaIdealDeficit τ e, aggregateGammaDeficitLimit τ e) := by
+  apply aggregateGammaComparison_of_tendsto τ hτ e he (fun χ ↦
+    AnalyticLattice.certifiedSum (polynomialIdealSampleMagnitude χ.val) gammaComparisonAxis)
+  intro χ
+  have hpos := gammaComparisonProfile_spec.2.2.2.2.2.2.2
+  have hn (t : ℝ) : 0 ≤ gammaComparisonAxis t := by
+    rw [gammaComparisonAxis_apply]
+    apply (hpos _ ?_).le
+    simp
+  rw [(tendsto_sampleSum_chosenFiniteHeckeL τ χ gammaComparisonAxis).limUnder_eq]
+  exact (tendsto_certified_polynomialIdealSampleMagnitude τ hτ χ.val χ.property
+    gammaComparisonAxis hn).2
+
+/-- Along any prescribed sequence of resolutions tending to infinity, the genuine-value
+and finite-ideal aggregates converge to the same arithmetic deficit. Convergence of
+either measurement to zero characterizes the all-width assertion of Theorem 12.5.1.1. -/
+theorem aggregateGammaDeficits_tendsto_along
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (e : ℕ → Charts(τ)) (he : Surjective e) (r : ℕ → ℕ) (hr : Tendsto r atTop atTop) :
+    let W := aggregateGammaSampleDeficit τ e ∘ r
+    let P := aggregateGammaIdealDeficit τ e ∘ r
+    let D := aggregateGammaDeficitLimit τ e
+    (Tendsto W atTop (𝓝 D) ∧ Tendsto P atTop (𝓝 D)) ∧
+      (Tendsto W atTop (𝓝 0) ↔ exterior(τ)) ∧ (Tendsto P atTop (𝓝 0) ↔ exterior(τ)) := by
+  have hW := (aggregateGammaSampleDeficit_comparisons τ hτ e he).1.2.comp hr
+  have hP := (aggregateGammaIdealDeficit_comparisons τ hτ e he).1.2.comp hr
+  have criterion (U : ℕ → ℝ) (hU : Tendsto U atTop (𝓝 (aggregateGammaDeficitLimit τ e))) :
+      Tendsto U atTop (𝓝 0) ↔ exterior(τ) := by
+    rw [← aggregateGammaDeficitLimit_eq_zero_iff τ hτ e he]
+    exact ⟨fun hz ↦ tendsto_nhds_unique hU hz, fun hz ↦ hz ▸ hU⟩
+  exact ⟨⟨hW, hP⟩, criterion _ hW, criterion _ hP⟩
 
 end GammaConductorComparison
 
