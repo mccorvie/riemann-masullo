@@ -27,6 +27,12 @@ local notation "E" => closedStageSubmodule X T hT
 def fixedBoxDenominator : ClosedSubmodule ℂ E :=
   (closedStageSubmodule X (insert p T) hTp).comap (E).toSubmodule.subtypeL
 
+/-- Pullback membership is exactly membership in the next ambient stage. -/
+theorem mem_fixedBoxDenominator_iff (u : E) :
+    u ∈ (fixedBoxDenominator X T hT p hTp : Set E) ↔
+      (u : LogL2) ∈ (closedStageSubmodule X (insert p T) hTp : Set LogL2) := by
+  rfl
+
 local notation "N" => ClosedSubmodule.toSubmodule (fixedBoxDenominator X T hT p hTp)
 
 instance fixedBoxDenominator_isClosed : IsClosed (N : Set E) :=
