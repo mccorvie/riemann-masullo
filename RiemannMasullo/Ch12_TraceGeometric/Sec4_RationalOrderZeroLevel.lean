@@ -93,7 +93,7 @@ theorem map_invariantOrderZeroLevel_evenExtension (ω : PontryaginDual (N).ker) 
     (V(ω,B)).map orderZeroEvenExtension.toLinearMap = realPWLevel B := by
   obtain ⟨U, κ, c, hc, hκ, hU, hlev⟩ := exists_linearIsometry_map_sLocalInvariantPWSobolev_rat ω hB
   rw [← (orderZeroEvenExtension_unique U κ c hc hκ hU).1]
-  exact hlev
+  tauto
 
 /-- In the half-twist coordinates the named arithmetic level is the ray
 physical mean-zero subspace. -/

@@ -18,6 +18,7 @@ Gaussian heat of their arithmetic compression therefore has the same Hilbert tra
 The logarithmic heat prescription is due to mrshu in #7354. The proof uses
 thierryaaron’s full-line level (#7651), mrshu’s Haar normalization (#7657), and
 the real-even heat trace (#7646). Mrshu computes the individual dilation trace in #7671.
+Thierryaaron computes the unsmoothed upper-cutoff trace of an interval average in #7681.
 -/
 
 @[expose] public noncomputable section

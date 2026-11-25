@@ -1,7 +1,7 @@
 module
 
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_RealAnnularQuotient
-import RiemannMasullo.Ch12_TraceGeometric.Sec4_RealPWLevelBridge
+import RiemannMasullo.Ch12_TraceGeometric.Sec4_RationalOrderZeroLevel
 import Mathlib.MeasureTheory.Integral.Bochner.ContinuousLinearMap
 import RiemannMasullo.ForMathlib.MeasureTheory.Function.L2Space
 import Mathlib.MeasureTheory.Measure.OpenPos
@@ -126,8 +126,7 @@ theorem exists_test_thetaLift_norm_sq_lt {B s : ℝ} (hB : 0 < B) (hs : 0 < s) :
     have hV := actualLevel (s := 0) le_rfl B
     rw [LinearMap.range_eq_bot.mpr hz,
       IsClosed.submodule_topologicalClosure_eq (by simp)] at hV
-    obtain ⟨U, _, _, _, _, _, hU⟩ :=
-      exists_linearIsometry_map_sLocalInvariantPWSobolev_rat
+    have hU := map_invariantOrderZeroLevel_evenExtension
         (1 : PontryaginDual (sIdeleQuotientNorm ℚ ∅).ker) hB
     rw [hV, Submodule.map_bot] at hU
     obtain ⟨F, hF, hi⟩ := exists_mem_realPWLevel_integral_ne_zero hB
