@@ -1,5 +1,7 @@
 module
 
+public import RiemannMasullo.Ch12_TraceGeometric.Sec5_FirstPrimeAbel
+public import RiemannMasullo.ForMathlib.Analysis.Fourier.QuadraticBoxProfile
 import Mathlib.Geometry.Manifold.PartitionOfUnity
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 
@@ -16,6 +18,188 @@ The second theorem specializes that formula to this kernel.
 -/
 
 @[expose] public noncomputable section
+
+/-! ## A physical zero criterion at a fixed positive threshold
+
+For the all-zero identity of Theorem B.4.4.7 (p. 623), the shifted first-prime
+observable detects the same genuine zeros whose omission is at issue in
+Theorem 12.5.1.1 (pp. 519–520). Its smallness at an unproved rate is an additional
+arithmetic assertion. The criterion below also detects a zero exactly on the line.
+-/
+
+namespace RiemannMasullo.Isolated
+
+open Classical Filter Function MeasureTheory NumberField Set
+open scoped ContDiff ENNReal NNReal Topology
+
+set_option quotPrecheck false
+
+/-- The common complex-valued profile for the degree-one prime test, supported in `[2,4]`. -/
+def thresholdProfile (x : ℝ) : ℂ := (exists_translatedGevreyPolarProfile.choose x : ℂ)
+
+/-- The detector has both polar moments zero and sees each point strictly right of the axis
+in the open centered strip, with the positive bilateral Laplace convention of §12.5. -/
+theorem thresholdProfile_spec :
+    ContDiff ℝ ∞ thresholdProfile ∧ tsupport thresholdProfile ⊆ Icc 2 4 ∧
+    (bilateralLaplace thresholdProfile (1 / 2) = 0 ∧ bilateralLaplace thresholdProfile (-(1 / 2)) = 0) ∧
+    ∀ s : ℂ, 0 < s.re → s.re < 1 / 2 → bilateralLaplace thresholdProfile s ≠ 0 := by
+  let g := exists_translatedGevreyPolarProfile.choose
+  obtain ⟨_, hg, hsupport, ⟨hneg, _, hpos⟩, hdetect, _⟩ := exists_translatedGevreyPolarProfile.choose_spec
+  have hs : Function.support thresholdProfile ⊆ Function.support g := fun x hx he ↦
+    hx (show (g x : ℂ) = 0 by simp [he])
+  refine ⟨Complex.ofRealCLM.contDiff.comp hg, (closure_mono hs).trans hsupport, ⟨hpos, hneg⟩, ?_⟩
+  intro s h h'
+  exact hdetect s (abs_pos_of_pos h) (by simpa only [abs_of_pos h] using h')
+
+variable {F : Type*} [Field F] [NumberField F]
+local notation "G" => IdeleClassGroup (𝓞 F) F
+local notation "U" => PontryaginDual G
+local notation "ord(" χ "," ρ ")" => MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ ρ
+local notation "sites(" χ ")" => {ρ : ℂ // 0 < ord(χ, ρ)}
+local notation "energy(" ψ "," c ")" =>
+  AbelEdge.weightedSquareAbelMean (fun y ↦ firstPrimeDegreeOneSum (ψ)⁻¹ thresholdProfile y 4) (c)
+
+/-- Every positive divisor site right of the central line has nonzero detector moment. -/
+theorem thresholdProfile_detects_right_zero (ψ : U) (ρ : sites(ψ⁻¹)) (hr : 1 / 2 < ρ.val.re) :
+    bilateralLaplace thresholdProfile (ρ.val - 1 / 2) ≠ 0 := by
+  obtain ⟨hL, heq⟩ := continuedCompletedHeckeL_spec (F := F) ψ⁻¹
+  have hz := ρ.property
+  rw [MeromorphicOn.divisor_apply hL.meromorphicOn (mem_univ _)] at hz
+  have ho : 0 < meromorphicOrderAt (continuedCompletedHeckeL ψ⁻¹) ρ.val := by
+    cases he : meromorphicOrderAt (continuedCompletedHeckeL ψ⁻¹) ρ.val with
+    | top => simp
+    | coe k => rw [he, WithTop.untop₀_coe] at hz; exact_mod_cast hz
+  have hlt := completedHeckeL_continuation_zeros ψ⁻¹ _ hL heq (by linarith : 0 < ρ.val.re) ho
+  apply thresholdProfile_spec.2.2.2 <;>
+    simp only [Complex.sub_re, Complex.div_ofNat_re, Complex.one_re] <;> linarith
+
+private theorem thresholdProfile_polarTerm (ψ : U) (y : ℝ) :
+    firstPrimePolarMoment ψ thresholdProfile y (1 / 2) = 0 := by
+  have h : (∫ x : ℝ, thresholdProfile x * Complex.exp ((1 / 2 : ℂ) * x)) = 0 :=
+    thresholdProfile_spec.2.2.1.1
+  rw [firstPrimePolarMoment, h, mul_zero, ite_self]
+
+variable (τ : ℝ≥0ˣ →ₜ* IdeleClassGroup (𝓞 F) F) (hτ : RightInverse τ (ideleClassNorm F))
+  (ψ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (hψ : ∀ t, ψ (τ t) = 1)
+include hτ hψ
+
+/-- One weighted square-integrability bound for the signed degree-one prime sum excludes
+every completed-divisor site strictly beyond its damping line. -/
+theorem firstPrime_zero_re_le_of_integrableOn_square {q : ℝ} (hq : 0 ≤ q)
+    (hL : IntegrableOn (fun y : ℝ ↦ ‖firstPrimeDegreeOneSum ψ⁻¹ thresholdProfile y 4‖ ^ 2 *
+      Real.exp (-(2 * q) * y)) (Ici 0)) :
+    ∀ ρ : ℂ, 0 < ord(ψ⁻¹, ρ) → ρ.re - 1 / 2 ≤ q := by
+  intro ρ hρ
+  apply le_of_not_gt
+  intro hgap
+  apply thresholdProfile_detects_right_zero ψ ⟨ρ, hρ⟩ (by change 1 / 2 < ρ.re; linarith)
+  apply firstPrime_moment_eq_zero_of_integrableOn_square τ hτ ψ hψ thresholdProfile thresholdProfile_spec.1
+    (by norm_num : (0 : ℝ) < 2) (by norm_num : (2 : ℝ) ≤ 4) thresholdProfile_spec.2.1 hq _ ρ hρ hgap
+  simpa only [thresholdProfile_polarTerm, sub_zero] using hL
+
+/-- A strictly exterior site makes the energy infinite throughout the explicit open
+damping interval. The offset may be zero. -/
+theorem firstPrime_weightedSquareAbelMean_eq_top_of_zero {c ε : ℝ} (hc : 0 ≤ c) (hε : 0 < ε)
+    {ρ : ℂ} (hρ : 0 < ord(ψ⁻¹, ρ)) (hgap : ε < 2 * (ρ.re - 1 / 2 - c)) : energy(ψ, c) ε = ⊤ := by
+  by_contra hQ
+  have hm := firstPrimeDegreeOneSum_measurable ψ⁻¹ thresholdProfile
+    thresholdProfile_spec.1.continuous.measurable 4
+  have hi := (AbelEdge.weightedSquareAbelMean_ne_top_iff_integrableOn_sq_mul_exp hm c hε).mp hQ
+  have h := firstPrime_zero_re_le_of_integrableOn_square τ hτ ψ hψ (q := c + ε / 2) (by linarith) hi ρ hρ
+  linarith
+
+/-- If all divisor sites lie on or left of the edge, the limit of the uncentered prime
+observable is the sum of the squared full-multiplicity coefficients on that edge. -/
+theorem firstPrime_tendsto_abelBoundaryMass {c : ℝ} (hc : 0 < c)
+    (hr : ∀ ρ : ℂ, 0 < ord(ψ⁻¹, ρ) → ρ.re - 1 / 2 ≤ c) :
+    Tendsto (energy(ψ, c)) (𝓝[>] 0)
+      (𝓝 (ENNReal.ofReal (firstPrimeBoundaryMass ψ⁻¹ thresholdProfile c))) := by
+  simpa only [thresholdProfile_polarTerm, sub_zero] using
+    firstPrime_centered_tendsto_abelBoundaryMass τ hτ ψ hψ thresholdProfile thresholdProfile_spec.1
+      (by norm_num : (0 : ℝ) < 2) (by norm_num : (2 : ℝ) ≤ 4) thresholdProfile_spec.2.1 hc hr
+
+/-- The energy always has an extended-real limit. A strictly exterior site gives infinity,
+and otherwise the limit is the full boundary mass. -/
+theorem firstPrime_abel_tendsto_dichotomy {c : ℝ} (hc : 0 < c) :
+    Tendsto (energy(ψ, c)) (𝓝[>] 0)
+      (𝓝 (if ∃ ρ : ℂ, 0 < ord(ψ⁻¹, ρ) ∧ c < ρ.re - 1 / 2 then (⊤ : ℝ≥0∞)
+        else ENNReal.ofReal (firstPrimeBoundaryMass ψ⁻¹ thresholdProfile c))) := by
+  split_ifs with he
+  · obtain ⟨ρ, hρ, hgap⟩ := he
+    apply tendsto_const_nhds.congr'
+    filter_upwards [Ioo_mem_nhdsGT (by linarith : 0 < 2 * (ρ.re - 1 / 2 - c))] with ε hε
+    exact (firstPrime_weightedSquareAbelMean_eq_top_of_zero τ hτ ψ hψ hc.le hε.1 hρ hε.2).symm
+  · exact firstPrime_tendsto_abelBoundaryMass τ hτ ψ hψ hc fun ρ hρ ↦
+      le_of_not_gt fun h ↦ he ⟨ρ, hρ, h⟩
+
+private theorem thresholdProfile_mass_zero_iff {c : ℝ} (hc : 0 < c) :
+    ENNReal.ofReal (firstPrimeBoundaryMass ψ⁻¹ thresholdProfile c) = 0 ↔
+      ∀ z : sites(ψ⁻¹), z.val.re - 1 / 2 ≠ c := by
+  let b (z : sites(ψ⁻¹)) := firstPrimeFullCoefficient ψ⁻¹ thresholdProfile z.val
+  let d (z : sites(ψ⁻¹)) := if z.val.re - 1 / 2 = c then ‖b z‖ ^ 2 else 0
+  have hb : Summable (fun z ↦ ‖b z‖) := (firstPrime_fullSeries_bounded_error τ hτ ψ hψ
+    thresholdProfile thresholdProfile_spec.1 (by norm_num : (0 : ℝ) < 2) (by norm_num : (2 : ℝ) ≤ 4)
+    thresholdProfile_spec.2.1).1
+  have hn (z) : 0 ≤ d z := by dsimp [d]; split_ifs <;> positivity
+  have hd : Summable d := (hb.mul_right (∑' z, ‖b z‖)).of_nonneg_of_le hn (fun z ↦ by
+    dsimp [d]
+    split_ifs
+    · rw [pow_two]
+      exact mul_le_mul_of_nonneg_left (hb.le_tsum z (fun j _ ↦ norm_nonneg _)) (norm_nonneg _)
+    · exact mul_nonneg (norm_nonneg _) (tsum_nonneg (fun z ↦ norm_nonneg (b z))))
+  rw [ENNReal.ofReal_eq_zero]
+  constructor
+  · intro hm z hz
+    change (∑' z, d z) ≤ 0 at hm
+    have hne : b z ≠ 0 := mul_ne_zero (by exact_mod_cast z.property.ne')
+      (thresholdProfile_detects_right_zero ψ z (by linarith))
+    have hp : 0 < d z := by simpa only [d, ite_eq_left hz] using sq_pos_of_pos (norm_pos_iff.mpr hne)
+    exact hp.not_ge ((hd.le_tsum z (fun j _ ↦ hn j)).trans hm)
+  · intro h
+    have hzero (z : sites(ψ⁻¹)) : d z = 0 := ite_eq_right (h z)
+    change (∑' z, d z) ≤ 0
+    simp only [hzero, tsum_zero, le_refl]
+
+/-- The energy of the fixed signed prime observable tends to zero exactly when the closed
+right half-plane at the given positive offset contains no divisor site.
+Reconstruction: This criterion for #5571 combines the translated §12.5 identity with the
+compact detector. Proving vanishing of the arithmetic energy remains open. -/
+theorem firstPrime_tendsto_zero_iff_no_closed_exterior {c : ℝ} (hc : 0 < c) :
+    Tendsto (energy(ψ, c)) (𝓝[>] 0) (𝓝 0) ↔ ∀ ρ : ℂ, 0 < ord(ψ⁻¹, ρ) → ρ.re < 1 / 2 + c := by
+  have hd := firstPrime_abel_tendsto_dichotomy τ hτ ψ hψ hc
+  have hz : Tendsto (energy(ψ, c)) (𝓝[>] 0) (𝓝 0) ↔ _ :=
+    ⟨fun h ↦ tendsto_nhds_unique hd h, fun h ↦ h ▸ hd⟩
+  rw [hz]
+  split_ifs with he
+  · obtain ⟨ρ, hρ, hgap⟩ := he
+    simp only [ENNReal.top_ne_zero, false_iff]
+    intro h
+    linarith [h ρ hρ]
+  · rw [thresholdProfile_mass_zero_iff τ hτ ψ hψ hc]
+    constructor
+    · intro hn ρ hρ
+      have hle : ρ.re - 1 / 2 ≤ c := le_of_not_gt fun h ↦ he ⟨ρ, hρ, h⟩
+      have hlt := lt_of_le_of_ne hle (hn ⟨ρ, hρ⟩)
+      linarith
+    · intro h z hz
+      linarith [h z.val z.property]
+
+/-- The same criterion follows from the lower limit of the energy. -/
+theorem firstPrime_liminf_zero_iff_no_closed_exterior {c : ℝ} (hc : 0 < c) :
+    Filter.liminf (energy(ψ, c)) (𝓝[>] 0) = 0 ↔ ∀ ρ : ℂ, 0 < ord(ψ⁻¹, ρ) → ρ.re < 1 / 2 + c := by
+  have hd := firstPrime_abel_tendsto_dichotomy τ hτ ψ hψ hc
+  rw [← firstPrime_tendsto_zero_iff_no_closed_exterior τ hτ ψ hψ hc, hd.liminf_eq]
+  exact ⟨fun h ↦ h ▸ hd, fun h ↦ tendsto_nhds_unique hd h⟩
+
+/-- Any prescribed approach from the right gives the same criterion. -/
+theorem firstPrime_sampled_abel_zero_iff_no_closed_exterior {c : ℝ} (hc : 0 < c)
+    {T : Type*} {l : Filter T} [l.NeBot] {e : T → ℝ} (he : Tendsto e l (𝓝[>] (0 : ℝ))) :
+    Tendsto (fun t ↦ energy(ψ, c) (e t)) l (𝓝 0) ↔ ∀ ρ : ℂ, 0 < ord(ψ⁻¹, ρ) → ρ.re < 1 / 2 + c := by
+  have hd := firstPrime_abel_tendsto_dichotomy τ hτ ψ hψ hc
+  rw [← firstPrime_tendsto_zero_iff_no_closed_exterior τ hτ ψ hψ hc]
+  exact ⟨fun h ↦ (tendsto_nhds_unique (hd.comp he) h) ▸ hd, fun h ↦ h.comp he⟩
+
+end RiemannMasullo.Isolated
 
 open MeasureTheory NumberField Set
 open scoped NNReal

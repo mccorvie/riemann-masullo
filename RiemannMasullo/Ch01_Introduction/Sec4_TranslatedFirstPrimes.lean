@@ -611,7 +611,8 @@ theorem firstPrime_localTerms_eq (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse 
     (fun w t ↦ (hB w t).trans (hφ _))]
   ring
 
-private theorem firstPrime_volume_pos : 0 < normOneMass := by
+/-- The norm-one mass dividing the translated local terms is strictly positive. -/
+theorem firstPrime_volume_pos : 0 < normOneMass := by
   have := NumberField.Units.regulator_pos F
   have := NumberField.classNumber_pos F
   have := NumberField.Units.torsionOrder_pos F
@@ -805,5 +806,23 @@ theorem firstPrime_integrableOn_weight_iff (τ : ℝ≥0ˣ →ₜ* G) (hτ : Rig
       simp only [L, norm_div, Complex.norm_real, Real.norm_of_nonneg hV.le], div_eq_mul_inv]
     ring
   exact hsplit.trans (by simp only [hh]; exact integrable_const_mul_iff (inv_ne_zero hV.ne').isUnit _)
+
+/-- The true signed first-prime observable is measurable for every measurable profile. -/
+theorem firstPrimeDegreeOneSum_measurable (χ : U) (H : ℝ → ℂ) (hH : Measurable H) (v : ℝ) :
+    Measurable (fun y : ℝ ↦ firstPrimeDegreeOneSum χ H y v) := by
+  let c (n : ℕ) := heckeLogDerivCoefficient (ideleClassNormTwist χ 0) n
+  let S (p : ℝ × ℕ) := ∑ n ∈ Finset.Ioc 0 p.2 with n.Prime, c n * firstPrimeShellWeight H p.1 n
+  have hm : Measurable S := measurable_from_prod_countable_left fun N ↦ by
+    change Measurable (fun y : ℝ ↦
+      ∑ n ∈ (Finset.Ioc 0 N).filter Nat.Prime, c n * firstPrimeShellWeight H y n)
+    apply Finset.measurable_fun_sum
+    intro n _
+    exact measurable_const.mul ((hH.comp (measurable_const.sub measurable_id)).div measurable_const)
+  have he (y : ℝ) : S (y, ⌊Real.exp (y + v)⌋₊) = firstPrimeDegreeOneSum χ H y v := by
+    apply Finset.sum_congr rfl
+    intro n hn
+    rw [show c n = _ from firstPrime_coefficient χ (Finset.mem_filter.mp hn).2]
+  rw [← funext he]
+  exact hm.comp (measurable_id.prodMk ((Real.measurable_exp.comp (measurable_id.add_const v)).nat_floor))
 
 end RiemannMasullo
