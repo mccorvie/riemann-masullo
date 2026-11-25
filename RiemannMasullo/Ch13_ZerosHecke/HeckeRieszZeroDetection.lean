@@ -401,4 +401,129 @@ theorem hasSum_exteriorZeros_iff_centeredRealRieszLogDeriv
     rw [hp', sub_self, abs_zero] at hdist
     exact ha.not_ge hdist
 
+
+private theorem riesz_finite_order_at_one
+    (τ : ℝ≥0ˣ →ₜ* IdeleClassGroup (𝓞 K) K) (hτ : RightInverse τ (ideleClassNorm K))
+    (χ : U) (hχ : ∀ t, χ (τ t) = 1) :
+    meromorphicOrderAt Lfin(χ) 1 = if χ = 1 then -1 else 0 := by
+  have hL := (finiteHeckeL_exists_continuation χ).choose_spec
+  have hC := continuedCompletedHeckeL_spec χ
+  rw [meromorphicOrderAt_finiteHeckeL_continuation χ hL.1.meromorphicOn hL.2 (by norm_num)]
+  split_ifs with h
+  · subst χ
+    obtain ⟨t, ⟨_, h₀, h₁, _⟩, _⟩ := completedHeckeL_continuation_simplePoles
+      (1 : U) _ hC.1 hC.2 (by ext; rfl)
+    have ht : Complex.I * (t : ℂ) = 0 := by
+      by_contra hne
+      have hn₁ : Complex.I * (t : ℂ) ≠ 1 := by
+        intro he
+        have := congrArg Complex.re he
+        simp [Complex.mul_re] at this
+      have han := completedHeckeL_one_analyticOnNhd (F := K) _ hC.1 hC.2 (Complex.I * (t : ℂ))
+        (by simpa using And.intro hne hn₁)
+      have hnon := han.meromorphicOrderAt_nonneg
+      rw [h₀] at hnon
+      exact (WithTop.coe_lt_coe.mpr (show (-1 : ℤ) < 0 by decide)).not_ge hnon
+    simpa [ht] using h₁
+  · have hk : χ.toMonoidHom.comp (ideleClassNorm K).ker.subtype ≠ 1 := by
+      intro he
+      apply h
+      ext1 g
+      let u := g / τ (ideleClassNorm K g)
+      have hu : u ∈ (ideleClassNorm K).ker := by
+        change ideleClassNorm K (g / τ _) = 1
+        rw [map_div, hτ, div_self']
+      have hv := DFunLike.congr_fun he (⟨u, hu⟩ : (ideleClassNorm K).ker)
+      change χ u = 1 at hv
+      simpa [u, hχ] using hv
+    exact le_antisymm (le_of_not_gt (fun hp ↦ (lt_irrefl (1 : ℝ))
+      (completedHeckeL_continuation_zeros χ _ hC.1 hC.2 (by norm_num) hp)))
+      ((completedHeckeL_continuation_entire χ _ hC.1 hC.2 hk).analyticAt 1).meromorphicOrderAt_nonneg
+
+private theorem riesz_normal_analytic_of_zero_residue {G : ℂ → ℂ} {p : ℂ} (hG : MeromorphicOn G univ)
+    (hz : Tendsto (fun z ↦ (z-p)*G z) (𝓝[≠] p) (𝓝 0)) :
+    AnalyticAt ℂ (toMeromorphicNFOn G univ) p := by
+  have hlin : MeromorphicAt (fun z : ℂ ↦ z-p) p := (analyticAt_id.sub analyticAt_const).meromorphicAt
+  have ho := (tendsto_zero_iff_meromorphicOrderAt_pos (hlin.mul (hG p (mem_univ _)))).mp hz
+  rw [meromorphicOrderAt_mul hlin (hG p (mem_univ _)), meromorphicOrderAt_id_sub_const] at ho
+  apply ((meromorphicNFOn_toMeromorphicNFOn G univ) (mem_univ p)).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+  rw [meromorphicOrderAt_toMeromorphicNFOn hG (mem_univ _)]
+  by_cases ht : meromorphicOrderAt G p = ⊤
+  · simp [ht]
+  lift meromorphicOrderAt G p to ℤ using ht with n
+  have hn : (0 : ℤ) < 1 + n := by exact_mod_cast ho
+  exact_mod_cast (show 0 ≤ n by omega)
+
+private theorem riesz_normal_analytic_at_one
+    (τ : ℝ≥0ˣ →ₜ* IdeleClassGroup (𝓞 K) K) (hτ : RightInverse τ (ideleClassNorm K))
+    (χ : U) (hχ : ∀ t, χ (τ t) = 1) :
+    AnalyticAt ℂ (toMeromorphicNFOn (centeredRealRieszLogDeriv Lfin(χ) (if χ = 1 then 1 else 0)) univ) 1 := by
+  let c : ℝ := if χ = 1 then 1 else 0
+  have hL := (finiteHeckeL_exists_continuation χ).choose_spec.1
+  apply riesz_normal_analytic_of_zero_residue (centeredRealRieszLogDeriv_meromorphic hL.meromorphicOn c)
+  have h := tendsto_mul_reflected_logDeriv_riesz (L := Lfin(χ)) (p := 1) (hL (mem_univ _)).meromorphicAt
+    (hL (mem_univ _)).meromorphicAt one_ne_zero (by norm_num)
+  have ho := riesz_finite_order_at_one τ hτ χ hχ
+  have hlim : Tendsto (fun z : ℂ ↦ (z-1) * (((-logDeriv Lfin(χ) z -
+      conj (logDeriv Lfin(χ) (conj z))) / 2) / (z*(z+1)))) (𝓝[≠] 1) (𝓝 ((c : ℂ)/2)) := by
+    convert h using 2
+    simp only [map_one, ho]
+    by_cases hχ' : χ = 1 <;> norm_num [c, hχ']
+  have hzero := hlim.sub (tendsto_const_nhds (x := (c : ℂ)/2))
+  rw [sub_self] at hzero
+  apply hzero.congr'
+  filter_upwards [self_mem_nhdsWithin] with z hz
+  unfold centeredRealRieszLogDeriv
+  rw [mul_sub]
+  congr 1
+  field_simp [sub_ne_zero.mpr (show z ≠ 1 from hz)]
+
+/-- The centered real Riesz expression has a normal-form meromorphic representative.
+It agrees with the Euler formula on its entire half-plane. At every real point in
+the positive half-line up to one, it is regular or has strictly negative residue.
+The unshifted principal pole at one is removable after centering. -/
+theorem hecke_centeredRealRieszLogDeriv_real_germs
+    (τ : ℝ≥0ˣ →ₜ* IdeleClassGroup (𝓞 K) K) (hτ : RightInverse τ (ideleClassNorm K))
+    (χ : U) (hχ : ∀ t, χ (τ t) = 1) :
+    let G := centeredRealRieszLogDeriv Lfin(χ) (if χ = 1 then 1 else 0)
+    ∃ H : ℂ → ℂ, MeromorphicNFOn H univ ∧ EqOn H G Euler ∧
+      ∀ x : ℝ, 0 < x → x ≤ 1 → AnalyticAt ℂ H (x : ℂ) ∨ ∃ r : ℝ, r < 0 ∧
+        Tendsto (fun z : ℂ ↦ (z-x) * H z) (𝓝[≠] (x : ℂ)) (𝓝 (r : ℂ)) := by
+  intro G
+  let c : ℝ := if χ = 1 then 1 else 0
+  have hL := (finiteHeckeL_exists_continuation χ).choose_spec
+  have hm : MeromorphicOn G univ := centeredRealRieszLogDeriv_meromorphic hL.1.meromorphicOn c
+  refine ⟨toMeromorphicNFOn G univ, meromorphicNFOn_toMeromorphicNFOn _ _, ?_, ?_⟩
+  · intro z hz
+    rw [toMeromorphicNFOn_eq_toMeromorphicNFAt hm (mem_univ _),
+      toMeromorphicNFAt_eq_self.mpr ((centeredRealRieszLogDeriv_analytic_euler χ c z hz).meromorphicNFAt)]
+  intro x hx hx'
+  rcases hx'.eq_or_lt with rfl | hx₁
+  · exact Or.inl (by simpa [G] using riesz_normal_analytic_at_one τ hτ χ hχ)
+  have hcmp := meromorphicOrderAt_finiteHeckeL_continuation χ hL.1.meromorphicOn hL.2 (s := (x : ℂ)) hx
+  by_cases hp : 0 < meromorphicOrderAt (continuedCompletedHeckeL χ) (x : ℂ)
+  · obtain ⟨r, hr, ht⟩ := hecke_realRiesz_residue_negative χ (L := Lfin(χ)) hL.1 hL.2 hx hx₁ hp c
+    refine Or.inr ⟨r, hr, ht.congr' ?_⟩
+    filter_upwards [hm.toMeromorphicNFOn_eq_self_on_nhdsNE (mem_univ (x : ℂ))] with z hz
+    rw [hz]
+  left
+  have ho : meromorphicOrderAt Lfin(χ) (x : ℂ) = 0 := le_antisymm (hcmp.trans_le (not_lt.mp hp))
+    (riesz_hecke_order_in_strip χ hL.1 hL.2 hx hx₁).1
+  have hn := hL.1 (mem_univ (x : ℂ))
+  have hA := hn.meromorphicOrderAt_nonneg_iff_analyticAt.mp ho.ge
+  have hlog : AnalyticAt ℂ (logDeriv Lfin(χ)) (x : ℂ) := hA.deriv.div hA (hn.meromorphicOrderAt_eq_zero_iff.mp ho)
+  have hrc := riesz_analyticAt_reflect (H := logDeriv Lfin(χ)) (p := (x : ℂ)) (by simpa using hlog)
+  have hG : AnalyticAt ℂ G (x : ℂ) := by
+    change AnalyticAt ℂ (centeredRealRieszLogDeriv Lfin(χ) c) (x : ℂ)
+    unfold centeredRealRieszLogDeriv
+    have h₀ : (x : ℂ) ≠ 0 := by exact_mod_cast hx.ne'
+    have h₁ : (x : ℂ) + 1 ≠ 0 := by exact_mod_cast (show x+1 ≠ 0 by linarith)
+    have hsub : (x : ℂ) - 1 ≠ 0 := sub_ne_zero.mpr (by exact_mod_cast hx₁.ne)
+    exact ((((hlog.neg.sub hrc).div analyticAt_const two_ne_zero).div
+      (analyticAt_id.mul (analyticAt_id.add analyticAt_const)) (mul_ne_zero h₀ h₁))).sub
+      (analyticAt_const.div (analyticAt_const.mul (analyticAt_id.sub analyticAt_const)) (mul_ne_zero two_ne_zero hsub))
+  apply ((meromorphicNFOn_toMeromorphicNFOn G univ) (mem_univ _)).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+  rw [meromorphicOrderAt_toMeromorphicNFOn hm (mem_univ _)]
+  exact hG.meromorphicOrderAt_nonneg
+
 end RiemannMasullo
