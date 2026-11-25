@@ -16,6 +16,7 @@ pp. 519–520, with the Hecke Euler series of equation (B.6.1.12), p. 638.
 @[expose] public noncomputable section
 
 open Set MeasureTheory NumberField
+open scoped ENNReal NNReal
 
 namespace RiemannMasullo
 
@@ -88,11 +89,10 @@ private theorem riesz_kernel_norm_integral_le {q : ℝ} (hq : 1 ≤ q) {s : ℂ}
         integral_Ioi_rpow_of_lt hd hq₀, show -s.re - 1 + 1 = -s.re by ring,
         Real.rpow_neg hq₀.le, neg_div_neg_eq]
 
-/-- Mellin transform of a first Riesz mean on a locally finite family of real norms.
-Absolute convergence of the Dirichlet series at `s` justifies summing the ramp integrals. -/
-theorem mellin_firstRieszMean {ι : Type*} (q : ι → ℝ) (a : ι → ℂ)
+private theorem mellin_firstRieszMean_integrable_eq {ι : Type*} (q : ι → ℝ) (a : ι → ℂ)
     (hq : ∀ i, 1 ≤ q i) (hfin : ∀ x : ℝ, {i | q i ≤ x}.Finite) {s : ℂ} (hs : 0 < s.re)
     {A : ℂ} (hA : HasSum (fun i ↦ a i / (q i : ℂ) ^ s) A) :
+    IntegrableOn (fun x : ℝ ↦ (∑ᶠ i, a i * (max (x - q i) 0 : ℝ)) * (x : ℂ) ^ (-s - 2)) (Ioi 1) ∧
     (∫ x in Ioi (1 : ℝ), (∑ᶠ i, a i * (max (x - q i) 0 : ℝ)) *
       (x : ℂ) ^ (-s - 2)) = A / (s * (s + 1)) := by
   classical
@@ -122,12 +122,33 @@ theorem mellin_firstRieszMean {ι : Type*} (q : ι → ℝ) (a : ι → ℂ)
     calc
       _ = ∑' i, g i * (x : ℂ) ^ (-s - 2) := tsum_congr fun i ↦ by dsimp [f, g]; ring
       _ = _ := by rw [tsum_mul_right, tsum_eq_finsum hgf]
+  constructor
+  · simp_rw [← he]
+    refine ⟨.tsum (fun i ↦ (hi i).aestronglyMeasurable), hasFiniteIntegral_iff_eNorm.mpr ?_⟩
+    refine lt_of_le_of_lt (lintegral_mono fun x ↦ eNorm_tsum_le_tsum_eNorm) ?_
+    rw [lintegral_tsum (fun i ↦ (hi i).aestronglyMeasurable.eNorm), lt_top_iff_ne_top]
+    have hv (i : ι) : (∫⁻ x in Ioi (1 : ℝ), ‖f i x‖ₑ) = ‖∫ x in Ioi (1 : ℝ), ‖f i x‖‖ₑ := by
+      dsimp [eNorm]
+      rw [lintegral_coe_eq_integral _ (hi i).norm, ENNReal.coe_nnreal_eq, coe_nnNorm,
+        Real.norm_of_nonneg (integral_nonneg (fun _ ↦ norm_nonneg _))]
+      simp only [coe_nnNorm]
+    rw [funext hv]
+    exact ENNReal.tsum_coe_ne_top_iff_summable.2 (NNReal.summable_coe.1 hn.abs)
   have he' (i : ι) : (∫ x in Ioi (1 : ℝ), f i x) = (a i / (q i : ℂ) ^ s) / (s * (s + 1)) := by
     dsimp only [f]
     rw [integral_const_mul, riesz_kernel_integral (hq i) hs, Complex.cpow_neg]
     ring
   simpa only [he] using ((hasSum_integral_of_summable_integral_norm hi hn).congr_fun
     (fun i ↦ (he' i).symm)).unique (hA.div_const _)
+
+/-- Mellin transform of a first Riesz mean on a locally finite family of real norms.
+Absolute convergence of the Dirichlet series at `s` justifies summing the ramp integrals. -/
+theorem mellin_firstRieszMean {ι : Type*} (q : ι → ℝ) (a : ι → ℂ)
+    (hq : ∀ i, 1 ≤ q i) (hfin : ∀ x : ℝ, {i | q i ≤ x}.Finite) {s : ℂ} (hs : 0 < s.re)
+    {A : ℂ} (hA : HasSum (fun i ↦ a i / (q i : ℂ) ^ s) A) :
+    (∫ x in Ioi (1 : ℝ), (∑ᶠ i, a i * (max (x - q i) 0 : ℝ)) *
+      (x : ℂ) ^ (-s - 2)) = A / (s * (s + 1)) := by
+  exact (mellin_firstRieszMean_integrable_eq q a hq hfin hs hA).2
 
 variable {F : Type*} [Field F] [NumberField F]
 local notation "U" => PontryaginDual (IdeleClassGroup (𝓞 F) F)
@@ -300,12 +321,10 @@ private theorem heckeFirstRieszMean_re_eq (χ : U) (x : ℝ) :
   intro I _
   simp [Complex.mul_re]
 
-/-- The readout from a single real arithmetic inequality averages the logarithmic derivative
-at `s` with the conjugate of its value at the reflected argument. Thus coincident zero
-residues in the two terms have the same sign. -/
-theorem heckeFirstRieszMean_re_mellin (χ : U) (L : ℂ → ℂ) (hL : MeromorphicNFOn L univ)
+private theorem heckeFirstRieszMean_re_integrable_eq (χ : U) (L : ℂ → ℂ) (hL : MeromorphicNFOn L univ)
     (hSeries : ∀ z : Complex.re ⁻¹' Ioi (1 : ℝ), L z = finiteHeckeL χ z)
     {s : ℂ} (hs : 1 < s.re) :
+    IntegrableOn (fun x : ℝ ↦ ((heckeFirstRieszMean χ x).re : ℂ) * (x : ℂ) ^ (-s - 2)) (Ioi 1) ∧
     (∫ x in Ioi (1 : ℝ), ((heckeFirstRieszMean χ x).re : ℂ) * (x : ℂ) ^ (-s - 2)) =
       ((-logDeriv L s - star (logDeriv L (star s))) / 2) / (s * (s + 1)) := by
   have hq (I : I₀) : (1 : ℝ) ≤ I.val.absNorm := by
@@ -314,7 +333,7 @@ theorem heckeFirstRieszMean_re_mellin (χ : U) (L : ℂ → ℂ) (hL : Meromorph
       (-logDeriv L w) := by
     simpa only [neg_div, neg_neg] using (finiteHeckeL_logDeriv_hasSum_ideals χ L hL hSeries ⟨w, hw⟩).2.2.neg
   simp_rw [heckeFirstRieszMean_re_eq]
-  apply mellin_firstRieszMean (fun I : I₀ ↦ (I.val.absNorm : ℝ)) (fun I ↦ ((Λ(χ, I)).re : ℂ)) hq
+  apply mellin_firstRieszMean_integrable_eq (fun I : I₀ ↦ (I.val.absNorm : ℝ)) (fun I ↦ ((Λ(χ, I)).re : ℂ)) hq
     (heckeFirstRieszMean_finite (F := F)) (zero_lt_one.trans hs)
   have h := ((hsum s hs).add (Complex.hasSum_conj'.mpr (hsum (star s) hs))).div_const 2
   rw [map_neg] at h
@@ -330,5 +349,72 @@ theorem heckeFirstRieszMean_re_mellin (χ : U) (L : ℂ → ℂ) (hL : Meromorph
   rw [← add_div, show Λ(χ, I) + (starRingEnd ℂ) (Λ(χ, I)) = 2 * ((Λ(χ, I)).re : ℂ) from
     RCLike.add_conj _]
   ring
+
+/-- The readout from a single real arithmetic inequality averages the logarithmic derivative
+at `s` with the conjugate of its value at the reflected argument. Thus coincident zero
+residues in the two terms have the same sign. -/
+theorem heckeFirstRieszMean_re_mellin (χ : U) (L : ℂ → ℂ) (hL : MeromorphicNFOn L univ)
+    (hSeries : ∀ z : Complex.re ⁻¹' Ioi (1 : ℝ), L z = finiteHeckeL χ z)
+    {s : ℂ} (hs : 1 < s.re) :
+    (∫ x in Ioi (1 : ℝ), ((heckeFirstRieszMean χ x).re : ℂ) * (x : ℂ) ^ (-s - 2)) =
+      ((-logDeriv L s - star (logDeriv L (star s))) / 2) / (s * (s + 1)) := by
+  exact (heckeFirstRieszMean_re_integrable_eq χ L hL hSeries hs).2
+
+/-- The ideal ramp sum is continuous at every real cutoff. Locally it is a finite
+sum of ordinary continuous ramps, including at an integral norm. -/
+theorem continuous_heckeFirstRieszMean (χ : U) : Continuous (heckeFirstRieszMean χ) := by
+  classical
+  apply continuous_iff_continuousAt.mpr
+  intro x
+  let S := (heckeFirstRieszMean_finite (F := F) (x + 1)).toFinset
+  let G (y : ℝ) := ∑ I ∈ S, Λ(χ, I) * (max (y - I.val.absNorm) 0 : ℝ)
+  have hG : Continuous G := by unfold G; fun_prop
+  apply hG.continuousAt.congr
+  filter_upwards [gt_mem_nhds (lt_add_one x)] with y hy
+  symm
+  apply finsum_eq_sum_of_support_subset
+  intro I hi
+  apply (Set.Finite.mem_toFinset _).mpr
+  change (I.val.absNorm : ℝ) ≤ x + 1
+  by_contra! h
+  exact hi (by simp [max_eq_right (sub_nonpos.mpr (hy.trans h).le)])
+
+private theorem riesz_log_kernel (s : ℂ) {x : ℝ} (hx : 0 < x) :
+    Complex.exp (-s * (Real.log x : ℂ)) = (x : ℂ) ^ (-s) ∧
+      (x : ℂ) ^ (-s - 2) = (x : ℂ) ^ (-s) / (x : ℂ)^2 := by
+  constructor
+  · rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hx.ne'), Complex.ofReal_log hx.le, mul_comm]
+  · rw [Complex.cpow_sub _ _ (Complex.ofReal_ne_zero.mpr hx.ne'), Complex.cpow_ofNat]
+
+/-- With log norm as the Laplace variable and ordinary measure on cutoffs above one,
+the real centered density is the real ideal ramp sum divided by the cutoff squared,
+less half the principal coefficient. Its Laplace integral is absolutely convergent
+on the Euler half-plane and has the displayed meromorphic expression there. -/
+theorem heckeFirstRieszMean_centered_laplace (χ : U) (L : ℂ → ℂ) (hL : MeromorphicNFOn L univ)
+    (hSeries : ∀ z : Complex.re ⁻¹' Ioi (1 : ℝ), L z = finiteHeckeL χ z) (c : ℝ)
+    {s : ℂ} (hs : 1 < s.re) :
+    let f (x : ℝ) : ℝ := (heckeFirstRieszMean χ x).re / x^2 - c/2
+    IntegrableOn (fun x : ℝ ↦ (f x : ℂ) * Complex.exp (-s * (Real.log x : ℂ))) (Ioi 1) ∧
+      (∫ x in Ioi (1 : ℝ), (f x : ℂ) * Complex.exp (-s * (Real.log x : ℂ))) =
+      ((-logDeriv L s - star (logDeriv L (star s))) / 2) / (s * (s + 1)) -
+        (c : ℂ) / (2 * (s-1)) := by
+  intro f
+  obtain ⟨hInt, hEq⟩ := heckeFirstRieszMean_re_integrable_eq χ L hL hSeries hs
+  have hr : (-s).re < -1 := by simp; linarith
+  have hpow := (integrableOn_Ioi_cpow_of_lt hr zero_lt_one).const_mul ((c : ℂ)/2)
+  have he : ∀ᵐ x ∂volume.restrict (Ioi (1 : ℝ)), (f x : ℂ) * Complex.exp (-s * (Real.log x : ℂ)) =
+      ((heckeFirstRieszMean χ x).re : ℂ) * (x : ℂ) ^ (-s - 2) - (c/2 : ℂ) * (x : ℂ)^(-s) := by
+    filter_upwards [ae_restrict_mem measurableSet_Ioi] with x hx
+    obtain ⟨he, he'⟩ := riesz_log_kernel s (zero_lt_one.trans hx)
+    dsimp only [f]
+    push_cast
+    rw [he, he']
+    ring
+  constructor
+  · exact (hInt.sub hpow).congr (Filter.EventuallyEq.symm he)
+  · rw [integral_congr_ae he, integral_sub hInt hpow, hEq, integral_const_mul, integral_Ioi_cpow_of_lt hr zero_lt_one]
+    simp only [Complex.ofReal_one, Complex.one_cpow, show -s + 1 = -(s-1) by ring, neg_div_neg_eq]
+    congr 1
+    simp [div_eq_mul_inv, mul_left_comm, mul_comm]
 
 end RiemannMasullo
