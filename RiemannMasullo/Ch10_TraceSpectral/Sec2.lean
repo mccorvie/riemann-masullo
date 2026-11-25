@@ -8733,6 +8733,84 @@ private theorem spectralStripJet_multiple_zero_finite_of_slices
   let p : S := ⟨σ, hσ⟩
   exact mem_iUnion₂.mpr ⟨component p, mem_range_self p, ordinate p, hw p⟩
 
+/-- Greedily avoid the endpoints already used to obtain an infinite matching of the relation. -/
+private theorem exists_injective_pairs_of_no_cover {A B : Type*} (E : A → B → Prop)
+    (h : ∀ (W : Finset A) (S : Finset B), ∃ a b, a ∉ W ∧ b ∉ S ∧ E a b) :
+    ∃ (a : ℕ → A) (b : ℕ → B), Injective a ∧ Injective b ∧ ∀ n, E (a n) (b n) := by
+  classical
+  choose a b ha hb he using h
+  let step (s : Finset A × Finset B) :=
+    (insert (a s.1 s.2) s.1, insert (b s.1 s.2) s.2)
+  let C (n : ℕ) := step^[n] (∅, ∅)
+  have hstep (n : ℕ) : C (n + 1) = step (C n) :=
+    Function.iterate_succ_apply' step n (∅, ∅)
+  have hmonoA : Monotone (fun n ↦ (C n).1) := monotone_nat_of_le_succ fun n ↦ by
+    rw [hstep]
+    exact Finset.subset_insert _ _
+  have hmonoB : Monotone (fun n ↦ (C n).2) := monotone_nat_of_le_succ fun n ↦ by
+    rw [hstep]
+    exact Finset.subset_insert _ _
+  refine ⟨fun n ↦ a (C n).1 (C n).2, fun n ↦ b (C n).1 (C n).2, ?_, ?_,
+    fun n ↦ he (C n).1 (C n).2⟩
+  · apply Function.Injective.of_lt_imp_ne
+    intro m n hmn hEq
+    have hm : a (C m).1 (C m).2 ∈ (C (m + 1)).1 := by
+      rw [hstep]
+      exact Finset.mem_insert_self _ _
+    exact ha (C n).1 (C n).2 (hEq ▸ hmonoA (Nat.succ_le_of_lt hmn) hm)
+  · apply Function.Injective.of_lt_imp_ne
+    intro m n hmn hEq
+    have hm : b (C m).1 (C m).2 ∈ (C (m + 1)).2 := by
+      rw [hstep]
+      exact Finset.mem_insert_self _ _
+    exact hb (C n).1 (C n).2 (hEq ▸ hmonoB (Nat.succ_le_of_lt hmn) hm)
+
+/-- Paper: Proposition 10.2.2.2, pp. 446–447. Finiteness on the real segment for every
+choice of basepoints is equivalent to a finite cover of the multiple-zero incidences:
+outside finitely many components, all abscissae in the open right half of the strip
+come from a finite set. No height bound in the exceptional components is needed here.
+Reconstruction: This reformulates the real-segment test; it does not establish that
+such a finite cover exists. -/
+theorem spectralStripJet_multiple_real_zeros_finite_iff_finite_cover :
+    (∀ (χ : PontryaginDual C₁ → PontryaginDual C𝔽), IsSpectralBasepointChoice χ →
+      {σ : ℝ | σ ∈ Ioo (1 / 2 : ℝ) 1 ∧ ∃ ω : PontryaginDual C₁,
+        1 < multiplicity(χ ω, (σ : ℂ))}.Finite) ↔
+    (∀ (χ : PontryaginDual C₁ → PontryaginDual C𝔽), IsSpectralBasepointChoice χ →
+      ∃ (W : Finset (PontryaginDual C₁)) (S : Finset ℝ), ∀ ω σ, σ ∈ Ioo (1 / 2 : ℝ) 1 →
+        (∃ t : ℝ, 1 < multiplicity(χ ω, shift(σ, t))) → ω ∈ W ∨ σ ∈ S) := by
+  classical
+  constructor
+  · intro hreal χ hχ
+    by_contra hcover
+    let E (ω : PontryaginDual C₁) (σ : ℝ) :=
+      σ ∈ Ioo (1 / 2 : ℝ) 1 ∧ ∃ t : ℝ, 1 < multiplicity(χ ω, shift(σ, t))
+    have hmissing (W : Finset (PontryaginDual C₁)) (S : Finset ℝ) :
+        ∃ ω σ, ω ∉ W ∧ σ ∉ S ∧ E ω σ := by
+      by_contra hn
+      apply hcover
+      refine ⟨W, S, fun ω σ hs hm ↦ ?_⟩
+      by_contra hor
+      exact hn ⟨ω, σ, fun h ↦ hor (Or.inl h), fun h ↦ hor (Or.inr h), hs, hm⟩
+    obtain ⟨ω, σ, hω, hσ, hE⟩ := exists_injective_pairs_of_no_cover E hmissing
+    choose t ht using fun n ↦ (hE n).2
+    let τ := Function.extend ω t (fun _ ↦ 0)
+    choose η hres hmove using fun ω' ↦ spectralStripJet_recenter (χ ω') (τ ω')
+    have hη : IsSpectralBasepointChoice η := fun ω' ↦ (hres ω').trans (hχ ω')
+    have hfin : (range σ).Finite := (hreal η hη).subset <| by
+      rintro _ ⟨n, rfl⟩
+      refine ⟨(hE n).1, ω n, ?_⟩
+      rw [hmove (ω n) (σ n), show τ (ω n) = t n from hω.extend_apply t _ n]
+      exact ht n
+    exact infinite_range_of_injective hσ hfin
+  · intro hcover χ hχ
+    obtain ⟨W, S, hWS⟩ := hcover χ hχ
+    refine (S.finite_toSet.union (W.finite_toSet.biUnion fun ω _ ↦
+      spectralStripJet_multiple_zero_lines_finite_on_compact (χ ω) 0)).subset ?_
+    rintro σ ⟨hs, ω, hm⟩
+    rcases hWS ω σ hs ⟨0, by simpa using hm⟩ with hw | hσ
+    · exact Or.inr (mem_iUnion₂.mpr ⟨ω, hw, ⟨hs.1.le, hs.2.le⟩, 0, by simp, by simpa using hm⟩)
+    · exact Or.inl hσ
+
 /-- The finite-line assertion for every section is equivalent to two tests in the open
 right half of the strip. One tests each component separately over unbounded heights.
 The other uses a single real segment for all components, allowing every choice of section. -/
