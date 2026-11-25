@@ -4,6 +4,7 @@ import Mathlib.Geometry.Manifold.PartitionOfUnity
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 
 public import RiemannMasullo.Ch01_Introduction.Sec4_PoissonCertificate
+public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeGreenExterior
 
 /-! # Isolated statements of §12.5
 
@@ -410,5 +411,71 @@ theorem exists_projectiveKernel_stripTestAction_spectralProjection_iff_support_i
   simp at hx
 
 end KernelLocalization
+
+/-! ## Compact circle measurements of the exterior terms -/
+
+namespace CompactGreen
+
+open Filter HeckePoisson HeckeHalfPlaneJensen
+open scoped Topology
+
+local notation "U𝔽" => PontryaginDual C𝔽
+local notation "ord(" χ ", " z ")" =>
+  MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ z
+local notation "ext(" τ ", " a ")" =>
+  {p : {χ : U𝔽 // ∀ u : ℝ≥0ˣ, χ (τ u) = 1} × ℂ //
+    0 < ord(p.1.val, p.2) ∧ (a : ℝ) ≤ |p.2.re - 1/2|}
+local notation "allWidths(" τ ")" =>
+  ∀ a > (0 : ℝ), ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C₁, φ.val g = 0) →
+    HasSum (fun z : ext(τ, a) ↦ (ord(z.val.1.val, z.val.2) : ℂ) *
+      modulatedFourierMellin m𝔽 univ ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+        μ𝔽 φ.val (ideleClassNormTwist z.val.1.val (z.val.2 - 1/2))) 0
+
+private theorem allWidths_iff_critical (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : Function.RightInverse τ (ideleClassNorm F)) :
+    allWidths(τ) ↔ ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (τ u) = 1) → ∀ z : Site χ, z.val.re = 1/2 := by
+  have ha : allWidths(τ) ↔ (∀ a > 0, PoissonCertificate.exteriorCancellation τ a) := by
+    simp only [PoissonCertificate.exteriorCancellation,modulatedFourierMellin,relativeVerticalStrip,
+      Set.preimage_univ,Set.indicator_univ]
+  rw [ha,PoissonCertificate.all_widths_iff_integer_mass τ hτ]
+  constructor <;> intro h χ hχ
+  · exact (criticalLine_iff_integer_mass χ).mpr (h χ hχ)
+  · exact (criticalLine_iff_integer_mass χ).mp (h χ hχ)
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The claimed all-width exterior cancellation is
+equivalent to a nonpositive limit of the genuine corrected finite-Hecke circle means
+for every character normalized by the given norm section. -/
+theorem all_widths_iff_circleLimit_nonpos (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) :
+    allWidths(τ) ↔ ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (τ u) = 1) →
+      Filter.limUnder (𝓝[<] (1 : ℝ)) (correctedMean χ (finiteHeckeL_exists_continuation χ).choose) ≤ 0 := by
+  rw [allWidths_iff_critical τ hτ]
+  constructor <;> intro h χ hχ
+  · rw [(tendsto_corrected_circle_mean_rightGreenMass τ hτ χ hχ).2.limUnder_eq,
+      (rightGreenMass_eq_zero_iff χ).mpr (h χ hχ)]
+  · have hle := h χ hχ
+    rw [(tendsto_corrected_circle_mean_rightGreenMass τ hτ χ hχ).2.limUnder_eq] at hle
+    exact (rightGreenMass_eq_zero_iff χ).mp (le_antisymm hle (rightGreenMass_nonneg χ))
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The all-width cancellation is also equivalent
+to nonpositivity of each corrected compact mean, including circles passing through
+a zero or the possible principal pole. -/
+theorem all_widths_iff_compact_circleMeans_nonpos (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) :
+    allWidths(τ) ↔ ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (τ u) = 1) → ∀ r ∈ Ioo (0 : ℝ) 1,
+      correctedMean χ (finiteHeckeL_exists_continuation χ).choose r ≤ 0 := by
+  rw [all_widths_iff_circleLimit_nonpos τ hτ]
+  constructor
+  · intro h χ hχ r hr
+    have hle := h χ hχ
+    rw [(tendsto_corrected_circle_mean_rightGreenMass τ hτ χ hχ).2.limUnder_eq] at hle
+    exact (correctedMean_mem_Icc τ hτ χ hχ hr).2.trans hle
+  · intro h χ hχ
+    have ht := (tendsto_corrected_circle_mean_rightGreenMass τ hτ χ hχ).2
+    rw [ht.limUnder_eq]
+    apply le_of_tendsto ht
+    filter_upwards [Ioo_mem_nhdsLT (by norm_num : (0 : ℝ) < 1)] with r hr
+    exact h χ hχ r hr
+
+end CompactGreen
 
 end RiemannMasullo.Isolated
