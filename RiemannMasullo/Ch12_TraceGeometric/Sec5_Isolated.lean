@@ -3,6 +3,8 @@ module
 import Mathlib.Geometry.Manifold.PartitionOfUnity
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 
+public import RiemannMasullo.Ch13_ZerosHecke.FourthPowerPrimeDeficitCriterion
+
 /-! # Isolated statements of §12.5
 
 Statements of the section that are neither proved nor refuted and that nothing else in Lean
@@ -296,6 +298,40 @@ private theorem kernelLocalization_sum {α s : ℝ} (ha : 0 ≤ α) (hs : 0 ≤ 
   change ∑ i, A(ha, hs, f i) (P v) =
     (∑ i, (A(ha, hs, f i) : W(α, s) →L[ℂ] W(α, s))) (P v)
   rw [sum_apply]
+
+section FourthPowerDeficit
+
+open Filter Function
+open scoped Asymptotics Classical
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. Consider the exterior trace assertion at every positive width.
+Deviation: This equivalence expresses the simultaneous vanishing in terms of the cumulative
+degree-one prime deficit bound with exponent `7+ε` for every normalized character of the field. -/
+theorem hasSum_exteriorZeros_iff_fourthPowerPrimeDeficit_growth
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F)) :
+    (∀ a : ℝ, 0 < a → ∀ φ : BruhatCompactSupport (C𝔽),
+      (∀ g : C₁, φ.val g = 0) →
+      HasSum (fun z : {p : {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ //
+          0 < MeromorphicOn.divisor (continuedCompletedHeckeL p.1.val) univ p.2 ∧
+          a ≤ |p.2.re - 1 / 2|} ↦
+        (MeromorphicOn.divisor (continuedCompletedHeckeL z.val.1.val) univ z.val.2 : ℂ) *
+        ∫ g, φ.val g * ideleClassNormTwist z.val.1.val (z.val.2 - 1 / 2) g
+          ∂μ𝔽) 0) ↔
+    ∀ χ : PontryaginDual C𝔽, (∀ t, χ (τ t) = 1) → ∀ ε : ℝ, 0 < ε →
+      (fun J : ℕ ↦ ∑ j ∈ Finset.Icc 1 J, fourthPowerPrimeDeficit χ j) =O[atTop]
+        fun J ↦ (J : ℝ) ^ (7 + ε) := by
+  refine ⟨?_, hasSum_exteriorZeros_of_fourthPowerPrimeDeficit_growth τ hτ⟩
+  intro h χ hχ ε hε
+  have he := (hasSum_exteriorZeros_iff_centeredRealRieszLogDeriv τ hτ).mp h χ hχ
+  have hz := (hecke_centeredRealRieszLogDeriv_continuation_iff τ hτ χ hχ (a := 0)
+    le_rfl (by norm_num)).mp (by simpa only [zero_add] using he)
+  simp only [zero_add] at hz
+  have hbound := (fourthPowerPrimeDeficit_bounds_of_no_right_zeros τ hτ χ hχ
+    (b := 1/2) le_rfl (by norm_num) hz hε).2
+  norm_num at hbound
+  exact hbound
+
+end FourthPowerDeficit
 
 /-- At fixed strip and input operator, it suffices to test a single prescribed nonempty
 open set of log norms. -/

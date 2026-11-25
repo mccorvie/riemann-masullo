@@ -53,35 +53,4 @@ theorem hecke_no_right_zeros_iff_fourthPowerPrimeDeficit_growth
   ⟨fun hz _ hε ↦ (fourthPowerPrimeDeficit_bounds_of_no_right_zeros τ hτ χ hχ hb hb' hz hε).2,
     hecke_no_right_zeros_of_fourthPowerPrimeDeficit_growth τ hτ χ hχ hb hb'⟩
 
-attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorelSpaceSec1
-  instIdeleClassT2Sec1 instIdeleClassLocallyCompactSec1 instIdeleClassSecondCountableSec1
-
-local notation "ord(" χ ", " p ")" =>
-  MeromorphicOn.divisor (continuedCompletedHeckeL (F := K) χ) univ p
-
-/-- Paper: Theorem 12.5.1.1, pp. 519–520. The exterior trace statement at all
-positive widths is equivalent to the cumulative degree-one prime deficit bound
-with exponent `7+ε` for every normalized character of this field. -/
-theorem hasSum_exteriorZeros_iff_fourthPowerPrimeDeficit_growth
-    (τ : ℝ≥0ˣ →ₜ* IdeleClassGroup (𝓞 K) K) (hτ : RightInverse τ (ideleClassNorm K)) :
-    (∀ a : ℝ, 0 < a → ∀ φ : BruhatCompactSupport (IdeleClassGroup (𝓞 K) K),
-      (∀ g : (ideleClassNorm K).ker, φ.val g = 0) →
-      HasSum (fun z : {p : {χ : U // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ //
-          0 < ord(p.1.val, p.2) ∧ a ≤ |p.2.re - 1 / 2|} ↦ (ord(z.val.1.val, z.val.2) : ℂ) *
-        ∫ g, φ.val g * ideleClassNormTwist z.val.1.val (z.val.2 - 1 / 2) g
-          ∂ideleClassTamagawaMeasure K) 0) ↔
-    ∀ χ : U, (∀ t, χ (τ t) = 1) → ∀ ε : ℝ, 0 < ε →
-      (fun J : ℕ ↦ ∑ j ∈ Finset.Icc 1 J, fourthPowerPrimeDeficit χ j) =O[atTop]
-        fun J ↦ (J : ℝ) ^ (7 + ε) := by
-  refine ⟨?_, hasSum_exteriorZeros_of_fourthPowerPrimeDeficit_growth τ hτ⟩
-  intro h χ hχ ε hε
-  have he := (hasSum_exteriorZeros_iff_centeredRealRieszLogDeriv τ hτ).mp h χ hχ
-  have hz := (hecke_centeredRealRieszLogDeriv_continuation_iff τ hτ χ hχ (a := 0)
-    le_rfl (by norm_num)).mp (by simpa only [zero_add] using he)
-  simp only [zero_add] at hz
-  have hbound := (fourthPowerPrimeDeficit_bounds_of_no_right_zeros τ hτ χ hχ
-    (b := 1/2) le_rfl (by norm_num) hz hε).2
-  norm_num at hbound
-  exact hbound
-
 end RiemannMasullo
