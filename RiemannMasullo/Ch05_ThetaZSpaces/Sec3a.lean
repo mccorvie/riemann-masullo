@@ -6667,7 +6667,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_rational_empty_inverse_from_mod
 
 /-- A product of a polynomially bounded function and a function that decays faster than that
 polynomial in the imaginary direction is bounded on a closed vertical strip. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_bounded_product
+private theorem meyerCriticalStrip_bounded_product
     (P Q : ℂ → ℂ) (a b D C Y : ℝ) (N : ℕ) (hD : 0 ≤ D) (hC : 0 ≤ C)
     (hP : ContinuousOn P (Complex.re ⁻¹' Icc a b)) (hQ : ContinuousOn Q (Complex.re ⁻¹' Icc a b))
     (hPb : ∀ z : ℂ, z.re ∈ Icc a b → ‖P z‖ ≤ D * (1 + ‖z‖) ^ N)
@@ -6710,7 +6710,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- Phragmén–Lindelöf across the critical strip. Two holomorphic functions that are glued by
 a functional equation on the open critical strip, with polynomially weighted bounds on the
 lines of real part `-1/2` and `3/2`, satisfy the weighted bound on the whole strip. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_glue
+private theorem meyerCriticalStrip_glue
     (U U' h g : ℂ → ℂ) (A B : ℝ) (hA : 0 ≤ A) (m : ℕ)
     (hU : DifferentiableOn ℂ U (Complex.re ⁻¹' Ioi 0))
     (hU' : DifferentiableOn ℂ U' (Complex.re ⁻¹' Ioi 0))
@@ -6779,7 +6779,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The functional equation of the S-local zeta function at every point of the open critical
 strip, in a norm chart. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_equation
+private theorem meyerCriticalStrip_equation
     (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T)) (g : ℬₛ(T))
     (z : ℂ) (hz : z.re ∈ Ioo (0 : ℝ) 1) :
     sLocalIdelicZFunction g (chartₜ(T, χ) z) = sLocalRhoFactor (chartₜ(T, χ) z) *
@@ -6799,7 +6799,7 @@ holomorphic glues the zeta function of a test to the reflected zeta function of 
 transform, and the zeta function of the Fourier transform to the reflected zeta function of
 the test. The second identity uses that the Tate factors of dual quasi-characters multiply
 to one off a discrete set, and continuity. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_equation_glue
+private theorem meyerCriticalStrip_equation_glue
     (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T)) (u : ℬₛ(T))
     (h g : ℂ → ℂ) (hh : Differentiable ℂ h) (hg : DifferentiableOn ℂ g (Complex.re ⁻¹' Ioo (-1) 1))
     (hρ : ∀ z : ℂ, 0 < z.re → z.re < 1 → g z = h z * sLocalRhoFactor (chartₜ(T, χ) z))
@@ -6810,7 +6810,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         g z * sLocalIdelicZFunction u (chartₜ(T, χ⁻¹) (1 - z)) := by
   constructor
   · rw [hρ z hz0 hz1,
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_equation
+      meyerCriticalStrip_equation
         T χ u z ⟨hz0, hz1⟩, mul_assoc]
   · have hS : Complex.re ⁻¹' Ioo (0 : ℝ) 1 ∈ 𝓝 z :=
       (isOpen_Ioo.preimage Complex.continuous_re).mem_nhds ⟨hz0, hz1⟩
@@ -6848,7 +6848,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
           sLocalRhoFactor (chartₜ(T, χ⁻¹) (1 - s)) *
             sLocalIdelicZFunction (sAdeleSchwartzFourier u) (chartₜ(T, η) (1 - (1 - s)))
       have hfe : eqn χ := (congrArg eqn (inv_inv χ)).mp
-        (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_equation
+        (meyerCriticalStrip_equation
           T χ⁻¹ u (1 - s) hs1)
       change sLocalIdelicZFunction u (chartₜ(T, χ⁻¹) (1 - s)) =
           sLocalRhoFactor (chartₜ(T, χ⁻¹) (1 - s)) *
@@ -6870,7 +6870,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The real inequality behind the edge bounds: a multiplier of polynomial size in the
 character and in the height is absorbed by a larger angular weight and a higher power. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_edge
+private theorem meyerCriticalStrip_edge
     (x y C hn Zn t r B : ℝ) (k m N : ℕ) (hx : 0 ≤ x) (hy : 0 ≤ y)
     (hC : 0 ≤ C) (ht : 0 ≤ t) (hZ : 0 ≤ Zn) (hhn : 0 ≤ hn) (htr : t ≤ r) (h1r : 1 + t ≤ 2 * r)
     (hh : hn ≤ C * (1 + y) ^ N * (1 + t) ^ N)
@@ -6896,7 +6896,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The strip bound for one angular character and one pair of tests: the a priori bounds
 come from the rapid decay of the zeta functions on closed strips of positive real part. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_single
+private theorem meyerCriticalStrip_single
     (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T)) (u u' : ℬₛ(T))
     (h g : ℂ → ℂ) (hh : Differentiable ℂ h) (hg : DifferentiableOn ℂ g (Complex.re ⁻¹' Ioo (-1) 1))
     (heq : ∀ z : ℂ, 0 < z.re → z.re < 1 → h z * sLocalIdelicZFunction u (chartₜ(T, χ) z) =
@@ -6911,7 +6911,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       A * ‖z ^ m * (g z * sLocalIdelicZFunction u' (chartₜ(T, χ⁻¹) (1 - z)))‖ ≤ B)
     (z : ℂ) (hz0 : 0 < z.re) (hz2 : z.re ≤ 3 / 2) :
     A * ‖z ^ m * (h z * sLocalIdelicZFunction u (chartₜ(T, χ) z))‖ ≤ B := by
-  refine sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_glue
+  refine meyerCriticalStrip_glue
     (fun s ↦ sLocalIdelicZFunction u (chartₜ(T, χ) s))
     (fun s ↦ sLocalIdelicZFunction u' (chartₜ(T, χ⁻¹) s)) h g A B hA m
     (sLocalMellinSchwartzBounds_holomorphic T u χ)
@@ -6919,7 +6919,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   · obtain ⟨C₁, hC₁, htail⟩ := sLocalIdelicZFunction_rapid_decay_on_positive_strip u χ
       (1 / 2) (3 / 2) (by norm_num) (by norm_num) (N + 1) (by omega)
     obtain ⟨Y, hY⟩ := eventually_atTop.mp (eventually_comap.mp htail)
-    exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_bounded_product
+    exact meyerCriticalStrip_bounded_product
       h (fun s ↦ sLocalIdelicZFunction u (chartₜ(T, χ) s))
       (1 / 2) (3 / 2) D C₁ Y N hD hC₁.le hh.continuous.continuousOn
       ((sLocalMellinSchwartzBounds_holomorphic T u χ).continuousOn.mono
@@ -6935,7 +6935,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         (1 - s).re ∈ Icc (1 / 2 : ℝ) (3 / 2) := by
       simp only [Complex.sub_re, Complex.one_re, mem_Icc]
       exact ⟨by linarith [hs.2], by linarith [hs.1]⟩
-    exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_bounded_product
+    exact meyerCriticalStrip_bounded_product
       g (fun s ↦ sLocalIdelicZFunction u' (chartₜ(T, χ⁻¹) (1 - s)))
       (-1 / 2) (1 / 2) D C₁ Y N hD hC₁.le
       (hg.continuousOn.mono fun s hs ↦ ⟨by linarith [hs.1], by linarith [hs.2]⟩)
@@ -6950,7 +6950,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         rwa [Complex.re_add_im, him] at hd)
 
 /-- A weighted bound over a subgroup of a subgroup, read at the inverse character. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_inverse_index
+private theorem meyerCriticalStrip_inverse_index
     {P : Type*} [CommGroup P] (L : Subgroup P) (K : Subgroup L)
     (Z : ℕ → P → ℂ → ℂ) (q : GroupSeminorm K) (k m : ℕ) (a B : ℝ)
     (hB : ∀ i : K × ℕ, ∀ z : ℂ, z.re = a → (1 + q i.1) ^ k * ‖z ^ m * Z i.2 i.1.val.val z‖ ≤ B)
@@ -6962,7 +6962,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- The bound at one angular character: the bounds for a test and for its partner on the line
 of real part `3/2`, with a multiplier of polynomial size that is bounded below at `z`, give the
 weighted bound at `z`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_bound
+private theorem meyerCriticalStrip_bound
     (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T)) (u u' : ℬₛ(T))
     (h g : ℂ → ℂ) (hh : Differentiable ℂ h) (hg : DifferentiableOn ℂ g (Complex.re ⁻¹' Ioo (-1) 1))
     (heq : ∀ z : ℂ, 0 < z.re → z.re < 1 → h z * sLocalIdelicZFunction u (chartₜ(T, χ) z) =
@@ -6982,7 +6982,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   have hCN : 0 ≤ C * 2 ^ N := mul_nonneg hC (by positivity)
   have key : (1 + x) ^ k * ‖z ^ m * (h z * sLocalIdelicZFunction u (chartₜ(T, χ) z))‖ ≤
       C * 2 ^ N * max B₁ B₂ := by
-    refine sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_single
+    refine meyerCriticalStrip_single
       T χ u u' h g hh hg heq (C * (1 + y) ^ N) N
       (mul_nonneg hC (pow_nonneg (by linarith) _)) hhb hgb ((1 + x) ^ k) _
       (pow_nonneg (by linarith) _) m ?_ ?_ z hz0 (by linarith)
@@ -6994,7 +6994,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       rw [← sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T u χ s (by linarith),
         norm_mul, norm_pow] at hb
       rw [norm_mul, norm_pow, norm_mul]
-      exact (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_edge
+      exact (meyerCriticalStrip_edge
         x y C ‖h s‖ _ ‖s‖ ‖s‖ B₁ k m N hx hy hC (norm_nonneg _)
         (norm_nonneg _) (norm_nonneg _) le_rfl (by linarith)
         (hhb s ⟨by linarith, by linarith⟩) hb).trans
@@ -7016,7 +7016,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       have hθ := sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T u' χ⁻¹ (1 - s) (by linarith)
       rw [← hθ, norm_mul, norm_pow] at hb
       rw [norm_mul, norm_pow, norm_mul]
-      exact (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_edge
+      exact (meyerCriticalStrip_edge
         x y C ‖g s‖ _ ‖s‖ ‖1 - s‖ B₂ k m N hx hy hC (norm_nonneg _)
         (norm_nonneg _) (norm_nonneg _) hsw (by linarith)
         (hgb s ⟨by linarith, by linarith⟩) hb).trans
@@ -7031,7 +7031,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     _ ≤ _ := key
 
 /-- The real Gamma factor is bounded on closed vertical strips of positive real part. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_gammaReal_bounded
+private theorem meyerStripMultiplier_gammaReal_bounded
     (x₀ x₁ : ℝ) (hx₀ : 0 < x₀) :
     ∃ M : ℝ, ∀ u : ℂ, u.re ∈ Icc x₀ x₁ → ‖Complex.Gammaℝ u‖ ≤ M := by
   have hc : ContinuousOn Real.Gamma (Icc (x₀ / 2) (x₁ / 2)) :=
@@ -7059,11 +7059,11 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- Reflection: away from the real axis, the reciprocal real Gamma factor on the strip
 `-1/2 ≤ Re w ≤ 3/2` grows at most like `exp (π |Im w| / 2)`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_inv_gammaReal_base :
+private theorem meyerStripMultiplier_inv_gammaReal_base :
     ∃ M : ℝ, 0 ≤ M ∧ ∀ w : ℂ, w.re ∈ Icc (-1 / 2 : ℝ) (3 / 2) → 1 ≤ |w.im| →
       ‖(Complex.Gammaℝ w)⁻¹‖ ≤ M * Real.exp (Real.pi * |w.im| / 2) := by
   obtain ⟨M, hM⟩ :=
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_gammaReal_bounded
+    meyerStripMultiplier_gammaReal_bounded
       (1 / 2) (5 / 2) (by norm_num)
   refine ⟨max M 0, le_max_right _ _, fun w hw him ↦ ?_⟩
   have hcos (u : ℂ) : ‖Complex.cos u‖ ≤ Real.exp |u.im| := by
@@ -7103,12 +7103,12 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The functional equation `Γ_ℝ(w + 2) = Γ_ℝ(w) w / (2π)` carries the bound of the reciprocal
 real Gamma factor to every strip `-1/2 ≤ Re w ≤ x₁`, away from the real axis. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_inv_gammaReal_growth
+private theorem meyerStripMultiplier_inv_gammaReal_growth
     (x₁ : ℝ) :
     ∃ M : ℝ, 0 ≤ M ∧ ∀ w : ℂ, -1 / 2 ≤ w.re → w.re ≤ x₁ → 1 ≤ |w.im| →
       ‖(Complex.Gammaℝ w)⁻¹‖ ≤ M * Real.exp (Real.pi * |w.im| / 2) := by
   obtain ⟨M, hM0, hM⟩ :=
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_inv_gammaReal_base
+    meyerStripMultiplier_inv_gammaReal_base
   have hpi : 1 ≤ 2 * Real.pi := by linarith [Real.pi_gt_three]
   have key (n : ℕ) : ∀ w : ℂ, -1 / 2 ≤ w.re → w.re ≤ 3 / 2 + 2 * n → 1 ≤ |w.im| →
       ‖(Complex.Gammaℝ w)⁻¹‖ ≤ (2 * Real.pi) ^ n * (M * Real.exp (Real.pi * |w.im| / 2)) := by
@@ -7158,7 +7158,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   exact key n w h1 (by linarith) h3
 
 /-- The real Gamma factor is differentiable at every point of positive real part. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_gammaReal_differentiableAt
+private theorem meyerStripMultiplier_gammaReal_differentiableAt
     (u : ℂ) (hu : 0 < u.re) : DifferentiableAt ℂ Complex.Gammaℝ u := by
   have h1 : DifferentiableAt ℂ (fun s : ℂ ↦ (Real.pi : ℂ) ^ (-s / 2)) u :=
     (differentiableAt_id.neg.div_const 2).const_cpow
@@ -7175,7 +7175,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 `2π Γ_ℝ(z + σ + 2) / Γ_ℝ(1 - z + conj σ)` is holomorphic for `Re z > -1`, has modulus `2π` on
 the line `Re z = -1/2`, grows at most exponentially in the height, and is
 `(z + σ) Γ_ℝ(z + σ) / Γ_ℝ(1 - z + conj σ)` for `Re z > 0`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_real_factor
+private theorem meyerStripMultiplier_real_factor
     (σ : ℂ) (hσ : 0 ≤ σ.re) :
     ∃ ψ : ℂ → ℂ, DifferentiableOn ℂ ψ (Complex.re ⁻¹' Ioi (-1)) ∧
       (∀ z : ℂ, z.re = -1 / 2 → ‖ψ z‖ = 2 * Real.pi) ∧
@@ -7196,7 +7196,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     have hz' : -1 < z.re := hz
     have h1 : DifferentiableAt ℂ (fun s : ℂ ↦ Complex.Gammaℝ (s + σ + 2)) z :=
       DifferentiableAt.comp z
-        (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_gammaReal_differentiableAt
+        (meyerStripMultiplier_gammaReal_differentiableAt
           _ (by rw [hre2]; linarith)) (by fun_prop)
     have h2 : DifferentiableAt ℂ
         (fun s : ℂ ↦ (Complex.Gammaℝ (1 - s + (starRingEnd ℂ) σ))⁻¹) z :=
@@ -7219,10 +7219,10 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       Complex.norm_real, Real.norm_of_nonneg Real.pi_pos.le, Complex.norm_ofNat, mul_assoc,
       mul_inv_cancel₀ hne, mul_one]
   · obtain ⟨M₁, hM₁⟩ :=
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_gammaReal_bounded
+      meyerStripMultiplier_gammaReal_bounded
         (3 / 2 + σ.re) (5 / 2 + σ.re) (by linarith)
     obtain ⟨M₂, hM₂0, hM₂⟩ :=
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_inv_gammaReal_growth
+      meyerStripMultiplier_inv_gammaReal_growth
         (3 / 2 + σ.re)
     refine ⟨2 * Real.pi * max M₁ 0 * (M₂ * Real.exp (Real.pi * |σ.im| / 2)), 1 + |σ.im|,
       by positivity, fun z hz hy ↦ ?_⟩
@@ -7271,7 +7271,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- The factor of the multiplier at one infinite place with parameter `σ`, real (`r`) or
 complex: a polynomial `φ` of degree one or two, bounded below on the lines of positive real
 part, and its product `ψ` with the quotient of the Euler factors of the place. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_arch_factor
+private theorem meyerStripMultiplier_arch_factor
     (r : Prop) (σ : ℂ) (hσ : 0 ≤ σ.re) :
     ∃ φ ψ : ℂ → ℂ, Differentiable ℂ φ ∧
       (∀ z : ℂ, ‖φ z‖ ≤ ((1 + ‖σ‖) * (1 + ‖z‖)) ^ 2) ∧
@@ -7296,7 +7296,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     rw [Complex.add_re, hz] at h
     linarith
   obtain ⟨ψ₁, hd₁, hn₁, ⟨A₁, Y₁, hA₁, hg₁⟩, he₁⟩ :=
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_real_factor
+    meyerStripMultiplier_real_factor
       σ hσ
   by_cases hr : r
   · refine ⟨fun z ↦ z + σ, ψ₁, by fun_prop, fun z ↦ ?_, fun a z _ hz ↦ hlow a z hz, hd₁,
@@ -7311,7 +7311,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       rw [Complex.add_re, Complex.one_re]
       linarith
     obtain ⟨ψ₂, hd₂, hn₂, ⟨A₂, Y₂, hA₂, hg₂⟩, he₂⟩ :=
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_real_factor
+      meyerStripMultiplier_real_factor
         (σ + 1) hσ1
     refine ⟨fun z ↦ (z + σ) * (z + (σ + 1)), fun z ↦ ψ₁ z * ψ₂ z, by fun_prop, fun z ↦ ?_,
       fun a z ha hz ↦ ?_, hd₁.mul hd₂, fun z hz ↦ ?_,
@@ -7353,7 +7353,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The factor of the multiplier at one finite place: the inverse Euler factor `1 - u r^z` and
 the dual one `1 - conj u r^(1 - z)`, for `0 < r < 1` and `‖u‖ ≤ 1`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_finite_factor
+private theorem meyerStripMultiplier_finite_factor
     (r : ℝ) (hr0 : 0 < r) (hr1 : r < 1) (u : ℂ) (hu : ‖u‖ ≤ 1) :
     Differentiable ℂ (fun z : ℂ ↦ 1 - u * (r : ℂ) ^ z) ∧
       (∀ z : ℂ, -1 / 2 ≤ z.re → ‖1 - u * (r : ℂ) ^ z‖ ≤ 1 + r ^ (-1 / 2 : ℝ)) ∧
@@ -7390,7 +7390,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- Phragmén–Lindelöf with polynomial weights on the strip `-1/2 ≤ Re z ≤ 1/2`: a holomorphic
 function of at most exponential growth in the height that is bounded by `M (1 + ‖z‖)^N` on
 both edges is bounded by `6^N M (1 + ‖z‖)^N` on the strip. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_strip
+private theorem meyerStripMultiplier_strip
     (g : ℂ → ℂ) (hg : DifferentiableOn ℂ g (Complex.re ⁻¹' Ioo (-1) 1)) (M : ℝ) (N : ℕ)
     (hM : 0 ≤ M)
     (hl : ∀ z : ℂ, z.re = -1 / 2 → ‖g z‖ ≤ M * (1 + ‖z‖) ^ N)
@@ -7480,7 +7480,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- At a real place the Euler factor of the norm chart of a unitary character `η` is
 `Γ_ℝ(z + s η)`. The shift `s η` has real part `0` or `1` (the sign parity); its real part is
 subadditive, its imaginary part additive, and inversion conjugates it. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_real_parameter
+private theorem meyerStripMultiplier_real_parameter
     (w : InfinitePlace F) (hw : w.IsReal) :
     ∃ s : PontryaginDual w.Completionˣ → ℂ,
       (∀ η : PontryaginDual w.Completionˣ, 0 ≤ (s η).re) ∧ s 1 = 0 ∧
@@ -7488,7 +7488,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         (s (η * η')).im = (s η).im + (s η').im) ∧
       (∀ η : PontryaginDual w.Completionˣ, s η⁻¹ = (starRingEnd ℂ) (s η)) ∧
       ∀ (η : PontryaginDual w.Completionˣ) (z : ℂ),
-        infiniteLocalEulerFactor w (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) = Complex.Gammaℝ (z + s η) := by
+        infiniteLocalEulerFactor w (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
+            Complex.Gammaℝ (z + s η) := by
   let e : ℝˣ →* w.Completionˣ :=
     Units.map (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm.toMonoidHom
   let sg (x : ℝˣ) : ℂ := if 0 < (x : ℝ) then 1 else -1
@@ -7509,27 +7511,41 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         (map_zero (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm) (x : ℝ)
     simp [e, InfinitePlace.mult, hw, hn]
   have hval (η : PontryaginDual w.Completionˣ) (z : ℂ) (x : ℝˣ) :
-      quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z (e x) = (η (e x) : ℂ) * (‖(x : ℝ)‖ : ℂ) ^ z := by
+      quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z (e x) =
+          (η (e x) : ℂ) * (‖(x : ℝ)‖ : ℂ) ^ z := by
     change (η (e x) : ℂ) * ((((Units.map nnNormHom.toMonoidHom ^ InfinitePlace.mult w :
       w.Completionˣ →* ℝ≥0ˣ) (e x) : ℝ≥0) : ℝ) : ℂ) ^ z = _
     rw [hmod]
   have hx0 (x : ℝˣ) : ((‖(x : ℝ)‖ : ℝ) : ℂ) ≠ 0 :=
     Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr x.ne_zero)
   let P (η : PontryaginDual w.Completionˣ) : ℂ × Fin 2 :=
-    (realLocalEulerParameters w hw (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) 0)).exists.choose
+    (realLocalEulerParameters w hw (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) 0)).exists.choose
   have hP (η : PontryaginDual w.Completionˣ) (x : ℝˣ) :
       (η (e x) : ℂ) = (‖(x : ℝ)‖ : ℂ) ^ (P η).1 * sg x ^ (P η).2.val := by
-    have h := (realLocalEulerParameters w hw (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) 0)).exists.choose_spec x
-    change quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) 0 (e x) = _ at h
+    have h := (realLocalEulerParameters w hw (quasiCharacterNormTwist _
+      (continuous_infiniteLocalModule w)
+      (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) 0)).exists.choose_spec x
+    change quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) 0 (e x) = _ at h
     rw [hval, Complex.cpow_zero, mul_one] at h
     exact h
   have huniq (η : PontryaginDual w.Completionˣ) (t : ℂ) (a : Fin 2)
       (h : ∀ x : ℝˣ, (η (e x) : ℂ) = (‖(x : ℝ)‖ : ℂ) ^ t * sg x ^ a.val) (z : ℂ) :
-      (realLocalEulerParameters w hw (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)).exists.choose = (t + z, a) := by
-    refine (realLocalEulerParameters w hw (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)).unique
-      (realLocalEulerParameters w hw (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)).exists.choose_spec (y₂ := (t + z, a))
+      (realLocalEulerParameters w hw (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)).exists.choose =
+          (t + z, a) := by
+    refine (realLocalEulerParameters w hw
+        (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)).unique
+      (realLocalEulerParameters w hw (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η)
+          z)).exists.choose_spec (y₂ := (t + z, a))
       fun x ↦ ?_
-    change quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z (e x) = (‖(x : ℝ)‖ : ℂ) ^ (t + z) * sg x ^ a.val
+    change quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z (e x) =
+        (‖(x : ℝ)‖ : ℂ) ^ (t + z) * sg x ^ a.val
     rw [hval, h x, Complex.cpow_add _ _ (hx0 x)]
     ring
   have hP0 (η : PontryaginDual w.Completionˣ) (t : ℂ) (a : Fin 2)
@@ -7582,7 +7598,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     · rw [Complex.neg_re, Complex.conj_re, hPre, neg_zero]
     · rw [Complex.neg_im, Complex.conj_im]
   · have hu := huniq η (P η).1 (P η).2 (hP η) z
-    have hE : infiniteLocalEulerFactor w (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
+    have hE : infiniteLocalEulerFactor w
+        (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
         Complex.Gammaℝ ((P η).1 + z + ((P η).2.val : ℂ)) := by
       simp only [infiniteLocalEulerFactor, hw, ↓reduceDIte, hu]
     rw [hE]
@@ -7592,7 +7610,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- At a complex place the Euler factor of the norm chart of a unitary character `η` is
 `Γ_ℂ(z + s η) / 2`. The shift `s η` has real part `|k| / 2` (`k` the angular weight); its real
 part is subadditive, its imaginary part additive, and inversion conjugates it. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_complex_parameter
+private theorem meyerStripMultiplier_complex_parameter
     (w : InfinitePlace F) (hw : w.IsComplex) :
     ∃ s : PontryaginDual w.Completionˣ → ℂ,
       (∀ η : PontryaginDual w.Completionˣ, 0 ≤ (s η).re) ∧ s 1 = 0 ∧
@@ -7600,7 +7618,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         (s (η * η')).im = (s η).im + (s η').im) ∧
       (∀ η : PontryaginDual w.Completionˣ, s η⁻¹ = (starRingEnd ℂ) (s η)) ∧
       ∀ (η : PontryaginDual w.Completionˣ) (z : ℂ),
-        infiniteLocalEulerFactor w (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) = Complex.Gammaℂ (z + s η) / 2 := by
+        infiniteLocalEulerFactor w (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
+            Complex.Gammaℂ (z + s η) / 2 := by
   let e : ℂˣ →* w.Completionˣ :=
     Units.map (InfinitePlace.Completion.ringEquivComplexOfIsComplex hw).symm.toMonoidHom
   let θ (x : ℂˣ) : ℂ := (x : ℂ) / (‖(x : ℂ)‖ : ℂ)
@@ -7615,27 +7635,43 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         (map_zero (InfinitePlace.Completion.ringEquivComplexOfIsComplex hw).symm) (x : ℂ)
     simp [e, InfinitePlace.mult, InfinitePlace.not_isReal_iff_isComplex.mpr hw, hn]
   have hval (η : PontryaginDual w.Completionˣ) (z : ℂ) (x : ℂˣ) :
-      quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z (e x) = (η (e x) : ℂ) * ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ^ z := by
+      quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z (e x) =
+          (η (e x) : ℂ) * ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ^ z := by
     change (η (e x) : ℂ) * ((((Units.map nnNormHom.toMonoidHom ^ InfinitePlace.mult w :
       w.Completionˣ →* ℝ≥0ˣ) (e x) : ℝ≥0) : ℝ) : ℂ) ^ z = _
     rw [hmod]
   have hx0 (x : ℂˣ) : ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ≠ 0 :=
     Complex.ofReal_ne_zero.mpr (pow_ne_zero _ (norm_ne_zero_iff.mpr x.ne_zero))
   let P (η : PontryaginDual w.Completionˣ) : ℂ × ℤ :=
-    (complexLocalEulerParameters w hw (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) 0)).exists.choose
+    (complexLocalEulerParameters w hw (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) 0)).exists.choose
   have hP (η : PontryaginDual w.Completionˣ) (x : ℂˣ) :
       (η (e x) : ℂ) = ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ^ (P η).1 * θ x ^ (P η).2 := by
-    have h := (complexLocalEulerParameters w hw (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) 0)).exists.choose_spec x
-    change quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) 0 (e x) = _ at h
+    have h := (complexLocalEulerParameters w hw (quasiCharacterNormTwist _
+      (continuous_infiniteLocalModule w)
+      (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) 0)).exists.choose_spec x
+    change quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) 0 (e x) = _ at h
     rw [hval, Complex.cpow_zero, mul_one] at h
     exact h
   have huniq (η : PontryaginDual w.Completionˣ) (t : ℂ) (k : ℤ)
       (h : ∀ x : ℂˣ, (η (e x) : ℂ) = ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ^ t * θ x ^ k) (z : ℂ) :
-      (complexLocalEulerParameters w hw (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)).exists.choose = (t + z, k) := by
-    refine (complexLocalEulerParameters w hw (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)).unique
-      (complexLocalEulerParameters w hw (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)).exists.choose_spec (y₂ := (t + z, k))
+      (complexLocalEulerParameters w hw
+          (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)).exists.choose =
+          (t + z, k) := by
+    refine (complexLocalEulerParameters w hw
+        (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)).unique
+      (complexLocalEulerParameters w hw
+          (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η)
+          z)).exists.choose_spec (y₂ := (t + z, k))
       fun x ↦ ?_
-    change quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z (e x) = ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ^ (t + z) * θ x ^ k
+    change quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z (e x) =
+        ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ^ (t + z) * θ x ^ k
     rw [hval, h x, Complex.cpow_add _ _ (hx0 x)]
     ring
   have hP0 (η : PontryaginDual w.Completionˣ) (t : ℂ) (k : ℤ)
@@ -7690,7 +7726,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     · rw [Complex.neg_re, Complex.conj_re, hPre, neg_zero]
     · rw [Complex.neg_im, Complex.conj_im]
   · have hu := huniq η (P η).1 (P η).2 (hP η) z
-    have hE : infiniteLocalEulerFactor w (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
+    have hE : infiniteLocalEulerFactor w
+        (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
         Complex.Gammaℂ ((P η).1 + z + ((P η).2.natAbs : ℂ) / 2) / 2 := by
       simp only [infiniteLocalEulerFactor, InfinitePlace.not_isReal_iff_isComplex.mpr hw,
         ↓reduceDIte, hu]
@@ -7700,11 +7738,14 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The restriction of a norm chart to an archimedean place is the local norm chart of the
 restricted character; restricting characters is a homomorphism of the dual groups. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_infinite_restriction
+private theorem meyerStripMultiplier_infinite_restriction
     (T : Finset V) (w : InfinitePlace F) :
     ∃ i : w.Completionˣ →ₜ* SIdeleQuotient F T,
       ∀ (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ),
-        sLocalInfiniteRestriction w (chartₜ(T, χ) z) = quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ (PontryaginDual.map i χ)) z := by
+        sLocalInfiniteRestriction w (chartₜ(T, χ) z) = quasiCharacterNormTwist _
+            (continuous_infiniteLocalModule w)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩
+            (PontryaginDual.map i χ)) z := by
   have hi : ∃ i : w.Completionˣ →ₜ* SIdeleQuotient F T,
       ∀ c : QuasiCharacter (SIdeleQuotient F T), sLocalInfiniteRestriction w c = c.comp i :=
     ⟨_, fun c ↦ rfl⟩
@@ -7724,11 +7765,14 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The restriction of a norm chart to a finite place of `T` is the local norm chart of the
 restricted character; restricting characters is a homomorphism of the dual groups. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_finite_restriction
+private theorem meyerStripMultiplier_finite_restriction
     (T : Finset V) (v : T) :
     ∃ i : (v.val.adicCompletion F)ˣ →ₜ* SIdeleQuotient F T,
       ∀ (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ),
-        sLocalFiniteRestriction v (chartₜ(T, χ) z) = quasiCharacterNormTwist _ (continuous_finiteLocalModule v.val) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ (PontryaginDual.map i χ)) z := by
+        sLocalFiniteRestriction v (chartₜ(T, χ) z) = quasiCharacterNormTwist _
+            (continuous_finiteLocalModule v.val)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩
+            (PontryaginDual.map i χ)) z := by
   have hi : ∃ i : (v.val.adicCompletion F)ˣ →ₜ* SIdeleQuotient F T,
       ∀ c : QuasiCharacter (SIdeleQuotient F T), sLocalFiniteRestriction v c = c.comp i :=
     ⟨_, fun c ↦ rfl⟩
@@ -7749,7 +7793,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- The factor of the multiplier at one infinite place, for all unitary characters of the
 S-idele quotient: a polynomial `φ χ` whose size is controlled by a subadditive, symmetric
 weight `ν χ`, and its product `ψ χ` with the quotient of the Euler factors of the place. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_arch_place
+private theorem meyerStripMultiplier_arch_place
     (T : Finset V) (w : InfinitePlace F) :
     ∃ (ν : PontryaginDual (SIdeleQuotient F T) → ℝ)
       (φ ψ : PontryaginDual (SIdeleQuotient F T) → ℂ → ℂ),
@@ -7768,7 +7812,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
               (dualQuasiCharacter (sIdeleQuotientNorm F T)
                 (isProperMap_sIdeleQuotientNorm F T).continuous (chartₜ(T, χ) z)))) = ψ χ z := by
   refine Exists.elim
-    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_infinite_restriction
+    (meyerStripMultiplier_infinite_restriction
       T w) fun i hi ↦ ?_
   have hpar : ∃ s : PontryaginDual w.Completionˣ → ℂ,
       (∀ η : PontryaginDual w.Completionˣ, 0 ≤ (s η).re) ∧ s 1 = 0 ∧
@@ -7776,32 +7820,41 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         (s (η * η')).im = (s η).im + (s η').im) ∧
       (∀ η : PontryaginDual w.Completionˣ, s η⁻¹ = (starRingEnd ℂ) (s η)) ∧
       ∀ (η : PontryaginDual w.Completionˣ) (z : ℂ),
-        (w.IsReal → infiniteLocalEulerFactor w (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) = Complex.Gammaℝ (z + s η)) ∧
+        (w.IsReal → infiniteLocalEulerFactor w
+            (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
+            Complex.Gammaℝ (z + s η)) ∧
         (¬ w.IsReal →
-          infiniteLocalEulerFactor w (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) = Complex.Gammaℂ (z + s η) / 2) := by
+          infiniteLocalEulerFactor w (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+              (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
+              Complex.Gammaℂ (z + s η) / 2) := by
     by_cases hw : w.IsReal
     · obtain ⟨s, h1, h2, h3, h4, h5⟩ :=
-        sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_real_parameter
+        meyerStripMultiplier_real_parameter
           w hw
       exact ⟨s, h1, h2, h3, h4, fun η z ↦ ⟨fun _ ↦ h5 η z, fun h ↦ absurd hw h⟩⟩
     · obtain ⟨s, h1, h2, h3, h4, h5⟩ :=
-        sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_complex_parameter
+        meyerStripMultiplier_complex_parameter
           w (InfinitePlace.not_isReal_iff_isComplex.mp hw)
       exact ⟨s, h1, h2, h3, h4, fun η z ↦ ⟨fun h ↦ absurd h hw, fun _ ↦ h5 η z⟩⟩
   obtain ⟨s, hs0, hs1, hsmul, hsinv, hsE⟩ := hpar
   have hfac := fun χ : PontryaginDual (SIdeleQuotient F T) ↦
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_arch_factor
+    meyerStripMultiplier_arch_factor
       w.IsReal (s (PontryaginDual.map i χ)) (hs0 _)
   choose φ ψ hφ using hfac
   have hdual (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ) :
       sLocalInfiniteRestriction w (dualQuasiCharacter (sIdeleQuotientNorm F T)
         (isProperMap_sIdeleQuotientNorm F T).continuous (chartₜ(T, χ) z)) =
-        quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ ((PontryaginDual.map i χ)⁻¹ : PontryaginDual w.Completionˣ)) (1 - z) := by
+        quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩
+            ((PontryaginDual.map i χ)⁻¹ : PontryaginDual w.Completionˣ)) (1 - z) := by
     have h1 := congrArg (sLocalInfiniteRestriction w) (sLocalNormTwistChart_dual χ z)
     have h2 := hi χ⁻¹ (1 - z)
     have h3 : PontryaginDual.map i χ⁻¹ = (PontryaginDual.map i χ)⁻¹ :=
       map_inv (PontryaginDual.map i) χ
-    exact h1.trans (h2.trans (congrArg (fun η ↦ quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) (1 - z)) h3))
+    exact h1.trans
+        (h2.trans (congrArg (fun η ↦ quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) (1 - z)) h3))
   refine ⟨fun χ ↦ |(s (PontryaginDual.map i χ)).re| + |(s (PontryaginDual.map i χ)).im|, φ, ψ,
     ?_, fun χ χ' ↦ ?_, fun χ ↦ ?_, fun χ ↦ ⟨by positivity, (hφ χ).1, fun z ↦ ?_, (hφ χ).2.2.1,
       (hφ χ).2.2.2.1, (hφ χ).2.2.2.2.1, (hφ χ).2.2.2.2.2.1, fun z hz ↦ ?_⟩⟩
@@ -7836,7 +7889,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- The archimedean part of the multiplier: at every infinite place a polynomial factor
 `φ w χ` of size controlled by one group seminorm `q` on the dual of the S-idele quotient,
 and its product `ψ w χ` with the quotient of the Euler factors of the place. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_arch
+private theorem meyerStripMultiplier_arch
     (T : Finset V) :
     ∃ (q : GroupSeminorm (PontryaginDual (SIdeleQuotient F T)))
       (φ ψ : InfinitePlace F → PontryaginDual (SIdeleQuotient F T) → ℂ → ℂ),
@@ -7855,7 +7908,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
                 (isProperMap_sIdeleQuotientNorm F T).continuous (chartₜ(T, χ) z)))) =
             ψ w χ z := by
   choose ν φ ψ h1 hmul hinv h using fun w : InfinitePlace F ↦
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_arch_place
+    meyerStripMultiplier_arch_place
       T w
   let q : GroupSeminorm (PontryaginDual (SIdeleQuotient F T)) :=
     { toFun := fun χ ↦ ∑ w, ν w χ
@@ -7875,14 +7928,16 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- The Euler factor of the norm chart of a unitary character `η` at a finite place is
 `(1 - u r^z)⁻¹`, with `r` the inverse of the norm of the place and `‖u‖ ≤ 1` (`u = 0` when `η`
 is ramified); the inverse character has the same shape with `conj u`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_finite_euler
+private theorem meyerStripMultiplier_finite_euler
     (v : V) (η : PontryaginDual (v.adicCompletion F)ˣ) :
     ∃ u : ℂ, ‖u‖ ≤ 1 ∧
-      (∀ z : ℂ, finiteLocalEulerFactor v (quasiCharacterNormTwist _ (continuous_finiteLocalModule v) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
+      (∀ z : ℂ, finiteLocalEulerFactor v (quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
         (1 - u * (((v.asIdeal.absNorm : ℝ)⁻¹ : ℝ) : ℂ) ^ z)⁻¹) ∧
       ∀ η' : PontryaginDual (v.adicCompletion F)ˣ,
         (∀ g : (v.adicCompletion F)ˣ, η' g = (η g)⁻¹) → ∀ z : ℂ,
-        finiteLocalEulerFactor v (quasiCharacterNormTwist _ (continuous_finiteLocalModule v) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η') z) =
+        finiteLocalEulerFactor v (quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η') z) =
           (1 - (starRingEnd ℂ) u * (((v.asIdeal.absNorm : ℝ)⁻¹ : ℝ) : ℂ) ^ z)⁻¹ := by
   classical
   let hπ := (Valued.v : Valuation (v.adicCompletion F)
@@ -7899,19 +7954,24 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         (a := Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u)).mp
         ⟨u.val.prop, u.inv.prop⟩)
   have he (χ : PontryaginDual (v.adicCompletion F)ˣ) (z : ℂ) :
-      finiteLocalEulerFactor v (quasiCharacterNormTwist _ (continuous_finiteLocalModule v) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ χ) z) =
+      finiteLocalEulerFactor v (quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ χ) z) =
         if (∀ u : (v.adicCompletionIntegers F)ˣ,
           (χ (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) : ℂ) = 1)
         then (1 - (χ π : ℂ) * ((‖π.val‖ : ℝ) : ℂ) ^ z)⁻¹ else 1 := by
     have hu (u : (v.adicCompletionIntegers F)ˣ) :
-        quasiCharacterNormTwist _ (continuous_finiteLocalModule v) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ χ) z (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) =
+        quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ χ) z
+            (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) =
           (χ (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) : ℂ) := by
       change (χ (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) : ℂ) *
         ((‖(Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u :
           (v.adicCompletion F)ˣ).val‖ : ℝ) : ℂ) ^ z = _
       rw [hnorm u, Complex.ofReal_one, Complex.one_cpow, mul_one]
     have h : (∀ u : (v.adicCompletionIntegers F)ˣ,
-        quasiCharacterNormTwist _ (continuous_finiteLocalModule v) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ χ) z (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) = 1) ↔
+        quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ χ) z
+            (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) = 1) ↔
         ∀ u : (v.adicCompletionIntegers F)ˣ,
           (χ (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) : ℂ) = 1 :=
       ⟨fun h u ↦ (hu u).symm.trans (h u), fun h u ↦ (hu u).trans (h u)⟩
@@ -7943,7 +8003,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- The factor of the multiplier at one finite place of `T`, for all unitary characters of the
 S-idele quotient: the inverse Euler factor `φ χ`, bounded above on `Re z ≥ -1/2` and below on
 every line of positive real part, and the inverse Euler factor `ψ χ` of the dual character. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_finite_place
+private theorem meyerStripMultiplier_finite_place
     (T : Finset V) (v : T) :
     ∃ (C : ℝ) (c : ℝ → ℝ) (φ ψ : PontryaginDual (SIdeleQuotient F T) → ℂ → ℂ),
       0 ≤ C ∧ (∀ a : ℝ, 0 < a → 0 < c a) ∧
@@ -7958,7 +8018,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
               (dualQuasiCharacter (sIdeleQuotientNorm F T)
                 (isProperMap_sIdeleQuotientNorm F T).continuous (chartₜ(T, χ) z)))) = ψ χ z := by
   refine Exists.elim
-    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_finite_restriction
+    (meyerStripMultiplier_finite_restriction
       T v) fun i hi ↦ ?_
   let r : ℝ := (v.val.asIdeal.absNorm : ℝ)⁻¹
   have hq : 1 < (v.val.asIdeal.absNorm : ℝ) := by
@@ -7966,10 +8026,10 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   have hr0 : 0 < r := inv_pos.mpr (zero_lt_one.trans hq)
   have hr1 : r < 1 := inv_lt_one_of_one_lt₀ hq
   choose u hu1 hu2 hu3 using fun χ : PontryaginDual (SIdeleQuotient F T) ↦
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_finite_euler
+    meyerStripMultiplier_finite_euler
       v.val (PontryaginDual.map i χ)
   have hfac := fun χ : PontryaginDual (SIdeleQuotient F T) ↦
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_finite_factor
+    meyerStripMultiplier_finite_factor
       r hr0 hr1 (u χ) (hu1 χ)
   refine ⟨1 + r ^ (-1 / 2 : ℝ), fun a ↦ 1 - r ^ a, fun χ z ↦ 1 - u χ * (r : ℂ) ^ z,
     fun χ z ↦ 1 - (starRingEnd ℂ) (u χ) * (r : ℂ) ^ (1 - z), by positivity,
@@ -7995,7 +8055,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- A continuous function that is periodic in the imaginary direction is bounded on closed
 vertical strips. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_periodic_bounded
+private theorem meyerStripMultiplier_periodic_bounded
     (p : ℂ → ℂ) (P : ℝ) (hP : 0 < P) (hper : Function.Periodic p ((P : ℂ) * Complex.I))
     (hp : Continuous p) (a b : ℝ) :
     ∃ B : ℝ, ∀ z : ℂ, z.re ∈ Icc a b → ‖p z‖ ≤ B := by
@@ -8020,17 +8080,20 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The epsilon factor of the norm charts of one unitary character at a finite place is
 bounded on closed vertical strips: the charts are periodic in the imaginary direction. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_epsilon_place_bounded
+private theorem meyerStripMultiplier_epsilon_place_bounded
     (v : V) (η : PontryaginDual (v.adicCompletion F)ˣ) (a b : ℝ) :
     ∃ B : ℝ, ∀ z : ℂ, z.re ∈ Icc a b →
-      ‖finiteLocalEpsilonFactor v (quasiCharacterNormTwist _ (continuous_finiteLocalModule v) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)‖ ≤ B := by
+      ‖finiteLocalEpsilonFactor v (quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)‖ ≤ B := by
   let q := (v.asIdeal.absNorm : ℝ)
   have hq : 1 < q := by
     dsimp only [q]
     exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
   let P := 2 * Real.pi / Real.log q
   have hP : 0 < P := div_pos (by positivity) (Real.log_pos hq)
-  have hperiod : Function.Periodic (quasiCharacterNormTwist _ (continuous_finiteLocalModule v) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η)) ((P : ℂ) * Complex.I) := by
+  have hperiod : Function.Periodic (quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+      (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η))
+      ((P : ℂ) * Complex.I) := by
     intro z
     ext1 u
     let k := WithZero.log (Valued.v u.val)
@@ -8054,8 +8117,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     change (η u : ℂ) * (‖u.val‖ : ℂ) ^ (z + (P : ℂ) * Complex.I) =
       (η u : ℂ) * (‖u.val‖ : ℂ) ^ z
     rw [Complex.cpow_add _ _ (Complex.ofReal_ne_zero.mpr hu.ne'), hpow, mul_one]
-  exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_periodic_bounded
-    (finiteLocalEpsilonFactor v ∘ quasiCharacterNormTwist _ (continuous_finiteLocalModule v) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η)) P hP
+  exact meyerStripMultiplier_periodic_bounded
+    (finiteLocalEpsilonFactor v ∘ quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η)) P hP
     (fun z ↦ congrArg (finiteLocalEpsilonFactor v) (hperiod z))
     (continuous_iff_continuousAt.mpr fun z ↦
       ((finiteLocalEpsilonFactor_entire v η) z (mem_univ z)).continuousAt) a b
@@ -8063,11 +8127,14 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- A unitary character of a nonarchimedean local field that is trivial on the units of norm
 one is an imaginary power of the norm: multiplying a character by it translates the norm
 charts in the imaginary direction. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_unramified_twist
+private theorem meyerStripMultiplier_unramified_twist
     (v : V) (ψ : PontryaginDual (v.adicCompletion F)ˣ)
     (hψ : ∀ g : (v.adicCompletion F)ˣ, ‖g.val‖ = 1 → ψ g = 1) :
     ∃ t : ℂ, t.re = 0 ∧ ∀ (η : PontryaginDual (v.adicCompletion F)ˣ) (z : ℂ),
-      quasiCharacterNormTwist _ (continuous_finiteLocalModule v) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ (η * ψ)) z = quasiCharacterNormTwist _ (continuous_finiteLocalModule v) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) (z + t) := by
+      quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ (η * ψ)) z =
+          quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) (z + t) := by
   let hπ := (Valued.v : Valuation (v.adicCompletion F)
     (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
   let p : (v.adicCompletion F)ˣ :=
@@ -8099,7 +8166,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   let c : QuasiCharacter (v.adicCompletion F)ˣ :=
     (ContinuousMonoidHom.mk Circle.coeHom continuous_subtype_val : Circle →ₜ* ℂ).comp ψ
   let Nt : QuasiCharacter (v.adicCompletion F)ˣ :=
-    quasiCharacterNormTwist _ (continuous_finiteLocalModule v) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ (1 : PontryaginDual (v.adicCompletion F)ˣ)) t
+    quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩
+        (1 : PontryaginDual (v.adicCompletion F)ˣ)) t
   have hNt (g : (v.adicCompletion F)ˣ) : Nt g = ((‖g.val‖ : ℝ) : ℂ) ^ t := by
     change (((1 : PontryaginDual (v.adicCompletion F)ˣ) g : Circle) : ℂ) *
       ((‖g.val‖ : ℝ) : ℂ) ^ t = _
@@ -8134,7 +8203,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- A unitary character of a nonarchimedean local field has finite order on the units of norm
 one: it is trivial near one, and the units of norm one form a compact group. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_unit_torsion
+private theorem meyerStripMultiplier_unit_torsion
     (v : V) (η : PontryaginDual (v.adicCompletion F)ˣ) :
     ∃ m : ℕ, 0 < m ∧ ∀ g : (v.adicCompletion F)ˣ, ‖g.val‖ = 1 → η g ^ m = 1 := by
   have hproper : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
@@ -8234,7 +8303,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- In a finitely generated commutative group with a subgroup of torsion quotient, a bound
 that exists for each element and is unchanged by multiplication with the subgroup holds
 uniformly. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_finite_classes
+private theorem meyerStripMultiplier_finite_classes
     (A : Type*) [CommGroup A] [Group.FG A] (N : Subgroup A)
     (htors : ∀ x : A, ∃ m : ℕ, 0 < m ∧ x ^ m ∈ N) (P : A → ℝ → Prop)
     (hmono : ∀ (x : A) (B B' : ℝ), P x B → B ≤ B' → P x B')
@@ -8262,11 +8331,12 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- Uniform bound for the epsilon factors at a finite place over a finitely generated group of
 unitary characters, on a closed vertical strip: modulo the imaginary powers of the norm, which
 translate the strip along itself, the group has finitely many characters. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_epsilon_place_uniform
+private theorem meyerStripMultiplier_epsilon_place_uniform
     (v : V) (A : Type*) [CommGroup A] [Group.FG A]
     (f : A →* PontryaginDual (v.adicCompletion F)ˣ) (a b : ℝ) :
     ∃ B : ℝ, ∀ (x : A) (z : ℂ), z.re ∈ Icc a b →
-      ‖finiteLocalEpsilonFactor v (quasiCharacterNormTwist _ (continuous_finiteLocalModule v) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ (f x)) z)‖ ≤ B := by
+      ‖finiteLocalEpsilonFactor v (quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ (f x)) z)‖ ≤ B := by
   let N : Subgroup A :=
     { carrier := {x | ∀ g : (v.adicCompletion F)ˣ, ‖g.val‖ = 1 → f x g = 1}
       mul_mem' := fun {x y} hx hy g hg ↦ by
@@ -8276,16 +8346,18 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       inv_mem' := fun {x} hx g hg ↦ by
         have h : f x⁻¹ g = (f x g)⁻¹ := by rw [map_inv]; rfl
         rw [h, hx g hg, inv_one] }
-  refine sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_finite_classes
+  refine meyerStripMultiplier_finite_classes
     A N (fun x ↦ ?_)
-    (fun x B ↦ ∀ z : ℂ, z.re ∈ Icc a b → ‖finiteLocalEpsilonFactor v (quasiCharacterNormTwist _ (continuous_finiteLocalModule v) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ (f x)) z)‖ ≤ B)
+    (fun x B ↦ ∀ z : ℂ, z.re ∈ Icc a b → ‖finiteLocalEpsilonFactor v
+        (quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ (f x)) z)‖ ≤ B)
     (fun x B B' h hB z hz ↦ (h z hz).trans hB)
     (fun x ↦
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_epsilon_place_bounded
+      meyerStripMultiplier_epsilon_place_bounded
         v (f x) a b)
     (fun x y B hy h z hz ↦ ?_)
   · obtain ⟨m, hm, h⟩ :=
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_unit_torsion
+      meyerStripMultiplier_unit_torsion
         v (f x)
     refine ⟨m, hm, fun g hg ↦ ?_⟩
     let ev : A →* Circle :=
@@ -8294,17 +8366,22 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         map_mul' := fun x y ↦ by rw [map_mul]; rfl }
     exact (map_pow ev x m).trans (h g hg)
   · obtain ⟨t, ht, htw⟩ :=
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_unramified_twist
+      meyerStripMultiplier_unramified_twist
         v (f y) hy
-    have h1 : quasiCharacterNormTwist _ (continuous_finiteLocalModule v) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ (f (x * y))) z = quasiCharacterNormTwist _ (continuous_finiteLocalModule v) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ (f x)) (z + t) :=
-      (congrArg (fun η : PontryaginDual (v.adicCompletion F)ˣ ↦ quasiCharacterNormTwist _ (continuous_finiteLocalModule v) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)
+    have h1 : quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ (f (x * y))) z =
+        quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ (f x)) (z + t) :=
+      (congrArg (fun η : PontryaginDual (v.adicCompletion F)ˣ ↦ quasiCharacterNormTwist _
+          (continuous_finiteLocalModule v)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)
         (map_mul f x y)).trans (htw (f x) z)
     rw [h1]
     exact h (z + t) (by rw [Complex.add_re, ht, add_zero]; exact hz)
 
 /-- Uniform bound for the S-local epsilon factor over a finitely generated group of unitary
 characters of the S-idele quotient, on a closed vertical strip. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_epsilon_uniform
+private theorem meyerStripMultiplier_epsilon_uniform
     (T : Finset V) (A : Type*) [CommGroup A] [Group.FG A]
     (f : A →* PontryaginDual (SIdeleQuotient F T)) (a b : ℝ) :
     ∃ B : ℝ, 0 ≤ B ∧ ∀ (x : A) (z : ℂ), z.re ∈ Icc a b →
@@ -8312,10 +8389,10 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   have hfin (v : T) : ∃ B : ℝ, ∀ (x : A) (z : ℂ), z.re ∈ Icc a b →
       ‖finiteLocalEpsilonFactor v.val (sLocalFiniteRestriction v (chartₜ(T, f x) z))‖ ≤ B := by
     refine Exists.elim
-      (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_finite_restriction
+      (meyerStripMultiplier_finite_restriction
         T v) fun i hi ↦ ?_
     obtain ⟨B, hB⟩ :=
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_epsilon_place_uniform
+      meyerStripMultiplier_epsilon_place_uniform
         v.val A ((PontryaginDual.map i).toMonoidHom.comp f) a b
     refine ⟨B, fun x z hz ↦ ?_⟩
     rw [hi (f x) z]
@@ -8337,7 +8414,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- Bookkeeping for products over the places: factorwise identities `a (b / c) = d` multiply
 to the identity between the products. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_product_identity
+private theorem meyerStripMultiplier_product_identity
     {ι κ : Type*} [Fintype ι] [Fintype κ] (a b c d : ι → ℂ) (a' b' c' d' : κ → ℂ) (ε : ℂ)
     (h1 : ∀ i : ι, a i * (b i / c i) = d i) (h2 : ∀ k : κ, a' k * (b' k / c' k) = d' k) :
     ε * ((∏ i, d i) * ∏ k, d' k) = ((∏ i, a i) * ∏ k, a' k) *
@@ -8355,7 +8432,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- The local multiplier factors against the Tate factor: on the open critical strip
 `(∏ φ) ρ = ε ∏ ψ`. Off a discrete set this is the factorisation of the Tate factor into the
 epsilon factor and the quotient of the Euler products; both sides are continuous. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_tate_identity
+private theorem meyerStripMultiplier_tate_identity
     (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T))
     (φA ψA : InfinitePlace F → ℂ → ℂ) (φF ψF : T → ℂ → ℂ)
     (hφA : ∀ w : InfinitePlace F, Differentiable ℂ (φA w))
@@ -8410,7 +8487,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     change sLocalEpsilonFactor (chartₜ(T, χ) s) * ((∏ w, ψA w s) * ∏ v, ψF v s) =
       ((∏ w, φA w s) * ∏ v, φF v s) * sLocalRhoFactor (chartₜ(T, χ) s)
     rw [hfac]
-    exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_product_identity
+    exact meyerStripMultiplier_product_identity
       (fun w : InfinitePlace F ↦ φA w s)
       (fun w : InfinitePlace F ↦
         infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (chartₜ(T, χ) s)))
@@ -8430,7 +8507,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 the places: polynomial bounds for `h` on `Re z ≥ -1/2` and, by Phragmén–Lindelöf between the
 lines `Re z = -1/2` and `Re z = 1/2` (where `g = h ρ` with `‖ρ‖ = 1`), for `g`; and a lower
 bound for `h` on the lines of positive real part. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_bounds
+private theorem meyerStripMultiplier_bounds
     {ι κ : Type*} [Fintype ι] [Fintype κ] (φA ψA : ι → ℂ → ℂ) (φF ψF : κ → ℂ → ℂ)
     (E ρ : ℂ → ℂ) (P Eb : ℝ) (C : κ → ℝ) (c : κ → ℝ → ℝ) (hP : 0 ≤ P) (hEb : 0 ≤ Eb)
     (hC : ∀ k : κ, 0 ≤ C k) (hc : ∀ (k : κ) (a : ℝ), 0 < a → 0 < c k a)
@@ -8547,7 +8624,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   · exact mul_le_mul_of_nonneg_right (mul_le_mul_of_nonneg_right
       ((le_max_left _ _).trans (le_mul_of_one_le_left hM₀0 h6)) (pow_nonneg hP1 _))
       (pow_nonneg (by positivity) _)
-  · have h := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_strip
+  · have h := meyerStripMultiplier_strip
       (fun z ↦ E z * ((∏ i, ψA i z) * ∏ k, ψF k z)) hgd (M₀ * (1 + P) ^ (2 * n)) (2 * n)
       (mul_nonneg hM₀0 (pow_nonneg hP1 _)) hleft hright hgrow z hz
     calc ‖E z * ((∏ i, ψA i z) * ∏ k, ψF k z)‖
@@ -8601,22 +8678,22 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   let ι₀ : H →* PontryaginDual (SIdeleQuotient F T) :=
     ((PontryaginDual.map τ).ker.subtype).comp H.subtype
   refine Exists.elim
-    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_arch
+    (meyerStripMultiplier_arch
       (F := F) T) fun q hx ↦ ?_
   refine Exists.elim hx fun φA hx ↦ ?_
   refine Exists.elim hx fun ψA hA ↦ ?_
   choose C c φF ψF hC hc hF using fun v : T ↦
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_finite_place
+    meyerStripMultiplier_finite_place
       T v
   refine Exists.elim
-    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_epsilon_uniform
+    (meyerStripMultiplier_epsilon_uniform
       T H ι₀ (-1 / 2) (1 / 2)) fun Eb hEb ↦ ?_
   have hid (χ : H) (z : ℂ) (hz0 : 0 < z.re) :
       sLocalEpsilonFactor (chartₜ(T, χ.val.val) z) *
           ((∏ w, ψA w χ.val.val z) * ∏ v : T, ψF v χ.val.val z) =
         ((∏ w, φA w χ.val.val z) * ∏ v : T, φF v χ.val.val z) *
           sLocalRhoFactor (chartₜ(T, χ.val.val) z) :=
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_tate_identity
+    meyerStripMultiplier_tate_identity
       T χ.val.val (fun w : InfinitePlace F ↦ φA w χ.val.val)
       (fun w : InfinitePlace F ↦ ψA w χ.val.val) (fun v : T ↦ φF v χ.val.val)
       (fun v : T ↦ ψF v χ.val.val) (fun w ↦ (hA w χ.val.val).1)
@@ -8626,7 +8703,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   have hE1 (χ : H) : Differentiable ℂ fun z ↦ sLocalEpsilonFactor (chartₜ(T, χ.val.val) z) :=
     fun z ↦ ((sLocalEpsilonFactor_entire χ.val.val) z (mem_univ z)).differentiableAt
   have hb := fun χ : H ↦
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_bounds
+    meyerStripMultiplier_bounds
       (ι := InfinitePlace F) (κ := T) (fun w : InfinitePlace F ↦ φA w χ.val.val)
       (fun w : InfinitePlace F ↦ ψA w χ.val.val) (fun v : T ↦ φF v χ.val.val)
       (fun v : T ↦ ψF v χ.val.val) (fun z ↦ sLocalEpsilonFactor (chartₜ(T, χ.val.val) z))
@@ -8661,7 +8738,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- One sequence and its partner under the functional equation: the bounds on the line of
 real part `3/2` for both give the bounds on every line of real part in `(0, 1]` for the
 first. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_line
+private theorem meyerCriticalStrip_line
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (hτ : RightInverse τ (sIdeleQuotientNorm F T)) (f f' : ℕ → ℬₛ(T))
     (hglue : ∀ n (χ : PontryaginDual (SIdeleQuotient F T)) (h g : ℂ → ℂ), Differentiable ℂ h →
@@ -8716,7 +8793,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       sLocalThetaMellinIntegral (f' n) (chartₜ(T,χ.val) z)) Hf' (Hf ⊔ Hf') hf'K (3 / 2) hsf'
     hwf' (p + p₀) (k + N) (m + N)) fun B₂ hB₂ ↦ ?_
   refine ⟨C * 2 ^ N * max B₁ B₂ / c, fun χ n z hz ↦ ?_⟩
-  refine sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_bound
+  refine meyerCriticalStrip_bound
     T χ.val.val (f n) (f' n) (h χ) (g χ) (hh χ) (hg χ)
     (hglue n χ.val.val (h χ) (g χ) (hh χ) (hg χ) (hρ χ)) (p χ) (p₀ χ) C c B₁ B₂ k m N
     (apply_nonneg p χ) (apply_nonneg p₀ χ) hC hc.1 (hhb χ) (hgb χ) ?_ (χ.val.val)⁻¹ rfl ?_ z
@@ -8727,7 +8804,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     exact hb
   · intro s hs
     have hb :=
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_inverse_index
+      meyerCriticalStrip_inverse_index
         (P := PontryaginDual (SIdeleQuotient F T))
         (PontryaginDual.map τ).ker (Hf ⊔ Hf')
         (fun (n : ℕ) (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ) ↦
@@ -8784,10 +8861,10 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       Set.mem_insert_of_mem _ (Set.mem_singleton _)
     refine Exists.elim (hw v hf (3 / 2) h2) fun Hf hx ↦ ?_
     refine Exists.elim (hw _ hF (3 / 2) h2) fun Hf' hx' ↦ ?_
-    exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_line
+    exact meyerCriticalStrip_line
       T τ hτ v (fun n ↦ sAdeleSchwartzFourier (v n))
       (fun n χ h g hh hg hρ z hz0 hz1 ↦
-        (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_equation_glue
+        (meyerCriticalStrip_equation_glue
           T χ (v n) h g hh hg hρ z hz0 hz1).1)
       Hf Hf' hx.1 hx'.1 hx.2.1 hx.2.2 hx'.2.1 hx'.2.2 a ha h1
   · have hfF' : f = fun n ↦ sAdeleSchwartzFourier (v n) := Set.mem_singleton_iff.mp hfF
@@ -8796,10 +8873,10 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       Set.mem_insert _ _
     refine Exists.elim (hw _ hf (3 / 2) h2) fun Hf hx ↦ ?_
     refine Exists.elim (hw v hV (3 / 2) h2) fun Hf' hx' ↦ ?_
-    exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_line
+    exact meyerCriticalStrip_line
       T τ hτ (fun n ↦ sAdeleSchwartzFourier (v n)) v
       (fun n χ h g hh hg hρ z hz0 hz1 ↦
-        (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_equation_glue
+        (meyerCriticalStrip_equation_glue
           T χ (v n) h g hh hg hρ z hz0 hz1).2)
       Hf Hf' hx.1 hx'.1 hx.2.1 hx.2.2 hx'.2.1 hx'.2.2 a ha h1
 
@@ -8808,7 +8885,7 @@ local notation "kern(" Λ ", " c ", " z ", " t ")" =>
 
 /-- The Beta integral is at most `1 / x₀` when the first exponent has real part at least
 `x₀ > 0` and the second has real part at least one. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_beta_bound
+private theorem meyerPositiveLines_beta_bound
     (x₀ : ℝ) (hx₀ : 0 < x₀) (u δ : ℂ) (hu : x₀ ≤ u.re) (hδ : 1 ≤ δ.re) :
     ‖Complex.betaIntegral u δ‖ ≤ 1 / x₀ := by
   have hg : IntervalIntegrable (fun x : ℝ ↦ x ^ (x₀ - 1)) volume 0 1 :=
@@ -8846,7 +8923,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- Gamma at a point divided by Gamma at a point further right by a step of real part between
 one and `D₁`: the quotient grows at most like the inverse of Gamma at the step. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_gamma_quotient_step
+private theorem meyerPositiveLines_gamma_quotient_step
     (x₀ D₁ : ℝ) (hx₀ : 0 < x₀) :
     ∃ C : ℝ, 0 ≤ C ∧ ∀ u δ : ℂ, x₀ ≤ u.re → 1 ≤ δ.re → δ.re ≤ D₁ →
       ‖Complex.Gamma u‖ * ‖(Complex.Gamma (u + δ))⁻¹‖ ≤
@@ -8856,7 +8933,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   have hu0 : 0 < u.re := hx₀.trans_le hu
   have hδ0 : 0 < δ.re := by linarith
   have key := Complex.Gamma_mul_Gamma_eq_betaIntegral hu0 hδ0
-  have hB := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_beta_bound x₀ hx₀ u δ hu h1
+  have hB := meyerPositiveLines_beta_bound x₀ hx₀ u δ hu h1
   have hΓδ : Complex.Gamma δ ≠ 0 := Complex.Gamma_ne_zero_of_re_pos hδ0
   have hΓs : Complex.Gamma (u + δ) ≠ 0 :=
     Complex.Gamma_ne_zero_of_re_pos (by simp only [Complex.add_re]; linarith)
@@ -8873,7 +8950,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The inverse of Gamma at `s` is at most a polynomial factor times the inverse of Gamma at
 `s + j`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_inv_gamma_shift
+private theorem meyerPositiveLines_inv_gamma_shift
     (j : ℕ) : ∀ s : ℂ,
     ‖(Complex.Gamma s)⁻¹‖ ≤ (‖s‖ + j) ^ j * ‖(Complex.Gamma (s + j))⁻¹‖ := by
   induction j with
@@ -8906,14 +8983,14 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The Gamma quotient with the exact exponential rate, uniformly in the real part: only the
 difference of the real parts has to be bounded. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_gamma_quotient_uniform
+private theorem meyerPositiveLines_gamma_quotient_uniform
     (x₀ D₀ : ℝ) (hx₀ : 0 < x₀) :
     ∃ (C : ℝ) (N : ℕ), 0 ≤ C ∧ ∀ s s' : ℂ, x₀ ≤ s'.re → |s.re - s'.re| ≤ D₀ →
       ‖Complex.Gamma s'‖ * ‖(Complex.Gamma s)⁻¹‖ ≤
         C * (1 + ‖s‖) ^ N *
           ((1 + |s.im - s'.im|) * Real.exp (Real.pi * |s.im - s'.im| / 2)) := by
   let J : ℕ := ⌈D₀⌉₊ + 2
-  obtain ⟨C, hC, h⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_gamma_quotient_step x₀ (D₀ + J + 1) hx₀
+  obtain ⟨C, hC, h⟩ := meyerPositiveLines_gamma_quotient_step x₀ (D₀ + J + 1) hx₀
   refine ⟨C * (1 + J) ^ J, J, by positivity, fun s s' hs' hd ↦ ?_⟩
   have hd' := abs_le.mp hd
   let j : ℕ := ⌈s'.re - s.re + 1⌉₊
@@ -8933,7 +9010,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   have step := h s' δ hs' hδ1 hδ2
   have hsum : s' + δ = s + j := by simp [δ]
   rw [hsum, hδim] at step
-  have hshift := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_inv_gamma_shift j s
+  have hshift := meyerPositiveLines_inv_gamma_shift j s
   have hbase : ‖s‖ + j ≤ (1 + J) * (1 + ‖s‖) := by
     have := norm_nonneg s
     have hJ0 : (0 : ℝ) ≤ J := Nat.cast_nonneg _
@@ -8956,32 +9033,32 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         rw [mul_pow]; ring
 
 /-- The real part of the point `c + t i` of the vertical line of real part `c`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_re
+private theorem meyerPositiveLines_line_re
     (c t : ℝ) : ((c : ℂ) + t * Complex.I).re = c := by simp
 
 /-- The imaginary part of the point `c + t i` of the vertical line of real part `c`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_im
+private theorem meyerPositiveLines_line_im
     (c t : ℝ) : ((c : ℂ) + t * Complex.I).im = t := by simp
 
 /-- A point off the vertical line of real part `c` is different from every point of the line. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_sub_ne
+private theorem meyerPositiveLines_line_sub_ne
     (c t : ℝ) (z : ℂ) (hz : z.re ≠ c) :
     (c : ℂ) + t * Complex.I - z ≠ 0 := by
   intro h
   have h' := congrArg Complex.re h
-  rw [Complex.sub_re, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_re, Complex.zero_re] at h'
+  rw [Complex.sub_re, meyerPositiveLines_line_re, Complex.zero_re] at h'
   exact hz (by linarith)
 
 /-- The distance from `z` to a point of the vertical line of real part `c` is at least the
 horizontal distance from `z` to the line. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_sub_norm_ge
+private theorem meyerPositiveLines_line_sub_norm_ge
     (c t : ℝ) (z : ℂ) :
     |z.re - c| ≤ ‖(c : ℂ) + t * Complex.I - z‖ := by
   have h := Complex.abs_re_le_norm ((c : ℂ) + t * Complex.I - z)
-  rwa [Complex.sub_re, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_re, abs_sub_comm] at h
+  rwa [Complex.sub_re, meyerPositiveLines_line_re, abs_sub_comm] at h
 
 /-- The modulus of the Gaussian factor. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_norm_gauss
+private theorem meyerPositiveLines_norm_gauss
     (z w : ℂ) :
     ‖Complex.exp ((z - w) ^ 2)‖ =
       Real.exp ((z.re - w.re) ^ 2) * Real.exp (-(w.im - z.im) ^ 2) := by
@@ -8991,14 +9068,14 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   ring
 
 /-- The shifted Gaussian `t ↦ exp (-(t - y)²)` is integrable. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_gauss_integrable
+private theorem meyerPositiveLines_gauss_integrable
     (y : ℝ) :
     Integrable fun t : ℝ ↦ Real.exp (-(t - y) ^ 2) := by
   have h := (integrable_exp_neg_mul_sq (b := 1) one_pos).comp_sub_right y
   simpa using h
 
 /-- The function `u ↦ exp (κ |u| - u²)` is integrable. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_exp_abs_sq_integrable
+private theorem meyerPositiveLines_exp_abs_sq_integrable
     (κ : ℝ) :
     Integrable fun u : ℝ ↦ Real.exp (κ * |u| - u ^ 2) := by
   have hc : Continuous fun u : ℝ ↦ Real.exp (κ * |u| - u ^ 2) :=
@@ -9010,32 +9087,33 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   nlinarith [sq_nonneg (κ - |u|), sq_abs u]
 
 /-- The kernel on the line of real part `c`, at a point off the line. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_kernel_norm_le
+private theorem meyerPositiveLines_kernel_norm_le
     (Λ : ℂ → ℂ) (z : ℂ) (c t : ℝ) (hz : z.re ≠ c) :
     ‖kern(Λ, c, z, t)‖ ≤
       Real.exp ((z.re - c) ^ 2) * Real.exp (-(t - z.im) ^ 2) * ‖Λ (c + t * Complex.I)‖ /
         |z.re - c| := by
-  rw [norm_div, norm_mul, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_norm_gauss, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_re, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_im]
+  rw [norm_div, norm_mul, meyerPositiveLines_norm_gauss,
+      meyerPositiveLines_line_re, meyerPositiveLines_line_im]
   exact div_le_div_of_nonneg_left (by positivity) (abs_pos.mpr (sub_ne_zero.mpr hz))
-    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_sub_norm_ge c t z)
+    (meyerPositiveLines_line_sub_norm_ge c t z)
 
 /-- The kernel on the line of real part `c`, at a point off the line, is integrable along the
 line when `Λ` is continuous and bounded on it. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_kernel_integrable
+private theorem meyerPositiveLines_kernel_integrable
     (Λ : ℂ → ℂ) (z : ℂ) (c M : ℝ) (hz : z.re ≠ c)
     (hc : Continuous fun t : ℝ ↦ Λ (c + t * Complex.I))
     (hM : ∀ t : ℝ, ‖Λ (c + t * Complex.I)‖ ≤ M) :
     Integrable fun t : ℝ ↦ kern(Λ, c, z, t) := by
   have hcont : Continuous fun t : ℝ ↦ kern(Λ, c, z, t) :=
     ((Complex.continuous_exp.comp (by fun_prop)).mul hc).div (by fun_prop)
-      fun t ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_sub_ne c t z hz
+      fun t ↦ meyerPositiveLines_line_sub_ne c t z hz
   refine Integrable.mono'
     (g := fun t : ℝ ↦ Real.exp ((z.re - c) ^ 2) * M / |z.re - c| * Real.exp (-(t - z.im) ^ 2))
-    ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_gauss_integrable z.im).const_mul _) hcont.aestronglyMeasurable
+    ((meyerPositiveLines_gauss_integrable z.im).const_mul _) hcont.aestronglyMeasurable
     (Eventually.of_forall fun t ↦ ?_)
   calc ‖kern(Λ, c, z, t)‖
       ≤ Real.exp ((z.re - c) ^ 2) * Real.exp (-(t - z.im) ^ 2) * ‖Λ (c + t * Complex.I)‖ /
-          |z.re - c| := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_kernel_norm_le Λ z c t hz
+          |z.re - c| := meyerPositiveLines_kernel_norm_le Λ z c t hz
     _ ≤ Real.exp ((z.re - c) ^ 2) * Real.exp (-(t - z.im) ^ 2) * M / |z.re - c| :=
         div_le_div_of_nonneg_right (mul_le_mul_of_nonneg_left (hM t) (by positivity))
           (abs_nonneg _)
@@ -9043,7 +9121,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- Shifting a vertical line across a simple pole, for a function with Gaussian decay in the
 strip. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_shift
+private theorem meyerPositiveLines_line_shift
     (Ψ : ℂ → ℂ) (a b c d C y₀ : ℝ) (q : ℂ)
     (hΨ : DifferentiableOn ℂ Ψ (Complex.re ⁻¹' Ioo a b)) (ha : a < c) (hb : d < b)
     (hq : q.re ∈ Ioo c d)
@@ -9059,28 +9137,28 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     have hcontΨ : Continuous fun t : ℝ ↦ Ψ (σ + t * Complex.I) :=
       hΨ.continuousOn.comp_continuous (by fun_prop) fun t ↦ by
         change ((σ : ℂ) + t * Complex.I).re ∈ Ioo a b
-        rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_re]
+        rw [meyerPositiveLines_line_re]
         exact ⟨ha.trans_le hσ.1, hσ.2.trans_lt hb⟩
     have hcont : Continuous fun t : ℝ ↦ Ψ (σ + t * Complex.I) / ((σ + t * Complex.I) - q) :=
-      hcontΨ.div (by fun_prop) fun t ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_sub_ne σ t q hσq
+      hcontΨ.div (by fun_prop) fun t ↦ meyerPositiveLines_line_sub_ne σ t q hσq
     refine Integrable.mono'
       (g := fun t : ℝ ↦ C / |q.re - σ| * Real.exp (-(t - y₀) ^ 2))
-      ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_gauss_integrable y₀).const_mul _) hcont.aestronglyMeasurable
+      ((meyerPositiveLines_gauss_integrable y₀).const_mul _) hcont.aestronglyMeasurable
       (Eventually.of_forall fun t ↦ ?_)
-    have h := hbound (σ + t * Complex.I) (by rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_re]; exact hσ)
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_im] at h
+    have h := hbound (σ + t * Complex.I) (by rw [meyerPositiveLines_line_re]; exact hσ)
+    rw [meyerPositiveLines_line_im] at h
     rw [norm_div]
     calc ‖Ψ (σ + t * Complex.I)‖ / ‖(σ : ℂ) + t * Complex.I - q‖
         ≤ C * Real.exp (-(t - y₀) ^ 2) / |q.re - σ| :=
           div_le_div₀ (by positivity) h (abs_pos.mpr (sub_ne_zero.mpr hσq))
-            (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_sub_norm_ge σ t q)
+            (meyerPositiveLines_line_sub_norm_ge σ t q)
       _ = _ := by ring
   have hdecay : ∀ᶠ y : ℝ in comap abs atTop, ∀ x ∈ Icc c d,
       ‖Ψ ((x : ℂ) + y * Complex.I)‖ ≤ 4 * C / |y| := by
     have hy : Tendsto (abs : ℝ → ℝ) (comap abs atTop) atTop := tendsto_comap
     filter_upwards [hy.eventually (eventually_ge_atTop (2 * |y₀| + 2))] with y hy x hx
-    have h := hbound (x + y * Complex.I) (by rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_re]; exact hx)
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_im] at h
+    have h := hbound (x + y * Complex.I) (by rw [meyerPositiveLines_line_re]; exact hx)
+    rw [meyerPositiveLines_line_im] at h
     refine h.trans ?_
     have hy1 : 1 ≤ |y| := by linarith [abs_nonneg y₀]
     have h1 : |y| / 2 ≤ |y - y₀| := by linarith [abs_sub_abs_le_abs_sub y y₀]
@@ -9098,7 +9176,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     (hint d ⟨hcd, le_rfl⟩ hq.2.ne)
 
 /-- The jump of the Gaussian Cauchy transform across the point `z`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_jump
+private theorem meyerPositiveLines_line_jump
     (Λ : ℂ → ℂ) (hΛ : DifferentiableOn ℂ Λ (Complex.re ⁻¹' Ioo 0 1))
     (c c' M : ℝ) (hc : 0 < c) (hc' : c' < 1)
     (hM : ∀ ζ : ℂ, c ≤ ζ.re → ζ.re ≤ c' → ‖Λ ζ‖ ≤ M) (z : ℂ) (hz : z.re ∈ Ioo c c') :
@@ -9110,7 +9188,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       ‖Ψ w‖ ≤ Real.exp 1 * M * Real.exp (-(w.im - z.im) ^ 2) := by
     intro w hw
     change ‖Complex.exp ((z - w) ^ 2) * Λ w‖ ≤ _
-    rw [norm_mul, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_norm_gauss]
+    rw [norm_mul, meyerPositiveLines_norm_gauss]
     have h1 : (z.re - w.re) ^ 2 ≤ 1 := by
       have h : |z.re - w.re| ≤ 1 := by
         rw [abs_le]
@@ -9123,7 +9201,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
           mul_le_mul (mul_le_mul_of_nonneg_right (Real.exp_le_exp.mpr h1) (Real.exp_pos _).le)
             (hM w hw.1 hw.2) (norm_nonneg _) (by positivity)
       _ = _ := by ring
-  have key := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_shift Ψ 0 1 c c' (Real.exp 1 * M) z.im z hΨ hc hc' hz hb
+  have key := meyerPositiveLines_line_shift Ψ 0 1 c c' (Real.exp 1 * M) z.im z hΨ hc hc' hz hb
   have hz' : Ψ z = Λ z := by
     change Complex.exp ((z - z) ^ 2) * Λ z = Λ z
     rw [sub_self, zero_pow two_ne_zero, Complex.exp_zero, one_mul]
@@ -9131,7 +9209,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   exact key
 
 /-- The Gaussian Cauchy transform does not change when the line moves without crossing `z`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_nojump_aux
+private theorem meyerPositiveLines_nojump_aux
     (Λ : ℂ → ℂ) (a b c c' M : ℝ) (z : ℂ)
     (hΛ : DifferentiableOn ℂ Λ (Complex.re ⁻¹' Ioo a b)) (ha : a < c) (hcc : c < c')
     (hb : c' < b) (hz : z.re ∉ Ioo a b)
@@ -9184,7 +9262,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       rw [add_mul, one_mul]
       linarith
     change ‖Complex.exp ((z - w) ^ 2) * Λ w / (w - z) * (w - p)‖ ≤ _
-    rw [norm_mul, norm_div, norm_mul, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_norm_gauss]
+    rw [norm_mul, norm_div, norm_mul, meyerPositiveLines_norm_gauss]
     have hA : Real.exp ((z.re - w.re) ^ 2) * Real.exp (-(w.im - z.im) ^ 2) * ‖Λ w‖ ≤
         Real.exp ((|z.re| + |c| + |c'|) ^ 2) * Real.exp (-(w.im - z.im) ^ 2) * M :=
       mul_le_mul (mul_le_mul_of_nonneg_right (Real.exp_le_exp.mpr h1) (Real.exp_pos _).le) h2
@@ -9200,7 +9278,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   have hp : p.re ∈ Ioo c c' := by
     rw [hpre]
     constructor <;> linarith
-  have key := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_shift Ψ a b c c' _ z.im p hΨ ha hb hp hbd
+  have key := meyerPositiveLines_line_shift Ψ a b c c' _ z.im p hΨ ha hb hp hbd
   have hΨp : Ψ p = 0 := by
     change _ * (p - p) = 0
     rw [sub_self, mul_zero]
@@ -9208,30 +9286,31 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       (∫ t : ℝ, Ψ (σ + t * Complex.I) / ((σ + t * Complex.I) - p)) =
         ∫ t : ℝ, kern(Λ, σ, z, t) := by
     refine integral_congr_ae (Eventually.of_forall fun t ↦ ?_)
-    exact mul_div_cancel_right₀ _ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_sub_ne σ t p hσ)
+    exact mul_div_cancel_right₀ _ (meyerPositiveLines_line_sub_ne σ t p hσ)
   rw [e c' (by rw [hpre]; linarith), e c (by rw [hpre]; linarith), hΨp, mul_zero] at key
   exact sub_eq_zero.mp key
 
 /-- The Gaussian Cauchy transform does not change when the line moves inside the strip
 `0 < re < 1` without crossing `z`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_no_jump
+private theorem meyerPositiveLines_line_no_jump
     (Λ : ℂ → ℂ) (hΛ : DifferentiableOn ℂ Λ (Complex.re ⁻¹' Ioo 0 1))
     (c c' M : ℝ) (hc : 0 < c) (hcc : c < c') (hc' : c' < 1)
     (hM : ∀ ζ : ℂ, c ≤ ζ.re → ζ.re ≤ c' → ‖Λ ζ‖ ≤ M) (z : ℂ)
     (hz : z.re < c ∨ c' < z.re) :
     (∫ t : ℝ, kern(Λ, c', z, t)) = ∫ t : ℝ, kern(Λ, c, z, t) := by
   rcases hz with hz | hz
-  · refine sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_nojump_aux Λ (max z.re 0) 1 c c' M z (hΛ.mono fun w hw ↦ ?_) (max_lt hz hc) hcc
+  · refine meyerPositiveLines_nojump_aux Λ (max z.re 0) 1 c c' M z
+      (hΛ.mono fun w hw ↦ ?_) (max_lt hz hc) hcc
       hc' (fun h ↦ ?_) hM
     · exact ⟨(le_max_right _ _).trans_lt hw.1, hw.2⟩
     · exact absurd h.1 (not_lt.mpr (le_max_left _ _))
-  · refine sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_nojump_aux Λ 0 (min z.re 1) c c' M z (hΛ.mono fun w hw ↦ ?_) hc hcc
+  · refine meyerPositiveLines_nojump_aux Λ 0 (min z.re 1) c c' M z (hΛ.mono fun w hw ↦ ?_) hc hcc
       (lt_min hz hc') (fun h ↦ ?_) hM
     · exact ⟨hw.1, hw.2.trans_le (min_le_right _ _)⟩
     · exact absurd h.2 (not_lt.mpr (min_le_left _ _))
 
 /-- The Gaussian Cauchy transform over a vertical line is holomorphic off the line. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_G_differentiableAt
+private theorem meyerPositiveLines_G_differentiableAt
     (Λ : ℂ → ℂ) (c M : ℝ)
     (hcont : Continuous fun t : ℝ ↦ Λ (c + t * Complex.I))
     (hM : ∀ t : ℝ, ‖Λ (c + t * Complex.I)‖ ≤ M) (z₀ : ℂ) (hz₀ : z₀.re ≠ c) :
@@ -9254,7 +9333,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         exact abs_le.mpr ⟨by linarith, by linarith⟩
     · exact abs_le.mpr ⟨by linarith [neg_abs_le z₀.im], by linarith [le_abs_self z₀.im]⟩
   have hne (z : ℂ) (hz : z ∈ Metric.ball z₀ ε) (t : ℝ) : (c : ℂ) + t * Complex.I - z ≠ 0 :=
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_sub_ne c t z fun h ↦ by
+    meyerPositiveLines_line_sub_ne c t z fun h ↦ by
       have h' := (hball z hz).1
       rw [h, sub_self, abs_zero] at h'
       linarith
@@ -9267,7 +9346,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       (((Complex.continuous_exp.comp (by fun_prop)).mul hcont).div (by fun_prop)
         (hne z hz)).aestronglyMeasurable
   have hFi : Integrable (fun t : ℝ ↦ kern(Λ, c, z₀, t)) volume :=
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_kernel_integrable Λ z₀ c M hz₀ hcont hM
+    meyerPositiveLines_kernel_integrable Λ z₀ c M hz₀ hcont hM
   have hF'm : AEStronglyMeasurable (F' z₀) volume :=
     (((Complex.continuous_exp.comp (by fun_prop)).mul hcont).mul
       ((((by fun_prop : Continuous fun t : ℝ ↦ (c : ℂ) + t * Complex.I - z₀)).inv₀
@@ -9278,7 +9357,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     obtain ⟨hb1, hb2, hb3⟩ := hball z hz
     change ‖Complex.exp ((z - (c + t * Complex.I)) ^ 2) * Λ (c + t * Complex.I) *
       (((c + t * Complex.I) - z)⁻¹ ^ 2 - 2)‖ ≤ _
-    rw [norm_mul, norm_mul, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_norm_gauss, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_re, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_im]
+    rw [norm_mul, norm_mul, meyerPositiveLines_norm_gauss,
+        meyerPositiveLines_line_re, meyerPositiveLines_line_im]
     have h1 : Real.exp ((z.re - c) ^ 2) ≤ Real.exp ((3 * ε) ^ 2) := by
       rw [Real.exp_le_exp, ← sq_abs (z.re - c)]
       exact pow_le_pow_left₀ (abs_nonneg _) hb2 2
@@ -9293,7 +9373,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     have h4 : ‖((c : ℂ) + t * Complex.I - z)⁻¹ ^ 2 - 2‖ ≤ ε⁻¹ ^ 2 + 2 := by
       refine (norm_sub_le _ _).trans ?_
       rw [norm_pow, norm_inv, Complex.norm_ofNat]
-      have h5 : ε ≤ ‖(c : ℂ) + t * Complex.I - z‖ := hb1.trans (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_sub_norm_ge c t z)
+      have h5 : ε ≤ ‖(c : ℂ) + t * Complex.I - z‖ :=
+          hb1.trans (meyerPositiveLines_line_sub_norm_ge c t z)
       have h6 : ‖(c : ℂ) + t * Complex.I - z‖⁻¹ ≤ ε⁻¹ := inv_anti₀ hε0 h5
       linarith [pow_le_pow_left₀ (by positivity) h6 2]
     calc Real.exp ((z.re - c) ^ 2) * Real.exp (-(t - z.im) ^ 2) * ‖Λ (c + t * Complex.I)‖ *
@@ -9330,13 +9411,13 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     hs hFm hFi hF'm hbound hbi hdiff).2.differentiableAt
 
 /-- The Gaussian Cauchy transform of `Λ` over the line of real part `c`. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral
+private noncomputable def meyerPositiveLines_lineIntegral
     (Λ : ℂ → ℂ) (c : ℝ) (z : ℂ) : ℂ :=
   1 / (2 * (Real.pi : ℂ)) * ∫ t : ℝ, kern(Λ, c, z, t)
 
 /-- The partition function: an entire function that is `Δ G_c` to the left of the line
 of real part `c` and `1 + Δ G_c` to the right of it, for every `c` in `(0, 1)`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_partition
+private theorem meyerPositiveLines_partition
     (Δ Λ : ℂ → ℂ) (hΔ : Differentiable ℂ Δ)
     (hΛ : DifferentiableOn ℂ Λ (Complex.re ⁻¹' Ioo 0 1))
     (hΔΛ : ∀ ζ : ℂ, 0 < ζ.re → ζ.re < 1 → Δ ζ * Λ ζ = 1)
@@ -9350,58 +9431,65 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   have hπ : (2 * (Real.pi : ℂ)) ≠ 0 :=
     mul_ne_zero two_ne_zero (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero)
   have hsame (c c' : ℝ) (z : ℂ) (hc : 0 < c) (hcc : c < c') (hc' : c' < 1)
-      (hz : z.re < c ∨ c' < z.re) : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ c' z = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ c z := by
+      (hz : z.re < c ∨ c' < z.re) : meyerPositiveLines_lineIntegral Λ c' z =
+          meyerPositiveLines_lineIntegral Λ c z := by
     obtain ⟨M, hM⟩ := hbd c c' hc hcc.le hc'
     exact congrArg (fun x : ℂ ↦ 1 / (2 * (Real.pi : ℂ)) * x)
-      (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_no_jump Λ hΛ c c' M hc hcc hc' hM z hz)
+      (meyerPositiveLines_line_no_jump Λ hΛ c c' M hc hcc hc' hM z hz)
   have hjump (c c' : ℝ) (z : ℂ) (hc : 0 < c) (hc' : c' < 1) (hz : z.re ∈ Ioo c c') :
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ c' z = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ c z + Λ z := by
+      meyerPositiveLines_lineIntegral Λ c' z = meyerPositiveLines_lineIntegral Λ c z + Λ z := by
     obtain ⟨M, hM⟩ := hbd c c' hc (hz.1.trans hz.2).le hc'
-    have h := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_jump Λ hΛ c c' M hc hc' hM z hz
+    have h := meyerPositiveLines_line_jump Λ hΛ c c' M hc hc' hM z hz
     have h2 : 1 / (2 * (Real.pi : ℂ)) * (2 * Real.pi * Λ z) = Λ z := by
       field_simp
     change 1 / (2 * (Real.pi : ℂ)) * (∫ t : ℝ, kern(Λ, c', z, t)) =
       1 / (2 * (Real.pi : ℂ)) * (∫ t : ℝ, kern(Λ, c, z, t)) + Λ z
     rw [sub_eq_iff_eq_add.mp h, mul_add, h2, add_comm]
   have hleft (c₁ c₂ : ℝ) (z : ℂ) (h1 : 0 < c₁) (h1' : c₁ < 1) (h2 : 0 < c₂) (h2' : c₂ < 1)
-      (hz1 : z.re < c₁) (hz2 : z.re < c₂) : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ c₁ z = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ c₂ z := by
+      (hz1 : z.re < c₁) (hz2 : z.re < c₂) : meyerPositiveLines_lineIntegral Λ c₁ z =
+          meyerPositiveLines_lineIntegral Λ c₂ z := by
     rcases lt_trichotomy c₁ c₂ with h | h | h
     · exact (hsame c₁ c₂ z h1 h h2' (Or.inl hz1)).symm
     · rw [h]
     · exact hsame c₂ c₁ z h2 h h1' (Or.inl hz2)
   have hright (c₁ c₂ : ℝ) (z : ℂ) (h1 : 0 < c₁) (h1' : c₁ < 1) (h2 : 0 < c₂) (h2' : c₂ < 1)
-      (hz1 : c₁ < z.re) (hz2 : c₂ < z.re) : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ c₁ z = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ c₂ z := by
+      (hz1 : c₁ < z.re) (hz2 : c₂ < z.re) : meyerPositiveLines_lineIntegral Λ c₁ z =
+          meyerPositiveLines_lineIntegral Λ c₂ z := by
     rcases lt_trichotomy c₁ c₂ with h | h | h
     · exact (hsame c₁ c₂ z h1 h h2' (Or.inr hz2)).symm
     · rw [h]
     · exact hsame c₂ c₁ z h2 h h1' (Or.inr hz1)
   let om : ℂ → ℂ := fun z ↦
-    if z.re < 1 / 2 then Δ z * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ (3 / 4) z else 1 + Δ z * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ (1 / 4) z
+    if z.re < 1 / 2 then Δ z * meyerPositiveLines_lineIntegral Λ (3 / 4) z
+    else 1 + Δ z * meyerPositiveLines_lineIntegral Λ (1 / 4) z
   have hL (c : ℝ) (z : ℂ) (hc : 0 < c) (hc' : c < 1) (hz : z.re < c) :
-      om z = Δ z * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ c z := by
-    change (if z.re < 1 / 2 then Δ z * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ (3 / 4) z else 1 + Δ z * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ (1 / 4) z) = _
+      om z = Δ z * meyerPositiveLines_lineIntegral Λ c z := by
+    change (if z.re < 1 / 2 then Δ z * meyerPositiveLines_lineIntegral Λ (3 / 4) z
+      else 1 + Δ z * meyerPositiveLines_lineIntegral Λ (1 / 4) z) = _
     by_cases h : z.re < 1 / 2
     · rw [ite_eq_left h, hleft (3 / 4) c z (by norm_num) (by norm_num) hc hc' (by linarith) hz]
     · rw [ite_eq_right h, hjump (1 / 4) c z (by norm_num) hc' ⟨by linarith [not_lt.mp h], hz⟩,
         mul_add, hΔΛ z (by linarith [not_lt.mp h]) (hz.trans hc'), add_comm]
   have hR (c : ℝ) (z : ℂ) (hc : 0 < c) (hc' : c < 1) (hz : c < z.re) :
-      om z = 1 + Δ z * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ c z := by
-    change (if z.re < 1 / 2 then Δ z * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ (3 / 4) z else 1 + Δ z * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ (1 / 4) z) = _
+      om z = 1 + Δ z * meyerPositiveLines_lineIntegral Λ c z := by
+    change (if z.re < 1 / 2 then Δ z * meyerPositiveLines_lineIntegral Λ (3 / 4) z
+      else 1 + Δ z * meyerPositiveLines_lineIntegral Λ (1 / 4) z) = _
     by_cases h : z.re < 1 / 2
     · rw [ite_eq_left h, hjump c (3 / 4) z hc (by norm_num) ⟨hz, by linarith⟩, mul_add,
         hΔΛ z (hc.trans hz) (by linarith), add_comm]
     · rw [ite_eq_right h, hright (1 / 4) c z (by norm_num) (by norm_num) hc hc'
         (by linarith [not_lt.mp h]) hz]
   have hGd (c : ℝ) (hc : 0 < c) (hc' : c < 1) (z₀ : ℂ) (hz₀ : z₀.re ≠ c) :
-      DifferentiableAt ℂ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ c) z₀ := by
+      DifferentiableAt ℂ (meyerPositiveLines_lineIntegral Λ c) z₀ := by
     obtain ⟨M, hM⟩ := hbd c c hc le_rfl hc'
     have hcont : Continuous fun t : ℝ ↦ Λ (c + t * Complex.I) :=
       hΛ.continuousOn.comp_continuous (by fun_prop) fun t ↦ by
         change ((c : ℂ) + t * Complex.I).re ∈ Ioo (0 : ℝ) 1
-        rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_re]
+        rw [meyerPositiveLines_line_re]
         exact ⟨hc, hc'⟩
-    exact (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_G_differentiableAt Λ c M hcont
-      (fun t ↦ hM _ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_re c t).ge (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_re c t).le) z₀ hz₀).const_mul _
+    exact (meyerPositiveLines_G_differentiableAt Λ c M hcont
+      (fun t ↦ hM _ (meyerPositiveLines_line_re c t).ge
+          (meyerPositiveLines_line_re c t).le) z₀ hz₀).const_mul _
   refine ⟨om, fun z₀ ↦ ?_, hL, hR⟩
   rcases lt_or_ge z₀.re (3 / 4) with h | h
   · have hU : {z : ℂ | z.re < 3 / 4} ∈ 𝓝 z₀ :=
@@ -9420,7 +9508,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The bound for the partition function, with an arbitrary factor `A`. The constant
 `(1 / (2π)) ∫ exp (κ |u| - u²) du` depends only on `κ`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_partition_bound
+private theorem meyerPositiveLines_partition_bound
     (Λ : ℂ → ℂ) (c κ P : ℝ) (z A : ℂ) (hz : z.re ≠ c)
     (h : ∀ ζ : ℂ, ζ.re = c → ‖A‖ * ‖Λ ζ‖ ≤ P * Real.exp (κ * |z.im - ζ.im|)) :
     ‖A * (1 / (2 * (Real.pi : ℂ)) * ∫ t : ℝ, kern(Λ, c, z, t))‖ ≤
@@ -9429,14 +9517,14 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   have hd : 0 < |z.re - c| := abs_pos.mpr (sub_ne_zero.mpr hz)
   have hg : Integrable fun t : ℝ ↦ P * Real.exp ((z.re - c) ^ 2) / |z.re - c| *
       Real.exp (κ * |t - z.im| - (t - z.im) ^ 2) :=
-    ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_exp_abs_sq_integrable κ).comp_sub_right z.im).const_mul _
+    ((meyerPositiveLines_exp_abs_sq_integrable κ).comp_sub_right z.im).const_mul _
   have hI : ‖∫ t : ℝ, A * kern(Λ, c, z, t)‖ ≤
       ∫ t : ℝ, P * Real.exp ((z.re - c) ^ 2) / |z.re - c| *
         Real.exp (κ * |t - z.im| - (t - z.im) ^ 2) := by
     refine norm_integral_le_of_norm_le hg (Eventually.of_forall fun t ↦ ?_)
-    have h1 := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_kernel_norm_le Λ z c t hz
-    have h2 := h (c + t * Complex.I) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_re c t)
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_im, abs_sub_comm] at h2
+    have h1 := meyerPositiveLines_kernel_norm_le Λ z c t hz
+    have h2 := h (c + t * Complex.I) (meyerPositiveLines_line_re c t)
+    rw [meyerPositiveLines_line_im, abs_sub_comm] at h2
     rw [norm_mul]
     calc ‖A‖ * ‖kern(Λ, c, z, t)‖
         ≤ ‖A‖ * (Real.exp ((z.re - c) ^ 2) * Real.exp (-(t - z.im) ^ 2) *
@@ -9473,9 +9561,10 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The Gaussian Cauchy transform under the reflection `z ↦ 1 - z`: the substitution
 `t ↦ -t` in the kernel. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_posG_reflect
+private theorem meyerDecomposition_posG_reflect
     (Λ Λ' : ℂ → ℂ) (hΛ : ∀ ζ, Λ' ζ = Λ (1 - ζ)) (c : ℝ)
-    (z : ℂ) : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ' (1 - c) (1 - z) = -sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ c z := by
+    (z : ℂ) : meyerPositiveLines_lineIntegral Λ' (1 - c) (1 - z) =
+        -meyerPositiveLines_lineIntegral Λ c z := by
   have hpt (t : ℝ) : kern(Λ', ((1 - c : ℝ) : ℂ), 1 - z, ((-t : ℝ) : ℂ)) =
       -kern(Λ, (c : ℂ), z, (t : ℂ)) := by
     have e1 : ((1 - c : ℝ) : ℂ) + ((-t : ℝ) : ℂ) * Complex.I =
@@ -9500,77 +9589,80 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- On the critical line, a family of partition functions given by the Gaussian Cauchy
 transforms of `Λ χ` satisfies `om χ⁻¹ (1 - z) = 1 - om χ z`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_symmetry
+private theorem meyerDecomposition_symmetry
     {P : Type*} [CommGroup P] (E Λ om : P → ℂ → ℂ)
     (hΛ : ∀ χ ζ, Λ χ⁻¹ ζ = Λ χ (1 - ζ))
     (homL : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → z.re < c →
-      om χ z = E χ z * E χ⁻¹ (1 - z) * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ) c z)
+      om χ z = E χ z * E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) c z)
     (homR : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → c < z.re →
-      om χ z = 1 + E χ z * E χ⁻¹ (1 - z) * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ) c z)
+      om χ z = 1 + E χ z * E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) c z)
     (χ : P) (z : ℂ) (hz : z.re = 1 / 2) : om χ⁻¹ (1 - z) = 1 - om χ z := by
   have h1 : (1 - z).re = 1 / 2 := by rw [Complex.sub_re, Complex.one_re, hz]; norm_num
   rw [homR χ⁻¹ (1 / 4) (1 - z) (by norm_num) (by norm_num) (by rw [h1]; norm_num),
     homL χ (3 / 4) z (by norm_num) (by norm_num) (by rw [hz]; norm_num), inv_inv, sub_sub_cancel]
-  have hG := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_posG_reflect (Λ χ) (Λ χ⁻¹) (hΛ χ) (3 / 4) z
+  have hG := meyerDecomposition_posG_reflect (Λ χ) (Λ χ⁻¹) (hΛ χ) (3 / 4) z
   rw [show (1 : ℝ) - 3 / 4 = 1 / 4 by norm_num] at hG
   rw [hG]
   ring
 
 /-- The glued function: `om · Z` on the right half-plane, its continuation through the
 functional equation on the left. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued
+private noncomputable def meyerDecomposition_glued
     {P : Type*} [CommGroup P] (E ε Λ om : P → ℂ → ℂ)
     (Z Z' : ℕ → P → ℂ → ℂ) (n : ℕ) (χ : P) (z : ℂ) : ℂ :=
   if 0 < z.re then om χ z * Z n χ z
-  else sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ) (1 / 2) z * (ε χ z * E χ⁻¹ (1 - z) ^ 2 * Z' n χ⁻¹ (1 - z))
+  else meyerPositiveLines_lineIntegral (Λ χ) (1 / 2) z *
+    (ε χ z * E χ⁻¹ (1 - z) ^ 2 * Z' n χ⁻¹ (1 - z))
 
 /-- The glued function on the right half-plane is `om · Z`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued_right
+private theorem meyerDecomposition_glued_right
     {P : Type*} [CommGroup P] (E ε Λ om : P → ℂ → ℂ)
     (Z Z' : ℕ → P → ℂ → ℂ) (n : ℕ) (χ : P) (z : ℂ) (hz : 0 < z.re) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued E ε Λ om Z Z' n χ z = om χ z * Z n χ z := by
-  rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued]
+    meyerDecomposition_glued E ε Λ om Z Z' n χ z = om χ z * Z n χ z := by
+  rw [meyerDecomposition_glued]
   exact ite_eq_left_iff.mpr fun h ↦ absurd hz h
 
 /-- To the left of the line of real part `1 / 2`, the glued function is given by its formula
 through the functional equation. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued_left
+private theorem meyerDecomposition_glued_left
     {P : Type*} [CommGroup P] (E ε Λ om : P → ℂ → ℂ)
     (Z Z' : ℕ → P → ℂ → ℂ)
     (homL : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → z.re < c →
-      om χ z = E χ z * E χ⁻¹ (1 - z) * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ) c z)
+      om χ z = E χ z * E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) c z)
     (hglue : ∀ n χ (z : ℂ), 0 < z.re → z.re < 1 →
       E χ z * Z n χ z = ε χ z * E χ⁻¹ (1 - z) * Z' n χ⁻¹ (1 - z))
     (n : ℕ) (χ : P) (z : ℂ) (hz : z.re < 1 / 2) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued E ε Λ om Z Z' n χ z =
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ) (1 / 2) z * (ε χ z * E χ⁻¹ (1 - z) ^ 2 * Z' n χ⁻¹ (1 - z)) := by
-  rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued]
+    meyerDecomposition_glued E ε Λ om Z Z' n χ z =
+      meyerPositiveLines_lineIntegral (Λ χ) (1 / 2) z *
+          (ε χ z * E χ⁻¹ (1 - z) ^ 2 * Z' n χ⁻¹ (1 - z)) := by
+  rw [meyerDecomposition_glued]
   split_ifs with h
   · rw [homL χ (1 / 2) z (by norm_num) (by norm_num) hz]
     have e := hglue n χ z h (by linarith)
-    linear_combination (E χ⁻¹ (1 - z) * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ) (1 / 2) z) * e
+    linear_combination (E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) (1 / 2) z) * e
   · rfl
 
 /-- The Gaussian Cauchy transform over the line of real part `c` is holomorphic off the line,
 for `Λ` holomorphic on the strip `0 < re < 1` and bounded on its closed substrips. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_posG_differentiableAt
+private theorem meyerDecomposition_posG_differentiableAt
     (Λ : ℂ → ℂ)
     (hΛ : DifferentiableOn ℂ Λ (Complex.re ⁻¹' Ioo 0 1))
     (hbd : ∀ c₁ c₂ : ℝ, 0 < c₁ → c₁ ≤ c₂ → c₂ < 1 →
       ∃ M : ℝ, ∀ ζ : ℂ, c₁ ≤ ζ.re → ζ.re ≤ c₂ → ‖Λ ζ‖ ≤ M)
     (c : ℝ) (hc : 0 < c) (hc' : c < 1) (z₀ : ℂ) (hz₀ : z₀.re ≠ c) :
-    DifferentiableAt ℂ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral Λ c) z₀ := by
+    DifferentiableAt ℂ (meyerPositiveLines_lineIntegral Λ c) z₀ := by
   obtain ⟨M, hM⟩ := hbd c c hc le_rfl hc'
   have hcont : Continuous fun t : ℝ ↦ Λ (c + t * Complex.I) :=
     hΛ.continuousOn.comp_continuous (by fun_prop) fun t ↦ by
       change ((c : ℂ) + t * Complex.I).re ∈ Ioo (0 : ℝ) 1
-      rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_re]
+      rw [meyerPositiveLines_line_re]
       exact ⟨hc, hc'⟩
-  exact (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_G_differentiableAt Λ c M hcont
-    (fun t ↦ hM _ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_re c t).ge (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_re c t).le) z₀ hz₀).const_mul _
+  exact (meyerPositiveLines_G_differentiableAt Λ c M hcont
+    (fun t ↦ hM _ (meyerPositiveLines_line_re c t).ge
+        (meyerPositiveLines_line_re c t).le) z₀ hz₀).const_mul _
 
 /-- The glued function is entire, for each index and character. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued_differentiable
+private theorem meyerDecomposition_glued_differentiable
     {P : Type*} [CommGroup P] (E ε Λ om : P → ℂ → ℂ)
     (Z Z' : ℕ → P → ℂ → ℂ) (hE : ∀ χ, Differentiable ℂ (E χ))
     (hε : ∀ χ, Differentiable ℂ (ε χ))
@@ -9579,12 +9671,12 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       ∃ M : ℝ, ∀ ζ : ℂ, c₁ ≤ ζ.re → ζ.re ≤ c₂ → ‖Λ χ ζ‖ ≤ M)
     (hom : ∀ χ, Differentiable ℂ (om χ))
     (homL : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → z.re < c →
-      om χ z = E χ z * E χ⁻¹ (1 - z) * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ) c z)
+      om χ z = E χ z * E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) c z)
     (hglue : ∀ n χ (z : ℂ), 0 < z.re → z.re < 1 →
       E χ z * Z n χ z = ε χ z * E χ⁻¹ (1 - z) * Z' n χ⁻¹ (1 - z))
     (hZd : ∀ n χ, DifferentiableOn ℂ (Z n χ) (Complex.re ⁻¹' Ioi 0))
     (hZ'd : ∀ n χ, DifferentiableOn ℂ (Z' n χ) (Complex.re ⁻¹' Ioi 0)) (n : ℕ) (χ : P) :
-    Differentiable ℂ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued E ε Λ om Z Z' n χ) := by
+    Differentiable ℂ (meyerDecomposition_glued E ε Λ om Z Z' n χ) := by
   intro z₀
   by_cases h : 0 < z₀.re
   · have ho : Complex.re ⁻¹' Ioi (0 : ℝ) ∈ 𝓝 z₀ :=
@@ -9593,34 +9685,35 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       (hom χ z₀).mul ((hZd n χ z₀ h).differentiableAt ho)
     exact hd.congr_of_eventuallyEq (by
       filter_upwards [ho] with s hs
-      exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued_right E ε Λ om Z Z' n χ s hs)
+      exact meyerDecomposition_glued_right E ε Λ om Z Z' n χ s hs)
   · have h' : z₀.re < 1 / 2 := by linarith [not_lt.mp h]
     have ho : {s : ℂ | s.re < 1 / 2} ∈ 𝓝 z₀ :=
       (isOpen_lt Complex.continuous_re continuous_const).mem_nhds h'
-    have hG : DifferentiableAt ℂ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ) (1 / 2)) z₀ :=
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_posG_differentiableAt (Λ χ) (hΛd χ) (hΛb χ) (1 / 2) (by norm_num) (by norm_num) z₀
+    have hG : DifferentiableAt ℂ (meyerPositiveLines_lineIntegral (Λ χ) (1 / 2)) z₀ :=
+      meyerDecomposition_posG_differentiableAt (Λ χ) (hΛd χ) (hΛb χ) (1 / 2)
+          (by norm_num) (by norm_num) z₀
         h'.ne
     have h1 : 0 < (1 - z₀).re := by rw [Complex.sub_re, Complex.one_re]; linarith
     have hZ' : DifferentiableAt ℂ (fun s ↦ Z' n χ⁻¹ (1 - s)) z₀ :=
       ((hZ'd n χ⁻¹ (1 - z₀) h1).differentiableAt
         ((isOpen_Ioi.preimage Complex.continuous_re).mem_nhds h1)).comp z₀ (by fun_prop)
-    have hd : DifferentiableAt ℂ (fun s ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ) (1 / 2) s *
+    have hd : DifferentiableAt ℂ (fun s ↦ meyerPositiveLines_lineIntegral (Λ χ) (1 / 2) s *
         (ε χ s * E χ⁻¹ (1 - s) ^ 2 * Z' n χ⁻¹ (1 - s))) z₀ :=
       hG.mul (((hε χ z₀).mul
         (((hE χ⁻¹).comp (by fun_prop : Differentiable ℂ fun s : ℂ ↦ 1 - s) z₀).pow 2)).mul hZ')
     exact hd.congr_of_eventuallyEq (by
       filter_upwards [ho] with s hs
-      exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued_left E ε Λ om Z Z' homL hglue n χ s hs)
+      exact meyerDecomposition_glued_left E ε Λ om Z Z' homL hglue n χ s hs)
 
 /-- `1 + X ≤ (1 + K) Y` when `X ≤ K Y` and `1 ≤ Y`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_one_add_le
+private theorem meyerDecomposition_one_add_le
     (X K Y : ℝ) (hY : 1 ≤ Y) (hX : X ≤ K * Y) :
     1 + X ≤ (1 + K) * Y := by
   nlinarith
 
 /-- The factor `P e / d · I` of the bound of the Gaussian Cauchy transform, on a range where
 `e ≤ e'` and `d ≥ d₀ > 0`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_frac_le
+private theorem meyerDecomposition_frac_le
     (P e e' d d₀ I : ℝ) (hP : 0 ≤ P) (he : 0 ≤ e) (hee' : e ≤ e')
     (hd₀ : 0 < d₀) (hd : d₀ ≤ d) (hI : 0 ≤ I) : P * e / d * I ≤ P * e' / d₀ * I :=
   mul_le_mul_of_nonneg_right (div_le_div₀ (mul_nonneg hP (he.trans hee'))
@@ -9628,7 +9721,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The glued function is bounded on every closed vertical strip, for each index and
 character (the a priori bound for Phragmén–Lindelöf). -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued_bounded
+private theorem meyerDecomposition_glued_bounded
     {P : Type*} [CommGroup P] (q : GroupSeminorm P)
     (E ε Λ om : P → ℂ → ℂ) (Z Z' : ℕ → P → ℂ → ℂ) (hE : ∀ χ, Differentiable ℂ (E χ))
     (hε : ∀ χ, Differentiable ℂ (ε χ))
@@ -9643,9 +9736,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
           C * ((1 + q χ) * (1 + ‖z‖)) ^ N * Real.exp (κ * |z.im - ζ.im|))
     (hom : ∀ χ, Differentiable ℂ (om χ))
     (homL : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → z.re < c →
-      om χ z = E χ z * E χ⁻¹ (1 - z) * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ) c z)
+      om χ z = E χ z * E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) c z)
     (homR : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → c < z.re →
-      om χ z = 1 + E χ z * E χ⁻¹ (1 - z) * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ) c z)
+      om χ z = 1 + E χ z * E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) c z)
     (hglue : ∀ n χ (z : ℂ), 0 < z.re → z.re < 1 →
       E χ z * Z n χ z = ε χ z * E χ⁻¹ (1 - z) * Z' n χ⁻¹ (1 - z))
     (hZd : ∀ n χ, DifferentiableOn ℂ (Z n χ) (Complex.re ⁻¹' Ioi 0))
@@ -9656,7 +9749,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       Y ≤ |z.im| → ‖Z' n χ z‖ ≤ C / |z.im| ^ (N + 1))
     (n : ℕ) (χ : P) (a' b' Bε : ℝ) (ha' : a' ≤ 1 / 4) (hb' : 1 / 4 ≤ b') (hBε : 0 ≤ Bε)
     (hεχ : ∀ z : ℂ, z.re ∈ Icc a' b' → ‖ε χ z‖ ≤ Bε) :
-    ∃ M : ℝ, ∀ z : ℂ, z.re ∈ Icc a' b' → ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued E ε Λ om Z Z' n χ z‖ ≤ M := by
+    ∃ M : ℝ, ∀ z : ℂ, z.re ∈ Icc a' b' → ‖meyerDecomposition_glued E ε Λ om Z Z' n χ z‖ ≤ M := by
   have hq0 : 0 ≤ q χ := apply_nonneg q χ
   -- the right part, `1/4 ≤ Re z ≤ b'`
   obtain ⟨C₁, N₁, κ₁, hC₁, hK₁⟩ := hK (1 / 8) (by norm_num) (by norm_num) (1 / 4) b'
@@ -9670,23 +9763,24 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       (1 + C₁ * (1 + q χ) ^ N₁ * Real.exp ((b' - 1 / 8) ^ 2) / (1 / 8) *
         (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ₁ * |u| - u ^ 2))) * (1 + ‖z‖) ^ N₁ := by
     intro z hz
-    have hb := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_partition_bound (Λ χ) (1 / 8) κ₁ (C₁ * ((1 + q χ) * (1 + ‖z‖)) ^ N₁) z
+    have hb := meyerPositiveLines_partition_bound (Λ χ) (1 / 8) κ₁
+        (C₁ * ((1 + q χ) * (1 + ‖z‖)) ^ N₁) z
       (E χ z * E χ⁻¹ (1 - z)) (by linarith [hz.1]) (fun ζ hζ ↦ (hK₁ χ z ζ hz hζ).1)
-    change ‖E χ z * E χ⁻¹ (1 - z) * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ) (1 / 8) z‖ ≤ _ at hb
-    have hb2 := hb.trans (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_frac_le _ _ (Real.exp ((b' - 1 / 8) ^ 2)) _ (1 / 8) _
+    change ‖E χ z * E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) (1 / 8) z‖ ≤ _ at hb
+    have hb2 := hb.trans (meyerDecomposition_frac_le _ _ (Real.exp ((b' - 1 / 8) ^ 2)) _ (1 / 8) _
       (by positivity) (Real.exp_pos _).le
       (Real.exp_le_exp.mpr (by nlinarith [hz.1, hz.2])) (by norm_num)
       (by rw [abs_of_pos (by linarith [hz.1])]; linarith [hz.1]) hI₁)
     rw [homR χ (1 / 8) z (by norm_num) (by norm_num) (by linarith [hz.1])]
     refine (norm_add_le _ _).trans ?_
     rw [norm_one]
-    refine sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_one_add_le _ _ _ (one_le_pow₀ (by linarith [norm_nonneg z])) ?_
+    refine meyerDecomposition_one_add_le _ _ _ (one_le_pow₀ (by linarith [norm_nonneg z])) ?_
     refine hb2.trans (le_of_eq ?_)
     rw [mul_pow]
     ring
   obtain ⟨Cr, Yr, hCr, hdecr⟩ := hZdec n χ (1 / 4) b' (by norm_num) N₁
   obtain ⟨M₁, hM₁⟩ :=
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_bounded_product
+    meyerCriticalStrip_bounded_product
       (om χ) (Z n χ) (1 / 4) b' _ Cr Yr N₁ (by linarith) hCr (hom χ).continuous.continuousOn
       ((hZd n χ).continuousOn.mono fun s hs ↦ (by norm_num : (0 : ℝ) < 1 / 4).trans_le hs.1)
       homb hdecr
@@ -9695,12 +9789,13 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   have hI₂ : 0 ≤ 1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ₂ * |u| - u ^ 2) :=
     mul_nonneg (by positivity) (integral_nonneg fun u ↦ (Real.exp_pos _).le)
   have hPb : ∀ z : ℂ, z.re ∈ Icc a' (1 / 4) →
-      ‖ε χ z * E χ⁻¹ (1 - z) ^ 2 * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ) (1 / 2) z‖ ≤
+      ‖ε χ z * E χ⁻¹ (1 - z) ^ 2 * meyerPositiveLines_lineIntegral (Λ χ) (1 / 2) z‖ ≤
       Bε * C₂ * (1 + q χ) ^ N₂ * Real.exp ((a' - 1 / 2) ^ 2) / (1 / 4) *
         (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ₂ * |u| - u ^ 2)) * (1 + ‖z‖) ^ N₂ := by
     intro z hz
     have hzI : z.re ∈ Icc a' b' := ⟨hz.1, hz.2.trans hb'⟩
-    have hb := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_partition_bound (Λ χ) (1 / 2) κ₂ (Bε * (C₂ * ((1 + q χ) * (1 + ‖z‖)) ^ N₂)) z
+    have hb := meyerPositiveLines_partition_bound (Λ χ) (1 / 2) κ₂
+        (Bε * (C₂ * ((1 + q χ) * (1 + ‖z‖)) ^ N₂)) z
       (ε χ z * E χ⁻¹ (1 - z) ^ 2) (by linarith [hz.2]) (fun ζ hζ ↦ by
         have h1 := (hK₂ χ z ζ hz hζ).2
         rw [norm_mul, norm_pow]
@@ -9709,8 +9804,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
           _ ≤ Bε * (C₂ * ((1 + q χ) * (1 + ‖z‖)) ^ N₂ * Real.exp (κ₂ * |z.im - ζ.im|)) :=
             mul_le_mul (hεχ z hzI) h1 (by positivity) hBε
           _ = _ := by ring)
-    change ‖ε χ z * E χ⁻¹ (1 - z) ^ 2 * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ) (1 / 2) z‖ ≤ _ at hb
-    refine (hb.trans (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_frac_le _ _ (Real.exp ((a' - 1 / 2) ^ 2)) _ (1 / 4) _
+    change ‖ε χ z * E χ⁻¹ (1 - z) ^ 2 * meyerPositiveLines_lineIntegral (Λ χ) (1 / 2) z‖ ≤ _ at hb
+    refine (hb.trans (meyerDecomposition_frac_le _ _ (Real.exp ((a' - 1 / 2) ^ 2)) _ (1 / 4) _
       (mul_nonneg hBε (mul_nonneg hC₂ (by positivity))) (Real.exp_pos _).le
       (Real.exp_le_exp.mpr (by nlinarith [hz.1, hz.2])) (by norm_num)
       (by rw [abs_of_neg (by linarith [hz.2])]; linarith [hz.2]) hI₂)).trans (le_of_eq ?_)
@@ -9721,15 +9816,17 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     rw [Complex.sub_re, Complex.one_re]
     exact ⟨by linarith [hs.2], by linarith [hs.1]⟩
   obtain ⟨M₂, hM₂⟩ :=
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_bounded_product
-      (fun z ↦ ε χ z * E χ⁻¹ (1 - z) ^ 2 * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ) (1 / 2) z) (fun z ↦ Z' n χ⁻¹ (1 - z)) a'
+    meyerCriticalStrip_bounded_product
+      (fun z ↦ ε χ z * E χ⁻¹ (1 - z) ^ 2 * meyerPositiveLines_lineIntegral (Λ χ) (1 / 2) z)
+          (fun z ↦ Z' n χ⁻¹ (1 - z)) a'
       (1 / 4) _ Cl Yl N₂
       (mul_nonneg (div_nonneg (mul_nonneg (mul_nonneg (mul_nonneg hBε hC₂) (by positivity))
         (Real.exp_pos _).le) (by norm_num)) hI₂) hCl
       (fun s hs ↦ (((hε χ s).mul (((hE χ⁻¹).comp
         (by fun_prop : Differentiable ℂ fun s : ℂ ↦ 1 - s) s).pow 2)).mul
-        (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_posG_differentiableAt (Λ χ) (hΛd χ) (hΛb χ) (1 / 2) (by norm_num) (by norm_num)
-          s (by linarith [(show s.re ∈ Icc a' (1 / 4) from hs).2]))).continuousAt.continuousWithinAt)
+        (meyerDecomposition_posG_differentiableAt (Λ χ) (hΛd χ) (hΛb χ) (1 / 2) (by norm_num)
+          (by norm_num) s
+          (by linarith [(show s.re ∈ Icc a' (1 / 4) from hs).2]))).continuousAt.continuousWithinAt)
       (ContinuousOn.comp (g := fun s : ℂ ↦ Z' n χ⁻¹ s) (hZ'd n χ⁻¹).continuousOn
         (by fun_prop : Continuous fun s : ℂ ↦ 1 - s).continuousOn
         (fun s hs ↦ (by norm_num : (0 : ℝ) < 3 / 4).trans_le (hmaps s hs).1))
@@ -9739,17 +9836,17 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         rwa [him] at hd)
   refine ⟨max M₁ M₂, fun z hz ↦ ?_⟩
   by_cases h : z.re ≤ 1 / 4
-  · rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued_left E ε Λ om Z Z' homL hglue n χ z (by linarith)]
+  · rw [meyerDecomposition_glued_left E ε Λ om Z Z' homL hglue n χ z (by linarith)]
     have h2 := hM₂ z ⟨hz.1, h⟩
     refine le_trans (le_of_eq ?_) (h2.trans (le_max_right _ _))
     congr 1
     ring
-  · rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued_right E ε Λ om Z Z' n χ z (by linarith [not_le.mp h])]
+  · rw [meyerDecomposition_glued_right E ε Λ om Z Z' n χ z (by linarith [not_le.mp h])]
     exact (hM₁ z ⟨(not_le.mp h).le, hz.2⟩).trans (le_max_left _ _)
 
 /-- One piece of the decomposition: the glued function is entire, satisfies the bounds on every
 closed vertical strip, and is `om · Z` on the right half-plane. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_piece
+private theorem meyerDecomposition_piece
     {P : Type*} [CommGroup P] (K : Subgroup P) (q : GroupSeminorm P)
     (E ε Λ om : P → ℂ → ℂ) (hE : ∀ χ, Differentiable ℂ (E χ))
     (hε : ∀ χ, Differentiable ℂ (ε χ))
@@ -9766,9 +9863,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
           C * ((1 + q χ) * (1 + ‖z‖)) ^ N * Real.exp (κ * |z.im - ζ.im|))
     (hom : ∀ χ, Differentiable ℂ (om χ))
     (homL : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → z.re < c →
-      om χ z = E χ z * E χ⁻¹ (1 - z) * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ) c z)
+      om χ z = E χ z * E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) c z)
     (homR : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → c < z.re →
-      om χ z = 1 + E χ z * E χ⁻¹ (1 - z) * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ) c z)
+      om χ z = 1 + E χ z * E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) c z)
     (Z Z' : ℕ → P → ℂ → ℂ)
     (hZd : ∀ n χ, DifferentiableOn ℂ (Z n χ) (Complex.re ⁻¹' Ioi 0))
     (hZ'd : ∀ n χ, DifferentiableOn ℂ (Z' n χ) (Complex.re ⁻¹' Ioi 0))
@@ -9792,9 +9889,10 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re ∈ Icc a b →
           (1 + p χ) ^ k * ‖z ^ m * Φ n χ.val z‖ ≤ B) ∧
       ∀ n (χ : K) (z : ℂ), 0 < z.re → Φ n χ z = om χ.val z * Z n χ.val z := by
-  refine ⟨fun n χ z ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued E ε Λ om Z Z' n χ.val z,
-    fun n χ ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued_differentiable E ε Λ om Z Z' hE hε hΛd hΛb hom homL hglue hZd hZ'd n
-      χ.val, fun a b ↦ ?_, fun n χ z hz ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued_right E ε Λ om Z Z' n χ.val z hz⟩
+  refine ⟨fun n χ z ↦ meyerDecomposition_glued E ε Λ om Z Z' n χ.val z,
+    fun n χ ↦ meyerDecomposition_glued_differentiable E ε Λ om Z Z' hE hε hΛd hΛb
+        hom homL hglue hZd hZ'd n
+      χ.val, fun a b ↦ ?_, fun n χ z hz ↦ meyerDecomposition_glued_right E ε Λ om Z Z' n χ.val z hz⟩
   set a' := min a (-1 / 2) with ha'_def
   set b' := max b (3 / 2) with hb'_def
   have ha' : a' ≤ -1 / 2 := min_le_right _ _
@@ -9814,8 +9912,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       sLocalMellinSchwartzBounds_meyer_line_support _
         ((hZ'd n χ.val⁻¹).analyticOnNhd (isOpen_Ioi.preimage Complex.continuous_re)) (1 - a')
         (by linarith) (hs₁ χ⁻¹ hχ₁ n)
-    change sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued E ε Λ om Z Z' n χ.val z = 0
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued]
+    change meyerDecomposition_glued E ε Λ om Z Z' n χ.val z = 0
+    rw [meyerDecomposition_glued]
     split_ifs with h
     · rw [hZ0 z h, mul_zero]
     · rw [hZ'0 (1 - z) (by rw [Complex.sub_re, Complex.one_re]; linarith [not_lt.mp h]),
@@ -9853,7 +9951,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     have hp0 : 0 ≤ p χ := apply_nonneg p χ
     -- the right edge
     have hright (w : ℂ) (hw : w.re = b') :
-        (1 + p χ) ^ k * ‖w ^ m * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued E ε Λ om Z Z' n χ.val.val w‖ ≤
+        (1 + p χ) ^ k * ‖w ^ m * meyerDecomposition_glued E ε Λ om Z Z' n χ.val.val w‖ ≤
           (1 + C_R * Real.exp ((b' - 1 / 2) ^ 2) / |b' - 1 / 2| *
             (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ_R * |u| - u ^ 2))) * 2 ^ N_R * B_R := by
       have hw0 : 0 < w.re := by linarith
@@ -9861,10 +9959,11 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         have := (le_abs_self w.re).trans (Complex.abs_re_le_norm w)
         linarith
       have hwI : w.re ∈ Icc b' b' := ⟨hw.ge, hw.le⟩
-      have hΔG := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_partition_bound (Λ χ.val.val) (1 / 2) κ_R
+      have hΔG := meyerPositiveLines_partition_bound (Λ χ.val.val) (1 / 2) κ_R
         (C_R * ((1 + q χ.val.val) * (1 + ‖w‖)) ^ N_R) w (E χ.val.val w * E χ.val.val⁻¹ (1 - w))
         (by linarith) (fun ζ hζ ↦ (hK_R χ.val.val w ζ hwI hζ).1)
-      change ‖E χ.val.val w * E χ.val.val⁻¹ (1 - w) * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ.val.val) (1 / 2) w‖ ≤ _ at hΔG
+      change ‖E χ.val.val w * E χ.val.val⁻¹ (1 - w) * meyerPositiveLines_lineIntegral
+          (Λ χ.val.val) (1 / 2) w‖ ≤ _ at hΔG
       rw [hw] at hΔG
       have hom_bd : ‖om χ.val.val w‖ ≤ (1 + C_R * Real.exp ((b' - 1 / 2) ^ 2) / |b' - 1 / 2| *
           (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ_R * |u| - u ^ 2))) *
@@ -9872,26 +9971,27 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         rw [homR χ.val.val (1 / 2) w (by norm_num) (by norm_num) (by linarith)]
         refine (norm_add_le _ _).trans ?_
         rw [norm_one, mul_assoc _ ((1 + q χ.val.val) ^ N_R), ← mul_pow]
-        refine sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_one_add_le _ _ _ (one_le_pow₀ (by nlinarith [norm_nonneg w]))
+        refine meyerDecomposition_one_add_le _ _ _ (one_le_pow₀ (by nlinarith [norm_nonneg w]))
           (hΔG.trans (le_of_eq ?_))
         ring
       have hB := hB_R (χ, n) w hw
       rw [add_apply, hqH, norm_mul, norm_pow] at hB
-      rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued_right E ε Λ om Z Z' n χ.val.val w hw0, norm_mul (w ^ m), norm_pow,
+      rw [meyerDecomposition_glued_right E ε Λ om Z Z' n χ.val.val w hw0,
+          norm_mul (w ^ m), norm_pow,
         norm_mul]
-      exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_edge
+      exact meyerCriticalStrip_edge
         (p χ) (q χ.val.val) _ ‖om χ.val.val w‖ ‖Z n χ.val.val w‖ ‖w‖ ‖w‖ B_R k m N_R hp0 hq0
         (by linarith [hKR]) (norm_nonneg _) (norm_nonneg _) (norm_nonneg _) le_rfl
         (by linarith) hom_bd hB
     -- the left edge
     have hleft (w : ℂ) (hw : w.re = a') :
-        (1 + p χ) ^ k * ‖w ^ m * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued E ε Λ om Z Z' n χ.val.val w‖ ≤
+        (1 + p χ) ^ k * ‖w ^ m * meyerDecomposition_glued E ε Λ om Z Z' n χ.val.val w‖ ≤
           (Bε * C_L * Real.exp ((a' - 1 / 2) ^ 2) / |a' - 1 / 2| *
             (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ_L * |u| - u ^ 2))) * 2 ^ N_L * B_L := by
       have hw1 : w.re < 1 / 2 := by linarith
       have hwI : w.re ∈ Icc a' a' := ⟨hw.ge, hw.le⟩
       have hre1 : (1 - w).re = 1 - a' := by rw [Complex.sub_re, Complex.one_re, hw]
-      have hb := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_partition_bound (Λ χ.val.val) (1 / 2) κ_L
+      have hb := meyerPositiveLines_partition_bound (Λ χ.val.val) (1 / 2) κ_L
         (Bε * (C_L * ((1 + q χ.val.val) * (1 + ‖w‖)) ^ N_L)) w
         (ε χ.val.val w * E χ.val.val⁻¹ (1 - w) ^ 2) (by linarith) (fun ζ hζ ↦ by
           have h1 := (hK_L χ.val.val w ζ hwI hζ).2
@@ -9902,16 +10002,18 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
             _ ≤ Bε * (C_L * ((1 + q χ.val.val) * (1 + ‖w‖)) ^ N_L *
                 Real.exp (κ_L * |w.im - ζ.im|)) := mul_le_mul h2 h1 (by positivity) hBε0
             _ = _ := by ring)
-      change ‖ε χ.val.val w * E χ.val.val⁻¹ (1 - w) ^ 2 * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ.val.val) (1 / 2) w‖ ≤ _ at hb
+      change ‖ε χ.val.val w * E χ.val.val⁻¹ (1 - w) ^ 2 * meyerPositiveLines_lineIntegral
+          (Λ χ.val.val) (1 / 2) w‖ ≤ _ at hb
       rw [hw] at hb
-      have hA_bd : ‖ε χ.val.val w * E χ.val.val⁻¹ (1 - w) ^ 2 * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ.val.val) (1 / 2) w‖ ≤
+      have hA_bd : ‖ε χ.val.val w * E χ.val.val⁻¹ (1 - w) ^ 2 * meyerPositiveLines_lineIntegral
+          (Λ χ.val.val) (1 / 2) w‖ ≤
           (Bε * C_L * Real.exp ((a' - 1 / 2) ^ 2) / |a' - 1 / 2| *
             (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ_L * |u| - u ^ 2))) *
               (1 + q χ.val.val) ^ N_L * (1 + ‖w‖) ^ N_L := by
         refine hb.trans (le_of_eq ?_)
         rw [mul_pow]
         ring
-      have hB := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_inverse_index
+      have hB := meyerCriticalStrip_inverse_index
         (P := P) K (H₁ ⊔ H₂) (fun n χ z ↦ Z' n χ z) (p + qH) (k + N_L) (m + N_L) (1 - a') B_L
         hB_L χ n (1 - w) hre1
       rw [add_apply, hqH, norm_mul, norm_pow] at hB
@@ -9925,16 +10027,19 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         have := (le_abs_self (1 - w).re).trans (Complex.abs_re_le_norm (1 - w))
         rw [hre1] at this
         linarith
-      rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued_left E ε Λ om Z Z' homL hglue n χ.val.val w hw1,
-        show sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ.val.val) (1 / 2) w * (ε χ.val.val w * E χ.val.val⁻¹ (1 - w) ^ 2 *
+      rw [meyerDecomposition_glued_left E ε Λ om Z Z' homL hglue n χ.val.val w hw1,
+        show meyerPositiveLines_lineIntegral (Λ χ.val.val) (1 / 2) w *
+            (ε χ.val.val w * E χ.val.val⁻¹ (1 - w) ^ 2 *
           Z' n χ.val.val⁻¹ (1 - w)) = (ε χ.val.val w * E χ.val.val⁻¹ (1 - w) ^ 2 *
-            sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (Λ χ.val.val) (1 / 2) w) * Z' n χ.val.val⁻¹ (1 - w) by ring,
+            meyerPositiveLines_lineIntegral (Λ χ.val.val) (1 / 2) w) *
+                Z' n χ.val.val⁻¹ (1 - w) by ring,
         norm_mul (w ^ m), norm_pow, norm_mul]
-      exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_edge
+      exact meyerCriticalStrip_edge
         (p χ) (q χ.val.val) _ _ ‖Z' n χ.val.val⁻¹ (1 - w)‖ ‖w‖ ‖1 - w‖ B_L k m N_L hp0 hq0 hKL
         (norm_nonneg _) (norm_nonneg _) (norm_nonneg _) htr h1r hA_bd hB
     -- Phragmén–Lindelöf
-    obtain ⟨Mg, hMg⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued_bounded q E ε Λ om Z Z' hE hε hΛd hΛb hK hom homL homR
+    obtain ⟨Mg, hMg⟩ := meyerDecomposition_glued_bounded q E ε Λ om Z Z' hE hε
+        hΛd hΛb hK hom homL homR
       hglue hZd hZ'd hZdec hZ'dec n χ.val.val a' b' Bε (by linarith) (by linarith) hBε0
       (fun w hw ↦ hBε χ w hw)
     have hpk : 0 ≤ (1 + p χ) ^ k := pow_nonneg (by linarith) _
@@ -9942,17 +10047,20 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ_L * |u| - u ^ 2))) * 2 ^ N_L * B_L with hBL
     set BR := (1 + C_R * Real.exp ((b' - 1 / 2) ^ 2) / |b' - 1 / 2| *
       (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ_R * |u| - u ^ 2))) * 2 ^ N_R * B_R with hBR
-    let G : ℂ → ℂ := fun w ↦ (((1 + p χ) ^ k : ℝ) : ℂ) * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued E ε Λ om Z Z' n χ.val.val w
+    let G : ℂ → ℂ := fun w ↦ (((1 + p χ) ^ k : ℝ) : ℂ) *
+        meyerDecomposition_glued E ε Λ om Z Z' n χ.val.val w
     have hGn (w : ℂ) : ‖w ^ m * G w‖ =
-        (1 + p χ) ^ k * ‖w ^ m * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued E ε Λ om Z Z' n χ.val.val w‖ := by
-      change ‖w ^ m * ((((1 + p χ) ^ k : ℝ) : ℂ) * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued E ε Λ om Z Z' n χ.val.val w)‖ = _
+        (1 + p χ) ^ k * ‖w ^ m * meyerDecomposition_glued E ε Λ om Z Z' n χ.val.val w‖ := by
+      change ‖w ^ m *
+          ((((1 + p χ) ^ k : ℝ) : ℂ) * meyerDecomposition_glued E ε Λ om Z Z' n χ.val.val w)‖ = _
       rw [mul_left_comm, norm_mul, Complex.norm_real, Real.norm_of_nonneg hpk]
     have hGd : Differentiable ℂ G := (differentiable_const _).mul
-      (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued_differentiable E ε Λ om Z Z' hE hε hΛd hΛb hom homL hglue hZd hZ'd n
+      (meyerDecomposition_glued_differentiable E ε Λ om Z Z' hE hε hΛd hΛb hom homL hglue hZd hZ'd n
         χ.val.val)
     have key := norm_pow_mul_le_on_verticalStrip (a := a') (b := b') (by linarith) (F := G)
       hGd.diffContOnCl (M := (1 + p χ) ^ k * Mg) (fun w hw ↦ by
-        change ‖(((1 + p χ) ^ k : ℝ) : ℂ) * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_glued E ε Λ om Z Z' n χ.val.val w‖ ≤ _
+        change ‖(((1 + p χ) ^ k : ℝ) : ℂ) *
+          meyerDecomposition_glued E ε Λ om Z Z' n χ.val.val w‖ ≤ _
         rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg hpk]
         exact mul_le_mul_of_nonneg_left (hMg w hw) hpk) m (C := max BL BR)
       (fun w hw ↦ by rw [hGn]; exact (hleft w hw).trans (le_max_left _ _))
@@ -9962,94 +10070,97 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     exact key
 
 /-- The S-local Hecke L-function in a norm chart. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL
+private noncomputable def meyerDecomposition_heckeL
     (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ) : ℂ :=
   sLocalHeckeL (chartₜ(T, χ) z)
 
 /-- The S-local epsilon factor in a norm chart. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon
+private noncomputable def meyerDecomposition_epsilon
     (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ) : ℂ :=
   sLocalEpsilonFactor (chartₜ(T, χ) z)
 
 open Classical in
 /-- The Euler factor at an infinite place, as a function of the shifted variable. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor
+private noncomputable def meyerDecomposition_archFactor
     (w : InfinitePlace F) (x : ℂ) : ℂ :=
   if w.IsReal then Complex.Gammaℝ x else Complex.Gammaℂ x / 2
 
 /-- The Euler factor at a real place. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_of_real
+private theorem meyerDecomposition_A_of_real
     (w : InfinitePlace F) (hw : w.IsReal) (x : ℂ) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w x = Complex.Gammaℝ x := by
+    meyerDecomposition_archFactor w x = Complex.Gammaℝ x := by
   classical
   exact ite_eq_left_iff.mpr fun h ↦ absurd hw h
 
 /-- The Euler factor at a complex place. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_of_not_real
+private theorem meyerDecomposition_A_of_not_real
     (w : InfinitePlace F) (hw : ¬ w.IsReal) (x : ℂ) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w x = Complex.Gammaℂ x / 2 := by
+    meyerDecomposition_archFactor w x = Complex.Gammaℂ x / 2 := by
   classical
   exact ite_eq_right_iff.mpr fun h ↦ absurd h hw
 
 /-- The Euler factor at an infinite place does not vanish on the right half-plane. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_ne_zero
+private theorem meyerDecomposition_A_ne_zero
     (w : InfinitePlace F) (x : ℂ) (hx : 0 < x.re) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w x ≠ 0 := by
+    meyerDecomposition_archFactor w x ≠ 0 := by
   by_cases hw : w.IsReal
-  · rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_of_real w hw]
+  · rw [meyerDecomposition_A_of_real w hw]
     exact Complex.Gammaℝ_ne_zero_of_re_pos hx
-  · rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_of_not_real w hw, ← Complex.Gammaℝ_mul_Gammaℝ_add_one]
+  · rw [meyerDecomposition_A_of_not_real w hw, ← Complex.Gammaℝ_mul_Gammaℝ_add_one]
     have h1 : 0 < (x + 1).re := by rw [Complex.add_re, Complex.one_re]; linarith
     exact div_ne_zero (mul_ne_zero (Complex.Gammaℝ_ne_zero_of_re_pos hx)
       (Complex.Gammaℝ_ne_zero_of_re_pos h1)) two_ne_zero
 
 /-- The inverse of the Euler factor at an infinite place is entire. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_inv_differentiable
+private theorem meyerDecomposition_A_inv_differentiable
     (w : InfinitePlace F) :
-    Differentiable ℂ fun x ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w x)⁻¹ := by
+    Differentiable ℂ fun x ↦ (meyerDecomposition_archFactor w x)⁻¹ := by
   by_cases hw : w.IsReal
-  · have e : (fun x ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w x)⁻¹) = fun x ↦ (Complex.Gammaℝ x)⁻¹ := by
+  · have e : (fun x ↦ (meyerDecomposition_archFactor w x)⁻¹) = fun x ↦ (Complex.Gammaℝ x)⁻¹ := by
       funext x
-      rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_of_real w hw]
+      rw [meyerDecomposition_A_of_real w hw]
     rw [e]
     exact Complex.differentiable_Gammaℝ_inv
-  · have e : (fun x ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w x)⁻¹) =
+  · have e : (fun x ↦ (meyerDecomposition_archFactor w x)⁻¹) =
         fun x ↦ 2 * ((Complex.Gammaℝ x)⁻¹ * (Complex.Gammaℝ (x + 1))⁻¹) := by
       funext x
-      rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_of_not_real w hw, ← Complex.Gammaℝ_mul_Gammaℝ_add_one, inv_div,
+      rw [meyerDecomposition_A_of_not_real w hw, ← Complex.Gammaℝ_mul_Gammaℝ_add_one, inv_div,
         div_eq_mul_inv, mul_inv]
     rw [e]
     exact (differentiable_const _).mul (Complex.differentiable_Gammaℝ_inv.mul
       (Complex.differentiable_Gammaℝ_inv.comp (differentiable_id.add_const 1)))
 
 /-- The Euler factor at an infinite place commutes with complex conjugation. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_conj
+private theorem meyerDecomposition_A_conj
     (w : InfinitePlace F) (x : ℂ) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w (starRingEnd ℂ x) = starRingEnd ℂ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w x) := by
+    meyerDecomposition_archFactor w (starRingEnd ℂ x) =
+        starRingEnd ℂ (meyerDecomposition_archFactor w x) := by
   by_cases hw : w.IsReal
-  · rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_of_real w hw, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_of_real w hw, Complex.Gammaℝ_conj]
-  · rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_of_not_real w hw, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_of_not_real w hw, Complex.Gammaℂ_conj, map_div₀,
+  · rw [meyerDecomposition_A_of_real w hw, meyerDecomposition_A_of_real w hw, Complex.Gammaℝ_conj]
+  · rw [meyerDecomposition_A_of_not_real w hw, meyerDecomposition_A_of_not_real w hw,
+      Complex.Gammaℂ_conj, map_div₀,
       map_ofNat]
 
 /-- The Euler factor at an infinite place is bounded on every closed vertical strip of
 positive real part. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_bounded
+private theorem meyerDecomposition_A_bounded
     (w : InfinitePlace F) (x₀ x₁ : ℝ) (hx₀ : 0 < x₀) :
-    ∃ M : ℝ, ∀ x : ℂ, x.re ∈ Icc x₀ x₁ → ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w x‖ ≤ M := by
+    ∃ M : ℝ, ∀ x : ℂ, x.re ∈ Icc x₀ x₁ → ‖meyerDecomposition_archFactor w x‖ ≤ M := by
   obtain ⟨M₁, hM₁⟩ :=
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_gammaReal_bounded
+    meyerStripMultiplier_gammaReal_bounded
       x₀ x₁ hx₀
   by_cases hw : w.IsReal
-  · exact ⟨M₁, fun x hx ↦ by rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_of_real w hw]; exact hM₁ x hx⟩
+  · exact ⟨M₁, fun x hx ↦ by rw [meyerDecomposition_A_of_real w hw]; exact hM₁ x hx⟩
   · obtain ⟨M₂, hM₂⟩ :=
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_gammaReal_bounded
+      meyerStripMultiplier_gammaReal_bounded
         (x₀ + 1) (x₁ + 1) (by linarith)
     refine ⟨|M₁| * |M₂|, fun x hx ↦ ?_⟩
     have h1 := (hM₁ x hx).trans (le_abs_self M₁)
     have h2 := (hM₂ (x + 1) (by
       rw [Complex.add_re, Complex.one_re]
       exact ⟨by linarith [hx.1], by linarith [hx.2]⟩)).trans (le_abs_self M₂)
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_of_not_real w hw, ← Complex.Gammaℝ_mul_Gammaℝ_add_one, norm_div, norm_mul,
+    rw [meyerDecomposition_A_of_not_real w hw,
+        ← Complex.Gammaℝ_mul_Gammaℝ_add_one, norm_div, norm_mul,
       Complex.norm_ofNat]
     have h3 : ‖Complex.Gammaℝ x‖ * ‖Complex.Gammaℝ (x + 1)‖ ≤ |M₁| * |M₂| :=
       mul_le_mul h1 h2 (norm_nonneg _) (abs_nonneg _)
@@ -10057,7 +10168,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     linarith
 
 /-- `(1 + x) e^{π x / 2} ≤ e^{(π + 1) x}` for `x ≥ 0`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_exp_le
+private theorem meyerDecomposition_exp_le
     (x : ℝ) (hx : 0 ≤ x) :
     (1 + x) * Real.exp (Real.pi * x / 2) ≤ Real.exp ((Real.pi + 1) * x) := by
   have h1 : 1 + x ≤ Real.exp x := by linarith [Real.add_one_le_exp x]
@@ -10068,7 +10179,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     _ = Real.exp ((Real.pi + 1) * x) := by rw [← Real.exp_add]; ring_nf
 
 /-- `1 + ‖a + σ‖ ≤ (1 + ‖a‖) (1 + ‖σ‖)`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_one_add_norm_le
+private theorem meyerDecomposition_one_add_norm_le
     (a σ : ℂ) :
     1 + ‖a + σ‖ ≤ (1 + ‖a‖) * (1 + ‖σ‖) := by
   nlinarith [norm_add_le a σ, norm_nonneg a, norm_nonneg σ, mul_nonneg (norm_nonneg a)
@@ -10076,15 +10187,16 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The quotient of Euler factors at an infinite place, with the shift `σ`: a polynomial in
 `z` and `σ` times an exponential in the difference of the heights. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_ratio
+private theorem meyerDecomposition_A_ratio
     (w : InfinitePlace F) (c D₀ : ℝ) (hc : 0 < c) :
     ∃ (C : ℝ) (N : ℕ), 0 ≤ C ∧ ∀ σ z ζ : ℂ, 0 ≤ σ.re → ζ.re = c → |z.re - c| ≤ D₀ →
-      ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w (ζ + σ)‖ * ‖(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w (z + σ))⁻¹‖ ≤
+      ‖meyerDecomposition_archFactor w (ζ + σ)‖ * ‖(meyerDecomposition_archFactor w (z + σ))⁻¹‖ ≤
         C * ((1 + ‖z‖) * (1 + ‖σ‖)) ^ N * Real.exp ((Real.pi + 1) * |z.im - ζ.im|) := by
   by_cases hw : w.IsReal
-  · obtain ⟨C, N, hC, h⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_gamma_quotient_uniform (c / 2) (D₀ / 2) (by positivity)
+  · obtain ⟨C, N, hC, h⟩ := meyerPositiveLines_gamma_quotient_uniform (c / 2)
+      (D₀ / 2) (by positivity)
     refine ⟨Real.pi ^ (D₀ / 2) * C, N, by positivity, fun σ z ζ hσ hζ hz ↦ ?_⟩
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_of_real w hw, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_of_real w hw]
+    rw [meyerDecomposition_A_of_real w hw, meyerDecomposition_A_of_real w hw]
     have hre (u : ℂ) : (u / 2).re = u.re / 2 := Complex.div_ofNat_re u 2
     have him (u : ℂ) : (u / 2).im = u.im / 2 := Complex.div_ofNat_im u 2
     have hzσ : ((z + σ) / 2).re = (z.re + σ.re) / 2 := by rw [hre, Complex.add_re]
@@ -10120,10 +10232,10 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       have h1 : ‖(z + σ) / 2‖ ≤ ‖z + σ‖ := by
         rw [norm_div, Complex.norm_ofNat]
         linarith [norm_nonneg (z + σ)]
-      linarith [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_one_add_norm_le z σ]
+      linarith [meyerDecomposition_one_add_norm_le z σ]
     have hexp : (1 + |z.im - ζ.im| / 2) * Real.exp (Real.pi * (|z.im - ζ.im| / 2) / 2) ≤
         Real.exp ((Real.pi + 1) * |z.im - ζ.im|) :=
-      (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_exp_le _ (by positivity)).trans
+      (meyerDecomposition_exp_le _ (by positivity)).trans
         (Real.exp_le_exp.mpr (by nlinarith [Real.pi_pos, abs_nonneg (z.im - ζ.im)]))
     rw [hn1, hn2]
     calc Real.pi ^ (-(ζ + σ) / 2).re * ‖Complex.Gamma ((ζ + σ) / 2)‖ *
@@ -10136,9 +10248,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       _ ≤ Real.pi ^ (D₀ / 2) * (C * ((1 + ‖z‖) * (1 + ‖σ‖)) ^ N *
           Real.exp ((Real.pi + 1) * |z.im - ζ.im|)) := by gcongr
       _ = _ := by ring
-  · obtain ⟨C, N, hC, h⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_gamma_quotient_uniform c D₀ hc
+  · obtain ⟨C, N, hC, h⟩ := meyerPositiveLines_gamma_quotient_uniform c D₀ hc
     refine ⟨(2 * Real.pi) ^ D₀ * C, N, by positivity, fun σ z ζ hσ hζ hz ↦ ?_⟩
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_of_not_real w hw, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_of_not_real w hw]
+    rw [meyerDecomposition_A_of_not_real w hw, meyerDecomposition_A_of_not_real w hw]
     have hζσ : (ζ + σ).re = c + σ.re := by rw [Complex.add_re, hζ]
     have key := h (z + σ) (ζ + σ) (by rw [hζσ]; linarith)
       (by rw [Complex.add_re, hζσ, show z.re + σ.re - (c + σ.re) = z.re - c by ring]; exact hz)
@@ -10176,13 +10288,13 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       _ ≤ (2 * Real.pi) ^ D₀ * (C * ((1 + ‖z‖) * (1 + ‖σ‖)) ^ N *
           Real.exp ((Real.pi + 1) * |z.im - ζ.im|)) := by
         gcongr
-        · exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_one_add_norm_le z σ
-        · exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_exp_le _ (abs_nonneg _)
+        · exact meyerDecomposition_one_add_norm_le z σ
+        · exact meyerDecomposition_exp_le _ (abs_nonneg _)
       _ = _ := by ring
 
 /-- The local Euler factors of a norm chart: Gamma factors with a shift controlled by one group
 seminorm at the infinite places, `(1 - u r^z)⁻¹` at the finite places. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_local
+private theorem meyerDecomposition_local
     (T : Finset V) :
     ∃ (q : GroupSeminorm (PontryaginDual (SIdeleQuotient F T)))
       (s : InfinitePlace F → PontryaginDual (SIdeleQuotient F T) → ℂ)
@@ -10200,7 +10312,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       (∀ v χ z, finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (chartₜ(T, χ⁻¹) z)) =
         (1 - starRingEnd ℂ (u v χ) * (((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) : ℂ) ^ z)⁻¹) := by
   choose i hi using fun w : InfinitePlace F ↦
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_infinite_restriction
+    meyerStripMultiplier_infinite_restriction
       T w
   have hpar (w : InfinitePlace F) : ∃ s : PontryaginDual w.Completionˣ → ℂ,
       (∀ η : PontryaginDual w.Completionˣ, 0 ≤ (s η).re) ∧ s 1 = 0 ∧
@@ -10208,16 +10320,21 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         (s (η * η')).im = (s η).im + (s η').im) ∧
       (∀ η : PontryaginDual w.Completionˣ, s η⁻¹ = (starRingEnd ℂ) (s η)) ∧
       ∀ (η : PontryaginDual w.Completionˣ) (z : ℂ),
-        (w.IsReal → infiniteLocalEulerFactor w (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) = Complex.Gammaℝ (z + s η)) ∧
+        (w.IsReal → infiniteLocalEulerFactor w
+            (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
+            Complex.Gammaℝ (z + s η)) ∧
         (¬ w.IsReal →
-          infiniteLocalEulerFactor w (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) = Complex.Gammaℂ (z + s η) / 2) := by
+          infiniteLocalEulerFactor w (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+              (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
+              Complex.Gammaℂ (z + s η) / 2) := by
     by_cases hw : w.IsReal
     · obtain ⟨s, h1, h2, h3, h4, h5⟩ :=
-        sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_real_parameter
+        meyerStripMultiplier_real_parameter
           w hw
       exact ⟨s, h1, h2, h3, h4, fun η z ↦ ⟨fun _ ↦ h5 η z, fun h ↦ absurd hw h⟩⟩
     · obtain ⟨s, h1, h2, h3, h4, h5⟩ :=
-        sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_complex_parameter
+        meyerStripMultiplier_complex_parameter
           w (InfinitePlace.not_isReal_iff_isComplex.mp hw)
       exact ⟨s, h1, h2, h3, h4, fun η z ↦ ⟨fun h ↦ absurd h hw, fun _ ↦ h5 η z⟩⟩
   choose sl hs0 hs1 hsmul hsinv hsE using hpar
@@ -10253,10 +10370,10 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
           |(sl w (PontryaginDual.map (i w) χ)).re| + |(sl w (PontryaginDual.map (i w) χ)).im|
         rw [map_inv, hsinv, Complex.conj_re, Complex.conj_im, abs_neg] }
   choose j hj using fun v : T ↦
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_finite_restriction
+    meyerStripMultiplier_finite_restriction
       T v
   choose u hu1 hu2 hu3 using fun (v : T) (χ : PontryaginDual (SIdeleQuotient F T)) ↦
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_finite_euler
+    meyerStripMultiplier_finite_euler
       v.val (PontryaginDual.map (j v) χ)
   refine ⟨q, s, u, fun w χ ↦ ⟨hsre w χ, ?_, ?_⟩, hu1, fun w χ z ↦ ⟨fun h ↦ ?_, fun h ↦ ?_⟩,
     fun v χ z ↦ ?_, fun v χ z ↦ ?_⟩
@@ -10274,24 +10391,25 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       (hu3 v χ (PontryaginDual.map (j v) χ⁻¹) (fun g ↦ rfl) z)
 
 /-- The S-local Hecke L-function as a product of the local factors. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_factor
+private theorem meyerDecomposition_factor
     (T : Finset V) :
     ∃ (q : GroupSeminorm (PontryaginDual (SIdeleQuotient F T)))
       (s : InfinitePlace F → PontryaginDual (SIdeleQuotient F T) → ℂ)
       (u : T → PontryaginDual (SIdeleQuotient F T) → ℂ),
       (∀ w χ, 0 ≤ (s w χ).re ∧ ‖s w χ‖ ≤ q χ) ∧ (∀ v χ, ‖u v χ‖ ≤ 1) ∧
-      (∀ χ z, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z = (∏ w, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w (z + s w χ)) *
+      (∀ χ z, meyerDecomposition_heckeL T χ z = (∏ w, meyerDecomposition_archFactor w (z + s w χ)) *
           ∏ v : T, (1 - u v χ * (((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) : ℂ) ^ z)⁻¹) ∧
-      (∀ χ z, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ z = (∏ w, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w (z + starRingEnd ℂ (s w χ))) *
+      (∀ χ z, meyerDecomposition_heckeL T χ⁻¹ z =
+          (∏ w, meyerDecomposition_archFactor w (z + starRingEnd ℂ (s w χ))) *
           ∏ v : T, (1 - starRingEnd ℂ (u v χ) *
             (((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) : ℂ) ^ z)⁻¹) := by
-  obtain ⟨q, s, u, hs, hu, hA, hF1, hF2⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_local T
+  obtain ⟨q, s, u, hs, hu, hA, hF1, hF2⟩ := meyerDecomposition_local T
   have hAw (w : InfinitePlace F) (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ) :
       infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (chartₜ(T, χ) z)) =
-        sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w (z + s w χ) := by
+        meyerDecomposition_archFactor w (z + s w χ) := by
     by_cases hw : w.IsReal
-    · rw [(hA w χ z).1 hw, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_of_real w hw]
-    · rw [(hA w χ z).2 hw, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_of_not_real w hw]
+    · rw [(hA w χ z).1 hw, meyerDecomposition_A_of_real w hw]
+    · rw [(hA w χ z).2 hw, meyerDecomposition_A_of_not_real w hw]
   refine ⟨q, s, u, fun w χ ↦ ⟨(hs w χ).1, (hs w χ).2.1⟩, hu, fun χ z ↦ ?_, fun χ z ↦ ?_⟩
   · change (∏ w : InfinitePlace F, infiniteLocalEulerFactor w
         (sLocalInfiniteRestriction w (chartₜ(T, χ) z))) *
@@ -10304,11 +10422,11 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       ∏ v : T, finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (chartₜ(T, χ⁻¹) z)) = _
     congr 1
     · exact Finset.prod_congr rfl fun w _ ↦ (hAw w χ⁻¹ z).trans
-        (congrArg (fun x ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w (z + x)) (hs w χ).2.2)
+        (congrArg (fun x ↦ meyerDecomposition_archFactor w (z + x)) (hs w χ).2.2)
     · exact Finset.prod_congr rfl fun v _ ↦ hF2 v χ z
 
 /-- The inverse of the absolute norm of a finite place of `T` lies in `(0, 1)`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_r
+private theorem meyerDecomposition_r
     (T : Finset V) (v : T) :
     0 < ((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) ∧ ((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) < 1 := by
   have hq : 1 < (v.val.asIdeal.absNorm : ℝ) := by
@@ -10316,7 +10434,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   exact ⟨inv_pos.mpr (zero_lt_one.trans hq), inv_lt_one_of_one_lt₀ hq⟩
 
 /-- The inverse Euler factor `1 - u r^z` at a finite place. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_B_facts
+private theorem meyerDecomposition_B_facts
     (r : ℝ) (hr0 : 0 < r) (hr1 : r < 1) (u : ℂ) (hu : ‖u‖ ≤ 1) :
     (∀ z : ℂ, 0 < z.re → 1 - u * (r : ℂ) ^ z ≠ 0) ∧
     (∀ (a : ℝ) (z : ℂ), a ≤ z.re → ‖1 - u * (r : ℂ) ^ z‖ ≤ 1 + r ^ a) ∧
@@ -10346,58 +10464,61 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The S-local Hecke L-function at `χ⁻¹` is the conjugate of the one at `χ`, reflected in the
 real axis. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_conj
+private theorem meyerDecomposition_L_conj
     (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T))
-    (z : ℂ) : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ z = starRingEnd ℂ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ (starRingEnd ℂ z)) := by
-  obtain ⟨q, s, u, hs, hu, hL, hLi⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_factor T
+    (z : ℂ) : meyerDecomposition_heckeL T χ⁻¹ z =
+        starRingEnd ℂ (meyerDecomposition_heckeL T χ (starRingEnd ℂ z)) := by
+  obtain ⟨q, s, u, hs, hu, hL, hLi⟩ := meyerDecomposition_factor T
   rw [hLi χ z, hL χ (starRingEnd ℂ z), map_mul, map_prod, map_prod]
   congr 1
   · refine Finset.prod_congr rfl fun w _ ↦ ?_
-    rw [← sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_conj, map_add, Complex.conj_conj]
+    rw [← meyerDecomposition_A_conj, map_add, Complex.conj_conj]
   · refine Finset.prod_congr rfl fun v _ ↦ ?_
-    obtain ⟨hr0, hr1⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_r T v
-    rw [map_inv₀, (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_B_facts _ hr0 hr1 (u v χ) (hu v χ)).2.2.2 z]
+    obtain ⟨hr0, hr1⟩ := meyerDecomposition_r T v
+    rw [map_inv₀, (meyerDecomposition_B_facts _ hr0 hr1 (u v χ) (hu v χ)).2.2.2 z]
 
 /-- The S-local Hecke L-function in a norm chart does not vanish on the right half-plane. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_ne_zero
+private theorem meyerDecomposition_L_ne_zero
     (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T))
-    (z : ℂ) (hz : 0 < z.re) : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z ≠ 0 := by
-  obtain ⟨q, s, u, hs, hu, hL, -⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_factor T
+    (z : ℂ) (hz : 0 < z.re) : meyerDecomposition_heckeL T χ z ≠ 0 := by
+  obtain ⟨q, s, u, hs, hu, hL, -⟩ := meyerDecomposition_factor T
   rw [hL χ z]
-  refine mul_ne_zero (Finset.prod_ne_zero_iff.mpr fun w _ ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_ne_zero w _ ?_)
+  refine mul_ne_zero (Finset.prod_ne_zero_iff.mpr fun w _ ↦ meyerDecomposition_A_ne_zero w _ ?_)
     (Finset.prod_ne_zero_iff.mpr fun v _ ↦ inv_ne_zero ?_)
   · rw [Complex.add_re]
     linarith [(hs w χ).1]
-  · obtain ⟨hr0, hr1⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_r T v
-    exact (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_B_facts _ hr0 hr1 (u v χ) (hu v χ)).1 z hz
+  · obtain ⟨hr0, hr1⟩ := meyerDecomposition_r T v
+    exact (meyerDecomposition_B_facts _ hr0 hr1 (u v χ) (hu v χ)).1 z hz
 
 /-- The inverse of the S-local Hecke L-function in a norm chart is entire. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_inv_differentiable
+private theorem meyerDecomposition_L_inv_differentiable
     (T : Finset V)
     (χ : PontryaginDual (SIdeleQuotient F T)) :
-    Differentiable ℂ fun z ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹ := by
-  obtain ⟨q, s, u, hs, hu, hL, -⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_factor T
-  have e : (fun z ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹) = fun z ↦ (∏ w, (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w (z + s w χ))⁻¹) *
+    Differentiable ℂ fun z ↦ (meyerDecomposition_heckeL T χ z)⁻¹ := by
+  obtain ⟨q, s, u, hs, hu, hL, -⟩ := meyerDecomposition_factor T
+  have e : (fun z ↦ (meyerDecomposition_heckeL T χ z)⁻¹) =
+      fun z ↦ (∏ w, (meyerDecomposition_archFactor w (z + s w χ))⁻¹) *
       ∏ v : T, (1 - u v χ * (((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) : ℂ) ^ z) := by
     funext z
     rw [hL χ z, mul_inv, Finset.prod_inv_distrib, Finset.prod_inv_distrib]
     simp only [inv_inv]
   rw [e]
   refine (Differentiable.fun_finsetProd fun w _ ↦
-    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_inv_differentiable w).comp (differentiable_id.add_const (s w χ))).mul
+    (meyerDecomposition_A_inv_differentiable w).comp (differentiable_id.add_const (s w χ))).mul
     (Differentiable.fun_finsetProd fun v _ ↦ ?_)
-  obtain ⟨hr0, hr1⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_r T v
-  exact (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_finite_factor
+  obtain ⟨hr0, hr1⟩ := meyerDecomposition_r T v
+  exact (meyerStripMultiplier_finite_factor
     _ hr0 hr1 (u v χ) (hu v χ)).1
 
 /-- The S-local Hecke L-function in a norm chart is bounded on every closed vertical strip of
 positive real part. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_bounded
+private theorem meyerDecomposition_L_bounded
     (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T))
     (c₁ c₂ : ℝ) (hc₁ : 0 < c₁) :
-    ∃ M : ℝ, ∀ ζ : ℂ, c₁ ≤ ζ.re → ζ.re ≤ c₂ → ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ ζ‖ ≤ M := by
-  obtain ⟨q, s, u, hs, hu, hL, -⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_factor T
-  choose M hM using fun w : InfinitePlace F ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_bounded w c₁ (c₂ + (s w χ).re) hc₁
+    ∃ M : ℝ, ∀ ζ : ℂ, c₁ ≤ ζ.re → ζ.re ≤ c₂ → ‖meyerDecomposition_heckeL T χ ζ‖ ≤ M := by
+  obtain ⟨q, s, u, hs, hu, hL, -⟩ := meyerDecomposition_factor T
+  choose M hM using fun w : InfinitePlace F ↦ meyerDecomposition_A_bounded w
+      c₁ (c₂ + (s w χ).re) hc₁
   refine ⟨(∏ w, |M w|) * ∏ v : T, (1 - ((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) ^ c₁)⁻¹,
     fun ζ h1 h2 ↦ ?_⟩
   rw [hL χ ζ, norm_mul, norm_prod, norm_prod]
@@ -10409,8 +10530,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       linarith [(hs w χ).1]
     · rw [Complex.add_re]
       linarith
-  · obtain ⟨hr0, hr1⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_r T v
-    have hlow := (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_B_facts _ hr0 hr1 (u v χ) (hu v χ)).2.2.1 c₁ ζ h1
+  · obtain ⟨hr0, hr1⟩ := meyerDecomposition_r T v
+    have hlow := (meyerDecomposition_B_facts _ hr0 hr1 (u v χ) (hu v χ)).2.2.1 c₁ ζ h1
     have hpos : 0 < 1 - ((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) ^ c₁ :=
       sub_pos.mpr (Real.rpow_lt_one hr0.le hr1 hc₁)
     rw [norm_inv]
@@ -10419,19 +10540,19 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- The quotient of the S-local Hecke L-function on a line of positive real part by its value
 at a point of a closed vertical strip: polynomial in `z` and in one group seminorm of the
 character, times an exponential in the difference of the heights. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_ratio
+private theorem meyerDecomposition_L_ratio
     (T : Finset V) :
     ∃ q : GroupSeminorm (PontryaginDual (SIdeleQuotient F T)), ∀ c : ℝ, 0 < c → ∀ α β : ℝ,
       ∃ (C : ℝ) (N : ℕ) (κ : ℝ), 0 ≤ C ∧ 0 ≤ κ ∧
         ∀ (χ : PontryaginDual (SIdeleQuotient F T)) (z ζ : ℂ), z.re ∈ Icc α β → ζ.re = c →
-        ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ ζ‖ * ‖(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹‖ ≤
+        ‖meyerDecomposition_heckeL T χ ζ‖ * ‖(meyerDecomposition_heckeL T χ z)⁻¹‖ ≤
           C * ((1 + q χ) * (1 + ‖z‖)) ^ N * Real.exp (κ * |z.im - ζ.im|) := by
-  obtain ⟨q, s, u, hs, hu, hL, -⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_factor T
+  obtain ⟨q, s, u, hs, hu, hL, -⟩ := meyerDecomposition_factor T
   refine ⟨q, fun c hc α β ↦ ?_⟩
   choose C N hC hCN using fun w : InfinitePlace F ↦
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_A_ratio w c (|α - c| + |β - c|) hc
+    meyerDecomposition_A_ratio w c (|α - c| + |β - c|) hc
   let r : T → ℝ := fun v ↦ ((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ)
-  have hr (v : T) : 0 < r v ∧ r v < 1 := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_r T v
+  have hr (v : T) : 0 < r v ∧ r v < 1 := meyerDecomposition_r T v
   have hCf (v : T) : 0 ≤ (1 + r v ^ α) / (1 - r v ^ c) :=
     div_nonneg (by linarith [Real.rpow_nonneg (hr v).1.le α])
       (sub_pos.mpr (Real.rpow_lt_one (hr v).1.le (hr v).2 hc)).le
@@ -10444,8 +10565,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     constructor
     · linarith [hz.1, neg_abs_le (α - c), abs_nonneg (β - c)]
     · linarith [hz.2, le_abs_self (β - c), abs_nonneg (α - c)]
-  have e : ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ ζ‖ * ‖(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹‖ =
-      (∏ w, ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w (ζ + s w χ)‖ * ‖(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w (z + s w χ))⁻¹‖) *
+  have e : ‖meyerDecomposition_heckeL T χ ζ‖ * ‖(meyerDecomposition_heckeL T χ z)⁻¹‖ =
+      (∏ w, ‖meyerDecomposition_archFactor w (ζ + s w χ)‖ *
+          ‖(meyerDecomposition_archFactor w (z + s w χ))⁻¹‖) *
         ∏ v : T, ‖(1 - u v χ * (r v : ℂ) ^ ζ)⁻¹‖ * ‖((1 - u v χ * (r v : ℂ) ^ z)⁻¹)⁻¹‖ := by
     rw [hL χ ζ, hL χ z, mul_inv, ← Finset.prod_inv_distrib, ← Finset.prod_inv_distrib, norm_mul,
       norm_mul, norm_prod, norm_prod, norm_prod, norm_prod, Finset.prod_mul_distrib,
@@ -10453,7 +10575,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     ring
   have hW : 1 ≤ (1 + ‖z‖) * (1 + q χ) := by
     nlinarith [norm_nonneg z, apply_nonneg q χ]
-  have hA (w : InfinitePlace F) : ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w (ζ + s w χ)‖ * ‖(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w (z + s w χ))⁻¹‖ ≤
+  have hA (w : InfinitePlace F) : ‖meyerDecomposition_archFactor w (ζ + s w χ)‖ *
+      ‖(meyerDecomposition_archFactor w (z + s w χ))⁻¹‖ ≤
       C w * ((1 + ‖z‖) * (1 + q χ)) ^ N w * Real.exp ((Real.pi + 1) * |z.im - ζ.im|) := by
     refine (hCN w (s w χ) z ζ (hs w χ).1 hζ hzc).trans ?_
     have h1 : (1 + ‖z‖) * (1 + ‖s w χ‖) ≤ (1 + ‖z‖) * (1 + q χ) :=
@@ -10462,13 +10585,14 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       (pow_le_pow_left₀ (by positivity) h1 _) (hC w)) (Real.exp_pos _).le
   have hB (v : T) : ‖(1 - u v χ * (r v : ℂ) ^ ζ)⁻¹‖ * ‖((1 - u v χ * (r v : ℂ) ^ z)⁻¹)⁻¹‖ ≤
       (1 + r v ^ α) / (1 - r v ^ c) := by
-    have hf := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_B_facts (r v) (hr v).1 (hr v).2 (u v χ) (hu v χ)
+    have hf := meyerDecomposition_B_facts (r v) (hr v).1 (hr v).2 (u v χ) (hu v χ)
     have hpos : 0 < 1 - r v ^ c := sub_pos.mpr (Real.rpow_lt_one (hr v).1.le (hr v).2 hc)
     rw [inv_inv, norm_inv, ← div_eq_inv_mul]
     exact div_le_div₀ (by linarith [Real.rpow_nonneg (hr v).1.le α]) (hf.2.1 α z hz.1) hpos
       (hf.2.2.1 c ζ hζ.ge)
   rw [e]
-  calc (∏ w, ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w (ζ + s w χ)‖ * ‖(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_archFactor w (z + s w χ))⁻¹‖) *
+  calc (∏ w, ‖meyerDecomposition_archFactor w (ζ + s w χ)‖ *
+      ‖(meyerDecomposition_archFactor w (z + s w χ))⁻¹‖) *
         ∏ v : T, ‖(1 - u v χ * (r v : ℂ) ^ ζ)⁻¹‖ * ‖((1 - u v χ * (r v : ℂ) ^ z)⁻¹)⁻¹‖
       ≤ (∏ w, C w * ((1 + ‖z‖) * (1 + q χ)) ^ N w *
           Real.exp ((Real.pi + 1) * |z.im - ζ.im|)) *
@@ -10485,7 +10609,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         ring_nf
 
 /-- Two bounds of the form `C W^N e`, each in a variable at most `2 W`, multiply. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_mul_bound
+private theorem meyerDecomposition_mul_bound
     (a b W W₁ W₂ e₁ e₂ C₁ C₂ : ℝ) (N₁ N₂ : ℕ) (hW₁ : 0 ≤ W₁)
     (hW₂ : 0 ≤ W₂) (h₁ : W₁ ≤ 2 * W) (h₂ : W₂ ≤ 2 * W) (hC₁ : 0 ≤ C₁) (hC₂ : 0 ≤ C₂)
     (he₁ : 0 ≤ e₁) (he₂ : 0 ≤ e₂) (hb0 : 0 ≤ b) (ha : a ≤ C₁ * W₁ ^ N₁ * e₁)
@@ -10501,7 +10625,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     _ = _ := by rw [mul_pow, mul_pow, pow_add, pow_add]; ring
 
 /-- A bound `C W^N e` is weakened to a larger constant, exponent and exponential. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_weaken
+private theorem meyerDecomposition_weaken
     (C C' W e e' : ℝ) (N N' : ℕ) (hW : 1 ≤ W) (hC : 0 ≤ C)
     (hCC : C ≤ C') (hNN : N ≤ N') (he : 0 ≤ e) (hee : e ≤ e') :
     C * W ^ N * e ≤ C' * W ^ N' * e' := by
@@ -10513,17 +10637,18 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- The bounds of the kernels of the partition function: the product of the inverse
 L-functions at `z` and `1 - z` against the product of the L-functions on a line inside the
 critical strip. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_kernels
+private theorem meyerDecomposition_kernels
     (T : Finset V) :
     ∃ q : GroupSeminorm (PontryaginDual (SIdeleQuotient F T)), ∀ c : ℝ, 0 < c → c < 1 →
       ∀ α β : ℝ, ∃ (C : ℝ) (N : ℕ) (κ : ℝ), 0 ≤ C ∧
         ∀ (χ : PontryaginDual (SIdeleQuotient F T)) (z ζ : ℂ), z.re ∈ Icc α β → ζ.re = c →
-        ‖(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹ * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖ *
-            ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ ζ * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - ζ)‖ ≤
+        ‖(meyerDecomposition_heckeL T χ z)⁻¹ * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖ *
+            ‖meyerDecomposition_heckeL T χ ζ * meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)‖ ≤
           C * ((1 + q χ) * (1 + ‖z‖)) ^ N * Real.exp (κ * |z.im - ζ.im|) ∧
-        ‖(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖ ^ 2 * ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ ζ * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - ζ)‖ ≤
+        ‖(meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖ ^ 2 * ‖meyerDecomposition_heckeL T χ ζ *
+            meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)‖ ≤
           C * ((1 + q χ) * (1 + ‖z‖)) ^ N * Real.exp (κ * |z.im - ζ.im|) := by
-  obtain ⟨q, hq⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_ratio T
+  obtain ⟨q, hq⟩ := meyerDecomposition_L_ratio T
   refine ⟨q, fun c hc hc1 α β ↦ ?_⟩
   obtain ⟨C₁, N₁, κ₁, hC₁, hκ₁, h₁⟩ := hq c hc α β
   obtain ⟨C₂, N₂, κ₂, hC₂, hκ₂, h₂⟩ := hq (1 - c) (by linarith) (1 - β) (1 - α)
@@ -10551,9 +10676,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   have B1 := h₁ χ z ζ hz hζ
   have B2 := h₂ χ⁻¹ (1 - z) (1 - ζ) hz' hζ'
   rw [hqi, hdd] at B2
-  have hconj : ‖(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖ =
-      ‖(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ (starRingEnd ℂ (1 - z)))⁻¹‖ := by
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_conj T χ (1 - z), norm_inv, norm_inv, Complex.norm_conj]
+  have hconj : ‖(meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖ =
+      ‖(meyerDecomposition_heckeL T χ (starRingEnd ℂ (1 - z)))⁻¹‖ := by
+    rw [meyerDecomposition_L_conj T χ (1 - z), norm_inv, norm_inv, Complex.norm_conj]
   have hz'' : (starRingEnd ℂ (1 - z)).re ∈ Icc (1 - β) (1 - α) := by
     rw [Complex.conj_re]
     exact hz'
@@ -10571,47 +10696,53 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     rw [← Real.exp_add, Real.exp_le_exp]
     nlinarith
   refine ⟨?_, ?_⟩
-  · have e1 : ‖(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹ * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖ *
-        ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ ζ * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - ζ)‖ =
-        (‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ ζ‖ * ‖(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹‖) *
-          (‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - ζ)‖ * ‖(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖) := by
+  · have e1 : ‖(meyerDecomposition_heckeL T χ z)⁻¹ * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖ *
+        ‖meyerDecomposition_heckeL T χ ζ * meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)‖ =
+        (‖meyerDecomposition_heckeL T χ ζ‖ * ‖(meyerDecomposition_heckeL T χ z)⁻¹‖) *
+          (‖meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)‖ *
+              ‖(meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖) := by
       rw [norm_mul, norm_mul]
       ring
     rw [e1]
-    have hm := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_mul_bound _ _ _ _ _ _ _ C₁ C₂ N₁ N₂ (by positivity) (by positivity) hW₁
+    have hm := meyerDecomposition_mul_bound _ _ _ _ _ _ _ C₁ C₂ N₁ N₂
+        (by positivity) (by positivity) hW₁
       hW₂ hC₁ hC₂ (Real.exp_pos _).le (Real.exp_pos _).le (by positivity) B1 B2
     have hCle : C₁ * C₂ * 2 ^ (N₁ + N₂) ≤ (C₁ + C₃) * C₂ * 2 ^ (N₁ + N₂ + N₃) :=
       mul_le_mul (mul_le_mul_of_nonneg_right (by linarith) hC₂)
         (pow_le_pow_right₀ (by norm_num) (by omega)) (by positivity) (mul_nonneg hC₁₃ hC₂)
-    exact hm.trans (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_weaken _ _ _ _ _ _ _ hW
+    exact hm.trans (meyerDecomposition_weaken _ _ _ _ _ _ _ hW
       (mul_nonneg (mul_nonneg hC₁ hC₂) (by positivity)) hCle (by omega) (by positivity) hexp)
-  · have e2 : ‖(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖ ^ 2 * ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ ζ * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - ζ)‖ =
-        (‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ ζ‖ * ‖(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖) *
-          (‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - ζ)‖ * ‖(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖) := by
+  · have e2 : ‖(meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖ ^ 2 * ‖meyerDecomposition_heckeL T χ ζ *
+      meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)‖ =
+        (‖meyerDecomposition_heckeL T χ ζ‖ * ‖(meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖) *
+          (‖meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)‖ *
+              ‖(meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖) := by
       rw [norm_mul]
       ring
     rw [e2]
-    have hm := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_mul_bound _ _ _ _ _ _ _ C₃ C₂ N₃ N₂ (by positivity) (by positivity) hW₂
+    have hm := meyerDecomposition_mul_bound _ _ _ _ _ _ _ C₃ C₂ N₃ N₂
+        (by positivity) (by positivity) hW₂
       hW₂ hC₃ hC₂ (Real.exp_pos _).le (Real.exp_pos _).le (by positivity) B3 B2
     have hCle : C₃ * C₂ * 2 ^ (N₃ + N₂) ≤ (C₁ + C₃) * C₂ * 2 ^ (N₁ + N₂ + N₃) :=
       mul_le_mul (mul_le_mul_of_nonneg_right (by linarith) hC₂)
         (pow_le_pow_right₀ (by norm_num) (by omega)) (by positivity) (mul_nonneg hC₁₃ hC₂)
-    exact hm.trans (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_weaken _ _ _ _ _ _ _ hW
+    exact hm.trans (meyerDecomposition_weaken _ _ _ _ _ _ _ hW
       (mul_nonneg (mul_nonneg hC₃ hC₂) (by positivity)) hCle (by omega) (by positivity) hexp')
 
 /-- The product `L(χ, z) L(χ⁻¹, 1 - z)` is holomorphic on the critical strip. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_lambda_differentiableOn
+private theorem meyerDecomposition_lambda_differentiableOn
     (T : Finset V)
     (χ : PontryaginDual (SIdeleQuotient F T)) :
-    DifferentiableOn ℂ (fun z ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))
+    DifferentiableOn ℂ (fun z ↦ meyerDecomposition_heckeL T χ z *
+        meyerDecomposition_heckeL T χ⁻¹ (1 - z))
       (Complex.re ⁻¹' Ioo 0 1) := by
   have hLd (χ' : PontryaginDual (SIdeleQuotient F T)) :
-      DifferentiableOn ℂ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ') (Complex.re ⁻¹' Ioi 0) := by
+      DifferentiableOn ℂ (meyerDecomposition_heckeL T χ') (Complex.re ⁻¹' Ioi 0) := by
     intro z hz
-    have h := ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_inv_differentiable T χ') z).inv
-      (inv_ne_zero (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_ne_zero T χ' z hz))
+    have h := ((meyerDecomposition_L_inv_differentiable T χ') z).inv
+      (inv_ne_zero (meyerDecomposition_L_ne_zero T χ' z hz))
     exact (h.congr_of_eventuallyEq (Eventually.of_forall fun s ↦
-      (inv_inv (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ' s)).symm)).differentiableWithinAt
+      (inv_inv (meyerDecomposition_heckeL T χ' s)).symm)).differentiableWithinAt
   refine ((hLd χ).mono fun s (hs : s ∈ Complex.re ⁻¹' Ioo (0 : ℝ) 1) ↦
     show s ∈ Complex.re ⁻¹' Ioi (0 : ℝ) from hs.1).mul ?_
   refine (hLd χ⁻¹).comp (by fun_prop : Differentiable ℂ fun s : ℂ ↦ 1 - s).differentiableOn
@@ -10622,12 +10753,13 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The product `L(χ, ζ) L(χ⁻¹, 1 - ζ)` is bounded on every closed substrip of the critical
 strip. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_lambda_bounded
+private theorem meyerDecomposition_lambda_bounded
     (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T))
     (c₁ c₂ : ℝ) (hc₁ : 0 < c₁) (hc₂ : c₂ < 1) :
-    ∃ M : ℝ, ∀ ζ : ℂ, c₁ ≤ ζ.re → ζ.re ≤ c₂ → ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ ζ * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - ζ)‖ ≤ M := by
-  obtain ⟨M₁, hM₁⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_bounded T χ c₁ c₂ hc₁
-  obtain ⟨M₂, hM₂⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_bounded T χ⁻¹ (1 - c₂) (1 - c₁) (by linarith)
+    ∃ M : ℝ, ∀ ζ : ℂ, c₁ ≤ ζ.re → ζ.re ≤ c₂ → ‖meyerDecomposition_heckeL T χ ζ *
+        meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)‖ ≤ M := by
+  obtain ⟨M₁, hM₁⟩ := meyerDecomposition_L_bounded T χ c₁ c₂ hc₁
+  obtain ⟨M₂, hM₂⟩ := meyerDecomposition_L_bounded T χ⁻¹ (1 - c₂) (1 - c₁) (by linarith)
   refine ⟨M₁ * M₂, fun ζ hζ1 hζ2 ↦ ?_⟩
   have hre : (1 - ζ).re = 1 - ζ.re := by rw [Complex.sub_re, Complex.one_re]
   rw [norm_mul]
@@ -10635,132 +10767,150 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     (norm_nonneg _) ((norm_nonneg _).trans (hM₁ ζ hζ1 hζ2))
 
 /-- The partition function of every angular character. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_partition
+private theorem meyerDecomposition_partition
     (T : Finset V) :
     ∃ om : PontryaginDual (SIdeleQuotient F T) → ℂ → ℂ, (∀ χ, Differentiable ℂ (om χ)) ∧
       (∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → z.re < c →
-        om χ z = (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹ * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
-          sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (fun ζ ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ ζ * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - ζ)) c z) ∧
+        om χ z = (meyerDecomposition_heckeL T χ z)⁻¹ * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+          meyerPositiveLines_lineIntegral (fun ζ ↦ meyerDecomposition_heckeL T χ ζ *
+              meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)) c z) ∧
       (∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → c < z.re →
-        om χ z = 1 + (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹ * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
-          sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (fun ζ ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ ζ * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - ζ)) c z) := by
+        om χ z = 1 + (meyerDecomposition_heckeL T χ z)⁻¹ *
+            (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+          meyerPositiveLines_lineIntegral (fun ζ ↦ meyerDecomposition_heckeL T χ ζ *
+              meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)) c z) := by
   have hΔΛ (χ : PontryaginDual (SIdeleQuotient F T)) (ζ : ℂ) (h0 : 0 < ζ.re) (h1 : ζ.re < 1) :
-      (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ ζ)⁻¹ * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - ζ))⁻¹ *
-        (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ ζ * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - ζ)) = 1 := by
+      (meyerDecomposition_heckeL T χ ζ)⁻¹ * (meyerDecomposition_heckeL T χ⁻¹ (1 - ζ))⁻¹ *
+        (meyerDecomposition_heckeL T χ ζ * meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)) = 1 := by
     have h2 : 0 < (1 - ζ).re := by rw [Complex.sub_re, Complex.one_re]; linarith
-    rw [← mul_inv, inv_mul_cancel₀ (mul_ne_zero (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_ne_zero T χ ζ h0)
-      (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_ne_zero T χ⁻¹ (1 - ζ) h2))]
+    rw [← mul_inv, inv_mul_cancel₀ (mul_ne_zero (meyerDecomposition_L_ne_zero T χ ζ h0)
+      (meyerDecomposition_L_ne_zero T χ⁻¹ (1 - ζ) h2))]
   choose om homd homL homR using fun χ : PontryaginDual (SIdeleQuotient F T) ↦
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_partition (fun z ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹ * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹)
-      (fun z ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))
-      ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_inv_differentiable T χ).mul ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_inv_differentiable T χ⁻¹).comp
+    meyerPositiveLines_partition (fun z ↦ (meyerDecomposition_heckeL T χ z)⁻¹ *
+        (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹)
+      (fun z ↦ meyerDecomposition_heckeL T χ z * meyerDecomposition_heckeL T χ⁻¹ (1 - z))
+      ((meyerDecomposition_L_inv_differentiable T χ).mul
+          ((meyerDecomposition_L_inv_differentiable T χ⁻¹).comp
         (by fun_prop : Differentiable ℂ fun z : ℂ ↦ 1 - z)))
-      (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_lambda_differentiableOn T χ) (hΔΛ χ)
-      (fun c₁ c₂ h1 _ h2 ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_lambda_bounded T χ c₁ c₂ h1 h2)
+      (meyerDecomposition_lambda_differentiableOn T χ) (hΔΛ χ)
+      (fun c₁ c₂ h1 _ h2 ↦ meyerDecomposition_lambda_bounded T χ c₁ c₂ h1 h2)
   exact ⟨om, homd, homL, homR⟩
 
 /-- On the critical line, the partition functions of `χ` and `χ⁻¹` satisfy
 `om χ⁻¹ (1 - z) = 1 - om χ z`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_om_symmetry
+private theorem meyerDecomposition_om_symmetry
     (T : Finset V)
     (om : PontryaginDual (SIdeleQuotient F T) → ℂ → ℂ)
     (homL : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → z.re < c →
-      om χ z = (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹ * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
-        sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (fun ζ ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ ζ * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - ζ)) c z)
+      om χ z = (meyerDecomposition_heckeL T χ z)⁻¹ * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+        meyerPositiveLines_lineIntegral (fun ζ ↦ meyerDecomposition_heckeL T χ ζ *
+            meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)) c z)
     (homR : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → c < z.re →
-      om χ z = 1 + (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹ * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
-        sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (fun ζ ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ ζ * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - ζ)) c z)
+      om χ z = 1 + (meyerDecomposition_heckeL T χ z)⁻¹ *
+          (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+        meyerPositiveLines_lineIntegral (fun ζ ↦ meyerDecomposition_heckeL T χ ζ *
+            meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)) c z)
     (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ) (hz : z.re = 1 / 2) :
     om χ⁻¹ (1 - z) = 1 - om χ z := by
-  refine sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_symmetry (fun χ z ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹)
-    (fun χ z ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z)) om (fun χ' ζ ↦ ?_) homL homR χ z hz
-  have h : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ'⁻¹⁻¹ = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ' := congrArg (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T) (inv_inv χ')
-  change sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ'⁻¹ ζ * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ'⁻¹⁻¹ (1 - ζ) =
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ' (1 - ζ) * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ'⁻¹ (1 - (1 - ζ))
+  refine meyerDecomposition_symmetry (fun χ z ↦ (meyerDecomposition_heckeL T χ z)⁻¹)
+    (fun χ z ↦ meyerDecomposition_heckeL T χ z * meyerDecomposition_heckeL T χ⁻¹ (1 - z)) om
+        (fun χ' ζ ↦ ?_) homL homR χ z hz
+  have h : meyerDecomposition_heckeL T χ'⁻¹⁻¹ = meyerDecomposition_heckeL T χ' :=
+      congrArg (meyerDecomposition_heckeL T) (inv_inv χ')
+  change meyerDecomposition_heckeL T χ'⁻¹ ζ * meyerDecomposition_heckeL T χ'⁻¹⁻¹ (1 - ζ) =
+    meyerDecomposition_heckeL T χ' (1 - ζ) * meyerDecomposition_heckeL T χ'⁻¹ (1 - (1 - ζ))
   rw [h, sub_sub_cancel, mul_comm]
 
 /-- The epsilon factors of the characters of a finitely generated subgroup of the angular
 characters are bounded uniformly on every closed vertical strip. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon_bound
+private theorem meyerDecomposition_epsilon_bound
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (H : Subgroup (PontryaginDual.map τ).ker) (hH : H.FG) (a b : ℝ) :
-    ∃ B : ℝ, 0 ≤ B ∧ ∀ (χ : H) (z : ℂ), z.re ∈ Icc a b → ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon T χ.val.val z‖ ≤ B := by
+    ∃ B : ℝ, 0 ≤ B ∧ ∀ (χ : H) (z : ℂ), z.re ∈ Icc a b →
+        ‖meyerDecomposition_epsilon T χ.val.val z‖ ≤ B := by
   have hFG : Group.FG H := (Group.fg_iff_subgroup_fg H).mpr hH
   let ι₀ : H →* PontryaginDual (SIdeleQuotient F T) :=
     ((PontryaginDual.map τ).ker.subtype).comp H.subtype
   obtain ⟨B, hB0, hB⟩ :=
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier_epsilon_uniform
+    meyerStripMultiplier_epsilon_uniform
       T H ι₀ a b
   exact ⟨B, hB0, fun χ z hz ↦ hB χ z hz⟩
 
 /-- The epsilon factor in a norm chart is entire. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_eps_differentiable
+private theorem meyerDecomposition_eps_differentiable
     (T : Finset V)
-    (χ : PontryaginDual (SIdeleQuotient F T)) : Differentiable ℂ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon T χ) := fun z ↦
+    (χ : PontryaginDual (SIdeleQuotient F T)) :
+        Differentiable ℂ (meyerDecomposition_epsilon T χ) := fun z ↦
   ((sLocalEpsilonFactor_entire χ) z (mem_univ z)).differentiableAt
 
 /-- In the critical strip, the epsilon factor divided by the L-function at `1 - z` is the
 rho factor divided by the L-function at `z`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_rho
+private theorem meyerDecomposition_rho
     (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ)
     (hz0 : 0 < z.re) (hz1 : z.re < 1) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon T χ z * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹ =
-      (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹ * sLocalRhoFactor (chartₜ(T, χ) z) := by
+    meyerDecomposition_epsilon T χ z * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ =
+      (meyerDecomposition_heckeL T χ z)⁻¹ * sLocalRhoFactor (chartₜ(T, χ) z) := by
   have hS : Complex.re ⁻¹' Ioo (0 : ℝ) 1 ∈ 𝓝 z :=
     (isOpen_Ioo.preimage Complex.continuous_re).mem_nhds ⟨hz0, hz1⟩
-  have hcL : ContinuousAt (fun s ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon T χ s * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - s))⁻¹) z :=
-    ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_eps_differentiable T χ) z).continuousAt.mul
-      (((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_inv_differentiable T χ⁻¹) (1 - z)).continuousAt.comp
+  have hcL : ContinuousAt (fun s ↦ meyerDecomposition_epsilon T χ s *
+      (meyerDecomposition_heckeL T χ⁻¹ (1 - s))⁻¹) z :=
+    ((meyerDecomposition_eps_differentiable T χ) z).continuousAt.mul
+      (((meyerDecomposition_L_inv_differentiable T χ⁻¹) (1 - z)).continuousAt.comp
         (by fun_prop : ContinuousAt (fun s : ℂ ↦ 1 - s) z))
   have hρ : ContinuousAt (fun s ↦ sLocalRhoFactor (chartₜ(T, χ) s)) z := by
     have h := (sLocalRhoFactor_iteratedDeriv_analyticOn χ 0) z hz0
     rw [iteratedDeriv_zero] at h
     exact h.continuousAt
-  have hcR : ContinuousAt (fun s ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ s)⁻¹ * sLocalRhoFactor (chartₜ(T, χ) s)) z :=
-    ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_inv_differentiable T χ) z).continuousAt.mul hρ
-  have hev : (fun s ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon T χ s * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - s))⁻¹) =ᶠ[𝓝[≠] z]
-      fun s ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ s)⁻¹ * sLocalRhoFactor (chartₜ(T, χ) s) := by
+  have hcR : ContinuousAt (fun s ↦ (meyerDecomposition_heckeL T χ s)⁻¹ *
+      sLocalRhoFactor (chartₜ(T, χ) s)) z :=
+    ((meyerDecomposition_L_inv_differentiable T χ) z).continuousAt.mul hρ
+  have hev : (fun s ↦ meyerDecomposition_epsilon T χ s *
+      (meyerDecomposition_heckeL T χ⁻¹ (1 - s))⁻¹) =ᶠ[𝓝[≠] z]
+      fun s ↦ (meyerDecomposition_heckeL T χ s)⁻¹ * sLocalRhoFactor (chartₜ(T, χ) s) := by
     filter_upwards [nhdsWithin_le_nhds hS,
       nhdsNE_le_codiscrete z (sLocalRhoFactor_eq_epsilon_mul (F := F) (S := T) χ)] with s hs hfac
-    change sLocalRhoFactor (chartₜ(T, χ) s) = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon T χ s *
-      (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ s / sLocalHeckeL (dualQuasiCharacter (sIdeleQuotientNorm F T)
+    change sLocalRhoFactor (chartₜ(T, χ) s) = meyerDecomposition_epsilon T χ s *
+      (meyerDecomposition_heckeL T χ s / sLocalHeckeL (dualQuasiCharacter (sIdeleQuotientNorm F T)
         (isProperMap_sIdeleQuotientNorm F T).continuous (chartₜ(T, χ) s))) at hfac
     have hdual : sLocalHeckeL (dualQuasiCharacter (sIdeleQuotientNorm F T)
         (isProperMap_sIdeleQuotientNorm F T).continuous (chartₜ(T, χ) s)) =
-        sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - s) :=
+        meyerDecomposition_heckeL T χ⁻¹ (1 - s) :=
       congrArg sLocalHeckeL (sLocalNormTwistChart_dual χ s)
-    have hL : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ s ≠ 0 := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_ne_zero T χ s hs.1
-    change sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon T χ s * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - s))⁻¹ =
-      (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ s)⁻¹ * sLocalRhoFactor (chartₜ(T, χ) s)
+    have hL : meyerDecomposition_heckeL T χ s ≠ 0 := meyerDecomposition_L_ne_zero T χ s hs.1
+    change meyerDecomposition_epsilon T χ s * (meyerDecomposition_heckeL T χ⁻¹ (1 - s))⁻¹ =
+      (meyerDecomposition_heckeL T χ s)⁻¹ * sLocalRhoFactor (chartₜ(T, χ) s)
     rw [hfac, hdual, div_eq_mul_inv,
-      show (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ s)⁻¹ * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon T χ s * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ s *
-        (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - s))⁻¹)) = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon T χ s *
-          ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ s)⁻¹ * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ s) * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - s))⁻¹ by ring,
+      show (meyerDecomposition_heckeL T χ s)⁻¹ *
+          (meyerDecomposition_epsilon T χ s * (meyerDecomposition_heckeL T χ s *
+        (meyerDecomposition_heckeL T χ⁻¹ (1 - s))⁻¹)) = meyerDecomposition_epsilon T χ s *
+          ((meyerDecomposition_heckeL T χ s)⁻¹ * meyerDecomposition_heckeL T χ s) *
+              (meyerDecomposition_heckeL T χ⁻¹ (1 - s))⁻¹ by ring,
       inv_mul_cancel₀ hL, mul_one]
   exact tendsto_nhds_unique_of_eventuallyEq (hcL.tendsto.mono_left nhdsWithin_le_nhds)
     (hcR.tendsto.mono_left nhdsWithin_le_nhds) hev
 
 /-- The functional equation of the theta Mellin integrals in the critical strip, divided by the
 L-functions, for a test and for its Fourier transform. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_equation
+private theorem meyerDecomposition_equation
     (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T))
     (g : ℬₛ(T)) (z : ℂ) (hz0 : 0 < z.re) (hz1 : z.re < 1) :
-    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹ * sLocalThetaMellinIntegral g (chartₜ(T, χ) z) =
-        sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon T χ z * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+    (meyerDecomposition_heckeL T χ z)⁻¹ * sLocalThetaMellinIntegral g (chartₜ(T, χ) z) =
+        meyerDecomposition_epsilon T χ z * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
           sLocalThetaMellinIntegral (sAdeleSchwartzFourier g) (chartₜ(T, χ⁻¹) (1 - z)) ∧
-      (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹ *
+      (meyerDecomposition_heckeL T χ z)⁻¹ *
           sLocalThetaMellinIntegral (sAdeleSchwartzFourier g) (chartₜ(T, χ) z) =
-        sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon T χ z * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+        meyerDecomposition_epsilon T χ z * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
           sLocalThetaMellinIntegral g (chartₜ(T, χ⁻¹) (1 - z)) := by
   have h1 : 0 < (1 - z).re := by rw [Complex.sub_re, Complex.one_re]; linarith
   obtain ⟨e1, e2⟩ :=
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_equation_glue
-      T χ g (fun s ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ s)⁻¹)
-      (fun s ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon T χ s * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - s))⁻¹)
-      (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_inv_differentiable T χ)
-      (((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_eps_differentiable T χ).mul ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_inv_differentiable T χ⁻¹).comp
+    meyerCriticalStrip_equation_glue
+      T χ g (fun s ↦ (meyerDecomposition_heckeL T χ s)⁻¹)
+      (fun s ↦ meyerDecomposition_epsilon T χ s * (meyerDecomposition_heckeL T χ⁻¹ (1 - s))⁻¹)
+      (meyerDecomposition_L_inv_differentiable T χ)
+      (((meyerDecomposition_eps_differentiable T χ).mul
+          ((meyerDecomposition_L_inv_differentiable T χ⁻¹).comp
         (by fun_prop : Differentiable ℂ fun s : ℂ ↦ 1 - s))).differentiableOn)
-      (fun s hs0 hs1 ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_rho T χ s hs0 hs1) z hz0 hz1
+      (fun s hs0 hs1 ↦ meyerDecomposition_rho T χ s hs0 hs1) z hz0 hz1
   have hA := sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T g χ z hz0
   have hB := sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T (sAdeleSchwartzFourier g) χ⁻¹
     (1 - z) h1
@@ -10768,22 +10918,25 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     hz0
   have hB' := sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T g χ⁻¹ (1 - z) h1
   constructor
-  · calc (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹ * sLocalThetaMellinIntegral g (chartₜ(T, χ) z)
-        = (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹ * sLocalIdelicZFunction g (chartₜ(T, χ) z) := by rw [hA]
-      _ = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon T χ z * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+  · calc (meyerDecomposition_heckeL T χ z)⁻¹ * sLocalThetaMellinIntegral g (chartₜ(T, χ) z)
+        = (meyerDecomposition_heckeL T χ z)⁻¹ *
+            sLocalIdelicZFunction g (chartₜ(T, χ) z) := by rw [hA]
+      _ = meyerDecomposition_epsilon T χ z * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
           sLocalIdelicZFunction (sAdeleSchwartzFourier g) (chartₜ(T, χ⁻¹) (1 - z)) := e1
-      _ = _ := congrArg (fun x ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon T χ z * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹ * x) hB
-  · calc (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹ *
+      _ = _ := congrArg (fun x ↦ meyerDecomposition_epsilon T χ z *
+          (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ * x) hB
+  · calc (meyerDecomposition_heckeL T χ z)⁻¹ *
           sLocalThetaMellinIntegral (sAdeleSchwartzFourier g) (chartₜ(T, χ) z)
-        = (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹ *
+        = (meyerDecomposition_heckeL T χ z)⁻¹ *
           sLocalIdelicZFunction (sAdeleSchwartzFourier g) (chartₜ(T, χ) z) := by rw [hA']
-      _ = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon T χ z * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+      _ = meyerDecomposition_epsilon T χ z * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
           sLocalIdelicZFunction g (chartₜ(T, χ⁻¹) (1 - z)) := e2
-      _ = _ := congrArg (fun x ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon T χ z * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹ * x) hB'
+      _ = _ := congrArg (fun x ↦ meyerDecomposition_epsilon T χ z *
+          (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ * x) hB'
 
 /-- On the critical line, the theta Mellin integral of the Fourier transform at `η = χ⁻¹` and
 `1 - z` is the rho factor times the theta Mellin integral at `χ` and `z`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_reflect
+private theorem meyerDecomposition_reflect
     (T : Finset V) (g : ℬₛ(T))
     (χ η : PontryaginDual (SIdeleQuotient F T)) (hη : η = χ⁻¹) (z : ℂ) (hz : z.re = 1 / 2) :
     sLocalThetaMellinIntegral (sAdeleSchwartzFourier g) (chartₜ(T, η) (1 - z)) =
@@ -10791,9 +10944,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   have h0 : 0 < (1 - z).re := by rw [Complex.sub_re, Complex.one_re, hz]; norm_num
   have h1 : (1 - z).re < 1 := by rw [Complex.sub_re, Complex.one_re, hz]; norm_num
   have hχ : η⁻¹ = χ := by rw [hη, inv_inv]
-  have e := (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_equation T η g (1 - z) h0 h1).2
-  rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_rho T η (1 - z) h0 h1, mul_assoc] at e
-  have e' := mul_left_cancel₀ (inv_ne_zero (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_ne_zero T η (1 - z) h0)) e
+  have e := (meyerDecomposition_equation T η g (1 - z) h0 h1).2
+  rw [meyerDecomposition_rho T η (1 - z) h0 h1, mul_assoc] at e
+  have e' := mul_left_cancel₀ (inv_ne_zero (meyerDecomposition_L_ne_zero T η (1 - z) h0)) e
   have hZ : sLocalThetaMellinIntegral g (chartₜ(T, η⁻¹) (1 - (1 - z))) =
       sLocalThetaMellinIntegral g (chartₜ(T, χ) z) :=
     (congrArg (fun η' : PontryaginDual (SIdeleQuotient F T) ↦
@@ -10803,7 +10956,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The theta Mellin integral of a test decays faster than every power of the height on every
 closed vertical strip of positive real part. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_decay
+private theorem meyerDecomposition_decay
     (T : Finset V) (g : ℬₛ(T)) (χ : PontryaginDual (SIdeleQuotient F T))
     (a b : ℝ) (ha : 0 < a) (N : ℕ) :
     ∃ C Y : ℝ, 0 ≤ C ∧ ∀ z : ℂ, z.re ∈ Icc a b → Y ≤ |z.im| →
@@ -10818,15 +10971,18 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   exact hd
 
 /-- One of the two families: the glued function for a sequence `u` and its partner `u'`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_half
+private theorem meyerDecomposition_half
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (om : PontryaginDual (SIdeleQuotient F T) → ℂ → ℂ) (homd : ∀ χ, Differentiable ℂ (om χ))
     (homL : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → z.re < c →
-      om χ z = (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹ * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
-        sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (fun ζ ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ ζ * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - ζ)) c z)
+      om χ z = (meyerDecomposition_heckeL T χ z)⁻¹ * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+        meyerPositiveLines_lineIntegral (fun ζ ↦ meyerDecomposition_heckeL T χ ζ *
+            meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)) c z)
     (homR : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → c < z.re →
-      om χ z = 1 + (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹ * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
-        sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_lineIntegral (fun ζ ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ ζ * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - ζ)) c z)
+      om χ z = 1 + (meyerDecomposition_heckeL T χ z)⁻¹ *
+          (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+        meyerPositiveLines_lineIntegral (fun ζ ↦ meyerDecomposition_heckeL T χ ζ *
+            meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)) c z)
     (u u' : ℕ → ℬₛ(T))
     (hu : ∀ a : ℝ, 0 < a → ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
       (∀ χ ∉ H, ∀ n (z : ℂ), z.re = a → sLocalThetaMellinIntegral (u n) (chartₜ(T,χ.val) z) = 0) ∧
@@ -10837,8 +10993,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re = a →
         (1+p χ)^k * ‖z^m*sLocalThetaMellinIntegral (u' n) (chartₜ(T,χ.val.val) z)‖ ≤ B)
     (hglue : ∀ n (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ), 0 < z.re → z.re < 1 →
-      (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹ * sLocalThetaMellinIntegral (u n) (chartₜ(T, χ) z) =
-        sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon T χ z * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+      (meyerDecomposition_heckeL T χ z)⁻¹ * sLocalThetaMellinIntegral (u n) (chartₜ(T, χ) z) =
+        meyerDecomposition_epsilon T χ z * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
           sLocalThetaMellinIntegral (u' n) (chartₜ(T, χ⁻¹) (1 - z))) :
     ∃ Φ : ℕ → (PontryaginDual.map τ).ker → ℂ → ℂ, (∀ n χ, Differentiable ℂ (Φ n χ)) ∧
       (∀ a b : ℝ, ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
@@ -10847,21 +11003,24 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
           (1 + p χ) ^ k * ‖z ^ m * Φ n χ.val z‖ ≤ B) ∧
       ∀ n (χ : (PontryaginDual.map τ).ker) (z : ℂ), 0 < z.re →
         Φ n χ z = om χ.val z * sLocalThetaMellinIntegral (u n) (chartₜ(T, χ.val) z) := by
-  obtain ⟨q, hK⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_kernels T
-  exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_piece (PontryaginDual.map τ).ker q (fun χ z ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z)⁻¹)
-    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon T) (fun χ z ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ z * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_heckeL T χ⁻¹ (1 - z)) om
-    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_L_inv_differentiable T) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_eps_differentiable T) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_epsilon_bound T τ)
-    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_lambda_differentiableOn T)
-    (fun χ c₁ c₂ h1 _ h2 ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_lambda_bounded T χ c₁ c₂ h1 h2) hK homd homL homR
+  obtain ⟨q, hK⟩ := meyerDecomposition_kernels T
+  exact meyerDecomposition_piece (PontryaginDual.map τ).ker q
+      (fun χ z ↦ (meyerDecomposition_heckeL T χ z)⁻¹)
+    (meyerDecomposition_epsilon T) (fun χ z ↦ meyerDecomposition_heckeL T χ z *
+        meyerDecomposition_heckeL T χ⁻¹ (1 - z)) om
+    (meyerDecomposition_L_inv_differentiable T) (meyerDecomposition_eps_differentiable T)
+        (meyerDecomposition_epsilon_bound T τ)
+    (meyerDecomposition_lambda_differentiableOn T)
+    (fun χ c₁ c₂ h1 _ h2 ↦ meyerDecomposition_lambda_bounded T χ c₁ c₂ h1 h2) hK homd homL homR
     (fun n χ z ↦ sLocalThetaMellinIntegral (u n) (chartₜ(T, χ) z))
     (fun n χ z ↦ sLocalThetaMellinIntegral (u' n) (chartₜ(T, χ) z))
     (fun n χ ↦ (sLocalThetaMellinIntegral_analyticOn (u n) χ).differentiableOn)
     (fun n χ ↦ (sLocalThetaMellinIntegral_analyticOn (u' n) χ).differentiableOn)
-    (fun n χ a b ha N ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_decay T (u n) χ a b ha N)
-    (fun n χ a b ha N ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_decay T (u' n) χ a b ha N) hu hu' hglue
+    (fun n χ a b ha N ↦ meyerDecomposition_decay T (u n) χ a b ha N)
+    (fun n χ a b ha N ↦ meyerDecomposition_decay T (u' n) χ a b ha N) hu hu' hglue
 
 /-- The algebra of the identity on the critical line. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_algebra
+private theorem meyerDecomposition_algebra
     {ρ A B Φ₁ Φ₂ om₁ om₂ : ℂ} (h₁ : Φ₁ = om₁ * A) (h₂ : Φ₂ = om₂ * B)
     (hsym : om₂ = 1 - om₁) (hrefl : B = ρ * A) : ρ * (A - Φ₁) = Φ₂ := by
   rw [h₁, h₂, hsym, hrefl]
@@ -10890,31 +11049,31 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       ∀ n (χ η : (PontryaginDual.map τ).ker), η.val = χ.val⁻¹ → ∀ z : ℂ, z.re = 1 / 2 →
         sLocalRhoFactor (chartₜ(T, η.val) (1 - z)) *
           (sLocalThetaMellinIntegral (v n) (chartₜ(T, χ.val) z) - Φ₁ n χ z) = Φ₂ n η (1 - z) := by
-  obtain ⟨om, homd, homL, homR⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_partition T
+  obtain ⟨om, homd, homL, homR⟩ := meyerDecomposition_partition T
   have hv : v ∈ ({v,fun n ↦ sAdeleSchwartzFourier (v n)} : Set (ℕ → ℬₛ(T))) := Set.mem_insert _ _
   have hF : (fun n ↦ sAdeleSchwartzFourier (v n)) ∈
       ({v,fun n ↦ sAdeleSchwartzFourier (v n)} : Set (ℕ → ℬₛ(T))) :=
     Set.mem_insert_of_mem _ (Set.mem_singleton _)
-  refine Exists.elim (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_half T τ om homd homL homR v
+  refine Exists.elim (meyerDecomposition_half T τ om homd homL homR v
     (fun n ↦ sAdeleSchwartzFourier (v n)) (hw v hv) (hw _ hF)
-    (fun n χ z h0 h1 ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_equation T χ (v n) z h0 h1).1)) fun Φ₁ h₁ ↦ ?_
-  refine Exists.elim (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_half T τ om homd homL homR
+    (fun n χ z h0 h1 ↦ (meyerDecomposition_equation T χ (v n) z h0 h1).1)) fun Φ₁ h₁ ↦ ?_
+  refine Exists.elim (meyerDecomposition_half T τ om homd homL homR
     (fun n ↦ sAdeleSchwartzFourier (v n)) v (hw _ hF) (hw v hv)
-    (fun n χ z h0 h1 ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_equation T χ (v n) z h0 h1).2)) fun Φ₂ h₂ ↦ ?_
+    (fun n χ z h0 h1 ↦ (meyerDecomposition_equation T χ (v n) z h0 h1).2)) fun Φ₂ h₂ ↦ ?_
   refine ⟨Φ₁, Φ₂, h₁.1, h₂.1, h₁.2.1, h₂.2.1, fun n χ η hη z hz ↦ ?_⟩
   have hz0 : 0 < z.re := by rw [hz]; norm_num
   have hz1 : 0 < (1 - z).re := by rw [Complex.sub_re, Complex.one_re, hz]; norm_num
   have hsym : om η.val (1 - z) = 1 - om χ.val z := by
     rw [hη]
-    exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_om_symmetry T om homL homR χ.val z hz
-  exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_algebra (h₁.2.2 n χ z hz0) (h₂.2.2 n η (1 - z) hz1) hsym
-    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition_reflect T (v n) χ.val η.val hη z hz)
+    exact meyerDecomposition_om_symmetry T om homL homR χ.val z hz
+  exact meyerDecomposition_algebra (h₁.2.2 n χ z hz0) (h₂.2.2 n η (1 - z) hz1) hsym
+    (meyerDecomposition_reflect T (v n) χ.val η.val hη z hz)
 
 section PositiveLinesFlatLift
 
 /-- A function vanishing at the origin and bounded by a multiple of the squared norm near the
 origin has derivative zero there. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_hasFDerivAt_zero_of_sq
+private theorem meyerFlatLift_hasFDerivAt_zero_of_sq
     {E G : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
     [NormedAddCommGroup G] [NormedSpace ℝ G] (g : E → G) (hg0 : g 0 = 0) (C δ : ℝ) (hδ : 0 < δ)
     (hb : ∀ x : E, ‖x‖ < δ → ‖g x‖ ≤ C * ‖x‖ ^ 2) :
@@ -10931,7 +11090,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- A function smooth away from the origin, vanishing there, whose derivatives of every order
 are bounded by a multiple of the squared norm near the origin, is smooth with all derivatives
 zero at the origin. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_flat_contDiff
+private theorem meyerFlatLift_flat_contDiff
     {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
     (f : E → ℂ) (hf : ContDiffOn ℝ (∞) f {0}ᶜ) (h0 : f 0 = 0)
     (hflat : ∀ k : ℕ, ∃ C δ : ℝ, 0 < δ ∧ ∀ x : E, x ≠ 0 → ‖x‖ < δ →
@@ -10942,7 +11101,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   have hder (k : ℕ) (hk : iteratedFDeriv ℝ k f 0 = 0) :
       HasFDerivAt (iteratedFDeriv ℝ k f) (0 : E →L[ℝ] _) 0 := by
     obtain ⟨C, δ, hδ, hb⟩ := hflat k
-    refine sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_hasFDerivAt_zero_of_sq _ hk C δ hδ fun x hx ↦ ?_
+    refine meyerFlatLift_hasFDerivAt_zero_of_sq _ hk C δ hδ fun x hx ↦ ?_
     rcases eq_or_ne x 0 with rfl | hx0
     · simp [hk]
     · exact hb x hx0 hx
@@ -10960,7 +11119,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       (by exact_mod_cast le_top)).differentiableAt one_ne_zero
 
 /-- The dilation by a positive real as a continuous linear equivalence. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_dilation
+private noncomputable def meyerFlatLift_dilation
     {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E] (c : ℝ) (hc : c ≠ 0) :
     E ≃L[ℝ] E :=
   ContinuousLinearEquiv.equivOfInverse (c • ContinuousLinearMap.id ℝ E)
@@ -10969,15 +11128,15 @@ private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside
 
 /-- Scaling identity: a function which changes only by a constant under a dilation preserving
 an open set has iterated derivatives of positive order scaling with the power of the factor. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_norm_iteratedFDerivWithin_dilation
+private theorem meyerFlatLift_norm_iteratedFDerivWithin_dilation
     {E G : Type*} [NormedAddCommGroup E]
     [NormedSpace ℝ E] [NormedAddCommGroup G] [NormedSpace ℝ G]
     (Ω : Set E) (hΩ : IsOpen Ω) (f : E → G) (hf : ContDiffOn ℝ (∞) f Ω) (c : ℝ) (hc : 0 < c)
     (hscale : ∀ x ∈ Ω, c • x ∈ Ω) (hscale' : ∀ x, c • x ∈ Ω → x ∈ Ω)
     (d : G) (hd : ∀ x ∈ Ω, f (c • x) = f x + d) (i : ℕ) (hi : i ≠ 0) (x : E) (hx : x ∈ Ω) :
     ‖iteratedFDerivWithin ℝ i f Ω x‖ = c ^ i * ‖iteratedFDerivWithin ℝ i f Ω (c • x)‖ := by
-  let g : E ≃L[ℝ] E := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_dilation c hc.ne'
-  have hg (y : E) : g y = c • y := by simp [g, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_dilation]
+  let g : E ≃L[ℝ] E := meyerFlatLift_dilation c hc.ne'
+  have hg (y : E) : g y = c • y := by simp [g, meyerFlatLift_dilation]
   have hpre : g ⁻¹' Ω = Ω := by
     ext y
     simp only [mem_preimage, hg]
@@ -10994,7 +11153,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   have h3 : (iteratedFDerivWithin ℝ i f Ω (g x)).compContinuousLinearMap (fun _ ↦ (g : E →L[ℝ] E)) =
       c ^ i • iteratedFDerivWithin ℝ i f Ω (g x) := by
     ext m
-    simp only [ContinuousMultilinearMap.compContinuousLinearMap_apply, ContinuousLinearEquiv.coe_coe,
+    simp only [ContinuousMultilinearMap.compContinuousLinearMap_apply,
+        ContinuousLinearEquiv.coe_coe,
       hg, smul_apply]
     rw [ContinuousMultilinearMap.map_smul_univ]
     simp [Finset.prod_const, Finset.card_univ]
@@ -11003,14 +11163,15 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- On a cone whose unit section is a compact part of a dilation-invariant open set, the
 iterated derivatives of positive order of a dilation-covariant smooth function decay like the
 corresponding negative power of the norm. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cone_deriv_bound
+private theorem meyerFlatLift_cone_deriv_bound
     {E G : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
     [NormedAddCommGroup G] [NormedSpace ℝ G]
     (Ω : Set E) (hΩ : IsOpen Ω) (f : E → G) (hf : ContDiffOn ℝ (∞) f Ω)
     (hscale : ∀ c : ℝ, 0 < c → ∀ x, c • x ∈ Ω ↔ x ∈ Ω)
     (hd : ∀ c : ℝ, 0 < c → ∃ d : G, ∀ x ∈ Ω, f (c • x) = f x + d)
     (Cn : Set E) (hcone : ∀ c : ℝ, 0 < c → ∀ x ∈ Cn, c • x ∈ Cn)
-    (hK : IsCompact (Cn ∩ Metric.sphere 0 1)) (hKΩ : Cn ∩ Metric.sphere 0 1 ⊆ Ω) (i : ℕ) (hi : i ≠ 0) :
+    (hK : IsCompact (Cn ∩ Metric.sphere 0 1)) (hKΩ : Cn ∩ Metric.sphere 0 1 ⊆ Ω)
+    (i : ℕ) (hi : i ≠ 0) :
     ∃ A : ℝ, 0 ≤ A ∧ ∀ x ∈ Cn, x ≠ 0 → x ∈ Ω →
       ‖iteratedFDerivWithin ℝ i f Ω x‖ ≤ A * ‖x‖⁻¹ ^ i := by
   have hcont : ContinuousOn (fun y ↦ iteratedFDerivWithin ℝ i f Ω y) Ω :=
@@ -11025,7 +11186,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     refine ⟨hcone c hc x hxC, ?_⟩
     rw [mem_sphere_zero_iff_norm, norm_smul, Real.norm_eq_abs, abs_of_pos hc, hc_def,
       inv_mul_cancel₀ hnx.ne']
-  rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_norm_iteratedFDerivWithin_dilation Ω hΩ f hf c hc (fun y hy ↦ (hscale c hc y).2 hy)
+  rw [meyerFlatLift_norm_iteratedFDerivWithin_dilation Ω hΩ f hf c hc
+      (fun y hy ↦ (hscale c hc y).2 hy)
     (fun y hy ↦ (hscale c hc y).1 hy) d hdd i hi x hxΩ, mul_comm]
   exact mul_le_mul_of_nonneg_right ((hA _ hcx).trans (le_max_left _ _)) (pow_nonneg hc.le i)
 
@@ -11033,7 +11195,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 which meets the complement of the open set only at the origin, and whose derivatives satisfy
 bounds with every integer power of the norm on the cone, is a Schwartz function. The Schwartz
 seminorms are bounded by the corresponding bounds on the cone. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cone_schwartz
+private theorem meyerFlatLift_cone_schwartz
     {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
     (Ω Cn : Set E) (hΩ : IsOpen Ω) (h0 : (0 : E) ∉ Ω) (hC : IsClosed Cn)
     (hCΩ : ∀ x ∈ Cn, x ≠ 0 → x ∈ Ω) (a : E → ℂ) (ha : ContDiffOn ℝ (∞) a Ω)
@@ -11076,7 +11238,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
           mul_le_mul_of_nonneg_right (h.trans (le_max_left _ _)) h2.le
     · rw [hzero k x hxC, norm_zero]
       exact mul_nonneg (le_max_right _ _) h2.le
-  obtain ⟨hcd, hd0⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_flat_contDiff a hsmooth ha0 hflat
+  obtain ⟨hcd, hd0⟩ := meyerFlatLift_flat_contDiff a hsmooth ha0 hflat
   -- a bound on the cone gives the bound everywhere
   have hall (k l : ℕ) (C : ℝ) (hC0 : 0 ≤ C)
       (h : ∀ x ∈ Ω ∩ Cn, ‖x‖ ^ k * ‖iteratedFDeriv ℝ l a x‖ ≤ C) (x : E) :
@@ -11103,35 +11265,35 @@ section LogPolar
 variable {E ι : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E] [Fintype ι]
 
 /-- The points with all coordinates nonzero. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω
+private noncomputable def meyerFlatLift_Ω
     (π : ι → E →L[ℝ] ℂ) : Set E := {x | ∀ j, π j x ≠ 0}
 
 /-- Logarithmic radii and angular parts of the coordinates. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L
+private noncomputable def meyerFlatLift_L
     (π : ι → E →L[ℝ] ℂ) (x : E) : (ι → ℝ) × (ι → ℂ) :=
   (fun j ↦ Real.log ‖π j x‖, fun j ↦ π j x * ((‖π j x‖ : ℝ) : ℂ)⁻¹)
 
 /-- The cone where every coordinate is comparable to the norm. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone
+private noncomputable def meyerFlatLift_Cone
     (π : ι → E →L[ℝ] ℂ) (c₀ : ℝ) : Set E := {x | ∀ j, c₀ * ‖x‖ ≤ ‖π j x‖}
 
 /-- The set of points with all coordinates nonzero is open. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω_isOpen
-    (π : ι → E →L[ℝ] ℂ) : IsOpen (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π) := by
-  have : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π = ⋂ j, (π j) ⁻¹' {0}ᶜ := by ext x; simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω]
+private theorem meyerFlatLift_Ω_isOpen
+    (π : ι → E →L[ℝ] ℂ) : IsOpen (meyerFlatLift_Ω π) := by
+  have : meyerFlatLift_Ω π = ⋂ j, (π j) ⁻¹' {0}ᶜ := by ext x; simp [meyerFlatLift_Ω]
   rw [this]
   exact isOpen_iInter_of_finite fun j ↦ isOpen_compl_singleton.preimage (π j).continuous
 
 /-- The set of points with all coordinates nonzero is invariant under positive dilations. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω_smul
+private theorem meyerFlatLift_Ω_smul
     (π : ι → E →L[ℝ] ℂ) (c : ℝ) (hc : 0 < c) (x : E) :
-    c • x ∈ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π ↔ x ∈ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π := by
-  simp only [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω, mem_ofPred_eq, map_smul]
+    c • x ∈ meyerFlatLift_Ω π ↔ x ∈ meyerFlatLift_Ω π := by
+  simp only [meyerFlatLift_Ω, mem_ofPred_eq, map_smul]
   exact forall_congr' fun j ↦ by rw [Ne, smul_eq_zero, not_or, and_iff_right hc.ne']
 
 /-- The log-polar map is smooth where all coordinates are nonzero. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L_contDiffOn
-    (π : ι → E →L[ℝ] ℂ) : ContDiffOn ℝ (∞) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π) := by
+private theorem meyerFlatLift_L_contDiffOn
+    (π : ι → E →L[ℝ] ℂ) : ContDiffOn ℝ (∞) (meyerFlatLift_L π) (meyerFlatLift_Ω π) := by
   intro x hx
   have hn (j : ι) : ContDiffAt ℝ (∞) (fun y ↦ ‖π j y‖) x :=
     (contDiffAt_norm ℝ (hx j)).comp x (π j).contDiff.contDiffAt
@@ -11144,15 +11306,15 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- A positive dilation adds its logarithm to the logarithmic radii and leaves the angular
 parts unchanged. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L_smul
-    (π : ι → E →L[ℝ] ℂ) (c : ℝ) (hc : 0 < c) (x : E) (hx : x ∈ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π (c • x) = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π x + ((fun _ ↦ Real.log c), 0) := by
+private theorem meyerFlatLift_L_smul
+    (π : ι → E →L[ℝ] ℂ) (c : ℝ) (hc : 0 < c) (x : E) (hx : x ∈ meyerFlatLift_Ω π) :
+    meyerFlatLift_L π (c • x) = meyerFlatLift_L π x + ((fun _ ↦ Real.log c), 0) := by
   have hpos (j : ι) : 0 < ‖π j x‖ := norm_pos_iff.mpr (hx j)
   ext j
-  · simp only [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L, map_smul, norm_smul, Real.norm_eq_abs, abs_of_pos hc, Prod.fst_add,
+  · simp only [meyerFlatLift_L, map_smul, norm_smul, Real.norm_eq_abs, abs_of_pos hc, Prod.fst_add,
       Pi.add_apply]
     rw [Real.log_mul hc.ne' (hpos j).ne', add_comm]
-  · simp only [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L, map_smul, norm_smul, Real.norm_eq_abs, abs_of_pos hc, Prod.snd_add,
+  · simp only [meyerFlatLift_L, map_smul, norm_smul, Real.norm_eq_abs, abs_of_pos hc, Prod.snd_add,
       Pi.add_apply, Prod.snd_zero, Pi.zero_apply, add_zero, Complex.real_smul,
       Complex.ofReal_mul, mul_inv]
     have : (c : ℂ) ≠ 0 := by exact_mod_cast hc.ne'
@@ -11161,26 +11323,27 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     field_simp
 
 /-- The cone is closed. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone_isClosed
-    (π : ι → E →L[ℝ] ℂ) (c₀ : ℝ) : IsClosed (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone π c₀) := by
-  have : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone π c₀ = ⋂ j, {x | c₀ * ‖x‖ ≤ ‖π j x‖} := by ext x; simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone]
+private theorem meyerFlatLift_Cone_isClosed
+    (π : ι → E →L[ℝ] ℂ) (c₀ : ℝ) : IsClosed (meyerFlatLift_Cone π c₀) := by
+  have : meyerFlatLift_Cone π c₀ = ⋂ j, {x | c₀ * ‖x‖ ≤ ‖π j x‖} := by
+    ext x; simp [meyerFlatLift_Cone]
   rw [this]
   exact isClosed_iInter fun j ↦ isClosed_le (continuous_const.mul continuous_norm)
     ((π j).continuous.norm)
 
 /-- The cone is invariant under positive dilations. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone_smul
+private theorem meyerFlatLift_Cone_smul
     (π : ι → E →L[ℝ] ℂ) (c₀ c : ℝ) (hc : 0 < c) (x : E)
-    (hx : x ∈ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone π c₀) : c • x ∈ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone π c₀ := by
+    (hx : x ∈ meyerFlatLift_Cone π c₀) : c • x ∈ meyerFlatLift_Cone π c₀ := by
   intro j
   simp only [map_smul, norm_smul, Real.norm_eq_abs, abs_of_pos hc]
   have := hx j
   nlinarith
 
 /-- For a positive constant, the nonzero points of the cone have all coordinates nonzero. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone_subset
+private theorem meyerFlatLift_Cone_subset
     (π : ι → E →L[ℝ] ℂ) (c₀ : ℝ) (hc₀ : 0 < c₀) (x : E)
-    (hx : x ∈ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone π c₀) (hx0 : x ≠ 0) : x ∈ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π := by
+    (hx : x ∈ meyerFlatLift_Cone π c₀) (hx0 : x ≠ 0) : x ∈ meyerFlatLift_Ω π := by
   intro j h
   have := hx j
   rw [h, norm_zero] at this
@@ -11189,40 +11352,44 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- On the cone the derivatives of positive order of the log-polar map decay like the
 corresponding negative power of the norm. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L_cone_bound
+private theorem meyerFlatLift_L_cone_bound
     [FiniteDimensional ℝ E] (π : ι → E →L[ℝ] ℂ) (c₀ : ℝ) (hc₀ : 0 < c₀)
     (i : ℕ) (hi : i ≠ 0) :
-    ∃ A : ℝ, 0 ≤ A ∧ ∀ x ∈ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone π c₀, x ≠ 0 →
-      ‖iteratedFDerivWithin ℝ i (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π) x‖ ≤ A * ‖x‖⁻¹ ^ i := by
-  obtain ⟨A, hA0, hA⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cone_deriv_bound (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω_isOpen π) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L_contDiffOn π)
-    (fun c hc x ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω_smul π c hc x) (fun c hc ↦ ⟨_, fun x hx ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L_smul π c hc x hx⟩)
-    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone π c₀) (fun c hc x hx ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone_smul π c₀ c hc x hx)
-    (Metric.isCompact_of_isClosed_isBounded ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone_isClosed π c₀).inter Metric.isClosed_sphere)
+    ∃ A : ℝ, 0 ≤ A ∧ ∀ x ∈ meyerFlatLift_Cone π c₀, x ≠ 0 →
+      ‖iteratedFDerivWithin ℝ i (meyerFlatLift_L π) (meyerFlatLift_Ω π) x‖ ≤ A * ‖x‖⁻¹ ^ i := by
+  obtain ⟨A, hA0, hA⟩ := meyerFlatLift_cone_deriv_bound (meyerFlatLift_Ω π)
+      (meyerFlatLift_Ω_isOpen π) (meyerFlatLift_L π) (meyerFlatLift_L_contDiffOn π)
+    (fun c hc x ↦ meyerFlatLift_Ω_smul π c hc x)
+        (fun c hc ↦ ⟨_, fun x hx ↦ meyerFlatLift_L_smul π c hc x hx⟩)
+    (meyerFlatLift_Cone π c₀) (fun c hc x hx ↦ meyerFlatLift_Cone_smul π c₀ c hc x hx)
+    (Metric.isCompact_of_isClosed_isBounded
+        ((meyerFlatLift_Cone_isClosed π c₀).inter Metric.isClosed_sphere)
       (Metric.isBounded_sphere.subset inter_subset_right))
-    (fun x hx ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone_subset π c₀ hc₀ x hx.1
+    (fun x hx ↦ meyerFlatLift_Cone_subset π c₀ hc₀ x hx.1
       (by rintro rfl; simpa using hx.2)) i hi
-  exact ⟨A, hA0, fun x hx hx0 ↦ hA x hx hx0 (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone_subset π c₀ hc₀ x hx hx0)⟩
+  exact ⟨A, hA0, fun x hx hx0 ↦ hA x hx hx0 (meyerFlatLift_Cone_subset π c₀ hc₀ x hx hx0)⟩
 
 /-- Faà di Bruno on the cone: a smooth function of the log-polar coordinates has derivatives
 bounded by those of the outer function times the negative power of the norm. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp_cone_bound
+private theorem meyerFlatLift_comp_cone_bound
     [FiniteDimensional ℝ E] (π : ι → E →L[ℝ] ℂ) (c₀ : ℝ) (hc₀ : 0 < c₀)
     (k : ℕ) :
     ∃ A : ℝ, 1 ≤ A ∧ ∀ (G : (ι → ℝ) × (ι → ℂ) → ℂ), ContDiff ℝ (∞) G →
-      ∀ x ∈ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone π c₀, x ≠ 0 → ∀ C : ℝ,
-        (∀ i, i ≤ k → ‖iteratedFDeriv ℝ i G (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π x)‖ ≤ C) →
-          ‖iteratedFDerivWithin ℝ k (G ∘ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π) x‖ ≤
+      ∀ x ∈ meyerFlatLift_Cone π c₀, x ≠ 0 → ∀ C : ℝ,
+        (∀ i, i ≤ k → ‖iteratedFDeriv ℝ i G (meyerFlatLift_L π x)‖ ≤ C) →
+          ‖iteratedFDerivWithin ℝ k (G ∘ meyerFlatLift_L π) (meyerFlatLift_Ω π) x‖ ≤
             k.factorial * C * (A * ‖x‖⁻¹) ^ k := by
-  choose Ai hAi0 hAi using fun j : ℕ ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L_cone_bound π c₀ hc₀ (j + 1) (Nat.succ_ne_zero j)
+  choose Ai hAi0 hAi using fun j : ℕ ↦ meyerFlatLift_L_cone_bound π c₀ hc₀
+      (j + 1) (Nat.succ_ne_zero j)
   have hsum0 : 0 ≤ ∑ j ∈ Finset.range k, Ai j :=
     Finset.sum_nonneg fun j _ ↦ hAi0 j
   refine ⟨1 + ∑ j ∈ Finset.range k, Ai j, by linarith, ?_⟩
   intro G hG x hxC hx0 C hC
   set A := 1 + ∑ j ∈ Finset.range k, Ai j with hA
   have hA1 : 1 ≤ A := by linarith
-  have hxΩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone_subset π c₀ hc₀ x hxC hx0
-  refine norm_iteratedFDerivWithin_comp_le (t := univ) hG.contDiffOn (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L_contDiffOn π)
-    (by exact_mod_cast le_top) uniqueDiffOn_univ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω_isOpen π).uniqueDiffOn
+  have hxΩ := meyerFlatLift_Cone_subset π c₀ hc₀ x hxC hx0
+  refine norm_iteratedFDerivWithin_comp_le (t := univ) hG.contDiffOn (meyerFlatLift_L_contDiffOn π)
+    (by exact_mod_cast le_top) uniqueDiffOn_univ (meyerFlatLift_Ω_isOpen π).uniqueDiffOn
     (mapsTo_univ _ _) hxΩ (fun i hi ↦ by rw [iteratedFDerivWithin_univ]; exact hC i hi)
     (fun i hi1 hik ↦ ?_)
   obtain ⟨j, rfl⟩ : ∃ j, i = j + 1 := ⟨i - 1, by omega⟩
@@ -11233,7 +11400,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         (Finset.mem_range.mpr (by omega : j < k))
       linarith
     exact h1.trans (le_self_pow₀ hA1 (by omega))
-  calc ‖iteratedFDerivWithin ℝ (j + 1) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π) x‖ ≤ Ai j * ‖x‖⁻¹ ^ (j + 1) :=
+  calc ‖iteratedFDerivWithin ℝ (j + 1) (meyerFlatLift_L π) (meyerFlatLift_Ω π) x‖ ≤
+         Ai j * ‖x‖⁻¹ ^ (j + 1) :=
         hAi j x hxC hx0
     _ ≤ A ^ (j + 1) * ‖x‖⁻¹ ^ (j + 1) := mul_le_mul_of_nonneg_right hAi_le (by positivity)
     _ = (A * ‖x‖⁻¹) ^ (j + 1) := (mul_pow _ _ _).symm
@@ -11242,34 +11410,34 @@ end LogPolar
 
 /-- The angular power: `w ^ β` written with the conjugate for negative exponents, so that it is
 a real polynomial map; on the unit circle it is the integer power. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow
+private noncomputable def meyerFlatLift_gpow
     (β : ℤ) (w : ℂ) : ℂ :=
   if 0 ≤ β then w ^ β.toNat else (starRingEnd ℂ w) ^ (-β).toNat
 
 /-- The angular power is smooth. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow_contDiff
-    (β : ℤ) : ContDiff ℝ (∞) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow β) := by
-  unfold sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow
+private theorem meyerFlatLift_gpow_contDiff
+    (β : ℤ) : ContDiff ℝ (∞) (meyerFlatLift_gpow β) := by
+  unfold meyerFlatLift_gpow
   split_ifs
   · exact contDiff_id.pow _
   · exact (Complex.conjCLE.contDiff).pow _
 
 /-- On the unit circle the angular power is the integer power. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow_eq_zpow
-    (β : ℤ) (w : ℂ) (hw : ‖w‖ = 1) : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow β w = w ^ β := by
+private theorem meyerFlatLift_gpow_eq_zpow
+    (β : ℤ) (w : ℂ) (hw : ‖w‖ = 1) : meyerFlatLift_gpow β w = w ^ β := by
   have hw0 : w ≠ 0 := by rintro rfl; simp at hw
   have hconj : starRingEnd ℂ w = w⁻¹ := by
     rw [Complex.inv_def, Complex.normSq_eq_norm_sq, hw]; simp
-  unfold sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow
+  unfold meyerFlatLift_gpow
   split_ifs with h
   · rw [← zpow_natCast, Int.toNat_of_nonneg h]
   · rw [hconj, inv_pow, ← zpow_natCast, Int.toNat_of_nonneg (by omega), ← zpow_neg, neg_neg]
 
 /-- The derivatives of the angular power on the unit circle grow polynomially in the
 exponent. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow_deriv_bound
+private theorem meyerFlatLift_gpow_deriv_bound
     (β : ℤ) (m : ℕ) (w : ℂ) (hw : ‖w‖ = 1) :
-    ‖iteratedFDeriv ℝ m (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow β) w‖ ≤ (|(β : ℝ)| + m) ^ m := by
+    ‖iteratedFDeriv ℝ m (meyerFlatLift_gpow β) w‖ ≤ (|(β : ℝ)| + m) ^ m := by
   -- the holomorphic power and its derivatives
   have hpow (n : ℕ) (hn : (n : ℝ) ≤ |(β : ℝ)|) :
       ‖iteratedFDeriv ℝ m (fun v : ℂ ↦ v ^ n) w‖ ≤ (|(β : ℝ)| + m) ^ m := by
@@ -11285,7 +11453,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
             _ = n + i := by simp
             _ ≤ |(β : ℝ)| + m := by linarith
       _ = _ := by rw [Finset.prod_const, Finset.card_range]
-  unfold sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow
+  unfold meyerFlatLift_gpow
   split_ifs with h
   · have : (β.toNat : ℤ) ≤ |β| := by rw [Int.toNat_of_nonneg h]; exact le_abs_self β
     exact hpow β.toNat (by exact_mod_cast this)
@@ -11298,7 +11466,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- Composition with a continuous linear map on the right multiplies the bound by the power of
 its norm. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_norm_iteratedFDeriv_comp_clm
+private theorem meyerFlatLift_norm_iteratedFDeriv_comp_clm
     {D E G : Type*} [NormedAddCommGroup D] [NormedSpace ℝ D]
     [NormedAddCommGroup E] [NormedSpace ℝ E] [NormedAddCommGroup G] [NormedSpace ℝ G]
     (g : D →L[ℝ] E) {f : E → G} (hf : ContDiff ℝ (∞) f) (x : D) (i : ℕ) :
@@ -11308,14 +11476,15 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   simp [Finset.prod_const, Finset.card_univ]
 
 /-- The unitary exponential of a real variable has all derivatives of norm at most one. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_expI_bound
+private theorem meyerFlatLift_expI_bound
     (c : ℕ) (t : ℝ) :
     ‖iteratedFDeriv ℝ c (fun s : ℝ ↦ Complex.exp (Complex.I * s)) t‖ ≤ 1 := by
   let g : ℂ → ℂ := fun w ↦ Complex.exp (Complex.I * w)
   have hg : ContDiff ℂ (∞) g := (contDiff_const.mul contDiff_id).cexp
   have hcomp : (fun s : ℝ ↦ Complex.exp (Complex.I * s)) = g ∘ Complex.ofRealCLM := rfl
   rw [hcomp]
-  refine (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_norm_iteratedFDeriv_comp_clm Complex.ofRealCLM (hg.restrict_scalars ℝ) t c).trans ?_
+  refine (meyerFlatLift_norm_iteratedFDeriv_comp_clm Complex.ofRealCLM
+      (hg.restrict_scalars ℝ) t c).trans ?_
   have hcd : ContDiffAt ℂ c g (t : ℂ) := hg.contDiffAt.of_le (by exact_mod_cast le_top)
   rw [Complex.ofRealCLM_apply, ← hcd.restrictScalars_iteratedFDeriv (𝕜 := ℝ), comp_apply,
     ContinuousMultilinearMap.norm_restrictScalars, norm_iteratedFDeriv_eq_norm_iteratedDeriv]
@@ -11330,36 +11499,37 @@ variable {ι : Type*} [Fintype ι] [DecidableEq ι]
 
 /-- The derivatives of a product of angular powers on the product of unit circles grow
 polynomially in the exponents. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_prod_gpow_bound
+private theorem meyerFlatLift_prod_gpow_bound
     (b : ℕ) :
     ∃ N : ℝ, 0 ≤ N ∧ ∀ (β : ι → ℤ) (z : ι → ℂ), (∀ j, ‖z j‖ = 1) →
-      ‖iteratedFDeriv ℝ b (fun z : ι → ℂ ↦ ∏ j, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow (β j) (z j)) z‖ ≤
+      ‖iteratedFDeriv ℝ b (fun z : ι → ℂ ↦ ∏ j, meyerFlatLift_gpow (β j) (z j)) z‖ ≤
         N * (1 + ∑ j, |(β j : ℝ)|) ^ b := by
   refine ⟨(∑ p ∈ (Finset.univ : Finset ι).sym b, ((p : Multiset ι).countPerms : ℝ)) *
     (1 + b) ^ b, by positivity, fun β z hz ↦ ?_⟩
   set B := ∑ j, |(β j : ℝ)| with hB
   have hB0 : 0 ≤ B := Finset.sum_nonneg fun j _ ↦ abs_nonneg _
   have hfac (j : ι) (c : ℕ) (hc : c ≤ b) :
-      ‖iteratedFDeriv ℝ c (fun z : ι → ℂ ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow (β j) (z j)) z‖ ≤ (B + b) ^ c := by
-    have hcomp : (fun z : ι → ℂ ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow (β j) (z j)) =
-        sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow (β j) ∘ (ContinuousLinearMap.proj j : (ι → ℂ) →L[ℝ] ℂ) := rfl
+      ‖iteratedFDeriv ℝ c (fun z : ι → ℂ ↦ meyerFlatLift_gpow (β j) (z j)) z‖ ≤ (B + b) ^ c := by
+    have hcomp : (fun z : ι → ℂ ↦ meyerFlatLift_gpow (β j) (z j)) =
+        meyerFlatLift_gpow (β j) ∘ (ContinuousLinearMap.proj j : (ι → ℂ) →L[ℝ] ℂ) := rfl
     rw [hcomp]
-    refine (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_norm_iteratedFDeriv_comp_clm _ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow_contDiff _) z c).trans ?_
+    refine (meyerFlatLift_norm_iteratedFDeriv_comp_clm _
+        (meyerFlatLift_gpow_contDiff _) z c).trans ?_
     have hproj : ‖(ContinuousLinearMap.proj j : (ι → ℂ) →L[ℝ] ℂ)‖ ≤ 1 :=
       ContinuousLinearMap.opNorm_le_bound _ zero_le_one fun x ↦ by
         simpa using norm_le_pi_norm x j
     have hj : |(β j : ℝ)| ≤ B := Finset.single_le_sum (f := fun j ↦ |(β j : ℝ)|)
       (fun j _ ↦ abs_nonneg _) (Finset.mem_univ j)
-    calc ‖iteratedFDeriv ℝ c (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow (β j)) (z j)‖ * ‖(ContinuousLinearMap.proj j :
+    calc ‖iteratedFDeriv ℝ c (meyerFlatLift_gpow (β j)) (z j)‖ * ‖(ContinuousLinearMap.proj j :
           (ι → ℂ) →L[ℝ] ℂ)‖ ^ c ≤ (|(β j : ℝ)| + c) ^ c * 1 ^ c := by
           gcongr
-          exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow_deriv_bound (β j) c (z j) (hz j)
+          exact meyerFlatLift_gpow_deriv_bound (β j) c (z j) (hz j)
       _ ≤ (B + b) ^ c := by
           rw [one_pow, mul_one]
           gcongr
   have hprod := norm_iteratedFDeriv_prod_le (𝕜 := ℝ) (u := Finset.univ)
-    (f := fun j (z : ι → ℂ) ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow (β j) (z j))
-    (fun j _ ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow_contDiff _).comp
+    (f := fun j (z : ι → ℂ) ↦ meyerFlatLift_gpow (β j) (z j))
+    (fun j _ ↦ (meyerFlatLift_gpow_contDiff _).comp
       (ContinuousLinearMap.proj j : (ι → ℂ) →L[ℝ] ℂ).contDiff) (x := z)
     (n := b) (N := ∞) (by exact_mod_cast le_top)
   refine hprod.trans ((Finset.sum_le_sum fun p hp ↦ mul_le_mul_of_nonneg_left
@@ -11378,7 +11548,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- A Leibniz bound with polynomial weights: if the derivatives of `f` up to order `k` are
 bounded by `A * w ^ i` and those of `g` by `B * v ^ i` with `1 ≤ w, v`, the product has
 derivatives bounded by `2 ^ k * A * B * (w * v) ^ k`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_leibniz_bound
+private theorem meyerFlatLift_leibniz_bound
     {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
     {f g : E → ℂ} (hf : ContDiff ℝ (∞) f) (hg : ContDiff ℝ (∞) g) (x : E) (k : ℕ)
     (A B w v : ℝ) (hA : 0 ≤ A) (hw : 1 ≤ w) (hv : 1 ≤ v)
@@ -11410,55 +11580,57 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         ring
 
 /-- The linear form `y ↦ ∑ j, a j * y j`. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin
+private noncomputable def meyerFlatLift_lin
     (a : ι → ℝ) : (ι → ℝ) →L[ℝ] ℝ := ∑ j, a j • ContinuousLinearMap.proj j
 
 /-- The value of the linear form. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin_apply
-    (a : ι → ℝ) (y : ι → ℝ) : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin a y = ∑ j, a j * y j := by
-  simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin]
+private theorem meyerFlatLift_lin_apply
+    (a : ι → ℝ) (y : ι → ℝ) : meyerFlatLift_lin a y = ∑ j, a j * y j := by
+  simp [meyerFlatLift_lin]
 
 /-- The norm of the linear form is at most the sum of the absolute values of its
 coefficients. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin_norm_le
-    (a : ι → ℝ) : ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin a‖ ≤ ∑ j, |a j| := by
+private theorem meyerFlatLift_lin_norm_le
+    (a : ι → ℝ) : ‖meyerFlatLift_lin a‖ ≤ ∑ j, |a j| := by
   refine ContinuousLinearMap.opNorm_le_bound _ (Finset.sum_nonneg fun j _ ↦ abs_nonneg _)
     fun y ↦ ?_
-  rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin_apply, Finset.sum_mul]
+  rw [meyerFlatLift_lin_apply, Finset.sum_mul]
   refine (norm_sum_le _ _).trans (Finset.sum_le_sum fun j _ ↦ ?_)
   rw [norm_mul, Real.norm_eq_abs]
   exact mul_le_mul_of_nonneg_left (norm_le_pi_norm y j) (abs_nonneg _)
 
 /-- The outer function of the archimedean test: a unitary exponential of the log-radii times a
 cutoff times a profile of a linear form of the log-radii, times angular powers. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_G
+private noncomputable def meyerFlatLift_G
     (α μ : ι → ℝ) (s₀ : ℝ) (B : (ι → ℝ) → ℂ) (φ : ℝ → ℂ) (β : ι → ℤ)
     (p : (ι → ℝ) × (ι → ℂ)) : ℂ :=
-  (Complex.exp (Complex.I * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin α p.1 : ℝ)) * B p.1 * φ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin μ p.1 + s₀)) *
-    ∏ j, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow (β j) (p.2 j)
+  (Complex.exp (Complex.I * (meyerFlatLift_lin α p.1 : ℝ)) * B p.1 *
+      φ (meyerFlatLift_lin μ p.1 + s₀)) *
+    ∏ j, meyerFlatLift_gpow (β j) (p.2 j)
 
 /-- The outer function of the archimedean test is smooth. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_G_contDiff
+private theorem meyerFlatLift_G_contDiff
     (α μ : ι → ℝ) (s₀ : ℝ) (B : (ι → ℝ) → ℂ) (hB : ContDiff ℝ (∞) B)
-    (φ : ℝ → ℂ) (hφ : ContDiff ℝ (∞) φ) (β : ι → ℤ) : ContDiff ℝ (∞) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_G α μ s₀ B φ β) := by
-  unfold sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_G
+    (φ : ℝ → ℂ) (hφ : ContDiff ℝ (∞) φ) (β : ι → ℤ) :
+        ContDiff ℝ (∞) (meyerFlatLift_G α μ s₀ B φ β) := by
+  unfold meyerFlatLift_G
   refine ContDiff.mul (ContDiff.mul (ContDiff.mul ?_ (hB.comp contDiff_fst)) ?_) ?_
   · exact (contDiff_const.mul (Complex.ofRealCLM.contDiff.comp
-      ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin α).contDiff.comp contDiff_fst))).cexp
-  · exact hφ.comp (((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin μ).contDiff.comp contDiff_fst).add contDiff_const)
-  · exact contDiff_prod fun j _ ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow_contDiff _).comp
+      ((meyerFlatLift_lin α).contDiff.comp contDiff_fst))).cexp
+  · exact hφ.comp (((meyerFlatLift_lin μ).contDiff.comp contDiff_fst).add contDiff_const)
+  · exact contDiff_prod fun j _ ↦ (meyerFlatLift_gpow_contDiff _).comp
       ((ContinuousLinearMap.proj j : (ι → ℂ) →L[ℝ] ℂ).contDiff.comp contDiff_snd)
 
 /-- Bounds for the derivatives of the outer function at points with unit angular parts. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_G_bound
+private theorem meyerFlatLift_G_bound
     (μ : ι → ℝ) (s₀ : ℝ) (B : (ι → ℝ) → ℂ) (hB : ContDiff ℝ (∞) B)
     (bB : ℕ → ℝ) (hbB : ∀ i y, ‖iteratedFDeriv ℝ i B y‖ ≤ bB i) (k : ℕ) :
     ∃ K : ℝ, 0 ≤ K ∧ ∀ (α : ι → ℝ) (β : ι → ℤ) (φ : ℝ → ℂ), ContDiff ℝ (∞) φ →
       ∀ (y : ι → ℝ) (z : ι → ℂ), (∀ j, ‖z j‖ = 1) → ∀ M : ℝ,
-        (∀ d ≤ k, ‖iteratedFDeriv ℝ d φ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin μ y + s₀)‖ ≤ M) →
-          ∀ i ≤ k, ‖iteratedFDeriv ℝ i (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_G α μ s₀ B φ β) (y, z)‖ ≤
+        (∀ d ≤ k, ‖iteratedFDeriv ℝ d φ (meyerFlatLift_lin μ y + s₀)‖ ≤ M) →
+          ∀ i ≤ k, ‖iteratedFDeriv ℝ i (meyerFlatLift_G α μ s₀ B φ β) (y, z)‖ ≤
             K * M * ((1 + ∑ j, |α j|) * (1 + ∑ j, |(β j : ℝ)|)) ^ k := by
-  choose Nb hNb0 hNb using fun b : ℕ ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_prod_gpow_bound (ι := ι) b
+  choose Nb hNb0 hNb using fun b : ℕ ↦ meyerFlatLift_prod_gpow_bound (ι := ι) b
   set Bm := ∑ i ∈ Finset.range (k + 1), bB i with hBm
   set Nm := ∑ i ∈ Finset.range (k + 1), Nb i with hNm
   set mu := ∑ j, |μ j| with hmu
@@ -11477,31 +11649,33 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   let snd' : (ι → ℝ) × (ι → ℂ) →L[ℝ] (ι → ℂ) := ContinuousLinearMap.snd ℝ _ _
   have hfst : ‖fst'‖ ≤ 1 := ContinuousLinearMap.norm_fst_le _ _ _
   have hsnd : ‖snd'‖ ≤ 1 := ContinuousLinearMap.norm_snd_le _ _ _
-  let f1 : (ι → ℝ) × (ι → ℂ) → ℂ := (fun s : ℝ ↦ Complex.exp (Complex.I * s)) ∘ ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin α).comp fst')
+  let f1 : (ι → ℝ) × (ι → ℂ) → ℂ := (fun s : ℝ ↦ Complex.exp (Complex.I * s)) ∘
+      ((meyerFlatLift_lin α).comp fst')
   let f2 : (ι → ℝ) × (ι → ℂ) → ℂ := B ∘ fst'
-  let f3 : (ι → ℝ) × (ι → ℂ) → ℂ := (fun t ↦ φ (t + s₀)) ∘ ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin μ).comp fst')
-  let f4 : (ι → ℝ) × (ι → ℂ) → ℂ := (fun z : ι → ℂ ↦ ∏ j, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow (β j) (z j)) ∘ snd'
+  let f3 : (ι → ℝ) × (ι → ℂ) → ℂ := (fun t ↦ φ (t + s₀)) ∘ ((meyerFlatLift_lin μ).comp fst')
+  let f4 : (ι → ℝ) × (ι → ℂ) → ℂ := (fun z : ι → ℂ ↦ ∏ j, meyerFlatLift_gpow (β j) (z j)) ∘ snd'
   have hexp : ContDiff ℝ (∞) (fun s : ℝ ↦ Complex.exp (Complex.I * s)) :=
     (contDiff_const.mul Complex.ofRealCLM.contDiff).cexp
   have hφs : ContDiff ℝ (∞) (fun t ↦ φ (t + s₀)) := hφ.comp (contDiff_id.add contDiff_const)
-  have hP : ContDiff ℝ (∞) (fun z : ι → ℂ ↦ ∏ j, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow (β j) (z j)) :=
-    contDiff_prod fun j _ ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow_contDiff _).comp
+  have hP : ContDiff ℝ (∞) (fun z : ι → ℂ ↦ ∏ j, meyerFlatLift_gpow (β j) (z j)) :=
+    contDiff_prod fun j _ ↦ (meyerFlatLift_gpow_contDiff _).comp
       (ContinuousLinearMap.proj j : (ι → ℂ) →L[ℝ] ℂ).contDiff
-  have h1c : ContDiff ℝ (∞) f1 := hexp.comp ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin α).comp fst').contDiff
+  have h1c : ContDiff ℝ (∞) f1 := hexp.comp ((meyerFlatLift_lin α).comp fst').contDiff
   have h2c : ContDiff ℝ (∞) f2 := hB.comp fst'.contDiff
-  have h3c : ContDiff ℝ (∞) f3 := hφs.comp ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin μ).comp fst').contDiff
+  have h3c : ContDiff ℝ (∞) f3 := hφs.comp ((meyerFlatLift_lin μ).comp fst').contDiff
   have h4c : ContDiff ℝ (∞) f4 := hP.comp snd'.contDiff
   have hcompn (g : (ι → ℝ) →L[ℝ] ℝ) : ‖g.comp fst'‖ ≤ ‖g‖ :=
     (ContinuousLinearMap.opNorm_comp_le _ _).trans (mul_le_of_le_one_right (norm_nonneg _) hfst)
   -- the four factors
   have b1 (j : ℕ) : ‖iteratedFDeriv ℝ j f1 (y, z)‖ ≤ 1 * (1 + a) ^ j := by
-    refine (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_norm_iteratedFDeriv_comp_clm _ hexp _ j).trans ?_
+    refine (meyerFlatLift_norm_iteratedFDeriv_comp_clm _ hexp _ j).trans ?_
     rw [one_mul]
-    refine mul_le_mul (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_expI_bound j _) ?_ (by positivity) zero_le_one |>.trans_eq (one_mul _)
-    exact pow_le_pow_left₀ (norm_nonneg _) (((hcompn _).trans (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin_norm_le α)).trans
+    refine mul_le_mul (meyerFlatLift_expI_bound j _) ?_ (by positivity)
+        zero_le_one |>.trans_eq (one_mul _)
+    exact pow_le_pow_left₀ (norm_nonneg _) (((hcompn _).trans (meyerFlatLift_lin_norm_le α)).trans
       (by linarith)) j
   have b2 (j : ℕ) (hj : j ≤ k) : ‖iteratedFDeriv ℝ j f2 (y, z)‖ ≤ Bm * 1 ^ j := by
-    refine (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_norm_iteratedFDeriv_comp_clm _ hB _ j).trans ?_
+    refine (meyerFlatLift_norm_iteratedFDeriv_comp_clm _ hB _ j).trans ?_
     rw [one_pow, mul_one]
     calc ‖iteratedFDeriv ℝ j B (fst' (y, z))‖ * ‖fst'‖ ^ j ≤ bB j * 1 ^ j :=
           mul_le_mul (hbB j _) (pow_le_pow_left₀ (norm_nonneg _) hfst j) (by positivity)
@@ -11510,15 +11684,15 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
           rw [one_pow, mul_one, hBm]
           exact Finset.single_le_sum (fun i _ ↦ hbB0 i) (Finset.mem_range.mpr (by omega))
   have b3 (j : ℕ) (hj : j ≤ k) : ‖iteratedFDeriv ℝ j f3 (y, z)‖ ≤ M * (1 + mu) ^ j := by
-    refine (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_norm_iteratedFDeriv_comp_clm _ hφs _ j).trans ?_
-    have heq : iteratedFDeriv ℝ j (fun t ↦ φ (t + s₀)) (((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin μ).comp fst') (y, z)) =
-        iteratedFDeriv ℝ j φ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin μ y + s₀) := iteratedFDeriv_comp_add_right j s₀ _
+    refine (meyerFlatLift_norm_iteratedFDeriv_comp_clm _ hφs _ j).trans ?_
+    have heq : iteratedFDeriv ℝ j (fun t ↦ φ (t + s₀)) (((meyerFlatLift_lin μ).comp fst') (y, z)) =
+        iteratedFDeriv ℝ j φ (meyerFlatLift_lin μ y + s₀) := iteratedFDeriv_comp_add_right j s₀ _
     rw [heq]
     exact mul_le_mul (hM j hj) (pow_le_pow_left₀ (norm_nonneg _)
-      (((hcompn _).trans (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin_norm_le μ)).trans (by linarith)) j) (by positivity) hM0
+      (((hcompn _).trans (meyerFlatLift_lin_norm_le μ)).trans (by linarith)) j) (by positivity) hM0
   have b4 (j : ℕ) (hj : j ≤ k) : ‖iteratedFDeriv ℝ j f4 (y, z)‖ ≤ Nm * (1 + bb) ^ j := by
-    refine (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_norm_iteratedFDeriv_comp_clm _ hP _ j).trans ?_
-    calc ‖iteratedFDeriv ℝ j (fun z : ι → ℂ ↦ ∏ j, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow (β j) (z j)) (snd' (y, z))‖ *
+    refine (meyerFlatLift_norm_iteratedFDeriv_comp_clm _ hP _ j).trans ?_
+    calc ‖iteratedFDeriv ℝ j (fun z : ι → ℂ ↦ ∏ j, meyerFlatLift_gpow (β j) (z j)) (snd' (y, z))‖ *
           ‖snd'‖ ^ j ≤ (Nb j * (1 + bb) ^ j) * 1 ^ j :=
           mul_le_mul (hNb j β z hz) (pow_le_pow_left₀ (norm_nonneg _) hsnd j) (by positivity)
             (mul_nonneg (hNb0 j) (by positivity))
@@ -11530,7 +11704,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   -- assemble with the Leibniz bound
   have b12 (j : ℕ) (hj : j ≤ k) :
       ‖iteratedFDeriv ℝ j (fun p ↦ f1 p * f2 p) (y, z)‖ ≤ Bm * (2 * (1 + a)) ^ j := by
-    have := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_leibniz_bound h1c h2c (y, z) j 1 Bm (1 + a) 1 zero_le_one (by linarith) le_rfl
+    have := meyerFlatLift_leibniz_bound h1c h2c (y, z) j 1 Bm (1 + a) 1
+        zero_le_one (by linarith) le_rfl
       (fun i _ ↦ b1 i) (fun i hi ↦ b2 i (hi.trans hj))
     calc _ ≤ 2 ^ j * 1 * Bm * ((1 + a) * 1) ^ j := this
       _ = Bm * (2 * (1 + a)) ^ j := by
@@ -11538,17 +11713,17 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   have b123 (j : ℕ) (hj : j ≤ k) :
       ‖iteratedFDeriv ℝ j (fun p ↦ f1 p * f2 p * f3 p) (y, z)‖ ≤
         Bm * M * (4 * (1 + a) * (1 + mu)) ^ j := by
-    have := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_leibniz_bound (h1c.mul h2c) h3c (y, z) j Bm M (2 * (1 + a)) (1 + mu) hBm0
+    have := meyerFlatLift_leibniz_bound (h1c.mul h2c) h3c (y, z) j Bm M (2 * (1 + a)) (1 + mu) hBm0
       (by linarith) (by linarith) (fun i hi ↦ b12 i (hi.trans hj)) (fun i hi ↦ b3 i (hi.trans hj))
     calc _ ≤ 2 ^ j * Bm * M * (2 * (1 + a) * (1 + mu)) ^ j := this
       _ = Bm * M * (4 * (1 + a) * (1 + mu)) ^ j := by
           rw [show (4 : ℝ) * (1 + a) * (1 + mu) = 2 * (2 * (1 + a) * (1 + mu)) by ring,
             mul_pow (2 : ℝ) (2 * (1 + a) * (1 + mu)) j]
           ring
-  have hall := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_leibniz_bound ((h1c.mul h2c).mul h3c) h4c (y, z) i (Bm * M) Nm
+  have hall := meyerFlatLift_leibniz_bound ((h1c.mul h2c).mul h3c) h4c (y, z) i (Bm * M) Nm
     (4 * (1 + a) * (1 + mu)) (1 + bb) (by positivity) (by nlinarith) (by linarith)
     (fun j hj ↦ b123 j (hj.trans hi)) (fun j hj ↦ b4 j (hj.trans hi))
-  have hG : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_G α μ s₀ B φ β = fun p ↦ f1 p * f2 p * f3 p * f4 p := rfl
+  have hG : meyerFlatLift_G α μ s₀ B φ β = fun p ↦ f1 p * f2 p * f3 p * f4 p := rfl
   rw [hG]
   refine hall.trans ?_
   have h1a : (1 : ℝ) ≤ 1 + a := by linarith
@@ -11576,32 +11751,33 @@ variable {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
 open Classical in
 /-- The archimedean test attached to a profile and a character: the outer function of the
 log-polar coordinates where all coordinates are nonzero, and zero elsewhere. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch
+private noncomputable def meyerFlatLift_arch
     (π : ι → E →L[ℝ] ℂ) (μ : ι → ℝ) (s₀ : ℝ) (B : (ι → ℝ) → ℂ) (α : ι → ℝ) (β : ι → ℤ)
     (φ : ℝ → ℂ) (x : E) : ℂ :=
-  if x ∈ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π then sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_G α μ s₀ B φ β (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π x) else 0
+  if x ∈ meyerFlatLift_Ω π then meyerFlatLift_G α μ s₀ B φ β (meyerFlatLift_L π x) else 0
 
 /-- Where all coordinates are nonzero, the archimedean test is the outer function of the
 log-polar coordinates. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch_eqOn
+private theorem meyerFlatLift_arch_eqOn
     (π : ι → E →L[ℝ] ℂ) (μ : ι → ℝ) (s₀ : ℝ) (B : (ι → ℝ) → ℂ) (α : ι → ℝ)
-    (β : ι → ℤ) (φ : ℝ → ℂ) : EqOn (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch π μ s₀ B α β φ) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_G α μ s₀ B φ β ∘ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π) :=
-  fun x hx ↦ by simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch, hx]
+    (β : ι → ℤ) (φ : ℝ → ℂ) : EqOn (meyerFlatLift_arch π μ s₀ B α β φ)
+        (meyerFlatLift_G α μ s₀ B φ β ∘ meyerFlatLift_L π) (meyerFlatLift_Ω π) :=
+  fun x hx ↦ by simp [meyerFlatLift_arch, hx]
 
 /-- On the support of the cutoff, the log-radii of the coordinates are comparable to the log of
 the norm, so the point lies in a cone. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_support_cone
+private theorem meyerFlatLift_support_cone
     (π : ι → E →L[ℝ] ℂ) (hπ1 : ∀ x j, ‖π j x‖ ≤ ‖x‖)
-    (hπ2 : ∀ x, ∃ j, ‖x‖ ≤ ‖π j x‖) (R : ℝ) (x : E) (hx : x ∈ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π)
-    (hR : ∀ j j', |(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π x).1 j - (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π x).1 j'| ≤ R) :
-    x ∈ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone π (Real.exp (-R)) ∧ ∀ j, |Real.log ‖π j x‖ - Real.log ‖x‖| ≤ R := by
+    (hπ2 : ∀ x, ∃ j, ‖x‖ ≤ ‖π j x‖) (R : ℝ) (x : E) (hx : x ∈ meyerFlatLift_Ω π)
+    (hR : ∀ j j', |(meyerFlatLift_L π x).1 j - (meyerFlatLift_L π x).1 j'| ≤ R) :
+    x ∈ meyerFlatLift_Cone π (Real.exp (-R)) ∧ ∀ j, |Real.log ‖π j x‖ - Real.log ‖x‖| ≤ R := by
   obtain ⟨j₀, hj₀⟩ := hπ2 x
   have hpos (j : ι) : 0 < ‖π j x‖ := norm_pos_iff.mpr (hx j)
   have hx0 : 0 < ‖x‖ := (hpos j₀).trans_le (hπ1 x j₀)
   have heq : ‖x‖ = ‖π j₀ x‖ := le_antisymm hj₀ (hπ1 x j₀)
   have hlog (j : ι) : |Real.log ‖π j x‖ - Real.log ‖x‖| ≤ R := by
     have := hR j j₀
-    simp only [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L] at this
+    simp only [meyerFlatLift_L] at this
     rwa [heq]
   refine ⟨fun j ↦ ?_, hlog⟩
   have h1 : Real.log ‖x‖ - R ≤ Real.log ‖π j x‖ := by linarith [(abs_le.mp (hlog j)).1]
@@ -11612,7 +11788,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The weighted derivative bounds of the archimedean test on the cone, polynomial in the
 parameters of the character and linear in a weighted bound of the profile. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch_bound
+private theorem meyerFlatLift_arch_bound
     [FiniteDimensional ℝ E] (π : ι → E →L[ℝ] ℂ) (hπ1 : ∀ x j, ‖π j x‖ ≤ ‖x‖)
     (hπ2 : ∀ x, ∃ j, ‖x‖ ≤ ‖π j x‖) (μ : ι → ℝ) (hμ : ∀ j, 0 ≤ μ j) (hμ1 : 0 < ∑ j, μ j)
     (s₀ : ℝ) (B : (ι → ℝ) → ℂ) (hB : ContDiff ℝ (∞) B) (bB : ℕ → ℝ)
@@ -11621,11 +11797,11 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     ∃ C : ℝ, 0 ≤ C ∧ ∀ (α : ι → ℝ) (β : ι → ℤ) (φ : ℝ → ℂ), ContDiff ℝ (∞) φ → ∀ S : ℝ,
       (∀ d ≤ k, ∀ u, Real.exp (((p - k : ℤ) : ℝ) / (∑ j, μ j) * u) *
         ‖iteratedFDeriv ℝ d φ u‖ ≤ S) →
-      ∀ x ∈ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π ∩ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone π (Real.exp (-R)),
-        ‖x‖ ^ p * ‖iteratedFDeriv ℝ k (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch π μ s₀ B α β φ) x‖ ≤
+      ∀ x ∈ meyerFlatLift_Ω π ∩ meyerFlatLift_Cone π (Real.exp (-R)),
+        ‖x‖ ^ p * ‖iteratedFDeriv ℝ k (meyerFlatLift_arch π μ s₀ B α β φ) x‖ ≤
           C * S * ((1 + ∑ j, |α j|) * (1 + ∑ j, |(β j : ℝ)|)) ^ k := by
-  obtain ⟨A, hA1, hA⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp_cone_bound π (Real.exp (-R)) (Real.exp_pos _) k
-  obtain ⟨K, hK0, hK⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_G_bound μ s₀ B hB bB hbB k
+  obtain ⟨A, hA1, hA⟩ := meyerFlatLift_comp_cone_bound π (Real.exp (-R)) (Real.exp_pos _) k
+  obtain ⟨K, hK0, hK⟩ := meyerFlatLift_G_bound μ s₀ B hB bB hbB k
   set Mμ := ∑ j, μ j with hMμ
   set q : ℤ := p - k with hq
   set bq : ℝ := (q : ℝ) / Mμ with hbq
@@ -11644,37 +11820,42 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     exact hxΩ j₀ (by rw [h, map_zero])
   have hnx : 0 < ‖x‖ := norm_pos_iff.mpr hx0
   -- the derivative of the test is the derivative of the composition within the open set
-  have hderiv : iteratedFDeriv ℝ k (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch π μ s₀ B α β φ) x =
-      iteratedFDerivWithin ℝ k (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_G α μ s₀ B φ β ∘ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π) x := by
-    rw [← iteratedFDerivWithin_of_isOpen k (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω_isOpen π) hxΩ]
-    exact iteratedFDerivWithin_congr (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch_eqOn π μ s₀ B α β φ) hxΩ k
-  by_cases hsupp : (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π x).1 ∈ tsupport B
+  have hderiv : iteratedFDeriv ℝ k (meyerFlatLift_arch π μ s₀ B α β φ) x =
+      iteratedFDerivWithin ℝ k (meyerFlatLift_G α μ s₀ B φ β ∘ meyerFlatLift_L π)
+          (meyerFlatLift_Ω π) x := by
+    rw [← iteratedFDerivWithin_of_isOpen k (meyerFlatLift_Ω_isOpen π) hxΩ]
+    exact iteratedFDerivWithin_congr (meyerFlatLift_arch_eqOn π μ s₀ B α β φ) hxΩ k
+  by_cases hsupp : (meyerFlatLift_L π x).1 ∈ tsupport B
   · -- comparability of the log-radii with the log of the norm
-    obtain ⟨-, hlog⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_support_cone π hπ1 hπ2 R x hxΩ (hR _ hsupp)
-    set t := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin μ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π x).1 + s₀ with ht
+    obtain ⟨-, hlog⟩ := meyerFlatLift_support_cone π hπ1 hπ2 R x hxΩ (hR _ hsupp)
+    set t := meyerFlatLift_lin μ (meyerFlatLift_L π x).1 + s₀ with ht
     have hφb (d : ℕ) (hd : d ≤ k) :
         ‖iteratedFDeriv ℝ d φ t‖ ≤ Real.exp (-bq * t) * S := by
       have := hS d hd t
       rw [neg_mul, Real.exp_neg]
       rw [le_inv_mul_iff₀ (Real.exp_pos _)]
       exact this
-    have hunit (j : ι) : ‖(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π x).2 j‖ = 1 := by
-      simp only [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L]
+    have hunit (j : ι) : ‖(meyerFlatLift_L π x).2 j‖ = 1 := by
+      simp only [meyerFlatLift_L]
       rw [norm_mul, norm_inv, Complex.norm_real, Real.norm_eq_abs, abs_norm,
         mul_inv_cancel₀ (norm_ne_zero_iff.mpr (hxΩ j))]
-    have hG := hK α β φ hφ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π x).1 (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π x).2 hunit (Real.exp (-bq * t) * S) hφb
-    have hcomp := hA (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_G α μ s₀ B φ β) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_G_contDiff α μ s₀ B hB φ hφ β) x hx.2 hx0 _
+    have hG := hK α β φ hφ (meyerFlatLift_L π x).1 (meyerFlatLift_L π x).2 hunit
+        (Real.exp (-bq * t) * S) hφb
+    have hcomp := hA (meyerFlatLift_G α μ s₀ B φ β)
+        (meyerFlatLift_G_contDiff α μ s₀ B hB φ hφ β) x hx.2 hx0 _
       (fun i hi ↦ hG i hi)
     rw [hderiv]
     -- the norm power against the exponential weight
-    have hnorm : ‖x‖ ^ q ≤ Real.exp (bq * t) * (Real.exp (-bq * s₀) * Real.exp (|(q : ℝ)| * R)) := by
+    have hnorm : ‖x‖ ^ q ≤ Real.exp (bq * t) *
+        (Real.exp (-bq * s₀) * Real.exp (|(q : ℝ)| * R)) := by
       have hsum : |(t - s₀) - Mμ * Real.log ‖x‖| ≤ Mμ * R := by
-        rw [ht, add_sub_cancel_right, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin_apply, hMμ, Finset.sum_mul, ← Finset.sum_sub_distrib]
+        rw [ht, add_sub_cancel_right, meyerFlatLift_lin_apply, hMμ, Finset.sum_mul,
+            ← Finset.sum_sub_distrib]
         refine (Finset.abs_sum_le_sum_abs _ _).trans ?_
         rw [Finset.sum_mul]
         refine Finset.sum_le_sum fun j _ ↦ ?_
         rw [← mul_sub, abs_mul, abs_of_nonneg (hμ j)]
-        exact mul_le_mul_of_nonneg_left (by simpa [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L] using hlog j) (hμ j)
+        exact mul_le_mul_of_nonneg_left (by simpa [meyerFlatLift_L] using hlog j) (hμ j)
       have hlogx : |Real.log ‖x‖ - (t - s₀) / Mμ| ≤ R := by
         rw [show Real.log ‖x‖ - (t - s₀) / Mμ = -((t - s₀) - Mμ * Real.log ‖x‖) / Mμ by
           field_simp; ring, abs_div, abs_neg, abs_of_pos hμ1, div_le_iff₀ hμ1]
@@ -11689,7 +11870,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       have h2 : (q : ℝ) * Real.log ‖x‖ = (q : ℝ) * (Real.log ‖x‖ - (t - s₀) / Mμ) +
           bq * t + -bq * s₀ := by rw [hbq]; field_simp; ring
       linarith
-    calc ‖x‖ ^ p * ‖iteratedFDerivWithin ℝ k (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_G α μ s₀ B φ β ∘ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π) x‖
+    calc ‖x‖ ^ p * ‖iteratedFDerivWithin ℝ k (meyerFlatLift_G α μ s₀ B φ β ∘
+        meyerFlatLift_L π) (meyerFlatLift_Ω π) x‖
         ≤ ‖x‖ ^ p * (k.factorial * (K * (Real.exp (-bq * t) * S) * W ^ k) *
             (A * ‖x‖⁻¹) ^ k) := mul_le_mul_of_nonneg_left hcomp (zpow_nonneg hnx.le p)
       _ = k.factorial * K * A ^ k * W ^ k * S * Real.exp (-bq * t) * ‖x‖ ^ q := by
@@ -11698,19 +11880,21 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       _ ≤ k.factorial * K * A ^ k * W ^ k * S * Real.exp (-bq * t) *
             (Real.exp (bq * t) * (Real.exp (-bq * s₀) * Real.exp (|(q : ℝ)| * R))) := by
           gcongr
-      _ = k.factorial * K * A ^ k * (Real.exp (-bq * s₀) * Real.exp (|(q : ℝ)| * R)) * S * W ^ k := by
+      _ = k.factorial * K * A ^ k *
+          (Real.exp (-bq * s₀) * Real.exp (|(q : ℝ)| * R)) * S * W ^ k := by
           have : Real.exp (-bq * t) * Real.exp (bq * t) = 1 := by
             rw [← Real.exp_add]; simp
           linear_combination (k.factorial * K * A ^ k * W ^ k * S *
             (Real.exp (-bq * s₀) * Real.exp (|(q : ℝ)| * R))) * this
   · -- off the support of the cutoff the test vanishes near the point
-    have hloc : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch π μ s₀ B α β φ =ᶠ[𝓝 x] fun _ ↦ 0 := by
-      have hcont : ContinuousAt (fun y ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π y).1) x :=
-        ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L_contDiffOn π).continuousOn.continuousAt ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω_isOpen π).mem_nhds hxΩ)).fst
+    have hloc : meyerFlatLift_arch π μ s₀ B α β φ =ᶠ[𝓝 x] fun _ ↦ 0 := by
+      have hcont : ContinuousAt (fun y ↦ (meyerFlatLift_L π y).1) x :=
+        ((meyerFlatLift_L_contDiffOn π).continuousOn.continuousAt
+            ((meyerFlatLift_Ω_isOpen π).mem_nhds hxΩ)).fst
       filter_upwards [hcont.preimage_mem_nhds ((isClosed_tsupport B).isOpen_compl.mem_nhds hsupp),
-        (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω_isOpen π).mem_nhds hxΩ] with y hy hyΩ
-      have hBy : B (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π y).1 = 0 := image_eq_zero_of_notMem_tsupport hy
-      simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch, hyΩ, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_G, hBy]
+        (meyerFlatLift_Ω_isOpen π).mem_nhds hxΩ] with y hy hyΩ
+      have hBy : B (meyerFlatLift_L π y).1 = 0 := image_eq_zero_of_notMem_tsupport hy
+      simp [meyerFlatLift_arch, hyΩ, meyerFlatLift_G, hBy]
     rw [(hloc.iteratedFDeriv ℝ k).eq_of_nhds]
     rcases k with _ | k
     · simp only [iteratedFDeriv_zero_eq_comp, comp_apply]
@@ -11722,7 +11906,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- The archimedean test of a profile with all exponential weights is a Schwartz function, with
 each seminorm bounded linearly in one weighted bound of the profile and polynomially in the
 parameters of the character. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch_schwartz
+private theorem meyerFlatLift_arch_schwartz
     [FiniteDimensional ℝ E] (π : ι → E →L[ℝ] ℂ) (hπ1 : ∀ x j, ‖π j x‖ ≤ ‖x‖)
     (hπ2 : ∀ x, ∃ j, ‖x‖ ≤ ‖π j x‖) (μ : ι → ℝ) (hμ : ∀ j, 0 ≤ μ j) (hμ1 : 0 < ∑ j, μ j)
     (s₀ : ℝ) (B : (ι → ℝ) → ℂ) (hB : ContDiff ℝ (∞) B) (bB : ℕ → ℝ)
@@ -11732,39 +11916,43 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       (∀ (b : ℝ) (d : ℕ), ∃ S : ℝ, ∀ u, Real.exp (b * u) * ‖iteratedFDeriv ℝ d φ u‖ ≤ S) →
       ∀ S : ℝ, (∀ d ≤ l, ∀ u, Real.exp (((k - l : ℤ) : ℝ) / (∑ j, μ j) * u) *
         ‖iteratedFDeriv ℝ d φ u‖ ≤ S) →
-      ∃ g : 𝓢(E, ℂ), ⇑g = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch π μ s₀ B α β φ ∧
+      ∃ g : 𝓢(E, ℂ), ⇑g = meyerFlatLift_arch π μ s₀ B α β φ ∧
         SchwartzMap.seminorm ℂ k l g ≤ C * S * ((1 + ∑ j, |α j|) * (1 + ∑ j, |(β j : ℝ)|)) ^ l := by
-  obtain ⟨C, hC0, hC⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch_bound π hπ1 hπ2 μ hμ hμ1 s₀ B hB bB hbB R hR l k
+  obtain ⟨C, hC0, hC⟩ := meyerFlatLift_arch_bound π hπ1 hπ2 μ hμ hμ1 s₀ B hB bB hbB R hR l k
   refine ⟨C, hC0, fun α β φ hφ hdec S hS ↦ ?_⟩
   have hS0 : 0 ≤ S := by
     have := hS 0 (Nat.zero_le _) 0
     exact (mul_nonneg (Real.exp_pos _).le (norm_nonneg _)).trans this
-  have hsmooth : ContDiffOn ℝ (∞) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch π μ s₀ B α β φ) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π) :=
-    ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_G_contDiff α μ s₀ B hB φ hφ β).comp_contDiffOn (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L_contDiffOn π)).congr
-      (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch_eqOn π μ s₀ B α β φ)
-  have hvan (x : E) (hx : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch π μ s₀ B α β φ x ≠ 0) :
-      x ∈ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π ∩ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone π (Real.exp (-R)) := by
-    by_cases hxΩ : x ∈ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π
+  have hsmooth : ContDiffOn ℝ (∞) (meyerFlatLift_arch π μ s₀ B α β φ) (meyerFlatLift_Ω π) :=
+    ((meyerFlatLift_G_contDiff α μ s₀ B hB φ hφ β).comp_contDiffOn
+        (meyerFlatLift_L_contDiffOn π)).congr
+      (meyerFlatLift_arch_eqOn π μ s₀ B α β φ)
+  have hvan (x : E) (hx : meyerFlatLift_arch π μ s₀ B α β φ x ≠ 0) :
+      x ∈ meyerFlatLift_Ω π ∩ meyerFlatLift_Cone π (Real.exp (-R)) := by
+    by_cases hxΩ : x ∈ meyerFlatLift_Ω π
     · refine ⟨hxΩ, ?_⟩
-      have hB0 : B (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L π x).1 ≠ 0 := by
+      have hB0 : B (meyerFlatLift_L π x).1 ≠ 0 := by
         intro h
         apply hx
-        simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch, hxΩ, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_G, h]
-      exact (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_support_cone π hπ1 hπ2 R x hxΩ
+        simp [meyerFlatLift_arch, hxΩ, meyerFlatLift_G, h]
+      exact (meyerFlatLift_support_cone π hπ1 hπ2 R x hxΩ
         (hR _ (subset_tsupport B hB0))).1
-    · exact absurd (by simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch, hxΩ]) hx
-  have hbd (k' : ℕ) (p' : ℤ) : ∃ C' : ℝ, ∀ x ∈ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π ∩ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone π (Real.exp (-R)),
-      ‖x‖ ^ p' * ‖iteratedFDeriv ℝ k' (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch π μ s₀ B α β φ) x‖ ≤ C' := by
-    obtain ⟨C₁, -, hC₁⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch_bound π hπ1 hπ2 μ hμ hμ1 s₀ B hB bB hbB R hR k' p'
+    · exact absurd (by simp [meyerFlatLift_arch, hxΩ]) hx
+  have hbd (k' : ℕ) (p' : ℤ) : ∃ C' : ℝ, ∀ x ∈
+      meyerFlatLift_Ω π ∩ meyerFlatLift_Cone π (Real.exp (-R)),
+      ‖x‖ ^ p' * ‖iteratedFDeriv ℝ k' (meyerFlatLift_arch π μ s₀ B α β φ) x‖ ≤ C' := by
+    obtain ⟨C₁, -, hC₁⟩ := meyerFlatLift_arch_bound π hπ1 hπ2 μ hμ hμ1 s₀ B hB bB hbB R hR k' p'
     choose Sd hSd using fun d ↦ hdec (((p' - k' : ℤ) : ℝ) / (∑ j, μ j)) d
     refine ⟨C₁ * (∑ d ∈ Finset.range (k' + 1), |Sd d|) *
       ((1 + ∑ j, |α j|) * (1 + ∑ j, |(β j : ℝ)|)) ^ k', fun x hx ↦ ?_⟩
     refine hC₁ α β φ hφ _ (fun d hd u ↦ (hSd d u).trans ((le_abs_self _).trans ?_)) x hx
     exact Finset.single_le_sum (f := fun d ↦ |Sd d|) (fun d _ ↦ abs_nonneg _)
       (Finset.mem_range.mpr (Nat.lt_succ_of_le hd))
-  obtain ⟨g, hg, hgs⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cone_schwartz (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω π) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone π (Real.exp (-R))) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω_isOpen π)
+  obtain ⟨g, hg, hgs⟩ := meyerFlatLift_cone_schwartz (meyerFlatLift_Ω π)
+      (meyerFlatLift_Cone π (Real.exp (-R))) (meyerFlatLift_Ω_isOpen π)
     (fun h ↦ by obtain ⟨j₀, -⟩ := hπ2 0; exact h j₀ (map_zero _))
-    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone_isClosed π _) (fun x hx hx0 ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Cone_subset π _ (Real.exp_pos _) x hx hx0)
+    (meyerFlatLift_Cone_isClosed π _) (fun x hx hx0 ↦ meyerFlatLift_Cone_subset π _
+        (Real.exp_pos _) x hx hx0)
     _ hsmooth hvan hbd
   refine ⟨g, hg, hgs k l _ (by positivity) fun x hx ↦ ?_⟩
   have := hC α β φ hφ S hS x hx
@@ -11775,7 +11963,7 @@ end ArchTest
 section ArchChar
 
 /-- Positive reals as units of the complex numbers. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posC :
+private noncomputable def meyerFlatLift_posC :
     ℝ≥0ˣ →ₜ* ℂˣ where
   toFun t := Units.mk0 (((t : ℝ≥0) : ℝ) : ℂ) (by exact_mod_cast (Units.ne_zero t))
   map_one' := by ext; simp
@@ -11788,7 +11976,7 @@ private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside
         fun t ↦ by simp [Function.comp_def, Units.ne_zero]
 
 /-- The circle as units of the complex numbers. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circC :
+private noncomputable def meyerFlatLift_circC :
     Circle →ₜ* ℂˣ where
   toFun := Circle.toUnits
   map_one' := map_one _
@@ -11801,42 +11989,42 @@ private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside
     exact continuous_subtype_val.comp continuous_inv
 
 /-- The coefficient of a unitary continuous character of the positive reals. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam
+private noncomputable def meyerFlatLift_radParam
     (c : ℝ≥0ˣ →ₜ* ℂ) : ℂ := (existsUnique_complexPower c).exists.choose
 
 /-- A continuous character of the positive reals is the power with its coefficient. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam_spec
+private theorem meyerFlatLift_radParam_spec
     (c : ℝ≥0ˣ →ₜ* ℂ) (t : ℝ≥0ˣ) :
-    c t = (((t : ℝ≥0) : ℝ) : ℂ) ^ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam c :=
+    c t = (((t : ℝ≥0) : ℝ) : ℂ) ^ meyerFlatLift_radParam c :=
   (existsUnique_complexPower c).exists.choose_spec t
 
 /-- The coefficient of a continuous character of the positive reals is unique. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam_unique
+private theorem meyerFlatLift_radParam_unique
     (c : ℝ≥0ˣ →ₜ* ℂ) (z : ℂ) (h : ∀ t : ℝ≥0ˣ, c t = (((t : ℝ≥0) : ℝ) : ℂ) ^ z) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam c = z :=
-  (existsUnique_complexPower c).unique (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam_spec c) h
+    meyerFlatLift_radParam c = z :=
+  (existsUnique_complexPower c).unique (meyerFlatLift_radParam_spec c) h
 
 /-- The exponent of a continuous character of the circle. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circParam
+private noncomputable def meyerFlatLift_circParam
     (c : Circle →ₜ* ℂ) : ℤ := (existsUnique_circleCharacter_zpow c).exists.choose
 
 /-- A continuous character of the circle is the integer power with its exponent. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circParam_spec
-    (c : Circle →ₜ* ℂ) (z : Circle) : c z = (z : ℂ) ^ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circParam c :=
+private theorem meyerFlatLift_circParam_spec
+    (c : Circle →ₜ* ℂ) (z : Circle) : c z = (z : ℂ) ^ meyerFlatLift_circParam c :=
   (existsUnique_circleCharacter_zpow c).exists.choose_spec z
 
 /-- The exponent of a continuous character of the circle is unique. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circParam_unique
+private theorem meyerFlatLift_circParam_unique
     (c : Circle →ₜ* ℂ) (n : ℤ) (h : ∀ z : Circle, c z = (z : ℂ) ^ n) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circParam c = n :=
-  (existsUnique_circleCharacter_zpow c).unique (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circParam_spec c) h
+    meyerFlatLift_circParam c = n :=
+  (existsUnique_circleCharacter_zpow c).unique (meyerFlatLift_circParam_spec c) h
 
 /-- The circle character as a complex valued continuous homomorphism. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe :
+private noncomputable def meyerFlatLift_coe :
     Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
 
 /-- A unitary positive power is the unitary exponential of the logarithm. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_unitary_power
+private theorem meyerFlatLift_unitary_power
     (z : ℂ) (h : ∀ t : ℝ≥0ˣ, ‖(((t : ℝ≥0) : ℝ) : ℂ) ^ z‖ = 1)
     (t : ℝ) (ht : 0 < t) :
     (t : ℂ) ^ z = Complex.exp (Complex.I * ((z.im * Real.log t : ℝ) : ℂ)) ∧ z.re = 0 := by
@@ -11857,18 +12045,20 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   ring
 
 /-- The radial parameter of a continuous character of `ℂˣ`. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αC
-    (ψ : ℂˣ →ₜ* Circle) : ℝ := (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp (ψ.comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posC))).im
+private noncomputable def meyerFlatLift_αC
+    (ψ : ℂˣ →ₜ* Circle) : ℝ :=
+        (meyerFlatLift_radParam (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posC))).im
 
 /-- The angular parameter of a continuous character of `ℂˣ`. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_βC
-    (ψ : ℂˣ →ₜ* Circle) : ℤ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circParam (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp (ψ.comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circC))
+private noncomputable def meyerFlatLift_βC
+    (ψ : ℂˣ →ₜ* Circle) : ℤ :=
+        meyerFlatLift_circParam (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_circC))
 
 /-- Classification of the continuous characters of `ℂˣ`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_char_complex
+private theorem meyerFlatLift_char_complex
     (ψ : ℂˣ →ₜ* Circle) (z : ℂˣ) :
-    (ψ z : ℂ) = Complex.exp (Complex.I * ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αC ψ * Real.log ‖(z : ℂ)‖ : ℝ) : ℂ)) *
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_βC ψ) ((z : ℂ) * ((‖(z : ℂ)‖ : ℝ) : ℂ)⁻¹) := by
+    (ψ z : ℂ) = Complex.exp (Complex.I * ((meyerFlatLift_αC ψ * Real.log ‖(z : ℂ)‖ : ℝ) : ℂ)) *
+      meyerFlatLift_gpow (meyerFlatLift_βC ψ) ((z : ℂ) * ((‖(z : ℂ)‖ : ℝ) : ℂ)⁻¹) := by
   have hz0 : (z : ℂ) ≠ 0 := z.ne_zero
   have hn : 0 < ‖(z : ℂ)‖ := norm_pos_iff.mpr hz0
   let t : ℝ≥0ˣ := Units.mk0 ⟨‖(z : ℂ)‖, hn.le⟩ (by
@@ -11876,66 +12066,76 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   have hunit : ‖(z : ℂ) * ((‖(z : ℂ)‖ : ℝ) : ℂ)⁻¹‖ = 1 := by
     rw [norm_mul, norm_inv, Complex.norm_real, Real.norm_eq_abs, abs_norm, mul_inv_cancel₀ hn.ne']
   let s : Circle := ⟨(z : ℂ) * ((‖(z : ℂ)‖ : ℝ) : ℂ)⁻¹, mem_sphere_zero_iff_norm.mpr hunit⟩
-  have hfac : z = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posC t * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circC s := by
+  have hfac : z = meyerFlatLift_posC t * meyerFlatLift_circC s := by
     ext
     change (z : ℂ) = ((‖(z : ℂ)‖ : ℝ) : ℂ) * ((z : ℂ) * ((‖(z : ℂ)‖ : ℝ) : ℂ)⁻¹)
     have : ((‖(z : ℂ)‖ : ℝ) : ℂ) ≠ 0 := by exact_mod_cast hn.ne'
     field_simp
-  have hψ : (ψ z : ℂ) = (ψ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posC t) : ℂ) * (ψ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circC s) : ℂ) := by
+  have hψ : (ψ z : ℂ) = (ψ (meyerFlatLift_posC t) : ℂ) * (ψ (meyerFlatLift_circC s) : ℂ) := by
     conv_lhs => rw [hfac]
     rw [map_mul, Circle.coe_mul]
-  have hrad : (ψ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posC t) : ℂ) =
-      Complex.exp (Complex.I * ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αC ψ * Real.log ‖(z : ℂ)‖ : ℝ) : ℂ)) := by
-    have h1 : (ψ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posC t) : ℂ) = ((‖(z : ℂ)‖ : ℝ) : ℂ) ^ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp (ψ.comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posC)) :=
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam_spec (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp (ψ.comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posC)) t
-    have hu : ∀ t' : ℝ≥0ˣ, ‖(((t' : ℝ≥0) : ℝ) : ℂ) ^ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp (ψ.comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posC))‖ = 1 :=
+  have hrad : (ψ (meyerFlatLift_posC t) : ℂ) =
+      Complex.exp (Complex.I * ((meyerFlatLift_αC ψ * Real.log ‖(z : ℂ)‖ : ℝ) : ℂ)) := by
+    have h1 : (ψ (meyerFlatLift_posC t) : ℂ) = ((‖(z : ℂ)‖ : ℝ) : ℂ) ^
+        meyerFlatLift_radParam (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posC)) :=
+      meyerFlatLift_radParam_spec (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posC)) t
+    have hu : ∀ t' : ℝ≥0ˣ, ‖(((t' : ℝ≥0) : ℝ) : ℂ) ^
+        meyerFlatLift_radParam (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posC))‖ = 1 :=
       fun t' ↦ by
-        rw [← sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam_spec]
+        rw [← meyerFlatLift_radParam_spec]
         exact Circle.norm_coe _
-    rw [h1, (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_unitary_power _ hu ‖(z : ℂ)‖ hn).1]
+    rw [h1, (meyerFlatLift_unitary_power _ hu ‖(z : ℂ)‖ hn).1]
     rfl
-  have hcirc : (ψ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circC s) : ℂ) = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_βC ψ) ((z : ℂ) * ((‖(z : ℂ)‖ : ℝ) : ℂ)⁻¹) := by
-    have h1 : (ψ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circC s) : ℂ) = (s : ℂ) ^ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circParam (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp (ψ.comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circC)) :=
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circParam_spec (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp (ψ.comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circC)) s
-    rw [h1, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow_eq_zpow _ _ hunit]
+  have hcirc : (ψ (meyerFlatLift_circC s) : ℂ) = meyerFlatLift_gpow (meyerFlatLift_βC ψ) ((z : ℂ) *
+      ((‖(z : ℂ)‖ : ℝ) : ℂ)⁻¹) := by
+    have h1 : (ψ (meyerFlatLift_circC s) : ℂ) = (s : ℂ) ^
+        meyerFlatLift_circParam (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_circC)) :=
+      meyerFlatLift_circParam_spec (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_circC)) s
+    rw [h1, meyerFlatLift_gpow_eq_zpow _ _ hunit]
     rfl
   rw [hψ, hrad, hcirc]
 
 /-- The coefficient of a product of characters of the positive reals is the sum of the
 coefficients. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam_mul
+private theorem meyerFlatLift_radParam_mul
     (c c' : ℝ≥0ˣ →ₜ* ℂ) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam (c * c') = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam c + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam c' := by
-  refine sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam_unique _ _ fun t ↦ ?_
+    meyerFlatLift_radParam (c * c') = meyerFlatLift_radParam c + meyerFlatLift_radParam c' := by
+  refine meyerFlatLift_radParam_unique _ _ fun t ↦ ?_
   have ht : (((t : ℝ≥0) : ℝ) : ℂ) ≠ 0 := by exact_mod_cast Units.ne_zero t
-  rw [Complex.cpow_add _ _ ht, ← sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam_spec, ← sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam_spec]
+  rw [Complex.cpow_add _ _ ht, ← meyerFlatLift_radParam_spec, ← meyerFlatLift_radParam_spec]
   rfl
 
 /-- The exponent of a product of characters of the circle is the sum of the exponents. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circParam_mul
+private theorem meyerFlatLift_circParam_mul
     (c c' : Circle →ₜ* ℂ) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circParam (c * c') = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circParam c + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circParam c' := by
-  refine sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circParam_unique _ _ fun z ↦ ?_
-  rw [zpow_add₀ (Circle.coe_ne_zero z), ← sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circParam_spec, ← sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circParam_spec]
+    meyerFlatLift_circParam (c * c') = meyerFlatLift_circParam c + meyerFlatLift_circParam c' := by
+  refine meyerFlatLift_circParam_unique _ _ fun z ↦ ?_
+  rw [zpow_add₀ (Circle.coe_ne_zero z), ← meyerFlatLift_circParam_spec,
+      ← meyerFlatLift_circParam_spec]
   rfl
 
 /-- The radial parameter of characters of `ℂˣ` is additive. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αC_mul
-    (ψ ψ' : ℂˣ →ₜ* Circle) : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αC (ψ * ψ') = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αC ψ + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αC ψ' := by
-  have : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp ((ψ * ψ').comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posC) = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp (ψ.comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posC) * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp (ψ'.comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posC) := by
-    ext t; simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe]
-  simp only [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αC, this, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam_mul, Complex.add_im]
+private theorem meyerFlatLift_αC_mul
+    (ψ ψ' : ℂˣ →ₜ* Circle) : meyerFlatLift_αC (ψ * ψ') = meyerFlatLift_αC ψ +
+        meyerFlatLift_αC ψ' := by
+  have : meyerFlatLift_coe.comp ((ψ * ψ').comp meyerFlatLift_posC) =
+      meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posC) *
+      meyerFlatLift_coe.comp (ψ'.comp meyerFlatLift_posC) := by
+    ext t; simp [meyerFlatLift_coe]
+  simp only [meyerFlatLift_αC, this, meyerFlatLift_radParam_mul, Complex.add_im]
 
 /-- The angular parameter of characters of `ℂˣ` is additive. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_βC_mul
-    (ψ ψ' : ℂˣ →ₜ* Circle) : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_βC (ψ * ψ') = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_βC ψ + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_βC ψ' := by
-  have : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp ((ψ * ψ').comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circC) =
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp (ψ.comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circC) * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp (ψ'.comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circC) := by
-    ext t; simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe]
-  simp only [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_βC, this, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_circParam_mul]
+private theorem meyerFlatLift_βC_mul
+    (ψ ψ' : ℂˣ →ₜ* Circle) : meyerFlatLift_βC (ψ * ψ') = meyerFlatLift_βC ψ +
+        meyerFlatLift_βC ψ' := by
+  have : meyerFlatLift_coe.comp ((ψ * ψ').comp meyerFlatLift_circC) =
+      meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_circC) *
+          meyerFlatLift_coe.comp (ψ'.comp meyerFlatLift_circC) := by
+    ext t; simp [meyerFlatLift_coe]
+  simp only [meyerFlatLift_βC, this, meyerFlatLift_circParam_mul]
 
 /-- Positive reals as units of the reals. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posR :
+private noncomputable def meyerFlatLift_posR :
     ℝ≥0ˣ →ₜ* ℝˣ where
   toFun t := Units.mk0 ((t : ℝ≥0) : ℝ) (by exact_mod_cast (Units.ne_zero t))
   map_one' := by ext; simp
@@ -11947,52 +12147,55 @@ private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside
       fun t ↦ by simp [Function.comp_def, Units.ne_zero]
 
 /-- The radial parameter of a continuous character of `ℝˣ`. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αR
-    (ψ : ℝˣ →ₜ* Circle) : ℝ := (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp (ψ.comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posR))).im
+private noncomputable def meyerFlatLift_αR
+    (ψ : ℝˣ →ₜ* Circle) : ℝ :=
+        (meyerFlatLift_radParam (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posR))).im
 
 open Classical in
 /-- The sign parameter of a continuous character of `ℝˣ`. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_εR
+private noncomputable def meyerFlatLift_εR
     (ψ : ℝˣ →ₜ* Circle) : ℤ := if (ψ (-1) : ℂ) = 1 then 0 else 1
 
 /-- The sign parameter is `0` or `1`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_εR_abs
-    (ψ : ℝˣ →ₜ* Circle) : |sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_εR ψ| ≤ 1 := by
-  unfold sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_εR; split_ifs <;> simp
+private theorem meyerFlatLift_εR_abs
+    (ψ : ℝˣ →ₜ* Circle) : |meyerFlatLift_εR ψ| ≤ 1 := by
+  unfold meyerFlatLift_εR; split_ifs <;> simp
 
 /-- Classification of the continuous characters of `ℝˣ`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_char_real
+private theorem meyerFlatLift_char_real
     (ψ : ℝˣ →ₜ* Circle) (t : ℝˣ) :
-    (ψ t : ℂ) = Complex.exp (Complex.I * ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αR ψ * Real.log ‖(t : ℝ)‖ : ℝ) : ℂ)) *
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_εR ψ) (((t : ℝ) : ℂ) * ((‖(t : ℝ)‖ : ℝ) : ℂ)⁻¹) := by
+    (ψ t : ℂ) = Complex.exp (Complex.I * ((meyerFlatLift_αR ψ * Real.log ‖(t : ℝ)‖ : ℝ) : ℂ)) *
+      meyerFlatLift_gpow (meyerFlatLift_εR ψ) (((t : ℝ) : ℂ) * ((‖(t : ℝ)‖ : ℝ) : ℂ)⁻¹) := by
   have ht0 : (t : ℝ) ≠ 0 := t.ne_zero
   have hn : 0 < ‖(t : ℝ)‖ := norm_pos_iff.mpr ht0
   let r : ℝ≥0ˣ := Units.mk0 ⟨‖(t : ℝ)‖, hn.le⟩ (by
     intro h; exact hn.ne' (congrArg NNReal.toReal h))
-  have hrad : (ψ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posR r) : ℂ) =
-      Complex.exp (Complex.I * ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αR ψ * Real.log ‖(t : ℝ)‖ : ℝ) : ℂ)) := by
-    have h1 : (ψ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posR r) : ℂ) = ((‖(t : ℝ)‖ : ℝ) : ℂ) ^ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp (ψ.comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posR)) :=
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam_spec (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp (ψ.comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posR)) r
-    have hu : ∀ t' : ℝ≥0ˣ, ‖(((t' : ℝ≥0) : ℝ) : ℂ) ^ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp (ψ.comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posR))‖ = 1 :=
+  have hrad : (ψ (meyerFlatLift_posR r) : ℂ) =
+      Complex.exp (Complex.I * ((meyerFlatLift_αR ψ * Real.log ‖(t : ℝ)‖ : ℝ) : ℂ)) := by
+    have h1 : (ψ (meyerFlatLift_posR r) : ℂ) = ((‖(t : ℝ)‖ : ℝ) : ℂ) ^
+        meyerFlatLift_radParam (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posR)) :=
+      meyerFlatLift_radParam_spec (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posR)) r
+    have hu : ∀ t' : ℝ≥0ˣ, ‖(((t' : ℝ≥0) : ℝ) : ℂ) ^
+        meyerFlatLift_radParam (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posR))‖ = 1 :=
       fun t' ↦ by
-        rw [← sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam_spec]
+        rw [← meyerFlatLift_radParam_spec]
         exact Circle.norm_coe _
-    rw [h1, (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_unitary_power _ hu ‖(t : ℝ)‖ hn).1]
+    rw [h1, (meyerFlatLift_unitary_power _ hu ‖(t : ℝ)‖ hn).1]
     rfl
   -- the value at `-1`
-  have hm1 : (ψ (-1) : ℂ) = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_εR ψ) (-1) := by
+  have hm1 : (ψ (-1) : ℂ) = meyerFlatLift_gpow (meyerFlatLift_εR ψ) (-1) := by
     have hsq : ((ψ (-1) : Circle) : ℂ) ^ 2 = 1 := by
       rw [← Circle.coe_pow, ← map_pow]; simp
-    unfold sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_εR
+    unfold meyerFlatLift_εR
     split_ifs with h
-    · simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow, h]
+    · simp [meyerFlatLift_gpow, h]
     · have : (ψ (-1) : ℂ) = -1 := by
         rcases sq_eq_one_iff.mp hsq with h' | h'
         · exact absurd h' h
         · exact h'
-      simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow, this]
+      simp [meyerFlatLift_gpow, this]
   rcases lt_or_gt_of_ne ht0 with hneg | hpos
-  · have hfac : t = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posR r * (-1) := by
+  · have hfac : t = meyerFlatLift_posR r * (-1) := by
       ext
       change (t : ℝ) = ‖(t : ℝ)‖ * (-1)
       rw [Real.norm_eq_abs, abs_of_neg hneg]; ring
@@ -12003,7 +12206,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       field_simp
     conv_lhs => rw [hfac]
     rw [map_mul, Circle.coe_mul, hrad, hm1, hsgn]
-  · have hfac : t = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posR r := by
+  · have hfac : t = meyerFlatLift_posR r := by
       ext
       change (t : ℝ) = ‖(t : ℝ)‖
       rw [Real.norm_eq_abs, abs_of_pos hpos]
@@ -12013,22 +12216,25 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       field_simp
     conv_lhs => rw [hfac]
     rw [hrad, hsgn]
-    unfold sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow
+    unfold meyerFlatLift_gpow
     split_ifs <;> simp
 
 /-- The radial parameter of characters of `ℝˣ` is additive. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αR_mul
-    (ψ ψ' : ℝˣ →ₜ* Circle) : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αR (ψ * ψ') = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αR ψ + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αR ψ' := by
-  have : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp ((ψ * ψ').comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posR) = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp (ψ.comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posR) * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe.comp (ψ'.comp sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_posR) := by
-    ext t; simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coe]
-  simp only [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αR, this, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_radParam_mul, Complex.add_im]
+private theorem meyerFlatLift_αR_mul
+    (ψ ψ' : ℝˣ →ₜ* Circle) : meyerFlatLift_αR (ψ * ψ') = meyerFlatLift_αR ψ +
+        meyerFlatLift_αR ψ' := by
+  have : meyerFlatLift_coe.comp ((ψ * ψ').comp meyerFlatLift_posR) =
+      meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posR) *
+      meyerFlatLift_coe.comp (ψ'.comp meyerFlatLift_posR) := by
+    ext t; simp [meyerFlatLift_coe]
+  simp only [meyerFlatLift_αR, this, meyerFlatLift_radParam_mul, Complex.add_im]
 
 end ArchChar
 
 section SIdeleChar
 
 /-- The archimedean units as S-ideles with finite part one. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_archIdele
+private noncomputable def meyerFlatLift_archIdele
     (T : Finset (HeightOneSpectrum (𝓞 F))) :
     ((w : InfinitePlace F) → (w.Completion)ˣ) →ₜ* (SAdeleRing F T)ˣ :=
   let fin : ((w : InfinitePlace F) → (w.Completion)ˣ) ≃ₜ* (InfiniteAdeleRing F)ˣ :=
@@ -12040,22 +12246,24 @@ private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside
 
 open Classical in
 /-- The local embedding of the units of an archimedean completion into the S-ideles. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_loc
+private noncomputable def meyerFlatLift_loc
     (T : Finset (HeightOneSpectrum (𝓞 F))) (w : InfinitePlace F) :
     (w.Completion)ˣ →ₜ* (SAdeleRing F T)ˣ :=
-  (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_archIdele T).comp ⟨MonoidHom.mulSingle (fun w : InfinitePlace F ↦ (w.Completion)ˣ) w,
+  (meyerFlatLift_archIdele T).comp
+      ⟨MonoidHom.mulSingle (fun w : InfinitePlace F ↦ (w.Completion)ˣ) w,
     continuous_mulSingle (A := fun w : InfinitePlace F ↦ (w.Completion)ˣ) w⟩
 
 /-- The value of the archimedean embedding: the archimedean units, and one at the finite
 places. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_archIdele_val
+private theorem meyerFlatLift_archIdele_val
     (T : Finset (HeightOneSpectrum (𝓞 F)))
     (x : (w : InfinitePlace F) → (w.Completion)ˣ) :
-    ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_archIdele T x : (SAdeleRing F T)ˣ) : SAdeleRing F T) = ((fun w ↦ (x w : w.Completion)), 1) := by
+    ((meyerFlatLift_archIdele T x : (SAdeleRing F T)ˣ) : SAdeleRing F T) =
+        ((fun w ↦ (x w : w.Completion)), 1) := by
   rfl
 
 /-- The real coordinate units as units of a real completion. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_UR
+private noncomputable def meyerFlatLift_UR
     {w : InfinitePlace F} (hw : w.IsReal) : ℝˣ →ₜ* (w.Completion)ˣ where
   toMonoidHom := Units.map (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm.toMonoidHom
   continuous_toFun := by
@@ -12066,9 +12274,10 @@ private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside
         (Units.continuous_val.comp continuous_inv)
 
 /-- The complex coordinate units as units of a complex completion. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_UC
+private noncomputable def meyerFlatLift_UC
     {w : InfinitePlace F} (hw : w.IsComplex) : ℂˣ →ₜ* (w.Completion)ˣ where
-  toMonoidHom := Units.map (InfinitePlace.Completion.ringEquivComplexOfIsComplex hw).symm.toMonoidHom
+  toMonoidHom :=
+      Units.map (InfinitePlace.Completion.ringEquivComplexOfIsComplex hw).symm.toMonoidHom
   continuous_toFun := by
     refine Units.continuous_iff.mpr ⟨?_, ?_⟩
     · exact (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hw).symm.continuous.comp
@@ -12079,128 +12288,132 @@ private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside
 variable (T : Finset (HeightOneSpectrum (𝓞 F)))
 
 /-- The quotient map from the S-ideles to the S-idele classes. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_q :
+private noncomputable def meyerFlatLift_q :
     (SAdeleRing F T)ˣ →ₜ* SIdeleQuotient F T :=
   ⟨QuotientGroup.mk' _, QuotientGroup.continuous_mk⟩
 
 /-- The local character at a real place. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψR
+private noncomputable def meyerFlatLift_ψR
     (χ : PontryaginDual (SIdeleQuotient F T)) {w : InfinitePlace F} (hw : w.IsReal) :
     ℝˣ →ₜ* Circle :=
-  χ.comp ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_q T).comp ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_loc T w).comp (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_UR hw)))
+  χ.comp ((meyerFlatLift_q T).comp ((meyerFlatLift_loc T w).comp (meyerFlatLift_UR hw)))
 
 /-- The local character at a complex place. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψC
+private noncomputable def meyerFlatLift_ψC
     (χ : PontryaginDual (SIdeleQuotient F T)) {w : InfinitePlace F} (hw : w.IsComplex) :
     ℂˣ →ₜ* Circle :=
-  χ.comp ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_q T).comp ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_loc T w).comp (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_UC hw)))
+  χ.comp ((meyerFlatLift_q T).comp ((meyerFlatLift_loc T w).comp (meyerFlatLift_UC hw)))
 
 open Classical in
 /-- The radial parameter of a character at an archimedean place. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α
+private noncomputable def meyerFlatLift_α
     (χ : PontryaginDual (SIdeleQuotient F T)) (w : InfinitePlace F) : ℝ :=
-  if hw : w.IsReal then sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αR (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψR T χ hw)
-  else sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αC (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψC T χ (InfinitePlace.not_isReal_iff_isComplex.mp hw))
+  if hw : w.IsReal then meyerFlatLift_αR (meyerFlatLift_ψR T χ hw)
+  else meyerFlatLift_αC (meyerFlatLift_ψC T χ (InfinitePlace.not_isReal_iff_isComplex.mp hw))
 
 open Classical in
 /-- The angular parameter of a character at an archimedean place: the sign exponent at a real
 place and the winding number at a complex place. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β
+private noncomputable def meyerFlatLift_β
     (χ : PontryaginDual (SIdeleQuotient F T)) (w : InfinitePlace F) : ℤ :=
-  if hw : w.IsReal then sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_εR (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψR T χ hw)
-  else sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_βC (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψC T χ (InfinitePlace.not_isReal_iff_isComplex.mp hw))
+  if hw : w.IsReal then meyerFlatLift_εR (meyerFlatLift_ψR T χ hw)
+  else meyerFlatLift_βC (meyerFlatLift_ψC T χ (InfinitePlace.not_isReal_iff_isComplex.mp hw))
 
 /-- The local character at a real place is multiplicative in the character. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψR_mul
+private theorem meyerFlatLift_ψR_mul
     (χ χ' : PontryaginDual (SIdeleQuotient F T)) {w : InfinitePlace F}
-    (hw : w.IsReal) : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψR T (χ * χ') hw = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψR T χ hw * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψR T χ' hw := rfl
+    (hw : w.IsReal) : meyerFlatLift_ψR T (χ * χ') hw = meyerFlatLift_ψR T χ hw *
+        meyerFlatLift_ψR T χ' hw := rfl
 
 /-- The local character at a complex place is multiplicative in the character. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψC_mul
+private theorem meyerFlatLift_ψC_mul
     (χ χ' : PontryaginDual (SIdeleQuotient F T)) {w : InfinitePlace F}
-    (hw : w.IsComplex) : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψC T (χ * χ') hw = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψC T χ hw * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψC T χ' hw := rfl
+    (hw : w.IsComplex) : meyerFlatLift_ψC T (χ * χ') hw = meyerFlatLift_ψC T χ hw *
+        meyerFlatLift_ψC T χ' hw := rfl
 
 /-- The radial parameter is additive in the character. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α_mul
+private theorem meyerFlatLift_α_mul
     (χ χ' : PontryaginDual (SIdeleQuotient F T)) (w : InfinitePlace F) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T (χ * χ') w = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ w + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ' w := by
-  unfold sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α
+    meyerFlatLift_α T (χ * χ') w = meyerFlatLift_α T χ w + meyerFlatLift_α T χ' w := by
+  unfold meyerFlatLift_α
   split_ifs with hw
-  · rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψR_mul, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αR_mul]
-  · rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψC_mul, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αC_mul]
+  · rw [meyerFlatLift_ψR_mul, meyerFlatLift_αR_mul]
+  · rw [meyerFlatLift_ψC_mul, meyerFlatLift_αC_mul]
 
 /-- At a complex place the angular parameter is additive in the character. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β_mul
+private theorem meyerFlatLift_β_mul
     (χ χ' : PontryaginDual (SIdeleQuotient F T)) (w : InfinitePlace F)
-    (hw : ¬ w.IsReal) : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T (χ * χ') w = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ w + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ' w := by
-  unfold sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β
-  rw [dite_eq_right hw, dite_eq_right hw, dite_eq_right hw, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψC_mul, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_βC_mul]
+    (hw : ¬ w.IsReal) : meyerFlatLift_β T (χ * χ') w = meyerFlatLift_β T χ w +
+        meyerFlatLift_β T χ' w := by
+  unfold meyerFlatLift_β
+  rw [dite_eq_right hw, dite_eq_right hw, dite_eq_right hw,
+      meyerFlatLift_ψC_mul, meyerFlatLift_βC_mul]
 
 open Classical in
 /-- The size of the archimedean parameters of a character. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_sizeFun
+private noncomputable def meyerFlatLift_sizeFun
     (χ : PontryaginDual (SIdeleQuotient F T)) : ℝ :=
-  ∑ w, (|sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ w| + if w.IsReal then 0 else |(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ w : ℝ)|)
+  ∑ w, (|meyerFlatLift_α T χ w| + if w.IsReal then 0 else |(meyerFlatLift_β T χ w : ℝ)|)
 
 /-- The radial parameter of the trivial character is zero. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α_one
-    (w : InfinitePlace F) : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T 1 w = 0 := by
-  have h := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α_mul T 1 1 w
+private theorem meyerFlatLift_α_one
+    (w : InfinitePlace F) : meyerFlatLift_α T 1 w = 0 := by
+  have h := meyerFlatLift_α_mul T 1 1 w
   rw [mul_one] at h
   linarith
 
 /-- At a complex place the angular parameter of the trivial character is zero. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β_one
-    (w : InfinitePlace F) (hw : ¬ w.IsReal) : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T 1 w = 0 := by
-  have h := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β_mul T 1 1 w hw
+private theorem meyerFlatLift_β_one
+    (w : InfinitePlace F) (hw : ¬ w.IsReal) : meyerFlatLift_β T 1 w = 0 := by
+  have h := meyerFlatLift_β_mul T 1 1 w hw
   rw [mul_one] at h
   omega
 
 /-- The radial parameter of the inverse character is the negative. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α_inv
+private theorem meyerFlatLift_α_inv
     (χ : PontryaginDual (SIdeleQuotient F T)) (w : InfinitePlace F) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ⁻¹ w = -sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ w := by
-  have h := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α_mul T χ⁻¹ χ w
-  rw [inv_mul_cancel, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α_one] at h
+    meyerFlatLift_α T χ⁻¹ w = -meyerFlatLift_α T χ w := by
+  have h := meyerFlatLift_α_mul T χ⁻¹ χ w
+  rw [inv_mul_cancel, meyerFlatLift_α_one] at h
   linarith
 
 /-- At a complex place the angular parameter of the inverse character is the negative. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β_inv
+private theorem meyerFlatLift_β_inv
     (χ : PontryaginDual (SIdeleQuotient F T)) (w : InfinitePlace F)
-    (hw : ¬ w.IsReal) : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ⁻¹ w = -sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ w := by
-  have h := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β_mul T χ⁻¹ χ w hw
-  rw [inv_mul_cancel, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β_one T w hw] at h
+    (hw : ¬ w.IsReal) : meyerFlatLift_β T χ⁻¹ w = -meyerFlatLift_β T χ w := by
+  have h := meyerFlatLift_β_mul T χ⁻¹ χ w hw
+  rw [inv_mul_cancel, meyerFlatLift_β_one T w hw] at h
   omega
 
 open Classical in
 /-- The size of the archimedean parameters as a group seminorm. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size :
+private noncomputable def meyerFlatLift_size :
     GroupSeminorm (PontryaginDual (SIdeleQuotient F T)) where
-  toFun := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_sizeFun T
+  toFun := meyerFlatLift_sizeFun T
   map_one' := by
-    simp only [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_sizeFun]
+    simp only [meyerFlatLift_sizeFun]
     refine Finset.sum_eq_zero fun w _ ↦ ?_
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α_one, abs_zero, zero_add]
+    rw [meyerFlatLift_α_one, abs_zero, zero_add]
     split_ifs with hw
     · rfl
-    · rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β_one T w hw]; simp
+    · rw [meyerFlatLift_β_one T w hw]; simp
   mul_le' χ χ' := by
-    simp only [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_sizeFun, ← Finset.sum_add_distrib]
+    simp only [meyerFlatLift_sizeFun, ← Finset.sum_add_distrib]
     refine Finset.sum_le_sum fun w _ ↦ ?_
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α_mul]
+    rw [meyerFlatLift_α_mul]
     split_ifs with hw
-    · simpa using abs_add_le (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ w) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ' w)
-    · rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β_mul T χ χ' w hw]
+    · simpa using abs_add_le (meyerFlatLift_α T χ w) (meyerFlatLift_α T χ' w)
+    · rw [meyerFlatLift_β_mul T χ χ' w hw]
       push_cast
-      linarith [abs_add_le (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ w) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ' w),
-        abs_add_le ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ w : ℝ)) ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ' w : ℝ))]
+      linarith [abs_add_le (meyerFlatLift_α T χ w) (meyerFlatLift_α T χ' w),
+        abs_add_le ((meyerFlatLift_β T χ w : ℝ)) ((meyerFlatLift_β T χ' w : ℝ))]
   inv' χ := by
-    simp only [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_sizeFun]
+    simp only [meyerFlatLift_sizeFun]
     refine Finset.sum_congr rfl fun w _ ↦ ?_
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α_inv, abs_neg]
+    rw [meyerFlatLift_α_inv, abs_neg]
     split_ifs with hw
     · rfl
-    · rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β_inv T χ w hw]; push_cast; rw [abs_neg]
+    · rw [meyerFlatLift_β_inv T χ w hw]; push_cast; rw [abs_neg]
 
 end SIdeleChar
 
@@ -12212,7 +12425,7 @@ local notation "Mx" => mixedEmbedding.mixedSpace F
 
 open Classical in
 /-- The coordinate of a point of the mixed space at an infinite place, as a complex number. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π
+private noncomputable def meyerFlatLift_π
     (w : InfinitePlace F) : Mx →L[ℝ] ℂ :=
   if hw : w.IsReal then
     Complex.ofRealCLM.comp ((ContinuousLinearMap.proj (R := ℝ)
@@ -12223,29 +12436,29 @@ private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside
       ⟨w, InfinitePlace.not_isReal_iff_isComplex.mp hw⟩).comp (ContinuousLinearMap.snd ℝ _ _)
 
 /-- The coordinate at a real place is the real coordinate. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_real
+private theorem meyerFlatLift_π_real
     (w : InfinitePlace F) (hw : w.IsReal) (y : Mx) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π w y = ((y.1 ⟨w, hw⟩ : ℝ) : ℂ) := by
-  simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π, hw]
+    meyerFlatLift_π w y = ((y.1 ⟨w, hw⟩ : ℝ) : ℂ) := by
+  simp [meyerFlatLift_π, hw]
 
 /-- The coordinate at a complex place is the complex coordinate. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_complex
+private theorem meyerFlatLift_π_complex
     (w : InfinitePlace F) (hw : w.IsComplex) (y : Mx) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π w y = y.2 ⟨w, hw⟩ := by
+    meyerFlatLift_π w y = y.2 ⟨w, hw⟩ := by
   have : ¬ w.IsReal := InfinitePlace.not_isReal_iff_isComplex.mpr hw
-  simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π, this]
+  simp [meyerFlatLift_π, this]
 
 /-- Each coordinate is at most the norm. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_norm_le
-    (w : InfinitePlace F) (y : Mx) : ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π w y‖ ≤ ‖y‖ := by
+private theorem meyerFlatLift_π_norm_le
+    (w : InfinitePlace F) (y : Mx) : ‖meyerFlatLift_π w y‖ ≤ ‖y‖ := by
   by_cases hw : w.IsReal
-  · rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_real w hw, Complex.norm_real]
+  · rw [meyerFlatLift_π_real w hw, Complex.norm_real]
     exact (norm_le_pi_norm y.1 ⟨w, hw⟩).trans (norm_fst_le y)
-  · rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_complex w (InfinitePlace.not_isReal_iff_isComplex.mp hw)]
+  · rw [meyerFlatLift_π_complex w (InfinitePlace.not_isReal_iff_isComplex.mp hw)]
     exact (norm_le_pi_norm y.2 _).trans (norm_snd_le y)
 
 /-- A sup norm on a finite product is attained or zero. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_pi_norm_attained
+private theorem meyerFlatLift_pi_norm_attained
     {ι : Type*} [Fintype ι] {G : Type*} [NormedAddCommGroup G]
     (f : ι → G) : (∃ i, ‖f‖ ≤ ‖f i‖) ∨ ‖f‖ = 0 := by
   rcases isEmpty_or_nonempty ι with hι | hι
@@ -12256,75 +12469,78 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     exact ⟨i, (pi_norm_le_iff_of_nonneg (norm_nonneg _)).mpr fun j ↦ hi j (Finset.mem_univ j)⟩
 
 /-- Some coordinate attains the norm. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_exists
-    (y : Mx) : ∃ w, ‖y‖ ≤ ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π w y‖ := by
+private theorem meyerFlatLift_π_exists
+    (y : Mx) : ∃ w, ‖y‖ ≤ ‖meyerFlatLift_π w y‖ := by
   rw [Prod.norm_def]
   have hw₀ : Nonempty (InfinitePlace F) := inferInstance
   rcases le_total ‖y.1‖ ‖y.2‖ with h | h
   · rw [max_eq_right h]
-    rcases sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_pi_norm_attained y.2 with ⟨j, hj⟩ | hj
-    · exact ⟨j.val, by rwa [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_complex j.val j.property]⟩
+    rcases meyerFlatLift_pi_norm_attained y.2 with ⟨j, hj⟩ | hj
+    · exact ⟨j.val, by rwa [meyerFlatLift_π_complex j.val j.property]⟩
     · exact ⟨Classical.arbitrary _, by rw [hj]; exact norm_nonneg _⟩
   · rw [max_eq_left h]
-    rcases sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_pi_norm_attained y.1 with ⟨j, hj⟩ | hj
-    · exact ⟨j.val, by rwa [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_real j.val j.property, Complex.norm_real]⟩
+    rcases meyerFlatLift_pi_norm_attained y.1 with ⟨j, hj⟩ | hj
+    · exact ⟨j.val, by rwa [meyerFlatLift_π_real j.val j.property, Complex.norm_real]⟩
     · exact ⟨Classical.arbitrary _, by rw [hj]; exact norm_nonneg _⟩
 
 variable (T : Finset (HeightOneSpectrum (𝓞 F)))
 
 /-- The S-idele with archimedean part given in mixed coordinates and a finite part. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele
+private noncomputable def meyerFlatLift_idele
     (y : Mxˣ) (κ : ((v : T) → v.val.adicCompletion F)ˣ) : (SAdeleRing F T)ˣ :=
   (ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F) ((v : T) → v.val.adicCompletion F)).symm
     (Units.map (InfiniteAdeleRing.ringEquiv_mixedSpace F).symm.toMonoidHom y, κ)
 
 /-- The value of this S-idele. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_val
+private theorem meyerFlatLift_idele_val
     (y : Mxˣ) (κ : ((v : T) → v.val.adicCompletion F)ˣ) :
-    ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ : (SAdeleRing F T)ˣ) : SAdeleRing F T) =
+    ((meyerFlatLift_idele T y κ : (SAdeleRing F T)ˣ) : SAdeleRing F T) =
       ((InfiniteAdeleRing.ringEquiv_mixedSpace F).symm y.val, κ.val) := rfl
 
 /-- The S-idele splits into its archimedean part and its finite part. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_mul
+private theorem meyerFlatLift_idele_mul
     (y : Mxˣ) (κ : ((v : T) → v.val.adicCompletion F)ˣ) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y 1 * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T 1 κ := by
+    meyerFlatLift_idele T y κ = meyerFlatLift_idele T y 1 * meyerFlatLift_idele T 1 κ := by
   apply Units.ext
-  rw [Units.val_mul, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_val, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_val, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_val, Prod.mk_mul_mk, Units.val_one,
+  rw [Units.val_mul, meyerFlatLift_idele_val, meyerFlatLift_idele_val, meyerFlatLift_idele_val,
+      Prod.mk_mul_mk, Units.val_one,
     Units.val_one, map_one, mul_one, one_mul]
 
 /-- The coordinates of a unit of the mixed space are nonzero. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_ne_zero
-    (y : Mxˣ) (w : InfinitePlace F) : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π w y.val ≠ 0 := by
+private theorem meyerFlatLift_π_ne_zero
+    (y : Mxˣ) (w : InfinitePlace F) : meyerFlatLift_π w y.val ≠ 0 := by
   have hu := y.isUnit
   rw [Prod.isUnit_iff, Pi.isUnit_iff, Pi.isUnit_iff] at hu
   by_cases hw : w.IsReal
-  · rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_real w hw]
+  · rw [meyerFlatLift_π_real w hw]
     exact_mod_cast (hu.1 ⟨w, hw⟩).ne_zero
-  · rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_complex w (InfinitePlace.not_isReal_iff_isComplex.mp hw)]
+  · rw [meyerFlatLift_π_complex w (InfinitePlace.not_isReal_iff_isComplex.mp hw)]
     exact (hu.2 _).ne_zero
 
 /-- The component at a place of the archimedean idele of a point of the mixed space. -/
-private noncomputable def sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp
+private noncomputable def meyerFlatLift_comp
     (y : Mxˣ) (w : InfinitePlace F) : (w.Completion)ˣ :=
   Units.map (Pi.evalRingHom (fun w : InfinitePlace F ↦ w.Completion) w).toMonoidHom
     (Units.map (InfiniteAdeleRing.ringEquiv_mixedSpace F).symm.toMonoidHom y)
 
 /-- The archimedean S-idele is the product of its local components. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_eq_prod
+private theorem meyerFlatLift_idele_eq_prod
     (y : Mxˣ) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y 1 = ∏ w, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_loc T w (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp y w) := by
-  have h1 : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y 1 = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_archIdele T (fun w ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp y w) := by
+    meyerFlatLift_idele T y 1 = ∏ w, meyerFlatLift_loc T w (meyerFlatLift_comp y w) := by
+  have h1 : meyerFlatLift_idele T y 1 = meyerFlatLift_archIdele T
+      (fun w ↦ meyerFlatLift_comp y w) := by
     apply Units.ext
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_val, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_archIdele_val]
+    rw [meyerFlatLift_idele_val, meyerFlatLift_archIdele_val]
     rfl
-  rw [h1, ← Finset.univ_prod_mulSingle (fun w ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp y w), map_prod]
+  rw [h1, ← Finset.univ_prod_mulSingle (fun w ↦ meyerFlatLift_comp y w), map_prod]
   rfl
 
 /-- At a real place the component is the real coordinate. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp_real
+private theorem meyerFlatLift_comp_real
     (y : Mxˣ) (w : InfinitePlace F) (hw : w.IsReal) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp y w = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_UR hw (Units.mk0 (y.val.1 ⟨w, hw⟩) (by
-      have := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_ne_zero y w; rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_real w hw] at this; exact_mod_cast this)) := by
+    meyerFlatLift_comp y w = meyerFlatLift_UR hw (Units.mk0 (y.val.1 ⟨w, hw⟩) (by
+      have := meyerFlatLift_π_ne_zero y w; rw [meyerFlatLift_π_real w hw] at this;
+        exact_mod_cast this)) := by
   apply Units.ext
   apply (InfinitePlace.Completion.ringEquivRealOfIsReal hw).injective
   change InfinitePlace.Completion.extensionEmbeddingOfIsReal hw
@@ -12338,10 +12554,10 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   exact (congrFun (congrArg Prod.fst this) ⟨w, hw⟩).symm
 
 /-- At a complex place the component is the complex coordinate. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp_complex
+private theorem meyerFlatLift_comp_complex
     (y : Mxˣ) (w : InfinitePlace F) (hw : w.IsComplex) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp y w = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_UC hw (Units.mk0 (y.val.2 ⟨w, hw⟩) (by
-      have := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_ne_zero y w; rwa [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_complex w hw] at this)) := by
+    meyerFlatLift_comp y w = meyerFlatLift_UC hw (Units.mk0 (y.val.2 ⟨w, hw⟩) (by
+      have := meyerFlatLift_π_ne_zero y w; rwa [meyerFlatLift_π_complex w hw] at this)) := by
   apply Units.ext
   apply (InfinitePlace.Completion.ringEquivComplexOfIsComplex hw).injective
   change InfinitePlace.Completion.extensionEmbedding w
@@ -12356,37 +12572,51 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The value of a character of the S-idele classes at an archimedean idele, in log-polar
 coordinates of the mixed space. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_char_formula
+private theorem meyerFlatLift_char_formula
     (χ : PontryaginDual (SIdeleQuotient F T)) (y : Mxˣ) :
-    (χ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_q T (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y 1)) : ℂ) =
-      Complex.exp (Complex.I * ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π y.val).1 : ℝ) : ℂ)) *
-        ∏ w, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ w) ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π y.val).2 w) := by
-  have hloc (w : InfinitePlace F) : (χ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_q T (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_loc T w (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp y w))) : ℂ) =
-      Complex.exp (Complex.I * ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ w * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π y.val).1 w : ℝ) : ℂ)) *
-        sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ w) ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π y.val).2 w) := by
+    (χ (meyerFlatLift_q T (meyerFlatLift_idele T y 1)) : ℂ) =
+      Complex.exp (Complex.I *
+          ((meyerFlatLift_lin (meyerFlatLift_α T χ)
+          (meyerFlatLift_L meyerFlatLift_π y.val).1 : ℝ) : ℂ)) *
+        ∏ w, meyerFlatLift_gpow (meyerFlatLift_β T χ w)
+            ((meyerFlatLift_L meyerFlatLift_π y.val).2 w) := by
+  have hloc (w : InfinitePlace F) :
+      (χ (meyerFlatLift_q T (meyerFlatLift_loc T w (meyerFlatLift_comp y w))) : ℂ) =
+      Complex.exp (Complex.I *
+          ((meyerFlatLift_α T χ w * (meyerFlatLift_L meyerFlatLift_π y.val).1 w : ℝ) : ℂ)) *
+        meyerFlatLift_gpow (meyerFlatLift_β T χ w)
+            ((meyerFlatLift_L meyerFlatLift_π y.val).2 w) := by
     by_cases hw : w.IsReal
-    · rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp_real y w hw]
-      have h := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_char_real (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψR T χ hw) (Units.mk0 (y.val.1 ⟨w, hw⟩) (by
-        have := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_ne_zero y w; rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_real w hw] at this; exact_mod_cast this))
-      have hα : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αR (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψR T χ hw) = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ w := by simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α, hw]
-      have hβ : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_εR (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψR T χ hw) = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ w := by simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β, hw]
+    · rw [meyerFlatLift_comp_real y w hw]
+      have h := meyerFlatLift_char_real (meyerFlatLift_ψR T χ hw) (Units.mk0 (y.val.1 ⟨w, hw⟩) (by
+        have := meyerFlatLift_π_ne_zero y w; rw [meyerFlatLift_π_real w hw] at this;
+          exact_mod_cast this))
+      have hα : meyerFlatLift_αR (meyerFlatLift_ψR T χ hw) =
+          meyerFlatLift_α T χ w := by simp [meyerFlatLift_α, hw]
+      have hβ : meyerFlatLift_εR (meyerFlatLift_ψR T χ hw) =
+          meyerFlatLift_β T χ w := by simp [meyerFlatLift_β, hw]
       rw [hα, hβ] at h
       refine h.trans ?_
-      simp only [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_real w hw, Units.val_mk0, Complex.norm_real]
+      simp only [meyerFlatLift_L, meyerFlatLift_π_real w hw, Units.val_mk0, Complex.norm_real]
     · have hw' := InfinitePlace.not_isReal_iff_isComplex.mp hw
-      rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp_complex y w hw']
-      have h := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_char_complex (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψC T χ hw') (Units.mk0 (y.val.2 ⟨w, hw'⟩) (by
-        have := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_ne_zero y w; rwa [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_complex w hw'] at this))
-      have hα : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_αC (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψC T χ hw') = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ w := by simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α, hw]
-      have hβ : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_βC (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψC T χ hw') = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ w := by simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β, hw]
+      rw [meyerFlatLift_comp_complex y w hw']
+      have h := meyerFlatLift_char_complex (meyerFlatLift_ψC T χ hw')
+          (Units.mk0 (y.val.2 ⟨w, hw'⟩) (by
+        have := meyerFlatLift_π_ne_zero y w; rwa [meyerFlatLift_π_complex w hw'] at this))
+      have hα : meyerFlatLift_αC (meyerFlatLift_ψC T χ hw') =
+          meyerFlatLift_α T χ w := by simp [meyerFlatLift_α, hw]
+      have hβ : meyerFlatLift_βC (meyerFlatLift_ψC T χ hw') =
+          meyerFlatLift_β T χ w := by simp [meyerFlatLift_β, hw]
       rw [hα, hβ] at h
       refine h.trans ?_
-      simp only [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_complex w hw', Units.val_mk0]
-  rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_eq_prod, map_prod, map_prod]
-  rw [show ((∏ w, χ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_q T (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_loc T w (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp y w))) : Circle) : ℂ) =
-      ∏ w, (χ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_q T (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_loc T w (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp y w))) : ℂ) from map_prod Circle.coeHom _ _]
+      simp only [meyerFlatLift_L, meyerFlatLift_π_complex w hw', Units.val_mk0]
+  rw [meyerFlatLift_idele_eq_prod, map_prod, map_prod]
+  rw [show
+      ((∏ w, χ (meyerFlatLift_q T (meyerFlatLift_loc T w (meyerFlatLift_comp y w))) : Circle) : ℂ) =
+      ∏ w, (χ (meyerFlatLift_q T (meyerFlatLift_loc T w (meyerFlatLift_comp y w))) : ℂ)
+      from map_prod Circle.coeHom _ _]
   rw [Finset.prod_congr rfl fun w _ ↦ hloc w,
-    Finset.prod_mul_distrib, ← Complex.exp_sum, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin_apply]
+    Finset.prod_mul_distrib, ← Complex.exp_sum, meyerFlatLift_lin_apply]
   congr 3
   push_cast
   simp only [Finset.mul_sum]
@@ -12397,7 +12627,7 @@ section Glue
 
 /-- A test equal to a cutoff, whose S-unit translates sum to one, times the pullback of a
 function on the S-idele classes has that function as theta function. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_theta_of_cutoff
+private theorem meyerFlatLift_theta_of_cutoff
     (T : Finset (HeightOneSpectrum (𝓞 F))) (W : ℬₛ(T))
     (c : (SAdeleRing F T)ˣ → ℂ)
     (hc : ∀ x, HasSum (fun u : ((T : Set (HeightOneSpectrum (𝓞 F))).integer F)ˣ ↦
@@ -12422,7 +12652,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   rw [tsum_mul_right, (hc x).tsum_eq, one_mul]
 
 /-- Two angular characters with the same restriction to the norm-one classes are equal. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_angular_ext
+private theorem meyerFlatLift_angular_ext
     (T : Finset (HeightOneSpectrum (𝓞 F))) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (hτ : Function.RightInverse τ (sIdeleQuotientNorm F T)) (χ χ' : (PontryaginDual.map τ).ker)
     (h : ∀ k : (sIdeleQuotientNorm F T).ker, χ.val k.val = χ'.val k.val) : χ = χ' := by
@@ -12439,7 +12669,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 open Classical in
 /-- Orthogonality of angular characters on the norm-one classes. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_orthogonal
+private theorem meyerFlatLift_orthogonal
     (T : Finset (HeightOneSpectrum (𝓞 F))) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (hτ : Function.RightInverse τ (sIdeleQuotientNorm F T)) (χ χ' : (PontryaginDual.map τ).ker) :
     let : MeasurableSpace (sIdeleQuotientNorm F T).ker := borel _
@@ -12460,9 +12690,10 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     have hne : ∃ k₀ : (sIdeleQuotientNorm F T).ker, χ.val k₀.val ≠ χ'.val k₀.val := by
       by_contra hc
       push Not at hc
-      exact hχ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_angular_ext T τ hτ χ χ' hc)
+      exact hχ (meyerFlatLift_angular_ext T τ hτ χ χ' hc)
     obtain ⟨k₀, hk₀⟩ := hne
-    let η (k : (sIdeleQuotientNorm F T).ker) : ℂ := starRingEnd ℂ (χ.val k.val : ℂ) * (χ'.val k.val : ℂ)
+    let η (k : (sIdeleQuotientNorm F T).ker) : ℂ :=
+        starRingEnd ℂ (χ.val k.val : ℂ) * (χ'.val k.val : ℂ)
     have hη (k : (sIdeleQuotientNorm F T).ker) : η (k₀ * k) = η k₀ * η k := by
       simp only [η, Subgroup.coe_mul, map_mul, Circle.coe_mul]
       ring
@@ -12489,7 +12720,7 @@ section GlueHom
 open Classical in
 /-- The homogeneous theta function of a theta series of angular characters times radial
 profiles, at an angular character: the corresponding term. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_homTheta_eval
+private theorem meyerFlatLift_homTheta_eval
     (T : Finset (HeightOneSpectrum (𝓞 F)))
     (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T) (hτ : Function.RightInverse τ (sIdeleQuotientNorm F T))
     (W : ℬₛ(T)) (f : (PontryaginDual.map τ).ker → ℝ → ℂ)
@@ -12550,7 +12781,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       ((continuous_const.mul (hcont χ))).integrable_of_hasCompactSupport
         (HasCompactSupport.of_compactSpace _)
     have hnormint (χ : (PontryaginDual.map τ).ker) :
-        ∫ k, ‖c χ * (starRingEnd ℂ (χ.val k.val : ℂ) * (χ'.val k.val : ℂ))‖ ∂μ = ‖c χ‖ * μ.real univ := by
+        ∫ k, ‖c χ * (starRingEnd ℂ (χ.val k.val : ℂ) * (χ'.val k.val : ℂ))‖ ∂μ =
+            ‖c χ‖ * μ.real univ := by
       have : (fun k : (sIdeleQuotientNorm F T).ker ↦
           ‖c χ * (starRingEnd ℂ (χ.val k.val : ℂ) * (χ'.val k.val : ℂ))‖) = fun _ ↦ ‖c χ‖ :=
         funext fun k ↦ by rw [norm_mul, hnorm1, mul_one]
@@ -12565,7 +12797,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         ∫ k, c χ * (starRingEnd ℂ (χ.val k.val : ℂ) * (χ'.val k.val : ℂ)) ∂μ =
           if χ = χ' then c χ' * (μ.real univ : ℂ) else 0 := by
       have horth : ∫ k, starRingEnd ℂ (χ.val k.val : ℂ) * (χ'.val k.val : ℂ) ∂μ =
-          if χ = χ' then (μ.real univ : ℂ) else 0 := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_orthogonal T τ hτ χ χ'
+          if χ = χ' then (μ.real univ : ℂ) else 0 := meyerFlatLift_orthogonal T τ hτ χ χ'
       rw [integral_const_mul, horth]
       split_ifs with h
       · rw [h]
@@ -12578,7 +12810,7 @@ open Classical in
 /-- A theta function which is a convergent series of angular characters times radial profiles
 has, at each angular character, the Mellin transform of the corresponding profile as theta
 Mellin integral. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_mellin_of_theta
+private theorem meyerFlatLift_mellin_of_theta
     (T : Finset (HeightOneSpectrum (𝓞 F)))
     (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T) (hτ : Function.RightInverse τ (sIdeleQuotientNorm F T))
     (W : ℬₛ(T)) (f : (PontryaginDual.map τ).ker → ℝ → ℂ)
@@ -12606,7 +12838,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   beta_reduce
   set g : SIdeleQuotient F T := QuotientGroup.mk (τ' t) with hg
   have hgn : sIdeleQuotientNorm F T g = t := hτ' t
-  have hhom := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_homTheta_eval T τ hτ W f hsum hθ χ' g
+  have hhom := meyerFlatLift_homTheta_eval T τ hτ W f hsum hθ χ' g
   rw [hgn] at hhom
   have hchart : quasiCharacterNormTwist (sIdeleQuotientNorm F T)
       (IsProperMap.continuous (isProperMap_sIdeleQuotientNorm F T))
@@ -12629,7 +12861,7 @@ local notation "pseminorm(" i ")" =>
     (logExponentialDecayTwist univ (Prod.fst i)))
 
 /-- Products of inverse squares are summable over integer vectors. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_fg_weight_summable_prod
+private theorem meyerFlatLift_fg_weight_summable_prod
     (r : ℕ) :
     Summable fun k : Fin r → ℤ ↦ ∏ j, ((1 + |(k j : ℝ)|) ^ 2)⁻¹ := by
   induction r with
@@ -12650,7 +12882,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- (A1) A finitely generated commutative group carries a group seminorm (the word length) whose
 inverse powers are summable. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_fg_weight
+private theorem meyerFlatLift_fg_weight
     (G : Type*) [CommGroup G] (hG : Group.FG G) :
     ∃ (p : GroupSeminorm G) (L : ℕ), Summable fun g : G ↦ ((1 + p g) ^ L)⁻¹ := by
   classical
@@ -12672,7 +12904,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       inv' := fun x ↦ by simp [w, ofMul_inv] }
   refine ⟨p, 2 * r, ?_⟩
   have hF : Summable fun k : Fin r → ℤ ↦ ((1 + ∑ j, |(k j : ℝ)|) ^ (2 * r))⁻¹ := by
-    refine (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_fg_weight_summable_prod r).of_nonneg_of_le (fun _ ↦ by positivity) fun k ↦ ?_
+    refine (meyerFlatLift_fg_weight_summable_prod r).of_nonneg_of_le
+        (fun _ ↦ by positivity) fun k ↦ ?_
     have hc : (1 + ∑ j, |(k j : ℝ)|) ^ (2 * r) = ∏ _j : Fin r, (1 + ∑ j, |(k j : ℝ)|) ^ 2 := by
       rw [Finset.prod_const, Finset.card_univ, Fintype.card_fin, ← pow_mul]
     rw [Finset.prod_inv_distrib, hc]
@@ -12689,7 +12922,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- (A2) The weighted `L²` seminorm of a Schwartz–Bergman function on a vertical line is bounded
 by the sup bounds of `z ^ N f` and `z ^ (N + 1) f` on that line. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_line_bound :
+private theorem meyerFlatLift_line_bound :
     ∃ Cπ : ℝ, 0 ≤ Cπ ∧ ∀ (a : ℝ) (N : ℕ) (f : ℂ → ℂ) (B₀ B₁ : ℝ),
       (∀ z : ℂ, z.re = a → ‖z ^ N * f z‖ ≤ B₀) → (∀ z : ℂ, z.re = a → ‖z ^ (N + 1) * f z‖ ≤ B₁) →
         (eLpNorm (weightedVerticalTrace a N f) 2 volume).toReal ≤ Cπ * (B₀ + B₁) := by
@@ -12730,7 +12963,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     positivity
 
 /-- The data lie in the Schwartz–Bergman space of the whole plane. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_mem_SB
+private theorem meyerFlatLift_mem_SB
     {T : Finset V} {τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T}
     (Φ : ℕ → (PontryaginDual.map τ).ker → ℂ → ℂ) (hΦ : ∀ n χ, Differentiable ℂ (Φ n χ))
     (hb : ∀ a b : ℝ, ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
@@ -12751,7 +12984,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- (L1) A continuous seminorm on the Schwartz–Bergman space of the plane is bounded by finitely
 many weighted line seminorms. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_SB_seminorm_bound
+private theorem meyerFlatLift_SB_seminorm_bound
     (q : Seminorm ℂ (SchwartzBergman univ)) (hq : Continuous q) :
     ∃ (s : Finset (↥(univ : Set ℝ) × ℕ)) (C : ℝ), 0 ≤ C ∧ ∀ G : SchwartzBergman univ,
       q G ≤ C * ∑ j ∈ s, (eLpNorm (weightedVerticalTrace j.1 j.2 G.val) 2 volume).toReal := by
@@ -12765,7 +12998,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     (fun j _ ↦ ENNReal.toReal_nonneg) hj
 
 /-- (L2) Line seminorms on lines inside a strip are bounded by the strip bounds. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_SB_lines_bound
+private theorem meyerFlatLift_SB_lines_bound
     (Cπ : ℝ)
     (hCπ : ∀ (a : ℝ) (N : ℕ) (f : ℂ → ℂ) (B₀ B₁ : ℝ),
       (∀ z : ℂ, z.re = a → ‖z ^ N * f z‖ ≤ B₀) → (∀ z : ℂ, z.re = a → ‖z ^ (N + 1) * f z‖ ≤ B₁) →
@@ -12779,7 +13012,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     (fun z hz ↦ hfb j.2 z (hz ▸ hAj j hj)) (fun z hz ↦ hfb (j.2 + 1) z (hz ▸ hAj j hj))
 
 /-- (L3) Line seminorms of a function vanishing on a strip containing the lines vanish. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_SB_lines_zero
+private theorem meyerFlatLift_SB_lines_zero
     (s : Finset (↥(univ : Set ℝ) × ℕ)) (A : ℝ)
     (hAj : ∀ j ∈ s, (j.1 : ℝ) ∈ Icc (-A) A) (f : ℂ → ℂ)
     (hf : ∀ z : ℂ, z.re ∈ Icc (-A) A → f z = 0) :
@@ -12792,7 +13025,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   simp [this]
 
 /-- (L4) The weight inequality for one character. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_weight_ineq
+private theorem meyerFlatLift_weight_ineq
     (K L : ℕ) (ν₀ w₀ P₀ Q D : ℝ) (hν0 : 0 ≤ ν₀) (hw0 : 0 ≤ w₀)
     (hν : ν₀ ≤ P₀) (hw : w₀ ≤ P₀) (hQ : Q ≤ D * ((1 + P₀) ^ (K + L))⁻¹) (hQ0 : 0 ≤ Q) :
     (1 + ν₀) ^ K * Q ≤ D * ((1 + w₀) ^ L)⁻¹ := by
@@ -12812,7 +13045,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         gcongr
 
 /-- The bound of a continuous seminorm at a function with weighted strip bounds. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_in_bound
+private theorem meyerFlatLift_in_bound
     (q : Seminorm ℂ (SchwartzBergman univ)) (s : Finset (↥(univ : Set ℝ) × ℕ))
     (C : ℝ) (hC0 : 0 ≤ C)
     (hC : ∀ G : SchwartzBergman univ,
@@ -12825,7 +13058,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     (hB : ∀ (m : ℕ) (z : ℂ), z.re ∈ Icc (-A) A → (1 + P₀) ^ N * ‖z ^ m * G.val z‖ ≤ Bm m) :
     q G ≤ C * (Cπ * ∑ j ∈ s, (|Bm j.2| + |Bm (j.2 + 1)|)) * ((1 + P₀) ^ N)⁻¹ := by
   have hpos : 0 < (1 + P₀) ^ N := pow_pos (by linarith) _
-  have hlines := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_SB_lines_bound Cπ hCπ s A hAj G.val
+  have hlines := meyerFlatLift_SB_lines_bound Cπ hCπ s A hAj G.val
     (fun m ↦ |Bm m| * ((1 + P₀) ^ N)⁻¹) (fun m z hz ↦ by
       rw [le_mul_inv_iff₀ hpos, mul_comm]
       exact (hB m z hz).trans (le_abs_self _))
@@ -12837,19 +13070,19 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         ring
 
 /-- A continuous seminorm vanishes at a function vanishing on the strip of its lines. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_out_bound
+private theorem meyerFlatLift_out_bound
     (q : Seminorm ℂ (SchwartzBergman univ)) (s : Finset (↥(univ : Set ℝ) × ℕ))
     (C : ℝ)
     (hC : ∀ G : SchwartzBergman univ,
       q G ≤ C * ∑ j ∈ s, (eLpNorm (weightedVerticalTrace j.1 j.2 G.val) 2 volume).toReal)
     (A : ℝ) (hAj : ∀ j ∈ s, (j.1 : ℝ) ∈ Icc (-A) A) (G : SchwartzBergman univ)
     (hG : ∀ z : ℂ, z.re ∈ Icc (-A) A → G.val z = 0) : q G = 0 :=
-  le_antisymm ((hC G).trans (by rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_SB_lines_zero s A hAj G.val hG, mul_zero]))
+  le_antisymm ((hC G).trans (by rw [meyerFlatLift_SB_lines_zero s A hAj G.val hG, mul_zero]))
     (apply_nonneg _ _)
 
 open Classical in
 /-- The summed weighted bounds of the inverse Mellin profiles of the data. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_summed
+private theorem meyerFlatLift_summed
     {T : Finset V} {τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T}
     (Φ : ℕ → (PontryaginDual.map τ).ker → ℂ → ℂ) (hΦ : ∀ n χ, Differentiable ℂ (Φ n χ))
     (hb : ∀ a b : ℝ, ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
@@ -12859,11 +13092,11 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     (ν : GroupSeminorm (PontryaginDual.map τ).ker) (K : ℕ) (i : ↥(univ : Set ℝ) × ℕ × ℕ) :
     ∃ B : ℝ, ∀ n, Summable (fun χ ↦ (1 + ν χ) ^ K *
         pseminorm(i) ((positiveRealFourierMellin univ isOpen_univ ordConnected_univ
-          univ_nonempty).symm ⟨Φ n χ, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_mem_SB Φ hΦ hb n χ⟩)) ∧
+          univ_nonempty).symm ⟨Φ n χ, meyerFlatLift_mem_SB Φ hΦ hb n χ⟩)) ∧
       ∑' χ, (1 + ν χ) ^ K * pseminorm(i) ((positiveRealFourierMellin univ isOpen_univ
-        ordConnected_univ univ_nonempty).symm ⟨Φ n χ, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_mem_SB Φ hΦ hb n χ⟩) ≤ B := by
+        ordConnected_univ univ_nonempty).symm ⟨Φ n χ, meyerFlatLift_mem_SB Φ hΦ hb n χ⟩) ≤ B := by
   let Φ' (n : ℕ) (χ : (PontryaginDual.map τ).ker) : SchwartzBergman univ :=
-    ⟨Φ n χ, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_mem_SB Φ hΦ hb n χ⟩
+    ⟨Φ n χ, meyerFlatLift_mem_SB Φ hΦ hb n χ⟩
   let M := positiveRealFourierMellin univ isOpen_univ ordConnected_univ univ_nonempty
   let q₀ : Seminorm ℂ (PositiveRealExponentialDecay univ) := pseminorm(i)
   have hq₀ : Continuous q₀ := (withGeneratingSeminorms_spec _ _).continuous_seminorm i
@@ -12872,7 +13105,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   show ∃ B : ℝ, ∀ n, Summable (fun χ ↦ (1 + ν χ) ^ K * q (Φ' n χ)) ∧
     ∑' χ, (1 + ν χ) ^ K * q (Φ' n χ) ≤ B
   clear_value q
-  obtain ⟨s, C, hC0, hC⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_SB_seminorm_bound q hq
+  obtain ⟨s, C, hC0, hC⟩ := meyerFlatLift_SB_seminorm_bound q hq
   obtain ⟨A, hA⟩ : ∃ A : ℝ, A = ∑ j ∈ s, |(j.1 : ℝ)| := ⟨_, rfl⟩
   have hAj : ∀ j ∈ s, (j.1 : ℝ) ∈ Icc (-A) A := fun j hj ↦ by
     have := Finset.single_le_sum (f := fun j : ↥(univ : Set ℝ) × ℕ ↦ |(j.1 : ℝ)|)
@@ -12880,8 +13113,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     rw [← hA] at this
     exact ⟨by linarith [neg_abs_le (j.1 : ℝ)], by linarith [le_abs_self (j.1 : ℝ)]⟩
   obtain ⟨H₁, hH₁, hv₁, hB₁⟩ := hb (-A) A
-  obtain ⟨pw, L, hpw⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_fg_weight H₁ ((Group.fg_iff_subgroup_fg H₁).mpr hH₁)
-  obtain ⟨Cπ, -, hCπ⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_line_bound
+  obtain ⟨pw, L, hpw⟩ := meyerFlatLift_fg_weight H₁ ((Group.fg_iff_subgroup_fg H₁).mpr hH₁)
+  obtain ⟨Cπ, -, hCπ⟩ := meyerFlatLift_line_bound
   choose Bm hBm using fun m : ℕ ↦ hB₁ (ν.comp H₁.subtype + pw) (K + L) m
   obtain ⟨D, hD⟩ : ∃ D : ℝ, D = C * (Cπ * ∑ j ∈ s, (|Bm j.2| + |Bm (j.2 + 1)|)) := ⟨_, rfl⟩
   have hone (n : ℕ) (χ : (PontryaginDual.map τ).ker) :
@@ -12896,12 +13129,12 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         have := hBm m ⟨χ, hχ⟩ n z hz
         rw [hP] at this
         exact this
-      have hin := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_in_bound q s C hC0 hC A hAj Cπ hCπ (Φ' n χ) Bm
+      have hin := meyerFlatLift_in_bound q s C hC0 hC A hAj Cπ hCπ (Φ' n χ) Bm
         (ν χ + pw ⟨χ, hχ⟩) (add_nonneg hν0 hw0) (K + L) hB'
-      exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_weight_ineq K L (ν χ) (pw ⟨χ, hχ⟩) (ν χ + pw ⟨χ, hχ⟩) _ D hν0 hw0
+      exact meyerFlatLift_weight_ineq K L (ν χ) (pw ⟨χ, hχ⟩) (ν χ + pw ⟨χ, hχ⟩) _ D hν0 hw0
         (le_add_of_nonneg_right hw0) (le_add_of_nonneg_left hν0)
         (hin.trans_eq (by rw [hD])) (apply_nonneg _ _)
-    · rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_out_bound q s C hC A hAj (Φ' n χ) (fun z hz ↦ hv₁ χ hχ n z hz), mul_zero]
+    · rw [meyerFlatLift_out_bound q s C hC A hAj (Φ' n χ) (fun z hz ↦ hv₁ χ hχ n z hz), mul_zero]
   -- summation over the finitely generated group
   let g : H₁ → (PontryaginDual.map τ).ker := H₁.subtype
   have hg : Function.Injective g := Subtype.val_injective
@@ -12925,7 +13158,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- Lemma A: the inverse Mellin profiles of the data, vanishing outside one finitely generated
 group, with summed weighted bounds for every group seminorm. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_profiles
+private theorem meyerFlatLift_profiles
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (Φ : ℕ → (PontryaginDual.map τ).ker → ℂ → ℂ) (hΦ : ∀ n χ, Differentiable ℂ (Φ n χ))
     (hb : ∀ a b : ℝ, ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
@@ -12940,7 +13173,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         ∃ B : ℝ, ∀ n, Summable (fun χ ↦ (1 + ν χ) ^ K * pseminorm(i) (φ n χ)) ∧
           ∑' χ, (1 + ν χ) ^ K * pseminorm(i) (φ n χ) ≤ B := by
   let Φ' (n : ℕ) (χ : (PontryaginDual.map τ).ker) : SchwartzBergman univ :=
-    ⟨Φ n χ, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_mem_SB Φ hΦ hb n χ⟩
+    ⟨Φ n χ, meyerFlatLift_mem_SB Φ hΦ hb n χ⟩
   let M := positiveRealFourierMellin univ isOpen_univ ordConnected_univ univ_nonempty
   obtain ⟨H₀, hH₀, hv₀, -⟩ := hb 0 1
   refine ⟨H₀, fun n χ ↦ M.symm (Φ' n χ), hH₀, ?_, ?_, ?_⟩
@@ -12949,7 +13182,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     have hzero : Φ n χ = 0 := by
       have han : AnalyticOnNhd ℂ (Φ n χ) univ := fun z _ ↦ (hΦ n χ).analyticAt z
       have hev : Φ n χ =ᶠ[𝓝 ((1 : ℂ) / 2)] 0 := by
-        have hopen : IsOpen (Complex.re ⁻¹' Ioo (0 : ℝ) 1) := isOpen_Ioo.preimage Complex.continuous_re
+        have hopen : IsOpen (Complex.re ⁻¹' Ioo (0 : ℝ) 1) :=
+            isOpen_Ioo.preimage Complex.continuous_re
         filter_upwards [hopen.mem_nhds (by norm_num : ((1 : ℂ) / 2).re ∈ Ioo (0 : ℝ) 1)] with z hz
         exact hv₀ χ hχ n z (Ioo_subset_Icc_self hz)
       funext z
@@ -12965,11 +13199,11 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     rw [M.apply_symm_apply] at h
     exact h.symm
   · intro ν K i
-    exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_summed Φ hΦ hb ν K i
+    exact meyerFlatLift_summed Φ hΦ hb ν K i
 
 /-- The telescoping bump `t ↦ s(t + 1) - s(t)`, with `s` the smooth transition, vanishes
 outside the open interval `(-1, 1)`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_bump_eq_zero
+private theorem meyerFlatLift_cutoff_bump_eq_zero
     (t : ℝ) (ht : t ∉ Ioo (-1 : ℝ) 1) :
     Real.smoothTransition (t + 1) - Real.smoothTransition t = 0 := by
   simp only [mem_Ioo, not_and_or, not_lt] at ht
@@ -12981,7 +13215,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The integer translates of the telescoping bump: only two can be nonzero, and they sum to
 one. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_bump_finset
+private theorem meyerFlatLift_cutoff_bump_finset
     (a : ℝ) :
     (∀ n : ℤ, n ∉ ({-⌊a⌋ - 1, -⌊a⌋} : Finset ℤ) →
       Real.smoothTransition (a + n + 1) - Real.smoothTransition (a + n) = 0) ∧
@@ -12990,7 +13224,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   have hfl := Int.floor_le a
   have hlt := Int.lt_floor_add_one a
   refine ⟨fun n hn ↦ ?_, ?_⟩
-  · apply sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_bump_eq_zero
+  · apply meyerFlatLift_cutoff_bump_eq_zero
     simp only [Finset.mem_insert, Finset.mem_singleton, not_or] at hn
     rw [mem_Ioo, not_and_or, not_lt, not_lt]
     rcases lt_or_gt_of_ne hn.2 with h | h
@@ -13016,7 +13250,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     ring
 
 /-- The product of telescoping bumps sums to one over the translates by the integer lattice. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_lattice_sum
+private theorem meyerFlatLift_cutoff_lattice_sum
     {r : ℕ} (a : Fin r → ℝ) :
     HasSum (fun k : Fin r → ℤ ↦
       ∏ i, (Real.smoothTransition (a i + k i + 1) - Real.smoothTransition (a i + k i))) 1 := by
@@ -13028,15 +13262,16 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       (∑ k ∈ Fintype.piFinset t, ∏ i, g i (k i)) := hasSum_sum_of_ne_finset_zero ?_
   · convert h using 1
     rw [← Finset.prod_univ_sum t g]
-    exact (Finset.prod_eq_one fun i _ ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_bump_finset (a i)).2).symm
+    exact (Finset.prod_eq_one fun i _ ↦ (meyerFlatLift_cutoff_bump_finset (a i)).2).symm
   · intro k hk
     rw [Fintype.mem_piFinset, not_forall] at hk
     obtain ⟨i, hi⟩ := hk
-    exact Finset.prod_eq_zero (Finset.mem_univ i) ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_bump_finset (a i)).1 (k i) hi)
+    exact Finset.prod_eq_zero (Finset.mem_univ i)
+        ((meyerFlatLift_cutoff_bump_finset (a i)).1 (k i) hi)
 
 /-- Summing a nonnegative function on a quotient by a finite subgroup, pulled back to the
 group, multiplies the sum by the order of the subgroup. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_quotient_sum
+private theorem meyerFlatLift_cutoff_quotient_sum
     {G : Type*} [Group G] (H : Subgroup G) [Finite H] (f : G ⧸ H → ℝ)
     (hf0 : ∀ q, 0 ≤ f q) {s : ℝ} (hf : HasSum f s) :
     HasSum (fun g : G ↦ f g) (Nat.card H * s) := by
@@ -13059,7 +13294,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- Iterated derivatives of a smooth compactly supported function composed with a continuous
 linear map are bounded. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_deriv_bound
+private theorem meyerFlatLift_cutoff_deriv_bound
     {E E' : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
     [NormedAddCommGroup E'] [NormedSpace ℝ E'] (G : E' → ℝ) (hG : ContDiff ℝ (∞) G)
     (hGc : HasCompactSupport G) (L : E →L[ℝ] E') (i : ℕ) :
@@ -13074,7 +13309,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   exact mul_le_mul_of_nonneg_right (hC (L y)) (pow_nonneg (norm_nonneg _) _)
 
 /-- The S-units modulo torsion have a `ℤ`-basis indexed by `Fin (r₁ + r₂ + |T| - 1)`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_basis
+private theorem meyerFlatLift_cutoff_basis
     (T : Finset V) :
     Nonempty (Module.Basis (Fin (Fintype.card (InfinitePlace F) + T.card - 1)) ℤ
       (Additive (((T : Set V).integer F)ˣ ⧸ CommGroup.torsion ((T : Set V).integer F)ˣ))) := by
@@ -13090,13 +13325,14 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         obtain ⟨y, hy⟩ := QuotientGroup.mk_surjective x.toMul
         exact ⟨Additive.ofMul y, congrArg Additive.ofMul hy⟩)
   have hr : Module.finrank ℤ (Additive (((T : Set V).integer F)ˣ ⧸
-      CommGroup.torsion ((T : Set V).integer F)ˣ)) = Fintype.card (InfinitePlace F) + T.card - 1 := by
+      CommGroup.torsion ((T : Set V).integer F)ˣ)) =
+          Fintype.card (InfinitePlace F) + T.card - 1 := by
     rw [← hrank]
     simpa using! (finrank_quotient_torsion_eq (M := Additive ((T : Set V).integer F)ˣ))
   exact ⟨Module.finBasisOfFinrankEq ℤ _ hr⟩
 
 /-- The S-logarithm is additive. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_log_mul
+private theorem meyerFlatLift_cutoff_log_mul
     (T : Finset V) (g h : (SAdeleRing F T)ˣ) :
     sIdeleLog F T (g * h) = sIdeleLog F T g + sIdeleLog F T h := by
   funext j
@@ -13114,7 +13350,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The S-logarithm of an S-unit is the combination of the basis logarithms with the
 coefficients of its class modulo torsion. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_log_repr
+private theorem meyerFlatLift_cutoff_log_repr
     (T : Finset V)
     (b : Module.Basis (Fin (Fintype.card (InfinitePlace F) + T.card - 1)) ℤ
       (Additive (((T : Set V).integer F)ˣ ⧸ CommGroup.torsion ((T : Set V).integer F)ˣ)))
@@ -13124,7 +13360,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         sIdeleLog F T (sUnitEmbedding F T (b i).toMul.out) := by
   let L : ((T : Set V).integer F)ˣ →* Multiplicative (InfinitePlace F ⊕ T → ℝ) :=
     MonoidHom.mk' (fun u ↦ Multiplicative.ofAdd (sIdeleLog F T (sUnitEmbedding F T u)))
-      (fun u w ↦ by rw [map_mul, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_log_mul]; rfl)
+      (fun u w ↦ by rw [map_mul, meyerFlatLift_cutoff_log_mul]; rfl)
   have hk : CommGroup.torsion ((T : Set V).integer F)ˣ ≤ L.ker := fun w hw ↦ by
     rw [MonoidHom.mem_ker]
     exact congrArg Multiplicative.ofAdd ((sIdeleLog_unit_eq_zero F T w).2 hw)
@@ -13141,7 +13377,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     _ = _ := by simp only [map_sum, map_zsmul, hb, Int.cast_smul_eq_zsmul]
 
 /-- The coordinates of the S-logarithm of an S-unit sum to zero. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_log_sum_zero
+private theorem meyerFlatLift_cutoff_log_sum_zero
     (T : Finset V) (u : ((T : Set V).integer F)ˣ) :
     ∑ j, sIdeleLog F T (sUnitEmbedding F T u) j = 0 := by
   have h1 : sIdeleNorm F T (sUnitEmbedding F T u) = 1 :=
@@ -13150,7 +13386,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   simp
 
 /-- The torsion of the S-units is finite. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_torsion_finite
+private theorem meyerFlatLift_cutoff_torsion_finite
     (T : Finset V) :
     Finite (CommGroup.torsion ((T : Set V).integer F)ˣ) := by
   rw [← sUnit_torsion_eq_image F T]
@@ -13158,7 +13394,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The S-unit cutoff: a smooth function of the S-logarithm with bounded derivatives, whose
 support is bounded modulo the archimedean diagonal, and whose S-unit translates sum to one. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff
+private theorem meyerFlatLift_cutoff
     (T : Finset V) :
     ∃ β : (InfinitePlace F ⊕ T → ℝ) → ℝ, ContDiff ℝ (∞) β ∧
       (∀ i : ℕ, ∃ C : ℝ, ∀ y, ‖iteratedFDeriv ℝ i β y‖ ≤ C) ∧
@@ -13168,7 +13404,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       ∀ x : (SAdeleRing F T)ˣ, HasSum (fun u : ((T : Set V).integer F)ˣ ↦
         (β (sIdeleLog F T (sUnitEmbedding F T u * x)) : ℂ)) 1 := by
   classical
-  obtain ⟨b⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_basis (F := F) T
+  obtain ⟨b⟩ := meyerFlatLift_cutoff_basis (F := F) T
   set r := Fintype.card (InfinitePlace F) + T.card - 1
   -- the basis logarithms and the archimedean diagonal direction
   let v : Fin r → (InfinitePlace F ⊕ T → ℝ) := fun i ↦
@@ -13185,7 +13421,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     have hle : Submodule.span ℝ (range v) ≤ LinearMap.ker σ := by
       rw [Submodule.span_le]
       rintro _ ⟨i, rfl⟩
-      exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_log_sum_zero T _
+      exact meyerFlatLift_cutoff_log_sum_zero T _
     have h0 : ∑ j, d j = 0 := hle hmem
     have hpos : 0 < ∑ j, d j := by
       rw [Fintype.sum_sum_type]
@@ -13207,7 +13443,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     (LinearMap.funLeft ℝ ℝ Fin.succ ∘ₗ B.equivFun.toLinearMap).toContinuousLinearMap
   have hℓ (y : InfinitePlace F ⊕ T → ℝ) (i : Fin r) : ℓ y i = B.equivFun y i.succ := rfl
   let N := Nat.card (CommGroup.torsion ((T : Set V).integer F)ˣ)
-  have := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_torsion_finite (F := F) T
+  have := meyerFlatLift_cutoff_torsion_finite (F := F) T
   have hN : (N : ℝ) ≠ 0 := by
     have : 0 < N := Nat.card_pos
     exact_mod_cast this.ne'
@@ -13222,7 +13458,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     by_contra hti
     apply ht
     simp only [G]
-    rw [Finset.prod_eq_zero (Finset.mem_univ i) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_bump_eq_zero (t i) hti), mul_zero]
+    rw [Finset.prod_eq_zero (Finset.mem_univ i)
+        (meyerFlatLift_cutoff_bump_eq_zero (t i) hti), mul_zero]
   have hGc : HasCompactSupport G := by
     refine HasCompactSupport.intro (isCompact_closedBall (0 : Fin r → ℝ) 1) fun t ht ↦ ?_
     by_contra hne
@@ -13232,7 +13469,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     have := hGsupp t hne i
     rw [Real.norm_eq_abs, abs_le]
     exact ⟨this.1.le, this.2.le⟩
-  refine ⟨G ∘ ℓ, hG.comp ℓ.contDiff, fun i ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_deriv_bound G hG hGc ℓ i, ?_, ?_⟩
+  refine ⟨G ∘ ℓ, hG.comp ℓ.contDiff, fun i ↦ meyerFlatLift_cutoff_deriv_bound G hG hGc ℓ i, ?_, ?_⟩
   · -- the support is bounded modulo the archimedean diagonal
     refine ⟨2 * ∑ i, ‖v i‖, fun y hy ↦ ?_⟩
     have hcl : tsupport (G ∘ ℓ) ⊆ {y | ∀ i, |ℓ y i| ≤ 1} := by
@@ -13305,21 +13542,22 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       let c : Fin (r + 1) → ℝ :=
         Fin.cons 0 fun i ↦ (b.repr (Additive.ofMul (QuotientGroup.mk u)) i : ℝ)
       have hc : sIdeleLog F T (sUnitEmbedding F T u) = B.equivFun.symm c := by
-        rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_log_repr T b u, Module.Basis.equivFun_symm_apply, Fin.sum_univ_succ]
+        rw [meyerFlatLift_cutoff_log_repr T b u,
+            Module.Basis.equivFun_symm_apply, Fin.sum_univ_succ]
         simp only [c, hB, Fin.cons_zero, Fin.cons_succ, zero_smul, zero_add]
         rfl
       rw [hℓ, hc, LinearEquiv.apply_symm_apply]
       rfl
     have hterm (u : ((T : Set V).integer F)ˣ) :
         (G ∘ ℓ) (sIdeleLog F T (sUnitEmbedding F T u * x)) = f (QuotientGroup.mk u) := by
-      simp only [comp_apply, G, f, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_log_mul, map_add, Pi.add_apply, hlogu]
+      simp only [comp_apply, G, f, meyerFlatLift_cutoff_log_mul, map_add, Pi.add_apply, hlogu]
       congr 1
       refine Finset.prod_congr rfl fun i _ ↦ ?_
       rw [add_comm]
     have hf : HasSum f ((N : ℝ)⁻¹ * 1) := by
       let e : Q ≃ (Fin r → ℤ) :=
         Additive.ofMul.trans (b.repr.toEquiv.trans Finsupp.equivFunOnFinite)
-      have h1 := (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_lattice_sum a).mul_left (N : ℝ)⁻¹
+      have h1 := (meyerFlatLift_cutoff_lattice_sum a).mul_left (N : ℝ)⁻¹
       rw [← e.hasSum_iff] at h1
       convert h1 using 1
       funext q
@@ -13327,14 +13565,14 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     have hf0 (q : Q) : 0 ≤ f q := by
       refine mul_nonneg (inv_nonneg.mpr (Nat.cast_nonneg _)) (Finset.prod_nonneg fun i _ ↦ ?_)
       exact sub_nonneg.mpr (Real.smoothTransition.monotone (by linarith))
-    have hsum := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_quotient_sum _ f hf0 hf
+    have hsum := meyerFlatLift_cutoff_quotient_sum _ f hf0 hf
     rw [mul_one, mul_inv_cancel₀ hN] at hsum
     simp_rw [hterm]
     rw [← Complex.ofReal_one]
     exact Complex.hasSum_ofReal.mpr hsum
 
 /-- The valuation ball of level `k₀` at a finite place is clopen. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_vball_clopen
+private theorem meyerFlatLift_vball_clopen
     (v : V) (k₀ : ℕ) :
     IsClopen {a : v.adicCompletion F | Valued.v a ≤ WithZero.exp (-(k₀ + 1 : ℤ))} := by
   obtain ⟨π, hπ⟩ := v.valuation_exists_uniformizer F
@@ -13360,7 +13598,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The indicator of a level-`k₀` ball around a nonzero point of a local field is a
 Schwartz–Bruhat function. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ball_test
+private theorem meyerFlatLift_ball_test
     (v : V) (k₀ : ℕ) (c : v.adicCompletion F) (hc : c ≠ 0) :
     ∃ g : SchwartzBruhat (Multiplicative (v.adicCompletion F)), ∀ z,
       g (Multiplicative.ofAdd z) =
@@ -13369,7 +13607,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   let S : Set (v.adicCompletion F) := (fun z ↦ c⁻¹ * z - 1) ⁻¹'
     {a | Valued.v a ≤ WithZero.exp (-(k₀ + 1 : ℤ))}
   have hS : IsClopen S :=
-    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_vball_clopen v k₀).preimage ((continuous_const.mul continuous_id).sub continuous_const)
+    (meyerFlatLift_vball_clopen v k₀).preimage
+        ((continuous_const.mul continuous_id).sub continuous_const)
   have hf : (fun z ↦ if Valued.v (c⁻¹ * z - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)) then (1 : ℂ)
       else 0) = S.indicator (fun _ ↦ 1) := by
     funext z
@@ -13394,12 +13633,13 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     exact ((inv_mul_le_iff₀ hcv).mp h1).trans_eq (mul_one _)
 
 /-- The finite parts with bounded logarithmic absolute values form a compact set. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_annulus_compact
+private theorem meyerFlatLift_annulus_compact
     (T : Finset V) (R : ℝ) :
     IsCompact {y : (v : T) → v.val.adicCompletion F |
       ∀ v, ‖y v‖ ≤ Real.exp R ∧ Real.exp (-R) ≤ ‖y v‖} := by
   have (v : T) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
-  refine (isCompact_closedBall (0 : (v : T) → v.val.adicCompletion F) (Real.exp R)).of_isClosed_subset
+  refine (isCompact_closedBall (0 : (v : T) → v.val.adicCompletion F)
+      (Real.exp R)).of_isClosed_subset
     ?_ ?_
   · have hset : {y : (v : T) → v.val.adicCompletion F |
         ∀ v, ‖y v‖ ≤ Real.exp R ∧ Real.exp (-R) ≤ ‖y v‖} =
@@ -13415,7 +13655,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     exact (pi_norm_le_iff_of_nonneg (Real.exp_pos R).le).mpr fun v ↦ (hy v).1
 
 /-- The level-`k₀` ball around a finite part is open. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ball_open
+private theorem meyerFlatLift_ball_open
     (T : Finset V) (k₀ : ℕ) (y : (v : T) → v.val.adicCompletion F) :
     IsOpen {z : (v : T) → v.val.adicCompletion F |
       ∀ w : T, Valued.v ((y w)⁻¹ * z w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))} := by
@@ -13426,11 +13666,11 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     ext z
     simp
   rw [hset]
-  exact isOpen_iInter_of_finite fun w ↦ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_vball_clopen w.val k₀).isOpen.preimage
+  exact isOpen_iInter_of_finite fun w ↦ (meyerFlatLift_vball_clopen w.val k₀).isOpen.preimage
     ((continuous_const.mul (continuous_apply w)).sub continuous_const)
 
 /-- The components of a quotient of finite units. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_units_inv_apply
+private theorem meyerFlatLift_units_inv_apply
     (T : Finset V) (κ x : ((v : T) → v.val.adicCompletion F)ˣ) (w : T) :
     (κ⁻¹ * x).val w = (κ.val w)⁻¹ * x.val w := by
   rw [Units.val_mul, Pi.mul_apply]
@@ -13440,9 +13680,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   exact eq_inv_of_mul_eq_one_left h
 
 /-- Two level-`k₀` balls through a common point coincide. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ball_eq
-    {L : Type*} [Field L] [Valued L (WithZero (Multiplicative ℤ))] (k₀ : ℕ) (c c' y : L) (hc : c ≠ 0)
-    (hc' : c' ≠ 0) (h : Valued.v (c⁻¹ * y - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)))
+private theorem meyerFlatLift_ball_eq
+    {L : Type*} [Field L] [Valued L (WithZero (Multiplicative ℤ))] (k₀ : ℕ) (c c' y : L)
+    (hc : c ≠ 0) (hc' : c' ≠ 0) (h : Valued.v (c⁻¹ * y - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)))
     (h' : Valued.v (c'⁻¹ * y - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) (z : L) :
     Valued.v (c⁻¹ * z - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)) ↔
       Valued.v (c'⁻¹ * z - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)) := by
@@ -13482,7 +13722,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- Finitely many level-`k₀` balls cover the finite parts with bounded logarithmic absolute
 values. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cover_exists
+private theorem meyerFlatLift_cover_exists
     (T : Finset V) (k₀ : ℕ) (R : ℝ) :
     ∃ t : Finset ((v : T) → v.val.adicCompletion F)ˣ, ∀ x : ((v : T) → v.val.adicCompletion F)ˣ,
       (∀ v : T, |Real.log ‖x.val v‖| ≤ R) →
@@ -13497,10 +13737,10 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     linarith [Real.exp_pos (-R)]
   have hunit (y : S) : IsUnit y.val :=
     Pi.isUnit_iff.mpr fun v ↦ isUnit_iff_ne_zero.mpr (hne y v)
-  obtain ⟨t, ht⟩ := (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_annulus_compact T R).elim_finite_subcover
+  obtain ⟨t, ht⟩ := (meyerFlatLift_annulus_compact T R).elim_finite_subcover
     (fun y : S ↦ {z : (v : T) → v.val.adicCompletion F |
       ∀ w : T, Valued.v ((y.val w)⁻¹ * z w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))})
-    (fun y ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ball_open T k₀ y.val)
+    (fun y ↦ meyerFlatLift_ball_open T k₀ y.val)
     (fun y hy ↦ mem_iUnion.mpr ⟨⟨y, hy⟩, fun w ↦ by
       rw [inv_mul_cancel₀ (hne ⟨y, hy⟩ w), sub_self, map_zero]
       exact zero_le⟩)
@@ -13512,12 +13752,12 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     exact ⟨(Real.log_le_iff_le_exp hpos).mp h2, (Real.le_log_iff_exp_le hpos).mp h1⟩
   obtain ⟨y, hyt, hy⟩ := mem_iUnion₂.mp (ht hxS)
   refine ⟨(hunit y).unit, Finset.mem_image_of_mem _ hyt, fun w ↦ ?_⟩
-  rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_units_inv_apply]
+  rw [meyerFlatLift_units_inv_apply]
   exact hy w
 
 /-- (T1) Finitely many cosets of the level-`k₀` units at the finite places of `T`, with indicator
 tests, cover every finite part whose logarithmic absolute values are bounded by `R`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_finite_cover
+private theorem meyerFlatLift_finite_cover
     (T : Finset V) (k₀ : ℕ) (R : ℝ) :
     ∃ (K : Finset ((v : T) → v.val.adicCompletion F)ˣ)
       (b : ((v : T) → v.val.adicCompletion F)ˣ → (w : T) →
@@ -13530,7 +13770,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         ∃ κ ∈ K, ∏ w, b κ w (Multiplicative.ofAdd (x.val w)) = 1 ∧
           ∀ κ' ∈ K, κ' ≠ κ → ∏ w, b κ' w (Multiplicative.ofAdd (x.val w)) = 0 := by
   classical
-  obtain ⟨t, ht⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cover_exists (F := F) T k₀ R
+  obtain ⟨t, ht⟩ := meyerFlatLift_cover_exists (F := F) T k₀ R
   have hne (κ : ((v : T) → v.val.adicCompletion F)ˣ) (w : T) : κ.val w ≠ 0 :=
     (κ.isUnit.map (Pi.evalRingHom _ w)).ne_zero
   -- the balls, as predicates, coincide when they meet
@@ -13544,9 +13784,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     refine propext (forall_congr' fun w ↦ ?_)
     have h1 := h w
     have h2 := h' w
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_units_inv_apply] at h1 h2
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_units_inv_apply, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_units_inv_apply]
-    exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ball_eq k₀ _ _ _ (hne κ w) (hne κ' w) h1 h2 (z.val w)
+    rw [meyerFlatLift_units_inv_apply] at h1 h2
+    rw [meyerFlatLift_units_inv_apply, meyerFlatLift_units_inv_apply]
+    exact meyerFlatLift_ball_eq k₀ _ _ _ (hne κ w) (hne κ' w) h1 h2 (z.val w)
   have hself (κ : ((v : T) → v.val.adicCompletion F)ˣ) :
       ∀ w : T, Valued.v ((κ⁻¹ * κ).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)) := fun w ↦ by
     rw [inv_mul_cancel, Units.val_one, Pi.one_apply, sub_self, map_zero]
@@ -13561,7 +13801,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       ∀ w : T, Valued.v ((κ⁻¹ * z).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) ⟨κ, hself κ⟩
   -- the indicator tests
   choose b hb using fun (κ : ((v : T) → v.val.adicCompletion F)ˣ) (w : T) ↦
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ball_test w.val k₀ (κ.val w) (hne κ w)
+    meyerFlatLift_ball_test w.val k₀ (κ.val w) (hne κ w)
   have hprod (κ x : ((v : T) → v.val.adicCompletion F)ˣ) :
       (∏ w, b κ w (Multiplicative.ofAdd (x.val w)) = 1 ∧
         ∀ w : T, Valued.v ((κ⁻¹ * x).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) ∨
@@ -13569,12 +13809,12 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     by_cases hall : ∀ w : T, Valued.v ((κ⁻¹ * x).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))
     · refine Or.inl ⟨Finset.prod_eq_one fun w _ ↦ ?_, hall⟩
       have h1 := hall w
-      rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_units_inv_apply] at h1
+      rw [meyerFlatLift_units_inv_apply] at h1
       rw [hb, ite_eq_left h1]
     · push Not at hall
       obtain ⟨w, hw⟩ := hall
       refine Or.inr (Finset.prod_eq_zero (Finset.mem_univ w) ?_)
-      rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_units_inv_apply] at hw
+      rw [meyerFlatLift_units_inv_apply] at hw
       rw [hb, ite_eq_right (not_le.mpr hw)]
   refine ⟨t.image rep, b, fun κ _ x ↦ hprod κ x, fun x hx ↦ ?_⟩
   obtain ⟨κ₀, hκ₀t, hκ₀⟩ := ht x hx
@@ -13589,7 +13829,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       rw [Finset.prod_eq_one fun w _ ↦ ?_]
       · exact one_ne_zero
       · have h1 := hxκ w
-        rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_units_inv_apply] at h1
+        rw [meyerFlatLift_units_inv_apply] at h1
         rw [hb, ite_eq_left h1]
   · obtain ⟨κ₁, -, rfl⟩ := Finset.mem_image.mp hκ'
     rcases hprod (rep κ₁) x with ⟨-, hx1⟩ | h0
@@ -13602,7 +13842,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     · exact h0
 
 /-- The derivatives of a real exponential, viewed as a complex function. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_rexp_bound
+private theorem meyerFlatLift_rexp_bound
     (c : ℝ) (i : ℕ) (u : ℝ) :
     ‖iteratedFDeriv ℝ i (fun s : ℝ ↦ ((Real.exp (-c * s) : ℝ) : ℂ)) u‖ ≤
       Real.exp (-c * u) * (1 + |c|) ^ i := by
@@ -13612,7 +13852,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     funext s
     simp only [g, comp_apply, Complex.ofRealCLM_apply, Complex.ofReal_exp, Complex.ofReal_mul]
   rw [hcomp]
-  refine (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_norm_iteratedFDeriv_comp_clm Complex.ofRealCLM (hg.restrict_scalars ℝ) u i).trans ?_
+  refine (meyerFlatLift_norm_iteratedFDeriv_comp_clm Complex.ofRealCLM
+      (hg.restrict_scalars ℝ) u i).trans ?_
   have hcd : ContDiffAt ℂ i g (u : ℂ) := hg.contDiffAt.of_le (by exact_mod_cast le_top)
   rw [Complex.ofRealCLM_apply, ← hcd.restrictScalars_iteratedFDeriv (𝕜 := ℝ), comp_apply,
     ContinuousMultilinearMap.norm_restrictScalars, norm_iteratedFDeriv_eq_norm_iteratedDeriv]
@@ -13632,7 +13873,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- A profile with all exponential weights is smooth, and its weighted derivatives are bounded
 by the weighted Schwartz seminorms. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_profile_bound
+private theorem meyerFlatLift_profile_bound
     (f : PositiveRealExponentialDecay univ) (c : ℝ) (l : ℕ) :
     ContDiff ℝ (∞) (f.val : ℝ → ℂ) ∧ ∀ d ≤ l, ∀ u : ℝ,
       Real.exp (c * u) * ‖iteratedFDeriv ℝ d (f.val : ℝ → ℂ) u‖ ≤
@@ -13664,9 +13905,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       (Finset.mem_range.mpr (show i < l + 1 by omega))
     rw [hgdef]
     exact hle
-  have hb := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_leibniz_bound he (g.smooth ⊤) u d (Real.exp (-c * u)) S (1 + |c|) 1
+  have hb := meyerFlatLift_leibniz_bound he (g.smooth ⊤) u d (Real.exp (-c * u)) S (1 + |c|) 1
     (Real.exp_pos _).le (by linarith [abs_nonneg c]) le_rfl
-    (fun i _ ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_rexp_bound c i u) hgb
+    (fun i _ ↦ meyerFlatLift_rexp_bound c i u) hgb
   rw [hfeq]
   have hee : Real.exp (c * u) * Real.exp (-c * u) = 1 := by
     rw [← Real.exp_add, neg_mul, add_neg_cancel, Real.exp_zero]
@@ -13682,7 +13923,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- A family of Schwartz functions with summable seminorms sums to a Schwartz function, with
 each seminorm at most the sum of the seminorms. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_schwartz_tsum
+private theorem meyerFlatLift_schwartz_tsum
     {E α : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
     (g : α → 𝓢(E, ℂ)) (hg : ∀ k l : ℕ, Summable fun i ↦ SchwartzMap.seminorm ℂ k l (g i)) :
     ∃ G : 𝓢(E, ℂ), (∀ x, G x = ∑' i, g i x) ∧
@@ -13710,7 +13951,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 /-- The archimedean test of a profile with all exponential weights is a Schwartz function, with
 each seminorm bounded by weighted seminorms of the profile. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch_schwartz_pred
+private theorem meyerFlatLift_arch_schwartz_pred
     {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
     [FiniteDimensional ℝ E] (π : ι → E →L[ℝ] ℂ) (hπ1 : ∀ x j, ‖π j x‖ ≤ ‖x‖)
     (hπ2 : ∀ x, ∃ j, ‖x‖ ≤ ‖π j x‖) (μ : ι → ℝ) (hμ : ∀ j, 0 ≤ μ j) (hμ1 : 0 < ∑ j, μ j)
@@ -13719,21 +13960,21 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     (hR : ∀ y ∈ tsupport B, ∀ j j', |y j - y j'| ≤ R) (k l : ℕ) (c : ℝ)
     (hc : c = ((k - l : ℤ) : ℝ) / ∑ j, μ j) :
     ∃ C : ℝ, 0 ≤ C ∧ ∀ (α : ι → ℝ) (β : ι → ℤ) (f : PositiveRealExponentialDecay univ),
-      (∃ g : 𝓢(E, ℂ), ⇑g = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch π μ s₀ B α β f.val) ∧
-      ∀ g : 𝓢(E, ℂ), ⇑g = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch π μ s₀ B α β f.val →
+      (∃ g : 𝓢(E, ℂ), ⇑g = meyerFlatLift_arch π μ s₀ B α β f.val) ∧
+      ∀ g : 𝓢(E, ℂ), ⇑g = meyerFlatLift_arch π μ s₀ B α β f.val →
         SchwartzMap.seminorm ℂ k l g ≤ C * (2 ^ l * (1 + |c|) ^ l *
           ∑ m ∈ Finset.range (l + 1), ((SchwartzMap.seminorm ℂ 0 m).comp
             (logExponentialDecayTwist univ ⟨c, mem_univ _⟩)) f) *
           ((1 + ∑ j, |α j|) * (1 + ∑ j, |(β j : ℝ)|)) ^ l := by
   subst hc
-  obtain ⟨C, hC0, hC⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch_schwartz π hπ1 hπ2 μ hμ hμ1 s₀ B hB bB hbB R hR k l
+  obtain ⟨C, hC0, hC⟩ := meyerFlatLift_arch_schwartz π hπ1 hπ2 μ hμ hμ1 s₀ B hB bB hbB R hR k l
   refine ⟨C, hC0, fun α β f ↦ ?_⟩
-  have hsm := (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_profile_bound f 0 0).1
+  have hsm := (meyerFlatLift_profile_bound f 0 0).1
   have hdec (b : ℝ) (d : ℕ) :
       ∃ S : ℝ, ∀ u, Real.exp (b * u) * ‖iteratedFDeriv ℝ d f.val u‖ ≤ S :=
-    ⟨_, (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_profile_bound f b d).2 d le_rfl⟩
+    ⟨_, (meyerFlatLift_profile_bound f b d).2 d le_rfl⟩
   obtain ⟨g₀, hg₀, hg₀b⟩ := hC α β f.val hsm hdec _
-    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_profile_bound f (((k - l : ℤ) : ℝ) / ∑ j, μ j) l).2
+    (meyerFlatLift_profile_bound f (((k - l : ℤ) : ℝ) / ∑ j, μ j) l).2
   refine ⟨⟨g₀, hg₀⟩, fun g hg ↦ ?_⟩
   have : g = g₀ := DFunLike.coe_injective (hg.trans hg₀.symm)
   rw [this]
@@ -13742,7 +13983,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 open Classical in
 /-- The cutoff restricted to the archimedean log-radii at a fixed finite part: smooth, with
 bounded derivatives, and with support bounded modulo the diagonal. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_slice
+private theorem meyerFlatLift_cutoff_slice
     (T : Finset V) (β : (InfinitePlace F ⊕ T → ℝ) → ℝ)
     (hβ : ContDiff ℝ (∞) β) (hβd : ∀ i : ℕ, ∃ C : ℝ, ∀ y, ‖iteratedFDeriv ℝ i β y‖ ≤ C) (R : ℝ)
     (hR : ∀ y ∈ tsupport β,
@@ -13778,7 +14019,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     refine ⟨fun i ↦ Cβ i * ‖L‖ ^ i, fun i t ↦ ?_⟩
     rw [hBeq, Complex.ofRealLI.norm_iteratedFDeriv_comp_left
       ((hβc.comp L.contDiff).contDiffAt) (by exact_mod_cast le_top)]
-    refine (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_norm_iteratedFDeriv_comp_clm L hβc t i).trans ?_
+    refine (meyerFlatLift_norm_iteratedFDeriv_comp_clm L hβc t i).trans ?_
     rw [iteratedFDeriv_comp_add_right]
     exact mul_le_mul_of_nonneg_right (hCβ i _) (pow_nonneg (norm_nonneg _) _)
   · intro t ht w w'
@@ -13803,147 +14044,165 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 open Classical in
 /-- The absolute value at an infinite place of the archimedean part of the S-idele of a point of
 the mixed space is the absolute value of its coordinate. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp_norm
+private theorem meyerFlatLift_comp_norm
     (y : (mixedEmbedding.mixedSpace F)ˣ) (w : InfinitePlace F) :
-    ‖(InfiniteAdeleRing.ringEquiv_mixedSpace F).symm y.val w‖ = ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π w y.val‖ := by
+    ‖(InfiniteAdeleRing.ringEquiv_mixedSpace F).symm y.val w‖ = ‖meyerFlatLift_π w y.val‖ := by
   have h1 : ‖(InfiniteAdeleRing.ringEquiv_mixedSpace F).symm y.val w‖ =
-      ‖((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp y w : (w.Completion)ˣ) : w.Completion)‖ := rfl
+      ‖((meyerFlatLift_comp y w : (w.Completion)ˣ) : w.Completion)‖ := rfl
   rw [h1]
   by_cases hw : w.IsReal
-  · rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp_real y w hw]
+  · rw [meyerFlatLift_comp_real y w hw]
     change ‖(InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm (y.val.1 ⟨w, hw⟩)‖ = _
     rw [← (InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal hw).norm_map_of_map_zero
       (map_zero _) ((InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm (y.val.1 ⟨w, hw⟩)),
       ← InfinitePlace.Completion.ringEquivRealOfIsReal_apply, RingEquiv.apply_symm_apply,
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_real w hw, Complex.norm_real]
+      meyerFlatLift_π_real w hw, Complex.norm_real]
   · have hw' := InfinitePlace.not_isReal_iff_isComplex.mp hw
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp_complex y w hw']
+    rw [meyerFlatLift_comp_complex y w hw']
     change ‖(InfinitePlace.Completion.ringEquivComplexOfIsComplex hw').symm
       (y.val.2 ⟨w, hw'⟩)‖ = _
     rw [← (InfinitePlace.Completion.isometry_extensionEmbedding w).norm_map_of_map_zero
       (map_zero _) ((InfinitePlace.Completion.ringEquivComplexOfIsComplex hw').symm
         (y.val.2 ⟨w, hw'⟩)),
       ← InfinitePlace.Completion.ringEquivComplexOfIsComplex_apply hw', RingEquiv.apply_symm_apply,
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_complex w hw']
+      meyerFlatLift_π_complex w hw']
 
 open Classical in
 /-- The S-logarithm of the S-idele of a point of the mixed space and a finite part. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_log_idele
+private theorem meyerFlatLift_log_idele
     (T : Finset V) (y : (mixedEmbedding.mixedSpace F)ˣ)
     (κ : ((v : T) → v.val.adicCompletion F)ˣ) :
-    sIdeleLog F T (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ) = Sum.elim (fun w ↦ (w.mult : ℝ) * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π y.val).1 w)
+    sIdeleLog F T (meyerFlatLift_idele T y κ) =
+        Sum.elim (fun w ↦ (w.mult : ℝ) * (meyerFlatLift_L meyerFlatLift_π y.val).1 w)
       (fun v ↦ Real.log ‖κ.val v‖) := by
   funext j
   rcases j with w | v
   · change (w.mult : ℝ) * Real.log ‖(InfiniteAdeleRing.ringEquiv_mixedSpace F).symm y.val w‖ =
-      (w.mult : ℝ) * Real.log ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π w y.val‖
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_comp_norm]
+      (w.mult : ℝ) * Real.log ‖meyerFlatLift_π w y.val‖
+    rw [meyerFlatLift_comp_norm]
   · rfl
 
 open Classical in
 /-- The conjugate of a character at the archimedean S-idele of a point of the mixed space. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_conj_char
+private theorem meyerFlatLift_conj_char
     (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T))
     (y : (mixedEmbedding.mixedSpace F)ˣ) :
-    starRingEnd ℂ (χ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_q T (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y 1)) : ℂ) =
-      Complex.exp (Complex.I * ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin (-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π y.val).1 : ℝ) : ℂ)) *
-        ∏ w, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow ((-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ) w) ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π y.val).2 w) := by
-  have hu (w : InfinitePlace F) : ‖(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π y.val).2 w‖ = 1 := by
-    have h0 : ‖sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π w y.val‖ ≠ 0 := norm_ne_zero_iff.mpr (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_ne_zero y w)
-    simp only [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L]
+    starRingEnd ℂ (χ (meyerFlatLift_q T (meyerFlatLift_idele T y 1)) : ℂ) =
+      Complex.exp (Complex.I *
+          ((meyerFlatLift_lin (-meyerFlatLift_α T χ)
+          (meyerFlatLift_L meyerFlatLift_π y.val).1 : ℝ) : ℂ)) *
+        ∏ w, meyerFlatLift_gpow ((-meyerFlatLift_β T χ) w)
+            ((meyerFlatLift_L meyerFlatLift_π y.val).2 w) := by
+  have hu (w : InfinitePlace F) : ‖(meyerFlatLift_L meyerFlatLift_π y.val).2 w‖ = 1 := by
+    have h0 : ‖meyerFlatLift_π w y.val‖ ≠ 0 := norm_ne_zero_iff.mpr (meyerFlatLift_π_ne_zero y w)
+    simp only [meyerFlatLift_L]
     rw [norm_mul, norm_inv, Complex.norm_real, norm_norm, mul_inv_cancel₀ h0]
-  rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_char_formula, map_mul, map_prod, ← Complex.exp_conj]
+  rw [meyerFlatLift_char_formula, map_mul, map_prod, ← Complex.exp_conj]
   congr 1
   · congr 1
-    rw [map_mul, Complex.conj_I, Complex.conj_ofReal, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin_apply, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin_apply]
+    rw [map_mul, Complex.conj_I, Complex.conj_ofReal,
+        meyerFlatLift_lin_apply, meyerFlatLift_lin_apply]
     simp only [Pi.neg_apply, neg_mul, Finset.sum_neg_distrib, Complex.ofReal_neg]
     ring
   · refine Finset.prod_congr rfl fun w _ ↦ ?_
-    have hconj : starRingEnd ℂ ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π y.val).2 w) = ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π y.val).2 w)⁻¹ := by
+    have hconj : starRingEnd ℂ ((meyerFlatLift_L meyerFlatLift_π y.val).2 w) =
+        ((meyerFlatLift_L meyerFlatLift_π y.val).2 w)⁻¹ := by
       rw [Complex.inv_def, Complex.normSq_eq_norm_sq, hu w]; simp
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow_eq_zpow _ _ (hu w), sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_gpow_eq_zpow _ _ (hu w), map_zpow₀, hconj, inv_zpow',
+    rw [meyerFlatLift_gpow_eq_zpow _ _ (hu w), meyerFlatLift_gpow_eq_zpow _ _ (hu w),
+        map_zpow₀, hconj, inv_zpow',
       Pi.neg_apply]
 
 open Classical in
 /-- The size of the parameters of a character is controlled by its seminorm. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_param_bound
+private theorem meyerFlatLift_param_bound
     (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T)) :
-    (1 + ∑ w, |(-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ) w|) * (1 + ∑ w, |(((-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ) w : ℤ) : ℝ)|) ≤
-      (1 + Fintype.card (InfinitePlace F)) * (1 + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T χ) ^ 2 := by
-  have hν : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T χ =
-      ∑ w, (|sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ w| + if w.IsReal then 0 else |(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ w : ℝ)|) := rfl
-  have hα : ∑ w, |(-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ) w| ≤ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T χ := by
+    (1 + ∑ w, |(-meyerFlatLift_α T χ) w|) * (1 + ∑ w, |(((-meyerFlatLift_β T χ) w : ℤ) : ℝ)|) ≤
+      (1 + Fintype.card (InfinitePlace F)) * (1 + meyerFlatLift_size T χ) ^ 2 := by
+  have hν : meyerFlatLift_size T χ =
+      ∑ w, (|meyerFlatLift_α T χ w| + if w.IsReal then 0 else |(meyerFlatLift_β T χ w : ℝ)|) := rfl
+  have hα : ∑ w, |(-meyerFlatLift_α T χ) w| ≤ meyerFlatLift_size T χ := by
     rw [hν]
     refine Finset.sum_le_sum fun w _ ↦ ?_
     rw [Pi.neg_apply, abs_neg]
     split_ifs
     · simp
-    · linarith [abs_nonneg (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ w : ℝ)]
-  have hβ : ∑ w, |(((-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ) w : ℤ) : ℝ)| ≤ Fintype.card (InfinitePlace F) + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T χ := by
-    have h (w : InfinitePlace F) : |(((-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ) w : ℤ) : ℝ)| ≤
-        1 + (|sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ w| + if w.IsReal then 0 else |(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ w : ℝ)|) := by
+    · linarith [abs_nonneg (meyerFlatLift_β T χ w : ℝ)]
+  have hβ : ∑ w, |(((-meyerFlatLift_β T χ) w : ℤ) : ℝ)| ≤ Fintype.card (InfinitePlace F) +
+      meyerFlatLift_size T χ := by
+    have h (w : InfinitePlace F) : |(((-meyerFlatLift_β T χ) w : ℤ) : ℝ)| ≤
+        1 + (|meyerFlatLift_α T χ w| + if w.IsReal then 0 else |(meyerFlatLift_β T χ w : ℝ)|) := by
       rw [Pi.neg_apply, Int.cast_neg, abs_neg]
       by_cases hw : w.IsReal
       · rw [ite_eq_left hw]
-        have h1 : |(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ w : ℝ)| ≤ 1 := by
-          have hβ' : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ w = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_εR (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψR T χ hw) := by simp [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β, hw]
+        have h1 : |(meyerFlatLift_β T χ w : ℝ)| ≤ 1 := by
+          have hβ' : meyerFlatLift_β T χ w =
+              meyerFlatLift_εR (meyerFlatLift_ψR T χ hw) := by simp [meyerFlatLift_β, hw]
           rw [hβ']
-          exact_mod_cast sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_εR_abs (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_ψR T χ hw)
-        linarith [abs_nonneg (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ w)]
+          exact_mod_cast meyerFlatLift_εR_abs (meyerFlatLift_ψR T χ hw)
+        linarith [abs_nonneg (meyerFlatLift_α T χ w)]
       · rw [ite_eq_right hw]
-        linarith [abs_nonneg (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ w)]
-    calc ∑ w, |(((-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ) w : ℤ) : ℝ)|
-        ≤ ∑ w, (1 + (|sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ w| + if w.IsReal then 0 else |(sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ w : ℝ)|)) :=
+        linarith [abs_nonneg (meyerFlatLift_α T χ w)]
+    calc ∑ w, |(((-meyerFlatLift_β T χ) w : ℤ) : ℝ)|
+        ≤ ∑ w, (1 + (|meyerFlatLift_α T χ w| +
+            if w.IsReal then 0 else |(meyerFlatLift_β T χ w : ℝ)|)) :=
           Finset.sum_le_sum fun w _ ↦ h w
-      _ = Fintype.card (InfinitePlace F) + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T χ := by
+      _ = Fintype.card (InfinitePlace F) + meyerFlatLift_size T χ := by
           rw [Finset.sum_add_distrib, hν]
           simp
-  have hν0 : 0 ≤ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T χ := apply_nonneg _ _
+  have hν0 : 0 ≤ meyerFlatLift_size T χ := apply_nonneg _ _
   have hn0 : (0 : ℝ) ≤ Fintype.card (InfinitePlace F) := Nat.cast_nonneg _
-  have hα0 : 0 ≤ ∑ w, |(-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ) w| := Finset.sum_nonneg fun w _ ↦ abs_nonneg _
-  have hβ0 : 0 ≤ ∑ w, |(((-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ) w : ℤ) : ℝ)| := Finset.sum_nonneg fun w _ ↦ abs_nonneg _
-  calc (1 + ∑ w, |(-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ) w|) * (1 + ∑ w, |(((-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ) w : ℤ) : ℝ)|)
-      ≤ (1 + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T χ) * (1 + (Fintype.card (InfinitePlace F) + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T χ)) :=
+  have hα0 : 0 ≤ ∑ w, |(-meyerFlatLift_α T χ) w| := Finset.sum_nonneg fun w _ ↦ abs_nonneg _
+  have hβ0 : 0 ≤ ∑ w, |(((-meyerFlatLift_β T χ) w : ℤ) : ℝ)| :=
+      Finset.sum_nonneg fun w _ ↦ abs_nonneg _
+  calc (1 + ∑ w, |(-meyerFlatLift_α T χ) w|) * (1 + ∑ w, |(((-meyerFlatLift_β T χ) w : ℤ) : ℝ)|)
+      ≤ (1 + meyerFlatLift_size T χ) *
+          (1 + (Fintype.card (InfinitePlace F) + meyerFlatLift_size T χ)) :=
         mul_le_mul (by linarith) (by linarith) (by linarith) (by linarith)
-    _ ≤ (1 + Fintype.card (InfinitePlace F)) * (1 + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T χ) ^ 2 := by
-        nlinarith [mul_nonneg hn0 (mul_nonneg hν0 (by linarith : (0 : ℝ) ≤ 1 + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T χ))]
+    _ ≤ (1 + Fintype.card (InfinitePlace F)) * (1 + meyerFlatLift_size T χ) ^ 2 := by
+        nlinarith [mul_nonneg hn0
+            (mul_nonneg hν0 (by linarith : (0 : ℝ) ≤ 1 + meyerFlatLift_size T χ))]
 
 open Classical in
 /-- At a point of the mixed space, the archimedean test of a character times the character at
 the finite part is the cutoff times the conjugate character times the profile at the
 logarithmic norm. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_term
+private theorem meyerFlatLift_term
     (T : Finset V) (β : (InfinitePlace F ⊕ T → ℝ) → ℝ)
     (κ : ((v : T) → v.val.adicCompletion F)ˣ) (χ : PontryaginDual (SIdeleQuotient F T))
     (f : ℝ → ℂ) (y : (mixedEmbedding.mixedSpace F)ˣ) :
-    starRingEnd ℂ (χ (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T 1 κ)) : ℂ) *
-        sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π (fun w ↦ (w.mult : ℝ)) (∑ v, Real.log ‖κ.val v‖)
+    starRingEnd ℂ (χ (QuotientGroup.mk (meyerFlatLift_idele T 1 κ)) : ℂ) *
+        meyerFlatLift_arch meyerFlatLift_π (fun w ↦ (w.mult : ℝ)) (∑ v, Real.log ‖κ.val v‖)
           (fun t ↦ (β (Sum.elim (fun w ↦ (w.mult : ℝ) * t w) fun v ↦ Real.log ‖κ.val v‖) : ℂ))
-          (-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ) (-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ) f y.val =
-      (β (sIdeleLog F T (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℂ) *
-        starRingEnd ℂ (χ (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℂ) *
-          f (Real.log ((sIdeleQuotientNorm F T (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℝ≥0) : ℝ)) := by
-  have hΩ : y.val ∈ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_Ω sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π := fun w ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_ne_zero y w
-  rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch_eqOn _ _ _ _ _ _ _ hΩ, comp_apply]
-  simp only [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_G]
-  have hchar : (χ (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℂ) =
-      (χ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_q T (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y 1)) : ℂ) * (χ (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T 1 κ)) : ℂ) := by
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_mul T y κ, QuotientGroup.mk_mul, map_mul, Circle.coe_mul]
+          (-meyerFlatLift_α T χ) (-meyerFlatLift_β T χ) f y.val =
+      (β (sIdeleLog F T (meyerFlatLift_idele T y κ)) : ℂ) *
+        starRingEnd ℂ (χ (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℂ) *
+          f (Real.log ((sIdeleQuotientNorm F T
+              (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℝ≥0) : ℝ)) := by
+  have hΩ : y.val ∈ meyerFlatLift_Ω meyerFlatLift_π := fun w ↦ meyerFlatLift_π_ne_zero y w
+  rw [meyerFlatLift_arch_eqOn _ _ _ _ _ _ _ hΩ, comp_apply]
+  simp only [meyerFlatLift_G]
+  have hchar : (χ (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℂ) =
+      (χ (meyerFlatLift_q T (meyerFlatLift_idele T y 1)) : ℂ) *
+          (χ (QuotientGroup.mk (meyerFlatLift_idele T 1 κ)) : ℂ) := by
+    rw [meyerFlatLift_idele_mul T y κ, QuotientGroup.mk_mul, map_mul, Circle.coe_mul]
     rfl
-  have hB : (β (Sum.elim (fun w ↦ (w.mult : ℝ) * (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π y.val).1 w)
-      fun v ↦ Real.log ‖κ.val v‖) : ℂ) = (β (sIdeleLog F T (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℂ) := by
-    rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_log_idele]
-  have hN : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin (fun w ↦ (w.mult : ℝ)) (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_L sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π y.val).1 + ∑ v, Real.log ‖κ.val v‖ =
-      Real.log ((sIdeleQuotientNorm F T (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℝ≥0) : ℝ) := by
-    rw [sIdeleQuotientNorm_mk, ← sIdeleLog_sum, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_log_idele, Fintype.sum_sum_type, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_lin_apply]
+  have hB : (β (Sum.elim (fun w ↦ (w.mult : ℝ) * (meyerFlatLift_L meyerFlatLift_π y.val).1 w)
+      fun v ↦ Real.log ‖κ.val v‖) : ℂ) = (β (sIdeleLog F T (meyerFlatLift_idele T y κ)) : ℂ) := by
+    rw [meyerFlatLift_log_idele]
+  have hN : meyerFlatLift_lin (fun w ↦ (w.mult : ℝ)) (meyerFlatLift_L meyerFlatLift_π y.val).1 +
+      ∑ v, Real.log ‖κ.val v‖ =
+      Real.log
+        ((sIdeleQuotientNorm F T (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℝ≥0) : ℝ) := by
+    rw [sIdeleQuotientNorm_mk, ← sIdeleLog_sum, meyerFlatLift_log_idele,
+        Fintype.sum_sum_type, meyerFlatLift_lin_apply]
     rfl
-  rw [hB, hN, hchar, map_mul (starRingEnd ℂ), sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_conj_char]
+  rw [hB, hN, hchar, map_mul (starRingEnd ℂ), meyerFlatLift_conj_char]
   ring
 
 open Classical in
 /-- Summability over the characters of the seminorms of the tests, uniformly in `n`, from a
 bound by the weighted seminorms of the profiles. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch_summable
+private theorem meyerFlatLift_arch_summable
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ)
     (hφb : ∀ (ν : GroupSeminorm (PontryaginDual.map τ).ker) (K : ℕ)
@@ -13953,18 +14212,19 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     (g : ℕ → (PontryaginDual.map τ).ker → 𝓢(mixedEmbedding.mixedSpace F, ℂ)) (k l : ℕ)
     (c D : ℝ) (hD0 : 0 ≤ D)
     (hD : ∀ n χ, SchwartzMap.seminorm ℂ k l (g n χ) ≤ D * ∑ m ∈ Finset.range (l + 1),
-        (1 + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T χ.val) ^ (2 * l) * ((SchwartzMap.seminorm ℂ 0 m).comp
+        (1 + meyerFlatLift_size T χ.val) ^ (2 * l) * ((SchwartzMap.seminorm ℂ 0 m).comp
           (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) (φ n χ)) :
     ∃ M : ℝ, ∀ n, Summable (fun χ ↦ SchwartzMap.seminorm ℂ k l (g n χ)) ∧
       ∑' χ, SchwartzMap.seminorm ℂ k l (g n χ) ≤ M := by
   choose Bm hBm using fun m : ℕ ↦
-    hφb ((sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T).comp (PontryaginDual.map τ).ker.subtype) (2 * l) (⟨c, mem_univ c⟩, 0, m)
+    hφb ((meyerFlatLift_size T).comp (PontryaginDual.map τ).ker.subtype)
+        (2 * l) (⟨c, mem_univ c⟩, 0, m)
   refine ⟨D * ∑ m ∈ Finset.range (l + 1), Bm m, fun n ↦ ?_⟩
   have hw (m : ℕ) : Summable fun χ : (PontryaginDual.map τ).ker ↦
-      (1 + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T χ.val) ^ (2 * l) * ((SchwartzMap.seminorm ℂ 0 m).comp
+      (1 + meyerFlatLift_size T χ.val) ^ (2 * l) * ((SchwartzMap.seminorm ℂ 0 m).comp
         (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) (φ n χ) := (hBm m n).1
   have hwB (m : ℕ) : ∑' χ : (PontryaginDual.map τ).ker,
-      (1 + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T χ.val) ^ (2 * l) * ((SchwartzMap.seminorm ℂ 0 m).comp
+      (1 + meyerFlatLift_size T χ.val) ^ (2 * l) * ((SchwartzMap.seminorm ℂ 0 m).comp
         (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) (φ n χ) ≤ Bm m := (hBm m n).2
   have hsD := (summable_sum (s := Finset.range (l + 1)) fun m _ ↦ hw m).mul_left D
   have hs : Summable (fun χ ↦ SchwartzMap.seminorm ℂ k l (g n χ)) :=
@@ -13972,11 +14232,11 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   refine ⟨hs, ?_⟩
   calc ∑' χ, SchwartzMap.seminorm ℂ k l (g n χ)
       ≤ ∑' χ : (PontryaginDual.map τ).ker, D * ∑ m ∈ Finset.range (l + 1),
-          (1 + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T χ.val) ^ (2 * l) * ((SchwartzMap.seminorm ℂ 0 m).comp
+          (1 + meyerFlatLift_size T χ.val) ^ (2 * l) * ((SchwartzMap.seminorm ℂ 0 m).comp
             (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) (φ n χ) :=
         Summable.tsum_le_tsum (hD n) hs hsD
     _ = D * ∑ m ∈ Finset.range (l + 1), ∑' χ : (PontryaginDual.map τ).ker,
-          (1 + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T χ.val) ^ (2 * l) * ((SchwartzMap.seminorm ℂ 0 m).comp
+          (1 + meyerFlatLift_size T χ.val) ^ (2 * l) * ((SchwartzMap.seminorm ℂ 0 m).comp
             (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) (φ n χ) := by
         rw [tsum_mul_left, Summable.tsum_finsetSum fun m _ ↦ hw m]
     _ ≤ D * ∑ m ∈ Finset.range (l + 1), Bm m :=
@@ -13985,7 +14245,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 open Classical in
 /-- The seminorms of the archimedean tests of the characters, bounded by the weighted seminorms
 of the profiles with polynomial weights in the characters. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_c1_arch_bound
+private theorem meyerFlatLift_arch_seminorm_bound
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ)
     (β : (InfinitePlace F ⊕ T → ℝ) → ℝ) (κ : ((v : T) → v.val.adicCompletion F)ˣ)
@@ -13998,11 +14258,12 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       (β (Sum.elim (fun w ↦ (w.mult : ℝ) * t w) fun v ↦ Real.log ‖κ.val v‖) : ℂ)),
       ∀ w w' : InfinitePlace F, |t w - t w'| ≤ R)
     (g : ℕ → (PontryaginDual.map τ).ker → 𝓢(mixedEmbedding.mixedSpace F, ℂ))
-    (hg : ∀ n χ, ⇑(g n χ) = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π (fun w ↦ (w.mult : ℝ)) (∑ v, Real.log ‖κ.val v‖)
+    (hg : ∀ n χ, ⇑(g n χ) = meyerFlatLift_arch meyerFlatLift_π (fun w ↦ (w.mult : ℝ))
+      (∑ v, Real.log ‖κ.val v‖)
       (fun t ↦ (β (Sum.elim (fun w ↦ (w.mult : ℝ) * t w) fun v ↦ Real.log ‖κ.val v‖) : ℂ))
-      (-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ.val) (-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ.val) (φ n χ).val) (k l : ℕ) :
+      (-meyerFlatLift_α T χ.val) (-meyerFlatLift_β T χ.val) (φ n χ).val) (k l : ℕ) :
     ∃ c D : ℝ, 0 ≤ D ∧ ∀ n χ, SchwartzMap.seminorm ℂ k l (g n χ) ≤
-      D * ∑ m ∈ Finset.range (l + 1), (1 + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T χ.val) ^ (2 * l) *
+      D * ∑ m ∈ Finset.range (l + 1), (1 + meyerFlatLift_size T χ.val) ^ (2 * l) *
         ((SchwartzMap.seminorm ℂ 0 m).comp (logExponentialDecayTwist univ ⟨c, mem_univ c⟩))
           (φ n χ) := by
   have hμ : ∀ w : InfinitePlace F, 0 ≤ (fun w : InfinitePlace F ↦ (w.mult : ℝ)) w :=
@@ -14012,15 +14273,17 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     exact Finset.sum_pos (fun w _ ↦ by exact_mod_cast w.mult_pos) ⟨w₀, Finset.mem_univ _⟩
   obtain ⟨c, hc⟩ : ∃ c : ℝ, c = ((k - l : ℤ) : ℝ) / ∑ w : InfinitePlace F, (w.mult : ℝ) :=
     ⟨_, rfl⟩
-  obtain ⟨C, hC0, hC⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch_schwartz_pred (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π (F := F)) (fun x w ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_norm_le w x)
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_exists (fun w : InfinitePlace F ↦ (w.mult : ℝ)) hμ hμ1 (∑ v, Real.log ‖κ.val v‖) _ hB
+  obtain ⟨C, hC0, hC⟩ := meyerFlatLift_arch_schwartz_pred (meyerFlatLift_π (F := F))
+      (fun x w ↦ meyerFlatLift_π_norm_le w x)
+    meyerFlatLift_π_exists (fun w : InfinitePlace F ↦ (w.mult : ℝ)) hμ hμ1
+        (∑ v, Real.log ‖κ.val v‖) _ hB
     bB hbB R hRB k l c hc
   refine ⟨c, C * 2 ^ l * (1 + |c|) ^ l * (1 + Fintype.card (InfinitePlace F)) ^ l,
     by positivity, fun n χ ↦ ?_⟩
-  have h1 := (hC (-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ.val) (-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ.val) (φ n χ)).2 (g n χ) (hg n χ)
-  have hP := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_param_bound T χ.val
-  have hP0 : 0 ≤ (1 + ∑ w, |(-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ.val) w|) *
-      (1 + ∑ w, |(((-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ.val) w : ℤ) : ℝ)|) := by positivity
+  have h1 := (hC (-meyerFlatLift_α T χ.val) (-meyerFlatLift_β T χ.val) (φ n χ)).2 (g n χ) (hg n χ)
+  have hP := meyerFlatLift_param_bound T χ.val
+  have hP0 : 0 ≤ (1 + ∑ w, |(-meyerFlatLift_α T χ.val) w|) *
+      (1 + ∑ w, |(((-meyerFlatLift_β T χ.val) w : ℤ) : ℝ)|) := by positivity
   have hS0 : 0 ≤ ∑ m ∈ Finset.range (l + 1), ((SchwartzMap.seminorm ℂ 0 m).comp
       (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) (φ n χ) :=
     Finset.sum_nonneg fun m _ ↦ apply_nonneg _ _
@@ -14028,14 +14291,15 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   refine h1.trans ?_
   calc C * (2 ^ l * (1 + |c|) ^ l * ∑ m ∈ Finset.range (l + 1), ((SchwartzMap.seminorm ℂ 0 m).comp
           (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) (φ n χ)) *
-        ((1 + ∑ w, |(-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ.val) w|) * (1 + ∑ w, |(((-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ.val) w : ℤ) : ℝ)|)) ^ l
+        ((1 + ∑ w, |(-meyerFlatLift_α T χ.val) w|) *
+            (1 + ∑ w, |(((-meyerFlatLift_β T χ.val) w : ℤ) : ℝ)|)) ^ l
       ≤ C * (2 ^ l * (1 + |c|) ^ l * ∑ m ∈ Finset.range (l + 1), ((SchwartzMap.seminorm ℂ 0 m).comp
           (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) (φ n χ)) *
-        ((1 + Fintype.card (InfinitePlace F)) * (1 + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T χ.val) ^ 2) ^ l :=
+        ((1 + Fintype.card (InfinitePlace F)) * (1 + meyerFlatLift_size T χ.val) ^ 2) ^ l :=
         mul_le_mul_of_nonneg_left (pow_le_pow_left₀ hP0 hP l)
           (mul_nonneg hC0 (mul_nonneg (by positivity) hS0))
     _ = C * 2 ^ l * (1 + |c|) ^ l * (1 + Fintype.card (InfinitePlace F)) ^ l *
-          ((1 + sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_size T χ.val) ^ (2 * l) * ∑ m ∈ Finset.range (l + 1),
+          ((1 + meyerFlatLift_size T χ.val) ^ (2 * l) * ∑ m ∈ Finset.range (l + 1),
             ((SchwartzMap.seminorm ℂ 0 m).comp
               (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) (φ n χ)) := by
         rw [mul_pow, ← pow_mul]
@@ -14045,7 +14309,7 @@ open Classical in
 /-- (T2) For a fixed finite part, the archimedean sums over the characters of the tests of the
 characters times the profiles are a bounded sequence of Schwartz functions on the mixed space,
 with the values of the cutoff times the normalized theta series at the corresponding S-ideles. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch_sum
+private theorem meyerFlatLift_arch_sum
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (hτ : Function.RightInverse τ (sIdeleQuotientNorm F T))
     (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ)
@@ -14063,36 +14327,39 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       (∀ k l : ℕ, ∃ B : ℝ, ∀ n, SchwartzMap.seminorm ℂ k l (A n) ≤ B) ∧
       ∀ n (y : (mixedEmbedding.mixedSpace F)ˣ), A n y.val =
         ((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
-          ∑' χ : (PontryaginDual.map τ).ker, (β (sIdeleLog F T (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℂ) *
-            starRingEnd ℂ (χ.val (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℂ) *
+          ∑' χ : (PontryaginDual.map τ).ker, (β (sIdeleLog F T (meyerFlatLift_idele T y κ)) : ℂ) *
+            starRingEnd ℂ (χ.val (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℂ) *
               (φ n χ).val (Real.log ((sIdeleQuotientNorm F T
-                (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℝ≥0) : ℝ)) := by
+                (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℝ≥0) : ℝ)) := by
   obtain ⟨R, hR⟩ := hβs
-  obtain ⟨hB, ⟨bB, hbB⟩, hRB⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff_slice T β hβ hβd R hR κ
+  obtain ⟨hB, ⟨bB, hbB⟩, hRB⟩ := meyerFlatLift_cutoff_slice T β hβ hβd R hR κ
   have hμ : ∀ w : InfinitePlace F, 0 ≤ (fun w : InfinitePlace F ↦ (w.mult : ℝ)) w :=
     fun w ↦ Nat.cast_nonneg _
   have hμ1 : 0 < ∑ w : InfinitePlace F, (fun w : InfinitePlace F ↦ (w.mult : ℝ)) w := by
     obtain ⟨w₀⟩ := (inferInstance : Nonempty (InfinitePlace F))
     exact Finset.sum_pos (fun w _ ↦ by exact_mod_cast w.mult_pos) ⟨w₀, Finset.mem_univ _⟩
-  obtain ⟨C₀, -, hex0⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch_schwartz_pred (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π (F := F)) (fun x w ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_norm_le w x)
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_π_exists (fun w : InfinitePlace F ↦ (w.mult : ℝ)) hμ hμ1 (∑ v, Real.log ‖κ.val v‖) _ hB
+  obtain ⟨C₀, -, hex0⟩ := meyerFlatLift_arch_schwartz_pred (meyerFlatLift_π (F := F))
+      (fun x w ↦ meyerFlatLift_π_norm_le w x)
+    meyerFlatLift_π_exists (fun w : InfinitePlace F ↦ (w.mult : ℝ)) hμ hμ1
+        (∑ v, Real.log ‖κ.val v‖) _ hB
     bB hbB R hRB 0 0 _ rfl
   choose g hg using fun (n : ℕ) (χ : (PontryaginDual.map τ).ker) ↦
-    (hex0 (-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_α T χ.val) (-sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_β T χ.val) (φ n χ)).1
+    (hex0 (-meyerFlatLift_α T χ.val) (-meyerFlatLift_β T χ.val) (φ n χ)).1
   -- the tests of the characters times the characters at the finite part
   obtain ⟨g', hg'⟩ : ∃ g' : ℕ → (PontryaginDual.map τ).ker → 𝓢(mixedEmbedding.mixedSpace F, ℂ),
-      ∀ n χ, g' n χ = (starRingEnd ℂ (χ.val (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T 1 κ)) : ℂ)) • g n χ :=
+      ∀ n χ, g' n χ =
+          (starRingEnd ℂ (χ.val (QuotientGroup.mk (meyerFlatLift_idele T 1 κ)) : ℂ)) • g n χ :=
     ⟨_, fun _ _ ↦ rfl⟩
   have hsem (n : ℕ) (χ : (PontryaginDual.map τ).ker) (k l : ℕ) :
       SchwartzMap.seminorm ℂ k l (g' n χ) = SchwartzMap.seminorm ℂ k l (g n χ) := by
     rw [hg', map_smul_eq_mul, Complex.norm_conj, Circle.norm_coe, one_mul]
   have hsum (k l : ℕ) : ∃ M : ℝ, ∀ n, Summable (fun χ ↦ SchwartzMap.seminorm ℂ k l (g' n χ)) ∧
       ∑' χ, SchwartzMap.seminorm ℂ k l (g' n χ) ≤ M := by
-    obtain ⟨c, D, hD0, hD⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_c1_arch_bound T τ φ β κ hB bB hbB R hRB g hg k l
-    obtain ⟨M, hM⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch_summable T τ φ hφb g k l c D hD0 hD
+    obtain ⟨c, D, hD0, hD⟩ := meyerFlatLift_arch_seminorm_bound T τ φ β κ hB bB hbB R hRB g hg k l
+    obtain ⟨M, hM⟩ := meyerFlatLift_arch_summable T τ φ hφb g k l c D hD0 hD
     exact ⟨M, fun n ↦ by simpa only [hsem] using hM n⟩
   choose G hGv hGs using fun n ↦
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_schwartz_tsum (g' n) fun k l ↦ ((hsum k l).choose_spec n).1
+    meyerFlatLift_schwartz_tsum (g' n) fun k l ↦ ((hsum k l).choose_spec n).1
   refine ⟨fun n ↦ (((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹) • G n,
     fun k l ↦ ?_, fun n y ↦ ?_⟩
   · obtain ⟨M, hM⟩ := hsum k l
@@ -14103,10 +14370,10 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     congr 1
     refine tsum_congr fun χ ↦ ?_
     rw [hg', smul_apply, hg, smul_eq_mul]
-    exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_term T β κ χ.val (φ n χ).val y
+    exact meyerFlatLift_term T β κ χ.val (φ n χ).val y
 
 /-- A sequence of Schwartz functions with uniformly bounded seminorms is bounded. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_schwartz_range_bounded
+private theorem meyerFlatLift_schwartz_range_bounded
     {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
     (A : ℕ → 𝓢(E, ℂ)) (hA : ∀ k l : ℕ, ∃ B : ℝ, ∀ n, SchwartzMap.seminorm ℂ k l (A n) ≤ B) :
     Bornology.IsVonNBounded ℂ (range A) := by
@@ -14119,9 +14386,10 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 open Classical in
 /-- The tensor with a fixed finite tensor is continuous for the inductive topology. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_tmul_clm
+private theorem meyerFlatLift_tmul_clm
     (T : Finset V)
-    (c : FinestLocallyConvex (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))) :
+    (c : FinestLocallyConvex
+        (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))) :
     ∃ Tc : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) →L[ℂ]
       InductiveTensor (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
         (FinestLocallyConvex
@@ -14131,7 +14399,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) ⊗[ℂ]
       FinestLocallyConvex (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))))
     (fun p : {p : Seminorm ℂ (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) ⊗[ℂ]
-        FinestLocallyConvex (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))) //
+        FinestLocallyConvex
+            (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))) //
       (∀ x : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)),
         Continuous (fun y : FinestLocallyConvex
           (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))) ↦
@@ -14155,7 +14424,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 open Classical in
 /-- (T5) The tensor of a bounded sequence of archimedean Schwartz functions with a fixed finite
 tensor is a bounded sequence of S-adelic tests. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_tensor_bounded
+private theorem meyerFlatLift_tensor_bounded
     (T : Finset V)
     (J : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ ≃L[ℂ]
       SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
@@ -14166,9 +14435,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     (A : ℕ → SchwartzMap (mixedEmbedding.mixedSpace F) ℂ)
     (hA : ∀ k l : ℕ, ∃ B : ℝ, ∀ n, SchwartzMap.seminorm ℂ k l (A n) ≤ B) :
     Bornology.IsVonNBounded ℂ (range fun n ↦ e (J (A n) ⊗ₜ[ℂ] c)) := by
-  have hAb := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_schwartz_range_bounded A hA
+  have hAb := meyerFlatLift_schwartz_range_bounded A hA
   -- `obtain` on this existential times out (in `cases`); `Exists.elim` does not
-  refine (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_tmul_clm T c).elim fun Tc hTc ↦ ?_
+  refine (meyerFlatLift_tmul_clm T c).elim fun Tc hTc ↦ ?_
   have hΦ (n : ℕ) : (e.toContinuousLinearMap.comp (Tc.comp J.toContinuousLinearMap)) (A n) =
       e (J (A n) ⊗ₜ[ℂ] c) := by
     show e (Tc (J (A n))) = _
@@ -14178,7 +14447,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
   exact ⟨A n, ⟨n, rfl⟩, hΦ n⟩
 
 /-- A finite unit close to one at the level `k₀` has absolute value one at every place. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_close_norm
+private theorem meyerFlatLift_close_norm
     (T : Finset V) (k₀ : ℕ) (a : ((v : T) → v.val.adicCompletion F)ˣ)
     (ha : ∀ w : T, Valued.v (a.val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) (w : T) :
     ‖a.val w‖ = 1 := by
@@ -14191,7 +14460,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 open Classical in
 /-- At an S-idele whose finite part is close to a finite unit `κ`, the archimedean sum attached
 to `κ` is the cutoff times the normalized theta series. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coset_value
+private theorem meyerFlatLift_coset_value
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (H₀ : Subgroup (PontryaginDual.map τ).ker)
     (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ)
@@ -14203,19 +14472,19 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     (hclose : ∀ w : T, Valued.v ((κ⁻¹ * xf).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)))
     (n : ℕ) :
     ((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
-        ∑' χ : (PontryaginDual.map τ).ker, (β (sIdeleLog F T (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℂ) *
-          starRingEnd ℂ (χ.val (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℂ) *
+        ∑' χ : (PontryaginDual.map τ).ker, (β (sIdeleLog F T (meyerFlatLift_idele T y κ)) : ℂ) *
+          starRingEnd ℂ (χ.val (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℂ) *
             (φ n χ).val (Real.log ((sIdeleQuotientNorm F T
-              (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℝ≥0) : ℝ)) =
-      (β (sIdeleLog F T (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y xf)) : ℂ) *
+              (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℝ≥0) : ℝ)) =
+      (β (sIdeleLog F T (meyerFlatLift_idele T y xf)) : ℂ) *
         (((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
           ∑' χ : (PontryaginDual.map τ).ker,
-            starRingEnd ℂ (χ.val (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y xf)) : ℂ) *
+            starRingEnd ℂ (χ.val (QuotientGroup.mk (meyerFlatLift_idele T y xf)) : ℂ) *
               (φ n χ).val (Real.log ((sIdeleQuotientNorm F T
-                (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y xf)) : ℝ≥0) : ℝ))) := by
+                (QuotientGroup.mk (meyerFlatLift_idele T y xf)) : ℝ≥0) : ℝ))) := by
   -- the absolute values of the finite parts agree
   have hnorm (w : T) : ‖κ.val w‖ = ‖xf.val w‖ := by
-    have h := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_close_norm T k₀ (κ⁻¹ * xf) hclose w
+    have h := meyerFlatLift_close_norm T k₀ (κ⁻¹ * xf) hclose w
     have hinv : (κ⁻¹).val w * κ.val w = 1 := by
       rw [← Pi.mul_apply, ← Units.val_mul, inv_mul_cancel, Units.val_one, Pi.one_apply]
     rw [Units.val_mul, Pi.mul_apply, norm_mul] at h
@@ -14225,26 +14494,33 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     calc ‖κ.val w‖ = ‖κ.val w‖ * (‖(κ⁻¹).val w‖ * ‖xf.val w‖) := by rw [h, mul_one]
       _ = (‖(κ⁻¹).val w‖ * ‖κ.val w‖) * ‖xf.val w‖ := by ring
       _ = ‖xf.val w‖ := by rw [h2, one_mul]
-  have hlog : sIdeleLog F T (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ) = sIdeleLog F T (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y xf) := by
+  have hlog : sIdeleLog F T (meyerFlatLift_idele T y κ) =
+      sIdeleLog F T (meyerFlatLift_idele T y xf) := by
     funext v
     rcases v with v | v
     · rfl
     · change Real.log ‖κ.val v‖ = Real.log ‖xf.val v‖
       rw [hnorm v]
-  have hN : Real.log ((sIdeleQuotientNorm F T (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℝ≥0) : ℝ) =
-      Real.log ((sIdeleQuotientNorm F T (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y xf)) : ℝ≥0) : ℝ) := by
+  have hN : Real.log
+      ((sIdeleQuotientNorm F T (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℝ≥0) : ℝ) =
+      Real.log
+        ((sIdeleQuotientNorm F T (QuotientGroup.mk (meyerFlatLift_idele T y xf)) : ℝ≥0) : ℝ) := by
     rw [sIdeleQuotientNorm_mk, sIdeleQuotientNorm_mk, ← sIdeleLog_sum, ← sIdeleLog_sum, hlog]
   -- the characters of the group agree
-  have hfac : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y xf = sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ * sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T 1 (κ⁻¹ * xf) := by
+  have hfac : meyerFlatLift_idele T y xf = meyerFlatLift_idele T y κ *
+      meyerFlatLift_idele T 1 (κ⁻¹ * xf) := by
     apply Units.ext
-    rw [Units.val_mul, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_val, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_val, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_val, Prod.mk_mul_mk, Units.val_one,
+    rw [Units.val_mul, meyerFlatLift_idele_val, meyerFlatLift_idele_val, meyerFlatLift_idele_val,
+        Prod.mk_mul_mk, Units.val_one,
       map_one, mul_one, Units.val_mul, ← mul_assoc, ← Units.val_mul, mul_inv_cancel,
       Units.val_one, one_mul]
   have hchar (χ : (PontryaginDual.map τ).ker) (hχ : χ ∈ H₀) :
-      χ.val (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y xf)) = χ.val (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) := by
+      χ.val (QuotientGroup.mk (meyerFlatLift_idele T y xf)) =
+          χ.val (QuotientGroup.mk (meyerFlatLift_idele T y κ)) := by
     rw [hfac, QuotientGroup.mk_mul, map_mul]
-    have h1 := hk₀ (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T 1 (κ⁻¹ * xf)) (by rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_val, Units.val_one, map_one])
-      (fun w ↦ by rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_val]; exact hclose w) χ hχ
+    have h1 := hk₀ (meyerFlatLift_idele T 1 (κ⁻¹ * xf))
+        (by rw [meyerFlatLift_idele_val, Units.val_one, map_one])
+      (fun w ↦ by rw [meyerFlatLift_idele_val]; exact hclose w) χ hχ
     rw [h1, mul_one]
   rw [hlog, hN, ← tsum_mul_left, ← tsum_mul_left, ← tsum_mul_left]
   refine tsum_congr fun χ ↦ ?_
@@ -14255,7 +14531,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       mul_zero]
 
 /-- A finite sum of bounded sequences is bounded. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_sum_bounded
+private theorem meyerFlatLift_sum_bounded
     {E ι : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
     [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] (s : Finset ι) (f : ι → ℕ → E)
     (hf : ∀ i ∈ s, Bornology.IsVonNBounded ℂ (range (f i))) :
@@ -14274,29 +14550,29 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 open Classical in
 /-- An S-idele is the S-idele of its mixed archimedean coordinates and its finite part. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_decomp
+private theorem meyerFlatLift_idele_decomp
     (T : Finset V) (x : (SAdeleRing F T)ˣ) :
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T (Units.map (InfiniteAdeleRing.ringEquiv_mixedSpace F).toMonoidHom
+    meyerFlatLift_idele T (Units.map (InfiniteAdeleRing.ringEquiv_mixedSpace F).toMonoidHom
       (Units.map (RingHom.fst _ _).toMonoidHom x)) (Units.map (RingHom.snd _ _).toMonoidHom x) =
       x := by
   apply Units.ext
-  rw [sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_val]
+  rw [meyerFlatLift_idele_val]
   ext
   · exact (InfiniteAdeleRing.ringEquiv_mixedSpace F).symm_apply_apply x.val.1
   · rfl
 
 open Classical in
 /-- Every S-idele is given by mixed archimedean coordinates and a finite part. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_surj
+private theorem meyerFlatLift_idele_surj
     (T : Finset V) (x : (SAdeleRing F T)ˣ) :
     ∃ (y : (mixedEmbedding.mixedSpace F)ˣ) (xf : ((v : T) → v.val.adicCompletion F)ˣ),
-      sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y xf = x :=
-  ⟨_, _, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_decomp T x⟩
+      meyerFlatLift_idele T y xf = x :=
+  ⟨_, _, meyerFlatLift_idele_decomp T x⟩
 
 open Classical in
 /-- The value of the assembled tests at an S-idele given by mixed coordinates and a finite
 part. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_tests_formula
+private theorem meyerFlatLift_tests_formula
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (H₀ : Subgroup (PontryaginDual.map τ).ker)
     (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ)
@@ -14320,10 +14596,10 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     (A : ((v : T) → v.val.adicCompletion F)ˣ → ℕ → SchwartzMap (mixedEmbedding.mixedSpace F) ℂ)
     (hAv : ∀ κ n (y : (mixedEmbedding.mixedSpace F)ˣ), A κ n y.val =
         ((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
-          ∑' χ : (PontryaginDual.map τ).ker, (β (sIdeleLog F T (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℂ) *
-            starRingEnd ℂ (χ.val (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℂ) *
+          ∑' χ : (PontryaginDual.map τ).ker, (β (sIdeleLog F T (meyerFlatLift_idele T y κ)) : ℂ) *
+            starRingEnd ℂ (χ.val (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℂ) *
               (φ n χ).val (Real.log ((sIdeleQuotientNorm F T
-                (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℝ≥0) : ℝ)))
+                (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℝ≥0) : ℝ)))
     (J : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ ≃L[ℂ]
       SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
     (hJ : ∀ f x, J f (Multiplicative.ofAdd x) = f (InfiniteAdeleRing.ringEquiv_mixedSpace F x))
@@ -14335,7 +14611,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w)) (Multiplicative.ofAdd x) =
           f (Multiplicative.ofAdd x.1) * ∏ w : T, g w (Multiplicative.ofAdd (x.2 w)))
     (n : ℕ) (y : (mixedEmbedding.mixedSpace F)ˣ) (xf : ((v : T) → v.val.adicCompletion F)ˣ)
-    (x : (SAdeleRing F T)ˣ) (hx : sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y xf = x) :
+    (x : (SAdeleRing F T)ˣ) (hx : meyerFlatLift_idele T y xf = x) :
     (∑ κ ∈ K, e (J (A κ n) ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b κ w))) (Multiplicative.ofAdd x.val) =
       (β (sIdeleLog F T x) : ℂ) * (((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
         ∑' χ : (PontryaginDual.map τ).ker, starRingEnd ℂ (χ.val (QuotientGroup.mk x) : ℂ) *
@@ -14348,14 +14624,14 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     | insert a s ha ih => rw [Finset.sum_insert ha, Finset.sum_insert ha, SchwartzBruhat.coe_add,
         Pi.add_apply, ih]
   have hval (κ : ((v : T) → v.val.adicCompletion F)ˣ) :
-      e (J (A κ n) ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b κ w)) (Multiplicative.ofAdd (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y xf).val) =
+      e (J (A κ n) ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b κ w)) (Multiplicative.ofAdd (meyerFlatLift_idele T y xf).val) =
         A κ n y.val * ∏ w, b κ w (Multiplicative.ofAdd (xf.val w)) := by
-    rw [he, hJ, sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_val]
+    rw [he, hJ, meyerFlatLift_idele_val]
     simp only [RingEquiv.apply_symm_apply]
   rw [hsum, Finset.sum_congr rfl fun κ _ ↦ hval κ]
   have hcl (κ : ((v : T) → v.val.adicCompletion F)ˣ)
       (hclose : ∀ w : T, Valued.v ((κ⁻¹ * xf).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) :=
-    (hAv κ n y).trans (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_coset_value T τ H₀ φ hφ0 β k₀ hk₀ y xf κ hclose n)
+    (hAv κ n y).trans (meyerFlatLift_coset_value T τ H₀ φ hφ0 β k₀ hk₀ y xf κ hclose n)
   by_cases hann : ∀ v : T, |Real.log ‖xf.val v‖| ≤ R
   · obtain ⟨κ₀, hκ₀, h1, h0⟩ := hb2 xf hann
     rw [Finset.sum_eq_single κ₀ (fun κ hκ hne ↦ by rw [h0 κ hκ hne, mul_zero])
@@ -14364,7 +14640,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     · exact hcl κ₀ hclose
     · rw [h1] at h; exact absurd h one_ne_zero
   · -- outside the annuli the cutoff vanishes
-    have hβ0 : β (sIdeleLog F T (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y xf)) = 0 := by
+    have hβ0 : β (sIdeleLog F T (meyerFlatLift_idele T y xf)) = 0 := by
       refine image_eq_zero_of_notMem_tsupport fun hmem ↦ hann fun v ↦ ?_
       exact (hR _ hmem).2 v
     rw [hβ0, Complex.ofReal_zero, zero_mul]
@@ -14375,7 +14651,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 
 open Classical in
 /-- The value of the assembled tests at any S-idele. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_tests_value
+private theorem meyerFlatLift_tests_value
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (H₀ : Subgroup (PontryaginDual.map τ).ker)
     (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ)
@@ -14399,10 +14675,10 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     (A : ((v : T) → v.val.adicCompletion F)ˣ → ℕ → SchwartzMap (mixedEmbedding.mixedSpace F) ℂ)
     (hAv : ∀ κ n (y : (mixedEmbedding.mixedSpace F)ˣ), A κ n y.val =
         ((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
-          ∑' χ : (PontryaginDual.map τ).ker, (β (sIdeleLog F T (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℂ) *
-            starRingEnd ℂ (χ.val (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℂ) *
+          ∑' χ : (PontryaginDual.map τ).ker, (β (sIdeleLog F T (meyerFlatLift_idele T y κ)) : ℂ) *
+            starRingEnd ℂ (χ.val (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℂ) *
               (φ n χ).val (Real.log ((sIdeleQuotientNorm F T
-                (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℝ≥0) : ℝ)))
+                (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℝ≥0) : ℝ)))
     (J : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ ≃L[ℂ]
       SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
     (hJ : ∀ f x, J f (Multiplicative.ofAdd x) = f (InfiniteAdeleRing.ringEquiv_mixedSpace F x))
@@ -14419,12 +14695,12 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         ∑' χ : (PontryaginDual.map τ).ker, starRingEnd ℂ (χ.val (QuotientGroup.mk x) : ℂ) *
           (φ n χ).val (Real.log ((sIdeleQuotientNorm F T (QuotientGroup.mk x) : ℝ≥0) : ℝ))) := by
   -- `obtain` on this existential times out (in `cases`); `Exists.elim` does not
-  exact (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele_surj T x).elim fun y h ↦ h.elim fun xf hx ↦
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_tests_formula T τ H₀ φ hφ0 β R hR k₀ hk₀ K b hb1 hb2 A hAv J hJ e he n y xf x hx
+  exact (meyerFlatLift_idele_surj T x).elim fun y h ↦ h.elim fun xf hx ↦
+    meyerFlatLift_tests_formula T τ H₀ φ hφ0 β R hR k₀ hk₀ K b hb1 hb2 A hAv J hJ e he n y xf x hx
 
 open Classical in
 /-- The assembled tests form a bounded sequence. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_tests_bounded
+private theorem meyerFlatLift_tests_bounded
     (T : Finset V) (K : Finset ((v : T) → v.val.adicCompletion F)ˣ)
     (b : ((v : T) → v.val.adicCompletion F)ˣ → (w : T) →
         SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))
@@ -14437,12 +14713,12 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         ≃L[ℂ] ℬₛ(T)) :
     Bornology.IsVonNBounded ℂ
       (range fun n ↦ ∑ κ ∈ K, e (J (A κ n) ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b κ w))) :=
-  sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_sum_bounded K _ fun κ _ ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_tensor_bounded T J e _ (A κ) (hAb κ)
+  meyerFlatLift_sum_bounded K _ fun κ _ ↦ meyerFlatLift_tensor_bounded T J e _ (A κ) (hAb κ)
 
 open Classical in
 /-- The tests assembled from the finite cover, the archimedean sums and the tensor
 equivalences. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_tests_of_data
+private theorem meyerFlatLift_tests_of_data
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (H₀ : Subgroup (PontryaginDual.map τ).ker)
     (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ)
@@ -14467,10 +14743,10 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     (hAb : ∀ κ (k l : ℕ), ∃ B : ℝ, ∀ n, SchwartzMap.seminorm ℂ k l (A κ n) ≤ B)
     (hAv : ∀ κ n (y : (mixedEmbedding.mixedSpace F)ˣ), A κ n y.val =
         ((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
-          ∑' χ : (PontryaginDual.map τ).ker, (β (sIdeleLog F T (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℂ) *
-            starRingEnd ℂ (χ.val (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℂ) *
+          ∑' χ : (PontryaginDual.map τ).ker, (β (sIdeleLog F T (meyerFlatLift_idele T y κ)) : ℂ) *
+            starRingEnd ℂ (χ.val (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℂ) *
               (φ n χ).val (Real.log ((sIdeleQuotientNorm F T
-                (QuotientGroup.mk (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_idele T y κ)) : ℝ≥0) : ℝ)))
+                (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℝ≥0) : ℝ)))
     (J : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ ≃L[ℂ]
       SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
     (hJ : ∀ f x, J f (Multiplicative.ofAdd x) = f (InfiniteAdeleRing.ringEquiv_mixedSpace F x))
@@ -14487,13 +14763,13 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
           ∑' χ : (PontryaginDual.map τ).ker, starRingEnd ℂ (χ.val (QuotientGroup.mk x) : ℂ) *
             (φ n χ).val (Real.log ((sIdeleQuotientNorm F T (QuotientGroup.mk x) : ℝ≥0) : ℝ))) := by
   exact ⟨fun n ↦ ∑ κ ∈ K, e (J (A κ n) ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b κ w)),
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_tests_bounded T K b A hAb J e,
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_tests_value T τ H₀ φ hφ0 β R hR k₀ hk₀ K b hb1 hb2 A hAv J hJ e he⟩
+    meyerFlatLift_tests_bounded T K b A hAb J e,
+    meyerFlatLift_tests_value T τ H₀ φ hφ0 β R hR k₀ hk₀ K b hb1 hb2 A hAv J hJ e he⟩
 
 /-- The tests: for a cutoff as above and profiles with summed weighted bounds vanishing outside
 a finitely generated group of angular characters, a bounded sequence of tests equal on the
 S-ideles to the cutoff times the normalized theta series of the profiles. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_tests
+private theorem meyerFlatLift_tests
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (hτ : Function.RightInverse τ (sIdeleQuotientNorm F T))
     (H₀ : Subgroup (PontryaginDual.map τ).ker) (hH₀ : H₀.FG)
@@ -14515,15 +14791,15 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
             (φ n χ).val (Real.log ((sIdeleQuotientNorm F T (QuotientGroup.mk x) : ℝ≥0) : ℝ))) := by
   obtain ⟨R, hR⟩ := hβs
   obtain ⟨k₀, hk₀⟩ := sLocalMellinSchwartzBounds_meyer_common_angular_conductor T τ H₀ hH₀
-  obtain ⟨K, b, hb1, hb2⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_finite_cover (F := F) T k₀ R
-  choose A hAb hAv using fun κ ↦ sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_arch_sum T τ hτ φ hφb β hβ hβd ⟨R, hR⟩ κ
+  obtain ⟨K, b, hb1, hb2⟩ := meyerFlatLift_finite_cover (F := F) T k₀ R
+  choose A hAb hAv using fun κ ↦ meyerFlatLift_arch_sum T τ hτ φ hφb β hβ hβd ⟨R, hR⟩ κ
   obtain ⟨J, hJ⟩ := archimedeanSchwartzBruhat_equiv (F := F)
   obtain ⟨e, he⟩ := sAdeleSchwartz_inductiveTensor_equiv F T
-  exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_tests_of_data T τ H₀ φ hφ0 β R hR k₀ hk₀ K b hb1 hb2 A hAb hAv J hJ e he
+  exact meyerFlatLift_tests_of_data T τ H₀ φ hφ0 β R hR k₀ hk₀ K b hb1 hb2 A hAb hAv J hJ e he
 
 /-- Lemma B: profiles vanishing outside a finitely generated group of angular characters, with
 summed weighted bounds, are the theta Mellin transforms of a bounded sequence of tests. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_construction
+private theorem meyerFlatLift_construction
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (hτ : Function.RightInverse τ (sIdeleQuotientNorm F T))
     (H₀ : Subgroup (PontryaginDual.map τ).ker) (hH₀ : H₀.FG)
@@ -14537,26 +14813,27 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       ∀ n (χ : (PontryaginDual.map τ).ker) (z : ℂ), 0 < z.re →
         sLocalThetaMellinIntegral (W n) (chartₜ(T, χ.val) z) =
           mellin (fun t ↦ (φ n χ).val (Real.log t)) z := by
-  obtain ⟨β, hβ, hβd, hβs, hβsum⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_cutoff (F := F) T
-  obtain ⟨W, hW, hWx⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_tests T τ hτ H₀ hH₀ φ hφ0 hφb β hβ hβd hβs
+  obtain ⟨β, hβ, hβd, hβs, hβsum⟩ := meyerFlatLift_cutoff (F := F) T
+  obtain ⟨W, hW, hWx⟩ := meyerFlatLift_tests T τ hτ H₀ hH₀ φ hφ0 hφb β hβ hβd hβs
   refine ⟨W, hW, fun n χ z hz ↦ ?_⟩
   -- pointwise summability of the profiles
   have hsum (u : ℝ) : Summable fun χ ↦ ‖(φ n χ).val u‖ := by
     obtain ⟨B, hB⟩ := hφb 0 0 (⟨0, mem_univ _⟩, 0, 0)
     refine (hB n).1.of_nonneg_of_le (fun _ ↦ norm_nonneg _) fun χ ↦ ?_
     simp only [pow_zero, one_mul]
-    have h := SchwartzMap.norm_le_seminorm ℂ (logExponentialDecayTwist univ ⟨0, mem_univ _⟩ (φ n χ)) u
+    have h := SchwartzMap.norm_le_seminorm ℂ
+        (logExponentialDecayTwist univ ⟨0, mem_univ _⟩ (φ n χ)) u
     have hv : (logExponentialDecayTwist univ ⟨0, mem_univ _⟩ (φ n χ)) u = (φ n χ).val u := by
       have := logExponentialDecayTwist_apply univ ⟨0, mem_univ _⟩
         (φ n χ : logExponentialDecaySubmodule univ) u
       simpa using this
     rw [hv] at h
     exact h
-  have hθ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_theta_of_cutoff T (W n) (fun x ↦ (β (sIdeleLog F T x) : ℂ)) hβsum
+  have hθ := meyerFlatLift_theta_of_cutoff T (W n) (fun x ↦ (β (sIdeleLog F T x) : ℂ)) hβsum
     (fun g ↦ ((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
       ∑' χ : (PontryaginDual.map τ).ker, starRingEnd ℂ (χ.val g : ℂ) *
         (φ n χ).val (Real.log ((sIdeleQuotientNorm F T g : ℝ≥0) : ℝ))) (hWx n)
-  exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_mellin_of_theta T τ hτ (W n) (fun χ u ↦ (φ n χ).val u) hsum hθ χ z hz
+  exact meyerFlatLift_mellin_of_theta T τ hτ (W n) (fun χ u ↦ (φ n χ).val u) hsum hθ χ z hz
 
 end Top
 
@@ -14579,13 +14856,13 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     ∃ W : ℕ → ℬₛ(T), Bornology.IsVonNBounded ℂ (range W) ∧
       ∀ n (χ : (PontryaginDual.map τ).ker) (z : ℂ), 0 < z.re →
         sLocalThetaMellinIntegral (W n) (chartₜ(T, χ.val) z) = Φ n χ z := by
-  obtain ⟨H₀, φ, hH₀, hφ0, hφM, hφb⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_profiles T τ Φ hΦ hb
-  obtain ⟨W, hW, hWM⟩ := sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift_construction T τ hτ H₀ hH₀ φ hφ0 hφb
+  obtain ⟨H₀, φ, hH₀, hφ0, hφM, hφb⟩ := meyerFlatLift_profiles T τ Φ hΦ hb
+  obtain ⟨W, hW, hWM⟩ := meyerFlatLift_construction T τ hτ H₀ hH₀ φ hφ0 hφb
   exact ⟨W, hW, fun n χ z hz ↦ (hWM n χ z hz).trans (hφM n χ z)⟩
 
 /-- On the critical line, the reflected identity for three tests gives the vanishing of the
 theta Mellin integral of `a - b - F c`. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_zero
+private theorem meyerPositiveLines_line_zero
     (T : Finset V) (a b c : ℬₛ(T))
     (χ η : PontryaginDual (SIdeleQuotient F T)) (hχ : χ = η⁻¹) (z : ℂ) (hz : z.re = 1 / 2)
     (h : sLocalThetaMellinIntegral c (chartₜ(T, η) (1 - z)) =
@@ -14605,7 +14882,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       sLocalRhoFactor (chartₜ(T, η) (1 - z)) *
         sLocalIdelicZFunction (sAdeleSchwartzFourier c)
           (chartₜ(T, (η⁻¹ : PontryaginDual (SIdeleQuotient F T))) (1 - (1 - z))) :=
-    sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_equation
+    meyerCriticalStrip_equation
       T η c (1 - z) hI
   rw [sub_sub_cancel,
     sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T c η (1 - z) h10,
@@ -14621,7 +14898,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 /-- Three tests whose theta Mellin integrals satisfy the reflected identity on the critical
 line, at the angular characters: the class of the first is the sum of the class of the second
 and of the class of the Fourier transform of the third. -/
-private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_class_eq
+private theorem meyerPositiveLines_class_eq
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (hτ : RightInverse τ (sIdeleQuotientNorm F T)) (a b c : ℬₛ(T))
     (h : ∀ χ η : (PontryaginDual.map τ).ker, η.val = χ.val⁻¹ → ∀ z : ℂ, z.re = 1 / 2 →
@@ -14644,7 +14921,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         (sLocalThetaMellinIntegral_analyticOn (sAdeleSchwartzFourier c) χ.val))
       (1 / 2) (by norm_num) (fun s hs ↦ ?_) z hz
     have hinv : (χ⁻¹ : (PontryaginDual.map τ).ker).val = χ.val⁻¹ := rfl
-    exact sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_line_zero T a b c χ.val (χ⁻¹ : (PontryaginDual.map τ).ker).val
+    exact meyerPositiveLines_line_zero T a b c χ.val (χ⁻¹ : (PontryaginDual.map τ).ker).val
       (inv_eq_iff_eq_inv.mpr hinv).symm s hs (h χ χ⁻¹ hinv s hs)
   apply sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_dilation_line T
   funext χ
@@ -14713,12 +14990,16 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
         (1+p χ)^k * ‖z^m*sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val.val) z)‖ ≤ B) :
     Bornology.IsVonNBounded ℂ (range fun n ↦ (sLocalAdelicTheta F T).ker.mkQ (v n)) := by
   refine Exists.elim (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition T τ hτ v hw) fun Φ₁ h1 ↦ Exists.elim h1 fun Φ₂ hΦ ↦ ?_
-  refine Exists.elim (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift T τ hτ Φ₁ hΦ.1 hΦ.2.2.1) fun W₁ hW₁ ↦ ?_
-  refine Exists.elim (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift T τ hτ Φ₂ hΦ.2.1 hΦ.2.2.2.1) fun W₂ hW₂ ↦ ?_
+  refine Exists.elim
+    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift
+      T τ hτ Φ₁ hΦ.1 hΦ.2.2.1) fun W₁ hW₁ ↦ ?_
+  refine Exists.elim
+    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift
+      T τ hτ Φ₂ hΦ.2.1 hΦ.2.2.2.1) fun W₂ hW₂ ↦ ?_
   have hcls (n : ℕ) : (sLocalAdelicTheta F T).ker.mkQ (v n) =
       (sLocalAdelicTheta F T).ker.mkQ (W₁ n) +
         (sLocalAdelicTheta F T).ker.mkQ (sAdeleSchwartzFourier (W₂ n)) := by
-    refine sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_class_eq T τ hτ (v n) (W₁ n) (W₂ n) fun χ η hη z hz ↦ ?_
+    refine meyerPositiveLines_class_eq T τ hτ (v n) (W₁ n) (W₂ n) fun χ η hη z hz ↦ ?_
     have hz0 : 0 < z.re := by rw [hz]; norm_num
     have h10 : 0 < (1 - z).re := by
       rw [Complex.sub_re, Complex.one_re, hz]; norm_num
