@@ -8639,7 +8639,7 @@ private theorem meyerStripMultiplier_bounds
 
 /-- The multiplier of R. Meyer, *On a representation of the idele class group related to
 primes and zeros of L-functions*, Duke Math. J. 127 (2005), arXiv:math/0311468 (page numbers
-are those of the preprint), Lemma 4.19, p. 35, with the first paragraph of the proof of
+are those of the preprint), Lemma 4.19, p. 35, with the second paragraph of the proof of
 Lemma 4.20, p. 36, written on the Mellin side and proved in Lean.
 For a finitely generated group `H` of angular characters there is a multiplier `h χ`, entire
 in `z`, of polynomial size in `χ` (measured by one group seminorm `p₀`) and in `z` on the
@@ -11025,8 +11025,12 @@ private theorem meyerDecomposition_algebra
   rw [h₁, h₂, hsym, hrefl]
   ring
 
-/-- The theta Mellin transforms of a sequence with the bounds on all positive lines are a
-sum of an entire part and the reflection of an entire part. -/
+/-- For a sequence with the bounds on all lines of positive real part, there are functions
+`Φ₁ n χ` and `Φ₂ n χ`, entire in `z`, with the bounds of the criterion on every vertical strip
+(zero outside a finitely generated subgroup of characters, every polynomial weight bounded
+uniformly in the index), such that on the line of real part `1/2` the theta Mellin transform
+of `v n` at `χ` minus `Φ₁ n χ`, multiplied by the factor `sLocalRhoFactor` of `χ⁻¹` at
+`1 - z`, is `Φ₂ n χ⁻¹ (1 - z)`. -/
 private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T) (v : ℕ → ℬₛ(T))
     (hw : ∀ f ∈ ({v,fun n ↦ sAdeleSchwartzFourier (v n)} : Set (ℕ → ℬₛ(T))),
@@ -12851,7 +12855,6 @@ end GlueHom
 
 section Top
 
-set_option quotPrecheck false in
 /-- The seminorms of the exponential decay profiles. -/
 local notation "pseminorm(" i ")" =>
   ((SchwartzMap.seminorm ℂ (Prod.fst (Prod.snd i)) (Prod.snd (Prod.snd i))).comp
@@ -12877,8 +12880,8 @@ private theorem meyerFlatLift_fg_weight_summable_prod
       (fun _ ↦ Finset.prod_nonneg fun _ _ ↦ by positivity)).congr fun x ↦ ?_
     simp [Fin.consEquiv, Fin.prod_univ_succ, mul_comm]
 
-/-- (A1) A finitely generated commutative group carries a group seminorm (the word length) whose
-inverse powers are summable. -/
+/-- A finitely generated commutative group carries a group seminorm `p` (the word length) and an
+exponent `L` for which `((1 + p g) ^ L)⁻¹` is summable over the group. -/
 private theorem meyerFlatLift_fg_weight
     (G : Type*) [CommGroup G] (hG : Group.FG G) :
     ∃ (p : GroupSeminorm G) (L : ℕ), Summable fun g : G ↦ ((1 + p g) ^ L)⁻¹ := by
@@ -12917,7 +12920,7 @@ private theorem meyerFlatLift_fg_weight
       (fun _ ↦ by positivity) (fun _ ↦ zero_le_one)
   exact (Additive.ofMul.trans e.toEquiv).summable_iff.mpr hP
 
-/-- (A2) The weighted `L²` seminorm of a Schwartz–Bergman function on a vertical line is bounded
+/-- The weighted `L²` seminorm of a Schwartz–Bergman function on a vertical line is bounded
 by the sup bounds of `z ^ N f` and `z ^ (N + 1) f` on that line. -/
 private theorem meyerFlatLift_line_bound :
     ∃ Cπ : ℝ, 0 ≤ Cπ ∧ ∀ (a : ℝ) (N : ℕ) (f : ℂ → ℂ) (B₀ B₁ : ℝ),
@@ -12979,7 +12982,7 @@ private theorem meyerFlatLift_mem_SB
     rintro _ ⟨z, hz, rfl⟩
     simp [hv χ hχ n z hz]
 
-/-- (L1) A continuous seminorm on the Schwartz–Bergman space of the plane is bounded by finitely
+/-- A continuous seminorm on the Schwartz–Bergman space of the plane is bounded by finitely
 many weighted line seminorms. -/
 private theorem meyerFlatLift_SB_seminorm_bound
     (q : Seminorm ℂ (SchwartzBergman univ)) (hq : Continuous q) :
@@ -12994,7 +12997,7 @@ private theorem meyerFlatLift_SB_seminorm_bound
     (eLpNorm (weightedVerticalTrace j.1 j.2 G.val) 2 volume).toReal)
     (fun j _ ↦ ENNReal.toReal_nonneg) hj
 
-/-- (L2) Line seminorms on lines inside a strip are bounded by the strip bounds. -/
+/-- Line seminorms on lines inside a strip are bounded by the strip bounds. -/
 private theorem meyerFlatLift_SB_lines_bound
     (Cπ : ℝ)
     (hCπ : ∀ (a : ℝ) (N : ℕ) (f : ℂ → ℂ) (B₀ B₁ : ℝ),
@@ -13008,7 +13011,7 @@ private theorem meyerFlatLift_SB_lines_bound
   exact Finset.sum_le_sum fun j hj ↦ hCπ j.1 j.2 f _ _
     (fun z hz ↦ hfb j.2 z (hz ▸ hAj j hj)) (fun z hz ↦ hfb (j.2 + 1) z (hz ▸ hAj j hj))
 
-/-- (L3) Line seminorms of a function vanishing on a strip containing the lines vanish. -/
+/-- Line seminorms of a function vanishing on a strip containing the lines vanish. -/
 private theorem meyerFlatLift_SB_lines_zero
     (s : Finset (↥(univ : Set ℝ) × ℕ)) (A : ℝ)
     (hAj : ∀ j ∈ s, (j.1 : ℝ) ∈ Icc (-A) A) (f : ℂ → ℂ)
@@ -13021,7 +13024,7 @@ private theorem meyerFlatLift_SB_lines_zero
     rw [hf _ (by simpa using hAj j hj), mul_zero]
   simp [this]
 
-/-- (L4) The weight inequality for one character. -/
+/-- The weight inequality for one character. -/
 private theorem meyerFlatLift_weight_ineq
     (K L : ℕ) (ν₀ w₀ P₀ Q D : ℝ) (hν0 : 0 ≤ ν₀) (hw0 : 0 ≤ w₀)
     (hν : ν₀ ≤ P₀) (hw : w₀ ≤ P₀) (hQ : Q ≤ D * ((1 + P₀) ^ (K + L))⁻¹) (hQ0 : 0 ≤ Q) :
@@ -13153,7 +13156,7 @@ private theorem meyerFlatLift_summed
   · exact hsumbnd.of_nonneg_of_le (hnn n) (hone n)
   · exact Summable.tsum_le_tsum (hone n) (hsumbnd.of_nonneg_of_le (hnn n) (hone n)) hsumbnd
 
-/-- Lemma A: the inverse Mellin profiles of the data, vanishing outside one finitely generated
+/-- The inverse Mellin profiles of the data, vanishing outside one finitely generated
 group, with summed weighted bounds for every group seminorm. -/
 private theorem meyerFlatLift_profiles
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
@@ -13752,7 +13755,7 @@ private theorem meyerFlatLift_cover_exists
   rw [meyerFlatLift_units_inv_apply]
   exact hy w
 
-/-- (T1) Finitely many cosets of the level-`k₀` units at the finite places of `T`, with indicator
+/-- Finitely many cosets of the level-`k₀` units at the finite places of `T`, with indicator
 tests, cover every finite part whose logarithmic absolute values are bounded by `R`. -/
 private theorem meyerFlatLift_finite_cover
     (T : Finset V) (k₀ : ℕ) (R : ℝ) :
@@ -14303,7 +14306,7 @@ private theorem meyerFlatLift_arch_seminorm_bound
         ring
 
 open Classical in
-/-- (T2) For a fixed finite part, the archimedean sums over the characters of the tests of the
+/-- For a fixed finite part, the archimedean sums over the characters of the tests of the
 characters times the profiles are a bounded sequence of Schwartz functions on the mixed space,
 with the values of the cutoff times the normalized theta series at the corresponding S-ideles. -/
 private theorem meyerFlatLift_arch_sum
@@ -14418,7 +14421,7 @@ private theorem meyerFlatLift_tmul_clm
   exact ⟨Tc, fun x ↦ rfl⟩
 
 open Classical in
-/-- (T5) The tensor of a bounded sequence of archimedean Schwartz functions with a fixed finite
+/-- The tensor of a bounded sequence of archimedean Schwartz functions with a fixed finite
 tensor is a bounded sequence of S-adelic tests. -/
 private theorem meyerFlatLift_tensor_bounded
     (T : Finset V)
@@ -14793,7 +14796,7 @@ private theorem meyerFlatLift_tests
   obtain ⟨e, he⟩ := sAdeleSchwartz_inductiveTensor_equiv F T
   exact meyerFlatLift_tests_of_data T τ H₀ φ hφ0 β R hR k₀ hk₀ K b hb1 hb2 A hAb hAv J hJ e he
 
-/-- Lemma B: profiles vanishing outside a finitely generated group of angular characters, with
+/-- Profiles vanishing outside a finitely generated group of angular characters, with
 summed weighted bounds, are the theta Mellin transforms of a bounded sequence of tests. -/
 private theorem meyerFlatLift_construction
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
