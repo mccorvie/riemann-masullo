@@ -10,6 +10,7 @@ import RiemannMasullo.AppB_AnalyticNT.Sec4b
 import RiemannMasullo.External.Grh.Lemmas.AnalyticGoodHeightDisk
 import RiemannMasullo.External.Grh.Lemmas.LogLossGoodHeight
 import RiemannMasullo.Ch12_TraceGeometric.Sec5
+import Mathlib.Topology.Instances.AddCircle.DenseSubgroup
 import Mathlib.Analysis.Complex.Poisson
 import Mathlib.Analysis.Normed.Module.MultipliableUniformlyOn
 import Mathlib.Analysis.Calculus.LogDerivUniformlyOn
@@ -12774,6 +12775,158 @@ theorem introTrace_completed_logDeriv_poles_residues
       apply (hnf (mem_univ p)).meromorphicOrderAt_nonneg_iff_analyticAt.mp
       rw [meromorphicOrderAt_congr he₀]
       exact hg.meromorphicOrderAt_nonneg
+
+/-- A nonnegative four-neighbour harmonic multiplicity on a vertical orbit cannot
+be supported discretely at the origin: its zero set is invariant under two dense generators. -/
+private theorem introTrace_twoCosine_discrete (m : ℝ → ℤ) (hm : ∀ t, 0 ≤ m t)
+    (hh : ∀ t, 4 * m t = m (t + 1) + m (t - 1) + m (t + Real.sqrt 2) + m (t - Real.sqrt 2))
+    {ε : ℝ} (hε : 0 < ε) (hgap : ∀ t ∈ Ioo 0 ε, m t = 0) : m 0 = 0 := by
+  have hstep (t : ℝ) (ht : m t = 0) :
+      m (t + 1) = 0 ∧ m (t - 1) = 0 ∧ m (t + Real.sqrt 2) = 0 ∧ m (t - Real.sqrt 2) = 0 := by
+    have := hh t
+    have := hm (t + 1)
+    have := hm (t - 1)
+    have := hm (t + Real.sqrt 2)
+    have := hm (t - Real.sqrt 2)
+    omega
+  let P : AddSubgroup ℝ :=
+    { carrier := {a | ∀ t, m (t + a) = 0 ↔ m t = 0}
+      zero_mem' := by simp
+      add_mem' := by
+        intro a b ha hb t
+        exact (add_assoc t a b ▸ hb (t + a)).trans (ha t)
+      neg_mem' := by
+        intro a ha t
+        simpa using (ha (t + -a)).symm }
+  have hP : AddSubgroup.closure {Real.sqrt 2, (1 : ℝ)} ≤ P := by
+    rw [AddSubgroup.closure_le, pair_subset_iff]
+    constructor
+    · intro t
+      exact ⟨fun h ↦ by simpa using (hstep (t + Real.sqrt 2) h).2.2.2,
+        fun h ↦ (hstep t h).2.2.1⟩
+    · intro t
+      exact ⟨fun h ↦ by simpa using (hstep (t + 1) h).2.1, fun h ↦ (hstep t h).1⟩
+  have hd : Dense (AddSubgroup.closure {Real.sqrt 2, (1 : ℝ)} : Set ℝ) :=
+    dense_addSubgroupClosure_pair_iff.mpr (by simpa using irrational_sqrt_two)
+  obtain ⟨t, ht, hlt⟩ := hd.exists_between hε
+  exact (hP ht 0).mp (by simpa using hgap t hlt)
+
+local notation "twoCosine(" R ", " z ")" =>
+  (4 * (R : ℂ → ℂ) z - R (z + Complex.I) - R (z - Complex.I) -
+    R (z + (Real.sqrt 2 : ℂ) * Complex.I) - R (z - (Real.sqrt 2 : ℂ) * Complex.I))
+
+/-- Analytic continuation of the two-cosine combination forces its four-neighbour
+residue relation, by uniqueness of meromorphic continuation from the Euler overlap. -/
+private theorem introTrace_twoCosine_residues (R : ℂ → ℂ) (m : ℂ → ℤ)
+    (hR : MeromorphicOn R univ)
+    (hlim : ∀ p, Tendsto (fun z : ℂ ↦ (z - p) * R z) (𝓝[≠] p) (𝓝 (m p : ℂ)))
+    {b c : ℝ} {H : ℂ → ℂ} (hH : AnalyticOnNhd ℂ H right(b))
+    (he : EqOn H (fun z ↦ twoCosine(R, z)) right(max b c)) {p : ℂ} (hp : b < p.re) :
+    4 * m p = m (p + Complex.I) + m (p - Complex.I) +
+      m (p + (Real.sqrt 2 : ℂ) * Complex.I) + m (p - (Real.sqrt 2 : ℂ) * Complex.I) := by
+  let D := fun z ↦ twoCosine(R, z)
+  have hD : MeromorphicOn D right(b) := by
+    intro z _
+    have ht (c : ℂ) : MeromorphicAt (fun w ↦ R (w + c)) z :=
+      (hR (z + c) (mem_univ _)).comp_analyticAt (g := fun w ↦ w + c) (by fun_prop)
+    have hfour : MeromorphicAt (fun _ : ℂ ↦ (4 : ℂ)) z := by fun_prop
+    simpa only [D, sub_eq_add_neg] using
+      ((((hfour.fun_mul (hR z (mem_univ _))).fun_sub
+        (ht Complex.I)).fun_sub (ht (-Complex.I))).fun_sub (ht ((Real.sqrt 2 : ℂ) * Complex.I))).fun_sub
+          (ht (-((Real.sqrt 2 : ℂ) * Complex.I)))
+  let u : ℂ := (max b c + 1 : ℝ)
+  have hu : max b c < u.re := by simp [u]
+  have hu₀ : meromorphicOrderAt (H - D) u = ⊤ := by
+    apply meromorphicOrderAt_eq_top_iff.mpr
+    filter_upwards [nhdsWithin_le_nhds ((isOpen_lt continuous_const Complex.continuous_re).mem_nhds hu :
+      {z : ℂ | max b c < z.re} ∈ 𝓝 u)] with z hz
+    exact sub_eq_zero.mpr (he hz)
+  have hloc := (hH.meromorphicOn.sub hD).meromorphicOrderAt_eq_top_of_isPreconnected
+    (convex_halfSpace_re_gt b).isPreconnected ((le_max_left _ _).trans_lt hu) hp hu₀
+  have hnear : H =ᶠ[𝓝[≠] p] D :=
+    (meromorphicOrderAt_eq_top_iff.mp hloc).mono fun _ hz ↦ sub_eq_zero.mp hz
+  have ht (c : ℂ) : Tendsto (fun z : ℂ ↦ (z - p) * R (z + c)) (𝓝[≠] p)
+      (𝓝 (m (p + c) : ℂ)) := by
+    have hs : Tendsto (fun z : ℂ ↦ z + c) (𝓝[≠] p) (𝓝[≠] (p + c)) := by
+      apply tendsto_nhdsWithin_iff.mpr
+      refine ⟨(continuousAt_id.add_const _).continuousWithinAt, ?_⟩
+      filter_upwards [self_mem_nhdsWithin] with z hz
+      exact fun h ↦ hz (add_right_cancel h)
+    simpa only [comp_def, add_sub_add_right_eq_sub] using (hlim (p + c)).comp hs
+  have hsum := (((((hlim p).const_mul (4 : ℂ)).sub (ht Complex.I)).sub (ht (-Complex.I))).sub
+    (ht ((Real.sqrt 2 : ℂ) * Complex.I))).sub (ht (-((Real.sqrt 2 : ℂ) * Complex.I)))
+  have hsum' := hsum.congr' (f₂ := fun z : ℂ ↦ (z - p) * H z) (by
+    filter_upwards [hnear] with z hz
+    rw [hz]
+    dsimp only [D]
+    simp only [sub_eq_add_neg]
+    ring)
+  have hz : Tendsto (fun z : ℂ ↦ (z - p) * H z) (𝓝[≠] p) (𝓝 0) := by
+    have hcont : ContinuousAt (fun z : ℂ ↦ (z - p) * H z) p :=
+      (continuousAt_id.sub_const p).mul (hH p hp).continuousAt
+    simpa only [sub_self, zero_mul] using hcont.tendsto.mono_left nhdsWithin_le_nhds
+  have hc := tendsto_nhds_unique hsum' hz
+  simp only [← sub_eq_add_neg] at hc
+  norm_cast at hc
+  omega
+
+/-- A single two-cosine multiplier detects the positive divisor of a normalized
+completed Hecke character on any right half-plane. An analytic function agreeing
+with the multiplier on a more restricted right half-plane forces zero positive
+orders everywhere in the larger one. The shifts have incommensurable heights
+`1` and `√2`. Establishing the analytic continuation is a separate arithmetic input. -/
+theorem introTrace_zeroOrder_nonpos_of_twoCosine_continuation
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : U𝔽) (hχ : ∀ t, χ (τ t) = 1) (b c : ℝ) :
+    let R := fun z ↦ completedSpectral(χ, z)
+    (∃ H : ℂ → ℂ, AnalyticOnNhd ℂ H right(b) ∧
+      EqOn H (fun z ↦ twoCosine(R, z)) right(max b c)) →
+    ∀ p : ℂ, b < p.re → zeroOrder(χ, p + 1 / 2) ≤ 0 := by
+  intro R ⟨H, hH, he⟩ p hp
+  let m := fun q : ℂ ↦ max zeroOrder(χ, q + 1 / 2) 0
+  have hR : MeromorphicOn R univ := by
+    intro q _
+    obtain ⟨g, hg, h⟩ := introTrace_completed_spectral_principalPart τ hτ χ hχ q
+    apply MeromorphicAt.congr _ h.symm
+    have hc : MeromorphicAt (fun _ : ℂ ↦ (m q : ℂ)) q := by fun_prop
+    have hd : MeromorphicAt (fun z : ℂ ↦ z - q) q := by fun_prop
+    exact (hc.div hd).add hg.meromorphicAt
+  have hlim (q : ℂ) : Tendsto (fun z : ℂ ↦ (z - q) * R z) (𝓝[≠] q) (𝓝 (m q : ℂ)) := by
+    obtain ⟨g, hg, h⟩ := introTrace_completed_spectral_principalPart τ hτ χ hχ q
+    have hcont : ContinuousAt (fun z : ℂ ↦ (m q : ℂ) + (z - q) * g z) q :=
+      continuousAt_const.add ((continuousAt_id.sub_const _).mul hg.continuousAt)
+    apply Tendsto.congr' (f₁ := fun z : ℂ ↦ (m q : ℂ) + (z - q) * g z) ?_ ?_
+    · filter_upwards [h, self_mem_nhdsWithin] with z hz hne
+      dsimp only [R]
+      rw [hz]
+      change _ = (z - q) * ((m q : ℂ) / (z - q) + g z)
+      field_simp [sub_ne_zero.mpr hne]
+    · simpa only [sub_self, zero_mul, add_zero] using hcont.tendsto.mono_left nhdsWithin_le_nhds
+  let v (t : ℝ) := p + (t : ℂ) * Complex.I
+  have hh (t : ℝ) := introTrace_twoCosine_residues R m hR hlim hH he
+    (p := v t) (by simpa [v] using hp)
+  have hD :=
+    (MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ).eq_zero_codiscreteWithin
+  have hnear := (mem_codiscreteWithin_iff_forall_mem_nhdsNE.mp hD) (p + 1 / 2) (mem_univ _)
+  rw [compl_univ, union_empty] at hnear
+  obtain ⟨ε, hε, hgap⟩ := Metric.mem_nhdsWithin_iff.mp hnear
+  have hzero : (fun t ↦ m (v t)) 0 = 0 := by
+    apply introTrace_twoCosine_discrete (fun t ↦ m (v t)) (fun _ ↦ le_max_right _ _) _ hε
+    · intro t ht
+      have hdist : dist (v t + 1 / 2) (p + 1 / 2) = t := by
+        simp [v, dist_eq_norm, Real.norm_eq_abs, abs_of_pos ht.1]
+      have hne : v t + 1 / 2 ≠ p + 1 / 2 := by
+        intro heq
+        rw [heq, dist_self] at hdist
+        exact ht.1.ne hdist
+      have hdiv : zeroOrder(χ, v t + 1 / 2) = 0 :=
+        hgap ⟨Metric.mem_ball.mpr (hdist.trans_lt ht.2), hne⟩
+      exact max_eq_right hdiv.le
+    · intro t
+      simpa only [v, Complex.ofReal_add, Complex.ofReal_sub, Complex.ofReal_one,
+        add_mul, sub_mul, one_mul, ← add_assoc, add_sub_assoc] using hh t
+  have hz : m p = 0 := by simpa [v] using hzero
+  exact (le_max_left _ _).trans hz.le
 
 /-- On the Euler half-plane the completed logarithmic derivative splits into the
 logarithmic derivatives of the gamma factor and the finite continuation. -/
