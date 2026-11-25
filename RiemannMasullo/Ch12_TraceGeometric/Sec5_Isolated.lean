@@ -3,11 +3,14 @@ module
 import Mathlib.Geometry.Manifold.PartitionOfUnity
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 public import RiemannMasullo.ForMathlib.Analysis.Analytic.ZeroDensity
+public import RiemannMasullo.ForMathlib.Analysis.Analytic.ZeroLatticeCertifiedLimit
 public import RiemannMasullo.ForMathlib.Analysis.Analytic.ZeroLatticeSchwartz
 public import RiemannMasullo.ForMathlib.Analysis.Fourier.SchwartzLaplaceAxis
 public import RiemannMasullo.ForMathlib.MeasureTheory.Integral.PolynomialWindow
+public import RiemannMasullo.ForMathlib.NumberTheory.BinomialZetaLattice
 import Mathlib.MeasureTheory.Integral.Bochner.SumMeasure
 import RiemannMasullo.AppB_AnalyticNT.Sec4b
+import RiemannMasullo.Ch13_ZerosHecke.Targets
 import RiemannMasullo.ForMathlib.Analysis.Analytic.CauchyWindow
 
 /-! # Isolated statements of §12.5
@@ -1210,6 +1213,169 @@ theorem criticalDensity_iff_exteriorZeros_of_hasSum
     intro χ
     rw [(tendsto_integral_criticalFiniteHeckeL_schwartz χ.val g).2.limUnder_eq]
     exact (h χ).2
+
+section RationalBinomialLattice
+
+open AnalyticLattice
+open scoped _root_.SchwartzMap
+
+local notation "Uℚ" => PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ)
+local notation "sℚ(" t ")" => ((1 / 2 : ℂ) + ((t : ℝ) : ℂ) * I)
+local notation "ordℚ(" z ")" => MeromorphicOn.divisor (continuedCompletedHeckeL (1 : Uℚ)) univ z
+local notation "ratMass(" g ")" => (∑' z : {z : ℂ // 0 < ordℚ(z) ∧ z.re = 1/2},
+  ((ordℚ(z.val)).toNat : ℝ) * (g : ℝ → ℝ) z.val.im)
+local notation "ζmass(" g ")" => (∑' t : {t : ℝ // riemannZeta sℚ(t) = 0},
+  (analyticOrderNatAt riemannZeta sℚ(t.val) : ℝ) * (g : ℝ → ℝ) t.val)
+
+private theorem meromorphicOn_rat_zeta : MeromorphicOn riemannZeta univ := by
+  simpa only [DirichletCharacter.LFunction_modOne_eq] using
+    meromorphic_dirichletLFunction (1 : DirichletCharacter ℂ 1)
+
+private theorem finiteHeckeL_rat_one_eq_zeta {z : ℂ} (hz : 1 < z.re) :
+    finiteHeckeL (1 : Uℚ) ⟨z,hz⟩ = riemannZeta z :=
+  (finiteHeckeL_one_eq_dedekindZeta (K := ℚ) ⟨z,hz⟩).trans (dedekindZeta_rat_eq_riemannZeta hz)
+
+private theorem rationalCritical_ne_one (t : ℝ) : sℚ(t) ≠ 1 := by
+  intro h
+  have he := congrArg Complex.re h
+  norm_num [Complex.mul_re] at he
+
+/-- On the critical line the chosen normal-form continuation of the rational principal
+finite Hecke Euler product is Mathlib's Riemann zeta function. -/
+theorem chosenFiniteHeckeL_rat_one_eq_riemannZeta (t : ℝ) :
+    (finiteHeckeL_exists_continuation (1 : Uℚ)).choose sℚ(t) = riemannZeta sℚ(t) := by
+  let L := (finiteHeckeL_exists_continuation (1 : Uℚ)).choose
+  obtain ⟨hL, he⟩ := (finiteHeckeL_exists_continuation (1 : Uℚ)).choose_spec
+  have hEq := heckeEulerProductOutside_eq_finite_nf_eq L riemannZeta hL.meromorphicOn
+    meromorphicOn_rat_zeta (fun z hz ↦ (he ⟨z,hz⟩).trans (finiteHeckeL_rat_one_eq_zeta hz))
+  rw [toMeromorphicNFOn_eq_self.mpr hL] at hEq
+  refine (congrFun hEq sℚ(t)).trans ?_
+  rw [toMeromorphicNFOn_eq_toMeromorphicNFAt meromorphicOn_rat_zeta (mem_univ _),
+    toMeromorphicNFAt_eq_self.mpr (analyticOn_riemannZeta _ (rationalCritical_ne_one t)).meromorphicNFAt]
+
+/-- Removing the specified gamma factor gives exactly zeta on the rational principal line. -/
+theorem criticalFiniteHeckeL_rat_one_eq_riemannZeta :
+    criticalFiniteHeckeL (1 : Uℚ) = fun t : ℝ ↦ riemannZeta sℚ(t) := by
+  have h := (finiteHeckeL_exists_continuation (1 : Uℚ)).choose_spec
+  rw [criticalFiniteHeckeL_eq_continuation (1 : Uℚ) _ h.1 h.2]
+  exact funext chosenFiniteHeckeL_rat_one_eq_riemannZeta
+
+private theorem rationalZeta_zeroMass_eq (g : ℝ → ℝ) : ζmass(g) = ratMass(g) := by
+  have h := critical_zero_moments_eq (1 : Uℚ) g
+  rw [criticalFiniteHeckeL_rat_one_eq_riemannZeta] at h
+  refine Eq.trans ?_ h
+  apply tsum_congr
+  intro t
+  have hA := analyticOn_riemannZeta _ (rationalCritical_ne_one t.val)
+  simp only [analyticOrderNatAt, (analyticOrderAt_criticalLine hA).2]
+
+private theorem rationalDivisor_pos_iff_zeta_zero {z : ℂ} (hp : 0 < z.re) (h1 : z ≠ 1) :
+    0 < ordℚ(z) ↔ riemannZeta z = 0 := by
+  have horder := meromorphicOrderAt_finiteHeckeL_continuation (1 : Uℚ) meromorphicOn_rat_zeta
+    (fun w ↦ (finiteHeckeL_rat_one_eq_zeta w.property).symm) hp
+  have ha := analyticOn_riemannZeta z h1
+  have hposOrder : 0 < ordℚ(z) ↔ 0 < meromorphicOrderAt (continuedCompletedHeckeL (1 : Uℚ)) z := by
+    obtain ⟨k, hk⟩ := WithTop.ne_top_iff_exists.mp (completedHecke_order_ne_top (1 : Uℚ) z)
+    rw [MeromorphicOn.divisor_apply (continuedCompletedHeckeL_spec (1 : Uℚ)).1.meromorphicOn
+      (mem_univ z), ← hk, WithTop.untop₀_coe]
+    exact_mod_cast Iff.rfl
+  rw [hposOrder, ← horder]
+  constructor
+  · intro hz
+    by_contra hn
+    exact hz.ne' (ha.meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mpr hn)
+  · intro hz
+    exact lt_of_le_of_ne ha.meromorphicOrderAt_nonneg fun he ↦
+      ha.meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mp he.symm hz
+
+/-- The central zeta moments of a Schwartz function are absolutely summable with their
+full complex zero orders. -/
+theorem summable_abs_riemannZeta_critical_moments (g : 𝓢(ℝ, ℝ)) :
+    Summable (fun t : {t : ℝ // riemannZeta sℚ(t) = 0} ↦
+      (analyticOrderNatAt riemannZeta sℚ(t.val) : ℝ) * |g t.val|) := by
+  let Z := {t : ℝ // riemannZeta sℚ(t) = 0}
+  let C := {z : ℂ // 0 < ordℚ(z) ∧ z.re = 1/2}
+  let e (t : Z) : C := ⟨sℚ(t.val), (rationalDivisor_pos_iff_zeta_zero
+    (by rw [criticalLine_re]; norm_num) (rationalCritical_ne_one t)).mpr t.2, criticalLine_re _⟩
+  have he : Injective e := by
+    intro a b h
+    apply Subtype.ext
+    simpa only [e, criticalLine_im] using congrArg (fun z : C ↦ z.val.im) h
+  have h := (tendsto_integral_criticalFiniteHeckeL_schwartz (1 : Uℚ) g).1
+  apply (h.comp_injective he).congr
+  intro t
+  have hA := analyticOn_riemannZeta _ (rationalCritical_ne_one t.val)
+  have hh := (criticalFiniteHeckeL_order (1 : Uℚ) t.val).2.2
+  rw [criticalFiniteHeckeL_rat_one_eq_riemannZeta] at hh
+  change ((ordℚ(sℚ(t.val))).toNat : ℝ) * |g sℚ(t.val).im| = _
+  rw [criticalLine_im, ← hh, Int.toNat_natCast]
+  simp only [analyticOrderNatAt, (analyticOrderAt_criticalLine hA).2]
+
+/-- The finite binomial lattice over the whole real line recovers every central zero
+of Riemann zeta, weighted by its complex analytic order and a nonnegative Schwartz test. -/
+theorem tendsto_binomialZetaLatticeSum (g : 𝓢(ℝ, ℝ)) (hg : ∀ t, 0 ≤ g t) :
+    Tendsto (binomialZetaLatticeSum g) atTop (𝓝 ζmass(g)) := by
+  rw [rationalZeta_zeroMass_eq]
+  have hA : AccurateMagnitudes (criticalFiniteHeckeL (1 : Uℚ)) binomialZetaLatticeMagnitude := by
+    rw [criticalFiniteHeckeL_rat_one_eq_riemannZeta]
+    exact binomialZetaLatticeMagnitude_accurate
+  have hlocal (t : ℝ) := criticalFiniteHeckeL_order (1 : Uℚ) t
+  apply tendsto_certifiedSum_nonnegative_of_exact hA (fun t ↦ (hlocal t).1)
+    (fun t ht ↦ (hlocal t).2.1 (analyticOrderAt_eq_top.mp ht))
+    (fun z : {z : ℂ // 0 < ordℚ(z) ∧ z.re = 1/2} ↦ z.val.im)
+    (fun z ↦ ((ordℚ(z.val)).toNat : ℝ)) (fun _ ↦ Nat.cast_nonneg _)
+    (fun _ ↦ tendsto_sampleSum_criticalFiniteHeckeL_compact (1 : Uℚ)) g.continuous hg
+  exact tendsto_sampleSum_criticalFiniteHeckeL (1 : Uℚ) g
+
+private theorem rationalPrincipalCentral_iff_RH
+    (τ : ℝ≥0ˣ →ₜ* IdeleClassGroup (𝓞 ℚ) ℚ) (hτ : RightInverse τ (ideleClassNorm ℚ)) :
+    (∀ z : {z : ℂ // 0 < ordℚ(z)}, z.val.re = 1/2) ↔ RiemannHypothesis := by
+  constructor
+  · intro h s hz htriv hs
+    have hpos : 0 < s.re :=
+      lt_of_not_ge fun h ↦ htriv ((riemannZeta_eq_zero_iff_of_re_nonpos h).mp hz)
+    exact h ⟨s,(rationalDivisor_pos_iff_zeta_zero hpos hs).mpr hz⟩
+  · intro h z
+    let χ : {ψ : Uℚ // ∀ a : ℝ≥0ˣ, ψ (τ a) = 1} := ⟨1, fun _ ↦ rfl⟩
+    have empty := (hasSum_exteriorZeros_iff_isEmpty τ hτ (1/2)).mp
+      (fun φ _ ↦ traceFormula_exteriorZeros_of_half_le τ φ le_rfl)
+    have hwidth : |z.val.re-1/2| < 1/2 :=
+      lt_of_not_ge fun h ↦ empty.false ⟨(χ,z.val),z.property,h⟩
+    have hstrip := abs_lt.mp hwidth
+    change -(1/2 : ℝ) < z.val.re-1/2 ∧ z.val.re-1/2 < 1/2 at hstrip
+    have hp : 0 < z.val.re := by linarith [hstrip.1]
+    have hlt : z.val.re < 1 := by linarith [hstrip.2]
+    have hz1 : z.val ≠ 1 := fun e ↦ by simp [e] at hlt
+    apply h z.val ((rationalDivisor_pos_iff_zeta_zero hp hz1).mp z.property) _ hz1
+    rintro ⟨n,hn⟩
+    rw [hn] at hp
+    simp [Complex.mul_re] at hp
+    linarith [Nat.cast_nonneg (α := ℝ) n]
+
+/-- A supplied positive full-divisor identity bounds the critical mass measured by the
+finite integer sums. The sums approach that scalar from below arbitrarily late precisely
+when all nontrivial Riemann zeta zeros lie on the critical line. -/
+theorem binomialZetaLatticeSum_iff_riemannHypothesis_of_hasSum
+    (g : 𝓢(ℝ, ℝ)) (hg : ∀ t, 0 ≤ g t) (W : {z : ℂ // 0 < ordℚ(z)} → ℝ)
+    (S : ℝ) (hS : HasSum W S) (hpos : ∀ z, 0 < W z)
+    (hline : ∀ (z : {z : ℂ // 0 < ordℚ(z)}), z.val.re = 1/2 →
+      W z = ((ordℚ(z.val)).toNat : ℝ) * g z.val.im) :
+    limUnder atTop (binomialZetaLatticeSum g) ≤ S ∧
+      ((∀ δ : ℝ, 0 < δ → ∀ N : ℕ, ∃ n : ℕ, N ≤ n ∧
+        S-δ ≤ binomialZetaLatticeSum g n) ↔ RiemannHypothesis) := by
+  let q : (AdeleRing (𝓞 ℚ) ℚ)ˣ →ₜ* IdeleClassGroup (𝓞 ℚ) ℚ :=
+    ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
+  let τ : ℝ≥0ˣ →ₜ* IdeleClassGroup (𝓞 ℚ) ℚ := q.comp
+    ⟨canonicalIdeleNormSection ℚ, canonicalIdeleNormSection_continuous ℚ⟩
+  have hτ : RightInverse τ (ideleClassNorm ℚ) := canonicalIdeleNormSection_rightInverse ℚ
+  have hc := centralMass_of_hasSum (1 : Uℚ) g W S hS hpos hline
+  have hv := tendsto_binomialZetaLatticeSum g hg
+  rw [rationalZeta_zeroMass_eq] at hv
+  exact ⟨hv.limUnder_eq.le.trans hc.1,
+    (lowerBound_iff_cofinal_samples hv).trans (hc.2.trans (rationalPrincipalCentral_iff_RH τ hτ))⟩
+
+end RationalBinomialLattice
+
 end CriticalMeasurements
 
 end RiemannMasullo.Isolated
