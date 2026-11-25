@@ -2,6 +2,10 @@ module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1a
 
+import RiemannMasullo.Ch03_IdelicZeta.RationalNormTwist
+import RiemannMasullo.ForMathlib.Analysis.Complex.ExponentialPoleSeparation
+import RiemannMasullo.ForMathlib.NumberTheory.LinearFormsInLogarithms
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Analysis.PSeries
 import Mathlib.RingTheory.RamificationInertia.Inertia
 import Mathlib.RingTheory.RamificationInertia.Ramification
@@ -1043,6 +1047,169 @@ theorem sLocalStripPoles_uniformly_discrete_of_same_prime (χ : PontryaginDual J
   obtain ⟨δ, hδ, hsep⟩ :=
     uniformly_discrete_union_finite (sLocalPoleContributes_archimedean_finite_in_strip χ A) hfin_disc
   exact ⟨δ, hδ, fun a ha b hb hne ↦ hsep a (hPsub ha) b (hPsub hb) hne⟩
+
+/-! ## Polynomial separation over mixed rational primes -/
+
+section MixedFinitePoles
+
+private theorem finitePole_uniformizer_chart (χ : PontryaginDual Jₛ) (v : S)
+    (π : (v.val.adicCompletion F)ˣ) (hπ : ‖π.val‖ = (v.val.asIdeal.absNorm : ℝ)⁻¹) :
+    ∃ g : Jₛ, (((normₛ g : ℝ≥0) : ℝ) : ℂ) = (‖π.val‖ : ℂ) ∧
+      ∀ a : ℂ, sLocalFiniteRestriction v (chart(χ) a) π =
+        (χ g : ℂ) * Complex.exp (-(Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ) * a) := by
+  obtain ⟨g, hg⟩ : ∃ g : Jₛ, ∀ c : QuasiCharacter Jₛ, sLocalFiniteRestriction v c π = c g :=
+    ⟨_, fun _ ↦ rfl⟩
+  have hnorm := sLocalFiniteRestriction_norm v π
+  rw [hg] at hnorm
+  change ((1 : PontryaginDual Jₛ) g : ℂ) * _ ^ (1 : ℂ) = _ at hnorm
+  simp only [PontryaginDual.one_apply, Circle.coe_one, one_mul, Complex.cpow_one] at hnorm
+  change (((normₛ g : ℝ≥0) : ℝ) : ℂ) = (‖π.val‖ : ℂ) at hnorm
+  refine ⟨g, hnorm, fun a ↦ ?_⟩
+  rw [hg]
+  change (χ g : ℂ) * ((((normₛ g : ℝ≥0) : ℝ) : ℂ) ^ a) = _
+  rw [hnorm, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr
+    (norm_ne_zero_iff.mpr π.ne_zero)), ← Complex.ofReal_log (norm_nonneg _), hπ, Real.log_inv,
+    Complex.ofReal_neg]
+
+private theorem finitePole_uniformizer_pow (χ : PontryaginDual Jₛ) {N : ℕ} {κ : ℝ}
+    (hχ : ∀ g : Jₛ, (χ g : ℂ) ^ N =
+      ((((normₛ g : ℝ≥0) : ℝ) : ℂ) ^ ((κ : ℂ) * Complex.I)) ^ N)
+    (v : S) (π : (v.val.adicCompletion F)ˣ) (hπ : ‖π.val‖ = (v.val.asIdeal.absNorm : ℝ)⁻¹)
+    (a : ℂ) :
+    (sLocalFiniteRestriction v (chart(χ) a) π) ^ N =
+      Complex.exp (N * (-(Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ) *
+        (a + (κ : ℂ) * Complex.I))) := by
+  obtain ⟨g, hn, he⟩ := finitePole_uniformizer_chart χ v π hπ
+  rw [he, mul_pow, hχ, hn, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr
+    (norm_ne_zero_iff.mpr π.ne_zero)), ← Complex.ofReal_log (norm_nonneg _), hπ,
+    Real.log_inv, Complex.ofReal_neg, ← mul_pow, ← Complex.exp_add, Complex.exp_nat_mul]
+  congr 2
+  ring
+
+private theorem finitePole_uniformizer_eq_one (χ : PontryaginDual Jₛ) (v : S)
+    (π : (v.val.adicCompletion F)ˣ) (hπ : ‖π.val‖ = (v.val.asIdeal.absNorm : ℝ)⁻¹)
+    {a : ℂ} (ha : sLocalPoleContributes χ (Sum.inr v) a) :
+    a.re = 0 ∧ sLocalFiniteRestriction v (chart(χ) a) π = 1 := by
+  have hψ (x : (v.val.adicCompletion F)ˣ) : ‖sLocalFiniteRestriction v (chart(χ) 0) x‖ = 1 := by
+    change ‖((χ _ : Circle) : ℂ) * _ ^ (0 : ℂ)‖ = 1
+    rw [Complex.cpow_zero, mul_one, Circle.norm_coe]
+  have hp := ((sLocalRhoFactor_poles_iff_finite_explicit v.val _ hψ π hπ a).mpr ha).2
+  obtain ⟨m, t, -, -, h⟩ := ha
+  refine ⟨by rw [h, Complex.mul_re]; simp only [Complex.I_re, Complex.I_im, Complex.ofReal_im,
+    mul_zero, zero_mul, sub_zero], ?_⟩
+  obtain ⟨g, -, he⟩ := finitePole_uniformizer_chart χ v π hπ
+  rw [he, mul_zero, Complex.exp_zero, mul_one, Complex.cpow_def_of_ne_zero
+    (Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr π.ne_zero)),
+    ← Complex.ofReal_log (norm_nonneg _), hπ, Real.log_inv, Complex.ofReal_neg] at hp
+  exact (he a).trans hp
+
+private theorem finitePole_uniformizer_reciprocal_bound (χ : PontryaginDual Jₛ) {N : ℕ} (hN : 0 < N)
+    {κ : ℝ} (hχ : ∀ g : Jₛ, (χ g : ℂ) ^ N =
+      ((((normₛ g : ℝ≥0) : ℝ) : ℂ) ^ ((κ : ℂ) * Complex.I)) ^ N) :
+    ∃ d : ℕ, ∃ C ≥ (0 : ℝ), ∀ (v w : S) (a : ℂ), sLocalPoleContributes χ (Sum.inr v) a →
+      ∀ (π : (w.val.adicCompletion F)ˣ), ‖π.val‖ = (w.val.asIdeal.absNorm : ℝ)⁻¹ →
+      ‖(1 - sLocalFiniteRestriction w (chart(χ) a) π)⁻¹‖ ≤ C * (1 + |a.im|) ^ d := by
+  classical
+  choose d C hC hpair using fun vw : S × S ↦ polynomial_bound_inv_one_sub_of_exp_eq_one
+    vw.1.val.asIdeal.absNorm vw.2.val.asIdeal.absNorm N
+    (HeightOneSpectrum.one_lt_absNorm _) (HeightOneSpectrum.one_lt_absNorm _) hN
+  let D := Finset.univ.sup d
+  let M := ∑ vw, C vw
+  have hM : 0 ≤ M := Finset.sum_nonneg fun vw _ ↦ hC vw
+  refine ⟨D, M * (1 + |κ|) ^ D, by positivity, ?_⟩
+  intro v w a ha π hπ
+  obtain ⟨πv, hπv, -⟩ := sLocalRhoFactor_poles_iff_finite χ v
+  obtain ⟨hre, hval⟩ := finitePole_uniformizer_eq_one χ v πv hπv ha
+  have hP := finitePole_uniformizer_pow χ hχ v πv hπv a
+  rw [hval, one_pow] at hP
+  have hb := hpair (v,w) (a + (κ : ℂ) * Complex.I) _ hP.symm
+    (finitePole_uniformizer_pow χ hχ w π hπ a)
+  have ha' : a = (a.im : ℂ) * Complex.I := Complex.ext (by simp [hre]) (by simp)
+  have haNorm : ‖a‖ = |a.im| := by conv_lhs => rw [ha']; simp
+  have hnorm : ‖a + (κ : ℂ) * Complex.I‖ ≤ |a.im| + |κ| := by
+    simpa [haNorm] using norm_add_le a ((κ : ℂ) * Complex.I)
+  have hbase : 1 + ‖a + (κ : ℂ) * Complex.I‖ ≤ (1 + |κ|) * (1 + |a.im|) := by
+    nlinarith [mul_nonneg (abs_nonneg κ) (abs_nonneg a.im)]
+  calc
+    _ ≤ C (v,w) * (1 + ‖a + (κ : ℂ) * Complex.I‖) ^ d (v,w) := hb
+    _ ≤ M * ((1 + |κ|) * (1 + |a.im|)) ^ D := by
+      apply mul_le_mul (Finset.single_le_sum (fun k _ ↦ hC k) (Finset.mem_univ (v,w))) _ (by positivity) hM
+      exact (pow_le_pow_left₀ (by positivity) hbase _).trans
+        (pow_le_pow_right₀ (one_le_mul_of_one_le_of_one_le
+          (le_add_of_nonneg_right (abs_nonneg _)) (le_add_of_nonneg_right (abs_nonneg _)))
+          (Finset.le_sup (f := d) (Finset.mem_univ (v,w))))
+    _ = _ := by rw [mul_pow, mul_assoc]
+
+/-- Paper: Lemma 7.1.2.2(2), p. 317. At every finite pole of the actual character, each
+totalized finite Euler factor grows at most polynomially in the height, uniformly over the
+finite set of places. A single power clears the character after an imaginary norm twist.
+Deviation: This estimates all foreign denominators in the mixed-prime criterion proposed
+on #7279, using the two-logarithm input of #7371. -/
+theorem finiteLocalEulerFactor_polynomialBound_at_sLocalPole (χ : PontryaginDual Jₛ)
+    {κ : ℝ} {N : ℕ} (hN : 0 < N) (hχ : ∀ g : Jₛ, (χ g : ℂ) ^ N =
+      ((((normₛ g : ℝ≥0) : ℝ) : ℂ) ^ ((κ : ℂ) * Complex.I)) ^ N) :
+    ∃ d : ℕ, ∃ C ≥ (0 : ℝ), ∀ (v w : S) (a : ℂ), sLocalPoleContributes χ (Sum.inr v) a →
+      ‖finiteLocalEulerFactor w.val (sLocalFiniteRestriction w (chart(χ) a))‖ ≤
+        C * (1 + |a.im|) ^ d := by
+  obtain ⟨d, C, hC, hb⟩ := finitePole_uniformizer_reciprocal_bound χ hN hχ
+  refine ⟨d, max 1 C, hC.trans (le_max_right _ _), fun v w a ha ↦ ?_⟩
+  unfold finiteLocalEulerFactor
+  split
+  · let e := (Valued.v : Valuation (w.val.adicCompletion F)
+      (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+    exact (hb v w a ha (Units.mk0 e.choose e.choose_spec.ne_zero)
+      (norm_uniformizer_adicCompletion w.val _ e.choose_spec)).trans
+      (mul_le_mul_of_nonneg_right (le_max_right _ _) (by positivity))
+  · rw [norm_one]
+    exact one_le_mul_of_one_le_of_one_le (le_max_left _ _)
+      (one_le_pow₀ (le_add_of_nonneg_right (abs_nonneg _)))
+
+/-- Paper: Lemma 7.1.2.2(2), p. 317. If one positive power of the character is the same
+power of an imaginary norm twist, the distinct finite pole centers satisfy the quantitative
+separation hypothesis for the individual series of Theorem 7.1.2.3. -/
+theorem sLocalFinitePolePolynomialSeparation_of_normPower (χ : PontryaginDual Jₛ)
+    {κ : ℝ} {N : ℕ} (hN : 0 < N) (hχ : ∀ g : Jₛ, (χ g : ℂ) ^ N =
+      ((((normₛ g : ℝ≥0) : ℝ) : ℂ) ^ ((κ : ℂ) * Complex.I)) ^ N) :
+    sLocalFinitePolePolynomialSeparation χ := by
+  classical
+  obtain ⟨d, C, hC, hb⟩ := finitePole_uniformizer_reciprocal_bound χ hN hχ
+  choose π hπ _ using sLocalRhoFactor_poles_iff_finite χ
+  choose g _ hg using fun v : S ↦ finitePole_uniformizer_chart χ v (π v) (hπ v)
+  obtain ⟨c, hc, hsep⟩ := finitePoleSpacing_of_reciprocalDenominatorBound
+    (fun v a ↦ sLocalPoleContributes χ (Sum.inr v) a)
+    (fun v : S ↦ Real.log (v.val.asIdeal.absNorm : ℝ)) (fun v ↦ (χ (g v) : ℂ))
+    (fun v ↦ Real.log_pos (by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val))
+    (fun v a ha ↦ (hg v a).symm.trans (finitePole_uniformizer_eq_one χ v (π v) (hπ v) ha).2)
+    C hC d (fun v w a ha ↦ hg w a ▸ hb v w a ha (π w) (hπ w))
+  exact ⟨c, hc, d, hsep⟩
+
+/-- Paper: Theorem 7.1.2.3, pp. 317–323. Finite-order unitary characters of the S-idèle
+quotient, and their common imaginary norm twists, have polynomially separated finite poles.
+Deviation: This supplies the arithmetic hypothesis for the separate place sums on #7279. -/
+theorem sLocalFinitePolePolynomialSeparation_of_finiteOrder_normTwist
+    (χ χ₀ : PontryaginDual Jₛ) (hχ₀ : IsOfFinOrder χ₀) (κ : ℝ)
+    (hχ : chart(χ) 0 = chart(χ₀) ((κ : ℂ) * Complex.I)) :
+    sLocalFinitePolePolynomialSeparation χ := by
+  obtain ⟨N, hN, hpow⟩ := hχ₀.exists_pow_eq_one
+  apply sLocalFinitePolePolynomialSeparation_of_normPower χ (κ := κ) hN
+  intro g
+  have hg := DFunLike.congr_fun hχ g
+  change (χ g : ℂ) * _ ^ (0 : ℂ) = (χ₀ g : ℂ) * _ ^ ((κ : ℂ) * Complex.I) at hg
+  rw [Complex.cpow_zero, mul_one] at hg
+  have hroot : χ₀ g ^ N = 1 :=
+    (ContinuousMonoidHom.pow_apply χ₀ N g).symm.trans (DFunLike.congr_fun hpow g)
+  have hroot' : (χ₀ g : ℂ) ^ N = 1 :=
+    (Circle.coe_pow _ _).symm.trans ((congrArg (fun z : Circle ↦ (z : ℂ)) hroot).trans Circle.coe_one)
+  rw [hg, mul_pow, hroot', one_mul]
+
+/-- Paper: Theorem 7.1.2.3, pp. 317–323. For every finite set of rational places, every
+unitary character of the S-idèle quotient satisfies the finite-pole separation hypothesis. -/
+theorem sLocalFinitePolePolynomialSeparation_rat {S : Finset (HeightOneSpectrum (𝓞 ℚ))}
+    (χ : PontryaginDual (SIdeleQuotient ℚ S)) : sLocalFinitePolePolynomialSeparation χ := by
+  obtain ⟨κ, N, hN, hχ⟩ := ratSLocalCharacter_pow_eq_norm_pow χ
+  exact sLocalFinitePolePolynomialSeparation_of_normPower χ hN hχ
+
+end MixedFinitePoles
 
 /-! ## Exact arithmetic criterion on a pole lattice (#7279) -/
 
