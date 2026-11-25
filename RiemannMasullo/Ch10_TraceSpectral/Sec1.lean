@@ -3720,14 +3720,17 @@ private theorem globalThetaSobolev_translate_upper (a : ℝ) {α s : ℝ}
       (congrArg (· * ‖z‖) (Real.norm_of_nonneg (Real.exp_pos _).le))
   exact globalThetaSobolev_exponential_untwist a α s t _ _ ((hnorm.trans hnorm').ge.trans hρbound)
 
-/-- A bound from the completion at weight a to the completion at weight b on the same
-theta classes forces b ≤ a, by translating a nonzero test to positive log norm. -/
-private theorem globalThetaSobolev_weight_le (a b α s C : ℝ) (hα : 0 ≤ α) (hs : 0 ≤ s)
-    (h : let hI := (neg_nonpos.mpr hα).trans hα
-      ∀ u : Θ₀, ‖j𝔽(b, hI, hs) u‖ ≤ C * ‖j𝔽(a, hI, hs) u‖) : b ≤ a := by
-  let hI := (neg_nonpos.mpr hα).trans hα
+/-- A uniform bound on the same theta classes forces the positive endpoint
+of the target weight interval to be no greater than that of the source.
+Translate one nonzero polar test to arbitrarily large positive log norms. -/
+theorem globalThetaSobolev_positiveEnd_le (a b α β s C : ℝ)
+    (hα : 0 ≤ α) (hβ : 0 ≤ β) (hs : 0 ≤ s)
+    (h : ∀ u : Θ₀, ‖j𝔽(b, neg_le_self hβ, hs) u‖ ≤ C * ‖j𝔽(a, neg_le_self hα, hs) u‖) :
+    b + β ≤ a + α := by
+  let hI := neg_le_self hα
+  let hJ := neg_le_self hβ
   let C' := |C|
-  have hbound (u : Θ₀) : ‖j𝔽(b, hI, hs) u‖ ≤ C' * ‖j𝔽(a, hI, hs) u‖ :=
+  have hbound (u : Θ₀) : ‖j𝔽(b, hJ, hs) u‖ ≤ C' * ‖j𝔽(a, hI, hs) u‖ :=
     (h u).trans (mul_le_mul_of_nonneg_right (le_abs_self C) (norm_nonneg _))
   obtain ⟨f, g, hg⟩ := globalThetaSobolev_polarFree_nonzero (F := F)
   have hf : (Submodule.Quotient.mk f : Θ₀) ≠ 0 := by
@@ -3738,29 +3741,55 @@ private theorem globalThetaSobolev_weight_le (a b α s C : ℝ) (hα : 0 ≤ α)
     have hval := congrArg (fun p : C(C𝔽, ℂ) ↦ p g) he
     rw [Submodule.coe_zero, map_zero, ContinuousMap.zero_apply] at hval
     exact hg hval
-  have hinj := (existsUnique_globalThetaSobolevEmbedding (F := F) (b + α)
+  have hinj := (existsUnique_globalThetaSobolevEmbedding (F := F) (b + β)
     0 0 0 le_rfl le_rfl).exists.choose_spec.1
-  let ε := ‖j𝔽(b + α, le_refl (0 : ℝ), le_rfl) (Submodule.Quotient.mk f)‖
+  let ε := ‖j𝔽(b + β, le_refl (0 : ℝ), le_rfl) (Submodule.Quotient.mk f)‖
   have hε : 0 < ε := by
     apply norm_pos_iff.mpr
     intro hz
-    have hz' := congrArg (fun p : H𝔽(b + α, le_refl (0 : ℝ), le_rfl) ↦ (p : W𝔽(0, 0, 0))) hz
-    change E𝔽(b + α, le_refl (0 : ℝ), le_rfl) (Submodule.Quotient.mk f) = 0 at hz'
+    have hz' := congrArg (fun p : H𝔽(b + β, le_refl (0 : ℝ), le_rfl) ↦ (p : W𝔽(0, 0, 0))) hz
+    change E𝔽(b + β, le_refl (0 : ℝ), le_rfl) (Submodule.Quotient.mk f) = 0 at hz'
     exact hf (hinj (hz'.trans (map_zero _).symm))
-  have horder : b + α ≤ a + α := by
-    apply globalThetaSobolev_exponential_order
-      (C := C' * ‖j𝔽(a, hI, hs) (Submodule.Quotient.mk f)‖) hε
-    intro t ht
-    let v := canonicalIdeleNormSection F (sobolevLogEquiv t)
-    have ht' : logNorm(m𝔽) (QuotientGroup.mk v) = t := by
-      change Real.log ((ideleNorm F v).val : ℝ) = t
-      rw [canonicalIdeleNormSection_rightInverse F (sobolevLogEquiv t), sobolevLogEquiv_log]
-    obtain ⟨f', htest, hupper⟩ := globalThetaSobolev_translate_upper a hα hs f v t ht ht'
-    calc
-      _ ≤ ‖j𝔽(b, hI, hs) (Submodule.Quotient.mk f')‖ :=
-        globalThetaSobolev_translate_lower b hI hs f f' v htest t ht'
-      _ ≤ C' * ‖j𝔽(a, hI, hs) (Submodule.Quotient.mk f')‖ := hbound _
-      _ ≤ _ := (mul_le_mul_of_nonneg_left hupper (abs_nonneg _)).trans_eq (by ring)
+  apply globalThetaSobolev_exponential_order
+    (C := C' * ‖j𝔽(a, hI, hs) (Submodule.Quotient.mk f)‖) hε
+  intro t ht
+  let v := canonicalIdeleNormSection F (sobolevLogEquiv t)
+  have ht' : logNorm(m𝔽) (QuotientGroup.mk v) = t := by
+    change Real.log ((ideleNorm F v).val : ℝ) = t
+    rw [canonicalIdeleNormSection_rightInverse F (sobolevLogEquiv t), sobolevLogEquiv_log]
+  obtain ⟨f', htest, hupper⟩ := globalThetaSobolev_translate_upper a hα hs f v t ht ht'
+  calc
+    _ ≤ ‖j𝔽(b, hJ, hs) (Submodule.Quotient.mk f')‖ :=
+      globalThetaSobolev_translate_lower b hJ hs f f' v htest t ht'
+    _ ≤ C' * ‖j𝔽(a, hI, hs) (Submodule.Quotient.mk f')‖ := hbound _
+    _ ≤ _ := (mul_le_mul_of_nonneg_left hupper (abs_nonneg _)).trans_eq (by ring)
+
+/-- The genuine geometric theta spaces at strictly different widths admit
+no uniform inverse bound on physical representatives, even at a fixed center
+and degree. This concerns the theta subspaces, not their spectral quotients. -/
+theorem globalThetaSobolev_widthRestriction_not_boundedBelow (a : ℝ) {α β s : ℝ}
+    (hα : 0 ≤ α) (hab : α < β) (hs : 0 ≤ s)
+    (I : W𝔽(-β, β, s) →L[ℂ] W𝔽(-α, α, s))
+    (hI : ∀ q, (I q : C𝔽 → ℂ) =ᵐ[intervalSobolevMeasure μ𝔽 (logIdeleClassNorm F) (-α) α s] q) :
+    ¬ ∃ C : ℝ, ∀ q ∈ H𝔽(a, neg_le_self (hα.trans hab.le), hs), ‖q‖ ≤ C * ‖I q‖ := by
+  rintro ⟨C, hC⟩
+  let hβ := hα.trans hab.le
+  have hrep (u : Θ₀) :
+      I (j𝔽(a, neg_le_self hβ, hs) u : W𝔽(-β, β, s)) =
+        (j𝔽(a, neg_le_self hα, hs) u : W𝔽(-α, α, s)) := by
+    obtain ⟨f, rfl⟩ := Submodule.Quotient.mk_surjective _ u
+    apply Lp.ext
+    apply (hI _).trans
+    apply (withDensity_absolutelyContinuous μ𝔽 _).ae_eq
+    exact ((existsUnique_globalThetaSobolevEmbedding (F := F) a (-β) β s
+      (neg_le_self hβ) hs).exists.choose_spec.2 f).trans
+      ((existsUnique_globalThetaSobolevEmbedding (F := F) a (-α) α s
+        (neg_le_self hα) hs).exists.choose_spec.2 f).symm
+  have hbound (u : Θ₀) :
+      ‖j𝔽(a, neg_le_self hβ, hs) u‖ ≤ C * ‖j𝔽(a, neg_le_self hα, hs) u‖ := by
+    have h := hC _ (j𝔽(a, neg_le_self hβ, hs) u).property
+    rwa [hrep u] at h
+  have hle := globalThetaSobolev_positiveEnd_le (F := F) a a α β s C hα hβ hs hbound
   linarith
 
 private theorem globalThetaSobolev_symmetricFourier (a α s : ℝ) (hα : 0 ≤ α) (hs : 0 ≤ s) :
@@ -3774,6 +3803,53 @@ private theorem globalThetaSobolev_symmetricFourier (a α s : ℝ) (hα : 0 ≤ 
       J (j𝔽(a, hI, hs) u) = j𝔽(1 - a, hJ, hs) (Fourier𝔽 u)
   have hp : P (-(-α)) := fun _ ↦ ⟨h.choose, h.choose_spec.2⟩
   exact (Eq.mp (congrArg P (neg_neg α)) hp) hI
+
+/-- At a fixed Sobolev degree, the genuine theta norm associated with one
+closed interval is bounded by that of another exactly when the first interval
+is contained in the second. In that case the bound is contractive. -/
+theorem globalThetaSobolev_intervalNorm_bound_iff (a b α β s : ℝ)
+    (hα : 0 ≤ α) (hβ : 0 ≤ β) (hs : 0 ≤ s) :
+    (∃ C : ℝ, ∀ u : Θ₀,
+      ‖j𝔽(b, neg_le_self hβ, hs) u‖ ≤ C * ‖j𝔽(a, neg_le_self hα, hs) u‖) ↔
+    a - α ≤ b - β ∧ b + β ≤ a + α := by
+  constructor
+  · rintro ⟨C, hC⟩
+    refine ⟨?_, globalThetaSobolev_positiveEnd_le (F := F) a b α β s C hα hβ hs hC⟩
+    obtain ⟨Ja, hJa⟩ := globalThetaSobolev_symmetricFourier (F := F) a α s hα hs
+    obtain ⟨Jb, hJb⟩ := globalThetaSobolev_symmetricFourier (F := F) b β s hβ hs
+    have hdual (u : Θ₀) :
+        ‖j𝔽(1 - b, neg_le_self hβ, hs) u‖ ≤ C * ‖j𝔽(1 - a, neg_le_self hα, hs) u‖ := by
+      obtain ⟨v, rfl⟩ := (Fourier𝔽).surjective u
+      rw [← hJb v, ← hJa v, Jb.norm_map, Ja.norm_map]
+      exact hC v
+    have hle := globalThetaSobolev_positiveEnd_le (F := F) (1 - a) (1 - b) α β s C hα hβ hs hdual
+    linarith
+  · rintro ⟨hleft, hright⟩
+    refine ⟨1, ?_⟩
+    intro u
+    obtain ⟨f, rfl⟩ := Submodule.Quotient.mk_surjective _ u
+    have hαnorm := globalThetaSobolev_norm (F := F) a (neg_le_self hα) hs f
+    have hβnorm := globalThetaSobolev_norm (F := F) b (neg_le_self hβ) hs f
+    simp only [one_mul]
+    change ‖E𝔽(b, neg_le_self hβ, hs) (Submodule.Quotient.mk f)‖ ≤
+      ‖E𝔽(a, neg_le_self hα, hs) (Submodule.Quotient.mk f)‖
+    rw [hβnorm.2, hαnorm.2]
+    apply Real.sqrt_le_sqrt
+    apply integral_mono hβnorm.1 hαnorm.1
+    intro g
+    apply mul_le_mul_of_nonneg_left _ (sq_nonneg _)
+    let x := logNorm(m𝔽) g
+    have hEnd (c : ℝ) (hc₁ : a + -α ≤ c) (hc₂ : c ≤ a + α) :
+        Real.exp (2 * c * x) ≤ max (Real.exp (2 * (a + -α) * x)) (Real.exp (2 * (a + α) * x)) := by
+      rcases le_or_gt 0 x with hx | hx
+      · exact (Real.exp_le_exp.mpr (by nlinarith [mul_nonneg (sub_nonneg.mpr hc₂) hx])).trans
+          (le_max_right _ _)
+      · exact (Real.exp_le_exp.mpr (by
+          nlinarith [mul_nonpos_of_nonneg_of_nonpos (sub_nonneg.mpr hc₁) hx.le])).trans (le_max_left _ _)
+    unfold intervalSobolevDensity
+    exact mul_le_mul_of_nonneg_right
+      (max_le (hEnd (b + -β) (by linarith) (by linarith)) (hEnd (b + β) (by linarith) hright))
+      (Real.rpow_nonneg (by positivity) _)
 
 /-- Paper: Theorem 10.1.2.1(1)–(2), (10.1.2.2), pp. 437–438. On a symmetric compact
 interval, the global Fourier transform extends uniquely to a continuous linear
@@ -3802,9 +3878,11 @@ theorem globalThetaSobolev_fourier_extension_iff (a α s : ℝ) (hα : 0 ≤ α)
       exact (congrArg J hTu').trans ((hJ u).trans (congrArg (j𝔽(1 - a, hI, hs)) hu))
     have hU' (v : Θ₀) : U.symm (j𝔽(1 - a, hI, hs) v) = j𝔽(a, hI, hs) v :=
       (congrArg U.symm (hU v).symm).trans (U.symm_apply_apply _)
-    have h₁ := globalThetaSobolev_weight_le (F := F) a (1 - a) α s ‖U.toContinuousLinearMap‖ hα hs (fun u ↦
+    have h₁ := globalThetaSobolev_positiveEnd_le (F := F) a (1 - a) α α s
+      ‖U.toContinuousLinearMap‖ hα hα hs (fun u ↦
       (congrArg norm (hU u)).ge.trans (U.toContinuousLinearMap.le_opNorm _))
-    have h₂ := globalThetaSobolev_weight_le (F := F) (1 - a) a α s ‖U.symm.toContinuousLinearMap‖ hα hs (fun u ↦
+    have h₂ := globalThetaSobolev_positiveEnd_le (F := F) (1 - a) a α α s
+      ‖U.symm.toContinuousLinearMap‖ hα hα hs (fun u ↦
       (congrArg norm (hU' u)).ge.trans (U.symm.toContinuousLinearMap.le_opNorm _))
     linarith
   · intro ha
