@@ -1,13 +1,12 @@
 module
 
 import Mathlib.Geometry.Manifold.PartitionOfUnity
+import RiemannMasullo.Ch10_TraceSpectral.Sec4b_ProjectedKernels
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 
 /-! # Isolated statements of §12.5
 
-Statements of the section that are neither proved nor refuted and that nothing else in Lean
-uses, with what follows from them (`AGENTS.md`, "False statements and gaps"). Nothing imports
-this file.
+The projective strip kernel and its consequences for the smoothened geometric diagonal.
 
 ## The projective strip kernel needed for (12.5.1.4)
 
@@ -43,24 +42,22 @@ Reconstruction: Definition 10.4.3.7(2), p. 473, subtracts the spectral kernel. U
 subtraction on p. 520 presupposes a tensor for the operator in (10.4.3.45).
 Deviation: We ask for any representing tensor, restricted to the positive half-widths and
 tests of Theorem 12.5.1.1. We impose no finite-rank expansion on the tensor.
-Gap: The projective norm estimate for the geometric component of the output is missing.
-Nothing in the Lean uses this statement, and it is not known how it connects with the rest of
-the proof in Lean; in the paper it is used on pp. 520, 522. -/
+Quotient nuclearity and a finite decomposition into weighted adjoints give the representing
+tensor. The paper uses it on pp. 520, 522. -/
 theorem exists_projectiveKernel_stripTestAction_spectralProjection
     (φ : BruhatCompactSupport C𝔽) (_hφ : ∀ g : C₁, φ.val g = 0)
     {α s : ℝ} (hα : 0 < α) (hs : 3 ≤ s) :
     ∃ K, sobolevProjectiveKernelOperator (F := F) hα.le hs₀(hs) K =
       (hardySobolevTestAction μ𝔽 m𝔽 (-α) α s ((neg_nonpos.mpr hα.le).trans hα.le) hs₀(hs) φ).comp
         (spectralProjection (F := F) (1 / 2) hα.le hs₀(hs)) := by
-  sorry
+  exact stripTestAction_spectralProjection_has_projectiveKernel (1 / 2) hα.le hs₀(hs) φ
 
 /-- Paper: (12.5.1.4), p. 520. The smoothened geometric diagonal is Haar-integrable, and the
 strip zero terms sum absolutely to its negative integral.
 Deviation: As in §12.5 of the library, a measurable D′-sequence specifies the smoothening,
 and the sum uses the closed strip with strict reciprocal-weight multiplicities on its edges.
 It agrees with the printed interior sum when both edges are zero-free.
-It is proved from the kernel existence statement above, which is open, so it is no more
-established than that statement. Nothing in the Lean uses it. -/
+The projective kernel above supplies the witness in the smoothened diagonal formula. -/
 theorem hasSum_stripZeros_neg_integral_smoothenedDiagonal_of_vanishing
     (φ : BruhatCompactSupport C𝔽) (hφ : ∀ g : C₁, φ.val g = 0)
     (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
