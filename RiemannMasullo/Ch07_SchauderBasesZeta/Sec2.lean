@@ -2604,6 +2604,13 @@ private theorem sLocalPrincipalValue_chart_apply (χ : PontryaginDual C𝔽)
   simp only [sIdeleQuotientNorm_mk, ← ideleNorm_sIdeleInsertion]
   rfl
 
+/-- Restricting a global character to a retained finite place commutes with passage to the
+S-idèle quotient. -/
+theorem sLocalFiniteRestriction_sIdeleRestriction (c : unramifiedOutside F S) (v : S)
+    (x : (v.val.adicCompletion F)ˣ) :
+    sLocalFiniteRestriction v (sIdeleRestriction F S c) x = finitePlaceRestriction F v.val c.val x :=
+  congrArg (fun g : (𝔸[F])ˣ ↦ c.val (QuotientGroup.mk g)) (sIdeleInsertion_finiteUnit v x)
+
 private theorem sLocalPrincipalValue_chart_finite (χ : PontryaginDual C𝔽)
     (hS : globalUnitary(χ) ∈ unramifiedOutside F S) (s : ℂ) (v : S) :
     finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (localChart(χ, hS) s)) =

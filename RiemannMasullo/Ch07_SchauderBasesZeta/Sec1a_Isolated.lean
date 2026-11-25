@@ -3,6 +3,8 @@ module
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1a
 
 import RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
+import RiemannMasullo.ForMathlib.Analysis.Complex.SeparatedExponentialFactor
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Analysis.Analytic.IsolatedZeros
 import Mathlib.Analysis.MellinInversion
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform
@@ -1954,6 +1956,49 @@ theorem summable_sLocalStripPoles_inv_height_sq (χ : PontryaginDual Jₛ) (A : 
     · obtain ⟨m, t, _, _, he⟩ := hv
       exact (haoff (by rw [he, Complex.mul_I_re, Complex.ofReal_im, neg_zero])).elim
 
+/-- The inverse-square height weight is summable over the actual distinct strip poles,
+for every finite set of places. Poles assigned to a given finite place have separated
+ordinates, and only finitely many archimedean poles lie in the strip. -/
+theorem summable_sLocalStripPoles_inv_height_sq_all (χ : PontryaginDual Jₛ) (A : ℝ) :
+    Summable (fun a : strip(χ, A) ↦ 1 / (1 + |a.val.im|) ^ 2) := by
+  classical
+  obtain ⟨assign, hassign⟩ := exists_isValidPoleAssignment χ
+  let fiber (v : Places) : Set (strip(χ, A)) := {a | assign a.val = v}
+  have hpart (a : strip(χ, A)) : ∃! v, a ∈ fiber v :=
+    ⟨assign a.val, rfl, fun _ h ↦ h.symm⟩
+  have hcontrib {v : Places} (a : fiber v) : sLocalPoleContributes χ v a.val.val := by
+    have h := hassign a.val.val a.val.prop.2
+    have ha : assign a.val.val = v := a.prop
+    rwa [ha] at h
+  apply (summable_partition (s := fiber) (fun a ↦ by positivity) hpart).mpr
+  refine ⟨?_, (hasSum_fintype _).summable⟩
+  intro v
+  cases v with
+  | inl w =>
+    have hfin := sLocalPoleContributes_archimedean_finite_in_strip χ A
+    have hf : (fiber (.inl w)).Finite := (hfin.preimage
+      (f := fun a : strip(χ, A) ↦ a.val) Subtype.val_injective.injOn).subset fun a ha ↦
+        ⟨⟨a.prop.1.1.le, a.prop.1.2.le⟩, w, hcontrib ⟨a, ha⟩⟩
+    let _ := hf.fintype
+    exact (hasSum_fintype _).summable
+  | inr v =>
+    let T := 2 * Real.pi / Real.log (v.val.asIdeal.absNorm : ℝ)
+    have hq : 1 < (v.val.asIdeal.absNorm : ℝ) := by
+      exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val
+    have hT : 0 < T := div_pos (mul_pos (by norm_num) Real.pi_pos) (Real.log_pos hq)
+    apply summable_inv_sq_of_separated_heights (fun a : fiber (.inr v) ↦ a.val.val.im) hT
+    intro a b hab
+    obtain ⟨k, hk⟩ := sLocalPoleContributes_finite_sub χ v (hcontrib b) (hcontrib a)
+    have hk₀ : k ≠ 0 := by
+      intro h
+      have h₀ : a.val.val = b.val.val := sub_eq_zero.mp (by simpa [h] using hk)
+      exact hab (Subtype.ext (Subtype.ext h₀))
+    have hki : (1 : ℝ) ≤ |(k : ℝ)| := by exact_mod_cast Int.one_le_abs hk₀
+    have him : a.val.val.im - b.val.val.im = (k : ℝ) * T := by
+      simpa only [Complex.sub_im, Complex.mul_I_im, Complex.ofReal_re] using congrArg Complex.im hk
+    rw [him, abs_mul, abs_of_pos hT]
+    exact le_mul_of_one_le_left hT.le hki
+
 /-- Every bounded height range contains only finitely many actual open-strip poles. -/
 private theorem eventually_sLocalStripPoles_abs_im_gt (χ : PontryaginDual Jₛ) (A T : ℝ) :
     ∀ᶠ a : strip(χ, A) in cofinite, T < |a.val.im| := by
@@ -2341,28 +2386,20 @@ private theorem sLocal_weighted_residue_bounded_at (χ : PontryaginDual Jₛ) (f
     exact mul_le_mul (hk g hg z ⟨by linarith [hdre.1], by linarith [hdre.2]⟩)
       ((hM ⟨z, hz, rfl⟩).trans (le_max_right _ _)) (norm_nonneg _) hD
 
-/-- Paper: Theorem 7.1.2.3, pp. 317–323. For a fixed test at one rational prime, one
-constant bounds the weighted residues at all strip poles by any prescribed inverse
-power of their height, uniformly on a compact set of ideles.
-Deviation: Each distinct pole carries its full weighted Mellin residue. -/
-private theorem sLocalStripPoles_weighted_residue_bound_of_same_prime
+/-- Extend a compact-set residue estimate above a height cutoff to every strip pole. -/
+private theorem sLocalStripPoles_weighted_residue_bound_of_decay
     (χ : PontryaginDual Jₛ) (A : ℝ)
-    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ))
-    (f : Tests) (K : Set Jₛ) (hK : IsCompact K) (N : ℕ) :
+    (f : Tests) (K : Set Jₛ) (hK : IsCompact K) (N : ℕ)
+    (htail : ∃ C ≥ (0 : ℝ), ∃ T : ℝ, ∀ a : strip(χ,A), T < |a.val.im| → ∀ g ∈ K,
+      ‖sLocalMellinPoleTerm χ f g a.val‖ ≤ C / (1 + |a.val.im|) ^ N) :
     ∃ C ≥ (0 : ℝ), ∀ a : strip(χ,A), ∀ g ∈ K,
-      ‖star (χ g : ℂ) * complexResidue (fun z ↦ ((((normₛ g).val : ℝ) : ℂ) ^ (-z)) *
-        Z(f,χ,z)) a.val‖ ≤ C / (1 + |a.val.im|) ^ N := by
+      ‖sLocalMellinPoleTerm χ f g a.val‖ ≤ C / (1 + |a.val.im|) ^ N := by
   classical
-  obtain ⟨L, hL, T, htail⟩ := sLocalStripPoles_weighted_residue_decay_of_same_prime χ A hsame f K hK N
+  obtain ⟨L, hL, T, htail⟩ := htail
   let low := {a : strip(χ,A) | |a.val.im| ≤ T}
   have hlow : low.Finite := by
-    have hrect := finite_rectanglePoles (f := fun z ↦ sLocalRhoFactor (chart(χ) z))
-      (a := -A - 1) (b := 2) (σ₁ := -A) (σ₂ := 1) (t₁ := -T-1) (t₂ := T+1)
-      (sLocalRhoFactor_meromorphic χ).meromorphicOn (by linarith) (by norm_num)
-    apply (hrect.preimage (f := fun a : strip(χ,A) ↦ a.val) Subtype.val_injective.injOn).subset
-    intro a ha
-    have him := abs_le.mp (show |a.val.im| ≤ T from ha)
-    exact ⟨a.prop.1, ⟨by linarith [him.1], by linarith [him.2]⟩, a.prop.2⟩
+    simpa only [low, not_lt] using
+      (eventually_cofinite.mp (eventually_sLocalStripPoles_abs_im_gt χ A T))
   choose B _ hB using fun a : strip(χ,A) ↦ sLocal_weighted_residue_bounded_at χ f K hK a.val
   obtain ⟨D, hD⟩ := (hlow.image (fun a : strip(χ,A) ↦ B a * (1 + |a.val.im|)^N)).bddAbove
   refine ⟨max L D, hL.trans (le_max_left _ _), fun a g hg ↦ ?_⟩
@@ -2435,12 +2472,12 @@ private theorem strongDual_family_bounded_on_bounded_set {X ι : Type*} [AddComm
     hB ⟨q, hq⟩
   exact ⟨C, fun i x hx ↦ (hle i x).trans (hC x hx).le⟩
 
-/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323. At every one-prime strip pole the complete
-Mellin residue decays to every polynomial order, simultaneously over a bounded set of
-Schwartz–Bruhat tests and a compact set of idèles. -/
-theorem sLocalSinglePrime_residue_bound_on_bounded_compact (χ : PontryaginDual Jₛ) (A : ℝ)
-    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ))
-    (B : Set Tests) (hB : Bornology.IsVonNBounded ℂ B) (K : Set Jₛ) (hK : IsCompact K) (N : ℕ) :
+/-- Uniform boundedness upgrades decay for each test on a compact set of idèles to decay
+uniform over any bounded set of tests. -/
+private theorem sLocalMellinPoleTerm_bounded_compact_of_decay (χ : PontryaginDual Jₛ) (A : ℝ)
+    (B : Set Tests) (hB : Bornology.IsVonNBounded ℂ B) (K : Set Jₛ) (hK : IsCompact K) (N : ℕ)
+    (hdecay : ∀ f : Tests, ∃ C ≥ (0 : ℝ), ∃ T : ℝ, ∀ a : strip(χ,A),
+      T < |a.val.im| → ∀ g ∈ K, ‖sLocalMellinPoleTerm χ f g a.val‖ ≤ C / (1 + |a.val.im|) ^ N) :
     ∃ C ≥ (0 : ℝ), ∀ a : strip(χ,A), ∀ f ∈ B, ∀ g ∈ K,
       ‖sLocalMellinPoleTerm χ f g a.val‖ ≤ C / (1 + |a.val.im|) ^ N := by
   classical
@@ -2453,10 +2490,10 @@ theorem sLocalSinglePrime_residue_bound_on_bounded_compact (χ : PontryaginDual 
   have hU (i : I) (f : Tests) : ‖weighted i f‖ = h i * ‖sLocalMellinPoleTerm χ f i.2.val i.1.val‖ := by
     simp only [weighted, smul_apply, norm_smul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos (hpos i), hR]
   have hb (f : Tests) : ∃ C : ℝ, ∀ i : I, ‖weighted i f‖ ≤ C := by
-    obtain ⟨C, _, hC⟩ := sLocalStripPoles_weighted_residue_bound_of_same_prime χ A hsame f K hK N
+    obtain ⟨C, _, hC⟩ := sLocalStripPoles_weighted_residue_bound_of_decay χ A f K hK N (hdecay f)
     refine ⟨C, fun i ↦ ?_⟩
     rw [hU, mul_comm]
-    exact (le_div_iff₀ (hpos i)).mp (by simpa only [sLocalMellinPoleTerm] using hC i.1 i.2.val i.2.property)
+    exact (le_div_iff₀ (hpos i)).mp (hC i.1 i.2.val i.2.property)
   obtain ⟨C, hC⟩ := strongDual_family_bounded_on_bounded_set weighted hb hB
   refine ⟨max C 0, le_max_right _ _, fun a f hf g hg ↦ ?_⟩
   let i : I := (a, ⟨g, hg⟩)
@@ -2465,19 +2502,32 @@ theorem sLocalSinglePrime_residue_bound_on_bounded_compact (χ : PontryaginDual 
   rw [mul_comm, ← hU]
   exact (hC i f hf).trans (le_max_left _ _)
 
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323. At every one-prime strip pole the complete
+Mellin residue decays to every polynomial order, simultaneously over a bounded set of
+Schwartz–Bruhat tests and a compact set of idèles. -/
+theorem sLocalSinglePrime_residue_bound_on_bounded_compact (χ : PontryaginDual Jₛ) (A : ℝ)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ))
+    (B : Set Tests) (hB : Bornology.IsVonNBounded ℂ B) (K : Set Jₛ) (hK : IsCompact K) (N : ℕ) :
+    ∃ C ≥ (0 : ℝ), ∀ a : strip(χ,A), ∀ f ∈ B, ∀ g ∈ K,
+      ‖sLocalMellinPoleTerm χ f g a.val‖ ≤ C / (1 + |a.val.im|) ^ N :=
+  sLocalMellinPoleTerm_bounded_compact_of_decay χ A B hB K hK N
+    (fun f ↦ sLocalStripPoles_weighted_residue_decay_of_same_prime χ A hsame f K hK N)
+
 /-- The unconditional sum of the actual Mellin residues assigned to a given place or block. -/
 def sLocalAssignedMellinPoleSum {ι : Type*} (χ : PontryaginDual Jₛ) (A : ℝ)
     (assign : ℂ → ι) (v : ι) (f : Tests) (g : Jₛ) : ℂ :=
   ∑' a : strip(χ,A), if assign a.val = v then sLocalMellinPoleTerm χ f g a.val else 0
 
-/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323; absolute sums on p. 389. For a single
-residue characteristic, the full weighted residues are absolutely summable over all strip
-poles. For every assignment both the complex sums and the sums of their norms converge
-uniformly on each product of a bounded set of tests and a compact set of idèles, with the
-upper and lower heights tending independently to infinity. -/
-theorem sLocalSinglePrime_separatePlace_absolute {ι : Type*}
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323. Inverse-square residue bounds on compact idèle sets
+for each individual test give absolute convergence for every assignment.
+The residue sums and the sums of their norms converge uniformly on products of bounded
+test sets and compact idèle sets as the two window heights tend independently to infinity. -/
+theorem sLocalMellinPoleTerm_separatePlace_absolute_of_residue_decay {ι : Type*}
     (χ : PontryaginDual Jₛ) (A : ℝ)
-    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ)) (assign : ℂ → ι) :
+    (hdecay : ∀ (f : Tests) (K : Set Jₛ), IsCompact K →
+      ∃ C ≥ (0 : ℝ), ∃ T : ℝ, ∀ a : strip(χ,A), T < |a.val.im| → ∀ g ∈ K,
+        ‖sLocalMellinPoleTerm χ f g a.val‖ ≤ C / (1 + |a.val.im|) ^ 2)
+    (assign : ℂ → ι) :
     (∀ f g, Summable (fun a : strip(χ,A) ↦ ‖sLocalMellinPoleTerm χ f g a.val‖)) ∧
     ∀ (v : ι) (B : Set Tests), Bornology.IsVonNBounded ℂ B → ∀ K : Set Jₛ, IsCompact K →
       TendstoUniformlyOn (fun h fg ↦ ∑ a ∈ (sLocalStripPoleWindow χ A h).filter (assign · = v),
@@ -2489,17 +2539,18 @@ theorem sLocalSinglePrime_separatePlace_absolute {ι : Type*}
           if assign a.val = v then ‖sLocalMellinPoleTerm χ fg.1 fg.2 a.val‖ else 0)
         (atBot ×ˢ atTop) (B ×ˢ K) := by
   let w (a : strip(χ,A)) := 1 / (1 + |a.val.im|) ^ 2
-  have hw : Summable w := summable_sLocalStripPoles_inv_height_sq χ A hsame
+  have hw : Summable w := summable_sLocalStripPoles_inv_height_sq_all χ A
   constructor
   · intro f g
-    obtain ⟨C, _, hC⟩ := sLocalStripPoles_weighted_residue_bound_of_same_prime
-      χ A hsame f {g} isCompact_singleton 2
+    obtain ⟨C, _, hC⟩ := sLocalStripPoles_weighted_residue_bound_of_decay
+      χ A f {g} isCompact_singleton 2 (hdecay f {g} isCompact_singleton)
     refine (hw.mul_left C).of_norm_bounded ?_
     intro a
     rw [Real.norm_of_nonneg (norm_nonneg _)]
-    simpa only [sLocalMellinPoleTerm, w, div_eq_mul_inv, one_mul] using hC a g (mem_singleton g)
+    simpa only [w, div_eq_mul_inv, one_mul] using hC a g (mem_singleton g)
   · intro v B hB K hK
-    obtain ⟨C, _, hC⟩ := sLocalSinglePrime_residue_bound_on_bounded_compact χ A hsame B hB K hK 2
+    obtain ⟨C, _, hC⟩ := sLocalMellinPoleTerm_bounded_compact_of_decay
+      χ A B hB K hK 2 (fun f ↦ hdecay f K hK)
     let M (a : strip(χ,A)) := C * w a
     have hM : Summable M := hw.mul_left C
     have hb (a : strip(χ,A)) (fg : Tests × Jₛ) (hfg : fg ∈ B ×ˢ K) :
@@ -2519,6 +2570,27 @@ theorem sLocalSinglePrime_separatePlace_absolute {ι : Type*}
         tendstoUniformlyOn_separatePlacePartialSum_of_cofinite_bound
           (a := -A-1) (b := 2) (σ₁ := -A) (σ₂ := 1) he (by linarith) (by norm_num)
           assign (fun a fg ↦ ‖sLocalMellinPoleTerm χ fg.1 fg.2 a‖) (B ×ˢ K) M hM (.of_forall hn) v
+
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323; absolute sums on p. 389. For a single
+residue characteristic, the full weighted residues are absolutely summable over all strip
+poles. For every assignment both the complex sums and the sums of their norms converge
+uniformly on each product of a bounded set of tests and a compact set of idèles, with the
+upper and lower heights tending independently to infinity. -/
+theorem sLocalSinglePrime_separatePlace_absolute {ι : Type*}
+    (χ : PontryaginDual Jₛ) (A : ℝ)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ)) (assign : ℂ → ι) :
+    (∀ f g, Summable (fun a : strip(χ,A) ↦ ‖sLocalMellinPoleTerm χ f g a.val‖)) ∧
+    ∀ (v : ι) (B : Set Tests), Bornology.IsVonNBounded ℂ B → ∀ K : Set Jₛ, IsCompact K →
+      TendstoUniformlyOn (fun h fg ↦ ∑ a ∈ (sLocalStripPoleWindow χ A h).filter (assign · = v),
+        sLocalMellinPoleTerm χ fg.1 fg.2 a)
+        (fun fg ↦ sLocalAssignedMellinPoleSum χ A assign v fg.1 fg.2) (atBot ×ˢ atTop) (B ×ˢ K) ∧
+      TendstoUniformlyOn (fun h fg ↦ ∑ a ∈ (sLocalStripPoleWindow χ A h).filter (assign · = v),
+        ‖sLocalMellinPoleTerm χ fg.1 fg.2 a‖)
+        (fun fg ↦ ∑' a : strip(χ,A),
+          if assign a.val = v then ‖sLocalMellinPoleTerm χ fg.1 fg.2 a.val‖ else 0)
+        (atBot ×ˢ atTop) (B ×ˢ K) :=
+  sLocalMellinPoleTerm_separatePlace_absolute_of_residue_decay χ A
+    (fun f K hK ↦ sLocalStripPoles_weighted_residue_decay_of_same_prime χ A hsame f K hK 2) assign
 
 /-- The coefficient of order `-(j+1)` at the chart center is the residue of the zeta
 integral multiplied by the corresponding nonnegative power of the centered variable. -/
@@ -2924,6 +2996,23 @@ local notation "strip(" χ "," A ")" => {a : ℂ // a.re ∈ Ioo (-A) 1 ∧
   meromorphicOrderAt (fun z ↦ sLocalRhoFactor (chart(χ) z)) a < 0}
 local notation "twistₛ" => quasiCharacterNormTwist (G := Jₛ) normₛ (isProperMap_sIdeleQuotientNorm F S).continuous
 
+/-- When every assigned window converges, summing its limits gives the common-height
+contour difference at the given test and idèle. -/
+private theorem sLocal_sum_assigned_eq_verticalLineIntegral_sub_of_tendsto {ι : Type*} [Fintype ι]
+    (χ : PontryaginDual Jₛ) (A : ℝ) (hA : 0 < A)
+    (hLeft : ∀ a : ℂ, a.re = -A → 0 ≤ meromorphicOrderAt (fun z ↦ sLocalRhoFactor (chart(χ) z)) a)
+    (assign : ℂ → ι) (f : Tests) (g : Jₛ)
+    (hpoint : ∀ v : ι, Tendsto (fun h ↦ ∑ a ∈ (sLocalStripPoleWindow χ A h).filter (assign · = v),
+      sLocalMellinPoleTerm χ f g a) (atBot ×ˢ atTop) (𝓝 (sLocalAssignedMellinPoleSum χ A assign v f g))) :
+    let W (z : ℂ) := ((((normₛ g).val : ℝ) : ℂ) ^ (-z)) * Z(f,χ,z)
+    ∑ v, sLocalAssignedMellinPoleSum χ A assign v f g =
+      star (χ g : ℂ) * ((verticalLineIntegral W 1 - verticalLineIntegral W (-A)) /
+        (2 * (Real.pi : ℂ) * Complex.I)) := by
+  obtain ⟨lo, hi, hlo, hhi, hcontour⟩ := sLocalMellinPoleTerm_commonHeight_limit χ A hA hLeft
+  have htot := tendsto_finsetSum Finset.univ (fun v _ ↦ (hpoint v).comp (hlo.prodMk hhi))
+  exact tendsto_nhds_unique (htot.congr (fun n ↦ Finset.sum_fiberwise
+    (sLocalStripPoleWindow χ A (lo n, hi n)) assign (sLocalMellinPoleTerm χ f g))) (hcontour f g)
+
 /-- Paper: Theorem 7.1.2.3, p. 322. At a pole-free left boundary, the sum over any finite
 assignment of one-prime poles equals the normalized contour difference for the actual
 Mellin chart. Each assigned sum is its unconditional sum in the open strip. -/
@@ -2936,15 +3025,11 @@ theorem sLocalSinglePrime_sum_assigned_eq_verticalLineIntegral_sub {ι : Type*} 
     ∑ v, sLocalAssignedMellinPoleSum χ A assign v f g =
       star (χ g : ℂ) * ((verticalLineIntegral W 1 - verticalLineIntegral W (-A)) /
         (2 * (Real.pi : ℂ) * Complex.I)) := by
-  obtain ⟨lo, hi, hlo, hhi, hcontour⟩ := sLocalMellinPoleTerm_commonHeight_limit χ A hA hLeft
-  have hpoint (v : ι) : Tendsto (fun h ↦ ∑ a ∈ (sLocalStripPoleWindow χ A h).filter (assign · = v),
-      sLocalMellinPoleTerm χ f g a) (atBot ×ˢ atTop) (𝓝 (sLocalAssignedMellinPoleSum χ A assign v f g)) := by
-    have hv := ((sLocalSinglePrime_separatePlace_absolute χ A hsame assign).2 v
-      {f} (Bornology.isVonNBounded_singleton _) {g} isCompact_singleton).1
-    exact hv.tendsto_at (x := (f, g)) ⟨mem_singleton _, mem_singleton _⟩
-  have htot := tendsto_finsetSum Finset.univ (fun v _ ↦ (hpoint v).comp (hlo.prodMk hhi))
-  exact tendsto_nhds_unique (htot.congr (fun n ↦ Finset.sum_fiberwise
-    (sLocalStripPoleWindow χ A (lo n, hi n)) assign (sLocalMellinPoleTerm χ f g))) (hcontour f g)
+  apply sLocal_sum_assigned_eq_verticalLineIntegral_sub_of_tendsto χ A hA hLeft assign f g
+  intro v
+  have hu := ((sLocalSinglePrime_separatePlace_absolute χ A hsame assign).2 v
+    {f} (Bornology.isVonNBounded_singleton _) {g} isCompact_singleton).1
+  exact hu.tendsto_at (x := (f, g)) ⟨mem_singleton _, mem_singleton _⟩
 
 section BoundedVerticalLine
 
@@ -3240,16 +3325,21 @@ private theorem norm_sLocalTheta_sub_normalizedContour_eq_left (χ : PontryaginD
 
 end ThetaInversion
 
-/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323, and (8.4.0.1)–(8.4.0.3), p. 389. When the
-finite places lie over one rational prime and the left boundary is free of correcting-factor
-poles, the repaired separate-place theta expansion holds for every assignment. In particular,
-a shared pole can be assigned to any one of its contributing places. -/
-theorem sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor_of_same_prime
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323, and (8.4.0.1)–(8.4.0.3), p. 389. At a
+regular left boundary, inverse-square residue bounds on compact idèle sets for each test
+imply the separate-place theta expansion for every assignment. -/
+theorem sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor_of_residue_decay
     (χ : PontryaginDual Jₛ) (A : ℝ) (hA : 0 < A)
-    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ))
+    (hdecay : ∀ (f : Tests) (K : Set Jₛ), IsCompact K →
+      ∃ C ≥ (0 : ℝ), ∃ T : ℝ, ∀ a : strip(χ,A), T < |a.val.im| → ∀ g ∈ K,
+        ‖sLocalMellinPoleTerm χ f g a.val‖ ≤ C / (1 + |a.val.im|) ^ 2)
     (hLeft : ∀ a : ℂ, a.re = -A → 0 ≤ meromorphicOrderAt (fun z ↦ sLocalRhoFactor (chart(χ) z)) a)
     (assign : ℂ → Places) : sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor χ A hA assign := by
-  have hlimits := (sLocalSinglePrime_separatePlace_absolute χ A hsame assign).2
+  have hlimits := (sLocalMellinPoleTerm_separatePlace_absolute_of_residue_decay χ A hdecay assign).2
+  have hcontour (f : Tests) (g : Jₛ) :=
+    sLocal_sum_assigned_eq_verticalLineIntegral_sub_of_tendsto χ A hA hLeft assign f g (fun v ↦
+      ((hlimits v {f} (Bornology.isVonNBounded_singleton _) {g} isCompact_singleton).1).tendsto_at
+        (x := (f, g)) ⟨mem_singleton _, mem_singleton _⟩)
   obtain ⟨_, _, _, _, hvertical⟩ := sLocalIdelicZFunction_commonHeight_residue_limit χ A hA hLeft
   refine ⟨fun v f g ↦ sLocalAssignedMellinPoleSum χ A assign v f g, ?_, ?_, ?_, ?_⟩
   · intro v f K hK
@@ -3271,15 +3361,27 @@ theorem sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor_of_same_prime
   · intro f
     refine ⟨?_, fun g _ ↦ ?_⟩
     · simpa only [Complex.ofReal_one, Complex.one_cpow, one_mul] using (hvertical f 1 zero_lt_one).1
-    · rw [sLocalSinglePrime_sum_assigned_eq_verticalLineIntegral_sub χ A hA hsame hLeft assign f g,
+    · rw [hcontour f g,
         norm_sLocalTheta_sub_normalizedContour_eq_left]
       exact norm_verticalLineIntegral_normPower_mul_le (fun z ↦ Z(f,χ,z)) _ (NNReal.coe_pos.mpr (Units.zero_lt _)) A
   · intro B hB
     obtain ⟨C, hC, hb⟩ := sLocalIdelicZFunction_leftIntegral_bounded_remainder χ A hA hLeft B hB
     refine ⟨C, hC, fun f hf g _ ↦ ?_⟩
-    rw [sLocalSinglePrime_sum_assigned_eq_verticalLineIntegral_sub χ A hA hsame hLeft assign f g,
+    rw [hcontour f g,
       norm_sLocalTheta_sub_normalizedContour_eq_left]
     exact hb f hf _ (NNReal.coe_pos.mpr (Units.zero_lt _))
+
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323, and (8.4.0.1)–(8.4.0.3), p. 389. When the
+finite places lie over one rational prime and the left boundary is free of correcting-factor
+poles, the repaired separate-place theta expansion holds for every assignment. In particular,
+a shared pole can be assigned to any one of its contributing places. -/
+theorem sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor_of_same_prime
+    (χ : PontryaginDual Jₛ) (A : ℝ) (hA : 0 < A)
+    (hsame : ∀ v w : S, v.val.under (𝓞 ℚ) = w.val.under (𝓞 ℚ))
+    (hLeft : ∀ a : ℂ, a.re = -A → 0 ≤ meromorphicOrderAt (fun z ↦ sLocalRhoFactor (chart(χ) z)) a)
+    (assign : ℂ → Places) : sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor χ A hA assign :=
+  sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor_of_residue_decay χ A hA
+    (fun f K hK ↦ sLocalStripPoles_weighted_residue_decay_of_same_prime χ A hsame f K hK 2) hLeft assign
 
 /-- Every one-prime datum at an admissible cutoff has a valid assignment realizing the
 full separate-place expansion of Theorem 7.1.2.3. -/
@@ -3326,6 +3428,370 @@ theorem eventually_sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor_of_sam
   filter_upwards [eventually_sLocal_leftBoundary_regular χ A hA, self_mem_nhdsWithin] with B hreg hB
   have hpos : 0 < B := hA.trans hB
   exact ⟨hpos, sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor_of_same_prime χ B hpos hsame hreg⟩
+
+/-! ## Separate residues under polynomial separation of the finite poles -/
+
+/-- The norm power in the global finite Euler denominator has real logarithm
+and negative exponent in the additive spectral coordinate. -/
+private theorem finitePlace_absNorm_cpow_neg_eq_exp (v : HeightOneSpectrum (𝓞 F)) (z : ℂ) :
+    (v.asIdeal.absNorm : ℂ) ^ (-z) =
+      Complex.exp (-((Real.log (v.asIdeal.absNorm : ℝ)) : ℂ) * z) := by
+  have hq : 0 < (v.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast Nat.zero_lt_of_lt (HeightOneSpectrum.one_lt_absNorm v)
+  rw [← Complex.ofReal_natCast, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hq.ne'),
+    ← Complex.ofReal_log hq.le, mul_neg, neg_mul]
+
+/-- At a place of S where the global extension is unramified, its local Euler
+denominator vanishes precisely at the poles contributed by the stage character. -/
+theorem sLocalPoleContributes_finite_iff_globalEulerRoot (χ : PontryaginDual Jₛ) (η : U)
+    (h : ideleClassNormTwist η 0 ∈ unramifiedOutside F S)
+    (he : sIdeleRestriction F S ⟨ideleClassNormTwist η 0, h⟩ = chart(χ) 0)
+    (v : S) (hvr : (ideleClassNormTwist η 0).IsUnramifiedAt v.val) (b : ℂ) :
+    sLocalPoleContributes χ (Sum.inr v) b ↔
+      (ideleClassNormTwist η 0).localValue v.val *
+        Complex.exp (-((Real.log (v.val.asIdeal.absNorm : ℝ)) : ℂ) * b) = 1 := by
+  let ψ := sLocalFiniteRestriction v (chart(χ) 0)
+  have hψ (x : (v.val.adicCompletion F)ˣ) : ‖ψ x‖ = 1 := by
+    change ‖((χ _ : Circle) : ℂ) * _ ^ (0 : ℂ)‖ = 1
+    rw [Complex.cpow_zero, mul_one, Circle.norm_coe]
+  have hres (x : (v.val.adicCompletion F)ˣ) : ψ x = (ideleClassNormTwist η 0).restrict v.val x.val := by
+    change sLocalFiniteRestriction v (chart(χ) 0) x = _
+    rw [← he, HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    exact sLocalFiniteRestriction_sIdeleRestriction _ v x
+  have hU (u : (v.val.adicCompletionIntegers F)ˣ) :
+      ψ (Units.map (v.val.adicCompletionIntegers F).subtype.toMonoidHom u) = 1 :=
+    (hres _).trans (hvr.restrict_apply_unit_eq_one u)
+  let val : Valuation (v.val.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+  obtain ⟨π₀, hπ₀⟩ := val.exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π : (v.val.adicCompletion F)ˣ := Units.mk0 (π₀ : v.val.adicCompletion F) hπ₀.ne_zero
+  have hπ : ‖π.val‖ = (v.val.asIdeal.absNorm : ℝ)⁻¹ :=
+    norm_uniformizer_adicCompletion v.val π.val hπ₀
+  have hvalue : ψ π = (ideleClassNormTwist η 0).localValue v.val :=
+    (hres π).trans (hvr.localValue_eq π.val hπ₀).symm
+  have hpow : ((‖π.val‖ : ℝ) : ℂ) ^ b =
+      Complex.exp (-((Real.log (v.val.asIdeal.absNorm : ℝ)) : ℂ) * b) := by
+    rw [← finitePlace_absNorm_cpow_neg_eq_exp, hπ, Complex.ofReal_inv,
+      Complex.inv_cpow_ofReal_nonneg (Nat.cast_nonneg _) b, Complex.cpow_neg, Complex.ofReal_natCast]
+  refine (sLocalRhoFactor_poles_iff_finite_explicit v.val ψ hψ π hπ b).symm.trans ?_
+  rw [and_iff_right hU, hvalue, hpow]
+
+/-- Above the archimedean pole heights, inverse-polynomial separation gives punctured
+disks containing no other pole. Every point of the boundary is at least the disk radius
+from every finite pole, including the center itself. -/
+private theorem sLocalStripPoles_polynomial_isolating_circles
+    (χ : PontryaginDual Jₛ) (A : ℝ) (hsep : sLocalFinitePolePolynomialSeparation χ) :
+    ∃ d : ℕ, ∃ c > (0 : ℝ), ∃ T : ℝ, ∀ a : strip(χ,A), T < |a.val.im| →
+      let r := c / (1 + |a.val.im|) ^ d
+      0 < r ∧ r < 1 ∧ a.val.re = 0 ∧
+        (∀ z ∈ Metric.closedBall a.val r, z ≠ a.val →
+          0 ≤ meromorphicOrderAt (fun w ↦ sLocalRhoFactor (chart(χ) w)) z) ∧
+        ∀ z ∈ Metric.sphere a.val r, ∀ b : ℂ,
+          (∃ v : S, sLocalPoleContributes χ (Sum.inr v) b) → r ≤ ‖z - b‖ := by
+  obtain ⟨k, hk, d, hgap⟩ := hsep
+  obtain ⟨H, hH⟩ := sLocalStripPoles_high_finite_place χ A
+  obtain ⟨Q, hQ⟩ := sLocalStripPoles_high_finite_place χ 2
+  let c := min k 1 / 3
+  have hc : 0 < c := div_pos (lt_min hk one_pos) (by norm_num)
+  have hc₁ : c < 1 := by dsimp [c]; linarith [min_le_right k 1]
+  have hc₂ : 2 * c ≤ k := by dsimp [c]; linarith [min_le_left k 1]
+  refine ⟨d, c, hc, max H (Q+1), fun a ha ↦ ?_⟩
+  let h := (1 + |a.val.im|) ^ d
+  let r := c / h
+  have hh : 1 ≤ h := one_le_pow₀ (by linarith [abs_nonneg a.val.im])
+  have hhp : 0 < h := zero_lt_one.trans_le hh
+  have hr : 0 < r := div_pos hc hhp
+  have hr₁ : r < 1 := (div_le_self hc.le hh).trans_lt hc₁
+  have hfin := hH a ((le_max_left _ _).trans_lt ha)
+  obtain ⟨v, hv⟩ := hfin
+  have ha₀ : a.val.re = 0 := by
+    obtain ⟨m, t, _, _, he⟩ := hv
+    rw [he, Complex.mul_I_re, Complex.ofReal_im, neg_zero]
+  have hdist (b : ℂ) (hb : ∃ w : S, sLocalPoleContributes χ (Sum.inr w) b)
+      (hne : b ≠ a.val) : 2 * r ≤ ‖b - a.val‖ := by
+    calc
+      2 * r = (2*c)/h := (mul_div_assoc _ _ _).symm
+      _ ≤ k/h := div_le_div_of_nonneg_right hc₂ hhp.le
+      _ ≤ _ := hgap _ _ ⟨v, hv⟩ hb hne.symm
+  refine ⟨hr, hr₁, ha₀, fun z hz hza ↦ ?_, fun z hz b hb ↦ ?_⟩
+  · have hd : ‖z-a.val‖ ≤ r := by simpa [dist_eq_norm] using Metric.mem_closedBall.mp hz
+    have hre : |z.re| ≤ r := by simpa [Complex.sub_re, ha₀] using (Complex.abs_re_le_norm (z-a.val)).trans hd
+    have hzi : Q < |z.im| := by
+      have hδ : |a.val.im| ≤ |z.im| + r := by
+        calc
+          |a.val.im| = |(a.val - z).im + z.im| := by rw [Complex.sub_im, sub_add_cancel]
+          _ ≤ |(a.val-z).im| + |z.im| := abs_add_le _ _
+          _ ≤ _ := by linarith [Complex.abs_im_le_norm (a.val-z), norm_sub_rev a.val z]
+      have hQ' : Q + 1 < |a.val.im| := (le_max_right _ _).trans_lt ha
+      linarith
+    apply le_of_not_gt
+    intro hp
+    let p : strip(χ,2) := ⟨z, ⟨by linarith [(abs_le.mp hre).1], by linarith [(abs_le.mp hre).2]⟩, hp⟩
+    have := hdist z (hQ p hzi) hza
+    linarith
+  · have hd : ‖z-a.val‖ = r := by simpa [dist_eq_norm] using Metric.mem_sphere.mp hz
+    by_cases hb' : b = a.val
+    · subst b
+      exact hd.ge
+    · have htri : ‖b - a.val‖ ≤ ‖z-b‖ + r := by
+        rw [← hd, norm_sub_rev z b]
+        simpa only [dist_eq_norm] using dist_triangle b z a.val
+      linarith [hdist b hb hb']
+
+/-- If every finite pole is at least distance r from z, the product that clears the
+Euler factors is bounded below by a constant times r to the number of places. -/
+private theorem reciprocal_euler_product_lower_of_separated (χ : PontryaginDual Jₛ) (η : U)
+    (he : ideleClassNormTwist η 0 ∈ unramifiedOutside F S)
+    (heq : sIdeleRestriction F S ⟨ideleClassNormTwist η 0, he⟩ = chart(χ) 0) :
+    ∃ k > (0 : ℝ), ∀ (z : ℂ) (r : ℝ), 0 < r → r ≤ 1 →
+      (∀ b : ℂ, (∃ v : S, sLocalPoleContributes χ (Sum.inr v) b) → r ≤ ‖z-b‖) →
+      k * r^(Fintype.card S) ≤ ‖P(η,z)‖ := by
+  classical
+  have hL (v : S) : 0 < Real.log (v.val.asIdeal.absNorm : ℝ) :=
+    Real.log_pos (by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val)
+  choose k hk hc using fun v : S ↦ exists_mul_le_norm_one_sub_mul_exp_of_separated _ (hL v)
+  let m (v : S) := min (k v) 1
+  have hm (v : S) : 0 < m v := lt_min (hk v) one_pos
+  refine ⟨∏ v, m v, Finset.prod_pos (fun v _ ↦ hm v), fun z r hr hr₁ hdist ↦ ?_⟩
+  have hprod : (∏ v : S, m v * r) = (∏ v : S, m v) * r ^ Fintype.card S := by
+    simp [Finset.prod_mul_distrib]
+  rw [← hprod, norm_prod]
+  apply Finset.prod_le_prod₀ (fun v _ ↦ mul_nonneg (hm v).le hr.le)
+  intro v _
+  unfold finiteHeckeEulerFactor
+  split_ifs with hu
+  · rw [inv_inv, finitePlace_absNorm_cpow_neg_eq_exp]
+    refine (mul_le_mul_of_nonneg_right (min_le_left _ _) hr.le).trans ?_
+    apply hc v _ z r hr hr₁
+    intro b hb
+    exact hdist b ⟨v, (sLocalPoleContributes_finite_iff_globalEulerRoot χ η he heq v hu b).mpr hb⟩
+  · simp only [inv_one, norm_one]
+    exact (mul_le_of_le_one_right (hm v).le hr₁).trans (min_le_right _ _)
+
+/-- Absorb the inverse power of a shrinking radius into the prescribed order of
+vertical decay. Here the radius is c/h^d and h is at most twice the vertical height. -/
+private theorem absorb_euler_circle_loss {h t c k p v L : ℝ} (N d n : ℕ)
+    (hh : 0 < h) (ht : 0 ≤ t) (hc : 0 < c) (hk : 0 < k) (hv : 0 ≤ v)
+    (hh₂ : h ≤ 2*t) (hp : k * (c/h^d)^n ≤ p)
+    (hclear : t^(N+d*n) * (p*v) ≤ L) :
+    v * h^N ≤ (2:ℝ)^(N+d*n)*L/(k*c^n) := by
+  apply (le_div_iff₀ (mul_pos hk (pow_pos hc n))).mpr
+  have hsplit : k*c^n = (k*(c/h^d)^n) * h^(d*n) := by
+    rw [div_pow, pow_mul]
+    field_simp [hh.ne']
+  have hraise : h^(N+d*n) ≤ (2:ℝ)^(N+d*n) * t^(N+d*n) := by
+    rw [← mul_pow]
+    exact pow_le_pow_left₀ hh.le hh₂ _
+  calc
+    v * h^N * (k*c^n) = h^(N+d*n) * (k*(c/h^d)^n) * v := by rw [hsplit, pow_add]; ring
+    _ ≤ ((2:ℝ)^(N+d*n)*t^(N+d*n)) * p * v := mul_le_mul_of_nonneg_right
+      (mul_le_mul hraise hp (mul_nonneg hk.le (pow_nonneg (div_nonneg hc.le (pow_nonneg hh.le _)) _))
+        (mul_nonneg (by positivity) (pow_nonneg ht _))) hv
+    _ = (2:ℝ)^(N+d*n) * (t^(N+d*n) * (p*v)) := by ring
+    _ ≤ _ := mul_le_mul_of_nonneg_left hclear (by positivity)
+
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323. On shrinking circles around all sufficiently
+high poles, the weighted Mellin transform decays to every order, uniformly for idèles in
+a fixed compact set. The disk isolates the complete principal part at a shared pole. -/
+private theorem sLocalStripPoles_mellin_circle_decay_of_polynomialSeparation
+    (χ : PontryaginDual Jₛ) (A : ℝ) (hsep : sLocalFinitePolePolynomialSeparation χ)
+    (f : Tests) (K : Set Jₛ) (hK : IsCompact K) (N : ℕ) :
+    ∃ C ≥ (0 : ℝ), ∃ T : ℝ, ∀ a : strip(χ,A), T < |a.val.im| →
+      ∃ r ∈ Ioo (0 : ℝ) 1, ∀ g ∈ K,
+        (∀ z ∈ Metric.closedBall a.val r, z ≠ a.val →
+          AnalyticAt ℂ (fun s ↦ ((((normₛ g).val : ℝ) : ℂ) ^ (-s)) * Z(f,χ,s)) z) ∧
+        ∀ z ∈ Metric.sphere a.val r,
+          ‖((((normₛ g).val : ℝ) : ℂ) ^ (-z)) * Z(f,χ,z)‖ ≤ C / (1 + |a.val.im|) ^ N := by
+  obtain ⟨η, he, heq, _⟩ := sLocal_character_extension χ
+  obtain ⟨d, c, hc, H, hgeom⟩ := sLocalStripPoles_polynomial_isolating_circles χ A hsep
+  obtain ⟨k, hk, hprod⟩ := reciprocal_euler_product_lower_of_separated χ η he heq
+  obtain ⟨D, hD, hkernel⟩ := sLocalNormPower_bounded_on_compact_strip K hK (-1) 1
+  let n := Fintype.card S
+  let M := N+d*n
+  obtain ⟨L, hL, Y, htail⟩ :=
+    RiemannMasullo.sLocalIdelicZFunction_cleared_strip_tails χ η f he heq (-1) 1 M
+  let B := (2:ℝ)^M*L/(k*c^n)
+  have hB : 0 ≤ B := by dsimp [B]; positivity
+  refine ⟨D*B, mul_nonneg hD hB, max H (max (Y+1) 3), fun a ha ↦ ?_⟩
+  let h := 1 + |a.val.im|
+  let r := c/h^d
+  have hh : 0 < h := by dsimp [h]; positivity
+  obtain ⟨hr, hr₁, har, hreg, hcirc⟩ := hgeom a ((le_max_left _ _).trans_lt ha)
+  refine ⟨r, ⟨hr, hr₁⟩, fun g hg ↦ ⟨?_, ?_⟩⟩
+  · intro z hz hne
+    have hp := sLocalIdelicZFunction_poles f χ z
+    rw [min_eq_left (hreg z hz hne)] at hp
+    have hzeta := ((sLocalIdelicZFunction_meromorphic f χ)
+      (mem_univ z)).meromorphicOrderAt_nonneg_iff_analyticAt.mp hp
+    have hpos : 0 < ((normₛ g).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+    exact ((differentiable_neg.const_cpow (Or.inl (Complex.ofReal_ne_zero.mpr hpos.ne'))).analyticAt z).mul hzeta
+  · intro z hz
+    have hd : ‖z-a.val‖ = r := by simpa [dist_eq_norm] using Metric.mem_sphere.mp hz
+    have hre : |z.re| ≤ r := by
+      simpa [Complex.sub_re, har, hd] using Complex.abs_re_le_norm (z-a.val)
+    have hzre : z.re ∈ Icc (-1 : ℝ) 1 :=
+      ⟨by linarith [(abs_le.mp hre).1], by linarith [(abs_le.mp hre).2]⟩
+    have him : |a.val.im| ≤ |z.im|+r := by
+      calc
+        |a.val.im| = |(a.val-z).im + z.im| := by rw [Complex.sub_im, sub_add_cancel]
+        _ ≤ |(a.val-z).im| + |z.im| := abs_add_le _ _
+        _ ≤ _ := by linarith [Complex.abs_im_le_norm (a.val-z), norm_sub_rev a.val z]
+    have hY : Y + 1 < |a.val.im| := ((le_max_left _ _).trans (le_max_right _ _)).trans_lt ha
+    have h3 : 3 < |a.val.im| := ((le_max_right _ _).trans (le_max_right _ _)).trans_lt ha
+    have hzbig : Y < |z.im| := by linarith
+    have hh₂ : h ≤ 2*|z.im| := by dsimp only [h]; linarith
+    have hclear := htail z hzre hzbig
+    rw [norm_mul] at hclear
+    have hp := hprod z r hr hr₁.le (hcirc z hz)
+    have hzbound : ‖Z(f,χ,z)‖*h^N ≤ B := absorb_euler_circle_loss N d n hh (abs_nonneg _) hc hk
+      (norm_nonneg _) hh₂ hp hclear
+    apply (le_div_iff₀ (pow_pos hh N)).mpr
+    rw [norm_mul, mul_assoc]
+    exact mul_le_mul (hkernel g hg z hzre) hzbound
+      (mul_nonneg (norm_nonneg _) (pow_nonneg hh.le _)) hD
+
+/-- Every complete Mellin residue satisfies an arbitrary inverse-power bound in the
+ordinate, for each fixed test and uniformly on compact sets of idèles. The radius
+factor in the Cauchy estimate is at most one. -/
+private theorem sLocalStripPoles_residue_decay_of_polynomialSeparation
+    (χ : PontryaginDual Jₛ) (A : ℝ) (hsep : sLocalFinitePolePolynomialSeparation χ)
+    (f : Tests) (K : Set Jₛ) (hK : IsCompact K) (N : ℕ) :
+    ∃ C ≥ (0 : ℝ), ∃ T : ℝ, ∀ a : strip(χ,A), T < |a.val.im| → ∀ g ∈ K,
+      ‖sLocalMellinPoleTerm χ f g a.val‖ ≤ C / (1 + |a.val.im|)^N := by
+  obtain ⟨C,hC,T,hh⟩ := sLocalStripPoles_mellin_circle_decay_of_polynomialSeparation χ A hsep f K hK N
+  refine ⟨C,hC,T,fun a ha g hg ↦ ?_⟩
+  obtain ⟨r,hr,h⟩ := hh a ha
+  obtain ⟨hreg,hcirc⟩ := h g hg
+  rw [sLocalMellinPoleTerm, norm_mul, norm_star, Circle.norm_coe, one_mul]
+  exact (norm_complexResidue_le_circle hr.1 hreg hcirc).trans
+    (mul_le_of_le_one_left (by positivity) hr.2.le)
+
+/-- A varying circle of radius less than one transfers its height bound to every principal
+Laurent coefficient simultaneously, with the same constant and height cutoff. -/
+private theorem sLocalZLaurentCoeff_neg_decay_of_circle_decay (χ : PontryaginDual Jₛ) (A : ℝ)
+    (f : Tests) (N : ℕ) {C T : ℝ} (hC : 0 ≤ C)
+    (hcircle : ∀ a : strip(χ,A), T < |a.val.im| → ∃ r ∈ Ioo (0 : ℝ) 1,
+      (∀ z ∈ Metric.closedBall a.val r, z ≠ a.val → AnalyticAt ℂ (fun s ↦ Z(f,χ,s)) z) ∧
+      ∀ z ∈ Metric.sphere a.val r, ‖Z(f,χ,z)‖ ≤ C / (1 + |a.val.im|)^N) :
+    ∀ a : strip(χ,A), T < |a.val.im| → ∀ k : ℕ, 0 < k →
+      ‖sLocalZLaurentCoeff f (chart(χ) a.val) (-(k : ℤ))‖ ≤ C / (1 + |a.val.im|)^N := by
+  intro a ha k hk
+  obtain ⟨j, rfl⟩ := Nat.exists_eq_succ_of_ne_zero hk.ne'
+  obtain ⟨r, hr, hZ, hb⟩ := hcircle a ha
+  have hM : 0 ≤ C / (1 + |a.val.im|)^N := by positivity
+  rw [sLocalZLaurentCoeff_neg_succ_eq_residue]
+  refine (norm_complexResidue_le_circle (C := C / (1 + |a.val.im|)^N) hr.1 ?_ ?_).trans
+    (mul_le_of_le_one_left hM hr.2.le)
+  · intro z hz hne
+    exact ((analyticAt_id.sub analyticAt_const).pow j).mul (hZ z hz hne)
+  · intro z hz
+    have hd : ‖z - a.val‖ = r := by simpa [dist_eq_norm] using Metric.mem_sphere.mp hz
+    rw [norm_mul, norm_pow, hd]
+    exact (mul_le_mul_of_nonneg_left (hb z hz) (pow_nonneg hr.1.le j)).trans
+      (mul_le_of_le_one_left hM (pow_le_one₀ hr.1.le hr.2.le))
+
+/-- A height bound on the circles for each test gives a single bound, at every pole and every
+principal order, for any bounded set of Schwartz–Bruhat tests. -/
+private theorem sLocalZLaurentCoeff_neg_bound_on_bounded_of_circle_decay (χ : PontryaginDual Jₛ)
+    (A : ℝ) (N : ℕ) (hcircle : ∀ f : Tests, ∃ C ≥ (0 : ℝ), ∃ T : ℝ,
+      ∀ a : strip(χ,A), T < |a.val.im| → ∃ r ∈ Ioo (0 : ℝ) 1,
+        (∀ z ∈ Metric.closedBall a.val r, z ≠ a.val → AnalyticAt ℂ (fun s ↦ Z(f,χ,s)) z) ∧
+        ∀ z ∈ Metric.sphere a.val r, ‖Z(f,χ,z)‖ ≤ C / (1 + |a.val.im|)^N)
+    (B : Set Tests) (hB : Bornology.IsVonNBounded ℂ B) :
+    ∃ C ≥ (0 : ℝ), ∀ a : strip(χ,A), ∀ k : ℕ, 0 < k → ∀ f ∈ B,
+      ‖sLocalZLaurentCoeff f (chart(χ) a.val) (-(k : ℤ))‖ ≤ C / (1 + |a.val.im|)^N := by
+  classical
+  let : BarrelledSpace ℂ Tests := (sAdeleSchwartz_montel (F := F) S).1
+  let I := strip(χ,A) × {k : ℕ // 0 < k}
+  let w (i : I) : ℝ := (1 + |i.1.val.im|)^N
+  have hw (i : I) : 0 < w i := by dsimp only [w]; positivity
+  let L (i : I) : StrongDual ℂ Tests :=
+    (w i : ℂ) • sLocalPrincipalPartCoeff (chart(χ) i.1.val) i.2.val
+  have hnorm (i : I) (f : Tests) :
+      ‖L i f‖ = w i * ‖sLocalZLaurentCoeff f (chart(χ) i.1.val) (-(i.2.val : ℤ))‖ := by
+    simp only [L, smul_apply, norm_smul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos (hw i),
+      sLocalPrincipalPartCoeff_apply]
+  have hpoint (f : Tests) : ∃ M : ℝ, ∀ i : I, ‖L i f‖ ≤ M := by
+    obtain ⟨C, hC, T, hc⟩ := hcircle f
+    have htail := sLocalZLaurentCoeff_neg_decay_of_circle_decay χ A f N hC hc
+    have hlow : {a : strip(χ,A) | ¬ T < |a.val.im|}.Finite :=
+      eventually_cofinite.mp (eventually_sLocalStripPoles_abs_im_gt χ A T)
+    have hsite (a : strip(χ,A)) : ∃ D : ℝ, ∀ k : ℕ,
+        ‖sLocalZLaurentCoeff f (chart(χ) a.val) (-(k : ℤ))‖ ≤ D := by
+      obtain ⟨m, _, _, hz, _⟩ := sLocalZLaurentCoeff_hasLaurentSeries f (chart(χ) a.val)
+      obtain ⟨D, hD⟩ := ((Finset.range ((-m).toNat + 1)).finite_toSet.image (fun k : ℕ ↦
+        ‖sLocalZLaurentCoeff f (chart(χ) a.val) (-(k : ℤ))‖)).bddAbove
+      refine ⟨max D 0, fun k ↦ ?_⟩
+      by_cases hk : k < (-m).toNat + 1
+      · exact (hD ⟨k, Finset.mem_range.mpr hk, rfl⟩).trans (le_max_left _ _)
+      · rw [hz _ (by omega), norm_zero]
+        exact le_max_right _ _
+    choose D hD using hsite
+    obtain ⟨Q, hQ⟩ := (hlow.image (fun a : strip(χ,A) ↦ D a * (1 + |a.val.im|)^N)).bddAbove
+    refine ⟨max C Q, fun i ↦ ?_⟩
+    rw [hnorm, mul_comm]
+    by_cases ht : T < |i.1.val.im|
+    · exact ((le_div_iff₀ (hw i)).mp (htail i.1 ht i.2 i.2.property)).trans (le_max_left _ _)
+    · exact (mul_le_mul_of_nonneg_right (hD i.1 i.2.val) (hw i).le).trans
+        ((hQ ⟨i.1, ht, rfl⟩).trans (le_max_right _ _))
+  obtain ⟨C, hC⟩ := strongDual_family_bounded_on_bounded_set L hpoint hB
+  refine ⟨max C 0, le_max_right _ _, fun a k hk f hf ↦ ?_⟩
+  let i : I := ⟨a, ⟨k, hk⟩⟩
+  apply (le_div_iff₀ (hw i)).mpr
+  rw [mul_comm]
+  exact (hnorm i f ▸ hC i f hf).trans (le_max_left _ _)
+
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323; (8.4.0.2), p. 389. The actual Mellin
+residues are absolutely summable for polynomially separated pole centers. For any
+assignment the complex sums and their norm sums converge uniformly over each product
+of a bounded set of tests and a compact set of idèles. -/
+theorem sLocalMellinPoleTerm_separatePlace_absolute_of_polynomialSeparation {ι : Type*}
+    (χ : PontryaginDual Jₛ) (A : ℝ) (hsep : sLocalFinitePolePolynomialSeparation χ)
+    (assign : ℂ → ι) :
+    (∀ f g, Summable (fun a : strip(χ,A) ↦ ‖sLocalMellinPoleTerm χ f g a.val‖)) ∧
+    ∀ (v : ι) (B : Set Tests), Bornology.IsVonNBounded ℂ B → ∀ K : Set Jₛ, IsCompact K →
+      TendstoUniformlyOn (fun h fg ↦ ∑ a ∈ (sLocalStripPoleWindow χ A h).filter (assign · = v),
+        sLocalMellinPoleTerm χ fg.1 fg.2 a)
+        (fun fg ↦ sLocalAssignedMellinPoleSum χ A assign v fg.1 fg.2) (atBot ×ˢ atTop) (B ×ˢ K) ∧
+      TendstoUniformlyOn (fun h fg ↦ ∑ a ∈ (sLocalStripPoleWindow χ A h).filter (assign · = v),
+        ‖sLocalMellinPoleTerm χ fg.1 fg.2 a‖)
+        (fun fg ↦ ∑' a : strip(χ,A),
+          if assign a.val = v then ‖sLocalMellinPoleTerm χ fg.1 fg.2 a.val‖ else 0)
+        (atBot ×ˢ atTop) (B ×ˢ K) :=
+  sLocalMellinPoleTerm_separatePlace_absolute_of_residue_decay χ A
+    (fun f K hK ↦ sLocalStripPoles_residue_decay_of_polynomialSeparation χ A hsep f K hK 2) assign
+
+/-- Paper: Theorem 7.1.2.3, pp. 317–323. On a pole-free left line, inverse-polynomial
+separation of distinct finite pole centers implies the full separate-place expansion
+for every assignment. Both uniform convergence clauses and the bounded-test remainder
+refer to the genuine S-local theta function and its Mellin transform.
+Deviation: Each shared pole contributes its complete principal part once. -/
+theorem sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor_of_polynomialSeparation
+    (χ : PontryaginDual Jₛ) (A : ℝ) (hA : 0 < A) (hsep : sLocalFinitePolePolynomialSeparation χ)
+    (hLeft : ∀ a : ℂ, a.re = -A → 0 ≤ meromorphicOrderAt (fun z ↦ sLocalRhoFactor (chart(χ) z)) a)
+    (assign : ℂ → Places) :
+    sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor χ A hA assign :=
+  sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor_of_residue_decay χ A hA
+    (fun f K hK ↦ sLocalStripPoles_residue_decay_of_polynomialSeparation χ A hsep f K hK 2) hLeft assign
+
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322–323, and (8.4.0.2), p. 389. For a bounded
+set of tests, one summable function on the distinct strip poles dominates every negative
+Laurent coefficient, uniformly in its order and in the test.
+Deviation: The hypothesis allows coincident finite poles but bounds the approach of
+distinct centers. All negative coefficients come from the actual Mellin chart. -/
+theorem sLocalZLaurentCoeff_neg_summable_majorant_of_polynomialSeparation
+    (χ : PontryaginDual Jₛ) (A : ℝ) (hsep : sLocalFinitePolePolynomialSeparation χ)
+    (B : Set Tests) (hB : Bornology.IsVonNBounded ℂ B) :
+    ∃ W : strip(χ,A) → ℝ, Summable W ∧ ∀ a : strip(χ,A), ∀ k : ℕ, 0 < k → ∀ f ∈ B,
+      ‖sLocalZLaurentCoeff f (chart(χ) a.val) (-(k : ℤ))‖ ≤ W a := by
+  obtain ⟨C, _, h⟩ := sLocalZLaurentCoeff_neg_bound_on_bounded_of_circle_decay χ A 2
+    (fun f ↦ by
+      obtain ⟨D, hD, T, hT⟩ :=
+        sLocalStripPoles_mellin_circle_decay_of_polynomialSeparation χ A hsep f {1} isCompact_singleton 2
+      refine ⟨D, hD, T, fun a ha ↦ ?_⟩
+      obtain ⟨r, hr, hb⟩ := hT a ha
+      exact ⟨r, hr, by simpa using hb 1 (mem_singleton _)⟩) B hB
+  refine ⟨fun a ↦ C / (1 + |a.val.im|)^2, ?_, h⟩
+  simpa [div_eq_mul_inv] using (summable_sLocalStripPoles_inv_height_sq_all χ A).mul_left C
 
 end
 
