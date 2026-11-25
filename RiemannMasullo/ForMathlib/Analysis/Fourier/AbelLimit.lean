@@ -329,4 +329,36 @@ theorem fourier_L2_abel_limit (g : Lp ℂ 2 (volume : Measure ℝ)) :
   apply integral_congr_ae (ae_of_all _ fun x ↦ ?_)
   rw [← sub_mul, norm_mul, Complex.norm_real, Real.norm_of_nonneg (hk _), mul_comm]
 
+/-- The Fourier integral of the reciprocal quadratic weight in angular frequency.
+Its value at zero is the mass π. -/
+theorem integral_cexp_mul_inv_one_add_sq (d : ℝ) :
+    (∫ x : ℝ, Complex.exp (↑(d * x) * Complex.I) * (((1 + x ^ 2)⁻¹ : ℝ) : ℂ)) =
+      ((Real.pi * Real.exp (-|d|) : ℝ) : ℂ) := by
+  let v := d / (2 * Real.pi)
+  let f := halfPlaneAbelTest 1 0
+  have hf (x : ℝ) : 𝓕 f x = (ProbabilityTheory.cauchyPDFReal 0 1 x : ℂ) :=
+    fourier_halfPlaneAbelTest one_pos 0 x
+  have hi : Integrable (𝓕 f) := by
+    rw [funext hf]
+    exact (ProbabilityTheory.integrable_cauchyPDFReal 0 (γ := 1)).ofReal
+  have hc : Continuous f := by unfold f halfPlaneAbelTest; fun_prop
+  have hv := (halfPlaneAbelTest_mem one_pos 0).1.fourierInv_fourier_eq hi (v := v) hc.continuousAt
+  rw [Real.fourierInv_eq_fourier_neg, Real.fourier_real_eq_integral_exp_smul] at hv
+  have hscale : 2 * Real.pi * |v| = |d| := by
+    rw [show |v| = |d| / (2 * Real.pi) by
+      dsimp [v]; rw [abs_div, abs_of_pos Real.two_pi_pos]]
+    field_simp [Real.pi_ne_zero]
+  have hval : halfPlaneAbelTest 1 0 v = (Real.exp (-|d|) : ℂ) := by
+    simp [halfPlaneAbelTest, hscale, Complex.ofReal_exp]
+  calc
+    _ = (Real.pi : ℂ) * ∫ x : ℝ, Complex.exp (↑(-2 * Real.pi * x * -v) * Complex.I) • (𝓕 f x) := by
+      rw [← integral_const_mul]
+      apply integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+      have hphase : -2 * Real.pi * x * -v = d * x := by dsimp [v]; field_simp
+      rw [hphase, hf, ProbabilityTheory.cauchyPDFReal_def]
+      simp only [NNReal.coe_one, sub_zero, one_pow, mul_one, smul_eq_mul, Complex.ofReal_mul,
+        Complex.ofReal_inv, add_comm (x ^ 2) 1]
+      field_simp [Real.pi_ne_zero]
+    _ = _ := by rw [hv, hval, Complex.ofReal_mul]
+
 end RiemannMasullo
