@@ -17520,4 +17520,183 @@ theorem bruhatCompactSupport_mellin_conductor_level (φ : BruhatCompactSupport C
 
 end FiniteConductor
 
+section CriticalHeckeZeroWindows
+
+open Metric
+open scoped Asymptotics
+
+variable {F : Type*} [Field F] [NumberField F]
+
+local notation "U[" F "]" => PontryaginDual (IdeleClassGroup (𝓞 F) F)
+local notation "halfPlane" => (Complex.re ⁻¹' Ioi (1 : ℝ))
+local notation "ezInverseGrowth(" f ", " σ ", " k ")" =>
+  (fun t : ℝ ↦ ((f : ℂ → ℂ) ⟨σ, t⟩)⁻¹) =O[comap (abs : ℝ → ℝ) atTop] (fun t ↦ |t| ^ (k : ℕ))
+
+/-- On all sufficiently high discs of radius four centered on the Euler line,
+a finite Hecke continuation is analytic and bounded polynomially relative to
+its nonzero value at the center. Heights of either sign are allowed. -/
+theorem finiteHeckeL_continuation_highHeight_disk_growth (χ : U[F]) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s) :
+    ∃ B E T : ℝ, 0 < B ∧ 0 ≤ E ∧ ∀ u : ℝ, T ≤ |u| →
+      let c : ℂ := ⟨2, u⟩
+      AnalyticOnNhd ℂ L (closedBall c 4) ∧ L c ≠ 0 ∧
+        ∀ z ∈ closedBall c 4, ‖L z / L c‖ ≤ B * (1 + |u|) ^ E := by
+  obtain ⟨c, hc, hlow⟩ := explicitZeroCount_line_two χ L hSeries
+  have hne (t : ℝ) : L ⟨2, t⟩ ≠ 0 := norm_pos_iff.mp (hc.trans_le (hlow t))
+  have hinv : ezInverseGrowth(L, (2 : ℝ), 0) := by
+    refine Asymptotics.IsBigO.of_bound c⁻¹ (Eventually.of_forall fun t ↦ ?_)
+    rw [pow_zero, norm_one, mul_one, norm_inv]
+    exact inv_anti₀ hc (hlow t)
+  exact explicitZeroCount_disk_growth (σ := 2) (k := 0) hL
+    (fun a b hab ↦ finiteHeckeL_continuation_isBigO_rpow χ L hL hSeries a b hab)
+    (Eventually.of_forall hne) hinv 4 (by norm_num)
+
+/-- A single finite set of genuine zeros controls every critical-line ordinate
+in a unit interval at sufficiently large absolute height. Its total multiplicity
+and the Landau remainder are both logarithmic. The same set controls all real
+parts from one half to two and is independent of the evaluation point. -/
+theorem finiteHeckeL_continuation_highHeight_unitWindow_logDeriv (χ : U[F]) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s) :
+    ∃ C > (0 : ℝ), ∃ J > (0 : ℝ), ∀ j : ℝ, J ≤ |j| →
+      let c : ℂ := ⟨2, j + 1 / 2⟩
+      AnalyticOnNhd ℂ L (closedBall c 4) ∧ L c ≠ 0 ∧ ∃ S : Finset ℂ,
+        (∀ ρ, ρ ∈ S ↔ ρ ∈ closedBall c (5 / 2) ∧ L ρ = 0) ∧
+        (∀ ρ ∈ S, 0 < analyticOrderNatAt L ρ ∧
+          MeromorphicOn.divisor L univ ρ = (analyticOrderNatAt L ρ : ℤ)) ∧
+        (∑ ρ ∈ S, (analyticOrderNatAt L ρ : ℝ)) ≤ C * Real.log (2 + |j|) ∧
+        (∀ z ∈ closedBall c 2, L z ≠ 0 →
+          ‖logDeriv L z - ∑ ρ ∈ S, (analyticOrderNatAt L ρ : ℂ) / (z - ρ)‖ ≤
+            C * Real.log (2 + |j|)) ∧
+        ∀ σ ∈ Icc (1 / 2 : ℝ) 2, ∀ t ∈ Icc j (j + 1), (∀ ρ ∈ S, t ≠ ρ.im) →
+          AnalyticAt ℂ (logDeriv L) (⟨σ, t⟩ : ℂ) ∧ L ⟨σ, t⟩ ≠ 0 ∧
+            ‖logDeriv L ⟨σ, t⟩‖ ≤ C * Real.log (2 + |j|) +
+              ∑ ρ ∈ S, (analyticOrderNatAt L ρ : ℝ) / |t - ρ.im| := by
+  classical
+  obtain ⟨B, E, T, hB, hE, hdata⟩ :=
+    finiteHeckeL_continuation_highHeight_disk_growth χ L hL hSeries
+  let b := max 2 B
+  let K := Real.log b + E
+  let d := Real.log ((4 : ℝ) / (5 / 2))
+  let D := landauConstant 2 (5 / 2) 3 4
+  let C := max (K / d) (D * K)
+  have hb : 1 < b := lt_of_lt_of_le (by norm_num : (1 : ℝ) < 2) (le_max_left _ _)
+  have hK : 0 < K := add_pos_of_pos_of_nonneg (Real.log_pos hb) hE
+  have hd : 0 < d := Real.log_pos (by norm_num)
+  have hD : 0 < D := landauConstant_pos (by norm_num) (by norm_num) (by norm_num) (by norm_num)
+  have hC : 0 < C := (div_pos hK hd).trans_le (le_max_left _ _)
+  refine ⟨C, hC, max (T + 1) (Real.exp 1), (Real.exp_pos _).trans_le (le_max_right _ _), ?_⟩
+  intro j hj c
+  let u := 2 + |j|
+  have hu : 1 ≤ u := by dsimp [u]; linarith [abs_nonneg j]
+  have hu₀ : 0 < u := zero_lt_one.trans_le hu
+  have hlogu : 1 ≤ Real.log u := by
+    have he : Real.exp 1 ≤ u := (le_max_right _ _).trans (hj.trans (by dsimp [u]; linarith))
+    simpa only [Real.log_exp] using Real.log_le_log (Real.exp_pos _) he
+  have hshift : 1 + |j + 1 / 2| ≤ u := by
+    have h := abs_add_le j (1 / 2 : ℝ)
+    rw [abs_of_pos (by norm_num : (0 : ℝ) < 1 / 2)] at h
+    dsimp [u]
+    linarith
+  have hlarge : T ≤ |j + 1 / 2| := by
+    have ht := (le_max_left _ _).trans hj
+    have h := abs_add_le (j + 1 / 2) (-(1 / 2 : ℝ))
+    rw [← sub_eq_add_neg, add_sub_cancel_right, abs_neg,
+      abs_of_pos (by norm_num : (0 : ℝ) < 1 / 2)] at h
+    linarith
+  obtain ⟨ha, hc, hbound⟩ := hdata (j + 1 / 2) hlarge
+  let M := b * u ^ E
+  have hM : 1 < M := hb.trans_le (le_mul_of_one_le_right (zero_lt_one.trans hb).le (Real.one_le_rpow hu hE))
+  have hMbound (z : ℂ) (hz : z ∈ closedBall c 4) : ‖L z / L c‖ ≤ M :=
+    (hbound z hz).trans (mul_le_mul (le_max_right _ _)
+      (Real.rpow_le_rpow (by positivity) hshift hE) (Real.rpow_nonneg (by positivity) _) (zero_lt_one.trans hb).le)
+  have hlogM : Real.log M ≤ K * Real.log u := by
+    rw [show M = b * u ^ E from rfl,
+      Real.log_mul (zero_lt_one.trans hb).ne' (Real.rpow_pos_of_pos hu₀ _).ne', Real.log_rpow hu₀]
+    dsimp [K]
+    nlinarith [mul_le_mul_of_nonneg_left hlogu (Real.log_pos hb).le]
+  have ha' : AnalyticOnNhd ℂ L (closedBall c (5 / 2)) := ha.mono (closedBall_subset_closedBall (by norm_num))
+  let S := (finite_zeros_closedBall (by norm_num : (0 : ℝ) ≤ 5 / 2) ha' hc).toFinset
+  have hS (ρ : ℂ) : ρ ∈ S ↔ ρ ∈ closedBall c (5 / 2) ∧ L ρ = 0 := by simp [S]
+  have hsites (ρ : ℂ) (hρ : ρ ∈ S) : 0 < analyticOrderNatAt L ρ ∧
+      MeromorphicOn.divisor L univ ρ = (analyticOrderNatAt L ρ : ℤ) := by
+    obtain ⟨hmem, hzero⟩ := (hS ρ).mp hρ
+    have hfinite := ha'.analyticOrderAt_ne_top_of_isPreconnected (convex_closedBall c (5 / 2)).isPreconnected
+      (x := c) (mem_closedBall_self (by norm_num)) hmem (by
+        rw [analyticOrderAt_eq_zero.mpr (Or.inr hc)]
+        simp)
+    have hne : analyticOrderAt L ρ ≠ 0 := by
+      rw [ne_eq, analyticOrderAt_eq_zero]
+      exact not_or_intro (not_not_intro (ha' ρ hmem)) (not_not_intro hzero)
+    have hcast := Nat.cast_analyticOrderNatAt hfinite
+    have hn : 0 < analyticOrderNatAt L ρ := by
+      by_contra! h
+      have hh : analyticOrderNatAt L ρ = 0 := by omega
+      rw [hh, Nat.cast_zero] at hcast
+      exact hne hcast.symm
+    have ho : meromorphicOrderAt L ρ = ((analyticOrderNatAt L ρ : ℤ) : WithTop ℤ) := by
+      rw [(ha' ρ hmem).meromorphicOrderAt_eq, ← hcast, ENat.map_natCast]
+    exact ⟨hn, by rw [MeromorphicOn.divisor_apply hL.meromorphicOn (mem_univ _), ho, WithTop.untop₀_coe]⟩
+  have hsum {A : Type} [AddCommMonoid A] (g : ℂ → A) (hg : ∀ ρ, L ρ ≠ 0 → g ρ = 0) :
+      ∑ᶠ ρ ∈ closedBall c (5 / 2), g ρ = ∑ ρ ∈ S, g ρ := by
+    rw [← finsum_mem_coe_finset]
+    refine finsum_mem_inter_support_eq' _ _ _ fun ρ hρ ↦ ?_
+    have hzero : L ρ = 0 := by
+      by_contra h
+      exact hρ (hg ρ h)
+    simp [hS, hzero]
+  have horder_zero {ρ : ℂ} (hρ : L ρ ≠ 0) : analyticOrderNatAt L ρ = 0 := by
+    simp [analyticOrderNatAt, analyticOrderAt_eq_zero.mpr (Or.inr hρ)]
+  have hmass : (∑ ρ ∈ S, (analyticOrderNatAt L ρ : ℝ)) ≤ Real.log M / d := by
+    exact explicitZeroCount_disk_sum (by norm_num : (0 : ℝ) < 5 / 2) (by norm_num : (5 / 2 : ℝ) < 4)
+      ha hc hMbound S (fun ρ hρ ↦ ((hS ρ).mp hρ).1)
+  have hmass' : (∑ ρ ∈ S, (analyticOrderNatAt L ρ : ℝ)) ≤ C * Real.log u := by
+    apply hmass.trans
+    calc
+      Real.log M / d ≤ K * Real.log u / d := div_le_div_of_nonneg_right hlogM hd.le
+      _ = (K / d) * Real.log u := by ring
+      _ ≤ C * Real.log u := mul_le_mul_of_nonneg_right (le_max_left _ _) (zero_le_one.trans hlogu)
+  have hlandau (z : ℂ) (hz : z ∈ closedBall c 2) (hz₀ : L z ≠ 0) :
+      ‖logDeriv L z - ∑ ρ ∈ S, (analyticOrderNatAt L ρ : ℂ) / (z - ρ)‖ ≤ C * Real.log u := by
+    have hl := landau_norm_logDeriv_sub_le hM (by norm_num : (0 : ℝ) < 2)
+      (by norm_num : (2 : ℝ) < 5 / 2) (by norm_num : (5 / 2 : ℝ) < 3) (by norm_num : (3 : ℝ) < 4)
+      ha hc hMbound hz hz₀
+    rw [hsum (fun ρ ↦ (analyticOrderNatAt L ρ : ℂ) / (z - ρ)) (fun _ h ↦ by simp [horder_zero h])] at hl
+    apply hl.trans
+    calc
+      D * Real.log M ≤ D * (K * Real.log u) := mul_le_mul_of_nonneg_left hlogM hD.le
+      _ = (D * K) * Real.log u := (mul_assoc _ _ _).symm
+      _ ≤ C * Real.log u := mul_le_mul_of_nonneg_right (le_max_right _ _) (zero_le_one.trans hlogu)
+  refine ⟨ha, hc, S, hS, hsites, hmass', hlandau, ?_⟩
+  intro σ hσ t ht haway
+  let z : ℂ := ⟨σ, t⟩
+  have hz : z ∈ closedBall c 2 := by
+    rw [mem_closedBall, dist_eq_norm]
+    apply (Complex.norm_le_abs_re_add_abs_im _).trans
+    change |σ - 2| + |t - (j + 1 / 2)| ≤ 2
+    have hτ : |t - (j + 1 / 2)| ≤ 1 / 2 := abs_le.mpr ⟨by linarith [ht.1], by linarith [ht.2]⟩
+    rw [abs_of_nonpos (sub_nonpos.mpr hσ.2)]
+    linarith [hσ.1]
+  have hz' : z ∈ closedBall c (5 / 2) := closedBall_subset_closedBall (by norm_num) hz
+  have hz₀ : L z ≠ 0 := fun h ↦ haway z ((hS z).mpr ⟨hz', h⟩) rfl
+  refine ⟨(ha' z hz').deriv.div (ha' z hz') hz₀, hz₀, ?_⟩
+  let P (ρ : ℂ) := (analyticOrderNatAt L ρ : ℂ) / (z - ρ)
+  have hP : ‖∑ ρ ∈ S, P ρ‖ ≤ ∑ ρ ∈ S, (analyticOrderNatAt L ρ : ℝ) / |t - ρ.im| := by
+    refine (norm_sum_le _ _).trans (Finset.sum_le_sum fun ρ hρ ↦ ?_)
+    rw [show P ρ = (analyticOrderNatAt L ρ : ℂ) / (z - ρ) from rfl, norm_div, Complex.norm_natCast]
+    exact div_le_div_of_nonneg_left (Nat.cast_nonneg _) (abs_pos.mpr (sub_ne_zero.mpr (haway ρ hρ)))
+      (Complex.abs_im_le_norm (z - ρ))
+  have htriangle := norm_add_le (logDeriv L z - ∑ ρ ∈ S, P ρ) (∑ ρ ∈ S, P ρ)
+  rw [sub_add_cancel] at htriangle
+  exact htriangle.trans (add_le_add (hlandau z hz hz₀) hP)
+
+end CriticalHeckeZeroWindows
+
+/-- The circle residue of an analytic multiplier times a meromorphic logarithmic
+derivative equals the multiplier at the point times the divisor order there. -/
+theorem complexResidue_mul_logDeriv (Φ L : ℂ → ℂ) (ρ : ℂ)
+    (hΦ : AnalyticAt ℂ Φ ρ) (hL : MeromorphicAt L ρ) (hne : meromorphicOrderAt L ρ ≠ ⊤) :
+    complexResidue (fun z ↦ Φ z * logDeriv L z) ρ =
+      ((meromorphicOrderAt L ρ).untop₀ : ℂ) * Φ ρ :=
+  hasSum_heckeAsymptoticResidue_residue Φ L ρ hΦ hL hne
+
 end RiemannMasullo
