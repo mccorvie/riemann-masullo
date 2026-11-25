@@ -8,9 +8,12 @@ import RiemannMasullo.AppB_AnalyticNT.Sec4b
 import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec5
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.Ch10_TraceSpectral.Sec3_LineWindows
+import RiemannMasullo.Ch10_TraceSpectral.Sec3_TraceClass
 import RiemannMasullo.ForMathlib.Analysis.Fourier.StripLaplace
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 import Mathlib.Analysis.Calculus.ParametricIntegral
+import Mathlib.Order.Prod.Lex.Basic
+import Mathlib.Topology.ContinuousMap.SecondCountableSpace
 
 /-! # The geometric part of the projective kernel in Theorem 10.4.3.5 -/
 
@@ -1918,5 +1921,113 @@ theorem spectralStripAmbientKernel_exists :
       sobolevProjectiveKernelOperator (F := F) hα hs₀ K = (Aφ).comp Pₐ :=
   (spectralStripAmbientKernel_exists_iff_geometric_cauchy a hα hs φ ha χ eχ e x f hχ he horder hb).mpr
     (spectralStripGeometricKernel_cauchy a hα hs φ ha χ eχ e x f hχ he horder hb)
+
+omit ha hχ he horder hb
+
+section DegreeTwoKernel
+
+local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
+local notation "C₁" => (ideleClassNorm F).ker
+local notation "μ𝔽" => ideleClassTamagawaMeasure F
+local notation "m𝔽" => (continuousIdeleClassNorm F : C𝔽 →ₜ* ℝ≥0ˣ)
+local notation "Z₀(" χ ", " a ")" => zeros(F, χ, a, (0 : ℝ))
+local notation "h₀" => (le_refl (0 : ℝ))
+local notation "hs₂" => (zero_le_two : (0 : ℝ) ≤ 2)
+local notation "A₂(" φ ")" =>
+  hardySobolevTestAction μ𝔽 m𝔽 (-(0 : ℝ)) 0 2 ((neg_nonpos.mpr h₀).trans h₀) hs₂ φ
+local notation "W₂" => CompactIntervalSobolev μ𝔽 (logIdeleClassNorm F) (-(0 : ℝ)) 0 2
+
+private theorem spectralLineZeroOrdinates_finite_abs_le (η : PontryaginDual C𝔽) (a R : ℝ) :
+    {t : ℝ | t ∈ spectralLineZeroOrdinates η a ∧ |t| ≤ R}.Finite := by
+  let p (t : ℝ) := (a : ℂ) + (t : ℂ) * Complex.I
+  let L := continuedCompletedHeckeL η
+  let K := Icc (-R) R
+  have hp : Continuous p := continuous_const.add (Complex.continuous_ofReal.mul continuous_const)
+  have hi : Function.Injective p := fun x y h ↦ by simpa [p] using congrArg Complex.im h
+  have hL : MeromorphicOn L (p '' K) := fun z _ ↦ (continuedCompletedHeckeL_spec η).1.meromorphicOn z (mem_univ z)
+  refine Set.Finite.of_injOn (f := p) ?_ hi.injOn
+    ((MeromorphicOn.divisor L (p '' K)).finiteSupport (isCompact_Icc.image hp))
+  intro t ht
+  change MeromorphicOn.divisor L (p '' K) (p t) ≠ 0
+  rw [hL.divisor_apply ⟨t, abs_le.mp ht.2, rfl⟩]
+  have hpos : 0 < (meromorphicOrderAt L (p t)).untop₀.toNat := ht.1
+  exact fun he ↦ by rw [he] at hpos; simp at hpos
+
+/-- In each character, number the line sites by their absolute ordinate, breaking ties by signed ordinate. -/
+private theorem spectralLineKernel_orderedIndices (a : ℝ) (χ : PontryaginDual C₁ → PontryaginDual C𝔽) :
+    ∃ (r : PontryaginDual C₁ ↪ ℕ) (e : Z₀(χ, a) ↪ ℕ × ℕ), (∀ z, (e z).1 = r z.val.1) ∧
+      ∀ z z' : Z₀(χ, a), z.val.1 = z'.val.1 → (e z).2 ≤ (e z').2 → |z.val.2.2| ≤ |z'.val.2.2| := by
+  classical
+  have hK : IsCompact ((ideleClassNorm F).ker : Set C𝔽) := IsModulation.isCompact_ker (m := m𝔽)
+    ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+  let : CompactSpace C₁ := isCompact_iff_compactSpace.mp hK
+  let : LocallyCompactSpace C₁ := hK.isClosed.locallyCompactSpace
+  let : SecondCountableTopology C₁ := Topology.IsInducing.subtypeVal.secondCountableTopology
+  let : SecondCountableTopology Circle := inferInstanceAs (SecondCountableTopology (Metric.sphere (0 : ℂ) 1))
+  let : SecondCountableTopology (PontryaginDual C₁) :=
+    (ContinuousMonoidHom.isEmbedding_toContinuousMap C₁ Circle).secondCountableTopology
+  let : Countable (PontryaginDual C₁) := countable_of_Lindelof_of_discrete
+  obtain ⟨r⟩ := nonempty_embedding_nat (PontryaginDual C₁)
+  let key (t : ℝ) : ℝ ×ₗ ℝ := toLex (|t|, t)
+  let sites (ω : PontryaginDual C₁) := key '' spectralLineZeroOrdinates (χ ω) a
+  let rank (ω : PontryaginDual C₁) (k : ℝ ×ₗ ℝ) := (sites ω ∩ Iio k).ncard
+  have hmono (ω) : StrictMonoOn (rank ω) (sites ω) := by
+    intro k hk l _ hkl
+    apply Set.ncard_lt_ncard
+    · exact Set.ssubset_iff_exists.mpr ⟨fun _ hv ↦ ⟨hv.1, hv.2.trans hkl⟩, k, ⟨hk, hkl⟩, fun h ↦ lt_irrefl k h.2⟩
+    · apply ((spectralLineZeroOrdinates_finite_abs_le (χ ω) a (ofLex l).1).image key).subset
+      rintro _ ⟨⟨t, ht, rfl⟩, hl⟩
+      exact ⟨t, ⟨ht, Prod.Lex.monotone_fst (key t) l hl.le⟩, rfl⟩
+  have hmem (z : Z₀(χ, a)) : key z.val.2.2 ∈ sites z.val.1 :=
+    ⟨_, (spectralStripJet_data_line_two χ (spectralLineZeroJet χ z)).2.2, rfl⟩
+  let label (z : Z₀(χ, a)) := (r z.val.1, rank z.val.1 (key z.val.2.2))
+  have hinj : Function.Injective label := by
+    intro z u h
+    have hrow := r.injective (congrArg Prod.fst h)
+    have he : rank z.val.1 (key z.val.2.2) = rank u.val.1 (key u.val.2.2) := congrArg Prod.snd h
+    have hu := hmem u
+    rw [← hrow] at he hu
+    have ht := congrArg (fun v : ℝ ×ₗ ℝ ↦ (ofLex v).2) ((hmono z.val.1).injOn (hmem z) hu he)
+    have hz₀ : z.val.2.1 = 0 := by simpa using z.property.1
+    have hu₀ : u.val.2.1 = 0 := by simpa using u.property.1
+    exact Subtype.ext (Prod.ext hrow (Prod.ext (hz₀.trans hu₀.symm) ht))
+  refine ⟨r, ⟨label, hinj⟩, fun _ ↦ rfl, ?_⟩
+  intro z u hrow hle
+  change rank z.val.1 (key z.val.2.2) ≤ rank u.val.1 (key u.val.2.2) at hle
+  have hu := hmem u
+  rw [← hrow] at hu hle
+  exact le_of_not_gt fun h ↦ (not_lt_of_ge hle) (hmono _ hu (hmem z) (Prod.Lex.toLex_lt_toLex.mpr (Or.inl h)))
+
+/-- Paper: Theorem 10.4.3.5(3), p. 473. At zero strip width and Sobolev degree two,
+a unique projective Sobolev tensor represents convolution by any compact test after spectral
+projection at positive twist. This combines the geometric bound of #7537 with the criterion of #7532
+and Szymon Mikler's clustered quotient nuclearity from #7535. -/
+theorem existsUnique_spectralLineProjectiveKernel_two (a : ℝ) (ha : 0 < a) (φ : BruhatCompactSupport C𝔽) :
+    ∃! K, sobolevProjectiveKernelOperator (F := F) h₀ hs₂ K = (A₂(φ)).comp (spectralProjection (F := F) a h₀ hs₂) := by
+  refine (exists_spectralBasepointChoice F).elim fun χ hχ ↦ ?_
+  refine (spectralLineKernel_orderedIndices a χ).elim fun r hr ↦ hr.elim fun e he ↦ ?_
+  refine (spectralStripMarkushevichBasis (a := a) χ hχ h₀ hs₂).2.elim fun x hx ↦ hx.elim fun f hb ↦ ?_
+  have hblocks := spectralStripGeometricKernel_blocks_bddAbove_line_two (F := F) a h₀ one_lt_two φ ha χ r e x f
+    hχ he.1 he.2 hb rfl rfl
+  apply (sobolevProjectiveKernelOperator_injective (F := F) h₀ hs₂).existsUnique_iff_exists.mpr
+  exact (spectralStripKernel_exists_iff_quotient_nuclear_of_geometric_blocks (F := F) a h₀ one_lt_two φ ha χ e x f
+    hb.1 hblocks).mpr (spectralStripConvolution_nuclear_of_summable_clusterTraceNorms (F := F) a h₀ hs₂ φ)
+
+/-- Paper: Theorems 10.4.2.8 and 10.4.3.5, pp. 463 and 473. At degree two and zero strip
+width, the actual expanding spectral restrictions converge to convolution after spectral
+projection in trace norm, and their Hilbert traces converge to its trace.
+Deviation: The tensor gives trace-norm convergence for every compact test at this degree. -/
+theorem spectralLineRestriction_traceNorm_tendsto_two (a : ℝ) (ha : 0 < a) (φ : BruhatCompactSupport C𝔽)
+    (ε : ℝ → ℝ) (ρ : ℝ → C𝔽 → ℝ) (hε : Tendsto (fun R ↦ ε R * R) atTop (𝓝 0))
+    (hρ : ∀ᶠ R in atTop, IsModulatedCutoff m𝔽 R (ε R) (ρ R) ∧ 0 < R⁻¹ + ε R ∧ R⁻¹ + ε R < R - ε R) :
+    ∃ (T : nuclearEndomorphisms W₂) (D : ℝ → nuclearEndomorphisms W₂),
+      T.val = (A₂(φ)).comp (spectralProjection (F := F) a h₀ hs₂) ∧
+      (∀ R (hc : IsModulatedCutoff m𝔽 R (ε R) (ρ R)), (D R).val = spectralRestriction a h₀ hs₂ hc φ) ∧
+      Tendsto (fun R ↦ traceNorm (D R - T)) atTop (𝓝 0) ∧
+      Tendsto (fun R ↦ hilbertTrace (D R)) atTop (𝓝 (hilbertTrace T)) :=
+  spectralRestriction_traceNorm_tendsto_of_projectiveKernel a h₀ hs₂ φ
+    (existsUnique_spectralLineProjectiveKernel_two a ha φ).exists ε ρ hε hρ
+
+end DegreeTwoKernel
 
 end RiemannMasullo.Isolated
