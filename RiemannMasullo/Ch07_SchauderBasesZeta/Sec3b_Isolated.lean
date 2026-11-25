@@ -2521,10 +2521,13 @@ private theorem circle_independent_power_separation (a b : ℂ)
 
 end LogarithmicForm
 
-/-- Classical input: Baker–Wüstholz for three fixed complex logarithms, including the
-principal logarithm of `-1`. See A. Baker and G. Wüstholz, *Logarithmic forms and group
-varieties*, J. reine angew. Math. 442 (1993), 19–62, doi:10.1515/crll.1993.442.19,
-and G. Wüstholz, *One Century of Logarithmic Forms*, §3, pp. 5–6.
+/-- Baker–Wüstholz for three fixed complex logarithms, including the principal logarithm of
+`-1`. See A. Baker and G. Wüstholz, *Logarithmic forms and group varieties*, J. reine angew.
+Math. 442 (1993), 19–62, doi:10.1515/crll.1993.442.19, and G. Wüstholz, *One Century of
+Logarithmic Forms*, §3, pp. 5–6. Proved here from the two classical inputs
+`LogarithmicForm.positive_independent_power_separation` and
+`LogarithmicForm.circle_independent_power_separation`, which are its cases of two
+multiplicatively independent bases, both positive or both on the unit circle (#7513).
 The constants depend on the fixed numbers. The reduction uses the radial and angular power
 quotients, and separates multiplicatively dependent pairs on each one-dimensional group. -/
 private theorem bakerWustholz_fixedThreeLogs (a b : ℂ) (ha : IsAlgebraic ℚ a)

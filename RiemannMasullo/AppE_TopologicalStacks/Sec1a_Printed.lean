@@ -4,15 +4,17 @@ public import RiemannMasullo.AppE_TopologicalStacks.Sec1a
 import Mathlib.Topology.Compactification.OnePoint.Basic
 
 /-!
-# Appendix E.1.1: the elaborated coarseness statement is false
+# Appendix E.1.1: an earlier Lean statement of the coarseness of the k-topology was false
 
 Definition E.1.1.1(2), p. 828, takes the k-closed subsets of the original space `X` and asks
-for the coarsest topology on the same carrier in which those subsets are closed. In
-`isCoarsest_compactlyGenerated` the candidate topology is a local instance inside the set
-comprehension, so `IsKClosed` tests compact Hausdorff probes into that candidate rather than
-into the original topology. The elaborated statement is false. The paper's statement, with
-the original topology written explicitly, is proved below as
-`Printed.isCoarsest_compactlyGenerated_original`. Nothing imports this file.
+for the coarsest topology on the same carrier in which those subsets are closed. The first
+Lean statement of `isCoarsest_compactlyGenerated` bound the candidate topology as a local
+instance inside the set comprehension, so that `IsKClosed` tested compact Hausdorff probes
+into the candidate, not into the original topology. That statement is false, as proved below.
+It was the project's statement and not the paper's: the paper's statement, with the original
+topology written explicitly, is `isCoarsest_compactlyGenerated` in `Sec1a.lean` and is proved
+there. The declarations here are therefore not in the namespace `Printed`. Found by #7528.
+Nothing imports this file.
 -/
 
 @[expose] public section
@@ -21,15 +23,17 @@ open Set Topology TopologicalSpace
 
 namespace RiemannMasullo
 
-/-- The statement elaborated by `isCoarsest_compactlyGenerated`. The bound topology is a local
-instance, so `IsKClosed` is k-closedness for that topology. -/
-def Printed.isCoarsest_compactlyGenerated.{u, w} : Prop :=
+/-- The statement that `isCoarsest_compactlyGenerated` first made in Lean. The bound topology
+is a local instance, so `IsKClosed` is k-closedness for that topology.
+Reconstruction: This is not a statement of the paper. It is an earlier Lean reading of
+Definition E.1.1.1(2), p. 828, kept with the proof that it is false. -/
+def isCoarsest_compactlyGenerated_candidateProbes.{u, w} : Prop :=
   ∀ {X : Type w} [tX : TopologicalSpace X],
     IsGreatest {t : TopologicalSpace X | ∀ s : Set X, IsKClosed.{u} s → IsClosed[t] s}
       (@TopologicalSpace.compactlyGenerated.{u, w} X tX)
 
 /-- Some compact Hausdorff space has a subset that is not closed. -/
-private theorem Printed.isCoarsest_compactlyGenerated_false_exists_not_closed.{u} :
+private theorem isCoarsest_compactlyGenerated_candidateProbes_false_exists_not_closed.{u} :
     ∃ (K : CompHaus.{u}) (A : Set K), ¬ IsClosed A := by
   by_contra! h
   let K := CompHaus.of (ULift.{u} (OnePoint ℕ))
@@ -44,11 +48,11 @@ private theorem Printed.isCoarsest_compactlyGenerated_false_exists_not_closed.{u
 test that Lean writes down: every map into it is continuous, so a proper nonempty subset is
 not k-closed, and the k-closed sets are `∅` and `univ`. The greatest-element clause would then
 make the indiscrete topology finer than the discrete one. -/
-theorem Printed.isCoarsest_compactlyGenerated_false.{u} :
-    ¬ Printed.isCoarsest_compactlyGenerated.{u, 0} := by
+theorem isCoarsest_compactlyGenerated_candidateProbes_false.{u} :
+    ¬ isCoarsest_compactlyGenerated_candidateProbes.{u, 0} := by
   classical
   intro h
-  obtain ⟨K, A, hA⟩ := Printed.isCoarsest_compactlyGenerated_false_exists_not_closed.{u}
+  obtain ⟨K, A, hA⟩ := isCoarsest_compactlyGenerated_candidateProbes_false_exists_not_closed.{u}
   have hmem : (⊤ : TopologicalSpace Bool) ∈
       {t : TopologicalSpace Bool | ∀ s : Set Bool, IsKClosed.{u} s → IsClosed[t] s} := by
     intro s hs
@@ -91,27 +95,5 @@ theorem Printed.isCoarsest_compactlyGenerated_false.{u} :
   · simp at h'
   · have : false ∈ ({true} : Set Bool) := h' ▸ mem_univ false
     cases this
-
-/-- Definition E.1.1.1(2), p. 828, with k-closedness taken in the original topology.
-This is the statement `isCoarsest_compactlyGenerated` was meant to make. -/
-theorem Printed.isCoarsest_compactlyGenerated_original.{u, w}
-    (X : Type w) [tX : TopologicalSpace X] :
-    IsGreatest {t : TopologicalSpace X | ∀ s : Set X, @IsKClosed.{u, w} X tX s → IsClosed[t] s}
-      (@TopologicalSpace.compactlyGenerated.{u, w} X tX) := by
-  have key (s : Set X) :
-      IsClosed[@TopologicalSpace.compactlyGenerated.{u, w} X tX] s ↔ @IsKClosed.{u, w} X tX s :=
-    isClosed_compactlyGenerated_iff s
-  refine ⟨fun s hs => (key s).2 hs, fun t' ht => ?_⟩
-  rw [TopologicalSpace.le_def]
-  intro s hs
-  have hc : IsClosed[@TopologicalSpace.compactlyGenerated.{u, w} X tX] sᶜ :=
-    (@isClosed_compl_iff X (@TopologicalSpace.compactlyGenerated.{u, w} X tX) s).2 hs
-  exact (@isClosed_compl_iff X t' s).1 (ht sᶜ ((key sᶜ).1 hc))
-
-/-- `isCoarsest_compactlyGenerated` is the statement refuted above. The proof is that
-declaration, so the two say the same thing. -/
-private theorem Printed.isCoarsest_compactlyGenerated_of_library.{u, w} :
-    Printed.isCoarsest_compactlyGenerated.{u, w} :=
-  @RiemannMasullo.isCoarsest_compactlyGenerated.{u, w}
 
 end RiemannMasullo
