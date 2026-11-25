@@ -74,6 +74,25 @@ local notation "fourierₛ" => tamagawaFourier νₛ ψₛ
 local notation "band(" L ")" => sLocalPWProductRegion (F := F) S L
 local notation "testₛ" => SchwartzBruhat (Multiplicative Aₛ)
 local notation "testAt(" f "," x ")" => (f : testₛ) (Multiplicative.ofAdd x)
+local notation "X∞" => mixedEmbedding.mixedSpace F
+local notation "coord" => InfiniteAdeleRing.ringEquiv_mixedSpace F
+local notation "Bₛ" => ((v : S) → v.val.adicCompletion F)
+local notation "archTest" => ((w : InfinitePlace F) → BruhatCompactSupport w.Completionˣ)
+local notation "finiteTest" => ((v : S) → BruhatCompactSupport (v.val.adicCompletion F)ˣ)
+local notation "archClass(" w ")" => IdeleClassGroup.ofCompletion (𝓞 F) F w
+local notation "finiteClass(" v ")" => IdeleClassGroup.ofAdicCompletion (𝓞 F) F v
+local notation "finiteVolume(" v ")" =>
+  (finiteLocalMultiplicativeTamagawaMeasure F v
+    ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set _)).toReal
+local notation "principalValues(" a "," b ")" =>
+  ((∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) +
+    ∑ v : S, ((Real.log (v.val.asIdeal.absNorm : ℝ) / finiteVolume(v.val) : ℝ) : ℂ) *
+      finiteConnesWeilPrincipalValue v.val 1 (b v))
+local notation "A∞" => ((q : InfinitePlace F) → q.Completion)
+local notation "A𝒻" => ((q : S) → q.val.adicCompletion F)
+local notation "places" => InfinitePlace F ⊕ S
+-- Use the sup norm on the product. The norm on InfiniteAdeleRing itself is the product modulus.
+local notation "Eₛ" => A∞ × A𝒻
 
 local instance instSIdeleT2Sec4 : T2Space Iₛ := (sIdeleGroup_description F S).2.1
 
@@ -1209,10 +1228,6 @@ private theorem smooth_vector_pullback {G E : Type*} [CommGroup G] [TopologicalS
   change f₀ (e.equiv.symm (e.equiv _ * e.equiv _)) = _
   rw [← map_mul, e.equiv.symm_apply_apply]
   exact heval (⟨g,hg⟩ * ⟨j (Multiplicative.ofAdd v),hJ _⟩)
-
-local notation "X∞" => mixedEmbedding.mixedSpace F
-local notation "coord" => InfiniteAdeleRing.ringEquiv_mixedSpace F
-local notation "Bₛ" => ((v : S) → v.val.adicCompletion F)
 
 private def archExp : Multiplicative X∞ →* Iₛ :=
   MonoidHom.toHomUnits
@@ -2840,18 +2855,6 @@ theorem sLocalTraceSharpMass_eq_integral (f : BruhatCompactSupport Iₛ) (ξ : H
   · exact (ae_restrict_iff'₀ hdm).2 (ae_of_all _ hd)
   · rw [← setIntegral_congr_ae₀ hdm (ae_of_all _ hd), hce, hre, hte]
 
-local notation "archTest" => ((w : InfinitePlace F) → BruhatCompactSupport w.Completionˣ)
-local notation "finiteTest" => ((v : S) → BruhatCompactSupport (v.val.adicCompletion F)ˣ)
-local notation "archClass(" w ")" => IdeleClassGroup.ofCompletion (𝓞 F) F w
-local notation "finiteClass(" v ")" => IdeleClassGroup.ofAdicCompletion (𝓞 F) F v
-local notation "finiteVolume(" v ")" =>
-  (finiteLocalMultiplicativeTamagawaMeasure F v
-    ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set _)).toReal
-local notation "principalValues(" a "," b ")" =>
-  ((∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) +
-    ∑ v : S, ((Real.log (v.val.asIdeal.absNorm : ℝ) / finiteVolume(v.val) : ℝ) : ℂ) *
-      finiteConnesWeilPrincipalValue v.val 1 (b v))
-
 /-- Summation bookkeeping for `sLocalTraceSharpMass_asymptotic`: if the masses split as the
 logarithmic term, a summable constant term and a remainder that sums to something tending
 to zero, then the summed masses have the stated asymptotic. -/
@@ -3610,9 +3613,6 @@ private theorem sLocalTrace_local_hasSum {K : Type*} [NormedField K] [ProperSpac
   filter_upwards [sLocalTrace_axis_test i j d hd hi hj hz f a hlift s hs] with D hD t
   simp only [← hψ, sLocalTrace_fourier_moment, hD]
 
-local notation "A∞" => ((q : InfinitePlace F) → q.Completion)
-local notation "A𝒻" => ((q : S) → q.val.adicCompletion F)
-
 private theorem sLocalTrace_marginals (g : Aₛ → ℂ) (hg : Integrable g νₛ) :
     (∀ w : InfinitePlace F, ∃ a, HasIntegralMarginal νₛ (infiniteLocalAdditiveTamagawaMeasure F w)
       (fun x : Aₛ ↦ x.1 w) g a) ∧
@@ -3979,12 +3979,6 @@ private theorem sLocalTrace_fourier_affine (f : BruhatCompactSupport Iₛ) (ξ :
     ← integral_add_left_eq_self _ (1 : Aₛ)]
   simp_rw [h]
   exact integral_mul_const _ _
-
-local notation "A∞" => ((w : InfinitePlace F) → w.Completion)
-local notation "A𝒻" => ((v : S) → v.val.adicCompletion F)
-local notation "places" => InfinitePlace F ⊕ S
--- Use the sup norm on the product. The norm on InfiniteAdeleRing itself is the product modulus.
-local notation "Eₛ" => A∞ × A𝒻
 
 private def sLocalTrace_radii (x : Eₛ) : places → ℝ :=
   Sum.elim (fun w ↦ ‖x.1 w‖) (fun v ↦ ‖x.2 v‖)
