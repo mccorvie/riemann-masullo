@@ -10,6 +10,7 @@ import RiemannMasullo.ForMathlib.NumberTheory.LSeries.DirichletZeros
 import RiemannMasullo.External.AlgebraicNumberTheoryLean.Chebotarev.DirichletHecke
 public import RiemannMasullo.External.HardyCriticalLine.HardyFunctionNormalization
 public import Mathlib.MeasureTheory.Integral.IntervalIntegral.Basic
+import Mathlib.Analysis.SpecialFunctions.Integrals.Basic
 import Mathlib.Analysis.Real.Pi.Bounds
 import RiemannMasullo.External.HardyCriticalLine.LowerIntegralBound
 import RiemannMasullo.External.HardyCriticalLine.UpperIntegralBound
@@ -382,6 +383,485 @@ theorem spectralLineJet_selberg_mollified_bulk_lower :
     _ ≤ _ := intervalIntegral.integral_mono_interval hh (by linarith) le_rfl
       (Filter.Eventually.of_forall (fun t ↦ by dsimp [W]; positivity))
       (((hW.mul (hP.norm.pow 2)).mul continuous_hardyZ.abs).intervalIntegrable ..)
+
+/-- A finite continuous Dirichlet approximation on the critical line. The last
+mode is interpolated linearly as the cutoff `3t/π` passes its next integer. -/
+def spectralLineJet_selbergFiniteZeta (L : ℕ) (t : ℝ) : ℂ :=
+  ∑ n ∈ Finset.Icc 1 L, ((min 1 (max 0 (3 * t / Real.pi - n + 1)) : ℝ) : ℂ) * mode(n, t)
+
+private theorem spectralLineJet_selbergFiniteZeta_continuous (L : ℕ) :
+    Continuous (spectralLineJet_selbergFiniteZeta L) := by
+  apply continuous_finsetSum
+  intro n hn
+  apply Continuous.mul _ (continuous_cpow_neg_criticalLinePoint (Finset.mem_Icc.mp hn).1)
+  fun_prop
+
+/-- Interpolating the cutoff costs at most one original Dirichlet mode. -/
+private theorem spectralLineJet_selbergFiniteZeta_cutoff (L : ℕ) {t : ℝ} (ht : 0 ≤ t)
+    (hL : zetaFirstApproximationCutoff t + 1 ≤ L) :
+    let m := zetaFirstApproximationCutoff t
+    ‖spectralLineJet_selbergFiniteZeta L t - ∑ n ∈ Finset.Icc 1 m, mode(n, t)‖ ≤
+      1 / Real.sqrt (m + 1) := by
+  intro m
+  let q := 3 * t / Real.pi
+  let w (n : ℕ) := min 1 (max 0 (q - n + 1))
+  have hm : (m : ℝ) ≤ q := Nat.floor_le (show 0 ≤ 3 * t / Real.pi by positivity)
+  have hm' : q < (m : ℝ) + 1 := Nat.lt_floor_add_one _
+  have hw (n : ℕ) (hn : n ≤ m) : w n = 1 := by
+    have hn' : (n : ℝ) ≤ m := by exact_mod_cast hn
+    exact min_eq_left ((by linarith : 1 ≤ q - n + 1).trans (le_max_right _ _))
+  have hcut : spectralLineJet_selbergFiniteZeta L t =
+      ∑ n ∈ Finset.Icc 1 (m + 1), (w n : ℂ) * mode(n, t) := by
+    refine (Finset.sum_subset (Finset.Icc_subset_Icc_right hL) ?_).symm
+    intro n hn hnot
+    have hn' : m + 1 < n := by
+      by_contra! h
+      exact hnot (Finset.mem_Icc.mpr ⟨(Finset.mem_Icc.mp hn).1, h⟩)
+    have hn'' : (m : ℝ) + 2 ≤ n := by exact_mod_cast hn'
+    have hz : w n = 0 := by simp [w, max_eq_left (show q - n + 1 ≤ 0 by linarith)]
+    change (w n : ℂ) * mode(n, t) = 0
+    simp [hz]
+  rw [hcut, Finset.sum_Icc_succ_top (by omega : 1 ≤ m + 1)]
+  have hprefix : (∑ n ∈ Finset.Icc 1 m, (w n : ℂ) * mode(n, t)) =
+      ∑ n ∈ Finset.Icc 1 m, mode(n, t) := Finset.sum_congr rfl fun n hn ↦ by
+    rw [hw n (Finset.mem_Icc.mp hn).2, Complex.ofReal_one, one_mul]
+  rw [hprefix, add_sub_cancel_left, norm_mul, Complex.norm_real, Real.norm_eq_abs,
+    abs_of_nonneg (le_min (by norm_num) (le_max_left _ _)),
+    norm_cpow_neg_criticalLinePoint (Nat.succ_pos _), Nat.cast_succ]
+  exact mul_le_of_le_one_left (by positivity) (min_le_left _ _)
+
+/-- The finite, continuous cutoff has a uniform approximation error
+`O((1+t)^(-1/2))` on the whole positive half-line covered by its length. -/
+private theorem spectralLineJet_selbergFiniteZeta_error :
+    ∃ K > (0 : ℝ), ∀ (L : ℕ) (t : ℝ), 0 ≤ t → zetaFirstApproximationCutoff t + 1 ≤ L →
+      ‖riemannZeta (criticalLinePoint t) - spectralLineJet_selbergFiniteZeta L t‖ *
+        Real.sqrt (1 + t) ≤ K := by
+  obtain ⟨K, hK, T₀, hT₀, ha⟩ := exists_uniform_zetaFirstApproximation
+  obtain ⟨u, hu, hmax⟩ := isCompact_Icc.exists_isMaxOn
+    (nonempty_Icc.mpr (by linarith : 0 ≤ T₀)) continuous_riemannZeta_criticalLine.norm.continuousOn
+  let D := ‖riemannZeta (criticalLinePoint u)‖ + 2 * Real.sqrt T₀ + 1
+  refine ⟨max (D * Real.sqrt (1 + T₀)) (2 * K + 2), (by positivity : 0 < 2 * K + 2).trans_le (le_max_right _ _), ?_⟩
+  intro L t ht hL
+  let m := zetaFirstApproximationCutoff t
+  let Z := riemannZeta (criticalLinePoint t)
+  let P := ∑ n ∈ Finset.Icc 1 m, mode(n, t)
+  let Q := spectralLineJet_selbergFiniteZeta L t
+  have hdiff : ‖P - Q‖ ≤ 1 / Real.sqrt (m + 1) := by
+    rw [norm_sub_rev]
+    exact spectralLineJet_selbergFiniteZeta_cutoff L ht hL
+  have hsplit : ‖Z - Q‖ ≤ ‖Z - P‖ + ‖P - Q‖ := norm_sub_le_norm_sub_add_norm_sub ..
+  change ‖Z - Q‖ * _ ≤ _
+  by_cases h : T₀ ≤ t
+  · apply le_trans _ (le_max_right _ _)
+    have ht' : 0 < t := by linarith
+    have hz : ‖Z - P‖ ≤ K / Real.sqrt t := by
+      have H := ha t t h le_rfl (by linarith)
+      norm_num [Z, P, m, criticalLinePoint] at H ⊢
+      exact H
+    have hs₁ : Real.sqrt (1 + t) ≤ 2 * Real.sqrt t := by
+      rw [Real.sqrt_le_left (by positivity), mul_pow, Real.sq_sqrt ht]
+      linarith
+    have hs₂ : Real.sqrt (1 + t) ≤ 2 * Real.sqrt (m + 1) := by
+      have hfloor : 3 * t / Real.pi < (m : ℝ) + 1 := Nat.lt_floor_add_one _
+      have hfloor' := (div_lt_iff₀ Real.pi_pos).mp hfloor
+      have hpi := mul_lt_mul_of_pos_left Real.pi_lt_four (show (0 : ℝ) < m + 1 by positivity)
+      rw [Real.sqrt_le_left (by positivity), mul_pow, Real.sq_sqrt (by positivity)]
+      linarith
+    calc _ ≤ (K / Real.sqrt t + 1 / Real.sqrt (m + 1)) * Real.sqrt (1 + t) :=
+           mul_le_mul_of_nonneg_right (hsplit.trans (add_le_add hz hdiff)) (by positivity)
+         _ ≤ K / Real.sqrt t * (2 * Real.sqrt t) + 1 / Real.sqrt (m + 1) * (2 * Real.sqrt (m + 1)) := by
+           rw [add_mul]; gcongr
+         _ = _ := by field_simp
+  · apply le_trans _ (le_max_left _ _)
+    have ht' := le_of_not_ge h
+    have hz : ‖Z‖ ≤ ‖riemannZeta (criticalLinePoint u)‖ := hmax ⟨ht, ht'⟩
+    have hrem : 1 / Real.sqrt (m + 1) ≤ 1 := by
+      apply (div_le_one (by positivity)).mpr
+      exact Real.one_le_sqrt.mpr (by linarith [Nat.cast_nonneg (α := ℝ) m])
+    have hp : ‖P‖ ≤ 2 * Real.sqrt T₀ :=
+      (norm_sum_Icc_cpow_neg_criticalLinePoint_le m t).trans
+        (mul_le_mul_of_nonneg_left (Real.sqrt_le_sqrt ((zetaFirstApproximationCutoff_le_height ht).trans ht')) (by norm_num))
+    exact mul_le_mul (hsplit.trans (add_le_add ((norm_sub_le Z P).trans (add_le_add hz hp)) (hdiff.trans hrem)))
+      (Real.sqrt_le_sqrt (by linarith)) (by positivity) (by dsimp [D]; positivity)
+
+private theorem spectralLineJet_selbergGamma_continuous :
+    Continuous (fun t : ℝ ↦ Complex.Gamma (criticalLineGammaArgument t)) := by
+  apply continuous_iff_continuousAt.mpr
+  intro t
+  apply ContinuousAt.comp (g := Complex.Gamma) (f := criticalLineGammaArgument)
+  · apply Complex.continuousAt_Gamma
+    intro n he
+    have H := congrArg Complex.re he
+    rw [criticalLineGammaArgument_re] at H
+    norm_num at H
+    linarith [Nat.cast_nonneg (α := ℝ) n]
+  · unfold criticalLineGammaArgument
+    fun_prop
+
+/-- Uniform upper envelope for the critical-line gamma factor, including the exponential damping and bounded heights. -/
+private theorem spectralLineJet_selbergGamma_upper :
+    ∃ C > (0 : ℝ), ∀ H > (0 : ℝ), ∀ t ≥ (0 : ℝ),
+      ‖Complex.Gamma (criticalLineGammaArgument t)‖ * Real.exp ((Real.pi / 4 - 1 / (2 * H)) * t) *
+        (1 + t) ^ (1 / 4 : ℝ) ≤ C := by
+  obtain ⟨c, hc, ha⟩ := exists_pos_gammaBinetExponentialRatio_at_one
+  let A := Real.log 4 / 4 - Real.log Real.pi / 4 + 1
+  let B (t : ℝ) := ‖Complex.Gamma (criticalLineGammaArgument t)‖ * Real.exp (Real.pi * t / 4) *
+    (1 + t) ^ (1 / 4 : ℝ)
+  have hB : Continuous B := by
+    exact (spectralLineJet_selbergGamma_continuous.norm.mul (by fun_prop)).mul
+      ((continuous_const.add continuous_id).rpow_const (fun _ ↦ Or.inr (by norm_num)))
+  obtain ⟨u, _, hu⟩ := isCompact_Icc.exists_isMaxOn
+    (nonempty_Icc.mpr zero_le_one) (hB.continuousOn (s := Icc (0 : ℝ) 1))
+  let p := Real.pi ^ (-(1 / 4) : ℝ)
+  have hp : 0 < p := Real.rpow_pos_of_pos Real.pi_pos _
+  refine ⟨max (B u) ((c * Real.exp A) / p), (by positivity : 0 < (c * Real.exp A) / p).trans_le
+    (le_max_right _ _), ?_⟩
+  intro H hH t ht
+  apply le_trans (b := B t)
+  · apply mul_le_mul_of_nonneg_right _ (by positivity)
+    apply mul_le_mul_of_nonneg_left _ (norm_nonneg _)
+    apply Real.exp_le_exp.mpr
+    rw [sub_mul]
+    linarith [show 0 ≤ 1 / (2 * H) * t by positivity]
+  by_cases h : t ≤ 1
+  · exact (hu ⟨ht, h⟩).trans (le_max_left _ _)
+  · refine le_trans ?_ (le_max_right _ _)
+    have h₁ := le_of_not_ge h
+    have ht₀ : 0 < t := by linarith
+    let z := criticalLineGammaArgument t
+    have hz : 0 < z.re := by rw [criticalLineGammaArgument_re]; norm_num
+    have hn : 0 < ‖z‖ := norm_pos_iff.mpr fun H ↦ by rw [H] at hz; exact lt_irrefl _ hz
+    have hlog : Real.log (1 + t) ≤ Real.log 4 + Real.log ‖z‖ := by
+      rw [← Real.log_mul (by norm_num) hn.ne']
+      apply Real.log_le_log (by positivity)
+      have hi := Complex.im_le_norm z
+      rw [criticalLineGammaArgument_im] at hi
+      linarith
+    have hrem : (gammaBinetLogRemainder z).re ≤ 1 := by
+      refine (Complex.re_le_norm _).trans ((norm_gammaBinetLogRemainder_criticalLine_le ht₀).trans ?_)
+      apply (div_le_one (by positivity)).mpr
+      linarith
+    have har := mul_le_mul_of_nonneg_left (Real.arctan_le_self (show 0 ≤ 1 / (2 * t) by positivity))
+      (show 0 ≤ t / 2 by positivity)
+    rw [show t / 2 * (1 / (2 * t)) = 1 / 4 by field_simp; norm_num] at har
+    have hmain : (gammaRStirlingLogMain z).re =
+        -(1 / 4) * Real.log ‖z‖ - (t / 2) * Complex.arg z - 1 / 4 - (1 / 4) * Real.log Real.pi := by
+      simp only [gammaRStirlingLogMain, Complex.sub_re, Complex.mul_re, Complex.sub_im,
+        Complex.ofReal_re, Complex.ofReal_im, Complex.log_re, Complex.log_im, z,
+        criticalLineGammaArgument_re, criticalLineGammaArgument_im]
+      norm_num
+    have hweight : (gammaRStirlingLogMain z + gammaBinetLogRemainder z).re +
+        Real.pi * t / 4 + Real.log (1 + t) * (1 / 4) ≤ A := by
+      rw [Complex.add_re, hmain, arg_criticalLineGammaArgument_eq_pi_div_two_sub ht₀]
+      dsimp [A]
+      linarith only [hlog, har, hrem]
+    have hratio := gammaBinetExponentialRatio_eq_at_one hz
+    rw [ha, div_eq_iff (Complex.exp_ne_zero _)] at hratio
+    have hfac := congrArg norm hratio
+    simp only [norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hc, Complex.norm_exp,
+      Complex.norm_cpow_eq_rpow_re_of_pos Real.pi_pos, Complex.neg_re] at hfac
+    rw [show z.re = 1 / 4 from criticalLineGammaArgument_re t] at hfac
+    apply (le_div_iff₀ hp).mpr
+    dsimp only [B]
+    rw [Real.rpow_def_of_pos (by positivity : 0 < 1 + t)]
+    calc _ = (p * ‖Complex.Gamma z‖) * Real.exp (Real.pi * t / 4) * Real.exp (Real.log (1 + t) * (1 / 4)) := by ring
+         _ = c * Real.exp ((gammaRStirlingLogMain z + gammaBinetLogRemainder z).re +
+             Real.pi * t / 4 + Real.log (1 + t) * (1 / 4)) := by rw [hfac, Real.exp_add, Real.exp_add]; ring
+         _ ≤ _ := by gcongr
+
+local notation "winWeight(" H ", " N ", " b ", " t ")" =>
+  (‖Complex.Gamma (1 / 4 + (((t : ℝ) / 2 : ℝ) : ℂ) * Complex.I)‖ *
+    Real.exp ((Real.pi / 4 - 1 / (2 * H)) * t) * ‖poly(N, b, t)‖ ^ 2)
+local notation "finiteHardy(" L ", " t ")" =>
+  (Complex.re (-hardyPhaseFactor t * spectralLineJet_selbergFiniteZeta L t))
+
+/-- Replacing Hardy's Z by the phase-corrected finite critical-line sum costs
+`O(N(1+t)^(-3/4))` in the gamma-weighted mollified function. -/
+private theorem spectralLineJet_selberg_pointwise_error :
+    ∃ K > (0 : ℝ), ∀ (H : ℝ), 0 < H → ∀ L N (b : ℕ → ℝ),
+      (∀ n ∈ Finset.Icc 1 N, |b n| ≤ 1) → ∀ t ≥ (0 : ℝ), zetaFirstApproximationCutoff t + 1 ≤ L →
+      |winWeight(H, N, b, t) * hardyZ t - winWeight(H, N, b, t) * finiteHardy(L, t)| ≤
+        K * N * (1 + t) ^ (-(3 / 4) : ℝ) := by
+  obtain ⟨A, hA, ha⟩ := spectralLineJet_selbergGamma_upper
+  obtain ⟨B, hB, hb₀⟩ := spectralLineJet_selbergFiniteZeta_error
+  refine ⟨4 * A * B, by positivity, ?_⟩
+  intro H hH L N b hb t ht hL
+  let Z := riemannZeta (criticalLinePoint t)
+  let Q := spectralLineJet_selbergFiniteZeta L t
+  let V := ‖Complex.Gamma (criticalLineGammaArgument t)‖ * Real.exp ((Real.pi / 4 - 1 / (2 * H)) * t)
+  let σ := -hardyPhaseFactor t
+  have hphase : (hardyZ t : ℂ) = σ * Z := by
+    have hx := hardyFunction_eq_factor_unit_mul_riemannZeta t
+    rw [hardyFunction, hardyFunctionReal, Complex.ofReal_neg] at hx
+    simpa [σ, Z] using congrArg Neg.neg hx
+  have hdiff : |hardyZ t - finiteHardy(L, t)| ≤ ‖Z - Q‖ := by
+    change |hardyZ t - (σ * Q).re| ≤ _
+    rw [show hardyZ t = (σ * Z).re from congrArg Complex.re hphase, ← Complex.sub_re, ← mul_sub]
+    exact (Complex.abs_re_le_norm _).trans_eq (by simp [σ, norm_hardyPhaseFactor])
+  have hgamma : V * (1 + t) ^ (1 / 4 : ℝ) ≤ A := ha H hH t ht
+  have hp : ‖poly(N, b, t)‖ ^ 2 ≤ 4 * N := by
+    refine (pow_le_pow_left₀ (norm_nonneg _) (spectralLineJet_mollifier_norm N b hb t) 2).trans_eq ?_
+    rw [mul_pow, Real.sq_sqrt (Nat.cast_nonneg N)]
+    ring
+  have ht₁ : 0 < 1 + t := by positivity
+  rw [← mul_sub, abs_mul, abs_of_nonneg (show 0 ≤ winWeight(H, N, b, t) by positivity),
+    Real.rpow_neg ht₁.le, ← div_eq_mul_inv]
+  apply (le_div_iff₀ (Real.rpow_pos_of_pos ht₁ _)).mpr
+  change V * ‖poly(N, b, t)‖ ^ 2 * _ * _ ≤ _
+  have hpow : (1 + t) ^ (3 / 4 : ℝ) = (1 + t) ^ (1 / 4 : ℝ) * Real.sqrt (1 + t) := by
+    rw [Real.sqrt_eq_rpow, ← Real.rpow_add ht₁]
+    congr 1
+    norm_num
+  rw [hpow]
+  calc
+    _ ≤ (V * (1 + t) ^ (1 / 4 : ℝ)) * (‖Z - Q‖ * Real.sqrt (1 + t)) * ‖poly(N, b, t)‖ ^ 2 := by
+      calc _ ≤ V * ‖poly(N, b, t)‖ ^ 2 * ‖Z - Q‖ * ((1 + t) ^ (1 / 4 : ℝ) * Real.sqrt (1 + t)) := by
+             gcongr
+           _ = _ := by ring
+    _ ≤ (A * B) * (4 * N) := by
+      apply mul_le_mul _ hp (by positivity) (by positivity)
+      exact mul_le_mul hgamma (hb₀ L t ht hL) (by positivity) hA.le
+    _ = _ := by ring
+
+private theorem spectralLineJet_selberg_continuousWindow {f : ℝ → ℝ} (hf : Continuous f) (h : ℝ) :
+    Continuous (fun t : ℝ ↦ ∫ u in t..t + h, f u) := by
+  let P (t : ℝ) := ∫ u in (0 : ℝ)..t, f u
+  have hP : Continuous P := intervalIntegral.continuous_primitive (fun a b ↦ hf.intervalIntegrable a b) 0
+  apply ((hP.comp (continuous_id.add_const h)).sub hP).congr
+  intro t
+  simpa [P] using (eq_sub_of_add_eq' (intervalIntegral.integral_add_adjacent_intervals
+    (hf.intervalIntegrable 0 t) (hf.intervalIntegrable t (t + h)))).symm
+
+/-- A `(1+t)^(-3/4)` error envelope costs a bounded short-window second moment
+on arbitrarily long initial intervals. The same proof works after a 1-Lipschitz
+map, in particular for the signed window and for the absolute window. -/
+private theorem spectralLineJet_selberg_window_error_envelope {f g : ℝ → ℝ}
+    (hf : Continuous f) (hg : Continuous g) {H h D : ℝ} (hH : 0 ≤ H) (hh : 0 ≤ h) (hD : 0 ≤ D)
+    (he : ∀ t ∈ Icc (0 : ℝ) (H + h), |f t - g t| ≤ D * (1 + t) ^ (-(3 / 4) : ℝ))
+    (q : ℝ → ℝ) (hq : LipschitzWith 1 q) :
+    (∫ t in (0 : ℝ)..H, ((∫ u in t..t + h, q (f u)) - ∫ u in t..t + h, q (g u)) ^ 2) ≤
+      2 * (h * D) ^ 2 := by
+  let E (u : ℝ) := q (f u) - q (g u)
+  have hE : Continuous E := (hq.continuous.comp hf).sub (hq.continuous.comp hg)
+  let J (t : ℝ) := ∫ u in t..t + h, E u
+  have hJ : Continuous J := spectralLineJet_selberg_continuousWindow hE h
+  have heq (t : ℝ) : (∫ u in t..t + h, q (f u)) - (∫ u in t..t + h, q (g u)) = J t :=
+    (intervalIntegral.integral_sub ((hq.continuous.comp hf).intervalIntegrable ..)
+      ((hq.continuous.comp hg).intervalIntegrable ..)).symm
+  have hsq (t : ℝ) (ht : t ∈ Icc 0 H) : J t ^ 2 ≤ (h * D) ^ 2 * (1 + t) ^ (-(3 / 2) : ℝ) := by
+    have ht₁ : 0 < 1 + t := by linarith [ht.1]
+    have hb := intervalIntegral.norm_integral_le_of_norm_le_const (a := t) (b := t + h)
+      (C := D * (1 + t) ^ (-(3 / 4) : ℝ)) (f := E) (fun u hu ↦ by
+        rw [uIoc_of_le (by linarith)] at hu
+        have h₁ := hq.dist_le_mul (f u) (g u)
+        have h₂ := he u ⟨ht.1.trans hu.1.le, by linarith [ht.2, hu.2]⟩
+        have h₃ : (1 + u) ^ (-(3 / 4) : ℝ) ≤ (1 + t) ^ (-(3 / 4) : ℝ) :=
+          Real.rpow_le_rpow_of_nonpos ht₁ (by linarith [hu.1]) (by norm_num)
+        exact (by simpa only [E, Real.norm_eq_abs, Real.dist_eq, NNReal.coe_one, one_mul] using h₁ :
+          ‖E u‖ ≤ |f u - g u|).trans (h₂.trans (mul_le_mul_of_nonneg_left h₃ hD)))
+    rw [show t + h - t = h by ring, abs_of_nonneg hh] at hb
+    calc J t ^ 2 = ‖J t‖ ^ 2 := by rw [Real.norm_eq_abs, sq_abs]
+         _ ≤ (D * (1 + t) ^ (-(3 / 4) : ℝ) * h) ^ 2 := pow_le_pow_left₀ (norm_nonneg _) hb _
+         _ = _ := by
+           rw [mul_pow, mul_pow, ← Real.rpow_mul_natCast ht₁.le]
+           norm_num
+           ring
+  have hpow : ContinuousOn (fun t : ℝ ↦ (1 + t) ^ (-(3 / 2) : ℝ)) (Icc 0 H) := by
+    apply (continuous_const.add continuous_id).continuousOn.rpow_const
+    intro t ht
+    exact Or.inl (ne_of_gt (by linarith [ht.1] : 0 < 1 + t))
+  have hint : (∫ t in (0 : ℝ)..H, (1 + t) ^ (-(3 / 2) : ℝ)) ≤ 2 := by
+    rw [intervalIntegral.integral_comp_add_left (fun x : ℝ ↦ x ^ (-(3 / 2) : ℝ)) 1]
+    simp only [add_zero]
+    rw [integral_rpow (Or.inr ⟨by norm_num, by rw [uIcc_of_le (by linarith : 1 ≤ 1 + H)]; simp⟩)]
+    norm_num
+    have := Real.rpow_nonneg (show 0 ≤ 1 + H by linarith) (-(1 / 2) : ℝ)
+    linarith
+  simp_rw [heq]
+  calc _ ≤ ∫ t in (0 : ℝ)..H, (h * D) ^ 2 * (1 + t) ^ (-(3 / 2) : ℝ) :=
+         intervalIntegral.integral_mono_on hH ((hJ.pow 2).intervalIntegrable ..)
+           ((continuousOn_const.mul hpow).intervalIntegrable_of_Icc hH) hsq
+       _ = (h * D) ^ 2 * ∫ t in (0 : ℝ)..H, (1 + t) ^ (-(3 / 2) : ℝ) := intervalIntegral.integral_const_mul ..
+       _ ≤ _ := (mul_le_mul_of_nonneg_left hint (sq_nonneg _)).trans_eq (mul_comm _ _)
+
+private theorem spectralLineJet_selbergPhase_continuous : Continuous hardyPhaseFactor := by
+  have hG : Continuous (fun t ↦ Complex.Gammaℝ (criticalLinePoint t)) := by
+    have heq (t : ℝ) : criticalLinePoint t / 2 = criticalLineGammaArgument t := by
+      unfold criticalLinePoint criticalLineGammaArgument
+      push_cast
+      ring
+    simp_rw [Complex.Gammaℝ_def, heq]
+    apply Continuous.mul _ spectralLineJet_selbergGamma_continuous
+    apply Continuous.const_cpow (continuous_criticalLinePoint.neg.div_const _)
+    exact Or.inl (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero)
+  exact (hG.div (Complex.continuous_ofReal.comp hG.norm) fun t ↦ by
+    exact Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr (Complex.Gammaℝ_ne_zero_of_re_pos
+      (by simp [criticalLinePoint] : 0 < (criticalLinePoint t).re)))).neg
+
+private theorem spectralLineJet_selberg_signals_continuous (H : ℝ) (L N : ℕ) (b : ℕ → ℝ) :
+    Continuous (fun t ↦ winWeight(H, N, b, t) * hardyZ t) ∧
+    Continuous (fun t ↦ winWeight(H, N, b, t) * finiteHardy(L, t)) := by
+  have hW : Continuous (fun t ↦ winWeight(H, N, b, t)) := by
+    apply (spectralLineJet_selbergGamma_continuous.norm.mul (by fun_prop)).mul
+    apply Continuous.pow _ 2
+    apply Continuous.norm
+    apply continuous_finsetSum
+    intro n hn
+    exact continuous_const.mul (continuous_cpow_neg_criticalLinePoint (Finset.mem_Icc.mp hn).1)
+  have hQ : Continuous (fun t ↦ finiteHardy(L, t)) := Complex.continuous_re.comp
+    (spectralLineJet_selbergPhase_continuous.neg.mul (spectralLineJet_selbergFiniteZeta_continuous L))
+  exact ⟨hW.mul continuous_hardyZ, hW.mul hQ⟩
+
+/-- Both short-window second moments in Selberg's counting argument can be computed
+with a finite Dirichlet sum up to squared error `O(h² N²)`. Here `q = id` gives the
+signed windows, and `q = abs` the absolute windows. The constant is independent of
+height, window length, cutoff, and mollifier coefficients. The estimate includes
+window starts at height zero and the final window extending beyond `H`. -/
+theorem spectralLineJet_selberg_finite_window_second_moment_error :
+    ∃ C > (0 : ℝ), ∀ H > (0 : ℝ), ∀ h ≥ (0 : ℝ), ∀ (L N : ℕ) (b : ℕ → ℝ),
+      3 * (H + h) / Real.pi + 1 ≤ L → (∀ n ∈ Finset.Icc 1 N, |b n| ≤ 1) →
+      ∀ (q : ℝ → ℝ), LipschitzWith 1 q →
+      (∫ t in (0 : ℝ)..H,
+        ((∫ u in t..t + h, q (winWeight(H, N, b, u) * hardyZ u)) -
+          ∫ u in t..t + h, q (winWeight(H, N, b, u) * finiteHardy(L, u))) ^ 2) ≤
+        C * (h * N) ^ 2 := by
+  obtain ⟨K, hK, he⟩ := spectralLineJet_selberg_pointwise_error
+  refine ⟨2 * K ^ 2, by positivity, ?_⟩
+  intro H hH h hh L N b hL hb q hq
+  obtain ⟨hf, hg⟩ := spectralLineJet_selberg_signals_continuous H L N b
+  have hbnd := spectralLineJet_selberg_window_error_envelope hf hg hH.le hh (show 0 ≤ K * N by positivity) (fun t ht ↦ by
+      apply he H hH L N b hb t ht.1
+      have hcut : (zetaFirstApproximationCutoff t : ℝ) ≤ 3 * t / Real.pi :=
+        Nat.floor_le (div_nonneg (mul_nonneg (by norm_num) ht.1) Real.pi_pos.le)
+      have hdiv : 3 * t / Real.pi ≤ 3 * (H + h) / Real.pi := by gcongr; exact ht.2
+      exact_mod_cast (show (zetaFirstApproximationCutoff t : ℝ) + 1 ≤ L by linarith)) q hq
+  exact hbnd.trans_eq (by ring)
+
+/-- The upper short-window second moments of the actual mollified Hardy function reduce
+to those of one entirely finite Dirichlet sum. An arbitrarily small relative loss
+`1 + ε` on the model costs only `O((1 + 1/ε) h² N²)` additively. -/
+theorem spectralLineJet_selberg_finite_window_second_moment_upper :
+    ∃ C > (0 : ℝ), ∀ H > (0 : ℝ), ∀ h ≥ (0 : ℝ), ∀ (L N : ℕ) (b : ℕ → ℝ),
+      3 * (H + h) / Real.pi + 1 ≤ L → (∀ n ∈ Finset.Icc 1 N, |b n| ≤ 1) →
+      ∀ (q : ℝ → ℝ), LipschitzWith 1 q → ∀ ε > (0 : ℝ),
+      (∫ t in (0 : ℝ)..H, (∫ u in t..t + h, q (winWeight(H, N, b, u) * hardyZ u)) ^ 2) ≤
+      (1 + ε) * (∫ t in (0 : ℝ)..H, (∫ u in t..t + h, q (winWeight(H, N, b, u) * finiteHardy(L, u))) ^ 2) +
+        (1 + 1 / ε) * C * (h * N) ^ 2 := by
+  obtain ⟨C, hC, he⟩ := spectralLineJet_selberg_finite_window_second_moment_error
+  refine ⟨C, hC, ?_⟩
+  intro H hH h hh L N b hL hb q hq ε hε
+  let f (u : ℝ) := q (winWeight(H, N, b, u) * hardyZ u)
+  let g (u : ℝ) := q (winWeight(H, N, b, u) * finiteHardy(L, u))
+  let U (t : ℝ) := ∫ u in t..t + h, f u
+  let V (t : ℝ) := ∫ u in t..t + h, g u
+  obtain ⟨hf, hg⟩ := spectralLineJet_selberg_signals_continuous H L N b
+  have hU : Continuous U := spectralLineJet_selberg_continuousWindow (hq.continuous.comp hf) h
+  have hV : Continuous V := spectralLineJet_selberg_continuousWindow (hq.continuous.comp hg) h
+  have hpt (t : ℝ) : U t ^ 2 ≤ (1 + ε) * V t ^ 2 + (1 + 1 / ε) * (U t - V t) ^ 2 := by
+    apply (mul_le_mul_iff_right₀ hε).mp
+    field_simp
+    nlinarith [sq_nonneg (ε * V t - (U t - V t))]
+  have H₁ : Continuous (fun t ↦ (1 + ε) * V t ^ 2) := continuous_const.mul (hV.pow 2)
+  have H₂ : Continuous (fun t ↦ (1 + 1 / ε) * (U t - V t) ^ 2) := continuous_const.mul ((hU.sub hV).pow 2)
+  change (∫ t in (0 : ℝ)..H, U t ^ 2) ≤ _
+  calc
+    _ ≤ ∫ t in (0 : ℝ)..H, (1 + ε) * V t ^ 2 + (1 + 1 / ε) * (U t - V t) ^ 2 :=
+      intervalIntegral.integral_mono_on hH.le ((hU.pow 2).intervalIntegrable ..)
+        ((H₁.add H₂).intervalIntegrable ..) fun t _ ↦ hpt t
+    _ = (1 + ε) * (∫ t in (0 : ℝ)..H, V t ^ 2) +
+        (1 + 1 / ε) * (∫ t in (0 : ℝ)..H, (U t - V t) ^ 2) := by
+      rw [intervalIntegral.integral_add (H₁.intervalIntegrable ..) (H₂.intervalIntegrable ..),
+        intervalIntegral.integral_const_mul, intervalIntegral.integral_const_mul]
+    _ ≤ (1 + ε) * (∫ t in (0 : ℝ)..H, V t ^ 2) + (1 + 1 / ε) * (C * (h * N) ^ 2) :=
+      add_le_add le_rfl (mul_le_mul_of_nonneg_left (he H hH h hh L N b hL hb q hq)
+        (show 0 ≤ 1 + 1 / ε by positivity))
+    _ = _ := by dsimp [V, g]; ring
+
+/-- A uniform elementary bound for the critical-line zeta factor, including height zero. -/
+private theorem spectralLineJet_selberg_zeta_growth :
+    ∃ K > (0 : ℝ), ∀ t ≥ (0 : ℝ), ‖riemannZeta (criticalLinePoint t)‖ ≤ K * Real.sqrt (1 + t) := by
+  obtain ⟨K, hK, he⟩ := spectralLineJet_selbergFiniteZeta_error
+  refine ⟨K + 3, by positivity, ?_⟩
+  intro t ht
+  let m := zetaFirstApproximationCutoff t
+  let Z := riemannZeta (criticalLinePoint t)
+  let Q := spectralLineJet_selbergFiniteZeta (m + 1) t
+  let D := ∑ n ∈ Finset.Icc 1 m, mode(n, t)
+  have ht₁ : 1 ≤ Real.sqrt (1 + t) := Real.one_le_sqrt.mpr (by linarith)
+  have hm₁ : 1 ≤ Real.sqrt (m + 1) := Real.one_le_sqrt.mpr (by linarith [Nat.cast_nonneg (α := ℝ) m])
+  have herror : ‖Z - Q‖ ≤ K :=
+    (le_mul_of_one_le_right (norm_nonneg _) ht₁).trans (he (m + 1) t ht le_rfl)
+  have hcut : ‖Q - D‖ ≤ 1 := (spectralLineJet_selbergFiniteZeta_cutoff (m + 1) ht le_rfl).trans
+    ((div_le_one (by positivity)).mpr hm₁)
+  have hsum : ‖D‖ ≤ 2 * Real.sqrt (1 + t) := (norm_sum_Icc_cpow_neg_criticalLinePoint_le m t).trans
+    (mul_le_mul_of_nonneg_left (Real.sqrt_le_sqrt ((zetaFirstApproximationCutoff_le_height ht).trans
+      (by linarith))) (by norm_num))
+  have hzd := norm_sub_le_norm_sub_add_norm_sub Z Q D
+  have hZ := norm_sub_le_norm_sub_add_norm_sub Z D 0
+  simp only [sub_zero] at hZ
+  change ‖Z‖ ≤ _
+  nlinarith [mul_nonneg hK.le (sub_nonneg.mpr ht₁)]
+
+/-- An unconditional upper bound for both actual short-window second moments on
+initial heights `[0,Y]`. For bounded window length and power lengths `N ≤ H^β`,
+`Y ≤ H^α`, this range is negligible at Selberg's scale `h²√H` if `4β + 3α < 1`. -/
+theorem spectralLineJet_selberg_initial_window_second_moment_upper :
+    ∃ C > (0 : ℝ), ∀ H > (0 : ℝ), ∀ h ≥ (0 : ℝ), ∀ Y ≥ (0 : ℝ), ∀ (N : ℕ) (b : ℕ → ℝ),
+      (∀ n ∈ Finset.Icc 1 N, |b n| ≤ 1) →
+      ∀ (q : ℝ → ℝ), LipschitzWith 1 q → q 0 = 0 →
+      (∫ t in (0 : ℝ)..Y, (∫ u in t..t + h, q (winWeight(H, N, b, u) * hardyZ u)) ^ 2) ≤
+        C * (h * N) ^ 2 * Y * Real.sqrt (1 + Y + h) := by
+  obtain ⟨A, hA, ha⟩ := spectralLineJet_selbergGamma_upper
+  obtain ⟨B, hB, hb₀⟩ := spectralLineJet_selberg_zeta_growth
+  refine ⟨(4 * A * B) ^ 2, by positivity, ?_⟩
+  intro H hH h hh Y hY N b hb q hq hq₀
+  let f (t : ℝ) := q (winWeight(H, N, b, t) * hardyZ t)
+  let U (t : ℝ) := ∫ u in t..t + h, f u
+  let D := 4 * A * B * N
+  have hD : 0 ≤ D := by dsimp [D]; positivity
+  have hf : Continuous f := hq.continuous.comp (spectralLineJet_selberg_signals_continuous H 0 N b).1
+  have hU : Continuous U := spectralLineJet_selberg_continuousWindow hf h
+  have hsize (u : ℝ) (hu : 0 ≤ u) : ‖f u‖ ≤ D * (1 + u) ^ (1 / 4 : ℝ) := by
+    have hu₁ : 0 < 1 + u := by positivity
+    have he := hq.dist_le_mul (winWeight(H, N, b, u) * hardyZ u) 0
+    rw [hq₀, Real.dist_eq, Real.dist_eq, sub_zero, sub_zero, NNReal.coe_one, one_mul, abs_mul,
+      abs_of_nonneg (show 0 ≤ winWeight(H, N, b, u) by positivity), abs_hardyZ] at he
+    have hγ := ha H hH u hu
+    have hp : ‖poly(N, b, u)‖ ^ 2 ≤ 4 * N := by
+      refine (pow_le_pow_left₀ (norm_nonneg _) (spectralLineJet_mollifier_norm N b hb u) 2).trans_eq ?_
+      rw [mul_pow, Real.sq_sqrt (Nat.cast_nonneg N)]
+      ring
+    have hpow : (1 + u) ^ (1 / 4 : ℝ) * (1 + u) ^ (1 / 4 : ℝ) = Real.sqrt (1 + u) := by
+      rw [← Real.rpow_add hu₁, Real.sqrt_eq_rpow]
+      congr 1
+      norm_num
+    change |q _| ≤ _
+    refine he.trans ?_
+    calc _ ≤ (‖Complex.Gamma (criticalLineGammaArgument u)‖ * Real.exp ((Real.pi / 4 - 1 / (2 * H)) * u)) *
+            (4 * N) * (B * Real.sqrt (1 + u)) := by
+           apply mul_le_mul _ (hb₀ u hu) (norm_nonneg _) (by positivity)
+           exact mul_le_mul_of_nonneg_left hp (by positivity)
+         _ = ((‖Complex.Gamma (criticalLineGammaArgument u)‖ * Real.exp ((Real.pi / 4 - 1 / (2 * H)) * u)) *
+             (1 + u) ^ (1 / 4 : ℝ)) * ((4 * N) * B * (1 + u) ^ (1 / 4 : ℝ)) := by rw [← hpow]; ring
+         _ ≤ A * ((4 * N) * B * (1 + u) ^ (1 / 4 : ℝ)) := mul_le_mul_of_nonneg_right hγ (by positivity)
+         _ = _ := by dsimp [D]; ring
+  have hbound (t : ℝ) (ht : t ∈ Icc 0 Y) : U t ^ 2 ≤ (D * h) ^ 2 * Real.sqrt (1 + Y + h) := by
+    have H₁ := intervalIntegral.norm_integral_le_of_norm_le_const (a := t) (b := t + h)
+      (C := D * (1 + Y + h) ^ (1 / 4 : ℝ)) (f := f) (fun u hu ↦ by
+        rw [uIoc_of_le (by linarith)] at hu
+        refine (hsize u (ht.1.trans hu.1.le)).trans (mul_le_mul_of_nonneg_left ?_ hD)
+        exact Real.rpow_le_rpow (by linarith [ht.1, hu.1]) (by linarith [ht.2, hu.2]) (by norm_num))
+    rw [show t + h - t = h by ring, abs_of_nonneg hh] at H₁
+    calc _ = ‖U t‖ ^ 2 := by rw [Real.norm_eq_abs, sq_abs]
+         _ ≤ (D * (1 + Y + h) ^ (1 / 4 : ℝ) * h) ^ 2 := pow_le_pow_left₀ (norm_nonneg _) H₁ _
+         _ = _ := by
+           rw [mul_pow, mul_pow,← Real.rpow_mul_natCast (show 0 ≤ 1 + Y + h by linarith), Real.sqrt_eq_rpow]
+           norm_num
+           ring
+  change (∫ t in (0 : ℝ)..Y, U t ^ 2) ≤ _
+  calc _ ≤ ∫ _t in (0 : ℝ)..Y, (D * h) ^ 2 * Real.sqrt (1 + Y + h) :=
+         intervalIntegral.integral_mono_on hY ((hU.pow 2).intervalIntegrable ..) intervalIntegrable_const hbound
+       _ = _ := by simp only [intervalIntegral.integral_const, sub_zero, smul_eq_mul, D]; ring
 
 end SelbergBulk
 
