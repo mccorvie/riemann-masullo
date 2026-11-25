@@ -1594,3 +1594,322 @@ theorem exists_projectiveKernel_stripTestAction_spectralProjection_iff_support_i
 end KernelLocalization
 
 end RiemannMasullo.Isolated
+
+namespace RiemannMasullo.Isolated.AngularPair
+
+/-- De Smit, *Generating arithmetically equivalent number fields with elliptic curves*,
+§3, pp. 395–396. For the curve `y² = x³ - x + 1`, the quartic division coordinate
+and its radicand generate the same field in characteristic zero, by the second identity. -/
+theorem deSmit_quartic_coordinates {K : Type*} [Field K] (x : K)
+    (hx : 3 * x ^ 4 - 6 * x ^ 2 + 12 * x - 1 = 0) :
+    let D := x ^ 3 - x + 1
+    27 * D ^ 4 + 216 * D ^ 3 + 414 * D ^ 2 - 529 = 0 ∧
+      92 * x = -3 * (3 * D ^ 3 + 24 * D ^ 2 + 23 * D - 46) := by
+  dsimp only
+  constructor
+  · linear_combination
+      (9 * x ^ 8 - 18 * x ^ 6 + 72 * x ^ 5 + 21 * x ^ 4 - 108 * x ^ 3 + 120 * x ^ 2 + 48 * x - 128) * hx
+  · linear_combination (3 * x ^ 5 - 3 * x ^ 3 + 21 * x ^ 2 + 4 * x - 12) * hx
+
+/-- The induced traces of the line and quotient signs agree for every matrix of
+`GL₂(𝔽₃)`. In the chart `(1,t)`, a fixed line has eigenvalue `a+b*t` and quotient
+eigenvalue `d-b*t`. The line `(0,1)` supplies the remaining summand. -/
+theorem glTwoThree_diagonal_induced_traces (a b c d : ZMod 3) (hinv : a * d - b * c ≠ 0) :
+    let sign (z : ZMod 3) : ℤ := if z = 1 then 1 else -1
+    (if b = 0 then sign d else 0) +
+        (∑ t : ZMod 3, if c + d * t = t * (a + b * t) then sign (a + b * t) else 0) =
+      (if b = 0 then sign a else 0) +
+        (∑ t : ZMod 3, if c + d * t = t * (a + b * t) then sign (d - b * t) else 0) := by
+  decide +revert
+
+/-- The residue of the division coordinate at the degree-one prime above 41 is a simple
+root. The two quadratic radicands have opposite square classes at that prime. -/
+theorem deSmit_separating_prime :
+    let x : ZMod 41 := 24
+    let D := x ^ 3 - x + 1
+    3 * x ^ 4 - 6 * x ^ 2 + 12 * x - 1 = 0 ∧ 12 * x ^ 3 - 12 * x + 12 ≠ 0 ∧
+      D ≠ 0 ∧ (∃ y : ZMod 41, y ^ 2 = D) ∧ ∀ y : ZMod 41, y ^ 2 ≠ -3 * D := by
+  decide
+
+section
+
+open Classical ComplexConjugate Function MeasureTheory NumberField Set
+open scoped ContDiff NNReal
+
+private theorem translatedMultiplier_neg (z : ℂ) :
+    translatedIntervalMultiplier quadraticBoxLaplace (-z) =
+      -Complex.exp (-6 * z) * translatedIntervalMultiplier quadraticBoxLaplace z := by
+  have he : Complex.exp (-6 * z) * Complex.exp (3 * z) = Complex.exp (-(3 * z)) := by
+    rw [← Complex.exp_add]
+    congr 1
+    ring
+  unfold translatedIntervalMultiplier
+  rw [GaussianPairDetector.quadratic_even, show (3 : ℂ) * -z = -(3 * z) by ring, ← he]
+  ring
+
+/-- One real even compact smooth radial test vanishes at the origin and detects the whole
+off-axis open strip. It is the sum of a translated three-moment profile and its reflection. -/
+theorem exists_evenRadialDetector :
+    ∃ g : ℝ → ℂ, ContDiff ℝ ∞ g ∧ HasCompactSupport g ∧ Function.Even g ∧
+      (∀ x, conj (g x) = g x) ∧ g 0 = 0 ∧
+      (∀ w : ℂ, 0 < |w.re| → |w.re| < 1 / 2 → bilateralLaplace g w ≠ 0) ∧
+      bilateralLaplace g (-(1 / 2)) = 0 ∧ bilateralLaplace g 0 = 0 ∧
+      bilateralLaplace g (1 / 2) = 0 := by
+  obtain ⟨H, hH, hs, hsup, hp, hn, _⟩ := exists_translatedGevreyPolarProfile
+  let f (x : ℝ) : ℂ := H x
+  let g (x : ℝ) : ℂ := f x + f (-x)
+  have hf : ContDiff ℝ ∞ f := Complex.ofRealCLM.contDiff.comp hs
+  have hHc : HasCompactSupport H := isCompact_Icc.of_isClosed_subset (isClosed_tsupport _) hsup
+  have hc : HasCompactSupport f := hHc.comp_left (g := Complex.ofReal) rfl
+  have hcr : HasCompactSupport (fun x : ℝ ↦ f (-x)) := hc.comp_homeomorph (Homeomorph.neg ℝ)
+  have hL (w : ℂ) : bilateralLaplace g w = bilateralLaplace f w + bilateralLaplace f (-w) := by
+    rw [← GaussianPairDetector.laplace_reflect f w]
+    unfold bilateralLaplace
+    rw [← integral_add (GaussianPairDetector.tilted_smooth_integrable hf.continuous hc w)
+      (GaussianPairDetector.tilted_smooth_integrable (f := fun x ↦ f (-x))
+        (hf.continuous.comp continuous_neg) hcr w)]
+    congr 1
+    funext x
+    exact add_mul _ _ _
+  have hz : H 0 = 0 := image_eq_zero_of_notMem_tsupport fun h ↦ by
+    have := (hsup h).1
+    norm_num at this
+  refine ⟨g, hf.add (hf.comp contDiff_id.neg), hc.add hcr, fun x ↦ ?_, fun x ↦ ?_,
+    ?_, fun w hw hb ↦ ?_, ?_, ?_, ?_⟩
+  · simp [g, add_comm]
+  · simp [g, f]
+  · simp [g, f, hz]
+  · have hu : Complex.exp (-6 * w) ≠ 1 := by
+      intro he
+      have t := congrArg (fun u : ℂ ↦ ‖u‖) he
+      rw [Complex.norm_exp, norm_one, ← Real.exp_zero, Real.exp_eq_exp] at t
+      have := abs_pos.mp hw
+      simp [Complex.mul_re] at t
+      exact this (by linarith)
+    have hm : translatedIntervalMultiplier quadraticBoxLaplace w ≠ 0 := by
+      rw [← hH]
+      exact hn w hw hb
+    rw [hL, show bilateralLaplace f = translatedIntervalMultiplier quadraticBoxLaplace from hH,
+      translatedMultiplier_neg]
+    convert mul_ne_zero (sub_ne_zero.mpr (Ne.symm hu)) hm using 1
+    ring
+  · rw [hL, neg_neg, show bilateralLaplace f (-(1/2)) = 0 from hp.1,
+      show bilateralLaplace f (1/2) = 0 from hp.2.2, add_zero]
+  · rw [hL, neg_zero, show bilateralLaplace f 0 = 0 from hp.2.1, add_zero]
+  · rw [hL, show bilateralLaplace f (1/2) = 0 from hp.2.2,
+      show bilateralLaplace f (-(1/2)) = 0 from hp.1, add_zero]
+
+end
+
+section
+
+open Classical ComplexConjugate Function MeasureTheory NumberField Set
+open scoped ContDiff NNReal
+
+open Filter
+open scoped Topology
+
+set_option quotPrecheck false
+
+attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorelSpaceSec1
+  instIdeleClassT2Sec1 instIdeleClassLocallyCompactSec1 instIdeleClassSecondCountableSec1
+  instIdeleClassHaarMeasureSec1
+
+variable {F : Type*} [Field F] [NumberField F]
+
+local notation "G" => IdeleClassGroup (𝓞 F) F
+local notation "U" => PontryaginDual G
+local notation "N" => ideleClassNorm F
+local notation "V" => (((normOneIdeleClassTamagawaMeasure F) univ).toReal : ℂ)
+local notation "D(" χ "," w ")" => MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ w
+local notation "M(" φ "," χ "," w ")" =>
+  modulatedFourierMellin (continuousIdeleClassNorm F) univ
+    ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ (ideleClassTamagawaMeasure F)
+    (φ : BruhatCompactSupport G).val (ideleClassNormTwist χ w)
+local notation "Chars(" τ ")" => {χ : U // ∀ t : ℝ≥0ˣ, χ (τ t) = 1}
+local notation "Sites(" τ "," α ")" => {z : Chars(τ) × ℂ //
+  0 < D(z.1.val,z.2) ∧ α ≤ |z.2.re - 1 / 2|}
+
+private theorem quadratic_on_section (χ : U) (hχ : χ ^ 2 = 1)
+    (τ : ℝ≥0ˣ →ₜ* G) (t : ℝ≥0ˣ) : χ (τ t) = 1 := by
+  let r := Units.mk0 (NNReal.sqrt t.val) (by
+    exact (NNReal.sqrt_pos.mpr (Units.zero_lt t)).ne')
+  have hr : r ^ 2 = t := Units.ext (NNReal.sq_sqrt t.val)
+  rw [← hr, map_pow, map_pow]
+  exact congrArg (fun θ : U ↦ θ (τ r)) hχ
+
+private theorem quadratic_inv (χ : U) (hχ : χ ^ 2 = 1) : χ⁻¹ = χ := by
+  calc χ⁻¹ = χ⁻¹ * 1 := (mul_one _).symm
+       _ = χ := by rw [← hχ, pow_two, inv_mul_cancel_left]
+
+private theorem quadratic_values_real (χ : U) (hχ : χ ^ 2 = 1) (x : G) :
+    conj (χ x : ℂ) = (χ x : ℂ) := by
+  have h := congrArg (fun θ : U ↦ (θ x : ℂ)) (quadratic_inv χ hχ)
+  change ((χ x)⁻¹ : Circle).val = (χ x : ℂ) at h
+  exact (Circle.coe_inv_eq_conj (χ x)).symm.trans h
+
+private theorem dual_completed_order (χ : U) (z : ℂ) :
+    meromorphicOrderAt (continuedCompletedHeckeL χ⁻¹) (1 - z) =
+      meromorphicOrderAt (continuedCompletedHeckeL χ) z := by
+  obtain ⟨hχ, heχ⟩ := continuedCompletedHeckeL_spec χ
+  obtain ⟨hη, heη⟩ := continuedCompletedHeckeL_spec χ⁻¹
+  obtain ⟨ε, hε, hn, hfe⟩ := completedHeckeL_continuation_functionalEquation χ _ _ hχ heχ hη heη
+  have hc : meromorphicOrderAt (fun s ↦ continuedCompletedHeckeL χ⁻¹ (1 - s)) z =
+      meromorphicOrderAt (continuedCompletedHeckeL χ⁻¹) (1 - z) := by
+    simpa [Function.comp_def] using
+      meromorphicOrderAt_comp_of_deriv_ne_zero (f := continuedCompletedHeckeL χ⁻¹)
+        (show AnalyticAt ℂ (fun s : ℂ ↦ 1 - s) z by fun_prop)
+        (show deriv (fun s : ℂ ↦ 1 - s) z ≠ 0 by simp)
+  rw [show (fun s ↦ continuedCompletedHeckeL χ⁻¹ (1 - s)) = ε * continuedCompletedHeckeL χ
+    from funext hfe, meromorphicOrderAt_mul_of_ne_zero (hε.analyticAt z) (hn z)] at hc
+  exact hc.symm
+
+private theorem positive_divisor_re_pos (χ : U) (z : ℂ) (h : 0 < D(χ,z)) : 0 < z.re := by
+  by_contra! hs
+  have hraw : 0 < meromorphicOrderAt (continuedCompletedHeckeL χ) z := by
+    rw [MeromorphicOn.divisor_apply (continuedCompletedHeckeL_spec χ).1.meromorphicOn (mem_univ _)] at h
+    cases hh : meromorphicOrderAt (continuedCompletedHeckeL χ) z with
+    | top => simp
+    | coe k =>
+      rw [hh, WithTop.untop₀_coe] at h
+      exact_mod_cast h
+  have hdual : 0 < meromorphicOrderAt (continuedCompletedHeckeL χ⁻¹) (1 - z) := by
+    rwa [dual_completed_order]
+  have hpos : 0 < (1 - z).re := by rw [Complex.sub_re, Complex.one_re]; linarith
+  obtain ⟨hm, he⟩ := continuedCompletedHeckeL_spec χ⁻¹
+  have hu := completedHeckeL_continuation_zeros χ⁻¹ _ hm he hpos hdual
+  rw [Complex.sub_re, Complex.one_re] at hu
+  linarith
+
+/-- Equality of ordinary finite Hecke series on the Euler half-plane identifies every
+positive completed order, including those on a proposed strip edge. -/
+theorem positive_completed_divisors_eq_of_finiteHeckeL_eq (ψ η : U)
+    (heq : ∀ s : {s : ℂ // 1 < s.re}, finiteHeckeL ψ s = finiteHeckeL η s) (z : ℂ)
+    (hz : 0 < D(ψ,z) ∨ 0 < D(η,z)) : D(ψ,z) = D(η,z) := by
+  have hpos : 0 < z.re := hz.elim (positive_divisor_re_pos ψ z) (positive_divisor_re_pos η z)
+  let A (χ : U) (w : ℂ) := (heckeGammaFactor χ w)⁻¹ * continuedCompletedHeckeL χ w
+  have hm (χ : U) : MeromorphicOn (A χ) univ := fun w hw ↦
+    ((differentiable_inv_heckeGammaFactor χ).analyticAt w).meromorphicAt.mul
+      ((continuedCompletedHeckeL_spec χ).1 hw).meromorphicAt
+  have hA (χ : U) (s : {s : ℂ // 1 < s.re}) : A χ s.val = finiteHeckeL χ s := by
+    dsimp only [A]
+    rw [(continuedCompletedHeckeL_spec χ).2 s]
+    exact inv_mul_cancel_left₀ (heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans s.property)) _
+  have htop : meromorphicOrderAt (A ψ - A η) (2 : ℂ) = ⊤ := by
+    apply meromorphicOrderAt_eq_top_iff.mpr
+    have hr : ∀ᶠ w : ℂ in 𝓝 (2 : ℂ), 1 < w.re :=
+      (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+    filter_upwards [hr.filter_mono nhdsWithin_le_nhds] with w hw
+    exact sub_eq_zero.mpr ((hA ψ ⟨w,hw⟩).trans ((heq ⟨w,hw⟩).trans (hA η ⟨w,hw⟩).symm))
+  have ht := ((hm ψ).sub (hm η)).meromorphicOrderAt_eq_top_of_isPreconnected
+    isPreconnected_univ (mem_univ (2 : ℂ)) (mem_univ z) htop
+  have hgerm : A ψ =ᶠ[𝓝[≠] z] A η :=
+    (meromorphicOrderAt_eq_top_iff.mp ht).mono fun _ hw ↦ sub_eq_zero.mp hw
+  have ho (χ : U) : meromorphicOrderAt (A χ) z = meromorphicOrderAt (continuedCompletedHeckeL χ) z :=
+    meromorphicOrderAt_mul_of_ne_zero ((differentiable_inv_heckeGammaFactor χ).analyticAt z)
+      (inv_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ hpos))
+  rw [MeromorphicOn.divisor_apply (continuedCompletedHeckeL_spec ψ).1.meromorphicOn (mem_univ _),
+    MeromorphicOn.divisor_apply (continuedCompletedHeckeL_spec η).1.meromorphicOn (mem_univ _),
+    ← ho ψ, ← ho η, meromorphicOrderAt_congr hgerm]
+
+/-- The zeta factorizations of two relative quadratic fields and arithmetic equivalence
+of the top fields suffice for equality of the two ordinary Hecke series. For the elliptic
+3-torsion construction, see de Smit, *Generating arithmetically equivalent number fields
+with elliptic curves*, §3, pp. 395–396. -/
+theorem finiteHeckeL_eq_of_relative_zeta (ψ η : U) (E₁ E₂ : Type*) [Field E₁] [Field E₂]
+    [NumberField E₁] [NumberField E₂]
+    (h₁ : ∀ s : {s : ℂ // 1 < s.re}, dedekindZeta E₁ s = dedekindZeta F s * finiteHeckeL ψ s)
+    (h₂ : ∀ s : {s : ℂ // 1 < s.re}, dedekindZeta E₂ s = dedekindZeta F s * finiteHeckeL η s)
+    (he : ∀ s : {s : ℂ // 1 < s.re}, dedekindZeta E₁ s = dedekindZeta E₂ s)
+    (s : {s : ℂ // 1 < s.re}) : finiteHeckeL ψ s = finiteHeckeL η s := by
+  have hζ := completedHeckeL_one_eq_dedekindZeta (F := F) s
+  rw [← heckeGammaFactor_one] at hζ
+  have hbase : finiteHeckeL (1 : U) s = dedekindZeta F s :=
+    mul_left_cancel₀ (heckeGammaFactor_ne_zero_of_re_pos (1 : U) (zero_lt_one.trans s.property)) hζ
+  apply mul_left_cancel₀ (hbase ▸ finiteHeckeL_ne_zero_of_one_lt_re (1 : U) s)
+  exact (h₁ s).symm.trans ((he s).trans (h₂ s))
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. Two distinct quadratic Hecke characters with
+equal ordinary or completed functions give a real inversion-even physical test. Its only
+normalized Mellin samples are opposite and nonzero throughout the off-axis open strip.
+The full exterior sum vanishes, with both edges, for every norm section and width. -/
+theorem exists_quadraticPair_exteriorZeros (ψ η : U) (hψ : ψ ^ 2 = 1) (hη : η ^ 2 = 1)
+    (hne : ψ ≠ η) (hL : (∀ s : {s : ℂ // 1 < s.re}, finiteHeckeL ψ s = finiteHeckeL η s) ∨
+      continuedCompletedHeckeL ψ = continuedCompletedHeckeL η) :
+    ∃ (g : ℝ → ℂ) (φ : BruhatCompactSupport G),
+      ContDiff ℝ ∞ g ∧ HasCompactSupport g ∧ Function.Even g ∧ g 0 = 0 ∧
+      (∀ x, φ.val x = ((ψ x : ℂ) - (η x : ℂ)) * g (logIdeleClassNorm F x) / V) ∧
+      (∀ x, conj (φ.val x) = φ.val x) ∧ (∀ x, φ.val x⁻¹ = φ.val x) ∧
+      (∀ u : (N).ker, φ.val u.val = 0) ∧ (∃ x, φ.val x ≠ 0) ∧
+      (∀ w : ℂ, M(φ,ψ,w) = bilateralLaplace g w ∧ M(φ,η,w) = -bilateralLaplace g w) ∧
+      (∀ w : ℂ, 0 < |w.re| → |w.re| < 1 / 2 → bilateralLaplace g w ≠ 0) ∧
+      ∀ (τ : ℝ≥0ˣ →ₜ* G), RightInverse τ N →
+        (∀ χ : Chars(τ), χ.val ≠ ψ → χ.val ≠ η → ∀ w, M(φ,χ.val,w) = 0) ∧
+        ∀ α : ℝ, HasSum (fun z : Sites(τ,α) ↦ (D(z.val.1.val,z.val.2) : ℂ) *
+          M(φ,z.val.1.val,z.val.2 - 1 / 2)) 0 := by
+  obtain ⟨g, hg, hc, he, hr, hz, hd, _⟩ := exists_evenRadialDetector
+  obtain ⟨p, hp⟩ := exists_characterNormTest (F := F) ψ g hg hc
+  obtain ⟨q, hq⟩ := exists_characterNormTest (F := F) η g hg hc
+  let φ : BruhatCompactSupport G := V⁻¹ • (p - q)
+  have hφ (x : G) : φ.val x = ((ψ x : ℂ) - (η x : ℂ)) * g (logIdeleClassNorm F x) / V := by
+    change V⁻¹ * (p.val x - q.val x) = _
+    rw [hp, hq]
+    ring
+  have hpair (x : G) : φ.val x = ((ψ⁻¹ x : ℂ) - (η⁻¹ x : ℂ)) *
+      g (logIdeleClassNorm F x) / V := by
+    rw [quadratic_inv ψ hψ, quadratic_inv η hη, hφ]
+  have hrows (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ N) (χ : Chars(τ)) (w : ℂ) :
+      M(φ,χ.val,w) = (if χ.val = ψ then bilateralLaplace g w else 0) -
+        (if χ.val = η then bilateralLaplace g w else 0) := by
+    let P : Chars(τ) := ⟨ψ, quadratic_on_section ψ hψ τ⟩
+    let Q : Chars(τ) := ⟨η, quadratic_on_section η hη τ⟩
+    simpa only [Subtype.ext_iff, P, Q, bilateralLaplace] using
+      mellin_normalizedPair τ hτ P Q χ g hg hc φ hpair w
+  let σ : ℝ≥0ˣ →ₜ* G := ⟨(QuotientGroup.mk' _).comp (canonicalIdeleNormSection F),
+    continuous_quotient_mk'.comp (canonicalIdeleNormSection_continuous _)⟩
+  have hσ : RightInverse σ N := canonicalIdeleNormSection_rightInverse F
+  have hsamp (w : ℂ) : M(φ,ψ,w) = bilateralLaplace g w ∧ M(φ,η,w) = -bilateralLaplace g w := by
+    have a := hrows σ hσ ⟨ψ, quadratic_on_section ψ hψ σ⟩ w
+    have b := hrows σ hσ ⟨η, quadratic_on_section η hη σ⟩ w
+    simpa only [ite_eq_left rfl, ite_true, ite_eq_right hne, ite_eq_right (Ne.symm hne), sub_zero, zero_sub]
+      using And.intro a b
+  refine ⟨g, φ, hg, hc, he, hz, hφ, fun x ↦ ?_, fun x ↦ ?_, fun u ↦ ?_, ?_, hsamp, hd,
+    fun τ hτ ↦ ⟨fun χ h₁ h₂ w ↦ ?_, fun α ↦ ?_⟩⟩
+  · rw [hφ, map_div₀, map_mul, map_sub, quadratic_values_real ψ hψ,
+      quadratic_values_real η hη, hr, Complex.conj_ofReal]
+  · have hinv (χ : U) (hχ : χ ^ 2 = 1) : χ x⁻¹ = χ x :=
+      (map_inv χ x).trans (congrArg (fun θ : U ↦ θ x) (quadratic_inv χ hχ))
+    have hl : logIdeleClassNorm F x⁻¹ = -logIdeleClassNorm F x := by
+      change Real.log _ = -Real.log _
+      simp [map_inv]
+    rw [hφ, hφ, hinv ψ hψ, hinv η hη, hl, he]
+  · rw [hφ]
+    have hl : logIdeleClassNorm F u.val = 0 := by
+      change Real.log ((N u.val).val : ℝ) = 0
+      rw [u.property]
+      simp
+    rw [hl, hz, mul_zero, zero_div]
+  · by_contra! hzero
+    have h := (hsamp (1 / 4)).1
+    simp [modulatedFourierMellin, hzero] at h
+    exact hd (1 / 4) (by norm_num) (by norm_num) (by simpa only [one_div] using h.symm)
+  · rw [hrows τ hτ, ite_eq_right h₁, ite_eq_right h₂, sub_self]
+  · let P : Chars(τ) := ⟨ψ, quadratic_on_section ψ hψ τ⟩
+    let Q : Chars(τ) := ⟨η, quadratic_on_section η hη τ⟩
+    let f (x : ℝ) := g x / V
+    have hfc : HasCompactSupport f := HasCompactSupport.intro hc.isCompact fun x hx ↦ by
+      change g x / V = 0
+      rw [image_eq_zero_of_notMem_tsupport hx, zero_div]
+    apply hasSum_exteriorZeros_characterPair τ hτ P Q f (hg.div_const _) hfc α
+    · intro z _ hz
+      rcases hL with hfinite | hcompleted
+      · exact positive_completed_divisors_eq_of_finiteHeckeL_eq ψ η hfinite z hz
+      · exact congrArg (fun L : ℂ → ℂ ↦ MeromorphicOn.divisor L univ z) hcompleted
+    · intro x
+      change φ.val x = ((ψ⁻¹ x : ℂ) - (η⁻¹ x : ℂ)) * (g _ / V)
+      rw [hpair]
+      ring
+
+end
+
+end RiemannMasullo.Isolated.AngularPair
