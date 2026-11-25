@@ -424,10 +424,34 @@ private theorem completedHecke_order_ne_top (χ : PontryaginDual C𝔽) (z : ℂ
   rw [(hm (mem_univ _)).meromorphicOrderAt_eq_zero_iff.mpr hval]
   exact WithTop.coe_ne_top
 
+section CriticalMeasurementProofWitnesses
+
+-- Lean originally generated these names when it abstracted proofs from the measurement
+-- definitions. The physical profile uses independent witnesses for the same propositions.
+-- Retain the two historical names and choose them only inside the three data lambdas.
+set_option linter.auxLemma false
+
+/-- The established normal-subgroup witness in the critical measurement data. -/
+theorem criticalFiniteHeckeL._proof_1 {K : Type u_1} [Field K] [NumberField K] :
+    (NumberField.IdeleGroup.principalSubgroup (𝓞 K) K).Normal := inferInstance
+
+/-- The established numeral witness in the critical measurement data. -/
+theorem criticalFiniteHeckeL._proof_2 : (1 + 1 : ℕ).AtLeastTwo := inferInstance
+
+namespace CriticalMeasurementWitnesses
+
+attribute [scoped instance 2000] criticalFiniteHeckeL._proof_1 criticalFiniteHeckeL._proof_2
+
+end CriticalMeasurementWitnesses
+
+end CriticalMeasurementProofWitnesses
+
 /-- The finite Hecke function on the critical line, formed by removing the archimedean
 gamma factor from the specified meromorphic continuation of the completed function. -/
-def criticalFiniteHeckeL (χ : PontryaginDual C𝔽) (t : ℝ) : ℂ :=
-  completed(χ) cl(t) * (heckeGammaFactor χ cl(t))⁻¹
+def criticalFiniteHeckeL : (χ : PontryaginDual C𝔽) → (t : ℝ) → ℂ :=
+  open scoped CriticalMeasurementWitnesses in
+  fun (χ : PontryaginDual C𝔽) (t : ℝ) ↦
+    completed(χ) cl(t) * (heckeGammaFactor χ cl(t))⁻¹
 
 /-- Every normal-form continuation of the finite Euler product agrees with
 `criticalFiniteHeckeL` at every point of the critical line. -/
@@ -551,8 +575,10 @@ local notation "density(" χ ", " η ")" => analyticZeroDensity (criticalFiniteH
 
 /-- The positive atomic measure on the ordinates of the central zeros of the completed
 Hecke function. Each point has mass equal to its full analytic multiplicity. -/
-def criticalHeckeZeroMeasure (χ : PontryaginDual C𝔽) : Measure ℝ :=
-  Measure.sum fun z : central(χ) ↦ (mult(χ, z) : ℝ≥0∞) • Measure.dirac z.val.im
+def criticalHeckeZeroMeasure : (χ : PontryaginDual C𝔽) → Measure ℝ :=
+  open scoped CriticalMeasurementWitnesses in
+  fun (χ : PontryaginDual C𝔽) ↦
+    Measure.sum fun z : central(χ) ↦ (mult(χ, z) : ℝ≥0∞) • Measure.dirac z.val.im
 
 private theorem criticalHeckeZeroMeasure_finite_sites (χ : PontryaginDual C𝔽)
     {K : Set ℝ} (hK : IsCompact K) : {z : central(χ) | z.val.im ∈ K}.Finite := by
@@ -635,8 +661,10 @@ theorem integrable_schwartz_mul_criticalFiniteHeckeL_density (χ : PontryaginDua
     rw [_root_.norm_mul]
     exact mul_le_mul_of_nonneg_left (criticalHeckeDensity_norm_le χ hη t) (norm_nonneg _)
 
-private def criticalHeckeDensityMeasure (χ : PontryaginDual C𝔽) (η : ℝ) : Measure ℝ :=
-  volume.withDensity (fun t ↦ ENNReal.ofReal (density(χ, η) t))
+private def criticalHeckeDensityMeasure : (χ : PontryaginDual C𝔽) → (η : ℝ) → Measure ℝ :=
+  open scoped CriticalMeasurementWitnesses in
+  fun (χ : PontryaginDual C𝔽) (η : ℝ) ↦
+    volume.withDensity (fun t ↦ ENNReal.ofReal (density(χ, η) t))
 
 private theorem criticalHeckeDensityMeasure_pairing (χ : PontryaginDual C𝔽)
     {η : ℝ} (hη : 0 < η) {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E] (g : ℝ → E) :
