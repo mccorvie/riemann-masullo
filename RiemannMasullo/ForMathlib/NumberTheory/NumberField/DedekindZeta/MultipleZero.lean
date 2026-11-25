@@ -1760,6 +1760,24 @@ theorem cubicSplittingField_completedDedekindZeta_multipleZeros_unbounded (B : �
   letI : NumberField L := ⟨⟩
   exact cubicZeroCount_unbounded_of_infinite L cubicSplittingField_completedDedekindZeta_multipleZeros_infinite B
 
+/-- The finite Euler-factor comparison for the splitting field of X³ − 2 transfers
+an excess of cubic over rational zeta orders in the open strip to arbitrarily
+high multiple zeros. -/
+theorem cubicSplittingField_multipleZeros_unbounded_of_subfield_excess
+    (h : ∀ (K : Type) [Field K] [NumberField K], Module.finrank ℚ K = 3 →
+      {z : ℂ | 0 < z.re ∧ z.re < 1 ∧ order(ζChar(ℚ), z) < order(ζChar(K), z)}.Infinite)
+    (B : ℝ) :
+    let L := (Polynomial.X ^ 3 - Polynomial.C (2 : ℚ)).SplittingField
+    letI : NumberField L := ⟨⟩
+    ∃ z : ℂ, B < z.im ∧ 0 < z.re ∧ z.re < 1 ∧ 1 < order(ζChar(L), z) := by
+  let L := (Polynomial.X ^ 3 - Polynomial.C (2 : ℚ)).SplittingField
+  let _ : NumberField L := ⟨⟩
+  apply cubicZeroCount_unbounded_of_infinite L _ B
+  obtain ⟨K, _, _, b, _, hd, ht⟩ := cubicZeroCount_splittingField_comparison
+  apply (h K (b.finrank.trans hd)).mono
+  rintro z ⟨h₀, h₁, hz⟩
+  exact ⟨h₀, h₁, ht z h₀ h₁ hz⟩
+
 end CubicZeroCount
 
 /-- Paper: Theorem 10.2.1.1, p. 440. The trivial Hecke character of some
