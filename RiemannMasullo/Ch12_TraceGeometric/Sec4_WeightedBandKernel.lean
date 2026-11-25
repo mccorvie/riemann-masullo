@@ -17,6 +17,7 @@ compute the trace in that picture.
   functions of the band.
 * `weightedZero`: the point `ζ`, with `ζ ^ 2 = i`.
 * `weightedDilationMultiplier`: the multiplier `r_g x = g (x ^ 2 - i) / (x ^ 2 - i g ^ 2)`.
+* `weightedBandWeight`, `weightedBandFactor`: the weight `w` and the factor `μ`.
 * `weightedBandDefect`: the term `E (Y)` that appears both in the trace over the odd band and in
   the rank-one correction, and cancels between them.
 -/
@@ -134,6 +135,44 @@ theorem weightedDilationMultiplier_eq {g : ℝ} (hg : g ≠ 0) (x : ℝ) :
 theorem weightedDilationMultiplier_neg (g x : ℝ) :
     weightedDilationMultiplier g (-x) = weightedDilationMultiplier g x := by
   simp [weightedDilationMultiplier]
+
+/-- The weight `w x = x ^ 2 + x ^ (-2)` of the weighted band. -/
+def weightedBandWeight (x : ℝ) : ℝ := x ^ 2 + (x ^ 2)⁻¹
+
+/-- The factor `μ x = (x ^ 2 - i) / x`, whose squared modulus is the weight. -/
+def weightedBandFactor (x : ℝ) : ℂ := ((x : ℂ) ^ 2 - Complex.I) / (x : ℂ)
+
+/-- The squared modulus of `μ` is the weight. -/
+theorem norm_sq_weightedBandFactor {x : ℝ} (hx : x ≠ 0) :
+    ‖weightedBandFactor x‖ ^ 2 = weightedBandWeight x := by
+  have h := norm_sq_sub_I_mul x 1
+  rw [Complex.ofReal_one, mul_one] at h
+  rw [weightedBandFactor, norm_div, div_pow, h, Complex.norm_real, Real.norm_eq_abs, sq_abs,
+    weightedBandWeight]
+  field_simp
+
+/-- `μ x` is not zero for `x ≠ 0`. -/
+theorem weightedBandFactor_ne_zero {x : ℝ} (hx : x ≠ 0) : weightedBandFactor x ≠ 0 := by
+  intro h
+  have h2 := norm_sq_weightedBandFactor hx
+  rw [h, norm_zero, weightedBandWeight] at h2
+  have : 0 < x ^ 2 + (x ^ 2)⁻¹ := by positivity
+  nlinarith
+
+/-- The multiplier is the quotient of `μ` by its dilate: `r_g x = μ x / μ (x / g)`. -/
+theorem weightedDilationMultiplier_mul_weightedBandFactor {g x : ℝ} (hg : g ≠ 0) (hx : x ≠ 0) :
+    weightedDilationMultiplier g x * weightedBandFactor (x / g) = weightedBandFactor x := by
+  have hden := weightedDilationMultiplier_den_ne_zero hg x
+  have hxc : (x : ℂ) ≠ 0 := by exact_mod_cast hx
+  have hgc : (g : ℂ) ≠ 0 := by exact_mod_cast hg
+  have h1 : weightedBandFactor (x / g) =
+      ((x : ℂ) ^ 2 - Complex.I * (g : ℂ) ^ 2) / ((g : ℂ) * (x : ℂ)) := by
+    rw [weightedBandFactor]
+    push_cast
+    field_simp
+  rw [h1, weightedDilationMultiplier, weightedBandFactor, div_mul_div_comm,
+    div_eq_div_iff (mul_ne_zero hden (mul_ne_zero hgc hxc)) hxc]
+  ring
 
 /-- The term `E (Y)` of the trace over the odd band that the rank-one correction cancels:
 `(g ^ 2 - 1) / (2 √g) (E₋ / (g - 1) - E₊ / (g + 1))` with `E_± = exp (2 π i Y (g ± 1) ζ)`. -/
