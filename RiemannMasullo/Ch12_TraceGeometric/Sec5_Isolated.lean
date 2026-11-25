@@ -604,8 +604,6 @@ theorem exists_projectiveKernel_stripTestAction_spectralProjection_iff_support_i
   rw [g.property] at hx
   simp at hx
 
-end KernelLocalization
-
 /-! ## Ordered rational prime pairs in the fixed physical test -/
 
 section OrderedRationalPrimePairs
@@ -757,7 +755,7 @@ theorem thresholdProfile_critical_pair_abel_bounds :
     change Tendsto Q (𝓝[>] 0) (𝓝 0) at hzero
     have hP : Measurable P := firstPrimeDegreeOneSum_measurable (F := ℚ) 1 thresholdProfile
       thresholdProfile_spec.1.continuous.measurable 4
-    have hfinite : ∀ᶠ ε in 𝓝[>] (0 : ℝ), Q ε ≠ ∞ :=
+    have hfinite : ∀ᶠ ε in 𝓝[>] (0 : ℝ), Q ε ≠ (⊤ : ℝ≥0∞) :=
       (hzero.eventually_lt_const (show (0 : ℝ≥0∞) < 1 by exact zero_lt_one)).mono
         fun _ h ↦ (h.trans_le le_top).ne
     have htotal : ∀ᶠ ε in 𝓝[>] (0 : ℝ), IntegrableOn
@@ -791,5 +789,7 @@ theorem thresholdProfile_critical_pair_abel_bounds :
       simpa only [heq] using limsup_signedAbelMean_sub_le hn hδn ht hz
 
 end OrderedRationalPrimePairs
+
+end KernelLocalization
 
 end RiemannMasullo.Isolated
