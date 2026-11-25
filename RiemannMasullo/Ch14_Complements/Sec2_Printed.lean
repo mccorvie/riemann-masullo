@@ -47,6 +47,17 @@ def Printed.f9AffineCount (A : Printed.F9) : ℕ :=
 /-- `y^2 = x^3 + (1+i) x` has nine affine solutions over this model of `F_9`. -/
 lemma Printed.f9AffineCount_one_add_i : Printed.f9AffineCount (1, 1) = 9 := by decide
 
+/-- `y^2 = x^3 - x` has fifteen affine solutions over this model of `F_9`. -/
+lemma Printed.f9AffineCount_neg_one : Printed.f9AffineCount (2, 0) = 15 := by decide
+
+/-- Paper: §14.2, p. 536. The curve `y^2 = x^3 - x` over `F_9` has trace `-6`.
+Its Weil polynomial is `1 + 6 T + 9 T^2 = (1 + 3 T)^2`, a double zero. This is a
+curve for which the printed conclusion holds. The universal claim still fails,
+by `Printed.supersingularDoubleCover_doubleZero_false`. -/
+theorem Printed.supersingular_x3_sub_x_doubleZero :
+    ((9 : ℤ) - Printed.f9AffineCount (2, 0)) ^ 2 = 36 := by
+  simp [Printed.f9AffineCount_neg_one]
+
 /-- Paper: §14.2, p. 536. A supersingular elliptic curve over `F_{p^2}`, as a double cover of
 the projective line, has an L-function with a double zero.
 Deviation: The printed sentence quantifies over every such curve. This proposition is that
