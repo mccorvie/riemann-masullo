@@ -1,7 +1,7 @@
 module
 
 import Mathlib.Geometry.Manifold.PartitionOfUnity
-import RiemannMasullo.Ch10_TraceSpectral.Sec4b_ProjectedKernels
+public import RiemannMasullo.Ch10_TraceSpectral.Sec4b_ProjectedKernels
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 public import RiemannMasullo.ForMathlib.Analysis.Fourier.StripLaplace
 import RiemannMasullo.Ch01_Introduction.Sec4
@@ -920,6 +920,59 @@ theorem exists_centerGeometricProbes_exteriorZeros (τ : ℝ≥0ˣ →ₜ* C𝔽
       rw [hcenter p.val.1 z,sub_self,abs_zero] at hge
       exact hα.not_ge hge⟩
     exact hasSum_empty
+
+local notation "centerKernel(" h ", " hs ", " φ ")" =>
+  ((sobolevProjectiveKernelOperator_injective (F := F) h centerHs₀(hs)).existsUnique_iff_exists.mpr
+    (stripTestAction_spectralProjection_has_projectiveKernel (F := F) (1/2) h centerHs₀(hs) φ)).exists
+local notation "centerDiagonal(" h ", " hs ", " φ ", " U ")" =>
+  Rdiag(h,hs,φ,centerKernel(h,hs,φ),U)
+
+/-- For any compact test vanishing on the norm-one classes and supported in a single
+normalized character on the Mellin side, the change in the genuine geometric diagonal
+from half-width one half to a shrinking positive width converges to the full-order
+off-line real moment sum. The weighted-adjoint theorem of #7590 supplies the representing
+tensors using Szymon Mikler's clustered quotient nuclearity from #7535. Injectivity of the
+projective kernel operator gives uniqueness. -/
+theorem tendsto_geometricDiagonal_sub_halfWidth_offLineMass (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (χ : Chars(τ))
+    (φ : BruhatCompactSupport C𝔽) (hφ : ∀ g : C₁, φ.val g = 0)
+    (hoff : ∀ η : PontryaginDual C𝔽, (∀ t, η (τ t) = 1) → η ≠ χ.val → ∀ z : ℂ, M(φ,η,z) = 0)
+    {s : ℝ} (hs : 3 ≤ s) (β : ℕ → ℝ) (hβ : ∀ n, 0 < β n) (ht : Tendsto β atTop (𝓝 0))
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    Tendsto (fun n ↦ centerDiagonal((hβ n).le,hs,φ,U) - centerDiagonal(hhalf,hs,φ,U))
+      atTop (𝓝 mass(χ.val,φ)) :=
+  tendsto_centerDiagonal τ hτ χ φ hφ hoff hs β hβ ht
+    (fun n ↦ centerKernel((hβ n).le,hs,φ)) centerKernel(hhalf,hs,φ) U hU hBorel
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The compact positive probes of #7556 use one
+test per normalized character. An upper comparison of its genuine smoothened diagonal with its
+half-width diagonal on one admissible shrinking family per character implies the exterior
+cancellation for every positive width and every compact test vanishing on the norm-one classes. -/
+theorem exists_centerGeometricProbes_exteriorZeros_of_upperComparison (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) :
+    ∃ probe : Chars(τ) → BruhatCompactSupport C𝔽,
+      (∀ χ : Chars(τ), (∀ g : C₁, (probe χ).val g = 0) ∧
+        M(probe χ,(1 : PontryaginDual C𝔽),(0:ℂ)) = 0 ∧ M(probe χ,(1 : PontryaginDual C𝔽),(1:ℂ)) = 0 ∧
+        (∀ η : PontryaginDual C𝔽, (∀ t, η (τ t) = 1) → η ≠ χ.val → ∀ z : ℂ, M(probe χ,η,z) = 0) ∧
+        ∀ z : Sites(χ.val), 0 < (M(probe χ,χ.val,z.val)).re) ∧
+      ((∀ χ : Chars(τ), ∃ (s : ℝ) (hs : 3 ≤ s) (β : ℕ → ℝ) (hβ : ∀ n, 0 < β n),
+        Tendsto β atTop (𝓝 0) ∧ ∃ U : ℕ → Set C𝔽, IsDPrimeSequence μ𝔽 U ∧
+          (∀ n, MeasurableSet (U n)) ∧
+          limUnder atTop (fun n ↦ centerDiagonal((hβ n).le,hs,probe χ,U)) ≤ centerDiagonal(hhalf,hs,probe χ,U)) →
+        ∀ α : ℝ, 0 < α → ∀ f : BruhatCompactSupport C𝔽, (∀ g : C₁, f.val g = 0) →
+          HasSum (fun p : ExtC(τ,α) ↦ ((ord(p.val.1.val,p.val.2) : ℤ) : ℂ) * M(f,p.val.1.val,p.val.2)) 0) := by
+  refine (exists_centerGeometricProbes_exteriorZeros τ hτ).elim fun probe hp ↦ ?_
+  refine ⟨probe, ?_, ?_⟩
+  · intro χ
+    have h := hp.1 χ
+    exact ⟨h.1, h.2.1, h.2.2.1, h.2.2.2.1, h.2.2.2.2.1⟩
+  · intro hcompare
+    apply hp.2
+    intro χ
+    refine (hcompare χ).elim fun s h ↦ h.elim fun hs h ↦ ?_
+    refine h.elim fun β h ↦ h.elim fun hβ h ↦ ?_
+    exact h.2.elim fun U hU ↦ ⟨s, hs, β, hβ, h.1, fun n ↦ centerKernel((hβ n).le,hs,probe χ),
+      centerKernel(hhalf,hs,probe χ), U, hU.1, hU.2.1, hU.2.2⟩
 
 end CenterGeometry
 
