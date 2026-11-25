@@ -1,6 +1,6 @@
 module
 
-public import RiemannMasullo.Ch01_Introduction.Sec4_PoissonCertificate
+public import RiemannMasullo.Ch01_Introduction.Sec4_RationalPoissonBounds
 public import RiemannMasullo.Ch13_ZerosHecke.Targets
 import RiemannMasullo.External.ZetaLab.HardyFirstZero.FirstZero
 
@@ -66,7 +66,7 @@ local notation "χ₀" => (1 : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ))
 certifies that the completed rational principal function has exactly one site in the
 closed cell `[13.5,14.5]`. It is central, has multiplicity one, and lies in the certified
 open bracket `(14.13,14.14)`. -/
-theorem rational_first_cell_unique_simple_of_logDerivative_lt
+private theorem rational_first_cell_unique_simple_of_logDerivative_lt
     (hformula : HasSum (siteWeight (F := ℚ) (χ := χ₀) 14) (normalizedLogDerivative χ₀ 14))
     (hupper : normalizedLogDerivative χ₀ 14 < bracketLowerBound 14 (1413 / 100) (707 / 50) + 3 / 5) :
     ∃ z : Site (F := ℚ) χ₀, z.val.re = 1 / 2 ∧ z.val.im ∈ Ioo (1413 / 100 : ℝ) (707 / 50) ∧
@@ -106,5 +106,17 @@ theorem rational_first_cell_unique_simple_of_logDerivative_lt
       simpa [B, Finsupp.single_eq_of_ne hne] using hmul w hw
     have := one_le_multiplicity w
     omega
+
+/-- The single translated zero-sum identity at `2 + 14i` certifies the whole
+closed cell `[13.5,14.5]`: it contains exactly one positive divisor site of the
+completed rational principal function, in `(14.13,14.14)`, and that site is simple. -/
+theorem rational_first_cell_unique_simple
+    (hformula : HasSum (siteWeight (F := ℚ) (χ := χ₀) 14) (normalizedLogDerivative χ₀ 14)) :
+    ∃ z : Site (F := ℚ) χ₀, z.val.re = 1 / 2 ∧ z.val.im ∈ Ioo (1413 / 100 : ℝ) (707 / 50) ∧
+      multiplicity (χ := χ₀) z = 1 ∧
+      ∀ w : Site (F := ℚ) χ₀, w.val.im ∈ Icc (27 / 2 : ℝ) (29 / 2) ↔ w = z := by
+  apply rational_first_cell_unique_simple_of_logDerivative_lt hformula
+  apply rational_normalizedLogDerivative_fourteen_le.trans_lt
+  norm_num [bracketLowerBound]
 
 end RiemannMasullo.HeckePoisson
