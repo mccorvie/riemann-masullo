@@ -4,7 +4,7 @@ import RiemannMasullo.AppB_AnalyticNT.Sec2
 import RiemannMasullo.AppB_AnalyticNT.Sec4b
 import RiemannMasullo.AppB_AnalyticNT.Sec6
 import RiemannMasullo.Ch13_ZerosHecke.Targets
-import RiemannMasullo.ForMathlib.Analysis.Complex.ExpSumLogarithmicRegion
+public import RiemannMasullo.ForMathlib.Analysis.Complex.ExpSumLogarithmicRegion
 import RiemannMasullo.ForMathlib.Analysis.Fourier.StripLaplace
 
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
@@ -207,6 +207,68 @@ private theorem translatedLocalTerms_logarithmicZeroGap (χ : U) :
   rw [div_div, mul_assoc]
   exact div_le_div_of_nonneg_left hA.le (mul_pos hD hlog) (mul_le_mul_of_nonneg_left hcomp hD.le)
 
+/-- Classical input: M. D. Coleman, *A zero-free region for the Hecke L-functions*,
+Mathematika 37 (1990), Theorem 2, pp. 287–304. See I. Petrow, *The Weyl law for
+algebraic tori*, (1.12) and Lemma 2.12, p. 20. This is the large-ordinate
+zero-free region of a fixed unitary Hecke character, expressed for the
+meromorphic continuation of its finite Euler product. The constants may depend
+on the field and character. -/
+theorem finiteHeckeL_colemanRegion_atLarge (χ : U) :
+    ∃ c > (0 : ℝ), ∃ T ≥ (0 : ℝ), ∀ L : ℂ → ℂ, MeromorphicNFOn L univ →
+      (∀ s : {s : ℂ // 1 < s.re}, L s = finiteHeckeL χ s) →
+      ∀ s : ℂ, T ≤ |s.im| → 0 < s.re → 0 < meromorphicOrderAt L s →
+        s.re ≤ 1 - c / colemanLogWeight 3 |s.im| := by
+  sorry
+
+/-- Coleman's large-ordinate region extends to every positive completed divisor
+site for a fixed character. The logarithmic region on the remaining compact
+height range allows the constant to absorb a possible exceptional real zero. -/
+theorem continuedCompletedHeckeL_colemanZeroGap (χ : U) :
+    ∃ c > (0 : ℝ), ∀ z : zeros(χ),
+      z.val.re ≤ 1 - c / colemanLogWeight 3 |z.val.im| := by
+  obtain ⟨c, hc, T, hT, hreg⟩ := finiteHeckeL_colemanRegion_atLarge χ
+  obtain ⟨b, hb, hlow⟩ := translatedLocalTerms_logarithmicZeroGap χ
+  obtain ⟨L, hL, hseries⟩ := finiteHeckeL_exists_continuation χ
+  let B := 1 + Real.log (1 + T)
+  have hB : 0 < B := by
+    have := Real.log_nonneg (show 1 ≤ 1 + T by linarith)
+    dsimp only [B]
+    linarith
+  let d := min c (min (1 / 2) ((b / B) / 2))
+  have hd : 0 < d := lt_min hc (lt_min (by norm_num) (half_pos (div_pos hb hB)))
+  refine ⟨d, hd, fun z ↦ ?_⟩
+  let t := |z.val.im|
+  have ht : 0 ≤ t := abs_nonneg _
+  have hW := half_le_colemanLogWeight (a := 3) (by norm_num) ht
+  have hp : 0 < colemanLogWeight 3 t := lt_of_lt_of_le (by norm_num) hW
+  by_cases hr : 0 < z.val.re
+  · by_cases hlarge : T ≤ t
+    · have ho : 0 < meromorphicOrderAt L z.val := by
+        rw [meromorphicOrderAt_finiteHeckeL_continuation χ hL.meromorphicOn hseries hr]
+        exact translatedLocalTerms_characterZero_order χ z
+      exact (hreg L hL hseries z.val hlarge hr ho).trans
+        (sub_le_sub_left (div_le_div_of_nonneg_right (min_le_left _ _) hp.le) _)
+    · have hpos : 0 < 1 + Real.log (1 + t) := by
+        linarith [Real.log_nonneg (show 1 ≤ 1 + t by linarith)]
+      have hB' : 1 + Real.log (1 + t) ≤ B := by
+        have hh : Real.log (1 + t) ≤ Real.log (1 + T) :=
+          Real.log_le_log (by positivity) (by linarith [lt_of_not_ge hlarge])
+        dsimp only [B]
+        linarith
+      have hstep : d / colemanLogWeight 3 t ≤ b / B := by
+        apply (div_le_iff₀ hp).mpr
+        calc
+          d ≤ (b / B) / 2 := (min_le_right _ _).trans (min_le_right _ _)
+          _ = (b / B) * (1 / 2) := by ring
+          _ ≤ _ := mul_le_mul_of_nonneg_left hW (div_nonneg hb.le hB.le)
+      exact (hlow z).trans (sub_le_sub_left
+        (hstep.trans (div_le_div_of_nonneg_left hb.le hpos hB')) _)
+  · have hdW : d ≤ colemanLogWeight 3 t :=
+      ((min_le_right _ _).trans (min_le_left _ _)).trans hW
+    have hquot := (div_le_one hp).mpr hdW
+    change z.val.re ≤ 1 - d / colemanLogWeight 3 t
+    linarith
+
 local notation "V" => IsDedekindDomain.HeightOneSpectrum (𝓞 F)
 local notation "M(" φ ", " c ")" =>
   modulatedFourierMellin m𝔽 univ ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
@@ -314,6 +376,33 @@ theorem translatedLocalTerms_integrableOn_exp_sqrt (τ : ℝ≥0ˣ →ₜ* C𝔽
     obtain ⟨D, hD, h⟩ := translatedLocalTerms_norm_le_exp_sub_sqrt τ hτ ψ hψ H hs hc K
     exact ⟨D, hD, fun y hy ↦ h y hy (φ y) (hφ y hy) (a y) (b y) (ha y hy) (hb y hy)⟩
 
+private theorem translatedLocalTerms_gevreyCoef (χ : U) (H : ℝ → ℂ)
+    {κ A : ℝ} (hA : 0 < A)
+    (hH : ∀ w : ℂ, w.re ∈ Icc (-(1 / 2) : ℝ) (1 / 2) →
+      ‖∫ x : ℝ, H x * Complex.exp (w * x)‖ ≤ A * Real.exp (-κ * Real.sqrt |w.im|))
+    (z : zeros(χ)) : ‖coef(χ, H, z)‖ ≤ ((‖vol₁‖ + 1) * A) * mass(χ, z) * (1 + |z.val.im|) ^ 2 *
+      Real.exp (-κ * Real.sqrt |z.val.im|) := by
+  let m : ℝ := ord(χ, z.val)
+  let x := 1 + |z.val.im|
+  let E := Real.exp (-κ * Real.sqrt |z.val.im|)
+  have hx : 0 < x := by dsimp [x]; positivity
+  have hm : 0 ≤ m := by dsimp only [m]; exact_mod_cast z.property.le
+  have he : 0 ≤ E := (Real.exp_pos _).le
+  have hz := explicitFormulaCompletedHeckeL_zero_re_mem χ z.property
+  have hre : (z.val - 1 / 2).re ∈ Icc (-(1 / 2) : ℝ) (1 / 2) := by
+    simp only [Complex.sub_re, Complex.div_ofNat_re, Complex.one_re]
+    constructor <;> linarith [hz.1, hz.2]
+  have hcoeff : ‖bilateralLaplace H (z.val - 1 / 2)‖ ≤ A * E := by
+    simpa [bilateralLaplace, E] using hH _ hre
+  rw [norm_mul, Complex.norm_intCast, abs_of_nonneg hm, norm_mul]
+  change m * (‖vol₁‖ * _) ≤ ((‖vol₁‖ + 1) * A) * (m / x ^ 2) * x ^ 2 * E
+  calc
+    _ ≤ m * (‖vol₁‖ * (A * E)) :=
+      mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_left hcoeff (norm_nonneg _)) hm
+    _ ≤ m * ((‖vol₁‖ + 1) * (A * E)) :=
+      mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_right (by linarith) (mul_nonneg hA.le he)) hm
+    _ = _ := by field_simp [hx.ne']
+
 /-- A square-root exponential height bound on the bilateral Laplace transform
 improves the positive-translate saving to d*y/log(2+y) for the same local
 functional. The constant d depends on the fixed field, character and profile. -/
@@ -328,37 +417,66 @@ theorem translatedLocalTerms_norm_le_exp_sub_div_log (τ : ℝ≥0ˣ →ₜ* C�
       ∀ (a : archTest) (b : finiteTest), archRestricts(φ, a) → finiteRestricts(φ, b) →
         ‖localTerms(φ, a, b)‖ ≤ C * Real.exp (y / 2 - d * y / Real.log (2 + y)) := by
   obtain ⟨c, hc', hgap⟩ := translatedLocalTerms_logarithmicZeroGap (ψ⁻¹)
-  let B := (‖vol₁‖ + 1) * A
-  have hB : 0 < B := mul_pos (by positivity) hA
-  have hamp (z : zeros(ψ⁻¹)) : ‖coef(ψ⁻¹, H, z)‖ ≤ B * mass(ψ⁻¹, z) * (1 + |z.val.im|) ^ 2 *
-      Real.exp (-κ * Real.sqrt |z.val.im|) := by
-    let m : ℝ := ord(ψ⁻¹, z.val)
-    let x := 1 + |z.val.im|
-    let E := Real.exp (-κ * Real.sqrt |z.val.im|)
-    have hx : 0 < x := by dsimp [x]; positivity
-    have hm : 0 ≤ m := by dsimp only [m]; exact_mod_cast z.property.le
-    have he : 0 ≤ E := (Real.exp_pos _).le
-    have hz := explicitFormulaCompletedHeckeL_zero_re_mem (ψ⁻¹) z.property
-    have hre : (z.val - 1 / 2).re ∈ Icc (-(1 / 2) : ℝ) (1 / 2) := by
-      simp only [Complex.sub_re, Complex.div_ofNat_re, Complex.one_re]
-      constructor <;> linarith [hz.1, hz.2]
-    have hcoeff : ‖bilateralLaplace H (z.val - 1 / 2)‖ ≤ A * E := by
-      simpa [bilateralLaplace, E] using hH _ hre
-    rw [norm_mul, Complex.norm_intCast, abs_of_nonneg hm, norm_mul]
-    change m * (‖vol₁‖ * _) ≤ B * (m / x ^ 2) * x ^ 2 * E
-    calc
-      _ ≤ m * (‖vol₁‖ * (A * E)) :=
-        mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_left hcoeff (norm_nonneg _)) hm
-      _ ≤ m * ((‖vol₁‖ + 1) * (A * E)) :=
-        mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_right (by linarith) (mul_nonneg hA.le he)) hm
-      _ = _ := by dsimp only [B]; field_simp [hx.ne']
   obtain ⟨d, hd, C, hC, h⟩ := expSum_norm_le_exp_sub_div_log (fun z : zeros(ψ⁻¹) ↦ z.val)
     (fun z ↦ coef(ψ⁻¹, H, z)) (fun z ↦ mass(ψ⁻¹, z))
     (explicitFormulaCompletedHeckeL_summable_divisor_div_sq _)
     (fun z ↦ div_nonneg (by exact_mod_cast z.property.le) (by positivity))
-    hc' hκ hB hgap hamp
+    hc' hκ (mul_pos (by positivity) hA) hgap (translatedLocalTerms_gevreyCoef _ H hA hH)
   exact ⟨d, hd, C, hC, fun y hy φ hφ a b ha hb ↦ h y hy _
     (translatedLocalTerms_hasSum τ hτ ψ hψ H hs hc y φ hφ a b ha hb)⟩
+
+/-- The Coleman region and square-root exponential transform decay yield a savings
+of order `y / colemanLogWeight 2 y` for the genuine signed local terms of each
+positive translate. The divisor is that of the inverse normalized character. -/
+theorem translatedLocalTerms_norm_le_exp_sub_coleman (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (ψ : PontryaginDual C𝔽) (hψ : ∀ t, ψ (τ t) = 1)
+    (H : ℝ → ℂ) (hs : ContDiff ℝ ∞ H) (hc : HasCompactSupport H)
+    {κ A : ℝ} (hκ : 0 < κ) (hA : 0 < A)
+    (hH : ∀ w : ℂ, w.re ∈ Icc (-(1 / 2) : ℝ) (1 / 2) →
+      ‖∫ x : ℝ, H x * Complex.exp (w * x)‖ ≤ A * Real.exp (-κ * Real.sqrt |w.im|)) :
+    ∃ d > (0 : ℝ), ∃ C ≥ (0 : ℝ), ∀ (y : ℝ), 0 ≤ y → ∀ (φ : BruhatCompactSupport C𝔽),
+      (∀ x, φ.val x = (ψ x : ℂ) * H (Real.log ((ideleClassNorm F x : ℝ≥0) : ℝ) - y)) →
+      ∀ (a : archTest) (b : finiteTest), archRestricts(φ, a) → finiteRestricts(φ, b) →
+        ‖localTerms(φ, a, b)‖ ≤ C * Real.exp (y / 2 - d * y / colemanLogWeight 2 y) := by
+  obtain ⟨c, hc', hgap⟩ := continuedCompletedHeckeL_colemanZeroGap (ψ⁻¹)
+  obtain ⟨d, hd, C, hC, h⟩ := expSum_norm_le_exp_sub_coleman (fun z : zeros(ψ⁻¹) ↦ z.val)
+    (fun z ↦ coef(ψ⁻¹, H, z)) (fun z ↦ mass(ψ⁻¹, z))
+    (explicitFormulaCompletedHeckeL_summable_divisor_div_sq _)
+    (fun z ↦ div_nonneg (by exact_mod_cast z.property.le) (by positivity))
+    hc' hκ (mul_nonneg (by positivity) hA.le) hgap (translatedLocalTerms_gevreyCoef _ H hA hH)
+  exact ⟨d, hd, C, hC, fun y hy φ hφ a b ha hb ↦ h y hy _
+    (translatedLocalTerms_hasSum τ hτ ψ hψ H hs hc y φ hφ a b ha hb)⟩
+
+/-- For each fixed normalized character and Gevrey profile, every positive
+integral moment of the actual signed geometric expression is integrable at
+each strictly smaller Coleman tilt. No regularity of the chosen families
+of local restrictions is required. -/
+theorem translatedLocalTerms_integrableOn_exp_coleman (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (ψ : PontryaginDual C𝔽) (hψ : ∀ t, ψ (τ t) = 1)
+    (H : ℝ → ℂ) (hs : ContDiff ℝ ∞ H) (hc : HasCompactSupport H)
+    {κ A : ℝ} (hκ : 0 < κ) (hA : 0 < A)
+    (hH : ∀ w : ℂ, w.re ∈ Icc (-(1 / 2) : ℝ) (1 / 2) →
+      ‖∫ x : ℝ, H x * Complex.exp (w * x)‖ ≤ A * Real.exp (-κ * Real.sqrt |w.im|)) :
+    ∃ d > (0 : ℝ), ∀ (φ : ℝ → BruhatCompactSupport C𝔽)
+      (_hφ : ∀ y ≥ (0 : ℝ), ∀ x, (φ y).val x =
+        (ψ x : ℂ) * H (Real.log ((ideleClassNorm F x : ℝ≥0) : ℝ) - y))
+      (a : ℝ → archTest) (b : ℝ → finiteTest)
+      (_ha : ∀ y ≥ (0 : ℝ), archRestricts(φ y, a y)) (_hb : ∀ y ≥ (0 : ℝ), finiteRestricts(φ y, b y))
+      (n : ℕ), 0 < n → ∀ k : ℝ, k < d →
+        IntegrableOn (fun y : ℝ ↦ ‖localTerms(φ y, a y, b y)‖ ^ n *
+          Real.exp ((n : ℝ) * (-y / 2 + k * y / colemanLogWeight 2 y))) (Ici 0) := by
+  obtain ⟨d, hd, C, hC, hbound⟩ := translatedLocalTerms_norm_le_exp_sub_coleman τ hτ ψ hψ H hs hc hκ hA hH
+  refine ⟨d, hd, ?_⟩
+  intro φ hφ a b ha hb n hn k hk
+  let g (y : ℝ) := ‖localTerms(φ y, a y, b y)‖
+  have hbase := (translatedLocalTerms_integrableOn_exp_sqrt τ hτ ψ hψ H hs hc φ hφ a b ha hb 0).aestronglyMeasurable
+  have hm : AEStronglyMeasurable g (volume.restrict (Ici 0)) := by
+    have hx : Measurable (fun y : ℝ ↦ Real.exp (y / 2)) := by fun_prop
+    apply (hbase.mul hx.aestronglyMeasurable).congr (.of_forall fun y ↦ ?_)
+    change (g y * Real.exp (-y / 2 + 0 * Real.sqrt y)) * Real.exp (y / 2) = g y
+    rw [mul_assoc, ← Real.exp_add, zero_mul, add_zero, neg_div, neg_add_cancel, Real.exp_zero, mul_one]
+  exact integrableOn_pow_mul_exp_coleman_of_bound hm (fun y ↦ norm_nonneg _)
+    (fun y hy ↦ hbound y hy (φ y) (hφ y hy) (a y) (b y) (ha y hy) (hb y hy)) n hn k hk
 
 section UniversalGevrey
 
@@ -522,6 +640,47 @@ theorem exists_universalGevrey_signedLocalTerms :
     rw [show (-1/2 : ℂ) = -(1/2) by ring, hzero 1 (by simp) (1/2) (by simp),
       hzero 1 (by simp) (-(1/2)) (by simp)]
     simp
+
+/-- The fixed real profile of `exists_universalGevrey_signedLocalTerms` has the
+Coleman rate for every fixed number field and normalized character. The tests,
+their vanishing polar moments and their nonvanishing off the centered line
+are the same witnesses as in that theorem. -/
+theorem exists_universalGevrey_signedLocalTerms_coleman :
+    ∃ H : ℝ → ℝ, let G := fun x : ℝ ↦ (H x : ℂ)
+      bilateralLaplace G = translatedIntervalMultiplier quadraticBoxLaplace ∧
+      ContDiff ℝ ∞ H ∧ tsupport H ⊆ Icc 2 4 ∧
+      (∀ w ∈ polarSites, bilateralLaplace G w = 0) ∧
+      (∀ w : ℂ, 0 < |w.re| → |w.re| < 1/2 → bilateralLaplace G w ≠ 0) ∧
+      (∀ B : ℝ, 0 ≤ B → ∃ A > (0 : ℝ), ∀ w : ℂ, |w.re| ≤ B →
+        ‖bilateralLaplace G w‖ ≤ A * Real.exp (-(Real.log 2 / 4) * Real.sqrt |w.im|)) ∧
+      ∀ (F : Type u) [Field F] [NumberField F] (τ : ℝ≥0ˣ →ₜ* C𝔽(F))
+        (_hτ : RightInverse τ (ideleClassNorm F)) (ψ : PontryaginDual C𝔽(F)) (_hψ : ∀ t, ψ (τ t) = 1),
+        ∃ d > (0 : ℝ), ∃ C ≥ (0 : ℝ), ∀ y : ℝ, 0 ≤ y →
+          (∃ (φ : BruhatCompactSupport C𝔽(F)) (a : archTest(F)) (b : finiteTest(F)),
+            matches(F, φ, ψ, G, y) ∧ archRestricts(F, φ, a) ∧ finiteRestricts(F, φ, b)) ∧
+          ∀ φ : BruhatCompactSupport C𝔽(F), matches(F, φ, ψ, G, y) →
+            (∀ g : C₁(F), φ.val g = 0) ∧
+            (∀ η : PontryaginDual C𝔽(F), (∀ t, η (τ t) = 1) →
+              ∀ w ∈ polarSites, mom(F, φ, η, w) = 0) ∧
+            (∀ ρ : ℂ, 1/2 < ρ.re → ρ.re < 1 → mom(F, φ, ψ⁻¹, ρ - 1/2) ≠ 0) ∧
+            ∀ (a : archTest(F)) (b : finiteTest(F)), archRestricts(F, φ, a) → finiteRestricts(F, φ, b) →
+              localTerms(F, φ, a, b) = -(vol₁(F) * localPVs(F, a, b)) ∧
+              ‖localTerms(F, φ, a, b)‖ ≤ C * Real.exp (y / 2 - d * y / colemanLogWeight 2 y) := by
+  obtain ⟨H, hform, hs, ht, hp, hn, he, hold⟩ := exists_universalGevrey_signedLocalTerms.{u}
+  let G := fun x : ℝ ↦ (H x : ℂ)
+  have hG : ContDiff ℝ ∞ G := Complex.ofRealCLM.contDiff.comp hs
+  have hc : HasCompactSupport H := isCompact_Icc.of_isClosed_subset (isClosed_tsupport _) ht
+  obtain ⟨A, hA, hfast⟩ := he (1/2) (by norm_num)
+  refine ⟨H, hform, hs, ht, hp, hn, he, ?_⟩
+  intro F _ _ τ hτ ψ hψ
+  obtain ⟨d, hd, C, hC, hbound⟩ := translatedLocalTerms_norm_le_exp_sub_coleman τ hτ ψ hψ G hG
+    (hc.comp_left Complex.ofReal_zero) (div_pos (Real.log_pos (by norm_num)) (by norm_num)) hA
+    (fun w hw ↦ hfast w (abs_le.mpr hw))
+  obtain ⟨_, _, _, _, htests⟩ := hold F τ hτ ψ hψ
+  refine ⟨d, hd, C, hC, fun y hy ↦ ⟨(htests y hy).1, fun φ hφ ↦ ?_⟩⟩
+  obtain ⟨hker, hpolar, hdet, hlocal⟩ := (htests y hy).2 φ hφ
+  exact ⟨hker, hpolar, hdet, fun a b ha hb ↦
+    ⟨(hlocal a b ha hb).1, hbound y hy φ hφ a b ha hb⟩⟩
 
 end UniversalGevrey
 
