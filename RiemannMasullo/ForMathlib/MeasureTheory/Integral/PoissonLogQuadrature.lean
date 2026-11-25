@@ -116,4 +116,32 @@ theorem poisson_cell_pos {n : ℕ} (hn : 0 < n) (j : ℕ) : 0 < poissonMeasure.r
   apply sub_pos.mpr
   exact Real.arctan_strictMono (div_lt_div_of_pos_right hh (by norm_num))
 
+
+/-- The Cauchy measure at two has a finite square-root height moment. -/
+theorem poisson_sqrtMoment : Integrable (fun x : ℝ ↦ Real.sqrt (1+|x|)) poissonMeasure := by
+  rw [poisson_integrable_iff]
+  have hi := integrable_one_add_norm (E:=ℝ) (μ:=volume) (r:=3/2) (by norm_num)
+  have hc : Continuous (fun x : ℝ ↦ Real.sqrt (1+|x|)) :=
+    Real.continuous_sqrt.comp (continuous_const.add continuous_abs)
+  apply (hi.const_mul (3/Real.pi)).mono' (continuous_weight.mul hc).aestronglyMeasurable
+  filter_upwards with x
+  have hpos : 0 < 1+|x| := by positivity
+  have hw : 0 < poissonWeight x := by unfold poissonWeight; positivity
+  have hweight : poissonWeight x ≤ (3/Real.pi)/(1+|x|)^2 := by
+    unfold poissonWeight
+    have hd : (1+|x|)^2 ≤ 2*((3/2:ℝ)^2+x^2) := by nlinarith [sq_nonneg (|x|-1),sq_abs x]
+    calc (3/2:ℝ)/(Real.pi*((3/2)^2+x^2)) = (3/Real.pi)/(2*((3/2)^2+x^2)) := by
+          rw [div_div,div_div]; congr 1; ring
+      _ ≤ _ := div_le_div_of_nonneg_left (by positivity) (by positivity) hd
+  change ‖poissonWeight x * Real.sqrt (1+|x|)‖ ≤ (3/Real.pi)*(1+‖x‖)^(-(3/2):ℝ)
+  rw [Real.norm_of_nonneg (mul_nonneg hw.le (Real.sqrt_nonneg _)),Real.norm_eq_abs]
+  calc
+    poissonWeight x * Real.sqrt (1+|x|) ≤ ((3/Real.pi)/(1+|x|)^2) * Real.sqrt (1+|x|) :=
+      mul_le_mul_of_nonneg_right hweight (Real.sqrt_nonneg _)
+    _ = _ := by
+      rw [Real.sqrt_eq_rpow,show -(3/2:ℝ) = -2 + 1/2 by ring,
+        Real.rpow_add hpos,Real.rpow_neg hpos.le]
+      norm_num
+      ring
+
 end RiemannMasullo.LogQuadrature

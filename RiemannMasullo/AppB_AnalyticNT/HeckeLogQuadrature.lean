@@ -273,4 +273,23 @@ theorem tendsto_trueLogStatistic (τ : ℝ≥0ˣ →ₜ* Cᶠ) (hτ : RightInver
     (Eventually.of_forall (fun _ _ _ ↦ by simp)) (hecke_critical_ae_ne_zero τ hτ χ hχ L hL he)
     ((poisson_integrable_iff _).mpr hlog) poisson_logMoment
 
+
+/-- The actual finite critical-line table has the stated rate if the canonical
+log modulus has the integrated tail bound. All arithmetic and derivative data
+come from the ordinary finite Hecke continuation. -/
+theorem hasRootLogRate_heckeLogStatistic (τ : ℝ≥0ˣ →ₜ* Cᶠ) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : Uᶠ) (hχ : ∀ t, χ (τ t) = 1) (L : ℂ → ℂ) (hL : MeromorphicNFOn L univ)
+    (he : ∀ s : Hp, L s = finiteHeckeL χ s)
+    (hlog : Integrable (fun t ↦ poissonWeight t * Real.log ‖L (point t)‖))
+    (htail : HasIntegratedLogTail poissonMeasure (fun t ↦ Real.log ‖L (point t)‖)) :
+    HasRootLogRate (fun n ↦ heckeLogStatistic χ n -
+      ∫ t, poissonWeight t * Real.log ‖L (point t)‖) := by
+  obtain ⟨hd,C,hC,hb⟩ := hecke_critical_deriv_polynomial τ hτ χ hχ L hL he
+  have hh := hasRootLogRate_statistic poissonMeasure (fun t ↦ L (point t)) (frequencySample χ)
+    hC.le (localPolynomialLipschitz_of_deriv hC.le hd hb)
+    ((eventually_frequencySample_error τ hτ χ hχ L hL he).mono (fun _ hn t ht ↦ (hn t ht).le))
+    (hecke_critical_ae_ne_zero τ hτ χ hχ L hL he) hd.continuous.measurable
+    ((poisson_integrable_iff _).mpr hlog) poisson_sqrtMoment htail
+  simpa only [heckeLogStatistic,poisson_integral] using hh
+
 end RiemannMasullo.LogQuadrature

@@ -1480,6 +1480,29 @@ theorem all_widths_iff_cofinal_finiteLogDifference (τ : ℝ≥0ˣ →ₜ* C𝔽
     exact (hN n hn).not_ge ha
 
 /-- Paper: Theorem 12.5.1.1, pp. 519–520.
+Reconstruction: each finite ideal table bounds the full absolute exterior sum with
+a quantitative remainder. The two error constants work for every compact test and
+every positive width for this normalized character. -/
+theorem exists_hasSum_absolute_exterior_le_finiteLogDifference_rate (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) (χ : U𝔽)
+    (hχ : ∀ u : ℝ≥0ˣ, χ (τ u) = 1) :
+    ∃ C > 0, ∃ c > 0, ∀ φ : BruhatCompactSupport C𝔽, ∃ W : ℝ, 0 ≤ W ∧
+      ∀ α : ℝ, 0 < α → ∃ A : ℝ,
+        HasSum (fun z : {p : ℂ // 0 < ord(χ, p) ∧ α ≤ |p.re-1/2|} ↦
+          ‖(ord(χ, z.val) : ℂ) *
+            modulatedFourierMellin m𝔽 univ ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+              μ𝔽 φ.val (ideleClassNormTwist χ (z.val - 1/2))‖) A ∧
+        ∀ n : ℕ, A ≤ (3*W/(2*α)) *
+          (finiteLogDifference χ n + C * Real.exp (-c * Real.sqrt (Real.log n))) := by
+  obtain ⟨C, hC, c, hc, hrate⟩ := finiteLogDifference_rate τ hτ χ hχ
+  refine ⟨C, hC, c, hc, fun φ ↦ ?_⟩
+  obtain ⟨W, hW, h⟩ := exists_hasSum_absolute_exterior_le_criticalLogDifference τ hτ χ hχ φ
+  refine ⟨W, hW, fun α hα ↦ ?_⟩
+  obtain ⟨A, hA, hbound⟩ := h α hα
+  refine ⟨A, hA, fun n ↦ hbound.trans (mul_le_mul_of_nonneg_left ?_ (by positivity))⟩
+  linarith [(abs_le.mp (hrate n)).1]
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520.
 For each normalized character and compact test, the absolute exterior sum at each
 positive width is bounded by the measured limit. With any positive tolerance, each
 sufficiently late finite table gives the same upper bound with that tolerance added. -/

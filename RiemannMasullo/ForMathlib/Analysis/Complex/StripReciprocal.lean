@@ -64,6 +64,19 @@ private theorem stripReciprocal_disk_harnack (H : ℂ → ℝ) (hH : HarmonicOnN
       rfl
     _ ≤ _ := mul_le_mul_of_nonneg_right hcc (hn _ (by simp))
 
+/-- Harnack's bound for the logarithmic deficit of a bounded, zero-free disk function. -/
+theorem disk_log_norm_deficit_le (f : ℂ → ℂ) (M : ℝ)
+    (hf : AnalyticOnNhd ℂ f (ball 0 1)) (hn : ∀ z ∈ ball (0 : ℂ) 1, f z ≠ 0)
+    (hb : ∀ z ∈ ball (0 : ℂ) 1, ‖f z‖ ≤ M) {z : ℂ} (hz : ‖z‖ < 1) :
+    Real.log M - Real.log ‖f z‖ ≤
+      (4 / (1 - ‖z‖)) * (Real.log M - Real.log ‖f 0‖) := by
+  apply stripReciprocal_disk_harnack (fun w ↦ Real.log M - Real.log ‖f w‖)
+  · intro w hw
+    exact (harmonicAt_const (Real.log M)).sub ((hf w hw).harmonicAt_log_norm (hn w hw))
+  · intro w hw
+    exact sub_nonneg.mpr (Real.log_le_log (norm_pos_iff.mpr (hn w hw)) (hb w hw))
+  · exact mem_ball_zero_iff.mpr hz
+
 private theorem stripReciprocal_cayley_gap {u : ℂ} (hu : 0 < u.re) :
     (1 - ‖(u - 1) / (u + 1)‖)⁻¹ ≤ (‖u‖ + 1) ^ 2 / (2 * u.re) := by
   have hsq : ‖u + 1‖ ^ 2 - ‖u - 1‖ ^ 2 = 4 * u.re := by

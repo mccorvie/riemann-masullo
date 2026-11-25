@@ -1,5 +1,6 @@
 module
 
+public import RiemannMasullo.ForMathlib.Analysis.Asymptotics.LogMeshRate
 public import Mathlib.MeasureTheory.Integral.DominatedConvergence
 public import Mathlib.Analysis.SpecialFunctions.Log.Basic
 import Mathlib.MeasureTheory.Integral.Bochner.Set
@@ -258,5 +259,233 @@ theorem tendsto_statistic (μ : Measure ℝ) [IsFiniteMeasure μ] (f : ℝ → �
     apply hh.congr'
     filter_upwards [hwin] with n hn
     simp [step,hn,clip]
+
+open Real
+
+/-- A bound for the integrated tails of a real logarithm under its sampling measure. -/
+def HasIntegratedLogTail (μ : Measure ℝ) (u : ℝ → ℝ) : Prop :=
+  ∃ A > 0, ∃ c > 0, ∀ᶠ Y : ℝ in atTop,
+    (∫ x in {x | Y ≤ |u x|}, |u x| ∂μ) ≤ A * exp (-c * √Y)
+
+private theorem abs_log_sub_log_le_floor {a d x y : ℝ} (ha : 0 < a) (hd : 0 ≤ d)
+    (hx : a ≤ x) (hy : a ≤ y) (hxy : x-y ≤ d) (hyx : y-x ≤ d) :
+    |log x-log y| ≤ d/a := by
+  have side {r s : ℝ} (hr : a ≤ r) (hs : a ≤ s) (hb : r-s ≤ d) :
+      log r-log s ≤ d/a := by
+    have hsp := ha.trans_le hs
+    rw [← log_div (ha.trans_le hr).ne' hsp.ne']
+    calc log (r/s) ≤ r/s-1 := log_le_sub_one_of_pos (div_pos (ha.trans_le hr) hsp)
+      _ = (r-s)/s := by field_simp
+      _ ≤ d/s := div_le_div_of_nonneg_right hb hsp.le
+      _ ≤ d/a := div_le_div_of_nonneg_left hd ha hs
+  exact abs_le.mpr ⟨by linarith [side hy hx hyx], side hx hy hxy⟩
+
+private theorem clip_error_interior {n : ℕ} {q : ℝ} (hq : 4 ≤ q)
+    (hn : exp (q^2) = n) {z v : ℂ} (hv : v ≠ 0) (hl : |log ‖v‖| ≤ q^2/4)
+    (hd : ‖z-v‖ ≤ exp (-q^2/2)) : |clip n z - log ‖v‖| ≤ 2*exp (-q^2/4) := by
+  have hn' : (n:ℝ)⁻¹ = exp (-(q^2)) := by rw [←hn,exp_neg]
+  have hL : exp (-q^2/4) ≤ ‖v‖ := by
+    rw [← exp_log (norm_pos_iff.mpr hv)]
+    apply exp_monotone
+    linarith [(abs_le.mp hl).1]
+  have hsplit : 2 * exp (-q^2/2) ≤ exp (-q^2/4) := by
+    have hh : 2 ≤ exp (q^2/4) := by nlinarith [add_one_le_exp (q^2/4),sq_nonneg (q-2)]
+    have h := mul_le_mul_of_nonneg_right hh (exp_pos (-q^2/2)).le
+    rw [←exp_add, show q^2/4+ -q^2/2 = -q^2/4 by ring] at h
+    exact h
+  have hinv : (n:ℝ)⁻¹ ≤ exp (-q^2/2) := by
+    rw [hn']; exact exp_monotone (by nlinarith [sq_nonneg q])
+  have norm₁ := (norm_sub_norm_le z v).trans hd
+  have norm₂ := (norm_sub_norm_le v z).trans (by rwa [norm_sub_rev] : ‖v-z‖ ≤ exp (-q^2/2))
+  have hz : exp (-q^2/4)/2 ≤ ‖z‖ := by linarith
+  rw [clip,max_eq_right (by linarith : (n:ℝ)⁻¹ ≤ ‖z‖)]
+  calc
+    |log ‖z‖-log ‖v‖| ≤ exp (-q^2/2) / (exp (-q^2/4)/2) :=
+      abs_log_sub_log_le_floor (by positivity) (exp_pos _).le hz
+        (by linarith [exp_pos (-q^2/4)]) norm₁ norm₂
+    _ = 2*exp (-q^2/4) := by
+      have hh : exp (-q^2/4) * exp (-q^2/4) = exp (-q^2/2) := by
+        rw [←exp_add]; congr 1; ring
+      apply (div_eq_iff (by positivity)).2
+      rw [← hh]
+      ring
+
+private theorem step_abs_le_log {n : ℕ} (hn : 2 ≤ n) {q : ℝ} (hq : 4 ≤ q)
+    (hnq : q^2 = log n) {f : ℝ → ℂ} {C : ℝ} {p : ℕ} (hC : 0 ≤ C)
+    (hmod : LocalPolynomialLipschitz f C p) {S : ℕ → ℝ → ℂ}
+    (hs : ∀ y, |y| ≤ (n:ℝ)+1 → ‖f y-S n y‖ ≤ (1/2:ℝ)^n)
+    {x : ℝ} (hne : f x ≠ 0) :
+    |step S n x| ≤ |log ‖f x‖| + (log (2+C)+2*p)*q^2 := by
+  have hn0 : 0 < n := by omega
+  have hn2 : (2:ℝ) ≤ n := by exact_mod_cast hn
+  have hln := log_nonneg (show 1 ≤ 2+C by linarith)
+  have hq1 : 1 ≤ q^2 := by nlinarith [sq_nonneg (q-1)]
+  by_cases hx : x ∈ Ico (-(n:ℝ)) n
+  · have h := abs_clip_le hn0 (by positivity : 0 ≤ 1+C*(2+|x|)^p) hne
+      (sampleTag_le hC hmod hn0 hs hx)
+    rw [step,indicator_of_mem hx]
+    refine h.trans (add_le_add le_rfl ?_)
+    have hx' : |x| ≤ n := abs_le.mpr ⟨hx.1,hx.2.le⟩
+    have hp' := pow_le_pow_left₀ (by positivity : 0 ≤ 2+|x|)
+      (by linarith : 2+|x| ≤ 2+n) p
+    have hsize : 2+C*(2+|x|)^p ≤ (2+C)*(2+n)^p := by
+      have hpn := one_le_pow₀ (show 1 ≤ 2+(n:ℝ) by linarith) (n:=p)
+      nlinarith [mul_le_mul_of_nonneg_left hp' hC]
+    have hsq : 2+(n:ℝ) ≤ (n:ℝ)^2 := by nlinarith [sq_nonneg ((n:ℝ)-2)]
+    have hlog := log_le_log (by positivity : 0 < 2+(n:ℝ)) hsq
+    rw [log_pow,←hnq] at hlog
+    have hbig := log_le_log (by positivity : 0 < 2+C*(2+|x|)^p) hsize
+    rw [log_mul (by positivity) (by positivity),log_pow] at hbig
+    have hp := Nat.cast_nonneg (α:=ℝ) p
+    rw [show 1+(1+C*(2+|x|)^p) = 2+C*(2+|x|)^p by ring]
+    norm_num at hlog
+    nlinarith [mul_le_mul_of_nonneg_left hlog hp,mul_le_mul_of_nonneg_left hq1 hln]
+  · rw [step,indicator_of_notMem hx, abs_zero]
+    positivity
+
+private theorem integrable_step_rate (μ : Measure ℝ) [IsFiniteMeasure μ]
+    (S : ℕ → ℝ → ℂ) {n : ℕ} (hn : 0 < n) : Integrable (step S n) μ := by
+  simp_rw [funext (step_eq_cell_sum hn S)]
+  exact integrable_finsetSum _ fun j _ ↦ (integrable_const _).indicator measurableSet_Ico
+
+/-- A one-mesh error estimate. The interior term uses the polynomial derivative bound,
+the second term measures exceptional continuum values, and the last term measures height. -/
+private theorem abs_statistic_sub_integral_mesh (μ : Measure ℝ) [IsProbabilityMeasure μ]
+    {f : ℝ → ℂ} {C : ℝ} {p : ℕ} (hC : 0 ≤ C) (hmod : LocalPolynomialLipschitz f C p)
+    (S : ℕ → ℝ → ℂ) {n : ℕ} (hn : 2 ≤ n)
+    (hs : ∀ y, |y| ≤ (n:ℝ)+1 → ‖f y-S n y‖ ≤ (1/2:ℝ)^n)
+    (hne : ∀ᵐ x ∂μ, f x ≠ 0) (hm : Measurable f)
+    (hu : Integrable (fun x ↦ log ‖f x‖) μ)
+    (hheight : Integrable (fun x : ℝ ↦ √(1+|x|)) μ)
+    {q : ℝ} (hq : 4 ≤ q) (hnq : q^2 = log n)
+    (hpoly : 1+C*(2+exp q)^p ≤ exp (q^2/2)) :
+    let A := log (2+C)+2*p
+    let u := fun x ↦ log ‖f x‖
+    |statistic μ S n - ∫ x, u x ∂μ| ≤ 2*exp (-q^2/4) +
+      (2+4*A)*(∫ x in {x | q^2/4 ≤ |u x|}, |u x| ∂μ) +
+      ((A+1)*(q^2 * exp (-q/2))) * (∫ x : ℝ, √(1+|x|) ∂μ) := by
+  intro A u
+  let B := {x : ℝ | q^2/4 ≤ |u x|}
+  have hB : MeasurableSet B := measurableSet_le measurable_const (continuous_abs.measurable.comp hm.norm.log)
+  have hn0 : 0 < n := by omega
+  have hEn : exp (q^2) = n := by rw [hnq,exp_log (by positivity)]
+  have hq0 : 0 ≤ q := by linarith
+  have hA : 0 ≤ A := by dsimp [A]; positivity [log_nonneg (show 1 ≤ 2+C by linarith)]
+  let m₀ := 2*exp (-q^2/4)
+  let m₁ := 2+4*A
+  let m₂ := (A+1)*(q^2*exp (-q/2))
+  let tail := B.indicator (fun x ↦ |u x|)
+  have ht : Integrable tail μ := hu.abs.indicator hB
+  have hi := integrable_step_rate μ S hn0
+  have h₀ : Integrable (fun _ : ℝ ↦ m₀) μ := integrable_const _
+  have h₁ := ht.const_mul m₁
+  have h₂ := hheight.const_mul m₂
+  have hb : ∀ᵐ x ∂μ, |step S n x-u x| ≤ m₀+m₁*tail x+m₂*√(1+|x|) := by
+    filter_upwards [hne] with x hx
+    have hbasic := step_abs_le_log hn hq hnq hC hmod hs hx
+    change |step S n x| ≤ |u x|+A*q^2 at hbasic
+    have hrough := abs_sub (step S n x) (u x)
+    have hm0 : 0 ≤ m₀ := by dsimp [m₀]; positivity
+    have hm2x : 0 ≤ m₂*√(1+|x|) := by dsimp [m₂]; positivity
+    by_cases hbad : x ∈ B
+    · have hh : q^2/4 ≤ |u x| := hbad
+      have htail : tail x = |u x| := indicator_of_mem hbad _
+      rw [htail]
+      dsimp only [m₁]
+      nlinarith [mul_le_mul_of_nonneg_left hh hA]
+    · have hh : |u x| ≤ q^2/4 := (lt_of_not_ge (show ¬ q^2/4 ≤ |u x| from hbad)).le
+      have htail : tail x = 0 := indicator_of_notMem hbad _
+      rw [htail,mul_zero,add_zero]
+      by_cases hc : |x| ≤ exp q
+      · have hex : exp q < (n:ℝ) := by
+          rw [←hEn]; apply exp_lt_exp.mpr; nlinarith [sq_nonneg (q-2)]
+        have hM : x ∈ Ico (-(n:ℝ)) n :=
+          ⟨by linarith [neg_abs_le x],by linarith [le_abs_self x]⟩
+        have hv := sampleTag_le hC hmod hn0 hs hM
+        have hh' : 1+C*(2+|x|)^p ≤ exp (q^2/2) :=
+          (add_le_add le_rfl (mul_le_mul_of_nonneg_left
+            (pow_le_pow_left₀ (by positivity) (by linarith : 2+|x| ≤ 2+exp q) p) hC)).trans hpoly
+        have hinv : (n:ℝ)⁻¹ = exp (-(q^2)) := by rw [←hEn,exp_neg]
+        have hnoise : ‖S n (node n (index n x))-f x‖ ≤ exp (-q^2/2) := by
+          refine hv.trans ((mul_le_mul_of_nonneg_right hh' (by positivity)).trans_eq ?_)
+          rw [hinv, ←exp_add]; congr 1; ring
+        rw [step,indicator_of_mem hM]
+        exact (clip_error_interior hq hEn hx hh hnoise).trans (by linarith)
+      · have hsr := Real.sqrt_le_sqrt (show exp q ≤ 1+|x| by linarith [lt_of_not_ge hc])
+        rw [←exp_half] at hsr
+        have hsq : 1 ≤ exp (-q/2)*√(1+|x|) := calc
+          1 = exp (-q/2)*exp (q/2) := by rw [←exp_add, show -q/2+q/2=0 by ring, exp_zero]
+          _ ≤ _ := mul_le_mul_of_nonneg_left hsr (exp_pos _).le
+        have hmt : (A+1)*q^2 ≤ m₂*√(1+|x|) := by
+          have xx := mul_le_mul_of_nonneg_left hsq
+            (show 0 ≤ (A+1)*q^2 by positivity)
+          dsimp [m₂]; nlinarith
+        nlinarith [sq_nonneg q]
+  calc
+    |statistic μ S n - ∫ x, u x ∂μ| = |∫ x, step S n x - u x ∂μ| := by
+      rw [integral_sub hi hu,integral_step μ S hn0]
+    _ ≤ ∫ x, |step S n x-u x| ∂μ := abs_integral_le_integral_abs
+    _ ≤ ∫ x, m₀+m₁*tail x + m₂*√(1+|x|) ∂μ :=
+      integral_mono_ae (hi.sub hu).abs ((h₀.add h₁).add h₂) hb
+    _ = _ := by
+      have h01 : Integrable (fun x : ℝ ↦ m₀+m₁*tail x) μ := h₀.add h₁
+      rw [integral_add h01 h₂,integral_add h₀ h₁,
+        integral_const_mul m₁ tail,integral_const_mul m₂ (fun x : ℝ ↦ √(1+|x|))]
+      simp [m₀,m₁,m₂,tail,B,integral_indicator hB]
+
+/-- A logarithmic tail bound and a polynomial derivative modulus give a root-log rate for
+the exact clipped mesh, allowing exponentially accurate input tables. -/
+theorem hasRootLogRate_statistic (μ : Measure ℝ) [IsProbabilityMeasure μ]
+    (f : ℝ → ℂ) (S : ℕ → ℝ → ℂ) {C : ℝ} {p : ℕ}
+    (hC : 0 ≤ C) (hmod : LocalPolynomialLipschitz f C p)
+    (hs : ∀ᶠ n : ℕ in atTop, ∀ y, |y| ≤ (n:ℝ)+1 → ‖f y-S n y‖ ≤ (1/2:ℝ)^n)
+    (hne : ∀ᵐ x ∂μ, f x ≠ 0) (hm : Measurable f)
+    (hu : Integrable (fun x ↦ log ‖f x‖) μ) (hheight : Integrable (fun x : ℝ ↦ √(1+|x|)) μ)
+    (htail : HasIntegratedLogTail μ (fun x ↦ log ‖f x‖)) :
+    HasRootLogRate (fun n ↦ statistic μ S n - ∫ x, log ‖f x‖ ∂μ) := by
+  obtain ⟨K,hK,c,hc,hbound⟩ := htail
+  obtain ⟨Y,hY⟩ := eventually_atTop.mp hbound
+  let A := log (2+C)+2*p
+  let M := ∫ x : ℝ, √(1+|x|) ∂μ
+  let k := min (c/2) (1/4)
+  have hk : 0 < k := lt_min (by positivity) (by norm_num)
+  have hA : 0 ≤ A := by dsimp [A]; positivity [log_nonneg (show 1 ≤ 2+C by linarith)]
+  have hM : 0 ≤ M := integral_nonneg fun _ ↦ sqrt_nonneg _
+  refine ⟨2+(2+4*A)*K+32*(A+1)*M,by positivity,k,hk,?_⟩
+  filter_upwards [hs,eventually_ge_atTop (2:ℕ),
+    meshScale_atTop.eventually_ge_atTop (4+4*|Y|),
+    meshScale_atTop.eventually (eventually_mesh_polynomial C hC p)] with n hn hN hqY hpoly
+  let q := meshScale n
+  have hq : 4 ≤ q := by change 4+4*|Y| ≤ q at hqY; linarith [abs_nonneg Y]
+  have hq0 : 0 ≤ q := by linarith
+  have hqSq := meshScale_sq (show 0 < n by omega)
+  have hraw := abs_statistic_sub_integral_mesh μ hC hmod S hN hn hne hm hu hheight hq hqSq hpoly
+  have hsmall : Y ≤ q^2/4 := by
+    change 4+4*|Y| ≤ q at hqY
+    nlinarith [le_abs_self Y,sq_nonneg (q-2)]
+  have hbad := hY _ hsmall
+  rw [show q^2/4 = (q/2)^2 by ring, Real.sqrt_sq (by positivity)] at hbad
+  have hkc : k ≤ c/2 := min_le_left _ _
+  have hk4 : k ≤ 1/4 := min_le_right _ _
+  have h₀ : exp (-q^2/4) ≤ exp (-k*q) := by
+    apply exp_monotone
+    nlinarith [mul_le_mul_of_nonneg_right hk4 hq0,sq_nonneg (q-2)]
+  have h₁ : exp (-c*(q/2)) ≤ exp (-k*q) := by
+    apply exp_monotone
+    nlinarith [mul_le_mul_of_nonneg_right hkc hq0]
+  have h₂ : exp (-q/4) ≤ exp (-k*q) := by
+    apply exp_monotone
+    nlinarith [mul_le_mul_of_nonneg_right hk4 hq0]
+  have hbad' : (∫ x in {x | q^2/4 ≤ |log ‖f x‖|}, |log ‖f x‖| ∂μ) ≤ K*exp (-k*q) := by
+    rw [show q^2/4 = (q/2)^2 by ring]
+    exact hbad.trans (mul_le_mul_of_nonneg_left h₁ hK.le)
+  have hh := (mesh_height_damping hq0).trans (mul_le_mul_of_nonneg_left h₂ (by norm_num))
+  calc
+    |statistic μ S n - ∫ x, log ‖f x‖ ∂μ| ≤ 2*exp (-q^2/4) +
+      (2+4*A)*(∫ x in {x | q^2/4 ≤ |log ‖f x‖|}, |log ‖f x‖| ∂μ) +
+      ((A+1)*(q^2*exp (-q/2)))*M := hraw
+    _ ≤ 2*exp (-k*q)+(2+4*A)*(K*exp (-k*q))+((A+1)*(32*exp (-k*q)))*M := by
+      gcongr
+    _ = _ := by dsimp only [q]; ring
 
 end RiemannMasullo.LogQuadrature
