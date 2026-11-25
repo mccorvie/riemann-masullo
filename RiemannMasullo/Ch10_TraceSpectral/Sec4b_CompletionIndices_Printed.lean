@@ -14,6 +14,7 @@ import RiemannMasullo.External.HardyCriticalLine.UpperIntegralBound
 import Mathlib.Analysis.Calculus.Deriv.Star
 import Mathlib.Analysis.Complex.LocallyUniformLimit
 import Mathlib.NumberTheory.LSeries.Nonvanishing
+import Mathlib.NumberTheory.DirichletCharacter.Orthogonality
 import Mathlib.NumberTheory.MulChar.Lemmas
 
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
@@ -990,6 +991,292 @@ private theorem primitiveDirichletL_infinite_criticalZeros_phase {N : ℕ} [NeZe
     exp ((θ : ℂ) * I) * χ.completedLFunction s
   rw [map_mul, ← hfac, mul_assoc]
   exact congrArg (fun w : ℂ ↦ exp ((θ : ℂ) * I) * w) (primitiveDirichletL_infinite_criticalZeros_fe hχ t).symm
+
+section SignedCriticalMoments
+
+open scoped ComplexConjugate
+
+/-- The usual conductor-completed critical-line value, including the factor
+`N^(1/4) exp(i t log N / 2)` absent from Mathlib's completed Dirichlet function. -/
+def dirichletConductorCompletedCriticalValue {N : ℕ} [NeZero N]
+    (χ : DirichletCharacter ℂ N) (t : ℝ) : ℂ :=
+  (((N : ℝ) ^ (1 / 4 : ℝ) : ℝ) : ℂ) *
+    (Complex.exp (((t * Real.log N / 2 : ℝ) : ℂ) * Complex.I) *
+      χ.completedLFunction ((1 / 2 : ℂ) + (t : ℂ) * Complex.I))
+
+private theorem dirichletConductorCompletedCriticalValue_continuous {N : ℕ} [NeZero N]
+    (χ : DirichletCharacter ℂ N) : Continuous (dirichletConductorCompletedCriticalValue χ) := by
+  let s (t : ℝ) : ℂ := 1 / 2 + t * Complex.I
+  have hs : Continuous s := by dsimp [s]; fun_prop
+  have hΛ : Continuous (fun t ↦ χ.completedLFunction (s t)) := by
+    apply continuous_iff_continuousAt.mpr
+    intro t
+    have h : (s t).re = 1 / 2 := by norm_num [s, Complex.mul_re]
+    apply (χ.differentiableAt_completedLFunction _ (.inl ?_) (.inl ?_)).continuousAt.comp hs.continuousAt <;>
+      intro he <;> norm_num [he] at h
+  unfold dirichletConductorCompletedCriticalValue
+  exact continuous_const.mul ((by fun_prop : Continuous (fun t : ℝ ↦
+    Complex.exp (((t * Real.log N / 2 : ℝ) : ℂ) * Complex.I))).mul hΛ)
+
+private theorem dirichletConductorCompletedCriticalValue_root_one {N : ℕ} [NeZero N]
+    {χ : DirichletCharacter ℂ N} (hχ : χ.IsPrimitive) (hdual : χ⁻¹ = χ)
+    (hz : (dirichletConductorCompletedCriticalValue χ 0).re ≠ 0) : χ.rootNumber = 1 := by
+  have hc : χ.completedLFunction (1 / 2) ≠ 0 := by
+    intro hc
+    apply hz
+    unfold dirichletConductorCompletedCriticalValue
+    simp only [Complex.ofReal_zero, zero_mul, zero_div, Complex.exp_zero,
+       add_zero, hc, mul_zero, Complex.zero_re]
+  have he := hχ.completedLFunction_one_sub (1 / 2)
+  rw [show (1 : ℂ) - 1 / 2 = 1 / 2 by norm_num, sub_self, Complex.cpow_zero, one_mul, hdual] at he
+  exact mul_right_cancel₀ hc (he.symm.trans (one_mul _).symm)
+
+private theorem dirichletConductorCompletedCriticalValue_real {N : ℕ} [NeZero N]
+    {χ : DirichletCharacter ℂ N} (hχ : χ.IsPrimitive) (hroot : χ.rootNumber = 1) (t : ℝ) :
+    conj (dirichletConductorCompletedCriticalValue χ t) = dirichletConductorCompletedCriticalValue χ t := by
+  have h := primitiveDirichletL_infinite_criticalZeros_phase hχ t
+  simp only [hroot, Complex.arg_one, sub_zero] at h
+  unfold dirichletConductorCompletedCriticalValue
+  rw [map_mul, Complex.conj_ofReal, h]
+
+/-- A negative product at zero and at t gives two distinct critical-line
+zeros of the same self-dual primitive character, one inside (0,t) and its
+reflection. There is no assumption on the root number. -/
+theorem primitiveDirichlet_symmetricZeros_of_negativeProduct {N : ℕ} [NeZero N]
+    {χ : DirichletCharacter ℂ N} (hχ : χ.IsPrimitive) (hdual : χ⁻¹ = χ) {t : ℝ} (ht : 0 < t)
+    (hneg : (dirichletConductorCompletedCriticalValue χ 0).re *
+      (dirichletConductorCompletedCriticalValue χ t).re < 0) :
+    ∃ u ∈ Ioo 0 t, χ.LFunction ((1 / 2 : ℂ) + (u : ℂ) * Complex.I) = 0 ∧
+      χ.LFunction ((1 / 2 : ℂ) + ((-u : ℝ) : ℂ) * Complex.I) = 0 := by
+  let Z := dirichletConductorCompletedCriticalValue χ
+  let f (u : ℝ) := (Z u).re
+  have hf : Continuous f := Complex.continuous_re.comp (dirichletConductorCompletedCriticalValue_continuous χ)
+  change f 0 * f t < 0 at hneg
+  have hroot := dirichletConductorCompletedCriticalValue_root_one hχ hdual
+    (fun e ↦ by change f 0 = 0 at e; rw [e, zero_mul] at hneg; exact hneg.false)
+  have hex : ∃ u ∈ Ioo 0 t, f u = 0 := by
+    rcases mul_neg_iff.mp hneg with h | h
+    · exact intermediate_value_Ioo' ht.le hf.continuousOn ⟨h.2, h.1⟩
+    · exact intermediate_value_Ioo ht.le hf.continuousOn ⟨h.1, h.2⟩
+  obtain ⟨u, hu, hzu⟩ := hex
+  have hre := dirichletConductorCompletedCriticalValue_real hχ hroot u
+  have hz : Z u = 0 := by
+    apply Complex.ext hzu
+    have H := congrArg Complex.im hre
+    change -(Z u).im = (Z u).im at H
+    change (Z u).im = 0
+    linarith
+  let s : ℂ := 1 / 2 + (u : ℂ) * Complex.I
+  have hs : s.re = 1 / 2 := by norm_num [s, Complex.mul_re]
+  have hN : 0 < (N : ℝ) := by exact_mod_cast Nat.pos_of_ne_zero (NeZero.ne N)
+  have hscalar := Complex.ofReal_ne_zero.mpr (Real.rpow_pos_of_pos hN (1 / 4 : ℝ)).ne'
+  have hcomp : χ.completedLFunction s = 0 :=
+    (mul_eq_zero.mp ((mul_eq_zero.mp hz).resolve_left hscalar)).resolve_left (Complex.exp_ne_zero _)
+  have hL : χ.LFunction s = 0 := by
+    rw [χ.LFunction_eq_completed_div_gammaFactor _ (.inl (fun e ↦ by norm_num [e] at hs)), hcomp, zero_div]
+  have hnegL := primitiveDirichletL_infinite_criticalZeros_conj χ s (fun e ↦ by norm_num [e] at hs)
+  rw [hdual, hL, map_eq_zero] at hnegL
+  refine ⟨u, hu, hL, ?_⟩
+  have hconj : conj s = (1 / 2 : ℂ) + ((-u : ℝ) : ℂ) * Complex.I := by
+    simp only [s, map_add, map_div₀, map_one, map_ofNat, map_mul, Complex.conj_ofReal,
+      Complex.conj_I, Complex.ofReal_neg]
+    ring
+  rwa [hconj] at hnegL
+
+/-- A finite family of conductors has a common neighbourhood on which every
+central signed product is nonnegative. Characters vanishing centrally
+contribute zero for every shift. -/
+private theorem boundedConductor_signedCriticalProducts_nonneg (M : ℕ) :
+    ∀ᶠ t in 𝓝 (0 : ℝ), ∀ (N : ℕ) (_ : NeZero N), N ≤ M → ∀ χ : DirichletCharacter ℂ N,
+      0 ≤ (dirichletConductorCompletedCriticalValue χ 0).re *
+        (dirichletConductorCompletedCriticalValue χ t).re := by
+  let J := (j : Fin (M + 1)) × DirichletCharacter ℂ (j.val + 1)
+  have : Finite J := by dsimp [J]; infer_instance
+  have oneRow (j : J) : ∀ᶠ t in 𝓝 (0 : ℝ),
+      0 ≤ (dirichletConductorCompletedCriticalValue j.2 0).re *
+        (dirichletConductorCompletedCriticalValue j.2 t).re := by
+    let f (t : ℝ) := (dirichletConductorCompletedCriticalValue j.2 t).re
+    by_cases h : f 0 = 0
+    · exact Filter.Eventually.of_forall fun _ ↦ by change 0 ≤ f 0 * _; rw [h, zero_mul]
+    have hc : Continuous (fun t ↦ f 0 * f t) := continuous_const.mul
+      (Complex.continuous_re.comp (dirichletConductorCompletedCriticalValue_continuous j.2))
+    have pos : ∀ᶠ t in 𝓝 (0 : ℝ), 0 < f 0 * f t :=
+      (isOpen_lt continuous_const hc).mem_nhds (mul_self_pos.mpr h)
+    exact pos.mono fun _ ht ↦ ht.le
+  have hall : ∀ᶠ t in 𝓝 (0 : ℝ), ∀ j : J,
+      0 ≤ (dirichletConductorCompletedCriticalValue j.2 0).re *
+        (dirichletConductorCompletedCriticalValue j.2 t).re := Filter.eventually_all.mpr oneRow
+  filter_upwards [hall] with t ht
+  rintro (_ | n) hn hM χ
+  · exact False.elim (hn.out rfl)
+  · exact ht ⟨⟨n, by omega⟩, χ⟩
+
+/-- A nonzero cosine main term in log X cannot stay nonnegative.
+The phase and the bounded error may depend on the fixed shift. -/
+private theorem signedCriticalMoment_frequently_neg (S : ℝ → ℝ) {t A : ℝ}
+    (ht : 0 < t) (hA : 0 < A) (θ C : ℝ)
+    (h : ∀ᶠ X in atTop, |S X / X ^ (3 / 2 : ℝ) -
+      A * Real.log X * Real.cos (t * Real.log X / 2 + θ)| ≤ C) :
+    ∃ᶠ X in atTop, S X < 0 := by
+  obtain ⟨X₀, hh⟩ := Filter.eventually_atTop.mp h
+  apply Filter.frequently_atTop.mpr
+  intro R
+  let Y := max (max (Real.log (max 1 R)) (Real.log (max 1 X₀))) (C / A)
+  obtain ⟨j : ℕ, hj⟩ := exists_nat_gt ((t * Y / 2 + θ - Real.pi) / (2 * Real.pi))
+  let y := (Real.pi + j * (2 * Real.pi) - θ) * 2 / t
+  have hY : Y < y := by
+    have hp : 0 < 2 * Real.pi := by positivity
+    have := (div_lt_iff₀ hp).mp hj
+    apply (lt_div_iff₀ ht).mpr
+    linarith
+  have hpR : 0 < max 1 R := lt_max_of_lt_left zero_lt_one
+  have hpX : 0 < max 1 X₀ := lt_max_of_lt_left zero_lt_one
+  have hR : R ≤ Real.exp y := (le_max_right 1 R).trans
+    ((Real.log_le_iff_le_exp hpR).mp ((le_max_left _ _).trans ((le_max_left _ _).trans hY.le)))
+  have hX : X₀ ≤ Real.exp y := (le_max_right 1 X₀).trans
+    ((Real.log_le_iff_le_exp hpX).mp ((le_max_right _ _).trans ((le_max_left _ _).trans hY.le)))
+  have hC := (div_lt_iff₀ hA).mp ((le_max_right _ _).trans_lt hY : C / A < y)
+  have hcos : Real.cos (t * y / 2 + θ) = -1 := by
+    rw [show t * y / 2 + θ = Real.pi + j * (2 * Real.pi) by dsimp [y]; field_simp; ring,
+      Real.cos_add_nat_mul_two_pi, Real.cos_pi]
+  have hneg := (abs_le.mp (hh (Real.exp y) hX)).2
+  rw [Real.log_exp, hcos, mul_neg_one, sub_neg_eq_add] at hneg
+  refine ⟨Real.exp y, hR, ?_⟩
+  have H : S (Real.exp y) / (Real.exp y) ^ (3 / 2 : ℝ) < 0 := by linarith
+  exact ((div_neg_iff.mp H).resolve_left (fun p ↦ (not_lt_of_ge (by positivity)) p.2)).1
+
+/-- The conjugate pair of completed main terms has a nonzero cosine
+coefficient whenever the complex residue is nonzero. The constant term of
+the residue expansion contributes only a bounded error after normalization. -/
+private theorem signedCriticalMoment_frequently_neg_of_residue (S : ℝ → ℝ) {t : ℝ}
+    (ht : 0 < t) (A B : ℂ) (hA : A ≠ 0) (C : ℝ)
+    (h : ∀ᶠ X in atTop, |S X / X ^ (3 / 2 : ℝ) -
+      2 * (Complex.exp (((t * Real.log X / 2 : ℝ) : ℂ) * Complex.I) *
+        (A * (Real.log X : ℂ) + B)).re| ≤ C) : ∃ᶠ X in atTop, S X < 0 := by
+  apply signedCriticalMoment_frequently_neg S ht (A := 2 * ‖A‖) (by positivity)
+    A.arg (C + 2 * ‖B‖)
+  filter_upwards [h] with X hX
+  let y := t * Real.log X / 2
+  let E := Complex.exp ((y : ℂ) * Complex.I)
+  have hE : ‖E‖ = 1 := Complex.norm_exp_ofReal_mul_I _
+  have ha : (E * A).re = ‖A‖ * Real.cos (y + A.arg) := by
+    calc
+      _ = (E * ((‖A‖ : ℂ) * Complex.exp ((A.arg : ℂ) * Complex.I))).re :=
+        congrArg (fun z : ℂ ↦ (E * z).re) (Complex.norm_mul_exp_arg_mul_I A).symm
+      _ = ((‖A‖ : ℂ) * Complex.exp (((y + A.arg : ℝ) : ℂ) * Complex.I)).re := by
+        dsimp [E]; push_cast; rw [add_mul, Complex.exp_add]; ring_nf
+      _ = _ := by
+        rw [Complex.mul_re, Complex.ofReal_re, Complex.ofReal_im, zero_mul, sub_zero,
+          Complex.exp_ofReal_mul_I_re]
+  have hb : |(E * B).re| ≤ ‖B‖ := (Complex.abs_re_le_norm _).trans_eq (by rw [norm_mul, hE, one_mul])
+  have heq : 2 * (E * (A * (Real.log X : ℂ) + B)).re =
+      2 * ‖A‖ * Real.log X * Real.cos (y + A.arg) + 2 * (E * B).re := by
+    rw [mul_add, ← mul_assoc, Complex.add_re, show ((E * A) * (Real.log X : ℂ)).re =
+      (E * A).re * Real.log X by simp [Complex.mul_re], ha]
+    ring
+  change |S X / X ^ (3 / 2 : ℝ) - 2 * (E * (A * (Real.log X : ℂ) + B)).re| ≤ C at hX
+  rw [heq] at hX
+  apply abs_le.mpr
+  have hlow := (abs_le.mp hb).1
+  have hhigh := (abs_le.mp hb).2
+  rcases abs_le.mp hX with ⟨hl, hu⟩
+  change -_ ≤ S X / _ - 2 * ‖A‖ * Real.log X * Real.cos (y + A.arg) ∧ _
+  constructor <;> linarith
+
+/-- The chosen normalization is the customary `N^(s/2) Λ(s,χ)` at
+`s = 1/2 + it`. This accounts for the conductor weight in the moment. -/
+theorem dirichletConductorCompletedCriticalValue_eq {N : ℕ} [NeZero N]
+    (χ : DirichletCharacter ℂ N) (t : ℝ) :
+    dirichletConductorCompletedCriticalValue χ t =
+      (N : ℂ) ^ (((1 / 2 : ℂ) + (t : ℂ) * Complex.I) / 2) *
+        χ.completedLFunction ((1 / 2 : ℂ) + (t : ℂ) * Complex.I) := by
+  have hN : 0 < (N : ℝ) := by exact_mod_cast Nat.pos_of_ne_zero (NeZero.ne N)
+  have hlog : Complex.log (N : ℂ) = (Real.log N : ℂ) := by
+    rw [Complex.ofReal_log hN.le, Complex.ofReal_natCast]
+  unfold dirichletConductorCompletedCriticalValue
+  rw [← mul_assoc, Complex.cpow_def_of_ne_zero (by exact_mod_cast (NeZero.ne N)), hlog,
+    Real.rpow_def_of_pos hN, Complex.ofReal_exp, ← Complex.exp_add]
+  congr 2
+  push_cast
+  ring
+
+/-- For a self-dual primitive character the product appearing in a
+completed central second moment is exactly the real signed product, even
+when the central value vanishes. -/
+theorem dirichletConductorCompletedCriticalProduct_eq {N : ℕ} [NeZero N]
+    {χ : DirichletCharacter ℂ N} (hχ : χ.IsPrimitive) (hdual : χ⁻¹ = χ) (t : ℝ) :
+    ((dirichletConductorCompletedCriticalValue χ 0).re : ℂ) *
+      ((dirichletConductorCompletedCriticalValue χ t).re : ℂ) =
+      dirichletConductorCompletedCriticalValue χ 0 * dirichletConductorCompletedCriticalValue χ t := by
+  have hhalf : conj (1 / 2 : ℂ) = 1 / 2 := by simp only [map_div₀, map_one, map_ofNat]
+  have hL := primitiveDirichletL_infinite_criticalZeros_conj χ (1 / 2) (by norm_num)
+  have hγ := primitiveDirichletL_infinite_criticalZeros_gamma_conj χ (1 / 2)
+  rw [hhalf, hdual] at hL hγ
+  have hc : conj (dirichletConductorCompletedCriticalValue χ 0) =
+      dirichletConductorCompletedCriticalValue χ 0 := by
+    unfold dirichletConductorCompletedCriticalValue
+    simp only [zero_mul, zero_div, Complex.ofReal_zero, Complex.exp_zero, one_mul, add_zero,
+      primitiveDirichletL_infinite_criticalZeros_completion χ (s := 1 / 2) (by norm_num),
+      map_mul, Complex.conj_ofReal, hL, ← hγ]
+  have h₀ := Complex.conj_eq_iff_re.mp hc
+  by_cases hn : (dirichletConductorCompletedCriticalValue χ 0).re = 0
+  · rw [hn, Complex.ofReal_zero] at h₀ ⊢
+    rw [← h₀, zero_mul, zero_mul]
+  · rw [h₀, Complex.conj_eq_iff_re.mp (dirichletConductorCompletedCriticalValue_real hχ
+      (dirichletConductorCompletedCriticalValue_root_one hχ hdual hn) t)]
+
+/-- The signed quadratic second-moment route to close critical zeros in
+(10.3.1.18), p. 451. An oscillating main term for arbitrarily small fixed
+shifts gives symmetric zeros as near the centre as prescribed, on moduli
+exceeding every bound. The asymptotic is for the conductor-completed values.
+This is the analytic implication in the application of M. Čech, *Moments of
+real Dirichlet L-functions and multiple Dirichlet series*, Corollary 1.5. -/
+theorem primitiveDirichlet_symmetricZeros_of_residueMoment {ι : Type*}
+    (N : ι → ℕ) [∀ i, NeZero (N i)] (χ : (i : ι) → DirichletCharacter ℂ (N i))
+    (hprim : ∀ i, (χ i).IsPrimitive) (hdual : ∀ i, (χ i)⁻¹ = χ i)
+    (S : ℝ → ℝ → Finset ι) (w : ℝ → ℝ → ι → ℝ) (hw : ∀ t X i, i ∈ S t X → 0 ≤ w t X i)
+    (hm : ∀ ε > (0 : ℝ), ∃ t ∈ Ioo 0 ε, ∃ A B : ℂ, A ≠ 0 ∧ ∃ C : ℝ, ∀ᶠ X in atTop,
+      |(∑ i ∈ S t X, w t X i * (dirichletConductorCompletedCriticalValue (χ i) 0 *
+          dirichletConductorCompletedCriticalValue (χ i) t).re) / X ^ (3 / 2 : ℝ) -
+        2 * (Complex.exp (((t * Real.log X / 2 : ℝ) : ℂ) * Complex.I) *
+          (A * (Real.log X : ℂ) + B)).re| ≤ C)
+    (M : ℕ) (δ : ℝ) (hδ : 0 < δ) :
+    ∃ i, M < N i ∧ ∃ u ∈ Ioo 0 (δ / 2),
+      (χ i).LFunction ((1 / 2 : ℂ) + (u : ℂ) * Complex.I) = 0 ∧
+      (χ i).LFunction ((1 / 2 : ℂ) + ((-u : ℝ) : ℂ) * Complex.I) = 0 := by
+  obtain ⟨r, hr, hcut⟩ := Metric.eventually_nhds_iff.mp (boundedConductor_signedCriticalProducts_nonneg M)
+  obtain ⟨t, ht, A, B, hA, C, hmoment⟩ := hm (min r (δ / 2)) (lt_min hr (by positivity))
+  obtain ⟨X, hX⟩ := (signedCriticalMoment_frequently_neg_of_residue _ ht.1 A B hA C hmoment).exists
+  have hi : ∃ i ∈ S t X, (dirichletConductorCompletedCriticalValue (χ i) 0).re *
+      (dirichletConductorCompletedCriticalValue (χ i) t).re < 0 := by
+    by_contra! hall
+    apply hX.not_ge (Finset.sum_nonneg fun i h ↦ mul_nonneg (hw t X i h) ?_)
+    rw [← dirichletConductorCompletedCriticalProduct_eq (hprim i) (hdual i) t]
+    simpa only [Complex.mul_re, Complex.ofReal_re, Complex.ofReal_im, zero_mul, sub_zero] using hall i h
+  obtain ⟨i, -, hi⟩ := hi
+  have hnear : dist t 0 < r := by
+    rw [Real.dist_eq, sub_zero, abs_of_pos ht.1]
+    exact ht.2.trans_le (min_le_left _ _)
+  have hlarge : M < N i := lt_of_not_ge fun h ↦ hi.not_ge (hcut hnear _ (inferInstance) h (χ i))
+  obtain ⟨u, hu, hpos, hneg⟩ := primitiveDirichlet_symmetricZeros_of_negativeProduct (hprim i) (hdual i) ht.1 hi
+  exact ⟨i, hlarge, u, ⟨hu.1, hu.2.trans (ht.2.trans_le (min_le_right _ _))⟩, hpos, hneg⟩
+
+/-- When two shifted simple poles meet at the central point, their finite
+sum contributes a log X coefficient equal to the common residue. The
+remaining coefficient is the difference of the two residue derivatives. -/
+theorem dirichletSignedCriticalMoment_pairedPole_limit {f g : ℂ → ℂ} {a b : ℂ}
+    (hf : HasDerivAt f a 0) (hg : HasDerivAt g b 0) (h₀ : f 0 = g 0) (X : ℝ) :
+    Tendsto (fun z : ℂ ↦ (f z - Complex.exp (-(Real.log X : ℂ) * z) * g z) / z)
+      (𝓝[≠] 0) (𝓝 (a - b + (Real.log X : ℂ) * f 0)) := by
+  have he : HasDerivAt (fun z : ℂ ↦ Complex.exp (-(Real.log X : ℂ) * z)) (-(Real.log X : ℂ)) 0 := by
+    simpa using ((hasDerivAt_id (0 : ℂ)).const_mul (-(Real.log X : ℂ))).cexp
+  have h := (hf.sub (he.mul hg)).tendsto_slope_zero
+  simp only [Pi.sub_apply, Pi.mul_apply, zero_add, mul_zero, Complex.exp_zero, one_mul,
+    ← h₀, sub_self, sub_zero, smul_eq_mul] at h
+  rw [show a - (-(Real.log X : ℂ) * f 0 + b) = a - b + (Real.log X : ℂ) * f 0 by ring] at h
+  simpa only [div_eq_mul_inv, mul_comm] using h
+
+end SignedCriticalMoments
 
 open Complex in
 /-- Normalizing a nonzero complex number near one changes its distance from one by at most a factor two. -/
