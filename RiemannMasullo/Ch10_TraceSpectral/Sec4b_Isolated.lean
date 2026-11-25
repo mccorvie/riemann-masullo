@@ -1,4 +1,8 @@
 module
+public import RiemannMasullo.Ch10_TraceSpectral.WeakCardinal.PhysicalZeroCount
+public import RiemannMasullo.Ch10_TraceSpectral.WeakCardinal.FiniteInterpolation
+public import RiemannMasullo.Ch10_TraceSpectral.WeakCardinal.FixedStageProbeBounds
+public import RiemannMasullo.Ch10_TraceSpectral.WeakCardinal.PhysicalRadiusSix
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4b
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
@@ -987,6 +991,481 @@ theorem spectralStripAmbientKernel_exists_iff_geometric_cauchy :
     exact (spectralStripAmbientKernel_tendsto (F := F) a hα hs φ ha χ eχ e x f hχ he horder hb hgeom).imp
       fun K hK ↦ ⟨hK, spectralStripAmbientKernel_operator (F := F) a hα hs φ ha χ eχ e x f hχ he horder hb K hK⟩
 
+section FiniteGramReadout
+
+open WeakCardinal
+open scoped InnerProductSpace
+
+local notation "ambientSpace" => CompactIntervalSobolev
+  (ideleClassTamagawaMeasure F) (logIdeleClassNorm F) (-α) α s
+local notation "sectionMap" => (Θ₀).orthogonal.subtypeL.comp
+  (Θ₀).quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
+local notation "residual(" z ")" => (Aφ).comp sectionMap - mellinAt(z) • sectionMap
+local notation "gramCost(" z ", " m ", " E ")" => ‖(f jet(z, m)).comp (Θ₀).mkQL‖ ^ 2 *
+  finiteRieszGramEnergy (residual(z)) f jet(z, m) E
+
+/-- At a one-jet site the squared trace norm of the actual geometric block is the limit
+of positive quadratic forms on finite sets of quotient jets. Their two Gram matrices use
+the evaluation vectors and their convolution images after subtraction of the site's Mellin
+value. In particular the finite costs do not require the unknown full interpolant. -/
+theorem spectralStripGeometricKernel_block_traceNorm_sq_tendsto_of_finiteGram
+    (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z))) (hcount : jetCount(z) ≤ 1) :
+    Tendsto (fun E : Finset jets ↦ gramCost(z, m, E)) atTop (𝓝 (traceNorm (geometricBlock(z)) ^ 2)) := by
+  have hsub : Subsingleton (Fin (jetCount(z))) := Fin.subsingleton_iff_le_one.mpr hcount
+  have hnorm : traceNorm (geometricBlock(z)) =
+      ‖(f jet(z, m)).comp (Θ₀).mkQL‖ * ‖(residual(z)) (x jet(z, m))‖ := by
+    rw [Fintype.sum_subsingleton _ m, traceNorm_smulRight]
+    apply congrArg (fun y : ambientSpace ↦ ‖(f jet(z, m)).comp (Θ₀).mkQL‖ * ‖y‖)
+    exact spectralStripGeometricKernel_output_eq_sub_of_one_jet a hα hs φ ha χ eχ e x f hχ he horder hb z m hcount
+  conv_rhs => rw [hnorm, mul_pow]
+  exact tendsto_const_nhds.mul (tendsto_finiteRieszGramEnergy x f hb.1 (residual(z)) jet(z, m))
+
+/-- Reconstruction of Theorem 10.4.3.5(2), p. 472, on the zero-width line at orders up to three.
+A summable envelope need only bound the finite Gram costs on arbitrarily large finite sets
+for each site separately. The asserted trace bound is for arbitrary finite selections of
+the original geometric blocks. -/
+theorem spectralStripGeometricKernel_blocks_bddAbove_of_frequently_finiteGram
+    (hline : α = 0) (hs₃ : s ≤ 3)
+    (M : zeros(F, χ, a, α) → ℝ) (hM₀ : ∀ z, 0 ≤ M z) (hM : Summable M)
+    (hcost : ∀ (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z))),
+      ∃ᶠ E : Finset jets in atTop, gramCost(z, m, E) ≤ M z ^ 2) :
+    BddAbove (range fun K : Finset zeros(F, χ, a, α) ↦ traceNorm (∑ z ∈ K, geometricBlock(z))) := by
+  classical
+  refine ⟨∑' z, M z, ?_⟩
+  rintro _ ⟨K, rfl⟩
+  refine (spectralStripGeometricKernel_traceNorm_sum_le K _).trans ?_
+  refine (Finset.sum_le_sum fun z _ ↦ ?_).trans (hM.sum_le_tsum K fun z _ ↦ hM₀ z)
+  have hz : z.val.2.1 = -α := by linarith only [z.property.1.1, z.property.1.2, hline]
+  have hc : jetCount(z) ≤ 1 := by
+    rw [spectralStripMultiplicity_boundary hα (Or.inl hz), spectralBoundaryMultiplicity]
+    exact (Nat.min_le_right _ _).trans (Nat.ceil_le.mpr (by push_cast; linarith))
+  by_cases hn : Nonempty (Fin (jetCount(z)))
+  · obtain ⟨m⟩ := hn
+    have h := le_of_tendsto_of_tendsto_of_frequently
+      (spectralStripGeometricKernel_block_traceNorm_sq_tendsto_of_finiteGram
+        a hα hs φ ha χ eχ e x f hχ he horder hb z m hc)
+      tendsto_const_nhds (hcost z m)
+    let : Norm (nuclearEndomorphisms ambientSpace) := ⟨traceNorm⟩
+    exact (sq_le_sq₀ ((traceNorm_normedSpaceCore (H := ambientSpace)).norm_nonneg _) (hM₀ z)).mp h
+  · let : IsEmpty (Fin (jetCount(z))) := not_nonempty_iff.mp hn
+    let : Norm (nuclearEndomorphisms ambientSpace) := ⟨traceNorm⟩
+    have hz₀ : traceNorm (0 : nuclearEndomorphisms ambientSpace) = 0 := ((traceNorm_normedSpaceCore (H := ambientSpace)).norm_eq_zero_iff 0).mpr rfl
+    simpa only [Finset.univ_eq_empty, Finset.sum_empty, hz₀] using hM₀ z
+
+end FiniteGramReadout
+
+section PhysicalOutputBound
+
+open Function WeakCardinal
+
+local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
+local notation "K𝔽" => (ideleClassNorm F).ker
+local notation "U𝔽" => PontryaginDual C𝔽
+local notation "output(" z ", " m ")" => Gₐ (Aφ (Sₐ(x jet(z, m))))
+local notation "rowCost(" z ")" =>
+  (∑ m : Fin (jetCount(z)), ‖(f jet(z,m)).comp (Θ₀).mkQL‖ * ‖output(z,m)‖)
+
+omit ha hχ he horder hb in
+private theorem summable_of_le_one_row {Z : Type*} (N : Z → ℕ) (hN : ∀ z, N z ≤ 1)
+    (u v : (z : Z) → Fin (N z) → ℝ) (w : Z → ℝ) (hw : Summable w) (hw₀ : ∀ z, 0 ≤ w z)
+    {U B : ℝ} (hU : 0 ≤ U) (hB : 0 ≤ B)
+    (hu₀ : ∀ z m, 0 ≤ u z m) (hv₀ : ∀ z m, 0 ≤ v z m)
+    (hu : ∀ z m, u z m ≤ U) (hv : ∀ z m, v z m ≤ B * w z) :
+    Summable (fun z ↦ ∑ m : Fin (N z), u z m * v z m) := by
+  apply (hw.mul_left (U * B)).of_nonneg_of_le
+    (fun z ↦ Finset.sum_nonneg fun m _ ↦ mul_nonneg (hu₀ z m) (hv₀ z m))
+  intro z
+  calc
+    _ ≤ ∑ _m : Fin (N z), (U * B) * w z := by
+      apply Finset.sum_le_sum
+      intro m _
+      rw [mul_assoc]
+      exact mul_le_mul (hu z m) (hv z m) (hv₀ z m) hU
+    _ ≤ _ := by
+      simp only [Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul]
+      exact mul_le_of_le_one_left (mul_nonneg (mul_nonneg hU hB) (hw₀ z)) (by exact_mod_cast hN z)
+
+omit ha hχ he horder hb in
+private theorem physical_one_jet_at_zero_width (hline : α = 0) (hs₃ : s ≤ 3)
+    (z : zeros(F, χ, a, α)) : jetCount(z) ≤ 1 := by
+  have hz : z.val.2.1 = -α := by linarith only [z.property.1.1, z.property.1.2, hline]
+  rw [spectralStripMultiplicity_boundary hline.ge (Or.inl hz), spectralBoundaryMultiplicity]
+  exact (Nat.min_le_right _ _).trans (Nat.ceil_le.mpr (by push_cast; linarith))
+
+omit ha hχ he horder in
+private theorem physical_dual_rows_bounded (hline : α = 0) :
+    ∃ U : ℝ, 0 ≤ U ∧ ∀ j : jets, ‖(f j).comp (Θ₀).mkQL‖ ≤ U := by
+  obtain ⟨V,hV⟩ : ∃ V : ℝ, ∀ j : jets,
+      ‖(spectralStripJet_memLp χ hα hs₀ j).toLp
+        (spectralZeroJet (F := F) (χ j.val.1) j.val.2.1 j.val.2.2.1 j.val.2.2.2)‖ ≤ V := by
+    subst α
+    have hlow (j : SpectralStripJetIndex (F := F) χ a 0 s) : (j.val.2.2.2 : ℝ) < (s-1)/2 := by
+      have hz := (SpectralStripJetIndex.mem_strip_order_pos (le_refl (0:ℝ)) j).1
+      have hzero : j.val.2.1 = 0 := by linarith only [hz.1, hz.2]
+      have hj := j.property
+      rw [spectralStripMultiplicity_boundary (le_refl (0:ℝ)) (Or.inr hzero)] at hj
+      exact ((lt_spectralBoundaryMultiplicity _ _ _).mp hj).2
+    obtain ⟨C, _, hC⟩ := spectralStripJet_upperBound_of_margin (a := a) χ (le_refl (0:ℝ)) hs
+      ⌈(s-1)/2⌉₊ 1 one_pos (fun j ↦ ⟨(Nat.lt_ceil.mpr (hlow j)).le, fun h ↦ ((hlow j).not_ge h).elim⟩)
+    exact ⟨C, hC⟩
+  refine ⟨max V 0, le_max_right _ _, fun j ↦ ?_⟩
+  have hn : ‖(f j).comp (Θ₀).mkQL‖ = ‖Dₐ (f j)‖ := by simp [spectralSobolevDualEmbedding]
+  rw [hn, hb.2 j]
+  exact (hV j).trans (le_max_left _ _)
+
+/-- One inverse power determined by the actual joint arithmetic count suffices for
+absolute summability of the native row costs and the issued arbitrary finite block bound.
+The hypothesis is pointwise on the projected geometric output, with its standard ambient norm. -/
+theorem spectralStripGeometricKernel_fixedLevel_output_criterion
+    (hline : α = 0) (hs₃ : s ≤ 3) (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (k : Subgroup C𝔽) (hk : IsBruhatGoodSubgroup k) :
+    ∃ (r : ℕ) (Y : Fin r → LCATopologicalLie K𝔽) (d : ℕ), ∀ B : ℝ, 0 ≤ B →
+      (∀ (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z))),
+        ‖output(z,m)‖ ≤ B * spectralFixedLevelWeight (F := F) Y k (d+2)
+          (spectralSectionNormalizedChar (F := F) τ hτ (χ z.val.1)).val
+          (spectralSectionPhysicalOrdinate (F := F) τ hτ χ hχ z.val.1 z.val.2.2)) →
+      Summable (fun z : zeros(F, χ, a, α) ↦ rowCost(z)) ∧
+      BddAbove (range fun K : Finset zeros(F, χ, a, α) ↦ traceNorm (∑ z ∈ K, geometricBlock(z))) := by
+  classical
+  let count := exists_summable_spectralStripSiteWeight (F := F) τ hτ k hk χ hχ a α
+  let r := count.choose
+  let Y := count.choose_spec.choose
+  let d := count.choose_spec.choose_spec.choose
+  have hweight := count.choose_spec.choose_spec.choose_spec
+  let dual := physical_dual_rows_bounded (F := F) a hα hs χ x f hb hline
+  let U := dual.choose
+  have hU : 0 ≤ U := dual.choose_spec.1
+  have hdual := dual.choose_spec.2
+  refine ⟨r,Y,d,?_⟩
+  intro B hB hout
+  let w (z : zeros(F, χ, a, α)) := spectralFixedLevelWeight (F := F) Y k (d+2)
+    (spectralSectionNormalizedChar (F := F) τ hτ (χ z.val.1)).val
+    (spectralSectionPhysicalOrdinate (F := F) τ hτ χ hχ z.val.1 z.val.2.2)
+  have hr : Summable (fun z : zeros(F, χ, a, α) ↦ rowCost(z)) :=
+    summable_of_le_one_row (Z := zeros(F, χ, a, α)) (fun z : zeros(F, χ, a, α) ↦ jetCount(z))
+      (physical_one_jet_at_zero_width (F := F) a χ hline hs₃)
+      (fun z m ↦ ‖(f jet(z,m)).comp (Θ₀).mkQL‖) (fun z m ↦ ‖output(z,m)‖)
+      w hweight (fun _ ↦ spectralFixedLevelWeight_nonneg (F := F) _ _ _ _ _)
+      hU hB (fun _ _ ↦ norm_nonneg _) (fun _ _ ↦ norm_nonneg _)
+      (fun z m ↦ hdual jet(z,m)) hout
+  exact ⟨hr, spectralStripGeometricKernel_blocks_bddAbove_of_summable_rows a hα hs φ ha χ eχ e x f
+    hχ he horder hb hr⟩
+
+
+section PhysicalGramSmoothing
+
+open WeakCardinal
+
+local notation "sectionMap" => (Θ₀).orthogonal.subtypeL.comp
+  (Θ₀).quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
+local notation "weakMap" => (intervalSobolevWeakening (ideleClassTamagawaMeasure F)
+  (logIdeleClassNorm F) (-α) α s).comp sectionMap
+local notation "weakSize(" j ")" => ‖weakMap (x (j))‖
+local notation "weakEnergy(" j ", " E ")" => finiteRieszGramEnergy weakMap f (j) ((E) (j))
+local notation "physChar(" τ "," hτ "," z ")" => (spectralSectionNormalizedChar τ hτ (χ (z).val.1)).val
+local notation "active(" k "," τ "," hτ "," z ")" => (∀ u : k, physChar(τ,hτ,z) u.val = 1)
+local notation "physOrd(" τ "," hτ "," z ")" => spectralSectionPhysicalOrdinate τ hτ χ hχ (z).val.1 (z).val.2.2
+local notation "height(" τ "," hτ "," Y "," z ")" => 1 + (|physOrd(τ,hτ,z)| + spectralAngularFlowHeight (Y) physChar(τ,hτ,z))
+local notation "relativeFactor" => 1 + 13 * Real.sqrt 3 / 48
+
+omit ha hχ he horder hb in
+private theorem sqrt_gram_le_polynomial {T W C : ℝ} (hT : 1 ≤ T) (hC : 0 ≤ C)
+    (p : ℕ) (hW : W ≤ C * T ^ p) :
+    Real.sqrt W ≤ Real.sqrt C * T ^ ((p + 1) / 2) := by
+  have he : p ≤ (p+1)/2 * 2 := by omega
+  have hp : T ^ p ≤ (T ^ ((p+1)/2))^2 := by
+    rw [← pow_mul]
+    exact pow_le_pow_right₀ hT he
+  calc
+    Real.sqrt W ≤ Real.sqrt (C * (T ^ ((p+1)/2))^2) :=
+      Real.sqrt_le_sqrt (hW.trans (mul_le_mul_of_nonneg_left hp hC))
+    _ = _ := by rw [Real.sqrt_mul hC, Real.sqrt_sq (pow_nonneg (zero_le_one.trans hT) _)]
+
+omit ha hχ he horder hb in
+private theorem gram_smoothing_decay_le {T W weak out C B : ℝ} {p d : ℕ}
+    (hT : 1 ≤ T) (hC : 0 ≤ C) (hB : 0 ≤ B) (hW : W ≤ C*T^p)
+    (hw : weak ≤ relativeFactor * Real.sqrt W)
+    (ho : out ≤ (B/T^(d+2+(p+1)/2))*weak) :
+    out ≤ (B * relativeFactor * Real.sqrt C) * (1/T^(d+2)) := by
+  have hT₀ : 0 < T := zero_lt_one.trans_le hT
+  have hpow := sqrt_gram_le_polynomial hT hC p hW
+  have hnorm : weak ≤ (relativeFactor * Real.sqrt C) * T^((p+1)/2) :=
+    hw.trans ((mul_le_mul_of_nonneg_left hpow (by positivity)).trans_eq (mul_assoc _ _ _).symm)
+  calc
+    out ≤ (B/T^(d+2+(p+1)/2))*weak := ho
+    _ ≤ (B/T^(d+2+(p+1)/2))*((relativeFactor * Real.sqrt C)*T^((p+1)/2)) :=
+      mul_le_mul_of_nonneg_left hnorm (by positivity)
+    _ = _ := by rw [pow_add]; field_simp
+
+/-- The genuine finite weak Gram polynomial and a single weak-normalized local multiplier
+estimate suffice for all the issued geometric block sums. The zero count selects the angular
+flows and its degree before the growth exponent is specified. The finite comparison factor is
+the upper radius-six estimate for the same physical weak map. -/
+theorem spectralStripGeometricKernel_blocks_bddAbove_of_finiteGram_smoothing
+    (hline : α = 0) (hs₃ : s ≤ 3) (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (k : Subgroup C𝔽) (hk : IsBruhatGoodSubgroup k) (E : jets → Finset jets)
+    (hoff : ∀ (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z))), ¬active(k,τ,hτ,z) → output(z,m) = 0) :
+    ∃ (r : ℕ) (Y : Fin r → LCATopologicalLie K𝔽) (d : ℕ),
+      ∀ (p : ℕ) (C B : ℝ), 0 ≤ C → 0 ≤ B →
+        (∀ (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z))), active(k,τ,hτ,z) →
+          weakEnergy(jet(z,m), E) ≤ C * height(τ,hτ,Y,z)^p) →
+        (∀ (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z))), active(k,τ,hτ,z) →
+          weakSize(jet(z,m)) ≤ relativeFactor * Real.sqrt (weakEnergy(jet(z,m), E))) →
+        (∀ (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z))), active(k,τ,hτ,z) →
+          ‖output(z,m)‖ ≤ (B / height(τ,hτ,Y,z)^(d+2+(p+1)/2)) * weakSize(jet(z,m))) →
+        Summable (fun z : zeros(F, χ, a, α) ↦ rowCost(z)) ∧
+        BddAbove (range fun K : Finset zeros(F, χ, a, α) ↦ traceNorm (∑ z ∈ K, geometricBlock(z))) := by
+  classical
+  refine (spectralStripGeometricKernel_fixedLevel_output_criterion (F := F) (α := α) (s := s)
+    a hα hs φ ha χ eχ e x f hχ he horder hb hline hs₃ τ hτ k hk).imp
+    (fun r hr ↦ hr.imp (fun Y hY ↦ hY.imp (fun d hcount ↦ ?_)))
+  intro p C B hC hB hpoly hweak hsmooth
+  let A : ℝ := B * relativeFactor * Real.sqrt C
+  have hA : 0 ≤ A := by dsimp [A]; positivity
+  apply hcount A hA
+  intro z m
+  by_cases hz : active(k,τ,hτ,z)
+  · rw [spectralFixedLevelWeight, ite_eq_left hz]
+    apply gram_smoothing_decay_le (p := p) (d := d) _ hC hB (hpoly z m hz) (hweak z m hz) (hsmooth z m hz)
+    exact le_add_of_nonneg_right (add_nonneg (abs_nonneg _) (Finset.sum_nonneg fun _ _ ↦ norm_nonneg _))
+  · rw [hoff z m hz, norm_zero, spectralFixedLevelWeight, ite_eq_right hz, mul_zero]
+
+
+local notation "nativeμ" => ideleClassTamagawaMeasure F
+local notation "ambientS" => CompactIntervalSobolev nativeμ (logIdeleClassNorm F) (-α) α s
+local notation "nativeFourier(" v ")" => lcaFourier nativeμ ((v) : C𝔽 → ℂ)
+local notation "siteMellin(" z ")" => (∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ (z).val.1)
+  (((z).val.2.1 : ℂ) + ((z).val.2.2 : ℂ) * Complex.I) g ∂nativeμ)
+
+omit ha hχ he horder hb in
+/-- Physical Mellin ordinate of a Fourier character on the chosen norm section. Fourier
+transformation pairs with the inverse character, which fixes the sign of this coordinate. -/
+def spectralFourierSectionOrdinate (τ : ℝ≥0ˣ →ₜ* C𝔽) (ψ : U𝔽) : ℝ :=
+  (existsUnique_unitaryComplexPower
+    ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ((ψ⁻¹).comp τ))
+    (fun _ ↦ Circle.norm_coe _)).choose.im
+
+omit ha hχ he horder hb in
+theorem spectralFourierSectionOrdinate_spec (τ : ℝ≥0ˣ →ₜ* C𝔽) (ψ : U𝔽) (u : ℝ≥0ˣ) :
+    (((ψ (τ u))⁻¹ : Circle) : ℂ) =
+      ((u.val : ℝ) : ℂ) ^ ((spectralFourierSectionOrdinate τ ψ : ℂ) * Complex.I) := by
+  let c := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ((ψ⁻¹).comp τ)
+  let h := existsUnique_unitaryComplexPower c (fun _ ↦ Circle.norm_coe _)
+  have he : h.choose = (h.choose.im : ℂ) * Complex.I := by
+    apply Complex.ext
+    · simpa using h.choose_spec.1.1
+    · simp
+  exact (h.choose_spec.1.2 u).trans (congrArg (((u.val : ℝ) : ℂ) ^ ·) he)
+
+local notation "offset(" τ "," hτ "," z "," ψ ")" =>
+  (((spectralFourierSectionOrdinate (τ) (ψ) - physOrd(τ,hτ,z) : ℝ)) : ℂ)
+
+omit ha hχ he horder hb in
+private theorem native_haar_ac_density (l r s : ℝ) (dual : Bool) :
+    nativeμ ≪ intervalSobolevMeasure nativeμ (logIdeleClassNorm F) l r s dual := by
+  have hlog : Continuous (logIdeleClassNorm F) :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp (continuousIdeleClassNorm F).continuous)).log
+      (fun _ ↦ (NNReal.coe_pos.mpr (Units.zero_lt _)).ne')
+  have hd : Measurable (fun x : C𝔽 ↦ intervalSobolevDensity l r s (logIdeleClassNorm F x)) := by
+    have hc : Continuous (intervalSobolevDensity l r s) := by
+      unfold intervalSobolevDensity
+      exact Continuous.mul (by fun_prop) (Continuous.rpow_const (by fun_prop)
+        (fun t ↦ Or.inl (by positivity : 1+t^2 ≠ 0)))
+    exact (hc.comp hlog).measurable
+  have hp (x : C𝔽) : 0 < intervalSobolevDensity l r s (logIdeleClassNorm F x) := by
+    unfold intervalSobolevDensity
+    positivity
+  cases dual
+  · exact withDensity_absolutelyContinuous' hd.ennreal_ofReal.aemeasurable
+      (.of_forall fun x ↦ (ENNReal.ofReal_pos.mpr (hp x)).ne')
+  · exact withDensity_absolutelyContinuous' hd.inv.ennreal_ofReal.aemeasurable
+      (.of_forall fun x ↦ (ENNReal.ofReal_pos.mpr (inv_pos.mpr (hp x))).ne')
+
+omit ha hχ he horder hb in
+private theorem zeroLine_jetCount_le_one (hline : α = 0) (hs₃ : s ≤ 3) (z : zeros(F, χ, a, α)) :
+    jetCount(z) ≤ 1 := by
+  have hz : z.val.2.1 = -α := by linarith only [z.property.1.1, z.property.1.2, hline]
+  have hzα : 0 ≤ α := hline.ge
+  rw [spectralStripMultiplicity_boundary hzα (Or.inl hz), spectralBoundaryMultiplicity]
+  exact (Nat.min_le_right _ _).trans (Nat.ceil_le.mpr (by push_cast; linarith))
+
+omit ha hχ he horder in
+private theorem native_haar_integrable_at_value_jet (hline : α = 0) (hs₃ : s ≤ 3)
+    (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z))) (v : ambientS) :
+    Integrable (v : C𝔽 → ℂ) nativeμ := by
+  let j := jet(z,m)
+  have hp := (spectralSobolevPairing_dual hI hs₀ ((f j).comp (Θ₀).mkQL) v).1
+  change Integrable (fun g : C𝔽 ↦ v g * (Dₐ (f j)) g) nativeμ at hp
+  rw [hb.2 j] at hp
+  have hjet := (native_haar_ac_density (F := F) (-α) α s true).ae_eq
+    (MemLp.coeFn_toLp (spectralStripJet_memLp χ hα hs₀ j))
+  have hv : AEStronglyMeasurable (v : C𝔽 → ℂ) nativeμ :=
+    (Lp.stronglyMeasurable v).aestronglyMeasurable
+  have hc := zeroLine_jetCount_le_one a χ hline hs₃ z
+  have hm : m.val = 0 := by have hm' := m.isLt; omega
+  have hz : z.val.2.1 = 0 := by linarith only [z.property.1.1, z.property.1.2, hline]
+  apply hp.mono hv
+  filter_upwards [hjet] with g hg
+  rw [norm_mul,hg]
+  change ‖v g‖ ≤ ‖v g‖ * ‖spectralZeroJet (χ z.val.1) z.val.2.1 z.val.2.2 m.val g‖
+  rw [hm,hz]
+  have hmod : 0 < ((ideleClassNorm F g).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  change ‖v g‖ ≤ ‖v g‖ * ‖((χ z.val.1 g : ℂ) * (((ideleClassNorm F g).val : ℝ) : ℂ)^
+    ((0 : ℂ)+(z.val.2.2 : ℂ)*Complex.I)) * (logIdeleClassNorm F g : ℂ)^0‖
+  simp [Complex.norm_cpow_eq_rpow_re_of_pos hmod]
+
+omit ha hχ he horder hb in
+private theorem native_eq_of_haarFourier (u v : ambientS) (hu : Integrable (u : C𝔽 → ℂ) nativeμ)
+    (hv : Integrable (v : C𝔽 → ℂ) nativeμ) (heq : ∀ ψ, nativeFourier(u) ψ = nativeFourier(v) ψ) : u = v := by
+  let H := lcaFourier_L1 nativeμ
+  let f₁ := hu.toL1 u
+  let f₂ := hv.toL1 v
+  have he : H.choose f₁ = H.choose f₂ := by
+    apply ZeroAtInftyContinuousMap.ext
+    intro ψ
+    rw [H.choose_spec.1,H.choose_spec.1]
+    exact (integral_congr_ae (hu.coeFn_toL1.mul EventuallyEq.rfl)).trans
+      ((heq ψ).trans (integral_congr_ae (hv.coeFn_toL1.symm.mul EventuallyEq.rfl)))
+  have hr : (f₁ : C𝔽 → ℂ) =ᵐ[nativeμ] (f₂ : C𝔽 → ℂ) := by rw [H.choose_spec.2.1 he]
+  exact Lp.ext ((withDensity_absolutelyContinuous nativeμ _).ae_eq (hu.coeFn_toL1.symm.trans (hr.trans hv.coeFn_toL1)))
+
+omit ha hχ he horder hb in
+private theorem native_fourier_residual (u : ambientS) (hu : Integrable (u : C𝔽 → ℂ) nativeμ) (c : ℂ) (ψ : U𝔽) :
+    nativeFourier((Aφ u - c • u : ambientS)) ψ = (nativeFourier(φ.val) ψ-c) * nativeFourier(u) ψ := by
+  have hφ : Integrable φ.val nativeμ :=
+    (continuous_of_bruhatSmooth ((mem_bruhatSmoothSubmodule_iff _).1 φ.property.1)).integrable_of_hasCompactSupport φ.property.2
+  have hconv := hardySobolevTestAction_apply nativeμ (continuousIdeleClassNorm F) (-α) α s hI hs₀ φ u
+  let haed := native_haar_ac_density (F := F) (-α) α s false
+  have hsub := haed.ae_eq (Lp.coeFn_sub (Aφ u) (c • u))
+  have hsm := haed.ae_eq (Lp.coeFn_smul c u)
+  have hrep : ((Aφ u - c • u : ambientS) : C𝔽 → ℂ) =ᵐ[nativeμ]
+      fun g ↦ lcaConvolution nativeμ φ.val u g - c * u g := by
+    filter_upwards [hsub,hconv,hsm] with g hg ha hs'
+    exact hg.trans (by change Aφ u g - (c • u) g = _; rw [ha,hs']; rfl)
+  change ∫ g : C𝔽, (Aφ u - c • u : ambientS) g * star (ψ g : ℂ) ∂nativeμ = _
+  refine Eq.trans (b := ∫ g : C𝔽, (lcaConvolution nativeμ φ.val u g - c * u g) * star (ψ g : ℂ) ∂nativeμ)
+    (integral_congr_ae (hrep.mono fun g hg ↦ congrArg (· * star (ψ g : ℂ)) hg)) ?_
+  simp_rw [sub_mul,mul_assoc]
+  have hconvI := (lcaConvolution_integrable nativeμ hφ hu).2.1
+  rw [integral_sub (integrable_fourierIntegrand nativeμ hconvI ψ)
+    ((integrable_fourierIntegrand nativeμ hu ψ).const_mul c), integral_const_mul]
+  change nativeFourier(lcaConvolution nativeμ φ.val u) ψ-c*nativeFourier(u) ψ = _
+  rw [lcaFourier_convolution nativeμ hφ hu, Pi.mul_apply]
+
+/-- A pair of centered Mellin moments and a multiplier acting on that pair recover the actual
+geometric output. The factorization of its scalar symbol is only needed on the Fourier
+support of the lifted cardinal. All transforms here use the original Tamagawa measure. -/
+theorem spectralStripGeometricKernel_output_eq_centeredMomentMultiplier
+    (hline : α = 0) (hs₃ : s ≤ 3) (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z))) (n : ℕ) (u v : ambientS)
+    (L : (ambientS × ambientS) →L[ℂ] ambientS) (b c : U𝔽 → ℂ)
+    (hu : ∀ ψ, nativeFourier(u) ψ = offset(τ,hτ,z,ψ) * nativeFourier(Sₐ(x jet(z,m))) ψ)
+    (hv : ∀ ψ, nativeFourier(v) ψ = offset(τ,hτ,z,ψ)^n * nativeFourier(Sₐ(x jet(z,m))) ψ)
+    (hL : ∀ ψ, nativeFourier(L (u,v)) ψ = b ψ * nativeFourier(u) ψ + c ψ * nativeFourier(v) ψ)
+    (hsplit : ∀ ψ, nativeFourier(Sₐ(x jet(z,m))) ψ ≠ 0 →
+      nativeFourier(φ.val) ψ - siteMellin(z) = b ψ*offset(τ,hτ,z,ψ) + c ψ*offset(τ,hτ,z,ψ)^n) :
+    output(z,m) = L (u,v) := by
+  have hint := native_haar_integrable_at_value_jet a hα hs χ x f hb hline hs₃ z m
+  rw [spectralStripGeometricKernel_output_eq_sub_of_one_jet a hα hs φ ha χ eχ e x f hχ he horder hb z m
+    (zeroLine_jetCount_le_one a χ hline hs₃ z)]
+  apply native_eq_of_haarFourier _ _ (hint _) (hint _)
+  intro ψ
+  rw [native_fourier_residual hα hs φ _ (hint _) _ ψ, hL, hu, hv]
+  by_cases hzero : nativeFourier(Sₐ(x jet(z,m))) ψ = 0
+  · simp only [hzero, mul_zero, zero_add]
+  · rw [hsplit ψ hzero]
+    ring
+
+/-- A test whose Fourier symbol equals the site's scalar on the Fourier support of its
+actual lift has zero geometric output at that site. This supplies the off-level condition
+from scalar information. -/
+theorem spectralStripGeometricKernel_output_zero_of_symbol_on_support
+    (hline : α = 0) (hs₃ : s ≤ 3) (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z)))
+    (hsymbol : ∀ ψ, nativeFourier(Sₐ(x jet(z,m))) ψ ≠ 0 → nativeFourier(φ.val) ψ = siteMellin(z)) :
+    output(z,m) = 0 := by
+  have hint := native_haar_integrable_at_value_jet a hα hs χ x f hb hline hs₃ z m
+  rw [spectralStripGeometricKernel_output_eq_sub_of_one_jet a hα hs φ ha χ eχ e x f hχ he horder hb z m
+    (zeroLine_jetCount_le_one a χ hline hs₃ z)]
+  apply native_eq_of_haarFourier _ _ (hint _) (hint _)
+  intro ψ
+  have hzero : nativeFourier((0 : ambientS)) ψ = 0 := by
+    apply integral_eq_zero_of_ae
+    filter_upwards [(native_haar_ac_density (F := F) (-α) α s false).ae_eq (Lp.coeFn_zero ℂ 2 _)] with g hg
+    change (0 : ambientS) g * star (ψ g : ℂ) = 0
+    rw [hg]
+    exact zero_mul _
+  rw [native_fourier_residual hα hs φ _ (hint _) _ ψ, hzero]
+  by_cases h : nativeFourier(Sₐ(x jet(z,m))) ψ = 0
+  · exact mul_eq_zero_of_right _ h
+  · rw [hsymbol ψ h, sub_self, zero_mul]
+
+omit ha he horder hb in
+/-- On one native lift, the first and the `n`th centered moments, a bounded pair multiplier,
+and a two-term scalar symbol identity on the actual Fourier support. `B` bounds the
+multiplier norm and `M` bounds each moment relative to the weak cardinal norm. -/
+def HasSpectralCenteredMomentMultiplier
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z))) (n : ℕ) (B M : ℝ) : Prop :=
+  ∃ (u v : ambientS) (L : (ambientS × ambientS) →L[ℂ] ambientS) (b c : U𝔽 → ℂ),
+    ‖L‖ ≤ B ∧ ‖u‖ ≤ M * weakSize(jet(z,m)) ∧ ‖v‖ ≤ M * weakSize(jet(z,m)) ∧
+    (∀ ψ, nativeFourier(u) ψ = offset(τ,hτ,z,ψ) * nativeFourier(Sₐ(x jet(z,m))) ψ) ∧
+    (∀ ψ, nativeFourier(v) ψ = offset(τ,hτ,z,ψ)^n * nativeFourier(Sₐ(x jet(z,m))) ψ) ∧
+    (∀ ψ, nativeFourier(L (u,v)) ψ = b ψ * nativeFourier(u) ψ + c ψ * nativeFourier(v) ψ) ∧
+    (∀ ψ, nativeFourier(Sₐ(x jet(z,m))) ψ ≠ 0 →
+      nativeFourier(φ.val) ψ - siteMellin(z) = b ψ*offset(τ,hτ,z,ψ) + c ψ*offset(τ,hτ,z,ψ)^n)
+
+local notation "localMoments(" τ "," hτ "," z "," m "," n "," B "," M ")" =>
+  HasSpectralCenteredMomentMultiplier (a := a) (hα := hα) (hs := hs) (φ := φ) (χ := χ) (x := x) (hχ := hχ)
+    (τ) (hτ) (z) (m) (n) (B) (M)
+
+/-- The native multiplier norm converts the two individual centered moment estimates
+to the weak-normalized smoothing estimate. -/
+private theorem centeredMomentMultiplier_output_norm_le
+    (hline : α = 0) (hs₃ : s ≤ 3) (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z))) (n : ℕ) (B M : ℝ) (hB : 0 ≤ B)
+    (hloc : localMoments(τ,hτ,z,m,n,B,M)) :
+    ‖output(z,m)‖ ≤ B*(M*weakSize(jet(z,m))) := by
+  obtain ⟨u,v,L,b,c,hL,hu,hv,hfirst,hhigh,hsymbol,hsplit⟩ := hloc
+  have he := spectralStripGeometricKernel_output_eq_centeredMomentMultiplier (F := F) (α := α) (s := s)
+    a hα hs φ ha χ eχ e x f hχ he horder hb hline hs₃ τ hτ z m n u v L b c hfirst hhigh hsymbol hsplit
+  rw [he]
+  exact (L.le_opNorm (u,v)).trans (mul_le_mul hL (norm_prod_le_iff.mpr ⟨hu,hv⟩) (norm_nonneg _) hB)
+
+/-- Finite Gram polynomial growth and near/far centered-moment multiplier data imply
+absolute summability of the true geometric costs. This version tests scalar Fourier
+symbols and an operator norm. Its assumptions contain no bound on a geometric output. -/
+theorem spectralStripGeometricKernel_blocks_bddAbove_of_finiteGram_moments
+    (hline : α = 0) (hs₃ : s ≤ 3) (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (k : Subgroup C𝔽) (hk : IsBruhatGoodSubgroup k) (E : jets → Finset jets)
+    (hoff : ∀ (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z))), ¬active(k,τ,hτ,z) →
+      ∀ ψ, nativeFourier(Sₐ(x jet(z,m))) ψ ≠ 0 → nativeFourier(φ.val) ψ = siteMellin(z)) :
+    ∃ (r : ℕ) (Y : Fin r → LCATopologicalLie K𝔽) (d : ℕ),
+      ∀ (p : ℕ) (C B M : ℝ), 0 ≤ C → 0 ≤ B → 0 ≤ M →
+        (∀ (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z))), active(k,τ,hτ,z) →
+          weakEnergy(jet(z,m), E) ≤ C * height(τ,hτ,Y,z)^p) →
+        (∀ (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z))), active(k,τ,hτ,z) →
+          weakSize(jet(z,m)) ≤ relativeFactor * Real.sqrt (weakEnergy(jet(z,m), E))) →
+        (∀ (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z))), active(k,τ,hτ,z) →
+          localMoments(τ,hτ,z,m,d+2+(p+1)/2,B / height(τ,hτ,Y,z)^(d+2+(p+1)/2),M)) →
+        Summable (fun z : zeros(F, χ, a, α) ↦ rowCost(z)) ∧
+        BddAbove (range fun K : Finset zeros(F, χ, a, α) ↦ traceNorm (∑ z ∈ K, geometricBlock(z))) := by
+  refine (spectralStripGeometricKernel_blocks_bddAbove_of_finiteGram_smoothing (F := F) (α := α) (s := s)
+    a hα hs φ ha χ eχ e x f hχ he horder hb hline hs₃ τ hτ k hk E (fun z m hz ↦
+      spectralStripGeometricKernel_output_zero_of_symbol_on_support a hα hs φ ha χ eχ e x f hχ he horder hb
+        hline hs₃ z m (hoff z m hz))).imp (fun r hr ↦ hr.imp (fun Y hY ↦ hY.imp (fun d h ↦ ?_)))
+  intro p C B M hC hB hM hpoly hweak hlocal
+  apply h p C (B*M) hC (mul_nonneg hB hM) hpoly hweak
+  intro z m hz
+  let T := height(τ,hτ,Y,z)
+  let n := d+2+(p+1)/2
+  have hn : 0 ≤ T := add_nonneg zero_le_one (add_nonneg (abs_nonneg _) (Finset.sum_nonneg fun _ _ ↦ norm_nonneg _))
+  have hbound := centeredMomentMultiplier_output_norm_le (F := F) (α := α) (s := s) a hα hs φ ha χ eχ e x f
+    hχ he horder hb hline hs₃ τ hτ z m n (B/T^n) M (div_nonneg hB (pow_nonneg hn _)) (hlocal z m hz)
+  exact hbound.trans_eq (by ring)
+
+end PhysicalGramSmoothing
+end PhysicalOutputBound
+
 /-- Paper: Theorem 10.4.3.5(2)–(3), p. 472. The isolated geometric Cauchy estimate supplies
 the limit and the operator identity (10.4.3.45) on p. 473.
 Deviation: The ambient tensors use the repaired output action and strip indexing of §10.4.3. -/
@@ -997,3 +1476,292 @@ theorem spectralStripAmbientKernel_exists :
     (spectralStripGeometricKernel_cauchy a hα hs φ ha χ eχ e x f hχ he horder hb)
 
 end RiemannMasullo.Isolated
+
+namespace RiemannMasullo
+namespace Isolated
+
+open Function WeakCardinal
+
+set_option quotPrecheck false
+attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorelSpaceSec1
+  instIdeleClassT2Sec1 instIdeleClassLocallyCompactSec1 instIdeleClassSecondCountableSec1
+  instIdeleClassHaarMeasureSec1
+
+variable {F : Type*} [Field F] [NumberField F]
+local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
+local notation "K𝔽" => (ideleClassNorm F).ker
+local notation "U𝔽" => PontryaginDual C𝔽
+local notation "Ω𝔽" => PontryaginDual K𝔽
+local notation "incl" => (⟨(ideleClassNorm F).ker.subtype, continuous_subtype_val⟩ : K𝔽 →ₜ* C𝔽)
+local notation "UnitChars(" τ ")" => {η : U𝔽 // ∀ t : ℝ≥0ˣ, η (τ t) = 1}
+local notation "PZeros(" τ ")" => {q : UnitChars(τ) × ℂ //
+  0 < MeromorphicOn.divisor (explicitFormulaCompletedHeckeL q.1.val) univ q.2}
+local notation "pt(" σ ", " t ")" => ((σ : ℝ) : ℂ) + ((t : ℝ) : ℂ) * Complex.I
+local notation "ord(" η ", " u ")" => meromorphicOrderAt (continuedCompletedHeckeL η) u
+local notation "order(" χ ", " a ", " z ")" => ord(χ (z).1, pt(a + (z).2.1, (z).2.2))
+local notation "zeros(" F ", " χ ", " a ", " α ")" => {z : PontryaginDual (ideleClassNorm F).ker × ℝ × ℝ //
+  z.2.1 ∈ Icc (-α) α ∧ 0 < order(χ, a, z)}
+
+variable (a : ℝ) {s : ℝ} (hs : 1 < s)
+  (φ : BruhatCompactSupport (IdeleClassGroup (𝓞 F) F)) (ha : 0 < a)
+  (χ : PontryaginDual (ideleClassNorm F).ker → PontryaginDual (IdeleClassGroup (𝓞 F) F))
+
+local notation "hs₀" => (zero_le_one.trans hs.le)
+local notation "hI" => (neg_nonpos.mpr (le_refl (0:ℝ))).trans (le_refl (0:ℝ))
+local notation "Θ₀" => globalThetaSobolev F a hI hs₀
+local notation "Sₐ(" v ")" => ((Θ₀).quotientEquivOrthogonal v).val
+local notation "Aφ" => hardySobolevTestAction (ideleClassTamagawaMeasure F) (continuousIdeleClassNorm F)
+  (-(0:ℝ)) (0:ℝ) s hI hs₀ φ
+local notation "Gₐ" => geometricProjection (F := F) a (le_refl (0:ℝ)) hs₀
+local notation "Dₐ" => spectralSobolevDualEmbedding F a hI hs₀
+
+local notation "jetCount(" z ")" => spectralStripMultiplicity (0:ℝ) s (z).val.2.1 (order(χ, a, (z).val)).untop₀.toNat
+local notation "jets" => SpectralStripJetIndex (F := F) χ a (0:ℝ) s
+
+variable (eχ : PontryaginDual (ideleClassNorm F).ker ↪ ℕ) (e : zeros(F, χ, a, (0:ℝ)) ↪ ℕ × ℕ)
+  (x : SpectralStripJetIndex χ a (0:ℝ) s → (spectralSobolevQuotient F a hI (zero_le_one.trans hs.le)))
+  (f : SpectralStripJetIndex χ a (0:ℝ) s → StrongDual ℂ (spectralSobolevQuotient F a hI (zero_le_one.trans hs.le)))
+  (hχ : IsSpectralBasepointChoice χ) (he : ∀ z, (e z).1 = eχ z.val.1)
+  (horder : ∀ z z' : zeros(F, χ, a, (0:ℝ)), z.val.1 = z'.val.1 → (e z).2 ≤ (e z').2 → |z.val.2.2| ≤ |z'.val.2.2|)
+  (hb : IsSpectralMarkushevichBasis x f ∧ ∀ j,
+    spectralSobolevDualEmbedding F a ((neg_nonpos.mpr (le_refl (0:ℝ))).trans (le_refl (0:ℝ))) (zero_le_one.trans hs.le) (f j) =
+    (spectralStripJet_memLp χ (le_refl (0:ℝ)) (zero_le_one.trans hs.le) j).toLp
+      (spectralZeroJet (F := F) (χ j.val.1) j.val.2.1 j.val.2.2.1 j.val.2.2.2))
+
+include ha hχ he horder hb
+
+local notation "jet(" z ", " m ")" =>
+  (⟨((z).val.1, (z).val.2.1, (z).val.2.2, (m).val), (m).isLt⟩ : jets)
+local notation "geometricBlock(" z ")" =>
+  (∑ m : Fin (jetCount(z)),
+    (⟨((f jet(z, m)).comp (Θ₀).mkQL).smulRight (Gₐ (Aφ (Sₐ(x jet(z, m))))),
+      smulRight_mem_nuclearEndomorphisms _ _⟩ : nuclearEndomorphisms _))
+
+local notation "output(" z ", " m ")" => Gₐ (Aφ (Sₐ(x jet(z, m))))
+local notation "rowCost(" z ")" =>
+  (∑ m : Fin (jetCount(z)), ‖(f jet(z,m)).comp (Θ₀).mkQL‖ * ‖output(z,m)‖)
+
+open WeakCardinal
+
+local notation "sectionMap" => (Θ₀).orthogonal.subtypeL.comp
+  (Θ₀).quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
+local notation "weakMap" => spectralWeakRieszReadout F a s hs
+local notation "weakSize(" j ")" => ‖weakMap (x (j))‖
+local notation "physChar(" τ "," hτ "," z ")" => (spectralSectionNormalizedChar (τ) (hτ) (χ (z).val.1)).val
+local notation "active(" k "," τ "," hτ "," z ")" => (∀ u : (k), physChar(τ,hτ,z) u.val = 1)
+local notation "ord₀(" τ "," hτ "," z ")" => spectralSectionPhysicalOrdinate (τ) (hτ) χ hχ (z).val.1 (z).val.2.2
+local notation "T₀(" τ "," hτ "," Y "," z ")" => 1 + (|ord₀(τ,hτ,z)| + spectralAngularFlowHeight (Y) physChar(τ,hτ,z))
+local notation "nativeμ" => ideleClassTamagawaMeasure F
+local notation "FT(" v ")" => lcaFourier nativeμ ((v) : C𝔽 → ℂ)
+local notation "siteMellin(" z ")" => (∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ (z).val.1)
+  (((z).val.2.1 : ℂ) + ((z).val.2.2 : ℂ) * Complex.I) g ∂nativeμ)
+local notation "localMoments(" τ "," hτ "," z "," m "," n "," B "," M ")" =>
+  HasSpectralCenteredMomentMultiplier (a := a) (hα := (le_refl (0:ℝ))) (hs := hs) (φ := φ)
+    (χ := χ) (x := x) (hχ := hχ) (τ) (hτ) (z) (m) (n) (B) (M)
+local notation "relativeFactor" => 1 + 13 * Real.sqrt 3 / 48
+
+omit ha he horder in
+private theorem spectralRadiusSix_local_readout (hs₂ : 2 < s) (hs₃ : s ≤ 3) (j : jets) :
+    let E := spectralCardinalWindow χ hs₃ j
+    let W := finiteRieszGramEnergy weakMap f j E
+    W = (heckeJetGramScale F)⁻¹ * spectralWeakCardinalForm χ hs₃ j ∧
+    weakSize(j) ≤ relativeFactor * Real.sqrt W := by
+  intro E W
+  have hw : W = (heckeJetGramScale F)⁻¹ * spectralWeakCardinalForm χ hs₃ j :=
+    spectralWeakRiesz_window_energy (F := F) χ hs hs₃ f hb.2 j
+  refine ⟨hw, ?_⟩
+  rw [hw, Real.sqrt_mul (inv_nonneg.mpr (heckeJetGramScale_pos (F := F)).le)]
+  exact (spectralWeakCardinal_radiusSix χ hχ hs hs₂ hs₃ x f hb.1 hb.2 j).2
+
+omit ha he horder in
+private theorem spectralRadiusSix_local_polynomial (hs₂ : 2 < s) (hs₃ : s ≤ 3) (j : jets)
+    (T C : ℝ) (p : ℕ) (hpoly : spectralWeakCardinalForm χ hs₃ j ≤ C * T^p) :
+    finiteRieszGramEnergy weakMap f j (spectralCardinalWindow χ hs₃ j) ≤
+      ((heckeJetGramScale F)⁻¹*C) * T ^ p := by
+  rw [(spectralRadiusSix_local_readout a hs χ x f hχ hb hs₂ hs₃ j).1,mul_assoc]
+  exact mul_le_mul_of_nonneg_left hpoly (inv_nonneg.mpr (heckeJetGramScale_pos (F := F)).le)
+
+/-- On the actual closed radius-six Hecke window, a polynomial bound on the numerical inverse-column form
+and one weak-normalized test estimate imply the issued finite-subset bound and absolute row summability. -/
+theorem spectralStripGeometricKernel_blocks_bddAbove_of_radiusSix_smoothing
+    (hs₂ : 2 < s) (hs₃ : s ≤ 3) (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (k : Subgroup C𝔽) (hk : IsBruhatGoodSubgroup k)
+    (hoff : ∀ (z : zeros(F, χ, a, 0)) (m : Fin (jetCount(z))), ¬active(k,τ,hτ,z) →
+      ∀ ψ, FT(Sₐ(x jet(z,m))) ψ ≠ 0 → FT(φ.val) ψ = siteMellin(z)) :
+    ∃ (r : ℕ) (Y : Fin r → LCATopologicalLie K𝔽) (d : ℕ),
+      ∀ (p : ℕ) (C B : ℝ), 0 ≤ C → 0 ≤ B →
+        (∀ (z : zeros(F, χ, a, 0)) (m : Fin (jetCount(z))), active(k,τ,hτ,z) →
+          spectralWeakCardinalForm χ hs₃ jet(z,m) ≤ C * T₀(τ,hτ,Y,z)^p) →
+        (∀ (z : zeros(F, χ, a, 0)) (m : Fin (jetCount(z))), active(k,τ,hτ,z) →
+          ‖output(z,m)‖ ≤ (B / T₀(τ,hτ,Y,z)^(d+2+(p+1)/2))*weakSize(jet(z,m))) →
+        Summable (fun z : zeros(F, χ, a, 0) ↦ rowCost(z)) ∧
+        BddAbove (range fun K : Finset zeros(F, χ, a, 0) ↦ traceNorm (∑ z ∈ K, geometricBlock(z))) := by
+  let E := spectralCardinalWindow (a := a) χ hs₃
+  refine (spectralStripGeometricKernel_blocks_bddAbove_of_finiteGram_smoothing (F := F) (α := 0) (s := s)
+    a (le_refl (0:ℝ)) hs φ ha χ eχ e x f hχ he horder hb rfl hs₃ τ hτ k hk E (fun z m hz ↦
+      spectralStripGeometricKernel_output_zero_of_symbol_on_support a (le_refl (0:ℝ)) hs φ ha χ eχ e x f hχ he horder hb
+        rfl hs₃ z m (hoff z m hz))).imp (fun r hr ↦ hr.imp (fun Y hY ↦ hY.imp (fun d h ↦ ?_)))
+  intro p C B hC hB hpoly hlocal
+  apply h p ((heckeJetGramScale F)⁻¹*C) B (mul_nonneg (inv_nonneg.mpr (heckeJetGramScale_pos (F := F)).le) hC) hB
+  · intro z m hz
+    exact spectralRadiusSix_local_polynomial a hs χ x f hχ hb hs₂ hs₃ jet(z,m) _ C p (hpoly z m hz)
+  · intro z m _
+    exact (spectralRadiusSix_local_readout a hs χ x f hχ hb hs₂ hs₃ jet(z,m)).2
+  · exact hlocal
+
+/-- Number-field sufficiency on the actual radius-six windows from a polynomial in the computed Gram form,
+uniform bounds for two centered moments, and a decaying norm for their combined Fourier multiplier. -/
+theorem spectralStripGeometricKernel_blocks_bddAbove_of_radiusSix_moments
+    (hs₂ : 2 < s) (hs₃ : s ≤ 3) (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (k : Subgroup C𝔽) (hk : IsBruhatGoodSubgroup k)
+    (hoff : ∀ (z : zeros(F, χ, a, 0)) (m : Fin (jetCount(z))), ¬active(k,τ,hτ,z) →
+      ∀ ψ, FT(Sₐ(x jet(z,m))) ψ ≠ 0 → FT(φ.val) ψ = siteMellin(z)) :
+    ∃ (r : ℕ) (Y : Fin r → LCATopologicalLie K𝔽) (d : ℕ),
+      ∀ (p : ℕ) (C B M : ℝ), 0 ≤ C → 0 ≤ B → 0 ≤ M →
+        (∀ (z : zeros(F, χ, a, 0)) (m : Fin (jetCount(z))), active(k,τ,hτ,z) →
+          spectralWeakCardinalForm χ hs₃ jet(z,m) ≤ C * T₀(τ,hτ,Y,z)^p) →
+        (∀ (z : zeros(F, χ, a, 0)) (m : Fin (jetCount(z))), active(k,τ,hτ,z) →
+          localMoments(τ,hτ,z,m,d+2+(p+1)/2,B / T₀(τ,hτ,Y,z)^(d+2+(p+1)/2),M)) →
+        Summable (fun z : zeros(F, χ, a, 0) ↦ rowCost(z)) ∧
+        BddAbove (range fun K : Finset zeros(F, χ, a, 0) ↦ traceNorm (∑ z ∈ K, geometricBlock(z))) := by
+  let E := spectralCardinalWindow (a := a) χ hs₃
+  refine (spectralStripGeometricKernel_blocks_bddAbove_of_finiteGram_moments (F := F) (α := 0) (s := s)
+    a (le_refl (0:ℝ)) hs φ ha χ eχ e x f hχ he horder hb rfl hs₃ τ hτ k hk E hoff).imp (fun r hr ↦ hr.imp (fun Y hY ↦ hY.imp (fun d h ↦ ?_)))
+  intro p C B M hC hB hM hpoly hlocal
+  apply h p ((heckeJetGramScale F)⁻¹*C) B M (mul_nonneg (inv_nonneg.mpr (heckeJetGramScale_pos (F := F)).le) hC) hB hM
+  · intro z m hz
+    exact spectralRadiusSix_local_polynomial a hs χ x f hχ hb hs₂ hs₃ jet(z,m) _ C p (hpoly z m hz)
+  · intro z m _
+    exact (spectralRadiusSix_local_readout a hs χ x f hχ hb hs₂ hs₃ jet(z,m)).2
+  · exact hlocal
+
+end Isolated
+end RiemannMasullo
+
+namespace RiemannMasullo
+namespace Isolated
+
+open WeakCardinal Set Topology TopologicalSpace NumberField MeasureTheory
+open scoped NNReal NumberField.AdeleRing
+
+private theorem form_le_polynomial_of_sqrt_bound {v A B g t : ℝ} {n : ℕ} (hg : 0 < g)
+    (h : g * Real.sqrt v ≤ A * (B * t^n)) :
+    v ≤ (A * B / g)^2 * t^(n * 2) := by
+  have hr : Real.sqrt v ≤ (A * B / g) * t^n := by
+    calc
+      _ ≤ (A * (B * t^n)) / g := (le_div_iff₀ hg).mpr (by simpa only [mul_comm (Real.sqrt v) g] using h)
+      _ = _ := by ring
+  calc
+    v ≤ (Real.sqrt v)^2 := by rw [Real.sq_sqrt']; exact le_max_left _ _
+    _ ≤ ((A * B / g) * t^n)^2 := pow_le_pow_left₀ (Real.sqrt_nonneg _) hr _
+    _ = _ := by rw [mul_pow, ← pow_mul]
+
+section OriginalSites
+
+set_option quotPrecheck false
+attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorelSpaceSec1
+  instIdeleClassT2Sec1 instIdeleClassLocallyCompactSec1 instIdeleClassSecondCountableSec1
+  instIdeleClassHaarMeasureSec1
+
+variable {F : Type*} [Field F] [NumberField F]
+variable (a : ℝ) {s : ℝ} (hs : 1 < s)
+local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
+local notation "C₁" => (ideleClassNorm F).ker
+local notation "hs₀" => zero_le_one.trans hs.le
+local notation "h₀" => (le_refl (0 : ℝ))
+local notation "hI" => (neg_nonpos.mpr h₀).trans h₀
+local notation "Q" => spectralSobolevQuotient F a (l := -(0 : ℝ)) (r := 0) (s := s) hI hs₀
+
+variable (χ : PontryaginDual (ideleClassNorm F).ker → PontryaginDual (IdeleClassGroup (𝓞 F) F))
+variable (b : BruhatStructuralPair (IdeleClassGroup (𝓞 F) F))
+  (e : ElementaryLCAPresentation b.quotient) (K : Compacts (IdeleClassGroup (𝓞 F) F))
+local notation "X" => bruhatCompactSupportStage (G := C𝔽) b e K
+local notation "incl" => fixedStageInclusionCLM (G := C𝔽) b e K
+local notation "orderAt(" z ")" => meromorphicOrderAt (continuedCompletedHeckeL (F := F) (χ (z).1))
+  (((a + (z).2.1 : ℝ) : ℂ) + ((z).2.2 : ℂ) * Complex.I)
+local notation "sites" => {z : PontryaginDual C₁ × ℝ × ℝ //
+  z.2.1 ∈ Icc (-(0 : ℝ)) 0 ∧ 0 < orderAt(z)}
+local notation "rows(" z ")" => spectralStripMultiplicity 0 s (z).val.2.1 (orderAt((z).val)).untop₀.toNat
+local notation "jets" => SpectralStripJetIndex (F := F) χ a 0 s
+local notation "jet(" z "," m ")" =>
+  (⟨((z).val.1, (z).val.2.1, (z).val.2.2, (m).val), (m).isLt⟩ : jets)
+
+local notation "W" => CompactIntervalSobolev (ideleClassTamagawaMeasure F) (logIdeleClassNorm F) (-(0 : ℝ)) 0 s
+
+include χ F a hs in
+include χ b e K F a hs in
+/-- Necessity on the actual compact-support, fixed-level Bruhat stage for the original
+finite spectral selections in Theorem 10.4.3.5(2), p. 472. For `1 < s ≤ 3` and strip
+width zero, every retained jet is the only row at its site. Given moving probes whose
+elementary seminorms have individual polynomial bounds, any quantity they detect in the
+single-block trace norm also has a polynomial bound on the whole chosen family. -/
+theorem spectralStripSingletonCost_polynomial_on_fixedStage (h₃ : s ≤ 3)
+    {J : Type*} (pick : J → jets) (x : jets → Q) (f : jets → StrongDual ℂ Q)
+    (hbound : ∀ ψ : X, BddAbove (range fun S : Finset sites ↦ traceNorm
+      (∑ z ∈ S, spectralStripGeometryAtSite (F := F) a hs χ x f ((incl) ψ) z)))
+    (probe : J → X) (height cost : J → ℝ) (hheight : ∀ j, 0 ≤ height j)
+    (hprobe : ∀ k : ElementarySchwartzIndex e.realDim e.torusDim e.latticeRank, ∃ C : ℝ≥0, ∃ N : ℕ, ∀ j,
+      elementarySchwartzSeminorm (F := e.finiteFactor) k (probe j).val ≤ (C : ℝ) * (1 + height j)^N)
+    (hdetect : ∀ j, cost j ≤ traceNorm (nativeSingletonBlock (F := F) (α := 0) (s := s) a h₀ hs₀
+      (x (pick j)) (f (pick j)) ((incl) (probe j)))) :
+    ∃ C : ℝ≥0, ∃ N : ℕ, ∀ j, cost j ≤ (C : ℝ) * (1 + height j)^N := by
+  let : UniformSpace X := IsTopologicalAddGroup.rightUniformSpace X
+  have : IsUniformAddGroup X := isUniformAddGroup_of_addCommGroup
+  have : ContinuousSMul ℂ X := (fixedStage_withSeminorms b e K).continuousSMul
+  have : BarrelledSpace ℂ X := fixedStage_barrelled b e K
+  let z (j : J) : sites := ⟨((pick j).val.1, (pick j).val.2.1, (pick j).val.2.2.1),
+    SpectralStripJetIndex.mem_strip_order_pos (F := F) (χ := χ) (a := a) (α := 0) (s := s) h₀ (pick j)⟩
+  let row (j : J) : Fin (rows(z j)) := ⟨(pick j).val.2.2.2, (pick j).property⟩
+  have hone (j : J) : rows(z j) ≤ 1 := by
+    have hb : (z j).val.2.1 = -(0 : ℝ) := by
+      have h := (z j).property.1
+      exact le_antisymm (by simpa using h.2) h.1
+    rw [spectralStripMultiplicity_boundary h₀ (Or.inl hb), spectralBoundaryMultiplicity]
+    exact (Nat.min_le_right _ _).trans (Nat.ceil_le.mpr (by linarith))
+  exact nativeSingletonCost_polynomial_of_blockBounds (F := F) (E := X) (J := J) (Z := sites)
+    a h₀ hs₀ _ (fixedStage_withSeminorms b e K)
+    incl (fun z : sites ↦ rows(z)) (fun z m ↦ x jet(z,m)) (fun z m ↦ f jet(z,m))
+    z row hone hbound probe height cost hheight hprobe hdetect
+
+local notation "dualEmbed" => spectralSobolevDualEmbedding F a hI hs₀
+local notation "nv(" i ")" =>
+  (spectralStripJet_memLp (F := F) χ h₀ hs₀ i).toLp
+    (spectralZeroJet (F := F) (χ (i).val.1) (i).val.2.1 (i).val.2.2.1 (i).val.2.2.2)
+
+include F χ b e K a hs in
+/-- Necessity of polynomial growth of the finite radius-six quadratic forms on any family
+of genuine retained Hecke sites at a fixed Bruhat level and fixed support. The two remaining
+probe conditions are the polynomial bounds for each elementary seminorm and uniform detection
+of the native weak Riesz norm by the single geometric block. -/
+theorem spectralWeakCardinalForm_polynomial_on_fixedStage
+    (hχ : IsSpectralBasepointChoice χ) (hs₂ : 2 < s) (hs₃ : s ≤ 3)
+    {J : Type*} (pick : J → jets) (x : jets → Q) (f : jets → StrongDual ℂ Q)
+    (hb : IsSpectralMarkushevichBasis x f) (hf : ∀ i, dualEmbed (f i) = nv(i))
+    (hbound : ∀ ψ : X, BddAbove (range fun S : Finset sites ↦ traceNorm
+      (∑ z ∈ S, spectralStripGeometryAtSite (F := F) a hs χ x f ((incl) ψ) z)))
+    (probe : J → X) (height : J → ℝ) (hheight : ∀ j, 0 ≤ height j)
+    (hprobe : ∀ k : ElementarySchwartzIndex e.realDim e.torusDim e.latticeRank, ∃ C : ℝ≥0, ∃ N : ℕ, ∀ j,
+      elementarySchwartzSeminorm (F := e.finiteFactor) k (probe j).val ≤ (C : ℝ) * (1 + height j)^N)
+    (A : ℝ≥0) (hdetect : ∀ j, ‖spectralWeakRieszReadout F a s hs (x (pick j))‖ ≤
+      (A : ℝ) * traceNorm (nativeSingletonBlock (F := F) (α := 0) (s := s) a h₀ hs₀
+        (x (pick j)) (f (pick j)) ((incl) (probe j)))) :
+    ∃ C : ℝ≥0, ∃ N : ℕ, ∀ j, spectralWeakCardinalForm χ hs₃ (pick j) ≤ (C : ℝ) * (1 + height j)^N := by
+  let measured (j : J) := traceNorm (nativeSingletonBlock (F := F) (α := 0) (s := s) a h₀ hs₀
+    (x (pick j)) (f (pick j)) ((incl) (probe j)))
+  obtain ⟨C, N, hC⟩ := spectralStripSingletonCost_polynomial_on_fixedStage (F := F)
+    a hs χ b e K hs₃ pick x f hbound probe height measured hheight hprobe (fun _ ↦ le_rfl)
+  let g := (1 - radiusSixError) * Real.sqrt (heckeJetGramScale F)⁻¹
+  have hg : 0 < g := mul_pos (by linarith [radiusSixError_lt_half])
+    (Real.sqrt_pos_of_pos (inv_pos.mpr (heckeJetGramScale_pos (F := F))))
+  refine ⟨⟨((A : ℝ) * (C : ℝ) / g)^2, sq_nonneg _⟩, N * 2, fun j ↦ ?_⟩
+  apply form_le_polynomial_of_sqrt_bound hg
+  have hlocal := (spectralWeakCardinal_radiusSix (F := F) χ hχ hs hs₂ hs₃ x f hb hf (pick j)).1
+  exact (by simpa only [g, mul_assoc] using hlocal :
+    g * Real.sqrt (spectralWeakCardinalForm χ hs₃ (pick j)) ≤
+      ‖spectralWeakRieszReadout F a s hs (x (pick j))‖).trans
+    ((hdetect j).trans (mul_le_mul_of_nonneg_left (hC j) A.coe_nonneg))
+
+end OriginalSites
+
+end Isolated
+end RiemannMasullo
