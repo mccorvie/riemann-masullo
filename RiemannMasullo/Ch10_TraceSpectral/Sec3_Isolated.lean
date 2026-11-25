@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec3
+public import RiemannMasullo.Ch10_TraceSpectral.Sec3_LineGaps
 public import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.GramMatrix
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform.Holomorphic
@@ -382,6 +383,46 @@ theorem spectralStripConvolution_finiteGram_bound
       (∀ z ∈ T, w z ∈ circle z) →
       ∑ z ∈ T, v z (w z) * ∑ m, ‖u (j z m)‖ * finiteGramCoordinate u (j z m) S ≤ B := by
   sorry
+
+/-- Paper: Theorem 10.3.2.1(1), pp. 453–455.
+At width zero and exponent two the finite Gram bound is equivalent to a single
+nonnegative series. The summand uses the actual maximum on the Mellin circle and
+the nearest actual zeros on the same character. Convergence for general compact
+Bruhat tests remains open. -/
+theorem spectralStripConvolution_finiteGram_bound_iff_trueGaps
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    (φ : BruhatCompactSupport C𝔽) :
+    let u (j : SpectralStripJetIndex χ a 0 2) :=
+      (spectralStripJet_memLp χ (le_refl (0 : ℝ)) (by norm_num : (0 : ℝ) ≤ 2) j).toLp (raw(χ, j))
+    let j (z : Z(χ, 0)) (m : Fin (N(χ, 0, 2, z))) : SpectralStripJetIndex χ a 0 2 := jet(z, m)
+    let v (z : Z(χ, 0)) (w : ℂ) := ‖∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ z.val.1) w g ∂μ𝔽‖
+    let circle (z : Z(χ, 0)) := Metric.sphere (shift(z.val.2.1, z.val.2.2)) (2 * Real.exp ((4 * 0 + 2) / 2))
+    (∃ B : ℝ, ∀ (T : Finset (Z(χ, 0))) (w : Z(χ, 0) → ℂ)
+      (S : Finset (SpectralStripJetIndex χ a 0 2)), (∀ z ∈ T, w z ∈ circle z) →
+      ∑ z ∈ T, v z (w z) * ∑ m, ‖u (j z m)‖ * finiteGramCoordinate u (j z m) S ≤ B) ↔
+      Summable (fun z : Z(χ, 0) ↦ sSup ((v z) '' circle z) *
+        Real.sqrt (spectralLineTrueGramDiagonal χ (spectralLineZeroJet χ z))) := by
+  intro u j v circle
+  let k (z : Z(χ, 0)) (S : Finset (SpectralStripJetIndex χ a 0 2)) :=
+    ‖u (spectralLineZeroJet χ z)‖ * finiteGramCoordinate u (spectralLineZeroJet χ z) S
+  have hsum (z : Z(χ, 0)) (S : Finset (SpectralStripJetIndex χ a 0 2)) :
+      (∑ m, ‖u (j z m)‖ * finiteGramCoordinate u (j z m) S) = k z S :=
+    spectralLine_sum_retainedJets_two χ z (fun i ↦ ‖u i‖ * finiteGramCoordinate u i S)
+  simp_rw [hsum]
+  apply (summable_maxima_iff_common_finite_bound v circle k _ _ (fun _ _ ↦ norm_nonneg _)
+    (fun _ _ ↦ mul_nonneg (norm_nonneg _) (finiteGramCoordinate_nonneg _ _ _)) _ _
+    (fun z ↦ spectralLine_finiteGram_isGreatest χ hχ (spectralLineZeroJet χ z))).symm
+  · intro z S U hSU
+    exact mul_le_mul_of_nonneg_left ((monotone_finiteGramCoordinate
+      (spectralStripJet_toLp_linearIndependent χ hχ a (le_refl 0) (by norm_num : (0 : ℝ) ≤ 2)) _) hSU) (norm_nonneg _)
+  · intro z
+    obtain ⟨w, hw, hmax⟩ := (isCompact_sphere (shift(z.val.2.1, z.val.2.2)) _).exists_isMaxOn
+      (NormedSpace.sphere_nonempty.mpr (by positivity : (0 : ℝ) ≤ 2 * Real.exp ((4 * 0 + 2) / 2)))
+      (stripTest_mellinNorm_continuous (χ z.val.1) φ).continuousOn
+    have hg : IsGreatest ((v z) '' circle z) (v z w) :=
+      ⟨⟨w, hw, rfl⟩, fun _ ⟨q, hq, he⟩ ↦ he ▸ hmax hq⟩
+    rw [hg.csSup_eq]
+    exact hg
 
 /-- Paper: Theorem 10.3.2.1(1), pp. 453–455, the estimate of (10.3.2.7) on p. 455 in the
 actual norms. For a Markushevich basis realizing the strip jets, some bounds for the scalar
