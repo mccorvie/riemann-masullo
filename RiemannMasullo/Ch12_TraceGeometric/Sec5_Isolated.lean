@@ -17,6 +17,7 @@ public import RiemannMasullo.ForMathlib.MeasureTheory.Integral.PolynomialWindow
 import Mathlib.MeasureTheory.Integral.Bochner.SumMeasure
 import RiemannMasullo.AppB_AnalyticNT.Sec4b
 import RiemannMasullo.ForMathlib.Analysis.Analytic.CauchyWindow
+import RiemannMasullo.AppB_AnalyticNT.Sec4b_HeckeGammaLine
 
 /-! # Isolated statements of §12.5
 
@@ -2024,6 +2025,57 @@ theorem fixedGammaConductorScalar_comparisons
   obtain ⟨hs, hc, hshort, _, _, hp, hm, hpos⟩ := gammaComparisonProfile_spec
   exact gammaConductorScalar_comparisons τ hτ gammaComparisonProfile hs hc hshort hp hm hpos
     gammaComparisonAxis gammaComparisonAxis_apply
+
+local notation "Γline(" χ ", " t ")" =>
+  Complex.re (logDeriv (heckeGammaFactor (F := F) χ) (((1/2 : ℝ) : ℂ) + (t : ℂ)*I))
+
+/-- Paper: Equation (B.4.2.4), p. 615. Reconstruction: an even smooth compact real profile evaluates the
+gamma-conductor scalar by one real critical-line integral and the conductor contribution. -/
+theorem gammaConductorScalar_eq_criticalGammaLine (χ : PontryaginDual C𝔽) (H : ℝ → ℝ)
+    (hs : ContDiff ℝ (∞) H) (hc : HasCompactSupport H) (he : ∀ x, H (-x) = H x) :
+    gammaConductorScalar χ H =
+      (1 / Real.pi) * (∫ t : ℝ, (BL(H, (t : ℂ)*I)).re * Γline(χ,t)) +
+        H 0 * heckeLogDiscriminantConductor χ := by
+  rw [gammaConductorScalar, (heckeGammaLines_eq_criticalLine χ H hs hc he).2, Complex.ofReal_re]
+
+/-- Paper: Theorem B.4.2.2, p. 616. Reconstruction: for the chosen strictly positive short test, the
+sum over every positive completed-divisor site equals its conductor contribution plus
+the absolutely convergent real integral of its fixed Schwartz axis weight. -/
+theorem hasSum_positiveSites_fixedCriticalGammaLine
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : {ψ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, ψ (τ t) = 1}) :
+    Integrable (fun t : ℝ ↦ gammaComparisonAxis t * Γline(χ.val,t)) ∧
+    HasSum (fun z : {z : ℂ // 0 < MeromorphicOn.divisor (continuedCompletedHeckeL χ.val) univ z} ↦
+      ((MeromorphicOn.divisor (continuedCompletedHeckeL χ.val) univ z.val).toNat : ℝ) *
+        (BL(gammaComparisonProfile, z.val-1/2)).re)
+      ((1 / Real.pi) * (∫ t : ℝ, gammaComparisonAxis t * Γline(χ.val,t)) +
+        gammaComparisonProfile 0 * heckeLogDiscriminantConductor χ.val) := by
+  obtain ⟨hs, hc, hshort, he, _, hp, hm, _⟩ := gammaComparisonProfile_spec
+  simp only [gammaComparisonAxis_apply]
+  refine ⟨(heckeGammaLines_eq_criticalLine χ.val gammaComparisonProfile hs hc he).1, ?_⟩
+  rw [← gammaConductorScalar_eq_criticalGammaLine χ.val gammaComparisonProfile hs hc he]
+  exact hasSum_positiveSites_gammaConductorScalar τ hτ χ gammaComparisonProfile hs hc hshort hp hm
+
+/-- Reconstruction from Theorem 12.5.1.1, pp. 519–520, and Equation (B.4.2.4), p. 615.
+The finite critical-line samples and the density integral have the same explicit
+upper bound. Each reverse comparison is equivalent to the exterior-zero sum at every
+positive width. -/
+theorem fixedCriticalGammaLine_comparisons
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F)) :
+    let S (χ : Charts(τ)) := (1 / Real.pi) * (∫ t : ℝ, gammaComparisonAxis t * Γline(χ.val,t)) +
+      gammaComparisonProfile 0 * heckeLogDiscriminantConductor χ.val
+    ((∀ χ : Charts(τ), limUnder atTop grid(χ.val, gammaComparisonAxis) ≤ S χ) ∧
+      ((∀ (χ : Charts(τ)) (δ : ℝ), 0 < δ → ∀ N : ℕ,
+        ∃ n : ℕ, N ≤ n ∧ S χ - δ ≤ grid(χ.val, gammaComparisonAxis) n) ↔ exterior(τ))) ∧
+    ((∀ χ : Charts(τ), densityMass(χ.val, gammaComparisonAxis) ≤ S χ) ∧
+      ((∀ χ : Charts(τ), S χ ≤ densityMass(χ.val, gammaComparisonAxis)) ↔ exterior(τ))) := by
+  intro S
+  obtain ⟨hs, hc, _, he, _, _, _, _⟩ := gammaComparisonProfile_spec
+  have hS (χ : Charts(τ)) : S χ = gammaConductorScalar χ.val gammaComparisonProfile := by
+    dsimp only [S]
+    simp only [gammaComparisonAxis_apply]
+    exact (gammaConductorScalar_eq_criticalGammaLine χ.val gammaComparisonProfile hs hc he).symm
+  simpa only [hS] using fixedGammaConductorScalar_comparisons τ hτ
 
 end GammaConductorComparison
 
