@@ -242,6 +242,152 @@ local notation "m𝔽" => (continuousIdeleClassNorm F : C𝔽 →ₜ* ℝ≥0ˣ)
 local notation "hs₁(" hs ")" => (lt_of_lt_of_le (by norm_num : (1 : ℝ) < 3) hs)
 local notation "hs₀(" hs ")" => (zero_lt_one.trans hs₁(hs)).le
 
+section WidthIntersection
+
+namespace StripWidth
+
+open Filter Function
+open scoped Topology NumberField.AdeleRing
+
+local notation "μ" => ideleClassTamagawaMeasure F
+local notation "logN" => logIdeleClassNorm F
+local notation "H(" α ", " s ")" => CompactIntervalSobolev μ logN (-α) α s
+local notation "Θ(" a ", " hα ", " hs ")" => globalThetaSobolev F a (neg_le_self hα) hs
+local notation "jets(" χ ", " a ", " α ", " s ")" => SpectralStripJetIndex χ a α s
+local notation "jet(" χ ", " j ")" =>
+  spectralZeroJet (χ j.1.1) j.1.2.1 j.1.2.2.1 j.1.2.2.2
+
+private theorem symm_density {α : ℝ} (ha : 0 ≤ α) (s t : ℝ) :
+    intervalSobolevDensity (-α) α s t = Real.exp (2 * α * |t|) * (1 + t ^ 2) ^ (s / 2) := by
+  unfold intervalSobolevDensity
+  congr 1
+  rcases le_total 0 t with ht | ht
+  · rw [abs_of_nonneg ht, max_eq_right]
+    exact Real.exp_le_exp.mpr (by nlinarith)
+  · rw [abs_of_nonpos ht, max_eq_left]
+    · congr 1
+      ring
+    · exact Real.exp_le_exp.mpr (by nlinarith)
+
+private theorem logN_cont : Continuous (logIdeleClassNorm F) := by
+  let m : C𝔽 →ₜ* ℝ≥0ˣ := continuousIdeleClassNorm F
+  change Continuous (fun g : C𝔽 ↦ Real.log ((m g).val : ℝ))
+  exact (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).log
+    (fun g ↦ NNReal.coe_ne_zero.mpr (m g).ne_zero)
+
+private theorem haar_ac_strip (α s : ℝ) (dual : Bool) :
+    μ ≪ intervalSobolevMeasure μ logN (-α) α s dual := by
+  have hlog : Measurable logN := (logN_cont (F := F)).measurable
+  have hd : Measurable (fun x : C𝔽 ↦ intervalSobolevDensity (-α) α s (logN x)) := by
+    unfold intervalSobolevDensity
+    fun_prop
+  have hp (x : C𝔽) : 0 < intervalSobolevDensity (-α) α s (logN x) :=
+    mul_pos (lt_max_of_lt_left (Real.exp_pos _)) (Real.rpow_pos_of_pos (by positivity) _)
+  cases dual with
+  | false =>
+    exact withDensity_absolutelyContinuous' hd.ennreal_ofReal.aemeasurable
+      (.of_forall fun x ↦ (ENNReal.ofReal_pos.mpr (hp x)).ne')
+  | true =>
+    exact withDensity_absolutelyContinuous' hd.inv.ennreal_ofReal.aemeasurable
+      (.of_forall fun x ↦ (ENNReal.ofReal_pos.mpr (inv_pos.mpr (hp x))).ne')
+
+/-- The ambient strip measure increases with the half-width at fixed Sobolev order. -/
+theorem measure_le_of_halfWidth_le {α b : ℝ} (ha : 0 ≤ α) (hab : α ≤ b) (s : ℝ) :
+    intervalSobolevMeasure μ logN (-α) α s ≤ intervalSobolevMeasure μ logN (-b) b s := by
+  apply withDensity_mono
+  refine .of_forall fun g ↦ ENNReal.ofReal_le_ofReal ?_
+  change intervalSobolevDensity (-α) α s (logN g) ≤ intervalSobolevDensity (-b) b s (logN g)
+  rw [symm_density ha, symm_density (ha.trans hab)]
+  gcongr
+
+/-- Regard a vector in a wider symmetric strip as the same Haar class in a narrower strip. -/
+def restrictWidth {α b : ℝ} (ha : 0 ≤ α) (hab : α ≤ b) (s : ℝ) (f : H(b,s)) : H(α,s) :=
+  ((Lp.memLp f).mono_measure (measure_le_of_halfWidth_le ha hab s)).toLp f
+
+private theorem restrictWidth_ae {α b : ℝ} (ha : 0 ≤ α) (hab : α ≤ b) (s : ℝ) (f : H(b,s)) :
+    (restrictWidth ha hab s f : C𝔽 → ℂ) =ᵐ[μ] (f : C𝔽 → ℂ) :=
+  (haar_ac_strip (F := F) α s false).ae_eq (MemLp.coeFn_toLp _)
+
+private theorem jetClass_ae (χ : PontryaginDual C₁ → PontryaginDual C𝔽) {a α s : ℝ}
+    (ha : 0 ≤ α) (hs : 0 ≤ s) (j : jets(χ,a,α,s)) :
+    ((spectralStripJet_memLp χ ha hs j).toLp _ : C𝔽 → ℂ) =ᵐ[μ]
+    jet(χ, j) :=
+  (haar_ac_strip (F := F) α s true).ae_eq (MemLp.coeFn_toLp _)
+
+private theorem rawKernel (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (hχ : IsSpectralBasepointChoice χ) {a α s : ℝ} (ha : 0 ≤ α) (hs : 0 ≤ s) (f : H(α,s)) :
+    f ∈ Θ(a,ha,hs) ↔ ∀ j : jets(χ,a,α,s),
+      (∫ g, f g * jet(χ, j) g ∂μ) = 0 := by
+  rw [spectralStripJet_commonKernel χ hχ ha hs f]
+  apply forall_congr'
+  intro j
+  have he := integral_congr_ae ((EventuallyEq.rfl (f := (f : C𝔽 → ℂ))).mul (jetClass_ae χ ha hs j))
+  exact ⟨fun h ↦ he.symm.trans h, fun h ↦ he.trans h⟩
+
+/-- For the varying half-width in (12.5.1.4), p. 520, a vector in the target strip belongs
+physically to every strictly narrower global theta space exactly when all the target's
+strict-interior zero moments vanish. Zero abscissae may accumulate at the target width. -/
+theorem all_narrower_iff_interior_moments (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (hχ : IsSpectralBasepointChoice χ) {a b s : ℝ} (hb : 0 < b) (hs : 0 ≤ s) (f : H(b,s)) :
+    (∀ (α : ℝ) (ha : 0 < α) (hab : α < b),
+      restrictWidth ha.le hab.le s f ∈ Θ(a,ha.le,hs)) ↔
+    ∀ j : jets(χ,a,b,s), |j.1.2.1| < b →
+      (∫ g, f g * jet(χ, j) g ∂μ) = 0 := by
+  constructor
+  · intro H j hj
+    let α := (|j.1.2.1| + b) / 2
+    have ha : 0 < α := by dsimp [α]; linarith [abs_nonneg j.1.2.1]
+    have hab : α < b := by dsimp [α]; linarith
+    have hjα : |j.1.2.1| < α := by dsimp [α]; linarith
+    let k : jets(χ,a,α,s) := ⟨j.1, by
+      rw [spectralStripMultiplicity_interior (abs_lt.mp hjα)]
+      exact j.2.trans_le (widthJump_le ..)⟩
+    have he := (rawKernel χ hχ ha.le hs _).mp (H α ha hab) k
+    exact (integral_congr_ae ((restrictWidth_ae ha.le hab.le s f).mul
+      (EventuallyEq.rfl (f := jet(χ, j))))).symm.trans he
+  · intro H α ha hab
+    apply (rawKernel χ hχ ha.le hs _).mpr
+    intro j
+    have hjα := (j.mem_strip_order_pos ha.le).1
+    have hjb : |j.1.2.1| < b := abs_lt.mpr ⟨by linarith [hjα.1], by linarith [hjα.2]⟩
+    let k : jets(χ,a,b,s) := ⟨j.1, by
+      rw [spectralStripMultiplicity_interior (abs_lt.mp hjb)]
+      exact j.2.trans_le (widthJump_le ..)⟩
+    exact (integral_congr_ae ((restrictWidth_ae ha.le hab.le s f).mul
+      (EventuallyEq.rfl (f := jet(χ, j))))).trans (H k hjb)
+
+/-- For the global theta projection in (12.5.1.4), p. 520, the pullbacks from every strictly
+narrower strip recover the target theta space exactly when every admitted jet lies in the
+strict interior. The reverse obstruction is witnessed by an individual jet interpolant. -/
+theorem closed_strip_recovered_iff_no_edge_jet (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (hχ : IsSpectralBasepointChoice χ) {a b s : ℝ} (hb : 0 < b) (hs : 0 ≤ s) :
+    (∀ f : H(b,s), (∀ (α : ℝ) (ha : 0 < α) (hab : α < b),
+      restrictWidth ha.le hab.le s f ∈ Θ(a,ha.le,hs)) → f ∈ Θ(a,hb.le,hs)) ↔
+    (∀ j : jets(χ,a,b,s), |j.1.2.1| < b) := by
+  classical
+  constructor
+  · intro h j
+    by_contra hcrit
+    obtain ⟨f, hf⟩ := spectralStripJet_singleInterpolant χ hχ hb.le hs j
+    have hr (i : jets(χ,a,b,s)) :
+        (∫ g, f g * jet(χ, i) g ∂μ) =
+          if i = j then 1 else 0 := by
+      exact (integral_congr_ae ((EventuallyEq.rfl (f := (f : C𝔽 → ℂ))).mul
+        (jetClass_ae χ hb.le hs i))).symm.trans (hf i)
+    have hinside := (all_narrower_iff_interior_moments χ hχ hb hs f).mpr
+      (fun i hi ↦ by
+        have hij : i ≠ j := fun he ↦ hcrit (he ▸ hi)
+        simpa [hij] using hr i)
+    have hzero := (rawKernel χ hχ hb.le hs f).mp (h f hinside) j
+    simp [hr] at hzero
+  · intro hall f hn
+    exact (rawKernel χ hχ hb.le hs f).mpr fun j ↦
+      (all_narrower_iff_interior_moments χ hχ hb hs f).mp hn j (hall j)
+
+end StripWidth
+
+end WidthIntersection
+
 /-- Paper: (12.5.1.4), p. 520. For a test vanishing on the norm-one classes, a projective
 Sobolev tensor represents convolution by the test after spectral projection at twist 1/2.
 Reconstruction: Definition 10.4.3.7(2), p. 473, subtracts the spectral kernel. Using this
