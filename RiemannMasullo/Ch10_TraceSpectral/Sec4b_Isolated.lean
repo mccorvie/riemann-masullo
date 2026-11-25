@@ -944,11 +944,22 @@ operator `U`, of `z ↦ ∑ₘ f_{z,m}(q(U(P^geom_a(A(φ)(S_a x_{z,m})))))`, by 
 Gap: No bound is known for the geometric output of convolution on the biorthogonal vectors,
 that is, for the part of `A(φ)(S_a x_{z,m})` outside the spectral subspace; the bound
 (10.4.2.34) on p. 464 does not give one. The statement implies that `P^geom_a ∘ A(φ) ∘ P^spec_a`
-is nuclear on the Sobolev space, which is not known either. Nothing in the Lean uses this statement, and it is not
-known how it connects with the rest of the proof in Lean; in the paper it is used on pp. 471–474. -/
+is nuclear on the Sobolev space by `spectralStripGeometricKernel_nuclear_of_blocks` below.
+The paper uses the geometric bound on pp. 471–474. -/
 theorem spectralStripGeometricKernel_blocks_bddAbove :
     BddAbove (range fun K : Finset zeros(F, χ, a, α) ↦ traceNorm (∑ z ∈ K, geometricBlock(z))) := by
   sorry
+
+omit ha hχ he horder hb in
+private theorem spectralStripGeometricKernel_cauchy_of_block_bound
+    (hblocks : BddAbove (range fun K : Finset zeros(F, χ, a, α) ↦
+      traceNorm (∑ z ∈ K, geometricBlock(z)))) :
+    Cauchy (Filter.map geometricRectangles atTop) :=
+  spectralStripGeometricKernel_cauchy_of_blocks
+    (modulatedIntervalSobolev_dual (continuousIdeleClassNorm F : IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ)
+      ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ (ideleClassTamagawaMeasure F)
+      (-α) α s hI hs₀).exists.choose.toContinuousLinearEquiv.toContinuousLinearMap
+    (Θ₀).mkQL e _ _ _ f _ (fun _ ↦ rfl) hblocks
 
 /-- Paper: Theorem 10.4.3.5(2), p. 472. At positive twist and Sobolev order above one, the
 geometric projections of the corrected ambient rectangles are Cauchy in the completed
@@ -964,12 +975,42 @@ tending to zero for these projective tails. Nothing in the Lean outside this fil
 statement, and it is not known how it connects with the rest of the proof in Lean; in the
 paper it is used on pp. 471–474. -/
 theorem spectralStripGeometricKernel_cauchy : Cauchy (Filter.map geometricRectangles atTop) :=
-  spectralStripGeometricKernel_cauchy_of_blocks
-    (modulatedIntervalSobolev_dual (continuousIdeleClassNorm F : IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ)
-      ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ (ideleClassTamagawaMeasure F)
-      (-α) α s hI hs₀).exists.choose.toContinuousLinearEquiv.toContinuousLinearMap
-    (Θ₀).mkQL e _ _ _ f _ (fun _ ↦ rfl)
+  spectralStripGeometricKernel_cauchy_of_block_bound a hα hs φ χ e x f
     (spectralStripGeometricKernel_blocks_bddAbove a hα hs φ ha χ eχ e x f hχ he horder hb)
+
+omit hχ he horder hb in
+include e in
+/-- If the geometric finite block sums are bounded in trace norm, their projective
+rectangles converge to a tensor representing the geometric output of convolution on spectral
+inputs. At width zero and Sobolev order two,
+`spectralStripGeometricKernel_blocks_bddAbove_of_lineEnergy` supplies this bound from its two
+line-energy hypotheses. -/
+theorem spectralStripGeometricKernel_nuclear_of_blocks
+    (hbasis : IsSpectralMarkushevichBasis x f)
+    (hblocks : BddAbove (range fun K : Finset zeros(F, χ, a, α) ↦
+      traceNorm (∑ z ∈ K, geometricBlock(z)))) :
+    IsNuclearOperator ((Gₐ).comp ((Aφ).comp Pₐ)) := by
+  have hc := spectralStripGeometricKernel_cauchy_of_block_bound a hα hs φ χ e x f hblocks
+  obtain ⟨K, hK⟩ := cauchy_map_iff_exists_tendsto.mp hc
+  have he : sobolevProjectiveKernelOperator (F := F) hα hs₀ K = (Gₐ).comp ((Aφ).comp Pₐ) :=
+    spectralStripKernel_operator_of_output (F := F) a hα hs ha χ e x f hbasis ((Gₐ).comp Aφ) K hK
+  exact (existsUnique_sobolevProjectiveKernel_iff_nuclear hα hs₀ _).mp
+    ⟨K, he, fun L hL ↦ sobolevProjectiveKernelOperator_injective hα hs₀ (hL.trans he.symm)⟩
+
+omit hχ he horder hb in
+include e in
+attribute [local instance] instSpectralQuotientPolynormableSec3 in
+/-- Paper: Theorem 10.4.3.5, pp. 472–473. Under the geometric finite block bound,
+convolution after spectral projection has a representing projective kernel exactly
+when its action on the quotient is nuclear. -/
+theorem spectralStripKernel_exists_iff_quotient_nuclear_of_geometric_blocks
+    (hbasis : IsSpectralMarkushevichBasis x f)
+    (hblocks : BddAbove (range fun K : Finset zeros(F, χ, a, α) ↦
+      traceNorm (∑ z ∈ K, geometricBlock(z)))) :
+    (∃ K, sobolevProjectiveKernelOperator (F := F) hα hs₀ K = (Aφ).comp Pₐ) ↔
+      IsNuclearOperator (spectralConvolution (F := F) a hI hs₀ φ) :=
+  (spectralStripKernel_exists_iff_quotient_and_geometric_nuclear a hα hs₀ φ).trans
+    (and_iff_left (spectralStripGeometricKernel_nuclear_of_blocks a hα hs φ ha χ e x f hbasis hblocks))
 
 /-- Paper: Theorem 10.4.3.5(2)–(3), p. 472. The corrected ambient net converges to a kernel
 representing convolution after projection (p. 473) exactly when its geometric rectangles are Cauchy.
