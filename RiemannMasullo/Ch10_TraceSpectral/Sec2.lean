@@ -110,14 +110,48 @@ theorem spectralSobolevQuotient_eq_zero (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (
 
 variable (F) in
 /-- Paper: (10.2.1.2), p. 439, and (10.2.2.2), p. 445. Divide the ambient
-norm-one isotype by its closed weighted theta subspace.
-
-Kept as an `abbrev` for now (#5398): as a `def` with its own instances it breaks proofs and
-statements that use it, see the issue. Do not copy this pattern: a new type synonym with
-structure is a `def` with its own instances (`AGENTS.md`). -/
-abbrev spectralSobolevIsotypeQuotient (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (hs : 0 ≤ s)
+norm-one isotype by its closed weighted theta subspace. -/
+def spectralSobolevIsotypeQuotient (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (hs : 0 ≤ s)
     (ω : PontryaginDual C₁) :=
   ↥(Wω(hI, hs, ω)) ⧸ (Θ(a, hI, hs)).comap (Wω(hI, hs, ω)).subtype
+
+section IsotypeQuotient
+
+variable (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (hs : 0 ≤ s)
+
+local notation "Nω(" ω ")" => (Θ(a, hI, hs)).comap (Wω(hI, hs, ω)).subtype
+
+/-- The isotype quotient carries the quotient norm. -/
+instance instNormedAddCommGroupSpectralSobolevIsotypeQuotient (ω : PontryaginDual C₁) :
+    NormedAddCommGroup (spectralSobolevIsotypeQuotient F a hI hs ω) :=
+  inferInstanceAs (NormedAddCommGroup (↥(Wω(hI, hs, ω)) ⧸ Nω(ω)))
+
+/-- The closed isotypic theta subspace gives the quotient its complex inner product. -/
+instance instInnerProductSpaceSpectralSobolevIsotypeQuotient (ω : PontryaginDual C₁) :
+    InnerProductSpace ℂ (spectralSobolevIsotypeQuotient F a hI hs ω) :=
+  inferInstanceAs (InnerProductSpace ℂ (↥(Wω(hI, hs, ω)) ⧸ Nω(ω)))
+
+/-- The quotient of the closed Sobolev isotype is complete. -/
+instance instCompleteSpaceSpectralSobolevIsotypeQuotient (ω : PontryaginDual C₁) :
+    CompleteSpace (spectralSobolevIsotypeQuotient F a hI hs ω) :=
+  inferInstanceAs (CompleteSpace (↥(Wω(hI, hs, ω)) ⧸ Nω(ω)))
+
+/-- The continuous linear map sending an isotypic Sobolev vector to its spectral class. -/
+def spectralSobolevIsotypeQuotient_mk (ω : PontryaginDual C₁) :
+    Wω(hI, hs, ω) →L[ℂ] spectralSobolevIsotypeQuotient F a hI hs ω :=
+  (Nω(ω)).mkQL
+
+/-- An isotypic vector has zero spectral class exactly when it belongs to the theta subspace. -/
+theorem spectralSobolevIsotypeQuotient_mk_eq_zero_iff (ω : PontryaginDual C₁) (f : Wω(hI, hs, ω)) :
+    spectralSobolevIsotypeQuotient_mk a hI hs ω f = 0 ↔ f.val ∈ Θ(a, hI, hs) :=
+  Submodule.Quotient.mk_eq_zero (Nω(ω))
+
+/-- Every spectral class has an isotypic Sobolev representative. -/
+theorem spectralSobolevIsotypeQuotient_mk_surjective (ω : PontryaginDual C₁) :
+    Surjective (spectralSobolevIsotypeQuotient_mk (F := F) a hI hs ω) :=
+  (Nω(ω)).mkQ_surjective
+
+end IsotypeQuotient
 
 /-- Testing an isotypic Pettis average against a functional gives its scalar integral. -/
 private theorem spectralSobolevIsotypeQuotient_isometry_dual {K W : Type*} [Group K]
@@ -1234,8 +1268,9 @@ theorem spectralLineIsotypeDual_pullback (a : ℝ) {s : ℝ} (hs : 0 ≤ s) (ω 
   intro hI N i D
   have hi := (existsUnique_spectralLineTestCompletion (F := F) a hs ω).exists.choose_spec
   constructor
-  · have hd : DenseRange (N.mkQL.comp i) :=
-      N.mkQ_surjective.denseRange.comp hi.2.1 N.mkQL.continuous
+  · let q := spectralSobolevIsotypeQuotient_mk (F := F) a hI hs ω
+    have hd : DenseRange (q.comp i) :=
+      (spectralSobolevIsotypeQuotient_mk_surjective a hI hs ω).denseRange.comp hi.2.1 q.continuous
     intro Λ₁ Λ₂ hΛ
     apply DFunLike.coe_injective
     exact hd.equalizer Λ₁.continuous Λ₂.continuous
@@ -1254,12 +1289,11 @@ theorem spectralLineIsotypeDual_pullback (a : ℝ) {s : ℝ} (hs : 0 ≤ s) (ω 
           modulationWeight m𝔽 a (homogeneousAdelicTheta ω f.val) :=
         Filter.Eventually.of_forall (congrFun (congrArg (modulationWeight m𝔽 a) hφ))
       exact (hi.1 φ).trans (hw.trans (hj f x rfl).2.symm)
-    have hn : i φ ∈ N := by
-      change (i φ).val ∈ Θ(a, hI, hs)
+    have hn : (i φ).val ∈ Θ(a, hI, hs) := by
       rw [he]
       exact (j x).val.property
-    change Λ (N.mkQ (i φ)) = 0
-    exact (congrArg Λ ((Submodule.Quotient.mk_eq_zero N).mpr hn)).trans (map_zero Λ)
+    exact (congrArg Λ ((spectralSobolevIsotypeQuotient_mk_eq_zero_iff a hI hs ω (i φ)).mpr hn)).trans
+      (map_zero Λ)
 
 end TestDuality
 
@@ -2007,7 +2041,7 @@ Deviation: The Fourier bands use the inverse lift for left translation. -/
 theorem spectralLineIsotype_bandProjections (χ : PontryaginDual C𝔽) (a : ℝ)
     {s : ℝ} (hs : 0 ≤ s) (ν : Measure (PontryaginDual C𝔽)) (hν : IsLCAPlancherelMeasure μ𝔽 ν) :
     let hI : (0 : ℝ) ≤ 0 := le_rfl
-    let ω := χ.comp restriction
+    let ω := PontryaginDual.map restriction χ
     let E := Wω(hI, hs, ω)
     let N := (Θ(a, hI, hs)).comap E.subtype
     let Q := spectralSobolevIsotypeQuotient F a hI hs ω
@@ -2039,17 +2073,12 @@ theorem spectralLineIsotype_bandProjections (χ : PontryaginDual C𝔽) (a : ℝ
     filter_upwards [hsupp] with ψ hψ
     intro hψband
     exact hψ (fun hψsupp ↦ hψband (hband n hψsupp))
-  let hEclosed : IsClosed (E : Set W(0, 0, s)) :=
-    instClosedSpectralIsotypeSec2 (F := F) hI hs ω
-  let : CompleteSpace E := hEclosed.completeSpace_coe
-  let hNclosed : IsClosed (N : Set E) :=
-    instClosedSpectralIsotypeThetaSec2 (F := F) a hI hs ω
-  let : CompleteSpace N := hNclosed.completeSpace_coe
   exact spectralLineIsotype_bandProjections_of_supported_approximants
     (X := C𝔽) (Y := PontryaginDual C𝔽) (E := E) (Q := Q)
     μ𝔽 ν (fun f : E ↦ (f.val : C𝔽 → ℂ))
     (J.toLinearMap.comp E.subtype) (fun f ↦ hJ f.val)
-    N.mkQL N.mkQ_surjective U.toLinearEquiv.toLinearMap
+    (spectralSobolevIsotypeQuotient_mk a hI hs ω)
+    (spectralSobolevIsotypeQuotient_mk_surjective a hI hs ω) U.toLinearEquiv.toLinearMap
     (fun n ↦ modulatedFrequencyBand m𝔽 χ⁻¹ (-(n : ℝ)) n)
     (fun n f ↦ R n f) hsupported hlim
 
@@ -8540,18 +8569,424 @@ theorem spectralStripJet_lowerBound (χ : PontryaginDual C₁ → PontryaginDual
     _ = ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖ :=
       Real.sqrt_sq (norm_nonneg _)
 
+/-- Paper: Proposition 10.2.2.2, pp. 446–447.
+One integer bounds the multiplicity of every zero of every chosen completed Hecke
+L-function: all components of the norm-one dual, all real parts and all ordinates at once.
+This is the half of `spectralStripJet_order_and_margin_locally_finite_multiple_zeros` that
+bounds the orders of the strip jets.
+Reconstruction: The paper does not state this. It is the project's formulation of the bound on
+the orders that the norm integral of Proposition 10.2.2.2, p. 447, needs, and it is not known
+whether it is what the author intends.
+Gap: The known bounds for the multiplicity of a zero grow with its height and with the
+conductor. Over `ℚ` this statement contains a height-independent bound for the multiplicities
+of the zeros of the Riemann zeta function, which is open, also on the Riemann hypothesis
+(report on #7220). The statement that all zeros lie on the critical line does not supply it. -/
+private theorem spectralStripJet_order_and_margin_multiplicity_bounded
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (_hχ : IsSpectralBasepointChoice χ) :
+    ∃ M : ℕ, ∀ (ω : PontryaginDual C₁) (σ t : ℝ), multiplicity(χ ω, shift(σ, t)) ≤ M := by
+  sorry
+
+/-- Paper: Proposition 10.2.2.2, pp. 446–447. For one chosen Hecke character, each
+multiple-zero line strictly to the right of the centre has a representative at bounded
+height. The height bound may depend on the character.
+Reconstruction: This isolates the single-character part of the strip margin.
+Gap: Discreteness on compact rectangles does not control new abscissae at increasing heights. -/
+private theorem spectralStripJet_multiple_zero_bounded_height_representatives
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (_hχ : IsSpectralBasepointChoice χ)
+    (ω : PontryaginDual C₁) :
+    ∃ T : ℝ, ∀ (σ t : ℝ), σ ∈ Ioo (1 / 2 : ℝ) 1 → 1 < multiplicity(χ ω, shift(σ, t)) →
+      ∃ u : ℝ, |u| ≤ T ∧ 1 < multiplicity(χ ω, shift(σ, u)) := by
+  sorry
+
+/-- Paper: Proposition 10.2.2.2, pp. 446–447. For each choice of basepoints the real
+interval (1/2, 1) contains only finitely many distinct multiple zeros of the family.
+Reconstruction: This tests only ordinate zero. A different choice of basepoint may move
+one prescribed ordinate to zero independently in each norm-one component.
+Gap: Compactness gives finiteness for each character on this segment. Finiteness across
+components for every choice of basepoints is open. -/
+private theorem spectralStripJet_multiple_real_zeros_finite
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (_hχ : IsSpectralBasepointChoice χ) :
+    {σ : ℝ | σ ∈ Ioo (1 / 2 : ℝ) 1 ∧ ∃ ω : PontryaginDual C₁,
+      1 < multiplicity(χ ω, (σ : ℂ))}.Finite := by
+  sorry
+
+/-- For one character, a bounded height interval contributes only finitely many multiple-zero
+abscissae in the closed right half of the critical strip. -/
+private theorem spectralStripJet_multiple_zero_lines_finite_on_compact
+    (ψ : PontryaginDual C𝔽) (T : ℝ) :
+    {σ : ℝ | σ ∈ Icc (1 / 2 : ℝ) 1 ∧ ∃ t : ℝ, |t| ≤ T ∧
+      1 < multiplicity(ψ, shift(σ, t))}.Finite := by
+  let R := (Icc (1 / 2 : ℝ) 1) ×ˢ (Icc (-T) T)
+  let A (p : ℝ × ℝ) : ℂ := shift(p.1, p.2)
+  have hA : Continuous A :=
+    (Complex.continuous_ofReal.comp continuous_fst).add
+      ((Complex.continuous_ofReal.comp continuous_snd).mul continuous_const)
+  have hK : IsCompact (A '' R) := (isCompact_Icc.prod isCompact_Icc).image hA
+  let L := continuedCompletedHeckeL ψ
+  have hL : MeromorphicOn L (A '' R) :=
+    fun z _ ↦ (continuedCompletedHeckeL_spec ψ).1.meromorphicOn z (mem_univ z)
+  apply (((MeromorphicOn.divisor L (A '' R)).finiteSupport hK).image Complex.re).subset
+  rintro σ ⟨hσ, t, ht, hm⟩
+  refine ⟨A (σ, t), ?_, by simp [A]⟩
+  change MeromorphicOn.divisor L (A '' R) (A (σ, t)) ≠ 0
+  rw [hL.divisor_apply ⟨(σ, t), ⟨hσ, abs_le.mp ht⟩, rfl⟩]
+  change 1 < (meromorphicOrderAt L (A (σ, t))).untop₀.toNat at hm
+  exact fun heq ↦ by rw [heq] at hm; simp at hm
+
+/-- If two norm-twist charts differ by translation, their zero multiplicities agree
+at the corresponding points. -/
+private theorem spectralZeroMultiplicity_eq_of_chart_shift
+    {ψ η : PontryaginDual C𝔽} {w : ℂ}
+    (h : ideleClassNormTwist ψ 0 = ideleClassNormTwist η w) (z : ℂ) :
+    multiplicity(ψ, z) = multiplicity(η, z + w) := by
+  have hchart (s : ℂ) : ideleClassNormTwist ψ s = ideleClassNormTwist η (s + w) := by
+    simpa only [zero_add, add_comm w s] using ideleClassNormTwist_add_of_eq h s
+  have horder (f : adelePolarSubspace F) :
+      meromorphicOrderAt (fun s ↦ globalThetaMellinIntegral f.val (ideleClassNormTwist ψ s)) z =
+        meromorphicOrderAt (fun s ↦ globalThetaMellinIntegral f.val (ideleClassNormTwist η s))
+          (z + w) := by
+    simp_rw [hchart]
+    exact meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt (f := fun s ↦
+      globalThetaMellinIntegral f.val (ideleClassNormTwist η s)) (c := w) (x := z)
+  have hleast := isLeast_globalThetaMellinIntegral_orders ψ z
+  simp_rw [horder] at hleast
+  have he := hleast.unique (isLeast_globalThetaMellinIntegral_orders η (z + w))
+  have hclip (o : WithTop ℤ) : (max 0 o).untop₀.toNat = o.untop₀.toNat := by
+    cases o with
+    | top => simp
+    | coe n => simp only [← WithTop.coe_zero, ← WithTop.coe_max, WithTop.untop₀_coe]; omega
+  exact (hclip _).symm.trans ((congrArg (fun o : WithTop ℤ ↦ o.untop₀.toNat) he).trans (hclip _))
+
+/-- Paper: Notation 10.2.1.1, p. 440, and Proposition 10.2.2.2, pp. 446–447.
+Relative to a prescribed section, each unitary lift has a unique real ordinate shift.
+The shift identifies the quasi-characters and the zero multiplicities at every height
+and real part, so differences of ordinates within this component are preserved. -/
+theorem IsSpectralBasepointChoice.existsUnique_ordinate_shift
+    {χ : PontryaginDual C₁ → PontryaginDual C𝔽} (hχ : IsSpectralBasepointChoice χ)
+    (ψ : PontryaginDual C𝔽) :
+    ∃! d : ℝ, ∀ σ t : ℝ,
+      ideleClassNormTwist ψ (shift(σ, t)) =
+        ideleClassNormTwist (χ (ψ.comp restriction)) (shift(σ, t + d)) ∧
+      multiplicity(ψ, shift(σ, t)) = multiplicity(χ (ψ.comp restriction), shift(σ, t + d)) := by
+  let ω := ψ.comp restriction
+  have hres (g : C₁) : ideleClassNormTwist ψ 0 g.val = (ω g : ℂ) := by
+    change (ψ g.val : ℂ) * _ ^ (0 : ℂ) = ψ g.val
+    simp
+  obtain ⟨w, hw, huniq⟩ := hχ.existsUnique_normTwist ω (ideleClassNormTwist ψ 0) hres
+  have hre : w.re = 0 := by
+    have he := congrArg (quasiCharacterAbscissa (ideleClassNorm F)
+      (isProperMap_ideleClassNorm F) ideleClassNorm_ne_one) hw
+    simpa only [quasiCharacterAbscissa_ideleClassNormTwist, Complex.zero_re] using he.symm
+  have hwI : (w.im : ℂ) * Complex.I = w := by simpa [hre] using Complex.re_add_im w
+  have hshift (σ t : ℝ) : shift(σ, t + w.im) = shift(σ, t) + w := by
+    calc
+      _ = shift(σ, t) + (w.im : ℂ) * Complex.I := by ring
+      _ = _ := by rw [hwI]
+  refine ⟨w.im, fun σ t ↦ ?_, fun d hd ↦ ?_⟩
+  · rw [hshift]
+    refine ⟨?_, spectralZeroMultiplicity_eq_of_chart_shift hw _⟩
+    simpa only [zero_add, add_comm w] using ideleClassNormTwist_add_of_eq hw (shift(σ, t))
+  · have he : ideleClassNormTwist ψ 0 = ideleClassNormTwist (χ ω) ((d : ℂ) * Complex.I) := by
+      simpa using (hd 0 0).1
+    have hu := congrArg Complex.im (huniq _ he)
+    simpa using hu
+
+/-- Paper: Notation 10.2.1.1, p. 440, and Proposition 10.2.2.2, pp. 446–447.
+Two unitary lifts with the same norm-one restriction have the same zero multiplicities
+after one unique vertical translation of their norm charts. -/
+theorem spectralZeroMultiplicity_existsUnique_shift_of_restriction_eq
+    (ψ η : PontryaginDual C𝔽) (hres : ψ.comp restriction = η.comp restriction) :
+    ∃! d : ℝ, ∀ σ t : ℝ,
+      ideleClassNormTwist ψ (shift(σ, t)) = ideleClassNormTwist η (shift(σ, t + d)) ∧
+      multiplicity(ψ, shift(σ, t)) = multiplicity(η, shift(σ, t + d)) := by
+  classical
+  obtain ⟨χ₀, hχ₀⟩ := exists_spectralBasepointChoice F
+  let χ := Function.update χ₀ (ψ.comp restriction) η
+  have hη : χ (ψ.comp restriction) = η := Function.update_self ..
+  have hχ : IsSpectralBasepointChoice χ := by
+    intro ω
+    by_cases hω : ω = ψ.comp restriction
+    · subst ω
+      rw [hη]
+      exact hres.symm
+    · rw [show χ ω = χ₀ ω from Function.update_of_ne hω ..]
+      exact hχ₀ ω
+  simpa only [hη] using hχ.existsUnique_ordinate_shift ψ
+
+/-- Translating a unitary norm chart to ordinate zero preserves its norm-one component and
+all completed Hecke zero multiplicities. -/
+private theorem spectralStripJet_recenter (ψ : PontryaginDual C𝔽) (t : ℝ) :
+    ∃ θ : PontryaginDual C𝔽, θ.comp restriction = ψ.comp restriction ∧ ∀ σ : ℝ,
+      multiplicity(θ, (σ : ℂ)) = multiplicity(ψ, shift(σ, t)) := by
+  let a := (t : ℂ) * Complex.I
+  let c := ideleClassNormTwist ψ a
+  have hn (g : C𝔽) : ‖c g‖ = 1 := by
+    change ‖(ψ g : ℂ) * ((((ideleClassNorm F g).val : ℝ) : ℂ) ^ a)‖ = 1
+    rw [norm_mul, Circle.norm_coe, Complex.norm_cpow_eq_rpow_re_of_pos
+      (NNReal.coe_pos.mpr (Units.zero_lt _))]
+    simp [a]
+  let θ : PontryaginDual C𝔽 :=
+    { toFun := fun g ↦ ⟨c g, mem_sphere_zero_iff_norm.mpr (hn g)⟩
+      map_one' := Subtype.ext (map_one c)
+      map_mul' := fun x y ↦ Subtype.ext (map_mul c x y)
+      continuous_toFun := c.continuous.subtype_mk _ }
+  have hθ : ideleClassNormTwist θ 0 = ideleClassNormTwist ψ a := by
+    ext1 g
+    change c g * _ ^ (0 : ℂ) = c g
+    simp
+  refine ⟨θ, ?_, fun σ ↦ spectralZeroMultiplicity_eq_of_chart_shift hθ (σ : ℂ)⟩
+  ext g : 1
+  apply Subtype.ext
+  change (ψ g.val : ℂ) * ((((ideleClassNorm F g.val).val : ℝ) : ℂ) ^ a) = ψ g.val
+  rw [show ideleClassNorm F g.val = 1 from g.property]
+  simp
+
+/-- Paper: Proposition 10.2.2.2, pp. 446–447. Finiteness of the multiple real zeros
+for every choice of basepoints is equivalent to a finite cover of all the multiple zeros
+in the open right half of the critical strip. There are finitely many exceptional
+norm-one characters and finitely many real parts. At any height, a multiple zero of
+any unitary Hecke character either belongs to an exceptional component or has one of
+these real parts. The same two finite sets work for every choice of basepoints.
+Reconstruction: This characterizes the real-segment part of the strip margin. -/
+theorem spectralStripJet_multiple_real_zeros_finite_iff_finite_cover :
+    (∀ (χ : PontryaginDual C₁ → PontryaginDual C𝔽), IsSpectralBasepointChoice χ →
+      {σ : ℝ | σ ∈ Ioo (1 / 2 : ℝ) 1 ∧ ∃ ω : PontryaginDual C₁,
+        1 < multiplicity(χ ω, (σ : ℂ))}.Finite) ↔
+    ∃ (E : Finset (PontryaginDual C₁)) (S : Finset ℝ), ∀ (ψ : PontryaginDual C𝔽) (σ t : ℝ),
+      σ ∈ Ioo (1 / 2 : ℝ) 1 → 1 < multiplicity(ψ, shift(σ, t)) →
+        ψ.comp restriction ∈ E ∨ σ ∈ S := by
+  classical
+  constructor
+  · intro hreal
+    by_contra! hcover
+    -- Greedily take zeros in fresh components and at fresh real parts, moving each to height zero.
+    let component (p : PontryaginDual C𝔽 × ℝ) := p.1.comp restriction
+    let P (p : PontryaginDual C𝔽 × ℝ) :=
+      p.2 ∈ Ioo (1 / 2 : ℝ) 1 ∧ 1 < multiplicity(p.1, (p.2 : ℂ))
+    let r (p q : PontryaginDual C𝔽 × ℝ) := component p ≠ component q ∧ p.2 ≠ q.2
+    have : Std.Symm r := ⟨fun _ _ h ↦ ⟨h.1.symm, h.2.symm⟩⟩
+    obtain ⟨p, hp, hpair⟩ := exists_seq_of_forall_finset_exists' P r (fun K _ ↦ by
+      obtain ⟨ψ, σ, t, hσ, hm, hψ, hs⟩ := hcover (K.image component) (K.image Prod.snd)
+      obtain ⟨θ, hθ, hmove⟩ := spectralStripJet_recenter ψ t
+      have hmθ : 1 < multiplicity(θ, (σ : ℂ)) := by rwa [hmove]
+      refine ⟨(θ, σ), ⟨hσ, hmθ⟩, fun q hq ↦ ⟨?_, ?_⟩⟩
+      · exact fun he ↦ hψ (Finset.mem_image.mpr ⟨q, hq, he.trans hθ⟩)
+      · exact fun he ↦ hs (Finset.mem_image.mpr ⟨q, hq, he⟩))
+    have hcomp : Injective (fun n ↦ component (p n)) :=
+      injective_iff_pairwise_ne.mpr fun _ _ h ↦ (hpair h).1
+    have hparts : Injective (fun n ↦ (p n).2) :=
+      injective_iff_pairwise_ne.mpr fun _ _ h ↦ (hpair h).2
+    -- The components are distinct, so the selected characters extend to one choice of basepoints.
+    obtain ⟨χ₀, hχ₀⟩ := exists_spectralBasepointChoice F
+    let χ := extend (fun n ↦ component (p n)) (fun n ↦ (p n).1) χ₀
+    have hmatch (n : ℕ) : χ (component (p n)) = (p n).1 := hcomp.extend_apply _ _ n
+    have hχ : IsSpectralBasepointChoice χ := by
+      intro ω
+      by_cases h : ∃ n, component (p n) = ω
+      · obtain ⟨n, rfl⟩ := h
+        rw [hmatch]
+      · exact (congrArg (fun ψ : PontryaginDual C𝔽 ↦ ψ.comp restriction)
+          (extend_apply' _ χ₀ ω h)).trans (hχ₀ ω)
+    apply infinite_range_of_injective hparts
+    apply (hreal χ hχ).subset
+    rintro _ ⟨n, rfl⟩
+    refine ⟨(hp n).1, component (p n), ?_⟩
+    rw [hmatch]
+    exact (hp n).2
+  · rintro ⟨E, S, hcover⟩ χ hχ
+    let Z (ω : PontryaginDual C₁) :=
+      {σ : ℝ | σ ∈ Ioo (1 / 2 : ℝ) 1 ∧ 1 < multiplicity(χ ω, (σ : ℂ))}
+    have hZ (ω : PontryaginDual C₁) : (Z ω).Finite := by
+      apply (spectralStripJet_multiple_zero_lines_finite_on_compact (χ ω) 0).subset
+      rintro σ ⟨hσ, hm⟩
+      exact ⟨⟨hσ.1.le, hσ.2.le⟩, 0, by simp, by simpa using hm⟩
+    apply (S.finite_toSet.union (E.finite_toSet.biUnion fun ω _ ↦ hZ ω)).subset
+    rintro σ ⟨hσ, ω, hm⟩
+    rcases hcover (χ ω) σ 0 hσ (by simpa using hm) with hω | hs
+    · rw [hχ ω] at hω
+      exact Or.inr (mem_iUnion₂.mpr ⟨ω, hω, hσ, hm⟩)
+    · exact Or.inl hs
+
+/-- Reflect a multiple zero into the opposite half of the strip by the completed functional
+equation. Reflection negates the ordinate and replaces the character by its inverse. -/
+private theorem spectralStripJet_multiple_zero_reflect (ψ : PontryaginDual C𝔽) (σ t : ℝ) :
+    multiplicity(ψ, shift(σ, t)) = multiplicity(ψ⁻¹, shift(1 - σ, (-t : ℝ))) := by
+  obtain ⟨ε, hε, hne, he⟩ := completedHeckeL_continuation_functionalEquation ψ _ _
+    (continuedCompletedHeckeL_spec ψ).1 (continuedCompletedHeckeL_spec ψ).2
+    (continuedCompletedHeckeL_spec ψ⁻¹).1 (continuedCompletedHeckeL_spec ψ⁻¹).2
+  let r (z : ℂ) := 1 - z
+  have heq : continuedCompletedHeckeL ψ⁻¹ ∘ r = ε * continuedCompletedHeckeL ψ := funext he
+  have hr : HasDerivAt r (-1) (shift(σ, t)) := (hasDerivAt_id _).const_sub 1
+  have ho := meromorphicOrderAt_comp_of_deriv_ne_zero (f := continuedCompletedHeckeL ψ⁻¹)
+    (show AnalyticAt ℂ r (shift(σ, t)) by dsimp [r]; fun_prop) (hr.deriv.trans_ne (by norm_num))
+  rw [heq, meromorphicOrderAt_mul_of_ne_zero (hε.analyticAt _) (hne _)] at ho
+  have hz : r (shift(σ, t)) = shift(1 - σ, (-t : ℝ)) := by
+    dsimp [r]
+    push_cast
+    ring
+  rw [hz] at ho
+  rw [ho]
+
+/-- A multiple zero with real part greater than one half lies in the open critical strip. -/
+private theorem spectralStripJet_multiple_zero_re_lt_one (ψ : PontryaginDual C𝔽)
+    {σ t : ℝ} (hσ : 1 / 2 < σ) (h : 1 < multiplicity(ψ, shift(σ, t))) : σ < 1 := by
+  have hp : 0 < vanishingOrder(ψ, shift(σ, t)) := by
+    generalize vanishingOrder(ψ, shift(σ, t)) = o at *
+    cases o with
+    | top => simp at h
+    | coe k =>
+      rw [WithTop.untop₀_coe] at h
+      exact_mod_cast (by omega : 0 < k)
+  simpa using completedHeckeL_continuation_zeros ψ _ (continuedCompletedHeckeL_spec ψ).1
+    (continuedCompletedHeckeL_spec ψ).2 (by simpa using (show 0 < σ by linarith)) hp
+
+/-- Choose a witness component for each abscissa, then one abscissa representing each
+component so chosen. A single choice of ordinates sees all the representatives. -/
+private theorem spectralStripJet_multiple_zero_finite_of_slices
+    (R : PontryaginDual C₁ → ℝ → ℝ → Prop)
+    (hfixed : ∀ ω, {σ | ∃ t, R ω σ t}.Finite)
+    (hslice : ∀ τ : PontryaginDual C₁ → ℝ, {σ | ∃ ω, R ω σ (τ ω)}.Finite) :
+    {σ | ∃ ω t, R ω σ t}.Finite := by
+  classical
+  let S := {σ | ∃ ω t, R ω σ t}
+  choose component ordinate hw using fun σ : S ↦ σ.property
+  choose rep hrep using fun ω : range component ↦ ω.property
+  let τ (ω : PontryaginDual C₁) := if h : ω ∈ range component then ordinate (rep ⟨ω, h⟩) else 0
+  have hselected : (range (fun ω ↦ (rep ω : ℝ))).Finite := (hslice τ).subset <| by
+    rintro _ ⟨ω, rfl⟩
+    exact ⟨ω, by simpa only [τ, dite_eq_left ω.property, hrep] using hw (rep ω)⟩
+  have hinj : Injective (fun ω ↦ (rep ω : ℝ)) := fun i j h ↦
+    Subtype.ext <| (hrep i).symm.trans ((congrArg component (Subtype.ext h)).trans (hrep j))
+  have hfin : (range component).Finite := finite_coe_iff.mp ((finite_range_iff hinj).mp hselected)
+  apply (hfin.biUnion fun ω _ ↦ hfixed ω).subset
+  intro σ hσ
+  let p : S := ⟨σ, hσ⟩
+  exact mem_iUnion₂.mpr ⟨component p, mem_range_self p, ordinate p, hw p⟩
+
+/-- The finite-line assertion for every section is equivalent to two tests in the open
+right half of the strip. One tests each component separately over unbounded heights.
+The other uses a single real segment for all components, allowing every choice of section. -/
+private theorem spectralStripJet_multiple_zero_lines_iff :
+    (∀ (χ : PontryaginDual C₁ → PontryaginDual C𝔽), IsSpectralBasepointChoice χ →
+      {σ : ℝ | ∃ (ω : PontryaginDual C₁) (t : ℝ), 1 < multiplicity(χ ω, shift(σ, t))}.Finite) ↔
+    (∀ (χ : PontryaginDual C₁ → PontryaginDual C𝔽), IsSpectralBasepointChoice χ →
+      ∀ ω : PontryaginDual C₁, ∃ T : ℝ, ∀ (σ t : ℝ), σ ∈ Ioo (1 / 2 : ℝ) 1 →
+      1 < multiplicity(χ ω, shift(σ, t)) → ∃ u : ℝ, |u| ≤ T ∧
+        1 < multiplicity(χ ω, shift(σ, u))) ∧
+    (∀ (χ : PontryaginDual C₁ → PontryaginDual C𝔽), IsSpectralBasepointChoice χ →
+      {σ : ℝ | σ ∈ Ioo (1 / 2 : ℝ) 1 ∧ ∃ ω : PontryaginDual C₁,
+        1 < multiplicity(χ ω, (σ : ℂ))}.Finite) := by
+  constructor
+  · intro h
+    constructor
+    · intro χ hχ ω
+      let S := {σ : ℝ | σ ∈ Ioo (1 / 2 : ℝ) 1 ∧ ∃ t : ℝ, 1 < multiplicity(χ ω, shift(σ, t))}
+      have hS : S.Finite := (h χ hχ).subset fun σ hσ ↦ by
+        obtain ⟨t, ht⟩ := hσ.2
+        exact ⟨ω, t, ht⟩
+      choose u hu using fun σ : S ↦ σ.property.2
+      let := hS.fintype
+      obtain ⟨T, hT⟩ := (finite_range (fun σ : S ↦ |u σ|)).bddAbove
+      refine ⟨T, fun σ t hs hm ↦ ?_⟩
+      let p : S := ⟨σ, hs, t, hm⟩
+      exact ⟨u p, hT (mem_range_self p), hu p⟩
+    · intro χ hχ
+      apply (h χ hχ).subset
+      rintro σ ⟨_, ω, hm⟩
+      exact ⟨ω, 0, by simpa using hm⟩
+  · rintro ⟨hfixed, hreal⟩ χ hχ
+    let right (η : PontryaginDual C₁ → PontryaginDual C𝔽) :=
+      {σ : ℝ | σ ∈ Ioo (1 / 2 : ℝ) 1 ∧ ∃ (ω : PontryaginDual C₁) (t : ℝ),
+        1 < multiplicity(η ω, shift(σ, t))}
+    have hright (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ) :
+        (right χ).Finite := by
+      let R (ω : PontryaginDual C₁) (σ t : ℝ) :=
+        σ ∈ Ioo (1 / 2 : ℝ) 1 ∧ 1 < multiplicity(χ ω, shift(σ, t))
+      have hsingle (ω : PontryaginDual C₁) : {σ | ∃ t, R ω σ t}.Finite := by
+        obtain ⟨T, hT⟩ := hfixed χ hχ ω
+        apply (spectralStripJet_multiple_zero_lines_finite_on_compact (χ ω) T).subset
+        rintro σ ⟨t, hs, hm⟩
+        exact ⟨⟨hs.1.le, hs.2.le⟩, hT σ t hs hm⟩
+      have hslice (τ : PontryaginDual C₁ → ℝ) : {σ | ∃ ω, R ω σ (τ ω)}.Finite := by
+        choose η hres hmove using fun ω ↦ spectralStripJet_recenter (χ ω) (τ ω)
+        have hη : IsSpectralBasepointChoice η := fun ω ↦ (hres ω).trans (hχ ω)
+        apply (hreal η hη).subset
+        rintro σ ⟨ω, hs, hm⟩
+        refine ⟨hs, ω, ?_⟩
+        rw [hmove ω σ]
+        exact hm
+      apply (spectralStripJet_multiple_zero_finite_of_slices R hsingle hslice).subset
+      rintro σ ⟨hs, ω, t, hm⟩
+      exact ⟨ω, t, hs, hm⟩
+    let dual (ω : PontryaginDual C₁) := (χ ω⁻¹)⁻¹
+    have hdual : IsSpectralBasepointChoice dual := by
+      intro ω
+      ext g : 1
+      have hg := DFunLike.congr_fun (hχ (ω⁻¹)) g
+      change ((χ ω⁻¹) g.val)⁻¹ = ω g
+      change (χ ω⁻¹) g.val = (ω g)⁻¹ at hg
+      simp [hg]
+    have hr : (right χ).Finite := hright χ hχ
+    have hd : (right dual).Finite := hright dual hdual
+    apply ((hr.union (hd.image (fun σ : ℝ ↦ 1 - σ))).insert (1 / 2)).subset
+    rintro σ ⟨ω, t, h⟩
+    rcases lt_trichotomy σ (1 / 2) with hl | hc | hr
+    · apply Or.inr
+      apply Or.inr
+      have hz : 1 < multiplicity((χ ω)⁻¹, shift(1 - σ, (-t : ℝ))) := by
+        rwa [← spectralStripJet_multiple_zero_reflect]
+      have half : 1 / 2 < 1 - σ := by linarith
+      refine ⟨1 - σ, ⟨⟨half, spectralStripJet_multiple_zero_re_lt_one (χ ω)⁻¹ (t := -t) half hz⟩, ω⁻¹, -t, ?_⟩,
+        by ring⟩
+      simpa [dual] using hz
+    · exact Or.inl hc
+    · exact Or.inr (Or.inl ⟨⟨hr, spectralStripJet_multiple_zero_re_lt_one (χ ω) (t := t) hr h⟩, ω, t, h⟩)
+
+/-- Paper: Proposition 10.2.2.2, pp. 446–447.
+The multiple zeros of the chosen completed Hecke L-functions lie on finitely many vertical
+lines, over all components of the norm-one dual and all ordinates.
+This is the half of `spectralStripJet_order_and_margin_locally_finite_multiple_zeros` that
+keeps the jets of high order away from the edges of a strip.
+Reconstruction: The paper does not state this. It is the project's formulation of the margin
+that the norm integral of Proposition 10.2.2.2, p. 447, needs, and it is not known whether it
+is what the author intends.
+It is reduced below to bounded-height representatives for each character and finiteness on
+the real segment for every choice of basepoints. Both inputs remain open.
+The statement follows from the paper's main claim, that all zeros in
+the critical strip have real part `1/2`, but Proposition 10.2.2.2 stands on the way to that
+claim. For the splitting field of `X³ - 2` it already gives a zero-free strip to the left of
+the line of real part `1` for an Artin L-function (report on #7220). -/
+private theorem spectralStripJet_order_and_margin_multiple_zero_lines_finite
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (_hχ : IsSpectralBasepointChoice χ) :
+    {σ : ℝ | ∃ (ω : PontryaginDual C₁) (t : ℝ),
+      1 < multiplicity(χ ω, shift(σ, t))}.Finite := by
+  exact (spectralStripJet_multiple_zero_lines_iff (F := F)).2
+    ⟨spectralStripJet_multiple_zero_bounded_height_representatives,
+      spectralStripJet_multiple_real_zeros_finite⟩ χ _hχ
+
 /-- Near any real number there are only finitely many distinct pairs of real part and
 multiplicity among multiple completed Hecke zeros, over all ordinates and chosen characters.
 The norm integral on p. 447 gives no such restriction. It would suffice to bound the
 multiplicities on the line with that real part and exclude multiple zeros on all other
 sufficiently nearby vertical lines.
-Gap: Neither a bound for the multiplicities of the zeros on a vertical line nor the absence
-of multiple zeros on the nearby lines is known, and Remark 10.2.1.5 and Proposition 10.2.2.2
-supply no argument for either. -/
+Reconstruction: The paper does not state this. It is the project's formulation of what the
+estimates of Remark 10.2.1.5 and Proposition 10.2.2.2 need, and it is not known whether it is
+what the author intends.
+Proved here (#7425) from two open statements, which are its two halves in their global form:
+`spectralStripJet_order_and_margin_multiplicity_bounded` and
+`spectralStripJet_order_and_margin_multiple_zero_lines_finite`. Neither a bound for the
+multiplicities of the zeros on a vertical line nor the absence of multiple zeros on the nearby
+lines is known, and Remark 10.2.1.5 and Proposition 10.2.2.2 supply no argument for either. -/
 private theorem spectralStripJet_order_and_margin_locally_finite_multiple_zeros
     (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (_hχ : IsSpectralBasepointChoice χ) (x : ℝ) :
     ∃ U ∈ 𝓝 x, {p : ℝ × ℕ | p.1 ∈ U ∧ 1 < p.2 ∧ ∃ (ω : PontryaginDual C₁) (t : ℝ),
-      multiplicity(χ ω, shift(p.1, t)) = p.2}.Finite := by sorry
+      multiplicity(χ ω, shift(p.1, t)) = p.2}.Finite := by
+  obtain ⟨M, hM⟩ := spectralStripJet_order_and_margin_multiplicity_bounded χ _hχ
+  refine ⟨univ, univ_mem, ?_⟩
+  refine ((spectralStripJet_order_and_margin_multiple_zero_lines_finite χ _hχ).prod
+    (finite_Iic M)).subset ?_
+  rintro ⟨σ, n⟩ ⟨-, hn, ω, t, h⟩
+  exact ⟨⟨ω, t, h.symm ▸ hn⟩, h ▸ hM ω σ t⟩
 
 /-- Paper: Proposition 10.2.2.2, pp. 446–447. A uniform strip estimate requires a
 bound on admitted jet orders and a boundary margin for the nonintegrable powers.
@@ -8782,5 +9217,371 @@ theorem spectralStripMarkushevichBasis_normalized
     simpa only [hD j] using hupper j
   · intro j
     simpa only [hD j] using hlower j
+
+/-- The norm integral of a strip jet does not change when the real offset changes sign. -/
+private theorem spectralStripJet_order_and_margin_of_upperBound_neg (α s b : ℝ) (k : ℕ) :
+    ∫ x : ℝ, Real.exp (2 * (-b) * x - 2 * α * |x|) * x ^ (2 * k) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume =
+      ∫ x : ℝ, Real.exp (2 * b * x - 2 * α * |x|) * x ^ (2 * k) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume := by
+  rw [← integral_neg_eq_self (fun x : ℝ ↦ Real.exp (2 * b * x - 2 * α * |x|) * x ^ (2 * k) *
+    ((1 + x ^ 2) ^ (s / 2))⁻¹) volume]
+  refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+  dsimp only
+  rw [abs_neg, neg_sq, (even_two_mul k).neg_pow, show 2 * b * -x = 2 * (-b) * x by ring]
+
+/-- For a jet whose order is at least the boundary threshold, the norm integral is at least a
+fixed multiple of the logarithm of the inverse distance of its real offset from the edge. -/
+private theorem spectralStripJet_order_and_margin_of_upperBound_log {α s b : ℝ} {k : ℕ}
+    (hs : 0 ≤ s) (hbα : b < α) (hε : α - b < 1) (hk : s ≤ 2 * (k : ℝ) + 1)
+    (hint : Integrable (fun x : ℝ ↦ Real.exp (2 * b * x - 2 * α * |x|) * x ^ (2 * k) *
+      ((1 + x ^ 2) ^ (s / 2))⁻¹) volume) :
+    Real.exp (-2) * ((2 : ℝ) ^ (s / 2))⁻¹ * Real.log (α - b)⁻¹ ≤
+      ∫ x : ℝ, Real.exp (2 * b * x - 2 * α * |x|) * x ^ (2 * k) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume := by
+  have hε0 : 0 < α - b := sub_pos.mpr hbα
+  have hone : 1 ≤ (α - b)⁻¹ := (one_le_inv₀ hε0).mpr hε.le
+  have h2pos : 0 < (2 : ℝ) ^ (s / 2) := Real.rpow_pos_of_pos (by norm_num) _
+  have hg_int : Integrable ((Ioc 1 (α - b)⁻¹).indicator fun x : ℝ ↦
+      Real.exp (-2) * ((2 : ℝ) ^ (s / 2))⁻¹ * x⁻¹) volume := by
+    refine ((ContinuousOn.integrableOn_Icc ?_).mono_set
+      Ioc_subset_Icc_self).integrable_indicator measurableSet_Ioc
+    exact continuousOn_const.mul
+      (continuousOn_inv₀.mono fun x hx ↦ (zero_lt_one.trans_le hx.1).ne')
+  have hle : ∀ x : ℝ, (Ioc 1 (α - b)⁻¹).indicator (fun x : ℝ ↦
+      Real.exp (-2) * ((2 : ℝ) ^ (s / 2))⁻¹ * x⁻¹) x ≤
+      Real.exp (2 * b * x - 2 * α * |x|) * x ^ (2 * k) * ((1 + x ^ 2) ^ (s / 2))⁻¹ := by
+    intro x
+    by_cases hx : x ∈ Ioc 1 (α - b)⁻¹
+    · rw [indicator_of_mem hx]
+      have hx1 : 1 ≤ x := hx.1.le
+      have hx0 : 0 < x := zero_lt_one.trans hx.1
+      have hεx : (α - b) * x ≤ 1 := by
+        have h := mul_le_mul_of_nonneg_left hx.2 hε0.le
+        rwa [mul_inv_cancel₀ hε0.ne'] at h
+      have hexp : Real.exp (-2) ≤ Real.exp (2 * b * x - 2 * α * |x|) := by
+        rw [abs_of_pos hx0]
+        apply Real.exp_le_exp.mpr
+        nlinarith
+      have hD : (1 + x ^ 2) ^ (s / 2) ≤ 2 ^ (s / 2) * x ^ s := by
+        calc (1 + x ^ 2) ^ (s / 2) ≤ (2 * x ^ 2) ^ (s / 2) :=
+              Real.rpow_le_rpow (by positivity) (by nlinarith) (by linarith)
+          _ = 2 ^ (s / 2) * x ^ s := by
+              rw [Real.mul_rpow (by norm_num) (by positivity), ← Real.rpow_natCast x 2,
+                ← Real.rpow_mul hx0.le]
+              congr 2
+              push_cast
+              ring
+      have hpow : x ^ s ≤ x ^ (2 * k) * x := by
+        calc x ^ s ≤ x ^ ((2 * k + 1 : ℕ) : ℝ) :=
+              Real.rpow_le_rpow_of_exponent_le hx1 (by push_cast; linarith)
+          _ = x ^ (2 * k) * x := by rw [Real.rpow_natCast, pow_succ]
+      have hDpos : 0 < (1 + x ^ 2) ^ (s / 2) := Real.rpow_pos_of_pos (by positivity) _
+      have hfrac : ((2 : ℝ) ^ (s / 2))⁻¹ * x⁻¹ ≤ x ^ (2 * k) * ((1 + x ^ 2) ^ (s / 2))⁻¹ := by
+        rw [← mul_inv, ← div_eq_mul_inv, inv_eq_one_div,
+          div_le_div_iff₀ (mul_pos h2pos hx0) hDpos]
+        calc 1 * (1 + x ^ 2) ^ (s / 2) ≤ 2 ^ (s / 2) * x ^ s := by rw [one_mul]; exact hD
+          _ ≤ 2 ^ (s / 2) * (x ^ (2 * k) * x) := mul_le_mul_of_nonneg_left hpow h2pos.le
+          _ = x ^ (2 * k) * (2 ^ (s / 2) * x) := by ring
+      calc Real.exp (-2) * ((2 : ℝ) ^ (s / 2))⁻¹ * x⁻¹
+          = Real.exp (-2) * (((2 : ℝ) ^ (s / 2))⁻¹ * x⁻¹) := by ring
+        _ ≤ Real.exp (2 * b * x - 2 * α * |x|) *
+            (x ^ (2 * k) * ((1 + x ^ 2) ^ (s / 2))⁻¹) :=
+            mul_le_mul hexp hfrac (by positivity) (Real.exp_pos _).le
+        _ = _ := by ring
+    · rw [indicator_of_notMem hx]
+      exact mul_nonneg (mul_nonneg (Real.exp_pos _).le (Even.pow_nonneg (even_two_mul _) x))
+        (inv_nonneg.mpr (Real.rpow_pos_of_pos (by positivity) _).le)
+  have h1 := integral_mono hg_int hint hle
+  have h2 : ∫ x : ℝ, (Ioc 1 (α - b)⁻¹).indicator (fun x : ℝ ↦
+      Real.exp (-2) * ((2 : ℝ) ^ (s / 2))⁻¹ * x⁻¹) x ∂volume =
+      Real.exp (-2) * ((2 : ℝ) ^ (s / 2))⁻¹ * Real.log (α - b)⁻¹ := by
+    rw [integral_indicator measurableSet_Ioc, ← intervalIntegral.integral_of_le hone,
+      intervalIntegral.integral_const_mul, integral_inv_of_pos one_pos
+        (zero_lt_one.trans_le hone), div_one]
+  linarith
+
+/-- Paper: Proposition 10.2.2.2 and (10.2.2.8), pp. 446–447. The converse of
+`spectralStripJet_upperBound_of_margin`: on one strip, a common upper bound for the norms of
+the strip jets bounds their orders, and keeps the jets of order at least `(s - 1) / 2` at a
+fixed distance from the two edges. So on every strip the upper bound of Proposition 10.2.2.2
+is equivalent to the conclusion of `spectralStripJet_order_and_margin`.
+Deviation: The paper does not state this. The squared norm of a jet of order `m` is at least
+a constant times `4 ^ m`, and for `m ≥ (s - 1) / 2` at least a constant times the logarithm of
+the inverse distance of its real offset from the edge. -/
+theorem spectralStripJet_order_and_margin_of_upperBound
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) {a α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s) (C : ℝ)
+    (_h : ∀ j : SpectralStripJetIndex χ a α s,
+      ‖(spectralStripJet_memLp χ hα (lineHs(hs)) j).toLp (stripJet(χ, j))‖ ≤ C) :
+    ∃ (K : ℕ) (δ : ℝ), 0 < δ ∧ ∀ j : SpectralStripJetIndex χ a α s,
+      j.val.2.2.2 ≤ K ∧ ((s - 1) / 2 ≤ (j.val.2.2.2 : ℝ) → |j.val.2.1| ≤ α - δ) := by
+  let ν : Measure C𝔽 := canonicalModulatedHaar m𝔽 hm𝔽
+  let : ν.IsHaarMeasure := (existsUnique_canonicalModulatedHaar m𝔽 hm𝔽).exists.choose_spec.1
+  let hs₀ : 0 ≤ s := lineHs(hs)
+  have hfac_pos : 0 < (Measure.haarScalarFactor μ𝔽 ν : ℝ) := by
+    exact_mod_cast (Measure.haarScalarFactor_pos_of_isHaarMeasure μ𝔽 ν)
+  let c₁ : ℝ := Real.exp (-12 * α) * ((10 : ℝ) ^ (s / 2))⁻¹
+  let c₂ : ℝ := Real.exp (-2) * ((2 : ℝ) ^ (s / 2))⁻¹
+  have hc₁ : 0 < c₁ :=
+    mul_pos (Real.exp_pos _) (inv_pos.mpr (Real.rpow_pos_of_pos (by norm_num) _))
+  have hc₂ : 0 < c₂ :=
+    mul_pos (Real.exp_pos _) (inv_pos.mpr (Real.rpow_pos_of_pos (by norm_num) _))
+  let L : ℝ := C ^ 2 / ((Measure.haarScalarFactor μ𝔽 ν : ℝ) * c₂)
+  have hL : 0 ≤ L := div_nonneg (sq_nonneg C) (mul_pos hfac_pos hc₂).le
+  have hsq (j : SpectralStripJetIndex χ a α s) : (Measure.haarScalarFactor μ𝔽 ν : ℝ) *
+      ∫ x : ℝ, Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j.val.2.2.2) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume ≤ C ^ 2 := by
+    rw [← spectralStripJet_norm_sq χ hα hs₀ j ν rfl]
+    exact pow_le_pow_left₀ (norm_nonneg _) (_h j) 2
+  refine ⟨⌈C ^ 2 / ((Measure.haarScalarFactor μ𝔽 ν : ℝ) * c₁)⌉₊, Real.exp (-L),
+    Real.exp_pos _, fun j ↦ ⟨?_, fun hk ↦ ?_⟩⟩
+  · have hcond : (-α < j.val.2.1 ∧ j.val.2.1 < α) ∨
+        ((j.val.2.1 = -α ∨ j.val.2.1 = α) ∧ 2 * (j.val.2.2.2 : ℝ) + 1 < s) := by
+      have hj := j.property
+      unfold spectralStripMultiplicity at hj
+      split_ifs at hj with h1 h2
+      · exact Or.inl h1
+      · refine Or.inr ⟨h2, ?_⟩
+        have horder : (j.val.2.2.2 : ℝ) < (s - 1) / 2 :=
+          ((lt_spectralBoundaryMultiplicity s _ _).mp hj).2
+        linarith
+      · omega
+    have hf_int : Integrable (fun x : ℝ ↦
+        Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j.val.2.2.2) *
+          ((1 + x ^ 2) ^ (s / 2))⁻¹) volume :=
+      spectralStripJet_integrable hα hs₀ hcond
+    have hb : j.val.2.1 ∈ Icc (-α) α := (SpectralStripJetIndex.mem_strip_order_pos hα j).1
+    have hind_int : Integrable ((Icc (2 : ℝ) 3).indicator fun _ ↦
+        c₁ * 4 ^ j.val.2.2.2) volume :=
+      (integrableOn_const (by simp)).integrable_indicator measurableSet_Icc
+    have hle : ∀ x : ℝ, (Icc (2 : ℝ) 3).indicator (fun _ ↦ c₁ * 4 ^ j.val.2.2.2) x ≤
+        Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j.val.2.2.2) *
+          ((1 + x ^ 2) ^ (s / 2))⁻¹ := by
+      intro x
+      by_cases hx : x ∈ Icc (2 : ℝ) 3
+      · rw [indicator_of_mem hx]
+        have hxpos : 0 ≤ x := by linarith [hx.1]
+        have hexp : Real.exp (-12 * α) ≤ Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) := by
+          rw [abs_of_nonneg hxpos]
+          exact Real.exp_le_exp.mpr (by nlinarith [hb.1, hx.1, hx.2])
+        have hpow : (4 : ℝ) ^ j.val.2.2.2 ≤ x ^ (2 * j.val.2.2.2) := by
+          rw [pow_mul]
+          exact pow_le_pow_left₀ (by norm_num) (by nlinarith [hx.1]) _
+        have hbase : 1 + x ^ 2 ≤ 10 := by nlinarith [hx.1, hx.2]
+        have hrpow : (1 + x ^ 2) ^ (s / 2) ≤ (10 : ℝ) ^ (s / 2) :=
+          Real.rpow_le_rpow (by positivity) hbase (by linarith)
+        have hinv : ((10 : ℝ) ^ (s / 2))⁻¹ ≤ ((1 + x ^ 2) ^ (s / 2))⁻¹ :=
+          inv_anti₀ (Real.rpow_pos_of_pos (by positivity) _) hrpow
+        calc c₁ * 4 ^ j.val.2.2.2
+            = Real.exp (-12 * α) * 4 ^ j.val.2.2.2 * ((10 : ℝ) ^ (s / 2))⁻¹ := by
+              simp only [c₁]
+              ring
+          _ ≤ _ := mul_le_mul (mul_le_mul hexp hpow (by positivity) (Real.exp_pos _).le) hinv
+              (inv_nonneg.mpr (Real.rpow_pos_of_pos (by norm_num) _).le)
+              (mul_nonneg (Real.exp_pos _).le (Even.pow_nonneg (even_two_mul _) x))
+      · rw [indicator_of_notMem hx]
+        exact mul_nonneg (mul_nonneg (Real.exp_pos _).le (Even.pow_nonneg (even_two_mul _) x))
+          (inv_nonneg.mpr (Real.rpow_pos_of_pos (by positivity) _).le)
+    have hint_le : c₁ * 4 ^ j.val.2.2.2 ≤ ∫ x : ℝ,
+        Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j.val.2.2.2) *
+          ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume := by
+      have h1 := integral_mono hind_int hf_int hle
+      have h2 : ∫ x : ℝ, (Icc (2 : ℝ) 3).indicator (fun _ ↦ c₁ * 4 ^ j.val.2.2.2) x ∂volume =
+          c₁ * 4 ^ j.val.2.2.2 := by
+        rw [integral_indicator measurableSet_Icc, setIntegral_const, Real.volume_real_Icc]
+        norm_num
+      linarith
+    have h4 : (4 : ℝ) ^ j.val.2.2.2 ≤ C ^ 2 / ((Measure.haarScalarFactor μ𝔽 ν : ℝ) * c₁) := by
+      rw [le_div_iff₀ (mul_pos hfac_pos hc₁)]
+      calc (4 : ℝ) ^ j.val.2.2.2 * ((Measure.haarScalarFactor μ𝔽 ν : ℝ) * c₁)
+          = (Measure.haarScalarFactor μ𝔽 ν : ℝ) * (c₁ * 4 ^ j.val.2.2.2) := by ring
+        _ ≤ _ := (mul_le_mul_of_nonneg_left hint_le hfac_pos.le).trans (hsq j)
+    have hk : (j.val.2.2.2 : ℝ) ≤ 4 ^ j.val.2.2.2 := by
+      exact_mod_cast (Nat.lt_pow_self (by norm_num : 1 < 4)).le
+    exact Nat.cast_le.mp ((hk.trans h4).trans (Nat.le_ceil _))
+  · have hj := j.property
+    unfold spectralStripMultiplicity at hj
+    split_ifs at hj with hb he
+    · have habs : |j.val.2.1| < α := abs_lt.mpr hb
+      by_cases h1 : 1 ≤ α - |j.val.2.1|
+      · have : Real.exp (-L) ≤ 1 := Real.exp_le_one_iff.mpr (by linarith)
+        linarith
+      · have hint' : Integrable (fun x : ℝ ↦
+            Real.exp (2 * |j.val.2.1| * x - 2 * α * |x|) * x ^ (2 * j.val.2.2.2) *
+              ((1 + x ^ 2) ^ (s / 2))⁻¹) volume :=
+          spectralStripJet_integrable hα hs₀
+            (Or.inl ⟨by linarith [abs_nonneg j.val.2.1], habs⟩)
+        have hlog := spectralStripJet_order_and_margin_of_upperBound_log hs₀
+          habs (not_le.mp h1) (by linarith) hint'
+        have hsym : ∫ x : ℝ, Real.exp (2 * |j.val.2.1| * x - 2 * α * |x|) *
+            x ^ (2 * j.val.2.2.2) * ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume =
+            ∫ x : ℝ, Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) *
+              x ^ (2 * j.val.2.2.2) * ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume := by
+          rcases abs_cases j.val.2.1 with ⟨h, _⟩ | ⟨h, _⟩
+          · rw [h]
+          · rw [h]
+            exact spectralStripJet_order_and_margin_of_upperBound_neg α s _ _
+        rw [hsym] at hlog
+        have h3 : (Measure.haarScalarFactor μ𝔽 ν : ℝ) *
+            (c₂ * Real.log (α - |j.val.2.1|)⁻¹) ≤ C ^ 2 :=
+          (mul_le_mul_of_nonneg_left hlog hfac_pos.le).trans (hsq j)
+        have h4 : Real.log (α - |j.val.2.1|)⁻¹ ≤ L := by
+          rw [le_div_iff₀ (mul_pos hfac_pos hc₂)]
+          linarith
+        rw [Real.log_inv] at h4
+        have h5 : Real.exp (-L) ≤ α - |j.val.2.1| := by
+          calc Real.exp (-L) ≤ Real.exp (Real.log (α - |j.val.2.1|)) :=
+                Real.exp_le_exp.mpr (by linarith)
+            _ = α - |j.val.2.1| := Real.exp_log (sub_pos.mpr habs)
+        linarith
+    · have hlt := ((lt_spectralBoundaryMultiplicity _ _ _).mp hj).2
+      linarith
+    · omega
+
+/-- Paper: Proposition 10.2.2.2 and (10.2.2.8), pp. 446–447, as used before (10.3.1.19),
+p. 451. Among the strip jets with the same real offset, a jet of lower order has norm at most a
+fixed multiple of the norm of a jet of higher order. So the products of the norm of a jet and
+the norm of the biorthogonal vector of a jet of higher order at the same zero, for which
+p. 451 asks one constant, are bounded by the products with equal orders. No bound on the
+multiplicities of the zeros is used.
+Deviation: The paper does not state this. It takes the bound from an upper bound for the norms
+of all the jets. -/
+theorem spectralStripJet_norm_le_of_order_le (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (_hχ : IsSpectralBasepointChoice χ) {a α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s) :
+    ∃ C : ℝ, 0 < C ∧ ∀ j j' : SpectralStripJetIndex χ a α s,
+      j'.val.2.1 = j.val.2.1 → j'.val.2.2.2 ≤ j.val.2.2.2 →
+      ‖(spectralStripJet_memLp χ hα (lineHs(hs)) j').toLp (stripJet(χ, j'))‖ ≤
+        C * ‖(spectralStripJet_memLp χ hα (lineHs(hs)) j).toLp (stripJet(χ, j))‖ := by
+  let ν : Measure C𝔽 := canonicalModulatedHaar m𝔽 hm𝔽
+  let : ν.IsHaarMeasure := (existsUnique_canonicalModulatedHaar m𝔽 hm𝔽).exists.choose_spec.1
+  let hs₀ : 0 ≤ s := lineHs(hs)
+  have hfac_nonneg : 0 ≤ (Measure.haarScalarFactor μ𝔽 ν : ℝ) := NNReal.coe_nonneg _
+  obtain ⟨c, hc, hlower⟩ := spectralStripJet_lowerBound (a := a) χ _hχ hα hs
+  let I₀ : ℝ := ∫ x : ℝ, ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume
+  have hI₀_int : Integrable (fun x : ℝ ↦ ((1 + x ^ 2) ^ (s / 2))⁻¹) volume := by
+    have h := integrable_pow_mul_rpow_inv (k := 0) (s := s) (by
+      rw [Nat.cast_zero, mul_zero, zero_add]
+      exact hs)
+    simpa only [mul_zero, pow_zero, one_mul] using h
+  have hI₀ : 0 ≤ I₀ := integral_nonneg fun x ↦
+    inv_nonneg.mpr (Real.rpow_pos_of_pos (by positivity) _).le
+  let B : ℝ := (Measure.haarScalarFactor μ𝔽 ν : ℝ) * I₀ / c ^ 2 + 1
+  have hB : 0 < B := by
+    have : 0 ≤ (Measure.haarScalarFactor μ𝔽 ν : ℝ) * I₀ / c ^ 2 :=
+      div_nonneg (mul_nonneg hfac_nonneg hI₀) (sq_nonneg c)
+    linarith
+  refine ⟨Real.sqrt B, Real.sqrt_pos.mpr hB, fun j j' hb hm ↦ ?_⟩
+  have hcond (i : SpectralStripJetIndex χ a α s) : (-α < i.val.2.1 ∧ i.val.2.1 < α) ∨
+      ((i.val.2.1 = -α ∨ i.val.2.1 = α) ∧ 2 * (i.val.2.2.2 : ℝ) + 1 < s) := by
+    have hi := i.property
+    unfold spectralStripMultiplicity at hi
+    split_ifs at hi with h1 h2
+    · exact Or.inl h1
+    · refine Or.inr ⟨h2, ?_⟩
+      have horder : (i.val.2.2.2 : ℝ) < (s - 1) / 2 :=
+        ((lt_spectralBoundaryMultiplicity s _ _).mp hi).2
+      linarith
+    · omega
+  have hcond₀ : (-α < j.val.2.1 ∧ j.val.2.1 < α) ∨
+      ((j.val.2.1 = -α ∨ j.val.2.1 = α) ∧ 2 * ((0 : ℕ) : ℝ) + 1 < s) := by
+    rcases hcond j with h | ⟨h, -⟩
+    · exact Or.inl h
+    · refine Or.inr ⟨h, ?_⟩
+      rw [Nat.cast_zero, mul_zero, zero_add]
+      exact hs
+  have hint : Integrable (fun x : ℝ ↦
+      Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j.val.2.2.2) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹) volume := spectralStripJet_integrable hα hs₀ (hcond j)
+  have hint' : Integrable (fun x : ℝ ↦
+      Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j'.val.2.2.2) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹) volume := by
+    have h := spectralStripJet_integrable hα hs₀ (hcond j')
+    rwa [hb] at h
+  have hint₀ : Integrable (fun x : ℝ ↦
+      Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * 0) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹) volume := spectralStripJet_integrable hα hs₀ hcond₀
+  have hbα : j.val.2.1 ∈ Icc (-α) α := (SpectralStripJetIndex.mem_strip_order_pos hα j).1
+  have hpos (x : ℝ) : 0 ≤ ((1 + x ^ 2) ^ (s / 2))⁻¹ :=
+    inv_nonneg.mpr (Real.rpow_pos_of_pos (by positivity) _).le
+  -- The zeroth jet has a norm integral bounded independently of the offset.
+  have h₀ : ∫ x : ℝ, Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * 0) *
+      ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume ≤ I₀ := by
+    refine integral_mono hint₀ hI₀_int fun x ↦ ?_
+    have hbx : j.val.2.1 * x ≤ α * |x| := by
+      calc
+        j.val.2.1 * x ≤ |j.val.2.1 * x| := le_abs_self _
+        _ = |j.val.2.1| * |x| := abs_mul _ _
+        _ ≤ α * |x| := mul_le_mul_of_nonneg_right (abs_le.mpr hbα) (abs_nonneg x)
+    have hexp : Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) ≤ 1 :=
+      Real.exp_le_one_iff.mpr (by linarith)
+    calc Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * 0) * ((1 + x ^ 2) ^ (s / 2))⁻¹
+        = Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * ((1 + x ^ 2) ^ (s / 2))⁻¹ := by
+          rw [mul_zero, pow_zero, mul_one]
+      _ ≤ 1 * ((1 + x ^ 2) ^ (s / 2))⁻¹ := mul_le_mul_of_nonneg_right hexp (hpos x)
+      _ = ((1 + x ^ 2) ^ (s / 2))⁻¹ := one_mul _
+  -- A lower power is at most one plus a higher power.
+  have hle : ∫ x : ℝ, Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j'.val.2.2.2) *
+      ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume ≤
+      (∫ x : ℝ, Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * 0) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume) +
+      ∫ x : ℝ, Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j.val.2.2.2) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume := by
+    rw [← integral_add hint₀ hint]
+    refine integral_mono hint' (hint₀.add hint) fun x ↦ ?_
+    have hpow : x ^ (2 * j'.val.2.2.2) ≤ x ^ (2 * 0) + x ^ (2 * j.val.2.2.2) := by
+      have hxa : x ^ (2 * j'.val.2.2.2) = |x| ^ (2 * j'.val.2.2.2) := by
+        rw [pow_mul, ← sq_abs, ← pow_mul]
+      have hxaK : x ^ (2 * j.val.2.2.2) = |x| ^ (2 * j.val.2.2.2) := by
+        rw [pow_mul, ← sq_abs, ← pow_mul]
+      rw [hxa, hxaK, mul_zero, pow_zero]
+      rcases le_total |x| 1 with hx1 | hx1
+      · have : |x| ^ (2 * j'.val.2.2.2) ≤ 1 := pow_le_one₀ (abs_nonneg x) hx1
+        linarith [pow_nonneg (abs_nonneg x) (2 * j.val.2.2.2)]
+      · have : |x| ^ (2 * j'.val.2.2.2) ≤ |x| ^ (2 * j.val.2.2.2) :=
+          pow_le_pow_right₀ hx1 (Nat.mul_le_mul_left 2 hm)
+        linarith
+    calc Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j'.val.2.2.2) *
+          ((1 + x ^ 2) ^ (s / 2))⁻¹
+        ≤ Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) *
+            (x ^ (2 * 0) + x ^ (2 * j.val.2.2.2)) * ((1 + x ^ 2) ^ (s / 2))⁻¹ :=
+          mul_le_mul_of_nonneg_right
+            (mul_le_mul_of_nonneg_left hpow (Real.exp_pos _).le) (hpos x)
+      _ = _ := by ring
+  have hsq := spectralStripJet_norm_sq χ hα hs₀ j ν rfl
+  have hsq' : ‖(spectralStripJet_memLp χ hα hs₀ j').toLp (stripJet(χ, j'))‖ ^ 2 =
+      (Measure.haarScalarFactor μ𝔽 ν : ℝ) *
+        ∫ x : ℝ, Real.exp (2 * j.val.2.1 * x - 2 * α * |x|) * x ^ (2 * j'.val.2.2.2) *
+          ((1 + x ^ 2) ^ (s / 2))⁻¹ ∂volume := by
+    rw [spectralStripJet_norm_sq χ hα hs₀ j' ν rfl, hb]
+  have hc2 : c ^ 2 ≤ ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖ ^ 2 :=
+    pow_le_pow_left₀ hc.le (hlower j) 2
+  have hmain : ‖(spectralStripJet_memLp χ hα hs₀ j').toLp (stripJet(χ, j'))‖ ^ 2 ≤
+      B * ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖ ^ 2 := by
+    have h1 : ‖(spectralStripJet_memLp χ hα hs₀ j').toLp (stripJet(χ, j'))‖ ^ 2 ≤
+        (Measure.haarScalarFactor μ𝔽 ν : ℝ) * I₀ +
+          ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖ ^ 2 := by
+      rw [hsq', hsq, ← mul_add]
+      exact mul_le_mul_of_nonneg_left (by linarith) hfac_nonneg
+    have h2 : (Measure.haarScalarFactor μ𝔽 ν : ℝ) * I₀ ≤
+        (Measure.haarScalarFactor μ𝔽 ν : ℝ) * I₀ / c ^ 2 *
+          ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖ ^ 2 := by
+      calc (Measure.haarScalarFactor μ𝔽 ν : ℝ) * I₀
+          = (Measure.haarScalarFactor μ𝔽 ν : ℝ) * I₀ / c ^ 2 * c ^ 2 := by
+            field_simp
+        _ ≤ _ := mul_le_mul_of_nonneg_left hc2
+            (div_nonneg (mul_nonneg hfac_nonneg hI₀) (sq_nonneg c))
+    calc ‖(spectralStripJet_memLp χ hα hs₀ j').toLp (stripJet(χ, j'))‖ ^ 2
+        ≤ (Measure.haarScalarFactor μ𝔽 ν : ℝ) * I₀ / c ^ 2 *
+            ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖ ^ 2 +
+          ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖ ^ 2 := by linarith
+      _ = B * ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖ ^ 2 := by
+          simp only [B]
+          ring
+  have hfinal : ‖(spectralStripJet_memLp χ hα hs₀ j').toLp (stripJet(χ, j'))‖ ^ 2 ≤
+      (Real.sqrt B * ‖(spectralStripJet_memLp χ hα hs₀ j).toLp (stripJet(χ, j))‖) ^ 2 := by
+    rw [mul_pow, Real.sq_sqrt hB.le]
+    exact hmain
+  exact (pow_le_pow_iff_left₀ (norm_nonneg _)
+    (mul_nonneg (Real.sqrt_nonneg _) (norm_nonneg _)) two_ne_zero).mp hfinal
 
 end RiemannMasullo

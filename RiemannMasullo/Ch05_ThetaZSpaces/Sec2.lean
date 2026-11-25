@@ -1735,7 +1735,8 @@ private theorem isEmbedding_transpose_quotient_of_strictLF {E : Type*} [AddCommG
 
 universe v
 
-private theorem nuclear_of_linear_embedding {X Y : Type*}
+/-- A topological vector space admitting a continuous linear embedding into a nuclear TVS is nuclear. -/
+theorem nuclear_of_linear_embedding {X Y : Type*}
     [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
     [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] (i : X →L[ℂ] Y)
     (hi : IsEmbedding i) (hY : IsNuclearTVS.{v} Y) : IsNuclearTVS.{v} X := by
@@ -1755,7 +1756,8 @@ theorem sLocalAdelicThetaSpace_strongDual_nuclear : IsNuclearTVS (StrongDual ℂ
       (sAdeleSchwartz_nuclear F S) sLocalAdelicTheta_ker_isClosed sLocalAdelicThetaSpace_strictLF
   · exact (sAdeleSchwartz_strongDual_nuclear F S)
 
-private theorem barrelled_strongDual_of_montel {E : Type*} [AddCommGroup E] [Module ℂ E]
+/-- The strong dual of a Hausdorff polynormable Montel space is barrelled. -/
+theorem barrelled_strongDual_of_montel {E : Type*} [AddCommGroup E] [Module ℂ E]
     [TopologicalSpace E] [IsTopologicalAddGroup E] [ContinuousSMul ℂ E]
     [PolynormableSpace ℂ E] [T2Space E] [MontelSpace ℂ E] : BarrelledSpace ℂ (StrongDual ℂ E) := by
   let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
@@ -3134,14 +3136,16 @@ theorem existsUnique_sLocalThetaAction :
     N θ Tt t htt hc r hr h
   with_reducible exact result
 
-private theorem insert_mem_larger (hST : S ⊆ T) (u : (integralAdelesOutside F S)ˣ) :
+/-- Inserting an `S`-integral outside-`S` idele into `T ⊇ S` stays within the range of the `T`-integral insertion. -/
+theorem insert_mem_larger (hST : S ⊆ T) (u : (integralAdelesOutside F S)ˣ) :
     integralIdeleInsertion F S u ∈ Set.range (integralIdeleInsertion F T) := by
   let g := integralIdeleInsertion F S u
   have hg : g ∈ Set.range (integralIdeleInsertion F S) := ⟨u, rfl⟩
   exact (mem_range_integralIdeleInsertion F T g).mpr fun v hv ↦
     (mem_range_integralIdeleInsertion F S g).mp hg v (fun h ↦ hv (hST h))
 
-private theorem testTransition_translate_eq (hST : S ⊆ T)
+/-- Transitioning an `S`-local Schwartz–Bruhat function to a larger set `T` intertwines the unit-translation actions. -/
+theorem testTransition_translate_eq (hST : S ⊆ T)
     (u : (integralAdelesOutside F S)ˣ) (f : ℬₛ(S)) :
     let g := integralIdeleInsertion F S u
     let gS := Units.map (adeleProjection F S).toMonoidHom g
@@ -4235,7 +4239,8 @@ section GlobalTopology
 
 open Set TopologicalSpace
 
-private theorem frechet_of_closed_embedding {X Y : Type*} [AddCommGroup X] [Module ℂ X]
+/-- A topological vector space admitting a closed continuous linear embedding into a Fréchet TVS is Fréchet. -/
+theorem isFrechetTVS_of_closedEmbedding {X Y : Type*} [AddCommGroup X] [Module ℂ X]
     [TopologicalSpace X] [IsTopologicalAddGroup X] [AddCommGroup Y] [Module ℂ Y]
     [TopologicalSpace Y] (i : X →L[ℂ] Y) (hi : IsClosedEmbedding i) (hY : IsFrechetTVS Y) :
     IsFrechetTVS X := by
@@ -4265,7 +4270,7 @@ private theorem embedded_frechet_range {X E : Type*} [AddCommGroup X] [Module �
   let L : X ≃L[ℂ] i.toLinearMap.range := ⟨e, h.continuous, h.continuous_symm⟩
   exact ⟨(AddMonoidHom.isUniformInducing_of_isInducing (f := i.toLinearMap.toAddMonoidHom)
       hi.isInducing).isComplete_range.isClosed,
-    frechet_of_closed_embedding L.symm.toContinuousLinearMap L.symm.toHomeomorph.isClosedEmbedding ⟨a,p,m,c⟩⟩
+    isFrechetTVS_of_closedEmbedding L.symm.toContinuousLinearMap L.symm.toHomeomorph.isClosedEmbedding ⟨a,p,m,c⟩⟩
 
 private theorem frechet_range_in_cover {ι X E : Type*} [Countable ι] [AddCommGroup X] [Module ℂ X]
     [TopologicalSpace X] [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
@@ -4308,7 +4313,7 @@ private theorem strictLF_of_countable_frechet_cover {ι E : Type*} [Countable ι
     have hr : range l = Subtype.val ⁻¹' (S k : Set E) := by
       ext x
       exact ⟨fun ⟨y,hy⟩ ↦ hy ▸ y.property, fun hx ↦ ⟨⟨x.val, hx⟩, rfl⟩⟩
-    exact frechet_of_closed_embedding ⟨l, he.continuous⟩
+    exact isFrechetTVS_of_closedEmbedding ⟨l, he.continuous⟩
       ⟨he, hr ▸ (R k).isClosed_topologicalClosure.preimage continuous_subtype_val⟩ (hD t)
   refine ⟨h₂, S, monotone_nat_of_le_succ (fun k ↦ ?_), hS, fun x ↦ ?_, ?_⟩
   · apply closure_mono
