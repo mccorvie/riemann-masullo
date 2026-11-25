@@ -62,18 +62,19 @@ theorem tendsto_two_cpow_mul_finiteHecke_logDeriv (χ : PontryaginDual (IdeleCla
   rw [logDeriv_apply, LSeries_deriv hs, mul_div_assoc']
   ring
 
-/-- After the half-unit shift used for the Poisson width, the scaled finite Euler
-term tends to zero. -/
-theorem tendsto_mul_re_finiteHecke_logDeriv (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) :
-    Tendsto (fun a : ℝ ↦ a * (logDeriv (ideleClassNormTwist χ 0).LSeries ((a + 1 / 2 : ℝ) : ℂ)).re)
+/-- After the half-unit shift used for the Poisson width, the finite Euler term tends to
+zero after multiplication by any fixed natural power of the width. -/
+theorem tendsto_pow_mul_re_finiteHecke_logDeriv (n : ℕ)
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) :
+    Tendsto (fun a : ℝ ↦ a ^ n * (logDeriv (ideleClassNormTwist χ 0).LSeries ((a + 1 / 2 : ℝ) : ℂ)).re)
       atTop (𝓝 0) := by
-  have hsmall : Tendsto (fun a : ℝ ↦ a / (2 : ℝ) ^ (a + 1 / 2)) atTop (𝓝 0) := by
-    have h := (tendsto_rpow_mul_exp_neg_mul_atTop_nhds_zero 1 (Real.log 2)
+  have hsmall : Tendsto (fun a : ℝ ↦ a ^ n / (2 : ℝ) ^ (a + 1 / 2)) atTop (𝓝 0) := by
+    have h := (tendsto_rpow_mul_exp_neg_mul_atTop_nhds_zero (n : ℝ) (Real.log 2)
       (Real.log_pos (by norm_num))).mul_const (Real.exp (-(Real.log 2 / 2)))
     rw [zero_mul] at h
     apply h.congr'
     filter_upwards with a
-    rw [Real.rpow_one, Real.rpow_def_of_pos (by norm_num : (0 : ℝ) < 2), div_eq_mul_inv a _,
+    rw [Real.rpow_natCast, Real.rpow_def_of_pos (by norm_num : (0 : ℝ) < 2), div_eq_mul_inv (a ^ n) _,
       ← Real.exp_neg, mul_assoc, ← Real.exp_add]
     congr 2
     ring
@@ -91,12 +92,20 @@ theorem tendsto_mul_re_finiteHecke_logDeriv (χ : PontryaginDual (IdeleClassGrou
   have hne : (2 : ℝ) ^ (a + 1 / 2) ≠ 0 := (Real.rpow_pos_of_pos (by norm_num) _).ne'
   field_simp
 
+/-- The scaled finite Euler term tends to zero at expanding Poisson widths. -/
+theorem tendsto_mul_re_finiteHecke_logDeriv (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) :
+    Tendsto (fun a : ℝ ↦ a * (logDeriv (ideleClassNormTwist χ 0).LSeries ((a + 1 / 2 : ℝ) : ℂ)).re)
+      atTop (𝓝 0) := by
+  simpa only [pow_one] using tendsto_pow_mul_re_finiteHecke_logDeriv 1 χ
+
 /-- The difference between the real logarithmic derivatives of the actual completed
-continuation and its archimedean factor tends to zero after multiplication by the width. -/
-theorem tendsto_mul_re_completed_sub_gamma_logDeriv (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) :
-    Tendsto (fun a : ℝ ↦ a * ((logDeriv (continuedCompletedHeckeL χ) ((a + 1 / 2 : ℝ) : ℂ)).re -
+continuation and its archimedean factor tends to zero after multiplication by any fixed
+natural power of the width. -/
+theorem tendsto_pow_mul_re_completed_sub_gamma_logDeriv (n : ℕ)
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) :
+    Tendsto (fun a : ℝ ↦ a ^ n * ((logDeriv (continuedCompletedHeckeL χ) ((a + 1 / 2 : ℝ) : ℂ)).re -
       (logDeriv (heckeGammaFactor χ) ((a + 1 / 2 : ℝ) : ℂ)).re)) atTop (𝓝 0) := by
-  apply (tendsto_mul_re_finiteHecke_logDeriv χ).congr'
+  apply (tendsto_pow_mul_re_finiteHecke_logDeriv n χ).congr'
   filter_upwards [eventually_gt_atTop (2 : ℝ)] with a ha
   let s : ℂ := (a + 1 / 2 : ℝ)
   have hs : 1 < s.re := by dsimp [s]; linarith
@@ -114,7 +123,14 @@ theorem tendsto_mul_re_completed_sub_gamma_logDeriv (χ : PontryaginDual (IdeleC
     (finiteHeckeL_ne_zero_of_one_lt_re χ ⟨s, hs⟩)
     (differentiableAt_heckeGammaFactor_of_re_pos χ (zero_lt_one.trans hs))
     (LSeries_hasDerivAt hσ).differentiableAt)
-  change _ = a * ((logDeriv (continuedCompletedHeckeL χ) s).re - _)
+  change _ = a ^ n * ((logDeriv (continuedCompletedHeckeL χ) s).re - _)
   rw [h, Complex.add_re, add_sub_cancel_left]
+
+/-- The difference between the real logarithmic derivatives of the actual completed
+continuation and its archimedean factor tends to zero after multiplication by the width. -/
+theorem tendsto_mul_re_completed_sub_gamma_logDeriv (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) :
+    Tendsto (fun a : ℝ ↦ a * ((logDeriv (continuedCompletedHeckeL χ) ((a + 1 / 2 : ℝ) : ℂ)).re -
+      (logDeriv (heckeGammaFactor χ) ((a + 1 / 2 : ℝ) : ℂ)).re)) atTop (𝓝 0) := by
+  simpa only [pow_one] using tendsto_pow_mul_re_completed_sub_gamma_logDeriv 1 χ
 
 end RiemannMasullo.HeckePoisson

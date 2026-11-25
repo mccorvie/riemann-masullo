@@ -1,6 +1,6 @@
 module
 
-public import RiemannMasullo.Ch01_Introduction.Sec4_HeckePoisson
+public import RiemannMasullo.Ch01_Introduction.Sec4_HeckePoissonMass
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 public import Mathlib.Topology.Algebra.InfiniteSum.ENNReal
 import Mathlib.Topology.Algebra.Order.Field
@@ -106,8 +106,7 @@ def centralSoftCount (χ : U𝔽) (a : ℝ) : ℝ :=
   ∑' z : Central(χ), (multiplicity z.val : ℝ) * a ^ 2 / (a ^ 2 + z.val.val.im ^ 2)
 
 private def unscaledWeight {χ : U𝔽} (a : ℝ) (z : Site χ) : ℝ :=
-  (multiplicity z : ℝ) * ((a + 1 / 2 - z.val.re) /
-    ((a + 1 / 2 - z.val.re) ^ 2 + z.val.im ^ 2))
+  (multiplicity z : ℝ) * poissonWeight (a + 1 / 2) 0 z.val
 
 private def scaledWeight {χ : U𝔽} (a : ℝ) (z : Site χ) : ℝ :=
   (multiplicity z : ℝ) * (a * (a + 1 / 2 - z.val.re) /
@@ -156,7 +155,7 @@ private theorem hasSum_scaledWeight {χ : U𝔽} {a d : ℝ}
     (hd : HasSum (unscaledWeight (χ := χ) a) d) :
     HasSum (scaledWeight (χ := χ) a) (a * d) := (hd.mul_left a).congr_fun <| by
   intro z
-  dsimp [unscaledWeight, scaledWeight]
+  simp only [unscaledWeight, scaledWeight, poissonWeight, zero_sub, neg_sq]
   ring
 
 private theorem deficit_eq_tsum {χ : U𝔽} {a d : ℝ}
@@ -182,11 +181,9 @@ private theorem ofReal_deficit_eq {χ : U𝔽} {a d : ℝ} (ha : 1 / 2 < a)
   rw [deficit_eq_tsum hs]
   exact ENNReal.ofReal_tsum_of_nonneg (fun z ↦ scaledWeight_nonneg ha z.val) (hs.summable.subtype _)
 
-
 /-- The Cauchy weight of all completed zeros at a real abscissa, with the scale factored out. -/
 def zeroPoissonMass (χ : U𝔽) (a : ℝ) : ℝ :=
-  ∑' z : Site χ, (multiplicity z : ℝ) * ((a + 1 / 2 - z.val.re) /
-    ((a + 1 / 2 - z.val.re) ^ 2 + z.val.im ^ 2))
+  ∑' z : Site χ, (multiplicity z : ℝ) * poissonWeight (a + 1 / 2) 0 z.val
 
 private theorem summable_unscaledWeight (χ : U𝔽) {a : ℝ} (ha : 1 / 2 < a) :
     Summable (unscaledWeight (χ := χ) a) := by
@@ -223,6 +220,7 @@ private theorem summable_unscaledWeight (χ : U𝔽) {a : ℝ} (ha : 1 / 2 < a) 
       b * (1+|y|)^2 ≤ (a+1/2) * (1+|y|)^2 := mul_le_mul_of_nonneg_right hu hH.le
       _ ≤ (a+1/2) * (2*k*(b^2+y^2)) := mul_le_mul_of_nonneg_left hscale (by linarith)
       _ = _ := by ring
+  simp only [unscaledWeight, poissonWeight, zero_sub, neg_sq]
   change ‖(multiplicity z : ℝ) * (b/(b^2+y^2))‖ ≤
     (2*k*(a+1/2)) * ((multiplicity z : ℝ)/(1+|y|)^2)
   rw [Real.norm_of_nonneg (mul_nonneg (Nat.cast_nonneg _) (div_nonneg (hδ.le.trans hb) hD.le))]
@@ -240,7 +238,7 @@ theorem zeroPoissonMass_deficit_eq (χ : U𝔽) {a : ℝ} (ha : 1 / 2 < a) :
 the actual central soft count tends to the entire off-line multiplicity, including infinity. -/
 theorem tendsto_expanding_deficit (χ : U𝔽) (D : ℝ → ℝ)
     (hD : ∀ᶠ a in atTop, HasSum (fun z : Site χ ↦ (multiplicity z : ℝ) *
-      ((a + 1 / 2 - z.val.re) / ((a + 1 / 2 - z.val.re) ^ 2 + z.val.im ^ 2))) (D a)) :
+      poissonWeight (a + 1 / 2) 0 z.val) (D a)) :
     Tendsto (fun a : ℝ ↦ ENNReal.ofReal (a * D a - centralSoftCount χ a)) atTop
       (𝓝 (offLineCount χ)) := by
   apply (tendsto_offLineSoftCount χ).congr'
@@ -368,7 +366,8 @@ private theorem exteriorCancellation_iff_normalized_central
     rw [he, sub_self, abs_zero] at hle
     exact (not_le_of_gt hα) hle
 
-/-- Paper: Theorem 12.5.1.1, pp. 519–520. Any additive approximation to each scaled
+/-- Paper: Theorem 12.5.1.1, pp. 519–520.
+Reconstruction: Any additive approximation to each scaled
 complete mass with error tending to zero gives an equivalent statement of exterior-zero
 cancellation for every positive strip width. Both the margin below two and the cofinal
 widths may depend on the section-normalized character. -/
@@ -381,7 +380,8 @@ theorem exteriorCancellation_iff_cofinal_approximation
   rw [exteriorCancellation_iff_normalized_central τ hτ]
   exact forall_congr' fun χ ↦ forall_congr' fun hχ ↦ criticalLine_iff_cofinal_approximation χ _ (hM χ hχ)
 
-/-- Paper: Theorem 12.5.1.1, pp. 519–520. For all positive strip half-widths, the omitted
+/-- Paper: Theorem 12.5.1.1, pp. 519–520.
+Reconstruction: For all positive strip half-widths, the omitted
 zero sums cancel for every test exactly when each section-normalized character has arbitrarily
 large real widths with its scaled zero-mass deficit bounded by a fixed number below two. -/
 theorem exteriorCancellation_iff_cofinal_zeroPoissonMass
