@@ -1528,6 +1528,495 @@ theorem spectralLineJet_selbergGrouped_rough_dyadic (A : ℕ) :
        _ ≤ h^2*(C^2*Real.sqrt T)*M := by gcongr
        _ = _ := by ring
 
+/-- A finite row of the inverse-square integer-gap matrix has uniformly bounded mass. -/
+private theorem spectralLineJet_selberg_gap_row (R : Finset ℕ) (m : ℕ) :
+    (∑ n ∈ R, 1 / ((m:ℝ) - n)^2) ≤ ∑' k : ℤ, 1 / (k:ℝ)^2 := by
+  let e : ℕ ↪ ℤ := ⟨fun n ↦ (m:ℤ)-n, by intro i j hij; exact_mod_cast sub_right_inj.mp hij⟩
+  have he : (∑ n ∈ R, 1 / ((m:ℝ)-n)^2) = ∑ k ∈ R.map e, 1/(k:ℝ)^2 := by
+    rw [Finset.sum_map]
+    refine Finset.sum_congr rfl fun n _ ↦ ?_
+    change _ = 1/(((m:ℤ)-n : ℤ):ℝ)^2
+    push_cast
+    rfl
+  rw [he]
+  exact (Real.summable_one_div_int_pow.mpr (by norm_num : 1 < 2)).sum_le_tsum _ fun _ _ ↦ by positivity
+
+/-- Discrete Schur bound for the off-diagonal terms; the diagonal weight is zero. -/
+private theorem spectralLineJet_selberg_gap_quadratic (R : Finset ℕ) (A : ℕ → ℝ) :
+    (∑ m ∈ R, ∑ n ∈ R, A m*A n*(1/((m:ℝ)-n)^2)) ≤
+      (∑' k : ℤ, 1/(k:ℝ)^2) * (∑ m ∈ R, (A m)^2) := by
+  let D := ∑' k : ℤ, 1/(k:ℝ)^2
+  let w (m n : ℕ) := 1/((m:ℝ)-n)^2
+  have hw (m n : ℕ) : w m n = w n m := by dsimp [w]; ring
+  have hleft : (∑ m ∈ R, ∑ n ∈ R, (A m)^2*w m n) ≤ D*∑ m ∈ R, (A m)^2 := by
+    rw [Finset.mul_sum]
+    refine Finset.sum_le_sum fun m _ ↦ ?_
+    rw [← Finset.mul_sum,mul_comm D]
+    exact mul_le_mul_of_nonneg_left (spectralLineJet_selberg_gap_row R m) (sq_nonneg _)
+  have hright : (∑ m ∈ R, ∑ n ∈ R, (A n)^2*w m n) ≤ D*∑ m ∈ R, (A m)^2 := by
+    rw [Finset.sum_comm]
+    simpa only [hw] using hleft
+  have hp : 2*(∑ m ∈ R, ∑ n ∈ R, A m*A n*w m n) ≤
+      (∑ m ∈ R, ∑ n ∈ R, (A m)^2*w m n) + ∑ m ∈ R, ∑ n ∈ R, (A n)^2*w m n := by
+    simp only [Finset.mul_sum, ← Finset.sum_add_distrib]
+    refine Finset.sum_le_sum fun m _ ↦ Finset.sum_le_sum fun n _ ↦ ?_
+    have h := mul_nonneg (sq_nonneg (A m-A n)) (show 0 ≤ w m n by dsimp [w]; positivity)
+    nlinarith only [h]
+  change (∑ m ∈ R, ∑ n ∈ R, A m*A n*w m n) ≤ D*∑ m ∈ R, (A m)^2
+  linarith only [hp,hleft,hright]
+
+/-- Logarithmic gaps between integer frequencies retain the full integer difference. -/
+private theorem spectralLineJet_selberg_log_distance {X m n : ℕ} (hm : m ∈ Finset.Icc 1 X)
+    (hn : n ∈ Finset.Icc 1 X) : |(m:ℝ)-n| ≤ X*|Real.log m-Real.log n| := by
+  have H {i j : ℕ} (hi : 0 < i) (hj : j ≤ X) (hij : i ≤ j) :
+      (j:ℝ)-i ≤ X*(Real.log j-Real.log i) := by
+    have hip : 0 < (i:ℝ) := by exact_mod_cast hi
+    have hjp : 0 < (j:ℝ) := by exact_mod_cast hi.trans_le hij
+    have h := Real.one_sub_inv_le_log_of_pos (div_pos hjp hip)
+    rw [inv_div,Real.log_div hjp.ne' hip.ne'] at h
+    have hlog := sub_nonneg.mpr (Real.log_le_log hip (Nat.cast_le.mpr hij))
+    calc _ = (j:ℝ)*(1-(i:ℝ)/j) := by field_simp
+         _ ≤ (j:ℝ)*(Real.log j-Real.log i) := mul_le_mul_of_nonneg_left h hjp.le
+         _ ≤ _ := mul_le_mul_of_nonneg_right (Nat.cast_le.mpr hj) hlog
+  rcases le_total n m with h|h
+  · rw [abs_of_nonneg (sub_nonneg.mpr (Nat.cast_le.mpr h)),abs_of_nonneg (sub_nonneg.mpr
+      (Real.log_le_log (by exact_mod_cast (show 0<n from (Finset.mem_Icc.mp hn).1)) (Nat.cast_le.mpr h)))]
+    exact H (Finset.mem_Icc.mp hn).1 (Finset.mem_Icc.mp hm).2 h
+  · rw [abs_sub_comm (m:ℝ), abs_sub_comm (Real.log m),
+      abs_of_nonneg (sub_nonneg.mpr (Nat.cast_le.mpr h)), abs_of_nonneg (sub_nonneg.mpr
+        (Real.log_le_log (by exact_mod_cast (show 0<m from (Finset.mem_Icc.mp hm).1)) (Nat.cast_le.mpr h)))]
+    exact H (Finset.mem_Icc.mp hm).1 (Finset.mem_Icc.mp hn).2 h
+
+/-- A nonconstant pure logarithmic phase has a uniformly bounded primitive. -/
+private theorem spectralLineJet_selberg_exp_primitive {l : ℝ} (hl : l ≠ 0) (a b : ℝ) :
+    ‖∫ v in a..b, Complex.exp ((-Complex.I*(l:ℂ))*v)‖ ≤ 2/|l| := by
+  let c : ℂ := -Complex.I*(l:ℂ)
+  have hc : ‖c‖ = |l| := by simp [c]
+  have hcne : c ≠ 0 := norm_pos_iff.mp (hc ▸ abs_pos.mpr hl)
+  change ‖∫ v in a..b, Complex.exp (c*v)‖ ≤ _
+  rw [integral_exp_mul_complex hcne, norm_div,hc]
+  apply div_le_div_of_nonneg_right _ (abs_nonneg _)
+  calc _ ≤ ‖Complex.exp (c*b)‖+‖Complex.exp (c*a)‖ := norm_sub_le _ _
+       _ = 2 := by simp [Complex.norm_exp,c,Complex.mul_re]; norm_num
+
+private def spectralLineJet_selbergFourierPair (B : ℕ → ℂ) (m n : ℕ) (u : ℝ) : ℂ :=
+  B m * (starRingEnd ℂ) (B n) * Complex.exp ((-Complex.I * ((Real.log m - Real.log n : ℝ) : ℂ)) * u)
+
+/-- Averaging the starting height factors an off-diagonal term into two
+oscillatory primitives of the same frequency. -/
+private theorem spectralLineJet_selberg_shifted_pair (B : ℕ → ℂ) (m n : ℕ) (a b v : ℝ) :
+    (∫ x in a..b, spectralLineJet_selbergFourierPair B m n (x+v)) =
+      (B m * (starRingEnd ℂ) (B n) * ∫ x in a..b, Complex.exp ((-Complex.I *
+        ((Real.log m - Real.log n : ℝ) : ℂ))*x)) *
+      Complex.exp ((-Complex.I * ((Real.log m - Real.log n : ℝ) : ℂ))*v) := by
+  let c : ℂ := -Complex.I * ((Real.log m - Real.log n : ℝ) : ℂ)
+  have he (x : ℝ) : spectralLineJet_selbergFourierPair B m n (x+v) =
+      (B m*(starRingEnd ℂ) (B n)*Complex.exp (c*x))*Complex.exp (c*v) := by
+    simp only [spectralLineJet_selbergFourierPair,c,Complex.ofReal_add,mul_add,Complex.exp_add,mul_assoc]
+  rw [intervalIntegral.integral_congr (fun x _ ↦ he x), intervalIntegral.integral_mul_const,
+    intervalIntegral.integral_const_mul]
+
+/-- In the averaged rectangle the diagonal is unchanged and the off-diagonal
+kernel decays as the inverse square of the integer separation. -/
+private theorem spectralLineJet_selberg_rectangle_pair {X m n : ℕ} (hm : m ∈ Finset.Icc 1 X)
+    (hn : n ∈ Finset.Icc 1 X) (B : ℕ → ℂ) {a b : ℝ} (hab : a ≤ b) :
+    ‖∫ v in (0:ℝ)..X, ∫ x in a-X..b, spectralLineJet_selbergFourierPair B m n (x+v)‖ ≤
+      (if m=n then (X:ℝ)*(b-a+X)*‖B m‖^2 else 0) +
+      4*(X:ℝ)^2*(‖B m‖*‖B n‖*(1/((m:ℝ)-n)^2)) := by
+  by_cases h : m = n
+  · subst n
+    simp only [spectralLineJet_selbergFourierPair,sub_self,Complex.ofReal_zero,mul_zero,zero_mul,
+      Complex.exp_zero,mul_one,Complex.mul_conj',intervalIntegral.integral_const,sub_zero,norm_smul,
+      Real.norm_eq_abs,abs_of_nonneg (by positivity : 0≤(X:ℝ)),abs_of_nonneg (by linarith [Nat.cast_nonneg (α := ℝ) X] : 0≤b-(a-X)),
+      norm_pow,Complex.norm_real,Real.norm_of_nonneg (norm_nonneg _),ite_true]
+    ring_nf
+    exact le_rfl
+  · let l := Real.log m - Real.log n
+    let c : ℂ := -Complex.I*(l:ℂ)
+    have hx : 0 < (X:ℝ) := by exact_mod_cast (show 0<m from (Finset.mem_Icc.mp hm).1).trans_le (Finset.mem_Icc.mp hm).2
+    have hmn : 0 < |(m:ℝ)-n| := abs_pos.mpr (sub_ne_zero.mpr (by exact_mod_cast h))
+    have hg : |(m:ℝ)-n| ≤ (X:ℝ)*|l| := spectralLineJet_selberg_log_distance hm hn
+    have hl : 0 < |l| := (mul_pos_iff_of_pos_left hx).mp (hmn.trans_le hg)
+    have hbnd : 2/|l| ≤ 2*X/|(m:ℝ)-n| := by
+      rw [div_le_div_iff₀ hl hmn]; linarith
+    simp_rw [spectralLineJet_selberg_shifted_pair]
+    rw [intervalIntegral.integral_const_mul]
+    change ‖B m*(starRingEnd ℂ) (B n)*(∫ x in a-X..b, Complex.exp (c*x))*
+      (∫ v in (0:ℝ)..X, Complex.exp (c*v))‖ ≤ _
+    simp only [norm_mul,RCLike.norm_conj,ite_eq_right h,zero_add]
+    have hfirst := (spectralLineJet_selberg_exp_primitive (abs_pos.mp hl) (a-X) b).trans hbnd
+    have hsecond := (spectralLineJet_selberg_exp_primitive (abs_pos.mp hl) 0 X).trans hbnd
+    calc _ ≤ ‖B m‖*‖B n‖*(2*X/|(m:ℝ)-n|)*(2*X/|(m:ℝ)-n|) := by gcongr
+         _ = _ := by rw [div_eq_mul_inv, ← sq_abs ((m:ℝ)-n)]; ring
+
+/-- An interval mean of a nonnegative continuous function is bounded by its
+integral over a rectangle of translated, enlarged intervals. -/
+private theorem spectralLineJet_selberg_shift_average (E : ℝ → ℝ) (hc : Continuous E)
+    (he : ∀ t, 0 ≤ E t) {a b Y : ℝ} (hab : a ≤ b) (hY : 0 ≤ Y) :
+    Y*(∫ u in a..b, E u) ≤ ∫ v in (0:ℝ)..Y, ∫ x in a-Y..b, E (x+v) := by
+  let F (v : ℝ) := ∫ t in (0:ℝ)..v, E t
+  have hF : Continuous F := intervalIntegral.continuous_primitive (fun _ _ ↦ hc.intervalIntegrable ..) 0
+  have hJ (v : ℝ) : (∫ x in a-Y..b, E (x+v)) = F (b+v)-F (a-Y+v) := by
+    rw [intervalIntegral.integral_comp_add_right]
+    exact (intervalIntegral.integral_interval_sub_left (hc.intervalIntegrable ..) (hc.intervalIntegrable ..)).symm
+  calc _ = ∫ _ in (0:ℝ)..Y, ∫ t in a..b, E t := by simp
+       _ ≤ ∫ v in (0:ℝ)..Y, F (b+v)-F (a-Y+v) := by
+         apply intervalIntegral.integral_mono_on hY intervalIntegrable_const
+           (((hF.comp (continuous_const.add continuous_id)).sub (hF.comp (continuous_const.add continuous_id))).intervalIntegrable ..)
+         intro v hv
+         change _ ≤ F (b+v)-F (a-Y+v)
+         rw [← hJ,intervalIntegral.integral_comp_add_right]
+         exact intervalIntegral.integral_mono_interval (by linarith [hv.2]) hab (by linarith [hv.1])
+           (.of_forall he) (hc.intervalIntegrable ..)
+       _ = _ := intervalIntegral.integral_congr fun v _ ↦ (hJ v).symm
+
+/-- A continuous Dirichlet mean-value estimate at full linear length. Double
+averaging costs only the exact coefficient diagonal times an absolute multiple
+of the frequency cutoff. -/
+private theorem spectralLineJet_selberg_fourier_mean {X : ℕ} (hX : 0 < X) (R : Finset ℕ)
+    (hR : R ⊆ Finset.Icc 1 X) (B : ℕ → ℂ) {a b : ℝ} (hab : a ≤ b) :
+    (∫ t in a..b, ‖∑ m ∈ R, B m*Complex.exp ((-Complex.I*(Real.log m : ℂ))*t)‖^2) ≤
+      (b-a+(1+4*(∑' k : ℤ, 1/(k:ℝ)^2))*X) * (∑ m ∈ R, ‖B m‖^2) := by
+  classical
+  let S := R ×ˢ R
+  let E (t : ℝ) := ‖∑ m ∈ R, B m*Complex.exp ((-Complex.I*(Real.log m : ℂ))*t)‖^2
+  let K (p : ℕ × ℕ) (t : ℝ) := spectralLineJet_selbergFourierPair B p.1 p.2 t
+  have hE : Continuous E := by dsimp [E]; fun_prop
+  have hK (p : ℕ × ℕ) (v : ℝ) : Continuous (fun x : ℝ ↦ K p (x+v)) := by
+    dsimp [K,spectralLineJet_selbergFourierPair]; fun_prop
+  have hex (t : ℝ) : ((E t : ℝ) : ℂ) = ∑ p ∈ S, K p t := by
+    simp only [E,Complex.ofReal_pow, ← Complex.mul_conj',map_sum, Finset.sum_mul_sum,S,Finset.sum_product]
+    apply Finset.sum_congr rfl fun m _ ↦ Finset.sum_congr rfl fun n _ ↦ ?_
+    simp only [K,spectralLineJet_selbergFourierPair,map_mul,← Complex.exp_conj]
+    rw [show ∀ x y z w : ℂ, x*y*(z*w) = (x*z)*(y*w) from fun _ _ _ _ ↦ by ring,← Complex.exp_add]
+    congr 2
+    simp only [Complex.ofReal_sub,map_neg,Complex.conj_I,Complex.conj_ofReal,neg_neg]
+    ring
+  have heinner (v : ℝ) : ((∫ x in a-X..b, E (x+v) : ℝ) : ℂ) =
+      ∑ p ∈ S, ∫ x in a-X..b, K p (x+v) := by
+    rw [← intervalIntegral.integral_ofReal, intervalIntegral.integral_congr (fun x _ ↦ hex (x+v)),
+      intervalIntegral.integral_finsetSum fun p _ ↦ (hK p v).intervalIntegrable ..]
+  have houter (p : ℕ × ℕ) : Continuous (fun v : ℝ ↦ ∫ x in a-X..b, K p (x+v)) := by
+    simp only [K,spectralLineJet_selberg_shifted_pair]
+    fun_prop
+  have heint : ((∫ v in (0:ℝ)..X, ∫ x in a-X..b, E (x+v) : ℝ) : ℂ) =
+      ∑ p ∈ S, ∫ v in (0:ℝ)..X, ∫ x in a-X..b, K p (x+v) := by
+    rw [← intervalIntegral.integral_ofReal,intervalIntegral.integral_congr (fun v _ ↦ heinner v),
+      intervalIntegral.integral_finsetSum fun p _ ↦ (houter p).intervalIntegrable ..]
+  let M := ∑ m ∈ R, ‖B m‖^2
+  let D := ∑' k : ℤ, 1/(k:ℝ)^2
+  have hdiag : (∑ p ∈ S, if p.1=p.2 then (X:ℝ)*(b-a+X)*‖B p.1‖^2 else 0) =
+      (X:ℝ)*(b-a+X)*M := by simp [S,M,Finset.sum_product,Finset.mul_sum]
+  have hoff : (∑ p ∈ S, 4*(X:ℝ)^2*(‖B p.1‖*‖B p.2‖*(1/((p.1:ℝ)-p.2)^2))) ≤ 4*(X:ℝ)^2*(D*M) := by
+    simp only [S,Finset.sum_product, ← Finset.mul_sum]
+    exact mul_le_mul_of_nonneg_left (spectralLineJet_selberg_gap_quadratic R fun m ↦ ‖B m‖) (by positivity)
+  have hx : 0 < (X:ℝ) := by exact_mod_cast hX
+  apply (le_of_mul_le_mul_left (a := (X:ℝ)) · hx)
+  calc (X:ℝ)*(∫ t in a..b, E t) ≤ ∫ v in (0:ℝ)..X, ∫ x in a-X..b, E (x+v) :=
+         spectralLineJet_selberg_shift_average E hE (fun _ ↦ sq_nonneg _) hab hx.le
+       _ ≤ ‖((∫ v in (0:ℝ)..X, ∫ x in a-X..b, E (x+v) : ℝ) : ℂ)‖ := by
+         rw [Complex.norm_real,Real.norm_eq_abs]; exact le_abs_self _
+       _ ≤ ∑ p ∈ S, ‖∫ v in (0:ℝ)..X, ∫ x in a-X..b, K p (x+v)‖ := heint ▸ norm_sum_le _ _
+       _ ≤ ∑ p ∈ S, ((if p.1=p.2 then (X:ℝ)*(b-a+X)*‖B p.1‖^2 else 0) +
+             4*(X:ℝ)^2*(‖B p.1‖*‖B p.2‖*(1/((p.1:ℝ)-p.2)^2))) := by
+         apply Finset.sum_le_sum fun p hp ↦ ?_
+         exact spectralLineJet_selberg_rectangle_pair (hR (Finset.mem_product.mp hp).1)
+           (hR (Finset.mem_product.mp hp).2) B hab
+       _ ≤ (X:ℝ)*(b-a+X)*M + 4*(X:ℝ)^2*(D*M) := by rw [Finset.sum_add_distrib,hdiag]; gcongr
+       _ = _ := by dsimp only [M,D]; ring
+
+/-- Mean square for any fixed packet of critical-line modes, with its exact
+coefficient diagonal and a linear length loss. -/
+private theorem spectralLineJet_selberg_critical_mean {X : ℕ} (hX : 0 < X) (R : Finset ℕ)
+    (hR : R ⊆ Finset.Icc 1 X) (c : ℕ → ℝ) {a b : ℝ} (hab : a ≤ b) :
+    (∫ t in a..b, ‖∑ m ∈ R, (c m : ℂ)*mode(m,t)‖^2) ≤
+      (b-a+(1+4*(∑' k : ℤ, 1/(k:ℝ)^2))*X) * ∑ m ∈ R, (c m)^2 / m := by
+  let B (m : ℕ) := (c m : ℂ)*mode(m,0)
+  have he (t : ℝ) (m : ℕ) (hm : m ∈ R) : (c m : ℂ)*mode(m,t) =
+      B m*Complex.exp ((-Complex.I*(Real.log m : ℂ))*t) := by
+    rw [cpow_neg_criticalLinePoint_eq_mode (Finset.mem_Icc.mp (hR hm)).1, ← mul_assoc]
+    rw [← Complex.ofReal_natCast, ← Complex.ofReal_log (Nat.cast_nonneg m)]
+    rfl
+  have hd (m : ℕ) (hm : m ∈ R) : ‖B m‖^2 = (c m)^2/m := by
+    rw [show B m = (c m : ℂ)*mode(m,0) from rfl,norm_mul,Complex.norm_real,Real.norm_eq_abs,
+      norm_cpow_neg_criticalLinePoint (Finset.mem_Icc.mp (hR hm)).1,mul_pow,sq_abs,
+      div_pow,one_pow,Real.sq_sqrt (Nat.cast_nonneg m),mul_one_div]
+  calc _ = ∫ t in a..b, ‖∑ m ∈ R, B m*Complex.exp ((-Complex.I*(Real.log m : ℂ))*t)‖^2 :=
+         intervalIntegral.integral_congr fun t _ ↦ congrArg (fun z : ℂ ↦ ‖z‖^2) (Finset.sum_congr rfl (he t))
+       _ ≤ _ := (spectralLineJet_selberg_fourier_mean hX R hR B hab).trans_eq (by rw [Finset.sum_congr rfl hd])
+
+/-- The time-independent arithmetic coefficients of the full packet below the
+flat taper cutoff, with both sharp mollifier cutoffs retained. -/
+def spectralLineJet_selbergFlatCoefficient (N : ℕ) : ArithmeticFunction ℝ :=
+  let B := spectralLineJet_selbergCut N spectralLineJet_selbergHalfMoebius
+  B*(B*(ArithmeticFunction.zeta : ArithmeticFunction ℝ))
+
+/-- Below the flat cutoff every divisor in both Dirichlet convolutions has
+full zeta weight. This identity holds for all positive indices, including
+those whose smooth part exceeds the mollifier cutoff. -/
+theorem spectralLineJet_selbergGrouped_eq_flat {L N m : ℕ} {t : ℝ} (hm : 0 < m)
+    (hL : m ≤ L) (ht : (m:ℝ) ≤ 3*t/Real.pi) :
+    spectralLineJet_selbergGroupedCoefficient L N t m = spectralLineJet_selbergFlatCoefficient N m := by
+  let A := spectralLineJet_selbergCut L (fun k ↦ min 1 (max 0 (3*t/Real.pi-k+1)))
+  let Z : ArithmeticFunction ℝ := ArithmeticFunction.zeta
+  let B := spectralLineJet_selbergCut N spectralLineJet_selbergHalfMoebius
+  have hA (d : ℕ) (hd : d ∣ m) : A d = Z d := by
+    have hp := Nat.pos_of_dvd_of_pos hd hm
+    have hdm := Nat.le_of_dvd hm hd
+    have hcut := Finset.mem_Icc.mpr ⟨hp,hdm.trans hL⟩
+    have hlin : (1:ℝ) ≤ 3*t/Real.pi-d+1 := by linarith [(Nat.cast_le.mpr hdm).trans ht]
+    change (if d ∈ Finset.Icc 1 L then min 1 (max 0 (3*t/Real.pi-d+1)) else 0) = _
+    rw [ite_eq_left hcut,min_eq_left (hlin.trans (le_max_right _ _))]
+    simp [Z,ArithmeticFunction.zeta_apply_ne hp.ne']
+  have hconv {f g : ArithmeticFunction ℝ} {u : ℕ} (hv : ∀ d, d ∣ u → f d = g d) :
+      (B*f) u = (B*g) u := by
+    simp only [ArithmeticFunction.mul_apply]
+    apply Finset.sum_congr rfl fun p hp ↦ ?_
+    rw [hv p.2 ⟨p.1, by rw [← (Nat.mem_divisorsAntidiagonal.mp hp).1,mul_comm]⟩]
+  change (B*(B*A)) m = (B*(B*Z)) m
+  exact hconv (fun u hu ↦ hconv (fun d hd ↦ hA d (hd.trans hu)))
+
+/-- Local gamma damping and sliding-window averaging transfer an unweighted
+mean square to the absolute short-window estimate on a dyadic interval. -/
+private theorem spectralLineJet_selberg_dyadic_transfer :
+    ∃ C > (0:ℝ), ∀ {H T h : ℝ} (_ : 0 < H) (_ : 0 < T) (_ : 0 ≤ h) (P : ℝ → ℂ),
+      Continuous P →
+      (∫ t in T..2*T, (∫ u in t..t+h, ‖Complex.Gamma (criticalLineGammaArgument u)‖ *
+          Real.exp ((Real.pi/4-1/(2*H))*u) * ‖P u‖)^2) ≤
+        (C*h^2/Real.sqrt T) * ∫ u in T..2*T+h, ‖P u‖^2 := by
+  obtain ⟨c,hc,hgamma⟩ := spectralLineJet_selbergGamma_upper
+  refine ⟨c^2, by positivity, ?_⟩
+  intro H T h hH hT hh P hp
+  let W (u : ℝ) := ‖Complex.Gamma (criticalLineGammaArgument u)‖ *
+    Real.exp ((Real.pi/4-1/(2*H))*u)
+  have hW : Continuous W := spectralLineJet_selbergGamma_continuous.norm.mul (by fun_prop)
+  have hbound (u : ℝ) (hu : T ≤ u) : (W u)^2 ≤ c^2/Real.sqrt T := by
+    have hz : W u ≤ c/T^(1/4:ℝ) := by
+      apply (le_div_iff₀ (Real.rpow_pos_of_pos hT _)).mpr
+      calc _ ≤ W u*(1+u)^(1/4:ℝ) := by
+             apply mul_le_mul_of_nonneg_left _ (by dsimp [W]; positivity)
+             exact Real.rpow_le_rpow hT.le (by linarith) (by norm_num)
+           _ ≤ c := hgamma H hH u (hT.le.trans hu)
+    have hpow : (T^(1/4:ℝ))^2 = Real.sqrt T := by
+      rw [← Real.rpow_mul_natCast hT.le,Real.sqrt_eq_rpow]; norm_num
+    exact (pow_le_pow_left₀ (by dsimp [W]; positivity) hz 2).trans_eq (by rw [div_pow,hpow])
+  change (∫ t in T..2*T, (∫ u in t..t+h, W u*‖P u‖)^2) ≤ _
+  calc _ ≤ h^2*∫ u in T..2*T+h, (W u*‖P u‖)^2 :=
+         spectralLineJet_selberg_window_L2 _ (hW.mul hp.norm) (by linarith) hh
+       _ ≤ h^2*∫ u in T..2*T+h, (c^2/Real.sqrt T)*‖P u‖^2 := by
+         apply mul_le_mul_of_nonneg_left _ (sq_nonneg _)
+         apply intervalIntegral.integral_mono_on (by linarith) (((hW.mul hp.norm).pow 2).intervalIntegrable ..)
+           ((continuous_const.mul (hp.norm.pow 2)).intervalIntegrable ..)
+         intro u hu
+         change (W u*‖P u‖)^2 ≤ _
+         rw [mul_pow]
+         exact mul_le_mul_of_nonneg_right (hbound u hu.1) (sq_nonneg _)
+       _ = _ := by rw [intervalIntegral.integral_const_mul]; ring
+
+/-- At all frequencies below the physical flat cutoff, the full gamma-weighted
+absolute-window mean square is bounded by the arithmetic coefficient diagonal.
+The scale is linear in height and no coprimality restriction is imposed. -/
+theorem spectralLineJet_selbergGrouped_flat_dyadic :
+    ∃ K > (0:ℝ), ∀ {H T h : ℝ} (_ : 0 < H) (_ : 1 ≤ T) (_ : 0 ≤ h) (_ : h ≤ T)
+      {L N X : ℕ} (R : Finset ℕ) (_ : R ⊆ Finset.Icc 1 X), X ≤ L → (X:ℝ) ≤ 3*T/Real.pi →
+      (∫ t in T..2*T, (∫ u in t..t+h, ‖Complex.Gamma (1/4 + ((u/2:ℝ):ℂ)*Complex.I)‖ *
+          Real.exp ((Real.pi/4-1/(2*H))*u) *
+          ‖∑ m ∈ R, (spectralLineJet_selbergGroupedCoefficient L N u m : ℂ)*mode(m,u)‖)^2) ≤
+      K*h^2*Real.sqrt T * ∑ m ∈ R, (spectralLineJet_selbergFlatCoefficient N m)^2/m := by
+  obtain ⟨C,hC,htransfer⟩ := spectralLineJet_selberg_dyadic_transfer
+  let B := 1+4*(∑' k : ℤ, 1/(k:ℝ)^2)
+  have hB : 0 ≤ B := by dsimp [B]; positivity
+  refine ⟨C*(2+B), mul_pos hC (by linarith), ?_⟩
+  intro H T h hH hT hh hhT L N X R hR hL hX
+  have hTpos := zero_lt_one.trans_le hT
+  by_cases hxp : X = 0
+  · have hnil : R = ∅ := Finset.eq_empty_of_forall_notMem (fun m hm ↦ by simpa [hxp] using hR hm)
+    simp [hnil]
+  have hx := Nat.pos_of_ne_zero hxp
+  have hxT : (X:ℝ) ≤ T := hX.trans ((div_le_iff₀ Real.pi_pos).mpr (by nlinarith [mul_nonneg hTpos.le (sub_nonneg.mpr Real.pi_gt_three.le)]))
+  let c := spectralLineJet_selbergFlatCoefficient N
+  let P (u : ℝ) := ∑ m ∈ R, (c m : ℂ)*mode(m,u)
+  have hP : Continuous P := continuous_finsetSum _ fun m hm ↦
+    continuous_const.mul (continuous_cpow_neg_criticalLinePoint (Finset.mem_Icc.mp (hR hm)).1)
+  have he (u : ℝ) (hu : T ≤ u) :
+      (∑ m ∈ R, (spectralLineJet_selbergGroupedCoefficient L N u m : ℂ)*mode(m,u)) = P u := by
+    refine Finset.sum_congr rfl fun m hm ↦ ?_
+    obtain ⟨hm₁,hmX⟩ := Finset.mem_Icc.mp (hR hm)
+    rw [spectralLineJet_selbergGrouped_eq_flat hm₁ (hmX.trans hL) ((Nat.cast_le.mpr hmX).trans (hX.trans (by gcongr)))]
+  have hmean : (∫ u in T..2*T+h, ‖P u‖^2) ≤ ((2+B)*T) * ∑ m ∈ R, (c m)^2/m := by
+    apply (spectralLineJet_selberg_critical_mean hx R hR c (by linarith : T ≤ 2*T+h)).trans
+    apply mul_le_mul_of_nonneg_right _ (Finset.sum_nonneg fun _ _ ↦ by positivity)
+    change 2*T+h-T+B*X ≤ (2+B)*T
+    nlinarith only [hhT, mul_nonneg hB (sub_nonneg.mpr hxT)]
+  calc _ = ∫ t in T..2*T, (∫ u in t..t+h, ‖Complex.Gamma (criticalLineGammaArgument u)‖ *
+             Real.exp ((Real.pi/4-1/(2*H))*u) * ‖P u‖)^2 := by
+         apply intervalIntegral.integral_congr
+         intro t ht
+         rw [uIcc_of_le (by linarith : T ≤ 2*T)] at ht
+         apply congrArg (fun x : ℝ ↦ x^2)
+         apply intervalIntegral.integral_congr
+         intro u hu
+         rw [uIcc_of_le (by linarith : t ≤ t+h)] at hu
+         simp only [he u (ht.1.trans hu.1),criticalLineGammaArgument]
+       _ ≤ _ := htransfer hH hTpos hh P hP
+       _ ≤ (C*h^2/Real.sqrt T)*(((2+B)*T)*∑ m ∈ R, (c m)^2/m) := mul_le_mul_of_nonneg_left hmean (by positivity)
+       _ = _ := by
+         change _ = C*(2+B)*h^2*Real.sqrt T*(∑ m ∈ R, (c m)^2/m)
+         field_simp [Real.sqrt_pos.mpr hTpos]
+         ring_nf
+         rw [Real.sq_sqrt hTpos.le]
+         ring
+
+/-- All rough frequencies through the linear flat cutoff satisfy the window
+bound, uniformly in the subset. The logarithmic ratio stays bounded whenever
+the height cutoff is a fixed power of the mollifier length. -/
+theorem spectralLineJet_selbergGrouped_rough_linear :
+    ∃ K > (0:ℝ), ∀ {H T h : ℝ} (_ : 0 < H) (_ : 1 ≤ T) (_ : 0 ≤ h) (_ : h ≤ T)
+      {L N X : ℕ} (_ : 0 < N) (R : Finset ℕ) (_ : R ⊆ Finset.Icc 1 X),
+      (∀ m ∈ R, ∀ d, d ≤ N → 0 < d → d.Coprime m) → X ≤ L → (X:ℝ) ≤ 3*T/Real.pi →
+      (∫ t in T..2*T, (∫ u in t..t+h, ‖Complex.Gamma (1/4 + ((u/2:ℝ):ℂ)*Complex.I)‖ *
+          Real.exp ((Real.pi/4-1/(2*H))*u) *
+          ‖∑ m ∈ R, (spectralLineJet_selbergGroupedCoefficient L N u m : ℂ)*mode(m,u)‖)^2) ≤
+      K*h^2*Real.sqrt T * ((1+Real.log (N*X : ℕ))/Real.log (N+1 : ℕ)) := by
+  obtain ⟨K,hK,hmean⟩ := spectralLineJet_selbergGrouped_flat_dyadic
+  refine ⟨K,hK,?_⟩
+  intro H T h hH hT hh hhT L N X hN R hR hrough hL hX
+  apply (hmean hH hT hh hhT R hR hL hX).trans
+  apply mul_le_mul_of_nonneg_left _ (by positivity)
+  apply le_trans _ (spectralLineJet_selberg_rough_mass hN R hR hrough)
+  apply le_of_eq
+  refine Finset.sum_congr rfl fun m hm ↦ ?_
+  obtain ⟨hmpos,hmX⟩ := Finset.mem_Icc.mp (hR hm)
+  have hflat := (Nat.cast_le.mpr hmX).trans hX
+  rw [← spectralLineJet_selbergGrouped_eq_flat (N := N) hmpos (hmX.trans hL) hflat]
+  have hcoef := spectralLineJet_selbergGrouped_on_rough (r := 1) (s := m) Nat.zero_lt_one hmpos hN
+    (by simpa using hmX.trans hL) (by simpa using hflat) (hrough m hm)
+  simp only [one_mul,ite_true] at hcoef
+  simp [hcoef,one_div]
+
+/-- At indices up to a fixed multiple of the cutoff, every omitted mollifier
+factor has a complementary divisor of bounded size. This gives an absolute
+coefficient bound without a smoothness or squarefreeness restriction. -/
+theorem spectralLineJet_selbergFlat_cutoff_error {N U m : ℕ} (hm : 0 < m) (hmN : m ≤ U*N) :
+    |spectralLineJet_selbergFlatCoefficient N m - (if m=1 then 1 else 0)| ≤ 2*(U:ℝ)^2 := by
+  classical
+  let b := spectralLineJet_selbergHalfMoebius
+  let B := spectralLineJet_selbergCut N b
+  let Z : ArithmeticFunction ℝ := ArithmeticFunction.zeta
+  let g := (B+b)*Z
+  have hbb : b*b*Z = 1 := by
+    rw [show b*b = (ArithmeticFunction.moebius : ArithmeticFunction ℝ) from spectralLineJet_selbergHalfMoebius_spec.2.2]
+    exact ArithmeticFunction.coe_moebius_mul_coe_zeta
+  have heq : spectralLineJet_selbergFlatCoefficient N - 1 = g*(B-b) := by
+    change B*(B*Z)-1 = ((B+b)*Z)*(B-b)
+    rw [← hbb]; ring
+  have he (q : ℕ) (hq : q ≤ N) : (B-b) q = 0 := by
+    by_cases hz : q=0
+    · simp [hz]
+    have hmem := Finset.mem_Icc.mpr ⟨Nat.pos_of_ne_zero hz,hq⟩
+    change (if q ∈ Finset.Icc 1 N then b q else 0)-b q = 0
+    rw [ite_eq_left hmem,sub_self]
+  have hb (q : ℕ) : |B q| ≤ 1 ∧ |(B-b) q| ≤ 1 := by
+    change |if q ∈ Finset.Icc 1 N then b q else 0| ≤ 1 ∧ |(if q ∈ Finset.Icc 1 N then b q else 0)-b q| ≤ 1
+    split <;> simp [b,spectralLineJet_selbergHalfMoebius_spec.2.1]
+  have hg (d : ℕ) : |g d| ≤ 2*(d:ℝ) := by
+    change |((B+b)*Z) d| ≤ _
+    rw [ArithmeticFunction.coe_mul_zeta_apply]
+    calc _ ≤ ∑ q ∈ d.divisors, |(B+b) q| := Finset.abs_sum_le_sum_abs _ _
+         _ ≤ ∑ _q ∈ d.divisors, (2:ℝ) := by
+           refine Finset.sum_le_sum fun q _ ↦ (abs_add_le (B q) (b q)).trans ?_
+           linarith [(hb q).1,spectralLineJet_selbergHalfMoebius_spec.2.1 q]
+         _ ≤ _ := by
+           simp only [Finset.sum_const,nsmul_eq_mul]
+           linarith only [Nat.cast_le (α := ℝ).mpr (Nat.card_divisors_le_self d)]
+  have hside := congrArg (fun f : ArithmeticFunction ℝ ↦ f m) heq
+  change spectralLineJet_selbergFlatCoefficient N m - (if m=1 then 1 else 0) = (g*(B-b)) m at hside
+  rw [hside,ArithmeticFunction.mul_apply,← Nat.map_div_right_divisors,Finset.sum_map]
+  let Q (d : ℕ) := g d*(B-b) (m/d)
+  let S := m.divisors.filter (· ≤ U)
+  have hsmall : ∑ d ∈ S, Q d = ∑ d ∈ m.divisors, Q d := by
+    apply Finset.sum_subset (Finset.filter_subset _ _)
+    intro d hd hout
+    have hs : U < d := by simpa [S,hd] using hout
+    have hmd : m/d ≤ N := Nat.div_le_of_le_mul (hmN.trans (Nat.mul_le_mul_right N hs.le))
+    simp only [Q,he _ hmd,mul_zero]
+  change |∑ d ∈ m.divisors, Q d| ≤ _
+  rw [← hsmall]
+  have hcard : S.card ≤ U := by
+    have hsub : S ⊆ Finset.Icc 1 U := fun d hd ↦
+      Finset.mem_Icc.mpr ⟨Nat.pos_of_dvd_of_pos (Nat.mem_divisors.mp (Finset.mem_filter.mp hd).1).1 hm,
+        (Finset.mem_filter.mp hd).2⟩
+    simpa using Finset.card_le_card hsub
+  calc _ ≤ ∑ d ∈ S, |Q d| := Finset.abs_sum_le_sum_abs _ _
+       _ ≤ ∑ _d ∈ S, 2*(U:ℝ) := by
+         refine Finset.sum_le_sum fun d hd ↦ ?_
+         rw [show |Q d| = |g d| * |(B-b) (m/d)| from abs_mul _ _]
+         exact (mul_le_of_le_one_right (abs_nonneg _) (hb _).2).trans ((hg d).trans (by gcongr; exact_mod_cast (Finset.mem_filter.mp hd).2))
+       _ ≤ _ := by
+         simp only [Finset.sum_const,nsmul_eq_mul]
+         calc _ ≤ (U:ℝ)*(2*U) := mul_le_mul_of_nonneg_right (Nat.cast_le.mpr hcard) (by positivity)
+              _ = _ := by ring
+
+/-- Uniform diagonal mass throughout an entire fixed multiplicative enlargement
+of the mollifier band, including the indices whose smooth part exceeds `N`. -/
+private theorem spectralLineJet_selbergFlat_near_diagonal {N U X : ℕ} (hN : 0 < N)
+    (hX : X ≤ U*N) (R : Finset ℕ) (hR : R ⊆ Finset.Icc 1 X) :
+    (∑ m ∈ R, (spectralLineJet_selbergFlatCoefficient N m)^2/m) ≤ 1+4*(U:ℝ)^5 := by
+  classical
+  let c := spectralLineJet_selbergFlatCoefficient N
+  let B : ℝ := (2*U^2)^2
+  have hN' : 0 < (N:ℝ) := by exact_mod_cast hN
+  have hB : 0 ≤ B := sq_nonneg _
+  have hone (m : ℕ) (hm : 0 < m) (hle : m ≤ N) : c m = if m=1 then 1 else 0 := by
+    let t : ℝ := m*Real.pi
+    have hmt : (m:ℝ) ≤ 3*t/Real.pi := by
+      rw [le_div_iff₀ Real.pi_pos]
+      dsimp [t]; nlinarith [mul_nonneg (Nat.cast_nonneg (α := ℝ) m) Real.pi_pos.le]
+    rw [show c m = spectralLineJet_selbergGroupedCoefficient m N t m from
+      (spectralLineJet_selbergGrouped_eq_flat hm le_rfl hmt).symm]
+    simpa using spectralLineJet_selbergGrouped_on_rough (s := 1) hm Nat.zero_lt_one hle
+      (show m*1 ≤ m by simp) (by simpa using hmt) (by simp)
+  have hcoef (m : ℕ) (hm : m ∈ R) : (c m)^2/m ≤ (if m=1 then 1 else 0) + B/N := by
+    obtain ⟨hmpos,hmX⟩ := Finset.mem_Icc.mp (hR hm)
+    by_cases h : m ≤ N
+    · rw [hone m hmpos h]
+      split
+      · rename_i h1; subst m
+        simpa using div_nonneg hB hN'.le
+      · simpa using div_nonneg hB hN'.le
+    · have hn1 : m ≠ 1 := by omega
+      have hb := spectralLineJet_selbergFlat_cutoff_error hmpos (hmX.trans hX)
+      simp only [ite_eq_right hn1,sub_zero] at hb
+      rw [ite_eq_right hn1,zero_add]
+      apply div_le_div₀ hB _ hN' (Nat.cast_le.mpr (le_of_lt (lt_of_not_ge h)))
+      simpa only [sq_abs] using pow_le_pow_left₀ (abs_nonneg _) hb 2
+  have hi : (∑ m ∈ R, if m=1 then (1:ℝ) else 0) ≤ 1 := by simp; split <;> norm_num
+  have hcard : R.card ≤ U*N := (show R.card ≤ X by simpa using Finset.card_le_card hR).trans hX
+  calc _ ≤ ∑ m ∈ R, ((if m=1 then 1 else 0)+B/N) := Finset.sum_le_sum hcoef
+       _ ≤ 1+4*(U:ℝ)^5 := by
+         rw [Finset.sum_add_distrib,Finset.sum_const,nsmul_eq_mul]
+         apply add_le_add hi
+         calc _ ≤ ((U*N : ℕ):ℝ)*(B/N) := mul_le_mul_of_nonneg_right (Nat.cast_le.mpr hcard) (div_nonneg hB hN'.le)
+              _ = _ := by push_cast; dsimp [B]; field_simp; ring
+
+/-- The complete unsieved frequency band through any fixed multiple of the
+mollifier length has the target absolute-window second moment. -/
+theorem spectralLineJet_selbergGrouped_near_dyadic (U : ℕ) :
+    ∃ K > (0:ℝ), ∀ {H T h : ℝ} (_ : 0 < H) (_ : 1 ≤ T) (_ : 0 ≤ h) (_ : h ≤ T)
+      {L N X : ℕ} (_ : 0 < N) (R : Finset ℕ) (_ : R ⊆ Finset.Icc 1 X),
+      X ≤ U*N → X ≤ L → (X:ℝ) ≤ 3*T/Real.pi →
+      (∫ t in T..2*T, (∫ u in t..t+h, ‖Complex.Gamma (1/4 + ((u/2:ℝ):ℂ)*Complex.I)‖ *
+          Real.exp ((Real.pi/4-1/(2*H))*u) *
+          ‖∑ m ∈ R, (spectralLineJet_selbergGroupedCoefficient L N u m : ℂ)*mode(m,u)‖)^2) ≤
+      K*h^2*Real.sqrt T := by
+  obtain ⟨C,hC,hmean⟩ := spectralLineJet_selbergGrouped_flat_dyadic
+  refine ⟨C*(1+4*(U:ℝ)^5),by positivity,?_⟩
+  intro H T h hH hT hh hhT L N X hN R hR hX hL hflat
+  apply (hmean hH hT hh hhT R hR hL hflat).trans
+  calc _ ≤ C*h^2*Real.sqrt T*(1+4*(U:ℝ)^5) :=
+         mul_le_mul_of_nonneg_left (spectralLineJet_selbergFlat_near_diagonal hN hX R hR) (by positivity)
+       _ = _ := by ring
+
 end SelbergBulk
 
 /-- A grid of width 1/(k+1) forces two distinct ordinates in the same cell. -/
