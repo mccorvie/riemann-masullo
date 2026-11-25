@@ -10,6 +10,7 @@ import Mathlib.MeasureTheory.Integral.Asymptotics
 import Mathlib.MeasureTheory.Function.L2Space
 import Mathlib.Topology.Algebra.Module.Cardinality
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform.Weighted
+import Mathlib.Analysis.Complex.JensenFormula
 
 /-!
 # A theta-lift norm criterion for exterior-zero cancellation
@@ -1150,6 +1151,322 @@ theorem centeredLogThetaLift_right_zero_sum_with_multiplicity (χ : PontryaginDu
     simpa [S, d, m, n, L] using h
   have hd (ρ : Z) : 0 ≤ d ρ := mul_nonneg (Nat.cast_nonneg _) (div_nonneg (by linarith [ρ.property.1]) (sq_nonneg _))
   exact ⟨summable_of_sum_le hd hfin, (summable_of_sum_le hd hfin).tsum_le_of_sum_le hfin⟩
+
+section ThetaSupport
+
+open Metric
+open scoped FourierTransform
+
+local notation "positiveSites(" χ ")" => {z : ℂ // 0 < order(χ,z) ∧ |z.re - 1 / 2| < (1 / 2 : ℝ)}
+
+/-- At arbitrarily large heights the positive completed Hecke divisor has more than any
+specified linear mass. The sites retain their full multiplicities. -/
+theorem exists_completed_zero_mass_gt_linear (χ : PontryaginDual C𝔽) (C T : ℝ) :
+    ∃ R : ℝ, max 1 T ≤ R ∧ ∃ S : Finset positiveSites(χ),
+      (∀ r ∈ S, |r.val.im| ≤ R) ∧ C*R < ∑ r ∈ S, (order(χ, r.val) : ℝ) := by
+  classical
+  by_contra! hu
+  have hd : (1 : ℝ) ≤ (Module.finrank ℚ F : ℝ) := by exact_mod_cast (show 1 ≤ Module.finrank ℚ F from Module.finrank_pos)
+  have hl := (introTrace_completed_zero_count_height_lower χ (c := (1:ℝ)/8) (by linarith)).filter_mono atTop_le_cocompact
+  obtain ⟨a, ha⟩ := eventually_atTop.1 (hl.and (Real.tendsto_log_atTop.eventually_gt_atTop (8*(50*C+1))))
+  obtain ⟨n,hn⟩ := exists_nat_gt (max (max a 1) T)
+  have hn1 : 1 ≤ (n:ℝ) := (le_max_right a 1).trans ((le_max_left ..).trans hn.le)
+  let t (j : ℕ) : ℝ := 17*((n:ℝ)+(j:ℝ))
+  have ht (j : ℕ) : a ≤ t j := by
+    have h := (le_max_left a 1).trans ((le_max_left ..).trans hn.le)
+    dsimp [t]; linarith [Nat.cast_nonneg (α := ℝ) j]
+  choose S hS using fun j ↦ (ha _ (ht j)).1
+  let J := Finset.range n
+  have hrow (j : ℕ) : 50*C+1 ≤ ∑ r ∈ S j, (order(χ, r.val) : ℝ) := by
+    have h1 := (hS j).2
+    have h2 := (ha _ (ht j)).2
+    rw [abs_of_nonneg (by dsimp [t]; positivity : 0 ≤ t j)] at h1
+    linarith
+  have hdis : (J : Set ℕ).PairwiseDisjoint S := by
+    intro i _ j _ hne
+    apply Finset.disjoint_left.mpr
+    intro r hi hj
+    have h1 := abs_le.mp ((hS i).1 r |>.mp hi)
+    have h2 := abs_le.mp ((hS j).1 r |>.mp hj)
+    dsimp only [t] at h1 h2
+    rcases lt_or_gt_of_ne hne with hij | hji
+    · have hh : (i:ℝ)+1 ≤ j := by exact_mod_cast hij
+      linarith
+    · have hh : (j:ℝ)+1 ≤ i := by exact_mod_cast hji
+      linarith
+  have hb : ∀ r ∈ J.biUnion S, |r.val.im| ≤ 50*(n:ℝ) := by
+    intro r hr
+    obtain ⟨j,hj,hrj⟩ := Finset.mem_biUnion.mp hr
+    have hj' : (j:ℝ) ≤ n := by exact_mod_cast (Finset.mem_range.mp hj).le
+    have hx := abs_le.mp ((hS j).1 r |>.mp hrj)
+    dsimp only [t] at hx
+    exact abs_le.mpr ⟨by linarith [Nat.cast_nonneg (α := ℝ) j], by linarith⟩
+  have hT : T ≤ (n : ℝ) := (le_max_right ..).trans hn.le
+  have hupper := hu _ (max_le (by linarith : 1 ≤ 50*(n:ℝ)) (by linarith)) _ hb
+  rw [Finset.sum_biUnion hdis] at hupper
+  have hlower := Finset.sum_le_sum (fun j (_ : j ∈ J) ↦ hrow j)
+  simp only [Finset.sum_const, J, Finset.card_range, nsmul_eq_mul] at hlower
+  nlinarith
+
+
+open MeromorphicOn in
+/-- An entire function of exponential type whose zeros include the positive completed
+Hecke divisor with its full multiplicities is identically zero. -/
+theorem eq_zero_of_completed_divisor_of_exponential_type (χ : PontryaginDual C𝔽)
+    {f : ℂ → ℂ} (hf : AnalyticOnNhd ℂ f univ) {D : ℝ} (hD : 0 ≤ D)
+    (hbound : ∀ z, ‖f z‖ ≤ Real.exp (D*(1+‖z‖)))
+    (hdiv : ∀ r : positiveSites(χ), meromorphicOrderAt (continuedCompletedHeckeL χ) r.val ≤ meromorphicOrderAt f r.val) :
+    f = 0 := by
+  classical
+  by_contra hne
+  obtain ⟨c,hc⟩ : ∃ c : ℂ, f c ≠ 0 := by
+    by_contra! h
+    exact hne (funext h)
+  let K := D*(5+3*‖c‖)+|Real.log ‖f c‖|
+  obtain ⟨L,hL,S,hS,hmass⟩ := exists_completed_zero_mass_gt_linear χ (K / Real.log 2) 1
+  rw [max_self] at hL
+  apply hmass.not_ge
+  let r : ℝ := (2+‖c‖)*L
+  have hr : 0 < r := by dsimp [r]; positivity
+  have hs (v : positiveSites(χ)) (hv : v ∈ S) : (v:ℂ) ∈ closedBall c r := by
+    have hz := abs_lt.mp v.property.2
+    have hz' : |v.val.re| ≤ 1 := abs_le.mpr ⟨by linarith, by linarith⟩
+    rw [mem_closedBall, Complex.dist_eq]
+    calc
+      ‖v.val-c‖ ≤ ‖v.val‖ + ‖c‖ := norm_sub_le ..
+      _ ≤ (|v.val.re|+|v.val.im|) + ‖c‖ := by gcongr; exact Complex.norm_le_abs_re_add_abs_im _
+      _ ≤ r := by dsimp [r]; nlinarith [hS v hv, mul_nonneg (norm_nonneg c) (sub_nonneg.mpr hL)]
+  let W := closedBall c r
+  let q (z : ℂ) : ℤ := divisor f W z
+  have hfW : AnalyticOnNhd ℂ f W := hf.mono (subset_univ _)
+  have hqi (v : positiveSites(χ)) (hv : v ∈ S) : order(χ, v.val) ≤ q v.val := by
+    have horder := hf.analyticOrderAt_ne_top_of_isPreconnected isPreconnected_univ
+      (mem_univ c) (mem_univ (v : ℂ)) (((hf c (mem_univ _)).analyticOrderAt_eq_zero.mpr hc) ▸ (by simp))
+    have hfinite : meromorphicOrderAt f v.val ≠ ⊤ := by
+      rw [(hf v.val (mem_univ _)).meromorphicOrderAt_eq]
+      simpa using horder
+    dsimp only [q]
+    rw [hfW.meromorphicOn.divisor_apply (hs v hv),
+      (continuedCompletedHeckeL_spec χ).1.meromorphicOn.divisor_apply (mem_univ _)]
+    exact WithTop.untop₀_le_untop₀ hfinite (hdiv v)
+  let e : positiveSites(χ) ↪ ℂ := ⟨Subtype.val,Subtype.val_injective⟩
+  let T := S.map e
+  have hfin : (support q).Finite := (divisor f W).finiteSupport (isCompact_closedBall ..)
+  let V := T ∪ hfin.toFinset
+  have hsum : (∑ v ∈ S, order(χ, v.val)) ≤ ∑ᶠ z, q z := by
+    calc
+      _ ≤ ∑ v ∈ S, q v.val := Finset.sum_le_sum hqi
+      _ = ∑ z ∈ T, q z := (S.sum_map e q).symm
+      _ ≤ ∑ z ∈ V, q z := Finset.sum_le_sum_of_subset_of_nonneg Finset.subset_union_left
+        (fun z _ _ ↦ hfW.divisor_nonneg z)
+      _ = ∑ᶠ z, q z := (finsum_eq_sum_of_support_subset q (by
+        intro z hz
+        exact Finset.mem_union_right _ (hfin.mem_toFinset.mpr hz))).symm
+  let A := D*(1+2*r+‖c‖)
+  have hA : 0 ≤ A := by dsimp [A]; positivity
+  have hM : ∀ z ∈ sphere c |2*r|, ‖f z‖ ≤ Real.exp A := by
+    intro z hz
+    rw [mem_sphere, abs_of_pos (by positivity)] at hz
+    apply (hbound z).trans
+    apply Real.exp_le_exp.mpr
+    apply mul_le_mul_of_nonneg_left _ hD
+    have ht := norm_le_norm_add_norm_sub z c
+    have ht' := dist_triangle z c (0:ℂ)
+    rw [dist_zero_right,dist_zero_right,hz] at ht'
+    linarith
+  have hj := (show AnalyticOnNhd ℂ f (closedBall c |2*r|) from hf.mono (subset_univ _)).sum_divisor_le
+    (r := r) (R := 2*r) (by simpa [abs_of_pos hr] using hr)
+    (by rw [abs_of_pos hr, abs_of_pos (by positivity)]; linarith)
+    (Real.one_le_exp hA) hc hM
+  rw [abs_of_pos hr,show (2*r)/r = 2 by field_simp,
+    Real.log_div (Real.exp_pos _).ne' (norm_ne_zero_iff.mpr hc),Real.log_exp] at hj
+  change ((∑ᶠ z, q z : ℤ):ℝ) ≤ _ at hj
+  have hh : (∑ v ∈ S,(order(χ, v.val):ℝ)) ≤ ((∑ᶠ z,q z : ℤ):ℝ) := by exact_mod_cast hsum
+  apply hh.trans (hj.trans _)
+  rw [div_mul_eq_mul_div, div_le_div_iff_of_pos_right (Real.log_pos (by norm_num))]
+  have h1 := mul_le_mul_of_nonneg_left hL (show 0 ≤ D*(1+‖c‖) by positivity)
+  have h2 := mul_le_mul_of_nonneg_left hL (abs_nonneg (Real.log ‖f c‖))
+  dsimp [K, A,r]
+  nlinarith [neg_abs_le (Real.log ‖f c‖)]
+
+
+private theorem thetaMellin_exp_growth_of_compact {u : ℝ → ℂ} (hc : Continuous u)
+    (hs : HasCompactSupport u) :
+    ∃ D : ℝ, 0 ≤ D ∧ ∀ z : ℂ,
+      ‖∫ x : ℝ, u x * Complex.exp ((z-1/2)*(x:ℂ))‖ ≤ Real.exp (D*(1+‖z‖)) := by
+  obtain ⟨R,hR,hRs⟩ := hs.isBounded.exists_pos_norm_lt
+  let A : ℝ := ∫ x : ℝ, ‖u x‖
+  have hA : 0 ≤ A := integral_nonneg fun _ ↦ norm_nonneg _
+  have hi : Integrable u := hc.integrable_of_hasCompactSupport hs
+  refine ⟨A+R,by positivity,fun z ↦ ?_⟩
+  let M := R*(1+‖z‖)
+  have hx (x : ℝ) : ‖u x * Complex.exp ((z-1/2)*(x:ℂ))‖ ≤ ‖u x‖ * Real.exp M := by
+    by_cases hux : u x = 0
+    · simp [hux]
+    have hr : |x| ≤ R := by simpa [Real.norm_eq_abs] using (hRs x (subset_tsupport u hux)).le
+    rw [norm_mul,Complex.norm_exp]
+    apply mul_le_mul_of_nonneg_left _ (norm_nonneg _)
+    apply Real.exp_le_exp.mpr
+    have h1 := Complex.re_le_norm ((z-1/2)*(x:ℂ))
+    rw [norm_mul,Complex.norm_real,Real.norm_eq_abs] at h1
+    apply h1.trans
+    calc
+      _ ≤ (‖z‖+1) * R := by
+        gcongr
+        calc ‖z-1/2‖ ≤ ‖z‖+‖(1/2:ℂ)‖ := norm_sub_le ..
+             _ ≤ _ := by simp; norm_num
+      _ = M := by dsimp only [M]; ring
+  calc
+    _ ≤ ∫ x:ℝ, ‖u x‖ * Real.exp M := norm_integral_le_of_norm_le (hi.norm.mul_const _) (ae_of_all _ hx)
+    _ = A*Real.exp M := integral_mul_const _ _
+    _ ≤ Real.exp A*Real.exp M := mul_le_mul_of_nonneg_right (by linarith [Real.add_one_le_exp A]) (Real.exp_nonneg _)
+    _ ≤ _ := by rw [← Real.exp_add,Real.exp_le_exp]; dsimp [M]; nlinarith [mul_nonneg hA (norm_nonneg z)]
+
+
+
+/-- For every number field and every unitary character, a polar-free theta profile with
+compact logarithmic support vanishes identically. Both log-norm tails matter here. -/
+theorem centeredLogThetaLift_eq_zero_of_hasCompactSupport (χ : PontryaginDual C𝔽)
+    (τ : ℝ≥0ˣ →ₜ* I𝔽) (hτ : RightInverse τ (ideleNorm F)) (f : adelePolarSubspace F)
+    (hs : HasCompactSupport (centeredLogThetaLift χ τ f)) : centeredLogThetaLift χ τ f = 0 := by
+  let u := centeredLogThetaLift χ τ f
+  let Z (s : ℂ) := globalThetaMellinIntegral f.val (ideleClassNormTwist χ s)
+  have huc : Continuous u := (centeredLogThetaLift_energy χ τ hτ f (α:=0) (s:=0) le_rfl le_rfl 0).1
+  have hm (z : ℂ) : (∫ x : ℝ, u x*Complex.exp (z*(x:ℂ))) = Z (z+1/2) :=
+    (centeredLogThetaLift_mellin_moment χ τ hτ f z).2
+  have ht (z : ℂ) : (∫ x : ℝ, u x*Complex.exp ((z-1/2)*(x:ℂ))) = Z z := by
+    simpa only [sub_add_cancel] using hm (z-1/2)
+  obtain ⟨D,hD,hB⟩ := thetaMellin_exp_growth_of_compact huc hs
+  obtain ⟨hf₀,hf₁⟩ := (mem_adelePolarSubspace _).mp f.property
+  have hZ : AnalyticOnNhd ℂ Z univ := fun z _ ↦
+    (globalThetaMellinIntegral_entire_of_vanishing f.val hf₀ hf₁ χ).analyticAt z
+  have hzero : Z = 0 := by
+    apply eq_zero_of_completed_divisor_of_exponential_type χ hZ hD (fun z ↦ ht z ▸ hB z)
+    intro r
+    exact (le_max_right ..).trans ((isLeast_globalThetaMellinIntegral_orders χ r.val).2 ⟨f,rfl⟩)
+  have hFourier : 𝓕 u = 0 := by
+    funext t
+    let w : ℂ := (-2*(Real.pi:ℂ)*(t:ℂ))*Complex.I
+    rw [Real.fourier_real_eq_integral_exp_smul]
+    change (∫ v : ℝ, Complex.exp _ • u v) = 0
+    have h := hm w
+    rw [hzero] at h
+    change _ = 0 at h
+    convert h using 1
+    apply integral_congr_ae (ae_of_all _ _)
+    intro x
+    rw [smul_eq_mul,mul_comm]
+    congr 2
+    dsimp [w]; push_cast; ring
+  have hi : Integrable u := huc.integrable_of_hasCompactSupport hs
+  have he := huc.fourierInv_fourier_eq hi (hFourier ▸ integrable_zero _ _ _)
+  rw [hFourier] at he
+  change u = 0
+  rw [← he]
+  funext x
+  simp [Real.fourierInv_eq]
+
+
+
+private theorem logSobolev_energy_factor (k : ℕ) (x : ℝ) :
+    intervalSobolevDensity 0 0 (2*(k:ℝ)+3) x =
+      (1+x^2)^k * (1+x^2)^(3/2 : ℝ) := by
+  unfold intervalSobolevDensity
+  simp only [mul_zero, zero_mul, Real.exp_zero, max_self, one_mul]
+  rw [show (2*(k:ℝ)+3)/2 = (k:ℝ)+3/2 by ring, Real.rpow_add (by positivity),
+    Real.rpow_natCast]
+
+
+
+/-- Fix a nonzero centered polar-free theta lift, a visible window and any positive rate.
+At critical-line Sobolev degree `2k + 3`, the visible squared norm is bounded by that rate
+to the power `k` times the energy on one fixed exterior interval. Its energy is positive
+at every degree. -/
+theorem centeredLogThetaLift_visible_le_geometric_tail (χ : PontryaginDual C𝔽)
+    (τ : ℝ≥0ˣ →ₜ* I𝔽) (hτ : RightInverse τ (ideleNorm F)) (f : adelePolarSubspace F)
+    (hu : centeredLogThetaLift χ τ f ≠ 0) (R : ℝ) (hR : 0 ≤ R) {q : ℝ} (hq : 0 < q) :
+    let u := centeredLogThetaLift χ τ f
+    let E (k : ℕ) (x : ℝ) := ‖u x‖^2 * intervalSobolevDensity 0 0 (2*(k:ℝ)+3) x
+    ∃ a b C : ℝ, a < b ∧ 0 < C ∧ (∀ x ∈ Icc a b, R < |x| ∧ u x ≠ 0) ∧
+      ∀ k : ℕ, 0 < (∫ x in Icc a b, E k x) ∧ (∫ x in Icc (-R) R, E k x) ≤ C*q^k * ∫ x in Icc a b, E k x := by
+  intro u E
+  have huc : Continuous u := (centeredLogThetaLift_energy χ τ hτ f (α:=0) (s:=0) le_rfl le_rfl 0).1
+  let B := max R ((1+R^2)/q) + 1
+  have hBR : R < B := by dsimp [B]; linarith [le_max_left R ((1+R^2)/q)]
+  have hB1 : 1 ≤ B := by dsimp [B]; linarith [le_max_left R ((1+R^2)/q)]
+  have hratio : 1+R^2 ≤ q*(1+B^2) := by
+    have ha : (1+R^2)/q ≤ B := by dsimp [B]; linarith [le_max_right R ((1+R^2)/q)]
+    have ha' := (div_le_iff₀ hq).mp ha
+    have hb : B ≤ 1+B^2 := by nlinarith [sq_nonneg (B-1)]
+    nlinarith [mul_le_mul_of_nonneg_left hb hq.le]
+  obtain ⟨t,htB,ht⟩ : ∃ t : ℝ, B < |t| ∧ u t ≠ 0 := by
+    by_contra! h
+    apply hu
+    apply centeredLogThetaLift_eq_zero_of_hasCompactSupport χ τ hτ f
+    apply HasCompactSupport.intro' (K := Icc (-B) B) isCompact_Icc isClosed_Icc
+    intro x hx
+    exact h x (by by_contra! h'; exact hx (abs_le.mp h'))
+  have hneigh : {x : ℝ | B < |x| ∧ u x ≠ 0} ∈ 𝓝 t :=
+    (isOpen_lt continuous_const continuous_abs).inter (isOpen_ne_fun huc continuous_const) |>.mem_nhds ⟨htB, ht⟩
+  obtain ⟨d,hd,hin⟩ := Metric.mem_nhds_iff.mp hneigh
+  let a := t-d/2
+  let b := t+d/2
+  have hab : a < b := by dsimp [a,b]; linarith
+  have hj (x : ℝ) (hx : x ∈ Icc a b) : B < |x| ∧ u x ≠ 0 := by
+    apply hin
+    rw [Metric.mem_ball,Real.dist_eq,abs_lt]
+    dsimp [a,b] at hx
+    constructor <;> linarith [hx.1,hx.2]
+  let g (x : ℝ) := ‖u x‖^2*(1+x^2)^(3/2:ℝ)
+  have hc : Continuous g := by dsimp only [g]; fun_prop (disch := intros; positivity)
+  have hg (x : ℝ) : 0 ≤ g x := by dsimp [g]; positivity
+  have he (k : ℕ) (x : ℝ) : E k x = g x*(1+x^2)^k := by
+    dsimp only [E,g]; rw [logSobolev_energy_factor]; ring
+  have hec (k : ℕ) : Continuous (E k) := by
+    simp_rw [funext (he k)]; fun_prop
+  let N := ∫ x in Icc (-R) R, g x
+  let D := ∫ x in Icc a b, g x
+  have hp : 0 < D := by
+    dsimp only [D]
+    rw [integral_Icc_eq_integral_Ioc, ← intervalIntegral.integral_of_le hab.le]
+    apply intervalIntegral.intervalIntegral_pos_of_pos_on (hc.intervalIntegrable a b) _ hab
+    intro x hx
+    have hn := (hj x ⟨hx.1.le,hx.2.le⟩).2
+    dsimp [g]; positivity
+  have hN : 0 ≤ N := integral_nonneg hg
+  let C := (N+1)/D
+  have hC : 0 < C := by dsimp [C]; positivity
+  refine ⟨a,b,C,hab,hC,fun x hx ↦ ⟨hBR.trans (hj x hx).1, (hj x hx).2⟩, fun k ↦ ?_⟩
+  have hv : (∫ x in Icc (-R) R, E k x) ≤ N*(1+R^2)^k := by
+    dsimp only [N]
+    rw [← integral_mul_const]
+    apply setIntegral_mono_on (hec k |>.integrableOn_Icc) ((hc.mul_const _).integrableOn_Icc) measurableSet_Icc
+    intro x hx
+    rw [he]
+    apply mul_le_mul_of_nonneg_left _ (hg x)
+    apply pow_le_pow_left₀ (by positivity)
+    nlinarith [mul_nonneg (sub_nonneg.mpr hx.2) (show 0 ≤ R+x by linarith [hx.1])]
+  have hw : D*(1+B^2)^k ≤ ∫ x in Icc a b, E k x := by
+    dsimp only [D]
+    rw [← integral_mul_const]
+    apply setIntegral_mono_on ((hc.mul_const _).integrableOn_Icc) (hec k |>.integrableOn_Icc) measurableSet_Icc
+    intro x hx
+    rw [he]
+    apply mul_le_mul_of_nonneg_left _ (hg x)
+    apply pow_le_pow_left₀ (by positivity)
+    have hh := (hj x hx).1
+    nlinarith [sq_abs x, mul_nonneg (sub_nonneg.mpr hh.le) (show 0 ≤ |x|+B by linarith [abs_nonneg x])]
+  have hratio' := pow_le_pow_left₀ (show 0 ≤ 1+R^2 by positivity) hratio k
+  rw [mul_pow] at hratio'
+  refine ⟨lt_of_lt_of_le (by positivity : 0 < D*(1+B^2)^k) hw, ?_⟩
+  calc
+    _ ≤ N*(1+R^2)^k := hv
+    _ ≤ (N+1)*(q^k*(1+B^2)^k) := mul_le_mul (by linarith) hratio' (by positivity) (by positivity)
+    _ = C*q^k*(D*(1+B^2)^k) := by dsimp only [C]; field_simp
+    _ ≤ _ := mul_le_mul_of_nonneg_left hw (by positivity)
+
+
+end ThetaSupport
 
 /-- At a completed Hecke zero ρ to the right of the central line, a polar-free theta lift
 supported in nonpositive log norm has L² distance at least
