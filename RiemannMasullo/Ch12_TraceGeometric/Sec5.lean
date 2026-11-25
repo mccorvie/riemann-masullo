@@ -1568,6 +1568,167 @@ theorem spectralStripTrace_eq_localTerms_of_half_le (φ : BruhatCompactSupport C
   exact exteriorZeros_stripTrace_of_isEmpty τ hτ (one_half_pos.trans_le hα) hs
     (exteriorZeros_isEmpty_of_half_le τ hα) φ a b ha hb T hT
 
+section FiniteZeroSamples
+
+local notation "sites(" τ ")" => interiorZeros(τ, (1/2 : ℝ))
+local notation "multiplicity(" z ")" => (ord((z).val.1.val, (z).val.2)).toNat
+local notation "weight(" φ ", " z ")" => (M(φ, twist((z).val.1.val, (z).val.2 - 1/2))).re
+local notation "listed(" φ ", " k ")" => Finsupp.sum k (fun z (n : ℕ) ↦ (n : ℝ) * weight(φ, z))
+local notation "missing(" k ", " z ")" => ((multiplicity(z) - k z : ℕ) : ℝ)
+local notation "negativeMass(" τ ", " φ ", " k ")" =>
+  (∑' z : sites(τ), missing(k, z) * max (-weight(φ, z)) 0)
+
+/-- Theorem B.4.4.7 (p. 623) and Theorem 12.5.1.1 (pp. 519–520). After subtracting a
+finite list of certified lower multiplicities, the remaining real zero contributions
+sum to the signed local expression minus the listed mass. A listed zero may have
+higher multiplicity than the list certifies. -/
+theorem heckeZeroSample_residual_hasSum (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (φ : BruhatCompactSupport C𝔽) (a : archTest) (b : finiteTest)
+    (ha : archRestricts(φ, a)) (hb : finiteRestricts(φ, b)) (k : sites(τ) →₀ ℕ)
+    (hk : ∀ z, k z ≤ multiplicity(z)) :
+    HasSum (fun z : sites(τ) ↦ missing(k, z) * weight(φ, z)) ((localTerms(φ, a, b)).re - listed(φ, k)) := by
+  classical
+  obtain ⟨a', b', ha', hb', -, hall⟩ := traceFormula_of_half_le τ hτ φ (le_refl (1/2 : ℝ))
+  rw [exteriorZeros_localTerms_congr φ ha hb ha' hb']
+  have hfull : HasSum (fun z : sites(τ) ↦ (multiplicity(z) : ℝ) * weight(φ, z))
+      (localTerms(φ, a', b')).re := by
+    convert Complex.hasSum_re hall using 1
+    funext z
+    have hc : (multiplicity(z) : ℝ) = ((ord(z.val.1.val, z.val.2) : ℤ) : ℝ) := by
+      exact_mod_cast Int.toNat_of_nonneg z.property.1.le
+    simp [hc, Complex.mul_re]
+  have hlisted : HasSum (fun z : sites(τ) ↦ (k z : ℝ) * weight(φ, z)) (listed(φ, k)) := by
+    apply hasSum_sum_of_ne_finset_zero
+    intro z hz
+    simp [Finsupp.notMem_support_iff.mp hz]
+  convert hfull.sub hlisted using 1
+  funext z
+  simp [Nat.cast_sub (hk z), sub_mul]
+
+private theorem heckeZeroSample_positiveNegative {ι : Type*} (d w : ι → ℝ) (hd : ∀ i, 0 ≤ d i)
+    {R : ℝ} (h : HasSum (fun i ↦ d i * w i) R) :
+    Summable (fun i ↦ d i * max (-w i) 0) ∧
+    HasSum (fun i ↦ d i * max (w i) 0) (R + ∑' i, d i * max (-w i) 0) := by
+  have hn : Summable (fun i ↦ d i * max (-w i) 0) := by
+    apply h.summable.norm.of_norm_bounded
+    intro i
+    rw [Real.norm_eq_abs, abs_of_nonneg (mul_nonneg (hd _) (le_max_right _ _)),
+      Real.norm_eq_abs, abs_mul, abs_of_nonneg (hd _)]
+    exact mul_le_mul_of_nonneg_left (max_le (neg_le_abs _) (abs_nonneg _)) (hd _)
+  refine ⟨hn, ?_⟩
+  convert h.add hn.hasSum using 1
+  funext i
+  by_cases hi : 0 ≤ w i
+  · rw [max_eq_left hi, max_eq_right (neg_nonpos.mpr hi), mul_zero, add_zero]
+  · rw [max_eq_right (le_of_not_ge hi), max_eq_left (neg_nonneg.mpr (le_of_not_ge hi))]
+    ring
+
+/-- For a real Mellin weight bounded below by η on a finite collection of zero sites,
+η times their unlisted multiplicity is at most the signed local residual plus the
+negative mass of all unlisted copies. Thus a positive test needs no allowance for
+negative terms. Both the poles and all principal values retain the explicit formula's
+normalization. -/
+theorem heckeZeroSample_missingMultiplicity_le (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (φ : BruhatCompactSupport C𝔽) (a : archTest) (b : finiteTest)
+    (ha : archRestricts(φ, a)) (hb : finiteRestricts(φ, b)) (k : sites(τ) →₀ ℕ)
+    (hk : ∀ z, k z ≤ multiplicity(z)) :
+    Summable (fun z : sites(τ) ↦ missing(k, z) * max (-weight(φ, z)) 0) ∧
+      ∀ (S : Finset (sites(τ))) (η : ℝ), (∀ z ∈ S, η ≤ weight(φ, z)) →
+        ((∑ z ∈ S, (multiplicity(z) - k z) : ℕ) : ℝ) * η ≤
+          (localTerms(φ, a, b)).re - listed(φ, k) + negativeMass(τ, φ, k) := by
+  have hr := heckeZeroSample_residual_hasSum τ hτ φ a b ha hb k hk
+  obtain ⟨hn, hp⟩ := heckeZeroSample_positiveNegative (fun z : sites(τ) ↦ missing(k, z))
+    (fun z ↦ weight(φ, z)) (fun _ ↦ Nat.cast_nonneg _) hr
+  refine ⟨hn, fun S η hη ↦ ?_⟩
+  rw [Nat.cast_sum, Finset.sum_mul]
+  calc
+    _ ≤ ∑ z ∈ S, missing(k, z) * max (weight(φ, z)) 0 := by
+      apply Finset.sum_le_sum
+      intro z hz
+      exact mul_le_mul_of_nonneg_left ((hη z hz).trans (le_max_left _ _)) (Nat.cast_nonneg _)
+    _ ≤ _ := sum_le_hasSum S (fun z _ ↦ mul_nonneg (Nat.cast_nonneg _) (le_max_right _ _)) hp
+
+/-- A certified upper local value, lower listed mass and upper negative allowance suffice
+for completeness including multiplicities on any set of sites with a positive weight
+floor. If one additional copy costs more than the residual allowance, every multiplicity
+in that set has already been certified. -/
+theorem heckeZeroSample_completeOn_of_residual_lt (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (φ : BruhatCompactSupport C𝔽)
+    (a : archTest) (b : finiteTest) (ha : archRestricts(φ, a)) (hb : finiteRestricts(φ, b))
+    (k : sites(τ) →₀ ℕ) (hk : ∀ z, k z ≤ multiplicity(z)) (E : Set (sites(τ)))
+    {U L N η : ℝ} (hU : (localTerms(φ, a, b)).re ≤ U) (hL : L ≤ listed(φ, k))
+    (hN : negativeMass(τ, φ, k) ≤ N) (hη : 0 < η) (hE : ∀ z ∈ E, η ≤ weight(φ, z))
+    (hgap : U - L + N < η) : ∀ z ∈ E, k z = multiplicity(z) := by
+  classical
+  intro z hz
+  by_contra hne
+  have hd : (1 : ℝ) ≤ missing(k, z) := by
+    exact_mod_cast Nat.succ_le_of_lt (Nat.sub_pos_of_lt (lt_of_le_of_ne (hk z) hne))
+  have hs := (heckeZeroSample_missingMultiplicity_le τ hτ φ a b ha hb k hk).2 {z} η
+    (fun v hv ↦ (Finset.mem_singleton.mp hv) ▸ hE z hz)
+  simp only [Finset.sum_singleton] at hs
+  have hm : η ≤ missing(k, z) * η := by simpa using mul_le_mul_of_nonneg_right hd hη.le
+  linarith
+
+private theorem heckeZeroSample_reflectedOrder (χ : PontryaginDual C𝔽) (s : ℂ) :
+    ord(χ⁻¹, 1-s) = ord(χ, s) := by
+  obtain ⟨hL, hLh⟩ := continuedCompletedHeckeL_spec χ
+  obtain ⟨hD, hDh⟩ := continuedCompletedHeckeL_spec χ⁻¹
+  obtain ⟨ε, hε, hne, hfe⟩ :=
+    completedHeckeL_continuation_functionalEquation χ _ _ hL hLh hD hDh
+  have hr : meromorphicOrderAt (fun w ↦ continuedCompletedHeckeL χ⁻¹ (1-w)) s =
+      meromorphicOrderAt (continuedCompletedHeckeL χ⁻¹) (1-s) := by
+    simpa [Function.comp_def] using meromorphicOrderAt_comp_of_deriv_ne_zero
+      (f := continuedCompletedHeckeL χ⁻¹)
+      (show AnalyticAt ℂ (fun w : ℂ ↦ 1-w) s by fun_prop)
+      (show deriv (fun w : ℂ ↦ 1-w) s ≠ 0 by simp)
+  rw [show (fun w ↦ continuedCompletedHeckeL χ⁻¹ (1-w)) =
+    ε * continuedCompletedHeckeL χ from funext hfe,
+    meromorphicOrderAt_mul_of_ne_zero (hε.analyticAt s) (hne s)] at hr
+  rw [MeromorphicOn.divisor_apply hD.meromorphicOn (mem_univ _),
+    MeromorphicOn.divisor_apply hL.meromorphicOn (mem_univ _), hr]
+
+/-- The functional equation pairs a site (χ,ρ), for ρ ≠ 1/2, with the distinct site
+(χ⁻¹,1−ρ) of equal multiplicity. If both have the same certified multiplicity, every
+remaining copy costs the sum of their two real Mellin weights in the residual bound. -/
+theorem heckeZeroSample_reflectedPair_le (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (φ : BruhatCompactSupport C𝔽) (a : archTest) (b : finiteTest)
+    (ha : archRestricts(φ, a)) (hb : finiteRestricts(φ, b)) (k : sites(τ) →₀ ℕ)
+    (hk : ∀ z, k z ≤ multiplicity(z)) (z : sites(τ)) (hz : z.val.2 ≠ 1/2) :
+    ∃ u : sites(τ), u ≠ z ∧ u.val.1.val = z.val.1.val⁻¹ ∧ u.val.2 = 1-z.val.2 ∧
+      multiplicity(u) = multiplicity(z) ∧ (k u = k z →
+        missing(k, z) * (weight(φ, z) + weight(φ, u)) ≤
+          (localTerms(φ, a, b)).re - listed(φ, k) + negativeMass(τ, φ, k)) := by
+  classical
+  have ho := heckeZeroSample_reflectedOrder z.val.1.val z.val.2
+  have hχ (t) : z.val.1.val⁻¹ (τ t) = 1 := by
+    change (z.val.1.val (τ t))⁻¹ = 1
+    rw [z.val.1.property, inv_one]
+  have hi : |(1-z.val.2).re - 1/2| < 1/2 := by
+    rw [Complex.sub_re, Complex.one_re,
+      show 1 - z.val.2.re - 1/2 = -(z.val.2.re - 1/2) by ring, abs_neg]
+    exact z.property.2
+  let u : sites(τ) := ⟨(⟨z.val.1.val⁻¹, hχ⟩, 1-z.val.2), ho ▸ z.property.1, hi⟩
+  have hne : z ≠ u := by
+    intro h
+    have he := congrArg (fun v : sites(τ) ↦ v.val.2) h
+    change z.val.2 = 1-z.val.2 at he
+    apply hz
+    linear_combination he/2
+  have hm : multiplicity(u) = multiplicity(z) := congrArg Int.toNat ho
+  refine ⟨u, hne.symm, rfl, rfl, hm, fun heq ↦ ?_⟩
+  have hr := heckeZeroSample_residual_hasSum τ hτ φ a b ha hb k hk
+  have hp := (heckeZeroSample_positiveNegative (fun v : sites(τ) ↦ missing(k, v))
+    (fun v ↦ weight(φ, v)) (fun _ ↦ Nat.cast_nonneg _) hr).2
+  have hadd := sum_le_hasSum ({z,u} : Finset (sites(τ)))
+    (fun v _ ↦ mul_nonneg (Nat.cast_nonneg _) (le_max_right _ _)) hp
+  rw [Finset.sum_pair hne, hm, heq] at hadd
+  rw [mul_add]
+  exact (add_le_add (mul_le_mul_of_nonneg_left (le_max_left _ _) (Nat.cast_nonneg _))
+    (mul_le_mul_of_nonneg_left (le_max_left _ _) (Nat.cast_nonneg _))).trans hadd
+
+end FiniteZeroSamples
+
 /-- Paper: Theorem 12.5.1.1, p. 520, with (12.5.1.4) and Theorem B.4.4.7, p. 623. If the
 conclusion of `traceFormula_exteriorZeros` holds at a half-width α > 0 for every test vanishing on
 the norm-one classes, then the trace identity on the strip quotient holds at α, at every Sobolev
