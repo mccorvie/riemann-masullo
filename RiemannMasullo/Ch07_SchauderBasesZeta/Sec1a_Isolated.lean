@@ -4,13 +4,13 @@ public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1a
 
 import RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
 import RiemannMasullo.ForMathlib.Analysis.Complex.SeparatedExponentialFactor
-import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Analysis.Analytic.IsolatedZeros
 import Mathlib.Analysis.MellinInversion
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform
 import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import Mathlib.Analysis.PSeries
 import Mathlib.RingTheory.RamificationInertia.Inertia
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.RingTheory.RamificationInertia.Ramification
 import Mathlib.Algebra.Polynomial.RingDivision
 import Mathlib.Analysis.Calculus.DSlope
