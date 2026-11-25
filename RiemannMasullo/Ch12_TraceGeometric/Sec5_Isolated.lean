@@ -1,4 +1,5 @@
 module
+public import RiemannMasullo.ForMathlib.Analysis.Fourier.QuadraticBoxProfile
 import RiemannMasullo.AppB_AnalyticNT.Sec2
 import RiemannMasullo.AppB_AnalyticNT.Sec4b
 import RiemannMasullo.AppB_AnalyticNT.Sec6
@@ -358,6 +359,171 @@ theorem translatedLocalTerms_norm_le_exp_sub_div_log (τ : ℝ≥0ˣ →ₜ* C�
     hc' hκ hB hgap hamp
   exact ⟨d, hd, C, hC, fun y hy φ hφ a b ha hb ↦ h y hy _
     (translatedLocalTerms_hasSum τ hτ ψ hψ H hs hc y φ hφ a b ha hb)⟩
+
+section UniversalGevrey
+
+/-! The field is an explicit argument of the following local notations because
+the same real profile is selected before the number field. The quadratic
+interval construction and its quantitative transform bound are in
+`exists_translatedGevreyPolarProfile`. -/
+
+universe u
+
+local notation "C𝔽(" F ")" => IdeleClassGroup (𝓞 F) F
+local notation "C₁(" F ")" => (ideleClassNorm F).ker
+local notation "N(" F ", " x ")" => ((ideleClassNorm F x : ℝ≥0) : ℝ)
+local notation "V(" F ")" => HeightOneSpectrum (𝓞 F)
+local notation "μ𝔽(" F ")" => ideleClassTamagawaMeasure F
+local notation "m𝔽(" F ")" => (continuousIdeleClassNorm F : C𝔽(F) →ₜ* ℝ≥0ˣ)
+local notation "vol₁(" F ")" => (((normOneIdeleClassTamagawaMeasure F) univ).toReal : ℂ)
+local notation "mom(" F ", " φ ", " η ", " z ")" =>
+  modulatedFourierMellin m𝔽(F) univ ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+    μ𝔽(F) (φ : BruhatCompactSupport C𝔽(F)).val (ideleClassNormTwist (F := F) η z)
+local notation "archTest(" F ")" => ((w : InfinitePlace F) → BruhatCompactSupport w.Completionˣ)
+local notation "finiteTest(" F ")" => ((v : V(F)) → BruhatCompactSupport (v.adicCompletion F)ˣ)
+local notation "archRestricts(" F ", " φ ", " a ")" =>
+  (∀ (w : InfinitePlace F) (t : w.Completionˣ), (a w).val t =
+    (φ : BruhatCompactSupport C𝔽(F)).val (IdeleClassGroup.ofCompletion (𝓞 F) F w t))
+local notation "finiteRestricts(" F ", " φ ", " b ")" =>
+  (∀ (v : V(F)) (t : (v.adicCompletion F)ˣ), (b v).val t =
+    (φ : BruhatCompactSupport C𝔽(F)).val (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v t))
+local notation "localPVs(" F ", " a ", " b ")" =>
+  ((∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) +
+    ∑' v : V(F), ((Real.log (v.asIdeal.absNorm : ℝ) /
+      (finiteLocalMultiplicativeTamagawaMeasure F v
+        ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set _)).toReal : ℝ) : ℂ) *
+      finiteConnesWeilPrincipalValue v 1 (b v))
+local notation "localTerms(" F ", " φ ", " a ", " b ")" =>
+  (mom(F, φ, 1, 1 / 2) + mom(F, φ, 1, -1 / 2) - vol₁(F) * localPVs(F, a, b))
+local notation "matches(" F ", " φ ", " ψ ", " G ", " y ")" =>
+  (∀ x : C𝔽(F), (φ : BruhatCompactSupport C𝔽(F)).val x = (ψ x : ℂ) * G (Real.log N(F, x) - y))
+local notation "polarSites" => ({-(1 / 2), 0, 1 / 2} : Finset ℂ)
+
+private theorem jointDetector_classVolume_ne_zero : vol₁(F) ≠ 0 := by
+  rw [normOneIdeleClassTamagawaMeasure_volume]
+  have := NumberField.Units.regulator_pos F
+  have := NumberField.classNumber_pos F
+  have := NumberField.Units.torsionOrder_pos F
+  have : (0 : ℝ) < Real.sqrt (Int.natAbs (NumberField.discr F) : ℝ) :=
+    Real.sqrt_pos.mpr (by exact_mod_cast Int.natAbs_pos.mpr (NumberField.discr_ne_zero F))
+  exact Complex.ofReal_ne_zero.mpr
+    (ENNReal.toReal_pos (ENNReal.ofReal_pos.mpr (by positivity)).ne' ENNReal.ofReal_ne_top).ne'
+
+open Classical in
+private theorem jointDetector_moment (τ : ℝ≥0ˣ →ₜ* C𝔽(F)) (hτ : RightInverse τ (ideleClassNorm F))
+    (ψ η : PontryaginDual C𝔽(F)) (hψ : ∀ t, ψ (τ t) = 1) (hη : ∀ t, η (τ t) = 1)
+    (G : ℝ → ℂ) (hs : ContDiff ℝ ∞ G) (hc : HasCompactSupport G)
+    (y : ℝ) (φ : BruhatCompactSupport C𝔽(F)) (hφ : matches(F, φ, ψ, G, y)) (w : ℂ) :
+    mom(F, φ, η, w) = (if η * ψ = 1 then vol₁(F) else 0) *
+      (Complex.exp (w * y) * bilateralLaplace G w) := by
+  let g := fun x : ℝ ↦ G (x - y)
+  have hgs : ContDiff ℝ ∞ g := hs.comp (contDiff_id.sub contDiff_const)
+  have hgc : HasCompactSupport g := hc.comp_homeomorph (Homeomorph.subRight y)
+  obtain ⟨φr, hr⟩ := exists_normTest (F := F) g hgs hgc
+  have e : mom(F, φ, η, w) = mom(F, φr, η * ψ, w) := by
+    simp only [modulatedFourierMellin, relativeVerticalStrip, preimage_univ, indicator_univ]
+    apply integral_congr_ae
+    filter_upwards with x
+    change φ.val x * ((η x : ℂ) * ((N(F, x) : ℂ) ^ w)) =
+      φr.val x * ((((η * ψ) x : Circle) : ℂ) * ((N(F, x) : ℂ) ^ w))
+    rw [hφ, hr, show (((η * ψ) x : Circle) : ℂ) = (η x : ℂ) * (ψ x : ℂ) from Circle.coe_mul _ _]
+    dsimp only [g]
+    ring
+  rw [e, normTest_mellin g hgs.continuous φr hr (η * ψ) w]
+  by_cases he : η * ψ = 1
+  · rw [ite_eq_left he, ite_eq_left (fun t ↦ by rw [he]; rfl)]
+    congr 1
+    exact grh_shift_integral G hs.continuous _ (fun t ↦ by rw [he]; rfl) y w
+  · have hker : ¬ ∀ t : C₁(F), (η * ψ) t.val = 1 := by
+      intro h
+      apply he
+      refine ContinuousMonoidHom.ext fun x ↦ ?_
+      let t := ideleClassNorm F x
+      have hmem : (τ t)⁻¹ * x ∈ C₁(F) := by
+        rw [MonoidHom.mem_ker, map_mul, map_inv, hτ t, inv_mul_cancel]
+      have hsection : (η * ψ) (τ t) = 1 := by change η _ * ψ _ = 1; rw [hη, hψ, one_mul]
+      have hv := h ⟨_, hmem⟩
+      change (η * ψ) ((τ t)⁻¹ * x) = 1 at hv
+      rw [map_mul, map_inv, hsection, inv_one, one_mul] at hv
+      exact hv
+    rw [ite_eq_right he, ite_eq_right hker, zero_mul, zero_mul]
+
+/-- Paper: Theorem B.4.4.7, p. 623 and Proposition B.6.1.1, p. 636. One fixed
+real profile works for every number field and every section-normalized character.
+All positive translates vanish on the norm-one group and kill the three centered
+moments in every normalized character. Their signed principal values have a
+uniform positive-translate bound, and their selected Mellin transform detects
+each site strictly right of the critical line. -/
+theorem exists_universalGevrey_signedLocalTerms :
+    ∃ H : ℝ → ℝ, let G := fun x : ℝ ↦ (H x : ℂ)
+      bilateralLaplace G = translatedIntervalMultiplier quadraticBoxLaplace ∧
+      ContDiff ℝ ∞ H ∧ tsupport H ⊆ Icc 2 4 ∧
+      (∀ w ∈ polarSites, bilateralLaplace G w = 0) ∧
+      (∀ w : ℂ, 0 < |w.re| → |w.re| < 1/2 → bilateralLaplace G w ≠ 0) ∧
+      (∀ B : ℝ, 0 ≤ B → ∃ A > (0 : ℝ), ∀ w : ℂ, |w.re| ≤ B →
+        ‖bilateralLaplace G w‖ ≤ A * Real.exp (-(Real.log 2 / 4) * Real.sqrt |w.im|)) ∧
+      ∀ (F : Type u) [Field F] [NumberField F] (τ : ℝ≥0ˣ →ₜ* C𝔽(F))
+        (_hτ : RightInverse τ (ideleClassNorm F)) (ψ : PontryaginDual C𝔽(F)) (_hψ : ∀ t, ψ (τ t) = 1),
+        ∃ d > (0 : ℝ), ∃ C ≥ (0 : ℝ), ∀ y : ℝ, 0 ≤ y →
+          (∃ (φ : BruhatCompactSupport C𝔽(F)) (a : archTest(F)) (b : finiteTest(F)),
+            matches(F, φ, ψ, G, y) ∧ archRestricts(F, φ, a) ∧ finiteRestricts(F, φ, b)) ∧
+          ∀ φ : BruhatCompactSupport C𝔽(F), matches(F, φ, ψ, G, y) →
+            (∀ g : C₁(F), φ.val g = 0) ∧
+            (∀ η : PontryaginDual C𝔽(F), (∀ t, η (τ t) = 1) →
+              ∀ w ∈ polarSites, mom(F, φ, η, w) = 0) ∧
+            (∀ ρ : ℂ, 1/2 < ρ.re → ρ.re < 1 → mom(F, φ, ψ⁻¹, ρ - 1/2) ≠ 0) ∧
+            ∀ (a : archTest(F)) (b : finiteTest(F)), archRestricts(F, φ, a) → finiteRestricts(F, φ, b) →
+              localTerms(F, φ, a, b) = -(vol₁(F) * localPVs(F, a, b)) ∧
+              ‖localTerms(F, φ, a, b)‖ ≤ C * Real.exp (y / 2 - d * y / Real.log (2 + y)) := by
+  classical
+  obtain ⟨H, hMform, hs, ht, hm, hn, he⟩ := exists_translatedGevreyPolarProfile
+  let G := fun x : ℝ ↦ (H x : ℂ)
+  have hp : ∀ w ∈ polarSites, bilateralLaplace G w = 0 := by
+    intro w hw
+    simp only [Finset.mem_insert, Finset.mem_singleton] at hw
+    rcases hw with rfl | rfl | rfl
+    exacts [hm.1, hm.2.1, hm.2.2]
+  refine ⟨H, hMform, hs, ht, hp, hn, he, ?_⟩
+  intro F _ _ τ hτ ψ hψ
+  have hG : ContDiff ℝ ∞ G := Complex.ofRealCLM.contDiff.comp hs
+  have hc : HasCompactSupport H := isCompact_Icc.of_isClosed_subset (isClosed_tsupport _) ht
+  have hGc : HasCompactSupport G := hc.comp_left Complex.ofReal_zero
+  obtain ⟨A, hA, hfast⟩ := he (1/2) (by norm_num)
+  have hk : 0 < Real.log 2 / 4 := div_pos (Real.log_pos (by norm_num)) (by norm_num)
+  obtain ⟨d, hd, C, hC, hbound⟩ := translatedLocalTerms_norm_le_exp_sub_div_log τ hτ ψ hψ G hG hGc
+    hk hA (fun w hw ↦ hfast w (abs_le.mpr hw))
+  refine ⟨d, hd, C, hC, ?_⟩
+  intro y hy
+  constructor
+  · obtain ⟨φ, hφ⟩ := exists_characterNormTest (F := F) ψ (fun x ↦ G (x - y))
+      (hG.comp (contDiff_id.sub contDiff_const)) (hGc.comp_homeomorph (Homeomorph.subRight y))
+    obtain ⟨a, b, ha, hb, _⟩ := traceFormula_of_half_le τ hτ φ (le_refl (1/2 : ℝ))
+    exact ⟨φ, a, b, hφ, ha, hb⟩
+  intro φ hφ
+  have hM := jointDetector_moment τ hτ ψ
+  have hzero (η : PontryaginDual C𝔽(F)) (hη : ∀ t, η (τ t) = 1) (w : ℂ) (hw : w ∈ polarSites) :
+      mom(F, φ, η, w) = 0 := by
+    rw [hM η hψ hη G hG hGc y φ hφ w, hp w hw, mul_zero, mul_zero]
+  refine ⟨?_, hzero, ?_, ?_⟩
+  · intro g
+    have hx : H (-y) = 0 := image_eq_zero_of_notMem_tsupport (fun hx ↦ by linarith [(ht hx).1])
+    simp only [hφ, show ideleClassNorm F g.val = 1 from g.property,
+      Units.val_one, NNReal.coe_one, Real.log_one, zero_sub, hx, Complex.ofReal_zero, mul_zero]
+  · intro ρ hρ₁ hρ₂
+    have hinv (t) : ψ⁻¹ (τ t) = 1 := by change (ψ (τ t))⁻¹ = 1; rw [hψ, inv_one]
+    rw [hM ψ⁻¹ hψ hinv G hG hGc y φ hφ _, inv_mul_cancel, ite_eq_left rfl]
+    have hr : (ρ - 1/2).re = ρ.re - 1/2 := by simp
+    have hpos : 0 < (ρ - 1/2).re := by rw [hr]; linarith
+    have hlt : |(ρ - 1/2).re| < 1/2 := by rw [abs_of_pos hpos, hr]; linarith
+    exact mul_ne_zero (jointDetector_classVolume_ne_zero (F := F))
+      (mul_ne_zero (Complex.exp_ne_zero _) (hn _ (abs_pos.mpr hpos.ne') hlt))
+  · intro a b ha hb
+    refine ⟨?_, hbound y hy φ hφ a b ha hb⟩
+    rw [show (-1/2 : ℂ) = -(1/2) by ring, hzero 1 (by simp) (1/2) (by simp),
+      hzero 1 (by simp) (-(1/2)) (by simp)]
+    simp
+
+end UniversalGevrey
 
 end PositiveTranslations
 
