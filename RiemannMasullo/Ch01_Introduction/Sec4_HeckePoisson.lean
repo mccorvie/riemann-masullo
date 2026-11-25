@@ -1,7 +1,6 @@
 module
 
 public import RiemannMasullo.Ch01_Introduction.Sec4
-import all RiemannMasullo.Ch01_Introduction.Sec4
 import Mathlib.Algebra.Order.Archimedean.Real.Basic
 import Mathlib.Algebra.Order.Round
 
@@ -133,17 +132,17 @@ theorem divisor_reflection (χ : U𝔽) (z : ℂ) : ord(χ, 1 - conj z) = ord(χ
   have horder : meromorphicOrderAt (continuedCompletedHeckeL χ) (1 - conj z) =
       meromorphicOrderAt (continuedCompletedHeckeL χ) z := by
     by_cases hz : z.re < 1
-    · exact introTrace_single_character_reflected_order χ z hz
+    · exact completedHecke_reflected_order_of_re_lt_one χ z hz
     · have hr : (1 - conj z).re < 1 := by simp only [Complex.sub_re, Complex.one_re, Complex.conj_re]; linarith
       simpa only [map_sub, map_one, Complex.conj_conj, sub_sub_cancel] using
-        (introTrace_single_character_reflected_order χ (1 - conj z) hr).symm
+        (completedHecke_reflected_order_of_re_lt_one χ (1 - conj z) hr).symm
   have hL := (continuedCompletedHeckeL_spec χ).1.meromorphicOn
   rw [MeromorphicOn.divisor_apply hL (mem_univ _), MeromorphicOn.divisor_apply hL (mem_univ _), horder]
 
 /-- Every positive divisor point belongs to the open critical strip. -/
 theorem positive_divisor_re_mem_Ioo (χ : U𝔽) {z : ℂ} (hz : 0 < ord(χ, z)) :
     z.re ∈ Ioo (0 : ℝ) 1 := by
-  have h := abs_lt.mp (introTrace_positive_divisor_in_critical_strip χ z hz)
+  have h := abs_lt.mp (completedHecke_positive_divisor_in_critical_strip χ z hz)
   constructor <;> linarith [h.1, h.2]
 
 /-- The strip bound for a zero already indexed by its positive divisor. -/
@@ -207,7 +206,7 @@ theorem summable_siteWeight (χ : U𝔽) (τ : ℝ) :
   change Summable (fun z : Site χ ↦ ((ord(χ, z.val)).toNat : ℝ) * weight τ z.val)
   let b : ℂ := ⟨3/2, τ⟩
   let i : Site χ → window(χ) := fun z ↦
-    ⟨z.val, z.property, introTrace_positive_divisor_in_critical_strip χ z.val z.property⟩
+    ⟨z.val, z.property, completedHecke_positive_divisor_in_critical_strip χ z.val z.property⟩
   have hi : Function.Injective i := fun _ _ h ↦
     Subtype.ext (congrArg (fun r : window(χ) ↦ r.val) h)
   have hsep (r : window(χ)) : b ≠ r.val - 1/2 := by
@@ -215,7 +214,7 @@ theorem summable_siteWeight (χ : U𝔽) (τ : ℝ) :
     have he := congrArg Complex.re h
     simp only [b, Complex.sub_re, Complex.div_ofNat_re, Complex.one_re] at he
     linarith [(abs_lt.mp r.property.2).2]
-  have hwindow := introTrace_canonical_reciprocal_squares χ (1/2) b hsep
+  have hwindow := summable_completedHecke_divisor_reciprocal_squares χ (1/2) b hsep
   have hs := hwindow.comp_injective (i := i) hi
   change Summable (fun z : Site χ ↦ (ord(χ, z.val) : ℝ) * ‖(b - (z.val-1/2))⁻¹‖ ^ 2) at hs
   apply (hs.mul_left 2).of_norm_bounded
