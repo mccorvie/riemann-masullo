@@ -33,8 +33,10 @@ The proof of the closure is by duality. A vector of the level orthogonal to the 
 Fourier transform that is constant on `(0, Y)`, by the fundamental lemma of the calculus of
 variations, hence constant on the band, hence zero since its integral over the band is zero.
 
-**Not formalized.** The identification of this model with `sLocalInvariantPWSobolev` over `ℚ`
-with no finite place. Order zero only: with a logarithmic weight the norm changes and the
+The identification of this model with `sLocalInvariantPWSobolev` over `ℚ` with no finite place
+is proved in `Sec4_RealPWLevelBridge`.
+
+**Not formalized.** Order zero only: with a logarithmic weight the norm changes and the
 statement has to be proved again.
 -/
 

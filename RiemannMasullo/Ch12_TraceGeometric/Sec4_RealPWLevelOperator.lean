@@ -36,10 +36,11 @@ composites, and the trace is computed for the literal composite.
 * `tendsto_integral_realPWLevelCompressionTrace`: averaged against `φ(g) d×g`, the traces tend
   to the real-place term of (12.5.1.1) minus `∫ φ(g) min(g^(1/2), g^(-1/2)) d×g`.
 
+The identification of `realPWLevel Y` with the level `sLocalInvariantPWSobolev` of the project
+over `ℚ` with no finite place is proved in `Sec4_RealPWLevelBridge`.
+
 **Not formalized.** The average of the operators against `φ` is not formed, only the average of
-their traces. The identification of `L²(ℝ)`, its even part and `realPWLevel Y` with the weighted
-space and the level `sLocalInvariantPWSobolev` of the project over `ℚ` with no finite place is
-not made here.
+their traces.
 -/
 
 open MeasureTheory Real Set Filter Topology
