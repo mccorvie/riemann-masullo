@@ -3,6 +3,9 @@ module
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4a
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.AppC_LCTVS.Sec3b_HilbertSchmidtProduct
+import RiemannMasullo.ForMathlib.Analysis.Distribution.CompactSmoothFactorization
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1d
 
 /-! # The spectral trace statements of §10.4.2 at orders between zero and one -/
 
@@ -278,7 +281,137 @@ private theorem adelic_factorization_of_elementary
 
 end Adeles
 
-/-- Classical input: Dixmier and Malliavin, *Factorisations de fonctions et de vecteurs
+section Elementary
+
+open scoped ContDiff
+
+variable {Q : Type*} [CommGroup Q] [TopologicalSpace Q] [IsTopologicalGroup Q]
+  (e : ElementaryLCAPresentation Q)
+local notation "E" => EuclideanSpace ℝ (Fin e.realDim)
+local notation "T" => (Fin e.torusDim → AddCircle (1 : ℝ))
+local notation "A" => E × T
+local notation "D" => (Fin e.latticeRank → ℤ) × e.finiteFactor
+local notation "H" => ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor
+local instance : MeasurableSpace e.finiteFactor := borel _
+local instance : BorelSpace e.finiteFactor := ⟨rfl⟩
+
+private def FiberSmooth (f : H → ℂ) : Prop :=
+  ∀ a b, ContDiff ℝ (⊤ : ℕ∞) (fun u ↦ f (elementaryCover u a b))
+
+private def ConnectedSmooth (g : A → ℂ) : Prop :=
+  ContDiff ℝ (⊤ : ℕ∞) (fun x : E × (Fin e.torusDim → ℝ) ↦ g (DixmierMalliavin.Torus.cover x))
+
+/-- The analytic factorization uses the product Haar measure of Appendix D. -/
+private def ProductDM : Prop :=
+  ∀ f : H → ℂ, FiberSmooth e f → HasCompactSupport f → f ∈ AddSubmonoid.closure
+    {h | ∃ u v : H → ℂ, FiberSmooth e u ∧ HasCompactSupport u ∧
+      FiberSmooth e v ∧ HasCompactSupport v ∧
+      h = fun x ↦ ∫ y : H, u y * v (-y + x) ∂(productHaar e)}
+
+private theorem productDM_of_connected
+    (base : ∀ g : A → ℂ, ConnectedSmooth e g → HasCompactSupport g →
+      g ∈ AddSubmonoid.closure {h | ∃ u v : A → ℂ,
+        ConnectedSmooth e u ∧ HasCompactSupport u ∧ ConnectedSmooth e v ∧ HasCompactSupport v ∧
+        h = DixmierMalliavin.Discrete.conv ((volume : Measure E).prod
+          (Measure.pi fun _ : Fin e.torusDim ↦ (AddCircle.haarAddCircle : Measure UnitAddCircle))) u v}) :
+    ProductDM e := by
+  classical
+  let s := Homeomorph.prodAssoc E T D
+  let L := PiLp.continuousLinearEquiv 2 ℝ (fun _ : Fin e.torusDim ↦ ℝ)
+  have hfib (f : H → ℂ) : FiberSmooth e f ↔
+      ∀ j : D, ConnectedSmooth e (fun x : A ↦ f (s (x,j))) := by
+    constructor
+    · intro hf ⟨a,b⟩
+      exact (hf a b).comp (contDiff_fst.prodMk (L.symm.contDiff.comp contDiff_snd))
+    · intro hf a b
+      exact (show ContDiff ℝ (⊤ : ℕ∞) _ from hf (a,b)).comp
+        (contDiff_fst.prodMk (L.contDiff.comp contDiff_snd))
+  have hcircle : (volume : Measure (AddCircle (1 : ℝ))) = AddCircle.haarAddCircle := by
+    rw [AddCircle.volume_eq_smul_haarAddCircle]; simp
+  have htorus : (volume : Measure T) = Measure.pi
+      (fun _ : Fin e.torusDim ↦ (AddCircle.haarAddCircle : Measure (AddCircle (1 : ℝ)))) := by
+    change Measure.pi (fun _ : Fin e.torusDim ↦ (volume : Measure (AddCircle (1 : ℝ)))) = _
+    simp only [hcircle]
+  rw [← htorus] at base
+  intro f hf hc
+  let C := AddSubmonoid.closure {h : H → ℂ | ∃ u v : H → ℂ,
+    FiberSmooth e u ∧ HasCompactSupport u ∧ FiberSmooth e v ∧ HasCompactSupport v ∧
+    h = fun x ↦ ∫ y : H, u y * v (-y + x) ∂(productHaar e)}
+  have hall := DixmierMalliavin.Discrete.finite_slice_factorization
+    ((volume : Measure E).prod (volume : Measure T)) (ConnectedSmooth e)
+    (show ConnectedSmooth e 0 from contDiff_const) (fun z : A × D ↦ f (s z))
+    (hc.comp_homeomorph s) ((hfib f).mp hf) base
+  apply AddSubmonoid.closure_induction (motive := fun h _ ↦ (fun x : H ↦ h (s.symm x)) ∈ C)
+    _ _ _ hall
+  · rintro _ ⟨u, v, hu, hcu, hv, hcv, rfl⟩
+    refine AddSubmonoid.subset_closure ⟨fun x ↦ u (s.symm x), fun x ↦ v (s.symm x),
+      (hfib _).mpr hu, hcu.comp_homeomorph s.symm, (hfib _).mpr hv,
+      hcv.comp_homeomorph s.symm, ?_⟩
+    funext x
+    exact (measurePreserving_prodAssoc (volume : Measure E) (volume : Measure T)
+      (Measure.count : Measure D)).integral_comp' (fun y : H ↦ u (s.symm y) * v (s.symm (-y + x)))
+  · exact C.zero_mem
+  · intro a b _ _ ha hb
+    exact C.add_mem ha hb
+
+private theorem elementaryFactorization_of_productDM (hDM : ProductDM e)
+    (ν : @Measure Q (borel _)) (hν : letI : MeasurableSpace Q := borel _; ν.IsHaarMeasure) :
+    ElementaryFactorization e ν := by
+  classical
+  let : MeasurableSpace Q := borel _
+  let : BorelSpace Q := ⟨rfl⟩
+  let : ν.IsHaarMeasure := hν
+  let : T2Space (Multiplicative H) := inferInstanceAs (T2Space H)
+  let : LocallyCompactSpace (Multiplicative H) := inferInstanceAs (LocallyCompactSpace H)
+  let : T2Space Q := e.equiv.toHomeomorph.isEmbedding.t2Space
+  let : LocallyCompactSpace Q := e.equiv.toHomeomorph.isOpenEmbedding.locallyCompactSpace
+  let : BorelSpace (Multiplicative H) := by
+    have : BorelSpace D := inferInstance
+    have : BorelSpace (T × D) := inferInstance
+    exact inferInstanceAs (BorelSpace H)
+  let η := ν.map e.equiv
+  let σ := productHaar e
+  let : η.IsHaarMeasure := e.equiv.isHaarMeasure_map ν
+  let : σ.IsHaarMeasure := productHaar_isHaar e
+  let k := σ.haarScalarFactor η
+  have hscale : σ = k • η := Measure.isMulLeftInvariant_eq_smul σ η
+  let V (f : H → ℂ) (x : Q) := f (Multiplicative.toAdd (e.equiv x))
+  let C := AddSubmonoid.closure {h : Q → ℂ | ∃ u v : SchwartzBruhatStage e,
+    HasCompactSupport (V u) ∧ HasCompactSupport (V v) ∧ h = lcaConvolution ν (V u) (V v)}
+  intro f hc
+  change V f ∈ C
+  have hc' : HasCompactSupport (f : H → ℂ) := by
+    have ht := (show HasCompactSupport (V f) from hc).comp_homeomorph e.equiv.toHomeomorph.symm
+    have ht' : HasCompactSupport (fun y : H ↦ V f (e.equiv.symm (Multiplicative.ofAdd y))) := ht
+    simpa [V] using ht'
+  apply AddSubmonoid.closure_induction (motive := fun h _ ↦ V h ∈ C) _ _ _
+    (hDM f f.property.1 hc')
+  · rintro h ⟨u, v, hu, hcu, hv, hcv, rfl⟩
+    let u' : H → ℂ := fun y ↦ (k : ℂ) * u y
+    have hcu' : HasCompactSupport u' := hcu.mul_left (f := fun _ ↦ (k : ℂ))
+    let U : SchwartzBruhatStage e := ⟨u', elementarySchwartz_of_compactSupport
+      (fun a b ↦ contDiff_const.mul (hu a b)) hcu'⟩
+    let Vstage : SchwartzBruhatStage e := ⟨v, elementarySchwartz_of_compactSupport hv hcv⟩
+    apply AddSubmonoid.subset_closure
+    refine ⟨U, Vstage, hcu'.comp_homeomorph e.equiv.toHomeomorph,
+      hcv.comp_homeomorph e.equiv.toHomeomorph, ?_⟩
+    funext x
+    let p (y : Multiplicative H) := u y.toAdd * v (-(y.toAdd) + (e.equiv x).toAdd)
+    change (∫ y, p y ∂σ) = ∫ z, ((k : ℂ) * u (e.equiv z).toAdd) * v (e.equiv (z⁻¹ * x)).toAdd ∂ν
+    rw [hscale, integral_smul_nnreal_measure]
+    have hmap : (∫ y, p y ∂η) = ∫ z, p (e.equiv z) ∂ν :=
+      integral_map_equiv e.equiv.toHomeomorph.toMeasurableEquiv p
+    rw [hmap, NNReal.smul_def, Complex.real_smul, ← integral_const_mul]
+    apply integral_congr_ae
+    filter_upwards with z
+    rw [map_mul, map_inv, mul_assoc]; rfl
+  · exact C.zero_mem
+  · intro h g _ _ ih ig
+    exact C.add_mem ih ig
+
+end Elementary
+
+/-- Dixmier and Malliavin, *Factorisations de fonctions et de vecteurs
 indéfiniment différentiables*, Bull. Sci. Math. (2) 102 (1978), Théorème 3.1. On the elementary
 abelian Lie group presented by `e` (a product of Euclidean, torus, lattice and finite factors),
 each compactly supported smooth function is a finite sum of convolutions of two such functions
@@ -293,11 +426,15 @@ private theorem elementary_compact_convolution_factorization {Q : Type*} [CommGr
       ∀ f : SchwartzBruhatStage e, HasCompactSupport (V f) →
         V f ∈ AddSubmonoid.closure {θ : Q → ℂ | ∃ u v : SchwartzBruhatStage e,
           HasCompactSupport (V u) ∧ HasCompactSupport (V v) ∧ θ = lcaConvolution ν (V u) (V v)} := by
-  sorry
+  intro hν
+  exact elementaryFactorization_of_productDM e
+    (productDM_of_connected e (fun g hg hc ↦
+      DixmierMalliavin.Torus.compact_euclidean_torus_factorization e.realDim e.torusDim g hg hc))
+    ν hν
 
 end ConvolutionFactorization
 
-/-- Classical input: the Dixmier–Malliavin factorization theorem. Every compactly supported
+/-- The Dixmier–Malliavin factorization theorem. Every compactly supported
 Bruhat test on the idele class group is a finite sum of convolutions of two such tests, for
 the Tamagawa Haar measure. J. Dixmier and P. Malliavin, *Factorisations de fonctions et de
 vecteurs indéfiniment différentiables*, Bull. Sci. Math. (2) 102 (1978), 307–330,
