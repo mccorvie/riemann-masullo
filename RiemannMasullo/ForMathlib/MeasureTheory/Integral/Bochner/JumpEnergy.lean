@@ -28,6 +28,11 @@ def jumpPairing (μ : Measure X) (ν : Measure (X × X)) (f g : X → ℂ) : ℝ
   (∫ x, (conj (f x) * g x).re ∂μ) +
     (1 / 2) * ∫ p, (conj (f p.1 - f p.2) * (g p.1 - g p.2)).re ∂ν
 
+/-- Evaluation of the mass and jump pairing on two concrete representatives. -/
+theorem jumpPairing_apply (μ : Measure X) (ν : Measure (X × X)) (f g : X → ℂ) :
+    jumpPairing μ ν f g = (∫ x, (conj (f x) * g x).re ∂μ) +
+      (1 / 2) * ∫ p, (conj (f p.1 - f p.2) * (g p.1 - g p.2)).re ∂ν := by rfl
+
 private theorem jumpPairing_ofReal (μ : Measure X) (ν : Measure (X × X))
     (f g : X → ℝ) :
     jumpPairing μ ν (fun x ↦ (f x : ℂ)) (fun x ↦ (g x : ℂ)) =
@@ -109,6 +114,11 @@ theorem jumpPairing_mul_self_eq_of_orthogonal (μ : Measure X) (ν : Measure (X 
 /-- The displacement measure on ordered pairs of spatial arguments. -/
 def temperedJumpPairMeasure (s : ℝ) : Measure (ℝ × ℝ) :=
   ((temperedJumpMeasure s).prod volume).map (fun hx : ℝ × ℝ ↦ (hx.2 + hx.1, hx.2))
+
+/-- The ordered-pair jump measure is the shear of displacement times spatial Haar. -/
+theorem temperedJumpPairMeasure_eq_map (s : ℝ) :
+    temperedJumpPairMeasure s =
+      ((temperedJumpMeasure s).prod volume).map (fun hx : ℝ × ℝ ↦ (hx.2 + hx.1, hx.2)) := by rfl
 
 private theorem lintegral_norm_sq_temperedJumpPair (s : ℝ) (f : 𝓢(ℝ, ℂ)) :
     (∫⁻ z, ENNReal.ofReal (‖f z.1 - f z.2‖ ^ 2) ∂temperedJumpPairMeasure s) =

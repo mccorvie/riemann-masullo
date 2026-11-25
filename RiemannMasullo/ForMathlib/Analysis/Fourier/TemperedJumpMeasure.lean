@@ -30,7 +30,8 @@ def temperedJumpMeasure (s : ℝ) : Measure ℝ :=
   ((((volume : Measure ℝ).restrict (Ioi 0)).withDensity
     (fun u ↦ ENNReal.ofReal (jumpWeight s u))).prod (gaussianReal 0 1)).map heatDisplacement
 
-private theorem sFinite_temperedJumpMeasure (s : ℝ) : SFinite (temperedJumpMeasure s) := by
+/-- The displacement measure admits Tonelli integration even when its total mass is infinite. -/
+theorem sFinite_temperedJumpMeasure (s : ℝ) : SFinite (temperedJumpMeasure s) := by
   unfold temperedJumpMeasure
   infer_instance
 
