@@ -10,7 +10,9 @@ public import Mathlib.Algebra.Order.Chebyshev
 
 Complete-period orthogonality controls the mean square of quadratic twists of the
 rational prime coefficients in Theorem 12.5.1.1 (pp. 519–520). The bounds use
-the Euler coefficient majorant of Appendix B.6.
+the Euler coefficient majorant of Appendix B.6. In any class with a negative sign,
+square norms are absent. The Costa–Pereira inequalities for Chebyshev functions then
+control the cost of replacing the prime sum by the full Hecke Riesz sum.
 -/
 
 open Finset NumberField
@@ -493,5 +495,193 @@ theorem quadraticPrimeTwist_fourthPower_deficit_mean {F : Type*} [Field F] [Numb
     simpa only [sub_sub_sub_cancel_left, abs_sub_comm b a] using
       abs_max_sub_max_le_abs (c j-a) (c j-b) 0
   exact lip _ _
+
+
+/-- Four times the Riesz sum of the actual Hecke logarithmic-derivative coefficients
+over all integer norms with the indicated two quadratic signs. -/
+def quadraticPrimePowerCellRieszSum {F : Type*} [Field F] [NumberField F]
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (T : ℕ) (x : ℝ)
+    (q d : ℕ) (e f : ℝ) : ℝ :=
+  4 * ∑ n ∈ Ioc 0 T with (jacobiSym q n : ℝ) = e ∧ (jacobiSym d n : ℝ) = f,
+    (heckeLogDerivCoefficient (ideleClassNormTwist χ 0) n).re * max (x-n) 0
+
+open ArithmeticFunction in
+private theorem quadraticPrime_square_mass (T : ℕ) :
+    let S := (Ioc 0 (Nat.sqrt T)).image (fun n : ℕ ↦ n^2)
+    ∑ n ∈ S, vonMangoldt n = Chebyshev.psi ((T:ℝ)^(2:ℝ)⁻¹) := by
+  intro S
+  rw [← one_div, ← Real.sqrt_eq_rpow, Chebyshev.psi, Real.nat_floor_real_sqrt_eq_nat_sqrt]
+  dsimp only [S]
+  rw [sum_image (fun a _ b _ h ↦ by simpa using h)]
+  exact sum_congr rfl fun a _ ↦ vonMangoldt_apply_pow (by decide)
+
+open ArithmeticFunction in
+private theorem quadraticPrime_nonsquare_mass (T : ℕ) (hT : 1 ≤ T) :
+    let S := (Ioc 0 (Nat.sqrt T)).image (fun n : ℕ ↦ n^2)
+    ∑ n ∈ Ioc 0 T \ (Nat.primesLE T ∪ S), vonMangoldt n ≤
+      2*(Real.log 4+4)*(T:ℝ)^(3:ℝ)⁻¹ := by
+  intro S
+  let P := Nat.primesLE T
+  have hsub : P ∪ S ⊆ Ioc 0 T := by
+    intro n hn
+    rcases mem_union.mp hn with h | h
+    · exact mem_Ioc.mpr ⟨(Nat.prime_of_mem_primesLE h).pos, Nat.le_of_mem_primesLE h⟩
+    · obtain ⟨a, ha, rfl⟩ := mem_image.mp h
+      exact mem_Ioc.mpr ⟨pow_pos (mem_Ioc.mp ha).1 _, by
+        simpa only [pow_two] using (Nat.le_sqrt.mp (mem_Ioc.mp ha).2)⟩
+  have hd : Disjoint P S := by
+    refine Finset.disjoint_left.mpr fun n hn hs ↦ ?_
+    obtain ⟨a,ha,rfl⟩ := mem_image.mp hs
+    exact Nat.Prime.not_prime_pow (by decide : 2 ≤ 2) (Nat.prime_of_mem_primesLE hn)
+  have hsum := sum_sdiff (f := fun n ↦ vonMangoldt n) hsub
+  rw [sum_union hd] at hsum
+  have hp : ∑ n ∈ P, vonMangoldt n = Chebyshev.theta T := by
+    rw [Chebyshev.theta_eq_sum_primesLE_log]
+    exact sum_congr rfl fun n hn ↦ vonMangoldt_apply_prime (Nat.prime_of_mem_primesLE hn)
+  have hs : ∑ n ∈ S, vonMangoldt n = Chebyshev.psi ((T:ℝ)^(2:ℝ)⁻¹) :=
+    quadraticPrime_square_mass T
+  have hf : ∑ n ∈ Ioc 0 T, vonMangoldt n = Chebyshev.psi T := by simp [Chebyshev.psi]
+  rw [hp, hs, hf] at hsum
+  have h := Chebyshev.psi_sub_theta_le_psi_add_psi_add_psi T
+  have h3 := Chebyshev.psi_le_const_mul_self (x := (T:ℝ)^(3:ℝ)⁻¹) (by positivity)
+  have h5 := Chebyshev.psi_le_const_mul_self (x := (T:ℝ)^(5:ℝ)⁻¹) (by positivity)
+  have h53 : (Real.log 4+4)*(T:ℝ)^(5:ℝ)⁻¹ ≤ (Real.log 4+4)*T^(3:ℝ)⁻¹ := by
+    apply mul_le_mul_of_nonneg_left (Real.rpow_le_rpow_of_exponent_le (by exact_mod_cast hT) (by norm_num))
+    positivity
+  change ∑ n ∈ Ioc 0 T \ (P ∪ S), vonMangoldt n ≤ _
+  linarith
+
+open ArithmeticFunction in
+/-- Any class with a negative quadratic sign excludes every square norm. The cost of
+restricting its complete Riesz sum to prime norms is uniformly of order T^(4/3). -/
+theorem quadraticPrimePowerCell_sub_prime_le {F : Type*} [Field F] [NumberField F]
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) {T : ℕ} (hT : 1 ≤ T)
+    {x : ℝ} (hx : x ≤ T) (q d : ℕ) {e f : ℝ} (hneg : e = -1 ∨ f = -1) :
+    |quadraticPrimePowerCellRieszSum χ T x q d e f - quadraticPrimeCellRieszSum χ T x q d e f| ≤
+      8*(Module.finrank ℚ F : ℝ)*(Real.log 4+4)*T*(T:ℝ)^(3:ℝ)⁻¹ := by
+  classical
+  let A := Ioc 0 T
+  let P := Nat.primesLE T
+  let S := (Ioc 0 (Nat.sqrt T)).image (fun n : ℕ ↦ n^2)
+  let R := A \ (P ∪ S)
+  let D : ℝ := Module.finrank ℚ F
+  let g (n : ℕ) := if (jacobiSym q n : ℝ) = e ∧ (jacobiSym d n : ℝ) = f then
+    (heckeLogDerivCoefficient (ideleClassNormTwist χ 0) n).re * max (x-n) 0 else 0
+  have sqzero {n : ℕ} (hn : n ∈ S) : g n = 0 := by
+    obtain ⟨a,ha,rfl⟩ := mem_image.mp hn
+    apply ite_eq_right
+    rintro ⟨hq,hd⟩
+    simp only [jacobiSym.pow_right, Int.cast_pow] at hq hd
+    rcases hneg with rfl | rfl <;> nlinarith only [hq,hd,sq_nonneg (jacobiSym q a : ℝ),
+      sq_nonneg (jacobiSym d a : ℝ)]
+  have hP : P ⊆ A := fun _ hn ↦ mem_Ioc.mpr ⟨(Nat.prime_of_mem_primesLE hn).pos,
+    Nat.le_of_mem_primesLE hn⟩
+  have hPR : Disjoint P R := Finset.disjoint_left.mpr fun _ hp hr ↦
+    (mem_sdiff.mp hr).2 (mem_union_left _ hp)
+  have hR : ∑ n ∈ A, g n = (∑ n ∈ P, g n) + ∑ n ∈ R, g n := by
+    rw [← sum_union hPR]
+    symm
+    apply sum_subset (union_subset hP sdiff_subset)
+    intro n hn hout
+    have hp : n ∉ P := fun hp ↦ hout (mem_union_left _ hp)
+    apply sqzero
+    by_contra hs
+    exact hout (mem_union_right _ (mem_sdiff.mpr ⟨hn, fun h ↦ (mem_union.mp h).elim hp hs⟩))
+  have major (n : ℕ) : |g n| ≤ D*T*vonMangoldt n := by
+    dsimp only [g]
+    split_ifs
+    · rw [abs_mul, abs_of_nonneg (le_max_right (x-n) (0:ℝ))]
+      calc _ ≤ (D*vonMangoldt n)*T := by
+             apply mul_le_mul ((Complex.abs_re_le_norm _).trans
+               (heckeLogDerivCoefficient_le_vonMangoldt χ n)) _ (le_max_right _ _)
+               (mul_nonneg (Nat.cast_nonneg _) vonMangoldt_nonneg)
+             exact max_le ((sub_le_self _ (Nat.cast_nonneg n)).trans hx) (Nat.cast_nonneg _)
+           _ = _ := by ring
+    · rw [abs_zero]
+      exact mul_nonneg (mul_nonneg (Nat.cast_nonneg _) (Nat.cast_nonneg _)) vonMangoldt_nonneg
+  have hrem : ∑ n ∈ R, |g n| ≤ D*T*(2*(Real.log 4+4)*(T:ℝ)^(3:ℝ)⁻¹) := by
+    calc _ ≤ ∑ n ∈ R, D*T*vonMangoldt n := sum_le_sum fun n _ ↦ major n
+         _ ≤ _ := by
+           rw [← mul_sum]
+           exact mul_le_mul_of_nonneg_left (quadraticPrime_nonsquare_mass T hT)
+             (mul_nonneg (Nat.cast_nonneg _) (Nat.cast_nonneg _))
+  simp only [quadraticPrimePowerCellRieszSum, quadraticPrimeCellRieszSum, sum_filter]
+  change |4*(∑ n ∈ A, g n)-4*(∑ n ∈ P, g n)| ≤ _
+  rw [hR, mul_add, add_sub_cancel_left, abs_mul, abs_of_nonneg (by norm_num : (0:ℝ) ≤ 4)]
+  calc _ ≤ 4*(D*T*(2*(Real.log 4+4)*(T:ℝ)^(3:ℝ)⁻¹)) :=
+           mul_le_mul_of_nonneg_left ((abs_sum_le_sum_abs ..).trans hrem) (by norm_num)
+       _ = _ := by dsimp only [D]; ring
+
+/-- The cost of replacing primes by all norms in any of the three nonidentity cells is
+O(J^(19/3)) for the cumulative fourth-power deficit, with arbitrary center values.
+A new nonidentity cell may be chosen at each sample. -/
+theorem quadraticPrimePowerCell_fourthPower_deficit_sub_prime {F : Type*} [Field F] [NumberField F]
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) {J : ℕ} (hJ : 1 ≤ J)
+    (q d : ℕ) (c e f : ℕ → ℝ) (hneg : ∀ j ∈ Ioc 0 J, e j = -1 ∨ f j = -1) :
+    |(∑ j ∈ Ioc 0 J, max (c j - quadraticPrimePowerCellRieszSum χ (J^4) ((j:ℝ)^4)
+        q d (e j) (f j)) 0) -
+      ∑ j ∈ Ioc 0 J, max (c j - quadraticPrimeCellRieszSum χ (J^4) ((j:ℝ)^4)
+        q d (e j) (f j)) 0| ≤
+      8*(Module.finrank ℚ F : ℝ)*(Real.log 4+4)*(J:ℝ)^(19/3:ℝ) := by
+  let B := 8*(Module.finrank ℚ F : ℝ)*(Real.log 4+4)
+  rw [← sum_sub_distrib]
+  apply (abs_sum_le_sum_abs ..).trans
+  calc _ ≤ ∑ _j ∈ Ioc 0 J, B*(J:ℝ)^4*((J:ℝ)^4)^(3:ℝ)⁻¹ := by
+           apply sum_le_sum
+           intro j hj
+           have hx : (j:ℝ)^4 ≤ ((J^4:ℕ):ℝ) := by
+             exact_mod_cast Nat.pow_le_pow_left (mem_Ioc.mp hj).2 4
+           have hp := quadraticPrimePowerCell_sub_prime_le χ
+             (show 1 ≤ J^4 from one_le_pow₀ hJ) hx q d (hneg j hj)
+           have hlip (a b : ℝ) : |max (c j-a) 0 - max (c j-b) 0| ≤ |a-b| := by
+             simpa only [sub_sub_sub_cancel_left, abs_sub_comm b a] using
+               abs_max_sub_max_le_abs (c j-a) (c j-b) 0
+           apply (hlip _ _).trans
+           simpa only [Nat.cast_pow, B] using hp
+       _ = _ := by
+         simp only [sum_const, nsmul_eq_mul, Nat.card_Ioc, Nat.sub_zero]
+         have hpow : (J:ℝ)^(19/3:ℝ) = (J:ℝ)*((J:ℝ)^4*((J:ℝ)^4)^(3:ℝ)⁻¹) := by
+           have hpos : 0 < (J:ℝ) := by exact_mod_cast (show 0 < J by omega)
+           rw [show (19/3:ℝ) = 1+(4+4*3⁻¹) by norm_num, Real.rpow_add hpos, Real.rpow_one,
+             Real.rpow_add hpos, Real.rpow_mul hpos.le]
+           norm_cast
+         rw [hpow]
+         dsimp only [B]
+         ring
+
+open Filter in
+/-- A bound H for the full prime-power deficits in any nonempty family of selected
+nonidentity cells bounds the unrestricted prime deficit. The cardinalities display
+the exact cost of the proportion of auxiliary pairs on which the bound is available. -/
+theorem quadraticPrimePowerCell_fourthPower_deficit_transfer {F : Type*} [Field F] [NumberField F]
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) :
+    ∀ᶠ J : ℕ in atTop, let U := Nat.primesLE (2*J^12) \ Nat.primesLE (J^12)
+      ∀ (c : ℕ → ℝ) (e f : ℕ → ℕ → ℕ → ℝ),
+      (∀ q d j, |e q d j| = 1) → (∀ q d j, |f q d j| = 1) →
+      ∀ (G : Finset (ℕ × ℕ)), G ⊆ U ×ˢ U → ∀ H : ℝ,
+      (∀ w ∈ G, ∀ j ∈ Ioc 0 J, e w.1 w.2 j = -1 ∨ f w.1 w.2 j = -1) →
+      (∀ w ∈ G, ∑ j ∈ Ioc 0 J, max (c j - quadraticPrimePowerCellRieszSum χ (J^4) ((j:ℝ)^4)
+        w.1 w.2 (e w.1 w.2 j) (f w.1 w.2 j)) 0 ≤ H) →
+      G.card * ((∑ j ∈ Ioc 0 J, max (c j - degreeOnePrimeRieszSumWith χ (J^4) ((j:ℝ)^4) 1) 0)
+        - H - 8*(Module.finrank ℚ F : ℝ)*(Real.log 4+4)*(J:ℝ)^(19/3:ℝ)) ≤
+        (U.card:ℝ)^2*(300*(Module.finrank ℚ F : ℝ)*(J:ℝ)^7*Real.log (2+J)) := by
+  filter_upwards [quadraticPrimeTwist_fourthPower_deficit_mean χ, eventually_ge_atTop 1] with J hm hJ
+  intro U c e f he hf G hG H hneg hH
+  let A := ∑ j ∈ Ioc 0 J, max (c j - degreeOnePrimeRieszSumWith χ (J^4) ((j:ℝ)^4) 1) 0
+  let P (w : ℕ × ℕ) := ∑ j ∈ Ioc 0 J, max (c j - quadraticPrimeCellRieszSum χ (J^4)
+    ((j:ℝ)^4) w.1 w.2 (e w.1 w.2 j) (f w.1 w.2 j)) 0
+  let B := 8*(Module.finrank ℚ F : ℝ)*(Real.log 4+4)*(J:ℝ)^(19/3:ℝ)
+  have hpoint (w : ℕ × ℕ) (hw : w ∈ G) : A-H-B ≤ |P w-A| := by
+    have hpow := quadraticPrimePowerCell_fourthPower_deficit_sub_prime χ hJ w.1 w.2 c
+      (e w.1 w.2) (f w.1 w.2) (hneg w hw)
+    have h := (abs_le.mp hpow).1
+    change -B ≤ _ - P w at h
+    linarith [hH w hw, neg_le_abs (P w-A)]
+  calc G.card*(A-H-B) = ∑ _w ∈ G, (A-H-B) := by simp only [sum_const, nsmul_eq_mul]
+       _ ≤ ∑ w ∈ G, |P w-A| := sum_le_sum hpoint
+       _ ≤ ∑ w ∈ U ×ˢ U, |P w-A| := sum_le_sum_of_subset_of_nonneg hG (fun _ _ _ ↦ abs_nonneg _)
+       _ ≤ _ := by
+         rw [sum_product]
+         exact hm c e f he hf
 
 end RiemannMasullo
