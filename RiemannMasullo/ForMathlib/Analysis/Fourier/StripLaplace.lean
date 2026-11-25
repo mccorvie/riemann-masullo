@@ -49,6 +49,47 @@ theorem integrable_exp_neg_mul_abs {c : ℝ} (hc : 0 < c) :
     inv_eq_one_div, div_le_div_iff₀ (Real.exp_pos _) (by positivity)]
   linarith
 
+/-- An exponential window turns a polynomial envelope about its center into an
+`L²` bound with a constant independent of the center and coefficient. -/
+theorem sqrt_integral_exp_sub_le_of_polynomial_envelope (n : ℕ) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ (g : ℝ → ℝ) (v B : ℝ), 0 ≤ B →
+      AEStronglyMeasurable g → (∀ t, 0 ≤ g t) → (∀ t, g t ≤ B * (1 + |t - v|) ^ n) →
+      Integrable (fun t : ℝ ↦ g t ^ 2 * Real.exp (-2 * |t - v|)) ∧
+      Real.sqrt ((1 / 2 : ℝ) * ∫ t : ℝ, g t ^ 2 * Real.exp (-2 * |t - v|)) ≤ C * B := by
+  let K (u : ℝ) := (1 + |u|) ^ (2 * n) * Real.exp (-2 * |u|)
+  have hK : Integrable K := by
+    have he : Integrable (fun u : ℝ ↦ Real.exp (-|u|)) := by
+      simpa only [one_mul] using integrable_exp_neg_mul_abs (c := 1) zero_lt_one
+    refine (he.const_mul ((2 * n).factorial * Real.exp 1)).mono' (by dsimp [K]; fun_prop)
+      (.of_forall fun u ↦ ?_)
+    have hp := (div_le_iff₀ (by positivity : 0 < ((2 * n).factorial : ℝ))).mp
+      (Real.pow_div_factorial_le_exp (1 + |u|) (by positivity : 0 ≤ 1 + |u|) (2 * n))
+    rw [Real.norm_of_nonneg (by dsimp [K]; positivity : 0 ≤ K u)]
+    calc K u ≤ (Real.exp (1 + |u|) * (2 * n).factorial) * Real.exp (-2 * |u|) :=
+          mul_le_mul_of_nonneg_right hp (Real.exp_pos _).le
+      _ = _ := by
+        rw [show 1 + |u| = 1 + (-|u|) - (-2 * |u|) by ring, Real.exp_sub, Real.exp_add]
+        field_simp
+  let C := Real.sqrt ((1 / 2 : ℝ) * ∫ u, K u)
+  refine ⟨C, Real.sqrt_nonneg _, fun g v B hB hmeas hg hdec ↦ ?_⟩
+  have hpoint (t : ℝ) : g t ^ 2 * Real.exp (-2 * |t - v|) ≤ B ^ 2 * K (t - v) := by
+    calc _ ≤ (B * (1 + |t - v|) ^ n) ^ 2 * Real.exp (-2 * |t - v|) :=
+          mul_le_mul_of_nonneg_right (pow_le_pow_left₀ (hg t) (hdec t) 2) (Real.exp_pos _).le
+      _ = _ := by dsimp [K]; rw [mul_pow, ← pow_mul, Nat.mul_comm n 2]; ring
+  have hi := (hK.comp_sub_right v).const_mul (B ^ 2)
+  refine ⟨hi.mono' ((hmeas.pow 2).mul (by fun_prop)) (.of_forall fun t ↦ ?_), ?_⟩
+  · rw [Real.norm_of_nonneg (by positivity)]
+    exact hpoint t
+  have hI : (∫ t : ℝ, g t ^ 2 * Real.exp (-2 * |t - v|)) ≤ B ^ 2 * ∫ u, K u := by
+    apply le_trans (integral_mono_of_nonneg (.of_forall fun _ ↦ by positivity)
+      ((hK.comp_sub_right v).const_mul (B ^ 2)) (.of_forall hpoint))
+    rw [integral_const_mul, integral_sub_right_eq_self]
+  calc _ ≤ Real.sqrt ((1 / 2 : ℝ) * (B ^ 2 * ∫ u, K u)) :=
+        Real.sqrt_le_sqrt (mul_le_mul_of_nonneg_left hI (by norm_num))
+    _ = C * B := by
+      rw [show (1 / 2 : ℝ) * (B ^ 2 * ∫ u, K u) = B ^ 2 * ((1 / 2 : ℝ) * ∫ u, K u) by ring,
+        Real.sqrt_mul (sq_nonneg B), Real.sqrt_sq hB, mul_comm]
+
 /-- On the open strip `|re z| < α`, the integrand of the two-sided Laplace transform of a
 function in the weighted `L²` space is integrable. -/
 theorem integrable_mul_cexp_of_memLp_exp_abs
