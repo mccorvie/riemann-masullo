@@ -1,5 +1,6 @@
 module
 
+public import Mathlib.NumberTheory.LSeries.RiemannZeta
 public import RiemannMasullo.Ch10_TraceSpectral.Sec3
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.AppD_SchwartzBruhat.Sec3a_part2
@@ -252,6 +253,266 @@ private theorem spectralLineJet_separation_of_printed
     (fun i ↦ hbound i i rfl rfl le_rfl)
   refine ⟨ε, hε, fun i j hij ↦ ?_⟩
   simpa only [D, heq] using hsep i j hij
+
+/-- Each ordinate contributes its weight over exactly `h` units of window starts,
+including ordinates at the upper endpoint `T`. -/
+private theorem spectralLineJet_integral_weighted_windows {T h : ℝ} (hh : 0 ≤ h) (hh₁ : h ≤ 1)
+    (S : Finset ℝ) (w : ℝ → ℝ) (hS : ∀ γ ∈ S, γ ∈ Ioc 0 T) :
+    let D (t : ℝ) := ∑ γ ∈ S, (Ico (γ - h) γ).indicator (fun _ ↦ w γ) t
+    IntegrableOn D (Ioc (-1) T) ∧ (∫ t in Ioc (-1) T, D t) = h * ∑ γ ∈ S, w γ := by
+  let K := Ioc (-1 : ℝ) T
+  let F (γ : ℝ) := (Ico (γ - h) γ).indicator (fun _ ↦ w γ)
+  have hF (γ : ℝ) : IntegrableOn (F γ) K := by
+    apply Integrable.integrableOn
+    change Integrable ((Ico (γ - h) γ).indicator (fun _ ↦ w γ))
+    rw [integrable_indicator_iff measurableSet_Ico]
+    exact integrableOn_const (by simp [Real.volume_Ico])
+  refine ⟨integrable_finsetSum (f := F) S (fun γ _ ↦ hF γ), ?_⟩
+  change (∫ t in K, ∑ γ ∈ S, F γ t) = _
+  rw [Finset.mul_sum, integral_finsetSum (f := F) S (fun γ _ ↦ hF γ)]
+  apply Finset.sum_congr rfl
+  intro γ hγ
+  have hsub : Ico (γ - h) γ ⊆ K := fun t ht ↦
+    ⟨by linarith [ht.1, (hS γ hγ).1], ht.2.le.trans (hS γ hγ).2⟩
+  change (∫ t in K, (Ico (γ - h) γ).indicator (fun _ ↦ w γ) t) = _
+  rw [integral_indicator_const (μ := volume.restrict K) (w γ) measurableSet_Ico,
+    measureReal_restrict_apply measurableSet_Ico, inter_eq_left.mpr hsub,
+    Real.volume_real_Ico_of_le (by linarith)]
+  simp [smul_eq_mul]
+
+/-- A zero of weight `w γ` contributes its squared weight over an interval of
+window starts of length `h`. Positive weights make the cross terms nonnegative. -/
+private theorem spectralLineJet_multiplicity_diagonal {T h : ℝ} (hh : 0 ≤ h) (hh₁ : h ≤ 1)
+    (S : Finset ℝ) (w : ℝ → ℝ) (hw : ∀ γ ∈ S, 0 ≤ w γ)
+    (hS : ∀ γ ∈ S, γ ∈ Ioc 0 T) (G : ℝ → ℝ) (hG : IntegrableOn G (Ioc (-1) T))
+    (hupper : ∀ᵐ t ∂volume.restrict (Ioc (-1) T),
+      (∑ γ ∈ S, (Ico (γ - h) γ).indicator (fun _ ↦ w γ) t) ^ 2 ≤ G t) :
+    h * ∑ γ ∈ S, w γ ^ 2 ≤ ∫ t in Ioc (-1) T, G t := by
+  let D (γ : ℝ) := (Ico (γ - h) γ).indicator (fun _ ↦ w γ ^ 2)
+  obtain ⟨hD, hlength⟩ := spectralLineJet_integral_weighted_windows hh hh₁ S (fun γ ↦ w γ ^ 2) hS
+  rw [← hlength]
+  apply integral_mono_ae hD hG
+  filter_upwards [hupper] with t ht
+  calc
+    ∑ γ ∈ S, D γ t = ∑ γ ∈ S, ((Ico (γ - h) γ).indicator (fun _ ↦ w γ) t) ^ 2 := by
+      apply Finset.sum_congr rfl
+      intro γ _
+      by_cases htγ : t ∈ Ico (γ - h) γ <;> simp [D, Set.indicator, htγ]
+    _ ≤ _ := (Finset.sum_sq_le_sq_sum_of_nonneg (s := S)
+      (f := fun γ ↦ (Ico (γ - h) γ).indicator (fun _ ↦ w γ) t)
+      (fun γ hγ ↦ Set.indicator_apply_nonneg (fun _ ↦ hw γ hγ))).trans ht
+
+local notation "mζ(" t ")" =>
+  (analyticOrderNatAt riemannZeta (1 / 2 + ((t : ℝ) : ℂ) * Complex.I) : ℝ)
+
+/-- If a counting function majorizes the weighted zeros in every window `(t,t + h]`,
+bound the sum of squared multiplicities using only the unshifted second moment of
+its error. The error may be truncated outside `(-1,T + 1]`. -/
+theorem spectralLineJet_multiplicity_count_error {T h B : ℝ} (hT : 0 ≤ T)
+    (hh : 0 ≤ h) (hh₁ : h ≤ 1) (S : Finset ℝ) (hS : ∀ γ ∈ S, γ ∈ Ioc 0 T)
+    (E : ℝ → ℝ) (hE : Integrable fun t ↦ E t ^ 2)
+    (hcount : ∀ᵐ t ∂volume.restrict (Ioc (-1) T),
+      (∑ γ ∈ S, (Ico (γ - h) γ).indicator (fun _ ↦ mζ(γ)) t)
+        ≤ B + E (t + h) - E t) :
+    h * (∑ γ ∈ S, mζ(γ) ^ 2) ≤ 3 * ((T + 1) * B ^ 2 + 2 * ∫ t, E t ^ 2) := by
+  let K := Ioc (-1 : ℝ) T
+  have hshift : Integrable (fun t ↦ E (t + h) ^ 2) :=
+    ((measurePreserving_add_right volume h).integrable_comp_emb
+      (Homeomorph.addRight h).measurableEmbedding).mpr hE
+  have hB : IntegrableOn (fun _ : ℝ ↦ B ^ 2) K := integrableOn_const (by simp [K, Real.volume_Ioc])
+  have hup : ∀ᵐ t ∂volume.restrict K,
+      (∑ γ ∈ S, (Ico (γ - h) γ).indicator (fun _ ↦ mζ(γ)) t) ^ 2 ≤
+        3 * (B ^ 2 + E (t + h) ^ 2 + E t ^ 2) := by
+    filter_upwards [hcount] with t ht
+    have hpos : 0 ≤ ∑ γ ∈ S, (Ico (γ - h) γ).indicator (fun _ ↦ mζ(γ)) t :=
+      Finset.sum_nonneg fun γ _ ↦ Set.indicator_apply_nonneg fun _ ↦ Nat.cast_nonneg _
+    calc
+      _ ≤ (B + E (t + h) - E t) ^ 2 := by gcongr
+      _ ≤ _ := by
+        nlinarith [sq_nonneg (B - E (t + h)), sq_nonneg (B + E t), sq_nonneg (E (t + h) + E t)]
+  have hi := spectralLineJet_multiplicity_diagonal hh hh₁ S (fun γ ↦ mζ(γ))
+    (fun γ _ ↦ Nat.cast_nonneg _) hS _
+    (((hB.add hshift.integrableOn).add hE.integrableOn).const_mul 3) hup
+  have h₁ := setIntegral_le_integral (s := K) hshift (ae_of_all _ fun t ↦ sq_nonneg (E (t + h)))
+  have h₂ := setIntegral_le_integral (s := K) hE (ae_of_all _ fun t ↦ sq_nonneg (E t))
+  rw [integral_add_right_eq_self (μ := volume) (fun t ↦ E t ^ 2) h] at h₁
+  change h * _ ≤ ∫ t in K, 3 * (B ^ 2 + E (t + h) ^ 2 + E t ^ 2) at hi
+  have hsum : IntegrableOn (fun t ↦ B ^ 2 + E (t + h) ^ 2) K := hB.add hshift.integrableOn
+  rw [integral_const_mul, integral_add hsum hE.integrableOn,
+    integral_add hB hshift.integrableOn, setIntegral_const, smul_eq_mul,
+    show volume.real K = T - (-1) from Real.volume_real_Ioc_of_le (by linarith)] at hi
+  linarith
+
+/-- The first absolute moment also controls the distinct count. On an occupied window
+one can charge the bound `B` to a single ordinate. On an empty window the entire
+weighted count vanishes. Each ordinate is charged for at most `h` units of starts. -/
+private theorem spectralLineJet_occupied_window_count {T h B : ℝ} (hh : 0 ≤ h) (hh₁ : h ≤ 1)
+    (hB : 0 ≤ B) (S : Finset ℝ) (w : ℝ → ℝ) (hS : ∀ γ ∈ S, γ ∈ Ioc 0 T)
+    (E : ℝ → ℝ) (hE : Integrable E)
+    (hcount : ∀ᵐ t ∂volume.restrict (Ioc (-1) T),
+      (∑ γ ∈ S, (Ico (γ - h) γ).indicator (fun _ ↦ w γ) t) ≤ B + E (t + h) - E t) :
+    h * ∑ γ ∈ S, w γ ≤ B * (h * S.card) + 2 * ∫ t, |E t| := by
+  classical
+  let K := Ioc (-1 : ℝ) T
+  let W (t : ℝ) := ∑ γ ∈ S, (Ico (γ - h) γ).indicator (fun _ ↦ w γ) t
+  let A (t : ℝ) := ∑ γ ∈ S, (Ico (γ - h) γ).indicator (fun _ ↦ (1 : ℝ)) t
+  obtain ⟨hW, hWi⟩ := spectralLineJet_integral_weighted_windows hh hh₁ S w hS
+  obtain ⟨hA, hAi⟩ := spectralLineJet_integral_weighted_windows hh hh₁ S (fun _ ↦ (1 : ℝ)) hS
+  have ha (t : ℝ) : 0 ≤ A t := Finset.sum_nonneg fun γ _ ↦
+    Set.indicator_apply_nonneg (fun _ ↦ zero_le_one)
+  have hshift : Integrable (fun t ↦ |E (t + h)|) :=
+    ((measurePreserving_add_right volume h).integrable_comp_emb
+      (Homeomorph.addRight h).measurableEmbedding).mpr hE.abs
+  have hup : ∀ᵐ t ∂volume.restrict K, W t ≤ B * A t + |E (t + h)| + |E t| := by
+    filter_upwards [hcount] with t ht
+    by_cases hm : ∃ γ ∈ S, t ∈ Ico (γ - h) γ
+    · obtain ⟨γ, hγ, htγ⟩ := hm
+      have hone : 1 ≤ A t := by
+        have hle := Finset.single_le_sum (s := S)
+          (f := fun x ↦ (Ico (x - h) x).indicator (fun _ ↦ (1 : ℝ)) t)
+          (fun x _ ↦ Set.indicator_apply_nonneg (fun _ ↦ zero_le_one)) hγ
+        simpa only [Set.indicator_of_mem htγ] using hle
+      change W t ≤ B + E (t + h) - E t at ht
+      linarith [mul_le_mul_of_nonneg_left hone hB, le_abs_self (E (t + h)), neg_le_abs (E t)]
+    · have hzero : W t = 0 := Finset.sum_eq_zero fun γ hγ ↦
+        Set.indicator_of_notMem (fun htγ ↦ hm ⟨γ, hγ, htγ⟩) _
+      rw [hzero]
+      positivity [ha t]
+  have hBi : IntegrableOn (fun t ↦ B * A t) K := hA.const_mul B
+  have hsum : IntegrableOn (fun t ↦ B * A t + |E (t + h)|) K := hBi.add hshift.integrableOn
+  have hi := integral_mono_ae hW (hsum.add hE.abs.integrableOn) hup
+  change (∫ t in K, W t) ≤ ∫ t in K, B * A t + |E (t + h)| + |E t| at hi
+  rw [hWi, integral_add hsum hE.abs.integrableOn, integral_add hBi hshift.integrableOn,
+    integral_const_mul, hAi] at hi
+  simp only [Finset.sum_const, nsmul_eq_mul, mul_one] at hi
+  have h₁ := setIntegral_le_integral (s := K) hshift
+    (ae_of_all _ fun t ↦ abs_nonneg (E (t + h)))
+  have h₂ := setIntegral_le_integral (s := K) hE.abs (ae_of_all _ fun t ↦ abs_nonneg (E t))
+  rw [integral_add_right_eq_self (μ := volume) (fun t ↦ |E t|) h] at h₁
+  linarith
+
+/-- A multiplicity-weighted Selberg lower bound yields the distinct critical ordinates
+needed for (10.3.1.18), p. 451, provided the unshifted zero-counting error has first
+absolute moment `o(T log T)`. For each fixed width choose a height where the
+displayed error bound holds. A smooth main term with increments at most
+`h log(T+2)` gives the window majorant. Only error values on `(-1,T+1]` are used,
+so the error may be extended by zero. -/
+private theorem spectralLineJet_distinct_zero_count_of_window_majorant
+    (c : ℝ) (hc : 0 < c)
+    (hinput : ∀ h : ℝ, 0 < h → h ≤ 1 →
+      ∃ (T : ℕ) (S : Finset ℝ) (E : ℝ → ℝ),
+        (∀ γ ∈ S, γ ∈ Ioc (0 : ℝ) T ∧ riemannZeta (1 / 2 + (γ : ℂ) * Complex.I) = 0) ∧
+        c * (T + 1) * Real.log (T + 2) ≤ ∑ γ ∈ S, mζ(γ) ∧
+        Integrable E ∧ (∫ t, |E t|) ≤ c / 4 * h * (T + 1) * Real.log (T + 2) ∧
+        ∀ᵐ t ∂volume.restrict (Ioc (-1 : ℝ) T),
+          (∑ γ ∈ S, (Ico (γ - h) γ).indicator (fun _ ↦ mζ(γ)) t)
+            ≤ h * Real.log (T + 2) + E (t + h) - E t)
+    (k : ℕ) :
+    ∃ T : ℕ, ∃ S : Finset ℝ, (k + 1) * (T + 1) < S.card ∧
+      ∀ t ∈ S, t ∈ Ioc (0 : ℝ) T ∧ riemannZeta (1 / 2 + (t : ℂ) * Complex.I) = 0 := by
+  let h := min 1 (c / (4 * ((k : ℝ) + 1)))
+  have hh : 0 < h := by dsimp [h]; positivity
+  have hh₁ : h ≤ 1 := min_le_left ..
+  have hsmall : h * ((k : ℝ) + 1) ≤ c / 4 := by
+    have hden : (0 : ℝ) < 4 * ((k : ℝ) + 1) := by positivity
+    have hle := (le_div_iff₀ hden).mp (min_le_right 1 (c / (4 * ((k : ℝ) + 1))))
+    change h * (4 * ((k : ℝ) + 1)) ≤ c at hle
+    linarith
+  obtain ⟨T, S, E, hS, hmass, hE, herr, hwindow⟩ := hinput h hh hh₁
+  refine ⟨T, S, ?_, hS⟩
+  by_contra! hcard
+  have hcard' : (S.card : ℝ) ≤ ((k : ℝ) + 1) * ((T : ℝ) + 1) := by exact_mod_cast hcard
+  let L := Real.log ((T : ℝ) + 2)
+  have hL : 0 < L := Real.log_pos (by linarith [show (0 : ℝ) ≤ T from Nat.cast_nonneg T])
+  have hi := spectralLineJet_occupied_window_count hh.le hh₁ (mul_nonneg hh.le hL.le)
+    S (fun γ ↦ mζ(γ)) (fun γ hγ ↦ (hS γ hγ).1) E hE hwindow
+  have hcost : h * L * (h * S.card) ≤ c / 4 * h * ((T : ℝ) + 1) * L := calc
+    _ ≤ h * L * (h * (((k : ℝ) + 1) * ((T : ℝ) + 1))) := by gcongr
+    _ = h * ((k : ℝ) + 1) * (h * ((T : ℝ) + 1) * L) := by ring
+    _ ≤ c / 4 * (h * ((T : ℝ) + 1) * L) := by gcongr
+    _ = _ := by ring
+  change h * _ ≤ h * L * (h * S.card) + 2 * ∫ t, |E t| at hi
+  change (∫ t, |E t|) ≤ c / 4 * h * ((T : ℝ) + 1) * L at herr
+  have hlower := mul_le_mul_of_nonneg_left hmass hh.le
+  change h * (c * ((T : ℝ) + 1) * L) ≤ _ at hlower
+  nlinarith [show 0 < c * h * ((T : ℝ) + 1) * L by positivity]
+
+local notation "Nζ(" Z "," t ")" =>
+  (∑ z ∈ (Z : Finset ℂ), if z.im ≤ (t : ℝ) then (analyticOrderNatAt riemannZeta z : ℝ) else 0)
+
+/-- The increment of the full multiplicity-weighted count dominates the window sum
+on the critical line, even when distinct off-line zeros have the same ordinate. -/
+private theorem spectralLineJet_window_le_full_count (Z : Finset ℂ) (S : Finset ℝ)
+    (hS : ∀ γ ∈ S, (1 / 2 + (γ : ℂ) * Complex.I) ∈ Z) (t h : ℝ) (hh : 0 ≤ h) :
+    (∑ γ ∈ S, (Ico (γ - h) γ).indicator (fun _ ↦ mζ(γ)) t) ≤ Nζ(Z, t + h) - Nζ(Z, t) := by
+  classical
+  let p (γ : ℝ) := 1 / 2 + (γ : ℂ) * Complex.I
+  let W (z : ℂ) := (Ico (z.im - h) z.im).indicator (fun _ ↦ (analyticOrderNatAt riemannZeta z : ℝ)) t
+  have hp (γ : ℝ) : (p γ).im = γ := by simp [p]
+  have hinj : Function.Injective p := fun γ η heq ↦ by simpa only [hp] using congrArg Complex.im heq
+  have hsub : S.image p ⊆ Z := by
+    intro z hz
+    obtain ⟨γ, hγ, rfl⟩ := Finset.mem_image.mp hz
+    exact hS γ hγ
+  calc
+    _ = ∑ z ∈ S.image p, W z := by
+      rw [Finset.sum_image (fun _ _ _ _ ht ↦ hinj ht)]
+      apply Finset.sum_congr rfl
+      intro γ _
+      simp only [W, hp, p]
+    _ ≤ ∑ z ∈ Z, W z := Finset.sum_le_sum_of_subset_of_nonneg hsub fun _ _ _ ↦
+      Set.indicator_apply_nonneg (fun _ ↦ Nat.cast_nonneg _)
+    _ = _ := by
+      rw [← Finset.sum_sub_distrib]
+      apply Finset.sum_congr rfl
+      intro z _
+      by_cases h₁ : z.im ≤ t
+      · have h₂ : z.im ≤ t + h := by linarith
+        have hout : t ∉ Ico (z.im - h) z.im := fun ht ↦ (not_lt_of_ge h₁) ht.2
+        simp [W, h₁, h₂, hout]
+      · by_cases h₂ : z.im ≤ t + h
+        · have hin : t ∈ Ico (z.im - h) z.im := ⟨by linarith, lt_of_not_ge h₁⟩
+          simp [W, h₁, h₂, hin]
+        · have hout : t ∉ Ico (z.im - h) z.im := fun ht ↦ h₂ (by linarith [ht.1])
+          simp [W, h₁, h₂, hout]
+
+/-- A multiplicity-weighted lower bound on critical zeros and a first absolute moment
+bound for the full counting error imply the exact distinct-ordinate count used for
+(10.3.1.18), p. 451. Here `Z` can be all strip zeros up to `T+1`, each carrying its
+actual analytic order. The smooth main term `M` only needs the indicated increment
+bound. For fixed `h`, an error of `o(T log T)` gives the displayed moment estimate
+at sufficiently large heights. Selberg's ordinary second-moment estimate for the
+argument gives this error bound by Cauchy–Schwarz. -/
+theorem spectralLineJet_distinct_zero_count_of_multiplicity_and_count_error
+    (c : ℝ) (hc : 0 < c)
+    (hinput : ∀ h : ℝ, 0 < h → h ≤ 1 →
+      ∃ (T : ℕ) (Z : Finset ℂ) (S : Finset ℝ) (M : ℝ → ℝ),
+        (∀ γ ∈ S, γ ∈ Ioc (0 : ℝ) T ∧ (1 / 2 + (γ : ℂ) * Complex.I) ∈ Z ∧
+          riemannZeta (1 / 2 + (γ : ℂ) * Complex.I) = 0) ∧
+        c * (T + 1) * Real.log (T + 2) ≤ ∑ γ ∈ S, mζ(γ) ∧
+        IntegrableOn (fun t ↦ Nζ(Z, t) - M t) (Ioc (-1 : ℝ) (T + 1)) ∧
+        (∫ t in Ioc (-1 : ℝ) (T + 1), |Nζ(Z, t) - M t|) ≤ c / 4 * h * (T + 1) * Real.log (T + 2) ∧
+        ∀ᵐ t ∂volume.restrict (Ioc (-1 : ℝ) T), M (t + h) - M t ≤ h * Real.log (T + 2))
+    (k : ℕ) :
+    ∃ T : ℕ, ∃ S : Finset ℝ, (k + 1) * (T + 1) < S.card ∧
+      ∀ t ∈ S, t ∈ Ioc (0 : ℝ) T ∧ riemannZeta (1 / 2 + (t : ℂ) * Complex.I) = 0 := by
+  apply spectralLineJet_distinct_zero_count_of_window_majorant c hc _ k
+  intro h hh hh₁
+  obtain ⟨T, Z, S, M, hS, hmass, hE, herr, hM⟩ := hinput h hh hh₁
+  let J := Ioc (-1 : ℝ) ((T : ℝ) + 1)
+  let E := J.indicator (fun t ↦ Nζ(Z, t) - M t)
+  refine ⟨T, S, E, fun γ hγ ↦ ⟨(hS γ hγ).1, (hS γ hγ).2.2⟩, hmass,
+    (integrable_indicator_iff measurableSet_Ioc).mpr hE, ?_, ?_⟩
+  · have heq (t : ℝ) : |E t| = J.indicator (fun u ↦ |Nζ(Z, u) - M u|) t := by
+      by_cases ht : t ∈ J <;> simp [E, Set.indicator, ht]
+    simpa only [heq, integral_indicator (show MeasurableSet J from measurableSet_Ioc)] using herr
+  · filter_upwards [hM, ae_restrict_mem (μ := volume) measurableSet_Ioc] with t htM ht
+    have h₁ : t ∈ J := ⟨ht.1, by linarith [ht.2]⟩
+    have h₂ : t + h ∈ J := ⟨by linarith [ht.1], by linarith [ht.2]⟩
+    have hfull := spectralLineJet_window_le_full_count Z S (fun γ hγ ↦ (hS γ hγ).2.1) t h hh.le
+    dsimp only [E]
+    rw [Set.indicator_of_mem h₁, Set.indicator_of_mem h₂]
+    linarith
 
 open Filter in
 open scoped Topology in
