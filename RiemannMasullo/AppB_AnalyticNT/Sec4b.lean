@@ -10,7 +10,7 @@ public import RiemannMasullo.AppB_AnalyticNT.Sec4a
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import RiemannMasullo.ForMathlib.Analysis.Complex.LandauLemma
-import RiemannMasullo.ForMathlib.Analysis.Fourier.Log
+import RiemannMasullo.ForMathlib.Analysis.Fourier.RealLogFinitePart
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.WeightedIntegral
 import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
@@ -4797,12 +4797,13 @@ theorem realLogFourier_finitePart (w : InfinitePlace F) (_hw : w.IsReal)
   have hK (t : ℝ) : K (m t) = (Real.log |t| : ℂ) * FourierTransform.fourier (u : ℝ → ℂ) t := by
     change (Real.log (‖m t‖ ^ w.mult) : ℂ) * tamagawaFourier ν∞(w) ψ∞(w) addTest(f) (m t) = _
     rw [_hw.mult_eq_one, pow_one, hnorm, funext hf, realModelFourier w _hw, hem]
-  obtain ⟨hlog, hcut, hlim⟩ := real_log_fourier_cutoff u
+  obtain ⟨hlog, hcut, hlim⟩ := RealFourierLog.real_log_cutoff u
+  rw [add_comm Real.eulerMascheroniConstant (Real.log (2 * Real.pi))] at hlim
   -- Transport the cutoff sets along the isometry, then double the real-line limit.
   simp only [hμ, integrable_map_equiv, integrableOn_map_equiv, setIntegral_map_equiv,
     integral_map_equiv, Function.comp_def, preimage_ofPred_eq, hK, hnorm, hf, hem, map_zero]
   refine ⟨hlog, hcut, ?_⟩
-  have scale (x y z : ℂ) : 2 * (1 / 2 * x + y * z) = x + 2 * z * y := by ring
+  have scale (x y z : ℂ) : 2 * (1 / 2 * x + y * z) = x + 2 * y * z := by ring
   have scale_limit (x y : ℂ) : 2 * (-x - y) = -2 * (x + y) := by ring
   simpa only [scale, scale_limit, Complex.ofReal_add] using hlim.const_mul (2 : ℂ)
 
@@ -14132,7 +14133,7 @@ private theorem idelicExplicitFormula_infiniteMatching_realLocal_remainder (s : 
       (Complex.measurable_ofReal.comp continuous_abs.measurable)
   have htail {ε : ℝ} (hε : 0 < ε) (h₁ : ε ≤ 1) :
       IntegrableOn D (A ε) := by
-    have hi := (real_log_fourier_cutoff s).2.1 ε hε
+    have hi := (RealFourierLog.real_log_cutoff s).2.1 ε hε
     have hr := (idelicExplicitFormula_infiniteMatching_realLocal_cutoff hε h₁).1.ofReal.const_mul (s 0)
     refine (hi.sub hr).congr_fun (fun x _ ↦ ?_) (hA ε)
     change s x / _ - s 0 * ((R x / |x| : ℝ) : ℂ) = _
@@ -14189,7 +14190,7 @@ private theorem idelicExplicitFormula_infiniteMatching_realLocal_remainder (s : 
   obtain ⟨hr, hv⟩ := idelicExplicitFormula_infiniteMatching_realLocal_cutoff hε h₁.le
   have he (x : ℝ) : D x = s x / ((|x| : ℝ) : ℂ) - s 0 * ((R x / |x| : ℝ) : ℂ) := by
     simp only [D, Complex.ofReal_div, sub_div, mul_div_assoc]
-  have hi := (real_log_fourier_cutoff s).2.1 ε hε
+  have hi := (RealFourierLog.real_log_cutoff s).2.1 ε hε
   have hr' : IntegrableOn (fun x ↦ s 0 * ((R x / |x| : ℝ) : ℂ)) (A ε) := hr.ofReal.const_mul _
   change (∫ x in A ε, D x) + _ = _
   simp_rw [he]

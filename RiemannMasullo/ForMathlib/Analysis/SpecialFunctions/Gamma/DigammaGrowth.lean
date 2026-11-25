@@ -207,4 +207,16 @@ theorem exists_pos_norm_digamma_le_log (a : ℝ) (ha : 0 < a) :
     _ ≤ C * (1 + Real.log (2 + ‖z‖)) := by
       nlinarith only [mul_le_mul_of_nonneg_right hconst hlog]
 
+/-- On a right half-plane, the Gauss difference based at one has a logarithmic bound for its absolute integral. -/
+theorem integral_norm_gaussDifference_one_le {a : ℝ} (ha : 0 < a) (z : ℂ) (hz : a ≤ z.re) :
+    (∫ t in Ioi (0 : ℝ), ‖(exp (-(t : ℂ)) - exp (-z * t)) /
+          (1 - exp (-(t : ℂ)))‖) ≤ 4 + 4 * Real.log (2 + ‖z‖) + 4 / min a 1 := by
+  have hI := (gauss_logDeriv_Gamma_difference (u := 1) (v := z) (by norm_num) (ha.trans_le hz)).1
+  exact integral_norm_gauss_kernel_le z (lt_min ha zero_lt_one) ((min_le_left a 1).trans hz)
+    (min_le_right a 1) (by
+      change IntegrableOn (fun t : ℝ ↦ (exp (-(t : ℂ)) - exp (-z * t)) /
+        (1 - exp (-(t : ℂ)))) (Ioi 0)
+      simpa only [neg_one_mul] using hI)
+
+
 end Complex

@@ -5,6 +5,7 @@ public import RiemannMasullo.Ch12_TraceGeometric.Sec4_UpperFrequencyGate
 public import RiemannMasullo.AppA_AlgebraicNT.Sec5a_IdeleClassDPrime
 import RiemannMasullo.Ch01_Introduction.Sec4
 import RiemannMasullo.AppB_AnalyticNT.Sec4b
+import RiemannMasullo.AppB_AnalyticNT.Sec4b_ArchPrincipalValue
 import Mathlib.MeasureTheory.Group.Integral
 import Mathlib.MeasureTheory.Integral.IntegralEqImproper
 import Mathlib.Topology.Algebra.InfiniteSum.Order
@@ -920,5 +921,92 @@ theorem exists_measurableSequence_archConductor_linePA_iff_exteriorZeros_of_weil
     (F := F)
   exact ⟨U,hU,hB,fun τ hτ hWeil ↦ hw τ hτ hWeil fun χ k ↦
     primeFreeCharacterTest_quotientNuclear χ.val k⟩
+
+/-- Paper: Theorem B.4.4.7, pp. 625–626. The signed divisor formula, the two polar zeros
+of the prescribed test, and its normalized finite principal values give the Weil identity
+for one character. -/
+theorem primeFreeWeilIdentity (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (χ : Chars(τ)) :
+    PrimeFreeWeilIdentity χ.val := by
+  classical
+  let f : _root_.SchwartzMap ℝ ℂ :=
+    primeFreeProfile_complex_compact.toSchwartzMap primeFreeProfile_complex_smooth
+  have hfc : HasCompactSupport (f : ℝ → ℂ) := primeFreeProfile_complex_compact
+  have hf : ExponentialDecay f := ArchPV.exponentialDecay_of_compact f hfc
+  have he (x : ℝ) : f (-x) = f x :=
+    congrArg Complex.ofReal (primeFreeProfile_properties.2.2.2.1 x)
+  have hφ (g : C𝔽) : (φχ(χ.val)).val g =
+      (χ.val⁻¹ g : ℂ) * f (Real.log ((ideleClassNorm F g).val : ℝ)) :=
+    primeFreeCharacterTest_apply χ.val g
+  have hcut (x : ℝ) (hx : Real.log 2 ≤ |x|) : f x = 0 := by
+    change (primeFreeProfile x : ℂ) = 0
+    apply Complex.ofReal_eq_zero.mpr
+    by_contra hn
+    exact (not_lt_of_ge hx) (abs_lt.mpr (primeFreeProfile_properties.2.2.1 (subset_tsupport _ hn)))
+  obtain ⟨_, _, _, _, _, hplus, hminus, _⟩ := primeFreeProfile_properties
+  let L := continuedCompletedHeckeL (F := F) χ.val
+  obtain ⟨hL, hAgree⟩ := continuedCompletedHeckeL_spec χ.val
+  let t (z : ℂ) := (ord(χ.val, z) : ℂ) * bilateralLaplace f (z - 1 / 2)
+  let S := (heckeLogDiscriminantConductor χ.val : ℂ) * f 0 -
+    ∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w Aχ(χ.val, w)
+  have hall : HasSum t S :=
+    ArchPV.hasSum_short_actualPV τ hτ χ (φχ(χ.val)) f hfc hf he hφ hcut L hL hAgree
+  have hsupp : support t ⊆ {z : ℂ | 0 < ord(χ.val, z)} := by
+    intro z hz
+    by_contra h
+    change ¬ 0 < ord(χ.val, z) at h
+    rcases lt_or_eq_of_le (le_of_not_gt h) with hneg | hzero
+    · obtain ⟨_, hp⟩ := idelicExplicitFormula_chart_poles τ hτ χ.val χ.property z hneg
+      rcases hp with rfl | rfl
+      · exact hz (by
+          dsimp only [t]
+          rw [zero_sub, show bilateralLaplace f (-(1 / 2)) = 0 from hminus, mul_zero])
+      · exact hz (by
+          dsimp only [t]
+          rw [show (1 : ℂ) - 1 / 2 = 1 / 2 by norm_num,
+            show bilateralLaplace f (1 / 2) = 0 from hplus, mul_zero])
+    · exact hz (by
+        dsimp only [t]
+        rw [hzero, Int.cast_zero, zero_mul])
+  let v : ℝ := ((normOneIdeleClassTamagawaMeasure F) univ).toReal
+  have hreal :=
+    (Complex.hasSum_re ((hasSum_subtype_iff_of_support_subset hsupp).mpr hall)).mul_left v
+  have hw : HasSum (fun z : Sites(χ.val) ↦ Wχ(χ.val, z)) (v * S.re) := by
+    apply hreal.congr_fun
+    intro z
+    have hn : ((ord(χ.val, z.val)).toNat : ℝ) = (ord(χ.val, z.val) : ℝ) := by
+      exact_mod_cast Int.toNat_of_nonneg z.property.le
+    rw [primeFreeCharacterTest_mellin, Complex.re_ofReal_mul, hn]
+    change _ = v * ((ord(χ.val, z.val) : ℂ) * bilateralLaplace f (z.val - 1 / 2)).re
+    simp only [Complex.mul_re, Complex.intCast_re, Complex.intCast_im, zero_mul, sub_zero]
+    rw [show (f : ℝ → ℂ) = (fun x ↦ (primeFreeProfile x : ℂ)) from rfl]
+    change _ * (v * _) = v * (_ * _)
+    ring
+  have hp := primeFreeCharacterTest_polar τ hτ χ
+  have hfin := (primeFreeCharacterTest_finitePrincipalValues χ.val).2.tsum_eq
+  unfold PrimeFreeWeilIdentity
+  rw [hw.tsum_eq, hp.1, hp.2, hfin, zero_add, zero_sub, Complex.neg_re,
+    Complex.re_ofReal_mul, Complex.add_re]
+  dsimp only [S]
+  rw [Complex.sub_re]
+  change v * ((((heckeLogDiscriminantConductor χ.val : ℝ) : ℂ) * (primeFreeProfile 0 : ℂ)).re - _) =
+    -(v * (_ + (-(primeFreeProfile 0 : ℂ) * (heckeLogDiscriminantConductor χ.val : ℂ)).re))
+  simp only [Complex.re_ofReal_mul, neg_mul, Complex.neg_re, Complex.ofReal_re]
+  ring
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. One measurable smoothing sequence gives both
+upper comparisons on the actual centered line kernels, for every norm section. -/
+theorem exists_measurableSequence_archConductor_linePA_iff_exteriorZeros :
+    ∃ U : ℕ → Set C𝔽, IsDPrimeSequence μ𝔽 U ∧ (∀ n, MeasurableSet (U n)) ∧
+    ∀ (τ : ℝ≥0ˣ →ₜ* C𝔽), RightInverse τ (ideleClassNorm F) →
+      ((∀ (χ : Chars(τ)) (δ : ℝ), 0 < δ → ∃ k : ℕ,
+        primeFreeCenteredIntegral χ.val k (primeFreeCharacterTest_quotientNuclear χ.val k) U
+          ≤ primeFreeArchConductor χ.val + δ) ↔ target(τ)) ∧
+      ((∀ χ : Chars(τ), limUnder atTop (fun k ↦ primeFreeCenteredIntegral χ.val k
+        (primeFreeCharacterTest_quotientNuclear χ.val k) U) ≤ primeFreeArchConductor χ.val) ↔
+          target(τ)) := by
+  obtain ⟨U, hU, hB, hw⟩ :=
+    exists_measurableSequence_archConductor_linePA_iff_exteriorZeros_of_weil (F := F)
+  exact ⟨U, hU, hB, fun τ hτ ↦ hw τ hτ (primeFreeWeilIdentity τ hτ)⟩
 
 end RiemannMasullo.Isolated.OutputOrderGeometry
