@@ -9530,6 +9530,44 @@ private theorem explicitFormula_mellin_strip_bounded (f : 𝒟(C[F])) (χ : U[F]
 
 end ExplicitFormulaMellinDecay
 
+/-- For a fixed test and unitary character, every power of the Mellin height is
+uniformly bounded after multiplication by the centered transform on the closed
+critical strip. Each additional power uses one derivative along the norm flow. -/
+theorem idelicExplicitFormula_mellin_pow_envelope (f : 𝒟(C[F])) (χ : U[F]) (k : ℕ) :
+    ∃ W : ℝ, 0 ≤ W ∧ ∀ s : ℂ, s.re ∈ Icc (0 : ℝ) 1 →
+      (1 + |s.im|) ^ k *
+        ‖∫ g, classMellinIntegrand(f, ideleClassNormTwist χ s, -1 / 2) g ∂classMeasure‖ ≤ W := by
+  let M (h : 𝒟(C[F])) (s : ℂ) : ℂ :=
+    ∫ g, classMellinIntegrand(h, ideleClassNormTwist χ s, -1 / 2) g ∂classMeasure
+  change ∃ W : ℝ, 0 ≤ W ∧ ∀ s : ℂ, s.re ∈ Icc (0 : ℝ) 1 →
+    (1 + |s.im|) ^ k * ‖M f s‖ ≤ W
+  obtain ⟨κ, hflow⟩ := explicitFormula_mellin_flowDeriv χ
+  change ∀ h : 𝒟(C[F]), ∃ g : 𝒟(C[F]), ∀ s : ℂ, M g s = (s - 1 / 2 + κ) * M h s at hflow
+  induction k generalizing f with
+  | zero =>
+    simpa only [pow_zero, one_mul] using explicitFormula_mellin_strip_bounded f χ
+  | succ k ih =>
+    obtain ⟨g, hg⟩ := hflow f
+    obtain ⟨B, hB, hb⟩ := ih f
+    obtain ⟨D, hD, hd⟩ := ih g
+    refine ⟨(1 + |κ.im|) * B + D, by positivity, fun s hs ↦ ?_⟩
+    let w := s - 1 / 2 + κ
+    have him : w.im = s.im + κ.im := by simp [w]
+    have ht : 1 + |s.im| ≤ (1 + |κ.im|) + ‖w‖ := by
+      have h := abs_add_le (s.im + κ.im) (-κ.im)
+      rw [add_neg_cancel_right, abs_neg, ← him] at h
+      linarith [Complex.abs_im_le_norm w]
+    have hd' := hd s hs
+    rw [hg, norm_mul] at hd'
+    calc
+      (1 + |s.im|) ^ (k + 1) * ‖M f s‖ =
+          (1 + |s.im|) * ((1 + |s.im|) ^ k * ‖M f s‖) := by ring
+      _ ≤ ((1 + |κ.im|) + ‖w‖) * ((1 + |s.im|) ^ k * ‖M f s‖) :=
+        mul_le_mul_of_nonneg_right ht (by positivity)
+      _ = (1 + |κ.im|) * ((1 + |s.im|) ^ k * ‖M f s‖) +
+          (1 + |s.im|) ^ k * (‖w‖ * ‖M f s‖) := by ring
+      _ ≤ _ := add_le_add (mul_le_mul_of_nonneg_left (hb s hs) (by positivity)) hd'
+
 /-- Paper: Lemma B.4.4.9, pp. 624–625. For a fixed test and a fixed unitary character, the
 centered idelic Mellin transform of the test decays like the inverse square of the height in
 the closed critical strip. The test is smooth and compactly supported along the norm, so this
@@ -9538,42 +9576,9 @@ theorem idelicExplicitFormula_mellin_decay (f : 𝒟(C[F])) (χ : U[F]) :
     ∃ K : ℝ, ∀ s : ℂ, s.re ∈ Icc (0 : ℝ) 1 →
       ‖∫ g, classMellinIntegrand(f, ideleClassNormTwist χ s, -1 / 2) g ∂classMeasure‖ ≤
         K / (1 + |s.im|) ^ 2 := by
-  obtain ⟨κ, hκ⟩ := explicitFormula_mellin_flowDeriv χ
-  obtain ⟨f₁, h₁⟩ := hκ f
-  obtain ⟨f₂, h₂⟩ := hκ f₁
-  obtain ⟨B₀, hB₀, hb₀⟩ := explicitFormula_mellin_strip_bounded f χ
-  obtain ⟨B₂, hB₂, hb₂⟩ := explicitFormula_mellin_strip_bounded f₂ χ
-  refine ⟨B₀ * (2 * |κ.im| + 2) ^ 2 + 4 * B₂, fun s hs ↦ ?_⟩
-  set M := ∫ g, classMellinIntegrand(f, ideleClassNormTwist χ s, -1 / 2) g ∂classMeasure
-  set z : ℂ := s - 1 / 2 + κ
-  have hM2 : ‖z‖ ^ 2 * ‖M‖ ≤ B₂ := by
-    have h := hb₂ s hs
-    rw [h₂, h₁, ← mul_assoc, norm_mul, norm_mul] at h
-    change ‖z‖ * ‖z‖ * ‖M‖ ≤ B₂ at h
-    rwa [sq]
-  have hκ0 : 0 ≤ |κ.im| := abs_nonneg _
-  have ht : 0 ≤ |s.im| := abs_nonneg _
-  rw [le_div_iff₀ (by positivity)]
-  rcases le_or_gt |s.im| (2 * |κ.im| + 1) with h | h
-  · have hp : (1 + |s.im|) ^ 2 ≤ (2 * |κ.im| + 2) ^ 2 := pow_le_pow_left₀ (by positivity) (by linarith) 2
-    calc ‖M‖ * (1 + |s.im|) ^ 2 ≤ B₀ * (2 * |κ.im| + 2) ^ 2 :=
-          mul_le_mul (hb₀ s hs) hp (by positivity) hB₀
-      _ ≤ _ := le_add_of_nonneg_right (by positivity)
-  · have hzim : z.im = s.im + κ.im := by simp [z]
-    have hsub : |s.im| ≤ |s.im + κ.im| + |κ.im| := by
-      have := abs_add_le (s.im + κ.im) (-κ.im)
-      rwa [add_neg_cancel_right, abs_neg] at this
-    have hz : (1 + |s.im|) / 2 ≤ ‖z‖ := by
-      refine le_trans ?_ (Complex.abs_im_le_norm z)
-      rw [hzim]
-      linarith
-    have hz2 : (1 + |s.im|) ^ 2 ≤ 4 * ‖z‖ ^ 2 := by
-      nlinarith [hz, norm_nonneg z]
-    calc ‖M‖ * (1 + |s.im|) ^ 2 ≤ ‖M‖ * (4 * ‖z‖ ^ 2) :=
-          mul_le_mul_of_nonneg_left hz2 (norm_nonneg _)
-      _ = 4 * (‖z‖ ^ 2 * ‖M‖) := by ring
-      _ ≤ 4 * B₂ := by linarith
-      _ ≤ _ := le_add_of_nonneg_left (by positivity)
+  obtain ⟨K, _, hK⟩ := idelicExplicitFormula_mellin_pow_envelope f χ 2
+  refine ⟨K, fun s hs ↦ (le_div_iff₀ (by positivity)).2 ?_⟩
+  simpa only [mul_comm] using hK s hs
 
 /-- Paper: Lemma B.4.4.9, pp. 624–625, for one character. For a fixed unitary character `χ`,
 the spectral terms of the idelic explicit formula at the zeros of the completed Hecke

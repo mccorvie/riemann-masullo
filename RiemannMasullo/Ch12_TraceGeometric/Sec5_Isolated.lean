@@ -1,5 +1,6 @@
 module
 
+public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeGreenHeightTail
 import Mathlib.Geometry.Manifold.PartitionOfUnity
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 
@@ -483,6 +484,75 @@ private theorem criticalLogDifference_eq_mass (τ : ℝ≥0ˣ →ₜ* C𝔽) (h�
     (χ : U𝔽) (hχ : ∀ u : ℝ≥0ˣ, χ (τ u) = 1) :
     criticalLogDifference χ = rightGreenMass χ :=
   (hasSum_green_criticalLogDifference τ hτ χ hχ).tsum_eq.symm
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520.
+Reconstruction: If all positive divisor points through height
+`H` are central, an upper bound for the full two-sided quadratic tail gives a bound
+for the corrected logarithmic integral on the critical line. -/
+theorem criticalLogDifference_mem_Icc_of_verified_height (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) (χ : U𝔽) (hχ : ∀ u : ℝ≥0ˣ, χ (τ u) = 1)
+    {H B : ℝ} (hH : 0 < H) (hc : ∀ z : Site χ, |z.val.im| ≤ H → z.val.re = 1 / 2)
+    (hB : inverseHeightTail χ H 2 ≤ B) :
+    criticalLogDifference χ ∈ Icc 0 (3 / 4 * B) := by
+  rw [criticalLogDifference_eq_mass τ hτ χ hχ]
+  exact ⟨rightGreenMass_nonneg χ, (rightGreenMass_le_inverseHeightTail χ hH hc).trans
+    (mul_le_mul_of_nonneg_left hB (by norm_num))⟩
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520.
+Reconstruction: For each compact test, character and `k ≥ 2`,
+one Mellin envelope times the full high-ordinate tail bounds the absolute omitted sum.
+The estimate holds at every positive strip half-width and includes both edges. -/
+theorem exists_hasSum_absolute_exterior_le_verified_height_tail (χ : U𝔽)
+    (φ : BruhatCompactSupport C𝔽) {k : ℕ} (hk : 2 ≤ k) :
+    ∃ W : ℝ, 0 ≤ W ∧ ∀ {H B : ℝ}, 0 < H →
+      (∀ z : Site χ, |z.val.im| ≤ H → z.val.re = 1 / 2) → inverseHeightTail χ H k ≤ B →
+      ∀ α : ℝ, 0 < α → ∃ A : ℝ,
+        HasSum (fun z : {p : ℂ // 0 < ord(χ, p) ∧ α ≤ |p.re - 1 / 2|} ↦
+          ‖(ord(χ, z.val) : ℂ) * modulatedFourierMellin m𝔽 univ
+            ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+            μ𝔽 φ.val (ideleClassNormTwist χ (z.val - 1 / 2))‖) A ∧ A ≤ W * B := by
+  obtain ⟨W, hW, hM⟩ := exists_centeredMellin_site_pow_envelope φ χ k
+  refine ⟨W, hW, fun {H B} hH hc hB α hα ↦ ?_⟩
+  let M (z : ℂ) := modulatedFourierMellin m𝔽 univ
+    ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+    μ𝔽 φ.val (ideleClassNormTwist χ (z - 1 / 2))
+  obtain ⟨hs, hb⟩ := absolute_exterior_le_inverseHeightTail χ M hk hH hW hc hM hα
+  exact ⟨_, hs, hb.trans (mul_le_mul_of_nonneg_left hB hW)⟩
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520.
+Reconstruction: A summable family of characterwise height-tail bounds controls the absolute
+exterior sum on the original joint index.
+The test envelopes are chosen before the verification heights and strip width. -/
+theorem exists_hasSum_joint_absolute_exterior_le_verified_height_tails
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (φ : BruhatCompactSupport C𝔽) {k : ℕ} (hk : 2 ≤ k) :
+    let X := {χ : U𝔽 // ∀ u : ℝ≥0ˣ, χ (τ u) = 1}
+    let M (χ : X) (s : ℂ) := modulatedFourierMellin m𝔽 univ
+      ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+      μ𝔽 φ.val (ideleClassNormTwist χ.val (s - 1 / 2))
+    ∃ W : X → ℝ, (∀ χ, 0 ≤ W χ) ∧
+      (∀ χ (z : Site χ.val), |z.val.im| ^ k * ‖M χ z.val‖ ≤ W χ) ∧
+      ∀ H B : X → ℝ, (∀ χ, 0 < H χ) →
+        (∀ χ (z : Site χ.val), |z.val.im| ≤ H χ → z.val.re = 1 / 2) →
+        (∀ χ, inverseHeightTail χ.val (H χ) k ≤ B χ) →
+        Summable (fun χ ↦ W χ * B χ) → ∀ α : ℝ, 0 < α → ∃ A : ℝ,
+          HasSum (fun z : ext(τ, α) ↦ ‖(ord(z.val.1.val, z.val.2) : ℂ) * M z.val.1 z.val.2‖) A ∧
+            A ≤ ∑' χ, W χ * B χ := by
+  intro X M
+  choose W hW hm using fun χ : X ↦ exists_centeredMellin_site_pow_envelope φ χ.val k
+  refine ⟨W, hW, hm, fun H B hH hc hB hsum α hα ↦ ?_⟩
+  let P (χ : X) (z : ℂ) := 0 < ord(χ.val, z) ∧ α ≤ |z.re - 1 / 2|
+  let g (χ : X) (z : Subtype (P χ)) := ‖(ord(χ.val, z.val) : ℂ) * M χ z.val‖
+  have hf (χ : X) : Summable (g χ) ∧ (∑' z, g χ z) ≤ W χ * B χ := by
+    obtain ⟨hs, hb⟩ := absolute_exterior_le_inverseHeightTail χ.val (M χ) hk
+      (hH χ) (hW χ) (hc χ) (hm χ) hα
+    exact ⟨hs.summable, hb.trans (mul_le_mul_of_nonneg_left (hB χ) (hW χ))⟩
+  have hout : Summable (fun χ ↦ ∑' z, g χ z) := Summable.of_nonneg_of_le
+    (fun χ ↦ tsum_nonneg fun _ ↦ norm_nonneg _) (fun χ ↦ (hf χ).2) hsum
+  have hσ : Summable (fun z : (χ : X) × Subtype (P χ) ↦ g z.1 z.2) :=
+    (summable_sigma_of_nonneg fun _ ↦ norm_nonneg _).2 ⟨fun χ ↦ (hf χ).1, hout⟩
+  refine ⟨_, ?_, hout.tsum_le_tsum (fun χ ↦ (hf χ).2) hsum⟩
+  exact (Equiv.subtypeProdEquivSigmaSubtype P).symm.hasSum_iff.mp
+    (hout.hasSum.sigma_of_hasSum (fun χ ↦ (hf χ).1.hasSum) hσ)
 
 /-- Paper: Theorem 12.5.1.1, pp. 519–520. Reconstruction: the all-width exterior cancellation is
 equivalent to a single upper bound for the critical-line logarithmic integral of each normalized

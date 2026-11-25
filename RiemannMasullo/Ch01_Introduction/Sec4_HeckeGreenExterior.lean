@@ -186,14 +186,14 @@ local notation "M(" φ ", " χ ", " z ")" =>
     (ideleClassTamagawaMeasure F) (φ : BruhatCompactSupport CF).val
     (ideleClassNormTwist (F := F) χ ((z : ℂ) - 1 / 2))
 
-/-- The centered Fourier–Mellin transform of a compact Bruhat test has a quadratic
-height envelope throughout the closed critical strip, for every fixed unitary character. -/
-private theorem exists_centeredMellin_strip_envelope (φ : BruhatCompactSupport CF)
-    (χ : PontryaginDual CF) :
+/-- Every power of the height times the centered Fourier–Mellin transform of a
+compact Bruhat test is bounded on the closed critical strip for a fixed unitary character. -/
+theorem exists_centeredMellin_strip_pow_envelope (φ : BruhatCompactSupport CF)
+    (χ : PontryaginDual CF) (k : ℕ) :
     ∃ W : ℝ, 0 ≤ W ∧ ∀ z : ℂ, z.re ∈ Icc (0 : ℝ) 1 →
-      (1 + z.im ^ 2) * ‖M(φ,χ,z)‖ ≤ W := by
-  obtain ⟨K, hK⟩ := idelicExplicitFormula_mellin_decay φ χ
-  refine ⟨max K 0, le_max_right _ _, fun z hz ↦ ?_⟩
+      (1 + |z.im|) ^ k * ‖M(φ,χ,z)‖ ≤ W := by
+  obtain ⟨W, hW, h⟩ := idelicExplicitFormula_mellin_pow_envelope φ χ k
+  refine ⟨W, hW, fun z hz ↦ ?_⟩
   have hshift : M(φ,χ,z) =
       ∫ g, φ.val g * ideleClassNormTwist χ z g *
         ((((ideleClassNorm F g).val : ℝ) : ℂ) ^ (-1/2 : ℂ)) ∂ideleClassTamagawaMeasure F := by
@@ -206,11 +206,30 @@ private theorem exists_centeredMellin_strip_envelope (φ : BruhatCompactSupport 
       φ.val g * ((χ g : ℂ) * u ^ z) * u ^ (-1/2 : ℂ)
     rw [show z - 1/2 = z + (-1/2) by ring, Complex.cpow_add _ _ hu]
     ring
-  have h := (le_div_iff₀ (by positivity : 0 < (1 + |z.im|)^2)).mp (hK z hz)
-  rw [← hshift, mul_comm] at h
-  have hw : 1 + z.im ^ 2 ≤ (1 + |z.im|)^2 := by
+  rw [hshift]
+  exact h z hz
+
+/-- The fixed compact test has a polynomial height envelope on all occupied sites,
+without restricting the unitary character by a choice of section. -/
+theorem exists_centeredMellin_site_pow_envelope (φ : BruhatCompactSupport CF)
+    (χ : PontryaginDual CF) (k : ℕ) :
+    ∃ W : ℝ, 0 ≤ W ∧ ∀ z : Site χ, |z.val.im| ^ k * ‖M(φ,χ,z.val)‖ ≤ W := by
+  obtain ⟨W, hW, h⟩ := exists_centeredMellin_strip_pow_envelope φ χ k
+  refine ⟨W, hW, fun z ↦ ?_⟩
+  exact (mul_le_mul_of_nonneg_right (pow_le_pow_left₀ (abs_nonneg _) (by linarith) k)
+    (norm_nonneg _)).trans (h z.val (siteStrip z))
+
+/-- The centered Fourier–Mellin transform of a compact Bruhat test has a quadratic
+height envelope throughout the closed critical strip, for every fixed unitary character. -/
+private theorem exists_centeredMellin_strip_envelope (φ : BruhatCompactSupport CF)
+    (χ : PontryaginDual CF) :
+    ∃ W : ℝ, 0 ≤ W ∧ ∀ z : ℂ, z.re ∈ Icc (0 : ℝ) 1 →
+      (1 + z.im ^ 2) * ‖M(φ,χ,z)‖ ≤ W := by
+  obtain ⟨W, hW, h⟩ := exists_centeredMellin_strip_pow_envelope φ χ 2
+  refine ⟨W, hW, fun z hz ↦ ?_⟩
+  have hw : 1 + z.im ^ 2 ≤ (1 + |z.im|) ^ 2 := by
     nlinarith [abs_nonneg z.im, sq_abs z.im]
-  exact (mul_le_mul_of_nonneg_right hw (norm_nonneg _)).trans (h.trans (le_max_left _ _))
+  exact (mul_le_mul_of_nonneg_right hw (norm_nonneg _)).trans (h z hz)
 
 set_option maxHeartbeats 800000 in
 /-- The absolute Mellin contribution of both closed exterior half-strips in a single
