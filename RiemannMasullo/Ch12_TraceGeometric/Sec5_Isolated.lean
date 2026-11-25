@@ -1,6 +1,9 @@
 module
 
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5_FirstPrimeAbel
+public import RiemannMasullo.Ch12_TraceGeometric.Sec5_RationalPrimePairThreshold
+public import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.SignedAbelMean
+import Mathlib.Analysis.Calculus.ContDiff.RCLike
 public import RiemannMasullo.ForMathlib.Analysis.Fourier.QuadraticBoxProfile
 import Mathlib.Geometry.Manifold.PartitionOfUnity
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
@@ -602,5 +605,191 @@ theorem exists_projectiveKernel_stripTestAction_spectralProjection_iff_support_i
   simp at hx
 
 end KernelLocalization
+
+/-! ## Ordered rational prime pairs in the fixed physical test -/
+
+section OrderedRationalPrimePairs
+
+open AbelEdge Filter MeasureTheory Set RationalPrimePairs
+open scoped BigOperators ENNReal NNReal Topology
+
+/-- The translated prime test has a positive uniform norm bound on its support window. -/
+private theorem thresholdProfile_norm_le_on_Icc :
+    ∃ M : ℝ, 0 < M ∧ ∀ x ∈ Icc (2 : ℝ) 4, ‖thresholdProfile x‖ ≤ M := by
+  obtain ⟨C, hC⟩ := isCompact_Icc.exists_bound_of_continuousOn
+    (thresholdProfile_spec.1.continuous.continuousOn (s := Icc (2 : ℝ) 4))
+  exact ⟨max C 1, lt_of_lt_of_le zero_lt_one (le_max_right _ _),
+    fun x hx ↦ (hC x hx).trans (le_max_left _ _)⟩
+
+/-- On the translated prime window the smooth test has a single Lipschitz constant. -/
+private theorem thresholdProfile_lipschitzOn_Icc :
+    ∃ L : ℝ≥0, LipschitzOnWith L thresholdProfile (Icc (2 : ℝ) 4) :=
+  thresholdProfile_spec.1.contDiffOn.exists_lipschitzOnWith (by simp) (convex_Icc 2 4) isCompact_Icc
+
+/-- The nonzero moment at one quarter gives a fixed interval of positive length on which
+the translated prime test is bounded away from zero. -/
+theorem thresholdProfile_exists_subinterval_norm_ge :
+    ∃ u v m : ℝ, 2 ≤ u ∧ u < v ∧ v ≤ 4 ∧ 0 < m ∧ ∀ x ∈ Icc u v, m ≤ ‖thresholdProfile x‖ := by
+  obtain ⟨u, hu⟩ : ∃ u : ℝ, thresholdProfile u ≠ 0 := by
+    by_contra! hz
+    apply thresholdProfile_spec.2.2.2 (1 / 4)
+      (by norm_num [Complex.div_ofNat_re]) (by norm_num [Complex.div_ofNat_re])
+    simp [bilateralLaplace, hz]
+  have hnorm := norm_pos_iff.mpr hu
+  let m := ‖thresholdProfile u‖ / 2
+  have hm : 0 < m := half_pos hnorm
+  have hnear : {x : ℝ | m < ‖thresholdProfile x‖} ∈ 𝓝 u :=
+    thresholdProfile_spec.1.continuous.norm.continuousAt.eventually_const_lt (half_lt_self hnorm)
+  obtain ⟨v, huv, hv⟩ := mem_nhdsGE_iff_exists_Icc_subset.mp (mem_nhdsWithin_of_mem_nhds hnear)
+  have hvm : m < ‖thresholdProfile v‖ := hv (right_mem_Icc.mpr huv.le)
+  have hus : u ∈ tsupport thresholdProfile := subset_tsupport _ hu
+  have hvs : v ∈ tsupport thresholdProfile := subset_tsupport _ (norm_pos_iff.mp (hm.trans hvm))
+  exact ⟨u, v, m, (thresholdProfile_spec.2.1 hus).1, huv, (thresholdProfile_spec.2.1 hvs).2,
+    hm, fun x hx ↦ (hv hx).le⟩
+
+/-- The public rational principal degree-one sum is exactly the finite sum on the common
+prime window, including its original endpoint at `y+4`. -/
+theorem firstPrimeDegreeOneSum_trivial_thresholdProfile (y : ℝ) :
+    firstPrimeDegreeOneSum (F := ℚ) 1 thresholdProfile y 4 =
+      ∑ p ∈ window y, weight thresholdProfile y p := by
+  apply (firstPrimeDegreeOneSum_trivial_rat thresholdProfile y 4).trans
+  apply sum_prime_cutoff_eq_window
+  intro x hx
+  by_contra hn
+  exact (not_le_of_gt hx) (thresholdProfile_spec.2.1 (subset_tsupport _ hn)).1
+
+/-- Hard near and far prime pairs sum to the squared public rational principal observable. -/
+theorem firstPrimeDegreeOneSum_trivial_sq_eq_near_add_far (y : ℝ) (D : ℕ) :
+    ‖firstPrimeDegreeOneSum (F := ℚ) 1 thresholdProfile y 4‖^2 =
+      nearReal thresholdProfile y D + farReal thresholdProfile y D := by
+  rw [firstPrimeDegreeOneSum_trivial_thresholdProfile, norm_sum_weight_sq_eq_nearReal_add_farReal]
+
+/-- Every exponent below `2*c` gives zero Abel mean for the absolute near-pair products
+of the rational threshold test. -/
+theorem thresholdProfile_tendsto_subcritical_pair_abel_zero {c θ : ℝ}
+    (hc : 0 < c) (hθ : θ < 2*c) :
+    Tendsto (fun ε : ℝ ↦ ENNReal.ofReal ε * ∫⁻ y in Ici (0 : ℝ), ENNReal.ofReal
+      (nearAbs thresholdProfile y ⌊Real.exp (θ*y)⌋₊ * Real.exp (-(ε+2*c)*y)))
+      (𝓝[>] 0) (𝓝 0) := by
+  obtain ⟨B,hB,hH⟩ := thresholdProfile_norm_le_on_Icc
+  exact tendsto_nearAbs_abel_zero thresholdProfile hc hθ hB.le hH
+
+/-- The signed near contribution of the rational threshold test is also negligible in
+absolute Abel mean below `2*c`. -/
+theorem thresholdProfile_tendsto_abs_subcritical_pair_abel_zero {c θ : ℝ}
+    (hc : 0 < c) (hθ : θ < 2*c) :
+    Tendsto (fun ε : ℝ ↦ ENNReal.ofReal ε * ∫⁻ y in Ici (0 : ℝ), ENNReal.ofReal
+      (|nearReal thresholdProfile y ⌊Real.exp (θ*y)⌋₊| * Real.exp (-(ε+2*c)*y)))
+      (𝓝[>] 0) (𝓝 0) := by
+  obtain ⟨B,hB,hH⟩ := thresholdProfile_norm_le_on_Icc
+  exact tendsto_abs_nearReal_abel_zero thresholdProfile hc hθ hB.le hH
+
+/-- For the fixed public threshold test there is one positive constant for which the hard
+signed near-prime sum eventually exceeds that constant times the critical pair radius. -/
+theorem thresholdProfile_exists_pos_eventually_critical_pair :
+    ∃ δ : ℝ, 0 < δ ∧ ∀ c : ℝ, 0 < c → c < 1/2 →
+      ∀ᶠ y : ℝ in atTop, δ * Real.exp (2*c*y) ≤
+        nearReal thresholdProfile y ⌊Real.exp (2*c*y)⌋₊ := by
+  obtain ⟨L,hL⟩ := thresholdProfile_lipschitzOn_Icc
+  obtain ⟨u,v,m,hu,huv,hv,hm,hgood⟩ := thresholdProfile_exists_subinterval_norm_ge
+  exact exists_pos_eventually_critical_nearReal _ hL hu huv hv hm hgood
+
+private theorem critical_abel_weight_mul (a c ε y : ℝ) :
+    a * Real.exp (-(2*c)*y) * Real.exp (-ε*y) = a * Real.exp (-(ε+2*c)*y) := by
+  rw [mul_assoc, ← Real.exp_add, show -(2*c)*y + -ε*y = -(ε+2*c)*y by ring]
+
+/-- At nonnegative damping, the real Abel mean of the normalized square is the
+real value of the project's extended nonnegative square mean. -/
+private theorem signedAbelMean_normSq_exp_eq_weightedSquareAbelMean_toReal
+    {f : ℝ → ℂ} (hf : Measurable f) (c : ℝ) {ε : ℝ} (hε : 0 ≤ ε) :
+    signedAbelMean (fun y ↦ ‖f y‖^2 * Real.exp (-(2*c)*y)) ε =
+      (AbelEdge.weightedSquareAbelMean f c ε).toReal := by
+  have hg : Measurable (fun y ↦ ‖f y‖^2 * Real.exp (-(ε+2*c)*y)) := by fun_prop
+  rw [signedAbelMean, AbelEdge.weightedSquareAbelMean, ENNReal.toReal_mul, ENNReal.toReal_ofReal hε]
+  simp only [critical_abel_weight_mul]
+  exact congrArg (ε * ·) (integral_eq_lintegral_of_nonneg_ae
+    (.of_forall fun y ↦ mul_nonneg (sq_nonneg ‖f y‖) (Real.exp_pos _).le) hg.aestronglyMeasurable)
+
+/-- At the critical cutoff, the signed near Abel lower limit is at least a fixed
+positive constant. If the public principal energy tends to zero, the strictly distant
+contribution is eventually integrable and its signed Abel upper limit is at most
+the negative of the same constant. One constant works for every `0 < c < 1/2`. -/
+theorem thresholdProfile_critical_pair_abel_bounds :
+    ∃ δ : ℝ, 0 < δ ∧ ∀ c : ℝ, 0 < c → c < 1/2 →
+      ((δ : EReal) ≤ liminf (fun ε : ℝ ↦ ((ε * ∫ y in Ici (0 : ℝ),
+        nearReal thresholdProfile y ⌊Real.exp (2*c*y)⌋₊ * Real.exp (-(ε+2*c)*y) : ℝ) : EReal))
+        (𝓝[>] 0)) ∧
+      (Tendsto (AbelEdge.weightedSquareAbelMean
+        (fun y ↦ firstPrimeDegreeOneSum (F := ℚ) 1 thresholdProfile y 4) c) (𝓝[>] 0) (𝓝 0) →
+      (∀ᶠ ε : ℝ in 𝓝[>] 0, IntegrableOn (fun y ↦
+        farReal thresholdProfile y ⌊Real.exp (2*c*y)⌋₊ * Real.exp (-(ε+2*c)*y)) (Ici 0)) ∧
+      limsup (fun ε : ℝ ↦ ((ε * ∫ y in Ici (0 : ℝ),
+        farReal thresholdProfile y ⌊Real.exp (2*c*y)⌋₊ * Real.exp (-(ε+2*c)*y) : ℝ) : EReal))
+        (𝓝[>] 0) ≤ ((-δ : ℝ) : EReal)) := by
+  obtain ⟨δ, hδ, hlower⟩ := thresholdProfile_exists_pos_eventually_critical_pair
+  refine ⟨δ, hδ, ?_⟩
+  intro c hc hc'
+  let P (y : ℝ) := firstPrimeDegreeOneSum (F := ℚ) 1 thresholdProfile y 4
+  let Q := AbelEdge.weightedSquareAbelMean P c
+  let D (y : ℝ) := ⌊Real.exp (2*c*y)⌋₊
+  let K (y : ℝ) := Real.exp (-(2*c)*y)
+  let t (y : ℝ) := ‖P y‖^2 * K y
+  let n (y : ℝ) := nearReal thresholdProfile y (D y) * K y
+  have hn (ε : ℝ) (hε : 0 < ε) : IntegrableOn (fun y ↦ n y * Real.exp (-ε*y)) (Ici 0) := by
+    simpa only [n, K, D, critical_abel_weight_mul] using
+      (integrableOn_nearReal_critical thresholdProfile_spec.1.continuous hc.le hε)
+  have hδn : ∀ᶠ y in atTop, δ ≤ n y := by
+    filter_upwards [hlower c hc hc'] with y hy
+    have hk : Real.exp (2*c*y) * K y = 1 := by
+      dsimp only [K]
+      rw [← Real.exp_add, show 2*c*y + -(2*c)*y = 0 by ring, Real.exp_zero]
+    calc
+      δ = (δ * Real.exp (2*c*y)) * K y := by rw [mul_assoc, hk, mul_one]
+      _ ≤ n y := mul_le_mul_of_nonneg_right hy (Real.exp_pos _).le
+  refine ⟨?_, ?_⟩
+  · have heq (ε : ℝ) : signedAbelMean n ε =
+        ε * ∫ y in Ici (0 : ℝ), nearReal thresholdProfile y ⌊Real.exp (2*c*y)⌋₊ *
+          Real.exp (-(ε+2*c)*y) := by
+      simp only [signedAbelMean, n, D, K, critical_abel_weight_mul]
+    simpa only [heq] using le_liminf_signedAbelMean hn
+      (fun d hd ↦ hδn.mono fun _ h ↦ hd.le.trans h)
+  · intro hzero
+    change Tendsto Q (𝓝[>] 0) (𝓝 0) at hzero
+    have hP : Measurable P := firstPrimeDegreeOneSum_measurable (F := ℚ) 1 thresholdProfile
+      thresholdProfile_spec.1.continuous.measurable 4
+    have hfinite : ∀ᶠ ε in 𝓝[>] (0 : ℝ), Q ε ≠ ∞ :=
+      (hzero.eventually_lt_const (show (0 : ℝ≥0∞) < 1 by exact zero_lt_one)).mono
+        fun _ h ↦ (h.trans_le le_top).ne
+    have htotal : ∀ᶠ ε in 𝓝[>] (0 : ℝ), IntegrableOn
+        (fun y ↦ ‖P y‖^2 * Real.exp (-(ε+2*c)*y)) (Ici 0) := by
+      filter_upwards [hfinite, self_mem_nhdsWithin] with ε hfin (hε : 0 < ε)
+      have hi := (AbelEdge.weightedSquareAbelMean_ne_top_iff_integrableOn_sq_mul_exp hP c hε).mp hfin
+      rwa [show 2*(c+ε/2) = ε+2*c by ring] at hi
+    have ht : ∀ᶠ ε in 𝓝[>] (0 : ℝ), IntegrableOn (fun y ↦ t y * Real.exp (-ε*y)) (Ici 0) := by
+      simpa only [t, K, critical_abel_weight_mul] using htotal
+    have hz : Tendsto (signedAbelMean t) (𝓝[>] 0) (𝓝 0) := by
+      have hreal : Tendsto (fun ε ↦ (Q ε).toReal) (𝓝[>] 0) (𝓝 0) := by
+        simpa only [Function.comp_def, ENNReal.toReal_zero] using
+          (ENNReal.tendsto_toReal ENNReal.zero_ne_top).comp hzero
+      refine hreal.congr' ?_
+      filter_upwards [self_mem_nhdsWithin] with ε (hε : 0 < ε)
+      exact (signedAbelMean_normSq_exp_eq_weightedSquareAbelMean_toReal hP c hε.le).symm
+    have hsplit (y : ℝ) : t y - n y = farReal thresholdProfile y (D y) * K y := by
+      dsimp only [t, n, P]
+      rw [← sub_mul, firstPrimeDegreeOneSum_trivial_sq_eq_near_add_far y (D y)]
+      ring
+    refine ⟨?_, ?_⟩
+    · filter_upwards [htotal, self_mem_nhdsWithin] with ε hi (hε : 0 < ε)
+      have hwin : IntegrableOn (fun y ↦ ‖∑ p ∈ window y, weight thresholdProfile y p‖^2 *
+          Real.exp (-(ε+2*c)*y)) (Ici 0) := by
+        simpa only [P, firstPrimeDegreeOneSum_trivial_thresholdProfile] using hi
+      exact (integrableOn_farReal_and_integral_split thresholdProfile_spec.1.continuous hc.le hε hwin).1
+    · have heq (ε : ℝ) : signedAbelMean (fun y ↦ t y - n y) ε =
+            ε * ∫ y in Ici (0 : ℝ), farReal thresholdProfile y ⌊Real.exp (2*c*y)⌋₊ *
+              Real.exp (-(ε+2*c)*y) := by
+        simp only [signedAbelMean, hsplit, D, K, critical_abel_weight_mul]
+      simpa only [heq] using limsup_signedAbelMean_sub_le hn hδn ht hz
+
+end OrderedRationalPrimePairs
 
 end RiemannMasullo.Isolated
