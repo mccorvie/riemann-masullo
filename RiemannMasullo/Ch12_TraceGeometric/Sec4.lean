@@ -5172,4 +5172,13 @@ theorem sLocalTraceLift_global_polar_sum
 
 end PolarMoments
 
+/-- Pulling a Bruhat-smooth complex function back by a continuous homomorphism
+of locally compact abelian groups preserves Bruhat smoothness. -/
+theorem isBruhatSmooth_comp_continuousMonoidHom {G H : Type*}
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    [CommGroup H] [TopologicalSpace H] [IsTopologicalGroup H] [T2Space H] [LocallyCompactSpace H]
+    (π : G →ₜ* H) {f : H → ℂ} (hf : IsBruhatSmooth f) :
+    IsBruhatSmooth (f ∘ π) :=
+  sLocalTrace_comp_bruhatSmooth π hf
+
 end RiemannMasullo

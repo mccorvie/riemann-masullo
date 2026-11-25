@@ -901,4 +901,22 @@ theorem exists_linearIsometry_map_sLocalInvariantPWSobolev_rat
       obtain ⟨f, hfb, c, rfl⟩ := ratEmptyLevel_core_mem_span U hU ω F hF
       exact Submodule.smul_mem _ _ (Submodule.subset_span ⟨_, ⟨⟨f, hfb⟩, rfl⟩, rfl⟩)
 
+/-- Over ℚ at the empty finite stage the quotient norm has trivial kernel. -/
+theorem sIdeleQuotientNorm_ratEmpty_injective : Function.Injective (sIdeleQuotientNorm ℚ ∅) :=
+  ratEmptyLevel_norm_injective
+
+/-- Any lift of absolute value through the rational quotient norm pulls quotient
+null sets back to Lebesgue null sets on the full real line. -/
+theorem quasiMeasurePreserving_ratEmpty_normLift (κ : ℝ → SIdeleQuotient ℚ ∅)
+    (hκ : ∀ x : ℝ, x ≠ 0 → ((sIdeleQuotientNorm ℚ ∅ (κ x) : ℝ≥0) : ℝ) = |x|) :
+    QuasiMeasurePreserving κ volume (localMeasure(ℚ, ∅, 0)) := by
+  have hac : volume ≪ (volume : Measure ℝ).withDensity
+      (fun x ↦ (ratEmptyLevel_weight x : ℝ≥0∞)) :=
+    withDensity_absolutelyContinuous' ratEmptyLevel_measurable_weight.coe_nnreal_ennreal.aemeasurable
+      (.of_forall fun x ↦ by simpa using (ratEmptyLevel_weight_pos x).ne')
+  apply (ratEmptyLevel_measurePreserving_class.quasiMeasurePreserving.mono_left hac).congr
+  filter_upwards [(volume : Measure ℝ).ae_ne (0 : ℝ)] with x hx
+  apply sIdeleQuotientNorm_ratEmpty_injective
+  exact Units.ext (NNReal.eq ((ratEmptyLevel_norm_class hx).trans (hκ x hx).symm))
+
 end RiemannMasullo
