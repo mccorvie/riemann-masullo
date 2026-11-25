@@ -312,32 +312,6 @@ theorem stripTestAction_projectiveKernel_iff_support_in_open {α s : ℝ} (ha : 
   exact kernelLocalization_sum ha hs P f fun i ↦
     (stripTestAction_projectiveKernel_translate_iff ha hs P (g i) (ψ i) (f i) (htr i)).mpr (h _ (hsup i))
 
-/-- Paper: (12.5.1.4), p. 520. The kernel assertion for all tests vanishing on the
-norm-one classes is equivalent to testing any nonempty open set of log norms. In
-particular a fixed short interval, or an arbitrary far half-line, suffices. -/
-theorem exists_projectiveKernel_stripTestAction_spectralProjection_iff_support_in_open
-    {α s : ℝ} (hα : 0 < α) (hs : 3 ≤ s) {U : Set ℝ} (ho : IsOpen U) (hne : U.Nonempty) :
-    let hs' : 0 ≤ s := (by norm_num : (0 : ℝ) ≤ 3).trans hs
-    let P := spectralProjection (F := F) (1 / 2) hα.le hs'
-    (∀ φ : BruhatCompactSupport C𝔽, (∀ g : C₁, φ.val g = 0) → kerExists(hα.le, hs', P, φ)) ↔
-      ∀ φ : BruhatCompactSupport C𝔽, tsupport φ.val ⊆ ℓ ⁻¹' U → kerExists(hα.le, hs', P, φ) := by
-  intro hs' P
-  apply Iff.trans _ (stripTestAction_projectiveKernel_iff_support_in_open hα.le hs' P ho hne)
-  refine ⟨fun h ↦ ?_, fun h φ _ ↦ h φ⟩
-  apply (stripTestAction_projectiveKernel_iff_support_in_open hα.le hs' P isOpen_Ioi
-    (nonempty_Ioi : (Ioi (0 : ℝ)).Nonempty)).mpr
-  intro φ hφ
-  apply h φ
-  intro g
-  apply image_eq_zero_of_notMem_tsupport
-  intro hg
-  have hx : 0 < ℓ g.val := hφ hg
-  change 0 < Real.log ((ideleClassNorm F g.val).val : ℝ) at hx
-  rw [g.property] at hx
-  simp at hx
-
-end KernelLocalization
-
 /-! ## Integer ordinates and translated Poisson mass
 
 The unit cells cover the full ordinate line. A single off-line site and its
@@ -410,5 +384,31 @@ theorem all_widths_iff_integer_logDerivative (σ : ℝ≥0ˣ →ₜ* C𝔽)
     simpa only [fullMass, (hformula χ hχ k).tsum_eq] using h χ hχ k
 
 end PoissonCertificate
+
+/-- Paper: (12.5.1.4), p. 520. The kernel assertion for all tests vanishing on the
+norm-one classes is equivalent to testing any nonempty open set of log norms. In
+particular a fixed short interval, or an arbitrary far half-line, suffices. -/
+theorem exists_projectiveKernel_stripTestAction_spectralProjection_iff_support_in_open
+    {α s : ℝ} (hα : 0 < α) (hs : 3 ≤ s) {U : Set ℝ} (ho : IsOpen U) (hne : U.Nonempty) :
+    let hs' : 0 ≤ s := (by norm_num : (0 : ℝ) ≤ 3).trans hs
+    let P := spectralProjection (F := F) (1 / 2) hα.le hs'
+    (∀ φ : BruhatCompactSupport C𝔽, (∀ g : C₁, φ.val g = 0) → kerExists(hα.le, hs', P, φ)) ↔
+      ∀ φ : BruhatCompactSupport C𝔽, tsupport φ.val ⊆ ℓ ⁻¹' U → kerExists(hα.le, hs', P, φ) := by
+  intro hs' P
+  apply Iff.trans _ (stripTestAction_projectiveKernel_iff_support_in_open hα.le hs' P ho hne)
+  refine ⟨fun h ↦ ?_, fun h φ _ ↦ h φ⟩
+  apply (stripTestAction_projectiveKernel_iff_support_in_open hα.le hs' P isOpen_Ioi
+    (nonempty_Ioi : (Ioi (0 : ℝ)).Nonempty)).mpr
+  intro φ hφ
+  apply h φ
+  intro g
+  apply image_eq_zero_of_notMem_tsupport
+  intro hg
+  have hx : 0 < ℓ g.val := hφ hg
+  change 0 < Real.log ((ideleClassNorm F g.val).val : ℝ) at hx
+  rw [g.property] at hx
+  simp at hx
+
+end KernelLocalization
 
 end RiemannMasullo.Isolated
