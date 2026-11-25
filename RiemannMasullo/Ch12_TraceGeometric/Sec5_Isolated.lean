@@ -5,6 +5,7 @@ public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 
 public import RiemannMasullo.Ch01_Introduction.Sec4_PoissonCertificate
 public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeGreenExterior
+public import RiemannMasullo.AppB_AnalyticNT.Sec4b_BoundaryHeckeGreen
 
 /-! # Isolated statements of §12.5
 
@@ -475,6 +476,44 @@ theorem all_widths_iff_compact_circleMeans_nonpos (τ : ℝ≥0ˣ →ₜ* C𝔽)
     apply le_of_tendsto ht
     filter_upwards [Ioo_mem_nhdsLT (by norm_num : (0 : ℝ) < 1)] with r hr
     exact h χ hχ r hr
+
+open HeckeBoundaryGreen
+
+private theorem criticalLogDifference_eq_mass (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : Function.RightInverse τ (ideleClassNorm F))
+    (χ : U𝔽) (hχ : ∀ u : ℝ≥0ˣ, χ (τ u) = 1) :
+    criticalLogDifference χ = rightGreenMass χ :=
+  (hasSum_green_criticalLogDifference τ hτ χ hχ).tsum_eq.symm
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. Reconstruction: the all-width exterior cancellation is
+equivalent to a single upper bound for the critical-line logarithmic integral of each normalized
+character. The principal-character reference includes its pole correction at one. -/
+theorem all_widths_iff_criticalLogDifference_nonpos (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) :
+    allWidths(τ) ↔ ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (τ u) = 1) → criticalLogDifference χ ≤ 0 := by
+  rw [allWidths_iff_critical τ hτ]
+  constructor
+  · intro h χ hχ
+    rw [criticalLogDifference_eq_mass τ hτ χ hχ, (rightGreenMass_eq_zero_iff χ).mpr (h χ hχ)]
+  · intro h χ hχ
+    have hh := h χ hχ
+    rw [criticalLogDifference_eq_mass τ hτ χ hχ] at hh
+    exact (rightGreenMass_eq_zero_iff χ).mp (le_antisymm hh (rightGreenMass_nonneg χ))
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. For each compact test and normalized character, the
+absolute omitted Mellin sum, including both edges of any positive strip, is bounded by the
+actual critical-line logarithmic difference times a test constant divided by the width. -/
+theorem exists_hasSum_absolute_exterior_le_criticalLogDifference (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) (χ : U𝔽)
+    (hχ : ∀ u : ℝ≥0ˣ, χ (τ u) = 1) (φ : BruhatCompactSupport C𝔽) :
+    ∃ W : ℝ, 0 ≤ W ∧ ∀ α : ℝ, 0 < α → ∃ A : ℝ,
+      HasSum (fun z : {p : ℂ // 0 < ord(χ, p) ∧ α ≤ |p.re-1/2|} ↦
+        ‖(ord(χ, z.val) : ℂ) *
+          modulatedFourierMellin m𝔽 univ ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+            μ𝔽 φ.val (ideleClassNormTwist χ (z.val - 1/2))‖) A ∧
+      A ≤ (3*W/(2*α)) * criticalLogDifference χ := by
+  rw [criticalLogDifference_eq_mass τ hτ χ hχ,
+    ← (tendsto_corrected_circle_mean_rightGreenMass τ hτ χ hχ).2.limUnder_eq]
+  exact exists_hasSum_absolute_exterior_le_circleLimit τ hτ χ hχ φ
 
 end CompactGreen
 
