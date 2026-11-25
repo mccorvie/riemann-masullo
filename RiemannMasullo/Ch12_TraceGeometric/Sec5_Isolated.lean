@@ -1552,6 +1552,665 @@ theorem exists_gaussianAngularPair_exteriorZeros :
       ring
 
 end AngularPair
+
+/-! ## One compact test for all Gaussian angular pairs
+
+The angular Fourier series has geometric coefficients. The full zero series is absolutely
+summable by the joint count of Lemma B.4.4.9 before its inverse-character rows are paired.
+-/
+
+section
+open MeasureTheory NumberField Function
+open scoped NNReal ContDiff ComplexConjugate
+
+namespace GaussianSuperposition
+
+set_option quotPrecheck false
+
+attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorelSpaceSec1
+  instIdeleClassT2Sec1 instIdeleClassLocallyCompactSec1 instIdeleClassSecondCountableSec1
+  instIdeleClassHaarMeasureSec1
+
+/-- The angular multiplier for the simultaneous sum of the Gaussian mode pairs. -/
+def weight (z : ℂ) : ℂ := 2 * (conj z / (2 - conj z) - z / (2 - z))
+
+/-- Conjugating the angular variable reverses the signed multiplier. -/
+theorem weight_conj (z : ℂ) : weight (conj z) = -weight z := by
+  simp only [weight, Complex.conj_conj]
+  ring
+
+private theorem two_sub_ne_zero_of_norm {z : ℂ} (h : ‖z‖ = 1) : 2 - z ≠ 0 := by
+  intro he
+  rw [← sub_eq_zero.mp he] at h
+  norm_num at h
+
+/-- On the unit circle precisely the real points kill the angular multiplier. -/
+theorem weight_eq_zero_iff {z : ℂ} (hz : ‖z‖ = 1) :
+    weight z = 0 ↔ conj z = z := by
+  have hz' : ‖conj z‖ = 1 := by simpa using hz
+  rw [weight,mul_eq_zero,or_iff_right (by norm_num : (2:ℂ) ≠ 0),sub_eq_zero,
+    div_eq_div_iff (two_sub_ne_zero_of_norm hz') (two_sub_ne_zero_of_norm hz)]
+  constructor
+  · intro h
+    linear_combination h / 2
+  · intro h
+    rw [h]
+
+private theorem weight_character_smooth {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] (A : PontryaginDual G) :
+    IsBruhatSmooth (fun x ↦ weight (A x : ℂ)) := by
+  intro p
+  obtain ⟨k,hk,hi,hd⟩ := (mem_bruhatSmoothSubmodule_iff _).mp (pontryaginDual_mem_bruhatSmooth A) p
+  refine ⟨k,hk, fun h x ↦ congrArg weight (hi h x), fun a ha ↦ ?_⟩
+  obtain ⟨f,hf,hs⟩ := hd a ha
+  have hunit (v : a.quotient) : ‖f v‖ = 1 := by
+    obtain ⟨w,rfl⟩ := QuotientGroup.mk_surjective v
+    rw [hf]; exact Circle.norm_coe _
+  refine ⟨weight ∘ f, fun w ↦ congrArg weight (hf w), fun e z d ↦ ?_⟩
+  let u := fun xt ↦ f (e.equiv.symm (Multiplicative.ofAdd (elementaryCover xt z d)))
+  have hu : ContDiff ℝ (p : ℕ∞) u := hs e z d
+  have hc : ContDiff ℝ (p : ℕ∞) (fun x ↦ conj (u x)) := Complex.conjCLE.contDiff.comp hu
+  have hd₁ (x) : 2 - conj (u x) ≠ 0 :=
+    two_sub_ne_zero_of_norm (by simpa [u] using hunit _)
+  have hd₂ (x) : 2 - u x ≠ 0 := two_sub_ne_zero_of_norm (hunit _)
+  change ContDiff ℝ (p : ℕ∞) (fun x ↦ weight (u x))
+  simp only [weight, div_eq_mul_inv]
+  exact contDiff_const.mul ((hc.mul ((contDiff_const.sub hc).inv hd₁)).sub
+    (hu.mul ((contDiff_const.sub hu).inv hd₂)))
+
+variable {F : Type*} [Field F] [NumberField F]
+local notation "Gω" => IdeleClassGroup (𝓞 F) F
+
+/-- The rational angular weight times a smooth compact radial profile gives a genuine
+compact Bruhat test, for every unitary character and every constant normalizer. -/
+theorem exists_weightTest (A : PontryaginDual Gω) {g : ℝ → ℂ} (hs : ContDiff ℝ (∞) g)
+    (hc : HasCompactSupport g) (V : ℂ) :
+    ∃ φ : BruhatCompactSupport Gω, ∀ x,
+      φ.val x = weight (A x : ℂ) * g (logIdeleClassNorm F x) / V := by
+  obtain ⟨q,hq⟩ := exists_normTest (F := F) g hs hc
+  let a : Gω → ℂ := fun x ↦ weight (A x : ℂ)
+  have hqa : IsBruhatSmooth (a * q.val) := fun p ↦
+    isBruhatContDiff_mul (weight_character_smooth A p) ((mem_bruhatSmoothSubmodule_iff _).mp q.property.1 p)
+  let ψ : BruhatCompactSupport Gω :=
+    ⟨a * q.val, (mem_bruhatSmoothSubmodule_iff _).mpr hqa, q.property.2.mul_left⟩
+  refine ⟨V⁻¹ • ψ, fun x ↦ ?_⟩
+  change V⁻¹ * (weight (A x : ℂ) * q.val x) = _
+  rw [hq]
+  change V⁻¹ * (weight (A x : ℂ) * g (logIdeleClassNorm F x)) = _
+  ring
+
+/-- A non-self-inverse section-normalized character and a nonzero odd radial profile give
+a nonzero inversion-even compact Bruhat test that vanishes on the norm-one group. -/
+theorem exists_inversionEven_weightTest
+    (τ : ℝ≥0ˣ →ₜ* Gω) (hτ : RightInverse τ (ideleClassNorm F)) (A : PontryaginDual Gω)
+    (hA : ∀ t, A (τ t) = 1) (hne : A ≠ A⁻¹) {g : ℝ → ℂ}
+    (hs : ContDiff ℝ (∞) g) (hc : HasCompactSupport g) (ho : Function.Odd g)
+    (hn : ∃ t, g t ≠ 0) {V : ℂ} (hV : V ≠ 0) :
+    ∃ φ : BruhatCompactSupport Gω,
+      (∀ x, φ.val x = weight (A x : ℂ) * g (logIdeleClassNorm F x) / V) ∧
+      (∀ x, φ.val x⁻¹ = φ.val x) ∧ (∀ u : (ideleClassNorm F).ker, φ.val u.val = 0) ∧
+      ∃ x, φ.val x ≠ 0 := by
+  obtain ⟨φ,hφ⟩ := exists_weightTest A hs hc V
+  obtain ⟨ψ,hψ,_,_,x,hx⟩ :=
+    GaussianPairDetector.exists_inversionEven_characterPairTest τ hτ A hA hne hs hc ho hn hV
+  have hg₀ : g 0 = 0 := by
+    have h := ho 0
+    rw [neg_zero] at h
+    linear_combination h/2
+  refine ⟨φ,hφ,fun y ↦ ?_,fun u ↦ ?_,x,?_⟩
+  · have hL : logIdeleClassNorm F y⁻¹ = -(logIdeleClassNorm F y) := by
+      change Real.log _ = -Real.log _
+      simp [map_inv]
+    rw [hφ,hφ,map_inv,Circle.coe_inv_eq_conj,weight_conj,hL,ho,neg_mul_neg]
+  · have hL : logIdeleClassNorm F u.val = 0 := by
+      change Real.log ((ideleClassNorm F u.val).val : ℝ) = 0
+      rw [show ideleClassNorm F u.val = 1 from u.property]
+      simp
+    rw [hφ,hL,hg₀,mul_zero,zero_div]
+  · rw [hψ, show A⁻¹ x = (A x)⁻¹ from rfl, Circle.coe_inv_eq_conj] at hx
+    have hdiff : conj (A x : ℂ) ≠ (A x : ℂ) := by
+      intro he
+      simp [he] at hx
+    have hg : g (logIdeleClassNorm F x) ≠ 0 := by
+      intro he
+      simp [he] at hx
+    rw [hφ]
+    exact div_ne_zero (mul_ne_zero (fun h ↦ hdiff ((weight_eq_zero_iff (Circle.norm_coe _)).mp h)) hg) hV
+
+
+open AngularPair Set
+local notation "F₄" => CyclotomicField 4 ℚ
+local notation "G₄" => IdeleClassGroup (𝓞 F₄) F₄
+local notation "A₄" => Gaussian.globalAngularCharacter
+local notation "V₄" => (((normOneIdeleClassTamagawaMeasure F₄) univ).toReal : ℂ)
+
+/-- The fixed 172-box detector and the single Gaussian angular rational weight give a
+nonzero, inversion-even compact Bruhat test, with the actual Tamagawa volume normalization. -/
+theorem exists_gaussianCalibrated_weightTest :
+    ∃ (g : ℝ → ℂ) (φ : BruhatCompactSupport G₄),
+      (ContDiff ℝ (∞) g ∧ HasCompactSupport g ∧ Function.Odd g ∧ ∀ x, conj (g x) = g x) ∧
+      (∀ z, bilateralLaplace g z = GaussianPairDetector.oddRadialMultiplier z) ∧
+      (∀ x, φ.val x = weight (A₄ x : ℂ) * g (logIdeleClassNorm F₄ x) / V₄) ∧
+      (∀ x, φ.val x⁻¹ = φ.val x) ∧ (∀ u : (ideleClassNorm F₄).ker, φ.val u.val = 0) ∧
+      ∃ x, φ.val x ≠ 0 := by
+  obtain ⟨g,hs,hc,ho,_,hr,hn,hL⟩ := GaussianPairDetector.exists_oddRadialDetector
+  let σ : ℝ≥0ˣ →ₜ* G₄ := ⟨(QuotientGroup.mk' _).comp (canonicalIdeleNormSection F₄),
+    continuous_quotient_mk'.comp (canonicalIdeleNormSection_continuous _)⟩
+  have hV : V₄ ≠ 0 := by
+    rw [normOneIdeleClassTamagawaMeasure_volume]
+    have := NumberField.Units.regulator_pos F₄
+    have := NumberField.classNumber_pos F₄
+    have := NumberField.Units.torsionOrder_pos F₄
+    have := Int.natAbs_pos.mpr (NumberField.discr_ne_zero F₄)
+    exact Complex.ofReal_ne_zero.mpr (ENNReal.toReal_ne_zero.mpr
+      ⟨(ENNReal.ofReal_pos.mpr (by positivity)).ne', ENNReal.ofReal_ne_top⟩)
+  have hau : A₄ ≠ A₄⁻¹ := by
+    intro he
+    have h := Gaussian.globalAngularCharacter_power_injective
+      (show A₄^(1:ℤ) = A₄^(-1:ℤ) by simpa using he)
+    norm_num at h
+  obtain ⟨φ,hφ⟩ := exists_inversionEven_weightTest σ (canonicalIdeleNormSection_rightInverse _)
+    A₄ Gaussian.globalAngularCharacter_normSection hau hs hc ho hn hV
+  exact ⟨g,φ,⟨hs,hc,ho,hr⟩,hL,hφ⟩
+
+end GaussianSuperposition
+
+end
+
+section
+
+namespace GaussianSuperposition
+
+open Function MeasureTheory NumberField Set
+open scoped NNReal NumberField.AdeleRing Topology ContDiff ComplexConjugate
+
+private theorem weight_hasSum (z : Circle) :
+    HasSum (fun n : ℕ ↦ (1 / 2 : ℂ)^n *
+      ((conj (z : ℂ))^(n+1) - (z : ℂ)^(n+1))) (weight z) := by
+  have geom (u : Circle) : HasSum (fun n : ℕ ↦ (1 / 2 : ℂ)^n * (u : ℂ)^(n+1))
+      (2 * ((u : ℂ) / (2 - (u : ℂ)))) := by
+    have hr : ‖(1 / 2 : ℂ) * (u : ℂ)‖ < 1 := by
+      rw [norm_mul, Circle.norm_coe, mul_one, norm_div, norm_one, Complex.norm_two]
+      norm_num
+    have hs := (hasSum_geometric_of_norm_lt_one hr).mul_right (u : ℂ)
+    rw [show 1 - (1 / 2 : ℂ) * (u : ℂ) = (2 - (u : ℂ)) / 2 by ring, inv_div] at hs
+    convert hs.congr_fun (g := fun n : ℕ ↦ (1 / 2 : ℂ)^n * (u : ℂ)^(n+1)) ?_ using 1
+    · ring
+    · intro n
+      rw [mul_pow, pow_succ]
+      ring
+  have h := (geom z⁻¹).sub (geom z)
+  rw [Circle.coe_inv_eq_conj] at h
+  rw [weight, mul_sub]
+  apply h.congr_fun
+  intro n
+  rw [mul_sub]
+
+private theorem hasSum_integral_weight {X : Type*} [TopologicalSpace X] [MeasurableSpace X]
+    [OpensMeasurableSpace X] {μ : Measure X} (Z : X → Circle) (hZ : Continuous Z)
+    (f : X → ℂ) (hf : Integrable f μ) :
+    HasSum (fun n : ℕ ↦ (1 / 2 : ℂ)^n * ∫ x,
+      ((conj (Z x : ℂ))^(n+1) - (Z x : ℂ)^(n+1)) * f x ∂μ)
+      (∫ x, weight (Z x : ℂ) * f x ∂μ) := by
+  have hz : Continuous (fun x ↦ (Z x : ℂ)) := continuous_subtype_val.comp hZ
+  let B (n : ℕ) (x : X) := (1 / 2 : ℝ)^n * (2 * ‖f x‖)
+  have hB (x : X) : (∑' n, B n x) = 2 * (2 * ‖f x‖) := by
+    dsimp only [B]
+    rw [tsum_mul_right, tsum_geometric_of_lt_one (by norm_num) (by norm_num)]
+    norm_num
+  simp_rw [← integral_const_mul]
+  apply hasSum_integral_of_dominated_convergence B
+  · intro n
+    have h : Continuous (fun x ↦ (conj (Z x : ℂ))^(n+1) - (Z x : ℂ)^(n+1)) :=
+      ((Complex.continuous_conj.comp hz).pow _).sub (hz.pow _)
+    exact ((h.aestronglyMeasurable.mul hf.1).const_mul _)
+  · intro n
+    filter_upwards with x
+    have hd : ‖(conj (Z x : ℂ))^(n+1) - (Z x : ℂ)^(n+1)‖ ≤ 2 :=
+      (norm_sub_le _ _).trans_eq (by simp; norm_num)
+    dsimp only [B]
+    rw [norm_mul, norm_pow, norm_div, norm_one, Complex.norm_two, norm_mul]
+    gcongr
+  · exact .of_forall fun x ↦ (summable_geometric_of_lt_one (by norm_num) (by norm_num)).mul_right _
+  · simp_rw [hB]
+    exact (hf.norm.const_mul 2).const_mul 2
+  · filter_upwards with x
+    apply ((weight_hasSum (Z x)).mul_right (f x)).congr_fun
+    intro n
+    ring
+
+section
+
+open Classical
+
+set_option quotPrecheck false
+attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorelSpaceSec1
+  instIdeleClassT2Sec1 instIdeleClassLocallyCompactSec1 instIdeleClassSecondCountableSec1
+  instIdeleClassHaarMeasureSec1
+
+variable {F : Type*} [Field F] [NumberField F]
+
+local notation "G" => IdeleClassGroup (𝓞 F) F
+local notation "U" => PontryaginDual G
+local notation "μ" => ideleClassTamagawaMeasure F
+local notation "V" => (((normOneIdeleClassTamagawaMeasure F) univ).toReal : ℂ)
+local notation "M(" φ "," χ "," w ")" =>
+  modulatedFourierMellin (continuousIdeleClassNorm F) univ
+    ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ μ
+    (φ : BruhatCompactSupport G).val (ideleClassNormTwist χ w)
+
+private theorem weight_mellin_hasSum (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ (ideleClassNorm F))
+    (A : U) (hA : ∀ t, A (τ t) = 1) (g : ℝ → ℂ) (hg : ContDiff ℝ (∞) g)
+    (hc : HasCompactSupport g) (φ : BruhatCompactSupport G)
+    (hφ : ∀ x, φ.val x = weight (A x : ℂ) * g (logIdeleClassNorm F x) / V)
+    (χ : U) (hχ : ∀ t, χ (τ t) = 1) (w : ℂ) :
+    HasSum (fun n : ℕ ↦ (1 / 2 : ℂ)^n *
+      ((if χ = A^(n+1) then bilateralLaplace g w else 0) -
+       (if χ = (A^(n+1))⁻¹ then bilateralLaplace g w else 0))) M(φ,χ,w) := by
+  obtain ⟨rad, hrad⟩ := exists_normTest (F := F) g hg hc
+  let c := ideleClassNormTwist χ w
+  let f (x : G) : ℂ := rad.val x * c x / V
+  have hrc := continuous_of_bruhatSmooth ((mem_bruhatSmoothSubmodule_iff _).mp rad.property.1)
+  have hfi : Integrable f μ :=
+    ((hrc.mul c.continuous).integrable_of_hasCompactSupport rad.property.2.mul_right).div_const _
+  have htransform (T : BruhatCompactSupport G) (b : G → ℂ)
+      (hT : ∀ x, T.val x = b x * g (logIdeleClassNorm F x) / V) :
+      M(T,χ,w) = ∫ x, b x * f x ∂μ := by
+    simp only [modulatedFourierMellin, relativeVerticalStrip, preimage_univ, indicator_univ]
+    apply integral_congr_ae
+    filter_upwards with x
+    change T.val x * c x = b x * (rad.val x * c x / V)
+    rw [hT, hrad]
+    change b x * g (logIdeleClassNorm F x) / V * c x =
+      b x * (g (logIdeleClassNorm F x) * c x / V)
+    ring
+  rw [htransform φ _ hφ]
+  apply (hasSum_integral_weight A A.continuous f hfi).congr_fun
+  intro n
+  congr 1
+  let P := A^(n+1)
+  have hP (t : ℝ≥0ˣ) : P (τ t) = 1 := by
+    rw [show P (τ t) = (A (τ t))^(n+1) from ContinuousMonoidHom.pow_apply .., hA, one_pow]
+  let p : {χ : U // ∀ t, χ (τ t) = 1} := ⟨P,hP⟩
+  let q : {χ : U // ∀ t, χ (τ t) = 1} :=
+    ⟨P⁻¹,fun t ↦ by change (P (τ t))⁻¹ = 1; rw [hP, inv_one]⟩
+  let r : {χ : U // ∀ t, χ (τ t) = 1} := ⟨χ,hχ⟩
+  obtain ⟨neg,hneg⟩ := exists_characterNormTest (F := F) P⁻¹ g hg hc
+  obtain ⟨pos,hpos⟩ := exists_characterNormTest (F := F) P g hg hc
+  let T : BruhatCompactSupport G := V⁻¹ • (neg - pos)
+  have hT (x : G) : T.val x = ((P⁻¹ x : ℂ) - (P x : ℂ)) * g (logIdeleClassNorm F x) / V := by
+    change V⁻¹ * (neg.val x - pos.val x) = _
+    rw [hneg,hpos]
+    change V⁻¹ * ((P⁻¹ x : ℂ) * g (logIdeleClassNorm F x) - (P x : ℂ) * g (logIdeleClassNorm F x)) = _
+    ring
+  have hPQ := AngularPair.mellin_normalizedPair τ hτ p q r g hg hc T
+    (fun x ↦ by simpa only [p, q, inv_inv] using hT x) w
+  have hval : M(T,χ,w) = (if χ = P then bilateralLaplace g w else 0) -
+      (if χ = P⁻¹ then bilateralLaplace g w else 0) := by
+    simpa only [p, q, r, Subtype.mk.injEq, bilateralLaplace] using hPQ
+  rw [← hval, htransform T _ hT]
+  apply integral_congr_ae
+  filter_upwards with x
+  change (((((P x)⁻¹ : Circle) : ℂ) - (P x : ℂ)) * f x) = _
+  rw [Circle.coe_inv_eq_conj, show P x = (A x)^(n+1) from ContinuousMonoidHom.pow_apply ..,
+    Circle.coe_pow, map_pow]
+
+/-- The two signs of every nonzero power have the stated geometric Fourier–Mellin
+coefficients. Every other section-normalized character has zero coefficient. -/
+theorem mellin_weight_coefficients (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ (ideleClassNorm F))
+    (A : U) (hA : ∀ t, A (τ t) = 1) (hinj : Injective (fun k : ℤ ↦ A^k))
+    (g : ℝ → ℂ) (hg : ContDiff ℝ (∞) g) (hc : HasCompactSupport g) (φ : BruhatCompactSupport G)
+    (hφ : ∀ x, φ.val x = weight (A x : ℂ) * g (logIdeleClassNorm F x) / V) :
+    (∀ (n : ℕ) (w : ℂ),
+      M(φ,A^(n+1),w) = (1 / 2 : ℂ)^n * bilateralLaplace g w ∧
+      M(φ,(A^(n+1))⁻¹,w) = -((1 / 2 : ℂ)^n * bilateralLaplace g w)) ∧
+    (∀ χ : U, (∀ t, χ (τ t) = 1) →
+      (∀ n : ℕ, χ ≠ A^(n+1) ∧ χ ≠ (A^(n+1))⁻¹) → ∀ w, M(φ,χ,w) = 0) := by
+  have hp : Injective (fun n : ℕ ↦ A^(n+1)) := by
+    intro n m h
+    have he := @hinj ((n+1 : ℕ) : ℤ) ((m+1 : ℕ) : ℤ) (by simpa only [zpow_natCast] using h)
+    omega
+  have hd (n m : ℕ) : A^(n+1) ≠ (A^(m+1))⁻¹ := by
+    intro h
+    have he := @hinj ((n+1 : ℕ) : ℤ) (-((m+1 : ℕ) : ℤ)) (by simpa only [zpow_neg, zpow_natCast] using h)
+    omega
+  have hn (n : ℕ) (t : ℝ≥0ˣ) : (A^(n+1)) (τ t) = 1 := by
+    rw [show (A^(n+1)) (τ t) = (A (τ t))^(n+1) from ContinuousMonoidHom.pow_apply .., hA, one_pow]
+  have hni (n : ℕ) (t : ℝ≥0ˣ) : ((A^(n+1))⁻¹) (τ t) = 1 := by
+    change ((A^(n+1)) (τ t))⁻¹ = 1
+    rw [hn, inv_one]
+  have hs := fun χ hχ w ↦ (weight_mellin_hasSum τ hτ A hA g hg hc φ hφ χ hχ w).tsum_eq.symm
+  constructor
+  · intro n w
+    constructor
+    · rw [hs _ (hn n) w, tsum_eq_single n]
+      · simp [hd]
+      · intro m hm
+        rw [ite_eq_right (fun h ↦ hm (hp h).symm), ite_eq_right (hd n m), sub_self, mul_zero]
+    · rw [hs _ (hni n) w, tsum_eq_single n]
+      · simp [(hd n n).symm]
+      · intro m hm
+        rw [ite_eq_right (hd m n).symm, ite_eq_right (fun h ↦ hm (hp (inv_injective h)).symm),
+          sub_self, mul_zero]
+  · intro χ hχ hother w
+    rw [hs χ hχ w]
+    simp [fun n ↦ (hother n).1, fun n ↦ (hother n).2]
+
+end
+
+end GaussianSuperposition
+
+end
+
+section
+
+open Function MeasureTheory NumberField Set
+open scoped NNReal
+
+namespace GaussianSuperposition
+
+set_option quotPrecheck false
+attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorelSpaceSec1
+  instIdeleClassT2Sec1 instIdeleClassLocallyCompactSec1 instIdeleClassSecondCountableSec1
+  instIdeleClassHaarMeasureSec1
+
+variable {F : Type*} [Field F] [NumberField F]
+
+local notation "G" => IdeleClassGroup (𝓞 F) F
+local notation "U" => PontryaginDual G
+local notation "μ" => ideleClassTamagawaMeasure F
+local notation "N" => ideleClassNorm F
+local notation "D(" χ "," z ")" => MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ z
+local notation "M(" φ "," χ "," z ")" =>
+  modulatedFourierMellin (continuousIdeleClassNorm F) univ
+    ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ μ
+    (φ : BruhatCompactSupport G).val (ideleClassNormTwist χ z)
+local notation "Chars(" τ ")" => {χ : U // ∀ t : ℝ≥0ˣ, χ (τ t) = 1}
+local notation "E(" τ "," α ")" => {p : Chars(τ) × ℂ //
+  0 < D(p.1.val,p.2) ∧ α ≤ |p.2.re - 1/2|}
+local notation "ZTerm(" φ "," p ")" => (D((p).1.val,(p).2) : ℂ) * M(φ,(p).1.val,(p).2 - 1/2)
+
+/-- The actual Chapter 12 exterior family of any compact Bruhat test is absolutely
+summable before any pairing of angular modes. This restricts the joint Appendix B bound. -/
+theorem summable_norm_exteriorZeros (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ N)
+    (φ : BruhatCompactSupport G) (α : ℝ) :
+    Summable (fun z : E(τ,α) ↦ ‖ZTerm(φ,z.val)‖) := by
+  let e (z : E(τ,α)) : {p : Chars(τ) × ℂ // 0 < D(p.1.val,p.2)} := ⟨z.val,z.property.1⟩
+  have he : Injective e := fun x y h ↦ Subtype.ext (congrArg Subtype.val h : (e x).val = (e y).val)
+  apply ((idelicExplicitFormula_summable_spectral τ hτ φ).comp_injective he).congr
+  intro z
+  apply congrArg norm
+  change (D(z.val.1.val,z.val.2) : ℂ) * _ = _
+  congr 1
+  rw [show M(φ,z.val.1.val,z.val.2 - 1/2) =
+    ∫ g, φ.val g * ideleClassNormTwist z.val.1.val (z.val.2 - 1/2) g ∂μ
+    from Set.indicator_of_mem (Set.mem_univ _) _]
+  apply integral_congr_ae
+  filter_upwards with x
+  let u : ℂ := ((N x).val : ℝ)
+  have hu : u ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+  change φ.val x * ((z.val.1.val x : ℂ) * u ^ z.val.2) * u ^ (-1/2 : ℂ) =
+    φ.val x * ((z.val.1.val x : ℂ) * u ^ (z.val.2 - 1/2))
+  rw [show z.val.2 - 1/2 = z.val.2 + (-1/2) by ring, Complex.cpow_add _ _ hu]
+  ring
+
+private def inverseChar (τ : ℝ≥0ˣ →ₜ* G) (χ : Chars(τ)) : Chars(τ) :=
+  ⟨χ.val⁻¹, fun t ↦ by change (χ.val (τ t))⁻¹ = 1; rw [χ.property, inv_one]⟩
+
+/-- Opposite Mellin coefficients on inverse characters give a zero full exterior sum
+when their completed divisor orders agree at every nonzero coefficient. This includes
+infinitely many angular rows and zeros lying on either boundary. -/
+theorem hasSum_exteriorZeros_of_inverseRows (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ N)
+    (φ : BruhatCompactSupport G) (α : ℝ)
+    (hM : ∀ (χ : Chars(τ)) z, M(φ,χ.val⁻¹,z) = -M(φ,χ.val,z))
+    (hD : ∀ (χ : Chars(τ)) z, α ≤ |z.re - 1/2| → M(φ,χ.val,z - 1/2) ≠ 0 →
+      D(χ.val⁻¹,z) = D(χ.val,z)) :
+    HasSum (fun z : E(τ,α) ↦ ZTerm(φ,z.val)) 0 := by
+  classical
+  let S : Set (Chars(τ) × ℂ) := {p | 0 < D(p.1.val,p.2) ∧ α ≤ |p.2.re - 1/2|}
+  let t : Chars(τ) × ℂ → ℂ := fun p ↦ ZTerm(φ,p)
+  let i : Chars(τ) ≃ Chars(τ) :=
+    { toFun := inverseChar τ
+      invFun := inverseChar τ
+      left_inv := fun χ ↦ Subtype.ext (inv_inv χ.val)
+      right_inv := fun χ ↦ Subtype.ext (inv_inv χ.val) }
+  let e : Chars(τ) × ℂ ≃ Chars(τ) × ℂ := i.prodCongr (Equiv.refl ℂ)
+  have neg (p : Chars(τ) × ℂ) : S.indicator t (e p) = -S.indicator t p := by
+    rcases p with ⟨χ,z⟩
+    by_cases ha : α ≤ |z.re - 1/2|
+    · by_cases hm : M(φ,χ.val,z - 1/2) = 0
+      · have hv : M(φ,χ.val⁻¹,z - 1/2) = 0 := by rw [hM,hm,neg_zero]
+        have ht : t (χ,z) = 0 := by simp only [t,hm,mul_zero]
+        have ht' : t (e (χ,z)) = 0 := by
+          change (D(χ.val⁻¹,z) : ℂ) * M(φ,χ.val⁻¹,z - 1/2) = 0
+          rw [hv,mul_zero]
+        simp only [S.indicator_apply,ht,ht',ite_self,neg_zero]
+      · have hd := hD χ z ha hm
+        have he : e (χ,z) ∈ S ↔ (χ,z) ∈ S := by
+          change (0 < D(χ.val⁻¹,z) ∧ α ≤ |z.re - 1/2|) ↔ 0 < D(χ.val,z) ∧ α ≤ |z.re - 1/2|
+          rw [hd]
+        by_cases hs : (χ,z) ∈ S
+        · rw [Set.indicator_of_mem (he.mpr hs),Set.indicator_of_mem hs]
+          change (D(χ.val⁻¹,z) : ℂ) * M(φ,χ.val⁻¹,z - 1/2) = -((D(χ.val,z) : ℂ) * M(φ,χ.val,z - 1/2))
+          rw [hd,hM,mul_neg]
+        · rw [Set.indicator_of_notMem (mt he.mp hs),Set.indicator_of_notMem hs,neg_zero]
+    · have hs : (χ,z) ∉ S := fun h ↦ ha h.2
+      have hs' : e (χ,z) ∉ S := fun h ↦ ha h.2
+      rw [Set.indicator_of_notMem hs',Set.indicator_of_notMem hs,neg_zero]
+  have H := (summable_norm_exteriorZeros τ hτ φ α).of_norm.hasSum
+  change HasSum (fun p : S ↦ t p.val) _ at H
+  have HS := (hasSum_subtype_iff_indicator (f := t) (s := S)).mp H
+  have hneg := (e.hasSum_iff.mpr HS).congr_fun (fun p ↦ (neg p).symm)
+  have hzero := hneg.unique HS.neg
+  have hs : (∑' p : S, t p.val) = 0 := by linear_combination (1/2 : ℂ) * hzero
+  rw [← hs]
+  exact H
+
+private theorem hasSum_exteriorZeros_powerRows (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ N)
+    (φ : BruhatCompactSupport G) (A : U) (α : ℝ) (b : ℕ → ℂ → ℂ)
+    (hL : ∀ n : ℕ, continuedCompletedHeckeL (A^(n+1)) = continuedCompletedHeckeL (A^(n+1))⁻¹)
+    (hrow : ∀ (n : ℕ) w, M(φ,A^(n+1),w) = b n w ∧ M(φ,(A^(n+1))⁻¹,w) = -b n w)
+    (hoff : ∀ χ : Chars(τ), (∀ n : ℕ, χ.val ≠ A^(n+1) ∧ χ.val ≠ (A^(n+1))⁻¹) →
+      ∀ w, M(φ,χ.val,w) = 0) :
+    HasSum (fun z : E(τ,α) ↦ ZTerm(φ,z.val)) 0 := by
+  have rows (χ : Chars(τ)) :
+      (∀ w, M(φ,χ.val⁻¹,w) = -M(φ,χ.val,w)) ∧
+      ∀ z, M(φ,χ.val,z - 1/2) ≠ 0 → D(χ.val⁻¹,z) = D(χ.val,z) := by
+    by_cases hp : ∃ n : ℕ, χ.val = A^(n+1)
+    · obtain ⟨n,he⟩ := hp
+      rw [he]
+      exact ⟨fun w ↦ (hrow n w).2.trans (congrArg Neg.neg (hrow n w).1).symm,
+        fun z _ ↦ congrArg (fun L : ℂ → ℂ ↦ MeromorphicOn.divisor L univ z) (hL n).symm⟩
+    by_cases hm : ∃ n : ℕ, χ.val = (A^(n+1))⁻¹
+    · obtain ⟨n,he⟩ := hm
+      rw [he, inv_inv]
+      exact ⟨fun w ↦ by rw [(hrow n w).1,(hrow n w).2,neg_neg],
+        fun z _ ↦ congrArg (fun L : ℂ → ℂ ↦ MeromorphicOn.divisor L univ z) (hL n)⟩
+    have hx (n : ℕ) : χ.val ≠ A^(n+1) ∧ χ.val ≠ (A^(n+1))⁻¹ :=
+      ⟨fun h ↦ hp ⟨n,h⟩, fun h ↦ hm ⟨n,h⟩⟩
+    have hi (n : ℕ) : (inverseChar τ χ).val ≠ A^(n+1) ∧ (inverseChar τ χ).val ≠ (A^(n+1))⁻¹ := by
+      refine ⟨fun e ↦ (hx n).2 ?_,fun e ↦ (hx n).1 (inv_injective e)⟩
+      simpa only [inverseChar, inv_inv] using congrArg Inv.inv e
+    refine ⟨fun w ↦ ?_,fun z hz ↦ (hz (hoff χ hx (z-1/2))).elim⟩
+    change M(φ,(inverseChar τ χ).val,w) = _
+    rw [hoff _ hi,hoff _ hx, neg_zero]
+  exact hasSum_exteriorZeros_of_inverseRows τ hτ φ α (fun χ ↦ (rows χ).1)
+    (fun χ z _ ↦ (rows χ).2 z)
+
+open Filter
+open scoped Topology
+
+/-- The sum of norms of the same full-multiplicity terms that occur in (12.5.1.3). -/
+def exteriorNormSum (τ : ℝ≥0ˣ →ₜ* G) (φ : BruhatCompactSupport G) (α : ℝ) : ℝ :=
+  ∑' z : E(τ,α), ‖ZTerm(φ,z.val)‖
+
+private theorem exteriorNormSum_antitone (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ N)
+    (φ : BruhatCompactSupport G) : Antitone (exteriorNormSum τ φ) := by
+  intro a b h
+  let i (z : E(τ,b)) : E(τ,a) := ⟨z.val,z.property.1,h.trans z.property.2⟩
+  have hi : Injective i := fun x y e ↦ Subtype.ext (congrArg Subtype.val e : (i x).val = (i y).val)
+  exact Summable.tsum_le_tsum_of_inj (f := fun z : E(τ,b) ↦ ‖ZTerm(φ,z.val)‖)
+    (g := fun z : E(τ,a) ↦ ‖ZTerm(φ,z.val)‖) i hi (fun _ _ ↦ norm_nonneg _) (fun _ ↦ le_rfl)
+    (summable_norm_exteriorZeros τ hτ φ b) (summable_norm_exteriorZeros τ hτ φ a)
+
+/-- Shrinking the excluded open strip detects exactly the nonzero Mellin coefficients
+at true off-central zeros. Each such site gives the same positive lower bound at every
+sufficiently late reciprocal width. -/
+theorem liminf_exteriorNormSum_reciprocal_eq_zero_iff (τ : ℝ≥0ˣ →ₜ* G)
+    (hτ : RightInverse τ N) (φ : BruhatCompactSupport G) :
+    liminf (fun n : ℕ ↦ exteriorNormSum τ φ (1 / ((n : ℝ) + 1))) atTop = 0 ↔
+      ∀ (χ : Chars(τ)) z, 0 < D(χ.val,z) → z.re ≠ 1/2 → M(φ,χ.val,z - 1/2) = 0 := by
+  let a : ℕ → ℝ := fun n ↦ 1 / ((n : ℝ) + 1)
+  have hpos (n : ℕ) : 0 < a n := by dsimp [a]; positivity
+  constructor
+  · intro h χ z hz hdz
+    by_contra hn
+    have h0 := abs_pos.mpr (sub_ne_zero.mpr hdz)
+    have small : ∀ᶠ n in atTop, a n ≤ |z.re - 1/2| :=
+      tendsto_one_div_add_atTop_nhds_zero_nat.eventually_le_const h0
+    have bound : ∀ᶠ n : ℕ in atTop, ‖ZTerm(φ,(χ,z))‖ ≤ exteriorNormSum τ φ (a n) := by
+      filter_upwards [small] with n hsmall
+      exact (summable_norm_exteriorZeros τ hτ φ (a n)).le_tsum
+        ⟨(χ,z),hz,hsmall⟩ fun _ _ ↦ norm_nonneg _
+    have bounded : IsCoboundedUnder (· ≥ ·) atTop (fun n : ℕ ↦ exteriorNormSum τ φ (a n)) :=
+      isCoboundedUnder_ge_of_le _ (fun n ↦ exteriorNormSum_antitone τ hτ φ (hpos n).le)
+    have hh := le_liminf_of_le bounded bound
+    change liminf (fun n : ℕ ↦ exteriorNormSum τ φ (a n)) atTop = 0 at h
+    rw [h] at hh
+    have hd : (D(χ.val,z) : ℂ) ≠ 0 := by exact_mod_cast hz.ne'
+    exact (not_le_of_gt (norm_pos_iff.mpr (mul_ne_zero hd hn))) hh
+  · intro h
+    have zero (n : ℕ) : exteriorNormSum τ φ (a n) = 0 := by
+      unfold exteriorNormSum
+      have atSite (p : E(τ,a n)) : ‖ZTerm(φ,p.val)‖ = 0 := by
+        have hn : p.val.2.re ≠ 1/2 := sub_ne_zero.mp (abs_pos.mp ((hpos n).trans_le p.property.2))
+        rw [h p.val.1 p.val.2 p.property.1 hn, mul_zero, norm_zero]
+      simp only [atSite, tsum_zero]
+    change liminf (fun n : ℕ ↦ exteriorNormSum τ φ (a n)) atTop = 0
+    simp only [zero, liminf_const]
+
+theorem exteriorNormSum_change_section (τ υ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ N)
+    (hυ : RightInverse υ N) (φ : BruhatCompactSupport G) (α : ℝ) :
+    exteriorNormSum τ φ α = exteriorNormSum υ φ α := by
+  obtain ⟨e,he⟩ := AngularPair.exists_exteriorZeros_chartEquiv τ υ hτ hυ α
+  unfold exteriorNormSum
+  rw [← e.tsum_eq (fun p : E(υ,α) ↦ ‖ZTerm(φ,p.val)‖)]
+  apply tsum_congr
+  intro p
+  rcases he p with ⟨_, hd, ht⟩
+  rw [hd, sub_eq_add_neg p.val.2, sub_eq_add_neg (e p).val.2, ht]
+
+private theorem strict_width_of_site (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ N)
+    (χ : Chars(τ)) {z : ℂ} (hz : 0 < D(χ.val,z)) : |z.re - 1/2| < 1/2 := by
+  have empty : IsEmpty E(τ,(1/2 : ℝ)) := isEmpty_exteriorZeros_of_hasSum τ hτ _ fun φ _ ↦
+    traceFormula_exteriorZeros_of_half_le τ φ le_rfl
+  exact lt_of_not_ge fun h ↦ empty.false ⟨(χ,z),hz,h⟩
+
+private theorem liminf_exteriorNormSum_powerRows (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ N)
+    (φ : BruhatCompactSupport G) (A : U) (hA : ∀ t, A (τ t) = 1) (b : ℕ → ℂ → ℂ)
+    (hrow : ∀ (n : ℕ) w, M(φ,A^(n+1),w) = b n w ∧ M(φ,(A^(n+1))⁻¹,w) = -b n w)
+    (hoff : ∀ χ : Chars(τ), (∀ n : ℕ, χ.val ≠ A^(n+1) ∧ χ.val ≠ (A^(n+1))⁻¹) →
+      ∀ w, M(φ,χ.val,w) = 0)
+    (hb : ∀ (n : ℕ) (w : ℂ), 0 < |w.re| → |w.re| < 1/2 → b n w ≠ 0) :
+    liminf (fun n : ℕ ↦ exteriorNormSum τ φ (1 / ((n : ℝ) + 1))) atTop = 0 ↔
+      ∀ (k : ℤ), k ≠ 0 → ∀ z, 0 < D(A^k,z) → z.re = 1/2 := by
+  rw [liminf_exteriorNormSum_reciprocal_eq_zero_iff τ hτ]
+  have hp (n : ℕ) (t : ℝ≥0ˣ) : (A^(n+1)) (τ t) = 1 := by
+    rw [show (A^(n+1)) (τ t) = (A (τ t))^(n+1) from ContinuousMonoidHom.pow_apply .., hA, one_pow]
+  constructor
+  · intro h
+    have central (χ : Chars(τ)) (hn : ∀ w : ℂ, 0 < |w.re| → |w.re| < 1/2 → M(φ,χ.val,w) ≠ 0)
+        {z : ℂ} (hz : 0 < D(χ.val,z)) : z.re = 1/2 := by
+      by_contra he
+      have hRe : (z - 1/2).re = z.re - 1/2 := by simp
+      exact hn (z-1/2) (hRe ▸ abs_pos.mpr (sub_ne_zero.mpr he))
+        (hRe ▸ strict_width_of_site τ hτ χ hz) (h χ z hz he)
+    intro k hk z hz
+    cases k with
+    | ofNat n =>
+      cases n with
+      | zero => exact (hk rfl).elim
+      | succ n =>
+        let χ : Chars(τ) := ⟨A^(n+1),hp n⟩
+        change 0 < D(A^((n+1 : ℕ) : ℤ),z) at hz
+        exact central χ (fun w h₁ h₂ ↦ (hrow n w).1 ▸ hb n w h₁ h₂)
+          (by simpa only [χ, zpow_natCast] using hz)
+    | negSucc n =>
+      let χ : Chars(τ) := ⟨(A^(n+1))⁻¹,fun t ↦ by change ((A^(n+1)) (τ t))⁻¹ = 1; rw [hp,inv_one]⟩
+      exact central χ (fun w h₁ h₂ ↦ (hrow n w).2 ▸ neg_ne_zero.mpr (hb n w h₁ h₂))
+        (by simpa only [χ,zpow_negSucc] using hz)
+  · intro h χ z hz hne
+    apply hoff χ _ (z-1/2)
+    intro n
+    constructor
+    · intro he
+      apply hne (h ((n+1 : ℕ) : ℤ) (by omega) z ?_)
+      simpa only [zpow_natCast, ← he] using hz
+    · intro he
+      apply hne (h (-((n+1 : ℕ) : ℤ)) (by omega) z ?_)
+      simpa only [zpow_neg,zpow_natCast,← he] using hz
+
+open AngularPair
+open scoped ComplexConjugate ContDiff
+
+local notation "F₄" => CyclotomicField 4 ℚ
+local notation "G₄" => IdeleClassGroup (𝓞 F₄) F₄
+local notation "A₄" => Gaussian.globalAngularCharacter
+local notation "N₄" => ideleClassNorm F₄
+local notation "V₄" => (((normOneIdeleClassTamagawaMeasure F₄) univ).toReal : ℂ)
+local notation "D₄(" χ "," z ")" => MeromorphicOn.divisor (continuedCompletedHeckeL (F := F₄) χ) univ z
+local notation "M₄(" φ "," χ "," z ")" =>
+  modulatedFourierMellin (continuousIdeleClassNorm F₄) univ
+    ⟨isProperMap_ideleClassNorm F₄, ideleClassNorm_ne_one (F := F₄)⟩ (ideleClassTamagawaMeasure F₄)
+    (φ : BruhatCompactSupport G₄).val (ideleClassNormTwist χ z)
+local notation "E₄(" τ "," α ")" => {p : {χ : PontryaginDual G₄ // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ //
+  0 < D₄(p.1.val,p.2) ∧ α ≤ |p.2.re - 1/2|}
+local notation "T₄(" φ "," p ")" => (D₄((p).1.val,(p).2) : ℂ) * M₄(φ,(p).1.val,(p).2 - 1/2)
+
+/-- Paper: (12.5.1.3), pp. 519–520. A single nonzero inversion-even Gaussian
+Bruhat test selects every nontrivial angular power. Its signed exterior series is
+absolutely convergent and zero, including on both edges and in every norm section.
+The sums of norms at shrinking reciprocal widths detect the critical-line condition
+for every one of these Hecke functions. -/
+theorem exists_simultaneousGaussianAngularTest :
+    ∃ (g : ℝ → ℂ) (φ : BruhatCompactSupport G₄),
+      (ContDiff ℝ (∞) g ∧ HasCompactSupport g ∧ Function.Odd g ∧ ∀ x, conj (g x) = g x) ∧
+      (∀ w, bilateralLaplace g w = GaussianPairDetector.oddRadialMultiplier w) ∧
+      (∀ x, φ.val x = weight (A₄ x : ℂ) * g (logIdeleClassNorm F₄ x) / V₄) ∧
+      (∀ x, φ.val x⁻¹ = φ.val x) ∧ (∀ u : (N₄).ker, φ.val u.val = 0) ∧ (∃ x, φ.val x ≠ 0) ∧
+      (∀ (n : ℕ) w, M₄(φ,A₄^(n+1),w) = (1/2 : ℂ)^n * GaussianPairDetector.oddRadialMultiplier w ∧
+        M₄(φ,(A₄^(n+1))⁻¹,w) = -((1/2 : ℂ)^n * GaussianPairDetector.oddRadialMultiplier w)) ∧
+      (∀ χ : PontryaginDual G₄, (∀ t, χ (QuotientGroup.mk (canonicalIdeleNormSection F₄ t)) = 1) →
+        (∀ n : ℕ, χ ≠ A₄^(n+1) ∧ χ ≠ (A₄^(n+1))⁻¹) → ∀ w, M₄(φ,χ,w) = 0) ∧
+      (∀ (τ : ℝ≥0ˣ →ₜ* G₄), RightInverse τ N₄ → ∀ α : ℝ,
+        Summable (fun z : E₄(τ,α) ↦ ‖T₄(φ,z.val)‖) ∧ HasSum (fun z : E₄(τ,α) ↦ T₄(φ,z.val)) 0) ∧
+      ∀ (τ : ℝ≥0ˣ →ₜ* G₄), RightInverse τ N₄ →
+        (liminf (fun n : ℕ ↦ exteriorNormSum τ φ (1 / ((n : ℝ) + 1))) atTop = 0 ↔
+          ∀ (k : ℤ), k ≠ 0 → ∀ z, 0 < D₄(A₄^k,z) → z.re = 1/2) := by
+  obtain ⟨g,φ,hg,hL,hφ,he,hnorm,hnz⟩ := exists_gaussianCalibrated_weightTest
+  let σ : ℝ≥0ˣ →ₜ* G₄ := ⟨(QuotientGroup.mk' _).comp (canonicalIdeleNormSection F₄),
+    continuous_quotient_mk'.comp (canonicalIdeleNormSection_continuous _)⟩
+  have hσ : RightInverse σ N₄ := canonicalIdeleNormSection_rightInverse _
+  obtain ⟨hrows,hoff⟩ := mellin_weight_coefficients σ hσ A₄ Gaussian.globalAngularCharacter_normSection
+    Gaussian.globalAngularCharacter_power_injective g hg.1 hg.2.1 φ hφ
+  let b (n : ℕ) (w : ℂ) := (1/2 : ℂ)^n * GaussianPairDetector.oddRadialMultiplier w
+  have hr (n : ℕ) (w : ℂ) : M₄(φ,A₄^(n+1),w) = b n w ∧ M₄(φ,(A₄^(n+1))⁻¹,w) = -b n w := by
+    simpa only [b,hL] using hrows n w
+  refine ⟨g,φ,hg,hL,hφ,he,hnorm,hnz,hr,hoff,fun τ hτ α ↦ ⟨summable_norm_exteriorZeros τ hτ φ α,?_⟩,
+    fun τ hτ ↦ ?_⟩
+  · apply (hasSum_exteriorZeros_change_section σ τ hσ hτ φ α 0).mp
+    exact hasSum_exteriorZeros_powerRows σ hσ φ A₄ α b (fun n ↦ by
+      simpa only [zpow_natCast] using gaussianAngular_completedHeckeL_inv ((n+1 : ℕ) : ℤ)) hr
+      (fun χ ↦ hoff χ.val χ.property)
+  · simp only [← exteriorNormSum_change_section σ τ hσ hτ φ]
+    exact liminf_exteriorNormSum_powerRows σ hσ φ A₄ Gaussian.globalAngularCharacter_normSection b hr
+      (fun χ ↦ hoff χ.val χ.property) fun n w h₁ h₂ ↦
+        mul_ne_zero (pow_ne_zero n (by norm_num)) (GaussianPairDetector.oddRadialMultiplier_detects h₁ h₂)
+
+end GaussianSuperposition
+
+end
+
 end
 
 /-- At fixed strip and input operator, it suffices to test a single prescribed nonempty
