@@ -1,7 +1,7 @@
 module
 
-public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 import Mathlib.Geometry.Manifold.PartitionOfUnity
+public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 
 /-! # Isolated statements of §12.5
 
@@ -12,8 +12,7 @@ this file.
 ## The projective strip kernel needed for (12.5.1.4)
 
 The first theorem supplies the kernel hypothesis of the smoothened diagonal formula in §12.5.
-The second theorem specializes that formula to this kernel. The localization results below reduce
-the kernel condition to tests supported in any prescribed nonempty open set of log norms.
+The second theorem specializes that formula to this kernel.
 -/
 
 @[expose] public noncomputable section
@@ -82,6 +81,11 @@ theorem hasSum_stripZeros_neg_integral_smoothenedDiagonal_of_vanishing
       HasSum term (-(∫ x, diagonal x ∂μ𝔽)) :=
   hasSum_stripZeros_neg_integral_smoothenedDiagonal φ hφ χ hχ hα hs
     (exists_projectiveKernel_stripTestAction_spectralProjection φ hφ hα hs) U hU hBorel
+
+/-! ## Localizing the kernel condition
+
+Tests supported in any prescribed nonempty open set of log norms suffice to check the kernel condition.
+-/
 
 section KernelLocalization
 
