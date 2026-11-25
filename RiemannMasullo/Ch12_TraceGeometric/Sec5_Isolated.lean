@@ -2,6 +2,14 @@ module
 
 import Mathlib.Geometry.Manifold.PartitionOfUnity
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
+public import RiemannMasullo.ForMathlib.Analysis.Analytic.ZeroDensity
+public import RiemannMasullo.ForMathlib.Analysis.Analytic.ZeroLatticeSchwartz
+public import RiemannMasullo.ForMathlib.Analysis.Fourier.SchwartzLaplaceAxis
+public import RiemannMasullo.ForMathlib.MeasureTheory.Integral.PolynomialWindow
+import Mathlib.MeasureTheory.Integral.Bochner.SumMeasure
+import RiemannMasullo.AppB_AnalyticNT.Sec4b
+import RiemannMasullo.ForMathlib.Analysis.Analytic.CauchyWindow
+import Mathlib.Analysis.Calculus.BumpFunction.FiniteDimension
 public import RiemannMasullo.Ch10_TraceSpectral.Sec3_TraceClass
 public import RiemannMasullo.AppA_AlgebraicNT.Sec5a_IdeleClassDPrime
 public import RiemannMasullo.ForMathlib.Analysis.Fourier.StripLaplace
@@ -2140,6 +2148,967 @@ theorem exists_measurableSequence_archConductor_linePA_iff_exteriorZeros :
     (forall_congr' hlim).trans (allCentral_iff_exteriorZeros τ hτ)⟩
 
 end PrimeFreeCentered
+
+end OutputOrderGeometry
+
+section CriticalFiniteHeckeDensity
+
+open Complex Filter Function Topology
+
+local notation "cl(" t ")" => ((1 / 2 : ℂ) + ((t : ℝ) : ℂ) * I)
+local notation "completed(" χ ")" => (continuedCompletedHeckeL (F := F) χ)
+local notation "ord(" χ ", " z ")" => MeromorphicOn.divisor completed(χ) univ z
+
+private theorem criticalLine_re (t : ℝ) : cl(t).re = 1 / 2 := by norm_num [Complex.mul_re]
+private theorem criticalLine_im (t : ℝ) : cl(t).im = t := by norm_num [Complex.mul_im]
+private theorem criticalLine_rebuild (z : ℂ) (hz : z.re = 1 / 2) : cl(z.im) = z :=
+  Complex.ext ((criticalLine_re _).trans hz.symm) (criticalLine_im _)
+
+private theorem analyticAt_criticalLine (t : ℝ) : AnalyticAt ℝ (fun x : ℝ ↦ cl(x)) t :=
+  analyticAt_const.add ((Complex.ofRealCLM.analyticAt t).mul analyticAt_const)
+
+/-- Restricting a holomorphic germ to the parametrized vertical line preserves its order.
+The complex unit in the real factorization is multiplied by `I ^ n`. -/
+private theorem analyticOrderAt_criticalLine {A : ℂ → ℂ} {t : ℝ} (hA : AnalyticAt ℂ A cl(t)) :
+    AnalyticAt ℝ (fun x : ℝ ↦ A cl(x)) t ∧
+    analyticOrderAt (fun x : ℝ ↦ A cl(x)) t = analyticOrderAt A cl(t) := by
+  have hline := analyticAt_criticalLine t
+  have hres : AnalyticAt ℝ (fun x : ℝ ↦ A cl(x)) t :=
+    (hA.restrictScalars (𝕜 := ℝ)).comp (f := fun x : ℝ ↦ cl(x)) hline
+  refine ⟨hres, ?_⟩
+  by_cases htop : analyticOrderAt A cl(t) = ⊤
+  · rw [htop, analyticOrderAt_eq_top]
+    exact hline.continuousAt.tendsto.eventually (analyticOrderAt_eq_top.mp htop)
+  let n := analyticOrderNatAt A cl(t)
+  have hn : analyticOrderAt A cl(t) = (n : ℕ∞) := (Nat.cast_analyticOrderNatAt htop).symm
+  obtain ⟨u, hu, hu0, hfac⟩ := hA.analyticOrderAt_eq_natCast.mp hn
+  rw [hn, hres.analyticOrderAt_eq_natCast]
+  refine ⟨fun x : ℝ ↦ I ^ n * u cl(x),
+    analyticAt_const.mul ((hu.restrictScalars (𝕜 := ℝ)).comp (f := fun x : ℝ ↦ cl(x)) hline),
+    mul_ne_zero (pow_ne_zero _ I_ne_zero) hu0, ?_⟩
+  filter_upwards [hline.continuousAt.tendsto.eventually hfac] with x hx
+  have he : cl(x) - cl(t) = ((x - t : ℝ) : ℂ) * I := by push_cast; ring
+  rw [hx, he, smul_eq_mul, Complex.real_smul, Complex.ofReal_pow, mul_pow, mul_assoc]
+
+private theorem analyticAt_completedHecke_of_openStrip (χ : PontryaginDual C𝔽) {z : ℂ}
+    (ha : 0 < z.re) (hb : z.re < 1) : AnalyticAt ℂ completed(χ) z := by
+  obtain ⟨hm, he⟩ := continuedCompletedHeckeL_spec χ
+  by_cases hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1
+  · obtain ⟨r, ⟨-, -, -, hhol⟩, -⟩ := completedHeckeL_continuation_simplePoles χ _ hm he hχ
+    apply hhol z
+    simp only [mem_compl_iff, mem_insert_iff, mem_singleton_iff]
+    rintro (h | h)
+    · have hr := congrArg Complex.re h
+      simp [Complex.mul_re] at hr
+      linarith
+    · have hr := congrArg Complex.re h
+      simp [Complex.mul_re] at hr
+      linarith
+  · exact (completedHeckeL_continuation_entire χ _ hm he hχ).analyticAt z
+
+private theorem completedHecke_order_ne_top (χ : PontryaginDual C𝔽) (z : ℂ) :
+    meromorphicOrderAt completed(χ) z ≠ ⊤ := by
+  obtain ⟨hm, he⟩ := continuedCompletedHeckeL_spec χ
+  have h₂ : (1 : ℝ) < (2 : ℂ).re := by norm_num
+  have hval : completed(χ) 2 ≠ 0 := by
+    rw [he ⟨2, h₂⟩]
+    exact mul_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans h₂))
+      (finiteHeckeL_ne_zero_of_one_lt_re χ ⟨2, h₂⟩)
+  apply hm.meromorphicOn.meromorphicOrderAt_ne_top_of_isPreconnected
+    isPreconnected_univ (mem_univ (2 : ℂ)) (mem_univ z)
+  rw [(hm (mem_univ _)).meromorphicOrderAt_eq_zero_iff.mpr hval]
+  exact WithTop.coe_ne_top
+
+/-- The finite Hecke function on the critical line, formed by removing the archimedean
+gamma factor from the specified meromorphic continuation of the completed function. -/
+def criticalFiniteHeckeL (χ : PontryaginDual C𝔽) (t : ℝ) : ℂ :=
+  completed(χ) cl(t) * (heckeGammaFactor χ cl(t))⁻¹
+
+/-- Every normal-form continuation of the finite Euler product agrees with
+`criticalFiniteHeckeL` at every point of the critical line. -/
+theorem criticalFiniteHeckeL_eq_continuation (χ : PontryaginDual C𝔽) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ)
+    (he : ∀ z : {z : ℂ // 1 < z.re}, L z = finiteHeckeL χ z) :
+    criticalFiniteHeckeL χ = fun t : ℝ ↦ L cl(t) := by
+  let M (z : ℂ) := completed(χ) z * (heckeGammaFactor χ z)⁻¹
+  obtain ⟨hΛ, hΛe⟩ := continuedCompletedHeckeL_spec χ
+  have hM : MeromorphicOn M univ := fun z hz ↦ (hΛ hz).meromorphicAt.mul
+    ((differentiable_inv_heckeGammaFactor χ).analyticAt z).meromorphicAt
+  have hEq := heckeEulerProductOutside_eq_finite_nf_eq L M hL.meromorphicOn hM (fun z hz ↦ by
+    rw [he ⟨z, hz⟩]
+    dsimp only [M]
+    rw [hΛe ⟨z, hz⟩]
+    change finiteHeckeL χ ⟨z, hz⟩ = heckeGammaFactor χ z * finiteHeckeL χ ⟨z, hz⟩ * _
+    rw [mul_right_comm, mul_inv_cancel₀ (heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans hz)),
+      one_mul])
+  rw [toMeromorphicNFOn_eq_self.mpr hL] at hEq
+  funext t
+  have hpos : 0 < cl(t).re := by rw [criticalLine_re]; norm_num
+  have hlt : cl(t).re < 1 := by rw [criticalLine_re]; norm_num
+  have hreg : AnalyticAt ℂ M cl(t) := (analyticAt_completedHecke_of_openStrip χ hpos hlt).mul
+    ((differentiable_inv_heckeGammaFactor χ).analyticAt _)
+  rw [hEq, toMeromorphicNFOn_eq_toMeromorphicNFAt hM (mem_univ _),
+    toMeromorphicNFAt_eq_self.mpr hreg.meromorphicNFAt]
+  rfl
+
+/-- The finite critical-line function is real analytic with a nonzero germ. Its real
+analytic order, including at multiple zeros, equals the integer divisor of the completed
+Hecke function at the corresponding complex point. -/
+theorem criticalFiniteHeckeL_order (χ : PontryaginDual C𝔽) (t : ℝ) :
+    AnalyticAt ℝ (criticalFiniteHeckeL χ) t ∧
+    ¬ (∀ᶠ u in 𝓝 t, criticalFiniteHeckeL χ u = 0) ∧
+    (analyticOrderNatAt (criticalFiniteHeckeL χ) t : ℤ) = ord(χ, cl(t)) := by
+  let M := completed(χ) * (fun z ↦ (heckeGammaFactor χ z)⁻¹)
+  have hpos : 0 < cl(t).re := by rw [criticalLine_re]; norm_num
+  have hlt : cl(t).re < 1 := by rw [criticalLine_re]; norm_num
+  have hΛ := analyticAt_completedHecke_of_openStrip χ hpos hlt
+  have hΓ := (differentiable_inv_heckeGammaFactor χ).analyticAt cl(t)
+  have hunit : (heckeGammaFactor χ cl(t))⁻¹ ≠ 0 :=
+    inv_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ hpos)
+  have hM : AnalyticAt ℂ M cl(t) := hΛ.mul hΓ
+  obtain ⟨hreal, hv⟩ := analyticOrderAt_criticalLine hM
+  have hA : analyticOrderAt (criticalFiniteHeckeL χ) t = analyticOrderAt completed(χ) cl(t) := by
+    change analyticOrderAt (fun u : ℝ ↦ M cl(u)) t = _
+    rw [hv, show analyticOrderAt M cl(t) = _ + _ from analyticOrderAt_mul hΛ hΓ,
+      hΓ.analyticOrderAt_eq_zero.mpr hunit, add_zero]
+  have hfinite : analyticOrderAt (criticalFiniteHeckeL χ) t ≠ ⊤ := by
+    intro ht
+    apply completedHecke_order_ne_top χ cl(t)
+    rw [hΛ.meromorphicOrderAt_eq, ← hA, ht, ENat.map_top]
+  refine ⟨hreal, fun h ↦ hfinite (analyticOrderAt_eq_top.mpr h), ?_⟩
+  rw [MeromorphicOn.divisor_apply (continuedCompletedHeckeL_spec χ).1.meromorphicOn (mem_univ _),
+    hΛ.meromorphicOrderAt_eq, ← hA, ← Nat.cast_analyticOrderNatAt hfinite, ENat.map_natCast,
+    WithTop.untop₀_coe]
+
+private theorem critical_zero_moments_eq (χ : PontryaginDual C𝔽) (g : ℝ → ℝ) :
+    (∑' t : {t : ℝ // criticalFiniteHeckeL χ t = 0},
+      (analyticOrderNatAt (criticalFiniteHeckeL χ) t.val : ℝ) * g t.val) =
+      ∑' z : {z : ℂ // 0 < ord(χ,z) ∧ z.re = 1/2}, ((ord(χ,z.val)).toNat : ℝ) * g z.val.im := by
+  classical
+  let f := criticalFiniteHeckeL χ
+  let Z := {t : ℝ // f t = 0}
+  let C := {z : ℂ // 0 < ord(χ, z) ∧ z.re = 1 / 2}
+  have hlocal (t : ℝ) := criticalFiniteHeckeL_order χ t
+  have hfin (t : ℝ) : analyticOrderAt f t ≠ ⊤ := fun ht ↦ (hlocal t).2.1 (analyticOrderAt_eq_top.mp ht)
+  have hpos (t : ℝ) : f t = 0 ↔ 0 < ord(χ, cl(t)) := by
+    rw [← (hlocal t).2.2]
+    rw [← (hlocal t).1.analyticOrderAt_ne_zero, ← Nat.cast_analyticOrderNatAt (hfin t)]
+    simp [f, Nat.pos_iff_ne_zero]
+  let e : Z ≃ C :=
+    { toFun := fun t ↦ ⟨cl(t.val), (hpos t).mp t.2, criticalLine_re _⟩
+      invFun := fun z ↦ ⟨z.val.im, (hpos _).mpr (by rw [criticalLine_rebuild _ z.2.2]; exact z.2.1)⟩
+      left_inv := fun t ↦ Subtype.ext (criticalLine_im _)
+      right_inv := fun z ↦ Subtype.ext (criticalLine_rebuild _ z.2.2) }
+  have hsum : (∑' t : Z, (analyticOrderNatAt f t.val : ℝ) * g t.val) =
+      ∑' z : C, ((ord(χ, z.val)).toNat : ℝ) * g z.val.im := by
+    calc
+      _ = ∑' t : Z, ((ord(χ, (e t).val)).toNat : ℝ) * g (e t).val.im := by
+        apply tsum_congr
+        intro t
+        change _ = ((ord(χ, cl(t.val))).toNat : ℝ) * g cl(t.val).im
+        rw [criticalLine_im, ← (hlocal t).2.2, Int.toNat_natCast]
+      _ = _ := e.tsum_eq (fun z : C ↦ ((ord(χ, z.val)).toNat : ℝ) * g z.val.im)
+  exact hsum
+
+/-- Integrating the finite Hecke function's regularized logarithmic-derivative density
+against a signed compact continuous test recovers the completed divisor on exactly its
+occupied central sites, with full multiplicities. -/
+theorem tendsto_integral_criticalFiniteHeckeL (χ : PontryaginDual C𝔽) {g : ℝ → ℝ}
+    (hg : Continuous g) (hgc : HasCompactSupport g) :
+    Tendsto (fun η : ℝ ↦ ∫ t, g t * analyticZeroDensity (criticalFiniteHeckeL χ) η t) (𝓝[>] 0)
+      (𝓝 (∑' z : {z : ℂ // 0 < ord(χ, z) ∧ z.re = 1 / 2},
+        ((ord(χ, z.val)).toNat : ℝ) * g z.val.im)) := by
+  classical
+  let f := criticalFiniteHeckeL χ
+  let C := {z : ℂ // 0 < ord(χ,z) ∧ z.re = 1/2}
+  have hlocal (t : ℝ) := criticalFiniteHeckeL_order χ t
+  have hfin (t : ℝ) : analyticOrderAt f t ≠ ⊤ := fun ht ↦ (hlocal t).2.1 (analyticOrderAt_eq_top.mp ht)
+  have hlim := tendsto_integral_analyticZeroDensity (f := f) hg hgc
+    (fun t _ ↦ (hlocal t).1) (fun t _ ↦ hfin t)
+  have hsum := critical_zero_moments_eq χ g
+  change Tendsto (fun η : ℝ ↦ ∫ t, g t * analyticZeroDensity f η t) (𝓝[>] 0)
+    (𝓝 (∑' z : C, ((ord(χ, z.val)).toNat : ℝ) * g z.val.im))
+  rw [← hsum]
+  exact hlim
+
+end CriticalFiniteHeckeDensity
+
+section CriticalSchwartzDensity
+
+open Complex Filter Function Topology
+open scoped _root_.SchwartzMap ContDiff ENNReal FourierTransform NNReal
+
+local notation "cl(" t ")" => ((1 / 2 : ℂ) + ((t : ℝ) : ℂ) * I)
+local notation "ord(" χ ", " z ")" => MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ z
+local notation "central(" χ ")" => {z : ℂ // 0 < ord(χ, z) ∧ z.re = 1 / 2}
+local notation "mult(" χ ", " z ")" => (ord(χ, (z : ℂ))).toNat
+local notation "density(" χ ", " η ")" => analyticZeroDensity (criticalFiniteHeckeL χ) η
+
+/-- The positive atomic measure on the ordinates of the central zeros of the completed
+Hecke function. Each point has mass equal to its full analytic multiplicity. -/
+def criticalHeckeZeroMeasure (χ : PontryaginDual C𝔽) : Measure ℝ :=
+  Measure.sum fun z : central(χ) ↦ (mult(χ, z) : ℝ≥0∞) • Measure.dirac z.val.im
+
+private theorem criticalHeckeZeroMeasure_finite_sites (χ : PontryaginDual C𝔽)
+    {K : Set ℝ} (hK : IsCompact K) : {z : central(χ) | z.val.im ∈ K}.Finite := by
+  let D := MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ
+  have hloc : LocallyFiniteSupport (fun z ↦ D z) :=
+    fun z ↦ D.supportLocallyFiniteWithinDomain z (mem_univ z)
+  have hline : Continuous (fun t : ℝ ↦ cl(t)) := by fun_prop
+  have hf := hloc.finite_inter_support_of_isCompact (hK.image hline)
+  refine (hf.preimage (f := fun z : central(χ) ↦ z.val) Subtype.val_injective.injOn).subset ?_
+  intro z hz
+  exact ⟨⟨z.val.im, hz, criticalLine_rebuild _ z.property.2⟩, z.property.1.ne'⟩
+
+/-- Local finiteness of the completed divisor makes the central atomic measure finite on
+every compact set of ordinates. -/
+instance criticalHeckeZeroMeasure_finiteOnCompacts (χ : PontryaginDual C𝔽) :
+    IsFiniteMeasureOnCompacts (criticalHeckeZeroMeasure χ) where
+  lt_top_of_isCompact {K} hK := by
+    classical
+    let hfin := criticalHeckeZeroMeasure_finite_sites χ hK
+    have hv (z : central(χ)) : ((mult(χ, z) : ℝ≥0∞) • Measure.dirac z.val.im : Measure ℝ) K =
+        if z.val.im ∈ K then (mult(χ, z) : ℝ≥0∞) else 0 := by
+      by_cases h : z.val.im ∈ K <;> simp [Measure.dirac_apply' _ hK.measurableSet, h]
+    rw [criticalHeckeZeroMeasure, Measure.sum_apply _ hK.measurableSet, tsum_congr hv]
+    rw [tsum_eq_sum (s := hfin.toFinset) (f := fun z : central(χ) ↦
+      if z.val.im ∈ K then (mult(χ, z) : ℝ≥0∞) else 0) (fun z hz ↦ by
+        simp [show z.val.im ∉ K from fun hm ↦ hz (hfin.mem_toFinset.mpr hm)])]
+    apply ENNReal.sum_lt_top.mpr
+    intro z _
+    split <;> finiteness
+
+/-- Integrating against the central zero measure is an unconditionally convergent sum over
+the exact complex central-site subtype, with full multiplicities and ordinate evaluation. -/
+theorem hasSum_criticalHeckeZeroMeasure (χ : PontryaginDual C𝔽) {E : Type*}
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [CompleteSpace E] (g : ℝ → E)
+    (hg : Integrable g (criticalHeckeZeroMeasure χ)) :
+    HasSum (fun z : central(χ) ↦ (mult(χ, z) : ℝ) • g z.val.im)
+      (∫ t, g t ∂criticalHeckeZeroMeasure χ) := by
+  unfold criticalHeckeZeroMeasure at hg ⊢
+  simpa only [integral_smul_measure, integral_dirac, ENNReal.toReal_natCast] using
+    hasSum_integral_measure hg
+
+/-- The critical finite Hecke density is Borel measurable for every parameter. -/
+theorem criticalFiniteHeckeL_density_measurable (χ : PontryaginDual C𝔽) (η : ℝ) :
+    Measurable (density(χ, η)) := by
+  have hc : Continuous (criticalFiniteHeckeL χ) :=
+    continuous_iff_continuousAt.mpr fun t ↦ (criticalFiniteHeckeL_order χ t).1.continuousAt
+  have hd : Continuous (deriv (criticalFiniteHeckeL χ)) :=
+    continuous_iff_continuousAt.mpr fun t ↦ (criticalFiniteHeckeL_order χ t).1.deriv.continuousAt
+  unfold analyticZeroDensity
+  fun_prop
+
+private theorem criticalHeckeDensity_norm_le (χ : PontryaginDual C𝔽) {η : ℝ} (hη : 0 < η) (t : ℝ) :
+    ‖density(χ, η) t‖ ≤ 1 / (Real.pi * η) := by
+  rw [Real.norm_of_nonneg (by unfold analyticZeroDensity; positivity)]
+  unfold analyticZeroDensity
+  by_cases hd : deriv (criticalFiniteHeckeL χ) t = 0
+  · simp only [hd, norm_zero, zero_pow (by decide : 2 ≠ 0), mul_zero, zero_div]
+    positivity
+  have hs : 0 < η ^ 2 * ‖deriv (criticalFiniteHeckeL χ) t‖ ^ 2 := by positivity
+  calc
+    _ ≤ (η / Real.pi) * ‖deriv (criticalFiniteHeckeL χ) t‖ ^ 2 /
+        (η ^ 2 * ‖deriv (criticalFiniteHeckeL χ) t‖ ^ 2) :=
+      div_le_div_of_nonneg_left (by positivity) hs (le_add_of_nonneg_left (sq_nonneg _))
+    _ = _ := by field_simp [Real.pi_ne_zero, hη.ne', norm_ne_zero_iff.mpr hd]
+
+private theorem criticalHeckeDensity_integrableOn_compact (χ : PontryaginDual C𝔽)
+    {η : ℝ} (hη : 0 < η) {K : Set ℝ} (hK : IsCompact K) : IntegrableOn (density(χ, η)) K := by
+  have hc : IntegrableOn (fun _ : ℝ ↦ 1 / (Real.pi * η)) K := integrableOn_const hK.measure_ne_top
+  exact hc.mono' (criticalFiniteHeckeL_density_measurable χ η).aestronglyMeasurable
+    (ae_of_all _ (criticalHeckeDensity_norm_le χ hη))
+
+/-- At every positive scale the signed Schwartz pairing is an absolutely convergent
+Lebesgue integral. -/
+theorem integrable_schwartz_mul_criticalFiniteHeckeL_density (χ : PontryaginDual C𝔽)
+    {η : ℝ} (hη : 0 < η) (g : 𝓢(ℝ, ℝ)) : Integrable (fun t ↦ g t * density(χ, η) t) := by
+  have hmajor : Integrable (fun t ↦ ‖g t‖ * (1 / (Real.pi * η))) := g.integrable.norm.mul_const _
+  apply hmajor.mono' (g.continuous.measurable.mul (criticalFiniteHeckeL_density_measurable χ η)).aestronglyMeasurable
+  exact ae_of_all _ fun t ↦ by
+    change ‖g t * density(χ, η) t‖ ≤ _
+    rw [_root_.norm_mul]
+    exact mul_le_mul_of_nonneg_left (criticalHeckeDensity_norm_le χ hη t) (norm_nonneg _)
+
+private def criticalHeckeDensityMeasure (χ : PontryaginDual C𝔽) (η : ℝ) : Measure ℝ :=
+  volume.withDensity (fun t ↦ ENNReal.ofReal (density(χ, η) t))
+
+private theorem criticalHeckeDensityMeasure_pairing (χ : PontryaginDual C𝔽)
+    {η : ℝ} (hη : 0 < η) {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E] (g : ℝ → E) :
+    (∫ t, g t ∂criticalHeckeDensityMeasure χ η) = ∫ t, density(χ, η) t • g t := by
+  unfold criticalHeckeDensityMeasure
+  rw [integral_withDensity_eq_integral_toReal_smul₀
+    (criticalFiniteHeckeL_density_measurable χ η).aemeasurable.ennreal_ofReal
+    (ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top)]
+  exact integral_congr_ae (ae_of_all _ fun t ↦ by
+    change (ENNReal.ofReal (density(χ, η) t)).toReal • g t = density(χ, η) t • g t
+    rw [ENNReal.toReal_ofReal (by unfold analyticZeroDensity; positivity)])
+
+private theorem criticalHeckeDensityMeasure_compact (χ : PontryaginDual C𝔽) (g : ℝ → ℝ)
+    (hg : Continuous g) (hgc : HasCompactSupport g) :
+    Tendsto (fun η : ℝ ↦ ∫ t, g t ∂criticalHeckeDensityMeasure χ η) (𝓝[>] 0)
+      (𝓝 (∫ t, g t ∂criticalHeckeZeroMeasure χ)) := by
+  have hsum := (hasSum_criticalHeckeZeroMeasure χ g (hg.integrable_of_hasCompactSupport hgc)).tsum_eq
+  simp only [smul_eq_mul] at hsum
+  have h := tendsto_integral_criticalFiniteHeckeL χ hg hgc
+  rw [hsum] at h
+  apply h.congr'
+  filter_upwards [self_mem_nhdsWithin (a := (0 : ℝ)) (s := Ioi 0)] with η hη
+  rw [criticalHeckeDensityMeasure_pairing χ hη]
+  apply integral_congr_ae
+  exact ae_of_all _ fun t ↦ mul_comm _ _
+
+private theorem criticalHeckeDensityMeasure_window (χ : PontryaginDual C𝔽) {η : ℝ} (hη : 0 < η) (k : ℤ) :
+    criticalHeckeDensityMeasure χ η (Icc (k : ℝ) (k + 1)) =
+      ENNReal.ofReal (∫ t in Icc (k : ℝ) (k + 1), density(χ, η) t) := by
+  rw [criticalHeckeDensityMeasure, withDensity_apply _ measurableSet_Icc,
+    ← ofReal_integral_eq_lintegral_ofReal (criticalHeckeDensity_integrableOn_compact χ hη isCompact_Icc)]
+  exact ae_of_all _ fun t ↦ by unfold analyticZeroDensity; positivity
+
+private theorem integrable_schwartz_of_criticalWindow {E : Type*} [NormedAddCommGroup E]
+    [NormedSpace ℝ E] (ν : Measure ℝ) (C : ℝ≥0) (d : ℕ)
+    (hν : ∀ k : ℤ, ν (Icc (k : ℝ) (k + 1)) ≤ ENNReal.ofReal ((C : ℝ) * (1 + |(k : ℝ)|) ^ d))
+    (g : 𝓢(ℝ, E)) : Integrable g ν := by
+  let p : Seminorm ℝ 𝓢(ℝ, E) := (Finset.Iic (d + 2, 0)).sup
+    (fun m ↦ _root_.SchwartzMap.seminorm ℝ m.1 m.2)
+  have hb (x : ℝ) : (1 + |x|) ^ (d + 2) * ‖g x‖ ≤ 2 ^ (d + 2) * p g := by
+    simpa [p, Real.norm_eq_abs] using
+      _root_.SchwartzMap.one_add_le_sup_seminorm_apply (𝕜 := ℝ) (m := (d + 2, 0)) (n := 0)
+        le_rfl le_rfl g x
+  exact (integral_norm_le_of_polynomial_window_mass ν C d hν _ g.continuous.aestronglyMeasurable _
+    (mul_nonneg (by positivity) (apply_nonneg _ _)) hb).1
+
+/-- The regularized finite-Hecke critical-line density converges on every real Schwartz
+test to the sum of all central test moments with full analytic orders. A single eventual
+polynomial bound on its unit-window masses suffices. -/
+theorem tendsto_integral_criticalFiniteHeckeL_schwartz_of_window_bound (χ : PontryaginDual C𝔽)
+    (C : ℝ≥0) (d : ℕ)
+    (hwin : ∀ᶠ η : ℝ in 𝓝[>] 0, ∀ k : ℤ, (∫ t in Icc (k : ℝ) (k + 1), density(χ, η) t) ≤
+      (C : ℝ) * (1 + |(k : ℝ)|) ^ d) (g : 𝓢(ℝ, ℝ)) :
+    Summable (fun z : central(χ) ↦ (mult(χ, z) : ℝ) * |g z.val.im|) ∧
+    Tendsto (fun η : ℝ ↦ ∫ t, g t * density(χ, η) t) (𝓝[>] 0)
+      (𝓝 (∑' z : central(χ), (mult(χ, z) : ℝ) * g z.val.im)) := by
+  let ν := criticalHeckeZeroMeasure χ
+  let μ := criticalHeckeDensityMeasure χ
+  let D : ℝ≥0 := 3 * 2 ^ d * C
+  have hD : (D : ℝ) = 3 * 2 ^ d * (C : ℝ) := by simp [D]
+  have hC : (C : ℝ) ≤ D := by
+    rw [hD]
+    have hd : (1 : ℝ) ≤ 2 ^ d := one_le_pow₀ (by norm_num)
+    calc
+      _ = 1 * (C : ℝ) := (one_mul _).symm
+      _ ≤ _ := mul_le_mul_of_nonneg_right (by linarith) C.coe_nonneg
+  have hm : ∀ᶠ η : ℝ in 𝓝[>] 0, ∀ k : ℤ, μ η (Icc (k : ℝ) (k + 1)) ≤
+      ENNReal.ofReal ((C : ℝ) * (1 + |(k : ℝ)|) ^ d) := by
+    filter_upwards [hwin, self_mem_nhdsWithin] with η h hη k
+    exact (criticalHeckeDensityMeasure_window χ hη k).trans_le (ENNReal.ofReal_le_ofReal (h k))
+  have hcomp (f : 𝓢(ℝ, ℝ)) (hc : HasCompactSupport (f : ℝ → ℝ)) :=
+    criticalHeckeDensityMeasure_compact χ f f.continuous hc
+  have hn (k : ℤ) : ν (Icc (k : ℝ) (k + 1)) ≤ ENNReal.ofReal ((D : ℝ) * (1 + |(k : ℝ)|) ^ d) := by
+    rw [hD]
+    exact polynomial_window_mass_of_tendsto_compact _ μ ν C d hm hcomp k
+  have hi := integrable_schwartz_of_criticalWindow ν D d hn g
+  have hs := hasSum_criticalHeckeZeroMeasure χ g hi
+  simp only [smul_eq_mul] at hs
+  have habs := (show Integrable g (Measure.sum (fun z : central(χ) ↦
+    (mult(χ, z) : ℝ≥0∞) • Measure.dirac z.val.im)) from hi).summable_of_dirac
+  refine ⟨by simpa only [ENNReal.toReal_natCast, Real.norm_eq_abs] using habs, ?_⟩
+  rw [hs.tsum_eq]
+  have hlim := tendsto_integral_schwartz_of_polynomial_window_mass _ μ ν D d
+    (hm.mono fun η hh k ↦ (hh k).trans (ENNReal.ofReal_le_ofReal
+      (mul_le_mul_of_nonneg_right hC (by positivity)))) hn hcomp g
+  apply hlim.congr'
+  filter_upwards [self_mem_nhdsWithin (a := (0 : ℝ)) (s := Ioi 0)] with η hη
+  change (∫ t, g t ∂criticalHeckeDensityMeasure χ η) = _
+  rw [criticalHeckeDensityMeasure_pairing χ hη]
+  exact integral_congr_ae (ae_of_all _ fun t ↦ mul_comm _ _)
+
+/-- A smooth compactly supported log-profile gives precisely the centered Laplace moments
+of the complex central sites. The regularized integral uses only the real vertical trace. -/
+theorem tendsto_integral_criticalFiniteHeckeL_centeredLaplace_of_window_bound (χ : PontryaginDual C𝔽)
+    (C : ℝ≥0) (d : ℕ)
+    (hwin : ∀ᶠ η : ℝ in 𝓝[>] 0, ∀ k : ℤ, (∫ t in Icc (k : ℝ) (k + 1), density(χ, η) t) ≤
+      (C : ℝ) * (1 + |(k : ℝ)|) ^ d)
+    (H : ℝ → ℂ) (hH : ContDiff ℝ ∞ H) (hHc : HasCompactSupport H) :
+    Summable (fun z : central(χ) ↦ (mult(χ, z) : ℝ) * |(bilateralLaplace H (z.val - 1 / 2)).re|) ∧
+    Tendsto (fun η : ℝ ↦ ∫ t : ℝ, (bilateralLaplace H ((t : ℂ) * I)).re * density(χ, η) t)
+      (𝓝[>] 0) (𝓝 (∑' z : central(χ), (mult(χ, z) : ℝ) * (bilateralLaplace H (z.val - 1 / 2)).re)) := by
+  obtain ⟨g, hg⟩ := exists_realSchwartz_eq_bilateralLaplace_axis_re hHc hH
+  have hz (z : central(χ)) : (z.val.im : ℂ) * I = z.val - 1 / 2 := by
+    linear_combination criticalLine_rebuild z.val z.property.2
+  simpa only [hg, hz] using tendsto_integral_criticalFiniteHeckeL_schwartz_of_window_bound χ C d hwin g
+
+end CriticalSchwartzDensity
+
+section ActualHeckeWindows
+
+open Complex Filter MeasureTheory NumberField Set Topology
+open scoped NNReal
+
+local notation "cl(" t ")" => ((1 / 2 : ℂ) + ((t : ℝ) : ℂ) * I)
+local notation "W(" j ")" => Icc ((j : ℤ) : ℝ) ((j : ℝ) + 1)
+local notation "D(" χ ", " η ")" => analyticZeroDensity (criticalFiniteHeckeL χ) η
+
+/-- The density is nonnegative for all nonnegative regularization parameters. -/
+theorem criticalFiniteHeckeL_density_nonneg (χ : PontryaginDual C𝔽) {η : ℝ} (hη : 0 ≤ η) (t : ℝ) :
+    0 ≤ D(χ, η) t := by unfold analyticZeroDensity; positivity
+
+private theorem density_le_inverse_parameter (f : ℝ → ℂ) {η : ℝ} (hη : 0 < η) (t : ℝ) :
+    analyticZeroDensity f η t ≤ 1 / (Real.pi * η) := by
+  unfold analyticZeroDensity
+  apply div_le_of_le_mul₀ (by positivity) (by positivity)
+  calc
+    _ = 1 / (Real.pi * η) * (η ^ 2 * ‖deriv f t‖ ^ 2) := by
+      field_simp [Real.pi_ne_zero, hη.ne']
+    _ ≤ _ := mul_le_mul_of_nonneg_left (le_add_of_nonneg_left (sq_nonneg _)) (by positivity)
+
+private theorem criticalDensity_integrableOn (χ : PontryaginDual C𝔽) {η : ℝ} (hη : 0 < η) (j : ℤ) :
+    IntegrableOn D(χ, η) W(j) := by
+  have hc : IntegrableOn (fun _ : ℝ ↦ 1 / (Real.pi * η)) W(j) := integrableOn_const (by simp)
+  apply hc.mono' (criticalFiniteHeckeL_density_measurable χ η).aestronglyMeasurable
+  filter_upwards with t
+  rw [Real.norm_of_nonneg (criticalFiniteHeckeL_density_nonneg χ hη.le t)]
+  exact density_le_inverse_parameter _ hη t
+
+private theorem density_eq_regularizedSquare {f : ℝ → ℂ} {η t : ℝ} (ht : f t ≠ 0) :
+    analyticZeroDensity f η t = Real.pi⁻¹ *
+      (η * (‖deriv f t‖ / ‖f t‖) ^ 2 / (1 + η ^ 2 * (‖deriv f t‖ / ‖f t‖) ^ 2)) := by
+  have ha : 0 < ‖f t‖ := norm_pos_iff.mpr ht
+  have hb : 0 < ‖f t‖ ^ 2 + η ^ 2 * ‖deriv f t‖ ^ 2 := by positivity
+  have hc : 0 < 1 + η ^ 2 * (‖deriv f t‖ / ‖f t‖) ^ 2 := by positivity
+  unfold analyticZeroDensity
+  field_simp [Real.pi_ne_zero, ha.ne', hb.ne', hc.ne']
+
+private theorem criticalRelativeDerivative (χ : PontryaginDual C𝔽) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (he : ∀ z : {z : ℂ // 1 < z.re}, L z = finiteHeckeL χ z)
+    (t : ℝ) (hn : L ⟨1 / 2, t⟩ ≠ 0) :
+    criticalFiniteHeckeL χ t ≠ 0 ∧
+      ‖deriv (criticalFiniteHeckeL χ) t‖ / ‖criticalFiniteHeckeL χ t‖ = ‖logDeriv L ⟨1 / 2, t⟩‖ := by
+  have hcl : cl(t) = (⟨1 / 2, t⟩ : ℂ) := by
+    apply Complex.ext <;> norm_num [Complex.mul_re, Complex.mul_im]
+  rw [← hcl] at hn ⊢
+  have hnf := hL (mem_univ cl(t))
+  have ha := hnf.meromorphicOrderAt_nonneg_iff_analyticAt.mp
+    (hnf.meromorphicOrderAt_eq_zero_iff.mpr hn).ge
+  have hp : HasDerivAt (fun u : ℝ ↦ cl(u)) I t := by
+    simpa using ((Complex.ofRealCLM.hasDerivAt (x := t)).mul_const I).const_add (1 / 2 : ℂ)
+  have hd := ha.differentiableAt.hasDerivAt.scomp (h := fun u : ℝ ↦ cl(u)) t hp
+  rw [criticalFiniteHeckeL_eq_continuation χ L hL he]
+  refine ⟨hn, ?_⟩
+  change ‖deriv (L ∘ (fun u : ℝ ↦ cl(u))) t‖ / ‖L cl(t)‖ = _
+  rw [hd.deriv, logDeriv_apply, norm_div]
+  simp [smul_eq_mul]
+
+private theorem criticalDensity_high_windows (χ : PontryaginDual C𝔽) :
+    ∃ A > (0 : ℝ), ∃ J > (0 : ℝ), ∀ j : ℤ, J ≤ |(j : ℝ)| →
+      ∀ η : ℝ, 0 < η → η ≤ 1 →
+        ∫ t in W(j), D(χ, η) t ≤ A * (1 + |(j : ℝ)|) ^ 2 := by
+  classical
+  obtain ⟨L, hL, he⟩ := finiteHeckeL_exists_continuation χ
+  obtain ⟨C, hC, J, hJ, hwindow⟩ := finiteHeckeL_continuation_highHeight_unitWindow_logDeriv χ L hL he
+  let A := Real.pi⁻¹ * (4 + 2 * Real.pi) * C ^ 2
+  refine ⟨A, by dsimp [A]; positivity, J, hJ, ?_⟩
+  intro j hj η hη hη'
+  obtain ⟨_, _, S, _, horder, hmass, _, hrect⟩ := hwindow (j : ℝ) hj
+  let f := criticalFiniteHeckeL χ
+  let q (t : ℝ) := ‖deriv f t‖ / ‖f t‖
+  let m := analyticOrderNatAt L
+  let B := C * Real.log (2 + |(j : ℝ)|)
+  have hf : Continuous f := continuous_iff_continuousAt.mpr fun t ↦
+    (criticalFiniteHeckeL_order χ t).1.continuousAt
+  have hd : Continuous (deriv f) := continuous_iff_continuousAt.mpr fun t ↦
+    (criticalFiniteHeckeL_order χ t).1.deriv.continuousAt
+  have hq : Measurable q := hd.measurable.norm.div hf.measurable.norm
+  have hgood : ∀ᵐ t ∂volume.restrict W(j), f t ≠ 0 ∧ 0 ≤ q t ∧
+      q t ≤ B + ∑ ρ ∈ S, (m ρ : ℝ) / |t - ρ.im| := by
+    have hne : ∀ᵐ t ∂volume.restrict W(j), ∀ ρ ∈ S, t ≠ ρ.im :=
+      S.eventually_all.mpr (fun ρ _ ↦ ae_restrict_of_ae (volume.ae_ne ρ.im))
+    filter_upwards [ae_restrict_mem (μ := volume) measurableSet_Icc, hne] with t ht ha
+    have hz := (hrect (1 / 2) ⟨le_rfl, by norm_num⟩ t ht ha).2
+    have hder := criticalRelativeDerivative χ L hL he t hz.1
+    exact ⟨hder.1, div_nonneg (norm_nonneg _) (norm_nonneg _), hder.2.le.trans hz.2⟩
+  have hraw := integral_regularizedSquare_Icc_le_uniform S Complex.im m (j : ℝ) B η hη hη' q
+    hq.aemeasurable (hgood.mono fun _ ht ↦ ht.2)
+  have heq : (∫ t in W(j), D(χ, η) t) =
+      Real.pi⁻¹ * ∫ t in W(j), η * (q t) ^ 2 / (1 + η ^ 2 * (q t) ^ 2) := by
+    rw [← integral_const_mul]
+    exact integral_congr_ae (hgood.mono fun _ ht ↦ density_eq_regularizedSquare ht.1)
+  have hcard : (S.card : ℝ) ≤ ∑ ρ ∈ S, (m ρ : ℝ) := by
+    calc
+      _ = ∑ _ρ ∈ S, (1 : ℝ) := by simp
+      _ ≤ _ := Finset.sum_le_sum fun ρ hρ ↦ by exact_mod_cast (horder ρ hρ).1
+  have hB₀ : 0 ≤ B := (Finset.sum_nonneg fun ρ (_ : ρ ∈ S) ↦ (Nat.cast_nonneg (m ρ) : (0 : ℝ) ≤ _)).trans hmass
+  have hprod := mul_le_mul hmass (hcard.trans hmass) (Nat.cast_nonneg S.card) hB₀
+  have hrhs : 4 * B ^ 2 + 2 * Real.pi * (∑ ρ ∈ S, (m ρ : ℝ)) * S.card ≤
+      (4 + 2 * Real.pi) * B ^ 2 := by
+    nlinarith only [mul_le_mul_of_nonneg_left hprod (by positivity : (0 : ℝ) ≤ 2 * Real.pi)]
+  have hlog : Real.log (2 + |(j : ℝ)|) ≤ 1 + |(j : ℝ)| := by
+    linarith [Real.log_le_sub_one_of_pos (by positivity : 0 < 2 + |(j : ℝ)|)]
+  have hbig := pow_le_pow_left₀ hB₀ (mul_le_mul_of_nonneg_left hlog hC.le) 2
+  calc
+    _ = _ := heq
+    _ ≤ Real.pi⁻¹ * ((4 + 2 * Real.pi) * B ^ 2) :=
+      mul_le_mul_of_nonneg_left (hraw.trans hrhs) (by positivity)
+    _ ≤ Real.pi⁻¹ * ((4 + 2 * Real.pi) * (C * (1 + |(j : ℝ)|)) ^ 2) :=
+      mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_left hbig (by positivity)) (by positivity)
+    _ = _ := by dsimp [A]; ring
+
+private theorem criticalDensity_bounded_windows (χ : PontryaginDual C𝔽) {J : ℝ} (hJ : 0 < J) :
+    ∃ M > (0 : ℝ), ∀ j : ℤ, |(j : ℝ)| < J → ∀ η : ℝ, 0 < η → ∫ t in W(j), D(χ, η) t ≤ M := by
+  let b : ContDiffBump (0 : ℝ) := ⟨J + 1, J + 2, by linarith, by linarith⟩
+  have hone (j : ℤ) (hj : |(j : ℝ)| < J) (t : ℝ) (ht : t ∈ W(j)) : b t = 1 := by
+    apply b.one_of_mem_closedBall
+    change |t - 0| ≤ J + 1
+    rw [sub_zero]
+    obtain ⟨hleft, hright⟩ := abs_lt.mp hj
+    exact abs_le.mpr ⟨by linarith [ht.1], by linarith [ht.2]⟩
+  have hbi (η : ℝ) (hη : 0 < η) : Integrable (fun t ↦ b t * D(χ, η) t) := by
+    apply ((b.continuous.integrable_of_hasCompactSupport b.hasCompactSupport).mul_const
+      (1 / (Real.pi * η))).mono' (b.continuous.measurable.mul
+        (criticalFiniteHeckeL_density_measurable χ η)).aestronglyMeasurable
+    filter_upwards with t
+    change ‖b t * D(χ, η) t‖ ≤ b t * (1 / (Real.pi * η))
+    rw [Real.norm_of_nonneg (mul_nonneg (b.nonneg' t) (criticalFiniteHeckeL_density_nonneg χ hη.le t))]
+    exact mul_le_mul_of_nonneg_left (density_le_inverse_parameter _ hη t) (b.nonneg' t)
+  have htest (j : ℤ) (hj : |(j : ℝ)| < J) (η : ℝ) (hη : 0 < η) :
+      ∫ t in W(j), D(χ, η) t ≤ ∫ t, b t * D(χ, η) t := by
+    calc
+      _ = ∫ t in W(j), b t * D(χ, η) t := by
+        apply setIntegral_congr_fun measurableSet_Icc
+        intro t ht
+        change D(χ, η) t = b t * D(χ, η) t
+        rw [hone j hj t ht, one_mul]
+      _ ≤ _ := setIntegral_le_integral (hbi η hη) (ae_of_all _ fun t ↦
+        mul_nonneg (b.nonneg' t) (criticalFiniteHeckeL_density_nonneg χ hη.le t))
+  obtain ⟨M, hM⟩ : ∃ M : ℝ, ∀ᶠ η : ℝ in 𝓝[>] 0, (∫ t, b t * D(χ, η) t) ≤ M := by
+    have hlim := tendsto_integral_criticalFiniteHeckeL χ b.continuous b.hasCompactSupport
+    exact ⟨_, hlim.eventually_le_const (lt_add_one _)⟩
+  obtain ⟨δ, hδ, hsmall⟩ := (nhdsGT_basis (0 : ℝ)).eventually_iff.mp hM
+  refine ⟨max M (1 / (Real.pi * δ)), (by positivity : 0 < 1 / (Real.pi * δ)).trans_le
+    (le_max_right _ _), ?_⟩
+  intro j hj η hη
+  by_cases hs : η < δ
+  · exact (htest j hj η hη).trans ((hsmall ⟨hη, hs⟩).trans (le_max_left _ _))
+  · apply le_trans _ (le_max_right _ _)
+    have hc : IntegrableOn (fun _ : ℝ ↦ 1 / (Real.pi * η)) W(j) := integrableOn_const (by simp)
+    calc
+      _ ≤ ∫ _t in W(j), 1 / (Real.pi * η) := integral_mono (criticalDensity_integrableOn χ hη j) hc
+        (density_le_inverse_parameter _ hη)
+      _ = 1 / (Real.pi * η) := by simp [measureReal_def, Real.volume_Icc]
+      _ ≤ _ := one_div_le_one_div_of_le (mul_pos Real.pi_pos hδ)
+        (mul_le_mul_of_nonneg_left (le_of_not_gt hs) Real.pi_pos.le)
+
+/-- One quadratic bound controls the regularized finite Hecke density on every
+integer unit window simultaneously for every parameter in `(0, 1]`. -/
+theorem criticalFiniteHeckeL_polynomial_window_mass (χ : PontryaginDual C𝔽) :
+    ∃ C : ℝ≥0, ∀ η : ℝ, 0 < η → η ≤ 1 → ∀ j : ℤ,
+      IntegrableOn D(χ, η) W(j) ∧
+        ∫ t in W(j), D(χ, η) t ≤ (C : ℝ) * (1 + |(j : ℝ)|) ^ 2 := by
+  obtain ⟨A, hA, J, hJ, hhigh⟩ := criticalDensity_high_windows χ
+  obtain ⟨M, hM, hlow⟩ := criticalDensity_bounded_windows χ hJ
+  refine ⟨⟨max A M, hA.le.trans (le_max_left _ _)⟩, fun η hη hη' j ↦
+    ⟨criticalDensity_integrableOn χ hη j, ?_⟩⟩
+  change _ ≤ max A M * (1 + |(j : ℝ)|) ^ 2
+  by_cases hj : J ≤ |(j : ℝ)|
+  · exact (hhigh j hj η hη hη').trans (mul_le_mul_of_nonneg_right (le_max_left _ _) (sq_nonneg _))
+  · apply (hlow j (lt_of_not_ge hj) η hη).trans
+    have hOne := one_le_pow₀ (show 1 ≤ 1 + |(j : ℝ)| by linarith [abs_nonneg (j : ℝ)]) (n := 2)
+    exact (le_max_right A M).trans (le_mul_of_one_le_right (hM.le.trans (le_max_right _ _)) hOne)
+
+/-- The simultaneous window bound in the form used to extend compact-test
+convergence to Schwartz tests by polynomial mass control. -/
+theorem criticalFiniteHeckeL_eventually_polynomial_window_mass (χ : PontryaginDual C𝔽) :
+    ∃ C : ℝ≥0, ∀ᶠ η : ℝ in 𝓝[>] 0, ∀ j : ℤ, IntegrableOn D(χ, η) W(j) ∧
+      ∫ t in W(j), D(χ, η) t ≤ (C : ℝ) * (1 + |(j : ℝ)|) ^ 2 := by
+  obtain ⟨C, hC⟩ := criticalFiniteHeckeL_polynomial_window_mass χ
+  refine ⟨C, ?_⟩
+  have hnear : Tendsto (fun η : ℝ ↦ η) (𝓝[>] 0) (𝓝 0) := tendsto_id.mono_left nhdsWithin_le_nhds
+  have hpos : ∀ᶠ η : ℝ in 𝓝[>] 0, 0 < η := self_mem_nhdsWithin
+  filter_upwards [hpos, hnear.eventually_le_const (by norm_num : (0 : ℝ) < 1)] with η hη hη'
+  exact hC η hη hη'
+
+end ActualHeckeWindows
+
+section CriticalSchwartzLimits
+
+open Complex Filter MeasureTheory NumberField Set Topology
+open scoped _root_.SchwartzMap ContDiff
+
+local notation "ord(" χ ", " z ")" => MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ z
+local notation "central(" χ ")" => {z : ℂ // 0 < ord(χ, z) ∧ Complex.re z = 1 / 2}
+local notation "mult(" χ ", " z ")" => Int.toNat (ord(χ, (z : ℂ)))
+local notation "density(" χ ", " η ")" => analyticZeroDensity (criticalFiniteHeckeL χ) η
+
+/-- For every Hecke character, the whole-line regularized integral recovers the
+absolutely summable central moments of every real Schwartz test. -/
+theorem tendsto_integral_criticalFiniteHeckeL_schwartz (χ : PontryaginDual C𝔽) (g : 𝓢(ℝ, ℝ)) :
+    Summable (fun z : central(χ) ↦ (mult(χ, z) : ℝ) * |g z.val.im|) ∧
+    Tendsto (fun η : ℝ ↦ ∫ t, g t * density(χ, η) t) (𝓝[>] 0)
+      (𝓝 (∑' z : central(χ), (mult(χ, z) : ℝ) * g z.val.im)) := by
+  obtain ⟨C, hC⟩ := criticalFiniteHeckeL_eventually_polynomial_window_mass χ
+  exact tendsto_integral_criticalFiniteHeckeL_schwartz_of_window_bound χ C 2
+    (hC.mono fun _ hk k ↦ (hk k).2) g
+
+/-- On a smooth compactly supported log-profile the regularized finite-Hecke density
+recovers the full central real moments of its centered bilateral Laplace transform. -/
+theorem tendsto_integral_criticalFiniteHeckeL_centeredLaplace (χ : PontryaginDual C𝔽)
+    (H : ℝ → ℂ) (hH : ContDiff ℝ ∞ H) (hHc : HasCompactSupport H) :
+    Summable (fun z : central(χ) ↦ (mult(χ, z) : ℝ) * |(bilateralLaplace H (z.val - 1 / 2)).re|) ∧
+    Tendsto (fun η : ℝ ↦ ∫ t : ℝ, (bilateralLaplace H ((t : ℂ) * I)).re * density(χ, η) t)
+      (𝓝[>] 0) (𝓝 (∑' z : central(χ), (mult(χ, z) : ℝ) * (bilateralLaplace H (z.val - 1 / 2)).re)) := by
+  obtain ⟨C, hC⟩ := criticalFiniteHeckeL_eventually_polynomial_window_mass χ
+  exact tendsto_integral_criticalFiniteHeckeL_centeredLaplace_of_window_bound χ C 2
+    (hC.mono fun _ hk k ↦ (hk k).2) H hH hHc
+
+end CriticalSchwartzLimits
+
+section CriticalHeckeLattice
+
+open Complex Filter Metric Topology
+open RiemannMasullo.AnalyticLattice
+open scoped _root_.SchwartzMap
+
+local notation "cl(" t ")" => ((1 / 2 : ℂ) + ((t : ℝ) : ℂ) * I)
+local notation "ord(" χ ", " z ")" =>
+  MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ z
+local notation "central(" χ ")" => {z : ℂ // 0 < ord(χ, z) ∧ Complex.re z = 1 / 2}
+
+/-- The logarithmic window estimate for the finite Hecke continuation bounds the actual
+normalized count of strict consecutive-value comparisons in each high integer bin. -/
+theorem criticalFiniteHeckeL_high_bin_count (χ : PontryaginDual C𝔽) :
+    ∃ C > (0 : ℝ), ∃ J > (0 : ℝ), ∀ j : ℤ, J ≤ |(j : ℝ)| → ∀ n : ℕ, 0 < n →
+      ((binIndices (criticalFiniteHeckeL χ) j n).card : ℝ) / n ≤
+        13 * (C * Real.log (2 + |(j : ℝ)|) + 1) ^ 2 := by
+  let L := (finiteHeckeL_exists_continuation χ).choose
+  obtain ⟨hL, he⟩ := (finiteHeckeL_exists_continuation χ).choose_spec
+  have hfinite := criticalFiniteHeckeL_eq_continuation χ L hL he
+  obtain ⟨C, hC, J, hJ, hrect⟩ := finiteHeckeL_continuation_highHeight_unitWindow_logDeriv χ L hL he
+  refine ⟨C, hC, J, hJ, ?_⟩
+  intro j hj n hn
+  obtain ⟨hA, _, S, _, horders, hmass, _, hw⟩ := hrect j hj
+  apply bin_count_le_of_logDeriv S (analyticOrderNatAt L) Complex.im
+    (mul_nonneg hC.le (Real.log_nonneg (by linarith [abs_nonneg (j : ℝ)])))
+    (fun z hz ↦ (horders z hz).1) hmass j _ n hn
+  intro t ht hne
+  obtain ⟨_, hval, hder⟩ := hw (1 / 2 : ℝ) ⟨le_rfl, by norm_num⟩ t ht hne
+  have hm : cl(t) = (⟨1 / 2, t⟩ : ℂ) := by apply Complex.ext <;> simp
+  have hzin : cl(t) ∈ closedBall (⟨2, (j : ℝ) + 1 / 2⟩ : ℂ) 4 := by
+    rw [mem_closedBall, dist_eq_norm, hm]
+    apply (Complex.norm_le_abs_re_add_abs_im _).trans
+    change |1 / 2 - 2| + |t - ((j : ℝ) + 1 / 2)| ≤ 4
+    have hbound : |t - ((j : ℝ) + 1 / 2)| ≤ 1 / 2 := abs_le.mpr ⟨by linarith [ht.1], by linarith [ht.2]⟩
+    norm_num
+    linarith
+  have hp : HasDerivAt (fun u : ℝ ↦ cl(u)) I t := by
+    simpa using ((Complex.ofRealCLM.hasDerivAt (x := t)).mul_const I).const_add (1 / 2 : ℂ)
+  have hd := (hA _ hzin).differentiableAt.hasDerivAt.scomp (h := fun u : ℝ ↦ cl(u)) t hp
+  rw [hfinite]
+  refine ⟨by change L cl(t) ≠ 0; rw [hm]; exact hval, hd.differentiableAt, ?_⟩
+  change ‖deriv (L ∘ fun u : ℝ ↦ cl(u)) t‖ / ‖L cl(t)‖ ≤ _
+  rw [hd.deriv, hm]
+  simpa [logDeriv, smul_eq_mul, norm_div] using hder
+
+/-- The compact strict lattice probe of the finite Hecke function recovers the occupied
+critical-line divisor with its full orders. -/
+theorem tendsto_sampleSum_criticalFiniteHeckeL_compact (χ : PontryaginDual C𝔽) {g : ℝ → ℝ}
+    (hg : Continuous g) (hgc : HasCompactSupport g) :
+    Tendsto (sampleSum (criticalFiniteHeckeL χ) g) atTop
+      (𝓝 (∑' z : central(χ), ((ord(χ, z.val)).toNat : ℝ) * g z.val.im)) := by
+  classical
+  let f := criticalFiniteHeckeL χ
+  let C := {z : ℂ // 0 < ord(χ,z) ∧ z.re = 1/2}
+  have hlocal (t : ℝ) := criticalFiniteHeckeL_order χ t
+  have hfin (t : ℝ) : analyticOrderAt f t ≠ ⊤ := fun ht ↦ (hlocal t).2.1 (analyticOrderAt_eq_top.mp ht)
+  have hlim := tendsto_sampleSum (f := f) hg hgc (fun t _ ↦ (hlocal t).1) (fun t _ ↦ hfin t)
+  have hsum := critical_zero_moments_eq χ g
+  change Tendsto (sampleSum f g) atTop (𝓝 (∑' z : C, ((ord(χ, z.val)).toNat : ℝ) * g z.val.im))
+  rw [← hsum]
+  exact hlim
+
+/-- The finite Hecke continuation's strict lattice probe converges against every real
+Schwartz function to the genuine completed central divisor, including all multiplicities. -/
+theorem tendsto_sampleSum_criticalFiniteHeckeL (χ : PontryaginDual C𝔽) (g : 𝓢(ℝ, ℝ)) :
+    Tendsto (sampleSum (criticalFiniteHeckeL χ) g) atTop
+      (𝓝 (∑' z : central(χ), ((ord(χ, z.val)).toNat : ℝ) * g z.val.im)) := by
+  classical
+  let Z := {z : ℂ // 0 < ord(χ, z)}
+  let e (z : central(χ)) : Z := ⟨z.val, z.2.1⟩
+  have he : Function.Injective e := fun _ _ h ↦ Subtype.ext (congrArg (fun z : Z ↦ z.val) h)
+  have hZ : Summable (fun z : Z ↦ (ord(χ, z.val) : ℝ) / (1 + |z.val.im|) ^ 2) := by
+    simpa only [explicitFormulaCompletedHeckeL, continuedCompletedHeckeL] using
+      explicitFormulaCompletedHeckeL_summable_divisor_div_sq χ
+  have hc : Summable (fun z : central(χ) ↦ ((ord(χ, z.val)).toNat : ℝ) / (1 + |z.val.im|)^2) := by
+    apply (hZ.comp_injective he).congr
+    intro z
+    change (ord(χ, z.val) : ℝ) / _ = _
+    have hcast : ((ord(χ, z.val)).toNat : ℝ) = (ord(χ, z.val) : ℝ) := by
+      exact_mod_cast Int.toNat_of_nonneg z.2.1.le
+    rw [hcast]
+  obtain ⟨C, hC, J, hJ, hhigh⟩ := criticalFiniteHeckeL_high_bin_count χ
+  apply tendsto_sampleSum_schwartz (criticalFiniteHeckeL χ) (fun z : central(χ) ↦ z.val.im)
+    (fun z ↦ ((ord(χ, z.val)).toNat : ℝ)) (fun _ ↦ Nat.cast_nonneg _) hc
+    (fun _ ↦ tendsto_sampleSum_criticalFiniteHeckeL_compact χ)
+    (C := 13 * (C + 1)^2) (J := J) (by positivity) _ g
+  intro j hj n hn
+  have hl : Real.log (2 + |(j : ℝ)|) ≤ 1 + |(j : ℝ)| := by
+    linarith [Real.log_le_sub_one_of_pos (show 0 < 2 + |(j : ℝ)| by positivity)]
+  have hlog : 0 ≤ Real.log (2 + |(j : ℝ)|) := Real.log_nonneg (by linarith [abs_nonneg (j : ℝ)])
+  have hsize : C * Real.log (2 + |(j : ℝ)|) + 1 ≤ (C+1) * (1+|(j : ℝ)|) := by
+    nlinarith [mul_le_mul_of_nonneg_left hl hC.le, abs_nonneg (j : ℝ)]
+  calc
+    _ ≤ _ := hhigh j hj n hn
+    _ ≤ 13 * ((C+1) * (1+|(j : ℝ)|))^2 :=
+      mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (by positivity) hsize 2) (by norm_num)
+    _ = _ := by ring
+
+/-- The normalized character's chosen continuation is sampled directly at the prescribed
+critical-line points on every mesh. -/
+theorem tendsto_sampleSum_chosenFiniteHeckeL
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (χ : {χ : PontryaginDual C𝔽 // ∀ a : ℝ≥0ˣ, χ (τ a) = 1})
+    (g : 𝓢(ℝ, ℝ)) :
+    let L := (finiteHeckeL_exists_continuation χ.val).choose
+    Tendsto (sampleSum (fun t : ℝ ↦ L cl(t)) g) atTop
+      (𝓝 (∑' z : central(χ.val), ((ord(χ.val, z.val)).toNat : ℝ) * g z.val.im)) := by
+  let L := (finiteHeckeL_exists_continuation χ.val).choose
+  have hL := (finiteHeckeL_exists_continuation χ.val).choose_spec
+  change Tendsto (sampleSum (fun t : ℝ ↦ L cl(t)) g) atTop _
+  rw [← criticalFiniteHeckeL_eq_continuation χ.val L hL.1 hL.2]
+  exact tendsto_sampleSum_criticalFiniteHeckeL χ.val g
+
+end CriticalHeckeLattice
+
+namespace OutputOrderGeometry
+
+open Complex Filter Function IsDedekindDomain
+open scoped ContDiff NNReal NumberField.AdeleRing Topology
+
+set_option quotPrecheck false
+
+attribute [local instance] instSpectralQuotientPolynormableSec3 instFiniteCompletionUnitsLocallyCompactSec4b
+
+local notation "ord(" χ ", " z ")" => MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ z
+local notation "Chars(" τ ")" => {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1}
+local notation "Sites(" χ ")" => {z : ℂ // 0 < ord(χ,z)}
+local notation "M(" φ ", " χ ", " z ")" => modulatedFourierMellin m𝔽 univ
+  ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ μ𝔽 (φ : BruhatCompactSupport C𝔽).val
+  (ideleClassNormTwist (F := F) χ ((z : ℂ) - 1/2))
+local notation "m(" χ ", " z ")" => (ord(χ,(z : ℂ))).toNat
+local notation "v(" φ ", " χ ", " z ")" => (M(φ,χ,z)).re
+local notation "central(" z ")" => ((z : ℂ).re = 1/2)
+local notation "E(" χ ", " φ ")" =>
+  (∑' z : Sites(χ), if ¬ central(z) then (m(χ,z) : ℝ) * v(φ,χ,z) else 0)
+local notation "volC" => (((normOneIdeleClassTamagawaMeasure F) univ).toReal : ℂ)
+local notation "Arch" => ((w : InfinitePlace F) → BruhatCompactSupport w.Completionˣ)
+local notation "archClass(" w ")" => IdeleClassGroup.ofCompletion (𝓞 F) F w
+local notation "ext(" τ ", " α ")" => {p : Chars(τ) × ℂ //
+  0 < ord(p.1.val,p.2) ∧ α ≤ |p.2.re-1/2|}
+local notation "target(" τ ")" => (∀ (α : ℝ), 0 < α → ∀ f : BruhatCompactSupport C𝔽,
+  (∀ g : C₁, f.val g = 0) → HasSum (fun p : ext(τ,α) ↦
+    ((ord(p.val.1.val,p.val.2) : ℤ) : ℂ)*M(f,p.val.1.val,p.val.2)) 0)
+local notation "T(" χ ", " A ")" => ((normOneIdeleClassTamagawaMeasure F) univ).toReal *
+  ((∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (A w)).re -
+    primeFreeProfile 0 * heckeLogDiscriminantConductor (F := F) χ)
+
+local notation "centralMass(" χ ", " g ")" =>
+  (∑' z : {z : ℂ // 0 < ord(χ,z) ∧ z.re = 1/2},
+    ((ord(χ,z.val)).toNat : ℝ) * (g : ℝ → ℝ) z.val.im)
+local notation "archTarget(" χ ", " A ")" =>
+  (primeFreeProfile 0 * heckeLogDiscriminantConductor (F := F) χ -
+    (∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w ((A : Arch) w)).re)
+local notation "axisWeight" => (fun t : ℝ ↦
+  (bilateralLaplace (fun x ↦ (primeFreeProfile x : ℂ)) ((t : ℂ)*I)).re)
+
+/-- Reindex the real Mellin mass on the central line to its actual complex divisor
+sites. At the selected profile its common volume factor is the norm-one volume. -/
+private theorem central_sum_eq_volume_mul (χ : PontryaginDual C𝔽) (φ : BruhatCompactSupport C𝔽)
+    (hM : ∀ z : ℂ, M(φ,χ,z) = volC * bilateralLaplace
+      (fun x ↦ (primeFreeProfile x : ℂ)) (z-1/2)) :
+    (∑' z : Sites(χ), if central(z) then (m(χ,z):ℝ)*v(φ,χ,z) else 0) =
+      ((normOneIdeleClassTamagawaMeasure F) univ).toReal * centralMass(χ,axisWeight) := by
+  classical
+  let W (z : Sites(χ)) := (m(χ,z):ℝ)*v(φ,χ,z)
+  let s : Set (Sites(χ)) := {z | central(z)}
+  let C := {z : ℂ // 0 < ord(χ,z) ∧ z.re = 1/2}
+  let e : s ≃ C :=
+    { toFun := fun z ↦ ⟨z.val.val,z.val.property,z.property⟩
+      invFun := fun z ↦ ⟨⟨z.val,z.property.1⟩,z.property.2⟩
+      left_inv := fun _ ↦ rfl
+      right_inv := fun _ ↦ rfl }
+  let vF := ((normOneIdeleClassTamagawaMeasure F) univ).toReal
+  let G (z : C) := vF * (((ord(χ,z.val)).toNat : ℝ) * axisWeight z.val.im)
+  have hsub : (∑' z : Sites(χ), if central(z) then W z else 0) = ∑' z : s, W z.val := by
+    rw [tsum_subtype]
+    apply tsum_congr
+    intro z
+    by_cases h : central(z) <;> simp [Set.indicator_apply,s,h]
+  calc
+    _ = ∑' z : s, W z.val := hsub
+    _ = ∑' z : s, G (e z) := by
+      apply tsum_congr
+      intro z
+      have hz : z.val.val - 1/2 = ((z.val.val.im : ℝ):ℂ)*I := by
+        apply Complex.ext
+        · change z.val.val.re - (1/2 : ℂ).re = _
+          simp [show z.val.val.re = 1/2 from z.property,Complex.mul_re]
+        · simp [Complex.mul_im]
+      change (m(χ,z.val):ℝ) * v(φ,χ,z.val) =
+        vF * ((m(χ,z.val):ℝ) * axisWeight z.val.val.im)
+      rw [hM,hz,Complex.re_ofReal_mul]
+      ring
+    _ = ∑' z : C, G z := e.tsum_eq G
+    _ = _ := tsum_mul_left
+
+/-- For the short radial test the full archimedean and conductor scalar dominates
+the total mass of the positive central divisor. Equality detects all omitted sites. -/
+theorem exists_shortArch_centralMass_iff (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (χ : Chars(τ)) :
+    ∃ A : Arch, (∀ (w : InfinitePlace F) (u : w.Completionˣ), (A w).val u =
+      (χ.val⁻¹ (archClass(w) u) : ℂ) * (primeFreeProfile (logIdeleClassNorm F (archClass(w) u)) : ℂ)) ∧
+      centralMass(χ.val,axisWeight) ≤ archTarget(χ.val,A) ∧
+      (archTarget(χ.val,A) ≤ centralMass(χ.val,axisWeight) ↔
+        ∀ z : Sites(χ.val), central(z)) := by
+  classical
+  obtain ⟨U,hU,hB⟩ := exists_measurable_ideleClassDPrimeSequence F
+  obtain ⟨φ,A,B,h,hterminal,htlim⟩ := exists_centeredProbe_archConductor_iff_central τ hτ χ U hU hB
+  obtain ⟨hφ,_,_,_,hM,hpos,hA,_,_,_,hmass,_,_⟩ := h
+  refine ⟨A,fun w u ↦ (hA w u).trans (hφ _),?_⟩
+  let vF := ((normOneIdeleClassTamagawaMeasure F) univ).toReal
+  have hv : 0 < vF := CenterGeometry.normOneVolume_pos (F := F)
+  let n (z : Sites(χ.val)) := m(χ.val,z)
+  let W (z : Sites(χ.val)) := v(φ,χ.val,z)
+  let P (z : Sites(χ.val)) := central(z)
+  have hs : Summable (fun z : Sites(χ.val) ↦ (n z:ℝ)*|W z|) :=
+    summable_heckeRealMoments_fullOrder (F := F) τ hτ χ φ
+  have hn (z : Sites(χ.val)) : 0 < n z := by
+    have hz := z.property
+    change 0 < (ord(χ.val,z.val)).toNat
+    omega
+  have hE : E(χ.val,φ) = 0 ↔ ∀ z : Sites(χ.val), central(z) :=
+    exterior_zero_iff P n W hs hn hpos
+  have hnon : 0 ≤ E(χ.val,φ) := tsum_nonneg (fun z : Sites(χ.val) ↦
+    ite_nonneg (mul_nonneg (Nat.cast_nonneg _) (hpos z).le) le_rfl)
+  have hsplit := full_split P n W hs
+  have heq := central_sum_eq_volume_mul χ.val φ hM
+  have htotal : vF * archTarget(χ.val,A) =
+      vF * centralMass(χ.val,axisWeight) + E(χ.val,φ) := by
+    calc
+      _ = -T(χ.val,A) := by dsimp only [vF]; ring
+      _ = _ := hmass
+      _ = _ := by simpa only [P,n,W,heq] using hsplit
+  refine ⟨(mul_le_mul_iff_right₀ hv).mp (by linarith), ?_⟩
+  rw [← hE]
+  constructor
+  · intro h
+    have h' := mul_le_mul_of_nonneg_left h hv.le
+    linarith
+  · intro h
+    exact (mul_le_mul_iff_right₀ hv).mp (by linarith)
+
+
+local notation "densityIntegrand(" χ ", " η ")" => (fun t : ℝ ↦ axisWeight t *
+  analyticZeroDensity (criticalFiniteHeckeL (F := F) χ) η t)
+local notation "measurement(" χ ")" =>
+  (limUnder (𝓝[>] (0 : ℝ)) (fun η : ℝ ↦ ∫ t, densityIntegrand(χ,η) t))
+
+private theorem shortCriticalDensity_limits (χ : PontryaginDual C𝔽) :
+    (∀ η : ℝ, 0 < η → Integrable densityIntegrand(χ,η)) ∧
+    Tendsto (fun η : ℝ ↦ ∫ t, densityIntegrand(χ,η) t) (𝓝[>] 0)
+      (𝓝 centralMass(χ,axisWeight)) := by
+  obtain ⟨hH,hHc,_,_,_,_,_,_⟩ := primeFreeProfile_properties
+  let G (x : ℝ) : ℂ := primeFreeProfile x
+  have hs : ContDiff ℝ (∞) G := Complex.ofRealCLM.contDiff.comp hH
+  have hc : HasCompactSupport G := hHc.comp_left Complex.ofReal_zero
+  have hlim := (tendsto_integral_criticalFiniteHeckeL_centeredLaplace χ G hs hc).2
+  have hpoint (z : {z : ℂ // 0 < ord(χ,z) ∧ z.re = 1/2}) :
+      z.val - 1/2 = (z.val.im : ℂ) * I := by
+    apply Complex.ext
+    · simp [Complex.mul_re, z.property.2]
+    · simp [Complex.mul_im]
+  refine ⟨?_,by simpa only [hpoint,G] using hlim⟩
+  intro η hη
+  have hg : Integrable (fun t : ℝ ↦ (bilateralLaplace G ((t : ℂ)*I)).re) :=
+    (bilateralLaplace_inversion_zero hs hc).1.re
+  exact hg.mul_bdd (criticalFiniteHeckeL_density_measurable χ η).aestronglyMeasurable
+    (ae_of_all _ (criticalHeckeDensity_norm_le χ hη))
+
+/-- Theorem 12.5.1.1, pp. 519–520. For the fixed short profile the full local arithmetic
+scalar is a lower bound on one critical-line measurement for each normalized character
+exactly when the exterior terms vanish at all positive widths. The reverse inequalities
+and the absolute convergence of all the measured integrals hold unconditionally. -/
+theorem exists_archConductor_criticalDensity_iff_exteriorZeros
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F)) :
+    ∃ A : Chars(τ) → Arch,
+      (∀ (χ : Chars(τ)) (w : InfinitePlace F) (u : w.Completionˣ), ((A χ) w).val u =
+        (χ.val⁻¹ (archClass(w) u) : ℂ) * (primeFreeProfile (logIdeleClassNorm F (archClass(w) u)) : ℂ)) ∧
+      (∀ χ : Chars(τ), (∀ η : ℝ, 0 < η → Integrable densityIntegrand(χ.val,η)) ∧
+        Tendsto (fun η : ℝ ↦ ∫ t, densityIntegrand(χ.val,η) t) (𝓝[>] 0)
+          (𝓝 centralMass(χ.val,axisWeight)) ∧ measurement(χ.val) ≤ archTarget(χ.val,A χ)) ∧
+      ((∀ χ : Chars(τ), archTarget(χ.val,A χ) ≤ measurement(χ.val)) ↔ target(τ)) := by
+  choose A hA hle hiff using fun χ : Chars(τ) ↦ exists_shortArch_centralMass_iff τ hτ χ
+  refine ⟨A,hA,fun χ ↦ ?_, ?_⟩
+  · obtain ⟨hi,ht⟩ := shortCriticalDensity_limits χ.val
+    exact ⟨hi,ht,ht.limUnder_eq ▸ hle χ⟩
+  · apply Iff.trans _ (allCentral_iff_exteriorZeros τ hτ)
+    apply forall_congr'
+    intro χ
+    rw [(shortCriticalDensity_limits χ.val).2.limUnder_eq]
+    exact hiff χ
+
+
+
+local notation "criticalGrid(" χ ")" => (fun t : ℝ ↦
+  (finiteHeckeL_exists_continuation (F := F) χ).choose ((1/2 : ℂ)+(t : ℂ)*I))
+local notation "gridSum(" χ ")" => AnalyticLattice.sampleSum criticalGrid(χ) axisWeight
+
+private theorem tendsto_shortCriticalGrid (τ : ℝ≥0ˣ →ₜ* C𝔽) (χ : Chars(τ)) :
+    Tendsto gridSum(χ.val) atTop (𝓝 centralMass(χ.val,axisWeight)) := by
+  obtain ⟨hs,hc,_,_,_,_,_,_⟩ := primeFreeProfile_properties
+  let H (x : ℝ) : ℂ := primeFreeProfile x
+  have hs' : ContDiff ℝ (∞) H := Complex.ofRealCLM.contDiff.comp hs
+  have hc' : HasCompactSupport H := hc.comp_left Complex.ofReal_zero
+  obtain ⟨g,hg⟩ := exists_realSchwartz_eq_bilateralLaplace_axis_re hc' hs'
+  have he : (g : ℝ → ℝ) = axisWeight := funext hg
+  simpa only [he] using tendsto_sampleSum_chosenFiniteHeckeL τ χ g
+
+private theorem lowerBound_iff_cofinal_samples {v : ℕ → ℝ} {L S : ℝ}
+    (hv : Tendsto v atTop (𝓝 L)) :
+    (∀ δ : ℝ, 0 < δ → ∀ N : ℕ, ∃ n : ℕ, N ≤ n ∧ S-δ ≤ v n) ↔ S ≤ L := by
+  constructor
+  · intro h
+    by_contra! hgap
+    let d := (S-L)/3
+    have hd : 0 < d := by dsimp [d]; linarith
+    obtain ⟨N,hN⟩ := eventually_atTop.1 (hv.eventually (gt_mem_nhds (show L < L+d by linarith)))
+    obtain ⟨n,hn,hl⟩ := h d hd N
+    have hh := hN n hn
+    change v n < L+d at hh
+    dsimp [d] at hh hl
+    linarith
+  · intro h δ hδ N
+    obtain ⟨M,hM⟩ := eventually_atTop.1 (hv.eventually (lt_mem_nhds (show S-δ < L by linarith)))
+    exact ⟨max N M,le_max_left _ _,(hM _ (le_max_right N M)).le⟩
+
+/-- Theorem 12.5.1.1, pp. 519–520. On the predetermined critical-line grid,
+consecutive absolute values of the finite Hecke continuation recover the entire weighted
+central divisor. The remaining one-sided comparison asks for arbitrarily late finite
+samples approaching the fixed archimedean and conductor scalar from below. -/
+theorem exists_archConductor_finiteCriticalSamples_iff_exteriorZeros
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F)) :
+    ∃ A : Chars(τ) → Arch,
+      (∀ (χ : Chars(τ)) (w : InfinitePlace F) (u : w.Completionˣ), ((A χ) w).val u =
+        (χ.val⁻¹ (archClass(w) u) : ℂ) * (primeFreeProfile (logIdeleClassNorm F (archClass(w) u)) : ℂ)) ∧
+      (∀ χ : Chars(τ), Tendsto gridSum(χ.val) atTop (𝓝 centralMass(χ.val,axisWeight)) ∧
+        limUnder atTop gridSum(χ.val) ≤ archTarget(χ.val,A χ)) ∧
+      ((∀ (χ : Chars(τ)) (δ : ℝ), 0 < δ → ∀ N : ℕ, ∃ n : ℕ, N ≤ n ∧
+        archTarget(χ.val,A χ)-δ ≤ gridSum(χ.val) n) ↔ target(τ)) := by
+  choose A hA hle hiff using fun χ : Chars(τ) ↦ exists_shortArch_centralMass_iff τ hτ χ
+  refine ⟨A,hA,fun χ ↦ ?_, ?_⟩
+  · have ht := tendsto_shortCriticalGrid τ χ
+    exact ⟨ht,ht.limUnder_eq ▸ hle χ⟩
+  · apply Iff.trans _ (allCentral_iff_exteriorZeros τ hτ)
+    apply forall_congr'
+    intro χ
+    exact (lowerBound_iff_cofinal_samples (tendsto_shortCriticalGrid τ χ)).trans (hiff χ)
 
 end OutputOrderGeometry
 
