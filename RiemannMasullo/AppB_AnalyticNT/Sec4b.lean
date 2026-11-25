@@ -17541,4 +17541,12 @@ theorem finiteHeckeL_continuation_highHeight_unitWindow_logDeriv (χ : U[F]) (L 
 
 end CriticalHeckeZeroWindows
 
+/-- The circle residue of an analytic multiplier times a meromorphic logarithmic
+derivative equals the multiplier at the point times the divisor order there. -/
+theorem complexResidue_mul_logDeriv (Φ L : ℂ → ℂ) (ρ : ℂ)
+    (hΦ : AnalyticAt ℂ Φ ρ) (hL : MeromorphicAt L ρ) (hne : meromorphicOrderAt L ρ ≠ ⊤) :
+    complexResidue (fun z ↦ Φ z * logDeriv L z) ρ =
+      ((meromorphicOrderAt L ρ).untop₀ : ℂ) * Φ ρ :=
+  hasSum_heckeAsymptoticResidue_residue Φ L ρ hΦ hL hne
+
 end RiemannMasullo
