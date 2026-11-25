@@ -9,6 +9,7 @@ public import RiemannMasullo.ForMathlib.MeasureTheory.Integral.PolynomialWindow
 import Mathlib.MeasureTheory.Integral.Bochner.SumMeasure
 import RiemannMasullo.AppB_AnalyticNT.Sec4b
 import RiemannMasullo.ForMathlib.Analysis.Analytic.CauchyWindow
+public import RiemannMasullo.Ch01_Introduction.Sec4_TranslatedPoissonCount
 
 /-! # Isolated statements of §12.5
 
@@ -1210,6 +1211,21 @@ theorem criticalDensity_iff_exteriorZeros_of_hasSum
     intro χ
     rw [(tendsto_integral_criticalFiniteHeckeL_schwartz χ.val g).2.limUnder_eq]
     exact (h χ).2
+
+/-- Masullo, Theorem 12.5.1.1, pp. 519–520. At a single fixed abscissa greater
+than one, the all-width exterior sum is equivalent to a strict uniform margin
+on a cofinal part of any prescribed escaping sequence of ordinates. The margin
+and the cofinal part may depend on the character. -/
+theorem exteriorZeros_iff_cofinal_highOrdinate_deficit
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (σ : ℝ) (hσ : 1 < σ) {A : Type*} {l : Filter A} [l.NeBot]
+    (T : A → ℝ) (hT : Tendsto T l (cocompact ℝ)) :
+    target(τ) ↔ ∀ χ : Chars(τ), ∃ B : ℝ, B < 2 * (σ - 1/2) ∧
+      ∃ᶠ i in l, (T i)^2 * (HeckePoisson.logDerivativeMass χ.val σ (T i) -
+        HeckePoisson.centralTranslatedMass χ.val σ (T i)) ≤ B := by
+  refine (allCentral_iff_exteriorZeros τ hτ).symm.trans (forall_congr' fun χ ↦ ?_)
+  exact HeckePoisson.criticalLine_iff_cofinal_highOrdinate_deficit τ hτ χ.val χ.property σ hσ T hT
+
 end CriticalMeasurements
 
 end RiemannMasullo.Isolated
