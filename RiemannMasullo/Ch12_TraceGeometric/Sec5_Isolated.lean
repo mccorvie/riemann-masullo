@@ -19,6 +19,7 @@ public import RiemannMasullo.ForMathlib.MeasureTheory.Integral.PolynomialWindow
 import Mathlib.MeasureTheory.Integral.Bochner.SumMeasure
 import RiemannMasullo.AppB_AnalyticNT.Sec4b
 import RiemannMasullo.ForMathlib.Analysis.Analytic.CauchyWindow
+import RiemannMasullo.Ch01_Introduction.Sec4_HeckePoissonMultiplicity
 
 /-! # Isolated statements of §12.5
 
@@ -1912,5 +1913,385 @@ theorem exists_measurableSequence_archConductor_linePA_iff_exteriorZeros :
   obtain ⟨U, hU, hB, hw⟩ :=
     exists_measurableSequence_archConductor_linePA_iff_exteriorZeros_of_weil (F := F)
   exact ⟨U, hU, hB, fun τ hτ ↦ hw τ hτ (primeFreeWeilIdentity τ hτ)⟩
+
+/-! ### The centered comparison at a fixed Sobolev order
+
+The prime-free Weil identity in #7687 fixes the arithmetic scalar. The translated
+Poisson formula in #7669 controls the multiplicities in the central excess.
+Consecutive differences use the projected-output integral at the two degrees.
+-/
+
+local notation "Jχ(" χ ", " k ", " U ")" =>
+  primeFreeCenteredIntegral χ k (primeFreeCharacterTest_quotientNuclear χ k) U
+
+private theorem fixedOrder_residual {ι : Type*} (P : ι → Prop) [DecidablePred P]
+    (m : ι → ℕ) (v : ι → ℝ) (hm : ∀ i, 0 < m i) (hv : ∀ i, 0 < v i)
+    (hs : Summable (fun i ↦ (m i : ℝ) * |v i|)) (k : ℕ) (J T : ℝ)
+    (hgap : J - T = (∑' i, if ¬ P i then (m i : ℝ) * v i else 0) +
+      ∑' i, if P i then ((m i - (k + 1) : ℕ) : ℝ) * v i else 0) :
+    (J ≤ T ↔ ∀ i, P i ∧ m i ≤ k + 1) ∧
+      ∀ i, T + ((if P i then m i - (k + 1) else m i : ℕ) : ℝ) * v i ≤ J := by
+  let E (i : ι) := if ¬ P i then (m i : ℝ) * v i else 0
+  let R (i : ι) := if P i then ((m i - (k + 1) : ℕ) : ℝ) * v i else 0
+  have hE : Summable E :=
+    summable_masked_weight (fun i ↦ ¬ P i) m m v hs (fun _ ↦ le_rfl)
+  have hR : Summable R :=
+    summable_masked_weight P m _ v hs (fun i ↦ Nat.sub_le _ _)
+  have htotal : (∑' i, (E i + R i)) = J - T := (hE.tsum_add hR).trans hgap.symm
+  have hval (i) : E i + R i = ((if P i then m i - (k + 1) else m i : ℕ) : ℝ) * v i := by
+    by_cases hi : P i <;> simp [E, R, hi]
+  have hpoint (i) : T + ((if P i then m i - (k + 1) else m i : ℕ) : ℝ) * v i ≤ J := by
+    have h := (hE.add hR).le_tsum i (fun j _ ↦ by
+      change 0 ≤ E j + R j
+      rw [hval j]
+      exact mul_nonneg (Nat.cast_nonneg _) (hv j).le)
+    change E i + R i ≤ ∑' j, (E j + R j) at h
+    rw [hval i, htotal] at h
+    linarith
+  refine ⟨⟨?_, ?_⟩, hpoint⟩
+  · intro h i
+    have hz : ((if P i then m i - (k + 1) else m i : ℕ) : ℝ) * v i ≤ 0 := by
+      linarith [hpoint i]
+    have hnat : (if P i then m i - (k + 1) else m i : ℕ) ≤ 0 := by
+      exact_mod_cast nonpos_of_mul_nonpos_left hz (hv i)
+    by_cases hi : P i
+    · rw [ite_eq_left hi] at hnat
+      exact ⟨hi, by omega⟩
+    · rw [ite_eq_right hi] at hnat
+      exact ((hm i).not_ge hnat).elim
+  · intro hall
+    have hzero (i) : E i + R i = 0 := by
+      rw [hval, ite_eq_left (hall i).1, Nat.sub_eq_zero_of_le (hall i).2, Nat.cast_zero, zero_mul]
+    simp only [hzero, tsum_zero] at htotal
+    linarith
+
+/-- Reconstruction from Theorem 12.5.1.1, pp. 519–520. At a fixed odd Sobolev
+degree `2*k+3`, the geometric upper comparison holds exactly when every positive
+divisor site is central and has order at most `k+1`. Each site contributes at least
+its full off-line order, or its excess central order, times its positive real Mellin
+moment to the gap. -/
+theorem primeFreeCenteredIntegral_fixedOrder (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (χ : Chars(τ))
+    (k : ℕ)
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    let J := primeFreeCenteredIntegral χ.val k (primeFreeCharacterTest_quotientNuclear χ.val k) U
+    let T := primeFreeArchConductor χ.val
+    (J ≤ T ↔ ∀ z : Sites(χ.val), centered(z.val) ∧ ordN(χ.val,z.val) ≤ k + 1) ∧
+      ∀ z : Sites(χ.val), T + ((if centered(z.val) then ordN(χ.val,z.val) - (k + 1)
+        else ordN(χ.val,z.val) : ℕ) : ℝ) * valueχ(χ.val,z.val) ≤ J := by
+  classical
+  intro J T
+  have hgap := (primeFree_centeredComparison_of_weil_nuclear τ hτ χ (primeFreeWeilIdentity τ hτ χ)
+    (primeFreeCharacterTest_quotientNuclear χ.val) U hU hBorel).1 k
+  apply fixedOrder_residual (fun z : Sites(χ.val) ↦ centered(z.val))
+    (fun z ↦ ordN(χ.val,z.val)) (fun z ↦ valueχ(χ.val,z.val)) _ _ _ k J T hgap
+  · intro z
+    have hz := z.property
+    omega
+  · exact primeFreeCharacterTest_mellin_pos τ hτ χ
+  · exact ConditionalOutputOrder.summable_fullRealMoments χ.val (φχ(χ.val))
+
+/-- Every site of order above the geometric cap forces a strict gap, at any ordinate
+and any real part of the site. The excess is measured using the actual Mellin moment
+of the prescribed test. -/
+theorem primeFreeCenteredIntegral_excess_of_lt_order (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (χ : Chars(τ))
+    (k : ℕ)
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n))
+    (z : Sites(χ.val)) (hz : k + 1 < ordN(χ.val,z.val)) :
+    let J := primeFreeCenteredIntegral χ.val k (primeFreeCharacterTest_quotientNuclear χ.val k) U
+    let T := primeFreeArchConductor χ.val
+    let excess := ((ordN(χ.val,z.val) - (k + 1) : ℕ) : ℝ) * valueχ(χ.val,z.val)
+    T < T + excess ∧ T + excess ≤ J := by
+  classical
+  intro J T excess
+  have hv := primeFreeCharacterTest_mellin_pos τ hτ χ z
+  have hl : ordN(χ.val,z.val) - (k + 1) ≤
+      (if centered(z.val) then ordN(χ.val,z.val) - (k + 1) else ordN(χ.val,z.val)) := by
+    split_ifs <;> omega
+  have hreal : ((ordN(χ.val,z.val) - (k + 1) : ℕ) : ℝ) ≤
+      ((if centered(z.val) then ordN(χ.val,z.val) - (k + 1) else ordN(χ.val,z.val) : ℕ) : ℝ) := by
+    exact_mod_cast hl
+  exact ⟨lt_add_of_pos_right _ (mul_pos (by exact_mod_cast Nat.sub_pos_of_lt hz) hv),
+    (add_le_add (le_refl T) (mul_le_mul_of_nonneg_right hreal hv.le)).trans
+      ((primeFreeCenteredIntegral_fixedOrder τ hτ χ k U hU hBorel).2 z)⟩
+
+private theorem primeFree_summable_siteMask (χ : PontryaginDual C𝔽)
+    (P : Sites(χ) → Prop) [DecidablePred P] :
+    Summable (fun z : Sites(χ) ↦ if P z then valueχ(χ,z.val) else 0) := by
+  have hs := summable_masked_weight P (fun z ↦ ordN(χ,z.val)) (fun _ ↦ 1)
+    (fun z ↦ valueχ(χ,z.val)) (ConditionalOutputOrder.summable_fullRealMoments χ (φχ(χ)))
+    (fun z ↦ by have hz := z.property; omega)
+  simpa only [Nat.cast_one, one_mul] using hs
+
+/-- Increasing the odd Sobolev degree from `2*k+3` to `2*k+5` resolves a single
+additional jet at each central site of order at least `k+2`. The corresponding
+difference of genuine centered integrals counts each such site once. -/
+theorem primeFreeCenteredIntegral_sub_succ (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (χ : Chars(τ)) (k : ℕ)
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    Jχ(χ.val,k,U) - Jχ(χ.val,k+1,U) = ∑' z : Sites(χ.val),
+      if centered(z.val) ∧ k+2 ≤ ordN(χ.val,z.val) then valueχ(χ.val,z.val) else 0 := by
+  classical
+  let m (z : Sites(χ.val)) := ordN(χ.val,z.val)
+  let v (z : Sites(χ.val)) := valueχ(χ.val,z.val)
+  let c (j : ℕ) (z : Sites(χ.val)) := if centered(z.val) then ((min (m z) (j+1) : ℕ) : ℝ) * v z else 0
+  have hc (j : ℕ) : Summable (c j) := summable_masked_weight (fun z : Sites(χ.val) ↦ centered(z.val)) m
+    (fun z ↦ min (m z) (j+1)) v (ConditionalOutputOrder.summable_fullRealMoments χ.val (φχ(χ.val)))
+    (fun _ ↦ min_le_left _ _)
+  have hJ (j : ℕ) : Jχ(χ.val,j,U) = -(∑' z, c j z) :=
+    ConditionalOutputOrder.centeredIntegral_re_eq τ hτ χ (φχ(χ.val)) (primeFreeCharacterTest_outside τ hτ χ) j
+      (primeFreeCharacterTest_quotientNuclear χ.val j) U hU hBorel
+  rw [hJ k, hJ (k+1), neg_sub_neg, ← (hc (k+1)).tsum_sub (hc k)]
+  apply tsum_congr
+  intro z
+  change c (k+1) z - c k z = if centered(z.val) ∧ k+2 ≤ m z then v z else 0
+  by_cases hcenter : centered(z.val)
+  · simp only [c, hcenter, ite_true, true_and]
+    by_cases hm : k+2 ≤ m z
+    · rw [ite_eq_left hm, min_eq_right hm, min_eq_right (by omega : k+1 ≤ m z)]
+      push_cast
+      ring
+    · rw [ite_eq_right hm, min_eq_left (by omega : m z ≤ k+2), min_eq_left (by omega : m z ≤ k+1), sub_self]
+  · simp only [c, hcenter, false_and, ite_false, sub_self]
+
+/-- A single central site whose order is at least `k+2` supplies its full positive
+real Mellin moment as a lower bound for the difference of consecutive integrals. -/
+theorem primeFreeCenteredIntegral_moment_le_sub_succ (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (χ : Chars(τ)) (k : ℕ)
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n))
+    (z : Sites(χ.val)) (hcenter : centered(z.val)) (hm : k+2 ≤ ordN(χ.val,z.val)) :
+    0 < valueχ(χ.val,z.val) ∧ valueχ(χ.val,z.val) ≤ Jχ(χ.val,k,U) - Jχ(χ.val,k+1,U) := by
+  classical
+  let P (y : Sites(χ.val)) := centered(y.val) ∧ k+2 ≤ ordN(χ.val,y.val)
+  have hv := primeFreeCharacterTest_mellin_pos τ hτ χ
+  refine ⟨hv z, ?_⟩
+  rw [primeFreeCenteredIntegral_sub_succ τ hτ χ k U hU hBorel]
+  have h := (primeFree_summable_siteMask χ.val P).le_tsum z fun y _ ↦ ite_nonneg (hv y).le le_rfl
+  simpa only [P, ite_eq_left (And.intro hcenter hm)] using h
+
+/-- The second difference of the centered physical integrals counts precisely the
+central sites of order `k+2`, once each with their real Mellin moment. -/
+theorem primeFreeCenteredIntegral_second_difference (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (χ : Chars(τ)) (k : ℕ)
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    (Jχ(χ.val,k,U) - Jχ(χ.val,k+1,U)) - (Jχ(χ.val,k+1,U) - Jχ(χ.val,k+2,U)) =
+      ∑' z : Sites(χ.val), if centered(z.val) ∧ ordN(χ.val,z.val) = k+2 then valueχ(χ.val,z.val) else 0 := by
+  classical
+  let P (j : ℕ) (z : Sites(χ.val)) := centered(z.val) ∧ j+2 ≤ ordN(χ.val,z.val)
+  rw [primeFreeCenteredIntegral_sub_succ τ hτ χ k U hU hBorel,
+    primeFreeCenteredIntegral_sub_succ τ hτ χ (k+1) U hU hBorel,
+    ← (primeFree_summable_siteMask χ.val (P k)).tsum_sub (primeFree_summable_siteMask χ.val (P (k+1)))]
+  apply tsum_congr
+  intro z
+  dsimp only [P]
+  by_cases hc : centered(z.val)
+  · simp only [hc, true_and]
+    split_ifs <;> first | omega | ring
+  · simp only [hc, false_and, ite_false, sub_self]
+
+open scoped _root_.SchwartzMap
+
+private theorem primeFree_centralSchwartz (χ : PontryaginDual C𝔽) :
+    ∃ g : 𝓢(ℝ, ℝ), ∀ z : ℂ, centered(z) → valueχ(χ,z) = g z.im := by
+  obtain ⟨f, hf⟩ := exists_realSchwartz_eq_bilateralLaplace_axis_re
+    primeFreeProfile_complex_compact primeFreeProfile_complex_smooth
+  let c := ((normOneIdeleClassTamagawaMeasure F) univ).toReal
+  refine ⟨c • f, fun z hz ↦ ?_⟩
+  have hx : z - 1/2 = (z.im : ℂ) * I := by
+    apply Complex.ext <;> simp [Complex.mul_re, Complex.mul_im, hz]
+  rw [primeFreeCharacterTest_mellin, Complex.re_ofReal_mul, hx, ← hf]
+  rfl
+
+private theorem polynomial_bound_of_log_order (g : 𝓢(ℝ, ℝ)) (A C K : ℝ) :
+    ∃ D > (0 : ℝ), ∀ (t : ℝ) (m : ℕ), (m : ℝ) ≤ A + C * Real.log (2 + |t|) →
+      Real.exp (K * m) * |g t| ≤ D / (1 + |t|)^2 := by
+  let L := max K 0
+  have hL : 0 ≤ L := le_max_right _ _
+  obtain ⟨N, hN⟩ := exists_nat_gt (L * C)
+  let p := N + 2
+  let P : ℝ := 2^p * (Finset.Iic (p, 0)).sup (fun m : ℕ × ℕ ↦ SchwartzMap.seminorm ℝ m.1 m.2) g
+  let B := max 1 P
+  have hB : 0 < B := zero_lt_one.trans_le (le_max_left _ _)
+  have hg (t : ℝ) : (1 + |t|)^p * |g t| ≤ B := by
+    have h := SchwartzMap.one_add_le_sup_seminorm_apply (𝕜 := ℝ) (m := (p, 0)) le_rfl le_rfl g t
+    exact (show _ ≤ P from by simpa only [P, norm_iteratedFDeriv_zero, Real.norm_eq_abs] using h).trans
+      (le_max_right _ _)
+  refine ⟨Real.exp (L*A) * (2^N * B), by positivity, fun t m hm ↦ ?_⟩
+  have hlog : 0 ≤ Real.log (2 + |t|) := Real.log_nonneg (by linarith [abs_nonneg t])
+  have he : Real.exp (K * m) ≤ Real.exp (L*A) * (2 + |t|)^N := by
+    calc
+      _ ≤ Real.exp (L*A + (N : ℝ) * Real.log (2 + |t|)) := by
+        apply Real.exp_le_exp.mpr
+        have hKL := mul_le_mul_of_nonneg_right (show K ≤ L from le_max_left _ _) (Nat.cast_nonneg m)
+        have hmul := mul_le_mul_of_nonneg_left hm hL
+        have hNL := mul_le_mul_of_nonneg_right hN.le hlog
+        linarith
+      _ = _ := by rw [Real.exp_add, Real.exp_nat_mul, Real.exp_log (by positivity)]
+  have hbase : 2 + |t| ≤ 2 * (1 + |t|) := by linarith [abs_nonneg t]
+  apply (le_div_iff₀ (by positivity)).mpr
+  calc
+    _ ≤ (Real.exp (L*A) * (2 * (1 + |t|))^N) * |g t| * (1 + |t|)^2 := by
+      exact mul_le_mul_of_nonneg_right (mul_le_mul_of_nonneg_right (he.trans
+        (mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (by positivity) hbase N) (Real.exp_pos _).le))
+        (abs_nonneg _)) (sq_nonneg _)
+    _ = Real.exp (L*A) * (2^N * ((1 + |t|)^p * |g t|)) := by
+      rw [mul_pow, show p = N + 2 from rfl, pow_add]
+      ring
+    _ ≤ _ := mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_left (hg t) (by positivity)) (Real.exp_pos _).le
+
+/-- On each normalized character, the chosen central Mellin weight has an absolutely
+summable multiplicity moment at every real exponential rate. -/
+theorem primeFree_summable_centralExpOrder (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (χ : Chars(τ)) (K : ℝ) :
+    Summable (fun z : Sites(χ.val) ↦ if centered(z.val) then
+      Real.exp (K * ordN(χ.val,z.val)) * ((ordN(χ.val,z.val) : ℝ) * valueχ(χ.val,z.val)) else 0) := by
+  classical
+  obtain ⟨A,C,_,hAC⟩ := HeckePoisson.exists_multiplicity_le_log τ hτ χ.val χ.property
+  obtain ⟨g,hg⟩ := primeFree_centralSchwartz χ.val
+  obtain ⟨D,hD,hbound⟩ := polynomial_bound_of_log_order g A C K
+  have hs : Summable (fun z : Sites(χ.val) ↦ (ord(χ.val,z.val) : ℝ) / (1 + |z.val.im|)^2) :=
+    explicitFormulaCompletedHeckeL_summable_divisor_div_sq χ.val
+  apply (hs.mul_left D).of_norm_bounded
+  intro z
+  have hcast : (ordN(χ.val,z.val) : ℝ) = (ord(χ.val,z.val) : ℝ) := by
+    exact_mod_cast Int.toNat_of_nonneg z.property.le
+  change ‖_‖ ≤ D * ((ord(χ.val,z.val) : ℝ) / (1 + |z.val.im|)^2)
+  rw [← hcast]
+  by_cases hz : centered(z.val)
+  · rw [ite_eq_left hz, Real.norm_eq_abs, abs_mul, abs_mul, abs_of_pos (Real.exp_pos _),
+      Nat.abs_cast, hg z.val hz]
+    calc
+      _ = (ordN(χ.val,z.val) : ℝ) * (Real.exp (K * ordN(χ.val,z.val)) * |g z.val.im|) := by ring
+      _ ≤ (ordN(χ.val,z.val) : ℝ) * (D / (1 + |z.val.im|)^2) :=
+        mul_le_mul_of_nonneg_left (hbound _ _ (hAC z)) (Nat.cast_nonneg _)
+      _ = _ := by ring
+  · rw [ite_eq_right hz, norm_zero]
+    positivity
+
+/-- At odd Sobolev degree `2*k+3`, the excess remaining after subtracting the full
+off-line mass from the centered physical comparison decays faster than every fixed
+exponential. The constants can depend on the character and the exponent. -/
+theorem primeFreeCenteredIntegral_centralExcess_bound (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (χ : Chars(τ))
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n))
+    (K : ℝ) (hK : 0 < K) :
+    ∃ B > (0 : ℝ), ∀ k : ℕ,
+      Jχ(χ.val,k,U) - primeFreeArchConductor χ.val - exteriorMass(χ.val) ∈
+        Icc 0 (B * Real.exp (-K * k)) := by
+  classical
+  let m (z : Sites(χ.val)) := ordN(χ.val,z.val)
+  let v (z : Sites(χ.val)) := valueχ(χ.val,z.val)
+  let e (z : Sites(χ.val)) := if centered(z.val) then Real.exp (K * m z) * ((m z : ℝ) * v z) else 0
+  let r (k : ℕ) (z : Sites(χ.val)) := if centered(z.val) then ((m z - (k+1) : ℕ) : ℝ) * v z else 0
+  have he : Summable e := primeFree_summable_centralExpOrder τ hτ χ K
+  have hv (z : Sites(χ.val)) : 0 < v z := primeFreeCharacterTest_mellin_pos τ hτ χ z
+  have hr (k : ℕ) : Summable (r k) :=
+    summable_masked_weight (fun z : Sites(χ.val) ↦ centered(z.val)) m _ v
+      (ConditionalOutputOrder.summable_fullRealMoments χ.val (φχ(χ.val))) (fun z ↦ Nat.sub_le _ _)
+  let B := max 1 (∑' z, e z)
+  refine ⟨B, zero_lt_one.trans_le (le_max_left _ _), fun k ↦ ?_⟩
+  have gap := (primeFree_centeredComparison_of_weil_nuclear τ hτ χ (primeFreeWeilIdentity τ hτ χ)
+    (primeFreeCharacterTest_quotientNuclear χ.val) U hU hBorel).1 k
+  have exactR : Jχ(χ.val,k,U) - primeFreeArchConductor χ.val - exteriorMass(χ.val) = ∑' z, r k z := by
+    rw [gap]
+    exact add_sub_cancel_left _ _
+  rw [exactR]
+  have hr0 (z : Sites(χ.val)) : 0 ≤ r k z :=
+    ite_nonneg (mul_nonneg (Nat.cast_nonneg _) (hv z).le) le_rfl
+  refine ⟨tsum_nonneg hr0, ?_⟩
+  have hpoint (z : Sites(χ.val)) : r k z ≤ Real.exp (-K * k) * e z := by
+    by_cases hc : centered(z.val)
+    · simp only [e, r, hc, ite_true]
+      by_cases hmk : m z ≤ k+1
+      · rw [Nat.sub_eq_zero_of_le hmk, Nat.cast_zero, zero_mul]
+        exact mul_nonneg (Real.exp_pos _).le (mul_nonneg (Real.exp_pos _).le
+          (mul_nonneg (Nat.cast_nonneg _) (hv z).le))
+      · have hkm : (k : ℝ) ≤ m z := by exact_mod_cast (show k ≤ m z by omega)
+        have hone : 1 ≤ Real.exp (-K * k) * Real.exp (K * m z) := by
+          rw [← Real.exp_add]
+          exact Real.one_le_exp (by nlinarith only [mul_nonneg hK.le (sub_nonneg.mpr hkm)])
+        calc
+          _ ≤ (m z : ℝ) * v z := mul_le_mul_of_nonneg_right (by exact_mod_cast Nat.sub_le (m z) (k+1)) (hv z).le
+          _ ≤ (Real.exp (-K * k) * Real.exp (K * m z)) * ((m z : ℝ) * v z) :=
+            le_mul_of_one_le_left (mul_nonneg (Nat.cast_nonneg _) (hv z).le) hone
+          _ = _ := mul_assoc _ _ _
+    · simp only [r, e, ite_eq_right hc, mul_zero, le_refl]
+  have hsum := (hr k).tsum_le_tsum hpoint (he.mul_left (Real.exp (-K*k)))
+  rw [tsum_mul_left] at hsum
+  exact hsum.trans (by simpa only [mul_comm] using
+    (mul_le_mul_of_nonneg_left (show (∑' z, e z) ≤ B from le_max_right _ _) (Real.exp_pos (-K*k)).le))
+
+private theorem primeFree_exponentialTolerance_character (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (χ : Chars(τ))
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n))
+    (K : ℝ) (hK : 0 < K) :
+    ((∀ᶠ k : ℕ in atTop, Jχ(χ.val,k,U) ≤ primeFreeArchConductor χ.val + Real.exp (-K*k)) ↔
+      ∀ z : Sites(χ.val), centered(z.val)) ∧
+    ((∀ N : ℕ, ∃ k : ℕ, N ≤ k ∧ Jχ(χ.val,k,U) ≤ primeFreeArchConductor χ.val + Real.exp (-K*k)) ↔
+      ∀ z : Sites(χ.val), centered(z.val)) := by
+  classical
+  let J (k : ℕ) := Jχ(χ.val,k,U)
+  let T := primeFreeArchConductor χ.val
+  let Q (k : ℕ) := J k ≤ T + Real.exp (-K*k)
+  change ((∀ᶠ k : ℕ in atTop, Q k) ↔ _) ∧ ((∀ N : ℕ, ∃ k : ℕ, N ≤ k ∧ Q k) ↔ _)
+  have hd : Tendsto (fun k : ℕ ↦ Real.exp (-K*k)) atTop (𝓝 0) := by
+    simpa only [Function.comp_def, ← neg_mul] using Real.tendsto_exp_neg_atTop_nhds_zero.comp
+      ((tendsto_natCast_atTop_atTop (R := ℝ)).const_mul_atTop hK)
+  have freq (h : ∀ᶠ k : ℕ in atTop, Q k) (N : ℕ) : ∃ k : ℕ, N ≤ k ∧ Q k :=
+    ((eventually_ge_atTop N).and h).exists
+  have fromCofinal (h : ∀ N : ℕ, ∃ k : ℕ, N ≤ k ∧ Q k) : ∀ z : Sites(χ.val), centered(z.val) := by
+    apply (primeFree_centeredComparison_of_weil_nuclear τ hτ χ (primeFreeWeilIdentity τ hτ χ)
+      (primeFreeCharacterTest_quotientNuclear χ.val) U hU hBorel).2.2.1.mp
+    intro δ hδ
+    obtain ⟨N,hN⟩ := eventually_atTop.mp (hd.eventually (eventually_lt_nhds hδ))
+    obtain ⟨k,hk,hkQ⟩ := h N
+    exact ⟨k, hkQ.trans (add_le_add (le_refl T) (hN k hk).le)⟩
+  have toEventual (h : ∀ z : Sites(χ.val), centered(z.val)) : ∀ᶠ k : ℕ in atTop, Q k := by
+    have hE : exteriorMass(χ.val) = 0 := by simp only [h, not_true_eq_false, ite_false, tsum_zero]
+    obtain ⟨B, _, hb⟩ := primeFreeCenteredIntegral_centralExcess_bound τ hτ χ U hU hBorel
+      (K+1) (by linarith)
+    have hsmall : Tendsto (fun k : ℕ ↦ B * Real.exp (-(k : ℝ))) atTop (𝓝 0) := by
+      simpa only [Function.comp_def, mul_zero] using
+        (Real.tendsto_exp_neg_atTop_nhds_zero.comp (tendsto_natCast_atTop_atTop (R := ℝ))).const_mul B
+    filter_upwards [hsmall.eventually (eventually_lt_nhds zero_lt_one)] with k hk
+    have hscale : B * Real.exp (-(K+1)*k) ≤ Real.exp (-K*k) := by
+      rw [show -(K+1)*(k:ℝ) = -(k:ℝ) + -K*k by ring, Real.exp_add, ← mul_assoc]
+      simpa only [one_mul] using mul_le_mul_of_nonneg_right hk.le (Real.exp_pos (-K*k)).le
+    have hb' := (hb k).2
+    rw [hE, sub_zero] at hb'
+    change J k ≤ T + Real.exp (-K*k)
+    change J k - T ≤ B * Real.exp (-(K+1)*k) at hb'
+    linarith
+  exact ⟨⟨fun h ↦ fromCofinal (freq h), toEventual⟩,
+    ⟨fromCofinal, fun h ↦ freq (toEventual h)⟩⟩
+
+/-- Reconstruction from Theorem 12.5.1.1, pp. 519–520. Fix a positive exponential
+rate before choosing a character. Both eventual and cofinal upper comparison with this prescribed tolerance
+characterize the exterior sum at every positive width. -/
+theorem primeFree_exponentialTolerance_iff_exteriorZeros (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F))
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n))
+    (K : ℝ) (hK : 0 < K) :
+    ((∀ χ : Chars(τ), ∀ᶠ k : ℕ in atTop,
+        Jχ(χ.val,k,U) ≤ primeFreeArchConductor χ.val + Real.exp (-K*k)) ↔ target(τ)) ∧
+      ((∀ (χ : Chars(τ)) (N : ℕ), ∃ k : ℕ, N ≤ k ∧
+        Jχ(χ.val,k,U) ≤ primeFreeArchConductor χ.val + Real.exp (-K*k)) ↔ target(τ)) := by
+  have row (χ : Chars(τ)) :=
+    primeFree_exponentialTolerance_character τ hτ χ U hU hBorel K hK
+  exact ⟨(forall_congr' fun χ ↦ (row χ).1).trans (allCentral_iff_exteriorZeros τ hτ),
+    (forall_congr' fun χ ↦ (row χ).2).trans (allCentral_iff_exteriorZeros τ hτ)⟩
+
+/-- A common Borel D′ sequence, chosen before the section, characters and tolerance
+rate, gives both deterministic exponential comparisons with the original exterior sum. -/
+theorem exists_measurableSequence_primeFree_exponentialTolerance :
+    ∃ U : ℕ → Set C𝔽, IsDPrimeSequence μ𝔽 U ∧ (∀ n, MeasurableSet (U n)) ∧
+      ∀ (τ : ℝ≥0ˣ →ₜ* C𝔽), RightInverse τ (ideleClassNorm F) → ∀ K : ℝ, 0 < K →
+        (((∀ χ : Chars(τ), ∀ᶠ k : ℕ in atTop,
+          Jχ(χ.val,k,U) ≤ primeFreeArchConductor χ.val + Real.exp (-K*k)) ↔ target(τ)) ∧
+          ((∀ (χ : Chars(τ)) (N : ℕ), ∃ k : ℕ, N ≤ k ∧
+            Jχ(χ.val,k,U) ≤ primeFreeArchConductor χ.val + Real.exp (-K*k)) ↔ target(τ))) := by
+  obtain ⟨U,hU,hBorel⟩ := exists_measurable_ideleClassDPrimeSequence F
+  exact ⟨U,hU,hBorel,fun τ hτ K hK ↦ primeFree_exponentialTolerance_iff_exteriorZeros τ hτ U hU hBorel K hK⟩
 
 end RiemannMasullo.Isolated.OutputOrderGeometry
