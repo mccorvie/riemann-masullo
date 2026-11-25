@@ -119,6 +119,19 @@ theorem rationalPrimitiveHeckeParameter_spec (i : RationalPrimitiveCharacter) :
       i.2.1 n * (ArithmeticFunction.vonMangoldt n : ℂ) :=
   (exists_rat_heckeLogDerivCoefficient_eq_dirichlet i.2.2).choose_spec
 
+/-- The number of primitive characters in the deficit average is at least `C²/1024`. -/
+theorem rationalPrimitiveCharactersThrough_card_lower (C : ℕ) :
+    (C : ℝ)^2 ≤ 1024 * (rationalPrimitiveCharactersThrough C).card :=
+  primitiveCharacters_card_bound C
+
+/-- Exactly one indexed rational Hecke lift carries a pole, at the trivial
+primitive Dirichlet character of conductor one. -/
+theorem rationalPrimitiveHeckeParameter_unique_principal :
+    ∃! i : RationalPrimitiveCharacter, rationalPrimitiveHeckeParameter i = 1 := by
+  have h (i : RationalPrimitiveCharacter) : rationalPrimitiveHeckeParameter i = 1 ↔ i = primitivePrincipal :=
+    (rationalPrimitiveHeckeParameter_spec i).2.2.1.trans (primitivePrincipal_iff i)
+  exact ⟨primitivePrincipal, (h _).mpr rfl, fun i hi ↦ (h i).mp hi⟩
+
 /-- The four-times complete Hecke sum in a prescribed Jacobi cell is the real part
 of the corresponding Dirichlet row, including the coefficients at conductor primes. -/
 theorem rationalPrimitiveHeckeParameter_cell (i : RationalPrimitiveCharacter)
