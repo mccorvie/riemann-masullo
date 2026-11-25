@@ -3565,20 +3565,6 @@ private theorem stripMellinMoment_eq_twisted_integral (χ : PontryaginDual C𝔽
     exact congrArg ((χ g : ℂ) * ·) (congrArg Complex.exp (mul_comm _ _))
   rw [he]; ring
 
-/-- Differentiating a logarithmic Mellin moment of a compact Bruhat test inserts one
-further power of the logarithmic idele class norm. -/
-theorem hasDerivAt_ideleClass_bruhatMoment (χ : PontryaginDual C𝔽) (φ : BruhatCompactSupport C𝔽)
-    (z : ℂ) (k : ℕ) :
-    HasDerivAt (fun w : ℂ ↦ ∫ g : C𝔽, φ.val g * ideleClassNormTwist χ w g *
-      (logNorm g : ℂ)^k ∂μ𝔽)
-      (∫ g : C𝔽, φ.val g * ideleClassNormTwist χ z g * (logNorm g : ℂ)^(k+1) ∂μ𝔽) z := by
-  simp_rw [stripMellinMoment_eq_twisted_integral]
-  apply stripMellinMoment_hasDerivAt μ𝔽 logNorm
-    (fun g : C𝔽 ↦ φ.val g * (χ g : ℂ)) (continuous_logModule' (G := C𝔽) m𝔽)
-  · exact (continuous_of_bruhatSmooth ((mem_bruhatSmoothSubmodule_iff _).mp φ.property.1)).mul
-      (continuous_subtype_val.comp χ.continuous)
-  · exact φ.property.2.mul_right
-
 private theorem stripJet_geometric_sum_le (n : ℕ) :
     ∑ i : Fin (n + 1), (1 / 2 : ℝ) ^ (n - i.val) ≤ 2 := by
   have eq : (∑ i : Fin (n + 1), (1 / 2 : ℝ) ^ (n - i.val)) =
@@ -3679,6 +3665,20 @@ theorem spectralStripConvolution_traceCauchy_of_summable_jetNorms
   exact mul_le_mul_of_nonneg_right
     (spectralStripConvolution_jet_norm_le_mellin_circle a hα hs χ f hj φ z m _ (hM z) (hMellin z))
     (norm_nonneg _)
+
+/-- Differentiating a logarithmic Mellin moment of a compact Bruhat test inserts one
+further power of the logarithmic idele class norm. -/
+theorem hasDerivAt_ideleClass_bruhatMoment (χ : PontryaginDual C𝔽) (φ : BruhatCompactSupport C𝔽)
+    (z : ℂ) (k : ℕ) :
+    HasDerivAt (fun w : ℂ ↦ ∫ g : C𝔽, φ.val g * ideleClassNormTwist χ w g *
+      (logNorm g : ℂ)^k ∂μ𝔽)
+      (∫ g : C𝔽, φ.val g * ideleClassNormTwist χ z g * (logNorm g : ℂ)^(k+1) ∂μ𝔽) z := by
+  simp_rw [stripMellinMoment_eq_twisted_integral]
+  apply stripMellinMoment_hasDerivAt μ𝔽 logNorm
+    (fun g : C𝔽 ↦ φ.val g * (χ g : ℂ)) (continuous_logModule' (G := C𝔽) m𝔽)
+  · exact (continuous_of_bruhatSmooth ((mem_bruhatSmoothSubmodule_iff _).mp φ.property.1)).mul
+      (continuous_subtype_val.comp χ.continuous)
+  · exact φ.property.2.mul_right
 
 /-- Quotient translations act on every jet at one zero by the finite binomial matrix. -/
 private theorem strip_translation_finite_block
