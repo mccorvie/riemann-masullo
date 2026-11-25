@@ -213,4 +213,48 @@ theorem tendsto_ennreal_abel_square_of_bounded_sub {f g : ℝ → ℂ}
     ofReal_integral_eq_lintegral_ofReal hFi (.of_forall hpos)]
   rfl
 
+/-- If the unaveraged squared energy at the given shift is integrable, it is
+the exact coefficient of the Abel mean to first order in the damping
+parameter. It also bounds every positive damped mean after normalization. -/
+theorem weightedSquareAbelMean_firstOrder {f : ℝ → ℂ} (hf : Measurable f) (c : ℝ)
+    (hint : IntegrableOn (fun y : ℝ ↦ ‖f y‖ ^ 2 * exp (-(2 * c) * y)) (Ici 0)) :
+    let E := ∫ y in Ici (0 : ℝ), ‖f y‖ ^ 2 * exp (-(2 * c) * y)
+    (∀ ε > (0 : ℝ), weightedSquareAbelMean f c ε ≤ ENNReal.ofReal ε * ENNReal.ofReal E) ∧
+      Tendsto (fun ε : ℝ ↦ weightedSquareAbelMean f c ε / ENNReal.ofReal ε)
+        (𝓝[>] 0) (𝓝 (ENNReal.ofReal E)) := by
+  let μ := volume.restrict (Ici (0 : ℝ))
+  let G (ε y : ℝ) := ‖f y‖ ^ 2 * exp (-(ε + 2 * c) * y)
+  have hGm (ε : ℝ) : Measurable (G ε) := by dsimp only [G]; fun_prop
+  have hG₀ (ε y : ℝ) : 0 ≤ G ε y := mul_nonneg (sq_nonneg _) (exp_pos _).le
+  have h0 : Integrable (G 0) μ := by simpa [μ, G, IntegrableOn] using hint
+  have hle (ε : ℝ) (hε : 0 ≤ ε) : ∀ᵐ y ∂μ, G ε y ≤ G 0 y := by
+    filter_upwards [ae_restrict_mem (μ := volume) measurableSet_Ici] with y hy
+    apply mul_le_mul_of_nonneg_left (exp_le_exp.mpr ?_) (sq_nonneg _)
+    exact mul_le_mul_of_nonneg_right (by linarith) hy
+  have hi (ε : ℝ) (hε : 0 ≤ ε) : Integrable (G ε) μ :=
+    h0.mono' (hGm ε).aestronglyMeasurable ((hle ε hε).mono fun y hy ↦ by
+      simpa only [Real.norm_of_nonneg (hG₀ _ _)] using hy)
+  have hmean (ε : ℝ) (hε : 0 ≤ ε) :
+      weightedSquareAbelMean f c ε = ENNReal.ofReal ε * ENNReal.ofReal (∫ y, G ε y ∂μ) := by
+    rw [weightedSquareAbelMean, ofReal_integral_eq_lintegral_ofReal (hi ε hε) (.of_forall (hG₀ ε))]
+  change (∀ ε > (0 : ℝ), weightedSquareAbelMean f c ε ≤ ENNReal.ofReal ε *
+    ENNReal.ofReal (∫ y in Ici (0 : ℝ), ‖f y‖ ^ 2 * exp (-(2 * c) * y))) ∧ _
+  have heq : (∫ y, G 0 y ∂μ) = ∫ y in Ici (0 : ℝ), ‖f y‖ ^ 2 * exp (-(2 * c) * y) := by simp [μ, G]
+  rw [← heq]
+  constructor
+  · intro ε hε
+    rw [hmean ε hε.le]
+    exact mul_le_mul_of_nonneg_left (ENNReal.ofReal_le_ofReal (integral_mono_ae (hi _ hε.le) h0 (hle ε hε.le))) bot_le
+  · have hlim : Tendsto (fun ε : ℝ ↦ ∫ y, G ε y ∂μ) (𝓝[>] 0) (𝓝 (∫ y, G 0 y ∂μ)) := by
+      refine tendsto_integral_filter_of_dominated_convergence (G 0)
+        (.of_forall fun ε ↦ (hGm ε).aestronglyMeasurable) ?_ h0 ?_
+      · filter_upwards [self_mem_nhdsWithin] with ε (hε : 0 < ε)
+        exact (hle ε hε.le).mono fun y hy ↦ by simpa only [Real.norm_of_nonneg (hG₀ _ _)] using hy
+      · exact .of_forall fun y ↦
+          ((by dsimp only [G]; fun_prop : Continuous (fun ε ↦ G ε y)).tendsto 0).mono_left nhdsWithin_le_nhds
+    apply (ENNReal.tendsto_ofReal hlim).congr'
+    filter_upwards [self_mem_nhdsWithin] with ε (hε : 0 < ε)
+    rw [hmean ε hε.le, mul_comm (ENNReal.ofReal ε), mul_div_assoc,
+      ENNReal.div_self (ENNReal.ofReal_pos.mpr hε).ne' ENNReal.ofReal_ne_top, mul_one]
+
 end RiemannMasullo.AbelEdge

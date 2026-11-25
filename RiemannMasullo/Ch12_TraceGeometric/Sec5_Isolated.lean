@@ -1,5 +1,6 @@
 module
 public import RiemannMasullo.ForMathlib.Analysis.Fourier.QuadraticBoxProfile
+import Mathlib.Analysis.SpecialFunctions.Gaussian.GaussianIntegral
 import RiemannMasullo.AppB_AnalyticNT.Sec2
 import RiemannMasullo.AppB_AnalyticNT.Sec4b
 import RiemannMasullo.AppB_AnalyticNT.Sec6
@@ -746,6 +747,51 @@ theorem translatedLocalTerms_integrableOn_exp_coleman (τ : ℝ≥0ˣ →ₜ* C�
   exact integrableOn_pow_mul_exp_coleman_of_bound hm (fun y ↦ norm_nonneg _)
     (fun y hy ↦ hbound y hy (φ y) (hφ y hy) (a y) (b y) (ha y hy) (hb y hy)) n hn k hk
 
+/-- At half shift, every fixed smooth profile on a compact positive log interval
+with zero positive polar moment has finite square energy and an exact first-order
+Abel law for its genuine signed degree-one prime sum. The ordinary logarithmic
+region already suffices for this conclusion. -/
+theorem firstPrime_polarFree_half_abel_firstOrder (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (ψ : U) (hψ : ∀ t, ψ (τ t) = 1)
+    (H : ℝ → ℂ) (hH : ContDiff ℝ ∞ H) {u v : ℝ} (hu : 0 < u) (huv : u ≤ v)
+    (ht : tsupport H ⊆ Icc u v) (hpolar : bilateralLaplace H (1/2) = 0) :
+    let P := fun y : ℝ ↦ firstPrimeDegreeOneSum ψ⁻¹ H y v
+    let E := ∫ y in Ici (0 : ℝ), ‖P y‖ ^ 2 * Real.exp (-y)
+    IntegrableOn (fun y : ℝ ↦ ‖P y‖ ^ 2 * Real.exp (-y)) (Ici 0) ∧
+      (∀ ε > (0 : ℝ), AbelEdge.weightedSquareAbelMean P (1/2) ε ≤ ENNReal.ofReal ε * ENNReal.ofReal E) ∧
+      Tendsto (fun ε : ℝ ↦ AbelEdge.weightedSquareAbelMean P (1/2) ε / ENNReal.ofReal ε)
+        (𝓝[>] 0) (𝓝 (ENNReal.ofReal E)) := by
+  let P := fun y : ℝ ↦ firstPrimeDegreeOneSum ψ⁻¹ H y v
+  have hc : HasCompactSupport H := isCompact_Icc.of_isClosed_subset (isClosed_tsupport _) ht
+  obtain ⟨C, hC, hlocal⟩ := translatedLocalTerms_norm_le_exp_sub_sqrt τ hτ ψ hψ H hH hc 1
+  obtain ⟨D, _, hprime⟩ := firstPrime_centered_exp_sub_sqrt_of_localTerms τ hτ ψ hψ H hH hu huv ht 1
+    ⟨C, hC, fun y hy φ hφ a b ha hb ↦ hlocal y hy φ hφ a b ha hb⟩
+  have hP (y : ℝ) (hy : 0 ≤ y) : ‖P y‖ ≤ D * Real.exp (y / 2 - Real.sqrt y) := by
+    change (∫ x : ℝ, H x * Complex.exp ((1/2 : ℂ) * x)) = 0 at hpolar
+    simpa only [P, firstPrimePolarMoment, hpolar, mul_zero, ite_self, sub_zero, one_mul] using hprime y hy
+  have hm : Measurable P := firstPrimeDegreeOneSum_measurable ψ⁻¹ H hH.continuous.measurable v
+  have hgauss : IntegrableOn (fun y : ℝ ↦ Real.exp (-(2 : ℝ) * Real.sqrt y)) (Ici 0) := by
+    rw [integrableOn_Ici_iff_integrableOn_Ioi]
+    simpa only [Real.rpow_zero, one_mul, ← Real.sqrt_eq_rpow] using
+      integrableOn_rpow_mul_exp_neg_mul_rpow (s := 0) (p := (1/2 : ℝ)) (b := 2)
+        (by norm_num) (by norm_num) (by norm_num)
+  have hi : IntegrableOn (fun y : ℝ ↦ ‖P y‖ ^ 2 * Real.exp (-y)) (Ici 0) := by
+    have hm' : Measurable (fun y : ℝ ↦ ‖P y‖ ^ 2 * Real.exp (-y)) := by fun_prop
+    apply (hgauss.const_mul (D ^ 2)).mono' hm'.aestronglyMeasurable
+    filter_upwards [ae_restrict_mem (μ := volume) measurableSet_Ici] with y hy
+    rw [Real.norm_of_nonneg (mul_nonneg (sq_nonneg _) (Real.exp_pos _).le)]
+    calc
+      _ ≤ (D * Real.exp (y / 2 - Real.sqrt y)) ^ 2 * Real.exp (-y) :=
+        mul_le_mul_of_nonneg_right (pow_le_pow_left₀ (norm_nonneg _) (hP y hy) _) (Real.exp_pos _).le
+      _ = _ := by
+        rw [mul_pow, pow_two (Real.exp _), mul_assoc, ← Real.exp_add, ← Real.exp_add]
+        congr 2
+        ring
+  refine ⟨hi, ?_⟩
+  have h := AbelEdge.weightedSquareAbelMean_firstOrder hm (1/2)
+    (by simpa only [show (2 * (1/2 : ℝ)) = 1 by norm_num, neg_one_mul] using hi)
+  simpa only [show (2 * (1/2 : ℝ)) = 1 by norm_num, neg_one_mul] using h
+
 section UniversalGevrey
 
 /-! The field is an explicit argument of the following local notations because
@@ -949,6 +995,66 @@ theorem exists_universalGevrey_signedLocalTerms_coleman :
   obtain ⟨hker, hpolar, hdet, hlocal⟩ := (htests y hy).2 φ hφ
   exact ⟨hker, hpolar, hdet, fun a b ha hb ↦
     ⟨(hlocal a b ha hb).1, hbound y hy φ hφ a b ha hb⟩⟩
+
+/-- For the same fixed polar-free profile, the signed residue-degree-one sum of
+the inverse normalized character obeys the Coleman pointwise bound and has every
+positive integral moment at each smaller tilt. At half shift, its unaveraged
+square energy is the exact first-order coefficient of its Abel mean. -/
+theorem exists_universalGevrey_firstPrime_coleman :
+    ∃ H : ℝ → ℝ, let G := fun x : ℝ ↦ (H x : ℂ)
+      bilateralLaplace G = translatedIntervalMultiplier quadraticBoxLaplace ∧
+      ContDiff ℝ ∞ H ∧ tsupport H ⊆ Icc 2 4 ∧
+      (∀ w ∈ polarSites, bilateralLaplace G w = 0) ∧
+      (∀ w : ℂ, 0 < |w.re| → |w.re| < 1/2 → bilateralLaplace G w ≠ 0) ∧
+      ∀ (F : Type u) [Field F] [NumberField F] (τ : ℝ≥0ˣ →ₜ* C𝔽(F))
+        (_hτ : RightInverse τ (ideleClassNorm F)) (ψ : PontryaginDual C𝔽(F)) (_hψ : ∀ t, ψ (τ t) = 1),
+        let P := fun y : ℝ ↦ firstPrimeDegreeOneSum ψ⁻¹ G y 4
+        let E := ∫ y in Ici (0 : ℝ), ‖P y‖ ^ 2 * Real.exp (-y)
+        ∃ d > (0 : ℝ), ∃ C ≥ (0 : ℝ),
+          (∀ y ≥ (0 : ℝ), ‖P y‖ ≤ C * Real.exp (y / 2 - d * y / colemanLogWeight 2 y)) ∧
+          (∀ (n : ℕ), 0 < n → ∀ k : ℝ, k < d →
+            IntegrableOn (fun y : ℝ ↦ ‖P y‖ ^ n *
+              Real.exp ((n : ℝ) * (-y / 2 + k * y / colemanLogWeight 2 y))) (Ici 0)) ∧
+          (∀ ε > (0 : ℝ), AbelEdge.weightedSquareAbelMean P (1 / 2) ε ≤
+            ENNReal.ofReal ε * ENNReal.ofReal E) ∧
+          Tendsto (fun ε : ℝ ↦ AbelEdge.weightedSquareAbelMean P (1 / 2) ε / ENNReal.ofReal ε)
+            (𝓝[>] 0) (𝓝 (ENNReal.ofReal E)) := by
+  obtain ⟨H, hform, hs, ht, hp, hn, _, hfamilies⟩ := exists_universalGevrey_signedLocalTerms_coleman.{u}
+  let G := fun x : ℝ ↦ (H x : ℂ)
+  have hG : ContDiff ℝ ∞ G := Complex.ofRealCLM.contDiff.comp hs
+  have hGt : tsupport G ⊆ Icc 2 4 := (tsupport_comp_subset Complex.ofReal_zero H).trans ht
+  have hhalf : bilateralLaplace G (1/2) = 0 := hp _ (by simp)
+  refine ⟨H, hform, hs, ht, hp, hn, ?_⟩
+  intro F _ _ τ hτ ψ hψ
+  obtain ⟨b, hb, C, hC, hlocal⟩ := hfamilies F τ hτ ψ hψ
+  let d := min b (1/4)
+  have hd : 0 < d := lt_min hb (by norm_num)
+  let W (y : ℝ) := Real.exp (y / 2 - d * y / colemanLogWeight 2 y)
+  have hW (y : ℝ) (hy : 0 ≤ y) : 1 ≤ W y := by
+    have hh := half_le_colemanLogWeight (a := 2) (by norm_num) hy
+    have hpos : 0 < colemanLogWeight 2 y := lt_of_lt_of_le (by norm_num) hh
+    have hdw : d / colemanLogWeight 2 y ≤ 1/2 :=
+      (div_le_iff₀ hpos).mpr ((min_le_right _ _).trans (by linarith))
+    have hmul := mul_le_mul_of_nonneg_right hdw hy
+    rw [div_mul_eq_mul_div] at hmul
+    exact Real.one_le_exp (by linarith)
+  obtain ⟨D, hD, hprime⟩ := firstPrime_centered_bound_of_localTerms τ hτ ψ hψ G hG
+    (u := 2) (v := 4) (by norm_num) (by norm_num) hGt W zero_lt_one hC hW
+    (fun y hy φ hφ a b ha hb ↦ by
+      obtain ⟨_, _, _, hbound⟩ := (hlocal y hy).2 φ hφ
+      exact ((hbound a b ha hb).2).trans (mul_le_mul_of_nonneg_left (Real.exp_le_exp.mpr
+        (sub_le_sub_left (div_le_div_of_nonneg_right (mul_le_mul_of_nonneg_right (min_le_left _ _) hy)
+          ((by norm_num : (0 : ℝ) ≤ 1/2).trans (half_le_colemanLogWeight (by norm_num) hy))) _)) hC))
+  let P := fun y : ℝ ↦ firstPrimeDegreeOneSum ψ⁻¹ G y 4
+  have hP (y : ℝ) (hy : 0 ≤ y) : ‖P y‖ ≤ D * W y := by
+    have hmoment : (∫ x : ℝ, G x * Complex.exp ((1/2 : ℂ) * x)) = 0 := hhalf
+    simpa only [P, firstPrimePolarMoment, hmoment, mul_zero, ite_self, sub_zero] using hprime y hy
+  have hmP : Measurable P := firstPrimeDegreeOneSum_measurable ψ⁻¹ G hG.continuous.measurable 4
+  have hpow := integrableOn_pow_mul_exp_coleman_of_bound hmP.norm.aestronglyMeasurable
+    (fun y ↦ norm_nonneg (P y)) hP
+  have hfirst := firstPrime_polarFree_half_abel_firstOrder τ hτ ψ hψ G hG
+    (u := 2) (v := 4) (by norm_num) (by norm_num) hGt hhalf
+  exact ⟨d, hd, D, hD, hP, hpow, hfirst.2⟩
 
 end UniversalGevrey
 
