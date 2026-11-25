@@ -135,9 +135,10 @@ theorem spectralProjection_convolution_nuclear_of_le_one (_hs₁ : s ≤ 1) (φ 
 
 /-- Paper: Theorem 10.4.2.1, p. 459. Spectral projection after convolution is nuclear.
 Deviation: This checks the uncut conclusion on the range `1 < s` of the strip theorem. -/
-theorem spectralProjection_convolution_nuclear_of_one_lt (hs₁ : 1 < s) (φ : BruhatCompactSupport C𝔽) :
+theorem spectralProjection_convolution_nuclear_of_one_lt (_hs₁ : 1 < s) (φ : BruhatCompactSupport C𝔽) :
     IsNuclearOperator ((spectralProjection (F := F) a hα hs).comp (A(φ))) :=
-  RiemannMasullo.spectralProjection_convolution_nuclear_of_one_lt a hα hs₁ φ
+  spectralProjection_convolution_nuclear a hα hs φ
+    (spectralStripConvolution_nuclear_of_summable_clusterTraceNorms a hα hs φ)
 
 /-- Paper: Theorem 10.4.2.1, p. 459. At each admissible cutoff, spectral truncation
 after convolution is nuclear. This follows from the open `spectralStripConvolution_nuclear_of_le_one`
@@ -151,10 +152,11 @@ theorem spectralTruncatedConvolution_nuclear_of_le_one (_hs₁ : s ≤ 1)
 
 /-- Paper: Theorem 10.4.2.1, p. 459. Spectral truncation after convolution is nuclear.
 Deviation: At `1 < s` the existing theorem applies to real cutoffs even without the inner-band inequality. -/
-theorem spectralTruncatedConvolution_nuclear_of_one_lt (hs₁ : 1 < s)
+theorem spectralTruncatedConvolution_nuclear_of_one_lt (_hs₁ : 1 < s)
     (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (φ : BruhatCompactSupport C𝔽) :
     IsNuclearOperator (spectralTruncatedConvolution a hα hs hρ φ) :=
-  RiemannMasullo.spectralTruncatedConvolution_nuclear_of_one_lt a hα hs₁ hρ φ
+  spectralTruncatedConvolution_nuclear a hα hs hρ φ
+    (spectralStripConvolution_nuclear_of_summable_clusterTraceNorms a hα hs φ)
 
 /-- Paper: Theorem 10.4.2.1, p. 459. At each admissible cutoff, geometric truncation
 after convolution is nuclear. Given the open `spectralStripConvolution_nuclear_of_le_one`,
@@ -168,10 +170,11 @@ theorem geometricTruncatedConvolution_nuclear_of_le_one (_hs₁ : s ≤ 1)
 
 /-- Paper: Theorem 10.4.2.1, p. 459. Geometric truncation after convolution is nuclear.
 Deviation: This checks the real-cutoff conclusion at `1 < s` using the strip theorem. -/
-theorem geometricTruncatedConvolution_nuclear_of_one_lt (hs₁ : 1 < s)
+theorem geometricTruncatedConvolution_nuclear_of_one_lt (_hs₁ : 1 < s)
     (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (hband : band(Λ, ε)) (φ : BruhatCompactSupport C𝔽) :
     IsNuclearOperator (geometricTruncatedConvolution a hα hs hρ φ) :=
-  RiemannMasullo.geometricTruncatedConvolution_nuclear_of_one_lt a hα hs₁ hρ hband φ
+  geometricTruncatedConvolution_nuclear a hα hs hρ hband φ
+    (spectralStripConvolution_nuclear_of_summable_clusterTraceNorms a hα hs φ)
 
 local notation "traceSplit(" hρ ", " φ ")" =>
   (let T := (M(hρ)).comp (A(φ))
@@ -194,10 +197,11 @@ theorem truncatedConvolution_trace_split_of_le_one (_hs₁ : s ≤ 1)
 
 /-- Paper: Theorem 10.4.2.1, p. 459. The nuclear trace splits as in (10.4.2.3).
 Deviation: This checks the identity with real cutoffs and all three nuclearity witnesses at `1 < s`. -/
-theorem truncatedConvolution_trace_split_of_one_lt (hs₁ : 1 < s)
+theorem truncatedConvolution_trace_split_of_one_lt (_hs₁ : 1 < s)
     (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (hband : band(Λ, ε)) (φ : BruhatCompactSupport C𝔽) :
     traceSplit(hρ, φ) :=
-  RiemannMasullo.truncatedConvolution_trace_split_of_one_lt a hα hs₁ hρ hband φ
+  truncatedConvolution_trace_split a hα hs hρ hband φ
+    (spectralStripConvolution_nuclear_of_summable_clusterTraceNorms a hα hs φ)
 
 section Limits
 
@@ -229,10 +233,10 @@ theorem spectralTruncatedConvolution_trace_tendsto_of_le_one (_hs₁ : s ≤ 1) 
 
 /-- Paper: Theorem 10.4.2.2, p. 460. The projection-after-convolution traces tend to the strip quotient trace.
 Deviation: This checks the eventual real-cutoff formulation at `1 < s` with the nuclearity witness from §10.3. -/
-theorem spectralTruncatedConvolution_trace_tendsto_of_one_lt (hs₁ : 1 < s) :
-    traceLimit(spectralTruncatedConvolution) :=
-  ⟨spectralStripConvolution_nuclear a hα hs₁ φ,
-    RiemannMasullo.spectralTruncatedConvolution_trace_tendsto_of_one_lt a hα hs₁ φ ε ρ hε hρ⟩
+theorem spectralTruncatedConvolution_trace_tendsto_of_one_lt (_hs₁ : 1 < s) :
+    traceLimit(spectralTruncatedConvolution) := by
+  have hq := spectralStripConvolution_nuclear_of_summable_clusterTraceNorms a hα hs φ
+  exact ⟨hq, spectralTruncatedConvolution_trace_tendsto a hα hs φ hq ε ρ hε hρ⟩
 
 /-- Paper: Theorem 10.4.2.8, p. 463. The traces of cutoff convolution after spectral
 projection tend to the strip quotient trace, as in (10.4.2.20). This follows from the
@@ -246,10 +250,10 @@ theorem spectralRestriction_trace_tendsto_of_le_one (_hs₁ : s ≤ 1) :
 
 /-- Paper: Theorem 10.4.2.8, p. 463. The convolution-after-projection traces tend to the strip quotient trace.
 Deviation: This checks the eventual real-cutoff formulation at `1 < s` with the nuclearity witness from §10.3. -/
-theorem spectralRestriction_trace_tendsto_of_one_lt (hs₁ : 1 < s) :
-    traceLimit(spectralRestriction) :=
-  ⟨spectralStripConvolution_nuclear a hα hs₁ φ,
-    RiemannMasullo.spectralRestriction_trace_tendsto_of_one_lt a hα hs₁ φ ε ρ hε hρ⟩
+theorem spectralRestriction_trace_tendsto_of_one_lt (_hs₁ : 1 < s) :
+    traceLimit(spectralRestriction) := by
+  have hq := spectralStripConvolution_nuclear_of_summable_clusterTraceNorms a hα hs φ
+  exact ⟨hq, spectralRestriction_trace_tendsto a hα hs φ hq ε ρ hε hρ⟩
 
 end Limits
 
