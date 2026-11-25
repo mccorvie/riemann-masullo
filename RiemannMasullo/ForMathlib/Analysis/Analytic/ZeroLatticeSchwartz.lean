@@ -216,4 +216,235 @@ theorem tendsto_sampleSum_schwartz {ι : Type*} (f : ℝ → ℂ) (q m : ι → 
   change |sampleSum f g n - sampleSum f (G r) n| ≤ K / ((r : ℝ)+1) at htail
   linarith
 
+private def envelopeTail (w : ℤ → ℝ) (r : ℕ) (j : ℤ) : ℝ :=
+  if (r : ℝ) < |(j : ℝ)|+1 then w j else 0
+
+private lemma envelopeTail_bounds {w : ℤ → ℝ} (hw : ∀ j, 0 ≤ w j) (r : ℕ) (j : ℤ) :
+    0 ≤ envelopeTail w r j ∧ envelopeTail w r j ≤ w j := by
+  unfold envelopeTail
+  split <;> simp [hw]
+
+private lemma envelopeTail_tendsto {w : ℤ → ℝ} (hw : ∀ j, 0 ≤ w j) (hs : Summable w) :
+    Tendsto (fun r : ℕ ↦ ∑' j, envelopeTail w r j) atTop (𝓝 0) := by
+  have hh : Tendsto (fun r : ℕ ↦ ∑' j, envelopeTail w r j) atTop (𝓝 (∑' _ : ℤ, (0 : ℝ))) := by
+    apply tendsto_tsum_of_dominated_convergence hs
+    · intro j
+      apply tendsto_const_nhds.congr'
+      filter_upwards [tendsto_natCast_atTop_atTop.eventually (eventually_ge_atTop (|(j : ℝ)|+1))] with r hr
+      simp [envelopeTail,not_lt.mpr hr]
+    · filter_upwards with r j
+      rw [Real.norm_eq_abs,abs_of_nonneg (envelopeTail_bounds hw r j).1]
+      exact (envelopeTail_bounds hw r j).2
+  simpa using hh
+
+private lemma sampleSum_cut_error_le_envelope_tail (f : ℝ → ℂ) (g : ℝ → ℝ)
+    (b d : ℤ → ℝ) (hb : ∀ j, 0 ≤ b j) (hd : ∀ j, 0 ≤ d j)
+    (hs : Summable (fun j ↦ b j*d j)) {J : ℝ}
+    (hcount : ∀ j : ℤ, J ≤ |(j : ℝ)| → ∀ n : ℕ, 0 < n →
+      ((binIndices f j n).card : ℝ)/n ≤ b j)
+    (hsize : ∀ j : ℤ, J ≤ |(j : ℝ)| → ∀ t ∈ Ico (j : ℝ) ((j : ℝ)+1), |g t| ≤ d j)
+    {r n : ℕ} (hr : J+1 ≤ r) (hn : 0 < n) :
+    |sampleSum f g n - sampleSum f (fun t ↦ cutoff r t * g t) n| ≤
+      ∑' j, envelopeTail (fun i ↦ b i*d i) r j := by
+  classical
+  let A := finiteNodes f n
+  let x (k : ℤ) := (k : ℝ)/(n : ℝ)^2
+  let β (k : ℤ) := ⌊x k⌋
+  let S (j : ℤ) := A.filter fun k ↦ β k = j
+  let e (k : ℤ) := |g (x k) - cutoff r (x k)*g (x k)|
+  let w (j : ℤ) := b j*d j
+  have hw (j : ℤ) : 0 ≤ w j := mul_nonneg (hb j) (hd j)
+  have hn' : 0 < (n : ℝ) := by exact_mod_cast hn
+  have hn₂ := sq_pos_of_pos hn'
+  have hbin {j k : ℤ} (hk : k ∈ S j) : x k ∈ Ico (j : ℝ) ((j : ℝ)+1) := by
+    have hj : ⌊x k⌋ = j := (Finset.mem_filter.mp hk).2
+    rw [← hj]
+    exact ⟨Int.floor_le _,Int.lt_floor_add_one _⟩
+  have hsub (j : ℤ) : S j ⊆ binIndices f j n := by
+    intro k hk
+    obtain ⟨hl,hu⟩ := hbin hk
+    have hp := (Finset.mem_filter.mp (show k ∈ finiteNodes f n from (Finset.mem_filter.mp hk).1)).2
+    refine (mem_binIndices_iff f j n k).mpr ⟨⟨?_, ?_⟩, hp⟩
+    · exact_mod_cast (le_div_iff₀ hn₂).mp hl
+    · exact_mod_cast (div_lt_iff₀ hn₂).mp hu
+  have he (k : ℤ) : e k ≤ |g (x k)| := by
+    dsimp only [e]
+    rw [← one_sub_mul,abs_mul,abs_of_nonneg (sub_nonneg.mpr (cutoff_bounds r (x k)).2)]
+    exact mul_le_of_le_one_left (abs_nonneg _) (by linarith [(cutoff_bounds r (x k)).1])
+  have hpiece (j : ℤ) : (∑ k ∈ S j, e k)/(n : ℝ) ≤ envelopeTail w r j := by
+    by_cases H : (r : ℝ) < |(j : ℝ)|+1
+    · have hj : J ≤ |(j : ℝ)| := by linarith
+      have hcard : ((S j).card : ℝ) ≤ (binIndices f j n).card := by exact_mod_cast Finset.card_le_card (hsub j)
+      have hc := (div_le_div_of_nonneg_right hcard hn'.le).trans (hcount j hj n hn)
+      calc
+        _ ≤ (∑ _k ∈ S j, d j)/n := div_le_div_of_nonneg_right
+          (Finset.sum_le_sum fun k hk ↦ (he k).trans (hsize j hj (x k) (hbin hk))) hn'.le
+        _ = ((S j).card/(n : ℝ))*d j := by simp; ring
+        _ ≤ b j*d j := mul_le_mul_of_nonneg_right hc (hd j)
+        _ = _ := by simp [envelopeTail,H,w]
+    · have hz : ∑ k ∈ S j, e k = 0 := Finset.sum_eq_zero fun k hk ↦ by
+        obtain ⟨hl,hu⟩ := hbin hk
+        have hx : |x k| ≤ r := abs_le.mpr ⟨by linarith [neg_abs_le (j : ℝ)],by linarith [le_abs_self (j : ℝ)]⟩
+        simp [e,cutoff_one hx]
+      simp [hz,envelopeTail,H]
+  have hsum : Summable (envelopeTail w r) :=
+    Summable.of_nonneg_of_le (fun j ↦ (envelopeTail_bounds hw r j).1) (fun j ↦ (envelopeTail_bounds hw r j).2) hs
+  calc
+    _ ≤ (∑ k ∈ A,e k)/n := by
+      rw [sampleSum_eq,sampleSum_eq,← sub_div,abs_div,abs_of_pos hn']
+      apply div_le_div_of_nonneg_right _ hn'.le
+      rw [← Finset.sum_sub_distrib]
+      exact Finset.abs_sum_le_sum_abs _ _
+    _ = ∑ j ∈ A.image β, (∑ k ∈ S j, e k)/n := by
+      rw [← Finset.sum_div]
+      exact congrArg (·/(n : ℝ)) (Finset.sum_fiberwise_of_maps_to (fun k hk ↦ Finset.mem_image_of_mem β hk) e).symm
+    _ ≤ ∑ j ∈ A.image β,envelopeTail w r j := Finset.sum_le_sum fun j _ ↦ hpiece j
+    _ ≤ _ := hsum.sum_le_tsum _ fun j _ ↦ (envelopeTail_bounds hw r j).1
+
+/-- A signed continuous test inherits the compact lattice limit if its absolute target
+mass is summable and the product of its high-bin sup bound and normalized count bound
+is summable on the integer bins. -/
+theorem tendsto_sampleSum_of_summable_bin_envelope {ι : Type*} (f : ℝ → ℂ) (q m : ι → ℝ)
+    (hcompact : ∀ v : ℝ → ℝ, Continuous v → HasCompactSupport v →
+      Tendsto (sampleSum f v) atTop (𝓝 (∑' i, m i * v (q i))))
+    {g : ℝ → ℝ} (hg : Continuous g) (hsite : Summable (fun i ↦ |m i*g (q i)|))
+    (b d : ℤ → ℝ) (hb : ∀ j, 0 ≤ b j) (hd : ∀ j, 0 ≤ d j)
+    (hs : Summable (fun j ↦ b j*d j)) {J : ℝ}
+    (hcount : ∀ j : ℤ, J ≤ |(j : ℝ)| → ∀ n : ℕ, 0 < n → ((binIndices f j n).card : ℝ)/n ≤ b j)
+    (hsize : ∀ j : ℤ, J ≤ |(j : ℝ)| → ∀ t ∈ Ico (j : ℝ) ((j : ℝ)+1), |g t| ≤ d j) :
+    Tendsto (sampleSum f g) atTop (𝓝 (∑' i, m i*g (q i))) := by
+  let G (r : ℕ) (t : ℝ) := cutoff r t*g t
+  have hGc (r : ℕ) : Continuous (G r) := by dsimp [G,cutoff]; fun_prop
+  have hGK (r : ℕ) : HasCompactSupport (G r) := (cutoff_compact r).mul_right
+  have htarget : Tendsto (fun r : ℕ ↦ ∑' i, m i*G r (q i)) atTop (𝓝 (∑' i, m i*g (q i))) := by
+    apply tendsto_tsum_of_dominated_convergence hsite
+    · intro i
+      apply tendsto_const_nhds.congr'
+      filter_upwards [tendsto_natCast_atTop_atTop.eventually (eventually_ge_atTop |q i|)] with r hr
+      simp [G,cutoff_one hr]
+    · filter_upwards with r i
+      rw [Real.norm_eq_abs,show m i*G r (q i) = cutoff r (q i)*(m i*g (q i)) by dsimp [G]; ring,
+        abs_mul,abs_of_nonneg (cutoff_bounds _ _).1]
+      exact mul_le_of_le_one_left (abs_nonneg _) (cutoff_bounds _ _).2
+  have htail := envelopeTail_tendsto (fun j ↦ mul_nonneg (hb j) (hd j)) hs
+  apply Metric.tendsto_nhds.mpr
+  intro ε hε
+  have hp : 0 < ε/3 := by linarith
+  obtain ⟨r,hr,ht,hrJ⟩ := ((htarget.eventually (Metric.ball_mem_nhds _ hp)).and
+    ((htail.eventually_lt_const hp).and (tendsto_natCast_atTop_atTop.eventually (eventually_ge_atTop (J+1))))).exists
+  have hlim := hcompact (G r) (hGc r) (hGK r)
+  filter_upwards [hlim.eventually (Metric.ball_mem_nhds _ hp),eventually_gt_atTop (0 : ℕ)] with n hn hnpos
+  have hdiff := sampleSum_cut_error_le_envelope_tail f g b d hb hd hs hcount hsize hrJ hnpos
+  change |sampleSum f g n - sampleSum f (G r) n| ≤ _ at hdiff
+  change |sampleSum f (G r) n - ∑' i, m i*G r (q i)| < _ at hn
+  change |(∑' i, m i*G r (q i)) - ∑' i, m i*g (q i)| < _ at hr
+  rw [Real.dist_eq]
+  have hh := abs_add_le (sampleSum f g n - sampleSum f (G r) n)
+    (sampleSum f (G r) n - ∑' i, m i*g (q i))
+  have hhh := abs_add_le (sampleSum f (G r) n - ∑' i, m i*G r (q i))
+    ((∑' i, m i*G r (q i)) - ∑' i, m i*g (q i))
+  rw [sub_add_sub_cancel] at hh hhh
+  linarith
+
+/-- A squared logarithm from the bin count preserves summability of the inverse-square
+weight on the two-sided integer lattice. -/
+theorem summable_log_count_div_sq (C : ℝ) (hC : 0 ≤ C) :
+    Summable (fun j : ℤ ↦ (C*Real.log (2+|(j : ℝ)|)+1)^2/(1+|(j : ℝ)|)^2) := by
+  have hsN : Summable (fun n : ℕ ↦ 1/(1+(n : ℝ))^(3/2 : ℝ)) := by
+    have hh := (Real.summable_one_div_nat_add_rpow 1 (3/2 : ℝ)).mpr (by norm_num)
+    apply hh.congr
+    intro n
+    rw [abs_of_nonneg (by positivity : 0 ≤ (n : ℝ)+1),add_comm]
+  have hsZ : Summable (fun j : ℤ ↦ 1/(1+|(j : ℝ)|)^(3/2 : ℝ)) := by
+    apply Summable.of_nat_of_neg <;> simpa using hsN
+  apply Summable.of_nonneg_of_le (fun _ ↦ by positivity) _ (hsZ.mul_left ((5*C+1)^2))
+  intro j
+  let u := 1+|(j : ℝ)|
+  have hu : 0 < u := by dsimp [u]; positivity
+  have hu1 : 1 ≤ u := by dsimp [u]; linarith [abs_nonneg (j : ℝ)]
+  have hw : 1 ≤ u^(1/4 : ℝ) := Real.one_le_rpow hu1 (by norm_num)
+  have hlog₁ : Real.log (2+|(j : ℝ)|) ≤ Real.log (2*u) := by
+    apply Real.log_le_log (by positivity)
+    dsimp [u]
+    linarith [abs_nonneg (j : ℝ)]
+  rw [Real.log_mul (by norm_num) hu.ne'] at hlog₁
+  have hlog₂ := Real.log_le_rpow_div hu.le (by norm_num : 0 < (1/4 : ℝ))
+  have hlog₃ := Real.log_le_sub_one_of_pos (by norm_num : (0 : ℝ) < 2)
+  have hlog : Real.log (2+|(j : ℝ)|) ≤ 5*u^(1/4 : ℝ) := by linarith
+  have hl : 0 ≤ Real.log (2+|(j : ℝ)|) := Real.log_nonneg (by linarith [abs_nonneg (j : ℝ)])
+  have hh : C*Real.log (2+|(j : ℝ)|)+1 ≤ (5*C+1)*u^(1/4 : ℝ) := by
+    nlinarith [mul_le_mul_of_nonneg_left hlog hC]
+  have hpow : (u^(1/4 : ℝ))^2 * u^(3/2 : ℝ) = u^2 := by
+    have he : (u^(1/4 : ℝ))^2 = u^(1/2 : ℝ) := by
+      rw [← Real.rpow_natCast _ 2, ← Real.rpow_mul hu.le]
+      norm_num
+    rw [he,← Real.rpow_add hu,show (1/2 : ℝ)+3/2=2 by norm_num,Real.rpow_two]
+  change (C*Real.log (2+|(j : ℝ)|)+1)^2/u^2 ≤ (5*C+1)^2*(1/u^(3/2 : ℝ))
+  calc
+    _ ≤ ((5*C+1)*u^(1/4 : ℝ))^2/u^2 :=
+      div_le_div_of_nonneg_right (pow_le_pow_left₀ (by positivity) hh 2) (sq_nonneg _)
+    _ = (5*C+1)^2*((u^(1/4 : ℝ))^2/u^2) := by rw [mul_pow]; ring
+    _ = _ := by
+      congr 1
+      exact (div_eq_div_iff (by positivity) (Real.rpow_pos_of_pos hu _).ne').mpr (by simpa using hpow)
+
+/-- A translated Cauchy weight has a global inverse-square bound for each fixed positive
+scale and real center. -/
+theorem exists_cauchy_inverse_sq_bound {a : ℝ} (ha : 0 < a) (T : ℝ) :
+    ∃ P > 0, ∀ t : ℝ, (1+|t|)^2 * |a/(a^2+(t-T)^2)| ≤ P := by
+  let U := 1+|T|
+  let P := max (2*U^2/a) (2*a)
+  have hP : 2*a ≤ P := le_max_right _ _
+  have hU : 2*U^2 ≤ P*a := (div_le_iff₀ ha).mp (le_max_left _ _)
+  refine ⟨P,by linarith,?_⟩
+  intro t
+  have hD : 0 < a^2+(t-T)^2 := add_pos_of_pos_of_nonneg (sq_pos_of_pos ha) (sq_nonneg _)
+  have habs : |t| ≤ |t-T|+|T| := by simpa using (abs_add_le (t-T) T)
+  have h1 : 1+|t| ≤ U+|t-T| := by dsimp [U]; linarith
+  have h2 : (1+|t|)^2 ≤ 2*U^2+2*(t-T)^2 := by
+    have hsq := pow_le_pow_left₀ (by positivity : 0 ≤ 1+|t|) h1 2
+    nlinarith [sq_nonneg (U-|t-T|),sq_abs (t-T)]
+  rw [abs_of_pos (div_pos ha hD),← mul_div_assoc,div_le_iff₀ hD]
+  nlinarith [mul_le_mul_of_nonneg_right h2 ha.le,mul_le_mul_of_nonneg_right hU ha.le,
+    mul_le_mul_of_nonneg_right hP (sq_nonneg (t-T))]
+
+/-- A logarithmic-square count in high unit bins permits any continuous test of
+inverse-square decay. Both the sample limit and absolute convergence of its target follow. -/
+theorem summable_and_tendsto_sampleSum_of_log_count {ι : Type*} (f : ℝ → ℂ) (q m : ι → ℝ)
+    (hm : ∀ i, 0 ≤ m i) (hs : Summable (fun i ↦ m i/(1+|q i|)^2))
+    (hcompact : ∀ v : ℝ → ℝ, Continuous v → HasCompactSupport v →
+      Tendsto (sampleSum f v) atTop (𝓝 (∑' i, m i*v (q i))))
+    {K C J : ℝ} (hK : 0 ≤ K) (hC : 0 ≤ C)
+    (hcount : ∀ j : ℤ, J ≤ |(j : ℝ)| → ∀ n : ℕ, 0 < n →
+      ((binIndices f j n).card : ℝ)/n ≤ K*(C*Real.log (2+|(j : ℝ)|)+1)^2)
+    {g : ℝ → ℝ} (hg : Continuous g) {P : ℝ} (hP : 0 ≤ P) (hdec : ∀ t, (1+|t|)^2*|g t| ≤ P) :
+    Summable (fun i ↦ |m i*g (q i)|) ∧ Tendsto (sampleSum f g) atTop (𝓝 (∑' i, m i*g (q i))) := by
+  have hsite : Summable (fun i ↦ |m i*g (q i)|) := by
+    apply Summable.of_nonneg_of_le (fun _ ↦ abs_nonneg _) _ (hs.mul_left P)
+    intro i
+    rw [abs_mul,abs_of_nonneg (hm i)]
+    calc
+      m i*|g (q i)| ≤ m i*(P/(1+|q i|)^2) := by
+        apply mul_le_mul_of_nonneg_left _ (hm i)
+        exact (le_div_iff₀ (by positivity)).mpr (by simpa only [mul_comm] using hdec (q i))
+      _ = _ := by ring
+  refine ⟨hsite,?_⟩
+  let b (j : ℤ) := K*(C*Real.log (2+|(j : ℝ)|)+1)^2
+  let d (j : ℤ) := 4*P/(1+|(j : ℝ)|)^2
+  have hh : Summable (fun j ↦ b j*d j) := by
+    apply ((summable_log_count_div_sq C hC).mul_left (K*(4*P))).congr
+    intro j
+    dsimp [b,d]
+    ring
+  apply tendsto_sampleSum_of_summable_bin_envelope f q m hcompact hg hsite b d
+    (fun j ↦ by dsimp [b]; positivity) (fun j ↦ by dsimp [d]; positivity) hh hcount
+  intro j _ t ht
+  have hnear : |(j : ℝ)| ≤ |t|+1 := abs_le.mpr ⟨by linarith [neg_abs_le t,ht.2],by linarith [le_abs_self t,ht.1]⟩
+  have hsq : (1+|(j : ℝ)|)^2 ≤ 4*(1+|t|)^2 := by
+    have hh := pow_le_pow_left₀ (by positivity : 0 ≤ 1+|(j : ℝ)|)
+      (by linarith [abs_nonneg t] : 1+|(j : ℝ)| ≤ 2*(1+|t|)) 2
+    nlinarith
+  apply (le_div_iff₀ (by positivity : 0 < (1+|(j : ℝ)|)^2)).mpr
+  nlinarith [mul_le_mul_of_nonneg_right hsq (abs_nonneg (g t)),hdec t]
+
 end RiemannMasullo.AnalyticLattice

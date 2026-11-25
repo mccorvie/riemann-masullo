@@ -1,7 +1,10 @@
 module
 
+import RiemannMasullo.Ch01_Introduction.Sec4_HeckePoissonFormula
 import Mathlib.Geometry.Manifold.PartitionOfUnity
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
+public import RiemannMasullo.Ch01_Introduction.Sec4_HeckePoissonMass
+public import RiemannMasullo.Ch01_Introduction.Sec4_HeckePoissonReference
 public import RiemannMasullo.AppB_AnalyticNT.PolynomialIdealSamples
 public import RiemannMasullo.ForMathlib.Analysis.Analytic.ZeroLatticeEventuallyCertified
 public import RiemannMasullo.ForMathlib.Analysis.Analytic.ZeroDensity
@@ -1113,6 +1116,92 @@ theorem tendsto_certified_polynomialIdealSampleMagnitude (τ : ℝ≥0ˣ →ₜ*
     (fun _ ↦ Nat.cast_nonneg _) (fun _ ↦ tendsto_sampleSum_criticalFiniteHeckeL_compact χ)
     g.continuous hg (tendsto_sampleSum_criticalFiniteHeckeL χ g)
 
+private theorem summable_central_divisor_inverse_sq (χ : PontryaginDual C𝔽) :
+    Summable (fun z : central(χ) ↦ ((ord(χ, z.val)).toNat : ℝ) / (1 + |z.val.im|)^2) := by
+  let Z := {z : ℂ // 0 < ord(χ, z)}
+  let i (z : central(χ)) : Z := ⟨z.val, z.property.1⟩
+  have hi : Function.Injective i := fun _ _ h ↦ Subtype.ext (congrArg (fun p : Z ↦ p.val) h)
+  have hall : Summable (fun z : Z ↦ (ord(χ, z.val) : ℝ) / (1 + |z.val.im|)^2) := by
+    simpa only [explicitFormulaCompletedHeckeL, continuedCompletedHeckeL] using
+      explicitFormulaCompletedHeckeL_summable_divisor_div_sq χ
+  apply (hall.comp_injective hi).congr
+  intro z
+  have hcast : ((ord(χ, z.val)).toNat : ℝ) = (ord(χ, z.val) : ℝ) := by
+    exact_mod_cast Int.toNat_of_nonneg z.property.1.le
+  change (ord(χ, z.val) : ℝ) / _ = _
+  rw [hcast]
+
+/-- For every unitary character, a Cauchy test with arbitrary positive width and real
+center recovers the absolutely summable central divisor, with its full multiplicities,
+from the consecutive-value comparisons of the original finite mesh. -/
+theorem tendsto_sampleSum_criticalFiniteHeckeL_cauchy (χ : PontryaginDual C𝔽) {a : ℝ} (ha : 0 < a) (T : ℝ) :
+    let g (t : ℝ) := a / (a^2 + (T-t)^2)
+    let mass (z : central(χ)) := ((ord(χ, z.val)).toNat : ℝ) * g z.val.im
+    Summable mass ∧
+      Tendsto (sampleSum (criticalFiniteHeckeL χ) g) atTop (𝓝 (∑' z, mass z)) := by
+  intro g mass
+  have hD (t : ℝ) : 0 < a^2 + (T-t)^2 := add_pos_of_pos_of_nonneg (sq_pos_of_pos ha) (sq_nonneg _)
+  have hg : Continuous g :=
+    continuous_const.div (continuous_const.add ((continuous_const.sub continuous_id).pow 2))
+      (fun t ↦ (hD t).ne')
+  obtain ⟨P, hP, hbound⟩ := exists_cauchy_inverse_sq_bound ha T
+  have hdec (t : ℝ) : (1 + |t|)^2 * |g t| ≤ P := by
+    simpa only [g, show (T-t)^2 = (t-T)^2 by ring] using hbound t
+  obtain ⟨C, hC, J, _, hcount⟩ := criticalFiniteHeckeL_high_bin_count χ
+  have hlim := summable_and_tendsto_sampleSum_of_log_count (criticalFiniteHeckeL χ)
+    (fun z : central(χ) ↦ z.val.im) (fun z ↦ ((ord(χ, z.val)).toNat : ℝ))
+    (fun _ ↦ Nat.cast_nonneg _) (summable_central_divisor_inverse_sq χ)
+    (fun _ ↦ tendsto_sampleSum_criticalFiniteHeckeL_compact χ)
+    (by norm_num : (0 : ℝ) ≤ 13) hC.le hcount hg hP.le hdec
+  exact ⟨hlim.1.congr (fun z ↦ abs_of_nonneg (mul_nonneg (Nat.cast_nonneg _)
+    (div_pos ha (hD z.val.im)).le)), hlim.2⟩
+
+/-- The raw finite-Hecke lattice sums at abscissa `σ > 1` recover exactly the full-order
+contributions of the positive central divisor sites to the canonical Poisson kernel. -/
+theorem tendsto_sampleSum_criticalFiniteHeckeL_poisson (χ : PontryaginDual C𝔽) {σ : ℝ} (hσ : 1 < σ) (T : ℝ) :
+    let g (t : ℝ) := (σ - 1/2) / ((σ - 1/2)^2 + (T-t)^2)
+    let mass (z : central(χ)) := ((ord(χ, z.val)).toNat : ℝ) * HeckePoisson.poissonWeight σ T z.val
+    Summable mass ∧
+      Tendsto (sampleSum (criticalFiniteHeckeL χ) g) atTop (𝓝 (∑' z, mass z)) := by
+  intro g mass
+  have ha : 0 < σ - 1/2 := by linarith
+  have hm : mass = fun z : central(χ) ↦ ((ord(χ, z.val)).toNat : ℝ) * g z.val.im := by
+    funext z
+    simp only [mass, HeckePoisson.poissonWeight, z.property.2, g]
+  rw [hm]
+  exact tendsto_sampleSum_criticalFiniteHeckeL_cauchy χ ha T
+
+/-- The consecutive comparisons of polynomial-length ideal sums recover the
+central Poisson mass for every translated right-half-plane evaluation. -/
+theorem tendsto_certified_polynomialIdealSampleMagnitude_poisson
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : PontryaginDual C𝔽) (hχ : ∀ r, χ (τ r) = 1) {σ : ℝ} (hσ : 1 < σ) (T : ℝ) :
+    let g (t : ℝ) := (σ - 1 / 2) / ((σ - 1 / 2)^2 + (T - t)^2)
+    let mass (z : central(χ)) := ((ord(χ, z.val)).toNat : ℝ) * HeckePoisson.poissonWeight σ T z.val
+    Summable mass ∧
+      (∀ᶠ n : ℕ in atTop, certifiedSum (polynomialIdealSampleMagnitude χ) g n ≤
+        sampleSum (criticalFiniteHeckeL χ) g n) ∧
+      Tendsto (certifiedSum (polynomialIdealSampleMagnitude χ) g) atTop (𝓝 (∑' z, mass z)) := by
+  intro g mass
+  have hraw := tendsto_sampleSum_criticalFiniteHeckeL_poisson χ hσ T
+  have ht : Tendsto (sampleSum (criticalFiniteHeckeL χ) g) atTop (𝓝 (∑' z, mass z)) := hraw.2
+  refine ⟨hraw.1, ?_⟩
+  have hm : mass = fun z : central(χ) ↦ ((ord(χ, z.val)).toNat : ℝ) * g z.val.im := by
+    funext z
+    simp only [mass, HeckePoisson.poissonWeight, z.property.2, g]
+  rw [hm] at ht ⊢
+  have ha : 0 < σ - 1 / 2 := by linarith
+  have hd (t : ℝ) : 0 < (σ - 1 / 2)^2 + (T - t)^2 := add_pos_of_pos_of_nonneg (sq_pos_of_pos ha) (sq_nonneg _)
+  have hg : Continuous g := continuous_const.div
+    (continuous_const.add ((continuous_const.sub continuous_id).pow 2)) (fun t ↦ (hd t).ne')
+  have ho (t : ℝ) := criticalFiniteHeckeL_order χ t
+  exact tendsto_certifiedSum_of_eventuallyAccurate
+    (eventuallyAccurate_polynomialIdealSampleMagnitude τ hτ χ hχ)
+    (fun t ↦ (ho t).1) (fun t h ↦ (ho t).2.1 (analyticOrderAt_eq_top.mp h))
+    (fun z : central(χ) ↦ z.val.im) (fun z ↦ ((ord(χ, z.val)).toNat : ℝ))
+    (fun _ ↦ Nat.cast_nonneg _) (fun _ ↦ tendsto_sampleSum_criticalFiniteHeckeL_compact χ)
+    hg (fun t ↦ (div_pos ha (hd t)).le) ht
+
 end CriticalHeckeLattice
 
 section CriticalMeasurements
@@ -1170,7 +1259,7 @@ private theorem lowerBound_iff_cofinal_samples {v : ℕ → ℝ} {L S : ℝ}
     obtain ⟨M,hM⟩ := eventually_atTop.1 (hv.eventually (lt_mem_nhds (show S-δ < L by linarith)))
     exact ⟨max N M,le_max_left _ _,(hM _ (le_max_right N M)).le⟩
 
-private theorem centralMass_of_hasSum (χ : PontryaginDual C𝔽) (g : 𝓢(ℝ, ℝ))
+private theorem centralMass_of_hasSum (χ : PontryaginDual C𝔽) (g : ℝ → ℝ)
     (W : Sites(χ) → ℝ) (S : ℝ) (hS : HasSum W S) (hpos : ∀ z, 0 < W z)
     (hline : ∀ z : Sites(χ), z.val.re = 1/2 →
       W z = ((ord(χ,z.val)).toNat : ℝ) * g z.val.im) :
@@ -1201,6 +1290,157 @@ private theorem centralMass_of_hasSum (χ : PontryaginDual C𝔽) (g : 𝓢(ℝ,
   · intro h
     have : IsEmpty D := ⟨fun z ↦ z.property (h z.val)⟩
     simpa using hsplit.ge
+
+/-- At the single evaluation point two, saturation of the explicit
+finite-ideal comparisons characterizes centrality of every positive
+completed Hecke divisor site of the fixed normalized character. -/
+theorem cofinal_polynomialIdealSampleMagnitude_two_zero_iff
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : PontryaginDual C𝔽) (hχ : ∀ r, χ (τ r) = 1) :
+    let g (t : ℝ) := (3 / 2) / ((3 / 2)^2 + t^2)
+    (∀ δ : ℝ, 0 < δ → ∀ N : ℕ, ∃ n : ℕ, N ≤ n ∧ HeckePoisson.logDerivativeMass χ 2 0 - δ ≤
+      AnalyticLattice.certifiedSum (polynomialIdealSampleMagnitude χ) g n) ↔
+      ∀ p : HeckePoisson.Site χ, p.val.re = 1 / 2 := by
+  intro g
+  let W (p : HeckePoisson.Site χ) := (HeckePoisson.multiplicity p : ℝ) * HeckePoisson.poissonWeight 2 0 p.val
+  have hS : HasSum W (HeckePoisson.logDerivativeMass χ 2 0) :=
+    HeckePoisson.hasSum_logDerivativeMass τ hτ χ hχ 2 0 (by norm_num)
+  have hp (p : HeckePoisson.Site χ) : 0 < W p := by
+    apply mul_pos _ (HeckePoisson.poissonWeight_pos_of_site (by norm_num : (1 : ℝ) < 2) 0 p)
+    exact_mod_cast (show 0 < HeckePoisson.multiplicity p from HeckePoisson.one_le_multiplicity p)
+  have hline (z : ℂ) (hz : z.re = 1 / 2) : HeckePoisson.poissonWeight 2 0 z = g z.im := by
+    norm_num [HeckePoisson.poissonWeight, g, hz]
+  have hc := centralMass_of_hasSum χ g W _ hS hp (fun z hz ↦ by
+    simp only [W, HeckePoisson.multiplicity, hline z.val hz])
+  have hlim := (tendsto_certified_polynomialIdealSampleMagnitude_poisson τ hτ χ hχ
+    (by norm_num : (1 : ℝ) < 2) 0).2.2
+  have hcentral : Tendsto (AnalyticLattice.certifiedSum (polynomialIdealSampleMagnitude χ) g)
+      atTop (𝓝 centralMass(χ,g)) := by
+    convert hlim using 1
+    · congr 1
+      funext t
+      norm_num [g]
+    · congr 1
+      apply tsum_congr
+      intro z
+      rw [hline z.val z.property.2]
+  exact (lowerBound_iff_cofinal_samples hcentral).trans hc.2
+
+private theorem cofinal_lower_of_moving_reference_iff {v a : ℕ → ℝ} {s : ℝ}
+    (ha : Tendsto a atTop (𝓝 s)) :
+    (∀ δ : ℝ, 0 < δ → ∀ N : ℕ, ∃ n : ℕ, N ≤ n ∧ a n - δ ≤ v n) ↔
+      (∀ δ : ℝ, 0 < δ → ∀ N : ℕ, ∃ n : ℕ, N ≤ n ∧ s - δ ≤ v n) := by
+  have hnear (δ : ℝ) (hδ : 0 < δ) : ∃ K : ℕ, ∀ n ≥ K, |a n - s| < δ / 2 := by
+    apply eventually_atTop.1
+    simpa only [Real.dist_eq] using (Metric.tendsto_nhds.1 ha (δ / 2) (half_pos hδ))
+  constructor <;> intro h δ hδ N
+  · obtain ⟨K, hK⟩ := hnear δ hδ
+    obtain ⟨n, hn, hv⟩ := h (δ / 2) (half_pos hδ) (max N K)
+    have habs := (abs_lt.mp (hK n ((le_max_right N K).trans hn))).1
+    exact ⟨n, (le_max_left N K).trans hn, by linarith⟩
+  · obtain ⟨K, hK⟩ := hnear δ hδ
+    obtain ⟨n, hn, hv⟩ := h (δ / 2) (half_pos hδ) (max N K)
+    have habs := (abs_lt.mp (hK n ((le_max_right N K).trans hn))).2
+    exact ⟨n, (le_max_left N K).trans hn, by linarith⟩
+
+/-- The signed finite deficit converges to full mass minus central mass. The reference
+at stage `n` uses prime powers of norm at most `n + 2`. -/
+theorem tendsto_finiteReferenceTwo_sub_certifiedSum
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : PontryaginDual C𝔽) (hχ : ∀ r, χ (τ r) = 1) :
+    let g (t : ℝ) := (3 / 2) / ((3 / 2)^2 + t^2)
+    let d (z : ℂ) := MeromorphicOn.divisor (continuedCompletedHeckeL χ) univ z
+    Tendsto (fun n ↦ HeckePoisson.finiteReferenceTwo χ (n + 2) -
+      AnalyticLattice.certifiedSum (polynomialIdealSampleMagnitude χ) g n)
+      atTop (𝓝 (HeckePoisson.logDerivativeMass χ 2 0 -
+        ∑' z : {z : ℂ // 0 < d z ∧ z.re = 1/2},
+          ((d z.val).toNat : ℝ) * HeckePoisson.poissonWeight 2 0 z.val)) := by
+  intro g d
+  have hc := (tendsto_certified_polynomialIdealSampleMagnitude_poisson τ hτ χ hχ
+    (by norm_num : (1 : ℝ) < 2) 0).2.2
+  have hg : (fun t : ℝ ↦ (2 - 1/2) / ((2 - 1/2)^2 + (0 - t)^2)) = g := by
+    funext t
+    norm_num [g]
+  rw [hg] at hc
+  exact ((HeckePoisson.tendsto_finiteReferenceTwo χ).comp (tendsto_add_atTop_nat 2)).sub hc
+
+/-- Using only finite Euler and finite ordinary-ideal sums, cofinal lower saturation
+at the single evaluation point `(2,0)` is equivalent to centrality of every positive
+completed-divisor site of this normalized character. The explicit reference error is
+valid at each stage, including zero. -/
+theorem cofinal_finiteReferenceTwo_sub_error_certifiedSum_iff
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : PontryaginDual C𝔽) (hχ : ∀ r, χ (τ r) = 1) :
+    let g (t : ℝ) := (3 / 2) / ((3 / 2)^2 + t^2)
+    (∀ δ : ℝ, 0 < δ → ∀ N : ℕ, ∃ n : ℕ, N ≤ n ∧
+      HeckePoisson.finiteReferenceTwo χ (n + 2) - HeckePoisson.finiteReferenceErrorTwo F (n + 2) - δ ≤
+        AnalyticLattice.certifiedSum (polynomialIdealSampleMagnitude χ) g n) ↔
+      ∀ z : HeckePoisson.Site χ, z.val.re = 1 / 2 := by
+  intro g
+  exact (cofinal_lower_of_moving_reference_iff
+    ((HeckePoisson.tendsto_finiteReferenceTwo_sub_error χ).comp (tendsto_add_atTop_nat 2))).trans
+    (cofinal_polynomialIdealSampleMagnitude_two_zero_iff τ hτ χ hχ)
+
+/-- The running signed deficit tends to the full positive mass of the sites off the
+critical line. Its convergence to zero is equivalent to centrality of every site. -/
+theorem tendsto_finiteReferenceTwo_sub_certifiedSum_offline
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : PontryaginDual C𝔽) (hχ : ∀ r, χ (τ r) = 1) :
+    let g (t : ℝ) := (3 / 2) / ((3 / 2)^2 + t^2)
+    let D (n : ℕ) := HeckePoisson.finiteReferenceTwo χ (n + 2) -
+      AnalyticLattice.certifiedSum (polynomialIdealSampleMagnitude χ) g n
+    let W (p : HeckePoisson.Site χ) := (HeckePoisson.multiplicity p : ℝ) * HeckePoisson.poissonWeight 2 0 p.val
+    let E := {p : HeckePoisson.Site χ // p.val.re ≠ 1 / 2}
+    (∀ n : ℕ, |D n - (HeckePoisson.logDerivativeMass χ 2 0 -
+        AnalyticLattice.certifiedSum (polynomialIdealSampleMagnitude χ) g n)| ≤
+      HeckePoisson.finiteReferenceErrorTwo F (n + 2)) ∧
+    Tendsto D atTop (𝓝 (∑' p : E, W p.val)) ∧
+      (Tendsto D atTop (𝓝 0) ↔ ∀ p : HeckePoisson.Site χ, p.val.re = 1 / 2) := by
+  intro g D W E
+  classical
+  let A : Set (HeckePoisson.Site χ) := {p | p.val.re = 1 / 2}
+  let d (z : ℂ) := MeromorphicOn.divisor (continuedCompletedHeckeL χ) univ z
+  let C := {z : ℂ // 0 < d z ∧ z.re = 1 / 2}
+  let e : A ≃ C :=
+    { toFun := fun p ↦ ⟨p.val.val, p.val.property, p.property⟩
+      invFun := fun z ↦ ⟨⟨z.val, z.property.1⟩, z.property.2⟩
+      left_inv := fun _ ↦ rfl
+      right_inv := fun _ ↦ rfl }
+  have hf : HasSum W (HeckePoisson.logDerivativeMass χ 2 0) :=
+    HeckePoisson.hasSum_logDerivativeMass τ hτ χ hχ 2 0 (by norm_num)
+  have hcen : (∑' p : A, W p.val) =
+      ∑' z : C, ((d z.val).toNat : ℝ) * HeckePoisson.poissonWeight 2 0 z.val := by
+    rw [← e.tsum_eq]
+    rfl
+  have hsplit := hf.summable.tsum_subtype_add_tsum_subtype_compl A
+  rw [hcen, hf.tsum_eq] at hsplit
+  have hmass : HeckePoisson.logDerivativeMass χ 2 0 -
+      (∑' z : C, ((d z.val).toNat : ℝ) * HeckePoisson.poissonWeight 2 0 z.val) =
+        ∑' p : E, W p.val := by
+    apply sub_eq_iff_eq_add.mpr
+    rw [add_comm]
+    exact hsplit.symm
+  have hlim : Tendsto D atTop (𝓝 (∑' p : E, W p.val)) := by
+    rw [← hmass]
+    exact tendsto_finiteReferenceTwo_sub_certifiedSum τ hτ χ hχ
+  refine ⟨?_, hlim, ?_, ?_⟩
+  · intro n
+    calc
+      _ = |HeckePoisson.finiteReferenceTwo χ (n + 2) - HeckePoisson.logDerivativeMass χ 2 0| := by
+        congr 1
+        dsimp only [D]
+        abel
+      _ ≤ _ := HeckePoisson.abs_finiteReferenceTwo_sub_mass χ (by omega)
+  · intro h p
+    by_contra hne
+    have hp (q : HeckePoisson.Site χ) : 0 < W q :=
+      mul_pos (by exact_mod_cast HeckePoisson.one_le_multiplicity q)
+        (HeckePoisson.poissonWeight_pos_of_site (by norm_num : (1 : ℝ) < 2) 0 q)
+    have hpos := (hf.summable.subtype (· ∈ Aᶜ)).tsum_pos (fun q ↦ (hp q.val).le) (⟨p, hne⟩ : E) (hp p)
+    exact hpos.ne' (tendsto_nhds_unique hlim h)
+  · intro h
+    have : IsEmpty E := ⟨fun p ↦ p.property (h p.val)⟩
+    simpa only [tsum_empty] using hlim
 
 local notation "grid(" χ ", " g ")" => AnalyticLattice.sampleSum (fun t : ℝ ↦
   (finiteHeckeL_exists_continuation (F := F) χ).choose ((1/2 : ℂ) + (t : ℂ)*I)) g
