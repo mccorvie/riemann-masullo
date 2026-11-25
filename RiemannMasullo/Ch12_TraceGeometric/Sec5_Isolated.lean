@@ -9,6 +9,7 @@ import Mathlib.MeasureTheory.Group.Integral
 import Mathlib.MeasureTheory.Integral.IntegralEqImproper
 import Mathlib.Topology.Algebra.InfiniteSum.Order
 import Mathlib.Geometry.Manifold.PartitionOfUnity
+import RiemannMasullo.Ch10_TraceSpectral.Sec3_LineQuotientWindows
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 
 /-! # Isolated statements of §12.5
@@ -877,5 +878,47 @@ theorem exists_measurableSequence_archConductor_linePA_iff_exteriorZeros_of_weil
   exact ⟨(forall_congr' (fun χ ↦ (hrow χ).2.2.1)).trans (allCentral_iff_exteriorZeros τ hτ),
     (forall_congr' (fun χ ↦ (hrow χ).2.2.2)).trans (allCentral_iff_exteriorZeros τ hτ)⟩
 
+
+attribute [local instance] instSpectralQuotientPolynormableSec3 in
+/-- The prescribed polar-free test acts nuclearly on the true quotient at every
+line order used in the centered comparison, for every angular character. -/
+theorem primeFreeCharacterTest_quotientNuclear (χ : PontryaginDual C𝔽) (k : ℕ) :
+    ConditionalOutputOrder.QuotientNuclear (φχ(χ)) k := by
+  let row : PontryaginDual C₁ := χ.comp ⟨(ideleClassNorm F).ker.subtype, continuous_subtype_val⟩
+  have hφ (u : C₁) (x : C𝔽) : (φχ(χ)).val (u.val⁻¹ * x) = (row u : ℂ) * (φχ(χ)).val x := by
+    have hn : ideleClassNorm F (u.val⁻¹ * x) = ideleClassNorm F x := by
+      rw [map_mul, map_inv, show ideleClassNorm F u.val = 1 from u.property, inv_one, one_mul]
+    have hl : logIdeleClassNorm F (u.val⁻¹ * x) = logIdeleClassNorm F x :=
+      congrArg (fun t : ℝ≥0ˣ ↦ Real.log (t.val : ℝ)) hn
+    rw [primeFreeCharacterTest_apply, primeFreeCharacterTest_apply, hl]
+    change (((χ (u.val⁻¹ * x))⁻¹ : Circle) : ℂ) * _ =
+      (χ u.val : ℂ) * ((((χ x)⁻¹ : Circle) : ℂ) * (primeFreeProfile (logIdeleClassNorm F x) : ℂ))
+    rw [map_mul, map_inv, mul_inv_rev, inv_inv, Circle.coe_mul]
+    ring
+  have hs := ConditionalOutputOrder.one_lt_degree k
+  have hline (l : ℝ) (hl : l = 0) (hI : l ≤ 0) :
+      IsNuclearOperator (spectralConvolution (F := F) (1/2) hI
+        (zero_lt_one.trans hs).le (φχ(χ))) := by
+    subst l
+    exact spectralLineConvolution_homogeneous_nuclear (1/2) hs row (φχ(χ)) hφ
+  exact hline (-0) neg_zero _
+
+/-- At the actual fixed test and every odd Sobolev order, a single numerical
+Weil identity per normalized character suffices for both centered upper
+comparisons in Theorem 12.5.1.1, pp. 519–520. -/
+theorem exists_measurableSequence_archConductor_linePA_iff_exteriorZeros_of_weil :
+    ∃ U : ℕ → Set C𝔽, IsDPrimeSequence μ𝔽 U ∧ (∀ n, MeasurableSet (U n)) ∧
+    ∀ (τ : ℝ≥0ˣ →ₜ* C𝔽), RightInverse τ (ideleClassNorm F) →
+      (∀ χ : Chars(τ), PrimeFreeWeilIdentity χ.val) →
+        ((∀ (χ : Chars(τ)) (δ : ℝ), 0 < δ → ∃ k : ℕ,
+          primeFreeCenteredIntegral χ.val k (primeFreeCharacterTest_quotientNuclear χ.val k) U
+            ≤ primeFreeArchConductor χ.val + δ) ↔ target(τ)) ∧
+        ((∀ χ : Chars(τ), limUnder atTop (fun k ↦ primeFreeCenteredIntegral χ.val k
+          (primeFreeCharacterTest_quotientNuclear χ.val k) U) ≤ primeFreeArchConductor χ.val) ↔
+            target(τ)) := by
+  obtain ⟨U,hU,hB,hw⟩ := exists_measurableSequence_archConductor_linePA_iff_exteriorZeros_of_weil_nuclear
+    (F := F)
+  exact ⟨U,hU,hB,fun τ hτ hWeil ↦ hw τ hτ hWeil fun χ k ↦
+    primeFreeCharacterTest_quotientNuclear χ.val k⟩
 
 end RiemannMasullo.Isolated.OutputOrderGeometry
