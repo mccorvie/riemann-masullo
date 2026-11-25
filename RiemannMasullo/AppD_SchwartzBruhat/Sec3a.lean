@@ -3714,7 +3714,7 @@ private theorem realCoordinate_bruhatPresentation {G : Type*} [CommGroup G] [Top
 
 /-- In real coordinates, the Schwartz–Bruhat space of the real group carries the
 usual real-line Schwartz topology. -/
-private theorem schwartzBruhat_realCoordinate_equiv {G : Type*} [CommGroup G] [TopologicalSpace G]
+theorem schwartzBruhat_realCoordinate_equiv {G : Type*} [CommGroup G] [TopologicalSpace G]
     [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
     (c : G ≃ₜ* Multiplicative ℝ) :
     ∃ e : 𝓢(ℝ, ℂ) ≃L[ℂ] SchwartzBruhat G,
