@@ -903,9 +903,9 @@ theorem primeFreeCharacterTest_quotientNuclear (χ : PontryaginDual C𝔽) (k : 
     exact spectralLineConvolution_homogeneous_nuclear (1/2) hs row (φχ(χ)) hφ
   exact hline (-0) neg_zero _
 
-/-- At the actual fixed test and every odd Sobolev order, a single numerical
-Weil identity per normalized character suffices for both centered upper
-comparisons in Theorem 12.5.1.1, pp. 519–520. -/
+/-- Given the numerical Weil identity for the prescribed test, each of the two
+upper comparisons over the odd Sobolev orders is equivalent to the all-test
+exterior-zero assertion of Theorem 12.5.1.1, pp. 519–520. -/
 theorem exists_measurableSequence_archConductor_linePA_iff_exteriorZeros_of_weil :
     ∃ U : ℕ → Set C𝔽, IsDPrimeSequence μ𝔽 U ∧ (∀ n, MeasurableSet (U n)) ∧
     ∀ (τ : ℝ≥0ˣ →ₜ* C𝔽), RightInverse τ (ideleClassNorm F) →

@@ -162,7 +162,7 @@ theorem spectralLineQuotient_window_rank_le (a : ℝ) {s : ℝ} (hs : 1 < s)
       (meromorphicOrderAt (continuedCompletedHeckeL (χ z.val.1)) (shift(a,z.val.2))).untop₀.toNat) :=
     ⟨j.val.2.2,j.property⟩
   have hpol := SchwartzBruhat.integrable_norm_mul_logWeight μ𝔽 m𝔽 k (s / 2)
-  have hk := (continuous_schwartzBruhat k).aemeasurable (μ := μ𝔽)
+  have hk := (SchwartzBruhat.integrable μ𝔽 k).aestronglyMeasurable.aemeasurable
   have hscalar (δ : StrongDual ℂ W(s)) v :
       δ (A v) = ∫ g, k g * δ (τ(s,hs) g v) ∂μ𝔽 := by
     have h := congrArg (fun p : PettisWeakCompletion W(s) ↦
@@ -211,7 +211,7 @@ theorem spectralLineConvolution_homogeneous_nuclear (a : ℝ) {s : ℝ} (hs : 1 
     have hSR : S.Finite ∧ (S.ncard : ℝ) ≤ C * (1 + R) ^ 2 := hcount a s R hR
     obtain ⟨hS,hr⟩ := hSR
     have hpol := SchwartzBruhat.integrable_norm_mul_logWeight μ𝔽 m𝔽 (P f) (s / 2)
-    have hk := (continuous_schwartzBruhat (P f)).aemeasurable (μ := μ𝔽)
+    have hk := (SchwartzBruhat.integrable μ𝔽 (P f)).aestronglyMeasurable.aemeasurable
     have hm (ζ : Ω) (t : ℝ) :
         Isolated.spectralLineWindowMultiplier (P f) (χ ζ) t = if ζ = ω then f t else 0 := by
       have hd := Isolated.spectralLineWindowMultiplier_iteratedDeriv (P f) hk hpol (χ ζ) t 0
