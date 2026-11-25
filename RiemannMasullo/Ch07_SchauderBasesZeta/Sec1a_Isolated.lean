@@ -686,6 +686,25 @@ theorem sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor_rat_iff
   change v.val.asIdeal.comap (RingHom.id (𝓞 ℚ)) = w.val.asIdeal.comap (RingHom.id (𝓞 ℚ)) at h
   simpa using h
 
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322. Over `ℚ`, with the trivial character and no finite
+places, every assignment fails the vertical-integrability clause at every positive even cutoff.
+Deviation: This uses F90 on each boundary line, independently of the separate-height sums. -/
+theorem sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor_rat_even_false
+    (n : ℕ) (hn : 0 < n) (assign : ℂ → InfinitePlace ℚ ⊕ (∅ : Finset (HeightOneSpectrum (𝓞 ℚ)))) :
+    ¬ sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor
+      (1 : PontryaginDual (SIdeleQuotient ℚ ∅)) ((2 * n : ℕ) : ℝ) (by positivity) assign := by
+  obtain ⟨f, _, hf⟩ := sLocalIdelicZFunction_exists_simplePole_neg_even ℚ Rat.isReal_infinitePlace n
+  rintro ⟨_, _, _, hline, _⟩
+  exact hf (hline f).1
+
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322. The cutoff `A = 2` is a fixed rational
+counterexample to the existence of a suitable assignment in the packaged expansion. -/
+theorem sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor_rat_two_false
+    (assign : ℂ → InfinitePlace ℚ ⊕ (∅ : Finset (HeightOneSpectrum (𝓞 ℚ)))) :
+    ¬ sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor
+      (1 : PontryaginDual (SIdeleQuotient ℚ ∅)) 2 (by norm_num) assign := by
+  exact sLocalHomogeneousAdelicTheta_separatePlaceExpansionFor_rat_even_false 1 Nat.zero_lt_one assign
+
 /-! ## Uniform convergence for every assignment under a summable majorant -/
 
 open Classical in
