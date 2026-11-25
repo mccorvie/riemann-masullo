@@ -172,7 +172,9 @@ private theorem quadraticPrime_prime_card_le (T : ℕ) : (Nat.primesLE T).card �
          Finset.mem_Ioc.mpr ⟨(Nat.mem_primesLE.mp hp).2.pos, (Nat.mem_primesLE.mp hp).1⟩
        _ = T := by simp
 
-private theorem quadraticPrime_hecke_energy {F : Type*} [Field F] [NumberField F]
+/-- Chebyshev's bound controls the squared Riesz coefficients uniformly under bounded
+real multipliers, including a second quadratic twist. -/
+theorem quadraticPrime_hecke_energy {F : Type*} [Field F] [NumberField F]
     (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (T : ℕ) {x : ℝ} (hx : x ≤ T)
     (u : ℕ → ℝ) (hu : ∀ p ∈ Nat.primesLE T, |u p| ≤ 1) :
     ∑ p ∈ Nat.primesLE T, ((heckeLogDerivCoefficient (ideleClassNormTwist χ 0) p).re *
@@ -301,6 +303,24 @@ private theorem quadraticPrime_sign_of_coprime {q p : ℕ} (h : Nat.Coprime q p)
   have hg : (q : ℤ).gcd p = 1 := by simpa [Int.gcd_eq_natAbs] using h
   rcases jacobiSym.eq_one_or_neg_one hg with hh | hh <;> rw [hh] <;> norm_num
 
+/-- A selected sign cell differs from the unrestricted mean by at most the sum of the
+absolute first twist, second twist, and product twist, before averaging. -/
+theorem quadraticPrimeTwist_cell_error {F : Type*} [Field F] [NumberField F]
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (T q d : ℕ) (x e f : ℝ)
+    (he : |e| = 1) (hf : |f| = 1)
+    (hq : ∀ p ∈ Nat.primesLE T, Nat.Coprime q p)
+    (hd : ∀ p ∈ Nat.primesLE T, Nat.Coprime d p) :
+    |quadraticPrimeCellRieszSum χ T x q d e f - degreeOnePrimeRieszSumWith χ T x 1| ≤
+      |degreeOnePrimeRieszSumWith χ T x (fun p ↦ (jacobiSym q p : ℝ))| +
+      |degreeOnePrimeRieszSumWith χ T x (fun p ↦ (jacobiSym d p : ℝ))| +
+      |degreeOnePrimeRieszSumWith χ T x (fun p ↦ (jacobiSym q p : ℝ) * (jacobiSym d p : ℝ))| := by
+  simpa only [quadraticPrimeCellRieszSum, degreeOnePrimeRieszSumWith, Pi.one_apply, mul_one] using
+    quadraticPrime_cell_error (Nat.primesLE T)
+      (fun p ↦ (heckeLogDerivCoefficient (ideleClassNormTwist χ 0) p).re * max (x-p) 0)
+      (fun p ↦ (jacobiSym q p : ℝ)) (fun p ↦ (jacobiSym d p : ℝ)) he hf
+      (fun p hp ↦ quadraticPrime_sign_of_coprime (hq p hp))
+      (fun p hp ↦ quadraticPrime_sign_of_coprime (hd p hp))
+
 /-- Mean error for a collection of real cutoffs and two sets of auxiliary twists.
 The signs of the selected class may depend on each pair and each cutoff. -/
 theorem quadraticPrimeTwist_hecke_cell_mean {F : Type*} [Field F] [NumberField F]
@@ -328,13 +348,8 @@ theorem quadraticPrimeTwist_hecke_cell_mean {F : Type*} [Field F] [NumberField F
   have point (q : ℕ) (hq : q ∈ U) (d : ℕ) (hd : d ∈ V) (j : ℕ) :
       |quadraticPrimeCellRieszSum χ T (x j) q d (e q d j) (f q d j) -
         degreeOnePrimeRieszSumWith χ T (x j) 1| ≤ R q j + R d j + B q d j := by
-    simpa only [quadraticPrimeCellRieszSum, degreeOnePrimeRieszSumWith, R, B, Pi.one_apply,
-      mul_one] using quadraticPrime_cell_error (Nat.primesLE T)
-      (fun p ↦ (heckeLogDerivCoefficient (ideleClassNormTwist χ 0) p).re * max (x j-p) 0)
-      (fun p ↦ (jacobiSym q p : ℝ)) (fun p ↦ (jacobiSym d p : ℝ))
-      (he q d j) (hf q d j)
-      (fun p hp ↦ quadraticPrime_sign_of_coprime (hcU q hq p hp))
-      (fun p hp ↦ quadraticPrime_sign_of_coprime (hcV d hd p hp))
+    exact quadraticPrimeTwist_cell_error χ T q d (x j) (e q d j) (f q d j)
+      (he q d j) (hf q d j) (hcU q hq) (hcV d hd)
   calc _ ≤ ∑ q ∈ U, ∑ d ∈ V, ∑ j ∈ I, (R q j + R d j + B q d j) :=
            sum_le_sum fun q hq ↦ sum_le_sum fun d hd ↦ sum_le_sum fun j _ ↦ point q hq d hd j
        _ = V.card * (∑ q ∈ U, ∑ j ∈ I, R q j) +
@@ -347,7 +362,9 @@ theorem quadraticPrimeTwist_hecke_cell_mean {F : Type*} [Field F] [NumberField F
        _ = _ := by simp only [sum_const, nsmul_eq_mul]; ring
 
 open Filter Topology in
-private theorem quadraticPrime_dyadic_card :
+/-- The dyadic interval of rational primes has at least `Q / (2 log (2Q))` members
+for every sufficiently large cutoff. -/
+theorem quadraticPrime_dyadic_card :
     ∀ᶠ Q : ℕ in atTop, (Q : ℝ) ≤
       2 * ((Nat.primesLE (2*Q) \ Nat.primesLE Q).card : ℝ) * Real.log (2*Q) := by
   have ht := Chebyshev.tendsto_theta_div_atTop.comp
@@ -377,11 +394,13 @@ private theorem quadraticPrime_dyadic_card :
   change (Q : ℝ) ≤ 2 * (U.card : ℝ) * Real.log (2*Q)
   linarith
 
-private theorem quadraticPrime_fourthPower_error {J n D : ℝ} (hJ : 2 ≤ J) (hn : 0 ≤ n)
-    (hD : 0 ≤ D) (hcount : J^12 ≤ 2*n*Real.log (2*J^12)) :
+/-- The raw one-twist second-moment majorant divided by the number of auxiliary primes
+has square root at most `100 D J^6 log(2+J)`. -/
+theorem quadraticPrime_fourthPower_secondMoment_bound {J n D : ℝ} (hJ : 2 ≤ J) (hn : 0 ≤ n)
+    (_hD : 0 ≤ D) (hcount : J^12 ≤ 2*n*Real.log (2*J^12)) :
     let T := J^4
     let K := (2*J^12+1+T^3) * (D^2*T^3*Real.log (2+T)*Real.log 4)
-    3*n*J*Real.sqrt (n*K) ≤ n^2*(300*D*J^7*Real.log (2+J)) := by
+    K ≤ n*(100*D*J^6*Real.log (2+J))^2 := by
   intro T K
   let L := Real.log (2+J)
   have jpos : 0 < J := by linarith
@@ -420,6 +439,19 @@ private theorem quadraticPrime_fourthPower_error {J n D : ℝ} (hJ : 2 ≤ J) (h
          _ ≤ n*(100*D*J^6*L)^2 := by
            have factor : 0 ≤ D^2*J^12*L^2*n := by positivity
            nlinarith only [factor]
+  exact hK
+
+private theorem quadraticPrime_fourthPower_error {J n D : ℝ} (hJ : 2 ≤ J) (hn : 0 ≤ n)
+    (hD : 0 ≤ D) (hcount : J^12 ≤ 2*n*Real.log (2*J^12)) :
+    let T := J^4
+    let K := (2*J^12+1+T^3) * (D^2*T^3*Real.log (2+T)*Real.log 4)
+    3*n*J*Real.sqrt (n*K) ≤ n^2*(300*D*J^7*Real.log (2+J)) := by
+  intro T K
+  let L := Real.log (2+J)
+  have hL : 0 ≤ L := Real.log_nonneg (by linarith)
+  have hjpos : 0 < J := by linarith
+  have hK : K ≤ n*(100*D*J^6*L)^2 :=
+    quadraticPrime_fourthPower_secondMoment_bound hJ hn hD hcount
   have hs : Real.sqrt (n*K) ≤ n*(100*D*J^6*L) := by
     apply Real.sqrt_le_iff.mpr
     refine ⟨by positivity, ?_⟩
