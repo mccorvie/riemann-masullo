@@ -199,6 +199,89 @@ theorem firstPrime_sampled_abel_zero_iff_no_closed_exterior {c : ℝ} (hc : 0 < 
   rw [← firstPrime_tendsto_zero_iff_no_closed_exterior τ hτ ψ hψ hc]
   exact ⟨fun h ↦ (tendsto_nhds_unique (hd.comp he) h) ▸ hd, fun h ↦ h.comp he⟩
 
+section AllCharacters
+
+omit hτ hψ
+
+attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorelSpaceSec1
+  instIdeleClassT2Sec1 instIdeleClassLocallyCompactSec1 instIdeleClassSecondCountableSec1
+  instIdeleClassHaarMeasureSec1
+
+local notation "C₁" => (ideleClassNorm F).ker
+local notation "μ𝔽" => ideleClassTamagawaMeasure F
+local notation "m𝔽" => (continuousIdeleClassNorm F : G →ₜ* ℝ≥0ˣ)
+local notation "hm𝔽" => (⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ : IsModulation m𝔽)
+local notation "exteriorZeros(" τ ", " c ")" =>
+  {z : {χ : U // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ //
+    0 < ord(z.1.val, z.2) ∧ c ≤ |z.2.re - 1 / 2|}
+local notation "zeroTerm(" φ ", " z ")" =>
+  (ord((z).val.1.val, (z).val.2) : ℂ) * modulatedFourierMellin m𝔽 univ hm𝔽 μ𝔽
+    (φ : BruhatCompactSupport G).val (ideleClassNormTwist (F := F) (z).val.1.val ((z).val.2 - 1 / 2))
+
+/-- The completed divisors agree at `z` and `1 - z` after character inversion.
+The proof follows Michael Lyle (mlyle), PR #7586. -/
+private theorem firstPrime_ord_reflection (χ : U) (z : ℂ) : ord(χ⁻¹, 1 - z) = ord(χ, z) := by
+  obtain ⟨hL, hl⟩ := continuedCompletedHeckeL_spec χ
+  obtain ⟨hD, hd⟩ := continuedCompletedHeckeL_spec χ⁻¹
+  obtain ⟨ε, hε, hne, hfe⟩ := completedHeckeL_continuation_functionalEquation χ _ _ hL hl hD hd
+  have he : meromorphicOrderAt (fun s ↦ continuedCompletedHeckeL χ⁻¹ (1 - s)) z =
+      meromorphicOrderAt (continuedCompletedHeckeL χ⁻¹) (1 - z) := by
+    simpa [Function.comp_def] using meromorphicOrderAt_comp_of_deriv_ne_zero
+      (f := continuedCompletedHeckeL χ⁻¹) (show AnalyticAt ℂ (fun s : ℂ ↦ 1 - s) z by fun_prop)
+      (show deriv (fun s : ℂ ↦ 1 - s) z ≠ 0 by simp)
+  rw [show (fun s ↦ continuedCompletedHeckeL χ⁻¹ (1 - s)) =
+      ε * continuedCompletedHeckeL χ from funext hfe,
+    meromorphicOrderAt_mul_of_ne_zero (hε.analyticAt z) (hne z)] at he
+  rw [MeromorphicOn.divisor_apply hD.meromorphicOn (mem_univ _),
+    MeromorphicOn.divisor_apply hL.meromorphicOn (mem_univ _), ← he]
+
+private theorem firstPrime_isEmpty_exterior_iff_all_right (τ : ℝ≥0ˣ →ₜ* G) (c : ℝ) :
+    IsEmpty exteriorZeros(τ, c) ↔ ∀ (ψ : U), (∀ t, ψ (τ t) = 1) →
+      ∀ ρ : ℂ, 0 < ord(ψ⁻¹, ρ) → ρ.re < 1 / 2 + c := by
+  have hinv (χ : U) (hχ : ∀ t, χ (τ t) = 1) (t : ℝ≥0ˣ) : χ⁻¹ (τ t) = 1 := by
+    change (χ (τ t))⁻¹ = 1
+    rw [hχ, inv_one]
+  constructor
+  · intro he ψ hψ ρ hρ
+    apply lt_of_not_ge
+    intro hr
+    apply he.false
+    exact ⟨(⟨ψ⁻¹, hinv ψ hψ⟩, ρ), hρ, le_trans (by linarith : c ≤ ρ.re - 1 / 2) (le_abs_self _)⟩
+  · intro h
+    refine ⟨fun z ↦ ?_⟩
+    obtain ⟨⟨⟨χ, hχ⟩, ρ⟩, hρ, hout⟩ := z
+    change 0 < ord(χ, ρ) at hρ
+    change c ≤ |ρ.re - 1 / 2| at hout
+    have hright := h χ⁻¹ (hinv χ hχ) ρ (by simpa only [inv_inv] using hρ)
+    have hleft := h χ hχ (1 - ρ) (by rwa [firstPrime_ord_reflection])
+    rw [Complex.sub_re, Complex.one_re] at hleft
+    exact (abs_lt.mpr ⟨by linarith, by linarith⟩).not_ge hout
+
+/-- The exterior zero sum of Theorem 12.5.1.1 (pp. 519–520) vanishes for every admissible
+Bruhat test at a given positive width exactly when the fixed first-prime test has squared
+Abel limit zero for every character trivial on the norm section. -/
+theorem hasSum_exteriorZeros_iff_all_firstPrime_abel (τ : ℝ≥0ˣ →ₜ* G)
+    (hτ : RightInverse τ (ideleClassNorm F)) {c : ℝ} (hc : 0 < c) :
+    (∀ φ : BruhatCompactSupport G, (∀ g : C₁, φ.val g = 0) →
+      HasSum (fun z : exteriorZeros(τ, c) ↦ zeroTerm(φ, z)) 0) ↔
+      ∀ (ψ : U), (∀ t, ψ (τ t) = 1) → Tendsto (energy(ψ, c)) (𝓝[>] 0) (𝓝 0) := by
+  rw [hasSum_exteriorZeros_iff_isEmpty τ hτ c, firstPrime_isEmpty_exterior_iff_all_right]
+  exact forall_congr' fun ψ ↦ forall_congr' fun hψ ↦
+    (firstPrime_tendsto_zero_iff_no_closed_exterior τ hτ ψ hψ hc).symm
+
+/-- The damping parameters can be prescribed once for all normalized characters. -/
+theorem hasSum_exteriorZeros_iff_all_firstPrime_sampled_abel (τ : ℝ≥0ˣ →ₜ* G)
+    (hτ : RightInverse τ (ideleClassNorm F)) {c : ℝ} (hc : 0 < c)
+    {T : Type*} {l : Filter T} [l.NeBot] {e : T → ℝ} (he : Tendsto e l (𝓝[>] (0 : ℝ))) :
+    (∀ φ : BruhatCompactSupport G, (∀ g : C₁, φ.val g = 0) →
+      HasSum (fun z : exteriorZeros(τ, c) ↦ zeroTerm(φ, z)) 0) ↔
+      ∀ (ψ : U), (∀ t, ψ (τ t) = 1) → Tendsto (fun t ↦ energy(ψ, c) (e t)) l (𝓝 0) := by
+  rw [hasSum_exteriorZeros_iff_isEmpty τ hτ c, firstPrime_isEmpty_exterior_iff_all_right]
+  exact forall_congr' fun ψ ↦ forall_congr' fun hψ ↦
+    (firstPrime_sampled_abel_zero_iff_no_closed_exterior τ hτ ψ hψ hc he).symm
+
+end AllCharacters
+
 end RiemannMasullo.Isolated
 
 open MeasureTheory NumberField Set
