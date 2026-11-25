@@ -2,12 +2,12 @@ module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1a
 
+import Mathlib.Analysis.PSeries
 import RiemannMasullo.Ch03_IdelicZeta.RationalNormTwist
 import RiemannMasullo.ForMathlib.Analysis.Complex.ExponentialPoleSeparation
 import RiemannMasullo.ForMathlib.NumberTheory.LinearFormsInLogarithms
-import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
-import Mathlib.Analysis.PSeries
 import Mathlib.RingTheory.RamificationInertia.Inertia
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.RingTheory.RamificationInertia.Ramification
 
 /-!
