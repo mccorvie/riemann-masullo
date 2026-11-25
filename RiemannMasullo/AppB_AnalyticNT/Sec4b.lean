@@ -9389,6 +9389,12 @@ private theorem explicitFormula_flowDeriv_mem (b : Multiplicative ℝ →ₜ* C[
   change deriv _ 0 = 0
   rw [hev.deriv_eq, deriv_const]
 
+/-- Differentiating along a one-parameter subgroup of the idele class group preserves
+compact Bruhat tests. -/
+theorem ideleClass_bruhatFlowDeriv_mem (b : Multiplicative ℝ →ₜ* C[F]) (f : 𝒟(C[F])) :
+    bruhatDirectionalDeriv b f.val ∈ bruhatCompactSupportSubmodule C[F] :=
+  explicitFormula_flowDeriv_mem b f
+
 /-- Integration by parts along a one-parameter subgroup against a quasi-character: if the
 quasi-character has derivative `σ` at the identity along the subgroup, then the derivative of a
 test integrates against it to `-σ` times the test. -/
@@ -9426,6 +9432,15 @@ private theorem explicitFormula_integral_flowDeriv_mul (b : Multiplicative ℝ �
     simp only [ofAdd_zero, map_one, mul_one] at this
     convert this using 1
     ring
+/-- Haar integration by parts multiplies the Mellin coefficient of a compact Bruhat test by
+the negative derivative of the character along the flow. -/
+theorem ideleClass_integral_bruhatFlowDeriv_mul (b : Multiplicative ℝ →ₜ* C[F])
+    (c : C[F] →ₜ* ℂ) {σ : ℂ}
+    (hσ : HasDerivAt (fun t : ℝ ↦ c (b (Multiplicative.ofAdd t))) σ 0) (f : 𝒟(C[F])) :
+    ∫ x, bruhatDirectionalDeriv b f.val x * c x ∂classMeasure =
+      -(σ * ∫ x, f.val x * c x ∂classMeasure) :=
+  explicitFormula_integral_flowDeriv_mul b c hσ f
+
 /-- Differentiation along a one-parameter subgroup lifting the norm (`t ↦ τ(eᵗ)` for a section
 `τ` of the class norm): for a unitary character `χ` there is a constant `κ` such that every test
 has a test whose centered Mellin transform is that of the test times `s - 1/2 + κ`. -/
