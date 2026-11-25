@@ -8738,8 +8738,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
 real part `3/2` for both give the bounds on every line of real part in `(0, 1]` for the
 first. -/
 private theorem meyerCriticalStrip_line
-    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
-    (hτ : RightInverse τ (sIdeleQuotientNorm F T)) (f f' : ℕ → ℬₛ(T))
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T) (f f' : ℕ → ℬₛ(T))
     (hglue : ∀ n (χ : PontryaginDual (SIdeleQuotient F T)) (h g : ℂ → ℂ), Differentiable ℂ h →
       DifferentiableOn ℂ g (Complex.re ⁻¹' Ioo (-1) 1) →
       (∀ z : ℂ, 0 < z.re → z.re < 1 → g z = h z * sLocalRhoFactor (chartₜ(T, χ) z)) →
@@ -8837,8 +8836,7 @@ for every α > 0. Here both bornologies are written on the dual group, as in
 Lean. The paper interpolates the weights on `C_S` ((22), p. 24) where this proof uses
 Phragmén–Lindelöf on the dual side. -/
 private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip
-    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
-    (hτ : RightInverse τ (sIdeleQuotientNorm F T)) (v : ℕ → ℬₛ(T))
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T) (v : ℕ → ℬₛ(T))
     (hw : ∀ f ∈ ({v,fun n ↦ sAdeleSchwartzFourier (v n)} : Set (ℕ → ℬₛ(T))),
       ∀ a : ℝ, 1 < a → ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
       (∀ χ ∉ H, ∀ n (z : ℂ), z.re = a → sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val) z) = 0) ∧
@@ -8861,7 +8859,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     refine Exists.elim (hw v hf (3 / 2) h2) fun Hf hx ↦ ?_
     refine Exists.elim (hw _ hF (3 / 2) h2) fun Hf' hx' ↦ ?_
     exact meyerCriticalStrip_line
-      T τ hτ v (fun n ↦ sAdeleSchwartzFourier (v n))
+      T τ v (fun n ↦ sAdeleSchwartzFourier (v n))
       (fun n χ h g hh hg hρ z hz0 hz1 ↦
         (meyerCriticalStrip_equation_glue
           T χ (v n) h g hh hg hρ z hz0 hz1).1)
@@ -8873,7 +8871,7 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
     refine Exists.elim (hw _ hf (3 / 2) h2) fun Hf hx ↦ ?_
     refine Exists.elim (hw v hV (3 / 2) h2) fun Hf' hx' ↦ ?_
     exact meyerCriticalStrip_line
-      T τ hτ (fun n ↦ sAdeleSchwartzFourier (v n)) v
+      T τ (fun n ↦ sAdeleSchwartzFourier (v n)) v
       (fun n χ h g hh hg hρ z hz0 hz1 ↦
         (meyerCriticalStrip_equation_glue
           T χ (v n) h g hh hg hρ z hz0 hz1).2)
@@ -14770,7 +14768,6 @@ a finitely generated group of angular characters, a bounded sequence of tests eq
 S-ideles to the cutoff times the normalized theta series of the profiles. -/
 private theorem meyerFlatLift_tests
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
-    (hτ : Function.RightInverse τ (sIdeleQuotientNorm F T))
     (H₀ : Subgroup (PontryaginDual.map τ).ker) (hH₀ : H₀.FG)
     (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ)
     (hφ0 : ∀ χ ∉ H₀, ∀ n, φ n χ = 0)
@@ -14813,7 +14810,7 @@ private theorem meyerFlatLift_construction
         sLocalThetaMellinIntegral (W n) (chartₜ(T, χ.val) z) =
           mellin (fun t ↦ (φ n χ).val (Real.log t)) z := by
   obtain ⟨β, hβ, hβd, hβs, hβsum⟩ := meyerFlatLift_cutoff (F := F) T
-  obtain ⟨W, hW, hWx⟩ := meyerFlatLift_tests T τ hτ H₀ hH₀ φ hφ0 hφb β hβ hβd hβs
+  obtain ⟨W, hW, hWx⟩ := meyerFlatLift_tests T τ H₀ hH₀ φ hφ0 hφb β hβ hβd hβs
   refine ⟨W, hW, fun n χ z hz ↦ ?_⟩
   -- pointwise summability of the profiles
   have hsum (u : ℝ) : Summable fun χ ↦ ‖(φ n χ).val u‖ := by
@@ -14969,7 +14966,6 @@ library is as there. -/
 private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (hτ : RightInverse τ (sIdeleQuotientNorm F T)) (v : ℕ → ℬₛ(T))
-    (k : ℕ) (M : Submodule ℂ (SLocalAdelicThetaSpace F T))
     (hw : ∀ f ∈ ({v,fun n ↦ sAdeleSchwartzFourier (v n)} : Set (ℕ → ℬₛ(T))),
       ∀ a : ℝ, 0 < a → ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
       (∀ χ ∉ H, ∀ n (z : ℂ), z.re = a → sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val) z) = 0) ∧
@@ -15066,9 +15062,8 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re = a →
         (1+p χ)^k * ‖z^m*sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val.val) z)‖ ≤ B) :
     Bornology.IsVonNBounded ℂ (range fun n ↦ (sLocalAdelicTheta F T).ker.mkQ (v n)) :=
-  sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines T τ hτ v k M
-    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip
-      T τ hτ v hw)
+  sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines T τ hτ v
+    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip T τ v hw)
 
 /-- The real Schwartz profile criterion covers the rational empty-place stage of the inverse comparison. -/
 private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_bound (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
