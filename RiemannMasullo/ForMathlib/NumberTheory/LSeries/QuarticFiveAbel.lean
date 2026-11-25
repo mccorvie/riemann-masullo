@@ -370,4 +370,14 @@ theorem inverse_LFunction_conj (χ : DirichletCharacter ℂ 5) (hχ : χ 2=I)
   have h := (Complex.cpow_conj (t:ℂ) (-(s+1)) harg)
   simpa only [map_neg, map_add, map_one, Complex.conj_ofReal] using h
 
+/-- Every two partial sums for the conductor-five quartic character are at distance at most
+`√2`. In particular this controls the Abel remainder after any integer cutoff. -/
+theorem norm_sub_partialSums_le (χ : DirichletCharacter ℂ 5) (hχ : χ 2 = I) (m n : ℕ) :
+    ‖(∑ k ∈ Finset.Icc 1 m, χ (k : ZMod 5)) - ∑ k ∈ Finset.Icc 1 n, χ (k : ZMod 5)‖ ≤
+      Real.sqrt 2 := by
+  change ‖part χ m - part χ n‖ ≤ _
+  have h := norm_sub_le (part χ m - center) (part χ n - center)
+  rw [sub_sub_sub_cancel_right, norm_part_sub χ hχ, norm_part_sub χ hχ] at h
+  linarith
+
 end RiemannMasullo.QuarticFive
