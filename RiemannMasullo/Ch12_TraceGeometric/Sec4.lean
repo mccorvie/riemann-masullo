@@ -4656,7 +4656,11 @@ private theorem sLocalTraceSharpMass_asymptotic_tail
         (volume₁ : ℂ) * (f.val ξ.val * (Real.log R : ℂ) +
           -∫ w in range (Units.val : Iₛ → Aₛ),
             fourierₛ (sLocalTraceEta f ξ) w * ((Real.log (modS(w)) : ℝ) : ℂ) ∂νₛ)) (T R)) ∧
-      Tendsto T atTop (𝓝 0) := by
+      Tendsto T atTop (𝓝 0) ∧
+      ∃ D : Hₛ → ℝ, Summable D ∧ ∀ R : ℝ, 1 ≤ R → ∀ ξ : Hₛ,
+        ‖sLocalTraceSharpMass f ξ R - (volume₁ : ℂ) * (f.val ξ.val * (Real.log R : ℂ) +
+          -∫ w in range (Units.val : Iₛ → Aₛ),
+            fourierₛ (sLocalTraceEta f ξ) w * ((Real.log (modS(w)) : ℝ) : ℂ) ∂νₛ)‖ ≤ D ξ := by
   classical
   let : BorelSpace Aₛ := sAdeleRing_borelSpace
   let m (x : Aₛ) := modS(x)
@@ -4687,11 +4691,13 @@ private theorem sLocalTraceSharpMass_asymptotic_tail
   have hlim (ξ : Hₛ) : Tendsto (fun R ↦ q R ξ) atTop (𝓝 0) := by
     simpa only [mul_zero] using (logBand_remainder_tendsto νₛ _ m hm.measurable
       (sLocalTraceEta_fourier_integrable f ξ) (sLocalTrace_fourier_log_integrable f ξ)).const_mul V₁
-  refine ⟨fun R ↦ ∑' ξ, q R ξ, ?_, ?_⟩
+  refine ⟨fun R ↦ ∑' ξ, q R ξ, ?_, ?_, b, hsum, ?_⟩
   · filter_upwards [eventually_ge_atTop (1 : ℝ)] with R hR
     simpa only [sLocalTrace_remainder_eq] using (hsum.of_norm_bounded (hbound R hR)).hasSum
   · simpa only [tsum_zero] using (tendsto_tsum_of_dominated_convergence hsum hlim
       ((eventually_ge_atTop (1 : ℝ)).mono hbound))
+  · intro R hR ξ
+    simpa only [sLocalTrace_remainder_eq] using hbound R hR ξ
 
 /-- Paper: (12.4.1.25)–(12.4.1.28), p. 519. After subtraction of the logarithmic
 term the sum of sharp orbital masses tends to the norm-one volume times the local
@@ -4718,7 +4724,7 @@ theorem sLocalTraceSharpMass_asymptotic
   obtain ⟨a, b, ha, hb⟩ := sLocalTraceSharpMass_asymptotic_restrict φ
   have hκ := sLocalTraceSharpMass_asymptotic_const φ _hPic _hRamified _hOutside f _hLift
     a b ha hb
-  obtain ⟨T, hT, hT0⟩ := sLocalTraceSharpMass_asymptotic_tail _hRamified f
+  obtain ⟨T, hT, hT0, -⟩ := sLocalTraceSharpMass_asymptotic_tail _hRamified f
   have hy : HasSum (fun ξ : Hₛ ↦ f.val ξ.val) (φ.val 1) := by
     have h := _hLift 1
     simp only [mul_one, map_one, QuotientGroup.mk_one] at h
@@ -4726,6 +4732,148 @@ theorem sLocalTraceSharpMass_asymptotic
   obtain ⟨M, hM, hlim⟩ := sLocalTraceSharpMass_asymptotic_assemble
     (fun ξ R ↦ sLocalTraceSharpMass f ξ R) (fun ξ : Hₛ ↦ f.val ξ.val) _ _ _ _ T hy hκ hT hT0
   exact ⟨a, b, M, ha, hb, hM, hlim⟩
+
+/-- Paper p. 514, footnote 2, and (12.4.1.23), p. 518. An independent
+strict spatial floor subtracts a second sharp mass, at the product of
+the floor and the frequency radius. The diagonal is still additive. -/
+theorem sLocalTraceSharpAnnulus_eq_integral (f : BruhatCompactSupport Iₛ) (ξ : Hₛ)
+    (D : Set Iₛ) (hD : IsFundamentalDomain Hₛ D μₛ)
+    (a L L' : ℝ) (ha : 0 < a) (hL : a ≤ L) (hL' : 0 < L') :
+    let d := D ∩ {x : Iₛ | a < normS(x) ∧ normS(x) ≤ L}
+    let K := sLocalTraceCutoffKernel f
+      (indicator {x : Iₛ | a < normS(x) ∧ normS(x) ≤ L} (fun _ ↦ 1))
+      (indicator band(L') (fun _ ↦ 1))
+    let diag := fun x : Iₛ ↦ K (ξ.val * x) x.val
+    IntegrableOn diag d ((νₛ).comap (Units.val : Iₛ → Aₛ)) ∧
+      (∫ x in d, diag x ∂((νₛ).comap (Units.val : Iₛ → Aₛ))) =
+        sLocalTraceSharpMass f ξ (L * L') - sLocalTraceSharpMass f ξ (a * L') := by
+  intro d K diag
+  let μ := (νₛ).comap (Units.val : Iₛ → Aₛ)
+  let d₀ (r : ℝ) := D ∩ {x : Iₛ | normS(x) ≤ r}
+  let diag₀ (r : ℝ) (x : Iₛ) :=
+    sLocalTraceCutoffKernel f (indicator {z : Iₛ | normS(z) ≤ r} (fun _ ↦ 1))
+      (indicator band(L') (fun _ ↦ 1)) (ξ.val * x) x.val
+  have hsub : d₀ a ⊆ d₀ L := fun _ hx ↦ ⟨hx.1, hx.2.trans hL⟩
+  have hd : d = d₀ L \ d₀ a := by
+    ext x
+    change (x ∈ D ∧ a < normS(x) ∧ normS(x) ≤ L) ↔
+      (x ∈ D ∧ normS(x) ≤ L) ∧ ¬(x ∈ D ∧ normS(x) ≤ a)
+    constructor
+    · rintro ⟨hx, hxa, hxL⟩
+      exact ⟨⟨hx, hxL⟩, fun h ↦ (not_le_of_gt hxa) h.2⟩
+    · rintro ⟨⟨hx, hxL⟩, hxa⟩
+      exact ⟨hx, lt_of_not_ge (fun h ↦ hxa ⟨hx, h⟩), hxL⟩
+  have hnorm (x : Iₛ) : normS(ξ.val * x) = normS(x) := by
+    rw [map_mul, sLocalTrace_unit_norm ξ, one_mul]
+  have hsmall : NullMeasurableSet (d₀ a) μ :=
+    sLocalTrace_fundamentalDomain_slab_nullMeasurable D hD a
+  have hlarge : NullMeasurableSet (d₀ L) μ :=
+    sLocalTrace_fundamentalDomain_slab_nullMeasurable D hD L
+  have hAnn : NullMeasurableSet d μ := hd ▸ hlarge.inter hsmall.compl
+  obtain ⟨hI, hInt⟩ := sLocalTraceSharpMass_eq_integral f ξ D hD L L' (ha.trans_le hL) hL'
+  obtain ⟨_, hFloor⟩ := sLocalTraceSharpMass_eq_integral f ξ D hD a L' ha hL'
+  change IntegrableOn (diag₀ L) (d₀ L) μ at hI
+  change (∫ x in d₀ L, diag₀ L x ∂μ) = _ at hInt
+  change (∫ x in d₀ a, diag₀ a x ∂μ) = _ at hFloor
+  have hEq (x : Iₛ) (hx : x ∈ d) : diag₀ L x = diag x := by
+    have hx' : a < normS(ξ.val * x) ∧ normS(ξ.val * x) ≤ L := hnorm x ▸ hx.2
+    unfold diag₀ diag K sLocalTraceCutoffKernel
+    rw [indicator_of_mem (s := {z : Iₛ | normS(z) ≤ L}) hx'.2,
+      indicator_of_mem (s := {z : Iₛ | a < normS(z) ∧ normS(z) ≤ L}) hx']
+  have hEqFloor (x : Iₛ) (hx : x ∈ d₀ a) : diag₀ L x = diag₀ a x := by
+    have hx' : normS(ξ.val * x) ≤ a := hnorm x ▸ hx.2
+    unfold diag₀ sLocalTraceCutoffKernel
+    rw [indicator_of_mem (s := {z : Iₛ | normS(z) ≤ L}) (hx'.trans hL),
+      indicator_of_mem (s := {z : Iₛ | normS(z) ≤ a}) hx']
+  refine ⟨(hI.mono_set (hd ▸ sdiff_subset)).congr_fun_ae
+    ((ae_restrict_iff'₀ hAnn).2 (ae_of_all _ hEq)), ?_⟩
+  rw [← setIntegral_congr_ae₀ hAnn (ae_of_all _ hEq), hd,
+    setIntegral_sdiff₀ hsmall hI hsub, hInt,
+    setIntegral_congr_ae₀ hsmall (ae_of_all _ hEqFloor), hFloor]
+
+/-- If both products go to infinity, the two principal-value constants cancel.
+After insertion of a spatial floor `a`, the log term is the difference of
+the two product logarithms; subtracting only the upper one leaves the lower one. -/
+theorem sLocalTraceSharpAnnulus_asymptotic_of_floorProduct_tendsto_atTop
+    (φ : BruhatCompactSupport C𝔽)
+    (hPic : Subsingleton (CommRing.Pic ((S : Set V).integer F)))
+    (hRamified : ∀ v : V, differentIdeal ℤ (𝓞 F) ≤ v.asIdeal → v ∈ S)
+    (hOutside : ∀ (a : outsideIntegralIdeleUnits F S) (c : C𝔽),
+      φ.val (QuotientGroup.mk a.val * c) = φ.val c)
+    (f : BruhatCompactSupport Iₛ)
+    (hLift : ∀ g : Iₛ, HasSum (fun ξ : Hₛ ↦ f.val (ξ.val * g)) (φ.val (classAtS(g))))
+    {ι : Type*} {l : Filter ι} (upper lower : ι → ℝ)
+    (hupper : Tendsto upper l atTop) (hlower : Tendsto lower l atTop) :
+    ∃ M : ι → ℂ,
+      (∀ᶠ i in l, HasSum (fun ξ : Hₛ ↦
+        sLocalTraceSharpMass f ξ (upper i) - sLocalTraceSharpMass f ξ (lower i)) (M i)) ∧
+      Tendsto (fun i ↦ M i - (volume₁ : ℂ) * φ.val 1 *
+        ((Real.log (upper i) - Real.log (lower i) : ℝ) : ℂ)) l (𝓝 0) := by
+  obtain ⟨_, _, M, _, _, hM, hlim⟩ := sLocalTraceSharpMass_asymptotic φ hPic hRamified
+    hOutside f hLift
+  refine ⟨fun i ↦ M (upper i) - M (lower i), ?_, ?_⟩
+  · filter_upwards [hupper.eventually hM, hlower.eventually hM] with i hi hj
+    exact hi.sub hj
+  · have h := (hlim.comp hupper).sub (hlim.comp hlower)
+    rw [sub_self] at h
+    refine h.congr fun i ↦ ?_
+    simp only [Function.comp_apply, Complex.ofReal_sub]
+    ring
+
+private theorem sLocalTraceSharpMass_uniform_majorant
+    (φ : BruhatCompactSupport C𝔽)
+    (hPic : Subsingleton (CommRing.Pic ((S : Set V).integer F)))
+    (hRamified : ∀ v : V, differentIdeal ℤ (𝓞 F) ≤ v.asIdeal → v ∈ S)
+    (hOutside : ∀ (a : outsideIntegralIdeleUnits F S) (c : C𝔽),
+      φ.val (QuotientGroup.mk a.val * c) = φ.val c)
+    (f : BruhatCompactSupport Iₛ)
+    (hLift : ∀ g : Iₛ, HasSum (fun ξ : Hₛ ↦ f.val (ξ.val * g)) (φ.val (classAtS(g))))
+    (U : ℝ) :
+    ∃ b : Hₛ → ℝ, Summable b ∧ ∀ R ∈ Icc 1 U, ∀ ξ : Hₛ,
+      ‖sLocalTraceSharpMass f ξ R‖ ≤ b ξ := by
+  obtain ⟨a, b, ha, hb⟩ := sLocalTraceSharpMass_asymptotic_restrict φ
+  let κ (ξ : Hₛ) : ℂ := -∫ w in range (Units.val : Iₛ → Aₛ),
+    fourierₛ (sLocalTraceEta f ξ) w * ((Real.log (modS(w)) : ℝ) : ℂ) ∂νₛ
+  have hκ : Summable (fun ξ : Hₛ ↦ ‖κ ξ‖) :=
+    (sLocalTraceSharpMass_asymptotic_const φ hPic hRamified hOutside f hLift
+      a b ha hb).summable.norm
+  have hy : Summable (fun ξ : Hₛ ↦ ‖f.val ξ.val‖) := by
+    have h := (hLift 1).summable.norm
+    simpa only [mul_one] using h
+  obtain ⟨_, _, _, d, hd, htail⟩ := sLocalTraceSharpMass_asymptotic_tail hRamified f
+  let V₁ : ℂ := volume₁
+  refine ⟨fun ξ ↦ d ξ + ‖V₁‖ * (‖f.val ξ.val‖ * Real.log U + ‖κ ξ‖),
+    hd.add ((hy.mul_right _).add hκ |>.mul_left _), ?_⟩
+  rintro R ⟨hR, hU⟩ ξ
+  have hrpos : 0 < R := zero_lt_one.trans_le hR
+  have hlog : ‖(Real.log R : ℂ)‖ ≤ Real.log U := by
+    rw [Complex.norm_real, Real.norm_eq_abs, abs_of_nonneg (Real.log_nonneg hR)]
+    exact Real.log_le_log hrpos hU
+  let c : ℂ := V₁ * (f.val ξ.val * (Real.log R : ℂ) + κ ξ)
+  calc
+    _ ≤ ‖sLocalTraceSharpMass f ξ R - c‖ + ‖c‖ := by
+      simpa only [sub_add_cancel] using norm_add_le (sLocalTraceSharpMass f ξ R - c) c
+    _ ≤ d ξ + ‖V₁‖ * (‖f.val ξ.val‖ * Real.log U + ‖κ ξ‖) := by
+      refine add_le_add (htail R hR ξ) ?_
+      change ‖V₁ * (f.val ξ.val * (Real.log R : ℂ) + κ ξ)‖ ≤ _
+      rw [norm_mul]
+      refine mul_le_mul_of_nonneg_left ((norm_add_le ..).trans ?_) (norm_nonneg _)
+      rw [norm_mul]
+      gcongr
+
+/-- The sharp orbital series is absolutely summable at every product radius
+at least one, with a common summable majorant on any bounded interval of such radii. -/
+theorem sLocalTraceSharpMass_norm_summable_of_one_le
+    (φ : BruhatCompactSupport C𝔽)
+    (hPic : Subsingleton (CommRing.Pic ((S : Set V).integer F)))
+    (hRamified : ∀ v : V, differentIdeal ℤ (𝓞 F) ≤ v.asIdeal → v ∈ S)
+    (hOutside : ∀ (a : outsideIntegralIdeleUnits F S) (c : C𝔽),
+      φ.val (QuotientGroup.mk a.val * c) = φ.val c)
+    (f : BruhatCompactSupport Iₛ)
+    (hLift : ∀ g : Iₛ, HasSum (fun ξ : Hₛ ↦ f.val (ξ.val * g)) (φ.val (classAtS(g))))
+    (R : ℝ) (hR : 1 ≤ R) : Summable (fun ξ : Hₛ ↦ ‖sLocalTraceSharpMass f ξ R‖) := by
+  obtain ⟨b, hb, h⟩ := sLocalTraceSharpMass_uniform_majorant φ hPic hRamified hOutside f hLift R
+  exact Summable.of_nonneg_of_le (fun _ ↦ norm_nonneg _) (h R ⟨hR, le_rfl⟩) hb
 
 -- TODO(paper-gap): Theorem 12.4.1.1 needs the actual smoothed PW quotient kernel
 -- and a limit for its difference from the sharp orbital mass. Neither the cutoff
