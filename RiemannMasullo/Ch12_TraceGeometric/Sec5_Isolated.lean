@@ -10,6 +10,8 @@ import Mathlib.MeasureTheory.Integral.IntegralEqImproper
 import Mathlib.Topology.Algebra.InfiniteSum.Order
 import Mathlib.Geometry.Manifold.PartitionOfUnity
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
+public import RiemannMasullo.AppB_AnalyticNT.PolynomialIdealSamples
+public import RiemannMasullo.ForMathlib.Analysis.Analytic.ZeroLatticeEventuallyCertified
 public import RiemannMasullo.ForMathlib.Analysis.Analytic.ZeroDensity
 public import RiemannMasullo.ForMathlib.Analysis.Analytic.ZeroLatticeSchwartz
 public import RiemannMasullo.ForMathlib.Analysis.Fourier.SchwartzLaplaceAxis
@@ -1107,6 +1109,46 @@ theorem tendsto_sampleSum_chosenFiniteHeckeL
   change Tendsto (sampleSum (fun t : ℝ ↦ L cl(t)) g) atTop _
   rw [← criticalFiniteHeckeL_eq_continuation χ.val L hL.1 hL.2]
   exact tendsto_sampleSum_criticalFiniteHeckeL χ.val g
+
+open Function PolynomialIdealSamples
+
+/-- The observed critical-line magnitudes from the polynomial-length ideal sum. -/
+def polynomialIdealSampleMagnitude : (χ : PontryaginDual C𝔽) → (n : ℕ) → (k : ℤ) → ℝ :=
+  open scoped CriticalMeasurementWitnesses in
+  fun (χ : PontryaginDual C𝔽) (n : ℕ) (k : ℤ) ↦ ‖frequencySample χ n (samplePoint n k)‖
+
+/-- The actual successor-inclusive finite grid has every prescribed enclosure
+for all sufficiently large meshes. -/
+theorem eventuallyAccurate_polynomialIdealSampleMagnitude (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : PontryaginDual C𝔽) (hχ : ∀ t, χ (τ t)=1) :
+    EventuallyAccurateMagnitudes (criticalFiniteHeckeL χ) (polynomialIdealSampleMagnitude χ) := by
+  obtain ⟨L,hL,he⟩ := finiteHeckeL_exists_continuation χ
+  rw [criticalFiniteHeckeL_eq_continuation χ L hL he]
+  filter_upwards [eventually_frequencySample_error τ hτ χ hχ L hL he,eventually_gt_atTop (0:ℕ)]
+    with n hn hn₀
+  intro k hk
+  let t := samplePoint n k
+  have ht : |t| ≤ (n:ℝ)+1 := abs_samplePoint_le_succ hn₀ hk
+  have hz : (1/2:ℂ)+(t:ℂ)*I = point t := by
+    apply Complex.ext <;> norm_num [point,Complex.mul_re,Complex.mul_im]
+  rw [sampleError_eq_pow]
+  change |‖frequencySample χ n t‖-‖L ((1/2:ℂ)+(t:ℂ)*I)‖| ≤ _
+  rw [abs_sub_comm,hz]
+  exact (abs_norm_sub_norm_le _ _).trans (hn t ht).le
+
+/-- The same strict finite observation recovers the full central divisor
+with orders for every nonnegative real Schwartz test. -/
+theorem tendsto_certified_polynomialIdealSampleMagnitude (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : PontryaginDual C𝔽) (hχ : ∀ t, χ (τ t)=1) (g : 𝓢(ℝ,ℝ)) (hg : ∀ t, 0 ≤ g t) :
+    (∀ᶠ n : ℕ in atTop, certifiedSum (polynomialIdealSampleMagnitude χ) g n ≤ sampleSum (criticalFiniteHeckeL χ) g n) ∧
+    Tendsto (certifiedSum (polynomialIdealSampleMagnitude χ) g) atTop
+      (𝓝 (∑' z : central(χ), ((ord(χ,z.val)).toNat : ℝ)*g z.val.im)) := by
+  have ho (t : ℝ) := criticalFiniteHeckeL_order χ t
+  exact tendsto_certifiedSum_of_eventuallyAccurate (eventuallyAccurate_polynomialIdealSampleMagnitude τ hτ χ hχ)
+    (fun t ↦ (ho t).1) (fun t h ↦ (ho t).2.1 (analyticOrderAt_eq_top.mp h))
+    (fun z : central(χ) ↦ z.val.im) (fun z ↦ ((ord(χ,z.val)).toNat : ℝ))
+    (fun _ ↦ Nat.cast_nonneg _) (fun _ ↦ tendsto_sampleSum_criticalFiniteHeckeL_compact χ)
+    g.continuous hg (tendsto_sampleSum_criticalFiniteHeckeL χ g)
 
 end CriticalHeckeLattice
 
