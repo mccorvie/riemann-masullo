@@ -157,13 +157,26 @@ private theorem landauMoment_germ_left {Ω : Type*} [MeasurableSpace Ω] {μ : M
   exact tendsto_nhds_unique_of_eventuallyEq hH.continuousAt.continuousWithinAt
     (hA _ hz).continuousAt.continuousWithinAt hh
 
-/-- A meromorphic continuation of a positive exponential moment, regular at the real
-points it crosses, forces absolute convergence throughout the open half-plane. -/
-theorem landauMoment_integrable_of_real_regular {Ω : Type*} [MeasurableSpace Ω]
+private theorem landauMoment_nonneg_from_left {Ω : Type*} [MeasurableSpace Ω]
+    {μ : Measure Ω} {X : Ω → ℝ} {u : ℝ} {F : ℂ → ℂ}
+    (he : F =ᶠ[𝓝[{z : ℂ | z.re < u}] (u : ℂ)] complexMGF X μ) :
+    ∀ᶠ t : ℝ in 𝓝[<] u, 0 ≤ (F (t : ℂ)).re := by
+  have hmap : Tendsto (fun t : ℝ ↦ (t : ℂ)) (𝓝[<] u) (𝓝[{z : ℂ | z.re < u}] (u : ℂ)) :=
+    tendsto_nhdsWithin_iff.mpr ⟨Complex.continuous_ofReal.continuousAt.continuousWithinAt,
+      self_mem_nhdsWithin⟩
+  filter_upwards [hmap.eventually he] with t ht
+  rw [ht, re_complexMGF_ofReal]
+  exact mgf_nonneg
+
+/-- A positive exponential moment continues to converge across each real point where its
+meromorphic continuation is analytic or takes negative real part on the immediate left.
+The second alternative rules out an abscissa with a pole of the opposite sign. -/
+theorem landauMoment_integrable_of_real_alternative {Ω : Type*} [MeasurableSpace Ω]
     {μ : Measure Ω} {X : Ω → ℝ} (hX : 0 ≤ᵐ[μ] X) {a b : ℝ}
     (hstart : Iio a ⊆ integrableExpSet X μ) {F : ℂ → ℂ}
     (hF : MeromorphicOn F {z | z.re < b}) (he : ∀ z : ℂ, z.re < a → F z = complexMGF X μ z)
-    (hreal : ∀ u : ℝ, a ≤ u → u < b → AnalyticAt ℂ F (u : ℂ)) :
+    (hreal : ∀ u : ℝ, a ≤ u → u < b → AnalyticAt ℂ F (u : ℂ) ∨
+      ∀ᶠ t : ℝ in 𝓝[<] u, (F (t : ℂ)).re < 0) :
     Iio b ⊆ integrableExpSet X μ := by
   let E := integrableExpSet X μ
   have hbase : a - 1 < a := by linarith
@@ -192,8 +205,22 @@ theorem landauMoment_integrable_of_real_regular {Ω : Type*} [MeasurableSpace Ω
     obtain ⟨u, hu, hvu⟩ := exists_lt_of_lt_csSup hne hv
     exact hdown hvu.le hu
   have hout (u : ℝ) (hu : x < u) : u ∉ E := fun hh ↦ hu.not_ge (le_csSup hbdd hh)
-  exact landauMoment_not_analyticAt_boundary hX hin hout (landauMoment_germ_left hax hxb hin hF he)
-    (hreal x hax hxb)
+  have hg := landauMoment_germ_left hax hxb hin hF he
+  obtain hA | hneg := hreal x hax hxb
+  · exact landauMoment_not_analyticAt_boundary hX hin hout hg hA
+  · obtain ⟨u, hu, hu'⟩ := (hneg.and (landauMoment_nonneg_from_left hg)).exists
+    exact hu.not_ge hu'
+
+/-- A meromorphic continuation of a positive exponential moment, regular at the real
+points it crosses, forces absolute convergence throughout the open half-plane. -/
+theorem landauMoment_integrable_of_real_regular {Ω : Type*} [MeasurableSpace Ω]
+    {μ : Measure Ω} {X : Ω → ℝ} (hX : 0 ≤ᵐ[μ] X) {a b : ℝ}
+    (hstart : Iio a ⊆ integrableExpSet X μ) {F : ℂ → ℂ}
+    (hF : MeromorphicOn F {z | z.re < b}) (he : ∀ z : ℂ, z.re < a → F z = complexMGF X μ z)
+    (hreal : ∀ u : ℝ, a ≤ u → u < b → AnalyticAt ℂ F (u : ℂ)) :
+    Iio b ⊆ integrableExpSet X μ := by
+  exact landauMoment_integrable_of_real_alternative hX hstart hF he
+    (fun u hu hu' ↦ Or.inl (hreal u hu hu'))
 
 /-- If the difference of two positive transforms admits a meromorphic continuation
 regular at every real point crossed, convergence of the first throughout the larger
@@ -330,5 +357,133 @@ theorem landauLaplace_pos_iff_neg {Ω : Type*} [MeasurableSpace Ω] {μ : Measur
       (F := -F) (fun z hz ↦ (hm z hz).neg)
       (fun z hz ↦ by simp [he z hz, ← integral_neg]) (fun x ha hb ↦ (hr x ha hb).neg)
     simpa using h.1
+
+private theorem landauLaplace_negative_residue_left {F G : ℂ → ℂ} {u : ℝ}
+    (hG : AnalyticAt ℂ G (u : ℂ))
+    (hF : AnalyticAt ℂ F ((-u : ℝ) : ℂ) ∨ ∃ r : ℝ, r < 0 ∧
+      Tendsto (fun t : ℝ ↦ (t - -u) * (F t).re) (𝓝[>] (-u)) (𝓝 r)) :
+    AnalyticAt ℂ (fun z ↦ F (-z) + G z) (u : ℂ) ∨
+      ∀ᶠ t : ℝ in 𝓝[<] u, ((fun z : ℂ ↦ F (-z) + G z) (t : ℂ)).re < 0 := by
+  rcases hF with hA | ⟨r, hr, hres⟩
+  · left
+    rw [Complex.ofReal_neg] at hA
+    exact (hA.comp (f := fun z : ℂ ↦ -z) (x := (u : ℂ)) (by fun_prop)).add hG
+  right
+  have ht : Tendsto (fun t : ℝ ↦ -t) (𝓝[<] u) (𝓝[>] (-u)) := tendsto_neg_nhdsLT
+  have hδ : Tendsto (fun t : ℝ ↦ u - t) (𝓝[<] u) (𝓝 0) := by
+    rw [← sub_self u]
+    exact (show ContinuousAt (fun t : ℝ ↦ u - t) u by fun_prop).continuousWithinAt
+  have hGr : Tendsto (fun t : ℝ ↦ (G (t : ℂ)).re) (𝓝[<] u) (𝓝 (G u).re) :=
+    (Complex.continuous_re.continuousAt.comp (hG.continuousAt.comp
+      Complex.continuous_ofReal.continuousAt)).continuousWithinAt
+  have hlim : Tendsto (fun t : ℝ ↦ (u - t) * (F (-(t : ℂ)) + G t).re) (𝓝[<] u) (𝓝 r) := by
+    have h := (hres.comp ht).add (hδ.mul hGr)
+    simp only [zero_mul, add_zero] at h
+    apply h.congr' (Eventually.of_forall fun t ↦ ?_)
+    simp only [Function.comp_apply, Complex.ofReal_neg, Complex.add_re]
+    ring
+  filter_upwards [hlim.eventually (gt_mem_nhds hr), self_mem_nhdsWithin] with t hneg ht'
+  by_contra! hn
+  exact hneg.not_ge (mul_nonneg (sub_nonneg.mpr (le_of_lt ht')) hn)
+
+/-- Signed one-sided Landau continuation allowing real zeros in the arithmetic
+application. The negative part is integrable on the larger half-plane. At each real
+point crossed, a possible simple pole of the signed continuation may have a strictly
+negative residue, measured only on approach from the right. These poles are excluded
+by positivity after adding the transform of the negative part. The signed integral
+is then holomorphic throughout the larger half-plane. -/
+theorem landauLaplace_of_negative_residues {Ω : Type*} [MeasurableSpace Ω] {μ : Measure Ω}
+    {T f : Ω → ℝ} (hT : Measurable T) (hT0 : 0 ≤ᵐ[μ] T) (hf : Measurable f)
+    {b B : ℝ} (hbB : b ≤ B)
+    (hneg : ∀ d > b, Integrable (fun ω ↦ max (-f ω) 0 * Real.exp (-d * T ω)) μ)
+    (hpos : ∀ d > B, Integrable (fun ω ↦ max (f ω) 0 * Real.exp (-d * T ω)) μ)
+    {F : ℂ → ℂ} (hm : MeromorphicOn F {z | b < z.re})
+    (he : ∀ z : ℂ, B < z.re → F z = ∫ ω, (f ω : ℂ) * Complex.exp (-z * T ω) ∂μ)
+    (hr : ∀ x : ℝ, b < x → x ≤ B → AnalyticAt ℂ F (x : ℂ) ∨
+      ∃ r : ℝ, r < 0 ∧ Tendsto (fun t : ℝ ↦ (t-x) * (F t).re) (𝓝[>] x) (𝓝 r)) :
+    (∀ d > b, Integrable (fun ω ↦ max (f ω) 0 * Real.exp (-d * T ω)) μ) ∧
+      AnalyticOnNhd ℂ (fun z ↦ ∫ ω, (f ω : ℂ) * Complex.exp (-z * T ω) ∂μ) {z | b < z.re} := by
+  let P := μ.withDensity fun ω ↦ (f ω).toNNReal
+  let N := μ.withDensity fun ω ↦ (-f ω).toNNReal
+  have hn : Iio (-b) ⊆ integrableExpSet T N := by
+    intro u hu
+    change u < -b at hu
+    exact (landauLaplace_density_mem T hf.neg u).2 (by simpa using hneg (-u) (by linarith))
+  have hp : Iio (-B) ⊆ integrableExpSet T P := by
+    intro u hu
+    change u < -B at hu
+    exact (landauLaplace_density_mem T hf u).2 (by simpa using hpos (-u) (by linarith))
+  have hN : AnalyticOnNhd ℂ (complexMGF T N) {z : ℂ | z.re < -b} :=
+    fun z hz ↦ analyticAt_complexMGF (interior_maximal hn isOpen_Iio hz)
+  have hP0 : 0 ≤ᵐ[P] T := hT0.filter_mono (withDensity_absolutelyContinuous _ _).ae_le
+  have hp' := landauMoment_integrable_of_real_alternative hP0 hp
+    (F := fun z : ℂ ↦ F (-z) + complexMGF T N z) (b := -b)
+    (fun z hz ↦ by
+      change z.re < -b at hz
+      have hz' : b < (-z).re := by change b < -z.re; linarith
+      exact ((hm (-z) hz').comp_analyticAt (g := fun w : ℂ ↦ -w) (by fun_prop)).add
+        (hN z hz).meromorphicAt)
+    (fun z hz ↦ by
+      rw [he (-z) (by change _ < -z.re; linarith),
+        landauLaplace_density_sub hT hf (-z) (by simpa using hp hz)
+          (by simpa using hn (hz.trans_le (neg_le_neg hbB)))]
+      simp [N, P])
+    (fun u hu hu' ↦ landauLaplace_negative_residue_left (hN u hu') (hr (-u) (by linarith) (by linarith)))
+  refine ⟨fun d hd ↦ (landauLaplace_density_mem T hf (-d)).1 (hp' (neg_lt_neg hd)), ?_⟩
+  have hP : AnalyticOnNhd ℂ (complexMGF T P) {z : ℂ | z.re < -b} :=
+    fun z hz ↦ analyticAt_complexMGF (interior_maximal hp' isOpen_Iio hz)
+  intro z hz
+  change b < z.re at hz
+  have hw : -z ∈ {w : ℂ | w.re < -b} := neg_lt_neg hz
+  apply (((hP.sub hN) (-z) hw).comp (f := fun v : ℂ ↦ -v) (x := z) (by fun_prop)).congr
+  filter_upwards [(isOpen_lt continuous_const Complex.continuous_re).mem_nhds hz] with w hw
+  exact (landauLaplace_density_sub hT hf w (hp' (neg_lt_neg hw)) (hn (neg_lt_neg hw))).symm
+
+private theorem landauLaplace_real_residue {F : ℂ → ℂ} {x r : ℝ}
+    (hr : Tendsto (fun z : ℂ ↦ (z - x) * F z) (𝓝[≠] (x : ℂ)) (𝓝 (r : ℂ))) :
+    Tendsto (fun t : ℝ ↦ (t - x) * (F t).re) (𝓝[>] x) (𝓝 r) := by
+  have hmap : Tendsto (fun t : ℝ ↦ (t : ℂ)) (𝓝[>] x) (𝓝[≠] (x : ℂ)) := by
+    apply tendsto_nhdsWithin_iff.mpr
+    refine ⟨Complex.continuous_ofReal.continuousAt.continuousWithinAt, ?_⟩
+    filter_upwards [self_mem_nhdsWithin] with t ht
+    exact fun e ↦ (ne_of_gt ht) (Complex.ofReal_injective e)
+  have h := Complex.continuous_re.continuousAt.tendsto.comp (hr.comp hmap)
+  simpa [Function.comp_def, ← Complex.ofReal_sub, Complex.mul_re] using h
+
+/-- A lower bound by an exponentially integrable envelope, together with the ordinary
+complex residues of a continued Laplace transform, suffices for absolute convergence
+and analyticity of the actual signed integral. Real simple poles of strictly negative
+residue are allowed in the input. This is the sign furnished by a real zero in the
+centered Hecke Riesz transform. -/
+theorem landauLaplace_of_lower_bound_and_residues {Ω : Type*} [MeasurableSpace Ω] {μ : Measure Ω}
+    {T f g : Ω → ℝ} (hT : Measurable T) (hT0 : 0 ≤ᵐ[μ] T) (hf : Measurable f)
+    (hlower : ∀ᵐ ω ∂μ, -g ω ≤ f ω) {b B : ℝ} (hbB : b ≤ B)
+    (hmajor : ∀ d > b, Integrable (fun ω ↦ g ω * Real.exp (-d * T ω)) μ)
+    (hstart : ∀ d > B, Integrable (fun ω ↦ f ω * Real.exp (-d * T ω)) μ)
+    {F : ℂ → ℂ} (hm : MeromorphicOn F {z | b < z.re})
+    (he : ∀ z : ℂ, B < z.re → F z = ∫ ω, (f ω : ℂ) * Complex.exp (-z * T ω) ∂μ)
+    (hr : ∀ x : ℝ, b < x → x ≤ B → AnalyticAt ℂ F (x : ℂ) ∨ ∃ r : ℝ, r < 0 ∧
+      Tendsto (fun z : ℂ ↦ (z - x) * F z) (𝓝[≠] (x : ℂ)) (𝓝 (r : ℂ))) :
+    (∀ d > b, Integrable (fun ω ↦ f ω * Real.exp (-d * T ω)) μ) ∧
+      AnalyticOnNhd ℂ (fun z ↦ ∫ ω, (f ω : ℂ) * Complex.exp (-z * T ω) ∂μ) {z | b < z.re} := by
+  have hneg (d : ℝ) (hd : b < d) :
+      Integrable (fun ω ↦ max (-f ω) 0 * Real.exp (-d * T ω)) μ := by
+    apply (hmajor d hd).norm.mono' (by fun_prop)
+    filter_upwards [hlower] with ω hω
+    rw [norm_mul, norm_mul, Real.norm_of_nonneg (le_max_right _ _)]
+    apply mul_le_mul_of_nonneg_right _ (norm_nonneg _)
+    rw [Real.norm_eq_abs]
+    exact max_le ((neg_le.mp hω).trans (le_abs_self _)) (abs_nonneg _)
+  have hpos (d : ℝ) (hd : B < d) :
+      Integrable (fun ω ↦ max (f ω) 0 * Real.exp (-d * T ω)) μ := by
+    have hh := (hstart d hd).sup (show Integrable (0 : Ω → ℝ) μ from integrable_zero ..)
+    change Integrable (fun ω ↦ max (f ω * Real.exp (-d * T ω)) 0) μ at hh
+    simpa only [max_mul_of_nonneg _ _ (Real.exp_pos _).le, zero_mul] using hh
+  obtain ⟨hp, ha⟩ := landauLaplace_of_negative_residues hT hT0 hf hbB hneg hpos hm he
+    (fun x hx hx' ↦ (hr x hx hx').imp_right fun ⟨r, hr, ht⟩ ↦ ⟨r, hr, landauLaplace_real_residue ht⟩)
+  refine ⟨fun d hd ↦ ?_, ha⟩
+  have hi := (hp d hd).sub (hneg d hd)
+  change Integrable (fun ω ↦ max (f ω) 0 * Real.exp (-d * T ω) - max (-f ω) 0 * Real.exp (-d * T ω)) μ at hi
+  simpa only [← sub_mul, max_zero_sub_max_neg_zero_eq_self] using hi
 
 end RiemannMasullo
