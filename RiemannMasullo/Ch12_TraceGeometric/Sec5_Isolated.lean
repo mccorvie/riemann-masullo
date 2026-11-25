@@ -4,6 +4,7 @@ import Mathlib.Geometry.Manifold.PartitionOfUnity
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 
 public import RiemannMasullo.Ch01_Introduction.Sec4_PoissonCertificate
+public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeSignedCoefficients
 public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeGreenExterior
 public import RiemannMasullo.AppB_AnalyticNT.Sec4b_BoundaryHeckeGreen
 
@@ -498,6 +499,22 @@ theorem all_widths_iff_criticalLogDifference_nonpos (τ : ℝ≥0ˣ →ₜ* C�
     have hh := h χ hχ
     rw [criticalLogDifference_eq_mass τ hτ χ hχ] at hh
     exact (rightGreenMass_eq_zero_iff χ).mp (le_antisymm hh (rightGreenMass_nonneg χ))
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The exterior cancellation at every width is equivalent
+to subexponential signed prefix growth along arbitrarily late integer cutoffs for every
+normalized character. The sign may vary with both the character and the cutoff. -/
+theorem all_widths_iff_cofinal_signedCoefficients (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) (negative : U𝔽 → ℕ → Bool) :
+    allWidths(τ) ↔ ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (τ u) = 1) →
+      ∀ ε : ℝ, 0 < ε → ∀ J : ℕ, ∃ N ≥ J,
+        Real.log (SignedFrequency.chosenPrefix (HeckeLaguerre.measuredCoeff χ) (negative χ) N) /
+          (N : ℝ) ≤ ε := by
+  rw [allWidths_iff_critical τ hτ]
+  constructor <;> intro h χ hχ
+  · exact (HeckeLaguerre.isEmpty_rightSite_iff_cofinal_signed τ hτ χ hχ (negative χ)).mp
+      ((HeckeLaguerre.isEmpty_rightSite_iff_central χ).mpr (h χ hχ))
+  · exact (HeckeLaguerre.isEmpty_rightSite_iff_central χ).mp
+      ((HeckeLaguerre.isEmpty_rightSite_iff_cofinal_signed τ hτ χ hχ (negative χ)).mpr (h χ hχ))
 
 /-- Paper: Theorem 12.5.1.1, pp. 519–520. For each compact test and normalized character, the
 absolute omitted Mellin sum, including both edges of any positive strip, is bounded by the
