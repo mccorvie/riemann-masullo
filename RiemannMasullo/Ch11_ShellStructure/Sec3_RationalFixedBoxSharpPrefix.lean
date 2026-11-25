@@ -2,7 +2,7 @@ module
 
 public import RiemannMasullo.Ch11_ShellStructure.Sec3_RationalFixedBoxQuotient
 import Mathlib.Analysis.Normed.Ring.Units
-import Mathlib.Analysis.InnerProductSpace.Basic
+public import Mathlib.Analysis.InnerProductSpace.Adjoint
 
 /-! # Exact leakage through the first physical prefix of the rational box
 
@@ -127,6 +127,70 @@ theorem norm_comp_subtypeL_of_prefix_kill
   simpa only [Complex.norm_real, Real.norm_eq_abs, abs_of_nonneg hβ] using
     norm_comp_subtypeL_of_isometric_range B V N hN hV (β : ℂ) hkill
 
+/-- The identity on compressed orthogonal projections, not just on readout norms. -/
+private theorem comp_adjoint_subtypeL_of_prefix_kill
+    {E Y : Type*} [NormedAddCommGroup E] [InnerProductSpace ℂ E] [CompleteSpace E]
+    [NormedAddCommGroup Y] [InnerProductSpace ℂ Y] [CompleteSpace Y]
+    (B : E →L[ℂ] Y) (V : E →ₗᵢ[ℂ] E) (N : Submodule ℂ E) [CompleteSpace N]
+    (hN : N = LinearMap.range V.toLinearMap)
+    (β : ℝ) (hkill : ∀ x, B (V x + (β : ℂ) • x) = 0) :
+    (B.comp N.subtypeL).comp (B.comp N.subtypeL).adjoint =
+      ((β ^ 2 : ℝ) : ℂ) • (B.comp B.adjoint) := by
+  have hmem (x : E) : V x ∈ N := hN ▸ ⟨x, rfl⟩
+  let W : E →ₗᵢ[ℂ] N :=
+    { toLinearMap := V.toLinearMap.codRestrict N hmem
+      norm_map' := V.norm_map }
+  have hsur : Function.Surjective W := by
+    intro y
+    have hy : (y : E) ∈ LinearMap.range V.toLinearMap := hN ▸ y.property
+    obtain ⟨x, hx⟩ := hy
+    exact ⟨x, Subtype.ext hx⟩
+  let U := LinearIsometryEquiv.ofSurjective W hsur
+  let D := (U : E →L[ℂ] N)
+  let C := B.comp N.subtypeL
+  have hD (y : N) : D (D.adjoint y) = y := by
+    change U (ContinuousLinearMap.adjoint (U : E →L[ℂ] N) y) = y
+    rw [U.adjoint_eq_symm]
+    exact U.apply_symm_apply y
+  have hC : C.comp D = (-(β : ℂ)) • B := by
+    ext x
+    have h := hkill x
+    rw [map_add, map_smul] at h
+    change B (V x) = (-(β : ℂ)) • B x
+    simpa only [neg_smul] using eq_neg_of_add_eq_zero_left h
+  have hscalar : starRingEnd ℂ (-(β : ℂ)) = -(β : ℂ) := by simp
+  calc
+    C.comp C.adjoint = (C.comp D).comp (C.comp D).adjoint := by
+      rw [show (C.comp D).adjoint = D.adjoint.comp C.adjoint from
+        ContinuousLinearMap.adjoint_comp C D]
+      apply ContinuousLinearMap.ext
+      intro y
+      exact congrArg C (hD (C.adjoint y)).symm
+    _ = ((β ^ 2 : ℝ) : ℂ) • (B.comp B.adjoint) := by
+      rw [hC, map_smulₛₗ, hscalar]
+      ext y
+      simp only [ContinuousLinearMap.comp_apply, smul_apply, map_smul, smul_smul]
+      congr 1
+      push_cast
+      ring
+
+private theorem comp_starProjection_of_prefix_kill
+    {E Y : Type*} [NormedAddCommGroup E] [InnerProductSpace ℂ E] [CompleteSpace E]
+    [NormedAddCommGroup Y] [InnerProductSpace ℂ Y] [CompleteSpace Y]
+    (B : E →L[ℂ] Y) (V : E →ₗᵢ[ℂ] E) (N : Submodule ℂ E) [CompleteSpace N]
+    (hN : N = LinearMap.range V.toLinearMap)
+    (β : ℝ) (hkill : ∀ x, B (V x + (β : ℂ) • x) = 0) :
+    B.comp (N.starProjection.comp B.adjoint) =
+      ((β ^ 2 : ℝ) : ℂ) • (B.comp B.adjoint) := by
+  calc
+    _ = (B.comp N.subtypeL).comp (B.comp N.subtypeL).adjoint := by
+      rw [ContinuousLinearMap.adjoint_comp, N.adjoint_subtypeL]
+      apply ContinuousLinearMap.ext
+      intro y
+      change B (N.starProjection (B.adjoint y)) = B (↑(N.orthogonalProjectionOnto (B.adjoint y)))
+      rw [Submodule.starProjection_apply]
+    _ = _ := comp_adjoint_subtypeL_of_prefix_kill B V N hN β hkill
+
 section StagePeriod
 
 variable {X : ℝ} (hX : 0 < X) (T : Finset ℕ) (hT : ∀ q ∈ T, 1 ≤ q)
@@ -234,5 +298,41 @@ public theorem norm_fixedBox_prefix_leakage {X : ℝ} (hX : 0 < X) (T : Finset �
   obtain ⟨y, hy⟩ := ShiftMobius.isometry_add_mem_shift S β hp0 hp1 w
   rw [hy]
   exact hwindow _ (stageUnitPeriod_vanishes_prefix hX T hT p hp hb y)
+
+/-- The physical readout compression of the orthogonal projector loses the
+square of the first-delay attenuation. This includes the sharp endpoint. -/
+public theorem comp_adjoint_fixedBox_prefix_leakage {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
+    (hT : ∀ q ∈ T, 1 ≤ q) (p : ℕ) (hp : 1 < p) (hmem : p ∉ T)
+    (hTp : ∀ q ∈ insert p T, 1 ≤ q) {Y : Type*} [NormedAddCommGroup Y]
+    [InnerProductSpace ℂ Y] [CompleteSpace Y]
+    (B : closedStageSubmodule X T hT →L[ℂ] Y) {b : ℝ} (hb : b ≤ -Real.log X + Real.log p)
+    (hwindow : ∀ v : closedStageSubmodule X T hT,
+      (∀ᵐ x ∂volume, x ≤ b → (v : LogL2) x = 0) → B v = 0) :
+    let N := (fixedBoxDenominator X T hT p hTp).toSubmodule
+    B.comp (N.starProjection.comp B.adjoint) =
+      ((p : ℂ)⁻¹) • (B.comp B.adjoint) := by
+  let N := (fixedBoxDenominator X T hT p hTp).toSubmodule
+  let S := stageUnitPeriod hX T hT p hp
+  let β := stagePeriodBeta p
+  have hp0 : 0 ≤ β := (stagePeriodBeta_pos p).le
+  have hp1 : β < 1 := stagePeriodBeta_lt_one p hp
+  let V := ShiftMobius.isometry S β hp0 hp1
+  have hr : N = LinearMap.range V.toLinearMap := by
+    dsimp [V]
+    rw [ShiftMobius.range_isometry]
+    apply SetLike.coe_injective
+    exact (range_stageUnitPeriod_sub_beta hX T hT p hp hmem hTp).symm
+  have hβ : β ^ 2 = (p : ℝ)⁻¹ := by
+    change (Real.exp (Real.log (p : ℝ) / 2))⁻¹ ^ 2 = (p : ℝ)⁻¹
+    rw [inv_pow, sq, ← Real.exp_add, add_halves, Real.exp_log (by positivity)]
+  change B.comp (N.starProjection.comp B.adjoint) = _
+  have hout := comp_starProjection_of_prefix_kill B V N hr β (by
+    intro w
+    obtain ⟨y, hy⟩ := ShiftMobius.isometry_add_mem_shift S β hp0 hp1 w
+    rw [hy]
+    exact hwindow _ (stageUnitPeriod_vanishes_prefix hX T hT p hp hb y))
+  rw [hβ] at hout
+  push_cast at hout
+  exact hout
 
 end RiemannMasullo.RationalPacket
