@@ -204,6 +204,57 @@ theorem existsUnique_sobolevProjectiveKernel_iff_nuclear {α s : ℝ} (ha : 0 �
   obtain ⟨K, hK⟩ := h.mpr hn
   exact ⟨K, hK, fun L hL ↦ sobolevProjectiveKernelOperator_injective ha hs (hL.trans hK.symm)⟩
 
+attribute [local instance] instSpectralQuotientPolynormableSec3 in
+/-- Paper: Theorems 10.4.3.5(3) and 12.5.1.1, pp. 473 and 520. A projective
+kernel for convolution after spectral projection exists exactly when the quotient
+convolution and the geometric output on spectral inputs are nuclear. This tests
+existence of a representing tensor independently of convergence of the jet rectangles. -/
+theorem spectralStripKernel_exists_iff_quotient_and_geometric_nuclear (a : ℝ) {α s : ℝ}
+    (ha : 0 ≤ α) (hs : 0 ≤ s) (φ : BruhatCompactSupport C𝔽) :
+    (∃ K, sobolevProjectiveKernelOperator (F := F) ha hs K =
+      (A(ha, hs, φ)).comp Pspec(a, ha, hs)) ↔
+      IsNuclearOperator (Aq(a, ha, hs, φ)) ∧
+        IsNuclearOperator ((Pgeom(a, ha, hs)).comp ((A(ha, hs, φ)).comp Pspec(a, ha, hs))) := by
+  let θ := Θ(a, ha, hs)
+  let A : W(α, s) →L[ℂ] W(α, s) := A(ha, hs, φ)
+  let Q := Aq(a, ha, hs, φ)
+  let P := Pspec(a, ha, hs)
+  let G := Pgeom(a, ha, hs)
+  have hsplit : A.comp P = G.comp (A.comp P) + P.comp A := by
+    have hp : P.comp (A.comp P) = P.comp A :=
+      spectralProjection_convolution_spectralProjection (F := F) a ha hs φ
+    rw [← hp]
+    exact ContinuousLinearMap.ext fun v ↦
+      (θ.starProjection_add_starProjection_orthogonal (A (P v))).symm
+  rw [← (sobolevProjectiveKernelOperator_injective (F := F) ha hs).existsUnique_iff_exists,
+    existsUnique_sobolevProjectiveKernel_iff_nuclear]
+  constructor
+  · intro hn
+    refine ⟨?_, mul_mem_nuclearEndomorphisms_left G ⟨A.comp P, hn⟩⟩
+    -- Compress a nuclear series along the quotient map and its orthogonal section.
+    let j := θ.orthogonal.subtypeL.comp
+      θ.quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
+    have hqj (z) : θ.mkQL (j z) = z :=
+      (θ.quotientEquivOrthogonal_symm_eq_mk _ (θ.quotientEquivOrthogonal z).property).symm.trans
+        (θ.quotientEquivOrthogonal.symm_apply_apply z)
+    have hcomp (z) : θ.mkQL ((A.comp P) (j z)) = Q z := by
+      change θ.mkQL (A (P (j z))) = Q z
+      rw [show P (j z) = j z from spectralProjection_apply_of_mem (F := F) a ha hs
+        (θ.quotientEquivOrthogonal z).property]
+      exact (spectralConvolution_mkQ (F := F) a (hStrip(ha)) hs φ (j z)).symm.trans (congrArg Q (hqj z))
+    obtain ⟨c, l, y, hc, hl, hy, hseries⟩ := (isNuclearOperator_iff_isBanachNuclear (A.comp P)).mp hn
+    apply (isNuclearOperator_iff_isBanachNuclear Q).mpr
+    refine ⟨c, fun n ↦ (l n).comp j, θ.mkQL ∘ y, hc, ?_, ?_, fun z ↦ ?_⟩
+    · exact ((j.precomp ℂ).continuous.tendsto' 0 0 (map_zero _)).comp hl
+    · simpa only [map_zero] using (θ.mkQL.continuous.tendsto 0).comp hy
+    · rw [← hcomp z]
+      simpa only [Function.comp_apply, ContinuousLinearMap.comp_apply, map_smul] using
+        θ.mkQL.hasSum (hseries (j z))
+  · rintro ⟨hq, hg⟩
+    change IsNuclearOperator (A.comp P)
+    rw [hsplit]
+    exact (nuclearEndomorphisms _).add_mem hg (spectralProjection_convolution_nuclear a ha hs φ hq)
+
 /-- Every admissible finite cutoff in Definition 10.4.1.5, p. 458, has a unique
 reciprocal-weight projective kernel for convolution after the spectral projection. -/
 theorem spectralRestriction_existsUnique_projectiveKernel (a : ℝ) {α s : ℝ}
@@ -1771,6 +1822,41 @@ private theorem spectralStripAmbientKernel_operator_limit {Z J H V : Type*}
   simp only [hq] at hv
   exact (tendsto_nhds_unique (h v) hv).trans (DFunLike.congr_fun hlift (q v))
 
+/-- The limit of the strip rectangles with any fixed bounded output map represents
+that map after the spectral projection. Biorthogonality identifies the limit on each
+basis vector and their span is dense in the quotient. -/
+theorem spectralStripKernel_operator_of_output (ha : 0 < a)
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (e : Z(χ) ↪ ℕ × ℕ)
+    (x : SpectralStripJetIndex χ a α s → H(a, hα, hs₀(hs)))
+    (f : SpectralStripJetIndex χ a α s → StrongDual ℂ H(a, hα, hs₀(hs)))
+    (hb : IsSpectralMarkushevichBasis x f) (A : W(α, s) →L[ℂ] W(α, s))
+    (K : Π(W'(α, s), W(α, s)))
+    (hK : Tendsto (rectangle(χ, e) (fun j ↦ D (f j))
+      (fun j ↦ A (S(a, hα, hs₀(hs)) (x j)))) atTop (𝓝 K)) :
+    sobolevProjectiveKernelOperator (F := F) hα hs₀(hs) K = A.comp Ps := by
+  let θ := Θ(a, hα, hs₀(hs))
+  let lift := θ.orthogonal.subtypeL.comp θ.quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
+  have hsection (u) : θ.mkQL (lift u) = u :=
+    (θ.quotientEquivOrthogonal_symm_eq_mk _ (θ.quotientEquivOrthogonal u).property).symm.trans
+      (θ.quotientEquivOrthogonal.symm_apply_apply u)
+  let key (z : Z(χ)) (m : Fin N(χ, z)) : SpectralStripJetIndex χ a α s :=
+    ⟨(z.val.1, z.val.2.1, z.val.2.2, m.val), m.isLt⟩
+  let index : ((z : Z(χ)) × Fin N(χ, z)) ≃ SpectralStripJetIndex χ a α s :=
+    ⟨fun p ↦ key p.1 p.2,
+      fun j ↦ ⟨⟨(j.val.1, j.val.2.1, j.val.2.2.1), SpectralStripJetIndex.mem_strip_order_pos hα j⟩,
+        ⟨j.val.2.2.2, j.property⟩⟩, fun _ ↦ rfl, fun _ ↦ rfl⟩
+  let T := sobolevProjectiveKernelOperator (F := F) hα hs₀(hs) K
+  have h := spectralStripAmbientKernel_operator_limit θ.mkQL lift hsection A T e
+    (fun z ↦ N(χ, z)) key index.bijective x f hb (fun v ↦ by
+      let ev := (ContinuousLinearMap.apply ℂ (W(α, s)) v).comp
+        (sobolevProjectiveKernelOperator (F := F) hα hs₀(hs))
+      refine ((ev.continuous.tendsto K).comp hK).congr fun ij ↦ ?_
+      exact spectralLineAmbientKernel_operator_eval a hα hs₀(hs) e (fun z ↦ N(χ, z)) key f
+        (fun j ↦ A (lift (x j))) ij v)
+  apply ContinuousLinearMap.ext
+  intro v
+  exact (h v).trans (congrArg A (spectralStripKernel_orthogonalLift (F := F) a hα hs ha _ v rfl))
+
 /-- Paper: Theorem 10.4.3.5(3), p. 473. The ambient limit represents
 convolution after spectral projection.
 Deviation: The limit is taken in the ambient space of (10.4.3.43), with
@@ -1786,28 +1872,7 @@ theorem spectralStripAmbientKernel_operator (_ha : 0 < a)
     (_hK : Tendsto (rectangle(χ, e) (fun j ↦ D (f j))
       (fun j ↦ B (S(a, hα, hs₀(hs)) (x j)))) atTop (𝓝 K)) :
     sobolevProjectiveKernelOperator (F := F) hα hs₀(hs) K = Bpre := by
-  let θ := Θ(a, hα, hs₀(hs))
-  let lift := θ.orthogonal.subtypeL.comp θ.quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
-  have hsection (u) : θ.mkQL (lift u) = u :=
-    (θ.quotientEquivOrthogonal_symm_eq_mk _ (θ.quotientEquivOrthogonal u).property).symm.trans
-      (θ.quotientEquivOrthogonal.symm_apply_apply u)
-  let key (z : Z(χ)) (m : Fin N(χ, z)) : SpectralStripJetIndex χ a α s :=
-    ⟨(z.val.1, z.val.2.1, z.val.2.2, m.val), m.isLt⟩
-  let index : ((z : Z(χ)) × Fin N(χ, z)) ≃ SpectralStripJetIndex χ a α s :=
-    ⟨fun p ↦ key p.1 p.2,
-      fun j ↦ ⟨⟨(j.val.1, j.val.2.1, j.val.2.2.1), SpectralStripJetIndex.mem_strip_order_pos hα j⟩,
-        ⟨j.val.2.2.2, j.property⟩⟩, fun _ ↦ rfl, fun _ ↦ rfl⟩
-  let T := sobolevProjectiveKernelOperator (F := F) hα hs₀(hs) K
-  have h := spectralStripAmbientKernel_operator_limit θ.mkQL lift hsection B T e
-    (fun z ↦ N(χ, z)) key index.bijective x f _hb.1 (fun v ↦ by
-      let ev := (ContinuousLinearMap.apply ℂ (W(α, s)) v).comp
-        (sobolevProjectiveKernelOperator (F := F) hα hs₀(hs))
-      refine ((ev.continuous.tendsto K).comp _hK).congr fun ij ↦ ?_
-      exact spectralLineAmbientKernel_operator_eval a hα hs₀(hs) e (fun z ↦ N(χ, z)) key f
-        (fun j ↦ B (lift (x j))) ij v)
-  apply ContinuousLinearMap.ext
-  intro v
-  exact (h v).trans (congrArg B (spectralStripKernel_orthogonalLift (F := F) a hα hs _ha _ v rfl))
+  exact spectralStripKernel_operator_of_output (F := F) a hα hs _ha χ e x f _hb.1 B K _hK
 
 end StripTensors
 
