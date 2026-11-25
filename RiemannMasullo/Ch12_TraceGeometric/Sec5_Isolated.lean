@@ -17,6 +17,7 @@ public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeSignedCoefficients
 public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeGreenExterior
 public import RiemannMasullo.AppB_AnalyticNT.Sec4b_BoundaryHeckeGreen
 public import RiemannMasullo.AppB_AnalyticNT.HeckeFiniteLogGreen
+public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeFiniteSignedCoefficients
 
 /-! # Isolated statements of §12.5
 
@@ -1519,6 +1520,24 @@ theorem exists_hasSum_absolute_exterior_le_finiteLogDifference (τ : ℝ≥0ˣ �
     ht.eventually (Ioi_mem_nhds (by linarith))
   filter_upwards [hl] with n hn
   exact hb.trans (mul_le_mul_of_nonneg_left (by linarith) (by positivity))
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. All-width exterior cancellation is equivalent to
+arbitrarily late subexponential signed prefixes computed from finite ideal sums for every
+normalized character. The sign can depend on the character and the cutoff. Each character
+may use either the finite real sums or their integer floors. -/
+theorem all_widths_iff_cofinal_finiteIdealSignedCoefficients (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F))
+    (useFloor : U𝔽 → Bool) (negative : U𝔽 → ℕ → Bool) :
+    allWidths(τ) ↔ ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (τ u) = 1) →
+      ∀ ε : ℝ, 0 < ε → ∀ J : ℕ, ∃ N ≥ J,
+        Real.log (SignedFrequency.chosenPrefix
+          (FiniteIdealSigned.prefixCoeff χ (useFloor χ)) (negative χ) N)/(N:ℝ) ≤ ε := by
+  rw [allWidths_iff_critical τ hτ]
+  constructor <;> intro h χ hχ
+  · exact (FiniteIdealSigned.isEmpty_rightSite_iff_cofinal τ hτ χ hχ (useFloor χ) (negative χ)).mp
+      ((HeckeLaguerre.isEmpty_rightSite_iff_central χ).mpr (h χ hχ))
+  · exact (HeckeLaguerre.isEmpty_rightSite_iff_central χ).mp
+      ((FiniteIdealSigned.isEmpty_rightSite_iff_cofinal τ hτ χ hχ (useFloor χ) (negative χ)).mpr (h χ hχ))
 
 end CompactGreen
 
