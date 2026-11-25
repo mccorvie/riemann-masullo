@@ -685,6 +685,88 @@ theorem hasSum_stripZeros_neg_integral_smoothenedDiagonal
 
 end ClosedStripZeroSum
 
+namespace OutputProjectedLine
+
+open scoped ENNReal
+attribute [local instance] instSpectralQuotientPolynormableSec3
+
+local notation "line" => (le_refl (0 : ℝ))
+local notation "lineInterval" => ((neg_nonpos.mpr line).trans line)
+local notation "W(" s ")" => CompactIntervalSobolev μ𝔽 (logIdeleClassNorm F) (-(0 : ℝ)) 0 s
+local notation "weight(" s ")" => (fun x : C𝔽 ↦ intervalSobolevDensity (-(0 : ℝ)) 0 s (logIdeleClassNorm F x))
+local notation "ν(" s ")" => ((μ𝔽).withDensity fun x ↦ ENNReal.ofReal (weight(s) x))
+local notation "ν'(" s ")" => ((μ𝔽).withDensity fun x ↦ ENNReal.ofReal (weight(s) x)⁻¹)
+local notation "L²(" s ")" => Lp ℂ 2 ((ν(s)).prod (ν'(s)))
+local notation "PA(" a ", " hs ", " φ ")" => (spectralProjection (F := F) a line hs).comp
+  (hardySobolevTestAction μ𝔽 m𝔽 _ _ _ lineInterval hs φ)
+local notation "Aq(" a ", " hs ", " φ ")" => spectralConvolution (F := F) a lineInterval hs φ
+local notation "θ(" a ", " hs ")" => globalThetaSobolev F a lineInterval hs
+local notation "rows(" s ", " T ", " k ")" => (∀ u : W(s), ∀ᵐ x ∂μ𝔽,
+  Integrable (fun y ↦ k (x,y) * u y) μ𝔽 ∧ T u x = ∫ y, k (x,y) * u y ∂μ𝔽)
+
+/-- Paper: Theorem 10.4.3.4(1), p. 470. Quotient nuclearity selects the unique mixed-weight
+Haar kernel for the line projection applied after convolution. -/
+theorem existsUnique_haarKernel (a : ℝ) {s : ℝ} (hs : 0 ≤ s) (φ : BruhatCompactSupport C𝔽)
+    (hQ : IsNuclearOperator (Aq(a,hs,φ))) : ∃! k : L²(s), rows(s,PA(a,hs,φ),k) := by
+  have hn := spectralProjection_convolution_nuclear (F := F) a line hs φ hQ
+  obtain ⟨K,hK⟩ := ((existsUnique_sobolevProjectiveKernel_iff_nuclear line hs _).mpr hn).exists
+  let R (T : W(s) →L[ℂ] W(s)) := ∃! k : L²(s), rows(s,T,k)
+  exact (congrArg R hK).mp (sobolevProjectiveKernel_existsUnique_l2 (F := F) line hs K)
+
+private theorem trace_eq_quotient (a : ℝ) {s : ℝ} (hs : 0 ≤ s) (φ : BruhatCompactSupport C𝔽)
+    (hQ : IsNuclearOperator (Aq(a,hs,φ))) :
+    hilbertTrace ⟨PA(a,hs,φ),spectralProjection_convolution_nuclear (F := F) a line hs φ hQ⟩ =
+      hilbertTrace ⟨Aq(a,hs,φ),hQ⟩ := by
+  let j := (θ(a,hs)).orthogonal.subtypeL.comp
+    (θ(a,hs)).quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
+  let q := (θ(a,hs)).mkQL
+  let T := PA(a,hs,φ)
+  let B := Aq(a,hs,φ)
+  have hqj : q.comp j = ContinuousLinearMap.id ℂ _ := by
+    ext x
+    exact (θ(a,hs)).quotientEquivOrthogonal.symm_apply_apply x
+  have hfac : T = j.comp (B.comp q) := spectralProjection_convolution_factor (F := F) a line hs φ
+  have htj : T.comp j = j.comp B := by
+    rw [hfac, ContinuousLinearMap.comp_assoc j (B.comp q) j, ContinuousLinearMap.comp_assoc B q j, hqj,
+      ContinuousLinearMap.comp_id]
+  have ht : (T.comp j).comp q = T := by rw [htj, ContinuousLinearMap.comp_assoc j B q, ← hfac]
+  have hb : q.comp (T.comp j) = B := by rw [htj, ← ContinuousLinearMap.comp_assoc q j B, hqj,
+    ContinuousLinearMap.id_comp]
+  obtain ⟨_,htrace⟩ := stripDiagonal_quotient_compression q j hqj T
+    (spectralProjection_convolution_nuclear (F := F) a line hs φ hQ) ht
+  exact htrace.trans (congrArg hilbertTrace (Subtype.ext hb))
+
+/-- Paper: Theorem 12.1.1.3, pp. 502–503. For a test vanishing at one, the actual smoothened Haar
+diagonal of convolution minus the output-projected kernel is integrable and has integral
+equal to the negative quotient trace, for every nonnegative Sobolev degree. -/
+theorem geometricDiagonal_eq_neg_quotient (a : ℝ) {s : ℝ} (hs : 0 ≤ s)
+    (φ : BruhatCompactSupport C𝔽) (hφ : φ.val 1 = 0) (hQ : IsNuclearOperator (Aq(a,hs,φ)))
+    (k : L²(s)) (hk : rows(s,PA(a,hs,φ),k)) (U : ℕ → Set C𝔽)
+    (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    let G (x : C𝔽) := dSequenceKernelSmoothening μ𝔽 U
+      (fun p ↦ φ.val (p.1*p.2⁻¹)-k p) (x,x)
+    Integrable G μ𝔽 ∧ (∫ x, G x ∂μ𝔽) = -hilbertTrace ⟨Aq(a,hs,φ),hQ⟩ := by
+  let w := weight(s)
+  have hw : Continuous w := (continuous_intervalSobolevDensity (-(0:ℝ)) 0 s).comp (continuous_logModule' m𝔽)
+  have hp (x : C𝔽) : 0 < w x := intervalSobolevDensity_pos' _ _ _ _
+  let wNN (x : C𝔽) : ℝ≥0 := ⟨w x,(hp x).le⟩
+  have hwNN : Continuous wNN := hw.subtype_mk _
+  have hν : ν(s) = (μ𝔽).withDensity (fun x ↦ (wNN x : ℝ≥0∞)) :=
+    congrArg (μ𝔽).withDensity (funext fun x ↦ ENNReal.ofReal_eq_coe_nnreal (hp x).le)
+  let : IsLocallyFiniteMeasure (ν(s)) := sobolevKernelWeight_locallyFinite (F := F) 0 s
+  have hweighted := sobolevHilbertSchmidtKernel_of_haarRows (F := F) (PA(a,hs,φ)) k
+    (fun u ↦ (hk u).mono fun _ hx ↦ hx.2)
+  have hn := spectralProjection_convolution_nuclear (F := F) a line hs φ hQ
+  obtain ⟨hint,htrace⟩ := stripDiagonal_of_weightedKernel hU hBorel hwNN hp hν k (PA(a,hs,φ)) hn hweighted
+  let S (x : C𝔽) := dSequenceKernelSmoothening μ𝔽 U k (x,x)
+  have hneg : (fun x : C𝔽 ↦ dSequenceKernelSmoothening μ𝔽 U (fun p ↦ φ.val (p.1*p.2⁻¹)-k p) (x,x)) =
+      fun x ↦ -S x := funext (stripDiagonal_convolution_sub (F := F) U hU hBorel φ hφ k)
+  dsimp only
+  rw [hneg]
+  exact ⟨hint.neg,(integral_neg _).trans (congrArg Neg.neg (htrace.trans (trace_eq_quotient a hs φ hQ)))⟩
+
+end OutputProjectedLine
+
 section ExteriorZerosGRH
 
 /-! ### The exterior-zero cancellation is equivalent to GRH

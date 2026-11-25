@@ -1,6 +1,8 @@
 module
 
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
+public import RiemannMasullo.Ch10_TraceSpectral.Sec3_TraceClass
+public import RiemannMasullo.AppA_AlgebraicNT.Sec5a_IdeleClassDPrime
 public import RiemannMasullo.ForMathlib.Analysis.Fourier.StripLaplace
 import RiemannMasullo.Ch01_Introduction.Sec4
 import RiemannMasullo.ForMathlib.Analysis.Fourier.DiscreteStripProbe
@@ -33,6 +35,11 @@ As positive widths tend to zero, the difference of the genuine geometric
 diagonal integrals tends to the full-order noncentral mass. An upper bound
 by the half-width diagonal for one sequence per character would give
 the exterior cancellation at every positive width.
+
+At width zero, projecting after convolution gives a second comparison. Increasing
+the Sobolev degree recovers all central multiplicities for the same test. The
+upper comparison for its Haar integrals with the local principal values is
+equivalent to exterior cancellation, with quotient nuclearity supplied by §10.3.
 -/
 
 @[expose] public noncomputable section
@@ -922,6 +929,621 @@ theorem exists_centerGeometricProbes_exteriorZeros (τ : ℝ≥0ˣ →ₜ* C𝔽
     exact hasSum_empty
 
 end CenterGeometry
+
+namespace OutputOrderGeometry
+
+open Complex Filter Function IsDedekindDomain
+
+open scoped NNReal NumberField.AdeleRing Topology
+
+set_option quotPrecheck false
+
+attribute [local instance] instSpectralQuotientPolynormableSec3 instFiniteCompletionUnitsLocallyCompactSec4b
+
+local notation "restriction" =>
+  (⟨(ideleClassNorm F).ker.subtype, continuous_subtype_val⟩ : C₁ →ₜ* C𝔽)
+local notation "ord(" χ ", " z ")" => MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ z
+local notation "order(" χ ", " z ")" => meromorphicOrderAt (continuedCompletedHeckeL (F := F) χ) z
+local notation "Chars(" τ ")" => {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1}
+local notation "Sites(" χ ")" => {z : ℂ // 0 < ord(χ,z)}
+local notation "M(" φ ", " χ ", " z ")" => modulatedFourierMellin m𝔽 univ
+  ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ μ𝔽 (φ : BruhatCompactSupport C𝔽).val
+  (ideleClassNormTwist (F := F) χ ((z : ℂ) - 1/2))
+local notation "outside(" τ ", " χ ", " φ ")" => (∀ η : PontryaginDual C𝔽,
+  (∀ t, η (τ t) = 1) → η ≠ (χ).val → ∀ z : ℂ, M(φ,η,z) = 0)
+local notation "hline" => (le_refl (0 : ℝ))
+local notation "hbase" => ((neg_nonpos.mpr hline).trans hline)
+local notation "hs₀(" hs ")" => (le_of_lt (zero_lt_one.trans hs))
+local notation "Aq(" hs ", " φ ")" => spectralConvolution (F := F) (1/2) hbase hs φ
+local notation "w(" s ")" => (fun g : C𝔽 ↦ intervalSobolevDensity (-(0 : ℝ)) 0 s (logIdeleClassNorm F g))
+local notation "ν(" s ")" => ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (w(s) g))
+local notation "ν'(" s ")" => ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (w(s) g)⁻¹)
+local notation "L²(" s ")" => Lp ℂ 2 ((ν(s)).prod (ν'(s)))
+
+/-- The unique mixed-weight Haar class for the actual output-projected operator. -/
+private def haarClass {s : ℝ} (hs : 0 ≤ s) (φ : BruhatCompactSupport C𝔽)
+    (hQ : IsNuclearOperator (Aq(hs,φ))) : L²(s) :=
+  (OutputProjectedLine.existsUnique_haarKernel (F := F) (1/2) hs φ hQ).exists.choose
+
+/-- Smoothened geometric diagonal after selecting the output-projected Haar kernel. -/
+private def diagonal {s : ℝ} (hs : 0 ≤ s) (φ : BruhatCompactSupport C𝔽)
+    (hQ : IsNuclearOperator (Aq(hs,φ))) (U : ℕ → Set C𝔽) (x : C𝔽) : ℂ :=
+  dSequenceKernelSmoothening μ𝔽 U
+    (fun p ↦ φ.val (p.1 * p.2⁻¹) - haarClass hs φ hQ p) (x,x)
+
+local notation "point(" b ", " t ")" => ((b : ℝ) : ℂ) + ((t : ℝ) : ℂ) * Complex.I
+local notation "Mshift(" φ ", " χ ", " w ")" => modulatedFourierMellin m𝔽 univ
+  ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ μ𝔽 (φ : BruhatCompactSupport C𝔽).val
+  (ideleClassNormTwist (F := F) χ w)
+
+private theorem hasSum_global (φ : BruhatCompactSupport C𝔽) (hφ : φ.val 1 = 0)
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    {s : ℝ} (hs : 1 < s) (hQ : IsNuclearOperator (Aq(hs₀(hs),φ)))
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    Integrable (diagonal hs₀(hs) φ hQ U) μ𝔽 ∧
+    HasSum (fun z : {z : PontryaginDual C₁ × ℝ × ℝ //
+      z.2.1 ∈ Icc (-(0 : ℝ)) 0 ∧ 0 < order(χ z.1,point(1/2+z.2.1,z.2.2))} ↦
+      (spectralStripMultiplicity 0 s z.val.2.1
+        (order(χ z.val.1,point(1/2+z.val.2.1,z.val.2.2))).untop₀.toNat : ℂ) *
+      Mshift(φ,χ z.val.1,point(z.val.2.1,z.val.2.2)))
+      (-(∫ x, diagonal hs₀(hs) φ hQ U x ∂μ𝔽)) := by
+  let k := haarClass hs₀(hs) φ hQ
+  have hk := (OutputProjectedLine.existsUnique_haarKernel (F := F) (1/2) hs₀(hs) φ hQ).exists.choose_spec
+  obtain ⟨hi, he⟩ := OutputProjectedLine.geometricDiagonal_eq_neg_quotient (F := F) (1/2)
+    hs₀(hs) φ hφ hQ k hk U hU hBorel
+  change (∫ x, diagonal hs₀(hs) φ hQ U x ∂μ𝔽) = -hilbertTrace ⟨Aq(hs₀(hs),φ),hQ⟩ at he
+  refine ⟨hi, ?_⟩
+  rw [he, neg_neg]
+  exact (spectralStripConvolution_trace (F := F) (1/2) χ hχ hline hs φ ⟨_,hQ⟩ rfl).2
+
+/-- The geometric integral has the selected character's genuine closed-strip zero expansion at width zero. -/
+private theorem hasSum_oneCharacter (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : Chars(τ)) (φ : BruhatCompactSupport C𝔽) (hφ : φ.val 1 = 0) (hoff : outside(τ,χ,φ))
+    {s : ℝ} (hs : 1 < s) (hQ : IsNuclearOperator (Aq(hs₀(hs),φ)))
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    Integrable (diagonal hs₀(hs) φ hQ U) μ𝔽 ∧
+      HasSum (fun z : Sites(χ.val) ↦
+        (spectralStripMultiplicity 0 s (z.val.re-1/2) (ord(χ.val,z.val)).toNat : ℂ) *
+          M(φ,χ.val,z.val)) (-(∫ x, diagonal hs₀(hs) φ hQ U x ∂μ𝔽)) := by
+  obtain ⟨lift,hlift,hnorm,hinv⟩ := CenterGeometry.normalized_basepoints τ hτ
+  let k := χ.val.comp restriction
+  have hk : lift k = χ.val := hinv χ.val χ.property
+  have hdiff (j : PontryaginDual C₁) (hj : j ≠ k) : lift j ≠ χ.val := by
+    intro h
+    apply hj
+    rw [← hlift j,h]
+  let P (j : PontryaginDual C₁) (w : ℂ) := 0 < order(lift j,w)
+  let n (j : PontryaginDual C₁) (w : ℂ) := (order(lift j,w)).untop₀.toNat
+  let W (j : PontryaginDual C₁) (w : ℂ) := M(φ,lift j,w)
+  obtain ⟨hint,hglobal⟩ := hasSum_global φ hφ lift hlift hs hQ U hU hBorel
+  refine ⟨hint,?_⟩
+  have hmoment (σ t : ℝ) : CenterGeometry.Fiber.point σ t - 1/2 = (σ:ℂ)+(t:ℂ)*I := by
+    dsimp [CenterGeometry.Fiber.point]; push_cast; ring
+  have hsum := CenterGeometry.Fiber.hasSum_single_character k P n W 0 s hline
+    (fun j hj w ↦ hoff (lift j) (hnorm j) (hdiff j hj) w)
+    (T := -(∫ x, diagonal hs₀(hs) φ hQ U x ∂μ𝔽)) (by
+      apply hglobal.congr_fun
+      intro q
+      dsimp only [n,W]
+      rw [hmoment]
+      rfl)
+  have hraw : HasSum (fun z : {z : ℂ // 0 < order(χ.val,z)} ↦
+      (spectralStripMultiplicity 0 s (z.val.re-1/2) (order(χ.val,z.val)).untop₀.toNat : ℂ) *
+        M(φ,χ.val,z.val)) (-(∫ x, diagonal hs₀(hs) φ hQ U x ∂μ𝔽)) := by
+    rw [← hk]
+    exact hsum
+  let e : Sites(χ.val) ≃ {z : ℂ // 0 < order(χ.val,z)} :=
+    Equiv.subtypeEquivRight (CenterGeometry.divisor_pos_iff_order_pos χ.val)
+  apply (e.hasSum_iff.mpr hraw).congr_fun
+  intro z
+  change _ = (spectralStripMultiplicity 0 s (z.val.re-1/2) (order(χ.val,z.val)).untop₀.toNat : ℂ) *
+    M(φ,χ.val,z.val)
+  rw [CenterGeometry.divisor_eq_order]
+
+
+/-- An odd Sobolev degree with exactly `k+1` available boundary jets. -/
+private def degree (k : ℕ) : ℝ := 2 * ((k : ℝ) + 1) + 1
+
+private theorem one_lt_degree (k : ℕ) : 1 < degree k := by
+  have h : 0 ≤ (k : ℝ) := Nat.cast_nonneg _
+  unfold degree
+  linarith
+
+local notation "hk₀(" k ")" => (le_of_lt (zero_lt_one.trans (one_lt_degree k)))
+
+private theorem multiplicity_at_degree (k n : ℕ) (x : ℝ) :
+    spectralStripMultiplicity 0 (degree k) x n = if x = 0 then min n (k+1) else 0 := by
+  by_cases hx : x = 0
+  · subst x
+    rw [spectralStripMultiplicity_boundary hline (Or.inr rfl)]
+    have hreal : (degree k - 1) / 2 = ((k+1 : ℕ) : ℝ) := by push_cast; unfold degree; ring
+    simp only [spectralBoundaryMultiplicity, hreal, Nat.ceil_natCast, ite_true]
+  · have hno : ¬ (0 < x ∧ x < 0) := fun h ↦ lt_asymm h.1 h.2
+    simp [spectralStripMultiplicity, hx, hno]
+
+local notation "m(" χ ", " z ")" => (ord(χ,(z : ℂ))).toNat
+local notation "v(" φ ", " χ ", " z ")" => (M(φ,χ,z)).re
+local notation "central(" z ")" => ((z : ℂ).re = 1/2)
+
+/-- At degree `2(k+1)+1`, the complex trace counts each central site with
+weight `min(order,k+1)`. All noncentral sites contribute zero. -/
+private theorem hasSum_diagonal_degree (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : Chars(τ)) (φ : BruhatCompactSupport C𝔽) (hφ : φ.val 1 = 0) (hoff : outside(τ,χ,φ))
+    (k : ℕ) (hQ : IsNuclearOperator (Aq(hk₀(k),φ)))
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    Integrable (diagonal hk₀(k) φ hQ U) μ𝔽 ∧
+      HasSum (fun z : Sites(χ.val) ↦ if central(z) then
+        ((min (m(χ.val,z)) (k+1) : ℕ) : ℂ) * M(φ,χ.val,z) else 0)
+        (-(∫ x, diagonal hk₀(k) φ hQ U x ∂μ𝔽)) := by
+  obtain ⟨hi, ht⟩ := hasSum_oneCharacter τ hτ χ φ hφ hoff (one_lt_degree k) hQ U hU hBorel
+  refine ⟨hi, ht.congr_fun (fun z ↦ ?_)⟩
+  rw [multiplicity_at_degree]
+  by_cases hz : central(z)
+  · simp only [hz, sub_self, ite_true]
+  · simp only [hz, mt sub_eq_zero.mp hz, ite_false, Nat.cast_zero, zero_mul]
+
+/-- Real part of the measured integral at one degree. -/
+private theorem integral_re_degree (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : Chars(τ)) (φ : BruhatCompactSupport C𝔽) (hφ : φ.val 1 = 0) (hoff : outside(τ,χ,φ))
+    (k : ℕ) (hQ : IsNuclearOperator (Aq(hk₀(k),φ)))
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    (∫ x, diagonal hk₀(k) φ hQ U x ∂μ𝔽).re =
+      -(∑' z : Sites(χ.val), if central(z) then
+        ((min (m(χ.val,z)) (k+1) : ℕ) : ℝ) * v(φ,χ.val,z) else 0) := by
+  have hs := (hasSum_diagonal_degree τ hτ χ φ hφ hoff k hQ U hU hBorel).2
+  have hr : HasSum (fun z : Sites(χ.val) ↦ if central(z) then
+      ((min (m(χ.val,z)) (k+1) : ℕ) : ℝ) * v(φ,χ.val,z) else 0)
+      (-(∫ x, diagonal hk₀(k) φ hQ U x ∂μ𝔽).re) := by
+    apply (Complex.reCLM.hasSum hs).congr_fun
+    intro z
+    by_cases hz : central(z) <;> simp only [Complex.reCLM_apply,
+      hz, ite_true, ite_false, Complex.zero_re, Complex.mul_re, Complex.natCast_re,
+      Complex.natCast_im, zero_mul, sub_zero]
+  rw [hr.tsum_eq, neg_neg]
+
+private theorem norm_capped_le {ι : Type*} (center : ι → Prop) [DecidablePred center]
+    (n : ι → ℕ) (v : ι → ℝ) (k : ℕ) (i : ι) :
+    ‖if center i then ((min (n i) (k+1) : ℕ) : ℝ) * v i else 0‖ ≤ (n i : ℝ) * |v i| := by
+  by_cases h : center i
+  · simp only [h, ite_true, Real.norm_eq_abs, abs_mul, Nat.abs_cast]
+    exact mul_le_mul_of_nonneg_right (by exact_mod_cast min_le_left (n i) (k+1)) (abs_nonneg _)
+  · simp only [h, ite_false, norm_zero]
+    exact mul_nonneg (Nat.cast_nonneg (n i)) (abs_nonneg (v i))
+
+private theorem tendsto_capped_sum {ι : Type*} (center : ι → Prop) [DecidablePred center]
+    (n : ι → ℕ) (v : ι → ℝ) (h : Summable (fun i ↦ (n i : ℝ) * |v i|)) :
+    Tendsto (fun k : ℕ ↦ -(∑' i, if center i then ((min (n i) (k+1) : ℕ) : ℝ) * v i else 0))
+      atTop (𝓝 (-(∑' i, if center i then (n i : ℝ) * v i else 0))) := by
+  apply Tendsto.neg
+  apply tendsto_tsum_of_dominated_convergence h
+  · intro i
+    apply tendsto_const_nhds.congr'
+    filter_upwards [eventually_ge_atTop (n i)] with k hk
+    rw [min_eq_left (by omega : n i ≤ k+1)]
+  · exact Eventually.of_forall fun k i ↦ norm_capped_le center n v k i
+
+/-- The real geometric diagonal tends to minus the full central mass for the
+same test, with the intrinsic full-order Hecke estimate supplying domination. -/
+private theorem tendsto_integral_re (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : Chars(τ)) (φ : BruhatCompactSupport C𝔽) (hφ : φ.val 1 = 0) (hoff : outside(τ,χ,φ))
+    (hQ : ∀ k : ℕ, IsNuclearOperator (Aq(hk₀(k),φ)))
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    Tendsto (fun k : ℕ ↦ (∫ x, diagonal hk₀(k) φ (hQ k) U x ∂μ𝔽).re) atTop
+      (𝓝 (-(∑' z : Sites(χ.val), if central(z) then (m(χ.val,z) : ℝ) * v(φ,χ.val,z) else 0))) := by
+  let n (z : Sites(χ.val)) := m(χ.val,z)
+  let V (z : Sites(χ.val)) := v(φ,χ.val,z)
+  have hs : Summable (fun z : Sites(χ.val) ↦ (n z : ℝ) * |V z|) :=
+    summable_heckeRealMoments_fullOrder (F := F) τ hτ χ φ
+  have h := tendsto_capped_sum (fun z : Sites(χ.val) ↦ central(z)) n V hs
+  exact h.congr' (.of_forall fun k ↦
+    (integral_re_degree τ hτ χ φ hφ hoff k (hQ k) U hU hBorel).symm)
+
+
+private theorem capped_sum_successive_difference {ι : Type*} (center : ι → Prop) [DecidablePred center]
+    (n : ι → ℕ) (v : ι → ℝ) (h : Summable (fun i ↦ (n i : ℝ) * |v i|)) (k : ℕ) :
+    (-(∑' i, if center i then ((min (n i) (k+1) : ℕ) : ℝ) * v i else 0)) -
+      (-(∑' i, if center i then ((min (n i) ((k+1)+1) : ℕ) : ℝ) * v i else 0)) =
+       ∑' i, if center i ∧ k+2 ≤ n i then v i else 0 := by
+  let f (j : ℕ) (i : ι) := if center i then ((min (n i) (j+1) : ℕ) : ℝ) * v i else 0
+  have hsum (j : ℕ) : Summable (f j) := h.of_norm_bounded (norm_capped_le center n v j)
+  change (-(∑' i, f k i)) - (-(∑' i, f (k+1) i)) = _
+  rw [neg_sub_neg, ← (hsum (k+1)).tsum_sub (hsum k)]
+  apply tsum_congr
+  intro i
+  by_cases hc : center i
+  · by_cases hn : k+2 ≤ n i
+    · have h1 : k+1 ≤ n i := by omega
+      have h2 : (k+1)+1 ≤ n i := by omega
+      simp only [f, hc, hn, true_and, ite_true, min_eq_right h1, min_eq_right h2,
+        Nat.cast_add, Nat.cast_one]
+      ring
+    · have h1 : n i ≤ k+1 := by omega
+      have h2 : n i ≤ (k+1)+1 := by omega
+      simp only [f, hc, hn, true_and, ite_true, ite_false, min_eq_left h1, min_eq_left h2, sub_self]
+  · simp only [f, hc, false_and, ite_false, sub_self]
+
+/-- Subtracting the next measured integral from the current one counts each
+central site of order at least `k+2` once, with its signed real Mellin value. -/
+private theorem integral_degree_successive_difference (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (χ : Chars(τ)) (φ : BruhatCompactSupport C𝔽)
+    (hφ : φ.val 1 = 0) (hoff : outside(τ,χ,φ)) (k : ℕ)
+    (h0 : IsNuclearOperator (Aq(hk₀(k),φ))) (h1 : IsNuclearOperator (Aq(hk₀(k+1),φ)))
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    (∫ x, diagonal hk₀(k) φ h0 U x ∂μ𝔽).re - (∫ x, diagonal hk₀(k+1) φ h1 U x ∂μ𝔽).re =
+      ∑' z : Sites(χ.val), if central(z) ∧ k+2 ≤ m(χ.val,z) then v(φ,χ.val,z) else 0 := by
+  let n (z : Sites(χ.val)) := m(χ.val,z)
+  let V (z : Sites(χ.val)) := v(φ,χ.val,z)
+  have hs : Summable (fun z : Sites(χ.val) ↦ (n z : ℝ) * |V z|) :=
+    summable_heckeRealMoments_fullOrder (F := F) τ hτ χ φ
+  have hdiff := capped_sum_successive_difference (fun z : Sites(χ.val) ↦ central(z)) n V hs k
+  rw [integral_re_degree τ hτ χ φ hφ hoff k h0 U hU hBorel,
+    integral_re_degree τ hτ χ φ hφ hoff (k+1) h1 U hU hBorel]
+  exact hdiff
+
+/-- At Sobolev order 2(k+1)+1, smooth the convolution kernel minus the unique
+Haar kernel of projection after convolution. The cluster theorem supplies trace class. -/
+def lineOrderDiagonal (k : ℕ) (φ : BruhatCompactSupport C𝔽) (U : ℕ → Set C𝔽) (x : C𝔽) : ℂ :=
+  let s : ℝ := 2 * ((k : ℝ) + 1) + 1
+  have hs : 0 ≤ s := by dsimp [s]; positivity
+  let hQ := spectralStripConvolution_nuclear_of_summable_clusterTraceNorms (F := F) (1/2) hline hs φ
+  let K := (OutputProjectedLine.existsUnique_haarKernel (F := F) (1/2) hs φ hQ).exists.choose
+  dSequenceKernelSmoothening μ𝔽 U (fun p ↦ φ.val (p.1*p.2⁻¹) - K p) (x,x)
+
+/-- Exact complex expansion at each degree, including integrability of the actual diagonal. -/
+theorem hasSum_lineOrderDiagonal (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : Chars(τ)) (φ : BruhatCompactSupport C𝔽) (hφ : φ.val 1 = 0) (hoff : outside(τ,χ,φ))
+    (k : ℕ) (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    Integrable (lineOrderDiagonal k φ U) μ𝔽 ∧
+      HasSum (fun z : Sites(χ.val) ↦ if central(z) then
+        ((min (m(χ.val,z)) (k+1) : ℕ) : ℂ) * M(φ,χ.val,z) else 0)
+        (-(∫ x, lineOrderDiagonal k φ U x ∂μ𝔽)) :=
+  hasSum_diagonal_degree τ hτ χ φ hφ hoff k
+    (spectralStripConvolution_nuclear_of_summable_clusterTraceNorms (F := F) (1/2) hline hk₀(k) φ)
+    U hU hBorel
+
+/-- With the quotient trace class at every degree, the same compact test and the
+same sequence give the full-order real central mass in the high Sobolev limit. -/
+theorem tendsto_lineOrderDiagonal_re (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : Chars(τ)) (φ : BruhatCompactSupport C𝔽) (hφ : φ.val 1 = 0) (hoff : outside(τ,χ,φ))
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    Tendsto (fun k : ℕ ↦ (∫ x, lineOrderDiagonal k φ U x ∂μ𝔽).re) atTop
+      (𝓝 (-(∑' z : Sites(χ.val), if central(z) then (m(χ.val,z) : ℝ) * v(φ,χ.val,z) else 0))) :=
+  tendsto_integral_re τ hτ χ φ hφ hoff (fun k ↦
+    spectralStripConvolution_nuclear_of_summable_clusterTraceNorms (F := F) (1/2) hline hk₀(k) φ)
+    U hU hBorel
+
+/-- The difference of successive measured integrals counts the surviving central
+sites with order at least `k+2`, each with one real Mellin value. -/
+theorem lineOrderDiagonal_successive_difference (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (χ : Chars(τ)) (φ : BruhatCompactSupport C𝔽)
+    (hφ : φ.val 1 = 0) (hoff : outside(τ,χ,φ)) (k : ℕ)
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    (∫ x, lineOrderDiagonal k φ U x ∂μ𝔽).re - (∫ x, lineOrderDiagonal (k+1) φ U x ∂μ𝔽).re =
+      ∑' z : Sites(χ.val), if central(z) ∧ k+2 ≤ m(χ.val,z) then v(φ,χ.val,z) else 0 :=
+  integral_degree_successive_difference τ hτ χ φ hφ hoff k
+    (spectralStripConvolution_nuclear_of_summable_clusterTraceNorms (F := F) (1/2) hline hk₀(k) φ)
+    (spectralStripConvolution_nuclear_of_summable_clusterTraceNorms (F := F) (1/2) hline hk₀(k+1) φ)
+    U hU hBorel
+
+private theorem summable_masked_weight {ι : Type*} (P : ι → Prop) [DecidablePred P]
+    (n q : ι → ℕ) (v : ι → ℝ) (h : Summable (fun i ↦ (n i : ℝ) * |v i|))
+    (hq : ∀ i, q i ≤ n i) :
+    Summable (fun i ↦ if P i then (q i : ℝ) * v i else 0) := by
+  apply h.of_norm_bounded
+  intro i
+  by_cases hp : P i
+  · simp only [hp, ite_true, Real.norm_eq_abs, abs_mul, Nat.abs_cast]
+    exact mul_le_mul_of_nonneg_right (by exact_mod_cast hq i) (abs_nonneg (v i))
+  · simp only [hp, ite_false, norm_zero]
+    exact mul_nonneg (Nat.cast_nonneg (n i)) (abs_nonneg (v i))
+
+private theorem full_split {ι : Type*} (P : ι → Prop) [DecidablePred P]
+    (n : ι → ℕ) (v : ι → ℝ) (h : Summable (fun i ↦ (n i : ℝ) * |v i|)) :
+    (∑' i, (n i : ℝ) * v i) = (∑' i, if P i then (n i : ℝ) * v i else 0) +
+      ∑' i, if ¬ P i then (n i : ℝ) * v i else 0 := by
+  have hc := summable_masked_weight P n n v h (fun _ ↦ le_rfl)
+  have he := summable_masked_weight (fun i ↦ ¬ P i) n n v h (fun _ ↦ le_rfl)
+  rw [← hc.tsum_add he]
+  apply tsum_congr
+  intro i
+  by_cases hp : P i <;> simp only [hp, not_true_eq_false, not_false_eq_true,
+    ite_true, ite_false, add_zero, zero_add]
+
+private theorem split_at_order {ι : Type*} (P : ι → Prop) [DecidablePred P]
+    (n : ι → ℕ) (v : ι → ℝ) (h : Summable (fun i ↦ (n i : ℝ) * |v i|)) (k : ℕ) :
+    (∑' i, (n i : ℝ) * v i) -
+      (∑' i, if P i then ((min (n i) (k+1) : ℕ) : ℝ) * v i else 0) =
+      (∑' i, if ¬ P i then (n i : ℝ) * v i else 0) +
+      ∑' i, if P i then (((n i)-(k+1) : ℕ) : ℝ) * v i else 0 := by
+  let cap (i : ι) := if P i then ((min (n i) (k+1) : ℕ) : ℝ) * v i else 0
+  let rem (i : ι) := if P i then (((n i)-(k+1) : ℕ) : ℝ) * v i else 0
+  have hc : Summable cap := summable_masked_weight P n _ v h (fun i ↦ min_le_left _ _)
+  have hr : Summable rem := summable_masked_weight P n _ v h (fun i ↦ Nat.sub_le _ _)
+  have hcentral : (∑' i, if P i then (n i : ℝ) * v i else 0) = (∑' i, cap i) + ∑' i, rem i := by
+    rw [← hc.tsum_add hr]
+    apply tsum_congr
+    intro i
+    by_cases hp : P i
+    · have hnat : n i = min (n i) (k+1) + (n i - (k+1)) := by omega
+      have hreal : (n i : ℝ) = ((min (n i) (k+1) : ℕ) : ℝ) + ((n i - (k+1) : ℕ) : ℝ) := by
+        exact_mod_cast hnat
+      simp only [cap, rem, hp, ite_true]
+      exact (congrArg (· * v i) hreal).trans (add_mul _ _ _)
+    · simp only [cap, rem, hp, ite_false, add_zero]
+  change _ - (∑' i, cap i) = _ + ∑' i, rem i
+  rw [full_split P n v h, hcentral]
+  ring
+
+private theorem exterior_zero_iff {ι : Type*} (P : ι → Prop) [DecidablePred P]
+    (n : ι → ℕ) (v : ι → ℝ) (h : Summable (fun i ↦ (n i : ℝ) * |v i|))
+    (hn : ∀ i, 0 < n i) (hv : ∀ i, 0 < v i) :
+    (∑' i, if ¬ P i then (n i : ℝ) * v i else 0) = 0 ↔ ∀ i, P i := by
+  have he := summable_masked_weight (fun i ↦ ¬ P i) n n v h (fun _ ↦ le_rfl)
+  have hnon (i : ι) : 0 ≤ (if ¬ P i then (n i : ℝ) * v i else 0) :=
+    ite_nonneg (mul_nonneg (Nat.cast_nonneg _) (hv i).le) le_rfl
+  constructor
+  · intro hz i
+    by_contra hi
+    have hpos : 0 < (if ¬ P i then (n i : ℝ) * v i else 0) := by
+      rw [ite_eq_left hi]
+      exact mul_pos (by exact_mod_cast hn i) (hv i)
+    exact (he.tsum_pos hnon i hpos).ne' hz
+  · intro hp
+    simp only [hp, not_true_eq_false, ite_false, tsum_zero]
+
+private theorem approximates_iff_limUnder_le (I : ℕ → ℝ) (L V : ℝ)
+    (ht : Tendsto I atTop (𝓝 L)) (hb : ∀ k, L ≤ I k) :
+    (∀ δ : ℝ, 0 < δ → ∃ k, I k ≤ -V + δ) ↔ limUnder atTop I ≤ -V := by
+  rw [ht.limUnder_eq]
+  constructor
+  · intro h
+    by_contra! hlarge
+    obtain ⟨k,hk⟩ := h ((L+V)/2) (by linarith)
+    linarith [hb k]
+  · intro h δ hδ
+    have he : ∀ᶠ k in atTop, I k < -V + δ :=
+      ht.eventually (eventually_lt_nhds (by linarith : L < -V + δ))
+    exact he.exists.imp fun k hk ↦ hk.le
+
+local notation "I(" k ", " φ ", " U ")" => (∫ x, lineOrderDiagonal k φ U x ∂μ𝔽).re
+local notation "full(" χ ", " φ ")" =>
+  (∑' z : Sites(χ), (m(χ,z) : ℝ) * v(φ,χ,z))
+local notation "E(" χ ", " φ ")" =>
+  (∑' z : Sites(χ), if ¬ central(z) then (m(χ,z) : ℝ) * v(φ,χ,z) else 0)
+local notation "rem(" χ ", " φ ", " k ")" =>
+  (∑' z : Sites(χ), if central(z) then ((m(χ,z) - (k+1) : ℕ) : ℝ) * v(φ,χ,z) else 0)
+
+/-- The full mass plus the signed geometric integral is exactly the off-line mass
+and the central multiplicities above the Sobolev cutoff. The identity is signed. -/
+theorem lineOrderDiagonal_defect_eq_exterior_add_remainder
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F)) (χ : Chars(τ))
+    (φ : BruhatCompactSupport C𝔽) (hφ : φ.val 1 = 0) (hoff : outside(τ,χ,φ))
+    (V : ℝ) (hV : V = full(χ.val,φ)) (k : ℕ)
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    V + I(k,φ,U) = E(χ.val,φ) + rem(χ.val,φ,k) := by
+  let n (z : Sites(χ.val)) := m(χ.val,z)
+  let W (z : Sites(χ.val)) := v(φ,χ.val,z)
+  have hs : Summable (fun z : Sites(χ.val) ↦ (n z : ℝ) * |W z|) :=
+    summable_heckeRealMoments_fullOrder (F := F) τ hτ χ φ
+  have hQ := spectralStripConvolution_nuclear_of_summable_clusterTraceNorms
+    (F := F) (1/2) (le_refl (0:ℝ)) (le_of_lt (zero_lt_one.trans (one_lt_degree k))) φ
+  have hi : I(k,φ,U) = -(∑' z : Sites(χ.val), if central(z) then
+      ((min (n z) (k+1) : ℕ) : ℝ) * W z else 0) :=
+    integral_re_degree τ hτ χ φ hφ hoff k hQ U hU hBorel
+  rw [hV, hi, ← sub_eq_add_neg]
+  exact split_at_order (fun z : Sites(χ.val) ↦ central(z)) n W hs k
+
+/-- Adding the full mass to the high-order geometric diagonal converges to the
+full off-line mass for this one character and one fixed smoothing sequence. -/
+private theorem tendsto_lineOrderDiagonal_defect
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F)) (χ : Chars(τ))
+    (φ : BruhatCompactSupport C𝔽) (hφ : φ.val 1 = 0) (hoff : outside(τ,χ,φ))
+    (V : ℝ) (hV : V = full(χ.val,φ))
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    Tendsto (fun k : ℕ ↦ V + I(k,φ,U)) atTop (𝓝 E(χ.val,φ)) := by
+  let n (z : Sites(χ.val)) := m(χ.val,z)
+  let W (z : Sites(χ.val)) := v(φ,χ.val,z)
+  let P (z : Sites(χ.val)) := central(z)
+  have hs : Summable (fun z : Sites(χ.val) ↦ (n z : ℝ) * |W z|) :=
+    summable_heckeRealMoments_fullOrder (F := F) τ hτ χ φ
+  have hpart := full_split P n W hs
+  have hsum : V + (-(∑' z : Sites(χ.val), if P z then (n z : ℝ) * W z else 0)) = E(χ.val,φ) := by
+    rw [hV]
+    change (∑' z, (n z : ℝ) * W z) + _ = _
+    rw [hpart]
+    ring
+  have h := (tendsto_lineOrderDiagonal_re τ hτ χ φ hφ hoff U hU hBorel).const_add V
+  rw [← hsum]
+  exact h
+
+/-- For a strictly positive test and a fixed measurable D-prime sequence, arbitrarily
+close finite-order upper bounds, and the bound on the actual limit, are each equivalent
+to centrality of every positive-order site of the chosen character. -/
+private theorem lineOrderDiagonal_terminal_equivalences
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F)) (χ : Chars(τ))
+    (φ : BruhatCompactSupport C𝔽) (hφ : φ.val 1 = 0) (hoff : outside(τ,χ,φ))
+    (hpositive : ∀ z : Sites(χ.val), 0 < v(φ,χ.val,z))
+    (V : ℝ) (hV : V = full(χ.val,φ))
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    ((∀ δ : ℝ, 0 < δ → ∃ k : ℕ, I(k,φ,U) ≤ -V + δ) ↔
+        ∀ z : Sites(χ.val), central(z)) ∧
+      ((limUnder atTop (fun k : ℕ ↦ I(k,φ,U)) ≤ -V) ↔
+        ∀ z : Sites(χ.val), central(z)) := by
+  let n (z : Sites(χ.val)) := m(χ.val,z)
+  let W (z : Sites(χ.val)) := v(φ,χ.val,z)
+  let P (z : Sites(χ.val)) := central(z)
+  let A (k : ℕ) := I(k,φ,U)
+  let E₀ := E(χ.val,φ)
+  have hs : Summable (fun z : Sites(χ.val) ↦ (n z : ℝ) * |W z|) :=
+    summable_heckeRealMoments_fullOrder (F := F) τ hτ χ φ
+  have hn (z : Sites(χ.val)) : 0 < n z := by
+    have hz := z.property
+    change 0 < (ord(χ.val,z.val)).toNat
+    omega
+  have hE : E₀ = 0 ↔ ∀ z, P z := exterior_zero_iff P n W hs hn hpositive
+  have hnon : 0 ≤ E₀ := tsum_nonneg (fun z : Sites(χ.val) ↦
+    ite_nonneg (mul_nonneg (Nat.cast_nonneg (n z)) (hpositive z).le) le_rfl)
+  have hlim : Tendsto (fun k : ℕ ↦ V + A k) atTop (𝓝 E₀) :=
+    tendsto_lineOrderDiagonal_defect τ hτ χ φ hφ hoff V hV U hU hBorel
+  have hA : Tendsto A atTop (𝓝 (E₀ - V)) := by
+    have h := hlim.sub_const V
+    simpa only [add_sub_cancel_left] using h
+  have hlo (k : ℕ) : E₀ - V ≤ A k := by
+    have hr : 0 ≤ rem(χ.val,φ,k) := tsum_nonneg (fun z : Sites(χ.val) ↦
+      ite_nonneg (mul_nonneg (Nat.cast_nonneg _) (hpositive z).le) le_rfl)
+    have heq : V + A k = E₀ + rem(χ.val,φ,k) :=
+      lineOrderDiagonal_defect_eq_exterior_add_remainder τ hτ χ φ hφ hoff V hV k U hU hBorel
+    linarith
+  have hcrit : limUnder atTop A ≤ -V ↔ ∀ z, P z := by
+    rw [hA.limUnder_eq, ← hE]
+    constructor <;> intro h <;> linarith
+  exact ⟨(approximates_iff_limUnder_le A (E₀ - V) V hA hlo).trans hcrit, hcrit⟩
+
+local notation "Vf" => HeightOneSpectrum (𝓞 F)
+local notation "volC" => (((normOneIdeleClassTamagawaMeasure F) univ).toReal : ℂ)
+local notation "Arch" => ((w : InfinitePlace F) → BruhatCompactSupport w.Completionˣ)
+local notation "FinV" => ((v : Vf) → BruhatCompactSupport (v.adicCompletion F)ˣ)
+local notation "archClass(" w ")" => IdeleClassGroup.ofCompletion (𝓞 F) F w
+local notation "finiteClass(" v ")" => IdeleClassGroup.ofAdicCompletion (𝓞 F) F v
+local notation "finiteV(" v ")" => (finiteLocalMultiplicativeTamagawaMeasure F v
+  ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set _)).toReal
+local notation "finTerm(" v ", " b ")" => ((Real.log ((v : Vf).asIdeal.absNorm : ℝ) / finiteV(v) : ℝ) : ℂ) *
+  finiteConnesWeilPrincipalValue v 1 b
+local notation "rawM(" φ ", " χ ", " w ")" => modulatedFourierMellin m𝔽 univ
+  ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ μ𝔽 (φ : BruhatCompactSupport C𝔽).val
+  (ideleClassNormTwist (F := F) χ w)
+local notation "localSum(" φ ", " A ", " B ")" =>
+  rawM(φ,(1 : PontryaginDual C𝔽),(1/2)) + rawM(φ,(1 : PontryaginDual C𝔽),(-1/2)) -
+    volC * ((∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (A w)) +
+      ∑' v : Vf, finTerm(v,B v))
+
+/-- The unconditional wide explicit formula identifies the full signed moment of a
+single isotype with its actual polar terms and all finite and infinite principal values. -/
+theorem exists_localTerms_eq_fullMoments (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : Chars(τ)) (φ : BruhatCompactSupport C𝔽)
+    (hoff : ∀ η : PontryaginDual C𝔽, (∀ t, η (τ t) = 1) → η ≠ χ.val → ∀ z : ℂ, M(φ,η,z) = 0) :
+    ∃ (A : Arch) (B : FinV),
+      (∀ (w : InfinitePlace F) (u : w.Completionˣ), (A w).val u = φ.val (archClass(w) u)) ∧
+      (∀ (v : Vf) (u : (v.adicCompletion F)ˣ), (B v).val u = φ.val (finiteClass(v) u)) ∧
+      Summable (fun v : Vf ↦ finTerm(v,B v)) ∧
+      (localSum(φ,A,B)).re =
+        ∑' z : Sites(χ.val), ((ord(χ.val,z.val)).toNat : ℝ)*(M(φ,χ.val,z.val)).re := by
+  obtain ⟨A,B,hA,hB,hf,hall⟩ := traceFormula_of_half_le τ hτ φ (le_refl (1/2:ℝ))
+  refine ⟨A,B,hA,hB,hf,?_⟩
+  let J := {p : Chars(τ) × ℂ // 0 < ord(p.1.val,p.2) ∧ |p.2.re-1/2| < 1/2}
+  let f (p : J) := ((ord(p.val.1.val,p.val.2) : ℤ) : ℂ) * M(φ,p.val.1.val,p.val.2)
+  have hfull : HasSum f localSum(φ,A,B) := hall
+  have hw (z : Sites(χ.val)) : |z.val.re-1/2| < 1/2 :=
+    widthJump_strict_critical τ hτ χ z
+  let j : Sites(χ.val) → J := fun z ↦ ⟨(χ,z.val),z.property,hw z⟩
+  have hinj : Injective j := fun u v he ↦ Subtype.ext (congrArg (fun p : J ↦ p.val.2) he)
+  have hother (p : J) (hp : p ∉ range j) : f p = 0 := by
+    by_cases he : p.val.1 = χ
+    · exfalso
+      apply hp
+      let z : Sites(χ.val) := ⟨p.val.2, by rw [← he]; exact p.property.1⟩
+      exact ⟨z,Subtype.ext (Prod.ext he.symm rfl)⟩
+    · have hneq : p.val.1.val ≠ χ.val := fun e ↦ he (Subtype.ext e)
+      dsimp only [f]
+      rw [hoff p.val.1.val p.val.1.property hneq p.val.2, mul_zero]
+  have hv := Complex.reCLM.hasSum ((hinj.hasSum_iff hother).mpr hfull)
+  have hr : HasSum (fun z : Sites(χ.val) ↦ ((ord(χ.val,z.val)).toNat : ℝ)*(M(φ,χ.val,z.val)).re)
+      (localSum(φ,A,B)).re := by
+    apply hv.congr_fun
+    intro z
+    have hm : ((ord(χ.val,z.val)).toNat : ℝ) = ((ord(χ.val,z.val) : ℤ) : ℝ) := by
+      exact_mod_cast Int.toNat_of_nonneg z.property.le
+    simp only [Function.comp_apply, j, f, Complex.reCLM_apply, Complex.mul_re,
+      Complex.intCast_re, Complex.intCast_im, zero_mul, sub_zero,hm]
+  exact hr.tsum_eq.symm
+
+local notation "ext(" τ ", " α ")" => {p : Chars(τ) × ℂ //
+  0 < ord(p.1.val,p.2) ∧ α ≤ |p.2.re-1/2|}
+local notation "target(" τ ")" => (∀ (α : ℝ), 0 < α → ∀ f : BruhatCompactSupport C𝔽,
+  (∀ g : C₁, f.val g = 0) → HasSum (fun p : ext(τ,α) ↦
+    ((ord(p.val.1.val,p.val.2) : ℤ) : ℂ)*M(f,p.val.1.val,p.val.2)) 0)
+
+local notation "PV(" A ", " B ")" => (volC * ((∑ w : InfinitePlace F,
+  infiniteConnesWeilPrincipalValue w (A w)) + ∑' v : Vf, finTerm(v,B v))).re
+
+local notation "weight(" φ ", " χ ", " z ")" => ((ord(χ,(z : ℂ))).toNat : ℝ) * (M(φ,χ,z)).re
+
+private theorem allCentral_iff_exteriorZeros (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F)) :
+    (∀ (χ : Chars(τ)) (z : Sites(χ.val)), z.val.re = 1/2) ↔ target(τ) := by
+  constructor
+  · intro hc α hα
+    apply (hasSum_exteriorZeros_iff_isEmpty τ hτ α).mpr
+    refine ⟨fun p ↦ ?_⟩
+    have hz := hc p.val.1 ⟨p.val.2,p.property.1⟩
+    have he := p.property.2
+    change p.val.2.re = 1/2 at hz
+    rw [hz,sub_self,abs_zero] at he
+    exact hα.not_ge he
+  · intro h χ z
+    by_contra hne
+    have ha : 0 < |z.val.re-1/2| := abs_pos.mpr (sub_ne_zero.mpr hne)
+    have h₀ := (hasSum_exteriorZeros_iff_isEmpty τ hτ _).mp (h _ ha)
+    exact h₀.false ⟨(χ,z.val),z.property,le_refl _⟩
+
+local notation "probeComparison(" τ ", " U ")" => (
+  ∃ (φ : Chars(τ) → BruhatCompactSupport C𝔽) (A : Chars(τ) → Arch) (B : Chars(τ) → FinV),
+      (∀ χ : Chars(τ),
+        (∀ g : C₁, (φ χ).val g = 0) ∧
+        M(φ χ,(1 : PontryaginDual C𝔽),(0:ℂ)) = 0 ∧ M(φ χ,(1 : PontryaginDual C𝔽),(1:ℂ)) = 0 ∧
+        (∀ η : PontryaginDual C𝔽, (∀ t, η (τ t) = 1) → η ≠ χ.val → ∀ z : ℂ, M(φ χ,η,z) = 0) ∧
+        (∀ z : Sites(χ.val), 0 < (M(φ χ,χ.val,z.val)).re) ∧
+        (∀ (w : InfinitePlace F) (u : w.Completionˣ),
+          (A χ w).val u = (φ χ).val (IdeleClassGroup.ofCompletion (𝓞 F) F w u)) ∧
+        (∀ (v : Vf) (u : (v.adicCompletion F)ˣ),
+          (B χ v).val u = (φ χ).val (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u)) ∧
+        Summable (fun v : Vf ↦ finTerm(v,B χ v)) ∧
+        -PV(A χ,B χ) = ∑' z : Sites(χ.val), weight(φ χ,χ.val,z) ∧
+        Tendsto (fun k : ℕ ↦ -PV(A χ,B χ) + I(k,φ χ,U)) atTop
+          (𝓝 (∑' z : Sites(χ.val), if z.val.re ≠ 1/2 then weight(φ χ,χ.val,z) else 0))) ∧
+      ((∀ (χ : Chars(τ)) (δ : ℝ), 0 < δ → ∃ k : ℕ, I(k,φ χ,U) ≤ PV(A χ,B χ)+δ) ↔ target(τ)) ∧
+      ((∀ χ : Chars(τ), limUnder atTop (fun k : ℕ ↦ I(k,φ χ,U)) ≤ PV(A χ,B χ)) ↔ target(τ)))
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. A single compact test in each normalized
+character simultaneously detects its entire positive divisor. A fixed measurable
+D′-sequence determines its actual output-projected line Haar integrals at all odd
+Sobolev degrees at least three. The positive-width exterior sum holds for every
+test precisely when these real integrals admit the displayed signed upper bound
+by the finite and infinite principal values. -/
+theorem exists_probes_localPV_linePA_iff_exteriorZeros (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (U : ℕ → Set C𝔽)
+    (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    probeComparison(τ,U) := by
+  obtain ⟨φ,hspec,_⟩ := CenterGeometry.exists_centerGeometricProbes_exteriorZeros τ hτ
+  have hoff (χ : Chars(τ)) := (hspec χ).2.2.2.1
+  have hp (χ : Chars(τ)) := (hspec χ).2.2.2.2.1
+  have hφ (χ : Chars(τ)) : (φ χ).val 1 = 0 := (hspec χ).1 (1 : C₁)
+  choose A B hA hB hfin hv using fun χ : Chars(τ) ↦ exists_localTerms_eq_fullMoments τ hτ χ (φ χ) (hoff χ)
+  have hV (χ : Chars(τ)) : -PV(A χ,B χ) = ∑' z : Sites(χ.val), weight(φ χ,χ.val,z) := by
+    have h₀ : rawM(φ χ,(1 : PontryaginDual C𝔽),(-1/2)) = 0 := by
+      simpa only [zero_sub, neg_div] using (hspec χ).2.1
+    have h₁ : rawM(φ χ,(1 : PontryaginDual C𝔽),(1/2)) = 0 := by
+      simpa only [show (1 : ℂ) - 1/2 = 1/2 by ring] using (hspec χ).2.2.1
+    simpa only [h₁,h₀,zero_add,zero_sub,Complex.neg_re] using hv χ
+  have hc (χ : Chars(τ)) := lineOrderDiagonal_terminal_equivalences
+    τ hτ χ (φ χ) (hφ χ) (hoff χ) (hp χ) (-PV(A χ,B χ)) (hV χ) U hU hBorel
+  simp only [neg_neg] at hc
+  refine ⟨φ,A,B,?_,?_,?_⟩
+  · intro χ
+    refine ⟨(hspec χ).1,(hspec χ).2.1,(hspec χ).2.2.1,hoff χ,hp χ,hA χ,hB χ,hfin χ,hV χ,?_⟩
+    exact tendsto_lineOrderDiagonal_defect τ hτ χ (φ χ) (hφ χ) (hoff χ)
+      (-PV(A χ,B χ)) (hV χ) U hU hBorel
+  · exact (forall_congr' fun χ ↦ (hc χ).1).trans (allCentral_iff_exteriorZeros τ hτ)
+  · exact (forall_congr' fun χ ↦ (hc χ).2).trans (allCentral_iff_exteriorZeros τ hτ)
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. Every number field admits a single
+Borel smoothing sequence for the preceding comparison across all normalized characters. -/
+theorem exists_measurableSequence_localPV_linePA_iff_exteriorZeros :
+    ∃ U : ℕ → Set C𝔽, IsDPrimeSequence μ𝔽 U ∧ (∀ n, MeasurableSet (U n)) ∧
+      ∀ (τ : ℝ≥0ˣ →ₜ* C𝔽), RightInverse τ (ideleClassNorm F) → probeComparison(τ,U) := by
+  obtain ⟨U,hU,hBorel⟩ := exists_measurable_ideleClassDPrimeSequence F
+  exact ⟨U,hU,hBorel,fun τ hτ ↦ exists_probes_localPV_linePA_iff_exteriorZeros τ hτ U hU hBorel⟩
+
+end OutputOrderGeometry
 
 /-- Paper: (12.5.1.4), p. 520. For a test vanishing on the norm-one classes, a projective
 Sobolev tensor represents convolution by the test after spectral projection at twist 1/2.
