@@ -143,6 +143,16 @@ def realPWCutoffLeftFamily (p : ℝ → ℂ) (x : ℝ) : V := p x • evv x
 def realPWCutoffRightFamily (q : ℝ → ℂ) (x : ℝ) : V :=
   star (amp * q x) • evv (g⁻¹ * x)
 
+theorem realPWCutoffLeftFamily_apply (p : ℝ → ℂ) (x : ℝ) :
+    realPWCutoffLeftFamily Y α s hs p x = p x • evv x := by
+  unfold realPWCutoffLeftFamily
+  rfl
+
+theorem realPWCutoffRightFamily_apply (q : ℝ → ℂ) (x : ℝ) :
+    realPWCutoffRightFamily Y α s hs g q x = star (amp * q x) • evv (g⁻¹ * x) := by
+  unfold realPWCutoffRightFamily
+  rfl
+
 local notation "U" => realPWCutoffLeftFamily Y α s hs
 local notation "D" => realPWCutoffRightFamily Y α s hs g
 

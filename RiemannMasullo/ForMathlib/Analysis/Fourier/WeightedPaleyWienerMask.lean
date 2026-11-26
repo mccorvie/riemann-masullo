@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.ForMathlib.Analysis.Fourier.WeightedPaleyWienerBand
 public import RiemannMasullo.ForMathlib.Analysis.Fourier.SharpIntervalSmoothing
 import Mathlib.Analysis.Analytic.Uniqueness
+import Mathlib.Analysis.Complex.CauchyIntegral
 import Mathlib.Analysis.Fourier.Inversion
 
 /-! # Spatial and frequency-limited masks for real Paley–Wiener bands -/
@@ -72,6 +73,19 @@ private theorem exists_entire_smoothIntervalMask_type (η : 𝓢(ℝ, ℂ)) {c :
       not_ne_iff.mp fun hn ↦ ht (hs hn)))
   exact ⟨g, hg, fun x ↦ (he x).trans
     (congrFun ((continuous_smoothIntervalMask η L).fourierInv_fourier_eq hi hI) x), hb⟩
+
+/-- The actual smoothed mask has derivatives of every finite order when its
+smoothing kernel is band limited. -/
+theorem contDiff_smoothIntervalMask_of_fourier_support (η : 𝓢(ℝ, ℂ)) {c : ℝ} (hc : 0 ≤ c)
+    (hη : Function.support (𝓕 (η : ℝ → ℂ)) ⊆ Icc (-c) c) (L : ℝ) (k : ℕ) :
+    ContDiff ℝ k (smoothIntervalMask η L) := by
+  obtain ⟨g, hg, he, _⟩ := exists_entire_smoothIntervalMask_type η hc hη L
+  rw [← funext he]
+  have H : AnalyticOnNhd ℝ (fun x : ℝ ↦ g (x : ℂ)) univ := by
+    intro x _
+    exact ((hg.analyticAt (x : ℂ)).restrictScalars (𝕜 := ℝ)).comp_of_eq
+      (Complex.ofRealCLM.analyticAt x) rfl
+  exact H.contDiff
 
 /-- Narrow Fourier smoothing uses only the bandwidth freed by dilation.
 The actual product has spectrum in the original interval without a projection. -/
