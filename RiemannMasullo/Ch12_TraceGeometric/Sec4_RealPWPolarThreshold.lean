@@ -40,9 +40,11 @@ rational real place.
 
 So for `s ≥ 0` the condition is lost exactly when `α < 1 / 2`, or `α = 1 / 2` and `s ≤ 1`.
 
-Not treated here: that the closure, when the condition is lost, is exactly the kernel of
-evaluation at the origin, which needs the density of Schwartz functions in that kernel. The
-last statement for `α ≥ 3 / 2`. -/
+For `α < 1 / 2` the closure is exactly the kernel of evaluation at the origin. That is proved
+in `Sec4_RealPWBandDensity`, from the density of Schwartz functions in the band.
+
+Not treated here: the closure at width one half for `s ≤ 1`. The last statement of the list for
+`α ≥ 3 / 2`. -/
 
 public noncomputable section
 
@@ -159,7 +161,7 @@ integral zero. -/
     (fun x ↦ RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure α s hs) x f) = (g : ℝ → ℂ)}
 
 /-- The squared norm of a band vector is the weighted integral of its pointwise values. -/
-private theorem norm_sq_realPWBand_of_evaluation_eq (hs : 0 ≤ s)
+theorem norm_sq_realPWBand_of_evaluation_eq (hs : 0 ≤ s)
     (f : RealPWBand.space Y (volume_le_realPWIntervalMeasure α s hs)) (u : ℝ → ℂ)
     (hu : (fun x ↦ RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure α s hs) x f) = u) :
     ‖f‖ ^ 2 = ∫ x, ‖u x‖ ^ 2 ∂realPWIntervalMeasure α s := by
@@ -748,7 +750,7 @@ private theorem memLp_of_evenSchwartz_zero (hα : 0 ≤ α) (hα' : α < 3 / 2) 
 
 /-- The image of the weighted measure under a contraction by `t ≥ 1` is at most the dilation
 constant times `t` times the measure. -/
-private theorem map_mul_realPWIntervalMeasure_le (hα : 0 ≤ α) (hs : 0 ≤ s) {t : ℝ}
+theorem map_mul_realPWIntervalMeasure_le (hα : 0 ≤ α) (hs : 0 ≤ s) {t : ℝ}
     (ht : 1 ≤ t) :
     Measure.map (t⁻¹ * ·) (realPWIntervalMeasure α s) ≤
       (ENNReal.ofReal (Real.exp (2 * α * Real.log t) *
