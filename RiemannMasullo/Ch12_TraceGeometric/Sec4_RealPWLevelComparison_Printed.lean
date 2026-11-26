@@ -10,19 +10,20 @@ The step of Theorem 12.4.1.1 that #7354 leaves open after #7440 and #7498 is the
 the diagonal integral of the kernel on the level with the summed sharp orbital masses (errata
 entry I398). This file tests that comparison in the model `F = ℚ`, `S = {∞}`, for the
 compression to the polar-free level of the cutoff of the action of a test function supported
-away from `g = 1`. It fails, for both choices of parameters that the paper makes.
+away from `g = 1`. It fails for both weights that the paper's two uses of the theorem suggest.
 
-With the weight `(1 + log² |x|) ^ (s / 2)` of the proof on p. 515, the level is the space of
-band vectors vanishing at the origin. The trace on the level converges
+With the weight `(1 + log² |x|) ^ (s / 2)` of the proof on p. 515, which is the interval weight
+of Definition 10.1.1.1 at strip half-width `α = 0`, the level is the space of band vectors
+vanishing at the origin. The trace on the level converges
 (`exists_realPWTestCutoff_level_trace_limit`). Its limit is the real term of (12.4.1.1) minus
 `∫ ψ g g ^ (-1/2) dg`, which with `ψ g = φ g / g` has the form of the Mellin value
 `M(φ)(|·| ^ (-1/2))`. On the whole band the limit is the real term
 (`exists_realPWTestCutoff_trace_limit`), so the difference comes from the level alone: it is
 the diagonal entry at the direction that the condition `h(0) = 0` removes.
 
-With the weight of width one half and `s > 1`, the case `a = 1/2`, `s ≥ 2 [F : ℚ]` of p. 487
-that the proof of Theorem 12.5.1.1 uses on p. 520, the level is the space of band vectors of
-integral zero. The trace on the level converges
+With the interval weight at strip half-width `α = 1/2` and `s > 1`, the level is the space of
+band vectors of integral zero. The strip `1/2 + [-α, α]` of Theorem 12.5.1.1, p. 519, is then
+the closed critical strip, and p. 487 assumes `s ≥ 2 [F : ℚ]`. The trace on the level converges
 (`exists_realPWTestCutoff_integralLevel_trace_limit`), and its limit is the real term minus
 `∫ ψ g g ^ (-1/2) dg` minus `∫ ψ g g ^ (1/2) dg`. These have the form of the two Mellin values
 `M(φ)(|·| ^ (-1/2))` and `M(φ)(|·| ^ (1/2))` that p. 520 subtracts.
@@ -242,9 +243,11 @@ theorem sLocalTrace_realPWLevelSharpComparison_joint_false :
   exact hne (sub_eq_self.mp heq.symm)
 
 /-- Paper: Theorem 12.4.1.1, (12.4.1.1), p. 514, with Steps II–III of its proof, pp. 516–517,
-read in the model `F = ℚ`, `S = {∞}` of #7354 at the parameters `a = 1/2`, `s ≥ 2 [F : ℚ]` of
-p. 487, which the proof of Theorem 12.5.1.1 uses on p. 520. The statement says that the trace
-of the cutoff action on the polar-free level tends to the real term.
+read in the model `F = ℚ`, `S = {∞}` of #7354 with the interval weight of Definition 10.1.1.1
+at strip half-width `α = 1/2`, for which the strip `1/2 + [-α, α]` of Theorem 12.5.1.1 is the
+closed critical strip, and with `s > 1`, which the assumption `s ≥ 2 [F : ℚ]` of p. 487 gives.
+The statement says that the trace of the cutoff action on the polar-free level tends to the
+real term.
 Reconstruction: The paper does not state this for the model. The space is the weighted even
 band with weight `max(|x|, |x|⁻¹) (1 + log² |x|) ^ (s / 2)` and `s > 1`. The level is the
 closure of the polar-free core, given as the orthogonal complement of a band vector `e`. It is
@@ -300,8 +303,8 @@ private theorem continuousOn_realTermDensity {a b : ℝ} (ha : 1 < a) :
   exact Complex.continuous_ofReal.comp_continuousOn
     ((continuousOn_const.mul (h1.add h2)).mul h3)
 
-/-- Paper: Theorem 12.4.1.1, pp. 514–517, and the proof of Theorem 12.5.1.1, p. 520. At width
-one half with `s > 1` the trace on the level converges, and its limit is the real term minus
+/-- Paper: Theorem 12.4.1.1, pp. 514–517, and the proof of Theorem 12.5.1.1, p. 520. At strip
+half-width one half with `s > 1` the trace on the level converges, and its limit is the real term minus
 the integrals of `ψ g g ^ (-1/2)` and `ψ g g ^ (1/2)`. So the reconstruction
 `sLocalTrace_realPWIntegralLevelSharpComparison` fails for every nonnegative nonzero test. The
 two integrals have the form of the Mellin values that p. 520 subtracts from the diagonal
