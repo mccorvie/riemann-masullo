@@ -3616,6 +3616,229 @@ theorem quarticBenchmark_twoPlaceBound :
   · exact mixedChordBound _ _ _ norm_quarticPhasePlus norm_quarticPhaseMinus
       (Circle.norm_coe quarticRotation) m n
 
+/-- Algebraicity of a nonzero integral power is equivalent to algebraicity
+of the base, including for negative powers. -/
+private theorem quartic_isAlgebraic_zpow_iff {z : ℂ} (k : ℤ) (hk : k ≠ 0) :
+    IsAlgebraic ℚ (z ^ k) ↔ IsAlgebraic ℚ z := by
+  cases k with
+  | ofNat n =>
+    change IsAlgebraic ℚ (z ^ n) ↔ IsAlgebraic ℚ z
+    exact ⟨IsAlgebraic.of_pow (Nat.pos_of_ne_zero (fun h ↦ hk (by simp [h]))), fun h ↦ h.pow n⟩
+  | negSucc n =>
+    rw [zpow_negSucc]
+    exact ⟨fun h ↦ IsAlgebraic.of_pow (Nat.succ_pos n) (by simpa using h.inv),
+      fun h ↦ (h.pow (n + 1)).inv⟩
+
+/-- Two distinct algebraic Laurent denominators on the quartic primary pole
+lattice force both the outside phase and the rotation to be algebraic. This
+tests any nonconstant arithmetic progression by its first two indices. -/
+theorem quarticPoleValues_algebraic_two_iff (a : ℂ) (ha : a ≠ 0) (m n : ℤ) (hmn : m ≠ n) :
+    (IsAlgebraic ℚ ((1 - quarticPoleValue a m)⁻¹) ∧
+      IsAlgebraic ℚ ((1 - quarticPoleValue a n)⁻¹)) ↔
+    IsAlgebraic ℚ a ∧ IsAlgebraic ℚ (quarticRotation : ℂ) := by
+  have hrot : (quarticRotation : ℂ) ≠ 0 := Circle.coe_ne_zero _
+  have hpow (z : ℂ) (hz : IsAlgebraic ℚ z) (i : ℤ) : IsAlgebraic ℚ (z ^ i) := by
+    by_cases hi : i = 0
+    · simpa [hi] using (isAlgebraic_one : IsAlgebraic ℚ (1 : ℂ))
+    · exact (quartic_isAlgebraic_zpow_iff i hi).mpr hz
+  have he (x : ℂ) : IsAlgebraic ℚ (1 - x)⁻¹ ↔ IsAlgebraic ℚ x := by
+    constructor
+    · intro h
+      have h' : IsAlgebraic ℚ (1 - x) := by simpa using h.inv
+      simpa using (isAlgebraic_one.sub h')
+    · exact fun h ↦ (isAlgebraic_one.sub h).inv
+  rw [he, he]
+  constructor
+  · rintro ⟨hm, hn⟩
+    have hquot : quarticPoleValue a m / quarticPoleValue a n = (quarticRotation : ℂ) ^ (m - n) := by
+      rw [quarticPoleValue, quarticPoleValue, zpow_sub₀ hrot, mul_div_mul_left _ _ ha]
+    have hr : IsAlgebraic ℚ (quarticRotation : ℂ) :=
+      (quartic_isAlgebraic_zpow_iff _ (sub_ne_zero.mpr hmn)).mp (hquot ▸ (by simpa [div_eq_mul_inv] using hm.mul hn.inv))
+    have ha' : IsAlgebraic ℚ (quarticPoleValue a m / (quarticRotation : ℂ) ^ m) := by
+      simpa [div_eq_mul_inv] using hm.mul (hpow _ hr m).inv
+    rw [quarticPoleValue, mul_div_cancel_right₀ _ (zpow_ne_zero _ hrot)] at ha'
+    exact ⟨ha', hr⟩
+  · rintro ⟨hA, hT⟩
+    exact ⟨hA.mul (hpow _ hT m), hA.mul (hpow _ hT n)⟩
+
+/-- A clearing shift for an algebraic, non-torsion outside phase forces the
+rotation of the quartic pole lattice to be algebraic. -/
+private theorem quarticRotation_algebraic_of_clearingPhase (a : ℂ)
+    (hA : IsAlgebraic ℚ a) (hu : ‖a‖ = 1) (ht : ∀ N : ℕ, 0 < N → a ^ N ≠ 1)
+    (hc : QuarticCommonShift a) : IsAlgebraic ℚ (quarticRotation : ℂ) := by
+  obtain ⟨N, hN, k, hk⟩ := quartic_commonShift_power a hc (quarticEligible_exists a hu)
+  have hne : k ≠ 0 := fun h ↦ ht N hN (by simpa [h] using hk)
+  have he := (quartic_isAlgebraic_zpow_iff k hne).mp (hk ▸ hA.pow N)
+  rw [quarticRotation_coe, Complex.exp_neg]
+  exact he.inv
+
+/-- If the quartic rotation is algebraic, the individual outside Euler
+factor has the required polynomial height bound on the entire primary pole
+lattice. Exact coincidences cause no difficulty with totalized inversion. -/
+theorem quarticPoleValue_polynomial_of_algebraic_rotation (hrot : IsAlgebraic ℚ (quarticRotation : ℂ))
+    (a : ℂ) (ha : ‖a‖ = 1) (hA : IsAlgebraic ℚ a) :
+    ∃ d : ℕ, ∃ C ≥ (0 : ℝ), ∀ n : ℤ,
+      ‖(1 - quarticPoleValue a n)⁻¹‖ ≤ C * (1 + ‖quarticPoleHeight n‖) ^ d := by
+  obtain ⟨c, hc, d, _, hb⟩ := polynomialMixedChordBound a (quarticRotation : ℂ) ha
+    (Circle.norm_coe _) hA hrot
+  let L := 2 * Real.pi / Real.log 49
+  have hL : 0 < L := div_pos (by positivity) (Real.log_pos (by norm_num))
+  let K := 2 + L⁻¹
+  have hK : 0 < K := by dsimp [K]; positivity
+  refine ⟨d, K ^ d / c, by positivity, fun n ↦ ?_⟩
+  by_cases he : quarticPoleValue a n = 1
+  · rw [he, sub_self, inv_zero, norm_zero]; positivity
+  · have hbound := hb 1 (-n) (by simpa [quarticPoleValue] using he)
+    simp only [zpow_one, neg_neg, Int.cast_one, abs_one, Int.cast_neg, abs_neg, one_add_one_eq_two] at hbound
+    change c / (2 + |(n : ℝ)|) ^ d ≤ ‖1 - quarticPoleValue a n‖ at hbound
+    have hn : 0 < ‖1 - quarticPoleValue a n‖ := norm_pos_iff.mpr (sub_ne_zero.mpr (Ne.symm he))
+    have hh : 2 + |(n : ℝ)| ≤ K * (1 + ‖quarticPoleHeight n‖) := by
+      rw [quarticPoleHeight_norm]
+      change _ ≤ (2 + L⁻¹) * (1 + L * |(n : ℝ)|)
+      have hd : L⁻¹ * (L * |(n : ℝ)|) = |(n : ℝ)| := by rw [← mul_assoc, inv_mul_cancel₀ hL.ne', one_mul]
+      nlinarith [inv_pos.mpr hL, mul_nonneg hL.le (abs_nonneg (n : ℝ))]
+    have hl : c ≤ (2 + |(n : ℝ)|) ^ d * ‖1 - quarticPoleValue a n‖ := by
+      simpa [mul_comm] using (div_le_iff₀ (by positivity)).mp hbound
+    rw [norm_inv, inv_le_iff_one_le_mul₀ hn]
+    have hlarge := hl.trans (mul_le_mul_of_nonneg_right (pow_le_pow_left₀ (by positivity) hh d) hn.le)
+    rw [mul_pow] at hlarge
+    calc
+      _ ≤ ((K ^ d * (1 + ‖quarticPoleHeight n‖) ^ d) * ‖1 - quarticPoleValue a n‖) / c :=
+        (one_le_div hc).mpr hlarge
+      _ = _ := by ring
+
+/-- A clearing shift at either of the two specified places above 17 gives
+the individual polynomial Euler-factor bound at every algebraic unit phase
+on this lattice, including the other place even if it does not clear. -/
+theorem quarticBenchmark_individual_of_either_commonShift
+    (hc : QuarticCommonShift quarticPhasePlus ∨ QuarticCommonShift quarticPhaseMinus)
+    (a : ℂ) (hu : ‖a‖ = 1) (hA : IsAlgebraic ℚ a) :
+    ∃ d : ℕ, ∃ C ≥ (0 : ℝ), ∀ n : ℤ,
+      ‖(1 - quarticPoleValue a n)⁻¹‖ ≤ C * (1 + ‖quarticPoleHeight n‖) ^ d := by
+  apply quarticPoleValue_polynomial_of_algebraic_rotation _ a hu hA
+  rcases hc with hp | hm
+  · apply quarticRotation_algebraic_of_clearingPhase _ algebraic_quarticPhasePlus norm_quarticPhasePlus _ hp
+    intro N hN he
+    have h := (quarticPhases_independent (N : ℤ) 0 (by simpa using he)).1
+    exact (Nat.ne_of_gt hN) (by exact_mod_cast h)
+  · apply quarticRotation_algebraic_of_clearingPhase _ algebraic_quarticPhaseMinus norm_quarticPhaseMinus _ hm
+    intro N hN he
+    have h := (quarticPhases_independent 0 (N : ℤ) (by simpa using he)).2
+    exact (Nat.ne_of_gt hN) (by exact_mod_cast h)
+
+/-- The rotation in the worked example is the fourth entry of an exact
+Four Exponentials instance. The two rows and the two columns are rationally
+independent, and the other three exponentials are 49, 17 and 1. -/
+theorem quarticRotation_fourExponentials_instance :
+    let x : Fin 2 → ℂ := ![-(2 * Real.pi * Complex.I), (Real.log 49 : ℝ)]
+    let y : Fin 2 → ℂ := ![(quarticLogRatio : ℝ), 1]
+    LinearIndependent ℚ x ∧ LinearIndependent ℚ y ∧
+      ((∃ i j, Transcendental ℚ (Complex.exp (x i * y j))) ↔
+        Transcendental ℚ (quarticRotation : ℂ)) := by
+  intro x y
+  have lx : LinearIndependent ℚ x := by
+    apply linearIndependent_fin2.mpr
+    refine ⟨?_, ?_⟩
+    · exact quartic_primary_log_ne_zero
+    · intro r he
+      have hi := congrArg Complex.im he
+      simp [x, Algebra.smul_def, Complex.mul_im] at hi
+      have hz : (Complex.log 49).im = 0 := by
+        rw [show (49 : ℂ) = ((49 : ℝ) : ℂ) by norm_num, ← Complex.ofReal_log (by norm_num : (0 : ℝ) ≤ 49),
+          Complex.ofReal_im]
+      rw [hz, mul_zero] at hi
+      linarith [Real.pi_pos]
+  have ly : LinearIndependent ℚ y := by
+    apply linearIndependent_fin2.mpr
+    refine ⟨by simp [y], ?_⟩
+    intro r he
+    apply quarticLogRatio_irrational
+    exact ⟨r, by simpa [y, Algebra.smul_def] using congrArg Complex.re he⟩
+  have h00 : Complex.exp (x 0 * y 0) = (quarticRotation : ℂ) := by
+    rw [quarticRotation_coe]
+    congr 1; change -(2 * Real.pi * Complex.I) * (quarticLogRatio : ℂ) = _; ring
+  have h01 : Complex.exp (x 0 * y 1) = 1 := by simp [x, y, Complex.exp_neg, Complex.exp_two_pi_mul_I]
+  have h10 : Complex.exp (x 1 * y 0) = 17 := by
+    change Complex.exp (((Real.log 49 : ℝ) : ℂ) * (quarticLogRatio : ℂ)) = 17
+    rw [← Complex.ofReal_mul, ← Complex.ofReal_exp]
+    norm_cast
+    rw [quarticLogRatio, mul_div_cancel₀ _ (Real.log_pos (by norm_num : (1 : ℝ) < 49)).ne', Real.exp_log (by norm_num)]
+  have h11 : Complex.exp (x 1 * y 1) = 49 := by
+    change Complex.exp (((Real.log 49 : ℝ) : ℂ) * 1) = 49
+    rw [mul_one, ← Complex.ofReal_exp, Real.exp_log (by norm_num)]
+    norm_num
+  refine ⟨lx, ly, ?_⟩
+  constructor
+  · rintro ⟨i, j, h⟩
+    fin_cases i <;> fin_cases j
+    · exact h00 ▸ h
+    · exact False.elim (h (h01 ▸ isAlgebraic_one))
+    · exact False.elim (h (h10 ▸ (isAlgebraic_natCast 17)))
+    · exact False.elim (h (h11 ▸ (isAlgebraic_natCast 49)))
+  · exact fun h ↦ ⟨0, 0, h00 ▸ h⟩
+
+/-- On the quartic lattice a common shift is exactly a relation by nonzero
+natural powering between the outside phase and the lattice rotation. -/
+theorem quarticCommonShift_iff_power_of_rotation (a : ℂ) (hu : ‖a‖ = 1) :
+    QuarticCommonShift a ↔ ∃ N : ℕ, 0 < N ∧ ∃ k : ℤ,
+      a ^ N = (quarticRotation : ℂ) ^ k := by
+  constructor
+  · intro hc
+    obtain ⟨N, hN, k, hk⟩ := quartic_commonShift_power a hc (quarticEligible_exists _ hu)
+    refine ⟨N, hN, -k, ?_⟩
+    rw [quarticRotation_coe, Complex.exp_neg, inv_zpow', neg_neg]
+    exact hk
+  · rintro ⟨N, hN, k, hk⟩
+    let U : ℂ := 2 * Real.pi * Complex.I
+    let σ : ℂ := -(k : ℂ) * U / ((N : ℂ) * (Real.log 49 : ℂ))
+    have hN₀ : (N : ℂ) ≠ 0 := by exact_mod_cast hN.ne'
+    have hP : (N : ℂ) * ((Real.log 49 : ℂ) * σ) = ((-k : ℤ) : ℂ) * U := by
+      dsimp only [σ]; push_cast only [Int.cast_neg]
+      rw [← mul_assoc, mul_div_cancel₀ _ (mul_ne_zero hN₀ quartic_primary_log_ne_zero)]
+    have hQ : (N : ℂ) * ((Real.log 17 : ℂ) * σ) =
+        (k : ℂ) * -((quarticLogRatio : ℂ) * U) := by
+      dsimp [σ, quarticLogRatio]; push_cast only [Complex.ofReal_div]
+      field_simp [hN₀, quartic_primary_log_ne_zero]
+    refine ⟨σ, N, hN, fun n _ ↦ ⟨?_, ?_⟩⟩
+    · rw [exp_shifted_pole, hP, quartic_pole, one_pow, mul_one, Complex.exp_int_mul,
+        show Complex.exp U = 1 from Complex.exp_two_pi_mul_I, one_zpow]
+    · rw [exp_shifted_pole, hQ, Complex.exp_int_mul, ← quarticRotation_coe, ← hk,
+        quarticPoleValue_eq, mul_pow]
+
+/-- If the rotation is transcendental, the only algebraic outside phases
+with clearing shifts are roots of unity. In particular this separates the
+algebraic and transcendental alternatives without an independence conjecture. -/
+theorem quarticCommonShift_iff_finiteOrder_of_transcendental_rotation
+    (hT : Transcendental ℚ (quarticRotation : ℂ)) (a : ℂ) (hu : ‖a‖ = 1) (hA : IsAlgebraic ℚ a) :
+    QuarticCommonShift a ↔ IsOfFinOrder a := by
+  constructor
+  · intro hc
+    by_contra hn
+    apply hT (quarticRotation_algebraic_of_clearingPhase a hA hu _ hc)
+    exact fun N hN h ↦ hn (isOfFinOrder_iff_pow_eq_one.mpr ⟨N, hN, h⟩)
+  · intro hf
+    obtain ⟨N, hN, h⟩ := hf.exists_pow_eq_one
+    exact (quarticCommonShift_iff_power_of_rotation a hu).mpr ⟨N, hN, 0, by simpa using h⟩
+
+/-- Failure of the requested single-place polynomial bound in this quartic
+host forces a transcendental rotation, prevents clearing at both specified
+outside places and makes every nonzero-index Euler value transcendental
+for every nonzero algebraic phase. -/
+theorem quarticBenchmark_individual_failure (a : ℂ) (hu : ‖a‖ = 1) (hA : IsAlgebraic ℚ a)
+    (hfail : ¬ ∃ d : ℕ, ∃ C ≥ (0 : ℝ), ∀ n : ℤ,
+      ‖(1 - quarticPoleValue a n)⁻¹‖ ≤ C * (1 + ‖quarticPoleHeight n‖) ^ d) :
+    Transcendental ℚ (quarticRotation : ℂ) ∧ ¬ QuarticCommonShift quarticPhasePlus ∧
+      ¬ QuarticCommonShift quarticPhaseMinus ∧ ∀ b : ℂ, b ≠ 0 → IsAlgebraic ℚ b →
+        ∀ n : ℤ, n ≠ 0 → Transcendental ℚ ((1 - quarticPoleValue b n)⁻¹) := by
+  have ht : Transcendental ℚ (quarticRotation : ℂ) :=
+    fun h ↦ hfail (quarticPoleValue_polynomial_of_algebraic_rotation h a hu hA)
+  have hc := fun h ↦ hfail (quarticBenchmark_individual_of_either_commonShift h a hu hA)
+  refine ⟨ht, fun hp ↦ hc (Or.inl hp), fun hm ↦ hc (Or.inr hm), ?_⟩
+  intro b hb hB n hn h
+  have h₀ : IsAlgebraic ℚ ((1 - quarticPoleValue b 0)⁻¹) := by
+    simpa [quarticPoleValue] using (isAlgebraic_one.sub hB).inv
+  exact ht ((quarticPoleValues_algebraic_two_iff b hb n 0 hn).mp ⟨h, h₀⟩).2
+
 /-! ## Orbital indices from local Euler profiles -/
 
 section OrbitalIndices
@@ -4215,6 +4438,72 @@ theorem quarticBenchmark_orbitalExample :
   exact ⟨S₀, T, p, w₁, v, ω, hω, τ, hP, hs₀, hcard,
     quarticBenchmark_sInteger_picard _, hw₁, hvOutside v hv, h49₁, h17 v hv, hinc,
     horder, hτ, hinf, hunb, hclear⟩
+
+open scoped Classical in
+/-- If either outside phase clears, both actual outside Euler factors of the
+infinite-order quartic character have a common polynomial height bound at
+every repeated primary pole of the exhibited lattice. -/
+theorem quarticBenchmark_twoLocalEuler_bounds_of_either_commonShift
+    (hc : QuarticCommonShift quarticPhasePlus ∨ QuarticCommonShift quarticPhaseMinus) :
+    ∃ (T : Finset V₈) (w₁ w₂ vPlus vMinus : T) (ω : PontryaginDual C₁)
+      (hω : NormOneCharacterUnramifiedOutside ω ∅) (c : QuasiCharacter (SIdeleQuotient F₈ T)),
+      let χ := sLocalNormOneCharacter T ω (hω.mono (Finset.empty_subset T))
+      let E (v : T) (n : ℤ) := finiteLocalEulerFactor v.val (sLocalFiniteRestriction (F := F₈) v
+        (quasiCharacterNormTwist (G := SIdeleQuotient F₈ T) (sIdeleQuotientNorm F₈ T)
+          (isProperMap_sIdeleQuotientNorm F₈ T).continuous c (quarticPoleHeight n)))
+      ¬ IsOfFinOrder ω ∧ (∀ k : (sIdeleQuotientNorm F₈ T).ker, c k.val = (χ k : ℂ)) ∧
+      w₁ ≠ w₂ ∧ vPlus ≠ vMinus ∧
+      w₁.val.asIdeal.absNorm = 49 ∧ w₂.val.asIdeal.absNorm = 49 ∧
+      vPlus.val.asIdeal.absNorm = 17 ∧ vMinus.val.asIdeal.absNorm = 17 ∧
+      (∀ n : ℤ, E w₁ n = 0 ∧ E w₂ n = 0) ∧
+      ∃ d : ℕ, ∃ C ≥ (0 : ℝ), ∀ n : ℤ,
+        max ‖E vPlus n‖ ‖E vMinus n‖ ≤ C * (1 + ‖quarticPoleHeight n‖) ^ d := by
+  classical
+  obtain ⟨S₀, T, p, w₁, w₂, vPlus, vMinus, _, _, _, _, _, hw, hg₁, hg₂, hgPlus, hgMinus, h49₁, h49₂, h17, _⟩ :=
+    quarticBenchmark_placeData
+  obtain ⟨ω, hω, c, _, hcomp, _, _, horder, hprofile⟩ := quarticBenchmark_stageCharacter T
+  let E (v : T) (n : ℤ) := finiteLocalEulerFactor v.val (sLocalFiniteRestriction (F := F₈) v
+    (quasiCharacterNormTwist (G := SIdeleQuotient F₈ T) (sIdeleQuotientNorm F₈ T)
+      (isProperMap_sIdeleQuotientNorm F₈ T).continuous c (quarticPoleHeight n)))
+  have prof (v : T) (x : 𝓞 F₈) (hx : v.val.asIdeal = Ideal.span {x}) (a : ℂ)
+      (ha : quarticAngularRatio (quarticEmbeddingOne (x : F₈)) ^ 3 /
+        quarticAngularRatio (quarticEmbeddingThree (x : F₈)) = a) : quarticStageProfile c v a :=
+    ha ▸ hprofile v x hx
+  have h17p := h17 vPlus (by simp)
+  have h17m := h17 vMinus (by simp)
+  have hP (n : ℤ) : E vPlus n = (1 - quarticPoleValue quarticPhasePlus n)⁻¹ := by
+    simpa only [E, h17p, Nat.cast_ofNat, quarticPoleValue_eq]
+      using prof vPlus _ hgPlus _ quarticAngularRatio_prime_generators.1 (quarticPoleHeight n)
+  have hM (n : ℤ) : E vMinus n = (1 - quarticPoleValue quarticPhaseMinus n)⁻¹ := by
+    simpa only [E, h17m, Nat.cast_ofNat, quarticPoleValue_eq]
+      using prof vMinus _ hgMinus _ quarticAngularRatio_prime_generators.2 (quarticPoleHeight n)
+  have hv : vPlus ≠ vMinus := by
+    intro he
+    have h := (hP 0).symm.trans (he ▸ hM 0)
+    have hab : quarticPhasePlus = quarticPhaseMinus := by simpa [quarticPoleValue] using h
+    have hm := (quarticPhases_independent 1 (-1) (by simp [hab, norm_ne_zero_iff.mp
+      (norm_quarticPhaseMinus.trans_ne one_ne_zero)])).1
+    norm_num at hm
+  refine ⟨T, w₁, w₂, vPlus, vMinus, ω, hω, c, horder, (fun k ↦ DFunLike.congr_fun hcomp k), hw, hv, h49₁, h49₂, h17p, h17m, ?_, ?_⟩
+  · intro n
+    constructor
+    · simpa only [E, h49₁, Nat.cast_ofNat,
+        quartic_pole, mul_one, sub_self, inv_zero] using prof w₁ _ hg₁ _ quarticAngularRatio_primary_generators.1 (quarticPoleHeight n)
+    · simpa only [E, h49₂, Nat.cast_ofNat,
+        quartic_pole, mul_one, sub_self, inv_zero] using prof w₂ _ hg₂ _ quarticAngularRatio_primary_generators.2 (quarticPoleHeight n)
+  · obtain ⟨dp, Cp, hCp, hp⟩ := quarticBenchmark_individual_of_either_commonShift hc _
+      norm_quarticPhasePlus algebraic_quarticPhasePlus
+    obtain ⟨dm, Cm, hCm, hm⟩ := quarticBenchmark_individual_of_either_commonShift hc _
+      norm_quarticPhaseMinus algebraic_quarticPhaseMinus
+    refine ⟨dp+dm, max Cp Cm, hCp.trans (le_max_left _ _), fun n ↦ ?_⟩
+    change max ‖E vPlus n‖ ‖E vMinus n‖ ≤ _
+    rw [hP, hM]
+    have hbase : 1 ≤ 1 + ‖quarticPoleHeight n‖ := le_add_of_nonneg_right (norm_nonneg _)
+    apply max_le
+    · exact (hp n).trans (mul_le_mul (le_max_left _ _) (pow_le_pow_right₀ hbase (by omega))
+        (by positivity) (hCp.trans (le_max_left _ _)))
+    · exact (hm n).trans (mul_le_mul (le_max_right _ _) (pow_le_pow_right₀ hbase (by omega))
+        (by positivity) (hCm.trans (le_max_right _ _)))
 
 end QuarticRealization
 
