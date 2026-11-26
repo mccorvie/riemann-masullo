@@ -69,7 +69,7 @@ verdicts. Its summary says why.
 
 | Verdict | Meaning | What happens |
 |---|---|---|
-| merge | It builds, passes the lint, leaves every existing statement as it was, and only fills in proofs and adds private lemmas in existing files. | Merged automatically, usually within minutes. |
+| merge | It builds, passes the lint, leaves every existing statement as it was, and only fills in proofs and adds private lemmas in existing files. | Read by the project, then merged; the quickest kind to read. |
 | read | It passes, but does something a person should look at: a split (new `sorry`s), a new definition or file, a public lemma, a statement. | Waits for the merger or the integrator. |
 | fail | It does not merge into `main`, build, pass the lint, or keep the existing statements. | Yours to fix; the merger usually comments with what is wrong. |
 | error | The check itself could not run. | It says nothing about your change. If it stays that way, say so on the pull request. |

@@ -46,14 +46,15 @@ Merge with `gh pr merge <n> --squash`. About once an hour give the owner three l
 merged, what is waiting on its author, what you left for the integrator.
 
 CI does part of this before you look. The `PR check` workflow computes the verdict of
-`scripts/triage_prs.sh` for every pull request, whoever sent it, and the `Auto-merge` workflow
-squash-merges the ones that come out `merge`. What the two scripts list for you is what CI left:
-`read`, `fail`, and pull requests whose check has not run yet (the workflows of a first-time
-contributor wait for the owner's approval). The verdict and its reasons are in the summary of
+`scripts/triage_prs.sh` for every pull request, whoever sent it. Since 24 November 2026 the
+`Auto-merge` workflow is disabled and nothing is merged automatically, so the pull requests that
+come out `merge` wait for your pass along with what CI holds back: `read`, `fail`, and pull
+requests whose check has not run yet (the workflows of a first-time contributor wait for the
+owner's approval). The verdict and its reasons are in the summary of
 the pull request's `PR check` run; `gh pr checks <n>` links to it. CI applies
 `scripts/proof_review.sh` and is a little stricter besides (`scripts/ci/plain_proof.py`), so the
-scripts may still merge a few that CI held back. CI never merges a pull request labelled
-`integrator`. It does not sync the issues or repair `main`: both stay yours.
+scripts may accept a few that CI held back. CI does not merge, sync the issues or repair `main`:
+all three are yours.
 
 ## Issue sync after merging
 
