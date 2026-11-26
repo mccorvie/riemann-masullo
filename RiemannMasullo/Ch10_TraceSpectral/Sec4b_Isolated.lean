@@ -1288,4 +1288,38 @@ theorem spectralStripAmbientKernel_clusters_exists_of_polynomialDensity
     spectralStripAmbientKernel_along_exists_of_geometric_bddAbove a hα hs φ χ₀ x₀ f₀ hb₀ K hd
       hK'.1 hT hK'.2.2
 
+omit ha hχ he horder hb in
+/-- Paper: Theorem 10.4.3.5(2)–(3), pp. 472–473, at width zero and an even order, for every
+test, with the zeros summed by clusters. This is
+`spectralStripAmbientKernel_clusters_exists_of_polynomialDensity` with its hypothesis on the
+density replaced by the case in which it holds: `α = 0` and `s = 2 n`
+(`intervalSobolevDensity_zero_even`). There is a choice of the unitary extensions of the
+norm-one characters such that, for every Markushevich basis realizing the strip jets of that
+choice, the zeros can be grouped into finite clusters, pairwise disjoint and covering all the
+zeros, along which the ambient tensors converge in the completed projective tensor product to a
+kernel of convolution after spectral projection, the operator of (10.4.3.45) on p. 473.
+Reconstruction: The paper does not state this.
+Deviation: Stated for one choice of the unitary extensions, the one of a norm section. -/
+theorem spectralStripAmbientKernel_clusters_exists_of_width_zero_even_order
+    (hα0 : α = 0) (n : ℕ) (hsn : s = 2 * n) :
+    ∃ χ₀ : PontryaginDual (ideleClassNorm F).ker → PontryaginDual (IdeleClassGroup (𝓞 F) F),
+      IsSpectralBasepointChoice χ₀ ∧
+      ∀ (x₀ : SpectralStripJetIndex χ₀ a α s → H(F, a, hα, hs))
+        (f₀ : SpectralStripJetIndex χ₀ a α s → StrongDual ℂ H(F, a, hα, hs)),
+        (IsSpectralMarkushevichBasis x₀ f₀ ∧ ∀ j, Dₐ (f₀ j) =
+          (spectralStripJet_memLp χ₀ hα (zero_le_one.trans hs.le) j).toLp
+            (spectralZeroJet (F := F) (χ₀ j.val.1) j.val.2.1 j.val.2.2.1 j.val.2.2.2)) →
+        ∃ (K : PontryaginDual (ideleClassNorm F).ker × ℤ → Finset zeros(F, χ₀, a, α))
+          (hd : ∀ i j, i ≠ j → Disjoint (K i) (K j)),
+          (∀ z, ∃ i, z ∈ K i) ∧
+          ∃ κ, SpectralKernelSumsTendstoAlong K hd
+              (fun z : zeros(F, χ₀, a, α) ↦ spectralStripMultiplicity α s z.val.2.1
+                (order(χ₀, a, z.val)).untop₀.toNat)
+              (fun z m ↦ (⟨(z.val.1, z.val.2.1, z.val.2.2, m.val), m.isLt⟩ :
+                SpectralStripJetIndex (F := F) χ₀ a α s))
+              (fun j ↦ Dₐ (f₀ j)) (fun j ↦ Aφ (Sₐ(x₀ j))) κ ∧
+            sobolevProjectiveKernelOperator (F := F) hα hs₀ κ = (Aφ).comp Pₐ :=
+  spectralStripAmbientKernel_clusters_exists_of_polynomialDensity (F := F) a hα hs φ n
+    fun t ↦ intervalSobolevDensity_zero_even hα0 n hsn t
+
 end RiemannMasullo.Isolated
