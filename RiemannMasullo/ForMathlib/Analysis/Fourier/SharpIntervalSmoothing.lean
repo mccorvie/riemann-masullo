@@ -4,6 +4,7 @@ public import Mathlib.Analysis.Fourier.Convolution
 public import Mathlib.MeasureTheory.Integral.DominatedConvergence
 public import Mathlib.MeasureTheory.Integral.Prod
 public import Mathlib.MeasureTheory.Measure.Lebesgue.Basic
+import Mathlib.Analysis.Distribution.SchwartzSpace.Fourier
 import Mathlib.Analysis.Calculus.BumpFunction.InnerProduct
 
 /-! # Smoothing sharp interval cutoffs
@@ -93,41 +94,116 @@ theorem exists_evenSchwartz_smoothingKernel (c : ℝ) (hc : 0 < c) :
     exact abs_le.mp h₀.le
   · simpa only [Real.norm_eq_abs, pow_one] using η.integrable_pow_mul volume 1
 
+private theorem plateau_indicator_mass {R : ℝ} (h : 0 ≤ R) :
+    (∫ x, (Icc (-R) R).indicator (fun _ : ℝ ↦ (1 : ℝ)) x) = 2 * R := by
+  rw [integral_indicator measurableSet_Icc, setIntegral_const, Measure.real, Real.volume_Icc,
+    ENNReal.toReal_ofReal (by linarith : 0 ≤ R - -R), smul_eq_mul, mul_one]
+  ring
+
+private theorem plateau_indicator_integrable (R : ℝ) :
+    Integrable ((Icc (-R) R).indicator (fun _ : ℝ ↦ (1 : ℝ))) := by
+  rw [integrable_indicator_iff measurableSet_Icc]
+  exact integrableOn_const (by simp [Real.volume_Icc])
+
+private theorem spectral_bump_energy {r R : ℝ} (hr : 0 < r) (hrR : r < R) :
+    ∃ φ : 𝓢(ℝ, ℂ), Function.Even (φ : ℝ → ℂ) ∧
+      EqOn (𝓕⁻ (φ : ℝ → ℂ)) 1 (Icc (-r) r) ∧
+      Function.support (𝓕⁻ (φ : ℝ → ℂ)) ⊆ Ioo (-R) R ∧
+      2*r ≤ (∫ x, ‖φ x‖^2) ∧ (∫ x, ‖φ x‖^2) ≤ ‖φ 0‖ ∧ ‖φ 0‖ ≤ 2*R := by
+  let b : ContDiffBump (0 : ℝ) := ⟨r, R, hr, hrR⟩
+  let g : ℝ → ℂ := fun x ↦ (b x : ℂ)
+  have hg : HasCompactSupport g := b.hasCompactSupport.comp_left Complex.ofReal_zero
+  let ψ : 𝓢(ℝ, ℂ) := hg.toSchwartzMap (Complex.ofRealCLM.contDiff.comp b.contDiff)
+  let φ : 𝓢(ℝ, ℂ) := 𝓕 ψ
+  have hi : 𝓕⁻ (φ : ℝ → ℂ) = (ψ : ℝ → ℂ) := by
+    rw [← SchwartzMap.fourierInv_coe, show 𝓕⁻ φ = ψ from FourierTransform.fourierInv_fourier_eq ψ]
+  have hone {x : ℝ} (hx : x ∈ Icc (-r) r) : b x = 1 := by
+    apply b.one_of_mem_closedBall
+    simpa [Metric.mem_closedBall, Real.dist_eq] using abs_le.mpr hx
+  have hs {x : ℝ} (hx : b x ≠ 0) : x ∈ Ioo (-R) R := by
+    change x ∈ Function.support (b : ℝ → ℝ) at hx
+    rw [b.support_eq, Metric.mem_ball, Real.dist_eq, sub_zero] at hx
+    exact abs_lt.mp hx
+  have hnorm (x : ℝ) : ‖ψ x‖ = b x := Complex.norm_of_nonneg b.nonneg
+  have he : (∫ x, ‖φ x‖^2) = ∫ x, (b x)^2 := by
+    change (∫ x, ‖𝓕 ψ x‖^2) = _
+    rw [SchwartzMap.integral_norm_sq_fourier]; simp only [hnorm]
+  have hv : ‖φ 0‖ = ∫ x, b x := by
+    have hv' : φ 0 = ∫ x, ψ x := by
+      change 𝓕 (ψ : ℝ → ℂ) 0 = _
+      rw [Real.fourier_real_eq]; simp
+    rw [hv', show (∫ x, ψ x) = ((∫ x, b x : ℝ) : ℂ) from integral_ofReal]
+    exact Complex.norm_of_nonneg (integral_nonneg fun _ ↦ b.nonneg)
+  have hb : Integrable (b : ℝ → ℝ) := b.continuous.integrable_of_hasCompactSupport b.hasCompactSupport
+  have hb2 : Integrable (fun x ↦ (b x)^2) := by
+    simpa only [hnorm] using
+      (memLp_two_iff_integrable_sq_norm ψ.continuous.aestronglyMeasurable).mp (ψ.memLp 2)
+  refine ⟨φ, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · have hneg : (ψ : ℝ → ℂ) ∘ (LinearIsometryEquiv.neg ℝ (E := ℝ)) = (ψ : ℝ → ℂ) := by
+      funext x; change (b (-x) : ℂ) = (b x : ℂ); rw [b.neg]
+    intro x
+    have h := Real.fourier_comp_linearIsometry (LinearIsometryEquiv.neg ℝ (E := ℝ)) (⇑ψ) x
+    rw [hneg] at h
+    exact h.symm
+  · rw [hi]; intro x hx; change (b x : ℂ) = 1; simp [hone hx]
+  · rw [hi]; intro x hx; exact hs fun hz ↦ hx (Complex.ofReal_eq_zero.mpr hz)
+  · rw [he, ← plateau_indicator_mass hr.le]
+    apply integral_mono (plateau_indicator_integrable r) hb2
+    intro x; by_cases hx : x ∈ Icc (-r) r <;> simp [hx, sq_nonneg, hone]
+  · rw [he, hv]; apply integral_mono hb2 hb; intro x
+    change (b x) ^ 2 ≤ b x
+    rw [pow_two]
+    exact mul_le_of_le_one_right b.nonneg b.le_one
+  · rw [hv, ← plateau_indicator_mass (hr.trans hrR).le]
+    apply integral_mono hb (plateau_indicator_integrable R)
+    intro x; by_cases hx : x ∈ Icc (-R) R
+    · simpa [hx] using (b.le_one : b x ≤ 1)
+    · have hz : b x = 0 := by_contra fun hn ↦ hx (Ioo_subset_Icc_self (hs hn))
+      simp [hx, hz]
+
+/-- The inverse-transform plateau can have squared norm as close as desired
+to the length of the band. -/
+theorem exists_evenSchwartz_fourierInv_plateau_energy {Y δ : ℝ} (hY : 0 < Y) (hδ : 0 < δ) :
+    ∃ φ : 𝓢(ℝ, ℂ), Function.Even (φ : ℝ → ℂ) ∧
+      EqOn (𝓕⁻ (φ : ℝ → ℂ)) 1 (Icc (-Y) Y) ∧
+      Function.support (𝓕⁻ (φ : ℝ → ℂ)) ⊆ Ioo (-(Y+δ)) (Y+δ) ∧
+      (∫ x, ‖φ x‖^2) ≤ 2*(Y+δ) := by
+  obtain ⟨φ, hφ, hi, hs, _, he, hv⟩ := spectral_bump_energy hY (R := Y+δ) (by linarith)
+  exact ⟨φ, hφ, hi, hs, he.trans hv⟩
+
+/-- An even, strictly band-limited Schwartz trial approaches the flat evaluation bound. -/
+theorem exists_evenSchwartz_band_trial {Y ε : ℝ} (hY : 0 < Y) (hε : 0 < ε) :
+    ∃ b : 𝓢(ℝ, ℂ), Function.Even (b : ℝ → ℂ) ∧
+      Function.support (𝓕 (b : ℝ → ℂ)) ⊆ Ioo (-Y) Y ∧
+      Y-ε < ‖b 0‖^2 / (2 * ∫ x, ‖b x‖^2) := by
+  obtain ⟨r, hr, hrY⟩ := exists_between (show max 0 (Y-ε) < Y from max_lt hY (by linarith))
+  obtain ⟨b, hb, _, hs, hl, he, _⟩ := spectral_bump_energy ((le_max_left _ _).trans_lt hr) hrY
+  refine ⟨b, hb, ?_, ?_⟩
+  · intro x hx
+    have hx' : -x ∈ Function.support (𝓕⁻ (b : ℝ → ℂ)) := by
+      simpa [Function.mem_support, Real.fourierInv_eq_fourier_neg] using hx
+    obtain ⟨h₁,h₂⟩ := hs hx'; exact ⟨by linarith, by linarith⟩
+  · have hr0 := (le_max_left _ _).trans_lt hr
+    have hrε := (le_max_right _ _).trans_lt hr
+    have hp : 0 < ∫ x, ‖b x‖^2 := by linarith
+    apply lt_of_lt_of_le hrε
+    apply (le_div_iff₀ (by positivity)).2
+    calc r * (2 * ∫ x, ‖b x‖^2) = (2*r) * (∫ x, ‖b x‖^2) := by ring
+         _ ≤ ‖b 0‖ * ‖b 0‖ := mul_le_mul (hl.trans he) he hp.le (norm_nonneg _)
+         _ = _ := (sq _).symm
+
 /-- An even Schwartz function whose inverse transform equals one on the closed
 band and vanishes off a prescribed positive enlargement. -/
 theorem exists_evenSchwartz_fourierInv_plateau (Y δ : ℝ) (hY : 0 ≤ Y) (hδ : 0 < δ) :
     ∃ φ : 𝓢(ℝ, ℂ), Function.Even (φ : ℝ → ℂ) ∧
       EqOn (𝓕⁻ (φ : ℝ → ℂ)) 1 (Icc (-Y) Y) ∧
       Function.support (𝓕⁻ (φ : ℝ → ℂ)) ⊆ Icc (-(Y + δ)) (Y + δ) := by
-  let b : ContDiffBump (0 : ℝ) := ⟨Y + δ / 2, Y + δ, by positivity, by linarith⟩
-  let g : ℝ → ℂ := fun x ↦ (b x : ℂ)
-  have hg : HasCompactSupport g := b.hasCompactSupport.comp_left Complex.ofReal_zero
-  let ψ : 𝓢(ℝ, ℂ) := hg.toSchwartzMap (Complex.ofRealCLM.contDiff.comp b.contDiff)
-  let φ : 𝓢(ℝ, ℂ) := 𝓕 ψ
-  have hinv : 𝓕⁻ (φ : ℝ → ℂ) = (ψ : ℝ → ℂ) := by
-    rw [← SchwartzMap.fourierInv_coe, show 𝓕⁻ φ = ψ from FourierTransform.fourierInv_fourier_eq ψ]
-  refine ⟨φ, ?_, ?_, ?_⟩
-  · have he : (ψ : ℝ → ℂ) ∘ (LinearIsometryEquiv.neg ℝ (E := ℝ)) = (ψ : ℝ → ℂ) := by
-      funext x
-      change (b (-x) : ℂ) = (b x : ℂ)
-      rw [b.neg]
-    intro x
-    have h := Real.fourier_comp_linearIsometry (LinearIsometryEquiv.neg ℝ (E := ℝ)) (⇑ψ) x
-    rw [he] at h
-    change 𝓕 (⇑ψ) (-x) = 𝓕 (⇑ψ) x
-    exact h.symm
-  · rw [hinv]
+  obtain ⟨φ, hφ, hone, hs, _, _, _⟩ :=
+    spectral_bump_energy (r := Y + δ / 2) (R := Y + δ) (by linarith) (by linarith)
+  have hbands : Icc (-Y) Y ⊆ Icc (-(Y + δ / 2)) (Y + δ / 2) := by
     intro x hx
-    change (b x : ℂ) = 1
-    rw [b.one_of_mem_closedBall, Complex.ofReal_one]
-    rw [Metric.mem_closedBall, Real.dist_eq, sub_zero]
-    change |x| ≤ Y + δ / 2
-    exact (abs_le.mpr hx).trans (by linarith)
-  · rw [hinv]
-    intro x hx
-    have hb : x ∈ Function.support (b : ℝ → ℝ) := fun hz ↦ hx (Complex.ofReal_eq_zero.mpr hz)
-    rw [b.support_eq, Metric.mem_ball, Real.dist_eq, sub_zero] at hb
-    exact abs_le.mp hb.le
+    exact ⟨by linarith [hx.1], by linarith [hx.2]⟩
+  exact ⟨φ, hφ, hone.mono hbands, hs.trans Ioo_subset_Icc_self⟩
 
 private theorem measurable_sharpIntervalMask (L : ℝ) : Measurable (sharpIntervalMask L) :=
   measurable_const.indicator measurableSet_Icc
