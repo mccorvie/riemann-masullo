@@ -262,7 +262,7 @@ section BlockSums
 
 /-- A block-diagonal operator commutes with every finite sum of whole coordinate-block
 projections. A copy of the private `spectralStripAmbientKernel_tendsto_blocks` of `Sec4b`. -/
-private theorem spectralBlockSums_comm {E J Z : Type*}
+theorem spectralBlockSums_comm {E J Z : Type*}
     [NormedAddCommGroup E] [NormedSpace ℂ E]
     (x : J → E) (f : J → StrongDual ℂ E) (hb : IsSpectralMarkushevichBasis x f)
     (N : Z → ℕ) (j : (z : Z) → Fin (N z) → J)

@@ -200,7 +200,7 @@ private theorem opNorm_le_traceNorm (T : nuclearEndomorphisms H) : ‖T.val‖ �
 quotient kernel tensors, and that limit is the kernel of the operator. On algebraic tensors the
 projective norm is the trace norm of the finite-rank operator
 (`exists_projectiveTensorCompletion_traceClassIsometry`). -/
-private theorem exists_kernel_limit_of_traceNorm_tendsto {J ι : Type*} {Z : Type u}
+theorem exists_kernel_limit_of_traceNorm_tendsto {J ι : Type*} {Z : Type u}
     (A : H →L[ℂ] H) (x : J → H) (f : J → StrongDual ℂ H) (N : Z → ℕ)
     (jet : (z : Z) → Fin (N z) → J)
     (K : ι → Finset Z) (hd : ∀ i j, i ≠ j → Disjoint (K i) (K j))

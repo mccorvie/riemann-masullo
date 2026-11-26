@@ -113,7 +113,7 @@ def SpectralClusterSumsTraceTendsto {J : Type*} {Z : Type u} (A : H →L[ℂ] H)
 trace norms and sum to the operator in operator norm, then the finite sections over finite
 unions of clusters converge to the operator in trace norm: the remainder is nuclear, and its
 trace norm is at most the sum of the trace norms of the clusters left out. -/
-private theorem spectralConvolutionFiniteSum_clusters_traceNorm_tendsto {J Z ι : Type*}
+theorem spectralConvolutionFiniteSum_clusters_traceNorm_tendsto {J Z ι : Type*}
     (A : H →L[ℂ] H) (x : J → H) (Λ : J → StrongDual ℂ H)
     (N : Z → ℕ) (jet : (z : Z) → Fin (N z) → J)
     (K : ι → Finset Z) (hdisj : ∀ i j, i ≠ j → Disjoint (K i) (K j))
