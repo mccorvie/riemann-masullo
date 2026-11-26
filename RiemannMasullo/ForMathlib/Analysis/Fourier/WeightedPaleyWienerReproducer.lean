@@ -61,18 +61,14 @@ private theorem exists_reciprocalPacket {X : Type*} [MeasurableSpace X] {μ : Me
       show star (w t : ℂ) = (w t : ℂ) from Complex.conj_ofReal _, Complex.real_smul]
     field_simp [hne]
 
-/-- Lebesgue specialization to the translate `k(t) = φ(t-x)`. The lower bound on the
-weight makes the reciprocal energy finite for every `L²` window. -/
-private theorem exists_weightedPWReciprocalPacket {w : ℝ → ℝ} (hw : Measurable w)
-    (hw1 : ∀ t, 1 ≤ w t) {φ : ℝ → ℂ} (hφ : MemLp φ 2 volume) (x : ℝ) :
+/-- A density at least one makes every ordinary L² kernel finite in reciprocal energy. -/
+private theorem exists_L2_reciprocalPacket {w : ℝ → ℝ} (hw : Measurable w)
+    (hw1 : ∀ t, 1 ≤ w t) {k : ℝ → ℂ} (hk : MemLp k 2 volume) :
     ∃ r : Lp ℂ 2 (volume.withDensity fun t ↦ ENNReal.ofReal (w t)),
-      (∀ᵐ t ∂volume, r t = star (φ (t-x)) / (w t : ℂ)) ∧
-      ‖r‖ ^ 2 = (∫ t, ‖φ (t-x)‖ ^ 2 / w t) ∧
+      (∀ᵐ t ∂volume, r t = star (k t) / (w t : ℂ)) ∧
+      ‖r‖ ^ 2 = (∫ t, ‖k t‖ ^ 2 / w t) ∧
       ∀ f : Lp ℂ 2 (volume.withDensity fun t ↦ ENNReal.ofReal (w t)),
-        inner ℂ r f = ∫ t, f t * φ (t-x) := by
-  have hk : MemLp (fun t ↦ φ (t-x)) 2 volume := by
-    simpa only [Function.comp_def, sub_eq_add_neg] using
-      hφ.comp_measurePreserving (measurePreserving_add_right volume (-x))
+        inner ℂ r f = ∫ t, f t * k t := by
   apply exists_reciprocalPacket hw (fun t ↦ zero_lt_one.trans_le (hw1 t)) hk.aestronglyMeasurable
   refine ((memLp_two_iff_integrable_sq_norm hk.aestronglyMeasurable).1 hk).mono'
     ((hk.aestronglyMeasurable.norm.pow 2).div₀ hw.aestronglyMeasurable) ?_
@@ -116,7 +112,49 @@ theorem exists_evaluationVector_eq_projected_reproducer (Y x : ℝ) {w : ℝ →
       (∀ᵐ t ∂volume, r t = star (φ (t - x)) / (w t : ℂ)) ∧
       evaluationVector Y hμ x = (space Y hμ).orthogonalProjectionOnto r ∧
       ‖r‖ ^ 2 = (∫ t, ‖φ (t - x)‖ ^ 2 / w t) := by
-  obtain ⟨r, hr, hn, hp⟩ := exists_weightedPWReciprocalPacket hw hw₁ hφ₂ x
+  have hk : MemLp (fun t ↦ φ (t - x)) 2 volume := by
+    simpa only [Function.comp_def, sub_eq_add_neg] using
+      hφ₂.comp_measurePreserving (measurePreserving_add_right volume (-x))
+  obtain ⟨r, hr, hn, hp⟩ := exists_L2_reciprocalPacket hw hw₁ hk
   exact ⟨r, hr, evaluationVector_eq_projected_reproducer Y x hμ hφ hone r hp, hn⟩
+
+/-- In the even band the evaluation vector is the projection of the average
+of the two reciprocal-density packets centered at `x` and `−x`. -/
+theorem exists_evaluationVector_eq_projected_twoPackets (Y x : ℝ) {w : ℝ → ℝ}
+    (hw : Measurable w) (hw₁ : ∀ t, 1 ≤ w t)
+    (hμ : volume ≤ volume.withDensity (fun t ↦ ENNReal.ofReal (w t)))
+    {φ : ℝ → ℂ} (hφ : Integrable φ) (hφ₂ : MemLp φ 2 volume)
+    (hone : EqOn (𝓕⁻ φ) 1 (Icc (-Y) Y)) :
+    ∃ r : Lp ℂ 2 (volume.withDensity fun t ↦ ENNReal.ofReal (w t)),
+      (∀ᵐ t ∂volume, r t = star ((2 : ℂ)⁻¹ * (φ (t - x) + φ (t + x))) / (w t : ℂ)) ∧
+      evaluationVector Y hμ x = (space Y hμ).orthogonalProjectionOnto r ∧
+      ‖r‖ ^ 2 = (∫ t, ‖(2 : ℂ)⁻¹ * (φ (t - x) + φ (t + x))‖ ^ 2 / w t) := by
+  obtain ⟨p, hp, hpx, _⟩ := exists_evaluationVector_eq_projected_reproducer Y x hw hw₁ hμ hφ hφ₂ hone
+  obtain ⟨q, hq, hqx, _⟩ := exists_evaluationVector_eq_projected_reproducer Y (-x) hw hw₁ hμ hφ hφ₂ hone
+  let k (t : ℝ) := (2 : ℂ)⁻¹ * (φ (t - x) + φ (t + x))
+  have hk₁ : MemLp (fun t ↦ φ (t - x)) 2 volume := by
+    simpa only [Function.comp_def, sub_eq_add_neg] using
+      hφ₂.comp_measurePreserving (measurePreserving_add_right volume (-x))
+  have hk₂ : MemLp (fun t ↦ φ (t + x)) 2 volume :=
+    hφ₂.comp_measurePreserving (measurePreserving_add_right volume x)
+  have hk : MemLp k 2 volume := (hk₁.add hk₂).const_smul ((2 : ℂ)⁻¹)
+  obtain ⟨r, hr, hrn, _⟩ := exists_L2_reciprocalPacket hw hw₁ hk
+  refine ⟨r, hr, ?_, hrn⟩
+  have heq : r = (2 : ℂ)⁻¹ • (p + q) := by
+    apply Lp.ext
+    have hac := withDensity_absolutelyContinuous (volume : Measure ℝ) (fun t ↦ ENNReal.ofReal (w t))
+    filter_upwards [hac.ae_eq hr, hac.ae_eq hp, hac.ae_eq hq, Lp.coeFn_add p q,
+      Lp.coeFn_smul ((2 : ℂ)⁻¹) (p + q)] with t hrt hpt hqt hadd hsmul
+    rw [hrt, hsmul]
+    change star (k t) / (w t : ℂ) = (2 : ℂ)⁻¹ * (p + q) t
+    rw [hadd]
+    change star (k t) / (w t : ℂ) = (2 : ℂ)⁻¹ * (p t + q t)
+    rw [hpt, hqt, sub_neg_eq_add]
+    dsimp only [k]
+    rw [star_mul, star_add, show star ((2 : ℂ)⁻¹) = (2 : ℂ)⁻¹ by simp]
+    simp only [div_eq_mul_inv]
+    ring
+  rw [heq, map_smul, map_add, ← hpx, ← hqx, evaluationVector_even, ← two_smul ℂ, smul_smul]
+  simp
 
 end RiemannMasullo.RealPWBand
