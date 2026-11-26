@@ -94,7 +94,7 @@ private theorem castHom_resMod {m d : ℕ} [NeZero m] [NeZero d] (hd : d ∣ m) 
   exact cast_redP hle _
 
 /-- **The idelic character is compatible with change of level.** -/
-private theorem ideleChar_changeLevel {m d : ℕ} [NeZero m] [NeZero d] (hd : d ∣ m)
+theorem ideleChar_changeLevel {m d : ℕ} [NeZero m] [NeZero d] (hd : d ∣ m)
     (χ : DirichletCharacter ℂ d) :
     ideleChar m (DirichletCharacter.changeLevel hd χ) = ideleChar d χ := by
   ext x
@@ -111,7 +111,7 @@ private theorem ideleChar_changeLevel {m d : ℕ} [NeZero m] [NeZero d] (hd : d 
 local notation "Cℚ" => IdeleClassGroup (𝓞 ℚ) ℚ
 
 /-- The residue map hits every unit modulo `N`. -/
-private theorem resMod_toHomUnits_surjective (N : ℕ) [NeZero N] :
+theorem resMod_toHomUnits_surjective (N : ℕ) [NeZero N] :
     Function.Surjective (resMod N).toHomUnits := by
   intro a
   let n := (a.val : ZMod N).val
@@ -533,6 +533,26 @@ private theorem exists_level_of_trivial_on_section (τ : ℝ≥0ˣ →ₜ* Cℚ)
   calc ψ (QuotientGroup.mk x) = ψ (e th) := by rw [hth, e.apply_symm_apply]
     _ = ψ (e (th.1, 1)) * ψ (e (1, th.2)) := by rw [hsplit, map_mul]
     _ = 1 := by rw [hreal, hfinite _ hloc, one_mul]
+
+/-- A rational Hecke character trivial on a continuous norm section has finite
+order. Its residue level gives a common exponent on every idele class. -/
+theorem isOfFinOrder_rat_of_trivial_on_normSection (τ : ℝ≥0ˣ →ₜ* Cℚ)
+    (hτ : Function.RightInverse τ (ideleClassNorm ℚ)) (ψ : PontryaginDual Cℚ)
+    (hψ : ∀ t : ℝ≥0ˣ, ψ (τ t) = 1) : IsOfFinOrder ψ := by
+  obtain ⟨N, inst, hk⟩ := exists_level_of_trivial_on_section τ hτ ψ hψ
+  let n := Fintype.card (ZMod N)ˣ
+  apply isOfFinOrder_iff_pow_eq_one.mpr
+  refine ⟨n, Fintype.card_pos, ?_⟩
+  ext1 g
+  obtain ⟨x, rfl⟩ := QuotientGroup.mk'_surjective _ g
+  change (ψ ^ n) ((QuotientGroup.mk' _) x) = (1 : Circle)
+  calc
+    _ = (ψ ((QuotientGroup.mk' _) x)) ^ n := ContinuousMonoidHom.pow_apply ψ n _
+    _ = ψ ((QuotientGroup.mk' _) (x ^ n)) := by rw [map_pow, map_pow]
+    _ = 1 := hk _ ?_
+  have hu := congrArg Units.val (pow_card_eq_one : ((resMod N).toHomUnits x) ^ n = 1)
+  rw [map_pow]
+  exact hu
 
 /-- A unitary character of the rational idele class group that is trivial on a norm section
 comes from a primitive Dirichlet character with the same finite L-function on `Re s > 1`. -/

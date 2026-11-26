@@ -27,11 +27,12 @@ open scoped Topology BigOperators Asymptotics ComplexConjugate
 public noncomputable section
 namespace RiemannMasullo
 
-private theorem dirichletZero_partial_sum_bound {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) (hχ : χ ≠ 1) (n : ℕ) :
-    ‖∑ j ∈ Finset.Icc 1 n, χ (j : ZMod q)‖ ≤ (q : ℝ) / 2 := by
+/-- The partial sums of a nonprincipal Dirichlet character have period its level. -/
+theorem dirichletCharacter_partial_sum_mod {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) (hχ : χ ≠ 1) (n : ℕ) :
+    (∑ j ∈ Finset.Icc 1 n, χ (j : ZMod q)) = ∑ j ∈ Finset.Icc 1 (n%q), χ (j : ZMod q) := by
   let a (j : ℕ) := χ ((j : ZMod q) + 1)
   let S (n : ℕ) := ∑ j ∈ Finset.range n, a j
-  have hs : ∑ j ∈ Finset.Icc 1 n, χ (j : ZMod q) = S n := by
+  have hs (n : ℕ) : ∑ j ∈ Finset.Icc 1 n, χ (j : ZMod q) = S n := by
     rw [← Finset.Ico_succ_right_eq_Icc, Finset.sum_Ico_eq_sum_range]
     simp [S, a, add_comm]
   have hq : S q = 0 := by
@@ -57,6 +58,19 @@ private theorem dirichletZero_partial_sum_bound {q : ℕ} [NeZero q] (χ : Diric
     have h := (hper.nat_mul (n / q)) r
     change S (r + n / q * q) = S r at h
     rwa [show r + n / q * q = n by rw [Nat.mul_comm (n / q) q]; exact Nat.mod_add_div n q] at h
+  exact (hs n).trans (hSr.trans (hs r).symm)
+
+private theorem dirichletZero_partial_sum_bound {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) (hχ : χ ≠ 1) (n : ℕ) :
+    ‖∑ j ∈ Finset.Icc 1 n, χ (j : ZMod q)‖ ≤ (q : ℝ) / 2 := by
+  let a (j : ℕ) := χ ((j : ZMod q) + 1)
+  let S (n : ℕ) := ∑ j ∈ Finset.range n, a j
+  have hs (n : ℕ) : ∑ j ∈ Finset.Icc 1 n, χ (j : ZMod q) = S n := by
+    rw [← Finset.Ico_succ_right_eq_Icc, Finset.sum_Ico_eq_sum_range]
+    simp [S, a, add_comm]
+  have hq : S q = 0 := by rw [← hs, dirichletCharacter_partial_sum_mod χ hχ q]; simp
+  let r := n % q
+  have hr : r < q := Nat.mod_lt _ (NeZero.pos q)
+  have hSr : S n = S r := (hs n).symm.trans ((dirichletCharacter_partial_sum_mod χ hχ n).trans (hs r))
   have hbd (t l : ℕ) : ‖∑ j ∈ Finset.range l, a (t + j)‖ ≤ (l : ℝ) := by
     exact (norm_sum_le _ _).trans ((Finset.sum_le_sum (fun i _ ↦ χ.norm_le_one _)).trans_eq (by simp))
   have hleft : ‖S r‖ ≤ (r : ℝ) := by simpa [S] using hbd 0 r
@@ -67,13 +81,15 @@ private theorem dirichletZero_partial_sum_bound {q : ℕ} [NeZero q] (χ : Diric
       conv_rhs => rw [← Nat.add_sub_of_le hr.le, Finset.sum_range_add]
     rw [eq_neg_of_add_eq_zero_left hsum, norm_neg]
     exact hbd _ _
-  rw [hs, hSr]
+  rw [hs n, hSr]
   rw [Nat.cast_sub hr.le] at hright
   linarith
 
-private theorem dirichletZero_abel_bound {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) (hχ : χ ≠ 1) {B : ℝ}
+/-- Abel summation gives the integral of the partial character sums throughout
+  the open right half-plane for every nonprincipal character. -/
+theorem dirichletLFunction_eq_abelIntegral {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) (hχ : χ ≠ 1) {B : ℝ}
     (hB : ∀ n : ℕ, ‖∑ j ∈ Finset.Icc 1 n, χ (j : ZMod q)‖ ≤ B)
-    {s : ℂ} (hs : 0 < s.re) : ‖χ.LFunction s / s‖ ≤ B / s.re := by
+    {s : ℂ} (hs : 0 < s.re) : χ.LFunction s = s * ∫ x in Ioi (1 : ℝ), (∑ j ∈ Finset.Icc 1 ⌊x⌋₊, χ (j : ZMod q)) * (x : ℂ)^(-(s+1)) := by
   let P (n : ℕ) := ∑ j ∈ Finset.Icc 1 n, χ (j : ZMod q)
   let A : ℝ → ℂ := (Ioi 1).indicator (fun x : ℝ ↦ P ⌊x⌋₊)
   have hB₀ : 0 ≤ B := (norm_nonneg _).trans (hB 0)
@@ -124,8 +140,14 @@ private theorem dirichletZero_abel_bound {q : ℕ} [NeZero q] (χ : DirichletCha
     fun z _ ↦ (DirichletCharacter.differentiable_LFunction hχ).analyticAt z
   have hall := hLa.eqOn_of_preconnected_of_eventuallyEq
     hGa (convex_halfSpace_re_gt 0).isPreconnected (by norm_num : (2 : ℂ) ∈ {z : ℂ | 0 < z.re}) hEq
+  exact (hall hs).trans (congrArg (s * ·) (hI s))
+
+private theorem dirichletZero_abel_bound {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) (hχ : χ ≠ 1) {B : ℝ}
+    (hB : ∀ n : ℕ, ‖∑ j ∈ Finset.Icc 1 n, χ (j : ZMod q)‖ ≤ B)
+    {s : ℂ} (hs : 0 < s.re) : ‖χ.LFunction s / s‖ ≤ B / s.re := by
+  let P (n : ℕ) := ∑ j ∈ Finset.Icc 1 n, χ (j : ZMod q)
   have hz : s ≠ 0 := fun e ↦ by simp [e] at hs
-  rw [hall hs, show G s / s = mellin A (-s) by dsimp [G]; field_simp, hI]
+  rw [dirichletLFunction_eq_abelIntegral χ hχ hB hs, mul_div_cancel_left₀ _ hz]
   have hi := integrableOn_Ioi_rpow_of_lt (by linarith : -(s.re + 1) < -1) zero_lt_one
   calc
     _ ≤ ∫ x in Ioi (1 : ℝ), ‖P ⌊x⌋₊ * (x : ℂ) ^ (-(s + 1))‖ := norm_integral_le_integral_norm _
@@ -146,76 +168,77 @@ private theorem dirichletZero_abel_bound {q : ℕ} [NeZero q] (χ : DirichletCha
       simp
       ring
 
-private theorem dirichletZero_norm_sq_sub (c s : ℂ) :
-    ‖s + conj c - 1‖ ^ 2 - ‖s - c‖ ^ 2 = (2 * s.re - 1) * (2 * c.re - 1) := by
+private theorem dirichletZero_norm_sq_sub (u : ℝ) (c s : ℂ) :
+    ‖s + conj c - u‖ ^ 2 - ‖s - c‖ ^ 2 = (2 * s.re - u) * (2 * c.re - u) := by
   simp only [Complex.sq_norm, Complex.normSq_apply, Complex.sub_re, Complex.add_re, Complex.conj_re,
-    Complex.one_re, Complex.sub_im, Complex.add_im, Complex.conj_im, Complex.one_im]
+    Complex.ofReal_re, Complex.sub_im, Complex.add_im, Complex.conj_im, Complex.ofReal_im]
   ring
 
-private theorem dirichletZero_disk_chart (c : ℂ) (hc : 1 / 2 < c.re) :
-    let a (s : ℂ) := (s - c) / (s + conj c - 1)
-    let D (z : ℂ) := (c + conj c - 1) / (1 - z) - (conj c - 1)
-    D 0 = c ∧ (∀ z ∈ ball (0 : ℂ) 1, 1/2 < (D z).re ∧ AnalyticAt ℂ D z ∧ deriv D z ≠ 0) ∧
-      ∀ s : ℂ, 1/2 < s.re → ‖a s‖ < 1 ∧ D (a s) = s := by
+private theorem dirichletZero_disk_chart (u : ℝ) (c : ℂ) (hc : u / 2 < c.re) :
+    let a (s : ℂ) := (s - c) / (s + conj c - u)
+    let D (z : ℂ) := (c + conj c - u) / (1 - z) - (conj c - u)
+    D 0 = c ∧ (∀ z ∈ ball (0 : ℂ) 1, u/2 < (D z).re ∧ AnalyticAt ℂ D z ∧ deriv D z ≠ 0) ∧
+      ∀ s : ℂ, u/2 < s.re → ‖a s‖ < 1 ∧ D (a s) = s := by
   intro a D
-  have hn : c + conj c - 1 ≠ 0 := by
+  have hn : c + conj c - u ≠ 0 := by
     intro h
     have hh := congrArg Complex.re h
-    simp only [Complex.sub_re, Complex.add_re, Complex.conj_re, Complex.one_re, Complex.zero_re] at hh
+    simp only [Complex.sub_re, Complex.add_re, Complex.conj_re, Complex.ofReal_re, Complex.zero_re] at hh
     linarith
   refine ⟨by dsimp [D]; ring, ?_, ?_⟩
   · intro z hzb
     have hz := mem_ball_zero_iff.mp hzb
     have hnz : 1 - z ≠ 0 := sub_ne_zero.mpr fun h ↦ by simp [← h] at hz
-    have hden : D z + conj c - 1 = (c + conj c - 1) / (1 - z) := by dsimp [D]; ring
-    have hnum : D z - c = z * (D z + conj c - 1) := by
+    have hden : D z + conj c - u = (c + conj c - u) / (1 - z) := by dsimp [D]; ring
+    have hnum : D z - c = z * (D z + conj c - u) := by
       rw [hden]; dsimp only [D]; field_simp; ring
-    have hnd : 0 < ‖D z + conj c - 1‖ := norm_pos_iff.mpr (hden ▸ div_ne_zero hn hnz)
-    have hlt : ‖D z - c‖ < ‖D z + conj c - 1‖ := by
+    have hnd : 0 < ‖D z + conj c - u‖ := norm_pos_iff.mpr (hden ▸ div_ne_zero hn hnz)
+    have hlt : ‖D z - c‖ < ‖D z + conj c - u‖ := by
       rw [hnum, norm_mul]; exact mul_lt_of_lt_one_left hnd hz
-    have hpos : 0 < (2 * (D z).re - 1) * (2 * c.re - 1) := by
+    have hpos : 0 < (2 * (D z).re - u) * (2 * c.re - u) := by
       rw [← dirichletZero_norm_sq_sub]
       exact sub_pos.mpr (pow_lt_pow_left₀ hlt (norm_nonneg _) (by decide))
-    have hder := ((hasDerivAt_const z (c + conj c - 1)).div
-      ((hasDerivAt_const z (1 : ℂ)).sub (hasDerivAt_id z)) hnz).sub_const (conj c - 1)
-    refine ⟨by nlinarith [pos_of_mul_pos_left hpos (by linarith : 0 ≤ 2 * c.re - 1)], ?_, ?_⟩
+    have hder := ((hasDerivAt_const z (c + conj c - u)).div
+      ((hasDerivAt_const z (1 : ℂ)).sub (hasDerivAt_id z)) hnz).sub_const (conj c - u)
+    refine ⟨by nlinarith [pos_of_mul_pos_left hpos (by linarith : 0 ≤ 2 * c.re - u)], ?_, ?_⟩
     · dsimp only [D]; fun_prop (disch := assumption)
-    · have hd : deriv D z = (c + conj c - 1) / (1 - z) ^ 2 := by
+    · have hd : deriv D z = (c + conj c - u) / (1 - z) ^ 2 := by
         simpa only [D, Pi.div_apply, Pi.sub_apply, id_eq, zero_mul, zero_sub, mul_neg, mul_one, neg_neg] using hder.deriv
       rw [hd]
       exact div_ne_zero hn (pow_ne_zero _ hnz)
   · intro s hs
-    have hden : s + conj c - 1 ≠ 0 := by
+    have hden : s + conj c - u ≠ 0 := by
       intro h
       have hh := congrArg Complex.re h
-      simp only [Complex.sub_re, Complex.add_re, Complex.conj_re, Complex.one_re, Complex.zero_re] at hh
+      simp only [Complex.sub_re, Complex.add_re, Complex.conj_re, Complex.ofReal_re, Complex.zero_re] at hh
       linarith
     have ha : ‖a s‖ < 1 := by
-      rw [show ‖a s‖ = ‖s - c‖ / ‖s + conj c - 1‖ from norm_div .., div_lt_one (norm_pos_iff.mpr hden)]
-      nlinarith [dirichletZero_norm_sq_sub c s, mul_pos (by linarith : 0 < 2 * s.re - 1) (by linarith : 0 < 2 * c.re - 1),
-        norm_nonneg (s + conj c - 1), norm_nonneg (s - c)]
-    have he : 1 - a s = (c + conj c - 1) / (s + conj c - 1) := by dsimp [a]; field_simp; ring
+      rw [show ‖a s‖ = ‖s - c‖ / ‖s + conj c - u‖ from norm_div .., div_lt_one (norm_pos_iff.mpr hden)]
+      nlinarith [dirichletZero_norm_sq_sub u c s, mul_pos (by linarith : 0 < 2 * s.re - u) (by linarith : 0 < 2 * c.re - u),
+        norm_nonneg (s + conj c - u), norm_nonneg (s - c)]
+    have he : 1 - a s = (c + conj c - u) / (s + conj c - u) := by dsimp [a]; field_simp; ring
     refine ⟨ha, ?_⟩
     dsimp only [D]
     rw [he]
     field_simp
     ring
 
-/-- Every finite set of zeros to the right of the critical line bounds the normalized
-L-value at an interior anchor. Each zero contributes its full analytic multiplicity. -/
-theorem dirichletLFunction_finite_zero_product {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) (hχ : χ ≠ 1)
+/-- The finite Blaschke product on the half-plane of real part greater than
+`u/2` bounds the normalized L-value at an interior anchor. Every zero
+contributes its full analytic multiplicity. -/
+theorem dirichletLFunction_finite_zero_product_of_boundary {u : ℝ} (hu : 0 < u) {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) (hχ : χ ≠ 1)
     {B : ℝ} (hB : ∀ n : ℕ, ‖∑ j ∈ Finset.Icc 1 n, χ (j : ZMod q)‖ ≤ B)
-    (c : ℂ) (hc : 1 / 2 < c.re) (hv : χ.LFunction c ≠ 0)
-    (S : Finset {ρ : ℂ // 1 / 2 < ρ.re ∧ χ.LFunction ρ = 0}) :
-    ‖χ.LFunction c / c‖ ≤ (2 * B) * ∏ ρ ∈ S,
-      (‖ρ.val - c‖ / ‖ρ.val + conj c - 1‖) ^ analyticOrderNatAt χ.LFunction ρ.val := by
-  let Z := {ρ : ℂ // 1 / 2 < ρ.re ∧ χ.LFunction ρ = 0}
-  let a (s : ℂ) := (s - c) / (s + conj c - 1)
-  let D (z : ℂ) := (c + conj c - 1) / (1 - z) - (conj c - 1)
-  have ⟨h0, hD, ha⟩ := dirichletZero_disk_chart c hc
+    (c : ℂ) (hc : u / 2 < c.re) (hv : χ.LFunction c ≠ 0)
+    (S : Finset {ρ : ℂ // u / 2 < ρ.re ∧ χ.LFunction ρ = 0}) :
+    ‖χ.LFunction c / c‖ ≤ (2 * B / u) * ∏ ρ ∈ S,
+      (‖ρ.val - c‖ / ‖ρ.val + conj c - u‖) ^ analyticOrderNatAt χ.LFunction ρ.val := by
+  let Z := {ρ : ℂ // u / 2 < ρ.re ∧ χ.LFunction ρ = 0}
+  let a (s : ℂ) := (s - c) / (s + conj c - u)
+  let D (z : ℂ) := (c + conj c - u) / (1 - z) - (conj c - u)
+  have ⟨h0, hD, ha⟩ := dirichletZero_disk_chart u c hc
   change D 0 = c at h0
-  change ∀ z ∈ ball (0 : ℂ) 1, 1/2 < (D z).re ∧ AnalyticAt ℂ D z ∧ deriv D z ≠ 0 at hD
-  change ∀ s : ℂ, 1/2 < s.re → ‖a s‖ < 1 ∧ D (a s) = s at ha
+  change ∀ z ∈ ball (0 : ℂ) 1, u/2 < (D z).re ∧ AnalyticAt ℂ D z ∧ deriv D z ≠ 0 at hD
+  change ∀ s : ℂ, u/2 < s.re → ‖a s‖ < 1 ∧ D (a s) = s at ha
   let α (ρ : Z) := a ρ.val
   let m (ρ : Z) := analyticOrderNatAt χ.LFunction ρ.val
   have he (ρ : Z) : D (α ρ) = ρ.val := (ha _ ρ.property.1).2
@@ -245,12 +268,12 @@ theorem dirichletLFunction_finite_zero_product {q : ℕ} [NeZero q] (χ : Dirich
     change (m ρ : ℕ∞) ≤ analyticOrderAt (fun i ↦ (χ.LFunction ∘ D) i * D⁻¹ i) (α ρ)
     rw [hmul, hunit, add_zero, hc', he]
     exact ENat.natCast_toNat_le_self _
-  have hgb (z : ℂ) (h : z ∈ ball (0 : ℂ) 1) : ‖G z‖ ≤ 2 * B := by
+  have hgb (z : ℂ) (h : z ∈ ball (0 : ℂ) 1) : ‖G z‖ ≤ 2 * B / u := by
     have hr := (hD _ h).1
     have hB₀ := (norm_nonneg _).trans (hB 0)
     apply (dirichletZero_abel_bound χ hχ hB (by linarith : 0 < (D z).re)).trans
-    rw [div_le_iff₀ (by linarith)]
-    nlinarith [mul_nonneg hB₀ (by linarith : 0 ≤ 2 * (D z).re - 1)]
+    rw [div_le_div_iff₀ (by linarith) hu]
+    nlinarith [mul_nonneg hB₀ (by linarith : 0 ≤ 2 * (D z).re - u)]
   obtain ⟨N, -, hbN, hfac⟩ := Blaschke.exists_bounded_finite_blaschke_quotient α m S
     (fun i j hij ↦ Subtype.ext ((he i).symm.trans ((congrArg D hij).trans (he j)))) hz hmem
     G hG (fun ρ _ ↦ horder ρ) _ hgb
@@ -260,28 +283,28 @@ theorem dirichletLFunction_finite_zero_product {q : ℕ} [NeZero q] (χ : Dirich
   calc
     ‖χ.LFunction c / c‖ = ‖G 0‖ := by simp only [G, h0]
     _ = (∏ i ∈ S, ‖α i‖ ^ m i) * ‖N 0‖ := hbase.symm
-    _ ≤ (∏ i ∈ S, ‖α i‖ ^ m i) * (2 * B) := mul_le_mul_of_nonneg_left (hbN _ (by simp)) (by positivity)
+    _ ≤ (∏ i ∈ S, ‖α i‖ ^ m i) * (2 * B / u) := mul_le_mul_of_nonneg_left (hbN _ (by simp)) (by positivity)
     _ = _ := by simp only [α, a, m, norm_div]; ring
 
-/-- For a nonprincipal character, the displacements of the zeros to the right of the critical
-line, weighted by the half-plane kernel at any interior nonzero L-value, have bounded sum. -/
-theorem dirichletLFunction_right_zero_displacement {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) (hχ : χ ≠ 1)
-    (c : ℂ) (hc : 1 / 2 < c.re) (hv : χ.LFunction c ≠ 0) :
-    let Z := {ρ : ℂ // 1 / 2 < ρ.re ∧ χ.LFunction ρ = 0}
+/-- The half-plane displacement estimate with any positive boundary
+`u/2`, weighted by the kernel based at an interior nonzero L-value. -/
+theorem dirichletLFunction_zero_displacement_of_boundary {u : ℝ} (hu : 0 < u) {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) (hχ : χ ≠ 1)
+    (c : ℂ) (hc : u / 2 < c.re) (hv : χ.LFunction c ≠ 0) :
+    let Z := {ρ : ℂ // u / 2 < ρ.re ∧ χ.LFunction ρ = 0}
     let w (ρ : Z) := (analyticOrderNatAt χ.LFunction ρ.val : ℝ) *
-      ((2 * ρ.val.re - 1) * (2 * c.re - 1) / ‖ρ.val + conj c - 1‖ ^ 2)
-    Summable w ∧ ∑' ρ, w ρ ≤ 2 * Real.log ((q : ℝ) / ‖χ.LFunction c / c‖) := by
+      ((2 * ρ.val.re - u) * (2 * c.re - u) / ‖ρ.val + conj c - u‖ ^ 2)
+    Summable w ∧ ∑' ρ, w ρ ≤ 2 * Real.log ((q : ℝ) / u / ‖χ.LFunction c / c‖) := by
   intro Z w
-  let b (ρ : Z) := ‖ρ.val - c‖ / ‖ρ.val + conj c - 1‖
+  let b (ρ : Z) := ‖ρ.val - c‖ / ‖ρ.val + conj c - u‖
   let m (ρ : Z) := analyticOrderNatAt χ.LFunction ρ.val
   have hq : (0 : ℝ) < q := Nat.cast_pos.mpr (NeZero.pos q)
-  have hc₀ : c ≠ 0 := fun e ↦ by norm_num [e] at hc
+  have hc₀ : c ≠ 0 := fun e ↦ by norm_num [e] at hc; linarith
   have hv₀ : 0 < ‖χ.LFunction c / c‖ := norm_pos_iff.mpr (div_ne_zero hv hc₀)
-  have hd (ρ : Z) : 0 < ‖ρ.val + conj c - 1‖ := by
+  have hd (ρ : Z) : 0 < ‖ρ.val + conj c - u‖ := by
     apply norm_pos_iff.mpr
     intro h
     have he := congrArg Complex.re h
-    simp only [Complex.sub_re, Complex.add_re, Complex.conj_re, Complex.one_re, Complex.zero_re] at he
+    simp only [Complex.sub_re, Complex.add_re, Complex.conj_re, Complex.ofReal_re, Complex.zero_re] at he
     linarith [ρ.property.1]
   have hb (ρ : Z) : 0 < b ρ := by
     refine div_pos (norm_pos_iff.mpr (sub_ne_zero.mpr ?_)) (hd ρ)
@@ -294,13 +317,13 @@ theorem dirichletLFunction_right_zero_displacement {q : ℕ} [NeZero q] (χ : Di
   have hweight (ρ : Z) : w ρ = (m ρ : ℝ) * (1 - b ρ ^ 2) := by
     dsimp only [w, m, b]
     rw [← dirichletZero_norm_sq_sub, div_pow, sub_div, div_self (pow_ne_zero _ (hd ρ).ne')]
-  have hf (S : Finset Z) : ∑ ρ ∈ S, w ρ ≤ 2 * Real.log ((q : ℝ) / ‖χ.LFunction c / c‖) := by
-    have hp := dirichletLFunction_finite_zero_product χ hχ (dirichletZero_partial_sum_bound χ hχ) c hc hv S
-    change ‖χ.LFunction c / c‖ ≤ (2 * ((q : ℝ) / 2)) * ∏ ρ ∈ S, b ρ ^ m ρ at hp
+  have hf (S : Finset Z) : ∑ ρ ∈ S, w ρ ≤ 2 * Real.log ((q : ℝ) / u / ‖χ.LFunction c / c‖) := by
+    have hp := dirichletLFunction_finite_zero_product_of_boundary hu χ hχ (dirichletZero_partial_sum_bound χ hχ) c hc hv S
+    change ‖χ.LFunction c / c‖ ≤ (2 * ((q : ℝ) / 2) / u) * ∏ ρ ∈ S, b ρ ^ m ρ at hp
     rw [show 2 * ((q : ℝ) / 2) = (q : ℝ) by ring] at hp
     have hpn (ρ : Z) (_ : ρ ∈ S) := pow_ne_zero (m ρ) (hb ρ).ne'
     have hlog := Real.log_le_log hv₀ hp
-    rw [Real.log_mul hq.ne' (Finset.prod_ne_zero_iff.mpr hpn), Real.log_prod hpn] at hlog
+    rw [Real.log_mul (div_pos hq hu).ne' (Finset.prod_ne_zero_iff.mpr hpn), Real.log_prod hpn] at hlog
     simp only [Real.log_pow] at hlog
     have hcomp : ∑ ρ ∈ S, w ρ ≤ ∑ ρ ∈ S, (-2) * ((m ρ : ℝ) * Real.log (b ρ)) := by
       apply Finset.sum_le_sum
@@ -313,9 +336,29 @@ theorem dirichletLFunction_right_zero_displacement {q : ℕ} [NeZero q] (χ : Di
           mul_le_mul_of_nonneg_left (by linarith) (Nat.cast_nonneg _)
         _ = _ := by ring
     rw [← Finset.mul_sum] at hcomp
-    rw [Real.log_div hq.ne' hv₀.ne']
+    rw [Real.log_div (div_pos hq hu).ne' hv₀.ne']
     linarith
   exact ⟨summable_of_sum_le hn hf, Real.tsum_le_of_sum_le hn hf⟩
+
+/-- Every finite set of zeros to the right of the critical line bounds the normalized
+L-value at an interior anchor. Each zero contributes its full analytic multiplicity. -/
+theorem dirichletLFunction_finite_zero_product {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) (hχ : χ ≠ 1)
+    {B : ℝ} (hB : ∀ n : ℕ, ‖∑ j ∈ Finset.Icc 1 n, χ (j : ZMod q)‖ ≤ B)
+    (c : ℂ) (hc : 1 / 2 < c.re) (hv : χ.LFunction c ≠ 0)
+    (S : Finset {ρ : ℂ // 1 / 2 < ρ.re ∧ χ.LFunction ρ = 0}) :
+    ‖χ.LFunction c / c‖ ≤ (2 * B) * ∏ ρ ∈ S,
+      (‖ρ.val - c‖ / ‖ρ.val + conj c - 1‖) ^ analyticOrderNatAt χ.LFunction ρ.val := by
+  simpa using dirichletLFunction_finite_zero_product_of_boundary (u := 1) (by norm_num) χ hχ hB c hc hv S
+
+/-- For a nonprincipal character, the displacements of the zeros to the right of the critical
+line, weighted by the half-plane kernel at any interior nonzero L-value, have bounded sum. -/
+theorem dirichletLFunction_right_zero_displacement {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) (hχ : χ ≠ 1)
+    (c : ℂ) (hc : 1 / 2 < c.re) (hv : χ.LFunction c ≠ 0) :
+    let Z := {ρ : ℂ // 1 / 2 < ρ.re ∧ χ.LFunction ρ = 0}
+    let w (ρ : Z) := (analyticOrderNatAt χ.LFunction ρ.val : ℝ) *
+      ((2 * ρ.val.re - 1) * (2 * c.re - 1) / ‖ρ.val + conj c - 1‖ ^ 2)
+    Summable w ∧ ∑' ρ, w ρ ≤ 2 * Real.log ((q : ℝ) / ‖χ.LFunction c / c‖) := by
+  simpa using dirichletLFunction_zero_displacement_of_boundary (u := 1) (by norm_num) χ hχ c hc hv
 
 /-- At the anchor `1`, Dirichlet nonvanishing gives the displacement bound unconditionally
 for every nonprincipal character, including imprimitive characters. -/
@@ -387,5 +430,64 @@ theorem dirichletLFunction_right_zero_displacement_at_height {q : ℕ} [NeZero q
   · exact div_pos (Nat.cast_pos.mpr (NeZero.pos q)) (norm_pos_iff.mpr (div_ne_zero hv hc₀))
   · rw [norm_div, div_div_eq_mul_div, div_le_iff₀ (norm_pos_iff.mpr hv)]
     nlinarith [mul_le_mul_of_nonneg_left hl (by positivity : 0 ≤ 4 * (q:ℝ) * ‖c‖)]
+
+/-- The half-plane with boundary at real part 1/4 includes the critical line
+in its interior. At the anchor 2 this gives a logarithmic bound, uniform in the
+character, for the inverse-square height mass on the closed right half-strip. -/
+theorem dirichletLFunction_right_halfStrip_height_mass {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (hχ : χ ≠ 1) :
+    let Z := {ρ : ℂ // 1/2 ≤ ρ.re ∧ ρ.re < 1 ∧ χ.LFunction ρ = 0}
+    let w (ρ : Z) := (analyticOrderNatAt χ.LFunction ρ.val : ℝ) / (1+|ρ.val.im|)^2
+    Summable w ∧ ∑' ρ, w ρ ≤ 16 * Real.log (16 * (q:ℝ)) := by
+  intro Z w
+  have hL := dirichletZero_norm_lower_bound_at_two χ (c := 2) (by norm_num)
+  have hv : χ.LFunction 2 ≠ 0 := norm_pos_iff.mp (by linarith)
+  let Y := {ρ : ℂ // (1/2:ℝ)/2 < ρ.re ∧ χ.LFunction ρ = 0}
+  let W (ρ : Y) := (analyticOrderNatAt χ.LFunction ρ.val : ℝ) *
+    ((2*ρ.val.re-1/2)*(2*(2:ℂ).re-1/2) / ‖ρ.val + conj 2 - ((1/2:ℝ):ℂ)‖^2)
+  obtain ⟨hs,hb⟩ := dirichletLFunction_zero_displacement_of_boundary (u := 1/2)
+    (by norm_num) χ hχ 2 (by norm_num) hv
+  change Summable W at hs
+  change ∑' z, W z ≤ _ at hb
+  let e (ρ : Z) : Y := ⟨ρ.val, by linarith [ρ.property.1], ρ.property.2.2⟩
+  have hi : Injective e := fun x y he ↦ Subtype.ext (congrArg (fun y : Y ↦ y.val) he)
+  have hn (ρ : Y) : 0 ≤ W ρ := by
+    have hx := ρ.property.1
+    dsimp only [W]
+    apply mul_nonneg (Nat.cast_nonneg _) (div_nonneg (mul_nonneg (by linarith) (by norm_num)) (sq_nonneg _))
+  have hcomp (ρ : Z) : w ρ ≤ 8 * W (e ρ) := by
+    let D := ‖ρ.val + conj 2 - ((1/2:ℝ):ℂ)‖ ^ 2
+    have hx := ρ.property.1
+    have hX := ρ.property.2.1
+    have hd : D = (ρ.val.re+3/2)^2+ρ.val.im^2 := by
+      simp [D, Complex.sq_norm, Complex.normSq_apply]; ring
+    have ht := abs_nonneg ρ.val.im
+    have ht2 : |ρ.val.im|^2 = ρ.val.im^2 := sq_abs _
+    have hD : 0 < D := by rw [hd]; nlinarith [sq_nonneg ρ.val.im]
+    have hd' : D ≤ 7*(1+|ρ.val.im|)^2 := by
+      rw [hd]; nlinarith [sq_nonneg ρ.val.im, mul_nonneg (by linarith : 0 ≤ 1-ρ.val.re)
+        (by linarith : 0 ≤ 4+ρ.val.re)]
+    have h1 : 1 / (1+|ρ.val.im|)^2 ≤ 8 * ((2*ρ.val.re-1/2)*(2*(2:ℂ).re-1/2)/D) := by
+      rw [← mul_div_assoc, div_le_div_iff₀ (by positivity) hD]
+      norm_num
+      nlinarith [mul_nonneg (by linarith : 0 ≤ 2*ρ.val.re-1) (sq_nonneg (1+|ρ.val.im|))]
+    dsimp only [w,W,e]
+    calc _ = (analyticOrderNatAt χ.LFunction ρ.val : ℝ) * (1/(1+|ρ.val.im|)^2) := by ring
+         _ ≤ _ := mul_le_mul_of_nonneg_left h1 (Nat.cast_nonneg _)
+         _ = _ := by dsimp only [D]; ring
+  have hmajor := (hs.comp_injective hi).mul_left 8
+  have hw : Summable w := hmajor.of_nonneg_of_le (fun ρ ↦ div_nonneg (Nat.cast_nonneg _) (sq_nonneg _)) hcomp
+  refine ⟨hw,?_⟩
+  have hre : (q:ℝ)/(1/2)/‖χ.LFunction 2 / 2‖ ≤ 16*(q:ℝ) := by
+    rw [norm_div, show ‖(2:ℂ)‖ = 2 by norm_num, div_div_eq_mul_div, div_le_iff₀ (norm_pos_iff.mpr hv)]
+    nlinarith [mul_le_mul_of_nonneg_left hL (by positivity : 0 ≤ 16*(q:ℝ))]
+  calc ∑' z, w z ≤ ∑' z, 8*W (e z) := hw.tsum_le_tsum hcomp hmajor
+       _ = 8 * ∑' z, W (e z) := tsum_mul_left
+       _ ≤ 8 * ∑' z, W z := mul_le_mul_of_nonneg_left (tsum_comp_le_tsum_of_inj hs hn hi) (by norm_num)
+       _ ≤ _ := by
+         have hh := Real.log_le_log (show 0 < (q:ℝ)/(1/2)/‖χ.LFunction 2/2‖ from
+           div_pos (div_pos (Nat.cast_pos.mpr (NeZero.pos q)) (by norm_num))
+             (norm_pos_iff.mpr (div_ne_zero hv (by norm_num)))) hre
+         linarith
 
 end RiemannMasullo
