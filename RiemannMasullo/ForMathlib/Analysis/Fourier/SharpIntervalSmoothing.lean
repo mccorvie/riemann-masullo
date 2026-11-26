@@ -93,6 +93,42 @@ theorem exists_evenSchwartz_smoothingKernel (c : ℝ) (hc : 0 < c) :
     exact abs_le.mp h₀.le
   · simpa only [Real.norm_eq_abs, pow_one] using η.integrable_pow_mul volume 1
 
+/-- An even Schwartz function whose inverse transform equals one on the closed
+band and vanishes off a prescribed positive enlargement. -/
+theorem exists_evenSchwartz_fourierInv_plateau (Y δ : ℝ) (hY : 0 ≤ Y) (hδ : 0 < δ) :
+    ∃ φ : 𝓢(ℝ, ℂ), Function.Even (φ : ℝ → ℂ) ∧
+      EqOn (𝓕⁻ (φ : ℝ → ℂ)) 1 (Icc (-Y) Y) ∧
+      Function.support (𝓕⁻ (φ : ℝ → ℂ)) ⊆ Icc (-(Y + δ)) (Y + δ) := by
+  let b : ContDiffBump (0 : ℝ) := ⟨Y + δ / 2, Y + δ, by positivity, by linarith⟩
+  let g : ℝ → ℂ := fun x ↦ (b x : ℂ)
+  have hg : HasCompactSupport g := b.hasCompactSupport.comp_left Complex.ofReal_zero
+  let ψ : 𝓢(ℝ, ℂ) := hg.toSchwartzMap (Complex.ofRealCLM.contDiff.comp b.contDiff)
+  let φ : 𝓢(ℝ, ℂ) := 𝓕 ψ
+  have hinv : 𝓕⁻ (φ : ℝ → ℂ) = (ψ : ℝ → ℂ) := by
+    rw [← SchwartzMap.fourierInv_coe, show 𝓕⁻ φ = ψ from FourierTransform.fourierInv_fourier_eq ψ]
+  refine ⟨φ, ?_, ?_, ?_⟩
+  · have he : (ψ : ℝ → ℂ) ∘ (LinearIsometryEquiv.neg ℝ (E := ℝ)) = (ψ : ℝ → ℂ) := by
+      funext x
+      change (b (-x) : ℂ) = (b x : ℂ)
+      rw [b.neg]
+    intro x
+    have h := Real.fourier_comp_linearIsometry (LinearIsometryEquiv.neg ℝ (E := ℝ)) (⇑ψ) x
+    rw [he] at h
+    change 𝓕 (⇑ψ) (-x) = 𝓕 (⇑ψ) x
+    exact h.symm
+  · rw [hinv]
+    intro x hx
+    change (b x : ℂ) = 1
+    rw [b.one_of_mem_closedBall, Complex.ofReal_one]
+    rw [Metric.mem_closedBall, Real.dist_eq, sub_zero]
+    change |x| ≤ Y + δ / 2
+    exact (abs_le.mpr hx).trans (by linarith)
+  · rw [hinv]
+    intro x hx
+    have hb : x ∈ Function.support (b : ℝ → ℝ) := fun hz ↦ hx (Complex.ofReal_eq_zero.mpr hz)
+    rw [b.support_eq, Metric.mem_ball, Real.dist_eq, sub_zero] at hb
+    exact abs_le.mp hb.le
+
 private theorem measurable_sharpIntervalMask (L : ℝ) : Measurable (sharpIntervalMask L) :=
   measurable_const.indicator measurableSet_Icc
 

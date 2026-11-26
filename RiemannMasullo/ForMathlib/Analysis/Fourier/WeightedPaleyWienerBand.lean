@@ -4,6 +4,7 @@ public import RiemannMasullo.ForMathlib.Analysis.Fourier.PaleyWiener
 public import Mathlib.Analysis.InnerProductSpace.Dual
 import Mathlib.Analysis.SpecialFunctions.Trigonometric.Bounds
 import Mathlib.Analysis.Fourier.FourierTransformDeriv
+import Mathlib.Analysis.Complex.CauchyIntegral
 import Mathlib.MeasureTheory.Integral.DominatedConvergence
 import RiemannMasullo.ForMathlib.MeasureTheory.Function.L2Space
 
@@ -253,6 +254,39 @@ private theorem evaluation_eq_fourierInv (Y : ℝ) {μ : Measure ℝ} (hμ : vol
         rw [conj_phase, mul_comm]
       _ = ∫ t, k t := by rw [← integral_add_compl measurableSet_Icc hk, hoff, add_zero]
       _ = _ := by rw [Real.fourierInv_eq']; simp only [k, F, Real.inner_apply, smul_eq_mul]
+
+/-- Evaluation on the real axis extends to an entire function for each band element. -/
+theorem exists_entire_evaluation (Y : ℝ) (hY : 0 ≤ Y) {μ : Measure ℝ}
+    (hμ : volume ≤ μ) (f : space Y hμ) :
+    ∃ g : ℂ → ℂ, Differentiable ℂ g ∧ ∀ x : ℝ, g x = evaluation Y hμ x f := by
+  obtain ⟨g, hg, htrace⟩ := exists_entire_fourierInv_of_band hY
+    (𝓕 (restrictL2 hμ f.val) : L2R) (spectrum_zero_off Y hμ f)
+  exact ⟨g, hg, fun x ↦ (htrace x).trans (evaluation_eq_fourierInv Y hμ f x).symm⟩
+
+/-- The canonical evaluation representative is real analytic at every point. -/
+theorem analyticOnNhd_evaluation (Y : ℝ) (hY : 0 ≤ Y) {μ : Measure ℝ}
+    (hμ : volume ≤ μ) (f : space Y hμ) :
+    AnalyticOnNhd ℝ (fun x ↦ evaluation Y hμ x f) univ := by
+  obtain ⟨g, hg, he⟩ := exists_entire_evaluation Y hY hμ f
+  rw [← funext he]
+  intro x _
+  exact ((hg.analyticAt (x : ℂ)).restrictScalars (𝕜 := ℝ)).comp_of_eq
+    (Complex.ofRealCLM.analyticAt x) rfl
+
+/-- An integrable reproducing kernel works pointwise without assuming the band
+vector is integrable in physical space. -/
+theorem evaluation_reproduces (Y : ℝ) {μ : Measure ℝ} (hμ : volume ≤ μ)
+    (f : space Y hμ) {φ : ℝ → ℂ} (hφ : Integrable φ)
+    (hone : EqOn (𝓕⁻ φ) 1 (Icc (-Y) Y)) (x : ℝ) :
+    evaluation Y hμ x f = ∫ t, evaluation Y hμ (x + t) f * φ t := by
+  simp_rw [evaluation_eq_fourierInv]
+  apply fourierInv_reproduces (spectrum_integrable Y hμ f) hφ
+  have hoff := (ae_restrict_iff' measurableSet_Icc.compl).mp (spectrum_zero_off Y hμ f)
+  filter_upwards [hoff] with ξ hξ
+  intro hn
+  by_cases hmem : ξ ∈ Icc (-Y) Y
+  · exact hone hmem
+  · exact (hn (hξ hmem)).elim
 
 private theorem evaluation_ordinary_ae (Y : ℝ) {μ : Measure ℝ} (hμ : volume ≤ μ)
     (f : space Y hμ) :

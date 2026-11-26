@@ -172,7 +172,8 @@ theorem measurable_realPWIntervalWeight (α s : ℝ) :
     (Real.continuous_exp.measurable.comp hv.neg)).mul
     (Real.continuous_exp.measurable.comp (hu.const_mul _))
 
-private theorem one_le_realPWIntervalWeight (α s : ℝ) (hs : 0 ≤ s) (x : ℝ) :
+/-- The real-place weight dominates the Lebesgue density everywhere. -/
+theorem one_le_realPWIntervalWeight (α s : ℝ) (hs : 0 ≤ s) (x : ℝ) :
     1 ≤ realPWIntervalWeight α s x := by
   let t := Real.log |x|
   let u := 2 * α * t

@@ -478,6 +478,84 @@ private theorem intervalExtension_real (A : ℝ) (F : ℝ → ℂ) (x : ℝ) :
       ring
     · simp [ht]
 
+/-- The inverse Fourier integral of an L² spectrum supported almost everywhere on
+`[-A,A]` admits an entire representative, with pointwise agreement on the real axis. -/
+theorem exists_entire_fourierInv_of_band {A : ℝ} (hA : 0 ≤ A)
+    (F : Lp ℂ 2 (volume : Measure ℝ))
+    (hzero : ∀ᵐ t ∂volume.restrict (Icc (-A) A)ᶜ, F t = 0) :
+    ∃ g : ℂ → ℂ, Differentiable ℂ g ∧ ∀ x : ℝ, g x = 𝓕⁻ (F : ℝ → ℂ) x := by
+  let J := Ioo (-A) A
+  have : IsFiniteMeasure (volume.restrict J) := isFiniteMeasure_restrict.mpr (by
+    dsimp [J]; rw [Real.volume_Ioo]; exact ENNReal.ofReal_ne_top)
+  have hF : MemLp (F : ℝ → ℂ) 2 (volume.restrict J) :=
+    (Lp.memLp F).mono_measure Measure.restrict_le_self
+  have he : J.indicator (F : ℝ → ℂ) =ᵐ[volume] (F : ℝ → ℂ) := by
+    filter_upwards [(ae_restrict_iff' measurableSet_Icc.compl).1 hzero,
+      volume.ae_ne A, volume.ae_ne (-A)] with t ht htA hta
+    by_cases h : t ∈ J
+    · exact indicator_of_mem h _
+    · rw [indicator_of_notMem h]
+      apply Eq.symm (ht ?_)
+      intro hm
+      exact h ⟨lt_of_le_of_ne hm.1 (Ne.symm hta), lt_of_le_of_ne hm.2 htA⟩
+  refine ⟨fun z ↦ intervalExtension A F (((2 * Real.pi : ℝ) : ℂ) * z),
+    (intervalExtension_diff hA (hF.integrable one_le_two)).comp (differentiable_id.const_mul _), ?_⟩
+  intro x
+  change intervalExtension A F (((2 * Real.pi : ℝ) : ℂ) * (x : ℂ)) = 𝓕⁻ (F : ℝ → ℂ) x
+  rw [← ofReal_mul, intervalExtension_real, Real.fourierInv_eq', Real.fourierInv_eq']
+  apply integral_congr_ae
+  filter_upwards [he] with t ht
+  rw [ht]
+
+/-- An inverse transform reproduces against an integrable kernel whose inverse
+transform is one almost everywhere on the nonzero frequencies of the density. -/
+theorem fourierInv_reproduces {F φ : ℝ → ℂ} (hF : Integrable F) (hφ : Integrable φ)
+    (hone : ∀ᵐ ξ : ℝ, F ξ ≠ 0 → 𝓕⁻ φ ξ = 1) (x : ℝ) :
+    𝓕⁻ F x = ∫ t, 𝓕⁻ F (x + t) * φ t := by
+  let p (ξ y : ℝ) := Complex.exp ((↑(2 * Real.pi * (ξ * y) : ℝ) : ℂ) * Complex.I)
+  have hinv (G : ℝ → ℂ) (y : ℝ) : 𝓕⁻ G y = ∫ ξ, p ξ y * G ξ := by
+    simp only [Real.fourierInv_eq', Real.inner_apply, smul_eq_mul, p]
+  have hsplit (ξ t : ℝ) : p ξ (x + t) = p ξ x * p t ξ := by
+    unfold p
+    rw [← Complex.exp_add]
+    congr 1
+    push_cast
+    ring
+  let k (ξ t : ℝ) := p ξ (x + t) * (F ξ * φ t)
+  have hc : Continuous (fun z : ℝ × ℝ ↦ p z.1 (x + z.2)) := by unfold p; fun_prop
+  have hp := hF.mul_prod hφ
+  have hk : Integrable (Function.uncurry k) (volume.prod volume) := by
+    refine hp.norm.mono' (hc.aestronglyMeasurable.mul hp.aestronglyMeasurable) ?_
+    filter_upwards with z
+    change ‖p z.1 (x + z.2) * (F z.1 * φ z.2)‖ ≤ ‖F z.1 * φ z.2‖
+    rw [norm_mul]
+    dsimp only [p]
+    rw [Complex.norm_exp_ofReal_mul_I, one_mul]
+  calc
+    𝓕⁻ F x = ∫ ξ, (p ξ x * F ξ) * 𝓕⁻ φ ξ := by
+      rw [hinv F x]
+      apply integral_congr_ae
+      filter_upwards [hone] with ξ hξ
+      by_cases hz : F ξ = 0
+      · simp [hz]
+      · rw [hξ hz, mul_one]
+    _ = ∫ ξ, ∫ t, k ξ t := by
+      apply integral_congr_ae
+      filter_upwards with ξ
+      rw [hinv φ ξ, ← integral_const_mul]
+      apply integral_congr_ae
+      filter_upwards with t
+      simp only [k, hsplit]
+      ring
+    _ = ∫ t, ∫ ξ, k ξ t := integral_integral_swap hk
+    _ = _ := by
+      apply integral_congr_ae
+      filter_upwards with t
+      rw [hinv F (x + t), ← integral_mul_const]
+      apply integral_congr_ae
+      filter_upwards with ξ
+      exact (mul_assoc _ _ _).symm
+
 private theorem memLp_dilate {g : ℝ → ℂ} (h : MemLp g 2) {r : ℝ} (hr : r ≠ 0) :
     MemLp (fun x : ℝ ↦ g (r * x)) 2 := by
   have hm : MemLp g 2 (Measure.map (fun x : ℝ ↦ r • x) volume) := by
