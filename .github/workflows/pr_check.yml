@@ -10,6 +10,14 @@ name: PR check
 # scripts/ci/verdict.py has the exact rules; they are those of scripts/triage_prs.sh. The verdict
 # is shown in the run's summary and uploaded as the artifact `verdict-<verdict>`.
 #
+# The pull request is checked against the newest commit of main that the Main state workflow has
+# a saved build for, so that only the pull request itself is compiled here, not everything merged
+# since that build (#6414). Main's tip is used instead when the pull request contains newer
+# commits of main, when main has since changed one of its files or anything that affects every
+# check, or when that build is too far behind (scripts/ci/base_state.py --choose has the rules).
+# A verdict against the saved build other than `merge` or `read` is never published: the pull
+# request is then checked again against main's tip, in the same run.
+#
 # The pull request is only ever data here. The checker (scripts/, lakefile, lean-toolchain,
 # lake-manifest.json) is main's: main is what gets checked out, the pull request's commit is
 # fetched next to it, and only its Lean files under RiemannMasullo/ are merged in, after
@@ -39,7 +47,7 @@ jobs:
   verdict:
     name: Verdict
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180        # a check against the saved build, then perhaps one against the tip
     env:
       PR: ${{ github.event.pull_request.number }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -71,9 +79,21 @@ jobs:
             echo "::error::The pull request was pushed to after this run started; a newer run checks it."
             exit 1
           fi
-          base=$(git rev-parse HEAD)
-          git worktree add --detach ../work "$base"
+          echo "MAIN_SHA=$(git rev-parse HEAD)" >>"$GITHUB_ENV"
+
+      - name: Choose the commit of main to check against, and make the work tree
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REPO_ID: ${{ github.repository_id }}
+        run: |
+          choice=$(python3 tools/scripts/ci/base_state.py --choose --work tools --main "$MAIN_SHA" --head "$HEAD_SHA") || choice=
+          read -r base artifact <<<"$choice" || true
+          [[ "$base" =~ ^[0-9a-f]{40}$ ]] || { echo "could not choose; checking against main's tip"; base=$MAIN_SHA; artifact=; }
+          [[ "$artifact" =~ ^[0-9]+$ ]] || artifact=
+          git -C tools worktree add --detach ../work "$base"
           echo "BASE_SHA=$base" >>"$GITHUB_ENV"
+          echo "SAVED_ARTIFACT=$artifact" >>"$GITHUB_ENV"    # the saved build the choice was made with
 
       - name: Set up the sandbox
         run: |
@@ -98,33 +118,108 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           REPO_ID: ${{ github.repository_id }}
-        run: python3 tools/scripts/ci/base_state.py --work work --base "$BASE_SHA" --out base-state || echo "could not fetch it; main will be built here"
+        run: |
+          python3 tools/scripts/ci/base_state.py --work work --base "$BASE_SHA" --out base-state \
+            ${SAVED_ARTIFACT:+--artifact "$SAVED_ARTIFACT"} || echo "could not fetch it; main will be built here"
 
       - name: Check the pull request
         id: check
         run: |
           saved=()
           if [ -s "base-state/signatures-$BASE_SHA.txt" ]; then saved=(--base-signatures "base-state/signatures-$BASE_SHA.txt"); fi
-          python3 tools/scripts/ci/verdict.py --work work --base "$BASE_SHA" --head "$HEAD_SHA" --pr "$PR" \
-            --out verdict "${saved[@]}" || true
+          python3 tools/scripts/ci/verdict.py --work work --base "$BASE_SHA" --main "$MAIN_SHA" --head "$HEAD_SHA" \
+            --pr "$PR" --out verdict "${saved[@]}" || true
+          verdict=$(python3 -c 'import json; print(json.load(open("verdict/verdict.json"))["verdict"])')
+          case $verdict in merge|read|fail|error) ;; *) verdict=error ;; esac
+          echo "verdict=$verdict" >>"$GITHUB_OUTPUT"
+          if [ "$BASE_SHA" = "$MAIN_SHA" ] || [ "$verdict" = merge ] || [ "$verdict" = read ]; then
+            cat verdict/summary.md >>"$GITHUB_STEP_SUMMARY"
+            echo "::notice title=Verdict::$verdict"
+          fi
+
+      # Against the saved build the verdict was fail or error: that is never published, since it
+      # may come from the older base. Check again against main's tip, starting from the same saved
+      # build, and publish that verdict instead.
+      - name: Check again against main's tip
+        id: tip
+        if: env.BASE_SHA != env.MAIN_SHA && steps.check.outputs.verdict != 'merge' && steps.check.outputs.verdict != 'read'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REPO_ID: ${{ github.repository_id }}
+          FIRST: ${{ steps.check.outputs.verdict }}
+        run: |
+          mv verdict verdict-saved-base
+          git -C work merge --abort 2>/dev/null || true
+          git -C work reset -q --hard
+          git -C work clean -fdq
+          git -C work checkout -q --detach "$MAIN_SHA"
+          rm -rf work/.lake/build
+          python3 tools/scripts/ci/base_state.py --work work --base "$MAIN_SHA" --out base-state \
+            ${SAVED_ARTIFACT:+--artifact "$SAVED_ARTIFACT"} || echo "could not fetch it; main will be built here"
+          python3 tools/scripts/ci/verdict.py --work work --base "$MAIN_SHA" --head "$HEAD_SHA" \
+            --pr "$PR" --out verdict || true
           verdict=$(python3 -c 'import json; print(json.load(open("verdict/verdict.json"))["verdict"])')
           case $verdict in merge|read|fail|error) ;; *) verdict=error ;; esac
           echo "verdict=$verdict" >>"$GITHUB_OUTPUT"
           cat verdict/summary.md >>"$GITHUB_STEP_SUMMARY"
+          { printf '\n<details><summary>Against the saved build of <code>main</code> at <code>%s</code> the verdict was <code>%s</code>; the verdict above is against its tip</summary>\n\n' \
+              "${BASE_SHA:0:12}" "$FIRST"; cat verdict-saved-base/summary.md; printf '\n</details>\n'; } >>"$GITHUB_STEP_SUMMARY"
           echo "::notice title=Verdict::$verdict"
 
+      # Not when the step before failed: the verdict against the saved build alone is then not published.
       - name: Publish the verdict
         if: steps.check.outputs.verdict != ''
         uses: actions/upload-artifact@v4
         with:
-          name: verdict-${{ steps.check.outputs.verdict }}
+          name: verdict-${{ steps.tip.outputs.verdict || steps.check.outputs.verdict }}
           path: verdict/verdict.json
           if-no-files-found: error
           overwrite: true
           retention-days: 3
 
       - name: Fail the check unless the verdict is merge or read
-        if: steps.check.outputs.verdict != 'merge' && steps.check.outputs.verdict != 'read'
+        if: (steps.tip.outputs.verdict || steps.check.outputs.verdict) != 'merge' && (steps.tip.outputs.verdict || steps.check.outputs.verdict) != 'read'
         run: |
           echo "See the summary of this run for the reasons."
           exit 1
+
+  # A run that published no verdict (the job ran out of time, or a step broke) would otherwise leave
+  # nothing for Auto-merge to act on, and the pull request would wait for a person. Publish `error`
+  # then: Auto-merge's scheduled runs check it again (MAX_ERROR_ATTEMPTS times).
+  unfinished:
+    name: Leave an unfinished check to be run again
+    needs: verdict
+    if: always() && needs.verdict.result != 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Did this attempt publish a verdict?
+        id: published
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          started=$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID" --jq .run_started_at)
+          ours=$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/artifacts" \
+            --jq "[.artifacts[] | select((.name | startswith(\"verdict-\")) and .created_at >= \"$started\")] | length")
+          if [ "$ours" != 0 ]; then echo "a verdict was published"; exit 0; fi
+          mkdir verdict
+          python3 -c 'import json, os; json.dump(dict(schema=1, verdict="error", pr=int(os.environ["PR"]),
+            head_sha=os.environ["HEAD_SHA"], base_sha=os.environ["BASE_SHA"], notes=[],
+            reasons=["the check did not finish (out of time, or a step broke); it is run again"]),
+            open("verdict/verdict.json", "w"), indent=1)'
+          echo "missing=true" >>"$GITHUB_OUTPUT"
+      - name: Publish `error`
+        if: steps.published.outputs.missing == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: verdict-error
+          path: verdict/verdict.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 3

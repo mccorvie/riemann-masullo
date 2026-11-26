@@ -14,6 +14,19 @@ name: Main state
 # forward. Three things bound that: a build from scratch every night, a build from scratch
 # whenever the toolchain, the dependencies or the build options change, and the `full` switch of
 # a manual run. Outputs of modules whose source is gone are deleted (scripts/ci/prune_build.py).
+#
+# It fails, and saves nothing, when a declaration that the previous saved signatures had is gone
+# or has a different statement (scripts/ci/main_statements.py; new declarations are fine). A pull
+# request is checked against the newest saved build, not main's tip (#6414), so this is where
+# what main merged meanwhile shows. While a run here has failed and no later one has succeeded,
+# Auto-merge merges nothing (auto_merge.py, `line_stopped`). When statements changed on purpose,
+# run this workflow with the three `accept_*` inputs the failed run's summary prints, after
+# reading its list (prompts/integrator.md). The signatures are also saved on their own, as
+# `main-signatures`, kept for two weeks, so that a day of failures does not lose the baseline; a
+# build from scratch starts a new one when there is none.
+
+# Auto-merge tells a build from scratch by this name: only one of those clears a failure of one.
+run-name: ${{ (github.event_name == 'schedule' || inputs.full) && 'Main state, from scratch' || 'Main state' }}
 
 on:
   push:
@@ -26,6 +39,18 @@ on:
         description: Build from scratch instead of from the previous saved build
         type: boolean
         default: false
+      accept_baseline:
+        description: To accept changed statements, the commit of the saved signatures the failed run compared with
+        type: string
+        default: ""
+      accept_target:
+        description: and the commit it built (this run must build the same one)
+        type: string
+        default: ""
+      accept_names:
+        description: and the declarations to accept, separated by spaces; any other change still fails
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -59,20 +84,30 @@ jobs:
       - name: Fetch the dependencies and Mathlib's build
         run: lake exe cache get || { sleep 20; lake exe cache get; }
       - name: Start from the previous saved build of main
-        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.full)
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           REPO_ID: ${{ github.repository_id }}
+          FULL: ${{ (github.event_name == 'schedule' || inputs.full) && 'true' || 'false' }}
         run: |
           prev="$RUNNER_TEMP/previous"
+          # The signatures to compare statements with, the newest saved for an ancestor by history.
+          python3 scripts/ci/base_state.py --signatures --work . --base "$GITHUB_SHA" --out "$RUNNER_TEMP/baseline" ||
+            { echo "could not fetch the saved signatures"; echo "BASELINE_UNKNOWN=1" >>"$GITHUB_ENV"; }
           python3 scripts/ci/base_state.py --work . --base "$GITHUB_SHA" --out "$prev" ||
-            { echo "could not fetch a saved build; building from scratch"; rm -rf .lake/build; exit 0; }
-          [ -d .lake/build ] || exit 0
+            { echo "could not fetch a saved build; building from scratch"; rm -rf .lake/build; echo "FROM_SCRATCH=1" >>"$GITHUB_ENV"; exit 0; }
+          [ -d .lake/build ] || { echo "FROM_SCRATCH=1" >>"$GITHUB_ENV"; exit 0; }
           from=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("sha", ""))' "$prev/meta.json")
+          if [ "$FULL" = true ]; then
+            echo "building from scratch"
+            rm -rf .lake/build
+            echo "FROM_SCRATCH=1" >>"$GITHUB_ENV"
+            exit 0
+          fi
           if ! git diff --quiet "$from" "$GITHUB_SHA" -- lean-toolchain lake-manifest.json lakefile.toml lakefile.lean; then
             echo "the toolchain, the dependencies or the build options changed since $from: building from scratch"
             rm -rf .lake/build
+            echo "FROM_SCRATCH=1" >>"$GITHUB_ENV"
             exit 0
           fi
           python3 scripts/ci/prune_build.py
@@ -86,12 +121,29 @@ jobs:
           mkdir main-state
           scripts/signatures.sh --all >main-state/signatures.txt
           scripts/signatures.sh --sorry-in-defs main-state/signatures.txt
+      # Before anything is uploaded: the summary lists every change, accepted or not.
+      - name: No existing statement changed since the saved signatures
+        env:
+          ACCEPT_BASELINE: ${{ inputs.accept_baseline }}
+          ACCEPT_TARGET: ${{ inputs.accept_target }}
+          ACCEPT_NAMES: ${{ inputs.accept_names }}
+        run: |
+          baseline="$RUNNER_TEMP/baseline"
+          previous=$(cat "$baseline/previous-signatures.sha" 2>/dev/null || true)
+          # Only a baseline known to be missing is started afresh, not one that failed to download.
+          scratch=${FROM_SCRATCH:+--from-scratch}
+          [ -z "${BASELINE_UNKNOWN:-}" ] || scratch=
+          python3 scripts/ci/main_statements.py --target "$GITHUB_SHA" ${previous:+--previous-sha "$previous"} \
+            ${scratch:+"$scratch"} --accept-baseline "$ACCEPT_BASELINE" --accept-target "$ACCEPT_TARGET" \
+            --accept-names "$ACCEPT_NAMES" "$baseline/previous-signatures.txt" main-state/signatures.txt
       - name: The list of command keywords is up to date
         run: scripts/ci/keywords.sh --check
       - name: Pack the build
         run: |
           tar -C .lake -I 'zstd -T0 -6' -cf main-state/build.tar.zst build
           printf '{"sha": "%s", "from": "%s"}\n' "$GITHUB_SHA" "${FROM_SHA:-}" >main-state/meta.json
+          mkdir main-signatures
+          cp main-state/signatures.txt main-state/meta.json main-signatures/
           ls -l main-state
           echo "saved the build of ${GITHUB_SHA:0:12}${FROM_SHA:+, built on top of the saved build of ${FROM_SHA:0:12}}" >>"$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
@@ -101,3 +153,9 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: main-signatures     # what the next runs compare statements with (base_state.py --signatures)
+          path: main-signatures
+          if-no-files-found: error
+          retention-days: 14

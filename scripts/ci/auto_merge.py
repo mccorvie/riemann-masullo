@@ -27,9 +27,26 @@ commit ids and the GitHub API alone, this script
      so the two things only the check can know (it builds, and no existing declaration
      changed) were reported by main's script and not by the pull request;
   5. requires that main has not moved, since the commit the verdict was computed against, in a
-     way that matters to this pull request: no file it touches, and nothing outside the library
-     that affects the build. If it has, the check is run again and nothing is merged;
+     way that matters to this pull request: no file it touches, nothing outside the library
+     that affects the build, and at most MAX_BEHIND commits (base_state.stale, the predicate
+     the check uses to choose that commit). If it has, the check is run again and nothing is
+     merged; the new check is then never against the same commit (base_state.py). Nor may the
+     pull request contain commits of main newer than that commit: its own changes are measured
+     from its merge base with that commit, as the check measured them, and that is the merge
+     base with main only then;
   6. squash-merges, naming the head commit, so that a push made after the check is not merged.
+
+The check is usually against the newest commit of main with a saved build, not main's tip
+(#6414), so nothing builds main's tip with the pull request before it is merged. Two things catch
+what the merges in between do to it, within one build of main: Main state fails when an existing
+statement has changed, and this script merges nothing while the line is stopped (`line_stopped`,
+asked before the first and before every merge and every new check): while some Main state run on
+main failed and no run created after it has succeeded on that commit or a later one. A failure
+of a build from scratch is cleared only by a build from scratch, so that an incremental build
+cannot hide it; and while a run is being run again, the line waits for it. Verdicts wait
+meanwhile and are looked at again on every run of this workflow (every 15 minutes); the line
+restarts after a push to main, the nightly build, a manual run or a re-run of the failed one,
+once that succeeds. A verdict artifact expires after three days.
 
 One run handles everything that is waiting, one pull request at a time (the workflow allows
 only one run at once), so each merge is judged against a main that includes the previous one.
@@ -48,6 +65,9 @@ import zipfile
 from pathlib import Path
 
 import plain_proof
+# What decides whether main has moved in a way that matters to a verdict is shared with the
+# check's choice of the commit to check against (base_state.py), and lives there.
+from base_state import BUILD_DIRS, BUILD_FILES, MAX_BEHIND, NON_BUILD_FILES, matters_to_everyone, stale  # noqa: F401
 
 TOOLS = Path(__file__).resolve().parent.parent.parent
 BRANCH = "main"
@@ -63,26 +83,16 @@ REPO = re.compile(r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+")
 MAX_ARTIFACT_BYTES = 256 * 1024
 MAX_VERDICT_BYTES = 64 * 1024
 MAX_FILES = 40            # changed files in one pull request
-MAX_BEHIND = 60           # commits main may have moved since the verdict
 MAX_ATTEMPTS = 12         # runs of the check for one head commit
 MAX_ERROR_ATTEMPTS = 3
 MAX_MERGES = 60           # per run of this script
-# Changes on main that make a verdict stale whatever files the pull request touches.
-# Of scripts/, only what the check itself runs: a change to the launcher or to the integrator's
-# tools does not touch any verdict, and counting it made every pending verdict stale.
-BUILD_FILES = ("lakefile.toml", "lakefile.lean", "lean-toolchain", "lake-manifest.json",
-               "scripts/lint.sh", "scripts/proof_review.sh", "scripts/signatures.sh", "scripts/Signatures.lean")
-BUILD_DIRS = ("scripts/ci/", ".github/workflows/", "RiemannMasullo/External/")
-# These files are independent of proof checking. The merge step applies its current policy
-# to the completed check, whose verdict was produced by the separate PR check workflow.
-NON_BUILD_FILES = (
-    "RiemannMasullo/External/ATTRIBUTION.md",
-    ".github/workflows/claims.yml",
-    "scripts/ci/stale_claims.py",
-    "scripts/ci/test_stale_claims.py",
-    "scripts/ci/auto_merge.py",
-    "scripts/ci/test_auto_merge.py",
-)
+# Conclusions of a Main state run that say something about main; others (cancelled, skipped) do not.
+DECISIVE = ("success", "failure", "timed_out", "startup_failure")
+FROM_SCRATCH = "Main state, from scratch"     # the run name main_state.yml gives such a build
+
+
+class LineStopped(Exception):
+    """Main's build is broken: nothing more is merged or checked again in this run."""
 
 
 class ApiError(Exception):
@@ -131,15 +141,6 @@ def query(**params):
     return urllib.parse.urlencode(params)
 
 
-def matters_to_everyone(path):
-    """Whether a change to this file on main can change the result of any pull request's check."""
-    if path in NON_BUILD_FILES:
-        return False
-    if path in BUILD_FILES or path.startswith(BUILD_DIRS):
-        return True
-    return path.endswith(".lean") and not plain_proof.library_file(path)
-
-
 def read_verdict(data):
     """The verdict JSON inside an artifact's zip, or None if it is not what verdict.py writes."""
     try:
@@ -169,6 +170,9 @@ class Merger:
         self.rows = []       # (pull request, commit, what happened)
         self.merged = 0
         self.scanner = plain_proof.Scanner()
+        self.stopped = None  # why the line is stopped, if it is
+        self.repo_id = None
+        self.cleared = set() # ids of failed Main state runs a later success has cleared
         run_id = os.environ.get("GITHUB_RUN_ID", "")
         self.url = (f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/{api.repo}/actions/runs/{run_id}"
                     if run_id.isdigit() else None)
@@ -187,11 +191,16 @@ class Merger:
             return None
         return base64.b64decode(data["content"])
 
-    def rederive(self, base, head):
-        """(reasons the change is not a plain proof, the files it changes), from the API."""
+    def merge_base(self, base, head):
         merge_base = self.api.call(f"compare/{base}...{head}?per_page=1")["merge_base_commit"]["sha"]
         if not SHA.fullmatch(merge_base):
             raise ApiError(0, "no merge base")
+        return merge_base
+
+    def rederive(self, base, head, merge_base=None):
+        """(reasons the change is not a plain proof, the files it changes), from the API: what
+        changed between `head` and its merge base with `base`, as the check measured it."""
+        merge_base = merge_base or self.merge_base(base, head)
         before, after = self.tree(merge_base), self.tree(head)
         paths = sorted(p for p in set(before) | set(after) if before.get(p) != after.get(p))
         reasons = []
@@ -239,23 +248,59 @@ class Merger:
 
     @staticmethod
     def moved(ahead, paths):
-        """Why main has moved too far (see `since`) for a verdict about `paths`, or None."""
+        """Why main has moved (see `since`) in a way that matters to a verdict about `paths`, or None."""
         if ahead["status"] == "identical":
             return None
-        if ahead["ahead_by"] > MAX_BEHIND:
-            return f"main has moved by {ahead['ahead_by']} commits since the check"
-        files = ahead.get("files") or []
-        if len(files) >= 300:
-            return "main has changed too many files since the check to tell"
-        for entry in files:
-            for name in (entry.get("filename"), entry.get("previous_filename")):
-                if name is None:
+        # GitHub lists at most 300 files; with as many names, `stale` says it cannot tell.
+        if not isinstance(ahead.get("files"), list):
+            return "GitHub did not list the files main changed since the check"
+        names = [n for e in ahead["files"] for n in (e.get("filename"), e.get("previous_filename"))
+                 if n is not None]
+        return stale(ahead["ahead_by"], names, paths, MAX_BEHIND)
+
+    def line_stopped(self, repo_id):
+        """Why nothing may be merged now, or None. Among the latest 100 Main state runs on main:
+        a run is being run again (its earlier attempt may have failed); or one failed and no run
+        created after it succeeded on the same commit or a later one (a build from scratch, if
+        the failed one was); or none has finished. One API call, and one per failure the first
+        time it is found cleared by a success on another commit."""
+        runs = self.api.call(f"actions/workflows/{MAIN_WORKFLOW}/runs?"
+                             + query(branch=BRANCH, per_page=100))["workflow_runs"]
+        ours = [r for r in runs if r.get("head_branch") == BRANCH and SHA.fullmatch(str(r.get("head_sha")))
+                and r.get("event") in ("push", "schedule", "workflow_dispatch")
+                and (r.get("repository") or {}).get("id") == repo_id
+                and (r.get("head_repository") or {}).get("id") == repo_id]
+        for run in ours:
+            if run.get("status") != "completed" and run.get("run_attempt", 1) > 1:
+                return f"a run of {MAIN_WORKFLOW} on main ({run.get('html_url') or run['id']}) is being run again"
+        decisive = [r for r in ours if r.get("status") == "completed" and r.get("conclusion") in DECISIVE]
+        if not decisive:
+            return f"no run of {MAIN_WORKFLOW} on main has finished lately"
+        def scratch(run):
+            return run.get("event") == "schedule" or run.get("display_title") == FROM_SCRATCH
+        when = lambda r: (r.get("created_at") or "", r["id"])
+        successes = sorted((r for r in decisive if r["conclusion"] == "success"), key=when, reverse=True)
+        for failed in sorted((r for r in decisive if r["conclusion"] != "success"), key=when, reverse=True):
+            if failed["id"] in self.cleared:
+                continue
+            for success in successes:
+                if when(success) <= when(failed) or (scratch(failed) and not scratch(success)):
                     continue
-                if name in paths:
-                    return f"main has since changed {name}, which this pull request also changes"
-                if matters_to_everyone(name):
-                    return f"main has since changed {name}, which affects every check"
+                if success["head_sha"] == failed["head_sha"] or self.api.call(
+                        f"compare/{failed['head_sha']}...{success['head_sha']}?per_page=1").get("status") == "ahead":
+                    self.cleared.add(failed["id"])
+                    break
+            else:
+                return (f"a run of {MAIN_WORKFLOW} on main ({failed.get('html_url') or failed['id']}) ended in "
+                        f"{failed['conclusion']}, and no later run on that commit or a newer one has succeeded"
+                        + (" from scratch" if scratch(failed) else ""))
         return None
+
+    def halt_if_stopped(self):
+        """Ask again before a merge or a new check, since Main state may have failed meanwhile."""
+        why = self.line_stopped(self.repo_id)
+        if why:
+            raise LineStopped(why)
 
     # -- acting -------------------------------------------------------------------------------
 
@@ -275,6 +320,7 @@ class Merger:
             print(f"  could not delete artifact {artifact['id']}: {problem}")
 
     def check_again(self, run, artifact, sha, why, limit=MAX_ATTEMPTS):
+        self.halt_if_stopped()
         if run.get("run_attempt", 1) >= limit:
             self.discard(artifact)
             self.status(sha, "error", f"Not merged automatically: {why}. Checked {limit} times; needs a person.")
@@ -367,12 +413,19 @@ class Merger:
         ahead = self.since(base)
         if ahead is None:
             return self.refuse(artifact, sha, "the verdict was not computed against a commit of main")
-        reasons, paths = self.rederive(base, sha)
+        # Its own changes, measured from its merge base with that commit as the check measured
+        # them, are what they would be against main only if that is also its merge base with main.
+        merge_base = self.merge_base(base, sha)
+        if self.merge_base(BRANCH, sha) != merge_base:
+            return self.check_again(run, artifact, sha, "the pull request contains commits of main newer "
+                                    "than the commit it was checked against")
+        reasons, paths = self.rederive(base, sha, merge_base)
         if reasons:
             return self.refuse(artifact, sha, "; ".join(reasons)[:400])
         why = self.moved(ahead, set(paths))
         if why:
             return self.check_again(run, artifact, sha, why)
+        self.halt_if_stopped()
         result = self.merge(number, sha)
         if result is True:
             self.merged += 1
@@ -423,6 +476,12 @@ class Merger:
             return
         given = os.environ.get("GITHUB_REPOSITORY_ID", "")
         repo_id = int(given) if given.isdigit() else self.api.call("")["id"]
+        self.repo_id = repo_id
+        stopped = self.line_stopped(repo_id)
+        if stopped:
+            self.stopped = stopped
+            print(f"::warning::nothing is merged while main's build is broken: {stopped}")
+            return
         prs = self.open_pull_requests()
         for artifact in artifacts:
             run = artifact["workflow_run"]
@@ -434,6 +493,11 @@ class Merger:
                 break
             try:
                 outcome = self.handle(artifact, pr, repo_id)
+            except LineStopped as stopped:
+                self.stopped = str(stopped)
+                self.rows.append((pr["number"], run["head_sha"], "left waiting: main's build is broken"))
+                print(f"::warning::nothing more is merged while main's build is broken: {stopped}")
+                break
             except ApiError as problem:
                 outcome = f"GitHub API error, left for the next run ({problem})"
                 if problem.status in (401, 403, 429):
@@ -454,6 +518,9 @@ class Merger:
 
     def summary(self):
         target = os.environ.get("GITHUB_STEP_SUMMARY")
+        if target and self.stopped:
+            with open(target, "a") as out:
+                out.write(f"Nothing merged: {self.stopped}.\n")
         if not target or not self.rows:
             return
         lines = ["| Pull request | Commit | Outcome |", "|---|---|---|"]

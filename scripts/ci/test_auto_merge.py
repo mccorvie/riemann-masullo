@@ -14,6 +14,11 @@ import auto_merge
 REPO_ID = 1
 BASE = "b" * 40          # main when the check ran
 MERGE_BASE = "a" * 40
+
+
+def main_commit(n):
+    """The n-th commit of main, for Main state runs; a later n is a descendant."""
+    return "d" + format(n, "039x")
 LEAN = "RiemannMasullo/AppA/Sec1.lean"
 OLD = "theorem t : True := by\n  sorry\n\nvariable (n : Nat)\n"
 NEW = "theorem t : True := by\n  trivial\n\nvariable (n : Nat)\n"
@@ -35,11 +40,15 @@ class FakeApi:
 
     def __init__(self):
         self.calls = 0
+        self.paths = []
         self.changes = []
         self.artifacts, self.prs, self.runs = [], {}, {}
         self.common, self.heads, self.blobs = {}, {}, {}   # the merge base's files; each head's changes
         self.main_files = []          # files main changed since BASE
         self.not_on_main = set()      # commits that are not ancestors of main
+        self.main_ahead = None        # commits main has moved since BASE, if not len(main_files)
+        self.merge_bases = {}         # (base or "main", head) -> their merge base, if not MERGE_BASE
+        self.main_state = [dict(id=1, conclusion="success", created_at="2026-01-01T00:00:00Z")]
         self.merge_errors = {}
         self._ids = iter(range(100, 10_000))
 
@@ -81,6 +90,7 @@ class FakeApi:
 
     def call(self, path, method="GET", body=None, binary=False):
         self.calls += 1
+        self.paths.append(path)
         if method != "GET":
             raise AssertionError(f"a change through call(): {method} {path}")
         if path == "":
@@ -98,15 +108,24 @@ class FakeApi:
         if path.startswith("actions/runs?"):
             sha = re.search(r"head_sha=([0-9a-f]+)", path).group(1)
             return dict(workflow_runs=[r for r in self.runs.values() if r["head_sha"] == sha])
-        if m := re.fullmatch(r"compare/([0-9a-f]{40})\.\.\.([0-9a-f]{40})\?per_page=1", path):
-            return dict(merge_base_commit=dict(sha=MERGE_BASE))
+        if m := re.fullmatch(r"compare/(d[0-9a-f]{39})\.\.\.(d[0-9a-f]{39})\?per_page=1", path):
+            older, newer = (int(x, 16) for x in m.groups())
+            return dict(status="ahead" if newer > older else "identical" if newer == older else "behind")
+        if m := re.fullmatch(r"compare/([0-9a-f]{40}|main)\.\.\.([0-9a-f]{40})\?per_page=1", path):
+            return dict(merge_base_commit=dict(sha=self.merge_bases.get(m.groups(), MERGE_BASE)))
         if m := re.fullmatch(r"compare/([0-9a-f]{40})\.\.\.main\?per_page=1", path):
             if m.group(1) in self.not_on_main:
                 return dict(status="diverged", ahead_by=3, behind_by=2, files=[])
             if not self.main_files:
                 return dict(status="identical", ahead_by=0, behind_by=0, files=[])
-            return dict(status="ahead", ahead_by=len(self.main_files), behind_by=0,
+            return dict(status="ahead", ahead_by=self.main_ahead or len(self.main_files), behind_by=0,
                         files=[dict(filename=f) for f in self.main_files])
+        if path.startswith("actions/workflows/main_state.yml/runs?"):
+            assert "branch=main" in path and "status=" not in path
+            return dict(workflow_runs=[dict(dict(status="completed", head_branch="main", event="push",
+                                                 head_sha=main_commit(r["id"]), run_attempt=1,
+                                                 repository=dict(id=REPO_ID), head_repository=dict(id=REPO_ID)), **r)
+                                       for r in self.main_state])
         if m := re.fullmatch(r"git/trees/([0-9a-f]{40})\?recursive=1", path):
             return dict(truncated=False, tree=[dict(path=p, mode=e[0], type=e[1], sha=e[2])
                                                for p, e in self.tree(m.group(1)).items()])
@@ -255,6 +274,127 @@ class AutoMerge(unittest.TestCase):
         self.assertEqual(self.drain(), {7: "merged"})
         self.assertFalse(self.api.did("POST", r"actions/runs/\d+/rerun"))
 
+    def test_check_against_an_older_commit_merges_when_main_moved_elsewhere(self):
+        # The check ran against the newest commit of main with a saved build (#6414).
+        self.api.pull_request(7, {LEAN: (OLD, NEW)})
+        self.api.main_files = ["RiemannMasullo/AppB/Sec2.lean", "README.md"]
+        self.api.main_ahead = auto_merge.MAX_BEHIND
+        self.assertEqual(self.drain(), {7: "merged"})
+
+    def test_too_far_behind_is_checked_again(self):
+        # The chooser's bound is smaller, so the new check is against a newer commit (base_state.py).
+        self.api.pull_request(7, {LEAN: (OLD, NEW)})
+        self.api.main_files = ["RiemannMasullo/AppB/Sec2.lean"]
+        self.api.main_ahead = auto_merge.MAX_BEHIND + 1
+        self.assertIn("checking again", self.drain()[7])
+        self.assertTrue(self.api.did("POST", r"actions/runs/1007/rerun"))
+        self.assertEqual(self.merged(), [])
+
+    def test_branch_with_newer_commits_of_main_is_checked_again_not_refused(self):
+        # Review of #6461, item 2: measured from its merge base with the checked commit, a branch
+        # cut from a later main would show main's own changes (here a README) as its own.
+        head = self.api.pull_request(7, {LEAN: (OLD, NEW), "README.md": ("x", "y")})
+        self.api.merge_bases[("main", head)] = "e" * 40
+        self.assertIn("checking again", self.drain()[7])
+        self.assertTrue(self.api.did("POST", r"actions/runs/1007/rerun"))
+        self.assertFalse(self.api.did("POST", r"statuses/.*"))
+        self.assertEqual(self.merged(), [])
+
+    def test_files_are_measured_from_the_merge_base_with_the_checked_commit(self):
+        head = self.api.pull_request(7, {LEAN: (OLD, NEW)})
+        self.api.merge_bases[(BASE, head)] = self.api.merge_bases[("main", head)] = "e" * 40
+        self.assertEqual(self.drain(), {7: "merged"})
+        self.assertIn(f"git/trees/{'e' * 40}?recursive=1", self.api.paths)
+
+    def test_line_stopped_while_main_state_is_red(self):
+        self.api.pull_request(7, {LEAN: (OLD, NEW)})
+        self.api.pull_request(8, {"RiemannMasullo/AppB/Sec2.lean": (OLD, NEW)}, verdict="error",
+                              run=dict(conclusion="failure"))
+        self.api.main_state = [dict(id=1, conclusion="success", created_at="2026-01-01T00:00:00Z"),
+                               dict(id=2, conclusion="failure", created_at="2026-01-01T01:00:00Z"),
+                               dict(id=3, conclusion="cancelled", created_at="2026-01-01T02:00:00Z")]
+        self.assertEqual(self.drain(retry_errors=True), {})
+        self.assertEqual(self.api.changes, [])
+        self.assertIn("main's build is broken", self.out)
+        self.assertEqual(len([a for a in self.api.artifacts if a["name"].startswith("verdict-")]), 2)   # they wait
+        # a later run that succeeded restarts the line (a re-run of the failed one, too)
+        self.api.main_state.append(dict(id=4, conclusion="success", created_at="2026-01-01T03:00:00Z"))
+        self.assertEqual(self.drain()[7], "merged")
+
+    def test_line_stopped_by_runs_that_do_not_count(self):
+        for runs, stopped in (
+                ([dict(id=1, conclusion="cancelled", created_at="2026-01-01T00:00:00Z")], True),
+                ([], True),
+                ([dict(id=1, conclusion="timed_out", created_at="2026-01-01T01:00:00Z"),
+                  dict(id=2, conclusion="success", created_at="2026-01-01T00:00:00Z")], True),
+                ([dict(id=1, conclusion="failure", created_at="2026-01-01T01:00:00Z", head_branch="other"),
+                  dict(id=2, conclusion="success", created_at="2026-01-01T00:00:00Z")], False),
+                ([dict(id=1, conclusion="failure", created_at="2026-01-01T01:00:00Z", event="pull_request"),
+                  dict(id=2, conclusion="success", created_at="2026-01-01T00:00:00Z")], False),
+                ([dict(id=1, conclusion="failure", created_at="2026-01-01T01:00:00Z"),
+                  dict(id=2, conclusion="success", created_at="2026-01-01T00:00:00Z",
+                       head_repository=dict(id=99))], True)):
+            self.api = FakeApi()
+            self.api.pull_request(7, {LEAN: (OLD, NEW)})
+            self.api.main_state = runs
+            self.assertEqual(self.drain() == {}, stopped, runs)
+
+    def stopped(self, runs):
+        self.api = FakeApi()
+        self.api.pull_request(7, {LEAN: (OLD, NEW)})
+        self.api.main_state = runs
+        return self.drain() == {}
+
+    def test_a_failure_is_latched_until_a_success_at_or_after_its_commit(self):
+        failed = dict(id=5, conclusion="failure", created_at="2026-01-01T01:00:00Z")
+        # a success created later, but on an older commit (a re-dispatch of an old run), does not clear it
+        self.assertTrue(self.stopped([failed, dict(id=6, conclusion="success", head_sha=main_commit(4),
+                                                   created_at="2026-01-01T02:00:00Z")]))
+        # nor does a success on a newer commit created before the failure
+        self.assertTrue(self.stopped([failed, dict(id=6, conclusion="success", created_at="2026-01-01T00:30:00Z")]))
+        # nor a newer cancelled run
+        self.assertTrue(self.stopped([failed, dict(id=6, conclusion="cancelled", created_at="2026-01-01T02:00:00Z")]))
+        # a later success on the same commit or a newer one does
+        self.assertFalse(self.stopped([failed, dict(id=6, conclusion="success", head_sha=main_commit(5),
+                                                    created_at="2026-01-01T02:00:00Z")]))
+        self.assertFalse(self.stopped([failed, dict(id=6, conclusion="success", created_at="2026-01-01T02:00:00Z")]))
+        # an older failure stays latched behind a newer, cleared one
+        self.assertTrue(self.stopped([
+            dict(id=3, conclusion="failure", created_at="2026-01-01T00:00:00Z", display_title=auto_merge.FROM_SCRATCH),
+            failed, dict(id=6, conclusion="success", created_at="2026-01-01T02:00:00Z")]))
+
+    def test_an_incremental_success_does_not_clear_a_failure_from_scratch(self):
+        for scratch in (dict(event="schedule"), dict(event="workflow_dispatch", display_title=auto_merge.FROM_SCRATCH)):
+            failed = dict(dict(id=5, conclusion="failure", created_at="2026-01-01T01:00:00Z"), **scratch)
+            self.assertTrue(self.stopped([failed, dict(id=6, conclusion="success", created_at="2026-01-01T02:00:00Z")]))
+            self.assertFalse(self.stopped([failed, dict(dict(id=6, conclusion="success",
+                                                             created_at="2026-01-01T02:00:00Z"), **scratch)]))
+
+    def test_a_pending_re_run_stops_the_line(self):
+        runs = [dict(id=5, status="in_progress", conclusion=None, run_attempt=2, created_at="2026-01-01T01:00:00Z"),
+                dict(id=4, conclusion="success", created_at="2026-01-01T00:00:00Z")]
+        self.assertTrue(self.stopped(runs))
+        runs[0].update(run_attempt=1)        # a new run in progress is no reason to wait
+        self.assertFalse(self.stopped(runs))
+
+    def test_asked_again_before_every_merge(self):
+        self.api.pull_request(7, {LEAN: (OLD, NEW)})
+        self.api.pull_request(8, {"RiemannMasullo/AppB/Sec2.lean": (OLD, NEW)})
+        real = self.api.change
+        def change(what, path, method, body=None):
+            result = real(what, path, method, body)
+            if path == "pulls/7/merge":     # Main state fails while the drain is under way
+                self.api.main_state.append(dict(id=9, conclusion="failure", created_at="2026-01-01T05:00:00Z"))
+            return result
+        self.api.change = change
+        self.assertEqual(self.drain(), {7: "merged", 8: "left waiting: main's build is broken"})
+        self.assertFalse(self.api.did("PUT", r"pulls/8/merge"))
+
+    def test_a_comparison_without_a_file_list_is_not_safe(self):
+        why = auto_merge.Merger.moved(dict(status="ahead", ahead_by=1), {LEAN})
+        self.assertIn("did not list", why)
+        self.assertIsNone(auto_merge.Merger.moved(dict(status="ahead", ahead_by=1, files=[]), {LEAN}))
+
     def test_two_pull_requests_for_one_file_are_not_merged_on_one_check(self):
         self.api.pull_request(7, {LEAN: (OLD, NEW)})
         self.api.pull_request(8, {LEAN: (OLD, OLD.replace("sorry", "exact True.intro"))})
@@ -369,7 +509,8 @@ class Verdict(unittest.TestCase):
 class Paths(unittest.TestCase):
     def test_what_matters_to_every_check(self):
         for path in ("lakefile.toml", "lean-toolchain", "lake-manifest.json", "scripts/ci/verdict.py",
-                     ".github/workflows/pr_check.yml", "Main.lean", "Statements.lean", "RiemannMasullo/External/A.lean"):
+                     ".github/workflows/pr_check.yml", "Main.lean", "Statements.lean", "RiemannMasullo/External/A.lean",
+                     ".gitattributes", "RiemannMasullo/.gitattributes", "scripts/ci/base_state.py", "scripts/ci/main_statements.py"):
             self.assertTrue(auto_merge.matters_to_everyone(path), path)
         for path in ("RiemannMasullo/AppA/Sec1.lean", "ERRATA.md", "paper/paper.pdf", "prompts/prover.md",
                      "RiemannMasullo/External/ATTRIBUTION.md", ".github/workflows/claims.yml",
