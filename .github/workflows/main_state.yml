@@ -77,6 +77,14 @@ jobs:
           fi
           python3 scripts/ci/prune_build.py
           echo "FROM_SHA=$from" >>"$GITHUB_ENV"
+      - name: Cache vendored External build
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.full) }}
+        uses: actions/cache@v6
+        with:
+          path: |
+            .lake/build/lib/lean/RiemannMasullo/External
+            .lake/build/ir/RiemannMasullo/External
+          key: external-build-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json', 'lakefile.toml', 'lakefile.lean', 'RiemannMasullo/External/**/*.lean') }}
       - name: Build
         # The main library and the comparator files. RiemannMasulloClassField, the fourth default
         # target, needs the class field theory dependency; the Full build workflow builds it.
