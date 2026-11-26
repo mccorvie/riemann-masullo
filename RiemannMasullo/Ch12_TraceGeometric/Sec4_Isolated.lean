@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4
 public import RiemannMasullo.AppC_LCTVS.Sec3b_HilbertSchmidtProduct
+public import RiemannMasullo.Ch12_TraceGeometric.Sec4_RealPWThetaLogModel
 import Mathlib.MeasureTheory.Integral.Prod
 import RiemannMasullo.ForMathlib.MeasureTheory.Function.L2Space
 
@@ -314,5 +315,53 @@ theorem sLocalTrace_projectedCutoffKernel
   have hn := nuclearTrace_factor_comps hilbert_approximationProperty
     hilbert_approximationProperty j hj _ hLq
   simpa only [hLqj] using hn
+
+/-- Paper: Theorem 12.4.1.1, pp. 514–517, for the real place of `ℚ` beside one finite prime
+`p`, at fixed bandwidth `Y` and a fixed level. Let `0 < α < 1 / 2`. The theta sums
+`t ↦ ∑ n, h (p ^ n exp t)` of the band vectors `h` that vanish at the origin form a closed
+subspace `V` of the weighted space in the logarithmic coordinate, and `e t` are its evaluation
+vectors. For every continuous cutoff `c` that is square integrable for the weighted measure and
+every bounded operator `D` on `V`, the compression to `V` of multiplication by `c ^ 2` after `D`
+is of trace class, it has a continuous kernel, and its trace is the integral of the kernel over
+the diagonal.
+Reconstruction: The paper does not state this model. The statement is
+`sLocalTrace_projectedCutoffKernel` for the space of `Sec4_RealPWThetaLogModel`, which supplies
+its hypotheses.
+Deviation: Only the real place of `ℚ` and one finite prime, at fixed bandwidth, with the level
+taken to be the vanishing at the origin. `D` is an arbitrary bounded operator on the level. The
+action of the paper is not constructed here, and nothing is said about the limit in the
+cutoff. -/
+theorem sLocalTrace_realPWThetaLevelRange {Y α s p : ℝ} (hY : 0 ≤ Y) (hα : 0 < α)
+    (hα' : α < 1 / 2) (hs : 0 ≤ s) (hp : 1 < p) :
+    haveI := completeSpace_realPWThetaLevelRange hY hα hα' hs hp
+    ∃ e : ℝ → realPWThetaLevelRange Y α hs p, Continuous e ∧
+      (∀ (t : ℝ) (h : realPWBandLevel Y α hs) (f : realPWThetaLevelRange Y α hs p),
+        (f : Lp ℂ 2 (realPWLogMeasure α s)) = realPWThetaMap Y α hs p h →
+          ⟪e t, f⟫_ℂ = ∑' n : ℕ, RealPWBand.evaluation Y
+            (volume_le_realPWIntervalMeasure α s hs) (p ^ n * Real.exp t) h) ∧
+      ∀ c : ℝ → ℝ, Continuous c → MemLp c 2 (realPWLogMeasure α s) →
+        ∀ M : Lp ℂ 2 (realPWLogMeasure α s) →L[ℂ] Lp ℂ 2 (realPWLogMeasure α s),
+          (∀ f : Lp ℂ 2 (realPWLogMeasure α s), ∀ᵐ x ∂realPWLogMeasure α s,
+            M f x = c x ^ 2 • f x) →
+        ∀ D : realPWThetaLevelRange Y α hs p →L[ℂ] realPWThetaLevelRange Y α hs p,
+          let j := (realPWThetaLevelRange Y α hs p).subtypeL
+          let q := (realPWThetaLevelRange Y α hs p).orthogonalProjectionOnto
+          let L := q.comp (M.comp (j.comp D))
+          let T := j.comp (L.comp q)
+          let k (x : ℝ × ℝ) := ∫ z,
+            (c z ^ 2 : ℝ) • (⟪e x.1, e z⟫_ℂ * ⟪e z, D (e x.2)⟫_ℂ) ∂realPWLogMeasure α s
+          ∃ (hT : IsNuclearOperator T) (hL : IsNuclearOperator L),
+            Continuous k ∧
+            (∀ f : Lp ℂ 2 (realPWLogMeasure α s), ∀ᵐ x ∂realPWLogMeasure α s,
+              Integrable (fun y ↦ k (x, y) * f y) (realPWLogMeasure α s) ∧
+              T f x = ∫ y, k (x, y) * f y ∂realPWLogMeasure α s) ∧
+            Integrable (fun x ↦ k (x, x)) (realPWLogMeasure α s) ∧
+            hilbertTrace ⟨T, hT⟩ = (∫ x, k (x, x) ∂realPWLogMeasure α s) ∧
+            hilbertTrace ⟨L, hL⟩ = ∫ x, k (x, x) ∂realPWLogMeasure α s := by
+  have := completeSpace_realPWThetaLevelRange hY hα hα' hs hp
+  obtain ⟨e, C, he, hC, hform, hrep⟩ :=
+    exists_realPWThetaLevelRange_evaluationVector hY hα hα' hs hp
+  exact ⟨e, he, hform, fun c hc hc₂ M hM D ↦
+    sLocalTrace_projectedCutoffKernel _ e he C hC hrep c hc hc₂ M hM D⟩
 
 end RiemannMasullo.Isolated
