@@ -424,7 +424,7 @@ private theorem infiniteLocalTamagawa_integrable_norm_rpow (w : InfinitePlace F)
 
 /-- A positive norm power at a finite place is integrable against the multiplicative
 Tamagawa measure on units with bounded norm. -/
-private theorem finiteLocalTamagawa_integrable_norm_rpow (v : HeightOneSpectrum (𝓞 F)) {σ : ℝ}
+theorem finiteLocalTamagawa_integrable_norm_rpow (v : HeightOneSpectrum (𝓞 F)) {σ : ℝ}
     (hσ : 0 < σ) (R : ℝ) :
     SigmaFinite (finiteLocalMultiplicativeTamagawaMeasure F v) ∧
     Integrable ({u : (v.adicCompletion F)ˣ | ‖u.val‖ ≤ R}.indicator (fun u ↦ ‖u.val‖ ^ σ))

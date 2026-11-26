@@ -3,14 +3,14 @@ module
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3b
 public import RiemannMasullo.AppC_LCTVS.Sec5b
 public import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
-import all RiemannMasullo.Ch03_IdelicZeta.Sec3
+import RiemannMasullo.Ch03_IdelicZeta.Sec3
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform.Holomorphic
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform.Gaussian
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import all RiemannMasullo.AppC_LCTVS.Sec2a_part2
 import RiemannMasullo.AppC_LCTVS.Sec2b
-import all RiemannMasullo.Ch03_IdelicZeta.Sec2
+import RiemannMasullo.Ch03_IdelicZeta.Sec2
 import all RiemannMasullo.AppC_LCTVS.Sec5b
 import RiemannMasullo.AppA_AlgebraicNT.Sec3
 import RiemannMasullo.Ch02_AdelicTheta.Sec2a
