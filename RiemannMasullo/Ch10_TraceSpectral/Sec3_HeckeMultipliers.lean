@@ -6,7 +6,8 @@ import RiemannMasullo.Ch03_IdelicZeta.Sec2
 import RiemannMasullo.AppB_AnalyticNT.Sec1
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gamma.Deligne
 import RiemannMasullo.ForMathlib.Analysis.Meromorphic.VerticalStripZeros
-import RiemannMasullo.ForMathlib.Analysis.Complex.GoodHeight
+import Mathlib.Analysis.Meromorphic.NormalForm
+import Mathlib.Analysis.Complex.JensenFormula
 import Mathlib.Analysis.Complex.PhragmenLindelof
 
 /-! # Multipliers of Hecke L-functions with bounds that are uniform in the character
@@ -42,9 +43,8 @@ The uniform statements are for characters that are not trivial on the norm-one i
 In the application they are the values `χ ω`, `ω ≠ 1`, of a basepoint choice that is trivial on
 the image of a norm section. The trivial character, whose completed L-function has poles at `0`
 and `1`, has a multiplier of the same shape (`exists_trivial_heckeMultiplier`): the poles are
-removed by the factor `s (s - 1)`, through
-`exists_entire_eq_prod_sub_mul_of_finite_simple_poles` of
-`ForMathlib/Analysis/Complex/GoodHeight.lean`, and two more gamma shifts absorb its growth.
+removed by normalizing the meromorphic product with `s (s - 1)`, and two more gamma shifts
+absorb its growth.
 
 Main statements: `exists_uniform_heckeMultiplier`, `exists_trivial_heckeMultiplier`, their
 versions in the variable `u = s - a` (`…_strip_of_line`), and the zero counts
@@ -825,6 +825,35 @@ private theorem uniform_trivial_poles (F : Type*) [Field F] [NumberField F] :
   subst ht
   exact ⟨hA, by simpa using h0, by simpa using h1⟩
 
+/-- Normalize the product of a meromorphic function by a polynomial clearing its simple poles. -/
+private theorem clear_simple_poles {L : ℂ → ℂ} (hL : MeromorphicNFOn L univ) (Z : Finset ℂ)
+    (hAway : ∀ s ∉ Z, AnalyticAt ℂ L s) (hLower : ∀ s, (-1 : WithTop ℤ) ≤ meromorphicOrderAt L s) :
+    ∃ f : ℂ → ℂ, AnalyticOnNhd ℂ f univ ∧ ∀ s ∉ Z, f s = (∏ p ∈ Z, (s-p)) * L s := by
+  classical
+  let P (s : ℂ) := ∏ p ∈ Z, (s-p)
+  have hP (s : ℂ) : AnalyticAt ℂ P s :=
+    Finset.analyticAt_fun_prod Z (f := fun p s : ℂ ↦ s - p) (fun _ _ ↦ by fun_prop)
+  have hPL : MeromorphicOn (P*L) univ :=
+    fun s hs ↦ (hP s).meromorphicAt.mul (hL.meromorphicOn s hs)
+  refine ⟨toMeromorphicNFOn (P*L) univ, ?_, ?_⟩
+  · intro s hs
+    apply ((meromorphicNFOn_toMeromorphicNFOn (P*L) univ) hs).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+    rw [meromorphicOrderAt_toMeromorphicNFOn hPL hs]
+    by_cases hm : s ∈ Z
+    · rw [meromorphicOrderAt_mul (hP s).meromorphicAt (hL.meromorphicOn s hs)]
+      have horder : (1 : WithTop ℤ) ≤ meromorphicOrderAt P s := by
+        change 1 ≤ meromorphicOrderAt (fun s ↦ ∏ p ∈ Z, (s-p)) s
+        rw [meromorphicOrderAt_fun_prod (f := fun p s ↦ s-p) (fun p _ ↦ by fun_prop)]
+        rw [← meromorphicOrderAt_id_sub_const (𝕜 := ℂ) (x := s)]
+        exact Finset.single_le_sum (fun p _ ↦
+          (show AnalyticAt ℂ (fun z : ℂ ↦ z-p) s by fun_prop).meromorphicOrderAt_nonneg) hm
+      exact (show (0 : WithTop ℤ) = 1 + (-1) by norm_num) ▸ add_le_add horder (hLower s)
+    · exact ((hP s).mul (hAway s hm)).meromorphicOrderAt_nonneg
+  · intro s hs
+    rw [toMeromorphicNFOn_eq_toMeromorphicNFAt hPL (mem_univ s),
+      toMeromorphicNFAt_eq_self.mpr ((hP s).mul (hAway s hs)).meromorphicNFAt]
+    rfl
+
 /-- The completed L-function of the trivial character times `s (s - 1)` extends to an entire
 function. -/
 private theorem exists_trivial_entire (F : Type*) [Field F] [NumberField F] :
@@ -832,7 +861,7 @@ private theorem exists_trivial_entire (F : Type*) [Field F] [NumberField F] :
       continuedCompletedHeckeL (1 : PontryaginDual (IdeleClassGroup (𝓞 F) F)) s := by
   obtain ⟨hA, h0, h1⟩ := uniform_trivial_poles F
   have hL := (continuedCompletedHeckeL_spec (1 : PontryaginDual (IdeleClassGroup (𝓞 F) F))).1
-  obtain ⟨E, hE, hEeq⟩ := exists_entire_eq_prod_sub_mul_of_finite_simple_poles hL {0, 1}
+  obtain ⟨E, hE, hEeq⟩ := clear_simple_poles hL {0, 1}
     (fun s hs ↦ hA s (by simpa using hs)) (fun s ↦ by
       by_cases hs : s = 0 ∨ s = 1
       · rcases hs with rfl | rfl
