@@ -3,8 +3,11 @@ module
 public import Mathlib.NumberTheory.LSeries.DirichletContinuation
 public import Mathlib.Analysis.Analytic.Order
 public import Mathlib.NumberTheory.DirichletCharacter.Orthogonality
+public import RiemannMasullo.Ch10_TraceSpectral.Sec3_DirichletZeroCount
 import Mathlib.Analysis.Calculus.BumpFunction.InnerProduct
 import Mathlib.NumberTheory.Bertrand
+import Mathlib.Analysis.Real.Pi.Bounds
+import Mathlib.Analysis.Complex.ExponentialBounds
 import Mathlib.RingTheory.RootsOfUnity.AlgebraicallyClosed
 
 /-!
@@ -17,21 +20,24 @@ that input is Selberg's count for the Riemann zeta function
 shows that it is enough to have such pairs for some primitive Dirichlet character, which may
 depend on the distance (`PrimitiveDirichletLCloseCriticalZeros` there).
 
-This file proves that statement (`primitiveDirichletL_closeCriticalZeros`) from two theorems of
-the literature, each stated as a `Classical input:` with `sorry`:
+This file proves that statement (`primitiveDirichletL_closeCriticalZeros`) from one theorem of
+the literature, stated as a `Classical input:` with `sorry`:
 
 * `conreyIwaniecSoundararajan_simpleCriticalZeros`: Conrey–Iwaniec–Soundararajan, *Critical
   zeros of Dirichlet L-functions*, arXiv:1105.1177, Theorem 1, (1.5), p. 2. On average over the
   primitive characters of modulus about `Q`, at least `14/25` of the zeros with `|γ| ≤ T` are
   simple zeros on the critical line, for `(log Q)^6 ≤ T ≤ (log Q)^A`.
-* `dirichletStripZeroCount_asymptotic`: the zero count (1.2), p. 1 of the same paper,
-  `N(T, χ) = (T / π) log (q T / (2 π e)) + O(log q T)` for `T ≥ 3`, uniformly in `q`.
+
+The lower bound for the zero count that the argument also needs,
+`2π N(T, χ) ≥ ⌊T/4⌋ (log (T/4)/2 - c) - 8 (log T/2 + log q + c)`, is proved in
+`Sec3_DirichletZeroCount.lean` (`DirichletZeroCount.dirichletStripZeroCount_lower`), together with
+the definitions of `N(T, χ)` and `N₀'(T, χ)`.
 
 The argument. Fix one smooth weight `Ψ` supported in `[1, 4]` and take `T = (log Q)^6`. Every
-character of the family has `N(T, χ) ≥ c T log Q`, so by (1.5) some single character `χ` has at
-least `(14/25) c T log Q` simple critical-line zeros with `|γ| ≤ T`. A prime in `(Q, 2Q + 2]`
+character of the family has `N(T, χ) ≥ c T log T`, so by (1.5) some single character `χ` has at
+least `(14/25) c T log T` simple critical-line zeros with `|γ| ≤ T`. A prime in `(Q, 2Q + 2]`
 (Bertrand) makes the family nonempty. Those zeros have distinct ordinates in an interval of
-length `2T`, so two of them are within `O(1 / log Q)` of each other.
+length `2T`, so two of them are within `O(1 / log T)` of each other.
 
 Nothing here is a statement of the paper. The file uses no formalization of the Riemann
 hypothesis.
@@ -43,19 +49,6 @@ open Complex Set
 open scoped ContDiff
 
 namespace RiemannMasullo
-
-/-- `N(T, χ)` of Conrey–Iwaniec–Soundararajan (arXiv:1105.1177, p. 1): the number of zeros
-`ρ = β + iγ` of `L(s, χ)` with `0 < β < 1` and `|γ| ≤ T`, each counted with its multiplicity,
-as in their Appendix (before (A.6)). Not a statement of the paper. -/
-noncomputable def dirichletStripZeroCount {N : ℕ} [NeZero N] (χ : DirichletCharacter ℂ N)
-    (T : ℝ) : ℕ :=
-  ∑ᶠ (s : ℂ) (_ : 0 < s.re ∧ s.re < 1 ∧ |s.im| ≤ T), (analyticOrderAt χ.LFunction s).toNat
-
-/-- `N₀'(T, χ)` of Conrey–Iwaniec–Soundararajan (arXiv:1105.1177, p. 1): the number of simple
-zeros `ρ = 1/2 + iγ` of `L(s, χ)` with `|γ| ≤ T`. Not a statement of the paper. -/
-noncomputable def dirichletSimpleCriticalZeroCount {N : ℕ} [NeZero N]
-    (χ : DirichletCharacter ℂ N) (T : ℝ) : ℕ :=
-  {γ : ℝ | |γ| ≤ T ∧ analyticOrderAt χ.LFunction ((1 / 2 : ℂ) + γ * I) = 1}.ncard
 
 open scoped Classical in
 /-- Classical input: J. B. Conrey, H. Iwaniec and K. Soundararajan, *Critical zeros of
@@ -80,20 +73,6 @@ theorem conreyIwaniecSoundararajan_simpleCriticalZeros (Ψ : ℝ → ℝ) (_hΨ 
           ∑ n ∈ Finset.range M, Ψ ((n + 1 : ℕ) / Q) / (n + 1).totient *
             ∑ χ : DirichletCharacter ℂ (n + 1) with χ.IsPrimitive,
               (dirichletSimpleCriticalZeroCount χ T : ℝ) := by
-  sorry
-
-/-- Classical input: the number of zeros of a primitive Dirichlet L-function in the critical
-strip up to height `T`, uniformly in the modulus: `N(T, χ) = (T/π) log (qT/(2πe)) + O(log qT)`
-for `T ≥ 3`, as stated (as known) in J. B. Conrey, H. Iwaniec and K. Soundararajan,
-arXiv:1105.1177, (1.2), p. 1, where it is used uniformly over the family of (1.4). Not a
-statement of the paper and not a gap in it: a classical theorem of which this project has no
-formal proof. It is used, through its lower bound, by
-`primitiveDirichletL_closeCriticalZeros`. -/
-theorem dirichletStripZeroCount_asymptotic :
-    ∃ C : ℝ, ∀ (q : ℕ) [NeZero q] (χ : DirichletCharacter ℂ q), χ.IsPrimitive →
-      ∀ T : ℝ, 3 ≤ T →
-        |(dirichletStripZeroCount χ T : ℝ) - T / Real.pi * Real.log (q * T / (2 * Real.pi *
-          Real.exp 1))| ≤ C * Real.log (q * T) := by
   sorry
 
 /-- A finite set of at least two reals in `[-T, T]` has two distinct points within
@@ -172,73 +151,118 @@ private theorem exists_weight : ∃ Ψ : ℝ → ℝ, (∀ x, 0 ≤ Ψ x) ∧ Co
     rw [f.support_eq] at this
     exact (hball x).mp this
 
-/-- The lower half of (1.2) for a modulus in `(Q, 4Q)`, with the modulus replaced by `Q` in the
-main term and by `4Q` in the error term. -/
-private theorem stripZeroCount_lower {C : ℝ}
-    (hC : ∀ (q : ℕ) [NeZero q] (χ : DirichletCharacter ℂ q), χ.IsPrimitive →
-      ∀ T : ℝ, 3 ≤ T →
-        |(dirichletStripZeroCount χ T : ℝ) - T / Real.pi * Real.log (q * T / (2 * Real.pi *
-          Real.exp 1))| ≤ C * Real.log (q * T))
-    {Q T : ℝ} (hQ : 0 < Q) (hT : 3 ≤ T) {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q)
-    (hχ : χ.IsPrimitive) (h1 : Q < q) (h4 : (q : ℝ) < 4 * Q) :
-    T / Real.pi * Real.log (Q * T / (2 * Real.pi * Real.exp 1)) - |C| * Real.log (4 * Q * T) ≤
-      dirichletStripZeroCount χ T := by
-  have hlow := (abs_le.mp (hC q χ hχ T hT)).1
-  have hlog1 : Real.log (Q * T / (2 * Real.pi * Real.exp 1)) ≤
-      Real.log (q * T / (2 * Real.pi * Real.exp 1)) := by
-    apply Real.log_le_log (by positivity)
-    gcongr
-  have hq1 : (1 : ℝ) ≤ q := by exact_mod_cast Nat.one_le_iff_ne_zero.mpr (NeZero.ne q)
-  have hqT : 1 ≤ (q : ℝ) * T := by nlinarith
-  have hlog2 : C * Real.log (q * T) ≤ |C| * Real.log (4 * Q * T) := by
-    calc C * Real.log (q * T) ≤ |C| * Real.log (q * T) :=
-          mul_le_mul_of_nonneg_right (le_abs_self C) (Real.log_nonneg hqT)
-      _ ≤ |C| * Real.log (4 * Q * T) := by gcongr
-  have hTπ : 0 ≤ T / Real.pi := by positivity
-  nlinarith [mul_le_mul_of_nonneg_left hlog1 hTπ]
+open scoped LSeries.notation in
+/-- The family bound: a primitive character of modulus `q ∈ (Q, 4Q)` with `q ≥ 2` has
+`N(T, χ) ≥ (⌊T/4⌋ (log (T/4)/2 - A) - 8 (log T/2 + log (4Q) + A)) / (2π)` for `T ≥ 16`, where
+`A = 1 + 3K + B` collects the absolute constants of `dirichletStripZeroCount_lower`. -/
+private theorem family_zero_count_lower {Q T : ℝ} (hT : 16 ≤ T) {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (hχ : χ.IsPrimitive) (hq2 : 2 ≤ q) (h4 : (q : ℝ) < 4 * Q) :
+    let B := ∑' n, ‖LSeries.term ↗ArithmeticFunction.vonMangoldt 2 n‖
+    let A := 1 + 3 * ((Real.log Real.pi + Real.log 4 + 1) / 2 + B) + B
+    ((⌊T / 4⌋₊ : ℝ) * (Real.log (T / 4) / 2 - A) - 8 * (Real.log T / 2 + Real.log (4 * Q) + A)) /
+        (2 * Real.pi) ≤ dirichletStripZeroCount χ T := by
+  intro B A
+  have hχ1 : χ ≠ 1 := by
+    rintro rfl
+    have h := hχ
+    rw [DirichletCharacter.isPrimitive_def, DirichletCharacter.conductor_one] at h
+    omega
+  have hmain := DirichletZeroCount.dirichletStripZeroCount_lower χ hχ hχ1 (T := T / 2)
+    (by linarith)
+  simp only at hmain
+  rw [show 2 * (T / 2) = T by ring, show T / 2 / 2 = T / 4 by ring] at hmain
+  have hB0 : 0 ≤ B := tsum_nonneg fun _ ↦ norm_nonneg _
+  have hπ : 0 < Real.log Real.pi := Real.log_pos (by linarith [Real.pi_gt_three])
+  have hl4 : 0 < Real.log 4 := Real.log_pos (by norm_num)
+  have hl2 : Real.log 2 < 1 := by
+    have := Real.log_two_lt_d9; linarith
+  have hl20 : 0 < Real.log 2 := Real.log_pos (by norm_num)
+  have hK0 : 0 ≤ (Real.log Real.pi + Real.log 4 + 1) / 2 + B := by positivity
+  have hq : Real.log q ≤ Real.log (4 * Q) :=
+    Real.log_le_log (by exact_mod_cast (show 0 < q by omega)) h4.le
+  have hfl : (0 : ℝ) ≤ ⌊T / 4⌋₊ := Nat.cast_nonneg _
+  rw [div_le_iff₀ (by positivity)]
+  have e1 : (⌊T / 4⌋₊ : ℝ) * (Real.log (T / 4) / 2 - A) ≤
+      (⌊T / 4⌋₊ : ℝ) * (Real.log (T / 4) / 2 - (2 * ((Real.log Real.pi + Real.log 4 + 1) / 2 + B) +
+        Real.log 2 / 2)) := by
+    apply mul_le_mul_of_nonneg_left _ hfl
+    simp only [A]; linarith
+  have e2 : 8 * (Real.log (T) / 2 + Real.log q + (1 / 2 + B + Real.log 2 / 2 +
+      ((Real.log Real.pi + Real.log 4 + 1) / 2 + B))) ≤
+      8 * (Real.log T / 2 + Real.log (4 * Q) + A) := by
+    simp only [A]; linarith
+  have e3 := mul_comm (dirichletStripZeroCount χ T : ℝ) (2 * Real.pi)
+  linarith
 
-/-- With `T = (log Q)^6`, the lower bound of `stripZeroCount_lower`, times `14/25`, exceeds
-`1 + 2T/δ` once `log Q` is large. -/
-private theorem eventually_many_zeros (C δ : ℝ) :
+/-- With `T = (log Q)^6`, the family bound times `14/25` exceeds `1 + 2T/δ` once `log Q` is
+large. -/
+private theorem eventually_many_zeros {A : ℝ} (hA : 0 ≤ A) (δ : ℝ) (hδ : 0 < δ) :
     ∃ ℓ₀ : ℝ, 2 ≤ ℓ₀ ∧ ∀ Q : ℝ, 0 < Q → ℓ₀ ≤ Real.log Q →
-      2 * Real.log Q ^ 6 / δ < 14 / 25 * (Real.log Q ^ 6 / Real.pi *
-        Real.log (Q * Real.log Q ^ 6 / (2 * Real.pi * Real.exp 1)) -
-          |C| * Real.log (4 * Q * Real.log Q ^ 6)) - 1 := by
-  set c₁ : ℝ := Real.log (2 * Real.pi * Real.exp 1)
-  set B : ℝ := 2 / δ + 14 / 25 * |C| * (Real.log 4 + 7) + 1 with hB
-  refine ⟨max 2 (c₁ + 25 * Real.pi * B / 14 + 1), le_max_left _ _, fun Q hQ hℓ ↦ ?_⟩
+      2 * Real.log Q ^ 6 / δ < 14 / 25 * (((⌊Real.log Q ^ 6 / 4⌋₊ : ℝ) *
+        (Real.log (Real.log Q ^ 6 / 4) / 2 - A) - 8 * (Real.log (Real.log Q ^ 6) / 2 +
+          Real.log (4 * Q) + A)) / (2 * Real.pi)) - 1 := by
+  set c₁ : ℝ := Real.log 4 / 2 + A
+  set c₂ : ℝ := 8 * (4 + Real.log 4 + A)
+  set L₀ : ℝ := (8 * ((2 / δ + 2) * (50 * Real.pi / 14) + c₂) + c₁) / 3
+  refine ⟨max 2 (Real.exp L₀), le_max_left _ _, fun Q hQ hℓ ↦ ?_⟩
   set ℓ := Real.log Q
   have hℓ2 : 2 ≤ ℓ := (le_max_left _ _).trans hℓ
-  have hℓc : c₁ + 25 * Real.pi * B / 14 + 1 ≤ ℓ := (le_max_right _ _).trans hℓ
+  have hℓL : L₀ ≤ Real.log ℓ :=
+    (Real.le_log_iff_exp_le (by linarith)).mpr ((le_max_right _ _).trans hℓ)
   set T := ℓ ^ 6 with hT
   have hTℓ : ℓ ≤ T := by
     calc ℓ = ℓ ^ 1 := (pow_one ℓ).symm
       _ ≤ ℓ ^ 6 := pow_le_pow_right₀ (by linarith) (by norm_num)
-  have hT0 : 0 < T := by positivity
+  have hT64 : 64 ≤ T := by
+    calc (64 : ℝ) = 2 ^ 6 := by norm_num
+      _ ≤ ℓ ^ 6 := by gcongr
   have hlogT : Real.log T = 6 * Real.log ℓ := by rw [hT, Real.log_pow]; norm_num
   have hlogℓ : Real.log ℓ ≤ ℓ := (Real.log_le_sub_one_of_pos (by linarith)).trans (by linarith)
-  have hlogℓ0 : 0 ≤ Real.log ℓ := Real.log_nonneg (by linarith)
-  have hlog4 : 0 < Real.log 4 := Real.log_pos (by norm_num)
-  have hA1 : ℓ - c₁ ≤ Real.log (Q * T / (2 * Real.pi * Real.exp 1)) := by
-    rw [Real.log_div (by positivity) (by positivity), Real.log_mul hQ.ne' hT0.ne', hlogT]
-    linarith
-  have hA2 : Real.log (4 * Q * T) ≤ (Real.log 4 + 7) * T := by
-    rw [Real.log_mul (by positivity) hT0.ne', Real.log_mul (by norm_num) hQ.ne', hlogT]
-    nlinarith
+  have hl4 : 0 < Real.log 4 := Real.log_pos (by norm_num)
   have hπ : 0 < Real.pi := Real.pi_pos
-  have h1 : T * B * 25 / 14 < T / Real.pi * (ℓ - c₁) := by
-    rw [div_mul_eq_mul_div, lt_div_iff₀ hπ]
-    have : 25 * Real.pi * B / 14 < ℓ - c₁ := by linarith
+  have hfloor : T / 8 ≤ (⌊T / 4⌋₊ : ℝ) := by
+    have := Nat.lt_floor_add_one (T / 4); linarith
+  have hlog4 : Real.log (T / 4) = 6 * Real.log ℓ - Real.log 4 := by
+    rw [Real.log_div (by positivity) (by norm_num), hlogT]
+  have hlogQ : Real.log (4 * Q) = Real.log 4 + ℓ := by
+    rw [Real.log_mul (by norm_num) hQ.ne']
+  have hc1 : 0 ≤ 3 * Real.log ℓ - c₁ := by
+    have : 0 ≤ (2 / δ + 2) * (50 * Real.pi / 14) := by positivity
+    have : 0 ≤ c₂ := by positivity
+    have hL0 : 3 * L₀ = 8 * ((2 / δ + 2) * (50 * Real.pi / 14) + c₂) + c₁ := by
+      simp only [L₀]; ring
+    linarith
+  have hmainT : T / 8 * (3 * Real.log ℓ - c₁) ≤
+      (⌊T / 4⌋₊ : ℝ) * (Real.log (T / 4) / 2 - A) := by
+    rw [hlog4]
+    have : Real.log 4 / 2 + A = c₁ := rfl
+    calc T / 8 * (3 * Real.log ℓ - c₁) ≤ (⌊T / 4⌋₊ : ℝ) * (3 * Real.log ℓ - c₁) :=
+          mul_le_mul_of_nonneg_right hfloor hc1
+      _ = _ := by rw [← this]; ring
+  have herr : 8 * (Real.log T / 2 + Real.log (4 * Q) + A) ≤ T * c₂ := by
+    rw [hlogT, hlogQ]
+    have : 8 * (6 * Real.log ℓ / 2 + (Real.log 4 + ℓ) + A) ≤ 8 * (4 * ℓ + Real.log 4 + A) := by
+      nlinarith
+    have h2 : 8 * (4 * ℓ + Real.log 4 + A) ≤ T * c₂ := by
+      simp only [c₂]; nlinarith
+    linarith
+  set Y : ℝ := (2 / δ + 2) * (50 * Real.pi / 14)
+  have hL : Y ≤ (3 * Real.log ℓ - c₁) / 8 - c₂ := by
+    simp only [L₀] at hℓL; simp only [Y]; linarith
+  set X := (⌊T / 4⌋₊ : ℝ) * (Real.log (T / 4) / 2 - A) -
+    8 * (Real.log T / 2 + Real.log (4 * Q) + A)
+  have hX : T * Y ≤ X := by
+    have h1 : T * Y ≤ T * ((3 * Real.log ℓ - c₁) / 8 - c₂) :=
+      mul_le_mul_of_nonneg_left hL (by linarith)
+    simp only [X]
     nlinarith
-  have h2 : T / Real.pi * (ℓ - c₁) ≤
-      T / Real.pi * Real.log (Q * T / (2 * Real.pi * Real.exp 1)) :=
-    mul_le_mul_of_nonneg_left hA1 (by positivity)
-  have h3 : |C| * Real.log (4 * Q * T) ≤ |C| * ((Real.log 4 + 7) * T) :=
-    mul_le_mul_of_nonneg_left hA2 (abs_nonneg C)
-  have hδT : 2 * T / δ = T * (2 / δ) := by ring
-  rw [hδT]
-  rw [hB] at h1
-  nlinarith [abs_nonneg C]
+  have hmono : 14 / 25 * (T * Y / (2 * Real.pi)) ≤ 14 / 25 * (X / (2 * Real.pi)) := by
+    gcongr
+  have hval : 14 / 25 * (T * Y / (2 * Real.pi)) = T * (2 / δ + 2) := by
+    simp only [Y]; field_simp; ring
+  have h2T : 2 * T / δ = T * (2 / δ) := by ring
+  rw [h2T]
+  linarith
 
 open scoped Classical in
 /-- The weighted average of (1.5): if every character of the family with positive weight has
@@ -329,10 +353,10 @@ ordinates differ by less than `δ`; the character depends on `δ`.
 
 The statement is, word for word, the proposition `PrimitiveDirichletLCloseCriticalZeros` of
 PR #7538, from which that PR refutes the uniform constant after (10.3.1.18), p. 451
-(`ERRATA.md`, F214). It is proved here from the classical inputs
-`conreyIwaniecSoundararajan_simpleCriticalZeros` (arXiv:1105.1177, Theorem 1) and
-`dirichletStripZeroCount_asymptotic` (ibid., (1.2)), in place of Selberg's theorem
-(`spectralLineJet_rational_critical_zero_count`, issue #6742). -/
+(`ERRATA.md`, F214). It is proved here from the classical input
+`conreyIwaniecSoundararajan_simpleCriticalZeros` (arXiv:1105.1177, Theorem 1) and the proved
+lower bound `DirichletZeroCount.dirichletStripZeroCount_lower` for the zero count, in place of
+Selberg's theorem (`spectralLineJet_rational_critical_zero_count`, issue #6742). -/
 theorem primitiveDirichletL_closeCriticalZeros :
     ∀ δ : ℝ, 0 < δ → ∃ (N : ℕ) (_ : NeZero N) (χ : DirichletCharacter ℂ N), χ.IsPrimitive ∧
       ∃ t u : ℝ, t ≠ u ∧ |t - u| < δ ∧
@@ -340,11 +364,17 @@ theorem primitiveDirichletL_closeCriticalZeros :
         χ.LFunction ((1 / 2 : ℂ) + (u : ℂ) * Complex.I) = 0 := by
   classical
   intro δ hδ
-  obtain ⟨C, hC⟩ := dirichletStripZeroCount_asymptotic
+  set B : ℝ := ∑' n, ‖LSeries.term (fun n ↦ (ArithmeticFunction.vonMangoldt n : ℂ)) 2 n‖
+  set A : ℝ := 1 + 3 * ((Real.log Real.pi + Real.log 4 + 1) / 2 + B) + B with hAdef
+  have hA : 0 ≤ A := by
+    have hB0 : 0 ≤ B := tsum_nonneg fun _ ↦ norm_nonneg _
+    have hπ : 0 < Real.log Real.pi := Real.log_pos (by linarith [Real.pi_gt_three])
+    have hl4 : 0 < Real.log 4 := Real.log_pos (by norm_num)
+    positivity
   obtain ⟨Ψ, hΨnn, hΨsmooth, hΨsupp, hΨtsupp, hΨpos, hΨwin⟩ := exists_weight
   obtain ⟨Q₀, hQ₀⟩ := conreyIwaniecSoundararajan_simpleCriticalZeros Ψ hΨnn hΨsmooth hΨsupp
     hΨtsupp 6 le_rfl
-  obtain ⟨ℓ₀, hℓ₀2, hbig⟩ := eventually_many_zeros C δ
+  obtain ⟨ℓ₀, hℓ₀2, hbig⟩ := eventually_many_zeros hA δ hδ
   -- the scale
   set Q : ℝ := max (max Q₀ 3) (Real.exp ℓ₀) with hQ
   have hQ₀Q : Q₀ ≤ Q := le_trans (le_max_left _ _) (le_max_left _ _)
@@ -356,8 +386,8 @@ theorem primitiveDirichletL_closeCriticalZeros :
     calc (64 : ℝ) = 2 ^ 6 := by norm_num
       _ ≤ Real.log Q ^ 6 := by gcongr; linarith
   have hT0 : 0 < T := by linarith
-  set K : ℝ := 14 / 25 * (T / Real.pi * Real.log (Q * T / (2 * Real.pi * Real.exp 1)) -
-    |C| * Real.log (4 * Q * T)) with hK
+  set K : ℝ := 14 / 25 * (((⌊T / 4⌋₊ : ℝ) * (Real.log (T / 4) / 2 - A) -
+    8 * (Real.log T / 2 + Real.log (4 * Q) + A)) / (2 * Real.pi)) with hK
   have hKbig : 2 * T / δ < K - 1 := hbig Q hQpos hℓ
   have hK1 : 1 < K := by
     have : 0 < 2 * T / δ := by positivity
@@ -387,7 +417,11 @@ theorem primitiveDirichletL_closeCriticalZeros :
     obtain ⟨h1, h4⟩ := hΨwin _ hΨ
     rw [lt_div_iff₀ hQpos, one_mul] at h1
     rw [div_lt_iff₀ hQpos] at h4
-    have := stripZeroCount_lower (T := T) hC hQpos (by linarith) χ hχ h1 h4
+    have hq2 : 2 ≤ n + 1 := by
+      have : (2 : ℝ) < ((n + 1 : ℕ) : ℝ) := by linarith
+      exact_mod_cast this.le
+    have := family_zero_count_lower (T := T) (Q := Q) (by linarith) χ hχ hq2 h4
+    simp only at this
     rw [hK]
     linarith
   -- a prime of the family, and a primitive character modulo it
