@@ -5,6 +5,7 @@ import Mathlib.Analysis.SpecialFunctions.Complex.LogBounds
 import Mathlib.Algebra.Polynomial.Roots
 import Mathlib.Analysis.Real.Pi.Bounds
 import Mathlib.NumberTheory.Transcendental.Liouville.Basic
+import RiemannMasullo.ForMathlib.NumberTheory.Transcendental.Baker.TwoLogarithms
 
 /-! # Separation of the exponential lattices of two integer logarithms -/
 
@@ -83,22 +84,22 @@ private theorem baker_two_logarithms_of_not_liouville {P Q : ℝ} (hQ : 0 < Q) (
     rw [e, abs_neg] at h'
     simpa only [Int.cast_neg, abs_neg] using h'
 
-/-- Classical input: for multiplicatively independent integers `1 < p < q`, the
-ratio of their real logarithms has finite irrationality measure. This is the
-non-effective two-logarithm consequence of A. Baker and G. Wüstholz,
-*Logarithmic forms and group varieties*, J. reine angew. Math. 442 (1993), 19–62. -/
+/-- For multiplicatively independent integers `1 < p < q`, the ratio of their real
+logarithms has finite irrationality measure. This is the two-logarithm case of the
+Baker–Feldman bound (A. Baker, *Transcendental Number Theory*, Theorem 3.1), proved in
+`Transcendental/Baker/` by a port of the HOL Light development `Baker/`. -/
 private theorem baker_two_logarithms_not_liouville_of_independent (p q : ℕ)
     (hp : 1 < p) (hpq : p < q) (hind : ¬ ∃ k l : ℕ, 0 < k ∧ 0 < l ∧ p ^ k = q ^ l) :
-    ¬ Liouville (Real.log p / Real.log q) := by
-  sorry
+    ¬ Liouville (Real.log p / Real.log q) :=
+  Baker.not_liouville_log_div_log_of_independent p q hp hpq hind
 
 /-- The Baker–Wüstholz theorem on linear forms in logarithms, for two fixed integers:
 A. Baker and G. Wüstholz, *Logarithmic forms and group varieties*, J. reine angew.
 Math. 442 (1993), 19–62. For two fixed integers greater than one, the reciprocal
 of a nonzero integral linear form in their real logarithms grows at most
-polynomially in the coefficients. Proved here (#7362) from the classical input
+polynomially in the coefficients. Proved here (#7362) from
 `baker_two_logarithms_not_liouville_of_independent`, the case of multiplicatively independent
-integers, which is not proved in Lean. -/
+integers. -/
 private theorem baker_two_logarithms (p q : ℕ) (hp : 1 < p) (hq : 1 < q) :
     ∃ d : ℕ, ∃ B ≥ (0 : ℝ), ∀ m n : ℤ,
       (m : ℝ) * Real.log p + n * Real.log q ≠ 0 →

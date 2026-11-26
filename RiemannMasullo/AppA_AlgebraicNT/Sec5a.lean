@@ -1226,9 +1226,9 @@ private theorem sUnitLog_finite_near_zero :
     rw [mul_comm, ← le_div_iff₀ (lt_of_lt_of_le (by norm_num) hm)] at hlog
     exact hlog.trans (div_le_self hr hm)
 
-/-- The logarithms of an integral basis of the S-units modulo torsion are real-linearly
-independent. -/
-private theorem sUnitLog_basis_linearIndependent :
+/-- The logarithm vectors of a ℤ-basis of the S-units modulo torsion are linearly independent
+over ℝ. A private lemma with the same statement stands in `AppA_AlgebraicNT/Sec2b.lean`. -/
+theorem sUnitLog_basis_linearIndependent :
     LinearIndependent ℝ (fun i ↦ sIdeleLog F S (unitAtS (bₛ i).toMul.out)) := by
   let L := sUnitLogHom F S
   have hr : 0 < Real.log 2 / 2 := div_pos (Real.log_pos (by norm_num)) (by norm_num)
