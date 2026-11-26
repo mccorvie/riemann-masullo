@@ -11,6 +11,7 @@ import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import all RiemannMasullo.Ch09_HardySobolev.Sec3
 import RiemannMasullo.ForMathlib.Analysis.Complex.ExpSumUniqueness
 import Mathlib.Analysis.Calculus.BumpFunction.Normed
+import Mathlib.Analysis.Normed.Group.Tannery
 
 /-! # Trace formula: the Main Theorem
 
@@ -1617,5 +1618,427 @@ theorem traceFormula_exteriorZeros_of_stripTrace (τ : ℝ≥0ˣ →ₜ* C𝔽)
   exact hasSum_empty
 
 end GlobalDiagonal
+
+namespace OutputProjectedLine
+
+open scoped ENNReal Pointwise
+attribute [local instance] instSpectralQuotientPolynormableSec3
+
+local notation "line" => (le_refl (0 : ℝ))
+local notation "lineInterval" => ((neg_nonpos.mpr line).trans line)
+local notation "W(" s ")" => CompactIntervalSobolev μ𝔽 (logIdeleClassNorm F) (-(0 : ℝ)) 0 s
+local notation "weight(" s ")" => (fun x : C𝔽 ↦ intervalSobolevDensity (-(0 : ℝ)) 0 s (logIdeleClassNorm F x))
+local notation "ν(" s ")" => ((μ𝔽).withDensity fun x ↦ ENNReal.ofReal (weight(s) x))
+local notation "ν'(" s ")" => ((μ𝔽).withDensity fun x ↦ ENNReal.ofReal (weight(s) x)⁻¹)
+local notation "L²(" s ")" => Lp ℂ 2 ((ν(s)).prod (ν'(s)))
+local notation "PA(" a ", " hs ", " φ ")" => (spectralProjection (F := F) a line hs).comp
+  (hardySobolevTestAction μ𝔽 m𝔽 _ _ _ lineInterval hs φ)
+local notation "Aq(" a ", " hs ", " φ ")" => spectralConvolution (F := F) a lineInterval hs φ
+local notation "θ(" a ", " hs ")" => globalThetaSobolev F a lineInterval hs
+local notation "rows(" s ", " T ", " k ")" => (∀ u : W(s), ∀ᵐ x ∂μ𝔽,
+  Integrable (fun y ↦ k (x,y) * u y) μ𝔽 ∧ T u x = ∫ y, k (x,y) * u y ∂μ𝔽)
+
+/-- Paper: Theorem 10.4.3.4(1), p. 470. Quotient nuclearity selects the unique mixed-weight
+Haar kernel for the line projection applied after convolution. -/
+theorem existsUnique_haarKernel (a : ℝ) {s : ℝ} (hs : 0 ≤ s) (φ : BruhatCompactSupport C𝔽)
+    (hQ : IsNuclearOperator (Aq(a,hs,φ))) : ∃! k : L²(s), rows(s,PA(a,hs,φ),k) := by
+  have hn := spectralProjection_convolution_nuclear (F := F) a line hs φ hQ
+  obtain ⟨K,hK⟩ := ((existsUnique_sobolevProjectiveKernel_iff_nuclear line hs _).mpr hn).exists
+  let R (T : W(s) →L[ℂ] W(s)) := ∃! k : L²(s), rows(s,T,k)
+  exact (congrArg R hK).mp (sobolevProjectiveKernel_existsUnique_l2 (F := F) line hs K)
+
+private theorem trace_eq_quotient (a : ℝ) {s : ℝ} (hs : 0 ≤ s) (φ : BruhatCompactSupport C𝔽)
+    (hQ : IsNuclearOperator (Aq(a,hs,φ))) :
+    hilbertTrace ⟨PA(a,hs,φ),spectralProjection_convolution_nuclear (F := F) a line hs φ hQ⟩ =
+      hilbertTrace ⟨Aq(a,hs,φ),hQ⟩ := by
+  let j := (θ(a,hs)).orthogonal.subtypeL.comp
+    (θ(a,hs)).quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
+  let q := (θ(a,hs)).mkQL
+  let T := PA(a,hs,φ)
+  let B := Aq(a,hs,φ)
+  have hqj : q.comp j = ContinuousLinearMap.id ℂ _ := by
+    ext x
+    exact (θ(a,hs)).quotientEquivOrthogonal.symm_apply_apply x
+  have hfac : T = j.comp (B.comp q) := spectralProjection_convolution_factor (F := F) a line hs φ
+  have htj : T.comp j = j.comp B := by
+    rw [hfac, ContinuousLinearMap.comp_assoc j (B.comp q) j, ContinuousLinearMap.comp_assoc B q j, hqj,
+      ContinuousLinearMap.comp_id]
+  have ht : (T.comp j).comp q = T := by rw [htj, ContinuousLinearMap.comp_assoc j B q, ← hfac]
+  have hb : q.comp (T.comp j) = B := by rw [htj, ← ContinuousLinearMap.comp_assoc q j B, hqj,
+    ContinuousLinearMap.id_comp]
+  obtain ⟨_,htrace⟩ := stripDiagonal_quotient_compression q j hqj T
+    (spectralProjection_convolution_nuclear (F := F) a line hs φ hQ) ht
+  exact htrace.trans (congrArg hilbertTrace (Subtype.ext hb))
+
+/-- At a regular center, the averages of convolution minus the Haar kernel converge
+to the value at one minus the regular spectral value. -/
+private theorem centered_convolution_sub_of_regular (φ : BruhatCompactSupport C𝔽)
+    (K : C𝔽 × C𝔽 → ℂ) (hK : LocallyIntegrable K ((μ𝔽).prod μ𝔽))
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n))
+    (x : C𝔽) (hreg : (x,x) ∈ dSequenceRegularSet ((μ𝔽).prod μ𝔽) (fun n ↦ U n ×ˢ U n) K) :
+    dSequenceKernelSmoothening μ𝔽 U (fun p ↦ φ.val (p.1*p.2⁻¹) - K p) (x,x) - φ.val 1 =
+      -dSequenceKernelSmoothening μ𝔽 U K (x,x) := by
+  let μ := (μ𝔽).prod μ𝔽
+  let rects (n : ℕ) := U n ×ˢ U n
+  let p := (x,x)
+  let f (q : C𝔽 × C𝔽) := φ.val (q.1*q.2⁻¹)
+  obtain ⟨W, hW, hint⟩ := hK p
+  have hpre : (fun y : C𝔽 × C𝔽 ↦ p * y) ⁻¹' W ∈ 𝓝 (1 : C𝔽 × C𝔽) :=
+    (continuous_const_mul p).continuousAt.preimage_mem_nhds (by simpa only [mul_one] using hW)
+  obtain ⟨A,hA,B,hB,hAB⟩ := mem_nhds_prod_iff.mp hpre
+  obtain ⟨N,hN⟩ := hU.2 _ (inter_mem hA hB)
+  have hi : ∀ᶠ n in atTop, IntegrableOn K (p • rects n) μ := by
+    filter_upwards [eventually_ge_atTop N] with n hn
+    have hsmall := (hU.1.2.1 hn).trans hN
+    exact hint.mono_set (Set.smul_set_subset_iff.mpr ((Set.prod_mono
+      (hsmall.trans inter_subset_left) (hsmall.trans inter_subset_right)).trans hAB))
+  obtain ⟨hfi,hf⟩ := diagonal_mem_convolutionKernelRegularSet_averages hU hBorel φ x
+  obtain ⟨v,hv⟩ := hreg
+  change Tendsto (fun n ↦ dSequenceAverage μ (rects n) K p) atTop (𝓝 v) at hv
+  have hlim : Tendsto (fun n ↦ dSequenceAverage μ (rects n) (fun q ↦ f q - K q) p)
+      atTop (𝓝 (φ.val 1 - v)) := by
+    apply (hf.sub hv).congr'
+    filter_upwards [hfi,hi] with n hn hk
+    exact (setAverage_fun_sub hn hk).symm
+  have hfg : p ∈ dSequenceRegularSet μ rects (fun q ↦ f q - K q) := ⟨_,hlim⟩
+  have hg : p ∈ dSequenceRegularSet μ rects K := ⟨_,hv⟩
+  change dSequenceSmootheningOrZero μ rects (fun q ↦ f q - K q) p - φ.val 1 =
+    -dSequenceSmootheningOrZero μ rects K p
+  simp only [dSequenceSmootheningOrZero, dite_eq_left hfg, dite_eq_left hg,
+    dSequenceSmoothening, hlim.limUnder_eq, hv.limUnder_eq]
+  abel
+
+/-- Paper: Theorem 12.1.1.3, pp. 502–503. Subtracting the value of an arbitrary
+Bruhat test at one from the smoothened geometric diagonal gives an integrable
+Haar function with integral equal to the negative quotient trace. -/
+theorem geometricDiagonal_sub_atOne_eq_neg_quotient (a : ℝ) {s : ℝ} (hs : 0 ≤ s)
+    (φ : BruhatCompactSupport C𝔽) (hQ : IsNuclearOperator (Aq(a,hs,φ)))
+    (k : L²(s)) (hk : rows(s,PA(a,hs,φ),k)) (U : ℕ → Set C𝔽)
+    (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    let G (x : C𝔽) := dSequenceKernelSmoothening μ𝔽 U
+      (fun p ↦ φ.val (p.1*p.2⁻¹) - k p) (x,x) - φ.val 1
+    Integrable G μ𝔽 ∧ (∫ x, G x ∂μ𝔽) = -hilbertTrace ⟨Aq(a,hs,φ),hQ⟩ := by
+  let w := weight(s)
+  have hw : Continuous w := (continuous_intervalSobolevDensity (-(0:ℝ)) 0 s).comp (continuous_logModule' m𝔽)
+  have hp (x : C𝔽) : 0 < w x := intervalSobolevDensity_pos' _ _ _ _
+  let wNN (x : C𝔽) : ℝ≥0 := ⟨w x,(hp x).le⟩
+  have hwNN : Continuous wNN := hw.subtype_mk _
+  have hν : ν(s) = (μ𝔽).withDensity (fun x ↦ (wNN x : ℝ≥0∞)) :=
+    congrArg (μ𝔽).withDensity (funext fun x ↦ ENNReal.ofReal_eq_coe_nnreal (hp x).le)
+  let : IsLocallyFiniteMeasure (ν(s)) := sobolevKernelWeight_locallyFinite (F := F) 0 s
+  have hn := spectralProjection_convolution_nuclear (F := F) a line hs φ hQ
+  have hweighted := sobolevHilbertSchmidtKernel_of_haarRows (F := F) (PA(a,hs,φ)) k
+    (fun u ↦ (hk u).mono fun _ hx ↦ hx.2)
+  obtain ⟨hint,htrace⟩ := stripDiagonal_of_weightedKernel hU hBorel hwNN hp hν k (PA(a,hs,φ)) hn hweighted
+  let κ (p : C𝔽 × C𝔽) := (w p.2)⁻¹ • k p
+  obtain ⟨hκ,hop⟩ := hweighted
+  have hrep : κ =ᵐ[(ν(s)).prod (ν(s))] hκ.toLp κ := hκ.coeFn_toLp.symm
+  have hN : IsNuclearOperator (integralKernelOperator (ν(s)) (hκ.toLp κ)).val :=
+    (congrArg (fun T : W(s) →L[ℂ] W(s) ↦ IsNuclearOperator T) hop).mpr hn
+  have hmul : (fun p : C𝔽 × C𝔽 ↦ (w p.2 : ℂ) * κ p) = (k : C𝔽 × C𝔽 → ℂ) := by
+    funext p
+    simp only [κ, Complex.real_smul, Complex.ofReal_inv]
+    exact mul_inv_cancel_left₀ (Complex.ofReal_ne_zero.mpr (hp p.2).ne') _
+  have hμ : μ𝔽 ≤ ν(s) := by
+    calc
+      μ𝔽 = (μ𝔽).withDensity 1 := withDensity_one.symm
+      _ ≤ _ := withDensity_mono (.of_forall fun x ↦ by
+        change 1 ≤ ENNReal.ofReal (w x)
+        rw [ENNReal.one_le_ofReal]
+        simpa [w,intervalSobolevDensity] using Real.one_le_rpow
+          (le_add_of_nonneg_right (sq_nonneg (logIdeleClassNorm F x))) (by linarith : 0 ≤ s / 2))
+  have hlocκ : LocallyIntegrable κ ((μ𝔽).prod μ𝔽) :=
+    (hκ.mono_measure (Measure.prod_mono hμ hμ)).locallyIntegrable one_le_two
+  have hloc : LocallyIntegrable (k : C𝔽 × C𝔽 → ℂ) ((μ𝔽).prod μ𝔽) := by
+    rw [← hmul]
+    have hcont : Continuous (fun p : C𝔽 × C𝔽 ↦ (w p.2 : ℂ)) :=
+      Complex.continuous_ofReal.comp (hw.comp continuous_snd)
+    simpa only [smul_eq_mul] using hlocκ.continuous_smul hcont
+  have hreg := dSequenceKernelSmoothening_mul_continuous_snd_diagonal hU hBorel hwNN hp hν
+    hrep hN (fun x ↦ (w x : ℂ)) (Complex.continuous_ofReal.comp hw)
+  rw [hmul] at hreg
+  have hae : (fun x : C𝔽 ↦ dSequenceKernelSmoothening μ𝔽 U
+      (fun p ↦ φ.val (p.1*p.2⁻¹) - k p) (x,x) - φ.val 1) =ᵐ[μ𝔽]
+      fun x ↦ -dSequenceKernelSmoothening μ𝔽 U k (x,x) :=
+    hreg.mono fun x hx ↦ centered_convolution_sub_of_regular φ k hloc U hU hBorel x hx.1
+  exact ⟨hint.neg.congr hae.symm,
+    (integral_congr_ae hae).trans ((integral_neg _).trans
+      (congrArg Neg.neg (htrace.trans (trace_eq_quotient a hs φ hQ))))⟩
+
+end OutputProjectedLine
+
+namespace ConditionalOutputOrder
+
+open Complex
+
+attribute [local instance] instSpectralQuotientPolynormableSec3 instFiniteCompletionUnitsLocallyCompactSec4b
+
+local notation "restriction" =>
+  (⟨(ideleClassNorm F).ker.subtype, continuous_subtype_val⟩ : C₁ →ₜ* C𝔽)
+local notation "siteOrder(" χ ", " z ")" => MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ z
+local notation "meromorphicOrder(" χ ", " z ")" => meromorphicOrderAt (continuedCompletedHeckeL (F := F) χ) z
+local notation "Chars(" τ ")" => {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1}
+local notation "Sites(" χ ")" => {z : ℂ // 0 < siteOrder(χ,z)}
+local notation "M(" φ ", " χ ", " z ")" => modulatedFourierMellin m𝔽 univ
+  ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ μ𝔽 (φ : BruhatCompactSupport C𝔽).val
+  (ideleClassNormTwist (F := F) χ ((z : ℂ) - 1/2))
+local notation "outside(" τ ", " χ ", " φ ")" => (∀ η : PontryaginDual C𝔽,
+  (∀ t, η (τ t) = 1) → η ≠ (χ).val → ∀ z : ℂ, M(φ,η,z) = 0)
+local notation "hline" => (le_refl (0 : ℝ))
+local notation "hbase" => ((neg_nonpos.mpr hline).trans hline)
+local notation "hs₀(" hs ")" => (le_of_lt (zero_lt_one.trans hs))
+local notation "Aq(" hs ", " φ ")" => spectralConvolution (F := F) (1/2) hbase hs φ
+
+namespace Fiber
+
+private def point (σ t : ℝ) : ℂ := ((1/2+σ : ℝ) : ℂ) + (t:ℂ)*I
+
+private theorem point_re_sub (σ t : ℝ) : (point σ t).re - 1/2 = σ := by simp [point]
+private theorem point_im (σ t : ℝ) : (point σ t).im = t := by simp [point]
+private theorem point_reconstruct (z : ℂ) : point (z.re-1/2) z.im = z := by
+  apply Complex.ext <;> simp [point]
+
+private theorem exterior_multiplicity {a σ : ℝ} (ha : 0 ≤ a)
+    (h : σ ∉ Icc (-a) a) (s : ℝ) (n : ℕ) : spectralStripMultiplicity a s σ n = 0 := by
+  have hi : ¬(-a<σ ∧ σ<a) := fun t ↦ h ⟨t.1.le,t.2.le⟩
+  have he : ¬(σ = -a ∨ σ = a) := by
+    rintro (rfl | rfl) <;> apply h <;> constructor <;> linarith
+  simp [spectralStripMultiplicity, hi, he]
+
+/-- Removing the other character fibers and extending the selected row from the
+closed strip to all its sites preserves the sum. The multiplicity remains truncated
+on the two edges and is zero strictly outside. -/
+private theorem hasSum_single_character {K : Type*} (k : K) (P : K → ℂ → Prop)
+    (n : K → ℂ → ℕ) (W : K → ℂ → ℂ) (a s : ℝ) (ha : 0 ≤ a)
+    (hoff : ∀ j : K, j ≠ k → ∀ z : ℂ, W j z = 0) {T : ℂ}
+    (hsum : HasSum (fun q : {q : K × ℝ × ℝ //
+        q.2.1 ∈ Icc (-a) a ∧ P q.1 (point q.2.1 q.2.2)} ↦
+      (spectralStripMultiplicity a s q.val.2.1 (n q.val.1 (point q.val.2.1 q.val.2.2)) : ℂ) *
+        W q.val.1 (point q.val.2.1 q.val.2.2)) T) :
+    HasSum (fun z : {z : ℂ // P k z} ↦
+      (spectralStripMultiplicity a s (z.val.re-1/2) (n k z.val) : ℂ) * W k z.val) T := by
+  let S := {z : ℂ // P k z}
+  let B := {z : S // z.val.re-1/2 ∈ Icc (-a) a}
+  let Q := {q : K × ℝ × ℝ // q.2.1 ∈ Icc (-a) a ∧ P q.1 (point q.2.1 q.2.2)}
+  let R (q : Q) := (spectralStripMultiplicity a s q.val.2.1
+    (n q.val.1 (point q.val.2.1 q.val.2.2)) : ℂ) * W q.val.1 (point q.val.2.1 q.val.2.2)
+  let moment (z : S) := (spectralStripMultiplicity a s (z.val.re-1/2) (n k z.val) : ℂ) * W k z.val
+  let j : B → Q := fun z ↦ ⟨(k,z.val.val.re-1/2,z.val.val.im),z.property,
+    by rw [point_reconstruct]; exact z.val.property⟩
+  have hj : Injective j := by
+    intro x y e
+    have hr := congrArg (fun q : Q ↦ q.val.2.1) e
+    have hi := congrArg (fun q : Q ↦ q.val.2.2) e
+    apply Subtype.ext
+    apply Subtype.ext
+    apply Complex.ext
+    · change x.val.val.re-1/2 = y.val.val.re-1/2 at hr
+      change x.val.val.re = y.val.val.re
+      linarith
+    · exact hi
+  have hother (q : Q) (hq : q ∉ range j) : R q = 0 := by
+    by_cases h : q.val.1 = k
+    · exfalso
+      apply hq
+      let ρ := point q.val.2.1 q.val.2.2
+      have hz : P k ρ := h ▸ q.property.2
+      have has : ρ.re-1/2 ∈ Icc (-a) a := by rw [point_re_sub]; exact q.property.1
+      refine ⟨⟨⟨ρ,hz⟩,has⟩,Subtype.ext (Prod.ext h.symm (Prod.ext ?_ ?_))⟩
+      · exact point_re_sub _ _
+      · exact point_im _ _
+    · change _ * W q.val.1 _ = 0
+      rw [hoff _ h, mul_zero]
+  have hcomp : HasSum (R ∘ j) T := (hj.hasSum_iff hother).mpr hsum
+  have hB : HasSum (fun z : B ↦ moment z.val) T := by
+    apply hcomp.congr_fun
+    intro z
+    simp only [moment, R, Function.comp_apply, j, point_reconstruct]
+  have hext (z : S) (hz : z ∉ range (fun x : B ↦ x.val)) : moment z = 0 := by
+    have hout : z.val.re-1/2 ∉ Icc (-a) a := fun hi ↦ hz ⟨⟨z,hi⟩,rfl⟩
+    dsimp only [moment]
+    rw [exterior_multiplicity ha hout s _, Nat.cast_zero, zero_mul]
+  exact (Subtype.val_injective.hasSum_iff hext).mp hB
+
+end Fiber
+
+/-- For a test supported in one character, the conditional strip trace is its zero sum. -/
+theorem quotient_hasSum_oneCharacter (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : Chars(τ)) (φ : BruhatCompactSupport C𝔽) (hoff : outside(τ,χ,φ))
+    {s : ℝ} (hs : 1 < s) (hQ : IsNuclearOperator (Aq(hs₀(hs),φ))) :
+    HasSum (fun z : Sites(χ.val) ↦
+      (spectralStripMultiplicity 0 s (z.val.re-1/2) (siteOrder(χ.val,z.val)).toNat : ℂ) *
+        M(φ,χ.val,z.val)) (hilbertTrace ⟨Aq(hs₀(hs),φ),hQ⟩) := by
+  obtain ⟨lift,hlift,hnorm,hinv⟩ := exteriorZeros_basepoint τ hτ
+  let k := χ.val.comp restriction
+  have hk : lift k = χ.val := hinv χ.val χ.property
+  have hdiff (j : PontryaginDual C₁) (hj : j ≠ k) : lift j ≠ χ.val := by
+    intro h
+    apply hj
+    rw [← hlift j,h]
+  let P (j : PontryaginDual C₁) (w : ℂ) := 0 < meromorphicOrder(lift j,w)
+  let n (j : PontryaginDual C₁) (w : ℂ) := (meromorphicOrder(lift j,w)).untop₀.toNat
+  let W (j : PontryaginDual C₁) (w : ℂ) := M(φ,lift j,w)
+  let T := hilbertTrace ⟨Aq(hs₀(hs),φ),hQ⟩
+  have hglobal := (spectralStripConvolution_trace (F := F) (1/2) lift hlift hline hs φ
+    (⟨_,hQ⟩ : nuclearEndomorphisms (spectralSobolevQuotient F (1/2) hbase hs₀(hs))) rfl).2
+  have hmoment (σ t : ℝ) : Fiber.point σ t - 1/2 = (σ:ℂ)+(t:ℂ)*I := by
+    dsimp [Fiber.point]; push_cast; ring
+  have hsum := Fiber.hasSum_single_character k P n W 0 s hline
+    (fun j hj w ↦ hoff (lift j) (hnorm j) (hdiff j hj) w) (T := T) (by
+      apply hglobal.congr_fun
+      intro q
+      dsimp only [n,W]
+      rw [hmoment]
+      rfl)
+  let SumAt (ψ : PontryaginDual C𝔽) := HasSum (fun z : {z : ℂ // 0 < meromorphicOrder(ψ,z)} ↦
+    (spectralStripMultiplicity 0 s (z.val.re-1/2) (meromorphicOrder(ψ,z.val)).untop₀.toNat : ℂ) *
+      M(φ,ψ,z.val)) T
+  have hraw : SumAt χ.val := (congrArg SumAt hk).mp (show SumAt (lift k) from hsum)
+  let e : Sites(χ.val) ≃ {z : ℂ // 0 < meromorphicOrder(χ.val,z)} :=
+    Equiv.subtypeEquivRight (exteriorZeros_ord_pos_iff χ.val)
+  apply (e.hasSum_iff.mpr hraw).congr_fun
+  intro z
+  change _ = (spectralStripMultiplicity 0 s (z.val.re-1/2) (meromorphicOrder(χ.val,z.val)).untop₀.toNat : ℂ) *
+    M(φ,χ.val,z.val)
+  rw [exteriorZeros_ord_eq]
+
+/-- An odd Sobolev degree with exactly `k+1` available boundary jets. -/
+def degree (k : ℕ) : ℝ := 2 * ((k : ℝ) + 1) + 1
+
+/-- Every chosen order is above the boundary trace threshold. -/
+theorem one_lt_degree (k : ℕ) : 1 < degree k := by
+  have h : 0 ≤ (k : ℝ) := Nat.cast_nonneg _
+  unfold degree
+  linarith
+
+local notation "hk₀(" k ")" => (le_of_lt (zero_lt_one.trans (one_lt_degree k)))
+
+private theorem multiplicity_at_degree (k n : ℕ) (x : ℝ) :
+    spectralStripMultiplicity 0 (degree k) x n = if x = 0 then min n (k+1) else 0 := by
+  by_cases hx : x = 0
+  · subst x
+    rw [spectralStripMultiplicity_boundary hline (Or.inr rfl)]
+    have hreal : (degree k - 1) / 2 = ((k+1 : ℕ) : ℝ) := by push_cast; unfold degree; ring
+    simp only [spectralBoundaryMultiplicity, hreal, Nat.ceil_natCast, ite_true]
+  · have hno : ¬ (0 < x ∧ x < 0) := fun h ↦ lt_asymm h.1 h.2
+    simp [spectralStripMultiplicity, hx, hno]
+
+local notation "m(" χ ", " z ")" => (siteOrder(χ,(z : ℂ))).toNat
+local notation "v(" φ ", " χ ", " z ")" => (M(φ,χ,z)).re
+local notation "central(" z ")" => ((z : ℂ).re = 1/2)
+
+/-- Nuclearity of the actual quotient convolution at the indicated line order. -/
+abbrev QuotientNuclear (φ : BruhatCompactSupport C𝔽) (k : ℕ) : Prop :=
+  IsNuclearOperator (Aq(hk₀(k),φ))
+
+/-- Smooth the convolution kernel minus the Haar kernel of projection after convolution. -/
+def lineOrderDiagonal (k : ℕ) (φ : BruhatCompactSupport C𝔽) (hQ : QuotientNuclear φ k)
+    (U : ℕ → Set C𝔽) (x : C𝔽) : ℂ :=
+  let K := (OutputProjectedLine.existsUnique_haarKernel (F := F) (1/2) hk₀(k) φ hQ).exists.choose
+  dSequenceKernelSmoothening μ𝔽 U (fun p ↦ φ.val (p.1 * p.2⁻¹) - K p) (x,x)
+
+/-- Centering inside the integral recovers the negative quotient trace even if φ(1) is nonzero. -/
+theorem centered_integral_eq_neg_trace (k : ℕ) (φ : BruhatCompactSupport C𝔽)
+    (hQ : QuotientNuclear φ k) (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U)
+    (hBorel : ∀ n, MeasurableSet (U n)) :
+    Integrable (fun x ↦ lineOrderDiagonal k φ hQ U x - φ.val 1) μ𝔽 ∧
+      (∫ x, lineOrderDiagonal k φ hQ U x - φ.val 1 ∂μ𝔽) = -hilbertTrace ⟨Aq(hk₀(k),φ),hQ⟩ := by
+  let existence := (OutputProjectedLine.existsUnique_haarKernel (F := F) (1/2) hk₀(k) φ hQ).exists
+  exact OutputProjectedLine.geometricDiagonal_sub_atOne_eq_neg_quotient (F := F) (1/2) hk₀(k)
+    φ hQ existence.choose existence.choose_spec U hU hBorel
+
+/-- The single-character spectral expansion for the centered geometric integral at fixed order. -/
+theorem hasSum_centeredLineOrderDiagonal (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : Chars(τ)) (φ : BruhatCompactSupport C𝔽) (hoff : outside(τ,χ,φ))
+    (k : ℕ) (hQ : QuotientNuclear φ k) (U : ℕ → Set C𝔽)
+    (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    HasSum (fun z : Sites(χ.val) ↦ if central(z) then
+      ((min (m(χ.val,z)) (k+1) : ℕ) : ℂ) * M(φ,χ.val,z) else 0)
+      (-(∫ x, lineOrderDiagonal k φ hQ U x - φ.val 1 ∂μ𝔽)) := by
+  rw [(centered_integral_eq_neg_trace k φ hQ U hU hBorel).2, neg_neg]
+  apply (quotient_hasSum_oneCharacter τ hτ χ φ hoff (one_lt_degree k) hQ).congr_fun
+  intro z
+  rw [multiplicity_at_degree]
+  split_ifs <;> simp_all [sub_eq_zero]
+
+/-- All complex Mellin values on one character row are absolutely summable with full divisor
+multiplicity, by the fixed-character estimate of Lemma B.4.4.9, pp. 624–625. -/
+theorem summable_fullMellinNorms (χ : PontryaginDual C𝔽) (φ : BruhatCompactSupport C𝔽) :
+    Summable (fun z : Sites(χ) ↦ (m(χ,z) : ℝ) * ‖M(φ,χ,z)‖) := by
+  let N (g : C𝔽) : ℂ := (((ideleClassNorm F g).val : ℝ) : ℂ)
+  let moment (z : ℂ) := ∫ g, φ.val g * ideleClassNormTwist χ z g * N g ^ (-1/2 : ℂ) ∂μ𝔽
+  have hs : Summable (fun z : Sites(χ) ↦ ‖(siteOrder(χ,z.val) : ℂ) * moment z.val‖) :=
+    idelicExplicitFormula_summable_spectral_fiber φ χ
+  refine Summable.of_nonneg_of_le (fun z ↦ mul_nonneg (Nat.cast_nonneg _) (norm_nonneg _)) (fun z ↦ ?_) hs
+  have he : M(φ,χ,z) = moment z.val := by
+    have hu : M(φ,χ,z) = ∫ g, φ.val g * ideleClassNormTwist χ (z.val - 1/2) g ∂μ𝔽 :=
+      Set.indicator_of_mem (Set.mem_univ _) _
+    rw [hu]
+    apply integral_congr_ae
+    filter_upwards with g
+    have hn : N g ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+    change φ.val g * ((χ g : ℂ) * N g ^ (z.val - 1/2)) =
+      φ.val g * ((χ g : ℂ) * N g ^ z.val) * N g ^ (-1/2 : ℂ)
+    rw [show (z.val - 1/2) = z.val + (-1/2) by ring, Complex.cpow_add _ _ hn]
+    ring
+  have hd : (0 : ℝ) ≤ (siteOrder(χ,z.val) : ℝ) := by exact_mod_cast z.property.le
+  have hm : (m(χ,z) : ℝ) = (siteOrder(χ,z.val) : ℝ) := by exact_mod_cast Int.toNat_of_nonneg z.property.le
+  rw [he, hm, norm_mul, Complex.norm_intCast, abs_of_nonneg hd]
+
+/-- The real Mellin moments are absolutely summable on the full divisor of one character. -/
+theorem summable_fullRealMoments (χ : PontryaginDual C𝔽) (φ : BruhatCompactSupport C𝔽) :
+    Summable (fun z : Sites(χ) ↦ (m(χ,z) : ℝ) * |v(φ,χ,z)|) :=
+  Summable.of_nonneg_of_le (fun _ ↦ mul_nonneg (Nat.cast_nonneg _) (abs_nonneg _))
+    (fun _ ↦ mul_le_mul_of_nonneg_left (Complex.abs_re_le_norm _) (Nat.cast_nonneg _))
+    (summable_fullMellinNorms χ φ)
+
+/-- The centered Haar integral at one degree records the capped central multiplicities. -/
+theorem centeredIntegral_re_eq (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : Chars(τ)) (φ : BruhatCompactSupport C𝔽) (hoff : outside(τ,χ,φ))
+    (k : ℕ) (hQ : QuotientNuclear φ k) (U : ℕ → Set C𝔽)
+    (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    (∫ x, lineOrderDiagonal k φ hQ U x - φ.val 1 ∂μ𝔽).re =
+      -(∑' z : Sites(χ.val), if central(z) then
+        ((min (m(χ.val,z)) (k+1) : ℕ) : ℝ) * v(φ,χ.val,z) else 0) := by
+  have hs := hasSum_centeredLineOrderDiagonal τ hτ χ φ hoff k hQ U hU hBorel
+  have hr : HasSum (fun z : Sites(χ.val) ↦ if central(z) then
+      ((min (m(χ.val,z)) (k+1) : ℕ) : ℝ) * v(φ,χ.val,z) else 0)
+      (-(∫ x, lineOrderDiagonal k φ hQ U x - φ.val 1 ∂μ𝔽).re) := by
+    apply (Complex.reCLM.hasSum hs).congr_fun
+    intro z
+    by_cases hc : central(z) <;> simp only [Complex.reCLM_apply, hc, ite_true, ite_false,
+      Complex.zero_re, Complex.mul_re, Complex.natCast_re, Complex.natCast_im, zero_mul, sub_zero]
+  rw [hr.tsum_eq, neg_neg]
+
+/-- Increasing the odd Sobolev order gives the negative full central mass. -/
+theorem tendsto_centeredLineOrderDiagonal (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : Chars(τ)) (φ : BruhatCompactSupport C𝔽) (hoff : outside(τ,χ,φ))
+    (hQ : ∀ k, QuotientNuclear φ k)
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    Tendsto (fun k ↦ (∫ x, lineOrderDiagonal k φ (hQ k) U x - φ.val 1 ∂μ𝔽).re) atTop
+      (𝓝 (-(∑' z : Sites(χ.val), if central(z) then
+        (m(χ.val,z) : ℝ) * v(φ,χ.val,z) else 0))) := by
+  let f (k : ℕ) (z : Sites(χ.val)) : ℝ := if central(z) then
+    ((min (m(χ.val,z)) (k+1) : ℕ) : ℝ) * v(φ,χ.val,z) else 0
+  have hlim : Tendsto (fun k ↦ ∑' z, f k z) atTop (𝓝 (∑' z : Sites(χ.val),
+      if central(z) then (m(χ.val,z) : ℝ) * v(φ,χ.val,z) else 0)) := by
+    apply tendsto_tsum_of_dominated_convergence (summable_fullRealMoments χ.val φ)
+    · intro z
+      apply tendsto_const_nhds.congr'
+      filter_upwards [eventually_ge_atTop (m(χ.val,z))] with k hk
+      simp only [f, min_eq_left (by omega : m(χ.val,z) ≤ k + 1)]
+    · apply Eventually.of_forall
+      intro k z
+      by_cases hc : central(z)
+      · simp only [f, hc, ite_true, Real.norm_eq_abs, abs_mul, Nat.abs_cast]
+        exact mul_le_mul_of_nonneg_right (by exact_mod_cast min_le_left (m(χ.val,z)) (k+1)) (abs_nonneg _)
+      · simp only [f, hc, ite_false, norm_zero]
+        exact mul_nonneg (Nat.cast_nonneg _) (abs_nonneg _)
+  apply hlim.neg.congr'
+  apply Eventually.of_forall
+  intro k
+  exact (centeredIntegral_re_eq τ hτ χ φ hoff k (hQ k) U hU hBorel).symm
+
+end ConditionalOutputOrder
 
 end RiemannMasullo

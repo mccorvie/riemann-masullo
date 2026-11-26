@@ -4246,4 +4246,16 @@ theorem exists_schwartzBruhat_mellinFrequencyChart (m : G →ₜ* ℝ≥0ˣ) (hm
 
 end MellinFrequencyChart
 
+section LogWeight
+
+variable [SecondCountableTopology G] (μ : Measure G) [μ.IsHaarMeasure] (m : G →ₜ* ℝ≥0ˣ)
+
+/-- A Schwartz–Bruhat kernel on a locally compact group is Haar integrable after
+weighting its norm by an arbitrary real power of one plus the absolute log modulus. -/
+theorem SchwartzBruhat.integrable_norm_mul_logWeight (f : SchwartzBruhat G) (r : ℝ) :
+    Integrable (fun x ↦ ‖f x‖ * (1 + |Real.log ((m x).val : ℝ)|) ^ r) μ :=
+  integrable_schwartz_log_weight μ m f r
+
+end LogWeight
+
 end RiemannMasullo
