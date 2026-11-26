@@ -21,8 +21,11 @@ at the origin (#7770). This file computes the trace on that level.
 * `exists_realPWTestCutoff_level_nuclear`. The cutoff action, projected onto the level on both
   sides, is nuclear. Its trace is the trace on the whole band minus the diagonal entry of the
   cutoff action at the normalized evaluation vector at the origin.
+  `exists_realPWTestCutoff_compl_nuclear` is the same statement for the orthogonal complement
+  of any band vector.
 * `tendsto_realPWZeroLevelCorrection`. As the cutoff is removed that entry tends to the
-  integral of `ψ g g ^ (-1/2)`.
+  integral of `ψ g g ^ (-1/2)`. `tendsto_realPWTestCorrection` is the statement for any band
+  vector whose pairing with its own contractions is known.
 * `exists_realPWTestCutoff_level_trace_limit`. So the traces on the level converge to the limit
   on the whole band minus that integral. By `realPWSharpTraceLimit_sub_of_lt_half` the
   integrand of the difference is `ψ g g ^ (-1/2) g ^ (-2) / (1 - g ^ (-2))`, the limit for one
@@ -32,7 +35,7 @@ The limit of the entry rests on `integral_star_evaluationVector_zero_mul_dilate`
 the contraction `x ↦ f (g⁻¹ x)` of a band vector pairs with the evaluation vector at the origin
 as a band vector does. The contraction is not shown to be a band vector. It is cut off by the
 smoothed masks of `Sec4_RealPWSmoothedAction`, for which the product is one, and the masks are
-then removed.
+then removed (`exists_realPWBand_maskedDilate`).
 
 Reconstruction: The paper does not state this. The operator is stated on the whole band, as
 `P₀ T P₀` with `P₀` the orthogonal projection onto the level. On the level it is the
@@ -85,32 +88,45 @@ theorem realPWZeroLevel_starProjection_apply (f : V) :
     RealPWBand.toDual_evaluationVector]
   rfl
 
+/-- The diagonal entry of the cutoff of the action of `ψ` at a band vector `e`, before division
+by the square of its norm. -/
+def realPWTestCorrection (e : V) (ψ : ℝ → ℂ) (L : ℝ) : ℂ :=
+  ∫ x, sharpIntervalMask L x * (star (ev x e) *
+    ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) e)) ∂μw
+
 /-- The diagonal entry of the cutoff of the action of `ψ` at the evaluation vector at the
 origin, before division by the square of its norm. -/
 def realPWZeroLevelCorrection (ψ : ℝ → ℂ) (L : ℝ) : ℂ :=
-  ∫ x, sharpIntervalMask L x * (star (ev x (evv 0)) *
-    ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv 0))) ∂μw
+  realPWTestCorrection Y α s hs (evv 0) ψ L
+
+/-- The orthogonal projection onto the complement of a vector subtracts the component along
+it. -/
+private theorem starProjection_orthogonal_singleton_apply (e f : V) :
+    (ℂ ∙ e)ᗮ.starProjection f = f - (⟪e, f⟫_ℂ / ((‖e‖ ^ 2 : ℝ) : ℂ)) • e := by
+  rw [Submodule.starProjection_orthogonal_val, Submodule.starProjection_singleton]
+  rfl
 
 /-- The sharp mask is real. -/
 private theorem star_mask (L x : ℝ) : star (sharpIntervalMask L x) = sharpIntervalMask L x := by
   by_cases h : x ∈ Icc (-L) L <;> simp [sharpIntervalMask, h]
 
-/-- Reconstruction: the cutoff of the action of `ψ`, projected onto the level on both sides,
-is nuclear. Its trace is the trace on the whole band minus the diagonal entry at the normalized
-evaluation vector at the origin. On the level this operator is the compression of the cutoff
-action, and it vanishes on the orthogonal complement of the level. -/
-theorem exists_realPWTestCutoff_level_nuclear (hY : 0 < Y) (ha : 0 ≤ α) {a b : ℝ}
-    (ha1 : 1 ≤ a) (ψ : ℝ → ℂ) (hψc : Continuous ψ) (hψ0 : ∀ g ∉ Icc a b, ψ g = 0) (L : ℝ) :
+/-- Reconstruction: the cutoff of the action of `ψ`, projected on both sides onto the
+orthogonal complement of a band vector `e`, is nuclear. Its trace is the trace on the whole
+band minus the diagonal entry at the normalized vector. On the complement this operator is the
+compression of the cutoff action, and it vanishes on the line of `e`. -/
+theorem exists_realPWTestCutoff_compl_nuclear (hY : 0 < Y) (ha : 0 ≤ α) {a b : ℝ}
+    (ha1 : 1 ≤ a) (ψ : ℝ → ℂ) (hψc : Continuous ψ) (hψ0 : ∀ g ∉ Icc a b, ψ g = 0) (L : ℝ)
+    (e : V) :
     ∃ T : nuclearEndomorphisms V,
       (∀ f : V, ∃ r : Lp ℂ 2 μw,
         (∀ᵐ x ∂μw, r x = sharpIntervalMask L x *
           ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) *
-            ev (g⁻¹ * x) ((realPWZeroLevel Y α s hs).starProjection f))) ∧
-        T.val f = (realPWZeroLevel Y α s hs).starProjection ((V).orthogonalProjectionOnto r)) ∧
+            ev (g⁻¹ * x) ((ℂ ∙ e)ᗮ.starProjection f))) ∧
+        T.val f = (ℂ ∙ e)ᗮ.starProjection ((V).orthogonalProjectionOnto r)) ∧
       hilbertTrace T = (∫ g, ψ g * realPWSharpTrace Y α s hs g L) -
-        (((‖evv 0‖ ^ 2 : ℝ) : ℂ))⁻¹ * realPWZeroLevelCorrection Y α s hs ψ L := by
+        (((‖e‖ ^ 2 : ℝ) : ℂ))⁻¹ * realPWTestCorrection Y α s hs e ψ L := by
   have hμac := realPWIntervalMeasure_absolutelyContinuous α s
-  let P : V →L[ℂ] V := (realPWZeroLevel Y α s hs).starProjection
+  let P : V →L[ℂ] V := (ℂ ∙ e)ᗮ.starProjection
   let U : ℝ → V := realPWTestLeftFamily Y α s hs L
   let R : ℝ → V := realPWTestRightFamily Y α s hs ψ L
   have hU : MemLp U 2 μw := memLp_realPWTestLeftFamily Y α s hs hY.le ha L
@@ -158,52 +174,51 @@ theorem exists_realPWTestCutoff_level_nuclear (hY : 0 < Y) (ha : 0 ≤ α) {a b 
     rw [A'.adjoint_inner_right, hAP, hBP,
       ← Submodule.inner_starProjection_left_eq_right, A.adjoint_inner_right]
   · -- the trace
-    let N : ℂ := ((‖evv 0‖ ^ 2 : ℝ) : ℂ)
-    let F₂ : ℝ → ℂ := fun x ↦ sharpIntervalMask L x * (star (ev x (evv 0)) *
-      ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv 0)))
-    have hRE (x : ℝ) : ⟪R x, evv 0⟫_ℂ = sharpIntervalMask L x *
-        ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv 0)) :=
-      inner_realPWTestRightFamily_eq Y α s hs hY.le ha ha1 hψc hψ0 L x (evv 0)
-    have hUE (x : ℝ) : ev 0 (U x) = sharpIntervalMask L x * star (ev x (evv 0)) := by
-      change ev 0 (sharpIntervalMask L x • evv x) = _
-      rw [map_smul, smul_eq_mul]
+    let N : ℂ := ((‖e‖ ^ 2 : ℝ) : ℂ)
+    let F₂ : ℝ → ℂ := fun x ↦ sharpIntervalMask L x * (star (ev x (e)) *
+      ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (e)))
+    have hRE (x : ℝ) : ⟪R x, e⟫_ℂ = sharpIntervalMask L x *
+        ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (e)) :=
+      inner_realPWTestRightFamily_eq Y α s hs hY.le ha ha1 hψc hψ0 L x (e)
+    have hUE (x : ℝ) : ⟪e, U x⟫_ℂ = sharpIntervalMask L x * star (ev x e) := by
+      change ⟪e, sharpIntervalMask L x • evv x⟫_ℂ = _
+      rw [inner_smul_right]
       congr 1
-      have h1 : ev 0 (evv x) = ⟪evv 0, evv x⟫_ℂ := by
+      have h2 : ev x e = ⟪evv x, e⟫_ℂ := by
         rw [← InnerProductSpace.toDual_apply_apply, RealPWBand.toDual_evaluationVector]
-      have h2 : ev x (evv 0) = ⟪evv x, evv 0⟫_ℂ := by
-        rw [← InnerProductSpace.toDual_apply_apply, RealPWBand.toDual_evaluationVector]
-      rw [h1, h2, ← inner_conj_symm, starRingEnd_apply]
+      rw [h2, ← inner_conj_symm, starRingEnd_apply]
     have hpt (x : ℝ) : ⟪P (R x), P (U x)⟫_ℂ = ⟪R x, U x⟫_ℂ - N⁻¹ * F₂ x := by
       have hPP : P (P (U x)) = P (U x) :=
         Submodule.starProjection_eq_self_iff.mpr
-          ((realPWZeroLevel Y α s hs).orthogonalProjectionOnto (U x)).2
+          ((ℂ ∙ e)ᗮ.orthogonalProjectionOnto (U x)).2
       rw [Submodule.inner_starProjection_left_eq_right, hPP]
-      change ⟪R x, (realPWZeroLevel Y α s hs).starProjection (U x)⟫_ℂ = _
-      rw [realPWZeroLevel_starProjection_apply, inner_sub_right, inner_smul_right, hRE, hUE]
-      change _ = _ - N⁻¹ * (sharpIntervalMask L x * (star (ev x (evv 0)) *
-        ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv 0))))
+      change ⟪R x, (ℂ ∙ e)ᗮ.starProjection (U x)⟫_ℂ = _
+      rw [starProjection_orthogonal_singleton_apply Y α s hs, inner_sub_right,
+        inner_smul_right, hRE, hUE]
+      change _ = _ - N⁻¹ * (sharpIntervalMask L x * (star (ev x e) *
+        ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) e)))
       rw [div_eq_mul_inv]
-      linear_combination (N⁻¹ * star (ev x (evv 0)) *
-        ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv 0))) *
+      linear_combination (N⁻¹ * star (ev x e) *
+        ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) e)) *
           (sharpIntervalMask_mul_self L x).symm
     have hF₁ : Integrable (fun x ↦ ⟪R x, U x⟫_ℂ) μw :=
       (L2.integrable_inner (𝕜 := ℂ) (hR.toLp _) (hU.toLp _)).congr (by
         filter_upwards [hR.coeFn_toLp, hU.coeFn_toLp] with x hx hy
         rw [hx, hy])
     have hF₂ : Integrable F₂ μw := by
-      refine (L2.integrable_inner (𝕜 := ℂ) (A (evv 0)) (B (evv 0))).congr ?_
-      filter_upwards [hA (evv 0), hB (evv 0)] with x h1 h2
+      refine (L2.integrable_inner (𝕜 := ℂ) (A (e)) (B (e))).congr ?_
+      filter_upwards [hA (e), hB (e)] with x h1 h2
       rw [h1, h2, hRE]
-      have hUz : ⟪U x, evv 0⟫_ℂ = star (sharpIntervalMask L x) * ev x (evv 0) := by
-        change ⟪sharpIntervalMask L x • evv x, evv 0⟫_ℂ = _
+      have hUz : ⟪U x, e⟫_ℂ = star (sharpIntervalMask L x) * ev x (e) := by
+        change ⟪sharpIntervalMask L x • evv x, e⟫_ℂ = _
         rw [inner_smul_left, starRingEnd_apply, ← InnerProductSpace.toDual_apply_apply,
           RealPWBand.toDual_evaluationVector]
       rw [hUz, star_mask]
       simp only [RCLike.inner_apply, starRingEnd_apply, star_mul', star_mask]
-      change _ = sharpIntervalMask L x * (star (ev x (evv 0)) *
-        ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv 0)))
-      linear_combination (star (ev x (evv 0)) *
-        ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv 0))) *
+      change _ = sharpIntervalMask L x * (star (ev x (e)) *
+        ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (e)))
+      linear_combination (star (ev x (e)) *
+        ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (e))) *
           sharpIntervalMask_mul_self L x
     calc ∫ x, ⟪P (R x), P (U x)⟫_ℂ ∂μw = ∫ x, (⟪R x, U x⟫_ℂ - N⁻¹ * F₂ x) ∂μw :=
           integral_congr_ae (ae_of_all _ hpt)
@@ -212,6 +227,22 @@ theorem exists_realPWTestCutoff_level_nuclear (hY : 0 < Y) (ha : 0 ≤ α) {a b 
       _ = _ := by
           rw [integral_inner_realPWTestFamilies Y α s hs hY.le ha ha1 hψc hψ0 L]
           rfl
+
+/-- Reconstruction: the cutoff of the action of `ψ`, projected onto the level on both sides,
+is nuclear. Its trace is the trace on the whole band minus the diagonal entry at the normalized
+evaluation vector at the origin. On the level this operator is the compression of the cutoff
+action, and it vanishes on the orthogonal complement of the level. -/
+theorem exists_realPWTestCutoff_level_nuclear (hY : 0 < Y) (ha : 0 ≤ α) {a b : ℝ}
+    (ha1 : 1 ≤ a) (ψ : ℝ → ℂ) (hψc : Continuous ψ) (hψ0 : ∀ g ∉ Icc a b, ψ g = 0) (L : ℝ) :
+    ∃ T : nuclearEndomorphisms V,
+      (∀ f : V, ∃ r : Lp ℂ 2 μw,
+        (∀ᵐ x ∂μw, r x = sharpIntervalMask L x *
+          ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) *
+            ev (g⁻¹ * x) ((realPWZeroLevel Y α s hs).starProjection f))) ∧
+        T.val f = (realPWZeroLevel Y α s hs).starProjection ((V).orthogonalProjectionOnto r)) ∧
+      hilbertTrace T = (∫ g, ψ g * realPWSharpTrace Y α s hs g L) -
+        (((‖evv 0‖ ^ 2 : ℝ) : ℂ))⁻¹ * realPWZeroLevelCorrection Y α s hs ψ L :=
+  exists_realPWTestCutoff_compl_nuclear Y α s hs hY ha ha1 ψ hψc hψ0 L (evv 0)
 
 /-- The pointwise values of a band vector are square integrable for the weighted measure. -/
 private theorem memLp_evaluation (f : V) : MemLp (fun x ↦ ev x f) 2 μw :=
@@ -233,62 +264,83 @@ private theorem integrable_star_evaluation_mul_dilate {g : ℝ} (hg : 0 < g) (e 
   simp only [RCLike.inner_apply, starRingEnd_apply]
   ring
 
-/-- Reconstruction: for `g > 1` the contraction `x ↦ f (g⁻¹ x)` of a band vector pairs with the
-evaluation vector at the origin as a band vector does: the weighted integral of its product
-with the conjugate of that vector is `f 0`. The contraction is cut off by smoothed masks, for
-which the product is a band vector, and the masks are then removed. -/
-theorem integral_star_evaluationVector_zero_mul_dilate (hY : 0 < Y) {g : ℝ} (hg : 1 < g)
-    (f : V) : ∫ x, star (ev x (evv 0)) * ev (g⁻¹ * x) f ∂μw = ev 0 f := by
+/-- Reconstruction: for `g > 1` the contraction `x ↦ f (g⁻¹ x)` of a band vector is a limit of
+band vectors in a weak sense. There are bounded continuous masks `m L` tending pointwise to one
+and band vectors `q L` with values `m L x * f (g⁻¹ x)`, and for every band vector `e` the inner
+products `⟪e, q L⟫` tend to the weighted integral of the product of the conjugate of `e` with
+the contraction. The masks are the smoothed masks of `Sec4_RealPWSmoothedAction`. The
+contraction itself is not shown to be a band vector. -/
+theorem exists_realPWBand_maskedDilate (hY : 0 < Y) {g : ℝ} (hg : 1 < g) (f : V) :
+    ∃ (m : ℝ → ℝ → ℂ) (q : ℝ → V) (C : ℝ),
+      (∀ L, Continuous (m L)) ∧ (∀ L x, ‖m L x‖ ≤ C) ∧
+      (∀ x, Tendsto (fun L ↦ m L x) atTop (𝓝 1)) ∧
+      (∀ L x, ev x (q L) = m L x * ev (g⁻¹ * x) f) ∧
+      ∀ e : V, Tendsto (fun L ↦ ⟪e, q L⟫_ℂ) atTop
+        (𝓝 (∫ x, star (ev x e) * ev (g⁻¹ * x) f ∂μw)) := by
   have hμac := realPWIntervalMeasure_absolutelyContinuous α s
   have hg0 : 0 < g := zero_lt_one.trans hg
   have hginv : g⁻¹ < 1 := inv_lt_one_of_one_lt₀ hg
-  let F : ℝ → ℂ := fun x ↦ star (ev x (evv 0)) * ev (g⁻¹ * x) f
-  have hF : Integrable F μw := integrable_star_evaluation_mul_dilate Y α s hs hg0 (evv 0) f
   let c := (1 - g⁻¹) * Y / 2
   have hc : 0 < c := half_pos (mul_pos (sub_pos.mpr hginv) hY)
   have hmargin : c ≤ (1 - g⁻¹) * Y :=
     half_le_self (mul_nonneg (sub_nonneg.mpr hginv.le) hY.le)
   obtain ⟨η, he, hm, hη, -⟩ := exists_evenSchwartz_smoothingKernel c hc
-  have key : ∀ L, ∫ x, smoothIntervalMask η L x * F x ∂μw =
-      smoothIntervalMask η L 0 * ev 0 f := by
-    intro L
-    obtain ⟨q, hq⟩ := exists_realPW_smoothIntervalMask_mul_dilate_evaluation hY hs
-      (inv_pos.mpr hg0) hc.le hmargin η he hη L 1 f
-    have hval : ev 0 q = smoothIntervalMask η L 0 * ev 0 f := by
-      rw [hq 0, one_mul, mul_zero]
-    have h1 : ev 0 q = ⟪evv 0, q⟫_ℂ := by
+  choose q hq using fun L ↦ exists_realPW_smoothIntervalMask_mul_dilate_evaluation hY hs
+    (inv_pos.mpr hg0) hc.le hmargin η he hη L 1 f
+  refine ⟨fun L x ↦ smoothIntervalMask η L x, q, ∫ t, ‖η t‖,
+    fun L ↦ continuous_smoothIntervalMask η L,
+    fun L x ↦ norm_smoothIntervalMask_le η.integrable L x, fun x ↦ ?_, fun L x ↦ ?_,
+    fun e ↦ ?_⟩
+  · have h := tendsto_smoothIntervalMask η η.integrable x
+    rwa [hm] at h
+  · rw [hq L x, one_mul]
+  · let F : ℝ → ℂ := fun x ↦ star (ev x e) * ev (g⁻¹ * x) f
+    have hF : Integrable F μw := integrable_star_evaluation_mul_dilate Y α s hs hg0 e f
+    have key : ∀ L, ∫ x, smoothIntervalMask η L x * F x ∂μw = ⟪e, q L⟫_ℂ := by
+      intro L
+      have h2 : ⟪e, q L⟫_ℂ =
+          ∫ x, ⟪(e.val : Lp ℂ 2 μw) x, ((q L).val : Lp ℂ 2 μw) x⟫_ℂ ∂μw := by
+        rw [← L2.inner_def]
+        rfl
+      rw [h2]
+      apply integral_congr_ae
+      filter_upwards [RealPWBand.evaluation_ae Y hμw hμac e,
+        RealPWBand.evaluation_ae Y hμw hμac (q L)] with x hx1 hx2
+      rw [← hx1, ← hx2]
+      change smoothIntervalMask η L x * (star (ev x e) * ev (g⁻¹ * x) f) =
+        ⟪ev x e, ev x (q L)⟫_ℂ
+      rw [hq L x]
+      simp only [RCLike.inner_apply, starRingEnd_apply]
+      ring
+    have hlimL : Tendsto (fun L ↦ ∫ x, smoothIntervalMask η L x * F x ∂μw) atTop
+        (𝓝 (∫ x, F x ∂μw)) := by
+      refine tendsto_integral_filter_of_dominated_convergence
+        (fun x ↦ (∫ t, ‖η t‖) * ‖F x‖) (.of_forall fun L ↦ ?_)
+        (.of_forall fun L ↦ ae_of_all _ fun x ↦ ?_) (hF.norm.const_mul _)
+        (ae_of_all _ fun x ↦ ?_)
+      · exact ((continuous_smoothIntervalMask η L).aestronglyMeasurable).mul
+          hF.aestronglyMeasurable
+      · rw [norm_mul]
+        exact mul_le_mul_of_nonneg_right (norm_smoothIntervalMask_le η.integrable L x)
+          (norm_nonneg _)
+      · have h := (tendsto_smoothIntervalMask η η.integrable x).mul_const (F x)
+        rwa [hm, one_mul] at h
+    exact hlimL.congr key
+
+/-- Reconstruction: for `g > 1` the contraction `x ↦ f (g⁻¹ x)` of a band vector pairs with the
+evaluation vector at the origin as a band vector does: the weighted integral of its product
+with the conjugate of that vector is `f 0`. -/
+theorem integral_star_evaluationVector_zero_mul_dilate (hY : 0 < Y) {g : ℝ} (hg : 1 < g)
+    (f : V) : ∫ x, star (ev x (evv 0)) * ev (g⁻¹ * x) f ∂μw = ev 0 f := by
+  obtain ⟨m, q, C, -, -, hm1, hq, hlim⟩ := exists_realPWBand_maskedDilate Y α s hs hY hg f
+  have h1 (L : ℝ) : ⟪evv 0, q L⟫_ℂ = m L 0 * ev 0 f := by
+    have h : ev 0 (q L) = ⟪evv 0, q L⟫_ℂ := by
       rw [← InnerProductSpace.toDual_apply_apply, RealPWBand.toDual_evaluationVector]
-    have h2 : ⟪evv 0, q⟫_ℂ =
-        ∫ x, ⟪((evv 0).val : Lp ℂ 2 μw) x, (q.val : Lp ℂ 2 μw) x⟫_ℂ ∂μw := by
-      rw [← L2.inner_def]
-      rfl
-    rw [← hval, h1, h2]
-    apply integral_congr_ae
-    filter_upwards [RealPWBand.evaluation_ae Y hμw hμac (evv 0),
-      RealPWBand.evaluation_ae Y hμw hμac q] with x hx1 hx2
-    rw [← hx1, ← hx2]
-    change smoothIntervalMask η L x * (star (ev x (evv 0)) * ev (g⁻¹ * x) f) =
-      ⟪ev x (evv 0), ev x q⟫_ℂ
-    rw [hq x]
-    simp only [RCLike.inner_apply, starRingEnd_apply]
-    ring
-  have hlimL : Tendsto (fun L ↦ ∫ x, smoothIntervalMask η L x * F x ∂μw) atTop
-      (𝓝 (∫ x, F x ∂μw)) := by
-    refine tendsto_integral_filter_of_dominated_convergence
-      (fun x ↦ (∫ t, ‖η t‖) * ‖F x‖) (.of_forall fun L ↦ ?_)
-      (.of_forall fun L ↦ ae_of_all _ fun x ↦ ?_) (hF.norm.const_mul _)
-      (ae_of_all _ fun x ↦ ?_)
-    · exact ((continuous_smoothIntervalMask η L).aestronglyMeasurable).mul
-        hF.aestronglyMeasurable
-    · rw [norm_mul]
-      exact mul_le_mul_of_nonneg_right (norm_smoothIntervalMask_le η.integrable L x)
-        (norm_nonneg _)
-    · have h := (tendsto_smoothIntervalMask η η.integrable x).mul_const (F x)
-      rwa [hm, one_mul] at h
-  have hlimR : Tendsto (fun L ↦ smoothIntervalMask η L 0 * ev 0 f) atTop (𝓝 (ev 0 f)) := by
-    have h := (tendsto_smoothIntervalMask η η.integrable 0).mul_const (ev 0 f)
-    rwa [hm, one_mul] at h
-  exact tendsto_nhds_unique (hlimL.congr key) hlimR
+    rw [← h, hq L 0, mul_zero]
+  have h2 : Tendsto (fun L ↦ m L 0 * ev 0 f) atTop (𝓝 (ev 0 f)) := by
+    have h := (hm1 0).mul_const (ev 0 f)
+    rwa [one_mul] at h
+  exact tendsto_nhds_unique ((hlim (evv 0)).congr h1) h2
 
 /-- The weighted integral of the product of a band vector with its contraction by `g⁻¹` is
 bounded uniformly for `g` between `1` and `b`. -/
@@ -353,29 +405,31 @@ private theorem exists_integral_norm_star_mul_dilate_le (ha : 0 ≤ α) (b : ℝ
           (mul_le_mul_of_nonneg_right hg.2 hI0) hKb0
         linarith
 
-/-- Reconstruction: as the cutoff is removed, the diagonal entry of the cutoff action of `ψ` at
-the evaluation vector at the origin tends to the integral of `ψ g g ^ (-1/2)` times the value
-at the origin of that vector. -/
-theorem tendsto_realPWZeroLevelCorrection (hY : 0 < Y) (ha : 0 ≤ α) {a b : ℝ} (ha1 : 1 < a)
-    (ψ : ℝ → ℂ) (hψc : Continuous ψ) (hψ0 : ∀ g ∉ Icc a b, ψ g = 0) :
-    Tendsto (fun L ↦ realPWZeroLevelCorrection Y α s hs ψ L) atTop
-      (𝓝 ((∫ g, ψ g * ((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ)) * ev 0 (evv 0))) := by
+/-- Reconstruction: let `e` be a band vector and suppose that for each `g` in the support of
+`ψ` the weighted integral of the product of the conjugate of `e` with its contraction by `g⁻¹`
+is `κ g`. As the cutoff is removed, the diagonal entry of the cutoff action of `ψ` at `e` tends
+to the integral of `ψ g g ^ (-1/2) κ g`. -/
+theorem tendsto_realPWTestCorrection (hY : 0 < Y) (ha : 0 ≤ α) {a b : ℝ} (ha1 : 1 ≤ a)
+    (ψ : ℝ → ℂ) (hψc : Continuous ψ) (hψ0 : ∀ g ∉ Icc a b, ψ g = 0) (e : V) (κ : ℝ → ℂ)
+    (hκ : ∀ g ∈ Icc a b, ∫ x, star (ev x e) * ev (g⁻¹ * x) e ∂μw = κ g) :
+    Tendsto (fun L ↦ realPWTestCorrection Y α s hs e ψ L) atTop
+      (𝓝 (∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * κ g))) := by
   have hψm : Measurable ψ := hψc.measurable
   have hψi : Integrable ψ :=
     hψc.integrable_of_hasCompactSupport (HasCompactSupport.intro isCompact_Icc hψ0)
-  let E : ℝ → ℂ := fun x ↦ ev x (evv 0)
-  have hEc : Continuous E := (RealPWBand.contDiff_evaluation Y hμw (evv 0) 0).continuous
+  let E : ℝ → ℂ := fun x ↦ ev x e
+  have hEc : Continuous E := (RealPWBand.contDiff_evaluation Y hμw e 0).continuous
   obtain ⟨C, hC0, hC⟩ := exists_norm_realPWEvaluationVector_dilate_le Y α s hs hY.le ha
   let k := 2 * realPWOriginJetCount α
-  have hEb : ∀ g : ℝ, 1 ≤ g → ∀ x, ‖E (g⁻¹ * x)‖ ≤ C * |x| ^ k * ‖evv 0‖ := by
+  have hEb : ∀ g : ℝ, 1 ≤ g → ∀ x, ‖E (g⁻¹ * x)‖ ≤ C * |x| ^ k * ‖e‖ := by
     intro g hg x
-    have h : E (g⁻¹ * x) = ⟪evv (g⁻¹ * x), evv 0⟫_ℂ := by
-      change ev (g⁻¹ * x) (evv 0) = _
+    have h : E (g⁻¹ * x) = ⟪evv (g⁻¹ * x), e⟫_ℂ := by
+      change ev (g⁻¹ * x) e = _
       rw [← InnerProductSpace.toDual_apply_apply, RealPWBand.toDual_evaluationVector]
     rw [h]
     exact (norm_inner_le_norm _ _).trans
       (mul_le_mul_of_nonneg_right (hC g hg x) (norm_nonneg _))
-  have hEb1 : ∀ x, ‖E x‖ ≤ C * |x| ^ k * ‖evv 0‖ := by
+  have hEb1 : ∀ x, ‖E x‖ ≤ C * |x| ^ k * ‖e‖ := by
     intro x
     have h := hEb 1 le_rfl x
     rwa [inv_one, one_mul] at h
@@ -390,7 +444,7 @@ theorem tendsto_realPWZeroLevelCorrection (hY : 0 < Y) (ha : 0 ≤ α) {a b : �
       Real.norm_of_nonneg (Real.rpow_nonneg (zero_lt_one.trans_le hg1).le _)]
     exact Real.rpow_le_one_of_one_le_of_nonpos hg1 (by norm_num)
   -- the two integrals are exchanged at a fixed cutoff
-  have hfub : ∀ L, realPWZeroLevelCorrection Y α s hs ψ L =
+  have hfub : ∀ L, realPWTestCorrection Y α s hs e ψ L =
       ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * J L g) := by
     intro L
     let K : ℝ → ℝ → ℂ := fun x g ↦ ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) *
@@ -407,19 +461,19 @@ theorem tendsto_realPWZeroLevelCorrection (hY : 0 < Y) (ha : 0 ≤ α) {a b : �
         hEc.measurable.comp (measurable_snd.inv.mul measurable_fst)
       exact h1.mul (h3.mul (h2.mul (h4.mul h5)))
     have hKb : ∀ x g, ‖K x g‖ ≤
-        ((C * ‖evv 0‖) ^ 2 * (‖sharpIntervalMask L x‖ * |x| ^ (2 * k))) * ‖ψ g‖ := by
+        ((C * ‖e‖) ^ 2 * (‖sharpIntervalMask L x‖ * |x| ^ (2 * k))) * ‖ψ g‖ := by
       intro x g
       change ‖ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) *
         (sharpIntervalMask L x * (star (E x) * E (g⁻¹ * x))))‖ ≤ _
       by_cases hg : g ∈ Icc a b
-      · have hg1 : 1 ≤ g := ha1.le.trans hg.1
-        have hp0 : 0 ≤ C * |x| ^ k * ‖evv 0‖ :=
+      · have hg1 : 1 ≤ g := ha1.trans hg.1
+        have hp0 : 0 ≤ C * |x| ^ k * ‖e‖ :=
           mul_nonneg (mul_nonneg hC0 (pow_nonneg (abs_nonneg x) k)) (norm_nonneg _)
         rw [norm_mul, norm_mul, norm_mul, norm_mul, norm_star]
         calc ‖ψ g‖ * (‖((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ)‖ *
               (‖sharpIntervalMask L x‖ * (‖E x‖ * ‖E (g⁻¹ * x)‖)))
             ≤ ‖ψ g‖ * (1 * (‖sharpIntervalMask L x‖ *
-                ((C * |x| ^ k * ‖evv 0‖) * (C * |x| ^ k * ‖evv 0‖)))) :=
+                ((C * |x| ^ k * ‖e‖) * (C * |x| ^ k * ‖e‖)))) :=
               mul_le_mul_of_nonneg_left (mul_le_mul (hampn g hg1)
                 (mul_le_mul_of_nonneg_left
                   (mul_le_mul (hEb1 x) (hEb g hg1 x) (norm_nonneg _) hp0) (norm_nonneg _))
@@ -430,9 +484,9 @@ theorem tendsto_realPWZeroLevelCorrection (hY : 0 < Y) (ha : 0 ≤ α) {a b : �
         simp
     have hKint : Integrable (Function.uncurry K) (Measure.prod μw volume) :=
       (((integrable_sharpIntervalMask_abs_pow_realPW α s hs ha L).const_mul
-        ((C * ‖evv 0‖) ^ 2)).mul_prod hψi.norm).mono' hKm.aestronglyMeasurable
+        ((C * ‖e‖) ^ 2)).mul_prod hψi.norm).mono' hKm.aestronglyMeasurable
           (ae_of_all _ fun z ↦ hKb z.1 z.2)
-    calc realPWZeroLevelCorrection Y α s hs ψ L = ∫ x, (∫ g, K x g) ∂μw := by
+    calc realPWTestCorrection Y α s hs e ψ L = ∫ x, (∫ g, K x g) ∂μw := by
           refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
           change sharpIntervalMask L x * (star (E x) *
             ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * E (g⁻¹ * x))) = ∫ g, K x g
@@ -451,13 +505,11 @@ theorem tendsto_realPWZeroLevelCorrection (hY : 0 < Y) (ha : 0 ≤ α) {a b : �
             ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * J L g)
           rw [integral_const_mul, integral_const_mul]
   -- the limit of the inner integral for one dilation
-  have hJlim : ∀ g ∈ Icc a b, Tendsto (fun L ↦ J L g) atTop (𝓝 (ev 0 (evv 0))) := by
+  have hJlim : ∀ g ∈ Icc a b, Tendsto (fun L ↦ J L g) atTop (𝓝 (κ g)) := by
     intro g hg
-    have hg1 : 1 < g := ha1.trans_le hg.1
-    have hF := integrable_star_evaluation_mul_dilate Y α s hs (zero_lt_one.trans hg1)
-      (evv 0) (evv 0)
-    have hval := integral_star_evaluationVector_zero_mul_dilate Y α s hs hY hg1 (evv 0)
-    rw [← hval]
+    have hg1 : 1 ≤ g := ha1.trans hg.1
+    have hF := integrable_star_evaluation_mul_dilate Y α s hs (zero_lt_one.trans_le hg1) e e
+    rw [← hκ g hg]
     refine tendsto_integral_filter_of_dominated_convergence
       (fun x ↦ ‖star (E x) * E (g⁻¹ * x)‖) (.of_forall fun L ↦ ?_)
       (.of_forall fun L ↦ ae_of_all _ fun x ↦ ?_) hF.norm (ae_of_all _ fun x ↦ ?_)
@@ -470,12 +522,12 @@ theorem tendsto_realPWZeroLevelCorrection (hY : 0 < Y) (ha : 0 ≤ α) {a b : �
       have hm : sharpIntervalMask L x = 1 := by simp [sharpIntervalMask, abs_le.mp hL]
       rw [hm, one_mul]
   -- a bound for it that is uniform in the dilation and the cutoff
-  obtain ⟨D, hD⟩ := exists_integral_norm_star_mul_dilate_le Y α s hs ha b (evv 0)
+  obtain ⟨D, hD⟩ := exists_integral_norm_star_mul_dilate_le Y α s hs ha b e
   have hJb : ∀ g ∈ Icc a b, ∀ L, ‖J L g‖ ≤ D := by
     intro g hg L
-    have hg1 : 1 ≤ g := ha1.le.trans hg.1
+    have hg1 : 1 ≤ g := ha1.trans hg.1
     have hF := integrable_star_evaluation_mul_dilate Y α s hs (zero_lt_one.trans_le hg1)
-      (evv 0) (evv 0)
+      e e
     calc ‖J L g‖ ≤ ∫ x, ‖sharpIntervalMask L x * (star (E x) * E (g⁻¹ * x))‖ ∂μw :=
           norm_integral_le_integral_norm _
       _ ≤ ∫ x, ‖star (E x) * E (g⁻¹ * x)‖ ∂μw :=
@@ -495,14 +547,9 @@ theorem tendsto_realPWZeroLevelCorrection (hY : 0 < Y) (ha : 0 ≤ α) {a b : �
         ((continuous_star.measurable.comp (hEc.measurable.comp measurable_snd)).mul
           (hEc.measurable.comp (measurable_fst.inv.mul measurable_snd)))
     exact (hF.stronglyMeasurable.integral_prod_right' (ν := μw)).measurable
-  have hfun : (fun L ↦ realPWZeroLevelCorrection Y α s hs ψ L) =
+  have hfun : (fun L ↦ realPWTestCorrection Y α s hs e ψ L) =
       fun L ↦ ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * J L g) := funext hfub
-  have hgoal : (∫ g, ψ g * ((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ)) * ev 0 (evv 0) =
-      ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev 0 (evv 0)) := by
-    rw [← integral_mul_const]
-    refine integral_congr_ae (ae_of_all _ fun g ↦ ?_)
-    ring
-  rw [hfun, hgoal]
+  rw [hfun]
   refine tendsto_integral_filter_of_dominated_convergence (fun g ↦ ‖ψ g‖ * D)
     (.of_forall fun L ↦ ?_) (.of_forall fun L ↦ ae_of_all _ fun g ↦ ?_)
     (hψi.norm.mul_const D) (ae_of_all _ fun g ↦ ?_)
@@ -512,7 +559,7 @@ theorem tendsto_realPWZeroLevelCorrection (hY : 0 < Y) (ha : 0 ≤ α) {a b : �
   · by_cases hg : g ∈ Icc a b
     · rw [norm_mul, norm_mul]
       calc ‖ψ g‖ * (‖((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ)‖ * ‖J L g‖) ≤ ‖ψ g‖ * (1 * D) :=
-            mul_le_mul_of_nonneg_left (mul_le_mul (hampn g (ha1.le.trans hg.1)) (hJb g hg L)
+            mul_le_mul_of_nonneg_left (mul_le_mul (hampn g (ha1.trans hg.1)) (hJb g hg L)
               (norm_nonneg _) zero_le_one) (norm_nonneg _)
         _ = ‖ψ g‖ * D := by ring
     · rw [hψ0 g hg, zero_mul, norm_zero, zero_mul]
@@ -520,6 +567,23 @@ theorem tendsto_realPWZeroLevelCorrection (hY : 0 < Y) (ha : 0 ≤ α) {a b : �
     · exact ((hJlim g hg).const_mul _).const_mul _
     · simp only [hψ0 g hg, zero_mul]
       exact tendsto_const_nhds
+
+/-- Reconstruction: as the cutoff is removed, the diagonal entry of the cutoff action of `ψ` at
+the evaluation vector at the origin tends to the integral of `ψ g g ^ (-1/2)` times the value
+at the origin of that vector. -/
+theorem tendsto_realPWZeroLevelCorrection (hY : 0 < Y) (ha : 0 ≤ α) {a b : ℝ} (ha1 : 1 < a)
+    (ψ : ℝ → ℂ) (hψc : Continuous ψ) (hψ0 : ∀ g ∉ Icc a b, ψ g = 0) :
+    Tendsto (fun L ↦ realPWZeroLevelCorrection Y α s hs ψ L) atTop
+      (𝓝 ((∫ g, ψ g * ((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ)) * ev 0 (evv 0))) := by
+  have hgoal : (∫ g, ψ g * ((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ)) * ev 0 (evv 0) =
+      ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev 0 (evv 0)) := by
+    rw [← integral_mul_const]
+    refine integral_congr_ae (ae_of_all _ fun g ↦ ?_)
+    ring
+  rw [hgoal]
+  exact tendsto_realPWTestCorrection Y α s hs hY ha ha1.le ψ hψc hψ0 (evv 0)
+    (fun _ ↦ ev 0 (evv 0)) fun g hg ↦
+      integral_star_evaluationVector_zero_mul_dilate Y α s hs hY (ha1.trans_le hg.1) (evv 0)
 
 /-- Below width one half the evaluation at the origin is not zero on the band. -/
 theorem realPWEvaluationVector_zero_ne_zero (hY : 0 < Y) (ha : 0 ≤ α) (hα : α < 1 / 2) :
