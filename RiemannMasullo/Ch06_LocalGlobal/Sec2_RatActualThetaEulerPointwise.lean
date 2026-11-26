@@ -112,4 +112,99 @@ theorem singleton_euler_eq_emptyTheta (v : V) (x y : (SAdeleRing ℚ {v})ˣ)
   rw [singleton_euler_difference f phi hf v x y hx hy hshift, halfTheta,
     empty_theta f phi hf z hz, hsame, halfProfile]
 
+private def insertIndex {T : Finset V} (v : V) (kn : ℕ × (T → ℕ))
+    (w : ↥(insert v T : Finset V)) : ℕ :=
+  if hw : w.val ∈ T then kn.2 ⟨w.val, hw⟩ else kn.1
+
+private def insertIndexEquiv {T : Finset V} (v : V) (hv : v ∉ T) :
+    (ℕ × (T → ℕ)) ≃ (↥(insert v T : Finset V) → ℕ) where
+  toFun := insertIndex v
+  invFun n := (n ⟨v, Finset.mem_insert_self _ _⟩, fun w ↦ n ⟨w.val, Finset.mem_insert_of_mem w.property⟩)
+  left_inv kn := by
+    apply Prod.ext
+    · simp [insertIndex, hv]
+    · funext w
+      simp [insertIndex, w.property]
+  right_inv n := by
+    funext w
+    by_cases hw : w.val ∈ T
+    · simp [insertIndex, hw]
+    · have he : w.val = v := (Finset.mem_insert.mp w.property).resolve_right hw
+      have he' : w = (⟨v, Finset.mem_insert_self _ _⟩ : ↥(insert v T : Finset V)) := Subtype.ext he
+      rw [he']
+      simp [insertIndex, hv]
+
+private theorem latticeRadius_insertIndex {T : Finset V} (v : V) (hv : v ∉ T)
+    (kn : ℕ × (T → ℕ)) :
+    latticeRadius (insertIndexEquiv v hv kn) = (v.asIdeal.absNorm : ℝ)^kn.1 * latticeRadius kn.2 := by
+  let E := Finset.subtypeInsertEquivOption hv
+  let G : Option T → ℝ := Option.rec ((v.asIdeal.absNorm : ℝ)^kn.1)
+    (fun w : T ↦ (w.val.asIdeal.absNorm : ℝ) ^ kn.2 w)
+  calc
+    _ = ∏ o : Option T, G o := by
+      apply Fintype.prod_equiv E
+      intro w
+      obtain ⟨o, rfl⟩ := E.symm.surjective w
+      rw [Equiv.apply_symm_apply]
+      cases o with
+      | none => simp [G, E, Finset.subtypeInsertEquivOption, insertIndexEquiv, insertIndex, hv]
+      | some u => simp [G, E, Finset.subtypeInsertEquivOption, insertIndexEquiv, insertIndex, u.property]
+    _ = _ := Fintype.prod_option G
+
+include hf in
+private theorem theta_hasSum_rows (T : Finset V) (v : V) (hv : v ∉ T)
+    (x : (SAdeleRing ℚ (insert v T))ˣ) (hx : Normalized (insert v T) x) :
+    HasSum (fun k : ℕ ↦ ∑' n : T → ℕ,
+      signedProfile phi (radius (insert v T) x * ((v.asIdeal.absNorm : ℝ)^k * latticeRadius n)))
+      (theta (insert v T) f x) := by
+  have h := (insertIndexEquiv v hv).hasSum_iff.mpr (normChart_hasSum f phi hf (insert v T) x hx)
+  have he : HasSum (fun kn : ℕ × (T → ℕ) ↦ signedProfile phi
+      (radius (insert v T) x * ((v.asIdeal.absNorm : ℝ)^kn.1 * latticeRadius kn.2)))
+      (theta (insert v T) f x) :=
+    h.congr_fun (fun kn ↦ by simp only [Function.comp_apply, latticeRadius_insertIndex])
+  refine he.prod_fiberwise fun k ↦ ?_
+  exact (he.summable.comp_injective (i := fun n : T → ℕ ↦ (k, n))
+    (fun _ _ e ↦ congrArg Prod.snd e)).hasSum
+
+include hf in
+/-- The exact finite-place Euler difference at the actual chart radii `r` and
+`q*r` gives the genuine smaller-stage half-theta at `r`. The identity holds for
+any finite set of retained places and all normalized representatives. -/
+theorem insert_euler_eq_halfTheta (T : Finset V) (v : V) (hv : v ∉ T)
+    (x y : (SAdeleRing ℚ (insert v T))ˣ) (z : (SAdeleRing ℚ T)ˣ)
+    (hx : Normalized (insert v T) x) (hy : Normalized (insert v T) y) (hz : Normalized T z)
+    (hshift : radius (insert v T) y = radius (insert v T) x * (v.asIdeal.absNorm : ℝ))
+    (hsame : radius T z = radius (insert v T) x) :
+    halfTheta (insert v T) f x - (Real.sqrt (v.asIdeal.absNorm : ℝ) : ℂ)⁻¹ *
+      halfTheta (insert v T) f y = halfTheta T f z := by
+  let rr := radius (insert v T) x
+  let q : ℝ := v.asIdeal.absNorm
+  let b (k : ℕ) := ∑' n : T → ℕ, signedProfile phi (rr * (q^k * latticeRadius n))
+  have hs : HasSum b (theta (insert v T) f x) := theta_hasSum_rows f phi hf T v hv x hx
+  have hs' := (hasSum_nat_add_iff' 1).mpr hs
+  rw [Finset.sum_range_one] at hs'
+  have h0 : b 0 = theta T f z := by
+    rw [← (normChart_hasSum f phi hf T z hz).tsum_eq, hsame]
+    simp only [b, rr, pow_zero, one_mul]
+  have ht : HasSum (fun k ↦ b (k+1)) (theta (insert v T) f y) := by
+    refine (theta_hasSum_rows f phi hf T v hv y hy).congr_fun fun k ↦ ?_
+    change b (k + 1) = ∑' n : T → ℕ, signedProfile phi
+      (radius (insert v T) y * (q^k * latticeRadius n))
+    apply tsum_congr
+    intro n
+    rw [hshift, pow_succ]
+    congr 1
+    dsimp only [rr, q]
+    ring
+  have he := hs'.unique ht
+  rw [h0] at he
+  have hr : 0 ≤ rr := NNReal.coe_nonneg _
+  have hq : 0 < q := Nat.cast_pos.mpr (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v))
+  have hn : (Real.sqrt q : ℂ) ≠ 0 := by exact_mod_cast (Real.sqrt_pos.2 hq).ne'
+  rw [halfTheta, halfTheta, halfTheta, hshift, hsame]
+  change (Real.sqrt rr : ℂ) * theta (insert v T) f x - (Real.sqrt q : ℂ)⁻¹ *
+    ((Real.sqrt (rr * q) : ℂ) * theta (insert v T) f y) = (Real.sqrt rr : ℂ) * theta T f z
+  rw [Real.sqrt_mul hr, Complex.ofReal_mul, ← he]
+  field_simp; ring
+
 end RiemannMasullo.RatActualThetaEulerPointwise
