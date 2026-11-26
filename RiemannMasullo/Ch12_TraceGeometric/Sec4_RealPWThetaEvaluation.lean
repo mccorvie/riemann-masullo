@@ -18,13 +18,18 @@ bound of the unweighted band, and the bound of the weight times the squared norm
 terms are dominated by a geometric series with ratio `p ^ (-α)`. For `x ≤ 1` the terms with
 `p ^ n x < 1` are counted, about `|log x| / log p` of them, and the rest is a geometric tail.
 
+The same bound makes the evaluation vectors at the points `p ^ n x` summable in norm. Their sum
+`E_x` represents the theta sum as a functional on the band
+(`exists_realPWBand_thetaEvaluationVector_bound`), and the inner products of these sums are
+bounded by a constant times `x ^ (-α) y ^ (-α)` (`exists_realPWBand_thetaKernel_bound`).
+
 No space of theta sums and no operator is introduced here. The width must be positive: at
 `α = 0` the ratio of the geometric series is one. -/
 
 public noncomputable section
 
 open Filter MeasureTheory Set
-open scoped Topology
+open scoped Topology InnerProductSpace
 
 namespace RiemannMasullo.Isolated
 
@@ -194,5 +199,91 @@ theorem exists_realPWBand_thetaEvaluation_bound {Y α s p : ℝ} (hY : 0 ≤ Y) 
       mul_le_mul_of_nonneg_right hN' hK
     nlinarith [hhead, htail, h1, mul_nonneg hK hA, mul_nonneg (mul_nonneg hK hA) hL,
       mul_nonneg hK hL, mul_nonneg hK hB, mul_nonneg (mul_nonneg hK hL) hB]
+
+/-- Paper: Theorem 12.4.1.1, pp. 514–517, for one finite prime beside the real place. At positive
+strip width, the evaluation vectors of the even weighted band at the points `p ^ n x`, `n ≥ 0`,
+are summable in norm. Their sum `E_x` has norm at most a constant times `x ^ (-α)`, and it
+represents the theta sum: the values of `f` at the points `p ^ n x` sum to the inner product of
+`E_x` with `f`.
+Reconstruction: The paper does not state this. The band is the fixed-bandwidth model of
+#7354. -/
+theorem exists_realPWBand_thetaEvaluationVector_bound {Y α s p : ℝ} (hY : 0 ≤ Y) (ha : 0 < α)
+    (hs : 0 ≤ s) (hp : 1 < p) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ x : ℝ, 0 < x →
+      Summable (fun n : ℕ ↦ ‖RealPWBand.evaluationVector Y
+        (volume_le_realPWIntervalMeasure α s hs) (p ^ n * x)‖) ∧
+      ‖∑' n : ℕ, RealPWBand.evaluationVector Y
+        (volume_le_realPWIntervalMeasure α s hs) (p ^ n * x)‖ ≤ C * x ^ (-α) ∧
+      ∀ f : RealPWBand.space Y (volume_le_realPWIntervalMeasure α s hs),
+        HasSum (fun n : ℕ ↦ RealPWBand.evaluation Y
+            (volume_le_realPWIntervalMeasure α s hs) (p ^ n * x) f)
+          ⟪∑' n : ℕ, RealPWBand.evaluationVector Y
+            (volume_le_realPWIntervalMeasure α s hs) (p ^ n * x), f⟫_ℂ := by
+  let hμ := volume_le_realPWIntervalMeasure α s hs
+  let e := RealPWBand.evaluationVector Y hμ
+  obtain ⟨C₂, hC₂, hκ⟩ := exists_realPWBand_evaluationVector_rpow_bound (s := s) hY ha.le hs
+  have hp0 : 0 < p := zero_lt_one.trans hp
+  let ρ := p ^ (-α)
+  have hρ0 : 0 < ρ := Real.rpow_pos_of_pos hp0 _
+  have hρ1 : ρ < 1 := Real.rpow_lt_one_of_one_lt_of_neg hp (by linarith)
+  have hA : 0 ≤ (1 - ρ)⁻¹ := (inv_pos.mpr (sub_pos.mpr hρ1)).le
+  have hpow (n : ℕ) (x : ℝ) (hx : 0 < x) : (p ^ n * x) ^ (-α) = ρ ^ n * x ^ (-α) := by
+    rw [Real.mul_rpow (pow_nonneg hp0.le n) hx.le, ← Real.rpow_natCast p n,
+      ← Real.rpow_mul hp0.le, mul_comm (n : ℝ) (-α), Real.rpow_mul hp0.le, Real.rpow_natCast]
+  have hterm (n : ℕ) (x : ℝ) (hx : 0 < x) : ‖e (p ^ n * x)‖ ≤ C₂ * x ^ (-α) * ρ ^ n := by
+    have hy : 0 < p ^ n * x := mul_pos (pow_pos hp0 n) hx
+    calc ‖e (p ^ n * x)‖ ≤ C₂ * (p ^ n * x) ^ (-α) := (hκ _ hy).2
+      _ = C₂ * x ^ (-α) * ρ ^ n := by rw [hpow n x hx]; ring
+  have hgeo (c : ℝ) : Summable (fun n : ℕ ↦ c * ρ ^ n) :=
+    (summable_geometric_of_lt_one hρ0.le hρ1).mul_left c
+  refine ⟨C₂ * (1 - ρ)⁻¹, mul_nonneg hC₂ hA, fun x hx ↦ ?_⟩
+  have hnorm : Summable (fun n : ℕ ↦ ‖e (p ^ n * x)‖) :=
+    Summable.of_nonneg_of_le (fun _ ↦ norm_nonneg _) (fun n ↦ hterm n x hx) (hgeo _)
+  have hS : Summable (fun n : ℕ ↦ e (p ^ n * x)) := hnorm.of_norm
+  refine ⟨hnorm, ?_, fun f ↦ ?_⟩
+  · calc ‖∑' n : ℕ, e (p ^ n * x)‖ ≤ ∑' n : ℕ, ‖e (p ^ n * x)‖ := norm_tsum_le_tsum_norm hnorm
+      _ ≤ ∑' n : ℕ, C₂ * x ^ (-α) * ρ ^ n :=
+        Summable.tsum_le_tsum (fun n ↦ hterm n x hx) hnorm (hgeo _)
+      _ = C₂ * (1 - ρ)⁻¹ * x ^ (-α) := by
+        rw [tsum_mul_left, tsum_geometric_of_lt_one hρ0.le hρ1]
+        ring
+  · have h1 : HasSum (fun n : ℕ ↦ ⟪f, e (p ^ n * x)⟫_ℂ) ⟪f, ∑' n : ℕ, e (p ^ n * x)⟫_ℂ := by
+      simpa using hS.hasSum.mapL (innerSL ℂ f)
+    have h2 := h1.star
+    have hterm' (n : ℕ) : RealPWBand.evaluation Y hμ (p ^ n * x) f =
+        star ⟪f, e (p ^ n * x)⟫_ℂ := by
+      rw [← RealPWBand.toDual_evaluationVector Y hμ (p ^ n * x),
+        InnerProductSpace.toDual_apply_apply]
+      exact (inner_conj_symm _ _).symm
+    have hlim : ⟪∑' n : ℕ, e (p ^ n * x), f⟫_ℂ = star ⟪f, ∑' n : ℕ, e (p ^ n * x)⟫_ℂ :=
+      (inner_conj_symm _ _).symm
+    rw [hlim]
+    exact h2.congr_fun fun n ↦ hterm' n
+
+/-- Paper: Theorem 12.4.1.1, pp. 514–517, for one finite prime beside the real place. The kernel
+of the theta sums of the evaluation vectors, the inner product of `E_y` with `E_x`, is at most a
+constant times `x ^ (-α) y ^ (-α)`. In particular it is bounded on every set of pairs bounded
+away from zero.
+Reconstruction: The paper does not state this. It is the reproducing kernel of the image of the
+band under the theta sum when that image carries the norm of the band; no such space is
+introduced here. -/
+theorem exists_realPWBand_thetaKernel_bound {Y α s p : ℝ} (hY : 0 ≤ Y) (ha : 0 < α)
+    (hs : 0 ≤ s) (hp : 1 < p) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ x y : ℝ, 0 < x → 0 < y →
+      ‖⟪∑' n : ℕ, RealPWBand.evaluationVector Y
+          (volume_le_realPWIntervalMeasure α s hs) (p ^ n * y),
+        ∑' m : ℕ, RealPWBand.evaluationVector Y
+          (volume_le_realPWIntervalMeasure α s hs) (p ^ m * x)⟫_ℂ‖ ≤
+        C * x ^ (-α) * y ^ (-α) := by
+  obtain ⟨C, hC, h⟩ := exists_realPWBand_thetaEvaluationVector_bound (s := s) hY ha hs hp
+  refine ⟨C * C, mul_nonneg hC hC, fun x y hx hy ↦ ?_⟩
+  have hx' := (h x hx).2.1
+  have hy' := (h y hy).2.1
+  have hxα : 0 ≤ x ^ (-α) := (Real.rpow_pos_of_pos hx _).le
+  have hyα : 0 ≤ y ^ (-α) := (Real.rpow_pos_of_pos hy _).le
+  refine (norm_inner_le_norm _ _).trans ?_
+  calc _ ≤ (C * y ^ (-α)) * (C * x ^ (-α)) :=
+        mul_le_mul hy' hx' (norm_nonneg _) (mul_nonneg hC hyα)
+    _ = C * C * x ^ (-α) * y ^ (-α) := by ring
 
 end RiemannMasullo.Isolated
