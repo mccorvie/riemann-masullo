@@ -7,6 +7,8 @@ import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform.Holomorphic
 import RiemannMasullo.Ch11_ShellStructure.Sec2a
 import Mathlib.Analysis.SpecialFunctions.JapaneseBracket
+import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.ModulatedBound
+import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec5
 
 /-! # The block series of Theorem 10.3.2.1(1): a sufficient majorant and a necessary separation
 
@@ -19,12 +21,14 @@ bound the Mellin value at every zero times its zeroth jet, relative to the dista
 from the zeroth jet at any other zero. The second statement is where the spacing of the zeros of
 the Hecke `L`-functions enters. The majorant is equivalent to a uniform bound for finite
 principal Gram matrices of the explicit jets. The remaining estimate is
-`spectralStripConvolution_finiteGram_bound`. -/
+`spectralStripConvolution_finiteGram_bound`. At width zero, that estimate for every test forces
+the zeros of each component to be separated polynomially in the height
+(`spectralStripConvolution_finiteGram_bound_forces_polynomial_gaps`). -/
 
 @[expose] public noncomputable section
 
 open Filter Function MeasureTheory NumberField Set
-open scoped BigOperators NNReal NumberField.AdeleRing Topology
+open scoped BigOperators NNReal NumberField.AdeleRing Topology SchwartzMap
 
 namespace RiemannMasullo.Isolated
 
@@ -1040,6 +1044,326 @@ theorem spectralStripConvolution_summable_jetNorms_forces_line_gaps (hα0 : α =
         ring
 
 end LineHolder
+
+section GramSpacing
+
+/-- The completed `L`-function of a unitary character has finite order at every point.
+This repeats the private `spectralStripComponent_finite_window_order_ne_top` of
+`Sec3_Clusters`. -/
+private theorem gramSpacing_order_ne_top (ψ : PontryaginDual C𝔽) (z : ℂ) : order(ψ, z) ≠ ⊤ := by
+  obtain ⟨hΛ, hval⟩ := continuedCompletedHeckeL_spec ψ
+  have h2 : order(ψ, (2 : ℂ)) ≠ ⊤ := fun htop ↦ by
+    have hbad := completedHeckeL_continuation_zeros ψ _ hΛ hval (by norm_num : 0 < (2 : ℂ).re)
+      (by rw [htop]; exact WithTop.coe_lt_top 0)
+    norm_num at hbad
+  exact hΛ.meromorphicOn.meromorphicOrderAt_ne_top_of_isPreconnected isPreconnected_univ
+    (mem_univ _) (mem_univ z) h2
+
+include hs in
+/-- At width zero every zero keeps its jet of order zero. -/
+private theorem gramSpacing_N_pos (hα0 : α = 0) (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (z : Z(χ, α)) : 0 < N(χ, α, s, z) := by
+  have hz0 : z.val.2.1 = 0 := by
+    have := z.property.1; simp only [mem_Icc] at this; subst hα0; linarith
+  have hord := z.property.2
+  have hne := gramSpacing_order_ne_top (χ z.val.1) (shift(a + z.val.2.1, z.val.2.2))
+  have hmult : 0 < mult(χ z.val.1, shift(a + z.val.2.1, z.val.2.2)) := by
+    obtain ⟨n, hn⟩ := WithTop.ne_top_iff_exists.mp hne
+    rw [← hn] at hord ⊢
+    simp only [WithTop.untop₀_coe]
+    exact Int.lt_toNat.mpr (by exact_mod_cast hord)
+  rw [spectralStripMultiplicity_boundary (le_of_eq hα0.symm) (Or.inr (hz0.trans hα0.symm)) s]
+  unfold spectralBoundaryMultiplicity
+  refine lt_min hmult (Nat.ceil_pos.mpr (by linarith))
+
+/-- One test and two zeros: the finite Gram bound of `spectralStripConvolution_finiteGram_bound`
+for one test, applied to the block of the two zeroth jets, bounds the Mellin transform of the
+test on the circle around the first zero by a constant times the `β`-th power of the distance
+between the ordinates. -/
+private theorem gramSpacing_pair (hα0 : α = 0) (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (hχ : IsSpectralBasepointChoice χ) (φ : BruhatCompactSupport C𝔽)
+    (hgap : ∃ B : ℝ, ∀ (T : Finset (Z(χ, α))) (w : Z(χ, α) → ℂ) (S : Finset (J(χ))),
+      (∀ z ∈ T, w z ∈ Metric.sphere (shift(z.val.2.1, z.val.2.2))
+        (2 * Real.exp ((4 * α + s) / 2))) →
+      ∑ z ∈ T, ‖∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ z.val.1) (w z) g ∂μ𝔽‖ *
+        ∑ m : Fin (N(χ, α, s, z)), ‖u(χ, (jet(z, m) : J(χ)))‖ *
+          finiteGramCoordinate (fun j : J(χ) ↦ u(χ, j)) (jet(z, m) : J(χ)) S ≤ B)
+    {β : ℝ} (hβ0 : 0 ≤ β) (hβ1 : β ≤ 1) (hβs : 2 * β < s - 1) :
+    ∃ C ≥ (0 : ℝ), ∀ z w : Z(χ, α), w ≠ z → w.val.1 = z.val.1 →
+      ∀ w' ∈ Metric.sphere (shift(z.val.2.1, z.val.2.2)) (2 * Real.exp ((4 * α + s) / 2)),
+        ‖∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ z.val.1) w' g ∂μ𝔽‖ ≤
+          C * |z.val.2.2 - w.val.2.2| ^ β := by
+  classical
+  obtain ⟨B, hB⟩ := hgap
+  obtain ⟨c₀, hc₀, hlow⟩ := spectralStripJet_lowerBound χ hχ (a := a) hα hs
+  have hind := spectralStripJet_toLp_linearIndependent χ hχ a hα hs₀(hs)
+  let K := (eLpNorm (fun g : C𝔽 ↦ (1 + logIdeleClassNorm F g ^ 2) ^ (β / 2)) 2
+    (intervalSobolevMeasure μ𝔽 (logIdeleClassNorm F) (-α) α s true)).toReal
+  have hK0 : 0 ≤ K := ENNReal.toReal_nonneg
+  have hB0 : 0 ≤ B := by simpa using hB ∅ (fun _ ↦ 0) ∅ (by simp)
+  refine ⟨2 * K * B / c₀, by positivity, fun z w hwz hχzw w' hw' ↦ ?_⟩
+  let jz : J(χ) := jet(z, (⟨0, gramSpacing_N_pos a hs hα0 χ z⟩ : Fin (N(χ, α, s, z))))
+  let jw : J(χ) := jet(w, (⟨0, gramSpacing_N_pos a hs hα0 χ w⟩ : Fin (N(χ, α, s, w))))
+  have hz0 : z.val.2.1 = 0 := by
+    have := z.property.1; simp only [mem_Icc] at this; subst hα0; linarith
+  have hw0 : w.val.2.1 = 0 := by
+    have := w.property.1; simp only [mem_Icc] at this; subst hα0; linarith
+  have hjne : jw ≠ jz := by
+    intro h
+    apply hwz
+    apply Subtype.ext
+    have h1 := congrArg (fun i : J(χ) ↦ i.val.1) h
+    have h2 := congrArg (fun i : J(χ) ↦ i.val.2.1) h
+    have h3 := congrArg (fun i : J(χ) ↦ i.val.2.2.1) h
+    exact Prod.ext h1 (Prod.ext h2 h3)
+  have hdist : ‖u(χ, jz) - u(χ, jw)‖ ≤ 2 * |z.val.2.2 - w.val.2.2| ^ β * K :=
+    lineHolder_jet_dist_le a hα hs hα0 χ hβ0 hβ1 hβs jz jw hχzw hz0 hw0 rfl rfl
+  have hpos : 0 < ‖u(χ, jz) - u(χ, jw)‖ :=
+    norm_pos_iff.mpr (sub_ne_zero.mpr fun h ↦ hjne (hind.injective h).symm)
+  -- The Gram coordinate of the zeroth jet at `z` in the block `{jz, jw}`.
+  have hcoord : 1 / ‖u(χ, jz) - u(χ, jw)‖ ≤
+      finiteGramCoordinate (fun j : J(χ) ↦ u(χ, j)) jz {jz, jw} := by
+    have hg := (finiteGramCoordinate_isGreatest hind jz {jz, jw}).2
+    refine hg ⟨Finsupp.single jz 1 - Finsupp.single jw 1, ?_, ?_⟩
+    · intro k hk
+      have := Finsupp.support_sub hk
+      rcases Finset.mem_union.mp this with h | h
+      · exact Finset.mem_insert.mpr (Or.inl (Finset.mem_singleton.mp (Finsupp.support_single_subset h)))
+      · exact Finset.mem_insert.mpr (Or.inr (Finset.mem_singleton.mpr
+          (Finset.mem_singleton.mp (Finsupp.support_single_subset h))))
+    · simp only [Finsupp.coe_sub, Pi.sub_apply, Finsupp.single_eq_same,
+        Finsupp.single_eq_of_ne hjne.symm, sub_zero, norm_one, map_sub,
+        Finsupp.linearCombination_single, one_smul]
+  have hsum := hB {z} (fun _ ↦ w') {jz, jw} (by simpa using hw')
+  rw [Finset.sum_singleton] at hsum
+  have hterm : ‖u(χ, jz)‖ * finiteGramCoordinate (fun j : J(χ) ↦ u(χ, j)) jz {jz, jw} ≤
+      ∑ m : Fin (N(χ, α, s, z)), ‖u(χ, (jet(z, m) : J(χ)))‖ *
+        finiteGramCoordinate (fun j : J(χ) ↦ u(χ, j)) (jet(z, m) : J(χ)) {jz, jw} :=
+    Finset.single_le_sum (f := fun m : Fin (N(χ, α, s, z)) ↦ ‖u(χ, (jet(z, m) : J(χ)))‖ *
+        finiteGramCoordinate (fun j : J(χ) ↦ u(χ, j)) (jet(z, m) : J(χ)) {jz, jw})
+      (fun m _ ↦ mul_nonneg (norm_nonneg _) (finiteGramCoordinate_nonneg _ _ _))
+      (Finset.mem_univ _)
+  have hlowz : c₀ ≤ ‖u(χ, jz)‖ := hlow jz
+  have hv0 : 0 ≤ ‖∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ z.val.1) w' g ∂μ𝔽‖ := norm_nonneg _
+  have hquot : c₀ / ‖u(χ, jz) - u(χ, jw)‖ ≤ ∑ m : Fin (N(χ, α, s, z)), ‖u(χ, (jet(z, m) : J(χ)))‖ *
+        finiteGramCoordinate (fun j : J(χ) ↦ u(χ, j)) (jet(z, m) : J(χ)) {jz, jw} := by
+    calc c₀ / ‖u(χ, jz) - u(χ, jw)‖ = c₀ * (1 / ‖u(χ, jz) - u(χ, jw)‖) := by ring
+      _ ≤ ‖u(χ, jz)‖ * finiteGramCoordinate (fun j : J(χ) ↦ u(χ, j)) jz {jz, jw} :=
+          mul_le_mul hlowz hcoord (by positivity) (norm_nonneg _)
+      _ ≤ _ := hterm
+  have h1 := (mul_le_mul_of_nonneg_left hquot hv0).trans hsum
+  rw [← mul_div_assoc, div_le_iff₀ hpos] at h1
+  have h3 := h1.trans (mul_le_mul_of_nonneg_left hdist hB0)
+  rw [show 2 * K * B / c₀ * |z.val.2.2 - w.val.2.2| ^ β =
+    B * (2 * |z.val.2.2 - w.val.2.2| ^ β * K) / c₀ by ring]
+  exact (le_div_iff₀ hc₀).mpr h3
+
+local notation "ν𝔽" => canonicalModulatedHaar m𝔽 hm𝔽
+
+local instance gramSpacingCanonicalHaar : (ν𝔽).IsHaarMeasure :=
+  (existsUnique_canonicalModulatedHaar m𝔽 hm𝔽).exists.choose_spec.1
+
+/-- The logarithm of the idele class norm is a proper map. -/
+private theorem gramSpacing_logNorm_proper : IsProperMap (logIdeleClassNorm F) := by
+  have hpos (x : C𝔽) : 0 < ((m𝔽 x).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt (m𝔽 x))
+  let e : ℝ≥0ˣ ≃ₜ ℝ :=
+    (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.symm.toHomeomorph
+  have he : (e ∘ m𝔽) = logIdeleClassNorm F :=
+    funext fun g ↦ (Real.log_of_pos (hpos g)).symm
+  exact he ▸ e.isProperMap.comp (hm𝔽).1
+
+/-- A smooth compactly supported profile of the logarithm of the norm, times the conjugate of a
+unitary character, is a compactly supported Bruhat test. -/
+private theorem gramSpacing_exists_test (η : PontryaginDual C𝔽) (r : ℝ → ℂ)
+    (hr : ContDiff ℝ (⊤ : ℕ∞) r) (hc : HasCompactSupport r) :
+    ∃ φ : BruhatCompactSupport C𝔽, ∀ g, φ.val g = r (logIdeleClassNorm F g) * star (η g : ℂ) := by
+  let c : QuasiCharacter C𝔽 :=
+    (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η⁻¹
+  have hcg (g : C𝔽) : c g = star (η g : ℂ) := by
+    change ((η⁻¹ g : Circle) : ℂ) = _
+    rw [show η⁻¹ g = (η g)⁻¹ from rfl, Circle.coe_inv_eq_conj]
+    rfl
+  let f : C𝔽 → ℂ := fun g ↦ r (logIdeleClassNorm F g) * star (η g : ℂ)
+  have hlog : IsBruhatSmooth (fun x : C𝔽 ↦ (r (Real.log ((m𝔽 x).val : ℝ)) : ℂ)) :=
+    isBruhatSmooth_logProfile m𝔽 hr
+  have hchar : IsBruhatSmooth (fun x : C𝔽 ↦ c x) :=
+    (mem_bruhatSmoothSubmodule_iff _).mp (quasiCharacter_mem_bruhatSmooth c)
+  have hsmooth : IsBruhatSmooth f := by
+    intro p
+    have := isBruhatContDiff_mul (hlog p) (hchar p)
+    convert this using 1
+    funext g
+    simp only [Pi.mul_apply, f, hcg]
+    rfl
+  have hsupp : HasCompactSupport f := by
+    refine HasCompactSupport.intro ((gramSpacing_logNorm_proper (F := F)).isCompact_preimage hc) ?_
+    intro g hg
+    simp only [f, mem_preimage] at hg ⊢
+    rw [image_eq_zero_of_notMem_tsupport hg, zero_mul]
+  exact ⟨⟨f, (mem_bruhatSmoothSubmodule_iff f).mpr hsmooth, hsupp⟩, fun _ ↦ rfl⟩
+
+/-- The Mellin integral of the test of `gramSpacing_exists_test` against the twist of the same
+character is a Laplace integral of the profile. -/
+private theorem gramSpacing_mellin (η : PontryaginDual C𝔽) (r : ℝ → ℂ) (hr : Continuous r)
+    (φ : BruhatCompactSupport C𝔽)
+    (hφ : ∀ g, φ.val g = r (logIdeleClassNorm F g) * star (η g : ℂ)) (w : ℂ) :
+    ∫ g : C𝔽, φ.val g * ideleClassNormTwist (F := F) η w g ∂μ𝔽 =
+      (Measure.haarScalarFactor μ𝔽 ν𝔽 : ℂ) * ∫ x : ℝ, r x * Complex.exp (w * x) := by
+  let G : ℝ → ℂ := fun x ↦ r x * Complex.exp (w * x)
+  have hpt (g : C𝔽) : φ.val g * ideleClassNormTwist (F := F) η w g = G (logIdeleClassNorm F g) := by
+    have hp : (0 : ℝ) < ((ideleClassNorm F g).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+    have htw : (ideleClassNormTwist (F := F) η w g : ℂ) =
+        (η g : ℂ) * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ w := rfl
+    have hη : star (η g : ℂ) * (η g : ℂ) = 1 := by
+      rw [Complex.star_def, Complex.conj_mul', Circle.norm_coe]; norm_num
+    rw [hφ, htw, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hp.ne'),
+      ← Complex.ofReal_log hp.le]
+    change r _ * star (η g : ℂ) * ((η g : ℂ) * Complex.exp (_ * w)) = r _ * Complex.exp (w * _)
+    rw [show r (logIdeleClassNorm F g) * star (η g : ℂ) * ((η g : ℂ) *
+        Complex.exp (((Real.log ((ideleClassNorm F g).val : ℝ) : ℝ) : ℂ) * w)) =
+        r (logIdeleClassNorm F g) * (star (η g : ℂ) * (η g : ℂ)) *
+        Complex.exp (((Real.log ((ideleClassNorm F g).val : ℝ) : ℝ) : ℂ) * w) by ring, hη,
+      mul_one, mul_comm _ w]
+  have hG : Continuous G := hr.mul (Complex.continuous_exp.comp
+    (continuous_const.mul Complex.continuous_ofReal))
+  simp_rw [hpt]
+  have hL := lineHolder_log_preserving (F := F)
+  rw [← integral_map hL.measurable.aemeasurable hG.aestronglyMeasurable, hL.map_eq,
+    integral_smul_nnreal_measure, NNReal.smul_def, Complex.real_smul]
+
+/-- Paper: Theorem 10.3.2.1(1), pp. 453–455. What the recorded gap
+`spectralStripConvolution_finiteGram_bound` (#7455), assumed for every test, forces at width
+zero: the zeros of each component are separated polynomially in the height. For each norm-one
+character `ω` there are `c > 0` and `A` such that any two distinct zeros `z, w` of `χ ω` on the
+line satisfy `|Im z - Im w| ≥ c (1 + |Im z|) ^ (-A)`.
+The hypothesis is the statement of `spectralStripConvolution_finiteGram_bound` for every test,
+with its `let`s unfolded. The proof applies the finite Gram bound to the block of two zeroth jets
+(`gramSpacing_pair`), tests of the form `ψ(log |g|) · conj (χ ω g)` whose Mellin transforms are
+Laplace integrals of `ψ`, the Banach–Steinhaus theorem on the Schwartz space of the line, and the
+modulated tests `ρ(x) e^{-itx}`, whose Schwartz seminorms grow polynomially in `t`. Over `ℚ`,
+at `a = 1/2` and on the component of the trivial character, the conclusion is a lower bound,
+polynomial in the height, for the gaps between the ordinates of zeros of the Riemann zeta
+function on the critical line. No such bound is known to us, unconditionally or on the Riemann
+hypothesis. The bound is for one component at a time, with no uniformity in `ω`. -/
+theorem spectralStripConvolution_finiteGram_bound_forces_polynomial_gaps (hα0 : α = 0)
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    (hgap : ∀ φ : BruhatCompactSupport C𝔽, ∃ B : ℝ, ∀ (T : Finset (Z(χ, α))) (w : Z(χ, α) → ℂ)
+      (S : Finset (J(χ))),
+      (∀ z ∈ T, w z ∈ Metric.sphere (shift(z.val.2.1, z.val.2.2))
+        (2 * Real.exp ((4 * α + s) / 2))) →
+      ∑ z ∈ T, ‖∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ z.val.1) (w z) g ∂μ𝔽‖ *
+        ∑ m : Fin (N(χ, α, s, z)), ‖u(χ, (jet(z, m) : J(χ)))‖ *
+          finiteGramCoordinate (fun j : J(χ) ↦ u(χ, j)) (jet(z, m) : J(χ)) S ≤ B)
+    (ω : PontryaginDual C₁) :
+    ∃ c > (0 : ℝ), ∃ A : ℝ, ∀ z w : Z(χ, α), z.val.1 = ω → w ≠ z → w.val.1 = z.val.1 →
+      c * (1 + |z.val.2.2|) ^ (-A) ≤ |z.val.2.2 - w.val.2.2| := by
+  classical
+  -- The exponent.
+  let β : ℝ := min 1 ((s - 1) / 4)
+  have hβpos : 0 < β := lt_min one_pos (by linarith)
+  have hβ1 : β ≤ 1 := min_le_left _ _
+  have hβs : 2 * β < s - 1 := by
+    have : β ≤ (s - 1) / 4 := min_le_right _ _
+    linarith
+  -- The cut-off and the profile.
+  let b : ContDiffBump (0 : ℝ) := ⟨1, 2, one_pos, one_lt_two⟩
+  let θ : ℝ → ℂ := fun x ↦ ((b x : ℝ) : ℂ)
+  have hθs : ContDiff ℝ (⊤ : ℕ∞) θ := Complex.ofRealCLM.contDiff.comp b.contDiff
+  have hθc : HasCompactSupport θ := b.hasCompactSupport.comp_left Complex.ofReal_zero
+  have hθcont : Continuous θ := hθs.continuous
+  let η := χ ω
+  let R : ℝ := 2 * Real.exp ((4 * α + s) / 2)
+  have hR : 0 < R := by positivity
+  let cH : ℝ := Measure.haarScalarFactor μ𝔽 ν𝔽
+  have hcH : 0 < cH := NNReal.coe_pos.mpr (Measure.haarScalarFactor_pos_of_isHaarMeasure _ _)
+  -- For every Schwartz profile, the test and the bound of `gramSpacing_pair`.
+  have htest (ψ : 𝓢(ℝ, ℂ)) := gramSpacing_exists_test η (fun x ↦ θ x * ψ x)
+    (hθs.mul (ψ.smooth ⊤)) (hθc.mul_right)
+  choose φ hφ using htest
+  have hpair (ψ : 𝓢(ℝ, ℂ)) := gramSpacing_pair a hα hs hα0 χ hχ (φ ψ) (hgap (φ ψ))
+    hβpos.le hβ1 hβs
+  choose Cψ hCψ0 hCψ using hpair
+  -- The family of functionals.
+  let I := {p : Z(χ, α) × Z(χ, α) × ℂ // p.1.val.1 = ω ∧ p.2.1 ≠ p.1 ∧
+    p.2.1.val.1 = p.1.val.1 ∧ p.2.2 ∈ Metric.sphere (shift(p.1.val.2.1, p.1.val.2.2)) R}
+  let g (i : I) : ℝ → ℂ := fun x ↦ θ x * Complex.exp (i.val.2.2 * x)
+  have hg (i : I) : Integrable (g i) :=
+    (hθcont.mul (Complex.continuous_exp.comp (continuous_const.mul Complex.continuous_ofReal))
+      ).integrable_of_hasCompactSupport hθc.mul_right
+  let Δ (i : I) : ℝ := |i.val.1.val.2.2 - i.val.2.1.val.2.2| ^ β
+  have hΔ (i : I) : 0 < Δ i := by
+    refine Real.rpow_pos_of_pos (abs_pos.mpr (sub_ne_zero.mpr fun h ↦ i.property.2.1 ?_)) _
+    have hz0 : i.val.1.val.2.1 = 0 := by
+      have := i.val.1.property.1; simp only [mem_Icc] at this; subst hα0; linarith
+    have hw0 : i.val.2.1.val.2.1 = 0 := by
+      have := i.val.2.1.property.1; simp only [mem_Icc] at this; subst hα0; linarith
+    exact Subtype.ext (Prod.ext i.property.2.2.1 (Prod.ext (hw0.trans hz0.symm) h.symm))
+  let L (i : I) : 𝓢(ℝ, ℂ) →L[ℂ] ℂ := ((cH / Δ i : ℝ) : ℂ) • schwartzPairing (g i) (hg i)
+  have hLapp (i : I) (ψ : 𝓢(ℝ, ℂ)) : L i ψ = ((cH / Δ i : ℝ) : ℂ) *
+      ∫ x, θ x * ψ x * Complex.exp (i.val.2.2 * x) := by
+    change ((cH / Δ i : ℝ) : ℂ) • schwartzPairing (g i) (hg i) ψ = _
+    rw [schwartzPairing_apply, smul_eq_mul]
+    congr 1
+    refine integral_congr_ae (Eventually.of_forall fun x ↦ ?_)
+    simp only [g]
+    ring
+  have hbound (i : I) (ψ : 𝓢(ℝ, ℂ)) : ‖L i ψ‖ ≤ Cψ ψ := by
+    have hm := gramSpacing_mellin η (fun x ↦ θ x * ψ x) (hθcont.mul ψ.continuous) (φ ψ) (hφ ψ)
+      i.val.2.2
+    have hc := hCψ ψ i.val.1 i.val.2.1 i.property.2.1 i.property.2.2.1 i.val.2.2 i.property.2.2.2
+    rw [show χ i.val.1.val.1 = η from congrArg χ i.property.1, hm] at hc
+    rw [hLapp, norm_mul, Complex.norm_real, Real.norm_of_nonneg (div_nonneg hcH.le (hΔ i).le)]
+    rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg hcH.le] at hc
+    rw [div_mul_eq_mul_div, div_le_iff₀ (hΔ i)]
+    exact hc
+  obtain ⟨C, n, hC0, hCL⟩ := schwartz_uniform_bound_modulated L Cψ hbound θ hθs hθc
+  -- The value at the matching frequency.
+  let I₀ : ℝ := ∫ x, b x * b x * Real.exp (R * x)
+  have hI₀ : 0 < I₀ := by
+    have hcont : Continuous fun x : ℝ ↦ b x * b x * Real.exp (R * x) :=
+      (b.continuous.mul b.continuous).mul (Real.continuous_exp.comp (continuous_const.mul continuous_id))
+    refine hcont.integral_pos_of_hasCompactSupport_nonneg_ne_zero
+      (b.hasCompactSupport.mul_right.mul_right)
+      (fun x ↦ mul_nonneg (mul_nonneg b.nonneg b.nonneg) (Real.exp_pos _).le) (x := 0) ?_
+    rw [b.one_of_mem_closedBall (Metric.mem_closedBall_self b.rIn_pos.le)]
+    simp
+  refine ⟨(cH * I₀ / (C + 1)) ^ β⁻¹, by positivity, n / β, fun z w hzω hwz hχzw ↦ ?_⟩
+  let i : I := ⟨(z, w, shift(z.val.2.1, z.val.2.2) + R), hzω, hwz, hχzw, by simp [abs_of_pos hR]⟩
+  have hval : L i (modulatedSchwartz θ hθs hθc z.val.2.2) = ((cH / Δ i : ℝ) : ℂ) * (I₀ : ℂ) := by
+    rw [hLapp]
+    congr 1
+    rw [show (I₀ : ℂ) = ∫ x : ℝ, ((b x * b x * Real.exp (R * x) : ℝ) : ℂ) from integral_ofReal.symm]
+    refine integral_congr_ae (Eventually.of_forall fun x ↦ ?_)
+    simp only [modulatedSchwartz_apply, θ, i]
+    have hz0 : z.val.2.1 = 0 := by
+      have := z.property.1; simp only [mem_Icc] at this; subst hα0; linarith
+    rw [hz0]
+    push_cast
+    rw [mul_assoc, mul_assoc, ← Complex.exp_add]
+    have : -(z.val.2.2 : ℂ) * Complex.I * x + ((0 : ℂ) + z.val.2.2 * Complex.I + R) * x =
+        ((R * x : ℝ) : ℂ) := by push_cast; ring
+    rw [this]
+    push_cast
+    ring
+  have hle := hCL i z.val.2.2
+  rw [hval, norm_mul, Complex.norm_real, Complex.norm_real,
+    Real.norm_of_nonneg (div_nonneg hcH.le (hΔ i).le), Real.norm_of_nonneg hI₀.le] at hle
+  have h1t : 0 < 1 + |z.val.2.2| := by positivity
+  -- `cH I₀ / (C + 1) · (1 + |t|) ^ (-n) ≤ |Δ| ^ β`.
+  have hkey : cH * I₀ / (C + 1) * (1 + |z.val.2.2|) ^ (-(n : ℝ)) ≤ Δ i := by
+    rw [Real.rpow_neg h1t.le, Real.rpow_natCast, ← div_eq_mul_inv, div_div,
+      div_le_iff₀ (by positivity)]
+    have : cH / Δ i * I₀ ≤ (C + 1) * (1 + |z.val.2.2|) ^ n :=
+      hle.trans (by gcongr; linarith)
+    rw [div_mul_eq_mul_div, div_le_iff₀ (hΔ i)] at this
+    linarith
+  have hd : |z.val.2.2 - w.val.2.2| = (Δ i) ^ β⁻¹ :=
+    (Real.rpow_rpow_inv (abs_nonneg _) hβpos.ne').symm
+  rw [hd, show -(n / β) = -(n : ℝ) * β⁻¹ by ring, Real.rpow_mul h1t.le, ← Real.mul_rpow
+    (by positivity) (by positivity)]
+  exact Real.rpow_le_rpow (by positivity) hkey (by positivity)
+
+end GramSpacing
 
 end Majorant
 
