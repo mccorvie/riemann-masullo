@@ -41,10 +41,8 @@ rational real place.
 So for `s ≥ 0` the condition is lost exactly when `α < 1 / 2`, or `α = 1 / 2` and `s ≤ 1`.
 
 For `α < 1 / 2` the closure is exactly the kernel of evaluation at the origin. That is proved
-in `Sec4_RealPWBandDensity`, from the density of Schwartz functions in the band.
-
-Not treated here: the closure at width one half for `s ≤ 1`. The last statement of the list for
-`α ≥ 3 / 2`. -/
+in `Sec4_RealPWBandDensity`, from the density of Schwartz functions in the band. The closure
+for `1 / 2 ≤ α < 5 / 2` is determined in `Sec4_RealPWBandClosure`. -/
 
 public noncomputable section
 

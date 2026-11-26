@@ -29,8 +29,10 @@ bounded on the weighted space by one constant, so the tails are uniformly small.
 Reconstruction: The paper does not state this. The core is that of the order-zero model of the
 rational real place.
 
-Not treated here: the width one half, where the weight is no longer integrable at the
-origin. -/
+The convergence argument is stated for a band vector bounded near the origin by a multiple of
+`|y| ^ p` (`exists_schwartz_realPWBand_norm_sub_lt_of_local`). Here it is used with `p = 0`.
+`Sec4_RealPWBandClosure` uses it with `p = 2` for the widths from one half to five halves, where
+the weight is no longer integrable at the origin. -/
 
 public noncomputable section
 
@@ -337,13 +339,36 @@ private theorem exists_tail_integral_lt {μ : Measure ℝ} (U : ℝ → ℝ) (hU
   rw [integral_zero] at hlim
   exact ((tendsto_order.1 hlim).2 δ hδ).exists
 
-/-- Reconstruction: for `0 ≤ α < 1/2` the band vectors whose pointwise representative is an even
-Schwartz function with Fourier transform zero outside `[-Y, Y]` are dense in the weighted even
-band. The approximant of `f` is `x ↦ f (a x) m(x)` with `a < 1` close to one and `m` the inverse
-Fourier transform of a narrow normalized bump. -/
-theorem exists_schwartz_realPWBand_norm_sub_lt (hα : 0 ≤ α) (hα' : α < 1 / 2) (hs : 0 ≤ s)
-    (hY : 0 < Y) (f : RealPWBand.space Y (volume_le_realPWIntervalMeasure α s hs)) {η : ℝ}
-    (hη : 0 < η) :
+/-- A real function is integrable on a measurable set for the weighted measure exactly when
+its product with the weight is integrable there for Lebesgue measure. -/
+theorem integrableOn_realPWIntervalMeasure_iff (hs : 0 ≤ s) (φ : ℝ → ℝ) {S : Set ℝ}
+    (hS : MeasurableSet S) :
+    IntegrableOn φ S (realPWIntervalMeasure α s) ↔
+      IntegrableOn (fun x ↦ φ x * realPWIntervalWeight α s x) S := by
+  have hWm : Measurable fun x ↦ ENNReal.ofReal (realPWIntervalWeight α s x) :=
+    (measurable_realPWIntervalWeight α s).ennreal_ofReal
+  have hWlt : ∀ᵐ x ∂(volume.restrict S), ENNReal.ofReal (realPWIntervalWeight α s x) < ⊤ :=
+    ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top
+  change Integrable φ
+    ((volume.withDensity fun x ↦ ENNReal.ofReal (realPWIntervalWeight α s x)).restrict S) ↔ _
+  rw [restrict_withDensity hS, integrable_withDensity_iff_integrable_smul' hWm hWlt]
+  refine integrable_congr (ae_of_all _ fun x ↦ ?_)
+  change (ENNReal.ofReal (realPWIntervalWeight α s x)).toReal • φ x =
+    φ x * realPWIntervalWeight α s x
+  rw [ENNReal.toReal_ofReal (zero_le_one.trans (one_le_realPWIntervalWeight α s hs x)),
+    smul_eq_mul, mul_comm]
+
+/-- Reconstruction: a band vector whose pointwise values are bounded on every bounded interval
+by a multiple of `|y| ^ p`, where `|y| ^ (2 p)` times the weight is integrable at the origin, is
+a limit of band vectors given by even Schwartz functions with Fourier transform zero outside
+`[-Y, Y]`. The approximant of `f` is `x ↦ f (a x) m(x)` with `a < 1` close to one and `m` the
+inverse Fourier transform of a narrow normalized bump. -/
+theorem exists_schwartz_realPWBand_norm_sub_lt_of_local (hα : 0 ≤ α) (hs : 0 ≤ s) (hY : 0 < Y)
+    (f : RealPWBand.space Y (volume_le_realPWIntervalMeasure α s hs)) (p : ℝ) (hp0 : 0 ≤ p)
+    (hp : -1 < 2 * p - 2 * α)
+    (hloc : ∀ R : ℝ, ∃ C : ℝ, 0 ≤ C ∧ ∀ y ∈ Icc (-R) R,
+      ‖RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure α s hs) y f‖ ≤ C * |y| ^ p)
+    {η : ℝ} (hη : 0 < η) :
     ∃ (g : 𝓢(ℝ, ℂ)) (f' : RealPWBand.space Y (volume_le_realPWIntervalMeasure α s hs)),
       Function.Even (g : ℝ → ℂ) ∧ (∀ ξ ∉ Icc (-Y) Y, (𝓕 g) ξ = 0) ∧
       (fun x ↦ RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure α s hs) x f') = g ∧
@@ -376,14 +401,13 @@ theorem exists_schwartz_realPWBand_norm_sub_lt (hα : 0 ≤ α) (hα' : α < 1 /
   -- the bounded part
   let R : ℝ := 2 * k
   let I : Set ℝ := Icc (-R) R
-  obtain ⟨M, hM⟩ := isCompact_Icc.exists_bound_of_continuousOn (huc.continuousOn (s := I))
-  have hμI : realPWIntervalMeasure α s I < ⊤ := by
-    have hint : IntegrableOn (fun x ↦ |x| ^ (0 : ℝ) * realPWIntervalWeight α s x) I :=
-      integrableOn_abs_rpow_mul_realPWIntervalWeight hα hs (by linarith)
-    have h := hint.lintegral_lt_top
-    change (volume.withDensity fun x ↦ ENNReal.ofReal (realPWIntervalWeight α s x)) I < ⊤
-    rw [withDensity_apply _ measurableSet_Icc]
-    simpa only [Real.rpow_zero, one_mul] using h
+  obtain ⟨C, hC0, hC⟩ := hloc R
+  have hbI : IntegrableOn (fun x ↦ (2 * C) ^ 2 * |x| ^ (2 * p)) I
+      (realPWIntervalMeasure α s) := by
+    have h : IntegrableOn (fun x : ℝ ↦ |x| ^ (2 * p)) I (realPWIntervalMeasure α s) :=
+      (integrableOn_realPWIntervalMeasure_iff hs _ measurableSet_Icc).mpr
+        (integrableOn_abs_rpow_mul_realPWIntervalWeight hα hs hp)
+    exact h.const_mul _
   -- the sequence of dilations and bump widths
   let r : ℕ → ℝ := fun n ↦ 1 / ((n : ℝ) + 1)
   have hr0 : ∀ n, 0 < r n := fun n ↦ by positivity
@@ -433,25 +457,33 @@ theorem exists_schwartz_realPWBand_norm_sub_lt (hα : 0 ≤ α) (hα' : α < 1 /
       atTop (𝓝 0) := by
     have h := tendsto_integral_of_dominated_convergence
       (μ := (realPWIntervalMeasure α s).restrict I) (F := fun n x ↦ ‖u x - g n x‖ ^ 2)
-      (f := fun _ ↦ (0 : ℝ)) (fun _ ↦ (2 * M) ^ 2) (fun n ↦ ?_) ?_ (fun n ↦ ?_) ?_
+      (f := fun _ ↦ (0 : ℝ)) (fun x ↦ (2 * C) ^ 2 * |x| ^ (2 * p)) (fun n ↦ ?_) ?_
+      (fun n ↦ ?_) ?_
     · rwa [integral_zero] at h
     · exact (((huc.sub (g n).continuous).norm).pow 2).aestronglyMeasurable
-    · exact integrableOn_const hμI.ne
+    · exact hbI
     · refine (ae_restrict_mem measurableSet_Icc).mono fun x hx ↦ ?_
-      have hax : a n * x ∈ I := by
-        have h1 : |a n * x| ≤ R := by
-          rw [abs_mul, abs_of_pos (hap n)]
-          calc a n * |x| ≤ 1 * |x| :=
-                mul_le_mul_of_nonneg_right (ha1 n).le (abs_nonneg x)
-            _ = |x| := one_mul _
-            _ ≤ R := abs_le.mpr hx
-        exact abs_le.mp h1
-      have h1 : ‖u x - g n x‖ ≤ 2 * M := by
+      have hle : |a n * x| ≤ |x| := by
+        rw [abs_mul, abs_of_pos (hap n)]
+        calc a n * |x| ≤ 1 * |x| :=
+              mul_le_mul_of_nonneg_right (ha1 n).le (abs_nonneg x)
+          _ = |x| := one_mul _
+      have hax : a n * x ∈ I := abs_le.mp (hle.trans (abs_le.mpr hx))
+      have hxp : ‖u x‖ ≤ C * |x| ^ p := hC x hx
+      have haxp : ‖u (a n * x)‖ ≤ C * |x| ^ p :=
+        (hC _ hax).trans
+          (mul_le_mul_of_nonneg_left (Real.rpow_le_rpow (abs_nonneg _) hle hp0) hC0)
+      have h1 : ‖u x - g n x‖ ≤ 2 * C * |x| ^ p := by
         calc ‖u x - g n x‖ ≤ ‖u x‖ + ‖g n x‖ := norm_sub_le _ _
-          _ ≤ M + M := add_le_add (hM x hx) ((hgle n x).trans (hM _ hax))
-          _ = 2 * M := by ring
+          _ ≤ C * |x| ^ p + C * |x| ^ p := add_le_add hxp ((hgle n x).trans haxp)
+          _ = 2 * C * |x| ^ p := by ring
       rw [Real.norm_of_nonneg (sq_nonneg _)]
-      exact pow_le_pow_left₀ (norm_nonneg _) h1 2
+      calc ‖u x - g n x‖ ^ 2 ≤ (2 * C * |x| ^ p) ^ 2 := pow_le_pow_left₀ (norm_nonneg _) h1 2
+        _ = (2 * C) ^ 2 * |x| ^ (2 * p) := by
+            rw [mul_pow, ← Real.rpow_natCast (|x| ^ p) 2, ← Real.rpow_mul (abs_nonneg x)]
+            congr 2
+            push_cast
+            ring
     · refine ae_of_all _ fun x ↦ ?_
       have h := (((hpt x).const_sub (u x)).norm).pow 2
       rwa [sub_self, norm_zero, zero_pow two_ne_zero] at h
@@ -527,6 +559,25 @@ theorem exists_schwartz_realPWBand_norm_sub_lt (hα : 0 ≤ α) (hα' : α < 1 /
     rw [hnorm]
     linarith
   exact lt_of_pow_lt_pow_left₀ 2 hη.le hlt
+
+/-- Reconstruction: for `0 ≤ α < 1/2` every vector of the weighted even band is within any
+given distance of a band vector whose pointwise representative is an even Schwartz function
+with Fourier transform zero outside `[-Y, Y]`. -/
+theorem exists_schwartz_realPWBand_norm_sub_lt (hα : 0 ≤ α) (hα' : α < 1 / 2) (hs : 0 ≤ s)
+    (hY : 0 < Y) (f : RealPWBand.space Y (volume_le_realPWIntervalMeasure α s hs)) {η : ℝ}
+    (hη : 0 < η) :
+    ∃ (g : 𝓢(ℝ, ℂ)) (f' : RealPWBand.space Y (volume_le_realPWIntervalMeasure α s hs)),
+      Function.Even (g : ℝ → ℂ) ∧ (∀ ξ ∉ Icc (-Y) Y, (𝓕 g) ξ = 0) ∧
+      (fun x ↦ RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure α s hs) x f') = g ∧
+      ‖f - f'‖ < η := by
+  refine exists_schwartz_realPWBand_norm_sub_lt_of_local hα hs hY f 0 le_rfl (by linarith)
+    (fun R ↦ ?_) hη
+  obtain ⟨M, hM⟩ := isCompact_Icc.exists_bound_of_continuousOn
+    ((RealPWBand.contDiff_evaluation Y (volume_le_realPWIntervalMeasure α s hs) f
+      0).continuous.continuousOn (s := Icc (-R) R))
+  exact ⟨max M 0, le_max_right _ _, fun y hy ↦ by
+    rw [Real.rpow_zero, mul_one]
+    exact (hM y hy).trans (le_max_left _ _)⟩
 
 /-- Reconstruction: for `0 ≤ α < 1/2` the band vectors given by even Schwartz functions with
 Fourier transform zero outside `[-Y, Y]` are dense in the weighted even band. -/
