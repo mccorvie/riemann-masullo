@@ -24,6 +24,15 @@ def signedProfile (phi : ℝ → ℂ) (r : ℝ) := phi r + phi (-r)
 
 def halfProfile (phi : ℝ → ℂ) (r : ℝ) := (Real.sqrt r : ℂ) * signedProfile phi r
 
+theorem signedProfile_apply (phi : ℝ → ℂ) (r : ℝ) : signedProfile phi r = phi r + phi (-r) := by
+  unfold signedProfile
+  rfl
+
+theorem halfProfile_apply (phi : ℝ → ℂ) (r : ℝ) :
+    halfProfile phi r = (Real.sqrt r : ℂ) * signedProfile phi r := by
+  unfold halfProfile
+  rfl
+
 def halfTheta (S : Finset V) (f : B∞) (x : (SAdeleRing ℚ S)ˣ) :=
   (Real.sqrt (radius S x) : ℂ) * theta S f x
 
