@@ -10,14 +10,16 @@ import RiemannMasullo.ForMathlib.Analysis.MellinTransform.Holomorphic
 
 The recorded gap `spectralStripConvolution_traceCauchy_compact_block_series` of `Sec3` (#7241)
 says that, after inserting any fixed compact operator, the traces of the zero blocks of the
-spectral convolution are summable. This file proves it from one smaller statement, a summable
+spectral convolution are summable. This file proves it from a sufficient condition, a summable
 majorant built from the scalar Mellin transform of the test and the norms of the coordinate
 functionals and their biorthogonal vectors, and shows what the gap forces: one constant must
 bound the Mellin value at every zero times its zeroth jet, relative to the distance of that jet
 from the zeroth jet at any other zero. The second statement is where the spacing of the zeros of
 the Hecke `L`-functions enters. The majorant is equivalent to a uniform bound for finite
-principal Gram matrices of the explicit jets. The remaining estimate is
-`spectralStripConvolution_finiteGram_bound`. -/
+principal Gram matrices of the explicit jets. That bound is kept as a proposition,
+`spectralStripConvolution_finiteGram_bound`, which asserts nothing; the theorems that need it
+take it as a hypothesis. It is not known whether it holds, and it asks for more than the gap
+does. Nothing in this file is left unproved. -/
 
 @[expose] public noncomputable section
 
@@ -366,23 +368,28 @@ theorem spectralStripConvolution_summable_jetNorms_iff_finiteGram
     exact mul_le_mul_of_nonneg_left (Finset.sum_le_sum fun m _ ↦
       mul_le_mul_of_nonneg_left (hle z hz m) (norm_nonneg _)) (norm_nonneg _)
 
-/-- Paper: Theorem 10.3.2.1(1), pp. 453–455.
+/-- Paper: Theorem 10.3.2.1(1), pp. 453–455. A sufficient condition for the recorded gap
+`spectralStripConvolution_traceCauchy_compact_block_series` of `Sec3` (#7241), kept as a
+proposition: this definition asserts nothing. It says that one constant bounds the finite sums
+below, over all finite sets of zeros, all points of the Mellin circles and all finite sets of
+jets. `spectralStripConvolution_traceCauchy_compact_block_series_of_summable_jetNorms` proves
+the statement of the gap from it. It asks for more than the gap: it controls each biorthogonal
+vector, where the gap only needs the whole block at a zero.
 Reconstruction: the fixed Mellin circles in (10.3.2.7) and the weighted jets determine
-each finite sum below. All coordinate factors come from one principal Gram matrix.
-Gap: a uniform bound for these finite sums at the genuine Hecke zeros is unknown.
-The issue is the growth of the inverse Gram diagonal when zeros cluster. -/
-theorem spectralStripConvolution_finiteGram_bound
-    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
-    (_hχ : IsSpectralBasepointChoice (F := F) (fun ω ↦ χ ω)) (φ : BruhatCompactSupport C𝔽) :
-    let u (j : J(χ)) := (spectralStripJet_memLp χ hα hs₀(hs) j).toLp (raw(χ, j))
-    let j (z : Z(χ, α)) (m : Fin (N(χ, α, s, z))) : J(χ) := jet(z, m)
-    let v (z : Z(χ, α)) (w : ℂ) := ‖∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ z.val.1) w g ∂μ𝔽‖
-    let circle (z : Z(χ, α)) := Metric.sphere (shift(z.val.2.1, z.val.2.2))
-      (2 * Real.exp ((4 * α + s) / 2))
-    ∃ B : ℝ, ∀ (T : Finset (Z(χ, α))) (w : Z(χ, α) → ℂ) (S : Finset (J(χ))),
-      (∀ z ∈ T, w z ∈ circle z) →
-      ∑ z ∈ T, v z (w z) * ∑ m, ‖u (j z m)‖ * finiteGramCoordinate u (j z m) S ≤ B := by
-  sorry
+each finite sum below. All coordinate factors come from one principal Gram matrix. The paper
+does not state this bound.
+It is not known whether the bound holds at the genuine Hecke zeros. The issue is the growth of
+the inverse Gram diagonal when zeros cluster. -/
+def spectralStripConvolution_finiteGram_bound
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (φ : BruhatCompactSupport C𝔽) : Prop :=
+  let u (j : J(χ)) := (spectralStripJet_memLp χ hα hs₀(hs) j).toLp (raw(χ, j))
+  let j (z : Z(χ, α)) (m : Fin (N(χ, α, s, z))) : J(χ) := jet(z, m)
+  let v (z : Z(χ, α)) (w : ℂ) := ‖∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ z.val.1) w g ∂μ𝔽‖
+  let circle (z : Z(χ, α)) := Metric.sphere (shift(z.val.2.1, z.val.2.2))
+    (2 * Real.exp ((4 * α + s) / 2))
+  ∃ B : ℝ, ∀ (T : Finset (Z(χ, α))) (w : Z(χ, α) → ℂ) (S : Finset (J(χ))),
+    (∀ z ∈ T, w z ∈ circle z) →
+    ∑ z ∈ T, v z (w z) * ∑ m, ‖u (j z m)‖ * finiteGramCoordinate u (j z m) S ≤ B
 
 /-- Paper: Theorem 10.3.2.1(1), pp. 453–455.
 At width zero and exponent two the finite Gram bound is equivalent to a single
@@ -441,7 +448,7 @@ the reciprocal of the distance of `Λ_{z,0}` from the span of all the other jets
 forces a lower bound for the distance of `Λ_{z,0}` from each single `Λ_{w,0}`, `w ≠ z`.
 It is not known how this statement connects with the rest of the proof in Lean; the pages that
 use it are those of `spectralStripConvolution_traceCauchy`, pp. 452–455 and 458–473.
-Proved here (#7468) from the open statement `spectralStripConvolution_finiteGram_bound`, a
+Proved here (#7468) under the hypothesis `spectralStripConvolution_finiteGram_bound`, a
 bound for finite Gram matrices of the weighted jets, to which it is proved equivalent in this
 file. No bound for the biorthogonal vectors of the zero jets is known when zeros cluster. At
 width zero it needs at least a lower bound, polynomial in the height, for the distance between
@@ -451,7 +458,8 @@ theorem spectralStripConvolution_summable_jetNorms (χ : PontryaginDual C₁ →
     (_hχ : IsSpectralBasepointChoice (F := F) (fun ω ↦ χ ω)) (φ : BruhatCompactSupport C𝔽)
     (x : J(χ) → Q(a, hStrip(hα), hs₀(hs))) (Λ : J(χ) → StrongDual ℂ Q(a, hStrip(hα), hs₀(hs)))
     (_hb : IsSpectralMarkushevichBasis x Λ)
-    (_hj : ∀ j, D (Λ j) = (spectralStripJet_memLp χ hα hs₀(hs) j).toLp (raw(χ, j))) :
+    (_hj : ∀ j, D (Λ j) = (spectralStripJet_memLp χ hα hs₀(hs) j).toLp (raw(χ, j)))
+    (hGram : spectralStripConvolution_finiteGram_bound a hα hs χ φ) :
     ∃ M : Z(χ, α) → ℝ, (∀ z, 0 ≤ M z) ∧
       (∀ z : Z(χ, α), ∀ w ∈ Metric.sphere (shift(z.val.2.1, z.val.2.2))
         (2 * Real.exp ((4 * α + s) / 2)),
@@ -459,7 +467,7 @@ theorem spectralStripConvolution_summable_jetNorms (χ : PontryaginDual C₁ →
       Summable (fun z : Z(χ, α) ↦ M z *
         ∑ m : Fin (N(χ, α, s, z)), ‖Λ (jet(z, m))‖ * ‖x (jet(z, m))‖) := by
   exact (spectralStripConvolution_summable_jetNorms_iff_finiteGram a hα hs χ φ x Λ _hb _hj).2
-    (spectralStripConvolution_finiteGram_bound a hα hs χ _hχ φ)
+    hGram
 
 /-- Paper: Theorem 10.3.2.1(1), pp. 453–455. What the recorded gap
 `spectralStripConvolution_traceCauchy_compact_block_series` of `Sec3` forces. If the block
@@ -756,7 +764,8 @@ end Majorant
 
 /-- Paper: Theorem 10.3.2.1(1), pp. 453–455. The statement of the recorded gap
 `spectralStripConvolution_traceCauchy_compact_block_series` of `Sec3` (#7241), word for word,
-proved from the majorant `spectralStripConvolution_summable_jetNorms`. -/
+proved from the majorant `spectralStripConvolution_summable_jetNorms`, under the hypothesis
+`spectralStripConvolution_finiteGram_bound`. -/
 theorem spectralStripConvolution_traceCauchy_compact_block_series_of_summable_jetNorms
     (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
     (_hχ : IsSpectralBasepointChoice (F := F) (fun ω ↦ χ ω))
@@ -766,7 +775,8 @@ theorem spectralStripConvolution_traceCauchy_compact_block_series_of_summable_je
     (_hb : IsSpectralMarkushevichBasis x Λ)
     (_hj : ∀ j, spectralSobolevDualEmbedding F a hStrip(hα) hs₀(hs) (Λ j) =
       (spectralStripJet_memLp (F := F) (fun ω ↦ χ ω) hα hs₀(hs) j).toLp
-        (spectralZeroJet (F := F) (χ j.val.1) j.val.2.1 j.val.2.2.1 j.val.2.2.2)) :
+        (spectralZeroJet (F := F) (χ j.val.1) j.val.2.1 j.val.2.2.1 j.val.2.2.2))
+    (hGram : spectralStripConvolution_finiteGram_bound a hα hs χ φ) :
     let H := Q(a, hStrip(hα), hs₀(hs))
     let A := spectralConvolution (F := F) a hStrip(hα) hs₀(hs) φ
     let jet (z : Z(χ, α)) (m : Fin (N(χ, α, s, z))) :
@@ -776,7 +786,7 @@ theorem spectralStripConvolution_traceCauchy_compact_block_series_of_summable_je
       Summable (fun z : Z(χ, α) ↦ ∑ m, Λ (jet z m) (A (U.val (x (jet z m))))) := by
   intro H A jet U
   obtain ⟨M, hM, hMellin, hsum⟩ :=
-    spectralStripConvolution_summable_jetNorms a hα hs χ _hχ φ x Λ _hb _hj
+    spectralStripConvolution_summable_jetNorms a hα hs χ _hχ φ x Λ _hb _hj hGram
   exact spectralStripConvolution_block_series_of_summable_jetNorms a hα hs χ x Λ _hj φ M hM hMellin
     hsum U.val
 
