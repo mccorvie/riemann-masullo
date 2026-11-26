@@ -42,6 +42,12 @@ import Mathlib.LinearAlgebra.Dual.Lemmas
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Analysis.Fourier.FiniteAbelian.PontryaginDuality
 import RiemannMasullo.ForMathlib.Topology.MetricSpace.CompactQuotient
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gamma.VerticalStrip
+import RiemannMasullo.ForMathlib.Analysis.Complex.VerticalCauchyIntegral
+import Mathlib.Analysis.Calculus.ContDiff.RestrictScalars
+import Mathlib.Analysis.Calculus.SmoothSeries
+import Mathlib.LinearAlgebra.Dimension.Torsion.Basic
+import RiemannMasullo.AppA_AlgebraicNT.Sec5a
 
 /-! # Non-archimedean principal values and distributions supported at the origin
 
@@ -6659,11 +6665,8355 @@ private theorem sLocalMellinSchwartzBounds_meyer_rational_empty_inverse_from_mod
   · obtain rfl := Set.mem_singleton_iff.mp hw
     exact hF
 
-/-- Classical input: R. Meyer, *On a representation of the idele class group related to
+/-- A product of a polynomially bounded function and a function that decays faster than that
+polynomial in the imaginary direction is bounded on a closed vertical strip. -/
+private theorem meyerCriticalStrip_bounded_product
+    (P Q : ℂ → ℂ) (a b D C Y : ℝ) (N : ℕ) (hD : 0 ≤ D) (hC : 0 ≤ C)
+    (hP : ContinuousOn P (Complex.re ⁻¹' Icc a b)) (hQ : ContinuousOn Q (Complex.re ⁻¹' Icc a b))
+    (hPb : ∀ z : ℂ, z.re ∈ Icc a b → ‖P z‖ ≤ D * (1 + ‖z‖) ^ N)
+    (hQb : ∀ z : ℂ, z.re ∈ Icc a b → Y ≤ |z.im| → ‖Q z‖ ≤ C / |z.im| ^ (N + 1)) :
+    ∃ M : ℝ, ∀ z : ℂ, z.re ∈ Icc a b → ‖P z * Q z‖ ≤ M := by
+  let R := max Y (|a| + |b| + 1)
+  have hR1 : 1 ≤ R := le_max_of_le_right (by linarith [abs_nonneg a, abs_nonneg b])
+  let K := Complex.reProdIm (Icc a b) (Icc (-R) R)
+  have hK : IsCompact K := isCompact_Icc.reProdIm isCompact_Icc
+  have hc : ContinuousOn (fun s ↦ ‖P s * Q s‖) K :=
+    ((hP.mul hQ).norm).mono fun s hs ↦ hs.1
+  obtain ⟨B, hB⟩ := hK.bddAbove_image hc
+  refine ⟨max B (D * 2 ^ N * C), fun z hz ↦ ?_⟩
+  by_cases hy : |z.im| ≤ R
+  · exact (hB (mem_image_of_mem _ (show z ∈ K from ⟨hz, abs_le.mp hy⟩))).trans (le_max_left _ _)
+  · have hyR : R < |z.im| := lt_of_not_ge hy
+    have hy1 : 1 ≤ |z.im| := hR1.trans hyR.le
+    have hy0 : 0 < |z.im| := zero_lt_one.trans_le hy1
+    have hre : |z.re| ≤ |a| + |b| := by
+      apply abs_le.mpr
+      exact ⟨by linarith [hz.1, neg_abs_le a, abs_nonneg b],
+        by linarith [hz.2, le_abs_self b, abs_nonneg a]⟩
+    have hz2 : 1 + ‖z‖ ≤ 2 * |z.im| := by
+      have h1 := Complex.norm_le_abs_re_add_abs_im z
+      have h2 : |a| + |b| + 1 ≤ |z.im| := (le_max_right _ _).trans hyR.le
+      linarith
+    have hP' : ‖P z‖ ≤ D * (2 * |z.im|) ^ N :=
+      (hPb z hz).trans (mul_le_mul_of_nonneg_left
+        (pow_le_pow_left₀ (by positivity) hz2 N) hD)
+    have hQ' := hQb z hz ((le_max_left _ _).trans hyR.le)
+    rw [norm_mul]
+    calc ‖P z‖ * ‖Q z‖ ≤ (D * (2 * |z.im|) ^ N) * (C / |z.im| ^ (N + 1)) :=
+          mul_le_mul hP' hQ' (norm_nonneg _) (by positivity)
+      _ = D * 2 ^ N * C / |z.im| := by
+          rw [mul_pow, pow_succ]
+          field_simp
+      _ ≤ D * 2 ^ N * C := div_le_self (by positivity) hy1
+      _ ≤ _ := le_max_right _ _
+
+/-- Phragmén–Lindelöf across the critical strip. Two holomorphic functions that are glued by
+a functional equation on the open critical strip, with polynomially weighted bounds on the
+lines of real part `-1/2` and `3/2`, satisfy the weighted bound on the whole strip. -/
+private theorem meyerCriticalStrip_glue
+    (U U' h g : ℂ → ℂ) (A B : ℝ) (hA : 0 ≤ A) (m : ℕ)
+    (hU : DifferentiableOn ℂ U (Complex.re ⁻¹' Ioi 0))
+    (hU' : DifferentiableOn ℂ U' (Complex.re ⁻¹' Ioi 0))
+    (hh : Differentiable ℂ h) (hg : DifferentiableOn ℂ g (Complex.re ⁻¹' Ioo (-1) 1))
+    (heq : ∀ z : ℂ, 0 < z.re → z.re < 1 → h z * U z = g z * U' (1 - z))
+    (hr : ∃ M : ℝ, ∀ z : ℂ, z.re ∈ Icc (1 / 2 : ℝ) (3 / 2) → ‖h z * U z‖ ≤ M)
+    (hl : ∃ M : ℝ, ∀ z : ℂ, z.re ∈ Icc (-1 / 2 : ℝ) (1 / 2) → ‖g z * U' (1 - z)‖ ≤ M)
+    (hright : ∀ z : ℂ, z.re = 3 / 2 → A * ‖z ^ m * (h z * U z)‖ ≤ B)
+    (hleft : ∀ z : ℂ, z.re = -1 / 2 → A * ‖z ^ m * (g z * U' (1 - z))‖ ≤ B)
+    (z : ℂ) (hz0 : 0 < z.re) (hz2 : z.re ≤ 3 / 2) : A * ‖z ^ m * (h z * U z)‖ ≤ B := by
+  classical
+  let E (w : ℂ) : ℂ := if 0 < w.re then h w * U w else g w * U' (1 - w)
+  have hE1 (w : ℂ) (hw : 0 < w.re) : E w = h w * U w := ite_eq_left hw
+  have hE2 (w : ℂ) (hw : w.re < 1) : E w = g w * U' (1 - w) := by
+    by_cases hp : 0 < w.re
+    · rw [hE1 w hp, heq w hp hw]
+    · exact ite_eq_right hp
+  have hD : DifferentiableOn ℂ E (Complex.re ⁻¹' Ioi (-1)) := by
+    intro w hw
+    apply DifferentiableAt.differentiableWithinAt
+    by_cases hp : 0 < w.re
+    · have ho : Complex.re ⁻¹' Ioi (0 : ℝ) ∈ 𝓝 w :=
+        (isOpen_Ioi.preimage Complex.continuous_re).mem_nhds hp
+      have hd : DifferentiableAt ℂ (fun s ↦ h s * U s) w :=
+        (hh w).mul ((hU w hp).differentiableAt ho)
+      exact hd.congr_of_eventuallyEq (by filter_upwards [ho] with s hs using hE1 s hs)
+    · have hw1 : w.re ∈ Ioo (-1 : ℝ) 1 := ⟨hw, by linarith [not_lt.mp hp]⟩
+      have ho : Complex.re ⁻¹' Ioo (-1 : ℝ) 1 ∈ 𝓝 w :=
+        (isOpen_Ioo.preimage Complex.continuous_re).mem_nhds hw1
+      have h1 : (1 - w) ∈ Complex.re ⁻¹' Ioi (0 : ℝ) := by
+        change 0 < (1 - w).re
+        simp only [Complex.sub_re, Complex.one_re]
+        linarith [hw1.2]
+      have hd' : DifferentiableAt ℂ (fun s ↦ U' (1 - s)) w :=
+        ((hU' (1 - w) h1).differentiableAt
+          ((isOpen_Ioi.preimage Complex.continuous_re).mem_nhds h1)).comp w (by fun_prop)
+      have hd : DifferentiableAt ℂ (fun s ↦ g s * U' (1 - s)) w :=
+        ((hg w hw1).differentiableAt ho).mul hd'
+      exact hd.congr_of_eventuallyEq (by filter_upwards [ho] with s hs using hE2 s hs.2)
+  let W (w : ℂ) := (A : ℂ) * E w
+  have hW (s : ℂ) : ‖s ^ m * W s‖ = A * ‖s ^ m * E s‖ := by
+    simp only [W, mul_left_comm (s ^ m) (A : ℂ), norm_mul, Complex.norm_of_nonneg hA]
+  obtain ⟨Mr, hMr⟩ := hr
+  obtain ⟨Ml, hMl⟩ := hl
+  have key := norm_pow_mul_le_on_verticalStrip (a := -1 / 2) (b := 3 / 2) (by norm_num) (F := W)
+    (M := A * max Mr Ml) (by
+      apply DifferentiableOn.diffContOnCl
+      rw [Complex.closure_preimage_re, closure_Ioo (by norm_num)]
+      exact (hD.const_mul _).mono fun s hs ↦ (by norm_num : (-1 : ℝ) < -1 / 2).trans_le hs.1)
+    (by
+      intro s hs
+      change ‖(A : ℂ) * E s‖ ≤ _
+      rw [norm_mul, Complex.norm_of_nonneg hA]
+      apply mul_le_mul_of_nonneg_left _ hA
+      by_cases hp : 1 / 2 ≤ s.re
+      · rw [hE1 s (by linarith)]
+        exact (hMr s ⟨hp, hs.2⟩).trans (le_max_left _ _)
+      · rw [hE2 s (by linarith [not_le.mp hp])]
+        exact (hMl s ⟨hs.1, (not_le.mp hp).le⟩).trans (le_max_right _ _))
+    m (C := B)
+    (fun s hs ↦ by rw [hW, hE2 s (by linarith)]; exact hleft s hs)
+    (fun s hs ↦ by rw [hW, hE1 s (by linarith)]; exact hright s hs)
+    z ⟨by linarith, hz2⟩
+  rw [hW, hE1 z hz0] at key
+  exact key
+
+/-- The functional equation of the S-local zeta function at every point of the open critical
+strip, in a norm chart. -/
+private theorem meyerCriticalStrip_equation
+    (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T)) (g : ℬₛ(T))
+    (z : ℂ) (hz : z.re ∈ Ioo (0 : ℝ) 1) :
+    sLocalIdelicZFunction g (chartₜ(T, χ) z) = sLocalRhoFactor (chartₜ(T, χ) z) *
+      sLocalIdelicZFunction (sAdeleSchwartzFourier g) (chartₜ(T, χ⁻¹) (1 - z)) := by
+  have hdual : dualQuasiCharacter (sIdeleQuotientNorm F T)
+      (isProperMap_sIdeleQuotientNorm F T).continuous
+      (chartₜ(T, χ) z) = chartₜ(T, χ⁻¹) (1 - z) := sLocalNormTwistChart_dual χ z
+  have hd : 0 < (1 - z).re := by simpa using sub_pos.mpr hz.2
+  exact (sLocalIdelicZFunction_eq_integral g ⟨χ, z, hz.1, rfl⟩).trans
+    ((sLocalIdelicZetaIntegral_functionalEquation g χ z hz).trans
+      (congrArg (sLocalRhoFactor (chartₜ(T, χ) z) * ·)
+        ((congrArg (sLocalIdelicZetaIntegral (sAdeleSchwartzFourier g)) hdual).trans
+          (sLocalIdelicZFunction_eq_integral _ ⟨χ⁻¹, 1 - z, hd, rfl⟩).symm)))
+
+/-- On the open critical strip, a multiplier `h` whose product `g` with the Tate factor is
+holomorphic glues the zeta function of a test to the reflected zeta function of its Fourier
+transform, and the zeta function of the Fourier transform to the reflected zeta function of
+the test. The second identity uses that the Tate factors of dual quasi-characters multiply
+to one off a discrete set, and continuity. -/
+private theorem meyerCriticalStrip_equation_glue
+    (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T)) (u : ℬₛ(T))
+    (h g : ℂ → ℂ) (hh : Differentiable ℂ h) (hg : DifferentiableOn ℂ g (Complex.re ⁻¹' Ioo (-1) 1))
+    (hρ : ∀ z : ℂ, 0 < z.re → z.re < 1 → g z = h z * sLocalRhoFactor (chartₜ(T, χ) z))
+    (z : ℂ) (hz0 : 0 < z.re) (hz1 : z.re < 1) :
+    h z * sLocalIdelicZFunction u (chartₜ(T, χ) z) =
+        g z * sLocalIdelicZFunction (sAdeleSchwartzFourier u) (chartₜ(T, χ⁻¹) (1 - z)) ∧
+      h z * sLocalIdelicZFunction (sAdeleSchwartzFourier u) (chartₜ(T, χ) z) =
+        g z * sLocalIdelicZFunction u (chartₜ(T, χ⁻¹) (1 - z)) := by
+  constructor
+  · rw [hρ z hz0 hz1,
+      meyerCriticalStrip_equation
+        T χ u z ⟨hz0, hz1⟩, mul_assoc]
+  · have hS : Complex.re ⁻¹' Ioo (0 : ℝ) 1 ∈ 𝓝 z :=
+      (isOpen_Ioo.preimage Complex.continuous_re).mem_nhds ⟨hz0, hz1⟩
+    have hcL : ContinuousAt (fun s ↦ h s *
+        sLocalIdelicZFunction (sAdeleSchwartzFourier u) (chartₜ(T, χ) s)) z :=
+      (hh z).continuousAt.mul
+        ((sLocalMellinSchwartzBounds_holomorphic T
+          (sAdeleSchwartzFourier u) χ).continuousOn.continuousAt
+          ((isOpen_Ioi.preimage Complex.continuous_re).mem_nhds hz0))
+    have h1 : (1 - z) ∈ Complex.re ⁻¹' Ioi (0 : ℝ) := by
+      change 0 < (1 - z).re
+      simpa using sub_pos.mpr hz1
+    have hc1 : ContinuousAt (fun s : ℂ ↦ sLocalIdelicZFunction u (chartₜ(T, χ⁻¹) (1 - s))) z :=
+      ContinuousAt.comp (g := fun s : ℂ ↦ sLocalIdelicZFunction u (chartₜ(T, χ⁻¹) s))
+        (f := fun s : ℂ ↦ 1 - s)
+        ((sLocalMellinSchwartzBounds_holomorphic T u χ⁻¹).continuousOn.continuousAt
+          ((isOpen_Ioi.preimage Complex.continuous_re).mem_nhds h1)) (by fun_prop)
+    have hz2 : z.re ∈ Ioo (-1 : ℝ) 1 := ⟨by linarith, hz1⟩
+    have hcR : ContinuousAt (fun s ↦ g s * sLocalIdelicZFunction u (chartₜ(T, χ⁻¹) (1 - s))) z :=
+      ((hg z hz2).differentiableAt
+        ((isOpen_Ioo.preimage Complex.continuous_re).mem_nhds hz2)).continuousAt.mul hc1
+    have hm1 : (QuotientGroup.mk (-1 : (SAdeleRing F T)ˣ) : SIdeleQuotient F T) = 1 := by
+      refine (sIdeleQuotient_mk_eq_one F T _).2 ⟨-1, ?_⟩
+      apply Units.ext
+      simp
+    have hev : (fun s ↦ h s * sLocalIdelicZFunction (sAdeleSchwartzFourier u) (chartₜ(T, χ) s))
+        =ᶠ[𝓝[≠] z] fun s ↦ g s * sLocalIdelicZFunction u (chartₜ(T, χ⁻¹) (1 - s)) := by
+      filter_upwards [nhdsWithin_le_nhds hS,
+        nhdsNE_le_codiscrete _ (sLocalRhoFactor_mul_dual (F := F) (S := T) χ)] with s hs hmul
+      have hs1 : (1 - s).re ∈ Ioo (0 : ℝ) 1 := by
+        simp only [Complex.sub_re, Complex.one_re, mem_Ioo]
+        exact ⟨by linarith [hs.2], by linarith [hs.1]⟩
+      let eqn (η : PontryaginDual (SIdeleQuotient F T)) : Prop :=
+        sLocalIdelicZFunction u (chartₜ(T, χ⁻¹) (1 - s)) =
+          sLocalRhoFactor (chartₜ(T, χ⁻¹) (1 - s)) *
+            sLocalIdelicZFunction (sAdeleSchwartzFourier u) (chartₜ(T, η) (1 - (1 - s)))
+      have hfe : eqn χ := (congrArg eqn (inv_inv χ)).mp
+        (meyerCriticalStrip_equation
+          T χ⁻¹ u (1 - s) hs1)
+      change sLocalIdelicZFunction u (chartₜ(T, χ⁻¹) (1 - s)) =
+          sLocalRhoFactor (chartₜ(T, χ⁻¹) (1 - s)) *
+            sLocalIdelicZFunction (sAdeleSchwartzFourier u) (chartₜ(T, χ) (1 - (1 - s))) at hfe
+      rw [sub_sub_cancel] at hfe
+      have hdual : dualQuasiCharacter (sIdeleQuotientNorm F T)
+          (isProperMap_sIdeleQuotientNorm F T).continuous
+          (chartₜ(T, χ) s) = chartₜ(T, χ⁻¹) (1 - s) := sLocalNormTwistChart_dual χ s
+      have hone : sLocalRhoFactor (chartₜ(T, χ) s) *
+          sLocalRhoFactor (chartₜ(T, χ⁻¹) (1 - s)) = 1 := by
+        rw [← hdual]
+        exact hmul.trans (by rw [hm1, map_one])
+      change h s * _ = g s * sLocalIdelicZFunction u (chartₜ(T, χ⁻¹) (1 - s))
+      rw [hfe, hρ s hs.1 hs.2]
+      linear_combination
+        (-(h s * sLocalIdelicZFunction (sAdeleSchwartzFourier u) (chartₜ(T, χ) s))) * hone
+    exact tendsto_nhds_unique_of_eventuallyEq (hcL.tendsto.mono_left nhdsWithin_le_nhds)
+      (hcR.tendsto.mono_left nhdsWithin_le_nhds) hev
+
+/-- The real inequality behind the edge bounds: a multiplier of polynomial size in the
+character and in the height is absorbed by a larger angular weight and a higher power. -/
+private theorem meyerCriticalStrip_edge
+    (x y C hn Zn t r B : ℝ) (k m N : ℕ) (hx : 0 ≤ x) (hy : 0 ≤ y)
+    (hC : 0 ≤ C) (ht : 0 ≤ t) (hZ : 0 ≤ Zn) (hhn : 0 ≤ hn) (htr : t ≤ r) (h1r : 1 + t ≤ 2 * r)
+    (hh : hn ≤ C * (1 + y) ^ N * (1 + t) ^ N)
+    (hB : (1 + (x + y)) ^ (k + N) * (r ^ (m + N) * Zn) ≤ B) :
+    (1 + x) ^ k * (t ^ m * (hn * Zn)) ≤ C * 2 ^ N * B := by
+  have hr : 0 ≤ r := ht.trans htr
+  have hy1 : (0 : ℝ) ≤ 1 + y := by linarith
+  have hxy : (1 + y) ^ N ≤ (1 + (x + y)) ^ N := pow_le_pow_left₀ hy1 (by linarith) N
+  have h1 : hn ≤ C * (1 + (x + y)) ^ N * (2 * r) ^ N :=
+    hh.trans (mul_le_mul (mul_le_mul_of_nonneg_left hxy hC)
+      (pow_le_pow_left₀ (by linarith) h1r N) (pow_nonneg (by linarith) N)
+      (mul_nonneg hC (pow_nonneg (by linarith) N)))
+  calc (1 + x) ^ k * (t ^ m * (hn * Zn))
+      ≤ (1 + (x + y)) ^ k * (r ^ m * ((C * (1 + (x + y)) ^ N * (2 * r) ^ N) * Zn)) :=
+        mul_le_mul (pow_le_pow_left₀ (by linarith) (by linarith) k)
+          (mul_le_mul (pow_le_pow_left₀ ht htr m) (mul_le_mul_of_nonneg_right h1 hZ)
+            (mul_nonneg hhn hZ) (pow_nonneg hr m))
+          (mul_nonneg (pow_nonneg ht m) (mul_nonneg hhn hZ)) (pow_nonneg (by linarith) k)
+    _ = C * 2 ^ N * ((1 + (x + y)) ^ (k + N) * (r ^ (m + N) * Zn)) := by
+        rw [mul_pow, pow_add, pow_add]
+        ring
+    _ ≤ C * 2 ^ N * B := mul_le_mul_of_nonneg_left hB (by positivity)
+
+/-- The strip bound for one angular character and one pair of tests: the a priori bounds
+come from the rapid decay of the zeta functions on closed strips of positive real part. -/
+private theorem meyerCriticalStrip_single
+    (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T)) (u u' : ℬₛ(T))
+    (h g : ℂ → ℂ) (hh : Differentiable ℂ h) (hg : DifferentiableOn ℂ g (Complex.re ⁻¹' Ioo (-1) 1))
+    (heq : ∀ z : ℂ, 0 < z.re → z.re < 1 → h z * sLocalIdelicZFunction u (chartₜ(T, χ) z) =
+      g z * sLocalIdelicZFunction u' (chartₜ(T, χ⁻¹) (1 - z)))
+    (D : ℝ) (N : ℕ) (hD : 0 ≤ D)
+    (hhb : ∀ z : ℂ, z.re ∈ Icc (-1 / 2 : ℝ) (3 / 2) → ‖h z‖ ≤ D * (1 + ‖z‖) ^ N)
+    (hgb : ∀ z : ℂ, z.re ∈ Icc (-1 / 2 : ℝ) (1 / 2) → ‖g z‖ ≤ D * (1 + ‖z‖) ^ N)
+    (A B : ℝ) (hA : 0 ≤ A) (m : ℕ)
+    (hright : ∀ z : ℂ, z.re = 3 / 2 →
+      A * ‖z ^ m * (h z * sLocalIdelicZFunction u (chartₜ(T, χ) z))‖ ≤ B)
+    (hleft : ∀ z : ℂ, z.re = -1 / 2 →
+      A * ‖z ^ m * (g z * sLocalIdelicZFunction u' (chartₜ(T, χ⁻¹) (1 - z)))‖ ≤ B)
+    (z : ℂ) (hz0 : 0 < z.re) (hz2 : z.re ≤ 3 / 2) :
+    A * ‖z ^ m * (h z * sLocalIdelicZFunction u (chartₜ(T, χ) z))‖ ≤ B := by
+  refine meyerCriticalStrip_glue
+    (fun s ↦ sLocalIdelicZFunction u (chartₜ(T, χ) s))
+    (fun s ↦ sLocalIdelicZFunction u' (chartₜ(T, χ⁻¹) s)) h g A B hA m
+    (sLocalMellinSchwartzBounds_holomorphic T u χ)
+    (sLocalMellinSchwartzBounds_holomorphic T u' χ⁻¹) hh hg heq ?_ ?_ hright hleft z hz0 hz2
+  · obtain ⟨C₁, hC₁, htail⟩ := sLocalIdelicZFunction_rapid_decay_on_positive_strip u χ
+      (1 / 2) (3 / 2) (by norm_num) (by norm_num) (N + 1) (by omega)
+    obtain ⟨Y, hY⟩ := eventually_atTop.mp (eventually_comap.mp htail)
+    exact meyerCriticalStrip_bounded_product
+      h (fun s ↦ sLocalIdelicZFunction u (chartₜ(T, χ) s))
+      (1 / 2) (3 / 2) D C₁ Y N hD hC₁.le hh.continuous.continuousOn
+      ((sLocalMellinSchwartzBounds_holomorphic T u χ).continuousOn.mono
+        fun s hs ↦ (by norm_num : (0 : ℝ) < 1 / 2).trans_le hs.1)
+      (fun s hs ↦ hhb s ⟨by linarith [hs.1], hs.2⟩)
+      (fun s hs hy ↦ by
+        have hd := hY |s.im| hy s.im rfl s.re hs
+        rwa [Complex.re_add_im] at hd)
+  · obtain ⟨C₁, hC₁, htail⟩ := sLocalIdelicZFunction_rapid_decay_on_positive_strip u' χ⁻¹
+      (1 / 2) (3 / 2) (by norm_num) (by norm_num) (N + 1) (by omega)
+    obtain ⟨Y, hY⟩ := eventually_atTop.mp (eventually_comap.mp htail)
+    have hmaps (s : ℂ) (hs : s.re ∈ Icc (-1 / 2 : ℝ) (1 / 2)) :
+        (1 - s).re ∈ Icc (1 / 2 : ℝ) (3 / 2) := by
+      simp only [Complex.sub_re, Complex.one_re, mem_Icc]
+      exact ⟨by linarith [hs.2], by linarith [hs.1]⟩
+    exact meyerCriticalStrip_bounded_product
+      g (fun s ↦ sLocalIdelicZFunction u' (chartₜ(T, χ⁻¹) (1 - s)))
+      (-1 / 2) (1 / 2) D C₁ Y N hD hC₁.le
+      (hg.continuousOn.mono fun s hs ↦ ⟨by linarith [hs.1], by linarith [hs.2]⟩)
+      (ContinuousOn.comp (g := fun s : ℂ ↦ sLocalIdelicZFunction u' (chartₜ(T, χ⁻¹) s))
+        (sLocalMellinSchwartzBounds_holomorphic T u' χ⁻¹).continuousOn
+        (by fun_prop : Continuous fun s : ℂ ↦ 1 - s).continuousOn
+        (fun s hs ↦ (by norm_num : (0 : ℝ) < 1 / 2).trans_le (hmaps s hs).1))
+      hgb
+      (fun s hs hy ↦ by
+        have him : |(1 - s).im| = |s.im| := by simp
+        have hd := hY |(1 - s).im| (by rw [him]; exact hy) (1 - s).im rfl (1 - s).re (hmaps s hs)
+        rwa [Complex.re_add_im, him] at hd)
+
+/-- A weighted bound over a subgroup of a subgroup, read at the inverse character. -/
+private theorem meyerCriticalStrip_inverse_index
+    {P : Type*} [CommGroup P] (L : Subgroup P) (K : Subgroup L)
+    (Z : ℕ → P → ℂ → ℂ) (q : GroupSeminorm K) (k m : ℕ) (a B : ℝ)
+    (hB : ∀ i : K × ℕ, ∀ z : ℂ, z.re = a → (1 + q i.1) ^ k * ‖z ^ m * Z i.2 i.1.val.val z‖ ≤ B)
+    (χ : K) (n : ℕ) (z : ℂ) (hz : z.re = a) :
+    (1 + q χ) ^ k * ‖z ^ m * Z n (χ.val.val)⁻¹ z‖ ≤ B := by
+  have h := hB (χ⁻¹, n) z hz
+  simpa only [map_inv_eq_map, Subgroup.coe_inv] using h
+
+/-- The bound at one angular character: the bounds for a test and for its partner on the line
+of real part `3/2`, with a multiplier of polynomial size that is bounded below at `z`, give the
+weighted bound at `z`. -/
+private theorem meyerCriticalStrip_bound
+    (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T)) (u u' : ℬₛ(T))
+    (h g : ℂ → ℂ) (hh : Differentiable ℂ h) (hg : DifferentiableOn ℂ g (Complex.re ⁻¹' Ioo (-1) 1))
+    (heq : ∀ z : ℂ, 0 < z.re → z.re < 1 → h z * sLocalIdelicZFunction u (chartₜ(T, χ) z) =
+      g z * sLocalIdelicZFunction u' (chartₜ(T, χ⁻¹) (1 - z)))
+    (x y C c B₁ B₂ : ℝ) (k m N : ℕ) (hx : 0 ≤ x) (hy : 0 ≤ y) (hC : 0 ≤ C) (hc : 0 < c)
+    (hhb : ∀ z : ℂ, z.re ∈ Icc (-1 / 2 : ℝ) (3 / 2) → ‖h z‖ ≤ C * (1 + y) ^ N * (1 + ‖z‖) ^ N)
+    (hgb : ∀ z : ℂ, z.re ∈ Icc (-1 / 2 : ℝ) (1 / 2) → ‖g z‖ ≤ C * (1 + y) ^ N * (1 + ‖z‖) ^ N)
+    (hb₁ : ∀ s : ℂ, s.re = 3 / 2 → (1 + (x + y)) ^ (k + N) *
+      ‖s ^ (m + N) * sLocalThetaMellinIntegral u (chartₜ(T, χ) s)‖ ≤ B₁)
+    (χ' : PontryaginDual (SIdeleQuotient F T)) (hχ' : χ' = χ⁻¹)
+    (hb₂ : ∀ s : ℂ, s.re = 3 / 2 → (1 + (x + y)) ^ (k + N) *
+      ‖s ^ (m + N) * sLocalThetaMellinIntegral u' (chartₜ(T, χ') s)‖ ≤ B₂)
+    (z : ℂ) (hz0 : 0 < z.re) (hz1 : z.re ≤ 1) (hcz : c ≤ ‖h z‖) :
+    (1 + x) ^ k * ‖z ^ m * sLocalThetaMellinIntegral u (chartₜ(T, χ) z)‖ ≤
+      C * 2 ^ N * max B₁ B₂ / c := by
+  subst hχ'
+  have hCN : 0 ≤ C * 2 ^ N := mul_nonneg hC (by positivity)
+  have key : (1 + x) ^ k * ‖z ^ m * (h z * sLocalIdelicZFunction u (chartₜ(T, χ) z))‖ ≤
+      C * 2 ^ N * max B₁ B₂ := by
+    refine meyerCriticalStrip_single
+      T χ u u' h g hh hg heq (C * (1 + y) ^ N) N
+      (mul_nonneg hC (pow_nonneg (by linarith) _)) hhb hgb ((1 + x) ^ k) _
+      (pow_nonneg (by linarith) _) m ?_ ?_ z hz0 (by linarith)
+    · intro s hs
+      have hs1 : 1 ≤ ‖s‖ := by
+        have := (le_abs_self s.re).trans (Complex.abs_re_le_norm s)
+        linarith
+      have hb := hb₁ s hs
+      rw [← sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T u χ s (by linarith),
+        norm_mul, norm_pow] at hb
+      rw [norm_mul, norm_pow, norm_mul]
+      exact (meyerCriticalStrip_edge
+        x y C ‖h s‖ _ ‖s‖ ‖s‖ B₁ k m N hx hy hC (norm_nonneg _)
+        (norm_nonneg _) (norm_nonneg _) le_rfl (by linarith)
+        (hhb s ⟨by linarith, by linarith⟩) hb).trans
+        (mul_le_mul_of_nonneg_left (le_max_left _ _) hCN)
+    · intro s hs
+      have hre : (1 - s).re = 3 / 2 := by
+        rw [Complex.sub_re, Complex.one_re, hs]
+        norm_num
+      have hw1 : 1 ≤ ‖1 - s‖ := by
+        have := (le_abs_self (1 - s).re).trans (Complex.abs_re_le_norm (1 - s))
+        linarith
+      have hsw : ‖s‖ ≤ ‖1 - s‖ := by
+        rw [Complex.norm_def, Complex.norm_def]
+        apply Real.sqrt_le_sqrt
+        rw [Complex.normSq_apply, Complex.normSq_apply, Complex.sub_re, Complex.sub_im,
+          Complex.one_re, Complex.one_im, hs]
+        nlinarith [mul_self_nonneg s.im]
+      have hb := hb₂ (1 - s) hre
+      have hθ := sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T u' χ⁻¹ (1 - s) (by linarith)
+      rw [← hθ, norm_mul, norm_pow] at hb
+      rw [norm_mul, norm_pow, norm_mul]
+      exact (meyerCriticalStrip_edge
+        x y C ‖g s‖ _ ‖s‖ ‖1 - s‖ B₂ k m N hx hy hC (norm_nonneg _)
+        (norm_nonneg _) (norm_nonneg _) hsw (by linarith)
+        (hgb s ⟨by linarith, by linarith⟩) hb).trans
+        (mul_le_mul_of_nonneg_left (le_max_right _ _) hCN)
+  rw [le_div_iff₀ hc, ← sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T u χ z hz0]
+  calc (1 + x) ^ k * ‖z ^ m * sLocalIdelicZFunction u (chartₜ(T, χ) z)‖ * c
+      ≤ (1 + x) ^ k * ‖z ^ m * sLocalIdelicZFunction u (chartₜ(T, χ) z)‖ * ‖h z‖ :=
+        mul_le_mul_of_nonneg_left hcz (mul_nonneg (pow_nonneg (by linarith) _) (norm_nonneg _))
+    _ = (1 + x) ^ k * ‖z ^ m * (h z * sLocalIdelicZFunction u (chartₜ(T, χ) z))‖ := by
+        rw [norm_mul, norm_mul, norm_mul]
+        ring
+    _ ≤ _ := key
+
+/-- The real Gamma factor is bounded on closed vertical strips of positive real part. -/
+private theorem meyerStripMultiplier_gammaReal_bounded
+    (x₀ x₁ : ℝ) (hx₀ : 0 < x₀) :
+    ∃ M : ℝ, ∀ u : ℂ, u.re ∈ Icc x₀ x₁ → ‖Complex.Gammaℝ u‖ ≤ M := by
+  have hc : ContinuousOn Real.Gamma (Icc (x₀ / 2) (x₁ / 2)) :=
+    Real.differentiableOn_Gamma_Ioi.continuousOn.mono fun x hx ↦
+      show 0 < x from lt_of_lt_of_le (by positivity) hx.1
+  obtain ⟨M, hM⟩ := isCompact_Icc.exists_bound_of_continuousOn hc
+  refine ⟨M, fun u hu ↦ ?_⟩
+  have hre : (u / 2).re = u.re / 2 := Complex.div_ofNat_re u 2
+  have hpos : 0 < (u / 2).re := by rw [hre]; linarith [hu.1]
+  have h1 : Real.pi ^ (-u / 2).re ≤ 1 := by
+    apply Real.rpow_le_one_of_one_le_of_nonpos (by linarith [Real.pi_gt_three])
+    rw [Complex.div_ofNat_re, Complex.neg_re]
+    linarith [hu.1]
+  have h2 : ‖Complex.Gamma (u / 2)‖ ≤ Real.Gamma (u / 2).re := by
+    rw [Complex.Gamma_eq_integral hpos, Real.Gamma_eq_integral hpos, Complex.GammaIntegral]
+    refine (norm_integral_le_integral_norm _).trans_eq (integral_congr_ae ?_)
+    filter_upwards [ae_restrict_mem measurableSet_Ioi] with x hx
+    rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg (Real.exp_pos _).le,
+      Complex.norm_cpow_eq_rpow_re_of_pos hx, Complex.sub_re, Complex.one_re]
+  have h3 := hM (u / 2).re ⟨by rw [hre]; linarith [hu.1], by rw [hre]; linarith [hu.2]⟩
+  rw [Complex.Gammaℝ_def, norm_mul, Complex.norm_cpow_eq_rpow_re_of_pos Real.pi_pos]
+  calc Real.pi ^ (-u / 2).re * ‖Complex.Gamma (u / 2)‖
+      ≤ 1 * Real.Gamma (u / 2).re := mul_le_mul h1 h2 (norm_nonneg _) zero_le_one
+    _ ≤ M := by rw [one_mul]; exact (le_abs_self _).trans h3
+
+/-- Reflection: away from the real axis, the reciprocal real Gamma factor on the strip
+`-1/2 ≤ Re w ≤ 3/2` grows at most like `exp (π |Im w| / 2)`. -/
+private theorem meyerStripMultiplier_inv_gammaReal_base :
+    ∃ M : ℝ, 0 ≤ M ∧ ∀ w : ℂ, w.re ∈ Icc (-1 / 2 : ℝ) (3 / 2) → 1 ≤ |w.im| →
+      ‖(Complex.Gammaℝ w)⁻¹‖ ≤ M * Real.exp (Real.pi * |w.im| / 2) := by
+  obtain ⟨M, hM⟩ :=
+    meyerStripMultiplier_gammaReal_bounded
+      (1 / 2) (5 / 2) (by norm_num)
+  refine ⟨max M 0, le_max_right _ _, fun w hw him ↦ ?_⟩
+  have hcos (u : ℂ) : ‖Complex.cos u‖ ≤ Real.exp |u.im| := by
+    have h := norm_add_le (Complex.exp (u * Complex.I)) (Complex.exp (-u * Complex.I))
+    have he := congrArg (fun a : ℂ ↦ ‖a‖) (Complex.two_cos u)
+    simp only [norm_mul] at he
+    norm_num [Complex.norm_exp, Complex.mul_re] at he h
+    linarith [Real.exp_le_exp.mpr (le_abs_self u.im), Real.exp_le_exp.mpr (neg_le_abs u.im)]
+  have hprod := Complex.Gammaℝ_one_sub_mul_Gammaℝ_one_add (1 - w)
+  rw [sub_sub_cancel] at hprod
+  have h2re : (1 + (1 - w)).re = 2 - w.re := by
+    simp only [Complex.add_re, Complex.sub_re, Complex.one_re]
+    ring
+  have hne2 : Complex.Gammaℝ (1 + (1 - w)) ≠ 0 :=
+    Complex.Gammaℝ_ne_zero_of_re_pos (by rw [h2re]; linarith [hw.2])
+  have hne : Complex.Gammaℝ w ≠ 0 := by
+    intro h0
+    obtain ⟨n, hn⟩ := Complex.Gammaℝ_eq_zero_iff.mp h0
+    have h0im : w.im = 0 := by rw [hn]; simp
+    rw [h0im, abs_zero] at him
+    linarith
+  have hc : Complex.cos (Real.pi * (1 - w) / 2) ≠ 0 := by
+    intro h0
+    rw [h0, inv_zero] at hprod
+    exact mul_ne_zero hne hne2 hprod
+  have hinv : (Complex.Gammaℝ w)⁻¹ =
+      Complex.Gammaℝ (1 + (1 - w)) * Complex.cos (Real.pi * (1 - w) / 2) := by
+    apply inv_eq_of_mul_eq_one_right
+    rw [← mul_assoc, hprod, inv_mul_cancel₀ hc]
+  have him2 : |((Real.pi : ℂ) * (1 - w) / 2).im| = Real.pi * |w.im| / 2 := by
+    rw [Complex.div_ofNat_im, Complex.im_ofReal_mul, Complex.sub_im, Complex.one_im, zero_sub,
+      mul_neg, neg_div, abs_neg, abs_div, abs_mul, abs_of_pos Real.pi_pos,
+      abs_of_pos (by norm_num : (0 : ℝ) < 2)]
+  rw [hinv, norm_mul]
+  refine mul_le_mul ((hM _ ⟨by rw [h2re]; linarith [hw.2], by rw [h2re]; linarith [hw.1]⟩).trans
+    (le_max_left _ _)) ((hcos _).trans_eq (by rw [him2])) (norm_nonneg _) (le_max_right _ _)
+
+/-- The functional equation `Γ_ℝ(w + 2) = Γ_ℝ(w) w / (2π)` carries the bound of the reciprocal
+real Gamma factor to every strip `-1/2 ≤ Re w ≤ x₁`, away from the real axis. -/
+private theorem meyerStripMultiplier_inv_gammaReal_growth
+    (x₁ : ℝ) :
+    ∃ M : ℝ, 0 ≤ M ∧ ∀ w : ℂ, -1 / 2 ≤ w.re → w.re ≤ x₁ → 1 ≤ |w.im| →
+      ‖(Complex.Gammaℝ w)⁻¹‖ ≤ M * Real.exp (Real.pi * |w.im| / 2) := by
+  obtain ⟨M, hM0, hM⟩ :=
+    meyerStripMultiplier_inv_gammaReal_base
+  have hpi : 1 ≤ 2 * Real.pi := by linarith [Real.pi_gt_three]
+  have key (n : ℕ) : ∀ w : ℂ, -1 / 2 ≤ w.re → w.re ≤ 3 / 2 + 2 * n → 1 ≤ |w.im| →
+      ‖(Complex.Gammaℝ w)⁻¹‖ ≤ (2 * Real.pi) ^ n * (M * Real.exp (Real.pi * |w.im| / 2)) := by
+    induction n with
+    | zero =>
+      intro w h1 h2 h3
+      rw [pow_zero, one_mul]
+      exact hM w ⟨h1, by simpa using h2⟩ h3
+    | succ n ih =>
+      intro w h1 h2 h3
+      have hnn : 0 ≤ M * Real.exp (Real.pi * |w.im| / 2) := mul_nonneg hM0 (Real.exp_pos _).le
+      by_cases hc : w.re ≤ 3 / 2 + 2 * n
+      · exact (ih w h1 hc h3).trans (mul_le_mul_of_nonneg_right
+          (pow_le_pow_right₀ hpi (Nat.le_succ n)) hnn)
+      · have hc' : 3 / 2 + 2 * (n : ℝ) < w.re := lt_of_not_ge hc
+        have him : (w - 2).im = w.im := by simp
+        have hre : (w - 2).re = w.re - 2 := by simp
+        have hu1 : 1 ≤ ‖w - 2‖ := by
+          have := Complex.abs_im_le_norm (w - 2)
+          rw [him] at this
+          exact h3.trans this
+        have hu : w - 2 ≠ 0 := fun h0 ↦ by
+          rw [h0, norm_zero] at hu1
+          linarith
+        have hG : Complex.Gammaℝ w = Complex.Gammaℝ (w - 2) * (w - 2) / 2 / Real.pi := by
+          have h := Complex.Gammaℝ_add_two hu
+          rwa [sub_add_cancel] at h
+        have hstep := ih (w - 2) (by rw [hre]; linarith [Nat.cast_nonneg (α := ℝ) n])
+          (by rw [hre]; push_cast at h2; linarith) (by rw [him]; exact h3)
+        rw [him] at hstep
+        have hnorm : ‖(Complex.Gammaℝ w)⁻¹‖ =
+            2 * Real.pi * ‖(Complex.Gammaℝ (w - 2))⁻¹‖ * ‖w - 2‖⁻¹ := by
+          rw [hG, norm_inv, norm_div, norm_div, norm_mul, norm_inv, Complex.norm_real,
+            Real.norm_of_nonneg Real.pi_pos.le, Complex.norm_ofNat]
+          simp only [div_eq_mul_inv, mul_inv, inv_inv]
+          ring
+        rw [hnorm, pow_succ]
+        calc 2 * Real.pi * ‖(Complex.Gammaℝ (w - 2))⁻¹‖ * ‖w - 2‖⁻¹
+            ≤ 2 * Real.pi * ‖(Complex.Gammaℝ (w - 2))⁻¹‖ * 1 :=
+              mul_le_mul_of_nonneg_left (inv_le_one_of_one_le₀ hu1) (by positivity)
+          _ ≤ 2 * Real.pi * ((2 * Real.pi) ^ n * (M * Real.exp (Real.pi * |w.im| / 2))) * 1 := by
+              gcongr
+          _ = _ := by ring
+  obtain ⟨n, hn⟩ := exists_nat_ge (x₁ / 2)
+  refine ⟨(2 * Real.pi) ^ n * M, by positivity, fun w h1 h2 h3 ↦ ?_⟩
+  rw [mul_assoc]
+  exact key n w h1 (by linarith) h3
+
+/-- The real Gamma factor is differentiable at every point of positive real part. -/
+private theorem meyerStripMultiplier_gammaReal_differentiableAt
+    (u : ℂ) (hu : 0 < u.re) : DifferentiableAt ℂ Complex.Gammaℝ u := by
+  have h1 : DifferentiableAt ℂ (fun s : ℂ ↦ (Real.pi : ℂ) ^ (-s / 2)) u :=
+    (differentiableAt_id.neg.div_const 2).const_cpow
+      (Or.inl (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero))
+  have h2 : DifferentiableAt ℂ (fun s : ℂ ↦ Complex.Gamma (s / 2)) u := by
+    refine DifferentiableAt.comp u (Complex.differentiableAt_Gamma (u / 2) fun m hm ↦ ?_)
+      (differentiableAt_id.div_const 2)
+    have h := congrArg Complex.re hm
+    rw [Complex.div_ofNat_re, Complex.neg_re, Complex.natCast_re] at h
+    linarith [Nat.cast_nonneg (α := ℝ) m]
+  exact (h1.mul h2).congr_of_eventuallyEq (Eventually.of_forall fun s ↦ Complex.Gammaℝ_def s)
+
+/-- The factor of the multiplier for one real Gamma factor with parameter `σ`: the quotient
+`2π Γ_ℝ(z + σ + 2) / Γ_ℝ(1 - z + conj σ)` is holomorphic for `Re z > -1`, has modulus `2π` on
+the line `Re z = -1/2`, grows at most exponentially in the height, and is
+`(z + σ) Γ_ℝ(z + σ) / Γ_ℝ(1 - z + conj σ)` for `Re z > 0`. -/
+private theorem meyerStripMultiplier_real_factor
+    (σ : ℂ) (hσ : 0 ≤ σ.re) :
+    ∃ ψ : ℂ → ℂ, DifferentiableOn ℂ ψ (Complex.re ⁻¹' Ioi (-1)) ∧
+      (∀ z : ℂ, z.re = -1 / 2 → ‖ψ z‖ = 2 * Real.pi) ∧
+      (∃ A Y : ℝ, 0 ≤ A ∧ ∀ z : ℂ, z.re ∈ Icc (-1 / 2 : ℝ) (1 / 2) → Y ≤ |z.im| →
+        ‖ψ z‖ ≤ A * Real.exp (Real.pi * |z.im| / 2)) ∧
+      ∀ z : ℂ, 0 < z.re → (z + σ) * (Complex.Gammaℝ (z + σ) /
+        Complex.Gammaℝ (1 - z + (starRingEnd ℂ) σ)) = ψ z := by
+  have hre2 (z : ℂ) : (z + σ + 2).re = z.re + σ.re + 2 := by
+    simp only [Complex.add_re, Complex.re_ofNat]
+  have hrew (z : ℂ) : (1 - z + (starRingEnd ℂ) σ).re = 1 - z.re + σ.re := by
+    simp only [Complex.add_re, Complex.sub_re, Complex.one_re, Complex.conj_re]
+  have himw (z : ℂ) : (1 - z + (starRingEnd ℂ) σ).im = -z.im - σ.im := by
+    simp only [Complex.add_im, Complex.sub_im, Complex.one_im, Complex.conj_im]
+    ring
+  refine ⟨fun z ↦ 2 * (Real.pi : ℂ) * Complex.Gammaℝ (z + σ + 2) *
+    (Complex.Gammaℝ (1 - z + (starRingEnd ℂ) σ))⁻¹, ?_, ?_, ?_, ?_⟩
+  · intro z hz
+    have hz' : -1 < z.re := hz
+    have h1 : DifferentiableAt ℂ (fun s : ℂ ↦ Complex.Gammaℝ (s + σ + 2)) z :=
+      DifferentiableAt.comp z
+        (meyerStripMultiplier_gammaReal_differentiableAt
+          _ (by rw [hre2]; linarith)) (by fun_prop)
+    have h2 : DifferentiableAt ℂ
+        (fun s : ℂ ↦ (Complex.Gammaℝ (1 - s + (starRingEnd ℂ) σ))⁻¹) z :=
+      DifferentiableAt.comp z (g := fun s : ℂ ↦ (Complex.Gammaℝ s)⁻¹)
+        (Complex.differentiable_Gammaℝ_inv _) (by fun_prop)
+    exact (((differentiableAt_const _).mul h1).mul h2).differentiableWithinAt
+  · intro z hz
+    have hconj : 1 - z + (starRingEnd ℂ) σ = (starRingEnd ℂ) (z + σ + 2) := by
+      apply Complex.ext
+      · rw [hrew, Complex.conj_re, hre2, hz]
+        ring
+      · rw [himw, Complex.conj_im]
+        simp only [Complex.add_im, Complex.im_ofNat]
+        ring
+    have hne : ‖Complex.Gammaℝ (z + σ + 2)‖ ≠ 0 :=
+      norm_ne_zero_iff.mpr (Complex.Gammaℝ_ne_zero_of_re_pos (by rw [hre2, hz]; linarith))
+    change ‖2 * (Real.pi : ℂ) * Complex.Gammaℝ (z + σ + 2) *
+      (Complex.Gammaℝ (1 - z + (starRingEnd ℂ) σ))⁻¹‖ = _
+    rw [hconj, Complex.Gammaℝ_conj, norm_mul, norm_mul, norm_mul, norm_inv, Complex.norm_conj,
+      Complex.norm_real, Real.norm_of_nonneg Real.pi_pos.le, Complex.norm_ofNat, mul_assoc,
+      mul_inv_cancel₀ hne, mul_one]
+  · obtain ⟨M₁, hM₁⟩ :=
+      meyerStripMultiplier_gammaReal_bounded
+        (3 / 2 + σ.re) (5 / 2 + σ.re) (by linarith)
+    obtain ⟨M₂, hM₂0, hM₂⟩ :=
+      meyerStripMultiplier_inv_gammaReal_growth
+        (3 / 2 + σ.re)
+    refine ⟨2 * Real.pi * max M₁ 0 * (M₂ * Real.exp (Real.pi * |σ.im| / 2)), 1 + |σ.im|,
+      by positivity, fun z hz hy ↦ ?_⟩
+    have hw1 : 1 ≤ |(1 - z + (starRingEnd ℂ) σ).im| := by
+      rw [himw]
+      have h := abs_sub_abs_le_abs_sub (-z.im) σ.im
+      rw [abs_neg] at h
+      linarith
+    have hw2 : |(1 - z + (starRingEnd ℂ) σ).im| ≤ |z.im| + |σ.im| := by
+      rw [himw]
+      have h := abs_sub (-z.im) σ.im
+      rw [abs_neg] at h
+      exact h
+    have hG₁ : ‖Complex.Gammaℝ (z + σ + 2)‖ ≤ max M₁ 0 :=
+      (hM₁ _ ⟨by rw [hre2]; linarith [hz.1], by rw [hre2]; linarith [hz.2]⟩).trans
+        (le_max_left _ _)
+    have hG₂ := hM₂ (1 - z + (starRingEnd ℂ) σ) (by rw [hrew]; linarith [hz.2])
+      (by rw [hrew]; linarith [hz.1]) hw1
+    have hexp : Real.exp (Real.pi * |(1 - z + (starRingEnd ℂ) σ).im| / 2) ≤
+        Real.exp (Real.pi * |σ.im| / 2) * Real.exp (Real.pi * |z.im| / 2) := by
+      rw [← Real.exp_add, Real.exp_le_exp]
+      nlinarith [Real.pi_pos]
+    change ‖2 * (Real.pi : ℂ) * Complex.Gammaℝ (z + σ + 2) *
+      (Complex.Gammaℝ (1 - z + (starRingEnd ℂ) σ))⁻¹‖ ≤ _
+    rw [norm_mul, norm_mul, norm_mul, Complex.norm_real, Real.norm_of_nonneg Real.pi_pos.le,
+      Complex.norm_ofNat]
+    calc 2 * Real.pi * ‖Complex.Gammaℝ (z + σ + 2)‖ *
+          ‖(Complex.Gammaℝ (1 - z + (starRingEnd ℂ) σ))⁻¹‖
+        ≤ 2 * Real.pi * max M₁ 0 * (M₂ * (Real.exp (Real.pi * |σ.im| / 2) *
+            Real.exp (Real.pi * |z.im| / 2))) :=
+          mul_le_mul (mul_le_mul_of_nonneg_left hG₁ (by positivity))
+            (hG₂.trans (mul_le_mul_of_nonneg_left hexp hM₂0)) (norm_nonneg _) (by positivity)
+      _ = _ := by ring
+  · intro z hz
+    have hs : z + σ ≠ 0 := fun h ↦ by
+      have h0 := congrArg Complex.re h
+      rw [Complex.add_re, Complex.zero_re] at h0
+      linarith
+    have hπ : (Real.pi : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr Real.pi_ne_zero
+    change _ = 2 * (Real.pi : ℂ) * Complex.Gammaℝ (z + σ + 2) *
+      (Complex.Gammaℝ (1 - z + (starRingEnd ℂ) σ))⁻¹
+    rw [Complex.Gammaℝ_add_two hs, div_eq_mul_inv]
+    generalize (Complex.Gammaℝ (1 - z + (starRingEnd ℂ) σ))⁻¹ = d
+    field_simp
+
+/-- The factor of the multiplier at one infinite place with parameter `σ`, real (`r`) or
+complex: a polynomial `φ` of degree one or two, bounded below on the lines of positive real
+part, and its product `ψ` with the quotient of the Euler factors of the place. -/
+private theorem meyerStripMultiplier_arch_factor
+    (r : Prop) (σ : ℂ) (hσ : 0 ≤ σ.re) :
+    ∃ φ ψ : ℂ → ℂ, Differentiable ℂ φ ∧
+      (∀ z : ℂ, ‖φ z‖ ≤ ((1 + ‖σ‖) * (1 + ‖z‖)) ^ 2) ∧
+      (∀ (a : ℝ) (z : ℂ), 0 < a → z.re = a → a ≤ ‖φ z‖) ∧
+      DifferentiableOn ℂ ψ (Complex.re ⁻¹' Ioi (-1)) ∧
+      (∀ z : ℂ, z.re = -1 / 2 → ‖ψ z‖ ≤ (2 * Real.pi) ^ 2) ∧
+      (∃ A Y : ℝ, 0 ≤ A ∧ ∀ z : ℂ, z.re ∈ Icc (-1 / 2 : ℝ) (1 / 2) → Y ≤ |z.im| →
+        ‖ψ z‖ ≤ A * Real.exp (Real.pi * |z.im|)) ∧
+      ∀ z : ℂ, 0 < z.re →
+        (r → φ z * (Complex.Gammaℝ (z + σ) /
+          Complex.Gammaℝ (1 - z + (starRingEnd ℂ) σ)) = ψ z) ∧
+        (¬ r → φ z * (Complex.Gammaℂ (z + σ) / 2 /
+          (Complex.Gammaℂ (1 - z + (starRingEnd ℂ) σ) / 2)) = ψ z) := by
+  have hpi : 1 ≤ 2 * Real.pi := by linarith [Real.pi_gt_three]
+  have hX (z : ℂ) : 1 ≤ (1 + ‖σ‖) * (1 + ‖z‖) := by
+    nlinarith [norm_nonneg σ, norm_nonneg z, mul_nonneg (norm_nonneg σ) (norm_nonneg z)]
+  have hlin (z : ℂ) : ‖z + σ‖ ≤ (1 + ‖σ‖) * (1 + ‖z‖) := by
+    nlinarith [norm_add_le z σ, norm_nonneg σ, norm_nonneg z,
+      mul_nonneg (norm_nonneg σ) (norm_nonneg z)]
+  have hlow (a : ℝ) (z : ℂ) (hz : z.re = a) : a ≤ ‖z + σ‖ := by
+    have h := (le_abs_self (z + σ).re).trans (Complex.abs_re_le_norm (z + σ))
+    rw [Complex.add_re, hz] at h
+    linarith
+  obtain ⟨ψ₁, hd₁, hn₁, ⟨A₁, Y₁, hA₁, hg₁⟩, he₁⟩ :=
+    meyerStripMultiplier_real_factor
+      σ hσ
+  by_cases hr : r
+  · refine ⟨fun z ↦ z + σ, ψ₁, by fun_prop, fun z ↦ ?_, fun a z _ hz ↦ hlow a z hz, hd₁,
+      fun z hz ↦ ?_, ⟨A₁, Y₁, hA₁, fun z hz hy ↦ ?_⟩, fun z hz ↦ ⟨fun _ ↦ he₁ z hz,
+        fun h ↦ absurd hr h⟩⟩
+    · exact (hlin z).trans (le_self_pow₀ (hX z) (by norm_num))
+    · rw [hn₁ z hz]
+      exact le_self_pow₀ hpi (by norm_num)
+    · refine (hg₁ z hz hy).trans (mul_le_mul_of_nonneg_left (Real.exp_le_exp.mpr ?_) hA₁)
+      nlinarith [Real.pi_pos, abs_nonneg z.im]
+  · have hσ1 : 0 ≤ (σ + 1).re := by
+      rw [Complex.add_re, Complex.one_re]
+      linarith
+    obtain ⟨ψ₂, hd₂, hn₂, ⟨A₂, Y₂, hA₂, hg₂⟩, he₂⟩ :=
+      meyerStripMultiplier_real_factor
+        (σ + 1) hσ1
+    refine ⟨fun z ↦ (z + σ) * (z + (σ + 1)), fun z ↦ ψ₁ z * ψ₂ z, by fun_prop, fun z ↦ ?_,
+      fun a z ha hz ↦ ?_, hd₁.mul hd₂, fun z hz ↦ ?_,
+      ⟨A₁ * A₂, max Y₁ Y₂, mul_nonneg hA₁ hA₂, fun z hz hy ↦ ?_⟩,
+      fun z hz ↦ ⟨fun h ↦ absurd h hr, fun _ ↦ ?_⟩⟩
+    · have h2 : ‖z + (σ + 1)‖ ≤ (1 + ‖σ‖) * (1 + ‖z‖) := by
+        have h := norm_add₃_le (a := z) (b := σ) (c := 1)
+        rw [norm_one, add_assoc] at h
+        nlinarith [norm_nonneg σ, norm_nonneg z, mul_nonneg (norm_nonneg σ) (norm_nonneg z)]
+      rw [norm_mul, sq]
+      exact mul_le_mul (hlin z) h2 (norm_nonneg _) (zero_le_one.trans (hX z))
+    · have h1 := hlow a z hz
+      have h2 : 1 ≤ ‖z + (σ + 1)‖ := by
+        have h := (le_abs_self (z + (σ + 1)).re).trans (Complex.abs_re_le_norm (z + (σ + 1)))
+        rw [Complex.add_re, Complex.add_re, Complex.one_re, hz] at h
+        linarith
+      rw [norm_mul]
+      nlinarith [norm_nonneg (z + σ)]
+    · rw [norm_mul, hn₁ z hz, hn₂ z hz, sq]
+    · rw [norm_mul]
+      calc ‖ψ₁ z‖ * ‖ψ₂ z‖ ≤ (A₁ * Real.exp (Real.pi * |z.im| / 2)) *
+            (A₂ * Real.exp (Real.pi * |z.im| / 2)) :=
+          mul_le_mul (hg₁ z hz ((le_max_left _ _).trans hy))
+            (hg₂ z hz ((le_max_right _ _).trans hy)) (norm_nonneg _)
+            (mul_nonneg hA₁ (Real.exp_pos _).le)
+        _ = A₁ * A₂ * Real.exp (Real.pi * |z.im|) := by
+          rw [mul_mul_mul_comm, ← Real.exp_add, add_halves]
+    · have h1 := he₁ z hz
+      have h2 := he₂ z hz
+      rw [map_add, map_one] at h2
+      change (z + σ) * (z + (σ + 1)) * _ = ψ₁ z * ψ₂ z
+      rw [← h1, ← h2, ← Complex.Gammaℝ_mul_Gammaℝ_add_one (z + σ),
+        ← Complex.Gammaℝ_mul_Gammaℝ_add_one (1 - z + (starRingEnd ℂ) σ),
+        show z + σ + 1 = z + (σ + 1) by ring,
+        show 1 - z + (starRingEnd ℂ) σ + 1 = 1 - z + ((starRingEnd ℂ) σ + 1) by ring]
+      simp only [div_eq_mul_inv, mul_inv, inv_inv]
+      have h2c : (2 : ℂ) ≠ 0 := two_ne_zero
+      field_simp
+
+/-- The factor of the multiplier at one finite place: the inverse Euler factor `1 - u r^z` and
+the dual one `1 - conj u r^(1 - z)`, for `0 < r < 1` and `‖u‖ ≤ 1`. -/
+private theorem meyerStripMultiplier_finite_factor
+    (r : ℝ) (hr0 : 0 < r) (hr1 : r < 1) (u : ℂ) (hu : ‖u‖ ≤ 1) :
+    Differentiable ℂ (fun z : ℂ ↦ 1 - u * (r : ℂ) ^ z) ∧
+      (∀ z : ℂ, -1 / 2 ≤ z.re → ‖1 - u * (r : ℂ) ^ z‖ ≤ 1 + r ^ (-1 / 2 : ℝ)) ∧
+      (∀ (a : ℝ) (z : ℂ), z.re = a → 1 - r ^ a ≤ ‖1 - u * (r : ℂ) ^ z‖) ∧
+      Differentiable ℂ (fun z : ℂ ↦ 1 - (starRingEnd ℂ) u * (r : ℂ) ^ (1 - z)) ∧
+      ∀ z : ℂ, z.re ≤ 1 / 2 → ‖1 - (starRingEnd ℂ) u * (r : ℂ) ^ (1 - z)‖ ≤ 2 := by
+  have hrc : (r : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr hr0.ne'
+  have hnorm (z : ℂ) : ‖(r : ℂ) ^ z‖ = r ^ z.re := Complex.norm_cpow_eq_rpow_re_of_pos hr0 z
+  have hmul (c z : ℂ) (hc : ‖c‖ ≤ 1) : ‖c * (r : ℂ) ^ z‖ ≤ r ^ z.re := by
+    rw [norm_mul, hnorm]
+    exact mul_le_of_le_one_left (Real.rpow_nonneg hr0.le _) hc
+  refine ⟨((differentiable_id.const_cpow (Or.inl hrc)).const_mul u).const_sub 1,
+    fun z hz ↦ ?_, fun a z hz ↦ ?_,
+    (((differentiable_const (1 : ℂ)).sub differentiable_id).const_cpow
+      (Or.inl hrc) |>.const_mul _).const_sub 1, fun z hz ↦ ?_⟩
+  · refine (norm_sub_le _ _).trans ?_
+    rw [norm_one]
+    exact add_le_add_right ((hmul u z hu).trans
+      (Real.rpow_le_rpow_of_exponent_ge hr0 hr1.le hz)) 1
+  · have h := norm_sub_norm_le (1 : ℂ) (u * (r : ℂ) ^ z)
+    rw [norm_one] at h
+    have h2 := hmul u z hu
+    rw [hz] at h2
+    linarith
+  · refine (norm_sub_le _ _).trans ?_
+    rw [norm_one]
+    have h1 : ‖(starRingEnd ℂ) u * (r : ℂ) ^ (1 - z)‖ ≤ 1 := by
+      refine (hmul _ (1 - z) (by rw [Complex.norm_conj]; exact hu)).trans
+        (Real.rpow_le_one hr0.le hr1.le ?_)
+      rw [Complex.sub_re, Complex.one_re]
+      linarith
+    linarith
+
+/-- Phragmén–Lindelöf with polynomial weights on the strip `-1/2 ≤ Re z ≤ 1/2`: a holomorphic
+function of at most exponential growth in the height that is bounded by `M (1 + ‖z‖)^N` on
+both edges is bounded by `6^N M (1 + ‖z‖)^N` on the strip. -/
+private theorem meyerStripMultiplier_strip
+    (g : ℂ → ℂ) (hg : DifferentiableOn ℂ g (Complex.re ⁻¹' Ioo (-1) 1)) (M : ℝ) (N : ℕ)
+    (hM : 0 ≤ M)
+    (hl : ∀ z : ℂ, z.re = -1 / 2 → ‖g z‖ ≤ M * (1 + ‖z‖) ^ N)
+    (hr : ∀ z : ℂ, z.re = 1 / 2 → ‖g z‖ ≤ M * (1 + ‖z‖) ^ N)
+    (hgrow : ∃ A B Y : ℝ, ∀ z : ℂ, z.re ∈ Icc (-1 / 2 : ℝ) (1 / 2) → Y ≤ |z.im| →
+      ‖g z‖ ≤ A * Real.exp (B * |z.im|))
+    (z : ℂ) (hz : z.re ∈ Icc (-1 / 2 : ℝ) (1 / 2)) :
+    ‖g z‖ ≤ 6 ^ N * M * (1 + ‖z‖) ^ N := by
+  have hlow (w : ℂ) (hw : -1 / 2 ≤ w.re) : 3 / 2 ≤ ‖w + 2‖ := by
+    have h := (le_abs_self (w + 2).re).trans (Complex.abs_re_le_norm (w + 2))
+    rw [Complex.add_re, Complex.re_ofNat] at h
+    linarith
+  have hne (w : ℂ) (hw : -1 / 2 ≤ w.re) : (w + 2) ^ N ≠ 0 :=
+    pow_ne_zero N (norm_pos_iff.mp (by linarith [hlow w hw]))
+  have h3 (w : ℂ) (hw : -1 / 2 ≤ w.re) : 1 + ‖w‖ ≤ 3 * ‖w + 2‖ := by
+    have h := norm_sub_le (w + 2) 2
+    rw [add_sub_cancel_right, Complex.norm_ofNat] at h
+    linarith [hlow w hw]
+  have h2 (w : ℂ) : ‖w + 2‖ ≤ 2 * (1 + ‖w‖) := by
+    have h := norm_add_le w 2
+    rw [Complex.norm_ofNat] at h
+    linarith [norm_nonneg w]
+  let f (w : ℂ) : ℂ := g w * ((w + 2) ^ N)⁻¹
+  have hfn (w : ℂ) : ‖f w‖ = ‖g w‖ * (‖w + 2‖ ^ N)⁻¹ := by
+    change ‖g w * ((w + 2) ^ N)⁻¹‖ = _
+    rw [norm_mul, norm_inv, norm_pow]
+  have hedge (w : ℂ) (hw : -1 / 2 ≤ w.re) (hb : ‖g w‖ ≤ M * (1 + ‖w‖) ^ N) :
+      ‖f w‖ ≤ 3 ^ N * M := by
+    have hp : 0 < ‖w + 2‖ ^ N := pow_pos (by linarith [hlow w hw]) N
+    rw [hfn, ← div_eq_mul_inv, div_le_iff₀ hp]
+    calc ‖g w‖ ≤ M * (1 + ‖w‖) ^ N := hb
+      _ ≤ M * (3 * ‖w + 2‖) ^ N :=
+        mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (by positivity) (h3 w hw) N) hM
+      _ = 3 ^ N * M * ‖w + 2‖ ^ N := by rw [mul_pow]; ring
+  have hd : DiffContOnCl ℂ f (Complex.re ⁻¹' Ioo (-1 / 2 : ℝ) (1 / 2)) := by
+    apply DifferentiableOn.diffContOnCl
+    rw [Complex.closure_preimage_re, closure_Ioo (by norm_num)]
+    intro w hw
+    have hw' : w.re ∈ Icc (-1 / 2 : ℝ) (1 / 2) := hw
+    have hg' : DifferentiableWithinAt ℂ g (Complex.re ⁻¹' Icc (-1 / 2 : ℝ) (1 / 2)) w :=
+      (hg w ⟨by linarith [hw'.1], by linarith [hw'.2]⟩).mono fun s hs ↦
+        ⟨by linarith [(show s.re ∈ Icc (-1 / 2 : ℝ) (1 / 2) from hs).1],
+          by linarith [(show s.re ∈ Icc (-1 / 2 : ℝ) (1 / 2) from hs).2]⟩
+    have hp : DifferentiableAt ℂ (fun s : ℂ ↦ ((s + 2) ^ N)⁻¹) w :=
+      (((differentiableAt_id.add_const 2).pow N)).inv (hne w hw'.1)
+    exact hg'.mul hp.differentiableWithinAt
+  obtain ⟨A, B, Y, hAB⟩ := hgrow
+  have key : ‖f z‖ ≤ 3 ^ N * M := by
+    apply PhragmenLindelof.vertical_strip hd _ (fun w hw ↦ hedge w hw.ge (hl w hw))
+      (fun w hw ↦ hedge w (by rw [hw]; norm_num) (hr w hw)) hz.1 hz.2
+    refine ⟨1, by
+      rw [show (1 / 2 : ℝ) - -1 / 2 = 1 by norm_num, div_one]
+      linarith [Real.pi_gt_three], max B 0, ?_⟩
+    apply Asymptotics.IsBigO.of_bound (max A 0)
+    rw [eventually_inf_principal]
+    filter_upwards [(tendsto_comap (f := abs ∘ Complex.im) (x := atTop)).eventually
+      (eventually_ge_atTop Y)] with w hwY hw
+    have hw' : w.re ∈ Icc (-1 / 2 : ℝ) (1 / 2) :=
+      ⟨(show w.re ∈ Ioo (-1 / 2 : ℝ) (1 / 2) from hw).1.le,
+        (show w.re ∈ Ioo (-1 / 2 : ℝ) (1 / 2) from hw).2.le⟩
+    have hgw := hAB w hw' hwY
+    have hinv : (‖w + 2‖ ^ N)⁻¹ ≤ 1 :=
+      inv_le_one_of_one_le₀ (one_le_pow₀ (by linarith [hlow w hw'.1]))
+    have hexp : Real.exp (B * |w.im|) ≤ Real.exp (max B 0 * Real.exp (1 * |w.im|)) := by
+      rw [Real.exp_le_exp, one_mul]
+      have h1 := Real.add_one_le_exp |w.im|
+      have h0 := abs_nonneg w.im
+      calc B * |w.im| ≤ max B 0 * |w.im| := mul_le_mul_of_nonneg_right (le_max_left _ _) h0
+        _ ≤ max B 0 * Real.exp |w.im| :=
+          mul_le_mul_of_nonneg_left (by linarith) (le_max_right _ _)
+    rw [hfn, Real.norm_of_nonneg (Real.exp_pos _).le]
+    calc ‖g w‖ * (‖w + 2‖ ^ N)⁻¹ ≤ ‖g w‖ * 1 :=
+          mul_le_mul_of_nonneg_left hinv (norm_nonneg _)
+      _ ≤ max A 0 * Real.exp (max B 0 * Real.exp (1 * |w.im|)) := by
+          rw [mul_one]
+          exact hgw.trans (mul_le_mul (le_max_left _ _) hexp (Real.exp_pos _).le
+            (le_max_right _ _))
+  have hp : 0 < ‖z + 2‖ ^ N := pow_pos (by linarith [hlow z hz.1]) N
+  rw [hfn, ← div_eq_mul_inv, div_le_iff₀ hp] at key
+  calc ‖g z‖ ≤ 3 ^ N * M * ‖z + 2‖ ^ N := key
+    _ ≤ 3 ^ N * M * (2 * (1 + ‖z‖)) ^ N :=
+      mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (norm_nonneg _) (h2 z) N) (by positivity)
+    _ = 6 ^ N * M * (1 + ‖z‖) ^ N := by
+      rw [mul_pow, show (6 : ℝ) = 3 * 2 by norm_num, mul_pow]
+      ring
+
+/-- At a real place the Euler factor of the norm chart of a unitary character `η` is
+`Γ_ℝ(z + s η)`. The shift `s η` has real part `0` or `1` (the sign parity); its real part is
+subadditive, its imaginary part additive, and inversion conjugates it. -/
+private theorem meyerStripMultiplier_real_parameter
+    (w : InfinitePlace F) (hw : w.IsReal) :
+    ∃ s : PontryaginDual w.Completionˣ → ℂ,
+      (∀ η : PontryaginDual w.Completionˣ, 0 ≤ (s η).re) ∧ s 1 = 0 ∧
+      (∀ η η' : PontryaginDual w.Completionˣ, (s (η * η')).re ≤ (s η).re + (s η').re ∧
+        (s (η * η')).im = (s η).im + (s η').im) ∧
+      (∀ η : PontryaginDual w.Completionˣ, s η⁻¹ = (starRingEnd ℂ) (s η)) ∧
+      ∀ (η : PontryaginDual w.Completionˣ) (z : ℂ),
+        infiniteLocalEulerFactor w (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
+            Complex.Gammaℝ (z + s η) := by
+  let e : ℝˣ →* w.Completionˣ :=
+    Units.map (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm.toMonoidHom
+  let sg (x : ℝˣ) : ℂ := if 0 < (x : ℝ) then 1 else -1
+  have hsg2 (x : ℝˣ) : sg x ^ 2 = 1 := by
+    by_cases h : 0 < (x : ℝ)
+    · simp [sg, h]
+    · simp [sg, h]
+  have hsginv (x : ℝˣ) (n : ℕ) : (sg x ^ n)⁻¹ = sg x ^ n := by
+    by_cases h : 0 < (x : ℝ)
+    · have h1 : sg x = 1 := by simp [sg, h]
+      rw [h1, one_pow, inv_one]
+    · have h1 : sg x = -1 := by simp [sg, h]
+      rw [h1, ← inv_pow, inv_neg_one]
+  have hmod (x : ℝˣ) : ((((Units.map nnNormHom.toMonoidHom ^ InfinitePlace.mult w :
+      w.Completionˣ →* ℝ≥0ˣ) (e x) : ℝ≥0) : ℝ)) = ‖(x : ℝ)‖ := by
+    have hn : ‖(InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm (x : ℝ)‖ = ‖(x : ℝ)‖ :=
+      (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).symm.isometry.norm_map_of_map_zero
+        (map_zero (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm) (x : ℝ)
+    simp [e, InfinitePlace.mult, hw, hn]
+  have hval (η : PontryaginDual w.Completionˣ) (z : ℂ) (x : ℝˣ) :
+      quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z (e x) =
+          (η (e x) : ℂ) * (‖(x : ℝ)‖ : ℂ) ^ z := by
+    change (η (e x) : ℂ) * ((((Units.map nnNormHom.toMonoidHom ^ InfinitePlace.mult w :
+      w.Completionˣ →* ℝ≥0ˣ) (e x) : ℝ≥0) : ℝ) : ℂ) ^ z = _
+    rw [hmod]
+  have hx0 (x : ℝˣ) : ((‖(x : ℝ)‖ : ℝ) : ℂ) ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr x.ne_zero)
+  let P (η : PontryaginDual w.Completionˣ) : ℂ × Fin 2 :=
+    (realLocalEulerParameters w hw (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) 0)).exists.choose
+  have hP (η : PontryaginDual w.Completionˣ) (x : ℝˣ) :
+      (η (e x) : ℂ) = (‖(x : ℝ)‖ : ℂ) ^ (P η).1 * sg x ^ (P η).2.val := by
+    have h := (realLocalEulerParameters w hw (quasiCharacterNormTwist _
+      (continuous_infiniteLocalModule w)
+      (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) 0)).exists.choose_spec x
+    change quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) 0 (e x) = _ at h
+    rw [hval, Complex.cpow_zero, mul_one] at h
+    exact h
+  have huniq (η : PontryaginDual w.Completionˣ) (t : ℂ) (a : Fin 2)
+      (h : ∀ x : ℝˣ, (η (e x) : ℂ) = (‖(x : ℝ)‖ : ℂ) ^ t * sg x ^ a.val) (z : ℂ) :
+      (realLocalEulerParameters w hw (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)).exists.choose =
+          (t + z, a) := by
+    refine (realLocalEulerParameters w hw
+        (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)).unique
+      (realLocalEulerParameters w hw (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η)
+          z)).exists.choose_spec (y₂ := (t + z, a))
+      fun x ↦ ?_
+    change quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z (e x) =
+        (‖(x : ℝ)‖ : ℂ) ^ (t + z) * sg x ^ a.val
+    rw [hval, h x, Complex.cpow_add _ _ (hx0 x)]
+    ring
+  have hP0 (η : PontryaginDual w.Completionˣ) (t : ℂ) (a : Fin 2)
+      (h : ∀ x : ℝˣ, (η (e x) : ℂ) = (‖(x : ℝ)‖ : ℂ) ^ t * sg x ^ a.val) : P η = (t, a) :=
+    (huniq η t a h 0).trans (by rw [add_zero])
+  have hPre (η : PontryaginDual w.Completionˣ) : (P η).1.re = 0 := by
+    let x : ℝˣ := Units.mk0 2 (by norm_num)
+    have hx2 : ‖((x : ℝˣ) : ℝ)‖ = 2 := by norm_num [x]
+    have hsgx : sg x = 1 := by norm_num [sg, x]
+    have h := congrArg (fun c : ℂ ↦ ‖c‖) (hP η x)
+    simp only [Circle.norm_coe, hsgx, one_pow, mul_one] at h
+    rw [Complex.norm_cpow_eq_rpow_re_of_pos (by rw [hx2]; norm_num), hx2] at h
+    apply (Real.rpow_right_inj (x := 2) (by norm_num) (by norm_num)).mp
+    rw [Real.rpow_zero]
+    exact h.symm
+  refine ⟨fun η ↦ (P η).1 + ((P η).2.val : ℂ), fun η ↦ ?_, ?_, fun η η' ↦ ?_, fun η ↦ ?_,
+    fun η z ↦ ?_⟩
+  · rw [Complex.add_re, hPre, Complex.natCast_re]
+    positivity
+  · have h1 : P 1 = (0, 0) := hP0 1 0 0 fun x ↦ by simp
+    change (P 1).1 + ((P 1).2.val : ℂ) = 0
+    rw [h1]
+    simp
+  · have hm : P (η * η') = ((P η).1 + (P η').1, (P η).2 + (P η').2) :=
+      hP0 _ _ _ fun x ↦ by
+        change ((η (e x) * η' (e x) : Circle) : ℂ) = _
+        rw [Circle.coe_mul, hP η x, hP η' x, Complex.cpow_add _ _ (hx0 x), Fin.val_add,
+          ← pow_eq_pow_mod _ (hsg2 x), pow_add]
+        ring
+    change ((P (η * η')).1 + ((P (η * η')).2.val : ℂ)).re ≤
+        ((P η).1 + ((P η).2.val : ℂ)).re + ((P η').1 + ((P η').2.val : ℂ)).re ∧
+      ((P (η * η')).1 + ((P (η * η')).2.val : ℂ)).im =
+        ((P η).1 + ((P η).2.val : ℂ)).im + ((P η').1 + ((P η').2.val : ℂ)).im
+    rw [hm]
+    simp only [Complex.add_re, Complex.add_im, Complex.natCast_re, Complex.natCast_im, hPre,
+      zero_add, add_zero]
+    refine ⟨?_, trivial⟩
+    have hle : ((P η).2 + (P η').2).val ≤ (P η).2.val + (P η').2.val := by
+      rw [Fin.val_add]
+      exact Nat.mod_le _ _
+    exact_mod_cast hle
+  · have hi : P η⁻¹ = (-(P η).1, (P η).2) :=
+      hP0 _ _ _ fun x ↦ by
+        change (((η (e x))⁻¹ : Circle) : ℂ) = _
+        rw [Circle.coe_inv, hP η x, mul_inv, Complex.cpow_neg, hsginv]
+    change (P η⁻¹).1 + ((P η⁻¹).2.val : ℂ) = (starRingEnd ℂ) ((P η).1 + ((P η).2.val : ℂ))
+    rw [hi, map_add, Complex.conj_natCast]
+    congr 1
+    apply Complex.ext
+    · rw [Complex.neg_re, Complex.conj_re, hPre, neg_zero]
+    · rw [Complex.neg_im, Complex.conj_im]
+  · have hu := huniq η (P η).1 (P η).2 (hP η) z
+    have hE : infiniteLocalEulerFactor w
+        (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
+        Complex.Gammaℝ ((P η).1 + z + ((P η).2.val : ℂ)) := by
+      simp only [infiniteLocalEulerFactor, hw, ↓reduceDIte, hu]
+    rw [hE]
+    congr 1
+    ring
+
+/-- At a complex place the Euler factor of the norm chart of a unitary character `η` is
+`Γ_ℂ(z + s η) / 2`. The shift `s η` has real part `|k| / 2` (`k` the angular weight); its real
+part is subadditive, its imaginary part additive, and inversion conjugates it. -/
+private theorem meyerStripMultiplier_complex_parameter
+    (w : InfinitePlace F) (hw : w.IsComplex) :
+    ∃ s : PontryaginDual w.Completionˣ → ℂ,
+      (∀ η : PontryaginDual w.Completionˣ, 0 ≤ (s η).re) ∧ s 1 = 0 ∧
+      (∀ η η' : PontryaginDual w.Completionˣ, (s (η * η')).re ≤ (s η).re + (s η').re ∧
+        (s (η * η')).im = (s η).im + (s η').im) ∧
+      (∀ η : PontryaginDual w.Completionˣ, s η⁻¹ = (starRingEnd ℂ) (s η)) ∧
+      ∀ (η : PontryaginDual w.Completionˣ) (z : ℂ),
+        infiniteLocalEulerFactor w (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
+            Complex.Gammaℂ (z + s η) / 2 := by
+  let e : ℂˣ →* w.Completionˣ :=
+    Units.map (InfinitePlace.Completion.ringEquivComplexOfIsComplex hw).symm.toMonoidHom
+  let θ (x : ℂˣ) : ℂ := (x : ℂ) / (‖(x : ℂ)‖ : ℂ)
+  have hθ (x : ℂˣ) : θ x ≠ 0 :=
+    div_ne_zero x.ne_zero (Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr x.ne_zero))
+  have hmod (x : ℂˣ) : ((((Units.map nnNormHom.toMonoidHom ^ InfinitePlace.mult w :
+      w.Completionˣ →* ℝ≥0ˣ) (e x) : ℝ≥0) : ℝ)) = ‖(x : ℂ)‖ ^ 2 := by
+    have hn : ‖(InfinitePlace.Completion.ringEquivComplexOfIsComplex hw).symm (x : ℂ)‖ =
+        ‖(x : ℂ)‖ :=
+      (InfinitePlace.Completion.isometryEquivComplexOfIsComplex
+        hw).symm.isometry.norm_map_of_map_zero
+        (map_zero (InfinitePlace.Completion.ringEquivComplexOfIsComplex hw).symm) (x : ℂ)
+    simp [e, InfinitePlace.mult, InfinitePlace.not_isReal_iff_isComplex.mpr hw, hn]
+  have hval (η : PontryaginDual w.Completionˣ) (z : ℂ) (x : ℂˣ) :
+      quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z (e x) =
+          (η (e x) : ℂ) * ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ^ z := by
+    change (η (e x) : ℂ) * ((((Units.map nnNormHom.toMonoidHom ^ InfinitePlace.mult w :
+      w.Completionˣ →* ℝ≥0ˣ) (e x) : ℝ≥0) : ℝ) : ℂ) ^ z = _
+    rw [hmod]
+  have hx0 (x : ℂˣ) : ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (pow_ne_zero _ (norm_ne_zero_iff.mpr x.ne_zero))
+  let P (η : PontryaginDual w.Completionˣ) : ℂ × ℤ :=
+    (complexLocalEulerParameters w hw (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) 0)).exists.choose
+  have hP (η : PontryaginDual w.Completionˣ) (x : ℂˣ) :
+      (η (e x) : ℂ) = ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ^ (P η).1 * θ x ^ (P η).2 := by
+    have h := (complexLocalEulerParameters w hw (quasiCharacterNormTwist _
+      (continuous_infiniteLocalModule w)
+      (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) 0)).exists.choose_spec x
+    change quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) 0 (e x) = _ at h
+    rw [hval, Complex.cpow_zero, mul_one] at h
+    exact h
+  have huniq (η : PontryaginDual w.Completionˣ) (t : ℂ) (k : ℤ)
+      (h : ∀ x : ℂˣ, (η (e x) : ℂ) = ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ^ t * θ x ^ k) (z : ℂ) :
+      (complexLocalEulerParameters w hw
+          (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)).exists.choose =
+          (t + z, k) := by
+    refine (complexLocalEulerParameters w hw
+        (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)).unique
+      (complexLocalEulerParameters w hw
+          (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η)
+          z)).exists.choose_spec (y₂ := (t + z, k))
+      fun x ↦ ?_
+    change quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z (e x) =
+        ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ^ (t + z) * θ x ^ k
+    rw [hval, h x, Complex.cpow_add _ _ (hx0 x)]
+    ring
+  have hP0 (η : PontryaginDual w.Completionˣ) (t : ℂ) (k : ℤ)
+      (h : ∀ x : ℂˣ, (η (e x) : ℂ) = ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ^ t * θ x ^ k) : P η = (t, k) :=
+    (huniq η t k h 0).trans (by rw [add_zero])
+  have hPre (η : PontryaginDual w.Completionˣ) : (P η).1.re = 0 := by
+    let x : ℂˣ := Units.mk0 2 (by norm_num)
+    have hx2 : ‖((x : ℂˣ) : ℂ)‖ ^ 2 = 4 := by norm_num [x]
+    have hθx : θ x = 1 := by norm_num [θ, x]
+    have h := congrArg (fun c : ℂ ↦ ‖c‖) (hP η x)
+    simp only [Circle.norm_coe, hθx, one_zpow, mul_one] at h
+    rw [Complex.norm_cpow_eq_rpow_re_of_pos (by rw [hx2]; norm_num), hx2] at h
+    apply (Real.rpow_right_inj (x := 4) (by norm_num) (by norm_num)).mp
+    rw [Real.rpow_zero]
+    exact h.symm
+  have hsre (η : PontryaginDual w.Completionˣ) :
+      ((P η).1 + ((P η).2.natAbs : ℂ) / 2).re = ((P η).2.natAbs : ℝ) / 2 := by
+    rw [Complex.add_re, hPre, Complex.div_ofNat_re, Complex.natCast_re, zero_add]
+  have hsim (η : PontryaginDual w.Completionˣ) :
+      ((P η).1 + ((P η).2.natAbs : ℂ) / 2).im = (P η).1.im := by
+    rw [Complex.add_im, Complex.div_ofNat_im, Complex.natCast_im, zero_div, add_zero]
+  refine ⟨fun η ↦ (P η).1 + ((P η).2.natAbs : ℂ) / 2, fun η ↦ ?_, ?_, fun η η' ↦ ?_,
+    fun η ↦ ?_, fun η z ↦ ?_⟩
+  · rw [hsre]
+    positivity
+  · have h1 : P 1 = (0, 0) := hP0 1 0 0 fun x ↦ by simp
+    change (P 1).1 + (((P 1).2.natAbs : ℕ) : ℂ) / 2 = 0
+    rw [h1]
+    simp
+  · have hm : P (η * η') = ((P η).1 + (P η').1, (P η).2 + (P η').2) :=
+      hP0 _ _ _ fun x ↦ by
+        change ((η (e x) * η' (e x) : Circle) : ℂ) = _
+        rw [Circle.coe_mul, hP η x, hP η' x, Complex.cpow_add _ _ (hx0 x), zpow_add₀ (hθ x)]
+        ring
+    refine ⟨?_, ?_⟩
+    · rw [hsre, hsre, hsre, hm]
+      have hle : ((P η).2 + (P η').2).natAbs ≤ (P η).2.natAbs + (P η').2.natAbs :=
+        Int.natAbs_add_le _ _
+      have hle' : ((((P η).2 + (P η').2).natAbs : ℕ) : ℝ) ≤
+          ((P η).2.natAbs : ℝ) + ((P η').2.natAbs : ℝ) := by exact_mod_cast hle
+      linarith
+    · rw [hsim, hsim, hsim, hm, Complex.add_im]
+  · have hi : P η⁻¹ = (-(P η).1, -(P η).2) :=
+      hP0 _ _ _ fun x ↦ by
+        change (((η (e x))⁻¹ : Circle) : ℂ) = _
+        rw [Circle.coe_inv, hP η x, mul_inv, Complex.cpow_neg, zpow_neg]
+    change (P η⁻¹).1 + (((P η⁻¹).2.natAbs : ℕ) : ℂ) / 2 =
+      (starRingEnd ℂ) ((P η).1 + (((P η).2.natAbs : ℕ) : ℂ) / 2)
+    rw [hi, map_add, map_div₀, Complex.conj_natCast, map_ofNat, Int.natAbs_neg]
+    congr 1
+    apply Complex.ext
+    · rw [Complex.neg_re, Complex.conj_re, hPre, neg_zero]
+    · rw [Complex.neg_im, Complex.conj_im]
+  · have hu := huniq η (P η).1 (P η).2 (hP η) z
+    have hE : infiniteLocalEulerFactor w
+        (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
+        Complex.Gammaℂ ((P η).1 + z + ((P η).2.natAbs : ℂ) / 2) / 2 := by
+      simp only [infiniteLocalEulerFactor, InfinitePlace.not_isReal_iff_isComplex.mpr hw,
+        ↓reduceDIte, hu]
+    rw [hE]
+    congr 2
+    ring
+
+/-- The restriction of a norm chart to an archimedean place is the local norm chart of the
+restricted character; restricting characters is a homomorphism of the dual groups. -/
+private theorem meyerStripMultiplier_infinite_restriction
+    (T : Finset V) (w : InfinitePlace F) :
+    ∃ i : w.Completionˣ →ₜ* SIdeleQuotient F T,
+      ∀ (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ),
+        sLocalInfiniteRestriction w (chartₜ(T, χ) z) = quasiCharacterNormTwist _
+            (continuous_infiniteLocalModule w)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩
+            (PontryaginDual.map i χ)) z := by
+  have hi : ∃ i : w.Completionˣ →ₜ* SIdeleQuotient F T,
+      ∀ c : QuasiCharacter (SIdeleQuotient F T), sLocalInfiniteRestriction w c = c.comp i :=
+    ⟨_, fun c ↦ rfl⟩
+  refine Exists.elim hi fun i hi ↦ ⟨i, fun χ z ↦ ?_⟩
+  have hm (g : w.Completionˣ) :
+      ((((sIdeleQuotientNorm F T (i g) : ℝ≥0) : ℝ)) : ℂ) =
+        ((((Units.map nnNormHom.toMonoidHom ^ InfinitePlace.mult w :
+          w.Completionˣ →* ℝ≥0ˣ) g : ℝ≥0) : ℝ) : ℂ) := by
+    have he := sLocalInfiniteRestriction_norm (S := T) w g
+    rw [hi] at he
+    change ((1 : PontryaginDual (SIdeleQuotient F T)) (i g) : ℂ) *
+      ((((sIdeleQuotientNorm F T (i g) : ℝ≥0) : ℝ)) : ℂ) ^ (1 : ℂ) = _ at he
+    simpa only [PontryaginDual.one_apply, Circle.coe_one, one_mul, Complex.cpow_one] using he
+  rw [hi]
+  ext1 g
+  exact congrArg (fun t : ℂ ↦ (χ (i g) : ℂ) * t ^ z) (hm g)
+
+/-- The restriction of a norm chart to a finite place of `T` is the local norm chart of the
+restricted character; restricting characters is a homomorphism of the dual groups. -/
+private theorem meyerStripMultiplier_finite_restriction
+    (T : Finset V) (v : T) :
+    ∃ i : (v.val.adicCompletion F)ˣ →ₜ* SIdeleQuotient F T,
+      ∀ (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ),
+        sLocalFiniteRestriction v (chartₜ(T, χ) z) = quasiCharacterNormTwist _
+            (continuous_finiteLocalModule v.val)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩
+            (PontryaginDual.map i χ)) z := by
+  have hi : ∃ i : (v.val.adicCompletion F)ˣ →ₜ* SIdeleQuotient F T,
+      ∀ c : QuasiCharacter (SIdeleQuotient F T), sLocalFiniteRestriction v c = c.comp i :=
+    ⟨_, fun c ↦ rfl⟩
+  refine Exists.elim hi fun i hi ↦ ⟨i, fun χ z ↦ ?_⟩
+  have hm (g : (v.val.adicCompletion F)ˣ) :
+      ((((sIdeleQuotientNorm F T (i g) : ℝ≥0) : ℝ)) : ℂ) =
+        ((((Units.map nnNormHom.toMonoidHom :
+          (v.val.adicCompletion F)ˣ →* ℝ≥0ˣ) g : ℝ≥0) : ℝ) : ℂ) := by
+    have he := sLocalFiniteRestriction_norm (S := T) v g
+    rw [hi] at he
+    change ((1 : PontryaginDual (SIdeleQuotient F T)) (i g) : ℂ) *
+      ((((sIdeleQuotientNorm F T (i g) : ℝ≥0) : ℝ)) : ℂ) ^ (1 : ℂ) = _ at he
+    simpa only [PontryaginDual.one_apply, Circle.coe_one, one_mul, Complex.cpow_one] using he
+  rw [hi]
+  ext1 g
+  exact congrArg (fun t : ℂ ↦ (χ (i g) : ℂ) * t ^ z) (hm g)
+
+/-- The factor of the multiplier at one infinite place, for all unitary characters of the
+S-idele quotient: a polynomial `φ χ` whose size is controlled by a subadditive, symmetric
+weight `ν χ`, and its product `ψ χ` with the quotient of the Euler factors of the place. -/
+private theorem meyerStripMultiplier_arch_place
+    (T : Finset V) (w : InfinitePlace F) :
+    ∃ (ν : PontryaginDual (SIdeleQuotient F T) → ℝ)
+      (φ ψ : PontryaginDual (SIdeleQuotient F T) → ℂ → ℂ),
+      ν 1 = 0 ∧ (∀ χ χ' : PontryaginDual (SIdeleQuotient F T), ν (χ * χ') ≤ ν χ + ν χ') ∧
+      (∀ χ : PontryaginDual (SIdeleQuotient F T), ν χ⁻¹ = ν χ) ∧
+      ∀ χ : PontryaginDual (SIdeleQuotient F T), 0 ≤ ν χ ∧ Differentiable ℂ (φ χ) ∧
+        (∀ z : ℂ, ‖φ χ z‖ ≤ ((1 + ν χ) * (1 + ‖z‖)) ^ 2) ∧
+        (∀ (a : ℝ) (z : ℂ), 0 < a → z.re = a → a ≤ ‖φ χ z‖) ∧
+        DifferentiableOn ℂ (ψ χ) (Complex.re ⁻¹' Ioi (-1)) ∧
+        (∀ z : ℂ, z.re = -1 / 2 → ‖ψ χ z‖ ≤ (2 * Real.pi) ^ 2) ∧
+        (∃ A Y : ℝ, 0 ≤ A ∧ ∀ z : ℂ, z.re ∈ Icc (-1 / 2 : ℝ) (1 / 2) → Y ≤ |z.im| →
+          ‖ψ χ z‖ ≤ A * Real.exp (Real.pi * |z.im|)) ∧
+        ∀ z : ℂ, 0 < z.re →
+          φ χ z * (infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (chartₜ(T, χ) z)) /
+            infiniteLocalEulerFactor w (sLocalInfiniteRestriction w
+              (dualQuasiCharacter (sIdeleQuotientNorm F T)
+                (isProperMap_sIdeleQuotientNorm F T).continuous (chartₜ(T, χ) z)))) = ψ χ z := by
+  refine Exists.elim
+    (meyerStripMultiplier_infinite_restriction
+      T w) fun i hi ↦ ?_
+  have hpar : ∃ s : PontryaginDual w.Completionˣ → ℂ,
+      (∀ η : PontryaginDual w.Completionˣ, 0 ≤ (s η).re) ∧ s 1 = 0 ∧
+      (∀ η η' : PontryaginDual w.Completionˣ, (s (η * η')).re ≤ (s η).re + (s η').re ∧
+        (s (η * η')).im = (s η).im + (s η').im) ∧
+      (∀ η : PontryaginDual w.Completionˣ, s η⁻¹ = (starRingEnd ℂ) (s η)) ∧
+      ∀ (η : PontryaginDual w.Completionˣ) (z : ℂ),
+        (w.IsReal → infiniteLocalEulerFactor w
+            (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
+            Complex.Gammaℝ (z + s η)) ∧
+        (¬ w.IsReal →
+          infiniteLocalEulerFactor w (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+              (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
+              Complex.Gammaℂ (z + s η) / 2) := by
+    by_cases hw : w.IsReal
+    · obtain ⟨s, h1, h2, h3, h4, h5⟩ :=
+        meyerStripMultiplier_real_parameter
+          w hw
+      exact ⟨s, h1, h2, h3, h4, fun η z ↦ ⟨fun _ ↦ h5 η z, fun h ↦ absurd hw h⟩⟩
+    · obtain ⟨s, h1, h2, h3, h4, h5⟩ :=
+        meyerStripMultiplier_complex_parameter
+          w (InfinitePlace.not_isReal_iff_isComplex.mp hw)
+      exact ⟨s, h1, h2, h3, h4, fun η z ↦ ⟨fun h ↦ absurd h hw, fun _ ↦ h5 η z⟩⟩
+  obtain ⟨s, hs0, hs1, hsmul, hsinv, hsE⟩ := hpar
+  have hfac := fun χ : PontryaginDual (SIdeleQuotient F T) ↦
+    meyerStripMultiplier_arch_factor
+      w.IsReal (s (PontryaginDual.map i χ)) (hs0 _)
+  choose φ ψ hφ using hfac
+  have hdual (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ) :
+      sLocalInfiniteRestriction w (dualQuasiCharacter (sIdeleQuotientNorm F T)
+        (isProperMap_sIdeleQuotientNorm F T).continuous (chartₜ(T, χ) z)) =
+        quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩
+            ((PontryaginDual.map i χ)⁻¹ : PontryaginDual w.Completionˣ)) (1 - z) := by
+    have h1 := congrArg (sLocalInfiniteRestriction w) (sLocalNormTwistChart_dual χ z)
+    have h2 := hi χ⁻¹ (1 - z)
+    have h3 : PontryaginDual.map i χ⁻¹ = (PontryaginDual.map i χ)⁻¹ :=
+      map_inv (PontryaginDual.map i) χ
+    exact h1.trans
+        (h2.trans (congrArg (fun η ↦ quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) (1 - z)) h3))
+  refine ⟨fun χ ↦ |(s (PontryaginDual.map i χ)).re| + |(s (PontryaginDual.map i χ)).im|, φ, ψ,
+    ?_, fun χ χ' ↦ ?_, fun χ ↦ ?_, fun χ ↦ ⟨by positivity, (hφ χ).1, fun z ↦ ?_, (hφ χ).2.2.1,
+      (hφ χ).2.2.2.1, (hφ χ).2.2.2.2.1, (hφ χ).2.2.2.2.2.1, fun z hz ↦ ?_⟩⟩
+  · change |(s (PontryaginDual.map i 1)).re| + |(s (PontryaginDual.map i 1)).im| = 0
+    rw [map_one, hs1]
+    simp
+  · change |(s (PontryaginDual.map i (χ * χ'))).re| + |(s (PontryaginDual.map i (χ * χ'))).im| ≤
+      (|(s (PontryaginDual.map i χ)).re| + |(s (PontryaginDual.map i χ)).im|) +
+        (|(s (PontryaginDual.map i χ')).re| + |(s (PontryaginDual.map i χ')).im|)
+    rw [map_mul]
+    have h := hsmul (PontryaginDual.map i χ) (PontryaginDual.map i χ')
+    rw [h.2, abs_of_nonneg (hs0 _), abs_of_nonneg (hs0 _), abs_of_nonneg (hs0 _)]
+    linarith [abs_add_le (s (PontryaginDual.map i χ)).im (s (PontryaginDual.map i χ')).im, h.1]
+  · change |(s (PontryaginDual.map i χ⁻¹)).re| + |(s (PontryaginDual.map i χ⁻¹)).im| =
+      |(s (PontryaginDual.map i χ)).re| + |(s (PontryaginDual.map i χ)).im|
+    rw [map_inv, hsinv, Complex.conj_re, Complex.conj_im, abs_neg]
+  · refine ((hφ χ).2.1 z).trans (pow_le_pow_left₀ (by positivity) ?_ 2)
+    exact mul_le_mul_of_nonneg_right
+      (by linarith [Complex.norm_le_abs_re_add_abs_im (s (PontryaginDual.map i χ))])
+      (by positivity)
+  · have hE1 := hsE (PontryaginDual.map i χ) z
+    have hE2 := hsE (PontryaginDual.map i χ)⁻¹ (1 - z)
+    rw [hsinv] at hE2
+    have hL1 := congrArg (infiniteLocalEulerFactor w) (hi χ z)
+    have hL2 := congrArg (infiniteLocalEulerFactor w) (hdual χ z)
+    by_cases hw : w.IsReal
+    · rw [hL1.trans (hE1.1 hw), hL2.trans (hE2.1 hw)]
+      exact ((hφ χ).2.2.2.2.2.2 z hz).1 hw
+    · rw [hL1.trans (hE1.2 hw), hL2.trans (hE2.2 hw)]
+      exact ((hφ χ).2.2.2.2.2.2 z hz).2 hw
+
+/-- The archimedean part of the multiplier: at every infinite place a polynomial factor
+`φ w χ` of size controlled by one group seminorm `q` on the dual of the S-idele quotient,
+and its product `ψ w χ` with the quotient of the Euler factors of the place. -/
+private theorem meyerStripMultiplier_arch
+    (T : Finset V) :
+    ∃ (q : GroupSeminorm (PontryaginDual (SIdeleQuotient F T)))
+      (φ ψ : InfinitePlace F → PontryaginDual (SIdeleQuotient F T) → ℂ → ℂ),
+      ∀ (w : InfinitePlace F) (χ : PontryaginDual (SIdeleQuotient F T)),
+        Differentiable ℂ (φ w χ) ∧
+        (∀ z : ℂ, ‖φ w χ z‖ ≤ ((1 + q χ) * (1 + ‖z‖)) ^ 2) ∧
+        (∀ (a : ℝ) (z : ℂ), 0 < a → z.re = a → a ≤ ‖φ w χ z‖) ∧
+        DifferentiableOn ℂ (ψ w χ) (Complex.re ⁻¹' Ioi (-1)) ∧
+        (∀ z : ℂ, z.re = -1 / 2 → ‖ψ w χ z‖ ≤ (2 * Real.pi) ^ 2) ∧
+        (∃ A Y : ℝ, 0 ≤ A ∧ ∀ z : ℂ, z.re ∈ Icc (-1 / 2 : ℝ) (1 / 2) → Y ≤ |z.im| →
+          ‖ψ w χ z‖ ≤ A * Real.exp (Real.pi * |z.im|)) ∧
+        ∀ z : ℂ, 0 < z.re →
+          φ w χ z * (infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (chartₜ(T, χ) z)) /
+            infiniteLocalEulerFactor w (sLocalInfiniteRestriction w
+              (dualQuasiCharacter (sIdeleQuotientNorm F T)
+                (isProperMap_sIdeleQuotientNorm F T).continuous (chartₜ(T, χ) z)))) =
+            ψ w χ z := by
+  choose ν φ ψ h1 hmul hinv h using fun w : InfinitePlace F ↦
+    meyerStripMultiplier_arch_place
+      T w
+  let q : GroupSeminorm (PontryaginDual (SIdeleQuotient F T)) :=
+    { toFun := fun χ ↦ ∑ w, ν w χ
+      map_one' := Finset.sum_eq_zero fun w _ ↦ h1 w
+      mul_le' := fun χ χ' ↦
+        (Finset.sum_le_sum fun w _ ↦ hmul w χ χ').trans_eq Finset.sum_add_distrib
+      inv' := fun χ ↦ Finset.sum_congr rfl fun w _ ↦ hinv w χ }
+  refine ⟨q, φ, ψ, fun w χ ↦ ⟨(h w χ).2.1, fun z ↦ ?_, (h w χ).2.2.2.1, (h w χ).2.2.2.2.1,
+    (h w χ).2.2.2.2.2.1, (h w χ).2.2.2.2.2.2.1, (h w χ).2.2.2.2.2.2.2⟩⟩
+  have hq : ν w χ ≤ q χ :=
+    Finset.single_le_sum (f := fun w ↦ ν w χ) (fun w _ ↦ (h w χ).1) (Finset.mem_univ w)
+  refine ((h w χ).2.2.1 z).trans (pow_le_pow_left₀ ?_ ?_ 2)
+  · have := (h w χ).1
+    positivity
+  · exact mul_le_mul_of_nonneg_right (by linarith) (by positivity)
+
+/-- The Euler factor of the norm chart of a unitary character `η` at a finite place is
+`(1 - u r^z)⁻¹`, with `r` the inverse of the norm of the place and `‖u‖ ≤ 1` (`u = 0` when `η`
+is ramified); the inverse character has the same shape with `conj u`. -/
+private theorem meyerStripMultiplier_finite_euler
+    (v : V) (η : PontryaginDual (v.adicCompletion F)ˣ) :
+    ∃ u : ℂ, ‖u‖ ≤ 1 ∧
+      (∀ z : ℂ, finiteLocalEulerFactor v (quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
+        (1 - u * (((v.asIdeal.absNorm : ℝ)⁻¹ : ℝ) : ℂ) ^ z)⁻¹) ∧
+      ∀ η' : PontryaginDual (v.adicCompletion F)ˣ,
+        (∀ g : (v.adicCompletion F)ˣ, η' g = (η g)⁻¹) → ∀ z : ℂ,
+        finiteLocalEulerFactor v (quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η') z) =
+          (1 - (starRingEnd ℂ) u * (((v.asIdeal.absNorm : ℝ)⁻¹ : ℝ) : ℂ) ^ z)⁻¹ := by
+  classical
+  let hπ := (Valued.v : Valuation (v.adicCompletion F)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π : (v.adicCompletion F)ˣ :=
+    Units.mk0 (hπ.choose : v.adicCompletion F) hπ.choose_spec.ne_zero
+  have hb : ‖π.val‖ = (v.asIdeal.absNorm : ℝ)⁻¹ :=
+    norm_uniformizer_adicCompletion v _ hπ.choose_spec
+  have hnorm (u : (v.adicCompletionIntegers F)ˣ) :
+      ‖(Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u :
+        (v.adicCompletion F)ˣ).val‖ = 1 :=
+    Valued.toNormedField.norm_eq_one_iff.mpr
+      ((HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one
+        (a := Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u)).mp
+        ⟨u.val.prop, u.inv.prop⟩)
+  have he (χ : PontryaginDual (v.adicCompletion F)ˣ) (z : ℂ) :
+      finiteLocalEulerFactor v (quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ χ) z) =
+        if (∀ u : (v.adicCompletionIntegers F)ˣ,
+          (χ (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) : ℂ) = 1)
+        then (1 - (χ π : ℂ) * ((‖π.val‖ : ℝ) : ℂ) ^ z)⁻¹ else 1 := by
+    have hu (u : (v.adicCompletionIntegers F)ˣ) :
+        quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ χ) z
+            (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) =
+          (χ (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) : ℂ) := by
+      change (χ (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) : ℂ) *
+        ((‖(Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u :
+          (v.adicCompletion F)ˣ).val‖ : ℝ) : ℂ) ^ z = _
+      rw [hnorm u, Complex.ofReal_one, Complex.one_cpow, mul_one]
+    have h : (∀ u : (v.adicCompletionIntegers F)ˣ,
+        quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ χ) z
+            (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) = 1) ↔
+        ∀ u : (v.adicCompletionIntegers F)ˣ,
+          (χ (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) : ℂ) = 1 :=
+      ⟨fun h u ↦ (hu u).symm.trans (h u), fun h u ↦ (hu u).trans (h u)⟩
+    simp only [finiteLocalEulerFactor, h]
+    rfl
+  refine ⟨if (∀ u : (v.adicCompletionIntegers F)ˣ,
+      (η (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) : ℂ) = 1)
+    then (η π : ℂ) else 0, ?_, fun z ↦ ?_, fun η' hη' z ↦ ?_⟩
+  · split_ifs
+    · exact (Circle.norm_coe _).le
+    · rw [norm_zero]
+      exact zero_le_one
+  · rw [he η z, ← hb]
+    split_ifs
+    · rfl
+    · rw [zero_mul, sub_zero, inv_one]
+  · have hiff : (∀ u : (v.adicCompletionIntegers F)ˣ,
+        (η' (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) : ℂ) = 1) ↔
+        ∀ u : (v.adicCompletionIntegers F)ˣ,
+          (η (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) : ℂ) = 1 :=
+      forall_congr' fun u ↦ by rw [hη', Circle.coe_inv, inv_eq_one]
+    rw [he η' z, ← hb]
+    by_cases h : ∀ u : (v.adicCompletionIntegers F)ˣ,
+        (η (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) : ℂ) = 1
+    · rw [ite_eq_left (hiff.mpr h), ite_eq_left h, hη', Circle.coe_inv_eq_conj]
+    · rw [ite_eq_right (fun h' ↦ h (hiff.mp h')), ite_eq_right h, map_zero, zero_mul, sub_zero,
+        inv_one]
+
+/-- The factor of the multiplier at one finite place of `T`, for all unitary characters of the
+S-idele quotient: the inverse Euler factor `φ χ`, bounded above on `Re z ≥ -1/2` and below on
+every line of positive real part, and the inverse Euler factor `ψ χ` of the dual character. -/
+private theorem meyerStripMultiplier_finite_place
+    (T : Finset V) (v : T) :
+    ∃ (C : ℝ) (c : ℝ → ℝ) (φ ψ : PontryaginDual (SIdeleQuotient F T) → ℂ → ℂ),
+      0 ≤ C ∧ (∀ a : ℝ, 0 < a → 0 < c a) ∧
+      ∀ χ : PontryaginDual (SIdeleQuotient F T), Differentiable ℂ (φ χ) ∧
+        (∀ z : ℂ, -1 / 2 ≤ z.re → ‖φ χ z‖ ≤ C) ∧
+        (∀ (a : ℝ) (z : ℂ), 0 < a → z.re = a → c a ≤ ‖φ χ z‖) ∧
+        Differentiable ℂ (ψ χ) ∧
+        (∀ z : ℂ, z.re ≤ 1 / 2 → ‖ψ χ z‖ ≤ 2) ∧
+        ∀ z : ℂ, 0 < z.re →
+          φ χ z * (finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (chartₜ(T, χ) z)) /
+            finiteLocalEulerFactor v.val (sLocalFiniteRestriction v
+              (dualQuasiCharacter (sIdeleQuotientNorm F T)
+                (isProperMap_sIdeleQuotientNorm F T).continuous (chartₜ(T, χ) z)))) = ψ χ z := by
+  refine Exists.elim
+    (meyerStripMultiplier_finite_restriction
+      T v) fun i hi ↦ ?_
+  let r : ℝ := (v.val.asIdeal.absNorm : ℝ)⁻¹
+  have hq : 1 < (v.val.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val
+  have hr0 : 0 < r := inv_pos.mpr (zero_lt_one.trans hq)
+  have hr1 : r < 1 := inv_lt_one_of_one_lt₀ hq
+  choose u hu1 hu2 hu3 using fun χ : PontryaginDual (SIdeleQuotient F T) ↦
+    meyerStripMultiplier_finite_euler
+      v.val (PontryaginDual.map i χ)
+  have hfac := fun χ : PontryaginDual (SIdeleQuotient F T) ↦
+    meyerStripMultiplier_finite_factor
+      r hr0 hr1 (u χ) (hu1 χ)
+  refine ⟨1 + r ^ (-1 / 2 : ℝ), fun a ↦ 1 - r ^ a, fun χ z ↦ 1 - u χ * (r : ℂ) ^ z,
+    fun χ z ↦ 1 - (starRingEnd ℂ) (u χ) * (r : ℂ) ^ (1 - z), by positivity,
+    fun a ha ↦ sub_pos.mpr (Real.rpow_lt_one hr0.le hr1 ha), fun χ ↦ ⟨(hfac χ).1, (hfac χ).2.1,
+      fun a z _ hz ↦ (hfac χ).2.2.1 a z hz, (hfac χ).2.2.2.1, (hfac χ).2.2.2.2, fun z hz ↦ ?_⟩⟩
+  have hL1 : finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (chartₜ(T, χ) z)) =
+      (1 - u χ * (r : ℂ) ^ z)⁻¹ :=
+    (congrArg (finiteLocalEulerFactor v.val) (hi χ z)).trans (hu2 χ z)
+  have hL2 : finiteLocalEulerFactor v.val (sLocalFiniteRestriction v
+      (dualQuasiCharacter (sIdeleQuotientNorm F T)
+        (isProperMap_sIdeleQuotientNorm F T).continuous (chartₜ(T, χ) z))) =
+      (1 - (starRingEnd ℂ) (u χ) * (r : ℂ) ^ (1 - z))⁻¹ :=
+    (congrArg (fun c ↦ finiteLocalEulerFactor v.val (sLocalFiniteRestriction v c))
+      (sLocalNormTwistChart_dual χ z)).trans
+      ((congrArg (finiteLocalEulerFactor v.val) (hi χ⁻¹ (1 - z))).trans
+        (hu3 χ (PontryaginDual.map i χ⁻¹) (fun g ↦ rfl) (1 - z)))
+  have hne : 1 - u χ * (r : ℂ) ^ z ≠ 0 := by
+    intro h0
+    have hlow := (hfac χ).2.2.1 z.re z rfl
+    rw [h0, norm_zero] at hlow
+    linarith [Real.rpow_lt_one hr0.le hr1 hz]
+  rw [hL1, hL2, div_inv_eq_mul, ← mul_assoc, mul_inv_cancel₀ hne, one_mul]
+
+/-- A continuous function that is periodic in the imaginary direction is bounded on closed
+vertical strips. -/
+private theorem meyerStripMultiplier_periodic_bounded
+    (p : ℂ → ℂ) (P : ℝ) (hP : 0 < P) (hper : Function.Periodic p ((P : ℂ) * Complex.I))
+    (hp : Continuous p) (a b : ℝ) :
+    ∃ B : ℝ, ∀ z : ℂ, z.re ∈ Icc a b → ‖p z‖ ≤ B := by
+  let K := Complex.reProdIm (Icc a b) (Icc 0 P)
+  have hK : IsCompact K := isCompact_Icc.reProdIm isCompact_Icc
+  obtain ⟨B, hB⟩ := hK.bddAbove_image hp.norm.continuousOn
+  refine ⟨B, fun z hz ↦ ?_⟩
+  let n := ⌊z.im / P⌋
+  let s := (n : ℂ) * ((P : ℂ) * Complex.I)
+  have hsre : s.re = 0 := by simp [s, Complex.mul_re, Complex.mul_im]
+  have hsim : s.im = (n : ℝ) * P := by simp [s, Complex.mul_re, Complex.mul_im]
+  have hzK : z - s ∈ K := by
+    have hfloor := (le_div_iff₀ hP).mp (Int.floor_le (z.im / P))
+    have hceil := (div_lt_iff₀ hP).mp (Int.lt_floor_add_one (z.im / P))
+    change (z - s).re ∈ Icc a b ∧ (z - s).im ∈ Icc 0 P
+    rw [Complex.sub_re, hsre, sub_zero, Complex.sub_im, hsim]
+    exact ⟨hz, ⟨by dsimp [n]; linarith, by dsimp [n]; linarith⟩⟩
+  have hper' : p z = p (z - s) := by
+    simpa only [s, zsmul_eq_mul, sub_add_cancel] using (hper.zsmul n (z - s))
+  rw [hper']
+  exact hB ⟨z - s, hzK, rfl⟩
+
+/-- The epsilon factor of the norm charts of one unitary character at a finite place is
+bounded on closed vertical strips: the charts are periodic in the imaginary direction. -/
+private theorem meyerStripMultiplier_epsilon_place_bounded
+    (v : V) (η : PontryaginDual (v.adicCompletion F)ˣ) (a b : ℝ) :
+    ∃ B : ℝ, ∀ z : ℂ, z.re ∈ Icc a b →
+      ‖finiteLocalEpsilonFactor v (quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)‖ ≤ B := by
+  let q := (v.asIdeal.absNorm : ℝ)
+  have hq : 1 < q := by
+    dsimp only [q]
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  let P := 2 * Real.pi / Real.log q
+  have hP : 0 < P := div_pos (by positivity) (Real.log_pos hq)
+  have hperiod : Function.Periodic (quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+      (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η))
+      ((P : ℂ) * Complex.I) := by
+    intro z
+    ext1 u
+    let k := WithZero.log (Valued.v u.val)
+    have hnorm : ‖u.val‖ = q ^ k := by
+      rw [FinitePlace.norm_def, WithZeroMulInt.toNNReal_neg_apply _
+        ((Valuation.ne_zero_iff _).mpr u.ne_zero)]
+      push_cast
+      rfl
+    have hu : 0 < ‖u.val‖ := norm_pos_iff.mpr u.ne_zero
+    have hlog : Complex.log (‖u.val‖ : ℂ) = (k : ℂ) * (Real.log q : ℂ) := by
+      rw [← Complex.ofReal_log hu.le, hnorm, Real.log_zpow, Complex.ofReal_mul,
+        Complex.ofReal_intCast]
+    have hprod : (Real.log q : ℂ) * ((P : ℂ) * Complex.I) =
+        2 * (Real.pi : ℂ) * Complex.I := by
+      dsimp only [P]
+      push_cast
+      field_simp [(Real.log_pos hq).ne']
+    have hpow : (‖u.val‖ : ℂ) ^ ((P : ℂ) * Complex.I) = 1 := by
+      rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hu.ne'), hlog, mul_assoc,
+        hprod, Complex.exp_int_mul_two_pi_mul_I]
+    change (η u : ℂ) * (‖u.val‖ : ℂ) ^ (z + (P : ℂ) * Complex.I) =
+      (η u : ℂ) * (‖u.val‖ : ℂ) ^ z
+    rw [Complex.cpow_add _ _ (Complex.ofReal_ne_zero.mpr hu.ne'), hpow, mul_one]
+  exact meyerStripMultiplier_periodic_bounded
+    (finiteLocalEpsilonFactor v ∘ quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η)) P hP
+    (fun z ↦ congrArg (finiteLocalEpsilonFactor v) (hperiod z))
+    (continuous_iff_continuousAt.mpr fun z ↦
+      ((finiteLocalEpsilonFactor_entire v η) z (mem_univ z)).continuousAt) a b
+
+/-- A unitary character of a nonarchimedean local field that is trivial on the units of norm
+one is an imaginary power of the norm: multiplying a character by it translates the norm
+charts in the imaginary direction. -/
+private theorem meyerStripMultiplier_unramified_twist
+    (v : V) (ψ : PontryaginDual (v.adicCompletion F)ˣ)
+    (hψ : ∀ g : (v.adicCompletion F)ˣ, ‖g.val‖ = 1 → ψ g = 1) :
+    ∃ t : ℂ, t.re = 0 ∧ ∀ (η : PontryaginDual (v.adicCompletion F)ˣ) (z : ℂ),
+      quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ (η * ψ)) z =
+          quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) (z + t) := by
+  let hπ := (Valued.v : Valuation (v.adicCompletion F)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let p : (v.adicCompletion F)ˣ :=
+    Units.mk0 (hπ.choose : v.adicCompletion F) hπ.choose_spec.ne_zero
+  have hp : ‖p.val‖ = (v.asIdeal.absNorm : ℝ)⁻¹ :=
+    norm_uniformizer_adicCompletion v _ hπ.choose_spec
+  obtain ⟨e, hep, heι⟩ := finitePlace_unitDecomposition v p hp
+  let ι := Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom
+  have hnorm (u : (v.adicCompletionIntegers F)ˣ) : ‖(ι u).val‖ = 1 :=
+    Valued.toNormedField.norm_eq_one_iff.mpr
+      ((HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one
+        (a := ι u)).mp ⟨u.val.prop, u.inv.prop⟩)
+  let r := ‖p.val‖
+  have hr : 0 < r := norm_pos_iff.mpr p.ne_zero
+  have hq : 1 < (v.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have hlt : r < 1 := by
+    change ‖p.val‖ < 1
+    rw [hp]
+    exact inv_lt_one_of_one_lt₀ hq
+  have hL : Complex.log (r : ℂ) ≠ 0 := by
+    rw [← Complex.ofReal_log hr.le]
+    exact Complex.ofReal_ne_zero.mpr (Real.log_neg hr hlt).ne
+  let t := Complex.log (ψ p : ℂ) / Complex.log (r : ℂ)
+  have htp : (r : ℂ) ^ t = (ψ p : ℂ) := by
+    rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hr.ne')]
+    change Complex.exp (Complex.log (r : ℂ) * (Complex.log (ψ p : ℂ) / Complex.log (r : ℂ))) = _
+    rw [mul_div_cancel₀ _ hL, Complex.exp_log (Circle.coe_ne_zero _)]
+  let c : QuasiCharacter (v.adicCompletion F)ˣ :=
+    (ContinuousMonoidHom.mk Circle.coeHom continuous_subtype_val : Circle →ₜ* ℂ).comp ψ
+  let Nt : QuasiCharacter (v.adicCompletion F)ˣ :=
+    quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩
+        (1 : PontryaginDual (v.adicCompletion F)ˣ)) t
+  have hNt (g : (v.adicCompletion F)ˣ) : Nt g = ((‖g.val‖ : ℝ) : ℂ) ^ t := by
+    change (((1 : PontryaginDual (v.adicCompletion F)ˣ) g : Circle) : ℂ) *
+      ((‖g.val‖ : ℝ) : ℂ) ^ t = _
+    rw [PontryaginDual.one_apply, Circle.coe_one, one_mul]
+  have heq (x : (v.adicCompletion F)ˣ) : c x = Nt x := by
+    have hx : x = p ^ (e x).1.toAdd * ι (e x).2 := by
+      apply e.injective
+      rw [map_mul, map_zpow, hep, heι]
+      exact Prod.ext (by change (e x).1.toAdd = (e x).1.toAdd * 1 + 0; simp) (by simp)
+    have hcu (u : (v.adicCompletionIntegers F)ˣ) : c (ι u) = 1 := by
+      change ((ψ (ι u) : Circle) : ℂ) = 1
+      rw [hψ (ι u) (hnorm u), Circle.coe_one]
+    have htu (u : (v.adicCompletionIntegers F)ˣ) : Nt (ι u) = 1 := by
+      rw [hNt, hnorm u, Complex.ofReal_one, Complex.one_cpow]
+    have htp' : Nt p = c p := (hNt p).trans htp
+    rw [hx, map_mul, map_mul, map_zpow, map_zpow, hcu, htu, htp']
+  refine ⟨t, ?_, fun η z ↦ ?_⟩
+  · have h := congrArg (fun w : ℂ ↦ ‖w‖) htp
+    simp only [Circle.norm_coe] at h
+    rw [Complex.norm_cpow_eq_rpow_re_of_pos hr] at h
+    apply (Real.rpow_right_inj hr hlt.ne).mp
+    rw [Real.rpow_zero]
+    exact h
+  · ext1 g
+    have hg : ((‖g.val‖ : ℝ) : ℂ) ≠ 0 :=
+      Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr g.ne_zero)
+    have hcg : ((ψ g : Circle) : ℂ) = ((‖g.val‖ : ℝ) : ℂ) ^ t := (heq g).trans (hNt g)
+    change ((η g * ψ g : Circle) : ℂ) * ((‖g.val‖ : ℝ) : ℂ) ^ z =
+      (η g : ℂ) * ((‖g.val‖ : ℝ) : ℂ) ^ (z + t)
+    rw [Circle.coe_mul, hcg, Complex.cpow_add _ _ hg]
+    ring
+
+/-- A unitary character of a nonarchimedean local field has finite order on the units of norm
+one: it is trivial near one, and the units of norm one form a compact group. -/
+private theorem meyerStripMultiplier_unit_torsion
+    (v : V) (η : PontryaginDual (v.adicCompletion F)ˣ) :
+    ∃ m : ℕ, 0 < m ∧ ∀ g : (v.adicCompletion F)ˣ, ‖g.val‖ = 1 → η g ^ m = 1 := by
+  have hproper : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let A := Circle.centeredArc (Real.pi / 2)
+  have hA : A ∈ 𝓝 (1 : Circle) := by
+    simpa [A] using Circle.hasBasis_centeredArc_div_two_pow.mem_of_mem (i := 0) trivial
+  have hnear : ∀ᶠ g : (v.adicCompletion F)ˣ in 𝓝 1, η g ∈ A :=
+    η.continuous.continuousAt.preimage_mem_nhds (by simpa using hA)
+  have hind : IsInducing (Units.val : (v.adicCompletion F)ˣ → v.adicCompletion F) :=
+    Units.isEmbedding_val₀.isInducing
+  rw [hind.nhds_eq_comap 1] at hnear
+  obtain ⟨U, hU, hu⟩ := Filter.mem_comap.mp hnear
+  obtain ⟨ε, hε, hball⟩ := Metric.mem_nhds_iff.mp hU
+  let δ := min (ε / 2) (1 / 2)
+  have hδ0 : 0 < δ := lt_min (by positivity) (by norm_num)
+  have hδε : δ < ε := (min_le_left _ _).trans_lt (by linarith)
+  have hδ1 : δ < 1 := (min_le_right _ _).trans_lt (by norm_num)
+  have hsmall (g : (v.adicCompletion F)ˣ) (hg : ‖g.val - 1‖ ≤ δ) : η g ∈ A :=
+    hu (hball (by
+      rw [Metric.mem_ball, dist_eq_norm]
+      exact lt_of_le_of_lt hg hδε))
+  have hpow (g : (v.adicCompletion F)ˣ) (hg : ‖g.val - 1‖ ≤ δ) (n : ℕ) :
+      ‖(g ^ n).val - 1‖ ≤ δ := by
+    have ht : ‖g.val + (-1)‖ < max ‖g.val‖ ‖(-1 : v.adicCompletion F)‖ := by
+      simpa only [norm_neg, norm_one, ← sub_eq_add_neg] using
+        (hg.trans_lt hδ1).trans_le (le_max_right ‖g.val‖ 1)
+    have hg1 : ‖g.val‖ = 1 := by
+      simpa using IsUltrametricDist.norm_eq_of_add_norm_lt_max ht
+    induction n with
+    | zero => simpa using hδ0.le
+    | succ n ih =>
+      have he : (g ^ (n + 1)).val - 1 = (g ^ n).val * (g.val - 1) + ((g ^ n).val - 1) := by
+        rw [pow_succ, Units.val_mul]
+        ring
+      rw [he]
+      refine (IsUltrametricDist.norm_add_le_max _ _).trans (max_le ?_ ih)
+      rw [norm_mul, Units.val_pow_eq_pow_val, norm_pow, hg1, one_pow, one_mul]
+      exact hg
+  have hker (g : (v.adicCompletion F)ˣ) (hg : ‖g.val - 1‖ ≤ δ) : η g = 1 := by
+    apply Circle.eq_one_of_forall_pow_mem_centeredArc_pi_div_two
+    intro n _
+    rw [← map_pow]
+    exact hsmall (g ^ n) (hpow g hg n)
+  let G₀ : Subgroup (v.adicCompletion F)ˣ :=
+    { carrier := {g | ‖g.val‖ = 1}
+      mul_mem' := fun {x y} hx hy ↦ by
+        have hx' : ‖x.val‖ = 1 := hx
+        have hy' : ‖y.val‖ = 1 := hy
+        change ‖(x * y).val‖ = 1
+        rw [Units.val_mul, norm_mul, hx', hy', mul_one]
+      one_mem' := by
+        change ‖((1 : (v.adicCompletion F)ˣ)).val‖ = 1
+        rw [Units.val_one, norm_one]
+      inv_mem' := fun {x} hx ↦ by
+        have hx' : ‖x.val‖ = 1 := hx
+        change ‖(x⁻¹).val‖ = 1
+        rw [Units.val_inv_eq_inv_val, norm_inv, hx', inv_one] }
+  have hG₀c : IsCompact (G₀ : Set (v.adicCompletion F)ˣ) := by
+    have he : (G₀ : Set (v.adicCompletion F)ˣ) =
+        Units.val ⁻¹' Metric.sphere (0 : v.adicCompletion F) 1 := by
+      ext g
+      change ‖g.val‖ = 1 ↔ g.val ∈ Metric.sphere (0 : v.adicCompletion F) 1
+      rw [mem_sphere_zero_iff_norm]
+    rw [he, Units.isEmbedding_val₀.isCompact_iff, image_preimage_eq_of_subset]
+    · exact isCompact_sphere _ _
+    · intro x hx
+      have hx1 : ‖x‖ = 1 := mem_sphere_zero_iff_norm.mp hx
+      exact ⟨Units.mk0 x (norm_ne_zero_iff.mp (hx1.trans_ne one_ne_zero)), rfl⟩
+  have hG₀cs : CompactSpace G₀ := isCompact_iff_compactSpace.mp hG₀c
+  let N : Subgroup G₀ :=
+    { carrier := {g | η g.val = 1}
+      mul_mem' := fun {x y} hx hy ↦ by
+        have hx' : η x.val = 1 := hx
+        have hy' : η y.val = 1 := hy
+        change η (x.val * y.val) = 1
+        rw [map_mul, hx', hy', mul_one]
+      one_mem' := map_one η
+      inv_mem' := fun {x} hx ↦ by
+        have hx' : η x.val = 1 := hx
+        change η (x.val)⁻¹ = 1
+        rw [map_inv, hx', inv_one] }
+  have hD : Units.val ⁻¹' Metric.closedBall (1 : v.adicCompletion F) δ ∈
+      𝓝 (1 : (v.adicCompletion F)ˣ) :=
+    Units.continuous_val.continuousAt.preimage_mem_nhds (Metric.closedBall_mem_nhds _ hδ0)
+  have hNnhds : (N : Set G₀) ∈ 𝓝 (1 : G₀) :=
+    Filter.mem_of_superset (continuous_subtype_val.continuousAt.preimage_mem_nhds hD)
+      fun g hg ↦ hker g.val (by
+        have h : g.val.val ∈ Metric.closedBall (1 : v.adicCompletion F) δ := hg
+        rwa [Metric.mem_closedBall, dist_eq_norm] at h)
+  have hfin : Finite (G₀ ⧸ N) :=
+    Subgroup.quotient_finite_of_isOpen N (Subgroup.isOpen_of_mem_nhds N hNnhds)
+  refine ⟨N.index, Nat.pos_of_ne_zero Subgroup.index_ne_zero_of_finite, fun g hg ↦ ?_⟩
+  have hmem : η ((⟨g, hg⟩ : G₀) ^ N.index).val = 1 := Subgroup.pow_index_mem N ⟨g, hg⟩
+  rw [← map_pow]
+  exact hmem
+
+/-- In a finitely generated commutative group with a subgroup of torsion quotient, a bound
+that exists for each element and is unchanged by multiplication with the subgroup holds
+uniformly. -/
+private theorem meyerStripMultiplier_finite_classes
+    (A : Type*) [CommGroup A] [Group.FG A] (N : Subgroup A)
+    (htors : ∀ x : A, ∃ m : ℕ, 0 < m ∧ x ^ m ∈ N) (P : A → ℝ → Prop)
+    (hmono : ∀ (x : A) (B B' : ℝ), P x B → B ≤ B' → P x B')
+    (hex : ∀ x : A, ∃ B : ℝ, P x B)
+    (hinv : ∀ (x y : A) (B : ℝ), y ∈ N → P x B → P (x * y) B) :
+    ∃ B : ℝ, ∀ x : A, P x B := by
+  have htor : IsMulTorsion (A ⧸ N) := fun y ↦ by
+    obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective y
+    obtain ⟨m, hm, hx⟩ := htors x
+    exact isOfFinOrder_iff_pow_eq_one.mpr ⟨m, hm, by
+      rw [← QuotientGroup.mk_pow]
+      exact (QuotientGroup.eq_one_iff _).mpr hx⟩
+  have hfin : Finite (A ⧸ N) := CommGroup.finite_of_fg_isMulTorsion _ htor
+  let hft : Fintype (A ⧸ N) := Fintype.ofFinite _
+  choose B hB using hex
+  refine ⟨∑ y : A ⧸ N, |B y.out|, fun x ↦ ?_⟩
+  let y : A ⧸ N := QuotientGroup.mk x
+  have hy : y.out⁻¹ * x ∈ N := QuotientGroup.eq.mp (QuotientGroup.out_eq' y)
+  have hx : x = y.out * (y.out⁻¹ * x) := by group
+  rw [hx]
+  refine hmono _ _ _ (hinv y.out _ (B y.out) hy (hB y.out)) ?_
+  exact (le_abs_self _).trans (Finset.single_le_sum (f := fun y : A ⧸ N ↦ |B y.out|)
+    (fun _ _ ↦ abs_nonneg _) (Finset.mem_univ y))
+
+/-- Uniform bound for the epsilon factors at a finite place over a finitely generated group of
+unitary characters, on a closed vertical strip: modulo the imaginary powers of the norm, which
+translate the strip along itself, the group has finitely many characters. -/
+private theorem meyerStripMultiplier_epsilon_place_uniform
+    (v : V) (A : Type*) [CommGroup A] [Group.FG A]
+    (f : A →* PontryaginDual (v.adicCompletion F)ˣ) (a b : ℝ) :
+    ∃ B : ℝ, ∀ (x : A) (z : ℂ), z.re ∈ Icc a b →
+      ‖finiteLocalEpsilonFactor v (quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ (f x)) z)‖ ≤ B := by
+  let N : Subgroup A :=
+    { carrier := {x | ∀ g : (v.adicCompletion F)ˣ, ‖g.val‖ = 1 → f x g = 1}
+      mul_mem' := fun {x y} hx hy g hg ↦ by
+        have h : f (x * y) g = f x g * f y g := by rw [map_mul]; rfl
+        rw [h, hx g hg, hy g hg, mul_one]
+      one_mem' := fun g _ ↦ by rw [map_one]; rfl
+      inv_mem' := fun {x} hx g hg ↦ by
+        have h : f x⁻¹ g = (f x g)⁻¹ := by rw [map_inv]; rfl
+        rw [h, hx g hg, inv_one] }
+  refine meyerStripMultiplier_finite_classes
+    A N (fun x ↦ ?_)
+    (fun x B ↦ ∀ z : ℂ, z.re ∈ Icc a b → ‖finiteLocalEpsilonFactor v
+        (quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ (f x)) z)‖ ≤ B)
+    (fun x B B' h hB z hz ↦ (h z hz).trans hB)
+    (fun x ↦
+      meyerStripMultiplier_epsilon_place_bounded
+        v (f x) a b)
+    (fun x y B hy h z hz ↦ ?_)
+  · obtain ⟨m, hm, h⟩ :=
+      meyerStripMultiplier_unit_torsion
+        v (f x)
+    refine ⟨m, hm, fun g hg ↦ ?_⟩
+    let ev : A →* Circle :=
+      { toFun := fun x ↦ f x g
+        map_one' := by rw [map_one]; rfl
+        map_mul' := fun x y ↦ by rw [map_mul]; rfl }
+    exact (map_pow ev x m).trans (h g hg)
+  · obtain ⟨t, ht, htw⟩ :=
+      meyerStripMultiplier_unramified_twist
+        v (f y) hy
+    have h1 : quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ (f (x * y))) z =
+        quasiCharacterNormTwist _ (continuous_finiteLocalModule v)
+        (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ (f x)) (z + t) :=
+      (congrArg (fun η : PontryaginDual (v.adicCompletion F)ˣ ↦ quasiCharacterNormTwist _
+          (continuous_finiteLocalModule v)
+          (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z)
+        (map_mul f x y)).trans (htw (f x) z)
+    rw [h1]
+    exact h (z + t) (by rw [Complex.add_re, ht, add_zero]; exact hz)
+
+/-- Uniform bound for the S-local epsilon factor over a finitely generated group of unitary
+characters of the S-idele quotient, on a closed vertical strip. -/
+private theorem meyerStripMultiplier_epsilon_uniform
+    (T : Finset V) (A : Type*) [CommGroup A] [Group.FG A]
+    (f : A →* PontryaginDual (SIdeleQuotient F T)) (a b : ℝ) :
+    ∃ B : ℝ, 0 ≤ B ∧ ∀ (x : A) (z : ℂ), z.re ∈ Icc a b →
+      ‖sLocalEpsilonFactor (chartₜ(T, f x) z)‖ ≤ B := by
+  have hfin (v : T) : ∃ B : ℝ, ∀ (x : A) (z : ℂ), z.re ∈ Icc a b →
+      ‖finiteLocalEpsilonFactor v.val (sLocalFiniteRestriction v (chartₜ(T, f x) z))‖ ≤ B := by
+    refine Exists.elim
+      (meyerStripMultiplier_finite_restriction
+        T v) fun i hi ↦ ?_
+    obtain ⟨B, hB⟩ :=
+      meyerStripMultiplier_epsilon_place_uniform
+        v.val A ((PontryaginDual.map i).toMonoidHom.comp f) a b
+    refine ⟨B, fun x z hz ↦ ?_⟩
+    rw [hi (f x) z]
+    exact hB x z hz
+  choose B hB using hfin
+  refine ⟨∏ v : T, |B v|, Finset.prod_nonneg fun _ _ ↦ abs_nonneg _, fun x z hz ↦ ?_⟩
+  have harch (w : InfinitePlace F) : ‖infiniteLocalEpsilonFactor w
+      (sLocalInfiniteRestriction w (chartₜ(T, f x) z))‖ = 1 := by
+    unfold infiniteLocalEpsilonFactor
+    split <;> rw [norm_pow, Complex.norm_I, one_pow]
+  change ‖(∏ w : InfinitePlace F, infiniteLocalEpsilonFactor w
+      (sLocalInfiniteRestriction w (chartₜ(T, f x) z))) *
+    ∏ v : T, finiteLocalEpsilonFactor v.val
+      (sLocalFiniteRestriction v (chartₜ(T, f x) z))‖ ≤ _
+  rw [norm_mul, norm_prod, norm_prod]
+  simp only [harch, Finset.prod_const_one, one_mul]
+  exact Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _)
+    (fun v _ ↦ (hB v x z hz).trans (le_abs_self _))
+
+/-- Bookkeeping for products over the places: factorwise identities `a (b / c) = d` multiply
+to the identity between the products. -/
+private theorem meyerStripMultiplier_product_identity
+    {ι κ : Type*} [Fintype ι] [Fintype κ] (a b c d : ι → ℂ) (a' b' c' d' : κ → ℂ) (ε : ℂ)
+    (h1 : ∀ i : ι, a i * (b i / c i) = d i) (h2 : ∀ k : κ, a' k * (b' k / c' k) = d' k) :
+    ε * ((∏ i, d i) * ∏ k, d' k) = ((∏ i, a i) * ∏ k, a' k) *
+      (ε * (((∏ i, b i) * ∏ k, b' k) / ((∏ i, c i) * ∏ k, c' k))) := by
+  have e1 : ∏ i, d i = (∏ i, a i) * ((∏ i, b i) / ∏ i, c i) := by
+    rw [← Finset.prod_div_distrib, ← Finset.prod_mul_distrib]
+    exact Finset.prod_congr rfl fun i _ ↦ (h1 i).symm
+  have e2 : ∏ k, d' k = (∏ k, a' k) * ((∏ k, b' k) / ∏ k, c' k) := by
+    rw [← Finset.prod_div_distrib, ← Finset.prod_mul_distrib]
+    exact Finset.prod_congr rfl fun k _ ↦ (h2 k).symm
+  rw [e1, e2]
+  simp only [div_eq_mul_inv, mul_inv]
+  ring
+
+/-- The local multiplier factors against the Tate factor: on the open critical strip
+`(∏ φ) ρ = ε ∏ ψ`. Off a discrete set this is the factorisation of the Tate factor into the
+epsilon factor and the quotient of the Euler products; both sides are continuous. -/
+private theorem meyerStripMultiplier_tate_identity
+    (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T))
+    (φA ψA : InfinitePlace F → ℂ → ℂ) (φF ψF : T → ℂ → ℂ)
+    (hφA : ∀ w : InfinitePlace F, Differentiable ℂ (φA w))
+    (hψA : ∀ w : InfinitePlace F, DifferentiableOn ℂ (ψA w) (Complex.re ⁻¹' Ioi (-1)))
+    (hφF : ∀ v : T, Differentiable ℂ (φF v)) (hψF : ∀ v : T, Differentiable ℂ (ψF v))
+    (hA : ∀ (w : InfinitePlace F) (z : ℂ), 0 < z.re →
+      φA w z * (infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (chartₜ(T, χ) z)) /
+        infiniteLocalEulerFactor w (sLocalInfiniteRestriction w
+          (dualQuasiCharacter (sIdeleQuotientNorm F T)
+            (isProperMap_sIdeleQuotientNorm F T).continuous (chartₜ(T, χ) z)))) = ψA w z)
+    (hF : ∀ (v : T) (z : ℂ), 0 < z.re →
+      φF v z * (finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (chartₜ(T, χ) z)) /
+        finiteLocalEulerFactor v.val (sLocalFiniteRestriction v
+          (dualQuasiCharacter (sIdeleQuotientNorm F T)
+            (isProperMap_sIdeleQuotientNorm F T).continuous (chartₜ(T, χ) z)))) = ψF v z)
+    (z : ℂ) (hz0 : 0 < z.re) :
+    sLocalEpsilonFactor (chartₜ(T, χ) z) * ((∏ w, ψA w z) * ∏ v, ψF v z) =
+      ((∏ w, φA w z) * ∏ v, φF v z) * sLocalRhoFactor (chartₜ(T, χ) z) := by
+  have hS : Complex.re ⁻¹' Ioi (0 : ℝ) ∈ 𝓝 z :=
+    (isOpen_Ioi.preimage Complex.continuous_re).mem_nhds hz0
+  have hz1 : z ∈ Complex.re ⁻¹' Ioi (-1 : ℝ) := by
+    change -1 < z.re
+    linarith
+  have hε : ContinuousAt (fun s ↦ sLocalEpsilonFactor (chartₜ(T, χ) s)) z :=
+    ((sLocalEpsilonFactor_entire χ) z (mem_univ z)).continuousAt
+  have hρ : ContinuousAt (fun s ↦ sLocalRhoFactor (chartₜ(T, χ) s)) z := by
+    have h := (sLocalRhoFactor_iteratedDeriv_analyticOn χ 0) z hz0
+    rw [iteratedDeriv_zero] at h
+    exact h.continuousAt
+  have hc1 : ContinuousAt (fun s ↦ ∏ w, ψA w s) z :=
+    tendsto_finsetProd _ fun w _ ↦ ((hψA w z hz1).differentiableAt
+      ((isOpen_Ioi.preimage Complex.continuous_re).mem_nhds hz1)).continuousAt
+  have hc2 : ContinuousAt (fun s ↦ ∏ v, ψF v s) z :=
+    tendsto_finsetProd _ fun v _ ↦ (hψF v z).continuousAt
+  have hc3 : ContinuousAt (fun s ↦ ∏ w, φA w s) z :=
+    tendsto_finsetProd _ fun w _ ↦ (hφA w z).continuousAt
+  have hc4 : ContinuousAt (fun s ↦ ∏ v, φF v s) z :=
+    tendsto_finsetProd _ fun v _ ↦ (hφF v z).continuousAt
+  have hcL : ContinuousAt (fun s ↦ sLocalEpsilonFactor (chartₜ(T, χ) s) *
+      ((∏ w, ψA w s) * ∏ v, ψF v s)) z := hε.mul (hc1.mul hc2)
+  have hcR : ContinuousAt (fun s ↦ ((∏ w, φA w s) * ∏ v, φF v s) *
+      sLocalRhoFactor (chartₜ(T, χ) s)) z := (hc3.mul hc4).mul hρ
+  have hev : (fun s ↦ sLocalEpsilonFactor (chartₜ(T, χ) s) * ((∏ w, ψA w s) * ∏ v, ψF v s))
+      =ᶠ[𝓝[≠] z] fun s ↦ ((∏ w, φA w s) * ∏ v, φF v s) *
+        sLocalRhoFactor (chartₜ(T, χ) s) := by
+    filter_upwards [nhdsWithin_le_nhds hS,
+      nhdsNE_le_codiscrete z (sLocalRhoFactor_eq_epsilon_mul (F := F) (S := T) χ)] with s hs hfac
+    have hs0 : 0 < s.re := hs
+    change sLocalRhoFactor (chartₜ(T, χ) s) = sLocalEpsilonFactor (chartₜ(T, χ) s) *
+      (sLocalHeckeL (chartₜ(T, χ) s) / sLocalHeckeL (dualQuasiCharacter (sIdeleQuotientNorm F T)
+        (isProperMap_sIdeleQuotientNorm F T).continuous (chartₜ(T, χ) s))) at hfac
+    change sLocalEpsilonFactor (chartₜ(T, χ) s) * ((∏ w, ψA w s) * ∏ v, ψF v s) =
+      ((∏ w, φA w s) * ∏ v, φF v s) * sLocalRhoFactor (chartₜ(T, χ) s)
+    rw [hfac]
+    exact meyerStripMultiplier_product_identity
+      (fun w : InfinitePlace F ↦ φA w s)
+      (fun w : InfinitePlace F ↦
+        infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (chartₜ(T, χ) s)))
+      (fun w : InfinitePlace F ↦ infiniteLocalEulerFactor w (sLocalInfiniteRestriction w
+        (dualQuasiCharacter (sIdeleQuotientNorm F T)
+          (isProperMap_sIdeleQuotientNorm F T).continuous (chartₜ(T, χ) s))))
+      (fun w : InfinitePlace F ↦ ψA w s) (fun v : T ↦ φF v s)
+      (fun v : T ↦ finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (chartₜ(T, χ) s)))
+      (fun v : T ↦ finiteLocalEulerFactor v.val (sLocalFiniteRestriction v
+        (dualQuasiCharacter (sIdeleQuotientNorm F T)
+          (isProperMap_sIdeleQuotientNorm F T).continuous (chartₜ(T, χ) s))))
+      (fun v : T ↦ ψF v s) _ (fun w ↦ hA w s hs0) (fun v ↦ hF v s hs0)
+  exact tendsto_nhds_unique_of_eventuallyEq (hcL.tendsto.mono_left nhdsWithin_le_nhds)
+    (hcR.tendsto.mono_left nhdsWithin_le_nhds) hev
+
+/-- The size of the multiplier `h = ∏ φ` and of `g = E ∏ ψ` from the bounds of the factors at
+the places: polynomial bounds for `h` on `Re z ≥ -1/2` and, by Phragmén–Lindelöf between the
+lines `Re z = -1/2` and `Re z = 1/2` (where `g = h ρ` with `‖ρ‖ = 1`), for `g`; and a lower
+bound for `h` on the lines of positive real part. -/
+private theorem meyerStripMultiplier_bounds
+    {ι κ : Type*} [Fintype ι] [Fintype κ] (φA ψA : ι → ℂ → ℂ) (φF ψF : κ → ℂ → ℂ)
+    (E ρ : ℂ → ℂ) (P Eb : ℝ) (C : κ → ℝ) (c : κ → ℝ → ℝ) (hP : 0 ≤ P) (hEb : 0 ≤ Eb)
+    (hC : ∀ k : κ, 0 ≤ C k) (hc : ∀ (k : κ) (a : ℝ), 0 < a → 0 < c k a)
+    (hφA1 : ∀ (i : ι) (z : ℂ), ‖φA i z‖ ≤ ((1 + P) * (1 + ‖z‖)) ^ 2)
+    (hφA2 : ∀ (i : ι) (a : ℝ) (z : ℂ), 0 < a → z.re = a → a ≤ ‖φA i z‖)
+    (hψA1 : ∀ i : ι, DifferentiableOn ℂ (ψA i) (Complex.re ⁻¹' Ioi (-1)))
+    (hψA2 : ∀ (i : ι) (z : ℂ), z.re = -1 / 2 → ‖ψA i z‖ ≤ (2 * Real.pi) ^ 2)
+    (hψA3 : ∀ i : ι, ∃ A Y : ℝ, 0 ≤ A ∧ ∀ z : ℂ, z.re ∈ Icc (-1 / 2 : ℝ) (1 / 2) →
+      Y ≤ |z.im| → ‖ψA i z‖ ≤ A * Real.exp (Real.pi * |z.im|))
+    (hφF1 : ∀ (k : κ) (z : ℂ), -1 / 2 ≤ z.re → ‖φF k z‖ ≤ C k)
+    (hφF2 : ∀ (k : κ) (a : ℝ) (z : ℂ), 0 < a → z.re = a → c k a ≤ ‖φF k z‖)
+    (hψF1 : ∀ k : κ, Differentiable ℂ (ψF k))
+    (hψF2 : ∀ (k : κ) (z : ℂ), z.re ≤ 1 / 2 → ‖ψF k z‖ ≤ 2)
+    (hE1 : Differentiable ℂ E)
+    (hE2 : ∀ z : ℂ, z.re ∈ Icc (-1 / 2 : ℝ) (1 / 2) → ‖E z‖ ≤ Eb)
+    (hρ : ∀ z : ℂ, z.re = 1 / 2 → ‖ρ z‖ = 1)
+    (hgh : ∀ z : ℂ, 0 < z.re → E z * ((∏ i, ψA i z) * ∏ k, ψF k z) =
+      ((∏ i, φA i z) * ∏ k, φF k z) * ρ z) :
+    (∀ z : ℂ, -1 / 2 ≤ z.re → ‖(∏ i, φA i z) * ∏ k, φF k z‖ ≤
+      6 ^ (2 * Fintype.card ι) * max (∏ k, C k)
+        (Eb * ((2 * Real.pi) ^ (2 * Fintype.card ι) * 2 ^ Fintype.card κ)) *
+        (1 + P) ^ (2 * Fintype.card ι) * (1 + ‖z‖) ^ (2 * Fintype.card ι)) ∧
+    (∀ z : ℂ, z.re ∈ Icc (-1 / 2 : ℝ) (1 / 2) → ‖E z * ((∏ i, ψA i z) * ∏ k, ψF k z)‖ ≤
+      6 ^ (2 * Fintype.card ι) * max (∏ k, C k)
+        (Eb * ((2 * Real.pi) ^ (2 * Fintype.card ι) * 2 ^ Fintype.card κ)) *
+        (1 + P) ^ (2 * Fintype.card ι) * (1 + ‖z‖) ^ (2 * Fintype.card ι)) ∧
+    ∀ (a : ℝ) (z : ℂ), 0 < a → z.re = a →
+      a ^ Fintype.card ι * ∏ k, c k a ≤ ‖(∏ i, φA i z) * ∏ k, φF k z‖ := by
+  set n := Fintype.card ι
+  set m := Fintype.card κ
+  have hP1 : (0 : ℝ) ≤ 1 + P := by linarith
+  have hX (z : ℂ) : 1 ≤ (1 + P) * (1 + ‖z‖) := by
+    nlinarith [norm_nonneg z, mul_nonneg hP (norm_nonneg z)]
+  have hone (z : ℂ) : (1 : ℝ) ≤ (1 + P) ^ (2 * n) * (1 + ‖z‖) ^ (2 * n) := by
+    rw [← mul_pow]
+    exact one_le_pow₀ (hX z)
+  have hCp : 0 ≤ ∏ k, C k := Finset.prod_nonneg fun k _ ↦ hC k
+  have hpi : (0 : ℝ) ≤ 2 * Real.pi := by positivity
+  set M₀ := max (∏ k, C k) (Eb * ((2 * Real.pi) ^ (2 * n) * 2 ^ m))
+  have hM₀0 : 0 ≤ M₀ := hCp.trans (le_max_left _ _)
+  have h6 : (1 : ℝ) ≤ 6 ^ (2 * n) := one_le_pow₀ (by norm_num)
+  have hhA (z : ℂ) : ‖∏ i, φA i z‖ ≤ ((1 + P) * (1 + ‖z‖)) ^ (2 * n) := by
+    rw [norm_prod, pow_mul]
+    calc ∏ i, ‖φA i z‖ ≤ ∏ _i : ι, ((1 + P) * (1 + ‖z‖)) ^ 2 :=
+          Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _) (fun i _ ↦ hφA1 i z)
+      _ = _ := by rw [Finset.prod_const, Finset.card_univ]
+  have hhF (z : ℂ) (hz : -1 / 2 ≤ z.re) : ‖∏ k, φF k z‖ ≤ ∏ k, C k := by
+    rw [norm_prod]
+    exact Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _) (fun k _ ↦ hφF1 k z hz)
+  have hh (z : ℂ) (hz : -1 / 2 ≤ z.re) : ‖(∏ i, φA i z) * ∏ k, φF k z‖ ≤
+      (∏ k, C k) * (1 + P) ^ (2 * n) * (1 + ‖z‖) ^ (2 * n) := by
+    rw [norm_mul]
+    calc ‖∏ i, φA i z‖ * ‖∏ k, φF k z‖
+        ≤ ((1 + P) * (1 + ‖z‖)) ^ (2 * n) * ∏ k, C k :=
+          mul_le_mul (hhA z) (hhF z hz) (norm_nonneg _)
+            (pow_nonneg (zero_le_one.trans (hX z)) _)
+      _ = _ := by rw [mul_pow]; ring
+  have hF2 (z : ℂ) (hz : z.re ≤ 1 / 2) : ‖∏ k, ψF k z‖ ≤ 2 ^ m := by
+    rw [norm_prod]
+    calc ∏ k, ‖ψF k z‖ ≤ ∏ _k : κ, (2 : ℝ) :=
+          Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _) (fun k _ ↦ hψF2 k z hz)
+      _ = _ := by rw [Finset.prod_const, Finset.card_univ]
+  have hgd : DifferentiableOn ℂ (fun z ↦ E z * ((∏ i, ψA i z) * ∏ k, ψF k z))
+      (Complex.re ⁻¹' Ioo (-1) 1) :=
+    hE1.differentiableOn.mul ((DifferentiableOn.fun_finsetProd fun i _ ↦
+      (hψA1 i).mono fun s (hs : s ∈ Complex.re ⁻¹' Ioo (-1 : ℝ) 1) ↦ hs.1).mul
+        (Differentiable.fun_finsetProd fun k _ ↦ hψF1 k).differentiableOn)
+  have hleft : ∀ z : ℂ, z.re = -1 / 2 → ‖E z * ((∏ i, ψA i z) * ∏ k, ψF k z)‖ ≤
+      M₀ * (1 + P) ^ (2 * n) * (1 + ‖z‖) ^ (2 * n) := by
+    intro z hz
+    have hzI : z.re ∈ Icc (-1 / 2 : ℝ) (1 / 2) := ⟨hz.ge, by rw [hz]; norm_num⟩
+    have h1 : ‖∏ i, ψA i z‖ ≤ (2 * Real.pi) ^ (2 * n) := by
+      rw [norm_prod, pow_mul]
+      calc ∏ i, ‖ψA i z‖ ≤ ∏ _i : ι, (2 * Real.pi) ^ 2 :=
+            Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _) (fun i _ ↦ hψA2 i z hz)
+        _ = _ := by rw [Finset.prod_const, Finset.card_univ]
+    rw [norm_mul, norm_mul]
+    calc ‖E z‖ * (‖∏ i, ψA i z‖ * ‖∏ k, ψF k z‖)
+        ≤ Eb * ((2 * Real.pi) ^ (2 * n) * 2 ^ m) :=
+          mul_le_mul (hE2 z hzI) (mul_le_mul h1 (hF2 z hzI.2) (norm_nonneg _)
+            (pow_nonneg hpi _)) (mul_nonneg (norm_nonneg _) (norm_nonneg _)) hEb
+      _ ≤ M₀ := le_max_right _ _
+      _ ≤ M₀ * ((1 + P) ^ (2 * n) * (1 + ‖z‖) ^ (2 * n)) :=
+          le_mul_of_one_le_right hM₀0 (hone z)
+      _ = _ := by ring
+  have hright : ∀ z : ℂ, z.re = 1 / 2 → ‖E z * ((∏ i, ψA i z) * ∏ k, ψF k z)‖ ≤
+      M₀ * (1 + P) ^ (2 * n) * (1 + ‖z‖) ^ (2 * n) := by
+    intro z hz
+    rw [hgh z (by rw [hz]; norm_num), norm_mul, hρ z hz, mul_one]
+    exact (hh z (by rw [hz]; norm_num)).trans
+      (mul_le_mul_of_nonneg_right (mul_le_mul_of_nonneg_right (le_max_left _ _)
+        (pow_nonneg hP1 _)) (pow_nonneg (by positivity) _))
+  have hgrow : ∃ A B Y : ℝ, ∀ z : ℂ, z.re ∈ Icc (-1 / 2 : ℝ) (1 / 2) → Y ≤ |z.im| →
+      ‖E z * ((∏ i, ψA i z) * ∏ k, ψF k z)‖ ≤ A * Real.exp (B * |z.im|) := by
+    choose A Y hA0 hAY using hψA3
+    have hAp : 0 ≤ ∏ i, A i := Finset.prod_nonneg fun i _ ↦ hA0 i
+    refine ⟨Eb * ((∏ i, A i) * 2 ^ m), n * Real.pi, ∑ i, |Y i|, fun z hz hy ↦ ?_⟩
+    have h1 : ‖∏ i, ψA i z‖ ≤ (∏ i, A i) * Real.exp (n * (Real.pi * |z.im|)) := by
+      rw [norm_prod]
+      calc ∏ i, ‖ψA i z‖ ≤ ∏ i, (A i * Real.exp (Real.pi * |z.im|)) :=
+            Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _) (fun i _ ↦ hAY i z hz
+              (((le_abs_self _).trans (Finset.single_le_sum (f := fun i ↦ |Y i|)
+                (fun _ _ ↦ abs_nonneg _) (Finset.mem_univ i))).trans hy))
+        _ = _ := by
+          rw [Finset.prod_mul_distrib, Finset.prod_const, Finset.card_univ, ← Real.exp_nat_mul]
+    rw [norm_mul, norm_mul]
+    calc ‖E z‖ * (‖∏ i, ψA i z‖ * ‖∏ k, ψF k z‖)
+        ≤ Eb * (((∏ i, A i) * Real.exp (n * (Real.pi * |z.im|))) * 2 ^ m) :=
+          mul_le_mul (hE2 z hz) (mul_le_mul h1 (hF2 z hz.2) (norm_nonneg _)
+            (mul_nonneg hAp (Real.exp_pos _).le))
+            (mul_nonneg (norm_nonneg _) (norm_nonneg _)) hEb
+      _ = _ := by rw [mul_assoc (n : ℝ)]; ring
+  refine ⟨fun z hz ↦ (hh z hz).trans ?_, fun z hz ↦ ?_, fun a z ha hz ↦ ?_⟩
+  · exact mul_le_mul_of_nonneg_right (mul_le_mul_of_nonneg_right
+      ((le_max_left _ _).trans (le_mul_of_one_le_left hM₀0 h6)) (pow_nonneg hP1 _))
+      (pow_nonneg (by positivity) _)
+  · have h := meyerStripMultiplier_strip
+      (fun z ↦ E z * ((∏ i, ψA i z) * ∏ k, ψF k z)) hgd (M₀ * (1 + P) ^ (2 * n)) (2 * n)
+      (mul_nonneg hM₀0 (pow_nonneg hP1 _)) hleft hright hgrow z hz
+    calc ‖E z * ((∏ i, ψA i z) * ∏ k, ψF k z)‖
+        ≤ 6 ^ (2 * n) * (M₀ * (1 + P) ^ (2 * n)) * (1 + ‖z‖) ^ (2 * n) := h
+      _ = _ := by ring
+  · rw [norm_mul, norm_prod, norm_prod]
+    refine mul_le_mul ?_ ?_ (Finset.prod_nonneg fun k _ ↦ (hc k a ha).le)
+      (Finset.prod_nonneg fun _ _ ↦ norm_nonneg _)
+    · calc a ^ n = ∏ _i : ι, a := by rw [Finset.prod_const, Finset.card_univ]
+        _ ≤ _ := Finset.prod_le_prod₀ (fun _ _ ↦ ha.le) (fun i _ ↦ hφA2 i a z ha hz)
+    · exact Finset.prod_le_prod₀ (fun k _ ↦ (hc k a ha).le) (fun k _ ↦ hφF2 k a z ha hz)
+
+/-- The multiplier of R. Meyer, *On a representation of the idele class group related to
+primes and zeros of L-functions*, Duke Math. J. 127 (2005), arXiv:math/0311468 (page numbers
+are those of the preprint), Lemma 4.19, p. 35, with the second paragraph of the proof of
+Lemma 4.20, p. 36, written on the Mellin side and proved in Lean.
+For a finitely generated group `H` of angular characters there is a multiplier `h χ`, entire
+in `z`, of polynomial size in `χ` (measured by one group seminorm `p₀`) and in `z` on the
+strip `-1/2 ≤ Re z ≤ 3/2`, bounded below on every line of positive real part uniformly in
+`χ`, whose product `g χ` with the Tate factor `sLocalRhoFactor` of the functional equation
+extends holomorphically from the critical strip to `-1 < Re z < 1`, with the same polynomial
+bound on `-1/2 ≤ Re z ≤ 1/2`.
+The proof takes for `h χ` the product of `z + iτ + a` over the real places (where the
+character is `sgn^a |x|^{iτ}`), of `(z + iτ + |k|/2)(z + iτ + |k|/2 + 1)` over the complex
+places (character `(x/|x|)^k` times `|x|^{iτ}` in the normalized absolute value) and of the
+inverse Euler factors `1 - χ(ϖ) q^{-z}` over the finite places where the character is
+unramified. These cancel the poles of the Tate factor in `Re z > -2`. On the line
+`Re z = -1/2` the functional equation of the Gamma function gives the modulus of the product
+up to the ε-factors, which are bounded there because the conductors are bounded on a finitely
+generated group; on the line `Re z = 1/2` the Tate factor has modulus one; the bound between
+the two lines follows by Phragmén–Lindelöf.
+Deviation: The paper states the lemma for an operator `h` on the Schwartz–Bruhat functions of
+the S-ideles (Euler operators `x^n (d/dx)^n` at the infinite places, the isomorphism of
+Lemma 4.18 at the finite places) and proves by an abstract argument that `h ∘ F` is bounded
+on weighted spaces. Here the statement is about the Mellin symbols of `h` and of `h ∘ F`. -/
+private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (H : Subgroup (PontryaginDual.map τ).ker) (hH : H.FG) :
+    ∃ (h g : H → ℂ → ℂ) (p₀ : GroupSeminorm H) (N : ℕ) (C : ℝ), 0 ≤ C ∧
+      (∀ χ : H, Differentiable ℂ (h χ)) ∧
+      (∀ χ : H, DifferentiableOn ℂ (g χ) (Complex.re ⁻¹' Ioo (-1) 1)) ∧
+      (∀ (χ : H) (z : ℂ), 0 < z.re → z.re < 1 →
+        g χ z = h χ z * sLocalRhoFactor (chartₜ(T, χ.val.val) z)) ∧
+      (∀ (χ : H) (z : ℂ), z.re ∈ Icc (-1 / 2 : ℝ) (3 / 2) →
+        ‖h χ z‖ ≤ C * (1 + p₀ χ) ^ N * (1 + ‖z‖) ^ N) ∧
+      (∀ (χ : H) (z : ℂ), z.re ∈ Icc (-1 / 2 : ℝ) (1 / 2) →
+        ‖g χ z‖ ≤ C * (1 + p₀ χ) ^ N * (1 + ‖z‖) ^ N) ∧
+      ∀ a : ℝ, 0 < a → ∃ c : ℝ, 0 < c ∧ ∀ (χ : H) (z : ℂ), z.re = a → c ≤ ‖h χ z‖ := by
+  have hFG : Group.FG H := (Group.fg_iff_subgroup_fg H).mpr hH
+  let ι₀ : H →* PontryaginDual (SIdeleQuotient F T) :=
+    ((PontryaginDual.map τ).ker.subtype).comp H.subtype
+  refine Exists.elim
+    (meyerStripMultiplier_arch
+      (F := F) T) fun q hx ↦ ?_
+  refine Exists.elim hx fun φA hx ↦ ?_
+  refine Exists.elim hx fun ψA hA ↦ ?_
+  choose C c φF ψF hC hc hF using fun v : T ↦
+    meyerStripMultiplier_finite_place
+      T v
+  refine Exists.elim
+    (meyerStripMultiplier_epsilon_uniform
+      T H ι₀ (-1 / 2) (1 / 2)) fun Eb hEb ↦ ?_
+  have hid (χ : H) (z : ℂ) (hz0 : 0 < z.re) :
+      sLocalEpsilonFactor (chartₜ(T, χ.val.val) z) *
+          ((∏ w, ψA w χ.val.val z) * ∏ v : T, ψF v χ.val.val z) =
+        ((∏ w, φA w χ.val.val z) * ∏ v : T, φF v χ.val.val z) *
+          sLocalRhoFactor (chartₜ(T, χ.val.val) z) :=
+    meyerStripMultiplier_tate_identity
+      T χ.val.val (fun w : InfinitePlace F ↦ φA w χ.val.val)
+      (fun w : InfinitePlace F ↦ ψA w χ.val.val) (fun v : T ↦ φF v χ.val.val)
+      (fun v : T ↦ ψF v χ.val.val) (fun w ↦ (hA w χ.val.val).1)
+      (fun w ↦ (hA w χ.val.val).2.2.2.1) (fun v ↦ (hF v χ.val.val).1)
+      (fun v ↦ (hF v χ.val.val).2.2.2.1) (fun w ↦ (hA w χ.val.val).2.2.2.2.2.2)
+      (fun v ↦ (hF v χ.val.val).2.2.2.2.2) z hz0
+  have hE1 (χ : H) : Differentiable ℂ fun z ↦ sLocalEpsilonFactor (chartₜ(T, χ.val.val) z) :=
+    fun z ↦ ((sLocalEpsilonFactor_entire χ.val.val) z (mem_univ z)).differentiableAt
+  have hb := fun χ : H ↦
+    meyerStripMultiplier_bounds
+      (ι := InfinitePlace F) (κ := T) (fun w : InfinitePlace F ↦ φA w χ.val.val)
+      (fun w : InfinitePlace F ↦ ψA w χ.val.val) (fun v : T ↦ φF v χ.val.val)
+      (fun v : T ↦ ψF v χ.val.val) (fun z ↦ sLocalEpsilonFactor (chartₜ(T, χ.val.val) z))
+      (fun z ↦ sLocalRhoFactor (chartₜ(T, χ.val.val) z)) (q χ.val.val) Eb C c
+      (apply_nonneg q χ.val.val) hEb.1 hC hc (fun w ↦ (hA w χ.val.val).2.1)
+      (fun w ↦ (hA w χ.val.val).2.2.1) (fun w ↦ (hA w χ.val.val).2.2.2.1)
+      (fun w ↦ (hA w χ.val.val).2.2.2.2.1) (fun w ↦ (hA w χ.val.val).2.2.2.2.2.1)
+      (fun v ↦ (hF v χ.val.val).2.1) (fun v ↦ (hF v χ.val.val).2.2.1)
+      (fun v ↦ (hF v χ.val.val).2.2.2.1) (fun v ↦ (hF v χ.val.val).2.2.2.2.1) (hE1 χ)
+      (fun z hz ↦ hEb.2 χ z hz)
+      (fun z hz ↦ sLocalRhoFactor_norm_criticalLine χ.val.val z hz) (hid χ)
+  refine ⟨fun χ z ↦ (∏ w, φA w χ.val.val z) * ∏ v : T, φF v χ.val.val z,
+    fun χ z ↦ sLocalEpsilonFactor (chartₜ(T, χ.val.val) z) *
+      ((∏ w, ψA w χ.val.val z) * ∏ v : T, ψF v χ.val.val z),
+    q.comp ι₀, 2 * Fintype.card (InfinitePlace F),
+    6 ^ (2 * Fintype.card (InfinitePlace F)) * max (∏ v : T, C v)
+      (Eb * ((2 * Real.pi) ^ (2 * Fintype.card (InfinitePlace F)) * 2 ^ Fintype.card T)),
+    ?_, fun χ ↦ ?_, fun χ ↦ ?_, fun χ z hz0 _ ↦ hid χ z hz0, fun χ z hz ↦ (hb χ).1 z hz.1,
+    fun χ z hz ↦ (hb χ).2.1 z hz, fun a ha ↦ ?_⟩
+  · exact mul_nonneg (pow_nonneg (by norm_num) _)
+      ((Finset.prod_nonneg fun v _ ↦ hC v).trans (le_max_left _ _))
+  · exact (Differentiable.fun_finsetProd fun w _ ↦ (hA w χ.val.val).1).mul
+      (Differentiable.fun_finsetProd fun v _ ↦ (hF v χ.val.val).1)
+  · exact (hE1 χ).differentiableOn.mul ((DifferentiableOn.fun_finsetProd fun w _ ↦
+      ((hA w χ.val.val).2.2.2.1).mono fun s (hs : s ∈ Complex.re ⁻¹' Ioo (-1 : ℝ) 1) ↦
+        hs.1).mul
+        (Differentiable.fun_finsetProd fun v _ ↦ (hF v χ.val.val).2.2.2.1).differentiableOn)
+  · exact ⟨a ^ Fintype.card (InfinitePlace F) * ∏ v : T, c v a,
+      mul_pos (pow_pos ha _) (Finset.prod_pos fun v _ ↦ hc v a ha),
+      fun χ z hz ↦ (hb χ).2.2 a z ha hz⟩
+
+/-- One sequence and its partner under the functional equation: the bounds on the line of
+real part `3/2` for both give the bounds on every line of real part in `(0, 1]` for the
+first. -/
+private theorem meyerCriticalStrip_line
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T) (f f' : ℕ → ℬₛ(T))
+    (hglue : ∀ n (χ : PontryaginDual (SIdeleQuotient F T)) (h g : ℂ → ℂ), Differentiable ℂ h →
+      DifferentiableOn ℂ g (Complex.re ⁻¹' Ioo (-1) 1) →
+      (∀ z : ℂ, 0 < z.re → z.re < 1 → g z = h z * sLocalRhoFactor (chartₜ(T, χ) z)) →
+      ∀ z : ℂ, 0 < z.re → z.re < 1 → h z * sLocalIdelicZFunction (f n) (chartₜ(T, χ) z) =
+        g z * sLocalIdelicZFunction (f' n) (chartₜ(T, χ⁻¹) (1 - z)))
+    (Hf Hf' : Subgroup (PontryaginDual.map τ).ker) (hHf : Hf.FG) (hHf' : Hf'.FG)
+    (hsf : ∀ χ ∉ Hf, ∀ n (z : ℂ), z.re = 3 / 2 →
+      sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val) z) = 0)
+    (hwf : ∀ (p : GroupSeminorm Hf) (k m : ℕ), ∃ B : ℝ, ∀ (χ : Hf) n (z : ℂ), z.re = 3 / 2 →
+      (1+p χ)^k * ‖z^m*sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val.val) z)‖ ≤ B)
+    (hsf' : ∀ χ ∉ Hf', ∀ n (z : ℂ), z.re = 3 / 2 →
+      sLocalThetaMellinIntegral (f' n) (chartₜ(T,χ.val) z) = 0)
+    (hwf' : ∀ (p : GroupSeminorm Hf') (k m : ℕ), ∃ B : ℝ, ∀ (χ : Hf') n (z : ℂ), z.re = 3 / 2 →
+      (1+p χ)^k * ‖z^m*sLocalThetaMellinIntegral (f' n) (chartₜ(T,χ.val.val) z)‖ ≤ B)
+    (a : ℝ) (ha : 0 < a) (ha1 : a ≤ 1) :
+    ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
+      (∀ χ ∉ H, ∀ n (z : ℂ), z.re = a → sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val) z) = 0) ∧
+      ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re = a →
+        (1+p χ)^k * ‖z^m*sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val.val) z)‖ ≤ B := by
+  have hfK : Hf ≤ Hf ⊔ Hf' := le_sup_left
+  have hf'K : Hf' ≤ Hf ⊔ Hf' := le_sup_right
+  refine Exists.elim
+    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier
+      T τ (Hf ⊔ Hf') (hHf.sup hHf')) fun h hx ↦ ?_
+  refine Exists.elim hx fun g hx ↦ ?_
+  refine Exists.elim hx fun p₀ hx ↦ ?_
+  refine Exists.elim hx fun N hx ↦ ?_
+  refine Exists.elim hx fun C hx ↦ ?_
+  have hC := hx.1
+  have hh := hx.2.1
+  have hg := hx.2.2.1
+  have hρ := hx.2.2.2.1
+  have hhb := hx.2.2.2.2.1
+  have hgb := hx.2.2.2.2.2.1
+  refine Exists.elim (hx.2.2.2.2.2.2 a ha) fun c hc ↦ ?_
+  refine ⟨Hf ⊔ Hf', hHf.sup hHf', ?_, ?_⟩
+  · intro χ hχ n z hz
+    exact sLocalMellinSchwartzBounds_meyer_line_support _
+      (sLocalThetaMellinIntegral_analyticOn (f n) χ.val) (3 / 2) (by norm_num)
+      (hsf χ (fun hx ↦ hχ (hfK hx)) n) z (by rw [hz]; exact ha)
+  intro p k m
+  refine Exists.elim (sLocalMellinSchwartzBounds_meyer_enlarge_weights
+    (D := (PontryaginDual.map τ).ker)
+    (fun (n : ℕ) (χ : (PontryaginDual.map τ).ker) (z : ℂ) ↦
+      sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val) z)) Hf (Hf ⊔ Hf') hfK (3 / 2) hsf hwf
+    (p + p₀) (k + N) (m + N)) fun B₁ hB₁ ↦ ?_
+  refine Exists.elim (sLocalMellinSchwartzBounds_meyer_enlarge_weights
+    (D := (PontryaginDual.map τ).ker)
+    (fun (n : ℕ) (χ : (PontryaginDual.map τ).ker) (z : ℂ) ↦
+      sLocalThetaMellinIntegral (f' n) (chartₜ(T,χ.val) z)) Hf' (Hf ⊔ Hf') hf'K (3 / 2) hsf'
+    hwf' (p + p₀) (k + N) (m + N)) fun B₂ hB₂ ↦ ?_
+  refine ⟨C * 2 ^ N * max B₁ B₂ / c, fun χ n z hz ↦ ?_⟩
+  refine meyerCriticalStrip_bound
+    T χ.val.val (f n) (f' n) (h χ) (g χ) (hh χ) (hg χ)
+    (hglue n χ.val.val (h χ) (g χ) (hh χ) (hg χ) (hρ χ)) (p χ) (p₀ χ) C c B₁ B₂ k m N
+    (apply_nonneg p χ) (apply_nonneg p₀ χ) hC hc.1 (hhb χ) (hgb χ) ?_ (χ.val.val)⁻¹ rfl ?_ z
+    (by rw [hz]; exact ha) (by rw [hz]; exact ha1) (hc.2 χ z hz)
+  · intro s hs
+    have hb := hB₁ (χ, n) s hs
+    rw [add_apply] at hb
+    exact hb
+  · intro s hs
+    have hb :=
+      meyerCriticalStrip_inverse_index
+        (P := PontryaginDual (SIdeleQuotient F T))
+        (PontryaginDual.map τ).ker (Hf ⊔ Hf')
+        (fun (n : ℕ) (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ) ↦
+          sLocalThetaMellinIntegral (f' n) (chartₜ(T, χ) z))
+        (p + p₀) (k + N) (m + N) (3 / 2) B₂ hB₂ χ n s hs
+    rw [add_apply] at hb
+    exact hb
+
+/-- R. Meyer, *On a representation of the idele class group related to primes and zeros of
+L-functions*, Duke Math. J. 127 (2005), arXiv:math/0311468 (page numbers are those of the
+preprint), Lemma 4.20, p. 36, at α = 1 (the maximum principle of §4.7): on `T(C_S)`, bounded
+sets are detected outside the critical strip.
+For a sequence of tests: if the Mellin transforms of the θ-functions of the tests, and of
+their additive Fourier transforms, satisfy the bounds of the criterion on every line of real
+part greater than one (supported on a finitely generated subgroup of the discrete factor of
+the dual, with every polynomial weight bounded uniformly in the index), then they satisfy
+them on every line of real part greater than zero.
+The θ Mellin integral is an absolutely convergent integral on the whole half-plane of real
+part greater than zero, where it is the S-local zeta integral
+(`sLocalThetaMellinIntegral_eq_zeta`); the bounds on the lines of real part in `(0, 1]` are
+the new information. Proved in Lean, with the multiplier of
+`sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip_multiplier`
+(Lemma 4.19 on the Mellin side): the multiplier removes the poles of the Tate factor, the
+functional equation carries the bound of the Fourier transforms on the line of real part
+`3/2` to the line of real part `-1/2`, and Phragmén–Lindelöf gives the strip between.
+Deviation: The paper states the lemma for bounded sets of the bornological space `T(C_S)`,
+whose bornology (p. 27, after Proposition 4.4, and (24), p. 28) is: the functions and their
+Fourier transforms, multiplied by `|x|^α`, are bounded Schwartz–Bruhat functions on `C_S`
+for every α > 0. Here both bornologies are written on the dual group, as in
+`sLocalMellinSchwartzBounds_meyer`; this translation is the project's and is not proved in
+Lean. The paper interpolates the weights on `C_S` ((22), p. 24) where this proof uses
+Phragmén–Lindelöf on the dual side. -/
+private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T) (v : ℕ → ℬₛ(T))
+    (hw : ∀ f ∈ ({v,fun n ↦ sAdeleSchwartzFourier (v n)} : Set (ℕ → ℬₛ(T))),
+      ∀ a : ℝ, 1 < a → ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
+      (∀ χ ∉ H, ∀ n (z : ℂ), z.re = a → sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val) z) = 0) ∧
+      ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re = a →
+        (1+p χ)^k * ‖z^m*sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val.val) z)‖ ≤ B) :
+    ∀ f ∈ ({v,fun n ↦ sAdeleSchwartzFourier (v n)} : Set (ℕ → ℬₛ(T))),
+      ∀ a : ℝ, 0 < a → ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
+      (∀ χ ∉ H, ∀ n (z : ℂ), z.re = a → sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val) z) = 0) ∧
+      ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re = a →
+        (1+p χ)^k * ‖z^m*sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val.val) z)‖ ≤ B := by
+  intro f hf a ha
+  rcases lt_or_ge 1 a with h1 | h1
+  · exact hw f hf a h1
+  have h2 : (1 : ℝ) < 3 / 2 := by norm_num
+  rcases Set.mem_insert_iff.mp hf with hfv | hfF
+  · subst f
+    have hF : (fun n ↦ sAdeleSchwartzFourier (v n)) ∈
+        ({v,fun n ↦ sAdeleSchwartzFourier (v n)} : Set (ℕ → ℬₛ(T))) :=
+      Set.mem_insert_of_mem _ (Set.mem_singleton _)
+    refine Exists.elim (hw v hf (3 / 2) h2) fun Hf hx ↦ ?_
+    refine Exists.elim (hw _ hF (3 / 2) h2) fun Hf' hx' ↦ ?_
+    exact meyerCriticalStrip_line
+      T τ v (fun n ↦ sAdeleSchwartzFourier (v n))
+      (fun n χ h g hh hg hρ z hz0 hz1 ↦
+        (meyerCriticalStrip_equation_glue
+          T χ (v n) h g hh hg hρ z hz0 hz1).1)
+      Hf Hf' hx.1 hx'.1 hx.2.1 hx.2.2 hx'.2.1 hx'.2.2 a ha h1
+  · have hfF' : f = fun n ↦ sAdeleSchwartzFourier (v n) := Set.mem_singleton_iff.mp hfF
+    subst f
+    have hV : v ∈ ({v,fun n ↦ sAdeleSchwartzFourier (v n)} : Set (ℕ → ℬₛ(T))) :=
+      Set.mem_insert _ _
+    refine Exists.elim (hw _ hf (3 / 2) h2) fun Hf hx ↦ ?_
+    refine Exists.elim (hw v hV (3 / 2) h2) fun Hf' hx' ↦ ?_
+    exact meyerCriticalStrip_line
+      T τ (fun n ↦ sAdeleSchwartzFourier (v n)) v
+      (fun n χ h g hh hg hρ z hz0 hz1 ↦
+        (meyerCriticalStrip_equation_glue
+          T χ (v n) h g hh hg hρ z hz0 hz1).2)
+      Hf Hf' hx.1 hx'.1 hx.2.1 hx.2.2 hx'.2.1 hx'.2.2 a ha h1
+
+local notation "kern(" Λ ", " c ", " z ", " t ")" =>
+  Complex.exp ((z - (c + t * Complex.I)) ^ 2) * Λ (c + t * Complex.I) / ((c + t * Complex.I) - z)
+
+/-- The Beta integral is at most `1 / x₀` when the first exponent has real part at least
+`x₀ > 0` and the second has real part at least one. -/
+private theorem meyerPositiveLines_beta_bound
+    (x₀ : ℝ) (hx₀ : 0 < x₀) (u δ : ℂ) (hu : x₀ ≤ u.re) (hδ : 1 ≤ δ.re) :
+    ‖Complex.betaIntegral u δ‖ ≤ 1 / x₀ := by
+  have hg : IntervalIntegrable (fun x : ℝ ↦ x ^ (x₀ - 1)) volume 0 1 :=
+    intervalIntegral.intervalIntegrable_rpow' (by linarith)
+  have hint : ∫ x : ℝ in (0 : ℝ)..1, x ^ (x₀ - 1) = 1 / x₀ := by
+    rw [integral_rpow (Or.inl (by linarith))]
+    simp [hx₀.ne']
+  have hb := intervalIntegral.norm_integral_le_of_norm_le
+    (f := fun x : ℝ ↦ (x : ℂ) ^ (u - 1) * (1 - (x : ℂ)) ^ (δ - 1))
+    (g := fun x : ℝ ↦ x ^ (x₀ - 1)) (a := 0) (b := 1) (μ := volume) zero_le_one ?_ hg
+  · rw [hint] at hb
+    exact hb
+  · refine Eventually.of_forall fun x hx ↦ ?_
+    have hx0 : 0 < x := hx.1
+    have h1 : ‖(x : ℂ) ^ (u - 1)‖ ≤ x ^ (x₀ - 1) := by
+      rw [Complex.norm_cpow_eq_rpow_re_of_pos hx0]
+      apply Real.rpow_le_rpow_of_exponent_ge hx0 hx.2
+      simp only [Complex.sub_re, Complex.one_re]
+      linarith
+    have h2 : ‖(1 - (x : ℂ)) ^ (δ - 1)‖ ≤ 1 := by
+      rcases hx.2.eq_or_lt with rfl | hlt
+      · by_cases hd : δ - 1 = 0
+        · simp [hd]
+        · simp [Complex.zero_cpow hd]
+      · have hpos : 0 < 1 - x := by linarith
+        have hcast : (1 - (x : ℂ)) = ((1 - x : ℝ) : ℂ) := by push_cast; ring
+        rw [hcast, Complex.norm_cpow_eq_rpow_re_of_pos hpos]
+        apply Real.rpow_le_one hpos.le (by linarith)
+        simp only [Complex.sub_re, Complex.one_re]
+        linarith
+    rw [norm_mul]
+    calc ‖(x : ℂ) ^ (u - 1)‖ * ‖(1 - (x : ℂ)) ^ (δ - 1)‖ ≤ x ^ (x₀ - 1) * 1 :=
+          mul_le_mul h1 h2 (norm_nonneg _) (Real.rpow_nonneg hx0.le _)
+      _ = x ^ (x₀ - 1) := mul_one _
+
+/-- Gamma at a point divided by Gamma at a point further right by a step of real part between
+one and `D₁`: the quotient grows at most like the inverse of Gamma at the step. -/
+private theorem meyerPositiveLines_gamma_quotient_step
+    (x₀ D₁ : ℝ) (hx₀ : 0 < x₀) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ u δ : ℂ, x₀ ≤ u.re → 1 ≤ δ.re → δ.re ≤ D₁ →
+      ‖Complex.Gamma u‖ * ‖(Complex.Gamma (u + δ))⁻¹‖ ≤
+        C * (1 + |δ.im|) * Real.exp (Real.pi * |δ.im| / 2) := by
+  obtain ⟨C, hC, h⟩ := exists_norm_inv_Gamma_le_half_exp_on_strip 1 D₁ one_pos
+  refine ⟨C / x₀, by positivity, fun u δ hu h1 h2 ↦ ?_⟩
+  have hu0 : 0 < u.re := hx₀.trans_le hu
+  have hδ0 : 0 < δ.re := by linarith
+  have key := Complex.Gamma_mul_Gamma_eq_betaIntegral hu0 hδ0
+  have hB := meyerPositiveLines_beta_bound x₀ hx₀ u δ hu h1
+  have hΓδ : Complex.Gamma δ ≠ 0 := Complex.Gamma_ne_zero_of_re_pos hδ0
+  have hΓs : Complex.Gamma (u + δ) ≠ 0 :=
+    Complex.Gamma_ne_zero_of_re_pos (by simp only [Complex.add_re]; linarith)
+  have e : Complex.Gamma u * (Complex.Gamma (u + δ))⁻¹ =
+      Complex.betaIntegral u δ * (Complex.Gamma δ)⁻¹ := by
+    field_simp
+    rw [key]
+  calc ‖Complex.Gamma u‖ * ‖(Complex.Gamma (u + δ))⁻¹‖
+      = ‖Complex.betaIntegral u δ‖ * ‖(Complex.Gamma δ)⁻¹‖ := by
+        rw [← norm_mul, e, norm_mul]
+    _ ≤ (1 / x₀) * (C * (1 + |δ.im|) * Real.exp (Real.pi * |δ.im| / 2)) :=
+        mul_le_mul hB (h δ ⟨h1, h2⟩) (norm_nonneg _) (by positivity)
+    _ = C / x₀ * (1 + |δ.im|) * Real.exp (Real.pi * |δ.im| / 2) := by ring
+
+/-- The inverse of Gamma at `s` is at most a polynomial factor times the inverse of Gamma at
+`s + j`. -/
+private theorem meyerPositiveLines_inv_gamma_shift
+    (j : ℕ) : ∀ s : ℂ,
+    ‖(Complex.Gamma s)⁻¹‖ ≤ (‖s‖ + j) ^ j * ‖(Complex.Gamma (s + j))⁻¹‖ := by
+  induction j with
+  | zero => intro s; simp
+  | succ j ih =>
+    intro s
+    have h1 : (Complex.Gamma s)⁻¹ = s * (Complex.Gamma (s + 1))⁻¹ :=
+      Complex.one_div_Gamma_eq_self_mul_one_div_Gamma_add_one s
+    have h2 := ih (s + 1)
+    have hcast : s + 1 + (j : ℂ) = s + ((j + 1 : ℕ) : ℂ) := by push_cast; ring
+    rw [hcast] at h2
+    have hn : ‖s + 1‖ + j ≤ ‖s‖ + (j + 1 : ℕ) := by
+      have := norm_add_le s 1
+      rw [norm_one] at this
+      push_cast
+      linarith
+    have hs : ‖s‖ ≤ ‖s‖ + (j + 1 : ℕ) := by
+      have : (0 : ℝ) ≤ ((j + 1 : ℕ) : ℝ) := Nat.cast_nonneg _
+      linarith
+    rw [h1, norm_mul]
+    calc ‖s‖ * ‖(Complex.Gamma (s + 1))⁻¹‖
+        ≤ ‖s‖ * ((‖s + 1‖ + j) ^ j * ‖(Complex.Gamma (s + ((j + 1 : ℕ) : ℂ)))⁻¹‖) :=
+          mul_le_mul_of_nonneg_left h2 (norm_nonneg _)
+      _ ≤ (‖s‖ + (j + 1 : ℕ)) * ((‖s‖ + (j + 1 : ℕ)) ^ j *
+            ‖(Complex.Gamma (s + ((j + 1 : ℕ) : ℂ)))⁻¹‖) :=
+          mul_le_mul hs (mul_le_mul_of_nonneg_right
+            (pow_le_pow_left₀ (by positivity) hn j) (norm_nonneg _)) (by positivity) (by positivity)
+      _ = (‖s‖ + (j + 1 : ℕ)) ^ (j + 1) * ‖(Complex.Gamma (s + ((j + 1 : ℕ) : ℂ)))⁻¹‖ := by
+          rw [pow_succ]; ring
+
+/-- The Gamma quotient with the exact exponential rate, uniformly in the real part: only the
+difference of the real parts has to be bounded. -/
+private theorem meyerPositiveLines_gamma_quotient_uniform
+    (x₀ D₀ : ℝ) (hx₀ : 0 < x₀) :
+    ∃ (C : ℝ) (N : ℕ), 0 ≤ C ∧ ∀ s s' : ℂ, x₀ ≤ s'.re → |s.re - s'.re| ≤ D₀ →
+      ‖Complex.Gamma s'‖ * ‖(Complex.Gamma s)⁻¹‖ ≤
+        C * (1 + ‖s‖) ^ N *
+          ((1 + |s.im - s'.im|) * Real.exp (Real.pi * |s.im - s'.im| / 2)) := by
+  let J : ℕ := ⌈D₀⌉₊ + 2
+  obtain ⟨C, hC, h⟩ := meyerPositiveLines_gamma_quotient_step x₀ (D₀ + J + 1) hx₀
+  refine ⟨C * (1 + J) ^ J, J, by positivity, fun s s' hs' hd ↦ ?_⟩
+  have hd' := abs_le.mp hd
+  let j : ℕ := ⌈s'.re - s.re + 1⌉₊
+  have hj1 : s'.re - s.re + 1 ≤ j := Nat.le_ceil _
+  have hjJ : j ≤ J := by
+    have h1 : s'.re - s.re + 1 ≤ ((⌈D₀⌉₊ + 2 : ℕ) : ℝ) := by
+      have := Nat.le_ceil D₀
+      push_cast
+      linarith [hd'.1]
+    exact Nat.ceil_le.mpr h1
+  have hjJ' : (j : ℝ) ≤ J := Nat.cast_le.mpr hjJ
+  let δ : ℂ := s + j - s'
+  have hδre : δ.re = s.re + j - s'.re := by simp [δ]
+  have hδim : δ.im = s.im - s'.im := by simp [δ]
+  have hδ1 : 1 ≤ δ.re := by rw [hδre]; linarith
+  have hδ2 : δ.re ≤ D₀ + J + 1 := by rw [hδre]; linarith [hd'.2]
+  have step := h s' δ hs' hδ1 hδ2
+  have hsum : s' + δ = s + j := by simp [δ]
+  rw [hsum, hδim] at step
+  have hshift := meyerPositiveLines_inv_gamma_shift j s
+  have hbase : ‖s‖ + j ≤ (1 + J) * (1 + ‖s‖) := by
+    have := norm_nonneg s
+    have hJ0 : (0 : ℝ) ≤ J := Nat.cast_nonneg _
+    nlinarith
+  have hone : (1 : ℝ) ≤ (1 + J) * (1 + ‖s‖) := by
+    have := norm_nonneg s
+    have hJ0 : (0 : ℝ) ≤ J := Nat.cast_nonneg _
+    nlinarith
+  have hpow : (‖s‖ + j) ^ j ≤ ((1 + J) * (1 + ‖s‖)) ^ J :=
+    (pow_le_pow_left₀ (by positivity) hbase j).trans (pow_le_pow_right₀ hone hjJ)
+  calc ‖Complex.Gamma s'‖ * ‖(Complex.Gamma s)⁻¹‖
+      ≤ ‖Complex.Gamma s'‖ * ((‖s‖ + j) ^ j * ‖(Complex.Gamma (s + j))⁻¹‖) :=
+        mul_le_mul_of_nonneg_left hshift (norm_nonneg _)
+    _ = (‖s‖ + j) ^ j * (‖Complex.Gamma s'‖ * ‖(Complex.Gamma (s + j))⁻¹‖) := by ring
+    _ ≤ ((1 + J) * (1 + ‖s‖)) ^ J *
+          (C * (1 + |s.im - s'.im|) * Real.exp (Real.pi * |s.im - s'.im| / 2)) :=
+        mul_le_mul hpow step (by positivity) (by positivity)
+    _ = C * (1 + J) ^ J * (1 + ‖s‖) ^ J *
+          ((1 + |s.im - s'.im|) * Real.exp (Real.pi * |s.im - s'.im| / 2)) := by
+        rw [mul_pow]; ring
+
+/-- The real part of the point `c + t i` of the vertical line of real part `c`. -/
+private theorem meyerPositiveLines_line_re
+    (c t : ℝ) : ((c : ℂ) + t * Complex.I).re = c := by simp
+
+/-- The imaginary part of the point `c + t i` of the vertical line of real part `c`. -/
+private theorem meyerPositiveLines_line_im
+    (c t : ℝ) : ((c : ℂ) + t * Complex.I).im = t := by simp
+
+/-- A point off the vertical line of real part `c` is different from every point of the line. -/
+private theorem meyerPositiveLines_line_sub_ne
+    (c t : ℝ) (z : ℂ) (hz : z.re ≠ c) :
+    (c : ℂ) + t * Complex.I - z ≠ 0 := by
+  intro h
+  have h' := congrArg Complex.re h
+  rw [Complex.sub_re, meyerPositiveLines_line_re, Complex.zero_re] at h'
+  exact hz (by linarith)
+
+/-- The distance from `z` to a point of the vertical line of real part `c` is at least the
+horizontal distance from `z` to the line. -/
+private theorem meyerPositiveLines_line_sub_norm_ge
+    (c t : ℝ) (z : ℂ) :
+    |z.re - c| ≤ ‖(c : ℂ) + t * Complex.I - z‖ := by
+  have h := Complex.abs_re_le_norm ((c : ℂ) + t * Complex.I - z)
+  rwa [Complex.sub_re, meyerPositiveLines_line_re, abs_sub_comm] at h
+
+/-- The modulus of the Gaussian factor. -/
+private theorem meyerPositiveLines_norm_gauss
+    (z w : ℂ) :
+    ‖Complex.exp ((z - w) ^ 2)‖ =
+      Real.exp ((z.re - w.re) ^ 2) * Real.exp (-(w.im - z.im) ^ 2) := by
+  rw [Complex.norm_exp, ← Real.exp_add]
+  congr 1
+  simp only [sq, Complex.mul_re, Complex.sub_re, Complex.sub_im]
+  ring
+
+/-- The shifted Gaussian `t ↦ exp (-(t - y)²)` is integrable. -/
+private theorem meyerPositiveLines_gauss_integrable
+    (y : ℝ) :
+    Integrable fun t : ℝ ↦ Real.exp (-(t - y) ^ 2) := by
+  have h := (integrable_exp_neg_mul_sq (b := 1) one_pos).comp_sub_right y
+  simpa using h
+
+/-- The function `u ↦ exp (κ |u| - u²)` is integrable. -/
+private theorem meyerPositiveLines_exp_abs_sq_integrable
+    (κ : ℝ) :
+    Integrable fun u : ℝ ↦ Real.exp (κ * |u| - u ^ 2) := by
+  have hc : Continuous fun u : ℝ ↦ Real.exp (κ * |u| - u ^ 2) :=
+    Real.continuous_exp.comp ((continuous_const.mul continuous_abs).sub (continuous_pow 2))
+  refine Integrable.mono' (g := fun u : ℝ ↦ Real.exp (κ ^ 2 / 2) * Real.exp (-(1 / 2) * u ^ 2))
+    ((integrable_exp_neg_mul_sq (by norm_num : (0 : ℝ) < 1 / 2)).const_mul _)
+    hc.aestronglyMeasurable (Eventually.of_forall fun u ↦ ?_)
+  rw [Real.norm_of_nonneg (Real.exp_pos _).le, ← Real.exp_add, Real.exp_le_exp]
+  nlinarith [sq_nonneg (κ - |u|), sq_abs u]
+
+/-- The kernel on the line of real part `c`, at a point off the line. -/
+private theorem meyerPositiveLines_kernel_norm_le
+    (Λ : ℂ → ℂ) (z : ℂ) (c t : ℝ) (hz : z.re ≠ c) :
+    ‖kern(Λ, c, z, t)‖ ≤
+      Real.exp ((z.re - c) ^ 2) * Real.exp (-(t - z.im) ^ 2) * ‖Λ (c + t * Complex.I)‖ /
+        |z.re - c| := by
+  rw [norm_div, norm_mul, meyerPositiveLines_norm_gauss,
+      meyerPositiveLines_line_re, meyerPositiveLines_line_im]
+  exact div_le_div_of_nonneg_left (by positivity) (abs_pos.mpr (sub_ne_zero.mpr hz))
+    (meyerPositiveLines_line_sub_norm_ge c t z)
+
+/-- The kernel on the line of real part `c`, at a point off the line, is integrable along the
+line when `Λ` is continuous and bounded on it. -/
+private theorem meyerPositiveLines_kernel_integrable
+    (Λ : ℂ → ℂ) (z : ℂ) (c M : ℝ) (hz : z.re ≠ c)
+    (hc : Continuous fun t : ℝ ↦ Λ (c + t * Complex.I))
+    (hM : ∀ t : ℝ, ‖Λ (c + t * Complex.I)‖ ≤ M) :
+    Integrable fun t : ℝ ↦ kern(Λ, c, z, t) := by
+  have hcont : Continuous fun t : ℝ ↦ kern(Λ, c, z, t) :=
+    ((Complex.continuous_exp.comp (by fun_prop)).mul hc).div (by fun_prop)
+      fun t ↦ meyerPositiveLines_line_sub_ne c t z hz
+  refine Integrable.mono'
+    (g := fun t : ℝ ↦ Real.exp ((z.re - c) ^ 2) * M / |z.re - c| * Real.exp (-(t - z.im) ^ 2))
+    ((meyerPositiveLines_gauss_integrable z.im).const_mul _) hcont.aestronglyMeasurable
+    (Eventually.of_forall fun t ↦ ?_)
+  calc ‖kern(Λ, c, z, t)‖
+      ≤ Real.exp ((z.re - c) ^ 2) * Real.exp (-(t - z.im) ^ 2) * ‖Λ (c + t * Complex.I)‖ /
+          |z.re - c| := meyerPositiveLines_kernel_norm_le Λ z c t hz
+    _ ≤ Real.exp ((z.re - c) ^ 2) * Real.exp (-(t - z.im) ^ 2) * M / |z.re - c| :=
+        div_le_div_of_nonneg_right (mul_le_mul_of_nonneg_left (hM t) (by positivity))
+          (abs_nonneg _)
+    _ = _ := by ring
+
+/-- Shifting a vertical line across a simple pole, for a function with Gaussian decay in the
+strip. -/
+private theorem meyerPositiveLines_line_shift
+    (Ψ : ℂ → ℂ) (a b c d C y₀ : ℝ) (q : ℂ)
+    (hΨ : DifferentiableOn ℂ Ψ (Complex.re ⁻¹' Ioo a b)) (ha : a < c) (hb : d < b)
+    (hq : q.re ∈ Ioo c d)
+    (hbound : ∀ w : ℂ, w.re ∈ Icc c d → ‖Ψ w‖ ≤ C * Real.exp (-(w.im - y₀) ^ 2)) :
+    (∫ t : ℝ, Ψ (d + t * Complex.I) / ((d + t * Complex.I) - q)) -
+      (∫ t : ℝ, Ψ (c + t * Complex.I) / ((c + t * Complex.I) - q)) = 2 * Real.pi * Ψ q := by
+  have hcd : c ≤ d := (hq.1.trans hq.2).le
+  have hC : 0 ≤ C := by
+    have h := hbound c (by rw [Complex.ofReal_re]; exact ⟨le_rfl, hcd⟩)
+    exact nonneg_of_mul_nonneg_left ((norm_nonneg _).trans h) (Real.exp_pos _)
+  have hint (σ : ℝ) (hσ : σ ∈ Icc c d) (hσq : q.re ≠ σ) :
+      Integrable fun t : ℝ ↦ Ψ (σ + t * Complex.I) / ((σ + t * Complex.I) - q) := by
+    have hcontΨ : Continuous fun t : ℝ ↦ Ψ (σ + t * Complex.I) :=
+      hΨ.continuousOn.comp_continuous (by fun_prop) fun t ↦ by
+        change ((σ : ℂ) + t * Complex.I).re ∈ Ioo a b
+        rw [meyerPositiveLines_line_re]
+        exact ⟨ha.trans_le hσ.1, hσ.2.trans_lt hb⟩
+    have hcont : Continuous fun t : ℝ ↦ Ψ (σ + t * Complex.I) / ((σ + t * Complex.I) - q) :=
+      hcontΨ.div (by fun_prop) fun t ↦ meyerPositiveLines_line_sub_ne σ t q hσq
+    refine Integrable.mono'
+      (g := fun t : ℝ ↦ C / |q.re - σ| * Real.exp (-(t - y₀) ^ 2))
+      ((meyerPositiveLines_gauss_integrable y₀).const_mul _) hcont.aestronglyMeasurable
+      (Eventually.of_forall fun t ↦ ?_)
+    have h := hbound (σ + t * Complex.I) (by rw [meyerPositiveLines_line_re]; exact hσ)
+    rw [meyerPositiveLines_line_im] at h
+    rw [norm_div]
+    calc ‖Ψ (σ + t * Complex.I)‖ / ‖(σ : ℂ) + t * Complex.I - q‖
+        ≤ C * Real.exp (-(t - y₀) ^ 2) / |q.re - σ| :=
+          div_le_div₀ (by positivity) h (abs_pos.mpr (sub_ne_zero.mpr hσq))
+            (meyerPositiveLines_line_sub_norm_ge σ t q)
+      _ = _ := by ring
+  have hdecay : ∀ᶠ y : ℝ in comap abs atTop, ∀ x ∈ Icc c d,
+      ‖Ψ ((x : ℂ) + y * Complex.I)‖ ≤ 4 * C / |y| := by
+    have hy : Tendsto (abs : ℝ → ℝ) (comap abs atTop) atTop := tendsto_comap
+    filter_upwards [hy.eventually (eventually_ge_atTop (2 * |y₀| + 2))] with y hy x hx
+    have h := hbound (x + y * Complex.I) (by rw [meyerPositiveLines_line_re]; exact hx)
+    rw [meyerPositiveLines_line_im] at h
+    refine h.trans ?_
+    have hy1 : 1 ≤ |y| := by linarith [abs_nonneg y₀]
+    have h1 : |y| / 2 ≤ |y - y₀| := by linarith [abs_sub_abs_le_abs_sub y y₀]
+    have h2 : |y| ^ 2 / 4 ≤ (y - y₀) ^ 2 := by
+      rw [← sq_abs (y - y₀)]
+      nlinarith [abs_nonneg y]
+    have h3 : Real.exp (-(y - y₀) ^ 2) ≤ 4 / |y| := by
+      have h4 := Real.add_one_le_exp ((y - y₀) ^ 2)
+      rw [Real.exp_neg, inv_le_comm₀ (Real.exp_pos _) (by positivity), inv_div]
+      nlinarith
+    calc C * Real.exp (-(y - y₀) ^ 2) ≤ C * (4 / |y|) := mul_le_mul_of_nonneg_left h3 hC
+      _ = 4 * C / |y| := by ring
+  exact verticalCauchyIntegral_sub_eq (Φ := Ψ) (z := q) hΨ ha hb hq
+    (by positivity : (0 : ℝ) ≤ 4 * C) hdecay (hint c ⟨le_rfl, hcd⟩ hq.1.ne')
+    (hint d ⟨hcd, le_rfl⟩ hq.2.ne)
+
+/-- The jump of the Gaussian Cauchy transform across the point `z`. -/
+private theorem meyerPositiveLines_line_jump
+    (Λ : ℂ → ℂ) (hΛ : DifferentiableOn ℂ Λ (Complex.re ⁻¹' Ioo 0 1))
+    (c c' M : ℝ) (hc : 0 < c) (hc' : c' < 1)
+    (hM : ∀ ζ : ℂ, c ≤ ζ.re → ζ.re ≤ c' → ‖Λ ζ‖ ≤ M) (z : ℂ) (hz : z.re ∈ Ioo c c') :
+    (∫ t : ℝ, kern(Λ, c', z, t)) - (∫ t : ℝ, kern(Λ, c, z, t)) = 2 * Real.pi * Λ z := by
+  let Ψ : ℂ → ℂ := fun w ↦ Complex.exp ((z - w) ^ 2) * Λ w
+  have hΨ : DifferentiableOn ℂ Ψ (Complex.re ⁻¹' Ioo 0 1) :=
+    (by fun_prop : Differentiable ℂ fun w : ℂ ↦ Complex.exp ((z - w) ^ 2)).differentiableOn.mul hΛ
+  have hb : ∀ w : ℂ, w.re ∈ Icc c c' →
+      ‖Ψ w‖ ≤ Real.exp 1 * M * Real.exp (-(w.im - z.im) ^ 2) := by
+    intro w hw
+    change ‖Complex.exp ((z - w) ^ 2) * Λ w‖ ≤ _
+    rw [norm_mul, meyerPositiveLines_norm_gauss]
+    have h1 : (z.re - w.re) ^ 2 ≤ 1 := by
+      have h : |z.re - w.re| ≤ 1 := by
+        rw [abs_le]
+        constructor <;> linarith [hz.1, hz.2, hw.1, hw.2]
+      calc (z.re - w.re) ^ 2 = |z.re - w.re| ^ 2 := (sq_abs _).symm
+        _ ≤ 1 ^ 2 := pow_le_pow_left₀ (abs_nonneg _) h 2
+        _ = 1 := one_pow 2
+    calc Real.exp ((z.re - w.re) ^ 2) * Real.exp (-(w.im - z.im) ^ 2) * ‖Λ w‖
+        ≤ Real.exp 1 * Real.exp (-(w.im - z.im) ^ 2) * M :=
+          mul_le_mul (mul_le_mul_of_nonneg_right (Real.exp_le_exp.mpr h1) (Real.exp_pos _).le)
+            (hM w hw.1 hw.2) (norm_nonneg _) (by positivity)
+      _ = _ := by ring
+  have key := meyerPositiveLines_line_shift Ψ 0 1 c c' (Real.exp 1 * M) z.im z hΨ hc hc' hz hb
+  have hz' : Ψ z = Λ z := by
+    change Complex.exp ((z - z) ^ 2) * Λ z = Λ z
+    rw [sub_self, zero_pow two_ne_zero, Complex.exp_zero, one_mul]
+  rw [hz'] at key
+  exact key
+
+/-- The Gaussian Cauchy transform does not change when the line moves without crossing `z`. -/
+private theorem meyerPositiveLines_nojump_aux
+    (Λ : ℂ → ℂ) (a b c c' M : ℝ) (z : ℂ)
+    (hΛ : DifferentiableOn ℂ Λ (Complex.re ⁻¹' Ioo a b)) (ha : a < c) (hcc : c < c')
+    (hb : c' < b) (hz : z.re ∉ Ioo a b)
+    (hM : ∀ ζ : ℂ, c ≤ ζ.re → ζ.re ≤ c' → ‖Λ ζ‖ ≤ M) :
+    (∫ t : ℝ, kern(Λ, c', z, t)) = ∫ t : ℝ, kern(Λ, c, z, t) := by
+  let p : ℂ := ((c + c') / 2 : ℝ)
+  have hpre : p.re = (c + c') / 2 := Complex.ofReal_re _
+  let δ : ℝ := min (c - a) (b - c')
+  have hδ : 0 < δ := lt_min (sub_pos.mpr ha) (sub_pos.mpr hb)
+  have hsep (u : ℝ) (hu : u ∈ Icc c c') : δ ≤ |u - z.re| := by
+    rcases le_or_gt z.re a with h | h
+    · exact (min_le_left _ _).trans ((le_abs_self _).trans' (by linarith [hu.1]))
+    · have h2 : b ≤ z.re := not_lt.mp fun h' ↦ hz ⟨h, h'⟩
+      exact (min_le_right _ _).trans ((neg_le_abs _).trans' (by linarith [hu.2]))
+  let Ψ : ℂ → ℂ := fun w ↦ Complex.exp ((z - w) ^ 2) * Λ w / (w - z) * (w - p)
+  have hne (w : ℂ) (hw : w ∈ Complex.re ⁻¹' Ioo a b) : w - z ≠ 0 := fun h ↦
+    hz ((sub_eq_zero.mp h) ▸ hw)
+  have hΨ : DifferentiableOn ℂ Ψ (Complex.re ⁻¹' Ioo a b) := by
+    have h1 : DifferentiableOn ℂ (fun w : ℂ ↦ Complex.exp ((z - w) ^ 2) * Λ w)
+        (Complex.re ⁻¹' Ioo a b) :=
+      (by fun_prop : Differentiable ℂ fun w : ℂ ↦ Complex.exp ((z - w) ^ 2)).differentiableOn.mul
+        hΛ
+    exact (h1.div (by fun_prop : Differentiable ℂ fun w : ℂ ↦ w - z).differentiableOn hne).mul
+      (by fun_prop : Differentiable ℂ fun w : ℂ ↦ w - p).differentiableOn
+  have hbd : ∀ w : ℂ, w.re ∈ Icc c c' → ‖Ψ w‖ ≤
+      Real.exp ((|z.re| + |c| + |c'|) ^ 2) * M * (1 + ‖z - p‖ / δ) *
+        Real.exp (-(w.im - z.im) ^ 2) := by
+    intro w hw
+    have hwz : δ ≤ ‖w - z‖ := (hsep w.re hw).trans (by
+      have h := Complex.abs_re_le_norm (w - z)
+      rwa [Complex.sub_re] at h)
+    have hwz0 : 0 < ‖w - z‖ := hδ.trans_le hwz
+    have h1 : (z.re - w.re) ^ 2 ≤ (|z.re| + |c| + |c'|) ^ 2 := by
+      have h : |z.re - w.re| ≤ |z.re| + |c| + |c'| := by
+        rw [abs_le]
+        constructor
+        · linarith [hw.2, le_abs_self c', abs_nonneg c, neg_abs_le z.re]
+        · linarith [hw.1, neg_abs_le c, abs_nonneg c', le_abs_self z.re]
+      calc (z.re - w.re) ^ 2 = |z.re - w.re| ^ 2 := (sq_abs _).symm
+        _ ≤ _ := pow_le_pow_left₀ (abs_nonneg _) h 2
+    have h2 := hM w hw.1 hw.2
+    have hM0 : 0 ≤ M := (norm_nonneg _).trans h2
+    have h3 : ‖w - p‖ ≤ (1 + ‖z - p‖ / δ) * ‖w - z‖ := by
+      have h4 : ‖w - p‖ ≤ ‖w - z‖ + ‖z - p‖ := by
+        have h := norm_add_le (w - z) (z - p)
+        rwa [sub_add_sub_cancel] at h
+      have h5 : ‖z - p‖ ≤ ‖z - p‖ / δ * ‖w - z‖ := by
+        rw [div_mul_eq_mul_div, le_div_iff₀ hδ]
+        exact mul_le_mul_of_nonneg_left hwz (norm_nonneg _)
+      rw [add_mul, one_mul]
+      linarith
+    change ‖Complex.exp ((z - w) ^ 2) * Λ w / (w - z) * (w - p)‖ ≤ _
+    rw [norm_mul, norm_div, norm_mul, meyerPositiveLines_norm_gauss]
+    have hA : Real.exp ((z.re - w.re) ^ 2) * Real.exp (-(w.im - z.im) ^ 2) * ‖Λ w‖ ≤
+        Real.exp ((|z.re| + |c| + |c'|) ^ 2) * Real.exp (-(w.im - z.im) ^ 2) * M :=
+      mul_le_mul (mul_le_mul_of_nonneg_right (Real.exp_le_exp.mpr h1) (Real.exp_pos _).le) h2
+        (norm_nonneg _) (by positivity)
+    calc Real.exp ((z.re - w.re) ^ 2) * Real.exp (-(w.im - z.im) ^ 2) * ‖Λ w‖ / ‖w - z‖ *
+          ‖w - p‖
+        ≤ Real.exp ((|z.re| + |c| + |c'|) ^ 2) * Real.exp (-(w.im - z.im) ^ 2) * M / ‖w - z‖ *
+            ((1 + ‖z - p‖ / δ) * ‖w - z‖) :=
+          mul_le_mul (div_le_div_of_nonneg_right hA (norm_nonneg _)) h3 (norm_nonneg _)
+            (div_nonneg (mul_nonneg (by positivity) hM0) (norm_nonneg _))
+      _ = _ := by
+          field_simp
+  have hp : p.re ∈ Ioo c c' := by
+    rw [hpre]
+    constructor <;> linarith
+  have key := meyerPositiveLines_line_shift Ψ a b c c' _ z.im p hΨ ha hb hp hbd
+  have hΨp : Ψ p = 0 := by
+    change _ * (p - p) = 0
+    rw [sub_self, mul_zero]
+  have e (σ : ℝ) (hσ : p.re ≠ σ) :
+      (∫ t : ℝ, Ψ (σ + t * Complex.I) / ((σ + t * Complex.I) - p)) =
+        ∫ t : ℝ, kern(Λ, σ, z, t) := by
+    refine integral_congr_ae (Eventually.of_forall fun t ↦ ?_)
+    exact mul_div_cancel_right₀ _ (meyerPositiveLines_line_sub_ne σ t p hσ)
+  rw [e c' (by rw [hpre]; linarith), e c (by rw [hpre]; linarith), hΨp, mul_zero] at key
+  exact sub_eq_zero.mp key
+
+/-- The Gaussian Cauchy transform does not change when the line moves inside the strip
+`0 < re < 1` without crossing `z`. -/
+private theorem meyerPositiveLines_line_no_jump
+    (Λ : ℂ → ℂ) (hΛ : DifferentiableOn ℂ Λ (Complex.re ⁻¹' Ioo 0 1))
+    (c c' M : ℝ) (hc : 0 < c) (hcc : c < c') (hc' : c' < 1)
+    (hM : ∀ ζ : ℂ, c ≤ ζ.re → ζ.re ≤ c' → ‖Λ ζ‖ ≤ M) (z : ℂ)
+    (hz : z.re < c ∨ c' < z.re) :
+    (∫ t : ℝ, kern(Λ, c', z, t)) = ∫ t : ℝ, kern(Λ, c, z, t) := by
+  rcases hz with hz | hz
+  · refine meyerPositiveLines_nojump_aux Λ (max z.re 0) 1 c c' M z
+      (hΛ.mono fun w hw ↦ ?_) (max_lt hz hc) hcc
+      hc' (fun h ↦ ?_) hM
+    · exact ⟨(le_max_right _ _).trans_lt hw.1, hw.2⟩
+    · exact absurd h.1 (not_lt.mpr (le_max_left _ _))
+  · refine meyerPositiveLines_nojump_aux Λ 0 (min z.re 1) c c' M z (hΛ.mono fun w hw ↦ ?_) hc hcc
+      (lt_min hz hc') (fun h ↦ ?_) hM
+    · exact ⟨hw.1, hw.2.trans_le (min_le_right _ _)⟩
+    · exact absurd h.2 (not_lt.mpr (min_le_left _ _))
+
+/-- The Gaussian Cauchy transform over a vertical line is holomorphic off the line. -/
+private theorem meyerPositiveLines_G_differentiableAt
+    (Λ : ℂ → ℂ) (c M : ℝ)
+    (hcont : Continuous fun t : ℝ ↦ Λ (c + t * Complex.I))
+    (hM : ∀ t : ℝ, ‖Λ (c + t * Complex.I)‖ ≤ M) (z₀ : ℂ) (hz₀ : z₀.re ≠ c) :
+    DifferentiableAt ℂ (fun z : ℂ ↦ ∫ t : ℝ, kern(Λ, c, z, t)) z₀ := by
+  obtain ⟨ε, hε0, hε⟩ : ∃ ε : ℝ, 0 < ε ∧ |z₀.re - c| = 2 * ε :=
+    ⟨|z₀.re - c| / 2, half_pos (abs_pos.mpr (sub_ne_zero.mpr hz₀)), by ring⟩
+  have hs : Metric.ball z₀ ε ∈ 𝓝 z₀ := Metric.ball_mem_nhds z₀ hε0
+  have hball (z : ℂ) (hz : z ∈ Metric.ball z₀ ε) :
+      ε ≤ |z.re - c| ∧ |z.re - c| ≤ 3 * ε ∧ |z.im| ≤ |z₀.im| + ε := by
+    have h1 : ‖z - z₀‖ < ε := by rwa [Metric.mem_ball, dist_eq_norm] at hz
+    have h2 := abs_le.mp ((Complex.abs_re_le_norm (z - z₀)).trans h1.le)
+    have h3 := abs_le.mp ((Complex.abs_im_le_norm (z - z₀)).trans h1.le)
+    rw [Complex.sub_re] at h2
+    rw [Complex.sub_im] at h3
+    refine ⟨?_, ?_, ?_⟩
+    · rcases abs_cases (z₀.re - c) with ⟨h, -⟩ | ⟨h, -⟩
+      · exact (le_abs_self _).trans' (by linarith)
+      · exact (neg_le_abs _).trans' (by linarith)
+    · rcases abs_cases (z₀.re - c) with ⟨h, -⟩ | ⟨h, -⟩ <;>
+        exact abs_le.mpr ⟨by linarith, by linarith⟩
+    · exact abs_le.mpr ⟨by linarith [neg_abs_le z₀.im], by linarith [le_abs_self z₀.im]⟩
+  have hne (z : ℂ) (hz : z ∈ Metric.ball z₀ ε) (t : ℝ) : (c : ℂ) + t * Complex.I - z ≠ 0 :=
+    meyerPositiveLines_line_sub_ne c t z fun h ↦ by
+      have h' := (hball z hz).1
+      rw [h, sub_self, abs_zero] at h'
+      linarith
+  let F' : ℂ → ℝ → ℂ := fun z t ↦
+    Complex.exp ((z - (c + t * Complex.I)) ^ 2) * Λ (c + t * Complex.I) *
+      (((c + t * Complex.I) - z)⁻¹ ^ 2 - 2)
+  let K : ℝ := Real.exp ((3 * ε) ^ 2) * Real.exp ((|z₀.im| + ε) ^ 2) * |M| * (ε⁻¹ ^ 2 + 2)
+  have hFm : ∀ᶠ z in 𝓝 z₀, AEStronglyMeasurable (fun t : ℝ ↦ kern(Λ, c, z, t)) volume :=
+    Filter.eventually_of_mem hs fun z hz ↦
+      (((Complex.continuous_exp.comp (by fun_prop)).mul hcont).div (by fun_prop)
+        (hne z hz)).aestronglyMeasurable
+  have hFi : Integrable (fun t : ℝ ↦ kern(Λ, c, z₀, t)) volume :=
+    meyerPositiveLines_kernel_integrable Λ z₀ c M hz₀ hcont hM
+  have hF'm : AEStronglyMeasurable (F' z₀) volume :=
+    (((Complex.continuous_exp.comp (by fun_prop)).mul hcont).mul
+      ((((by fun_prop : Continuous fun t : ℝ ↦ (c : ℂ) + t * Complex.I - z₀)).inv₀
+        (hne z₀ (Metric.mem_ball_self hε0))).pow 2 |>.sub continuous_const)).aestronglyMeasurable
+  have hbound : ∀ᵐ t : ℝ ∂volume, ∀ z ∈ Metric.ball z₀ ε,
+      ‖F' z t‖ ≤ K * Real.exp (-(1 / 2) * t ^ 2) := by
+    refine Eventually.of_forall fun t z hz ↦ ?_
+    obtain ⟨hb1, hb2, hb3⟩ := hball z hz
+    change ‖Complex.exp ((z - (c + t * Complex.I)) ^ 2) * Λ (c + t * Complex.I) *
+      (((c + t * Complex.I) - z)⁻¹ ^ 2 - 2)‖ ≤ _
+    rw [norm_mul, norm_mul, meyerPositiveLines_norm_gauss,
+        meyerPositiveLines_line_re, meyerPositiveLines_line_im]
+    have h1 : Real.exp ((z.re - c) ^ 2) ≤ Real.exp ((3 * ε) ^ 2) := by
+      rw [Real.exp_le_exp, ← sq_abs (z.re - c)]
+      exact pow_le_pow_left₀ (abs_nonneg _) hb2 2
+    have h2 : Real.exp (-(t - z.im) ^ 2) ≤
+        Real.exp ((|z₀.im| + ε) ^ 2) * Real.exp (-(1 / 2) * t ^ 2) := by
+      rw [← Real.exp_add, Real.exp_le_exp]
+      have h : z.im ^ 2 ≤ (|z₀.im| + ε) ^ 2 := by
+        rw [← sq_abs z.im]
+        exact pow_le_pow_left₀ (abs_nonneg _) hb3 2
+      nlinarith [sq_nonneg (t - 2 * z.im)]
+    have h3 : ‖Λ (c + t * Complex.I)‖ ≤ |M| := (hM t).trans (le_abs_self M)
+    have h4 : ‖((c : ℂ) + t * Complex.I - z)⁻¹ ^ 2 - 2‖ ≤ ε⁻¹ ^ 2 + 2 := by
+      refine (norm_sub_le _ _).trans ?_
+      rw [norm_pow, norm_inv, Complex.norm_ofNat]
+      have h5 : ε ≤ ‖(c : ℂ) + t * Complex.I - z‖ :=
+          hb1.trans (meyerPositiveLines_line_sub_norm_ge c t z)
+      have h6 : ‖(c : ℂ) + t * Complex.I - z‖⁻¹ ≤ ε⁻¹ := inv_anti₀ hε0 h5
+      linarith [pow_le_pow_left₀ (by positivity) h6 2]
+    calc Real.exp ((z.re - c) ^ 2) * Real.exp (-(t - z.im) ^ 2) * ‖Λ (c + t * Complex.I)‖ *
+          ‖((c : ℂ) + t * Complex.I - z)⁻¹ ^ 2 - 2‖
+        ≤ Real.exp ((3 * ε) ^ 2) *
+            (Real.exp ((|z₀.im| + ε) ^ 2) * Real.exp (-(1 / 2) * t ^ 2)) * |M| *
+            (ε⁻¹ ^ 2 + 2) :=
+          mul_le_mul (mul_le_mul (mul_le_mul h1 h2 (Real.exp_pos _).le (Real.exp_pos _).le) h3
+            (norm_nonneg _) (by positivity)) h4 (norm_nonneg _) (by positivity)
+      _ = K * Real.exp (-(1 / 2) * t ^ 2) := by
+          simp only [K]
+          ring
+  have hbi : Integrable (fun t : ℝ ↦ K * Real.exp (-(1 / 2) * t ^ 2)) volume :=
+    (integrable_exp_neg_mul_sq (by norm_num : (0 : ℝ) < 1 / 2)).const_mul K
+  have hdiff : ∀ᵐ t : ℝ ∂volume, ∀ z ∈ Metric.ball z₀ ε,
+      HasDerivAt (fun w : ℂ ↦ kern(Λ, c, w, t)) (F' z t) z := by
+    refine Eventually.of_forall fun t z hz ↦ ?_
+    have h1 : HasDerivAt (fun w : ℂ ↦ Complex.exp ((w - (c + t * Complex.I)) ^ 2))
+        (Complex.exp ((z - (c + t * Complex.I)) ^ 2) * (2 * (z - (c + t * Complex.I)))) z := by
+      have h := (((hasDerivAt_id z).sub_const ((c : ℂ) + t * Complex.I)).pow 2).cexp
+      simpa using h
+    have h2 : HasDerivAt (fun w : ℂ ↦ (c : ℂ) + t * Complex.I - w) (-1) z :=
+      (hasDerivAt_id z).const_sub _
+    have h3 := (h1.mul_const (Λ (c + t * Complex.I))).div h2 (hne z hz t)
+    convert h3 using 1
+    have h0 := hne z hz t
+    change Complex.exp ((z - (c + t * Complex.I)) ^ 2) * Λ (c + t * Complex.I) *
+      (((c + t * Complex.I) - z)⁻¹ ^ 2 - 2) = _
+    field_simp
+    ring
+  exact (hasDerivAt_integral_of_dominated_loc_of_deriv_le
+    (F := fun (z : ℂ) (t : ℝ) ↦ kern(Λ, c, z, t)) (F' := F')
+    (bound := fun t : ℝ ↦ K * Real.exp (-(1 / 2) * t ^ 2))
+    hs hFm hFi hF'm hbound hbi hdiff).2.differentiableAt
+
+/-- The Gaussian Cauchy transform of `Λ` over the line of real part `c`. -/
+private noncomputable def meyerPositiveLines_lineIntegral
+    (Λ : ℂ → ℂ) (c : ℝ) (z : ℂ) : ℂ :=
+  1 / (2 * (Real.pi : ℂ)) * ∫ t : ℝ, kern(Λ, c, z, t)
+
+/-- The partition function: an entire function that is `Δ G_c` to the left of the line
+of real part `c` and `1 + Δ G_c` to the right of it, for every `c` in `(0, 1)`. -/
+private theorem meyerPositiveLines_partition
+    (Δ Λ : ℂ → ℂ) (hΔ : Differentiable ℂ Δ)
+    (hΛ : DifferentiableOn ℂ Λ (Complex.re ⁻¹' Ioo 0 1))
+    (hΔΛ : ∀ ζ : ℂ, 0 < ζ.re → ζ.re < 1 → Δ ζ * Λ ζ = 1)
+    (hbd : ∀ c₁ c₂ : ℝ, 0 < c₁ → c₁ ≤ c₂ → c₂ < 1 →
+      ∃ M : ℝ, ∀ ζ : ℂ, c₁ ≤ ζ.re → ζ.re ≤ c₂ → ‖Λ ζ‖ ≤ M) :
+    ∃ om : ℂ → ℂ, Differentiable ℂ om ∧
+      (∀ (c : ℝ) (z : ℂ), 0 < c → c < 1 → z.re < c →
+        om z = Δ z * (1 / (2 * (Real.pi : ℂ)) * ∫ t : ℝ, kern(Λ, c, z, t))) ∧
+      (∀ (c : ℝ) (z : ℂ), 0 < c → c < 1 → c < z.re →
+        om z = 1 + Δ z * (1 / (2 * (Real.pi : ℂ)) * ∫ t : ℝ, kern(Λ, c, z, t))) := by
+  have hπ : (2 * (Real.pi : ℂ)) ≠ 0 :=
+    mul_ne_zero two_ne_zero (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero)
+  have hsame (c c' : ℝ) (z : ℂ) (hc : 0 < c) (hcc : c < c') (hc' : c' < 1)
+      (hz : z.re < c ∨ c' < z.re) : meyerPositiveLines_lineIntegral Λ c' z =
+          meyerPositiveLines_lineIntegral Λ c z := by
+    obtain ⟨M, hM⟩ := hbd c c' hc hcc.le hc'
+    exact congrArg (fun x : ℂ ↦ 1 / (2 * (Real.pi : ℂ)) * x)
+      (meyerPositiveLines_line_no_jump Λ hΛ c c' M hc hcc hc' hM z hz)
+  have hjump (c c' : ℝ) (z : ℂ) (hc : 0 < c) (hc' : c' < 1) (hz : z.re ∈ Ioo c c') :
+      meyerPositiveLines_lineIntegral Λ c' z = meyerPositiveLines_lineIntegral Λ c z + Λ z := by
+    obtain ⟨M, hM⟩ := hbd c c' hc (hz.1.trans hz.2).le hc'
+    have h := meyerPositiveLines_line_jump Λ hΛ c c' M hc hc' hM z hz
+    have h2 : 1 / (2 * (Real.pi : ℂ)) * (2 * Real.pi * Λ z) = Λ z := by
+      field_simp
+    change 1 / (2 * (Real.pi : ℂ)) * (∫ t : ℝ, kern(Λ, c', z, t)) =
+      1 / (2 * (Real.pi : ℂ)) * (∫ t : ℝ, kern(Λ, c, z, t)) + Λ z
+    rw [sub_eq_iff_eq_add.mp h, mul_add, h2, add_comm]
+  have hleft (c₁ c₂ : ℝ) (z : ℂ) (h1 : 0 < c₁) (h1' : c₁ < 1) (h2 : 0 < c₂) (h2' : c₂ < 1)
+      (hz1 : z.re < c₁) (hz2 : z.re < c₂) : meyerPositiveLines_lineIntegral Λ c₁ z =
+          meyerPositiveLines_lineIntegral Λ c₂ z := by
+    rcases lt_trichotomy c₁ c₂ with h | h | h
+    · exact (hsame c₁ c₂ z h1 h h2' (Or.inl hz1)).symm
+    · rw [h]
+    · exact hsame c₂ c₁ z h2 h h1' (Or.inl hz2)
+  have hright (c₁ c₂ : ℝ) (z : ℂ) (h1 : 0 < c₁) (h1' : c₁ < 1) (h2 : 0 < c₂) (h2' : c₂ < 1)
+      (hz1 : c₁ < z.re) (hz2 : c₂ < z.re) : meyerPositiveLines_lineIntegral Λ c₁ z =
+          meyerPositiveLines_lineIntegral Λ c₂ z := by
+    rcases lt_trichotomy c₁ c₂ with h | h | h
+    · exact (hsame c₁ c₂ z h1 h h2' (Or.inr hz2)).symm
+    · rw [h]
+    · exact hsame c₂ c₁ z h2 h h1' (Or.inr hz1)
+  let om : ℂ → ℂ := fun z ↦
+    if z.re < 1 / 2 then Δ z * meyerPositiveLines_lineIntegral Λ (3 / 4) z
+    else 1 + Δ z * meyerPositiveLines_lineIntegral Λ (1 / 4) z
+  have hL (c : ℝ) (z : ℂ) (hc : 0 < c) (hc' : c < 1) (hz : z.re < c) :
+      om z = Δ z * meyerPositiveLines_lineIntegral Λ c z := by
+    change (if z.re < 1 / 2 then Δ z * meyerPositiveLines_lineIntegral Λ (3 / 4) z
+      else 1 + Δ z * meyerPositiveLines_lineIntegral Λ (1 / 4) z) = _
+    by_cases h : z.re < 1 / 2
+    · rw [ite_eq_left h, hleft (3 / 4) c z (by norm_num) (by norm_num) hc hc' (by linarith) hz]
+    · rw [ite_eq_right h, hjump (1 / 4) c z (by norm_num) hc' ⟨by linarith [not_lt.mp h], hz⟩,
+        mul_add, hΔΛ z (by linarith [not_lt.mp h]) (hz.trans hc'), add_comm]
+  have hR (c : ℝ) (z : ℂ) (hc : 0 < c) (hc' : c < 1) (hz : c < z.re) :
+      om z = 1 + Δ z * meyerPositiveLines_lineIntegral Λ c z := by
+    change (if z.re < 1 / 2 then Δ z * meyerPositiveLines_lineIntegral Λ (3 / 4) z
+      else 1 + Δ z * meyerPositiveLines_lineIntegral Λ (1 / 4) z) = _
+    by_cases h : z.re < 1 / 2
+    · rw [ite_eq_left h, hjump c (3 / 4) z hc (by norm_num) ⟨hz, by linarith⟩, mul_add,
+        hΔΛ z (hc.trans hz) (by linarith), add_comm]
+    · rw [ite_eq_right h, hright (1 / 4) c z (by norm_num) (by norm_num) hc hc'
+        (by linarith [not_lt.mp h]) hz]
+  have hGd (c : ℝ) (hc : 0 < c) (hc' : c < 1) (z₀ : ℂ) (hz₀ : z₀.re ≠ c) :
+      DifferentiableAt ℂ (meyerPositiveLines_lineIntegral Λ c) z₀ := by
+    obtain ⟨M, hM⟩ := hbd c c hc le_rfl hc'
+    have hcont : Continuous fun t : ℝ ↦ Λ (c + t * Complex.I) :=
+      hΛ.continuousOn.comp_continuous (by fun_prop) fun t ↦ by
+        change ((c : ℂ) + t * Complex.I).re ∈ Ioo (0 : ℝ) 1
+        rw [meyerPositiveLines_line_re]
+        exact ⟨hc, hc'⟩
+    exact (meyerPositiveLines_G_differentiableAt Λ c M hcont
+      (fun t ↦ hM _ (meyerPositiveLines_line_re c t).ge
+          (meyerPositiveLines_line_re c t).le) z₀ hz₀).const_mul _
+  refine ⟨om, fun z₀ ↦ ?_, hL, hR⟩
+  rcases lt_or_ge z₀.re (3 / 4) with h | h
+  · have hU : {z : ℂ | z.re < 3 / 4} ∈ 𝓝 z₀ :=
+      (isOpen_lt Complex.continuous_re continuous_const).mem_nhds h
+    refine ((hΔ z₀).mul (hGd (3 / 4) (by norm_num) (by norm_num) z₀
+      h.ne)).congr_of_eventuallyEq ?_
+    filter_upwards [hU] with z hz
+    exact hL (3 / 4) z (by norm_num) (by norm_num) hz
+  · have h' : (1 / 4 : ℝ) < z₀.re := by linarith
+    have hU : {z : ℂ | (1 / 4 : ℝ) < z.re} ∈ 𝓝 z₀ :=
+      (isOpen_lt continuous_const Complex.continuous_re).mem_nhds h'
+    refine ((differentiableAt_const (1 : ℂ)).add ((hΔ z₀).mul (hGd (1 / 4) (by norm_num)
+      (by norm_num) z₀ h'.ne'))).congr_of_eventuallyEq ?_
+    filter_upwards [hU] with z hz
+    exact hR (1 / 4) z (by norm_num) (by norm_num) hz
+
+/-- The bound for the partition function, with an arbitrary factor `A`. The constant
+`(1 / (2π)) ∫ exp (κ |u| - u²) du` depends only on `κ`. -/
+private theorem meyerPositiveLines_partition_bound
+    (Λ : ℂ → ℂ) (c κ P : ℝ) (z A : ℂ) (hz : z.re ≠ c)
+    (h : ∀ ζ : ℂ, ζ.re = c → ‖A‖ * ‖Λ ζ‖ ≤ P * Real.exp (κ * |z.im - ζ.im|)) :
+    ‖A * (1 / (2 * (Real.pi : ℂ)) * ∫ t : ℝ, kern(Λ, c, z, t))‖ ≤
+      P * Real.exp ((z.re - c) ^ 2) / |z.re - c| *
+        (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ * |u| - u ^ 2)) := by
+  have hd : 0 < |z.re - c| := abs_pos.mpr (sub_ne_zero.mpr hz)
+  have hg : Integrable fun t : ℝ ↦ P * Real.exp ((z.re - c) ^ 2) / |z.re - c| *
+      Real.exp (κ * |t - z.im| - (t - z.im) ^ 2) :=
+    ((meyerPositiveLines_exp_abs_sq_integrable κ).comp_sub_right z.im).const_mul _
+  have hI : ‖∫ t : ℝ, A * kern(Λ, c, z, t)‖ ≤
+      ∫ t : ℝ, P * Real.exp ((z.re - c) ^ 2) / |z.re - c| *
+        Real.exp (κ * |t - z.im| - (t - z.im) ^ 2) := by
+    refine norm_integral_le_of_norm_le hg (Eventually.of_forall fun t ↦ ?_)
+    have h1 := meyerPositiveLines_kernel_norm_le Λ z c t hz
+    have h2 := h (c + t * Complex.I) (meyerPositiveLines_line_re c t)
+    rw [meyerPositiveLines_line_im, abs_sub_comm] at h2
+    rw [norm_mul]
+    calc ‖A‖ * ‖kern(Λ, c, z, t)‖
+        ≤ ‖A‖ * (Real.exp ((z.re - c) ^ 2) * Real.exp (-(t - z.im) ^ 2) *
+            ‖Λ (c + t * Complex.I)‖ / |z.re - c|) :=
+          mul_le_mul_of_nonneg_left h1 (norm_nonneg _)
+      _ = (‖A‖ * ‖Λ (c + t * Complex.I)‖) *
+            (Real.exp ((z.re - c) ^ 2) * Real.exp (-(t - z.im) ^ 2) / |z.re - c|) := by ring
+      _ ≤ (P * Real.exp (κ * |t - z.im|)) *
+            (Real.exp ((z.re - c) ^ 2) * Real.exp (-(t - z.im) ^ 2) / |z.re - c|) :=
+          mul_le_mul_of_nonneg_right h2 (by positivity)
+      _ = P * Real.exp ((z.re - c) ^ 2) / |z.re - c| *
+            Real.exp (κ * |t - z.im| - (t - z.im) ^ 2) := by
+          rw [show κ * |t - z.im| - (t - z.im) ^ 2 = κ * |t - z.im| + -(t - z.im) ^ 2 by ring,
+            Real.exp_add]
+          ring
+  have hJ : (∫ t : ℝ, P * Real.exp ((z.re - c) ^ 2) / |z.re - c| *
+      Real.exp (κ * |t - z.im| - (t - z.im) ^ 2)) =
+      P * Real.exp ((z.re - c) ^ 2) / |z.re - c| * ∫ u : ℝ, Real.exp (κ * |u| - u ^ 2) := by
+    rw [integral_const_mul]
+    congr 1
+    exact integral_sub_right_eq_self (fun u : ℝ ↦ Real.exp (κ * |u| - u ^ 2)) z.im
+  have hnorm : ‖(1 / (2 * (Real.pi : ℂ)))‖ = 1 / (2 * Real.pi) := by
+    rw [norm_div, norm_one, norm_mul, Complex.norm_ofNat, Complex.norm_real,
+      Real.norm_of_nonneg Real.pi_pos.le]
+  rw [show A * (1 / (2 * (Real.pi : ℂ)) * ∫ t : ℝ, kern(Λ, c, z, t)) =
+      1 / (2 * (Real.pi : ℂ)) * ∫ t : ℝ, A * kern(Λ, c, z, t) by
+    rw [integral_const_mul]
+    ring, norm_mul, hnorm]
+  calc 1 / (2 * Real.pi) * ‖∫ t : ℝ, A * kern(Λ, c, z, t)‖
+      ≤ 1 / (2 * Real.pi) * (P * Real.exp ((z.re - c) ^ 2) / |z.re - c| *
+          ∫ u : ℝ, Real.exp (κ * |u| - u ^ 2)) :=
+        mul_le_mul_of_nonneg_left (hI.trans_eq hJ) (by positivity)
+    _ = _ := by ring
+
+/-- The Gaussian Cauchy transform under the reflection `z ↦ 1 - z`: the substitution
+`t ↦ -t` in the kernel. -/
+private theorem meyerDecomposition_posG_reflect
+    (Λ Λ' : ℂ → ℂ) (hΛ : ∀ ζ, Λ' ζ = Λ (1 - ζ)) (c : ℝ)
+    (z : ℂ) : meyerPositiveLines_lineIntegral Λ' (1 - c) (1 - z) =
+        -meyerPositiveLines_lineIntegral Λ c z := by
+  have hpt (t : ℝ) : kern(Λ', ((1 - c : ℝ) : ℂ), 1 - z, ((-t : ℝ) : ℂ)) =
+      -kern(Λ, (c : ℂ), z, (t : ℂ)) := by
+    have e1 : ((1 - c : ℝ) : ℂ) + ((-t : ℝ) : ℂ) * Complex.I =
+        1 - ((c : ℂ) + (t : ℂ) * Complex.I) := by push_cast; ring
+    rw [e1, hΛ, sub_sub_cancel,
+      show (1 - z - (1 - ((c : ℂ) + (t : ℂ) * Complex.I))) ^ 2 =
+        (z - ((c : ℂ) + (t : ℂ) * Complex.I)) ^ 2 by ring,
+      show 1 - ((c : ℂ) + (t : ℂ) * Complex.I) - (1 - z) =
+        -(((c : ℂ) + (t : ℂ) * Complex.I) - z) by ring, div_neg]
+  have hint : (∫ t : ℝ, kern(Λ', ((1 - c : ℝ) : ℂ), 1 - z, (t : ℂ))) =
+      -∫ t : ℝ, kern(Λ, (c : ℂ), z, (t : ℂ)) := by
+    calc (∫ t : ℝ, kern(Λ', ((1 - c : ℝ) : ℂ), 1 - z, (t : ℂ)))
+        = ∫ t : ℝ, kern(Λ', ((1 - c : ℝ) : ℂ), 1 - z, ((-t : ℝ) : ℂ)) :=
+          (integral_neg_eq_self (fun t : ℝ ↦ kern(Λ', ((1 - c : ℝ) : ℂ), 1 - z, (t : ℂ)))
+            volume).symm
+      _ = ∫ t : ℝ, -kern(Λ, (c : ℂ), z, (t : ℂ)) := integral_congr_ae (Eventually.of_forall hpt)
+      _ = _ := integral_neg _
+  change 1 / (2 * (Real.pi : ℂ)) * (∫ t : ℝ, kern(Λ', ((1 - c : ℝ) : ℂ), 1 - z, (t : ℂ))) =
+    -(1 / (2 * (Real.pi : ℂ)) * ∫ t : ℝ, kern(Λ, (c : ℂ), z, (t : ℂ)))
+  rw [hint]
+  ring
+
+/-- On the critical line, a family of partition functions given by the Gaussian Cauchy
+transforms of `Λ χ` satisfies `om χ⁻¹ (1 - z) = 1 - om χ z`. -/
+private theorem meyerDecomposition_symmetry
+    {P : Type*} [CommGroup P] (E Λ om : P → ℂ → ℂ)
+    (hΛ : ∀ χ ζ, Λ χ⁻¹ ζ = Λ χ (1 - ζ))
+    (homL : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → z.re < c →
+      om χ z = E χ z * E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) c z)
+    (homR : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → c < z.re →
+      om χ z = 1 + E χ z * E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) c z)
+    (χ : P) (z : ℂ) (hz : z.re = 1 / 2) : om χ⁻¹ (1 - z) = 1 - om χ z := by
+  have h1 : (1 - z).re = 1 / 2 := by rw [Complex.sub_re, Complex.one_re, hz]; norm_num
+  rw [homR χ⁻¹ (1 / 4) (1 - z) (by norm_num) (by norm_num) (by rw [h1]; norm_num),
+    homL χ (3 / 4) z (by norm_num) (by norm_num) (by rw [hz]; norm_num), inv_inv, sub_sub_cancel]
+  have hG := meyerDecomposition_posG_reflect (Λ χ) (Λ χ⁻¹) (hΛ χ) (3 / 4) z
+  rw [show (1 : ℝ) - 3 / 4 = 1 / 4 by norm_num] at hG
+  rw [hG]
+  ring
+
+/-- The glued function: `om · Z` on the right half-plane, its continuation through the
+functional equation on the left. -/
+private noncomputable def meyerDecomposition_glued
+    {P : Type*} [CommGroup P] (E ε Λ om : P → ℂ → ℂ)
+    (Z Z' : ℕ → P → ℂ → ℂ) (n : ℕ) (χ : P) (z : ℂ) : ℂ :=
+  if 0 < z.re then om χ z * Z n χ z
+  else meyerPositiveLines_lineIntegral (Λ χ) (1 / 2) z *
+    (ε χ z * E χ⁻¹ (1 - z) ^ 2 * Z' n χ⁻¹ (1 - z))
+
+/-- The glued function on the right half-plane is `om · Z`. -/
+private theorem meyerDecomposition_glued_right
+    {P : Type*} [CommGroup P] (E ε Λ om : P → ℂ → ℂ)
+    (Z Z' : ℕ → P → ℂ → ℂ) (n : ℕ) (χ : P) (z : ℂ) (hz : 0 < z.re) :
+    meyerDecomposition_glued E ε Λ om Z Z' n χ z = om χ z * Z n χ z := by
+  rw [meyerDecomposition_glued]
+  exact ite_eq_left_iff.mpr fun h ↦ absurd hz h
+
+/-- To the left of the line of real part `1 / 2`, the glued function is given by its formula
+through the functional equation. -/
+private theorem meyerDecomposition_glued_left
+    {P : Type*} [CommGroup P] (E ε Λ om : P → ℂ → ℂ)
+    (Z Z' : ℕ → P → ℂ → ℂ)
+    (homL : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → z.re < c →
+      om χ z = E χ z * E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) c z)
+    (hglue : ∀ n χ (z : ℂ), 0 < z.re → z.re < 1 →
+      E χ z * Z n χ z = ε χ z * E χ⁻¹ (1 - z) * Z' n χ⁻¹ (1 - z))
+    (n : ℕ) (χ : P) (z : ℂ) (hz : z.re < 1 / 2) :
+    meyerDecomposition_glued E ε Λ om Z Z' n χ z =
+      meyerPositiveLines_lineIntegral (Λ χ) (1 / 2) z *
+          (ε χ z * E χ⁻¹ (1 - z) ^ 2 * Z' n χ⁻¹ (1 - z)) := by
+  rw [meyerDecomposition_glued]
+  split_ifs with h
+  · rw [homL χ (1 / 2) z (by norm_num) (by norm_num) hz]
+    have e := hglue n χ z h (by linarith)
+    linear_combination (E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) (1 / 2) z) * e
+  · rfl
+
+/-- The Gaussian Cauchy transform over the line of real part `c` is holomorphic off the line,
+for `Λ` holomorphic on the strip `0 < re < 1` and bounded on its closed substrips. -/
+private theorem meyerDecomposition_posG_differentiableAt
+    (Λ : ℂ → ℂ)
+    (hΛ : DifferentiableOn ℂ Λ (Complex.re ⁻¹' Ioo 0 1))
+    (hbd : ∀ c₁ c₂ : ℝ, 0 < c₁ → c₁ ≤ c₂ → c₂ < 1 →
+      ∃ M : ℝ, ∀ ζ : ℂ, c₁ ≤ ζ.re → ζ.re ≤ c₂ → ‖Λ ζ‖ ≤ M)
+    (c : ℝ) (hc : 0 < c) (hc' : c < 1) (z₀ : ℂ) (hz₀ : z₀.re ≠ c) :
+    DifferentiableAt ℂ (meyerPositiveLines_lineIntegral Λ c) z₀ := by
+  obtain ⟨M, hM⟩ := hbd c c hc le_rfl hc'
+  have hcont : Continuous fun t : ℝ ↦ Λ (c + t * Complex.I) :=
+    hΛ.continuousOn.comp_continuous (by fun_prop) fun t ↦ by
+      change ((c : ℂ) + t * Complex.I).re ∈ Ioo (0 : ℝ) 1
+      rw [meyerPositiveLines_line_re]
+      exact ⟨hc, hc'⟩
+  exact (meyerPositiveLines_G_differentiableAt Λ c M hcont
+    (fun t ↦ hM _ (meyerPositiveLines_line_re c t).ge
+        (meyerPositiveLines_line_re c t).le) z₀ hz₀).const_mul _
+
+/-- The glued function is entire, for each index and character. -/
+private theorem meyerDecomposition_glued_differentiable
+    {P : Type*} [CommGroup P] (E ε Λ om : P → ℂ → ℂ)
+    (Z Z' : ℕ → P → ℂ → ℂ) (hE : ∀ χ, Differentiable ℂ (E χ))
+    (hε : ∀ χ, Differentiable ℂ (ε χ))
+    (hΛd : ∀ χ, DifferentiableOn ℂ (Λ χ) (Complex.re ⁻¹' Ioo 0 1))
+    (hΛb : ∀ χ (c₁ c₂ : ℝ), 0 < c₁ → c₁ ≤ c₂ → c₂ < 1 →
+      ∃ M : ℝ, ∀ ζ : ℂ, c₁ ≤ ζ.re → ζ.re ≤ c₂ → ‖Λ χ ζ‖ ≤ M)
+    (hom : ∀ χ, Differentiable ℂ (om χ))
+    (homL : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → z.re < c →
+      om χ z = E χ z * E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) c z)
+    (hglue : ∀ n χ (z : ℂ), 0 < z.re → z.re < 1 →
+      E χ z * Z n χ z = ε χ z * E χ⁻¹ (1 - z) * Z' n χ⁻¹ (1 - z))
+    (hZd : ∀ n χ, DifferentiableOn ℂ (Z n χ) (Complex.re ⁻¹' Ioi 0))
+    (hZ'd : ∀ n χ, DifferentiableOn ℂ (Z' n χ) (Complex.re ⁻¹' Ioi 0)) (n : ℕ) (χ : P) :
+    Differentiable ℂ (meyerDecomposition_glued E ε Λ om Z Z' n χ) := by
+  intro z₀
+  by_cases h : 0 < z₀.re
+  · have ho : Complex.re ⁻¹' Ioi (0 : ℝ) ∈ 𝓝 z₀ :=
+      (isOpen_Ioi.preimage Complex.continuous_re).mem_nhds h
+    have hd : DifferentiableAt ℂ (fun s ↦ om χ s * Z n χ s) z₀ :=
+      (hom χ z₀).mul ((hZd n χ z₀ h).differentiableAt ho)
+    exact hd.congr_of_eventuallyEq (by
+      filter_upwards [ho] with s hs
+      exact meyerDecomposition_glued_right E ε Λ om Z Z' n χ s hs)
+  · have h' : z₀.re < 1 / 2 := by linarith [not_lt.mp h]
+    have ho : {s : ℂ | s.re < 1 / 2} ∈ 𝓝 z₀ :=
+      (isOpen_lt Complex.continuous_re continuous_const).mem_nhds h'
+    have hG : DifferentiableAt ℂ (meyerPositiveLines_lineIntegral (Λ χ) (1 / 2)) z₀ :=
+      meyerDecomposition_posG_differentiableAt (Λ χ) (hΛd χ) (hΛb χ) (1 / 2)
+          (by norm_num) (by norm_num) z₀
+        h'.ne
+    have h1 : 0 < (1 - z₀).re := by rw [Complex.sub_re, Complex.one_re]; linarith
+    have hZ' : DifferentiableAt ℂ (fun s ↦ Z' n χ⁻¹ (1 - s)) z₀ :=
+      ((hZ'd n χ⁻¹ (1 - z₀) h1).differentiableAt
+        ((isOpen_Ioi.preimage Complex.continuous_re).mem_nhds h1)).comp z₀ (by fun_prop)
+    have hd : DifferentiableAt ℂ (fun s ↦ meyerPositiveLines_lineIntegral (Λ χ) (1 / 2) s *
+        (ε χ s * E χ⁻¹ (1 - s) ^ 2 * Z' n χ⁻¹ (1 - s))) z₀ :=
+      hG.mul (((hε χ z₀).mul
+        (((hE χ⁻¹).comp (by fun_prop : Differentiable ℂ fun s : ℂ ↦ 1 - s) z₀).pow 2)).mul hZ')
+    exact hd.congr_of_eventuallyEq (by
+      filter_upwards [ho] with s hs
+      exact meyerDecomposition_glued_left E ε Λ om Z Z' homL hglue n χ s hs)
+
+/-- `1 + X ≤ (1 + K) Y` when `X ≤ K Y` and `1 ≤ Y`. -/
+private theorem meyerDecomposition_one_add_le
+    (X K Y : ℝ) (hY : 1 ≤ Y) (hX : X ≤ K * Y) :
+    1 + X ≤ (1 + K) * Y := by
+  nlinarith
+
+/-- The factor `P e / d · I` of the bound of the Gaussian Cauchy transform, on a range where
+`e ≤ e'` and `d ≥ d₀ > 0`. -/
+private theorem meyerDecomposition_frac_le
+    (P e e' d d₀ I : ℝ) (hP : 0 ≤ P) (he : 0 ≤ e) (hee' : e ≤ e')
+    (hd₀ : 0 < d₀) (hd : d₀ ≤ d) (hI : 0 ≤ I) : P * e / d * I ≤ P * e' / d₀ * I :=
+  mul_le_mul_of_nonneg_right (div_le_div₀ (mul_nonneg hP (he.trans hee'))
+    (mul_le_mul_of_nonneg_left hee' hP) hd₀ hd) hI
+
+/-- The glued function is bounded on every closed vertical strip, for each index and
+character (the a priori bound for Phragmén–Lindelöf). -/
+private theorem meyerDecomposition_glued_bounded
+    {P : Type*} [CommGroup P] (q : GroupSeminorm P)
+    (E ε Λ om : P → ℂ → ℂ) (Z Z' : ℕ → P → ℂ → ℂ) (hE : ∀ χ, Differentiable ℂ (E χ))
+    (hε : ∀ χ, Differentiable ℂ (ε χ))
+    (hΛd : ∀ χ, DifferentiableOn ℂ (Λ χ) (Complex.re ⁻¹' Ioo 0 1))
+    (hΛb : ∀ χ (c₁ c₂ : ℝ), 0 < c₁ → c₁ ≤ c₂ → c₂ < 1 →
+      ∃ M : ℝ, ∀ ζ : ℂ, c₁ ≤ ζ.re → ζ.re ≤ c₂ → ‖Λ χ ζ‖ ≤ M)
+    (hK : ∀ c : ℝ, 0 < c → c < 1 → ∀ α β : ℝ, ∃ (C : ℝ) (N : ℕ) (κ : ℝ), 0 ≤ C ∧
+      ∀ χ (z ζ : ℂ), z.re ∈ Icc α β → ζ.re = c →
+        ‖E χ z * E χ⁻¹ (1 - z)‖ * ‖Λ χ ζ‖ ≤
+          C * ((1 + q χ) * (1 + ‖z‖)) ^ N * Real.exp (κ * |z.im - ζ.im|) ∧
+        ‖E χ⁻¹ (1 - z)‖ ^ 2 * ‖Λ χ ζ‖ ≤
+          C * ((1 + q χ) * (1 + ‖z‖)) ^ N * Real.exp (κ * |z.im - ζ.im|))
+    (hom : ∀ χ, Differentiable ℂ (om χ))
+    (homL : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → z.re < c →
+      om χ z = E χ z * E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) c z)
+    (homR : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → c < z.re →
+      om χ z = 1 + E χ z * E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) c z)
+    (hglue : ∀ n χ (z : ℂ), 0 < z.re → z.re < 1 →
+      E χ z * Z n χ z = ε χ z * E χ⁻¹ (1 - z) * Z' n χ⁻¹ (1 - z))
+    (hZd : ∀ n χ, DifferentiableOn ℂ (Z n χ) (Complex.re ⁻¹' Ioi 0))
+    (hZ'd : ∀ n χ, DifferentiableOn ℂ (Z' n χ) (Complex.re ⁻¹' Ioi 0))
+    (hZdec : ∀ n χ (a b : ℝ), 0 < a → ∀ N : ℕ, ∃ C Y : ℝ, 0 ≤ C ∧ ∀ z : ℂ, z.re ∈ Icc a b →
+      Y ≤ |z.im| → ‖Z n χ z‖ ≤ C / |z.im| ^ (N + 1))
+    (hZ'dec : ∀ n χ (a b : ℝ), 0 < a → ∀ N : ℕ, ∃ C Y : ℝ, 0 ≤ C ∧ ∀ z : ℂ, z.re ∈ Icc a b →
+      Y ≤ |z.im| → ‖Z' n χ z‖ ≤ C / |z.im| ^ (N + 1))
+    (n : ℕ) (χ : P) (a' b' Bε : ℝ) (ha' : a' ≤ 1 / 4) (hb' : 1 / 4 ≤ b') (hBε : 0 ≤ Bε)
+    (hεχ : ∀ z : ℂ, z.re ∈ Icc a' b' → ‖ε χ z‖ ≤ Bε) :
+    ∃ M : ℝ, ∀ z : ℂ, z.re ∈ Icc a' b' → ‖meyerDecomposition_glued E ε Λ om Z Z' n χ z‖ ≤ M := by
+  have hq0 : 0 ≤ q χ := apply_nonneg q χ
+  -- the right part, `1/4 ≤ Re z ≤ b'`
+  obtain ⟨C₁, N₁, κ₁, hC₁, hK₁⟩ := hK (1 / 8) (by norm_num) (by norm_num) (1 / 4) b'
+  have hI₁ : 0 ≤ 1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ₁ * |u| - u ^ 2) :=
+    mul_nonneg (by positivity) (integral_nonneg fun u ↦ (Real.exp_pos _).le)
+  have hK₁' : 0 ≤ C₁ * (1 + q χ) ^ N₁ * Real.exp ((b' - 1 / 8) ^ 2) / (1 / 8) *
+      (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ₁ * |u| - u ^ 2)) :=
+    mul_nonneg (div_nonneg (mul_nonneg (mul_nonneg hC₁ (by positivity)) (Real.exp_pos _).le)
+      (by norm_num)) hI₁
+  have homb : ∀ z : ℂ, z.re ∈ Icc (1 / 4 : ℝ) b' → ‖om χ z‖ ≤
+      (1 + C₁ * (1 + q χ) ^ N₁ * Real.exp ((b' - 1 / 8) ^ 2) / (1 / 8) *
+        (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ₁ * |u| - u ^ 2))) * (1 + ‖z‖) ^ N₁ := by
+    intro z hz
+    have hb := meyerPositiveLines_partition_bound (Λ χ) (1 / 8) κ₁
+        (C₁ * ((1 + q χ) * (1 + ‖z‖)) ^ N₁) z
+      (E χ z * E χ⁻¹ (1 - z)) (by linarith [hz.1]) (fun ζ hζ ↦ (hK₁ χ z ζ hz hζ).1)
+    change ‖E χ z * E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) (1 / 8) z‖ ≤ _ at hb
+    have hb2 := hb.trans (meyerDecomposition_frac_le _ _ (Real.exp ((b' - 1 / 8) ^ 2)) _ (1 / 8) _
+      (by positivity) (Real.exp_pos _).le
+      (Real.exp_le_exp.mpr (by nlinarith [hz.1, hz.2])) (by norm_num)
+      (by rw [abs_of_pos (by linarith [hz.1])]; linarith [hz.1]) hI₁)
+    rw [homR χ (1 / 8) z (by norm_num) (by norm_num) (by linarith [hz.1])]
+    refine (norm_add_le _ _).trans ?_
+    rw [norm_one]
+    refine meyerDecomposition_one_add_le _ _ _ (one_le_pow₀ (by linarith [norm_nonneg z])) ?_
+    refine hb2.trans (le_of_eq ?_)
+    rw [mul_pow]
+    ring
+  obtain ⟨Cr, Yr, hCr, hdecr⟩ := hZdec n χ (1 / 4) b' (by norm_num) N₁
+  obtain ⟨M₁, hM₁⟩ :=
+    meyerCriticalStrip_bounded_product
+      (om χ) (Z n χ) (1 / 4) b' _ Cr Yr N₁ (by linarith) hCr (hom χ).continuous.continuousOn
+      ((hZd n χ).continuousOn.mono fun s hs ↦ (by norm_num : (0 : ℝ) < 1 / 4).trans_le hs.1)
+      homb hdecr
+  -- the left part, `a' ≤ Re z ≤ 1/4`
+  obtain ⟨C₂, N₂, κ₂, hC₂, hK₂⟩ := hK (1 / 2) (by norm_num) (by norm_num) a' (1 / 4)
+  have hI₂ : 0 ≤ 1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ₂ * |u| - u ^ 2) :=
+    mul_nonneg (by positivity) (integral_nonneg fun u ↦ (Real.exp_pos _).le)
+  have hPb : ∀ z : ℂ, z.re ∈ Icc a' (1 / 4) →
+      ‖ε χ z * E χ⁻¹ (1 - z) ^ 2 * meyerPositiveLines_lineIntegral (Λ χ) (1 / 2) z‖ ≤
+      Bε * C₂ * (1 + q χ) ^ N₂ * Real.exp ((a' - 1 / 2) ^ 2) / (1 / 4) *
+        (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ₂ * |u| - u ^ 2)) * (1 + ‖z‖) ^ N₂ := by
+    intro z hz
+    have hzI : z.re ∈ Icc a' b' := ⟨hz.1, hz.2.trans hb'⟩
+    have hb := meyerPositiveLines_partition_bound (Λ χ) (1 / 2) κ₂
+        (Bε * (C₂ * ((1 + q χ) * (1 + ‖z‖)) ^ N₂)) z
+      (ε χ z * E χ⁻¹ (1 - z) ^ 2) (by linarith [hz.2]) (fun ζ hζ ↦ by
+        have h1 := (hK₂ χ z ζ hz hζ).2
+        rw [norm_mul, norm_pow]
+        calc ‖ε χ z‖ * ‖E χ⁻¹ (1 - z)‖ ^ 2 * ‖Λ χ ζ‖ =
+              ‖ε χ z‖ * (‖E χ⁻¹ (1 - z)‖ ^ 2 * ‖Λ χ ζ‖) := by ring
+          _ ≤ Bε * (C₂ * ((1 + q χ) * (1 + ‖z‖)) ^ N₂ * Real.exp (κ₂ * |z.im - ζ.im|)) :=
+            mul_le_mul (hεχ z hzI) h1 (by positivity) hBε
+          _ = _ := by ring)
+    change ‖ε χ z * E χ⁻¹ (1 - z) ^ 2 * meyerPositiveLines_lineIntegral (Λ χ) (1 / 2) z‖ ≤ _ at hb
+    refine (hb.trans (meyerDecomposition_frac_le _ _ (Real.exp ((a' - 1 / 2) ^ 2)) _ (1 / 4) _
+      (mul_nonneg hBε (mul_nonneg hC₂ (by positivity))) (Real.exp_pos _).le
+      (Real.exp_le_exp.mpr (by nlinarith [hz.1, hz.2])) (by norm_num)
+      (by rw [abs_of_neg (by linarith [hz.2])]; linarith [hz.2]) hI₂)).trans (le_of_eq ?_)
+    rw [mul_pow]
+    ring
+  obtain ⟨Cl, Yl, hCl, hdecl⟩ := hZ'dec n χ⁻¹ (3 / 4) (1 - a') (by norm_num) N₂
+  have hmaps (s : ℂ) (hs : s.re ∈ Icc a' (1 / 4)) : (1 - s).re ∈ Icc (3 / 4 : ℝ) (1 - a') := by
+    rw [Complex.sub_re, Complex.one_re]
+    exact ⟨by linarith [hs.2], by linarith [hs.1]⟩
+  obtain ⟨M₂, hM₂⟩ :=
+    meyerCriticalStrip_bounded_product
+      (fun z ↦ ε χ z * E χ⁻¹ (1 - z) ^ 2 * meyerPositiveLines_lineIntegral (Λ χ) (1 / 2) z)
+          (fun z ↦ Z' n χ⁻¹ (1 - z)) a'
+      (1 / 4) _ Cl Yl N₂
+      (mul_nonneg (div_nonneg (mul_nonneg (mul_nonneg (mul_nonneg hBε hC₂) (by positivity))
+        (Real.exp_pos _).le) (by norm_num)) hI₂) hCl
+      (fun s hs ↦ (((hε χ s).mul (((hE χ⁻¹).comp
+        (by fun_prop : Differentiable ℂ fun s : ℂ ↦ 1 - s) s).pow 2)).mul
+        (meyerDecomposition_posG_differentiableAt (Λ χ) (hΛd χ) (hΛb χ) (1 / 2) (by norm_num)
+          (by norm_num) s
+          (by linarith [(show s.re ∈ Icc a' (1 / 4) from hs).2]))).continuousAt.continuousWithinAt)
+      (ContinuousOn.comp (g := fun s : ℂ ↦ Z' n χ⁻¹ s) (hZ'd n χ⁻¹).continuousOn
+        (by fun_prop : Continuous fun s : ℂ ↦ 1 - s).continuousOn
+        (fun s hs ↦ (by norm_num : (0 : ℝ) < 3 / 4).trans_le (hmaps s hs).1))
+      hPb (fun s hs hy ↦ by
+        have him : |(1 - s).im| = |s.im| := by simp
+        have hd := hdecl (1 - s) (hmaps s hs) (by rw [him]; exact hy)
+        rwa [him] at hd)
+  refine ⟨max M₁ M₂, fun z hz ↦ ?_⟩
+  by_cases h : z.re ≤ 1 / 4
+  · rw [meyerDecomposition_glued_left E ε Λ om Z Z' homL hglue n χ z (by linarith)]
+    have h2 := hM₂ z ⟨hz.1, h⟩
+    refine le_trans (le_of_eq ?_) (h2.trans (le_max_right _ _))
+    congr 1
+    ring
+  · rw [meyerDecomposition_glued_right E ε Λ om Z Z' n χ z (by linarith [not_le.mp h])]
+    exact (hM₁ z ⟨(not_le.mp h).le, hz.2⟩).trans (le_max_left _ _)
+
+/-- One piece of the decomposition: the glued function is entire, satisfies the bounds on every
+closed vertical strip, and is `om · Z` on the right half-plane. -/
+private theorem meyerDecomposition_piece
+    {P : Type*} [CommGroup P] (K : Subgroup P) (q : GroupSeminorm P)
+    (E ε Λ om : P → ℂ → ℂ) (hE : ∀ χ, Differentiable ℂ (E χ))
+    (hε : ∀ χ, Differentiable ℂ (ε χ))
+    (hεb : ∀ H : Subgroup K, H.FG → ∀ a b : ℝ, ∃ B : ℝ, 0 ≤ B ∧
+      ∀ (χ : H) (z : ℂ), z.re ∈ Icc a b → ‖ε χ.val.val z‖ ≤ B)
+    (hΛd : ∀ χ, DifferentiableOn ℂ (Λ χ) (Complex.re ⁻¹' Ioo 0 1))
+    (hΛb : ∀ χ (c₁ c₂ : ℝ), 0 < c₁ → c₁ ≤ c₂ → c₂ < 1 →
+      ∃ M : ℝ, ∀ ζ : ℂ, c₁ ≤ ζ.re → ζ.re ≤ c₂ → ‖Λ χ ζ‖ ≤ M)
+    (hK : ∀ c : ℝ, 0 < c → c < 1 → ∀ α β : ℝ, ∃ (C : ℝ) (N : ℕ) (κ : ℝ), 0 ≤ C ∧
+      ∀ χ (z ζ : ℂ), z.re ∈ Icc α β → ζ.re = c →
+        ‖E χ z * E χ⁻¹ (1 - z)‖ * ‖Λ χ ζ‖ ≤
+          C * ((1 + q χ) * (1 + ‖z‖)) ^ N * Real.exp (κ * |z.im - ζ.im|) ∧
+        ‖E χ⁻¹ (1 - z)‖ ^ 2 * ‖Λ χ ζ‖ ≤
+          C * ((1 + q χ) * (1 + ‖z‖)) ^ N * Real.exp (κ * |z.im - ζ.im|))
+    (hom : ∀ χ, Differentiable ℂ (om χ))
+    (homL : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → z.re < c →
+      om χ z = E χ z * E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) c z)
+    (homR : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → c < z.re →
+      om χ z = 1 + E χ z * E χ⁻¹ (1 - z) * meyerPositiveLines_lineIntegral (Λ χ) c z)
+    (Z Z' : ℕ → P → ℂ → ℂ)
+    (hZd : ∀ n χ, DifferentiableOn ℂ (Z n χ) (Complex.re ⁻¹' Ioi 0))
+    (hZ'd : ∀ n χ, DifferentiableOn ℂ (Z' n χ) (Complex.re ⁻¹' Ioi 0))
+    (hZdec : ∀ n χ (a b : ℝ), 0 < a → ∀ N : ℕ, ∃ C Y : ℝ, 0 ≤ C ∧ ∀ z : ℂ, z.re ∈ Icc a b →
+      Y ≤ |z.im| → ‖Z n χ z‖ ≤ C / |z.im| ^ (N + 1))
+    (hZ'dec : ∀ n χ (a b : ℝ), 0 < a → ∀ N : ℕ, ∃ C Y : ℝ, 0 ≤ C ∧ ∀ z : ℂ, z.re ∈ Icc a b →
+      Y ≤ |z.im| → ‖Z' n χ z‖ ≤ C / |z.im| ^ (N + 1))
+    (hZw : ∀ a : ℝ, 0 < a → ∃ H : Subgroup K, H.FG ∧
+      (∀ χ ∉ H, ∀ n (z : ℂ), z.re = a → Z n χ.val z = 0) ∧
+      ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re = a →
+        (1 + p χ) ^ k * ‖z ^ m * Z n χ.val.val z‖ ≤ B)
+    (hZ'w : ∀ a : ℝ, 0 < a → ∃ H : Subgroup K, H.FG ∧
+      (∀ χ ∉ H, ∀ n (z : ℂ), z.re = a → Z' n χ.val z = 0) ∧
+      ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re = a →
+        (1 + p χ) ^ k * ‖z ^ m * Z' n χ.val.val z‖ ≤ B)
+    (hglue : ∀ n χ (z : ℂ), 0 < z.re → z.re < 1 →
+      E χ z * Z n χ z = ε χ z * E χ⁻¹ (1 - z) * Z' n χ⁻¹ (1 - z)) :
+    ∃ Φ : ℕ → K → ℂ → ℂ, (∀ n χ, Differentiable ℂ (Φ n χ)) ∧
+      (∀ a b : ℝ, ∃ H : Subgroup K, H.FG ∧
+        (∀ χ ∉ H, ∀ n (z : ℂ), z.re ∈ Icc a b → Φ n χ z = 0) ∧
+        ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re ∈ Icc a b →
+          (1 + p χ) ^ k * ‖z ^ m * Φ n χ.val z‖ ≤ B) ∧
+      ∀ n (χ : K) (z : ℂ), 0 < z.re → Φ n χ z = om χ.val z * Z n χ.val z := by
+  refine ⟨fun n χ z ↦ meyerDecomposition_glued E ε Λ om Z Z' n χ.val z,
+    fun n χ ↦ meyerDecomposition_glued_differentiable E ε Λ om Z Z' hE hε hΛd hΛb
+        hom homL hglue hZd hZ'd n
+      χ.val, fun a b ↦ ?_, fun n χ z hz ↦ meyerDecomposition_glued_right E ε Λ om Z Z' n χ.val z hz⟩
+  set a' := min a (-1 / 2) with ha'_def
+  set b' := max b (3 / 2) with hb'_def
+  have ha' : a' ≤ -1 / 2 := min_le_right _ _
+  have hb' : 3 / 2 ≤ b' := le_max_right _ _
+  have haa' : a' ≤ a := min_le_left _ _
+  have hbb' : b ≤ b' := le_max_left _ _
+  obtain ⟨H₁, hH₁, hs₁, hw₁⟩ := hZ'w (1 - a') (by linarith)
+  obtain ⟨H₂, hH₂, hs₂, hw₂⟩ := hZw b' (by linarith)
+  refine ⟨H₁ ⊔ H₂, hH₁.sup hH₂, fun χ hχ n z _ ↦ ?_, fun p k m ↦ ?_⟩
+  · have hχ₂ : χ ∉ H₂ := fun h ↦ hχ ((le_sup_right : H₂ ≤ H₁ ⊔ H₂) h)
+    have hχ₁ : χ⁻¹ ∉ H₁ := fun h ↦ hχ ((le_sup_left : H₁ ≤ H₁ ⊔ H₂) (inv_mem_iff.mp h))
+    have hZ0 : ∀ s : ℂ, 0 < s.re → Z n χ.val s = 0 :=
+      sLocalMellinSchwartzBounds_meyer_line_support _
+        ((hZd n χ.val).analyticOnNhd (isOpen_Ioi.preimage Complex.continuous_re)) b'
+        (by linarith) (hs₂ χ hχ₂ n)
+    have hZ'0 : ∀ s : ℂ, 0 < s.re → Z' n χ.val⁻¹ s = 0 :=
+      sLocalMellinSchwartzBounds_meyer_line_support _
+        ((hZ'd n χ.val⁻¹).analyticOnNhd (isOpen_Ioi.preimage Complex.continuous_re)) (1 - a')
+        (by linarith) (hs₁ χ⁻¹ hχ₁ n)
+    change meyerDecomposition_glued E ε Λ om Z Z' n χ.val z = 0
+    rw [meyerDecomposition_glued]
+    split_ifs with h
+    · rw [hZ0 z h, mul_zero]
+    · rw [hZ'0 (1 - z) (by rw [Complex.sub_re, Complex.one_re]; linarith [not_lt.mp h]),
+        mul_zero, mul_zero]
+  · let ι : ↥(H₁ ⊔ H₂) →* P := K.subtype.comp (H₁ ⊔ H₂).subtype
+    let qH : GroupSeminorm ↥(H₁ ⊔ H₂) := q.comp ι
+    have hqH (χ : ↥(H₁ ⊔ H₂)) : qH χ = q χ.val.val := rfl
+    obtain ⟨Bε, hBε0, hBε⟩ := hεb (H₁ ⊔ H₂) (hH₁.sup hH₂) a' b'
+    obtain ⟨C_R, N_R, κ_R, hC_R, hK_R⟩ := hK (1 / 2) (by norm_num) (by norm_num) b' b'
+    obtain ⟨C_L, N_L, κ_L, hC_L, hK_L⟩ := hK (1 / 2) (by norm_num) (by norm_num) a' a'
+    have hI_R : 0 ≤ 1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ_R * |u| - u ^ 2) :=
+      mul_nonneg (by positivity) (integral_nonneg fun u ↦ (Real.exp_pos _).le)
+    have hI_L : 0 ≤ 1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ_L * |u| - u ^ 2) :=
+      mul_nonneg (by positivity) (integral_nonneg fun u ↦ (Real.exp_pos _).le)
+    have hdR : 0 < |b' - 1 / 2| := abs_pos.mpr (by linarith)
+    have hdL : 0 < |a' - 1 / 2| := abs_pos.mpr (by linarith)
+    have hKR : 0 ≤ C_R * Real.exp ((b' - 1 / 2) ^ 2) / |b' - 1 / 2| *
+        (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ_R * |u| - u ^ 2)) :=
+      mul_nonneg (div_nonneg (mul_nonneg hC_R (Real.exp_pos _).le) hdR.le) hI_R
+    have hKL : 0 ≤ Bε * C_L * Real.exp ((a' - 1 / 2) ^ 2) / |a' - 1 / 2| *
+        (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ_L * |u| - u ^ 2)) :=
+      mul_nonneg (div_nonneg (mul_nonneg (mul_nonneg hBε0 hC_L) (Real.exp_pos _).le) hdL.le) hI_L
+    obtain ⟨B_R, hB_R⟩ := sLocalMellinSchwartzBounds_meyer_enlarge_weights (D := K)
+      (fun n (χ : K) z ↦ Z n χ.val z) H₂ (H₁ ⊔ H₂) le_sup_right b' hs₂ hw₂ (p + qH)
+      (k + N_R) (m + N_R)
+    obtain ⟨B_L, hB_L⟩ := sLocalMellinSchwartzBounds_meyer_enlarge_weights (D := K)
+      (fun n (χ : K) z ↦ Z' n χ.val z) H₁ (H₁ ⊔ H₂) le_sup_left (1 - a') hs₁ hw₁ (p + qH)
+      (k + N_L) (m + N_L)
+    refine ⟨max ((Bε * C_L * Real.exp ((a' - 1 / 2) ^ 2) / |a' - 1 / 2| *
+        (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ_L * |u| - u ^ 2))) * 2 ^ N_L * B_L)
+      ((1 + C_R * Real.exp ((b' - 1 / 2) ^ 2) / |b' - 1 / 2| *
+        (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ_R * |u| - u ^ 2))) * 2 ^ N_R * B_R),
+      fun χ n z hz ↦ ?_⟩
+    have hq0 : 0 ≤ q χ.val.val := apply_nonneg q _
+    have hp0 : 0 ≤ p χ := apply_nonneg p χ
+    -- the right edge
+    have hright (w : ℂ) (hw : w.re = b') :
+        (1 + p χ) ^ k * ‖w ^ m * meyerDecomposition_glued E ε Λ om Z Z' n χ.val.val w‖ ≤
+          (1 + C_R * Real.exp ((b' - 1 / 2) ^ 2) / |b' - 1 / 2| *
+            (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ_R * |u| - u ^ 2))) * 2 ^ N_R * B_R := by
+      have hw0 : 0 < w.re := by linarith
+      have hw1 : 1 ≤ ‖w‖ := by
+        have := (le_abs_self w.re).trans (Complex.abs_re_le_norm w)
+        linarith
+      have hwI : w.re ∈ Icc b' b' := ⟨hw.ge, hw.le⟩
+      have hΔG := meyerPositiveLines_partition_bound (Λ χ.val.val) (1 / 2) κ_R
+        (C_R * ((1 + q χ.val.val) * (1 + ‖w‖)) ^ N_R) w (E χ.val.val w * E χ.val.val⁻¹ (1 - w))
+        (by linarith) (fun ζ hζ ↦ (hK_R χ.val.val w ζ hwI hζ).1)
+      change ‖E χ.val.val w * E χ.val.val⁻¹ (1 - w) * meyerPositiveLines_lineIntegral
+          (Λ χ.val.val) (1 / 2) w‖ ≤ _ at hΔG
+      rw [hw] at hΔG
+      have hom_bd : ‖om χ.val.val w‖ ≤ (1 + C_R * Real.exp ((b' - 1 / 2) ^ 2) / |b' - 1 / 2| *
+          (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ_R * |u| - u ^ 2))) *
+            (1 + q χ.val.val) ^ N_R * (1 + ‖w‖) ^ N_R := by
+        rw [homR χ.val.val (1 / 2) w (by norm_num) (by norm_num) (by linarith)]
+        refine (norm_add_le _ _).trans ?_
+        rw [norm_one, mul_assoc _ ((1 + q χ.val.val) ^ N_R), ← mul_pow]
+        refine meyerDecomposition_one_add_le _ _ _ (one_le_pow₀ (by nlinarith [norm_nonneg w]))
+          (hΔG.trans (le_of_eq ?_))
+        ring
+      have hB := hB_R (χ, n) w hw
+      rw [add_apply, hqH, norm_mul, norm_pow] at hB
+      rw [meyerDecomposition_glued_right E ε Λ om Z Z' n χ.val.val w hw0,
+          norm_mul (w ^ m), norm_pow,
+        norm_mul]
+      exact meyerCriticalStrip_edge
+        (p χ) (q χ.val.val) _ ‖om χ.val.val w‖ ‖Z n χ.val.val w‖ ‖w‖ ‖w‖ B_R k m N_R hp0 hq0
+        (by linarith [hKR]) (norm_nonneg _) (norm_nonneg _) (norm_nonneg _) le_rfl
+        (by linarith) hom_bd hB
+    -- the left edge
+    have hleft (w : ℂ) (hw : w.re = a') :
+        (1 + p χ) ^ k * ‖w ^ m * meyerDecomposition_glued E ε Λ om Z Z' n χ.val.val w‖ ≤
+          (Bε * C_L * Real.exp ((a' - 1 / 2) ^ 2) / |a' - 1 / 2| *
+            (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ_L * |u| - u ^ 2))) * 2 ^ N_L * B_L := by
+      have hw1 : w.re < 1 / 2 := by linarith
+      have hwI : w.re ∈ Icc a' a' := ⟨hw.ge, hw.le⟩
+      have hre1 : (1 - w).re = 1 - a' := by rw [Complex.sub_re, Complex.one_re, hw]
+      have hb := meyerPositiveLines_partition_bound (Λ χ.val.val) (1 / 2) κ_L
+        (Bε * (C_L * ((1 + q χ.val.val) * (1 + ‖w‖)) ^ N_L)) w
+        (ε χ.val.val w * E χ.val.val⁻¹ (1 - w) ^ 2) (by linarith) (fun ζ hζ ↦ by
+          have h1 := (hK_L χ.val.val w ζ hwI hζ).2
+          have h2 : ‖ε χ.val.val w‖ ≤ Bε := hBε χ w ⟨hw.ge, by linarith⟩
+          rw [norm_mul, norm_pow]
+          calc ‖ε χ.val.val w‖ * ‖E χ.val.val⁻¹ (1 - w)‖ ^ 2 * ‖Λ χ.val.val ζ‖ =
+                ‖ε χ.val.val w‖ * (‖E χ.val.val⁻¹ (1 - w)‖ ^ 2 * ‖Λ χ.val.val ζ‖) := by ring
+            _ ≤ Bε * (C_L * ((1 + q χ.val.val) * (1 + ‖w‖)) ^ N_L *
+                Real.exp (κ_L * |w.im - ζ.im|)) := mul_le_mul h2 h1 (by positivity) hBε0
+            _ = _ := by ring)
+      change ‖ε χ.val.val w * E χ.val.val⁻¹ (1 - w) ^ 2 * meyerPositiveLines_lineIntegral
+          (Λ χ.val.val) (1 / 2) w‖ ≤ _ at hb
+      rw [hw] at hb
+      have hA_bd : ‖ε χ.val.val w * E χ.val.val⁻¹ (1 - w) ^ 2 * meyerPositiveLines_lineIntegral
+          (Λ χ.val.val) (1 / 2) w‖ ≤
+          (Bε * C_L * Real.exp ((a' - 1 / 2) ^ 2) / |a' - 1 / 2| *
+            (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ_L * |u| - u ^ 2))) *
+              (1 + q χ.val.val) ^ N_L * (1 + ‖w‖) ^ N_L := by
+        refine hb.trans (le_of_eq ?_)
+        rw [mul_pow]
+        ring
+      have hB := meyerCriticalStrip_inverse_index
+        (P := P) K (H₁ ⊔ H₂) (fun n χ z ↦ Z' n χ z) (p + qH) (k + N_L) (m + N_L) (1 - a') B_L
+        hB_L χ n (1 - w) hre1
+      rw [add_apply, hqH, norm_mul, norm_pow] at hB
+      have htr : ‖w‖ ≤ ‖1 - w‖ := by
+        rw [Complex.norm_def, Complex.norm_def]
+        apply Real.sqrt_le_sqrt
+        rw [Complex.normSq_apply, Complex.normSq_apply, Complex.sub_re, Complex.sub_im,
+          Complex.one_re, Complex.one_im, hw]
+        nlinarith [mul_self_nonneg w.im]
+      have h1r : 1 + ‖w‖ ≤ 2 * ‖1 - w‖ := by
+        have := (le_abs_self (1 - w).re).trans (Complex.abs_re_le_norm (1 - w))
+        rw [hre1] at this
+        linarith
+      rw [meyerDecomposition_glued_left E ε Λ om Z Z' homL hglue n χ.val.val w hw1,
+        show meyerPositiveLines_lineIntegral (Λ χ.val.val) (1 / 2) w *
+            (ε χ.val.val w * E χ.val.val⁻¹ (1 - w) ^ 2 *
+          Z' n χ.val.val⁻¹ (1 - w)) = (ε χ.val.val w * E χ.val.val⁻¹ (1 - w) ^ 2 *
+            meyerPositiveLines_lineIntegral (Λ χ.val.val) (1 / 2) w) *
+                Z' n χ.val.val⁻¹ (1 - w) by ring,
+        norm_mul (w ^ m), norm_pow, norm_mul]
+      exact meyerCriticalStrip_edge
+        (p χ) (q χ.val.val) _ _ ‖Z' n χ.val.val⁻¹ (1 - w)‖ ‖w‖ ‖1 - w‖ B_L k m N_L hp0 hq0 hKL
+        (norm_nonneg _) (norm_nonneg _) (norm_nonneg _) htr h1r hA_bd hB
+    -- Phragmén–Lindelöf
+    obtain ⟨Mg, hMg⟩ := meyerDecomposition_glued_bounded q E ε Λ om Z Z' hE hε
+        hΛd hΛb hK hom homL homR
+      hglue hZd hZ'd hZdec hZ'dec n χ.val.val a' b' Bε (by linarith) (by linarith) hBε0
+      (fun w hw ↦ hBε χ w hw)
+    have hpk : 0 ≤ (1 + p χ) ^ k := pow_nonneg (by linarith) _
+    set BL := (Bε * C_L * Real.exp ((a' - 1 / 2) ^ 2) / |a' - 1 / 2| *
+      (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ_L * |u| - u ^ 2))) * 2 ^ N_L * B_L with hBL
+    set BR := (1 + C_R * Real.exp ((b' - 1 / 2) ^ 2) / |b' - 1 / 2| *
+      (1 / (2 * Real.pi) * ∫ u : ℝ, Real.exp (κ_R * |u| - u ^ 2))) * 2 ^ N_R * B_R with hBR
+    let G : ℂ → ℂ := fun w ↦ (((1 + p χ) ^ k : ℝ) : ℂ) *
+        meyerDecomposition_glued E ε Λ om Z Z' n χ.val.val w
+    have hGn (w : ℂ) : ‖w ^ m * G w‖ =
+        (1 + p χ) ^ k * ‖w ^ m * meyerDecomposition_glued E ε Λ om Z Z' n χ.val.val w‖ := by
+      change ‖w ^ m *
+          ((((1 + p χ) ^ k : ℝ) : ℂ) * meyerDecomposition_glued E ε Λ om Z Z' n χ.val.val w)‖ = _
+      rw [mul_left_comm, norm_mul, Complex.norm_real, Real.norm_of_nonneg hpk]
+    have hGd : Differentiable ℂ G := (differentiable_const _).mul
+      (meyerDecomposition_glued_differentiable E ε Λ om Z Z' hE hε hΛd hΛb hom homL hglue hZd hZ'd n
+        χ.val.val)
+    have key := norm_pow_mul_le_on_verticalStrip (a := a') (b := b') (by linarith) (F := G)
+      hGd.diffContOnCl (M := (1 + p χ) ^ k * Mg) (fun w hw ↦ by
+        change ‖(((1 + p χ) ^ k : ℝ) : ℂ) *
+          meyerDecomposition_glued E ε Λ om Z Z' n χ.val.val w‖ ≤ _
+        rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg hpk]
+        exact mul_le_mul_of_nonneg_left (hMg w hw) hpk) m (C := max BL BR)
+      (fun w hw ↦ by rw [hGn]; exact (hleft w hw).trans (le_max_left _ _))
+      (fun w hw ↦ by rw [hGn]; exact (hright w hw).trans (le_max_right _ _))
+      z ⟨haa'.trans hz.1, hz.2.trans hbb'⟩
+    rw [hGn] at key
+    exact key
+
+/-- The S-local Hecke L-function in a norm chart. -/
+private noncomputable def meyerDecomposition_heckeL
+    (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ) : ℂ :=
+  sLocalHeckeL (chartₜ(T, χ) z)
+
+/-- The S-local epsilon factor in a norm chart. -/
+private noncomputable def meyerDecomposition_epsilon
+    (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ) : ℂ :=
+  sLocalEpsilonFactor (chartₜ(T, χ) z)
+
+open Classical in
+/-- The Euler factor at an infinite place, as a function of the shifted variable. -/
+private noncomputable def meyerDecomposition_archFactor
+    (w : InfinitePlace F) (x : ℂ) : ℂ :=
+  if w.IsReal then Complex.Gammaℝ x else Complex.Gammaℂ x / 2
+
+/-- The Euler factor at a real place. -/
+private theorem meyerDecomposition_A_of_real
+    (w : InfinitePlace F) (hw : w.IsReal) (x : ℂ) :
+    meyerDecomposition_archFactor w x = Complex.Gammaℝ x := by
+  classical
+  exact ite_eq_left_iff.mpr fun h ↦ absurd hw h
+
+/-- The Euler factor at a complex place. -/
+private theorem meyerDecomposition_A_of_not_real
+    (w : InfinitePlace F) (hw : ¬ w.IsReal) (x : ℂ) :
+    meyerDecomposition_archFactor w x = Complex.Gammaℂ x / 2 := by
+  classical
+  exact ite_eq_right_iff.mpr fun h ↦ absurd h hw
+
+/-- The Euler factor at an infinite place does not vanish on the right half-plane. -/
+private theorem meyerDecomposition_A_ne_zero
+    (w : InfinitePlace F) (x : ℂ) (hx : 0 < x.re) :
+    meyerDecomposition_archFactor w x ≠ 0 := by
+  by_cases hw : w.IsReal
+  · rw [meyerDecomposition_A_of_real w hw]
+    exact Complex.Gammaℝ_ne_zero_of_re_pos hx
+  · rw [meyerDecomposition_A_of_not_real w hw, ← Complex.Gammaℝ_mul_Gammaℝ_add_one]
+    have h1 : 0 < (x + 1).re := by rw [Complex.add_re, Complex.one_re]; linarith
+    exact div_ne_zero (mul_ne_zero (Complex.Gammaℝ_ne_zero_of_re_pos hx)
+      (Complex.Gammaℝ_ne_zero_of_re_pos h1)) two_ne_zero
+
+/-- The inverse of the Euler factor at an infinite place is entire. -/
+private theorem meyerDecomposition_A_inv_differentiable
+    (w : InfinitePlace F) :
+    Differentiable ℂ fun x ↦ (meyerDecomposition_archFactor w x)⁻¹ := by
+  by_cases hw : w.IsReal
+  · have e : (fun x ↦ (meyerDecomposition_archFactor w x)⁻¹) = fun x ↦ (Complex.Gammaℝ x)⁻¹ := by
+      funext x
+      rw [meyerDecomposition_A_of_real w hw]
+    rw [e]
+    exact Complex.differentiable_Gammaℝ_inv
+  · have e : (fun x ↦ (meyerDecomposition_archFactor w x)⁻¹) =
+        fun x ↦ 2 * ((Complex.Gammaℝ x)⁻¹ * (Complex.Gammaℝ (x + 1))⁻¹) := by
+      funext x
+      rw [meyerDecomposition_A_of_not_real w hw, ← Complex.Gammaℝ_mul_Gammaℝ_add_one, inv_div,
+        div_eq_mul_inv, mul_inv]
+    rw [e]
+    exact (differentiable_const _).mul (Complex.differentiable_Gammaℝ_inv.mul
+      (Complex.differentiable_Gammaℝ_inv.comp (differentiable_id.add_const 1)))
+
+/-- The Euler factor at an infinite place commutes with complex conjugation. -/
+private theorem meyerDecomposition_A_conj
+    (w : InfinitePlace F) (x : ℂ) :
+    meyerDecomposition_archFactor w (starRingEnd ℂ x) =
+        starRingEnd ℂ (meyerDecomposition_archFactor w x) := by
+  by_cases hw : w.IsReal
+  · rw [meyerDecomposition_A_of_real w hw, meyerDecomposition_A_of_real w hw, Complex.Gammaℝ_conj]
+  · rw [meyerDecomposition_A_of_not_real w hw, meyerDecomposition_A_of_not_real w hw,
+      Complex.Gammaℂ_conj, map_div₀,
+      map_ofNat]
+
+/-- The Euler factor at an infinite place is bounded on every closed vertical strip of
+positive real part. -/
+private theorem meyerDecomposition_A_bounded
+    (w : InfinitePlace F) (x₀ x₁ : ℝ) (hx₀ : 0 < x₀) :
+    ∃ M : ℝ, ∀ x : ℂ, x.re ∈ Icc x₀ x₁ → ‖meyerDecomposition_archFactor w x‖ ≤ M := by
+  obtain ⟨M₁, hM₁⟩ :=
+    meyerStripMultiplier_gammaReal_bounded
+      x₀ x₁ hx₀
+  by_cases hw : w.IsReal
+  · exact ⟨M₁, fun x hx ↦ by rw [meyerDecomposition_A_of_real w hw]; exact hM₁ x hx⟩
+  · obtain ⟨M₂, hM₂⟩ :=
+      meyerStripMultiplier_gammaReal_bounded
+        (x₀ + 1) (x₁ + 1) (by linarith)
+    refine ⟨|M₁| * |M₂|, fun x hx ↦ ?_⟩
+    have h1 := (hM₁ x hx).trans (le_abs_self M₁)
+    have h2 := (hM₂ (x + 1) (by
+      rw [Complex.add_re, Complex.one_re]
+      exact ⟨by linarith [hx.1], by linarith [hx.2]⟩)).trans (le_abs_self M₂)
+    rw [meyerDecomposition_A_of_not_real w hw,
+        ← Complex.Gammaℝ_mul_Gammaℝ_add_one, norm_div, norm_mul,
+      Complex.norm_ofNat]
+    have h3 : ‖Complex.Gammaℝ x‖ * ‖Complex.Gammaℝ (x + 1)‖ ≤ |M₁| * |M₂| :=
+      mul_le_mul h1 h2 (norm_nonneg _) (abs_nonneg _)
+    have h4 : 0 ≤ ‖Complex.Gammaℝ x‖ * ‖Complex.Gammaℝ (x + 1)‖ := by positivity
+    linarith
+
+/-- `(1 + x) e^{π x / 2} ≤ e^{(π + 1) x}` for `x ≥ 0`. -/
+private theorem meyerDecomposition_exp_le
+    (x : ℝ) (hx : 0 ≤ x) :
+    (1 + x) * Real.exp (Real.pi * x / 2) ≤ Real.exp ((Real.pi + 1) * x) := by
+  have h1 : 1 + x ≤ Real.exp x := by linarith [Real.add_one_le_exp x]
+  have h2 : Real.exp (Real.pi * x / 2) ≤ Real.exp (Real.pi * x) :=
+    Real.exp_le_exp.mpr (by nlinarith [Real.pi_pos])
+  calc (1 + x) * Real.exp (Real.pi * x / 2) ≤ Real.exp x * Real.exp (Real.pi * x) :=
+        mul_le_mul h1 h2 (Real.exp_pos _).le (Real.exp_pos _).le
+    _ = Real.exp ((Real.pi + 1) * x) := by rw [← Real.exp_add]; ring_nf
+
+/-- `1 + ‖a + σ‖ ≤ (1 + ‖a‖) (1 + ‖σ‖)`. -/
+private theorem meyerDecomposition_one_add_norm_le
+    (a σ : ℂ) :
+    1 + ‖a + σ‖ ≤ (1 + ‖a‖) * (1 + ‖σ‖) := by
+  nlinarith [norm_add_le a σ, norm_nonneg a, norm_nonneg σ, mul_nonneg (norm_nonneg a)
+    (norm_nonneg σ)]
+
+/-- The quotient of Euler factors at an infinite place, with the shift `σ`: a polynomial in
+`z` and `σ` times an exponential in the difference of the heights. -/
+private theorem meyerDecomposition_A_ratio
+    (w : InfinitePlace F) (c D₀ : ℝ) (hc : 0 < c) :
+    ∃ (C : ℝ) (N : ℕ), 0 ≤ C ∧ ∀ σ z ζ : ℂ, 0 ≤ σ.re → ζ.re = c → |z.re - c| ≤ D₀ →
+      ‖meyerDecomposition_archFactor w (ζ + σ)‖ * ‖(meyerDecomposition_archFactor w (z + σ))⁻¹‖ ≤
+        C * ((1 + ‖z‖) * (1 + ‖σ‖)) ^ N * Real.exp ((Real.pi + 1) * |z.im - ζ.im|) := by
+  by_cases hw : w.IsReal
+  · obtain ⟨C, N, hC, h⟩ := meyerPositiveLines_gamma_quotient_uniform (c / 2)
+      (D₀ / 2) (by positivity)
+    refine ⟨Real.pi ^ (D₀ / 2) * C, N, by positivity, fun σ z ζ hσ hζ hz ↦ ?_⟩
+    rw [meyerDecomposition_A_of_real w hw, meyerDecomposition_A_of_real w hw]
+    have hre (u : ℂ) : (u / 2).re = u.re / 2 := Complex.div_ofNat_re u 2
+    have him (u : ℂ) : (u / 2).im = u.im / 2 := Complex.div_ofNat_im u 2
+    have hzσ : ((z + σ) / 2).re = (z.re + σ.re) / 2 := by rw [hre, Complex.add_re]
+    have hζσ : ((ζ + σ) / 2).re = (c + σ.re) / 2 := by rw [hre, Complex.add_re, hζ]
+    have key := h ((z + σ) / 2) ((ζ + σ) / 2) (by rw [hζσ]; linarith)
+      (by
+        rw [hzσ, hζσ, show (z.re + σ.re) / 2 - (c + σ.re) / 2 = (z.re - c) / 2 by ring, abs_div,
+          abs_of_pos (by norm_num : (0 : ℝ) < 2)]
+        linarith)
+    have hd : |((z + σ) / 2).im - ((ζ + σ) / 2).im| = |z.im - ζ.im| / 2 := by
+      rw [him, him, Complex.add_im, Complex.add_im,
+        show (z.im + σ.im) / 2 - (ζ.im + σ.im) / 2 = (z.im - ζ.im) / 2 by ring, abs_div,
+        abs_of_pos (by norm_num : (0 : ℝ) < 2)]
+    rw [hd] at key
+    have hpi : 1 ≤ Real.pi := by linarith [Real.pi_gt_three]
+    have hn1 : ‖Complex.Gammaℝ (ζ + σ)‖ =
+        Real.pi ^ (-(ζ + σ) / 2).re * ‖Complex.Gamma ((ζ + σ) / 2)‖ := by
+      rw [Complex.Gammaℝ_def, norm_mul, Complex.norm_cpow_eq_rpow_re_of_pos Real.pi_pos]
+    have hn2 : ‖(Complex.Gammaℝ (z + σ))⁻¹‖ =
+        Real.pi ^ ((z + σ) / 2).re * ‖(Complex.Gamma ((z + σ) / 2))⁻¹‖ := by
+      rw [Complex.Gammaℝ_def, mul_inv, norm_mul, ← Complex.cpow_neg,
+        Complex.norm_cpow_eq_rpow_re_of_pos Real.pi_pos]
+      congr 3
+      ring
+    have hpow : Real.pi ^ (-(ζ + σ) / 2).re * Real.pi ^ ((z + σ) / 2).re ≤
+        Real.pi ^ (D₀ / 2) := by
+      rw [← Real.rpow_add Real.pi_pos]
+      apply Real.rpow_le_rpow_of_exponent_le hpi
+      rw [hzσ, show -(ζ + σ) / 2 = -((ζ + σ) / 2) by ring, Complex.neg_re, hζσ]
+      have := (le_abs_self (z.re - c)).trans hz
+      linarith
+    have hnorm : 1 + ‖(z + σ) / 2‖ ≤ (1 + ‖z‖) * (1 + ‖σ‖) := by
+      have h1 : ‖(z + σ) / 2‖ ≤ ‖z + σ‖ := by
+        rw [norm_div, Complex.norm_ofNat]
+        linarith [norm_nonneg (z + σ)]
+      linarith [meyerDecomposition_one_add_norm_le z σ]
+    have hexp : (1 + |z.im - ζ.im| / 2) * Real.exp (Real.pi * (|z.im - ζ.im| / 2) / 2) ≤
+        Real.exp ((Real.pi + 1) * |z.im - ζ.im|) :=
+      (meyerDecomposition_exp_le _ (by positivity)).trans
+        (Real.exp_le_exp.mpr (by nlinarith [Real.pi_pos, abs_nonneg (z.im - ζ.im)]))
+    rw [hn1, hn2]
+    calc Real.pi ^ (-(ζ + σ) / 2).re * ‖Complex.Gamma ((ζ + σ) / 2)‖ *
+          (Real.pi ^ ((z + σ) / 2).re * ‖(Complex.Gamma ((z + σ) / 2))⁻¹‖)
+        = (Real.pi ^ (-(ζ + σ) / 2).re * Real.pi ^ ((z + σ) / 2).re) *
+          (‖Complex.Gamma ((ζ + σ) / 2)‖ * ‖(Complex.Gamma ((z + σ) / 2))⁻¹‖) := by ring
+      _ ≤ Real.pi ^ (D₀ / 2) * (C * (1 + ‖(z + σ) / 2‖) ^ N *
+          ((1 + |z.im - ζ.im| / 2) * Real.exp (Real.pi * (|z.im - ζ.im| / 2) / 2))) :=
+        mul_le_mul hpow key (by positivity) (by positivity)
+      _ ≤ Real.pi ^ (D₀ / 2) * (C * ((1 + ‖z‖) * (1 + ‖σ‖)) ^ N *
+          Real.exp ((Real.pi + 1) * |z.im - ζ.im|)) := by gcongr
+      _ = _ := by ring
+  · obtain ⟨C, N, hC, h⟩ := meyerPositiveLines_gamma_quotient_uniform c D₀ hc
+    refine ⟨(2 * Real.pi) ^ D₀ * C, N, by positivity, fun σ z ζ hσ hζ hz ↦ ?_⟩
+    rw [meyerDecomposition_A_of_not_real w hw, meyerDecomposition_A_of_not_real w hw]
+    have hζσ : (ζ + σ).re = c + σ.re := by rw [Complex.add_re, hζ]
+    have key := h (z + σ) (ζ + σ) (by rw [hζσ]; linarith)
+      (by rw [Complex.add_re, hζσ, show z.re + σ.re - (c + σ.re) = z.re - c by ring]; exact hz)
+    have hd : (z + σ).im - (ζ + σ).im = z.im - ζ.im := by
+      rw [Complex.add_im, Complex.add_im]; ring
+    rw [hd] at key
+    have h2π : (2 * (Real.pi : ℂ)) = ((2 * Real.pi : ℝ) : ℂ) := by push_cast; ring
+    have h2πpos : (0 : ℝ) < 2 * Real.pi := by positivity
+    have hn1 : ‖Complex.Gammaℂ (ζ + σ) / 2‖ =
+        (2 * Real.pi) ^ (-(ζ + σ)).re * ‖Complex.Gamma (ζ + σ)‖ := by
+      rw [Complex.Gammaℂ_def, h2π, norm_div, norm_mul, norm_mul,
+        Complex.norm_cpow_eq_rpow_re_of_pos h2πpos, Complex.norm_ofNat]
+      ring
+    have hn2 : ‖(Complex.Gammaℂ (z + σ) / 2)⁻¹‖ =
+        (2 * Real.pi) ^ (z + σ).re * ‖(Complex.Gamma (z + σ))⁻¹‖ := by
+      rw [Complex.Gammaℂ_def, inv_div, div_eq_mul_inv, mul_inv, mul_inv, ← Complex.cpow_neg,
+        neg_neg, h2π, norm_mul, norm_mul, norm_mul, Complex.norm_cpow_eq_rpow_re_of_pos h2πpos,
+        show ‖(2 : ℂ)⁻¹‖ = 2⁻¹ by norm_num, Complex.norm_ofNat]
+      ring
+    have hpow : (2 * Real.pi) ^ (-(ζ + σ)).re * (2 * Real.pi) ^ (z + σ).re ≤
+        (2 * Real.pi) ^ D₀ := by
+      rw [← Real.rpow_add h2πpos]
+      apply Real.rpow_le_rpow_of_exponent_le (by linarith [Real.pi_gt_three])
+      rw [Complex.neg_re, hζσ, Complex.add_re]
+      have := (le_abs_self (z.re - c)).trans hz
+      linarith
+    rw [hn1, hn2]
+    calc (2 * Real.pi) ^ (-(ζ + σ)).re * ‖Complex.Gamma (ζ + σ)‖ *
+          ((2 * Real.pi) ^ (z + σ).re * ‖(Complex.Gamma (z + σ))⁻¹‖)
+        = ((2 * Real.pi) ^ (-(ζ + σ)).re * (2 * Real.pi) ^ (z + σ).re) *
+          (‖Complex.Gamma (ζ + σ)‖ * ‖(Complex.Gamma (z + σ))⁻¹‖) := by ring
+      _ ≤ (2 * Real.pi) ^ D₀ * (C * (1 + ‖z + σ‖) ^ N *
+          ((1 + |z.im - ζ.im|) * Real.exp (Real.pi * |z.im - ζ.im| / 2))) :=
+        mul_le_mul hpow key (by positivity) (by positivity)
+      _ ≤ (2 * Real.pi) ^ D₀ * (C * ((1 + ‖z‖) * (1 + ‖σ‖)) ^ N *
+          Real.exp ((Real.pi + 1) * |z.im - ζ.im|)) := by
+        gcongr
+        · exact meyerDecomposition_one_add_norm_le z σ
+        · exact meyerDecomposition_exp_le _ (abs_nonneg _)
+      _ = _ := by ring
+
+/-- The local Euler factors of a norm chart: Gamma factors with a shift controlled by one group
+seminorm at the infinite places, `(1 - u r^z)⁻¹` at the finite places. -/
+private theorem meyerDecomposition_local
+    (T : Finset V) :
+    ∃ (q : GroupSeminorm (PontryaginDual (SIdeleQuotient F T)))
+      (s : InfinitePlace F → PontryaginDual (SIdeleQuotient F T) → ℂ)
+      (u : T → PontryaginDual (SIdeleQuotient F T) → ℂ),
+      (∀ w χ, 0 ≤ (s w χ).re ∧ ‖s w χ‖ ≤ q χ ∧ s w χ⁻¹ = starRingEnd ℂ (s w χ)) ∧
+      (∀ v χ, ‖u v χ‖ ≤ 1) ∧
+      (∀ w χ z, (w.IsReal →
+          infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (chartₜ(T, χ) z)) =
+            Complex.Gammaℝ (z + s w χ)) ∧
+        (¬ w.IsReal →
+          infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (chartₜ(T, χ) z)) =
+            Complex.Gammaℂ (z + s w χ) / 2)) ∧
+      (∀ v χ z, finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (chartₜ(T, χ) z)) =
+        (1 - u v χ * (((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) : ℂ) ^ z)⁻¹) ∧
+      (∀ v χ z, finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (chartₜ(T, χ⁻¹) z)) =
+        (1 - starRingEnd ℂ (u v χ) * (((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) : ℂ) ^ z)⁻¹) := by
+  choose i hi using fun w : InfinitePlace F ↦
+    meyerStripMultiplier_infinite_restriction
+      T w
+  have hpar (w : InfinitePlace F) : ∃ s : PontryaginDual w.Completionˣ → ℂ,
+      (∀ η : PontryaginDual w.Completionˣ, 0 ≤ (s η).re) ∧ s 1 = 0 ∧
+      (∀ η η' : PontryaginDual w.Completionˣ, (s (η * η')).re ≤ (s η).re + (s η').re ∧
+        (s (η * η')).im = (s η).im + (s η').im) ∧
+      (∀ η : PontryaginDual w.Completionˣ, s η⁻¹ = (starRingEnd ℂ) (s η)) ∧
+      ∀ (η : PontryaginDual w.Completionˣ) (z : ℂ),
+        (w.IsReal → infiniteLocalEulerFactor w
+            (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+            (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
+            Complex.Gammaℝ (z + s η)) ∧
+        (¬ w.IsReal →
+          infiniteLocalEulerFactor w (quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+              (ContinuousMonoidHom.comp ⟨Circle.coeHom, continuous_subtype_val⟩ η) z) =
+              Complex.Gammaℂ (z + s η) / 2) := by
+    by_cases hw : w.IsReal
+    · obtain ⟨s, h1, h2, h3, h4, h5⟩ :=
+        meyerStripMultiplier_real_parameter
+          w hw
+      exact ⟨s, h1, h2, h3, h4, fun η z ↦ ⟨fun _ ↦ h5 η z, fun h ↦ absurd hw h⟩⟩
+    · obtain ⟨s, h1, h2, h3, h4, h5⟩ :=
+        meyerStripMultiplier_complex_parameter
+          w (InfinitePlace.not_isReal_iff_isComplex.mp hw)
+      exact ⟨s, h1, h2, h3, h4, fun η z ↦ ⟨fun h ↦ absurd h hw, fun _ ↦ h5 η z⟩⟩
+  choose sl hs0 hs1 hsmul hsinv hsE using hpar
+  let s : InfinitePlace F → PontryaginDual (SIdeleQuotient F T) → ℂ :=
+    fun w χ ↦ sl w (PontryaginDual.map (i w) χ)
+  have hsre (w : InfinitePlace F) (χ : PontryaginDual (SIdeleQuotient F T)) :
+      0 ≤ (s w χ).re := hs0 w _
+  let q : GroupSeminorm (PontryaginDual (SIdeleQuotient F T)) :=
+    { toFun := fun χ ↦ ∑ w, (|(s w χ).re| + |(s w χ).im|)
+      map_one' := by
+        refine Finset.sum_eq_zero fun w _ ↦ ?_
+        change |(sl w (PontryaginDual.map (i w) 1)).re| +
+          |(sl w (PontryaginDual.map (i w) 1)).im| = 0
+        rw [map_one, hs1]
+        simp
+      mul_le' := fun χ χ' ↦ by
+        rw [← Finset.sum_add_distrib]
+        refine Finset.sum_le_sum fun w _ ↦ ?_
+        change |(sl w (PontryaginDual.map (i w) (χ * χ'))).re| +
+            |(sl w (PontryaginDual.map (i w) (χ * χ'))).im| ≤
+          (|(sl w (PontryaginDual.map (i w) χ)).re| + |(sl w (PontryaginDual.map (i w) χ)).im|) +
+            (|(sl w (PontryaginDual.map (i w) χ')).re| +
+              |(sl w (PontryaginDual.map (i w) χ')).im|)
+        rw [map_mul]
+        have h := hsmul w (PontryaginDual.map (i w) χ) (PontryaginDual.map (i w) χ')
+        rw [h.2, abs_of_nonneg (hs0 _ _), abs_of_nonneg (hs0 _ _), abs_of_nonneg (hs0 _ _)]
+        linarith [abs_add_le (sl w (PontryaginDual.map (i w) χ)).im
+          (sl w (PontryaginDual.map (i w) χ')).im, h.1]
+      inv' := fun χ ↦ by
+        refine Finset.sum_congr rfl fun w _ ↦ ?_
+        change |(sl w (PontryaginDual.map (i w) χ⁻¹)).re| +
+            |(sl w (PontryaginDual.map (i w) χ⁻¹)).im| =
+          |(sl w (PontryaginDual.map (i w) χ)).re| + |(sl w (PontryaginDual.map (i w) χ)).im|
+        rw [map_inv, hsinv, Complex.conj_re, Complex.conj_im, abs_neg] }
+  choose j hj using fun v : T ↦
+    meyerStripMultiplier_finite_restriction
+      T v
+  choose u hu1 hu2 hu3 using fun (v : T) (χ : PontryaginDual (SIdeleQuotient F T)) ↦
+    meyerStripMultiplier_finite_euler
+      v.val (PontryaginDual.map (j v) χ)
+  refine ⟨q, s, u, fun w χ ↦ ⟨hsre w χ, ?_, ?_⟩, hu1, fun w χ z ↦ ⟨fun h ↦ ?_, fun h ↦ ?_⟩,
+    fun v χ z ↦ ?_, fun v χ z ↦ ?_⟩
+  · have h1 : ‖s w χ‖ ≤ |(s w χ).re| + |(s w χ).im| := Complex.norm_le_abs_re_add_abs_im _
+    have h2 : |(s w χ).re| + |(s w χ).im| ≤ q χ :=
+      Finset.single_le_sum (f := fun w ↦ |(s w χ).re| + |(s w χ).im|)
+        (fun w _ ↦ by positivity) (Finset.mem_univ w)
+    exact h1.trans h2
+  · change sl w (PontryaginDual.map (i w) χ⁻¹) = (starRingEnd ℂ) (sl w (PontryaginDual.map (i w) χ))
+    rw [map_inv, hsinv]
+  · exact (congrArg (infiniteLocalEulerFactor w) (hi w χ z)).trans ((hsE w _ z).1 h)
+  · exact (congrArg (infiniteLocalEulerFactor w) (hi w χ z)).trans ((hsE w _ z).2 h)
+  · exact (congrArg (finiteLocalEulerFactor v.val) (hj v χ z)).trans (hu2 v χ z)
+  · exact (congrArg (finiteLocalEulerFactor v.val) (hj v χ⁻¹ z)).trans
+      (hu3 v χ (PontryaginDual.map (j v) χ⁻¹) (fun g ↦ rfl) z)
+
+/-- The S-local Hecke L-function as a product of the local factors. -/
+private theorem meyerDecomposition_factor
+    (T : Finset V) :
+    ∃ (q : GroupSeminorm (PontryaginDual (SIdeleQuotient F T)))
+      (s : InfinitePlace F → PontryaginDual (SIdeleQuotient F T) → ℂ)
+      (u : T → PontryaginDual (SIdeleQuotient F T) → ℂ),
+      (∀ w χ, 0 ≤ (s w χ).re ∧ ‖s w χ‖ ≤ q χ) ∧ (∀ v χ, ‖u v χ‖ ≤ 1) ∧
+      (∀ χ z, meyerDecomposition_heckeL T χ z = (∏ w, meyerDecomposition_archFactor w (z + s w χ)) *
+          ∏ v : T, (1 - u v χ * (((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) : ℂ) ^ z)⁻¹) ∧
+      (∀ χ z, meyerDecomposition_heckeL T χ⁻¹ z =
+          (∏ w, meyerDecomposition_archFactor w (z + starRingEnd ℂ (s w χ))) *
+          ∏ v : T, (1 - starRingEnd ℂ (u v χ) *
+            (((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) : ℂ) ^ z)⁻¹) := by
+  obtain ⟨q, s, u, hs, hu, hA, hF1, hF2⟩ := meyerDecomposition_local T
+  have hAw (w : InfinitePlace F) (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ) :
+      infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (chartₜ(T, χ) z)) =
+        meyerDecomposition_archFactor w (z + s w χ) := by
+    by_cases hw : w.IsReal
+    · rw [(hA w χ z).1 hw, meyerDecomposition_A_of_real w hw]
+    · rw [(hA w χ z).2 hw, meyerDecomposition_A_of_not_real w hw]
+  refine ⟨q, s, u, fun w χ ↦ ⟨(hs w χ).1, (hs w χ).2.1⟩, hu, fun χ z ↦ ?_, fun χ z ↦ ?_⟩
+  · change (∏ w : InfinitePlace F, infiniteLocalEulerFactor w
+        (sLocalInfiniteRestriction w (chartₜ(T, χ) z))) *
+      ∏ v : T, finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (chartₜ(T, χ) z)) = _
+    congr 1
+    · exact Finset.prod_congr rfl fun w _ ↦ hAw w χ z
+    · exact Finset.prod_congr rfl fun v _ ↦ hF1 v χ z
+  · change (∏ w : InfinitePlace F, infiniteLocalEulerFactor w
+        (sLocalInfiniteRestriction w (chartₜ(T, χ⁻¹) z))) *
+      ∏ v : T, finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (chartₜ(T, χ⁻¹) z)) = _
+    congr 1
+    · exact Finset.prod_congr rfl fun w _ ↦ (hAw w χ⁻¹ z).trans
+        (congrArg (fun x ↦ meyerDecomposition_archFactor w (z + x)) (hs w χ).2.2)
+    · exact Finset.prod_congr rfl fun v _ ↦ hF2 v χ z
+
+/-- The inverse of the absolute norm of a finite place of `T` lies in `(0, 1)`. -/
+private theorem meyerDecomposition_r
+    (T : Finset V) (v : T) :
+    0 < ((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) ∧ ((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) < 1 := by
+  have hq : 1 < (v.val.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val
+  exact ⟨inv_pos.mpr (zero_lt_one.trans hq), inv_lt_one_of_one_lt₀ hq⟩
+
+/-- The inverse Euler factor `1 - u r^z` at a finite place. -/
+private theorem meyerDecomposition_B_facts
+    (r : ℝ) (hr0 : 0 < r) (hr1 : r < 1) (u : ℂ) (hu : ‖u‖ ≤ 1) :
+    (∀ z : ℂ, 0 < z.re → 1 - u * (r : ℂ) ^ z ≠ 0) ∧
+    (∀ (a : ℝ) (z : ℂ), a ≤ z.re → ‖1 - u * (r : ℂ) ^ z‖ ≤ 1 + r ^ a) ∧
+    (∀ (a : ℝ) (z : ℂ), a ≤ z.re → 1 - r ^ a ≤ ‖1 - u * (r : ℂ) ^ z‖) ∧
+    (∀ z : ℂ, starRingEnd ℂ (1 - u * (r : ℂ) ^ (starRingEnd ℂ z)) =
+      1 - starRingEnd ℂ u * (r : ℂ) ^ z) := by
+  have hmul (a : ℝ) (z : ℂ) (h : a ≤ z.re) : ‖u * (r : ℂ) ^ z‖ ≤ r ^ a := by
+    rw [norm_mul, Complex.norm_cpow_eq_rpow_re_of_pos hr0]
+    exact (mul_le_of_le_one_left (Real.rpow_nonneg hr0.le _) hu).trans
+      (Real.rpow_le_rpow_of_exponent_ge hr0 hr1.le h)
+  have hlow (a : ℝ) (z : ℂ) (h : a ≤ z.re) : 1 - r ^ a ≤ ‖1 - u * (r : ℂ) ^ z‖ := by
+    have h1 := norm_sub_norm_le (1 : ℂ) (u * (r : ℂ) ^ z)
+    rw [norm_one] at h1
+    linarith [hmul a z h]
+  refine ⟨fun z hz h0 ↦ ?_, fun a z h ↦ ?_, hlow, fun z ↦ ?_⟩
+  · have h1 := hlow z.re z le_rfl
+    rw [h0, norm_zero] at h1
+    linarith [Real.rpow_lt_one hr0.le hr1 hz]
+  · refine (norm_sub_le _ _).trans ?_
+    rw [norm_one]
+    linarith [hmul a z h]
+  · have harg : (r : ℂ).arg ≠ Real.pi := by
+      rw [Complex.arg_ofReal_of_nonneg hr0.le]
+      exact Real.pi_ne_zero.symm
+    rw [map_sub, map_one, map_mul, Complex.cpow_conj _ _ harg, Complex.conj_ofReal,
+      Complex.conj_conj]
+
+/-- The S-local Hecke L-function at `χ⁻¹` is the conjugate of the one at `χ`, reflected in the
+real axis. -/
+private theorem meyerDecomposition_L_conj
+    (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T))
+    (z : ℂ) : meyerDecomposition_heckeL T χ⁻¹ z =
+        starRingEnd ℂ (meyerDecomposition_heckeL T χ (starRingEnd ℂ z)) := by
+  obtain ⟨q, s, u, hs, hu, hL, hLi⟩ := meyerDecomposition_factor T
+  rw [hLi χ z, hL χ (starRingEnd ℂ z), map_mul, map_prod, map_prod]
+  congr 1
+  · refine Finset.prod_congr rfl fun w _ ↦ ?_
+    rw [← meyerDecomposition_A_conj, map_add, Complex.conj_conj]
+  · refine Finset.prod_congr rfl fun v _ ↦ ?_
+    obtain ⟨hr0, hr1⟩ := meyerDecomposition_r T v
+    rw [map_inv₀, (meyerDecomposition_B_facts _ hr0 hr1 (u v χ) (hu v χ)).2.2.2 z]
+
+/-- The S-local Hecke L-function in a norm chart does not vanish on the right half-plane. -/
+private theorem meyerDecomposition_L_ne_zero
+    (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T))
+    (z : ℂ) (hz : 0 < z.re) : meyerDecomposition_heckeL T χ z ≠ 0 := by
+  obtain ⟨q, s, u, hs, hu, hL, -⟩ := meyerDecomposition_factor T
+  rw [hL χ z]
+  refine mul_ne_zero (Finset.prod_ne_zero_iff.mpr fun w _ ↦ meyerDecomposition_A_ne_zero w _ ?_)
+    (Finset.prod_ne_zero_iff.mpr fun v _ ↦ inv_ne_zero ?_)
+  · rw [Complex.add_re]
+    linarith [(hs w χ).1]
+  · obtain ⟨hr0, hr1⟩ := meyerDecomposition_r T v
+    exact (meyerDecomposition_B_facts _ hr0 hr1 (u v χ) (hu v χ)).1 z hz
+
+/-- The inverse of the S-local Hecke L-function in a norm chart is entire. -/
+private theorem meyerDecomposition_L_inv_differentiable
+    (T : Finset V)
+    (χ : PontryaginDual (SIdeleQuotient F T)) :
+    Differentiable ℂ fun z ↦ (meyerDecomposition_heckeL T χ z)⁻¹ := by
+  obtain ⟨q, s, u, hs, hu, hL, -⟩ := meyerDecomposition_factor T
+  have e : (fun z ↦ (meyerDecomposition_heckeL T χ z)⁻¹) =
+      fun z ↦ (∏ w, (meyerDecomposition_archFactor w (z + s w χ))⁻¹) *
+      ∏ v : T, (1 - u v χ * (((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) : ℂ) ^ z) := by
+    funext z
+    rw [hL χ z, mul_inv, Finset.prod_inv_distrib, Finset.prod_inv_distrib]
+    simp only [inv_inv]
+  rw [e]
+  refine (Differentiable.fun_finsetProd fun w _ ↦
+    (meyerDecomposition_A_inv_differentiable w).comp (differentiable_id.add_const (s w χ))).mul
+    (Differentiable.fun_finsetProd fun v _ ↦ ?_)
+  obtain ⟨hr0, hr1⟩ := meyerDecomposition_r T v
+  exact (meyerStripMultiplier_finite_factor
+    _ hr0 hr1 (u v χ) (hu v χ)).1
+
+/-- The S-local Hecke L-function in a norm chart is bounded on every closed vertical strip of
+positive real part. -/
+private theorem meyerDecomposition_L_bounded
+    (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T))
+    (c₁ c₂ : ℝ) (hc₁ : 0 < c₁) :
+    ∃ M : ℝ, ∀ ζ : ℂ, c₁ ≤ ζ.re → ζ.re ≤ c₂ → ‖meyerDecomposition_heckeL T χ ζ‖ ≤ M := by
+  obtain ⟨q, s, u, hs, hu, hL, -⟩ := meyerDecomposition_factor T
+  choose M hM using fun w : InfinitePlace F ↦ meyerDecomposition_A_bounded w
+      c₁ (c₂ + (s w χ).re) hc₁
+  refine ⟨(∏ w, |M w|) * ∏ v : T, (1 - ((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) ^ c₁)⁻¹,
+    fun ζ h1 h2 ↦ ?_⟩
+  rw [hL χ ζ, norm_mul, norm_prod, norm_prod]
+  refine mul_le_mul (Finset.prod_le_prod₀ (fun w _ ↦ norm_nonneg _) fun w _ ↦ ?_)
+    (Finset.prod_le_prod₀ (fun v _ ↦ norm_nonneg _) fun v _ ↦ ?_)
+    (Finset.prod_nonneg fun v _ ↦ norm_nonneg _) (Finset.prod_nonneg fun w _ ↦ abs_nonneg _)
+  · refine (hM w (ζ + s w χ) ⟨?_, ?_⟩).trans (le_abs_self _)
+    · rw [Complex.add_re]
+      linarith [(hs w χ).1]
+    · rw [Complex.add_re]
+      linarith
+  · obtain ⟨hr0, hr1⟩ := meyerDecomposition_r T v
+    have hlow := (meyerDecomposition_B_facts _ hr0 hr1 (u v χ) (hu v χ)).2.2.1 c₁ ζ h1
+    have hpos : 0 < 1 - ((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ) ^ c₁ :=
+      sub_pos.mpr (Real.rpow_lt_one hr0.le hr1 hc₁)
+    rw [norm_inv]
+    exact inv_anti₀ hpos hlow
+
+/-- The quotient of the S-local Hecke L-function on a line of positive real part by its value
+at a point of a closed vertical strip: polynomial in `z` and in one group seminorm of the
+character, times an exponential in the difference of the heights. -/
+private theorem meyerDecomposition_L_ratio
+    (T : Finset V) :
+    ∃ q : GroupSeminorm (PontryaginDual (SIdeleQuotient F T)), ∀ c : ℝ, 0 < c → ∀ α β : ℝ,
+      ∃ (C : ℝ) (N : ℕ) (κ : ℝ), 0 ≤ C ∧ 0 ≤ κ ∧
+        ∀ (χ : PontryaginDual (SIdeleQuotient F T)) (z ζ : ℂ), z.re ∈ Icc α β → ζ.re = c →
+        ‖meyerDecomposition_heckeL T χ ζ‖ * ‖(meyerDecomposition_heckeL T χ z)⁻¹‖ ≤
+          C * ((1 + q χ) * (1 + ‖z‖)) ^ N * Real.exp (κ * |z.im - ζ.im|) := by
+  obtain ⟨q, s, u, hs, hu, hL, -⟩ := meyerDecomposition_factor T
+  refine ⟨q, fun c hc α β ↦ ?_⟩
+  choose C N hC hCN using fun w : InfinitePlace F ↦
+    meyerDecomposition_A_ratio w c (|α - c| + |β - c|) hc
+  let r : T → ℝ := fun v ↦ ((v.val.asIdeal.absNorm : ℝ)⁻¹ : ℝ)
+  have hr (v : T) : 0 < r v ∧ r v < 1 := meyerDecomposition_r T v
+  have hCf (v : T) : 0 ≤ (1 + r v ^ α) / (1 - r v ^ c) :=
+    div_nonneg (by linarith [Real.rpow_nonneg (hr v).1.le α])
+      (sub_pos.mpr (Real.rpow_lt_one (hr v).1.le (hr v).2 hc)).le
+  refine ⟨(∏ w, C w) * ∏ v, (1 + r v ^ α) / (1 - r v ^ c), ∑ w, N w,
+    Fintype.card (InfinitePlace F) * (Real.pi + 1),
+    mul_nonneg (Finset.prod_nonneg fun w _ ↦ hC w) (Finset.prod_nonneg fun v _ ↦ hCf v),
+    by positivity, fun χ z ζ hz hζ ↦ ?_⟩
+  have hzc : |z.re - c| ≤ |α - c| + |β - c| := by
+    rw [abs_le]
+    constructor
+    · linarith [hz.1, neg_abs_le (α - c), abs_nonneg (β - c)]
+    · linarith [hz.2, le_abs_self (β - c), abs_nonneg (α - c)]
+  have e : ‖meyerDecomposition_heckeL T χ ζ‖ * ‖(meyerDecomposition_heckeL T χ z)⁻¹‖ =
+      (∏ w, ‖meyerDecomposition_archFactor w (ζ + s w χ)‖ *
+          ‖(meyerDecomposition_archFactor w (z + s w χ))⁻¹‖) *
+        ∏ v : T, ‖(1 - u v χ * (r v : ℂ) ^ ζ)⁻¹‖ * ‖((1 - u v χ * (r v : ℂ) ^ z)⁻¹)⁻¹‖ := by
+    rw [hL χ ζ, hL χ z, mul_inv, ← Finset.prod_inv_distrib, ← Finset.prod_inv_distrib, norm_mul,
+      norm_mul, norm_prod, norm_prod, norm_prod, norm_prod, Finset.prod_mul_distrib,
+      Finset.prod_mul_distrib]
+    ring
+  have hW : 1 ≤ (1 + ‖z‖) * (1 + q χ) := by
+    nlinarith [norm_nonneg z, apply_nonneg q χ]
+  have hA (w : InfinitePlace F) : ‖meyerDecomposition_archFactor w (ζ + s w χ)‖ *
+      ‖(meyerDecomposition_archFactor w (z + s w χ))⁻¹‖ ≤
+      C w * ((1 + ‖z‖) * (1 + q χ)) ^ N w * Real.exp ((Real.pi + 1) * |z.im - ζ.im|) := by
+    refine (hCN w (s w χ) z ζ (hs w χ).1 hζ hzc).trans ?_
+    have h1 : (1 + ‖z‖) * (1 + ‖s w χ‖) ≤ (1 + ‖z‖) * (1 + q χ) :=
+      mul_le_mul_of_nonneg_left (by linarith [(hs w χ).2]) (by positivity)
+    exact mul_le_mul_of_nonneg_right (mul_le_mul_of_nonneg_left
+      (pow_le_pow_left₀ (by positivity) h1 _) (hC w)) (Real.exp_pos _).le
+  have hB (v : T) : ‖(1 - u v χ * (r v : ℂ) ^ ζ)⁻¹‖ * ‖((1 - u v χ * (r v : ℂ) ^ z)⁻¹)⁻¹‖ ≤
+      (1 + r v ^ α) / (1 - r v ^ c) := by
+    have hf := meyerDecomposition_B_facts (r v) (hr v).1 (hr v).2 (u v χ) (hu v χ)
+    have hpos : 0 < 1 - r v ^ c := sub_pos.mpr (Real.rpow_lt_one (hr v).1.le (hr v).2 hc)
+    rw [inv_inv, norm_inv, ← div_eq_inv_mul]
+    exact div_le_div₀ (by linarith [Real.rpow_nonneg (hr v).1.le α]) (hf.2.1 α z hz.1) hpos
+      (hf.2.2.1 c ζ hζ.ge)
+  rw [e]
+  calc (∏ w, ‖meyerDecomposition_archFactor w (ζ + s w χ)‖ *
+      ‖(meyerDecomposition_archFactor w (z + s w χ))⁻¹‖) *
+        ∏ v : T, ‖(1 - u v χ * (r v : ℂ) ^ ζ)⁻¹‖ * ‖((1 - u v χ * (r v : ℂ) ^ z)⁻¹)⁻¹‖
+      ≤ (∏ w, C w * ((1 + ‖z‖) * (1 + q χ)) ^ N w *
+          Real.exp ((Real.pi + 1) * |z.im - ζ.im|)) *
+        ∏ v : T, (1 + r v ^ α) / (1 - r v ^ c) :=
+        mul_le_mul (Finset.prod_le_prod₀ (fun w _ ↦ by positivity) fun w _ ↦ hA w)
+          (Finset.prod_le_prod₀ (fun v _ ↦ by positivity) fun v _ ↦ hB v)
+          (Finset.prod_nonneg fun v _ ↦ by positivity)
+          (Finset.prod_nonneg fun w _ ↦ mul_nonneg (mul_nonneg (hC w) (by positivity))
+            (Real.exp_pos _).le)
+    _ = _ := by
+        rw [Finset.prod_mul_distrib, Finset.prod_mul_distrib, Finset.prod_pow_eq_pow_sum,
+          Finset.prod_const, ← Real.exp_nat_mul, Finset.card_univ,
+          mul_comm (1 + ‖z‖) (1 + q χ)]
+        ring_nf
+
+/-- Two bounds of the form `C W^N e`, each in a variable at most `2 W`, multiply. -/
+private theorem meyerDecomposition_mul_bound
+    (a b W W₁ W₂ e₁ e₂ C₁ C₂ : ℝ) (N₁ N₂ : ℕ) (hW₁ : 0 ≤ W₁)
+    (hW₂ : 0 ≤ W₂) (h₁ : W₁ ≤ 2 * W) (h₂ : W₂ ≤ 2 * W) (hC₁ : 0 ≤ C₁) (hC₂ : 0 ≤ C₂)
+    (he₁ : 0 ≤ e₁) (he₂ : 0 ≤ e₂) (hb0 : 0 ≤ b) (ha : a ≤ C₁ * W₁ ^ N₁ * e₁)
+    (hb : b ≤ C₂ * W₂ ^ N₂ * e₂) :
+    a * b ≤ C₁ * C₂ * 2 ^ (N₁ + N₂) * W ^ (N₁ + N₂) * (e₁ * e₂) := by
+  have h2W : 0 ≤ 2 * W := hW₁.trans h₁
+  calc a * b ≤ (C₁ * (2 * W) ^ N₁ * e₁) * (C₂ * (2 * W) ^ N₂ * e₂) :=
+        mul_le_mul (ha.trans (mul_le_mul_of_nonneg_right (mul_le_mul_of_nonneg_left
+          (pow_le_pow_left₀ hW₁ h₁ _) hC₁) he₁))
+          (hb.trans (mul_le_mul_of_nonneg_right (mul_le_mul_of_nonneg_left
+            (pow_le_pow_left₀ hW₂ h₂ _) hC₂) he₂)) hb0
+          (mul_nonneg (mul_nonneg hC₁ (pow_nonneg h2W _)) he₁)
+    _ = _ := by rw [mul_pow, mul_pow, pow_add, pow_add]; ring
+
+/-- A bound `C W^N e` is weakened to a larger constant, exponent and exponential. -/
+private theorem meyerDecomposition_weaken
+    (C C' W e e' : ℝ) (N N' : ℕ) (hW : 1 ≤ W) (hC : 0 ≤ C)
+    (hCC : C ≤ C') (hNN : N ≤ N') (he : 0 ≤ e) (hee : e ≤ e') :
+    C * W ^ N * e ≤ C' * W ^ N' * e' := by
+  have h1 : W ^ N ≤ W ^ N' := pow_le_pow_right₀ hW hNN
+  have h0 : 0 ≤ W ^ N := pow_nonneg (by linarith) _
+  exact mul_le_mul (mul_le_mul hCC h1 h0 (hC.trans hCC)) hee he
+    (mul_nonneg (hC.trans hCC) (h0.trans h1))
+
+/-- The bounds of the kernels of the partition function: the product of the inverse
+L-functions at `z` and `1 - z` against the product of the L-functions on a line inside the
+critical strip. -/
+private theorem meyerDecomposition_kernels
+    (T : Finset V) :
+    ∃ q : GroupSeminorm (PontryaginDual (SIdeleQuotient F T)), ∀ c : ℝ, 0 < c → c < 1 →
+      ∀ α β : ℝ, ∃ (C : ℝ) (N : ℕ) (κ : ℝ), 0 ≤ C ∧
+        ∀ (χ : PontryaginDual (SIdeleQuotient F T)) (z ζ : ℂ), z.re ∈ Icc α β → ζ.re = c →
+        ‖(meyerDecomposition_heckeL T χ z)⁻¹ * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖ *
+            ‖meyerDecomposition_heckeL T χ ζ * meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)‖ ≤
+          C * ((1 + q χ) * (1 + ‖z‖)) ^ N * Real.exp (κ * |z.im - ζ.im|) ∧
+        ‖(meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖ ^ 2 * ‖meyerDecomposition_heckeL T χ ζ *
+            meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)‖ ≤
+          C * ((1 + q χ) * (1 + ‖z‖)) ^ N * Real.exp (κ * |z.im - ζ.im|) := by
+  obtain ⟨q, hq⟩ := meyerDecomposition_L_ratio T
+  refine ⟨q, fun c hc hc1 α β ↦ ?_⟩
+  obtain ⟨C₁, N₁, κ₁, hC₁, hκ₁, h₁⟩ := hq c hc α β
+  obtain ⟨C₂, N₂, κ₂, hC₂, hκ₂, h₂⟩ := hq (1 - c) (by linarith) (1 - β) (1 - α)
+  obtain ⟨C₃, N₃, κ₃, hC₃, hκ₃, h₃⟩ := hq c hc (1 - β) (1 - α)
+  have hC₁₃ : 0 ≤ C₁ + C₃ := add_nonneg hC₁ hC₃
+  refine ⟨(C₁ + C₃) * C₂ * 2 ^ (N₁ + N₂ + N₃), N₁ + N₂ + N₃, κ₁ + κ₂ + κ₃,
+    mul_nonneg (mul_nonneg hC₁₃ hC₂) (by positivity), fun χ z ζ hz hζ ↦ ?_⟩
+  have hd0 : 0 ≤ |z.im - ζ.im| := abs_nonneg _
+  have hz' : (1 - z).re ∈ Icc (1 - β) (1 - α) := by
+    rw [Complex.sub_re, Complex.one_re]
+    exact ⟨by linarith [hz.2], by linarith [hz.1]⟩
+  have hζ' : (1 - ζ).re = 1 - c := by rw [Complex.sub_re, Complex.one_re, hζ]
+  have hdd : |(1 - z).im - (1 - ζ).im| = |z.im - ζ.im| := by
+    rw [Complex.sub_im, Complex.sub_im, Complex.one_im,
+      show (0 - z.im) - (0 - ζ.im) = -(z.im - ζ.im) by ring, abs_neg]
+  have hqi : q χ⁻¹ = q χ := map_inv_eq_map q χ
+  have hq0 : 0 ≤ q χ := apply_nonneg q χ
+  have hW : 1 ≤ (1 + q χ) * (1 + ‖z‖) := by nlinarith [norm_nonneg z]
+  have h1z : ‖1 - z‖ ≤ 1 + ‖z‖ := by
+    have h := norm_sub_le (1 : ℂ) z
+    rwa [norm_one] at h
+  have hW₂ : (1 + q χ) * (1 + ‖1 - z‖) ≤ 2 * ((1 + q χ) * (1 + ‖z‖)) := by
+    nlinarith [norm_nonneg z, norm_nonneg (1 - z)]
+  have hW₁ : (1 + q χ) * (1 + ‖z‖) ≤ 2 * ((1 + q χ) * (1 + ‖z‖)) := by linarith
+  have B1 := h₁ χ z ζ hz hζ
+  have B2 := h₂ χ⁻¹ (1 - z) (1 - ζ) hz' hζ'
+  rw [hqi, hdd] at B2
+  have hconj : ‖(meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖ =
+      ‖(meyerDecomposition_heckeL T χ (starRingEnd ℂ (1 - z)))⁻¹‖ := by
+    rw [meyerDecomposition_L_conj T χ (1 - z), norm_inv, norm_inv, Complex.norm_conj]
+  have hz'' : (starRingEnd ℂ (1 - z)).re ∈ Icc (1 - β) (1 - α) := by
+    rw [Complex.conj_re]
+    exact hz'
+  have B3 := h₃ χ (starRingEnd ℂ (1 - z)) ζ hz'' hζ
+  have him3 : (starRingEnd ℂ (1 - z)).im = z.im := by
+    rw [Complex.conj_im, Complex.sub_im, Complex.one_im]
+    ring
+  rw [him3, Complex.norm_conj, ← hconj] at B3
+  have hexp : Real.exp (κ₁ * |z.im - ζ.im|) * Real.exp (κ₂ * |z.im - ζ.im|) ≤
+      Real.exp ((κ₁ + κ₂ + κ₃) * |z.im - ζ.im|) := by
+    rw [← Real.exp_add, Real.exp_le_exp]
+    nlinarith
+  have hexp' : Real.exp (κ₃ * |z.im - ζ.im|) * Real.exp (κ₂ * |z.im - ζ.im|) ≤
+      Real.exp ((κ₁ + κ₂ + κ₃) * |z.im - ζ.im|) := by
+    rw [← Real.exp_add, Real.exp_le_exp]
+    nlinarith
+  refine ⟨?_, ?_⟩
+  · have e1 : ‖(meyerDecomposition_heckeL T χ z)⁻¹ * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖ *
+        ‖meyerDecomposition_heckeL T χ ζ * meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)‖ =
+        (‖meyerDecomposition_heckeL T χ ζ‖ * ‖(meyerDecomposition_heckeL T χ z)⁻¹‖) *
+          (‖meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)‖ *
+              ‖(meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖) := by
+      rw [norm_mul, norm_mul]
+      ring
+    rw [e1]
+    have hm := meyerDecomposition_mul_bound _ _ _ _ _ _ _ C₁ C₂ N₁ N₂
+        (by positivity) (by positivity) hW₁
+      hW₂ hC₁ hC₂ (Real.exp_pos _).le (Real.exp_pos _).le (by positivity) B1 B2
+    have hCle : C₁ * C₂ * 2 ^ (N₁ + N₂) ≤ (C₁ + C₃) * C₂ * 2 ^ (N₁ + N₂ + N₃) :=
+      mul_le_mul (mul_le_mul_of_nonneg_right (by linarith) hC₂)
+        (pow_le_pow_right₀ (by norm_num) (by omega)) (by positivity) (mul_nonneg hC₁₃ hC₂)
+    exact hm.trans (meyerDecomposition_weaken _ _ _ _ _ _ _ hW
+      (mul_nonneg (mul_nonneg hC₁ hC₂) (by positivity)) hCle (by omega) (by positivity) hexp)
+  · have e2 : ‖(meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖ ^ 2 * ‖meyerDecomposition_heckeL T χ ζ *
+      meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)‖ =
+        (‖meyerDecomposition_heckeL T χ ζ‖ * ‖(meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖) *
+          (‖meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)‖ *
+              ‖(meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹‖) := by
+      rw [norm_mul]
+      ring
+    rw [e2]
+    have hm := meyerDecomposition_mul_bound _ _ _ _ _ _ _ C₃ C₂ N₃ N₂
+        (by positivity) (by positivity) hW₂
+      hW₂ hC₃ hC₂ (Real.exp_pos _).le (Real.exp_pos _).le (by positivity) B3 B2
+    have hCle : C₃ * C₂ * 2 ^ (N₃ + N₂) ≤ (C₁ + C₃) * C₂ * 2 ^ (N₁ + N₂ + N₃) :=
+      mul_le_mul (mul_le_mul_of_nonneg_right (by linarith) hC₂)
+        (pow_le_pow_right₀ (by norm_num) (by omega)) (by positivity) (mul_nonneg hC₁₃ hC₂)
+    exact hm.trans (meyerDecomposition_weaken _ _ _ _ _ _ _ hW
+      (mul_nonneg (mul_nonneg hC₃ hC₂) (by positivity)) hCle (by omega) (by positivity) hexp')
+
+/-- The product `L(χ, z) L(χ⁻¹, 1 - z)` is holomorphic on the critical strip. -/
+private theorem meyerDecomposition_lambda_differentiableOn
+    (T : Finset V)
+    (χ : PontryaginDual (SIdeleQuotient F T)) :
+    DifferentiableOn ℂ (fun z ↦ meyerDecomposition_heckeL T χ z *
+        meyerDecomposition_heckeL T χ⁻¹ (1 - z))
+      (Complex.re ⁻¹' Ioo 0 1) := by
+  have hLd (χ' : PontryaginDual (SIdeleQuotient F T)) :
+      DifferentiableOn ℂ (meyerDecomposition_heckeL T χ') (Complex.re ⁻¹' Ioi 0) := by
+    intro z hz
+    have h := ((meyerDecomposition_L_inv_differentiable T χ') z).inv
+      (inv_ne_zero (meyerDecomposition_L_ne_zero T χ' z hz))
+    exact (h.congr_of_eventuallyEq (Eventually.of_forall fun s ↦
+      (inv_inv (meyerDecomposition_heckeL T χ' s)).symm)).differentiableWithinAt
+  refine ((hLd χ).mono fun s (hs : s ∈ Complex.re ⁻¹' Ioo (0 : ℝ) 1) ↦
+    show s ∈ Complex.re ⁻¹' Ioi (0 : ℝ) from hs.1).mul ?_
+  refine (hLd χ⁻¹).comp (by fun_prop : Differentiable ℂ fun s : ℂ ↦ 1 - s).differentiableOn
+    fun s hs ↦ ?_
+  change 0 < (1 - s).re
+  rw [Complex.sub_re, Complex.one_re]
+  linarith [(show s.re ∈ Ioo (0 : ℝ) 1 from hs).2]
+
+/-- The product `L(χ, ζ) L(χ⁻¹, 1 - ζ)` is bounded on every closed substrip of the critical
+strip. -/
+private theorem meyerDecomposition_lambda_bounded
+    (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T))
+    (c₁ c₂ : ℝ) (hc₁ : 0 < c₁) (hc₂ : c₂ < 1) :
+    ∃ M : ℝ, ∀ ζ : ℂ, c₁ ≤ ζ.re → ζ.re ≤ c₂ → ‖meyerDecomposition_heckeL T χ ζ *
+        meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)‖ ≤ M := by
+  obtain ⟨M₁, hM₁⟩ := meyerDecomposition_L_bounded T χ c₁ c₂ hc₁
+  obtain ⟨M₂, hM₂⟩ := meyerDecomposition_L_bounded T χ⁻¹ (1 - c₂) (1 - c₁) (by linarith)
+  refine ⟨M₁ * M₂, fun ζ hζ1 hζ2 ↦ ?_⟩
+  have hre : (1 - ζ).re = 1 - ζ.re := by rw [Complex.sub_re, Complex.one_re]
+  rw [norm_mul]
+  exact mul_le_mul (hM₁ ζ hζ1 hζ2) (hM₂ (1 - ζ) (by rw [hre]; linarith) (by rw [hre]; linarith))
+    (norm_nonneg _) ((norm_nonneg _).trans (hM₁ ζ hζ1 hζ2))
+
+/-- The partition function of every angular character. -/
+private theorem meyerDecomposition_partition
+    (T : Finset V) :
+    ∃ om : PontryaginDual (SIdeleQuotient F T) → ℂ → ℂ, (∀ χ, Differentiable ℂ (om χ)) ∧
+      (∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → z.re < c →
+        om χ z = (meyerDecomposition_heckeL T χ z)⁻¹ * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+          meyerPositiveLines_lineIntegral (fun ζ ↦ meyerDecomposition_heckeL T χ ζ *
+              meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)) c z) ∧
+      (∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → c < z.re →
+        om χ z = 1 + (meyerDecomposition_heckeL T χ z)⁻¹ *
+            (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+          meyerPositiveLines_lineIntegral (fun ζ ↦ meyerDecomposition_heckeL T χ ζ *
+              meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)) c z) := by
+  have hΔΛ (χ : PontryaginDual (SIdeleQuotient F T)) (ζ : ℂ) (h0 : 0 < ζ.re) (h1 : ζ.re < 1) :
+      (meyerDecomposition_heckeL T χ ζ)⁻¹ * (meyerDecomposition_heckeL T χ⁻¹ (1 - ζ))⁻¹ *
+        (meyerDecomposition_heckeL T χ ζ * meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)) = 1 := by
+    have h2 : 0 < (1 - ζ).re := by rw [Complex.sub_re, Complex.one_re]; linarith
+    rw [← mul_inv, inv_mul_cancel₀ (mul_ne_zero (meyerDecomposition_L_ne_zero T χ ζ h0)
+      (meyerDecomposition_L_ne_zero T χ⁻¹ (1 - ζ) h2))]
+  choose om homd homL homR using fun χ : PontryaginDual (SIdeleQuotient F T) ↦
+    meyerPositiveLines_partition (fun z ↦ (meyerDecomposition_heckeL T χ z)⁻¹ *
+        (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹)
+      (fun z ↦ meyerDecomposition_heckeL T χ z * meyerDecomposition_heckeL T χ⁻¹ (1 - z))
+      ((meyerDecomposition_L_inv_differentiable T χ).mul
+          ((meyerDecomposition_L_inv_differentiable T χ⁻¹).comp
+        (by fun_prop : Differentiable ℂ fun z : ℂ ↦ 1 - z)))
+      (meyerDecomposition_lambda_differentiableOn T χ) (hΔΛ χ)
+      (fun c₁ c₂ h1 _ h2 ↦ meyerDecomposition_lambda_bounded T χ c₁ c₂ h1 h2)
+  exact ⟨om, homd, homL, homR⟩
+
+/-- On the critical line, the partition functions of `χ` and `χ⁻¹` satisfy
+`om χ⁻¹ (1 - z) = 1 - om χ z`. -/
+private theorem meyerDecomposition_om_symmetry
+    (T : Finset V)
+    (om : PontryaginDual (SIdeleQuotient F T) → ℂ → ℂ)
+    (homL : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → z.re < c →
+      om χ z = (meyerDecomposition_heckeL T χ z)⁻¹ * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+        meyerPositiveLines_lineIntegral (fun ζ ↦ meyerDecomposition_heckeL T χ ζ *
+            meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)) c z)
+    (homR : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → c < z.re →
+      om χ z = 1 + (meyerDecomposition_heckeL T χ z)⁻¹ *
+          (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+        meyerPositiveLines_lineIntegral (fun ζ ↦ meyerDecomposition_heckeL T χ ζ *
+            meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)) c z)
+    (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ) (hz : z.re = 1 / 2) :
+    om χ⁻¹ (1 - z) = 1 - om χ z := by
+  refine meyerDecomposition_symmetry (fun χ z ↦ (meyerDecomposition_heckeL T χ z)⁻¹)
+    (fun χ z ↦ meyerDecomposition_heckeL T χ z * meyerDecomposition_heckeL T χ⁻¹ (1 - z)) om
+        (fun χ' ζ ↦ ?_) homL homR χ z hz
+  have h : meyerDecomposition_heckeL T χ'⁻¹⁻¹ = meyerDecomposition_heckeL T χ' :=
+      congrArg (meyerDecomposition_heckeL T) (inv_inv χ')
+  change meyerDecomposition_heckeL T χ'⁻¹ ζ * meyerDecomposition_heckeL T χ'⁻¹⁻¹ (1 - ζ) =
+    meyerDecomposition_heckeL T χ' (1 - ζ) * meyerDecomposition_heckeL T χ'⁻¹ (1 - (1 - ζ))
+  rw [h, sub_sub_cancel, mul_comm]
+
+/-- The epsilon factors of the characters of a finitely generated subgroup of the angular
+characters are bounded uniformly on every closed vertical strip. -/
+private theorem meyerDecomposition_epsilon_bound
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (H : Subgroup (PontryaginDual.map τ).ker) (hH : H.FG) (a b : ℝ) :
+    ∃ B : ℝ, 0 ≤ B ∧ ∀ (χ : H) (z : ℂ), z.re ∈ Icc a b →
+        ‖meyerDecomposition_epsilon T χ.val.val z‖ ≤ B := by
+  have hFG : Group.FG H := (Group.fg_iff_subgroup_fg H).mpr hH
+  let ι₀ : H →* PontryaginDual (SIdeleQuotient F T) :=
+    ((PontryaginDual.map τ).ker.subtype).comp H.subtype
+  obtain ⟨B, hB0, hB⟩ :=
+    meyerStripMultiplier_epsilon_uniform
+      T H ι₀ a b
+  exact ⟨B, hB0, fun χ z hz ↦ hB χ z hz⟩
+
+/-- The epsilon factor in a norm chart is entire. -/
+private theorem meyerDecomposition_eps_differentiable
+    (T : Finset V)
+    (χ : PontryaginDual (SIdeleQuotient F T)) :
+        Differentiable ℂ (meyerDecomposition_epsilon T χ) := fun z ↦
+  ((sLocalEpsilonFactor_entire χ) z (mem_univ z)).differentiableAt
+
+/-- In the critical strip, the epsilon factor divided by the L-function at `1 - z` is the
+rho factor divided by the L-function at `z`. -/
+private theorem meyerDecomposition_rho
+    (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ)
+    (hz0 : 0 < z.re) (hz1 : z.re < 1) :
+    meyerDecomposition_epsilon T χ z * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ =
+      (meyerDecomposition_heckeL T χ z)⁻¹ * sLocalRhoFactor (chartₜ(T, χ) z) := by
+  have hS : Complex.re ⁻¹' Ioo (0 : ℝ) 1 ∈ 𝓝 z :=
+    (isOpen_Ioo.preimage Complex.continuous_re).mem_nhds ⟨hz0, hz1⟩
+  have hcL : ContinuousAt (fun s ↦ meyerDecomposition_epsilon T χ s *
+      (meyerDecomposition_heckeL T χ⁻¹ (1 - s))⁻¹) z :=
+    ((meyerDecomposition_eps_differentiable T χ) z).continuousAt.mul
+      (((meyerDecomposition_L_inv_differentiable T χ⁻¹) (1 - z)).continuousAt.comp
+        (by fun_prop : ContinuousAt (fun s : ℂ ↦ 1 - s) z))
+  have hρ : ContinuousAt (fun s ↦ sLocalRhoFactor (chartₜ(T, χ) s)) z := by
+    have h := (sLocalRhoFactor_iteratedDeriv_analyticOn χ 0) z hz0
+    rw [iteratedDeriv_zero] at h
+    exact h.continuousAt
+  have hcR : ContinuousAt (fun s ↦ (meyerDecomposition_heckeL T χ s)⁻¹ *
+      sLocalRhoFactor (chartₜ(T, χ) s)) z :=
+    ((meyerDecomposition_L_inv_differentiable T χ) z).continuousAt.mul hρ
+  have hev : (fun s ↦ meyerDecomposition_epsilon T χ s *
+      (meyerDecomposition_heckeL T χ⁻¹ (1 - s))⁻¹) =ᶠ[𝓝[≠] z]
+      fun s ↦ (meyerDecomposition_heckeL T χ s)⁻¹ * sLocalRhoFactor (chartₜ(T, χ) s) := by
+    filter_upwards [nhdsWithin_le_nhds hS,
+      nhdsNE_le_codiscrete z (sLocalRhoFactor_eq_epsilon_mul (F := F) (S := T) χ)] with s hs hfac
+    change sLocalRhoFactor (chartₜ(T, χ) s) = meyerDecomposition_epsilon T χ s *
+      (meyerDecomposition_heckeL T χ s / sLocalHeckeL (dualQuasiCharacter (sIdeleQuotientNorm F T)
+        (isProperMap_sIdeleQuotientNorm F T).continuous (chartₜ(T, χ) s))) at hfac
+    have hdual : sLocalHeckeL (dualQuasiCharacter (sIdeleQuotientNorm F T)
+        (isProperMap_sIdeleQuotientNorm F T).continuous (chartₜ(T, χ) s)) =
+        meyerDecomposition_heckeL T χ⁻¹ (1 - s) :=
+      congrArg sLocalHeckeL (sLocalNormTwistChart_dual χ s)
+    have hL : meyerDecomposition_heckeL T χ s ≠ 0 := meyerDecomposition_L_ne_zero T χ s hs.1
+    change meyerDecomposition_epsilon T χ s * (meyerDecomposition_heckeL T χ⁻¹ (1 - s))⁻¹ =
+      (meyerDecomposition_heckeL T χ s)⁻¹ * sLocalRhoFactor (chartₜ(T, χ) s)
+    rw [hfac, hdual, div_eq_mul_inv,
+      show (meyerDecomposition_heckeL T χ s)⁻¹ *
+          (meyerDecomposition_epsilon T χ s * (meyerDecomposition_heckeL T χ s *
+        (meyerDecomposition_heckeL T χ⁻¹ (1 - s))⁻¹)) = meyerDecomposition_epsilon T χ s *
+          ((meyerDecomposition_heckeL T χ s)⁻¹ * meyerDecomposition_heckeL T χ s) *
+              (meyerDecomposition_heckeL T χ⁻¹ (1 - s))⁻¹ by ring,
+      inv_mul_cancel₀ hL, mul_one]
+  exact tendsto_nhds_unique_of_eventuallyEq (hcL.tendsto.mono_left nhdsWithin_le_nhds)
+    (hcR.tendsto.mono_left nhdsWithin_le_nhds) hev
+
+/-- The functional equation of the theta Mellin integrals in the critical strip, divided by the
+L-functions, for a test and for its Fourier transform. -/
+private theorem meyerDecomposition_equation
+    (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T))
+    (g : ℬₛ(T)) (z : ℂ) (hz0 : 0 < z.re) (hz1 : z.re < 1) :
+    (meyerDecomposition_heckeL T χ z)⁻¹ * sLocalThetaMellinIntegral g (chartₜ(T, χ) z) =
+        meyerDecomposition_epsilon T χ z * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+          sLocalThetaMellinIntegral (sAdeleSchwartzFourier g) (chartₜ(T, χ⁻¹) (1 - z)) ∧
+      (meyerDecomposition_heckeL T χ z)⁻¹ *
+          sLocalThetaMellinIntegral (sAdeleSchwartzFourier g) (chartₜ(T, χ) z) =
+        meyerDecomposition_epsilon T χ z * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+          sLocalThetaMellinIntegral g (chartₜ(T, χ⁻¹) (1 - z)) := by
+  have h1 : 0 < (1 - z).re := by rw [Complex.sub_re, Complex.one_re]; linarith
+  obtain ⟨e1, e2⟩ :=
+    meyerCriticalStrip_equation_glue
+      T χ g (fun s ↦ (meyerDecomposition_heckeL T χ s)⁻¹)
+      (fun s ↦ meyerDecomposition_epsilon T χ s * (meyerDecomposition_heckeL T χ⁻¹ (1 - s))⁻¹)
+      (meyerDecomposition_L_inv_differentiable T χ)
+      (((meyerDecomposition_eps_differentiable T χ).mul
+          ((meyerDecomposition_L_inv_differentiable T χ⁻¹).comp
+        (by fun_prop : Differentiable ℂ fun s : ℂ ↦ 1 - s))).differentiableOn)
+      (fun s hs0 hs1 ↦ meyerDecomposition_rho T χ s hs0 hs1) z hz0 hz1
+  have hA := sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T g χ z hz0
+  have hB := sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T (sAdeleSchwartzFourier g) χ⁻¹
+    (1 - z) h1
+  have hA' := sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T (sAdeleSchwartzFourier g) χ z
+    hz0
+  have hB' := sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T g χ⁻¹ (1 - z) h1
+  constructor
+  · calc (meyerDecomposition_heckeL T χ z)⁻¹ * sLocalThetaMellinIntegral g (chartₜ(T, χ) z)
+        = (meyerDecomposition_heckeL T χ z)⁻¹ *
+            sLocalIdelicZFunction g (chartₜ(T, χ) z) := by rw [hA]
+      _ = meyerDecomposition_epsilon T χ z * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+          sLocalIdelicZFunction (sAdeleSchwartzFourier g) (chartₜ(T, χ⁻¹) (1 - z)) := e1
+      _ = _ := congrArg (fun x ↦ meyerDecomposition_epsilon T χ z *
+          (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ * x) hB
+  · calc (meyerDecomposition_heckeL T χ z)⁻¹ *
+          sLocalThetaMellinIntegral (sAdeleSchwartzFourier g) (chartₜ(T, χ) z)
+        = (meyerDecomposition_heckeL T χ z)⁻¹ *
+          sLocalIdelicZFunction (sAdeleSchwartzFourier g) (chartₜ(T, χ) z) := by rw [hA']
+      _ = meyerDecomposition_epsilon T χ z * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+          sLocalIdelicZFunction g (chartₜ(T, χ⁻¹) (1 - z)) := e2
+      _ = _ := congrArg (fun x ↦ meyerDecomposition_epsilon T χ z *
+          (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ * x) hB'
+
+/-- On the critical line, the theta Mellin integral of the Fourier transform at `η = χ⁻¹` and
+`1 - z` is the rho factor times the theta Mellin integral at `χ` and `z`. -/
+private theorem meyerDecomposition_reflect
+    (T : Finset V) (g : ℬₛ(T))
+    (χ η : PontryaginDual (SIdeleQuotient F T)) (hη : η = χ⁻¹) (z : ℂ) (hz : z.re = 1 / 2) :
+    sLocalThetaMellinIntegral (sAdeleSchwartzFourier g) (chartₜ(T, η) (1 - z)) =
+      sLocalRhoFactor (chartₜ(T, η) (1 - z)) * sLocalThetaMellinIntegral g (chartₜ(T, χ) z) := by
+  have h0 : 0 < (1 - z).re := by rw [Complex.sub_re, Complex.one_re, hz]; norm_num
+  have h1 : (1 - z).re < 1 := by rw [Complex.sub_re, Complex.one_re, hz]; norm_num
+  have hχ : η⁻¹ = χ := by rw [hη, inv_inv]
+  have e := (meyerDecomposition_equation T η g (1 - z) h0 h1).2
+  rw [meyerDecomposition_rho T η (1 - z) h0 h1, mul_assoc] at e
+  have e' := mul_left_cancel₀ (inv_ne_zero (meyerDecomposition_L_ne_zero T η (1 - z) h0)) e
+  have hZ : sLocalThetaMellinIntegral g (chartₜ(T, η⁻¹) (1 - (1 - z))) =
+      sLocalThetaMellinIntegral g (chartₜ(T, χ) z) :=
+    (congrArg (fun η' : PontryaginDual (SIdeleQuotient F T) ↦
+      sLocalThetaMellinIntegral g (chartₜ(T, η') (1 - (1 - z)))) hχ).trans
+      (congrArg (fun w : ℂ ↦ sLocalThetaMellinIntegral g (chartₜ(T, χ) w)) (sub_sub_cancel 1 z))
+  exact e'.trans (congrArg (fun x ↦ sLocalRhoFactor (chartₜ(T, η) (1 - z)) * x) hZ)
+
+/-- The theta Mellin integral of a test decays faster than every power of the height on every
+closed vertical strip of positive real part. -/
+private theorem meyerDecomposition_decay
+    (T : Finset V) (g : ℬₛ(T)) (χ : PontryaginDual (SIdeleQuotient F T))
+    (a b : ℝ) (ha : 0 < a) (N : ℕ) :
+    ∃ C Y : ℝ, 0 ≤ C ∧ ∀ z : ℂ, z.re ∈ Icc a b → Y ≤ |z.im| →
+      ‖sLocalThetaMellinIntegral g (chartₜ(T, χ) z)‖ ≤ C / |z.im| ^ (N + 1) := by
+  obtain ⟨C, hC, htail⟩ := sLocalIdelicZFunction_rapid_decay_on_positive_strip g χ a
+    (max b (a + 1)) ha (lt_of_lt_of_le (by linarith) (le_max_right _ _)) (N + 1) (by omega)
+  obtain ⟨Y, hY⟩ := eventually_atTop.mp (eventually_comap.mp htail)
+  refine ⟨C, Y, hC.le, fun z hz hy ↦ ?_⟩
+  have hd := hY |z.im| hy z.im rfl z.re ⟨hz.1, hz.2.trans (le_max_left _ _)⟩
+  rw [Complex.re_add_im] at hd
+  rw [← sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T g χ z (by linarith [hz.1])]
+  exact hd
+
+/-- One of the two families: the glued function for a sequence `u` and its partner `u'`. -/
+private theorem meyerDecomposition_half
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (om : PontryaginDual (SIdeleQuotient F T) → ℂ → ℂ) (homd : ∀ χ, Differentiable ℂ (om χ))
+    (homL : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → z.re < c →
+      om χ z = (meyerDecomposition_heckeL T χ z)⁻¹ * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+        meyerPositiveLines_lineIntegral (fun ζ ↦ meyerDecomposition_heckeL T χ ζ *
+            meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)) c z)
+    (homR : ∀ χ (c : ℝ) (z : ℂ), 0 < c → c < 1 → c < z.re →
+      om χ z = 1 + (meyerDecomposition_heckeL T χ z)⁻¹ *
+          (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+        meyerPositiveLines_lineIntegral (fun ζ ↦ meyerDecomposition_heckeL T χ ζ *
+            meyerDecomposition_heckeL T χ⁻¹ (1 - ζ)) c z)
+    (u u' : ℕ → ℬₛ(T))
+    (hu : ∀ a : ℝ, 0 < a → ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
+      (∀ χ ∉ H, ∀ n (z : ℂ), z.re = a → sLocalThetaMellinIntegral (u n) (chartₜ(T,χ.val) z) = 0) ∧
+      ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re = a →
+        (1+p χ)^k * ‖z^m*sLocalThetaMellinIntegral (u n) (chartₜ(T,χ.val.val) z)‖ ≤ B)
+    (hu' : ∀ a : ℝ, 0 < a → ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
+      (∀ χ ∉ H, ∀ n (z : ℂ), z.re = a → sLocalThetaMellinIntegral (u' n) (chartₜ(T,χ.val) z) = 0) ∧
+      ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re = a →
+        (1+p χ)^k * ‖z^m*sLocalThetaMellinIntegral (u' n) (chartₜ(T,χ.val.val) z)‖ ≤ B)
+    (hglue : ∀ n (χ : PontryaginDual (SIdeleQuotient F T)) (z : ℂ), 0 < z.re → z.re < 1 →
+      (meyerDecomposition_heckeL T χ z)⁻¹ * sLocalThetaMellinIntegral (u n) (chartₜ(T, χ) z) =
+        meyerDecomposition_epsilon T χ z * (meyerDecomposition_heckeL T χ⁻¹ (1 - z))⁻¹ *
+          sLocalThetaMellinIntegral (u' n) (chartₜ(T, χ⁻¹) (1 - z))) :
+    ∃ Φ : ℕ → (PontryaginDual.map τ).ker → ℂ → ℂ, (∀ n χ, Differentiable ℂ (Φ n χ)) ∧
+      (∀ a b : ℝ, ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
+        (∀ χ ∉ H, ∀ n (z : ℂ), z.re ∈ Icc a b → Φ n χ z = 0) ∧
+        ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re ∈ Icc a b →
+          (1 + p χ) ^ k * ‖z ^ m * Φ n χ.val z‖ ≤ B) ∧
+      ∀ n (χ : (PontryaginDual.map τ).ker) (z : ℂ), 0 < z.re →
+        Φ n χ z = om χ.val z * sLocalThetaMellinIntegral (u n) (chartₜ(T, χ.val) z) := by
+  obtain ⟨q, hK⟩ := meyerDecomposition_kernels T
+  exact meyerDecomposition_piece (PontryaginDual.map τ).ker q
+      (fun χ z ↦ (meyerDecomposition_heckeL T χ z)⁻¹)
+    (meyerDecomposition_epsilon T) (fun χ z ↦ meyerDecomposition_heckeL T χ z *
+        meyerDecomposition_heckeL T χ⁻¹ (1 - z)) om
+    (meyerDecomposition_L_inv_differentiable T) (meyerDecomposition_eps_differentiable T)
+        (meyerDecomposition_epsilon_bound T τ)
+    (meyerDecomposition_lambda_differentiableOn T)
+    (fun χ c₁ c₂ h1 _ h2 ↦ meyerDecomposition_lambda_bounded T χ c₁ c₂ h1 h2) hK homd homL homR
+    (fun n χ z ↦ sLocalThetaMellinIntegral (u n) (chartₜ(T, χ) z))
+    (fun n χ z ↦ sLocalThetaMellinIntegral (u' n) (chartₜ(T, χ) z))
+    (fun n χ ↦ (sLocalThetaMellinIntegral_analyticOn (u n) χ).differentiableOn)
+    (fun n χ ↦ (sLocalThetaMellinIntegral_analyticOn (u' n) χ).differentiableOn)
+    (fun n χ a b ha N ↦ meyerDecomposition_decay T (u n) χ a b ha N)
+    (fun n χ a b ha N ↦ meyerDecomposition_decay T (u' n) χ a b ha N) hu hu' hglue
+
+/-- The algebra of the identity on the critical line. -/
+private theorem meyerDecomposition_algebra
+    {ρ A B Φ₁ Φ₂ om₁ om₂ : ℂ} (h₁ : Φ₁ = om₁ * A) (h₂ : Φ₂ = om₂ * B)
+    (hsym : om₂ = 1 - om₁) (hrefl : B = ρ * A) : ρ * (A - Φ₁) = Φ₂ := by
+  rw [h₁, h₂, hsym, hrefl]
+  ring
+
+/-- For a sequence with the bounds on all lines of positive real part, there are functions
+`Φ₁ n χ` and `Φ₂ n χ`, entire in `z`, with the bounds of the criterion on every vertical strip
+(zero outside a finitely generated subgroup of characters, every polynomial weight bounded
+uniformly in the index), such that on the line of real part `1/2` the theta Mellin transform
+of `v n` at `χ` minus `Φ₁ n χ`, multiplied by the factor `sLocalRhoFactor` of `χ⁻¹` at
+`1 - z`, is `Φ₂ n χ⁻¹ (1 - z)`. -/
+private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T) (v : ℕ → ℬₛ(T))
+    (hw : ∀ f ∈ ({v,fun n ↦ sAdeleSchwartzFourier (v n)} : Set (ℕ → ℬₛ(T))),
+      ∀ a : ℝ, 0 < a → ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
+      (∀ χ ∉ H, ∀ n (z : ℂ), z.re = a → sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val) z) = 0) ∧
+      ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re = a →
+        (1+p χ)^k * ‖z^m*sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val.val) z)‖ ≤ B) :
+    ∃ Φ₁ Φ₂ : ℕ → (PontryaginDual.map τ).ker → ℂ → ℂ,
+      (∀ n χ, Differentiable ℂ (Φ₁ n χ)) ∧ (∀ n χ, Differentiable ℂ (Φ₂ n χ)) ∧
+      (∀ a b : ℝ, ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
+        (∀ χ ∉ H, ∀ n (z : ℂ), z.re ∈ Icc a b → Φ₁ n χ z = 0) ∧
+        ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re ∈ Icc a b →
+          (1 + p χ) ^ k * ‖z ^ m * Φ₁ n χ.val z‖ ≤ B) ∧
+      (∀ a b : ℝ, ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
+        (∀ χ ∉ H, ∀ n (z : ℂ), z.re ∈ Icc a b → Φ₂ n χ z = 0) ∧
+        ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re ∈ Icc a b →
+          (1 + p χ) ^ k * ‖z ^ m * Φ₂ n χ.val z‖ ≤ B) ∧
+      ∀ n (χ η : (PontryaginDual.map τ).ker), η.val = χ.val⁻¹ → ∀ z : ℂ, z.re = 1 / 2 →
+        sLocalRhoFactor (chartₜ(T, η.val) (1 - z)) *
+          (sLocalThetaMellinIntegral (v n) (chartₜ(T, χ.val) z) - Φ₁ n χ z) = Φ₂ n η (1 - z) := by
+  obtain ⟨om, homd, homL, homR⟩ := meyerDecomposition_partition T
+  have hv : v ∈ ({v,fun n ↦ sAdeleSchwartzFourier (v n)} : Set (ℕ → ℬₛ(T))) := Set.mem_insert _ _
+  have hF : (fun n ↦ sAdeleSchwartzFourier (v n)) ∈
+      ({v,fun n ↦ sAdeleSchwartzFourier (v n)} : Set (ℕ → ℬₛ(T))) :=
+    Set.mem_insert_of_mem _ (Set.mem_singleton _)
+  refine Exists.elim (meyerDecomposition_half T τ om homd homL homR v
+    (fun n ↦ sAdeleSchwartzFourier (v n)) (hw v hv) (hw _ hF)
+    (fun n χ z h0 h1 ↦ (meyerDecomposition_equation T χ (v n) z h0 h1).1)) fun Φ₁ h₁ ↦ ?_
+  refine Exists.elim (meyerDecomposition_half T τ om homd homL homR
+    (fun n ↦ sAdeleSchwartzFourier (v n)) v (hw _ hF) (hw v hv)
+    (fun n χ z h0 h1 ↦ (meyerDecomposition_equation T χ (v n) z h0 h1).2)) fun Φ₂ h₂ ↦ ?_
+  refine ⟨Φ₁, Φ₂, h₁.1, h₂.1, h₁.2.1, h₂.2.1, fun n χ η hη z hz ↦ ?_⟩
+  have hz0 : 0 < z.re := by rw [hz]; norm_num
+  have hz1 : 0 < (1 - z).re := by rw [Complex.sub_re, Complex.one_re, hz]; norm_num
+  have hsym : om η.val (1 - z) = 1 - om χ.val z := by
+    rw [hη]
+    exact meyerDecomposition_om_symmetry T om homL homR χ.val z hz
+  exact meyerDecomposition_algebra (h₁.2.2 n χ z hz0) (h₂.2.2 n η (1 - z) hz1) hsym
+    (meyerDecomposition_reflect T (v n) χ.val η.val hη z hz)
+
+section PositiveLinesFlatLift
+
+/-- A function vanishing at the origin and bounded by a multiple of the squared norm near the
+origin has derivative zero there. -/
+private theorem meyerFlatLift_hasFDerivAt_zero_of_sq
+    {E G : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    [NormedAddCommGroup G] [NormedSpace ℝ G] (g : E → G) (hg0 : g 0 = 0) (C δ : ℝ) (hδ : 0 < δ)
+    (hb : ∀ x : E, ‖x‖ < δ → ‖g x‖ ≤ C * ‖x‖ ^ 2) :
+    HasFDerivAt g (0 : E →L[ℝ] G) 0 := by
+  rw [hasFDerivAt_iff_isLittleO_nhds_zero]
+  simp only [zero_add, hg0, sub_zero, zero_apply]
+  refine Asymptotics.IsBigO.trans_isLittleO (g := fun x : E ↦ ‖x‖ ^ 2) ?_
+    (Asymptotics.isLittleO_norm_pow_id one_lt_two)
+  refine Asymptotics.IsBigO.of_bound C ?_
+  filter_upwards [Metric.ball_mem_nhds (0 : E) hδ] with x hx
+  rw [mem_ball_zero_iff] at hx
+  simpa [Real.norm_eq_abs, abs_of_nonneg (sq_nonneg ‖x‖)] using hb x hx
+
+/-- A function smooth away from the origin, vanishing there, whose derivatives of every order
+are bounded by a multiple of the squared norm near the origin, is smooth with all derivatives
+zero at the origin. -/
+private theorem meyerFlatLift_flat_contDiff
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (f : E → ℂ) (hf : ContDiffOn ℝ (∞) f {0}ᶜ) (h0 : f 0 = 0)
+    (hflat : ∀ k : ℕ, ∃ C δ : ℝ, 0 < δ ∧ ∀ x : E, x ≠ 0 → ‖x‖ < δ →
+      ‖iteratedFDeriv ℝ k f x‖ ≤ C * ‖x‖ ^ 2) :
+    ContDiff ℝ (∞) f ∧ ∀ k, iteratedFDeriv ℝ k f 0 = 0 := by
+  have hopen : IsOpen ({0}ᶜ : Set E) := isOpen_compl_singleton
+  have hat (x : E) (hx : x ≠ 0) : ContDiffAt ℝ (∞) f x := hf.contDiffAt (hopen.mem_nhds hx)
+  have hder (k : ℕ) (hk : iteratedFDeriv ℝ k f 0 = 0) :
+      HasFDerivAt (iteratedFDeriv ℝ k f) (0 : E →L[ℝ] _) 0 := by
+    obtain ⟨C, δ, hδ, hb⟩ := hflat k
+    refine meyerFlatLift_hasFDerivAt_zero_of_sq _ hk C δ hδ fun x hx ↦ ?_
+    rcases eq_or_ne x 0 with rfl | hx0
+    · simp [hk]
+    · exact hb x hx0 hx
+  have hzero (k : ℕ) : iteratedFDeriv ℝ k f 0 = 0 := by
+    induction k with
+    | zero =>
+      ext m
+      simp [iteratedFDeriv_zero_apply, h0]
+    | succ k ih =>
+      rw [iteratedFDeriv_succ_eq_comp_left, comp_apply, (hder k ih).fderiv, map_zero]
+  refine ⟨contDiff_of_differentiable_iteratedFDeriv fun m _ x ↦ ?_, hzero⟩
+  rcases eq_or_ne x 0 with rfl | hx0
+  · exact (hder m (hzero m)).differentiableAt
+  · exact ((hat x hx0).iteratedFDeriv_right (m := 1) (i := m)
+      (by exact_mod_cast le_top)).differentiableAt one_ne_zero
+
+/-- The dilation by a positive real as a continuous linear equivalence. -/
+private noncomputable def meyerFlatLift_dilation
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E] (c : ℝ) (hc : c ≠ 0) :
+    E ≃L[ℝ] E :=
+  ContinuousLinearEquiv.equivOfInverse (c • ContinuousLinearMap.id ℝ E)
+    (c⁻¹ • ContinuousLinearMap.id ℝ E) (fun x ↦ by simp [smul_smul, mul_inv_cancel₀ hc])
+    (fun x ↦ by simp [smul_smul, inv_mul_cancel₀ hc])
+
+/-- Scaling identity: a function which changes only by a constant under a dilation preserving
+an open set has iterated derivatives of positive order scaling with the power of the factor. -/
+private theorem meyerFlatLift_norm_iteratedFDerivWithin_dilation
+    {E G : Type*} [NormedAddCommGroup E]
+    [NormedSpace ℝ E] [NormedAddCommGroup G] [NormedSpace ℝ G]
+    (Ω : Set E) (hΩ : IsOpen Ω) (f : E → G) (hf : ContDiffOn ℝ (∞) f Ω) (c : ℝ) (hc : 0 < c)
+    (hscale : ∀ x ∈ Ω, c • x ∈ Ω) (hscale' : ∀ x, c • x ∈ Ω → x ∈ Ω)
+    (d : G) (hd : ∀ x ∈ Ω, f (c • x) = f x + d) (i : ℕ) (hi : i ≠ 0) (x : E) (hx : x ∈ Ω) :
+    ‖iteratedFDerivWithin ℝ i f Ω x‖ = c ^ i * ‖iteratedFDerivWithin ℝ i f Ω (c • x)‖ := by
+  let g : E ≃L[ℝ] E := meyerFlatLift_dilation c hc.ne'
+  have hg (y : E) : g y = c • y := by simp [g, meyerFlatLift_dilation]
+  have hpre : g ⁻¹' Ω = Ω := by
+    ext y
+    simp only [mem_preimage, hg]
+    exact ⟨hscale' y, hscale y⟩
+  have hU : UniqueDiffOn ℝ Ω := hΩ.uniqueDiffOn
+  have h1 := g.iteratedFDerivWithin_comp_right f hU (x := x) (by rw [hg]; exact hscale x hx) i
+  rw [hpre] at h1
+  have h2 : iteratedFDerivWithin ℝ i (f ∘ g) Ω x = iteratedFDerivWithin ℝ i f Ω x := by
+    have heq : EqOn (f ∘ g) (f + fun _ ↦ d) Ω := fun y hy ↦ by
+      simp only [comp_apply, hg, Pi.add_apply]; exact hd y hy
+    rw [iteratedFDerivWithin_congr heq hx]
+    rw [iteratedFDerivWithin_add_apply (hf.contDiffWithinAt hx |>.of_le (by exact_mod_cast le_top))
+      contDiffWithinAt_const hU hx, iteratedFDerivWithin_const_of_ne hi, Pi.zero_apply, add_zero]
+  have h3 : (iteratedFDerivWithin ℝ i f Ω (g x)).compContinuousLinearMap (fun _ ↦ (g : E →L[ℝ] E)) =
+      c ^ i • iteratedFDerivWithin ℝ i f Ω (g x) := by
+    ext m
+    simp only [ContinuousMultilinearMap.compContinuousLinearMap_apply,
+        ContinuousLinearEquiv.coe_coe,
+      hg, smul_apply]
+    rw [ContinuousMultilinearMap.map_smul_univ]
+    simp [Finset.prod_const, Finset.card_univ]
+  rw [← h2, h1, h3, norm_smul, hg, Real.norm_eq_abs, abs_of_pos (pow_pos hc i)]
+
+/-- On a cone whose unit section is a compact part of a dilation-invariant open set, the
+iterated derivatives of positive order of a dilation-covariant smooth function decay like the
+corresponding negative power of the norm. -/
+private theorem meyerFlatLift_cone_deriv_bound
+    {E G : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    [NormedAddCommGroup G] [NormedSpace ℝ G]
+    (Ω : Set E) (hΩ : IsOpen Ω) (f : E → G) (hf : ContDiffOn ℝ (∞) f Ω)
+    (hscale : ∀ c : ℝ, 0 < c → ∀ x, c • x ∈ Ω ↔ x ∈ Ω)
+    (hd : ∀ c : ℝ, 0 < c → ∃ d : G, ∀ x ∈ Ω, f (c • x) = f x + d)
+    (Cn : Set E) (hcone : ∀ c : ℝ, 0 < c → ∀ x ∈ Cn, c • x ∈ Cn)
+    (hK : IsCompact (Cn ∩ Metric.sphere 0 1)) (hKΩ : Cn ∩ Metric.sphere 0 1 ⊆ Ω)
+    (i : ℕ) (hi : i ≠ 0) :
+    ∃ A : ℝ, 0 ≤ A ∧ ∀ x ∈ Cn, x ≠ 0 → x ∈ Ω →
+      ‖iteratedFDerivWithin ℝ i f Ω x‖ ≤ A * ‖x‖⁻¹ ^ i := by
+  have hcont : ContinuousOn (fun y ↦ iteratedFDerivWithin ℝ i f Ω y) Ω :=
+    hf.continuousOn_iteratedFDerivWithin (by exact_mod_cast le_top) hΩ.uniqueDiffOn
+  obtain ⟨A, hA⟩ := hK.exists_bound_of_continuousOn (hcont.mono hKΩ)
+  refine ⟨max A 0, le_max_right _ _, fun x hxC hx0 hxΩ ↦ ?_⟩
+  have hnx : 0 < ‖x‖ := norm_pos_iff.mpr hx0
+  set c := ‖x‖⁻¹ with hc_def
+  have hc : 0 < c := inv_pos.mpr hnx
+  obtain ⟨d, hdd⟩ := hd c hc
+  have hcx : c • x ∈ Cn ∩ Metric.sphere 0 1 := by
+    refine ⟨hcone c hc x hxC, ?_⟩
+    rw [mem_sphere_zero_iff_norm, norm_smul, Real.norm_eq_abs, abs_of_pos hc, hc_def,
+      inv_mul_cancel₀ hnx.ne']
+  rw [meyerFlatLift_norm_iteratedFDerivWithin_dilation Ω hΩ f hf c hc
+      (fun y hy ↦ (hscale c hc y).2 hy)
+    (fun y hy ↦ (hscale c hc y).1 hy) d hdd i hi x hxΩ, mul_comm]
+  exact mul_le_mul_of_nonneg_right ((hA _ hcx).trans (le_max_left _ _)) (pow_nonneg hc.le i)
+
+/-- A function smooth on an open set not containing the origin, vanishing outside a closed cone
+which meets the complement of the open set only at the origin, and whose derivatives satisfy
+bounds with every integer power of the norm on the cone, is a Schwartz function. The Schwartz
+seminorms are bounded by the corresponding bounds on the cone. -/
+private theorem meyerFlatLift_cone_schwartz
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (Ω Cn : Set E) (hΩ : IsOpen Ω) (h0 : (0 : E) ∉ Ω) (hC : IsClosed Cn)
+    (hCΩ : ∀ x ∈ Cn, x ≠ 0 → x ∈ Ω) (a : E → ℂ) (ha : ContDiffOn ℝ (∞) a Ω)
+    (hvan : ∀ x, a x ≠ 0 → x ∈ Ω ∩ Cn)
+    (hbd : ∀ (k : ℕ) (p : ℤ), ∃ C : ℝ, ∀ x ∈ Ω ∩ Cn, ‖x‖ ^ p * ‖iteratedFDeriv ℝ k a x‖ ≤ C) :
+    ∃ g : 𝓢(E, ℂ), ⇑g = a ∧ ∀ (k l : ℕ) (C : ℝ), 0 ≤ C →
+      (∀ x ∈ Ω ∩ Cn, ‖x‖ ^ k * ‖iteratedFDeriv ℝ l a x‖ ≤ C) →
+        SchwartzMap.seminorm ℂ k l g ≤ C := by
+  -- outside the cone the function vanishes near every point
+  have hloc (x : E) (hx : x ∉ Cn) : a =ᶠ[𝓝 x] fun _ ↦ 0 := by
+    filter_upwards [hC.isOpen_compl.mem_nhds hx] with y hy
+    by_contra h
+    exact hy (hvan y h).2
+  have hzero (k : ℕ) (x : E) (hx : x ∉ Cn) : iteratedFDeriv ℝ k a x = 0 := by
+    rw [((hloc x hx).iteratedFDeriv ℝ k).eq_of_nhds]
+    rcases k with _ | k
+    · ext m; simp
+    · simp
+  have hsmooth : ContDiffOn ℝ (∞) a {0}ᶜ := by
+    intro x hx
+    by_cases hxC : x ∈ Cn
+    · exact (ha.contDiffAt (hΩ.mem_nhds (hCΩ x hxC hx))).contDiffWithinAt
+    · exact (contDiffAt_const.congr_of_eventuallyEq (hloc x hxC)).contDiffWithinAt
+  have ha0 : a 0 = 0 := by
+    by_contra h
+    exact h0 (hvan 0 h).1
+  have hflat : ∀ k : ℕ, ∃ C δ : ℝ, 0 < δ ∧ ∀ x : E, x ≠ 0 → ‖x‖ < δ →
+      ‖iteratedFDeriv ℝ k a x‖ ≤ C * ‖x‖ ^ 2 := by
+    intro k
+    obtain ⟨C, hC'⟩ := hbd k (-2)
+    refine ⟨max C 0, 1, one_pos, fun x hx _ ↦ ?_⟩
+    have hnx : 0 < ‖x‖ := norm_pos_iff.mpr hx
+    have h2 : 0 < ‖x‖ ^ 2 := by positivity
+    by_cases hxC : x ∈ Cn
+    · have h := hC' x ⟨hCΩ x hxC hx, hxC⟩
+      rw [zpow_neg, zpow_ofNat] at h
+      calc ‖iteratedFDeriv ℝ k a x‖ = (‖x‖ ^ 2)⁻¹ * ‖iteratedFDeriv ℝ k a x‖ * ‖x‖ ^ 2 := by
+            field_simp
+        _ ≤ max C 0 * ‖x‖ ^ 2 :=
+          mul_le_mul_of_nonneg_right (h.trans (le_max_left _ _)) h2.le
+    · rw [hzero k x hxC, norm_zero]
+      exact mul_nonneg (le_max_right _ _) h2.le
+  obtain ⟨hcd, hd0⟩ := meyerFlatLift_flat_contDiff a hsmooth ha0 hflat
+  -- a bound on the cone gives the bound everywhere
+  have hall (k l : ℕ) (C : ℝ) (hC0 : 0 ≤ C)
+      (h : ∀ x ∈ Ω ∩ Cn, ‖x‖ ^ k * ‖iteratedFDeriv ℝ l a x‖ ≤ C) (x : E) :
+      ‖x‖ ^ k * ‖iteratedFDeriv ℝ l a x‖ ≤ C := by
+    rcases eq_or_ne x 0 with rfl | hx
+    · simp [hd0 l, hC0]
+    by_cases hxC : x ∈ Cn
+    · exact h x ⟨hCΩ x hxC hx, hxC⟩
+    · rw [hzero l x hxC, norm_zero, mul_zero]; exact hC0
+  let g : 𝓢(E, ℂ) :=
+    { toFun := a
+      smooth' := hcd
+      decay' := fun k l ↦ by
+        obtain ⟨C, hC'⟩ := hbd l k
+        refine ⟨max C 0, hall k l _ (le_max_right _ _) fun x hx ↦ ?_⟩
+        have := hC' x hx
+        rw [zpow_natCast] at this
+        exact this.trans (le_max_left _ _) }
+  refine ⟨g, rfl, fun k l C hC0 h ↦ ?_⟩
+  exact SchwartzMap.seminorm_le_bound ℂ k l g hC0 (hall k l C hC0 h)
+
+section LogPolar
+
+variable {E ι : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E] [Fintype ι]
+
+/-- The points with all coordinates nonzero. -/
+private noncomputable def meyerFlatLift_Ω
+    (π : ι → E →L[ℝ] ℂ) : Set E := {x | ∀ j, π j x ≠ 0}
+
+/-- Logarithmic radii and angular parts of the coordinates. -/
+private noncomputable def meyerFlatLift_L
+    (π : ι → E →L[ℝ] ℂ) (x : E) : (ι → ℝ) × (ι → ℂ) :=
+  (fun j ↦ Real.log ‖π j x‖, fun j ↦ π j x * ((‖π j x‖ : ℝ) : ℂ)⁻¹)
+
+/-- The cone where every coordinate is comparable to the norm. -/
+private noncomputable def meyerFlatLift_Cone
+    (π : ι → E →L[ℝ] ℂ) (c₀ : ℝ) : Set E := {x | ∀ j, c₀ * ‖x‖ ≤ ‖π j x‖}
+
+/-- The set of points with all coordinates nonzero is open. -/
+private theorem meyerFlatLift_Ω_isOpen
+    (π : ι → E →L[ℝ] ℂ) : IsOpen (meyerFlatLift_Ω π) := by
+  have : meyerFlatLift_Ω π = ⋂ j, (π j) ⁻¹' {0}ᶜ := by ext x; simp [meyerFlatLift_Ω]
+  rw [this]
+  exact isOpen_iInter_of_finite fun j ↦ isOpen_compl_singleton.preimage (π j).continuous
+
+/-- The set of points with all coordinates nonzero is invariant under positive dilations. -/
+private theorem meyerFlatLift_Ω_smul
+    (π : ι → E →L[ℝ] ℂ) (c : ℝ) (hc : 0 < c) (x : E) :
+    c • x ∈ meyerFlatLift_Ω π ↔ x ∈ meyerFlatLift_Ω π := by
+  simp only [meyerFlatLift_Ω, mem_ofPred_eq, map_smul]
+  exact forall_congr' fun j ↦ by rw [Ne, smul_eq_zero, not_or, and_iff_right hc.ne']
+
+/-- The log-polar map is smooth where all coordinates are nonzero. -/
+private theorem meyerFlatLift_L_contDiffOn
+    (π : ι → E →L[ℝ] ℂ) : ContDiffOn ℝ (∞) (meyerFlatLift_L π) (meyerFlatLift_Ω π) := by
+  intro x hx
+  have hn (j : ι) : ContDiffAt ℝ (∞) (fun y ↦ ‖π j y‖) x :=
+    (contDiffAt_norm ℝ (hx j)).comp x (π j).contDiff.contDiffAt
+  have hpos (j : ι) : ‖π j x‖ ≠ 0 := norm_ne_zero_iff.mpr (hx j)
+  refine ContDiffAt.contDiffWithinAt (ContDiffAt.prodMk ?_ ?_)
+  · exact contDiffAt_pi.mpr fun j ↦ (hn j).log (hpos j)
+  · refine contDiffAt_pi.mpr fun j ↦ ((π j).contDiff.contDiffAt).mul ?_
+    exact ((Complex.ofRealCLM.contDiff.contDiffAt.comp x (hn j)).inv
+      (by simpa using hpos j))
+
+/-- A positive dilation adds its logarithm to the logarithmic radii and leaves the angular
+parts unchanged. -/
+private theorem meyerFlatLift_L_smul
+    (π : ι → E →L[ℝ] ℂ) (c : ℝ) (hc : 0 < c) (x : E) (hx : x ∈ meyerFlatLift_Ω π) :
+    meyerFlatLift_L π (c • x) = meyerFlatLift_L π x + ((fun _ ↦ Real.log c), 0) := by
+  have hpos (j : ι) : 0 < ‖π j x‖ := norm_pos_iff.mpr (hx j)
+  ext j
+  · simp only [meyerFlatLift_L, map_smul, norm_smul, Real.norm_eq_abs, abs_of_pos hc, Prod.fst_add,
+      Pi.add_apply]
+    rw [Real.log_mul hc.ne' (hpos j).ne', add_comm]
+  · simp only [meyerFlatLift_L, map_smul, Prod.snd_add, Pi.add_apply, Pi.zero_apply, add_zero,
+      Complex.real_smul]
+    have : (c : ℂ) ≠ 0 := by exact_mod_cast hc.ne'
+    have : ((‖π j x‖ : ℝ) : ℂ) ≠ 0 := by exact_mod_cast (hpos j).ne'
+    rw [norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hc, Complex.ofReal_mul]
+    field_simp
+
+/-- The cone is closed. -/
+private theorem meyerFlatLift_Cone_isClosed
+    (π : ι → E →L[ℝ] ℂ) (c₀ : ℝ) : IsClosed (meyerFlatLift_Cone π c₀) := by
+  have : meyerFlatLift_Cone π c₀ = ⋂ j, {x | c₀ * ‖x‖ ≤ ‖π j x‖} := by
+    ext x; simp [meyerFlatLift_Cone]
+  rw [this]
+  exact isClosed_iInter fun j ↦ isClosed_le (continuous_const.mul continuous_norm)
+    ((π j).continuous.norm)
+
+/-- The cone is invariant under positive dilations. -/
+private theorem meyerFlatLift_Cone_smul
+    (π : ι → E →L[ℝ] ℂ) (c₀ c : ℝ) (hc : 0 < c) (x : E)
+    (hx : x ∈ meyerFlatLift_Cone π c₀) : c • x ∈ meyerFlatLift_Cone π c₀ := by
+  intro j
+  simp only [map_smul, norm_smul, Real.norm_eq_abs, abs_of_pos hc]
+  have := hx j
+  nlinarith
+
+/-- For a positive constant, the nonzero points of the cone have all coordinates nonzero. -/
+private theorem meyerFlatLift_Cone_subset
+    (π : ι → E →L[ℝ] ℂ) (c₀ : ℝ) (hc₀ : 0 < c₀) (x : E)
+    (hx : x ∈ meyerFlatLift_Cone π c₀) (hx0 : x ≠ 0) : x ∈ meyerFlatLift_Ω π := by
+  intro j h
+  have := hx j
+  rw [h, norm_zero] at this
+  have : 0 < c₀ * ‖x‖ := mul_pos hc₀ (norm_pos_iff.mpr hx0)
+  linarith
+
+/-- On the cone the derivatives of positive order of the log-polar map decay like the
+corresponding negative power of the norm. -/
+private theorem meyerFlatLift_L_cone_bound
+    [FiniteDimensional ℝ E] (π : ι → E →L[ℝ] ℂ) (c₀ : ℝ) (hc₀ : 0 < c₀)
+    (i : ℕ) (hi : i ≠ 0) :
+    ∃ A : ℝ, 0 ≤ A ∧ ∀ x ∈ meyerFlatLift_Cone π c₀, x ≠ 0 →
+      ‖iteratedFDerivWithin ℝ i (meyerFlatLift_L π) (meyerFlatLift_Ω π) x‖ ≤ A * ‖x‖⁻¹ ^ i := by
+  obtain ⟨A, hA0, hA⟩ := meyerFlatLift_cone_deriv_bound (meyerFlatLift_Ω π)
+      (meyerFlatLift_Ω_isOpen π) (meyerFlatLift_L π) (meyerFlatLift_L_contDiffOn π)
+    (fun c hc x ↦ meyerFlatLift_Ω_smul π c hc x)
+        (fun c hc ↦ ⟨_, fun x hx ↦ meyerFlatLift_L_smul π c hc x hx⟩)
+    (meyerFlatLift_Cone π c₀) (fun c hc x hx ↦ meyerFlatLift_Cone_smul π c₀ c hc x hx)
+    (Metric.isCompact_of_isClosed_isBounded
+        ((meyerFlatLift_Cone_isClosed π c₀).inter Metric.isClosed_sphere)
+      (Metric.isBounded_sphere.subset inter_subset_right))
+    (fun x hx ↦ meyerFlatLift_Cone_subset π c₀ hc₀ x hx.1
+      (by rintro rfl; simpa using hx.2)) i hi
+  exact ⟨A, hA0, fun x hx hx0 ↦ hA x hx hx0 (meyerFlatLift_Cone_subset π c₀ hc₀ x hx hx0)⟩
+
+/-- Faà di Bruno on the cone: a smooth function of the log-polar coordinates has derivatives
+bounded by those of the outer function times the negative power of the norm. -/
+private theorem meyerFlatLift_comp_cone_bound
+    [FiniteDimensional ℝ E] (π : ι → E →L[ℝ] ℂ) (c₀ : ℝ) (hc₀ : 0 < c₀)
+    (k : ℕ) :
+    ∃ A : ℝ, 1 ≤ A ∧ ∀ (G : (ι → ℝ) × (ι → ℂ) → ℂ), ContDiff ℝ (∞) G →
+      ∀ x ∈ meyerFlatLift_Cone π c₀, x ≠ 0 → ∀ C : ℝ,
+        (∀ i, i ≤ k → ‖iteratedFDeriv ℝ i G (meyerFlatLift_L π x)‖ ≤ C) →
+          ‖iteratedFDerivWithin ℝ k (G ∘ meyerFlatLift_L π) (meyerFlatLift_Ω π) x‖ ≤
+            k.factorial * C * (A * ‖x‖⁻¹) ^ k := by
+  choose Ai hAi0 hAi using fun j : ℕ ↦ meyerFlatLift_L_cone_bound π c₀ hc₀
+      (j + 1) (Nat.succ_ne_zero j)
+  have hsum0 : 0 ≤ ∑ j ∈ Finset.range k, Ai j :=
+    Finset.sum_nonneg fun j _ ↦ hAi0 j
+  refine ⟨1 + ∑ j ∈ Finset.range k, Ai j, by linarith, ?_⟩
+  intro G hG x hxC hx0 C hC
+  set A := 1 + ∑ j ∈ Finset.range k, Ai j with hA
+  have hA1 : 1 ≤ A := by linarith
+  have hxΩ := meyerFlatLift_Cone_subset π c₀ hc₀ x hxC hx0
+  refine norm_iteratedFDerivWithin_comp_le (t := univ) hG.contDiffOn (meyerFlatLift_L_contDiffOn π)
+    (by exact_mod_cast le_top) uniqueDiffOn_univ (meyerFlatLift_Ω_isOpen π).uniqueDiffOn
+    (mapsTo_univ _ _) hxΩ (fun i hi ↦ by rw [iteratedFDerivWithin_univ]; exact hC i hi)
+    (fun i hi1 hik ↦ ?_)
+  obtain ⟨j, rfl⟩ : ∃ j, i = j + 1 := ⟨i - 1, by omega⟩
+  have hAi_le : Ai j ≤ A ^ (j + 1) := by
+    have h1 : Ai j ≤ A := by
+      rw [hA]
+      have := Finset.single_le_sum (fun j (_ : j ∈ Finset.range k) ↦ hAi0 j)
+        (Finset.mem_range.mpr (by omega : j < k))
+      linarith
+    exact h1.trans (le_self_pow₀ hA1 (by omega))
+  calc ‖iteratedFDerivWithin ℝ (j + 1) (meyerFlatLift_L π) (meyerFlatLift_Ω π) x‖ ≤
+         Ai j * ‖x‖⁻¹ ^ (j + 1) :=
+        hAi j x hxC hx0
+    _ ≤ A ^ (j + 1) * ‖x‖⁻¹ ^ (j + 1) := mul_le_mul_of_nonneg_right hAi_le (by positivity)
+    _ = (A * ‖x‖⁻¹) ^ (j + 1) := (mul_pow _ _ _).symm
+
+end LogPolar
+
+/-- The angular power: `w ^ β` written with the conjugate for negative exponents, so that it is
+a real polynomial map; on the unit circle it is the integer power. -/
+private noncomputable def meyerFlatLift_gpow
+    (β : ℤ) (w : ℂ) : ℂ :=
+  if 0 ≤ β then w ^ β.toNat else (starRingEnd ℂ w) ^ (-β).toNat
+
+/-- The angular power is smooth. -/
+private theorem meyerFlatLift_gpow_contDiff
+    (β : ℤ) : ContDiff ℝ (∞) (meyerFlatLift_gpow β) := by
+  unfold meyerFlatLift_gpow
+  split_ifs
+  · exact contDiff_id.pow _
+  · exact (Complex.conjCLE.contDiff).pow _
+
+/-- On the unit circle the angular power is the integer power. -/
+private theorem meyerFlatLift_gpow_eq_zpow
+    (β : ℤ) (w : ℂ) (hw : ‖w‖ = 1) : meyerFlatLift_gpow β w = w ^ β := by
+  have hw0 : w ≠ 0 := by rintro rfl; simp at hw
+  have hconj : starRingEnd ℂ w = w⁻¹ := by
+    rw [Complex.inv_def, Complex.normSq_eq_norm_sq, hw]; simp
+  unfold meyerFlatLift_gpow
+  split_ifs with h
+  · rw [← zpow_natCast, Int.toNat_of_nonneg h]
+  · rw [hconj, inv_pow, ← zpow_natCast, Int.toNat_of_nonneg (by omega), ← zpow_neg, neg_neg]
+
+/-- The derivatives of the angular power on the unit circle grow polynomially in the
+exponent. -/
+private theorem meyerFlatLift_gpow_deriv_bound
+    (β : ℤ) (m : ℕ) (w : ℂ) (hw : ‖w‖ = 1) :
+    ‖iteratedFDeriv ℝ m (meyerFlatLift_gpow β) w‖ ≤ (|(β : ℝ)| + m) ^ m := by
+  -- the holomorphic power and its derivatives
+  have hpow (n : ℕ) (hn : (n : ℝ) ≤ |(β : ℝ)|) :
+      ‖iteratedFDeriv ℝ m (fun v : ℂ ↦ v ^ n) w‖ ≤ (|(β : ℝ)| + m) ^ m := by
+    have hcd : ContDiffAt ℂ m (fun v : ℂ ↦ v ^ n) w := (contDiff_id.pow n).contDiffAt
+    rw [← hcd.restrictScalars_iteratedFDeriv (𝕜 := ℝ), comp_apply,
+      ContinuousMultilinearMap.norm_restrictScalars, norm_iteratedFDeriv_eq_norm_iteratedDeriv,
+      iteratedDeriv_eq_iterate, iter_deriv_pow, norm_mul, norm_pow, hw, one_pow, mul_one,
+      norm_prod]
+    calc ∏ i ∈ Finset.range m, ‖(n : ℂ) - i‖ ≤ ∏ _i ∈ Finset.range m, (|(β : ℝ)| + m) := by
+          refine Finset.prod_le_prod₀ (fun i _ ↦ norm_nonneg _) fun i hi ↦ ?_
+          have hi' : (i : ℝ) ≤ m := by exact_mod_cast (Finset.mem_range.mp hi).le
+          calc ‖(n : ℂ) - i‖ ≤ ‖(n : ℂ)‖ + ‖(i : ℂ)‖ := norm_sub_le _ _
+            _ = n + i := by simp
+            _ ≤ |(β : ℝ)| + m := by linarith
+      _ = _ := by rw [Finset.prod_const, Finset.card_range]
+  unfold meyerFlatLift_gpow
+  split_ifs with h
+  · have : (β.toNat : ℤ) ≤ |β| := by rw [Int.toNat_of_nonneg h]; exact le_abs_self β
+    exact hpow β.toNat (by exact_mod_cast this)
+  · have hcomp : (fun v : ℂ ↦ (starRingEnd ℂ v) ^ (-β).toNat) =
+        Complex.conjLIE ∘ fun v : ℂ ↦ v ^ (-β).toNat := by
+      funext v; simp [map_pow]
+    rw [hcomp, LinearIsometryEquiv.norm_iteratedFDeriv_comp_left]
+    have : ((-β).toNat : ℤ) ≤ |β| := by rw [Int.toNat_of_nonneg (by omega)]; exact neg_le_abs β
+    exact hpow _ (by exact_mod_cast this)
+
+/-- Composition with a continuous linear map on the right multiplies the bound by the power of
+its norm. -/
+private theorem meyerFlatLift_norm_iteratedFDeriv_comp_clm
+    {D E G : Type*} [NormedAddCommGroup D] [NormedSpace ℝ D]
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [NormedAddCommGroup G] [NormedSpace ℝ G]
+    (g : D →L[ℝ] E) {f : E → G} (hf : ContDiff ℝ (∞) f) (x : D) (i : ℕ) :
+    ‖iteratedFDeriv ℝ i (f ∘ g) x‖ ≤ ‖iteratedFDeriv ℝ i f (g x)‖ * ‖g‖ ^ i := by
+  rw [g.iteratedFDeriv_comp_right hf x (by exact_mod_cast le_top)]
+  refine (ContinuousMultilinearMap.norm_compContinuousLinearMap_le _ _).trans ?_
+  simp [Finset.prod_const, Finset.card_univ]
+
+/-- The unitary exponential of a real variable has all derivatives of norm at most one. -/
+private theorem meyerFlatLift_expI_bound
+    (c : ℕ) (t : ℝ) :
+    ‖iteratedFDeriv ℝ c (fun s : ℝ ↦ Complex.exp (Complex.I * s)) t‖ ≤ 1 := by
+  let g : ℂ → ℂ := fun w ↦ Complex.exp (Complex.I * w)
+  have hg : ContDiff ℂ (∞) g := (contDiff_const.mul contDiff_id).cexp
+  have hcomp : (fun s : ℝ ↦ Complex.exp (Complex.I * s)) = g ∘ Complex.ofRealCLM := rfl
+  rw [hcomp]
+  refine (meyerFlatLift_norm_iteratedFDeriv_comp_clm Complex.ofRealCLM
+      (hg.restrict_scalars ℝ) t c).trans ?_
+  have hcd : ContDiffAt ℂ c g (t : ℂ) := hg.contDiffAt.of_le (by exact_mod_cast le_top)
+  rw [Complex.ofRealCLM_apply, ← hcd.restrictScalars_iteratedFDeriv (𝕜 := ℝ), comp_apply,
+    ContinuousMultilinearMap.norm_restrictScalars, norm_iteratedFDeriv_eq_norm_iteratedDeriv]
+  simp only [g, iteratedDeriv_cexp_const_mul, norm_mul, norm_pow, Complex.norm_I, one_pow,
+    one_mul, Complex.norm_exp_I_mul_ofReal]
+  calc ‖Complex.ofRealCLM‖ ^ c ≤ 1 ^ c := by
+        gcongr
+        exact ContinuousLinearMap.opNorm_le_bound _ zero_le_one fun s ↦ by simp
+    _ = 1 := by simp
+
+variable {ι : Type*} [Fintype ι] [DecidableEq ι]
+
+/-- The derivatives of a product of angular powers on the product of unit circles grow
+polynomially in the exponents. -/
+private theorem meyerFlatLift_prod_gpow_bound
+    (b : ℕ) :
+    ∃ N : ℝ, 0 ≤ N ∧ ∀ (β : ι → ℤ) (z : ι → ℂ), (∀ j, ‖z j‖ = 1) →
+      ‖iteratedFDeriv ℝ b (fun z : ι → ℂ ↦ ∏ j, meyerFlatLift_gpow (β j) (z j)) z‖ ≤
+        N * (1 + ∑ j, |(β j : ℝ)|) ^ b := by
+  refine ⟨(∑ p ∈ (Finset.univ : Finset ι).sym b, ((p : Multiset ι).countPerms : ℝ)) *
+    (1 + b) ^ b, by positivity, fun β z hz ↦ ?_⟩
+  set B := ∑ j, |(β j : ℝ)| with hB
+  have hB0 : 0 ≤ B := Finset.sum_nonneg fun j _ ↦ abs_nonneg _
+  have hfac (j : ι) (c : ℕ) (hc : c ≤ b) :
+      ‖iteratedFDeriv ℝ c (fun z : ι → ℂ ↦ meyerFlatLift_gpow (β j) (z j)) z‖ ≤ (B + b) ^ c := by
+    have hcomp : (fun z : ι → ℂ ↦ meyerFlatLift_gpow (β j) (z j)) =
+        meyerFlatLift_gpow (β j) ∘ (ContinuousLinearMap.proj j : (ι → ℂ) →L[ℝ] ℂ) := rfl
+    rw [hcomp]
+    refine (meyerFlatLift_norm_iteratedFDeriv_comp_clm _
+        (meyerFlatLift_gpow_contDiff _) z c).trans ?_
+    have hproj : ‖(ContinuousLinearMap.proj j : (ι → ℂ) →L[ℝ] ℂ)‖ ≤ 1 :=
+      ContinuousLinearMap.opNorm_le_bound _ zero_le_one fun x ↦ by
+        simpa using norm_le_pi_norm x j
+    have hj : |(β j : ℝ)| ≤ B := Finset.single_le_sum (f := fun j ↦ |(β j : ℝ)|)
+      (fun j _ ↦ abs_nonneg _) (Finset.mem_univ j)
+    calc ‖iteratedFDeriv ℝ c (meyerFlatLift_gpow (β j)) (z j)‖ * ‖(ContinuousLinearMap.proj j :
+          (ι → ℂ) →L[ℝ] ℂ)‖ ^ c ≤ (|(β j : ℝ)| + c) ^ c * 1 ^ c := by
+          gcongr
+          exact meyerFlatLift_gpow_deriv_bound (β j) c (z j) (hz j)
+      _ ≤ (B + b) ^ c := by
+          rw [one_pow, mul_one]
+          gcongr
+  have hprod := norm_iteratedFDeriv_prod_le (𝕜 := ℝ) (u := Finset.univ)
+    (f := fun j (z : ι → ℂ) ↦ meyerFlatLift_gpow (β j) (z j))
+    (fun j _ ↦ (meyerFlatLift_gpow_contDiff _).comp
+      (ContinuousLinearMap.proj j : (ι → ℂ) →L[ℝ] ℂ).contDiff) (x := z)
+    (n := b) (N := ∞) (by exact_mod_cast le_top)
+  refine hprod.trans ((Finset.sum_le_sum fun p hp ↦ mul_le_mul_of_nonneg_left
+    (?_ : _ ≤ (B + b) ^ b) (Nat.cast_nonneg _)).trans ?_)
+  · have hcard : Multiset.card (p : Multiset ι) = b := p.2
+    refine (Finset.prod_le_prod₀ (fun j _ ↦ norm_nonneg _) fun j _ ↦ hfac j _ ?_).trans_eq ?_
+    · exact (Multiset.count_le_card j (p : Multiset ι)).trans hcard.le
+    · rw [Finset.prod_pow_eq_pow_sum, Multiset.sum_count_eq_card (fun a _ ↦ Finset.mem_univ a),
+        hcard]
+  · rw [← Finset.sum_mul, mul_assoc]
+    refine mul_le_mul_of_nonneg_left ?_ (Finset.sum_nonneg fun p _ ↦ Nat.cast_nonneg _)
+    rw [← mul_pow]
+    have hb0 : (0 : ℝ) ≤ b := Nat.cast_nonneg b
+    exact pow_le_pow_left₀ (by positivity) (by nlinarith) b
+
+/-- A Leibniz bound with polynomial weights: if the derivatives of `f` up to order `k` are
+bounded by `A * w ^ i` and those of `g` by `B * v ^ i` with `1 ≤ w, v`, the product has
+derivatives bounded by `2 ^ k * A * B * (w * v) ^ k`. -/
+private theorem meyerFlatLift_leibniz_bound
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    {f g : E → ℂ} (hf : ContDiff ℝ (∞) f) (hg : ContDiff ℝ (∞) g) (x : E) (k : ℕ)
+    (A B w v : ℝ) (hA : 0 ≤ A) (hw : 1 ≤ w) (hv : 1 ≤ v)
+    (hfb : ∀ i ≤ k, ‖iteratedFDeriv ℝ i f x‖ ≤ A * w ^ i)
+    (hgb : ∀ i ≤ k, ‖iteratedFDeriv ℝ i g x‖ ≤ B * v ^ i) :
+    ‖iteratedFDeriv ℝ k (fun y ↦ f y * g y) x‖ ≤ 2 ^ k * A * B * (w * v) ^ k := by
+  refine (norm_iteratedFDeriv_mul_le hf hg x (by exact_mod_cast le_top)).trans ?_
+  have hB : 0 ≤ B := by
+    have := (norm_nonneg _).trans (hgb 0 (Nat.zero_le _))
+    simpa using this
+  calc ∑ i ∈ Finset.range (k + 1), (k.choose i : ℝ) * ‖iteratedFDeriv ℝ i f x‖ *
+        ‖iteratedFDeriv ℝ (k - i) g x‖
+      ≤ ∑ i ∈ Finset.range (k + 1), (k.choose i : ℝ) * (A * B * (w * v) ^ k) := by
+        refine Finset.sum_le_sum fun i hi ↦ ?_
+        have hik : i ≤ k := Nat.lt_succ_iff.mp (Finset.mem_range.mp hi)
+        rw [mul_assoc]
+        refine mul_le_mul_of_nonneg_left ?_ (Nat.cast_nonneg _)
+        calc ‖iteratedFDeriv ℝ i f x‖ * ‖iteratedFDeriv ℝ (k - i) g x‖
+            ≤ (A * w ^ i) * (B * v ^ (k - i)) :=
+              mul_le_mul (hfb i hik) (hgb _ (Nat.sub_le _ _)) (norm_nonneg _) (by positivity)
+          _ ≤ (A * w ^ k) * (B * v ^ k) := by
+              gcongr
+              exact Nat.sub_le _ _
+          _ = A * B * (w * v) ^ k := by ring
+    _ = 2 ^ k * A * B * (w * v) ^ k := by
+        have h2 : ∑ i ∈ Finset.range (k + 1), (k.choose i : ℝ) = 2 ^ k := by
+          exact_mod_cast Nat.sum_range_choose k
+        rw [← Finset.sum_mul, h2]
+        ring
+
+/-- The linear form `y ↦ ∑ j, a j * y j`. -/
+private noncomputable def meyerFlatLift_lin
+    (a : ι → ℝ) : (ι → ℝ) →L[ℝ] ℝ := ∑ j, a j • ContinuousLinearMap.proj j
+
+/-- The value of the linear form. -/
+private theorem meyerFlatLift_lin_apply
+    (a : ι → ℝ) (y : ι → ℝ) : meyerFlatLift_lin a y = ∑ j, a j * y j := by
+  simp [meyerFlatLift_lin]
+
+/-- The norm of the linear form is at most the sum of the absolute values of its
+coefficients. -/
+private theorem meyerFlatLift_lin_norm_le
+    (a : ι → ℝ) : ‖meyerFlatLift_lin a‖ ≤ ∑ j, |a j| := by
+  refine ContinuousLinearMap.opNorm_le_bound _ (Finset.sum_nonneg fun j _ ↦ abs_nonneg _)
+    fun y ↦ ?_
+  rw [meyerFlatLift_lin_apply, Finset.sum_mul]
+  refine (norm_sum_le _ _).trans (Finset.sum_le_sum fun j _ ↦ ?_)
+  rw [norm_mul, Real.norm_eq_abs]
+  exact mul_le_mul_of_nonneg_left (norm_le_pi_norm y j) (abs_nonneg _)
+
+/-- The outer function of the archimedean test: a unitary exponential of the log-radii times a
+cutoff times a profile of a linear form of the log-radii, times angular powers. -/
+private noncomputable def meyerFlatLift_G
+    (α μ : ι → ℝ) (s₀ : ℝ) (B : (ι → ℝ) → ℂ) (φ : ℝ → ℂ) (β : ι → ℤ)
+    (p : (ι → ℝ) × (ι → ℂ)) : ℂ :=
+  (Complex.exp (Complex.I * (meyerFlatLift_lin α p.1 : ℝ)) * B p.1 *
+      φ (meyerFlatLift_lin μ p.1 + s₀)) *
+    ∏ j, meyerFlatLift_gpow (β j) (p.2 j)
+
+/-- The outer function of the archimedean test is smooth. -/
+private theorem meyerFlatLift_G_contDiff
+    (α μ : ι → ℝ) (s₀ : ℝ) (B : (ι → ℝ) → ℂ) (hB : ContDiff ℝ (∞) B)
+    (φ : ℝ → ℂ) (hφ : ContDiff ℝ (∞) φ) (β : ι → ℤ) :
+        ContDiff ℝ (∞) (meyerFlatLift_G α μ s₀ B φ β) := by
+  unfold meyerFlatLift_G
+  refine ContDiff.mul (ContDiff.mul (ContDiff.mul ?_ (hB.comp contDiff_fst)) ?_) ?_
+  · exact (contDiff_const.mul (Complex.ofRealCLM.contDiff.comp
+      ((meyerFlatLift_lin α).contDiff.comp contDiff_fst))).cexp
+  · exact hφ.comp (((meyerFlatLift_lin μ).contDiff.comp contDiff_fst).add contDiff_const)
+  · exact contDiff_prod fun j _ ↦ (meyerFlatLift_gpow_contDiff _).comp
+      ((ContinuousLinearMap.proj j : (ι → ℂ) →L[ℝ] ℂ).contDiff.comp contDiff_snd)
+
+/-- Bounds for the derivatives of the outer function at points with unit angular parts. -/
+private theorem meyerFlatLift_G_bound
+    (μ : ι → ℝ) (s₀ : ℝ) (B : (ι → ℝ) → ℂ) (hB : ContDiff ℝ (∞) B)
+    (bB : ℕ → ℝ) (hbB : ∀ i y, ‖iteratedFDeriv ℝ i B y‖ ≤ bB i) (k : ℕ) :
+    ∃ K : ℝ, 0 ≤ K ∧ ∀ (α : ι → ℝ) (β : ι → ℤ) (φ : ℝ → ℂ), ContDiff ℝ (∞) φ →
+      ∀ (y : ι → ℝ) (z : ι → ℂ), (∀ j, ‖z j‖ = 1) → ∀ M : ℝ,
+        (∀ d ≤ k, ‖iteratedFDeriv ℝ d φ (meyerFlatLift_lin μ y + s₀)‖ ≤ M) →
+          ∀ i ≤ k, ‖iteratedFDeriv ℝ i (meyerFlatLift_G α μ s₀ B φ β) (y, z)‖ ≤
+            K * M * ((1 + ∑ j, |α j|) * (1 + ∑ j, |(β j : ℝ)|)) ^ k := by
+  choose Nb hNb0 hNb using fun b : ℕ ↦ meyerFlatLift_prod_gpow_bound (ι := ι) b
+  set Bm := ∑ i ∈ Finset.range (k + 1), bB i with hBm
+  set Nm := ∑ i ∈ Finset.range (k + 1), Nb i with hNm
+  set mu := ∑ j, |μ j| with hmu
+  have hbB0 (i : ℕ) : 0 ≤ bB i := (norm_nonneg _).trans (hbB i 0)
+  have hBm0 : 0 ≤ Bm := Finset.sum_nonneg fun i _ ↦ hbB0 i
+  have hNm0 : 0 ≤ Nm := Finset.sum_nonneg fun i _ ↦ hNb0 i
+  have hmu0 : 0 ≤ mu := Finset.sum_nonneg fun j _ ↦ abs_nonneg _
+  refine ⟨Bm * Nm * (8 * (1 + mu)) ^ k, by positivity, ?_⟩
+  intro α β φ hφ y z hz M hM i hi
+  set a := ∑ j, |α j| with ha
+  set bb := ∑ j, |(β j : ℝ)| with hbb
+  have ha0 : 0 ≤ a := Finset.sum_nonneg fun j _ ↦ abs_nonneg _
+  have hbb0 : 0 ≤ bb := Finset.sum_nonneg fun j _ ↦ abs_nonneg _
+  have hM0 : 0 ≤ M := (norm_nonneg _).trans (hM 0 (Nat.zero_le _))
+  let fst' : (ι → ℝ) × (ι → ℂ) →L[ℝ] (ι → ℝ) := ContinuousLinearMap.fst ℝ _ _
+  let snd' : (ι → ℝ) × (ι → ℂ) →L[ℝ] (ι → ℂ) := ContinuousLinearMap.snd ℝ _ _
+  have hfst : ‖fst'‖ ≤ 1 := ContinuousLinearMap.norm_fst_le _ _ _
+  have hsnd : ‖snd'‖ ≤ 1 := ContinuousLinearMap.norm_snd_le _ _ _
+  let f1 : (ι → ℝ) × (ι → ℂ) → ℂ := (fun s : ℝ ↦ Complex.exp (Complex.I * s)) ∘
+      ((meyerFlatLift_lin α).comp fst')
+  let f2 : (ι → ℝ) × (ι → ℂ) → ℂ := B ∘ fst'
+  let f3 : (ι → ℝ) × (ι → ℂ) → ℂ := (fun t ↦ φ (t + s₀)) ∘ ((meyerFlatLift_lin μ).comp fst')
+  let f4 : (ι → ℝ) × (ι → ℂ) → ℂ := (fun z : ι → ℂ ↦ ∏ j, meyerFlatLift_gpow (β j) (z j)) ∘ snd'
+  have hexp : ContDiff ℝ (∞) (fun s : ℝ ↦ Complex.exp (Complex.I * s)) :=
+    (contDiff_const.mul Complex.ofRealCLM.contDiff).cexp
+  have hφs : ContDiff ℝ (∞) (fun t ↦ φ (t + s₀)) := hφ.comp (contDiff_id.add contDiff_const)
+  have hP : ContDiff ℝ (∞) (fun z : ι → ℂ ↦ ∏ j, meyerFlatLift_gpow (β j) (z j)) :=
+    contDiff_prod fun j _ ↦ (meyerFlatLift_gpow_contDiff _).comp
+      (ContinuousLinearMap.proj j : (ι → ℂ) →L[ℝ] ℂ).contDiff
+  have h1c : ContDiff ℝ (∞) f1 := hexp.comp ((meyerFlatLift_lin α).comp fst').contDiff
+  have h2c : ContDiff ℝ (∞) f2 := hB.comp fst'.contDiff
+  have h3c : ContDiff ℝ (∞) f3 := hφs.comp ((meyerFlatLift_lin μ).comp fst').contDiff
+  have h4c : ContDiff ℝ (∞) f4 := hP.comp snd'.contDiff
+  have hcompn (g : (ι → ℝ) →L[ℝ] ℝ) : ‖g.comp fst'‖ ≤ ‖g‖ :=
+    (ContinuousLinearMap.opNorm_comp_le _ _).trans (mul_le_of_le_one_right (norm_nonneg _) hfst)
+  -- the four factors
+  have b1 (j : ℕ) : ‖iteratedFDeriv ℝ j f1 (y, z)‖ ≤ 1 * (1 + a) ^ j := by
+    refine (meyerFlatLift_norm_iteratedFDeriv_comp_clm _ hexp _ j).trans ?_
+    rw [one_mul]
+    refine mul_le_mul (meyerFlatLift_expI_bound j _) ?_ (by positivity)
+        zero_le_one |>.trans_eq (one_mul _)
+    exact pow_le_pow_left₀ (norm_nonneg _) (((hcompn _).trans (meyerFlatLift_lin_norm_le α)).trans
+      (by linarith)) j
+  have b2 (j : ℕ) (hj : j ≤ k) : ‖iteratedFDeriv ℝ j f2 (y, z)‖ ≤ Bm * 1 ^ j := by
+    refine (meyerFlatLift_norm_iteratedFDeriv_comp_clm _ hB _ j).trans ?_
+    rw [one_pow, mul_one]
+    calc ‖iteratedFDeriv ℝ j B (fst' (y, z))‖ * ‖fst'‖ ^ j ≤ bB j * 1 ^ j :=
+          mul_le_mul (hbB j _) (pow_le_pow_left₀ (norm_nonneg _) hfst j) (by positivity)
+            (hbB0 j)
+      _ ≤ Bm := by
+          rw [one_pow, mul_one, hBm]
+          exact Finset.single_le_sum (fun i _ ↦ hbB0 i) (Finset.mem_range.mpr (by omega))
+  have b3 (j : ℕ) (hj : j ≤ k) : ‖iteratedFDeriv ℝ j f3 (y, z)‖ ≤ M * (1 + mu) ^ j := by
+    refine (meyerFlatLift_norm_iteratedFDeriv_comp_clm _ hφs _ j).trans ?_
+    have heq : iteratedFDeriv ℝ j (fun t ↦ φ (t + s₀)) (((meyerFlatLift_lin μ).comp fst') (y, z)) =
+        iteratedFDeriv ℝ j φ (meyerFlatLift_lin μ y + s₀) := iteratedFDeriv_comp_add_right j s₀ _
+    rw [heq]
+    exact mul_le_mul (hM j hj) (pow_le_pow_left₀ (norm_nonneg _)
+      (((hcompn _).trans (meyerFlatLift_lin_norm_le μ)).trans (by linarith)) j) (by positivity) hM0
+  have b4 (j : ℕ) (hj : j ≤ k) : ‖iteratedFDeriv ℝ j f4 (y, z)‖ ≤ Nm * (1 + bb) ^ j := by
+    refine (meyerFlatLift_norm_iteratedFDeriv_comp_clm _ hP _ j).trans ?_
+    calc ‖iteratedFDeriv ℝ j (fun z : ι → ℂ ↦ ∏ j, meyerFlatLift_gpow (β j) (z j)) (snd' (y, z))‖ *
+          ‖snd'‖ ^ j ≤ (Nb j * (1 + bb) ^ j) * 1 ^ j :=
+          mul_le_mul (hNb j β z hz) (pow_le_pow_left₀ (norm_nonneg _) hsnd j) (by positivity)
+            (mul_nonneg (hNb0 j) (by positivity))
+      _ ≤ Nm * (1 + bb) ^ j := by
+          rw [one_pow, mul_one]
+          refine mul_le_mul_of_nonneg_right ?_ (by positivity)
+          rw [hNm]
+          exact Finset.single_le_sum (fun i _ ↦ hNb0 i) (Finset.mem_range.mpr (by omega))
+  -- assemble with the Leibniz bound
+  have b12 (j : ℕ) (hj : j ≤ k) :
+      ‖iteratedFDeriv ℝ j (fun p ↦ f1 p * f2 p) (y, z)‖ ≤ Bm * (2 * (1 + a)) ^ j := by
+    have := meyerFlatLift_leibniz_bound h1c h2c (y, z) j 1 Bm (1 + a) 1
+        zero_le_one (by linarith) le_rfl
+      (fun i _ ↦ b1 i) (fun i hi ↦ b2 i (hi.trans hj))
+    calc _ ≤ 2 ^ j * 1 * Bm * ((1 + a) * 1) ^ j := this
+      _ = Bm * (2 * (1 + a)) ^ j := by
+          rw [mul_one, mul_one, mul_pow (2 : ℝ) (1 + a) j]; ring
+  have b123 (j : ℕ) (hj : j ≤ k) :
+      ‖iteratedFDeriv ℝ j (fun p ↦ f1 p * f2 p * f3 p) (y, z)‖ ≤
+        Bm * M * (4 * (1 + a) * (1 + mu)) ^ j := by
+    have := meyerFlatLift_leibniz_bound (h1c.mul h2c) h3c (y, z) j Bm M (2 * (1 + a)) (1 + mu) hBm0
+      (by linarith) (by linarith) (fun i hi ↦ b12 i (hi.trans hj)) (fun i hi ↦ b3 i (hi.trans hj))
+    calc _ ≤ 2 ^ j * Bm * M * (2 * (1 + a) * (1 + mu)) ^ j := this
+      _ = Bm * M * (4 * (1 + a) * (1 + mu)) ^ j := by
+          rw [show (4 : ℝ) * (1 + a) * (1 + mu) = 2 * (2 * (1 + a) * (1 + mu)) by ring,
+            mul_pow (2 : ℝ) (2 * (1 + a) * (1 + mu)) j]
+          ring
+  have hall := meyerFlatLift_leibniz_bound ((h1c.mul h2c).mul h3c) h4c (y, z) i (Bm * M) Nm
+    (4 * (1 + a) * (1 + mu)) (1 + bb) (by positivity) (by nlinarith) (by linarith)
+    (fun j hj ↦ b123 j (hj.trans hi)) (fun j hj ↦ b4 j (hj.trans hi))
+  have hG : meyerFlatLift_G α μ s₀ B φ β = fun p ↦ f1 p * f2 p * f3 p * f4 p := rfl
+  rw [hG]
+  refine hall.trans ?_
+  have h1a : (1 : ℝ) ≤ 1 + a := by linarith
+  have h1m : (1 : ℝ) ≤ 1 + mu := by linarith
+  have h1b : (1 : ℝ) ≤ 1 + bb := by linarith
+  have hbase : 1 ≤ 2 * (4 * (1 + a) * (1 + mu) * (1 + bb)) := by
+    have := one_le_mul_of_one_le_of_one_le (one_le_mul_of_one_le_of_one_le
+      (one_le_mul_of_one_le_of_one_le (by norm_num : (1 : ℝ) ≤ 4) h1a) h1m) h1b
+    linarith
+  calc 2 ^ i * (Bm * M) * Nm * (4 * (1 + a) * (1 + mu) * (1 + bb)) ^ i
+      = Bm * Nm * M * (2 * (4 * (1 + a) * (1 + mu) * (1 + bb))) ^ i := by
+        rw [mul_pow (2 : ℝ) (4 * (1 + a) * (1 + mu) * (1 + bb)) i]; ring
+    _ ≤ Bm * Nm * M * (2 * (4 * (1 + a) * (1 + mu) * (1 + bb))) ^ k := by
+        gcongr
+    _ = Bm * Nm * (8 * (1 + mu)) ^ k * M * ((1 + a) * (1 + bb)) ^ k := by
+        rw [show (2 : ℝ) * (4 * (1 + a) * (1 + mu) * (1 + bb)) =
+          (8 * (1 + mu)) * ((1 + a) * (1 + bb)) by ring,
+          mul_pow (8 * (1 + mu)) ((1 + a) * (1 + bb)) k]
+        ring
+
+section ArchTest
+
+variable {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+
+open Classical in
+/-- The archimedean test attached to a profile and a character: the outer function of the
+log-polar coordinates where all coordinates are nonzero, and zero elsewhere. -/
+private noncomputable def meyerFlatLift_arch
+    (π : ι → E →L[ℝ] ℂ) (μ : ι → ℝ) (s₀ : ℝ) (B : (ι → ℝ) → ℂ) (α : ι → ℝ) (β : ι → ℤ)
+    (φ : ℝ → ℂ) (x : E) : ℂ :=
+  if x ∈ meyerFlatLift_Ω π then meyerFlatLift_G α μ s₀ B φ β (meyerFlatLift_L π x) else 0
+
+/-- Where all coordinates are nonzero, the archimedean test is the outer function of the
+log-polar coordinates. -/
+private theorem meyerFlatLift_arch_eqOn
+    (π : ι → E →L[ℝ] ℂ) (μ : ι → ℝ) (s₀ : ℝ) (B : (ι → ℝ) → ℂ) (α : ι → ℝ)
+    (β : ι → ℤ) (φ : ℝ → ℂ) : EqOn (meyerFlatLift_arch π μ s₀ B α β φ)
+        (meyerFlatLift_G α μ s₀ B φ β ∘ meyerFlatLift_L π) (meyerFlatLift_Ω π) :=
+  fun x hx ↦ by simp [meyerFlatLift_arch, hx]
+
+/-- On the support of the cutoff, the log-radii of the coordinates are comparable to the log of
+the norm, so the point lies in a cone. -/
+private theorem meyerFlatLift_support_cone
+    (π : ι → E →L[ℝ] ℂ) (hπ1 : ∀ x j, ‖π j x‖ ≤ ‖x‖)
+    (hπ2 : ∀ x, ∃ j, ‖x‖ ≤ ‖π j x‖) (R : ℝ) (x : E) (hx : x ∈ meyerFlatLift_Ω π)
+    (hR : ∀ j j', |(meyerFlatLift_L π x).1 j - (meyerFlatLift_L π x).1 j'| ≤ R) :
+    x ∈ meyerFlatLift_Cone π (Real.exp (-R)) ∧ ∀ j, |Real.log ‖π j x‖ - Real.log ‖x‖| ≤ R := by
+  obtain ⟨j₀, hj₀⟩ := hπ2 x
+  have hpos (j : ι) : 0 < ‖π j x‖ := norm_pos_iff.mpr (hx j)
+  have hx0 : 0 < ‖x‖ := (hpos j₀).trans_le (hπ1 x j₀)
+  have heq : ‖x‖ = ‖π j₀ x‖ := le_antisymm hj₀ (hπ1 x j₀)
+  have hlog (j : ι) : |Real.log ‖π j x‖ - Real.log ‖x‖| ≤ R := by
+    have := hR j j₀
+    simp only [meyerFlatLift_L] at this
+    rwa [heq]
+  refine ⟨fun j ↦ ?_, hlog⟩
+  have h1 : Real.log ‖x‖ - R ≤ Real.log ‖π j x‖ := by linarith [(abs_le.mp (hlog j)).1]
+  calc Real.exp (-R) * ‖x‖ = Real.exp (Real.log ‖x‖ - R) := by
+        rw [Real.exp_sub, Real.exp_log hx0, Real.exp_neg]; field_simp
+    _ ≤ Real.exp (Real.log ‖π j x‖) := Real.exp_le_exp.mpr h1
+    _ = ‖π j x‖ := Real.exp_log (hpos j)
+
+/-- The weighted derivative bounds of the archimedean test on the cone, polynomial in the
+parameters of the character and linear in a weighted bound of the profile. -/
+private theorem meyerFlatLift_arch_bound
+    [FiniteDimensional ℝ E] (π : ι → E →L[ℝ] ℂ) (hπ1 : ∀ x j, ‖π j x‖ ≤ ‖x‖)
+    (hπ2 : ∀ x, ∃ j, ‖x‖ ≤ ‖π j x‖) (μ : ι → ℝ) (hμ : ∀ j, 0 ≤ μ j) (hμ1 : 0 < ∑ j, μ j)
+    (s₀ : ℝ) (B : (ι → ℝ) → ℂ) (hB : ContDiff ℝ (∞) B) (bB : ℕ → ℝ)
+    (hbB : ∀ i y, ‖iteratedFDeriv ℝ i B y‖ ≤ bB i) (R : ℝ)
+    (hR : ∀ y ∈ tsupport B, ∀ j j', |y j - y j'| ≤ R) (k : ℕ) (p : ℤ) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ (α : ι → ℝ) (β : ι → ℤ) (φ : ℝ → ℂ), ContDiff ℝ (∞) φ → ∀ S : ℝ,
+      (∀ d ≤ k, ∀ u, Real.exp (((p - k : ℤ) : ℝ) / (∑ j, μ j) * u) *
+        ‖iteratedFDeriv ℝ d φ u‖ ≤ S) →
+      ∀ x ∈ meyerFlatLift_Ω π ∩ meyerFlatLift_Cone π (Real.exp (-R)),
+        ‖x‖ ^ p * ‖iteratedFDeriv ℝ k (meyerFlatLift_arch π μ s₀ B α β φ) x‖ ≤
+          C * S * ((1 + ∑ j, |α j|) * (1 + ∑ j, |(β j : ℝ)|)) ^ k := by
+  obtain ⟨A, hA1, hA⟩ := meyerFlatLift_comp_cone_bound π (Real.exp (-R)) (Real.exp_pos _) k
+  obtain ⟨K, hK0, hK⟩ := meyerFlatLift_G_bound μ s₀ B hB bB hbB k
+  set Mμ := ∑ j, μ j with hMμ
+  set q : ℤ := p - k with hq
+  set bq : ℝ := (q : ℝ) / Mμ with hbq
+  refine ⟨k.factorial * K * A ^ k * (Real.exp (-bq * s₀) * Real.exp (|(q : ℝ)| * R)),
+    by positivity, ?_⟩
+  intro α β φ hφ S hS x hx
+  have hS0 : 0 ≤ S := by
+    have := hS 0 (Nat.zero_le _) 0
+    exact (mul_nonneg (Real.exp_pos _).le (norm_nonneg _)).trans this
+  set W := (1 + ∑ j, |α j|) * (1 + ∑ j, |(β j : ℝ)|) with hW
+  have hW0 : 0 ≤ W := by positivity
+  have hxΩ := hx.1
+  have hx0 : x ≠ 0 := by
+    intro h
+    obtain ⟨j₀, -⟩ := hπ2 x
+    exact hxΩ j₀ (by rw [h, map_zero])
+  have hnx : 0 < ‖x‖ := norm_pos_iff.mpr hx0
+  -- the derivative of the test is the derivative of the composition within the open set
+  have hderiv : iteratedFDeriv ℝ k (meyerFlatLift_arch π μ s₀ B α β φ) x =
+      iteratedFDerivWithin ℝ k (meyerFlatLift_G α μ s₀ B φ β ∘ meyerFlatLift_L π)
+          (meyerFlatLift_Ω π) x := by
+    rw [← iteratedFDerivWithin_of_isOpen k (meyerFlatLift_Ω_isOpen π) hxΩ]
+    exact iteratedFDerivWithin_congr (meyerFlatLift_arch_eqOn π μ s₀ B α β φ) hxΩ k
+  by_cases hsupp : (meyerFlatLift_L π x).1 ∈ tsupport B
+  · -- comparability of the log-radii with the log of the norm
+    obtain ⟨-, hlog⟩ := meyerFlatLift_support_cone π hπ1 hπ2 R x hxΩ (hR _ hsupp)
+    set t := meyerFlatLift_lin μ (meyerFlatLift_L π x).1 + s₀ with ht
+    have hφb (d : ℕ) (hd : d ≤ k) :
+        ‖iteratedFDeriv ℝ d φ t‖ ≤ Real.exp (-bq * t) * S := by
+      have := hS d hd t
+      rw [neg_mul, Real.exp_neg]
+      rw [le_inv_mul_iff₀ (Real.exp_pos _)]
+      exact this
+    have hunit (j : ι) : ‖(meyerFlatLift_L π x).2 j‖ = 1 := by
+      simp only [meyerFlatLift_L]
+      rw [norm_mul, norm_inv, Complex.norm_real, Real.norm_eq_abs, abs_norm,
+        mul_inv_cancel₀ (norm_ne_zero_iff.mpr (hxΩ j))]
+    have hG := hK α β φ hφ (meyerFlatLift_L π x).1 (meyerFlatLift_L π x).2 hunit
+        (Real.exp (-bq * t) * S) hφb
+    have hcomp := hA (meyerFlatLift_G α μ s₀ B φ β)
+        (meyerFlatLift_G_contDiff α μ s₀ B hB φ hφ β) x hx.2 hx0 _
+      (fun i hi ↦ hG i hi)
+    rw [hderiv]
+    -- the norm power against the exponential weight
+    have hnorm : ‖x‖ ^ q ≤ Real.exp (bq * t) *
+        (Real.exp (-bq * s₀) * Real.exp (|(q : ℝ)| * R)) := by
+      have hsum : |(t - s₀) - Mμ * Real.log ‖x‖| ≤ Mμ * R := by
+        rw [ht, add_sub_cancel_right, meyerFlatLift_lin_apply, hMμ, Finset.sum_mul,
+            ← Finset.sum_sub_distrib]
+        refine (Finset.abs_sum_le_sum_abs _ _).trans ?_
+        rw [Finset.sum_mul]
+        refine Finset.sum_le_sum fun j _ ↦ ?_
+        rw [← mul_sub, abs_mul, abs_of_nonneg (hμ j)]
+        exact mul_le_mul_of_nonneg_left (by simpa [meyerFlatLift_L] using hlog j) (hμ j)
+      have hlogx : |Real.log ‖x‖ - (t - s₀) / Mμ| ≤ R := by
+        rw [show Real.log ‖x‖ - (t - s₀) / Mμ = -((t - s₀) - Mμ * Real.log ‖x‖) / Mμ by
+          field_simp; ring, abs_div, abs_neg, abs_of_pos hμ1, div_le_iff₀ hμ1]
+        linarith
+      rw [← Real.exp_log (zpow_pos hnx q), Real.log_zpow, ← Real.exp_add, ← Real.exp_add]
+      refine Real.exp_le_exp.mpr ?_
+      have h1 : (q : ℝ) * (Real.log ‖x‖ - (t - s₀) / Mμ) ≤ |(q : ℝ)| * R := by
+        calc (q : ℝ) * (Real.log ‖x‖ - (t - s₀) / Mμ)
+            ≤ |(q : ℝ) * (Real.log ‖x‖ - (t - s₀) / Mμ)| := le_abs_self _
+          _ = |(q : ℝ)| * |Real.log ‖x‖ - (t - s₀) / Mμ| := abs_mul _ _
+          _ ≤ |(q : ℝ)| * R := mul_le_mul_of_nonneg_left hlogx (abs_nonneg _)
+      have h2 : (q : ℝ) * Real.log ‖x‖ = (q : ℝ) * (Real.log ‖x‖ - (t - s₀) / Mμ) +
+          bq * t + -bq * s₀ := by rw [hbq]; field_simp; ring
+      linarith
+    calc ‖x‖ ^ p * ‖iteratedFDerivWithin ℝ k (meyerFlatLift_G α μ s₀ B φ β ∘
+        meyerFlatLift_L π) (meyerFlatLift_Ω π) x‖
+        ≤ ‖x‖ ^ p * (k.factorial * (K * (Real.exp (-bq * t) * S) * W ^ k) *
+            (A * ‖x‖⁻¹) ^ k) := mul_le_mul_of_nonneg_left hcomp (zpow_nonneg hnx.le p)
+      _ = k.factorial * K * A ^ k * W ^ k * S * Real.exp (-bq * t) * ‖x‖ ^ q := by
+          rw [hq, zpow_sub₀ hnx.ne', zpow_natCast, mul_pow A ‖x‖⁻¹ k, inv_pow]
+          field_simp
+      _ ≤ k.factorial * K * A ^ k * W ^ k * S * Real.exp (-bq * t) *
+            (Real.exp (bq * t) * (Real.exp (-bq * s₀) * Real.exp (|(q : ℝ)| * R))) := by
+          gcongr
+      _ = k.factorial * K * A ^ k *
+          (Real.exp (-bq * s₀) * Real.exp (|(q : ℝ)| * R)) * S * W ^ k := by
+          have : Real.exp (-bq * t) * Real.exp (bq * t) = 1 := by
+            rw [← Real.exp_add]; simp
+          linear_combination (k.factorial * K * A ^ k * W ^ k * S *
+            (Real.exp (-bq * s₀) * Real.exp (|(q : ℝ)| * R))) * this
+  · -- off the support of the cutoff the test vanishes near the point
+    have hloc : meyerFlatLift_arch π μ s₀ B α β φ =ᶠ[𝓝 x] fun _ ↦ 0 := by
+      have hcont : ContinuousAt (fun y ↦ (meyerFlatLift_L π y).1) x :=
+        ((meyerFlatLift_L_contDiffOn π).continuousOn.continuousAt
+            ((meyerFlatLift_Ω_isOpen π).mem_nhds hxΩ)).fst
+      filter_upwards [hcont.preimage_mem_nhds ((isClosed_tsupport B).isOpen_compl.mem_nhds hsupp),
+        (meyerFlatLift_Ω_isOpen π).mem_nhds hxΩ] with y hy hyΩ
+      have hBy : B (meyerFlatLift_L π y).1 = 0 := image_eq_zero_of_notMem_tsupport hy
+      simp [meyerFlatLift_arch, hyΩ, meyerFlatLift_G, hBy]
+    rw [(hloc.iteratedFDeriv ℝ k).eq_of_nhds]
+    rcases k with _ | k
+    · simp only [iteratedFDeriv_zero_eq_comp, comp_apply]
+      simp
+      positivity
+    · simp
+      positivity
+
+/-- The archimedean test of a profile with all exponential weights is a Schwartz function, with
+each seminorm bounded linearly in one weighted bound of the profile and polynomially in the
+parameters of the character. -/
+private theorem meyerFlatLift_arch_schwartz
+    [FiniteDimensional ℝ E] (π : ι → E →L[ℝ] ℂ) (hπ1 : ∀ x j, ‖π j x‖ ≤ ‖x‖)
+    (hπ2 : ∀ x, ∃ j, ‖x‖ ≤ ‖π j x‖) (μ : ι → ℝ) (hμ : ∀ j, 0 ≤ μ j) (hμ1 : 0 < ∑ j, μ j)
+    (s₀ : ℝ) (B : (ι → ℝ) → ℂ) (hB : ContDiff ℝ (∞) B) (bB : ℕ → ℝ)
+    (hbB : ∀ i y, ‖iteratedFDeriv ℝ i B y‖ ≤ bB i) (R : ℝ)
+    (hR : ∀ y ∈ tsupport B, ∀ j j', |y j - y j'| ≤ R) (k l : ℕ) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ (α : ι → ℝ) (β : ι → ℤ) (φ : ℝ → ℂ), ContDiff ℝ (∞) φ →
+      (∀ (b : ℝ) (d : ℕ), ∃ S : ℝ, ∀ u, Real.exp (b * u) * ‖iteratedFDeriv ℝ d φ u‖ ≤ S) →
+      ∀ S : ℝ, (∀ d ≤ l, ∀ u, Real.exp (((k - l : ℤ) : ℝ) / (∑ j, μ j) * u) *
+        ‖iteratedFDeriv ℝ d φ u‖ ≤ S) →
+      ∃ g : 𝓢(E, ℂ), ⇑g = meyerFlatLift_arch π μ s₀ B α β φ ∧
+        SchwartzMap.seminorm ℂ k l g ≤ C * S * ((1 + ∑ j, |α j|) * (1 + ∑ j, |(β j : ℝ)|)) ^ l := by
+  obtain ⟨C, hC0, hC⟩ := meyerFlatLift_arch_bound π hπ1 hπ2 μ hμ hμ1 s₀ B hB bB hbB R hR l k
+  refine ⟨C, hC0, fun α β φ hφ hdec S hS ↦ ?_⟩
+  have hS0 : 0 ≤ S := by
+    have := hS 0 (Nat.zero_le _) 0
+    exact (mul_nonneg (Real.exp_pos _).le (norm_nonneg _)).trans this
+  have hsmooth : ContDiffOn ℝ (∞) (meyerFlatLift_arch π μ s₀ B α β φ) (meyerFlatLift_Ω π) :=
+    ((meyerFlatLift_G_contDiff α μ s₀ B hB φ hφ β).comp_contDiffOn
+        (meyerFlatLift_L_contDiffOn π)).congr
+      (meyerFlatLift_arch_eqOn π μ s₀ B α β φ)
+  have hvan (x : E) (hx : meyerFlatLift_arch π μ s₀ B α β φ x ≠ 0) :
+      x ∈ meyerFlatLift_Ω π ∩ meyerFlatLift_Cone π (Real.exp (-R)) := by
+    by_cases hxΩ : x ∈ meyerFlatLift_Ω π
+    · refine ⟨hxΩ, ?_⟩
+      have hB0 : B (meyerFlatLift_L π x).1 ≠ 0 := by
+        intro h
+        apply hx
+        simp [meyerFlatLift_arch, hxΩ, meyerFlatLift_G, h]
+      exact (meyerFlatLift_support_cone π hπ1 hπ2 R x hxΩ
+        (hR _ (subset_tsupport B hB0))).1
+    · exact absurd (by simp [meyerFlatLift_arch, hxΩ]) hx
+  have hbd (k' : ℕ) (p' : ℤ) : ∃ C' : ℝ, ∀ x ∈
+      meyerFlatLift_Ω π ∩ meyerFlatLift_Cone π (Real.exp (-R)),
+      ‖x‖ ^ p' * ‖iteratedFDeriv ℝ k' (meyerFlatLift_arch π μ s₀ B α β φ) x‖ ≤ C' := by
+    obtain ⟨C₁, -, hC₁⟩ := meyerFlatLift_arch_bound π hπ1 hπ2 μ hμ hμ1 s₀ B hB bB hbB R hR k' p'
+    choose Sd hSd using fun d ↦ hdec (((p' - k' : ℤ) : ℝ) / (∑ j, μ j)) d
+    refine ⟨C₁ * (∑ d ∈ Finset.range (k' + 1), |Sd d|) *
+      ((1 + ∑ j, |α j|) * (1 + ∑ j, |(β j : ℝ)|)) ^ k', fun x hx ↦ ?_⟩
+    refine hC₁ α β φ hφ _ (fun d hd u ↦ (hSd d u).trans ((le_abs_self _).trans ?_)) x hx
+    exact Finset.single_le_sum (f := fun d ↦ |Sd d|) (fun d _ ↦ abs_nonneg _)
+      (Finset.mem_range.mpr (Nat.lt_succ_of_le hd))
+  obtain ⟨g, hg, hgs⟩ := meyerFlatLift_cone_schwartz (meyerFlatLift_Ω π)
+      (meyerFlatLift_Cone π (Real.exp (-R))) (meyerFlatLift_Ω_isOpen π)
+    (fun h ↦ by obtain ⟨j₀, -⟩ := hπ2 0; exact h j₀ (map_zero _))
+    (meyerFlatLift_Cone_isClosed π _) (fun x hx hx0 ↦ meyerFlatLift_Cone_subset π _
+        (Real.exp_pos _) x hx hx0)
+    _ hsmooth hvan hbd
+  refine ⟨g, hg, hgs k l _ (by positivity) fun x hx ↦ ?_⟩
+  have := hC α β φ hφ S hS x hx
+  rwa [zpow_natCast] at this
+
+end ArchTest
+
+section ArchChar
+
+/-- Positive reals as units of the complex numbers. -/
+private noncomputable def meyerFlatLift_posC :
+    ℝ≥0ˣ →ₜ* ℂˣ where
+  toFun t := Units.mk0 (((t : ℝ≥0) : ℝ) : ℂ) (by exact_mod_cast (Units.ne_zero t))
+  map_one' := by ext; simp
+  map_mul' s t := by ext; simp
+  continuous_toFun := by
+    refine Units.continuous_iff.mpr ⟨?_, ?_⟩
+    · exact Complex.continuous_ofReal.comp (NNReal.continuous_coe.comp Units.continuous_val)
+    · simp only [Units.val_inv_eq_inv_val, Units.val_mk0]
+      exact (Complex.continuous_ofReal.comp (NNReal.continuous_coe.comp Units.continuous_val)).inv₀
+        fun t ↦ by simp [Function.comp_def, Units.ne_zero]
+
+/-- The circle as units of the complex numbers. -/
+private noncomputable def meyerFlatLift_circC :
+    Circle →ₜ* ℂˣ where
+  toFun := Circle.toUnits
+  map_one' := map_one _
+  map_mul' := map_mul _
+  continuous_toFun := by
+    refine Units.continuous_iff.mpr ⟨continuous_subtype_val, ?_⟩
+    have : (fun z : Circle ↦ ((Circle.toUnits z)⁻¹ : ℂˣ).val) = fun z ↦ ((z⁻¹ : Circle) : ℂ) := by
+      funext z; rw [← map_inv]; rfl
+    rw [this]
+    exact continuous_subtype_val.comp continuous_inv
+
+/-- The coefficient of a unitary continuous character of the positive reals. -/
+private noncomputable def meyerFlatLift_radParam
+    (c : ℝ≥0ˣ →ₜ* ℂ) : ℂ := (existsUnique_complexPower c).exists.choose
+
+/-- A continuous character of the positive reals is the power with its coefficient. -/
+private theorem meyerFlatLift_radParam_spec
+    (c : ℝ≥0ˣ →ₜ* ℂ) (t : ℝ≥0ˣ) :
+    c t = (((t : ℝ≥0) : ℝ) : ℂ) ^ meyerFlatLift_radParam c :=
+  (existsUnique_complexPower c).exists.choose_spec t
+
+/-- The coefficient of a continuous character of the positive reals is unique. -/
+private theorem meyerFlatLift_radParam_unique
+    (c : ℝ≥0ˣ →ₜ* ℂ) (z : ℂ) (h : ∀ t : ℝ≥0ˣ, c t = (((t : ℝ≥0) : ℝ) : ℂ) ^ z) :
+    meyerFlatLift_radParam c = z :=
+  (existsUnique_complexPower c).unique (meyerFlatLift_radParam_spec c) h
+
+/-- The exponent of a continuous character of the circle. -/
+private noncomputable def meyerFlatLift_circParam
+    (c : Circle →ₜ* ℂ) : ℤ := (existsUnique_circleCharacter_zpow c).exists.choose
+
+/-- A continuous character of the circle is the integer power with its exponent. -/
+private theorem meyerFlatLift_circParam_spec
+    (c : Circle →ₜ* ℂ) (z : Circle) : c z = (z : ℂ) ^ meyerFlatLift_circParam c :=
+  (existsUnique_circleCharacter_zpow c).exists.choose_spec z
+
+/-- The exponent of a continuous character of the circle is unique. -/
+private theorem meyerFlatLift_circParam_unique
+    (c : Circle →ₜ* ℂ) (n : ℤ) (h : ∀ z : Circle, c z = (z : ℂ) ^ n) :
+    meyerFlatLift_circParam c = n :=
+  (existsUnique_circleCharacter_zpow c).unique (meyerFlatLift_circParam_spec c) h
+
+/-- The circle character as a complex valued continuous homomorphism. -/
+private noncomputable def meyerFlatLift_coe :
+    Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+
+/-- A unitary positive power is the unitary exponential of the logarithm. -/
+private theorem meyerFlatLift_unitary_power
+    (z : ℂ) (h : ∀ t : ℝ≥0ˣ, ‖(((t : ℝ≥0) : ℝ) : ℂ) ^ z‖ = 1)
+    (t : ℝ) (ht : 0 < t) :
+    (t : ℂ) ^ z = Complex.exp (Complex.I * ((z.im * Real.log t : ℝ) : ℂ)) ∧ z.re = 0 := by
+  have hre : z.re = 0 := by
+    have h2 := h (Units.mk0 (2 : ℝ≥0) (by norm_num))
+    simp only [Units.val_mk0, NNReal.coe_ofNat] at h2
+    rw [Complex.norm_cpow_eq_rpow_re_of_pos (by norm_num)] at h2
+    rcases lt_trichotomy z.re 0 with hz | hz | hz
+    · have := Real.rpow_lt_one_of_one_lt_of_neg (by norm_num : (1 : ℝ) < 2) hz
+      linarith
+    · exact hz
+    · have := Real.one_lt_rpow (by norm_num : (1 : ℝ) < 2) hz
+      linarith
+  refine ⟨?_, hre⟩
+  rw [Complex.cpow_def_of_ne_zero (by exact_mod_cast ht.ne'), ← Complex.ofReal_log ht.le]
+  congr 1
+  apply Complex.ext <;> simp [hre]
+  ring
+
+/-- The radial parameter of a continuous character of `ℂˣ`. -/
+private noncomputable def meyerFlatLift_αC
+    (ψ : ℂˣ →ₜ* Circle) : ℝ :=
+        (meyerFlatLift_radParam (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posC))).im
+
+/-- The angular parameter of a continuous character of `ℂˣ`. -/
+private noncomputable def meyerFlatLift_βC
+    (ψ : ℂˣ →ₜ* Circle) : ℤ :=
+        meyerFlatLift_circParam (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_circC))
+
+/-- Classification of the continuous characters of `ℂˣ`. -/
+private theorem meyerFlatLift_char_complex
+    (ψ : ℂˣ →ₜ* Circle) (z : ℂˣ) :
+    (ψ z : ℂ) = Complex.exp (Complex.I * ((meyerFlatLift_αC ψ * Real.log ‖(z : ℂ)‖ : ℝ) : ℂ)) *
+      meyerFlatLift_gpow (meyerFlatLift_βC ψ) ((z : ℂ) * ((‖(z : ℂ)‖ : ℝ) : ℂ)⁻¹) := by
+  have hz0 : (z : ℂ) ≠ 0 := z.ne_zero
+  have hn : 0 < ‖(z : ℂ)‖ := norm_pos_iff.mpr hz0
+  let t : ℝ≥0ˣ := Units.mk0 ⟨‖(z : ℂ)‖, hn.le⟩ (by
+    intro h; exact hn.ne' (congrArg NNReal.toReal h))
+  have hunit : ‖(z : ℂ) * ((‖(z : ℂ)‖ : ℝ) : ℂ)⁻¹‖ = 1 := by
+    rw [norm_mul, norm_inv, Complex.norm_real, Real.norm_eq_abs, abs_norm, mul_inv_cancel₀ hn.ne']
+  let s : Circle := ⟨(z : ℂ) * ((‖(z : ℂ)‖ : ℝ) : ℂ)⁻¹, mem_sphere_zero_iff_norm.mpr hunit⟩
+  have hfac : z = meyerFlatLift_posC t * meyerFlatLift_circC s := by
+    ext
+    change (z : ℂ) = ((‖(z : ℂ)‖ : ℝ) : ℂ) * ((z : ℂ) * ((‖(z : ℂ)‖ : ℝ) : ℂ)⁻¹)
+    have : ((‖(z : ℂ)‖ : ℝ) : ℂ) ≠ 0 := by exact_mod_cast hn.ne'
+    field_simp
+  have hψ : (ψ z : ℂ) = (ψ (meyerFlatLift_posC t) : ℂ) * (ψ (meyerFlatLift_circC s) : ℂ) := by
+    conv_lhs => rw [hfac]
+    rw [map_mul, Circle.coe_mul]
+  have hrad : (ψ (meyerFlatLift_posC t) : ℂ) =
+      Complex.exp (Complex.I * ((meyerFlatLift_αC ψ * Real.log ‖(z : ℂ)‖ : ℝ) : ℂ)) := by
+    have h1 : (ψ (meyerFlatLift_posC t) : ℂ) = ((‖(z : ℂ)‖ : ℝ) : ℂ) ^
+        meyerFlatLift_radParam (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posC)) :=
+      meyerFlatLift_radParam_spec (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posC)) t
+    have hu : ∀ t' : ℝ≥0ˣ, ‖(((t' : ℝ≥0) : ℝ) : ℂ) ^
+        meyerFlatLift_radParam (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posC))‖ = 1 :=
+      fun t' ↦ by
+        rw [← meyerFlatLift_radParam_spec]
+        exact Circle.norm_coe _
+    rw [h1, (meyerFlatLift_unitary_power _ hu ‖(z : ℂ)‖ hn).1]
+    rfl
+  have hcirc : (ψ (meyerFlatLift_circC s) : ℂ) = meyerFlatLift_gpow (meyerFlatLift_βC ψ) ((z : ℂ) *
+      ((‖(z : ℂ)‖ : ℝ) : ℂ)⁻¹) := by
+    have h1 : (ψ (meyerFlatLift_circC s) : ℂ) = (s : ℂ) ^
+        meyerFlatLift_circParam (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_circC)) :=
+      meyerFlatLift_circParam_spec (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_circC)) s
+    rw [h1, meyerFlatLift_gpow_eq_zpow _ _ hunit]
+    rfl
+  rw [hψ, hrad, hcirc]
+
+/-- The coefficient of a product of characters of the positive reals is the sum of the
+coefficients. -/
+private theorem meyerFlatLift_radParam_mul
+    (c c' : ℝ≥0ˣ →ₜ* ℂ) :
+    meyerFlatLift_radParam (c * c') = meyerFlatLift_radParam c + meyerFlatLift_radParam c' := by
+  refine meyerFlatLift_radParam_unique _ _ fun t ↦ ?_
+  have ht : (((t : ℝ≥0) : ℝ) : ℂ) ≠ 0 := by exact_mod_cast Units.ne_zero t
+  rw [Complex.cpow_add _ _ ht, ← meyerFlatLift_radParam_spec, ← meyerFlatLift_radParam_spec]
+  rfl
+
+/-- The exponent of a product of characters of the circle is the sum of the exponents. -/
+private theorem meyerFlatLift_circParam_mul
+    (c c' : Circle →ₜ* ℂ) :
+    meyerFlatLift_circParam (c * c') = meyerFlatLift_circParam c + meyerFlatLift_circParam c' := by
+  refine meyerFlatLift_circParam_unique _ _ fun z ↦ ?_
+  rw [zpow_add₀ (Circle.coe_ne_zero z), ← meyerFlatLift_circParam_spec,
+      ← meyerFlatLift_circParam_spec]
+  rfl
+
+/-- The radial parameter of characters of `ℂˣ` is additive. -/
+private theorem meyerFlatLift_αC_mul
+    (ψ ψ' : ℂˣ →ₜ* Circle) : meyerFlatLift_αC (ψ * ψ') = meyerFlatLift_αC ψ +
+        meyerFlatLift_αC ψ' := by
+  have : meyerFlatLift_coe.comp ((ψ * ψ').comp meyerFlatLift_posC) =
+      meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posC) *
+      meyerFlatLift_coe.comp (ψ'.comp meyerFlatLift_posC) := by
+    ext t; simp [meyerFlatLift_coe]
+  simp only [meyerFlatLift_αC, this, meyerFlatLift_radParam_mul, Complex.add_im]
+
+/-- The angular parameter of characters of `ℂˣ` is additive. -/
+private theorem meyerFlatLift_βC_mul
+    (ψ ψ' : ℂˣ →ₜ* Circle) : meyerFlatLift_βC (ψ * ψ') = meyerFlatLift_βC ψ +
+        meyerFlatLift_βC ψ' := by
+  have : meyerFlatLift_coe.comp ((ψ * ψ').comp meyerFlatLift_circC) =
+      meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_circC) *
+          meyerFlatLift_coe.comp (ψ'.comp meyerFlatLift_circC) := by
+    ext t; simp [meyerFlatLift_coe]
+  simp only [meyerFlatLift_βC, this, meyerFlatLift_circParam_mul]
+
+/-- Positive reals as units of the reals. -/
+private noncomputable def meyerFlatLift_posR :
+    ℝ≥0ˣ →ₜ* ℝˣ where
+  toFun t := Units.mk0 ((t : ℝ≥0) : ℝ) (by exact_mod_cast (Units.ne_zero t))
+  map_one' := by ext; simp
+  map_mul' s t := by ext; simp
+  continuous_toFun := by
+    refine Units.continuous_iff.mpr ⟨NNReal.continuous_coe.comp Units.continuous_val, ?_⟩
+    simp only [Units.val_inv_eq_inv_val, Units.val_mk0]
+    exact (NNReal.continuous_coe.comp Units.continuous_val).inv₀
+      fun t ↦ by simp [Units.ne_zero]
+
+/-- The radial parameter of a continuous character of `ℝˣ`. -/
+private noncomputable def meyerFlatLift_αR
+    (ψ : ℝˣ →ₜ* Circle) : ℝ :=
+        (meyerFlatLift_radParam (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posR))).im
+
+open Classical in
+/-- The sign parameter of a continuous character of `ℝˣ`. -/
+private noncomputable def meyerFlatLift_εR
+    (ψ : ℝˣ →ₜ* Circle) : ℤ := if (ψ (-1) : ℂ) = 1 then 0 else 1
+
+/-- The sign parameter is `0` or `1`. -/
+private theorem meyerFlatLift_εR_abs
+    (ψ : ℝˣ →ₜ* Circle) : |meyerFlatLift_εR ψ| ≤ 1 := by
+  unfold meyerFlatLift_εR; split_ifs <;> simp
+
+/-- Classification of the continuous characters of `ℝˣ`. -/
+private theorem meyerFlatLift_char_real
+    (ψ : ℝˣ →ₜ* Circle) (t : ℝˣ) :
+    (ψ t : ℂ) = Complex.exp (Complex.I * ((meyerFlatLift_αR ψ * Real.log ‖(t : ℝ)‖ : ℝ) : ℂ)) *
+      meyerFlatLift_gpow (meyerFlatLift_εR ψ) (((t : ℝ) : ℂ) * ((‖(t : ℝ)‖ : ℝ) : ℂ)⁻¹) := by
+  have ht0 : (t : ℝ) ≠ 0 := t.ne_zero
+  have hn : 0 < ‖(t : ℝ)‖ := norm_pos_iff.mpr ht0
+  let r : ℝ≥0ˣ := Units.mk0 ⟨‖(t : ℝ)‖, hn.le⟩ (by
+    intro h; exact hn.ne' (congrArg NNReal.toReal h))
+  have hrad : (ψ (meyerFlatLift_posR r) : ℂ) =
+      Complex.exp (Complex.I * ((meyerFlatLift_αR ψ * Real.log ‖(t : ℝ)‖ : ℝ) : ℂ)) := by
+    have h1 : (ψ (meyerFlatLift_posR r) : ℂ) = ((‖(t : ℝ)‖ : ℝ) : ℂ) ^
+        meyerFlatLift_radParam (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posR)) :=
+      meyerFlatLift_radParam_spec (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posR)) r
+    have hu : ∀ t' : ℝ≥0ˣ, ‖(((t' : ℝ≥0) : ℝ) : ℂ) ^
+        meyerFlatLift_radParam (meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posR))‖ = 1 :=
+      fun t' ↦ by
+        rw [← meyerFlatLift_radParam_spec]
+        exact Circle.norm_coe _
+    rw [h1, (meyerFlatLift_unitary_power _ hu ‖(t : ℝ)‖ hn).1]
+    rfl
+  -- the value at `-1`
+  have hm1 : (ψ (-1) : ℂ) = meyerFlatLift_gpow (meyerFlatLift_εR ψ) (-1) := by
+    have hsq : ((ψ (-1) : Circle) : ℂ) ^ 2 = 1 := by
+      rw [← Circle.coe_pow, ← map_pow]; simp
+    unfold meyerFlatLift_εR
+    split_ifs with h
+    · simp [meyerFlatLift_gpow, h]
+    · have : (ψ (-1) : ℂ) = -1 := by
+        rcases sq_eq_one_iff.mp hsq with h' | h'
+        · exact absurd h' h
+        · exact h'
+      simp [meyerFlatLift_gpow, this]
+  rcases lt_or_gt_of_ne ht0 with hneg | hpos
+  · have hfac : t = meyerFlatLift_posR r * (-1) := by
+      ext
+      change (t : ℝ) = ‖(t : ℝ)‖ * (-1)
+      rw [Real.norm_eq_abs, abs_of_neg hneg]; ring
+    have hsgn : ((t : ℝ) : ℂ) * ((‖(t : ℝ)‖ : ℝ) : ℂ)⁻¹ = -1 := by
+      rw [Real.norm_eq_abs, abs_of_neg hneg]
+      have : ((t : ℝ) : ℂ) ≠ 0 := by exact_mod_cast ht0
+      push_cast
+      field_simp
+    conv_lhs => rw [hfac]
+    rw [map_mul, Circle.coe_mul, hrad, hm1, hsgn]
+  · have hfac : t = meyerFlatLift_posR r := by
+      ext
+      change (t : ℝ) = ‖(t : ℝ)‖
+      rw [Real.norm_eq_abs, abs_of_pos hpos]
+    have hsgn : ((t : ℝ) : ℂ) * ((‖(t : ℝ)‖ : ℝ) : ℂ)⁻¹ = 1 := by
+      rw [Real.norm_eq_abs, abs_of_pos hpos]
+      have : ((t : ℝ) : ℂ) ≠ 0 := by exact_mod_cast ht0
+      field_simp
+    conv_lhs => rw [hfac]
+    rw [hrad, hsgn]
+    unfold meyerFlatLift_gpow
+    split_ifs <;> simp
+
+/-- The radial parameter of characters of `ℝˣ` is additive. -/
+private theorem meyerFlatLift_αR_mul
+    (ψ ψ' : ℝˣ →ₜ* Circle) : meyerFlatLift_αR (ψ * ψ') = meyerFlatLift_αR ψ +
+        meyerFlatLift_αR ψ' := by
+  have : meyerFlatLift_coe.comp ((ψ * ψ').comp meyerFlatLift_posR) =
+      meyerFlatLift_coe.comp (ψ.comp meyerFlatLift_posR) *
+      meyerFlatLift_coe.comp (ψ'.comp meyerFlatLift_posR) := by
+    ext t; simp [meyerFlatLift_coe]
+  simp only [meyerFlatLift_αR, this, meyerFlatLift_radParam_mul, Complex.add_im]
+
+end ArchChar
+
+section SIdeleChar
+
+/-- The archimedean units as S-ideles with finite part one. -/
+private noncomputable def meyerFlatLift_archIdele
+    (T : Finset (HeightOneSpectrum (𝓞 F))) :
+    ((w : InfinitePlace F) → (w.Completion)ˣ) →ₜ* (SAdeleRing F T)ˣ :=
+  let fin : ((w : InfinitePlace F) → (w.Completion)ˣ) ≃ₜ* (InfiniteAdeleRing F)ˣ :=
+    ContinuousMulEquiv.piUnits.symm
+  let prod := ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F)
+    ((v : T) → v.val.adicCompletion F)
+  ⟨prod.symm.toMonoidHom.comp ((MonoidHom.inl _ _).comp fin.toMonoidHom),
+    prod.symm.continuous.comp (fin.continuous.prodMk continuous_const)⟩
+
+open Classical in
+/-- The local embedding of the units of an archimedean completion into the S-ideles. -/
+private noncomputable def meyerFlatLift_loc
+    (T : Finset (HeightOneSpectrum (𝓞 F))) (w : InfinitePlace F) :
+    (w.Completion)ˣ →ₜ* (SAdeleRing F T)ˣ :=
+  (meyerFlatLift_archIdele T).comp
+      ⟨MonoidHom.mulSingle (fun w : InfinitePlace F ↦ (w.Completion)ˣ) w,
+    continuous_mulSingle (A := fun w : InfinitePlace F ↦ (w.Completion)ˣ) w⟩
+
+/-- The value of the archimedean embedding: the archimedean units, and one at the finite
+places. -/
+private theorem meyerFlatLift_archIdele_val
+    (T : Finset (HeightOneSpectrum (𝓞 F)))
+    (x : (w : InfinitePlace F) → (w.Completion)ˣ) :
+    ((meyerFlatLift_archIdele T x : (SAdeleRing F T)ˣ) : SAdeleRing F T) =
+        ((fun w ↦ (x w : w.Completion)), 1) := by
+  rfl
+
+/-- The real coordinate units as units of a real completion. -/
+private noncomputable def meyerFlatLift_UR
+    {w : InfinitePlace F} (hw : w.IsReal) : ℝˣ →ₜ* (w.Completion)ˣ where
+  toMonoidHom := Units.map (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm.toMonoidHom
+  continuous_toFun := by
+    refine Units.continuous_iff.mpr ⟨?_, ?_⟩
+    · exact (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).symm.continuous.comp
+        Units.continuous_val
+    · exact (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).symm.continuous.comp
+        (Units.continuous_val.comp continuous_inv)
+
+/-- The complex coordinate units as units of a complex completion. -/
+private noncomputable def meyerFlatLift_UC
+    {w : InfinitePlace F} (hw : w.IsComplex) : ℂˣ →ₜ* (w.Completion)ˣ where
+  toMonoidHom :=
+      Units.map (InfinitePlace.Completion.ringEquivComplexOfIsComplex hw).symm.toMonoidHom
+  continuous_toFun := by
+    refine Units.continuous_iff.mpr ⟨?_, ?_⟩
+    · exact (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hw).symm.continuous.comp
+        Units.continuous_val
+    · exact (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hw).symm.continuous.comp
+        (Units.continuous_val.comp continuous_inv)
+
+variable (T : Finset (HeightOneSpectrum (𝓞 F)))
+
+/-- The quotient map from the S-ideles to the S-idele classes. -/
+private noncomputable def meyerFlatLift_q :
+    (SAdeleRing F T)ˣ →ₜ* SIdeleQuotient F T :=
+  ⟨QuotientGroup.mk' _, QuotientGroup.continuous_mk⟩
+
+/-- The local character at a real place. -/
+private noncomputable def meyerFlatLift_ψR
+    (χ : PontryaginDual (SIdeleQuotient F T)) {w : InfinitePlace F} (hw : w.IsReal) :
+    ℝˣ →ₜ* Circle :=
+  χ.comp ((meyerFlatLift_q T).comp ((meyerFlatLift_loc T w).comp (meyerFlatLift_UR hw)))
+
+/-- The local character at a complex place. -/
+private noncomputable def meyerFlatLift_ψC
+    (χ : PontryaginDual (SIdeleQuotient F T)) {w : InfinitePlace F} (hw : w.IsComplex) :
+    ℂˣ →ₜ* Circle :=
+  χ.comp ((meyerFlatLift_q T).comp ((meyerFlatLift_loc T w).comp (meyerFlatLift_UC hw)))
+
+open Classical in
+/-- The radial parameter of a character at an archimedean place. -/
+private noncomputable def meyerFlatLift_α
+    (χ : PontryaginDual (SIdeleQuotient F T)) (w : InfinitePlace F) : ℝ :=
+  if hw : w.IsReal then meyerFlatLift_αR (meyerFlatLift_ψR T χ hw)
+  else meyerFlatLift_αC (meyerFlatLift_ψC T χ (InfinitePlace.not_isReal_iff_isComplex.mp hw))
+
+open Classical in
+/-- The angular parameter of a character at an archimedean place: the sign exponent at a real
+place and the winding number at a complex place. -/
+private noncomputable def meyerFlatLift_β
+    (χ : PontryaginDual (SIdeleQuotient F T)) (w : InfinitePlace F) : ℤ :=
+  if hw : w.IsReal then meyerFlatLift_εR (meyerFlatLift_ψR T χ hw)
+  else meyerFlatLift_βC (meyerFlatLift_ψC T χ (InfinitePlace.not_isReal_iff_isComplex.mp hw))
+
+/-- The local character at a real place is multiplicative in the character. -/
+private theorem meyerFlatLift_ψR_mul
+    (χ χ' : PontryaginDual (SIdeleQuotient F T)) {w : InfinitePlace F}
+    (hw : w.IsReal) : meyerFlatLift_ψR T (χ * χ') hw = meyerFlatLift_ψR T χ hw *
+        meyerFlatLift_ψR T χ' hw := rfl
+
+/-- The local character at a complex place is multiplicative in the character. -/
+private theorem meyerFlatLift_ψC_mul
+    (χ χ' : PontryaginDual (SIdeleQuotient F T)) {w : InfinitePlace F}
+    (hw : w.IsComplex) : meyerFlatLift_ψC T (χ * χ') hw = meyerFlatLift_ψC T χ hw *
+        meyerFlatLift_ψC T χ' hw := rfl
+
+/-- The radial parameter is additive in the character. -/
+private theorem meyerFlatLift_α_mul
+    (χ χ' : PontryaginDual (SIdeleQuotient F T)) (w : InfinitePlace F) :
+    meyerFlatLift_α T (χ * χ') w = meyerFlatLift_α T χ w + meyerFlatLift_α T χ' w := by
+  unfold meyerFlatLift_α
+  split_ifs with hw
+  · rw [meyerFlatLift_ψR_mul, meyerFlatLift_αR_mul]
+  · rw [meyerFlatLift_ψC_mul, meyerFlatLift_αC_mul]
+
+/-- At a complex place the angular parameter is additive in the character. -/
+private theorem meyerFlatLift_β_mul
+    (χ χ' : PontryaginDual (SIdeleQuotient F T)) (w : InfinitePlace F)
+    (hw : ¬ w.IsReal) : meyerFlatLift_β T (χ * χ') w = meyerFlatLift_β T χ w +
+        meyerFlatLift_β T χ' w := by
+  unfold meyerFlatLift_β
+  rw [dite_eq_right hw, dite_eq_right hw, dite_eq_right hw,
+      meyerFlatLift_ψC_mul, meyerFlatLift_βC_mul]
+
+open Classical in
+/-- The size of the archimedean parameters of a character. -/
+private noncomputable def meyerFlatLift_sizeFun
+    (χ : PontryaginDual (SIdeleQuotient F T)) : ℝ :=
+  ∑ w, (|meyerFlatLift_α T χ w| + if w.IsReal then 0 else |(meyerFlatLift_β T χ w : ℝ)|)
+
+/-- The radial parameter of the trivial character is zero. -/
+private theorem meyerFlatLift_α_one
+    (w : InfinitePlace F) : meyerFlatLift_α T 1 w = 0 := by
+  have h := meyerFlatLift_α_mul T 1 1 w
+  rw [mul_one] at h
+  linarith
+
+/-- At a complex place the angular parameter of the trivial character is zero. -/
+private theorem meyerFlatLift_β_one
+    (w : InfinitePlace F) (hw : ¬ w.IsReal) : meyerFlatLift_β T 1 w = 0 := by
+  have h := meyerFlatLift_β_mul T 1 1 w hw
+  rw [mul_one] at h
+  omega
+
+/-- The radial parameter of the inverse character is the negative. -/
+private theorem meyerFlatLift_α_inv
+    (χ : PontryaginDual (SIdeleQuotient F T)) (w : InfinitePlace F) :
+    meyerFlatLift_α T χ⁻¹ w = -meyerFlatLift_α T χ w := by
+  have h := meyerFlatLift_α_mul T χ⁻¹ χ w
+  rw [inv_mul_cancel, meyerFlatLift_α_one] at h
+  linarith
+
+/-- At a complex place the angular parameter of the inverse character is the negative. -/
+private theorem meyerFlatLift_β_inv
+    (χ : PontryaginDual (SIdeleQuotient F T)) (w : InfinitePlace F)
+    (hw : ¬ w.IsReal) : meyerFlatLift_β T χ⁻¹ w = -meyerFlatLift_β T χ w := by
+  have h := meyerFlatLift_β_mul T χ⁻¹ χ w hw
+  rw [inv_mul_cancel, meyerFlatLift_β_one T w hw] at h
+  omega
+
+open Classical in
+/-- The size of the archimedean parameters as a group seminorm. -/
+private noncomputable def meyerFlatLift_size :
+    GroupSeminorm (PontryaginDual (SIdeleQuotient F T)) where
+  toFun := meyerFlatLift_sizeFun T
+  map_one' := by
+    simp only [meyerFlatLift_sizeFun]
+    refine Finset.sum_eq_zero fun w _ ↦ ?_
+    rw [meyerFlatLift_α_one, abs_zero, zero_add]
+    split_ifs with hw
+    · rfl
+    · rw [meyerFlatLift_β_one T w hw]; simp
+  mul_le' χ χ' := by
+    simp only [meyerFlatLift_sizeFun, ← Finset.sum_add_distrib]
+    refine Finset.sum_le_sum fun w _ ↦ ?_
+    rw [meyerFlatLift_α_mul]
+    split_ifs with hw
+    · simpa using abs_add_le (meyerFlatLift_α T χ w) (meyerFlatLift_α T χ' w)
+    · rw [meyerFlatLift_β_mul T χ χ' w hw]
+      push_cast
+      linarith [abs_add_le (meyerFlatLift_α T χ w) (meyerFlatLift_α T χ' w),
+        abs_add_le ((meyerFlatLift_β T χ w : ℝ)) ((meyerFlatLift_β T χ' w : ℝ))]
+  inv' χ := by
+    simp only [meyerFlatLift_sizeFun]
+    refine Finset.sum_congr rfl fun w _ ↦ ?_
+    rw [meyerFlatLift_α_inv, abs_neg]
+    split_ifs with hw
+    · rfl
+    · rw [meyerFlatLift_β_inv T χ w hw]; push_cast; rw [abs_neg]
+
+end SIdeleChar
+
+section MixedCoord
+
+open scoped Classical
+
+local notation "Mx" => mixedEmbedding.mixedSpace F
+
+open Classical in
+/-- The coordinate of a point of the mixed space at an infinite place, as a complex number. -/
+private noncomputable def meyerFlatLift_π
+    (w : InfinitePlace F) : Mx →L[ℝ] ℂ :=
+  if hw : w.IsReal then
+    Complex.ofRealCLM.comp ((ContinuousLinearMap.proj (R := ℝ)
+      (φ := fun _ : {w : InfinitePlace F // w.IsReal} ↦ ℝ) ⟨w, hw⟩).comp
+        (ContinuousLinearMap.fst ℝ _ _))
+  else
+    (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : {w : InfinitePlace F // w.IsComplex} ↦ ℂ)
+      ⟨w, InfinitePlace.not_isReal_iff_isComplex.mp hw⟩).comp (ContinuousLinearMap.snd ℝ _ _)
+
+/-- The coordinate at a real place is the real coordinate. -/
+private theorem meyerFlatLift_π_real
+    (w : InfinitePlace F) (hw : w.IsReal) (y : Mx) :
+    meyerFlatLift_π w y = ((y.1 ⟨w, hw⟩ : ℝ) : ℂ) := by
+  simp [meyerFlatLift_π, hw]
+
+/-- The coordinate at a complex place is the complex coordinate. -/
+private theorem meyerFlatLift_π_complex
+    (w : InfinitePlace F) (hw : w.IsComplex) (y : Mx) :
+    meyerFlatLift_π w y = y.2 ⟨w, hw⟩ := by
+  have : ¬ w.IsReal := InfinitePlace.not_isReal_iff_isComplex.mpr hw
+  simp [meyerFlatLift_π, this]
+
+/-- Each coordinate is at most the norm. -/
+private theorem meyerFlatLift_π_norm_le
+    (w : InfinitePlace F) (y : Mx) : ‖meyerFlatLift_π w y‖ ≤ ‖y‖ := by
+  by_cases hw : w.IsReal
+  · rw [meyerFlatLift_π_real w hw, Complex.norm_real]
+    exact (norm_le_pi_norm y.1 ⟨w, hw⟩).trans (norm_fst_le y)
+  · rw [meyerFlatLift_π_complex w (InfinitePlace.not_isReal_iff_isComplex.mp hw)]
+    exact (norm_le_pi_norm y.2 _).trans (norm_snd_le y)
+
+/-- A sup norm on a finite product is attained or zero. -/
+private theorem meyerFlatLift_pi_norm_attained
+    {ι : Type*} [Fintype ι] {G : Type*} [NormedAddCommGroup G]
+    (f : ι → G) : (∃ i, ‖f‖ ≤ ‖f i‖) ∨ ‖f‖ = 0 := by
+  rcases isEmpty_or_nonempty ι with hι | hι
+  · right
+    exact le_antisymm ((pi_norm_le_iff_of_nonneg le_rfl).mpr fun i ↦ isEmptyElim i) (norm_nonneg _)
+  · left
+    obtain ⟨i, -, hi⟩ := Finset.exists_max_image Finset.univ (fun i ↦ ‖f i‖) Finset.univ_nonempty
+    exact ⟨i, (pi_norm_le_iff_of_nonneg (norm_nonneg _)).mpr fun j ↦ hi j (Finset.mem_univ j)⟩
+
+/-- Some coordinate attains the norm. -/
+private theorem meyerFlatLift_π_exists
+    (y : Mx) : ∃ w, ‖y‖ ≤ ‖meyerFlatLift_π w y‖ := by
+  rw [Prod.norm_def]
+  have hw₀ : Nonempty (InfinitePlace F) := inferInstance
+  rcases le_total ‖y.1‖ ‖y.2‖ with h | h
+  · rw [max_eq_right h]
+    rcases meyerFlatLift_pi_norm_attained y.2 with ⟨j, hj⟩ | hj
+    · exact ⟨j.val, by rwa [meyerFlatLift_π_complex j.val j.property]⟩
+    · exact ⟨Classical.arbitrary _, by rw [hj]; exact norm_nonneg _⟩
+  · rw [max_eq_left h]
+    rcases meyerFlatLift_pi_norm_attained y.1 with ⟨j, hj⟩ | hj
+    · exact ⟨j.val, by rwa [meyerFlatLift_π_real j.val j.property, Complex.norm_real]⟩
+    · exact ⟨Classical.arbitrary _, by rw [hj]; exact norm_nonneg _⟩
+
+variable (T : Finset (HeightOneSpectrum (𝓞 F)))
+
+/-- The S-idele with archimedean part given in mixed coordinates and a finite part. -/
+private noncomputable def meyerFlatLift_idele
+    (y : Mxˣ) (κ : ((v : T) → v.val.adicCompletion F)ˣ) : (SAdeleRing F T)ˣ :=
+  (ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F) ((v : T) → v.val.adicCompletion F)).symm
+    (Units.map (InfiniteAdeleRing.ringEquiv_mixedSpace F).symm.toMonoidHom y, κ)
+
+/-- The value of this S-idele. -/
+private theorem meyerFlatLift_idele_val
+    (y : Mxˣ) (κ : ((v : T) → v.val.adicCompletion F)ˣ) :
+    ((meyerFlatLift_idele T y κ : (SAdeleRing F T)ˣ) : SAdeleRing F T) =
+      ((InfiniteAdeleRing.ringEquiv_mixedSpace F).symm y.val, κ.val) := rfl
+
+/-- The S-idele splits into its archimedean part and its finite part. -/
+private theorem meyerFlatLift_idele_mul
+    (y : Mxˣ) (κ : ((v : T) → v.val.adicCompletion F)ˣ) :
+    meyerFlatLift_idele T y κ = meyerFlatLift_idele T y 1 * meyerFlatLift_idele T 1 κ := by
+  apply Units.ext
+  rw [Units.val_mul, meyerFlatLift_idele_val, meyerFlatLift_idele_val, meyerFlatLift_idele_val,
+      Prod.mk_mul_mk, Units.val_one,
+    Units.val_one, map_one, mul_one, one_mul]
+
+/-- The coordinates of a unit of the mixed space are nonzero. -/
+private theorem meyerFlatLift_π_ne_zero
+    (y : Mxˣ) (w : InfinitePlace F) : meyerFlatLift_π w y.val ≠ 0 := by
+  have hu := y.isUnit
+  rw [Prod.isUnit_iff, Pi.isUnit_iff, Pi.isUnit_iff] at hu
+  by_cases hw : w.IsReal
+  · rw [meyerFlatLift_π_real w hw]
+    exact_mod_cast (hu.1 ⟨w, hw⟩).ne_zero
+  · rw [meyerFlatLift_π_complex w (InfinitePlace.not_isReal_iff_isComplex.mp hw)]
+    exact (hu.2 _).ne_zero
+
+/-- The component at a place of the archimedean idele of a point of the mixed space. -/
+private noncomputable def meyerFlatLift_comp
+    (y : Mxˣ) (w : InfinitePlace F) : (w.Completion)ˣ :=
+  Units.map (Pi.evalRingHom (fun w : InfinitePlace F ↦ w.Completion) w).toMonoidHom
+    (Units.map (InfiniteAdeleRing.ringEquiv_mixedSpace F).symm.toMonoidHom y)
+
+/-- The archimedean S-idele is the product of its local components. -/
+private theorem meyerFlatLift_idele_eq_prod
+    (y : Mxˣ) :
+    meyerFlatLift_idele T y 1 = ∏ w, meyerFlatLift_loc T w (meyerFlatLift_comp y w) := by
+  have h1 : meyerFlatLift_idele T y 1 = meyerFlatLift_archIdele T
+      (fun w ↦ meyerFlatLift_comp y w) := by
+    apply Units.ext
+    rw [meyerFlatLift_idele_val, meyerFlatLift_archIdele_val]
+    rfl
+  rw [h1, ← Finset.univ_prod_mulSingle (fun w ↦ meyerFlatLift_comp y w), map_prod]
+  rfl
+
+/-- At a real place the component is the real coordinate. -/
+private theorem meyerFlatLift_comp_real
+    (y : Mxˣ) (w : InfinitePlace F) (hw : w.IsReal) :
+    meyerFlatLift_comp y w = meyerFlatLift_UR hw (Units.mk0 (y.val.1 ⟨w, hw⟩) (by
+      have := meyerFlatLift_π_ne_zero y w; rw [meyerFlatLift_π_real w hw] at this;
+        exact_mod_cast this)) := by
+  apply Units.ext
+  apply (InfinitePlace.Completion.ringEquivRealOfIsReal hw).injective
+  change InfinitePlace.Completion.extensionEmbeddingOfIsReal hw
+      ((InfiniteAdeleRing.ringEquiv_mixedSpace F).symm y.val w) =
+    (InfinitePlace.Completion.ringEquivRealOfIsReal hw)
+      ((InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm (y.val.1 ⟨w, hw⟩))
+  rw [RingEquiv.apply_symm_apply]
+  have := InfiniteAdeleRing.ringEquiv_mixedSpace_apply F
+    ((InfiniteAdeleRing.ringEquiv_mixedSpace F).symm y.val)
+  rw [RingEquiv.apply_symm_apply] at this
+  exact (congrFun (congrArg Prod.fst this) ⟨w, hw⟩).symm
+
+/-- At a complex place the component is the complex coordinate. -/
+private theorem meyerFlatLift_comp_complex
+    (y : Mxˣ) (w : InfinitePlace F) (hw : w.IsComplex) :
+    meyerFlatLift_comp y w = meyerFlatLift_UC hw (Units.mk0 (y.val.2 ⟨w, hw⟩) (by
+      have := meyerFlatLift_π_ne_zero y w; rwa [meyerFlatLift_π_complex w hw] at this)) := by
+  apply Units.ext
+  apply (InfinitePlace.Completion.ringEquivComplexOfIsComplex hw).injective
+  change InfinitePlace.Completion.extensionEmbedding w
+      ((InfiniteAdeleRing.ringEquiv_mixedSpace F).symm y.val w) =
+    (InfinitePlace.Completion.ringEquivComplexOfIsComplex hw)
+      ((InfinitePlace.Completion.ringEquivComplexOfIsComplex hw).symm (y.val.2 ⟨w, hw⟩))
+  rw [RingEquiv.apply_symm_apply]
+  have := InfiniteAdeleRing.ringEquiv_mixedSpace_apply F
+    ((InfiniteAdeleRing.ringEquiv_mixedSpace F).symm y.val)
+  rw [RingEquiv.apply_symm_apply] at this
+  exact (congrFun (congrArg Prod.snd this) ⟨w, hw⟩).symm
+
+/-- The value of a character of the S-idele classes at an archimedean idele, in log-polar
+coordinates of the mixed space. -/
+private theorem meyerFlatLift_char_formula
+    (χ : PontryaginDual (SIdeleQuotient F T)) (y : Mxˣ) :
+    (χ (meyerFlatLift_q T (meyerFlatLift_idele T y 1)) : ℂ) =
+      Complex.exp (Complex.I *
+          ((meyerFlatLift_lin (meyerFlatLift_α T χ)
+          (meyerFlatLift_L meyerFlatLift_π y.val).1 : ℝ) : ℂ)) *
+        ∏ w, meyerFlatLift_gpow (meyerFlatLift_β T χ w)
+            ((meyerFlatLift_L meyerFlatLift_π y.val).2 w) := by
+  have hloc (w : InfinitePlace F) :
+      (χ (meyerFlatLift_q T (meyerFlatLift_loc T w (meyerFlatLift_comp y w))) : ℂ) =
+      Complex.exp (Complex.I *
+          ((meyerFlatLift_α T χ w * (meyerFlatLift_L meyerFlatLift_π y.val).1 w : ℝ) : ℂ)) *
+        meyerFlatLift_gpow (meyerFlatLift_β T χ w)
+            ((meyerFlatLift_L meyerFlatLift_π y.val).2 w) := by
+    by_cases hw : w.IsReal
+    · rw [meyerFlatLift_comp_real y w hw]
+      have h := meyerFlatLift_char_real (meyerFlatLift_ψR T χ hw) (Units.mk0 (y.val.1 ⟨w, hw⟩) (by
+        have := meyerFlatLift_π_ne_zero y w; rw [meyerFlatLift_π_real w hw] at this;
+          exact_mod_cast this))
+      have hα : meyerFlatLift_αR (meyerFlatLift_ψR T χ hw) =
+          meyerFlatLift_α T χ w := by simp [meyerFlatLift_α, hw]
+      have hβ : meyerFlatLift_εR (meyerFlatLift_ψR T χ hw) =
+          meyerFlatLift_β T χ w := by simp [meyerFlatLift_β, hw]
+      rw [hα, hβ] at h
+      refine h.trans ?_
+      simp only [meyerFlatLift_L, meyerFlatLift_π_real w hw, Units.val_mk0, Complex.norm_real]
+    · have hw' := InfinitePlace.not_isReal_iff_isComplex.mp hw
+      rw [meyerFlatLift_comp_complex y w hw']
+      have h := meyerFlatLift_char_complex (meyerFlatLift_ψC T χ hw')
+          (Units.mk0 (y.val.2 ⟨w, hw'⟩) (by
+        have := meyerFlatLift_π_ne_zero y w; rwa [meyerFlatLift_π_complex w hw'] at this))
+      have hα : meyerFlatLift_αC (meyerFlatLift_ψC T χ hw') =
+          meyerFlatLift_α T χ w := by simp [meyerFlatLift_α, hw]
+      have hβ : meyerFlatLift_βC (meyerFlatLift_ψC T χ hw') =
+          meyerFlatLift_β T χ w := by simp [meyerFlatLift_β, hw]
+      rw [hα, hβ] at h
+      refine h.trans ?_
+      simp only [meyerFlatLift_L, meyerFlatLift_π_complex w hw', Units.val_mk0]
+  rw [meyerFlatLift_idele_eq_prod, map_prod, map_prod]
+  rw [show
+      ((∏ w, χ (meyerFlatLift_q T (meyerFlatLift_loc T w (meyerFlatLift_comp y w))) : Circle) : ℂ) =
+      ∏ w, (χ (meyerFlatLift_q T (meyerFlatLift_loc T w (meyerFlatLift_comp y w))) : ℂ)
+      from map_prod Circle.coeHom _ _]
+  rw [Finset.prod_congr rfl fun w _ ↦ hloc w,
+    Finset.prod_mul_distrib, ← Complex.exp_sum, meyerFlatLift_lin_apply]
+  congr 3
+  push_cast
+  simp only [Finset.mul_sum]
+
+end MixedCoord
+
+section Glue
+
+/-- A test equal to a cutoff, whose S-unit translates sum to one, times the pullback of a
+function on the S-idele classes has that function as theta function. -/
+private theorem meyerFlatLift_theta_of_cutoff
+    (T : Finset (HeightOneSpectrum (𝓞 F))) (W : ℬₛ(T))
+    (c : (SAdeleRing F T)ˣ → ℂ)
+    (hc : ∀ x, HasSum (fun u : ((T : Set (HeightOneSpectrum (𝓞 F))).integer F)ˣ ↦
+      c (sUnitEmbedding F T u * x)) 1)
+    (Ψ : SIdeleQuotient F T → ℂ)
+    (hW : ∀ x : (SAdeleRing F T)ˣ, W (Multiplicative.ofAdd x.val) = c x * Ψ (QuotientGroup.mk x))
+    (g : SIdeleQuotient F T) : sLocalAdelicThetaOnClasses F T W g = Ψ g := by
+  obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective g
+  rw [sLocalAdelicThetaOnClasses_mk, sLocalAdelicTheta_apply]
+  have hmk (u : ((T : Set (HeightOneSpectrum (𝓞 F))).integer F)ˣ) :
+      (QuotientGroup.mk (sUnitEmbedding F T u * x) : SIdeleQuotient F T) = QuotientGroup.mk x := by
+    have h1 : (QuotientGroup.mk (sUnitEmbedding F T u) : SIdeleQuotient F T) = 1 :=
+      (QuotientGroup.eq_one_iff _).mpr
+        (Subgroup.mem_map_of_mem _ (MonoidHom.mem_range.mpr ⟨u, rfl⟩))
+    rw [QuotientGroup.mk_mul, h1, one_mul]
+  have hterm (u : ((T : Set (HeightOneSpectrum (𝓞 F))).integer F)ˣ) :
+      W (Multiplicative.ofAdd (sUnitEmbedding F T u * x).val) =
+        c (sUnitEmbedding F T u * x) * Ψ (QuotientGroup.mk x) := by
+    rw [hW, hmk]
+  change ∑' u, W (Multiplicative.ofAdd (sUnitEmbedding F T u * x).val) = _
+  simp_rw [hterm]
+  rw [tsum_mul_right, (hc x).tsum_eq, one_mul]
+
+/-- Two angular characters with the same restriction to the norm-one classes are equal. -/
+private theorem meyerFlatLift_angular_ext
+    (T : Finset (HeightOneSpectrum (𝓞 F))) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (hτ : Function.RightInverse τ (sIdeleQuotientNorm F T)) (χ χ' : (PontryaginDual.map τ).ker)
+    (h : ∀ k : (sIdeleQuotientNorm F T).ker, χ.val k.val = χ'.val k.val) : χ = χ' := by
+  apply Subtype.ext
+  ext g
+  have hk : g / τ (sIdeleQuotientNorm F T g) ∈ (sIdeleQuotientNorm F T).ker := by
+    rw [MonoidHom.mem_ker, map_div, hτ, div_self']
+  have hτχ (ψ : (PontryaginDual.map τ).ker) (t : ℝ≥0ˣ) : ψ.val (τ t) = 1 := by
+    have := DFunLike.congr_fun ψ.property t
+    simpa [PontryaginDual.map_apply] using this
+  have hg : g = (g / τ (sIdeleQuotientNorm F T g)) * τ (sIdeleQuotientNorm F T g) :=
+    (div_mul_cancel _ _).symm
+  rw [hg, map_mul, map_mul, hτχ, hτχ, h ⟨_, hk⟩]
+
+open Classical in
+/-- Orthogonality of angular characters on the norm-one classes. -/
+private theorem meyerFlatLift_orthogonal
+    (T : Finset (HeightOneSpectrum (𝓞 F))) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (hτ : Function.RightInverse τ (sIdeleQuotientNorm F T)) (χ χ' : (PontryaginDual.map τ).ker) :
+    let : MeasurableSpace (sIdeleQuotientNorm F T).ker := borel _
+    ∫ k : (sIdeleQuotientNorm F T).ker, starRingEnd ℂ (χ.val k.val : ℂ) * (χ'.val k.val : ℂ)
+        ∂(sLocalNormOneQuotientMeasure F T) =
+      if χ = χ' then ((sLocalNormOneQuotientMeasure F T).real univ : ℂ) else 0 := by
+  intro
+  let : BorelSpace (sIdeleQuotientNorm F T).ker := ⟨rfl⟩
+  let μ := sLocalNormOneQuotientMeasure F T
+  have : μ.IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := T)).1
+  split_ifs with hχ
+  · subst hχ
+    have h1 (k : (sIdeleQuotientNorm F T).ker) :
+        starRingEnd ℂ (χ.val k.val : ℂ) * (χ.val k.val : ℂ) = 1 := by
+      rw [mul_comm, Complex.mul_conj, Complex.normSq_eq_norm_sq, Circle.norm_coe]; simp
+    simp_rw [h1, integral_const, Complex.real_smul, mul_one]
+  · -- a point of the norm-one classes where the quotient character is not one
+    have hne : ∃ k₀ : (sIdeleQuotientNorm F T).ker, χ.val k₀.val ≠ χ'.val k₀.val := by
+      by_contra hc
+      push Not at hc
+      exact hχ (meyerFlatLift_angular_ext T τ hτ χ χ' hc)
+    obtain ⟨k₀, hk₀⟩ := hne
+    let η (k : (sIdeleQuotientNorm F T).ker) : ℂ :=
+        starRingEnd ℂ (χ.val k.val : ℂ) * (χ'.val k.val : ℂ)
+    have hη (k : (sIdeleQuotientNorm F T).ker) : η (k₀ * k) = η k₀ * η k := by
+      simp only [η, Subgroup.coe_mul, map_mul, Circle.coe_mul]
+      ring
+    have hη₀ : η k₀ ≠ 1 := by
+      intro h
+      apply hk₀
+      have hc : (χ.val k₀.val : ℂ) ≠ 0 := Circle.coe_ne_zero _
+      apply Circle.ext
+      have h2 : starRingEnd ℂ (χ.val k₀.val : ℂ) * (χ.val k₀.val : ℂ) = 1 := by
+        rw [mul_comm, Complex.mul_conj, Complex.normSq_eq_norm_sq, Circle.norm_coe]; simp
+      have : starRingEnd ℂ (χ.val k₀.val : ℂ) * (χ'.val k₀.val : ℂ) =
+          starRingEnd ℂ (χ.val k₀.val : ℂ) * (χ.val k₀.val : ℂ) := by rw [h2]; exact h
+      have hcc : starRingEnd ℂ (χ.val k₀.val : ℂ) ≠ 0 := by simp
+      exact (mul_left_cancel₀ hcc this).symm
+    have hinv := integral_mul_left_eq_self (μ := μ) η k₀
+    simp_rw [hη, integral_const_mul] at hinv
+    have : (η k₀ - 1) * ∫ k, η k ∂μ = 0 := by rw [sub_mul, hinv, one_mul, sub_self]
+    exact (mul_eq_zero.mp this).resolve_left (sub_ne_zero.mpr hη₀)
+
+end Glue
+
+section GlueHom
+
+open Classical in
+/-- The homogeneous theta function of a theta series of angular characters times radial
+profiles, at an angular character: the corresponding term. -/
+private theorem meyerFlatLift_homTheta_eval
+    (T : Finset (HeightOneSpectrum (𝓞 F)))
+    (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T) (hτ : Function.RightInverse τ (sIdeleQuotientNorm F T))
+    (W : ℬₛ(T)) (f : (PontryaginDual.map τ).ker → ℝ → ℂ)
+    (hsum : ∀ u, Summable fun χ ↦ ‖f χ u‖)
+    (hθ : ∀ g, sLocalAdelicThetaOnClasses F T W g =
+      ((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
+        ∑' χ, starRingEnd ℂ (χ.val g : ℂ) *
+          f χ (Real.log ((sIdeleQuotientNorm F T g : ℝ≥0) : ℝ)))
+    (χ' : (PontryaginDual.map τ).ker) (g : SIdeleQuotient F T) :
+    let : MeasurableSpace (sIdeleQuotientNorm F T).ker := borel _
+    letI := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := T)).1
+    sLocalHomogeneousAdelicTheta F T (sLocalNormOneQuotientMeasure F T) ((χ'.val).comp
+      ⟨Subgroup.subtype (sIdeleQuotientNorm F T).ker, continuous_subtype_val⟩) W g =
+      starRingEnd ℂ (χ'.val g : ℂ) *
+        f χ' (Real.log ((sIdeleQuotientNorm F T g : ℝ≥0) : ℝ)) := by
+  intro _
+  let : BorelSpace (sIdeleQuotientNorm F T).ker := ⟨rfl⟩
+  let μ := sLocalNormOneQuotientMeasure F T
+  have : μ.IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := T)).1
+  have : CompactSpace (sIdeleQuotientNorm F T).ker := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F T).isCompact_preimage (isCompact_singleton (x := 1)))
+  have : Countable (PontryaginDual.map τ).ker :=
+    sLocalMellinSchwartzBounds_meyer_angular_countable T τ hτ
+  have hvol : μ.real univ ≠ 0 := by
+    rw [Measure.real]
+    exact ENNReal.toReal_ne_zero.mpr ⟨(Measure.measure_univ_pos.mpr (NeZero.ne μ)).ne',
+      measure_ne_top μ univ⟩
+  set t := sIdeleQuotientNorm F T g with ht
+  have hgn : sIdeleQuotientNorm F T g = t := rfl
+  · simp only [sLocalHomogeneousAdelicTheta, IsLinearMap.mk'_apply, ContinuousMap.coe_mk]
+    have hnorm (k : (sIdeleQuotientNorm F T).ker) : sIdeleQuotientNorm F T (g * k.val) = t := by
+      rw [map_mul, k.property, mul_one, hgn]
+    have hint (k : (sIdeleQuotientNorm F T).ker) :
+        sLocalAdelicThetaOnClasses F T W (g * k.val) *
+            (((χ'.val).comp ⟨Subgroup.subtype (sIdeleQuotientNorm F T).ker,
+              continuous_subtype_val⟩ k : Circle) : ℂ) =
+          ∑' χ, (μ.real univ : ℂ)⁻¹ * (starRingEnd ℂ (χ.val g : ℂ) *
+            f χ (Real.log ((t : ℝ≥0) : ℝ))) *
+            (starRingEnd ℂ (χ.val k.val : ℂ) * (χ'.val k.val : ℂ)) := by
+      rw [hθ, hnorm, ← tsum_mul_left, ← tsum_mul_right]
+      refine tsum_congr fun χ ↦ ?_
+      change _ * (starRingEnd ℂ (χ.val (g * k.val) : ℂ) * _) * (χ'.val k.val : ℂ) = _
+      rw [map_mul, Circle.coe_mul, map_mul]
+      ring
+    refine (integral_congr_ae (Filter.Eventually.of_forall hint)).trans ?_
+    set c : (PontryaginDual.map τ).ker → ℂ := fun χ ↦ (μ.real univ : ℂ)⁻¹ *
+      (starRingEnd ℂ (χ.val g : ℂ) * f χ (Real.log ((t : ℝ≥0) : ℝ))) with hc
+    have hcont (χ : (PontryaginDual.map τ).ker) : Continuous fun k : (sIdeleQuotientNorm F T).ker ↦
+        starRingEnd ℂ (χ.val k.val : ℂ) * (χ'.val k.val : ℂ) := by
+      refine (Complex.continuous_conj.comp ?_).mul ?_
+      · exact continuous_subtype_val.comp (χ.val.continuous.comp continuous_subtype_val)
+      · exact continuous_subtype_val.comp (χ'.val.continuous.comp continuous_subtype_val)
+    have hnorm1 (χ : (PontryaginDual.map τ).ker) (k : (sIdeleQuotientNorm F T).ker) :
+        ‖starRingEnd ℂ (χ.val k.val : ℂ) * (χ'.val k.val : ℂ)‖ = 1 := by
+      rw [norm_mul, Complex.norm_conj, Circle.norm_coe, Circle.norm_coe, one_mul]
+    have hint' (χ : (PontryaginDual.map τ).ker) : Integrable (fun k : (sIdeleQuotientNorm F T).ker ↦
+        c χ * (starRingEnd ℂ (χ.val k.val : ℂ) * (χ'.val k.val : ℂ))) μ :=
+      ((continuous_const.mul (hcont χ))).integrable_of_hasCompactSupport
+        (HasCompactSupport.of_compactSpace _)
+    have hnormint (χ : (PontryaginDual.map τ).ker) :
+        ∫ k, ‖c χ * (starRingEnd ℂ (χ.val k.val : ℂ) * (χ'.val k.val : ℂ))‖ ∂μ =
+            ‖c χ‖ * μ.real univ := by
+      have : (fun k : (sIdeleQuotientNorm F T).ker ↦
+          ‖c χ * (starRingEnd ℂ (χ.val k.val : ℂ) * (χ'.val k.val : ℂ))‖) = fun _ ↦ ‖c χ‖ :=
+        funext fun k ↦ by rw [norm_mul, hnorm1, mul_one]
+      rw [this, integral_const, smul_eq_mul, mul_comm]
+    have hsumc : Summable fun χ ↦ ‖c χ‖ := by
+      have := (hsum (Real.log ((t : ℝ≥0) : ℝ))).mul_left ‖(μ.real univ : ℂ)⁻¹‖
+      refine this.congr fun χ ↦ ?_
+      simp only [hc, norm_mul, Complex.norm_conj, Circle.norm_coe, one_mul]
+    rw [← integral_tsum_of_summable_integral_norm hint' (by
+      simp_rw [hnormint]; exact hsumc.mul_right _)]
+    have hterm (χ : (PontryaginDual.map τ).ker) :
+        ∫ k, c χ * (starRingEnd ℂ (χ.val k.val : ℂ) * (χ'.val k.val : ℂ)) ∂μ =
+          if χ = χ' then c χ' * (μ.real univ : ℂ) else 0 := by
+      have horth : ∫ k, starRingEnd ℂ (χ.val k.val : ℂ) * (χ'.val k.val : ℂ) ∂μ =
+          if χ = χ' then (μ.real univ : ℂ) else 0 := meyerFlatLift_orthogonal T τ hτ χ χ'
+      rw [integral_const_mul, horth]
+      split_ifs with h
+      · rw [h]
+      · rw [mul_zero]
+    rw [tsum_congr hterm, tsum_eq_single χ' (fun b hb ↦ ite_eq_right hb), ite_eq_left rfl, hc]
+    have hv : (μ.real univ : ℂ) ≠ 0 := by exact_mod_cast hvol
+    rw [mul_right_comm, inv_mul_cancel₀ hv, one_mul]
+
+open Classical in
+/-- A theta function which is a convergent series of angular characters times radial profiles
+has, at each angular character, the Mellin transform of the corresponding profile as theta
+Mellin integral. -/
+private theorem meyerFlatLift_mellin_of_theta
+    (T : Finset (HeightOneSpectrum (𝓞 F)))
+    (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T) (hτ : Function.RightInverse τ (sIdeleQuotientNorm F T))
+    (W : ℬₛ(T)) (f : (PontryaginDual.map τ).ker → ℝ → ℂ)
+    (hsum : ∀ u, Summable fun χ ↦ ‖f χ u‖)
+    (hθ : ∀ g, sLocalAdelicThetaOnClasses F T W g =
+      ((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
+        ∑' χ, starRingEnd ℂ (χ.val g : ℂ) *
+          f χ (Real.log ((sIdeleQuotientNorm F T g : ℝ≥0) : ℝ)))
+    (χ' : (PontryaginDual.map τ).ker) (z : ℂ) (hz : 0 < z.re) :
+    sLocalThetaMellinIntegral W (quasiCharacterNormTwist (sIdeleQuotientNorm F T)
+      (IsProperMap.continuous (isProperMap_sIdeleQuotientNorm F T))
+      (ContinuousMonoidHom.comp (ContinuousMonoidHom.mk Circle.coeHom continuous_subtype_val :
+        Circle →ₜ* ℂ) χ'.val) z) = mellin (fun t ↦ f χ' (Real.log t)) z := by
+  -- an idele section of the norm
+  let π := Units.map (adeleProjection F T).toMonoidHom
+  have hπ : Continuous π := (continuous_fst.prodMk (continuous_pi fun v : T ↦
+    (RestrictedProduct.continuous_eval v.val).comp continuous_snd)).units_map _
+  let τ' : ℝ≥0ˣ →ₜ* (SAdeleRing F T)ˣ := ⟨π.comp (canonicalIdeleNormSection F),
+    hπ.comp (canonicalIdeleNormSection_continuous F)⟩
+  have hτ' : Function.RightInverse τ' (sIdeleNorm F T) := sIdeleNorm_project_canonicalSection F T
+  rw [← sLocalRadialMellinIntegral_eq_theta τ' hτ' W χ'.val z hz,
+    ← sLocalMellinSchwartzBounds_meyer_rational_ray_haar]
+  unfold sLocalRadialMellinIntegral
+  refine integral_congr_ae (.of_forall fun t ↦ ?_)
+  beta_reduce
+  set g : SIdeleQuotient F T := QuotientGroup.mk (τ' t) with hg
+  have hgn : sIdeleQuotientNorm F T g = t := hτ' t
+  have hhom := meyerFlatLift_homTheta_eval T τ hτ W f hsum hθ χ' g
+  rw [hgn] at hhom
+  have hchart : quasiCharacterNormTwist (sIdeleQuotientNorm F T)
+      (IsProperMap.continuous (isProperMap_sIdeleQuotientNorm F T))
+      (ContinuousMonoidHom.comp (ContinuousMonoidHom.mk Circle.coeHom continuous_subtype_val :
+        Circle →ₜ* ℂ) χ'.val) z g = (χ'.val g : ℂ) * (((t : ℝ≥0) : ℝ) : ℂ) ^ z := by
+    rw [← hgn]; rfl
+  have h1 : starRingEnd ℂ (χ'.val g : ℂ) * (χ'.val g : ℂ) = 1 := by
+    rw [mul_comm, Complex.mul_conj, Complex.normSq_eq_norm_sq, Circle.norm_coe]; simp
+  rw [hhom, hchart]
+  linear_combination (f χ' (Real.log ((t : ℝ≥0) : ℝ)) * (((t : ℝ≥0) : ℝ) : ℂ) ^ z) * h1
+
+end GlueHom
+
+section Top
+
+/-- The seminorms of the exponential decay profiles. -/
+local notation "pseminorm(" i ")" =>
+  ((SchwartzMap.seminorm ℂ (Prod.fst (Prod.snd i)) (Prod.snd (Prod.snd i))).comp
+    (logExponentialDecayTwist univ (Prod.fst i)))
+
+/-- Products of inverse squares are summable over integer vectors. -/
+private theorem meyerFlatLift_fg_weight_summable_prod
+    (r : ℕ) :
+    Summable fun k : Fin r → ℤ ↦ ∏ j, ((1 + |(k j : ℝ)|) ^ 2)⁻¹ := by
+  induction r with
+  | zero => exact Summable.of_finite
+  | succ r ih =>
+    have h1 : Summable fun n : ℤ ↦ ((1 + |(n : ℝ)|) ^ 2)⁻¹ := by
+      refine Summable.of_norm_bounded_eventually (Real.summable_one_div_int_pow.mpr one_lt_two) ?_
+      filter_upwards [(Set.finite_singleton (0 : ℤ)).compl_mem_cofinite] with n hn
+      have hn0 : (n : ℝ) ≠ 0 := by exact_mod_cast hn
+      rw [Real.norm_of_nonneg (by positivity), one_div]
+      refine inv_anti₀ (by positivity) ?_
+      rw [← sq_abs]
+      exact pow_le_pow_left₀ (abs_nonneg _) (by linarith) 2
+    rw [← (Fin.consEquiv fun _ : Fin (r + 1) ↦ ℤ).summable_iff]
+    refine (h1.mul_of_nonneg ih (fun _ ↦ by positivity)
+      (fun _ ↦ Finset.prod_nonneg fun _ _ ↦ by positivity)).congr fun x ↦ ?_
+    simp [Fin.consEquiv, Fin.prod_univ_succ, mul_comm]
+
+/-- A finitely generated commutative group carries a group seminorm `p` (the word length) and an
+exponent `L` for which `((1 + p g) ^ L)⁻¹` is summable over the group. -/
+private theorem meyerFlatLift_fg_weight
+    (G : Type*) [CommGroup G] (hG : Group.FG G) :
+    ∃ (p : GroupSeminorm G) (L : ℕ), Summable fun g : G ↦ ((1 + p g) ^ L)⁻¹ := by
+  classical
+  have : AddGroup.FG (Additive G) := GroupFG.iff_add_fg.mp hG
+  obtain ⟨r, I, _, q, hq, k, ⟨e'⟩⟩ := AddCommGroup.equiv_free_prod_directSum_zmod (Additive G)
+  let P := (i : I) → ZMod (q i ^ k i)
+  let (i : I) : NeZero (q i ^ k i) := ⟨pow_ne_zero _ (hq i).ne_zero⟩
+  let : Fintype P := inferInstanceAs (Fintype ((i : I) → ZMod (q i ^ k i)))
+  let e : Additive G ≃+ (Fin r → ℤ) × P :=
+    e'.trans (AddEquiv.prodCongr Finsupp.addEquivFunOnFinite (DirectSum.addEquivProd _))
+  let w (x : G) : ℝ := ∑ j, |((e (Additive.ofMul x)).1 j : ℝ)|
+  let p : GroupSeminorm G :=
+    { toFun := w
+      map_one' := by simp [w]
+      mul_le' := fun x y ↦ by
+        simp only [w, ofMul_mul, map_add, Prod.fst_add, Pi.add_apply, Int.cast_add,
+          ← Finset.sum_add_distrib]
+        exact Finset.sum_le_sum fun j _ ↦ abs_add_le _ _
+      inv' := fun x ↦ by simp [w, ofMul_inv] }
+  refine ⟨p, 2 * r, ?_⟩
+  have hF : Summable fun k : Fin r → ℤ ↦ ((1 + ∑ j, |(k j : ℝ)|) ^ (2 * r))⁻¹ := by
+    refine (meyerFlatLift_fg_weight_summable_prod r).of_nonneg_of_le
+        (fun _ ↦ by positivity) fun k ↦ ?_
+    have hc : (1 + ∑ j, |(k j : ℝ)|) ^ (2 * r) = ∏ _j : Fin r, (1 + ∑ j, |(k j : ℝ)|) ^ 2 := by
+      rw [Finset.prod_const, Finset.card_univ, Fintype.card_fin, ← pow_mul]
+    rw [Finset.prod_inv_distrib, hc]
+    refine inv_anti₀ (Finset.prod_pos fun _ _ ↦ by positivity) ?_
+    refine Finset.prod_le_prod₀ (fun _ _ ↦ by positivity) fun j _ ↦ ?_
+    refine pow_le_pow_left₀ (by positivity) ?_ 2
+    have := Finset.single_le_sum (f := fun j ↦ |(k j : ℝ)|) (fun _ _ ↦ abs_nonneg _)
+      (Finset.mem_univ j)
+    linarith
+  have hP : Summable fun y : (Fin r → ℤ) × P ↦ ((1 + ∑ j, |(y.1 j : ℝ)|) ^ (2 * r))⁻¹ := by
+    simpa using hF.mul_of_nonneg (Summable.of_finite (f := fun _ : P ↦ (1 : ℝ)))
+      (fun _ ↦ by positivity) (fun _ ↦ zero_le_one)
+  exact (Additive.ofMul.trans e.toEquiv).summable_iff.mpr hP
+
+/-- The weighted `L²` seminorm of a Schwartz–Bergman function on a vertical line is bounded
+by the sup bounds of `z ^ N f` and `z ^ (N + 1) f` on that line. -/
+private theorem meyerFlatLift_line_bound :
+    ∃ Cπ : ℝ, 0 ≤ Cπ ∧ ∀ (a : ℝ) (N : ℕ) (f : ℂ → ℂ) (B₀ B₁ : ℝ),
+      (∀ z : ℂ, z.re = a → ‖z ^ N * f z‖ ≤ B₀) → (∀ z : ℂ, z.re = a → ‖z ^ (N + 1) * f z‖ ≤ B₁) →
+        (eLpNorm (weightedVerticalTrace a N f) 2 volume).toReal ≤ Cπ * (B₀ + B₁) := by
+  have hmodel : MemLp (fun x : ℝ ↦ (1 + ‖x‖)⁻¹) 2 volume := by
+    apply (integrable_norm_rpow_iff (by fun_prop) two_ne_zero ENNReal.ofNat_ne_top).mp
+    have hnorm (x : ℝ) : ‖(1 + ‖x‖)⁻¹‖ = (1 + ‖x‖)⁻¹ := Real.norm_of_nonneg (by positivity)
+    simpa only [hnorm, Real.rpow_neg_eq_inv_rpow] using
+      (integrable_one_add_norm (μ := (volume : Measure ℝ)) (r := (2 : ENNReal).toReal) (by simp))
+  refine ⟨(eLpNorm (fun x : ℝ ↦ (1 + ‖x‖)⁻¹) 2 volume).toReal, ENNReal.toReal_nonneg,
+    fun a N f B₀ B₁ h₀ h₁ ↦ ?_⟩
+  have hB₀ : 0 ≤ B₀ := (norm_nonneg _).trans (h₀ a (by simp))
+  have hB₁ : 0 ≤ B₁ := (norm_nonneg _).trans (h₁ a (by simp))
+  by_cases hm : AEStronglyMeasurable (weightedVerticalTrace a N f) volume
+  · have hpt (x : ℝ) :
+        ‖weightedVerticalTrace a N f x‖ ≤ (B₀ + B₁) * ‖(1 + ‖x‖)⁻¹‖ := by
+      let z : ℂ := (a : ℂ) + (x : ℂ) * Complex.I
+      have hre : z.re = a := by simp [z]
+      have him : z.im = x := by simp [z]
+      have e0 := h₀ z hre
+      have e1 := h₁ z hre
+      rw [pow_succ, mul_comm (z ^ N) z, mul_assoc, norm_mul] at e1
+      have hx : ‖x‖ ≤ ‖z‖ := by
+        rw [Real.norm_eq_abs, ← him]
+        exact Complex.abs_im_le_norm z
+      have hxw := mul_le_mul_of_nonneg_right hx (norm_nonneg (z ^ N * f z))
+      change ‖z ^ N * f z‖ ≤ _
+      rw [Real.norm_of_nonneg (by positivity), ← div_eq_mul_inv, le_div_iff₀ (by positivity)]
+      nlinarith
+    have hle := eLpNorm_le_mul_eLpNorm_of_ae_le_mul hm (Eventually.of_forall hpt) 2
+    have hfin : ENNReal.ofReal (B₀ + B₁) * eLpNorm (fun x : ℝ ↦ (1 + ‖x‖)⁻¹) 2 volume ≠ ⊤ :=
+      ENNReal.mul_ne_top ENNReal.ofReal_ne_top hmodel.eLpNorm_ne_top
+    calc (eLpNorm (weightedVerticalTrace a N f) 2 volume).toReal
+        ≤ (ENNReal.ofReal (B₀ + B₁) * eLpNorm (fun x : ℝ ↦ (1 + ‖x‖)⁻¹) 2 volume).toReal :=
+          ENNReal.toReal_mono hfin hle
+      _ = _ := by
+          rw [ENNReal.toReal_mul, ENNReal.toReal_ofReal (by positivity), mul_comm]
+  · rw [eLpNorm_of_not_aestronglyMeasurable hm, ENNReal.toReal_top]
+    positivity
+
+/-- The data lie in the Schwartz–Bergman space of the whole plane. -/
+private theorem meyerFlatLift_mem_SB
+    {T : Finset V} {τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T}
+    (Φ : ℕ → (PontryaginDual.map τ).ker → ℂ → ℂ) (hΦ : ∀ n χ, Differentiable ℂ (Φ n χ))
+    (hb : ∀ a b : ℝ, ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
+      (∀ χ ∉ H, ∀ n (z : ℂ), z.re ∈ Icc a b → Φ n χ z = 0) ∧
+      ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re ∈ Icc a b →
+        (1 + p χ) ^ k * ‖z ^ m * Φ n χ.val z‖ ≤ B) (n : ℕ) (χ : (PontryaginDual.map τ).ker) :
+    Φ n χ ∈ schwartzBergmanSubmodule univ := by
+  refine ⟨fun z hz ↦ absurd (mem_univ _) hz, (hΦ n χ).differentiableOn, fun a b _ _ N ↦ ?_⟩
+  obtain ⟨H, -, hv, hB⟩ := hb a b
+  by_cases hχ : χ ∈ H
+  · obtain ⟨B, hB'⟩ := hB 0 0 N
+    refine ⟨B, ?_⟩
+    rintro _ ⟨z, hz, rfl⟩
+    simpa using hB' ⟨χ, hχ⟩ n z hz
+  · refine ⟨0, ?_⟩
+    rintro _ ⟨z, hz, rfl⟩
+    simp [hv χ hχ n z hz]
+
+/-- A continuous seminorm on the Schwartz–Bergman space of the plane is bounded by finitely
+many weighted line seminorms. -/
+private theorem meyerFlatLift_SB_seminorm_bound
+    (q : Seminorm ℂ (SchwartzBergman univ)) (hq : Continuous q) :
+    ∃ (s : Finset (↥(univ : Set ℝ) × ℕ)) (C : ℝ), 0 ≤ C ∧ ∀ G : SchwartzBergman univ,
+      q G ≤ C * ∑ j ∈ s, (eLpNorm (weightedVerticalTrace j.1 j.2 G.val) 2 volume).toReal := by
+  obtain ⟨s, C, -, hC⟩ := Seminorm.bound_of_continuous (withGeneratingSeminorms_spec _ _) q hq
+  refine ⟨s, C, C.2, fun G ↦ (hC G).trans ?_⟩
+  simp only [smul_apply, NNReal.smul_def, smul_eq_mul]
+  refine mul_le_mul_of_nonneg_left (Seminorm.finset_sup_apply_le
+    (Finset.sum_nonneg fun j _ ↦ ENNReal.toReal_nonneg) fun j hj ↦ ?_) C.2
+  exact Finset.single_le_sum (f := fun j : ↥(univ : Set ℝ) × ℕ ↦
+    (eLpNorm (weightedVerticalTrace j.1 j.2 G.val) 2 volume).toReal)
+    (fun j _ ↦ ENNReal.toReal_nonneg) hj
+
+/-- Line seminorms on lines inside a strip are bounded by the strip bounds. -/
+private theorem meyerFlatLift_SB_lines_bound
+    (Cπ : ℝ)
+    (hCπ : ∀ (a : ℝ) (N : ℕ) (f : ℂ → ℂ) (B₀ B₁ : ℝ),
+      (∀ z : ℂ, z.re = a → ‖z ^ N * f z‖ ≤ B₀) → (∀ z : ℂ, z.re = a → ‖z ^ (N + 1) * f z‖ ≤ B₁) →
+        (eLpNorm (weightedVerticalTrace a N f) 2 volume).toReal ≤ Cπ * (B₀ + B₁))
+    (s : Finset (↥(univ : Set ℝ) × ℕ)) (A : ℝ) (hAj : ∀ j ∈ s, (j.1 : ℝ) ∈ Icc (-A) A)
+    (f : ℂ → ℂ) (b : ℕ → ℝ) (hfb : ∀ (m : ℕ) (z : ℂ), z.re ∈ Icc (-A) A → ‖z ^ m * f z‖ ≤ b m) :
+    ∑ j ∈ s, (eLpNorm (weightedVerticalTrace j.1 j.2 f) 2 volume).toReal ≤
+      Cπ * ∑ j ∈ s, (b j.2 + b (j.2 + 1)) := by
+  rw [Finset.mul_sum]
+  exact Finset.sum_le_sum fun j hj ↦ hCπ j.1 j.2 f _ _
+    (fun z hz ↦ hfb j.2 z (hz ▸ hAj j hj)) (fun z hz ↦ hfb (j.2 + 1) z (hz ▸ hAj j hj))
+
+/-- Line seminorms of a function vanishing on a strip containing the lines vanish. -/
+private theorem meyerFlatLift_SB_lines_zero
+    (s : Finset (↥(univ : Set ℝ) × ℕ)) (A : ℝ)
+    (hAj : ∀ j ∈ s, (j.1 : ℝ) ∈ Icc (-A) A) (f : ℂ → ℂ)
+    (hf : ∀ z : ℂ, z.re ∈ Icc (-A) A → f z = 0) :
+    ∑ j ∈ s, (eLpNorm (weightedVerticalTrace j.1 j.2 f) 2 volume).toReal = 0 := by
+  refine Finset.sum_eq_zero fun j hj ↦ ?_
+  have : weightedVerticalTrace j.1 j.2 f = 0 := by
+    funext x
+    simp only [weightedVerticalTrace, Pi.zero_apply]
+    rw [hf _ (by simpa using hAj j hj), mul_zero]
+  simp [this]
+
+/-- The weight inequality for one character. -/
+private theorem meyerFlatLift_weight_ineq
+    (K L : ℕ) (ν₀ w₀ P₀ Q D : ℝ) (hν0 : 0 ≤ ν₀) (hw0 : 0 ≤ w₀)
+    (hν : ν₀ ≤ P₀) (hw : w₀ ≤ P₀) (hQ : Q ≤ D * ((1 + P₀) ^ (K + L))⁻¹) (hQ0 : 0 ≤ Q) :
+    (1 + ν₀) ^ K * Q ≤ D * ((1 + w₀) ^ L)⁻¹ := by
+  have hP1 : 0 < 1 + P₀ := by linarith
+  have hw1 : 0 < 1 + w₀ := by linarith
+  have hD0 : 0 ≤ D := by
+    by_contra h
+    have : D * ((1 + P₀) ^ (K + L))⁻¹ < 0 :=
+      mul_neg_of_neg_of_pos (not_le.mp h) (inv_pos.mpr (pow_pos hP1 _))
+    linarith
+  calc (1 + ν₀) ^ K * Q ≤ (1 + P₀) ^ K * (D * ((1 + P₀) ^ (K + L))⁻¹) :=
+        mul_le_mul (pow_le_pow_left₀ (by linarith) (by linarith) K) hQ hQ0 (by positivity)
+    _ = D * ((1 + P₀) ^ L)⁻¹ := by
+        rw [pow_add]
+        field_simp
+    _ ≤ D * ((1 + w₀) ^ L)⁻¹ := by
+        gcongr
+
+/-- The bound of a continuous seminorm at a function with weighted strip bounds. -/
+private theorem meyerFlatLift_in_bound
+    (q : Seminorm ℂ (SchwartzBergman univ)) (s : Finset (↥(univ : Set ℝ) × ℕ))
+    (C : ℝ) (hC0 : 0 ≤ C)
+    (hC : ∀ G : SchwartzBergman univ,
+      q G ≤ C * ∑ j ∈ s, (eLpNorm (weightedVerticalTrace j.1 j.2 G.val) 2 volume).toReal)
+    (A : ℝ) (hAj : ∀ j ∈ s, (j.1 : ℝ) ∈ Icc (-A) A) (Cπ : ℝ)
+    (hCπ : ∀ (a : ℝ) (N : ℕ) (f : ℂ → ℂ) (B₀ B₁ : ℝ),
+      (∀ z : ℂ, z.re = a → ‖z ^ N * f z‖ ≤ B₀) → (∀ z : ℂ, z.re = a → ‖z ^ (N + 1) * f z‖ ≤ B₁) →
+        (eLpNorm (weightedVerticalTrace a N f) 2 volume).toReal ≤ Cπ * (B₀ + B₁))
+    (G : SchwartzBergman univ) (Bm : ℕ → ℝ) (P₀ : ℝ) (hP0 : 0 ≤ P₀) (N : ℕ)
+    (hB : ∀ (m : ℕ) (z : ℂ), z.re ∈ Icc (-A) A → (1 + P₀) ^ N * ‖z ^ m * G.val z‖ ≤ Bm m) :
+    q G ≤ C * (Cπ * ∑ j ∈ s, (|Bm j.2| + |Bm (j.2 + 1)|)) * ((1 + P₀) ^ N)⁻¹ := by
+  have hpos : 0 < (1 + P₀) ^ N := pow_pos (by linarith) _
+  have hlines := meyerFlatLift_SB_lines_bound Cπ hCπ s A hAj G.val
+    (fun m ↦ |Bm m| * ((1 + P₀) ^ N)⁻¹) (fun m z hz ↦ by
+      rw [le_mul_inv_iff₀ hpos, mul_comm]
+      exact (hB m z hz).trans (le_abs_self _))
+  calc q G ≤ C * ∑ j ∈ s, (eLpNorm (weightedVerticalTrace j.1 j.2 G.val) 2 volume).toReal := hC G
+    _ ≤ C * (Cπ * ∑ j ∈ s, (|Bm j.2| * ((1 + P₀) ^ N)⁻¹ + |Bm (j.2 + 1)| * ((1 + P₀) ^ N)⁻¹)) :=
+        mul_le_mul_of_nonneg_left hlines hC0
+    _ = _ := by
+        simp only [← add_mul, ← Finset.sum_mul]
+        ring
+
+/-- A continuous seminorm vanishes at a function vanishing on the strip of its lines. -/
+private theorem meyerFlatLift_out_bound
+    (q : Seminorm ℂ (SchwartzBergman univ)) (s : Finset (↥(univ : Set ℝ) × ℕ))
+    (C : ℝ)
+    (hC : ∀ G : SchwartzBergman univ,
+      q G ≤ C * ∑ j ∈ s, (eLpNorm (weightedVerticalTrace j.1 j.2 G.val) 2 volume).toReal)
+    (A : ℝ) (hAj : ∀ j ∈ s, (j.1 : ℝ) ∈ Icc (-A) A) (G : SchwartzBergman univ)
+    (hG : ∀ z : ℂ, z.re ∈ Icc (-A) A → G.val z = 0) : q G = 0 :=
+  le_antisymm ((hC G).trans (by rw [meyerFlatLift_SB_lines_zero s A hAj G.val hG, mul_zero]))
+    (apply_nonneg _ _)
+
+open Classical in
+/-- The summed weighted bounds of the inverse Mellin profiles of the data. -/
+private theorem meyerFlatLift_summed
+    {T : Finset V} {τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T}
+    (Φ : ℕ → (PontryaginDual.map τ).ker → ℂ → ℂ) (hΦ : ∀ n χ, Differentiable ℂ (Φ n χ))
+    (hb : ∀ a b : ℝ, ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
+      (∀ χ ∉ H, ∀ n (z : ℂ), z.re ∈ Icc a b → Φ n χ z = 0) ∧
+      ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re ∈ Icc a b →
+        (1 + p χ) ^ k * ‖z ^ m * Φ n χ.val z‖ ≤ B)
+    (ν : GroupSeminorm (PontryaginDual.map τ).ker) (K : ℕ) (i : ↥(univ : Set ℝ) × ℕ × ℕ) :
+    ∃ B : ℝ, ∀ n, Summable (fun χ ↦ (1 + ν χ) ^ K *
+        pseminorm(i) ((positiveRealFourierMellin univ isOpen_univ ordConnected_univ
+          univ_nonempty).symm ⟨Φ n χ, meyerFlatLift_mem_SB Φ hΦ hb n χ⟩)) ∧
+      ∑' χ, (1 + ν χ) ^ K * pseminorm(i) ((positiveRealFourierMellin univ isOpen_univ
+        ordConnected_univ univ_nonempty).symm ⟨Φ n χ, meyerFlatLift_mem_SB Φ hΦ hb n χ⟩) ≤ B := by
+  let Φ' (n : ℕ) (χ : (PontryaginDual.map τ).ker) : SchwartzBergman univ :=
+    ⟨Φ n χ, meyerFlatLift_mem_SB Φ hΦ hb n χ⟩
+  let M := positiveRealFourierMellin univ isOpen_univ ordConnected_univ univ_nonempty
+  let q₀ : Seminorm ℂ (PositiveRealExponentialDecay univ) := pseminorm(i)
+  have hq₀ : Continuous q₀ := (withGeneratingSeminorms_spec _ _).continuous_seminorm i
+  let q : Seminorm ℂ (SchwartzBergman univ) := q₀.comp M.symm.toLinearEquiv.toLinearMap
+  have hq : Continuous q := hq₀.comp M.symm.continuous
+  show ∃ B : ℝ, ∀ n, Summable (fun χ ↦ (1 + ν χ) ^ K * q (Φ' n χ)) ∧
+    ∑' χ, (1 + ν χ) ^ K * q (Φ' n χ) ≤ B
+  clear_value q
+  obtain ⟨s, C, hC0, hC⟩ := meyerFlatLift_SB_seminorm_bound q hq
+  obtain ⟨A, hA⟩ : ∃ A : ℝ, A = ∑ j ∈ s, |(j.1 : ℝ)| := ⟨_, rfl⟩
+  have hAj : ∀ j ∈ s, (j.1 : ℝ) ∈ Icc (-A) A := fun j hj ↦ by
+    have := Finset.single_le_sum (f := fun j : ↥(univ : Set ℝ) × ℕ ↦ |(j.1 : ℝ)|)
+      (fun j _ ↦ abs_nonneg _) hj
+    rw [← hA] at this
+    exact ⟨by linarith [neg_abs_le (j.1 : ℝ)], by linarith [le_abs_self (j.1 : ℝ)]⟩
+  obtain ⟨H₁, hH₁, hv₁, hB₁⟩ := hb (-A) A
+  obtain ⟨pw, L, hpw⟩ := meyerFlatLift_fg_weight H₁ ((Group.fg_iff_subgroup_fg H₁).mpr hH₁)
+  obtain ⟨Cπ, -, hCπ⟩ := meyerFlatLift_line_bound
+  choose Bm hBm using fun m : ℕ ↦ hB₁ (ν.comp H₁.subtype + pw) (K + L) m
+  obtain ⟨D, hD⟩ : ∃ D : ℝ, D = C * (Cπ * ∑ j ∈ s, (|Bm j.2| + |Bm (j.2 + 1)|)) := ⟨_, rfl⟩
+  have hone (n : ℕ) (χ : (PontryaginDual.map τ).ker) :
+      (1 + ν χ) ^ K * q (Φ' n χ) ≤ if h : χ ∈ H₁ then D * ((1 + pw ⟨χ, h⟩) ^ L)⁻¹ else 0 := by
+    split_ifs with hχ
+    · have hν0 := apply_nonneg ν χ
+      have hw0 := apply_nonneg pw ⟨χ, hχ⟩
+      have hP : (ν.comp H₁.subtype + pw) ⟨χ, hχ⟩ = ν χ + pw ⟨χ, hχ⟩ := by
+        simp only [add_apply, GroupSeminorm.comp_apply, Subgroup.coe_subtype]
+      have hB' (m : ℕ) (z : ℂ) (hz : z.re ∈ Icc (-A) A) :
+          (1 + (ν χ + pw ⟨χ, hχ⟩)) ^ (K + L) * ‖z ^ m * (Φ' n χ).val z‖ ≤ Bm m := by
+        have := hBm m ⟨χ, hχ⟩ n z hz
+        rw [hP] at this
+        exact this
+      have hin := meyerFlatLift_in_bound q s C hC0 hC A hAj Cπ hCπ (Φ' n χ) Bm
+        (ν χ + pw ⟨χ, hχ⟩) (add_nonneg hν0 hw0) (K + L) hB'
+      exact meyerFlatLift_weight_ineq K L (ν χ) (pw ⟨χ, hχ⟩) (ν χ + pw ⟨χ, hχ⟩) _ D hν0 hw0
+        (le_add_of_nonneg_right hw0) (le_add_of_nonneg_left hν0)
+        (hin.trans_eq (by rw [hD])) (apply_nonneg _ _)
+    · rw [meyerFlatLift_out_bound q s C hC A hAj (Φ' n χ) (fun z hz ↦ hv₁ χ hχ n z hz), mul_zero]
+  -- summation over the finitely generated group
+  let g : H₁ → (PontryaginDual.map τ).ker := H₁.subtype
+  have hg : Function.Injective g := Subtype.val_injective
+  let bnd : (PontryaginDual.map τ).ker → ℝ := fun χ ↦
+    if h : χ ∈ H₁ then D * ((1 + pw ⟨χ, h⟩) ^ L)⁻¹ else 0
+  have hbnd0 : ∀ χ ∉ Set.range g, bnd χ = 0 := fun χ hχ ↦ by
+    simp only [bnd]
+    rw [dite_eq_right]
+    exact fun h ↦ hχ ⟨⟨χ, h⟩, rfl⟩
+  have hbndg : bnd ∘ g = fun h ↦ D * ((1 + pw h) ^ L)⁻¹ := by
+    funext h
+    simp [bnd, g, h.2]
+  have hsumbnd : Summable bnd := by
+    rw [← hg.summable_iff hbnd0, hbndg]
+    exact hpw.mul_left D
+  have hnn (n : ℕ) (χ : (PontryaginDual.map τ).ker) : 0 ≤ (1 + ν χ) ^ K * q (Φ' n χ) :=
+    mul_nonneg (pow_nonneg (by linarith [apply_nonneg ν χ]) K) (apply_nonneg _ _)
+  refine ⟨∑' χ, bnd χ, fun n ↦ ⟨?_, ?_⟩⟩
+  · exact hsumbnd.of_nonneg_of_le (hnn n) (hone n)
+  · exact Summable.tsum_le_tsum (hone n) (hsumbnd.of_nonneg_of_le (hnn n) (hone n)) hsumbnd
+
+/-- The inverse Mellin profiles of the data, vanishing outside one finitely generated
+group, with summed weighted bounds for every group seminorm. -/
+private theorem meyerFlatLift_profiles
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (Φ : ℕ → (PontryaginDual.map τ).ker → ℂ → ℂ) (hΦ : ∀ n χ, Differentiable ℂ (Φ n χ))
+    (hb : ∀ a b : ℝ, ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
+      (∀ χ ∉ H, ∀ n (z : ℂ), z.re ∈ Icc a b → Φ n χ z = 0) ∧
+      ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re ∈ Icc a b →
+        (1 + p χ) ^ k * ‖z ^ m * Φ n χ.val z‖ ≤ B) :
+    ∃ (H₀ : Subgroup (PontryaginDual.map τ).ker)
+      (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ),
+      H₀.FG ∧ (∀ χ ∉ H₀, ∀ n, φ n χ = 0) ∧
+      (∀ n χ (z : ℂ), mellin (fun t ↦ (φ n χ).val (Real.log t)) z = Φ n χ z) ∧
+      ∀ (ν : GroupSeminorm (PontryaginDual.map τ).ker) (K : ℕ) (i : ↥(univ : Set ℝ) × ℕ × ℕ),
+        ∃ B : ℝ, ∀ n, Summable (fun χ ↦ (1 + ν χ) ^ K * pseminorm(i) (φ n χ)) ∧
+          ∑' χ, (1 + ν χ) ^ K * pseminorm(i) (φ n χ) ≤ B := by
+  let Φ' (n : ℕ) (χ : (PontryaginDual.map τ).ker) : SchwartzBergman univ :=
+    ⟨Φ n χ, meyerFlatLift_mem_SB Φ hΦ hb n χ⟩
+  let M := positiveRealFourierMellin univ isOpen_univ ordConnected_univ univ_nonempty
+  obtain ⟨H₀, hH₀, hv₀, -⟩ := hb 0 1
+  refine ⟨H₀, fun n χ ↦ M.symm (Φ' n χ), hH₀, ?_, ?_, ?_⟩
+  · -- vanishing outside the group, by the identity theorem
+    intro χ hχ n
+    have hzero : Φ n χ = 0 := by
+      have han : AnalyticOnNhd ℂ (Φ n χ) univ := fun z _ ↦ (hΦ n χ).analyticAt z
+      have hev : Φ n χ =ᶠ[𝓝 ((1 : ℂ) / 2)] 0 := by
+        have hopen : IsOpen (Complex.re ⁻¹' Ioo (0 : ℝ) 1) :=
+            isOpen_Ioo.preimage Complex.continuous_re
+        filter_upwards [hopen.mem_nhds (by norm_num : ((1 : ℂ) / 2).re ∈ Ioo (0 : ℝ) 1)] with z hz
+        exact hv₀ χ hχ n z (Ioo_subset_Icc_self hz)
+      funext z
+      exact han.eqOn_zero_of_preconnected_of_eventuallyEq_zero isPreconnected_univ (mem_univ _)
+        hev (mem_univ z)
+    have : Φ' n χ = 0 := Subtype.ext hzero
+    simp [this]
+  · -- the Mellin transform of the profile is the datum
+    intro n χ z
+    have h := positiveRealFourierMellin_apply univ isOpen_univ ordConnected_univ univ_nonempty
+      (M.symm (Φ' n χ)) z (mem_univ _)
+    change (M (M.symm (Φ' n χ))).val z = _ at h
+    rw [M.apply_symm_apply] at h
+    exact h.symm
+  · intro ν K i
+    exact meyerFlatLift_summed Φ hΦ hb ν K i
+
+/-- The telescoping bump `t ↦ s(t + 1) - s(t)`, with `s` the smooth transition, vanishes
+outside the open interval `(-1, 1)`. -/
+private theorem meyerFlatLift_cutoff_bump_eq_zero
+    (t : ℝ) (ht : t ∉ Ioo (-1 : ℝ) 1) :
+    Real.smoothTransition (t + 1) - Real.smoothTransition t = 0 := by
+  simp only [mem_Ioo, not_and_or, not_lt] at ht
+  rcases ht with ht | ht
+  · rw [Real.smoothTransition.zero_of_nonpos (by linarith),
+      Real.smoothTransition.zero_of_nonpos (by linarith), sub_zero]
+  · rw [Real.smoothTransition.one_of_one_le (by linarith),
+      Real.smoothTransition.one_of_one_le ht, sub_self]
+
+/-- The integer translates of the telescoping bump: only two can be nonzero, and they sum to
+one. -/
+private theorem meyerFlatLift_cutoff_bump_finset
+    (a : ℝ) :
+    (∀ n : ℤ, n ∉ ({-⌊a⌋ - 1, -⌊a⌋} : Finset ℤ) →
+      Real.smoothTransition (a + n + 1) - Real.smoothTransition (a + n) = 0) ∧
+    ∑ n ∈ ({-⌊a⌋ - 1, -⌊a⌋} : Finset ℤ),
+      (Real.smoothTransition (a + n + 1) - Real.smoothTransition (a + n)) = 1 := by
+  have hfl := Int.floor_le a
+  have hlt := Int.lt_floor_add_one a
+  refine ⟨fun n hn ↦ ?_, ?_⟩
+  · apply meyerFlatLift_cutoff_bump_eq_zero
+    simp only [Finset.mem_insert, Finset.mem_singleton, not_or] at hn
+    rw [mem_Ioo, not_and_or, not_lt, not_lt]
+    rcases lt_or_gt_of_ne hn.2 with h | h
+    · left
+      have h3 : (n : ℝ) ≤ -(⌊a⌋ : ℝ) - 2 := by
+        have h2 : n ≤ -⌊a⌋ - 2 := by omega
+        exact_mod_cast h2
+      linarith
+    · right
+      have h3 : -(⌊a⌋ : ℝ) + 1 ≤ (n : ℝ) := by
+        have h2 : -⌊a⌋ + 1 ≤ n := by omega
+        exact_mod_cast h2
+      linarith
+  · rw [Finset.sum_pair (by omega)]
+    have c1 : ((-⌊a⌋ - 1 : ℤ) : ℝ) = -(⌊a⌋ : ℝ) - 1 := by push_cast; ring
+    have c2 : ((-⌊a⌋ : ℤ) : ℝ) = -(⌊a⌋ : ℝ) := by push_cast; ring
+    have e1 : Real.smoothTransition (a + -(⌊a⌋ : ℝ) + 1) = 1 :=
+      Real.smoothTransition.one_of_one_le (by linarith)
+    have e2 : Real.smoothTransition (a + (-(⌊a⌋ : ℝ) - 1)) = 0 :=
+      Real.smoothTransition.zero_of_nonpos (by linarith)
+    have e3 : a + (-(⌊a⌋ : ℝ) - 1) + 1 = a + -(⌊a⌋ : ℝ) := by ring
+    rw [c1, c2, e3, e1, e2]
+    ring
+
+/-- The product of telescoping bumps sums to one over the translates by the integer lattice. -/
+private theorem meyerFlatLift_cutoff_lattice_sum
+    {r : ℕ} (a : Fin r → ℝ) :
+    HasSum (fun k : Fin r → ℤ ↦
+      ∏ i, (Real.smoothTransition (a i + k i + 1) - Real.smoothTransition (a i + k i))) 1 := by
+  classical
+  let t : Fin r → Finset ℤ := fun i ↦ {-⌊a i⌋ - 1, -⌊a i⌋}
+  let g : Fin r → ℤ → ℝ := fun i n ↦
+    Real.smoothTransition (a i + n + 1) - Real.smoothTransition (a i + n)
+  have h : HasSum (fun k : Fin r → ℤ ↦ ∏ i, g i (k i))
+      (∑ k ∈ Fintype.piFinset t, ∏ i, g i (k i)) := hasSum_sum_of_ne_finset_zero ?_
+  · convert h using 1
+    rw [← Finset.prod_univ_sum t g]
+    exact (Finset.prod_eq_one fun i _ ↦ (meyerFlatLift_cutoff_bump_finset (a i)).2).symm
+  · intro k hk
+    rw [Fintype.mem_piFinset, not_forall] at hk
+    obtain ⟨i, hi⟩ := hk
+    exact Finset.prod_eq_zero (Finset.mem_univ i)
+        ((meyerFlatLift_cutoff_bump_finset (a i)).1 (k i) hi)
+
+/-- Summing a nonnegative function on a quotient by a finite subgroup, pulled back to the
+group, multiplies the sum by the order of the subgroup. -/
+private theorem meyerFlatLift_cutoff_quotient_sum
+    {G : Type*} [Group G] (H : Subgroup G) [Finite H] (f : G ⧸ H → ℝ)
+    (hf0 : ∀ q, 0 ≤ f q) {s : ℝ} (hf : HasSum f s) :
+    HasSum (fun g : G ↦ f g) (Nat.card H * s) := by
+  have : Fintype H := Fintype.ofFinite H
+  let e : G ≃ H × (G ⧸ H) :=
+    (Equiv.subtypeUnivEquiv (p := fun x : G ↦ x ∈ (QuotientGroup.mk ⁻¹' (univ : Set (G ⧸ H))))
+      (fun _ ↦ Set.mem_univ _)).symm.trans
+      ((QuotientGroup.preimageMkEquivSubgroupProdSet H univ).trans
+        (Equiv.prodCongr (Equiv.refl H) (Equiv.subtypeUnivEquiv fun q ↦ Set.mem_univ q)))
+  have he (g : G) : (e g).2 = (g : G ⧸ H) := rfl
+  have h1 : HasSum (fun _ : H ↦ (1 : ℝ)) (Nat.card H) := by
+    rw [Nat.card_eq_fintype_card]
+    simpa using hasSum_fintype (fun _ : H ↦ (1 : ℝ))
+  have h2 : HasSum (fun p : H × (G ⧸ H) ↦ (1 : ℝ) * f p.2) (Nat.card H * s) :=
+    h1.mul hf (h1.summable.mul_of_nonneg hf.summable (fun _ ↦ zero_le_one) hf0)
+  rw [← e.hasSum_iff] at h2
+  convert h2 using 1
+  funext g
+  simp only [comp_apply, he, one_mul]
+
+/-- Iterated derivatives of a smooth compactly supported function composed with a continuous
+linear map are bounded. -/
+private theorem meyerFlatLift_cutoff_deriv_bound
+    {E E' : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    [NormedAddCommGroup E'] [NormedSpace ℝ E'] (G : E' → ℝ) (hG : ContDiff ℝ (∞) G)
+    (hGc : HasCompactSupport G) (L : E →L[ℝ] E') (i : ℕ) :
+    ∃ C : ℝ, ∀ y, ‖iteratedFDeriv ℝ i (G ∘ L) y‖ ≤ C := by
+  have hi : (i : WithTop ℕ∞) ≤ ∞ := by exact_mod_cast le_top
+  obtain ⟨C, hC⟩ := (hG.continuous_iteratedFDeriv hi).bounded_above_of_compact_support
+    (hGc.iteratedFDeriv i)
+  refine ⟨C * ‖L‖ ^ i, fun y ↦ ?_⟩
+  rw [L.iteratedFDeriv_comp_right hG y hi]
+  refine (ContinuousMultilinearMap.norm_compContinuousLinearMap_le _ _).trans ?_
+  simp only [Finset.prod_const, Finset.card_univ, Fintype.card_fin]
+  exact mul_le_mul_of_nonneg_right (hC (L y)) (pow_nonneg (norm_nonneg _) _)
+
+/-- The S-units modulo torsion have a `ℤ`-basis indexed by `Fin (r₁ + r₂ + |T| - 1)`. -/
+private theorem meyerFlatLift_cutoff_basis
+    (T : Finset V) :
+    Nonempty (Module.Basis (Fin (Fintype.card (InfinitePlace F) + T.card - 1)) ℤ
+      (Additive (((T : Set V).integer F)ˣ ⧸ CommGroup.torsion ((T : Set V).integer F)ˣ))) := by
+  obtain ⟨-, -, -, hFG, hrank, -⟩ := sIdeleClassGroup_finiteness F T
+  have hfin : Module.Finite ℤ (Additive ((T : Set V).integer F)ˣ) := by
+    rw [Module.Finite.iff_addGroup_fg]
+    exact GroupFG.iff_add_fg.mp hFG
+  have hfinQ : Module.Finite ℤ (Additive (((T : Set V).integer F)ˣ ⧸
+      CommGroup.torsion ((T : Set V).integer F)ˣ)) :=
+    Module.Finite.of_surjective
+      (MonoidHom.toAdditive (QuotientGroup.mk' (CommGroup.torsion _))).toIntLinearMap
+      (fun x ↦ by
+        obtain ⟨y, hy⟩ := QuotientGroup.mk_surjective x.toMul
+        exact ⟨Additive.ofMul y, congrArg Additive.ofMul hy⟩)
+  have hr : Module.finrank ℤ (Additive (((T : Set V).integer F)ˣ ⧸
+      CommGroup.torsion ((T : Set V).integer F)ˣ)) =
+          Fintype.card (InfinitePlace F) + T.card - 1 := by
+    rw [← hrank]
+    simpa using! (finrank_quotient_torsion_eq (M := Additive ((T : Set V).integer F)ˣ))
+  exact ⟨Module.finBasisOfFinrankEq ℤ _ hr⟩
+
+/-- The S-logarithm is additive. -/
+private theorem meyerFlatLift_cutoff_log_mul
+    (T : Finset V) (g h : (SAdeleRing F T)ˣ) :
+    sIdeleLog F T (g * h) = sIdeleLog F T g + sIdeleLog F T h := by
+  funext j
+  rcases j with w | v
+  · have hne (a : (SAdeleRing F T)ˣ) : a.val.1 w ≠ 0 :=
+      ((a.isUnit.map (RingHom.fst _ _)).map (Pi.evalRingHom _ w)).ne_zero
+    change (w.mult : ℝ) * Real.log ‖g.val.1 w * h.val.1 w‖ =
+      w.mult * Real.log ‖g.val.1 w‖ + w.mult * Real.log ‖h.val.1 w‖
+    rw [norm_mul, Real.log_mul (norm_ne_zero_iff.mpr (hne g)) (norm_ne_zero_iff.mpr (hne h)),
+      mul_add]
+  · have hne (a : (SAdeleRing F T)ˣ) : a.val.2 v ≠ 0 :=
+      ((a.isUnit.map (RingHom.snd _ _)).map (Pi.evalRingHom _ v)).ne_zero
+    change Real.log ‖g.val.2 v * h.val.2 v‖ = Real.log ‖g.val.2 v‖ + Real.log ‖h.val.2 v‖
+    rw [norm_mul, Real.log_mul (norm_ne_zero_iff.mpr (hne g)) (norm_ne_zero_iff.mpr (hne h))]
+
+/-- The S-logarithm of an S-unit is the combination of the basis logarithms with the
+coefficients of its class modulo torsion. -/
+private theorem meyerFlatLift_cutoff_log_repr
+    (T : Finset V)
+    (b : Module.Basis (Fin (Fintype.card (InfinitePlace F) + T.card - 1)) ℤ
+      (Additive (((T : Set V).integer F)ˣ ⧸ CommGroup.torsion ((T : Set V).integer F)ˣ)))
+    (u : ((T : Set V).integer F)ˣ) :
+    sIdeleLog F T (sUnitEmbedding F T u) =
+      ∑ i, (b.repr (Additive.ofMul (QuotientGroup.mk u)) i : ℝ) •
+        sIdeleLog F T (sUnitEmbedding F T (b i).toMul.out) := by
+  let L : ((T : Set V).integer F)ˣ →* Multiplicative (InfinitePlace F ⊕ T → ℝ) :=
+    MonoidHom.mk' (fun u ↦ Multiplicative.ofAdd (sIdeleLog F T (sUnitEmbedding F T u)))
+      (fun u w ↦ by rw [map_mul, meyerFlatLift_cutoff_log_mul]; rfl)
+  have hk : CommGroup.torsion ((T : Set V).integer F)ˣ ≤ L.ker := fun w hw ↦ by
+    rw [MonoidHom.mem_ker]
+    exact congrArg Multiplicative.ofAdd ((sIdeleLog_unit_eq_zero F T w).2 hw)
+  let f := (QuotientGroup.lift _ L hk).toAdditiveLeft.toIntLinearMap
+  have hf (w : ((T : Set V).integer F)ˣ) :
+      f (Additive.ofMul (QuotientGroup.mk w)) = sIdeleLog F T (sUnitEmbedding F T w) := rfl
+  have hb (i) : f (b i) = sIdeleLog F T (sUnitEmbedding F T (b i).toMul.out) := by
+    have h := hf (b i).toMul.out
+    rw [show QuotientGroup.mk (b i).toMul.out = (b i).toMul from Quotient.out_eq' _] at h
+    exact h
+  calc sIdeleLog F T (sUnitEmbedding F T u) = f (Additive.ofMul (QuotientGroup.mk u)) :=
+        (hf u).symm
+    _ = f (∑ i, b.repr (Additive.ofMul (QuotientGroup.mk u)) i • b i) := by rw [b.sum_repr]
+    _ = _ := by simp only [map_sum, map_zsmul, hb, Int.cast_smul_eq_zsmul]
+
+/-- The coordinates of the S-logarithm of an S-unit sum to zero. -/
+private theorem meyerFlatLift_cutoff_log_sum_zero
+    (T : Finset V) (u : ((T : Set V).integer F)ˣ) :
+    ∑ j, sIdeleLog F T (sUnitEmbedding F T u) j = 0 := by
+  have h1 : sIdeleNorm F T (sUnitEmbedding F T u) = 1 :=
+    MonoidHom.mem_ker.mp ((sIdeleNorm_spec F T).2 ⟨u, rfl⟩)
+  rw [sIdeleLog_sum, h1]
+  simp
+
+/-- The torsion of the S-units is finite. -/
+private theorem meyerFlatLift_cutoff_torsion_finite
+    (T : Finset V) :
+    Finite (CommGroup.torsion ((T : Set V).integer F)ˣ) := by
+  rw [← sUnit_torsion_eq_image F T]
+  exact Finite.of_surjective _ (MonoidHom.subgroupMap_surjective _ _)
+
+/-- The S-unit cutoff: a smooth function of the S-logarithm with bounded derivatives, whose
+support is bounded modulo the archimedean diagonal, and whose S-unit translates sum to one. -/
+private theorem meyerFlatLift_cutoff
+    (T : Finset V) :
+    ∃ β : (InfinitePlace F ⊕ T → ℝ) → ℝ, ContDiff ℝ (∞) β ∧
+      (∀ i : ℕ, ∃ C : ℝ, ∀ y, ‖iteratedFDeriv ℝ i β y‖ ≤ C) ∧
+      (∃ R : ℝ, ∀ y ∈ tsupport β,
+        (∀ w w' : InfinitePlace F, |y (Sum.inl w) / w.mult - y (Sum.inl w') / w'.mult| ≤ R) ∧
+          ∀ v : T, |y (Sum.inr v)| ≤ R) ∧
+      ∀ x : (SAdeleRing F T)ˣ, HasSum (fun u : ((T : Set V).integer F)ˣ ↦
+        (β (sIdeleLog F T (sUnitEmbedding F T u * x)) : ℂ)) 1 := by
+  classical
+  obtain ⟨b⟩ := meyerFlatLift_cutoff_basis (F := F) T
+  set r := Fintype.card (InfinitePlace F) + T.card - 1
+  -- the basis logarithms and the archimedean diagonal direction
+  let v : Fin r → (InfinitePlace F ⊕ T → ℝ) := fun i ↦
+    sIdeleLog F T (sUnitEmbedding F T (b i).toMul.out)
+  let d : InfinitePlace F ⊕ T → ℝ := Sum.elim (fun w ↦ (w.mult : ℝ)) 0
+  have hv : LinearIndependent ℝ v := sUnitLog_basis_linearIndependent F T b
+  have hd : d ∉ Submodule.span ℝ (range v) := by
+    let σ : (InfinitePlace F ⊕ T → ℝ) →ₗ[ℝ] ℝ :=
+      { toFun := fun y ↦ ∑ j, y j
+        map_add' := fun y z ↦ by simp [Finset.sum_add_distrib]
+        map_smul' := fun c y ↦ by
+          simp only [Pi.smul_apply, smul_eq_mul, RingHom.id_apply, Finset.mul_sum] }
+    intro hmem
+    have hle : Submodule.span ℝ (range v) ≤ LinearMap.ker σ := by
+      rw [Submodule.span_le]
+      rintro _ ⟨i, rfl⟩
+      exact meyerFlatLift_cutoff_log_sum_zero T _
+    have h0 : ∑ j, d j = 0 := hle hmem
+    have hpos : 0 < ∑ j, d j := by
+      rw [Fintype.sum_sum_type]
+      simp only [d, Sum.elim_inl, Sum.elim_inr, Pi.zero_apply, Finset.sum_const_zero, add_zero]
+      obtain ⟨w₀⟩ := (inferInstance : Nonempty (InfinitePlace F))
+      exact Finset.sum_pos (fun w _ ↦ by exact_mod_cast w.mult_pos) ⟨w₀, Finset.mem_univ _⟩
+    exact hpos.ne' h0
+  have hli : LinearIndependent ℝ (Fin.cons d v : Fin (r + 1) → (InfinitePlace F ⊕ T → ℝ)) :=
+    hv.finCons hd
+  have hcard : Fintype.card (Fin (r + 1)) = Module.finrank ℝ (InfinitePlace F ⊕ T → ℝ) := by
+    rw [Module.finrank_fintype_fun_eq_card, Fintype.card_fin, Fintype.card_sum, Fintype.card_coe]
+    have : 0 < Fintype.card (InfinitePlace F) := Fintype.card_pos
+    omega
+  let B := basisOfLinearIndependentOfCardEqFinrank hli hcard
+  have hB (j : Fin (r + 1)) : B j = (Fin.cons d v : Fin (r + 1) → _) j := by
+    simp [B]
+  -- the coordinates along the basis logarithms
+  let ℓ : (InfinitePlace F ⊕ T → ℝ) →L[ℝ] (Fin r → ℝ) :=
+    (LinearMap.funLeft ℝ ℝ Fin.succ ∘ₗ B.equivFun.toLinearMap).toContinuousLinearMap
+  have hℓ (y : InfinitePlace F ⊕ T → ℝ) (i : Fin r) : ℓ y i = B.equivFun y i.succ := rfl
+  let N := Nat.card (CommGroup.torsion ((T : Set V).integer F)ˣ)
+  have := meyerFlatLift_cutoff_torsion_finite (F := F) T
+  have hN : (N : ℝ) ≠ 0 := by
+    have : 0 < N := Nat.card_pos
+    exact_mod_cast this.ne'
+  let ρ : ℝ → ℝ := fun t ↦ Real.smoothTransition (t + 1) - Real.smoothTransition t
+  have hρ : ContDiff ℝ (∞) ρ :=
+    (Real.smoothTransition.contDiff.comp (contDiff_id.add contDiff_const)).sub
+      Real.smoothTransition.contDiff
+  let G : (Fin r → ℝ) → ℝ := fun t ↦ (N : ℝ)⁻¹ * ∏ i, ρ (t i)
+  have hG : ContDiff ℝ (∞) G :=
+    contDiff_const.mul (contDiff_prod fun i _ ↦ hρ.comp (contDiff_apply ℝ (fun _ : Fin r ↦ ℝ) i))
+  have hGsupp (t : Fin r → ℝ) (ht : G t ≠ 0) (i : Fin r) : t i ∈ Ioo (-1 : ℝ) 1 := by
+    by_contra hti
+    apply ht
+    simp only [G]
+    rw [Finset.prod_eq_zero (Finset.mem_univ i)
+        (meyerFlatLift_cutoff_bump_eq_zero (t i) hti), mul_zero]
+  have hGc : HasCompactSupport G := by
+    refine HasCompactSupport.intro (isCompact_closedBall (0 : Fin r → ℝ) 1) fun t ht ↦ ?_
+    by_contra hne
+    apply ht
+    rw [Metric.mem_closedBall, dist_zero_right, pi_norm_le_iff_of_nonneg zero_le_one]
+    intro i
+    have := hGsupp t hne i
+    rw [Real.norm_eq_abs, abs_le]
+    exact ⟨this.1.le, this.2.le⟩
+  refine ⟨G ∘ ℓ, hG.comp ℓ.contDiff, fun i ↦ meyerFlatLift_cutoff_deriv_bound G hG hGc ℓ i, ?_, ?_⟩
+  · -- the support is bounded modulo the archimedean diagonal
+    refine ⟨2 * ∑ i, ‖v i‖, fun y hy ↦ ?_⟩
+    have hcl : tsupport (G ∘ ℓ) ⊆ {y | ∀ i, |ℓ y i| ≤ 1} := by
+      refine closure_minimal (fun y hy i ↦ ?_) ?_
+      · have := hGsupp (ℓ y) hy i
+        rw [abs_le]
+        exact ⟨this.1.le, this.2.le⟩
+      · simp only [Set.ofPred_forall]
+        exact isClosed_iInter fun i ↦ isClosed_le
+          ((continuous_apply i).comp ℓ.continuous).abs continuous_const
+    have hyb := hcl hy
+    have hdecomp : y = B.equivFun y 0 • d + ∑ i, ℓ y i • v i := by
+      conv_lhs => rw [← B.sum_equivFun y]
+      rw [Fin.sum_univ_succ, hB 0]
+      simp only [hB, Fin.cons_zero, Fin.cons_succ, hℓ]
+    have hcoord (j : InfinitePlace F ⊕ T) :
+        y j = B.equivFun y 0 * d j + ∑ i, ℓ y i * v i j := by
+      conv_lhs => rw [hdecomp]
+      simp [Finset.sum_apply]
+    have hvj (i : Fin r) (j : InfinitePlace F ⊕ T) : |v i j| ≤ ‖v i‖ := by
+      rw [← Real.norm_eq_abs]
+      exact norm_le_pi_norm (v i) j
+    constructor
+    · intro w w'
+      have hm (w : InfinitePlace F) : (1 : ℝ) ≤ w.mult := by exact_mod_cast w.mult_pos
+      have hm0 (w : InfinitePlace F) : (0 : ℝ) < w.mult := zero_lt_one.trans_le (hm w)
+      have hw (w : InfinitePlace F) : y (Sum.inl w) / w.mult =
+          B.equivFun y 0 + ∑ i, ℓ y i * (v i (Sum.inl w) / w.mult) := by
+        rw [hcoord]
+        simp only [d, Sum.elim_inl]
+        rw [add_div, mul_div_assoc, div_self (hm0 w).ne', mul_one, Finset.sum_div]
+        congr 1
+        refine Finset.sum_congr rfl fun i _ ↦ ?_
+        rw [mul_div_assoc]
+      rw [hw, hw, add_sub_add_left_eq_sub, ← Finset.sum_sub_distrib, two_mul,
+        ← Finset.sum_add_distrib]
+      refine (Finset.abs_sum_le_sum_abs _ _).trans (Finset.sum_le_sum fun i _ ↦ ?_)
+      rw [← mul_sub, abs_mul]
+      have h1 : |ℓ y i| ≤ 1 := hyb i
+      have h2 : |v i (Sum.inl w) / w.mult - v i (Sum.inl w') / w'.mult| ≤ ‖v i‖ + ‖v i‖ := by
+        refine (abs_sub _ _).trans (add_le_add ?_ ?_)
+        · rw [abs_div, abs_of_pos (hm0 w)]
+          exact (div_le_self (abs_nonneg _) (hm w)).trans (hvj i _)
+        · rw [abs_div, abs_of_pos (hm0 w')]
+          exact (div_le_self (abs_nonneg _) (hm w')).trans (hvj i _)
+      calc |ℓ y i| * |v i (Sum.inl w) / w.mult - v i (Sum.inl w') / w'.mult|
+          ≤ 1 * (‖v i‖ + ‖v i‖) := mul_le_mul h1 h2 (abs_nonneg _) zero_le_one
+        _ = ‖v i‖ + ‖v i‖ := one_mul _
+    · intro t
+      rw [hcoord]
+      simp only [d, Sum.elim_inr, Pi.zero_apply, mul_zero, zero_add]
+      refine (Finset.abs_sum_le_sum_abs _ _).trans ?_
+      have hsum : ∑ i, ‖v i‖ ≤ 2 * ∑ i, ‖v i‖ := by
+        have : 0 ≤ ∑ i, ‖v i‖ := Finset.sum_nonneg fun i _ ↦ norm_nonneg _
+        linarith
+      refine le_trans (Finset.sum_le_sum fun i _ ↦ ?_) hsum
+      rw [abs_mul]
+      calc |ℓ y i| * |v i (Sum.inr t)| ≤ 1 * ‖v i‖ :=
+            mul_le_mul (hyb i) (hvj i _) (abs_nonneg _) zero_le_one
+        _ = ‖v i‖ := one_mul _
+  · -- the S-unit translates sum to one
+    intro x
+    let a : Fin r → ℝ := ℓ (sIdeleLog F T x)
+    let Q := ((T : Set V).integer F)ˣ ⧸ CommGroup.torsion ((T : Set V).integer F)ˣ
+    let f : Q → ℝ := fun q ↦ (N : ℝ)⁻¹ *
+      ∏ i, ρ (a i + (b.repr (Additive.ofMul q) i : ℝ))
+    have hlogu (u : ((T : Set V).integer F)ˣ) (i : Fin r) :
+        ℓ (sIdeleLog F T (sUnitEmbedding F T u)) i =
+          (b.repr (Additive.ofMul (QuotientGroup.mk u)) i : ℝ) := by
+      let c : Fin (r + 1) → ℝ :=
+        Fin.cons 0 fun i ↦ (b.repr (Additive.ofMul (QuotientGroup.mk u)) i : ℝ)
+      have hc : sIdeleLog F T (sUnitEmbedding F T u) = B.equivFun.symm c := by
+        rw [meyerFlatLift_cutoff_log_repr T b u,
+            Module.Basis.equivFun_symm_apply, Fin.sum_univ_succ]
+        simp only [c, hB, Fin.cons_zero, Fin.cons_succ, zero_smul, zero_add]
+        rfl
+      rw [hℓ, hc, LinearEquiv.apply_symm_apply]
+      rfl
+    have hterm (u : ((T : Set V).integer F)ˣ) :
+        (G ∘ ℓ) (sIdeleLog F T (sUnitEmbedding F T u * x)) = f (QuotientGroup.mk u) := by
+      simp only [comp_apply, G, f, meyerFlatLift_cutoff_log_mul, map_add, Pi.add_apply, hlogu]
+      congr 1
+      refine Finset.prod_congr rfl fun i _ ↦ ?_
+      rw [add_comm]
+    have hf : HasSum f ((N : ℝ)⁻¹ * 1) := by
+      let e : Q ≃ (Fin r → ℤ) :=
+        Additive.ofMul.trans (b.repr.toEquiv.trans Finsupp.equivFunOnFinite)
+      have h1 := (meyerFlatLift_cutoff_lattice_sum a).mul_left (N : ℝ)⁻¹
+      rw [← e.hasSum_iff] at h1
+      convert h1 using 1
+      funext q
+      rfl
+    have hf0 (q : Q) : 0 ≤ f q := by
+      refine mul_nonneg (inv_nonneg.mpr (Nat.cast_nonneg _)) (Finset.prod_nonneg fun i _ ↦ ?_)
+      exact sub_nonneg.mpr (Real.smoothTransition.monotone (by linarith))
+    have hsum := meyerFlatLift_cutoff_quotient_sum _ f hf0 hf
+    rw [mul_one, mul_inv_cancel₀ hN] at hsum
+    simp_rw [hterm]
+    rw [← Complex.ofReal_one]
+    exact Complex.hasSum_ofReal.mpr hsum
+
+/-- The valuation ball of level `k₀` at a finite place is clopen. -/
+private theorem meyerFlatLift_vball_clopen
+    (v : V) (k₀ : ℕ) :
+    IsClopen {a : v.adicCompletion F | Valued.v a ≤ WithZero.exp (-(k₀ + 1 : ℤ))} := by
+  obtain ⟨π, hπ⟩ := v.valuation_exists_uniformizer F
+  have hv : Valued.v (((π : F) : v.adicCompletion F) ^ (k₀ + 1)) =
+      WithZero.exp (-(k₀ + 1 : ℤ)) := by
+    rw [map_pow, HeightOneSpectrum.valuedAdicCompletion_eq_valuation', hπ, ← WithZero.exp_nsmul]
+    congr 1
+    rw [nsmul_eq_mul]
+    push_cast
+    ring
+  have hset : {a : v.adicCompletion F | Valued.v a ≤ WithZero.exp (-(k₀ + 1 : ℤ))} =
+      Metric.closedBall 0 ‖((π : F) : v.adicCompletion F) ^ (k₀ + 1)‖ := by
+    ext a
+    rw [mem_ofPred_eq, Metric.mem_closedBall, dist_zero_right, Valued.toNormedField.norm_le_iff,
+      hv]
+  have hne : ‖((π : F) : v.adicCompletion F) ^ (k₀ + 1)‖ ≠ 0 := by
+    rw [norm_ne_zero_iff]
+    intro h
+    rw [h, map_zero] at hv
+    exact WithZero.exp_ne_zero hv.symm
+  rw [hset]
+  exact ⟨Metric.isClosed_closedBall, IsUltrametricDist.isOpen_closedBall _ hne⟩
+
+/-- The indicator of a level-`k₀` ball around a nonzero point of a local field is a
+Schwartz–Bruhat function. -/
+private theorem meyerFlatLift_ball_test
+    (v : V) (k₀ : ℕ) (c : v.adicCompletion F) (hc : c ≠ 0) :
+    ∃ g : SchwartzBruhat (Multiplicative (v.adicCompletion F)), ∀ z,
+      g (Multiplicative.ofAdd z) =
+        if Valued.v (c⁻¹ * z - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)) then 1 else 0 := by
+  have : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let S : Set (v.adicCompletion F) := (fun z ↦ c⁻¹ * z - 1) ⁻¹'
+    {a | Valued.v a ≤ WithZero.exp (-(k₀ + 1 : ℤ))}
+  have hS : IsClopen S :=
+    (meyerFlatLift_vball_clopen v k₀).preimage
+        ((continuous_const.mul continuous_id).sub continuous_const)
+  have hf : (fun z ↦ if Valued.v (c⁻¹ * z - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)) then (1 : ℂ)
+      else 0) = S.indicator (fun _ ↦ 1) := by
+    funext z
+    simp [S, Set.indicator_apply]
+  refine (mem_finitePlaceSchwartz_iff F v _).mpr ⟨?_, ?_⟩
+  · rw [hf]
+    exact (LocallyConstant.indicator (LocallyConstant.const _ (1 : ℂ)) hS).isLocallyConstant
+  · refine HasCompactSupport.intro (isCompact_closedBall (0 : v.adicCompletion F) ‖c‖)
+      fun z hz ↦ ?_
+    rw [ite_eq_right]
+    intro hle
+    apply hz
+    rw [Metric.mem_closedBall, dist_zero_right, Valued.toNormedField.norm_le_iff]
+    have hε : WithZero.exp (-(k₀ + 1 : ℤ)) ≤ 1 := by
+      rw [← WithZero.exp_zero, WithZero.exp_le_exp]; omega
+    have h1 : Valued.v (c⁻¹ * z) ≤ 1 := by
+      have : c⁻¹ * z = (c⁻¹ * z - 1) + 1 := by ring
+      rw [this]
+      exact Valuation.map_add_le _ (hle.trans hε) (le_of_eq (map_one _))
+    rw [map_mul, map_inv₀] at h1
+    have hcv : 0 < Valued.v c := (Valuation.pos_iff _).mpr hc
+    exact ((inv_mul_le_iff₀ hcv).mp h1).trans_eq (mul_one _)
+
+/-- The finite parts with bounded logarithmic absolute values form a compact set. -/
+private theorem meyerFlatLift_annulus_compact
+    (T : Finset V) (R : ℝ) :
+    IsCompact {y : (v : T) → v.val.adicCompletion F |
+      ∀ v, ‖y v‖ ≤ Real.exp R ∧ Real.exp (-R) ≤ ‖y v‖} := by
+  have (v : T) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  refine (isCompact_closedBall (0 : (v : T) → v.val.adicCompletion F)
+      (Real.exp R)).of_isClosed_subset
+    ?_ ?_
+  · have hset : {y : (v : T) → v.val.adicCompletion F |
+        ∀ v, ‖y v‖ ≤ Real.exp R ∧ Real.exp (-R) ≤ ‖y v‖} =
+        ⋂ v : T, ({y : (v : T) → v.val.adicCompletion F | ‖y v‖ ≤ Real.exp R} ∩
+          {y | Real.exp (-R) ≤ ‖y v‖}) := by
+      ext y
+      simp
+    rw [hset]
+    exact isClosed_iInter fun v ↦ (isClosed_le (continuous_apply v).norm continuous_const).inter
+      (isClosed_le continuous_const (continuous_apply v).norm)
+  · intro y hy
+    rw [Metric.mem_closedBall, dist_zero_right]
+    exact (pi_norm_le_iff_of_nonneg (Real.exp_pos R).le).mpr fun v ↦ (hy v).1
+
+/-- The level-`k₀` ball around a finite part is open. -/
+private theorem meyerFlatLift_ball_open
+    (T : Finset V) (k₀ : ℕ) (y : (v : T) → v.val.adicCompletion F) :
+    IsOpen {z : (v : T) → v.val.adicCompletion F |
+      ∀ w : T, Valued.v ((y w)⁻¹ * z w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))} := by
+  have hset : {z : (v : T) → v.val.adicCompletion F |
+      ∀ w : T, Valued.v ((y w)⁻¹ * z w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))} =
+      ⋂ w : T, (fun z : (v : T) → v.val.adicCompletion F ↦ (y w)⁻¹ * z w - 1) ⁻¹'
+        {a | Valued.v a ≤ WithZero.exp (-(k₀ + 1 : ℤ))} := by
+    ext z
+    simp
+  rw [hset]
+  exact isOpen_iInter_of_finite fun w ↦ (meyerFlatLift_vball_clopen w.val k₀).isOpen.preimage
+    ((continuous_const.mul (continuous_apply w)).sub continuous_const)
+
+/-- The components of a quotient of finite units. -/
+private theorem meyerFlatLift_units_inv_apply
+    (T : Finset V) (κ x : ((v : T) → v.val.adicCompletion F)ˣ) (w : T) :
+    (κ⁻¹ * x).val w = (κ.val w)⁻¹ * x.val w := by
+  rw [Units.val_mul, Pi.mul_apply]
+  congr 1
+  have h := congrFun (Units.inv_mul κ) w
+  simp only [Pi.mul_apply, Pi.one_apply] at h
+  exact eq_inv_of_mul_eq_one_left h
+
+/-- Two level-`k₀` balls through a common point coincide. -/
+private theorem meyerFlatLift_ball_eq
+    {L : Type*} [Field L] [Valued L (WithZero (Multiplicative ℤ))] (k₀ : ℕ) (c c' y : L)
+    (hc : c ≠ 0) (hc' : c' ≠ 0) (h : Valued.v (c⁻¹ * y - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)))
+    (h' : Valued.v (c'⁻¹ * y - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) (z : L) :
+    Valued.v (c⁻¹ * z - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)) ↔
+      Valued.v (c'⁻¹ * z - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)) := by
+  have hε1 : WithZero.exp (-(k₀ + 1 : ℤ)) < 1 := by
+    rw [← WithZero.exp_zero, WithZero.exp_lt_exp]; omega
+  have key (d t : L) (hd : d ≠ 0) : Valued.v (d⁻¹ * t - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)) ↔
+      Valued.v (t - d) ≤ Valued.v d * WithZero.exp (-(k₀ + 1 : ℤ)) := by
+    have : d⁻¹ * t - 1 = d⁻¹ * (t - d) := by rw [mul_sub, inv_mul_cancel₀ hd]
+    rw [this, map_mul, map_inv₀, inv_mul_le_iff₀ ((Valuation.pos_iff _).mpr hd)]
+  have habs (d : L) (hd : d ≠ 0) (hdy : Valued.v (d⁻¹ * y - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) :
+      Valued.v y = Valued.v d := by
+    have h1 : Valued.v (d⁻¹ * y) = 1 := by
+      have := Valuation.map_one_add_of_lt Valued.v (hdy.trans_lt hε1)
+      rwa [add_sub_cancel] at this
+    rw [map_mul, map_inv₀] at h1
+    have hd0 : Valued.v d ≠ 0 := (Valuation.ne_zero_iff _).mpr hd
+    calc Valued.v y = Valued.v d * ((Valued.v d)⁻¹ * Valued.v y) := by
+          rw [← mul_assoc, mul_inv_cancel₀ hd0, one_mul]
+      _ = Valued.v d := by rw [h1, mul_one]
+  have hcc' : Valued.v c' = Valued.v c := (habs c' hc' h').symm.trans (habs c hc h)
+  rw [key c y hc] at h
+  rw [key c' y hc', hcc'] at h'
+  have hd : Valued.v (c' - c) ≤ Valued.v c * WithZero.exp (-(k₀ + 1 : ℤ)) := by
+    have : c' - c = (y - c) - (y - c') := by ring
+    rw [this]
+    exact Valuation.map_sub_le _ h h'
+  rw [key c z hc, key c' z hc', hcc']
+  constructor
+  · intro hz
+    have : z - c' = (z - c) - (c' - c) := by ring
+    rw [this]
+    exact Valuation.map_sub_le _ hz hd
+  · intro hz
+    have : z - c = (z - c') + (c' - c) := by ring
+    rw [this]
+    exact Valuation.map_add_le _ hz hd
+
+/-- Finitely many level-`k₀` balls cover the finite parts with bounded logarithmic absolute
+values. -/
+private theorem meyerFlatLift_cover_exists
+    (T : Finset V) (k₀ : ℕ) (R : ℝ) :
+    ∃ t : Finset ((v : T) → v.val.adicCompletion F)ˣ, ∀ x : ((v : T) → v.val.adicCompletion F)ˣ,
+      (∀ v : T, |Real.log ‖x.val v‖| ≤ R) →
+        ∃ κ ∈ t, ∀ w : T, Valued.v ((κ⁻¹ * x).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)) := by
+  classical
+  let S : Set ((v : T) → v.val.adicCompletion F) :=
+    {y | ∀ v, ‖y v‖ ≤ Real.exp R ∧ Real.exp (-R) ≤ ‖y v‖}
+  have hne (y : S) (v : T) : y.val v ≠ 0 := by
+    intro h0
+    have := (y.2 v).2
+    rw [h0, norm_zero] at this
+    linarith [Real.exp_pos (-R)]
+  have hunit (y : S) : IsUnit y.val :=
+    Pi.isUnit_iff.mpr fun v ↦ isUnit_iff_ne_zero.mpr (hne y v)
+  obtain ⟨t, ht⟩ := (meyerFlatLift_annulus_compact T R).elim_finite_subcover
+    (fun y : S ↦ {z : (v : T) → v.val.adicCompletion F |
+      ∀ w : T, Valued.v ((y.val w)⁻¹ * z w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))})
+    (fun y ↦ meyerFlatLift_ball_open T k₀ y.val)
+    (fun y hy ↦ mem_iUnion.mpr ⟨⟨y, hy⟩, fun w ↦ by
+      rw [inv_mul_cancel₀ (hne ⟨y, hy⟩ w), sub_self, map_zero]
+      exact zero_le⟩)
+  refine ⟨t.image fun y ↦ (hunit y).unit, fun x hx ↦ ?_⟩
+  have hxS : x.val ∈ S := fun v ↦ by
+    have hpos : 0 < ‖x.val v‖ :=
+      norm_pos_iff.mpr (x.isUnit.map (Pi.evalRingHom _ v)).ne_zero
+    obtain ⟨h1, h2⟩ := abs_le.mp (hx v)
+    exact ⟨(Real.log_le_iff_le_exp hpos).mp h2, (Real.le_log_iff_exp_le hpos).mp h1⟩
+  obtain ⟨y, hyt, hy⟩ := mem_iUnion₂.mp (ht hxS)
+  refine ⟨(hunit y).unit, Finset.mem_image_of_mem _ hyt, fun w ↦ ?_⟩
+  rw [meyerFlatLift_units_inv_apply]
+  exact hy w
+
+/-- Finitely many cosets of the level-`k₀` units at the finite places of `T`, with indicator
+tests, cover every finite part whose logarithmic absolute values are bounded by `R`. -/
+private theorem meyerFlatLift_finite_cover
+    (T : Finset V) (k₀ : ℕ) (R : ℝ) :
+    ∃ (K : Finset ((v : T) → v.val.adicCompletion F)ˣ)
+      (b : ((v : T) → v.val.adicCompletion F)ˣ → (w : T) →
+        SchwartzBruhat (Multiplicative (w.val.adicCompletion F))),
+      (∀ κ ∈ K, ∀ x : ((v : T) → v.val.adicCompletion F)ˣ,
+        (∏ w, b κ w (Multiplicative.ofAdd (x.val w)) = 1 ∧
+          ∀ w : T, Valued.v ((κ⁻¹ * x).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) ∨
+        ∏ w, b κ w (Multiplicative.ofAdd (x.val w)) = 0) ∧
+      ∀ x : ((v : T) → v.val.adicCompletion F)ˣ, (∀ v : T, |Real.log ‖x.val v‖| ≤ R) →
+        ∃ κ ∈ K, ∏ w, b κ w (Multiplicative.ofAdd (x.val w)) = 1 ∧
+          ∀ κ' ∈ K, κ' ≠ κ → ∏ w, b κ' w (Multiplicative.ofAdd (x.val w)) = 0 := by
+  classical
+  obtain ⟨t, ht⟩ := meyerFlatLift_cover_exists (F := F) T k₀ R
+  have hne (κ : ((v : T) → v.val.adicCompletion F)ˣ) (w : T) : κ.val w ≠ 0 :=
+    (κ.isUnit.map (Pi.evalRingHom _ w)).ne_zero
+  -- the balls, as predicates, coincide when they meet
+  have hball (κ κ' x : ((v : T) → v.val.adicCompletion F)ˣ)
+      (h : ∀ w : T, Valued.v ((κ⁻¹ * x).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)))
+      (h' : ∀ w : T, Valued.v ((κ'⁻¹ * x).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) :
+      (fun z : ((v : T) → v.val.adicCompletion F)ˣ ↦
+        ∀ w : T, Valued.v ((κ⁻¹ * z).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) =
+      (fun z ↦ ∀ w : T, Valued.v ((κ'⁻¹ * z).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) := by
+    funext z
+    refine propext (forall_congr' fun w ↦ ?_)
+    have h1 := h w
+    have h2 := h' w
+    rw [meyerFlatLift_units_inv_apply] at h1 h2
+    rw [meyerFlatLift_units_inv_apply, meyerFlatLift_units_inv_apply]
+    exact meyerFlatLift_ball_eq k₀ _ _ _ (hne κ w) (hne κ' w) h1 h2 (z.val w)
+  have hself (κ : ((v : T) → v.val.adicCompletion F)ˣ) :
+      ∀ w : T, Valued.v ((κ⁻¹ * κ).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)) := fun w ↦ by
+    rw [inv_mul_cancel, Units.val_one, Pi.one_apply, sub_self, map_zero]
+    exact zero_le
+  -- one representative for each ball
+  let rep : ((v : T) → v.val.adicCompletion F)ˣ → ((v : T) → v.val.adicCompletion F)ˣ :=
+    fun κ ↦ Classical.epsilon fun z : ((v : T) → v.val.adicCompletion F)ˣ ↦
+      ∀ w : T, Valued.v ((κ⁻¹ * z).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))
+  have hrep (κ : ((v : T) → v.val.adicCompletion F)ˣ) :
+      ∀ w : T, Valued.v ((κ⁻¹ * rep κ).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)) :=
+    Classical.epsilon_spec (p := fun z : ((v : T) → v.val.adicCompletion F)ˣ ↦
+      ∀ w : T, Valued.v ((κ⁻¹ * z).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) ⟨κ, hself κ⟩
+  -- the indicator tests
+  choose b hb using fun (κ : ((v : T) → v.val.adicCompletion F)ˣ) (w : T) ↦
+    meyerFlatLift_ball_test w.val k₀ (κ.val w) (hne κ w)
+  have hprod (κ x : ((v : T) → v.val.adicCompletion F)ˣ) :
+      (∏ w, b κ w (Multiplicative.ofAdd (x.val w)) = 1 ∧
+        ∀ w : T, Valued.v ((κ⁻¹ * x).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) ∨
+      ∏ w, b κ w (Multiplicative.ofAdd (x.val w)) = 0 := by
+    by_cases hall : ∀ w : T, Valued.v ((κ⁻¹ * x).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))
+    · refine Or.inl ⟨Finset.prod_eq_one fun w _ ↦ ?_, hall⟩
+      have h1 := hall w
+      rw [meyerFlatLift_units_inv_apply] at h1
+      rw [hb, ite_eq_left h1]
+    · push Not at hall
+      obtain ⟨w, hw⟩ := hall
+      refine Or.inr (Finset.prod_eq_zero (Finset.mem_univ w) ?_)
+      rw [meyerFlatLift_units_inv_apply] at hw
+      rw [hb, ite_eq_right (not_le.mpr hw)]
+  refine ⟨t.image rep, b, fun κ _ x ↦ hprod κ x, fun x hx ↦ ?_⟩
+  obtain ⟨κ₀, hκ₀t, hκ₀⟩ := ht x hx
+  have hB0 := hball κ₀ (rep κ₀) (rep κ₀) (hrep κ₀) (hself (rep κ₀))
+  have hxκ : ∀ w : T, Valued.v (((rep κ₀)⁻¹ * x).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)) :=
+    Eq.mp (congrFun hB0 x) hκ₀
+  refine ⟨rep κ₀, Finset.mem_image_of_mem _ hκ₀t, ?_, fun κ' hκ' hne' ↦ ?_⟩
+  · rcases hprod (rep κ₀) x with ⟨h1, -⟩ | h0
+    · exact h1
+    · exfalso
+      refine absurd h0 ?_
+      rw [Finset.prod_eq_one fun w _ ↦ ?_]
+      · exact one_ne_zero
+      · have h1 := hxκ w
+        rw [meyerFlatLift_units_inv_apply] at h1
+        rw [hb, ite_eq_left h1]
+  · obtain ⟨κ₁, -, rfl⟩ := Finset.mem_image.mp hκ'
+    rcases hprod (rep κ₁) x with ⟨-, hx1⟩ | h0
+    · exfalso
+      apply hne'
+      have e1 := hball κ₁ (rep κ₁) (rep κ₁) (hrep κ₁) (hself (rep κ₁))
+      have e2 := hball (rep κ₁) (rep κ₀) x hx1 hxκ
+      exact congrArg (@Classical.epsilon ((v : T) → v.val.adicCompletion F)ˣ _)
+        (e1.trans (e2.trans hB0.symm))
+    · exact h0
+
+/-- The derivatives of a real exponential, viewed as a complex function. -/
+private theorem meyerFlatLift_rexp_bound
+    (c : ℝ) (i : ℕ) (u : ℝ) :
+    ‖iteratedFDeriv ℝ i (fun s : ℝ ↦ ((Real.exp (-c * s) : ℝ) : ℂ)) u‖ ≤
+      Real.exp (-c * u) * (1 + |c|) ^ i := by
+  let g : ℂ → ℂ := fun w ↦ Complex.exp (((-c : ℝ) : ℂ) * w)
+  have hg : ContDiff ℂ (∞) g := (contDiff_const.mul contDiff_id).cexp
+  have hcomp : (fun s : ℝ ↦ ((Real.exp (-c * s) : ℝ) : ℂ)) = g ∘ Complex.ofRealCLM := by
+    funext s
+    simp only [g, comp_apply, Complex.ofRealCLM_apply, Complex.ofReal_exp, Complex.ofReal_mul]
+  rw [hcomp]
+  refine (meyerFlatLift_norm_iteratedFDeriv_comp_clm Complex.ofRealCLM
+      (hg.restrict_scalars ℝ) u i).trans ?_
+  have hcd : ContDiffAt ℂ i g (u : ℂ) := hg.contDiffAt.of_le (by exact_mod_cast le_top)
+  rw [Complex.ofRealCLM_apply, ← hcd.restrictScalars_iteratedFDeriv (𝕜 := ℝ), comp_apply,
+    ContinuousMultilinearMap.norm_restrictScalars, norm_iteratedFDeriv_eq_norm_iteratedDeriv]
+  simp only [g, iteratedDeriv_cexp_const_mul, norm_mul, norm_pow, Complex.norm_exp,
+    Complex.norm_real, Real.norm_eq_abs, abs_neg]
+  have h1 : ‖Complex.ofRealCLM‖ ≤ 1 :=
+    ContinuousLinearMap.opNorm_le_bound _ zero_le_one fun s ↦ by simp
+  have h2 : (((-c : ℝ) : ℂ) * (u : ℂ)).re = -c * u := by simp
+  rw [h2]
+  calc |c| ^ i * Real.exp (-c * u) * ‖Complex.ofRealCLM‖ ^ i
+      ≤ |c| ^ i * Real.exp (-c * u) * 1 ^ i :=
+        mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (norm_nonneg _) h1 i) (by positivity)
+    _ ≤ Real.exp (-c * u) * (1 + |c|) ^ i := by
+        rw [one_pow, mul_one, mul_comm (|c| ^ i)]
+        exact mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (abs_nonneg c) (by linarith) i)
+          (Real.exp_pos _).le
+
+/-- A profile with all exponential weights is smooth, and its weighted derivatives are bounded
+by the weighted Schwartz seminorms. -/
+private theorem meyerFlatLift_profile_bound
+    (f : PositiveRealExponentialDecay univ) (c : ℝ) (l : ℕ) :
+    ContDiff ℝ (∞) (f.val : ℝ → ℂ) ∧ ∀ d ≤ l, ∀ u : ℝ,
+      Real.exp (c * u) * ‖iteratedFDeriv ℝ d (f.val : ℝ → ℂ) u‖ ≤
+        2 ^ l * (1 + |c|) ^ l * ∑ m ∈ Finset.range (l + 1),
+          ((SchwartzMap.seminorm ℂ 0 m).comp
+            (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) f := by
+  obtain ⟨g, hgdef⟩ : ∃ g : 𝓢(ℝ, ℂ), g = logExponentialDecayTwist univ ⟨c, mem_univ c⟩ f :=
+    ⟨_, rfl⟩
+  have hg (u : ℝ) : g u = (Real.exp (c * u) : ℂ) * f.val u := by
+    rw [hgdef]; exact logExponentialDecayTwist_apply univ _ f u
+  have hfeq : (f.val : ℝ → ℂ) = fun u ↦ ((Real.exp (-c * u) : ℝ) : ℂ) * g u := by
+    funext u
+    rw [hg, ← mul_assoc, ← Complex.ofReal_mul, ← Real.exp_add, neg_mul, neg_add_cancel,
+      Real.exp_zero, Complex.ofReal_one, one_mul]
+  have he : ContDiff ℝ (∞) (fun s : ℝ ↦ ((Real.exp (-c * s) : ℝ) : ℂ)) :=
+    Complex.ofRealCLM.contDiff.comp ((contDiff_const.mul contDiff_id).exp)
+  refine ⟨by rw [hfeq]; exact he.mul (g.smooth ⊤), fun d hd u ↦ ?_⟩
+  have hS0 (m : ℕ) : 0 ≤ ((SchwartzMap.seminorm ℂ 0 m).comp
+      (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) f := apply_nonneg _ _
+  obtain ⟨S, hS⟩ : ∃ S : ℝ, S = ∑ m ∈ Finset.range (l + 1), ((SchwartzMap.seminorm ℂ 0 m).comp
+      (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) f := ⟨_, rfl⟩
+  rw [← hS]
+  have hSnn : 0 ≤ S := by rw [hS]; exact Finset.sum_nonneg fun m _ ↦ hS0 m
+  have hgb (i : ℕ) (hi : i ≤ d) : ‖iteratedFDeriv ℝ i g u‖ ≤ S * 1 ^ i := by
+    rw [one_pow, mul_one, hS]
+    refine (SchwartzMap.norm_iteratedFDeriv_le_seminorm ℂ g i u).trans ?_
+    have hle := Finset.single_le_sum (f := fun m ↦ ((SchwartzMap.seminorm ℂ 0 m).comp
+      (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) f) (fun m _ ↦ hS0 m)
+      (Finset.mem_range.mpr (show i < l + 1 by omega))
+    rw [hgdef]
+    exact hle
+  have hb := meyerFlatLift_leibniz_bound he (g.smooth ⊤) u d (Real.exp (-c * u)) S (1 + |c|) 1
+    (Real.exp_pos _).le (by linarith [abs_nonneg c]) le_rfl
+    (fun i _ ↦ meyerFlatLift_rexp_bound c i u) hgb
+  rw [hfeq]
+  have hee : Real.exp (c * u) * Real.exp (-c * u) = 1 := by
+    rw [← Real.exp_add, neg_mul, add_neg_cancel, Real.exp_zero]
+  calc Real.exp (c * u) * ‖iteratedFDeriv ℝ d (fun u ↦ ((Real.exp (-c * u) : ℝ) : ℂ) * g u) u‖
+      ≤ Real.exp (c * u) * (2 ^ d * Real.exp (-c * u) * S * ((1 + |c|) * 1) ^ d) :=
+        mul_le_mul_of_nonneg_left hb (Real.exp_pos _).le
+    _ = (Real.exp (c * u) * Real.exp (-c * u)) * (2 ^ d * (1 + |c|) ^ d * S) := by ring
+    _ = 2 ^ d * (1 + |c|) ^ d * S := by rw [hee, one_mul]
+    _ ≤ 2 ^ l * (1 + |c|) ^ l * S :=
+        mul_le_mul_of_nonneg_right (mul_le_mul (pow_le_pow_right₀ (by norm_num) hd)
+          (pow_le_pow_right₀ (by linarith [abs_nonneg c]) hd) (by positivity) (by positivity))
+          hSnn
+
+/-- A family of Schwartz functions with summable seminorms sums to a Schwartz function, with
+each seminorm at most the sum of the seminorms. -/
+private theorem meyerFlatLift_schwartz_tsum
+    {E α : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (g : α → 𝓢(E, ℂ)) (hg : ∀ k l : ℕ, Summable fun i ↦ SchwartzMap.seminorm ℂ k l (g i)) :
+    ∃ G : 𝓢(E, ℂ), (∀ x, G x = ∑' i, g i x) ∧
+      ∀ k l : ℕ, SchwartzMap.seminorm ℂ k l G ≤ ∑' i, SchwartzMap.seminorm ℂ k l (g i) := by
+  have hsmooth : ContDiff ℝ (⊤ : ℕ∞) (fun x ↦ ∑' i, g i x) :=
+    contDiff_tsum (fun i ↦ (g i).smooth ⊤) (fun k _ ↦ hg 0 k)
+      (fun k i x _ ↦ SchwartzMap.norm_iteratedFDeriv_le_seminorm ℂ (g i) k x)
+  have hdec (k n : ℕ) (x : E) : ‖x‖ ^ k * ‖iteratedFDeriv ℝ n (fun x ↦ ∑' i, g i x) x‖ ≤
+      ∑' i, SchwartzMap.seminorm ℂ k n (g i) := by
+    rw [iteratedFDeriv_tsum_apply (N := ⊤) (fun i ↦ (g i).smooth ⊤) (fun k _ ↦ hg 0 k)
+      (fun k i x _ ↦ SchwartzMap.norm_iteratedFDeriv_le_seminorm ℂ (g i) k x) le_top x]
+    have hs : Summable fun i ↦ ‖iteratedFDeriv ℝ n (g i) x‖ :=
+      (hg 0 n).of_nonneg_of_le (fun _ ↦ norm_nonneg _)
+        (fun i ↦ SchwartzMap.norm_iteratedFDeriv_le_seminorm ℂ (g i) n x)
+    calc ‖x‖ ^ k * ‖∑' i, iteratedFDeriv ℝ n (g i) x‖
+        ≤ ‖x‖ ^ k * ∑' i, ‖iteratedFDeriv ℝ n (g i) x‖ :=
+          mul_le_mul_of_nonneg_left (norm_tsum_le_tsum_norm hs) (by positivity)
+      _ = ∑' i, ‖x‖ ^ k * ‖iteratedFDeriv ℝ n (g i) x‖ := tsum_mul_left.symm
+      _ ≤ ∑' i, SchwartzMap.seminorm ℂ k n (g i) :=
+          Summable.tsum_le_tsum (fun i ↦ SchwartzMap.le_seminorm ℂ k n (g i) x)
+            (hs.mul_left _) (hg k n)
+  let G : 𝓢(E, ℂ) := ⟨fun x ↦ ∑' i, g i x, hsmooth, fun k n ↦ ⟨_, hdec k n⟩⟩
+  exact ⟨G, fun x ↦ rfl, fun k l ↦ SchwartzMap.seminorm_le_bound ℂ k l G
+    (tsum_nonneg fun i ↦ apply_nonneg _ _) (hdec k l)⟩
+
+/-- The archimedean test of a profile with all exponential weights is a Schwartz function, with
+each seminorm bounded by weighted seminorms of the profile. -/
+private theorem meyerFlatLift_arch_schwartz_pred
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    [FiniteDimensional ℝ E] (π : ι → E →L[ℝ] ℂ) (hπ1 : ∀ x j, ‖π j x‖ ≤ ‖x‖)
+    (hπ2 : ∀ x, ∃ j, ‖x‖ ≤ ‖π j x‖) (μ : ι → ℝ) (hμ : ∀ j, 0 ≤ μ j) (hμ1 : 0 < ∑ j, μ j)
+    (s₀ : ℝ) (B : (ι → ℝ) → ℂ) (hB : ContDiff ℝ (∞) B) (bB : ℕ → ℝ)
+    (hbB : ∀ i y, ‖iteratedFDeriv ℝ i B y‖ ≤ bB i) (R : ℝ)
+    (hR : ∀ y ∈ tsupport B, ∀ j j', |y j - y j'| ≤ R) (k l : ℕ) (c : ℝ)
+    (hc : c = ((k - l : ℤ) : ℝ) / ∑ j, μ j) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ (α : ι → ℝ) (β : ι → ℤ) (f : PositiveRealExponentialDecay univ),
+      (∃ g : 𝓢(E, ℂ), ⇑g = meyerFlatLift_arch π μ s₀ B α β f.val) ∧
+      ∀ g : 𝓢(E, ℂ), ⇑g = meyerFlatLift_arch π μ s₀ B α β f.val →
+        SchwartzMap.seminorm ℂ k l g ≤ C * (2 ^ l * (1 + |c|) ^ l *
+          ∑ m ∈ Finset.range (l + 1), ((SchwartzMap.seminorm ℂ 0 m).comp
+            (logExponentialDecayTwist univ ⟨c, mem_univ _⟩)) f) *
+          ((1 + ∑ j, |α j|) * (1 + ∑ j, |(β j : ℝ)|)) ^ l := by
+  subst hc
+  obtain ⟨C, hC0, hC⟩ := meyerFlatLift_arch_schwartz π hπ1 hπ2 μ hμ hμ1 s₀ B hB bB hbB R hR k l
+  refine ⟨C, hC0, fun α β f ↦ ?_⟩
+  have hsm := (meyerFlatLift_profile_bound f 0 0).1
+  have hdec (b : ℝ) (d : ℕ) :
+      ∃ S : ℝ, ∀ u, Real.exp (b * u) * ‖iteratedFDeriv ℝ d f.val u‖ ≤ S :=
+    ⟨_, (meyerFlatLift_profile_bound f b d).2 d le_rfl⟩
+  obtain ⟨g₀, hg₀, hg₀b⟩ := hC α β f.val hsm hdec _
+    (meyerFlatLift_profile_bound f (((k - l : ℤ) : ℝ) / ∑ j, μ j) l).2
+  refine ⟨⟨g₀, hg₀⟩, fun g hg ↦ ?_⟩
+  have : g = g₀ := DFunLike.coe_injective (hg.trans hg₀.symm)
+  rw [this]
+  exact hg₀b
+
+open Classical in
+/-- The cutoff restricted to the archimedean log-radii at a fixed finite part: smooth, with
+bounded derivatives, and with support bounded modulo the diagonal. -/
+private theorem meyerFlatLift_cutoff_slice
+    (T : Finset V) (β : (InfinitePlace F ⊕ T → ℝ) → ℝ)
+    (hβ : ContDiff ℝ (∞) β) (hβd : ∀ i : ℕ, ∃ C : ℝ, ∀ y, ‖iteratedFDeriv ℝ i β y‖ ≤ C) (R : ℝ)
+    (hR : ∀ y ∈ tsupport β,
+      (∀ w w' : InfinitePlace F, |y (Sum.inl w) / w.mult - y (Sum.inl w') / w'.mult| ≤ R) ∧
+        ∀ v : T, |y (Sum.inr v)| ≤ R)
+    (κ : ((v : T) → v.val.adicCompletion F)ˣ) :
+    ContDiff ℝ (∞) (fun t : InfinitePlace F → ℝ ↦
+      (β (Sum.elim (fun w ↦ (w.mult : ℝ) * t w) fun v ↦ Real.log ‖κ.val v‖) : ℂ)) ∧
+    (∃ bB : ℕ → ℝ, ∀ i (t : InfinitePlace F → ℝ), ‖iteratedFDeriv ℝ i (fun t : InfinitePlace F → ℝ ↦
+      (β (Sum.elim (fun w ↦ (w.mult : ℝ) * t w) fun v ↦ Real.log ‖κ.val v‖) : ℂ)) t‖ ≤ bB i) ∧
+    ∀ t ∈ tsupport (fun t : InfinitePlace F → ℝ ↦
+      (β (Sum.elim (fun w ↦ (w.mult : ℝ) * t w) fun v ↦ Real.log ‖κ.val v‖) : ℂ)),
+      ∀ w w' : InfinitePlace F, |t w - t w'| ≤ R := by
+  let L : (InfinitePlace F → ℝ) →L[ℝ] (InfinitePlace F ⊕ T → ℝ) :=
+    ContinuousLinearMap.pi (Sum.elim (fun w ↦ (w.mult : ℝ) • ContinuousLinearMap.proj w)
+      fun _ ↦ 0)
+  let c₀ : InfinitePlace F ⊕ T → ℝ := Sum.elim 0 fun v ↦ Real.log ‖κ.val v‖
+  have hL (t : InfinitePlace F → ℝ) :
+      (Sum.elim (fun w ↦ (w.mult : ℝ) * t w) fun v ↦ Real.log ‖κ.val v‖) = L t + c₀ := by
+    funext j
+    rcases j with w | v <;> simp [L, c₀]
+  have hBeq : (fun t : InfinitePlace F → ℝ ↦
+      (β (Sum.elim (fun w ↦ (w.mult : ℝ) * t w) fun v ↦ Real.log ‖κ.val v‖) : ℂ)) =
+      ⇑Complex.ofRealLI ∘ ((fun z ↦ β (z + c₀)) ∘ L) := by
+    funext t
+    simp only [comp_apply, hL]
+    rfl
+  have hβc : ContDiff ℝ (∞) fun z ↦ β (z + c₀) := hβ.comp (contDiff_id.add contDiff_const)
+  refine ⟨?_, ?_, ?_⟩
+  · rw [hBeq]
+    exact Complex.ofRealLI.contDiff.comp (hβc.comp L.contDiff)
+  · choose Cβ hCβ using hβd
+    refine ⟨fun i ↦ Cβ i * ‖L‖ ^ i, fun i t ↦ ?_⟩
+    rw [hBeq, Complex.ofRealLI.norm_iteratedFDeriv_comp_left
+      ((hβc.comp L.contDiff).contDiffAt) (by exact_mod_cast le_top)]
+    refine (meyerFlatLift_norm_iteratedFDeriv_comp_clm L hβc t i).trans ?_
+    rw [iteratedFDeriv_comp_add_right]
+    exact mul_le_mul_of_nonneg_right (hCβ i _) (pow_nonneg (norm_nonneg _) _)
+  · intro t ht w w'
+    have h1 : tsupport (fun t : InfinitePlace F → ℝ ↦
+        (β (Sum.elim (fun w ↦ (w.mult : ℝ) * t w) fun v ↦ Real.log ‖κ.val v‖) : ℂ)) ⊆
+        tsupport (β ∘ fun t ↦ L t + c₀) := by
+      have : (fun t : InfinitePlace F → ℝ ↦
+          (β (Sum.elim (fun w ↦ (w.mult : ℝ) * t w) fun v ↦ Real.log ‖κ.val v‖) : ℂ)) =
+          Complex.ofReal ∘ (β ∘ fun t ↦ L t + c₀) := by
+        funext t
+        simp only [comp_apply, hL]
+      rw [this]
+      exact tsupport_comp_subset Complex.ofReal_zero _
+    have h2 := tsupport_comp_subset_preimage β (f := fun t ↦ L t + c₀)
+      (L.continuous.add continuous_const) (h1 ht)
+    have h3 := (hR (L t + c₀) h2).1 w w'
+    have hm (w : InfinitePlace F) : (L t + c₀) (Sum.inl w) / w.mult = t w := by
+      have : (w.mult : ℝ) ≠ 0 := by exact_mod_cast w.mult_pos.ne'
+      rw [← hL t, Sum.elim_inl, mul_div_cancel_left₀ _ this]
+    rwa [hm, hm] at h3
+
+open Classical in
+/-- The absolute value at an infinite place of the archimedean part of the S-idele of a point of
+the mixed space is the absolute value of its coordinate. -/
+private theorem meyerFlatLift_comp_norm
+    (y : (mixedEmbedding.mixedSpace F)ˣ) (w : InfinitePlace F) :
+    ‖(InfiniteAdeleRing.ringEquiv_mixedSpace F).symm y.val w‖ = ‖meyerFlatLift_π w y.val‖ := by
+  have h1 : ‖(InfiniteAdeleRing.ringEquiv_mixedSpace F).symm y.val w‖ =
+      ‖((meyerFlatLift_comp y w : (w.Completion)ˣ) : w.Completion)‖ := rfl
+  rw [h1]
+  by_cases hw : w.IsReal
+  · rw [meyerFlatLift_comp_real y w hw]
+    change ‖(InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm (y.val.1 ⟨w, hw⟩)‖ = _
+    rw [← (InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal hw).norm_map_of_map_zero
+      (map_zero _) ((InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm (y.val.1 ⟨w, hw⟩)),
+      ← InfinitePlace.Completion.ringEquivRealOfIsReal_apply, RingEquiv.apply_symm_apply,
+      meyerFlatLift_π_real w hw, Complex.norm_real]
+  · have hw' := InfinitePlace.not_isReal_iff_isComplex.mp hw
+    rw [meyerFlatLift_comp_complex y w hw']
+    change ‖(InfinitePlace.Completion.ringEquivComplexOfIsComplex hw').symm
+      (y.val.2 ⟨w, hw'⟩)‖ = _
+    rw [← (InfinitePlace.Completion.isometry_extensionEmbedding w).norm_map_of_map_zero
+      (map_zero _) ((InfinitePlace.Completion.ringEquivComplexOfIsComplex hw').symm
+        (y.val.2 ⟨w, hw'⟩)),
+      ← InfinitePlace.Completion.ringEquivComplexOfIsComplex_apply hw', RingEquiv.apply_symm_apply,
+      meyerFlatLift_π_complex w hw']
+
+open Classical in
+/-- The S-logarithm of the S-idele of a point of the mixed space and a finite part. -/
+private theorem meyerFlatLift_log_idele
+    (T : Finset V) (y : (mixedEmbedding.mixedSpace F)ˣ)
+    (κ : ((v : T) → v.val.adicCompletion F)ˣ) :
+    sIdeleLog F T (meyerFlatLift_idele T y κ) =
+        Sum.elim (fun w ↦ (w.mult : ℝ) * (meyerFlatLift_L meyerFlatLift_π y.val).1 w)
+      (fun v ↦ Real.log ‖κ.val v‖) := by
+  funext j
+  rcases j with w | v
+  · change (w.mult : ℝ) * Real.log ‖(InfiniteAdeleRing.ringEquiv_mixedSpace F).symm y.val w‖ =
+      (w.mult : ℝ) * Real.log ‖meyerFlatLift_π w y.val‖
+    rw [meyerFlatLift_comp_norm]
+  · rfl
+
+open Classical in
+/-- The conjugate of a character at the archimedean S-idele of a point of the mixed space. -/
+private theorem meyerFlatLift_conj_char
+    (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T))
+    (y : (mixedEmbedding.mixedSpace F)ˣ) :
+    starRingEnd ℂ (χ (meyerFlatLift_q T (meyerFlatLift_idele T y 1)) : ℂ) =
+      Complex.exp (Complex.I *
+          ((meyerFlatLift_lin (-meyerFlatLift_α T χ)
+          (meyerFlatLift_L meyerFlatLift_π y.val).1 : ℝ) : ℂ)) *
+        ∏ w, meyerFlatLift_gpow ((-meyerFlatLift_β T χ) w)
+            ((meyerFlatLift_L meyerFlatLift_π y.val).2 w) := by
+  have hu (w : InfinitePlace F) : ‖(meyerFlatLift_L meyerFlatLift_π y.val).2 w‖ = 1 := by
+    have h0 : ‖meyerFlatLift_π w y.val‖ ≠ 0 := norm_ne_zero_iff.mpr (meyerFlatLift_π_ne_zero y w)
+    simp only [meyerFlatLift_L]
+    rw [norm_mul, norm_inv, Complex.norm_real, norm_norm, mul_inv_cancel₀ h0]
+  rw [meyerFlatLift_char_formula, map_mul, map_prod, ← Complex.exp_conj]
+  congr 1
+  · congr 1
+    rw [map_mul, Complex.conj_I, Complex.conj_ofReal,
+        meyerFlatLift_lin_apply, meyerFlatLift_lin_apply]
+    simp only [Pi.neg_apply, neg_mul, Finset.sum_neg_distrib, Complex.ofReal_neg]
+    ring
+  · refine Finset.prod_congr rfl fun w _ ↦ ?_
+    have hconj : starRingEnd ℂ ((meyerFlatLift_L meyerFlatLift_π y.val).2 w) =
+        ((meyerFlatLift_L meyerFlatLift_π y.val).2 w)⁻¹ := by
+      rw [Complex.inv_def, Complex.normSq_eq_norm_sq, hu w]; simp
+    rw [meyerFlatLift_gpow_eq_zpow _ _ (hu w), meyerFlatLift_gpow_eq_zpow _ _ (hu w),
+        map_zpow₀, hconj, inv_zpow',
+      Pi.neg_apply]
+
+open Classical in
+/-- The size of the parameters of a character is controlled by its seminorm. -/
+private theorem meyerFlatLift_param_bound
+    (T : Finset V) (χ : PontryaginDual (SIdeleQuotient F T)) :
+    (1 + ∑ w, |(-meyerFlatLift_α T χ) w|) * (1 + ∑ w, |(((-meyerFlatLift_β T χ) w : ℤ) : ℝ)|) ≤
+      (1 + Fintype.card (InfinitePlace F)) * (1 + meyerFlatLift_size T χ) ^ 2 := by
+  have hν : meyerFlatLift_size T χ =
+      ∑ w, (|meyerFlatLift_α T χ w| + if w.IsReal then 0 else |(meyerFlatLift_β T χ w : ℝ)|) := rfl
+  have hα : ∑ w, |(-meyerFlatLift_α T χ) w| ≤ meyerFlatLift_size T χ := by
+    rw [hν]
+    refine Finset.sum_le_sum fun w _ ↦ ?_
+    rw [Pi.neg_apply, abs_neg]
+    split_ifs
+    · simp
+    · linarith [abs_nonneg (meyerFlatLift_β T χ w : ℝ)]
+  have hβ : ∑ w, |(((-meyerFlatLift_β T χ) w : ℤ) : ℝ)| ≤ Fintype.card (InfinitePlace F) +
+      meyerFlatLift_size T χ := by
+    have h (w : InfinitePlace F) : |(((-meyerFlatLift_β T χ) w : ℤ) : ℝ)| ≤
+        1 + (|meyerFlatLift_α T χ w| + if w.IsReal then 0 else |(meyerFlatLift_β T χ w : ℝ)|) := by
+      rw [Pi.neg_apply, Int.cast_neg, abs_neg]
+      by_cases hw : w.IsReal
+      · rw [ite_eq_left hw]
+        have h1 : |(meyerFlatLift_β T χ w : ℝ)| ≤ 1 := by
+          have hβ' : meyerFlatLift_β T χ w =
+              meyerFlatLift_εR (meyerFlatLift_ψR T χ hw) := by simp [meyerFlatLift_β, hw]
+          rw [hβ']
+          exact_mod_cast meyerFlatLift_εR_abs (meyerFlatLift_ψR T χ hw)
+        linarith [abs_nonneg (meyerFlatLift_α T χ w)]
+      · rw [ite_eq_right hw]
+        linarith [abs_nonneg (meyerFlatLift_α T χ w)]
+    calc ∑ w, |(((-meyerFlatLift_β T χ) w : ℤ) : ℝ)|
+        ≤ ∑ w, (1 + (|meyerFlatLift_α T χ w| +
+            if w.IsReal then 0 else |(meyerFlatLift_β T χ w : ℝ)|)) :=
+          Finset.sum_le_sum fun w _ ↦ h w
+      _ = Fintype.card (InfinitePlace F) + meyerFlatLift_size T χ := by
+          rw [Finset.sum_add_distrib, hν]
+          simp
+  have hν0 : 0 ≤ meyerFlatLift_size T χ := apply_nonneg _ _
+  have hn0 : (0 : ℝ) ≤ Fintype.card (InfinitePlace F) := Nat.cast_nonneg _
+  have hα0 : 0 ≤ ∑ w, |(-meyerFlatLift_α T χ) w| := Finset.sum_nonneg fun w _ ↦ abs_nonneg _
+  have hβ0 : 0 ≤ ∑ w, |(((-meyerFlatLift_β T χ) w : ℤ) : ℝ)| :=
+      Finset.sum_nonneg fun w _ ↦ abs_nonneg _
+  calc (1 + ∑ w, |(-meyerFlatLift_α T χ) w|) * (1 + ∑ w, |(((-meyerFlatLift_β T χ) w : ℤ) : ℝ)|)
+      ≤ (1 + meyerFlatLift_size T χ) *
+          (1 + (Fintype.card (InfinitePlace F) + meyerFlatLift_size T χ)) :=
+        mul_le_mul (by linarith) (by linarith) (by linarith) (by linarith)
+    _ ≤ (1 + Fintype.card (InfinitePlace F)) * (1 + meyerFlatLift_size T χ) ^ 2 := by
+        nlinarith [mul_nonneg hn0
+            (mul_nonneg hν0 (by linarith : (0 : ℝ) ≤ 1 + meyerFlatLift_size T χ))]
+
+open Classical in
+/-- At a point of the mixed space, the archimedean test of a character times the character at
+the finite part is the cutoff times the conjugate character times the profile at the
+logarithmic norm. -/
+private theorem meyerFlatLift_term
+    (T : Finset V) (β : (InfinitePlace F ⊕ T → ℝ) → ℝ)
+    (κ : ((v : T) → v.val.adicCompletion F)ˣ) (χ : PontryaginDual (SIdeleQuotient F T))
+    (f : ℝ → ℂ) (y : (mixedEmbedding.mixedSpace F)ˣ) :
+    starRingEnd ℂ (χ (QuotientGroup.mk (meyerFlatLift_idele T 1 κ)) : ℂ) *
+        meyerFlatLift_arch meyerFlatLift_π (fun w ↦ (w.mult : ℝ)) (∑ v, Real.log ‖κ.val v‖)
+          (fun t ↦ (β (Sum.elim (fun w ↦ (w.mult : ℝ) * t w) fun v ↦ Real.log ‖κ.val v‖) : ℂ))
+          (-meyerFlatLift_α T χ) (-meyerFlatLift_β T χ) f y.val =
+      (β (sIdeleLog F T (meyerFlatLift_idele T y κ)) : ℂ) *
+        starRingEnd ℂ (χ (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℂ) *
+          f (Real.log ((sIdeleQuotientNorm F T
+              (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℝ≥0) : ℝ)) := by
+  have hΩ : y.val ∈ meyerFlatLift_Ω meyerFlatLift_π := fun w ↦ meyerFlatLift_π_ne_zero y w
+  rw [meyerFlatLift_arch_eqOn _ _ _ _ _ _ _ hΩ, comp_apply]
+  simp only [meyerFlatLift_G]
+  have hchar : (χ (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℂ) =
+      (χ (meyerFlatLift_q T (meyerFlatLift_idele T y 1)) : ℂ) *
+          (χ (QuotientGroup.mk (meyerFlatLift_idele T 1 κ)) : ℂ) := by
+    rw [meyerFlatLift_idele_mul T y κ, QuotientGroup.mk_mul, map_mul, Circle.coe_mul]
+    rfl
+  have hB : (β (Sum.elim (fun w ↦ (w.mult : ℝ) * (meyerFlatLift_L meyerFlatLift_π y.val).1 w)
+      fun v ↦ Real.log ‖κ.val v‖) : ℂ) = (β (sIdeleLog F T (meyerFlatLift_idele T y κ)) : ℂ) := by
+    rw [meyerFlatLift_log_idele]
+  have hN : meyerFlatLift_lin (fun w ↦ (w.mult : ℝ)) (meyerFlatLift_L meyerFlatLift_π y.val).1 +
+      ∑ v, Real.log ‖κ.val v‖ =
+      Real.log
+        ((sIdeleQuotientNorm F T (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℝ≥0) : ℝ) := by
+    rw [sIdeleQuotientNorm_mk, ← sIdeleLog_sum, meyerFlatLift_log_idele,
+        Fintype.sum_sum_type, meyerFlatLift_lin_apply]
+    rfl
+  rw [hB, hN, hchar, map_mul (starRingEnd ℂ), meyerFlatLift_conj_char]
+  ring
+
+open Classical in
+/-- Summability over the characters of the seminorms of the tests, uniformly in `n`, from a
+bound by the weighted seminorms of the profiles. -/
+private theorem meyerFlatLift_arch_summable
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ)
+    (hφb : ∀ (ν : GroupSeminorm (PontryaginDual.map τ).ker) (K : ℕ)
+      (i : ↥(univ : Set ℝ) × ℕ × ℕ),
+        ∃ B : ℝ, ∀ n, Summable (fun χ ↦ (1 + ν χ) ^ K * pseminorm(i) (φ n χ)) ∧
+          ∑' χ, (1 + ν χ) ^ K * pseminorm(i) (φ n χ) ≤ B)
+    (g : ℕ → (PontryaginDual.map τ).ker → 𝓢(mixedEmbedding.mixedSpace F, ℂ)) (k l : ℕ)
+    (c D : ℝ) (hD0 : 0 ≤ D)
+    (hD : ∀ n χ, SchwartzMap.seminorm ℂ k l (g n χ) ≤ D * ∑ m ∈ Finset.range (l + 1),
+        (1 + meyerFlatLift_size T χ.val) ^ (2 * l) * ((SchwartzMap.seminorm ℂ 0 m).comp
+          (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) (φ n χ)) :
+    ∃ M : ℝ, ∀ n, Summable (fun χ ↦ SchwartzMap.seminorm ℂ k l (g n χ)) ∧
+      ∑' χ, SchwartzMap.seminorm ℂ k l (g n χ) ≤ M := by
+  choose Bm hBm using fun m : ℕ ↦
+    hφb ((meyerFlatLift_size T).comp (PontryaginDual.map τ).ker.subtype)
+        (2 * l) (⟨c, mem_univ c⟩, 0, m)
+  refine ⟨D * ∑ m ∈ Finset.range (l + 1), Bm m, fun n ↦ ?_⟩
+  have hw (m : ℕ) : Summable fun χ : (PontryaginDual.map τ).ker ↦
+      (1 + meyerFlatLift_size T χ.val) ^ (2 * l) * ((SchwartzMap.seminorm ℂ 0 m).comp
+        (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) (φ n χ) := (hBm m n).1
+  have hwB (m : ℕ) : ∑' χ : (PontryaginDual.map τ).ker,
+      (1 + meyerFlatLift_size T χ.val) ^ (2 * l) * ((SchwartzMap.seminorm ℂ 0 m).comp
+        (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) (φ n χ) ≤ Bm m := (hBm m n).2
+  have hsD := (summable_sum (s := Finset.range (l + 1)) fun m _ ↦ hw m).mul_left D
+  have hs : Summable (fun χ ↦ SchwartzMap.seminorm ℂ k l (g n χ)) :=
+    hsD.of_nonneg_of_le (fun χ ↦ apply_nonneg _ _) (hD n)
+  refine ⟨hs, ?_⟩
+  calc ∑' χ, SchwartzMap.seminorm ℂ k l (g n χ)
+      ≤ ∑' χ : (PontryaginDual.map τ).ker, D * ∑ m ∈ Finset.range (l + 1),
+          (1 + meyerFlatLift_size T χ.val) ^ (2 * l) * ((SchwartzMap.seminorm ℂ 0 m).comp
+            (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) (φ n χ) :=
+        Summable.tsum_le_tsum (hD n) hs hsD
+    _ = D * ∑ m ∈ Finset.range (l + 1), ∑' χ : (PontryaginDual.map τ).ker,
+          (1 + meyerFlatLift_size T χ.val) ^ (2 * l) * ((SchwartzMap.seminorm ℂ 0 m).comp
+            (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) (φ n χ) := by
+        rw [tsum_mul_left, Summable.tsum_finsetSum fun m _ ↦ hw m]
+    _ ≤ D * ∑ m ∈ Finset.range (l + 1), Bm m :=
+        mul_le_mul_of_nonneg_left (Finset.sum_le_sum fun m _ ↦ hwB m) hD0
+
+open Classical in
+/-- The seminorms of the archimedean tests of the characters, bounded by the weighted seminorms
+of the profiles with polynomial weights in the characters. -/
+private theorem meyerFlatLift_arch_seminorm_bound
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ)
+    (β : (InfinitePlace F ⊕ T → ℝ) → ℝ) (κ : ((v : T) → v.val.adicCompletion F)ˣ)
+    (hB : ContDiff ℝ (∞) (fun t : InfinitePlace F → ℝ ↦
+      (β (Sum.elim (fun w ↦ (w.mult : ℝ) * t w) fun v ↦ Real.log ‖κ.val v‖) : ℂ)))
+    (bB : ℕ → ℝ) (hbB : ∀ i (t : InfinitePlace F → ℝ), ‖iteratedFDeriv ℝ i
+      (fun t : InfinitePlace F → ℝ ↦
+        (β (Sum.elim (fun w ↦ (w.mult : ℝ) * t w) fun v ↦ Real.log ‖κ.val v‖) : ℂ)) t‖ ≤ bB i)
+    (R : ℝ) (hRB : ∀ t ∈ tsupport (fun t : InfinitePlace F → ℝ ↦
+      (β (Sum.elim (fun w ↦ (w.mult : ℝ) * t w) fun v ↦ Real.log ‖κ.val v‖) : ℂ)),
+      ∀ w w' : InfinitePlace F, |t w - t w'| ≤ R)
+    (g : ℕ → (PontryaginDual.map τ).ker → 𝓢(mixedEmbedding.mixedSpace F, ℂ))
+    (hg : ∀ n χ, ⇑(g n χ) = meyerFlatLift_arch meyerFlatLift_π (fun w ↦ (w.mult : ℝ))
+      (∑ v, Real.log ‖κ.val v‖)
+      (fun t ↦ (β (Sum.elim (fun w ↦ (w.mult : ℝ) * t w) fun v ↦ Real.log ‖κ.val v‖) : ℂ))
+      (-meyerFlatLift_α T χ.val) (-meyerFlatLift_β T χ.val) (φ n χ).val) (k l : ℕ) :
+    ∃ c D : ℝ, 0 ≤ D ∧ ∀ n χ, SchwartzMap.seminorm ℂ k l (g n χ) ≤
+      D * ∑ m ∈ Finset.range (l + 1), (1 + meyerFlatLift_size T χ.val) ^ (2 * l) *
+        ((SchwartzMap.seminorm ℂ 0 m).comp (logExponentialDecayTwist univ ⟨c, mem_univ c⟩))
+          (φ n χ) := by
+  have hμ : ∀ w : InfinitePlace F, 0 ≤ (fun w : InfinitePlace F ↦ (w.mult : ℝ)) w :=
+    fun w ↦ Nat.cast_nonneg _
+  have hμ1 : 0 < ∑ w : InfinitePlace F, (fun w : InfinitePlace F ↦ (w.mult : ℝ)) w := by
+    obtain ⟨w₀⟩ := (inferInstance : Nonempty (InfinitePlace F))
+    exact Finset.sum_pos (fun w _ ↦ by exact_mod_cast w.mult_pos) ⟨w₀, Finset.mem_univ _⟩
+  obtain ⟨c, hc⟩ : ∃ c : ℝ, c = ((k - l : ℤ) : ℝ) / ∑ w : InfinitePlace F, (w.mult : ℝ) :=
+    ⟨_, rfl⟩
+  obtain ⟨C, hC0, hC⟩ := meyerFlatLift_arch_schwartz_pred (meyerFlatLift_π (F := F))
+      (fun x w ↦ meyerFlatLift_π_norm_le w x)
+    meyerFlatLift_π_exists (fun w : InfinitePlace F ↦ (w.mult : ℝ)) hμ hμ1
+        (∑ v, Real.log ‖κ.val v‖) _ hB
+    bB hbB R hRB k l c hc
+  refine ⟨c, C * 2 ^ l * (1 + |c|) ^ l * (1 + Fintype.card (InfinitePlace F)) ^ l,
+    by positivity, fun n χ ↦ ?_⟩
+  have h1 := (hC (-meyerFlatLift_α T χ.val) (-meyerFlatLift_β T χ.val) (φ n χ)).2 (g n χ) (hg n χ)
+  have hP := meyerFlatLift_param_bound T χ.val
+  have hP0 : 0 ≤ (1 + ∑ w, |(-meyerFlatLift_α T χ.val) w|) *
+      (1 + ∑ w, |(((-meyerFlatLift_β T χ.val) w : ℤ) : ℝ)|) := by positivity
+  have hS0 : 0 ≤ ∑ m ∈ Finset.range (l + 1), ((SchwartzMap.seminorm ℂ 0 m).comp
+      (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) (φ n χ) :=
+    Finset.sum_nonneg fun m _ ↦ apply_nonneg _ _
+  rw [← Finset.mul_sum]
+  refine h1.trans ?_
+  calc C * (2 ^ l * (1 + |c|) ^ l * ∑ m ∈ Finset.range (l + 1), ((SchwartzMap.seminorm ℂ 0 m).comp
+          (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) (φ n χ)) *
+        ((1 + ∑ w, |(-meyerFlatLift_α T χ.val) w|) *
+            (1 + ∑ w, |(((-meyerFlatLift_β T χ.val) w : ℤ) : ℝ)|)) ^ l
+      ≤ C * (2 ^ l * (1 + |c|) ^ l * ∑ m ∈ Finset.range (l + 1), ((SchwartzMap.seminorm ℂ 0 m).comp
+          (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) (φ n χ)) *
+        ((1 + Fintype.card (InfinitePlace F)) * (1 + meyerFlatLift_size T χ.val) ^ 2) ^ l :=
+        mul_le_mul_of_nonneg_left (pow_le_pow_left₀ hP0 hP l)
+          (mul_nonneg hC0 (mul_nonneg (by positivity) hS0))
+    _ = C * 2 ^ l * (1 + |c|) ^ l * (1 + Fintype.card (InfinitePlace F)) ^ l *
+          ((1 + meyerFlatLift_size T χ.val) ^ (2 * l) * ∑ m ∈ Finset.range (l + 1),
+            ((SchwartzMap.seminorm ℂ 0 m).comp
+              (logExponentialDecayTwist univ ⟨c, mem_univ c⟩)) (φ n χ)) := by
+        rw [mul_pow, ← pow_mul]
+        ring
+
+open Classical in
+/-- For a fixed finite part, the archimedean sums over the characters of the tests of the
+characters times the profiles are a bounded sequence of Schwartz functions on the mixed space,
+with the values of the cutoff times the normalized theta series at the corresponding S-ideles. -/
+private theorem meyerFlatLift_arch_sum
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ)
+    (hφb : ∀ (ν : GroupSeminorm (PontryaginDual.map τ).ker) (K : ℕ)
+      (i : ↥(univ : Set ℝ) × ℕ × ℕ),
+        ∃ B : ℝ, ∀ n, Summable (fun χ ↦ (1 + ν χ) ^ K * pseminorm(i) (φ n χ)) ∧
+          ∑' χ, (1 + ν χ) ^ K * pseminorm(i) (φ n χ) ≤ B)
+    (β : (InfinitePlace F ⊕ T → ℝ) → ℝ) (hβ : ContDiff ℝ (∞) β)
+    (hβd : ∀ i : ℕ, ∃ C : ℝ, ∀ y, ‖iteratedFDeriv ℝ i β y‖ ≤ C)
+    (hβs : ∃ R : ℝ, ∀ y ∈ tsupport β,
+        (∀ w w' : InfinitePlace F, |y (Sum.inl w) / w.mult - y (Sum.inl w') / w'.mult| ≤ R) ∧
+          ∀ v : T, |y (Sum.inr v)| ≤ R)
+    (κ : ((v : T) → v.val.adicCompletion F)ˣ) :
+    ∃ A : ℕ → SchwartzMap (mixedEmbedding.mixedSpace F) ℂ,
+      (∀ k l : ℕ, ∃ B : ℝ, ∀ n, SchwartzMap.seminorm ℂ k l (A n) ≤ B) ∧
+      ∀ n (y : (mixedEmbedding.mixedSpace F)ˣ), A n y.val =
+        ((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
+          ∑' χ : (PontryaginDual.map τ).ker, (β (sIdeleLog F T (meyerFlatLift_idele T y κ)) : ℂ) *
+            starRingEnd ℂ (χ.val (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℂ) *
+              (φ n χ).val (Real.log ((sIdeleQuotientNorm F T
+                (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℝ≥0) : ℝ)) := by
+  obtain ⟨R, hR⟩ := hβs
+  obtain ⟨hB, ⟨bB, hbB⟩, hRB⟩ := meyerFlatLift_cutoff_slice T β hβ hβd R hR κ
+  have hμ : ∀ w : InfinitePlace F, 0 ≤ (fun w : InfinitePlace F ↦ (w.mult : ℝ)) w :=
+    fun w ↦ Nat.cast_nonneg _
+  have hμ1 : 0 < ∑ w : InfinitePlace F, (fun w : InfinitePlace F ↦ (w.mult : ℝ)) w := by
+    obtain ⟨w₀⟩ := (inferInstance : Nonempty (InfinitePlace F))
+    exact Finset.sum_pos (fun w _ ↦ by exact_mod_cast w.mult_pos) ⟨w₀, Finset.mem_univ _⟩
+  obtain ⟨C₀, -, hex0⟩ := meyerFlatLift_arch_schwartz_pred (meyerFlatLift_π (F := F))
+      (fun x w ↦ meyerFlatLift_π_norm_le w x)
+    meyerFlatLift_π_exists (fun w : InfinitePlace F ↦ (w.mult : ℝ)) hμ hμ1
+        (∑ v, Real.log ‖κ.val v‖) _ hB
+    bB hbB R hRB 0 0 _ rfl
+  choose g hg using fun (n : ℕ) (χ : (PontryaginDual.map τ).ker) ↦
+    (hex0 (-meyerFlatLift_α T χ.val) (-meyerFlatLift_β T χ.val) (φ n χ)).1
+  -- the tests of the characters times the characters at the finite part
+  obtain ⟨g', hg'⟩ : ∃ g' : ℕ → (PontryaginDual.map τ).ker → 𝓢(mixedEmbedding.mixedSpace F, ℂ),
+      ∀ n χ, g' n χ =
+          (starRingEnd ℂ (χ.val (QuotientGroup.mk (meyerFlatLift_idele T 1 κ)) : ℂ)) • g n χ :=
+    ⟨_, fun _ _ ↦ rfl⟩
+  have hsem (n : ℕ) (χ : (PontryaginDual.map τ).ker) (k l : ℕ) :
+      SchwartzMap.seminorm ℂ k l (g' n χ) = SchwartzMap.seminorm ℂ k l (g n χ) := by
+    rw [hg', map_smul_eq_mul, Complex.norm_conj, Circle.norm_coe, one_mul]
+  have hsum (k l : ℕ) : ∃ M : ℝ, ∀ n, Summable (fun χ ↦ SchwartzMap.seminorm ℂ k l (g' n χ)) ∧
+      ∑' χ, SchwartzMap.seminorm ℂ k l (g' n χ) ≤ M := by
+    obtain ⟨c, D, hD0, hD⟩ := meyerFlatLift_arch_seminorm_bound T τ φ β κ hB bB hbB R hRB g hg k l
+    obtain ⟨M, hM⟩ := meyerFlatLift_arch_summable T τ φ hφb g k l c D hD0 hD
+    exact ⟨M, fun n ↦ by simpa only [hsem] using hM n⟩
+  choose G hGv hGs using fun n ↦
+    meyerFlatLift_schwartz_tsum (g' n) fun k l ↦ ((hsum k l).choose_spec n).1
+  refine ⟨fun n ↦ (((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹) • G n,
+    fun k l ↦ ?_, fun n y ↦ ?_⟩
+  · obtain ⟨M, hM⟩ := hsum k l
+    refine ⟨‖(((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹)‖ * M, fun n ↦ ?_⟩
+    rw [map_smul_eq_mul]
+    exact mul_le_mul_of_nonneg_left ((hGs n k l).trans (hM n).2) (norm_nonneg _)
+  · rw [smul_apply, hGv, smul_eq_mul]
+    congr 1
+    refine tsum_congr fun χ ↦ ?_
+    rw [hg', smul_apply, hg, smul_eq_mul]
+    exact meyerFlatLift_term T β κ χ.val (φ n χ).val y
+
+/-- A sequence of Schwartz functions with uniformly bounded seminorms is bounded. -/
+private theorem meyerFlatLift_schwartz_range_bounded
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (A : ℕ → 𝓢(E, ℂ)) (hA : ∀ k l : ℕ, ∃ B : ℝ, ∀ n, SchwartzMap.seminorm ℂ k l (A n) ≤ B) :
+    Bornology.IsVonNBounded ℂ (range A) := by
+  rw [(schwartz_withSeminorms ℂ E ℂ).isVonNBounded_iff_seminorm_bounded]
+  intro i
+  obtain ⟨B, hB⟩ := hA i.1 i.2
+  refine ⟨|B| + 1, by positivity, ?_⟩
+  rintro _ ⟨n, rfl⟩
+  exact (hB n).trans_lt (by linarith [le_abs_self B])
+
+open Classical in
+/-- The tensor with a fixed finite tensor is continuous for the inductive topology. -/
+private theorem meyerFlatLift_tmul_clm
+    (T : Finset V)
+    (c : FinestLocallyConvex
+        (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))) :
+    ∃ Tc : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) →L[ℂ]
+      InductiveTensor (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+        (FinestLocallyConvex
+          (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))),
+      ∀ x, Tc x = x ⊗ₜ[ℂ] c := by
+  have hsp := withGeneratingSeminorms_spec
+    (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) ⊗[ℂ]
+      FinestLocallyConvex (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))))
+    (fun p : {p : Seminorm ℂ (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) ⊗[ℂ]
+        FinestLocallyConvex
+            (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))) //
+      (∀ x : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)),
+        Continuous (fun y : FinestLocallyConvex
+          (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))) ↦
+            p (x ⊗ₜ[ℂ] y))) ∧
+      (∀ y : FinestLocallyConvex
+          (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))),
+        Continuous (fun x : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) ↦
+          p (x ⊗ₜ[ℂ] y)))} ↦ p.val)
+  have htc := hsp.continuous_of_continuous_comp
+    ((TensorProduct.mk ℂ (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+      (FinestLocallyConvex
+        (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))))).flip c)
+    fun p ↦ p.2.2 c
+  let Tc : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) →L[ℂ]
+      InductiveTensor (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+        (FinestLocallyConvex
+          (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))) :=
+    ⟨(TensorProduct.mk ℂ _ _).flip c, htc⟩
+  exact ⟨Tc, fun x ↦ rfl⟩
+
+open Classical in
+/-- The tensor of a bounded sequence of archimedean Schwartz functions with a fixed finite
+tensor is a bounded sequence of S-adelic tests. -/
+private theorem meyerFlatLift_tensor_bounded
+    (T : Finset V)
+    (J : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ ≃L[ℂ]
+      SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+    (e : InductiveTensor (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+      (FinestLocallyConvex (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))))
+        ≃L[ℂ] ℬₛ(T))
+    (c : FinestLocallyConvex (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))))
+    (A : ℕ → SchwartzMap (mixedEmbedding.mixedSpace F) ℂ)
+    (hA : ∀ k l : ℕ, ∃ B : ℝ, ∀ n, SchwartzMap.seminorm ℂ k l (A n) ≤ B) :
+    Bornology.IsVonNBounded ℂ (range fun n ↦ e (J (A n) ⊗ₜ[ℂ] c)) := by
+  have hAb := meyerFlatLift_schwartz_range_bounded A hA
+  -- `obtain` on this existential times out (in `cases`); `Exists.elim` does not
+  refine (meyerFlatLift_tmul_clm T c).elim fun Tc hTc ↦ ?_
+  have hΦ (n : ℕ) : (e.toContinuousLinearMap.comp (Tc.comp J.toContinuousLinearMap)) (A n) =
+      e (J (A n) ⊗ₜ[ℂ] c) := by
+    show e (Tc (J (A n))) = _
+    exact congrArg e (hTc (J (A n)))
+  refine (hAb.image (e.toContinuousLinearMap.comp (Tc.comp J.toContinuousLinearMap))).subset ?_
+  rintro _ ⟨n, rfl⟩
+  exact ⟨A n, ⟨n, rfl⟩, hΦ n⟩
+
+/-- A finite unit close to one at the level `k₀` has absolute value one at every place. -/
+private theorem meyerFlatLift_close_norm
+    (T : Finset V) (k₀ : ℕ) (a : ((v : T) → v.val.adicCompletion F)ˣ)
+    (ha : ∀ w : T, Valued.v (a.val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) (w : T) :
+    ‖a.val w‖ = 1 := by
+  have hlt : WithZero.exp (-(k₀ + 1 : ℤ)) < 1 := by
+    rw [← WithZero.exp_zero, WithZero.exp_lt_exp]; omega
+  apply Valued.toNormedField.norm_eq_one_iff.mpr
+  have h := Valuation.map_one_add_of_lt Valued.v ((ha w).trans_lt hlt)
+  rwa [add_sub_cancel] at h
+
+open Classical in
+/-- At an S-idele whose finite part is close to a finite unit `κ`, the archimedean sum attached
+to `κ` is the cutoff times the normalized theta series. -/
+private theorem meyerFlatLift_coset_value
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (H₀ : Subgroup (PontryaginDual.map τ).ker)
+    (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ)
+    (hφ0 : ∀ χ ∉ H₀, ∀ n, φ n χ = 0) (β : (InfinitePlace F ⊕ T → ℝ) → ℝ) (k₀ : ℕ)
+    (hk₀ : ∀ g : (SAdeleRing F T)ˣ, g.val.1 = 1 →
+      (∀ w : T, Valued.v (g.val.2 w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) →
+      ∀ χ ∈ H₀, χ.val (QuotientGroup.mk g) = 1)
+    (y : (mixedEmbedding.mixedSpace F)ˣ) (xf κ : ((v : T) → v.val.adicCompletion F)ˣ)
+    (hclose : ∀ w : T, Valued.v ((κ⁻¹ * xf).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ)))
+    (n : ℕ) :
+    ((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
+        ∑' χ : (PontryaginDual.map τ).ker, (β (sIdeleLog F T (meyerFlatLift_idele T y κ)) : ℂ) *
+          starRingEnd ℂ (χ.val (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℂ) *
+            (φ n χ).val (Real.log ((sIdeleQuotientNorm F T
+              (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℝ≥0) : ℝ)) =
+      (β (sIdeleLog F T (meyerFlatLift_idele T y xf)) : ℂ) *
+        (((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
+          ∑' χ : (PontryaginDual.map τ).ker,
+            starRingEnd ℂ (χ.val (QuotientGroup.mk (meyerFlatLift_idele T y xf)) : ℂ) *
+              (φ n χ).val (Real.log ((sIdeleQuotientNorm F T
+                (QuotientGroup.mk (meyerFlatLift_idele T y xf)) : ℝ≥0) : ℝ))) := by
+  -- the absolute values of the finite parts agree
+  have hnorm (w : T) : ‖κ.val w‖ = ‖xf.val w‖ := by
+    have h := meyerFlatLift_close_norm T k₀ (κ⁻¹ * xf) hclose w
+    have hinv : (κ⁻¹).val w * κ.val w = 1 := by
+      rw [← Pi.mul_apply, ← Units.val_mul, inv_mul_cancel, Units.val_one, Pi.one_apply]
+    rw [Units.val_mul, Pi.mul_apply, norm_mul] at h
+    have h2 : ‖(κ⁻¹).val w‖ * ‖κ.val w‖ = 1 := by rw [← norm_mul, hinv, norm_one]
+    have hk0 : ‖κ.val w‖ ≠ 0 := by
+      intro h0; rw [h0, mul_zero] at h2; exact zero_ne_one h2
+    calc ‖κ.val w‖ = ‖κ.val w‖ * (‖(κ⁻¹).val w‖ * ‖xf.val w‖) := by rw [h, mul_one]
+      _ = (‖(κ⁻¹).val w‖ * ‖κ.val w‖) * ‖xf.val w‖ := by ring
+      _ = ‖xf.val w‖ := by rw [h2, one_mul]
+  have hlog : sIdeleLog F T (meyerFlatLift_idele T y κ) =
+      sIdeleLog F T (meyerFlatLift_idele T y xf) := by
+    funext v
+    rcases v with v | v
+    · rfl
+    · change Real.log ‖κ.val v‖ = Real.log ‖xf.val v‖
+      rw [hnorm v]
+  have hN : Real.log
+      ((sIdeleQuotientNorm F T (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℝ≥0) : ℝ) =
+      Real.log
+        ((sIdeleQuotientNorm F T (QuotientGroup.mk (meyerFlatLift_idele T y xf)) : ℝ≥0) : ℝ) := by
+    rw [sIdeleQuotientNorm_mk, sIdeleQuotientNorm_mk, ← sIdeleLog_sum, ← sIdeleLog_sum, hlog]
+  -- the characters of the group agree
+  have hfac : meyerFlatLift_idele T y xf = meyerFlatLift_idele T y κ *
+      meyerFlatLift_idele T 1 (κ⁻¹ * xf) := by
+    apply Units.ext
+    rw [Units.val_mul, meyerFlatLift_idele_val, meyerFlatLift_idele_val, meyerFlatLift_idele_val,
+        Prod.mk_mul_mk, Units.val_one,
+      map_one, mul_one, Units.val_mul, ← mul_assoc, ← Units.val_mul, mul_inv_cancel,
+      Units.val_one, one_mul]
+  have hchar (χ : (PontryaginDual.map τ).ker) (hχ : χ ∈ H₀) :
+      χ.val (QuotientGroup.mk (meyerFlatLift_idele T y xf)) =
+          χ.val (QuotientGroup.mk (meyerFlatLift_idele T y κ)) := by
+    rw [hfac, QuotientGroup.mk_mul, map_mul]
+    have h1 := hk₀ (meyerFlatLift_idele T 1 (κ⁻¹ * xf))
+        (by rw [meyerFlatLift_idele_val, Units.val_one, map_one])
+      (fun w ↦ by rw [meyerFlatLift_idele_val]; exact hclose w) χ hχ
+    rw [h1, mul_one]
+  rw [hlog, hN, ← tsum_mul_left, ← tsum_mul_left, ← tsum_mul_left]
+  refine tsum_congr fun χ ↦ ?_
+  by_cases hχ : χ ∈ H₀
+  · rw [hchar χ hχ]; ring
+  · rw [hφ0 χ hχ n]
+    simp only [show ∀ u, (0 : PositiveRealExponentialDecay univ).val u = 0 from fun _ ↦ rfl,
+      mul_zero]
+
+/-- A finite sum of bounded sequences is bounded. -/
+private theorem meyerFlatLift_sum_bounded
+    {E ι : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] (s : Finset ι) (f : ι → ℕ → E)
+    (hf : ∀ i ∈ s, Bornology.IsVonNBounded ℂ (range (f i))) :
+    Bornology.IsVonNBounded ℂ (range fun n ↦ ∑ i ∈ s, f i n) := by
+  classical
+  induction s using Finset.induction_on with
+  | empty =>
+    refine (Bornology.isVonNBounded_singleton (0 : E)).subset ?_
+    rintro _ ⟨n, rfl⟩
+    simp
+  | insert a s ha ih =>
+    refine ((hf a (Finset.mem_insert_self a s)).add
+      (ih fun i hi ↦ hf i (Finset.mem_insert_of_mem hi))).subset ?_
+    rintro _ ⟨n, rfl⟩
+    exact ⟨_, ⟨n, rfl⟩, _, ⟨n, rfl⟩, by simp only [Finset.sum_insert ha]⟩
+
+open Classical in
+/-- An S-idele is the S-idele of its mixed archimedean coordinates and its finite part. -/
+private theorem meyerFlatLift_idele_decomp
+    (T : Finset V) (x : (SAdeleRing F T)ˣ) :
+    meyerFlatLift_idele T (Units.map (InfiniteAdeleRing.ringEquiv_mixedSpace F).toMonoidHom
+      (Units.map (RingHom.fst _ _).toMonoidHom x)) (Units.map (RingHom.snd _ _).toMonoidHom x) =
+      x := by
+  apply Units.ext
+  rw [meyerFlatLift_idele_val]
+  ext
+  · exact (InfiniteAdeleRing.ringEquiv_mixedSpace F).symm_apply_apply x.val.1
+  · rfl
+
+open Classical in
+/-- Every S-idele is given by mixed archimedean coordinates and a finite part. -/
+private theorem meyerFlatLift_idele_surj
+    (T : Finset V) (x : (SAdeleRing F T)ˣ) :
+    ∃ (y : (mixedEmbedding.mixedSpace F)ˣ) (xf : ((v : T) → v.val.adicCompletion F)ˣ),
+      meyerFlatLift_idele T y xf = x :=
+  ⟨_, _, meyerFlatLift_idele_decomp T x⟩
+
+open Classical in
+/-- The value of the assembled tests at an S-idele given by mixed coordinates and a finite
+part. -/
+private theorem meyerFlatLift_tests_formula
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (H₀ : Subgroup (PontryaginDual.map τ).ker)
+    (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ)
+    (hφ0 : ∀ χ ∉ H₀, ∀ n, φ n χ = 0) (β : (InfinitePlace F ⊕ T → ℝ) → ℝ) (R : ℝ)
+    (hR : ∀ y ∈ tsupport β,
+        (∀ w w' : InfinitePlace F, |y (Sum.inl w) / w.mult - y (Sum.inl w') / w'.mult| ≤ R) ∧
+          ∀ v : T, |y (Sum.inr v)| ≤ R)
+    (k₀ : ℕ) (hk₀ : ∀ g : (SAdeleRing F T)ˣ, g.val.1 = 1 →
+      (∀ w : T, Valued.v (g.val.2 w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) →
+      ∀ χ ∈ H₀, χ.val (QuotientGroup.mk g) = 1)
+    (K : Finset ((v : T) → v.val.adicCompletion F)ˣ)
+    (b : ((v : T) → v.val.adicCompletion F)ˣ → (w : T) →
+        SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))
+    (hb1 : ∀ κ ∈ K, ∀ x : ((v : T) → v.val.adicCompletion F)ˣ,
+        (∏ w, b κ w (Multiplicative.ofAdd (x.val w)) = 1 ∧
+          ∀ w : T, Valued.v ((κ⁻¹ * x).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) ∨
+        ∏ w, b κ w (Multiplicative.ofAdd (x.val w)) = 0)
+    (hb2 : ∀ x : ((v : T) → v.val.adicCompletion F)ˣ, (∀ v : T, |Real.log ‖x.val v‖| ≤ R) →
+        ∃ κ ∈ K, ∏ w, b κ w (Multiplicative.ofAdd (x.val w)) = 1 ∧
+          ∀ κ' ∈ K, κ' ≠ κ → ∏ w, b κ' w (Multiplicative.ofAdd (x.val w)) = 0)
+    (A : ((v : T) → v.val.adicCompletion F)ˣ → ℕ → SchwartzMap (mixedEmbedding.mixedSpace F) ℂ)
+    (hAv : ∀ κ n (y : (mixedEmbedding.mixedSpace F)ˣ), A κ n y.val =
+        ((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
+          ∑' χ : (PontryaginDual.map τ).ker, (β (sIdeleLog F T (meyerFlatLift_idele T y κ)) : ℂ) *
+            starRingEnd ℂ (χ.val (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℂ) *
+              (φ n χ).val (Real.log ((sIdeleQuotientNorm F T
+                (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℝ≥0) : ℝ)))
+    (J : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ ≃L[ℂ]
+      SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+    (hJ : ∀ f x, J f (Multiplicative.ofAdd x) = f (InfiniteAdeleRing.ringEquiv_mixedSpace F x))
+    (e : InductiveTensor (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+      (FinestLocallyConvex (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))))
+        ≃L[ℂ] ℬₛ(T))
+    (he : ∀ (f : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+      (g : ∀ w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))) (x : SAdeleRing F T),
+        e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w)) (Multiplicative.ofAdd x) =
+          f (Multiplicative.ofAdd x.1) * ∏ w : T, g w (Multiplicative.ofAdd (x.2 w)))
+    (n : ℕ) (y : (mixedEmbedding.mixedSpace F)ˣ) (xf : ((v : T) → v.val.adicCompletion F)ˣ)
+    (x : (SAdeleRing F T)ˣ) (hx : meyerFlatLift_idele T y xf = x) :
+    (∑ κ ∈ K, e (J (A κ n) ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b κ w))) (Multiplicative.ofAdd x.val) =
+      (β (sIdeleLog F T x) : ℂ) * (((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
+        ∑' χ : (PontryaginDual.map τ).ker, starRingEnd ℂ (χ.val (QuotientGroup.mk x) : ℂ) *
+          (φ n χ).val (Real.log ((sIdeleQuotientNorm F T (QuotientGroup.mk x) : ℝ≥0) : ℝ))) := by
+  subst hx
+  have hsum (s : Finset ((v : T) → v.val.adicCompletion F)ˣ) (f : _ → ℬₛ(T)) (z) :
+      (∑ κ ∈ s, f κ) z = ∑ κ ∈ s, f κ z := by
+    induction s using Finset.induction_on with
+    | empty => simp
+    | insert a s ha ih => rw [Finset.sum_insert ha, Finset.sum_insert ha, SchwartzBruhat.coe_add,
+        Pi.add_apply, ih]
+  have hval (κ : ((v : T) → v.val.adicCompletion F)ˣ) :
+      e (J (A κ n) ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b κ w)) (Multiplicative.ofAdd (meyerFlatLift_idele T y xf).val) =
+        A κ n y.val * ∏ w, b κ w (Multiplicative.ofAdd (xf.val w)) := by
+    rw [he, hJ, meyerFlatLift_idele_val]
+    simp only [RingEquiv.apply_symm_apply]
+  rw [hsum, Finset.sum_congr rfl fun κ _ ↦ hval κ]
+  have hcl (κ : ((v : T) → v.val.adicCompletion F)ˣ)
+      (hclose : ∀ w : T, Valued.v ((κ⁻¹ * xf).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) :=
+    (hAv κ n y).trans (meyerFlatLift_coset_value T τ H₀ φ hφ0 β k₀ hk₀ y xf κ hclose n)
+  by_cases hann : ∀ v : T, |Real.log ‖xf.val v‖| ≤ R
+  · obtain ⟨κ₀, hκ₀, h1, h0⟩ := hb2 xf hann
+    rw [Finset.sum_eq_single κ₀ (fun κ hκ hne ↦ by rw [h0 κ hκ hne, mul_zero])
+      (fun h ↦ absurd hκ₀ h), h1, mul_one]
+    rcases hb1 κ₀ hκ₀ xf with ⟨-, hclose⟩ | h
+    · exact hcl κ₀ hclose
+    · rw [h1] at h; exact absurd h one_ne_zero
+  · -- outside the annuli the cutoff vanishes
+    have hβ0 : β (sIdeleLog F T (meyerFlatLift_idele T y xf)) = 0 := by
+      refine image_eq_zero_of_notMem_tsupport fun hmem ↦ hann fun v ↦ ?_
+      exact (hR _ hmem).2 v
+    rw [hβ0, Complex.ofReal_zero, zero_mul]
+    refine Finset.sum_eq_zero fun κ hκ ↦ ?_
+    rcases hb1 κ hκ xf with ⟨-, hclose⟩ | h
+    · rw [hcl κ hclose, hβ0, Complex.ofReal_zero, zero_mul, zero_mul]
+    · rw [h, mul_zero]
+
+open Classical in
+/-- The value of the assembled tests at any S-idele. -/
+private theorem meyerFlatLift_tests_value
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (H₀ : Subgroup (PontryaginDual.map τ).ker)
+    (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ)
+    (hφ0 : ∀ χ ∉ H₀, ∀ n, φ n χ = 0) (β : (InfinitePlace F ⊕ T → ℝ) → ℝ) (R : ℝ)
+    (hR : ∀ y ∈ tsupport β,
+        (∀ w w' : InfinitePlace F, |y (Sum.inl w) / w.mult - y (Sum.inl w') / w'.mult| ≤ R) ∧
+          ∀ v : T, |y (Sum.inr v)| ≤ R)
+    (k₀ : ℕ) (hk₀ : ∀ g : (SAdeleRing F T)ˣ, g.val.1 = 1 →
+      (∀ w : T, Valued.v (g.val.2 w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) →
+      ∀ χ ∈ H₀, χ.val (QuotientGroup.mk g) = 1)
+    (K : Finset ((v : T) → v.val.adicCompletion F)ˣ)
+    (b : ((v : T) → v.val.adicCompletion F)ˣ → (w : T) →
+        SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))
+    (hb1 : ∀ κ ∈ K, ∀ x : ((v : T) → v.val.adicCompletion F)ˣ,
+        (∏ w, b κ w (Multiplicative.ofAdd (x.val w)) = 1 ∧
+          ∀ w : T, Valued.v ((κ⁻¹ * x).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) ∨
+        ∏ w, b κ w (Multiplicative.ofAdd (x.val w)) = 0)
+    (hb2 : ∀ x : ((v : T) → v.val.adicCompletion F)ˣ, (∀ v : T, |Real.log ‖x.val v‖| ≤ R) →
+        ∃ κ ∈ K, ∏ w, b κ w (Multiplicative.ofAdd (x.val w)) = 1 ∧
+          ∀ κ' ∈ K, κ' ≠ κ → ∏ w, b κ' w (Multiplicative.ofAdd (x.val w)) = 0)
+    (A : ((v : T) → v.val.adicCompletion F)ˣ → ℕ → SchwartzMap (mixedEmbedding.mixedSpace F) ℂ)
+    (hAv : ∀ κ n (y : (mixedEmbedding.mixedSpace F)ˣ), A κ n y.val =
+        ((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
+          ∑' χ : (PontryaginDual.map τ).ker, (β (sIdeleLog F T (meyerFlatLift_idele T y κ)) : ℂ) *
+            starRingEnd ℂ (χ.val (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℂ) *
+              (φ n χ).val (Real.log ((sIdeleQuotientNorm F T
+                (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℝ≥0) : ℝ)))
+    (J : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ ≃L[ℂ]
+      SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+    (hJ : ∀ f x, J f (Multiplicative.ofAdd x) = f (InfiniteAdeleRing.ringEquiv_mixedSpace F x))
+    (e : InductiveTensor (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+      (FinestLocallyConvex (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))))
+        ≃L[ℂ] ℬₛ(T))
+    (he : ∀ (f : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+      (g : ∀ w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))) (x : SAdeleRing F T),
+        e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w)) (Multiplicative.ofAdd x) =
+          f (Multiplicative.ofAdd x.1) * ∏ w : T, g w (Multiplicative.ofAdd (x.2 w)))
+    (n : ℕ) (x : (SAdeleRing F T)ˣ) :
+    (∑ κ ∈ K, e (J (A κ n) ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b κ w))) (Multiplicative.ofAdd x.val) =
+      (β (sIdeleLog F T x) : ℂ) * (((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
+        ∑' χ : (PontryaginDual.map τ).ker, starRingEnd ℂ (χ.val (QuotientGroup.mk x) : ℂ) *
+          (φ n χ).val (Real.log ((sIdeleQuotientNorm F T (QuotientGroup.mk x) : ℝ≥0) : ℝ))) := by
+  -- `obtain` on this existential times out (in `cases`); `Exists.elim` does not
+  exact (meyerFlatLift_idele_surj T x).elim fun y h ↦ h.elim fun xf hx ↦
+    meyerFlatLift_tests_formula T τ H₀ φ hφ0 β R hR k₀ hk₀ K b hb1 hb2 A hAv J hJ e he n y xf x hx
+
+open Classical in
+/-- The assembled tests form a bounded sequence. -/
+private theorem meyerFlatLift_tests_bounded
+    (T : Finset V) (K : Finset ((v : T) → v.val.adicCompletion F)ˣ)
+    (b : ((v : T) → v.val.adicCompletion F)ˣ → (w : T) →
+        SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))
+    (A : ((v : T) → v.val.adicCompletion F)ˣ → ℕ → SchwartzMap (mixedEmbedding.mixedSpace F) ℂ)
+    (hAb : ∀ κ (k l : ℕ), ∃ B : ℝ, ∀ n, SchwartzMap.seminorm ℂ k l (A κ n) ≤ B)
+    (J : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ ≃L[ℂ]
+      SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+    (e : InductiveTensor (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+      (FinestLocallyConvex (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))))
+        ≃L[ℂ] ℬₛ(T)) :
+    Bornology.IsVonNBounded ℂ
+      (range fun n ↦ ∑ κ ∈ K, e (J (A κ n) ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b κ w))) :=
+  meyerFlatLift_sum_bounded K _ fun κ _ ↦ meyerFlatLift_tensor_bounded T J e _ (A κ) (hAb κ)
+
+open Classical in
+/-- The tests assembled from the finite cover, the archimedean sums and the tensor
+equivalences. -/
+private theorem meyerFlatLift_tests_of_data
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (H₀ : Subgroup (PontryaginDual.map τ).ker)
+    (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ)
+    (hφ0 : ∀ χ ∉ H₀, ∀ n, φ n χ = 0) (β : (InfinitePlace F ⊕ T → ℝ) → ℝ) (R : ℝ)
+    (hR : ∀ y ∈ tsupport β,
+        (∀ w w' : InfinitePlace F, |y (Sum.inl w) / w.mult - y (Sum.inl w') / w'.mult| ≤ R) ∧
+          ∀ v : T, |y (Sum.inr v)| ≤ R)
+    (k₀ : ℕ) (hk₀ : ∀ g : (SAdeleRing F T)ˣ, g.val.1 = 1 →
+      (∀ w : T, Valued.v (g.val.2 w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) →
+      ∀ χ ∈ H₀, χ.val (QuotientGroup.mk g) = 1)
+    (K : Finset ((v : T) → v.val.adicCompletion F)ˣ)
+    (b : ((v : T) → v.val.adicCompletion F)ˣ → (w : T) →
+        SchwartzBruhat (Multiplicative (w.val.adicCompletion F)))
+    (hb1 : ∀ κ ∈ K, ∀ x : ((v : T) → v.val.adicCompletion F)ˣ,
+        (∏ w, b κ w (Multiplicative.ofAdd (x.val w)) = 1 ∧
+          ∀ w : T, Valued.v ((κ⁻¹ * x).val w - 1) ≤ WithZero.exp (-(k₀ + 1 : ℤ))) ∨
+        ∏ w, b κ w (Multiplicative.ofAdd (x.val w)) = 0)
+    (hb2 : ∀ x : ((v : T) → v.val.adicCompletion F)ˣ, (∀ v : T, |Real.log ‖x.val v‖| ≤ R) →
+        ∃ κ ∈ K, ∏ w, b κ w (Multiplicative.ofAdd (x.val w)) = 1 ∧
+          ∀ κ' ∈ K, κ' ≠ κ → ∏ w, b κ' w (Multiplicative.ofAdd (x.val w)) = 0)
+    (A : ((v : T) → v.val.adicCompletion F)ˣ → ℕ → SchwartzMap (mixedEmbedding.mixedSpace F) ℂ)
+    (hAb : ∀ κ (k l : ℕ), ∃ B : ℝ, ∀ n, SchwartzMap.seminorm ℂ k l (A κ n) ≤ B)
+    (hAv : ∀ κ n (y : (mixedEmbedding.mixedSpace F)ˣ), A κ n y.val =
+        ((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
+          ∑' χ : (PontryaginDual.map τ).ker, (β (sIdeleLog F T (meyerFlatLift_idele T y κ)) : ℂ) *
+            starRingEnd ℂ (χ.val (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℂ) *
+              (φ n χ).val (Real.log ((sIdeleQuotientNorm F T
+                (QuotientGroup.mk (meyerFlatLift_idele T y κ)) : ℝ≥0) : ℝ)))
+    (J : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ ≃L[ℂ]
+      SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+    (hJ : ∀ f x, J f (Multiplicative.ofAdd x) = f (InfiniteAdeleRing.ringEquiv_mixedSpace F x))
+    (e : InductiveTensor (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+      (FinestLocallyConvex (⨂[ℂ] w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))))
+        ≃L[ℂ] ℬₛ(T))
+    (he : ∀ (f : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+      (g : ∀ w : T, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))) (x : SAdeleRing F T),
+        e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w)) (Multiplicative.ofAdd x) =
+          f (Multiplicative.ofAdd x.1) * ∏ w : T, g w (Multiplicative.ofAdd (x.2 w))) :
+    ∃ W : ℕ → ℬₛ(T), Bornology.IsVonNBounded ℂ (range W) ∧
+      ∀ n (x : (SAdeleRing F T)ˣ), W n (Multiplicative.ofAdd x.val) =
+        (β (sIdeleLog F T x) : ℂ) * (((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
+          ∑' χ : (PontryaginDual.map τ).ker, starRingEnd ℂ (χ.val (QuotientGroup.mk x) : ℂ) *
+            (φ n χ).val (Real.log ((sIdeleQuotientNorm F T (QuotientGroup.mk x) : ℝ≥0) : ℝ))) := by
+  exact ⟨fun n ↦ ∑ κ ∈ K, e (J (A κ n) ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b κ w)),
+    meyerFlatLift_tests_bounded T K b A hAb J e,
+    meyerFlatLift_tests_value T τ H₀ φ hφ0 β R hR k₀ hk₀ K b hb1 hb2 A hAv J hJ e he⟩
+
+/-- The tests: for a cutoff as above and profiles with summed weighted bounds vanishing outside
+a finitely generated group of angular characters, a bounded sequence of tests equal on the
+S-ideles to the cutoff times the normalized theta series of the profiles. -/
+private theorem meyerFlatLift_tests
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (H₀ : Subgroup (PontryaginDual.map τ).ker) (hH₀ : H₀.FG)
+    (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ)
+    (hφ0 : ∀ χ ∉ H₀, ∀ n, φ n χ = 0)
+    (hφb : ∀ (ν : GroupSeminorm (PontryaginDual.map τ).ker) (K : ℕ)
+      (i : ↥(univ : Set ℝ) × ℕ × ℕ),
+        ∃ B : ℝ, ∀ n, Summable (fun χ ↦ (1 + ν χ) ^ K * pseminorm(i) (φ n χ)) ∧
+          ∑' χ, (1 + ν χ) ^ K * pseminorm(i) (φ n χ) ≤ B)
+    (β : (InfinitePlace F ⊕ T → ℝ) → ℝ) (hβ : ContDiff ℝ (∞) β)
+    (hβd : ∀ i : ℕ, ∃ C : ℝ, ∀ y, ‖iteratedFDeriv ℝ i β y‖ ≤ C)
+    (hβs : ∃ R : ℝ, ∀ y ∈ tsupport β,
+        (∀ w w' : InfinitePlace F, |y (Sum.inl w) / w.mult - y (Sum.inl w') / w'.mult| ≤ R) ∧
+          ∀ v : T, |y (Sum.inr v)| ≤ R) :
+    ∃ W : ℕ → ℬₛ(T), Bornology.IsVonNBounded ℂ (range W) ∧
+      ∀ n (x : (SAdeleRing F T)ˣ), W n (Multiplicative.ofAdd x.val) =
+        (β (sIdeleLog F T x) : ℂ) * (((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
+          ∑' χ : (PontryaginDual.map τ).ker, starRingEnd ℂ (χ.val (QuotientGroup.mk x) : ℂ) *
+            (φ n χ).val (Real.log ((sIdeleQuotientNorm F T (QuotientGroup.mk x) : ℝ≥0) : ℝ))) := by
+  obtain ⟨R, hR⟩ := hβs
+  obtain ⟨k₀, hk₀⟩ := sLocalMellinSchwartzBounds_meyer_common_angular_conductor T τ H₀ hH₀
+  obtain ⟨K, b, hb1, hb2⟩ := meyerFlatLift_finite_cover (F := F) T k₀ R
+  choose A hAb hAv using fun κ ↦ meyerFlatLift_arch_sum T τ φ hφb β hβ hβd ⟨R, hR⟩ κ
+  obtain ⟨J, hJ⟩ := archimedeanSchwartzBruhat_equiv (F := F)
+  obtain ⟨e, he⟩ := sAdeleSchwartz_inductiveTensor_equiv F T
+  exact meyerFlatLift_tests_of_data T τ H₀ φ hφ0 β R hR k₀ hk₀ K b hb1 hb2 A hAb hAv J hJ e he
+
+/-- Profiles vanishing outside a finitely generated group of angular characters, with
+summed weighted bounds, are the theta Mellin transforms of a bounded sequence of tests. -/
+private theorem meyerFlatLift_construction
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (hτ : Function.RightInverse τ (sIdeleQuotientNorm F T))
+    (H₀ : Subgroup (PontryaginDual.map τ).ker) (hH₀ : H₀.FG)
+    (φ : ℕ → (PontryaginDual.map τ).ker → PositiveRealExponentialDecay univ)
+    (hφ0 : ∀ χ ∉ H₀, ∀ n, φ n χ = 0)
+    (hφb : ∀ (ν : GroupSeminorm (PontryaginDual.map τ).ker) (K : ℕ)
+      (i : ↥(univ : Set ℝ) × ℕ × ℕ),
+        ∃ B : ℝ, ∀ n, Summable (fun χ ↦ (1 + ν χ) ^ K * pseminorm(i) (φ n χ)) ∧
+          ∑' χ, (1 + ν χ) ^ K * pseminorm(i) (φ n χ) ≤ B) :
+    ∃ W : ℕ → ℬₛ(T), Bornology.IsVonNBounded ℂ (range W) ∧
+      ∀ n (χ : (PontryaginDual.map τ).ker) (z : ℂ), 0 < z.re →
+        sLocalThetaMellinIntegral (W n) (chartₜ(T, χ.val) z) =
+          mellin (fun t ↦ (φ n χ).val (Real.log t)) z := by
+  obtain ⟨β, hβ, hβd, hβs, hβsum⟩ := meyerFlatLift_cutoff (F := F) T
+  obtain ⟨W, hW, hWx⟩ := meyerFlatLift_tests T τ H₀ hH₀ φ hφ0 hφb β hβ hβd hβs
+  refine ⟨W, hW, fun n χ z hz ↦ ?_⟩
+  -- pointwise summability of the profiles
+  have hsum (u : ℝ) : Summable fun χ ↦ ‖(φ n χ).val u‖ := by
+    obtain ⟨B, hB⟩ := hφb 0 0 (⟨0, mem_univ _⟩, 0, 0)
+    refine (hB n).1.of_nonneg_of_le (fun _ ↦ norm_nonneg _) fun χ ↦ ?_
+    simp only [pow_zero, one_mul]
+    have h := SchwartzMap.norm_le_seminorm ℂ
+        (logExponentialDecayTwist univ ⟨0, mem_univ _⟩ (φ n χ)) u
+    have hv : (logExponentialDecayTwist univ ⟨0, mem_univ _⟩ (φ n χ)) u = (φ n χ).val u := by
+      have := logExponentialDecayTwist_apply univ ⟨0, mem_univ _⟩
+        (φ n χ : logExponentialDecaySubmodule univ) u
+      simpa using this
+    rw [hv] at h
+    exact h
+  have hθ := meyerFlatLift_theta_of_cutoff T (W n) (fun x ↦ (β (sIdeleLog F T x) : ℂ)) hβsum
+    (fun g ↦ ((sLocalNormOneQuotientMeasure F T).real univ : ℂ)⁻¹ *
+      ∑' χ : (PontryaginDual.map τ).ker, starRingEnd ℂ (χ.val g : ℂ) *
+        (φ n χ).val (Real.log ((sIdeleQuotientNorm F T g : ℝ≥0) : ℝ))) (hWx n)
+  exact meyerFlatLift_mellin_of_theta T τ hτ (W n) (fun χ u ↦ (φ n χ).val u) hsum hθ χ z hz
+
+end Top
+
+end PositiveLinesFlatLift
+
+/-- Meyer's lifting step in the proof of
+`sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines`: entire
+functions on the angular characters with the bounds on every closed vertical strip are, on the
+right half-plane, the theta Mellin transforms of a bounded sequence of tests.
+Proved from `…_flat_lift_profiles` (the inverse Mellin profiles of the data, with summed
+weighted bounds) and `…_flat_lift_construction` (such profiles come from bounded tests). -/
+private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (hτ : RightInverse τ (sIdeleQuotientNorm F T))
+    (Φ : ℕ → (PontryaginDual.map τ).ker → ℂ → ℂ) (hΦ : ∀ n χ, Differentiable ℂ (Φ n χ))
+    (hb : ∀ a b : ℝ, ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
+      (∀ χ ∉ H, ∀ n (z : ℂ), z.re ∈ Icc a b → Φ n χ z = 0) ∧
+      ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re ∈ Icc a b →
+        (1 + p χ) ^ k * ‖z ^ m * Φ n χ.val z‖ ≤ B) :
+    ∃ W : ℕ → ℬₛ(T), Bornology.IsVonNBounded ℂ (range W) ∧
+      ∀ n (χ : (PontryaginDual.map τ).ker) (z : ℂ), 0 < z.re →
+        sLocalThetaMellinIntegral (W n) (chartₜ(T, χ.val) z) = Φ n χ z := by
+  obtain ⟨H₀, φ, hH₀, hφ0, hφM, hφb⟩ := meyerFlatLift_profiles T τ Φ hΦ hb
+  obtain ⟨W, hW, hWM⟩ := meyerFlatLift_construction T τ hτ H₀ hH₀ φ hφ0 hφb
+  exact ⟨W, hW, fun n χ z hz ↦ (hWM n χ z hz).trans (hφM n χ z)⟩
+
+/-- On the critical line, the reflected identity for three tests gives the vanishing of the
+theta Mellin integral of `a - b - F c`. -/
+private theorem meyerPositiveLines_line_zero
+    (T : Finset V) (a b c : ℬₛ(T))
+    (χ η : PontryaginDual (SIdeleQuotient F T)) (hχ : χ = η⁻¹) (z : ℂ) (hz : z.re = 1 / 2)
+    (h : sLocalThetaMellinIntegral c (chartₜ(T, η) (1 - z)) =
+      sLocalRhoFactor (chartₜ(T, η) (1 - z)) *
+        (sLocalThetaMellinIntegral a (chartₜ(T, χ) z) -
+          sLocalThetaMellinIntegral b (chartₜ(T, χ) z))) :
+    sLocalThetaMellinIntegral a (chartₜ(T, χ) z) - sLocalThetaMellinIntegral b (chartₜ(T, χ) z) -
+      sLocalThetaMellinIntegral (sAdeleSchwartzFourier c) (chartₜ(T, χ) z) = 0 := by
+  subst hχ
+  have hz0 : 0 < z.re := by rw [hz]; norm_num
+  have h1 : (1 - z).re = 1 / 2 := by
+    rw [Complex.sub_re, Complex.one_re, hz]; norm_num
+  have h10 : 0 < (1 - z).re := by rw [h1]; norm_num
+  have hI : (1 - z).re ∈ Ioo (0 : ℝ) 1 := by
+    rw [h1]; constructor <;> norm_num
+  have hfe : sLocalIdelicZFunction c (chartₜ(T, η) (1 - z)) =
+      sLocalRhoFactor (chartₜ(T, η) (1 - z)) *
+        sLocalIdelicZFunction (sAdeleSchwartzFourier c)
+          (chartₜ(T, (η⁻¹ : PontryaginDual (SIdeleQuotient F T))) (1 - (1 - z))) :=
+    meyerCriticalStrip_equation
+      T η c (1 - z) hI
+  rw [sub_sub_cancel,
+    sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T c η (1 - z) h10,
+    sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T (sAdeleSchwartzFourier c) η⁻¹ z hz0,
+    h] at hfe
+  have hρ : sLocalRhoFactor (chartₜ(T, η) (1 - z)) ≠ 0 := by
+    intro h0
+    have hn := sLocalRhoFactor_norm_criticalLine η (1 - z) h1
+    rw [h0, norm_zero] at hn
+    exact zero_ne_one hn
+  exact sub_eq_zero.mpr (mul_left_cancel₀ hρ hfe)
+
+/-- Three tests whose theta Mellin integrals satisfy the reflected identity on the critical
+line, at the angular characters: the class of the first is the sum of the class of the second
+and of the class of the Fourier transform of the third. -/
+private theorem meyerPositiveLines_class_eq
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (hτ : RightInverse τ (sIdeleQuotientNorm F T)) (a b c : ℬₛ(T))
+    (h : ∀ χ η : (PontryaginDual.map τ).ker, η.val = χ.val⁻¹ → ∀ z : ℂ, z.re = 1 / 2 →
+      sLocalThetaMellinIntegral c (chartₜ(T, η.val) (1 - z)) =
+        sLocalRhoFactor (chartₜ(T, η.val) (1 - z)) *
+          (sLocalThetaMellinIntegral a (chartₜ(T, χ.val) z) -
+            sLocalThetaMellinIntegral b (chartₜ(T, χ.val) z))) :
+    (sLocalAdelicTheta F T).ker.mkQ a = (sLocalAdelicTheta F T).ker.mkQ b +
+      (sLocalAdelicTheta F T).ker.mkQ (sAdeleSchwartzFourier c) := by
+  have hpos (χ : (PontryaginDual.map τ).ker) (z : ℂ) (hz : 0 < z.re) :
+      sLocalThetaMellinIntegral a (chartₜ(T, χ.val) z) -
+        sLocalThetaMellinIntegral b (chartₜ(T, χ.val) z) -
+        sLocalThetaMellinIntegral (sAdeleSchwartzFourier c) (chartₜ(T, χ.val) z) = 0 := by
+    refine sLocalMellinSchwartzBounds_meyer_line_support
+      (fun s : ℂ ↦ sLocalThetaMellinIntegral a (chartₜ(T, χ.val) s) -
+        sLocalThetaMellinIntegral b (chartₜ(T, χ.val) s) -
+        sLocalThetaMellinIntegral (sAdeleSchwartzFourier c) (chartₜ(T, χ.val) s))
+      (((sLocalThetaMellinIntegral_analyticOn a χ.val).sub
+        (sLocalThetaMellinIntegral_analyticOn b χ.val)).sub
+        (sLocalThetaMellinIntegral_analyticOn (sAdeleSchwartzFourier c) χ.val))
+      (1 / 2) (by norm_num) (fun s hs ↦ ?_) z hz
+    have hinv : (χ⁻¹ : (PontryaginDual.map τ).ker).val = χ.val⁻¹ := rfl
+    exact meyerPositiveLines_line_zero T a b c χ.val (χ⁻¹ : (PontryaginDual.map τ).ker).val
+      (inv_eq_iff_eq_inv.mpr hinv).symm s hs (h χ χ⁻¹ hinv s hs)
+  apply sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_dilation_line T
+  funext χ
+  refine Exists.elim (sLocalMellinSchwartzBounds_meyer_angular_normalization T τ hτ χ)
+    fun η hη ↦ Exists.elim hη fun z hz ↦ ?_
+  have hp1 : 0 < (1 : ℂ).re := by norm_num
+  have hpz : 0 < (1 + z).re := by
+    rw [Complex.add_re, hz.1, Complex.one_re]; norm_num
+  have key := hpos η (1 + z) hpz
+  rw [← hz.2.1] at key
+  rw [← sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T a χ 1 hp1,
+    ← sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T b χ 1 hp1,
+    ← sLocalMellinSchwartzBounds_meyer_zeta_equals_theta T (sAdeleSchwartzFourier c) χ 1 hp1] at key
+  change sLocalIdelicZFunction a (chartₜ(T, χ) 1) = (sLocalThetaMellin
+    ((sLocalAdelicTheta F T).ker.mkQ b +
+      (sLocalAdelicTheta F T).ker.mkQ (sAdeleSchwartzFourier c))).val _
+  rw [map_add]
+  change sLocalIdelicZFunction a (chartₜ(T, χ) 1) = sLocalIdelicZFunction b (chartₜ(T, χ) 1) +
+    sLocalIdelicZFunction (sAdeleSchwartzFourier c) (chartₜ(T, χ) 1)
+  linear_combination key
+
+/-- After R. Meyer, *On a representation of the idele class group related to
+primes and zeros of L-functions*, Duke Math. J. 127 (2005), arXiv:math/0311468 (page numbers
+are those of the preprint), Corollary 4.17, p. 34, in degree zero, with the summation map of
+§5.2, p. 38: the sum over the S-units identifies the coinvariants of the Schwartz–Bruhat space
+of the S-adeles with `T(C_S)` as bornological spaces. Used: a bounded subset of `T(C_S)` is
+the image of a bounded set of tests.
+For a sequence of tests whose θ-classes have one conductor level and lie in one Fréchet
+subspace of the θ-quotient: if the Mellin transforms of the θ-functions of the tests, and of
+their additive Fourier transforms, satisfy the bounds of the criterion on every line of real
+part greater than zero, then the θ-classes form a bounded set.
+This is the statement of
+`sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles` with the bounds
+assumed on all lines of positive real part, not only outside the critical strip; that is
+the bornology of `T(C_S)` (p. 27, after Proposition 4.4, and (24), p. 28: the functions and
+their Fourier transforms, multiplied by `|x|^α`, are bounded Schwartz–Bruhat functions on
+`C_S` for every α > 0), written on the dual group.
+Proved here from
+`sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift`
+and
+`sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition`.
+Deviation: The lemma needs neither of the two exclusions `hreal` and `hS` of
+`sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles`, nor its hypotheses
+`hk`, `hM` and `hm`. What the project added in writing the paper's statement for this
+library is as there. -/
+private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines
+    (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
+    (hτ : RightInverse τ (sIdeleQuotientNorm F T)) (v : ℕ → ℬₛ(T))
+    (hw : ∀ f ∈ ({v,fun n ↦ sAdeleSchwartzFourier (v n)} : Set (ℕ → ℬₛ(T))),
+      ∀ a : ℝ, 0 < a → ∃ H : Subgroup (PontryaginDual.map τ).ker, H.FG ∧
+      (∀ χ ∉ H, ∀ n (z : ℂ), z.re = a → sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val) z) = 0) ∧
+      ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re = a →
+        (1+p χ)^k * ‖z^m*sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val.val) z)‖ ≤ B) :
+    Bornology.IsVonNBounded ℂ (range fun n ↦ (sLocalAdelicTheta F T).ker.mkQ (v n)) := by
+  refine Exists.elim
+    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_decomposition
+      T τ v hw) fun Φ₁ h1 ↦ Exists.elim h1 fun Φ₂ hΦ ↦ ?_
+  refine Exists.elim
+    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift
+      T τ hτ Φ₁ hΦ.1 hΦ.2.2.1) fun W₁ hW₁ ↦ ?_
+  refine Exists.elim
+    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines_flat_lift
+      T τ hτ Φ₂ hΦ.2.1 hΦ.2.2.2.1) fun W₂ hW₂ ↦ ?_
+  have hcls (n : ℕ) : (sLocalAdelicTheta F T).ker.mkQ (v n) =
+      (sLocalAdelicTheta F T).ker.mkQ (W₁ n) +
+        (sLocalAdelicTheta F T).ker.mkQ (sAdeleSchwartzFourier (W₂ n)) := by
+    refine meyerPositiveLines_class_eq T τ hτ (v n) (W₁ n) (W₂ n) fun χ η hη z hz ↦ ?_
+    have hz0 : 0 < z.re := by rw [hz]; norm_num
+    have h10 : 0 < (1 - z).re := by
+      rw [Complex.sub_re, Complex.one_re, hz]; norm_num
+    rw [hW₂.2 n η (1 - z) h10, hW₁.2 n χ z hz0]
+    exact (hΦ.2.2.2.2 n χ η hη z hz).symm
+  have hB₁ : Bornology.IsVonNBounded ℂ
+      (range fun n ↦ (sLocalAdelicTheta F T).ker.mkQ (W₁ n)) := by
+    refine (hW₁.1.image (sLocalAdelicTheta F T).ker.mkQL).subset ?_
+    rintro _ ⟨n, rfl⟩
+    exact ⟨W₁ n, mem_range_self n, rfl⟩
+  have hB₂ : Bornology.IsVonNBounded ℂ
+      (range fun n ↦ (sLocalAdelicTheta F T).ker.mkQ (W₂ n)) := by
+    refine (hW₂.1.image (sLocalAdelicTheta F T).ker.mkQL).subset ?_
+    rintro _ ⟨n, rfl⟩
+    exact ⟨W₂ n, mem_range_self n, rfl⟩
+  have hB₃ := sLocalMellinSchwartzBounds_meyer_fourier_bounded T W₂ hB₂
+  refine (hB₁.add hB₃).subset ?_
+  rintro _ ⟨n, rfl⟩
+  exact ⟨_, mem_range_self n, _, mem_range_self n, (hcls n).symm⟩
+
+/-- After R. Meyer, *On a representation of the idele class group related to
 primes and zeros of L-functions*, Duke Math. J. 127 (2005), arXiv:math/0311468 (page numbers
 are those of the preprint), Corollary 4.17, p. 34, and Lemma 4.20, p. 36, at α = 1: the
-direction from bounds on the Mellin transforms to bounded classes, in the cases that Lean does
-not prove.
+direction from bounds on the Mellin transforms to bounded classes, outside the two cases
+proved separately. It is proved in Lean, from
+`sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip`
+(Lemma 4.20) and
+`sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines`
+(Corollary 4.17).
 For a sequence of tests whose θ-classes have one conductor level and lie in one Fréchet
 subspace of the θ-quotient: if the Mellin transforms of the θ-functions of the tests, and of
 their additive Fourier transforms, are bounded on every line of real part greater than one
@@ -6675,7 +15025,9 @@ classes span a finite-dimensional space (`hS`), and the case in which they are g
 real Schwartz profiles (`hreal`; it covers ℚ with no finite place). The other direction of the
 criterion is proved in Lean as well (`sLocalMellinSchwartzBounds_meyer_general_forward`). The
 hypotheses `hk`, `hM` and `hm` follow from the bounds and are proved before this statement is
-applied. The bounds are written without derivatives, which is equivalent
+applied. The proof uses neither of the two exclusions (`hreal`, `hS`) nor `hk`, `hM` and `hm`,
+so this direction holds in all cases; the hypotheses stay because a proof does not change the
+statement. The bounds are written without derivatives, which is equivalent
 (`sLocalMellinSchwartzBounds_meyer_zeroth_iff`), and the conclusion is boundedness in the
 quotient, which is equivalent to representatives in one bounded set
 (`sLocalMellinSchwartzBounds_meyer_lift_iff_quotient_bounded`).
@@ -6685,7 +15037,9 @@ that the bounded sets of the Schwartz–Bruhat space here are the paper's, that 
 the S-unit sum is the closed span the paper divides by, the normalizations of the Fourier
 transform and of the Haar measures, and the seminorms on the dual group. The integrator and
 an independent reviewer checked these steps against the paper for the whole criterion (#7346);
-no specialist in the paper's framework has. -/
+no specialist in the paper's framework has. Since the statement is now proved in Lean in the
+terms of this library, its truth does not rest on that comparison; the comparison only says
+how the statement relates to the paper. -/
 private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
     (hτ : RightInverse τ (sIdeleQuotientNorm F T)) (v : ℕ → ℬₛ(T))
     (hreal : ¬ ∃ c : ℝ, 0 < c ∧ ∃ (P : ℬₛ(T) → SchwartzMap ℝ ℂ)
@@ -6707,8 +15061,9 @@ private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_prof
       (∀ χ ∉ H, ∀ n (z : ℂ), z.re = a → sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val) z) = 0) ∧
       ∀ (p : GroupSeminorm H) (k m : ℕ), ∃ B : ℝ, ∀ (χ : H) n (z : ℂ), z.re = a →
         (1+p χ)^k * ‖z^m*sLocalThetaMellinIntegral (f n) (chartₜ(T,χ.val.val) z)‖ ≤ B) :
-    Bornology.IsVonNBounded ℂ (range fun n ↦ (sLocalAdelicTheta F T).ker.mkQ (v n)) := by
-  sorry
+    Bornology.IsVonNBounded ℂ (range fun n ↦ (sLocalAdelicTheta F T).ker.mkQ (v n)) :=
+  sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_positive_lines T τ hτ v
+    (sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles_critical_strip T τ v hw)
 
 /-- The real Schwartz profile criterion covers the rational empty-place stage of the inverse comparison. -/
 private theorem sLocalMellinSchwartzBounds_meyer_infinite_span_bound (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T)
@@ -7076,9 +15431,9 @@ seminorm is bounded by a multiple of word length, itself a group seminorm. The
 subgroup and the seminorm bounds may depend on the line.
 Lean proves that bounded classes have bounded Mellin transforms, and the converse when the
 classes span a finite-dimensional space or are given by even real Schwartz profiles (#7434).
-The rest of the converse is the classical input
-`sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles`, which is not proved in
-Lean; what the project added in writing the paper's statement for this library is said
+The rest of the converse is
+`sLocalMellinSchwartzBounds_meyer_infinite_span_outside_real_profiles`, which is proved in
+Lean as well; what the project added in writing the paper's statement for this library is said
 there. -/
 private theorem sLocalMellinSchwartzBounds_meyer
     (T : Finset V) (τ : ℝ≥0ˣ →ₜ* SIdeleQuotient F T) (hτ : RightInverse τ (sIdeleQuotientNorm F T))
