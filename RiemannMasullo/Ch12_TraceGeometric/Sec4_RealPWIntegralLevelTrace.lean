@@ -179,7 +179,7 @@ theorem exists_realPWTestCutoff_integralLevel_trace_limit (hY : 0 < Y) (hα : 1 
   refine ⟨e, orthogonal_realPWBand_integralVector_eq_closure (hs := hs) hα (by linarith) hY hint
     he, ?_⟩
   choose T hT1 hT2 using fun L ↦
-    exists_realPWTestCutoff_compl_nuclear Y α s hs hY ha ha1.le ψ hψc hψ0 L e
+    exists_realPWTestCutoff_compl_nuclear Y α s hs hY ha (zero_lt_one.trans ha1) ψ hψc hψ0 L e
   refine ⟨T, hT1, ?_⟩
   have h : (fun L ↦ hilbertTrace (T L)) = fun L ↦
       (∫ g, ψ g * realPWSharpTrace Y α s hs g L) -
@@ -194,7 +194,7 @@ theorem exists_realPWTestCutoff_integralLevel_trace_limit (hY : 0 < Y) (hα : 1 
     rfl
   have hN0 : ((‖e‖ ^ 2 : ℝ) : ℂ) ≠ 0 :=
     Complex.ofReal_ne_zero.mpr (pow_ne_zero 2 (norm_ne_zero_iff.mpr he0))
-  have h2 := (tendsto_realPWTestCorrection Y α s hs hY ha ha1.le ψ hψc hψ0 e
+  have h2 := (tendsto_realPWTestCorrection Y α s hs hY ha (zero_lt_one.trans ha1) ψ hψc hψ0 e
     (fun g ↦ (g : ℂ) * ((‖e‖ ^ 2 : ℝ) : ℂ)) fun g hg ↦ by
       rw [integral_star_integralVector_mul_dilate (hs := hs) hY he (ha1.trans_le hg.1) e,
         hN]).const_mul
