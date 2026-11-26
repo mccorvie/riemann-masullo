@@ -230,6 +230,8 @@ garbled, does occur. The PDF decides. Before you formalize a formula, look at th
 
 ## Building and checking
 
+Before rebuilding from scratch on a fresh or stale checkout, fetch prebuilt `.olean`s: `lake exe cache get` pulls Mathlib, and `scripts/ci/base_state.py` pulls the newest `main-state` artifact from GitHub Actions for `RiemannMasullo` (`GH_REPO=mccorvie/riemann-masullo REPO_ID=$(gh api repos/mccorvie/riemann-masullo --jq .id) python3 scripts/ci/base_state.py --work . --base "$(git rev-parse origin/main)" --out /tmp/main-state`). Explore [`scripts/`](scripts/) and [`scripts/ci/verdict.py`](scripts/ci/verdict.py) for the exact local CI checks (`CheckImportAll.lean`, `AbbrevSizes.lean`, `Signatures.lean`, `lint.sh`).
+
 ```sh
 lake build RiemannMasullo.Ch02_AdelicTheta.Sec1   # one module
 lake lean RiemannMasullo/Ch02_AdelicTheta/Sec1.lean   # one file, or a scratch copy, with the project's options
