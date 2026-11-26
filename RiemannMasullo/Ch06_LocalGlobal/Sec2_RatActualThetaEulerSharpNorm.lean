@@ -2,7 +2,6 @@ module
 
 public import RiemannMasullo.Ch06_LocalGlobal.Sec2_RatActualThetaEulerLogL2
 public import Mathlib.Analysis.Normed.Group.Tannery
-import all RiemannMasullo.Ch06_LocalGlobal.Sec2_RatActualThetaEulerLogL2
 
 /-! # Sharp Hilbert operator norm of the rational standard theta Euler cone
 
@@ -94,7 +93,7 @@ theorem coneMass_le_norm_chartOperator (S : Finset (HeightOneSpectrum (𝓞 ℚ)
     let P := unitBox R
     have hp : ‖P‖ = 1 := norm_unitBox hR
     have hc (n) : coneTerm P n = w n • U n P := by
-      unfold coneTerm
+      rw [coneTerm_apply]
       apply Lp.ext
       filter_upwards [Lp.coeFn_smul ((Real.sqrt (latticeRadius n) : ℂ)⁻¹) (U n P),
         Lp.coeFn_smul (w n) (U n P)] with t h₁ h₂

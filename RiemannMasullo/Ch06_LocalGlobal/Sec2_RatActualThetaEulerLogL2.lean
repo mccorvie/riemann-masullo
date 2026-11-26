@@ -184,6 +184,12 @@ theorem coneMass_eq (S : Finset V) :
 def coneTerm {S : Finset V} (P : LogL2) (n : S → ℕ) : LogL2 :=
   (Real.sqrt (latticeRadius n) : ℂ)⁻¹ • Measure.translateLp volume 2 (Real.log (latticeRadius n)) P
 
+theorem coneTerm_apply {S : Finset V} (P : LogL2) (n : S → ℕ) :
+    coneTerm P n =
+      (Real.sqrt (latticeRadius n) : ℂ)⁻¹ • Measure.translateLp volume 2 (Real.log (latticeRadius n)) P := by
+  unfold coneTerm
+  rfl
+
 theorem norm_coneTerm_summable (S : Finset V) (P : LogL2) :
     Summable fun n : S → ℕ ↦ ‖coneTerm P n‖ := by
   simpa only [coneTerm, norm_smul, norm_inv, Complex.norm_real, Real.norm_eq_abs,
