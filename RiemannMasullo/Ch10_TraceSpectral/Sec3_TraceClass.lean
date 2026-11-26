@@ -501,47 +501,21 @@ private theorem uniform_jetCount_le_of_closedBall
         obtain ⟨z, hz, rfl⟩ := Finset.mem_image.mp hw
         exact hball z hz
 
-/-- Paper: Theorems 10.3.1.1(1)–(2) and 10.3.2.1(1)–(2), pp. 448–455. The analytic input of the
-clustered statement `spectralStripConvolution_summable_clusterTraceNorms`, with no operator, no
-quotient space and no biorthogonal vector in it, for every number field and every test. There
-are a choice `χ` of the unitary extensions of the norm-one characters, a half-width `X` and,
-for each angular component `ω`, an entire function `ϑ ω` of polynomial growth on a vertical
-strip that vanishes at every zero of the component to at least the surviving multiplicity, and
-heights `T ω k ∈ [2k, 2k + 1]`, such that: with lower bounds `ℓ ω k > 0` for `ϑ ω` and upper
-bounds `φb ω k` for the Mellin transform of the test on the boundary of the rectangle
-`[-X, X] × [T ω k, T ω (k + 1)]`, the numbers of jets between consecutive heights, times
-`φb / ℓ`, times a power of the height, form a summable family over the components and heights.
-The extensions are chosen, not given: the heights and the growth of `ϑ ω` are measured from
-height `0` in the chart of `χ ω`. For extensions `χ ω · |·|^{iτ_ω}` with `τ_ω` growing fast the
-summability is not to be expected, since each term is at least the number of jets times a
-positive constant times the squared height times the size of the Mellin transform on the
-boundary; this remark is not formalized.
-In the proof the extensions `χ ω` are those of a norm section, trivial on its image
-(`exists_spectralBasepointChoice_of_normSection`). The functions `ϑ ω` are the multipliers of
-`exists_uniform_heckeMultiplier_rectBoundary`, bounded by one, so `A ω = 0`.
-The lower bounds are `ℓ ω k = c / (Y ω + |k| + 1) ^ n` with `Y ω = 1 + κ (χ ω)` for the size
-`κ` of `exists_spectralLevel`; the constants `c`, `n` are the same for all the components that
-see the test. For these components the number of jets between two heights is at most a constant
-times `Y ω + |k|` (Jensen), and the Mellin transform of the test on the boundary of the `k`-th
-rectangle is at most a constant times any negative power of `1 + κ (χ ω) + |k|`. The components
-that see the test with `κ (χ ω) ≤ T` number at most a polynomial in `T`, so the sum over the
-components and the heights converges. The other components carry a zero Mellin transform, and
-their data come from the same theorems without uniformity.
-The statement holds for every real Sobolev order `s`: it enters only through the surviving
-multiplicities, which are at most the orders of the zeros.
-Reconstruction: The paper does not state this. It is the project's formulation of what the
-trace-class assertion of Theorem 10.3.2.1(2) needs when the zeros are summed by clusters cut
-along well-chosen heights and not one at a time. The clustered statement, and from it trace
-class, are proved from it below (`spectralStripConvolution_summable_clusterTraceNorms`,
-`spectralStripConvolution_nuclear_of_summable_clusterTraceNorms`), through the contour
-multiplier of `spectralStripConvolution_summable_clusterTraceNorms_of_boundaryData` of
-`Sec3_Clusters`. It asks for no bound at a single zero, so no lower bound for the distance
-between two zeros enters. -/
-theorem spectralStripConvolution_exists_clusterBoundaryData
+/-- Paper: Theorems 10.3.1.1(1)–(2) and 10.3.2.1(1)–(2), pp. 448–455. The boundary data of
+`spectralStripConvolution_exists_clusterBoundaryData` with one more conclusion: the same bounds
+`φb ω k` control the Mellin transform of the test on the boundary of each rectangle after a
+shift of the exponent by `i t`, at the cost of the factor `(1 + |t|) ^ p` for one exponent `p`.
+A shift of the exponent by `i t` is multiplication of the test by `|·| ^ (i t)`, so the same
+characters, heights, multipliers and clusters serve the test and all these modulations of it.
+In the proof `p` is the exponent of the decay of the Mellin transform that the sum over the
+components needs, and the factor comes from `1 + ‖w‖ ≤ (1 + |t|) (1 + ‖w + i t‖)`.
+Reconstruction: The paper does not state this. It is what a bound for a family of tests with
+common clusters needs from the proof of the trace-class assertion of Theorem 10.3.2.1(2). -/
+theorem spectralStripConvolution_exists_clusterBoundaryData_shift
     {α s : ℝ} (hα : 0 ≤ α) (φ : BruhatCompactSupport C𝔽) :
     ∃ (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (β X : ℝ) (A : PontryaginDual C₁ → ℕ)
       (ϑ : PontryaginDual C₁ → ℂ → ℂ)
-      (T : PontryaginDual C₁ → ℤ → ℝ) (φb ℓ : PontryaginDual C₁ → ℤ → ℝ)
+      (T : PontryaginDual C₁ → ℤ → ℝ) (φb ℓ : PontryaginDual C₁ → ℤ → ℝ) (p : ℕ)
       (hfin : ∀ ω (k : ℤ),
         {z : Z(χ, α) | z.val.1 = ω ∧ T ω k ≤ z.val.2.2 ∧ z.val.2.2 < T ω (k + 1)}.Finite),
       IsSpectralBasepointChoice (F := F) (fun ω ↦ χ ω) ∧
@@ -552,8 +526,9 @@ theorem spectralStripConvolution_exists_clusterBoundaryData
       (∀ ω (k : ℤ), T ω k ∈ Icc (2 * (k : ℝ)) (2 * (k : ℝ) + 1)) ∧
       (∀ ω k, 0 < ℓ ω k) ∧
       (∀ ω k, ∀ w ∈ rectBoundary (-X) X (T ω k) (T ω (k + 1)), ℓ ω k ≤ ‖ϑ ω w‖) ∧
-      (∀ ω k, ∀ w ∈ rectBoundary (-X) X (T ω k) (T ω (k + 1)),
-        ‖∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ ω) w g ∂μ𝔽‖ ≤ φb ω k) ∧
+      (∀ ω k, ∀ w ∈ rectBoundary (-X) X (T ω k) (T ω (k + 1)), ∀ t : ℝ,
+        ‖∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ ω) (w + (t : ℂ) * Complex.I) g ∂μ𝔽‖ ≤
+          (1 + |t|) ^ p * φb ω k) ∧
       Summable (fun p : PontryaginDual C₁ × ℤ ↦
         ((∑ z ∈ (hfin p.1 p.2).toFinset, N(χ, α, s, z) : ℕ) : ℝ) *
           (rectInterpolantGaussianConstant X β (A p.1) *
@@ -692,16 +667,17 @@ theorem spectralStripConvolution_exists_clusterBoundaryData
       _ = 6 * CJ' * L ω k := by ring
   let G₀ : ℝ := rectInterpolantGaussianConstant X β 0
   have hG₀ : 0 ≤ G₀ := rectInterpolantGaussianConstant_nonneg hX0.le _
-  refine ⟨χ, β, X, fun _ ↦ 0, ϑ, T, φb, ℓ, hfin, hχ, hαβ, hβX, hϑd, fun ω u hu ↦ ?_,
+  refine ⟨χ, β, X, fun _ ↦ 0, ϑ, T, φb, ℓ, Nd, hfin, hχ, hαβ, hβX, hϑd, fun ω u hu ↦ ?_,
     fun z ↦ spectralStripMultiplicity_le_analyticOrderAt a χ z (hϑord z.val.1), hT,
-    fun ω k ↦ ?_, hlow, fun ω k w hw ↦ ?_, ?_⟩
+    fun ω k ↦ ?_, hlow, fun ω k w hw t ↦ ?_, ?_⟩
   · rw [pow_zero]
     exact hϑup ω u hu
   · have := hcc ω
     have hbase : 0 < Y ω + |(k : ℝ)| + 1 := by linarith [hY1 ω, abs_nonneg (k : ℝ)]
     exact div_pos this (pow_pos hbase _)
-  · -- The Mellin transform on the boundary of a rectangle.
-    change ‖M ω w‖ ≤ if ω ∈ S then Kd * 3 ^ Nd / L ω k ^ Nd else 0
+  · -- The Mellin transform on the boundary of a rectangle, after a shift of the exponent.
+    change ‖M ω (w + (t : ℂ) * Complex.I)‖ ≤
+      (1 + |t|) ^ Nd * (if ω ∈ S then Kd * 3 ^ Nd / L ω k ^ Nd else 0)
     by_cases hS : ω ∈ S
     · have hbd : |w.re| ≤ X ∧ T ω k ≤ w.im ∧ w.im ≤ T ω (k + 1) := by
         rcases mem_rectBoundary_iff.mp hw with ⟨h1, h | h⟩ | ⟨h1, h | h⟩
@@ -709,11 +685,15 @@ theorem spectralStripConvolution_exists_clusterBoundaryData
         · exact ⟨abs_le.mpr h1, (hT1 ω k).trans h.ge, h.le⟩
         · exact ⟨by rw [h, abs_neg, abs_of_pos hX0], h1.1, h1.2⟩
         · exact ⟨by rw [h, abs_of_pos hX0], h1.1, h1.2⟩
-      have hdec := hKd (χ ω) (hχτ ω) w hbd.1
-      have him : |w.im| ≤ ‖w‖ := Complex.abs_im_le_norm w
+      have hre' : |(w + (t : ℂ) * Complex.I).re| ≤ X := by simpa using hbd.1
+      have hdec := hKd (χ ω) (hχτ ω) (w + (t : ℂ) * Complex.I) hre'
+      have hww : ‖w‖ ≤ ‖w + (t : ℂ) * Complex.I‖ + |t| := by
+        have h := norm_sub_le (w + (t : ℂ) * Complex.I) ((t : ℂ) * Complex.I)
+        simpa using h
       have hkw : |(k : ℝ)| ≤ ‖w‖ + 2 := by
         have h1 := (hT ω k).1
         have h2 := (hT ω (k + 1)).2
+        have him : |w.im| ≤ ‖w‖ := Complex.abs_im_le_norm w
         push_cast at h2
         rcases le_or_gt 0 k with hk | hk
         · have hk' : (0 : ℝ) ≤ k := by exact_mod_cast hk
@@ -722,22 +702,31 @@ theorem spectralStripConvolution_exists_clusterBoundaryData
         · have hk' : (k : ℝ) ≤ -1 := by exact_mod_cast Int.le_sub_one_of_lt hk
           rw [abs_of_nonpos (by linarith)]
           linarith [neg_abs_le w.im]
-      have hLle : L ω k ≤ 3 * (1 + ‖w‖ + κ (χ ω)) := by
+      have hLle : L ω k ≤
+          3 * ((1 + |t|) * (1 + ‖w + (t : ℂ) * Complex.I‖ + κ (χ ω))) := by
         dsimp only [L]
-        linarith [hκ0 (χ ω), norm_nonneg w]
+        nlinarith [hκ0 (χ ω), norm_nonneg (w + (t : ℂ) * Complex.I), abs_nonneg t,
+          mul_nonneg (abs_nonneg t) (norm_nonneg (w + (t : ℂ) * Complex.I)),
+          mul_nonneg (abs_nonneg t) (hκ0 (χ ω))]
       have hL0 : 0 < L ω k := by linarith [hL1 ω k]
-      rw [ite_eq_left hS, le_div_iff₀ (pow_pos hL0 Nd)]
-      calc ‖M ω w‖ * L ω k ^ Nd ≤ ‖M ω w‖ * (3 * (1 + ‖w‖ + κ (χ ω))) ^ Nd :=
+      rw [ite_eq_left hS, mul_div_assoc', le_div_iff₀ (pow_pos hL0 Nd)]
+      calc ‖M ω (w + (t : ℂ) * Complex.I)‖ * L ω k ^ Nd
+          ≤ ‖M ω (w + (t : ℂ) * Complex.I)‖ *
+              (3 * ((1 + |t|) * (1 + ‖w + (t : ℂ) * Complex.I‖ + κ (χ ω)))) ^ Nd :=
             mul_le_mul_of_nonneg_left (pow_le_pow_left₀ hL0.le hLle Nd) (norm_nonneg _)
-        _ = 3 ^ Nd * ((1 + ‖w‖ + κ (χ ω)) ^ Nd * ‖M ω w‖) := by
-            rw [mul_pow]
+        _ = (1 + |t|) ^ Nd * (3 ^ Nd *
+              ((1 + ‖w + (t : ℂ) * Complex.I‖ + κ (χ ω)) ^ Nd *
+                ‖M ω (w + (t : ℂ) * Complex.I)‖)) := by
+            rw [mul_pow, mul_pow]
             ring
-        _ ≤ 3 ^ Nd * Kd := mul_le_mul_of_nonneg_left hdec (by positivity)
-        _ = Kd * 3 ^ Nd := mul_comm _ _
-    · have h0 : M ω w = 0 := by
+        _ ≤ (1 + |t|) ^ Nd * (3 ^ Nd * Kd) :=
+            mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_left hdec (by positivity))
+              (by positivity)
+        _ = (1 + |t|) ^ Nd * (Kd * 3 ^ Nd) := by ring
+    · have h0 : M ω (w + (t : ℂ) * Complex.I) = 0 := by
         by_contra h
-        exact hS ⟨w, h⟩
-      rw [ite_eq_right hS, h0, norm_zero]
+        exact hS ⟨_, h⟩
+      rw [ite_eq_right hS, h0, norm_zero, mul_zero]
   · -- The sum over the components and the heights.
     have hinjχ : Function.Injective χ := fun ω ω' h ↦ by rw [← hχ ω, ← hχ ω', h]
     refine summable_prod_int_of_encard_le_of_norm_le (E := ℝ) S (fun ω ↦ κ (χ ω))
@@ -797,6 +786,69 @@ theorem spectralStripConvolution_exists_clusterBoundaryData
           (cc ω / (Y ω + |(k : ℝ)| + 1) ^ nn ω) * (1 + |T ω k|) ^ (0 + 2))) = 0
       rw [ite_eq_right hS]
       simp
+
+/-- Paper: Theorems 10.3.1.1(1)–(2) and 10.3.2.1(1)–(2), pp. 448–455. The analytic input of the
+clustered statement `spectralStripConvolution_summable_clusterTraceNorms`, with no operator, no
+quotient space and no biorthogonal vector in it, for every number field and every test. There
+are a choice `χ` of the unitary extensions of the norm-one characters, a half-width `X` and,
+for each angular component `ω`, an entire function `ϑ ω` of polynomial growth on a vertical
+strip that vanishes at every zero of the component to at least the surviving multiplicity, and
+heights `T ω k ∈ [2k, 2k + 1]`, such that: with lower bounds `ℓ ω k > 0` for `ϑ ω` and upper
+bounds `φb ω k` for the Mellin transform of the test on the boundary of the rectangle
+`[-X, X] × [T ω k, T ω (k + 1)]`, the numbers of jets between consecutive heights, times
+`φb / ℓ`, times a power of the height, form a summable family over the components and heights.
+The extensions are chosen, not given: the heights and the growth of `ϑ ω` are measured from
+height `0` in the chart of `χ ω`. For extensions `χ ω · |·|^{iτ_ω}` with `τ_ω` growing fast the
+summability is not to be expected, since each term is at least the number of jets times a
+positive constant times the squared height times the size of the Mellin transform on the
+boundary; this remark is not formalized.
+In the proof the extensions `χ ω` are those of a norm section, trivial on its image
+(`exists_spectralBasepointChoice_of_normSection`). The functions `ϑ ω` are the multipliers of
+`exists_uniform_heckeMultiplier_rectBoundary`, bounded by one, so `A ω = 0`.
+The lower bounds are `ℓ ω k = c / (Y ω + |k| + 1) ^ n` with `Y ω = 1 + κ (χ ω)` for the size
+`κ` of `exists_spectralLevel`; the constants `c`, `n` are the same for all the components that
+see the test. For these components the number of jets between two heights is at most a constant
+times `Y ω + |k|` (Jensen), and the Mellin transform of the test on the boundary of the `k`-th
+rectangle is at most a constant times any negative power of `1 + κ (χ ω) + |k|`. The components
+that see the test with `κ (χ ω) ≤ T` number at most a polynomial in `T`, so the sum over the
+components and the heights converges. The other components carry a zero Mellin transform, and
+their data come from the same theorems without uniformity.
+The statement holds for every real Sobolev order `s`: it enters only through the surviving
+multiplicities, which are at most the orders of the zeros.
+Reconstruction: The paper does not state this. It is the project's formulation of what the
+trace-class assertion of Theorem 10.3.2.1(2) needs when the zeros are summed by clusters cut
+along well-chosen heights and not one at a time. The clustered statement, and from it trace
+class, are proved from it below (`spectralStripConvolution_summable_clusterTraceNorms`,
+`spectralStripConvolution_nuclear_of_summable_clusterTraceNorms`), through the contour
+multiplier of `spectralStripConvolution_summable_clusterTraceNorms_of_boundaryData` of
+`Sec3_Clusters`. It asks for no bound at a single zero, so no lower bound for the distance
+between two zeros enters. -/
+theorem spectralStripConvolution_exists_clusterBoundaryData
+    {α s : ℝ} (hα : 0 ≤ α) (φ : BruhatCompactSupport C𝔽) :
+    ∃ (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (β X : ℝ) (A : PontryaginDual C₁ → ℕ)
+      (ϑ : PontryaginDual C₁ → ℂ → ℂ)
+      (T : PontryaginDual C₁ → ℤ → ℝ) (φb ℓ : PontryaginDual C₁ → ℤ → ℝ)
+      (hfin : ∀ ω (k : ℤ),
+        {z : Z(χ, α) | z.val.1 = ω ∧ T ω k ≤ z.val.2.2 ∧ z.val.2.2 < T ω (k + 1)}.Finite),
+      IsSpectralBasepointChoice (F := F) (fun ω ↦ χ ω) ∧
+      α < β ∧ β < X ∧ (∀ ω, Differentiable ℂ (ϑ ω)) ∧
+      (∀ ω (u : ℂ), |u.re| ≤ X + 2 → ‖ϑ ω u‖ ≤ (1 + |u.im|) ^ A ω) ∧
+      (∀ z : Z(χ, α), ((N(χ, α, s, z) : ℕ) : ℕ∞) ≤
+        analyticOrderAt (ϑ z.val.1) (shift(z.val.2.1, z.val.2.2))) ∧
+      (∀ ω (k : ℤ), T ω k ∈ Icc (2 * (k : ℝ)) (2 * (k : ℝ) + 1)) ∧
+      (∀ ω k, 0 < ℓ ω k) ∧
+      (∀ ω k, ∀ w ∈ rectBoundary (-X) X (T ω k) (T ω (k + 1)), ℓ ω k ≤ ‖ϑ ω w‖) ∧
+      (∀ ω k, ∀ w ∈ rectBoundary (-X) X (T ω k) (T ω (k + 1)),
+        ‖∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ ω) w g ∂μ𝔽‖ ≤ φb ω k) ∧
+      Summable (fun p : PontryaginDual C₁ × ℤ ↦
+        ((∑ z ∈ (hfin p.1 p.2).toFinset, N(χ, α, s, z) : ℕ) : ℝ) *
+          (rectInterpolantGaussianConstant X β (A p.1) *
+            (φb p.1 p.2 / ℓ p.1 p.2 * (1 + |T p.1 p.2|) ^ (A p.1 + 2)))) := by
+  obtain ⟨χ, β, X, A, ϑ, T, φb, ℓ, p, hfin, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11⟩ :=
+    spectralStripConvolution_exists_clusterBoundaryData_shift (s := s) a hα φ
+  refine ⟨χ, β, X, A, ϑ, T, φb, ℓ, hfin, h1, h2, h3, h4, h5, h6, h7, h8, h9,
+    fun ω k w hw ↦ ?_, h11⟩
+  simpa using h10 ω k w hw 0
 
 -- Select the norm topology directly when using the locally convex nuclear ideal, as in `Sec3`.
 attribute [local instance] instSpectralQuotientPolynormableSec3
