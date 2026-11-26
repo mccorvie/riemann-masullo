@@ -21,18 +21,20 @@ integral, in terms of the width `α` of the weight.
   (`mem_closure_realPWBandPolarFreeCore_of_schwartz`), and some of these have nonzero integral
   (`exists_mem_closure_realPWBandPolarFreeCore_integral_ne_zero`). The reason is that the
   dilates `x ↦ h (x / t) / t` keep their integral while their weighted norm tends to zero.
-* Above width one half the condition survives. The reciprocal of the weight is integrable
-  (`integrable_inv_realPWIntervalWeight`), so the integral is a continuous linear functional on
-  the band and vanishes on the closure (`exists_realPWBand_integralFunctional`). Between one
-  half and three halves it is a condition of its own
-  (`exists_realPWBand_notMem_closure_polarFreeCore`).
+* Above width one half, and at width one half for `s > 1`, the condition survives. The
+  reciprocal of the weight is integrable (`integrable_inv_realPWIntervalWeight`,
+  `integrable_inv_realPWIntervalWeight_half`), so the integral is a continuous linear functional
+  on the band and vanishes on the closure (`exists_realPWBand_integralFunctional_of_integrable`).
+  Up to width three halves it is a condition of its own
+  (`exists_realPWBand_notMem_closure_polarFreeCore_of_integrable`).
 
 Reconstruction: The paper does not state this. The core is that of the order-zero model of the
 rational real place.
 
-Not treated here: the width `α = 1 / 2` itself, where the answer depends on `s`. That the
-closure below one half is exactly the kernel of evaluation at the origin, which needs the
-density of Schwartz functions in that kernel. The last statement for `α ≥ 3 / 2`. -/
+Not treated here: the width `α = 1 / 2` with `s ≤ 1`, where the condition should again be
+lost. That the closure below one half is exactly the kernel of evaluation at the origin, which
+needs the density of Schwartz functions in that kernel. The last statement for
+`α ≥ 3 / 2`. -/
 
 public noncomputable section
 
@@ -452,8 +454,108 @@ theorem integrable_inv_realPWIntervalWeight (hα : 1 / 2 < α) (hs : 0 ≤ s) :
         rw [Real.norm_eq_abs, Real.div_rpow (by positivity) (by norm_num), inv_div,
           Real.rpow_neg (by positivity), div_eq_mul_inv]
 
-/-- Above width one half the reciprocal of the weight is a vector of the weighted space. -/
-private theorem memLp_inv_realPWIntervalWeight (hα : 1 / 2 < α) (hs : 0 ≤ s) :
+/-- At width one half the reciprocal of the weight of (9.2.1.30) is integrable when the
+logarithmic order exceeds one. -/
+theorem integrable_inv_realPWIntervalWeight_half (hs1 : 1 < s) :
+    Integrable (fun x ↦ (realPWIntervalWeight (1 / 2) s x)⁻¹) := by
+  have hs : 0 ≤ s := by linarith
+  let w := realPWIntervalWeight (1 / 2) s
+  have hw1 (x : ℝ) : 1 ≤ w x := one_le_realPWIntervalWeight (1 / 2) s hs x
+  have hmeas : Measurable fun x ↦ (w x)⁻¹ := (measurable_realPWIntervalWeight (1 / 2) s).inv
+  let G : ℝ → ℝ := fun x ↦ -(1 / (s - 1)) * (1 + Real.log x) ^ (1 - s)
+  let G' : ℝ → ℝ := fun x ↦ x⁻¹ * (1 + Real.log x) ^ (-s)
+  have hderiv : ∀ x ∈ Ici (1 : ℝ), HasDerivAt G (G' x) x := by
+    intro x hx
+    have hx0 : 0 < x := zero_lt_one.trans_le hx
+    have hb : 0 < 1 + Real.log x := by
+      have := Real.log_nonneg hx
+      linarith
+    have h1 : HasDerivAt (fun y ↦ 1 + Real.log y) x⁻¹ x :=
+      (Real.hasDerivAt_log hx0.ne').const_add 1
+    have h2 := (h1.rpow_const (p := 1 - s) (Or.inl hb.ne')).const_mul (-(1 / (s - 1)))
+    convert h2 using 1
+    have he : (1 : ℝ) - s - 1 = -s := by ring
+    rw [he]
+    have hs0 : s - 1 ≠ 0 := by linarith
+    field_simp
+    ring
+  have hlim : Tendsto G atTop (𝓝 0) := by
+    have h1 : Tendsto (fun x : ℝ ↦ 1 + Real.log x) atTop atTop :=
+      tendsto_atTop_add_const_left _ 1 Real.tendsto_log_atTop
+    have h2 := (tendsto_rpow_neg_atTop (show 0 < s - 1 by linarith)).comp h1
+    have h3 := h2.const_mul (-(1 / (s - 1)))
+    rw [mul_zero] at h3
+    refine h3.congr fun x ↦ ?_
+    simp only [G, Function.comp_apply, neg_sub]
+  have hG'nn : ∀ x ∈ Ioi (1 : ℝ), 0 ≤ G' x := fun x hx ↦
+    mul_nonneg (inv_nonneg.mpr (zero_le_one.trans (le_of_lt hx)))
+      (Real.rpow_nonneg (by have := Real.log_nonneg (le_of_lt hx); linarith) _)
+  have hG' : IntegrableOn G' (Ioi 1) := integrableOn_Ioi_deriv_of_nonneg' hderiv hG'nn hlim
+  have htail : ∀ x ∈ Ioi (1 : ℝ), (w x)⁻¹ ≤ 2 ^ (s / 2) * G' x := by
+    intro x hx
+    have hx1 : (1 : ℝ) < x := hx
+    have hx0 : 0 < x := zero_lt_one.trans hx1
+    have hL : 0 ≤ Real.log x := Real.log_nonneg hx1.le
+    have hwx : x * (1 + Real.log x ^ 2) ^ (s / 2) ≤ w x := by
+      change _ ≤ realPWIntervalWeight (1 / 2) s x
+      rw [realPWIntervalWeight_eq (1 / 2) s hx0.ne', abs_of_pos hx0]
+      refine mul_le_mul_of_nonneg_right ?_ (by positivity)
+      refine le_trans ?_ (le_max_left _ _)
+      rw [show (2 : ℝ) * (1 / 2) = 1 by norm_num, Real.rpow_one]
+    have hpow : (1 + Real.log x) ^ s ≤ 2 ^ (s / 2) * (1 + Real.log x ^ 2) ^ (s / 2) := by
+      have h1 : (1 + Real.log x) ^ s = ((1 + Real.log x) ^ (2 : ℝ)) ^ (s / 2) := by
+        rw [← Real.rpow_mul (by linarith)]
+        congr 1
+        ring
+      rw [h1, ← Real.mul_rpow (by norm_num) (by positivity)]
+      refine Real.rpow_le_rpow (by positivity) ?_ (by positivity)
+      rw [Real.rpow_two]
+      nlinarith [sq_nonneg (Real.log x - 1)]
+    have hbase : 0 < 1 + Real.log x := by linarith
+    have hpos : 0 < x * (1 + Real.log x ^ 2) ^ (s / 2) := by positivity
+    calc (w x)⁻¹ ≤ (x * (1 + Real.log x ^ 2) ^ (s / 2))⁻¹ := inv_anti₀ hpos hwx
+      _ ≤ 2 ^ (s / 2) * (x⁻¹ * (1 + Real.log x) ^ (-s)) := by
+          rw [Real.rpow_neg hbase.le, mul_inv, ← mul_assoc, mul_comm (2 ^ (s / 2)) x⁻¹,
+            mul_assoc]
+          refine mul_le_mul_of_nonneg_left ?_ (inv_nonneg.mpr hx0.le)
+          rw [inv_le_iff_one_le_mul₀ (by positivity), mul_assoc, ← div_eq_inv_mul,
+            le_div_iff₀ (by positivity), one_mul]
+          exact hpow
+  have hI1 : IntegrableOn (fun x ↦ (w x)⁻¹) (Ioi 1) := by
+    refine (hG'.const_mul (2 ^ (s / 2))).mono' hmeas.aestronglyMeasurable
+      ((ae_restrict_mem measurableSet_Ioi).mono fun x hx ↦ ?_)
+    rw [Real.norm_of_nonneg (inv_nonneg.mpr (zero_le_one.trans (hw1 x)))]
+    exact htail x hx
+  have hI2 : IntegrableOn (fun x ↦ (w x)⁻¹) (Icc (-1) 1) :=
+    Measure.integrableOn_of_bounded (M := 1) measure_Icc_lt_top.ne hmeas.aestronglyMeasurable
+      (ae_of_all _ fun x ↦ by
+        rw [Real.norm_of_nonneg (inv_nonneg.mpr (zero_le_one.trans (hw1 x)))]
+        exact inv_le_one_of_one_le₀ (hw1 x))
+  have hI3 : IntegrableOn (fun x ↦ (w x)⁻¹) (Iio (-1)) := by
+    have h := (Measure.measurePreserving_neg (volume : Measure ℝ)).integrableOn_comp_preimage
+      (MeasurableEquiv.neg ℝ).measurableEmbedding (f := fun x ↦ (w x)⁻¹) (s := Ioi 1)
+    have hpre : (Neg.neg ⁻¹' Ioi (1 : ℝ)) = Iio (-1) := by
+      ext x
+      simp [lt_neg]
+    have hcomp : ((fun x ↦ (w x)⁻¹) ∘ Neg.neg) = fun x ↦ (w x)⁻¹ := funext fun x ↦ by
+      change (realPWIntervalWeight (1 / 2) s (-x))⁻¹ = (realPWIntervalWeight (1 / 2) s x)⁻¹
+      rw [realPWIntervalWeight_even]
+    rw [hpre, hcomp] at h
+    exact h.mpr hI1
+  have huniv : (univ : Set ℝ) = Iio (-1) ∪ Icc (-1) 1 ∪ Ioi 1 := by
+    ext x
+    simp only [mem_univ, mem_union, mem_Iio, mem_Icc, mem_Ioi, true_iff]
+    rcases lt_or_ge x (-1) with h | h
+    · exact Or.inl (Or.inl h)
+    · rcases le_or_gt x 1 with h' | h'
+      · exact Or.inl (Or.inr ⟨h, h'⟩)
+      · exact Or.inr h'
+  rw [← integrableOn_univ, huniv]
+  exact (hI3.union hI2).union hI1
+
+/-- When the reciprocal of the weight is integrable it is a vector of the weighted space. -/
+private theorem memLp_inv_realPWIntervalWeight (hs : 0 ≤ s)
+    (hint : Integrable (fun x ↦ (realPWIntervalWeight α s x)⁻¹)) :
     MemLp (fun x ↦ (((realPWIntervalWeight α s x)⁻¹ : ℝ) : ℂ)) 2 (realPWIntervalMeasure α s) := by
   have hmeas : Measurable fun x ↦ (((realPWIntervalWeight α s x)⁻¹ : ℝ) : ℂ) :=
     Complex.measurable_ofReal.comp (measurable_realPWIntervalWeight α s).inv
@@ -461,7 +563,7 @@ private theorem memLp_inv_realPWIntervalWeight (hα : 1 / 2 < α) (hs : 0 ≤ s)
     integrable_withDensity_iff_integrable_smul'
       (measurable_realPWIntervalWeight α s).ennreal_ofReal
       (ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top)]
-  refine (integrable_inv_realPWIntervalWeight hα hs).congr (ae_of_all _ fun x ↦ ?_)
+  refine hint.congr (ae_of_all _ fun x ↦ ?_)
   have hw : 0 < realPWIntervalWeight α s x :=
     zero_lt_one.trans_le (one_le_realPWIntervalWeight α s hs x)
   change (realPWIntervalWeight α s x)⁻¹ = (ENNReal.ofReal (realPWIntervalWeight α s x)).toReal •
@@ -471,11 +573,15 @@ private theorem memLp_inv_realPWIntervalWeight (hα : 1 / 2 < α) (hs : 0 ≤ s)
   field_simp
 
 /-- Paper: Definition 11.2.1.1, pp. 487–488, as used in Theorem 12.4.1.1, pp. 514–519, for the
-real place of `ℚ` with the weight of (9.2.1.30). Above width one half every band vector is
-integrable, the integral is a continuous linear functional on the band, and it vanishes on the
-closure of the polar-free core. The condition that the integral vanishes survives the closure.
+real place of `ℚ` with the weight of (9.2.1.30). When the reciprocal of the weight is integrable,
+every band vector is integrable, the integral is a continuous linear functional on the band, and
+it vanishes on the closure of the polar-free core. The condition that the integral vanishes
+survives the closure. The hypothesis holds above width one half
+(`integrable_inv_realPWIntervalWeight`) and at width one half for `s > 1`
+(`integrable_inv_realPWIntervalWeight_half`).
 Reconstruction: The paper does not state this. -/
-theorem exists_realPWBand_integralFunctional (hα : 1 / 2 < α) (hs : 0 ≤ s) :
+theorem exists_realPWBand_integralFunctional_of_integrable (hs : 0 ≤ s)
+    (hint : Integrable (fun x ↦ (realPWIntervalWeight α s x)⁻¹)) :
     ∃ I : RealPWBand.space Y (volume_le_realPWIntervalMeasure α s hs) →L[ℂ] ℂ,
       (∀ f, Integrable (fun x ↦
           RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure α s hs) x f) ∧
@@ -489,7 +595,7 @@ theorem exists_realPWBand_integralFunctional (hα : 1 / 2 < α) (hs : 0 ≤ s) :
     (measurable_realPWIntervalWeight α s).ennreal_ofReal
   have hWlt : ∀ᵐ x ∂(volume : Measure ℝ), ENNReal.ofReal (w x) < ⊤ :=
     ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top
-  have hV := memLp_inv_realPWIntervalWeight hα hs
+  have hV := memLp_inv_realPWIntervalWeight hs hint
   let V : Lp ℂ 2 μ := hV.toLp _
   let I : RealPWBand.space Y hμ →L[ℂ] ℂ := (innerSL ℂ V).comp (RealPWBand.space Y hμ).subtypeL
   have hI (f : RealPWBand.space Y hμ) :
@@ -523,11 +629,35 @@ theorem exists_realPWBand_integralFunctional (hα : 1 / 2 < α) (hs : 0 ≤ s) :
   rw [(hI f).2, hfg]
   exact hgi
 
-/-- Between widths one half and three halves there is a band vector that vanishes at the origin
-and is not in the closure of the polar-free core: the vanishing of the integral is a
-condition of its own. -/
-theorem exists_realPWBand_notMem_closure_polarFreeCore (hα : 1 / 2 < α) (hα' : α < 3 / 2)
-    (hs : 0 ≤ s) (hY : 0 < Y) :
+/-- Above width one half every band vector is integrable, the integral is a continuous linear
+functional on the band, and it vanishes on the closure of the polar-free core. -/
+theorem exists_realPWBand_integralFunctional (hα : 1 / 2 < α) (hs : 0 ≤ s) :
+    ∃ I : RealPWBand.space Y (volume_le_realPWIntervalMeasure α s hs) →L[ℂ] ℂ,
+      (∀ f, Integrable (fun x ↦
+          RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure α s hs) x f) ∧
+        I f = ∫ x, RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure α s hs) x f) ∧
+      ∀ f ∈ closure (realPWBandPolarFreeCore Y α hs), I f = 0 :=
+  exists_realPWBand_integralFunctional_of_integrable hs (integrable_inv_realPWIntervalWeight hα hs)
+
+/-- At width one half, for `s > 1`, every band vector is integrable, the integral is a
+continuous linear functional on the band, and it vanishes on the closure of the polar-free
+core. -/
+theorem exists_realPWBand_integralFunctional_half (hs : 0 ≤ s) (hs1 : 1 < s) :
+    ∃ I : RealPWBand.space Y (volume_le_realPWIntervalMeasure (1 / 2) s hs) →L[ℂ] ℂ,
+      (∀ f, Integrable (fun x ↦
+          RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure (1 / 2) s hs) x f) ∧
+        I f = ∫ x,
+          RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure (1 / 2) s hs) x f) ∧
+      ∀ f ∈ closure (realPWBandPolarFreeCore Y (1 / 2) hs), I f = 0 :=
+  exists_realPWBand_integralFunctional_of_integrable hs
+    (integrable_inv_realPWIntervalWeight_half hs1)
+
+/-- Below width three halves, when the reciprocal of the weight is integrable, there is a band
+vector that vanishes at the origin and is not in the closure of the polar-free core: the
+vanishing of the integral is a condition of its own. -/
+theorem exists_realPWBand_notMem_closure_polarFreeCore_of_integrable (hα : 0 ≤ α)
+    (hα' : α < 3 / 2) (hs : 0 ≤ s) (hY : 0 < Y)
+    (hint : Integrable (fun x ↦ (realPWIntervalWeight α s x)⁻¹)) :
     ∃ f : RealPWBand.space Y (volume_le_realPWIntervalMeasure α s hs),
       RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure α s hs) 0 f = 0 ∧
         f ∉ closure (realPWBandPolarFreeCore Y α hs) := by
@@ -542,15 +672,35 @@ theorem exists_realPWBand_notMem_closure_polarFreeCore (hα : 1 / 2 < α) (hα' 
       (mem_univ (0 : ℝ)) (mem_univ x)
     rwa [hk0, sub_zero, sub_zero, Real.norm_eq_abs, ← pow_one |x|] at h
   have hkm : MemLp (k : ℝ → ℂ) 2 (realPWIntervalMeasure α s) :=
-    memLp_realPWIntervalMeasure_of_evenSchwartz_order (by linarith) hs k hke 1
+    memLp_realPWIntervalMeasure_of_evenSchwartz_order hα hs k hke 1
       (by push_cast; linarith) ⟨C, fun x _ ↦ hlip x⟩
   obtain ⟨f, hf⟩ := RealPWBand.exists_evaluation_eq_of_weightedSchwartz Y k hke hkb
     (volume_le_realPWIntervalMeasure α s hs) hkm
-  obtain ⟨I, hI, hIc⟩ := exists_realPWBand_integralFunctional (Y := Y) hα hs
+  obtain ⟨I, hI, hIc⟩ := exists_realPWBand_integralFunctional_of_integrable (Y := Y) hs hint
   refine ⟨f, by rw [congrFun hf 0, hk0], fun hmem ↦ ?_⟩
   have h1 := hIc f hmem
   rw [(hI f).2, hf, hki] at h1
   exact one_ne_zero h1
+
+/-- Between widths one half and three halves there is a band vector that vanishes at the origin
+and is not in the closure of the polar-free core. -/
+theorem exists_realPWBand_notMem_closure_polarFreeCore (hα : 1 / 2 < α) (hα' : α < 3 / 2)
+    (hs : 0 ≤ s) (hY : 0 < Y) :
+    ∃ f : RealPWBand.space Y (volume_le_realPWIntervalMeasure α s hs),
+      RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure α s hs) 0 f = 0 ∧
+        f ∉ closure (realPWBandPolarFreeCore Y α hs) :=
+  exists_realPWBand_notMem_closure_polarFreeCore_of_integrable (by linarith) hα' hs hY
+    (integrable_inv_realPWIntervalWeight hα hs)
+
+/-- At width one half, for `s > 1`, there is a band vector that vanishes at the origin and is not
+in the closure of the polar-free core. -/
+theorem exists_realPWBand_notMem_closure_polarFreeCore_half (hs : 0 ≤ s) (hs1 : 1 < s)
+    (hY : 0 < Y) :
+    ∃ f : RealPWBand.space Y (volume_le_realPWIntervalMeasure (1 / 2) s hs),
+      RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure (1 / 2) s hs) 0 f = 0 ∧
+        f ∉ closure (realPWBandPolarFreeCore Y (1 / 2) hs) :=
+  exists_realPWBand_notMem_closure_polarFreeCore_of_integrable (by norm_num) (by norm_num) hs hY
+    (integrable_inv_realPWIntervalWeight_half hs1)
 
 end AboveThreshold
 
