@@ -29,7 +29,6 @@ namespace RiemannMasullo
 
 set_option quotPrecheck false
 set_option maxHeartbeats 600000
-set_option Elab.async false
 
 variable {F : Type*} [Field F] [NumberField F]
 variable {S : Finset (HeightOneSpectrum (𝓞 F))}
@@ -1474,14 +1473,18 @@ def SLocalPrimaryOrbitalQuotient (p : Vℚ) (ω : PontryaginDual J₁) :=
 
 namespace SLocalPrimaryOrbitalQuotient
 
+-- Elaborated synchronously so that these instance terms stay exactly as before (#7088).
+set_option Elab.async false in
 instance instAddCommGroup (p : Vℚ) (ω : PontryaginDual J₁) :
     AddCommGroup (SLocalPrimaryOrbitalQuotient p ω) :=
   inferInstanceAs (AddCommGroup (Θₛ(ω) ⧸ Rₚ(p, ω)))
 
+set_option Elab.async false in
 instance instModule (p : Vℚ) (ω : PontryaginDual J₁) :
     Module ℂ (SLocalPrimaryOrbitalQuotient p ω) :=
   inferInstanceAs (Module ℂ (Θₛ(ω) ⧸ Rₚ(p, ω)))
 
+set_option Elab.async false in
 instance instTopologicalSpace (p : Vℚ) (ω : PontryaginDual J₁) :
     TopologicalSpace (SLocalPrimaryOrbitalQuotient p ω) :=
   inferInstanceAs (TopologicalSpace (Θₛ(ω) ⧸ Rₚ(p, ω)))

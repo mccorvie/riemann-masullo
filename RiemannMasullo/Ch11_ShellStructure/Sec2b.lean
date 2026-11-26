@@ -29,7 +29,6 @@ namespace RiemannMasullo
 
 set_option quotPrecheck false
 set_option maxSynthPendingDepth 8
-set_option Elab.async false
 
 variable {F : Type*} [Field F] [NumberField F]
 
@@ -1527,11 +1526,14 @@ def PrimeOrbitalSobolevQuotient (p : HeightOneSpectrum (𝓞 ℚ)) {s : ℝ} (hs
 
 local notation "Q(" p ", " hs ", " ω ")" => PrimeOrbitalSobolevQuotient F p hs ω
 
+-- Elaborated synchronously so that these instance terms stay exactly as before (#7088).
+set_option Elab.async false in
 /-- The quotient norm: the denominator is closed (`instClosedOrbitalSobolevSubmoduleSec2a`). -/
 instance instNormedAddCommGroupPrimeOrbitalSobolevQuotient (p : HeightOneSpectrum (𝓞 ℚ))
     {s : ℝ} (hs : 0 ≤ s) (ω : PontryaginDual C₁) : NormedAddCommGroup Q(p, hs, ω) :=
   inferInstanceAs (NormedAddCommGroup (↥(Wω(hs, ω)) ⧸ N(p, hs, ω)))
 
+set_option Elab.async false in
 /-- The quotient inner product, transported from the orthogonal complement of the closed
 denominator in the complete isotype. -/
 instance instInnerProductSpacePrimeOrbitalSobolevQuotient (p : HeightOneSpectrum (𝓞 ℚ))

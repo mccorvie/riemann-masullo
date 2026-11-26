@@ -44,7 +44,6 @@ namespace RiemannMasullo
 
 set_option quotPrecheck false
 set_option maxHeartbeats 150000
-set_option Elab.async false
 
 variable {F : Type*} [Field F] [NumberField F]
 
@@ -4662,13 +4661,17 @@ def FiniteNuclearityQuotient (p : HeightOneSpectrum (𝓞 ℚ)) :=
 
 namespace FiniteNuclearityQuotient
 
+-- Elaborated synchronously so that these instance terms stay exactly as before (#7088).
+set_option Elab.async false in
 instance instAddCommGroup (p : HeightOneSpectrum (𝓞 ℚ)) :
     AddCommGroup (FiniteNuclearityQuotient χ p) :=
   inferInstanceAs (AddCommGroup (Θ₀(χ) ⧸ finiteNuclearityDenominator χ p))
 
+set_option Elab.async false in
 instance instModule (p : HeightOneSpectrum (𝓞 ℚ)) : Module ℂ (FiniteNuclearityQuotient χ p) :=
   inferInstanceAs (Module ℂ (Θ₀(χ) ⧸ finiteNuclearityDenominator χ p))
 
+set_option Elab.async false in
 instance instTopologicalSpace (p : HeightOneSpectrum (𝓞 ℚ)) :
     TopologicalSpace (FiniteNuclearityQuotient χ p) :=
   inferInstanceAs (TopologicalSpace (Θ₀(χ) ⧸ finiteNuclearityDenominator χ p))
@@ -6880,12 +6883,15 @@ def ArchNuclearityQuotient := Θ₀(χ) ⧸ archNuclearityDenominator χ
 
 namespace ArchNuclearityQuotient
 
+set_option Elab.async false in
 instance instAddCommGroup : AddCommGroup (ArchNuclearityQuotient χ) :=
   inferInstanceAs (AddCommGroup (Θ₀(χ) ⧸ archNuclearityDenominator χ))
 
+set_option Elab.async false in
 instance instModule : Module ℂ (ArchNuclearityQuotient χ) :=
   inferInstanceAs (Module ℂ (Θ₀(χ) ⧸ archNuclearityDenominator χ))
 
+set_option Elab.async false in
 instance instTopologicalSpace : TopologicalSpace (ArchNuclearityQuotient χ) :=
   inferInstanceAs (TopologicalSpace (Θ₀(χ) ⧸ archNuclearityDenominator χ))
 
