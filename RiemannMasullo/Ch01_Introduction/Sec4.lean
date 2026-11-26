@@ -9401,6 +9401,16 @@ private theorem introTrace_heckeGamma_logDeriv_eq_sum (χ : U𝔽) (s : ℂ) (hs
     simpa [b,hv,Function.comp_def] using (hg'.comp s ((differentiableAt_id (x:=s)).add_const b)).div_const 2
 
 open Classical in
+/-- On the positive half-plane the logarithmic derivative of the completed Hecke gamma
+factor is the finite sum of the scaled digamma terms at its archimedean parameters. -/
+theorem heckeGammaFactor_logDeriv_eq_sum_digamma (χ : U𝔽) (s : ℂ) (hs : 0 < s.re) :
+    logDeriv (heckeGammaFactor χ) s = ∑ v : InfinitePlace F,
+      (archScale(v) : ℂ) * (Complex.digamma ((archScale(v) : ℂ) * (s + archShift(χ,v))) -
+        Complex.log (if v.IsReal then (Real.pi : ℂ) else 2 * (Real.pi : ℂ))) := by
+  rw [introTrace_heckeGamma_logDeriv_eq_sum χ s hs]
+  exact Finset.sum_congr rfl fun v _ ↦ introTrace_logDeriv_local_gamma χ v s hs
+
+open Classical in
 /-- Paper: §1.4.3, p. 29, and §3.2.1, pp. 123–124. The analytic archimedean term in the
 common-counterterm limit is the difference of the logarithmic derivatives of two Hecke gamma factors. -/
 theorem introTrace_archimedean_sub_sum_eq_heckeGamma_logDeriv (χ : U𝔽) (z : ℂ) (hz : -(1/2:ℝ) < z.re) :
@@ -15824,5 +15834,27 @@ theorem heckeL_zero_re_eq_half (χ : U𝔽) (s : ℂ) (_hs₀ : 0 < s.re) (_hs�
   intro a ha φ hφ
   simpa only [modulatedFourierMellin, relativeVerticalStrip, Set.preimage_univ, Set.indicator_univ] using
     traceFormula_exteriorZeros τ hτ φ hφ ha
+
+/-- Every positive integer divisor order of a completed unitary Hecke function
+lies strictly inside the critical strip. -/
+theorem completedHecke_positive_divisor_in_critical_strip (χ : U𝔽) (z : ℂ)
+    (hz : 0 < zeroOrder(χ, z)) : |z.re - 1 / 2| < 1 / 2 :=
+  introTrace_positive_divisor_in_critical_strip χ z hz
+
+open scoped ComplexConjugate in
+/-- The same unitary character has equal meromorphic order at two points
+reflected across the critical line, whenever the original abscissa is below one. -/
+theorem completedHecke_reflected_order_of_re_lt_one (χ : U𝔽) (z : ℂ) (hz : z.re < 1) :
+    meromorphicOrderAt (continuedCompletedHeckeL χ) (1 - conj z) =
+      meromorphicOrderAt (continuedCompletedHeckeL χ) z :=
+  introTrace_single_character_reflected_order χ z hz
+
+/-- The squared reciprocal distances from a point outside the shifted zero
+window are summable, weighted by the actual completed Hecke divisor. -/
+theorem summable_completedHecke_divisor_reciprocal_squares (χ : U𝔽) (a : ℝ) (z : ℂ)
+    (hz : ∀ r : windowZeros(χ, a), z ≠ r.val - 1 / 2) :
+    Summable (fun r : windowZeros(χ, a) ↦
+      (zeroOrder(χ, r.val) : ℝ) * ‖(z - (r.val - 1 / 2))⁻¹‖ ^ 2) :=
+  introTrace_canonical_reciprocal_squares χ a z hz
 
 end RiemannMasullo
