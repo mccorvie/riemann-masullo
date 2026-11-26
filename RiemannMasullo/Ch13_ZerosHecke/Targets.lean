@@ -225,7 +225,7 @@ private theorem rationalDirichletLift_unitResidue {N : ℕ} [NeZero N] (v : Pl)
 
 open NumberFieldKB.Chebotarev.RatIdele in
 /-- At a conductor prime, triviality on local units would force descent to N/p. -/
-private theorem rationalDirichletLift_ramified {N : ℕ} [NeZero N]
+theorem rationalDirichletLift_ramified {N : ℕ} [NeZero N]
     {χ : DirichletCharacter ℂ N} (hχ : χ.IsPrimitive)
     (η : HeckeCharacter (𝓞 ℚ) ℚ) (v : Pl) (hpN : pr v ∣ N)
     (hres : ∀ u : (v.adicCompletion ℚ)ˣ, η.restrict v u.val =
@@ -248,7 +248,7 @@ private theorem rationalDirichletLift_ramified {N : ℕ} [NeZero N]
 
 open IsDedekindDomain.HeightOneSpectrum NumberFieldKB.Chebotarev.RatIdele WithZero in
 /-- Away from the modulus, the uniformizer has the original Dirichlet character value. -/
-private theorem rationalDirichletLift_unramified {N : ℕ} [NeZero N] (χ : DirichletCharacter ℂ N)
+theorem rationalDirichletLift_unramified {N : ℕ} [NeZero N] (χ : DirichletCharacter ℂ N)
     (η : HeckeCharacter (𝓞 ℚ) ℚ) (v : Pl) (hc : (pr v).Coprime N)
     (hres : ∀ u : (v.adicCompletion ℚ)ˣ, η.restrict v u.val =
       (ideleChar N χ (IdeleGroup.ofAdicCompletion (𝓞 ℚ) ℚ v u) : ℂ)) :

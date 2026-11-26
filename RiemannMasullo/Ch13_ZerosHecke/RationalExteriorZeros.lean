@@ -94,7 +94,7 @@ private theorem castHom_resMod {m d : ℕ} [NeZero m] [NeZero d] (hd : d ∣ m) 
   exact cast_redP hle _
 
 /-- **The idelic character is compatible with change of level.** -/
-private theorem ideleChar_changeLevel {m d : ℕ} [NeZero m] [NeZero d] (hd : d ∣ m)
+theorem ideleChar_changeLevel {m d : ℕ} [NeZero m] [NeZero d] (hd : d ∣ m)
     (χ : DirichletCharacter ℂ d) :
     ideleChar m (DirichletCharacter.changeLevel hd χ) = ideleChar d χ := by
   ext x
@@ -111,7 +111,7 @@ private theorem ideleChar_changeLevel {m d : ℕ} [NeZero m] [NeZero d] (hd : d 
 local notation "Cℚ" => IdeleClassGroup (𝓞 ℚ) ℚ
 
 /-- The residue map hits every unit modulo `N`. -/
-private theorem resMod_toHomUnits_surjective (N : ℕ) [NeZero N] :
+theorem resMod_toHomUnits_surjective (N : ℕ) [NeZero N] :
     Function.Surjective (resMod N).toHomUnits := by
   intro a
   let n := (a.val : ZMod N).val
@@ -381,7 +381,7 @@ private theorem ideleClassNorm_decomposition (e : (ℝ≥0ˣ × Uℚ) ≃ₜ* C�
 
 /-- A character trivial on a norm section is trivial on the kernel of the residue map modulo
 some `N`: the product of the local conductors. -/
-private theorem exists_level_of_trivial_on_section (τ : ℝ≥0ˣ →ₜ* Cℚ)
+theorem exists_level_of_trivial_on_section (τ : ℝ≥0ˣ →ₜ* Cℚ)
     (hτ : Function.RightInverse τ (ideleClassNorm ℚ)) (ψ : PontryaginDual Cℚ)
     (hψ : ∀ t : ℝ≥0ˣ, ψ (τ t) = 1) :
     ∃ (N : ℕ) (_ : NeZero N), ∀ x : IdQ, resMod N x = 1 → ψ (QuotientGroup.mk x) = 1 := by

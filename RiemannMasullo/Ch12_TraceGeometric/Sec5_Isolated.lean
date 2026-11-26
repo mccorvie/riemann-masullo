@@ -1,4 +1,5 @@
 module
+public import RiemannMasullo.Ch12_TraceGeometric.Sec5_RationalCharacterPackets
 
 import Mathlib.Geometry.Manifold.PartitionOfUnity
 import RiemannMasullo.Ch10_TraceSpectral.Sec4b_ProjectedKernels
@@ -78,6 +79,80 @@ theorem hasSum_stripZeros_neg_integral_smoothenedDiagonal_of_vanishing
       HasSum term (-(∫ x, diagonal x ∂μ𝔽)) :=
   hasSum_stripZeros_neg_integral_smoothenedDiagonal φ hφ χ hχ hα hs
     (exists_projectiveKernel_stripTestAction_spectralProjection φ hφ hα hs) U hU hBorel
+
+section RationalPrimitiveProbe
+
+open Filter Function ConductorSelector
+open scoped ContDiff NumberField.AdeleRing Topology
+
+local notation "Cℚ" => IdeleClassGroup (𝓞 ℚ) ℚ
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. Over the rational field the all-width
+exterior cancellation is equivalent to cofinal decay of the absolute sum measured by
+one finite primitive-character test at each stage. Stage `n+1` includes every primitive
+conductor through `n+1` at half-width `1/(n+1)`, with one fixed off-axis-detecting radial profile.
+The profile can be chosen to vanish on the norm-one classes and at both polar Mellin
+values. This statement supplies the equivalence; proving the decay is the remaining premise. -/
+theorem rational_exteriorZeros_iff_primitiveProbe_cofinal
+    (τ : ℝ≥0ˣ →ₜ* Cℚ) (hτ : RightInverse τ (ideleClassNorm ℚ))
+    (H : ℝ → ℂ) (hH : ContDiff ℝ (∞) H) (hc : HasCompactSupport H)
+    (hdetect : ∀ w : ℂ, 0 < |w.re| → |w.re| < 1 / 2 → bilateralLaplace H w ≠ 0)
+    {ι : Type*} {l : Filter ι} [NeBot l] {n : ι → ℕ} (hcofinal : Tendsto n l atTop) :
+    (∀ (σ : ℝ≥0ˣ →ₜ* Cℚ) (_ : RightInverse σ (ideleClassNorm ℚ))
+      (φ : BruhatCompactSupport Cℚ) (_ : ∀ u : (ideleClassNorm ℚ).ker, φ.val u = 0)
+      (α : ℝ) (_ : 0 < α),
+      HasSum (fun z : ExteriorSite σ α ↦ traceZeroTerm φ z) 0) ↔
+    Tendsto (fun i ↦ stageMass τ H hH hc (n i)) l (𝓝 0) := by
+  constructor
+  · intro hzero
+    have hstage (k : ℕ) : stageMass τ H hH hc k = 0 := by
+      let α : ℝ := 1 / (k + 1 : ℝ)
+      have hα : 0 < α := by dsimp [α]; positivity
+      let : IsEmpty (ExteriorSite τ α) := (hasSum_exteriorZeros_iff_isEmpty τ hτ α).mp
+        (fun φ hφ ↦ hzero τ hτ φ hφ α hα)
+      exact tsum_empty
+    simpa only [hstage] using (tendsto_const_nhds : Tendsto (fun _ : ι ↦ (0 : ℝ)) l (𝓝 0))
+  · intro hlim σ hσ φ hφ α hα
+    apply (hasSum_exteriorZeros_iff_isEmpty σ hσ α).mpr _ φ hφ
+    refine ⟨fun z ↦ ?_⟩
+    rcases z with ⟨⟨⟨ψ, hn⟩, ρ⟩, hρ, hdist⟩
+    have hfar : ρ.re ≠ 1 / 2 := sub_ne_zero.mp
+      (abs_pos.mp (hα.trans_le hdist))
+    obtain ⟨Q, j, rfl⟩ := exists_primitiveRow_of_section σ hσ ψ hn
+    have hs := ConductorCylinder.row_site_in_strip (primitiveRow j) ⟨ρ, hρ⟩
+    have hre : (ρ - (1 / 2 : ℂ)).re = ρ.re - 1 / 2 := by simp
+    have hM : bilateralLaplace H (ρ - 1 / 2) ≠ 0 := hdetect _ (hre ▸ abs_pos.mpr (sub_ne_zero.mpr hfar))
+      (by rw [hre, abs_lt]; constructor <;> linarith [hs.1, hs.2])
+    have hbound := stageMass_lower_of_exterior_site τ hτ H hH hc (primitiveRow j)
+      (primitiveRow_on_section j τ.toMonoidHom) hρ hfar
+    have hle := ge_of_tendsto hlim (hcofinal.eventually hbound)
+    exact (not_le_of_gt (mul_pos (by exact_mod_cast hρ) (norm_pos_iff.mpr hM))) hle
+
+/-- Equivalently, every positive tolerance must be met at arbitrarily late positive
+conductor stages. The monotonicity of the actual absolute sums forces every stage to vanish. -/
+theorem rational_exteriorZeros_iff_primitiveProbe_arbitrarily_small
+    (τ : ℝ≥0ˣ →ₜ* Cℚ) (hτ : RightInverse τ (ideleClassNorm ℚ))
+    (H : ℝ → ℂ) (hH : ContDiff ℝ (∞) H) (hc : HasCompactSupport H)
+    (hdetect : ∀ w : ℂ, 0 < |w.re| → |w.re| < 1 / 2 → bilateralLaplace H w ≠ 0) :
+    (∀ (σ : ℝ≥0ˣ →ₜ* Cℚ) (_ : RightInverse σ (ideleClassNorm ℚ))
+      (φ : BruhatCompactSupport Cℚ) (_ : ∀ u : (ideleClassNorm ℚ).ker, φ.val u = 0)
+      (α : ℝ) (_ : 0 < α),
+      HasSum (fun z : ExteriorSite σ α ↦ traceZeroTerm φ z) 0) ↔
+    ∀ ε > 0, ∀ N : ℕ, ∃ n ≥ N, stageMass τ H hH hc n < ε := by
+  rw [rational_exteriorZeros_iff_primitiveProbe_cofinal τ hτ H hH hc hdetect
+    (n := id) (l := atTop) tendsto_id]
+  constructor
+  · intro ht ε hε N
+    obtain ⟨M, hM⟩ := eventually_atTop.1 (ht (gt_mem_nhds hε))
+    exact ⟨max N M, le_max_left _ _, hM _ (le_max_right _ _)⟩
+  · intro h
+    have heq (k : ℕ) : stageMass τ H hH hc k = 0 := by
+      refine le_antisymm (le_of_not_gt fun hk ↦ ?_) (tsum_nonneg fun _ ↦ norm_nonneg _)
+      obtain ⟨m, hm, he⟩ := h _ hk k
+      exact (not_lt_of_ge (monotone_stageMass τ hτ H hH hc hm)) he
+    simpa only [heq] using (tendsto_const_nhds : Tendsto (fun _ : ℕ ↦ (0 : ℝ)) atTop (𝓝 0))
+
+end RationalPrimitiveProbe
 
 /-! ## Localizing the kernel condition
 
