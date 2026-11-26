@@ -64,18 +64,20 @@ def main(argv):
         claimed_at = last_claim(comments)
         if claimed_at is None or not is_stale(claimed_at, now):
             continue
-        released += 1
         print(f"#{n}: claimed {claimed_at}, by {', '.join(issue['assignees']) or 'a project agent'}")
         if apply:
+            cmd = ["gh", "issue", "edit", str(n), "--remove-label", "claimed"]
+            if issue["assignees"]:
+                cmd += ["--remove-assignee", ",".join(issue["assignees"])]
+            # Announce the release only after GitHub accepts the update. Leave stderr visible
+            # and fail the workflow if either write fails, instead of reporting success.
+            subprocess.run(cmd, check=True)
             subprocess.run(["gh", "issue", "comment", str(n), "--body",
                             f"This claim has been released automatically: it is more than {HOURS} hours old and "
                             "no open pull request refers to this issue. If you are still working on it, "
                             "comment `Claiming` again; you are welcome to, and nothing is lost."],
-                           capture_output=True)
-            cmd = ["gh", "issue", "edit", str(n), "--remove-label", "claimed"]
-            if issue["assignees"]:
-                cmd += ["--remove-assignee", ",".join(issue["assignees"])]
-            subprocess.run(cmd, capture_output=True)
+                           check=True)
+        released += 1
     print(f"{released} stale claim(s) of {len(issues)} claimed issues" + ("" if apply else "; dry run"))
 
 
