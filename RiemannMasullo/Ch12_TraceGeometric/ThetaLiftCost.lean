@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.Ch01_Introduction.Sec4
 public import RiemannMasullo.Ch10_TraceSpectral.Sec2
+import RiemannMasullo.Ch11_ShellStructure.Sec1b
 import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
 import Mathlib.Analysis.Calculus.InverseFunctionTheorem.Deriv
 import Mathlib.RingTheory.RootsOfUnity.Complex
@@ -1194,5 +1195,587 @@ theorem exteriorCancellation_of_halfLine_approximation (σ : ℝ≥0ˣ →ₜ* I
     obtain ⟨f, ho, hdist⟩ := happrox χ hχ _ hε
     exact hdist.not_ge (centeredLogThetaLift_halfLine_distance χ σ hσ f ho ρ hρ hz))
   exact hasSum_empty
+
+
+private theorem widthLift_profile (χ : PontryaginDual C𝔽)
+    (hχ : ∀ t, χ (QuotientGroup.mk (canonicalIdeleNormSection F t)) = 1)
+    (τ : ℝ≥0ˣ →ₜ* I𝔽) (hτ : RightInverse τ (ideleNorm F)) (R : ℝ) (g : ℝ → ℂ)
+    (hc : HasCompactSupport g) (hg : ContDiff ℝ (⊤ : ENat) g) :
+    ∃ f : adelePolarSubspace F, EqOn (centeredLogThetaLift χ τ f) g (Ici (-R)) := by
+  let e := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  let h (x : ℝ) := g x * Complex.exp (-(x : ℂ) / 2)
+  have hr : ContDiff ℝ (⊤ : ENat) (fun t : ℝ ↦ (t : ℂ)) := Complex.ofRealCLM.contDiff
+  have hh : ContDiff ℝ (⊤ : ENat) h := hg.mul (by fun_prop)
+  obtain ⟨f, hf⟩ := exists_homogeneousAdelicTheta_eq_profile_on_halfLine χ (Real.exp_pos (-R)) h
+    (show HasCompactSupport h from hc.mul_right) hh
+  refine ⟨f, fun x hx ↦ ?_⟩
+  let y : C𝔽 := QuotientGroup.mk (τ (e x))
+  have hy : ideleClassNorm F y = e x := hτ (e x)
+  have hlog : Real.log ((ideleClassNorm F y).val : ℝ) = x := by rw [hy]; exact Real.log_exp x
+  have hval := hf y (show Real.exp (-R) ≤ ((ideleClassNorm F y).val : ℝ) by
+    rw [hy]; exact Real.exp_le_exp.mpr hx)
+  change homogeneousAdelicTheta _ f.val y * (χ y : ℂ) * Complex.exp ((x : ℂ) / 2) = g x
+  rw [hval, hχ, Circle.coe_one, mul_one, hlog]
+  dsimp only [h]
+  have hne : (χ y : ℂ) ≠ 0 := Circle.coe_ne_zero _
+  rw [show -(x : ℂ) / 2 = -((x : ℂ) / 2) by ring, Complex.exp_neg]
+  field_simp
+
+
+private theorem widthEnergy_weight {a : ℝ} (ha : 0 ≤ a) (s x : ℝ) :
+    intervalSobolevDensity (-a) a s x =
+      Real.exp (2 * a * |x|) * (1 + x ^ 2) ^ (s / 2) := by
+  unfold intervalSobolevDensity
+  rcases le_total 0 x with hx | hx
+  · rw [abs_of_nonneg hx, max_eq_right (Real.exp_le_exp.mpr (by nlinarith))]
+  · rw [abs_of_nonpos hx, max_eq_left (Real.exp_le_exp.mpr (by nlinarith)),
+      show 2 * -a * x = 2 * a * -x by ring]
+
+
+private theorem widthEnergy_integrable_of_profile (χ : PontryaginDual C𝔽)
+    (τ : ℝ≥0ˣ →ₜ* I𝔽) (hτ : RightInverse τ (ideleNorm F)) (f : adelePolarSubspace F)
+    {a s : ℝ} (ha : 0 ≤ a) (hs : 0 ≤ s) (R : ℝ) {g : ℝ → ℂ}
+    (hc : HasCompactSupport g) (hg : Continuous g)
+    (heq : EqOn (centeredLogThetaLift χ τ f) g (Ici (-R))) :
+    Integrable (fun x ↦ ‖centeredLogThetaLift χ τ f x‖ ^ 2 * intervalSobolevDensity (-a) a s x) := by
+  have hi : IntegrableOn (fun x ↦ ‖centeredLogThetaLift χ τ f x‖ ^ 2 * intervalSobolevDensity (-a) a s x) (Iic (-R)) :=
+    (centeredLogThetaLift_energy χ τ hτ f ha hs R).2
+  have hd : Continuous (intervalSobolevDensity (-a) a s) := by
+    unfold intervalSobolevDensity; fun_prop (disch := intros; positivity)
+  have hp : HasCompactSupport (fun x ↦ ‖g x‖ ^ 2 * intervalSobolevDensity (-a) a s x) :=
+    by simpa only [pow_two, Pi.mul_def] using (hc.norm.mul_right (f' := fun x ↦ ‖g x‖)).mul_right (f' := intervalSobolevDensity (-a) a s)
+  have hir : IntegrableOn (fun x ↦ ‖g x‖ ^ 2 * intervalSobolevDensity (-a) a s x) (Ici (-R)) :=
+    (((hg.norm.pow 2).mul hd).integrable_of_hasCompactSupport hp).integrableOn
+  have hr : IntegrableOn (fun x ↦ ‖centeredLogThetaLift χ τ f x‖ ^ 2 * intervalSobolevDensity (-a) a s x) (Ici (-R)) := by
+    apply IntegrableOn.congr_fun hir _ measurableSet_Ici
+    intro x hx
+    dsimp only
+    rw [heq hx]
+  simpa only [Iic_union_Ici, integrableOn_univ] using hi.union hr
+
+
+private theorem widthEnergy_one_le {a s : ℝ} (ha : 0 ≤ a) (hs : 0 ≤ s) (x : ℝ) :
+    1 ≤ intervalSobolevDensity (-a) a s x := by
+  rw [widthEnergy_weight ha]
+  exact one_le_mul_of_one_le_of_one_le (Real.one_le_exp (by positivity)) (Real.one_le_rpow (by nlinarith [sq_nonneg x]) (by positivity))
+
+
+private theorem widthEnergy_tail {a b s R : ℝ} (ha : 0 ≤ a) (hab : a < b)
+    {x : ℝ} (hx : R ≤ |x|) :
+    Real.exp (2 * (b - a) * R) * intervalSobolevDensity (-a) a s x ≤ intervalSobolevDensity (-b) b s x := by
+  rw [widthEnergy_weight ha, widthEnergy_weight (ha.trans hab.le), ← mul_assoc, ← Real.exp_add]
+  apply mul_le_mul_of_nonneg_right _ (by positivity)
+  exact Real.exp_le_exp.mpr (by nlinarith [mul_nonneg (sub_nonneg.mpr hab.le) (sub_nonneg.mpr hx)])
+
+
+private theorem widthEnergy_amplify {u g : ℝ → ℂ} {a b s R C : ℝ} (ha : 0 ≤ a) (hs : 0 ≤ s)
+    (hab : a < b) (hC : 0 ≤ C)
+    (hi : ∀ c ∈ ({a,b} : Finset ℝ), Integrable (fun x ↦ ‖u x‖ ^ 2 * intervalSobolevDensity (-c) c s x))
+    (hgi : Integrable (fun x ↦ ‖g x‖ ^ 2 * intervalSobolevDensity (-a) a s x))
+    (he : EqOn u g (Icc (-R) R)) (hunit : ∀ x ∈ Icc (R + 3) (R + 4), u x = 1)
+    (hsize : C * ((∫ x, ‖g x‖ ^ 2 * intervalSobolevDensity (-a) a s x) + 1) <
+      Real.exp (2 * (b - a) * R)) :
+    0 < ∫ x, ‖u x‖ ^ 2 * intervalSobolevDensity (-a) a s x
+    ∧ C * (∫ x, ‖u x‖ ^ 2 * intervalSobolevDensity (-a) a s x) <
+      ∫ x, ‖u x‖ ^ 2 * intervalSobolevDensity (-b) b s x := by
+  let e (c x : ℝ) := ‖u x‖ ^ 2 * intervalSobolevDensity (-c) c s x
+  let W := Icc (-R) R
+  let D := Real.exp (2 * (b - a) * R)
+  let A := ∫ x, ‖g x‖ ^ 2 * intervalSobolevDensity (-a) a s x
+  have hA : 0 ≤ A := integral_nonneg (fun x ↦ mul_nonneg (sq_nonneg _) (zero_le_one.trans (widthEnergy_one_le ha hs x)))
+  have hia : Integrable (e a) := hi a (by simp)
+  have hib : Integrable (e b) := hi b (by simp)
+  have hW : MeasurableSet W := measurableSet_Icc
+  have hnn {c : ℝ} (hc : 0 ≤ c) (x : ℝ) : 0 ≤ e c x :=
+    mul_nonneg (sq_nonneg _) (zero_le_one.trans (widthEnergy_one_le hc hs x))
+  have hinside : (∫ x in W, e a x) ≤ A := by
+    calc
+      _ = ∫ x in W, ‖g x‖ ^ 2 * intervalSobolevDensity (-a) a s x :=
+        setIntegral_congr_fun hW (fun x hx ↦ by simp only [e, he hx])
+      _ ≤ A := setIntegral_le_integral hgi (ae_of_all _ (fun x ↦ mul_nonneg (sq_nonneg _) (zero_le_one.trans (widthEnergy_one_le ha hs x))))
+  have hmass : 1 ≤ ∫ x in Wᶜ, e a x := by
+    let I := Icc (R + 3) (R + 4)
+    have hI : I ⊆ Wᶜ := by
+      intro x hx hWx; exact (show R < x by linarith [hx.1]).not_ge hWx.2
+    calc
+      1 = ∫ _ : ℝ in I, (1 : ℝ) := by
+        simp [I, Measure.real, Real.volume_Icc, show R + 4 - (R + 3) = 1 by ring]
+      _ ≤ ∫ x in I, e a x := by
+        apply setIntegral_mono_on _ hia.integrableOn measurableSet_Icc
+        · intro x hx
+          simpa only [e, hunit x hx, norm_one, one_pow, one_mul] using widthEnergy_one_le ha hs x
+        · exact integrableOn_const (by simp)
+      _ ≤ _ := setIntegral_mono_set hia.integrableOn (ae_of_all _ (hnn ha)) (ae_of_all _ hI)
+  have htail : D * (∫ x in Wᶜ, e a x) ≤ ∫ x in Wᶜ, e b x := by
+    rw [← integral_const_mul]
+    apply setIntegral_mono_on (hia.const_mul _).integrableOn hib.integrableOn hW.compl
+    intro x hx
+    have hxr : R ≤ |x| := by
+      by_contra! h
+      exact hx ⟨(abs_lt.mp h).1.le, (abs_lt.mp h).2.le⟩
+    simpa only [e, D, mul_left_comm] using
+      (mul_le_mul_of_nonneg_left (widthEnergy_tail (s := s) ha hab hxr) (sq_nonneg ‖u x‖))
+  have hsa := integral_add_compl hW hia
+  have hsb := integral_add_compl hW hib
+  have h0a : 0 ≤ ∫ x in W, e a x := integral_nonneg (hnn ha)
+  have h0b : 0 ≤ ∫ x in W, e b x := integral_nonneg (hnn (ha.trans hab.le))
+  change C * (A + 1) < D at hsize
+  change 0 < ∫ x, e a x
+    ∧ C * (∫ x, e a x) < ∫ x, e b x
+  constructor
+  · linarith
+  · have hdc : 0 ≤ D - C := by nlinarith [mul_nonneg hC hA]
+    nlinarith [mul_nonneg hC (sub_nonneg.mpr hinside), mul_nonneg hdc (sub_nonneg.mpr hmass)]
+
+
+/-- For a prescribed smooth compact profile on any bounded log window, the ratio of the
+squared global norms at two distinct strip widths is unbounded over *actual* polar-free
+theta lifts of that profile. The character is normalized on the canonical norm section.
+The profile is centered at 1/2; the squared norms use the §9.2 densities with degree s. -/
+theorem exists_centeredLogThetaLift_width_amplification (χ : PontryaginDual C𝔽)
+    (hχ : ∀ t, χ (QuotientGroup.mk (canonicalIdeleNormSection F t)) = 1)
+    (τ : ℝ≥0ˣ →ₜ* I𝔽) (hτ : RightInverse τ (ideleNorm F))
+    {a b s : ℝ} (ha : 0 ≤ a) (hab : a < b) (hs : 0 ≤ s)
+    (g : ℝ → ℂ) (hc : HasCompactSupport g) (hg : ContDiff ℝ (⊤ : ENat) g)
+    (K C : ℝ) (hC : 0 ≤ C) :
+    ∃ f : adelePolarSubspace F,
+      let u := centeredLogThetaLift χ τ f
+      EqOn u g (Icc (-K) K) ∧
+      (∀ c, 0 ≤ c → Integrable (fun x ↦ ‖u x‖ ^ 2 * intervalSobolevDensity (-c) c s x)) ∧
+      0 < (∫ x, ‖u x‖ ^ 2 * intervalSobolevDensity (-a) a s x) ∧
+      C * (∫ x, ‖u x‖ ^ 2 * intervalSobolevDensity (-a) a s x) <
+        ∫ x, ‖u x‖ ^ 2 * intervalSobolevDensity (-b) b s x := by
+  let A := ∫ x, ‖g x‖ ^ 2 * intervalSobolevDensity (-a) a s x
+  obtain ⟨B, hB, hBg⟩ := hc.isBounded.exists_pos_norm_lt
+  obtain ⟨R, hR⟩ := exists_gt (max (max K B) (C * (A + 1) / (2 * (b - a))))
+  have hK : K ≤ R := (le_max_left K B).trans ((le_max_left ..).trans hR.le)
+  have hBR : B < R := lt_of_le_of_lt ((le_max_right K B).trans (le_max_left ..)) hR
+  have hR₀ : 0 ≤ R := hB.le.trans hBR.le
+  have hsize : C * (A + 1) < Real.exp (2 * (b - a) * R) := by
+    have h := (div_lt_iff₀ (by linarith : 0 < 2 * (b - a))).mp
+      (lt_of_le_of_lt (le_max_right ..) hR)
+    linarith [Real.add_one_le_exp (2 * (b - a) * R)]
+  let Bump : ContDiffBump (R + 3) := ⟨1, 2, by norm_num, by norm_num⟩
+  let p (x : ℝ) := g x + ((Bump x : ℝ) : ℂ)
+  have hp : ContDiff ℝ (⊤ : ENat) p := hg.add (Complex.ofRealCLM.contDiff.comp Bump.contDiff)
+  have hpc : HasCompactSupport p := hc.add (Bump.hasCompactSupport.comp_left (by simp : ((0:ℝ):ℂ) = 0))
+  obtain ⟨f, hf⟩ := widthLift_profile χ hχ τ hτ R p hpc hp
+  let u := centeredLogThetaLift χ τ f
+  have hwin : EqOn u g (Icc (-R) R) := by
+    intro x hx
+    have hzero : Bump x = 0 := Bump.zero_of_le_dist (by
+      change 2 ≤ dist x (R + 3)
+      rw [Real.dist_eq, abs_of_nonpos (by linarith [hx.2] : x - (R + 3) ≤ 0)]; linarith [hx.2])
+    simpa only [p, hzero, Complex.ofReal_zero, add_zero] using hf (show x ∈ Ici (-R) from hx.1)
+  have hunit (x : ℝ) (hx : x ∈ Icc (R + 3) (R + 4)) : u x = 1 := by
+    have hzero : g x = 0 := by
+      by_contra hn
+      have hb := hBg x (subset_tsupport g hn)
+      rw [Real.norm_eq_abs, abs_of_nonneg (by linarith [hx.1])] at hb
+      linarith [hx.1]
+    have hone : Bump x = 1 := Bump.one_of_mem_closedBall (by
+      change dist x (R + 3) ≤ 1
+      rw [Real.dist_eq, abs_of_nonneg (by linarith [hx.1])]; linarith [hx.2])
+    simpa only [p, hzero, hone, Complex.ofReal_one, zero_add] using hf (show x ∈ Ici (-R) by
+      change -R ≤ x; linarith [hx.1])
+  have hi (c : ℝ) (hc₀ : 0 ≤ c) : Integrable (fun x ↦ ‖u x‖ ^ 2 * intervalSobolevDensity (-c) c s x) :=
+    widthEnergy_integrable_of_profile χ τ hτ f hc₀ hs R hpc hp.continuous hf
+  have hgi : Integrable (fun x ↦ ‖g x‖ ^ 2 * intervalSobolevDensity (-a) a s x) := by
+    have hd : Continuous (intervalSobolevDensity (-a) a s) := by
+      unfold intervalSobolevDensity; fun_prop (disch := intros; positivity)
+    apply ((hg.continuous.norm.pow 2).mul hd).integrable_of_hasCompactSupport
+    simpa only [pow_two, Pi.mul_def] using
+      (hc.norm.mul_right (f' := fun x ↦ ‖g x‖)).mul_right (f' := intervalSobolevDensity (-a) a s)
+  refine ⟨f, hwin.mono (Icc_subset_Icc (neg_le_neg hK) hK), hi, ?_⟩
+  apply widthEnergy_amplify ha hs hab hC _ hgi hwin hunit hsize
+  intro c hc'
+  rcases Finset.mem_insert.mp hc' with rfl | h
+  · exact hi _ ha
+  · obtain rfl := Finset.mem_singleton.mp h
+    exact hi _ (ha.trans hab.le)
+
+
+/-- Real localized convolution numerator of a radial vector on the log-norm line.
+The Haar-coordinate trace of its rank-one compression is this numerator divided by
+its squared global weighted norm, with the positive norm-one Haar factor. -/
+def logWindowConvolutionNumerator (a s : ℝ) (ρ : ℝ → ℝ) (H u : ℝ → ℂ) : ℝ :=
+  ∫ x, ρ x * intervalSobolevDensity (-a) a s x *
+    ((∫ y, H (x - y) * u y) * conj (u x)).re
+
+private theorem logWindowConvolutionNumerator_congr (a s : ℝ) {ρ : ℝ → ℝ} {H u g : ℝ → ℂ}
+    {R T : ℝ} (hT : 0 ≤ T) (hρ : ∀ x, R < |x| → ρ x = 0) (hH : ∀ x, T < |x| → H x = 0)
+    (hu : EqOn u g (Icc (-(R + T)) (R + T))) :
+    logWindowConvolutionNumerator a s ρ H u = logWindowConvolutionNumerator a s ρ H g := by
+  apply integral_congr_ae (ae_of_all _ _)
+  intro x
+  by_cases hx : |x| ≤ R
+  · have hx' := abs_le.mp hx
+    have heqx : u x = g x := hu ⟨by linarith [hx'.1], by linarith [hx'.2]⟩
+    have heqy : (∫ y, H (x - y) * u y) = ∫ y, H (x - y) * g y := by
+      apply integral_congr_ae (ae_of_all _ _)
+      intro y
+      by_cases hy : |x - y| ≤ T
+      · obtain ⟨hl, hr⟩ := abs_le.mp hy
+        rw [hu (show y ∈ Icc (-(R + T)) (R + T) from ⟨by linarith [hx'.1], by linarith [hx'.2]⟩)]
+      · rw [hH _ (lt_of_not_ge hy), zero_mul, zero_mul]
+    simp only [heqx, heqy]
+  · simp only [hρ _ (lt_of_not_ge hx), zero_mul]
+
+
+/-- At two distinct widths the absolute value of the normalized localized convolution
+trace can decrease by any prescribed factor on a genuine one-dimensional theta space.
+The same lift realizes a given compact smooth profile throughout the padded window;
+the hypothesis asks that its narrow-width numerator be nonzero. -/
+theorem exists_centeredLogThetaLift_small_wide_window_trace (χ : PontryaginDual C𝔽)
+    (hχ : ∀ t, χ (QuotientGroup.mk (canonicalIdeleNormSection F t)) = 1)
+    (τ : ℝ≥0ˣ →ₜ* I𝔽) (hτ : RightInverse τ (ideleNorm F))
+    {a b s : ℝ} (ha : 0 ≤ a) (hab : a < b) (hs : 0 ≤ s)
+    (g : ℝ → ℂ) (hc : HasCompactSupport g) (hg : ContDiff ℝ (⊤ : ENat) g)
+    (ρ : ℝ → ℝ) (H : ℝ → ℂ) {R T : ℝ} (hT : 0 ≤ T)
+    (hρ : ∀ x, R < |x| → ρ x = 0) (hH : ∀ x, T < |x| → H x = 0)
+    (hng : logWindowConvolutionNumerator a s ρ H g ≠ 0) {ε : ℝ} (hε : 0 < ε) :
+    ∃ f : adelePolarSubspace F,
+      let u := centeredLogThetaLift χ τ f
+      let E := fun c : ℝ ↦ ∫ x, ‖u x‖ ^ 2 * intervalSobolevDensity (-c) c s x
+      EqOn u g (Icc (-(R + T)) (R + T)) ∧ 0 < E a ∧ 0 < E b ∧
+      |logWindowConvolutionNumerator b s ρ H u| / E b <
+        ε * (|logWindowConvolutionNumerator a s ρ H u| / E a) := by
+  let N := fun c ↦ |logWindowConvolutionNumerator c s ρ H g|
+  have haN : 0 < N a := abs_pos.mpr hng
+  have hbN : 0 ≤ N b := abs_nonneg _
+  let C := N b / (ε * N a)
+  have hC : 0 ≤ C := div_nonneg hbN (mul_pos hε haN).le
+  obtain ⟨f, heq, _, hea, hgrowth⟩ := exists_centeredLogThetaLift_width_amplification
+    χ hχ τ hτ ha hab hs g hc hg (R + T) C hC
+  let u := centeredLogThetaLift χ τ f
+  let E := fun c : ℝ ↦ ∫ x, ‖u x‖ ^ 2 * intervalSobolevDensity (-c) c s x
+  change 0 < E a at hea
+  change C * E a < E b at hgrowth
+  have heb := (mul_nonneg hC hea.le).trans_lt hgrowth
+  refine ⟨f, heq, hea, heb, ?_⟩
+  rw [logWindowConvolutionNumerator_congr b s hT hρ hH heq, logWindowConvolutionNumerator_congr a s hT hρ hH heq]
+  change N b / E b < ε * (N a / E a)
+  rw [← mul_div_assoc, div_lt_div_iff₀ heb hea]
+  have hcoef : C * (ε * N a) = N b := div_mul_cancel₀ _ (mul_pos hε haN).ne'
+  calc
+    _ = (C * E a) * (ε * N a) := by rw [← hcoef]; ring
+    _ < E b * (ε * N a) := mul_lt_mul_of_pos_right hgrowth (mul_pos hε haN)
+    _ = _ := mul_comm _ _
+
+
+private theorem widthWindow_bump {x : ℝ} {P : ℝ → Prop} (hp : ∀ᶠ y in 𝓝 x, P y) :
+    ∃ b : ContDiffBump x, ∀ y, b y ≠ 0 → P y := by
+  obtain ⟨δ, hδ, hball⟩ := Metric.mem_nhds_iff.mp hp
+  let b : ContDiffBump x := ⟨δ / 2, δ, by positivity, by linarith⟩
+  refine ⟨b, fun y hy ↦ hball ?_⟩
+  exact b.support_eq ▸ (show y ∈ Function.support b from hy)
+
+
+/-- If a visible point interacts through a nonzero complex kernel with a point beyond
+the physical cutoff, smooth compact radial trial vectors realize every real localized
+convolution numerator. The phase of the exterior packet aligns the cross term. -/
+theorem exists_logWindowConvolutionNumerator_eq_of_cutoff_gap {a s : ℝ} (ha : 0 ≤ a) (hs : 0 ≤ s)
+    {ρ : ℝ → ℝ} {H : ℝ → ℂ} (hρ : Continuous ρ) (hH : Continuous H) (hcH : HasCompactSupport H)
+    {x₀ y₀ : ℝ} (hxy : H (x₀ - y₀) ≠ 0) (hx : 0 < ρ x₀)
+    (hy : ∀ᶠ y in 𝓝 y₀, ρ y = 0) (v : ℝ) :
+    ∃ g : ℝ → ℂ, ContDiff ℝ (⊤ : ENat) g ∧ HasCompactSupport g ∧
+      logWindowConvolutionNumerator a s ρ H g = v := by
+  let c := conj (H (x₀ - y₀))
+  let A (x : ℝ) := (H x).re
+  let B (x : ℝ) := (c * H x).re
+  have hA : Continuous A := Complex.continuous_re.comp hH
+  have hB : Continuous B := Complex.continuous_re.comp (continuous_const.mul hH)
+  have hcA : HasCompactSupport A := hcH.comp_left Complex.zero_re
+  have hcB : HasCompactSupport B := (hcH.mul_left (f := fun _ ↦ c)).comp_left Complex.zero_re
+  have hbxy : 0 < B (x₀ - y₀) := by
+    dsimp only [B, c]
+    rw [Complex.conj_mul']
+    rw [← Complex.ofReal_pow, Complex.ofReal_re]
+    exact sq_pos_of_pos (norm_pos_iff.mpr hxy)
+  have hcy : Continuous (fun y ↦ B (x₀ - y)) := hB.comp (continuous_const.sub continuous_id)
+  obtain ⟨d, hd⟩ := widthWindow_bump (hy.and (hcy.continuousAt.eventually (lt_mem_nhds hbxy)))
+  let conv (J k : ℝ → ℝ) (x : ℝ) := ∫ y, J (x - y) * k y
+  have hconv {J k : ℝ → ℝ} (hJ : Continuous J) (hJc : HasCompactSupport J) (hk : Continuous k) :
+      Continuous (conv J k) := by
+    have heq : conv J k = MeasureTheory.convolution k J (ContinuousLinearMap.mul ℝ ℝ) volume := by
+      funext x
+      simp only [conv, MeasureTheory.convolution_def, ContinuousLinearMap.mul_apply', mul_comm]
+    rw [heq]
+    exact hJc.continuous_convolution_right _ hk.locallyIntegrable hJ
+  have hcd : 0 < conv B d x₀ := by
+    apply (hcy.mul d.continuous).integral_pos_of_hasCompactSupport_nonneg_ne_zero (x := y₀) d.hasCompactSupport.mul_left
+    · intro y
+      by_cases h : d y = 0
+      · simp [h]
+      · exact mul_nonneg (hd y h).2.le d.nonneg
+    · simpa only [Pi.mul_apply, d.one_of_mem_closedBall (Metric.mem_closedBall_self d.rIn_pos.le), mul_one] using hbxy.ne'
+  obtain ⟨b, hb⟩ := widthWindow_bump ((hρ.continuousAt.eventually (lt_mem_nhds hx)).and
+    ((hconv hB hcB d.continuous).continuousAt.eventually (lt_mem_nhds hcd)))
+  let w (x : ℝ) := ρ x * intervalSobolevDensity (-a) a s x
+  have hw : Continuous w := hρ.mul (by
+    unfold intervalSobolevDensity; fun_prop (disch := intros; positivity))
+  let P (J k : ℝ → ℝ) := ∫ x, w x * b x * conv J k x
+  have hPint {J k : ℝ → ℝ} (hJ : Continuous J) (hJc : HasCompactSupport J) (hk : Continuous k) :
+      Integrable (fun x ↦ w x * b x * conv J k x) :=
+    ((hw.mul b.continuous).mul (hconv hJ hJc hk)).integrable_of_hasCompactSupport
+      (b.hasCompactSupport.mul_left.mul_right)
+  have hP : 0 < P B d := by
+    apply integral_pos_of_integrable_nonneg_ne_zero (x := x₀)
+      ((hw.mul b.continuous).mul (hconv hB hcB d.continuous)) (hPint hB hcB d.continuous)
+    · intro x
+      by_cases h : b x = 0
+      · simp [h]
+      · exact mul_nonneg (mul_nonneg (mul_nonneg (hb x h).1.le (zero_le_one.trans (widthEnergy_one_le ha hs x))) b.nonneg) (hb x h).2.le
+    · have hone := b.one_of_mem_closedBall (Metric.mem_closedBall_self b.rIn_pos.le)
+      exact (mul_pos (mul_pos (mul_pos hx (zero_lt_one.trans_le (widthEnergy_one_le ha hs x₀))) (hone.symm ▸ zero_lt_one)) hcd).ne'
+  let t := (v - P A b) / P B d
+  let g (x : ℝ) : ℂ := (b x : ℝ) + ((t : ℂ) * c) * (d x : ℝ)
+  have hg : ContDiff ℝ (⊤ : ENat) g := (Complex.ofRealCLM.contDiff.comp b.contDiff).add
+    (contDiff_const.mul (Complex.ofRealCLM.contDiff.comp d.contDiff))
+  have hgc : HasCompactSupport g := (b.hasCompactSupport.comp_left Complex.ofReal_zero).add
+    (d.hasCompactSupport.comp_left Complex.ofReal_zero).mul_left
+  refine ⟨g, hg, hgc, ?_⟩
+  have hlint {J k : ℝ → ℝ} (hJ : Continuous J) (hk : Continuous k) (hkc : HasCompactSupport k) (x : ℝ) :
+      Integrable (fun y ↦ J (x - y) * k y) :=
+    ((hJ.comp (continuous_const.sub continuous_id)).mul hk).integrable_of_hasCompactSupport hkc.mul_left
+  let U (x : ℝ) := ∫ y, H (x - y) * g y
+  have hreal (x : ℝ) : (U x).re = conv A b x + t * conv B d x := by
+    have hi : Integrable (fun y ↦ H (x - y) * g y) :=
+      ((hH.comp (continuous_const.sub continuous_id)).mul hg.continuous).integrable_of_hasCompactSupport hgc.mul_left
+    have hcast : (U x).re = ∫ y, (H (x - y) * g y).re := (integral_re hi).symm
+    rw [hcast]
+    have heq (y : ℝ) : (H (x - y) * g y).re = A (x - y) * b y + t * (B (x - y) * d y) := by
+      dsimp only [g, A, B]
+      simp only [mul_add, Complex.add_re, Complex.mul_re, Complex.mul_im, Complex.ofReal_re, Complex.ofReal_im]
+      ring
+    simp_rw [heq]
+    rw [integral_add (hlint hA b.continuous b.hasCompactSupport x)
+      ((hlint hB d.continuous d.hasCompactSupport x).const_mul t), integral_const_mul]
+  calc
+    _ = ∫ x, w x * b x * conv A b x + t * (w x * b x * conv B d x) := by
+      apply integral_congr_ae (ae_of_all _ _)
+      intro x
+      change w x * (U x * conj (g x)).re = _
+      by_cases hx : ρ x = 0
+      · simp [w, hx]
+      have hd₀ : d x = 0 := by
+        by_contra h
+        exact hx (hd x h).1
+      rw [show conj (g x) = ((b x : ℝ) : ℂ) by simp [g, hd₀], Complex.mul_re]
+      simp only [Complex.ofReal_re, Complex.ofReal_im, mul_zero, sub_zero, hreal]
+      ring
+    _ = P A b + t * P B d := by
+      rw [integral_add (hPint hA hcA b.continuous) ((hPint hB hcB d.continuous).const_mul t), integral_const_mul]
+    _ = v := by dsimp [t]; field_simp; ring
+
+
+private theorem widthWindow_cutoff_gap {ρ H : ℝ → ℝ} (hc : HasCompactSupport ρ)
+    (hρ : 0 ≤ ρ) (hn : ∃ x, ρ x ≠ 0) {t : ℝ} (ht : 0 < t) (hH : 0 < H (-t)) :
+    ∃ x y, 0 < H (x - y) ∧ 0 < ρ x ∧ ∀ᶠ z in 𝓝 y, ρ z = 0 := by
+  let S := Function.support ρ
+  have hS : S.Nonempty := hn
+  have hB : BddAbove S := hc.bddAbove.mono (subset_tsupport ρ)
+  obtain ⟨x, hx, hx'⟩ := exists_lt_of_lt_csSup hS (show sSup S - t < sSup S by linarith)
+  refine ⟨x, x + t, by simpa only [sub_add_cancel_left] using hH, lt_of_le_of_ne (hρ x) (Ne.symm hx), ?_⟩
+  filter_upwards [lt_mem_nhds (show sSup S < x + t by linarith)] with z hz
+  by_contra h
+  exact (le_csSup hB (show z ∈ S from h)).not_gt hz
+
+
+/-- Every nonnegative nonzero continuous compact physical cutoff admits genuine
+one-dimensional theta compressions with either sign at the narrow width and arbitrarily
+smaller absolute response at the wider one. The complex kernel needs only one nonzero
+value away from the origin. Both signs are obtained by prescribing the
+narrow numerator v. -/
+theorem exists_centeredLogThetaLift_signed_window_trace (χ : PontryaginDual C𝔽)
+    (hχ : ∀ t, χ (QuotientGroup.mk (canonicalIdeleNormSection F t)) = 1)
+    (τ : ℝ≥0ˣ →ₜ* I𝔽) (hτ : RightInverse τ (ideleNorm F))
+    {a b s : ℝ} (ha : 0 ≤ a) (hab : a < b) (hs : 0 ≤ s)
+    {ρ : ℝ → ℝ} {H : ℝ → ℂ} (hc : Continuous ρ) (hρ : HasCompactSupport ρ) (hnn : 0 ≤ ρ)
+    (hn : ∃ x, ρ x ≠ 0) (hH : Continuous H) (hcH : HasCompactSupport H)
+    {t : ℝ} (ht : t ≠ 0) (hpos : H t ≠ 0) {v ε : ℝ} (hv : v ≠ 0) (hε : 0 < ε) :
+    ∃ f : adelePolarSubspace F,
+      let u := centeredLogThetaLift χ τ f
+      let E := fun c : ℝ ↦ ∫ x, ‖u x‖ ^ 2 * intervalSobolevDensity (-c) c s x
+      let N := fun c : ℝ ↦ logWindowConvolutionNumerator c s ρ H u
+      0 < E a ∧ 0 < E b ∧ N a = v ∧ |N b| / E b < ε * (|v| / E a) := by
+  have hpair : ∃ x y, H (x - y) ≠ 0 ∧ 0 < ρ x ∧ ∀ᶠ z in 𝓝 y, ρ z = 0 := by
+    rcases lt_or_gt_of_ne ht with ht | ht
+    · obtain ⟨x, y, hxy, hx, hy⟩ := widthWindow_cutoff_gap (H := fun z ↦ ‖H z‖) hρ hnn hn
+        (neg_pos.mpr ht) (by simpa only [neg_neg] using norm_pos_iff.mpr hpos)
+      exact ⟨x, y, norm_pos_iff.mp hxy, hx, hy⟩
+    · have hrn : ∃ x : ℝ, ρ (-x) ≠ 0 := by
+        obtain ⟨x, hx⟩ := hn; exact ⟨-x, by simpa only [neg_neg]⟩
+      obtain ⟨x, y, hxy, hx, hy⟩ := widthWindow_cutoff_gap (H := fun z ↦ ‖H (-z)‖)
+        (hρ.comp_homeomorph (Homeomorph.neg ℝ)) (fun x ↦ hnn (-x)) hrn
+        ht (by simpa only [neg_neg] using norm_pos_iff.mpr hpos)
+      refine ⟨-x, -y, ?_, hx, ?_⟩
+      · simpa only [neg_sub, neg_sub_neg] using norm_pos_iff.mp hxy
+      · have hm : Tendsto (fun z : ℝ ↦ -z) (𝓝 (-y)) (𝓝 y) := by
+          simpa only [neg_neg] using continuous_neg.tendsto (-y)
+        simpa only [neg_neg] using hm.eventually (show ∀ᶠ z in 𝓝 y, ρ (-z) = 0 from hy)
+  obtain ⟨x, y, hxy, hx, hy⟩ := hpair
+  obtain ⟨g, hg, hgc, hval⟩ := exists_logWindowConvolutionNumerator_eq_of_cutoff_gap ha hs hc hH hcH hxy hx hy v
+  obtain ⟨R, _, hR⟩ := hρ.isBounded.exists_pos_norm_lt
+  obtain ⟨T, hT, hT'⟩ := hcH.isBounded.exists_pos_norm_lt
+  have hR₀ (x : ℝ) (hx : R < |x|) : ρ x = 0 := by
+    by_contra h
+    exact hx.not_ge (by simpa only [Real.norm_eq_abs] using (hR x (subset_tsupport ρ h)).le)
+  have hT₀ (x : ℝ) (hx : T < |x|) : H x = 0 := by
+    by_contra h
+    exact hx.not_ge (by simpa only [Real.norm_eq_abs] using (hT' x (subset_tsupport H h)).le)
+  obtain ⟨f, heq, hea, heb, hlt⟩ := exists_centeredLogThetaLift_small_wide_window_trace
+    χ hχ τ hτ ha hab hs g hgc hg ρ H hT.le hR₀ hT₀ (hval ▸ hv) hε
+  have hfa := (logWindowConvolutionNumerator_congr a s hT.le hR₀ hT₀ heq).trans hval
+  exact ⟨f, hea, heb, hfa, hfa ▸ hlt⟩
+
+
+attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorelSpaceSec1
+  instIdeleClassT2Sec1 instIdeleClassLocallyCompactSec1 instIdeleClassSecondCountableSec1
+  instIdeleClassHaarMeasureSec1
+
+/-- Log-coordinate realization of an idèle-class spatial cutoff along a norm section. -/
+def thetaLogWindowCutoff (τ : ℝ≥0ˣ →ₜ* I𝔽) (ρ : C𝔽 → ℝ) (x : ℝ) : ℝ :=
+  let e := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  ρ (QuotientGroup.mk (τ (e x)))
+
+private theorem thetaLogWindowCutoff_properties (τ : ℝ≥0ˣ →ₜ* I𝔽) (hτ : RightInverse τ (ideleNorm F))
+    {Λ η : ℝ} {ρ : C𝔽 → ℝ} (hρ : IsSmoothModulatedCutoff (continuousIdeleClassNorm F) Λ η ρ) :
+    let r := thetaLogWindowCutoff τ ρ
+    Continuous r ∧ HasCompactSupport r ∧ 0 ≤ r ∧ ∃ x, r x ≠ 0 := by
+  let e := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  let y (x : ℝ) : C𝔽 := QuotientGroup.mk (τ (e x))
+  let r := thetaLogWindowCutoff τ ρ
+  have hy : Continuous y := continuous_quotient_mk'.comp (τ.continuous.comp e.continuous)
+  have heq (x : ℝ) : ideleClassNorm F (y x) = e x := hτ (e x)
+  have hval (x : ℝ) : ((ideleClassNorm F (y x)).val : ℝ) = Real.exp x := by rw [heq]; rfl
+  have hrel : ∀ g : C𝔽, ρ g = r (Real.log ((ideleClassNorm F g).val : ℝ)) := by
+    obtain ⟨q, _, hq, _⟩ := hρ.1.profile
+    intro g
+    change ρ g = ρ (y _)
+    rw [hq g, hq (y _)]
+    congr 1
+    change ((ideleClassNorm F g).val : ℝ) = ((ideleClassNorm F (y _)).val : ℝ)
+    rw [hval, Real.exp_log (NNReal.coe_pos.mpr (Units.zero_lt _))]
+  have hnon : ∃ x, r x ≠ 0 := by
+    by_contra! h
+    have hzero : ρ = 0 := funext fun g ↦ (hrel g).trans (h _)
+    have hsup := hρ.1.sup_eq_one
+    simp [hzero] at hsup
+  have hrc : HasCompactSupport r := by
+    apply HasCompactSupport.of_support_subset_isCompact (isCompact_Icc (a := -Real.log Λ) (b := Real.log Λ))
+    intro x hx
+    have h := hρ.1.support_subset (subset_tsupport ρ (show ρ (y x) ≠ 0 from hx))
+    change Λ⁻¹ ≤ ((ideleClassNorm F (y x)).val : ℝ) ∧ ((ideleClassNorm F (y x)).val : ℝ) ≤ Λ at h
+    rw [hval] at h
+    exact ⟨by simpa only [Real.log_inv, Real.log_exp] using Real.log_le_log (inv_pos.mpr hρ.1.radius_pos) h.1,
+      by simpa only [Real.log_exp] using Real.log_le_log (Real.exp_pos x) h.2⟩
+  exact ⟨hρ.continuous.comp hy, hrc, fun x ↦ hρ.1.nonneg (y x), hnon⟩
+
+
+/-- For any actual smooth §9.3 physical cutoff, a complex probe nonzero at any
+nonzero log displacement admits both signs on genuine
+one-dimensional theta subspaces. At any pair of distinct widths the wide response
+can be arbitrarily small relative to the narrow response of the same subspace. -/
+theorem exists_centeredLogThetaLift_signed_modulatedCutoff (χ : PontryaginDual C𝔽)
+    (hχ : ∀ t, χ (QuotientGroup.mk (canonicalIdeleNormSection F t)) = 1)
+    (τ : ℝ≥0ˣ →ₜ* I𝔽) (hτ : RightInverse τ (ideleNorm F))
+    {a b s : ℝ} (ha : 0 ≤ a) (hab : a < b) (hs : 0 ≤ s)
+    {Λ η : ℝ} {ρ : C𝔽 → ℝ} (hρ : IsSmoothModulatedCutoff (continuousIdeleClassNorm F) Λ η ρ)
+    {H : ℝ → ℂ} (hc : Continuous H) (hcH : HasCompactSupport H)
+    (hn : ∃ t : ℝ, t ≠ 0 ∧ H t ≠ 0)
+    {v ε : ℝ} (hv : v ≠ 0) (hε : 0 < ε) :
+    ∃ f : adelePolarSubspace F,
+      let u := centeredLogThetaLift χ τ f
+      let E := fun c : ℝ ↦ ∫ x, ‖u x‖ ^ 2 * intervalSobolevDensity (-c) c s x
+      let N := fun c : ℝ ↦ logWindowConvolutionNumerator c s (thetaLogWindowCutoff τ ρ) H u
+      0 < E a ∧ 0 < E b ∧ N a = v ∧ |N b| / E b < ε * (|v| / E a) := by
+  obtain ⟨hr, hrc, hrn, hr₀⟩ := thetaLogWindowCutoff_properties τ hτ hρ
+  obtain ⟨t, ht, ht'⟩ := hn
+  exact exists_centeredLogThetaLift_signed_window_trace χ hχ τ hτ ha hab hs hr hrc hrn hr₀ hc hcH ht ht' hv hε
+
+
+private theorem widthEnergy_tendsto_right {b s : ℝ} (hb : 0 < b) (hs : 0 ≤ s) {F : ℝ → ℝ}
+    (hF : Continuous F) (hi : Integrable (fun x ↦ F x * intervalSobolevDensity (-b) b s x)) :
+    Tendsto (fun c : ℝ ↦ ∫ x, F x * intervalSobolevDensity (-c) c s x) (𝓝[>] 0)
+      (𝓝 (∫ x, F x * intervalSobolevDensity (-0) 0 s x)) := by
+  let w (c : ℝ) := intervalSobolevDensity (-c) c s
+  have hw (c : ℝ) : Continuous (w c) := by
+    change Continuous (intervalSobolevDensity (-c) c s)
+    unfold intervalSobolevDensity; fun_prop (disch := intros; positivity)
+  apply tendsto_integral_filter_of_dominated_convergence (fun x ↦ ‖F x * w b x‖)
+  · exact Eventually.of_forall (fun c ↦ (hF.mul (hw c)).aestronglyMeasurable)
+  · filter_upwards [self_mem_nhdsWithin (s := Ioi (0:ℝ)), nhdsWithin_le_nhds (gt_mem_nhds hb)] with c hc hb'
+    filter_upwards with x
+    have hc' : 0 < c := hc
+    have hmono : intervalSobolevDensity (-c) c s x ≤ w b x := by
+      change intervalSobolevDensity (-c) c s x ≤ intervalSobolevDensity (-b) b s x
+      rw [widthEnergy_weight hc'.le, widthEnergy_weight hb.le]
+      apply mul_le_mul_of_nonneg_right _ (by positivity)
+      exact Real.exp_le_exp.mpr (by nlinarith [mul_nonneg (sub_nonneg.mpr hb'.le) (abs_nonneg x)])
+    change ‖F x * intervalSobolevDensity (-c) c s x‖ ≤ _
+    rw [norm_mul, norm_mul, Real.norm_of_nonneg (zero_le_one.trans (widthEnergy_one_le hc'.le hs x)),
+      Real.norm_of_nonneg (zero_le_one.trans (widthEnergy_one_le hb.le hs x))]
+    exact mul_le_mul_of_nonneg_left hmono (norm_nonneg _)
+  · exact hi.norm
+  · apply ae_of_all
+    intro x
+    have hwc : Continuous (fun c : ℝ ↦ F x * intervalSobolevDensity (-c) c s x) := by
+      unfold intervalSobolevDensity; fun_prop
+    exact hwc.continuousAt.tendsto.mono_left nhdsWithin_le_nhds
+
+
+/-- The two separated endpoints can be tested on one fixed actual theta subspace.
+Its real compressed convolution response at the wide strip is strictly below the
+limit of its responses on positive widths tending to zero. -/
+theorem exists_centeredLogThetaLift_wide_trace_lt_center_limit (χ : PontryaginDual C𝔽)
+    (hχ : ∀ t, χ (QuotientGroup.mk (canonicalIdeleNormSection F t)) = 1)
+    (τ : ℝ≥0ˣ →ₜ* I𝔽) (hτ : RightInverse τ (ideleNorm F))
+    {b s : ℝ} (hb : 0 < b) (hs : 0 ≤ s)
+    {Λ η : ℝ} {ρ : C𝔽 → ℝ} (hρ : IsSmoothModulatedCutoff (continuousIdeleClassNorm F) Λ η ρ)
+    {H : ℝ → ℂ} (hc : Continuous H) (hcH : HasCompactSupport H) (hn : ∃ t : ℝ, t ≠ 0 ∧ H t ≠ 0) :
+    ∃ f : adelePolarSubspace F,
+      let u := centeredLogThetaLift χ τ f
+      let E := fun c : ℝ ↦ ∫ x, ‖u x‖ ^ 2 * intervalSobolevDensity (-c) c s x
+      let N := fun c : ℝ ↦ logWindowConvolutionNumerator c s (thetaLogWindowCutoff τ ρ) H u
+      Tendsto (fun c : ℝ ↦ N c / E c) (𝓝[>] 0) (𝓝 (N 0 / E 0)) ∧ N b / E b < N 0 / E 0 := by
+  obtain ⟨f, he₀, heb, hn₀, hlt⟩ := exists_centeredLogThetaLift_signed_modulatedCutoff
+    χ hχ τ hτ le_rfl hb hs hρ hc hcH hn (v := 1) one_ne_zero (ε := 1) zero_lt_one
+  let u := centeredLogThetaLift χ τ f
+  let E := fun c : ℝ ↦ ∫ x, ‖u x‖ ^ 2 * intervalSobolevDensity (-c) c s x
+  let r := thetaLogWindowCutoff τ ρ
+  let N := fun c : ℝ ↦ logWindowConvolutionNumerator c s r H u
+  change 0 < E 0 at he₀
+  change 0 < E b at heb
+  change N 0 = 1 at hn₀
+  change |N b| / E b < 1 * (|1| / E 0) at hlt
+  have hlt' : N b / E b < N 0 / E 0 := by
+    rw [hn₀]
+    exact (div_le_div_of_nonneg_right (le_abs_self _) heb.le).trans_lt (by simpa using hlt)
+  have hu : Continuous u := (centeredLogThetaLift_energy χ τ hτ f hb.le hs 0).1
+  have he := widthEnergy_tendsto_right hb hs (hu.norm.pow 2) (Integrable.of_integral_ne_zero heb.ne')
+  let U (x : ℝ) := ∫ y, H (x - y) * u y
+  have hcU : Continuous U := by
+    have hconv : U = MeasureTheory.convolution u H (ContinuousLinearMap.mul ℝ ℂ) volume := by
+      funext x
+      simp only [U, MeasureTheory.convolution_def, ContinuousLinearMap.mul_apply', mul_comm]
+    rw [hconv]; exact hcH.continuous_convolution_right _ hu.locallyIntegrable hc
+  let P (x : ℝ) := r x * (U x * conj (u x)).re
+  obtain ⟨hr, hrc, _, _⟩ := thetaLogWindowCutoff_properties τ hτ hρ
+  have hcP : Continuous P := hr.mul (Complex.continuous_re.comp (hcU.mul (Complex.continuous_conj.comp hu)))
+  have hN (c : ℝ) : N c = ∫ x, P x * intervalSobolevDensity (-c) c s x := by
+    apply integral_congr_ae (ae_of_all _ _)
+    intro x
+    change r x * _ * (U x * conj (u x)).re = (r x * (U x * conj (u x)).re) * _
+    ring
+  have hi : Integrable (fun x ↦ P x * intervalSobolevDensity (-b) b s x) := by
+    have hw : Continuous (intervalSobolevDensity (-b) b s) := by
+      unfold intervalSobolevDensity; fun_prop (disch := intros; positivity)
+    apply (hcP.mul hw).integrable_of_hasCompactSupport
+    exact hrc.mul_right.mul_right
+  have hn : Tendsto N (𝓝[>] 0) (𝓝 (N 0)) := by
+    rw [hN 0]
+    exact (widthEnergy_tendsto_right hb hs hcP hi).congr (fun c ↦ (hN c).symm)
+  exact ⟨f, hn.div he he₀.ne', hlt'⟩
 
 end RiemannMasullo
