@@ -2,12 +2,14 @@ module
 
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_RealPWSharpCutoff
 import Mathlib.Analysis.SpecialFunctions.JapaneseBracket
+import Mathlib.Analysis.SpecialFunctions.Integrability.Basic
 
 /-! # Weight bounds for the rational real-place cutoff -/
 
 public noncomputable section
 
 open Filter MeasureTheory
+open Set
 open scoped ENNReal Topology SchwartzMap
 
 namespace RiemannMasullo.Isolated
@@ -258,5 +260,110 @@ theorem tendsto_realPWIntervalWeight_translation_ratio (α s t : ℝ) (hs : 0 �
   filter_upwards [eventually_gt_atTop (0 : ℝ)] with x hx
   have hmul : (1 + t / x) * x = x + t := by field_simp [hx.ne']
   simp only [id_eq, hmul]
+
+/-- The interval weight is invariant under reflection. -/
+theorem realPWIntervalWeight_even (α s x : ℝ) :
+    realPWIntervalWeight α s (-x) = realPWIntervalWeight α s x := by
+  simp only [realPWIntervalWeight, abs_neg]
+
+/-- The interval density is continuous away from its possibly singular origin. -/
+theorem continuousAt_realPWIntervalWeight (α s : ℝ) {x : ℝ} (hx : x ≠ 0) :
+    ContinuousAt (realPWIntervalWeight α s) x := by
+  have ht : ContinuousAt (fun t : ℝ ↦ Real.log |t|) x :=
+    (Real.continuousAt_log (abs_ne_zero.2 hx)).comp continuous_abs.continuousAt
+  have hv := (continuousAt_const.mul ht : ContinuousAt (fun t : ℝ ↦ (2 * α) * Real.log |t|) x)
+  have hlogArg : ContinuousAt (fun t : ℝ ↦ 1 + (Real.log |t|) ^ 2) x :=
+    continuousAt_const.add (ht.pow 2)
+  have hu : ContinuousAt (fun t : ℝ ↦ Real.log (1 + (Real.log |t|) ^ 2)) x :=
+    hlogArg.log (by positivity)
+  exact ((Real.continuous_exp.continuousAt.comp hv).max
+    (Real.continuous_exp.continuousAt.comp hv.neg)).mul
+    (Real.continuous_exp.continuousAt.comp (continuousAt_const.mul hu))
+
+/-- When the combined power is integrable at zero, the logarithmic factor
+does not prevent local integrability of the weighted power. -/
+theorem integrableOn_abs_rpow_mul_realPWIntervalWeight {α s p R : ℝ}
+    (ha : 0 ≤ α) (hs : 0 ≤ s) (hp : -1 < p - 2 * α) :
+    IntegrableOn (fun x ↦ |x| ^ p * realPWIntervalWeight α s x) (Icc (-R) R) := by
+  let f (x : ℝ) := |x| ^ p * realPWIntervalWeight α s x
+  have hm : Measurable f := (continuous_abs.measurable.pow_const p).mul
+    (measurable_realPWIntervalWeight α s)
+  have heven (x : ℝ) : f (-x) = f x := by simp only [f, realPWIntervalWeight, abs_neg]
+  let ε := (p - 2 * α + 1) / 2
+  have hε : 0 < ε := by dsimp [ε]; linarith
+  have hO := (isLittleO_abs_log_rpow_rpow_nhdsGT_zero s (neg_neg_of_pos hε)).bound zero_lt_one
+  obtain ⟨δ, hδ, hnear⟩ := (nhdsGT_basis (0 : ℝ)).eventually_iff.mp
+    (hO.and (Ioo_mem_nhdsGT (show (0 : ℝ) < 1 by norm_num)))
+  have hb (x : ℝ) (hx : x ∈ Ioo 0 δ) : f x ≤ 2 ^ (s / 2) * x ^ (p - 2 * α - ε) := by
+    obtain ⟨hlog, h1⟩ := hnear hx
+    have hx0 : 0 < x := hx.1
+    have hx1 : x ≤ 1 := h1.2.le
+    have hlog' : |Real.log x| ^ s ≤ x ^ (-ε) := by
+      simpa only [Real.norm_of_nonneg (Real.rpow_nonneg (abs_nonneg _) s),
+        Real.norm_of_nonneg (Real.rpow_nonneg hx0.le (-ε)), one_mul] using hlog
+    let m := max 1 |Real.log x|
+    have hm1 : 1 ≤ m := le_max_left _ _
+    have hm0 : 0 ≤ m := zero_le_one.trans hm1
+    have hpoly : 1 + (Real.log x) ^ 2 ≤ 2 * m ^ 2 := by
+      have hm2 := pow_le_pow_left₀ (abs_nonneg (Real.log x)) (le_max_right 1 |Real.log x|) 2
+      rw [sq_abs] at hm2
+      nlinarith [sq_nonneg (m - 1)]
+    have hlogpart := Real.rpow_le_rpow (show 0 ≤ 1 + (Real.log x) ^ 2 by positivity)
+      hpoly (div_nonneg hs zero_le_two)
+    have hmPow : (m ^ (2 : ℕ)) ^ (s / 2) = m ^ s := by
+      rw [← Real.rpow_natCast m 2, ← Real.rpow_mul hm0]
+      congr 1
+      push_cast
+      ring
+    rw [Real.mul_rpow (by norm_num : (0 : ℝ) ≤ 2) (sq_nonneg _), hmPow] at hlogpart
+    have hmle : m ^ s ≤ x ^ (-ε) := by
+      dsimp only [m]
+      rcases le_total 1 |Real.log x| with h | h
+      · rw [max_eq_right h]
+        exact hlog'
+      · rw [max_eq_left h, Real.one_rpow, ← Real.rpow_zero x]
+        exact Real.rpow_le_rpow_of_exponent_ge hx0 hx1 (neg_nonpos.mpr hε.le)
+    have hw : realPWIntervalWeight α s x = x ^ (-(2 * α)) * (1 + Real.log x ^ 2) ^ (s / 2) := by
+      rw [realPWIntervalWeight_eq α s hx0.ne', abs_of_pos hx0, max_eq_right]
+      exact Real.rpow_le_rpow_of_exponent_ge hx0 hx1 (by linarith)
+    have h := hlogpart.trans (mul_le_mul_of_nonneg_left hmle
+      (show 0 ≤ (2 : ℝ) ^ (s / 2) by positivity))
+    calc
+      f x = x ^ (p - 2 * α) * (1 + Real.log x ^ 2) ^ (s / 2) := by
+        dsimp only [f]
+        rw [abs_of_pos hx0, hw, ← mul_assoc, ← Real.rpow_add hx0, sub_eq_add_neg]
+      _ ≤ x ^ (p - 2 * α) * (2 ^ (s / 2) * x ^ (-ε)) :=
+        mul_le_mul_of_nonneg_left h (Real.rpow_nonneg hx0.le _)
+      _ = _ := by rw [mul_left_comm, ← Real.rpow_add hx0, sub_eq_add_neg (p - 2 * α) ε]
+  have hsmall : IntegrableOn f (Ioo 0 δ) := by
+    have hpow : IntegrableOn (fun x : ℝ ↦ x ^ (p - 2 * α - ε)) (Ioo 0 δ) :=
+      (intervalIntegral.integrableOn_Ioo_rpow_iff hδ).2 (by dsimp [ε]; linarith)
+    apply (hpow.const_mul (2 ^ (s / 2))).mono' hm.aestronglyMeasurable
+    filter_upwards [ae_restrict_mem measurableSet_Ioo] with x hx
+    rw [Real.norm_of_nonneg (mul_nonneg (Real.rpow_nonneg (abs_nonneg _) _)
+      (zero_le_one.trans (one_le_realPWIntervalWeight α s hs x)))]
+    exact hb x hx
+  have hpos : IntegrableOn f (Icc 0 R) := by
+    apply (integrableOn_Icc_iff_integrableOn_Ioo (μ := (volume : Measure ℝ))
+      (f := f) (a := 0) (b := R)).mpr
+    have haway : ContinuousOn f (Icc (δ / 2) R) := by
+      intro x hx
+      have hx0 : 0 < x := (half_pos hδ).trans_le hx.1
+      exact ((continuous_abs.continuousAt.rpow_const (Or.inl (abs_ne_zero.2 hx0.ne'))).mul
+        (continuousAt_realPWIntervalWeight α s hx0.ne')).continuousWithinAt
+    refine ((integrableOn_union.mpr ⟨hsmall, haway.integrableOn_compact isCompact_Icc⟩)).mono_set ?_
+    intro x hx
+    rcases lt_or_ge x δ with h | h
+    · exact Or.inl ⟨hx.1, h⟩
+    · exact Or.inr ⟨(half_le_self hδ.le).trans h, hx.2.le⟩
+  have hneg : IntegrableOn f (Icc (-R) 0) := by
+    have h := (MeasurePreserving.integrableOn_comp_preimage (Measure.measurePreserving_neg volume)
+      (Homeomorph.neg ℝ).measurableEmbedding).2 hpos
+    simpa only [Function.comp_def, heven, neg_preimage, neg_Icc, neg_zero, neg_neg] using h
+  refine (integrableOn_union.mpr ⟨hneg, hpos⟩).mono_set ?_
+  intro x hx
+  rcases le_total x 0 with h | h
+  · exact Or.inl ⟨hx.1, h⟩
+  · exact Or.inr ⟨h, hx.2⟩
 
 end RiemannMasullo.Isolated
