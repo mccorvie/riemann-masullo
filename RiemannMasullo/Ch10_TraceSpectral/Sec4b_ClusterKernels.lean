@@ -25,8 +25,8 @@ line and of the transposed tensors on the strip represent spectral projection af
 convolution, as in Theorem 10.4.3.1(3) (`spectralLineAmbientKernel_clusters_operator`,
 `spectralStripTransposedKernel_clusters_operator`).
 
-Not treated: `spectralStripAmbientKernel_tendsto` of `Sec4b`, which assumes in addition that the
-geometric-output components are Cauchy. -/
+`spectralStripAmbientKernel_tendsto` of `Sec4b` assumes in addition that the geometric-output
+components are Cauchy. `Sec4b_ClusterGeometric` treats that component for sums by clusters. -/
 
 @[expose] public noncomputable section
 
@@ -316,7 +316,7 @@ local notation "Pspec(" a ", " hα ", " hs ")" => spectralProjection (F := F) a 
 
 /-- Evaluation of an ambient kernel sum over a finite set of zeros is the finite sum of its
 rank-one actions. -/
-private theorem sobolevProjectiveKernelOperator_spectralKernelSum {Z : Type u} {J : Type*}
+theorem sobolevProjectiveKernelOperator_spectralKernelSum {Z : Type u} {J : Type*}
     {α s : ℝ} (a : ℝ) (hα : 0 ≤ α) (hs : 0 ≤ s) (K : Finset Z) (N : Z → ℕ)
     (j : (z : Z) → Fin (N z) → J) (f : J → StrongDual ℂ H(a, hα, hs))
     (y : J → W(α, s)) (v : W(α, s)) :
