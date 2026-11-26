@@ -7,7 +7,6 @@ public import RiemannMasullo.Ch09_HardySobolev.Sec3
 
 import RiemannMasullo.Ch05_ThetaZSpaces.Sec5
 
-import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
 import RiemannMasullo.AppA_AlgebraicNT.Sec3
 import all RiemannMasullo.Ch09_HardySobolev.Sec2
 import all RiemannMasullo.Ch02_AdelicTheta.Sec3
