@@ -82,16 +82,37 @@ jobs:
           sudo sysctl -qw kernel.apparmor_restrict_unprivileged_userns=0 || true
           bwrap --unshare-all --ro-bind / / true
 
+      - name: Restore Lean toolchain and Mathlib cache
+        id: lean-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.elan
+            .lake/packages
+          key: lean-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/lean-toolchain') }}-${{ hashFiles('tools/lake-manifest.json') }}
+
       - name: Install Lean
         run: |
-          curl -sSfL --retry 3 https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o "$RUNNER_TEMP/elan-init.sh"
-          sh "$RUNNER_TEMP/elan-init.sh" -y --default-toolchain none
+          if [ ! -x "$HOME/.elan/bin/lake" ]; then
+            curl -sSfL --retry 3 https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o "$RUNNER_TEMP/elan-init.sh"
+            sh "$RUNNER_TEMP/elan-init.sh" -y --default-toolchain none
+          fi
           echo "$HOME/.elan/bin" >>"$GITHUB_PATH"
           cd work && "$HOME/.elan/bin/lake" --version
 
       - name: Fetch the dependencies and Mathlib's build
-        working-directory: work
-        run: lake exe cache get || { sleep 20; lake exe cache get; }
+        env:
+          CACHE_HIT: ${{ steps.lean-cache.outputs.cache-hit }}
+        run: |
+          if [ "$CACHE_HIT" = "true" ] && [ -d .lake/packages/mathlib/.lake/build ]; then
+            mkdir -p work/.lake
+            rm -rf work/.lake/packages
+            ln -s "$(realpath .lake/packages)" work/.lake/packages
+            echo "Using cached .lake/packages"
+            exit 0
+          fi
+          cd work
+          lake exe cache get || { sleep 20; lake exe cache get; }
 
       - name: Start from main's saved build, if there is one
         env:
