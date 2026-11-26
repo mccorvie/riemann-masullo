@@ -15,11 +15,22 @@ name: Main state
 # whenever the toolchain, the dependencies or the build options change, and the `full` switch of
 # a manual run. Outputs of modules whose source is gone are deleted (scripts/ci/prune_build.py).
 
+# Four staggered incremental slots (:00, :15, :30, :45) pipeline main builds so PR checks
+# see a fresher snapshot even when a single build takes ~45 minutes. Scheduled incremental slots
+# exit cleanly before installing Lean if a saved build already exists for main's current commit,
+# and scripts/ci/base_state.py ranks saved builds by git history so an older slot finishing late
+# never hides a newer commit's build. A build from scratch has a group of its own, so that a push
+# cannot displace it while it waits.
+
 on:
   push:
     branches: [main]
   schedule:
     - cron: "17 10 * * *"       # nightly, from scratch
+    - cron: "0 * * * *"         # incremental slot 0
+    - cron: "15 * * * *"        # incremental slot 1
+    - cron: "30 * * * *"        # incremental slot 2
+    - cron: "45 * * * *"        # incremental slot 3
   workflow_dispatch:
     inputs:
       full:
@@ -31,11 +42,15 @@ permissions:
   contents: read
   actions: read                 # to download the previous saved build
 
-# One build at a time, the newest push waiting behind it. A build from scratch has a group of its
-# own, so that a push cannot displace it while it waits; when it finishes, its saved build is the
-# newest and the next incremental build starts from it.
 concurrency:
-  group: main-state-${{ (github.event_name == 'schedule' || inputs.full) && 'full' || 'incremental' }}
+  group: >-
+    main-state-${{
+      ((github.event_name == 'schedule' && github.event.schedule == '17 10 * * *') || inputs.full) && 'full'
+      || (github.event_name == 'schedule' && github.event.schedule == '15 * * * *' && 'slot-1')
+      || (github.event_name == 'schedule' && github.event.schedule == '30 * * * *' && 'slot-2')
+      || (github.event_name == 'schedule' && github.event.schedule == '45 * * * *' && 'slot-3')
+      || 'slot-0'
+    }}
   cancel-in-progress: false
 
 jobs:
@@ -48,18 +63,36 @@ jobs:
         with:
           fetch-depth: 0        # the previous saved build must be for an ancestor of this commit
           persist-credentials: false
+      - name: Skip if main already has a saved build for this commit
+        id: check
+        if: github.event_name == 'schedule' && github.event.schedule != '17 10 * * *'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REPO_ID: ${{ github.repository_id }}
+        run: |
+          if python3 scripts/ci/base_state.py --has-exact --base "$GITHUB_SHA"; then
+            echo "skip=true" >>"$GITHUB_OUTPUT"
+            echo "main-state already exists for ${GITHUB_SHA:0:12}; skipping" >>"$GITHUB_STEP_SUMMARY"
+          fi
       - name: Lint
+        if: steps.check.outputs.skip != 'true'
         run: scripts/lint.sh
       - name: Install Lean
+        if: steps.check.outputs.skip != 'true'
         run: |
           curl -sSfL --retry 3 https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o "$RUNNER_TEMP/elan-init.sh"
           sh "$RUNNER_TEMP/elan-init.sh" -y --default-toolchain none
           echo "$HOME/.elan/bin" >>"$GITHUB_PATH"
           "$HOME/.elan/bin/lake" --version
       - name: Fetch the dependencies and Mathlib's build
+        if: steps.check.outputs.skip != 'true'
         run: lake exe cache get || { sleep 20; lake exe cache get; }
       - name: Start from the previous saved build of main
-        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.full)
+        if: >-
+          steps.check.outputs.skip != 'true' &&
+          !(github.event_name == 'schedule' && github.event.schedule == '17 10 * * *') &&
+          !(github.event_name == 'workflow_dispatch' && inputs.full)
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -78,23 +111,28 @@ jobs:
           python3 scripts/ci/prune_build.py
           echo "FROM_SHA=$from" >>"$GITHUB_ENV"
       - name: Build
+        if: steps.check.outputs.skip != 'true'
         # The main library and the comparator files. RiemannMasulloClassField, the fourth default
         # target, needs the class field theory dependency; the Full build workflow builds it.
         run: lake build RiemannMasullo Challenge Main
       - name: Signatures, and no sorry inside definitions
+        if: steps.check.outputs.skip != 'true'
         run: |
           mkdir main-state
           scripts/signatures.sh --all >main-state/signatures.txt
           scripts/signatures.sh --sorry-in-defs main-state/signatures.txt
       - name: The list of command keywords is up to date
+        if: steps.check.outputs.skip != 'true'
         run: scripts/ci/keywords.sh --check
       - name: Pack the build
+        if: steps.check.outputs.skip != 'true'
         run: |
           tar -C .lake -I 'zstd -T0 -6' -cf main-state/build.tar.zst build
           printf '{"sha": "%s", "from": "%s"}\n' "$GITHUB_SHA" "${FROM_SHA:-}" >main-state/meta.json
           ls -l main-state
           echo "saved the build of ${GITHUB_SHA:0:12}${FROM_SHA:+, built on top of the saved build of ${FROM_SHA:0:12}}" >>"$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - if: steps.check.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
         with:
           name: main-state
           path: main-state
