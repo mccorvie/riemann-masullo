@@ -1171,7 +1171,7 @@ private theorem spectralHomogeneousTest_real_factorization_term
     simpa only [sub_eq_add_neg] using
       integral_neg_eq_self (fun t : ℝ ↦ φ t * g (s + t)) volume
 
-/-- Classical input: the Dixmier–Malliavin factorization theorem on the additive real line,
+/-- The Dixmier–Malliavin factorization theorem on the additive real line,
 from J. Dixmier and P. Malliavin, *Factorisations de fonctions et de vecteurs indéfiniment
 différentiables*, Bull. Sci. Math. 102 (1978), 307–330. Every smooth compactly supported
 function is a finite sum of convolutions of such functions for the chosen Haar measure.

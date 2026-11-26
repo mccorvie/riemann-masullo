@@ -834,12 +834,14 @@ private theorem elementaryLieGroup_compact_convolution_factorization {m n r : �
   obtain ⟨k, hk, hkh⟩ := elementaryLieGroup_cover_kernel μ hμ Φ hΦ hΦc
   exact ⟨k, h, hk, hh, funext fun x ↦ (hkh h (elementarySchwartz_continuous h) x).symm⟩
 
-/-- Classical input: Dixmier and Malliavin, *Factorisations de fonctions et de vecteurs
+/-- Dixmier and Malliavin, *Factorisations de fonctions et de vecteurs
 indéfiniment différentiables*, Bull. Sci. Math. (2) 102 (1978), Théorème 3.1. On the elementary
 abelian Lie group presented by `e` (a product of Euclidean, torus, lattice and finite factors),
 each compactly supported smooth function is a finite sum of convolutions of two such functions
 for the given Haar measure. Smooth functions of compact support belong to the elementary
-Schwartz stage; the membership below is in the algebraic additive closure. -/
+Schwartz stage; the membership below is in the algebraic additive closure.
+This case was first stated as a classical input (#7486) and is now proved (#7543), from the
+one-parameter theorem vendored in `External/FermatDixmierMalliavin`. -/
 private theorem elementary_compact_convolution_factorization {Q : Type*} [CommGroup Q]
     [TopologicalSpace Q] [IsTopologicalGroup Q] (e : ElementaryLCAPresentation Q)
     (ν : @Measure Q (borel _)) :
@@ -906,7 +908,7 @@ private theorem elementary_compact_convolution_factorization {Q : Type*} [CommGr
 
 end ConvolutionFactorization
 
-/-- Classical input: the Dixmier–Malliavin factorization theorem. Every compactly supported
+/-- The Dixmier–Malliavin factorization theorem. Every compactly supported
 Bruhat test on the idele class group is a finite sum of convolutions of two such tests, for
 the Tamagawa Haar measure. J. Dixmier and P. Malliavin, *Factorisations de fonctions et de
 vecteurs indéfiniment différentiables*, Bull. Sci. Math. (2) 102 (1978), 307–330,
@@ -915,7 +917,8 @@ subgroup `K` with respect to which the test is a Bruhat test (F. Bruhat, *Distri
 un groupe localement compact et applications à l'étude des représentations des groupes
 ℘-adiques*, Bull. Soc. Math. France 89 (1961), 43–75). The library proves the case of tests
 of one angular character (`spectralHomogeneousTest_convolution_factorization` in §10.3).
-The structural quotient and zero extension reduce this to factorization on the elementary Lie group. -/
+The structural quotient and zero extension reduce this to factorization on the elementary Lie
+group (#7501), which is proved above (#7543). -/
 theorem bruhatCompactSupport_convolution_factorization (φ : BruhatCompactSupport C𝔽) :
     φ ∈ AddSubmonoid.closure {θ : BruhatCompactSupport C𝔽 |
       ∃ u v : BruhatCompactSupport C𝔽, θ.val = lcaConvolution μ𝔽 u.val v.val} := by
