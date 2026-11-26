@@ -5,6 +5,8 @@ import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.AppC_LCTVS.Sec3b_HilbertSchmidtProduct
 import RiemannMasullo.AppC_LCTVS.Sec3a_SchattenInclusion
 import RiemannMasullo.Ch10_TraceSpectral.Sec3_TraceClass
+import RiemannMasullo.ForMathlib.Analysis.Distribution.DixmierMalliavin
+import Mathlib.Topology.Instances.AddCircle.Defs
 
 /-! # The spectral trace statements of §10.4.2 at orders between zero and one -/
 
@@ -280,6 +282,558 @@ private theorem adelic_factorization_of_elementary
 
 end Adeles
 
+/-- A compactly supported function on the elementary group that is smooth on the cover of
+every discrete fibre is an elementary Schwartz function. This repeats the private
+`elementarySchwartz_of_compactSupport` of Appendix D, §1. -/
+private theorem elementaryLieGroup_schwartz_of_compactSupport {m n r : ℕ} {F : Type}
+    [AddCommGroup F] [Fintype F] [TopologicalSpace F] [DiscreteTopology F]
+    {f : ElementaryLieGroup m n r F → ℂ}
+    (hf : ∀ a b, ContDiff ℝ (⊤ : ℕ∞) (fun xt ↦ f (elementaryCover xt a b)))
+    (hc : HasCompactSupport f) :
+    f ∈ elementarySchwartzSubmodule m n r F := by
+  classical
+  refine ⟨hf, fun i ↦ ?_⟩
+  let Em := EuclideanSpace ℝ (Fin m)
+  let N := EuclideanSpace ℝ (Fin n)
+  let T := Fin n → AddCircle (1 : ℝ)
+  let Z := Fin r → ℤ
+  let q (v : N) : T := fun j ↦ (v j : AddCircle (1 : ℝ))
+  have hq : IsOpenQuotientMap q := (IsOpenQuotientMap.piMap
+    (fun _ ↦ QuotientAddGroup.isOpenQuotientMap_mk)).comp
+    (PiLp.homeomorph 2 (fun _ : Fin n ↦ ℝ)).isOpenQuotientMap
+  let lift (t : T) := hq.surjective.hasRightInverse.choose t
+  have hl (t : T) : q (lift t) = t := hq.surjective.hasRightInverse.choose_spec t
+  let d (y : ElementaryLieGroup m n r F) := elementaryPartial f i.2.1 i.2.2.1
+    (y.1, lift y.2.1) y.2.2.1 y.2.2.2
+  have hd (v : Em × N) (z : Z) (b : F) :
+      d (elementaryCover v z b) = elementaryPartial f i.2.1 i.2.2.1 v z b := by
+    apply (elementaryPartial_descends _ _ _ _ _ (hf z b)).2
+    exact Prod.ext rfl (Prod.ext (hl (q v.2)) rfl)
+  have hdc : Continuous d := by
+    apply (Homeomorph.prodAssoc Em T (Z × F)).isQuotientMap.continuous_iff.mpr
+    apply continuous_prod_of_discrete_right.mpr
+    intro z
+    apply (IsOpenQuotientMap.id.prodMap hq).continuous_comp_iff.mp
+    exact ((elementaryPartial_descends _ _ _ _ _ (hf z.1 z.2)).1.continuous).congr
+      (fun w ↦ (hd w z.1 z.2).symm)
+  have hdz {y : ElementaryLieGroup m n r F} (hy : y ∉ tsupport f) : d y = 0 := by
+    let v : Em × N := (y.1, lift y.2.1)
+    let p (w : Em × N) := elementaryCover w y.2.2.1 y.2.2.2
+    have hp : Continuous p := continuous_fst.prodMk ((hq.continuous.comp continuous_snd).prodMk continuous_const)
+    have hpv : p v = y := Prod.ext rfl (Prod.ext (hl y.2.1) rfl)
+    have hv : v ∉ tsupport (f ∘ p) := fun hv ↦ hy (hpv ▸ tsupport_comp_subset_preimage f hp hv)
+    have h0 (j : ℕ) : iteratedFDeriv ℝ j (f ∘ p) v = 0 := by
+      by_contra hn
+      exact hv (support_iteratedFDeriv_subset j hn)
+    dsimp only [d, elementaryPartial]
+    change (iteratedFDeriv ℝ _ (f ∘ p) v) _ = 0
+    rw [h0]
+    rfl
+  let w (y : ElementaryLieGroup m n r F) : ℂ :=
+    ((∏ j, (y.1 j : ℂ) ^ i.1 j) * (∏ j, (y.2.2.1 j : ℂ) ^ i.2.2.2 j)) * d y
+  have hw : Continuous w := by
+    apply Continuous.mul _ hdc
+    apply Continuous.mul
+    · fun_prop
+    · exact (continuous_of_discreteTopology (f := fun z : Z ↦ ∏ j, (z j : ℂ) ^ i.2.2.2 j)).comp
+        (continuous_fst.comp (continuous_snd.comp continuous_snd))
+  have hwK : HasCompactSupport w := HasCompactSupport.intro hc fun y hy ↦ by simp [w, hdz hy]
+  obtain ⟨C,hC⟩ := hw.bounded_above_of_compact_support hwK
+  apply lt_of_le_of_lt (b := ENNReal.ofReal C) _ ENNReal.ofReal_lt_top
+  refine iSup_le fun v ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_
+  rw [ENNReal.coe_nnreal_eq]
+  apply ENNReal.ofReal_le_ofReal
+  have h := hC (elementaryCover v a b)
+  dsimp only [w] at h
+  rw [hd] at h
+  exact h
+
+/-- One-parameter Dixmier–Malliavin on the elementary group for a function supported on
+one discrete fibre `d`: the two-term factorization `h = φ ⋆ᵥ h₁ + ψ ⋆ᵥ h`. The fibre is
+lifted to `ℝᵐ × ℝⁿ`, where the function is periodic in the torus coordinates, and
+`dixmierMalliavin_periodic_direction` applies. -/
+private theorem elementaryLieGroup_direction_fibre {m n r : ℕ} {D : Type}
+    [AddCommGroup D] [Fintype D] [TopologicalSpace D] [DiscreteTopology D]
+    (h : ElementarySchwartz m n r D)
+    (hh : HasCompactSupport (h : ElementaryLieGroup m n r D → ℂ))
+    (v : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) (d : (Fin r → ℤ) × D)
+    (hd : ∀ g : ElementaryLieGroup m n r D, g.2.2 ≠ d → h g = 0) :
+    ∃ (φ ψ : ℝ → ℂ) (h₁ : ElementarySchwartz m n r D),
+      ContDiff ℝ (⊤ : ℕ∞) φ ∧ HasCompactSupport φ ∧ ContDiff ℝ (⊤ : ℕ∞) ψ ∧
+      HasCompactSupport ψ ∧ HasCompactSupport (h₁ : ElementaryLieGroup m n r D → ℂ) ∧
+      ∀ x, h x = (∫ t : ℝ, φ t * h₁ (x + elementaryCover (t • v) 0 0)) +
+        ∫ t : ℝ, ψ t * h (x + elementaryCover (t • v) 0 0) := by
+  classical
+  let G := ElementaryLieGroup m n r D
+  let e₁ := EuclideanSpace.equiv (Fin m) ℝ
+  let e₂ := EuclideanSpace.equiv (Fin n) ℝ
+  let P : ((Fin m → ℝ) × (Fin n → ℝ)) ≃L[ℝ]
+      (EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) := e₁.symm.prodCongr e₂.symm
+  let Fh : (Fin m → ℝ) × (Fin n → ℝ) → ℂ := fun w ↦ h (elementaryCover (P w) d.1 d.2)
+  have hFh : ContDiff ℝ (⊤ : ℕ∞) Fh := (h.property.1 d.1 d.2).comp P.contDiff
+  have hint (k : ℤ) : ((k : ℝ) : AddCircle (1 : ℝ)) = 0 :=
+    (AddCircle.coe_eq_zero_iff (1 : ℝ)).mpr ⟨k, by simp⟩
+  have hcover (x : Fin m → ℝ) (t : Fin n → ℝ) (k : Fin n → ℤ) (c : (Fin r → ℤ) × D) :
+      (elementaryCover (P (x, fun j ↦ t j + k j)) c.1 c.2 : G) =
+        elementaryCover (P (x, t)) c.1 c.2 := by
+    refine Prod.ext rfl (Prod.ext (funext fun j ↦ ?_) rfl)
+    change ((t j + k j : ℝ) : AddCircle (1 : ℝ)) = (t j : AddCircle (1 : ℝ))
+    rw [AddCircle.coe_add, hint, add_zero]
+  let K : Set (Fin m → ℝ) := (fun g : G ↦ e₁ g.1) '' tsupport (h : G → ℂ)
+  have hK : IsCompact K := hh.isCompact.image (e₁.continuous.comp continuous_fst)
+  have hFK (x : Fin m → ℝ) (t : Fin n → ℝ) (hx : x ∉ K) : Fh (x, t) = 0 := by
+    by_contra h0
+    exact hx ⟨_, subset_tsupport _ h0, e₁.apply_symm_apply x⟩
+  obtain ⟨F₁, φ, ψ, hF₁, hper₁, hF₁K, hφ, hφc, hψ, hψc, heq⟩ :=
+    dixmierMalliavin_periodic_direction (e₁ v.1) (e₂ v.2) Fh hFh
+      (fun x t k ↦ congrArg h (hcover x t k d)) K hK hFK
+  choose sec hsec using fun z : AddCircle (1 : ℝ) ↦ QuotientAddGroup.mk_surjective z
+  let h₁f : G → ℂ := fun g ↦ if g.2.2 = d then F₁ (e₁ g.1, fun j ↦ sec (g.2.1 j)) else 0
+  have star (w : (Fin m → ℝ) × (Fin n → ℝ)) (c : (Fin r → ℤ) × D) :
+      h₁f (elementaryCover (P w) c.1 c.2) = if c = d then F₁ w else 0 := by
+    by_cases hc : c = d
+    · have hk : ∀ j, ∃ k : ℤ, sec ((w.2 j : ℝ) : AddCircle (1 : ℝ)) = w.2 j + k := fun j ↦ by
+        have h0 : ((sec ((w.2 j : ℝ) : AddCircle (1 : ℝ)) - w.2 j : ℝ) :
+            AddCircle (1 : ℝ)) = 0 := by
+          rw [AddCircle.coe_sub]
+          exact sub_eq_zero.mpr (hsec _)
+        obtain ⟨k, hk⟩ := (AddCircle.coe_eq_zero_iff (1 : ℝ)).mp h0
+        exact ⟨k, by simp at hk; linarith⟩
+      choose k hk using hk
+      have e : h₁f (elementaryCover (P w) c.1 c.2) = F₁ (w.1, fun j ↦ w.2 j + k j) := by
+        change (if (c.1, c.2) = d then
+          F₁ (e₁ (e₁.symm w.1), fun j ↦ sec ((w.2 j : ℝ) : AddCircle (1 : ℝ))) else 0) = _
+        rw [ite_eq_left (show (c.1, c.2) = d from hc), e₁.apply_symm_apply]
+        exact congrArg F₁ (Prod.ext rfl (funext hk))
+      rw [e, hper₁, ite_eq_left hc]
+    · change (if (c.1, c.2) = d then _ else 0) = _
+      rw [ite_eq_right (show ¬(c.1, c.2) = d from hc), ite_eq_right hc]
+  have hsm (a : Fin r → ℤ) (b : D) :
+      ContDiff ℝ (⊤ : ℕ∞) (fun xt ↦ h₁f (elementaryCover xt a b)) := by
+    have e : (fun xt ↦ h₁f (elementaryCover xt a b)) =
+        fun xt ↦ if (a, b) = d then F₁ (P.symm xt) else 0 := funext fun xt ↦ by
+      have := star (P.symm xt) (a, b)
+      rwa [P.apply_symm_apply] at this
+    rw [e]
+    by_cases hc : (a, b) = d
+    · simp only [ite_eq_left hc]
+      exact hF₁.comp P.symm.contDiff
+    · simp only [ite_eq_right hc]
+      exact contDiff_const
+  have hh₁c : HasCompactSupport h₁f := by
+    have hKc : IsCompact ((e₁.symm '' K) ×ˢ ((univ : Set (Fin n → AddCircle (1 : ℝ))) ×ˢ
+        ({d} : Set ((Fin r → ℤ) × D)))) :=
+      (hK.image e₁.symm.continuous).prod (isCompact_univ.prod isCompact_singleton)
+    refine HasCompactSupport.intro hKc fun g hg ↦ ?_
+    by_cases hc : g.2.2 = d
+    · have hx : e₁ g.1 ∉ K := fun hx ↦
+        hg ⟨⟨_, hx, e₁.symm_apply_apply g.1⟩, mem_univ _, hc⟩
+      change (if g.2.2 = d then _ else 0) = 0
+      rw [ite_eq_left hc]
+      exact hF₁K _ _ hx
+    · change (if g.2.2 = d then _ else 0) = 0
+      rw [ite_eq_right hc]
+  let h₁ : ElementarySchwartz m n r D :=
+    ⟨h₁f, elementaryLieGroup_schwartz_of_compactSupport hsm hh₁c⟩
+  refine ⟨φ, ψ, h₁, hφ, hφc, hψ, hψc, hh₁c, fun x ↦ ?_⟩
+  obtain ⟨t₀, ht₀⟩ := elementaryCover_surjective x.2.2.1 x.2.2.2 x.1 x.2.1
+  let w : (Fin m → ℝ) × (Fin n → ℝ) := P.symm (x.1, t₀)
+  let c : (Fin r → ℤ) × D := x.2.2
+  have hx : x = elementaryCover (P w) c.1 c.2 := by
+    rw [P.apply_symm_apply]
+    exact ht₀.symm
+  have hshift (t : ℝ) : x + elementaryCover (t • v) 0 0 =
+      elementaryCover (P (w + t • (e₁ v.1, e₂ v.2))) c.1 c.2 := by
+    have hv : P (e₁ v.1, e₂ v.2) = v :=
+      Prod.ext (e₁.symm_apply_apply v.1) (e₂.symm_apply_apply v.2)
+    rw [map_add, map_smul, hv, hx]
+    refine Prod.ext rfl (Prod.ext (funext fun j ↦ ?_) (Prod.ext (add_zero _) (add_zero _)))
+    exact (AddCircle.coe_add (1 : ℝ) _ _).symm
+  have h1 (t : ℝ) : h₁ (x + elementaryCover (t • v) 0 0) =
+      if c = d then F₁ (w + t • (e₁ v.1, e₂ v.2)) else 0 := by
+    rw [hshift]
+    exact star _ c
+  by_cases hc : c = d
+  · have h2 (t : ℝ) : h (x + elementaryCover (t • v) 0 0) = Fh (w + t • (e₁ v.1, e₂ v.2)) := by
+      rw [hshift, hc]
+    have h3 : h x = Fh w := by rw [hx, hc]
+    simp only [h1, h2, h3, ite_eq_left hc]
+    exact heq w
+  · have h2 (t : ℝ) : h (x + elementaryCover (t • v) 0 0) = 0 := by
+      rw [hshift]
+      exact hd _ hc
+    have h3 : h x = 0 := hd x hc
+    simp only [h1, h2, h3, ite_eq_right hc, mul_zero, integral_zero, add_zero]
+
+/-- Dixmier–Malliavin for one one-parameter subgroup of the elementary group
+`ℝᵐ × (ℝ/ℤ)ⁿ × ℤʳ × D`. For a vector `v` of the covering space `ℝᵐ × ℝⁿ`, each compactly
+supported elementary Schwartz function `h` is a finite sum of functions
+`x ↦ ∫ φ t * h₁ (x + elementaryCover (t • v) 0 0) dt` with `φ` a test function on the line
+and `h₁` a compactly supported elementary Schwartz function (J. Dixmier, P. Malliavin, Bull.
+Sci. Math. (2) 102 (1978), 307–330, §2 and Théorème 3.1 for a one-parameter group).
+The function is split over the finitely many discrete fibres that meet its support, and
+`elementaryLieGroup_direction_fibre` applies on each fibre. -/
+private theorem elementaryLieGroup_direction_factorization {m n r : ℕ} {D : Type}
+    [AddCommGroup D] [Fintype D] [TopologicalSpace D] [DiscreteTopology D]
+    (h : ElementarySchwartz m n r D)
+    (hh : HasCompactSupport (h : ElementaryLieGroup m n r D → ℂ))
+    (v : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) :
+    (h : ElementaryLieGroup m n r D → ℂ) ∈ AddSubmonoid.closure
+      {θ : ElementaryLieGroup m n r D → ℂ | ∃ (φ : ℝ → ℂ) (h₁ : ElementarySchwartz m n r D),
+        ContDiff ℝ (⊤ : ℕ∞) φ ∧ HasCompactSupport φ ∧
+        HasCompactSupport (h₁ : ElementaryLieGroup m n r D → ℂ) ∧
+        θ = fun x ↦ ∫ t : ℝ, φ t * h₁ (x + elementaryCover (t • v) 0 0)} := by
+  classical
+  let G := ElementaryLieGroup m n r D
+  have hfin : ((fun g : G ↦ g.2.2) '' tsupport (h : G → ℂ)).Finite :=
+    (hh.isCompact.image (continuous_snd.comp continuous_snd)).finite_of_discrete
+  let hf (d : (Fin r → ℤ) × D) : G → ℂ := fun g ↦ if g.2.2 = d then h g else 0
+  have hfs (d : (Fin r → ℤ) × D) (a : Fin r → ℤ) (b : D) :
+      ContDiff ℝ (⊤ : ℕ∞) (fun xt ↦ hf d (elementaryCover xt a b)) := by
+    by_cases hc : (a, b) = d
+    · have e : (fun xt ↦ hf d (elementaryCover xt a b)) = fun xt ↦ h (elementaryCover xt a b) :=
+        funext fun xt ↦ ite_eq_left hc
+      rw [e]
+      exact h.property.1 a b
+    · have e : (fun xt ↦ hf d (elementaryCover xt a b)) = fun _ ↦ 0 :=
+        funext fun xt ↦ ite_eq_right hc
+      rw [e]
+      exact contDiff_const
+  have hfc (d : (Fin r → ℤ) × D) : HasCompactSupport (hf d) :=
+    hh.mono fun g hg h0 ↦ hg (by
+      change (if g.2.2 = d then h g else 0) = 0
+      rw [h0, ite_self])
+  let hd (d : (Fin r → ℤ) × D) : ElementarySchwartz m n r D :=
+    ⟨hf d, elementaryLieGroup_schwartz_of_compactSupport (hfs d) (hfc d)⟩
+  have hsum : (h : G → ℂ) = ∑ d ∈ hfin.toFinset, (hd d : G → ℂ) := by
+    funext g
+    rw [Finset.sum_apply]
+    change h g = ∑ d ∈ hfin.toFinset, if g.2.2 = d then h g else 0
+    rw [Finset.sum_ite_eq hfin.toFinset g.2.2 (fun _ ↦ h g)]
+    split_ifs with hg
+    · rfl
+    · by_contra h0
+      exact hg (hfin.mem_toFinset.mpr ⟨g, subset_tsupport _ h0, rfl⟩)
+  rw [hsum]
+  refine sum_mem fun d _ ↦ ?_
+  obtain ⟨φ, ψ, h₁, hφ, hφc, hψ, hψc, hh₁, heq⟩ :=
+    elementaryLieGroup_direction_fibre (hd d) (hfc d) v d (fun g hg ↦ ite_eq_right hg)
+  rw [show ((hd d : ElementarySchwartz m n r D) : G → ℂ) =
+    (fun x ↦ ∫ t : ℝ, φ t * h₁ (x + elementaryCover (t • v) 0 0)) +
+      (fun x ↦ ∫ t : ℝ, ψ t * (hd d) (x + elementaryCover (t • v) 0 0)) from funext heq]
+  exact add_mem (AddSubmonoid.subset_closure ⟨φ, h₁, hφ, hφc, hh₁, rfl⟩)
+    (AddSubmonoid.subset_closure ⟨ψ, hd d, hψ, hψc, hfc d, rfl⟩)
+
+/-- Dixmier–Malliavin for the translation action of the covering vector space
+`ℝᵐ × ℝⁿ` on the elementary group `ℝᵐ × (ℝ/ℤ)ⁿ × ℤʳ × D`. Each compactly supported elementary
+Schwartz function `f` is a finite sum of smoothed functions
+`x ↦ ∫ Φ w * h (x + elementaryCover w 0 0) dw`, with `Φ` smooth of compact support on the
+cover and `h` a compactly supported elementary Schwartz function. No Haar measure of the
+group occurs: the integral is over the covering vector space. -/
+private theorem elementaryLieGroup_cover_factorization {m n r : ℕ} {D : Type}
+    [AddCommGroup D] [Fintype D] [TopologicalSpace D] [DiscreteTopology D]
+    (f : ElementarySchwartz m n r D)
+    (hf : HasCompactSupport (f : ElementaryLieGroup m n r D → ℂ)) :
+    (f : ElementaryLieGroup m n r D → ℂ) ∈ AddSubmonoid.closure
+      {θ : ElementaryLieGroup m n r D → ℂ |
+        ∃ (Φ : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n) → ℂ)
+          (h : ElementarySchwartz m n r D), ContDiff ℝ (⊤ : ℕ∞) Φ ∧ HasCompactSupport Φ ∧
+          HasCompactSupport (h : ElementaryLieGroup m n r D → ℂ) ∧
+          θ = fun x ↦ ∫ w, Φ w * h (x + elementaryCover w 0 0)} := by
+  let G := ElementaryLieGroup m n r D
+  let Wc := EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)
+  let γ : Wc →+ G := elementaryCoverZeroHom
+  have hγ : Continuous γ := elementaryCoverZeroHom_continuous_isOpenMap.1
+  let 𝒜 : Set (G → ℂ) :=
+    {θ | ∃ h : ElementarySchwartz m n r D, HasCompactSupport (h : G → ℂ) ∧ θ = h}
+  have : (volume : Measure Wc).IsAddHaarMeasure := Measure.prod.instIsAddHaarMeasure _ _
+  have key := dixmierMalliavin_action (volume : Measure Wc) 𝒜 (fun w x ↦ x + γ w)
+    (fun x ↦ by simp) (fun w w' x ↦ by simp only [map_add, add_assoc])
+    (by
+      rintro _ ⟨h, -, rfl⟩ x
+      exact (elementarySchwartz_continuous h).comp (continuous_const.add hγ))
+    (by
+      rintro _ ⟨h, hh, rfl⟩ v
+      refine AddSubmonoid.closure_mono ?_ (elementaryLieGroup_direction_factorization h hh v)
+      rintro θ ⟨φ, h₁, hφ, hφc, hh₁, rfl⟩
+      exact ⟨φ, h₁, ⟨h₁, hh₁, rfl⟩, hφ, hφc, rfl⟩)
+    f ⟨f, hf, rfl⟩
+  refine AddSubmonoid.closure_mono ?_ key
+  rintro θ ⟨Φ, _, ⟨h, hh, rfl⟩, hΦ, hΦc, rfl⟩
+  exact ⟨Φ, h, hΦ, hΦc, hh, rfl⟩
+
+/-- The cover does not see integer translations of the torus coordinates. -/
+private theorem elementaryCover_add_int {m n r : ℕ} {D : Type} [AddCommGroup D]
+    (w : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) (z : Fin n → ℤ)
+    (a : Fin r → ℤ) (b : D) :
+    (elementaryCover (w + (0, WithLp.toLp 2 fun j ↦ (z j : ℝ))) a b :
+      ElementaryLieGroup m n r D) = elementaryCover w a b := by
+  refine Prod.ext (add_zero w.1) (Prod.ext (funext fun j ↦ ?_) rfl)
+  have hint : ((z j : ℝ) : AddCircle (1 : ℝ)) = 0 :=
+    (AddCircle.coe_eq_zero_iff (1 : ℝ)).mpr ⟨z j, by simp⟩
+  change ((w.2 j + (z j : ℝ) : ℝ) : AddCircle (1 : ℝ)) = (w.2 j : AddCircle (1 : ℝ))
+  rw [AddCircle.coe_add, hint, add_zero]
+
+/-- The sum of a smooth compactly supported function on the cover `ℝᵐ × ℝⁿ` over the fibres
+of the covering map `w ↦ elementaryCover w 0 0` is a compactly supported elementary Schwartz
+function, carried by the identity component. -/
+private theorem elementaryLieGroup_cover_periodization {m n r : ℕ} {D : Type}
+    [AddCommGroup D] [Fintype D] [TopologicalSpace D] [DiscreteTopology D]
+    (Φ : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n) → ℂ)
+    (hΦ : ContDiff ℝ (⊤ : ℕ∞) Φ) (hΦc : HasCompactSupport Φ) :
+    ∃ k : ElementarySchwartz m n r D,
+      HasCompactSupport (k : ElementaryLieGroup m n r D → ℂ) ∧
+      (∀ g : ElementaryLieGroup m n r D, g.2.2 ≠ 0 → k g = 0) ∧
+      ∀ w, k (elementaryCover w 0 0) =
+        ∑' z : Fin n → ℤ, Φ (w + (0, WithLp.toLp 2 fun j ↦ (z j : ℝ))) := by
+  classical
+  let G := ElementaryLieGroup m n r D
+  let Wc := EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)
+  let γ : Wc →+ G := elementaryCoverZeroHom
+  have hγ : Continuous γ := elementaryCoverZeroHom_continuous_isOpenMap.1
+  let ζ : (Fin n → ℤ) → Wc := fun z ↦ (0, WithLp.toLp 2 fun j ↦ (z j : ℝ))
+  have hζadd (z z' : Fin n → ℤ) : ζ (z + z') = ζ z + ζ z' := by
+    refine Prod.ext (add_zero _).symm ?_
+    ext j
+    exact Int.cast_add (z j) (z' j)
+  have hζfin (R : ℝ) : {z | ‖ζ z‖ ≤ R}.Finite := by
+    refine (Set.Finite.pi fun _ : Fin n ↦ Set.finite_Icc (-⌈R⌉) ⌈R⌉).subset fun z hz ↦ ?_
+    have hj (j : Fin n) : |(z j : ℝ)| ≤ R := by
+      have h1 : ‖(ζ z).2 j‖ ≤ ‖(ζ z).2‖ := PiLp.norm_apply_le _ j
+      have h2 : ‖(ζ z).2‖ ≤ ‖ζ z‖ := norm_snd_le _
+      exact (h1.trans h2).trans hz
+    refine fun j _ ↦ ⟨?_, ?_⟩
+    · have h1 := (abs_le.mp (hj j)).1
+      have h2 : ((-⌈R⌉ : ℤ) : ℝ) ≤ (z j : ℝ) := by
+        push_cast
+        linarith [Int.le_ceil R]
+      exact_mod_cast h2
+    · have h1 := (abs_le.mp (hj j)).2
+      have h2 : (z j : ℝ) ≤ ((⌈R⌉ : ℤ) : ℝ) := by linarith [Int.le_ceil R]
+      exact_mod_cast h2
+  let S : Wc → ℂ := fun w ↦ ∑' z, Φ (w + ζ z)
+  have hS : ContDiff ℝ (⊤ : ℕ∞) S := contDiff_tsum_translates ζ hζfin Φ hΦ hΦc
+  have hSper (w : Wc) (z₀ : Fin n → ℤ) : S (w + ζ z₀) = S w := by
+    change ∑' z, Φ (w + ζ z₀ + ζ z) = ∑' z, Φ (w + ζ z)
+    rw [← (Equiv.addLeft z₀).tsum_eq (fun z ↦ Φ (w + ζ z))]
+    refine tsum_congr fun z ↦ ?_
+    simp only [Equiv.coe_addLeft, hζadd, add_assoc]
+  choose sec hsec using fun z : AddCircle (1 : ℝ) ↦ QuotientAddGroup.mk_surjective z
+  let kf : G → ℂ := fun g ↦
+    if g.2.2 = 0 then S (g.1, WithLp.toLp 2 fun j ↦ sec (g.2.1 j)) else 0
+  have star (w : Wc) (c : (Fin r → ℤ) × D) :
+      kf (elementaryCover w c.1 c.2) = if c = 0 then S w else 0 := by
+    by_cases hc : c = 0
+    · have hk : ∀ j, ∃ k : ℤ, sec ((w.2 j : ℝ) : AddCircle (1 : ℝ)) = w.2 j + k := fun j ↦ by
+        have h0 : ((sec ((w.2 j : ℝ) : AddCircle (1 : ℝ)) - w.2 j : ℝ) :
+            AddCircle (1 : ℝ)) = 0 := by
+          rw [AddCircle.coe_sub]
+          exact sub_eq_zero.mpr (hsec _)
+        obtain ⟨k, hk⟩ := (AddCircle.coe_eq_zero_iff (1 : ℝ)).mp h0
+        exact ⟨k, by simp at hk; linarith⟩
+      choose k hk using hk
+      have e : ((w.1, WithLp.toLp 2 fun j ↦ sec ((w.2 j : ℝ) : AddCircle (1 : ℝ))) : Wc) =
+          w + ζ k := by
+        refine Prod.ext (add_zero _).symm ?_
+        ext j
+        exact hk j
+      change (if (c.1, c.2) = 0 then
+        S (w.1, WithLp.toLp 2 fun j ↦ sec ((w.2 j : ℝ) : AddCircle (1 : ℝ))) else 0) = _
+      rw [ite_eq_left (show (c.1, c.2) = 0 from hc), e, hSper, ite_eq_left hc]
+    · change (if (c.1, c.2) = 0 then _ else 0) = _
+      rw [ite_eq_right (show ¬(c.1, c.2) = 0 from hc), ite_eq_right hc]
+  have hsm (a : Fin r → ℤ) (b : D) :
+      ContDiff ℝ (⊤ : ℕ∞) (fun xt ↦ kf (elementaryCover xt a b)) := by
+    have e : (fun xt ↦ kf (elementaryCover xt a b)) =
+        fun xt ↦ if (a, b) = 0 then S xt else 0 := funext fun xt ↦ star xt (a, b)
+    rw [e]
+    by_cases hc : (a, b) = 0
+    · simp only [ite_eq_left hc]
+      exact hS
+    · simp only [ite_eq_right hc]
+      exact contDiff_const
+  have hkc : HasCompactSupport kf := by
+    refine HasCompactSupport.intro (hΦc.isCompact.image hγ) fun g hg ↦ ?_
+    by_cases hc : g.2.2 = 0
+    · let wg : Wc := (g.1, WithLp.toLp 2 fun j ↦ sec (g.2.1 j))
+      have hwg : γ wg = g := Prod.ext rfl (Prod.ext (funext fun j ↦ hsec (g.2.1 j)) hc.symm)
+      have hz : ∀ z, Φ (wg + ζ z) = 0 := fun z ↦ by
+        by_contra h0
+        exact hg ⟨wg + ζ z, subset_tsupport _ h0, (elementaryCover_add_int wg z 0 0).trans hwg⟩
+      change (if g.2.2 = 0 then ∑' z, Φ (wg + ζ z) else 0) = 0
+      rw [ite_eq_left hc, tsum_congr hz, tsum_zero]
+    · change (if g.2.2 = 0 then _ else 0) = 0
+      rw [ite_eq_right hc]
+  refine ⟨⟨kf, elementaryLieGroup_schwartz_of_compactSupport hsm hkc⟩, hkc,
+    fun g hg ↦ ite_eq_right hg, fun w ↦ ?_⟩
+  exact (star w 0).trans (ite_eq_left rfl)
+
+/-- Unfolding along the cover. For a Haar measure `μ` of the elementary group
+`ℝᵐ × (ℝ/ℤ)ⁿ × ℤʳ × D` there is a constant `c > 0` such that, when a continuous function
+`κ` carried by the identity component is the sum of a continuous compactly supported `Ψ`
+over the fibres of the covering map `w ↦ elementaryCover w 0 0`, the integral of `κ` for `μ`
+is `c` times the Lebesgue integral of `Ψ` over `ℝᵐ × ℝⁿ`.
+The identity component `ℝᵐ × (ℝ/ℤ)ⁿ × 0` is an open subgroup, so `μ` restricts to a Haar
+measure there, which is a multiple of the product of Lebesgue measure and the Haar measures
+of the circles; `integral_eq_integral_of_tsum_int_translates` unfolds that product. -/
+private theorem elementaryLieGroup_cover_unfolding {m n r : ℕ} {D : Type}
+    [AddCommGroup D] [Fintype D] [TopologicalSpace D] [DiscreteTopology D]
+    (μ : @Measure (ElementaryLieGroup m n r D) (borel _)) :
+    letI : MeasurableSpace (ElementaryLieGroup m n r D) := borel _
+    μ.IsAddHaarMeasure →
+      ∃ c : ℝ, 0 < c ∧
+        ∀ (Ψ : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n) → ℂ)
+          (κ : ElementaryLieGroup m n r D → ℂ), Continuous Ψ → HasCompactSupport Ψ →
+          Continuous κ → (∀ g : ElementaryLieGroup m n r D, g.2.2 ≠ 0 → κ g = 0) →
+          (∀ w, κ (elementaryCover w 0 0) =
+            ∑' z : Fin n → ℤ, Ψ (w + (0, WithLp.toLp 2 fun j ↦ (z j : ℝ)))) →
+          ∫ g, κ g ∂μ = (c : ℂ) * ∫ w, Ψ w := by
+  intro hμ
+  classical
+  let G := ElementaryLieGroup m n r D
+  let Wc := EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)
+  let Hc := (Fin m → ℝ) × (Fin n → AddCircle (1 : ℝ))
+  let : MeasurableSpace G := borel G
+  have : BorelSpace G := ⟨rfl⟩
+  let e₁ := EuclideanSpace.equiv (Fin m) ℝ
+  let e₂ := EuclideanSpace.equiv (Fin n) ℝ
+  let P : ((Fin m → ℝ) × (Fin n → ℝ)) ≃L[ℝ] Wc := e₁.symm.prodCongr e₂.symm
+  let jh : Hc →+ G :=
+    { toFun := fun p ↦ (e₁.symm p.1, p.2, 0, 0)
+      map_zero' := Prod.ext (map_zero e₁.symm) rfl
+      map_add' := fun p p' ↦ Prod.ext (map_add e₁.symm p.1 p'.1)
+        (Prod.ext rfl (Prod.ext (add_zero 0).symm (add_zero 0).symm)) }
+  have hjc : Continuous jh :=
+    (e₁.symm.continuous.comp continuous_fst).prodMk (continuous_snd.prodMk continuous_const)
+  have hji : Injective jh := fun p p' hpp ↦ Prod.ext
+    (e₁.symm.injective (congrArg Prod.fst hpp)) (congrArg (fun g : G ↦ g.2.1) hpp)
+  have hrange (g : G) (hg : g.2.2 = 0) : jh (e₁ g.1, g.2.1) = g :=
+    Prod.ext (e₁.symm_apply_apply g.1) (Prod.ext rfl hg.symm)
+  have hjo : IsOpenMap jh := fun U hU ↦ by
+    have e : jh '' U = (fun g : G ↦ (e₁ g.1, g.2.1)) ⁻¹' U ∩ (fun g : G ↦ g.2.2) ⁻¹' {0} := by
+      ext g
+      constructor
+      · rintro ⟨p, hp, rfl⟩
+        refine ⟨?_, rfl⟩
+        change (e₁ (e₁.symm p.1), p.2) ∈ U
+        rwa [e₁.apply_symm_apply]
+      · rintro ⟨hg1, hg2⟩
+        exact ⟨_, hg1, hrange g hg2⟩
+    rw [e]
+    exact (hU.preimage ((e₁.continuous.comp continuous_fst).prodMk
+      (continuous_fst.comp continuous_snd))).inter
+      ((isOpen_discrete _).preimage (continuous_snd.comp continuous_snd))
+  have hj : Topology.IsOpenEmbedding jh :=
+    Topology.IsOpenEmbedding.of_continuous_injective_isOpenMap hjc hji hjo
+  let μ₀ : Measure Hc := μ.comap jh
+  have hμ₀ : μ₀.IsAddHaarMeasure :=
+    Measure.IsAddHaarMeasure.comap (mH := ContinuousAdd.measurableAdd) μ hj
+  have hvol : (volume : Measure Hc).IsAddHaarMeasure := Measure.prod.instIsAddHaarMeasure _ _
+  let c := Measure.addHaarScalarFactor μ₀ (volume : Measure Hc)
+  have hc : 0 < c := Measure.addHaarScalarFactor_pos_of_isAddHaarMeasure μ₀ volume
+  have hμc : μ₀ = c • (volume : Measure Hc) := Measure.isAddLeftInvariant_eq_smul μ₀ volume
+  have hvolP : (volume : Measure ((Fin m → ℝ) × (Fin n → ℝ))).IsAddHaarMeasure :=
+    Measure.prod.instIsAddHaarMeasure _ _
+  have hvolW : (volume : Measure Wc).IsAddHaarMeasure := Measure.prod.instIsAddHaarMeasure _ _
+  let μP : Measure Wc := Measure.map P volume
+  have hμP : μP.IsAddHaarMeasure := P.isAddHaarMeasure_map volume
+  let aP := Measure.addHaarScalarFactor μP (volume : Measure Wc)
+  have haP : 0 < aP := Measure.addHaarScalarFactor_pos_of_isAddHaarMeasure μP volume
+  have hμPa : μP = aP • (volume : Measure Wc) := Measure.isAddLeftInvariant_eq_smul μP volume
+  refine ⟨(c : ℝ) * (aP : ℝ), mul_pos (NNReal.coe_pos.mpr hc) (NNReal.coe_pos.mpr haP),
+    fun Ψ κ hΨ hΨc hκ hκ0 hfib ↦ ?_⟩
+  have s1 : ∫ g, κ g ∂μ = ∫ p, κ (jh p) ∂μ₀ := by
+    rw [← hj.measurableEmbedding.integral_map, hj.measurableEmbedding.map_comap]
+    refine (setIntegral_eq_integral_of_forall_compl_eq_zero fun g hg ↦ hκ0 g fun h0 ↦ ?_).symm
+    exact hg ⟨_, hrange g h0⟩
+  have s2 : ∫ p, κ (jh p) = ∫ w, Ψ (P w) := by
+    refine integral_eq_integral_of_tsum_int_translates (fun w ↦ Ψ (P w))
+      (hΨ.comp P.continuous) (hΨc.comp_homeomorph P.toHomeomorph) (fun p ↦ κ (jh p))
+      (hκ.comp hjc) fun x t ↦ ?_
+    change κ (elementaryCover (P (x, t)) 0 0) = _
+    rw [hfib]
+    exact tsum_congr fun z ↦ congrArg Ψ (Prod.ext (add_zero _) rfl)
+  have s3 : ∫ w, Ψ (P w) = (aP : ℝ) * ∫ w, Ψ w := by
+    have e : ∫ w, Ψ (P w) = ∫ w, Ψ w ∂μP := by
+      change _ = ∫ w, Ψ w ∂(Measure.map P.toHomeomorph.toMeasurableEquiv volume)
+      rw [integral_map_equiv]
+      rfl
+    rw [e, hμPa, integral_smul_nnreal_measure, NNReal.smul_def, Complex.real_smul]
+  rw [s1, hμc, integral_smul_nnreal_measure, NNReal.smul_def, Complex.real_smul, s2, s3]
+  push_cast
+  ring
+
+/-- The image under the covering homomorphism `w ↦ elementaryCover w 0 0` of a smooth
+compactly supported density on `ℝᵐ × ℝⁿ` has a compactly supported elementary Schwartz
+density `k` for any Haar measure `μ` of the elementary group: smoothing by `Φ` along the
+cover is convolution with `k`. The density is a constant multiple of the sum of `Φ` over the
+fibres of the cover, reflected. -/
+private theorem elementaryLieGroup_cover_kernel {m n r : ℕ} {D : Type}
+    [AddCommGroup D] [Fintype D] [TopologicalSpace D] [DiscreteTopology D]
+    (μ : @Measure (ElementaryLieGroup m n r D) (borel _)) :
+    letI : MeasurableSpace (ElementaryLieGroup m n r D) := borel _
+    μ.IsAddHaarMeasure →
+      ∀ Φ : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n) → ℂ,
+        ContDiff ℝ (⊤ : ℕ∞) Φ → HasCompactSupport Φ →
+        ∃ k : ElementarySchwartz m n r D,
+          HasCompactSupport (k : ElementaryLieGroup m n r D → ℂ) ∧
+          ∀ h : ElementaryLieGroup m n r D → ℂ, Continuous h → ∀ x,
+            ∫ y, k y * h (-y + x) ∂μ = ∫ w, Φ w * h (x + elementaryCover w 0 0) := by
+  intro hμ Φ hΦ hΦc
+  obtain ⟨c, hc, hunf⟩ := elementaryLieGroup_cover_unfolding μ hμ
+  let G := ElementaryLieGroup m n r D
+  let Wc := EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)
+  let γ : Wc →+ G := elementaryCoverZeroHom
+  have hγ : Continuous γ := elementaryCoverZeroHom_continuous_isOpenMap.1
+  have : (volume : Measure Wc).IsAddHaarMeasure := Measure.prod.instIsAddHaarMeasure _ _
+  have hΦn : HasCompactSupport (fun w : Wc ↦ Φ (-w)) := hΦc.comp_homeomorph (Homeomorph.neg Wc)
+  obtain ⟨k₀, hk₀c, hk₀z, hk₀⟩ := elementaryLieGroup_cover_periodization (r := r) (D := D)
+    (fun w ↦ Φ (-w)) (hΦ.comp contDiff_neg) hΦn
+  have hcc : (c : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr hc.ne'
+  refine ⟨(c : ℂ)⁻¹ • k₀, ?_, fun h hh x ↦ ?_⟩
+  · exact hk₀c.mono fun g hg h0 ↦ hg (by
+      change (c : ℂ)⁻¹ * k₀ g = 0
+      rw [h0, mul_zero])
+  · have key := hunf (fun w ↦ Φ (-w) * h (-(γ w) + x)) (fun g ↦ k₀ g * h (-g + x))
+      ((hΦ.continuous.comp continuous_neg).mul (hh.comp ((hγ.neg).add continuous_const)))
+      hΦn.mul_right
+      ((elementarySchwartz_continuous k₀).mul (hh.comp (continuous_neg.add continuous_const)))
+      (fun g hg ↦ by rw [hk₀z g hg, zero_mul])
+      (fun w ↦ by
+        rw [hk₀ w, ← tsum_mul_right]
+        refine tsum_congr fun z ↦ ?_
+        change _ = Φ (-(w + _)) * h (-(elementaryCover (w + _) 0 0) + x)
+        rw [elementaryCover_add_int])
+    have hneg : ∫ w : Wc, Φ (-w) * h (-(γ w) + x) = ∫ w : Wc, Φ w * h (x + γ w) := by
+      rw [← integral_comp_neg_of_isAddHaarMeasure (volume : Measure Wc)
+        (fun w : Wc ↦ Φ w * h (x + γ w))]
+      refine integral_congr_ae (Eventually.of_forall fun w ↦ ?_)
+      change Φ (-w) * h (-(γ w) + x) = Φ (-w) * h (x + γ (-w))
+      rw [map_neg, add_comm]
+    change ∫ y, (c : ℂ)⁻¹ * k₀ y * h (-y + x) ∂μ = ∫ w : Wc, Φ w * h (x + γ w)
+    simp only [mul_assoc]
+    rw [integral_const_mul, key, hneg, ← mul_assoc, inv_mul_cancel₀ hcc, one_mul]
+
+/-- Dixmier–Malliavin on the elementary group in additive form: each compactly supported
+elementary Schwartz function is a finite sum of convolutions of two such functions, for any
+Haar measure. -/
+private theorem elementaryLieGroup_compact_convolution_factorization {m n r : ℕ} {D : Type}
+    [AddCommGroup D] [Fintype D] [TopologicalSpace D] [DiscreteTopology D]
+    (μ : @Measure (ElementaryLieGroup m n r D) (borel _)) :
+    letI : MeasurableSpace (ElementaryLieGroup m n r D) := borel _
+    μ.IsAddHaarMeasure → ∀ f : ElementarySchwartz m n r D,
+      HasCompactSupport (f : ElementaryLieGroup m n r D → ℂ) →
+      (f : ElementaryLieGroup m n r D → ℂ) ∈ AddSubmonoid.closure
+        {θ : ElementaryLieGroup m n r D → ℂ | ∃ u v : ElementarySchwartz m n r D,
+          HasCompactSupport (u : ElementaryLieGroup m n r D → ℂ) ∧
+          HasCompactSupport (v : ElementaryLieGroup m n r D → ℂ) ∧
+          θ = fun x ↦ ∫ y, u y * v (-y + x) ∂μ} := by
+  intro hμ f hf
+  refine AddSubmonoid.closure_mono ?_ (elementaryLieGroup_cover_factorization f hf)
+  rintro θ ⟨Φ, h, hΦ, hΦc, hh, rfl⟩
+  obtain ⟨k, hk, hkh⟩ := elementaryLieGroup_cover_kernel μ hμ Φ hΦ hΦc
+  exact ⟨k, h, hk, hh, funext fun x ↦ (hkh h (elementarySchwartz_continuous h) x).symm⟩
+
 /-- Classical input: Dixmier and Malliavin, *Factorisations de fonctions et de vecteurs
 indéfiniment différentiables*, Bull. Sci. Math. (2) 102 (1978), Théorème 3.1. On the elementary
 abelian Lie group presented by `e` (a product of Euclidean, torus, lattice and finite factors),
@@ -295,7 +849,60 @@ private theorem elementary_compact_convolution_factorization {Q : Type*} [CommGr
       ∀ f : SchwartzBruhatStage e, HasCompactSupport (V f) →
         V f ∈ AddSubmonoid.closure {θ : Q → ℂ | ∃ u v : SchwartzBruhatStage e,
           HasCompactSupport (V u) ∧ HasCompactSupport (V v) ∧ θ = lcaConvolution ν (V u) (V v)} := by
-  sorry
+  let : MeasurableSpace Q := borel _
+  have : BorelSpace Q := ⟨rfl⟩
+  intro hν V f hf
+  let G := ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor
+  let : MeasurableSpace G := borel _
+  have : BorelSpace G := ⟨rfl⟩
+  let ψ : Q ≃ₜ G :=
+    { toEquiv := e.equiv.toEquiv.trans Multiplicative.toAdd
+      continuous_toFun := e.equiv.continuous
+      continuous_invFun := e.equiv.symm.continuous }
+  have hmul (x y : Q) : ψ (x * y) = ψ x + ψ y := by
+    change Multiplicative.toAdd (e.equiv (x * y)) = _
+    rw [map_mul]
+    rfl
+  have hinv (x : Q) : ψ x⁻¹ = -ψ x := by
+    change Multiplicative.toAdd (e.equiv x⁻¹) = _
+    rw [map_inv]
+    rfl
+  let μ : Measure G := ν.map ψ
+  have hμ : μ.IsAddHaarMeasure := by
+    have : IsFiniteMeasureOnCompacts μ := ⟨fun K hK ↦ by
+      change (ν.map ψ.toMeasurableEquiv) K < ⊤
+      rw [ψ.toMeasurableEquiv.map_apply]
+      exact (ψ.isCompact_preimage.mpr hK).measure_lt_top⟩
+    have : μ.IsOpenPosMeasure := ψ.continuous.isOpenPosMeasure_map ψ.surjective
+    have : μ.IsAddLeftInvariant := ⟨fun g ↦ by
+      have hc : (fun y ↦ g + y) ∘ ψ = ψ ∘ (fun y ↦ ψ.symm g * y) := by
+        funext y
+        simp [hmul]
+      have hg : Measurable (fun y : G ↦ g + y) := (continuous_const.add continuous_id).measurable
+      have hq : Measurable (fun y : Q ↦ ψ.symm g * y) :=
+        (continuous_const.mul continuous_id).measurable
+      change Measure.map (fun y ↦ g + y) (ν.map ψ) = ν.map ψ
+      rw [Measure.map_map hg ψ.continuous.measurable, hc,
+        ← Measure.map_map ψ.continuous.measurable hq, map_mul_left_eq_self]⟩
+    exact {}
+  have hfc : HasCompactSupport (f : G → ℂ) := by
+    have h := hf.comp_homeomorph ψ.symm
+    have he : V f ∘ ψ.symm = (f : G → ℂ) := funext fun y ↦ congrArg f (ψ.apply_symm_apply y)
+    rwa [he] at h
+  have key := elementaryLieGroup_compact_convolution_factorization μ hμ f hfc
+  refine AddSubmonoid.closure_induction (motive := fun θ _ ↦ θ ∘ ψ ∈ AddSubmonoid.closure
+    {θ : Q → ℂ | ∃ u v : SchwartzBruhatStage e,
+      HasCompactSupport (V u) ∧ HasCompactSupport (V v) ∧ θ = lcaConvolution ν (V u) (V v)})
+    ?_ ?_ ?_ key
+  · rintro θ ⟨u, v, hu, hv, rfl⟩
+    apply AddSubmonoid.subset_closure
+    refine ⟨u, v, hu.comp_homeomorph ψ, hv.comp_homeomorph ψ, funext fun x ↦ ?_⟩
+    change ∫ y, u y * v (-y + ψ x) ∂(ν.map ψ.toMeasurableEquiv) = ∫ y, u (ψ y) * v (ψ (y⁻¹ * x)) ∂ν
+    rw [integral_map_equiv]
+    simp [hmul, hinv]
+  · exact zero_mem _
+  · intro a b _ _ ha hb
+    exact add_mem ha hb
 
 end ConvolutionFactorization
 
@@ -1172,9 +1779,10 @@ theorem spectralProjection_convolution_nuclear_of_le_one (_hs₁ : s ≤ 1) (φ 
 
 /-- Paper: Theorem 10.4.2.1, p. 459. Spectral projection after convolution is nuclear.
 Deviation: This checks the uncut conclusion on the range `1 < s` of the strip theorem. -/
-theorem spectralProjection_convolution_nuclear_of_one_lt (hs₁ : 1 < s) (φ : BruhatCompactSupport C𝔽) :
+theorem spectralProjection_convolution_nuclear_of_one_lt (_hs₁ : 1 < s) (φ : BruhatCompactSupport C𝔽) :
     IsNuclearOperator ((spectralProjection (F := F) a hα hs).comp (A(φ))) :=
-  RiemannMasullo.spectralProjection_convolution_nuclear_of_one_lt a hα hs₁ φ
+  spectralProjection_convolution_nuclear a hα hs φ
+    (spectralStripConvolution_nuclear_of_summable_clusterTraceNorms a hα hs φ)
 
 /-- Paper: Theorem 10.4.2.1, p. 459. At each admissible cutoff, spectral truncation
 after convolution is nuclear. This follows from the open `spectralStripConvolution_nuclear_of_le_one`
@@ -1188,10 +1796,11 @@ theorem spectralTruncatedConvolution_nuclear_of_le_one (_hs₁ : s ≤ 1)
 
 /-- Paper: Theorem 10.4.2.1, p. 459. Spectral truncation after convolution is nuclear.
 Deviation: At `1 < s` the existing theorem applies to real cutoffs even without the inner-band inequality. -/
-theorem spectralTruncatedConvolution_nuclear_of_one_lt (hs₁ : 1 < s)
+theorem spectralTruncatedConvolution_nuclear_of_one_lt (_hs₁ : 1 < s)
     (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (φ : BruhatCompactSupport C𝔽) :
     IsNuclearOperator (spectralTruncatedConvolution a hα hs hρ φ) :=
-  RiemannMasullo.spectralTruncatedConvolution_nuclear_of_one_lt a hα hs₁ hρ φ
+  spectralTruncatedConvolution_nuclear a hα hs hρ φ
+    (spectralStripConvolution_nuclear_of_summable_clusterTraceNorms a hα hs φ)
 
 /-- Paper: Theorem 10.4.2.1, p. 459. At each admissible cutoff, geometric truncation
 after convolution is nuclear. Given the open `spectralStripConvolution_nuclear_of_le_one`,
@@ -1205,10 +1814,11 @@ theorem geometricTruncatedConvolution_nuclear_of_le_one (_hs₁ : s ≤ 1)
 
 /-- Paper: Theorem 10.4.2.1, p. 459. Geometric truncation after convolution is nuclear.
 Deviation: This checks the real-cutoff conclusion at `1 < s` using the strip theorem. -/
-theorem geometricTruncatedConvolution_nuclear_of_one_lt (hs₁ : 1 < s)
+theorem geometricTruncatedConvolution_nuclear_of_one_lt (_hs₁ : 1 < s)
     (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (hband : band(Λ, ε)) (φ : BruhatCompactSupport C𝔽) :
     IsNuclearOperator (geometricTruncatedConvolution a hα hs hρ φ) :=
-  RiemannMasullo.geometricTruncatedConvolution_nuclear_of_one_lt a hα hs₁ hρ hband φ
+  geometricTruncatedConvolution_nuclear a hα hs hρ hband φ
+    (spectralStripConvolution_nuclear_of_summable_clusterTraceNorms a hα hs φ)
 
 local notation "traceSplit(" hρ ", " φ ")" =>
   (let T := (M(hρ)).comp (A(φ))
@@ -1231,10 +1841,11 @@ theorem truncatedConvolution_trace_split_of_le_one (_hs₁ : s ≤ 1)
 
 /-- Paper: Theorem 10.4.2.1, p. 459. The nuclear trace splits as in (10.4.2.3).
 Deviation: This checks the identity with real cutoffs and all three nuclearity witnesses at `1 < s`. -/
-theorem truncatedConvolution_trace_split_of_one_lt (hs₁ : 1 < s)
+theorem truncatedConvolution_trace_split_of_one_lt (_hs₁ : 1 < s)
     (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (hband : band(Λ, ε)) (φ : BruhatCompactSupport C𝔽) :
     traceSplit(hρ, φ) :=
-  RiemannMasullo.truncatedConvolution_trace_split_of_one_lt a hα hs₁ hρ hband φ
+  truncatedConvolution_trace_split a hα hs hρ hband φ
+    (spectralStripConvolution_nuclear_of_summable_clusterTraceNorms a hα hs φ)
 
 section Limits
 
@@ -1266,10 +1877,10 @@ theorem spectralTruncatedConvolution_trace_tendsto_of_le_one (_hs₁ : s ≤ 1) 
 
 /-- Paper: Theorem 10.4.2.2, p. 460. The projection-after-convolution traces tend to the strip quotient trace.
 Deviation: This checks the eventual real-cutoff formulation at `1 < s` with the nuclearity witness from §10.3. -/
-theorem spectralTruncatedConvolution_trace_tendsto_of_one_lt (hs₁ : 1 < s) :
-    traceLimit(spectralTruncatedConvolution) :=
-  ⟨spectralStripConvolution_nuclear a hα hs₁ φ,
-    RiemannMasullo.spectralTruncatedConvolution_trace_tendsto_of_one_lt a hα hs₁ φ ε ρ hε hρ⟩
+theorem spectralTruncatedConvolution_trace_tendsto_of_one_lt (_hs₁ : 1 < s) :
+    traceLimit(spectralTruncatedConvolution) := by
+  have hq := spectralStripConvolution_nuclear_of_summable_clusterTraceNorms a hα hs φ
+  exact ⟨hq, spectralTruncatedConvolution_trace_tendsto a hα hs φ hq ε ρ hε hρ⟩
 
 /-- Paper: Theorem 10.4.2.8, p. 463. The traces of cutoff convolution after spectral
 projection tend to the strip quotient trace, as in (10.4.2.20). This follows from the
@@ -1283,10 +1894,10 @@ theorem spectralRestriction_trace_tendsto_of_le_one (_hs₁ : s ≤ 1) :
 
 /-- Paper: Theorem 10.4.2.8, p. 463. The convolution-after-projection traces tend to the strip quotient trace.
 Deviation: This checks the eventual real-cutoff formulation at `1 < s` with the nuclearity witness from §10.3. -/
-theorem spectralRestriction_trace_tendsto_of_one_lt (hs₁ : 1 < s) :
-    traceLimit(spectralRestriction) :=
-  ⟨spectralStripConvolution_nuclear a hα hs₁ φ,
-    RiemannMasullo.spectralRestriction_trace_tendsto_of_one_lt a hα hs₁ φ ε ρ hε hρ⟩
+theorem spectralRestriction_trace_tendsto_of_one_lt (_hs₁ : 1 < s) :
+    traceLimit(spectralRestriction) := by
+  have hq := spectralStripConvolution_nuclear_of_summable_clusterTraceNorms a hα hs φ
+  exact ⟨hq, spectralRestriction_trace_tendsto a hα hs φ hq ε ρ hε hρ⟩
 
 end Limits
 
