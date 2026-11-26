@@ -1231,40 +1231,21 @@ private theorem gramSpacing_mellin (η : PontryaginDual C𝔽) (r : ℝ → ℂ)
   rw [← integral_map hL.measurable.aemeasurable hG.aestronglyMeasurable, hL.map_eq,
     integral_smul_nnreal_measure, NNReal.smul_def, Complex.real_smul]
 
-/-- Paper: Theorem 10.3.2.1(1), pp. 453–455. What the recorded gap
-`spectralStripConvolution_finiteGram_bound` (#7455), assumed for every test, forces at width
-zero: the zeros of each component are separated polynomially in the height. For each norm-one
-character `ω` there are `c > 0` and `A` such that any two distinct zeros `z, w` of `χ ω` on the
-line satisfy `|Im z - Im w| ≥ c (1 + |Im z|) ^ (-A)`.
-The hypothesis is the statement of `spectralStripConvolution_finiteGram_bound` for every test,
-with its `let`s unfolded. The proof applies the finite Gram bound to the block of two zeroth jets
-(`gramSpacing_pair`), tests of the form `ψ(log |g|) · conj (χ ω g)` whose Mellin transforms are
-Laplace integrals of `ψ`, the Banach–Steinhaus theorem on the Schwartz space of the line, and the
-modulated tests `ρ(x) e^{-itx}`, whose Schwartz seminorms grow polynomially in `t`. Over `ℚ`,
-at `a = 1/2` and on the component of the trivial character, the conclusion is a lower bound,
-polynomial in the height, for the gaps between the ordinates of zeros of the Riemann zeta
-function on the critical line. No such bound is known to us, unconditionally or on the Riemann
-hypothesis. The bound is for one component at a time, with no uniformity in `ω`. -/
-theorem spectralStripConvolution_finiteGram_bound_forces_polynomial_gaps (hα0 : α = 0)
-    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
-    (hgap : ∀ φ : BruhatCompactSupport C𝔽, ∃ B : ℝ, ∀ (T : Finset (Z(χ, α))) (w : Z(χ, α) → ℂ)
-      (S : Finset (J(χ))),
-      (∀ z ∈ T, w z ∈ Metric.sphere (shift(z.val.2.1, z.val.2.2))
-        (2 * Real.exp ((4 * α + s) / 2))) →
-      ∑ z ∈ T, ‖∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ z.val.1) (w z) g ∂μ𝔽‖ *
-        ∑ m : Fin (N(χ, α, s, z)), ‖u(χ, (jet(z, m) : J(χ)))‖ *
-          finiteGramCoordinate (fun j : J(χ) ↦ u(χ, j)) (jet(z, m) : J(χ)) S ≤ B)
-    (ω : PontryaginDual C₁) :
+/-- The common end of the two spacing theorems below. Suppose that, for every test, one constant
+bounds the Mellin transform at the point `shift(0, Im z) + r` attached to a zero `z` by that
+constant times `|Im z - Im w| ^ β`, for every other zero `w` of the same component. Then the
+zeros of each component are separated polynomially in the height. The proof uses the tests
+`θ(log |g|) ψ(log |g|) · conj (χ ω g)` for `ψ` in the Schwartz space of the line, whose Mellin
+transforms are Laplace integrals of `θ ψ`, the Banach–Steinhaus theorem on that Schwartz space,
+and the modulated tests `θ(x) e^{-itx}`, whose Schwartz seminorms grow polynomially in `t`. -/
+private theorem gramSpacing_of_holder (hα0 : α = 0) (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (ω : PontryaginDual C₁) {β : ℝ} (hβpos : 0 < β) (R : ℝ)
+    (H : ∀ φ : BruhatCompactSupport C𝔽, ∃ C : ℝ, ∀ z w : Z(χ, α), w ≠ z → w.val.1 = z.val.1 →
+      ‖∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ z.val.1) (shift(z.val.2.1, z.val.2.2) + R) g
+        ∂μ𝔽‖ ≤ C * |z.val.2.2 - w.val.2.2| ^ β) :
     ∃ c > (0 : ℝ), ∃ A : ℝ, ∀ z w : Z(χ, α), z.val.1 = ω → w ≠ z → w.val.1 = z.val.1 →
       c * (1 + |z.val.2.2|) ^ (-A) ≤ |z.val.2.2 - w.val.2.2| := by
   classical
-  -- The exponent.
-  let β : ℝ := min 1 ((s - 1) / 4)
-  have hβpos : 0 < β := lt_min one_pos (by linarith)
-  have hβ1 : β ≤ 1 := min_le_left _ _
-  have hβs : 2 * β < s - 1 := by
-    have : β ≤ (s - 1) / 4 := min_le_right _ _
-    linarith
   -- The cut-off and the profile.
   let b : ContDiffBump (0 : ℝ) := ⟨1, 2, one_pos, one_lt_two⟩
   let θ : ℝ → ℂ := fun x ↦ ((b x : ℝ) : ℂ)
@@ -1272,35 +1253,31 @@ theorem spectralStripConvolution_finiteGram_bound_forces_polynomial_gaps (hα0 :
   have hθc : HasCompactSupport θ := b.hasCompactSupport.comp_left Complex.ofReal_zero
   have hθcont : Continuous θ := hθs.continuous
   let η := χ ω
-  let R : ℝ := 2 * Real.exp ((4 * α + s) / 2)
-  have hR : 0 < R := by positivity
   let cH : ℝ := Measure.haarScalarFactor μ𝔽 ν𝔽
   have hcH : 0 < cH := NNReal.coe_pos.mpr (Measure.haarScalarFactor_pos_of_isHaarMeasure _ _)
-  -- For every Schwartz profile, the test and the bound of `gramSpacing_pair`.
+  -- For every Schwartz profile, the test and its bound.
   have htest (ψ : 𝓢(ℝ, ℂ)) := gramSpacing_exists_test η (fun x ↦ θ x * ψ x)
     (hθs.mul (ψ.smooth ⊤)) (hθc.mul_right)
   choose φ hφ using htest
-  have hpair (ψ : 𝓢(ℝ, ℂ)) := gramSpacing_pair a hα hs hα0 χ hχ (φ ψ) (hgap (φ ψ))
-    hβpos.le hβ1 hβs
-  choose Cψ hCψ0 hCψ using hpair
+  choose Cψ hCψ using fun ψ ↦ H (φ ψ)
   -- The family of functionals.
-  let I := {p : Z(χ, α) × Z(χ, α) × ℂ // p.1.val.1 = ω ∧ p.2.1 ≠ p.1 ∧
-    p.2.1.val.1 = p.1.val.1 ∧ p.2.2 ∈ Metric.sphere (shift(p.1.val.2.1, p.1.val.2.2)) R}
-  let g (i : I) : ℝ → ℂ := fun x ↦ θ x * Complex.exp (i.val.2.2 * x)
+  let I := {p : Z(χ, α) × Z(χ, α) // p.1.val.1 = ω ∧ p.2 ≠ p.1 ∧ p.2.val.1 = p.1.val.1}
+  let pt (i : I) : ℂ := shift(i.val.1.val.2.1, i.val.1.val.2.2) + R
+  let g (i : I) : ℝ → ℂ := fun x ↦ θ x * Complex.exp (pt i * x)
   have hg (i : I) : Integrable (g i) :=
     (hθcont.mul (Complex.continuous_exp.comp (continuous_const.mul Complex.continuous_ofReal))
       ).integrable_of_hasCompactSupport hθc.mul_right
-  let Δ (i : I) : ℝ := |i.val.1.val.2.2 - i.val.2.1.val.2.2| ^ β
+  let Δ (i : I) : ℝ := |i.val.1.val.2.2 - i.val.2.val.2.2| ^ β
   have hΔ (i : I) : 0 < Δ i := by
     refine Real.rpow_pos_of_pos (abs_pos.mpr (sub_ne_zero.mpr fun h ↦ i.property.2.1 ?_)) _
     have hz0 : i.val.1.val.2.1 = 0 := by
       have := i.val.1.property.1; simp only [mem_Icc] at this; subst hα0; linarith
-    have hw0 : i.val.2.1.val.2.1 = 0 := by
-      have := i.val.2.1.property.1; simp only [mem_Icc] at this; subst hα0; linarith
-    exact Subtype.ext (Prod.ext i.property.2.2.1 (Prod.ext (hw0.trans hz0.symm) h.symm))
+    have hw0 : i.val.2.val.2.1 = 0 := by
+      have := i.val.2.property.1; simp only [mem_Icc] at this; subst hα0; linarith
+    exact Subtype.ext (Prod.ext i.property.2.2 (Prod.ext (hw0.trans hz0.symm) h.symm))
   let L (i : I) : 𝓢(ℝ, ℂ) →L[ℂ] ℂ := ((cH / Δ i : ℝ) : ℂ) • schwartzPairing (g i) (hg i)
   have hLapp (i : I) (ψ : 𝓢(ℝ, ℂ)) : L i ψ = ((cH / Δ i : ℝ) : ℂ) *
-      ∫ x, θ x * ψ x * Complex.exp (i.val.2.2 * x) := by
+      ∫ x, θ x * ψ x * Complex.exp (pt i * x) := by
     change ((cH / Δ i : ℝ) : ℂ) • schwartzPairing (g i) (hg i) ψ = _
     rw [schwartzPairing_apply, smul_eq_mul]
     congr 1
@@ -1309,8 +1286,8 @@ theorem spectralStripConvolution_finiteGram_bound_forces_polynomial_gaps (hα0 :
     ring
   have hbound (i : I) (ψ : 𝓢(ℝ, ℂ)) : ‖L i ψ‖ ≤ Cψ ψ := by
     have hm := gramSpacing_mellin η (fun x ↦ θ x * ψ x) (hθcont.mul ψ.continuous) (φ ψ) (hφ ψ)
-      i.val.2.2
-    have hc := hCψ ψ i.val.1 i.val.2.1 i.property.2.1 i.property.2.2.1 i.val.2.2 i.property.2.2.2
+      (pt i)
+    have hc := hCψ ψ i.val.1 i.val.2 i.property.2.1 i.property.2.2
     rw [show χ i.val.1.val.1 = η from congrArg χ i.property.1, hm] at hc
     rw [hLapp, norm_mul, Complex.norm_real, Real.norm_of_nonneg (div_nonneg hcH.le (hΔ i).le)]
     rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg hcH.le] at hc
@@ -1328,13 +1305,13 @@ theorem spectralStripConvolution_finiteGram_bound_forces_polynomial_gaps (hα0 :
     rw [b.one_of_mem_closedBall (Metric.mem_closedBall_self b.rIn_pos.le)]
     simp
   refine ⟨(cH * I₀ / (C + 1)) ^ β⁻¹, by positivity, n / β, fun z w hzω hwz hχzw ↦ ?_⟩
-  let i : I := ⟨(z, w, shift(z.val.2.1, z.val.2.2) + R), hzω, hwz, hχzw, by simp [abs_of_pos hR]⟩
+  let i : I := ⟨(z, w), hzω, hwz, hχzw⟩
   have hval : L i (modulatedSchwartz θ hθs hθc z.val.2.2) = ((cH / Δ i : ℝ) : ℂ) * (I₀ : ℂ) := by
     rw [hLapp]
     congr 1
     rw [show (I₀ : ℂ) = ∫ x : ℝ, ((b x * b x * Real.exp (R * x) : ℝ) : ℂ) from integral_ofReal.symm]
     refine integral_congr_ae (Eventually.of_forall fun x ↦ ?_)
-    simp only [modulatedSchwartz_apply, θ, i]
+    simp only [modulatedSchwartz_apply, θ, pt, i]
     have hz0 : z.val.2.1 = 0 := by
       have := z.property.1; simp only [mem_Icc] at this; subst hα0; linarith
     rw [hz0]
@@ -1362,6 +1339,84 @@ theorem spectralStripConvolution_finiteGram_bound_forces_polynomial_gaps (hα0 :
   rw [hd, show -(n / β) = -(n : ℝ) * β⁻¹ by ring, Real.rpow_mul h1t.le, ← Real.mul_rpow
     (by positivity) (by positivity)]
   exact Real.rpow_le_rpow (by positivity) hkey (by positivity)
+
+
+/-- Paper: Theorem 10.3.2.1(1), pp. 453–455. What the recorded gap
+`spectralStripConvolution_finiteGram_bound` (#7455), assumed for every test, forces at width
+zero: the zeros of each component are separated polynomially in the height. For each norm-one
+character `ω` there are `c > 0` and `A` such that any two distinct zeros `z, w` of `χ ω` on the
+line satisfy `|Im z - Im w| ≥ c (1 + |Im z|) ^ (-A)`.
+The hypothesis is the statement of `spectralStripConvolution_finiteGram_bound` for every test,
+with its `let`s unfolded. The proof applies the finite Gram bound to the block of two zeroth jets
+(`gramSpacing_pair`), tests of the form `ψ(log |g|) · conj (χ ω g)` whose Mellin transforms are
+Laplace integrals of `ψ`, the Banach–Steinhaus theorem on the Schwartz space of the line, and the
+modulated tests `ρ(x) e^{-itx}`, whose Schwartz seminorms grow polynomially in `t`. Over `ℚ`,
+at `a = 1/2` and on the component of the trivial character, the conclusion is a lower bound,
+polynomial in the height, for the gaps between the ordinates of zeros of the Riemann zeta
+function on the critical line. No such bound is known to us, unconditionally or on the Riemann
+hypothesis. The bound is for one component at a time, with no uniformity in `ω`. -/
+theorem spectralStripConvolution_finiteGram_bound_forces_polynomial_gaps (hα0 : α = 0)
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    (hgap : ∀ φ : BruhatCompactSupport C𝔽, ∃ B : ℝ, ∀ (T : Finset (Z(χ, α))) (w : Z(χ, α) → ℂ)
+      (S : Finset (J(χ))),
+      (∀ z ∈ T, w z ∈ Metric.sphere (shift(z.val.2.1, z.val.2.2))
+        (2 * Real.exp ((4 * α + s) / 2))) →
+      ∑ z ∈ T, ‖∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ z.val.1) (w z) g ∂μ𝔽‖ *
+        ∑ m : Fin (N(χ, α, s, z)), ‖u(χ, (jet(z, m) : J(χ)))‖ *
+          finiteGramCoordinate (fun j : J(χ) ↦ u(χ, j)) (jet(z, m) : J(χ)) S ≤ B)
+    (ω : PontryaginDual C₁) :
+    ∃ c > (0 : ℝ), ∃ A : ℝ, ∀ z w : Z(χ, α), z.val.1 = ω → w ≠ z → w.val.1 = z.val.1 →
+      c * (1 + |z.val.2.2|) ^ (-A) ≤ |z.val.2.2 - w.val.2.2| := by
+  let β : ℝ := min 1 ((s - 1) / 4)
+  have hβpos : 0 < β := lt_min one_pos (by linarith)
+  have hβs : 2 * β < s - 1 := by
+    have : β ≤ (s - 1) / 4 := min_le_right _ _
+    linarith
+  let R : ℝ := 2 * Real.exp ((4 * α + s) / 2)
+  have hR : 0 < R := by positivity
+  refine gramSpacing_of_holder a hα0 χ ω hβpos R fun φ ↦ ?_
+  obtain ⟨C, -, hC⟩ := gramSpacing_pair a hα hs hα0 χ hχ φ (hgap φ) hβpos.le (min_le_left _ _) hβs
+  refine ⟨C, fun z w hwz hχzw ↦ hC z w hwz hχzw _ ?_⟩
+  rw [Metric.mem_sphere, dist_eq_norm, add_sub_cancel_left, Complex.norm_real,
+    Real.norm_of_nonneg hR.le]
+
+/-- Paper: Theorem 10.3.2.1(1), pp. 453–455. What the recorded gap
+`spectralStripConvolution_traceCauchy_compact_block_series` of `Sec3` (#7241), assumed for every
+test, forces at width zero: the zeros of each component are separated polynomially in the
+height. For each norm-one character `ω` there are `c > 0` and `A` such that any two distinct
+zeros `z, w` of `χ ω` on the line satisfy `|Im z - Im w| ≥ c (1 + |Im z|) ^ (-A)`.
+The hypothesis `h` is the conclusion of that gap for every test, for the given basis, as in
+`spectralStripConvolution_compact_block_series_forces_line_holder`, which gives the bound at one
+test. The rest is as for `spectralStripConvolution_finiteGram_bound_forces_polynomial_gaps`, with
+the Mellin transform taken at the centres of the circles instead of on them. Over `ℚ`, at
+`a = 1/2` and on the component of the trivial character, the conclusion is a lower bound,
+polynomial in the height, for the gaps between the ordinates of zeros of the Riemann zeta
+function on the critical line. No such bound is known to us, unconditionally or on the Riemann
+hypothesis. The bound is for one component at a time, with no uniformity in `ω`. -/
+theorem spectralStripConvolution_compact_block_series_forces_polynomial_gaps (hα0 : α = 0)
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    (x : J(χ) → Q(a, hStrip(hα), hs₀(hs))) (Λ : J(χ) → StrongDual ℂ Q(a, hStrip(hα), hs₀(hs)))
+    (hb : IsSpectralMarkushevichBasis x Λ)
+    (hj : ∀ j, D (Λ j) = (spectralStripJet_memLp χ hα hs₀(hs) j).toLp (raw(χ, j)))
+    (h : ∀ φ : BruhatCompactSupport C𝔽,
+      ∀ U : compactOperator (RingHom.id ℂ) Q(a, hStrip(hα), hs₀(hs)) Q(a, hStrip(hα), hs₀(hs)),
+      Summable (fun z : Z(χ, α) ↦ ∑ m : Fin (N(χ, α, s, z)), Λ (jet(z, m))
+        (spectralConvolution (F := F) a hStrip(hα) hs₀(hs) φ (U.val (x (jet(z, m)))))))
+    (ω : PontryaginDual C₁) :
+    ∃ c > (0 : ℝ), ∃ A : ℝ, ∀ z w : Z(χ, α), z.val.1 = ω → w ≠ z → w.val.1 = z.val.1 →
+      c * (1 + |z.val.2.2|) ^ (-A) ≤ |z.val.2.2 - w.val.2.2| := by
+  let β : ℝ := min 1 ((s - 1) / 4)
+  have hβpos : 0 < β := lt_min one_pos (by linarith)
+  have hβs : 2 * β < s - 1 := by
+    have : β ≤ (s - 1) / 4 := min_le_right _ _
+    linarith
+  refine gramSpacing_of_holder a hα0 χ ω hβpos 0 fun φ ↦ ?_
+  obtain ⟨C, -, hC⟩ := spectralStripConvolution_compact_block_series_forces_line_holder a hα hs
+    hα0 χ hχ x Λ hb hj φ (h φ) hβpos.le (min_le_left _ _) hβs
+  refine ⟨C, fun z w hwz hχzw ↦ ?_⟩
+  have hM := hC z w hwz hχzw (gramSpacing_N_pos a hs hα0 χ z) (gramSpacing_N_pos a hs hα0 χ w)
+  simpa only [modulatedFourierMellin, relativeVerticalStrip, preimage_univ, indicator_univ,
+    Complex.ofReal_zero, add_zero] using hM
 
 end GramSpacing
 
