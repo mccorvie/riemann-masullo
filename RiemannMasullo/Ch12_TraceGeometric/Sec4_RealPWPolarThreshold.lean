@@ -4,6 +4,7 @@ public import RiemannMasullo.Ch12_TraceGeometric.Sec4_RealPWJetTrials
 import Mathlib.Analysis.Distribution.SchwartzSpace.CompactSupport
 import Mathlib.Analysis.Distribution.SchwartzSpace.Fourier
 import Mathlib.Analysis.SpecialFunctions.JapaneseBracket
+import Mathlib.Analysis.PSeries
 import RiemannMasullo.ForMathlib.MeasureTheory.Function.L2Space
 
 /-! # Which polar condition survives completion in the weighted real band
@@ -21,6 +22,12 @@ integral, in terms of the width `α` of the weight.
   (`mem_closure_realPWBandPolarFreeCore_of_schwartz`), and some of these have nonzero integral
   (`exists_mem_closure_realPWBandPolarFreeCore_integral_ne_zero`). The reason is that the
   dilates `x ↦ h (x / t) / t` keep their integral while their weighted norm tends to zero.
+* At width one half with `s ≤ 1` the condition is lost as well
+  (`mem_closure_realPWBandPolarFreeCore_of_schwartz_half`,
+  `exists_mem_closure_realPWBandPolarFreeCore_integral_ne_zero_half`). A single dilate no longer
+  has small norm. The sum over `n < N` of the dilates by `2 ^ n`, with weights proportional to
+  `1 / (n + 1)`, keeps integral one and has square norm of order one over the `N`-th harmonic
+  number.
 * Above width one half, and at width one half for `s > 1`, the condition survives. The
   reciprocal of the weight is integrable (`integrable_inv_realPWIntervalWeight`,
   `integrable_inv_realPWIntervalWeight_half`), so the integral is a continuous linear functional
@@ -31,10 +38,11 @@ integral, in terms of the width `α` of the weight.
 Reconstruction: The paper does not state this. The core is that of the order-zero model of the
 rational real place.
 
-Not treated here: the width `α = 1 / 2` with `s ≤ 1`, where the condition should again be
-lost. That the closure below one half is exactly the kernel of evaluation at the origin, which
-needs the density of Schwartz functions in that kernel. The last statement for
-`α ≥ 3 / 2`. -/
+So for `s ≥ 0` the condition is lost exactly when `α < 1 / 2`, or `α = 1 / 2` and `s ≤ 1`.
+
+Not treated here: that the closure, when the condition is lost, is exactly the kernel of
+evaluation at the origin, which needs the density of Schwartz functions in that kernel. The
+last statement for `α ≥ 3 / 2`. -/
 
 public noncomputable section
 
@@ -711,5 +719,547 @@ theorem exists_realPWBand_notMem_closure_polarFreeCore_half (hs : 0 ≤ s) (hs1 
     (integrable_inv_realPWIntervalWeight_half hs1)
 
 end AboveThreshold
+
+section CriticalEndpoint
+
+variable {Y α s : ℝ}
+
+/-- A Schwartz function that vanishes at the origin is bounded by a multiple of `|x|`. -/
+private theorem exists_schwartz_norm_le_mul_abs (ψ : 𝓢(ℝ, ℂ)) (h0 : ψ 0 = 0) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ x : ℝ, ‖ψ x‖ ≤ C * |x| := by
+  obtain ⟨C, hCpos, hC⟩ := ψ.decay 0 1
+  have hfd (x : ℝ) : ‖fderiv ℝ (ψ : ℝ → ℂ) x‖ ≤ C := by
+    have h := hC x
+    rwa [pow_zero, one_mul, norm_iteratedFDeriv_one] at h
+  refine ⟨C, hCpos.le, fun x ↦ ?_⟩
+  have h := Convex.norm_image_sub_le_of_norm_fderiv_le (𝕜 := ℝ) (f := (ψ : ℝ → ℂ))
+    (s := univ) (fun y _ ↦ ψ.differentiableAt) (fun y _ ↦ hfd y) convex_univ
+    (mem_univ (0 : ℝ)) (mem_univ x)
+  rwa [h0, sub_zero, sub_zero, Real.norm_eq_abs] at h
+
+/-- Below width three halves an even Schwartz function that vanishes at the origin is square
+integrable for the weighted measure. -/
+private theorem memLp_of_evenSchwartz_zero (hα : 0 ≤ α) (hα' : α < 3 / 2) (hs : 0 ≤ s)
+    (ψ : 𝓢(ℝ, ℂ)) (he : Function.Even (ψ : ℝ → ℂ)) (h0 : ψ 0 = 0) :
+    MemLp (ψ : ℝ → ℂ) 2 (realPWIntervalMeasure α s) := by
+  obtain ⟨C, -, hC⟩ := exists_schwartz_norm_le_mul_abs ψ h0
+  exact memLp_realPWIntervalMeasure_of_evenSchwartz_order hα hs ψ he 1 (by push_cast; linarith)
+    ⟨C, fun x _ ↦ by simpa using hC x⟩
+
+/-- The image of the weighted measure under a contraction by `t ≥ 1` is at most the dilation
+constant times `t` times the measure. -/
+private theorem map_mul_realPWIntervalMeasure_le (hα : 0 ≤ α) (hs : 0 ≤ s) {t : ℝ}
+    (ht : 1 ≤ t) :
+    Measure.map (t⁻¹ * ·) (realPWIntervalMeasure α s) ≤
+      (ENNReal.ofReal (Real.exp (2 * α * Real.log t) *
+        (1 + Real.log t + Real.log t ^ 2) ^ (s / 2)) * ENNReal.ofReal t) •
+          realPWIntervalMeasure α s := by
+  have ht0 : 0 < t := zero_lt_one.trans_le ht
+  have hlog : 0 ≤ Real.log t := Real.log_nonneg ht
+  let a := t⁻¹
+  have ha : 0 < a := inv_pos.mpr ht0
+  let C := Real.exp (2 * α * Real.log t) * (1 + Real.log t + Real.log t ^ 2) ^ (s / 2)
+  have hC : 0 ≤ C := by dsimp [C]; positivity
+  have hCa : Real.exp (2 * |α * Real.log a|) * (1 + |Real.log a| + Real.log a ^ 2) ^ (s / 2) =
+      C := by
+    have h1 : Real.log a = -Real.log t := Real.log_inv t
+    rw [h1, mul_neg, abs_neg, abs_neg, neg_sq, abs_of_nonneg (mul_nonneg hα hlog),
+      abs_of_nonneg hlog, ← mul_assoc]
+  let W := fun x ↦ ENNReal.ofReal (realPWIntervalWeight α s x)
+  have hW : Measurable W := (measurable_realPWIntervalWeight α s).ennreal_ofReal
+  have hmul : Measurable (a * ·) := measurable_const_mul a
+  apply Measure.le_iff.mpr
+  intro S hS
+  rw [Measure.map_apply hmul hS, smul_apply, realPWIntervalMeasure,
+    withDensity_apply _ (hmul hS), withDensity_apply _ hS]
+  change (∫⁻ x in (a * ·) ⁻¹' S, W x) ≤ (ENNReal.ofReal C * ENNReal.ofReal t) * ∫⁻ x in S, W x
+  calc
+    _ ≤ ∫⁻ x in (a * ·) ⁻¹' S, ENNReal.ofReal C * W (a * x) := by
+      apply lintegral_mono
+      intro x
+      change ENNReal.ofReal (realPWIntervalWeight α s x) ≤
+        ENNReal.ofReal C * ENNReal.ofReal (realPWIntervalWeight α s (a * x))
+      rw [← ENNReal.ofReal_mul hC, ← hCa]
+      exact ENNReal.ofReal_le_ofReal (realPWIntervalWeight_le_dilation hs ha x)
+    _ = ENNReal.ofReal C * ∫⁻ y in S, W y ∂Measure.map (a * ·) volume := by
+      rw [setLIntegral_map hS hW hmul]
+      exact lintegral_const_mul _ (hW.comp hmul)
+    _ = _ := by
+      rw [Real.map_volume_mul_left ha.ne', setLIntegral_smul_measure, smul_eq_mul, ← mul_assoc,
+        inv_inv, abs_of_pos ht0]
+
+/-- A dilation by `t ≥ 1` of a nonnegative continuous integrable function is integrable for the
+weighted measure, with integral at most the dilation constant times `t` times the integral. -/
+private theorem integrable_dilate_le (hα : 0 ≤ α) (hs : 0 ≤ s) {t : ℝ} (ht : 1 ≤ t)
+    (Φ : ℝ → ℝ) (hΦc : Continuous Φ) (hΦ0 : ∀ x, 0 ≤ Φ x)
+    (hΦ : Integrable Φ (realPWIntervalMeasure α s)) :
+    Integrable (fun x ↦ Φ (x * t⁻¹)) (realPWIntervalMeasure α s) ∧
+      ∫ x, Φ (x * t⁻¹) ∂realPWIntervalMeasure α s ≤
+        (Real.exp (2 * α * Real.log t) * (1 + Real.log t + Real.log t ^ 2) ^ (s / 2) * t) *
+          ∫ x, Φ x ∂realPWIntervalMeasure α s := by
+  have ht0 : 0 < t := zero_lt_one.trans_le ht
+  have hlog : 0 ≤ Real.log t := Real.log_nonneg ht
+  let C := Real.exp (2 * α * Real.log t) * (1 + Real.log t + Real.log t ^ 2) ^ (s / 2)
+  have hC : 0 ≤ C := by dsimp [C]; positivity
+  let k := ENNReal.ofReal C * ENNReal.ofReal t
+  have hmap : Measure.map (t⁻¹ * ·) (realPWIntervalMeasure α s) ≤ k • realPWIntervalMeasure α s :=
+    map_mul_realPWIntervalMeasure_le hα hs ht
+  have hk : k ≠ ⊤ := ENNReal.mul_ne_top ENNReal.ofReal_ne_top ENNReal.ofReal_ne_top
+  have hkr : k.toReal = C * t := by
+    dsimp [k]
+    rw [ENNReal.toReal_mul, ENNReal.toReal_ofReal hC, ENNReal.toReal_ofReal ht0.le]
+  have hmul : Measurable (t⁻¹ * ·) := measurable_const_mul _
+  have hImap : Integrable Φ (Measure.map (t⁻¹ * ·) (realPWIntervalMeasure α s)) :=
+    (hΦ.smul_measure hk).mono_measure hmap
+  have hcomp : Integrable (Φ ∘ (t⁻¹ * ·)) (realPWIntervalMeasure α s) :=
+    (integrable_map_measure hΦc.aestronglyMeasurable hmul.aemeasurable).mp hImap
+  have hfun : (fun x ↦ Φ (x * t⁻¹)) = Φ ∘ (t⁻¹ * ·) := funext fun x ↦ by
+    simp only [Function.comp_apply, mul_comm]
+  refine ⟨hfun ▸ hcomp, ?_⟩
+  calc ∫ x, Φ (x * t⁻¹) ∂realPWIntervalMeasure α s
+      = ∫ y, Φ y ∂Measure.map (t⁻¹ * ·) (realPWIntervalMeasure α s) := by
+        rw [integral_map hmul.aemeasurable hΦc.aestronglyMeasurable]
+        refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+        simp only [mul_comm]
+    _ ≤ ∫ y, Φ y ∂(k • realPWIntervalMeasure α s) :=
+        integral_mono_measure hmap (ae_of_all _ hΦ0) (hΦ.smul_measure hk)
+    _ = _ := by
+        rw [integral_smul_measure, hkr, smul_eq_mul]
+
+/-- At width one half, for `s ≤ 1`, the weight is at most `y ^ 2` outside the unit interval. -/
+private theorem realPWIntervalWeight_half_le_sq (hs1 : s ≤ 1) {y : ℝ} (hy : 1 ≤ |y|) :
+    realPWIntervalWeight (1 / 2) s y ≤ y ^ 2 := by
+  have ha : 0 < |y| := zero_lt_one.trans_le hy
+  have hy0 : y ≠ 0 := abs_pos.mp ha
+  rw [realPWIntervalWeight_eq (1 / 2) s hy0, show (2 : ℝ) * (1 / 2) = 1 by norm_num,
+    Real.rpow_one, Real.rpow_neg_one]
+  have hmax : max |y| |y|⁻¹ = |y| := max_eq_left ((inv_le_one_of_one_le₀ hy).trans hy)
+  rw [hmax]
+  have hL : 0 ≤ Real.log |y| := Real.log_nonneg hy
+  have hlog : Real.log |y| ≤ |y| - 1 := Real.log_le_sub_one_of_pos ha
+  have hbase : 1 ≤ 1 + Real.log |y| ^ 2 := by nlinarith [sq_nonneg (Real.log |y|)]
+  have h1 : (1 + Real.log |y| ^ 2) ^ (s / 2) ≤ (1 + Real.log |y| ^ 2) ^ ((1 : ℝ) / 2) :=
+    Real.rpow_le_rpow_of_exponent_le hbase (by linarith)
+  have h2 : (1 + Real.log |y| ^ 2) ^ ((1 : ℝ) / 2) ≤ |y| := by
+    rw [← Real.sqrt_eq_rpow]
+    calc Real.sqrt (1 + Real.log |y| ^ 2) ≤ Real.sqrt (|y| ^ 2) :=
+          Real.sqrt_le_sqrt (by nlinarith [mul_self_le_mul_self hL hlog])
+      _ = |y| := Real.sqrt_sq ha.le
+  calc |y| * (1 + Real.log |y| ^ 2) ^ (s / 2) ≤ |y| * |y| :=
+        mul_le_mul_of_nonneg_left (h1.trans h2) ha.le
+    _ = y ^ 2 := by rw [← sq, sq_abs]
+
+/-- At width one half, for `s ≤ 1`, the function `|y| ‖k y‖` is integrable for the weighted
+measure when the Schwartz function `k` is bounded by a multiple of `|y|`. -/
+private theorem integrable_abs_mul_norm_half (hs : 0 ≤ s) (hs1 : s ≤ 1) (k : 𝓢(ℝ, ℂ))
+    {C₁ : ℝ} (hC₁ : ∀ x, ‖k x‖ ≤ C₁ * |x|) :
+    Integrable (fun y ↦ |y| * ‖k y‖) (realPWIntervalMeasure (1 / 2) s) := by
+  let w := realPWIntervalWeight (1 / 2) s
+  have hw0 (y : ℝ) : 0 ≤ w y := zero_le_one.trans (one_le_realPWIntervalWeight (1 / 2) s hs y)
+  have hwm : Measurable w := measurable_realPWIntervalWeight (1 / 2) s
+  rw [realPWIntervalMeasure, integrable_withDensity_iff_integrable_smul' hwm.ennreal_ofReal
+    (ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top)]
+  have hI1 : IntegrableOn (fun y : ℝ ↦ |y| ^ (2 : ℝ) * w y) (Icc (-1) 1) :=
+    integrableOn_abs_rpow_mul_realPWIntervalWeight (by norm_num) hs (by norm_num)
+  have hI2 : Integrable (fun y : ℝ ↦ ‖y‖ ^ 3 * ‖k y‖) := k.integrable_pow_mul volume 3
+  have hdom : Integrable (fun y : ℝ ↦
+      C₁ * (Icc (-1 : ℝ) 1).indicator (fun y ↦ |y| ^ (2 : ℝ) * w y) y + ‖y‖ ^ 3 * ‖k y‖) :=
+    (((integrable_indicator_iff measurableSet_Icc).mpr hI1).const_mul C₁).add hI2
+  have hmeas : Measurable fun y : ℝ ↦ (ENNReal.ofReal (w y)).toReal • (|y| * ‖k y‖) :=
+    hwm.ennreal_ofReal.ennreal_toReal.smul
+      (continuous_abs.measurable.mul k.continuous.norm.measurable)
+  refine hdom.mono' hmeas.aestronglyMeasurable (ae_of_all _ fun y ↦ ?_)
+  have hnn : 0 ≤ w y * (|y| * ‖k y‖) :=
+    mul_nonneg (hw0 y) (mul_nonneg (abs_nonneg y) (norm_nonneg _))
+  rw [ENNReal.toReal_ofReal (hw0 y), smul_eq_mul, Real.norm_of_nonneg hnn]
+  have h3nn : 0 ≤ ‖y‖ ^ 3 * ‖k y‖ := by positivity
+  by_cases hy : |y| ≤ 1
+  · rw [indicator_of_mem (show y ∈ Icc (-1 : ℝ) 1 from abs_le.mp hy), Real.rpow_two]
+    have h1 : w y * (|y| * ‖k y‖) ≤ w y * (|y| * (C₁ * |y|)) :=
+      mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_left (hC₁ y) (abs_nonneg y)) (hw0 y)
+    have h2 : w y * (|y| * (C₁ * |y|)) = C₁ * (|y| ^ 2 * w y) := by ring
+    linarith
+  · have hy1 : 1 ≤ |y| := (not_le.mp hy).le
+    have hmem : y ∉ Icc (-1 : ℝ) 1 := fun h ↦ hy (abs_le.mpr h)
+    rw [indicator_of_notMem hmem, mul_zero, zero_add]
+    have hw2 : w y ≤ y ^ 2 := realPWIntervalWeight_half_le_sq hs1 hy1
+    calc w y * (|y| * ‖k y‖) ≤ y ^ 2 * (|y| * ‖k y‖) :=
+          mul_le_mul_of_nonneg_right hw2 (mul_nonneg (abs_nonneg y) (norm_nonneg _))
+      _ = ‖y‖ ^ 3 * ‖k y‖ := by
+          rw [Real.norm_eq_abs, ← sq_abs y]
+          ring
+
+/-- The value of a finite sum of Schwartz functions at a point. -/
+private theorem schwartz_sum_apply {ι : Type*} (S : Finset ι) (ψ : ι → 𝓢(ℝ, ℂ)) (x : ℝ) :
+    (∑ n ∈ S, ψ n) x = ∑ n ∈ S, ψ n x := by
+  classical
+  induction S using Finset.induction_on with
+  | empty => simp
+  | insert a S ha ih => rw [Finset.sum_insert ha, Finset.sum_insert ha, add_apply, ih]
+
+/-- The square of a finite sum, written with the partial sums of the earlier terms. -/
+private theorem sq_sum_range_eq (v : ℕ → ℝ) (N : ℕ) :
+    (∑ n ∈ Finset.range N, v n) ^ 2 =
+      ∑ n ∈ Finset.range N, (v n ^ 2 + 2 * v n * ∑ m ∈ Finset.range n, v m) := by
+  induction N with
+  | zero => simp
+  | succ N ih =>
+    rw [Finset.sum_range_succ, Finset.sum_range_succ, ← ih]
+    ring
+
+private theorem sum_four_pow_le (n : ℕ) : ∑ m ∈ Finset.range n, (4 : ℝ) ^ m ≤ 4 ^ n := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    rw [Finset.sum_range_succ, pow_succ]
+    nlinarith [pow_pos (show (0 : ℝ) < 4 by norm_num) n]
+
+/-- The logarithmic factor of the dilation by `2 ^ n` is at most `n + 1` when `s ≤ 1`. -/
+private theorem dilationLogFactor_le (hs1 : s ≤ 1) (n : ℕ) :
+    (1 + Real.log ((2 : ℝ) ^ n) + Real.log ((2 : ℝ) ^ n) ^ 2) ^ (s / 2) ≤ n + 1 := by
+  have hl2 : Real.log 2 ≤ 1 := by
+    have := Real.log_le_sub_one_of_pos (show (0 : ℝ) < 2 by norm_num)
+    linarith
+  have hl0 : 0 ≤ Real.log 2 := Real.log_nonneg (by norm_num)
+  rw [Real.log_pow]
+  have hℓ0 : 0 ≤ (n : ℝ) * Real.log 2 := mul_nonneg (Nat.cast_nonneg n) hl0
+  have hℓn : (n : ℝ) * Real.log 2 ≤ n := by
+    have := mul_le_mul_of_nonneg_left hl2 (Nat.cast_nonneg (α := ℝ) n)
+    linarith
+  have hbase : 1 ≤ 1 + (n : ℝ) * Real.log 2 + ((n : ℝ) * Real.log 2) ^ 2 := by nlinarith
+  calc (1 + (n : ℝ) * Real.log 2 + ((n : ℝ) * Real.log 2) ^ 2) ^ (s / 2)
+      ≤ (1 + (n : ℝ) * Real.log 2 + ((n : ℝ) * Real.log 2) ^ 2) ^ ((1 : ℝ) / 2) :=
+        Real.rpow_le_rpow_of_exponent_le hbase (by linarith)
+    _ = Real.sqrt (1 + (n : ℝ) * Real.log 2 + ((n : ℝ) * Real.log 2) ^ 2) :=
+        (Real.sqrt_eq_rpow _).symm
+    _ ≤ Real.sqrt ((1 + (n : ℝ) * Real.log 2) ^ 2) := Real.sqrt_le_sqrt (by nlinarith)
+    _ = 1 + (n : ℝ) * Real.log 2 := Real.sqrt_sq (by linarith)
+    _ ≤ n + 1 := by linarith
+
+/-- At width one half, for `s ≤ 1`, there are even Schwartz functions of the band that vanish
+at the origin, have integral one, and have arbitrarily small weighted norm: the sum of the
+dilates by `2 ^ n` of one such function, with weights proportional to `1 / (n + 1)`. -/
+private theorem exists_small_unit_integral_half (hs : 0 ≤ s) (hs1 : s ≤ 1) (hY : 0 < Y)
+    {ε : ℝ} (hε : 0 < ε) :
+    ∃ κ : 𝓢(ℝ, ℂ), Function.Even (κ : ℝ → ℂ) ∧ (∀ ξ ∉ Icc (-Y) Y, (𝓕 κ) ξ = 0) ∧ κ 0 = 0 ∧
+      ∫ x, κ x = 1 ∧ MemLp (κ : ℝ → ℂ) 2 (realPWIntervalMeasure (1 / 2) s) ∧
+      ∫ x, ‖κ x‖ ^ 2 ∂realPWIntervalMeasure (1 / 2) s < ε := by
+  classical
+  let μ := realPWIntervalMeasure (1 / 2) s
+  have hα : (0 : ℝ) ≤ 1 / 2 := by norm_num
+  have hα' : (1 / 2 : ℝ) < 3 / 2 := by norm_num
+  obtain ⟨k, hke, hkb, hk0, hki⟩ := exists_evenSchwartz_band_zero_integral_one hY
+  obtain ⟨C₁, hC₁0, hC₁⟩ := exists_schwartz_norm_le_mul_abs k hk0
+  have hkm : MemLp (k : ℝ → ℂ) 2 μ := memLp_of_evenSchwartz_zero hα hα' hs k hke hk0
+  have hk2 : Integrable (fun x ↦ ‖k x‖ ^ 2) μ :=
+    (memLp_two_iff_integrable_sq_norm k.continuous.aestronglyMeasurable).mp hkm
+  have hk2c : Continuous fun y : ℝ ↦ ‖k y‖ ^ 2 := k.continuous.norm.pow 2
+  let Φ : ℝ → ℝ := fun y ↦ |y| * ‖k y‖
+  have hΦc : Continuous Φ := continuous_abs.mul k.continuous.norm
+  have hΦ0 : ∀ y, 0 ≤ Φ y := fun y ↦ mul_nonneg (abs_nonneg y) (norm_nonneg _)
+  have hΦi : Integrable Φ μ := integrable_abs_mul_norm_half hs hs1 k hC₁
+  let A₀ : ℝ := ∫ x, ‖k x‖ ^ 2 ∂μ
+  let I₁ : ℝ := ∫ y, Φ y ∂μ
+  have hA₀ : 0 ≤ A₀ := integral_nonneg fun _ ↦ sq_nonneg _
+  have hI₁ : 0 ≤ I₁ := integral_nonneg hΦ0
+  let K : ℝ := A₀ + 2 * C₁ * I₁
+  have hK : 0 ≤ K := add_nonneg hA₀ (mul_nonneg (mul_nonneg (by norm_num) hC₁0) hI₁)
+  obtain ⟨N, hN⟩ := (Real.tendsto_sum_range_one_div_nat_succ_atTop.eventually
+    (eventually_gt_atTop (K / ε))).exists
+  let H : ℝ := ∑ i ∈ Finset.range N, 1 / ((i : ℝ) + 1)
+  have hNH : K / ε < H := hN
+  have hH : 0 < H := lt_of_le_of_lt (div_nonneg hK hε.le) hNH
+  have hKH : K / H < ε := by
+    rw [div_lt_iff₀ hH]
+    rw [div_lt_iff₀ hε] at hNH
+    linarith [mul_comm ε H]
+  let t : ℕ → ℝ := fun n ↦ 2 ^ n
+  have ht1 (n : ℕ) : 1 ≤ t n := one_le_pow₀ (by norm_num)
+  have ht0 (n : ℕ) : 0 < t n := zero_lt_one.trans_le (ht1 n)
+  have ht2 (n : ℕ) : t n ^ 2 = 4 ^ n := by
+    change ((2 : ℝ) ^ n) ^ 2 = 4 ^ n
+    rw [← pow_mul, mul_comm, pow_mul]
+    norm_num
+  let a : ℕ → ℝ := fun n ↦ 1 / ((n : ℝ) + 1) / H
+  have hn1 (n : ℕ) : (0 : ℝ) < (n : ℝ) + 1 := by positivity
+  have ha0 (n : ℕ) : 0 ≤ a n := div_nonneg (div_nonneg zero_le_one (hn1 n).le) hH.le
+  have haH (n : ℕ) : a n * ((n : ℝ) + 1) = 1 / H := by
+    change 1 / ((n : ℝ) + 1) / H * ((n : ℝ) + 1) = 1 / H
+    have := (hn1 n).ne'
+    field_simp
+  have hasum : ∑ n ∈ Finset.range N, a n = 1 := by
+    change ∑ n ∈ Finset.range N, 1 / ((n : ℝ) + 1) / H = 1
+    rw [← Finset.sum_div]
+    exact div_self hH.ne'
+  let κ : ℕ → 𝓢(ℝ, ℂ) := fun n ↦ ((t n)⁻¹ : ℂ) • schwartzDilate (t n) (ht0 n).ne' k
+  have hκx (n : ℕ) (x : ℝ) : κ n x = ((t n)⁻¹ : ℂ) * k (x * (t n)⁻¹) := rfl
+  let F : 𝓢(ℝ, ℂ) := ∑ n ∈ Finset.range N, (a n : ℂ) • κ n
+  have hFx (x : ℝ) : F x = ∑ n ∈ Finset.range N, (a n : ℂ) * κ n x := by
+    change (∑ n ∈ Finset.range N, (a n : ℂ) • κ n) x = _
+    rw [schwartz_sum_apply]
+    rfl
+  have hFe : Function.Even (F : ℝ → ℂ) := fun x ↦ by
+    rw [hFx, hFx]
+    refine Finset.sum_congr rfl fun n _ ↦ ?_
+    rw [hκx, hκx, neg_mul, hke]
+  have hF0 : F 0 = 0 := by
+    rw [hFx]
+    refine Finset.sum_eq_zero fun n _ ↦ ?_
+    rw [hκx, zero_mul, hk0, mul_zero, mul_zero]
+  have hFb : ∀ ξ ∉ Icc (-Y) Y, (𝓕 F) ξ = 0 := by
+    refine Finset.sum_induction (fun n ↦ (a n : ℂ) • κ n)
+      (fun ψ : 𝓢(ℝ, ℂ) ↦ ∀ ξ ∉ Icc (-Y) Y, (𝓕 ψ) ξ = 0) ?_ ?_ ?_
+    · intro ψ₁ ψ₂ h1 h2 ξ hξ
+      rw [FourierTransform.fourier_add, add_apply, h1 ξ hξ, h2 ξ hξ, add_zero]
+    · intro ξ hξ
+      have h0 : (0 : 𝓢(ℝ, ℂ)) = (0 : ℂ) • k := (zero_smul ℂ k).symm
+      rw [h0, FourierTransform.fourier_smul, zero_smul]
+      rfl
+    · intro n _ ξ hξ
+      change (𝓕 ((a n : ℂ) • (((t n)⁻¹ : ℂ) • schwartzDilate (t n) (ht0 n).ne' k))) ξ = 0
+      rw [FourierTransform.fourier_smul, smul_apply, FourierTransform.fourier_smul, smul_apply,
+        schwartzDilate_band (ht1 n) hY.le k hkb ξ hξ, smul_zero, smul_zero]
+  have hκi (n : ℕ) : ∫ x, κ n x = 1 := by
+    have h1 : ∫ x, κ n x = ((t n)⁻¹ : ℂ) * ∫ x, schwartzDilate (t n) (ht0 n).ne' k x :=
+      integral_const_mul _ _
+    rw [h1, integral_schwartzDilate (ht0 n), hki, Complex.real_smul, mul_one,
+      ← Complex.ofReal_inv, ← Complex.ofReal_mul, inv_mul_cancel₀ (ht0 n).ne',
+      Complex.ofReal_one]
+  have hFi : ∫ x, F x = 1 := by
+    have h1 : ∫ x, F x = ∑ n ∈ Finset.range N, (a n : ℂ) * ∫ x, κ n x := by
+      simp only [hFx]
+      rw [integral_finsetSum _ fun n _ ↦ (κ n).integrable.const_mul _]
+      exact Finset.sum_congr rfl fun n _ ↦ integral_const_mul _ _
+    rw [h1]
+    simp only [hκi, mul_one]
+    rw [← Complex.ofReal_sum, hasum, Complex.ofReal_one]
+  have hFm : MemLp (F : ℝ → ℂ) 2 μ := memLp_of_evenSchwartz_zero hα hα' hs F hFe hF0
+  let u : ℕ → ℝ → ℝ := fun n x ↦ (t n)⁻¹ * ‖k (x * (t n)⁻¹)‖
+  have hκn (n : ℕ) (x : ℝ) : ‖κ n x‖ = u n x := by
+    rw [hκx, norm_mul, ← Complex.ofReal_inv, Complex.norm_real,
+      Real.norm_of_nonneg (inv_nonneg.mpr (ht0 n).le)]
+  have hu0 (n : ℕ) (x : ℝ) : 0 ≤ u n x :=
+    mul_nonneg (inv_nonneg.mpr (ht0 n).le) (norm_nonneg _)
+  have huL (n : ℕ) (x : ℝ) : u n x ≤ C₁ * |x| * ((t n)⁻¹) ^ 2 := by
+    have h := hC₁ (x * (t n)⁻¹)
+    rw [abs_mul, abs_of_pos (inv_pos.mpr (ht0 n))] at h
+    calc u n x ≤ (t n)⁻¹ * (C₁ * (|x| * (t n)⁻¹)) :=
+          mul_le_mul_of_nonneg_left h (inv_nonneg.mpr (ht0 n).le)
+      _ = C₁ * |x| * ((t n)⁻¹) ^ 2 := by ring
+  have hΦu (m : ℕ) (x : ℝ) : |x| * u m x = Φ (x * (t m)⁻¹) := by
+    change |x| * ((t m)⁻¹ * ‖k (x * (t m)⁻¹)‖) = |x * (t m)⁻¹| * ‖k (x * (t m)⁻¹)‖
+    rw [abs_mul, abs_of_pos (inv_pos.mpr (ht0 m))]
+    ring
+  let T : ℕ → ℝ → ℝ := fun n x ↦ a n ^ 2 * u n x ^ 2 +
+    2 * (a n * C₁ * ((t n)⁻¹) ^ 2) * ∑ m ∈ Finset.range n, a m * Φ (x * (t m)⁻¹)
+  have hpt (x : ℝ) : ‖F x‖ ^ 2 ≤ ∑ n ∈ Finset.range N, T n x := by
+    have h1 : ‖F x‖ ≤ ∑ n ∈ Finset.range N, a n * u n x := by
+      rw [hFx]
+      refine (norm_sum_le _ _).trans (le_of_eq (Finset.sum_congr rfl fun n _ ↦ ?_))
+      rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg (ha0 n), hκn]
+    have h2 := pow_le_pow_left₀ (norm_nonneg _) h1 2
+    rw [sq_sum_range_eq] at h2
+    refine h2.trans (Finset.sum_le_sum fun n _ ↦ ?_)
+    have h3 : (a n * u n x) * ∑ m ∈ Finset.range n, a m * u m x ≤
+        (a n * C₁ * ((t n)⁻¹) ^ 2) * ∑ m ∈ Finset.range n, a m * Φ (x * (t m)⁻¹) := by
+      rw [Finset.mul_sum, Finset.mul_sum]
+      refine Finset.sum_le_sum fun m _ ↦ ?_
+      rw [← hΦu m x]
+      have h4 : a n * u n x ≤ a n * (C₁ * |x| * ((t n)⁻¹) ^ 2) :=
+        mul_le_mul_of_nonneg_left (huL n x) (ha0 n)
+      calc a n * u n x * (a m * u m x)
+          ≤ a n * (C₁ * |x| * ((t n)⁻¹) ^ 2) * (a m * u m x) :=
+            mul_le_mul_of_nonneg_right h4 (mul_nonneg (ha0 m) (hu0 m x))
+        _ = a n * C₁ * ((t n)⁻¹) ^ 2 * (a m * (|x| * u m x)) := by ring
+    change (a n * u n x) ^ 2 + 2 * (a n * u n x) * ∑ m ∈ Finset.range n, a m * u m x ≤
+      a n ^ 2 * u n x ^ 2 +
+        2 * (a n * C₁ * ((t n)⁻¹) ^ 2) * ∑ m ∈ Finset.range n, a m * Φ (x * (t m)⁻¹)
+    rw [mul_pow]
+    linarith
+  have hexp (n : ℕ) : Real.exp (2 * (1 / 2) * Real.log (t n)) = t n := by
+    rw [show (2 : ℝ) * (1 / 2) * Real.log (t n) = Real.log (t n) by ring, Real.exp_log (ht0 n)]
+  have hD (n : ℕ) : (1 + Real.log (t n) + Real.log (t n) ^ 2) ^ (s / 2) ≤ (n : ℝ) + 1 :=
+    dilationLogFactor_le hs1 n
+  have hDnn (n : ℕ) : 0 ≤ (1 + Real.log (t n) + Real.log (t n) ^ 2) ^ (s / 2) := by
+    have := Real.log_nonneg (ht1 n)
+    positivity
+  have hu2 (n : ℕ) : Integrable (fun x ↦ u n x ^ 2) μ ∧
+      ∫ x, u n x ^ 2 ∂μ ≤ ((n : ℝ) + 1) * A₀ := by
+    obtain ⟨hi, hle⟩ := integrable_dilate_le hα hs (ht1 n) (fun y ↦ ‖k y‖ ^ 2) hk2c
+      (fun _ ↦ sq_nonneg _) hk2
+    have hfun : (fun x ↦ u n x ^ 2) = fun x ↦ ((t n)⁻¹) ^ 2 * ‖k (x * (t n)⁻¹)‖ ^ 2 :=
+      funext fun x ↦ mul_pow _ _ 2
+    rw [hfun]
+    refine ⟨hi.const_mul _, ?_⟩
+    rw [integral_const_mul]
+    rw [hexp n] at hle
+    have ht := (ht0 n).ne'
+    calc ((t n)⁻¹) ^ 2 * ∫ x, ‖k (x * (t n)⁻¹)‖ ^ 2 ∂μ
+        ≤ ((t n)⁻¹) ^ 2 * (t n * (1 + Real.log (t n) + Real.log (t n) ^ 2) ^ (s / 2) * t n * A₀) :=
+          mul_le_mul_of_nonneg_left hle (sq_nonneg _)
+      _ = (1 + Real.log (t n) + Real.log (t n) ^ 2) ^ (s / 2) * A₀ := by
+          field_simp
+      _ ≤ ((n : ℝ) + 1) * A₀ := mul_le_mul_of_nonneg_right (hD n) hA₀
+  have hΦm (m : ℕ) : Integrable (fun x ↦ Φ (x * (t m)⁻¹)) μ ∧
+      ∫ x, Φ (x * (t m)⁻¹) ∂μ ≤ t m ^ 2 * (((m : ℝ) + 1) * I₁) := by
+    obtain ⟨hi, hle⟩ := integrable_dilate_le hα hs (ht1 m) Φ hΦc hΦ0 hΦi
+    refine ⟨hi, hle.trans ?_⟩
+    rw [hexp m]
+    calc t m * (1 + Real.log (t m) + Real.log (t m) ^ 2) ^ (s / 2) * t m * I₁
+        = t m ^ 2 * ((1 + Real.log (t m) + Real.log (t m) ^ 2) ^ (s / 2) * I₁) := by ring
+      _ ≤ t m ^ 2 * (((m : ℝ) + 1) * I₁) :=
+          mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_right (hD m) hI₁) (sq_nonneg _)
+  have hSi (n : ℕ) : Integrable (fun x ↦ ∑ m ∈ Finset.range n, a m * Φ (x * (t m)⁻¹)) μ :=
+    integrable_finsetSum _ fun m _ ↦ (hΦm m).1.const_mul _
+  have hTi (n : ℕ) : Integrable (T n) μ :=
+    ((hu2 n).1.const_mul _).add ((hSi n).const_mul _)
+  have hTb (n : ℕ) : ∫ x, T n x ∂μ ≤ a n * (K / H) := by
+    have hsplit : ∫ x, T n x ∂μ = a n ^ 2 * ∫ x, u n x ^ 2 ∂μ +
+        2 * (a n * C₁ * ((t n)⁻¹) ^ 2) *
+          ∑ m ∈ Finset.range n, a m * ∫ x, Φ (x * (t m)⁻¹) ∂μ := by
+      change ∫ x, (a n ^ 2 * u n x ^ 2 +
+        2 * (a n * C₁ * ((t n)⁻¹) ^ 2) * ∑ m ∈ Finset.range n, a m * Φ (x * (t m)⁻¹)) ∂μ = _
+      rw [integral_add ((hu2 n).1.const_mul _) ((hSi n).const_mul _), integral_const_mul,
+        integral_const_mul, integral_finsetSum _ fun m _ ↦ (hΦm m).1.const_mul _]
+      congr 2
+      exact Finset.sum_congr rfl fun m _ ↦ integral_const_mul _ _
+    rw [hsplit]
+    have hfirst : a n ^ 2 * ∫ x, u n x ^ 2 ∂μ ≤ a n * (A₀ / H) := by
+      calc a n ^ 2 * ∫ x, u n x ^ 2 ∂μ ≤ a n ^ 2 * (((n : ℝ) + 1) * A₀) :=
+            mul_le_mul_of_nonneg_left (hu2 n).2 (sq_nonneg _)
+        _ = a n * (a n * ((n : ℝ) + 1)) * A₀ := by ring
+        _ = a n * (A₀ / H) := by rw [haH]; ring
+    have hsum : ∑ m ∈ Finset.range n, a m * ∫ x, Φ (x * (t m)⁻¹) ∂μ ≤ I₁ / H * t n ^ 2 := by
+      calc ∑ m ∈ Finset.range n, a m * ∫ x, Φ (x * (t m)⁻¹) ∂μ
+          ≤ ∑ m ∈ Finset.range n, I₁ / H * (4 : ℝ) ^ m := Finset.sum_le_sum fun m _ ↦ by
+            calc a m * ∫ x, Φ (x * (t m)⁻¹) ∂μ ≤ a m * (t m ^ 2 * (((m : ℝ) + 1) * I₁)) :=
+                  mul_le_mul_of_nonneg_left (hΦm m).2 (ha0 m)
+              _ = a m * ((m : ℝ) + 1) * I₁ * t m ^ 2 := by ring
+              _ = I₁ / H * 4 ^ m := by rw [haH, ht2]; ring
+        _ = I₁ / H * ∑ m ∈ Finset.range n, (4 : ℝ) ^ m := (Finset.mul_sum _ _ _).symm
+        _ ≤ I₁ / H * 4 ^ n :=
+            mul_le_mul_of_nonneg_left (sum_four_pow_le n) (div_nonneg hI₁ hH.le)
+        _ = I₁ / H * t n ^ 2 := by rw [ht2]
+    have hcoef : 0 ≤ 2 * (a n * C₁ * ((t n)⁻¹) ^ 2) :=
+      mul_nonneg (by norm_num) (mul_nonneg (mul_nonneg (ha0 n) hC₁0) (sq_nonneg _))
+    have hsecond : 2 * (a n * C₁ * ((t n)⁻¹) ^ 2) *
+        ∑ m ∈ Finset.range n, a m * ∫ x, Φ (x * (t m)⁻¹) ∂μ ≤ a n * (2 * C₁ * I₁ / H) := by
+      have ht := (ht0 n).ne'
+      calc 2 * (a n * C₁ * ((t n)⁻¹) ^ 2) * ∑ m ∈ Finset.range n, a m * ∫ x, Φ (x * (t m)⁻¹) ∂μ
+          ≤ 2 * (a n * C₁ * ((t n)⁻¹) ^ 2) * (I₁ / H * t n ^ 2) :=
+            mul_le_mul_of_nonneg_left hsum hcoef
+        _ = a n * (2 * C₁ * I₁ / H) := by
+            field_simp
+    calc a n ^ 2 * ∫ x, u n x ^ 2 ∂μ + 2 * (a n * C₁ * ((t n)⁻¹) ^ 2) *
+          ∑ m ∈ Finset.range n, a m * ∫ x, Φ (x * (t m)⁻¹) ∂μ
+        ≤ a n * (A₀ / H) + a n * (2 * C₁ * I₁ / H) := add_le_add hfirst hsecond
+      _ = a n * (K / H) := by
+          change _ = a n * ((A₀ + 2 * C₁ * I₁) / H)
+          ring
+  have hfinal : ∫ x, ‖F x‖ ^ 2 ∂μ ≤ K / H := by
+    calc ∫ x, ‖F x‖ ^ 2 ∂μ ≤ ∫ x, ∑ n ∈ Finset.range N, T n x ∂μ :=
+          integral_mono_of_nonneg (ae_of_all _ fun _ ↦ sq_nonneg _)
+            (integrable_finsetSum _ fun n _ ↦ hTi n) (ae_of_all _ hpt)
+      _ = ∑ n ∈ Finset.range N, ∫ x, T n x ∂μ := integral_finsetSum _ fun n _ ↦ hTi n
+      _ ≤ ∑ n ∈ Finset.range N, a n * (K / H) := Finset.sum_le_sum fun n _ ↦ hTb n
+      _ = K / H := by rw [← Finset.sum_mul, hasum, one_mul]
+  exact ⟨F, hFe, hFb, hF0, hFi, hFm, hfinal.trans_lt hKH⟩
+
+/-- If the band contains even Schwartz functions vanishing at the origin, with integral one and
+arbitrarily small norm, then the closure of the polar-free core contains every band vector
+given by an even Schwartz function of the band that vanishes at the origin. -/
+private theorem mem_closure_polarFreeCore_of_small (hs : 0 ≤ s)
+    (hsmall : ∀ ε : ℝ, 0 < ε → ∃ κ : 𝓢(ℝ, ℂ), Function.Even (κ : ℝ → ℂ) ∧
+      (∀ ξ ∉ Icc (-Y) Y, (𝓕 κ) ξ = 0) ∧ κ 0 = 0 ∧ ∫ x, κ x = 1 ∧
+      MemLp (κ : ℝ → ℂ) 2 (realPWIntervalMeasure α s) ∧
+      ∫ x, ‖κ x‖ ^ 2 ∂realPWIntervalMeasure α s < ε)
+    (g : 𝓢(ℝ, ℂ)) (he : Function.Even (g : ℝ → ℂ))
+    (hb : ∀ ξ ∉ Icc (-Y) Y, (𝓕 g) ξ = 0) (h0 : g 0 = 0)
+    (f : RealPWBand.space Y (volume_le_realPWIntervalMeasure α s hs))
+    (hf : (fun x ↦ RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure α s hs) x f) =
+      (g : ℝ → ℂ)) :
+    f ∈ closure (realPWBandPolarFreeCore Y α hs) := by
+  let hμ := volume_le_realPWIntervalMeasure α s hs
+  let μ := realPWIntervalMeasure α s
+  have hgm : MemLp (g : ℝ → ℂ) 2 μ := by
+    have hae := RealPWBand.evaluation_ae Y hμ (realPWIntervalMeasure_absolutelyContinuous α s) f
+    rw [hf] at hae
+    exact (Lp.memLp (f.val : Lp ℂ 2 μ)).ae_eq hae.symm
+  let c : ℂ := ∫ x, g x
+  rw [Metric.mem_closure_iff]
+  intro ε hε
+  have hden : 0 < ‖c‖ ^ 2 + 1 := by positivity
+  obtain ⟨κ, hκe, hκb, hκ0, hκi, hκm, hκs⟩ := hsmall (ε ^ 2 / (‖c‖ ^ 2 + 1))
+    (div_pos (sq_pos_of_pos hε) hden)
+  let gt : 𝓢(ℝ, ℂ) := g - c • κ
+  have hgtx (x : ℝ) : gt x = g x - c * κ x := rfl
+  have hgte : Function.Even (gt : ℝ → ℂ) := fun x ↦ by
+    rw [hgtx, hgtx, he x, hκe x]
+  have hgtb : ∀ ξ ∉ Icc (-Y) Y, (𝓕 gt) ξ = 0 := fun ξ hξ ↦ by
+    change (𝓕 (g - c • κ)) ξ = 0
+    rw [FourierTransform.fourier_sub, sub_apply, FourierTransform.fourier_smul, smul_apply,
+      hb ξ hξ, hκb ξ hξ, smul_zero, sub_zero]
+  have hgt0 : gt 0 = 0 := by rw [hgtx, h0, hκ0, mul_zero, sub_zero]
+  have hgti : ∫ x, gt x = 0 := by
+    have h1 : ∫ x, gt x = (∫ x, g x) - c * ∫ x, κ x := by
+      have h2 : Integrable (fun x ↦ c * κ x) := κ.integrable.const_mul c
+      rw [← integral_const_mul, ← integral_sub g.integrable h2]
+      rfl
+    rw [h1, hκi, mul_one, sub_self]
+  have hgtm : MemLp (gt : ℝ → ℂ) 2 μ := hgm.sub (hκm.const_smul c)
+  obtain ⟨ft, hft⟩ := RealPWBand.exists_evaluation_eq_of_weightedSchwartz Y gt hgte hgtb hμ hgtm
+  refine ⟨ft, ⟨gt, hgte, hgtb, hgt0, hgti, hft⟩, ?_⟩
+  have hdiff : (fun x ↦ RealPWBand.evaluation Y hμ x (f - ft)) = fun x ↦ c * κ x := by
+    funext x
+    rw [map_sub, congrFun hf x, congrFun hft x, hgtx, sub_sub_cancel]
+  have hnorm := norm_sq_realPWBand_of_evaluation_eq hs (f - ft) _ hdiff
+  have hpt (x : ℝ) : ‖c * κ x‖ ^ 2 = ‖c‖ ^ 2 * ‖κ x‖ ^ 2 := by rw [norm_mul, mul_pow]
+  have hlt : ‖f - ft‖ ^ 2 < ε ^ 2 := by
+    rw [hnorm]
+    simp only [hpt]
+    rw [integral_const_mul]
+    have hI0 : 0 ≤ ∫ x, ‖κ x‖ ^ 2 ∂realPWIntervalMeasure α s :=
+      integral_nonneg fun _ ↦ sq_nonneg _
+    calc ‖c‖ ^ 2 * ∫ x, ‖κ x‖ ^ 2 ∂realPWIntervalMeasure α s
+        ≤ ‖c‖ ^ 2 * (ε ^ 2 / (‖c‖ ^ 2 + 1)) := mul_le_mul_of_nonneg_left hκs.le (sq_nonneg _)
+      _ < ε ^ 2 := by
+          rw [← mul_div_assoc, div_lt_iff₀ hden]
+          nlinarith [sq_pos_of_pos hε, sq_nonneg ‖c‖]
+  rw [dist_eq_norm]
+  exact lt_of_pow_lt_pow_left₀ 2 hε.le hlt
+
+/-- Paper: Definition 11.2.1.1, pp. 487–488, as used in Theorem 12.4.1.1, pp. 514–519, for the
+real place of `ℚ` with the weight of (9.2.1.30). At width one half with `s ≤ 1`, the closure of
+the polar-free core contains every band vector that is represented by an even Schwartz function
+with Fourier transform in the band and vanishing at the origin, whatever its integral. As below
+width one half, the condition that the integral vanishes does not survive the closure.
+Reconstruction: The paper does not state this. -/
+theorem mem_closure_realPWBandPolarFreeCore_of_schwartz_half (hs : 0 ≤ s) (hs1 : s ≤ 1)
+    (hY : 0 < Y) (g : 𝓢(ℝ, ℂ)) (he : Function.Even (g : ℝ → ℂ))
+    (hb : ∀ ξ ∉ Icc (-Y) Y, (𝓕 g) ξ = 0) (h0 : g 0 = 0)
+    (f : RealPWBand.space Y (volume_le_realPWIntervalMeasure (1 / 2) s hs))
+    (hf : (fun x ↦ RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure (1 / 2) s hs) x f) =
+      (g : ℝ → ℂ)) :
+    f ∈ closure (realPWBandPolarFreeCore Y (1 / 2) hs) :=
+  mem_closure_polarFreeCore_of_small hs
+    (fun _ hε ↦ exists_small_unit_integral_half hs hs1 hY hε) g he hb h0 f hf
+
+/-- At width one half with `s ≤ 1` the closure of the polar-free core contains a band vector,
+represented by an even Schwartz function vanishing at the origin, whose integral is not zero. -/
+theorem exists_mem_closure_realPWBandPolarFreeCore_integral_ne_zero_half (hs : 0 ≤ s)
+    (hs1 : s ≤ 1) (hY : 0 < Y) :
+    ∃ (g : 𝓢(ℝ, ℂ)) (f : RealPWBand.space Y (volume_le_realPWIntervalMeasure (1 / 2) s hs)),
+      f ∈ closure (realPWBandPolarFreeCore Y (1 / 2) hs) ∧
+      (fun x ↦ RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure (1 / 2) s hs) x f) =
+        (g : ℝ → ℂ) ∧ g 0 = 0 ∧ ∫ x, g x ≠ 0 := by
+  obtain ⟨k, hke, hkb, hk0, hki⟩ := exists_evenSchwartz_band_zero_integral_one hY
+  have hkm : MemLp (k : ℝ → ℂ) 2 (realPWIntervalMeasure (1 / 2) s) :=
+    memLp_of_evenSchwartz_zero (by norm_num) (by norm_num) hs k hke hk0
+  obtain ⟨f, hf⟩ := RealPWBand.exists_evaluation_eq_of_weightedSchwartz Y k hke hkb
+    (volume_le_realPWIntervalMeasure (1 / 2) s hs) hkm
+  exact ⟨k, f, mem_closure_realPWBandPolarFreeCore_of_schwartz_half hs hs1 hY k hke hkb hk0 f hf,
+    hf, hk0, by rw [hki]; exact one_ne_zero⟩
+
+end CriticalEndpoint
 
 end RiemannMasullo.Isolated
