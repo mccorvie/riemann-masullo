@@ -317,6 +317,10 @@ on work that does not appear there.
   [`ATTRIBUTION.md`](RiemannMasullo/External/ATTRIBUTION.md) records, and a survey of his
   repository pointed the way to further proofs and to witnesses over ℚ for refutations of
   printed claims.
+- **John Harrison**'s [HOL Light](https://github.com/jrh13/hol-light) (BSD-style) includes a
+  formal proof of Baker's theorem on linear forms in logarithms, in its `Baker/` directory.
+  The bounds for linear forms in logarithms used under Theorem 7.3.3.4 are ported from it, as
+  [`ATTRIBUTION.md`](RiemannMasullo/External/ATTRIBUTION.md) records.
 - Five independent readings of the paper located gaps, some of them before the formalization
   reached those pages. [`ERRATA.md`](ERRATA.md) names them where an entry agrees with one or
   started from one, and agents that work on those pages are given them as leads to test.
