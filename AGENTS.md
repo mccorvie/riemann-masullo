@@ -203,10 +203,12 @@ Pontryagin duality, Haar measure on the adeles, nuclear operators and more), wit
 If the launcher's prompt names a directory of reference copies, those projects are there to read.
 They use other Lean versions, so nothing can be imported from them, but a proof can be ported.
 
-If you adapt a proof or definition from one of them, say so in the pull request and add a line
-to [`RiemannMasullo/External/ATTRIBUTION.md`](RiemannMasullo/External/ATTRIBUTION.md): the
-projects are Apache-2.0 or MIT, which require the credit (for MIT, name the notice kept in
-`RiemannMasullo/External/licenses/`). Do not copy from a project with no license.
+If you adapt or port a proof, a statement or a definition from one of them, or from a formal
+library in another proof assistant, say so in the pull request and add a line to
+[`RiemannMasullo/External/ATTRIBUTION.md`](RiemannMasullo/External/ATTRIBUTION.md) that names
+what it was ported from: the sources used so far are Apache-2.0, MIT or BSD-style, which
+require the credit (for MIT and BSD-style, name the notice kept in
+`RiemannMasullo/External/licenses/`). Do not copy or port from a project with no license.
 
 The launcher's prompt may also name a directory of outside documents about gaps in the paper
 and possible repairs, with an index by page. Nothing in them has been checked by this project.

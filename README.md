@@ -94,10 +94,12 @@ give it back.
 
 ## Status
 
-**Searching for repairs of the final gaps in the proof.** As of 24 November 2026, about 13,200
-theorems and 1,800 definitions are stated in Lean. In the chapters the trace formula rests on
-(Chapters 2–7 and 9–13, with Appendices A–D) all but fifteen of the theorems are proved. About ninety people have
-had pull requests merged, some 2,660 pull requests in all.
+**Searching for repairs of the final gaps in the proof.** The paper's author, Alessandro
+Masullo, is working with the project to fill in the remaining gaps. As of 24 November 2026,
+about 13,200 theorems and 1,800 definitions are stated in Lean. In the chapters the trace
+formula rests on (Chapters 2–7 and 9–13, with Appendices A–D) all but eight of the theorems
+are proved, as of 26 November. About ninety people have had pull requests merged, some 2,660
+pull requests in all.
 
 - **Those chapters are stated, and what could be proved is proved.** Where a
   printed argument did not work, the statement was repaired or proved by another route, and
@@ -107,18 +109,22 @@ had pull requests merged, some 2,660 pull requests in all.
   that are derived from it, use exactly one statement that has no proof: the cancellation of
   the zeros outside the strip in Theorem 12.5.1.1. It is proved in Lean that this cancellation,
   for every width, is equivalent to the main claim, so nothing weaker can supply it.
-- **Nine more open statements, off the main line.** Each is a named Lean statement, neither
-  proved nor refuted, and the Lean proof of the targets uses none of them. Five, under the
-  bases and traces of Chapters 7 and 10, are statements from which other theorems of the paper
-  are proved. Four, under §10.3, §10.4 and (12.5.1.4), are used by nothing else in Lean and are
-  not known to hold; they are kept in files that nothing imports.
+- **Four more open steps, off the main line (six Lean statements).** Each statement is a named
+  Lean theorem without proof, neither proved nor refuted, and the Lean proof of the targets
+  uses none of them. Three of the steps, under the bases and traces of Chapters 7 and 10, stand
+  as five statements from which other theorems of the paper are proved. The fourth, under
+  Theorem 10.4.3.5, is one statement that nothing else in Lean uses and that is not known to
+  hold; it is kept in a file that nothing imports. Open steps are counted by the step of the
+  paper; a step can stand in Lean as several smaller statements, each with its own issue, so
+  the number of statements can rise when a step is narrowed.
 - **Five proof steps that the manuscript does not state precisely enough to formalize,** in
   Chapters 7, 11 and 12. They have no Lean statement.
-- **Five classical inputs:** theorems of the literature that are stated in Lean and used, and
-  not proved there. The targets do not use them either.
-- **290 statements of the manuscript are proved false as printed.** Each is kept in Lean with
+- **One classical input:** a theorem of the literature that is stated in Lean and used, and
+  not proved there. The targets do not use it either. Five others were proved in Lean on 25
+  and 26 November.
+- **292 statements of the manuscript are proved false as printed.** Each is kept in Lean with
   a machine-checked proof of its negation, next to the corrected statement, which is proved.
-  Six more such proofs rest on a statement that is itself still open.
+  Four more such proofs rest on a statement that is itself still open.
 - The supplementary material (Chapters 8 and 14, Appendix E, §A.4, §B.7), on which the trace
   formula does not rest, is partly stated and proved, and is not being worked on.
 
@@ -136,15 +142,15 @@ corrected form and says so.
 
 Most findings in the paper's own constructions, in Chapters 5–7 and 10–12, also come with a
 repair. Twenty-eight steps had none when they were found, and later results use them;
-`ERRATA.md` lists them first. Sixteen of the twenty-eight have since been proved in Lean: by an
-argument that is not the paper's, from another of the steps, or, in one case, from a published
-theorem that is taken as known. Among them are the structure theorem for the spaces of adelic
+`ERRATA.md` lists them first. Seventeen of the twenty-eight have since been proved in Lean: by
+an argument that is not the paper's, or from another of the steps. Among them are the structure theorem for the spaces of adelic
 θ-functions (Theorem 5.2.1.1), the reverse inclusion of the global converse theorem (Theorem
 6.3.2.1) and the spectral and orbital Markushevich bases (§10.2, §11.2). `ERRATA.md` says for
 each by which route. The explicit formula of §B.4, which Chapter 12 quotes, is proved in full,
 with its local terms and normalizations recomputed.
 
-Twelve steps remain open, all in Chapters 7 and 10–12: the separate convergence in Theorem
+Eleven remain open (Theorem 12.4.1.1 accounts for two of them, under one issue), all in
+Chapters 7 and 10–12: the separate convergence in Theorem
 7.1.2.3 and the Paley–Wiener orbital bases of Theorem 7.3.3.4, which meet the same arithmetic
 question; the normalized bases and the trace-norm estimates of §10.2–10.4; the lifts of
 (11.3.1.3)–(11.3.1.4); and the steps of Chapter 12 that lead to the trace formula, where the
@@ -223,7 +229,7 @@ trace formula:
 | Wave | Paper | Status |
 |---|---|---|
 | 1 | Appendices A.1–A.3, A.5, C, D; then Chapters 2–3 (adelic θ-functions, idelic zeta functions) and, independently, Chapters 4 and 9 (periodic Schauder bases, Hardy–Sobolev spaces) | stated and proved |
-| 2 | Chapters 5–7, with Appendix B.1–B.6 | stated; proved except for the open steps of Chapter 7 ([open problems](https://github.com/mccorvie/riemann-masullo/issues/7349)) and one classical input in Chapter 5 |
+| 2 | Chapters 5–7, with Appendix B.1–B.6 | stated; proved except for the open steps of Chapter 7 ([open problems](https://github.com/mccorvie/riemann-masullo/issues/7349)) |
 | 3 | Chapters 10–12: the trace formula; then Chapter 13 | stated; proved except for the open steps of Chapters 10–12 ([open problems](https://github.com/mccorvie/riemann-masullo/issues/7349)) |
 | later | Chapters 8 and 14, Appendix E, A.4, B.7 | partly stated and proved; the trace formula does not rest on them |
 
