@@ -255,19 +255,21 @@ private theorem evaluation_eq_fourierInv (Y : ℝ) {μ : Measure ℝ} (hμ : vol
       _ = ∫ t, k t := by rw [← integral_add_compl measurableSet_Icc hk, hoff, add_zero]
       _ = _ := by rw [Real.fourierInv_eq']; simp only [k, F, Real.inner_apply, smul_eq_mul]
 
-/-- Evaluation on the real axis extends to an entire function for each band element. -/
+/-- Each canonical real evaluation representative extends to an entire function
+of exponential type at most `2πY`. -/
 theorem exists_entire_evaluation (Y : ℝ) (hY : 0 ≤ Y) {μ : Measure ℝ}
     (hμ : volume ≤ μ) (f : space Y hμ) :
-    ∃ g : ℂ → ℂ, Differentiable ℂ g ∧ ∀ x : ℝ, g x = evaluation Y hμ x f := by
-  obtain ⟨g, hg, htrace⟩ := exists_entire_fourierInv_of_band hY
-    (𝓕 (restrictL2 hμ f.val) : L2R) (spectrum_zero_off Y hμ f)
-  exact ⟨g, hg, fun x ↦ (htrace x).trans (evaluation_eq_fourierInv Y hμ f x).symm⟩
+    ∃ g : ℂ → ℂ, Differentiable ℂ g ∧ (∀ x : ℝ, g x = evaluation Y hμ x f) ∧
+      ∃ C : ℝ, 0 ≤ C ∧ ∀ z, ‖g z‖ ≤ C * Real.exp (2 * Real.pi * Y * ‖z‖) := by
+  obtain ⟨g, hg, htrace, hb⟩ := exists_entire_fourierInv_of_band hY
+    (spectrum_integrable Y hμ f).integrableOn (spectrum_zero_off Y hμ f)
+  exact ⟨g, hg, fun x ↦ (htrace x).trans (evaluation_eq_fourierInv Y hμ f x).symm, hb⟩
 
 /-- The canonical evaluation representative is real analytic at every point. -/
 theorem analyticOnNhd_evaluation (Y : ℝ) (hY : 0 ≤ Y) {μ : Measure ℝ}
     (hμ : volume ≤ μ) (f : space Y hμ) :
     AnalyticOnNhd ℝ (fun x ↦ evaluation Y hμ x f) univ := by
-  obtain ⟨g, hg, he⟩ := exists_entire_evaluation Y hY hμ f
+  obtain ⟨g, hg, he, _⟩ := exists_entire_evaluation Y hY hμ f
   rw [← funext he]
   intro x _
   exact ((hg.analyticAt (x : ℂ)).restrictScalars (𝕜 := ℝ)).comp_of_eq
@@ -347,10 +349,54 @@ theorem evaluation_even (Y : ℝ) {μ : Measure ℝ} (hμ : volume ≤ μ)
   exact congrFun (((he.comp continuous_neg).ae_eq_iff_eq volume he).mp
     (hneg.trans (href.trans hrep.symm))) x
 
+/-- A continuous even weighted L² function with spectrum in the interval is
+the pointwise canonical representative of a vector in the band. -/
+theorem exists_evaluation_eq_of_band (Y : ℝ) {μ : Measure ℝ} (hμ : volume ≤ μ)
+    {u : ℝ → ℂ} (hcont : Continuous u) (heven : Function.Even u) (hu : MemLp u 2 μ)
+    (hspec : ∀ᵐ t ∂volume.restrict (Icc (-Y) Y)ᶜ,
+      (𝓕 ((hu.mono_measure hμ).toLp u) : L2R) t = 0) :
+    ∃ f : space Y hμ, (fun x ↦ evaluation Y hμ x f) = u := by
+  let hu₂ := hu.mono_measure hμ
+  have hrestrict : restrictL2 hμ (hu.toLp u) = hu₂.toLp u := by
+    apply Lp.ext
+    exact (restrictL2_ae hμ (hu.toLp u)).trans
+      (((Measure.absolutelyContinuous_of_le hμ).ae_eq hu.coeFn_toLp).trans hu₂.coeFn_toLp.symm)
+  have hmem : hu.toLp u ∈ space Y hμ := by
+    constructor
+    · change outsideBand Y (restrictL2 hμ (hu.toLp u)) = 0
+      rw [hrestrict]
+      apply Lp.ext
+      filter_upwards [restrictL2_ae (μ := volume.restrict (Icc (-Y) Y)ᶜ)
+        Measure.restrict_le_self (𝓕 (hu₂.toLp u) : L2R), hspec,
+        Lp.coeFn_zero ℂ 2 (volume.restrict (Icc (-Y) Y)ᶜ)] with t ht hs hz
+      exact ht.trans (hs.trans hz.symm)
+    · change reflected (restrictL2 hμ (hu.toLp u)) - restrictL2 hμ (hu.toLp u) = 0
+      rw [hrestrict, sub_eq_zero]
+      apply Lp.ext
+      have hp := Measure.measurePreserving_neg (volume : Measure ℝ)
+      have hr := Lp.coeFn_compMeasurePreserving (hu₂.toLp u) hp
+      change (reflected (hu₂.toLp u) : ℝ → ℂ) =ᵐ[volume]
+        (fun t : ℝ ↦ (hu₂.toLp u) (-t)) at hr
+      filter_upwards [hr, hp.quasiMeasurePreserving.ae_eq_comp hu₂.coeFn_toLp,
+        hu₂.coeFn_toLp] with t ht hn hv
+      exact ht.trans (hn.trans ((heven t).trans hv.symm))
+  let f : space Y hμ := ⟨hu.toLp u, hmem⟩
+  refine ⟨f, ?_⟩
+  have h := evaluation_ordinary_ae Y hμ f
+  change (fun x ↦ evaluation Y hμ x f) =ᵐ[volume] restrictL2 hμ (hu.toLp u) at h
+  rw [hrestrict] at h
+  exact ((contDiff_evaluation Y hμ f 0).continuous.ae_eq_iff_eq volume hcont).mp
+    (h.trans hu₂.coeFn_toLp)
+
 /-- The Riesz vector representing point evaluation on the weighted band. -/
 @[no_expose] def evaluationVector (Y : ℝ) {μ : Measure ℝ} (hμ : volume ≤ μ) (x : ℝ) :
     space Y hμ :=
   (InnerProductSpace.toDual ℂ (space Y hμ)).symm (evaluation Y hμ x)
+
+/-- The Riesz identification sends the evaluation vector to point evaluation. -/
+theorem toDual_evaluationVector (Y : ℝ) {μ : Measure ℝ} (hμ : volume ≤ μ) (x : ℝ) :
+    InnerProductSpace.toDual ℂ (space Y hμ) (evaluationVector Y hμ x) = evaluation Y hμ x := by
+  simp only [evaluationVector, LinearIsometryEquiv.apply_symm_apply]
 
 /-- The evaluation vectors on the weighted band depend continuously on the point. -/
 theorem continuous_evaluationVector (Y : ℝ) {μ : Measure ℝ} (hμ : volume ≤ μ) :

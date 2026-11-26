@@ -478,18 +478,15 @@ private theorem intervalExtension_real (A : ℝ) (F : ℝ → ℂ) (x : ℝ) :
       ring
     · simp [ht]
 
-/-- The inverse Fourier integral of an L² spectrum supported almost everywhere on
-`[-A,A]` admits an entire representative, with pointwise agreement on the real axis. -/
-theorem exists_entire_fourierInv_of_band {A : ℝ} (hA : 0 ≤ A)
-    (F : Lp ℂ 2 (volume : Measure ℝ))
+/-- An inverse Fourier integral supported on `[-A,A]` extends to an entire
+function of exponential type at most `2πA`. -/
+theorem exists_entire_fourierInv_of_band {A : ℝ} (hA : 0 ≤ A) {F : ℝ → ℂ}
+    (hF : IntegrableOn F (Ioo (-A) A))
     (hzero : ∀ᵐ t ∂volume.restrict (Icc (-A) A)ᶜ, F t = 0) :
-    ∃ g : ℂ → ℂ, Differentiable ℂ g ∧ ∀ x : ℝ, g x = 𝓕⁻ (F : ℝ → ℂ) x := by
+    ∃ g : ℂ → ℂ, Differentiable ℂ g ∧ (∀ x : ℝ, g x = 𝓕⁻ F x) ∧
+      ∃ C : ℝ, 0 ≤ C ∧ ∀ z, ‖g z‖ ≤ C * Real.exp (2 * Real.pi * A * ‖z‖) := by
   let J := Ioo (-A) A
-  have : IsFiniteMeasure (volume.restrict J) := isFiniteMeasure_restrict.mpr (by
-    dsimp [J]; rw [Real.volume_Ioo]; exact ENNReal.ofReal_ne_top)
-  have hF : MemLp (F : ℝ → ℂ) 2 (volume.restrict J) :=
-    (Lp.memLp F).mono_measure Measure.restrict_le_self
-  have he : J.indicator (F : ℝ → ℂ) =ᵐ[volume] (F : ℝ → ℂ) := by
+  have he : J.indicator F =ᵐ[volume] F := by
     filter_upwards [(ae_restrict_iff' measurableSet_Icc.compl).1 hzero,
       volume.ae_ne A, volume.ae_ne (-A)] with t ht htA hta
     by_cases h : t ∈ J
@@ -499,13 +496,34 @@ theorem exists_entire_fourierInv_of_band {A : ℝ} (hA : 0 ≤ A)
       intro hm
       exact h ⟨lt_of_le_of_ne hm.1 (Ne.symm hta), lt_of_le_of_ne hm.2 htA⟩
   refine ⟨fun z ↦ intervalExtension A F (((2 * Real.pi : ℝ) : ℂ) * z),
-    (intervalExtension_diff hA (hF.integrable one_le_two)).comp (differentiable_id.const_mul _), ?_⟩
-  intro x
-  change intervalExtension A F (((2 * Real.pi : ℝ) : ℂ) * (x : ℂ)) = 𝓕⁻ (F : ℝ → ℂ) x
-  rw [← ofReal_mul, intervalExtension_real, Real.fourierInv_eq', Real.fourierInv_eq']
-  apply integral_congr_ae
-  filter_upwards [he] with t ht
-  rw [ht]
+    (intervalExtension_diff hA hF).comp (differentiable_id.const_mul _), ?_,
+    ∫ t in J, ‖F t‖, integral_nonneg (fun _ ↦ norm_nonneg _), ?_⟩
+  · intro x
+    change intervalExtension A F (((2 * Real.pi : ℝ) : ℂ) * (x : ℂ)) = 𝓕⁻ F x
+    rw [← ofReal_mul, intervalExtension_real, Real.fourierInv_eq', Real.fourierInv_eq']
+    apply integral_congr_ae
+    filter_upwards [he] with t ht
+    rw [ht]
+  · intro z
+    have hb := intervalExtension_bound hF (((2 * Real.pi : ℝ) : ℂ) * z)
+    rwa [norm_mul, Complex.norm_real, Real.norm_of_nonneg (by positivity : 0 ≤ 2 * Real.pi),
+      ← mul_assoc, mul_comm A (2 * Real.pi)] at hb
+
+/-- An entire function of exponential type at most `2πY` with square-integrable
+real trace has its L² Fourier spectrum supported on `[-Y,Y]`. -/
+theorem fourier_trace_zero_off_interval {Y C : ℝ} (hY : 0 ≤ Y) (hC : 0 ≤ C)
+    {f : ℂ → ℂ} (hf : Differentiable ℂ f)
+    (hb : ∀ z, ‖f z‖ ≤ C * Real.exp (2 * Real.pi * Y * ‖z‖))
+    (h₂ : MemLp (fun x : ℝ ↦ f x) 2) :
+    ∀ᵐ t ∂volume.restrict (Icc (-Y) Y)ᶜ,
+      (𝓕 (h₂.toLp (fun x : ℝ ↦ f x)) : Lp ℂ 2) t = 0 := by
+  apply (ae_restrict_iff' measurableSet_Icc.compl).2
+  have hτ : 0 < 2 * Real.pi := by positivity
+  filter_upwards [fourier_trace_support hf (mul_nonneg hτ.le hY) hC hb h₂] with t ht
+  intro h
+  apply ht
+  rw [abs_mul, abs_of_pos hτ]
+  exact mul_lt_mul_of_pos_left (lt_of_not_ge fun he ↦ h (abs_le.mp he)) hτ
 
 /-- An inverse transform reproduces against an integrable kernel whose inverse
 transform is one almost everywhere on the nonzero frequencies of the density. -/

@@ -8,7 +8,7 @@ import Mathlib.Analysis.SpecialFunctions.JapaneseBracket
 public noncomputable section
 
 open Filter MeasureTheory
-open scoped Topology SchwartzMap
+open scoped ENNReal Topology SchwartzMap
 
 namespace RiemannMasullo.Isolated
 
@@ -94,30 +94,88 @@ theorem realPWIntervalWeight_translation_envelope {α s : ℝ} (ha : 0 ≤ α) (
       _ = (2:ℝ)^N * (1+|t|)^N := mul_pow _ _ _
       _ ≤ _ := mul_le_mul_of_nonneg_right (le_max_right _ _) (by positivity)
 
-/-- A fixed positive dilation has bounded weight distortion on the positive tail. -/
-theorem realPWIntervalWeight_dilation_ratio {α s a : ℝ} (ha : 0 ≤ α) (hs : 0 ≤ s)
-    (h : 0 < a) : ∃ C : ℝ, ∀ᶠ x : ℝ in atTop,
-      realPWIntervalWeight α s x / realPWIntervalWeight α s (a*x) ≤ C := by
-  let D := 2*(1 + Real.log a ^ 2)
-  refine ⟨(a ^ (2*α))⁻¹ * D ^ (s/2), ?_⟩
-  filter_upwards [eventually_ge_atTop (max 1 (1/a))] with x hx
-  have hx1 := (le_max_left _ _).trans hx
-  have hx0 : 0 < x := by linarith
-  have hy : 1 ≤ a*x := by
-    simpa [mul_comm] using (div_le_iff₀ h).mp ((le_max_right _ _).trans hx)
-  have hlog := Real.log_mul h.ne' hx0.ne'
-  have hpoly : 1 + Real.log x ^ 2 ≤ D * (1 + Real.log (a*x) ^ 2) := by
-    dsimp [D]
-    nlinarith [sq_nonneg (Real.log (a*x) + Real.log a),
-      sq_nonneg (Real.log a * Real.log (a*x)),
-      show Real.log x ^ 2 = (Real.log (a*x) - Real.log a)^2 by rw [hlog]; ring]
-  have hb := Real.rpow_le_rpow (by positivity) hpoly (show 0 ≤ s/2 by positivity)
-  rw [Real.mul_rpow (by dsimp [D]; positivity) (by positivity)] at hb
-  rw [weight_at_large ha hx1, weight_at_large ha hy, Real.mul_rpow h.le hx0.le]
-  apply (div_le_iff₀ (by positivity)).2
-  calc
-    _ ≤ _ := mul_le_mul_of_nonneg_left hb (Real.rpow_nonneg hx0.le _)
-    _ = _ := by field_simp [ne_of_gt (Real.rpow_pos_of_pos h (2*α))]
+private theorem weight_in_log_coordinates (α s x : ℝ) :
+    realPWIntervalWeight α s x = Real.exp (abs (2 * α * Real.log (abs x))) *
+      (1 + Real.log |x| ^ 2) ^ (s / 2) := by
+  rw [Real.rpow_def_of_pos (by positivity : 0 < 1 + Real.log |x| ^ 2),
+    mul_comm (Real.log (1 + Real.log |x| ^ 2)) (s / 2)]
+  simp only [realPWIntervalWeight, abs_eq_max_neg (a := 2 * α * Real.log |x|),
+    Real.exp_monotone.map_max]
+
+/-- Global distortion under positive dilation, for either sign of the strip parameter. -/
+theorem realPWIntervalWeight_le_dilation {α s a : ℝ} (hs : 0 ≤ s) (ha : 0 < a) (x : ℝ) :
+    realPWIntervalWeight α s x ≤
+      (Real.exp (2 * |α * Real.log a|) * (1 + |Real.log a| + Real.log a ^ 2) ^ (s / 2)) *
+        realPWIntervalWeight α s (a * x) := by
+  let D := 1 + |Real.log a| + Real.log a ^ 2
+  have hD : 1 ≤ D := by dsimp [D]; nlinarith [abs_nonneg (Real.log a), sq_nonneg (Real.log a)]
+  have hs' : 0 ≤ s / 2 := by positivity
+  by_cases hx : x = 0
+  · subst x
+    simpa [realPWIntervalWeight, D] using
+      one_le_mul_of_one_le_of_one_le (Real.one_le_exp (by positivity : 0 ≤ 2 * |α * Real.log a|))
+        (Real.one_le_rpow hD hs')
+  let t := Real.log |x|
+  let b := Real.log |a * x|
+  let c := Real.log a
+  have hbc : b = c + t := by
+    dsimp [b, c, t]
+    rw [abs_mul, abs_of_pos ha, Real.log_mul ha.ne' (abs_ne_zero.mpr hx)]
+  have habs : |2 * α * t| ≤ 2 * |α * c| + |2 * α * b| := by
+    calc
+      _ = |-(2 * (α * c)) + 2 * α * b| := by rw [hbc]; congr 1; ring
+      _ ≤ |-(2 * (α * c))| + |2 * α * b| := abs_add_le _ _
+      _ = _ := by rw [abs_neg, abs_mul, abs_of_nonneg (by norm_num : (0:ℝ) ≤ 2)]
+  have he := Real.exp_monotone habs
+  rw [Real.exp_add] at he
+  have hpoly : 1 + t ^ 2 ≤ D * (1 + b ^ 2) := by
+    change 1 + t ^ 2 ≤ (1 + |c| + c ^ 2) * (1 + b ^ 2)
+    have hb : 2 * |b| ≤ 1 + b ^ 2 := by nlinarith [sq_nonneg (|b| - 1), sq_abs b]
+    have hcross : -(2 * b * c) ≤ |c| * (1 + b ^ 2) := calc
+      _ ≤ |2 * b * c| := neg_le_abs _
+      _ = (2 * |b|) * |c| := by rw [abs_mul, abs_mul, abs_of_nonneg (by norm_num : (0 : ℝ) ≤ 2)]
+      _ ≤ (1 + b ^ 2) * |c| := mul_le_mul_of_nonneg_right hb (abs_nonneg c)
+      _ = _ := mul_comm _ _
+    nlinarith only [hcross, mul_nonneg (sq_nonneg b) (sq_nonneg c),
+      show t ^ 2 = (b - c) ^ 2 by rw [hbc]; ring]
+  have hp := Real.rpow_le_rpow (by positivity) hpoly hs'
+  rw [Real.mul_rpow (by linarith : 0 ≤ D) (by positivity)] at hp
+  rw [weight_in_log_coordinates, weight_in_log_coordinates]
+  change Real.exp (|2 * α * t|) * (1 + t ^ 2) ^ (s / 2) ≤
+    (Real.exp (2 * |α * c|) * D ^ (s / 2)) * (Real.exp (|2 * α * b|) * (1 + b ^ 2) ^ (s / 2))
+  exact (mul_le_mul he hp (by positivity) (by positivity)).trans_eq (by ring)
+
+/-- Dilation preserves weighted `MemLp`, including at the endpoint exponents. -/
+theorem memLp_realPWIntervalMeasure_dilation {α s a : ℝ} (hs : 0 ≤ s) (ha : 0 < a)
+    {p : ℝ≥0∞} {f : ℝ → ℂ} (hf : MemLp f p (realPWIntervalMeasure α s)) :
+    MemLp (fun x ↦ f (a * x)) p (realPWIntervalMeasure α s) := by
+  let C := Real.exp (2 * |α * Real.log a|) * (1 + |Real.log a| + Real.log a ^ 2) ^ (s / 2)
+  let W := fun x ↦ ENNReal.ofReal (realPWIntervalWeight α s x)
+  have hC : 0 ≤ C := by dsimp [C]; positivity
+  have hW : Measurable W := (measurable_realPWIntervalWeight α s).ennreal_ofReal
+  have hmul : Measurable (a * ·) := measurable_const_mul a
+  let k := ENNReal.ofReal C * ENNReal.ofReal |a⁻¹|
+  have hmap : Measure.map (a * ·) (realPWIntervalMeasure α s) ≤ k • realPWIntervalMeasure α s := by
+    apply Measure.le_iff.mpr
+    intro S hS
+    rw [Measure.map_apply hmul hS, smul_apply, realPWIntervalMeasure,
+      withDensity_apply _ (hmul hS), withDensity_apply _ hS]
+    change (∫⁻ x in (a * ·) ⁻¹' S, W x) ≤ k * ∫⁻ x in S, W x
+    calc
+      _ ≤ ∫⁻ x in (a * ·) ⁻¹' S, ENNReal.ofReal C * W (a * x) := by
+        apply lintegral_mono
+        intro x
+        change ENNReal.ofReal (realPWIntervalWeight α s x) ≤
+          ENNReal.ofReal C * ENNReal.ofReal (realPWIntervalWeight α s (a * x))
+        rw [← ENNReal.ofReal_mul hC]
+        exact ENNReal.ofReal_le_ofReal (realPWIntervalWeight_le_dilation hs ha x)
+      _ = ENNReal.ofReal C * ∫⁻ y in S, W y ∂Measure.map (a * ·) volume := by
+        rw [setLIntegral_map hS hW hmul]
+        exact lintegral_const_mul _ (hW.comp hmul)
+      _ = _ := by
+        rw [Real.map_volume_mul_left ha.ne', setLIntegral_smul_measure, smul_eq_mul, ← mul_assoc]
+  exact ((hf.smul_measure (c := k) (by dsimp [k]; finiteness)).mono_measure hmap).comp_of_map
+    hmul.aemeasurable
 
 /-- A Schwartz kernel times the square-root translation distortion has an explicit
 square-integrable envelope, independent of the packet center. -/
@@ -149,5 +207,56 @@ theorem schwartz_realPWIntervalWeight_L2_envelope {α s : ℝ}
   calc
     _ = |C| * ((1+|t|)^(N+1) * ‖K t‖) := by rw [pow_succ]; ring
     _ ≤ B := mul_le_mul_of_nonneg_left hk (abs_nonneg C)
+
+/-- A dilation converging to one changes the interval density by a ratio tending
+to one, uniformly with respect to the arguments being dilated. -/
+theorem tendsto_realPWIntervalWeight_div_of_dilation_tendsto_one {ι : Type*} {l : Filter ι}
+    {α s : ℝ} (hs : 0 ≤ s) {a x : ι → ℝ} (ha : Tendsto a l (𝓝 1)) :
+    Tendsto (fun i ↦ realPWIntervalWeight α s (x i) /
+      realPWIntervalWeight α s (a i * x i)) l (𝓝 1) := by
+  let w := realPWIntervalWeight α s
+  let D (a : ℝ) := Real.exp (2 * |α * Real.log a|) *
+    (1 + |Real.log a| + Real.log a ^ 2) ^ (s / 2)
+  have hlog : ContinuousAt Real.log 1 := Real.continuousAt_log (by norm_num)
+  have hc : ContinuousAt (fun _ : ℝ ↦ (1 : ℝ)) 1 := continuousAt_const
+  have hpow : ContinuousAt (fun a : ℝ ↦ (1 + |Real.log a| + Real.log a ^ 2) ^ (s / 2)) 1 :=
+    ((hc.add hlog.abs).add (hlog.pow 2)).rpow_const (Or.inr (by positivity))
+  have hD : ContinuousAt D 1 :=
+    (Real.continuous_exp.continuousAt.comp ((hlog.const_mul α).abs.const_mul 2)).mul hpow
+  have hD₁ : D 1 = 1 := by simp [D]
+  have hpos (a : ℝ) : 0 < D a := by dsimp [D]; positivity
+  have hw (a : ℝ) : 0 < w a := zero_lt_one.trans_le (one_le_realPWIntervalWeight α s hs a)
+  have hu : Tendsto (fun i ↦ D (a i)) l (𝓝 1) := by
+    change Tendsto (D ∘ a) l (𝓝 1)
+    rw [← hD₁]
+    exact hD.tendsto.comp ha
+  have hai : Tendsto (fun i ↦ (a i)⁻¹) l (𝓝 1) := by simpa using ha.inv₀ (by norm_num)
+  have hl₀ : Tendsto (fun i ↦ D ((a i)⁻¹)) l (𝓝 1) := by
+    change Tendsto (D ∘ fun i ↦ (a i)⁻¹) l (𝓝 1)
+    rw [← hD₁]
+    exact hD.tendsto.comp hai
+  have hl : Tendsto (fun i ↦ (D ((a i)⁻¹))⁻¹) l (𝓝 1) := by
+    simpa only [inv_one] using hl₀.inv₀ (by norm_num)
+  refine tendsto_of_tendsto_of_tendsto_of_le_of_le' hl hu ?_ ?_
+  · filter_upwards [(tendsto_order.1 ha).1 0 zero_lt_one] with i hi
+    apply (le_div_iff₀ (hw _)).2
+    rw [mul_comm, ← div_eq_mul_inv]
+    apply (div_le_iff₀ (hpos _)).2
+    have h := realPWIntervalWeight_le_dilation (α := α) hs (inv_pos.mpr hi) (a i * x i)
+    rw [← mul_assoc, inv_mul_cancel₀ hi.ne', one_mul] at h
+    exact h.trans_eq (mul_comm _ _)
+  · filter_upwards [(tendsto_order.1 ha).1 0 zero_lt_one] with i hi
+    exact (div_le_iff₀ (hw _)).2 (realPWIntervalWeight_le_dilation hs hi _)
+
+/-- Translation by any fixed displacement has asymptotically unit weight ratio. -/
+theorem tendsto_realPWIntervalWeight_translation_ratio (α s t : ℝ) (hs : 0 ≤ s) :
+    Tendsto (fun x ↦ realPWIntervalWeight α s x /
+      realPWIntervalWeight α s (x + t)) atTop (𝓝 1) := by
+  have h : Tendsto (fun x : ℝ ↦ t / x) atTop (𝓝 0) := tendsto_id.const_div_atTop _
+  have ha : Tendsto (fun x : ℝ ↦ 1 + t / x) atTop (𝓝 1) := by simpa using h.const_add 1
+  refine (tendsto_realPWIntervalWeight_div_of_dilation_tendsto_one (α := α) hs (x := id) ha).congr' ?_
+  filter_upwards [eventually_gt_atTop (0 : ℝ)] with x hx
+  have hmul : (1 + t / x) * x = x + t := by field_simp [hx.ne']
+  simp only [id_eq, hmul]
 
 end RiemannMasullo.Isolated

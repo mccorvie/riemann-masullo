@@ -135,6 +135,28 @@ private theorem measurable_sharpIntervalMask (L : ℝ) : Measurable (sharpInterv
 private theorem norm_sharpIntervalMask_le (L x : ℝ) : ‖sharpIntervalMask L x‖ ≤ 1 := by
   by_cases h : x ∈ Icc (-L) L <;> simp [sharpIntervalMask, h]
 
+/-- The smoothed mask is bounded by the L¹ norm of its smoothing kernel. -/
+theorem norm_smoothIntervalMask_le {η : ℝ → ℂ} (hη : Integrable η) (L x : ℝ) :
+    ‖smoothIntervalMask η L x‖ ≤ ∫ t, ‖η t‖ := by
+  let k (t : ℝ) := η t * sharpIntervalMask L (x - t)
+  have hm : AEStronglyMeasurable k volume := hη.aestronglyMeasurable.mul
+    ((measurable_sharpIntervalMask L).comp (measurable_const.sub measurable_id)).aestronglyMeasurable
+  have hb : ∀ᵐ t ∂volume, ‖k t‖ ≤ ‖η t‖ := ae_of_all _ fun t ↦ by
+    change ‖η t * sharpIntervalMask L (x - t)‖ ≤ ‖η t‖
+    rw [norm_mul]
+    exact mul_le_of_le_one_right (norm_nonneg _) (norm_sharpIntervalMask_le L (x - t))
+  change ‖∫ t, k t‖ ≤ _
+  exact (norm_integral_le_integral_norm _).trans
+    (integral_mono_ae (hη.norm.mono' hm hb).norm hη.norm hb)
+
+/-- Convolution with a Schwartz kernel gives a continuous interval mask. -/
+theorem continuous_smoothIntervalMask (η : 𝓢(ℝ, ℂ)) (L : ℝ) :
+    Continuous (smoothIntervalMask η L) := by
+  have hb : BddAbove (Set.range fun x ↦ ‖η x‖) :=
+    ⟨SchwartzMap.seminorm ℝ 0 0 η, by rintro _ ⟨x, rfl⟩; exact η.norm_le_seminorm ℝ x⟩
+  exact hb.continuous_convolution_left_of_integrable
+    (ContinuousLinearMap.mul ℂ ℂ) η.continuous (integrable_sharpIntervalMask L)
+
 private theorem norm_sharpIntervalMask_sub_le (L x y : ℝ) :
     ‖sharpIntervalMask L x - sharpIntervalMask L y‖ ≤ 1 := by
   by_cases hx : x ∈ Icc (-L) L <;> by_cases hy : y ∈ Icc (-L) L <;>
