@@ -40,8 +40,8 @@ For `1 / 2 ≤ α < 5 / 2` the Schwartz functions of the band are still dense
 Reconstruction: The paper does not state this. The core is that of the order-zero model of the
 rational real place.
 
-Not treated here: `α ≥ 5 / 2`, where band vectors vanish to higher order at the origin and
-further moments become continuous. -/
+Not treated here: `α ≥ 5 / 2`, where band vectors vanish to higher order at the origin and the
+bound `C x ^ 2` no longer suffices for the density. -/
 
 public noncomputable section
 
