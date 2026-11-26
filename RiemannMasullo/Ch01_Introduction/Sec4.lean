@@ -11,6 +11,7 @@ import RiemannMasullo.External.Grh.Lemmas.AnalyticGoodHeightDisk
 import RiemannMasullo.External.Grh.Lemmas.LogLossGoodHeight
 import RiemannMasullo.Ch12_TraceGeometric.Sec5
 import Mathlib.Analysis.Complex.Poisson
+import Mathlib.Analysis.Calculus.IteratedDeriv.Lemmas
 import Mathlib.Analysis.Normed.Module.MultipliableUniformlyOn
 import Mathlib.Analysis.Calculus.LogDerivUniformlyOn
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gamma.DigammaIntegral
@@ -3911,6 +3912,268 @@ private theorem introTraceApprox_spectral_differentiable_parts {f : ℝ → ℂ}
         have : T * D2 * (b - a) ≤ T * max D0 D2 * (b - a) := by gcongr; exact le_max_right _ _
         have hss : 0 ≤ ‖s‖ * ‖s + 1‖ := by positivity
         nlinarith
+
+/-- On an interval of length 2/c, the cutoff has bounded size and its second derivative
+is bounded by a constant times c. Vanishing of the profile at one supplies one factor of 1/c. -/
+private theorem introTrace_shrinking_mellin_bound_profile
+    (f b : ℝ → ℂ) (hf : ContDiff ℝ (⊤ : ℕ∞) f) (hb : ContDiff ℝ (⊤ : ℕ∞) b)
+    {P Q : ℝ} (hP0 : 0 ≤ P) (hQ0 : 0 ≤ Q)
+    (hP : ∀ i : ℕ, i ≤ 2 → ∀ x ∈ Icc (1 / 2 : ℝ) (3 / 2), ‖iteratedDeriv i f x‖ ≤ P)
+    (hQ : ∀ i : ℕ, i ≤ 2 → ∀ x, ‖iteratedDeriv i b x‖ ≤ Q)
+    (hsb : tsupport b ⊆ Ioo (-1 : ℝ) 1) (hf1 : f 1 = 0) :
+    ∀ c : ℝ, 4 ≤ c →
+      let v (x : ℝ) := f x * b (c * (x - 1))
+      ContDiff ℝ 2 v ∧ tsupport v ⊆ Ioo (1 - c⁻¹) (1 + c⁻¹) ∧
+      ∀ x ∈ Icc (1 - c⁻¹) (1 + c⁻¹), ‖v x‖ ≤ 4 * P * Q ∧ ‖deriv (deriv v) x‖ ≤ 4 * P * Q * c := by
+  intro c hc v
+  have hc0 : 0 < c := by linarith
+  have hc1 : 1 ≤ c := by linarith
+  have hcI : c * c⁻¹ = 1 := mul_inv_cancel₀ hc0.ne'
+  let g (t : ℝ) := b (c * (t - 1))
+  have hg : ContDiff ℝ (⊤ : ℕ∞) g := hb.comp (contDiff_const.mul (contDiff_id.sub contDiff_const))
+  have hgd (i : ℕ) (hi : i ≤ 2) (x : ℝ) : ‖iteratedDeriv i g x‖ ≤ c ^ i * Q := by
+    have he : iteratedDeriv i g x = c ^ i • iteratedDeriv i b (c * (x - 1)) := by
+      change iteratedDeriv i (fun t : ℝ ↦ (fun y : ℝ ↦ b (c * y)) (t - 1)) x = _
+      exact (congrFun (iteratedDeriv_comp_sub_const i (fun y : ℝ ↦ b (c * y)) 1) x).trans
+        (congrFun (iteratedDeriv_comp_const_smul (hb.of_le (by simp) : ContDiff ℝ i b) c) (x - 1))
+    rw [he, norm_smul, Real.norm_eq_abs, abs_of_nonneg (pow_nonneg hc0.le _)]
+    exact mul_le_mul_of_nonneg_left (hQ i hi _) (pow_nonneg hc0.le _)
+  have hs : tsupport v ⊆ (fun t : ℝ ↦ c * (t - 1)) ⁻¹' tsupport b := by
+    refine closure_minimal (fun x hx ↦ subset_tsupport _ (right_ne_zero_of_mul hx)) ?_
+    exact (isClosed_tsupport _).preimage (continuous_const.mul (continuous_id.sub continuous_const))
+  refine ⟨(hf.mul hg).of_le (by simp), fun x hx ↦ ?_, fun x hx ↦ ?_⟩
+  · obtain ⟨hl, hu⟩ := hsb (hs hx)
+    constructor <;> nlinarith
+  · have hi4 : c⁻¹ ≤ 1 / 4 := by rw [inv_le_comm₀ hc0 (by norm_num)]; norm_num; linarith
+    have hx' : x ∈ Icc (1 / 2 : ℝ) (3 / 2) := ⟨by linarith [hx.1], by linarith [hx.2]⟩
+    have hf0 : ‖f x‖ ≤ P := by simpa using hP 0 (by decide) x hx'
+    have hf' (y : ℝ) (hy : y ∈ Icc (1 / 2 : ℝ) (3 / 2)) : ‖deriv f y‖ ≤ P := by
+      simpa using hP 1 (by decide) y hy
+    have hb0 (y : ℝ) : ‖g y‖ ≤ Q := by simpa using hgd 0 (by decide) y
+    have hb' (y : ℝ) : ‖deriv g y‖ ≤ c * Q := by simpa using hgd 1 (by decide) y
+    have hfx : ‖f x‖ ≤ P * c⁻¹ := by
+      have h := (convex_Icc (1 / 2 : ℝ) (3 / 2)).norm_image_sub_le_of_norm_deriv_le
+        (fun y _ ↦ hf.differentiable (by simp) y) hf' (by constructor <;> norm_num : (1 : ℝ) ∈ Icc (1 / 2) (3 / 2)) hx'
+      rw [hf1, sub_zero, Real.norm_eq_abs] at h
+      exact h.trans (mul_le_mul_of_nonneg_left (abs_le.mpr ⟨by linarith [hx.1], by linarith [hx.2]⟩) hP0)
+    constructor
+    · change ‖f x * g x‖ ≤ _
+      rw [norm_mul]
+      exact (mul_le_mul hf0 (hb0 x) (norm_nonneg _) hP0).trans (by nlinarith [mul_nonneg hP0 hQ0])
+    · have h := norm_iteratedFDeriv_mul_le hf hg x (n := 2) (by simp)
+      simp_rw [norm_iteratedFDeriv_eq_norm_iteratedDeriv] at h
+      have hprod : ‖deriv (deriv v) x‖ ≤ ‖f x‖ * ‖iteratedDeriv 2 g x‖ +
+          2 * ‖deriv f x‖ * ‖deriv g x‖ + ‖iteratedDeriv 2 f x‖ * ‖g x‖ := by
+        simpa [v, g, Finset.sum_range_succ, Nat.choose, iteratedDeriv_succ] using h
+      calc _ ≤ _ := hprod
+           _ ≤ P * c⁻¹ * (c ^ 2 * Q) + 2 * P * (c * Q) + P * Q := by
+             gcongr
+             · exact hgd 2 le_rfl x
+             · exact hf' x hx'
+             · exact hb' x
+             · exact hP 2 le_rfl x hx'
+             · exact hb0 x
+           _ = (3 * P * Q) * c + P * Q := by
+             field_simp
+             ring
+           _ ≤ _ := by nlinarith [mul_le_mul_of_nonneg_left hc1 (mul_nonneg hP0 hQ0)]
+
+/-- Integration on the shrinking support gives one estimate by its length. Two integrations
+by parts give a second estimate uniform in the scale and summable over zero heights. -/
+private theorem introTrace_shrinking_mellin_bound_interval {C B : ℝ} (hC : 0 ≤ C) (hB : 0 ≤ B) :
+    let K := 8 * C * (4 : ℝ) ^ (B + 1)
+    ∀ c : ℝ, 4 ≤ c → ∀ v : ℝ → ℂ,
+      ContDiff ℝ 2 v → tsupport v ⊆ Ioo (1 - c⁻¹) (1 + c⁻¹) →
+      (∀ x ∈ Icc (1 - c⁻¹) (1 + c⁻¹), ‖v x‖ ≤ C ∧ ‖deriv (deriv v) x‖ ≤ C * c) →
+      ∀ s : ℂ, |s.re| ≤ B → ‖introTraceMellin v s‖ ≤ K * c⁻¹ ∧
+        ‖introTraceMellin v s‖ ≤ K / (1 + |s.im|) ^ 2 := by
+  let D := (4 : ℝ) ^ (B + 1)
+  have hD : 0 < D := Real.rpow_pos_of_pos (by norm_num) _
+  intro K c hc v hv hs hbd s hsr
+  change _ ≤ 8 * C * D * c⁻¹ ∧ _ ≤ 8 * C * D / _
+  have hc0 : 0 < c := by linarith
+  have hc1 : 1 ≤ c := by linarith
+  have hi : 0 < c⁻¹ := inv_pos.mpr hc0
+  have hi4 : c⁻¹ ≤ 1 / 4 := by rw [inv_le_comm₀ hc0 (by norm_num)]; norm_num; linarith
+  let l := 1 - c⁻¹
+  let r := 1 + c⁻¹
+  have hl : 0 < l := by dsimp [l]; linarith
+  have hlr : l ≤ r := by dsimp [l, r]; linarith
+  have hM : max r l⁻¹ + 1 ≤ 4 := by
+    have hinv : l⁻¹ ≤ 2 := (inv_le_comm₀ hl (by norm_num)).mpr (by dsimp [l]; linarith)
+    linarith [max_le (by dsimp [r]; linarith : r ≤ 2) hinv]
+  have hleft : l ∉ tsupport v := fun h ↦ (lt_irrefl _) (hs h).1
+  have hright : r ∉ tsupport v := fun h ↦ (lt_irrefl _) (hs h).2
+  rw [introTraceApprox_spectral_differentiable_mellin_interval v hl hlr (fun t ht ↦ hs (subset_tsupport _ ht))]
+  constructor
+  · have hnorm (t : ℝ) (ht : t ∈ Icc l r) : ‖(t : ℂ) ^ (s - 1) * v t‖ ≤ D * C := by
+      have ht0 : 0 < t := hl.trans_le ht.1
+      have ht2 : t ≤ 4 := by dsimp [r] at ht; linarith [ht.2]
+      have hti : t⁻¹ ≤ 4 := (inv_le_comm₀ ht0 (by norm_num)).mpr (by dsimp [l] at ht; linarith [ht.1])
+      have hlog : |Real.log t| ≤ Real.log 4 := abs_le.mpr
+        ⟨by have h := Real.log_le_log (inv_pos.mpr ht0) hti; rw [Real.log_inv] at h; linarith,
+         Real.log_le_log ht0 ht2⟩
+      have hre : |(s - 1).re| ≤ B + 1 := by
+        simp only [Complex.sub_re, Complex.one_re]
+        exact (abs_sub s.re 1).trans (by rw [abs_one]; linarith)
+      rw [norm_mul, Complex.norm_cpow_eq_rpow_re_of_pos ht0]
+      refine mul_le_mul ?_ (hbd t ht).1 (norm_nonneg _) hD.le
+      rw [Real.rpow_def_of_pos ht0, show D = Real.exp (Real.log 4 * (B + 1)) from
+        Real.rpow_def_of_pos (by norm_num) _]
+      apply Real.exp_le_exp.mpr
+      calc _ ≤ |Real.log t * (s - 1).re| := le_abs_self _
+           _ = |Real.log t| * |(s - 1).re| := abs_mul _ _
+           _ ≤ _ := mul_le_mul hlog hre (abs_nonneg _) (Real.log_nonneg (by norm_num))
+    have hx := intervalIntegral.norm_integral_le_of_norm_le_const (C := D * C)
+      (f := fun t : ℝ ↦ (t : ℂ) ^ (s - 1) * v t) (a := l) (b := r) fun t ht ↦
+        hnorm t (Ioc_subset_Icc_self (Set.uIoc_of_le hlr ▸ ht))
+    rw [abs_of_nonneg (sub_nonneg.mpr hlr)] at hx
+    calc _ ≤ _ := hx
+         _ = 2 * C * D * c⁻¹ := by dsimp [l, r]; ring
+         _ ≤ _ := by nlinarith [mul_nonneg (mul_nonneg hC hD.le) hi.le]
+  · have h := introTraceApprox_spectral_differentiable_parts hl hlr hv
+      (image_eq_zero_of_notMem_tsupport hleft) (image_eq_zero_of_notMem_tsupport hright)
+      (deriv_of_notMem_tsupport hleft) (deriv_of_notMem_tsupport hright)
+      (fun t ht ↦ ((hbd t ht).1).trans (le_mul_of_one_le_right hC hc1))
+      (fun t ht ↦ (hbd t ht).2) s hsr
+    rw [max_self] at h
+    have hM0 : 0 ≤ max r l⁻¹ + 1 := by have := le_max_left r l⁻¹; dsimp [r] at *; linarith
+    refine h.trans (div_le_div_of_nonneg_right ?_ (by positivity))
+    calc _ ≤ 4 * (r - l) * D * (C * c) := by
+           gcongr
+           exact Real.rpow_le_rpow hM0 hM (by linarith)
+         _ = 8 * C * D := by
+           dsimp [r, l]
+           field_simp
+           ring
+
+/-- Paper: §1.4.6, p. 30. For a smooth profile vanishing at norm one, the Mellin
+transform of its part in a shrinking neighborhood of one tends to zero with a
+height-square majorant. Both bounds are linear in the local two-derivative bound
+for the profile and in the corresponding bound for the fixed cutoff. -/
+theorem introTrace_shrinking_mellin_bound (f b : ℝ → ℂ)
+    (hf : ContDiff ℝ (⊤ : ℕ∞) f) (hb : ContDiff ℝ (⊤ : ℕ∞) b)
+    (hf1 : f 1 = 0) (hsb : tsupport b ⊆ Ioo (-1 : ℝ) 1)
+    {P Q : ℝ} (hP : 0 ≤ P) (hQ : 0 ≤ Q)
+    (hfD : ∀ j : ℕ, j ≤ 2 → ∀ x ∈ Icc (1 / 2 : ℝ) (3 / 2), ‖iteratedDeriv j f x‖ ≤ P)
+    (hbD : ∀ j : ℕ, j ≤ 2 → ∀ x, ‖iteratedDeriv j b x‖ ≤ Q)
+    {B c : ℝ} (hB : 0 ≤ B) (hc : 4 ≤ c) (s : ℂ) (hs : |s.re| ≤ B) :
+    let v (t : ℝ) := f t * b (c * (t - 1))
+    let K := 32 * P * Q * (4 : ℝ) ^ (B + 1)
+    ‖introTraceMellin v s‖ ≤ K * c⁻¹ ∧
+      ‖introTraceMellin v s‖ ≤ K / (1 + |s.im|) ^ 2 := by
+  intro v K
+  obtain ⟨hv, hvS, hvD⟩ := introTrace_shrinking_mellin_bound_profile f b hf hb hP hQ hfD hbD hsb hf1 c hc
+  have h := introTrace_shrinking_mellin_bound_interval (C := 4 * P * Q) (by positivity) hB c hc v hv hvS hvD s hs
+  simpa only [show 8 * (4 * P * Q) * (4 : ℝ) ^ (B + 1) = K by dsimp [K]; ring] using h
+
+private theorem introTrace_norm_one_spectral_approximation_mellinConvergent {f : ℝ → ℂ} (hf : Continuous f)
+    (hfc : HasCompactSupport f) (hpos : tsupport f ⊆ Ioi (0 : ℝ)) (s : ℂ) : MellinConvergent f s := by
+  have h : Continuous (fun t : ℝ ↦ (t : ℂ) ^ (s - 1) * f t) := by
+    apply continuous_iff_continuousAt.mpr
+    intro x
+    by_cases hx : x ∈ tsupport f
+    · exact (Complex.continuousAt_ofReal_cpow_const x (s - 1) (.inr (hpos hx).ne')).mul hf.continuousAt
+    · apply (continuousAt_const (y := (0 : ℂ))).congr_of_eventuallyEq
+      filter_upwards [notMem_tsupport_iff_eventuallyEq.mp hx] with y hy
+      change f y = 0 at hy
+      simp [hy]
+  exact (h.integrable_of_hasCompactSupport hfc.mul_left).integrableOn
+
+private theorem introTrace_norm_one_spectral_approximation_sum (χ : U𝔽) (a : ℝ)
+    (f : ℝ → ℂ) (v u : ℕ → ℝ → ℂ)
+    (hm : ∀ n s, introTraceMellin f s - introTraceMellin (v n) s = introTraceMellin (u n) s)
+    (K : ℝ) (hbound : ∀ n : ℕ, ∀ s : ℂ, |s.re| ≤ a →
+      ‖introTraceMellin (u n) s‖ ≤ K * ((n : ℝ) + 4)⁻¹ ∧
+      ‖introTraceMellin (u n) s‖ ≤ K / (1 + |s.im|) ^ 2) :
+    let R (n : ℕ) (r : windowZeros(χ, a)) := (zeroOrder(χ, r.val) : ℂ) *
+      (introTraceMellin f (r.val - 1 / 2) - introTraceMellin (v n) (r.val - 1 / 2))
+    (∀ n, Summable (fun r ↦ ‖R n r‖)) ∧
+      Tendsto (fun n ↦ ∑' r, ‖R n r‖) atTop (𝓝 0) := by
+  intro R
+  let w (r : windowZeros(χ, a)) : ℝ := K * ((zeroOrder(χ, r.val) : ℝ) / (1 + |r.val.im|) ^ 2)
+  have hw : Summable w := (introTraceApprox_spectral_differentiable_zeroCount χ a).mul_left K
+  have hp (r : windowZeros(χ, a)) : 0 < (zeroOrder(χ, r.val) : ℝ) := by exact_mod_cast r.property.1
+  have he (n : ℕ) (r : windowZeros(χ, a)) : ‖R n r‖ =
+      (zeroOrder(χ, r.val) : ℝ) * ‖introTraceMellin (u n) (r.val - 1 / 2)‖ := by
+    change ‖(_ : ℂ) * (_ - _)‖ = _
+    rw [hm, norm_mul, Complex.norm_intCast, abs_of_pos (hp r)]
+  have hb (n : ℕ) (r : windowZeros(χ, a)) := hbound n (r.val - 1 / 2)
+    (by simpa using r.property.2.le)
+  have hdom (n : ℕ) (r : windowZeros(χ, a)) : ‖R n r‖ ≤ w r := by
+    rw [he]
+    calc _ ≤ (zeroOrder(χ, r.val) : ℝ) * (K / (1 + |(r.val - 1 / 2).im|) ^ 2) :=
+          mul_le_mul_of_nonneg_left (hb n r).2 (hp r).le
+         _ = _ := by simp [w]; ring
+  refine ⟨fun n ↦ hw.of_nonneg_of_le (fun _ ↦ norm_nonneg _) (hdom n), ?_⟩
+  have hz : Tendsto (fun n : ℕ ↦ ((n : ℝ) + 4)⁻¹) atTop (𝓝 0) :=
+    tendsto_inv_atTop_zero.comp (tendsto_atTop_add_const_right _ 4 tendsto_natCast_atTop_atTop)
+  have ht (r : windowZeros(χ, a)) : Tendsto (fun n ↦ ‖R n r‖) atTop (𝓝 0) := by
+    apply squeeze_zero (fun _ ↦ norm_nonneg _)
+      (fun n ↦ (he n r).le.trans (mul_le_mul_of_nonneg_left (hb n r).1 (hp r).le))
+    simpa using (hz.const_mul K).const_mul (zeroOrder(χ, r.val) : ℝ)
+  simpa using tendsto_tsum_of_dominated_convergence (g := fun _ ↦ (0 : ℝ)) hw ht
+    (.of_forall fun n r ↦ by simpa using hdom n r)
+
+/-- Paper: §1.4.6, p. 30. Every compact smooth radial profile on the positive reals
+vanishing at one admits smooth approximants supported away from one. For each
+unitary character and each zero window their centered Mellin transforms converge
+in the absolute zero sum with the orders as weights. The same approximants work
+for every individual character. -/
+theorem introTrace_norm_one_spectral_approximation (f : ℝ → ℂ)
+    (hf : ContDiff ℝ (⊤ : ℕ∞) f) (hfc : HasCompactSupport f)
+    (hpos : tsupport f ⊆ Ioi (0 : ℝ)) (hf1 : f 1 = 0) :
+    ∃ v : ℕ → ℝ → ℂ,
+      (∀ n, ContDiff ℝ (⊤ : ℕ∞) (v n) ∧ tsupport (v n) ⊆ tsupport f ∧
+        (v n) =ᶠ[𝓝 1] 0) ∧
+      ∀ (χ : U𝔽) (a : ℝ), 0 < a →
+        let R (n : ℕ) (r : windowZeros(χ, a)) := (zeroOrder(χ, r.val) : ℂ) *
+          (introTraceMellin f (r.val - 1 / 2) - introTraceMellin (v n) (r.val - 1 / 2))
+        (∀ n, Summable (fun r ↦ ‖R n r‖)) ∧
+          Tendsto (fun n ↦ ∑' r, ‖R n r‖) atTop (𝓝 0) := by
+  let a : ContDiffBump (0 : ℝ) := ⟨1 / 4, 1 / 2, by norm_num, by norm_num⟩
+  let b (t : ℝ) : ℂ := (a t : ℝ)
+  have hb : ContDiff ℝ (⊤ : ℕ∞) b := Complex.ofRealCLM.contDiff.comp a.contDiff
+  have hbc : HasCompactSupport b := a.hasCompactSupport.comp_left Complex.ofReal_zero
+  have hbs : tsupport b ⊆ Ioo (-1 : ℝ) 1 := by
+    intro x hx
+    have ht := tsupport_comp_subset Complex.ofReal_zero a hx
+    rw [a.tsupport_eq, Metric.mem_closedBall, Real.dist_eq, sub_zero] at ht
+    change |x| ≤ 1 / 2 at ht
+    exact ⟨by linarith [(abs_le.mp ht).1], by linarith [(abs_le.mp ht).2]⟩
+  let c (n : ℕ) : ℝ := (n : ℝ) + 4
+  let u (n : ℕ) (t : ℝ) := f t * b (c n * (t - 1))
+  let v (n : ℕ) (t : ℝ) := f t - u n t
+  have hu (n : ℕ) : ContDiff ℝ (⊤ : ℕ∞) (u n) :=
+    hf.mul (hb.comp (contDiff_const.mul (contDiff_id.sub contDiff_const)))
+  have hus (n : ℕ) : tsupport (u n) ⊆ tsupport f := tsupport_mul_subset_left
+  have hm (n : ℕ) (s : ℂ) :
+      introTraceMellin f s - introTraceMellin (v n) s = introTraceMellin (u n) s := by
+    have huC : HasCompactSupport (u n) := hfc.mul_right
+    have h := (hasMellin_sub (introTrace_norm_one_spectral_approximation_mellinConvergent hf.continuous hfc hpos s)
+      (introTrace_norm_one_spectral_approximation_mellinConvergent (hu n).continuous huC ((hus n).trans hpos) s)).2
+    change introTraceMellin (v n) s = introTraceMellin f s - introTraceMellin (u n) s at h
+    rw [h, sub_sub_cancel]
+  refine ⟨v, fun n ↦ ⟨hf.sub (hu n), ?_, ?_⟩, fun χ B hB ↦ ?_⟩
+  · apply closure_mono
+    intro x hx hfz
+    apply hx
+    simp [v, u, hfz]
+  · have hcont : Tendsto (fun t : ℝ ↦ c n * (t - 1)) (𝓝 1) (𝓝 0) := by
+      have h : Continuous (fun t : ℝ ↦ c n * (t - 1)) :=
+        continuous_const.mul (continuous_id.sub continuous_const)
+      simpa only [sub_self, mul_zero] using h.tendsto 1
+    filter_upwards [hcont.eventually a.eventuallyEq_one] with t ht
+    change a (c n * (t - 1)) = 1 at ht
+    simp [v, u, b, ht]
+  · obtain ⟨P, hP, hPD⟩ := hfc.exists_bound_iteratedFDeriv hf 2
+    obtain ⟨Q, hQ, hQD⟩ := hbc.exists_bound_iteratedFDeriv hb 2
+    simp_rw [norm_iteratedFDeriv_eq_norm_iteratedDeriv] at hPD hQD
+    let K := 32 * P * Q * (4 : ℝ) ^ (B + 1)
+    apply introTrace_norm_one_spectral_approximation_sum χ B f v u hm K
+    intro n s hs
+    exact introTrace_shrinking_mellin_bound f b hf hb hf1 hbs hP hQ
+      (fun j hj x _ ↦ hPD j hj x) hQD hB.le (by dsimp [c]; linarith [Nat.cast_nonneg (α := ℝ) n] : 4 ≤ c n) s hs
 
 /-- The kernels `t ↦ h(t) ρ(t - v)` of the mollified cutoff are `C²`, vanish to first order at the
 ends of a fixed interval `[a, b] ⊂ (0, ∞)` containing the cutoff's support, and have value and second
