@@ -110,13 +110,15 @@ theorem map_add_realPWLogMeasure_le {α s : ℝ} (hs : 0 ≤ s) (ℓ : ℝ) :
   intro S hS
   rw [Measure.map_apply hadd hS, smul_apply, realPWLogMeasure,
     withDensity_apply _ (hadd hS), withDensity_apply _ hS]
-  change (∫⁻ t in (· + ℓ) ⁻¹' S, W t) ≤ ENNReal.ofReal (realPWLogShiftConstant α s ℓ) • ∫⁻ t in S, W t
+  change (∫⁻ t in (· + ℓ) ⁻¹' S, W t) ≤
+    ENNReal.ofReal (realPWLogShiftConstant α s ℓ) • ∫⁻ t in S, W t
   calc (∫⁻ t in (· + ℓ) ⁻¹' S, W t)
       ≤ ∫⁻ t in (· + ℓ) ⁻¹' S, ENNReal.ofReal (realPWLogShiftConstant α s ℓ) * W (t + ℓ) := by
         apply lintegral_mono
         intro t
         change ENNReal.ofReal (realPWLogDensity α s t) ≤
-          ENNReal.ofReal (realPWLogShiftConstant α s ℓ) * ENNReal.ofReal (realPWLogDensity α s (t + ℓ))
+          ENNReal.ofReal (realPWLogShiftConstant α s ℓ) *
+            ENNReal.ofReal (realPWLogDensity α s (t + ℓ))
         rw [← ENNReal.ofReal_mul hK]
         apply ENNReal.ofReal_le_ofReal
         have h := realPWLogDensity_sub_le (α := α) hs ℓ (t + ℓ)
