@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_RealPWIntegralLevelTrace
+public import RiemannMasullo.Ch12_TraceGeometric.Sec4_RealPWUnweightedLowerTrace
 import Mathlib.Analysis.Calculus.BumpFunction.Basic
 import Mathlib.MeasureTheory.Integral.Bochner.Basic
 
@@ -28,12 +29,18 @@ the closed critical strip, and p. 487 assumes `s ≥ 2 [F : ℚ]`. The trace on 
 `∫ ψ g g ^ (-1/2) dg` minus `∫ ψ g g ^ (1/2) dg`. These have the form of the two Mellin values
 `M(φ)(|·| ^ (-1/2))` and `M(φ)(|·| ^ (1/2))` that p. 520 subtracts.
 
+For test functions supported in `0 < g < 1` the limit is computed without weight, where the
+level is again the space of band vectors vanishing at the origin
+(`exists_realPWTestCutoff_level_trace_limit_of_lt_one`). It is the real term minus
+`∫ ψ g g ^ (1/2) dg`, so the comparison fails on that side as well.
+
 The statements are the project's reconstruction of one reading of the proof, not statements
 that the paper prints for this model. The reading is the one of dyknapp's fixed-level
 construction in #7354: the weighted space, the level the closure of the polar-free tests, the
 operator its orthogonal compression. Two things are not covered. The spatial cutoff is the
-sharp indicator of `[-L, L]`, with no inner radius. The test function is supported in `g > 1`
-and away from `g = 1`. The joint limit is treated for the first weight only. -/
+sharp indicator of `[-L, L]`, with no inner radius. The test function is supported away from
+`g = 1`, and for `g < 1` only the case without weight is treated. The joint limit is treated
+for the first weight only. -/
 
 @[expose] public noncomputable section
 
@@ -77,19 +84,20 @@ def sLocalTrace_realPWLevelSharpComparison : Prop :=
       Tendsto (fun L ↦ hilbertTrace (T L)) atTop
         (𝓝 (∫ g, ψ g * sLocalTrace_realTermDensity g))
 
-/-- A nonnegative continuous test supported in `[2, 3]` whose integral against every real power
-of `g` is a positive real number. -/
-private theorem exists_test_integral_pos :
-    ∃ ψ : ℝ → ℂ, Continuous ψ ∧ (∀ g ∉ Icc (2 : ℝ) 3, ψ g = 0) ∧
-      ∀ p : ℝ, ∃ c : ℝ, 0 < c ∧ ∫ g, ψ g * ((g ^ p : ℝ) : ℂ) = (c : ℂ) := by
-  let B : ContDiffBump (5 / 2 : ℝ) := ⟨1 / 4, 1 / 2, by norm_num, by norm_num⟩
-  have hB0 : ∀ g ∉ Icc (2 : ℝ) 3, B g = 0 := by
+/-- A nonnegative continuous test supported in `[c - 2 r, c + 2 r]`, an interval of positive
+numbers, whose integral against every real power of `g` is a positive real number. -/
+private theorem exists_test_integral_pos_at (c r : ℝ) (hr : 0 < r) (hc : 2 * r < c) :
+    ∃ ψ : ℝ → ℂ, Continuous ψ ∧ (∀ g ∉ Icc (c - 2 * r) (c + 2 * r), ψ g = 0) ∧
+      ∀ p : ℝ, ∃ k : ℝ, 0 < k ∧ ∫ g, ψ g * ((g ^ p : ℝ) : ℂ) = (k : ℂ) := by
+  let B : ContDiffBump c := ⟨r, 2 * r, hr, by linarith⟩
+  have hB0 : ∀ g ∉ Icc (c - 2 * r) (c + 2 * r), B g = 0 := by
     intro g hg
     apply B.zero_of_le_dist
     rw [Real.dist_eq]
     by_contra h
-    have h' := abs_lt.mp (not_le.mp h)
-    exact hg ⟨by norm_num [B] at h' ⊢; linarith [h'.1], by norm_num [B] at h' ⊢; linarith [h'.2]⟩
+    have h' : |g - c| < 2 * r := not_le.mp h
+    have h'' := abs_lt.mp h'
+    exact hg ⟨by linarith [h''.1], by linarith [h''.2]⟩
   refine ⟨fun g ↦ ((B g : ℝ) : ℂ), Complex.continuous_ofReal.comp B.continuous,
     fun g hg ↦ by
       change ((B g : ℝ) : ℂ) = 0
@@ -102,12 +110,12 @@ private theorem exists_test_integral_pos :
     rw [Complex.ofReal_mul]
   have hnn : 0 ≤ h := by
     intro g
-    by_cases hg : g ∈ Icc (2 : ℝ) 3
+    by_cases hg : g ∈ Icc (c - 2 * r) (c + 2 * r)
     · exact mul_nonneg B.nonneg (Real.rpow_nonneg (by linarith [hg.1]) _)
     · change 0 ≤ B g * g ^ p
       rw [hB0 g hg, zero_mul]
   have hint : Integrable h := by
-    have h1 : IntegrableOn h (Icc (2 : ℝ) 3) :=
+    have h1 : IntegrableOn h (Icc (c - 2 * r) (c + 2 * r)) :=
       (B.continuous.continuousOn.mul (continuousOn_id.rpow_const fun g hg ↦
         Or.inl (by linarith [hg.1] : (0 : ℝ) < g).ne')).integrableOn_Icc
     refine (integrableOn_iff_integrable_of_support_subset fun g hg ↦ ?_).mp h1
@@ -117,10 +125,8 @@ private theorem exists_test_integral_pos :
       rw [hB0 g hgn, zero_mul])
   have hpos : 0 < ∫ g, h g := by
     rw [integral_pos_iff_support_of_nonneg hnn hint]
-    refine lt_of_lt_of_le
-      (Metric.measure_ball_pos volume (5 / 2 : ℝ) (by norm_num : (0 : ℝ) < 1 / 4))
-      (measure_mono fun g hg ↦ ?_)
-    have hg' := abs_lt.mp (by simpa [Real.dist_eq] using hg : |g - 5 / 2| < 1 / 4)
+    refine lt_of_lt_of_le (Metric.measure_ball_pos volume c hr) (measure_mono fun g hg ↦ ?_)
+    have hg' := abs_lt.mp (by simpa [Real.dist_eq] using hg : |g - c| < r)
     have hB1 : B g = 1 := B.one_of_mem_closedBall (Metric.ball_subset_closedBall hg)
     have hgpos : 0 < g := by linarith [hg'.1]
     change B g * g ^ p ≠ 0
@@ -129,6 +135,24 @@ private theorem exists_test_integral_pos :
   refine ⟨∫ g, h g, hpos, ?_⟩
   change ∫ g, ((B g : ℝ) : ℂ) * ((g ^ p : ℝ) : ℂ) = _
   rw [hcast, integral_complex_ofReal]
+
+/-- A nonnegative continuous test supported in `[2, 3]` whose integral against every real power
+of `g` is a positive real number. -/
+private theorem exists_test_integral_pos :
+    ∃ ψ : ℝ → ℂ, Continuous ψ ∧ (∀ g ∉ Icc (2 : ℝ) 3, ψ g = 0) ∧
+      ∀ p : ℝ, ∃ c : ℝ, 0 < c ∧ ∫ g, ψ g * ((g ^ p : ℝ) : ℂ) = (c : ℂ) := by
+  obtain ⟨ψ, h1, h2, h3⟩ :=
+    exists_test_integral_pos_at (5 / 2) (1 / 4) (by norm_num) (by norm_num)
+  exact ⟨ψ, h1, fun g hg ↦ h2 g fun hg' ↦ hg ⟨by linarith [hg'.1], by linarith [hg'.2]⟩, h3⟩
+
+/-- A nonnegative continuous test supported in `[1/4, 3/4]` whose integral against every real
+power of `g` is a positive real number. -/
+private theorem exists_test_integral_pos_below :
+    ∃ ψ : ℝ → ℂ, Continuous ψ ∧ (∀ g ∉ Icc (1 / 4 : ℝ) (3 / 4), ψ g = 0) ∧
+      ∀ p : ℝ, ∃ c : ℝ, 0 < c ∧ ∫ g, ψ g * ((g ^ p : ℝ) : ℂ) = (c : ℂ) := by
+  obtain ⟨ψ, h1, h2, h3⟩ :=
+    exists_test_integral_pos_at (1 / 2) (1 / 8) (by norm_num) (by norm_num)
+  exact ⟨ψ, h1, fun g hg ↦ h2 g fun hg' ↦ hg ⟨by linarith [hg'.1], by linarith [hg'.2]⟩, h3⟩
 
 /-- A nonnegative continuous test supported in `[2, 3]` whose integral against `g ^ (-1/2)` is
 not zero. -/
@@ -346,5 +370,67 @@ theorem sLocalTrace_realPWIntegralLevelSharpComparison_false :
     linear_combination -heq
   have h3 : c₁ + c₂ = 0 := Complex.ofReal_eq_zero.mp h2
   linarith
+
+/-- The density of the real term of (12.4.1.1), p. 514, summed over the two signs of the
+dilation, as a function of `0 < g < 1`. -/
+def sLocalTrace_realTermDensityBelow (g : ℝ) : ℂ :=
+  ((1 / 2 * ((1 - g)⁻¹ + (1 + g)⁻¹) * g ^ (1 / 2 : ℝ) : ℝ) : ℂ)
+
+/-- Paper: Theorem 12.4.1.1, (12.4.1.1), p. 514, with Steps II–III of its proof, pp. 516–517,
+read in the model `F = ℚ`, `S = {∞}` of #7354 for a test function supported in `0 < g < 1`.
+The statement says that the trace of the cutoff action on the polar-free level tends to the
+real term.
+Reconstruction: As for `sLocalTrace_realPWLevelSharpComparison`, without weight: the space is
+the even band in `L²` of Lebesgue measure, and the level is the space of band vectors
+vanishing at the origin, which is the closure of the polar-free core (#7770). For `g < 1` the
+dilation does not preserve the band, and the operator is the compression of the cutoff of the
+dilation all the same.
+Deviation: The weight of the paper has `s ≥ 2 [F : ℚ]`, p. 487. For `g < 1` the limit with a
+weight is not computed. -/
+def sLocalTrace_realPWLevelSharpComparison_below : Prop :=
+  ∀ (Y : ℝ) (hs : (0 : ℝ) ≤ 0), 0 < Y → ∀ (a b : ℝ), 0 < a → b < 1 → ∀ ψ : ℝ → ℂ,
+    Continuous ψ → (∀ g ∉ Icc a b, ψ g = 0) →
+    ∀ T : ℝ → nuclearEndomorphisms
+        (RealPWBand.space Y (volume_le_realPWIntervalMeasure 0 0 hs)),
+      (∀ L (f : RealPWBand.space Y (volume_le_realPWIntervalMeasure 0 0 hs)),
+        ∃ r : Lp ℂ 2 (realPWIntervalMeasure 0 0),
+          (∀ᵐ x ∂realPWIntervalMeasure 0 0, r x = sharpIntervalMask L x *
+            ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) *
+              RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure 0 0 hs) (g⁻¹ * x)
+                ((realPWZeroLevel Y 0 0 hs).starProjection f))) ∧
+          (T L).val f = (realPWZeroLevel Y 0 0 hs).starProjection
+            ((RealPWBand.space Y (volume_le_realPWIntervalMeasure 0 0 hs)).orthogonalProjectionOnto
+              r)) →
+      Tendsto (fun L ↦ hilbertTrace (T L)) atTop
+        (𝓝 (∫ g, ψ g * sLocalTrace_realTermDensityBelow g))
+
+/-- Paper: Theorem 12.4.1.1, pp. 514–517. Without weight and for a test function supported in
+`0 < g < 1`, the trace on the level converges, and its limit is the real term minus the
+integral of `ψ g g ^ (1/2)`. So the reconstruction
+`sLocalTrace_realPWLevelSharpComparison_below` fails for every nonnegative nonzero test. On the
+whole band the limit is the real term (`exists_realPWTestCutoff_trace_limit_of_lt_one` with
+`realPWSharpTraceLimit_zero_inv`). -/
+theorem sLocalTrace_realPWLevelSharpComparison_below_false :
+    ¬ sLocalTrace_realPWLevelSharpComparison_below := by
+  intro hcomp
+  obtain ⟨ψ, hψc, hψ0, hp⟩ := exists_test_integral_pos_below
+  obtain ⟨c, hc, hce⟩ := hp (1 / 2 : ℝ)
+  have hs : (0 : ℝ) ≤ 0 := le_rfl
+  have ha0 : (0 : ℝ) < 1 / 4 := by norm_num
+  have hb1 : (3 / 4 : ℝ) < 1 := by norm_num
+  obtain ⟨T, hT1, hT2⟩ := exists_realPWTestCutoff_level_trace_limit_of_lt_one 1 hs one_pos
+    ha0 hb1 ψ hψc hψ0
+  have h1 := hcomp 1 hs one_pos (1 / 4) (3 / 4) ha0 hb1 ψ hψc hψ0 T hT1
+  have heq := tendsto_nhds_unique hT2 h1
+  have hlim : ∫ g, ψ g * realPWSharpTraceLimit 0 g⁻¹ =
+      ∫ g, ψ g * sLocalTrace_realTermDensityBelow g := by
+    refine integral_congr_ae (ae_of_all _ fun g ↦ ?_)
+    change ψ g * realPWSharpTraceLimit 0 g⁻¹ = ψ g * sLocalTrace_realTermDensityBelow g
+    by_cases hg : g ∈ Icc (1 / 4 : ℝ) (3 / 4)
+    · rw [realPWSharpTraceLimit_zero_inv (by linarith [hg.1]) (by linarith [hg.2])]
+      rfl
+    · rw [hψ0 g hg, zero_mul, zero_mul]
+  rw [hlim, hce] at heq
+  exact (Complex.ofReal_ne_zero.mpr hc.ne') (sub_eq_self.mp heq)
 
 end RiemannMasullo
