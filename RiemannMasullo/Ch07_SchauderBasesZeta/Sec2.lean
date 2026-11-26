@@ -11,7 +11,7 @@ import Mathlib.Tactic.TFAE
 import RiemannMasullo.ForMathlib.Topology.Algebra.Module.OpenMapping
 import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec4
 import all RiemannMasullo.Ch02_AdelicTheta.Sec1
-import all RiemannMasullo.AppB_AnalyticNT.Sec4b
+import RiemannMasullo.AppB_AnalyticNT.Sec4b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a_part2
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
@@ -19,8 +19,7 @@ import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
 import RiemannMasullo.Ch03_IdelicZeta.Sec3
 import RiemannMasullo.Ch03_IdelicZeta.Sec2
 import RiemannMasullo.AppA_AlgebraicNT.Sec3
-import all RiemannMasullo.Ch05_ThetaZSpaces.Sec5
-import all RiemannMasullo.Ch05_ThetaZSpaces.Sec3b
+import RiemannMasullo.Ch05_ThetaZSpaces.Sec3b
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import RiemannMasullo.Ch06_LocalGlobal.Sec3
 import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec1a
