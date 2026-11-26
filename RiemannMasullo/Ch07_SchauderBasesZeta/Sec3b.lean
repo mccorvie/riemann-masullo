@@ -5988,8 +5988,9 @@ Reconstruction: The paper does not state this. It is the project's formulation o
 that the change of coefficients on p. 349 needs uniformly in the pole, and it is not known
 whether it is what the author intends.
 Proved here (#7413) from the open statement
-`sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_minima` and the
-classical input `baker_two_logarithms_not_liouville_of_independent`. Baker's theorem covers
+`sLocalPWOrbital_bases_bounded_interpolation_laurent_other_prime_shift_minima` and Baker's
+theorem for two logarithms, `baker_two_logarithms_not_liouville_of_independent` (proved from
+the port of HOL Light's `Baker/`, #7682). Baker's theorem covers
 the unshifted form only, and p. 349 supplies no bound for the shifted one. Comparing two
 centers cancels both shifts, so it suffices to bound the infinite sequence of strict closest
 approaches whose heights increase by more than squaring; that is the open statement. Over a
