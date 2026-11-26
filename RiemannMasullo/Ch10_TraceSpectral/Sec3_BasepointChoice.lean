@@ -200,7 +200,7 @@ private theorem spectralStripConvolution_summable_clusterTraceNorms_of_basepoint
         Subtype.ext (Finset.map_injective _ (congrArg Subtype.val h))
 
 /-- A Markushevich basis stays one after reindexing by a bijection. -/
-private theorem spectralStripConvolution_summable_clusterTraceNorms_of_basepointChoice_basis
+theorem spectralStripConvolution_summable_clusterTraceNorms_of_basepointChoice_basis
     {ι ι' E : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E] {x' : ι' → E}
     {Λ' : ι' → StrongDual ℂ E} (h : IsSpectralMarkushevichBasis x' Λ') (e : ι ≃ ι') :
     IsSpectralMarkushevichBasis (x' ∘ e) (Λ' ∘ e) := by
@@ -272,7 +272,7 @@ private theorem spectralStripConvolution_summable_clusterTraceNorms_of_basepoint
 /-- The relabelling between two choices of the unitary extensions: bijections of the zeros and
 of the jets that translate the heights of each component, keep the surviving multiplicities,
 and carry the jets of one choice to the jets of the other. -/
-private theorem spectralStripConvolution_summable_clusterTraceNorms_of_basepointChoice_relabel
+theorem spectralStripConvolution_summable_clusterTraceNorms_of_basepointChoice_relabel
     (χ χ' : PontryaginDual C₁ → PontryaginDual C𝔽)
     (hχ : IsSpectralBasepointChoice (F := F) (fun ω ↦ χ ω))
     (hχ' : IsSpectralBasepointChoice (F := F) (fun ω ↦ χ' ω)) (α s : ℝ) :

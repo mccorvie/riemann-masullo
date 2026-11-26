@@ -1,7 +1,7 @@
 module
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4b
-public import RiemannMasullo.Ch10_TraceSpectral.Sec4b_ClusterLine
+public import RiemannMasullo.Ch10_TraceSpectral.Sec4b_ClusterBasepoint
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 
 /-! # The geometric part of the projective kernel in Theorem 10.4.3.5 -/
@@ -1379,7 +1379,9 @@ Reconstruction: The paper does not state this. It is the statement of
 on the line. For the rectangles of an arbitrary enumeration of the single zeros, and for
 positive widths, the estimate of the geometric component stays open; that is the recorded gap
 `spectralStripGeometricKernel_blocks_bddAbove` (#7406).
-Deviation: Stated for one choice of the unitary extensions, the one of a norm section. -/
+Deviation: Stated for one choice of the unitary extensions, the one of a norm section.
+`spectralStripAmbientKernel_clusters_exists_of_width_zero_of_basepointChoice` is the statement
+for every choice. -/
 theorem spectralStripAmbientKernel_clusters_exists_of_width_zero (hα0 : α = 0) :
     ∃ χ₀ : PontryaginDual (ideleClassNorm F).ker → PontryaginDual (IdeleClassGroup (𝓞 F) F),
       IsSpectralBasepointChoice χ₀ ∧
@@ -1400,5 +1402,38 @@ theorem spectralStripAmbientKernel_clusters_exists_of_width_zero (hα0 : α = 0)
             sobolevProjectiveKernelOperator (F := F) hα hs₀ κ = (Aφ).comp Pₐ :=
   spectralStripAmbientKernel_clusters_exists_of_rpowDensity (F := F) a hα hs φ (s / 2)
     fun t ↦ intervalSobolevDensity_width_zero hα0 t
+
+omit ha he horder in
+-- The statement is in the notation of this file, its proof in that of `Sec4b_ClusterBasepoint`.
+set_option maxHeartbeats 800000 in
+/-- Paper: Theorem 10.4.3.5(2)–(3), pp. 472–473, at width zero, for every order `s > 1`, every
+test and every choice of the unitary extensions of the norm-one characters, with the zeros
+summed by clusters. For the choice `χ` and the Markushevich basis of this section, the zeros can
+be grouped into finite clusters, pairwise disjoint and covering all the zeros, along which the
+ambient tensors converge in the completed projective tensor product to a kernel of convolution
+after spectral projection, the operator of (10.4.3.45) on p. 473.
+This is `spectralStripAmbientKernel_clusters_exists_of_width_zero` without its restriction to
+one choice. The bound for the geometric blocks is
+`spectralStripGeometricBlocks_clusters_bddAbove_of_rpowDensity_of_basepointChoice` of
+`Sec4b_ClusterBasepoint`, which carries the clusters of the choice of a norm section to `χ`.
+Reconstruction: The paper does not state this. It is the statement of
+`spectralStripAmbientKernel_exists` and of (10.4.3.45) for sums over unions of whole clusters,
+on the line. For the rectangles of an arbitrary enumeration of the single zeros, and for
+positive widths, the estimate of the geometric component stays open; that is the recorded gap
+`spectralStripGeometricKernel_blocks_bddAbove` (#7406). -/
+theorem spectralStripAmbientKernel_clusters_exists_of_width_zero_of_basepointChoice
+    (hα0 : α = 0) :
+    ∃ (K : PontryaginDual (ideleClassNorm F).ker × ℤ → Finset zeros(F, χ, a, α))
+      (hd : ∀ i j, i ≠ j → Disjoint (K i) (K j)),
+      (∀ z, ∃ i, z ∈ K i) ∧
+      ∃ κ, SpectralKernelSumsTendstoAlong K hd (fun z : zeros(F, χ, a, α) ↦ jetCount(z))
+          (fun z m ↦ jet(z, m)) (fun j ↦ Dₐ (f j)) (fun j ↦ Aφ (Sₐ(x j))) κ ∧
+        sobolevProjectiveKernelOperator (F := F) hα hs₀ κ = (Aφ).comp Pₐ := by
+  refine (spectralStripGeometricBlocks_clusters_bddAbove_of_rpowDensity_of_basepointChoice
+    (F := F) a hα hs (s / 2) (fun t ↦ intervalSobolevDensity_width_zero hα0 t) φ χ hχ x f
+    hb).imp fun K hK ↦ hK.imp fun hd hK' ↦ ⟨hK'.1, ?_⟩
+  exact hK'.2.1.elim fun κT hT ↦
+    spectralStripAmbientKernel_along_exists_of_geometric_bddAbove a hα hs φ χ x f hb K hd
+      hK'.1 hT hK'.2.2
 
 end RiemannMasullo.Isolated
