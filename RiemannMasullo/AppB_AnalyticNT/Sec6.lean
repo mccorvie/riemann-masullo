@@ -1432,6 +1432,55 @@ theorem heckeLogDerivCoefficient_sum_sub_sum_prime_le_mul_sqrt :
   refine ⟨C, fun F _ _ χ x b M hb ↦ (heckeLogDerivCoefficient_sum_sub_sum_prime_le χ x b hb).trans ?_⟩
   exact mul_le_mul_of_nonneg_left (hC x) (mul_nonneg (Nat.cast_nonneg _) ((norm_nonneg _).trans (hb 0)))
 
+/-- On a dyad the signed prime-norm truncation differs from the full smoothed
+logarithmic-derivative polynomial by bounded squared energy, uniformly in the height,
+the unitary character and the detector with a common sup norm. -/
+theorem exists_heckeLogDerivCoefficient_prime_dyadic_error (F : Type*) [Field F] [NumberField F] :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ (χ : U[F]) (Y H : ℝ) (h : ℝ → ℂ),
+      0 < Y → 0 ≤ H → Continuous h → (∀ r, ‖h r‖ ≤ H) →
+      let a := heckeLogDerivCoefficient (ideleClassNormTwist χ 0)
+      let S := Finset.Ioc 0 ⌊2 * Y⌋₊
+      (∫ y in Y..2 * Y,
+        ‖(∑ n ∈ S, a n * h (n / y)) - (∑ n ∈ S.filter Nat.Prime, a n * h (n / y))‖ ^ 2 /
+          y ^ 2) ≤ C * H ^ 2 := by
+  obtain ⟨A, bound⟩ := heckeLogDerivCoefficient_sum_sub_sum_prime_le_mul_sqrt
+  let B : ℝ := Module.finrank ℚ F * max A 0
+  refine ⟨2 * B ^ 2, by positivity, ?_⟩
+  intro χ Y H h hY hH hc hbound a S
+  have hY2 : Y ≤ 2 * Y := by linarith
+  have hn (y : ℝ) : ‖(∑ n ∈ S, a n * h (n / y)) -
+      ∑ n ∈ S.filter Nat.Prime, a n * h (n / y)‖ ≤ B * H * Real.sqrt (2 * Y) := by
+    refine (bound F χ (2 * Y) (fun n ↦ h (n / y)) H (fun n ↦ hbound _)).trans ?_
+    calc (Module.finrank ℚ F : ℝ) * H * (A * Real.sqrt (2 * Y)) ≤
+          Module.finrank ℚ F * H * (max A 0 * Real.sqrt (2 * Y)) := by
+            gcongr
+            exact le_max_left _ _
+      _ = B * H * Real.sqrt (2 * Y) := by dsimp [B]; ring
+  have hne : ∀ y ∈ uIcc Y (2 * Y), y ≠ 0 := by
+    rw [uIcc_of_le hY2]
+    exact fun y hy ↦ (hY.trans_le hy.1).ne'
+  have hc' : ContinuousOn (fun y : ℝ ↦
+      ‖(∑ n ∈ S, a n * h (n / y)) - ∑ n ∈ S.filter Nat.Prime, a n * h (n / y)‖ ^ 2 /
+      y ^ 2) (uIcc Y (2 * Y)) := by
+    have sum_cont (T : Finset ℕ) : ContinuousOn (fun y : ℝ ↦
+        ∑ n ∈ T, a n * h (n / y)) (uIcc Y (2 * Y)) := by
+      apply continuousOn_finsetSum
+      intro n _
+      exact continuousOn_const.mul (hc.comp_continuousOn (continuousOn_const.div continuousOn_id hne))
+    exact (((sum_cont S).sub (sum_cont _)).norm.pow 2).div (continuousOn_id.pow 2)
+      (fun y hy ↦ pow_ne_zero _ (hne y hy))
+  calc
+    _ ≤ ∫ _y in Y..2 * Y, (B * H) ^ 2 * (2 * Y) / Y ^ 2 := by
+      apply intervalIntegral.integral_mono_on hY2 hc'.intervalIntegrable intervalIntegrable_const
+      intro y hy
+      apply div_le_div₀ (by positivity) _ (by positivity) (by gcongr; exact hy.1)
+      calc _ ≤ (B * H * Real.sqrt (2 * Y)) ^ 2 := by gcongr; exact hn y
+        _ = _ := by rw [mul_pow, Real.sq_sqrt (by positivity)]
+    _ = _ := by
+      rw [intervalIntegral.integral_const, smul_eq_mul]
+      field_simp
+      ring
+
 -- TODO(paper-gap): In (B.6.1.16) a pure norm twist can have a pole in Ω.
 -- Restrict the logarithm to heights above the pole. After (B.6.1.19) the
 -- summand must retain the power m in N(p)^(m * (1 + αη(T))).
