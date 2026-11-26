@@ -3134,7 +3134,7 @@ end ScaledMellin
 
 /-- A test on a complex completion is a classical Schwartz function in the
 complex coordinate used for the local measure. -/
-private theorem complexModelSchwartz (w : InfinitePlace F) (hw : w.IsComplex) (f : ℬ(w.Completion)) :
+theorem complexModelSchwartz (w : InfinitePlace F) (hw : w.IsComplex) (f : ℬ(w.Completion)) :
     ∃ g : SchwartzMap ℂ ℂ, (g : ℂ → ℂ) = fun z ↦ test(f) ((complexModel(hw)).symm z) := by
   apply (complexModelSchwartz_iff w hw _).mp
   have he : (fun x : Multiplicative w.Completion ↦ test(f) ((complexModel(hw)).symm ((complexModel(hw)) x.toAdd))) = f.val := by
@@ -5144,7 +5144,9 @@ end GaussianMellin
 
 section ArchimedeanFourier
 open scoped FourierTransform ENNReal
-private theorem realModelFourier (w : InfinitePlace F) (hw : w.IsReal) (g : ℝ → ℂ) (y : w.Completion) :
+/-- At a real place, the Tamagawa Fourier transform of a function read through the real model
+`realModel(hw)` is the Euclidean Fourier transform of that function at the model of the point. -/
+theorem realModelFourier (w : InfinitePlace F) (hw : w.IsReal) (g : ℝ → ℂ) (y : w.Completion) :
     F∞(w) (fun x ↦ g (realModel(hw) x)) y = 𝓕 g (realModel(hw) y) := by
   let : BorelSpace w.Completion := ⟨rfl⟩
   let e := realModel(hw)
@@ -5160,7 +5162,9 @@ private theorem realModelFourier (w : InfinitePlace F) (hw : w.IsReal) (g : ℝ 
   change g (e (e.symm x)) * star (ψ∞(w) (e.symm x * y) : ℂ) = _
   rw [e.apply_symm_apply,hχ,Circle.star_addChar,Circle.smul_def,smul_eq_mul,mul_comm]
 
-private theorem complexModelFourier (w : InfinitePlace F) (hw : w.IsComplex) (g : ℂ → ℂ) (y : w.Completion) :
+/-- At a complex place, the Tamagawa Fourier transform of a function read through the complex
+model is twice its Euclidean Fourier transform at `2 • star` of the model of the point. -/
+theorem complexModelFourier (w : InfinitePlace F) (hw : w.IsComplex) (g : ℂ → ℂ) (y : w.Completion) :
     F∞(w) (fun x ↦ g (complexModel(hw) x)) y =
       2 * 𝓕 g ((2:ℝ) • star (complexModel(hw) y)) := by
   let : BorelSpace w.Completion := ⟨rfl⟩

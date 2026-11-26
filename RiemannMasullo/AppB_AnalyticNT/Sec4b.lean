@@ -7,7 +7,6 @@ import RiemannMasullo.AppB_AnalyticNT.Sec1
 public import RiemannMasullo.AppB_AnalyticNT.Sec3
 public import RiemannMasullo.AppB_AnalyticNT.Sec4a
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3b
-import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import RiemannMasullo.ForMathlib.Analysis.Complex.LandauLemma
 import RiemannMasullo.ForMathlib.Analysis.Fourier.Log
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.WeightedIntegral
