@@ -115,19 +115,21 @@ def chartBound (S : Finset V) : ℝ := ∏ v : S, (1 - (Real.sqrt (v.val.asIdeal
 theorem chartBound_nonneg (S : Finset V) : 0 ≤ chartBound S :=
   Finset.prod_nonneg fun v _ ↦ inv_nonneg.mpr (sub_nonneg.mpr (ratio_lt v.val).le)
 
+private theorem coneWeight_factor {S : Finset V} (n : S → ℕ) :
+    (Real.sqrt (latticeRadius n))⁻¹ = ∏ v : S, ratio v.val ^ n v := by
+  rw [latticeRadius, Real.sqrt_prod _ (fun _ _ ↦ by positivity), ← Finset.prod_inv_distrib]
+  apply Finset.prod_congr rfl
+  intro v _
+  rw [sqrt_natPow _ (by positivity)]
+  exact (inv_pow _ _).symm
+
 /-- Dominate each finite subsum by its rectangular hull, then sum each geometric factor. -/
 private theorem coneMass_partial_le (S : Finset V) (A : Finset (S → ℕ)) :
     (∑ n ∈ A, (Real.sqrt (latticeRadius n))⁻¹) ≤ chartBound S := by
   classical
   let b (v : S) := ratio v.val
   have hb (v : S) : 0 ≤ b v := inv_nonneg.mpr (Real.sqrt_nonneg _)
-  have factor (n : S → ℕ) : (Real.sqrt (latticeRadius n))⁻¹ = ∏ v, b v ^ n v := by
-    rw [latticeRadius, Real.sqrt_prod _ (fun _ _ ↦ by positivity), ← Finset.prod_inv_distrib]
-    apply Finset.prod_congr rfl
-    intro v _
-    rw [sqrt_natPow _ (by positivity)]
-    exact (inv_pow _ _).symm
-  simp_rw [factor]
+  simp_rw [coneWeight_factor]
   let K (v : S) := A.image (fun n ↦ n v)
   calc
     _ ≤ ∑ n ∈ Fintype.piFinset K, ∏ v, b v ^ n v := by
@@ -148,6 +150,36 @@ theorem weight_summable (S : Finset V) : Summable fun n : S → ℕ ↦ (Real.sq
 
 theorem coneMass_le (S : Finset V) : (∑' n : S → ℕ, (Real.sqrt (latticeRadius n))⁻¹) ≤ chartBound S := by
   exact le_of_tendsto (weight_summable S).hasSum (Filter.Eventually.of_forall (coneMass_partial_le S))
+
+/-- The exact mass of the actual local power cone, by cofinal rectangular exhaustion. -/
+theorem coneMass_eq (S : Finset V) :
+    (∑' n : S → ℕ, (Real.sqrt (latticeRadius n))⁻¹) = chartBound S := by
+  classical
+  let b (v : S) := ratio v.val
+  let box (N : ℕ) : Finset (S → ℕ) := Fintype.piFinset fun _ ↦ Finset.range N
+  have hbox : Filter.Tendsto box Filter.atTop Filter.atTop := by
+    apply Filter.tendsto_atTop_finset_of_monotone
+    · intro M N hMN n hn
+      exact Fintype.mem_piFinset.mpr fun v ↦
+        Finset.range_mono hMN (Fintype.mem_piFinset.mp hn v)
+    · intro n
+      refine ⟨(Finset.univ.sup n).succ, Fintype.mem_piFinset.mpr fun v ↦ ?_⟩
+      exact Finset.mem_range.mpr (Nat.lt_succ_of_le (Finset.le_sup (f := n) (Finset.mem_univ v)))
+  have hrect (N : ℕ) : (∑ n ∈ box N, (Real.sqrt (latticeRadius n))⁻¹) =
+      ∏ v, ∑ k ∈ Finset.range N, b v ^ k := by
+    simp_rw [coneWeight_factor]
+    exact (Finset.prod_univ_sum (fun _ : S ↦ Finset.range N) _).symm
+  have hlim : Filter.Tendsto (fun N ↦ ∏ v, ∑ k ∈ Finset.range N, b v ^ k)
+      Filter.atTop (nhds (chartBound S)) := by
+    unfold chartBound
+    apply tendsto_finsetProd
+    intro v _
+    exact (hasSum_geometric_of_lt_one (r := b v) (inv_nonneg.mpr (Real.sqrt_nonneg _))
+      (ratio_lt v.val)).tendsto_sum_nat
+  apply tendsto_nhds_unique ((weight_summable S).hasSum.comp hbox)
+  change Filter.Tendsto (fun N ↦ ∑ n ∈ box N, (Real.sqrt (latticeRadius n))⁻¹)
+    Filter.atTop (nhds (chartBound S))
+  simpa only [hrect] using hlim
 
 def coneTerm {S : Finset V} (P : LogL2) (n : S → ℕ) : LogL2 :=
   (Real.sqrt (latticeRadius n) : ℂ)⁻¹ • Measure.translateLp volume 2 (Real.log (latticeRadius n)) P
