@@ -37,7 +37,8 @@ interval (`exists_setIntegral_norm_realPWSharpDensity_le`).
 
 Reconstruction: The paper does not state this. The operator is the one of the model, on the
 whole weighted band. For `α < 1/2` the level of the model is the smaller space of band vectors
-vanishing at the origin (#7770), and the trace on that level is not computed here.
+vanishing at the origin (#7770). The trace on that level is computed in
+`Sec4_RealPWLevelTrace`.
 
 Not treated here: test functions whose support meets `g = 1` or `g < 1`. The comparison with
 the adelic operator of the paper. -/
@@ -160,6 +161,34 @@ theorem realPWSharpTrace_eq_smooth_add (hY : 0 < Y) (ha : 0 ≤ α) (hs : 0 ≤ 
   refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
   ring
 
+/-- One constant bounds the weight at `x` by the weight at `g⁻¹ x`, for all `g` between `1`
+and `b`. -/
+theorem exists_realPWIntervalWeight_le_dilation (ha : 0 ≤ α) (hs : 0 ≤ s) (b : ℝ) :
+    ∃ K : ℝ, 0 ≤ K ∧ ∀ g ∈ Icc 1 b, ∀ x : ℝ,
+      realPWIntervalWeight α s x ≤ K * realPWIntervalWeight α s (g⁻¹ * x) := by
+  have hbaseb : 0 ≤ 1 + Real.log b + Real.log b ^ 2 := by
+    nlinarith [sq_nonneg (Real.log b + 1 / 2)]
+  refine ⟨Real.exp (2 * α * Real.log b) * (1 + Real.log b + Real.log b ^ 2) ^ (s / 2),
+    mul_nonneg (Real.exp_nonneg _) (Real.rpow_nonneg hbaseb _), fun g hg x ↦ ?_⟩
+  have hg1 : 1 ≤ g := hg.1
+  have hg0 : 0 < g := zero_lt_one.trans_le hg1
+  have hlog : 0 ≤ Real.log g := Real.log_nonneg hg1
+  have hlogb : Real.log g ≤ Real.log b := Real.log_le_log hg0 hg.2
+  have hbase : 0 ≤ 1 + Real.log g + Real.log g ^ 2 := by positivity
+  have hw0 : 0 ≤ realPWIntervalWeight α s (g⁻¹ * x) :=
+    zero_le_one.trans (one_le_realPWIntervalWeight α s hs _)
+  have h := realPWIntervalWeight_le_dilation (α := α) (s := s) hs (inv_pos.mpr hg0) x
+  have hl : Real.log g⁻¹ = -Real.log g := Real.log_inv g
+  rw [hl, mul_neg, abs_neg, abs_neg, neg_sq, abs_of_nonneg (mul_nonneg ha hlog),
+    abs_of_nonneg hlog] at h
+  refine h.trans (mul_le_mul_of_nonneg_right ?_ hw0)
+  have h1 : Real.exp (2 * (α * Real.log g)) ≤ Real.exp (2 * α * Real.log b) :=
+    Real.exp_le_exp.mpr (by nlinarith)
+  have h2 : (1 + Real.log g + Real.log g ^ 2) ^ (s / 2) ≤
+      (1 + Real.log b + Real.log b ^ 2) ^ (s / 2) :=
+    Real.rpow_le_rpow hbase (by nlinarith) (div_nonneg hs zero_le_two)
+  exact mul_le_mul h1 h2 (Real.rpow_nonneg hbase _) (Real.exp_nonneg _)
+
 /-- On a bounded interval the diagonal of the dilation by `g⁻¹` is bounded in `L¹` uniformly
 for `g` between `1` and `b`. -/
 theorem exists_setIntegral_norm_realPWSharpDensity_le (hY : 0 ≤ Y) (ha : 0 ≤ α) (hs : 0 ≤ s)
@@ -193,31 +222,11 @@ theorem exists_setIntegral_norm_realPWSharpDensity_le (hY : 0 ≤ Y) (ha : 0 ≤
     · simp [Ψ, S, sharpIntervalMask, hx]
   let I := ∫ x, Ψ x
   have hI0 : 0 ≤ I := integral_nonneg hΨ0
-  let Kb := Real.exp (2 * α * Real.log b) * (1 + Real.log b + Real.log b ^ 2) ^ (s / 2)
+  obtain ⟨Kb, hKb0, hKdil⟩ := exists_realPWIntervalWeight_le_dilation (α := α) ha hs b
   refine ⟨1 / 2 * (I + Kb * (b * I)), fun g hg ↦ ?_⟩
   have hg1 : 1 ≤ g := hg.1
   have hg0 : 0 < g := zero_lt_one.trans_le hg1
-  have hb1 : 1 ≤ b := hg1.trans hg.2
-  have hlog : 0 ≤ Real.log g := Real.log_nonneg hg1
-  have hlogb : Real.log g ≤ Real.log b := Real.log_le_log hg0 hg.2
-  have hbase : 0 ≤ 1 + Real.log g + Real.log g ^ 2 := by positivity
-  have hbaseb : 0 ≤ 1 + Real.log b + Real.log b ^ 2 := by
-    have := Real.log_nonneg hb1
-    positivity
-  have hKb0 : 0 ≤ Kb := mul_nonneg (Real.exp_nonneg _) (Real.rpow_nonneg hbaseb _)
-  -- the dilation constant of the weight, uniformly in `g`
-  have hwdil (x : ℝ) : w x ≤ Kb * w (g⁻¹ * x) := by
-    have h := realPWIntervalWeight_le_dilation (α := α) (s := s) hs (inv_pos.mpr hg0) x
-    have hl : Real.log g⁻¹ = -Real.log g := Real.log_inv g
-    rw [hl, mul_neg, abs_neg, abs_neg, neg_sq, abs_of_nonneg (mul_nonneg ha hlog),
-      abs_of_nonneg hlog] at h
-    refine h.trans (mul_le_mul_of_nonneg_right ?_ (hw0 _))
-    have h1 : Real.exp (2 * (α * Real.log g)) ≤ Real.exp (2 * α * Real.log b) :=
-      Real.exp_le_exp.mpr (by nlinarith)
-    have h2 : (1 + Real.log g + Real.log g ^ 2) ^ (s / 2) ≤
-        (1 + Real.log b + Real.log b ^ 2) ^ (s / 2) :=
-      Real.rpow_le_rpow hbase (by nlinarith) (div_nonneg hs zero_le_two)
-    exact mul_le_mul h1 h2 (Real.rpow_nonneg hbase _) (Real.exp_nonneg _)
+  have hwdil (x : ℝ) : w x ≤ Kb * w (g⁻¹ * x) := hKdil g hg x
   have hΨg : Integrable (fun x ↦ Ψ (g⁻¹ * x)) := hΨ.comp_mul_left' (inv_ne_zero hg0.ne')
   have hbound : Integrable (fun x ↦ 1 / 2 * (Ψ x + Kb * Ψ (g⁻¹ * x))) :=
     (hΨ.add (hΨg.const_mul Kb)).const_mul _
@@ -477,21 +486,21 @@ def realPWTestRightFamily (ψ : ℝ → ℂ) (L : ℝ) (x : ℝ) : V :=
   ∫ g, realPWTestIntegrand Y α s hs ψ L (x, g)
 
 /-- The sharp mask has norm at most one. -/
-private theorem norm_mask_le_one (L x : ℝ) : ‖sharpIntervalMask L x‖ ≤ 1 := by
+theorem sharpIntervalMask_norm_le_one (L x : ℝ) : ‖sharpIntervalMask L x‖ ≤ 1 := by
   by_cases h : x ∈ Icc (-L) L <;> simp [sharpIntervalMask, h]
 
 /-- The sharp mask is idempotent. -/
-private theorem mask_mul_self (L x : ℝ) :
+theorem sharpIntervalMask_mul_self (L x : ℝ) :
     sharpIntervalMask L x * sharpIntervalMask L x = sharpIntervalMask L x := by
   by_cases h : x ∈ Icc (-L) L <;> simp [sharpIntervalMask, h]
 
 /-- The sharp mask is measurable. -/
-private theorem measurable_mask (L : ℝ) : Measurable (sharpIntervalMask L) :=
+theorem sharpIntervalMask_measurable (L : ℝ) : Measurable (sharpIntervalMask L) :=
   measurable_one.indicator measurableSet_Icc
 
 /-- The evaluation vector at a contracted point is bounded by a multiple of `|x| ^ k`, where
 `k` is the number of jets that the weight forces to vanish at the origin. -/
-private theorem exists_norm_evaluationVector_dilate_le (hY : 0 ≤ Y) (ha : 0 ≤ α) :
+theorem exists_norm_realPWEvaluationVector_dilate_le (hY : 0 ≤ Y) (ha : 0 ≤ α) :
     ∃ C : ℝ, 0 ≤ C ∧ ∀ g : ℝ, 1 ≤ g → ∀ x : ℝ,
       ‖evv (g⁻¹ * x)‖ ≤ C * |x| ^ (2 * realPWOriginJetCount α) := by
   let k := 2 * realPWOriginJetCount α
@@ -522,7 +531,7 @@ private theorem exists_norm_evaluationVector_dilate_le (hY : 0 ≤ Y) (ha : 0 �
 include hs in
 /-- The sharp mask times the power of `|x|` that the forced jets provide is integrable for the
 weighted measure, also when the weight is not integrable at the origin. -/
-private theorem integrable_mask_abs_pow (ha : 0 ≤ α) (L : ℝ) :
+theorem integrable_sharpIntervalMask_abs_pow_realPW (ha : 0 ≤ α) (L : ℝ) :
     Integrable (fun x ↦ ‖sharpIntervalMask L x‖ * |x| ^ (2 * (2 * realPWOriginJetCount α)))
       μw := by
   let k := 2 * realPWOriginJetCount α
@@ -557,10 +566,10 @@ private theorem memLp_of_norm_le_mask_pow (ha : 0 ≤ α) (L : ℝ) {W : ℝ →
     (hb : ∀ x, ‖W x‖ ≤ c * (‖sharpIntervalMask L x‖ * |x| ^ (2 * realPWOriginJetCount α))) :
     MemLp W 2 μw := by
   refine (memLp_two_iff_integrable_sq_norm hW).2
-    (((integrable_mask_abs_pow α s hs ha L).const_mul (c ^ 2)).mono' (hW.norm.pow 2)
-      (ae_of_all _ fun x ↦ ?_))
+    (((integrable_sharpIntervalMask_abs_pow_realPW α s hs ha L).const_mul (c ^ 2)).mono'
+      (hW.norm.pow 2) (ae_of_all _ fun x ↦ ?_))
   have hm0 := norm_nonneg (sharpIntervalMask L x)
-  have hm1 := norm_mask_le_one L x
+  have hm1 := sharpIntervalMask_norm_le_one L x
   have hp0 : 0 ≤ |x| ^ (2 * realPWOriginJetCount α) := pow_nonneg (abs_nonneg x) _
   rw [Real.norm_of_nonneg (sq_nonneg _)]
   calc ‖W x‖ ^ 2 ≤ (c * (‖sharpIntervalMask L x‖ * |x| ^ (2 * realPWOriginJetCount α))) ^ 2 :=
@@ -580,7 +589,7 @@ private theorem stronglyMeasurable_realPWTestIntegrand {ψ : ℝ → ℂ} (hψ :
     continuous_star.measurable.comp
       (((hψ.comp measurable_snd).mul
         (Complex.measurable_ofReal.comp (measurable_snd.pow_const _))).mul
-        ((measurable_mask L).comp measurable_fst))
+        ((sharpIntervalMask_measurable L).comp measurable_fst))
   have h2 : StronglyMeasurable (fun p : ℝ × ℝ ↦ evv (p.2⁻¹ * p.1)) :=
     (RealPWBand.continuous_evaluationVector Y hμw).comp_stronglyMeasurable
       (measurable_snd.inv.mul measurable_fst).stronglyMeasurable
@@ -656,6 +665,189 @@ private theorem inner_realPWTestRightFamily {ψ : ℝ → ℂ} {L : ℝ}
     ← InnerProductSpace.toDual_apply_apply, RealPWBand.toDual_evaluationVector]
   ring
 
+/-- The left vector family of the cutoff: the evaluation vectors under the sharp mask. -/
+def realPWTestLeftFamily (L : ℝ) (x : ℝ) : V := sharpIntervalMask L x • evv x
+
+/-- The left vector family is square integrable for the weighted measure. -/
+theorem memLp_realPWTestLeftFamily (hY : 0 ≤ Y) (ha : 0 ≤ α) (L : ℝ) :
+    MemLp (realPWTestLeftFamily Y α s hs L) 2 μw := by
+  obtain ⟨C, -, hC⟩ := exists_norm_realPWEvaluationVector_dilate_le Y α s hs hY ha
+  refine memLp_of_norm_le_mask_pow Y α s hs ha L (c := C)
+    (((sharpIntervalMask_measurable L).aestronglyMeasurable).smul
+      (RealPWBand.continuous_evaluationVector Y hμw).aestronglyMeasurable) fun x ↦ ?_
+  have h := hC 1 le_rfl x
+  rw [inv_one, one_mul] at h
+  change ‖sharpIntervalMask L x • evv x‖ ≤ _
+  rw [norm_smul]
+  calc ‖sharpIntervalMask L x‖ * ‖evv x‖
+      ≤ ‖sharpIntervalMask L x‖ * (C * |x| ^ (2 * realPWOriginJetCount α)) :=
+        mul_le_mul_of_nonneg_left h (norm_nonneg _)
+    _ = _ := by ring
+
+/-- For a continuous `ψ` supported in `[a, b]` with `1 ≤ a`, the integrand of the right vector
+family is integrable in the dilation. -/
+theorem integrable_realPWTestIntegrand_of_continuous (hY : 0 ≤ Y) (ha : 0 ≤ α) {a b : ℝ}
+    (ha1 : 1 ≤ a) {ψ : ℝ → ℂ} (hψc : Continuous ψ) (hψ0 : ∀ g ∉ Icc a b, ψ g = 0) (L x : ℝ) :
+    Integrable (fun g ↦ realPWTestIntegrand Y α s hs ψ L (x, g)) := by
+  obtain ⟨C, -, hC⟩ := exists_norm_realPWEvaluationVector_dilate_le Y α s hs hY ha
+  exact integrable_realPWTestIntegrand Y α s hs ha1 hψc.measurable
+    (hψc.integrable_of_hasCompactSupport (HasCompactSupport.intro isCompact_Icc hψ0)) hψ0 L
+    hC x
+
+/-- The right vector family is square integrable for the weighted measure. -/
+theorem memLp_realPWTestRightFamily (hY : 0 ≤ Y) (ha : 0 ≤ α) {a b : ℝ} (ha1 : 1 ≤ a)
+    {ψ : ℝ → ℂ} (hψc : Continuous ψ) (hψ0 : ∀ g ∉ Icc a b, ψ g = 0) (L : ℝ) :
+    MemLp (realPWTestRightFamily Y α s hs ψ L) 2 μw := by
+  obtain ⟨C, -, hC⟩ := exists_norm_realPWEvaluationVector_dilate_le Y α s hs hY ha
+  exact memLp_of_norm_le_mask_pow Y α s hs ha L
+    ((stronglyMeasurable_realPWTestIntegrand Y α s hs hψc.measurable L).integral_prod_right'
+      (ν := volume)).aestronglyMeasurable
+    (norm_realPWTestRightFamily_le Y α s hs ha1
+      (hψc.integrable_of_hasCompactSupport (HasCompactSupport.intro isCompact_Icc hψ0)) hψ0 L
+      hC)
+
+/-- The pairing of the right vector family with a band vector `f` is the cutoff at `x` of the
+action of `ψ` on `f`. -/
+theorem inner_realPWTestRightFamily_eq (hY : 0 ≤ Y) (ha : 0 ≤ α) {a b : ℝ} (ha1 : 1 ≤ a)
+    {ψ : ℝ → ℂ} (hψc : Continuous ψ) (hψ0 : ∀ g ∉ Icc a b, ψ g = 0) (L x : ℝ) (f : V) :
+    ⟪realPWTestRightFamily Y α s hs ψ L x, f⟫_ℂ = sharpIntervalMask L x *
+      ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) f) :=
+  inner_realPWTestRightFamily Y α s hs
+    (integrable_realPWTestIntegrand_of_continuous Y α s hs hY ha ha1 hψc hψ0 L) x f
+
+/-- The integral of the pairing of the two vector families is the integral of `ψ` against the
+traces of the cutoffs of the single dilations. -/
+theorem integral_inner_realPWTestFamilies (hY : 0 ≤ Y) (ha : 0 ≤ α) {a b : ℝ} (ha1 : 1 ≤ a)
+    {ψ : ℝ → ℂ} (hψc : Continuous ψ) (hψ0 : ∀ g ∉ Icc a b, ψ g = 0) (L : ℝ) :
+    ∫ x, ⟪realPWTestRightFamily Y α s hs ψ L x, realPWTestLeftFamily Y α s hs L x⟫_ℂ ∂μw =
+      ∫ g, ψ g * realPWSharpTrace Y α s hs g L := by
+  have hψm : Measurable ψ := hψc.measurable
+  have hψi : Integrable ψ :=
+    hψc.integrable_of_hasCompactSupport (HasCompactSupport.intro isCompact_Icc hψ0)
+  obtain ⟨C, hC0, hC⟩ := exists_norm_realPWEvaluationVector_dilate_le Y α s hs hY ha
+  let k := 2 * realPWOriginJetCount α
+  have hC1 : ∀ x, ‖evv x‖ ≤ C * |x| ^ k := by
+    intro x
+    have h := hC 1 le_rfl x
+    rwa [inv_one, one_mul] at h
+  let K : ℝ → ℝ → ℂ := fun x g ↦ ψ g * (sharpIntervalMask L x *
+    (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv x)))
+  have hpair : ∀ x, ⟪realPWTestRightFamily Y α s hs ψ L x,
+      realPWTestLeftFamily Y α s hs L x⟫_ℂ = ∫ g, K x g := by
+    intro x
+    rw [inner_realPWTestRightFamily_eq Y α s hs hY ha ha1 hψc hψ0 L x, ← integral_const_mul]
+    refine integral_congr_ae (ae_of_all _ fun g ↦ ?_)
+    change sharpIntervalMask L x * (ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) *
+      ev (g⁻¹ * x) (sharpIntervalMask L x • evv x))) =
+      ψ g * (sharpIntervalMask L x * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) *
+        ev (g⁻¹ * x) (evv x)))
+    rw [map_smul, smul_eq_mul]
+    linear_combination (ψ g * ((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv x)) *
+      sharpIntervalMask_mul_self L x
+  have hKm : Measurable (Function.uncurry K) := by
+    have hKc : Continuous (fun p : ℝ × ℝ ↦ ev p.1 (evv p.2)) :=
+      ((RealPWBand.continuous_evaluation Y hμw).comp continuous_fst).clm_apply
+        ((RealPWBand.continuous_evaluationVector Y hμw).comp continuous_snd)
+    have h1 : Measurable (fun p : ℝ × ℝ ↦ ψ p.2) := hψm.comp measurable_snd
+    have h2 : Measurable (fun p : ℝ × ℝ ↦ sharpIntervalMask L p.1) :=
+      (sharpIntervalMask_measurable L).comp measurable_fst
+    have h3 : Measurable (fun p : ℝ × ℝ ↦ ((p.2 ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ)) :=
+      Complex.measurable_ofReal.comp (measurable_snd.pow_const _)
+    have h4 : Measurable (fun p : ℝ × ℝ ↦ ev (p.2⁻¹ * p.1) (evv p.1)) :=
+      hKc.measurable.comp ((measurable_snd.inv.mul measurable_fst).prodMk measurable_fst)
+    exact h1.mul (h2.mul (h3.mul h4))
+  have hKb : ∀ x g, ‖K x g‖ ≤
+      (C ^ 2 * (‖sharpIntervalMask L x‖ * |x| ^ (2 * k))) * ‖ψ g‖ := by
+    intro x g
+    change ‖ψ g * (sharpIntervalMask L x *
+      (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv x)))‖ ≤ _
+    by_cases hg : g ∈ Icc a b
+    · have hg1 : 1 ≤ g := ha1.trans hg.1
+      have hg0 : 0 < g := zero_lt_one.trans_le hg1
+      have hamp : ‖((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ)‖ ≤ 1 := by
+        rw [Complex.norm_real, Real.norm_of_nonneg (Real.rpow_nonneg hg0.le _)]
+        exact Real.rpow_le_one_of_one_le_of_nonpos hg1 (by norm_num)
+      have hp0 : 0 ≤ C * |x| ^ k := mul_nonneg hC0 (pow_nonneg (abs_nonneg x) k)
+      have hev : ‖ev (g⁻¹ * x) (evv x)‖ ≤ (C * |x| ^ k) * (C * |x| ^ k) := by
+        have h : ev (g⁻¹ * x) (evv x) = ⟪evv (g⁻¹ * x), evv x⟫_ℂ := by
+          rw [← InnerProductSpace.toDual_apply_apply, RealPWBand.toDual_evaluationVector]
+        rw [h]
+        exact (norm_inner_le_norm _ _).trans
+          (mul_le_mul (hC g hg1 x) (hC1 x) (norm_nonneg _) hp0)
+      rw [norm_mul, norm_mul, norm_mul]
+      calc ‖ψ g‖ * (‖sharpIntervalMask L x‖ *
+            (‖((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ)‖ * ‖ev (g⁻¹ * x) (evv x)‖))
+          ≤ ‖ψ g‖ * (‖sharpIntervalMask L x‖ * (1 * ((C * |x| ^ k) * (C * |x| ^ k)))) :=
+            mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_left
+              (mul_le_mul hamp hev (norm_nonneg _) zero_le_one) (norm_nonneg _))
+              (norm_nonneg _)
+        _ = _ := by ring
+    · rw [hψ0 g hg]
+      simp
+  have hWm : Measurable fun x ↦ ENNReal.ofReal (realPWIntervalWeight α s x) :=
+    (measurable_realPWIntervalWeight α s).ennreal_ofReal
+  have hWlt : ∀ᵐ x ∂(volume : Measure ℝ),
+      ENNReal.ofReal (realPWIntervalWeight α s x) < ⊤ :=
+    ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top
+  have : SFinite μw := by
+    unfold realPWIntervalMeasure
+    infer_instance
+  have hKint : Integrable (Function.uncurry K) (Measure.prod μw volume) :=
+    (((integrable_sharpIntervalMask_abs_pow_realPW α s hs ha L).const_mul (C ^ 2)).mul_prod
+      hψi.norm).mono' hKm.aestronglyMeasurable (ae_of_all _ fun z ↦ hKb z.1 z.2)
+  calc ∫ x, ⟪realPWTestRightFamily Y α s hs ψ L x, realPWTestLeftFamily Y α s hs L x⟫_ℂ ∂μw
+      = ∫ x, (∫ g, K x g) ∂μw := integral_congr_ae (ae_of_all _ hpair)
+    _ = ∫ g, (∫ x, K x g ∂μw) := integral_integral_swap hKint
+    _ = ∫ g, ψ g * realPWSharpTrace Y α s hs g L := by
+        refine integral_congr_ae (ae_of_all _ fun g ↦ ?_)
+        change ∫ x, ψ g * (sharpIntervalMask L x *
+          (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv x))) ∂μw = _
+        rw [integral_const_mul]
+        congr 1
+        change ∫ x, sharpIntervalMask L x *
+          (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv x))
+            ∂(volume.withDensity fun x ↦ ENNReal.ofReal (realPWIntervalWeight α s x)) = _
+        rw [integral_withDensity_eq_integral_toReal_smul hWm hWlt]
+        refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+        have hw0 := zero_le_one.trans (one_le_realPWIntervalWeight α s hs x)
+        change (ENNReal.ofReal (realPWIntervalWeight α s x)).toReal •
+          (sharpIntervalMask L x *
+            (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv x))) =
+          sharpIntervalMask L x *
+            (((realPWIntervalWeight α s x * g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) *
+              ev (g⁻¹ * x) (evv x))
+        rw [ENNReal.toReal_ofReal hw0, Complex.real_smul]
+        push_cast
+        ring
+
+/-- The product of the adjoint of the analysis map of the left family with the analysis map of
+the right family is the orthogonal projection onto the band of the cutoff of the action of
+`ψ`. -/
+theorem realPWTest_adjoint_analysis_apply (hY : 0 ≤ Y) (ha : 0 ≤ α) {a b : ℝ} (ha1 : 1 ≤ a)
+    {ψ : ℝ → ℂ} (hψc : Continuous ψ) (hψ0 : ∀ g ∉ Icc a b, ψ g = 0) (L : ℝ)
+    (hU : MemLp (realPWTestLeftFamily Y α s hs L) 2 μw)
+    (hR : MemLp (realPWTestRightFamily Y α s hs ψ L) 2 μw) (f : V) :
+    (hilbertFamilyAnalysisCLM hU).adjoint (hilbertFamilyAnalysisCLM hR f) =
+      (V).orthogonalProjectionOnto (hilbertFamilyAnalysisCLM hR f) := by
+  have hμac := realPWIntervalMeasure_absolutelyContinuous α s
+  apply ext_inner_left ℂ
+  intro z
+  rw [(hilbertFamilyAnalysisCLM hU).adjoint_inner_right,
+    Submodule.inner_orthogonalProjectionOnto_eq_of_mem_left, L2.inner_def, L2.inner_def]
+  apply integral_congr_ae
+  filter_upwards [hilbertFamilyAnalysisCLM_apply_ae hU z,
+    hilbertFamilyAnalysisCLM_apply_ae hR f, RealPWBand.evaluation_ae Y hμw hμac z]
+    with x hax hbx hz
+  have hUz : ⟪realPWTestLeftFamily Y α s hs L x, z⟫_ℂ =
+      star (sharpIntervalMask L x) * ev x z := by
+    change ⟪sharpIntervalMask L x • evv x, z⟫_ℂ = _
+    rw [inner_smul_left, starRingEnd_apply, ← InnerProductSpace.toDual_apply_apply,
+      RealPWBand.toDual_evaluationVector]
+  rw [hax, hbx, ← hz, hUz, inner_realPWTestRightFamily_eq Y α s hs hY ha ha1 hψc hψ0 L x f]
+  simp only [RCLike.inner_apply, starRingEnd_apply, star_mul', star_star]
+  linear_combination ((∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) f)) *
+    star (ev x z)) * sharpIntervalMask_mul_self L x
+
 /-- Reconstruction: the sharp cutoff to `[-L, L]` of the action of a test function `ψ` of the
 dilation, compressed to the weighted even band, is nuclear, and its trace is the integral of
 `ψ` against the traces of the cutoffs of the single dilations. The operator sends `f` to the
@@ -671,156 +863,30 @@ theorem exists_realPWTestCutoff_nuclear (hY : 0 < Y) (ha : 0 ≤ α) {a b : ℝ}
         T.val f = (V).orthogonalProjectionOnto r) ∧
       hilbertTrace T = ∫ g, ψ g * realPWSharpTrace Y α s hs g L := by
   have hμac := realPWIntervalMeasure_absolutelyContinuous α s
-  have hψm : Measurable ψ := hψc.measurable
-  have hψi : Integrable ψ :=
-    hψc.integrable_of_hasCompactSupport (HasCompactSupport.intro isCompact_Icc hψ0)
-  obtain ⟨C, hC0, hC⟩ := exists_norm_evaluationVector_dilate_le Y α s hs hY.le ha
-  have hI := integrable_realPWTestIntegrand Y α s hs ha1 hψm hψi hψ0 L hC
-  let k := 2 * realPWOriginJetCount α
-  let U : ℝ → V := fun x ↦ sharpIntervalMask L x • evv x
-  let R : ℝ → V := realPWTestRightFamily Y α s hs ψ L
-  have hC1 : ∀ x, ‖evv x‖ ≤ C * |x| ^ k := by
-    intro x
-    have h := hC 1 le_rfl x
-    rwa [inv_one, one_mul] at h
-  have hUm : AEStronglyMeasurable U μw :=
-    ((measurable_mask L).aestronglyMeasurable).smul
-      (RealPWBand.continuous_evaluationVector Y hμw).aestronglyMeasurable
-  have hUb : ∀ x, ‖U x‖ ≤ C * (‖sharpIntervalMask L x‖ * |x| ^ k) := by
-    intro x
-    change ‖sharpIntervalMask L x • evv x‖ ≤ _
-    rw [norm_smul]
-    calc ‖sharpIntervalMask L x‖ * ‖evv x‖ ≤ ‖sharpIntervalMask L x‖ * (C * |x| ^ k) :=
-          mul_le_mul_of_nonneg_left (hC1 x) (norm_nonneg _)
-      _ = _ := by ring
-  have hU : MemLp U 2 μw := memLp_of_norm_le_mask_pow Y α s hs ha L hUm hUb
-  have hRm : AEStronglyMeasurable R μw :=
-    ((stronglyMeasurable_realPWTestIntegrand Y α s hs hψm L).integral_prod_right'
-      (ν := volume)).aestronglyMeasurable
-  have hRb : ∀ x, ‖R x‖ ≤ (∫ g, ‖ψ g‖) * C * (‖sharpIntervalMask L x‖ * |x| ^ k) :=
-    norm_realPWTestRightFamily_le Y α s hs ha1 hψi hψ0 L hC
-  have hR : MemLp R 2 μw := memLp_of_norm_le_mask_pow Y α s hs ha L hRm hRb
+  have hU := memLp_realPWTestLeftFamily Y α s hs hY.le ha L
+  have hR := memLp_realPWTestRightFamily Y α s hs hY.le ha ha1 hψc hψ0 L
   obtain ⟨ι, bs, _⟩ := exists_hilbertBasis ℂ V
   have := RealPWBand.countable_hilbertBasis Y hμw hμac bs
   let A := hilbertFamilyAnalysisCLM hU
   let B := hilbertFamilyAnalysisCLM hR
-  have hA (f : V) : A f =ᵐ[μw] fun x ↦ ⟪U x, f⟫_ℂ := hilbertFamilyAnalysisCLM_apply_ae hU f
-  have hB (f : V) : B f =ᵐ[μw] fun x ↦ ⟪R x, f⟫_ℂ := hilbertFamilyAnalysisCLM_apply_ae hR f
+  have hA (f : V) : A f =ᵐ[μw] fun x ↦ ⟪realPWTestLeftFamily Y α s hs L x, f⟫_ℂ :=
+    hilbertFamilyAnalysisCLM_apply_ae hU f
+  have hB (f : V) : B f =ᵐ[μw] fun x ↦ ⟪realPWTestRightFamily Y α s hs ψ L x, f⟫_ℂ :=
+    hilbertFamilyAnalysisCLM_apply_ae hR f
   let Ah : hilbertSchmidtOperators V (Lp ℂ 2 μw) :=
     ⟨A, familyAnalysis_mem_hilbertSchmidtOperators bs hU A hA⟩
   let Bh : hilbertSchmidtOperators V (Lp ℂ 2 μw) :=
     ⟨B, familyAnalysis_mem_hilbertSchmidtOperators bs hR B hB⟩
   have hn : IsNuclearOperator (A.adjoint.comp B) :=
     nuclear_hilbertSchmidt_comp ⟨_, mem_hilbertSchmidtOperators_adjoint Ah.property⟩ Bh
-  have htrace := hilbertTrace_familyAnalysisProduct bs U R Ah Bh
-    (fun i ↦ hA (bs i)) (fun i ↦ hB (bs i))
-  refine ⟨⟨_, hn⟩, fun f ↦ ⟨B f, ?_, ?_⟩, htrace.trans ?_⟩
+  have htrace := hilbertTrace_familyAnalysisProduct bs (realPWTestLeftFamily Y α s hs L)
+    (realPWTestRightFamily Y α s hs ψ L) Ah Bh (fun i ↦ hA (bs i)) (fun i ↦ hB (bs i))
+  refine ⟨⟨_, hn⟩, fun f ↦ ⟨B f, ?_, ?_⟩,
+    htrace.trans (integral_inner_realPWTestFamilies Y α s hs hY.le ha ha1 hψc hψ0 L)⟩
   · filter_upwards [hB f] with x hx
     rw [hx]
-    exact inner_realPWTestRightFamily Y α s hs hI x f
-  · apply ext_inner_left ℂ
-    intro z
-    change ⟪z, A.adjoint (B f)⟫_ℂ = _
-    rw [A.adjoint_inner_right, Submodule.inner_orthogonalProjectionOnto_eq_of_mem_left,
-      L2.inner_def, L2.inner_def]
-    apply integral_congr_ae
-    filter_upwards [hA z, hB f, RealPWBand.evaluation_ae Y hμw hμac z] with x hax hbx hz
-    have hUz : ⟪U x, z⟫_ℂ = star (sharpIntervalMask L x) * ev x z := by
-      change ⟪sharpIntervalMask L x • evv x, z⟫_ℂ = _
-      rw [inner_smul_left, starRingEnd_apply, ← InnerProductSpace.toDual_apply_apply,
-        RealPWBand.toDual_evaluationVector]
-    rw [hax, hbx, ← hz, hUz, inner_realPWTestRightFamily Y α s hs hI x f]
-    simp only [RCLike.inner_apply, starRingEnd_apply, star_mul', star_star]
-    linear_combination ((∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) f)) *
-      star (ev x z)) * mask_mul_self L x
-  · let K : ℝ → ℝ → ℂ := fun x g ↦ ψ g * (sharpIntervalMask L x *
-      (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv x)))
-    have hpair : ∀ x, ⟪R x, U x⟫_ℂ = ∫ g, K x g := by
-      intro x
-      rw [inner_realPWTestRightFamily Y α s hs hI x (U x), ← integral_const_mul]
-      refine integral_congr_ae (ae_of_all _ fun g ↦ ?_)
-      change sharpIntervalMask L x * (ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) *
-        ev (g⁻¹ * x) (sharpIntervalMask L x • evv x))) =
-        ψ g * (sharpIntervalMask L x * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) *
-          ev (g⁻¹ * x) (evv x)))
-      rw [map_smul, smul_eq_mul]
-      linear_combination (ψ g * ((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv x)) *
-        mask_mul_self L x
-    have hKm : Measurable (Function.uncurry K) := by
-      have hKc : Continuous (fun p : ℝ × ℝ ↦ ev p.1 (evv p.2)) :=
-        ((RealPWBand.continuous_evaluation Y hμw).comp continuous_fst).clm_apply
-          ((RealPWBand.continuous_evaluationVector Y hμw).comp continuous_snd)
-      have h1 : Measurable (fun p : ℝ × ℝ ↦ ψ p.2) := hψm.comp measurable_snd
-      have h2 : Measurable (fun p : ℝ × ℝ ↦ sharpIntervalMask L p.1) :=
-        (measurable_mask L).comp measurable_fst
-      have h3 : Measurable (fun p : ℝ × ℝ ↦ ((p.2 ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ)) :=
-        Complex.measurable_ofReal.comp (measurable_snd.pow_const _)
-      have h4 : Measurable (fun p : ℝ × ℝ ↦ ev (p.2⁻¹ * p.1) (evv p.1)) :=
-        hKc.measurable.comp ((measurable_snd.inv.mul measurable_fst).prodMk measurable_fst)
-      exact h1.mul (h2.mul (h3.mul h4))
-    have hKb : ∀ x g, ‖K x g‖ ≤
-        (C ^ 2 * (‖sharpIntervalMask L x‖ * |x| ^ (2 * k))) * ‖ψ g‖ := by
-      intro x g
-      change ‖ψ g * (sharpIntervalMask L x *
-        (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv x)))‖ ≤ _
-      by_cases hg : g ∈ Icc a b
-      · have hg1 : 1 ≤ g := ha1.trans hg.1
-        have hg0 : 0 < g := zero_lt_one.trans_le hg1
-        have hamp : ‖((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ)‖ ≤ 1 := by
-          rw [Complex.norm_real, Real.norm_of_nonneg (Real.rpow_nonneg hg0.le _)]
-          exact Real.rpow_le_one_of_one_le_of_nonpos hg1 (by norm_num)
-        have hp0 : 0 ≤ C * |x| ^ k := mul_nonneg hC0 (pow_nonneg (abs_nonneg x) k)
-        have hev : ‖ev (g⁻¹ * x) (evv x)‖ ≤ (C * |x| ^ k) * (C * |x| ^ k) := by
-          have h : ev (g⁻¹ * x) (evv x) = ⟪evv (g⁻¹ * x), evv x⟫_ℂ := by
-            rw [← InnerProductSpace.toDual_apply_apply, RealPWBand.toDual_evaluationVector]
-          rw [h]
-          exact (norm_inner_le_norm _ _).trans
-            (mul_le_mul (hC g hg1 x) (hC1 x) (norm_nonneg _) hp0)
-        rw [norm_mul, norm_mul, norm_mul]
-        calc ‖ψ g‖ * (‖sharpIntervalMask L x‖ *
-              (‖((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ)‖ * ‖ev (g⁻¹ * x) (evv x)‖))
-            ≤ ‖ψ g‖ * (‖sharpIntervalMask L x‖ * (1 * ((C * |x| ^ k) * (C * |x| ^ k)))) :=
-              mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_left
-                (mul_le_mul hamp hev (norm_nonneg _) zero_le_one) (norm_nonneg _))
-                (norm_nonneg _)
-          _ = _ := by ring
-      · rw [hψ0 g hg]
-        simp
-    have hWm : Measurable fun x ↦ ENNReal.ofReal (realPWIntervalWeight α s x) :=
-      (measurable_realPWIntervalWeight α s).ennreal_ofReal
-    have hWlt : ∀ᵐ x ∂(volume : Measure ℝ),
-        ENNReal.ofReal (realPWIntervalWeight α s x) < ⊤ :=
-      ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top
-    have : SFinite μw := by
-      unfold realPWIntervalMeasure
-      infer_instance
-    have hKint : Integrable (Function.uncurry K) (Measure.prod μw volume) :=
-      (((integrable_mask_abs_pow α s hs ha L).const_mul (C ^ 2)).mul_prod hψi.norm).mono'
-        hKm.aestronglyMeasurable (ae_of_all _ fun z ↦ hKb z.1 z.2)
-    calc ∫ x, ⟪R x, U x⟫_ℂ ∂μw = ∫ x, (∫ g, K x g) ∂μw :=
-          integral_congr_ae (ae_of_all _ hpair)
-      _ = ∫ g, (∫ x, K x g ∂μw) := integral_integral_swap hKint
-      _ = ∫ g, ψ g * realPWSharpTrace Y α s hs g L := by
-          refine integral_congr_ae (ae_of_all _ fun g ↦ ?_)
-          change ∫ x, ψ g * (sharpIntervalMask L x *
-            (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv x))) ∂μw = _
-          rw [integral_const_mul]
-          congr 1
-          change ∫ x, sharpIntervalMask L x *
-            (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv x))
-              ∂(volume.withDensity fun x ↦ ENNReal.ofReal (realPWIntervalWeight α s x)) = _
-          rw [integral_withDensity_eq_integral_toReal_smul hWm hWlt]
-          refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
-          have hw0 := zero_le_one.trans (one_le_realPWIntervalWeight α s hs x)
-          change (ENNReal.ofReal (realPWIntervalWeight α s x)).toReal •
-            (sharpIntervalMask L x *
-              (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) * ev (g⁻¹ * x) (evv x))) =
-            sharpIntervalMask L x *
-              (((realPWIntervalWeight α s x * g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) *
-                ev (g⁻¹ * x) (evv x))
-          rw [ENNReal.toReal_ofReal hw0, Complex.real_smul]
-          push_cast
-          ring
+    exact inner_realPWTestRightFamily_eq Y α s hs hY.le ha ha1 hψc hψ0 L x f
+  · exact realPWTest_adjoint_analysis_apply Y α s hs hY.le ha ha1 hψc hψ0 L hU hR f
 
 /-- Reconstruction: for a continuous test function `ψ` of the dilation supported in `[a, b]`
 with `1 < a`, the traces of the sharp cutoffs of its action on the weighted even band converge,
