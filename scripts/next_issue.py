@@ -39,7 +39,7 @@ def in_review():
         ["gh", "api", "--paginate", "repos/{owner}/{repo}/pulls?state=open&per_page=100",
          "--jq", ".[].head.ref"], capture_output=True, text=True, cwd=ROOT)
     if out.returncode:
-        return set()
+        sys.exit(out.stderr)
     found = set()
     for ref in out.stdout.split():
         m = re.fullmatch(r"(?:prover|digester|sweeper)/(\d+)", ref)

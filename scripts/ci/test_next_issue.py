@@ -16,6 +16,8 @@ FAKE_GH = """#!/usr/bin/env python3
 import json, pathlib, sys
 data = json.loads(pathlib.Path(__file__).with_name("responses.json").read_text())
 if any("/pulls?" in arg for arg in sys.argv[1:]):
+    if data.get("pull_error"):
+        sys.exit(data["pull_error"])
     print("\\n".join(data["pulls"]))
 elif any("/issues?" in arg for arg in sys.argv[1:]):
     for row in data["issues"]:
@@ -48,15 +50,15 @@ class NextIssueCapacityTest(unittest.TestCase):
         gh.write_text(FAKE_GH, encoding="utf-8")
         gh.chmod(0o755)
 
-    def select(self, issues, *args, pulls=()):
+    def select(self, issues, *args, pulls=(), pull_error=""):
         (self.bin / "responses.json").write_text(
-            json.dumps(dict(issues=issues, pulls=list(pulls))), encoding="utf-8")
+            json.dumps(dict(issues=issues, pulls=list(pulls), pull_error=pull_error)), encoding="utf-8")
         env = dict(os.environ, PATH=str(self.bin) + os.pathsep + os.environ.get("PATH", ""))
         result = subprocess.run(
             [sys.executable, str(self.script), "proof", *args],
             cwd=self.root, env=env, capture_output=True, text=True, timeout=10,
         )
-        self.assertEqual(result.stderr, "")
+        self.assertEqual(result.stderr.strip(), pull_error)
         return result.returncode, result.stdout
 
     def saturated(self):
@@ -92,6 +94,14 @@ class NextIssueCapacityTest(unittest.TestCase):
     def test_open_pull_request_counts_towards_capacity(self):
         rows = [issue(n, LOW, "claimed") for n in (1, 2)] + [issue(3), issue(4)]
         self.assertEqual(self.select(rows, pulls=("prover/3",)), (1, ""))
+
+    def test_failed_pull_request_lookup_does_not_assign(self):
+        self.assertEqual(self.select([issue(1)], pull_error="HTTP 403: rate limit exceeded"),
+                         (1, ""))
+
+    def test_failed_pull_request_lookup_does_not_list_free_issues(self):
+        self.assertEqual(self.select([issue(1)], "--list", pull_error="GitHub is unavailable"),
+                         (1, ""))
 
 
 if __name__ == "__main__":
