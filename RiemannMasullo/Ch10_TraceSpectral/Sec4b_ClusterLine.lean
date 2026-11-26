@@ -1,22 +1,26 @@
 module
 
-public import RiemannMasullo.Ch10_TraceSpectral.Sec4b_ModulatedRecursion
+public import RiemannMasullo.Ch10_TraceSpectral.Sec4b_BinomialRecursion
 public import RiemannMasullo.Ch10_TraceSpectral.Sec3_ClusterBounds
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.ForMathlib.Analysis.Fourier.CompactSupportSeries
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.SmoothPartition
 
-/-! # Theorem 10.4.3.5 on the line at even orders, with the zeros summed by clusters
+/-! # Theorem 10.4.3.5 on the line, with the zeros summed by clusters
 
 Theorem 10.4.3.5(2)–(3), pp. 472–473, needs an estimate for the geometric component of the
 ambient kernel tensors, the part in the theta subspace of the convolved lifts. The paper gives
 none; for sums over arbitrary finite sets of zeros it is the recorded gap
 `spectralStripGeometricKernel_blocks_bddAbove` of `Sec4b_Isolated` (#7406).
 
-This file proves the estimate for sums over finite unions of clusters, when the density of the
-Sobolev space is the polynomial `(1 + t ^ 2) ^ n` of the logarithm of the norm, that is on the
-line, width zero, at the even orders `s = 2 n`, and for every test
-(`spectralStripGeometricBlocks_clusters_bddAbove_of_polynomialDensity`).
+This file proves the estimate for sums over finite unions of clusters, for every test, on the
+line, width zero: first when the density of the Sobolev space is the polynomial
+`(1 + t ^ 2) ^ n` of the logarithm of the norm, the even orders `s = 2 n`
+(`spectralStripGeometricBlocks_clusters_bddAbove_of_polynomialDensity`), then for the density
+`(1 + t ^ 2) ^ σ` with any real `σ`, which is every order
+(`spectralStripGeometricBlocks_clusters_bddAbove_of_rpowDensity`). The two cases differ only in
+the recursion for tests of small support, which enters as a hypothesis of
+`spectralStripGeometricBlocks_bddAbove_of_commonClusters_of_recursion`.
 
 The proof has three parts.
 
@@ -25,7 +29,8 @@ The proof has three parts.
   multiplication by characters of the norm, translation, and series of these
   (`MellinShiftDominated.modulate`, `.translate`, `.series`).
 * For a dominated test supported close to the norm-one classes, the recursion of
-  `Sec4b_ModulatedRecursion` bounds the geometric part by the spectral parts of its modulations,
+  `Sec4b_ModulatedRecursion`, or of `Sec4b_BinomialRecursion` for a general order, bounds the
+  geometric part by the spectral parts of its modulations,
   which are lifts of sums of cluster blocks
   (`traceNorm_spectralPart_jetBlockSum_le`, `traceNorm_jetBlockSum_le_of_dominated_modulated`).
 * A test is cut along the logarithm of the norm into finitely many pieces, each a translate of
@@ -535,6 +540,14 @@ theorem spectralProjection_stripTestAction_lift (a : ℝ) {α s : ℝ} (hα : 0 
 
 end Tests
 
+/-- Paper: Proposition 9.2.1.8, p. 410. On the base interval `{0}` the density of the Sobolev
+space of order `s` is the power `(1 + t ^ 2) ^ (s / 2)` of the logarithmic coordinate. -/
+theorem intervalSobolevDensity_width_zero {α s : ℝ} (hα0 : α = 0) (t : ℝ) :
+    intervalSobolevDensity (-α) α s t = (1 + t ^ 2) ^ (s / 2) := by
+  subst hα0
+  unfold intervalSobolevDensity
+  simp
+
 section Clusters
 
 variable (a : ℝ) {α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s)
@@ -751,22 +764,24 @@ theorem traceNorm_jetBlockSum_le_of_dominated_modulated
   exact mul_le_mul_of_nonneg_right (le_mul_of_one_le_right hc h1) hBtot
 
 set_option maxHeartbeats 1600000 in
-/-- Paper: Theorem 10.4.3.5(2), p. 472, the geometric component, when the density of the
-Sobolev space is the polynomial `(1 + t ^ 2) ^ n`, for every test, with the zeros summed by
-clusters. Suppose a system of clusters with summable bounds `bd i` controls the cluster blocks
-of every test that is dominated on its contours, and the test `φ` is dominated with shifts
-(the two conclusions of `spectralStripConvolution_exists_commonClusters`). Then the geometric
+/-- Paper: Theorem 10.4.3.5(2), p. 472, the geometric component for every test, with the zeros
+summed by clusters, from a recursion for tests of small support. Suppose a system of clusters
+with summable bounds `bd i` controls the cluster blocks of every test that is dominated on its
+contours, and the test `φ` is dominated with shifts (the two conclusions of
+`spectralStripConvolution_exists_commonClusters`). Suppose further that for some `δ₀ > 0` the
+geometric part of a test supported where the logarithm of the norm is at most `δ₀` is bounded by
+the spectral parts of its modulations, as in
+`exists_traceNorm_geometricProjection_stripTestAction_le_of_modulated`. Then the geometric
 blocks of `φ`, summed over finite unions of clusters, are bounded in trace norm.
 The test is cut along the logarithm of the norm into finitely many pieces of small support
 (`exists_smooth_partition_Icc`). Each piece is a translate of a test supported close to the
 norm-one classes, which is dominated because the cutoff is a Fourier series in characters of
 the norm on the support of `φ` and translation multiplies the Mellin transform by a bounded
-factor. For such a test the recursion over modulations bounds the geometric part
+factor. For such a test the recursion bounds the geometric part
 (`traceNorm_jetBlockSum_le_of_dominated_modulated`), and a translation, which is a bounded
 operator, carries the bound back to the piece.
 Reconstruction: The paper gives no estimate for the geometric component. -/
-theorem spectralStripGeometricBlocks_bddAbove_of_commonClusters
-    (n : ℕ) (hdens : ∀ t, intervalSobolevDensity (-α) α s t = (1 + t ^ 2) ^ n)
+theorem spectralStripGeometricBlocks_bddAbove_of_commonClusters_of_recursion
     (φ : BruhatCompactSupport C𝔽)
     (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
     (x : SpectralStripJetIndex χ a α s → H(a, hα, hs₀(hs)))
@@ -782,7 +797,19 @@ theorem spectralStripGeometricBlocks_bddAbove_of_commonClusters
         ‖∫ g : C𝔽, ψ.val g * ideleClassNormTwist (χ ω) w g ∂μ𝔽‖ ≤ c * φb ω k) →
       ∀ i, ∃ R : nuclearEndomorphisms H(a, hα, hs₀(hs)),
         R.val = spectralConvolutionFiniteSum (Aq(a, hα, hs₀(hs), ψ)) x f (K i)
-          (fun z : Z(χ) ↦ N(χ, z)) (fun z m ↦ jet(z, m)) ∧ traceNorm R ≤ c * bd i) :
+          (fun z : Z(χ) ↦ N(χ, z)) (fun z m ↦ jet(z, m)) ∧ traceNorm R ≤ c * bd i)
+    (δ₀ : ℝ) (hδ₀ : 0 < δ₀)
+    (hrecursion : ∀ ψ : ℤ → BruhatCompactSupport C𝔽,
+      (∀ (m : ℤ) (g : C𝔽), (ψ m).val g =
+        Complex.exp (2 * Real.pi * Complex.I * m * (logNorm g / (4 * δ₀) : ℝ)) *
+          (ψ 0).val g) →
+      (∀ g, (ψ 0).val g ≠ 0 → |logNorm g| ≤ δ₀) →
+      ∀ (B : ℝ) (Q : nuclearEndomorphisms (W(α, s))),
+        Pspec(a, hα, hs₀(hs)) * Q.val = Q.val →
+        (∀ m : ℤ, traceNorm ⟨((Pspec(a, hα, hs₀(hs))).comp (A(hα, hs₀(hs), ψ m))) * Q.val,
+          mul_mem_nuclearEndomorphisms_left _ Q⟩ ≤ B * (1 + |(m : ℝ)|) ^ p) →
+        traceNorm ⟨((Pgeom(a, hα, hs₀(hs))).comp (A(hα, hs₀(hs), ψ 0))) * Q.val,
+          mul_mem_nuclearEndomorphisms_left _ Q⟩ ≤ B) :
     BddAbove (range fun C : Finset ι ↦ traceNorm
       (spectralJetBlockSum Q(a, hα, hs₀(hs)) (fun z : Z(χ) ↦ N(χ, z)) (fun z m ↦ jet(z, m)) f
         (fun j ↦ Pgeom(a, hα, hs₀(hs))
@@ -798,8 +825,6 @@ theorem spectralStripGeometricBlocks_bddAbove_of_commonClusters
   have hdomφ : MellinShiftDominated χ X T φb p φ 1 := fun ω k w hw t ↦ by
     rw [one_mul]
     exact hshift ω k w hw t
-  obtain ⟨δ₀, hδ₀, hrec⟩ :=
-    exists_traceNorm_geometricProjection_stripTestAction_le_of_modulated (F := F) n p
   obtain ⟨R₀, hR₀, hsupp⟩ := exists_abs_logIdeleClassNorm_le_of_ne_zero φ
   obtain ⟨J, η, t, hηs, hη1, hηsupp, hηsum⟩ := exists_smooth_partition_Icc hδ₀ R₀
   -- The pieces of the test.
@@ -885,7 +910,7 @@ theorem spectralStripGeometricBlocks_bddAbove_of_commonClusters
   have hpiece (k : ℕ) (C : Finset ι) :=
     traceNorm_jetBlockSum_le_of_dominated_modulated a hα hs χ x f hb X T φb p hφb K hd bd hbd0
       hbds hblocks δ₀ hδ₀ (ψ k) (hψm k) (c0 k) (hc0 k) (by rw [hψ0 k]; exact hdom0 k)
-      (fun B Q hPQ hsp ↦ hrec hα hs₀(hs) a hdens δ₀ hδ₀ le_rfl (ψ k) (hψm k)
+      (fun B Q hPQ hsp ↦ hrecursion (ψ k) (hψm k)
         (fun g hg ↦ hsupp0 k g (by rwa [hψ0 k] at hg)) B Q hPQ hsp) C
   -- The test is the sum of its pieces, and each piece acts as a translation after its centred
   -- piece.
@@ -958,6 +983,83 @@ theorem spectralStripGeometricBlocks_bddAbove_of_commonClusters
         (traceNorm_geometricPart_mul_le G P (τk k) (A0 k) hG hGP Qb).trans
           (mul_le_mul_of_nonneg_left (add_le_add (h3 k) (h4 k)) (norm_nonneg _))
 
+/-- Paper: Theorem 10.4.3.5(2), p. 472, the geometric component, when the density of the
+Sobolev space is the polynomial `(1 + t ^ 2) ^ n`, for every test, with the zeros summed by
+clusters. Suppose a system of clusters with summable bounds `bd i` controls the cluster blocks
+of every test that is dominated on its contours, and the test `φ` is dominated with shifts
+(the two conclusions of `spectralStripConvolution_exists_commonClusters`). Then the geometric
+blocks of `φ`, summed over finite unions of clusters, are bounded in trace norm.
+This is `spectralStripGeometricBlocks_bddAbove_of_commonClusters_of_recursion` with the
+recursion of `exists_traceNorm_geometricProjection_stripTestAction_le_of_modulated`.
+Reconstruction: The paper gives no estimate for the geometric component. -/
+theorem spectralStripGeometricBlocks_bddAbove_of_commonClusters
+    (n : ℕ) (hdens : ∀ t, intervalSobolevDensity (-α) α s t = (1 + t ^ 2) ^ n)
+    (φ : BruhatCompactSupport C𝔽)
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (x : SpectralStripJetIndex χ a α s → H(a, hα, hs₀(hs)))
+    (f : SpectralStripJetIndex χ a α s → StrongDual ℂ H(a, hα, hs₀(hs)))
+    (hb : Bases(χ, x, f)) (X : ℝ) (hX : 0 < X) (T φb : PontryaginDual C₁ → ℤ → ℝ) (p : ℕ)
+    {ι : Type*} (K : ι → Finset Z(χ)) (hd : ∀ i j, i ≠ j → Disjoint (K i) (K j))
+    (bd : ι → ℝ) (hbd0 : ∀ i, 0 ≤ bd i) (hbds : Summable bd)
+    (hshift : ∀ ω k, ∀ w ∈ rectBoundary (-X) X (T ω k) (T ω (k + 1)), ∀ t : ℝ,
+      ‖∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ ω) (w + (t : ℂ) * Complex.I) g ∂μ𝔽‖ ≤
+        (1 + |t|) ^ p * φb ω k)
+    (hblocks : ∀ (ψ : BruhatCompactSupport C𝔽) (c : ℝ),
+      (∀ ω k, ∀ w ∈ rectBoundary (-X) X (T ω k) (T ω (k + 1)),
+        ‖∫ g : C𝔽, ψ.val g * ideleClassNormTwist (χ ω) w g ∂μ𝔽‖ ≤ c * φb ω k) →
+      ∀ i, ∃ R : nuclearEndomorphisms H(a, hα, hs₀(hs)),
+        R.val = spectralConvolutionFiniteSum (Aq(a, hα, hs₀(hs), ψ)) x f (K i)
+          (fun z : Z(χ) ↦ N(χ, z)) (fun z m ↦ jet(z, m)) ∧ traceNorm R ≤ c * bd i) :
+    BddAbove (range fun C : Finset ι ↦ traceNorm
+      (spectralJetBlockSum Q(a, hα, hs₀(hs)) (fun z : Z(χ) ↦ N(χ, z)) (fun z m ↦ jet(z, m)) f
+        (fun j ↦ Pgeom(a, hα, hs₀(hs))
+          ((A(hα, hs₀(hs), φ) : W(α, s) →L[ℂ] W(α, s)) (S(a, hα, hs₀(hs)) (x j))))
+        (C.disjiUnion K fun i _ j _ h ↦ hd i j h))) := by
+  obtain ⟨δ₀, hδ₀, hrec⟩ :=
+    exists_traceNorm_geometricProjection_stripTestAction_le_of_modulated (F := F) n p
+  exact spectralStripGeometricBlocks_bddAbove_of_commonClusters_of_recursion a hα hs φ χ x f hb
+    X hX T φb p K hd bd hbd0 hbds hshift hblocks δ₀ hδ₀
+    fun ψ hψ hsupp B Q hPQ hsp ↦ hrec hα hs₀(hs) a hdens δ₀ hδ₀ le_rfl ψ hψ hsupp B Q hPQ hsp
+
+/-- Paper: Theorem 10.4.3.5(2), p. 472, the geometric component, when the density of the
+Sobolev space is `(1 + t ^ 2) ^ σ` for a real `σ`, for every test, with the zeros summed by
+clusters. Suppose a system of clusters with summable bounds `bd i` controls the cluster blocks
+of every test that is dominated on its contours, and the test `φ` is dominated with shifts
+(the two conclusions of `spectralStripConvolution_exists_commonClusters`). Then the geometric
+blocks of `φ`, summed over finite unions of clusters, are bounded in trace norm.
+This is `spectralStripGeometricBlocks_bddAbove_of_commonClusters_of_recursion` with the
+recursion of `exists_traceNorm_geometricProjection_stripTestAction_le_of_modulated_rpow` of
+`Sec4b_BinomialRecursion`.
+Reconstruction: The paper gives no estimate for the geometric component. -/
+theorem spectralStripGeometricBlocks_bddAbove_of_commonClusters_rpow
+    (σ : ℝ) (hdens : ∀ t, intervalSobolevDensity (-α) α s t = (1 + t ^ 2) ^ σ)
+    (φ : BruhatCompactSupport C𝔽)
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (x : SpectralStripJetIndex χ a α s → H(a, hα, hs₀(hs)))
+    (f : SpectralStripJetIndex χ a α s → StrongDual ℂ H(a, hα, hs₀(hs)))
+    (hb : Bases(χ, x, f)) (X : ℝ) (hX : 0 < X) (T φb : PontryaginDual C₁ → ℤ → ℝ) (p : ℕ)
+    {ι : Type*} (K : ι → Finset Z(χ)) (hd : ∀ i j, i ≠ j → Disjoint (K i) (K j))
+    (bd : ι → ℝ) (hbd0 : ∀ i, 0 ≤ bd i) (hbds : Summable bd)
+    (hshift : ∀ ω k, ∀ w ∈ rectBoundary (-X) X (T ω k) (T ω (k + 1)), ∀ t : ℝ,
+      ‖∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ ω) (w + (t : ℂ) * Complex.I) g ∂μ𝔽‖ ≤
+        (1 + |t|) ^ p * φb ω k)
+    (hblocks : ∀ (ψ : BruhatCompactSupport C𝔽) (c : ℝ),
+      (∀ ω k, ∀ w ∈ rectBoundary (-X) X (T ω k) (T ω (k + 1)),
+        ‖∫ g : C𝔽, ψ.val g * ideleClassNormTwist (χ ω) w g ∂μ𝔽‖ ≤ c * φb ω k) →
+      ∀ i, ∃ R : nuclearEndomorphisms H(a, hα, hs₀(hs)),
+        R.val = spectralConvolutionFiniteSum (Aq(a, hα, hs₀(hs), ψ)) x f (K i)
+          (fun z : Z(χ) ↦ N(χ, z)) (fun z m ↦ jet(z, m)) ∧ traceNorm R ≤ c * bd i) :
+    BddAbove (range fun C : Finset ι ↦ traceNorm
+      (spectralJetBlockSum Q(a, hα, hs₀(hs)) (fun z : Z(χ) ↦ N(χ, z)) (fun z m ↦ jet(z, m)) f
+        (fun j ↦ Pgeom(a, hα, hs₀(hs))
+          ((A(hα, hs₀(hs), φ) : W(α, s) →L[ℂ] W(α, s)) (S(a, hα, hs₀(hs)) (x j))))
+        (C.disjiUnion K fun i _ j _ h ↦ hd i j h))) := by
+  obtain ⟨δ₀, hδ₀, hrec⟩ :=
+    exists_traceNorm_geometricProjection_stripTestAction_le_of_modulated_rpow (F := F) σ p
+  exact spectralStripGeometricBlocks_bddAbove_of_commonClusters_of_recursion a hα hs φ χ x f hb
+    X hX T φb p K hd bd hbd0 hbds hshift hblocks δ₀ hδ₀
+    fun ψ hψ hsupp B Q hPQ hsp ↦ hrec hα hs₀(hs) a hdens δ₀ hδ₀ le_rfl ψ hψ hsupp B Q hPQ hsp
+
 set_option maxHeartbeats 800000 in
 /-- Paper: Theorem 10.4.3.5(2), pp. 472–473, on the line at even orders, for every test, with
 the zeros summed by clusters. Let the density of the Sobolev space be the polynomial
@@ -1012,6 +1114,58 @@ theorem spectralStripGeometricBlocks_clusters_bddAbove_of_polynomialDensity
     have h2 := h.2
     rwa [one_mul] at h2
   · exact spectralStripGeometricBlocks_bddAbove_of_commonClusters a hα hs n hdens φ χ x f hb X hX
+      T φb p K hd bd hbd0 hbds hshift (hblocks x f hb.1 hb.2)
+
+set_option maxHeartbeats 800000 in
+/-- Paper: Theorem 10.4.3.5(2), pp. 472–473, on the line at every order, for every test, with
+the zeros summed by clusters. Let the density of the Sobolev space be `(1 + t ^ 2) ^ σ` for a
+real `σ`; this is the line, width zero, at the order `s = 2 σ`
+(`intervalSobolevDensity_width_zero`). For every test `φ` there is a choice of the unitary
+extensions of the norm-one characters such that, for every Markushevich basis realizing the
+strip jets of that choice, the zeros can be grouped into finite clusters, pairwise disjoint and
+covering all the zeros, along which
+* the printed tensors (10.4.3.43), with convolution on the input factor, converge in the
+  completed projective tensor product, and
+* the sums of the geometric blocks `R_z` of `spectralStripGeometricKernel_blocks_bddAbove` of
+  `Sec4b_Isolated` over finite unions of clusters are bounded in trace norm.
+This is `spectralStripGeometricBlocks_clusters_bddAbove_of_polynomialDensity` for every real
+exponent, with the recursion of `Sec4b_BinomialRecursion`.
+Reconstruction: The paper does not state this. For positive widths the estimate of the
+geometric component stays open; that is the recorded gap #7406.
+Deviation: Stated for one choice of the unitary extensions, the one of a norm section, and for
+sums over unions of whole clusters. -/
+theorem spectralStripGeometricBlocks_clusters_bddAbove_of_rpowDensity
+    (σ : ℝ) (hdens : ∀ t, intervalSobolevDensity (-α) α s t = (1 + t ^ 2) ^ σ)
+    (φ : BruhatCompactSupport C𝔽) :
+    ∃ χ : PontryaginDual C₁ → PontryaginDual C𝔽, IsSpectralBasepointChoice χ ∧
+      ∀ (x : SpectralStripJetIndex χ a α s → H(a, hα, hs₀(hs)))
+        (f : SpectralStripJetIndex χ a α s → StrongDual ℂ H(a, hα, hs₀(hs))),
+        Bases(χ, x, f) →
+        ∃ (K : PontryaginDual C₁ × ℤ → Finset Z(χ))
+          (hd : ∀ i j, i ≠ j → Disjoint (K i) (K j)),
+          (∀ z, ∃ i, z ∈ K i) ∧
+          (∃ κT : Π(W'(α, s), W(α, s)),
+            SpectralKernelSumsTendstoAlong K hd (fun z : Z(χ) ↦ N(χ, z))
+              (fun z m ↦ jet(z, m)) (fun j ↦ D ((f j).comp (Aq(a, hα, hs₀(hs), φ))))
+              (fun j ↦ S(a, hα, hs₀(hs)) (x j)) κT) ∧
+          BddAbove (range fun C : Finset (PontryaginDual C₁ × ℤ) ↦ traceNorm
+            (spectralJetBlockSum Q(a, hα, hs₀(hs)) (fun z : Z(χ) ↦ N(χ, z))
+              (fun z m ↦ jet(z, m)) f
+              (fun j ↦ Pgeom(a, hα, hs₀(hs))
+                ((A(hα, hs₀(hs), φ) : W(α, s) →L[ℂ] W(α, s)) (S(a, hα, hs₀(hs)) (x j))))
+              (C.disjiUnion K fun i _ j _ h ↦ hd i j h))) := by
+  choose χ X T φb p K bd hχ hX hd hc hbd0 hbds hshift hblocks using
+    spectralStripConvolution_exists_commonClusters (s := s) a hα hs₀(hs) φ
+  refine ⟨χ, hχ, fun x f hb ↦ ⟨K, hd, hc, ?_, ?_⟩⟩
+  · refine spectralStripTransposedKernel_along_of_blocks a hα hs χ x f hb φ K hd hc bd hbds
+      fun i ↦ ?_
+    have hdomφ : MellinShiftDominated χ X T φb p φ 1 := fun ω k w hw t ↦ by
+      rw [one_mul]
+      exact hshift ω k w hw t
+    refine (hblocks x f hb.1 hb.2 φ 1 hdomφ.unshifted i).imp fun R h ↦ ⟨h.1, ?_⟩
+    have h2 := h.2
+    rwa [one_mul] at h2
+  · exact spectralStripGeometricBlocks_bddAbove_of_commonClusters_rpow a hα hs σ hdens φ χ x f hb X hX
       T φb p K hd bd hbd0 hbds hshift (hblocks x f hb.1 hb.2)
 
 end Clusters

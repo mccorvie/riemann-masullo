@@ -1111,9 +1111,9 @@ Reconstruction: The paper does not state this. It is the cluster form of
 `spectralStripGeometricKernel_blocks_bddAbove` for unions of whole clusters only, so no finite
 set of zeros that cuts a cluster enters. The spectral components are supplied by
 `spectralStripTransposedKernel_clusters_operator`, so the recorded gap #7241 is not used.
-On the line at even orders the hypothesis holds for the clusters of
-`spectralStripAmbientKernel_clusters_exists_of_polynomialDensity`. For positive widths and the
-other orders it is not known. -/
+At width zero the hypothesis holds for the clusters of
+`spectralStripAmbientKernel_clusters_exists_of_width_zero`. For positive widths it is not
+known. -/
 theorem spectralStripAmbientKernel_clusters_exists_of_geometric_bddAbove :
     ∃ (ι : Type u_1) (K : ι → Finset zeros(F, χ, a, α))
       (hd : ∀ i j, i ≠ j → Disjoint (K i) (K j)),
@@ -1258,9 +1258,10 @@ No hypothesis is left: the bound for the geometric blocks that
 `spectralStripGeometricBlocks_clusters_bddAbove_of_polynomialDensity` of `Sec4b_ClusterLine`.
 Reconstruction: The paper does not state this. It is the statement of
 `spectralStripAmbientKernel_exists` and of (10.4.3.45) for sums over unions of whole clusters,
-on the line at even orders. For the rectangles of an arbitrary enumeration of the single zeros,
-for positive widths and for the other orders the estimate of the geometric component stays
-open; that is the recorded gap `spectralStripGeometricKernel_blocks_bddAbove` (#7406).
+on the line at even orders; `spectralStripAmbientKernel_clusters_exists_of_width_zero` covers
+every order. For the rectangles of an arbitrary enumeration of the single zeros and for
+positive widths the estimate of the geometric component stays open; that is the recorded gap
+`spectralStripGeometricKernel_blocks_bddAbove` (#7406).
 Deviation: Stated for one choice of the unitary extensions, the one of a norm section. -/
 theorem spectralStripAmbientKernel_clusters_exists_of_polynomialDensity
     (n : ℕ) (hdens : ∀ t, intervalSobolevDensity (-α) α s t = (1 + t ^ 2) ^ n) :
@@ -1321,5 +1322,83 @@ theorem spectralStripAmbientKernel_clusters_exists_of_width_zero_even_order
             sobolevProjectiveKernelOperator (F := F) hα hs₀ κ = (Aφ).comp Pₐ :=
   spectralStripAmbientKernel_clusters_exists_of_polynomialDensity (F := F) a hα hs φ n
     fun t ↦ intervalSobolevDensity_zero_even hα0 n hsn t
+
+omit ha hχ he horder hb in
+-- The statement is in the notation of this file, its proof in that of `Sec4b_ClusterLine`.
+set_option maxHeartbeats 800000 in
+/-- Paper: Theorem 10.4.3.5(2)–(3), pp. 472–473, when the density of the Sobolev space is
+`(1 + t ^ 2) ^ σ` for a real `σ`, for every test, with the zeros summed by clusters. There is a
+choice of the unitary extensions of the norm-one characters such that, for every Markushevich
+basis realizing the strip jets of that choice, the zeros can be grouped into finite clusters,
+pairwise disjoint and covering all the zeros, along which the ambient tensors, with convolution
+on the output factor, converge in the completed projective tensor product; and the limit
+represents convolution after spectral projection, the operator of (10.4.3.45) on p. 473.
+This is `spectralStripAmbientKernel_clusters_exists_of_polynomialDensity` for every real
+exponent. The bound for the geometric blocks is
+`spectralStripGeometricBlocks_clusters_bddAbove_of_rpowDensity` of `Sec4b_ClusterLine`.
+Reconstruction: The paper does not state this.
+Deviation: Stated for one choice of the unitary extensions, the one of a norm section. -/
+theorem spectralStripAmbientKernel_clusters_exists_of_rpowDensity
+    (σ : ℝ) (hdens : ∀ t, intervalSobolevDensity (-α) α s t = (1 + t ^ 2) ^ σ) :
+    ∃ χ₀ : PontryaginDual (ideleClassNorm F).ker → PontryaginDual (IdeleClassGroup (𝓞 F) F),
+      IsSpectralBasepointChoice χ₀ ∧
+      ∀ (x₀ : SpectralStripJetIndex χ₀ a α s → H(F, a, hα, hs))
+        (f₀ : SpectralStripJetIndex χ₀ a α s → StrongDual ℂ H(F, a, hα, hs)),
+        (IsSpectralMarkushevichBasis x₀ f₀ ∧ ∀ j, Dₐ (f₀ j) =
+          (spectralStripJet_memLp χ₀ hα (zero_le_one.trans hs.le) j).toLp
+            (spectralZeroJet (F := F) (χ₀ j.val.1) j.val.2.1 j.val.2.2.1 j.val.2.2.2)) →
+        ∃ (K : PontryaginDual (ideleClassNorm F).ker × ℤ → Finset zeros(F, χ₀, a, α))
+          (hd : ∀ i j, i ≠ j → Disjoint (K i) (K j)),
+          (∀ z, ∃ i, z ∈ K i) ∧
+          ∃ κ, SpectralKernelSumsTendstoAlong K hd
+              (fun z : zeros(F, χ₀, a, α) ↦ spectralStripMultiplicity α s z.val.2.1
+                (order(χ₀, a, z.val)).untop₀.toNat)
+              (fun z m ↦ (⟨(z.val.1, z.val.2.1, z.val.2.2, m.val), m.isLt⟩ :
+                SpectralStripJetIndex (F := F) χ₀ a α s))
+              (fun j ↦ Dₐ (f₀ j)) (fun j ↦ Aφ (Sₐ(x₀ j))) κ ∧
+            sobolevProjectiveKernelOperator (F := F) hα hs₀ κ = (Aφ).comp Pₐ := by
+  refine (spectralStripGeometricBlocks_clusters_bddAbove_of_rpowDensity (F := F) a hα hs σ
+    hdens φ).imp fun χ₀ h ↦ ⟨h.1, fun x₀ f₀ hb₀ ↦ ?_⟩
+  refine (h.2 x₀ f₀ hb₀).imp fun K hK ↦ hK.imp fun hd hK' ↦ ⟨hK'.1, ?_⟩
+  exact hK'.2.1.elim fun κT hT ↦
+    spectralStripAmbientKernel_along_exists_of_geometric_bddAbove a hα hs φ χ₀ x₀ f₀ hb₀ K hd
+      hK'.1 hT hK'.2.2
+
+omit ha hχ he horder hb in
+/-- Paper: Theorem 10.4.3.5(2)–(3), pp. 472–473, at width zero, for every order `s > 1` and
+every test, with the zeros summed by clusters. There is a choice of the unitary extensions of
+the norm-one characters such that, for every Markushevich basis realizing the strip jets of that
+choice, the zeros can be grouped into finite clusters, pairwise disjoint and covering all the
+zeros, along which the ambient tensors converge in the completed projective tensor product to a
+kernel of convolution after spectral projection, the operator of (10.4.3.45) on p. 473.
+No hypothesis is left. At width zero the density is `(1 + t ^ 2) ^ (s / 2)`
+(`intervalSobolevDensity_width_zero`), and the statement is
+`spectralStripAmbientKernel_clusters_exists_of_rpowDensity` with `σ = s / 2`.
+Reconstruction: The paper does not state this. It is the statement of
+`spectralStripAmbientKernel_exists` and of (10.4.3.45) for sums over unions of whole clusters,
+on the line. For the rectangles of an arbitrary enumeration of the single zeros, and for
+positive widths, the estimate of the geometric component stays open; that is the recorded gap
+`spectralStripGeometricKernel_blocks_bddAbove` (#7406).
+Deviation: Stated for one choice of the unitary extensions, the one of a norm section. -/
+theorem spectralStripAmbientKernel_clusters_exists_of_width_zero (hα0 : α = 0) :
+    ∃ χ₀ : PontryaginDual (ideleClassNorm F).ker → PontryaginDual (IdeleClassGroup (𝓞 F) F),
+      IsSpectralBasepointChoice χ₀ ∧
+      ∀ (x₀ : SpectralStripJetIndex χ₀ a α s → H(F, a, hα, hs))
+        (f₀ : SpectralStripJetIndex χ₀ a α s → StrongDual ℂ H(F, a, hα, hs)),
+        (IsSpectralMarkushevichBasis x₀ f₀ ∧ ∀ j, Dₐ (f₀ j) =
+          (spectralStripJet_memLp χ₀ hα (zero_le_one.trans hs.le) j).toLp
+            (spectralZeroJet (F := F) (χ₀ j.val.1) j.val.2.1 j.val.2.2.1 j.val.2.2.2)) →
+        ∃ (K : PontryaginDual (ideleClassNorm F).ker × ℤ → Finset zeros(F, χ₀, a, α))
+          (hd : ∀ i j, i ≠ j → Disjoint (K i) (K j)),
+          (∀ z, ∃ i, z ∈ K i) ∧
+          ∃ κ, SpectralKernelSumsTendstoAlong K hd
+              (fun z : zeros(F, χ₀, a, α) ↦ spectralStripMultiplicity α s z.val.2.1
+                (order(χ₀, a, z.val)).untop₀.toNat)
+              (fun z m ↦ (⟨(z.val.1, z.val.2.1, z.val.2.2, m.val), m.isLt⟩ :
+                SpectralStripJetIndex (F := F) χ₀ a α s))
+              (fun j ↦ Dₐ (f₀ j)) (fun j ↦ Aφ (Sₐ(x₀ j))) κ ∧
+            sobolevProjectiveKernelOperator (F := F) hα hs₀ κ = (Aφ).comp Pₐ :=
+  spectralStripAmbientKernel_clusters_exists_of_rpowDensity (F := F) a hα hs φ (s / 2)
+    fun t ↦ intervalSobolevDensity_width_zero hα0 t
 
 end RiemannMasullo.Isolated

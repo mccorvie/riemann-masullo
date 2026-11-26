@@ -166,7 +166,7 @@ local notation "ν" => (fun a b s ↦ intervalSobolevMeasure μ L a b s)
 
 /-- The norm closure of the continuous compactly supported representatives is all of weighted
 L². A copy of the private `dense_compactCore` of `Sec3_Adjoint`. -/
-private theorem dense_compactCore' (ν₀ : Measure G) [IsLocallyFiniteMeasure ν₀] :
+theorem dense_compactCore' (ν₀ : Measure G) [IsLocallyFiniteMeasure ν₀] :
     Dense {u : Lp ℂ 2 ν₀ | ∃ f : G → ℂ,
       Continuous f ∧ HasCompactSupport f ∧ (u : G → ℂ) =ᵐ[ν₀] f} := by
   intro u
@@ -180,7 +180,7 @@ private theorem dense_compactCore' (ν₀ : Measure G) [IsLocallyFiniteMeasure �
   exact he.trans_lt hδε
 
 /-- A finite sum of square-integrable classes is represented by the sum of representatives. -/
-private theorem coeFn_finset_sum_ae {ι : Type*} (ν₀ : Measure G) (s : Finset ι)
+theorem coeFn_finset_sum_ae {ι : Type*} (ν₀ : Measure G) (s : Finset ι)
     (F : ι → Lp ℂ 2 ν₀) (f : ι → G → ℂ) (h : ∀ i ∈ s, (F i : G → ℂ) =ᵐ[ν₀] f i) :
     ((∑ i ∈ s, F i : Lp ℂ 2 ν₀) : G → ℂ) =ᵐ[ν₀] fun x ↦ ∑ i ∈ s, f i x := by
   classical

@@ -221,6 +221,157 @@ theorem traceNorm_geometricPart_le_of_modulated_recursion {ι : Type*} (s : Fins
   rw [hw00, mul_one] at h0
   exact h0.trans hγfin
 
+/-- A recursion for the trace norm of the part of an operator that an idempotent splitting
+`G + P = 1` sends from the range of `P` into the range of `G`, over a family of operators
+`A k m` indexed by a power `k` and an integer `m`, with infinitely many terms. Let
+`G (A 0 m) P = -∑ i, c i • G (M i) (A (e i) m) P`, a convergent series with contractions `M i`,
+and let each `A (k + 1) m` be the sum of the series `∑ n, a n • A k (m + n)`. Let `Q` be nuclear
+with `P Q = Q`, and let `v = ∑ n, ‖a n‖ (1 + |n|) ^ p`. If the `A 0 m` are uniformly bounded,
+the trace norms of `P (A 0 m) Q` are at most `Bd (1 + |m|) ^ p`, and
+`∑ i, ‖c i‖ v ^ (e i) ≤ θ < 1`, then the trace norm of `G (A 0 0) Q` is at most
+`θ / (1 - θ) * Bd`.
+This is `traceNorm_geometricPart_le_of_modulated_recursion` with the powers handled one step at
+a time: the bound for the level `k` gives the bound for the level `k + 1` with one more factor
+`v`. -/
+theorem traceNorm_geometricPart_le_of_iterated_recursion {ι : Type*}
+    (G P : W →L[ℂ] W) (hG : ‖G‖ ≤ 1) (hGP : G + P = 1)
+    (A : ℕ → ℤ → W →L[ℂ] W) (M : ι → W →L[ℂ] W) (hM : ∀ i, ‖M i‖ ≤ 1)
+    (c : ι → ℂ) (e : ι → ℕ) (a : ℤ → ℂ)
+    (hrec : ∀ m, HasSum (fun i ↦ c i • (G * (M i * (A (e i) m * P)))) (-(G * (A 0 m * P))))
+    (hstep : ∀ k m, HasSum (fun n : ℤ ↦ a n • A k (m + n)) (A (k + 1) m))
+    (Q : nuclearEndomorphisms W) (hPQ : P * Q.val = Q.val)
+    (M₀ Bd θ : ℝ) (p : ℕ) (hA : ∀ m, ‖A 0 m‖ ≤ M₀)
+    (hspec : ∀ m, traceNorm ⟨(P * A 0 m) * Q.val, mul_mem_nuclearEndomorphisms_left _ Q⟩ ≤
+      Bd * (1 + |(m : ℝ)|) ^ p)
+    (ha : Summable (fun n : ℤ ↦ ‖a n‖ * (1 + |(n : ℝ)|) ^ p))
+    (hθs : Summable (fun i ↦ ‖c i‖ * (∑' n : ℤ, ‖a n‖ * (1 + |(n : ℝ)|) ^ p) ^ e i))
+    (hθ : ∑' i, ‖c i‖ * (∑' n : ℤ, ‖a n‖ * (1 + |(n : ℝ)|) ^ p) ^ e i ≤ θ) (hθ1 : θ < 1) :
+    traceNorm ⟨(G * A 0 0) * Q.val, mul_mem_nuclearEndomorphisms_left _ Q⟩ ≤
+      θ / (1 - θ) * Bd := by
+  let L (X : W →L[ℂ] W) (T : nuclearEndomorphisms W) : nuclearEndomorphisms W :=
+    ⟨X * T.val, mul_mem_nuclearEndomorphisms_left X T⟩
+  let w (m : ℤ) : ℝ := (1 + |(m : ℝ)|) ^ p
+  have hw1 (m : ℤ) : 1 ≤ w m := one_le_pow₀ (by linarith [abs_nonneg (m : ℝ)])
+  have hw0 (m : ℤ) : 0 < w m := zero_lt_one.trans_le (hw1 m)
+  have hwmul (m n : ℤ) : w (m + n) ≤ w m * w n := one_add_abs_add_pow_le m n p
+  let g (m : ℤ) : ℝ := traceNorm (L (G * A 0 m) Q)
+  let τ (m : ℤ) : ℝ := traceNorm (L (P * A 0 m) Q)
+  let tQ := traceNorm Q
+  have htQ : 0 ≤ tQ := traceNorm_nonneg'' Q
+  have hg0 (m : ℤ) : 0 ≤ g m := traceNorm_nonneg'' _
+  have hBd : 0 ≤ Bd := by
+    have h := (traceNorm_nonneg'' _).trans (hspec 0)
+    simpa using h
+  let v : ℝ := ∑' n : ℤ, ‖a n‖ * (1 + |(n : ℝ)|) ^ p
+  have hv0 : 0 ≤ v := tsum_nonneg fun n ↦ by positivity
+  have hprior (m : ℤ) : g m ≤ M₀ * tQ := by
+    have h1 := traceNorm_mul_left_le (G * A 0 m) Q
+    have h2 : ‖G * A 0 m‖ ≤ M₀ := (norm_mul_le G (A 0 m)).trans
+      ((mul_le_mul hG (hA m) (norm_nonneg _) zero_le_one).trans (one_mul _).le)
+    exact h1.trans (mul_le_mul_of_nonneg_right h2 htQ)
+  have hbdd : BddAbove (range fun m : ℤ ↦ g m / w m) := by
+    refine ⟨M₀ * tQ, ?_⟩
+    rintro _ ⟨m, rfl⟩
+    exact (div_le_self (hg0 m) (hw1 m)).trans (hprior m)
+  let γ : ℝ := ⨆ m : ℤ, g m / w m
+  have hγ (m : ℤ) : g m ≤ γ * w m := by
+    have h := le_ciSup hbdd m
+    rwa [div_le_iff₀ (hw0 m)] at h
+  have hγ0 : 0 ≤ γ := (div_nonneg (hg0 0) (hw0 0).le).trans (le_ciSup hbdd 0)
+  have hτ (m : ℤ) : τ m ≤ Bd * w m := hspec m
+  -- The bound at the level `k`, by induction on `k`.
+  have hpart (X : W →L[ℂ] W) (C : ℝ) (hC : 0 ≤ C)
+      (hx : ∀ m, traceNorm (L (X * A 0 m) Q) ≤ C * w m) :
+      ∀ (k : ℕ) (m : ℤ), traceNorm (L (X * A k m) Q) ≤ C * w m * v ^ k := by
+    intro k
+    induction k with
+    | zero =>
+      intro m
+      rw [pow_zero, mul_one]
+      exact hx m
+    | succ k ih =>
+      intro m
+      have hsum : HasSum (fun n : ℤ ↦ (a n • L (X * A k (m + n)) Q).val)
+          ((X * A (k + 1) m) * Q.val) := by
+        have h1 := ((ContinuousLinearMap.mul ℂ (W →L[ℂ] W) X).hasSum (hstep k m))
+        have h2 := ((ContinuousLinearMap.mul ℂ (W →L[ℂ] W)).flip Q.val).hasSum h1
+        refine h2.congr_fun fun n ↦ ?_
+        change (a n • L (X * A k (m + n)) Q).val = (X * (a n • A k (m + n))) * Q.val
+        simp only [L, Submodule.coe_smul, mul_smul_comm, smul_mul_assoc]
+      obtain ⟨hn, hle⟩ := traceNorm_le_of_hasSum (fun n : ℤ ↦ a n • L (X * A k (m + n)) Q)
+        ((X * A (k + 1) m) * Q.val) hsum
+        (fun n ↦ C * w m * v ^ k * (‖a n‖ * (1 + |(n : ℝ)|) ^ p)) (ha.mul_left _) (fun n ↦ by
+          rw [traceNorm_smul'']
+          calc ‖a n‖ * traceNorm (L (X * A k (m + n)) Q)
+              ≤ ‖a n‖ * (C * w (m + n) * v ^ k) :=
+                mul_le_mul_of_nonneg_left (ih _) (norm_nonneg _)
+            _ ≤ ‖a n‖ * (C * (w m * w n) * v ^ k) :=
+                mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_right
+                  (mul_le_mul_of_nonneg_left (hwmul m n) hC) (pow_nonneg hv0 k)) (norm_nonneg _)
+            _ = C * w m * v ^ k * (‖a n‖ * (1 + |(n : ℝ)|) ^ p) := by ring)
+      rw [tsum_mul_left] at hle
+      calc traceNorm (L (X * A (k + 1) m) Q) ≤ C * w m * v ^ k * v := hle
+        _ = C * w m * v ^ (k + 1) := by ring
+  have hrecg (m : ℤ) : g m ≤ θ * (γ + Bd) * w m := by
+    have hsum : HasSum (fun i ↦
+        (c i • L (G * M i) (L (G * A (e i) m) Q + L (P * A (e i) m) Q)).val)
+        (-((G * A 0 m) * Q.val)) := by
+      have h2 := ((ContinuousLinearMap.mul ℂ (W →L[ℂ] W)).flip Q.val).hasSum (hrec m)
+      have hval : (-(G * (A 0 m * P))) * Q.val = -((G * A 0 m) * Q.val) := by
+        rw [neg_mul, mul_assoc, mul_assoc, mul_assoc, hPQ]
+      have h3 : HasSum (fun i ↦ (c i • (G * (M i * (A (e i) m * P)))) * Q.val)
+          (-((G * A 0 m) * Q.val)) := hval ▸ h2
+      refine h3.congr_fun fun i ↦ ?_
+      simp only [L, Submodule.coe_smul, Submodule.coe_add]
+      rw [smul_mul_assoc, ← add_mul, ← add_mul, hGP, one_mul]
+      congr 1
+      simp only [mul_assoc]
+      rw [hPQ]
+    obtain ⟨hn, hle⟩ := traceNorm_le_of_hasSum
+      (fun i ↦ c i • L (G * M i) (L (G * A (e i) m) Q + L (P * A (e i) m) Q))
+      (-((G * A 0 m) * Q.val)) hsum (fun i ↦ (γ + Bd) * w m * (‖c i‖ * v ^ e i))
+      (hθs.mul_left _) (fun i ↦ by
+        rw [traceNorm_smul'']
+        have h1 := traceNorm_mul_left_le (G * M i) (L (G * A (e i) m) Q + L (P * A (e i) m) Q)
+        have h2 : ‖G * M i‖ ≤ 1 := (norm_mul_le G (M i)).trans
+          ((mul_le_mul hG (hM i) (norm_nonneg _) zero_le_one).trans (one_mul 1).le)
+        have h3 := traceNorm_add_le'' (L (G * A (e i) m) Q) (L (P * A (e i) m) Q)
+        have h4 := hpart G γ hγ0 hγ (e i) m
+        have h5 := hpart P Bd hBd hτ (e i) m
+        have h6 : traceNorm (L (G * M i) (L (G * A (e i) m) Q + L (P * A (e i) m) Q)) ≤
+            (γ + Bd) * w m * v ^ e i :=
+          calc _ ≤ ‖G * M i‖ * traceNorm (L (G * A (e i) m) Q + L (P * A (e i) m) Q) := h1
+            _ ≤ 1 * traceNorm (L (G * A (e i) m) Q + L (P * A (e i) m) Q) :=
+                mul_le_mul_of_nonneg_right h2 (traceNorm_nonneg'' _)
+            _ ≤ γ * w m * v ^ e i + Bd * w m * v ^ e i := by
+                rw [one_mul]
+                exact h3.trans (add_le_add h4 h5)
+            _ = (γ + Bd) * w m * v ^ e i := by ring
+        calc ‖c i‖ * traceNorm (L (G * M i) (L (G * A (e i) m) Q + L (P * A (e i) m) Q))
+            ≤ ‖c i‖ * ((γ + Bd) * w m * v ^ e i) := mul_le_mul_of_nonneg_left h6 (norm_nonneg _)
+          _ = (γ + Bd) * w m * (‖c i‖ * v ^ e i) := by ring)
+    rw [tsum_mul_left] at hle
+    have hneg : traceNorm ⟨-((G * A 0 m) * Q.val), hn⟩ = g m := by
+      have h1 : (⟨-((G * A 0 m) * Q.val), hn⟩ : nuclearEndomorphisms W) =
+          (-1 : ℂ) • L (G * A 0 m) Q := Subtype.ext (by simp [L])
+      rw [h1, traceNorm_smul'', norm_neg, norm_one, one_mul]
+    rw [hneg] at hle
+    calc g m ≤ (γ + Bd) * w m * ∑' i, ‖c i‖ * v ^ e i := hle
+      _ ≤ (γ + Bd) * w m * θ :=
+          mul_le_mul_of_nonneg_left hθ (mul_nonneg (add_nonneg hγ0 hBd) (hw0 m).le)
+      _ = θ * (γ + Bd) * w m := by ring
+  have hγle : γ ≤ θ * (γ + Bd) := ciSup_le fun m ↦ by
+    rw [div_le_iff₀ (hw0 m)]
+    exact hrecg m
+  have hγfin : γ ≤ θ / (1 - θ) * Bd := by
+    have h1 : 0 < 1 - θ := by linarith
+    rw [div_mul_eq_mul_div, le_div_iff₀ h1]
+    linarith
+  have h0 := hγ 0
+  have hw00 : w 0 = 1 := by simp [w]
+  rw [hw00, mul_one] at h0
+  exact h0.trans hγfin
+
 end ModulatedRecursion
 
 variable {F : Type*} [Field F] [NumberField F]
