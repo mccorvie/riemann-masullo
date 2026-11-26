@@ -125,7 +125,8 @@ private def insertIndex {T : Finset V} (v : V) (kn : ℕ × (T → ℕ))
     (w : ↥(insert v T : Finset V)) : ℕ :=
   if hw : w.val ∈ T then kn.2 ⟨w.val, hw⟩ else kn.1
 
-private def insertIndexEquiv {T : Finset V} (v : V) (hv : v ∉ T) :
+/-- Separate the valuation at the new place from the retained cone coordinates. -/
+def insertIndexEquiv {T : Finset V} (v : V) (hv : v ∉ T) :
     (ℕ × (T → ℕ)) ≃ (↥(insert v T : Finset V) → ℕ) where
   toFun := insertIndex v
   invFun n := (n ⟨v, Finset.mem_insert_self _ _⟩, fun w ↦ n ⟨w.val, Finset.mem_insert_of_mem w.property⟩)
@@ -143,7 +144,8 @@ private def insertIndexEquiv {T : Finset V} (v : V) (hv : v ∉ T) :
       rw [he']
       simp [insertIndex, hv]
 
-private theorem latticeRadius_insertIndex {T : Finset V} (v : V) (hv : v ∉ T)
+/-- The radius splits as the new prime power times the radius of the retained cone. -/
+theorem latticeRadius_insertIndex {T : Finset V} (v : V) (hv : v ∉ T)
     (kn : ℕ × (T → ℕ)) :
     latticeRadius (insertIndexEquiv v hv kn) = (v.asIdeal.absNorm : ℝ)^kn.1 * latticeRadius kn.2 := by
   let E := Finset.subtypeInsertEquivOption hv
@@ -159,6 +161,10 @@ private theorem latticeRadius_insertIndex {T : Finset V} (v : V) (hv : v ∉ T)
       | none => simp [G, E, Finset.subtypeInsertEquivOption, insertIndexEquiv, insertIndex, hv]
       | some u => simp [G, E, Finset.subtypeInsertEquivOption, insertIndexEquiv, insertIndex, u.property]
     _ = _ := Fintype.prod_option G
+
+/-- The empty valuation cone has radius one. -/
+theorem latticeRadius_empty (n : (∅ : Finset V) → ℕ) : latticeRadius n = 1 := by
+  simp [latticeRadius]
 
 include hf in
 private theorem theta_hasSum_rows (T : Finset V) (v : V) (hv : v ∉ T)

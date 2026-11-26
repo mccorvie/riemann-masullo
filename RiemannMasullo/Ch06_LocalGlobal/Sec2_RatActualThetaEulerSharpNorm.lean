@@ -15,6 +15,8 @@ namespace RiemannMasullo.RatFiniteEulerLogLpSeries
 open MeasureTheory NumberField IsDedekindDomain RatUnramifiedThetaLattice RatFinitePositiveUnitRep Filter Set
 open scoped Classical Topology symmDiff
 
+local notation "LogL2" => Lp ℂ 2 (volume : Measure ℝ)
+
 private def box (a b : ℝ) : LogL2 :=
   indicatorConstLp 2 (measurableSet_Ioc (a := a) (b := b)) (by simp [Real.volume_Ioc]) (1 : ℂ)
 

@@ -90,9 +90,10 @@ open scoped Classical NumberField.AdeleRing
 local notation "V" => HeightOneSpectrum (𝓞 ℚ)
 local notation "B∞" => SchwartzBruhat (Multiplicative (InfiniteAdeleRing ℚ))
 local notation "rc" => InfinitePlace.Completion.extensionEmbeddingOfIsReal Rat.isReal_infinitePlace
-abbrev LogL2 := Lp ℂ 2 (volume : Measure ℝ)
+local notation "LogL2" => Lp ℂ 2 (volume : Measure ℝ)
 
-private theorem cone_pos {S : Finset V} (n : S → ℕ) : 0 < latticeRadius n :=
+/-- Every product of selected prime powers has strictly positive radius. -/
+theorem cone_pos {S : Finset V} (n : S → ℕ) : 0 < latticeRadius n :=
   Finset.prod_pos fun v _ ↦ pow_pos (Nat.cast_pos.mpr
     (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v.val))) _
 
@@ -108,6 +109,10 @@ private theorem ratio_lt (v : V) : ratio v < 1 := by
   have h : (1 : ℝ) < v.asIdeal.absNorm := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
   apply inv_lt_one_of_one_lt₀
   simpa using Real.sqrt_lt_sqrt zero_le_one h
+
+/-- The half-twisted coefficient of any finite place is strictly contractive. -/
+theorem primeRadiusInvSqrt_lt_one (v : V) : (Real.sqrt (v.asIdeal.absNorm : ℝ))⁻¹ < 1 :=
+  ratio_lt v
 
 /-- Product of the masses of the local geometric kernels. -/
 def chartBound (S : Finset V) : ℝ := ∏ v : S, (1 - (Real.sqrt (v.val.asIdeal.absNorm : ℝ))⁻¹)⁻¹
@@ -242,7 +247,8 @@ theorem norm_chartSeries_le (S : Finset V) (P : LogL2) : ‖chartSeries S P‖ �
     abs_of_nonneg (Real.sqrt_nonneg _), LinearIsometryEquiv.norm_map, tsum_mul_right]
   exact mul_le_mul_of_nonneg_right (coneMass_le S) (norm_nonneg _)
 
-private theorem translate_complex_smul (h : ℝ) (c : ℂ) (P : LogL2) :
+/-- Real-coordinate translation commutes with the complex scalars of logarithmic L². -/
+theorem translate_complex_smul (h : ℝ) (c : ℂ) (P : LogL2) :
     Measure.translateLp volume 2 h (c • P) = c • Measure.translateLp volume 2 h P := by
   apply Lp.ext
   filter_upwards [Measure.coeFn_translateLp h (c • P), Lp.coeFn_smul c (Measure.translateLp volume 2 h P),
