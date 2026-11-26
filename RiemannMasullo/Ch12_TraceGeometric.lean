@@ -1,5 +1,3 @@
-import Mathlib
-
 /-!
 # Chapter 12. Trace formula: Geometric Side
 

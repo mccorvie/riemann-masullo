@@ -1,5 +1,3 @@
-import Mathlib
-
 /-!
 # Appendix D. Schwartz-Bruhat functions
 

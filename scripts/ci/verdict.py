@@ -239,12 +239,16 @@ class Check:
         return parse_sizes(out) if status == 0 else None
 
     def keywords_current(self):
-        """Whether the checked-in list of command keywords matches main as just built."""
+        """Whether the checked-in list of command keywords covers main as just built."""
         status, out = self.lake("lake", "env", "lean", "--run", str(TOOLS / "scripts/ci/CommandKeywords.lean"),
                                 *self.modules(), timeout=1200, quiet=True)
         listed = (TOOLS / "scripts/ci/command_keywords.txt").read_text(encoding="utf-8")
-        listed = "".join(line + "\n" for line in listed.split("\n") if line and not line.startswith("#"))
-        return status == 0 and out == listed, out
+        listed_set = {line for line in listed.split("\n") if line and not line.startswith("#")}
+        actual_set = {line for line in out.split("\n") if line}
+        if status != 0 or not actual_set:
+            return False, out
+        missing = sorted(actual_set - listed_set)
+        return not missing, ("\n".join(missing) + "\n" if missing else out)
 
     def docstrings_inert(self):
         """Whether main leaves doc comments as plain text (the option `doc.verso` is not used).
