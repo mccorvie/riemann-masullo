@@ -45,6 +45,14 @@ def fixedBoxColumnDenominator : ClosedSubmodule ℂ C :=
 
 local notation "N" => ClosedSubmodule.toSubmodule (fixedBoxColumnDenominator hX T K hT hK hd hj hjK)
 
+theorem mem_fixedBoxColumnDenominator_iff (u : C) : u ∈ N ↔
+    (u : LogL2) ∈ closedStageSubmodule X (T ∪ K) (by
+      intro p hp
+      exact (Finset.mem_union.mp hp).elim (fun h ↦ (hT p h).one_lt.le)
+        (fun h ↦ (hK p h).one_lt.le)) := by
+  unfold fixedBoxColumnDenominator
+  rfl
+
 /-- Consecutive raw central jets on the actual intersection. -/
 def fixedBoxColumnJets : C →L[ℂ] (Fin (K.card - j) → ℂ) :=
   ContinuousLinearMap.pi fun i ↦
@@ -87,6 +95,13 @@ def fixedBoxColumnQuotientEquiv : (C ⧸ N) ≃ₗ[ℂ] (Fin (K.card - j) → �
   (Submodule.quotEquivOfEq _ _ (ker_fixedBoxColumnJets hX T K hT hK hd hj hjK).symm).trans
     (LinearMap.quotKerEquivOfSurjective (L).toLinearMap
       (fixedBoxColumnJets_surjective hX T K hT hK hd hj hjK))
+
+/-- Raw coordinates of an actual representative in the finite-column quotient. -/
+theorem fixedBoxColumnQuotientEquiv_mk (u : C) (i : Fin (K.card - j)) :
+    fixedBoxColumnQuotientEquiv hX T K hT hK hd hj hjK ((N).mkQ u) i =
+      halfLineMellinJet (-Real.log X) 0 (T.card + j + i.val) (u : LogL2) := by
+  unfold fixedBoxColumnQuotientEquiv fixedBoxColumnJets
+  rfl
 
 theorem finrank_fixedBoxColumnQuotient : Module.finrank ℂ (C ⧸ N) = K.card - j :=
   (fixedBoxColumnQuotientEquiv hX T K hT hK hd hj hjK).finrank_eq.trans (Module.finrank_fin_fun ℂ)

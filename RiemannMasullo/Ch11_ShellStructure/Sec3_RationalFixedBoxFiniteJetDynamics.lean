@@ -1,7 +1,6 @@
 module
 
 public import RiemannMasullo.Ch11_ShellStructure.Sec3_RationalFixedBoxFiniteJetQuotient
-import all RiemannMasullo.Ch11_ShellStructure.Sec3_RationalFixedBoxFiniteJetQuotient
 
 /-! # Forward translation on the actual finite-prime jet quotient
 
@@ -55,9 +54,16 @@ def fixedBoxColumnQuotientShift (h : ℝ≥0) : (C ⧸ N) →L[ℂ] (C ⧸ N) :=
     intro u hu
     change Submodule.Quotient.mk (R h u) = (0 : C ⧸ N)
     apply (Submodule.Quotient.mk_eq_zero _).mpr
-    exact halfShift_mem_closedStage hX (T ∪ K) _ h.property hu)
+    apply (mem_fixedBoxColumnDenominator_iff hX T K hT hK hd hj hjK _).mpr
+    exact halfShift_mem_closedStage hX (T ∪ K) _ h.property
+      ((mem_fixedBoxColumnDenominator_iff hX T K hT hK hd hj hjK _).mp hu))
 
 local notation "S" => fixedBoxColumnQuotientShift hX T K hT hK hd hj hjK
+
+theorem fixedBoxColumnQuotientShift_mk (h : ℝ≥0) (u : C) :
+    S h ((N).mkQ u) = (N).mkQ (R h u) := by
+  unfold fixedBoxColumnQuotientShift
+  rfl
 
 @[simp] theorem fixedBoxColumnQuotientShift_zero : S 0 = ContinuousLinearMap.id ℂ _ := by
   ext1 x
@@ -77,6 +83,7 @@ theorem fixedBoxColumnQuotientShift_row (h : ℝ≥0) (x : C ⧸ N) (r : Fin (K.
       ((b + r.val).choose (b + s.val) : ℂ) * ((h : ℝ) : ℂ)^(r.val-s.val) *
         E x ⟨s.val, lt_of_le_of_lt (Nat.le_of_lt_succ s.isLt) r.isLt⟩ := by
   obtain ⟨u, rfl⟩ := (N).mkQ_surjective x
+  simp only [fixedBoxColumnQuotientShift_mk, fixedBoxColumnQuotientEquiv_mk]
   change J (b + r.val) (halfShift h (u : LogL2)) = ∑ s : Fin (r.val+1),
     ((b + r.val).choose (b + s.val) : ℂ) * ((h : ℝ) : ℂ)^(r.val-s.val) * J (b+s.val) u
   have hf := halfLineMellinJet_halfShift (a := -Real.log X) (h := (h : ℝ)) (F := (u : LogL2))
@@ -103,18 +110,19 @@ theorem fixedBoxColumnQuotientShift_sub_filtration (h : ℝ≥0) (x : C ⧸ N) (
     · exact fixedBoxColumnIntersection_jet_zero hX T K hT hK hd hj hjK u hlow
     · let s : Fin (K.card-j) := ⟨d-b, by have := i.isLt; omega⟩
       have hs := hx s (by dsimp [s]; omega)
+      rw [fixedBoxColumnQuotientEquiv_mk] at hs
       change J (b + (d-b)) u = 0 at hs
       rwa [show b + (d-b) = d by omega] at hs
   have hsupp := closedStageSubmodule_supported hX T _ (column_oldStage hX T K hT hK hd hj hjK u)
   constructor
   · intro i hi
-    rw [map_sub]
+    simp only [map_sub, Pi.sub_apply, fixedBoxColumnQuotientShift_mk, fixedBoxColumnQuotientEquiv_mk]
     change J (b+i.val) (halfShift h (u : LogL2)) - J (b+i.val) u = 0
     rw [← map_sub]
     exact (halfLineMellinJet_halfShift_sub_leading h.property hsupp
       (fun d hd' ↦ hbound i d hd' hi)).1 _ le_rfl
   · intro i k hi hk
-    rw [map_sub]
+    simp only [map_sub, Pi.sub_apply, fixedBoxColumnQuotientShift_mk, fixedBoxColumnQuotientEquiv_mk]
     change J (b+k.val) (halfShift h (u : LogL2)) - J (b+k.val) u = _ * _ * J (b+i.val) u
     rw [← map_sub, show b+k.val = b+i.val+1 by omega, ← hi]
     exact (halfLineMellinJet_halfShift_sub_leading h.property hsupp
