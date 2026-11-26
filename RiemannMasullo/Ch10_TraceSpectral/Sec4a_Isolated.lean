@@ -3,6 +3,8 @@ module
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4a
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.AppC_LCTVS.Sec3b_HilbertSchmidtProduct
+import RiemannMasullo.AppC_LCTVS.Sec3a_SchattenInclusion
+import RiemannMasullo.Ch10_TraceSpectral.Sec3_TraceClass
 
 /-! # The spectral trace statements of §10.4.2 at orders between zero and one -/
 
@@ -325,12 +327,15 @@ survives. A Carleson formula with a positive measure for finite Blaschke product
 orthonormal basis `B_{n−1} g_n` of `D_s ⊖ V`. A positivity bound for the normalized kernels
 `g_n`, uniform in the measure, gives `‖Φ g_n‖² ≪ (1 + (Im ρ_n)²)^{−M}`, and the count of zeros
 with multiplicity makes the sum converge.
-Gap: Not proved in Lean. The argument is posted on #7405 as mathematics and was checked there
-by other contributors, not by Lean; the library has no Hardy or Dirichlet-type space of the
-strip in which to carry it out. Nothing in the Lean outside this file uses this statement. -/
+The Lean proof does not follow that argument. Convolution on the strip quotient is trace class
+for every Sobolev order `s ≥ 0` (`spectralStripConvolution_nuclear_of_summable_clusterTraceNorms`
+of `Sec3_TraceClass`: the zeros are summed by clusters between well-chosen heights, with contour
+multipliers built from the Hecke L-functions), and a nuclear operator is Hilbert–Schmidt
+(`mem_hilbertSchmidtOperators_of_isNuclearOperator`). The hypothesis `s ≤ 1` is not used. -/
 theorem spectralStripConvolution_hilbertSchmidt_of_le_one (_hs₁ : s ≤ 1)
-    (φ : BruhatCompactSupport C𝔽) : Aq(φ) ∈ hilbertSchmidtOperators H₀ H₀ := by
-  sorry
+    (φ : BruhatCompactSupport C𝔽) : Aq(φ) ∈ hilbertSchmidtOperators H₀ H₀ :=
+  mem_hilbertSchmidtOperators_of_isNuclearOperator
+    (spectralStripConvolution_nuclear_of_summable_clusterTraceNorms a hα hs φ)
 
 /-- Convolution of tests is composition of their actions on the strip quotient. -/
 private theorem spectralConvolution_lcaConvolution (θ u v : BruhatCompactSupport C𝔽)
@@ -350,29 +355,17 @@ private theorem spectralConvolution_lcaConvolution (θ u v : BruhatCompactSuppor
 Bruhat test acts by a nuclear convolution operator on the strip quotient.
 Deviation: The theorems of §10.4.2 print `s ≥ 0`, while p. 455 assumes `s > 1` for
 the section. This statement covers `0 ≤ s ≤ 1`.
-Proved from the Hilbert–Schmidt statement `spectralStripConvolution_hilbertSchmidt_of_le_one`
-and the Dixmier–Malliavin factorization `bruhatCompactSupport_convolution_factorization`: a
-product of two Hilbert–Schmidt operators is nuclear. At width zero the statement is also
+Proved directly from trace class on the strip quotient for every Sobolev order `s ≥ 0`
+(`spectralStripConvolution_nuclear_of_summable_clusterTraceNorms` of `Sec3_TraceClass`, the
+cluster route), so neither the Hilbert–Schmidt statement
+`spectralStripConvolution_hilbertSchmidt_of_le_one` nor the Dixmier–Malliavin factorization
+`bruhatCompactSupport_convolution_factorization` is used. At width zero the statement is also
 `spectralStripConvolution_nuclear_of_zero_width`. Nothing in the Lean uses this statement, and
 it is not known how it connects with the rest of the proof in Lean; in the paper it is used on
 pp. 459–461, 463–464, 503, 519–520. -/
 theorem spectralStripConvolution_nuclear_of_le_one (_hs₁ : s ≤ 1) (φ : BruhatCompactSupport C𝔽) :
-    IsNuclearOperator (E := H₀) (F := H₀) (Aq(φ)) := by
-  have hlin := spectralConvolution_isLinear (F := F) a hI hs
-  induction bruhatCompactSupport_convolution_factorization φ using
-    AddSubmonoid.closure_induction with
-  | mem θ h =>
-    obtain ⟨u, v, huv⟩ := h
-    rw [spectralConvolution_lcaConvolution a hα hs θ u v huv]
-    exact nuclear_hilbertSchmidt_comp
-      ⟨_, spectralStripConvolution_hilbertSchmidt_of_le_one a hα hs _hs₁ u⟩
-      ⟨_, spectralStripConvolution_hilbertSchmidt_of_le_one a hα hs _hs₁ v⟩
-  | zero =>
-    rw [hlin.map_zero]
-    exact (nuclearEndomorphisms _).zero_mem
-  | add x y _ _ hx hy =>
-    rw [hlin.map_add]
-    exact (nuclearEndomorphisms _).add_mem hx hy
+    IsNuclearOperator (E := H₀) (F := H₀) (Aq(φ)) :=
+  spectralStripConvolution_nuclear_of_summable_clusterTraceNorms a hα hs φ
 
 /-- Paper: Theorem 10.4.2.1, p. 459, equation (10.4.2.5). If every test acts on the strip
 quotient by a Hilbert–Schmidt operator, then every test acts by a nuclear operator.
@@ -1169,7 +1162,7 @@ theorem spectralStripConvolution_nuclear_iff_finite_jet_bound_adjoint
     ((A(ψ)).adjoint.comp (globalThetaSobolev F a hI hs)ᗮ.subtypeL) hsum v hv
 
 /-- Paper: Theorem 10.4.2.1, p. 459. Spectral projection after convolution is nuclear.
-This follows from the open statement `spectralStripConvolution_nuclear_of_le_one` by (10.4.2.5).
+This follows from the statement `spectralStripConvolution_nuclear_of_le_one` by (10.4.2.5).
 Deviation: This is the part of the printed range with `0 ≤ s ≤ 1`. The operator is independent
 of the cutoff. -/
 theorem spectralProjection_convolution_nuclear_of_le_one (_hs₁ : s ≤ 1) (φ : BruhatCompactSupport C𝔽) :
@@ -1226,7 +1219,7 @@ local notation "traceSplit(" hρ ", " φ ")" =>
        hilbertTrace (H := W) ⟨G, hG⟩ + hilbertTrace (H := W) ⟨S, hS⟩)
 
 /-- Paper: Theorem 10.4.2.1, p. 459. At an admissible cutoff the trace of cutoff convolution
-is the sum of the geometric and spectral traces, as in (10.4.2.3). The open statement
+is the sum of the geometric and spectral traces, as in (10.4.2.3). The statement
 `spectralStripConvolution_nuclear_of_le_one` supplies the hypothesis for the trace split.
 Deviation: The order is restricted to `0 ≤ s ≤ 1` and the three nuclearity witnesses are
 part of the conclusion for the real cutoff. -/
@@ -1262,7 +1255,7 @@ include hε hρ
 
 /-- Paper: Theorem 10.4.2.2, p. 460. The traces of cutoff projection after convolution tend
 to the trace of convolution on the strip quotient, as in (10.4.2.9). This follows from
-the open statement `spectralStripConvolution_nuclear_of_le_one`.
+the statement `spectralStripConvolution_nuclear_of_le_one`.
 Deviation: At `0 ≤ s ≤ 1` this asserts quotient nuclearity along with the limit. The proof
 on p. 461 uses the strip quotient. Real cutoffs and their traces need only agree with the
 prescribed data eventually as the radius tends to infinity. -/
@@ -1280,7 +1273,7 @@ theorem spectralTruncatedConvolution_trace_tendsto_of_one_lt (hs₁ : 1 < s) :
 
 /-- Paper: Theorem 10.4.2.8, p. 463. The traces of cutoff convolution after spectral
 projection tend to the strip quotient trace, as in (10.4.2.20). This follows from the
-open statement `spectralStripConvolution_nuclear_of_le_one`.
+statement `spectralStripConvolution_nuclear_of_le_one`.
 Deviation: At `0 ≤ s ≤ 1` this asserts quotient nuclearity along with the limit. The real
 cutoff conditions and agreement with the nuclear traces are eventual. -/
 theorem spectralRestriction_trace_tendsto_of_le_one (_hs₁ : s ≤ 1) :
