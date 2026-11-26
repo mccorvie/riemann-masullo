@@ -34,6 +34,17 @@ level is again the space of band vectors vanishing at the origin
 (`exists_realPWTestCutoff_level_trace_limit_of_lt_one`). It is the real term minus
 `∫ ψ g g ^ (1/2) dg`, so the comparison fails on that side as well.
 
+The proof of Theorem 12.5.1.1, p. 520, uses the theorem in another form: the diagonal integral
+is the local term less both polar Mellin values. On `main` the trace identity of
+Theorem 12.5.1.1 is proved for strip half-widths from one half (`traceFormula_of_half_le`), and
+below one half it holds exactly when no zero lies outside the strip
+(`spectralStripTrace_eq_localTerms_iff`). So the half-widths below one half are the ones where
+that use carries the content of the theorem. In the model it fails there
+(`sLocalTrace_realPWLevelPolarComparison_false`): the limit has one polar value, the integral
+condition does not survive the closure (#7770), and the term `∫ ψ g g ^ (1/2) dg` is not
+removed. From half-width one half, with `s > 1`, the form of p. 520 holds in the model
+(`exists_realPWTestCutoff_integralLevel_trace_limit`).
+
 The statements are the project's reconstruction of one reading of the proof, not statements
 that the paper prints for this model. The reading is the one of dyknapp's fixed-level
 construction in #7354: the weighted space, the level the closure of the polar-free tests, the
@@ -432,5 +443,74 @@ theorem sLocalTrace_realPWLevelSharpComparison_below_false :
     · rw [hψ0 g hg, zero_mul, zero_mul]
   rw [hlim, hce] at heq
   exact (Complex.ofReal_ne_zero.mpr hc.ne') (sub_eq_self.mp heq)
+
+/-- Paper: Theorem 12.5.1.1, proof, p. 520: "By Theorem 12.4.1.1, we further have that" the
+diagonal integral of the `S`-part of the kernel "equals the left side of (12.5.1.1) upon
+subtracting" the two polar Mellin values. Read in the model `F = ℚ`, `S = {∞}` of #7354 at a
+strip half-width `α < 1/2`, for a test function supported in `1 < g < 2`. For such a test
+`S = {∞}` meets the conditions of the first paragraph of p. 520. The statement says that the
+trace of the cutoff action on the polar-free level tends to the real term minus the integrals
+of `ψ g g ^ (-1/2)` and `ψ g g ^ (1/2)`.
+Reconstruction: As for `sLocalTrace_realPWLevelSharpComparison`, with the interval weight of
+Definition 10.1.1.1 at half-width `0 ≤ α < 1/2` and any order `s ≥ 0`. The level is the space
+of band vectors vanishing at the origin, which is the closure of the polar-free core (#7770).
+On `main` the trace identity of Theorem 12.5.1.1 holds for half-widths from one half
+(`traceFormula_of_half_le`), and below one half it holds exactly when no zero lies outside
+the strip (`spectralStripTrace_eq_localTerms_iff`). These are the half-widths for which this
+use of Theorem 12.4.1.1 carries the content of Theorem 12.5.1.1.
+Deviation: The limit is taken in the spatial cutoff at fixed bandwidth, where the paper has a
+joint limit. -/
+def sLocalTrace_realPWLevelPolarComparison : Prop :=
+  ∀ (Y α s : ℝ) (hs : 0 ≤ s), 0 < Y → 0 ≤ α → α < 1 / 2 → ∀ (a b : ℝ), 1 < a → b < 2 →
+    ∀ ψ : ℝ → ℂ, Continuous ψ → (∀ g ∉ Icc a b, ψ g = 0) →
+    ∀ T : ℝ → nuclearEndomorphisms
+        (RealPWBand.space Y (volume_le_realPWIntervalMeasure α s hs)),
+      (∀ L (f : RealPWBand.space Y (volume_le_realPWIntervalMeasure α s hs)),
+        ∃ r : Lp ℂ 2 (realPWIntervalMeasure α s),
+          (∀ᵐ x ∂realPWIntervalMeasure α s, r x = sharpIntervalMask L x *
+            ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) *
+              RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure α s hs) (g⁻¹ * x)
+                ((realPWZeroLevel Y α s hs).starProjection f))) ∧
+          (T L).val f = (realPWZeroLevel Y α s hs).starProjection
+            ((RealPWBand.space Y (volume_le_realPWIntervalMeasure α s hs)).orthogonalProjectionOnto
+              r)) →
+      Tendsto (fun L ↦ hilbertTrace (T L)) atTop
+        (𝓝 ((∫ g, ψ g * sLocalTrace_realTermDensity g) -
+          (∫ g, ψ g * ((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ)) -
+            ∫ g, ψ g * ((g ^ (1 / 2 : ℝ) : ℝ) : ℂ)))
+
+/-- Paper: Theorem 12.5.1.1, proof, p. 520, with Theorem 12.4.1.1, pp. 514–517. Below strip
+half-width one half the trace on the level of the model tends to the real term minus the
+integral of `ψ g g ^ (-1/2)` alone (`exists_realPWTestCutoff_level_trace_limit`). The integral
+of `ψ g g ^ (1/2)` is not removed, because the condition of integral zero does not survive the
+closure of the polar-free core at these widths. So the form in which p. 520 uses
+Theorem 12.4.1.1 fails in the model for every nonnegative nonzero test, at `α = 0`, `s = 2`
+and a test supported in `[5/4, 7/4]`. -/
+theorem sLocalTrace_realPWLevelPolarComparison_false :
+    ¬ sLocalTrace_realPWLevelPolarComparison := by
+  intro hcomp
+  obtain ⟨ψ, hψc, hψ0', hp⟩ :=
+    exists_test_integral_pos_at (3 / 2) (1 / 8) (by norm_num) (by norm_num)
+  have hψ0 : ∀ g ∉ Icc (5 / 4 : ℝ) (7 / 4), ψ g = 0 := fun g hg ↦
+    hψ0' g fun hg' ↦ hg ⟨by linarith [hg'.1], by linarith [hg'.2]⟩
+  obtain ⟨c, hc, hce⟩ := hp (1 / 2 : ℝ)
+  have hs : (0 : ℝ) ≤ 2 := by norm_num
+  have ha1 : (1 : ℝ) < 5 / 4 := by norm_num
+  obtain ⟨T, hT1, hT2⟩ := exists_realPWTestCutoff_level_trace_limit 1 0 2 hs one_pos le_rfl
+    (by norm_num) ha1 ψ hψc hψ0
+  have h1 := hcomp 1 0 2 hs one_pos le_rfl (by norm_num) (5 / 4) (7 / 4) ha1 (by norm_num) ψ
+    hψc hψ0 T hT1
+  have heq := tendsto_nhds_unique hT2 h1
+  have hlim : ∫ g, ψ g * realPWSharpTraceLimit 0 g =
+      ∫ g, ψ g * sLocalTrace_realTermDensity g := by
+    refine integral_congr_ae (ae_of_all _ fun g ↦ ?_)
+    change ψ g * realPWSharpTraceLimit 0 g = ψ g * sLocalTrace_realTermDensity g
+    by_cases hg : g ∈ Icc (5 / 4 : ℝ) (7 / 4)
+    · rw [realPWSharpTraceLimit_of_lt_half (by norm_num) (by linarith [hg.1])]
+      rfl
+    · rw [hψ0 g hg, zero_mul, zero_mul]
+  rw [hlim, hce] at heq
+  have h2 : ((c : ℝ) : ℂ) = 0 := by linear_combination heq
+  exact hc.ne' (Complex.ofReal_eq_zero.mp h2)
 
 end RiemannMasullo
