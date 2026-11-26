@@ -78,6 +78,7 @@ BUILD_DIRS = ("scripts/ci/", ".github/workflows/", "RiemannMasullo/External/")
 NON_BUILD_FILES = (
     "RiemannMasullo/External/ATTRIBUTION.md",
     ".github/workflows/claims.yml",
+    ".github/workflows/stop_pr_check.yml",
     "scripts/ci/stale_claims.py",
     "scripts/ci/test_stale_claims.py",
     "scripts/ci/auto_merge.py",
