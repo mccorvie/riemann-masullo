@@ -1,7 +1,7 @@
 module
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4b
-public import RiemannMasullo.Ch10_TraceSpectral.Sec4b_ClusterGeometric
+public import RiemannMasullo.Ch10_TraceSpectral.Sec4b_GeometricRecursion
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 
 /-! # The geometric part of the projective kernel in Theorem 10.4.3.5 -/
@@ -1134,5 +1134,109 @@ theorem spectralStripAmbientKernel_clusters_exists_of_geometric_bddAbove :
   have hamb := ((hall κ).1).mp hκ
   exact ⟨κ + κT, hamb, spectralStripAmbientKernel_clusters_operator (F := F) a hα hs φ χ x f
     hb.1 (κ + κT) ⟨ι, K, hd, hc, hamb⟩⟩
+
+omit ha hχ he horder in
+-- The statement is in the notation of this file, its proof in that of `Sec4b_ClusterGeometric`.
+set_option maxHeartbeats 800000 in
+/-- Paper: Theorem 10.4.3.5(2)–(3), pp. 472–473, with the zeros summed by clusters, for given
+clusters. Let `K i` be finite sets of zeros of the strip, pairwise disjoint and covering the
+zeros, along which the printed tensors (10.4.3.43), with convolution on the input factor,
+converge. If the sums of the geometric blocks over finite unions of the `K i` are bounded in
+trace norm, the ambient tensors summed over finite unions of the `K i` converge in the completed
+projective tensor product, and the limit represents convolution after spectral projection, the
+operator of (10.4.3.45) on p. 473.
+Reconstruction: The paper does not state this.
+`spectralStripAmbientKernel_clusters_exists_of_geometric_bddAbove` is this statement for the
+clusters of `spectralStripTransposedKernel_clusters_operator`. -/
+theorem spectralStripAmbientKernel_along_exists_of_geometric_bddAbove
+    {ι : Type u_1} (K : ι → Finset zeros(F, χ, a, α))
+    (hd : ∀ i j, i ≠ j → Disjoint (K i) (K j)) (hc : ∀ z, ∃ i, z ∈ K i)
+    {κT : Completion (ProjectiveTensor _ _)}
+    (hT : SpectralKernelSumsTendstoAlong K hd (fun z : zeros(F, χ, a, α) ↦ jetCount(z))
+      (fun z m ↦ jet(z, m))
+      (fun j ↦ Dₐ ((f j).comp (spectralConvolution (F := F) a hI hs₀ φ))) (fun j ↦ Sₐ(x j)) κT)
+    (hbound : BddAbove (range fun C : Finset ι ↦ traceNorm
+      (∑ z ∈ C.disjiUnion K fun i _ j _ h ↦ hd i j h, geometricBlock(z)))) :
+    ∃ κ, SpectralKernelSumsTendstoAlong K hd (fun z : zeros(F, χ, a, α) ↦ jetCount(z))
+        (fun z m ↦ jet(z, m)) (fun j ↦ Dₐ (f j)) (fun j ↦ Aφ (Sₐ(x j))) κ ∧
+      sobolevProjectiveKernelOperator (F := F) hα hs₀ κ = (Aφ).comp Pₐ := by
+  obtain ⟨κ, hκ⟩ := spectralKernelSumsTendstoAlong_of_blocks_bddAbove
+    (modulatedIntervalSobolev_dual (continuousIdeleClassNorm F : IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ)
+      ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ (ideleClassTamagawaMeasure F)
+      (-α) α s hI hs₀).exists.choose.toContinuousLinearEquiv.toContinuousLinearMap
+    (Θ₀).mkQL (fun z : zeros(F, χ, a, α) ↦ jetCount(z)) (fun z m ↦ jet(z, m)) K hd
+    (fun j ↦ Dₐ (f j)) f (fun j ↦ Gₐ (Aφ (Sₐ(x j)))) (fun _ ↦ rfl) hbound
+  have hamb := (spectralKernelSumsTendstoAlong_add_iff K hd
+    (fun z : zeros(F, χ, a, α) ↦ jetCount(z)) (fun z m ↦ jet(z, m)) (fun j ↦ Dₐ (f j))
+    (fun j ↦ Aφ (Sₐ(x j))) (fun j ↦ Gₐ (Aφ (Sₐ(x j))))
+    (fun j ↦ Dₐ ((f j).comp (spectralConvolution (F := F) a hI hs₀ φ))) (fun j ↦ Sₐ(x j)) κT
+    (spectralStripAmbientKernelSum_eq_geometric_add_transposed (F := F) a hα hs φ χ x f hb)
+    hT κ).mp hκ
+  exact ⟨κ + κT, hamb, spectralStripAmbientKernel_clusters_operator (F := F) a hα hs φ χ x f
+    hb.1 (κ + κT) ⟨ι, K, hd, hc, hamb⟩⟩
+
+omit ha hχ he horder in
+-- The statement is in the notation of this file, its proof in that of `Sec4b_GeometricRecursion`.
+set_option maxHeartbeats 800000 in
+/-- Paper: Theorem 10.4.3.5(2)–(3), pp. 472–473, with the zeros summed by clusters, when the
+density of the Sobolev space is the polynomial `(1 + t ^ 2) ^ n`; this is the line, width zero,
+at the even order `s = 2 n` (`intervalSobolevDensity_zero_even`). Let the test `φ` be supported
+where the logarithm of the norm is at most `δ` in absolute value, with
+`(1 + δ + δ ^ 2) ^ n < 2`, and let `φ_j` be `φ` times the `j`-th power of minus that logarithm.
+Let `K i` be clusters along which the printed tensors (10.4.3.43) converge. Suppose that the
+spectral blocks of the tests `φ_j`, summed over finite unions of the clusters, have trace norms
+at most `B δ ^ j`. Then the ambient tensors of `φ`, with convolution on the output factor,
+summed over finite unions of the clusters, converge in the completed projective tensor product,
+and the limit represents convolution after spectral projection, the operator of (10.4.3.45).
+So on the line at even orders the geometric estimate that the paper lacks is reduced to
+estimates for the spectral blocks, which are lifts of the cluster blocks of the quotient
+convolutions of §10.3. For one test these are summable
+(`spectralStripConvolution_clusters_traceNorm_tendsto` of `Sec3_ClusterSums`).
+Reconstruction: The paper does not state this, and gives no estimate for the geometric
+component. Whether the hypothesis on the family `φ_j` holds, with one family of clusters and
+a geometric rate, is not proved here. -/
+theorem spectralStripAmbientKernel_along_exists_of_logPow_spectral_bound
+    {ι : Type u_1} (K : ι → Finset zeros(F, χ, a, α))
+    (hd : ∀ i j, i ≠ j → Disjoint (K i) (K j)) (hc : ∀ z, ∃ i, z ∈ K i)
+    {κT : Completion (ProjectiveTensor _ _)}
+    (hT : SpectralKernelSumsTendstoAlong K hd (fun z : zeros(F, χ, a, α) ↦ jetCount(z))
+      (fun z m ↦ jet(z, m))
+      (fun j ↦ Dₐ ((f j).comp (spectralConvolution (F := F) a hI hs₀ φ))) (fun j ↦ Sₐ(x j)) κT)
+    (n : ℕ) (hdens : ∀ t, intervalSobolevDensity (-α) α s t = (1 + t ^ 2) ^ n)
+    (Φ : ℕ → BruhatCompactSupport (IdeleClassGroup (𝓞 F) F))
+    (hΦ : ∀ k g, (Φ k).val g = (((-logIdeleClassNorm F g) ^ k : ℝ) : ℂ) * φ.val g)
+    (δ B : ℝ) (hδ : 0 ≤ δ) (hsupp : ∀ g, φ.val g ≠ 0 → |logIdeleClassNorm F g| ≤ δ)
+    (hθ : (1 + δ + δ ^ 2) ^ n < 2)
+    (hspec : ∀ (k : ℕ) (C : Finset ι), traceNorm (spectralJetBlockSum (Θ₀).mkQL
+      (fun z : zeros(F, χ, a, α) ↦ jetCount(z)) (fun z m ↦ jet(z, m)) f
+      (fun j ↦ Pₐ (hardySobolevTestAction (ideleClassTamagawaMeasure F)
+        (continuousIdeleClassNorm F) (-α) α s hI hs₀ (Φ k) (Sₐ(x j))))
+      (C.disjiUnion K fun i _ j _ h ↦ hd i j h)) ≤ B * δ ^ k) :
+    ∃ κ, SpectralKernelSumsTendstoAlong K hd (fun z : zeros(F, χ, a, α) ↦ jetCount(z))
+        (fun z m ↦ jet(z, m)) (fun j ↦ Dₐ (f j)) (fun j ↦ Aφ (Sₐ(x j))) κ ∧
+      sobolevProjectiveKernelOperator (F := F) hα hs₀ κ = (Aφ).comp Pₐ := by
+  refine spectralStripAmbientKernel_along_exists_of_geometric_bddAbove a hα hs φ χ x f hb K hd hc
+    hT ⟨((1 + δ + δ ^ 2) ^ n - 1) / (2 - (1 + δ + δ ^ 2) ^ n) * B, ?_⟩
+  rintro _ ⟨C, rfl⟩
+  let box := C.disjiUnion K fun i _ j _ h ↦ hd i j h
+  let Q := spectralJetBlockSum (Θ₀).mkQL (fun z : zeros(F, χ, a, α) ↦ jetCount(z))
+    (fun z m ↦ jet(z, m)) f (fun j ↦ Sₐ(x j)) box
+  have hPQ : Pₐ * Q.val = Q.val :=
+    (congrArg Subtype.val (mul_spectralJetBlockSum Pₐ (Θ₀).mkQL
+      (fun z : zeros(F, χ, a, α) ↦ jetCount(z)) (fun z m ↦ jet(z, m)) f (fun j ↦ Sₐ(x j))
+      box)).trans (congrArg (fun v ↦ (spectralJetBlockSum (Θ₀).mkQL
+        (fun z : zeros(F, χ, a, α) ↦ jetCount(z)) (fun z m ↦ jet(z, m)) f v box).val)
+      (funext fun j ↦ spectralProjection_apply_of_mem a hα hs₀
+        ((Θ₀).quotientEquivOrthogonal (x j)).property))
+  have hspec' (k : ℕ) := (le_of_eq (congrArg traceNorm (mul_spectralJetBlockSum
+    ((Pₐ).comp (hardySobolevTestAction (ideleClassTamagawaMeasure F)
+      (continuousIdeleClassNorm F) (-α) α s hI hs₀ (Φ k))) (Θ₀).mkQL
+    (fun z : zeros(F, χ, a, α) ↦ jetCount(z)) (fun z m ↦ jet(z, m)) f (fun j ↦ Sₐ(x j))
+    box))).trans (hspec k C)
+  have hrec := traceNorm_geometricProjection_stripTestAction_le_of_logPow (F := F) hα hs₀ a n
+    hdens φ Φ hΦ δ B hδ hsupp hθ Q hPQ hspec'
+  exact (le_of_eq (congrArg traceNorm (mul_spectralJetBlockSum ((Gₐ).comp (Aφ)) (Θ₀).mkQL
+    (fun z : zeros(F, χ, a, α) ↦ jetCount(z)) (fun z m ↦ jet(z, m)) f (fun j ↦ Sₐ(x j))
+    box)).symm).trans hrec
 
 end RiemannMasullo.Isolated
