@@ -4,7 +4,7 @@ public import RiemannMasullo.AppB_AnalyticNT.Sec4b
 public import Mathlib.Geometry.Manifold.Algebra.LieGroup
 import all RiemannMasullo.AppB_AnalyticNT.Sec4a
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 import Mathlib.NumberTheory.NumberField.Cyclotomic.Embeddings
 import all RiemannMasullo.AppB_AnalyticNT.Sec2
 import Mathlib.Analysis.SpecialFunctions.Gaussian.FourierTransform
