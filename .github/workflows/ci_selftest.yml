@@ -1,11 +1,13 @@
 name: CI self-test
 
-# Runs when a pull request changes the workflows or the scripts: the unit tests of the checks
-# (scripts/ci/selftest.sh), then the pull request check itself, replayed on pull requests that
-# were merged by hand, with the sandbox and toolchain set up as in `PR check`.
+# Runs when a pull request changes the workflows or the scripts: always runs the fast unit
+# tests (scripts/ci/selftest.sh), and replays merged pull requests through scripts/ci/verdict.py
+# (with the sandbox and toolchain set up as in `PR check`) when non-draft changes touch the
+# verdict/replay checker or its inputs.
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths: [".github/workflows/**", "scripts/**"]
   workflow_dispatch:
 
@@ -27,20 +29,69 @@ jobs:
           persist-credentials: false
       - name: Unit tests
         run: scripts/ci/selftest.sh
+      - name: Check whether replay is needed
+        id: replay
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "run=true" >>"$GITHUB_OUTPUT"
+            echo "Replay required: true (event: $EVENT_NAME)"
+            exit 0
+          fi
+          if [ "$IS_DRAFT" = "true" ]; then
+            echo "run=false" >>"$GITHUB_OUTPUT"
+            echo "Skipping --replay on draft pull request."
+            exit 0
+          fi
+          if git rev-parse --verify --quiet HEAD^2 >/dev/null; then
+            changed=$(git diff --name-only HEAD^1 HEAD)
+          elif [ -n "$BASE_SHA" ]; then
+            changed=$(git diff --name-only "$BASE_SHA"...HEAD)
+          else
+            echo "run=true" >>"$GITHUB_OUTPUT"
+            echo "Replay required: true (could not determine changed files)"
+            exit 0
+          fi
+          run=false
+          while IFS= read -r path; do
+            case "$path" in
+              .github/workflows/ci_selftest.yml|\
+              scripts/ci/selftest.sh|\
+              scripts/ci/verdict.py|\
+              scripts/ci/plain_proof.py|\
+              scripts/ci/sandbox.sh|\
+              scripts/ci/command_keywords.txt|\
+              scripts/lint.sh|\
+              scripts/proof_review.sh|\
+              scripts/*.lean)
+                run=true
+                break
+                ;;
+            esac
+          done <<<"$changed"
+          echo "run=$run" >>"$GITHUB_OUTPUT"
+          echo "Replay required: $run"
       - name: Set up the sandbox
+        if: steps.replay.outputs.run == 'true'
         run: |
           command -v bwrap >/dev/null || { sudo apt-get update -qq; sudo apt-get install -y -qq bubblewrap; }
           sudo sysctl -qw kernel.apparmor_restrict_unprivileged_userns=0 || true
           bwrap --unshare-all --ro-bind / / true
       - name: Install Lean
+        if: steps.replay.outputs.run == 'true'
         run: |
           curl -sSfL --retry 3 https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o "$RUNNER_TEMP/elan-init.sh"
           sh "$RUNNER_TEMP/elan-init.sh" -y --default-toolchain none
           echo "$HOME/.elan/bin" >>"$GITHUB_PATH"
           "$HOME/.elan/bin/lake" --version
       - name: Fetch the dependencies and Mathlib's build
+        if: steps.replay.outputs.run == 'true'
         run: |
           lake exe cache get || { sleep 20; lake exe cache get; }
           git status --short   # the checks expect Lake to leave tracked files alone
       - name: Replay merged pull requests
+        if: steps.replay.outputs.run == 'true'
         run: scripts/ci/selftest.sh --replay
