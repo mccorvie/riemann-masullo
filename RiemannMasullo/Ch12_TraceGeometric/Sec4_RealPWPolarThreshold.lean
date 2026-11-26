@@ -152,7 +152,7 @@ variable {Y α s : ℝ}
 /-- The polar-free core of the weighted band: the band vectors represented by an even Schwartz
 function with Fourier transform supported in `[-Y, Y]` that vanishes at the origin and has
 integral zero. -/
-def realPWBandPolarFreeCore (Y α : ℝ) {s : ℝ} (hs : 0 ≤ s) :
+@[expose] def realPWBandPolarFreeCore (Y α : ℝ) {s : ℝ} (hs : 0 ≤ s) :
     Set (RealPWBand.space Y (volume_le_realPWIntervalMeasure α s hs)) :=
   {f | ∃ g : 𝓢(ℝ, ℂ), Function.Even (g : ℝ → ℂ) ∧ (∀ ξ ∉ Icc (-Y) Y, (𝓕 g) ξ = 0) ∧ g 0 = 0 ∧
     ∫ x, g x = 0 ∧
