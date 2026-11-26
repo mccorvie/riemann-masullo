@@ -478,6 +478,102 @@ private theorem intervalExtension_real (A : ℝ) (F : ℝ → ℂ) (x : ℝ) :
       ring
     · simp [ht]
 
+/-- An inverse Fourier integral supported on `[-A,A]` extends to an entire
+function of exponential type at most `2πA`. -/
+theorem exists_entire_fourierInv_of_band {A : ℝ} (hA : 0 ≤ A) {F : ℝ → ℂ}
+    (hF : IntegrableOn F (Ioo (-A) A))
+    (hzero : ∀ᵐ t ∂volume.restrict (Icc (-A) A)ᶜ, F t = 0) :
+    ∃ g : ℂ → ℂ, Differentiable ℂ g ∧ (∀ x : ℝ, g x = 𝓕⁻ F x) ∧
+      ∃ C : ℝ, 0 ≤ C ∧ ∀ z, ‖g z‖ ≤ C * Real.exp (2 * Real.pi * A * ‖z‖) := by
+  let J := Ioo (-A) A
+  have he : J.indicator F =ᵐ[volume] F := by
+    filter_upwards [(ae_restrict_iff' measurableSet_Icc.compl).1 hzero,
+      volume.ae_ne A, volume.ae_ne (-A)] with t ht htA hta
+    by_cases h : t ∈ J
+    · exact indicator_of_mem h _
+    · rw [indicator_of_notMem h]
+      apply Eq.symm (ht ?_)
+      intro hm
+      exact h ⟨lt_of_le_of_ne hm.1 (Ne.symm hta), lt_of_le_of_ne hm.2 htA⟩
+  refine ⟨fun z ↦ intervalExtension A F (((2 * Real.pi : ℝ) : ℂ) * z),
+    (intervalExtension_diff hA hF).comp (differentiable_id.const_mul _), ?_,
+    ∫ t in J, ‖F t‖, integral_nonneg (fun _ ↦ norm_nonneg _), ?_⟩
+  · intro x
+    change intervalExtension A F (((2 * Real.pi : ℝ) : ℂ) * (x : ℂ)) = 𝓕⁻ F x
+    rw [← ofReal_mul, intervalExtension_real, Real.fourierInv_eq', Real.fourierInv_eq']
+    apply integral_congr_ae
+    filter_upwards [he] with t ht
+    rw [ht]
+  · intro z
+    have hb := intervalExtension_bound hF (((2 * Real.pi : ℝ) : ℂ) * z)
+    rwa [norm_mul, Complex.norm_real, Real.norm_of_nonneg (by positivity : 0 ≤ 2 * Real.pi),
+      ← mul_assoc, mul_comm A (2 * Real.pi)] at hb
+
+/-- An entire function of exponential type at most `2πY` with square-integrable
+real trace has its L² Fourier spectrum supported on `[-Y,Y]`. -/
+theorem fourier_trace_zero_off_interval {Y C : ℝ} (hY : 0 ≤ Y) (hC : 0 ≤ C)
+    {f : ℂ → ℂ} (hf : Differentiable ℂ f)
+    (hb : ∀ z, ‖f z‖ ≤ C * Real.exp (2 * Real.pi * Y * ‖z‖))
+    (h₂ : MemLp (fun x : ℝ ↦ f x) 2) :
+    ∀ᵐ t ∂volume.restrict (Icc (-Y) Y)ᶜ,
+      (𝓕 (h₂.toLp (fun x : ℝ ↦ f x)) : Lp ℂ 2) t = 0 := by
+  apply (ae_restrict_iff' measurableSet_Icc.compl).2
+  have hτ : 0 < 2 * Real.pi := by positivity
+  filter_upwards [fourier_trace_support hf (mul_nonneg hτ.le hY) hC hb h₂] with t ht
+  intro h
+  apply ht
+  rw [abs_mul, abs_of_pos hτ]
+  exact mul_lt_mul_of_pos_left (lt_of_not_ge fun he ↦ h (abs_le.mp he)) hτ
+
+/-- An inverse transform reproduces against an integrable kernel whose inverse
+transform is one almost everywhere on the nonzero frequencies of the density. -/
+theorem fourierInv_reproduces {F φ : ℝ → ℂ} (hF : Integrable F) (hφ : Integrable φ)
+    (hone : ∀ᵐ ξ : ℝ, F ξ ≠ 0 → 𝓕⁻ φ ξ = 1) (x : ℝ) :
+    𝓕⁻ F x = ∫ t, 𝓕⁻ F (x + t) * φ t := by
+  let p (ξ y : ℝ) := Complex.exp ((↑(2 * Real.pi * (ξ * y) : ℝ) : ℂ) * Complex.I)
+  have hinv (G : ℝ → ℂ) (y : ℝ) : 𝓕⁻ G y = ∫ ξ, p ξ y * G ξ := by
+    simp only [Real.fourierInv_eq', Real.inner_apply, smul_eq_mul, p]
+  have hsplit (ξ t : ℝ) : p ξ (x + t) = p ξ x * p t ξ := by
+    unfold p
+    rw [← Complex.exp_add]
+    congr 1
+    push_cast
+    ring
+  let k (ξ t : ℝ) := p ξ (x + t) * (F ξ * φ t)
+  have hc : Continuous (fun z : ℝ × ℝ ↦ p z.1 (x + z.2)) := by unfold p; fun_prop
+  have hp := hF.mul_prod hφ
+  have hk : Integrable (Function.uncurry k) (volume.prod volume) := by
+    refine hp.norm.mono' (hc.aestronglyMeasurable.mul hp.aestronglyMeasurable) ?_
+    filter_upwards with z
+    change ‖p z.1 (x + z.2) * (F z.1 * φ z.2)‖ ≤ ‖F z.1 * φ z.2‖
+    rw [norm_mul]
+    dsimp only [p]
+    rw [Complex.norm_exp_ofReal_mul_I, one_mul]
+  calc
+    𝓕⁻ F x = ∫ ξ, (p ξ x * F ξ) * 𝓕⁻ φ ξ := by
+      rw [hinv F x]
+      apply integral_congr_ae
+      filter_upwards [hone] with ξ hξ
+      by_cases hz : F ξ = 0
+      · simp [hz]
+      · rw [hξ hz, mul_one]
+    _ = ∫ ξ, ∫ t, k ξ t := by
+      apply integral_congr_ae
+      filter_upwards with ξ
+      rw [hinv φ ξ, ← integral_const_mul]
+      apply integral_congr_ae
+      filter_upwards with t
+      simp only [k, hsplit]
+      ring
+    _ = ∫ t, ∫ ξ, k ξ t := integral_integral_swap hk
+    _ = _ := by
+      apply integral_congr_ae
+      filter_upwards with t
+      rw [hinv F (x + t), ← integral_mul_const]
+      apply integral_congr_ae
+      filter_upwards with ξ
+      exact (mul_assoc _ _ _).symm
+
 private theorem memLp_dilate {g : ℝ → ℂ} (h : MemLp g 2) {r : ℝ} (hr : r ≠ 0) :
     MemLp (fun x : ℝ ↦ g (r * x)) 2 := by
   have hm : MemLp g 2 (Measure.map (fun x : ℝ ↦ r • x) volume) := by
@@ -563,5 +659,13 @@ theorem paleyWiener_interval (A : ℝ) (hA : 0 < A) (f : ℂ → ℂ) (hf : Diff
       · exact ofReal_ne_zero.mpr (dampingRate_pos n).ne'
     exact congrFun ((hf.differentiableOn.analyticOnNhd isOpen_univ).eq_of_frequently_eq (hdiff.differentiableOn.analyticOnNhd isOpen_univ)
       (hpt.frequently (.of_forall fun n ↦ (hreal (dampingRate n)).symm))) z
+
+/-- The inverse Fourier integral is a representative of the `L²` inverse Fourier transform
+when the frequency vector is integrable. -/
+theorem fourierInv_ae_L2 (F : Lp ℂ 2 (volume : Measure ℝ))
+    (hF : Integrable (F : ℝ → ℂ)) :
+    𝓕⁻ (F : ℝ → ℂ) =ᵐ[volume] ((𝓕⁻ F : Lp ℂ 2 (volume : Measure ℝ)) : ℝ → ℂ) := by
+  have h := (fourier_L2_ae hF (Lp.memLp F)).2
+  rwa [show (Lp.memLp F).toLp (F : ℝ → ℂ) = F from Lp.ext (Lp.memLp F).coeFn_toLp] at h
 
 end RiemannMasullo
