@@ -12,7 +12,8 @@ The verdict is the one scripts/triage_prs.sh computes on the merger's machine:
     read    it passes, but a person should look first: a new `sorry` (a split or new
             statements), a new file or definition, an attribute, anything outside the library
     fail    it does not merge into main, build, pass the lint, or keep existing statements,
-            or it makes a type synonym exponentially large (see LARGE_SYNONYM)
+            or it makes a type synonym exponentially large (see LARGE_SYNONYM); a change that
+            also makes existing statements many times larger says so (see LARGE_STATEMENT)
     error   the check itself could not be carried out (main does not build, say); this says
             nothing about the pull request
 
@@ -61,6 +62,16 @@ BUILD_TARGETS = ("RiemannMasullo", "Challenge", "Main")
 # in its instance terms; parts of Lean walk those terms as trees and stop finishing (#5398, #5716).
 # A pull request fails if it adds such a synonym or makes one larger than on main.
 LARGE_SYNONYM = 10 ** 8
+# Statements are measured the same way (scripts/StatementSizes.lean): a term that a notation spells
+# out inside an `abbrev` type is copied into every instance argument over it, and `rw`, `obtain`
+# and `cases` on goals built from such a statement walk all the copies (#5398, #6948). Only
+# statements of at least LISTED_STATEMENT nodes are listed. An existing statement that reaches
+# LARGE_STATEMENT and grows more than STATEMENT_GROWTH-fold is named among the reasons of the
+# failure (changing it fails anyway); a new statement of NEW_LARGE_STATEMENT nodes gets a note.
+LISTED_STATEMENT = 10 ** 6
+LARGE_STATEMENT = 10 ** 9
+STATEMENT_GROWTH = 10
+NEW_LARGE_STATEMENT = 10 ** 10
 
 
 # Remarks for the summary that do not change the verdict: a measurement that could not run
@@ -238,6 +249,16 @@ class Check:
                                 *self.modules(), timeout=300, quiet=True)
         return parse_sizes(out) if status == 0 else None
 
+    def statement_sizes(self):
+        """{declaration: (tree size, dominant subterm)} for the statements of at least
+        LISTED_STATEMENT nodes, or None if the measurement did not run (scripts/StatementSizes.lean)."""
+        script = TOOLS / "scripts/StatementSizes.lean"
+        if not script.is_file():
+            return None
+        status, out = self.lake("lake", "env", "lean", "--run", str(script), "--min", str(LISTED_STATEMENT),
+                                *self.modules(), timeout=600, quiet=True)
+        return parse_statement_sizes(out) if status == 0 else None
+
     def keywords_current(self):
         """Whether the checked-in list of command keywords matches main as just built."""
         status, out = self.lake("lake", "env", "lean", "--run", str(TOOLS / "scripts/ci/CommandKeywords.lean"),
@@ -325,6 +346,47 @@ def parse_sizes(text):
     return sizes
 
 
+def parse_statement_sizes(text):
+    """{declaration: (tree size, dominant subterm)} from the output of scripts/StatementSizes.lean."""
+    sizes = {}
+    for line in text.split("\n"):
+        fields = line.split("\t")
+        if len(fields) == 5 and fields[2].isdigit():
+            sizes[fields[0]] = (int(fields[2]), fields[4])
+    return sizes
+
+
+def declared_names(dump):
+    """The declarations listed in a signature dump."""
+    return {m.group(2) for m in map(SIGNATURE_LINE.fullmatch, dump.split("\n")) if m}
+
+
+def describe_statement(name, size, dominant):
+    text = f"{name} ({size:.1e} nodes"
+    return text + (f", dominant subterm {dominant})" if dominant != "-" else ")")
+
+
+def grown_statements(base, head, on_main):
+    """Statements that exist on main, reach LARGE_STATEMENT nodes in `head`, and are more than
+    STATEMENT_GROWTH times as large as on main. Main lists only statements of at least
+    LISTED_STATEMENT nodes, so a smaller one counts as that size."""
+    grown = []
+    for name, (size, dominant) in sorted(head.items(), key=lambda kv: -kv[1][0]):
+        if name not in on_main or size < LARGE_STATEMENT:
+            continue
+        before = base.get(name, (LISTED_STATEMENT, "-"))[0]
+        if size > STATEMENT_GROWTH * before:
+            grown.append(describe_statement(name, size, dominant) + f", {before:.1e} on main")
+    return grown
+
+
+def large_new_statements(head, on_main):
+    """Statements that are not on main and have at least NEW_LARGE_STATEMENT nodes."""
+    return [describe_statement(name, size, dominant)
+            for name, (size, dominant) in sorted(head.items(), key=lambda kv: -kv[1][0])
+            if name not in on_main and size >= NEW_LARGE_STATEMENT]
+
+
 def grown_synonyms(base, head):
     """The synonyms of `head` (all at least LARGE_SYNONYM) that are new or larger than in `base`."""
     return sorted(n for n, size in head.items() if size >= LARGE_SYNONYM and size > base.get(n, 0))
@@ -388,6 +450,7 @@ def decide(check, supplied_base):
     if imports.returncode:
         raise Stop("error", ["the import policy check could not be carried out"], imports.stdout)
     base_dump, base_log, base_sizes = check.base_state(supplied_base)
+    base_statements = check.statement_sizes()
     check.merge(entries)
     held += [r for r in check.held_back_after_merge(entries) if r not in held]
     result = run([str(TOOLS / "scripts/lint.sh"), str(check.work)])
@@ -402,6 +465,7 @@ def decide(check, supplied_base):
     if head_dump is None:
         raise Stop("fail", ["the signature dump failed after the build"], out)
     head_sizes = check.synonym_sizes()
+    head_statements = check.statement_sizes() if base_statements is not None else None
 
     changed, removed, added, bad = compare(base_dump, head_dump)
     # A private definition cannot be mentioned by a public statement of a `module` file, so
@@ -427,6 +491,21 @@ def decide(check, supplied_base):
     else:
         NOTES.append("the size of type synonyms could not be measured (scripts/AbbrevSizes.lean), "
                      "so new or grown synonyms were not checked")
+    if base_statements is not None and head_statements is not None:
+        on_main = declared_names(base_dump)
+        grown = grown_statements(base_statements, head_statements, on_main)
+        if grown:
+            failures.append("it makes existing statements over 10^9 nodes as a "
+                            "tree more than ten times larger: " + names(grown, limit=6)
+                            + ". A term written out inside an abbrev type is copied into every instance "
+                            "argument; give the dominant subterm a name and point the notations at it (#5398)")
+        new = large_new_statements(head_statements, on_main)
+        if new:
+            NOTES.append("new statements of over 10^10 nodes as a tree, "
+                         "which makes `rw`, `obtain` and `cases` on their goals slow: " + names(new, limit=6))
+    else:
+        NOTES.append("the size of statements could not be measured (scripts/StatementSizes.lean), "
+                     "so grown statements were not checked")
     if failures:
         raise Stop("fail", failures, log)
 
