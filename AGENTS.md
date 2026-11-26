@@ -230,6 +230,11 @@ garbled, does occur. The PDF decides. Before you formalize a formula, look at th
 
 ## Building and checking
 
+On a fresh or stale clone, bootstrap `.lake/build` from prebuilt artifacts before running `lake build`:
+
+- Run `lake exe cache get` to download prebuilt Mathlib `.olean`s.
+- Check [`scripts/ci/base_state.py`](scripts/ci/base_state.py) to fetch the latest `main-state` GitHub Actions artifact (`.lake/build` and `signatures.txt` for `main` or its newest cached ancestor; needs read-only `gh` auth). It covers `RiemannMasullo`, `Challenge`, and `Main` and replays across architectures, leaving only the delta since the cached commit to compile. (See `scripts/` and `.github/workflows/` for the local checks CI runs.)
+
 ```sh
 lake build RiemannMasullo.Ch02_AdelicTheta.Sec1   # one module
 lake lean RiemannMasullo/Ch02_AdelicTheta/Sec1.lean   # one file, or a scratch copy, with the project's options
