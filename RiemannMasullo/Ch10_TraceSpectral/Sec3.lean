@@ -3553,6 +3553,316 @@ private theorem spectralStripConvolution_all_jet_coefficients
         (m.val.choose i.val : ℂ) * (∫ g : C𝔽, φ.val g * η g * (logNorm g : ℂ) ^ (m.val - i.val) ∂μ𝔽) * y i
       exact stripJet_scalar_integral μ𝔽 φ.val η (fun g ↦ (logNorm g : ℂ) ^ (m.val - i.val)) _ _
 
+/-- A kernel that is integrable against a bound for the norms of a strongly continuous family of
+operators defines a bounded operator, by the Bochner integral of its orbit maps. -/
+private theorem exists_spectralStripKernelOperator_bochner {G E : Type*} [TopologicalSpace G]
+    [MeasurableSpace G] [OpensMeasurableSpace G] [SecondCountableTopology G] (μ : Measure G)
+    [NormedAddCommGroup E] [NormedSpace ℂ E] [CompleteSpace E]
+    (ρ : G → E →L[ℂ] E) (hρ : ∀ u, Continuous (fun g ↦ ρ g u))
+    (κ : G → ℂ) (hκ : AEStronglyMeasurable κ μ) (c : G → ℝ) (hc : ∀ g, ‖ρ g‖ ≤ c g)
+    (hint : Integrable (fun g ↦ ‖κ g‖ * c g) μ) :
+    ∃ Ψ : E →L[ℂ] E, ‖Ψ‖ ≤ ∫ g, ‖κ g‖ * c g ∂μ ∧
+      ∀ u, Integrable (fun g ↦ κ g • ρ g u) μ ∧ Ψ u = ∫ g, κ g • ρ g u ∂μ := by
+  have hle (u : E) (g : G) : ‖κ g • ρ g u‖ ≤ ‖κ g‖ * c g * ‖u‖ := by
+    rw [norm_smul, mul_assoc]
+    exact mul_le_mul_of_nonneg_left (((ρ g).le_opNorm u).trans
+      (mul_le_mul_of_nonneg_right (hc g) (norm_nonneg u))) (norm_nonneg _)
+  have hI (u : E) : Integrable (fun g ↦ κ g • ρ g u) μ :=
+    (hint.mul_const ‖u‖).mono' (hκ.smul (hρ u).aestronglyMeasurable) (.of_forall (hle u))
+  have hlin : IsLinearMap ℂ (fun u : E ↦ ∫ g, κ g • ρ g u ∂μ) := by
+    constructor
+    · intro u v
+      simp only [map_add, smul_add]
+      exact integral_add (hI u) (hI v)
+    · intro b u
+      simp only [map_smul]
+      rw [← integral_smul]
+      exact integral_congr_ae (.of_forall fun g ↦ smul_comm _ _ _)
+  let L : E →ₗ[ℂ] E := hlin.mk' _
+  have hbound (u : E) : ‖L u‖ ≤ (∫ g, ‖κ g‖ * c g ∂μ) * ‖u‖ := by
+    rw [← integral_mul_const]
+    exact norm_integral_le_of_norm_le (hint.mul_const ‖u‖) (.of_forall (hle u))
+  have hnonneg : 0 ≤ ∫ g, ‖κ g‖ * c g ∂μ :=
+    integral_nonneg fun g ↦ mul_nonneg (norm_nonneg _) ((norm_nonneg _).trans (hc g))
+  exact ⟨L.mkContinuous _ hbound, L.mkContinuous_norm_le hnonneg hbound, fun u ↦ ⟨hI u, rfl⟩⟩
+
+section NonnegativeOrder
+
+/-! The kernel operator below holds for every Sobolev order `s ≥ 0`. Its two helpers are copies,
+for `0 ≤ s`, of private theorems of this file stated under the section hypothesis `1 < s`. -/
+
+variable (hs : 0 ≤ s)
+
+local notation "hs₀(" h ")" => h
+local notation "D₀" => spectralSobolevDualEmbedding F a (hStrip(hα)) hs
+
+/-- A quotient jet functional evaluates on a representative by its explicit Haar moment.
+This is `spectralStripConvolution_jet_eval` (in the section `StripConvolutionCoefficients` of this
+file) for `0 ≤ s`. That theorem is stated under the section hypothesis `1 < s`, but its proof uses
+only `0 ≤ s`; stating it for `0 ≤ s` in place would make this copy unnecessary. -/
+private theorem exists_spectralStripKernelOperator_jet_eval
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (j : SpectralStripJetIndex χ a α s) (f : StrongDual ℂ Q(a, hStrip(hα), hs))
+    (hf : D₀ f = (spectralStripJet_memLp χ hα hs j).toLp (raw(χ, j))) (v : W(-α, α, s)) :
+    Integrable (fun y ↦ v y * raw(χ, j) y) μ𝔽 ∧
+      f ((Θ(a, hStrip(hα), hs)).mkQL v) = ∫ y, v y * raw(χ, j) y ∂μ𝔽 := by
+  let w (g : C𝔽) := intervalSobolevDensity (-α) α s (logNorm g)
+  have hw : Measurable w := by
+    have hD : Continuous (intervalSobolevDensity (-α) α s) := by
+      unfold intervalSobolevDensity
+      fun_prop
+    exact hD.measurable.comp ((NNReal.continuous_coe.comp
+      (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)).measurable.log)
+  have habs : μ𝔽 ≪ (μ𝔽).withDensity (fun g ↦ ENNReal.ofReal (w g)⁻¹) := by
+    refine withDensity_absolutelyContinuous' hw.inv.ennreal_ofReal.aemeasurable
+      (.of_forall fun g ↦ ?_)
+    refine ENNReal.ofReal_ne_zero_iff.mpr (inv_pos.mpr ?_)
+    exact mul_pos (lt_max_of_lt_left (Real.exp_pos _)) (Real.rpow_pos_of_pos (by positivity) _)
+  have hae : (D₀ f : C𝔽 → ℂ) =ᵐ[μ𝔽] raw(χ, j) := by
+    rw [hf]
+    exact habs.ae_le (MemLp.coeFn_toLp _)
+  have he := spectralSobolevPairing_dual (hStrip(hα)) hs (f.comp ((Θ(a, hStrip(hα), hs)).mkQL)) v
+  change Integrable (fun y ↦ v y * D₀ f y) μ𝔽 ∧
+      f ((Θ(a, hStrip(hα), hs)).mkQL v) = ∫ y, v y * D₀ f y ∂μ𝔽 at he
+  have hEq := hae.mono fun y hy ↦ congrArg (v y * ·) hy
+  exact ⟨he.1.congr hEq, he.2.trans (integral_congr_ae hEq)⟩
+
+/-- The transpose convolution acts by the complete triangular matrix of logarithmic Mellin
+moments, before passing to the kernel of the lower coordinates.
+This is `spectralStripConvolution_all_jet_coefficients` (above in this section) for `0 ≤ s`.
+That theorem is stated under the section hypothesis `1 < s`, but its proof uses only `0 ≤ s`;
+stating it for `0 ≤ s` in place would make this copy unnecessary. -/
+private theorem exists_spectralStripKernelOperator_all_jet_coefficients
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (f : J(χ) → StrongDual ℂ Q(a, hStrip(hα), hs))
+    (hj : ∀ j, D₀ (f j) = (spectralStripJet_memLp χ hα hs j).toLp (raw(χ, j)))
+    (φ : BruhatCompactSupport C𝔽) (z : Z(χ, α)) (m : Fin (N(χ, α, s, z)))
+    (u : Q(a, hStrip(hα), hs)) :
+    f (jet(z, m)) (spectralConvolution (F := F) a (hStrip(hα)) hs φ u) =
+      ∑ i : Fin (m.val + 1), (m.val.choose i.val : ℂ) *
+        (∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ z.val.1) (shift(z.val.2.1, z.val.2.2)) g *
+           (logNorm g : ℂ) ^ (m.val - i.val) ∂μ𝔽) *
+        f (jet(z, (⟨i.val, (Nat.le_of_lt_succ i.isLt).trans_lt m.isLt⟩ :
+          Fin (N(χ, α, s, z))))) u := by
+  let θ : Submodule ℂ W(-α, α, s) :=
+    globalThetaSobolev F (α := -α) (β := α) (s := s) a (hStrip(hα)) hs
+  obtain ⟨v, hv⟩ := θ.mkQ_surjective u
+  let J (i : ℕ) := spectralZeroJet (χ z.val.1) z.val.2.1 z.val.2.2 i
+  let j : J(χ) := jet(z, m)
+  have hnorm : Continuous (ideleClassNorm F) := (isProperMap_ideleClassNorm F).continuous
+  let mod : C𝔽 →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, hnorm⟩
+  let τ := stripJetTranslation (G := C𝔽) μ𝔽 (ideleClassNorm F) hnorm (-α) α s (hStrip(hα)) hs
+  let ℓ := (f j).comp θ.mkQL
+  let η := ideleClassNormTwist (χ z.val.1) (shift(z.val.2.1, z.val.2.2))
+  have heval (j : J(χ)) (w : W(-α, α, s)) :=
+    exists_spectralStripKernelOperator_jet_eval (a := a) hα hs χ j (f j) (hj j) w
+  have hint (i : ℕ) (hi : i ≤ m.val) : Integrable (fun y ↦ v y * J i y) μ𝔽 := by
+    let k : Fin (N(χ, α, s, z)) := ⟨i, hi.trans_lt m.isLt⟩
+    exact (heval (jet(z, k)) v).1
+  let idx (i : Fin (m.val + 1)) : Fin (N(χ, α, s, z)) :=
+    ⟨i.val, (Nat.le_of_lt_succ i.isLt).trans_lt m.isLt⟩
+  let y (i : Fin (m.val + 1)) := f (jet(z, idx i)) u
+  let h (i : Fin (m.val + 1)) (g : C𝔽) :=
+    (η g * (logNorm g : ℂ) ^ (m.val - i.val) * (m.val.choose i.val : ℂ)) * y i
+  have hi (i : Fin (m.val + 1)) : (∫ x, v x * J i.val x ∂μ𝔽) = y i :=
+    (heval (jet(z, idx i)) v).2.symm.trans (congrArg (f (jet(z, idx i))) hv)
+  have hτ (g : C𝔽) : ℓ (τ g v) = ∑ i : Fin (m.val + 1), h i g := by
+    have haeFormula := stripJetTranslation_apply (G := C𝔽) μ𝔽 (ideleClassNorm F) hnorm (-α) α s
+      (hStrip(hα)) hs g
+    have hae := haeFormula v
+    have hshift := stripJet_integrated_product_congr μ𝔽 (J m.val) hae
+    have ht := stripJet_all_translated_moments (F := F) (α := α) (s := s) (χ z.val.1) z.val.2.1
+      z.val.2.2 m.val v hint g
+    refine (heval j (τ g v)).2.trans (hshift.trans (ht.trans ?_))
+    apply Finset.sum_congr rfl
+    intro i _
+    exact congrArg ((η g * (logNorm g : ℂ) ^ (m.val - i.val) * (m.val.choose i.val : ℂ)) * ·)
+      (hi i)
+  have hφ : Continuous φ.val :=
+    continuous_of_bruhatSmooth ((mem_bruhatSmoothSubmodule_iff _).mp φ.property.1)
+  have hg (i : Fin (m.val + 1)) : Integrable (fun g : C𝔽 ↦ φ.val g * h i g) μ𝔽 := by
+    have hl : Continuous (fun g : C𝔽 ↦ (logNorm g : ℂ)) :=
+      Complex.continuous_ofReal.comp (continuous_logModule' (G := C𝔽) mod)
+    exact (hφ.mul (((η.continuous.mul (hl.pow _)).mul continuous_const).mul
+      continuous_const)).integrable_of_hasCompactSupport
+      (show HasCompactSupport φ.val from φ.property.2).mul_right
+  have pettis := stripJetTranslation_pettis (G := C𝔽) μ𝔽 (ideleClassNorm F) hnorm (-α) α s
+    (hStrip(hα)) hs φ
+  have he := pettis v ℓ
+  have conv := spectralConvolution_mkQ (F := F) a (hStrip(hα)) hs φ
+  simp only at conv
+  calc
+    _ = ℓ (stripJetTestAction (G := C𝔽) μ𝔽 (ideleClassNorm F) hnorm (-α) α s (hStrip(hα)) hs
+          φ v) :=
+      (congrArg (fun w ↦ f j (spectralConvolution (F := F) a (hStrip(hα)) hs φ w)) hv.symm).trans
+        (congrArg (f j) (conv v))
+    _ = ∫ g, ℓ (φ.val g • τ g v) ∂μ𝔽 := he
+    _ = ∫ g, ∑ i : Fin (m.val + 1), φ.val g * h i g ∂μ𝔽 := integral_congr_ae (.of_forall fun g ↦ by
+      exact (map_smul ℓ (φ.val g) (τ g v)).trans
+        ((congrArg (φ.val g * ·) (hτ g)).trans (Finset.mul_sum ..)))
+    _ = _ := by
+      rw [integral_finsetSum _ (fun i _ ↦ hg i)]
+      apply Finset.sum_congr rfl
+      intro i _
+      change (∫ g : C𝔽, φ.val g * ((η g * (logNorm g : ℂ) ^ (m.val - i.val) *
+          (m.val.choose i.val : ℂ)) * y i) ∂μ𝔽) =
+        (m.val.choose i.val : ℂ) * (∫ g : C𝔽, φ.val g * η g * (logNorm g : ℂ) ^ (m.val - i.val) ∂μ𝔽) *
+          y i
+      exact stripJet_scalar_integral μ𝔽 φ.val η (fun g ↦ (logNorm g : ℂ) ^ (m.val - i.val)) _ _
+
+/-- Paper: Definition 9.3.1.1, p. 419, and (10.3.2.2), p. 454. A kernel on the idele class
+group that is integrable against the bound for the norms of the translations acts on the strip
+quotient, with operator norm at most that integral. At a zero where its logarithmic Mellin
+moments below the surviving multiplicity agree with those of a test, the operator acts on the
+jets of that zero as convolution with the test does; at a zero where these moments vanish, it
+annihilates the jets of that zero.
+Deviation: The paper integrates compactly supported tests only. The kernel here need not have
+compact support, and the operator is a Bochner integral of translates on each vector. The
+Sobolev order is any `s ≥ 0`; §10.3 of the paper assumes `s > 1` (p. 455). -/
+theorem exists_spectralStripKernelOperator
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (f : J(χ) → StrongDual ℂ Q(a, hStrip(hα), hs₀(hs)))
+    (hj : ∀ j, D₀ (f j) = (spectralStripJet_memLp χ hα hs₀(hs) j).toLp (raw(χ, j)))
+    (φ : BruhatCompactSupport C𝔽) (κ : C𝔽 → ℂ) (hκ : AEStronglyMeasurable κ μ𝔽)
+    (hint : Integrable (fun g : C𝔽 ↦ ‖κ g‖ *
+      (max (Real.exp (-α * logNorm g)) (Real.exp (α * logNorm g)) *
+        (1 + |logNorm g|) ^ (s / 2))) μ𝔽) :
+    ∃ Ψ : Q(a, hStrip(hα), hs₀(hs)) →L[ℂ] Q(a, hStrip(hα), hs₀(hs)),
+      ‖Ψ‖ ≤ ∫ g : C𝔽, ‖κ g‖ * (max (Real.exp (-α * logNorm g)) (Real.exp (α * logNorm g)) *
+        (1 + |logNorm g|) ^ (s / 2)) ∂μ𝔽 ∧
+      ∀ z : Z(χ, α),
+        (∀ q < N(χ, α, s, z), Integrable (fun g : C𝔽 ↦ κ g *
+          ideleClassNormTwist (χ z.val.1) (shift(z.val.2.1, z.val.2.2)) g *
+            (logNorm g : ℂ) ^ q) μ𝔽) →
+        ((∀ q < N(χ, α, s, z),
+            ∫ g : C𝔽, κ g * ideleClassNormTwist (χ z.val.1) (shift(z.val.2.1, z.val.2.2)) g *
+              (logNorm g : ℂ) ^ q ∂μ𝔽 =
+            ∫ g : C𝔽, φ.val g * ideleClassNormTwist (χ z.val.1) (shift(z.val.2.1, z.val.2.2)) g *
+              (logNorm g : ℂ) ^ q ∂μ𝔽) →
+          ∀ (m : Fin (N(χ, α, s, z))) (u : Q(a, hStrip(hα), hs₀(hs))),
+            f (jet(z, m)) (Ψ u) =
+              f (jet(z, m)) (spectralConvolution (F := F) a (hStrip(hα)) hs₀(hs) φ u)) ∧
+        ((∀ q < N(χ, α, s, z),
+            ∫ g : C𝔽, κ g * ideleClassNormTwist (χ z.val.1) (shift(z.val.2.1, z.val.2.2)) g *
+              (logNorm g : ℂ) ^ q ∂μ𝔽 = 0) →
+          ∀ (m : Fin (N(χ, α, s, z))) (u : Q(a, hStrip(hα), hs₀(hs))),
+            f (jet(z, m)) (Ψ u) = 0) := by
+  let θ : Submodule ℂ W(-α, α, s) :=
+    globalThetaSobolev F (α := -α) (β := α) (s := s) a (hStrip(hα)) hs₀(hs)
+  have hnorm : Continuous (ideleClassNorm F) := (isProperMap_ideleClassNorm F).continuous
+  let mod : C𝔽 →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, hnorm⟩
+  let τ := stripJetTranslation (G := C𝔽) μ𝔽 (ideleClassNorm F) hnorm (-α) α s (hStrip(hα)) hs₀(hs)
+  let c (g : C𝔽) : ℝ := max (Real.exp (-α * logNorm g)) (Real.exp (α * logNorm g)) *
+    (1 + |logNorm g|) ^ (s / 2)
+  have hτc (u : W(-α, α, s)) : Continuous (fun g ↦ τ g u) :=
+    (exists_hardySobolevTranslation μ𝔽 mod (-α) α s (hStrip(hα)) hs₀(hs)).choose_spec.2.comp
+      (Continuous.prodMk_left u)
+  have hτn (g : C𝔽) : ‖τ g‖ ≤ c g :=
+    norm_hardySobolevTranslation_le μ𝔽 mod (-α) α s (hStrip(hα)) hs₀(hs) g
+  obtain ⟨Ψ₀, hΨ₀n, hΨ₀⟩ := exists_spectralStripKernelOperator_bochner μ𝔽 (fun g ↦ τ g) hτc κ hκ c
+    hτn hint
+  have hker : θ ≤ (θ.mkQL.comp Ψ₀).ker := by
+    intro v hv
+    obtain ⟨ρ, hρ, -, -⟩ := exists_globalThetaSobolevAction (F := F) a (hStrip(hα)) hs₀(hs)
+    have hinv (g : C𝔽) : hardySobolevTranslation μ𝔽 m𝔽 (-α) α s (hStrip(hα)) hs₀(hs) g v ∈ θ := by
+      rw [← hρ g ⟨v, hv⟩]
+      exact (ρ g ⟨v, hv⟩).property
+    have hclosed : IsClosed (θ : Set W(-α, α, s)) := Submodule.isClosed_topologicalClosure _
+    have : CompleteSpace θ := hclosed.completeSpace_coe
+    have hmem : Ψ₀ v ∈ θ := by
+      rw [← θ.orthogonal_orthogonal]
+      intro w hw
+      have hcomm := (innerSL ℂ w).integral_comp_comm (hΨ₀ v).1
+      rw [(hΨ₀ v).2]
+      change innerSL ℂ w (∫ g, κ g • τ g v ∂μ𝔽) = 0
+      rw [← hcomm]
+      refine integral_eq_zero_of_ae (.of_forall fun g ↦ ?_)
+      change innerSL ℂ w (κ g • τ g v) = 0
+      rw [innerSL_apply_apply]
+      exact (θ.mem_orthogonal' w).mp hw _ (θ.smul_mem _ (hinv g))
+    exact (Submodule.Quotient.mk_eq_zero θ).mpr hmem
+  let ΨQ : Q(a, hStrip(hα), hs₀(hs)) →L[ℂ] Q(a, hStrip(hα), hs₀(hs)) :=
+    θ.liftQL (θ.mkQL.comp Ψ₀) hker
+  have hmk (v : W(-α, α, s)) : ΨQ (θ.mkQ v) = θ.mkQ (Ψ₀ v) := by
+    have h := liftQL_mkQ_aux θ (θ.mkQL.comp Ψ₀) hker v
+    with_reducible_and_instances exact h.trans (Submodule.mkQL_apply _ _)
+  refine ⟨ΨQ, (spectralConvolution_norm_le_of_quotient θ Ψ₀ ΨQ hmk).trans hΨ₀n, fun z hmom ↦ ?_⟩
+  have key (m : Fin (N(χ, α, s, z))) (u : Q(a, hStrip(hα), hs₀(hs))) :
+      f (jet(z, m)) (ΨQ u) = ∑ i : Fin (m.val + 1), (m.val.choose i.val : ℂ) *
+        (∫ g : C𝔽, κ g * ideleClassNormTwist (χ z.val.1) (shift(z.val.2.1, z.val.2.2)) g *
+           (logNorm g : ℂ) ^ (m.val - i.val) ∂μ𝔽) *
+        f (jet(z, (⟨i.val, (Nat.le_of_lt_succ i.isLt).trans_lt m.isLt⟩ :
+          Fin (N(χ, α, s, z))))) u := by
+    obtain ⟨v, hv⟩ := θ.mkQ_surjective u
+    let J (i : ℕ) := spectralZeroJet (χ z.val.1) z.val.2.1 z.val.2.2 i
+    let j : J(χ) := jet(z, m)
+    let ℓ := (f j).comp θ.mkQL
+    let η := ideleClassNormTwist (χ z.val.1) (shift(z.val.2.1, z.val.2.2))
+    have heval (j : J(χ)) (w : W(-α, α, s)) :=
+      exists_spectralStripKernelOperator_jet_eval (a := a) hα hs χ j (f j) (hj j) w
+    have hintv (i : ℕ) (hi : i ≤ m.val) : Integrable (fun y ↦ v y * J i y) μ𝔽 := by
+      let k : Fin (N(χ, α, s, z)) := ⟨i, hi.trans_lt m.isLt⟩
+      exact (heval (jet(z, k)) v).1
+    let idx (i : Fin (m.val + 1)) : Fin (N(χ, α, s, z)) :=
+      ⟨i.val, (Nat.le_of_lt_succ i.isLt).trans_lt m.isLt⟩
+    let y (i : Fin (m.val + 1)) := f (jet(z, idx i)) u
+    let h (i : Fin (m.val + 1)) (g : C𝔽) :=
+      (η g * (logNorm g : ℂ) ^ (m.val - i.val) * (m.val.choose i.val : ℂ)) * y i
+    have hi (i : Fin (m.val + 1)) : (∫ x, v x * J i.val x ∂μ𝔽) = y i :=
+      (heval (jet(z, idx i)) v).2.symm.trans (congrArg (f (jet(z, idx i))) hv)
+    have hτ (g : C𝔽) : ℓ (τ g v) = ∑ i : Fin (m.val + 1), h i g := by
+      have haeFormula := stripJetTranslation_apply (G := C𝔽) μ𝔽 (ideleClassNorm F) hnorm (-α) α s
+        (hStrip(hα)) hs₀(hs) g
+      have hae := haeFormula v
+      have hshift := stripJet_integrated_product_congr μ𝔽 (J m.val) hae
+      have ht := stripJet_all_translated_moments (F := F) (α := α) (s := s) (χ z.val.1) z.val.2.1
+        z.val.2.2 m.val v hintv g
+      refine (heval j (τ g v)).2.trans (hshift.trans (ht.trans ?_))
+      apply Finset.sum_congr rfl
+      intro i _
+      exact congrArg ((η g * (logNorm g : ℂ) ^ (m.val - i.val) * (m.val.choose i.val : ℂ)) * ·)
+        (hi i)
+    have hg (i : Fin (m.val + 1)) : Integrable (fun g : C𝔽 ↦ κ g * h i g) μ𝔽 := by
+      have hq := (hmom (m.val - i.val) ((Nat.sub_le _ _).trans_lt m.isLt)).mul_const
+        ((m.val.choose i.val : ℂ) * y i)
+      refine hq.congr (.of_forall fun g ↦ ?_)
+      change κ g * η g * (logNorm g : ℂ) ^ (m.val - i.val) * ((m.val.choose i.val : ℂ) * y i) =
+        κ g * ((η g * (logNorm g : ℂ) ^ (m.val - i.val) * (m.val.choose i.val : ℂ)) * y i)
+      ring
+    calc
+      f (jet(z, m)) (ΨQ u) = ℓ (Ψ₀ v) :=
+        (congrArg (fun w ↦ f j (ΨQ w)) hv.symm).trans (congrArg (f j) (hmk v))
+      _ = ∫ g, ℓ (κ g • τ g v) ∂μ𝔽 := by
+        rw [(hΨ₀ v).2]
+        exact (ContinuousLinearMap.integral_comp_comm ℓ (hΨ₀ v).1).symm
+      _ = ∫ g, ∑ i : Fin (m.val + 1), κ g * h i g ∂μ𝔽 :=
+        integral_congr_ae (.of_forall fun g ↦ by
+          exact (map_smul ℓ (κ g) (τ g v)).trans
+            ((congrArg (κ g * ·) (hτ g)).trans (Finset.mul_sum ..)))
+      _ = _ := by
+        rw [integral_finsetSum _ (fun i _ ↦ hg i)]
+        apply Finset.sum_congr rfl
+        intro i _
+        change (∫ g : C𝔽, κ g * ((η g * (logNorm g : ℂ) ^ (m.val - i.val) *
+            (m.val.choose i.val : ℂ)) * y i) ∂μ𝔽) =
+          (m.val.choose i.val : ℂ) * (∫ g : C𝔽, κ g * η g * (logNorm g : ℂ) ^ (m.val - i.val) ∂μ𝔽) *
+            y i
+        exact stripJet_scalar_integral μ𝔽 κ η (fun g ↦ (logNorm g : ℂ) ^ (m.val - i.val)) _ _
+  refine ⟨fun heq m u ↦ ?_, fun hzero m u ↦ ?_⟩
+  · rw [key m u, exists_spectralStripKernelOperator_all_jet_coefficients a hα hs χ f hj φ z m u]
+    refine Finset.sum_congr rfl fun i _ ↦ ?_
+    exact congrArg (fun t : ℂ ↦ (m.val.choose i.val : ℂ) * t *
+      f (jet(z, (⟨i.val, (Nat.le_of_lt_succ i.isLt).trans_lt m.isLt⟩ : Fin (N(χ, α, s, z))))) u)
+      (heq (m.val - i.val) ((Nat.sub_le _ _).trans_lt m.isLt))
+  · rw [key m u]
+    refine Finset.sum_eq_zero fun i _ ↦ ?_
+    exact (congrArg (fun t : ℂ ↦ (m.val.choose i.val : ℂ) * t *
+      f (jet(z, (⟨i.val, (Nat.le_of_lt_succ i.isLt).trans_lt m.isLt⟩ : Fin (N(χ, α, s, z))))) u)
+      (hzero (m.val - i.val) ((Nat.sub_le _ _).trans_lt m.isLt))).trans
+      (mul_eq_zero_of_left (mul_zero _) _)
+
+end NonnegativeOrder
+
 private theorem stripMellinMoment_eq_twisted_integral (χ : PontryaginDual C𝔽) (φ : BruhatCompactSupport C𝔽)
     (w : ℂ) (q : ℕ) :
     (∫ g : C𝔽, φ.val g * ideleClassNormTwist χ w g * (logNorm g : ℂ) ^ q ∂μ𝔽) =
@@ -3564,6 +3874,42 @@ private theorem stripMellinMoment_eq_twisted_integral (χ : PontryaginDual C𝔽
     rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hp.ne'), ← Complex.ofReal_log hp.le]
     exact congrArg ((χ g : ℂ) * ·) (congrArg Complex.exp (mul_comm _ _))
   rw [he]; ring
+
+/-- Paper: (10.3.2.6)–(10.3.2.7), p. 454. The Mellin transform of a test twisted by a unitary
+character is an entire function of the exponent, and its derivatives are the logarithmic Mellin
+moments of the test. -/
+theorem spectralStripTest_mellin_iteratedDeriv (χ : PontryaginDual C𝔽)
+    (φ : BruhatCompactSupport C𝔽) :
+    Differentiable ℂ (fun w : ℂ ↦ ∫ g : C𝔽, φ.val g * ideleClassNormTwist χ w g ∂μ𝔽) ∧
+      ∀ (q : ℕ) (w : ℂ),
+        iteratedDeriv q (fun w : ℂ ↦ ∫ g : C𝔽, φ.val g * ideleClassNormTwist χ w g ∂μ𝔽) w =
+          ∫ g : C𝔽, φ.val g * ideleClassNormTwist χ w g * (logNorm g : ℂ) ^ q ∂μ𝔽 := by
+  let ψ : C𝔽 → ℂ := fun g ↦ φ.val g * (χ g : ℂ)
+  have hφ : Continuous φ.val :=
+    continuous_of_bruhatSmooth ((mem_bruhatSmoothSubmodule_iff _).mp φ.property.1)
+  have hl : Continuous logNorm :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp
+      (isProperMap_ideleClassNorm F).continuous)).log
+      fun g ↦ (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+  have hψ : Continuous ψ := hφ.mul (continuous_subtype_val.comp χ.continuous)
+  have hc : HasCompactSupport ψ := (show HasCompactSupport φ.val from φ.property.2).mul_right
+  have hfun : (fun w : ℂ ↦ ∫ g : C𝔽, φ.val g * ideleClassNormTwist χ w g ∂μ𝔽) =
+      fun w ↦ stripMellinMoment μ𝔽 logNorm ψ w 0 := by
+    funext w
+    have h := stripMellinMoment_eq_twisted_integral χ φ w 0
+    simpa using h
+  have hder (n : ℕ) : iteratedDeriv n (fun w ↦ stripMellinMoment μ𝔽 logNorm ψ w 0) =
+      fun w ↦ stripMellinMoment μ𝔽 logNorm ψ w n := by
+    induction n with
+    | zero => simp
+    | succ n ih =>
+      funext w
+      rw [iteratedDeriv_succ, ih, (stripMellinMoment_hasDerivAt μ𝔽 logNorm ψ hl hψ hc w n).deriv]
+  rw [hfun]
+  refine ⟨fun w ↦ (stripMellinMoment_hasDerivAt μ𝔽 logNorm ψ hl hψ hc w 0).differentiableAt,
+    fun q w ↦ ?_⟩
+  rw [hder q]
+  exact (stripMellinMoment_eq_twisted_integral χ φ w q).symm
 
 private theorem stripJet_geometric_sum_le (n : ℕ) :
     ∑ i : Fin (n + 1), (1 / 2 : ℝ) ^ (n - i.val) ≤ 2 := by

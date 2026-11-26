@@ -924,6 +924,15 @@ private theorem introTrace_characterTrace_finite (χ : U𝔽) (h : ℝ → ℂ) 
     rw [introTrace_characterTrace_integral_zero μ W t _ hc hinv, mul_zero]
     simp [introTracePrimePower, hur]
 
+/-- The normalized principal value of the actual finite restriction equals the sum of its paired prime-power shells. -/
+theorem introTrace_finite_eq_tsum_primePower (χ : U𝔽) (h : ℝ → ℂ) (h1 : h 1 = 0)
+    (v : V) [LocallyCompactSpace (v.adicCompletion F)ˣ] (b : BruhatCompactSupport (v.adicCompletion F)ˣ)
+    (hb : ∀ x, b.val x = introTraceTest χ h (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v x)) :
+    ((Real.log q(v) / ((finiteLocalMultiplicativeTamagawaMeasure F v)
+      (v.adicCompletionIntegers F).units).toReal : ℝ) : ℂ) *
+      finiteConnesWeilPrincipalValue v 1 b = ∑' k, introTracePrimePower χ h v k :=
+  introTrace_characterTrace_finite χ h h1 v b hb
+
 end CharacterTrace
 
 section Tests

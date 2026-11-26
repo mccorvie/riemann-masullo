@@ -818,12 +818,13 @@ theorem exists_stronglyConvergent_modulatedCutoffOperators
 end
 
 /-- A uniformly bounded strongly null family kills a nuclear operator in trace norm. -/
-private theorem spectralTruncatedConvolution_trace_tendsto_null
+theorem spectralTruncatedConvolution_trace_tendsto_null
+    {ι : Type*} [Preorder ι] [IsDirectedOrder ι] [Nonempty ι]
     (H : Type*) [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
-    (Q : ℝ → H →L[ℂ] H) (hQ : ∀ x, Tendsto (fun R ↦ Q R x) atTop (𝓝 0))
+    (Q : ι → H →L[ℂ] H) (hQ : ∀ x, Tendsto (fun R ↦ Q R x) atTop (𝓝 0))
     (hbound : ∀ R, ‖Q R‖ ≤ 2) (T : nuclearEndomorphisms H) :
     Tendsto (fun R ↦ traceNorm ⟨Q R * T.val, mul_mem_nuclearEndomorphisms_left (Q R) T⟩) atTop (𝓝 0) := by
-  let product (R : ℝ) (A : nuclearEndomorphisms H) : nuclearEndomorphisms H :=
+  let product (R : ι) (A : nuclearEndomorphisms H) : nuclearEndomorphisms H :=
     ⟨Q R * A.val, mul_mem_nuclearEndomorphisms_left (Q R) A⟩
   let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
   have hcore := (traceNorm_normedSpaceCore (H := H)).toCore

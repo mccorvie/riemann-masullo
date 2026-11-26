@@ -1643,6 +1643,115 @@ theorem eta_test (f : BruhatCompactSupport Iₛ) (ξ : Hₛ) :
 
 end SLocalTraceEta
 
+section ComparisonLevel
+
+private theorem outsideIntegralIdeleUnits_antitone {S T : Finset V} (h : S ⊆ T) :
+    outsideIntegralIdeleUnits F T ≤ outsideIntegralIdeleUnits F S := by
+  intro x hx
+  obtain ⟨hi, hT, ho⟩ := (mem_outsideIntegralIdeleUnits_iff x).mp hx
+  have hTi := ((mem_outsideIntegralIdeleUnits_iff x⁻¹).mp
+    ((outsideIntegralIdeleUnits F T).inv_mem hx)).2.1
+  refine (mem_outsideIntegralIdeleUnits_iff x).mpr ⟨hi, fun v hv ↦ hT v (h hv), fun v _ ↦ ?_⟩
+  by_cases hv : v ∈ T
+  · rw [hT v hv, hTi v hv]
+    exact ⟨one_mem _, one_mem _⟩
+  · exact ho v hv
+
+/-- Every identity neighborhood contains the entire group of integral units
+outside some finite set of places. The groups decrease inside a compact group
+and their intersection is the identity. -/
+private theorem outsideIntegralIdeleUnits_subset_nhds {W : Set (IdeleGroup (𝓞 F) F)}
+    (hW : W ∈ 𝓝 1) : ∃ S : Finset V, (outsideIntegralIdeleUnits F S : Set _) ⊆ W := by
+  classical
+  let : T2Space (IdeleGroup (𝓞 F) F) := (ideleGroup_topology F).1
+  obtain ⟨U, hUW, hU, h1⟩ := mem_nhds_iff.mp hW
+  let K (S : Finset V) : Set (IdeleGroup (𝓞 F) F) := outsideIntegralIdeleUnits F S
+  let O (S : Finset V) := U ∪ (K S)ᶜ
+  have hO (S : Finset V) : IsOpen (O S) :=
+    hU.union (outsideIntegralIdeleUnits_isCompact (F := F) (S := S)).isClosed.isOpen_compl
+  have hcov : K ∅ ⊆ ⋃ S, O S := by
+    intro x hx
+    by_contra hn
+    have hall (S : Finset V) : x ∈ K S := by
+      by_contra h
+      exact hn (mem_iUnion.mpr ⟨S, Or.inr h⟩)
+    have he : x = 1 := by
+      apply Units.ext
+      refine Prod.ext ((mem_outsideIntegralIdeleUnits_iff x).mp hx).1 ?_
+      apply Subtype.ext
+      exact funext fun v ↦ ((mem_outsideIntegralIdeleUnits_iff x).mp (hall {v})).2.1 v (by simp)
+    exact hn (mem_iUnion.mpr ⟨∅, Or.inl (he ▸ h1)⟩)
+  have hdir : Directed (· ⊆ ·) O := by
+    intro S T
+    refine ⟨S ∪ T, union_subset_union_right _ (compl_subset_compl.mpr ?_),
+      union_subset_union_right _ (compl_subset_compl.mpr ?_)⟩
+    · exact outsideIntegralIdeleUnits_antitone Finset.subset_union_left
+    · exact outsideIntegralIdeleUnits_antitone Finset.subset_union_right
+  obtain ⟨S, hS⟩ := (outsideIntegralIdeleUnits_isCompact (F := F) (S := ∅)).elim_directed_cover O hO hcov hdir
+  refine ⟨S, fun x hx ↦ hUW ((hS (outsideIntegralIdeleUnits_antitone (Finset.empty_subset S) hx)).resolve_right ?_)⟩
+  exact fun h ↦ h hx
+
+/-- Paper: §12.4, p. 515. A global compact Bruhat test has a finite set of
+places outside which simultaneous multiplication by any family of integral
+units preserves the test. The same holds after enlarging this set. -/
+theorem exists_outsideIntegralIdeleUnits_period (φ : BruhatCompactSupport C𝔽) :
+    ∃ S : Finset V, ∀ T : Finset V, S ⊆ T → ∀ (u : outsideIntegralIdeleUnits F T) (c : C𝔽),
+      φ.val (QuotientGroup.mk u.val * c) = φ.val c := by
+  obtain ⟨H, hH, hinv, _⟩ := (mem_bruhatSmoothSubmodule_iff _).mp φ.property.1 0
+  obtain ⟨W, hW, hw⟩ := SLocalTraceEta.smallPowers H hH
+  let π := QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 F) F)
+  have hp : Continuous π := continuous_quotient_mk'
+  obtain ⟨S, hS⟩ := outsideIntegralIdeleUnits_subset_nhds
+    (hp.continuousAt.preimage_mem_nhds (by simpa only [map_one] using hW))
+  refine ⟨S, fun T hT u c ↦ hinv ⟨π u.val, hw _ (fun n ↦ ?_)⟩ c⟩
+  rw [← map_pow]
+  exact hS ((outsideIntegralIdeleUnits F S).pow_mem (outsideIntegralIdeleUnits_antitone hT u.property) n)
+
+local notation "normR(" g ")" => (((ideleClassNorm F g).val : ℝ))
+
+/-- Paper: §12.4, p. 515. Any compact Bruhat test admits a finite level
+containing any prescribed places, the different and all primes below its norm
+support bound. At that level the localized Picard group is trivial and all
+outside integral units fix the test. -/
+theorem exists_sLocalTrace_comparison_level (φ : BruhatCompactSupport C𝔽) (S₀ : Finset V) :
+    ∃ (S : Finset V) (B : ℝ), S₀ ⊆ S ∧
+      Subsingleton (CommRing.Pic ((S : Set V).integer F)) ∧
+      (∀ v : V, differentIdeal ℤ (𝓞 F) ≤ v.asIdeal → v ∈ S) ∧
+      (∀ (a : outsideIntegralIdeleUnits F S) (c : C𝔽), φ.val (QuotientGroup.mk a.val * c) = φ.val c) ∧
+      (∀ g ∈ tsupport φ.val, normR(g) < B ∧ (normR(g))⁻¹ < B) ∧
+      ∀ v : V, v ∉ S → B ≤ (v.asIdeal.absNorm : ℝ) := by
+  classical
+  have hn : Continuous (fun g : C𝔽 ↦ normR(g)) :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)
+  have hi := hn.inv₀ (fun g ↦ NNReal.coe_ne_zero.mpr (ideleClassNorm F g).ne_zero)
+  have hK : IsCompact (tsupport φ.val) := φ.property.2
+  let m (g : C𝔽) := max (normR(g)) ((normR(g))⁻¹)
+  have hm : Continuous m := hn.max hi
+  obtain ⟨b, hb⟩ := hK.bddAbove_image hm.continuousOn
+  let B := b + 1
+  have hB (g : C𝔽) (hg : g ∈ tsupport φ.val) : normR(g) < B ∧ (normR(g))⁻¹ < B := by
+    have he : max (normR(g)) ((normR(g))⁻¹) ≤ b := hb ⟨g, hg, rfl⟩
+    exact ⟨lt_of_le_of_lt (le_max_left _ _ |>.trans he) (lt_add_one _),
+      lt_of_le_of_lt (le_max_right _ _ |>.trans he) (lt_add_one _)⟩
+  let A := (Ring.HasFiniteQuotients.finite_absNorm_heightOneSpectrum_le (S := 𝓞 F) ⌈B⌉₊).toFinset
+  let J := (Ideal.finite_factors (differentIdeal_ne_bot (A := ℤ) (B := 𝓞 F))).toFinset
+  let S := A ∪ J
+  have hRam (v : V) (hv : differentIdeal ℤ (𝓞 F) ≤ v.asIdeal) : v ∈ S :=
+    Finset.mem_union_right _ (by simpa [J] using Ideal.dvd_iff_le.mpr hv)
+  have hS (v : V) (hv : v ∉ S) : B ≤ (v.asIdeal.absNorm : ℝ) := by
+    by_contra! h
+    apply hv
+    have hle : v.asIdeal.absNorm ≤ ⌈B⌉₊ := by exact_mod_cast h.le.trans (Nat.le_ceil B)
+    exact Finset.mem_union_left _ (by simpa [A] using hle)
+  obtain ⟨P, hP⟩ := exists_outsideIntegralIdeleUnits_period φ
+  obtain ⟨T, hT, hPic⟩ := (picard_uniformization F (S ∪ P ∪ S₀)).1
+  have hST : S ⊆ T := (Finset.subset_union_left.trans Finset.subset_union_left).trans hT
+  have hPT : P ⊆ T := (Finset.subset_union_right.trans Finset.subset_union_left).trans hT
+  exact ⟨T, B, Finset.subset_union_right.trans hT, hPic, fun v hv ↦ hST (hRam v hv),
+    hP T hPT, hB, fun v hv ↦ hS v (fun hs ↦ hv (hST hs))⟩
+
+end ComparisonLevel
+
 /-- Paper: (12.4.1.21)–(12.4.1.22), p. 518. The additive Tamagawa Fourier transform
 of the translated, zero-extended S-idelic test is integrable.
 Deviation: Step III uses Fourier integration on p. 518. We state explicitly the
