@@ -401,6 +401,13 @@ def decide(check, supplied_base):
     head_dump, out = check.signatures()
     if head_dump is None:
         raise Stop("fail", ["the signature dump failed after the build"], out)
+    if not check.docstrings_inert():
+        raise Stop("fail", ["it sets the option doc.verso, which makes Lean elaborate code inside doc "
+                            "comments; scripts/ci/plain_proof.py ignores comments and would reject main"], log)
+    current, kw_out = check.keywords_current()
+    if not current:
+        raise Stop("fail", ["it changes the reachable command keywords so scripts/ci/command_keywords.txt "
+                            "would be out of date on main (run scripts/ci/keywords.sh --write if intended)"], kw_out)
     head_sizes = check.synonym_sizes()
 
     changed, removed, added, bad = compare(base_dump, head_dump)
