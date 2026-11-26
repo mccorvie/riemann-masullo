@@ -473,12 +473,16 @@ theorem integrable_inv_realPWIntervalWeight_half (hs1 : 1 < s) :
     have h1 : HasDerivAt (fun y ↦ 1 + Real.log y) x⁻¹ x :=
       (Real.hasDerivAt_log hx0.ne').const_add 1
     have h2 := (h1.rpow_const (p := 1 - s) (Or.inl hb.ne')).const_mul (-(1 / (s - 1)))
-    convert h2 using 1
     have he : (1 : ℝ) - s - 1 = -s := by ring
-    rw [he]
     have hs0 : s - 1 ≠ 0 := by linarith
-    field_simp
-    ring
+    have hG'x : G' x =
+        -(1 / (s - 1)) * (x⁻¹ * (1 - s) * (1 + Real.log x) ^ (1 - s - 1)) := by
+      change x⁻¹ * (1 + Real.log x) ^ (-s) = _
+      rw [he]
+      field_simp
+      ring
+    rw [hG'x]
+    exact h2
   have hlim : Tendsto G atTop (𝓝 0) := by
     have h1 : Tendsto (fun x : ℝ ↦ 1 + Real.log x) atTop atTop :=
       tendsto_atTop_add_const_left _ 1 Real.tendsto_log_atTop
@@ -513,14 +517,18 @@ theorem integrable_inv_realPWIntervalWeight_half (hs1 : 1 < s) :
       nlinarith [sq_nonneg (Real.log x - 1)]
     have hbase : 0 < 1 + Real.log x := by linarith
     have hpos : 0 < x * (1 + Real.log x ^ 2) ^ (s / 2) := by positivity
+    have hA : 0 < (1 + Real.log x ^ 2) ^ (s / 2) := by positivity
+    have hB : 0 < (1 + Real.log x) ^ s := Real.rpow_pos_of_pos hbase s
+    have key : ((1 + Real.log x ^ 2) ^ (s / 2))⁻¹ ≤ 2 ^ (s / 2) * ((1 + Real.log x) ^ s)⁻¹ := by
+      rw [← div_eq_mul_inv, le_div_iff₀ hB, inv_mul_le_iff₀ hA]
+      linarith [hpow]
     calc (w x)⁻¹ ≤ (x * (1 + Real.log x ^ 2) ^ (s / 2))⁻¹ := inv_anti₀ hpos hwx
-      _ ≤ 2 ^ (s / 2) * (x⁻¹ * (1 + Real.log x) ^ (-s)) := by
-          rw [Real.rpow_neg hbase.le, mul_inv, ← mul_assoc, mul_comm (2 ^ (s / 2)) x⁻¹,
-            mul_assoc]
-          refine mul_le_mul_of_nonneg_left ?_ (inv_nonneg.mpr hx0.le)
-          rw [inv_le_iff_one_le_mul₀ (by positivity), mul_assoc, ← div_eq_inv_mul,
-            le_div_iff₀ (by positivity), one_mul]
-          exact hpow
+      _ = x⁻¹ * ((1 + Real.log x ^ 2) ^ (s / 2))⁻¹ := mul_inv _ _
+      _ ≤ x⁻¹ * (2 ^ (s / 2) * ((1 + Real.log x) ^ s)⁻¹) :=
+          mul_le_mul_of_nonneg_left key (inv_nonneg.mpr hx0.le)
+      _ = 2 ^ (s / 2) * (x⁻¹ * (1 + Real.log x) ^ (-s)) := by
+          rw [Real.rpow_neg hbase.le]
+          ring
   have hI1 : IntegrableOn (fun x ↦ (w x)⁻¹) (Ioi 1) := by
     refine (hG'.const_mul (2 ^ (s / 2))).mono' hmeas.aestronglyMeasurable
       ((ae_restrict_mem measurableSet_Ioi).mono fun x hx ↦ ?_)
