@@ -37,10 +37,9 @@ not.
 
 **What is left is open to everyone at once.** The formalization is close to its end, and the
 work now is to find repairs for the last gaps in the proof. Each open step is an issue labelled
-[`open-problem`](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aopen-problem), and [What is left: the open problems](https://github.com/mccorvie/riemann-masullo/issues/7349) lists them all: four
+[`open-problem`](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aopen-problem), and [What is left: the open problems](https://github.com/mccorvie/riemann-masullo/issues/7349) lists them all:
 the one statement on which the whole proof rests in Lean, further statements that are in Lean
-without a proof, proof steps that the manuscript does not state precisely enough to formalize,
-and known theorems that have no formal proof here.
+without a proof, and proof steps that the manuscript does not state precisely enough to formalize.
 
 These issues are **not claimed**. Nobody holds one, several people can work on the same one, and
 a partial result posted on the issue is a contribution: a sketch, a reference, a weaker
@@ -97,8 +96,8 @@ give it back.
 **Searching for repairs of the final gaps in the proof.** The paper's author, Alessandro
 Masullo, is working with the project to fill in the remaining gaps. As of 24 November 2026,
 about 13,200 theorems and 1,800 definitions are stated in Lean. In the chapters the trace
-formula rests on (Chapters 2–7 and 9–13, with Appendices A–D) all but eight of the theorems
-are proved, as of 26 November. About ninety people have had pull requests merged, some 2,660
+formula rests on (Chapters 2–7 and 9–13, with Appendices A–D) all but seven of the theorems
+are proved, as of 27 November. About ninety people have had pull requests merged, some 2,660
 pull requests in all.
 
 - **Those chapters are stated, and what could be proved is proved.** Where a
@@ -119,12 +118,12 @@ pull requests in all.
   the number of statements can rise when a step is narrowed.
 - **Five proof steps that the manuscript does not state precisely enough to formalize,** in
   Chapters 7, 11 and 12. They have no Lean statement.
-- **One classical input:** a theorem of the literature that is stated in Lean and used, and
-  not proved there. The targets do not use it either. Five others were proved in Lean on 25
-  and 26 November.
-- **292 statements of the manuscript are proved false as printed.** Each is kept in Lean with
+- **No classical input is left.** Six theorems of the literature were at first stated in Lean
+  and used without proof. All are now proved there, the last on 27 November: Selberg's
+  theorem on the zeros of ζ on the critical line, in the form the project uses.
+- **293 statements of the manuscript are proved false as printed.** Each is kept in Lean with
   a machine-checked proof of its negation, next to the corrected statement, which is proved.
-  Four more such proofs rest on a statement that is itself still open.
+  Three more such proofs rest on a statement that is itself still open.
 - The supplementary material (Chapters 8 and 14, Appendix E, §A.4, §B.7), on which the trace
   formula does not rest, is partly stated and proved, and is not being worked on.
 
