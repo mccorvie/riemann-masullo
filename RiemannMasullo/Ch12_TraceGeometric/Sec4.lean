@@ -4899,6 +4899,179 @@ private theorem sLocalTraceLift_weighted_integral
       _ = φJ q * w q := by simpa only [hq] using ((hLift q.out).mul_right (w q)).tsum_eq
   exact ⟨hW.2.1.congr he, hW.2.2.trans (integral_congr_ae he)⟩
 
+/-- The dilation average of a Schwartz–Bruhat test can be periodized by
+integrating its local theta series, using the compact support of the lift. -/
+private theorem sLocalTraceDilationKernel_periodize_theta
+    (f : BruhatCompactSupport Iₛ) (v : testₛ) (x : Iₛ) :
+    HasSum (fun ξ : Hₛ ↦ sLocalTraceDilationKernel f (fun z ↦ testAt(v,z)) (ξ.val * x).val)
+      (∫ g : Iₛ, (f.val g / (Real.sqrt (normS(g)) : ℂ)) *
+        sLocalAdelicThetaOnClasses F S v (QuotientGroup.mk (g⁻¹ * x)) ∂μₛ) := by
+  let U := (Set.integer (S : Set V) F)ˣ
+  let d := sUnitEmbedding F S
+  let : Countable F := Countable.of_moduleFinite (R := ℚ)
+  let : Countable U := Units.val_injective.countable
+  let : BorelSpace Iₛ := sIdeleGroup_borelSpace
+  let : (μₛ).IsHaarMeasure := sMultiplicativeTamagawaMeasure_isHaarMeasure
+  let b (u : U) (z : Iₛ) : ℂ := testAt(v,(d u * z).val)
+  let a (z : Iₛ) : ℝ := ∑' u : U, ‖b u z‖
+  have hv : Continuous (fun z : Aₛ ↦ testAt(v,z)) :=
+    (continuous_schwartzBruhat_apply v).comp continuous_ofAdd
+  have hb (u : U) : Continuous (b u) := hv.comp (Units.continuous_val.comp
+    ((continuous_const (y := d u)).mul continuous_id))
+  have hAbsSum : HasSumLocallyUniformly (fun u : U ↦ fun z : Iₛ ↦ ‖b u z‖) a :=
+    hasSumLocallyUniformly_of_forall_compact fun K hK ↦
+      (sLocalAdelicTheta_summableUniformlyOn_norm F S v K hK).hasSumUniformlyOn
+  have ha : Continuous a := hAbsSum.continuous
+    (Eventually.of_forall fun t ↦ continuous_finsetSum t fun u _ ↦ (hb u).norm).frequently
+  let p (g : Iₛ) := g⁻¹ * x
+  have hp : Continuous p := continuous_inv.mul continuous_const
+  let R (g : Iₛ) := f.val g / (Real.sqrt (normS(g)) : ℂ)
+  have hN : Continuous (fun g : Iₛ ↦ normS(g)) :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp sLocalTrace_sIdeleNorm_continuous)
+  have hR : Continuous R :=
+    (sLocalTraceDilationKernel_apply_zero_continuous ((mem_bruhatSmoothSubmodule_iff _).1 f.property.1)).div
+      (Complex.continuous_ofReal.comp hN.sqrt) (fun g ↦
+        Complex.ofReal_ne_zero.mpr (Real.sqrt_pos.mpr (NNReal.coe_pos.mpr (Units.zero_lt _))).ne')
+  let T (u : U) (g : Iₛ) : ℂ := R g * b u (p g)
+  let B (u : U) (g : Iₛ) : ℝ := ‖R g‖ * ‖b u (p g)‖
+  have hT (u : U) : AEStronglyMeasurable (T u) μₛ :=
+    (hR.mul ((hb u).comp hp)).aestronglyMeasurable
+  have hB (u : U) (g : Iₛ) : ‖T u g‖ ≤ B u g := (norm_mul _ _).le
+  have hBoundSum (g : Iₛ) : Summable fun u : U ↦ B u g :=
+    ((sLocalAdelicTheta_summableUniformlyOn_norm F S v {p g}
+      isCompact_singleton).summable rfl).mul_left ‖R g‖
+  have hBI : Integrable (fun g : Iₛ ↦ ∑' u : U, B u g) μₛ := by
+    let M (g : Iₛ) := ‖R g‖ * a (p g)
+    have hM : HasCompactSupport M := HasCompactSupport.mono f.property.2 fun g hg h0 ↦
+      hg (by simp [M, R, h0])
+    refine ((hR.norm.mul (ha.comp hp)).integrable_of_hasCompactSupport hM).congr
+      (ae_of_all _ fun g ↦ ?_)
+    change ‖R g‖ * (∑' u : U, ‖b u (p g)‖) = ∑' u : U, ‖R g‖ * ‖b u (p g)‖
+    rw [tsum_mul_left]
+  have hsum (g : Iₛ) : HasSum (fun u : U ↦ T u g)
+      (R g * sLocalAdelicThetaOnClasses F S v (QuotientGroup.mk (p g))) := by
+    rw [sLocalAdelicThetaOnClasses_mk]
+    exact ((sLocalAdelicTheta_hasSumUniformlyOn F S v {p g} isCompact_singleton).hasSum rfl).mul_left (R g)
+  have hInt := hasSum_integral_of_dominated_convergence B hT
+    (fun u ↦ ae_of_all _ (hB u)) (ae_of_all _ hBoundSum) hBI (ae_of_all _ hsum)
+  have hd : Injective d := fun _ _ h ↦ Units.ext
+    ((sAdele_additive_quotient F S).1 (congrArg Units.val h))
+  have hr : d.range = Hₛ := by
+    change _ = Subgroup.map _ _
+    rw [MonoidHom.map_range]
+  let e : U ≃ Hₛ := (MonoidHom.ofInjective hd).toEquiv.trans (MulEquiv.subgroupCongr hr).toEquiv
+  have he (u : U) : (e u : Iₛ) = d u := rfl
+  apply (e.hasSum_iff).mp
+  refine hInt.congr_fun fun u ↦ ?_
+  change sLocalTraceDilationKernel f (fun z ↦ testAt(v,z)) ((e u).val * x).val = ∫ g, T u g ∂μₛ
+  unfold sLocalTraceDilationKernel
+  refine integral_congr_ae (ae_of_all _ fun g ↦ ?_)
+  have harg : (g⁻¹).val * ((e u).val * x).val = (d u * p g).val := by
+    rw [he]
+    exact congrArg Units.val (mul_left_comm g⁻¹ (d u) x)
+  change R g * testAt(v,(g⁻¹).val * ((e u).val * x).val) =
+    R g * testAt(v,(d u * p g).val)
+  exact congrArg (fun z : Aₛ ↦ R g * testAt(v,z)) harg
+
+/-- Paper: (12.4.1.4)–(12.4.1.7), pp. 515–516. After multiplication by
+square-root norm, the periodized dilation of a Schwartz–Bruhat test is
+quotient Haar convolution by the periodization of the lift.
+Deviation: Pointwise identity for a Schwartz–Bruhat test and a compact
+idelic lift with the stated periodization. -/
+theorem sLocalTraceDilationKernel_periodize_halfDensity
+    (f : BruhatCompactSupport Iₛ) (v : testₛ) (x : Iₛ) (φ : Jₛ → ℂ)
+    (hLift : ∀ g : Iₛ, HasSum (fun ξ : Hₛ ↦ f.val (ξ.val * g)) (φ (QuotientGroup.mk g))) :
+    let N (q : Jₛ) : ℝ := (sIdeleQuotientNorm F S q).val
+    let U (q : Jₛ) := (Real.sqrt (N q) : ℂ) * sLocalAdelicThetaOnClasses F S v q
+    HasSum (fun ξ : Hₛ ↦ (Real.sqrt (N (QuotientGroup.mk x)) : ℂ) *
+      sLocalTraceDilationKernel f (fun z ↦ testAt(v,z)) (ξ.val * x).val)
+      (lcaConvolution μJ φ U (QuotientGroup.mk x)) := by
+  intro N U
+  let q : Jₛ := QuotientGroup.mk x
+  let w (r : Jₛ) := U (r⁻¹ * q)
+  have hN : Continuous N := NNReal.continuous_coe.comp (Units.continuous_val.comp
+    (isProperMap_sIdeleQuotientNorm F S).continuous)
+  have hU : Continuous U := (Complex.continuous_ofReal.comp hN.sqrt).mul
+    (sLocalAdelicThetaOnClasses F S v).continuous
+  have hw : Continuous w := hU.comp (continuous_inv.mul continuous_const)
+  have hLiftInt := (sLocalTraceLift_weighted_integral f φ w hw hLift).2
+  have hOrbit := (sLocalTraceDilationKernel_periodize_theta f v x).mul_left
+    (Real.sqrt (N q) : ℂ)
+  have hInt : (Real.sqrt (N q) : ℂ) *
+      (∫ g : Iₛ, (f.val g / (Real.sqrt (normS(g)) : ℂ)) *
+        sLocalAdelicThetaOnClasses F S v (QuotientGroup.mk (g⁻¹ * x)) ∂μₛ) =
+      lcaConvolution μJ φ U q := by
+    rw [← integral_const_mul]
+    change _ = ∫ r, φ r * w r ∂μJ
+    rw [← hLiftInt]
+    refine integral_congr_ae (ae_of_all _ fun g ↦ ?_)
+    have hnorm : normS(g) * normS(g⁻¹ * x) = normS(x) := by
+      rw [← NNReal.coe_mul, ← Units.val_mul, ← map_mul, mul_inv_cancel_left]
+    have hsqrt : Real.sqrt (normS(x)) =
+        Real.sqrt (normS(g)) * Real.sqrt (normS(g⁻¹ * x)) := by
+      rw [← Real.sqrt_mul (by positivity : 0 ≤ normS(g)), hnorm]
+    have hne : (Real.sqrt (normS(g)) : ℂ) ≠ 0 :=
+      Complex.ofReal_ne_zero.mpr (Real.sqrt_pos.mpr
+        (NNReal.coe_pos.mpr (Units.zero_lt _))).ne'
+    dsimp only [w, U, N, q]
+    rw [← QuotientGroup.mk_inv, ← QuotientGroup.mk_mul, sIdeleQuotientNorm_mk,
+      sIdeleQuotientNorm_mk, hsqrt, Complex.ofReal_mul]
+    field_simp [hne]
+  exact hInt ▸ hOrbit
+
+section NormOneConvolutionAverage
+
+local notation "J₁" => (sIdeleQuotientNorm F S).ker
+local notation "ηₛ" => sLocalNormOneQuotientMeasure F S
+
+/-- In Theorem 12.4.1.1, p. 515, a norm-one-invariant multiplier pulls out
+of the norm-one character integral. This integral passes through quotient
+Haar convolution by a continuous compactly supported test. -/
+theorem sLocalTrace_normOne_integral_mul_convolution
+    (φ U : C(Jₛ, ℂ)) (hφ : HasCompactSupport (φ : Jₛ → ℂ))
+    (ρ : Jₛ → ℂ) (hρ : ∀ (q : Jₛ) (h : J₁), ρ (q * h.val) = ρ q)
+    (character : PontryaginDual J₁) (q : Jₛ) :
+    (∫ h : J₁, ρ (q * h.val) * lcaConvolution μJ φ U (q * h.val) * (character h : ℂ) ∂ηₛ) =
+      ρ q * lcaConvolution μJ φ (fun z ↦ ∫ h : J₁, U (z * h.val) * (character h : ℂ) ∂ηₛ) q := by
+  let : T2Space Jₛ := instSIdeleQuotientT2Sec1
+  let : BorelSpace Jₛ := ⟨rfl⟩
+  let : BorelSpace J₁ := ⟨rfl⟩
+  let : CompactSpace J₁ := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let : (μJ).IsHaarMeasure := (sLocalQuotientTamagawaMeasure_isWeil (F := F) (S := S)).1
+  let : (ηₛ).IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  let A (r : Jₛ) (h : J₁) : ℂ := φ r * (U ((r⁻¹ * q) * h.val) * (character h : ℂ))
+  have harg : Continuous (fun p : Jₛ × J₁ ↦ (p.1⁻¹ * q) * p.2.val) :=
+    (continuous_fst.inv.mul continuous_const).mul (continuous_subtype_val.comp continuous_snd)
+  have hcharacter : Continuous (fun p : Jₛ × J₁ ↦ (character p.2 : ℂ)) :=
+    continuous_subtype_val.comp (character.continuous.comp continuous_snd)
+  have hAc : Continuous (Function.uncurry A) :=
+    (φ.continuous.comp continuous_fst).mul ((U.continuous.comp harg).mul hcharacter)
+  have hAs : HasCompactSupport (Function.uncurry A) := by
+    refine HasCompactSupport.intro (hφ.prod (isCompact_univ : IsCompact (univ : Set J₁))) ?_
+    intro p hp
+    have hz : p.1 ∉ tsupport (φ : Jₛ → ℂ) := fun h ↦ hp ⟨h, Set.mem_univ p.2⟩
+    simp only [Function.uncurry, A, image_eq_zero_of_notMem_tsupport hz, zero_mul]
+  calc
+    _ = ρ q * (∫ h : J₁, ∫ r : Jₛ, A r h ∂μJ ∂ηₛ) := by
+      rw [← integral_const_mul]
+      apply integral_congr_ae
+      exact ae_of_all _ fun h ↦ by
+        change ρ (q * h.val) * lcaConvolution μJ φ U (q * h.val) * (character h : ℂ) =
+          ρ q * ∫ r, A r h ∂μJ
+        rw [hρ q h, mul_assoc]
+        congr 1
+        unfold lcaConvolution
+        rw [← integral_mul_const]
+        apply integral_congr_ae
+        exact ae_of_all _ fun r ↦ by simp only [A, mul_assoc]
+    _ = ρ q * (∫ r : Jₛ, ∫ h : J₁, A r h ∂ηₛ ∂μJ) :=
+      congrArg (fun z : ℂ ↦ ρ q * z)
+        (integral_integral_swap_of_hasCompactSupport (μ := μJ) (ν := ηₛ) hAc hAs).symm
+    _ = _ := by simp only [A, integral_const_mul, lcaConvolution]
+
+end NormOneConvolutionAverage
+
 /-- With trivial S-class group, every global idele class is the product of an
 outside integral unit with the insertion of a representative of its image in
 the S-idele quotient. The quotient map preserves the module. -/
