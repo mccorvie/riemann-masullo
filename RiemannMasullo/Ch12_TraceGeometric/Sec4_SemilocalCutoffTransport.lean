@@ -5,12 +5,13 @@ public import Mathlib.Algebra.Star.Unitary
 import Mathlib.Tactic.Group
 
 /-!
-# Transport of the unweighted semilocal cutoff
+# Algebraic conjugation identities
 
-In the rational unit-invariant model, periodization is the product of the resolvents
-`(1 - p⁻¹ᐟ² Dₚ)⁻¹`, where `Dₚ` is the normalized dilation by `p`. The real Fourier
-transform reverses the dilations. The lemmas take the corresponding commutation and
-reversal identities as hypotheses for any finite list of local factors.
+These monoid lemmas are motivated by the sharp cutoff in Masullo, Theorem 12.4.1.1,
+pp. 515–517. In the rational unit-invariant model, the periodization factors are
+`(1 - p⁻¹ᐟ² Dₚ)⁻¹`, where `Dₚ` is the normalized dilation by `p`, and Fourier conjugation
+reverses the dilations. See Connes–Consani–Moscovici, *Zeta zeros and prolate wave operators*,
+§4.2, (44)–(47) and (iii).
 -/
 
 @[expose] public section
@@ -32,11 +33,10 @@ private theorem star_list_prod_of_commute {G : Type*} [Group G] [StarMul G]
     simpa only [Commute, SemiconjBy, star_mul] using congrArg star
       (h a (by simp) y (List.mem_cons_of_mem _ hy)).eq
 
-/-- Paper: Theorem 12.4.1.1, pp. 515–517. The conjugating operator `U` for the sharp
-frequency cutoff is unitary when periodization is a product of commuting invertible
-operators and Fourier conjugation sends each factor to its adjoint.
-Reconstruction: This is the operator identity behind the rational unit-invariant chart of
-Connes–Consani–Moscovici, *Zeta zeros and prolate wave operators*, §4.2, (44)–(47) and (iii). -/
+/-- Let `G` be the product of a list of units that commute with each other and with
+each other's adjoints. If conjugation by `F` sends each factor to its adjoint, then
+`U = G * (star G)⁻¹` is unitary and `G * F * G⁻¹ = U * F`. Conjugation of any `M`
+by `G * F * G⁻¹` thus factors through conjugation by `F` and then by `U`. -/
 theorem semilocalCutoff_unitary_transport {R : Type*} [Monoid R] [StarMul R]
     (factors : List Rˣ) (F : Rˣ) (M : R)
     (hcomm : ∀ x ∈ factors, ∀ y ∈ factors, Commute x y)
@@ -89,10 +89,8 @@ theorem semilocalCutoff_unitary_transport {R : Type*} [Monoid R] [StarMul R]
     rw [hU, mul_inv_rev]
     simp only [Units.val_mul, mul_assoc]
 
-/-- Paper: Theorem 12.4.1.1, pp. 515–517. If the flat band projection is `Q` and the
-semilocal band is its conjugate by the invertible transport `U`, the compression is carried to
-the flat band by putting the inverse transport and transport around the position cutoff `M`.
-This applies also to a flat band projection with the origin evaluation removed. -/
+/-- If `P = U * Q * U⁻¹` and `A` commutes with `U`, conjugation of `P * M * A * P`
+by `U⁻¹` gives `Q * (U⁻¹ * M * U) * A * Q`. -/
 theorem semilocalCutoff_compression_transport {R : Type*} [Monoid R]
     (U : Rˣ) (Q M A : R) (hA : Commute (U : R) A) :
     let P := (U : R) * Q * ↑U⁻¹
