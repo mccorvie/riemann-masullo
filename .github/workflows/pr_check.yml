@@ -39,7 +39,7 @@ jobs:
   verdict:
     name: Verdict
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 240        # two builds of up to BUILD_MINUTES (120) each in scripts/ci/verdict.py, plus the signature dumps
     env:
       PR: ${{ github.event.pull_request.number }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}

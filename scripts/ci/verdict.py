@@ -55,7 +55,7 @@ SHA = re.compile(r"[0-9a-f]{40}")
 SORRY_WARNING = re.compile(r"^warning: (RiemannMasullo/\S+\.lean):\d+:\d+: declaration uses `sorry`\s*$", re.M)
 SIGNATURE_LINE = re.compile(
     r"(theorem|def|opaque|axiom|inductive|constructor|recursor|quot) (\S+) \d+( \d+)?( SORRY)?")
-BUILD_MINUTES = 45
+BUILD_MINUTES = 120   # a check can start many merges behind main and must rebuild them first (#7324)
 BUILD_TARGETS = ("RiemannMasullo", "Challenge", "Main")
 # A type synonym whose body is this many nodes as a tree spells out other synonyms again and again
 # in its instance terms; parts of Lean walk those terms as trees and stop finishing (#5398, #5716).
