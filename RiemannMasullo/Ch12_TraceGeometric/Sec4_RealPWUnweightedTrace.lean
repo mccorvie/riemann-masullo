@@ -441,32 +441,14 @@ theorem exists_realPWTestCutoff_trace_limit_through_one (hY : 0 < Y) {a b : ℝ}
   exact tendsto_integral_realPWSharpTrace_zero_zero Y hs hY ha0 ψ
     (hψc.integrable_of_hasCompactSupport (HasCompactSupport.intro isCompact_Icc hψ0)) hψ0 hK
 
-/-- Reconstruction: without weight, for the same test functions, the traces of the cutoffs
-compressed to the level of band vectors vanishing at the origin converge to the limit on the
-whole band minus the integral of `ψ g min (g, 1) g ^ (-1/2)`. The term removed is
-`g ^ (-1/2)` for `g > 1` and `g ^ (1/2)` for `g < 1`. -/
-theorem exists_realPWTestCutoff_level_trace_limit_through_one (hY : 0 < Y) {a b : ℝ}
-    (ha0 : 0 < a) (ψ : ℝ → ℂ) (hψc : Continuous ψ) (hψ0 : ∀ g ∉ Icc a b, ψ g = 0) {K : ℝ}
-    (hK : ∀ g, ‖ψ g‖ ≤ K * |g - 1|) :
-    ∃ T : ℝ → nuclearEndomorphisms V₀,
-      (∀ L (f : V₀), ∃ r : Lp ℂ 2 μ₀,
-        (∀ᵐ x ∂μ₀, r x = sharpIntervalMask L x *
-          ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) *
-            ev (g⁻¹ * x) ((realPWZeroLevel Y 0 0 hs).starProjection f))) ∧
-        (T L).val f =
-          (realPWZeroLevel Y 0 0 hs).starProjection ((V₀).orthogonalProjectionOnto r)) ∧
-      Tendsto (fun L ↦ hilbertTrace (T L)) atTop
-        (𝓝 ((∫ g, ψ g * ((realTermDensity g : ℝ) : ℂ)) -
-          ∫ g, ψ g * ((min g 1 * g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ))) := by
-  choose T hT1 hT2 using fun L ↦
-    exists_realPWTestCutoff_level_nuclear Y 0 0 hs hY le_rfl ha0 ψ hψc hψ0 L
-  refine ⟨T, hT1, ?_⟩
-  have h : (fun L ↦ hilbertTrace (T L)) = fun L ↦
-      (∫ g, ψ g * realPWSharpTrace Y 0 0 hs g L) -
-        (((‖evv 0‖ ^ 2 : ℝ) : ℂ))⁻¹ * realPWZeroLevelCorrection Y 0 0 hs ψ L := funext hT2
-  rw [h]
-  have h1 := tendsto_integral_realPWSharpTrace_zero_zero Y hs hY ha0 ψ
-    (hψc.integrable_of_hasCompactSupport (HasCompactSupport.intro isCompact_Icc hψ0)) hψ0 hK
+/-- Reconstruction: without weight, as the cutoff is removed, the diagonal entry of the cutoff
+action of `ψ` at the normalized evaluation vector at the origin tends to the integral of
+`ψ g min (g, 1) g ^ (-1/2)`. The test function may be supported on both sides of `g = 1`, and
+it need not vanish there. -/
+theorem tendsto_realPWZeroLevelCorrection_zero_zero (hY : 0 < Y) {a b : ℝ} (ha0 : 0 < a)
+    (ψ : ℝ → ℂ) (hψc : Continuous ψ) (hψ0 : ∀ g ∉ Icc a b, ψ g = 0) :
+    Tendsto (fun L ↦ (((‖evv 0‖ ^ 2 : ℝ) : ℂ))⁻¹ * realPWZeroLevelCorrection Y 0 0 hs ψ L)
+      atTop (𝓝 (∫ g, ψ g * ((min g 1 * g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ))) := by
   have hE0 := realPWEvaluationVector_zero_ne_zero Y 0 0 hs hY le_rfl (by norm_num)
   have hN : ev 0 (evv 0) = ((‖evv 0‖ ^ 2 : ℝ) : ℂ) := by
     have h3 : ev 0 (evv 0) = ⟪evv 0, evv 0⟫_ℂ := by
@@ -503,7 +485,35 @@ theorem exists_realPWTestCutoff_level_trace_limit_through_one (hY : 0 < Y) {a b 
     rw [Complex.ofReal_mul]
     field_simp
   rw [h3] at h2
-  exact h1.sub h2
+  exact h2
+
+/-- Reconstruction: without weight, for the same test functions, the traces of the cutoffs
+compressed to the level of band vectors vanishing at the origin converge to the limit on the
+whole band minus the integral of `ψ g min (g, 1) g ^ (-1/2)`. The term removed is
+`g ^ (-1/2)` for `g > 1` and `g ^ (1/2)` for `g < 1`. -/
+theorem exists_realPWTestCutoff_level_trace_limit_through_one (hY : 0 < Y) {a b : ℝ}
+    (ha0 : 0 < a) (ψ : ℝ → ℂ) (hψc : Continuous ψ) (hψ0 : ∀ g ∉ Icc a b, ψ g = 0) {K : ℝ}
+    (hK : ∀ g, ‖ψ g‖ ≤ K * |g - 1|) :
+    ∃ T : ℝ → nuclearEndomorphisms V₀,
+      (∀ L (f : V₀), ∃ r : Lp ℂ 2 μ₀,
+        (∀ᵐ x ∂μ₀, r x = sharpIntervalMask L x *
+          ∫ g, ψ g * (((g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ) *
+            ev (g⁻¹ * x) ((realPWZeroLevel Y 0 0 hs).starProjection f))) ∧
+        (T L).val f =
+          (realPWZeroLevel Y 0 0 hs).starProjection ((V₀).orthogonalProjectionOnto r)) ∧
+      Tendsto (fun L ↦ hilbertTrace (T L)) atTop
+        (𝓝 ((∫ g, ψ g * ((realTermDensity g : ℝ) : ℂ)) -
+          ∫ g, ψ g * ((min g 1 * g ^ (-(1 / 2 : ℝ)) : ℝ) : ℂ))) := by
+  choose T hT1 hT2 using fun L ↦
+    exists_realPWTestCutoff_level_nuclear Y 0 0 hs hY le_rfl ha0 ψ hψc hψ0 L
+  refine ⟨T, hT1, ?_⟩
+  have h : (fun L ↦ hilbertTrace (T L)) = fun L ↦
+      (∫ g, ψ g * realPWSharpTrace Y 0 0 hs g L) -
+        (((‖evv 0‖ ^ 2 : ℝ) : ℂ))⁻¹ * realPWZeroLevelCorrection Y 0 0 hs ψ L := funext hT2
+  rw [h]
+  have h1 := tendsto_integral_realPWSharpTrace_zero_zero Y hs hY ha0 ψ
+    (hψc.integrable_of_hasCompactSupport (HasCompactSupport.intro isCompact_Icc hψ0)) hψ0 hK
+  exact h1.sub (tendsto_realPWZeroLevelCorrection_zero_zero Y hs hY ha0 ψ hψc hψ0)
 
 end Limit
 
