@@ -5,6 +5,7 @@ import RiemannMasullo.AppD_SchwartzBruhat.Sec1a
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Count
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Analysis.Normed.Field.ProperSpace
+import Mathlib.MeasureTheory.Integral.DominatedConvergence
 
 /-! # Absolute orbit unfolding for the S-local trace kernel -/
 
@@ -279,5 +280,102 @@ theorem sLocalQuotient_integral_radial_mul_theta
     sLocalQuotient_lintegral_radial_mul_absTheta_lt_top f A hA
       (fun q ↦ ‖k q‖) hC hsmall hlarge
   exact sLocalQuotient_integral_orbitSum_of_absolute g hg absMass G habs hG hfin
+
+/-- The multiplicative input form of the periodized kernel action.
+The absolute radial bounds on a row justify interchanging the output orbit
+sum with the integrals. Simultaneous S-unit covariance turns the output
+translates into the input orbit defining the quotient kernel. -/
+theorem sLocalQuotient_integral_outputOrbit_radial_theta
+    (f : SchwartzBruhat (Multiplicative Aₛ)) (K : Iₛ → Iₛ → ℂ) (x : Iₛ)
+    (hK : Measurable (K x))
+    (hcov : ∀ (ξ : Hₛ) (y : Iₛ), K (ξ.val * x) (ξ.val * y) = K x y)
+    (κ : Jₛ → ℂ) (hκ : Measurable κ)
+    (hrep : ∀ y : Iₛ, κ (QuotientGroup.mk y) = ∑' ξ : Hₛ, K x (ξ.val * y))
+    (hsum : ∀ y : Iₛ, Summable fun ξ : Hₛ ↦ ‖K x (ξ.val * y)‖)
+    {C : ℝ} (hC : 0 ≤ C)
+    (hsmall : ∀ y : Iₛ, ((sIdeleNorm F S y).val : ℝ) ≤ 1 →
+      (∑' ξ : Hₛ, ‖K x (ξ.val * y)‖) ≤ C * ((sIdeleNorm F S y).val : ℝ) ^ (-(1 / 4 : ℝ)))
+    (hlarge : ∀ y : Iₛ, 1 ≤ ((sIdeleNorm F S y).val : ℝ) →
+      (∑' ξ : Hₛ, ‖K x (ξ.val * y)‖) ≤ C * ((sIdeleNorm F S y).val : ℝ)⁻¹) :
+    let N (q : Jₛ) : ℝ := (sIdeleQuotientNorm F S q).val
+    let v (y : Iₛ) := f (Multiplicative.ofAdd y.val)
+    let G (q : Jₛ) := (N q : ℂ) * κ q * sLocalAdelicThetaOnClasses F S f q
+    Integrable G μJ ∧
+      (∑' ξ : Hₛ, ∫ y : Iₛ, (N (QuotientGroup.mk y) : ℂ) * K (ξ.val * x) y * v y ∂μₛ) =
+        ∫ q, G q ∂μJ := by
+  intro N v G
+  let π : Iₛ → Jₛ := QuotientGroup.mk
+  let h (y : Iₛ) := ∑' ξ : Hₛ, ‖K x (ξ.val * y)‖
+  let T (ξ : Hₛ) (y : Iₛ) := (N (π y) : ℂ) * K x (ξ.val * y) * v y
+  have hπn (y : Iₛ) : N (QuotientGroup.mk y) = ((sIdeleNorm F S y).val : ℝ) := by
+    simp only [N, sIdeleQuotientNorm_mk]
+  have hN₀ (y : Iₛ) : 0 ≤ N (π y) := NNReal.coe_nonneg _
+  have hNc : Continuous N := NNReal.continuous_coe.comp
+    (Units.continuous_val.comp (isProperMap_sIdeleQuotientNorm F S).continuous)
+  have hπc : Continuous π := continuous_quotient_mk'
+  have hv : Continuous v :=
+    (continuous_schwartzBruhat_apply f).comp (continuous_ofAdd.comp Units.continuous_val)
+  let : BorelSpace Jₛ := ⟨rfl⟩
+  have hT (ξ : Hₛ) : Measurable (T ξ) :=
+    (((Complex.continuous_ofReal.comp (hNc.comp hπc)).measurable.mul
+      (hK.comp (continuous_const (y := ξ.val) |>.mul continuous_id).measurable)).mul hv.measurable)
+  have hmass (y : Iₛ) : (∑' ξ : Hₛ, ‖T ξ y‖ₑ) =
+      ENNReal.ofReal (N (π y) * h y * ‖v y‖) := by
+    have he (ξ : Hₛ) : ‖T ξ y‖ₑ = ENNReal.ofReal (N (π y) * ‖K x (ξ.val * y)‖ * ‖v y‖) := by
+      rw [← ofReal_norm]
+      simp only [T, norm_mul, Complex.norm_real, Real.norm_of_nonneg (hN₀ y)]
+    have nonneg (ξ : Hₛ) : 0 ≤ N (π y) * ‖K x (ξ.val * y)‖ * ‖v y‖ :=
+      mul_nonneg (mul_nonneg (hN₀ y) (norm_nonneg _)) (norm_nonneg _)
+    have hweighted := ((hsum y).mul_left (N (π y))).mul_right ‖v y‖
+    simp_rw [he]
+    rw [← ENNReal.ofReal_tsum_of_nonneg nonneg hweighted, tsum_mul_right, tsum_mul_left]
+  let V (y : Iₛ) := C * Real.sqrt (N (π y)) * ‖v y‖
+  have hV : Integrable V μₛ := by
+    simpa only [V, π, hπn, v, mul_assoc] using (sLocalSchwartzBruhat_norm_sqrt_integrable f).const_mul C
+  have hV₀ (y : Iₛ) : 0 ≤ V y :=
+    mul_nonneg (mul_nonneg hC (Real.sqrt_nonneg _)) (norm_nonneg _)
+  have hfin : (∑' ξ : Hₛ, ∫⁻ y, ‖T ξ y‖ₑ ∂μₛ) < ⊤ := by
+    rw [← lintegral_tsum (fun ξ ↦ (hT ξ).eNorm.aemeasurable)]
+    calc
+      _ = ∫⁻ y, ENNReal.ofReal (N (π y) * h y * ‖v y‖) ∂μₛ := lintegral_congr hmass
+      _ ≤ ∫⁻ y, ENNReal.ofReal (V y) ∂μₛ := by
+        apply lintegral_mono
+        intro y
+        have hp : 0 < N (π y) := NNReal.coe_pos.mpr (Units.zero_lt _)
+        have hs : N (π y) ≤ 1 → h y ≤ C * (N (π y)) ^ (-(1 / 4 : ℝ)) := by
+          simpa only [h, π, hπn] using hsmall y
+        have hl : 1 ≤ N (π y) → h y ≤ C * (N (π y))⁻¹ := by
+          simpa only [h, π, hπn] using hlarge y
+        exact ENNReal.ofReal_le_ofReal
+          (mul_le_mul_of_nonneg_right (mul_orbitBound_le_sqrt hp hC hs hl) (norm_nonneg (v y)))
+      _ = ENNReal.ofReal (∫ y, V y ∂μₛ) :=
+        (ofReal_integral_eq_lintegral_ofReal hV (ae_of_all _ hV₀)).symm
+      _ < ⊤ := ENNReal.ofReal_lt_top
+  have hκNorm (y : Iₛ) : ‖κ (π y)‖ ≤ h y := by
+    change ‖κ (QuotientGroup.mk y)‖ ≤ h y
+    rw [hrep]
+    exact norm_tsum_le_tsum_norm (hsum y)
+  have hκsmall (q : Jₛ) (hq : N q ≤ 1) : ‖κ q‖ ≤ C * (N q) ^ (-(1 / 4 : ℝ)) := by
+    obtain ⟨y, rfl⟩ := QuotientGroup.mk_surjective q
+    exact (hκNorm y).trans (by simpa only [h, π, hπn] using hsmall y (by simpa only [hπn] using hq))
+  have hκlarge (q : Jₛ) (hq : 1 ≤ N q) : ‖κ q‖ ≤ C * (N q)⁻¹ := by
+    obtain ⟨y, rfl⟩ := QuotientGroup.mk_surjective q
+    exact (hκNorm y).trans (by simpa only [h, π, hπn] using hlarge y (by simpa only [hπn] using hq))
+  obtain ⟨_, hG, hWeil⟩ := sLocalQuotient_integral_radial_mul_theta f κ hκ hC hκsmall hκlarge
+  refine ⟨hG, ?_⟩
+  have hInv (ξ : Hₛ) (y : Iₛ) : K (ξ.val * x) y = K x ((ξ⁻¹).val * y) := by
+    simpa only [Subgroup.coe_inv, mul_inv_cancel_left] using hcov ξ ((ξ⁻¹).val * y)
+  have hpoint (y : Iₛ) : (∑' ξ : Hₛ, T ξ y) = (N (π y) : ℂ) * κ (π y) * v y := by
+    dsimp only [T, π]
+    rw [tsum_mul_right, tsum_mul_left, hrep]
+  calc
+    _ = ∑' ξ : Hₛ, ∫ y, T ξ⁻¹ y ∂μₛ := tsum_congr fun ξ ↦ by
+      simp only [T, π, hInv]
+    _ = ∑' ξ : Hₛ, ∫ y, T ξ y ∂μₛ :=
+      (Equiv.inv Hₛ).tsum_eq (fun ξ : Hₛ ↦ ∫ y, T ξ y ∂μₛ)
+    _ = ∫ y, ∑' ξ : Hₛ, T ξ y ∂μₛ :=
+      (integral_tsum (fun ξ ↦ (hT ξ).aestronglyMeasurable) hfin.ne).symm
+    _ = ∫ y, (N (π y) : ℂ) * κ (π y) * v y ∂μₛ := integral_congr_ae (ae_of_all _ hpoint)
+    _ = ∫ q, G q ∂μJ := hWeil
 
 end RiemannMasullo
