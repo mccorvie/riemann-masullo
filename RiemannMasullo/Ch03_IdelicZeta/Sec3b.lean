@@ -2711,6 +2711,14 @@ private theorem complexModelSchwartz_iff (w : InfinitePlace F) (hw : w.IsComplex
     refine ⟨SchwartzMap.compCLMOfContinuousLinearEquiv ℂ L.symm f, fun x ↦ ?_⟩
     exact congrArg f (L.symm_apply_apply _)
 
+/-- The multiplicative Tamagawa integral at a complex place is twice the Euclidean
+area integral with density the inverse squared absolute value. -/
+alias infiniteLocalMultiplicativeTamagawaMeasure_integral_complex := complexLocalIntegral_model
+
+/-- Pullback along the complex model of a completion identifies Euclidean Schwartz
+functions with the local Schwartz–Bruhat test functions. -/
+alias complexCompletion_mem_schwartzBruhat_iff := complexModelSchwartz_iff
+
 section AngularMellin
 
 open scoped ContDiff
@@ -4960,6 +4968,65 @@ private theorem sLocalFinite_charts (χ : PontryaginDual Jₛ) (v : S) :
 
 /-- A finite-place restriction of a unitary norm-twist chart and its dual is a local chart and its dual. -/
 alias sLocalFiniteRestriction_exists_normTwistChart := sLocalFinite_charts
+
+section GaussianLocalTests
+
+/-- At any finite place an actual compact open test has constant local Mellin transform
+in the restricted chart. Its normalization is nonzero and independent of the exponent. -/
+theorem exists_sLocalFinite_constant_zeta_test (χ : PontryaginDual Jₛ) (v : S) :
+    ∃ (g : ℬ(v.val.adicCompletion F)) (C : ℂ), C ≠ 0 ∧ ∀ z : ℂ,
+      localIdelicZetaIntegral μ𝔭(v.val) test(g) (sLocalFiniteRestriction v (chartₛ(χ) z)) = C := by
+  obtain ⟨η, hη, _⟩ := sLocalFinite_charts χ v
+  obtain ⟨g, C, hC, hg⟩ := exists_finite_constant_zeta_test v.val η
+  exact ⟨g, C, hC, fun z ↦ (congrArg _ (hη z)).trans (hg z)⟩
+
+/-- On the unramified chart the local integer-ring test has exactly the uniformizer's
+Euler factor, up to a fixed nonzero Haar normalization. -/
+theorem exists_sLocalFinite_unramified_zeta_test (χ : PontryaginDual Jₛ) (v : S)
+    (p : (v.val.adicCompletion F)ˣ) (hp : ‖p.val‖ = (v.val.asIdeal.absNorm : ℝ)⁻¹)
+    (hu : ∀ u ∈ (v.val.adicCompletionIntegers F).units,
+      sLocalFiniteRestriction v (chartₛ(χ) 0) u = 1) :
+    ∃ (g : ℬ(v.val.adicCompletion F)) (C : ℂ), C ≠ 0 ∧ ∀ z : ℂ, 0 < z.re →
+      localIdelicZetaIntegral μ𝔭(v.val) test(g) (sLocalFiniteRestriction v (chartₛ(χ) z)) =
+        C / (1 - sLocalFiniteRestriction v (chartₛ(χ) 0) p *
+          Complex.exp (-(Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ) * z)) := by
+  let U := (v.val.adicCompletionIntegers F).units
+  let : BorelSpace (v.val.adicCompletion F)ˣ := ⟨rfl⟩
+  let : μ𝔭(v.val).IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v.val
+  have ho : IsOpen (U : Set (v.val.adicCompletion F)ˣ) :=
+    Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hk : IsCompact (U : Set (v.val.adicCompletion F)ˣ) :=
+    Submonoid.units_isCompact (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v.val (K := F)))
+  let C : ℂ := (μ𝔭(v.val) (U : Set (v.val.adicCompletion F)ˣ)).toReal
+  have hC : C ≠ 0 := Complex.ofReal_ne_zero.mpr
+    (ENNReal.toReal_pos (ho.measure_pos _ ⟨1, U.one_mem⟩).ne' hk.measure_lt_top.ne).ne'
+  obtain ⟨η, hη, _⟩ := sLocalFinite_charts χ v
+  have hu0 (u : (v.val.adicCompletion F)ˣ) :
+      sLocalFiniteRestriction v (chartₛ(χ) 0) u = (η u : ℂ) := by
+    rw [hη]
+    change (η u : ℂ) * ((‖u.val‖ : ℝ) : ℂ) ^ (0 : ℂ) = _
+    rw [Complex.cpow_zero, mul_one]
+  have hInt : (∫ u in (U : Set (v.val.adicCompletion F)ˣ), (η u : ℂ) ∂μ𝔭(v.val)) = C := by
+    rw [setIntegral_congr_fun ho.measurableSet (g := fun _ ↦ (1 : ℂ))
+      (fun u h ↦ (hu0 u).symm.trans (hu u h)), setIntegral_const]
+    simp [C, Complex.real_smul, measureReal_def]
+  obtain ⟨g, hg⟩ := finiteBall_test v.val
+  refine ⟨g, C, hC, fun z hz ↦ ?_⟩
+  have he := finiteBall_integral v.val η p hp hz
+  rw [hInt] at he
+  have hn := norm_pos_iff.mpr p.ne_zero
+  have hq : 0 < (v.val.asIdeal.absNorm : ℝ) := by exact_mod_cast (HeightOneSpectrum.one_lt_absNorm v.val).pos
+  have hval : chart𝔭[v.val,η] z p = sLocalFiniteRestriction v (chartₛ(χ) 0) p *
+      Complex.exp (-(Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ) * z) := by
+    change (η p : ℂ) * (‖p.val‖ : ℂ) ^ z = _
+    rw [hu0, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hn.ne'),
+      ← Complex.ofReal_log hn.le, hp, Real.log_inv, Complex.ofReal_neg]
+  have hD : 1 - chart𝔭[v.val,η] z p ≠ 0 := fun h ↦ hC (by rw [← he, h, zero_mul])
+  rw [hη z, hg, ← hval]
+  exact (eq_div_iff hD).mpr (by simpa only [mul_comm] using he)
+
+end GaussianLocalTests
+
 
 /-- Paper: Lemma 3.3.1.7(3)(b), p. 136. The S-local epsilon factor is entire. -/
 theorem sLocalEpsilonFactor_entire (χ : PontryaginDual Jₛ) :
