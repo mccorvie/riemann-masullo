@@ -220,7 +220,7 @@ def stageUnitPeriod : E →ₗᵢ[ℂ] E where
   norm_map' u := by
     change ‖β • R u‖ = ‖u‖
     rw [norm_smul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos (stagePeriodBeta_pos p)]
-    change stagePeriodBeta p * ‖(R u : LogL2)‖ = ‖(u : LogL2)‖
+    change stagePeriodBeta p * ‖(R u : ℝ →₂[volume] ℂ)‖ = ‖(u : ℝ →₂[volume] ℂ)‖
     rw [closedStageForwardShift_apply, norm_halfShift,
       show (L : ℝ) = Real.log (p : ℝ) from rfl]
     change (Real.exp _)⁻¹ * (Real.exp _ * _) = _
@@ -233,9 +233,9 @@ theorem range_stageUnitPeriod_sub_beta (hmem : p ∉ T) (hTp : ∀ q ∈ insert 
     range (LinearIsometry.toContinuousLinearMap S - β • ContinuousLinearMap.id ℂ E) =
       (fixedBoxDenominator X T hT p hTp : Set E) := by
   let D := LinearIsometry.toContinuousLinearMap S - β • ContinuousLinearMap.id ℂ E
-  have hD (u : E) : (D u : LogL2) = stagePeriodDifference p (β • (u : LogL2)) := by
+  have hD (u : E) : (D u : ℝ →₂[volume] ℂ) = stagePeriodDifference p (β • (u : ℝ →₂[volume] ℂ)) := by
     rw [map_smul, stagePeriodDifference_apply, smul_sub]
-    change β • (R u : LogL2) - β • (u : LogL2) = _
+    change β • (R u : ℝ →₂[volume] ℂ) - β • (u : ℝ →₂[volume] ℂ) = _
     rw [closedStageForwardShift_apply, show (L : ℝ) = Real.log (p : ℝ) from rfl]
   have hr := range_stagePeriodDifference_closedStage hX T hT hp hmem hTp
   ext y
@@ -247,26 +247,26 @@ theorem range_stageUnitPeriod_sub_beta (hmem : p ∉ T) (hTp : ∀ q ∈ insert 
     rw [mem_fixedBoxDenominator_iff, ← hr] at hy
     obtain ⟨u, hu⟩ := hy
     refine ⟨β⁻¹ • u, Subtype.ext ?_⟩
-    change (D (β⁻¹ • u) : LogL2) = (y : LogL2)
+    change (D (β⁻¹ • u) : ℝ →₂[volume] ℂ) = (y : ℝ →₂[volume] ℂ)
     rw [hD]
-    change stagePeriodDifference p (β • (β⁻¹ • (u : LogL2))) = _
+    change stagePeriodDifference p (β • (β⁻¹ • (u : ℝ →₂[volume] ℂ))) = _
     have hn : β ≠ 0 := Complex.ofReal_ne_zero.mpr (stagePeriodBeta_pos p).ne'
     rw [smul_smul, mul_inv_cancel₀ hn, one_smul]
     exact hu
 
 /-- The normalized shift vanishes throughout the physical prefix, endpoint included. -/
 theorem stageUnitPeriod_vanishes_prefix {b : ℝ} (hb : b ≤ -Real.log X + Real.log p) (u : E) :
-    ∀ᵐ x ∂volume, x ≤ b → (S u : LogL2) x = 0 := by
-  change ∀ᵐ x ∂volume, x ≤ b → (β • (R u : LogL2) : LogL2) x = 0
+    ∀ᵐ x ∂volume, x ≤ b → (S u : ℝ →₂[volume] ℂ) x = 0 := by
+  change ∀ᵐ x ∂volume, x ≤ b → (β • (R u : ℝ →₂[volume] ℂ) : ℝ →₂[volume] ℂ) x = 0
   rw [closedStageForwardShift_apply, show (L : ℝ) = Real.log (p : ℝ) from rfl]
   have hs := (measurePreserving_add_right volume (-Real.log (p : ℝ))).quasiMeasurePreserving.ae
     (closedStageSubmodule_supported hX T hT u.property)
-  filter_upwards [Lp.coeFn_smul β (halfShift (Real.log p) (u : LogL2)),
-    halfShift_ae (Real.log p) (u : LogL2), hs, Measure.ae_ne volume b] with x hx hh hzero hne hxb
-  change x - Real.log p < -Real.log X → (u : LogL2) (x - Real.log p) = 0 at hzero
+  filter_upwards [Lp.coeFn_smul β (halfShift (Real.log p) (u : ℝ →₂[volume] ℂ)),
+    halfShift_ae (Real.log p) (u : ℝ →₂[volume] ℂ), hs, Measure.ae_ne volume b] with x hx hh hzero hne hxb
+  change x - Real.log p < -Real.log X → (u : ℝ →₂[volume] ℂ) (x - Real.log p) = 0 at hzero
   have hlt := lt_of_le_of_ne hxb hne
   rw [hx]
-  change β * (halfShift (Real.log p) (u : LogL2)) x = 0
+  change β * (halfShift (Real.log p) (u : ℝ →₂[volume] ℂ)) x = 0
   rw [hh, hzero (by linarith), mul_zero, mul_zero]
 
 end StagePeriod
@@ -278,7 +278,7 @@ public theorem norm_fixedBox_prefix_leakage {X : ℝ} (hX : 0 < X) (T : Finset �
     (hTp : ∀ q ∈ insert p T, 1 ≤ q) {Y : Type*} [NormedAddCommGroup Y] [NormedSpace ℂ Y]
     (B : closedStageSubmodule X T hT →L[ℂ] Y) {b : ℝ} (hb : b ≤ -Real.log X + Real.log p)
     (hwindow : ∀ v : closedStageSubmodule X T hT,
-      (∀ᵐ x ∂volume, x ≤ b → (v : LogL2) x = 0) → B v = 0) :
+      (∀ᵐ x ∂volume, x ≤ b → (v : ℝ →₂[volume] ℂ) x = 0) → B v = 0) :
     ‖B.comp (fixedBoxDenominator X T hT p hTp).toSubmodule.subtypeL‖ =
       (Real.exp (Real.log (p : ℝ) / 2))⁻¹ * ‖B‖ := by
   let N := (fixedBoxDenominator X T hT p hTp).toSubmodule
@@ -307,7 +307,7 @@ public theorem comp_adjoint_fixedBox_prefix_leakage {X : ℝ} (hX : 0 < X) (T : 
     [InnerProductSpace ℂ Y] [CompleteSpace Y]
     (B : closedStageSubmodule X T hT →L[ℂ] Y) {b : ℝ} (hb : b ≤ -Real.log X + Real.log p)
     (hwindow : ∀ v : closedStageSubmodule X T hT,
-      (∀ᵐ x ∂volume, x ≤ b → (v : LogL2) x = 0) → B v = 0) :
+      (∀ᵐ x ∂volume, x ≤ b → (v : ℝ →₂[volume] ℂ) x = 0) → B v = 0) :
     let N := (fixedBoxDenominator X T hT p hTp).toSubmodule
     B.comp (N.starProjection.comp B.adjoint) =
       ((p : ℂ)⁻¹) • (B.comp B.adjoint) := by

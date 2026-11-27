@@ -464,9 +464,7 @@ private theorem ae_eq_zero_of_packet_fourier_samples {f : ℝ → ℂ}
   rw [show 𝓕 f = 0 from funext hzero, eLpNorm_zero] at h
   exact (eLpNorm_eq_zero_iff two_ne_zero).mp h.symm
 
-scoped notation "LogL2" => Lp ℂ 2 (volume : Measure ℝ)
-
-private def lowerSupport (a : ℝ) : Set LogL2 :=
+private def lowerSupport (a : ℝ) : Set (ℝ →₂[volume] ℂ) :=
   { f | ∀ᵐ x ∂volume, x < a → f x = 0 }
 
 private theorem isClosed_lowerSupport (a : ℝ) : IsClosed (lowerSupport a) := by
@@ -507,12 +505,12 @@ private theorem norm_mellinWindow_le (a x : ℝ) : ‖mellinWindow a x‖ ≤ Re
     exact Real.exp_le_exp.mpr (by linarith)
   · simp [mellinWindow, hx, (Real.exp_pos _).le]
 
-private def mellinDensity (a : ℝ) (f : LogL2) (x : ℝ) := mellinWindow a x * f x
+private def mellinDensity (a : ℝ) (f : ℝ →₂[volume] ℂ) (x : ℝ) := mellinWindow a x * f x
 
-private theorem mellinDensity_integrable (a : ℝ) (f : LogL2) : Integrable (mellinDensity a f) :=
+private theorem mellinDensity_integrable (a : ℝ) (f : ℝ →₂[volume] ℂ) : Integrable (mellinDensity a f) :=
   (memLp_mellinWindow a).integrable_mul (Lp.memLp f)
 
-private theorem mellinDensity_memLp (a : ℝ) (f : LogL2) : MemLp (mellinDensity a f) 2 volume := by
+private theorem mellinDensity_memLp (a : ℝ) (f : ℝ →₂[volume] ℂ) : MemLp (mellinDensity a f) 2 volume := by
   apply (Lp.memLp f).of_le_mul (c := Real.exp (-a/2))
     ((measurable_mellinWindow a).aestronglyMeasurable.mul (Lp.memLp f).aestronglyMeasurable)
   filter_upwards with x
@@ -533,7 +531,7 @@ private theorem mellinProfile_memLp (a ξ : ℝ) : MemLp (mellinProfile a ξ) 2 
 
 /-- The closed-stage Mellin coefficient on the imaginary line is a bounded
 functional, represented by the exponential window times the Fourier character. -/
-def mellinSample (a ξ : ℝ) : LogL2 →L[ℂ] ℂ :=
+def mellinSample (a ξ : ℝ) : (ℝ →₂[volume] ℂ) →L[ℂ] ℂ :=
   innerSL ℂ ((mellinProfile_memLp a ξ).toLp (mellinProfile a ξ))
 
 private theorem conj_mellinWindow (a x : ℝ) : conj (mellinWindow a x) = mellinWindow a x := by
@@ -541,7 +539,7 @@ private theorem conj_mellinWindow (a x : ℝ) : conj (mellinWindow a x) = mellin
   · rw [mellinWindow, indicator_of_mem hx, Complex.conj_ofReal]
   · simp [mellinWindow, hx]
 
-private theorem mellinSample_apply (a ξ : ℝ) (f : LogL2) : mellinSample a ξ f = 𝓕 (mellinDensity a f) ξ := by
+private theorem mellinSample_apply (a ξ : ℝ) (f : ℝ →₂[volume] ℂ) : mellinSample a ξ f = 𝓕 (mellinDensity a f) ξ := by
   change inner ℂ ((mellinProfile_memLp a ξ).toLp (mellinProfile a ξ)) f = _
   rw [L2.inner_def, Real.fourier_real_eq]
   apply integral_congr_ae
@@ -555,21 +553,21 @@ private theorem mellinSample_apply (a ξ : ℝ) (f : LogL2) : mellinSample a ξ 
 
 /-- The genuine rational test family at the box `X / ∏ p`. The pair of polar
 conditions is imposed before applying the rational theta sum and the earlier factors. -/
-def stageGenerators (X : ℝ) (T : Finset ℕ) : Set LogL2 :=
+def stageGenerators (X : ℝ) (T : Finset ℕ) : Set (ℝ →₂[volume] ℂ) :=
   { F | ∃ f : 𝓢(ℝ, ℂ), f 0 = 0 ∧ (𝓕 f) 0 = 0 ∧
       (∀ y : ℝ, X / (∏ p ∈ T, (p : ℝ)) < |y| → (𝓕 f) y = 0) ∧
       F =ᵐ[volume] stage T f }
 
 /-- Membership in the genuine generator family is an actual polar Schwartz
 representation in the specified Fourier box. -/
-theorem mem_stageGenerators_iff {X : ℝ} {T : Finset ℕ} {F : LogL2} :
+theorem mem_stageGenerators_iff {X : ℝ} {T : Finset ℕ} {F : (ℝ →₂[volume] ℂ)} :
     F ∈ stageGenerators X T ↔
       ∃ f : 𝓢(ℝ, ℂ), f 0 = 0 ∧ (𝓕 f) 0 = 0 ∧
         (∀ y : ℝ, X / (∏ p ∈ T, (p : ℝ)) < |y| → (𝓕 f) y = 0) ∧
         (F : ℝ → ℂ) =ᵐ[volume] stage T f := Iff.rfl
 
 /-- The polar generator family is already a linear subspace. -/
-def stageSubmodule (X : ℝ) (T : Finset ℕ) (hT : ∀ q ∈ T, 1 ≤ q) : Submodule ℂ LogL2 where
+def stageSubmodule (X : ℝ) (T : Finset ℕ) (hT : ∀ q ∈ T, 1 ≤ q) : Submodule ℂ (ℝ →₂[volume] ℂ) where
   carrier := stageGenerators X T
   zero_mem' := by
     refine ⟨0, by simp, by simp, fun _ _ ↦ by simp, ?_⟩
@@ -590,11 +588,11 @@ def stageSubmodule (X : ℝ) (T : Finset ℕ) (hT : ∀ q ∈ T, 1 ≤ q) : Subm
 
 /-- The actual closed Hilbert subspace at the Fourier radius `X / ∏_{q∈T} q`. -/
 def closedStageSubmodule (X : ℝ) (T : Finset ℕ) (hT : ∀ q ∈ T, 1 ≤ q) :
-    ClosedSubmodule ℂ LogL2 where
+    ClosedSubmodule ℂ (ℝ →₂[volume] ℂ) where
   toSubmodule := (stageSubmodule X T hT).topologicalClosure
   isClosed' := isClosed_closure
 
-theorem mem_closedStageSubmodule_iff (X : ℝ) (T : Finset ℕ) (hT : ∀ q ∈ T, 1 ≤ q) (F : LogL2) :
+theorem mem_closedStageSubmodule_iff (X : ℝ) (T : Finset ℕ) (hT : ∀ q ∈ T, 1 ≤ q) (F : ℝ →₂[volume] ℂ) :
     F ∈ closedStageSubmodule X T hT ↔ F ∈ closure (stageGenerators X T) := Iff.rfl
 
 /-- Inserting a new finite factor preserves membership in the previous actual box:
@@ -641,14 +639,14 @@ private theorem closure_stageGenerators_supported {X : ℝ} (hX : 0 < X)
 
 /-- The fixed lower support edge persists in the genuine Hilbert closure. -/
 theorem closedStageSubmodule_supported {X : ℝ} (hX : 0 < X)
-    (T : Finset ℕ) (hT : ∀ q ∈ T, 1 ≤ q) {F : LogL2}
+    (T : Finset ℕ) (hT : ∀ q ∈ T, 1 ≤ q) {F : (ℝ →₂[volume] ℂ)}
     (hF : F ∈ closedStageSubmodule X T hT) :
     ∀ᵐ x ∂volume, x < -Real.log X → F x = 0 :=
   closure_stageGenerators_supported hX T hT ((mem_closedStageSubmodule_iff X T hT F).mp hF)
 
 theorem mellinSample_stage_zeros {X : ℝ} (hX : 0 < X)
     (T : Finset ℕ) (hT : ∀ q ∈ T, 1 ≤ q) {p : ℕ} (hp : 1 < p) (hpT : p ∈ T)
-    (j : ℤ) {F : LogL2} (hF : F ∈ closure (stageGenerators X T)) :
+    (j : ℤ) {F : (ℝ →₂[volume] ℂ)} (hF : F ∈ closure (stageGenerators X T)) :
     mellinSample (-Real.log X) ((j : ℝ) / Real.log p) F = 0 := by
   apply closure_minimal (s := stageGenerators X T)
     (t := {F | mellinSample (-Real.log X) ((j : ℝ) / Real.log p) F = 0}) ?_ ?_ hF
@@ -689,7 +687,7 @@ on the images of arbitrary L² functions. -/
 theorem eq_zero_of_mem_all_closed_stages {X : ℝ} (hX : 0 < X) (T : ℕ → Finset ℕ)
     (hT : ∀ n q, q ∈ T n → 1 ≤ q) (p : ℕ → ℕ) (hp : ∀ n, 1 < p n)
     (hpT : ∀ n, p n ∈ T n) (hmesh : Tendsto (fun n ↦ (Real.log (p n : ℝ))⁻¹) atTop (𝓝 0))
-    {F : LogL2} (hF : ∀ n, F ∈ closure (stageGenerators X (T n))) : F = 0 := by
+    {F : (ℝ →₂[volume] ℂ)} (hF : ∀ n, F ∈ closure (stageGenerators X (T n))) : F = 0 := by
   let a := -Real.log X
   have hpos (n : ℕ) : 0 < (Real.log (p n : ℝ))⁻¹ := by
     exact inv_pos.mpr (Real.log_pos (by exact_mod_cast hp n))
@@ -712,7 +710,7 @@ theorem eq_zero_of_mem_all_closed_stages {X : ℝ} (hX : 0 < X) (T : ℕ → Fin
 
 /-- The principal-value stage boxes shrink together while their common output
 support stays fixed. -/
-def closedStages (X : ℝ) (p : ℕ → ℕ) (n : ℕ) : Set LogL2 :=
+def closedStages (X : ℝ) (p : ℕ → ℕ) (n : ℕ) : Set (ℝ →₂[volume] ℂ) :=
   closure (stageGenerators X ((Finset.range n).image p))
 
 /-- The genuine rational fixed-box stages form a decreasing chain with zero
