@@ -10,7 +10,8 @@ import Mathlib.Analysis.SpecialFunctions.Pow.Asymptotics
 /-! # One-sided translation in the order-zero theta quotient
 
 Finite jet support in the critical strip gives dense families of representatives with
-decaying rescaled translates whenever every admitted real offset is below the target.
+decaying rescaled translates precisely when every admitted real offset is below the target.
+At half-width one half all representatives have this decay.
 -/
 
 @[expose] public noncomputable section
@@ -101,6 +102,62 @@ private theorem jetMoment_translate (χ : Basepoints) (j : J(χ)) (g : C𝔽) (x
       fun y hy ↦ congrArg (· * raw(χ, j) y) hy)).trans (h.trans ?_))
   exact Finset.sum_congr rfl fun i _ ↦ congrArg (_ * ·) (jetMoment_integral χ (lowerJet χ j i) x).2.symm
 
+private theorem norm_stripJet_twist (ψ : PontryaginDual C𝔽) (b t : ℝ) (x : C𝔽) :
+    ‖ideleClassNormTwist ψ ((b : ℂ) + (t : ℂ) * Complex.I) x‖ = Real.exp (b * logIdeleClassNorm F x) := by
+  have hx : 0 < ((ideleClassNorm F x).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  change ‖(ψ x : ℂ) * (((ideleClassNorm F x).val : ℝ) : ℂ) ^ ((b : ℂ) + (t : ℂ) * Complex.I)‖ = _
+  rw [norm_mul, Circle.norm_coe, one_mul, Complex.norm_cpow_eq_rpow_re_of_pos hx]
+  simp [Real.rpow_def_of_pos hx, logIdeleClassNorm, mul_comm]
+
+/-- A representative with arbitrarily small rescaled translates modulo theta annihilates
+every admitted logarithmic jet whose real offset is at least the scaling exponent, including
+at equality. Each derivative order supplies its own vanishing condition. -/
+theorem spectralZeroJet_integral_eq_zero_of_thetaQuotientReturns (χ : Basepoints)
+    (g : C𝔽) (hg : logIdeleClassNorm F g = 1) (α : ℝ) (x : W)
+    (hx : ∀ ε : ℝ, 0 < ε → ∃ n : ℕ, ‖(Θ).mkQ (T (g ^ n) x)‖ < ε * Real.exp (α * n))
+    (j : J(χ)) (hj : α ≤ j.val.2.1) : (∫ y, x y * raw(χ, j) y ∂μ𝔽) = 0 := by
+  classical
+  rw [← (jetMoment_integral χ j x).2]
+  suffices hall : ∀ m (k : J(χ)), k.val.2.2.2 = m → α ≤ k.val.2.1 → jetMoment χ k x = 0
+    from hall _ j rfl hj
+  intro m
+  induction m using Nat.strong_induction_on with
+  | ind m ih =>
+    intro k hm hk
+    let c := ideleClassNormTwist (χ k.val.1) ((k.val.2.1 : ℂ) + (k.val.2.2.1 : ℂ) * Complex.I)
+    have he (n : ℕ) : jetMoment χ k (T (g ^ n) x) = c (g ^ n) * jetMoment χ k x := by
+      rw [jetMoment_translate]
+      let last := Fin.last k.val.2.2.2
+      rw [Finset.sum_eq_single_of_mem last (Finset.mem_univ _)]
+      · have hlast : lowerJet χ k last = k := Subtype.ext rfl
+        simp [hlast, last, c]
+      · intro i _ hi
+        have hne : i.val ≠ k.val.2.2.2 := fun h ↦ hi (Fin.ext h)
+        have hlt : i.val < m := by have := i.isLt; omega
+        rw [ih i.val hlt (lowerJet χ k i) rfl hk, mul_zero]
+    have hker : Θ ≤ (jetMoment χ k).ker := fun v hv ↦ (jetMoment_pairing χ k v).trans
+      (spectralStripJet_commonKernel_forward χ hH (le_refl 0) v hv k)
+    let E := (Θ).liftQL (jetMoment χ k) hker
+    have hc : ‖c g‖ = Real.exp k.val.2.1 := by
+      simpa only [hg, mul_one] using norm_stripJet_twist (χ k.val.1) k.val.2.1 k.val.2.2.1 g
+    by_contra hnz
+    have hK : 0 < ‖E‖ + 1 := by positivity
+    obtain ⟨n, hn⟩ := hx _ (div_pos (norm_pos_iff.mpr hnz) hK)
+    have hc' : Real.exp (α * n) ≤ ‖c (g ^ n)‖ := by
+      rw [map_pow, norm_pow, hc, mul_comm, Real.exp_nat_mul]
+      exact pow_le_pow_left₀ (Real.exp_pos _).le (Real.exp_le_exp.mpr hk) _
+    have hbound := E.le_opNorm ((Θ).mkQ (T (g ^ n) x))
+    change ‖jetMoment χ k (T (g ^ n) x)‖ ≤ _ at hbound
+    rw [he, norm_mul] at hbound
+    apply lt_irrefl (Real.exp (α * n) * ‖jetMoment χ k x‖)
+    calc
+      _ ≤ ‖c (g ^ n)‖ * ‖jetMoment χ k x‖ := mul_le_mul_of_nonneg_right hc' (norm_nonneg _)
+      _ ≤ ‖E‖ * _ := hbound
+      _ ≤ (‖E‖ + 1) * _ := mul_le_mul_of_nonneg_right (le_add_of_nonneg_right zero_le_one) (norm_nonneg _)
+      _ < (‖E‖ + 1) * ((‖jetMoment χ k x‖ / (‖E‖ + 1)) * Real.exp (α * n)) :=
+        mul_lt_mul_of_pos_left hn hK
+      _ = _ := by rw [← mul_assoc, mul_div_cancel₀ _ hK.ne', mul_comm]
+
 private theorem exists_finite_translate_support (χ : Basepoints) (x : W)
     (hx : (support (fun j : J(χ) ↦ jetMoment χ j x)).Finite) :
     ∃ S : Finset J(χ), ∀ g j, j ∉ S → jetMoment χ j (T g x) = 0 := by
@@ -145,12 +202,6 @@ private theorem orbitCoefficient_tendsto_zero (ψ : PontryaginDual C𝔽) (b t �
     change Real.log ((ideleClassNorm F g).val : ℝ) = 1 at hg
     simp only [logIdeleClassNorm, map_pow, Units.val_pow_eq_pow_val, NNReal.coe_pow,
       Real.log_pow, hg, mul_one]
-  have htwist (x : C𝔽) :
-      ‖ideleClassNormTwist ψ ((b : ℂ) + (t : ℂ) * Complex.I) x‖ = Real.exp (b * logIdeleClassNorm F x) := by
-    have hx : 0 < ((ideleClassNorm F x).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
-    change ‖(ψ x : ℂ) * (((ideleClassNorm F x).val : ℝ) : ℂ) ^ ((b : ℂ) + (t : ℂ) * Complex.I)‖ = _
-    rw [norm_mul, Circle.norm_coe, one_mul, Complex.norm_cpow_eq_rpow_re_of_pos hx]
-    simp [Real.rpow_def_of_pos hx, logIdeleClassNorm, mul_comm]
   have hlim := (tendsto_rpow_mul_exp_neg_mul_atTop_nhds_zero (k : ℝ) (α - b) (sub_pos.mpr hb)).comp
     (tendsto_natCast_atTop_atTop (R := ℝ))
   apply tendsto_zero_iff_norm_tendsto_zero.mpr
@@ -158,7 +209,7 @@ private theorem orbitCoefficient_tendsto_zero (ψ : PontryaginDual C𝔽) (b t �
   rw [zero_mul] at hlim'
   apply hlim'.congr'
   filter_upwards [] with n
-  simp only [Function.comp_apply, Real.rpow_natCast, norm_mul, norm_pow, htwist, hlog,
+  simp only [Function.comp_apply, Real.rpow_natCast, norm_mul, norm_pow, norm_stripJet_twist, hlog,
     Complex.norm_real, Real.norm_of_nonneg (Real.exp_nonneg _), Real.norm_of_nonneg (Nat.cast_nonneg _)]
   rw [show -(α - b) * (n : ℝ) = -(α * n) + b * n by ring, Real.exp_add]
   ring
@@ -200,6 +251,28 @@ theorem dense_thetaQuotientOrbitDecay_of_jet_offsets_lt (χ : Basepoints) (hχ :
     orbitCoefficient_tendsto_zero (χ j.val.1) j.val.2.1 j.val.2.2.1 α (hgap j)
       g hg (j.val.2.2.2 - i.val) (c i)
   simpa only [jetMoment_translate, Finset.mul_sum, c, mul_assoc, Finset.sum_const_zero] using hh
+
+/-- Full-sequence decay on a dense set at a fixed width is equivalent to the strict
+right-hand offset bound. A jet at the boundary also excludes density, by interpolation. -/
+theorem dense_thetaQuotientOrbitDecay_iff_jet_offsets_lt (χ : Basepoints) (hχ : IsSpectralBasepointChoice χ)
+    (g : C𝔽) (hg : logIdeleClassNorm F g = 1) (α : ℝ) :
+    Dense {x : W | Tendsto (fun n : ℕ ↦ Real.exp (-(α * n)) * ‖(Θ).mkQ (T (g ^ n) x)‖)
+      atTop (𝓝 0)} ↔ ∀ j : J(χ), j.val.2.1 < α := by
+  refine ⟨fun hd j ↦ ?_, dense_thetaQuotientOrbitDecay_of_jet_offsets_lt χ hχ g hg⟩
+  by_contra! hj
+  have hsub : {x : W | Tendsto (fun n : ℕ ↦ Real.exp (-(α * n)) * ‖(Θ).mkQ (T (g ^ n) x)‖)
+      atTop (𝓝 0)} ⊆ (jetMoment χ j).ker := by
+    intro x hx
+    change Tendsto _ atTop (𝓝 (0 : ℝ)) at hx
+    apply (jetMoment_integral χ j x).2.trans
+    apply spectralZeroJet_integral_eq_zero_of_thetaQuotientReturns χ g hg α x _ j hj
+    intro ε hε
+    obtain ⟨n, hn⟩ := (hx.eventually (gt_mem_nhds hε)).exists
+    refine ⟨n, (div_lt_iff₀ (Real.exp_pos _)).mp ?_⟩
+    simpa only [Real.exp_neg, div_eq_inv_mul] using hn
+  obtain ⟨v, hv⟩ := spectralStripJet_singleInterpolant (F := F) χ hχ hH (le_refl 0) j
+  have hv₀ : jetMoment χ j v = 0 := closure_minimal hsub (jetMoment χ j).isClosed_ker (hd v)
+  exact zero_ne_one (hv₀.symm.trans ((jetMoment_pairing χ j v).trans (by simpa using hv j)))
 
 local notation "extZeros(" τ ", " α ")" =>
   {z : {ψ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, ψ (τ t) = 1} × ℂ //
