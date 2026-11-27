@@ -119,7 +119,8 @@ def fixedBoxSourceClosedStage :
 
 theorem fixedBoxSourceClosedStage_coe
     (f : (fixedBoxEvenSources (X / (∏ q ∈ T, (q : ℝ)))).toSubmodule) :
-    (fixedBoxSourceClosedStage T hT1 hX f : LogL2) = fixedBoxSourceStage hX T hT1 f := by rfl
+    (fixedBoxSourceClosedStage T hT1 hX f : ℝ →₂[volume] ℂ) = fixedBoxSourceStage hX T hT1 f := by
+  rfl
 
 /-- The actual source map into the completed relative packet. -/
 def fixedBoxSourceQuotient :
@@ -144,10 +145,10 @@ theorem exists_fixedBox_quotient_average (b : ℝ) (w : ℝ → ℂ) (hw : Conti
   let E := closedStageSubmodule X T hT1
   let D := (fixedBoxDenominator X T hT1 p hTp1).toSubmodule
   let A := fixedBoxSourceClosedStage T hT1 hX
-  let : IsClosed (E.toSubmodule : Set LogL2) := E.isClosed
+  let : IsClosed (E.toSubmodule : Set (ℝ →₂[volume] ℂ)) := E.isClosed
   let a (t : ℝ) : E := w t • closedStageForwardShift T hT1 hX t.toNNReal (A f)
   have ha : Continuous a := hw.smul
-    (((continuous_halfShift (A f : LogL2)).comp
+    (((continuous_halfShift (A f : ℝ →₂[volume] ℂ)).comp
       (NNReal.continuous_coe.comp continuous_real_toNNReal)).subtype_mk _)
   have hi : IntegrableOn a (Icc 0 b) := ha.integrableOn_Icc
   obtain ⟨g, hg⟩ := exists_fixedBox_stage_average hX T hT1 b w hw f
@@ -158,7 +159,7 @@ theorem exists_fixedBox_quotient_average (b : ℝ) (w : ℝ → ℂ) (hw : Conti
     apply integral_congr_ae
     filter_upwards [ae_restrict_mem measurableSet_Icc] with t ht
     change w t • halfShift t (fixedBoxSourceStage hX T hT1 f) =
-      w t • halfShift (t.toNNReal : ℝ) (A f : LogL2)
+      w t • halfShift (t.toNNReal : ℝ) (A f : ℝ →₂[volume] ℂ)
     rw [Real.coe_toNNReal _ ht.1, fixedBoxSourceClosedStage_coe]
   refine ⟨g, ?_⟩
   rw [fixedBoxSourceQuotient_apply]
@@ -188,7 +189,7 @@ theorem fixedBoxSourceClosedStage_denseRange :
     DenseRange (fixedBoxSourceClosedStage T hT1 hX) := by
   intro u
   rw [Topology.IsEmbedding.subtypeVal.closure_eq_preimage_closure_image]
-  change (u : LogL2) ∈ closure
+  change (u : ℝ →₂[volume] ℂ) ∈ closure
     (Subtype.val '' range (fixedBoxSourceClosedStage T hT1 hX))
   apply closure_mono ?_ ((mem_closedStageSubmodule_iff X T hT1 _).mp u.property)
   intro F hF
@@ -355,7 +356,7 @@ include hX hp hpT in
 /-- Exact kernel identification survives completion: the common kernel of the
 actual normalized rows is precisely the next *closed theta stage*. -/
 theorem mem_nextClosedStage_iff_packetRows_zero (hT : ∀ q ∈ T, q.Prime)
-    (F : LogL2) (hF : F ∈ closedStageSubmodule X T hT1) :
+    (F : ℝ →₂[volume] ℂ) (hF : F ∈ closedStageSubmodule X T hT1) :
     F ∈ closedStageSubmodule X (insert p T) hTp1 ↔
       ∀ n : ℤ, packetRow X T p n F = 0 := by
   let D := (fixedBoxDenominator X T hT1 p hTp1).toSubmodule

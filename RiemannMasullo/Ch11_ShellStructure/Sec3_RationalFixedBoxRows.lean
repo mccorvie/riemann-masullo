@@ -23,13 +23,13 @@ namespace RiemannMasullo.RationalPacket
 private theorem stage_supported_of_ae {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
     (hT : ∀ q ∈ T, 1 ≤ q) (f : 𝓢(ℝ, ℂ)) (h0 : (𝓕 f) 0 = 0)
     (hb : ∀ y : ℝ, X / (∏ p ∈ T, (p : ℝ)) < |y| → (𝓕 f) y = 0)
-    (F : LogL2) (hF : F =ᵐ[volume] stage T f) :
+    (F : ℝ →₂[volume] ℂ) (hF : F =ᵐ[volume] stage T f) :
     ∀ᵐ x ∂volume, x < -Real.log X → F x = 0 := by
   filter_upwards [hF] with x hx hxa
   exact hx.trans (stage_eq_zero_before_box hX T hT h0 hb hxa)
 
 private theorem stage_fourier_eq_of_ae (T : Finset ℕ) (f : 𝓢(ℝ, ℂ))
-    (F : LogL2) (hF : F =ᵐ[volume] stage T f) :
+    (F : ℝ →₂[volume] ℂ) (hF : F =ᵐ[volume] stage T f) :
     𝓕 (dampedStage T f) = 𝓕 (fun x : ℝ ↦ (Real.exp (-x/2) : ℂ) * F x) := by
   ext ξ
   rw [Real.fourier_real_eq, Real.fourier_real_eq]
@@ -52,7 +52,7 @@ in its fixed box, including every derivative needed at the zero frequency. -/
 theorem stage_fourier_jet {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
     (hT : ∀ q ∈ T, 1 ≤ q) (f : 𝓢(ℝ, ℂ)) (h0 : (𝓕 f) 0 = 0)
     (hb : ∀ y : ℝ, X / (∏ p ∈ T, (p : ℝ)) < |y| → (𝓕 f) y = 0)
-    (F : LogL2) (hF : F =ᵐ[volume] stage T f) (ξ : ℝ) (r : ℕ) :
+    (F : ℝ →₂[volume] ℂ) (hF : F =ᵐ[volume] stage T f) (ξ : ℝ) (r : ℕ) :
     iteratedDeriv r (𝓕 (dampedStage T f)) ξ =
       (-2 * (Real.pi : ℂ) * Complex.I)^r * halfLineMellinJet (-Real.log X) ξ r F := by
   rw [stage_fourier_eq_of_ae T f F hF]
@@ -126,7 +126,7 @@ private theorem packetZeroNormalizer_ne_zero (T : Finset ℕ) (hT : ∀ q ∈ T,
 of a rational fixed-box packet are bounded functionals on the ambient logarithmic
 Hilbert space. At zero the coordinate uses the moment of order `T.card`.
 Deviation: the ordinary logarithmic `L²` specialization is used here. -/
-def packetRow (X : ℝ) (T : Finset ℕ) (p : ℕ) (n : ℤ) : LogL2 →L[ℂ] ℂ :=
+def packetRow (X : ℝ) (T : Finset ℕ) (p : ℕ) (n : ℤ) : (ℝ →₂[volume] ℂ) →L[ℂ] ℂ :=
   if n = 0 then
     ((T.card.factorial : ℂ) * (∏ q ∈ T, (Real.log q : ℂ)))⁻¹ •
       halfLineMellinJet (-Real.log X) 0 T.card
@@ -136,7 +136,7 @@ def packetRow (X : ℝ) (T : Finset ℕ) (p : ℕ) (n : ℤ) : LogL2 →L[ℂ] �
 
 /-- The explicit normalized row, including its higher-order zero-frequency
 normalization. -/
-theorem packetRow_apply (X : ℝ) (T : Finset ℕ) (p : ℕ) (n : ℤ) (F : LogL2) :
+theorem packetRow_apply (X : ℝ) (T : Finset ℕ) (p : ℕ) (n : ℤ) (F : ℝ →₂[volume] ℂ) :
     packetRow X T p n F = if n = 0 then
       halfLineMellinJet (-Real.log X) 0 T.card F /
         ((T.card.factorial : ℂ) * ∏ q ∈ T, (Real.log q : ℂ))
@@ -150,7 +150,7 @@ theorem packetRow_stage {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
     (hT : ∀ q ∈ T, q.Prime) {p : ℕ} (hp : p.Prime) (hpT : p ∉ T)
     (f : 𝓢(ℝ, ℂ)) (hf : f 0 = 0) (h0 : (𝓕 f) 0 = 0)
     (hb : ∀ y : ℝ, X / (∏ q ∈ T, (q : ℝ)) < |y| → (𝓕 f) y = 0)
-    (F : LogL2) (hF : F =ᵐ[volume] stage T f) (n : ℤ) :
+    (F : ℝ →₂[volume] ℂ) (hF : F =ᵐ[volume] stage T f) (n : ℤ) :
     packetRow X T p n F = 𝓕 (dampedStage ∅ f) ((n : ℝ) / Real.log p) := by
   have hprod : 0 < ∏ q ∈ T, (q : ℝ) := Finset.prod_pos fun q hq ↦ by
     exact_mod_cast (hT q hq).pos
@@ -181,7 +181,7 @@ theorem packetRow_stage {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
 vanishes on the actual Hilbert closure of that stage. -/
 theorem halfLineMellinJet_stage_closure_zero {X : ℝ} (hX : 0 < X)
     (T : Finset ℕ) (hT : ∀ q ∈ T, q.Prime) (k : ℕ) (hk : k < T.card)
-    {F : LogL2} (hF : F ∈ closure (stageGenerators X T)) :
+    {F : (ℝ →₂[volume] ℂ)} (hF : F ∈ closure (stageGenerators X T)) :
     halfLineMellinJet (-Real.log X) 0 k F = 0 := by
   apply closure_minimal (s := stageGenerators X T)
     (t := {F | halfLineMellinJet (-Real.log X) 0 k F = 0}) ?_
@@ -198,7 +198,7 @@ theorem halfLineMellinJet_stage_closure_zero {X : ℝ} (hX : 0 < X)
 closed stage, measured by the same half-line Hilbert functionals. -/
 theorem halfLineMellinJet_stage_closure_mesh {X : ℝ} (hX : 0 < X)
     (T : Finset ℕ) (hT : ∀ q ∈ T, q.Prime) {p : ℕ} (hpT : p ∈ T) (j : ℤ)
-    {F : LogL2} (hF : F ∈ closure (stageGenerators X T)) :
+    {F : (ℝ →₂[volume] ℂ)} (hF : F ∈ closure (stageGenerators X T)) :
     halfLineMellinJet (-Real.log X) ((j : ℝ) / Real.log p) 0 F = 0 := by
   apply closure_minimal (s := stageGenerators X T)
     (t := {F | halfLineMellinJet (-Real.log X) ((j : ℝ) / Real.log p) 0 F = 0}) ?_
@@ -221,7 +221,7 @@ theorem halfLineMellinJet_stage_closure_mesh {X : ℝ} (hX : 0 < X)
 particular, the zero row survives normalization before taking the closure. -/
 theorem packetRow_eq_zero_of_mem_next {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
     (hT : ∀ q ∈ T, q.Prime) {p : ℕ} (hp : p.Prime) (hpT : p ∉ T)
-    {F : LogL2} (hF : F ∈ closure (stageGenerators X (insert p T))) (n : ℤ) :
+    {F : (ℝ →₂[volume] ℂ)} (hF : F ∈ closure (stageGenerators X (insert p T))) (n : ℤ) :
     packetRow X T p n F = 0 := by
   have hTp : ∀ q ∈ insert p T, q.Prime := by
     intro q hq
@@ -243,7 +243,7 @@ theorem stageGenerators_insert_iff_packetRows_zero {X : ℝ} (hX : 0 < X)
     (f : 𝓢(ℝ, ℂ)) (hf : f 0 = 0) (h0 : (𝓕 f) 0 = 0)
     (he : ∀ r, (𝓕 f) (-r) = (𝓕 f) r)
     (hb : ∀ r, X / (∏ q ∈ T, (q : ℝ)) < |r| → (𝓕 f) r = 0)
-    (F : LogL2) (hF : F =ᵐ[volume] stage T f) :
+    (F : ℝ →₂[volume] ℂ) (hF : F =ᵐ[volume] stage T f) :
     F ∈ stageGenerators X (insert p T) ↔ ∀ n : ℤ, packetRow X T p n F = 0 := by
   constructor
   · intro hn n
@@ -269,7 +269,7 @@ theorem stageGenerators_insert_iff_packetRows_zero {X : ℝ} (hX : 0 < X)
 source box, with exactly its prescribed bounded rows. -/
 theorem exists_fixedBox_biorthogonal_even_stage {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
     (hT : ∀ q ∈ T, q.Prime) {p : ℕ} (hp : p.Prime) (hpT : p ∉ T) :
-    ∃ v : ℤ → LogL2,
+    ∃ v : ℤ → (ℝ →₂[volume] ℂ),
       (∀ n, ∃ f : 𝓢(ℝ, ℂ), f 0 = 0 ∧ (𝓕 f) 0 = 0 ∧
         (∀ r, (𝓕 f) (-r) = (𝓕 f) r) ∧
         (∀ r, X / (∏ q ∈ T, (q : ℝ)) < |r| → (𝓕 f) r = 0) ∧
@@ -280,7 +280,7 @@ theorem exists_fixedBox_biorthogonal_even_stage {X : ℝ} (hX : 0 < X) (T : Fins
     exact_mod_cast (hT q hq).pos
   obtain ⟨ε, hε, f, hf⟩ := exists_fixedBox_theta_cardinals
     (show (1 : ℝ) < p by exact_mod_cast hp.one_lt) (div_pos hX hprod)
-  have hdata : ∀ n : ℤ, ∃ F : LogL2,
+  have hdata : ∀ n : ℤ, ∃ F : (ℝ →₂[volume] ℂ),
       (∃ f : 𝓢(ℝ, ℂ), f 0 = 0 ∧ (𝓕 f) 0 = 0 ∧
         (∀ r, (𝓕 f) (-r) = (𝓕 f) r) ∧
         (∀ r, X / (∏ q ∈ T, (q : ℝ)) < |r| → (𝓕 f) r = 0) ∧
@@ -307,7 +307,7 @@ theorem exists_fixedBox_biorthogonal_even_stage {X : ℝ} (hX : 0 < X) (T : Fins
 all the bounded normalized rows, including the zero mode. -/
 theorem exists_fixedBox_biorthogonal_stage {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
     (hT : ∀ q ∈ T, q.Prime) {p : ℕ} (hp : p.Prime) (hpT : p ∉ T) :
-    ∃ v : ℤ → LogL2, (∀ n, v n ∈ stageGenerators X T) ∧
+    ∃ v : ℤ → (ℝ →₂[volume] ℂ), (∀ n, v n ∈ stageGenerators X T) ∧
       ∀ j n : ℤ, packetRow X T p j (v n) = if j = n then 1 else 0 := by
   obtain ⟨v, hv, hrow⟩ := exists_fixedBox_biorthogonal_even_stage hX T hT hp hpT
   refine ⟨v, fun n ↦ ?_, hrow⟩
@@ -328,7 +328,7 @@ theorem exists_closed_packet_cardinals {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
       · exact (hT q hq).one_lt.le)).toSubmodule
     let D := N.comap E.subtype
     N ≤ E ∧ IsClosed (D : Set E) ∧ ∃ v : ℤ → E, ∃ ℓ : ℤ → ((E ⧸ D) →L[ℂ] ℂ),
-      (∀ n, (v n : LogL2) ∈ stageGenerators X T) ∧
+      (∀ n, (v n : ℝ →₂[volume] ℂ) ∈ stageGenerators X T) ∧
       (∀ j n : ℤ, ℓ j (D.mkQ (v n)) = if j = n then 1 else 0) ∧
       LinearIndependent ℂ (fun n ↦ D.mkQ (v n)) := by
   classical
@@ -353,9 +353,9 @@ theorem exists_closed_packet_cardinals {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
   let r (n : ℤ) : E →L[ℂ] ℂ := (packetRow X T p n).comp E.subtypeL
   have hker (n : ℤ) : D ≤ (r n).ker := by
     intro F hF
-    change packetRow X T p n (F : LogL2) = 0
+    change packetRow X T p n (F : ℝ →₂[volume] ℂ) = 0
     exact packetRow_eq_zero_of_mem_next hX T hT hp hpT
-      ((mem_closedStageSubmodule_iff X (insert p T) hTp1 (F : LogL2)).mp hF) n
+      ((mem_closedStageSubmodule_iff X (insert p T) hTp1 (F : ℝ →₂[volume] ℂ)).mp hF) n
   let ℓ (n : ℤ) : (E ⧸ D) →L[ℂ] ℂ := D.liftQL (r n) (hker n)
   have hpair (j n : ℤ) : ℓ j (D.mkQ (v n)) = if j = n then 1 else 0 := by
     change packetRow X T p j (V n) = _

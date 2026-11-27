@@ -13,7 +13,7 @@ The equality at the period uses the exact closed-stage range, not a coordinate m
 
 public noncomputable section
 
-open Set
+open MeasureTheory Set
 open scoped NNReal
 
 namespace RiemannMasullo.RationalPacket
@@ -31,7 +31,7 @@ def fixedBoxDenominator : ClosedSubmodule ℂ E :=
 in the next closed stage. -/
 theorem mem_fixedBoxDenominator_iff (u : E) :
     u ∈ fixedBoxDenominator X T hT p hTp ↔
-      (u : LogL2) ∈ closedStageSubmodule X (insert p T) hTp := by rfl
+      (u : ℝ →₂[volume] ℂ) ∈ closedStageSubmodule X (insert p T) hTp := by rfl
 
 local notation "N" => ClosedSubmodule.toSubmodule (fixedBoxDenominator X T hT p hTp)
 
@@ -54,7 +54,7 @@ local notation "R" => closedStageForwardShift T hT hX
 
 /-- Evaluation of the restricted forward operator in the ambient Hilbert space. -/
 theorem closedStageForwardShift_apply (h : ℝ≥0) (u : E) :
-    (R h u : LogL2) = halfShift (h : ℝ) (u : LogL2) := rfl
+    (R h u : ℝ →₂[volume] ℂ) = halfShift (h : ℝ) (u : ℝ →₂[volume] ℂ) := rfl
 
 /-- Descend the forward operator through the closed submodule, using invariance
 of the next stage independently of invariance of the preceding one. -/
@@ -77,7 +77,7 @@ local notation "S" => fixedBoxForwardShift T hT p hTp hX
   intro x
   obtain ⟨u, rfl⟩ := (N).mkQ_surjective x
   change (N).mkQL (R 0 u) = (N).mkQL u
-  exact congrArg (N).mkQL (Subtype.ext (halfShift_zero (u : LogL2)))
+  exact congrArg (N).mkQL (Subtype.ext (halfShift_zero (u : ℝ →₂[volume] ℂ)))
 
 /-- Forward composition needs no backwards stage-invariance hypothesis. -/
 theorem fixedBoxForwardShift_add (h k : ℝ≥0) : S (h + k) = (S h).comp (S k) := by
@@ -85,7 +85,7 @@ theorem fixedBoxForwardShift_add (h k : ℝ≥0) : S (h + k) = (S h).comp (S k) 
   intro x
   obtain ⟨u, rfl⟩ := (N).mkQ_surjective x
   change (N).mkQL (R (h + k) u) = (N).mkQL (R h (R k u))
-  exact congrArg (N).mkQL (Subtype.ext (halfShift_add (h : ℝ) (k : ℝ) (u : LogL2)))
+  exact congrArg (N).mkQL (Subtype.ext (halfShift_add (h : ℝ) (k : ℝ) (u : ℝ →₂[volume] ℂ)))
 
 /-- One logarithmic period is the identity modulo the *actual* next stage. -/
 theorem fixedBoxForwardShift_period (hp : 1 < p) (hmem : p ∉ T) :
@@ -95,8 +95,8 @@ theorem fixedBoxForwardShift_period (hp : 1 < p) (hmem : p ∉ T) :
   intro x
   obtain ⟨u, rfl⟩ := (N).mkQ_surjective x
   apply (Submodule.Quotient.eq N).mpr
-  have hd : stagePeriodDifference (p : ℝ) (u : LogL2) ∈
-      (closedStageSubmodule X (insert p T) hTp : Set LogL2) := by
+  have hd : stagePeriodDifference (p : ℝ) (u : ℝ →₂[volume] ℂ) ∈
+      (closedStageSubmodule X (insert p T) hTp : Set (ℝ →₂[volume] ℂ)) := by
     rw [← range_stagePeriodDifference_closedStage hX T hT hp hmem hTp]
     exact ⟨u, rfl⟩
   rw [stagePeriodDifference_apply] at hd
@@ -106,7 +106,7 @@ theorem fixedBoxForwardShift_period (hp : 1 < p) (hmem : p ∉ T) :
 theorem continuous_fixedBoxForwardShift (x : Q) : Continuous fun h : ℝ≥0 ↦ S h x := by
   obtain ⟨u, rfl⟩ := (N).mkQ_surjective x
   have hc : Continuous fun h : ℝ≥0 ↦ R h u :=
-    ((continuous_halfShift (u : LogL2)).comp NNReal.continuous_coe).subtype_mk _
+    ((continuous_halfShift (u : ℝ →₂[volume] ℂ)).comp NNReal.continuous_coe).subtype_mk _
   exact (N).mkQL.continuous.comp hc
 
 /-- The quotient operator norm retains the ambient exponential upper bound. -/
