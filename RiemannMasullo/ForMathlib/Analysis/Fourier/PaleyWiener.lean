@@ -564,4 +564,12 @@ theorem paleyWiener_interval (A : ℝ) (hA : 0 < A) (f : ℂ → ℂ) (hf : Diff
     exact congrFun ((hf.differentiableOn.analyticOnNhd isOpen_univ).eq_of_frequently_eq (hdiff.differentiableOn.analyticOnNhd isOpen_univ)
       (hpt.frequently (.of_forall fun n ↦ (hreal (dampingRate n)).symm))) z
 
+/-- The inverse Fourier integral is a representative of the `L²` inverse Fourier transform
+when the frequency vector is integrable. -/
+theorem fourierInv_ae_L2 (F : Lp ℂ 2 (volume : Measure ℝ))
+    (hF : Integrable (F : ℝ → ℂ)) :
+    𝓕⁻ (F : ℝ → ℂ) =ᵐ[volume] ((𝓕⁻ F : Lp ℂ 2 (volume : Measure ℝ)) : ℝ → ℂ) := by
+  have h := (fourier_L2_ae hF (Lp.memLp F)).2
+  rwa [show (Lp.memLp F).toLp (F : ℝ → ℂ) = F from Lp.ext (Lp.memLp F).coeFn_toLp] at h
+
 end RiemannMasullo
