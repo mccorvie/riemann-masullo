@@ -2,6 +2,8 @@ module
 
 public import RiemannMasullo.Ch11_ShellStructure.Sec3
 public import RiemannMasullo.Ch11_ShellStructure.Sec3_Indentation
+public import RiemannMasullo.Ch10_TraceSpectral.Sec4b
+import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 
 /-! # Theorem 11.3.2.1 with a normalized lift: the shell side of the omitted step
 
@@ -35,6 +37,23 @@ pointwise consequence for one indentation is
   fails: for a bump test at the residue size of a place the left side is zero and the right
   side is not (`orbitalShell_invariantLift_ne_poisson`,
   `orbitalShell_invariantLift_ne_poisson_of_packet`).
+* Section `EqualNormSampling`: for the lift (12.2.2.2) with any real function `b`, and any
+  homomorphism `τ`, the left side of (11.3.2.1) reads a kernel only at pairs of idele classes of
+  equal norm, a null set of `C_F × C_F` (`sampledShell_congr_equalNorm`,
+  `ideleClassTamagawaMeasure_prod_equalNorm_eq_zero`). For a test vanishing on the norm-one
+  classes, as every test supported above norm one does, the convolution part `φ(x y⁻¹)` of the
+  geometric kernel (10.4.3.50) contributes nothing there: the left side for `φ(x y⁻¹) − κ` is
+  minus the left side for `κ`, for the values of a kernel (`sampledShell_convolution_sub`; for
+  `globalStripGeometricKernel` when the strip tensor exists,
+  `sampledShell_globalStripGeometricKernel_eq_neg`) and, for every Borel D′-sequence, for its
+  smoothening (Definition 12.1.1.1) (`sampledShell_smoothening_convolution_sub`). Read through
+  the values of a representative, (11.3.2.1) cannot hold for every representative of a spectral
+  kernel that exists: at every finite place there is a radial test supported above norm one such
+  that, for every kernel, the kernel made zero at the pairs of equal norm is equal to it almost
+  everywhere and makes (11.3.2.1) fail for every lift
+  (`sampledShell_equalNormRepresentative_ne_poisson`). Read through the smoothening, the left
+  side depends only on the class of the kernel (`sampledShell_smoothening_congr_ae`). Nothing in
+  this section assumes an indentation or an invariant weight.
 
 The Paley–Wiener subquotients of (11.3.1.3) themselves, at a fixed Fourier box, are the
 subject of pull request #7480 and are not treated here. -/
@@ -648,5 +667,548 @@ theorem orbitalShell_invariantLift_ne_poisson_of_packet {b : I𝔽 → ℝ}
     (Complex.ofReal_ne_zero.mpr (orbitalShell_invariantLift_ne_poisson_mass v))).symm
 
 end NormalizedLift
+
+section EqualNormSampling
+
+/-! ### What the left side of (11.3.2.1) reads of a kernel
+
+The left side of (11.3.2.1) evaluates the lifted kernel at the pairs `(τ t, ξ g τ t)`, with `ξ`
+principal and `g` a norm-one idele. The two classes then differ by the norm-one class of `g`, so
+these are pairs of idele classes of equal norm, a null set of `C_F × C_F`. Nothing in this
+section assumes an indentation or an invariant weight: the statements hold for the lift
+(12.2.2.2) with any real function `b`, and for any homomorphism `τ`. Two consequences:
+
+* the convolution part `φ(x y⁻¹)` of the geometric kernel (10.4.3.50) is zero at these pairs when
+  `φ` vanishes on the norm-one classes, as every test of Theorems 11.3.2.1 and 12.5.1.1 does, so
+  the left side of (11.3.2.1) for `φ(x y⁻¹) − κ` is minus the same expression for `κ`. This holds
+  for the values of a kernel and, for every Borel D′-sequence, for its smoothening
+  (Definition 12.1.1.1, p. 498), which the paper applies along the diagonal; on the diagonal it
+  is (12.1.1.23), p. 503;
+* Definition 10.4.3.7(1), p. 473, gives the spectral kernel as a measurable function made from an
+  element of an `L²` space, so its values on a null set, such as these pairs, are not fixed by
+  it. Read through the values of a representative, as `globalStripGeometricKernel` reads the
+  coercion of an `L²` class, (11.3.2.1) cannot hold for every representative of a spectral kernel
+  that exists. Read through the smoothening, the left side depends only on the class of the
+  kernel. -/
+
+open scoped ENNReal Topology
+
+attribute [local instance] instIdeleMeasurableSpaceSec1a instMeasurableSpaceAdicUnitsSec3a
+
+local notation "I𝔽" => IdeleGroup (𝓞 F) F
+local notation "H𝔽" => IdeleGroup.principalSubgroup (𝓞 F) F
+local notation "N𝔽" => (ideleNorm F).ker
+local notation "principal" => IdeleGroup.unitEmbedding (𝓞 F) F
+local notation "τ₀" => canonicalIdeleNormSection F
+local notation "πclass(" v ", " π ")" => IdeleClassGroup.ofAdicCompletion (𝓞 F) F v π
+local notation "unitMass(" v ")" =>
+  (finiteLocalMultiplicativeTamagawaMeasure F v).real ((v).adicCompletionIntegers F).units
+
+/-- At a pair sampled by the left side of (11.3.2.1) the two ideles have the same norm, for any
+homomorphism `τ`: a principal idele and a norm-one idele have norm one. -/
+private theorem sampledPair_classNorm_eq (τ : ℝ≥0ˣ →* I𝔽) (t : ℝ≥0ˣ) (ξ : Fˣ) (g : N𝔽) :
+    ideleClassNorm F (QuotientGroup.mk' H𝔽 (τ t)) =
+      ideleClassNorm F (QuotientGroup.mk' H𝔽 (principal ξ * g.val * τ t)) := by
+  change ideleNorm F (τ t) = ideleNorm F (principal ξ * g.val * τ t)
+  rw [map_mul, map_mul, (ideleNorm_spec F).2 ⟨ξ, rfl⟩, MonoidHom.mem_ker.mp g.property,
+    one_mul, one_mul]
+
+/-- At a pair sampled by the left side of (11.3.2.1), the class of the first idele times the
+inverse class of the second is the inverse class of the norm-one idele `g`. -/
+private theorem sampledPair_class_quotient (τ : ℝ≥0ˣ →* I𝔽) (t : ℝ≥0ˣ) (ξ : Fˣ) (g : N𝔽) :
+    QuotientGroup.mk' H𝔽 (τ t) * (QuotientGroup.mk' H𝔽 (principal ξ * g.val * τ t))⁻¹ =
+      (QuotientGroup.mk' H𝔽 g.val)⁻¹ := by
+  have hξ : QuotientGroup.mk' H𝔽 (principal ξ) = 1 := (QuotientGroup.eq_one_iff _).mpr ⟨ξ, rfl⟩
+  rw [map_mul, map_mul, hξ, one_mul, mul_inv_rev, mul_inv_cancel_left]
+
+/-- At a pair sampled by the left side of (11.3.2.1), the convolution kernel `φ(x y⁻¹)` of a test
+vanishing on the norm-one classes is zero at the pair of classes. -/
+private theorem sampledPair_convolution_eq_zero (φ : 𝒟) (hφ : ∀ g : C₁, φ.val g = 0)
+    (τ : ℝ≥0ˣ →* I𝔽) (t : ℝ≥0ˣ) (ξ : Fˣ) (g : N𝔽) :
+    φ.val (QuotientGroup.mk' H𝔽 (τ t) * (QuotientGroup.mk' H𝔽 (principal ξ * g.val * τ t))⁻¹) =
+      0 := by
+  rw [sampledPair_class_quotient τ t ξ g]
+  refine hφ ⟨(QuotientGroup.mk' H𝔽 g.val)⁻¹, ?_⟩
+  rw [MonoidHom.mem_ker, map_inv]
+  change (ideleNorm F g.val)⁻¹ = 1
+  rw [MonoidHom.mem_ker.mp g.property, inv_one]
+
+/-- Paper: Theorem 11.3.2.1, (11.3.2.1), p. 495, with Definition 10.4.3.7(2), (10.4.3.50),
+pp. 473–474. For the lift (12.2.2.2) with any function `b`, every base, shell and domain `E` of
+norm-one ideles, and every homomorphism `τ` (in particular every norm section), the left side of
+(11.3.2.1) for a kernel `φ(x y⁻¹) − κ(x, y)` is minus the left side for `κ`, when `φ` vanishes
+on the norm-one classes. The convolution part is zero at every sampled pair, so for the
+geometric kernel (10.4.3.50) it contributes nothing, and (11.3.2.1) is a statement about the
+spectral kernel.
+Reconstruction: the printed weight (11.3.2.2) is replaced by the lift (12.2.2.2) with function
+`b`, that is, by the weight `diagonalIndentationWeight H𝔽 Measure.count b`; here `b` is any real
+function.
+Deviation: The paper does not state this. -/
+theorem sampledShell_convolution_sub (b : I𝔽 → ℝ) (φ : 𝒟) (hφ : ∀ g : C₁, φ.val g = 0)
+    (S : Finset V) (k : ℕ) (τ : ℝ≥0ˣ →* I𝔽) (E : Set N𝔽) (κ : C𝔽 × C𝔽 → ℂ) :
+    (∑' ξ : Fˣ, ∫ t, ∫ g in E,
+        divisorialKernelDifference S k
+          (diagonalIndentationLift H𝔽 Measure.count b (fun p ↦ φ.val (p.1 * p.2⁻¹) - κ p))
+          (τ t, principal ξ * g.val * τ t)
+        ∂normOneIdeleTamagawaMeasure F ∂positiveRealHaar) =
+      -(∑' ξ : Fˣ, ∫ t, ∫ g in E,
+        divisorialKernelDifference S k (diagonalIndentationLift H𝔽 Measure.count b κ)
+          (τ t, principal ξ * g.val * τ t)
+        ∂normOneIdeleTamagawaMeasure F ∂positiveRealHaar) := by
+  have h (ξ : Fˣ) (t : ℝ≥0ˣ) (g : N𝔽) :
+      divisorialKernelDifference S k
+          (diagonalIndentationLift H𝔽 Measure.count b (fun p ↦ φ.val (p.1 * p.2⁻¹) - κ p))
+          (τ t, principal ξ * g.val * τ t) =
+        -divisorialKernelDifference S k (diagonalIndentationLift H𝔽 Measure.count b κ)
+          (τ t, principal ξ * g.val * τ t) := by
+    simp only [divisorialKernelDifference, diagonalIndentationLift, Prod.map_fst, Prod.map_snd]
+    rw [sampledPair_convolution_eq_zero φ hφ τ t ξ g]
+    ring
+  simp_rw [h, integral_neg, tsum_neg]
+
+/-- Paper: Theorem 11.3.2.1, (11.3.2.1), p. 495, with Definition 10.4.3.7, (10.4.3.49)–
+(10.4.3.50), pp. 473–474. For the global geometric kernel `φ(x y⁻¹) − k^spec(x, y)` of the
+printed statement `Printed.orbitalTracesOnPaleyWienerLevels`, when the strip tensor exists
+(hypothesis `hK`), and for the lift with any function `b`, every base, shell, homomorphism `τ`
+and domain, the left side of (11.3.2.1) is minus the same expression for the global spectral
+kernel `k^spec` alone, when `φ` vanishes on the norm-one classes. Both kernels read
+`globalStripSpectralKernel` through the coercion of its `L²` class, that is, through one
+representative.
+Reconstruction: the printed weight (11.3.2.2) is replaced by the lift (12.2.2.2) with function
+`b`, that is, by the weight `diagonalIndentationWeight H𝔽 Measure.count b`; here `b` is any real
+function.
+Deviation: The paper does not state this. -/
+theorem sampledShell_globalStripGeometricKernel_eq_neg (b : I𝔽 → ℝ) (S : Finset V) (k : ℕ)
+    (τ : ℝ≥0ˣ →* I𝔽) (E : Set N𝔽) {α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s) (φ : 𝒟)
+    (hφ : ∀ g : C₁, φ.val g = 0) :
+    ∀ hK, (∑' ξ : Fˣ, ∫ t, ∫ g in E,
+        divisorialKernelDifference S k
+          (diagonalIndentationLift H𝔽 Measure.count b
+            (globalStripGeometricKernel (F := F) (1 / 2) hα hs φ hK))
+          (τ t, principal ξ * g.val * τ t)
+        ∂normOneIdeleTamagawaMeasure F ∂positiveRealHaar) =
+      -(∑' ξ : Fˣ, ∫ t, ∫ g in E,
+        divisorialKernelDifference S k
+          (diagonalIndentationLift H𝔽 Measure.count b
+            (fun p ↦ globalStripSpectralKernel (F := F) (1 / 2) hα hs φ hK p))
+          (τ t, principal ξ * g.val * τ t)
+        ∂normOneIdeleTamagawaMeasure F ∂positiveRealHaar) :=
+  fun _ ↦ sampledShell_convolution_sub b φ hφ S k τ E _
+
+open scoped Pointwise in
+/-- At every pair of idele classes, the convolution kernel of a test is eventually integrable on
+the translated product sets of a Borel D′-sequence, and its averages there converge to its value
+at the pair. This is the proof of `diagonal_mem_convolutionKernelRegularSet_averages` at an
+arbitrary pair in place of a diagonal one. -/
+private theorem convolutionKernel_dSequenceAverage {U : ℕ → Set C𝔽}
+    (hU : IsDPrimeSequence (ideleClassTamagawaMeasure F) U) (hBorel : ∀ n, MeasurableSet (U n))
+    (φ : 𝒟) (p : C𝔽 × C𝔽) :
+    (∀ᶠ n in atTop, IntegrableOn (fun y : C𝔽 × C𝔽 ↦ φ.val (y.1 * y.2⁻¹)) (p • (U n ×ˢ U n))
+      ((ideleClassTamagawaMeasure F).prod (ideleClassTamagawaMeasure F))) ∧
+      Tendsto (fun n ↦ dSequenceAverage
+        ((ideleClassTamagawaMeasure F).prod (ideleClassTamagawaMeasure F)) (U n ×ˢ U n)
+        (fun y : C𝔽 × C𝔽 ↦ φ.val (y.1 * y.2⁻¹)) p) atTop (𝓝 (φ.val (p.1 * p.2⁻¹))) := by
+  let μ : Measure C𝔽 := ideleClassTamagawaMeasure F
+  let f : C𝔽 × C𝔽 → ℂ := fun y ↦ φ.val (y.1 * y.2⁻¹)
+  have hg : Continuous f :=
+    (continuous_of_bruhatSmooth ((mem_bruhatSmoothSubmodule_iff _).1 φ.property.1)).comp
+      (continuous_fst.mul continuous_snd.inv)
+  have rectSeq [m : MeasurableSpace (C𝔽 × C𝔽)] (hm : m = borel _)
+      (η : Measure (C𝔽 × C𝔽)) [η.IsHaarMeasure]
+      (hrect : ∀ v w : Set C𝔽, MeasurableSet v → MeasurableSet w →
+        η (v ×ˢ w) = μ v * μ w) :
+      IsDPrimeSequence η (fun n ↦ U n ×ˢ U n) := by
+    subst m
+    exact IsDPrimeSequence.prod hrect hU hU
+  have hseq : IsDPrimeSequence (μ.prod μ) (fun n ↦ U n ×ˢ U n) :=
+    rectSeq BorelSpace.measurable_eq _ (fun v w _ _ ↦ Measure.prod_prod v w)
+  have hshrink {W : Set (C𝔽 × C𝔽)} (hW : W ∈ 𝓝 p) :
+      ∀ᶠ n in atTop, p • (U n ×ˢ U n) ⊆ W := by
+    have hpre : (fun y : C𝔽 × C𝔽 ↦ p * y) ⁻¹' W ∈ 𝓝 1 :=
+      (continuous_const.mul continuous_id).continuousAt.preimage_mem_nhds (by simpa using hW)
+    obtain ⟨N, hN⟩ := hseq.2 _ hpre
+    filter_upwards [eventually_ge_atTop N] with n hn
+    exact Set.smul_set_subset_iff.mpr fun _ hy ↦ hN (hseq.1.2.1 hn hy)
+  obtain ⟨W, hW, hiW⟩ := hg.locallyIntegrable (μ := μ.prod μ) p
+  have hint : ∀ᶠ n in atTop, IntegrableOn f (p • (U n ×ˢ U n)) (μ.prod μ) :=
+    (hshrink hW).mono fun _ hn ↦ hiW.mono_set hn
+  refine ⟨hint, ?_⟩
+  change Tendsto (fun n ↦ dSequenceAverage (μ.prod μ) (U n ×ˢ U n) f p) atTop (𝓝 (f p))
+  refine Metric.tendsto_nhds.mpr fun ε hε ↦ ?_
+  have hnear : f ⁻¹' Metric.ball (f p) (ε / 2) ∈ 𝓝 p :=
+    hg.continuousAt.preimage_mem_nhds (Metric.ball_mem_nhds _ (half_pos hε))
+  filter_upwards [hshrink hnear, hint] with n hn hi
+  let S := p • (U n ×ˢ U n)
+  have hzero : (μ.prod μ) S ≠ 0 := by
+    simpa only [S, measure_smul] using (hseq.1.1 n).2.2.1.ne'
+  have hfin : (μ.prod μ) S ≠ ∞ := by
+    simpa only [S, measure_smul] using (hseq.1.1 n).2.2.2.ne
+  have havg : (⨍ y in S, f y - f p ∂(μ.prod μ)) =
+      dSequenceAverage (μ.prod μ) (U n ×ˢ U n) f p - f p := by
+    change (⨍ y in S, f y - f p ∂(μ.prod μ)) = (⨍ y in S, f y ∂(μ.prod μ)) - f p
+    rw [setAverage_fun_sub hi (integrableOn_const (C := f p) hfin),
+      setAverage_const hzero hfin]
+  rw [dist_eq_norm, ← ENNReal.ofReal_lt_ofReal_iff hε, ofReal_norm, ← havg]
+  calc
+    ‖⨍ y in S, f y - f p ∂(μ.prod μ)‖ₑ ≤ ⨍⁻ y in S, ‖f y - f p‖ₑ ∂(μ.prod μ) := by
+      rw [setAverage_eq', setLAverage_eq']
+      exact eNorm_integral_le_lintegral_eNorm _
+    _ ≤ ⨍⁻ _ in S, ENNReal.ofReal (ε / 2) ∂(μ.prod μ) := by
+      rw [setLAverage_eq', setLAverage_eq']
+      apply lintegral_mono_ae
+      have hS := (ae_restrict_mem (μ := μ.prod μ)
+        (((hBorel n).prod (hBorel n)).const_smul p)).filter_mono
+        (Measure.ae_smul_measure_le ((μ.prod μ) S)⁻¹)
+      filter_upwards [hS] with y hy
+      have hy' : dist (f y) (f p) < ε / 2 := hn hy
+      rw [← ofReal_norm, ← dist_eq_norm]
+      exact ENNReal.ofReal_le_ofReal hy'.le
+    _ < ENNReal.ofReal ε := by
+      rw [setLAverage_const hzero hfin, ENNReal.ofReal_lt_ofReal_iff hε]
+      exact half_lt_self hε
+
+open scoped Pointwise in
+/-- At a pair of idele classes where the convolution kernel vanishes, the smoothening of a
+geometric kernel `φ(x y⁻¹) − κ(x, y)` is minus the smoothening of `κ`. This is the argument of
+the diagonal case in `Ch12_TraceGeometric/Sec5.lean`, at an arbitrary pair. -/
+private theorem dSequenceKernelSmoothening_convolution_sub {U : ℕ → Set C𝔽}
+    (hU : IsDPrimeSequence (ideleClassTamagawaMeasure F) U) (hBorel : ∀ n, MeasurableSet (U n))
+    (φ : 𝒟) (κ : C𝔽 × C𝔽 → ℂ) (p : C𝔽 × C𝔽) (hp : φ.val (p.1 * p.2⁻¹) = 0) :
+    dSequenceKernelSmoothening (ideleClassTamagawaMeasure F) U
+        (fun y ↦ φ.val (y.1 * y.2⁻¹) - κ y) p =
+      -dSequenceKernelSmoothening (ideleClassTamagawaMeasure F) U κ p := by
+  let μ : Measure (C𝔽 × C𝔽) :=
+    (ideleClassTamagawaMeasure F).prod (ideleClassTamagawaMeasure F)
+  let rects : ℕ → Set (C𝔽 × C𝔽) := fun n ↦ U n ×ˢ U n
+  let f : C𝔽 × C𝔽 → ℂ := fun y ↦ φ.val (y.1 * y.2⁻¹)
+  change dSequenceSmootheningOrZero μ rects (fun y ↦ f y - κ y) p =
+    -dSequenceSmootheningOrZero μ rects κ p
+  obtain ⟨hf, hlim⟩ := convolutionKernel_dSequenceAverage hU hBorel φ p
+  change ∀ᶠ n in atTop, IntegrableOn f (p • rects n) μ at hf
+  change Tendsto (fun n ↦ dSequenceAverage μ (rects n) f p) atTop (𝓝 (φ.val (p.1 * p.2⁻¹)))
+    at hlim
+  rw [hp] at hlim
+  have hsum : Tendsto (fun n ↦
+      dSequenceAverage μ (rects n) (fun y ↦ f y - κ y) p +
+        dSequenceAverage μ (rects n) κ p) atTop (𝓝 0) := by
+    refine squeeze_zero_norm' ?_ (by simpa only [norm_zero] using hlim.norm)
+    filter_upwards [hf] with n hn
+    by_cases hκ : IntegrableOn κ (p • rects n) μ
+    · change ‖(⨍ y in p • rects n, f y - κ y ∂μ) + (⨍ y in p • rects n, κ y ∂μ)‖ ≤
+        ‖⨍ y in p • rects n, f y ∂μ‖
+      rw [setAverage_fun_sub hn hκ, sub_add_cancel]
+    · -- If the average of `κ` is undefined, both totalized averages vanish.
+      have hfκ : ¬ IntegrableOn (fun y ↦ f y - κ y) (p • rects n) μ := by
+        intro h
+        apply hκ
+        simpa only [Pi.sub_def, sub_sub_cancel] using hn.sub h
+      have hzero : dSequenceAverage μ (rects n) κ p = 0 := by
+        rw [dSequenceAverage, setAverage_eq, integral_undef hκ, smul_zero]
+      have hsubzero : dSequenceAverage μ (rects n) (fun y ↦ f y - κ y) p = 0 := by
+        rw [dSequenceAverage, setAverage_eq, integral_undef hfκ, smul_zero]
+      rw [hzero, hsubzero, zero_add, norm_zero]
+      exact norm_nonneg _
+  by_cases hκ : p ∈ dSequenceRegularSet μ rects κ
+  · obtain ⟨w, hw⟩ := hκ
+    have hκreg : p ∈ dSequenceRegularSet μ rects κ := ⟨w, hw⟩
+    have hsub : Tendsto (fun n ↦ dSequenceAverage μ (rects n) (fun y ↦ f y - κ y) p)
+        atTop (𝓝 (-w)) := by
+      simpa only [add_sub_cancel_right, zero_sub] using hsum.sub hw
+    have hreg : p ∈ dSequenceRegularSet μ rects (fun y ↦ f y - κ y) := ⟨-w, hsub⟩
+    simp only [dSequenceSmootheningOrZero, dite_eq_left hreg, dite_eq_left hκreg,
+      dSequenceSmoothening, hsub.limUnder_eq, hw.limUnder_eq]
+  · have hreg : p ∉ dSequenceRegularSet μ rects (fun y ↦ f y - κ y) := by
+      rintro ⟨w, hw⟩
+      apply hκ
+      refine ⟨-w, ?_⟩
+      simpa only [add_sub_cancel_left, zero_sub] using hsum.sub hw
+    simp only [dSequenceSmootheningOrZero, dite_eq_right hreg, dite_eq_right hκ, neg_zero]
+
+/-- Paper: Theorem 11.3.2.1, (11.3.2.1), p. 495, read with the smoothened kernel of
+Definition 12.1.1.1, p. 498, and §12.1.1, p. 499, as the proof of Theorem 12.5.1.1 reads it on
+p. 520 ("the smoothened geometric kernel"). The identity of `sampledShell_convolution_sub` holds
+after smoothening too: for every Borel D′-sequence `U` of the idele class group, the left side of
+(11.3.2.1) for the smoothening of `φ(x y⁻¹) − κ(x, y)` is minus the left side for the smoothening
+of `κ`, when `φ` vanishes on the norm-one classes. The averages of the convolution kernel
+converge to its value at every pair, as in the proof of Theorem 12.1.1.3(1), p. 503, and that
+value is zero at the sampled pairs. On the diagonal, with `φ(1) = 0`, this is (12.1.1.23),
+p. 503.
+Reconstruction: the printed weight (11.3.2.2) is replaced by the lift (12.2.2.2) with function
+`b`, that is, by the weight `diagonalIndentationWeight H𝔽 Measure.count b`; here `b` is any real
+function.
+Deviation: The paper does not state this. The D′-sequence is a hypothesis: the library
+constructs none for the idele class group, and the families of §A.5.2 to which p. 498 refers
+fail the D′ conditions (ERRATA F219, F220, I36). -/
+theorem sampledShell_smoothening_convolution_sub (b : I𝔽 → ℝ) {U : ℕ → Set C𝔽}
+    (hU : IsDPrimeSequence (ideleClassTamagawaMeasure F) U) (hBorel : ∀ n, MeasurableSet (U n))
+    (φ : 𝒟) (hφ : ∀ g : C₁, φ.val g = 0) (S : Finset V) (k : ℕ) (τ : ℝ≥0ˣ →* I𝔽)
+    (E : Set N𝔽) (κ : C𝔽 × C𝔽 → ℂ) :
+    (∑' ξ : Fˣ, ∫ t, ∫ g in E,
+        divisorialKernelDifference S k
+          (diagonalIndentationLift H𝔽 Measure.count b
+            (dSequenceKernelSmoothening (ideleClassTamagawaMeasure F) U
+              (fun p ↦ φ.val (p.1 * p.2⁻¹) - κ p)))
+          (τ t, principal ξ * g.val * τ t)
+        ∂normOneIdeleTamagawaMeasure F ∂positiveRealHaar) =
+      -(∑' ξ : Fˣ, ∫ t, ∫ g in E,
+        divisorialKernelDifference S k
+          (diagonalIndentationLift H𝔽 Measure.count b
+            (dSequenceKernelSmoothening (ideleClassTamagawaMeasure F) U κ))
+          (τ t, principal ξ * g.val * τ t)
+        ∂normOneIdeleTamagawaMeasure F ∂positiveRealHaar) := by
+  have h (ξ : Fˣ) (t : ℝ≥0ˣ) (g : N𝔽) :
+      divisorialKernelDifference S k
+          (diagonalIndentationLift H𝔽 Measure.count b
+            (dSequenceKernelSmoothening (ideleClassTamagawaMeasure F) U
+              (fun p ↦ φ.val (p.1 * p.2⁻¹) - κ p)))
+          (τ t, principal ξ * g.val * τ t) =
+        -divisorialKernelDifference S k
+          (diagonalIndentationLift H𝔽 Measure.count b
+            (dSequenceKernelSmoothening (ideleClassTamagawaMeasure F) U κ))
+          (τ t, principal ξ * g.val * τ t) := by
+    simp only [divisorialKernelDifference, diagonalIndentationLift]
+    rw [dSequenceKernelSmoothening_convolution_sub hU hBorel φ κ _
+      (sampledPair_convolution_eq_zero φ hφ τ t ξ g)]
+    ring
+  simp_rw [h, integral_neg, tsum_neg]
+
+/-- The smoothening of Definition 12.1.1.1 depends only on the almost-everywhere class. -/
+private theorem dSequenceSmootheningOrZero_congr_ae {G : Type*} [CommGroup G]
+    [MeasurableSpace G] (μ : Measure G) (U : ℕ → Set G) {f f' : G → ℂ} (h : f =ᵐ[μ] f') :
+    dSequenceSmootheningOrZero μ U f = dSequenceSmootheningOrZero μ U f' := by
+  have havg (W : Set G) (x : G) : dSequenceAverage μ W f x = dSequenceAverage μ W f' x :=
+    average_congr (ae_restrict_of_ae h)
+  have hreg : dSequenceRegularSet μ U f = dSequenceRegularSet μ U f' := by
+    ext y
+    exact exists_congr fun l ↦ by simp only [havg]
+  funext x
+  unfold dSequenceSmootheningOrZero dSequenceSmoothening
+  by_cases hx : x ∈ dSequenceRegularSet μ U f
+  · rw [dite_eq_left hx, dite_eq_left (hreg ▸ hx)]
+    simp only [havg]
+  · rw [dite_eq_right hx, dite_eq_right (hreg ▸ hx)]
+
+/-- Paper: Theorem 11.3.2.1, (11.3.2.1), p. 495, read with the smoothened kernel of
+Definition 12.1.1.1, p. 498, as on p. 520. The smoothening is a limit of averages, so the left
+side of (11.3.2.1) for a smoothened kernel depends only on the class of the kernel for the product
+of the class measures: two kernels equal almost everywhere give the same left side, for every
+sequence `U`, every lift, base, shell, homomorphism `τ` and domain.
+Reconstruction: the printed weight (11.3.2.2) is replaced by the lift (12.2.2.2) with function
+`b`, that is, by the weight `diagonalIndentationWeight H𝔽 Measure.count b`; here `b` is any real
+function.
+Deviation: The paper does not state this. -/
+theorem sampledShell_smoothening_congr_ae (b : I𝔽 → ℝ) (U : ℕ → Set C𝔽) (S : Finset V) (k : ℕ)
+    (τ : ℝ≥0ˣ →* I𝔽) (E : Set N𝔽) {κ κ' : C𝔽 × C𝔽 → ℂ}
+    (h : κ =ᵐ[(ideleClassTamagawaMeasure F).prod (ideleClassTamagawaMeasure F)] κ') :
+    (∑' ξ : Fˣ, ∫ t, ∫ g in E,
+        divisorialKernelDifference S k
+          (diagonalIndentationLift H𝔽 Measure.count b
+            (dSequenceKernelSmoothening (ideleClassTamagawaMeasure F) U κ))
+          (τ t, principal ξ * g.val * τ t)
+        ∂normOneIdeleTamagawaMeasure F ∂positiveRealHaar) =
+      (∑' ξ : Fˣ, ∫ t, ∫ g in E,
+        divisorialKernelDifference S k
+          (diagonalIndentationLift H𝔽 Measure.count b
+            (dSequenceKernelSmoothening (ideleClassTamagawaMeasure F) U κ'))
+          (τ t, principal ξ * g.val * τ t)
+        ∂normOneIdeleTamagawaMeasure F ∂positiveRealHaar) := by
+  have hs : dSequenceKernelSmoothening (ideleClassTamagawaMeasure F) U κ =
+      dSequenceKernelSmoothening (ideleClassTamagawaMeasure F) U κ' :=
+    dSequenceSmootheningOrZero_congr_ae _ _ h
+  rw [hs]
+
+/-- Paper: Theorem 11.3.2.1, (11.3.2.1), p. 495. The left side of (11.3.2.1) depends on the
+kernel only through its values at pairs of idele classes of equal norm: two kernels that agree
+there give the same left side, for the lift with any function `b`, every base, shell,
+homomorphism `τ` and domain.
+Reconstruction: the printed weight (11.3.2.2) is replaced by the lift (12.2.2.2) with function
+`b`, that is, by the weight `diagonalIndentationWeight H𝔽 Measure.count b`; here `b` is any real
+function.
+Deviation: The paper does not state this. -/
+theorem sampledShell_congr_equalNorm (b : I𝔽 → ℝ) (S : Finset V) (k : ℕ) (τ : ℝ≥0ˣ →* I𝔽)
+    (E : Set N𝔽) (κ₁ κ₂ : C𝔽 × C𝔽 → ℂ)
+    (h : ∀ p : C𝔽 × C𝔽, ideleClassNorm F p.1 = ideleClassNorm F p.2 → κ₁ p = κ₂ p) :
+    (∑' ξ : Fˣ, ∫ t, ∫ g in E,
+        divisorialKernelDifference S k (diagonalIndentationLift H𝔽 Measure.count b κ₁)
+          (τ t, principal ξ * g.val * τ t)
+        ∂normOneIdeleTamagawaMeasure F ∂positiveRealHaar) =
+      (∑' ξ : Fˣ, ∫ t, ∫ g in E,
+        divisorialKernelDifference S k (diagonalIndentationLift H𝔽 Measure.count b κ₂)
+          (τ t, principal ξ * g.val * τ t)
+        ∂normOneIdeleTamagawaMeasure F ∂positiveRealHaar) := by
+  have hpt (ξ : Fˣ) (t : ℝ≥0ˣ) (g : N𝔽) :
+      divisorialKernelDifference S k (diagonalIndentationLift H𝔽 Measure.count b κ₁)
+          (τ t, principal ξ * g.val * τ t) =
+        divisorialKernelDifference S k (diagonalIndentationLift H𝔽 Measure.count b κ₂)
+          (τ t, principal ξ * g.val * τ t) := by
+    simp only [divisorialKernelDifference, diagonalIndentationLift]
+    rw [h _ (sampledPair_classNorm_eq τ t ξ g)]
+  simp_rw [hpt]
+
+/-- The measure `dt/t` on the positive reals has no atoms. -/
+private theorem positiveRealHaar_singleton (r : ℝ≥0ˣ) : positiveRealHaar {r} = 0 := by
+  let e (x : ℝ) : ℝ≥0ˣ := Units.mk0 (Real.exp x).toNNReal (by positivity)
+  have he : Measurable e :=
+    measurable_comap_iff.mpr (continuous_real_toNNReal.comp Real.continuous_exp).measurable
+  have hL : MeasurableSet {t : ℝ≥0ˣ | ((t.val : ℝ≥0) : ℝ) = ((r.val : ℝ≥0) : ℝ)} :=
+    measurableSet_eq_fun (NNReal.continuous_coe.measurable.comp MeasurableSpace.le_map_comap)
+      measurable_const
+  refine measure_mono_null (t := {t : ℝ≥0ˣ | ((t.val : ℝ≥0) : ℝ) = ((r.val : ℝ≥0) : ℝ)})
+    (fun t ht ↦ by rw [Set.mem_singleton_iff.mp ht]; rfl) ?_
+  change (volume.map e) _ = 0
+  rw [Measure.map_apply he hL]
+  refine measure_mono_null (t := {Real.log ((r.val : ℝ≥0) : ℝ)}) (fun x hx ↦ ?_)
+    Real.volume_singleton
+  have hx' : ((Real.exp x).toNNReal : ℝ) = ((r.val : ℝ≥0) : ℝ) := hx
+  rw [Real.coe_toNNReal _ (Real.exp_pos x).le] at hx'
+  rw [Set.mem_singleton_iff, ← hx', Real.log_exp]
+
+/-- Paper: Definition A.3.2.1, pp. 559–560, through the decomposition of the class measure
+along a norm section (`classTamagawa_normProduct`). Every level set of the idele class norm is
+a null set of the idele class group.
+Deviation: The paper does not state this. -/
+theorem ideleClassTamagawaMeasure_normLevel_eq_zero (r : ℝ≥0ˣ) :
+    ideleClassTamagawaMeasure F {x : C𝔽 | ideleClassNorm F x = r} = 0 := by
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ _
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SFinite positiveRealHaar := by unfold positiveRealHaar; infer_instance
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : (normOneIdeleClassTamagawaMeasure F).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let σ : ℝ≥0ˣ → C𝔽 := fun t ↦ QuotientGroup.mk (τ₀ t)
+  have hσ : Continuous σ := continuous_quotient_mk'.comp (canonicalIdeleNormSection_continuous F)
+  have hr : Function.RightInverse σ (ideleClassNorm F) :=
+    canonicalIdeleNormSection_rightInverse F
+  have hj : Continuous (fun p : ℝ≥0ˣ × C₁ ↦ σ p.1 * p.2.val) :=
+    (hσ.comp continuous_fst).mul (continuous_subtype_val.comp continuous_snd)
+  have hL : MeasurableSet {x : C𝔽 | ideleClassNorm F x = r} :=
+    (isClosed_eq (isProperMap_ideleClassNorm F).continuous continuous_const).measurableSet
+  rw [← classTamagawa_normProduct σ hσ hr, Measure.map_apply hj.measurable hL]
+  have hpre : (fun p : ℝ≥0ˣ × C₁ ↦ σ p.1 * p.2.val) ⁻¹' {x : C𝔽 | ideleClassNorm F x = r} =
+      {r} ×ˢ Set.univ := by
+    ext p
+    simp only [Set.mem_preimage, Set.mem_ofPred_eq, Set.mem_prod, Set.mem_singleton_iff,
+      Set.mem_univ, and_true]
+    rw [map_mul, hr p.1, MonoidHom.mem_ker.mp p.2.property, mul_one]
+  rw [hpre, Measure.prod_prod, positiveRealHaar_singleton r, zero_mul]
+
+/-- Paper: Theorem 11.3.2.1, (11.3.2.1), p. 495. The pairs of idele classes of equal norm, at
+which the left side of (11.3.2.1) reads a kernel, form a null set of `C_F × C_F`. They contain
+the diagonal, of which §12.1.1, p. 498, says that it is "a null set with respect to the product
+measure".
+Deviation: The paper does not state this. -/
+theorem ideleClassTamagawaMeasure_prod_equalNorm_eq_zero :
+    ((ideleClassTamagawaMeasure F).prod (ideleClassTamagawaMeasure F))
+      {p : C𝔽 × C𝔽 | ideleClassNorm F p.1 = ideleClassNorm F p.2} = 0 := by
+  have hZ : MeasurableSet {p : C𝔽 × C𝔽 | ideleClassNorm F p.1 = ideleClassNorm F p.2} :=
+    (isClosed_eq ((isProperMap_ideleClassNorm F).continuous.comp continuous_fst)
+      ((isProperMap_ideleClassNorm F).continuous.comp continuous_snd)).measurableSet
+  rw [Measure.prod_apply hZ]
+  have hx (x : C𝔽) : Prod.mk x ⁻¹' {p : C𝔽 × C𝔽 | ideleClassNorm F p.1 = ideleClassNorm F p.2} =
+      {y : C𝔽 | ideleClassNorm F y = ideleClassNorm F x} := by
+    ext y
+    exact eq_comm
+  simp_rw [hx, ideleClassTamagawaMeasure_normLevel_eq_zero, lintegral_zero]
+
+/-- Paper: Definition 10.4.3.7(1), (10.4.3.49), p. 473, which gives the spectral kernel as a
+measurable function, from a representative of a Hilbert–Schmidt kernel (Theorem 10.4.3.6(2),
+p. 473). A kernel changed only at pairs of idele classes of equal norm is the same kernel almost
+everywhere, for the product of any two s-finite measures absolutely continuous with respect to
+the class measure. This covers the weighted measures of the Hilbert–Schmidt kernels of §10.4,
+which have densities with respect to the class measure and on whose `L²` space
+`globalStripSpectralKernel` is a class.
+Deviation: The paper does not state this. -/
+theorem ae_eq_of_eq_off_equalNorm (κ κ' : C𝔽 × C𝔽 → ℂ)
+    (h : ∀ p : C𝔽 × C𝔽, ideleClassNorm F p.1 ≠ ideleClassNorm F p.2 → κ' p = κ p)
+    {ν ν' : Measure C𝔽} [SFinite ν] [SFinite ν'] (hν : ν ≪ ideleClassTamagawaMeasure F)
+    (hν' : ν' ≪ ideleClassTamagawaMeasure F) :
+    κ' =ᵐ[ν.prod ν'] κ := by
+  have hnull := (hν.prod hν') (ideleClassTamagawaMeasure_prod_equalNorm_eq_zero (F := F))
+  filter_upwards [measure_eq_zero_iff_ae_notMem.mp hnull] with p hp using h p hp
+
+/-- Paper: Theorem 11.3.2.1, (11.3.2.1), p. 495, with Definition 10.4.3.7, pp. 473–474. For every
+kernel `κ`, let `κ₀` equal `κ` off the pairs of equal norm and zero at them; it is equal to `κ`
+almost everywhere (`ae_eq_of_eq_off_equalNorm`). With the geometric kernel
+`φ(x y⁻¹) − κ₀(x, y)`, for a test vanishing on the norm-one classes, the left side of (11.3.2.1)
+is zero, for the lift with any function `b`, every base, shell, homomorphism `τ` and domain. So
+with `κ₀` in place of `κ`, (11.3.2.1) holds exactly when its right side is zero.
+Reconstruction: the printed weight (11.3.2.2) is replaced by the lift (12.2.2.2) with function
+`b`, that is, by the weight `diagonalIndentationWeight H𝔽 Measure.count b`; here `b` is any real
+function.
+Deviation: The paper does not state this. -/
+theorem sampledShell_equalNormRepresentative_eq_zero (b : I𝔽 → ℝ) (φ : 𝒟)
+    (hφ : ∀ g : C₁, φ.val g = 0) (S : Finset V) (k : ℕ) (τ : ℝ≥0ˣ →* I𝔽) (E : Set N𝔽)
+    (κ : C𝔽 × C𝔽 → ℂ) :
+    (∑' ξ : Fˣ, ∫ t, ∫ g in E,
+        divisorialKernelDifference S k
+          (diagonalIndentationLift H𝔽 Measure.count b (fun p ↦ φ.val (p.1 * p.2⁻¹) -
+            if ideleClassNorm F p.1 = ideleClassNorm F p.2 then 0 else κ p))
+          (τ t, principal ξ * g.val * τ t)
+        ∂normOneIdeleTamagawaMeasure F ∂positiveRealHaar) = 0 := by
+  rw [sampledShell_convolution_sub b φ hφ S k τ E, sampledShell_congr_equalNorm b S k τ E _
+    (fun _ ↦ 0) (fun p hp ↦ ite_eq_left hp)]
+  have hzero (ξ : Fˣ) (t : ℝ≥0ˣ) (g : N𝔽) :
+      divisorialKernelDifference S k (diagonalIndentationLift H𝔽 Measure.count b fun _ ↦ 0)
+        (τ t, principal ξ * g.val * τ t) = 0 := by
+    simp only [divisorialKernelDifference, diagonalIndentationLift, mul_zero]
+  simp_rw [hzero, integral_zero, tsum_zero, neg_zero]
+
+/-- Paper: Theorem 11.3.2.1, (11.3.2.1), p. 495, with Definition 10.4.3.7, (10.4.3.49)–
+(10.4.3.50), pp. 473–474. Read through the values of a representative of the spectral kernel,
+(11.3.2.1) cannot hold for every representative. At every finite place and uniformizer there is
+a radial test supported above norm one with the following property. For every kernel `κ`, in
+particular every representative of the spectral kernel of that test when it exists, the kernel
+`κ₀` equal to `κ` off the pairs of equal norm and zero at them is equal to `κ` almost everywhere,
+for the product of any two s-finite measures absolutely continuous with respect to the class
+measure. In Lean the spectral kernel exists when the strip tensor `hK` of
+`globalStripSpectralKernel` does; for `0 < α`, `3 ≤ s` and a test vanishing on the norm-one
+classes, at twist `1 / 2`, that is the open statement
+`Isolated.exists_projectiveKernel_stripTestAction_spectralProjection`.
+With the geometric kernel `φ(x y⁻¹) − κ₀(x, y)` the two sides of (11.3.2.1) differ for the lift
+with any function `b` (in particular every normalized indentation, with no invariance assumed),
+and every base, shell, homomorphism `τ` and domain: the left side is zero
+(`sampledShell_equalNormRepresentative_eq_zero`) and the right side is `log q_v / μ_v(O_v^×)`.
+This concerns readings through the values of a representative, such as the coercion that
+`globalStripGeometricKernel` evaluates. The smoothening of Definition 12.1.1.1 does not see the
+change from `κ` to `κ₀` (`sampledShell_smoothening_congr_ae`).
+Reconstruction: the printed weight (11.3.2.2) is replaced by the lift (12.2.2.2) with function
+`b`, that is, by the weight `diagonalIndentationWeight H𝔽 Measure.count b`; here `b` is any real
+function.
+Deviation: The paper does not state this. It complements `orbitalShell_invariantLift_ne_poisson`,
+which holds for every kernel but only for normalized lifts with dilation-invariant weight, the
+canonical norm section and large saturated bases. -/
+theorem sampledShell_equalNormRepresentative_ne_poisson (v : V) (π : (v.adicCompletion F)ˣ)
+    (hπ : Valued.v.IsUniformizer (π : v.adicCompletion F)) :
+    ∃ φ : 𝒟, tsupport φ.val ⊆ {g : C𝔽 | 1 < ((ideleClassNorm F g).val : ℝ)} ∧
+      (∀ x y : C𝔽, ideleClassNorm F x = ideleClassNorm F y → φ.val x = φ.val y) ∧
+      ∀ κ : C𝔽 × C𝔽 → ℂ,
+        (∀ (ν ν' : Measure C𝔽) [SFinite ν] [SFinite ν'], ν ≪ ideleClassTamagawaMeasure F →
+          ν' ≪ ideleClassTamagawaMeasure F →
+          (fun p ↦ if ideleClassNorm F p.1 = ideleClassNorm F p.2 then 0 else κ p) =ᵐ[ν.prod ν']
+            κ) ∧
+        ∀ (b : I𝔽 → ℝ) (S : Finset V) (k : ℕ) (τ : ℝ≥0ˣ →* I𝔽) (E : Set N𝔽),
+          (∑' ξ : Fˣ, ∫ t, ∫ g in E,
+              divisorialKernelDifference S k
+                (diagonalIndentationLift H𝔽 Measure.count b (fun p ↦ φ.val (p.1 * p.2⁻¹) -
+                  if ideleClassNorm F p.1 = ideleClassNorm F p.2 then 0 else κ p))
+                (τ t, principal ξ * g.val * τ t)
+              ∂normOneIdeleTamagawaMeasure F ∂positiveRealHaar) ≠
+            (Real.log (v.asIdeal.absNorm : ℝ) / unitMass(v) : ℂ) *
+              ∑' n : ℤ, φ.val (πclass(v, π) ^ n) := by
+  obtain ⟨φ, h1, h2, h3⟩ := orbitalShell_invariantLift_ne_poisson_test v π hπ
+  have hφ : ∀ g : C₁, φ.val g = 0 := fun g ↦ image_eq_zero_of_notMem_tsupport fun hg ↦ by
+    have hg' : (1 : ℝ) < ((ideleClassNorm F g.val).val : ℝ) := h1 hg
+    rw [MonoidHom.mem_ker.mp g.property] at hg'
+    simp at hg'
+  refine ⟨φ, h1, h2, fun κ ↦ ⟨?_, fun b S k τ E ↦ ?_⟩⟩
+  · intro ν ν' _ _ hν hν'
+    exact ae_eq_of_eq_off_equalNorm κ _ (fun p hp ↦ ite_eq_right hp) hν hν'
+  rw [sampledShell_equalNormRepresentative_eq_zero b φ hφ S k τ E κ, h3, mul_one]
+  have hq : (1 : ℝ) < v.asIdeal.absNorm := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  exact (div_ne_zero (Complex.ofReal_ne_zero.mpr (Real.log_pos hq).ne')
+    (Complex.ofReal_ne_zero.mpr (orbitalShell_invariantLift_ne_poisson_mass v))).symm
+
+end EqualNormSampling
 
 end RiemannMasullo.Isolated
