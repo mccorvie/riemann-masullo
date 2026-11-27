@@ -1,15 +1,17 @@
 module
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec2
+public import RiemannMasullo.ForMathlib.Analysis.Fourier.WeightedLaplaceAsymptotics
 import RiemannMasullo.Ch03_IdelicZeta.Sec2
 import RiemannMasullo.Ch09_HardySobolev.Sec2
 import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
 
-/-! # Boundary growth of order-one strip jets
+/-! # Boundary growth of strip jets
 
 At Sobolev order two the squared jet norm from Proposition 10.2.2.2, pp. 446–447, is a
 fixed Haar measure factor times the scalar integral below (see the norm formula in `Sec2`).
-The estimate holds for every interior offset, independently of the location of the zeros.
+For every jet order, the squared norm has power growth, logarithmic growth, or a finite
+endpoint limit according to the Sobolev order.
 -/
 
 public section
@@ -111,34 +113,11 @@ theorem spectralStripJet_orderOne_scaled_integral_tendsto {ι : Type*} {l : Filt
     {α : ℝ} (hα : 0 < α) {b : ι → ℝ} (hb : Tendsto (fun i ↦ |b i|) l (𝓝[<] α)) :
     Tendsto (fun i ↦ (α - |b i|) *
       ∫ x : ℝ, Real.exp (2 * b i * x - 2 * α * |x|) * x ^ 2 / (1 + x ^ 2)) l (𝓝 (1 / 2)) := by
-  obtain ⟨ht, hi⟩ := tendsto_nhdsWithin_iff.mp hb
-  have hhalf : Tendsto (fun i ↦ α / (α + |b i|)) l (𝓝 (1 / 2)) := by
-    have h := (tendsto_const_nhds (x := α)).div (tendsto_const_nhds.add ht)
-      (by positivity : α + α ≠ 0)
-    have hratio : α / (α + α) = 1 / 2 := by
-      field_simp
-      ring
-    rwa [hratio] at h
-  have hzero : Tendsto (fun i ↦ (α - |b i|) * π) l (𝓝 0) := by
-    simpa using ((tendsto_const_nhds (x := α)).sub ht).mul_const π
-  have bounds : ∀ᶠ i in l,
-      let δ := α - |b i|
-      let J := ∫ x : ℝ, Real.exp (2 * b i * x - 2 * α * |x|) * x ^ 2 / (1 + x ^ 2)
-      α / (α + |b i|) - δ * π ≤ δ * J ∧ δ * J ≤ α / (α + |b i|) := by
-    filter_upwards [hi] with i hi'
-    have hδ : 0 < α - |b i| := sub_pos.mpr hi'
-    have hsum : 0 < α + |b i| := add_pos_of_pos_of_nonneg hα (abs_nonneg _)
-    have hcancel : (α - |b i|) * (α / (α ^ 2 - b i ^ 2)) = α / (α + |b i|) := by
-      rw [← sq_abs (b i), sq_sub_sq]
-      field_simp [hsum.ne', hδ.ne']
-    obtain ⟨hlo, hhi⟩ := spectralStripJet_orderOne_integral_edge_bounds (α := α) hi'
-    dsimp only
-    constructor
-    · have h := mul_le_mul_of_nonneg_left hlo hδ.le
-      rwa [mul_sub, hcancel] at h
-    · simpa only [hcancel] using mul_le_mul_of_nonneg_left hhi hδ.le
-  exact tendsto_of_tendsto_of_tendsto_of_le_of_le' (by simpa using hhalf.sub hzero) hhalf
-    (bounds.mono fun _ h ↦ h.1) (bounds.mono fun _ h ↦ h.2)
+  have h := tendsto_scaled_polynomialWeight_laplace_gamma hα 1 zero_le_two (by norm_num) hb
+  norm_num [Real.Gamma_one, ← div_eq_mul_inv] at h
+  have h' := h.div_const 2
+  convert h' using 2
+  ring
 
 section IdeleClassJets
 
@@ -158,8 +137,8 @@ local notation "C₁" => (ideleClassNorm F).ker
 local notation "m𝔽" => (continuousIdeleClassNorm F : C𝔽 →ₜ* ℝ≥0ˣ)
 local notation "hm𝔽" => (⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ :
   IsModulation m𝔽)
-local notation "jetLp(" χ ", " hα ", " j ")" =>
-  (spectralStripJet_memLp χ hα zero_le_two j).toLp
+local notation "jetLp(" χ ", " hα ", " hs ", " j ")" =>
+  (spectralStripJet_memLp χ hα hs j).toLp
     (spectralZeroJet (χ (j).val.1) (j).val.2.1 (j).val.2.2.1 (j).val.2.2.2)
 
 /-- Paper: Proposition 10.2.2.2, pp. 446–447. The squared norm of every admitted
@@ -171,8 +150,8 @@ theorem spectralStripJet_orderOne_norm_sq_edge_bounds
     (ν : Measure C𝔽) [ν.IsHaarMeasure] (hν : ν = canonicalModulatedHaar m𝔽 hm𝔽) :
     let A : ℝ := Measure.haarScalarFactor (ideleClassTamagawaMeasure F) ν
     let b := j.val.2.1
-    A * (α / (α ^ 2 - b ^ 2) - π) ≤ ‖jetLp(χ, hα, j)‖ ^ 2 ∧
-      ‖jetLp(χ, hα, j)‖ ^ 2 ≤ A * (α / (α ^ 2 - b ^ 2)) := by
+    A * (α / (α ^ 2 - b ^ 2) - π) ≤ ‖jetLp(χ, hα, zero_le_two, j)‖ ^ 2 ∧
+      ‖jetLp(χ, hα, zero_le_two, j)‖ ^ 2 ≤ A * (α / (α ^ 2 - b ^ 2)) := by
   have hb : |j.val.2.1| < α := by
     have h := j.property
     unfold spectralStripMultiplicity at h
@@ -187,6 +166,64 @@ theorem spectralStripJet_orderOne_norm_sq_edge_bounds
   obtain ⟨hlo, hhi⟩ := spectralStripJet_orderOne_integral_edge_bounds hb
   exact ⟨mul_le_mul_of_nonneg_left hlo (NNReal.coe_nonneg _),
     mul_le_mul_of_nonneg_left hhi (NNReal.coe_nonneg _)⟩
+
+/-- Paper: Proposition 10.2.2.2, pp. 446–447. Along any family of admitted order-`k` jets
+approaching the strip boundary with `s < 2k + 1`, the rescaled squared norms tend to the
+Gamma coefficient times the Tamagawa-to-canonical Haar factor. -/
+theorem spectralStripJet_scaled_norm_sq_tendsto_Gamma
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) {a α s : ℝ} (hα : 0 < α) (hs : 0 ≤ s)
+    (k : ℕ) (hp : -1 < ((2 * k : ℕ) - s : ℝ)) {ι : Type*} {l : Filter ι}
+    (j : ι → SpectralStripJetIndex χ a α s) (hk : ∀ i, (j i).val.2.2.2 = k)
+    (hb : Tendsto (fun i ↦ |(j i).val.2.1|) l (𝓝[<] α))
+    (ν : Measure C𝔽) [ν.IsHaarMeasure] (hν : ν = canonicalModulatedHaar m𝔽 hm𝔽) :
+    let A : ℝ := Measure.haarScalarFactor (ideleClassTamagawaMeasure F) ν
+    Tendsto (fun i ↦ (2 * (α - |(j i).val.2.1|)) ^ ((2 * k : ℕ) - s + 1 : ℝ) *
+      ‖jetLp(χ, hα.le, hs, j i)‖ ^ 2) l (𝓝 (A * Real.Gamma ((2 * k : ℕ) - s + 1 : ℝ))) := by
+  let A : ℝ := Measure.haarScalarFactor (ideleClassTamagawaMeasure F) ν
+  apply ((tendsto_scaled_polynomialWeight_laplace_gamma hα k hs hp hb).const_mul A).congr'
+  filter_upwards [] with i
+  rw [spectralStripJet_norm_sq χ hα.le hs (j i) ν hν, hk i]
+  exact mul_left_comm _ _ _
+
+/-- Paper: Proposition 10.2.2.2, pp. 446–447. At the critical Sobolev order `s = 2k + 1`,
+the squared jet norm divided by the logarithm of the inverse scaled distance to the edge
+tends to the Tamagawa-to-canonical Haar factor. -/
+theorem spectralStripJet_critical_norm_sq_div_log_tendsto
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) {a α : ℝ} (hα : 0 < α) (k : ℕ)
+    {ι : Type*} {l : Filter ι} (j : ι → SpectralStripJetIndex χ a α ((2 * k : ℕ) + 1 : ℝ))
+    (hk : ∀ i, (j i).val.2.2.2 = k) (hb : Tendsto (fun i ↦ |(j i).val.2.1|) l (𝓝[<] α))
+    (ν : Measure C𝔽) [ν.IsHaarMeasure] (hν : ν = canonicalModulatedHaar m𝔽 hm𝔽) :
+    let A : ℝ := Measure.haarScalarFactor (ideleClassTamagawaMeasure F) ν
+    let hs : 0 ≤ ((2 * k : ℕ) + 1 : ℝ) := by positivity
+    Tendsto (fun i ↦ ‖jetLp(χ, hα.le, hs, j i)‖ ^ 2 / (-Real.log (2 * (α - |(j i).val.2.1|))))
+      l (𝓝 A) := by
+  let A : ℝ := Measure.haarScalarFactor (ideleClassTamagawaMeasure F) ν
+  have hs : 0 ≤ ((2 * k : ℕ) + 1 : ℝ) := by positivity
+  have h := (tendsto_polynomialWeight_laplace_div_log hα k hb).const_mul A
+  rw [mul_one] at h
+  apply h.congr'
+  filter_upwards [] with i
+  rw [spectralStripJet_norm_sq χ hα.le hs (j i) ν hν, hk i]
+  exact (mul_div_assoc _ _ _).symm
+
+/-- Paper: Proposition 10.2.2.2, pp. 446–447. When `s > 2k + 1`, the squared norm of an
+order-`k` jet tends at either edge to the finite radial endpoint integral with its Haar factor. -/
+theorem spectralStripJet_norm_sq_tendsto_endpoint
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) {a α s : ℝ} (hα : 0 ≤ α) (k : ℕ)
+    (hs : 2 * (k : ℝ) + 1 < s) {ι : Type*} {l : Filter ι}
+    (j : ι → SpectralStripJetIndex χ a α s) (hk : ∀ i, (j i).val.2.2.2 = k)
+    (hb : Tendsto (fun i ↦ |(j i).val.2.1|) l (𝓝[<] α))
+    (ν : Measure C𝔽) [ν.IsHaarMeasure] (hν : ν = canonicalModulatedHaar m𝔽 hm𝔽) :
+    let A : ℝ := Measure.haarScalarFactor (ideleClassTamagawaMeasure F) ν
+    let hs' : 0 ≤ s := by linarith [Nat.cast_nonneg (α := ℝ) k]
+    Tendsto (fun i ↦ ‖jetLp(χ, hα, hs', j i)‖ ^ 2) l
+      (𝓝 (A * ∫ x : ℝ, Real.exp (2 * α * x - 2 * α * |x|) * x ^ (2 * k) *
+        ((1 + x ^ 2) ^ (s / 2))⁻¹)) := by
+  let A : ℝ := Measure.haarScalarFactor (ideleClassTamagawaMeasure F) ν
+  have hs' : 0 ≤ s := by linarith [Nat.cast_nonneg (α := ℝ) k]
+  apply ((tendsto_polynomialWeight_laplace_endpoint k hs hb).const_mul A).congr'
+  filter_upwards [] with i
+  rw [spectralStripJet_norm_sq χ hα hs' (j i) ν hν, hk i]
 
 end IdeleClassJets
 
