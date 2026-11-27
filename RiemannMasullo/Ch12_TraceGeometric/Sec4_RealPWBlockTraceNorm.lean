@@ -1042,8 +1042,9 @@ def IsPrimeTwistedCutoff (T : V₀ →L[ℂ] V₀) (r p : ℝ) (ψ : ℝ → ℂ
 on the band, and its trace is `primeTraceSeries`. For `r² p ≤ 1` the series of the blocks with
 their coefficients converges in trace norm. The blocks with `i ≤ j` are bounded through the
 families of `exists_realPWTestCutoff_nuclear` and those with `i > j` through the transposed
-family, and both bounds are a constant times `(√p) ^ i`, against coefficients of size
-`r ^ (i + j)`. The case of the prime `p` is `r = p ^ (-1/2)`, where `r² p = 1`. -/
+family. For the pair `(i, j)` the bound is a constant times `(√p) ^ min i j`, against a
+coefficient of size `r ^ (i + j)`. The case of the prime `p` is `r = p ^ (-1/2)`, where
+`r² p = 1`. -/
 theorem exists_primeTwistedCutoff_nuclear (hY : 0 < Y) {p r : ℝ} (hp : 1 < p) (hr0 : 0 < r)
     (hrp : r ^ 2 * p ≤ 1) {a b : ℝ} (ha0 : 0 < a) {ψ : ℝ → ℂ} (hψc : Continuous ψ)
     (hψ0 : ∀ g ∉ Icc a b, ψ g = 0) {L : ℝ} (hL : 0 < L) :
