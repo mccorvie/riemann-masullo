@@ -19,6 +19,10 @@ trace. This file bounds its trace norm.
   integral of `‖u x‖²`.
 * `exists_traceNorm_familyAnalysis_comp_le`. The trace norm of `A_u† A_v` is at most half the
   sum of the integrals of `‖u x‖²` and of `‖v x‖²`.
+* `exists_traceNorm_familyAnalysis_comp_le_of_weight`. The same bound after `u` is multiplied
+  by a real weight and `v` by its inverse, which leaves `A_u† A_v` unchanged.
+* `exists_hasSum_hilbertTrace_of_hasSum`. A sum of nuclear operators with summable trace norms
+  is nuclear, and its trace is the sum of the traces.
 
 Reconstruction: The paper does not state the bound. It is the inequality between the trace
 norm of a product and the Hilbert–Schmidt norms of its factors, in the form with the
@@ -27,7 +31,7 @@ arithmetic mean. -/
 public noncomputable section
 
 open Filter MeasureTheory
-open scoped ENNReal InnerProductSpace
+open scoped ENNReal InnerProductSpace Topology
 
 namespace RiemannMasullo
 
@@ -168,5 +172,122 @@ theorem exists_traceNorm_familyAnalysis_comp_le [Countable ι] (b : HilbertBasis
     exact h0
   obtain ⟨h, hle⟩ := traceNorm_le_of_hasSum S (A.adjoint.comp B) hs c hc.summable hb
   exact ⟨h, hle.trans hc.tsum_eq.le⟩
+
+/-- The matrix element of `A_u† A_v` between `z` and `f` is the integral of the product of the
+pairings of `z` with `u` and of `v` with `f`. -/
+theorem inner_adjoint_familyAnalysis_comp {u v : X → H} (hu : MemLp u 2 μ) (hv : MemLp v 2 μ)
+    (z f : H) :
+    ⟪z, (hilbertFamilyAnalysisCLM hu).adjoint (hilbertFamilyAnalysisCLM hv f)⟫_ℂ =
+      ∫ x, ⟪z, u x⟫_ℂ * ⟪v x, f⟫_ℂ ∂μ := by
+  rw [ContinuousLinearMap.adjoint_inner_right, L2.inner_def]
+  refine integral_congr_ae ?_
+  filter_upwards [hilbertFamilyAnalysisCLM_apply_ae hu z, hilbertFamilyAnalysisCLM_apply_ae hv f]
+    with x hx hy
+  rw [hx, hy, RCLike.inner_apply, inner_conj_symm, mul_comm]
+
+/-- Two pairs of families with the same products of pairings almost everywhere give the same
+operator `A_u† A_v`. -/
+theorem familyAnalysis_adjoint_comp_congr {u v u' v' : X → H} (hu : MemLp u 2 μ)
+    (hv : MemLp v 2 μ) (hu' : MemLp u' 2 μ) (hv' : MemLp v' 2 μ)
+    (h : ∀ z f : H, ∀ᵐ x ∂μ, ⟪z, u x⟫_ℂ * ⟪v x, f⟫_ℂ = ⟪z, u' x⟫_ℂ * ⟪v' x, f⟫_ℂ) :
+    (hilbertFamilyAnalysisCLM hu).adjoint.comp (hilbertFamilyAnalysisCLM hv) =
+      (hilbertFamilyAnalysisCLM hu').adjoint.comp (hilbertFamilyAnalysisCLM hv') := by
+  refine ContinuousLinearMap.ext fun f ↦ ext_inner_left ℂ fun z ↦ ?_
+  change ⟪z, (hilbertFamilyAnalysisCLM hu).adjoint (hilbertFamilyAnalysisCLM hv f)⟫_ℂ =
+    ⟪z, (hilbertFamilyAnalysisCLM hu').adjoint (hilbertFamilyAnalysisCLM hv' f)⟫_ℂ
+  rw [inner_adjoint_familyAnalysis_comp, inner_adjoint_familyAnalysis_comp]
+  exact integral_congr_ae (h z f)
+
+/-- Multiplying `u` by a real weight and `v` by its inverse leaves `A_u† A_v` unchanged, so the
+trace norm of `A_u† A_v` is bounded through any such pair. -/
+theorem exists_traceNorm_familyAnalysis_comp_le_of_weight [Countable ι]
+    (b : HilbertBasis ι ℂ H) {u v : X → H} (hu : MemLp u 2 μ) (hv : MemLp v 2 μ) {w : X → ℝ}
+    (hw : ∀ᵐ x ∂μ, w x ≠ 0) (hu' : MemLp (fun x ↦ ((w x : ℝ) : ℂ) • u x) 2 μ)
+    (hv' : MemLp (fun x ↦ (((w x)⁻¹ : ℝ) : ℂ) • v x) 2 μ) :
+    ∃ h : IsNuclearOperator
+        ((hilbertFamilyAnalysisCLM hu).adjoint.comp (hilbertFamilyAnalysisCLM hv)),
+      traceNorm ⟨(hilbertFamilyAnalysisCLM hu).adjoint.comp (hilbertFamilyAnalysisCLM hv), h⟩ ≤
+        ((∫ x, ‖((w x : ℝ) : ℂ) • u x‖ ^ 2 ∂μ) +
+          ∫ x, ‖(((w x)⁻¹ : ℝ) : ℂ) • v x‖ ^ 2 ∂μ) / 2 := by
+  have heq := familyAnalysis_adjoint_comp_congr hu hv hu' hv' (fun z f ↦ by
+    filter_upwards [hw] with x hx
+    have hx' : ((w x : ℝ) : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr hx
+    rw [inner_smul_right, inner_smul_left, Complex.conj_ofReal, Complex.ofReal_inv]
+    field_simp)
+  rw [heq]
+  exact exists_traceNorm_familyAnalysis_comp_le b hu' hv'
+
+/-- The operator norm of a nuclear endomorphism is at most its trace norm. -/
+theorem norm_val_le_traceNorm (T : nuclearEndomorphisms H) : ‖T.val‖ ≤ traceNorm T := by
+  have hmem := (mem_traceClassOperators_iff_isNuclearOperator T.val).2 T.property
+  have hsum : Summable (approximationNumber T.val) := by simpa using hmem.2
+  have ht := schattenNorm_one_eq_traceNorm T
+  simp only [schattenNorm, Real.rpow_one, div_one] at ht
+  rw [← ht, ← approximationNumber_zero_eq_opNorm T.val hmem.1]
+  exact hsum.le_tsum 0 fun n _ ↦ Real.sInf_nonneg fun _ ⟨_, _, h⟩ ↦ h ▸ norm_nonneg _
+
+/-- The trace norm of a scalar multiple of a nuclear endomorphism. -/
+theorem traceNorm_smul_eq (c : ℂ) (T : nuclearEndomorphisms H) :
+    traceNorm (c • T) = ‖c‖ * traceNorm T := by
+  let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+  exact (traceNorm_normedSpaceCore (H := H)).norm_smul c T
+
+/-- A sum of nuclear operators whose trace norms have a summable majorant is nuclear, its trace
+norm is at most the sum of the majorant, and its trace is the sum of the traces. -/
+theorem exists_hasSum_hilbertTrace_of_hasSum {κ : Type*} (S : κ → nuclearEndomorphisms H)
+    (T : H →L[ℂ] H) (hS : HasSum (fun i ↦ (S i).val) T) (c : κ → ℝ) (hc : Summable c)
+    (hb : ∀ i, traceNorm (S i) ≤ c i) :
+    ∃ h : IsNuclearOperator T, traceNorm ⟨T, h⟩ ≤ ∑' i, c i ∧
+      HasSum (fun i ↦ hilbertTrace (S i)) (hilbertTrace ⟨T, h⟩) := by
+  classical
+  obtain ⟨h, hle⟩ := traceNorm_le_of_hasSum S T hS c hc hb
+  obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := H)
+  refine ⟨h, hle, ?_⟩
+  change Tendsto (fun F : Finset κ ↦ ∑ i ∈ F, hilbertTrace (S i)) atTop
+    (𝓝 (hilbertTrace ⟨T, h⟩))
+  rw [tendsto_iff_norm_sub_tendsto_zero]
+  refine squeeze_zero (fun _ ↦ norm_nonneg _) (fun F ↦ ?_) (tendsto_tsum_compl_atTop_zero c)
+  have hF : HasSum (fun i : {i // i ∉ F} ↦ (S i).val) (T - ∑ i ∈ F, (S i).val) :=
+    (Finset.hasSum_compl_iff (f := fun i ↦ (S i).val) F).2 (by rw [sub_add_cancel]; exact hS)
+  obtain ⟨hn, hnle⟩ := traceNorm_le_of_hasSum (fun i : {i // i ∉ F} ↦ S i) _ hF
+    (fun i ↦ c i) (hc.subtype _) (fun i ↦ hb i)
+  have hval : (⟨T - ∑ i ∈ F, (S i).val, hn⟩ : nuclearEndomorphisms H) =
+      (⟨T, h⟩ : nuclearEndomorphisms H) - ∑ i ∈ F, S i :=
+    Subtype.ext (by simp)
+  have htrace : hilbertTrace (⟨T - ∑ i ∈ F, (S i).val, hn⟩ : nuclearEndomorphisms H) =
+      hilbertTrace ⟨T, h⟩ - ∑ i ∈ F, hilbertTrace (S i) := by
+    rw [hval, ← htr, map_sub, map_sum, htr]
+    simp only [htr]
+  rw [norm_sub_rev, ← htrace]
+  exact (norm_hilbertTrace_le _).trans hnle
+
+/-- The trace of a sum of two nuclear endomorphisms. -/
+theorem hilbertTrace_add_eq (S T : nuclearEndomorphisms H) :
+    hilbertTrace (S + T) = hilbertTrace S + hilbertTrace T := by
+  obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := H)
+  rw [← htr, ← htr, ← htr, map_add]
+
+/-- The trace of a scalar multiple of a nuclear endomorphism. -/
+theorem hilbertTrace_smul_eq (c : ℂ) (T : nuclearEndomorphisms H) :
+    hilbertTrace (c • T) = c * hilbertTrace T := by
+  obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := H)
+  rw [← htr, ← htr, map_smul, smul_eq_mul]
+
+/-- A series of scalar multiples of nuclear operators, with a summable majorant for the moduli
+of the scalars times the trace norms, converges to a nuclear operator, and the trace of the sum
+is the series of the traces. -/
+theorem exists_nuclear_tsum_smul {κ : Type*} (c : κ → ℂ) (T : κ → nuclearEndomorphisms H)
+    (m : κ → ℝ) (hm : Summable m) (hb : ∀ i, ‖c i‖ * traceNorm (T i) ≤ m i) :
+    ∃ h : IsNuclearOperator (∑' i, c i • (T i).val),
+      hilbertTrace ⟨∑' i, c i • (T i).val, h⟩ = ∑' i, c i * hilbertTrace (T i) := by
+  let S : κ → nuclearEndomorphisms H := fun i ↦ c i • T i
+  have hS : ∀ i, traceNorm (S i) ≤ m i := fun i ↦ by
+    change traceNorm (c i • T i) ≤ m i
+    rw [traceNorm_smul_eq]
+    exact hb i
+  have hsum : Summable fun i ↦ (S i).val :=
+    Summable.of_norm_bounded hm fun i ↦ (norm_val_le_traceNorm (S i)).trans (hS i)
+  obtain ⟨h, -, htr⟩ := exists_hasSum_hilbertTrace_of_hasSum S _ hsum.hasSum m hm hS
+  exact ⟨h, htr.tsum_eq.symm.trans (tsum_congr fun i ↦ hilbertTrace_smul_eq (c i) (T i))⟩
 
 end RiemannMasullo
