@@ -193,8 +193,12 @@ theorem fixedBoxTestAction_eq_spectralMultiplier (hT : ∀ q ∈ T, q.Prime)
   have hs' := hs.congr_fun (fun k ↦ (he k).symm)
   exact (hs'.unique (hasSum_ite_eq n (c n • v n))).symm
 
-/-- The actual integrated Schwartz-test operator is nuclear. Its Hilbert trace
-is the absolutely convergent prime-mesh Fourier sum, including frequency zero. -/
+/-- Paper: §11.3.1.1(2), p. 494. The Hilbert trace of the integrated test
+is the absolutely convergent sum of Fourier samples at `n / log p`,
+including frequency zero.
+Deviation: The action is on the rational fixed-box quotient with trivial
+angular character in unweighted logarithmic `L²`. The logarithmic test is
+given directly. The theorem also proves nuclearity and bounds the trace norm. -/
 theorem fixedBoxTestAction_nuclear_trace (hT : ∀ q ∈ T, q.Prime)
     (w : 𝓢(ℝ, ℂ)) :
     ∃ h : IsNuclearOperator (fixedBoxTestAction T hT1 p hTp1 hX hp hpT w),
@@ -206,7 +210,11 @@ theorem fixedBoxTestAction_nuclear_trace (hT : ∀ q ∈ T, q.Prime)
   exact nuclear_trace_of_eq _ _ heq _ _ hn
 
 include hp in
-/-- Poisson summation in the exact logarithmic period normalization. -/
+/-- Paper: (B.4.1.7), p. 608. Poisson summation converts the Fourier sum on
+the reciprocal logarithmic mesh into `log p` times the sum on the logarithmic
+lattice.
+Deviation: This uses a Schwartz test in logarithmic coordinates and the
+trivial lattice character. -/
 theorem fixedBox_test_symbol_poisson (w : 𝓢(ℝ, ℂ)) :
     (∑' n : ℤ, (𝓕 w) ((n : ℝ) / L)) = (L : ℂ) * ∑' k : ℤ, w (L * k) := by
   have hL : 0 < L := Real.log_pos (by exact_mod_cast hp.one_lt)
@@ -219,9 +227,12 @@ theorem fixedBox_test_symbol_poisson (w : 𝓢(ℝ, ℂ)) :
     _ = (L : ℂ) * ((L⁻¹ : ℝ) : ℂ) * (∑' n : ℤ, (𝓕 w) ((n : ℝ) / L)) := by rw [Complex.ofReal_inv, mul_inv_cancel₀ hn, one_mul]
     _ = (L : ℂ) * (∑' k : ℤ, w (L * k)) := by rw [mul_assoc, ← h]
 
-/-- The packet trace is the logarithmic lattice mass predicted on p. 494. This
-is a trace of the actual quotient action; comparison with the physical shell
-operator is a separate statement. -/
+/-- Paper: §11.3.1.1(2), p. 494. The Hilbert trace of the integrated packet
+action is `log p` times the sum of the logarithmic test on the period lattice.
+Deviation: The action is on the rational fixed-box quotient with trivial
+angular character in unweighted logarithmic `L²`. The lattice samples are
+of the supplied logarithmic test `w`. A comparison with the printed
+spectral sum must incorporate its half-shift weight into the test. -/
 theorem fixedBoxTestAction_poisson_trace (hT : ∀ q ∈ T, q.Prime)
     (w : 𝓢(ℝ, ℂ)) :
     ∃ h : IsNuclearOperator (fixedBoxTestAction T hT1 p hTp1 hX hp hpT w),
@@ -255,8 +266,11 @@ private theorem fixedBox_lattice_test_eq_zero (w : 𝓢(ℝ, ℂ))
   have hklt : k < 1 := by exact_mod_cast hlt
   omega
 
-/-- A test supported strictly between zero and the first logarithmic period
-has zero nuclear packet trace. No Euler-zero term is omitted. -/
+/-- Paper: §11.3.1.1(2), p. 494. A test supported strictly between zero and
+the first logarithmic period has zero nuclear packet trace.
+Deviation: The action is on the rational fixed-box quotient with trivial
+angular character in unweighted logarithmic `L²`. The support condition
+is on the logarithmic test, and the trace includes frequency zero. -/
 theorem fixedBoxTestAction_trace_eq_zero (hT : ∀ q ∈ T, q.Prime)
     (w : 𝓢(ℝ, ℂ)) (hw : Function.support w ⊆ Ioo 0 L) :
     ∃ h : IsNuclearOperator (fixedBoxTestAction T hT1 p hTp1 hX hp hpT w),
