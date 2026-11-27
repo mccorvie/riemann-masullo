@@ -1618,4 +1618,1258 @@ theorem traceFormula_exteriorZeros_of_stripTrace (τ : ℝ≥0ˣ →ₜ* C𝔽)
 
 end GlobalDiagonal
 
+section Readings
+
+/-! ## Readings of Theorem 12.5.1.1
+
+Statements for issue #7363: what the trace identity says under each reading of the window of
+zeros, of their multiplicities, of the class of tests, of the Sobolev order and of the
+normalization. The equivalences combine the explicit formula (`traceFormula_of_half_le`) with
+the uniqueness argument of `isEmpty_exteriorZeros_of_hasSum`. The statements on classes of tests
+use the uniqueness argument alone, and the statements on a value `G` of the geometric side the
+explicit formula alone. Nothing here is used by the targets. -/
+
+attribute [local instance] instSpectralQuotientPolynormableSec3
+
+local notation "X(" τ ")" => ({χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ)
+local notation "zeros(" τ ")" =>
+  {z : {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ // 0 < ord(z.1.val, z.2)}
+local notation "logNorm(" g ")" => Real.log ((ideleClassNorm F g : ℝ≥0) : ℝ)
+local notation "hStrip(" hα ")" => (neg_nonpos.mpr hα |>.trans hα)
+local notation "stripQuot₀(" hα ", " hs ")" =>
+  spectralSobolevQuotient F (1 / 2) (hStrip(hα)) hs
+local notation "stripConv₀(" hα ", " hs ", " φ ")" =>
+  spectralConvolution (F := F) (1 / 2) (hStrip(hα)) hs φ
+local notation "localSum(" a ", " b ")" =>
+  ((∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) + ∑' v : V, finiteTerm(v, b v))
+local notation "weilLocalSide(" a ", " b ")" =>
+  (classVolume * ((∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) +
+    ∑' v : V, finiteTerm(v, b v)))
+local notation "localTerms(" φ ", " a ", " b ")" =>
+  (M(φ, twist(1, 1 / 2)) + M(φ, twist(1, -1 / 2)) -
+    classVolume * ((∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) +
+      ∑' v : V, finiteTerm(v, b v)))
+local notation "archRestricts(" φ ", " a ")" =>
+  (∀ (w : InfinitePlace F) (u : w.Completionˣ), (a w).val u = (φ).val (archClass(w) u))
+local notation "finiteRestricts(" φ ", " b ")" =>
+  (∀ (v : V) (u : (v.adicCompletion F)ˣ), (b v).val u = (φ).val (finiteClass(v) u))
+local notation "restriction" =>
+  (⟨(ideleClassNorm F).ker.subtype, continuous_subtype_val⟩ : C₁ →ₜ* C𝔽)
+local notation "order(" χ ", " z ")" => meromorphicOrderAt (continuedCompletedHeckeL (F := F) χ) z
+local notation "stripMult(" β ", " s ", " p ")" =>
+  spectralStripMultiplicity β s ((p).2.re - 1 / 2) (ord((p).1.val, (p).2)).toNat
+
+section ZeroTermUniqueness
+
+open scoped ContDiff
+
+open Classical in
+/-- Paper: Theorem 12.5.1.1, pp. 519–520, with §1.4.1–1.4.2, p. 28. Fix a norm section `τ`, a
+real `y₀`, a set `D` of quasi-characters `χ|·|^z` (`χ` trivial on `τ`) that is discrete in each
+component and lies in `Re z ≤ 1`, complex coefficients `c`, and a point `p₀ = (χ₀, z₀)` of `D`.
+Suppose `∑_{p ∈ D} c(p) · M(φ)(p|·|^{-1/2}) = 0` for every test of the form
+`φ(x) = χ̄₀(x) · g(log |x|)` with `g` smooth, compactly supported and zero below `y₀`. Then
+`c(p₀) = 0`. Only tests homogeneous for the one character `χ₀` are used, and they are supported
+in `log |x| ≥ y₀`.
+Reconstruction: not a statement of the paper. It is the proof of
+`isEmpty_exteriorZeros_of_hasSum` with general coefficients: the tests are
+`g(x) = β(x − y) e^{−w₀ (x − y)}` with `β` a bump on `[1/4, 3/4]`, `w₀ = z₀ − 1/2` and `y` large,
+and the conclusion is uniqueness of exponential sums on a half-line. -/
+theorem coefficient_eq_zero_of_hasSum_characterTests (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (y₀ : ℝ) (D : Set X(τ))
+    (hD : ∀ (χ : PontryaginDual C𝔽) (z : ℂ), ∀ᶠ u in 𝓝[≠] z,
+      ∀ p ∈ D, p.1.val = χ → p.2 - 1 / 2 ≠ u)
+    (hDre : ∀ p ∈ D, p.2.re ≤ 1) (c : X(τ) → ℂ) (p₀ : X(τ)) (hp₀ : p₀ ∈ D)
+    (hT : ∀ (φ : BruhatCompactSupport C𝔽) (g : ℝ → ℂ), ContDiff ℝ (∞) g → HasCompactSupport g →
+      (∀ x : ℝ, x < y₀ → g x = 0) →
+      (∀ x : C𝔽, φ.val x = ((p₀.1.val⁻¹ x : Circle) : ℂ) * g (logNorm(x))) →
+      HasSum (fun p : D ↦ c p.val * M(φ, twist(p.val.1.val, p.val.2 - 1 / 2))) 0) :
+    c p₀ = 0 := by
+  let z₀ : D := ⟨p₀, hp₀⟩
+  let χ₀ : PontryaginDual C𝔽 := p₀.1.val
+  let w₀ : ℂ := p₀.2 - 1 / 2
+  let y₁ : ℝ := max 0 y₀
+  let β : ContDiffBump (1 / 2 : ℝ) := ⟨1 / 8, 1 / 4, by norm_num, by norm_num⟩
+  let H₀ : ℝ → ℂ := fun x ↦ (β x : ℂ) * Complex.exp (-(w₀ * x))
+  have hH₀ : ContDiff ℝ (∞) H₀ :=
+    (Complex.ofRealCLM.contDiff.comp β.contDiff).mul
+      (Complex.contDiff_exp.comp (contDiff_const.mul Complex.ofRealCLM.contDiff).neg)
+  have hH₀c : HasCompactSupport H₀ :=
+    (β.hasCompactSupport.comp_left Complex.ofReal_zero).mul_right
+  have hH₀neg : ∀ x : ℝ, x ≤ 0 → H₀ x = 0 := fun x hx ↦ by
+    have : β x = 0 := β.zero_of_le_dist (by
+      rw [Real.dist_eq, abs_of_neg (by linarith)]; change (1 / 4 : ℝ) ≤ _; linarith)
+    simp only [H₀, this, Complex.ofReal_zero, zero_mul]
+  have hg (y : ℝ) : ContDiff ℝ (∞) (fun x ↦ H₀ (x - y)) := hH₀.comp (contDiff_id.sub contDiff_const)
+  have hgc (y : ℝ) : HasCompactSupport (fun x ↦ H₀ (x - y)) :=
+    hH₀c.comp_homeomorph (Homeomorph.subRight y)
+  choose φ hφ using fun y : ℝ ↦ exists_characterNormTest (F := F) χ₀⁻¹ _ (hg y) (hgc y)
+  -- the profile of the test `φ y` vanishes below `y`
+  have hzero (y : ℝ) (hy : y₁ ≤ y) : ∀ x : ℝ, x < y₀ → H₀ (x - y) = 0 := fun x hx ↦
+    hH₀neg _ (by linarith [(le_max_right 0 y₀).trans hy])
+  let K : ℂ → ℂ := fun w ↦ ∫ x : ℝ, H₀ x * Complex.exp (w * x)
+  -- the Mellin values of the test `φ y` at the points of `D`
+  have hzt (y : ℝ) (z : D) : M(φ y, twist(z.val.1.val, z.val.2 - 1 / 2)) =
+      if z.val.1.val = χ₀ then
+        (classVolume * K (z.val.2 - 1 / 2)) * Complex.exp ((z.val.2 - 1 / 2) * y) else 0 := by
+    rw [characterNormTest_mellin _ (hg y) (hgc y) χ₀⁻¹ (φ y) (hφ y)]
+    by_cases hχ : z.val.1.val = χ₀
+    · have hone : z.val.1.val * χ₀⁻¹ = 1 := by rw [hχ, mul_inv_cancel]
+      rw [ite_eq_left hχ, ite_eq_left (fun u ↦ by rw [hone]; rfl)]
+      beta_reduce
+      rw [grh_shift_integral H₀ hH₀.continuous _ (fun t ↦ by rw [hone]; rfl) y]
+      ring
+    · rw [ite_eq_right hχ, ite_eq_right (fun h1 ↦ hχ (grh_character_eq τ hτ z.val.1.property
+        p₀.1.property h1)), zero_mul]
+  let ι := {z : D // z.val.1.val = χ₀}
+  let w : ι → ℂ := fun i ↦ i.val.val.2 - 1 / 2
+  let b : ι → ℂ := fun i ↦
+    c i.val.val * (classVolume * K (w i)) * Complex.exp (w i * y₁)
+  have hsum (y : ℝ) (hy : 0 ≤ y) : HasSum (fun i : ι ↦ b i * Complex.exp (w i * y)) 0 := by
+    have h := hT (φ (y + y₁)) _ (hg (y + y₁)) (hgc (y + y₁)) (hzero (y + y₁) (by linarith))
+      (hφ (y + y₁))
+    have hsuppF : Function.support (fun z : D ↦
+        c z.val * M(φ (y + y₁), twist(z.val.1.val, z.val.2 - 1 / 2))) ⊆
+        {z | z.val.1.val = χ₀} := by
+      intro z hz
+      by_contra hχ
+      have hχ' : ¬ z.val.1.val = χ₀ := hχ
+      exact hz (by beta_reduce; rw [hzt (y + y₁) z, ite_eq_right hχ', mul_zero])
+    have h' := (hasSum_subtype_iff_of_support_subset hsuppF).mpr h
+    have hf : (fun i : ι ↦ b i * Complex.exp (w i * y)) =
+        (fun z : D ↦ c z.val * M(φ (y + y₁), twist(z.val.1.val, z.val.2 - 1 / 2))) ∘
+          (Subtype.val : ι → _) := by
+      funext i
+      rw [Function.comp_apply, hzt (y + y₁) i.val, ite_eq_left i.property]
+      change c i.val.val * (classVolume * K (w i)) * Complex.exp (w i * y₁) *
+          Complex.exp (w i * y) =
+        c i.val.val * (classVolume * K (w i) * Complex.exp (w i * ((y + y₁ : ℝ) : ℂ)))
+      rw [Complex.ofReal_add, mul_add, Complex.exp_add]
+      ring
+    rw [hf]
+    exact h'
+  have hw : Function.Injective w := fun i j hij ↦ by
+    have hs : i.val.val.2 = j.val.val.2 := sub_left_inj.mp hij
+    exact Subtype.ext (Subtype.ext (Prod.ext (Subtype.ext (i.property.trans j.property.symm)) hs))
+  have hdisc : ∀ z : ℂ, ∀ᶠ u in 𝓝[≠] z, u ∉ Set.range w := fun z ↦ by
+    filter_upwards [hD χ₀ z] with u hu
+    rintro ⟨i, rfl⟩
+    exact hu i.val.val i.val.property i.property rfl
+  have hre : ∀ i, (w i).re ≤ 1 / 2 := fun i ↦ by
+    have h := hDre i.val.val i.val.property
+    change (i.val.val.2 - 1 / 2).re ≤ 1 / 2
+    rw [Complex.sub_re]
+    norm_num
+    linarith
+  have hb : Summable b := by
+    have h := (hsum 0 le_rfl).summable
+    simpa using h
+  have h0 := eq_zero_of_hasSum_exp_eq_zero w b hw hdisc hre hb hsum ⟨z₀, rfl⟩
+  have hK : K w₀ = ((∫ x, β x : ℝ) : ℂ) := by
+    rw [← integral_complex_ofReal]
+    exact integral_congr_ae (Filter.Eventually.of_forall fun x ↦ grh_bump_mul_exp _ _)
+  have hKne : K w₀ ≠ 0 := by
+    rw [hK]; exact Complex.ofReal_ne_zero.mpr β.integral_pos.ne'
+  change c p₀ * (classVolume * K w₀) * Complex.exp (w₀ * y₁) = 0 at h0
+  exact (mul_eq_zero.mp ((mul_eq_zero.mp h0).resolve_right (Complex.exp_ne_zero _))).resolve_right
+    (mul_ne_zero grh_classVolume_ne_zero hKne)
+
+open Classical in
+/-- Paper: Theorem 12.5.1.1, pp. 519–520, with §1.4.6, p. 30. In the setting of
+`coefficient_eq_zero_of_hasSum_characterTests`, if `∑_{p ∈ D} c(p) · M(φ)(p|·|^{-1/2}) = 0` for
+every compactly supported Bruhat test `φ` whose support lies in `log |g| ≥ y₀`, then every
+coefficient is zero.
+Reconstruction: not a statement of the paper. -/
+theorem coefficients_eq_zero_of_hasSum_supportedTests (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (y₀ : ℝ) (D : Set X(τ))
+    (hD : ∀ (χ : PontryaginDual C𝔽) (z : ℂ), ∀ᶠ u in 𝓝[≠] z,
+      ∀ p ∈ D, p.1.val = χ → p.2 - 1 / 2 ≠ u)
+    (hDre : ∀ p ∈ D, p.2.re ≤ 1) (c : X(τ) → ℂ)
+    (hT : ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C𝔽, φ.val g ≠ 0 → y₀ ≤ logNorm(g)) →
+      HasSum (fun p : D ↦ c p.val * M(φ, twist(p.val.1.val, p.val.2 - 1 / 2))) 0) :
+    ∀ p ∈ D, c p = 0 := fun p₀ hp₀ ↦
+  coefficient_eq_zero_of_hasSum_characterTests τ hτ y₀ D hD hDre c p₀ hp₀
+    fun φ g _ _ hgz hφ ↦ hT φ fun x hne ↦ by
+      by_contra hlt
+      exact hne (by rw [hφ x, hgz _ (not_le.mp hlt), mul_zero])
+
+/-- The zeros of the completed Hecke L-functions of the characters trivial on a norm section
+form a set to which `coefficients_eq_zero_of_hasSum_supportedTests` applies: they are discrete
+in each component and have real part at most one. -/
+private theorem zeros_discrete_and_re_le_one (τ : ℝ≥0ˣ →ₜ* C𝔽) :
+    (∀ (χ : PontryaginDual C𝔽) (z : ℂ), ∀ᶠ u in 𝓝[≠] z,
+      ∀ p ∈ {p : X(τ) | 0 < ord(p.1.val, p.2)}, p.1.val = χ → p.2 - 1 / 2 ≠ u) ∧
+    ∀ p ∈ {p : X(τ) | 0 < ord(p.1.val, p.2)}, p.2.re ≤ 1 := by
+  refine ⟨fun χ z ↦ ?_, fun p hp ↦ grh_zero_re_le_one _ hp⟩
+  filter_upwards [grh_zeros_discrete χ z] with u hu
+  intro p hp hpχ hpu
+  apply hu
+  have h : 0 < ord(p.1.val, p.2) := hp
+  rw [hpχ] at h
+  rwa [← hpu, sub_add_cancel]
+
+open Classical in
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The case `D` = all zeros of
+`coefficients_eq_zero_of_hasSum_supportedTests`: if `∑_ρ c(ρ) · M(φ)(c_ρ |·|^{-1/2}) = 0` for
+every test supported in `log |g| ≥ y₀`, then every coefficient is zero.
+Reconstruction: not a statement of the paper. -/
+theorem zeroCoefficients_eq_zero_of_hasSum_supportedTests (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (y₀ : ℝ) (c : X(τ) → ℂ)
+    (hT : ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C𝔽, φ.val g ≠ 0 → y₀ ≤ logNorm(g)) →
+      HasSum (fun z : zeros(τ) ↦ c z.val * M(φ, twist(z.val.1.val, z.val.2 - 1 / 2))) 0) :
+    ∀ z : zeros(τ), c z.val = 0 := fun z ↦
+  coefficients_eq_zero_of_hasSum_supportedTests τ hτ y₀ {p : X(τ) | 0 < ord(p.1.val, p.2)}
+    (zeros_discrete_and_re_le_one τ).1 (zeros_discrete_and_re_le_one τ).2 c hT z.val z.property
+
+open Classical in
+/-- Paper: Theorem 12.5.1.1, pp. 519–520, with §1.4.6, p. 30, and Theorem 11.3.2.1, p. 495.
+Let `P` be any class of tests that contains every compactly supported Bruhat test whose
+support lies in `log |g| ≥ y₀`. If the exterior zero terms sum to zero for every test of the
+class, at one half-width `α`, then there are no zeros with `|Re s − 1/2| ≥ α`.
+Reconstruction: the paper states the class of tests in four ways: `φ(1) = 0` (p. 519, the
+preamble of §12.5), `φ(C_F¹) = 0` (the statement, and pp. 28, 53), support above norm one
+(Theorem 11.3.2.1, §1.4.6, and pp. 13, 46), and support below norm one (§1.4.6, p. 30). For
+`y₀ > 0` each of the first three contains the tests required here;
+`testClasses_contain_supportedTests` is the case `y₀ = 1`. -/
+theorem isEmpty_exteriorZeros_of_hasSum_of_testClass (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (α y₀ : ℝ)
+    (P : BruhatCompactSupport C𝔽 → Prop)
+    (hP : ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C𝔽, φ.val g ≠ 0 → y₀ ≤ logNorm(g)) → P φ)
+    (hT : ∀ φ : BruhatCompactSupport C𝔽, P φ →
+      HasSum (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z)) 0) :
+    IsEmpty exteriorZeros(τ, α) := by
+  let c : X(τ) → ℂ := fun p ↦ if α ≤ |p.2.re - 1 / 2| then ((ord(p.1.val, p.2) : ℤ) : ℂ) else 0
+  have key := zeroCoefficients_eq_zero_of_hasSum_supportedTests τ hτ y₀ c (fun φ hφ ↦ by
+    have h := hT φ (hP φ hφ)
+    let G : X(τ) → ℂ := fun p ↦
+      ((ord(p.1.val, p.2) : ℤ) : ℂ) * M(φ, twist(p.1.val, p.2 - 1 / 2))
+    let G' : X(τ) → ℂ := fun p ↦ c p * M(φ, twist(p.1.val, p.2 - 1 / 2))
+    let E : Set X(τ) := {p | 0 < ord(p.1.val, p.2) ∧ α ≤ |p.2.re - 1 / 2|}
+    let Z : Set X(τ) := {p | 0 < ord(p.1.val, p.2)}
+    have hE : HasSum (E.indicator G) 0 :=
+      (hasSum_subtype_iff_indicator (f := G) (s := E)).mp h
+    refine (hasSum_subtype_iff_indicator (f := G') (s := Z)).mpr ?_
+    have heq : Z.indicator G' = E.indicator G := by
+      funext p
+      by_cases hp : 0 < ord(p.1.val, p.2)
+      · by_cases ha : α ≤ |p.2.re - 1 / 2|
+        · rw [Set.indicator_of_mem (show p ∈ Z from hp),
+            Set.indicator_of_mem (show p ∈ E from ⟨hp, ha⟩)]
+          simp only [G, G', c, ite_eq_left ha]
+        · rw [Set.indicator_of_mem (show p ∈ Z from hp),
+            Set.indicator_of_notMem (show p ∉ E from fun h ↦ ha h.2)]
+          simp only [G', c, ite_eq_right ha, zero_mul]
+      · rw [Set.indicator_of_notMem (show p ∉ Z from hp),
+          Set.indicator_of_notMem (show p ∉ E from fun h ↦ hp h.1)]
+    rw [heq]
+    exact hE)
+  refine ⟨fun z ↦ ?_⟩
+  have h := key ⟨z.val, z.property.1⟩
+  change (if α ≤ |z.val.2.re - 1 / 2| then ((ord(z.val.1.val, z.val.2) : ℤ) : ℂ) else 0) = 0 at h
+  rw [ite_eq_left z.property.2] at h
+  exact z.property.1.ne' (by exact_mod_cast h)
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. For every class of tests between "supported in
+`log |g| ≥ y₀`" and all compactly supported Bruhat tests, the cancellation of the exterior zero
+terms at half-width `α` for the whole class is equivalent to the absence of zeros with
+`|Re s − 1/2| ≥ α`. With `P φ := ∀ g : C₁, φ g = 0` and `y₀ = 1` this is
+`hasSum_exteriorZeros_iff_isEmpty`.
+Reconstruction: not a statement of the paper. -/
+theorem hasSum_exteriorZeros_iff_isEmpty_of_testClass (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (α y₀ : ℝ)
+    (P : BruhatCompactSupport C𝔽 → Prop)
+    (hP : ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C𝔽, φ.val g ≠ 0 → y₀ ≤ logNorm(g)) → P φ) :
+    (∀ φ : BruhatCompactSupport C𝔽, P φ →
+      HasSum (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z)) 0) ↔
+      IsEmpty exteriorZeros(τ, α) :=
+  ⟨isEmpty_exteriorZeros_of_hasSum_of_testClass τ hτ α y₀ P hP, fun h _ _ ↦ by
+    have := h
+    exact hasSum_empty⟩
+
+open Classical in
+/-- Paper: Theorem 12.5.1.1, pp. 519–520, read one character at a time (§1.4.1, p. 28: "for
+`χ ∈ Ĉ_F` fixed"). Fix a character `χ₀` trivial on the norm section. If the exterior zero terms
+sum to zero for every test `φ(x) = χ̄₀(x) · g(log |x|)` with `g` smooth, compactly supported and
+zero below `y₀`, at one half-width `α`, then the completed L-function of `χ₀` has no zero with
+`|Re s − 1/2| ≥ α`. For such a test the terms of all other characters vanish, so this is
+Theorem 12.5.1.1 for the isotype of `χ₀` alone.
+Reconstruction: not a statement of the paper. -/
+theorem exteriorZeros_ne_of_hasSum_characterTests (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (α y₀ : ℝ)
+    (χ₀ : {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1})
+    (hT : ∀ (φ : BruhatCompactSupport C𝔽) (g : ℝ → ℂ), ContDiff ℝ (∞) g → HasCompactSupport g →
+      (∀ x : ℝ, x < y₀ → g x = 0) →
+      (∀ x : C𝔽, φ.val x = ((χ₀.val⁻¹ x : Circle) : ℂ) * g (logNorm(x))) →
+      HasSum (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z)) 0) :
+    ∀ z : exteriorZeros(τ, α), z.val.1 ≠ χ₀ := by
+  intro z hz
+  let E : Set X(τ) := {p | 0 < ord(p.1.val, p.2) ∧ α ≤ |p.2.re - 1 / 2|}
+  have hE : E ⊆ {p : X(τ) | 0 < ord(p.1.val, p.2)} := fun p hp ↦ hp.1
+  have h := coefficient_eq_zero_of_hasSum_characterTests τ hτ y₀ E
+    (fun χ w ↦ ((zeros_discrete_and_re_le_one τ).1 χ w).mono fun u hu p hp ↦ hu p (hE hp))
+    (fun p hp ↦ (zeros_discrete_and_re_le_one τ).2 p (hE hp))
+    (fun p ↦ ((ord(p.1.val, p.2) : ℤ) : ℂ)) z.val z.property
+    (fun φ g hg hgc hgz hφ ↦ hT φ g hg hgc hgz (by rw [← hz]; exact hφ))
+  exact z.property.1.ne' (by exact_mod_cast h)
+
+open Classical in
+/-- Paper: Theorem 12.5.1.1, pp. 519–520, read one character at a time (§1.4.1, p. 28). For a
+character `χ₀` trivial on the norm section, the exterior zero terms sum to zero on every test
+`φ(x) = χ̄₀(x) · g(log |x|)` with `g` smooth, compactly supported and zero below `y₀`, if and
+only if the completed L-function of `χ₀` has no zero with `|Re s − 1/2| ≥ α`. The converse
+holds because on such a test the terms of every other character vanish.
+Reconstruction: not a statement of the paper. -/
+theorem hasSum_exteriorZeros_characterTests_iff (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (α y₀ : ℝ)
+    (χ₀ : {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1}) :
+    (∀ (φ : BruhatCompactSupport C𝔽) (g : ℝ → ℂ), ContDiff ℝ (∞) g → HasCompactSupport g →
+      (∀ x : ℝ, x < y₀ → g x = 0) →
+      (∀ x : C𝔽, φ.val x = ((χ₀.val⁻¹ x : Circle) : ℂ) * g (logNorm(x))) →
+      HasSum (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z)) 0) ↔
+      ∀ z : exteriorZeros(τ, α), z.val.1 ≠ χ₀ := by
+  refine ⟨exteriorZeros_ne_of_hasSum_characterTests τ hτ α y₀ χ₀, fun h φ g hg hgc _ hφ ↦ ?_⟩
+  have hzero : (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z)) = fun _ ↦ 0 := by
+    funext z
+    rw [characterNormTest_mellin g hg hgc χ₀.val⁻¹ φ hφ z.val.1.val (z.val.2 - 1 / 2),
+      ite_eq_right (fun h1 ↦ h z (Subtype.ext
+        (grh_character_eq τ hτ z.val.1.property χ₀.property h1))),
+      zero_mul, mul_zero]
+  rw [hzero]
+  exact hasSum_zero
+
+/-- Paper: Theorem 12.5.1.1 and the preamble of §12.5, p. 519, with Theorem 11.3.2.1, p. 495.
+Three classes of tests printed in the paper all contain the tests supported in `log |g| ≥ 1`:
+tests vanishing at `1`, tests vanishing on the norm-one classes, and tests supported above norm
+one. -/
+theorem testClasses_contain_supportedTests (φ : BruhatCompactSupport C𝔽)
+    (hφ : ∀ g : C𝔽, φ.val g ≠ 0 → (1 : ℝ) ≤ logNorm(g)) :
+    φ.val 1 = 0 ∧ (∀ g : C₁, φ.val g = 0) ∧
+      ∀ g : C𝔽, φ.val g ≠ 0 → 1 < ((ideleClassNorm F g : ℝ≥0) : ℝ) := by
+  have hC (g : C𝔽) (hg : ideleClassNorm F g = 1) : φ.val g = 0 := by
+    by_contra hne
+    have h := hφ g hne
+    rw [hg, Units.val_one, NNReal.coe_one, Real.log_one] at h
+    linarith
+  refine ⟨hC 1 (map_one _), fun g ↦ hC g.val (MonoidHom.mem_ker.mp g.property), fun g hne ↦ ?_⟩
+  have h := hφ g hne
+  have hpos : (0 : ℝ) < ((ideleClassNorm F g : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  by_contra hle
+  rw [not_lt] at hle
+  have := Real.log_nonpos hpos.le hle
+  linarith
+
+end ZeroTermUniqueness
+
+/-- Paper: §1.4.8, p. 31 ("for Sobolev degree `s = 0`"). For `0 ≤ s ≤ 1` a zero on an edge of
+the strip has multiplicity zero in the trace: no jet survives at the boundary. -/
+theorem spectralStripMultiplicity_of_le_one {α s b : ℝ} (hs : s ≤ 1) (N : ℕ) :
+    spectralStripMultiplicity α s b N = if -α < b ∧ b < α then N else 0 := by
+  unfold spectralStripMultiplicity spectralBoundaryMultiplicity
+  have hceil : Nat.ceil ((s - 1) / 2) = 0 := Nat.ceil_eq_zero.mpr (by linarith)
+  by_cases h1 : -α < b ∧ b < α
+  · rw [ite_eq_left h1, ite_eq_left h1]
+  · rw [ite_eq_right h1, ite_eq_right h1]
+    by_cases h2 : b = -α ∨ b = α
+    · rw [ite_eq_left h2, hceil, Nat.min_zero]
+    · rw [ite_eq_right h2]
+
+/-- The closed-strip sum of the strip trace formula, for the lifts of a norm section, is the sum
+over all zeros with the multiplicities `spectralStripMultiplicity`, indexed as in
+`exteriorZeros`. Zeros strictly outside the closed strip have multiplicity zero. -/
+private theorem hasSum_zeros_stripMultiplicity (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    (hχτ : ∀ κ t, χ κ (τ t) = 1)
+    (hlift : ∀ ψ : PontryaginDual C𝔽, (∀ t, ψ (τ t) = 1) → χ (ψ.comp restriction) = ψ)
+    {β : ℝ} (hβ : 0 ≤ β) (s : ℝ) (φ : BruhatCompactSupport C𝔽) {T : ℂ}
+    (h : HasSum (fun z : {z : PontryaginDual C₁ × ℝ × ℝ // z.2.1 ∈ Icc (-β) β ∧
+        0 < order(χ z.1, ((1 / 2 + z.2.1 : ℝ) : ℂ) + (z.2.2 : ℂ) * Complex.I)} ↦
+      ((spectralStripMultiplicity β s z.val.2.1
+        (order(χ z.val.1, ((1 / 2 + z.val.2.1 : ℝ) : ℂ) + (z.val.2.2 : ℂ) * Complex.I)).untop₀.toNat
+          : ℕ) : ℂ) *
+        M(φ, twist(χ z.val.1, (z.val.2.1 : ℂ) + (z.val.2.2 : ℂ) * Complex.I))) T) :
+    HasSum (fun z : zeros(τ) ↦
+      ((stripMult(β, s, z.val) : ℕ) : ℂ) * M(φ, twist(z.val.1.val, z.val.2 - 1 / 2))) T := by
+  let Z := {z : PontryaginDual C₁ × ℝ × ℝ // z.2.1 ∈ Icc (-β) β ∧
+    0 < order(χ z.1, ((1 / 2 + z.2.1 : ℝ) : ℂ) + (z.2.2 : ℂ) * Complex.I)}
+  have hre (σ t : ℝ) : ((((1 / 2 + σ : ℝ) : ℂ) + (t : ℂ) * Complex.I).re - 1 / 2) = σ := by
+    simp
+  let e : Z → zeros(τ) := fun z ↦
+    ⟨(⟨χ z.val.1, hχτ z.val.1⟩, ((1 / 2 + z.val.2.1 : ℝ) : ℂ) + (z.val.2.2 : ℂ) * Complex.I),
+      (exteriorZeros_ord_pos_iff _ _).mpr z.property.2⟩
+  have he : Injective e := by
+    intro z z' hzz
+    have h1 := congrArg (fun y : zeros(τ) ↦ y.val.1.val) hzz
+    have h2 : ((1 / 2 + z.val.2.1 : ℝ) : ℂ) + (z.val.2.2 : ℂ) * Complex.I =
+        ((1 / 2 + z'.val.2.1 : ℝ) : ℂ) + (z'.val.2.2 : ℂ) * Complex.I :=
+      congrArg (fun y : zeros(τ) ↦ y.val.2) hzz
+    have hω : z.val.1 = z'.val.1 := by
+      rw [← hχ z.val.1, ← hχ z'.val.1]
+      exact congrArg (fun ψ : PontryaginDual C𝔽 ↦ ψ.comp restriction) h1
+    have hr : z.val.2.1 = z'.val.2.1 := by simpa using congrArg Complex.re h2
+    have hi : z.val.2.2 = z'.val.2.2 := by simpa using congrArg Complex.im h2
+    exact Subtype.ext (Prod.ext hω (Prod.ext hr hi))
+  -- a zero outside the range of `e` lies strictly outside the closed strip
+  have hout (p : zeros(τ)) (hp : p ∉ Set.range e) :
+      ((stripMult(β, s, p.val) : ℕ) : ℂ) * M(φ, twist(p.val.1.val, p.val.2 - 1 / 2)) = 0 := by
+    have hnot : ¬ (p.val.2.re - 1 / 2 ∈ Icc (-β) β) := by
+      intro hmem
+      apply hp
+      obtain ⟨⟨ψ, ρ⟩, hpos⟩ := p
+      have hψ := hlift ψ.val ψ.property
+      have hρ : (((1 / 2 + (ρ.re - 1 / 2) : ℝ) : ℂ) + (ρ.im : ℂ) * Complex.I) = ρ := by
+        apply Complex.ext <;> simp
+      refine ⟨⟨(ψ.val.comp restriction, ρ.re - 1 / 2, ρ.im), ⟨hmem, ?_⟩⟩, ?_⟩
+      · change 0 < order(χ (ψ.val.comp restriction), _)
+        rw [hψ, hρ]
+        exact (exteriorZeros_ord_pos_iff _ _).mp hpos
+      · apply Subtype.ext
+        change ((⟨χ (ψ.val.comp restriction), _⟩ :
+          {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1}), _) = (ψ, ρ)
+        exact Prod.ext (Subtype.ext hψ) hρ
+    have hzero : stripMult(β, s, p.val) = 0 := by
+      unfold spectralStripMultiplicity
+      rw [mem_Icc, not_and_or, not_le, not_le] at hnot
+      rw [ite_eq_right (fun h ↦ by rcases hnot with h' | h' <;> linarith [h.1, h.2]),
+        ite_eq_right (fun h ↦ by
+          rcases h with h | h <;> rcases hnot with h' | h' <;> linarith [hβ])]
+    rw [hzero, Nat.cast_zero, zero_mul]
+  have hterm (z : Z) :
+      ((stripMult(β, s, (e z).val) : ℕ) : ℂ) *
+          M(φ, twist((e z).val.1.val, (e z).val.2 - 1 / 2)) =
+      ((spectralStripMultiplicity β s z.val.2.1
+        (order(χ z.val.1, ((1 / 2 + z.val.2.1 : ℝ) : ℂ) + (z.val.2.2 : ℂ) * Complex.I)).untop₀.toNat
+          : ℕ) : ℂ) *
+        M(φ, twist(χ z.val.1, (z.val.2.1 : ℂ) + (z.val.2.2 : ℂ) * Complex.I)) := by
+    have hpt : ((1 / 2 + z.val.2.1 : ℝ) : ℂ) + (z.val.2.2 : ℂ) * Complex.I - 1 / 2 =
+        (z.val.2.1 : ℂ) + (z.val.2.2 : ℂ) * Complex.I := by
+      push_cast; ring
+    change ((spectralStripMultiplicity β s
+        ((((1 / 2 + z.val.2.1 : ℝ) : ℂ) + (z.val.2.2 : ℂ) * Complex.I).re - 1 / 2)
+        (ord(χ z.val.1, ((1 / 2 + z.val.2.1 : ℝ) : ℂ) + (z.val.2.2 : ℂ) * Complex.I)).toNat :
+          ℕ) : ℂ) *
+        M(φ, twist(χ z.val.1,
+          ((1 / 2 + z.val.2.1 : ℝ) : ℂ) + (z.val.2.2 : ℂ) * Complex.I - 1 / 2)) = _
+    rw [hre, exteriorZeros_ord_eq, hpt]
+  have hcomp : ((fun p : zeros(τ) ↦
+      ((stripMult(β, s, p.val) : ℕ) : ℂ) * M(φ, twist(p.val.1.val, p.val.2 - 1 / 2))) ∘ e) =
+      fun z : Z ↦ ((spectralStripMultiplicity β s z.val.2.1
+        (order(χ z.val.1,
+          ((1 / 2 + z.val.2.1 : ℝ) : ℂ) + (z.val.2.2 : ℂ) * Complex.I)).untop₀.toNat : ℕ) : ℂ) *
+        M(φ, twist(χ z.val.1, (z.val.2.1 : ℂ) + (z.val.2.2 : ℂ) * Complex.I)) :=
+    funext hterm
+  have h' : HasSum ((fun p : zeros(τ) ↦
+      ((stripMult(β, s, p.val) : ℕ) : ℂ) * M(φ, twist(p.val.1.val, p.val.2 - 1 / 2))) ∘ e) T := by
+    rw [hcomp]
+    exact h
+  exact (he.hasSum_iff hout).mp h'
+
+/-- A positive divisor value is the cast of its natural part. -/
+private theorem ord_cast_toNat {n : ℤ} (hn : 0 < n) : ((n : ℤ) : ℂ) = ((n.toNat : ℕ) : ℂ) := by
+  rw [show ((n.toNat : ℕ) : ℂ) = ((n.toNat : ℤ) : ℂ) from rfl, Int.toNat_of_nonneg hn.le]
+
+/-- Paper: (10.2.2.5)–(10.2.2.6), p. 446. The strip multiplicity counts a zero of order `N > 0`
+with its full order exactly when the zero lies in the open strip, or on an edge with
+`N ≤ ⌈(s − 1)/2⌉`. -/
+theorem spectralStripMultiplicity_eq_self_iff {β s b : ℝ} {N : ℕ} (hβ : 0 ≤ β) (hN : 0 < N) :
+    spectralStripMultiplicity β s b N = N ↔
+      |b| < β ∨ (|b| = β ∧ N ≤ Nat.ceil ((s - 1) / 2)) := by
+  unfold spectralStripMultiplicity spectralBoundaryMultiplicity
+  by_cases h1 : -β < b ∧ b < β
+  · rw [ite_eq_left h1]
+    exact ⟨fun _ ↦ Or.inl (abs_lt.mpr h1), fun _ ↦ rfl⟩
+  · rw [ite_eq_right h1]
+    have hnlt : ¬ |b| < β := fun h ↦ h1 (abs_lt.mp h)
+    by_cases h2 : b = -β ∨ b = β
+    · rw [ite_eq_left h2]
+      have habs : |b| = β := by
+        rcases h2 with rfl | rfl
+        · rw [abs_neg, abs_of_nonneg hβ]
+        · exact abs_of_nonneg hβ
+      exact ⟨fun h ↦ Or.inr ⟨habs, min_eq_left_iff.mp h⟩,
+        fun h ↦ min_eq_left (h.resolve_left hnlt).2⟩
+    · rw [ite_eq_right h2]
+      refine ⟨fun h ↦ absurd h.symm hN.ne', fun h ↦ ?_⟩
+      rcases h with h | ⟨h, -⟩
+      · exact absurd h hnlt
+      · exact absurd ((abs_eq hβ).mp h).symm h2
+
+/-- Paper: Proposition 3.2.1.3(3)–(4), p. 123. Every zero of a completed Hecke L-function lies in
+the open critical strip. -/
+private theorem abs_re_sub_half_lt_of_zero (τ : ℝ≥0ˣ →ₜ* C𝔽) (p : X(τ))
+    (hp : 0 < ord(p.1.val, p.2)) : |p.2.re - 1 / 2| < 1 / 2 :=
+  lt_of_not_ge fun h' ↦
+    (exteriorZeros_isEmpty_of_half_le τ (le_refl (1 / 2 : ℝ))).false ⟨p, hp, h'⟩
+
+/-- Paper: Theorem B.4.4.7, p. 623, in the normalization of `traceFormula`. For the lifts of a
+norm section, the zero terms of a test, summed over all zeros, give the two polar terms minus
+the local terms. This is `traceFormula_of_half_le` at half-width one half, reindexed. -/
+theorem hasSum_zeros_localTerms (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (φ : BruhatCompactSupport C𝔽) :
+    ∃ (a : archTest) (b : finiteTest), archRestricts(φ, a) ∧ finiteRestricts(φ, b) ∧
+      HasSum (fun z : zeros(τ) ↦ zeroTerm(φ, z)) localTerms(φ, a, b) := by
+  obtain ⟨a, b, ha, hb, -, hsum⟩ := traceFormula_of_half_le τ hτ φ (le_refl (1 / 2 : ℝ))
+  exact ⟨a, b, ha, hb, exteriorZeros_hasSum_of_iff
+    (fun p : X(τ) ↦ ((ord(p.1.val, p.2) : ℤ) : ℂ) * M(φ, twist(p.1.val, p.2 - 1 / 2)))
+    {p | 0 < ord(p.1.val, p.2) ∧ |p.2.re - 1 / 2| < 1 / 2} {p | 0 < ord(p.1.val, p.2)}
+    (fun p ↦ ⟨fun h ↦ h.1, fun h ↦ ⟨h, abs_re_sub_half_lt_of_zero τ p h⟩⟩) hsum⟩
+
+open Classical in
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. Let a reading of the theorem count the zero `ρ` of the
+character `χ` with a complex multiplicity `m(χ, ρ)`: the open or the closed strip, centred at
+`1/2` or not, with full or with capped orders. Let `P` be a class of tests that contains the
+tests supported in `log |g| ≥ y₀`. With the local side of `traceFormula`, the identity
+`∑ m(χ, ρ) M(φ)(χ, ρ − 1/2) = polar terms − local terms` holds for every test of the class
+exactly when every zero is counted with its full order.
+Reconstruction: not a statement of the paper. It is the explicit formula
+(`traceFormula_of_half_le`) and the uniqueness of the zero terms. -/
+theorem traceIdentity_multiplicity_iff (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (m : X(τ) → ℂ) (y₀ : ℝ)
+    (P : BruhatCompactSupport C𝔽 → Prop)
+    (hP : ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C𝔽, φ.val g ≠ 0 → y₀ ≤ logNorm(g)) → P φ) :
+    (∀ φ : BruhatCompactSupport C𝔽, P φ →
+      ∃ (a : archTest) (b : finiteTest), archRestricts(φ, a) ∧ finiteRestricts(φ, b) ∧
+        HasSum (fun z : zeros(τ) ↦ m z.val * M(φ, twist(z.val.1.val, z.val.2 - 1 / 2)))
+          localTerms(φ, a, b)) ↔
+      ∀ z : zeros(τ), m z.val = ((ord(z.val.1.val, z.val.2) : ℤ) : ℂ) := by
+  constructor
+  · intro h
+    let c : X(τ) → ℂ := fun p ↦ ((ord(p.1.val, p.2) : ℤ) : ℂ) - m p
+    have key := zeroCoefficients_eq_zero_of_hasSum_supportedTests τ hτ y₀ c (fun φ hφ ↦ by
+      obtain ⟨a, b, ha, hb, hm⟩ := h φ (hP φ hφ)
+      obtain ⟨a', b', ha', hb', hall⟩ := hasSum_zeros_localTerms τ hτ φ
+      rw [exteriorZeros_localTerms_congr φ ha' hb' ha hb] at hall
+      have hfun : (fun z : zeros(τ) ↦ c z.val * M(φ, twist(z.val.1.val, z.val.2 - 1 / 2))) =
+          fun z : zeros(τ) ↦ zeroTerm(φ, z) -
+            m z.val * M(φ, twist(z.val.1.val, z.val.2 - 1 / 2)) :=
+        funext fun z ↦ sub_mul _ _ _
+      rw [hfun, ← sub_self localTerms(φ, a, b)]
+      exact hall.sub hm)
+    intro z
+    have hz := key z
+    change ((ord(z.val.1.val, z.val.2) : ℤ) : ℂ) - m z.val = 0 at hz
+    exact (sub_eq_zero.mp hz).symm
+  · intro h φ _
+    obtain ⟨a, b, ha, hb, hall⟩ := hasSum_zeros_localTerms τ hτ φ
+    refine ⟨a, b, ha, hb, ?_⟩
+    have hfun : (fun z : zeros(τ) ↦ m z.val * M(φ, twist(z.val.1.val, z.val.2 - 1 / 2))) =
+        fun z : zeros(τ) ↦ zeroTerm(φ, z) :=
+      funext fun z ↦ by rw [h z]
+    rw [hfun]
+    exact hall
+
+open Classical in
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. Let a reading of the theorem sum over the zeros in an
+arbitrary set `W` of quasi-characters, with full orders: the open centred strip of p. 519, the
+closed strip of pp. 29 and 31, the uncentred window of p. 28, or the empty interior at `α = 0`.
+With the local side of `traceFormula`, the identity holds for every test of a class containing
+the tests supported in `log |g| ≥ y₀` exactly when every zero lies in `W`.
+Reconstruction: not a statement of the paper. -/
+theorem traceIdentity_window_iff (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (W : Set X(τ)) (y₀ : ℝ)
+    (P : BruhatCompactSupport C𝔽 → Prop)
+    (hP : ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C𝔽, φ.val g ≠ 0 → y₀ ≤ logNorm(g)) → P φ) :
+    (∀ φ : BruhatCompactSupport C𝔽, P φ →
+      ∃ (a : archTest) (b : finiteTest), archRestricts(φ, a) ∧ finiteRestricts(φ, b) ∧
+        HasSum (fun z : {p : X(τ) // 0 < ord(p.1.val, p.2) ∧ p ∈ W} ↦ zeroTerm(φ, z))
+          localTerms(φ, a, b)) ↔
+      ∀ z : zeros(τ), z.val ∈ W := by
+  let m : X(τ) → ℂ := fun p ↦ if p ∈ W then ((ord(p.1.val, p.2) : ℤ) : ℂ) else 0
+  have hsum (φ : BruhatCompactSupport C𝔽) (T : ℂ) :
+      HasSum (fun z : {p : X(τ) // 0 < ord(p.1.val, p.2) ∧ p ∈ W} ↦ zeroTerm(φ, z)) T ↔
+        HasSum (fun z : zeros(τ) ↦ m z.val * M(φ, twist(z.val.1.val, z.val.2 - 1 / 2))) T := by
+    let g : X(τ) → ℂ := fun p ↦
+      ((ord(p.1.val, p.2) : ℤ) : ℂ) * M(φ, twist(p.1.val, p.2 - 1 / 2))
+    let gm : X(τ) → ℂ := fun p ↦ m p * M(φ, twist(p.1.val, p.2 - 1 / 2))
+    let A : Set X(τ) := {p | 0 < ord(p.1.val, p.2)}
+    let S : Set X(τ) := {p | 0 < ord(p.1.val, p.2) ∧ p ∈ W}
+    have heq : S.indicator g = A.indicator gm := by
+      funext p
+      by_cases hp : 0 < ord(p.1.val, p.2)
+      · by_cases hW : p ∈ W
+        · rw [Set.indicator_of_mem (show p ∈ S from ⟨hp, hW⟩),
+            Set.indicator_of_mem (show p ∈ A from hp)]
+          simp only [g, gm, m, ite_eq_left hW]
+        · rw [Set.indicator_of_notMem (show p ∉ S from fun h' ↦ hW h'.2),
+            Set.indicator_of_mem (show p ∈ A from hp)]
+          simp only [gm, m, ite_eq_right hW, zero_mul]
+      · rw [Set.indicator_of_notMem (show p ∉ S from fun h' ↦ hp h'.1),
+          Set.indicator_of_notMem (show p ∉ A from hp)]
+    have h1 : HasSum (g ∘ (Subtype.val : S → X(τ))) T ↔ HasSum (S.indicator g) T :=
+      hasSum_subtype_iff_indicator
+    have h2 : HasSum (gm ∘ (Subtype.val : A → X(τ))) T ↔ HasSum (A.indicator gm) T :=
+      hasSum_subtype_iff_indicator
+    rw [heq] at h1
+    exact h1.trans h2.symm
+  have hmult := traceIdentity_multiplicity_iff τ hτ m y₀ P hP
+  constructor
+  · intro h z
+    have hz := hmult.mp (fun φ hφ ↦ by
+      obtain ⟨a, b, ha, hb, hs⟩ := h φ hφ
+      exact ⟨a, b, ha, hb, (hsum φ _).mp hs⟩) z
+    by_contra hW
+    change (if z.val ∈ W then ((ord(z.val.1.val, z.val.2) : ℤ) : ℂ) else 0) = _ at hz
+    rw [ite_eq_right hW] at hz
+    exact z.property.ne' (by exact_mod_cast hz.symm)
+  · intro h φ hφ
+    obtain ⟨a, b, ha, hb, hs⟩ := hmult.mpr (fun z ↦ by
+      change (if z.val ∈ W then ((ord(z.val.1.val, z.val.2) : ℤ) : ℂ) else 0) = _
+      rw [ite_eq_left (h z)]) φ hφ
+    exact ⟨a, b, ha, hb, (hsum φ _).mpr hs⟩
+
+/-- Paper: Theorem 10.3.2.1(2), (10.3.2.3)–(10.3.2.4), p. 454. For the lifts of a norm section,
+the trace of a nuclear representative of the strip action is the sum over all zeros with the
+multiplicities `spectralStripMultiplicity`.
+Deviation: any Sobolev order `s ≥ 0`, by `spectralStripConvolution_trace_of_nonneg`. -/
+theorem hasSum_zeros_stripTrace (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    {β s : ℝ} (hβ : 0 ≤ β) (hs : 0 ≤ s) (φ : BruhatCompactSupport C𝔽)
+    (T : nuclearEndomorphisms stripQuot₀(hβ, hs)) (hT : T.val = stripConv₀(hβ, hs, φ)) :
+    HasSum (fun z : zeros(τ) ↦
+      ((stripMult(β, s, z.val) : ℕ) : ℂ) * M(φ, twist(z.val.1.val, z.val.2 - 1 / 2)))
+      (hilbertTrace T) := by
+  obtain ⟨χ, hχ, hχτ, hlift⟩ := exteriorZeros_basepoint τ hτ
+  exact hasSum_zeros_stripMultiplicity τ χ hχ hχτ hlift hβ s φ
+    (spectralStripConvolution_trace_of_nonneg (F := F) (1 / 2) χ hχ hβ hs φ T hT).2
+
+open Classical in
+/-- Paper: Theorem 12.5.1.1, p. 520, with (12.5.1.4), Theorem 10.3.2.1(2), p. 454, §1.4.8, p. 31,
+and Theorem B.4.4.7, p. 623. Fix a norm section `τ`, a half-width `β > 0` and a Sobolev order
+`s ≥ 0`, and assume that the strip action of every test vanishing on the norm-one classes is
+nuclear. Then the trace identity on the strip quotient (the trace equals the local terms) holds
+for every such test exactly when `spectralStripMultiplicity β s` counts every zero with its
+full order.
+Reconstruction: not a statement of the paper. It extends `spectralStripTrace_eq_localTerms_iff`
+to half-widths whose edges carry zeros (ERRATA I368) and to the orders `0 ≤ s ≤ 1` (I353). -/
+theorem spectralStripTrace_eq_localTerms_iff_stripMultiplicity (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) {β s : ℝ} (hβ : 0 < β) (hs : 0 ≤ s)
+    (hN : ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C₁, φ.val g = 0) →
+      IsNuclearOperator stripConv₀(hβ.le, hs, φ)) :
+    (∀ φ : BruhatCompactSupport C𝔽, (∀ g : C₁, φ.val g = 0) →
+      ∀ (a : archTest) (b : finiteTest), archRestricts(φ, a) → finiteRestricts(φ, b) →
+        ∀ T : nuclearEndomorphisms stripQuot₀(hβ.le, hs), T.val = stripConv₀(hβ.le, hs, φ) →
+          hilbertTrace T = localTerms(φ, a, b)) ↔
+      ∀ z : zeros(τ), stripMult(β, s, z.val) = (ord(z.val.1.val, z.val.2)).toNat := by
+  constructor
+  · intro h
+    let c : X(τ) → ℂ := fun p ↦
+      ((ord(p.1.val, p.2) : ℤ) : ℂ) - ((stripMult(β, s, p) : ℕ) : ℂ)
+    have key := zeroCoefficients_eq_zero_of_hasSum_supportedTests τ hτ 1 c (fun φ hφ ↦ by
+      have hφ' : ∀ g : C₁, φ.val g = 0 := (testClasses_contain_supportedTests φ hφ).2.1
+      obtain ⟨a, b, ha, hb, hsum⟩ := hasSum_zeros_localTerms τ hτ φ
+      have ht := hasSum_zeros_stripTrace τ hτ hβ.le hs φ ⟨_, hN φ hφ'⟩ rfl
+      have htr := h φ hφ' a b ha hb ⟨_, hN φ hφ'⟩ rfl
+      rw [htr] at ht
+      have hd := hsum.sub ht
+      have hfun : (fun z : zeros(τ) ↦ c z.val * M(φ, twist(z.val.1.val, z.val.2 - 1 / 2))) =
+          fun z : zeros(τ) ↦ zeroTerm(φ, z) -
+            ((stripMult(β, s, z.val) : ℕ) : ℂ) * M(φ, twist(z.val.1.val, z.val.2 - 1 / 2)) :=
+        funext fun z ↦ sub_mul _ _ _
+      rw [hfun, ← sub_self localTerms(φ, a, b)]
+      exact hd)
+    intro z
+    have hz := key z
+    change ((ord(z.val.1.val, z.val.2) : ℤ) : ℂ) - ((stripMult(β, s, z.val) : ℕ) : ℂ) = 0 at hz
+    rw [ord_cast_toNat z.property, sub_eq_zero] at hz
+    exact (Nat.cast_injective hz).symm
+  · intro h φ _ a b ha hb T hT
+    obtain ⟨a', b', ha', hb', hsum⟩ := hasSum_zeros_localTerms τ hτ φ
+    have ht := hasSum_zeros_stripTrace τ hτ hβ.le hs φ T hT
+    have hfun : (fun z : zeros(τ) ↦
+        ((stripMult(β, s, z.val) : ℕ) : ℂ) * M(φ, twist(z.val.1.val, z.val.2 - 1 / 2))) =
+        fun z : zeros(τ) ↦ zeroTerm(φ, z) :=
+      funext fun z ↦ by rw [h z, ← ord_cast_toNat z.property]
+    rw [hfun] at ht
+    exact (ht.unique hsum).trans (exteriorZeros_localTerms_congr φ ha' hb' ha hb)
+
+open Classical in
+/-- Paper: Theorem 12.5.1.1, p. 520, with (10.2.2.5)–(10.2.2.6), p. 446. In the setting of
+`spectralStripTrace_eq_localTerms_iff_stripMultiplicity`, the trace identity at half-width `β`
+and order `s` holds for all tests exactly when every zero lies in the open strip, or on an edge
+with order at most `⌈(s − 1)/2⌉`.
+Reconstruction: not a statement of the paper. -/
+theorem spectralStripTrace_eq_localTerms_iff_edges (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) {β s : ℝ} (hβ : 0 < β) (hs : 0 ≤ s)
+    (hN : ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C₁, φ.val g = 0) →
+      IsNuclearOperator stripConv₀(hβ.le, hs, φ)) :
+    (∀ φ : BruhatCompactSupport C𝔽, (∀ g : C₁, φ.val g = 0) →
+      ∀ (a : archTest) (b : finiteTest), archRestricts(φ, a) → finiteRestricts(φ, b) →
+        ∀ T : nuclearEndomorphisms stripQuot₀(hβ.le, hs), T.val = stripConv₀(hβ.le, hs, φ) →
+          hilbertTrace T = localTerms(φ, a, b)) ↔
+      ∀ z : zeros(τ), |z.val.2.re - 1 / 2| < β ∨
+        (|z.val.2.re - 1 / 2| = β ∧
+          (ord(z.val.1.val, z.val.2)).toNat ≤ Nat.ceil ((s - 1) / 2)) := by
+  rw [spectralStripTrace_eq_localTerms_iff_stripMultiplicity τ hτ hβ hs hN]
+  refine forall_congr' fun z ↦ ?_
+  exact spectralStripMultiplicity_eq_self_iff hβ.le (Int.pos_iff_toNat_pos.mp z.property)
+
+open Classical in
+/-- Paper: Theorem 12.5.1.1, pp. 519–520, with §1.4, p. 27 ("we choose the Sobolev degree
+`s = 0`") and §1.4.8, p. 31. At a Sobolev order `0 ≤ s ≤ 1`, at every positive half-width and
+with no hypothesis on the edges, the trace identity on the strip quotient for all tests (with
+nuclear strip action) is equivalent to the absence of zeros with `|Re s − 1/2| ≥ β`, that is, to
+the conclusion of the recorded gap `traceFormula_exteriorZeros` at that width.
+Reconstruction: not a statement of the paper. -/
+theorem spectralStripTrace_eq_localTerms_iff_of_le_one (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) {β s : ℝ} (hβ : 0 < β) (hs : 0 ≤ s) (hs₁ : s ≤ 1)
+    (hN : ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C₁, φ.val g = 0) →
+      IsNuclearOperator stripConv₀(hβ.le, hs, φ)) :
+    (∀ φ : BruhatCompactSupport C𝔽, (∀ g : C₁, φ.val g = 0) →
+      ∀ (a : archTest) (b : finiteTest), archRestricts(φ, a) → finiteRestricts(φ, b) →
+        ∀ T : nuclearEndomorphisms stripQuot₀(hβ.le, hs), T.val = stripConv₀(hβ.le, hs, φ) →
+          hilbertTrace T = localTerms(φ, a, b)) ↔
+      IsEmpty exteriorZeros(τ, β) := by
+  rw [spectralStripTrace_eq_localTerms_iff_edges τ hτ hβ hs hN]
+  have hceil : Nat.ceil ((s - 1) / 2) = 0 := Nat.ceil_eq_zero.mpr (by linarith)
+  constructor
+  · intro h
+    refine ⟨fun z ↦ ?_⟩
+    rcases h ⟨z.val, z.property.1⟩ with h1 | ⟨-, h2⟩
+    · exact (not_lt.mpr z.property.2) h1
+    · rw [hceil, Nat.le_zero] at h2
+      exact (Int.pos_iff_toNat_pos.mp z.property.1).ne' h2
+  · intro hE z
+    exact Or.inl (lt_of_not_ge fun h' ↦ hE.false ⟨z.val, z.property, h'⟩)
+
+/-- Paper: §1.4.5, p. 30 ("Since `a > 0` is arbitrary"). Over any set of positive half-widths
+with infimum zero, the condition of `spectralStripTrace_eq_localTerms_iff_edges` (zeros in the
+open strip, or on an edge with small order) holds at every width of the set exactly when every
+zero lies on the critical line. So the interior-sum reading and the closed-strip reading of
+(12.5.1.4) differ at single widths and agree over the widths that p. 30 uses.
+Reconstruction: not a statement of the paper. -/
+theorem forall_width_edges_iff_critical_line (τ : ℝ≥0ˣ →ₜ* C𝔽) (s : ℝ) (W : Set ℝ)
+    (hW : ∀ β ∈ W, 0 < β) (hsmall : ∀ δ > 0, ∃ β ∈ W, β < δ) :
+    (∀ β ∈ W, ∀ z : zeros(τ), |z.val.2.re - 1 / 2| < β ∨
+        (|z.val.2.re - 1 / 2| = β ∧
+          (ord(z.val.1.val, z.val.2)).toNat ≤ Nat.ceil ((s - 1) / 2))) ↔
+      ∀ z : zeros(τ), z.val.2.re = 1 / 2 := by
+  constructor
+  · intro h z
+    by_contra hne
+    have hd : 0 < |z.val.2.re - 1 / 2| := abs_pos.mpr (sub_ne_zero.mpr hne)
+    obtain ⟨β, hβW, hβ⟩ := hsmall _ hd
+    rcases h β hβW z with h1 | ⟨h2, -⟩
+    · exact (lt_asymm hβ) h1
+    · exact hβ.ne' h2
+  · intro h β hβW z
+    refine Or.inl ?_
+    rw [h z, sub_self, abs_zero]
+    exact hW β hβW
+
+open Classical in
+/-- Paper: Theorem 12.5.1.1, p. 520, with §1.4.5, p. 30. Fix a Sobolev order `s ≥ 0` and a set
+of positive half-widths with infimum zero, and assume that at each of these widths the strip
+action of every test vanishing on the norm-one classes is nuclear. Then the trace identity on the
+strip quotient holds for all such tests at every width of the set exactly when every zero lies
+on the critical line. The orders of the zeros on the edges, and the Sobolev order, play no part.
+Reconstruction: not a statement of the paper. -/
+theorem spectralStripTrace_eq_localTerms_forall_width_iff_critical_line (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) {s : ℝ} (hs : 0 ≤ s) (W : Set ℝ)
+    (hW : ∀ β ∈ W, 0 < β) (hsmall : ∀ δ > 0, ∃ β ∈ W, β < δ)
+    (hN : ∀ (β : ℝ) (hβ : β ∈ W) (φ : BruhatCompactSupport C𝔽), (∀ g : C₁, φ.val g = 0) →
+      IsNuclearOperator stripConv₀((hW β hβ).le, hs, φ)) :
+    (∀ (β : ℝ) (hβ : β ∈ W) (φ : BruhatCompactSupport C𝔽), (∀ g : C₁, φ.val g = 0) →
+      ∀ (a : archTest) (b : finiteTest), archRestricts(φ, a) → finiteRestricts(φ, b) →
+        ∀ T : nuclearEndomorphisms stripQuot₀((hW β hβ).le, hs),
+          T.val = stripConv₀((hW β hβ).le, hs, φ) → hilbertTrace T = localTerms(φ, a, b)) ↔
+      ∀ z : zeros(τ), z.val.2.re = 1 / 2 := by
+  rw [← forall_width_edges_iff_critical_line τ s W hW hsmall]
+  exact forall_congr' fun β ↦ forall_congr' fun hβ ↦
+    spectralStripTrace_eq_localTerms_iff_edges τ hτ (hW β hβ) hs (hN β hβ)
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520, with Theorem B.4.4.7, p. 623. Fix a norm section, a
+test and a half-width, and let `G` be any complex number put in the place of the geometric side.
+The identity "sum over the zeros of the open strip = polar terms − `G`" holds exactly when the
+omitted zero terms sum to `G` minus the local side of the explicit formula. Nothing is assumed
+about `G`: it may come from any cutoff family and any order of limits, and it may depend on the
+half-width and on the test.
+Reconstruction: not a statement of the paper. It is the explicit formula
+(`traceFormula_of_half_le`) split along the strip. -/
+theorem hasSum_interiorZeros_iff_exteriorZeros_of_geometricValue (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (φ : BruhatCompactSupport C𝔽) (α : ℝ)
+    {a : archTest} {b : finiteTest} (ha : archRestricts(φ, a)) (hb : finiteRestricts(φ, b))
+    (G : ℂ) :
+    HasSum (fun z : interiorZeros(τ, α) ↦ zeroTerm(φ, z))
+        (M(φ, twist(1, 1 / 2)) + M(φ, twist(1, -1 / 2)) - G) ↔
+      HasSum (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z))
+        (G - classVolume * ((∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) +
+          ∑' v : V, finiteTerm(v, b v))) := by
+  obtain ⟨a', b', ha', hb', hall⟩ := hasSum_zeros_localTerms τ hτ φ
+  rw [exteriorZeros_localTerms_congr φ ha' hb' ha hb] at hall
+  let g : X(τ) → ℂ := fun p ↦
+    ((ord(p.1.val, p.2) : ℤ) : ℂ) * M(φ, twist(p.1.val, p.2 - 1 / 2))
+  let A : Set X(τ) := {p | 0 < ord(p.1.val, p.2)}
+  let I : Set X(τ) := {p | 0 < ord(p.1.val, p.2) ∧ |p.2.re - 1 / 2| < α}
+  let E : Set X(τ) := {p | 0 < ord(p.1.val, p.2) ∧ α ≤ |p.2.re - 1 / 2|}
+  have hA : HasSum (A.indicator g) localTerms(φ, a, b) :=
+    (hasSum_subtype_iff_indicator (f := g) (s := A)).mp hall
+  have heq : E.indicator g = A.indicator g - I.indicator g := by
+    funext p
+    by_cases hp : 0 < ord(p.1.val, p.2)
+    · by_cases hα : |p.2.re - 1 / 2| < α
+      · rw [Pi.sub_apply, Set.indicator_of_notMem (show p ∉ E from fun h' ↦ (not_lt.mpr h'.2) hα),
+          Set.indicator_of_mem (show p ∈ A from hp),
+          Set.indicator_of_mem (show p ∈ I from ⟨hp, hα⟩), sub_self]
+      · rw [Pi.sub_apply, Set.indicator_of_mem (show p ∈ E from ⟨hp, not_lt.mp hα⟩),
+          Set.indicator_of_mem (show p ∈ A from hp),
+          Set.indicator_of_notMem (show p ∉ I from fun h' ↦ hα h'.2), sub_zero]
+    · rw [Pi.sub_apply, Set.indicator_of_notMem (show p ∉ E from fun h' ↦ hp h'.1),
+        Set.indicator_of_notMem (show p ∉ A from hp),
+        Set.indicator_of_notMem (show p ∉ I from fun h' ↦ hp h'.1), sub_zero]
+  have heq' : I.indicator g = A.indicator g - E.indicator g := by
+    rw [heq, sub_sub_cancel]
+  constructor
+  · intro hint
+    have hI : HasSum (I.indicator g) (M(φ, twist(1, 1 / 2)) + M(φ, twist(1, -1 / 2)) - G) :=
+      (hasSum_subtype_iff_indicator (f := g) (s := I)).mp hint
+    have hd : HasSum (A.indicator g - I.indicator g)
+        (localTerms(φ, a, b) - (M(φ, twist(1, 1 / 2)) + M(φ, twist(1, -1 / 2)) - G)) :=
+      hA.sub hI
+    have hval : localTerms(φ, a, b) - (M(φ, twist(1, 1 / 2)) + M(φ, twist(1, -1 / 2)) - G) =
+        G - weilLocalSide(a, b) := by ring
+    rw [← heq, hval] at hd
+    exact (hasSum_subtype_iff_indicator (f := g) (s := E)).mpr hd
+  · intro hext
+    have hE : HasSum (E.indicator g) (G - weilLocalSide(a, b)) :=
+      (hasSum_subtype_iff_indicator (f := g) (s := E)).mp hext
+    have hd : HasSum (A.indicator g - E.indicator g)
+        (localTerms(φ, a, b) - (G - weilLocalSide(a, b))) :=
+      hA.sub hE
+    have hval : localTerms(φ, a, b) - (G - weilLocalSide(a, b)) =
+        M(φ, twist(1, 1 / 2)) + M(φ, twist(1, -1 / 2)) - G := by ring
+    rw [← heq', hval] at hd
+    exact (hasSum_subtype_iff_indicator (f := g) (s := I)).mpr hd
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. At a half-width at least one half, the identity
+"sum over the zeros of the open strip = polar terms − `G`" forces `G` to be the local side of
+the explicit formula.
+Reconstruction: not a statement of the paper. -/
+theorem geometricValue_eq_localSide_of_half_le (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (φ : BruhatCompactSupport C𝔽) {α : ℝ}
+    (hα : 1 / 2 ≤ α) {a : archTest} {b : finiteTest} (ha : archRestricts(φ, a))
+    (hb : finiteRestricts(φ, b)) (G : ℂ)
+    (h : HasSum (fun z : interiorZeros(τ, α) ↦ zeroTerm(φ, z))
+        (M(φ, twist(1, 1 / 2)) + M(φ, twist(1, -1 / 2)) - G)) :
+    G = classVolume * ((∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) +
+      ∑' v : V, finiteTerm(v, b v)) := by
+  have h' := (hasSum_interiorZeros_iff_exteriorZeros_of_geometricValue τ hτ φ α ha hb G).mp h
+  have := exteriorZeros_isEmpty_of_half_le τ hα
+  exact sub_eq_zero.mp (h'.unique hasSum_empty)
+
+open Classical in
+/-- Paper: Theorem 12.5.1.1, pp. 519–520, with §1.4.5, p. 30. If one complex number `G`, the
+same for every half-width, satisfies the identity "sum over the zeros of the open strip = polar
+terms − `G`" at every half-width in `(0, 1/2)`, then `G` is the local side of the explicit
+formula. No half-width `≥ 1/2` is used: the omitted zero terms tend to zero as the half-width
+increases to one half.
+Reconstruction: not a statement of the paper. -/
+theorem geometricValue_eq_localSide_of_narrow (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (φ : BruhatCompactSupport C𝔽)
+    {a : archTest} {b : finiteTest} (ha : archRestricts(φ, a)) (hb : finiteRestricts(φ, b))
+    (G : ℂ)
+    (h : ∀ α : ℝ, 0 < α → α < 1 / 2 →
+      HasSum (fun z : interiorZeros(τ, α) ↦ zeroTerm(φ, z))
+        (M(φ, twist(1, 1 / 2)) + M(φ, twist(1, -1 / 2)) - G)) :
+    G = classVolume * ((∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) +
+      ∑' v : V, finiteTerm(v, b v)) := by
+  obtain ⟨a', b', ha', hb', hall⟩ := hasSum_zeros_localTerms τ hτ φ
+  let g : X(τ) → ℂ := fun p ↦
+    ((ord(p.1.val, p.2) : ℤ) : ℂ) * M(φ, twist(p.1.val, p.2 - 1 / 2))
+  let A : Set X(τ) := {p | 0 < ord(p.1.val, p.2)}
+  let w : ℕ → ℝ := fun n ↦ 1 / 2 - 1 / ((n : ℝ) + 3)
+  let E : ℕ → Set X(τ) := fun n ↦ {p | 0 < ord(p.1.val, p.2) ∧ w n ≤ |p.2.re - 1 / 2|}
+  have hw0 (n : ℕ) : 0 < w n := by
+    have h3 : (3 : ℝ) ≤ (n : ℝ) + 3 := by linarith [Nat.cast_nonneg (α := ℝ) n]
+    have : 1 / ((n : ℝ) + 3) ≤ 1 / 3 := one_div_le_one_div_of_le (by norm_num) h3
+    change 0 < 1 / 2 - 1 / ((n : ℝ) + 3)
+    linarith
+  have hw1 (n : ℕ) : w n < 1 / 2 := by
+    have : 0 < 1 / ((n : ℝ) + 3) := by positivity
+    change 1 / 2 - 1 / ((n : ℝ) + 3) < 1 / 2
+    linarith
+  have hwlim : Tendsto w atTop (𝓝 (1 / 2)) := by
+    have h0 : Tendsto (fun n : ℕ ↦ ((n : ℝ) + 3)) atTop atTop :=
+      tendsto_atTop_add_const_right _ _ tendsto_natCast_atTop_atTop
+    have h1 : Tendsto (fun n : ℕ ↦ 1 / ((n : ℝ) + 3)) atTop (𝓝 0) :=
+      tendsto_const_nhds.div_atTop h0
+    have h2 : Tendsto (fun n : ℕ ↦ (1 / 2 : ℝ) - 1 / ((n : ℝ) + 3)) atTop (𝓝 (1 / 2 - 0)) :=
+      tendsto_const_nhds.sub h1
+    rw [sub_zero] at h2
+    exact h2
+  have hA : Summable (A.indicator g) :=
+    ((hasSum_subtype_iff_indicator (f := g) (s := A)).mp hall).summable
+  have hE (n : ℕ) : HasSum ((E n).indicator g) (G - weilLocalSide(a, b)) :=
+    (hasSum_subtype_iff_indicator (f := g) (s := E n)).mp
+      ((hasSum_interiorZeros_iff_exteriorZeros_of_geometricValue τ hτ φ (w n) ha hb G).mp
+        (h (w n) (hw0 n) (hw1 n)))
+  have hpt (p : X(τ)) : Tendsto (fun n ↦ (E n).indicator g p) atTop (𝓝 0) := by
+    by_cases hp : 0 < ord(p.1.val, p.2)
+    · have hlt := abs_re_sub_half_lt_of_zero τ p hp
+      have hev : ∀ᶠ n in atTop, |p.2.re - 1 / 2| < w n := hwlim.eventually (lt_mem_nhds hlt)
+      refine tendsto_const_nhds.congr' ?_
+      filter_upwards [hev] with n hn
+      exact (Set.indicator_of_notMem (show p ∉ E n from fun h' ↦ (not_le.mpr hn) h'.2) g).symm
+    · refine tendsto_const_nhds.congr' (Eventually.of_forall fun n ↦ ?_)
+      exact (Set.indicator_of_notMem (show p ∉ E n from fun h' ↦ hp h'.1) g).symm
+  have hbound : ∀ᶠ n in atTop, ∀ p, ‖(E n).indicator g p‖ ≤ ‖A.indicator g p‖ :=
+    Eventually.of_forall fun n p ↦ by
+      by_cases hp : p ∈ E n
+      · rw [Set.indicator_of_mem hp, Set.indicator_of_mem (show p ∈ A from hp.1)]
+      · rw [Set.indicator_of_notMem hp, norm_zero]
+        exact norm_nonneg _
+  have hlim := tendsto_tsum_of_dominated_convergence (𝓕 := atTop)
+    (f := fun n p ↦ (E n).indicator g p) (g := fun _ ↦ (0 : ℂ)) hA.norm hpt hbound
+  have hconst : (fun n : ℕ ↦ ∑' p, (E n).indicator g p) = fun _ ↦ G - weilLocalSide(a, b) :=
+    funext fun n ↦ (hE n).tsum_eq
+  rw [hconst, tsum_zero] at hlim
+  exact sub_eq_zero.mp (tendsto_nhds_unique tendsto_const_nhds hlim)
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520, with Theorem B.4.4.7, p. 623. For one norm section,
+one test and one half-width, the trace identity with the sum over the zeros of the open strip
+implies that the omitted zero terms sum to zero. This is the converse of
+`traceFormula_of_exteriorZeros`; no hypothesis on the test is needed.
+Reconstruction: not a statement of the paper. -/
+theorem hasSum_exteriorZeros_of_traceIdentity (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (φ : BruhatCompactSupport C𝔽) (α : ℝ)
+    (h : traceIdentity(τ, φ, α)) :
+    HasSum (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z)) 0 := by
+  obtain ⟨a, b, ha, hb, -, hint⟩ := h
+  have h' := (hasSum_interiorZeros_iff_exteriorZeros_of_geometricValue τ hτ φ α ha hb
+    weilLocalSide(a, b)).mp hint
+  rwa [sub_self] at h'
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. For each norm section, test and half-width, the
+recorded gap (the omitted zero terms sum to zero) and the printed identity in its corrected
+normalization (`traceFormula`) are equivalent. So the cancellation form changes no quantifier
+of the theorem.
+Reconstruction: not a statement of the paper. -/
+theorem hasSum_exteriorZeros_iff_traceIdentity (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (φ : BruhatCompactSupport C𝔽) (α : ℝ) :
+    HasSum (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z)) 0 ↔ traceIdentity(τ, φ, α) :=
+  ⟨traceFormula_of_exteriorZeros τ hτ φ α, hasSum_exteriorZeros_of_traceIdentity τ hτ φ α⟩
+
+open Classical in
+/-- Paper: Theorem 12.5.1.1, (12.5.1.3), p. 519, with Theorem B.4.4.7, p. 623. Uniqueness of the
+zero terms together with the two polar terms. Let `c` be coefficients on
+the zeros of the completed Hecke L-functions of the lifts of a norm section, and let `cPlus`,
+`cMinus` be complex numbers. If for every test supported in `log |g| ≥ y₀` the series
+`∑ c(ρ) M(φ)(χ, ρ − 1/2)` over the zeros has sum
+`cPlus * M(φ)(|·|^{1/2}) + cMinus * M(φ)(|·|^{-1/2})`, then `cPlus = cMinus = 0` and `c` vanishes
+at every zero. The two polar points `s = 1` and `s = 0` of the trivial character are not zeros,
+so `coefficients_eq_zero_of_hasSum_supportedTests` applies to the zeros and these two points.
+Reconstruction: not a statement of the paper. -/
+theorem zeroCoefficients_and_polarWeights_eq_zero (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (y₀ : ℝ) (c : X(τ) → ℂ) (cPlus cMinus : ℂ)
+    (hT : ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C𝔽, φ.val g ≠ 0 → y₀ ≤ logNorm(g)) →
+      HasSum (fun z : zeros(τ) ↦ c z.val * M(φ, twist(z.val.1.val, z.val.2 - 1 / 2)))
+        (cPlus * M(φ, twist(1, 1 / 2)) + cMinus * M(φ, twist(1, -1 / 2)))) :
+    cPlus = 0 ∧ cMinus = 0 ∧ ∀ z : zeros(τ), c z.val = 0 := by
+  let one : {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} :=
+    ⟨1, fun t ↦ PontryaginDual.one_apply (τ t)⟩
+  let pPlus : X(τ) := (one, 1)
+  let pMinus : X(τ) := (one, 0)
+  have hne : pPlus ≠ pMinus := fun h' ↦ one_ne_zero (congrArg Prod.snd h')
+  have hPlusNot : ¬ 0 < ord(pPlus.1.val, pPlus.2) := fun h' ↦ by
+    have := abs_re_sub_half_lt_of_zero τ pPlus h'
+    change |(1 : ℂ).re - 1 / 2| < 1 / 2 at this
+    norm_num at this
+  have hMinusNot : ¬ 0 < ord(pMinus.1.val, pMinus.2) := fun h' ↦ by
+    have := abs_re_sub_half_lt_of_zero τ pMinus h'
+    change |(0 : ℂ).re - 1 / 2| < 1 / 2 at this
+    norm_num at this
+  let Z : Set X(τ) := {p | 0 < ord(p.1.val, p.2)}
+  let D : Set X(τ) := Z ∪ {pPlus, pMinus}
+  let c' : X(τ) → ℂ := fun p ↦
+    if 0 < ord(p.1.val, p.2) then c p else if p = pPlus then -cPlus else -cMinus
+  have hDdisc : ∀ (χ : PontryaginDual C𝔽) (z : ℂ), ∀ᶠ u in 𝓝[≠] z,
+      ∀ p ∈ D, p.1.val = χ → p.2 - 1 / 2 ≠ u := by
+    intro χ z
+    have hpt (a : ℂ) : ∀ᶠ u in 𝓝[≠] z, u ≠ a := by
+      by_cases hza : z = a
+      · subst hza
+        exact self_mem_nhdsWithin
+      · exact nhdsWithin_le_nhds (isOpen_ne.mem_nhds (fun h' ↦ hza h'))
+    filter_upwards [(zeros_discrete_and_re_le_one τ).1 χ z, hpt (1 / 2), hpt (-1 / 2)]
+      with u hu h1 h2
+    intro p hp hpχ
+    rcases hp with hp | hp | hp
+    · exact hu p hp hpχ
+    · rw [hp]
+      change (1 : ℂ) - 1 / 2 ≠ u
+      intro h'
+      exact h1 (by rw [← h']; norm_num)
+    · rw [Set.mem_singleton_iff.mp hp]
+      change (0 : ℂ) - 1 / 2 ≠ u
+      intro h'
+      exact h2 (by rw [← h']; norm_num)
+  have hDre : ∀ p ∈ D, p.2.re ≤ 1 := by
+    intro p hp
+    rcases hp with hp | hp | hp
+    · exact (zeros_discrete_and_re_le_one τ).2 p hp
+    · rw [hp]; change (1 : ℂ).re ≤ 1; norm_num
+    · rw [Set.mem_singleton_iff.mp hp]; change (0 : ℂ).re ≤ 1; norm_num
+  have key := coefficients_eq_zero_of_hasSum_supportedTests τ hτ y₀ D hDdisc hDre c' (fun φ hφ ↦ by
+    let g : X(τ) → ℂ := fun p ↦ c' p * M(φ, twist(p.1.val, p.2 - 1 / 2))
+    let G : X(τ) → ℂ := fun p ↦ c p * M(φ, twist(p.1.val, p.2 - 1 / 2))
+    have hZ : HasSum (Z.indicator G)
+        (cPlus * M(φ, twist(1, 1 / 2)) + cMinus * M(φ, twist(1, -1 / 2))) :=
+      (hasSum_subtype_iff_indicator (f := G) (s := Z)).mp (hT φ hφ)
+    have hP : HasSum (Pi.single pPlus (-(cPlus * M(φ, twist(1, 1 / 2)))))
+        (-(cPlus * M(φ, twist(1, 1 / 2)))) :=
+      hasSum_pi_single pPlus _
+    have hM : HasSum (Pi.single pMinus (-(cMinus * M(φ, twist(1, -1 / 2)))))
+        (-(cMinus * M(φ, twist(1, -1 / 2)))) :=
+      hasSum_pi_single pMinus _
+    have htot := (hZ.add hP).add hM
+    have hval : cPlus * M(φ, twist(1, 1 / 2)) + cMinus * M(φ, twist(1, -1 / 2)) +
+        -(cPlus * M(φ, twist(1, 1 / 2))) + -(cMinus * M(φ, twist(1, -1 / 2))) = 0 := by ring
+    rw [hval] at htot
+    refine (hasSum_subtype_iff_indicator (f := g) (s := D)).mpr ?_
+    have hfun : D.indicator g = Z.indicator G +
+        Pi.single pPlus (-(cPlus * M(φ, twist(1, 1 / 2)))) +
+        Pi.single pMinus (-(cMinus * M(φ, twist(1, -1 / 2)))) := by
+      funext p
+      simp only [Pi.add_apply]
+      by_cases hz : 0 < ord(p.1.val, p.2)
+      · have hp1 : p ≠ pPlus := fun h' ↦ hPlusNot (h' ▸ hz)
+        have hp2 : p ≠ pMinus := fun h' ↦ hMinusNot (h' ▸ hz)
+        rw [Set.indicator_of_mem (show p ∈ D from Or.inl hz),
+          Set.indicator_of_mem (show p ∈ Z from hz), Pi.single_eq_of_ne hp1,
+          Pi.single_eq_of_ne hp2, add_zero, add_zero]
+        simp only [g, G, c', ite_eq_left hz]
+      · by_cases hp1 : p = pPlus
+        · rw [hp1, Set.indicator_of_mem (show pPlus ∈ D from Or.inr (Or.inl rfl)),
+            Set.indicator_of_notMem (show pPlus ∉ Z from hPlusNot), Pi.single_eq_same,
+            Pi.single_eq_of_ne hne, zero_add, add_zero]
+          change (if 0 < ord(pPlus.1.val, pPlus.2) then _
+            else (if pPlus = pPlus then -cPlus else -cMinus)) *
+            M(φ, twist(1, (1 : ℂ) - 1 / 2)) = -(cPlus * M(φ, twist(1, 1 / 2)))
+          rw [ite_eq_right hPlusNot, ite_eq_left rfl, show ((1 : ℂ) - 1 / 2) = 1 / 2 by norm_num]
+          ring
+        · by_cases hp2 : p = pMinus
+          · rw [hp2, Set.indicator_of_mem (show pMinus ∈ D from Or.inr (Or.inr rfl)),
+              Set.indicator_of_notMem (show pMinus ∉ Z from hMinusNot),
+              Pi.single_eq_of_ne hne.symm, Pi.single_eq_same, zero_add, zero_add]
+            change (if 0 < ord(pMinus.1.val, pMinus.2) then _
+              else (if pMinus = pPlus then -cPlus else -cMinus)) *
+              M(φ, twist(1, (0 : ℂ) - 1 / 2)) = -(cMinus * M(φ, twist(1, -1 / 2)))
+            rw [ite_eq_right hMinusNot, ite_eq_right hne.symm,
+              show ((0 : ℂ) - 1 / 2) = -1 / 2 by norm_num]
+            ring
+          · rw [Set.indicator_of_notMem (show p ∉ D from fun h' ↦ by
+                rcases h' with h' | h' | h'
+                · exact hz h'
+                · exact hp1 h'
+                · exact hp2 (Set.mem_singleton_iff.mp h')),
+              Set.indicator_of_notMem (show p ∉ Z from hz), Pi.single_eq_of_ne hp1,
+              Pi.single_eq_of_ne hp2, add_zero, add_zero]
+    rw [hfun]
+    exact htot)
+  refine ⟨?_, ?_, ?_⟩
+  · have hc := key pPlus (Or.inr (Or.inl rfl))
+    change (if 0 < ord(pPlus.1.val, pPlus.2) then _
+      else (if pPlus = pPlus then -cPlus else -cMinus)) = 0 at hc
+    rw [ite_eq_right hPlusNot, ite_eq_left rfl] at hc
+    exact neg_eq_zero.mp hc
+  · have hc := key pMinus (Or.inr (Or.inr rfl))
+    change (if 0 < ord(pMinus.1.val, pMinus.2) then _
+      else (if pMinus = pPlus then -cPlus else -cMinus)) = 0 at hc
+    rw [ite_eq_right hMinusNot, ite_eq_right hne.symm] at hc
+    exact neg_eq_zero.mp hc
+  · intro z
+    have hc := key z.val (Or.inl z.property)
+    change (if 0 < ord(z.val.1.val, z.val.2) then c z.val else _) = 0 at hc
+    rwa [ite_eq_left z.property] at hc
+
+open Classical in
+/-- Paper: Theorem 12.5.1.1, (12.5.1.1)–(12.5.1.3), p. 519. Let the two polar terms of the trace
+identity enter with arbitrary complex weights `cPlus`, `cMinus`, the local side being that of
+`traceFormula`, and let `P` be a class of tests that contains the tests supported in
+`log |g| ≥ y₀`. For a norm section and a half-width, the identity holds for every test of the
+class exactly when both weights are one and no zero lies outside the open strip. So an identity
+that has lost a polar term, or a multiple of one, fails for some test at every half-width, and
+with the printed weights the identity is the zero-free window.
+Reconstruction: not a statement of the paper. -/
+theorem traceIdentity_polarWeights_iff (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (α : ℝ) (cPlus cMinus : ℂ) (y₀ : ℝ)
+    (P : BruhatCompactSupport C𝔽 → Prop)
+    (hP : ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C𝔽, φ.val g ≠ 0 → y₀ ≤ logNorm(g)) → P φ) :
+    (∀ φ : BruhatCompactSupport C𝔽, P φ →
+      ∃ (a : archTest) (b : finiteTest), archRestricts(φ, a) ∧ finiteRestricts(φ, b) ∧
+        HasSum (fun z : interiorZeros(τ, α) ↦ zeroTerm(φ, z))
+          (cPlus * M(φ, twist(1, 1 / 2)) + cMinus * M(φ, twist(1, -1 / 2)) -
+            classVolume * ((∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) +
+              ∑' v : V, finiteTerm(v, b v)))) ↔
+      cPlus = 1 ∧ cMinus = 1 ∧ IsEmpty exteriorZeros(τ, α) := by
+  constructor
+  · intro h
+    let c : X(τ) → ℂ := fun p ↦
+      if α ≤ |p.2.re - 1 / 2| then ((ord(p.1.val, p.2) : ℤ) : ℂ) else 0
+    have key := zeroCoefficients_and_polarWeights_eq_zero τ hτ y₀ c (1 - cPlus) (1 - cMinus)
+      (fun φ hφ ↦ by
+        obtain ⟨a, b, ha, hb, hint⟩ := h φ (hP φ hφ)
+        obtain ⟨a', b', ha', hb', hall⟩ := hasSum_zeros_localTerms τ hτ φ
+        rw [exteriorZeros_localTerms_congr φ ha' hb' ha hb] at hall
+        let g : X(τ) → ℂ := fun p ↦
+          ((ord(p.1.val, p.2) : ℤ) : ℂ) * M(φ, twist(p.1.val, p.2 - 1 / 2))
+        let gc : X(τ) → ℂ := fun p ↦ c p * M(φ, twist(p.1.val, p.2 - 1 / 2))
+        let A : Set X(τ) := {p | 0 < ord(p.1.val, p.2)}
+        let I : Set X(τ) := {p | 0 < ord(p.1.val, p.2) ∧ |p.2.re - 1 / 2| < α}
+        have hA : HasSum (A.indicator g) localTerms(φ, a, b) :=
+          (hasSum_subtype_iff_indicator (f := g) (s := A)).mp hall
+        have hI : HasSum (I.indicator g)
+            (cPlus * M(φ, twist(1, 1 / 2)) + cMinus * M(φ, twist(1, -1 / 2)) -
+              weilLocalSide(a, b)) :=
+          (hasSum_subtype_iff_indicator (f := g) (s := I)).mp hint
+        have hfun : A.indicator gc = A.indicator g - I.indicator g := by
+          funext p
+          by_cases hp : 0 < ord(p.1.val, p.2)
+          · by_cases hα : |p.2.re - 1 / 2| < α
+            · rw [Pi.sub_apply, Set.indicator_of_mem (show p ∈ A from hp),
+                Set.indicator_of_mem (show p ∈ A from hp),
+                Set.indicator_of_mem (show p ∈ I from ⟨hp, hα⟩), sub_self]
+              simp only [gc, c, ite_eq_right (not_le.mpr hα), zero_mul]
+            · rw [Pi.sub_apply, Set.indicator_of_mem (show p ∈ A from hp),
+                Set.indicator_of_mem (show p ∈ A from hp),
+                Set.indicator_of_notMem (show p ∉ I from fun h' ↦ hα h'.2), sub_zero]
+              simp only [gc, g, c, ite_eq_left (not_lt.mp hα)]
+          · rw [Pi.sub_apply, Set.indicator_of_notMem (show p ∉ A from hp),
+              Set.indicator_of_notMem (show p ∉ A from hp),
+              Set.indicator_of_notMem (show p ∉ I from fun h' ↦ hp h'.1), sub_zero]
+        have hd : HasSum (A.indicator g - I.indicator g)
+            (localTerms(φ, a, b) -
+              (cPlus * M(φ, twist(1, 1 / 2)) + cMinus * M(φ, twist(1, -1 / 2)) -
+                weilLocalSide(a, b))) :=
+          hA.sub hI
+        have hval : localTerms(φ, a, b) -
+            (cPlus * M(φ, twist(1, 1 / 2)) + cMinus * M(φ, twist(1, -1 / 2)) -
+              weilLocalSide(a, b)) =
+            (1 - cPlus) * M(φ, twist(1, 1 / 2)) + (1 - cMinus) * M(φ, twist(1, -1 / 2)) := by
+          ring
+        rw [← hfun, hval] at hd
+        exact (hasSum_subtype_iff_indicator (f := gc) (s := A)).mpr hd)
+    obtain ⟨h1, h2, h3⟩ := key
+    refine ⟨(sub_eq_zero.mp h1).symm, (sub_eq_zero.mp h2).symm, ⟨fun z ↦ ?_⟩⟩
+    have hz := h3 ⟨z.val, z.property.1⟩
+    change (if α ≤ |z.val.2.re - 1 / 2| then ((ord(z.val.1.val, z.val.2) : ℤ) : ℂ) else 0) = 0
+      at hz
+    rw [ite_eq_left z.property.2] at hz
+    exact (ne_of_gt z.property.1) (by exact_mod_cast hz)
+  · rintro ⟨rfl, rfl, hE⟩ φ _
+    obtain ⟨a, b, ha, hb, -, hsum⟩ := traceFormula_of_exteriorZeros τ hτ φ α hasSum_empty
+    refine ⟨a, b, ha, hb, ?_⟩
+    rw [one_mul, one_mul]
+    exact hsum
+
+open Classical in
+/-- Paper: Theorem 12.5.1.1, (12.5.1.1)–(12.5.1.3), p. 519, against Theorem B.4.4.7, (B.4.4.16),
+p. 623. Let the local side of the trace identity be multiplied by an arbitrary complex constant
+`κ` in place of the volume `μ̄₁(C_F¹)`, the two polar terms being as printed, and let `P` be a
+class of tests that contains the tests supported in `log |g| ≥ y₀`. For a norm section and a
+half-width, the identity holds for every test of the class exactly when `κ` is that volume and
+no zero lies outside the open strip. So the factor is forced at every half-width, whatever the
+zeros do.
+Reconstruction: not a statement of the paper. -/
+theorem traceIdentity_localScale_iff (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (α : ℝ) (κ : ℂ) (y₀ : ℝ)
+    (P : BruhatCompactSupport C𝔽 → Prop)
+    (hP : ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C𝔽, φ.val g ≠ 0 → y₀ ≤ logNorm(g)) → P φ) :
+    (∀ φ : BruhatCompactSupport C𝔽, P φ →
+      ∃ (a : archTest) (b : finiteTest), archRestricts(φ, a) ∧ finiteRestricts(φ, b) ∧
+        HasSum (fun z : interiorZeros(τ, α) ↦ zeroTerm(φ, z))
+          (M(φ, twist(1, 1 / 2)) + M(φ, twist(1, -1 / 2)) -
+            κ * ((∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) +
+              ∑' v : V, finiteTerm(v, b v)))) ↔
+      κ = classVolume ∧ IsEmpty exteriorZeros(τ, α) := by
+  have hvol : classVolume ≠ 0 := grh_classVolume_ne_zero
+  constructor
+  · intro h
+    let r : ℂ := (κ - classVolume) / classVolume
+    have hr : r * classVolume = κ - classVolume := div_mul_cancel₀ _ hvol
+    let c : X(τ) → ℂ := fun p ↦
+      ((if α ≤ |p.2.re - 1 / 2| then (1 : ℂ) else 0) + r) * ((ord(p.1.val, p.2) : ℤ) : ℂ)
+    have key := zeroCoefficients_and_polarWeights_eq_zero τ hτ y₀ c r r (fun φ hφ ↦ by
+      obtain ⟨a, b, ha, hb, hint⟩ := h φ (hP φ hφ)
+      obtain ⟨a', b', ha', hb', hall⟩ := hasSum_zeros_localTerms τ hτ φ
+      rw [exteriorZeros_localTerms_congr φ ha' hb' ha hb] at hall
+      have hext : HasSum (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z))
+          (κ * localSum(a, b) - weilLocalSide(a, b)) :=
+        (hasSum_interiorZeros_iff_exteriorZeros_of_geometricValue τ hτ φ α ha hb
+          (κ * localSum(a, b))).mp hint
+      let g : X(τ) → ℂ := fun p ↦
+        ((ord(p.1.val, p.2) : ℤ) : ℂ) * M(φ, twist(p.1.val, p.2 - 1 / 2))
+      let gc : X(τ) → ℂ := fun p ↦ c p * M(φ, twist(p.1.val, p.2 - 1 / 2))
+      let A : Set X(τ) := {p | 0 < ord(p.1.val, p.2)}
+      let E : Set X(τ) := {p | 0 < ord(p.1.val, p.2) ∧ α ≤ |p.2.re - 1 / 2|}
+      have hA : HasSum (A.indicator g) localTerms(φ, a, b) :=
+        (hasSum_subtype_iff_indicator (f := g) (s := A)).mp hall
+      have hE : HasSum (E.indicator g) (κ * localSum(a, b) - weilLocalSide(a, b)) :=
+        (hasSum_subtype_iff_indicator (f := g) (s := E)).mp hext
+      have hfun : A.indicator gc = E.indicator g + r • A.indicator g := by
+        funext p
+        by_cases hp : 0 < ord(p.1.val, p.2)
+        · by_cases hα : α ≤ |p.2.re - 1 / 2|
+          · rw [Pi.add_apply, Pi.smul_apply, Set.indicator_of_mem (show p ∈ A from hp),
+              Set.indicator_of_mem (show p ∈ E from ⟨hp, hα⟩),
+              Set.indicator_of_mem (show p ∈ A from hp), smul_eq_mul]
+            simp only [gc, g, c, ite_eq_left hα]
+            ring
+          · rw [Pi.add_apply, Pi.smul_apply, Set.indicator_of_mem (show p ∈ A from hp),
+              Set.indicator_of_notMem (show p ∉ E from fun h' ↦ hα h'.2),
+              Set.indicator_of_mem (show p ∈ A from hp), smul_eq_mul]
+            simp only [gc, g, c, ite_eq_right hα]
+            ring
+        · rw [Pi.add_apply, Pi.smul_apply, Set.indicator_of_notMem (show p ∉ A from hp),
+            Set.indicator_of_notMem (show p ∉ E from fun h' ↦ hp h'.1),
+            Set.indicator_of_notMem (show p ∉ A from hp), smul_zero, add_zero]
+      have hd : HasSum (E.indicator g + r • A.indicator g)
+          (κ * localSum(a, b) - weilLocalSide(a, b) + r • localTerms(φ, a, b)) :=
+        hE.add (hA.const_smul r)
+      have hval : κ * localSum(a, b) - weilLocalSide(a, b) + r • localTerms(φ, a, b) =
+          r * M(φ, twist(1, 1 / 2)) + r * M(φ, twist(1, -1 / 2)) := by
+        rw [smul_eq_mul]
+        linear_combination (-localSum(a, b)) * hr
+      rw [← hfun, hval] at hd
+      exact (hasSum_subtype_iff_indicator (f := gc) (s := A)).mpr hd)
+    obtain ⟨h1, -, h3⟩ := key
+    have hκ : κ = classVolume := by
+      rw [h1, zero_mul] at hr
+      exact (sub_eq_zero.mp hr.symm)
+    refine ⟨hκ, ⟨fun z ↦ ?_⟩⟩
+    have hz := h3 ⟨z.val, z.property.1⟩
+    change ((if α ≤ |z.val.2.re - 1 / 2| then (1 : ℂ) else 0) + r) *
+      ((ord(z.val.1.val, z.val.2) : ℤ) : ℂ) = 0 at hz
+    rw [ite_eq_left z.property.2, h1, add_zero, one_mul] at hz
+    exact z.property.1.ne' (by exact_mod_cast hz)
+  · rintro ⟨rfl, hE⟩ φ _
+    obtain ⟨a, b, ha, hb, -, hsum⟩ := traceFormula_of_exteriorZeros τ hτ φ α hasSum_empty
+    exact ⟨a, b, ha, hb, hsum⟩
+
+/-- Paper: Theorem 12.5.1.1, (12.5.1.1)–(12.5.1.3), p. 519, against Theorem B.4.4.7, (B.4.4.16),
+p. 623. The display of p. 519 has no factor `μ̄₁(C_F¹)`. Take the local terms as in
+`traceFormula` (the normalized complex denominator, the canonical archimedean weights) and omit
+only that factor. For a number field whose norm-one idele classes do not have Tamagawa volume
+one, the resulting identity fails at every half-width, for some test vanishing on the norm-one
+classes.
+Reconstruction: not a statement of the paper, and not the literal display, which also has the
+ordinary modulus at a complex place. `Printed.traceFormula_false` refutes the display through
+that modulus (ERRATA F267); this statement shows that the volume alone is enough (ERRATA R4,
+issue #587). -/
+theorem traceIdentity_without_volume_false (hvol : classVolume ≠ 1) (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (α : ℝ) :
+    ¬ ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C₁, φ.val g = 0) →
+      ∃ (a : archTest) (b : finiteTest), archRestricts(φ, a) ∧ finiteRestricts(φ, b) ∧
+        HasSum (fun z : interiorZeros(τ, α) ↦ zeroTerm(φ, z))
+          (M(φ, twist(1, 1 / 2)) + M(φ, twist(1, -1 / 2)) -
+            ((∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) +
+              ∑' v : V, finiteTerm(v, b v))) := by
+  intro h
+  have h' := (traceIdentity_localScale_iff τ hτ α 1 1 (fun φ ↦ ∀ g : C₁, φ.val g = 0)
+    fun φ hφ ↦ (testClasses_contain_supportedTests φ hφ).2.1).mp fun φ hφ ↦ by
+    obtain ⟨a, b, ha, hb, hsum⟩ := h φ hφ
+    refine ⟨a, b, ha, hb, ?_⟩
+    rw [one_mul]
+    exact hsum
+  exact hvol h'.1.symm
+
+end Readings
+
 end RiemannMasullo
