@@ -1076,6 +1076,56 @@ private theorem sLocalTraceDilationKernel_skew_frequency (f : BruhatCompactSuppo
   unfold tamagawaFourier
   simp only [mul_neg, hneg, k]
 
+/-- Paper: Step II of Theorem 12.4.1.1, p. 517.
+Moving the input away from the diagonal multiplies the Fourier transform of the
+translated test by a character. The sign agrees with the convention that the
+Tamagawa Fourier transform uses the conjugate character. -/
+theorem sLocalTraceCutoffKernel_offDiagonal_fourier
+    (f : BruhatCompactSupport Iₛ) (ρ : Iₛ → ℂ) (σ : Aₛ → ℂ) (x : Iₛ) (y : Aₛ) :
+    sLocalTraceCutoffKernel f ρ σ x y =
+      ρ x * (sLocalTraceMeasureFactor S : ℂ) *
+        ∫ u, σ u * fourierₛ (sLocalTraceEta f 1) (-(x.val * u)) *
+          (ψₛ ((x.val - y) * u) : ℂ) ∂νₛ := by
+  obtain ⟨e, he, -⟩ := sAdditiveTamagawaMeasure_selfDual F S
+  let χ := e (Multiplicative.ofAdd (1 : Aₛ))
+  have hχ (z : Aₛ) : χ (Multiplicative.ofAdd z) = ψₛ z := by
+    simpa only [one_mul] using he 1 z
+  have hadd (a b : Aₛ) : (ψₛ (a + b) : ℂ) = (ψₛ a : ℂ) * (ψₛ b : ℂ) := by
+    simp only [← hχ, ofAdd_add, map_mul, Circle.coe_mul]
+  have hshift (u : Aₛ) :
+      sLocalTraceDilationKernel f (fun z ↦ (ψₛ ((z - y) * u) : ℂ)) x.val =
+        sLocalTraceDilationKernel f (fun z ↦ (ψₛ ((z - x.val) * u) : ℂ)) x.val *
+          (ψₛ ((x.val - y) * u) : ℂ) := by
+    unfold sLocalTraceDilationKernel
+    rw [← integral_mul_const]
+    apply integral_congr_ae
+    exact ae_of_all _ fun g ↦ by
+      let c : ℂ := f.val g / (Real.sqrt (normS(g)) : ℂ)
+      change c * (ψₛ (((g⁻¹).val * x.val - y) * u) : ℂ) =
+        c * (ψₛ (((g⁻¹).val * x.val - x.val) * u) : ℂ) *
+          (ψₛ ((x.val - y) * u) : ℂ)
+      rw [show ((g⁻¹).val * x.val - y) * u =
+        ((g⁻¹).val * x.val - x.val) * u + (x.val - y) * u by ring, hadd, mul_assoc]
+  have hdiag (u : Aₛ) :
+      sLocalTraceDilationKernel f (fun z ↦ (ψₛ ((z - x.val) * u) : ℂ)) x.val =
+        (sLocalTraceMeasureFactor S : ℂ) * fourierₛ (sLocalTraceEta f 1) (-(x.val * u)) := by
+    simpa only [Subgroup.coe_one, one_mul] using
+      sLocalTraceDilationKernel_skew_frequency f (1 : Hₛ) x u
+  calc
+    _ = ρ x * ∫ u, (sLocalTraceMeasureFactor S : ℂ) *
+        (σ u * fourierₛ (sLocalTraceEta f 1) (-(x.val * u)) *
+          (ψₛ ((x.val - y) * u) : ℂ)) ∂νₛ := by
+      unfold sLocalTraceCutoffKernel
+      apply congrArg (ρ x * ·)
+      apply integral_congr_ae
+      exact ae_of_all _ fun u ↦ by
+        change σ u * sLocalTraceDilationKernel f (fun z ↦ (ψₛ ((z - y) * u) : ℂ)) x.val =
+          (sLocalTraceMeasureFactor S : ℂ) *
+            (σ u * fourierₛ (sLocalTraceEta f 1) (-(x.val * u)) * (ψₛ ((x.val - y) * u) : ℂ))
+        rw [hshift u, hdiag u]
+        ring
+    _ = _ := by rw [integral_const_mul, ← mul_assoc]
+
 /-- Paper: (12.4.1.21)–(12.4.1.22), p. 518. On the skew diagonal, an even frequency
 symbol gives the same scalar integral on the kernel and Fourier sides.
 Deviation: The dilation average is taken first. This equality of Bochner integrals
@@ -3939,6 +3989,57 @@ private theorem sLocalTrace_integral_inv_dilate (u : Iₛ) (g : Aₛ → ℂ) :
   rw [← h]
   ring
 
+/-- Paper: Theorem 12.4.1.1, Step II, p. 517.
+Changing frequency by `u ↦ -x.val * u` gives an amplitude independent of the
+output idele. The radial cutoff scales by the idelic modulus and the character
+evaluates at the displacement of the input from the output in these coordinates. -/
+theorem sLocalTraceCutoffKernel_scaled_radial_fourier
+    (f : BruhatCompactSupport Iₛ) (ρ : Iₛ → ℂ) (b : ℝ → ℂ) (x : Iₛ) (y : Aₛ) :
+    sLocalTraceCutoffKernel f ρ (fun u ↦ b (modS(u))) x y =
+      (ρ x * (sLocalTraceMeasureFactor S : ℂ) / (normS(x) : ℂ)) *
+        ∫ w, b (modS(w) / normS(x)) * fourierₛ (sLocalTraceEta f 1) w *
+          (ψₛ (w * ((x⁻¹).val * y - 1)) : ℂ) ∂νₛ := by
+  have hunit (a : Iₛ) : modS(a.val) = normS(a) := by
+    simp [sIdeleNorm, Units.coe_prod]
+  have hneg (z : Aₛ) : modS(-z) = modS(z) := by
+    change (∏ v : InfinitePlace F, ‖-(z.1 v)‖ ^ v.mult) * (∏ v : S, ‖-(z.2 v)‖) = _
+    simp only [norm_neg]
+  have hmul (z w : Aₛ) : modS(z * w) = modS(z) * modS(w) := by
+    change (∏ v : InfinitePlace F, ‖z.1 v * w.1 v‖ ^ v.mult) *
+      (∏ v : S, ‖z.2 v * w.2 v‖) = _
+    simp only [norm_mul, mul_pow, Finset.prod_mul_distrib]
+    ring
+  have hxneg : normS(-x) = normS(x) := by
+    rw [← hunit (-x), Units.val_neg, hneg, hunit]
+  have hval : ((-x)⁻¹).val = -(x⁻¹).val := rfl
+  have hmod (w : Aₛ) : modS(((-x)⁻¹).val * w) = modS(w) / normS(x) := by
+    rw [hmul, hunit, map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv, hxneg, div_eq_mul_inv]
+    exact mul_comm _ _
+  have hfreq (w : Aₛ) : -(x.val * (((-x)⁻¹).val * w)) = w := by
+    rw [hval, neg_mul, mul_neg, neg_neg, Units.mul_inv_cancel_left]
+  have hphase (w : Aₛ) : (x.val - y) * (((-x)⁻¹).val * w) =
+      w * ((x⁻¹).val * y - 1) := by
+    rw [hval]
+    calc
+      _ = w * ((x⁻¹).val * y - x.val * (x⁻¹).val) := by ring
+      _ = _ := by rw [Units.mul_inv]
+  let k (u : Aₛ) : ℂ :=
+    b (modS(u)) * fourierₛ (sLocalTraceEta f 1) (-(x.val * u)) * (ψₛ ((x.val - y) * u) : ℂ)
+  have hterm (w : Aₛ) : k (((-x)⁻¹).val * w) =
+      b (modS(w) / normS(x)) * fourierₛ (sLocalTraceEta f 1) w *
+        (ψₛ (w * ((x⁻¹).val * y - 1)) : ℂ) := by
+    dsimp only [k]
+    rw [hmod, hfreq, hphase]
+  have hchange := sLocalTrace_integral_inv_dilate (-x) k
+  rw [hxneg] at hchange
+  simp only [hterm] at hchange
+  have hx0 : (normS(x) : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr
+    (NNReal.coe_pos.mpr (Units.zero_lt (sIdeleNorm F S x))).ne'
+  rw [sLocalTraceCutoffKernel_offDiagonal_fourier]
+  change ρ x * (sLocalTraceMeasureFactor S : ℂ) * (∫ u, k u ∂νₛ) = _
+  rw [hchange]
+  field_simp [hx0]
+
 private theorem sLocalTrace_integral_dilate_unit (ξ : Hₛ) (g : Aₛ → ℂ) :
     (∫ y, g (ξ.val.val * y) ∂νₛ) = ∫ y, g y ∂νₛ := by
   simpa [sLocalTrace_unit_norm] using sLocalTrace_integral_inv_dilate ξ.val⁻¹ g
@@ -4227,6 +4328,120 @@ private theorem sLocalTrace_weighted_moment (s : testₛ) (d : ℕ) :
          _ ≤ _ := add_le_add hs (hb x)
   · have hz : g x = 0 := hzero _ hx
     simp [hz, Q, indicator_of_notMem hx]
+
+/-- A bounded Lipschitz profile at scales bounded away from zero preserves the
+uniform square-root translation bound in additive `L¹`. -/
+private theorem sLocalTrace_profile_translation {E : Type*} [NormedAddCommGroup E]
+    [MeasurableSpace E] [BorelSpace E] (μ : Measure E) [μ.IsAddLeftInvariant]
+    (m : E → ℝ) (hm : Continuous m) (d : ℕ) (C : ℝ) (hC : 0 ≤ C)
+    (hmod : ∀ x h : E, ‖h‖ ≤ 1 →
+      |m (x + h) - m x| ≤ C * (1 + ‖x‖) ^ d * ‖h‖)
+    (g : E → ℂ) (hg : Continuous g) (K : ℝ) (hK : 0 ≤ K)
+    (hlip : ∀ x y, ‖g x - g y‖ ≤ K * ‖x - y‖)
+    (hW : Integrable (fun x ↦ (1 + ‖x‖) ^ d * (Real.sqrt ‖g x‖ + ‖g x‖)) μ)
+    (b : ℝ → ℂ) {L : ℝ≥0} (hb : LipschitzWith L b) (M : ℝ) (hM₀ : 0 ≤ M)
+    (hM : ∀ t, ‖b t‖ ≤ M) (δ : ℝ) (hδ : 0 < δ) :
+    let k (R : ℝ) (x : E) := g x * b (m x / (δ + (R - 1)))
+    ∃ A ≥ 0, ∀ R : ℝ, 1 ≤ R → Integrable (k R) μ ∧ (∫ x, ‖k R x‖ ∂μ) ≤ A ∧
+      ∀ h : E, ‖h‖ ≤ 1 → (∫ x, ‖k R (x + h) - k R x‖ ∂μ) ≤ A * Real.sqrt ‖h‖ := by
+  intro k
+  let P (x : E) := (1 + ‖x‖) ^ d
+  let W (x : E) := P x * (Real.sqrt ‖g x‖ + ‖g x‖)
+  change Integrable W μ at hW
+  have hP (x : E) : 1 ≤ P x := by
+    change 1 ≤ (1 + ‖x‖) ^ d
+    exact one_le_pow₀ (le_add_of_nonneg_right (norm_nonneg x))
+  have hW₀ (x : E) : 0 ≤ W x := by dsimp [W, P]; positivity
+  have hWi : 0 ≤ ∫ x, W x ∂μ := integral_nonneg hW₀
+  have hWnorm (x : E) : P x * ‖g x‖ ≤ W x :=
+    mul_le_mul_of_nonneg_left (le_add_of_nonneg_left (Real.sqrt_nonneg _)) (zero_le_one.trans (hP x))
+  have hWsqrt (x : E) : Real.sqrt ‖g x‖ ≤ W x :=
+    (le_mul_of_one_le_left (Real.sqrt_nonneg _) (hP x)).trans
+      (mul_le_mul_of_nonneg_left (le_add_of_nonneg_right (norm_nonneg _))
+        (zero_le_one.trans (hP x)))
+  let D := (L : ℝ) * C / δ
+  let B := M * Real.sqrt K + D
+  have hD : 0 ≤ D := by dsimp [D]; positivity
+  have hB : 0 ≤ B := by dsimp [B]; positivity
+  have hB₁ : M * Real.sqrt K ≤ B := le_add_of_nonneg_right hD
+  have hB₂ : D ≤ B := le_add_of_nonneg_left (by positivity)
+  refine ⟨(M + 3 * B) * (∫ x, W x ∂μ), by positivity, fun R hR ↦ ?_⟩
+  let s := δ + (R - 1)
+  let q (x : E) := b (m x / s)
+  have hδs : δ ≤ s := by dsimp [s]; linarith
+  have hs : 0 < s := hδ.trans_le hδs
+  have hkcont : Continuous (k R) := hg.mul (hb.continuous.comp (hm.div_const s))
+  have hkbound (x : E) : ‖k R x‖ ≤ M * W x := by
+    change ‖g x * q x‖ ≤ _
+    rw [norm_mul, mul_comm M]
+    exact mul_le_mul ((le_mul_of_one_le_left (norm_nonneg _) (hP x)).trans (hWnorm x))
+      (hM _) (norm_nonneg _) (hW₀ x)
+  have hki := (hW.const_mul M).mono' hkcont.aestronglyMeasurable (ae_of_all _ hkbound)
+  refine ⟨hki, ?_, fun h hh ↦ ?_⟩
+  · calc
+      _ ≤ ∫ x, M * W x ∂μ := integral_mono hki.norm (hW.const_mul M) hkbound
+      _ ≤ _ := by
+        rw [integral_const_mul]
+        exact mul_le_mul_of_nonneg_right (le_add_of_nonneg_right (by positivity)) hWi
+  · let t := Real.sqrt ‖h‖
+    have ht : 0 ≤ t := Real.sqrt_nonneg _
+    have hh' : ‖h‖ ≤ t := by
+      have := Real.sq_sqrt (norm_nonneg h)
+      have := Real.sqrt_le_one.mpr hh
+      nlinarith
+    have hdiff (x : E) : ‖k R (x + h) - k R x‖ ≤ B * t * (W (x + h) + W x + W x) := by
+      have hgdiff : ‖g (x + h) - g x‖ ≤
+          Real.sqrt K * t * (Real.sqrt ‖g (x + h)‖ + Real.sqrt ‖g x‖) :=
+        sLocalTrace_sqrt_difference _ _ K ‖h‖ hK (by simpa only [add_sub_cancel_left] using hlip (x + h) x)
+      have hqdiff : ‖q (x + h) - q x‖ ≤ D * (P x * ‖h‖) := by
+        have hLs : (L : ℝ) / s ≤ (L : ℝ) / δ :=
+          div_le_div_of_nonneg_left (NNReal.coe_nonneg L) hδ hδs
+        have hi : ‖q (x + h) - q x‖ ≤ (L : ℝ) * |m (x + h) / s - m x / s| := by
+          simpa only [q, dist_eq_norm, Real.norm_eq_abs] using hb.dist_le_mul (m (x + h) / s) (m x / s)
+        calc
+          _ ≤ (L : ℝ) * |m (x + h) / s - m x / s| := hi
+          _ = (L : ℝ) / s * |m (x + h) - m x| := by
+            rw [← sub_div, abs_div, abs_of_pos hs]
+            ring
+          _ ≤ (L : ℝ) / δ * (C * P x * ‖h‖) :=
+            mul_le_mul hLs (hmod x h hh) (abs_nonneg _) (by positivity)
+          _ = D * (P x * ‖h‖) := by dsimp [D]; ring
+      change ‖g (x + h) * q (x + h) - g x * q x‖ ≤ _
+      rw [show g (x + h) * q (x + h) - g x * q x =
+        (g (x + h) - g x) * q (x + h) + g x * (q (x + h) - q x) by ring]
+      calc
+        _ ≤ ‖(g (x + h) - g x) * q (x + h)‖ + ‖g x * (q (x + h) - q x)‖ :=
+          norm_add_le _ _
+        _ ≤ (Real.sqrt K * t * (Real.sqrt ‖g (x + h)‖ + Real.sqrt ‖g x‖)) * M +
+            ‖g x‖ * (D * (P x * ‖h‖)) := by
+          rw [norm_mul, norm_mul]
+          exact add_le_add (mul_le_mul hgdiff (hM _) (norm_nonneg _) (by positivity))
+            (mul_le_mul_of_nonneg_left hqdiff (norm_nonneg _))
+        _ = (M * Real.sqrt K) * t * (Real.sqrt ‖g (x + h)‖ + Real.sqrt ‖g x‖) +
+            D * ‖h‖ * (P x * ‖g x‖) := by ring
+        _ ≤ B * t * (W (x + h) + W x) + B * t * W x := by
+          exact add_le_add
+            (mul_le_mul (mul_le_mul_of_nonneg_right hB₁ ht) (add_le_add (hWsqrt _) (hWsqrt _))
+              (by positivity) (by positivity))
+            (mul_le_mul (mul_le_mul hB₂ hh' (norm_nonneg _) hB) (hWnorm x)
+              (by positivity) (by positivity))
+        _ = _ := by ring
+    have hW' : Integrable (fun x ↦ W (x + h)) μ :=
+      (measurePreserving_add_right μ h).integrable_comp_of_integrable hW
+    have hmaj := (((hW'.add hW).add hW).const_mul (B * t))
+    have hi : Integrable (fun x ↦ k R (x + h) - k R x) μ :=
+      ((measurePreserving_add_right μ h).integrable_comp_of_integrable hki).sub hki
+    calc
+      _ ≤ ∫ x, B * t * (W (x + h) + W x + W x) ∂μ := integral_mono hi.norm hmaj hdiff
+      _ = B * t * ((∫ x, W x ∂μ) + (∫ x, W x ∂μ) + (∫ x, W x ∂μ)) := by
+        rw [integral_const_mul,
+          integral_add (show Integrable (fun x ↦ W (x + h) + W x) μ from hW'.add hW) hW,
+          integral_add hW' hW, integral_add_right_eq_self]
+      _ = (3 * B) * (∫ x, W x ∂μ) * t := by ring
+      _ ≤ _ := by
+        change (3 * B) * (∫ x, W x ∂μ) * t ≤ (M + 3 * B) * (∫ x, W x ∂μ) * t
+        exact mul_le_mul_of_nonneg_right
+          (mul_le_mul_of_nonneg_right (le_add_of_nonneg_left hM₀) hWi) ht
 
 /-- The L¹ translation difference of the cutoff transform is bounded by a constant times the
 square root of the translation length, uniformly for all cutoffs R ≥ 1. -/
@@ -4641,6 +4856,151 @@ private theorem sLocalTrace_tail_bound (f : BruhatCompactSupport Iₛ) :
   obtain ⟨D, hD, hs⟩ := sLocalTrace_frequency_step (F := F) (S := S)
   simp_rw [← hχ] at hs ⊢
   exact sLocalTrace_frequency_decay (E := Eₛ) νₛ χ D hD hs (sLocalTrace_tail_amplitude f) A hA hcut
+
+/-- A single fixed Schwartz factor gives a uniform Fourier estimate for a bounded
+Lipschitz radial profile at all scales above a positive floor. -/
+private theorem sLocalTrace_radialProfile_fourier_decay (f : BruhatCompactSupport Iₛ)
+    (b : ℝ → ℂ) {L : ℝ≥0} (hLip : LipschitzWith L b) {M : ℝ} (hM : 0 ≤ M)
+    (hb : ∀ t, ‖b t‖ ≤ M) {δ : ℝ} (hδ : 0 < δ) :
+    ∃ B ≥ 0, ∀ t : ℝ, δ ≤ t → ∀ r : Eₛ,
+      ‖∫ w : Eₛ, b (modS(w) / t) * fourierₛ (sLocalTraceEta f 1) w *
+          (ψₛ (w * r) : ℂ) ∂νₛ‖ ≤ B * (Real.sqrt (max 1 ‖r + 1‖))⁻¹ := by
+  let : BorelSpace Eₛ := sAdeleRing_borelSpace
+  let : (νₛ).IsAddHaarMeasure := sLocalTrace_additiveHaar
+  let χ : Multiplicative Eₛ →ₜ* Circle :=
+    (sAdditiveTamagawaMeasure_selfDual F S).choose (Multiplicative.ofAdd (1 : Aₛ))
+  have hχ (x : Eₛ) : χ (Multiplicative.ofAdd x) = ψₛ x := by
+    exact ((sAdditiveTamagawaMeasure_selfDual F S).choose_spec.1 1 x).trans (congrArg ψₛ (one_mul _))
+  have he : (fun x : Eₛ ↦ χ (Multiplicative.ofAdd x)) = ψₛ := funext hχ
+  obtain ⟨η, hη⟩ := SLocalTraceEta.eta_test f (1 : Hₛ)
+  let s := sAdeleSchwartzFourier η
+  let g (x : Eₛ) := fourierₛ (sLocalTraceEta f 1) x
+  have hg (x : Eₛ) : g x = testAt(s, x) := by
+    change _ = fourierₛ (fun y ↦ η (Multiplicative.ofAdd y)) x
+    rw [funext hη]
+  have hgc : Continuous g := ((schwartzBruhat_continuous s).comp continuous_ofAdd).congr fun x ↦ (hg x).symm
+  have hc : Continuous (sLocalTraceEta f 1 : Eₛ → ℂ) :=
+    ((schwartzBruhat_continuous η).comp continuous_ofAdd).congr hη
+  obtain ⟨K, hK, hLipg⟩ := sLocalTrace_fourier_lipschitz (E := Eₛ) νₛ χ _
+    hc (SLocalTraceEta.eta_compact f 1)
+  rw [he] at hLipg
+  obtain ⟨d, C, hC, hmod⟩ := sLocalTrace_modulus_translation_bound (F := F) (S := S)
+  have hW := sLocalTrace_weighted_moment s d
+  simp_rw [← hg] at hW
+  have hm : Continuous fun w : Eₛ ↦ modS(w) :=
+    (continuous_finsetProd _ fun w _ ↦ (((continuous_apply w).comp continuous_fst).norm.pow _)).mul
+      (continuous_finsetProd _ fun v _ ↦ ((continuous_apply v).comp continuous_snd).norm)
+  let k (R : ℝ) (w : Eₛ) := g w * b (modS(w) / (δ + (R - 1)))
+  obtain ⟨A, hA, hcut⟩ := sLocalTrace_profile_translation (E := Eₛ) νₛ _ hm d C hC
+    (fun x h hh ↦ (hmod x h hh).2) g hgc K hK hLipg hW b hLip M hM hb δ hδ
+  obtain ⟨D, hD, hs⟩ := sLocalTrace_frequency_step (F := F) (S := S)
+  simp_rw [← hχ] at hs
+  obtain ⟨B, hB, hdec⟩ := sLocalTrace_frequency_decay (E := Eₛ) νₛ χ D hD hs k A hA hcut
+  refine ⟨B, hB, fun t ht r ↦ ?_⟩
+  let R := t - δ + 1
+  have hR : 1 ≤ R := by dsimp [R]; linarith
+  have hscale : δ + (R - 1) = t := by dsimp [R]; ring
+  let amplitude : Eₛ → ℂ := fun w ↦ b (modS(w) / t) * g w * (ψₛ (w * r) : ℂ)
+  have hkernel :
+      (fun w : Eₛ ↦ k R w * (χ (Multiplicative.ofAdd (w * r)) : ℂ)) = amplitude := by
+    funext w
+    change g w * b (modS(w) / (δ + (R - 1))) * (χ (Multiplicative.ofAdd (w * r)) : ℂ) =
+      b (modS(w) / t) * g w * (ψₛ (w * r) : ℂ)
+    rw [hχ (w * r), hscale, mul_comm (g w) (b (modS(w) / t))]
+  have h := hdec R hR r
+  rw [hkernel] at h
+  exact h
+
+/-- Paper: Theorem 12.4.1.1, Step III, p. 517.
+For bounded Lipschitz radial frequency profiles, a single summable majorant
+bounds the additive kernel over all S-unit translates of two compact idèle sets.
+Deviation: This proves absolute convergence on compact sets before passing
+to the weighted quotient operator. -/
+theorem sLocalTraceCutoffKernel_compact_orbit_bound
+    (f : BruhatCompactSupport Iₛ) (ρ : Iₛ → ℂ) (hρ : Continuous ρ)
+    (b : ℝ → ℂ) {L : ℝ≥0} (hLip : LipschitzWith L b) {M : ℝ} (hM : 0 ≤ M)
+    (hb : ∀ t, ‖b t‖ ≤ M) {X Y : Set Iₛ} (hX : IsCompact X) (hY : IsCompact Y) :
+    ∃ W : Hₛ → ℝ, Summable W ∧
+      ∀ ξ x, x ∈ X → ∀ y ∈ Y,
+        ‖sLocalTraceCutoffKernel f ρ (fun u ↦ b (modS(u))) x (ξ.val * y).val‖ ≤ W ξ := by
+  have hpos (x : Iₛ) : 0 < normS(x) :=
+    NNReal.coe_pos.mpr (Units.zero_lt (sIdeleNorm F S x))
+  have hN : Continuous (fun x : Iₛ ↦ normS(x)) :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp sLocalTrace_sIdeleNorm_continuous)
+  obtain ⟨D, hD⟩ := (hX.image (hN.inv₀ fun x ↦ (hpos x).ne')).bddAbove
+  let δ : ℝ := (max 1 D)⁻¹
+  have hδ : 0 < δ := inv_pos.mpr (zero_lt_one.trans_le (le_max_left _ _))
+  have hδle (x : Iₛ) (hx : x ∈ X) : δ ≤ normS(x) := by
+    have hbound : normS(x)⁻¹ ≤ max 1 D :=
+      (hD (mem_image_of_mem _ hx)).trans (le_max_right _ _)
+    simpa only [δ, inv_inv] using inv_anti₀ (inv_pos.mpr (hpos x)) hbound
+  obtain ⟨Cρ, hCρ⟩ := (hX.image hρ.norm).bddAbove
+  have hval : Continuous (fun x : Iₛ ↦ (show Eₛ from x.val)) := Units.continuous_val
+  obtain ⟨C₁, hC₁⟩ := (hX.image hval.norm).bddAbove
+  obtain ⟨C₂, hC₂⟩ := (hY.image (hval.comp continuous_inv).norm).bddAbove
+  let H : ℝ := max 1 (max 0 C₁ * max 0 C₂)
+  have hH : 1 ≤ H := le_max_left _ _
+  have hH0 : 0 ≤ H := zero_le_one.trans hH
+  have hxy (x y : Iₛ) (hx : x ∈ X) (hy : y ∈ Y) :
+      ‖(show Eₛ from x.val * (y⁻¹).val)‖ ≤ H := by
+    have hx' : ‖(show Eₛ from x.val)‖ ≤ max 0 C₁ :=
+      (hC₁ (mem_image_of_mem _ hx)).trans (le_max_right _ _)
+    have hy' : ‖(show Eₛ from (y⁻¹).val)‖ ≤ max 0 C₂ :=
+      (hC₂ (mem_image_of_mem _ hy)).trans (le_max_right _ _)
+    exact (norm_mul_le _ _).trans ((mul_le_mul hx' hy' (norm_nonneg _) (le_max_left _ _)).trans
+      (le_max_right _ _))
+  obtain ⟨B, hB, hFourier⟩ := sLocalTrace_radialProfile_fourier_decay f b hLip hM hb hδ
+  let A : ℝ := max 0 Cρ * |sLocalTraceMeasureFactor S| / δ
+  have hA : 0 ≤ A := by dsimp [A]; positivity
+  let W (ξ : Hₛ) := (A * B * Real.sqrt H) *
+    (Real.sqrt (max 1 ‖(show Eₛ from ξ.val.val)‖))⁻¹
+  refine ⟨W, (sLocalTrace_height_summable (F := F) (S := S)).mul_left _, ?_⟩
+  intro ξ x hx y hy
+  let r : Eₛ := (show Aₛ from (x⁻¹).val * (ξ.val * y).val - 1)
+  let z : Eₛ := (show Aₛ from x.val * (y⁻¹).val)
+  let T : ℝ := max 1 ‖r + 1‖
+  let U : ℝ := max 1 ‖(show Eₛ from ξ.val.val)‖
+  have hrec : (show Eₛ from ξ.val.val) = (r + 1) * z := by
+    change ξ.val.val =
+      (((x⁻¹).val * (ξ.val * y).val - (1 : Aₛ)) + 1) * (x.val * (y⁻¹).val)
+    rw [sub_add_cancel, Units.val_mul]
+    calc
+      _ = ((x⁻¹).val * x.val) * (y.val * (y⁻¹).val) * ξ.val.val := by
+        rw [Units.inv_mul, Units.mul_inv, one_mul, one_mul]
+      _ = _ := by ring
+  have hUT : U ≤ H * T := by
+    have hT : 1 ≤ T := le_max_left _ _
+    have hHT : 1 ≤ H * T := hH.trans (le_mul_of_one_le_right hH0 hT)
+    apply max_le hHT
+    rw [hrec]
+    refine (norm_mul_le (r + 1) z).trans ?_
+    rw [mul_comm ‖r + 1‖]
+    exact mul_le_mul (hxy x y hx hy) (le_max_right _ _) (norm_nonneg _) hH0
+  have hinv : (Real.sqrt T)⁻¹ ≤ Real.sqrt H * (Real.sqrt U)⁻¹ := by
+    have hT : 0 < T := zero_lt_one.trans_le (le_max_left _ _)
+    have hU : 0 < U := zero_lt_one.trans_le (le_max_left _ _)
+    have hroot : Real.sqrt U ≤ Real.sqrt H * Real.sqrt T :=
+      (Real.sqrt_le_sqrt hUT).trans_eq (Real.sqrt_mul hH0 T)
+    have h : 1 / Real.sqrt T ≤ Real.sqrt H / Real.sqrt U :=
+      (div_le_div_iff₀ (Real.sqrt_pos.mpr hT) (Real.sqrt_pos.mpr hU)).mpr
+        (by simpa only [one_mul] using hroot)
+    simpa only [one_div, div_eq_mul_inv, one_mul] using h
+  have hρx : ‖ρ x‖ ≤ max 0 Cρ := (hCρ (mem_image_of_mem _ hx)).trans (le_max_right _ _)
+  have hfactor : ‖ρ x * (sLocalTraceMeasureFactor S : ℂ) / (normS(x) : ℂ)‖ ≤ A := by
+    rw [norm_div, norm_mul, Complex.norm_real, Complex.norm_real, Real.norm_eq_abs,
+      Real.norm_eq_abs, abs_of_pos (hpos x)]
+    calc
+      _ ≤ max 0 Cρ * |sLocalTraceMeasureFactor S| / normS(x) :=
+        div_le_div_of_nonneg_right (mul_le_mul_of_nonneg_right hρx (abs_nonneg _)) (hpos x).le
+      _ ≤ A := div_le_div_of_nonneg_left (by positivity) hδ (hδle x hx)
+  have hdec : ‖∫ w : Aₛ, b (modS(w) / normS(x)) * fourierₛ (sLocalTraceEta f 1) w *
+      (ψₛ (w * ((x⁻¹).val * (ξ.val * y).val - 1)) : ℂ) ∂νₛ‖ ≤ B * (Real.sqrt T)⁻¹ :=
+    hFourier (normS(x)) (hδle x hx) r
+  rw [sLocalTraceCutoffKernel_scaled_radial_fourier, norm_mul]
+  apply (mul_le_mul hfactor hdec (norm_nonneg _) hA).trans
+  change A * (B * (Real.sqrt T)⁻¹) ≤ W ξ
+  simpa only [W, U, mul_assoc] using
+    mul_le_mul_of_nonneg_left hinv (mul_nonneg hA hB)
 
 end SharpMassRemainder
 
