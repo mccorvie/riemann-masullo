@@ -1477,6 +1477,39 @@ private theorem sLocalThetaFourier_mem_isotype_unitTranslate (u : (SAdeleRing F 
   have hm : (u.val * z) * y.toAdd = z * (u.val * y.toAdd) := by ring
   rw [hm]
 
+/-- Translating a test by a diagonal S-unit preserves its S-local theta function. -/
+theorem sLocalAdelicTheta_sUnitTranslate
+    (u : ((S : Set (HeightOneSpectrum (𝓞 F))).integer F)ˣ) (f : ℬₛ(S)) :
+    sLocalAdelicTheta F S (schwartzBruhatUnitTranslate (sUnitEmbedding F S u) f) =
+      sLocalAdelicTheta F S f :=
+  sLocalAdelicTheta_translate_diag u f
+
+/-- Fourier transformation reverses translation by a diagonal S-unit. The S-unit
+product formula makes its additive Haar scaling factor one. -/
+theorem sAdeleSchwartzFourier_sUnitTranslate
+    (u : ((S : Set (HeightOneSpectrum (𝓞 F))).integer F)ˣ) (f : ℬₛ(S)) :
+    sAdeleSchwartzFourier (schwartzBruhatUnitTranslate (sUnitEmbedding F S u) f) =
+      schwartzBruhatUnitTranslate (sUnitEmbedding F S u⁻¹) (sAdeleSchwartzFourier f) := by
+  have hu : sIdeleNorm F S (sUnitEmbedding F S u) = 1 := (sIdeleNorm_spec F S).2 ⟨u, rfl⟩
+  rw [map_inv (sUnitEmbedding F S)]
+  exact sLocalThetaFourier_mem_isotype_unitTranslate _ hu f
+
+/-- Translating a test by a diagonal S-unit preserves its value at zero and its
+integral against additive Tamagawa measure. -/
+theorem sAdeleSchwartz_sUnitTranslate_origin_integral
+    (u : ((S : Set (HeightOneSpectrum (𝓞 F))).integer F)ˣ) (f : ℬₛ(S)) :
+    let t := schwartzBruhatUnitTranslate (sUnitEmbedding F S u) f
+    t (Multiplicative.ofAdd 0) = f (Multiplicative.ofAdd 0) ∧
+      (∫ x : SAdeleRing F S, t (Multiplicative.ofAdd x) ∂sAdditiveTamagawaMeasure F S) =
+        ∫ x : SAdeleRing F S, f (Multiplicative.ofAdd x) ∂sAdditiveTamagawaMeasure F S := by
+  intro t
+  constructor
+  · dsimp only [t]
+    rw [schwartzBruhatUnitTranslate_apply, mul_zero]
+  · rw [← sAdeleSchwartzFourier_apply_zero, ← sAdeleSchwartzFourier_apply_zero]
+    dsimp only [t]
+    rw [sAdeleSchwartzFourier_sUnitTranslate, schwartzBruhatUnitTranslate_apply, mul_zero]
+
 end
 
 section
