@@ -38,9 +38,9 @@ too large, and the second bound `√(X / (a p ^ (i - j)))` is used.
 
 Reconstruction: The paper does not state this.
 
-Deviation: The operator is given as the sum of its blocks. That this sum is
-`Q (U⁻¹ M_L U) A_ψ Q`, and that this is the cutoff operator of Connes on the sector of
-`L²(X_S)`, are on paper and are not formalized here. -/
+Deviation: The operator is given here as the sum of its blocks. That this sum is
+`Q (U⁻¹ M_L U) A_ψ Q` is proved in `Sec4_RealPWPrimeTwist`. That this is the cutoff operator of
+Connes on the sector of `L²(X_S)` is on paper and is not formalized. -/
 
 @[expose] public noncomputable section
 
@@ -1098,9 +1098,9 @@ Paper: for `r = p ^ (-1/2)` this is the term of the place `p` in Theorem 12.4.1.
 (12.4.1.1), p. 514, for `F = ℚ`, and the statement is the case `k = ℚ`, `S = {∞, p}` of
 A. Connes, *Trace formula in noncommutative geometry and the zeros of the Riemann zeta
 function*, §VII, Theorem 4, p. 31, on the functions invariant under the units of `ℚ_p`.
-Deviation: the operator is given as the sum of its blocks. That this sum is
-`Q U⁻¹ M_L U A_ψ Q` for the unitary `U = (1 - r T⁻¹) (1 - r T)⁻¹`, `T f (x) = √p f (p x)`,
-and that this is the cutoff operator on the sector of `L²(X_S)`, is not formalized. The band
+Deviation: the operator is given as the sum of its blocks. `Sec4_RealPWPrimeTwist` shows that
+this sum is `Q U⁻¹ M_L U A_ψ Q` for `U = (1 - r T⁻¹) (1 - r T)⁻¹`, `T f (x) = √p f (p x)`.
+That this is the cutoff operator on the sector of `L²(X_S)` is not formalized. The band
 has a fixed width `Y`, where Connes cuts both variables at the same `Λ`. The test function is
 assumed Lipschitz. -/
 theorem exists_primeTwistedCutoff_trace_limit (hY : 0 < Y) {p r : ℝ} (hp : 1 < p)

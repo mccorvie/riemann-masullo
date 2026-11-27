@@ -47,7 +47,8 @@ of the blocks, through the first moments.
 Reconstruction: The paper does not state this.
 
 The convergence of the series of operators in trace norm, so that the series is the trace of
-one nuclear operator on the band, is in `Sec4_RealPWBlockTraceNorm`.
+one nuclear operator on the band, is in `Sec4_RealPWBlockTraceNorm`. The expansion of
+`Q (U⁻¹ M_L U) A_ψ Q` into the blocks is in `Sec4_RealPWPrimeTwist`.
 
 Not treated here: the reduction of the sector of `L²(X_S)` to this series, which is on paper.
 Test functions that are not Lipschitz. A weight. The level. -/
