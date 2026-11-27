@@ -169,6 +169,32 @@ theorem sLocalPWThetaSobolevMap_apply {a : ℝ} (ha : 0 < a) (ω : PontryaginDua
     ((sLocalPWThetaSobolevMap_apply_dens_meas 0 0 s).comp hm).aemeasurable
     (fun _ ↦ sLocalPWThetaSobolevMap_apply_dens_pos _ _ _ _) (MemLp.coeFn_toLp _)
 
+/-- Paper: (11.2.1.1) and (11.2.1.6), pp. 487–488. At twist one half, the local Paley–Wiener Sobolev generator is
+represented by the norm-one character integral of the ordinary theta
+multiplied by square-root norm. The integral uses the quotient Tamagawa
+measure on the norm-one subgroup, as in the homogeneous theta definition. -/
+theorem sLocalPWThetaSobolevMap_apply_halfDensityAverage
+    (ω : PontryaginDual J₁) (f : Zₛ) :
+    let N (q : SIdeleQuotient F S) : ℝ := (sIdeleQuotientNorm F S q).val
+    (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s)
+        (show (0 : ℝ) < 1 / 2 by norm_num) ω f : SIdeleQuotient F S → ℂ)
+      =ᵐ[sLocalQuotientTamagawaMeasure F S] fun q ↦
+        ∫ h : J₁, ((Real.sqrt (N (q * h.val)) : ℂ) *
+          sLocalAdelicThetaOnClasses F S f.val (q * h.val)) * (ω h : ℂ)
+          ∂sLocalNormOneQuotientMeasure F S := by
+  intro N
+  filter_upwards [sLocalPWThetaSobolevMap_apply (F := F) (S := S) (s := s)
+    (show (0 : ℝ) < 1 / 2 by norm_num) ω f] with q hq
+  rw [hq]
+  change ((N q ^ (1 / 2 : ℝ) : ℝ) : ℂ) *
+    sLocalHomogeneousAdelicThetaLinearMap F S ω f.val q = _
+  rw [← Real.sqrt_eq_rpow, sLocalHomogeneousAdelicThetaLinearMap_apply, ← integral_const_mul]
+  refine integral_congr_ae (ae_of_all _ fun h ↦ ?_)
+  have hN : N (q * h.val) = N q := by
+    dsimp only [N]
+    rw [map_mul, MonoidHom.mem_ker.mp h.property, mul_one]
+  simp only [hN, mul_assoc]
+
 /-- Paper: (11.2.1.2) and (11.2.1.7), pp. 487–488.
 Globalized polar-free tests yield weighted Sobolev vectors.
 Deviation: Use direct integer-indicator insertion as in the repaired §7.3.2. -/
@@ -1246,6 +1272,48 @@ theorem sLocalInvariantPWSobolev_mem {a : ℝ} (ha : 0 < a) (ω : PontryaginDual
     (f : Zₛ) (_hf : f ∈ band(sLocalPWProductRegion S Λ)) :
     sLocalPWThetaSobolevMap (F := F) (S := S) (s := s) ha ω f ∈ sLocalInvariantPWSobolev (F := F) (S := S) hs ha ω Λ := by
   exact Submodule.le_topologicalClosure _ (Submodule.subset_span ⟨⟨f, _hf⟩, rfl⟩)
+
+/-- Agreement on the polar-free product-band theta generators extends to
+the local invariant Paley–Wiener level. -/
+theorem sLocalInvariantPWSobolev_eqOn_of_generators
+    {a : ℝ} (ha : 0 < a) (ω : PontryaginDual J₁) (Λ : ℝ)
+    (T B : LocalW →L[ℂ] LocalW)
+    (hTest : ∀ f : band(sLocalPWProductRegion S Λ),
+      T (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s) ha ω f.val) =
+        B (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s) ha ω f.val)) :
+    Set.EqOn T B (sLocalInvariantPWSobolev (F := F) (S := S) hs ha ω Λ : Set LocalW) := by
+  let D := T - B
+  have hV : sLocalInvariantPWSobolev (F := F) (S := S) hs ha ω Λ ≤ D.ker := by
+    unfold sLocalInvariantPWSobolev
+    refine Submodule.topologicalClosure_minimal _ ?_ D.isClosed_ker
+    refine Submodule.span_le.mpr ?_
+    rintro _ ⟨f, rfl⟩
+    change T _ - B _ = 0
+    rw [hTest f, sub_self]
+  intro x hx
+  have hz : D x = 0 := LinearMap.mem_ker.mp (hV hx)
+  exact sub_eq_zero.mp hz
+
+/-- Auxiliary comparison for Theorem 12.4.1.1, p. 515. The compression
+to the local product-band weighted level is determined
+by a bounded operator's action on the defining theta generators. -/
+theorem sLocalInvariantPWSobolev_compress_eq_of_generators
+    {a : ℝ} (ha : 0 < a) (ω : PontryaginDual J₁) (Λ : ℝ)
+    (T B : LocalW →L[ℂ] LocalW)
+    (hTest : ∀ f : band(sLocalPWProductRegion S Λ),
+      T (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s) ha ω f.val) =
+        B (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s) ha ω f.val)) :
+    let level := sLocalInvariantPWSobolev (F := F) (S := S) hs ha ω Λ
+    let projection : LocalW →L[ℂ] level := by
+      letI : CompleteSpace level :=
+        (show IsClosed (level : Set LocalW) from Submodule.isClosed_topologicalClosure _).completeSpace_coe
+      exact level.orthogonalProjectionOnto
+    projection.comp (T.comp level.subtypeL) = projection.comp (B.comp level.subtypeL) := by
+  intro level projection
+  have hEq := sLocalInvariantPWSobolev_eqOn_of_generators hs ha ω Λ T B hTest
+  apply ContinuousLinearMap.ext
+  intro u
+  exact congrArg projection (hEq u.property)
 
 /-- Paper: Definition 11.2.1.3(1) and (11.2.1.7), p. 488.
 The global invariant level completes the weighted homogeneous theta image
