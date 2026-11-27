@@ -1,4 +1,6 @@
-import Mathlib
+module
+
+public import Mathlib
 
 /-!
 # Chapter 5. Spaces of adelic θ-functions and Idelic Z-functions
