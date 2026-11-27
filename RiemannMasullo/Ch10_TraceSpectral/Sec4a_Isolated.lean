@@ -1491,43 +1491,6 @@ theorem spectralStripConvolution_nuclear_of_finite_jet_bound
   exact spectralStripConvolution_nuclear_of_summable_basis a hα hs e fun ψ ↦
     he _ _ (hC ψ).choose_spec
 
-/-- Parseval's identity for a Hilbert basis. -/
-private theorem hasSum_norm_inner_sq_hilbertBasis {E ι : Type*} [NormedAddCommGroup E]
-    [InnerProductSpace ℂ E] (b : HilbertBasis ι ℂ E) (x : E) :
-    HasSum (fun i ↦ ‖inner ℂ (b i) x‖ ^ (2 : ℕ)) (‖x‖ ^ (2 : ℕ)) := by
-  simpa only [ENNReal.toReal_ofNat, Real.rpow_two, LinearIsometryEquiv.norm_map,
-    b.repr_apply_apply] using lp.hasSum_norm (p := 2) (by norm_num) (b.repr x)
-
-/-- The squared norms of an operator on one Hilbert basis are summable exactly when the squared
-norms of its adjoint on another Hilbert basis are: both sums add up `|⟪f j, T (b i)⟫|²`. -/
-private theorem summable_sq_basis_iff_summable_sq_adjoint {E G ι κ : Type*}
-    [NormedAddCommGroup E] [InnerProductSpace ℂ E] [CompleteSpace E] [NormedAddCommGroup G]
-    [InnerProductSpace ℂ G] [CompleteSpace G] (b : HilbertBasis ι ℂ E)
-    (f : HilbertBasis κ ℂ G) (T : E →L[ℂ] G) :
-    Summable (fun i ↦ ‖T (b i)‖ ^ (2 : ℕ)) ↔
-      Summable (fun j ↦ ‖T.adjoint (f j)‖ ^ (2 : ℕ)) := by
-  let c (i : ι) (j : κ) : ℝ := ‖inner ℂ (f j) (T (b i))‖ ^ (2 : ℕ)
-  have hnn (i : ι) (j : κ) : 0 ≤ c i j := by positivity
-  have hrow (i : ι) : HasSum (c i) (‖T (b i)‖ ^ (2 : ℕ)) :=
-    hasSum_norm_inner_sq_hilbertBasis f (T (b i))
-  have hcol (j : κ) : HasSum (fun i ↦ c i j) (‖T.adjoint (f j)‖ ^ (2 : ℕ)) := by
-    have h := hasSum_norm_inner_sq_hilbertBasis b (T.adjoint (f j))
-    convert h using 2 with i
-    simp only [c]
-    rw [ContinuousLinearMap.adjoint_inner_right, norm_inner_symm]
-  have h1 : Summable (fun p : ι × κ ↦ c p.1 p.2) ↔ Summable (fun i ↦ ‖T (b i)‖ ^ (2 : ℕ)) := by
-    have htsum (i : ι) : (∑' j, c i j) = ‖T (b i)‖ ^ (2 : ℕ) := (hrow i).tsum_eq
-    rw [summable_prod_of_nonneg (fun p ↦ hnn p.1 p.2), and_iff_right (fun i ↦ (hrow i).summable)]
-    simp only [htsum]
-  have h2 : Summable (fun p : κ × ι ↦ c p.2 p.1) ↔
-      Summable (fun j ↦ ‖T.adjoint (f j)‖ ^ (2 : ℕ)) := by
-    have htsum (j : κ) : (∑' i, c i j) = ‖T.adjoint (f j)‖ ^ (2 : ℕ) := (hcol j).tsum_eq
-    rw [summable_prod_of_nonneg (fun p ↦ hnn p.2 p.1), and_iff_right (fun j ↦ (hcol j).summable)]
-    simp only [htsum]
-  have h3 : Summable (fun p : κ × ι ↦ c p.2 p.1) ↔ Summable (fun p : ι × κ ↦ c p.1 p.2) :=
-    (Equiv.prodComm κ ι).summable_iff (f := fun p : ι × κ ↦ c p.1 p.2)
-  exact h1.symm.trans (h3.symm.trans h2)
-
 /-- For an operator with square summable values on a Hilbert basis, the sum of the squared norms
 equals the sum of the squared norms of the adjoint on another Hilbert basis. -/
 private theorem tsum_sq_basis_eq_tsum_sq_adjoint {E G ι κ : Type*}
