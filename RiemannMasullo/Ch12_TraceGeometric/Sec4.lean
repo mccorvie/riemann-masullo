@@ -1740,6 +1740,173 @@ def sLocalTraceSharpMass (f : BruhatCompactSupport Iₛ) (ξ : Hₛ) (R : ℝ) :
   (volume₁ : ℂ) * ∫ w in band(R) ∩ range (Units.val : Iₛ → Aₛ),
     fourierₛ (sLocalTraceEta f ξ) w * ((Real.log R - Real.log (modS(w)) : ℝ) : ℂ) ∂νₛ
 
+/-- Paper: Theorem 12.4.1.1, Step II and (12.4.1.8)–(12.4.1.10), pp. 516–517.
+At an S-idelic output the dilation-first additive kernel gives an absolutely
+integrable pairing with a Schwartz–Bruhat input. Its action is Fourier cutoff,
+dilation, then spatial multiplication.
+Deviation: Bounded measurable frequency symbols suffice for this pairing.
+The pointwise Fourier-kernel factorization for integrable symbols is
+`sLocalTraceCutoffKernel_eq_comp`. -/
+theorem sLocalTraceCutoffKernel_apply_test
+    (f : BruhatCompactSupport Iₛ) (ρ : Iₛ → ℂ) (σ : Aₛ → ℂ)
+    (hσ : Measurable σ) (M : ℝ) (hM : ∀ u, ‖σ u‖ ≤ M)
+    (v : testₛ) (x : Iₛ) :
+    Integrable (fun y ↦ sLocalTraceCutoffKernel f ρ σ x y * testAt(v,y)) νₛ ∧
+      (∫ y, sLocalTraceCutoffKernel f ρ σ x y * testAt(v,y) ∂νₛ) =
+        ρ x * sLocalTraceDilationKernel f (sLocalTraceFourierCutoff σ v) x.val := by
+  let : BorelSpace Aₛ := sAdeleRing_borelSpace
+  let : BorelSpace Iₛ := sIdeleGroup_borelSpace
+  let (p : S) : ProperSpace (p.val.adicCompletion F) := properSpace_adicCompletion p.val
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let : SecondCountableTopology Aₛ := inferInstanceAs (SecondCountableTopology
+    (((w : InfinitePlace F) → w.Completion) × ((p : S) → p.val.adicCompletion F)))
+  let : SecondCountableTopology Iₛ := (sIdeleGroup_description F S).1.secondCountableTopology
+  let : T2Space Aₛ := inferInstanceAs (T2Space
+    (((w : InfinitePlace F) → w.Completion) × ((p : S) → p.val.adicCompletion F)))
+  let : LocallyCompactSpace Aₛ := inferInstanceAs (LocallyCompactSpace
+    (((w : InfinitePlace F) → w.Completion) × ((p : S) → p.val.adicCompletion F)))
+  let : (νₛ).IsAddHaarMeasure := sLocalTrace_additiveHaar
+  let : (μₛ).IsHaarMeasure := sMultiplicativeTamagawaMeasure_isHaarMeasure
+  have htest (b : testₛ) : Integrable (fun y : Aₛ ↦ testAt(b,y)) νₛ := by
+    let G := Multiplicative Aₛ
+    let μ : Measure G := νₛ
+    have hν : (νₛ).IsAddHaarMeasure := sLocalTrace_additiveHaar
+    let : μ.IsHaarMeasure :=
+      { toIsFiniteMeasureOnCompacts := hν.toIsFiniteMeasureOnCompacts
+        toIsOpenPosMeasure := hν.toIsOpenPosMeasure
+        map_mul_left_eq_self := fun y ↦ hν.map_add_left_eq_self y.toAdd }
+    let (p : S) : LocallyCompactSpace (p.val.adicCompletion F) := locallyCompactSpace_adicCompletion _
+    let : T2Space G := inferInstanceAs (T2Space
+      (((w : InfinitePlace F) → w.Completion) × ((p : S) → p.val.adicCompletion F)))
+    let : LocallyCompactSpace G := inferInstanceAs (LocallyCompactSpace Aₛ)
+    let : BorelSpace G := sAdeleRing_borelSpace (F := F) (S := S)
+    exact SchwartzBruhat.integrable μ b
+  obtain ⟨e, he, _⟩ := sAdditiveTamagawaMeasure_selfDual F S
+  let χ := e (Multiplicative.ofAdd (1 : Aₛ))
+  have hχ (z : Aₛ) : χ (Multiplicative.ofAdd z) = ψₛ z := by
+    simpa only [one_mul] using he 1 z
+  let p (z : Aₛ) : ℂ := ψₛ z
+  have hcontinuous : Continuous p := by
+    change Continuous (fun z : Aₛ ↦ (ψₛ z : ℂ))
+    simp_rw [← hχ]
+    exact continuous_subtype_val.comp ((map_continuous χ).comp continuous_ofAdd)
+  have hadd (a b : Aₛ) : p (a + b) = p a * p b := by
+    change (ψₛ (a + b) : ℂ) = (ψₛ a : ℂ) * (ψₛ b : ℂ)
+    simp only [← hχ, ofAdd_add, map_mul, Circle.coe_mul]
+  have hneg (z : Aₛ) : star (p (-z)) = p z := by
+    change star (ψₛ (-z) : ℂ) = (ψₛ z : ℂ)
+    rw [← hχ, ofAdd_neg, map_inv, Circle.coe_inv_eq_conj,
+      ← Complex.star_def, star_star, hχ]
+  have hunit (z : Aₛ) : ‖p z‖ = 1 := Circle.norm_coe _
+  let c : ℂ := sLocalTraceMeasureFactor S
+  let L (u : Aₛ) := fourierₛ (sLocalTraceEta f 1) (-(x.val * u))
+  let D (u : Aₛ) := c * L u * p (x.val * u)
+  let testFun (y : Aₛ) := testAt(v,y)
+  let Vfourier (u : Aₛ) := testAt(sAdeleSchwartzFourier v,u)
+  have hL : Integrable (fun u ↦ σ u * L u) νₛ := by
+    simpa only [L, Units.val_neg, neg_mul] using
+      sLocalTrace_integrable_symbol_dilate _ (sLocalTraceEta_fourier_integrable f 1)
+        (-x) σ hσ M hM
+  have hD : Integrable (fun u ↦ σ u * D u) νₛ := by
+    have hp : Continuous (fun u : Aₛ ↦ p (x.val * u)) :=
+      hcontinuous.comp (continuous_const.mul continuous_id)
+    refine ((hL.const_mul c).mul_bdd hp.aestronglyMeasurable
+      (c := 1) (ae_of_all _ fun u ↦ (hunit (x.val * u)).le)).congr ?_
+    exact ae_of_all _ fun u ↦ by dsimp only [D]; ring
+  have hdilation (u : Aₛ) :
+      sLocalTraceDilationKernel f (fun z ↦ p (z * u)) x.val = D u := by
+    have hd :
+        sLocalTraceDilationKernel f (fun z ↦ p ((z - x.val) * u)) x.val = c * L u := by
+      simpa only [p, c, L, Subgroup.coe_one, one_mul] using
+        sLocalTraceDilationKernel_skew_frequency f (1 : Hₛ) x u
+    change sLocalTraceDilationKernel f (fun z ↦ p (z * u)) x.val =
+      (c * L u) * p (x.val * u)
+    rw [← hd]
+    unfold sLocalTraceDilationKernel
+    rw [← integral_mul_const]
+    apply integral_congr_ae
+    exact ae_of_all _ fun g ↦ by
+      let weight : ℂ := f.val g / (Real.sqrt (normS(g)) : ℂ)
+      change weight * p ((g⁻¹).val * x.val * u) =
+        weight * p (((g⁻¹).val * x.val - x.val) * u) * p (x.val * u)
+      rw [show (g⁻¹).val * x.val * u =
+        ((g⁻¹).val * x.val - x.val) * u + x.val * u by ring, hadd, mul_assoc]
+  have hkernel (y : Aₛ) :
+      sLocalTraceCutoffKernel f ρ σ x y =
+        ρ x * ∫ u, σ u * D u * p (-(y * u)) ∂νₛ := by
+    rw [sLocalTraceCutoffKernel_offDiagonal_fourier]
+    change ρ x * c * (∫ u, σ u * L u * p ((x.val - y) * u) ∂νₛ) = _
+    rw [mul_assoc, ← integral_const_mul]
+    apply congrArg (ρ x * ·)
+    apply integral_congr_ae
+    exact ae_of_all _ fun u ↦ by
+      change c * (σ u * L u * p ((x.val - y) * u)) = σ u * D u * p (-(y * u))
+      rw [show (x.val - y) * u = x.val * u + -(y * u) by ring, hadd]
+      dsimp only [D]
+      ring
+  let J (z : Aₛ × Aₛ) := σ z.2 * D z.2 * p (-(z.1 * z.2)) * testFun z.1
+  have hJ : Integrable J ((νₛ).prod νₛ) := by
+    have hp : Continuous (fun z : Aₛ × Aₛ ↦ p (-(z.1 * z.2))) :=
+      hcontinuous.comp ((continuous_fst.mul continuous_snd).neg)
+    refine (((htest v).mul_prod hD).mul_bdd hp.aestronglyMeasurable
+      (c := 1) (ae_of_all _ fun z ↦ (hunit (-(z.1 * z.2))).le)).congr ?_
+    exact ae_of_all _ fun z ↦ by dsimp only [J, testFun]; ring
+  have hinput (y : Aₛ) :
+      sLocalTraceCutoffKernel f ρ σ x y * testFun y =
+        ρ x * ∫ u, J (y, u) ∂νₛ := by
+    rw [hkernel y, mul_assoc, ← integral_mul_const] <;> rfl
+  have houtput (u : Aₛ) :
+      (∫ y, J (y, u) ∂νₛ) = (σ u * Vfourier u) * D u := by
+    calc
+      (∫ y, J (y, u) ∂νₛ) =
+          ∫ y, (σ u * D u) * (testFun y * star (p (y * u))) ∂νₛ := by
+        apply integral_congr_ae
+        exact ae_of_all _ fun y ↦ by
+          change σ u * D u * p (-(y * u)) * testFun y = _
+          have hy : p (-(y * u)) = star (p (y * u)) := by
+            simpa only [neg_neg] using (hneg (-(y * u))).symm
+          rw [hy]
+          ring
+      _ = (σ u * Vfourier u) * D u := by
+        rw [integral_const_mul]
+        change (σ u * D u) * Vfourier u = _
+        ring
+  let W (g : Iₛ) := f.val g / (Real.sqrt (normS(g)) : ℂ)
+  let phase (g : Iₛ) (u : Aₛ) := p (((g⁻¹).val * x.val) * u)
+  let symbol (u : Aₛ) := σ u * Vfourier u
+  have hW : Integrable W μₛ := (sLocalTraceDilationKernel_apply_zero f 0).1
+  have hsymbol : Integrable symbol νₛ :=
+    (htest (sAdeleSchwartzFourier v)).bdd_mul hσ.aestronglyMeasurable (ae_of_all _ hM)
+  have hphase : Continuous (fun z : Aₛ × Iₛ ↦ phase z.2 z.1) :=
+    hcontinuous.comp
+      ((((Units.continuous_val.comp continuous_inv).comp continuous_snd).mul
+        continuous_const).mul continuous_fst)
+  have hcutoff (g : Iₛ) :
+      (∫ u, symbol u * phase g u ∂νₛ) =
+        sLocalTraceFourierCutoff σ v ((g⁻¹).val * x.val) := by
+    unfold sLocalTraceFourierCutoff tamagawaFourier
+    apply integral_congr_ae
+    exact ae_of_all _ fun u ↦ by
+      change symbol u * p ((g⁻¹).val * x.val * u) =
+        symbol u * star (p (u * -((g⁻¹).val * x.val)))
+      rw [mul_neg, hneg, mul_comm u]
+  refine ⟨(hJ.integral_prod_left.const_mul (ρ x)).congr
+    (ae_of_all _ fun y ↦ (hinput y).symm), ?_⟩
+  calc
+    (∫ y, sLocalTraceCutoffKernel f ρ σ x y * testFun y ∂νₛ) =
+        (∫ y, ρ x * ∫ u, J (y, u) ∂νₛ ∂νₛ) := by simp only [hinput]
+    _ = ρ x * ∫ u, ∫ y, J (y, u) ∂νₛ ∂νₛ := by
+      rw [integral_const_mul, integral_integral_swap (f := fun y u ↦ J (y, u)) hJ]
+    _ = ρ x * ∫ u, symbol u * (∫ g, W g * phase g u ∂μₛ) ∂νₛ := by
+      have hD' (u : Aₛ) : D u = ∫ g, W g * phase g u ∂μₛ := (hdilation u).symm
+      simp only [houtput, hD', symbol]
+    _ = ρ x * ∫ g, W g * (∫ u, symbol u * phase g u ∂νₛ) ∂μₛ := by
+      rw [sLocalTraceCutoffKernel_eq_comp_fubini μₛ νₛ W symbol phase hW hsymbol
+        hphase.aestronglyMeasurable (fun g u ↦ hunit (((g⁻¹).val * x.val) * u))]
+    _ = ρ x * sLocalTraceDilationKernel f (sLocalTraceFourierCutoff σ v) x.val := by
+      simp only [hcutoff, sLocalTraceDilationKernel, W]
+
 /-- Paper: (12.4.1.24), p. 518. The sharp orbital mass of the zero lift vanishes
 at every radius. -/
 theorem sLocalTraceSharpMass_zero (ξ : Hₛ) (R : ℝ) :
@@ -4039,6 +4206,68 @@ theorem sLocalTraceCutoffKernel_scaled_radial_fourier
   change ρ x * (sLocalTraceMeasureFactor S : ℂ) * (∫ u, k u ∂νₛ) = _
   rw [hchange]
   field_simp [hx0]
+
+/-- A continuous spatial cutoff and a bounded continuous radial symbol give
+joint idelic continuity of the additive kernel. This supports the quotient-kernel
+construction left open in Theorem 12.4.1.1, Step II, p. 517. -/
+theorem sLocalTraceCutoffKernel_continuous_radial
+    (f : BruhatCompactSupport Iₛ) (ρ : Iₛ → ℂ) (hρ : Continuous ρ)
+    (b : ℝ → ℂ) (hb : Continuous b) {B : ℝ} (hB : ∀ t, 0 ≤ t → ‖b t‖ ≤ B) :
+    Continuous (fun p : Iₛ × Iₛ ↦
+      sLocalTraceCutoffKernel f ρ (fun v ↦ b (modS(v))) p.1 p.2.val) := by
+  let : BorelSpace Aₛ := sAdeleRing_borelSpace
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let : SecondCountableTopology Aₛ := inferInstanceAs (SecondCountableTopology
+    (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let : SecondCountableTopology Iₛ := (sIdeleGroup_description F S).1.secondCountableTopology
+  have hN : Continuous (fun x : Iₛ ↦ normS(x)) :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp sLocalTrace_sIdeleNorm_continuous)
+  have hN₀ (x : Iₛ) : normS(x) ≠ 0 :=
+    (NNReal.coe_pos.mpr (Units.zero_lt (sIdeleNorm F S x))).ne'
+  have hm : Continuous (fun w : Aₛ ↦ modS(w)) :=
+    (continuous_finsetProd _ fun w _ ↦ ((continuous_apply w).comp continuous_fst).norm.pow _).mul
+      (continuous_finsetProd _ fun v _ ↦ ((continuous_apply v).comp continuous_snd).norm)
+  have hm₀ (w : Aₛ) : 0 ≤ modS(w) := by positivity
+  obtain ⟨e, he, -⟩ := sAdditiveTamagawaMeasure_selfDual F S
+  let χ := e (Multiplicative.ofAdd (1 : Aₛ))
+  have hchar (w : Aₛ) : χ (Multiplicative.ofAdd w) = ψₛ w := by
+    simpa only [one_mul] using he 1 w
+  have hχ : Continuous (fun w : Aₛ ↦ (ψₛ w : ℂ)) :=
+    ((continuous_subtype_val.comp χ.continuous).comp continuous_ofAdd).congr
+      (fun w ↦ congrArg (fun z : Circle ↦ (z : ℂ)) (hchar w))
+  have hval : Continuous (fun y : Iₛ ↦ (show Aₛ from y.val)) := Units.continuous_val
+  let G (w : Aₛ) := fourierₛ (sLocalTraceEta f 1) w
+  have hG : Integrable G νₛ := sLocalTraceEta_fourier_integrable f 1
+  let r (p : Iₛ × Iₛ) : Aₛ := (p.1⁻¹).val * p.2.val - 1
+  have hr : Continuous r :=
+    ((hval.comp (continuous_inv.comp continuous_fst)).mul
+      (hval.comp continuous_snd)).sub continuous_const
+  let K (p : Iₛ × Iₛ) (w : Aₛ) : ℂ :=
+    b (modS(w) / normS(p.1)) * G w * (ψₛ (w * r p) : ℂ)
+  have hK : Continuous (fun p : Iₛ × Iₛ ↦ ∫ w, K p w ∂νₛ) := by
+    apply continuous_of_dominated (bound := fun w ↦ B * ‖G w‖)
+    · intro p
+      exact ((hb.comp (hm.div_const _)).aestronglyMeasurable.mul hG.aestronglyMeasurable).mul
+        (hχ.comp (continuous_id.mul_const (r p))).aestronglyMeasurable
+    · intro p
+      exact ae_of_all _ fun w ↦ by
+        dsimp only [K]
+        rw [norm_mul, norm_mul, Circle.norm_coe, mul_one]
+        exact mul_le_mul_of_nonneg_right (hB _ (div_nonneg (hm₀ w) (NNReal.coe_nonneg _)))
+          (norm_nonneg _)
+    · exact hG.norm.const_mul B
+    · exact ae_of_all _ fun w ↦
+        ((hb.comp (continuous_const.div (hN.comp continuous_fst) fun p ↦ hN₀ p.1)).mul_const (G w)).mul
+          (hχ.comp (continuous_const.mul hr))
+  have hp : Continuous (fun p : Iₛ × Iₛ ↦
+      ρ p.1 * (sLocalTraceMeasureFactor S : ℂ) / (normS(p.1) : ℂ)) :=
+    ((hρ.comp continuous_fst).mul_const _).div
+      (Complex.continuous_ofReal.comp (hN.comp continuous_fst))
+      (fun p ↦ Complex.ofReal_ne_zero.mpr (hN₀ p.1))
+  refine (hp.mul hK).congr fun p ↦ ?_
+  exact (sLocalTraceCutoffKernel_scaled_radial_fourier f ρ b p.1 p.2.val).symm
 
 private theorem sLocalTrace_integral_dilate_unit (ξ : Hₛ) (g : Aₛ → ℂ) :
     (∫ y, g (ξ.val.val * y) ∂νₛ) = ∫ y, g y ∂νₛ := by
