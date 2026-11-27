@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch11_ShellStructure.Sec2b
+import RiemannMasullo.Ch11_ShellStructure.Sec2b_RatEmptyQuotient
 import RiemannMasullo.Ch03_IdelicZeta.RatEmptyFourier
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.Ch11_ShellStructure.Sec2a_PrimePVRefutation
@@ -58,115 +59,6 @@ local notation "localTheta(" F ", " S ", " a ", " ω ", " f ")" =>
 
 local notation "qₛ(" F ", " S ", " ω ")" =>
   (LinearMap.ker (sLocalHomogeneousAdelicThetaLinearMap F S ω)).mkQ
-
-private theorem sec2bP_units (ξ : (Set.integer ((∅ : Finset V(ℚ)) : Set V(ℚ)) ℚ)ˣ) :
-    ξ = 1 ∨ ξ = -1 := by
-  have hmem : ∀ x : (Set.integer ((∅ : Finset V(ℚ)) : Set V(ℚ)) ℚ),
-      ∃ y : 𝓞 ℚ, algebraMap (𝓞 ℚ) ℚ y = (x : ℚ) := by
-    intro x
-    have he : ((∅ : Finset V(ℚ)) : Set V(ℚ)).integer ℚ = ⊥ := by
-      rw [Finset.coe_empty, integer_empty]
-    have hx : (x : ℚ) ∈ (⊥ : Subalgebra (𝓞 ℚ) ℚ) := he ▸ x.property
-    exact Algebra.mem_bot.mp hx
-  obtain ⟨a, ha⟩ := hmem ξ.val
-  obtain ⟨b, hb⟩ := hmem (ξ⁻¹).val
-  have hab : a * b = 1 := by
-    apply IsFractionRing.injective (𝓞 ℚ) ℚ
-    rw [map_mul, ha, hb, map_one]
-    have h := congrArg Subtype.val ξ.mul_inv
-    exact h
-  have hu : IsUnit (Rat.ringOfIntegersEquiv a) := (IsUnit.of_mul_eq_one b hab).map _
-  rcases Int.isUnit_iff.mp hu with h | h
-  · left
-    have ha1 : a = 1 := Rat.ringOfIntegersEquiv.injective (h.trans (map_one _).symm)
-    apply Units.ext
-    apply Subtype.ext
-    rw [← ha, ha1, map_one]
-    rfl
-  · right
-    have ha1 : a = -1 := Rat.ringOfIntegersEquiv.injective (h.trans (by simp))
-    apply Units.ext
-    apply Subtype.ext
-    rw [← ha, ha1, map_neg, map_one]
-    rfl
-
-private theorem sec2bP_one_ne_neg_one :
-    (1 : (Set.integer ((∅ : Finset V(ℚ)) : Set V(ℚ)) ℚ)ˣ) ≠ -1 := by
-  intro h
-  have h' := congrArg (fun u : (Set.integer ((∅ : Finset V(ℚ)) : Set V(ℚ)) ℚ)ˣ ↦
-    Subtype.val (Units.val u)) h
-  norm_num at h'
-
-private theorem sec2bP_norm (x : (SAdeleRing ℚ ∅)ˣ) :
-    ((sIdeleNorm ℚ ∅ x : ℝ≥0) : ℝ) = ‖x.val.1 Rat.infinitePlace‖ := by
-  simp [sIdeleNorm]
-  rw [Unique.eq_default Rat.infinitePlace]
-
-private theorem sec2bP_abs (z : Rat.infinitePlace.Completion) :
-    |InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace z| = ‖z‖ := by
-  rw [← Real.norm_eq_abs, ← dist_zero_right, ← dist_zero_right z,
-    ← map_zero (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace)]
-  exact (InfinitePlace.Completion.isometryEquivRealOfIsReal Rat.isReal_infinitePlace).dist_eq z 0
-
-private theorem sec2bP_thetaClasses (f : SchwartzBruhat (Multiplicative (SAdeleRing ℚ ∅)))
-    (φ : ℝ → ℂ) (hf : ∀ x : SAdeleRing ℚ ∅, f (Multiplicative.ofAdd x) =
-      φ (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
-        (x.1 Rat.infinitePlace)))
-    (x : (SAdeleRing ℚ ∅)ˣ) :
-    sLocalAdelicThetaOnClasses ℚ ∅ f (QuotientGroup.mk x) =
-      φ (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
-        (x.val.1 Rat.infinitePlace)) +
-      φ (-(InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
-        (x.val.1 Rat.infinitePlace))) := by
-  have hU : (Units.map (RingHom.toMonoidHom (RingHom.comp (adeleProjection ℚ ∅)
-      (Subring.subtype (integralAdelesOutside ℚ ∅)))))
-      (Units.map (RingHom.toMonoidHom (integralAdeleDiagonal ℚ ∅)) (-1)) = -1 := by
-    apply Units.ext
-    change ((adeleProjection ℚ ∅).comp (integralAdelesOutside ℚ ∅).subtype)
-      (integralAdeleDiagonal ℚ ∅
-        (-1 : (Set.integer ((∅ : Finset V(ℚ)) : Set V(ℚ)) ℚ)ˣ).val) =
-      (-1 : (SAdeleRing ℚ ∅)ˣ).val
-    simp
-  rw [sLocalAdelicThetaOnClasses_mk, sLocalAdelicTheta_apply]
-  dsimp only
-  rw [tsum_eq_sum (s := {1, -1}) (fun ξ hξ ↦ ?_)]
-  · rw [Finset.sum_pair sec2bP_one_ne_neg_one]
-    simp only [MonoidHom.comp_apply, hU, map_one, one_mul, hf]
-    simp only [Units.val_neg, neg_mul, one_mul]
-    rw [show ((-(x : SAdeleRing ℚ ∅)).1 Rat.infinitePlace) =
-      -((x : SAdeleRing ℚ ∅).1 Rat.infinitePlace) from rfl, map_neg]
-  · rcases sec2bP_units ξ with h | h <;> simp_all
-
-private theorem sec2bP_normOne_trivial (h : (sIdeleQuotientNorm ℚ ∅).ker) : h = 1 := by
-  obtain ⟨g, hg⟩ := h
-  obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective g
-  apply Subtype.ext
-  change (QuotientGroup.mk x : SIdeleQuotient ℚ ∅) = 1
-  rw [sIdeleQuotient_mk_eq_one]
-  have hn : ‖x.val.1 Rat.infinitePlace‖ = 1 := by
-    rw [← sec2bP_norm]
-    have h1 : sIdeleNorm ℚ ∅ x = 1 := hg
-    rw [h1]
-    simp
-  rw [← sec2bP_abs] at hn
-  rcases (abs_eq zero_le_one).mp hn with h1 | h1
-  · refine ⟨1, ?_⟩
-    simp only [map_one]
-    apply Units.ext
-    refine Prod.ext (funext fun w ↦ ?_) (Subsingleton.elim _ _)
-    obtain rfl : w = Rat.infinitePlace := Subsingleton.elim _ _
-    apply (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace).injective
-    exact h1.trans (map_one _).symm
-  · refine ⟨-1, ?_⟩
-    apply Units.ext
-    change (x : SAdeleRing ℚ ∅) = ((adeleProjection ℚ ∅).comp (integralAdelesOutside ℚ ∅).subtype)
-      (integralAdeleDiagonal ℚ ∅
-        (-1 : (Set.integer ((∅ : Finset V(ℚ)) : Set V(ℚ)) ℚ)ˣ).val)
-    simp only [Units.val_neg, Units.val_one, map_neg, map_one]
-    refine Prod.ext (funext fun w ↦ ?_) (Subsingleton.elim _ _)
-    obtain rfl : w = Rat.infinitePlace := Subsingleton.elim _ _
-    apply (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace).injective
-    exact h1.trans ((map_neg _ _).trans (congrArg Neg.neg (map_one _))).symm
 
 open LineDeriv in
 private theorem sec2bP_lineDeriv_tsupport (f : SchwartzMap ℝ ℂ) :
@@ -304,53 +196,11 @@ private theorem sec2bP_pic :
 private theorem sec2bP_mass_pos : 0 < (sLocalNormOneQuotientMeasure ℚ ∅).real univ := by
   have := (sLocalNormOneQuotientMeasure_normProduct (F := ℚ) (S := ∅)).1
   have : Subsingleton (sIdeleQuotientNorm ℚ ∅).ker :=
-    ⟨fun a b ↦ (sec2bP_normOne_trivial a).trans (sec2bP_normOne_trivial b).symm⟩
+    ⟨fun a b ↦ (ratEmpty_normOne_eq_one a).trans (ratEmpty_normOne_eq_one b).symm⟩
   have : Finite (sIdeleQuotientNorm ℚ ∅).ker := Finite.of_subsingleton
   have : CompactSpace (sIdeleQuotientNorm ℚ ∅).ker := Finite.compactSpace
   exact ENNReal.toReal_pos (isOpen_univ.measure_pos _ ⟨1, trivial⟩).ne'
     isCompact_univ.measure_lt_top.ne
-
-/-- Over ℚ with `S = ∅` the homogeneous theta function is the theta function on classes
-times the total norm-one mass. -/
-private theorem sec2bP_homTheta (ω : PontryaginDual (sIdeleQuotientNorm ℚ ∅).ker)
-    (f : SchwartzBruhat (Multiplicative (SAdeleRing ℚ ∅))) (g : SIdeleQuotient ℚ ∅) :
-    sLocalHomogeneousAdelicThetaLinearMap ℚ ∅ ω f g =
-      ((sLocalNormOneQuotientMeasure ℚ ∅).real univ : ℂ) * sLocalAdelicThetaOnClasses ℚ ∅ f g := by
-  rw [sLocalHomogeneousAdelicThetaLinearMap_apply,
-    integral_congr_ae (g := fun _ ↦ sLocalAdelicThetaOnClasses ℚ ∅ f g) (ae_of_all _ fun h ↦ ?_)]
-  · rw [integral_const, Complex.real_smul]
-  · have := sec2bP_normOne_trivial h
-    subst this
-    simp
-
-/-- The norm separates actual quotient classes of rational real idèles. -/
-theorem ratEmpty_sIdeleQuotientNorm_injective : Injective (sIdeleQuotientNorm ℚ ∅) := by
-  intro x y h
-  have hk : x / y ∈ (sIdeleQuotientNorm ℚ ∅).ker := by simp [MonoidHom.mem_ker, map_div, h]
-  exact div_eq_one.mp (congrArg Subtype.val (sec2bP_normOne_trivial ⟨x / y, hk⟩))
-
-/-- The actual rational homogeneous theta sum in norm coordinates, with its
-norm-one Tamagawa mass retained. The two terms are the two global signs. -/
-theorem ratEmpty_homogeneousTheta_real (ω : PontryaginDual (sIdeleQuotientNorm ℚ ∅).ker)
-    (φ : SchwartzMap ℝ ℂ) (f : SchwartzBruhat (Multiplicative (SAdeleRing ℚ ∅)))
-    (hf : ∀ x : SAdeleRing ℚ ∅, f (Multiplicative.ofAdd x) =
-      φ (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
-        (x.1 Rat.infinitePlace))) (g : SIdeleQuotient ℚ ∅) :
-    sLocalHomogeneousAdelicThetaLinearMap ℚ ∅ ω f g =
-      ((sLocalNormOneQuotientMeasure ℚ ∅).real univ : ℂ) *
-        (φ (((sIdeleQuotientNorm ℚ ∅ g).val : ℝ≥0) : ℝ) +
-          φ (-(((sIdeleQuotientNorm ℚ ∅ g).val : ℝ≥0) : ℝ))) := by
-  obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective g
-  let t := InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
-    (x.val.1 Rat.infinitePlace)
-  have hr : (((sIdeleQuotientNorm ℚ ∅ (QuotientGroup.mk x)).val : ℝ≥0) : ℝ) = |t| := by
-    rw [show |t| = ‖x.val.1 Rat.infinitePlace‖ from sec2bP_abs _]
-    exact sec2bP_norm x
-  rw [sec2bP_homTheta, sec2bP_thetaClasses f φ hf x, hr]
-  change _ * (φ t + φ (-t)) = _ * (φ |t| + φ (-|t|))
-  rcases le_total 0 t with h | h
-  · rw [abs_of_nonneg h]
-  · rw [abs_of_nonpos h, neg_neg, add_comm (φ (-t))]
 
 /-- The test of the counterexample weighted by the inverse square of the norm stays
 bounded below on classes of norm less than one. -/
@@ -363,25 +213,19 @@ private theorem sec2bP_lower (ω : PontryaginDual (sIdeleQuotientNorm ℚ ∅).k
     (hx : ((sIdeleQuotientNorm ℚ ∅ (QuotientGroup.mk x) : ℝ≥0) : ℝ) < 1) :
     (sLocalNormOneQuotientMeasure ℚ ∅).real univ * c ≤
       ‖localTheta(ℚ, ∅, -2, ω, f) (QuotientGroup.mk x)‖ := by
-  set t := InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
-    (x.val.1 Rat.infinitePlace) with ht
-  have hr : ((sIdeleQuotientNorm ℚ ∅ (QuotientGroup.mk x) : ℝ≥0) : ℝ) = |t| := by
-    rw [ht, sec2bP_abs]; exact sec2bP_norm x
-  have hpos : 0 < |t| := by
-    rw [← hr]; exact NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr (Units.ne_zero _))
+  let r : ℝ := ((sIdeleQuotientNorm ℚ ∅ (QuotientGroup.mk x) : ℝ≥0) : ℝ)
+  have hpos : 0 < r := NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr (Units.ne_zero _))
   have hν := sec2bP_mass_pos
-  have h1 := hlow t (by rw [← hr]; exact hx.le)
-  change ‖((((sIdeleQuotientNorm ℚ ∅ (QuotientGroup.mk x) : ℝ≥0) : ℝ) ^ (-2 : ℝ) : ℝ) : ℂ) *
+  have h1 := hlow r (by rw [abs_of_pos hpos]; exact hx.le)
+  change ‖((r ^ (-2 : ℝ) : ℝ) : ℂ) *
     sLocalHomogeneousAdelicThetaLinearMap ℚ ∅ ω f (QuotientGroup.mk x)‖ ≥ _
-  rw [sec2bP_homTheta, sec2bP_thetaClasses f φ hf x, norm_mul, norm_mul, Complex.norm_real,
-    Complex.norm_real, Real.norm_of_nonneg hν.le, hr,
-    Real.norm_of_nonneg (Real.rpow_nonneg (abs_nonneg t) _),
-    Real.rpow_neg (abs_nonneg t), Real.rpow_two, ← ht]
-  have ht2 : t ^ 2 = |t| ^ 2 := (sq_abs t).symm
-  have hne : |t| ^ 2 ≠ 0 := by positivity
+  rw [ratEmpty_homogeneousTheta_real ω φ f hf, norm_mul, norm_mul, Complex.norm_real,
+    Complex.norm_real, Real.norm_of_nonneg hν.le,
+    Real.norm_of_nonneg (Real.rpow_nonneg hpos.le _), Real.rpow_neg hpos.le, Real.rpow_two]
+  have hne : r ^ 2 ≠ 0 := by positivity
   calc (sLocalNormOneQuotientMeasure ℚ ∅).real univ * c
-      = (|t| ^ 2)⁻¹ * ((sLocalNormOneQuotientMeasure ℚ ∅).real univ * (c * t ^ 2)) := by
-        rw [ht2]; field_simp
+      = (r ^ 2)⁻¹ * ((sLocalNormOneQuotientMeasure ℚ ∅).real univ * (c * r ^ 2)) := by
+        field_simp
     _ ≤ _ := by gcongr
 
 /-- A left-invariant measure on a group with a continuous surjection onto the positive reals
@@ -522,7 +366,7 @@ private theorem sec2bP_inBand (φ : SchwartzMap ℝ ℂ)
     have h := hts (hsub hy)
     rw [Metric.mem_closedBall, dist_zero_right] at h
     change ‖(Multiplicative.toAdd y).1 Rat.infinitePlace‖ ≤ 1
-    rwa [← sec2bP_abs, ← Real.norm_eq_abs]
+    rwa [← ratEmpty_realCompletion_abs, ← Real.norm_eq_abs]
   refine ⟨?_, hsub'⟩
   refine (isCompact_sLocalPWBox (F := ℚ) (S := ∅) 1).of_isClosed_subset (isClosed_tsupport _)
     (fun y hy ↦ ⟨fun w ↦ ?_, fun v ↦ absurd v.2 (Finset.notMem_empty _)⟩)
