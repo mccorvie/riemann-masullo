@@ -1823,6 +1823,58 @@ theorem sLocalAbsolutePW_le_invariant (hST : S ⊆ T) (X : ℝ) (_hX : 0 < X)
     Submodule.map_mono (Submodule.span_mono hgen)
   exact Submodule.topologicalClosure_mono (Submodule.map_mono (inf_le_inf htests le_rfl))
 
+/-- Inserting the rational integer indicator at one finite place takes empty-stage
+Fourier box tests into the singleton product band at the same radius. -/
+theorem ratSingleton_standardTail_le_productPWTests
+    (v : HeightOneSpectrum (𝓞 ℚ)) (B : ℝ) :
+    sLocalPWTests (Finset.empty_subset {v}) (sLocalPWBox ∅ B) ≤
+      sLocalPWTests (S := {v}) (T := {v}) le_rfl (sLocalPWProductRegion {v} B) := by
+  classical
+  let : T2Space (Multiplicative (SAdeleRing ℚ {v})) := inferInstanceAs
+    (T2Space (((w : InfinitePlace ℚ) → w.Completion) ×
+      ((w : ({v} : Finset (HeightOneSpectrum (𝓞 ℚ)))) → w.val.adicCompletion ℚ)))
+  let hST : (∅ : Finset (HeightOneSpectrum (𝓞 ℚ))) ⊆ {v} := Finset.empty_subset {v}
+  have hDifferent : differentIdeal ℤ (𝓞 ℚ) = 1 := by
+    rw [Ideal.one_eq_top, ← Ideal.absNorm_eq_one_iff, NumberField.absNorm_differentIdeal ℚ (𝓞 ℚ),
+      NumberField.discr_rat]
+    rfl
+  intro f hf
+  obtain ⟨g, rfl, -, hg⟩ := (mem_sLocalPWTests hST (sLocalPWBox ∅ B) f).mp hf
+  let φ := sAdeleSchwartzFourier (sAdeleSchwartzTransition ℚ hST g)
+  let K := Multiplicative.ofAdd '' sLocalPWBox (F := ℚ) {v} (max B 1)
+  let P := Multiplicative.toAdd ⁻¹' sLocalPWProductRegion (F := ℚ) {v} B
+  have hK : IsCompact K := (isCompact_sLocalPWBox (F := ℚ) (S := {v}) (max B 1)).image
+    continuous_ofAdd
+  have hprod : Continuous (sLocalPWProduct (F := ℚ) (S := {v})) := by
+    unfold sLocalPWProduct
+    exact (continuous_finsetProd Finset.univ (fun w _ ↦
+      ((continuous_apply w).comp continuous_fst).norm.pow w.mult)).mul
+      (continuous_finsetProd Finset.univ (fun w _ ↦
+        ((continuous_apply w).comp continuous_snd).norm))
+  have hP : IsClosed P := isClosed_le (hprod.comp continuous_toAdd) continuous_const
+  have hsupp : tsupport φ.val ⊆ K ∩ P := by
+    refine closure_minimal (fun x hx ↦ ?_) (hK.isClosed.inter hP)
+    have hx' : φ (Multiplicative.ofAdd x.toAdd) ≠ 0 := hx
+    obtain ⟨hxArch, hxFin⟩ := sLocalAbsolutePW_fourier_transition_support hST g x.toAdd hx'
+    have hbox : (x.toAdd.1, fun w : (∅ : Finset (HeightOneSpectrum (𝓞 ℚ))) ↦
+        x.toAdd.2 ⟨w.val, hST w.property⟩) ∈ sLocalPWBox ∅ B :=
+      hg (subset_tsupport _ hxArch)
+    have hFin (w : ({v} : Finset (HeightOneSpectrum (𝓞 ℚ)))) : ‖x.toAdd.2 w‖ ≤ 1 := by
+      simpa only [hDifferent, multiplicity_one_right, pow_zero] using
+        hxFin ⟨w, Finset.notMem_empty _⟩
+    refine ⟨⟨x.toAdd, ⟨fun w ↦ (hbox.1 w).trans (le_max_left B 1),
+      fun w ↦ (hFin w).trans (le_max_right B 1)⟩, rfl⟩, ?_⟩
+    let : Unique (InfinitePlace ℚ) := ⟨⟨Rat.infinitePlace⟩, fun _ ↦ Subsingleton.elim _ _⟩
+    change sLocalPWProduct x.toAdd ≤ B
+    unfold sLocalPWProduct
+    rw [Fintype.prod_unique]
+    have hFinProd : (∏ w : ({v} : Finset (HeightOneSpectrum (𝓞 ℚ))), ‖x.toAdd.2 w‖) ≤ 1 :=
+      Finset.prod_le_one₀ (fun _ _ ↦ norm_nonneg _) (fun w _ ↦ hFin w)
+    exact (mul_le_of_le_one_right (pow_nonneg (norm_nonneg _) _) hFinProd).trans (hbox.1 _)
+  exact (mem_sLocalPWTests le_rfl (sLocalPWProductRegion {v} B) _).mpr
+    ⟨_, sLocalAbsolutePW_transition_self _, hK.of_isClosed_subset (isClosed_tsupport φ.val)
+      (fun _ hx ↦ (hsupp hx).1), fun _ hx ↦ (hsupp hx).2⟩
+
 section PrincipalValues
 
 open Classical
@@ -2224,6 +2276,80 @@ private theorem sLocalAbsolutePW_unitTranslate_polar (u : (SAdeleRing F T)ˣ) (g
     exact h0
   · rw [hb g 0, mul_zero]
     exact mul_eq_zero_of_right _ h1
+
+private theorem sLocalInvariantPWTests_polar_unitTranslate_mem (Y : ℝ)
+    (u : (SAdeleRing F T)ˣ) (hu : sIdeleNorm F T u = 1) (f : B(T))
+    (hf : f ∈ sLocalPWTests (S := T) (T := T) le_rfl (sLocalPWProductRegion T Y) ⊓ Z₀(T)) :
+    schwartzBruhatUnitTranslate u f ∈
+      sLocalPWTests (S := T) (T := T) le_rfl (sLocalPWProductRegion T Y) ⊓ Z₀(T) := by
+  obtain ⟨hfBand, hfPolar⟩ := Submodule.mem_inf.mp hf
+  obtain ⟨g, hg, hc, hs⟩ :=
+    (mem_sLocalPWTests le_rfl (sLocalPWProductRegion T Y) f).mp hfBand
+  have hgf : g = f := (sLocalAbsolutePW_transition_self g).symm.trans hg
+  subst g
+  obtain ⟨b, hb⟩ := sLocalInvariantPW_translate_fourier u
+  let e : Multiplicative (SAdeleRing F T) ≃ₜ Multiplicative (SAdeleRing F T) :=
+    { toFun := fun y ↦ Multiplicative.ofAdd ((u : SAdeleRing F T) * y.toAdd)
+      invFun := fun y ↦ Multiplicative.ofAdd ((↑u⁻¹ : SAdeleRing F T) * y.toAdd)
+      left_inv := fun y ↦ Multiplicative.ext (by simp [← mul_assoc])
+      right_inv := fun y ↦ Multiplicative.ext (by simp [← mul_assoc])
+      continuous_toFun := continuous_ofAdd.comp (continuous_const.mul continuous_toAdd)
+      continuous_invFun := continuous_ofAdd.comp (continuous_const.mul continuous_toAdd) }
+  let K := Multiplicative.toAdd ⁻¹' sLocalPWProductRegion T Y
+  have hregion : e ⁻¹' K ⊆ K := by
+    intro y hy
+    change sLocalPWProduct (u.val * y.toAdd) ≤ Y at hy
+    change sLocalPWProduct y.toAdd ≤ Y
+    rw [sLocalPWProduct_mul, sLocalPWProduct_unit, hu] at hy
+    simpa using hy
+  have hband := sLocalInvariantPW_translate_support e ((b : ℝ) : ℂ)
+    (sAdeleSchwartzFourier f).val (sAdeleSchwartzFourier (schwartzBruhatUnitTranslate u f)).val
+    (fun y ↦ hb f y.toAdd) K K hregion hc hs
+  refine Submodule.mem_inf.mpr ⟨?_, sLocalAbsolutePW_unitTranslate_polar u f hfPolar⟩
+  exact (mem_sLocalPWTests le_rfl (sLocalPWProductRegion T Y) _).mpr
+    ⟨schwartzBruhatUnitTranslate u f, sLocalAbsolutePW_transition_self _, hband⟩
+
+/-- A polar-free test in the rational singleton product band has a representative in the
+same band with the same trivial homogeneous theta function. The representative and its
+Fourier transform are both fixed by the relative integral units. -/
+theorem exists_ratSingleton_invariantPW_relativeUnit_fixedLift
+    (v : HeightOneSpectrum (𝓞 ℚ)) (Y : ℝ)
+    (f : SchwartzBruhat (Multiplicative (SAdeleRing ℚ {v})))
+    (hf : f ∈ sLocalPWTests (S := {v}) (T := {v}) le_rfl (sLocalPWProductRegion {v} Y) ⊓
+      sAdelePolarSubspace ℚ {v}) :
+    ∃ a : SchwartzBruhat (Multiplicative (SAdeleRing ℚ {v})),
+      a ∈ sLocalPWTests (S := {v}) (T := {v}) le_rfl (sLocalPWProductRegion {v} Y) ⊓
+        sAdelePolarSubspace ℚ {v} ∧
+      sLocalHomogeneousAdelicThetaLinearMap ℚ {v} 1 a =
+        sLocalHomogeneousAdelicThetaLinearMap ℚ {v} 1 f ∧
+      (∀ g : relativeIntegralIdeleUnits ℚ ∅ {v}, schwartzBruhatUnitTranslate g.val a = a) ∧
+      ∀ g : relativeIntegralIdeleUnits ℚ ∅ {v},
+        schwartzBruhatUnitTranslate g.val (sAdeleSchwartzFourier a) =
+          sAdeleSchwartzFourier a := by
+  let N := sLocalPWTests (S := {v}) (T := {v}) le_rfl (sLocalPWProductRegion {v} Y) ⊓
+    sAdelePolarSubspace ℚ {v}
+  let θ := sLocalHomogeneousAdelicThetaLinearMap ℚ {v} 1
+  have hOrbit (g : relativeIntegralIdeleUnits ℚ ∅ {v}) :
+      schwartzBruhatUnitTranslate g.val f ∈ N :=
+    sLocalInvariantPWTests_polar_unitTranslate_mem Y g.val
+      (sIdeleNorm_relativeIntegralIdeleUnits g) f hf
+  have hTheta (g : relativeIntegralIdeleUnits ℚ ∅ {v}) :
+      θ (schwartzBruhatUnitTranslate g.val f) = θ f := by
+    let c : (sIdeleQuotientNorm ℚ {v}).ker :=
+      ⟨QuotientGroup.mk g.val, (sIdeleQuotientNorm_mk ℚ {v} g.val).trans
+        (sIdeleNorm_relativeIntegralIdeleUnits g)⟩
+    simpa only [θ, PontryaginDual.one_apply, Circle.coe_one, one_smul] using
+      sLocalHomogeneousTheta_unitTranslate (F := ℚ) (S := {v}) 1 c g.val rfl f
+  obtain ⟨a, ha, hTheta_a, hFixed⟩ :=
+    exists_relativeUnit_fixedLift_mem (F := ℚ) (S := ∅) (T := {v})
+      (Finset.empty_subset {v}) θ N f hOrbit hTheta
+  refine ⟨a, ha, hTheta_a, hFixed, fun g ↦ ?_⟩
+  have hFourier := sAdeleSchwartzFourier_unitTranslate_of_norm_one ℚ {v} (g⁻¹).val
+    (sIdeleNorm_relativeIntegralIdeleUnits g⁻¹) a
+  change sAdeleSchwartzFourier (schwartzBruhatUnitTranslate (g⁻¹).val a) =
+    schwartzBruhatUnitTranslate (g.val⁻¹)⁻¹ (sAdeleSchwartzFourier a) at hFourier
+  rw [hFixed g⁻¹, inv_inv] at hFourier
+  exact hFourier.symm
 
 private theorem sLocalAbsolutePW_quotient_unitTranslate (χ : PontryaginDual J₁(T))
     (u : (SAdeleRing F T)ˣ) (hu : (QuotientGroup.mk u : J(T)) ∈ J₁(T)) (f : B(T)) :

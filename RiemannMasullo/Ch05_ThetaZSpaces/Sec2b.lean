@@ -1625,4 +1625,14 @@ theorem globalThetaFourier_mem_isotype (ω : PontryaginDual C₁) (x : Θ𝔽) :
 
 end Fourier
 
+variable (F S) in
+/-- Fourier transformation reverses translation by a norm-one S-idele on
+Schwartz–Bruhat tests. -/
+theorem sAdeleSchwartzFourier_unitTranslate_of_norm_one
+    (u : (SAdeleRing F S)ˣ) (hu : sIdeleNorm F S u = 1)
+    (f : SchwartzBruhat (Multiplicative (SAdeleRing F S))) :
+    sAdeleSchwartzFourier (schwartzBruhatUnitTranslate u f) =
+      schwartzBruhatUnitTranslate u⁻¹ (sAdeleSchwartzFourier f) :=
+  sLocalThetaFourier_mem_isotype_unitTranslate u hu f
+
 end RiemannMasullo

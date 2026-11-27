@@ -157,6 +157,33 @@ theorem mem_relativeIntegralIdeleUnits_iff (g : (SAdeleRing F T)ˣ) :
     · refine Units.ext (Prod.ext h1.symm (funext fun w ↦ ?_))
       exact he _ _ w.2
 
+open scoped NNReal in
+/-- Every relative integral idele unit has S-idele norm one at the enlarged stage. -/
+theorem sIdeleNorm_relativeIntegralIdeleUnits (g : relativeIntegralIdeleUnits F S T) :
+    sIdeleNorm F T g.val = 1 := by
+  classical
+  obtain ⟨harch, hold, hnew⟩ := (mem_relativeIntegralIdeleUnits_iff g.val).mp g.property
+  have hfinite (v : T) : ‖g.val.val.2 v‖ = 1 := by
+    by_cases hv : v.val ∈ S
+    · rw [hold v hv, norm_one]
+    · let ev := (Pi.evalRingHom (fun w : T ↦ w.val.adicCompletion F) v).comp
+        (RingHom.snd (InfiniteAdeleRing F) _)
+      apply Valued.toNormedField.norm_eq_one_iff.mpr
+      exact (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one
+        (a := Units.map ev.toMonoidHom g.val)).mp (hnew v hv)
+  apply Units.ext
+  apply NNReal.coe_injective
+  let evaluate : ((SAdeleRing F T)ˣ →* ℝ≥0ˣ) →* ℝ :=
+    NNReal.toRealHom.toMonoidHom.comp ((Units.coeHom ℝ≥0).comp (MonoidHom.eval g.val))
+  change evaluate (sIdeleNorm F T) = 1
+  simp only [sIdeleNorm, map_mul, map_prod]
+  change (∏ w : InfinitePlace F, ‖g.val.val.1 w‖ ^ w.mult) * ∏ v : T, ‖g.val.val.2 v‖ = 1
+  have harchNorm (w : InfinitePlace F) : ‖g.val.val.1 w‖ = 1 := by
+    rw [harch]
+    change ‖(1 : w.Completion)‖ = 1
+    exact norm_one
+  simp [harchNorm, hfinite]
+
 open scoped RestrictedProduct in
 /-- The local integer rings form a compact subset of the finite adeles. -/
 private theorem outsideIntegralIdeleUnits_isCompact_integral :
@@ -301,31 +328,36 @@ local notation "q(" A ")" => (LinearMap.ker (sLocalAdelicTheta F A)).mkQ
 local notation "H" => relativeIntegralIdeleUnits F S T
 local notation "Γ" => WithZero (Multiplicative ℤ)
 
+/-- The average of a finite orbit is fixed and belongs to every submodule containing that orbit. -/
+private theorem fixedLift_mem_of_finite_orbit {G E Q : Type*} [Group G]
+    [AddCommGroup E] [Module ℂ E] [AddCommGroup Q] [Module ℂ Q]
+    (r : G →* Module.End ℂ E) (q : E →ₗ[ℂ] Q) (N : Submodule ℂ E) (f : E)
+    (hf : (Set.range fun g ↦ r g f).Finite)
+    (hN : ∀ g, r g f ∈ N) (hq : ∀ g, q (r g f) = q f) :
+    ∃ a : E, a ∈ N ∧ q a = q f ∧ ∀ g, r g a = a := by
+  classical
+  let O := hf.toFinset
+  have hO : O.Nonempty := ⟨r 1 f, hf.mem_toFinset.mpr ⟨1, rfl⟩⟩
+  have hn : (O.card : ℂ) ≠ 0 := by exact_mod_cast hO.card_ne_zero
+  refine ⟨(O.card : ℂ)⁻¹ • ∑ a ∈ O, a, ?_, ?_, fun g ↦ ?_⟩
+  · refine N.smul_mem _ (N.sum_mem fun a ha ↦ ?_)
+    obtain ⟨g, rfl⟩ := hf.mem_toFinset.mp ha
+    exact hN g
+  · rw [map_smul, map_sum, Finset.sum_congr rfl (g := fun _ ↦ q f) (fun a ha ↦ ?_),
+      Finset.sum_const, ← Nat.cast_smul_eq_nsmul ℂ, smul_smul, inv_mul_cancel₀ hn, one_smul]
+    obtain ⟨g, rfl⟩ := hf.mem_toFinset.mp ha
+    exact hq g
+  · rw [map_smul]
+    exact congrArg ((O.card : ℂ)⁻¹ • ·) (sum_orbit_invariant r f hf g)
+
 /-- A fixed class has a fixed lift when the orbit of a representative is finite. -/
 private theorem fixedLift_of_finite_orbit {G E Q : Type*} [Group G] [AddCommGroup E] [Module ℂ E]
     [AddCommGroup Q] [Module ℂ Q] (r : G →* Module.End ℂ E) (q : E →ₗ[ℂ] Q) (f : E)
     (hf : (Set.range fun g ↦ r g f).Finite) (h : ∀ g, q (r g f) = q f) :
     ∃ a : E, q a = q f ∧ ∀ g, r g a = a := by
-  classical
-  let O := hf.toFinset
-  have hO : O.Nonempty := ⟨r 1 f, hf.mem_toFinset.mpr ⟨1, rfl⟩⟩
-  have hn : (O.card : ℂ) ≠ 0 := by exact_mod_cast hO.card_ne_zero
-  refine ⟨(O.card : ℂ)⁻¹ • ∑ a ∈ O, a, ?_, fun g ↦ ?_⟩
-  · rw [map_smul, map_sum, Finset.sum_congr rfl (g := fun _ ↦ q f) (fun a ha ↦ ?_),
-      Finset.sum_const, ← Nat.cast_smul_eq_nsmul ℂ, smul_smul, inv_mul_cancel₀ hn, one_smul]
-    obtain ⟨g, rfl⟩ := hf.mem_toFinset.mp ha
-    exact h g
-  · -- Each group element permutes the orbit (cf. Ch05 §2, sum_orbit_invariant).
-    have he (a b : G) (x : E) : r (a * b) x = r a (r b x) := DFunLike.congr_fun (r.map_mul a b) x
-    have hc (a : G) (x : E) (hx : x ∈ O) : r a x ∈ O := by
-      obtain ⟨b, rfl⟩ := hf.mem_toFinset.mp hx
-      exact hf.mem_toFinset.mpr ⟨a*b, he _ _ _⟩
-    have hi (a : G) (x : E) : r a⁻¹ (r a x) = x := by rw [← he, inv_mul_cancel, map_one]; rfl
-    rw [map_smul, map_sum]
-    congr 1
-    exact Finset.sum_bij' (fun a _ ↦ r g a) (fun a _ ↦ r g⁻¹ a)
-      (fun a ha ↦ hc _ _ ha) (fun a ha ↦ hc _ _ ha) (fun a _ ↦ hi g a)
-      (fun a _ ↦ by simp [← he]) (fun _ _ ↦ rfl)
+  obtain ⟨a, -, ha, hfix⟩ :=
+    fixedLift_mem_of_finite_orbit r q ⊤ f hf (fun _ ↦ Submodule.mem_top) h
+  exact ⟨a, ha, hfix⟩
 
 private theorem prod_old_new {ι : Type*} {S T : Finset ι} (hST : S ⊆ T) (c : T → ℂ) :
     ∏ w, c w = (∏ w : S, c ⟨w.val, hST w.property⟩) *
@@ -410,6 +442,16 @@ private theorem relativeUnit_finite_orbit (hST : S ⊆ T) (f : B(T)) :
       (congrArg (· * _) (hi.2.1 ⟨w.val, hST w.property⟩ w.property)).trans (one_mul _))
   rw [hold]
   rfl
+
+/-- A Schwartz–Bruhat test has a relative-unit-invariant representative in any submodule
+containing its orbit, with the same image under any linear map constant on that orbit. -/
+theorem exists_relativeUnit_fixedLift_mem {Q : Type*} [AddCommGroup Q] [Module ℂ Q]
+    (hST : S ⊆ T) (q : B(T) →ₗ[ℂ] Q) (N : Submodule ℂ B(T)) (f : B(T))
+    (hN : ∀ g : H, schwartzBruhatUnitTranslate g.val f ∈ N)
+    (hq : ∀ g : H, q (schwartzBruhatUnitTranslate g.val f) = q f) :
+    ∃ a : B(T), a ∈ N ∧ q a = q f ∧ ∀ g : H, schwartzBruhatUnitTranslate g.val a = a := by
+  let r := (unitTranslateEnd (R := SAdeleRing F T)).comp (relativeIntegralIdeleUnits F S T).subtype
+  exact fixedLift_mem_of_finite_orbit r q N f (relativeUnit_finite_orbit hST f) hN hq
 
 /-- Prescribing integral-unit cosets at the additional places amounts to choosing a T-unit. -/
 private theorem relativeUnit_choose_diagonal (hST : S ⊆ T)
@@ -562,6 +604,39 @@ private theorem integralUnit_of_valuation_eq (w : Places) (x y : L(w))
       div_mul_cancel₀ _ hx⟩
     change Valued.v (y / x) = 1
     rw [map_div₀, h, div_self ((Valuation.ne_zero_iff _).mpr hx)]
+
+/-- At a rational singleton stage, a test fixed by the relative integral units takes equal
+values at equal archimedean coordinates and equal finite valuations, including valuation zero. -/
+theorem singletonRadial_of_relativeIntegralIdeleUnits_invariant
+    (v : HeightOneSpectrum (𝓞 ℚ))
+    (f : SchwartzBruhat (Multiplicative (SAdeleRing ℚ {v})))
+    (hf : ∀ g : relativeIntegralIdeleUnits ℚ ∅ {v}, schwartzBruhatUnitTranslate g.val f = f)
+    (x y : SAdeleRing ℚ {v}) (hArch : x.1 = y.1)
+    (hVal : Valued.v (x.2 ⟨v, Finset.mem_singleton_self v⟩) =
+      Valued.v (y.2 ⟨v, Finset.mem_singleton_self v⟩)) :
+    f (Multiplicative.ofAdd x) = f (Multiplicative.ofAdd y) := by
+  classical
+  let T : Finset (HeightOneSpectrum (𝓞 ℚ)) := {v}
+  let w₀ : T := ⟨v, Finset.mem_singleton_self v⟩
+  let : Subsingleton T := Finset.card_le_one_iff_subsingleton_coe.mp (by simp [T])
+  have hValAll (w : T) : Valued.v (y.2 w) = Valued.v (x.2 w) := by
+    rw [Subsingleton.elim w w₀]
+    exact hVal.symm
+  choose u hu hux using fun w : T ↦
+    integralUnit_of_valuation_eq (F := ℚ) w.val (x.2 w) (y.2 w) (hValAll w)
+  let g : (SAdeleRing ℚ T)ˣ :=
+    (ContinuousMulEquiv.prodUnits _ _).symm ((1 : (InfiniteAdeleRing ℚ)ˣ),
+      (ContinuousMulEquiv.piUnits (M := fun w : T ↦ w.val.adicCompletion ℚ)).symm u)
+  have hg : g ∈ relativeIntegralIdeleUnits ℚ ∅ T :=
+    (mem_relativeIntegralIdeleUnits_iff (S := ∅) g).mpr
+      ⟨rfl, fun w hw ↦ (Finset.notMem_empty w.val hw).elim, fun w _ ↦ hu w⟩
+  have hxy : g.val * x = y := Prod.ext ((one_mul x.1).trans hArch) (funext hux)
+  have hfixed : schwartzBruhatUnitTranslate g⁻¹ f = f :=
+    hf (⟨g, hg⟩ : relativeIntegralIdeleUnits ℚ ∅ T)⁻¹
+  have h := congrArg (fun a : SchwartzBruhat (Multiplicative (SAdeleRing ℚ T)) ↦
+    a (Multiplicative.ofAdd x)) hfixed
+  rw [schwartzBruhatUnitTranslate_apply, inv_inv, hxy] at h
+  exact h.symm
 
 /-- Choose an element of each relative-unit orbit having prescribed samples in its
 new coordinates. Multiplication by the selected unit fixes the old coordinates. -/
