@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3b
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import RiemannMasullo.ForMathlib.NumberTheory.DiophantineApproximation.PowerCover
 import RiemannMasullo.ForMathlib.NumberTheory.LinearFormsInLogarithms
 import RiemannMasullo.ForMathlib.NumberTheory.Transcendental.BakerCoreBridge
 public import Mathlib.Analysis.SpecialFunctions.Complex.Circle
@@ -3990,6 +3991,157 @@ theorem quarticSquaredHeightRecord_of_orbitalRecord
     simpa only [hmPhase, hnPhase] using h
 
 end OrbitalRecord
+
+/-! ## Quantitative dependence on powers of the quartic character
+
+At both outside places of the benchmark, the mixed Baker bound controls how quickly powers
+of the local phase reach an arc. In the other direction, the pole at height zero gives a
+lower bound for the coefficient of any record estimate along a sequence of character powers.
+The fixed-character estimate in Theorem 7.3.3.4 (pp. 360–363, using p. 349) stays open.
+-/
+
+section QuarticCharacterPowers
+
+open Real
+
+private theorem quarticBenchmark_phase_norm (a : ℂ)
+    (ha : a ∈ ({quarticPhasePlus, quarticPhaseMinus} : Set ℂ)) : ‖a‖ = 1 := by
+  rcases Set.mem_insert_iff.mp ha with rfl | h
+  · exact norm_quarticPhasePlus
+  · simpa [Set.mem_singleton_iff.mp h] using norm_quarticPhaseMinus
+
+private theorem quarticBenchmark_phase_separation :
+    ∃ C > (0 : ℝ), ∃ d : ℕ, 0 < d ∧
+      ∀ a ∈ ({quarticPhasePlus, quarticPhaseMinus} : Set ℂ),
+        ∀ n : ℕ, 0 < n → C / (1 + (n : ℝ)) ^ d ≤ ‖a ^ n - 1‖ := by
+  obtain ⟨C, hC, d, hd, h⟩ := quarticBenchmark_twoPlaceBound
+  refine ⟨C, hC, d, hd, ?_⟩
+  intro a ha n hn
+  simp only [Set.mem_insert_iff, Set.mem_singleton_iff] at ha
+  rcases ha with rfl | rfl
+  · have h' := (h (n : ℤ) 0 (Or.inl (by exact_mod_cast hn.ne'))).1
+    simpa [norm_sub_rev (1 : ℂ)] using h'
+  · have h' := (h 0 (-(n : ℤ)) (Or.inr (by simp [hn.ne']))).1
+    simpa [norm_sub_rev (1 : ℂ)] using h'
+
+/-- For either of the two outside phases of the quartic Hecke character, every block
+of polynomially many consecutive powers meets every prescribed arc. The same constants
+work for both places, with the hitting power chosen separately at each place. -/
+theorem quarticBenchmark_powerCover :
+    ∃ C > (0 : ℝ), ∃ d : ℕ, 0 < d ∧
+      ∀ a ∈ ({quarticPhasePlus, quarticPhaseMinus} : Set ℂ),
+      ∀ N Q : ℕ, 0 < N → 0 < Q → 2 * π * (1 + (N : ℝ)) ^ d < C * ((Q : ℝ) + 1) →
+      ∀ (K : ℤ) (b : Circle), ∃ k : ℤ, K ≤ k ∧ k < K + Q ∧ ‖a ^ k - b‖ ≤ 3 * π / N := by
+  obtain ⟨C, hC, d, hd, hs⟩ := quarticBenchmark_phase_separation
+  refine ⟨C, hC, d, hd, ?_⟩
+  intro a ha N Q hN hQ hsize K b
+  have hnorm := quarticBenchmark_phase_norm a ha
+  let ac : Circle := ⟨a, mem_sphere_zero_iff_norm.mpr hnorm⟩
+  exact Circle.exists_zpow_approx_of_separation ac C d (hs a ha) hN hQ hsize K b
+
+private theorem quartic_zero_window {m : ℤ}
+    (h : 2 + ‖quarticPoleHeight m‖ ≤ (2 + ‖quarticPoleHeight 0‖) ^ 2) :
+    -1 ≤ m ∧ m ≤ 1 := by
+  have hlog : Real.log 49 < 2 * π := by
+    calc
+      Real.log 49 ≤ Real.log ((2 : ℝ) ^ 6) := Real.log_le_log (by norm_num) (by norm_num)
+      _ = 6 * Real.log 2 := by rw [Real.log_pow]; norm_num
+      _ ≤ 6 := by linarith [Real.log_le_sub_one_of_pos (by norm_num : (0 : ℝ) < 2)]
+      _ < _ := by linarith [Real.pi_gt_three]
+  have hlogpos : 0 < Real.log 49 := Real.log_pos (by norm_num)
+  have hc : 1 < 2 * π / Real.log 49 := (one_lt_div hlogpos).mpr hlog
+  have hzero : quarticPoleHeight 0 = 0 := by simp [quarticPoleHeight]
+  rw [hzero, norm_zero] at h
+  rw [quarticPoleHeight_norm] at h
+  have hmm : |(m : ℝ)| < 2 := by
+    by_contra! hf
+    nlinarith only [h, mul_lt_mul_of_pos_right hc (by linarith : 0 < |(m : ℝ)|), hf]
+  have h' : |m| < 2 := by exact_mod_cast hmm
+  rw [abs_lt] at h'
+  omega
+
+private theorem quarticRotation_coe_ne_one : (quarticRotation : ℂ) ≠ 1 := by
+  intro h
+  obtain ⟨n, hn, _⟩ := quarticPoleValue_approaches_one 1 (by simp) 1 zero_lt_one
+  simp [quarticPoleValue, h] at hn
+
+private theorem quartic_record_zero_of_near {z : ℂ} (hpos : 0 < ‖1 - z‖)
+    (hel : ‖1 - z‖ < 1) (hrot : 2 * ‖1 - z‖ < ‖1 - (quarticRotation : ℂ)‖)
+    (hinv : 2 * ‖1 - z‖ < ‖1 - (quarticRotation : ℂ)⁻¹‖) :
+    QuarticSquaredHeightRecord z 0 := by
+  have hzero : quarticPoleValue z 0 = z := by simp [quarticPoleValue]
+  refine ⟨?_, ?_⟩
+  · rwa [QuarticEligible, hzero, norm_inv, one_lt_inv₀ hpos]
+  intro m hm _ hw
+  obtain ⟨hl, hu⟩ := quartic_zero_window hw
+  have hm' : m = 1 ∨ m = -1 := by omega
+  have hbig : 2 * ‖1 - z‖ < ‖1 - (quarticRotation : ℂ) ^ m‖ := by
+    rcases hm' with rfl | rfl
+    · simpa using hrot
+    · simpa using hinv
+  have htri : ‖1 - (quarticRotation : ℂ) ^ m‖ ≤ ‖1 - quarticPoleValue z m‖ + ‖1 - z‖ := by
+    calc
+      _ = ‖(1 - z * (quarticRotation : ℂ) ^ m) + (z - 1) * (quarticRotation : ℂ) ^ m‖ := by ring_nf
+      _ ≤ ‖1 - z * (quarticRotation : ℂ) ^ m‖ + ‖(z - 1) * (quarticRotation : ℂ) ^ m‖ := norm_add_le _ _
+      _ = _ := by simp [quarticPoleValue, norm_zpow, norm_sub_rev z]
+  rw [hzero]
+  linarith
+
+/-- At the zero-height double pole, both algebraic outside phases have arbitrarily
+large positive powers giving a strict squared-height record. Its reciprocal chord
+is at least `k/(2π)` at power `k`, independently of any height exponent. -/
+theorem quarticBenchmark_zeroRecord_powers (a : ℂ)
+    (ha : a ∈ ({quarticPhasePlus, quarticPhaseMinus} : Set ℂ)) (K : ℕ) :
+    ∃ k : ℕ, K < k ∧ QuarticSquaredHeightRecord (a ^ k) 0 ∧
+      (k : ℝ) / (2 * π) ≤ ‖(1 - quarticPoleValue (a ^ k) 0)⁻¹‖ := by
+  obtain ⟨C, hC, d, _, hs⟩ := quarticBenchmark_phase_separation
+  have ha1 := quarticBenchmark_phase_norm a ha
+  let ac : Circle := ⟨a, mem_sphere_zero_iff_norm.mpr ha1⟩
+  have ht : 0 < ‖1 - (quarticRotation : ℂ)‖ :=
+    norm_pos_iff.mpr (sub_ne_zero.mpr quarticRotation_coe_ne_one.symm)
+  have hi : 0 < ‖1 - (quarticRotation : ℂ)⁻¹‖ :=
+    norm_pos_iff.mpr (sub_ne_zero.mpr (fun hh ↦ quarticRotation_coe_ne_one (by simpa using hh.symm)))
+  let e := min 1 (min (‖1 - (quarticRotation : ℂ)‖ / 2) (‖1 - (quarticRotation : ℂ)⁻¹‖ / 2))
+  have he : 0 < e := lt_min zero_lt_one (lt_min (by positivity) (by positivity))
+  obtain ⟨M, hM⟩ := exists_nat_gt (2 * π / e)
+  obtain ⟨k, hk, hp, hb⟩ := Circle.exists_large_pow_return_of_separation ac hC (hs a ha) (max M K)
+  change 0 < ‖a ^ k - 1‖ at hp
+  change ‖a ^ k - 1‖ ≤ 2 * π / k at hb
+  rw [norm_sub_rev] at hp hb
+  have hk0 : (0 : ℝ) < k := by exact_mod_cast (by omega : 0 < k)
+  have hkl : (M : ℝ) < k := by exact_mod_cast (lt_of_le_of_lt (le_max_left M K) hk)
+  have hsmall : ‖1 - a ^ k‖ < e := hb.trans_lt ((div_lt_iff₀ hk0).mpr (by
+    have := (div_lt_iff₀ he).mp (hM.trans hkl); linarith))
+  have hne := quartic_record_zero_of_near hp (hsmall.trans_le (min_le_left ..))
+    (by have hh := hsmall.trans_le ((min_le_right ..).trans (min_le_left ..)); linarith)
+    (by have hh := hsmall.trans_le ((min_le_right ..).trans (min_le_right ..)); linarith)
+  refine ⟨k, lt_of_le_of_lt (le_max_right M K) hk, hne, ?_⟩
+  simp only [quarticPoleValue, zpow_zero, mul_one, norm_inv]
+  rw [le_inv_comm₀ (by positivity) hp]
+  simpa using hb
+
+/-- In a quartic power family, allowing the height exponent to depend on the power
+cannot absorb the growth of the coefficient, since the witnessing record has height zero. -/
+theorem quarticBenchmark_recordCoefficient_lower (a : ℂ)
+    (ha : a ∈ ({quarticPhasePlus, quarticPhaseMinus} : Set ℂ)) (K : ℕ) :
+    ∃ k : ℕ, K < k ∧ ∀ (d : ℕ) (C : ℝ),
+      (∀ n : ℤ, QuarticSquaredHeightRecord (a ^ k) n →
+        1 ≤ C * (1 + ‖quarticPoleHeight n‖) ^ d * ‖1 - quarticPoleValue (a ^ k) n‖) →
+      (k : ℝ) / (2 * π) ≤ C := by
+  obtain ⟨k, hk, hr, hl⟩ := quarticBenchmark_zeroRecord_powers a ha K
+  refine ⟨k, hk, ?_⟩
+  intro d C h
+  have hbase := h 0 hr
+  have hzero : quarticPoleHeight 0 = 0 := by simp [quarticPoleHeight]
+  simp only [hzero, norm_zero, add_zero, one_pow, mul_one] at hbase
+  have hpos : 0 < ‖1 - quarticPoleValue (a ^ k) 0‖ := by
+    by_contra! hnonpos
+    rw [le_antisymm hnonpos (norm_nonneg _), mul_zero] at hbase
+    norm_num at hbase
+  rw [norm_inv] at hl
+  exact hl.trans ((inv_le_iff_one_le_mul₀ hpos).mpr hbase)
+
+end QuarticCharacterPowers
 
 /-! ## Realization of the quartic benchmark -/
 
