@@ -2768,6 +2768,53 @@ private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_tra
   exact D.add_mem (D.smul_mem _ (hD 0))
     (D.sum_mem fun m _ ↦ D.smul_mem _ (D.sub_mem (hD m) (hD (m - 1))))
 
+/-- A finite-place Schwartz–Bruhat test invariant under the local integer units and
+supported in a valuation ball is a finite linear combination of indicators of valuation
+balls contained in that ball. -/
+theorem finitePlaceRadialTest_exists_subball_expansion
+    (v : V) (f : ℬ(v.adicCompletion F))
+    (hf : ∀ u ∈ (v.adicCompletionIntegers F).units, schwartzBruhatUnitTranslate u f = f)
+    (R : ℤ) (hsupp : ∀ x : v.adicCompletion F,
+      WithZero.exp R < Valued.v x → f (Multiplicative.ofAdd x) = 0) :
+    ∃ a : {n : ℤ // n ≤ R} →₀ ℂ, ∀ x : v.adicCompletion F,
+      f (Multiplicative.ofAdd x) =
+        ∑ n ∈ a.support, if Valued.v x ≤ WithZero.exp n.val then a n else 0 := by
+  classical
+  let K := v.adicCompletion F
+  let ball (n : ℤ) (x : K) : ℂ := if Valued.v x ≤ WithZero.exp n then 1 else 0
+  let cut : (K → ℂ) →ₗ[ℂ] (K → ℂ) :=
+    LinearMap.pi fun x ↦ if Valued.v x ≤ WithZero.exp R then LinearMap.proj x else 0
+  let expand := Finsupp.linearCombination ℂ (fun n : {n : ℤ // n ≤ R} ↦ ball n.val)
+  have hcutBall (n : ℤ) : cut (ball n) = ball (min n R) := by
+    funext x
+    by_cases h : n ≤ R
+    · rw [min_eq_left h]
+      by_cases hx : Valued.v x ≤ WithZero.exp n
+      · simp [cut, ball, hx, hx.trans (WithZero.exp_le_exp.mpr h)]
+      · simp [cut, ball, hx, DFunLike.ite_apply]
+    · have h' := le_of_lt (lt_of_not_ge h)
+      rw [min_eq_right h']
+      by_cases hx : Valued.v x ≤ WithZero.exp R
+      · simp [cut, ball, hx, hx.trans (WithZero.exp_le_exp.mpr h')]
+      · simp [cut, ball, hx]
+  have hmem := sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_radial
+    v f hf (expand.range.comap cut) (fun n ↦ by
+      change cut (ball n) ∈ expand.range
+      rw [hcutBall]
+      refine ⟨Finsupp.single ⟨min n R, min_le_right _ _⟩ 1, ?_⟩
+      simp [expand])
+  have hcut : cut (fun x ↦ f (Multiplicative.ofAdd x)) = fun x ↦ f (Multiplicative.ofAdd x) := by
+    funext x
+    by_cases hx : Valued.v x ≤ WithZero.exp R
+    · simp [cut, hx]
+    · simp [cut, hx, hsupp x (lt_of_not_ge hx)]
+  change cut (fun x ↦ f (Multiplicative.ofAdd x)) ∈ expand.range at hmem
+  rw [hcut] at hmem
+  obtain ⟨a, ha⟩ := hmem
+  refine ⟨a, fun x ↦ ?_⟩
+  simpa [expand, Finsupp.linearCombination_apply, Finsupp.sum, Finset.sum_apply,
+    Pi.smul_apply, smul_eq_mul, ball, mul_ite] using (congrFun ha x).symm
+
 /-- The unit-invariant part of a test has a finite expansion in valuation balls
 with test functions on the old stage as coefficients. -/
 private theorem sLocalThetaPrincipalValue_isClosedEmbedding_difference_bound_trace_shells_expand
