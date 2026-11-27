@@ -323,6 +323,35 @@ private theorem sec2bP_homTheta (ω : PontryaginDual (sIdeleQuotientNorm ℚ ∅
     subst this
     simp
 
+/-- The norm separates actual quotient classes of rational real idèles. -/
+theorem ratEmpty_sIdeleQuotientNorm_injective : Injective (sIdeleQuotientNorm ℚ ∅) := by
+  intro x y h
+  have hk : x / y ∈ (sIdeleQuotientNorm ℚ ∅).ker := by simp [MonoidHom.mem_ker, map_div, h]
+  exact div_eq_one.mp (congrArg Subtype.val (sec2bP_normOne_trivial ⟨x / y, hk⟩))
+
+/-- The actual rational homogeneous theta sum in norm coordinates, with its
+norm-one Tamagawa mass retained. The two terms are the two global signs. -/
+theorem ratEmpty_homogeneousTheta_real (ω : PontryaginDual (sIdeleQuotientNorm ℚ ∅).ker)
+    (φ : SchwartzMap ℝ ℂ) (f : SchwartzBruhat (Multiplicative (SAdeleRing ℚ ∅)))
+    (hf : ∀ x : SAdeleRing ℚ ∅, f (Multiplicative.ofAdd x) =
+      φ (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
+        (x.1 Rat.infinitePlace))) (g : SIdeleQuotient ℚ ∅) :
+    sLocalHomogeneousAdelicThetaLinearMap ℚ ∅ ω f g =
+      ((sLocalNormOneQuotientMeasure ℚ ∅).real univ : ℂ) *
+        (φ (((sIdeleQuotientNorm ℚ ∅ g).val : ℝ≥0) : ℝ) +
+          φ (-(((sIdeleQuotientNorm ℚ ∅ g).val : ℝ≥0) : ℝ))) := by
+  obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective g
+  let t := InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
+    (x.val.1 Rat.infinitePlace)
+  have hr : (((sIdeleQuotientNorm ℚ ∅ (QuotientGroup.mk x)).val : ℝ≥0) : ℝ) = |t| := by
+    rw [show |t| = ‖x.val.1 Rat.infinitePlace‖ from sec2bP_abs _]
+    exact sec2bP_norm x
+  rw [sec2bP_homTheta, sec2bP_thetaClasses f φ hf x, hr]
+  change _ * (φ t + φ (-t)) = _ * (φ |t| + φ (-|t|))
+  rcases le_total 0 t with h | h
+  · rw [abs_of_nonneg h]
+  · rw [abs_of_nonpos h, neg_neg, add_comm (φ (-t))]
+
 /-- The test of the counterexample weighted by the inverse square of the norm stays
 bounded below on classes of norm less than one. -/
 private theorem sec2bP_lower (ω : PontryaginDual (sIdeleQuotientNorm ℚ ∅).ker)
