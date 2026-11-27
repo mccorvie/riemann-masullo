@@ -15,7 +15,7 @@ noncomputable section
 open Filter MeasureTheory Set
 open scoped NNReal
 
-namespace ShiftMobius
+namespace RiemannMasullo.ShiftMobius
 
 variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
 variable (S : H →ₗᵢ[ℂ] H) (β : ℝ) (h₀ : 0 ≤ β) (h₁ : β < 1)
@@ -77,7 +77,7 @@ theorem isometry_add_mem_shift (x : H) :
   rw [isometry_denominator, denominator_apply, smul_sub, map_sub, map_smul, map_smul]
   abel
 
-end ShiftMobius
+end RiemannMasullo.ShiftMobius
 
 namespace RiemannMasullo.RationalPacket
 
