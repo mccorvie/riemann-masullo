@@ -1,8 +1,13 @@
 module
 
+public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeGreenHeightTail
 import Mathlib.Geometry.Manifold.PartitionOfUnity
 import RiemannMasullo.Ch10_TraceSpectral.Sec4b_ProjectedKernels
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
+
+public import RiemannMasullo.Ch01_Introduction.Sec4_PoissonCertificate
+public import RiemannMasullo.Ch01_Introduction.Sec4_HeckeGreenExterior
+public import RiemannMasullo.AppB_AnalyticNT.Sec4b_BoundaryHeckeGreen
 
 /-! # Isolated statements of §12.5
 
@@ -307,6 +312,79 @@ theorem stripTestAction_projectiveKernel_iff_support_in_open {α s : ℝ} (ha : 
   exact kernelLocalization_sum ha hs P f fun i ↦
     (stripTestAction_projectiveKernel_translate_iff ha hs P (g i) (ψ i) (f i) (htr i)).mpr (h _ (hsup i))
 
+/-! ## Integer ordinates and translated Poisson mass
+
+The unit cells cover the full ordinate line. A single off-line site and its
+same-character reflection cost strictly more than six fifths in one of them.
+-/
+
+namespace PoissonCertificate
+
+open RiemannMasullo.HeckePoisson
+
+local notation "U𝔽" => PontryaginDual C𝔽
+local notation "ord(" χ ", " z ")" =>
+  MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ z
+
+local notation "ext(" σ ", " a ")" =>
+  {p : {η : U𝔽 // ∀ u : ℝ≥0ˣ, η (σ u) = 1} × ℂ //
+    0 < ord(p.1.val, p.2) ∧ (a : ℝ) ≤ |p.2.re - 1 / 2|}
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The omitted-zero cancellation at one half-width. -/
+def exteriorCancellation (σ : ℝ≥0ˣ →ₜ* C𝔽) (a : ℝ) : Prop :=
+  ∀ φ : BruhatCompactSupport C𝔽, (∀ g : (ideleClassNorm F).ker, φ.val g = 0) →
+    HasSum (fun z : ext(σ, a) ↦ (ord(z.val.1.val, z.val.2) : ℂ) *
+      ∫ g, φ.val g * ideleClassNormTwist z.val.1.val (z.val.2 - 1 / 2) g
+        ∂ideleClassTamagawaMeasure F) 0
+
+private theorem exteriorCancellation_iff_empty (σ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hσ : Function.RightInverse σ (ideleClassNorm F)) (a : ℝ) :
+    exteriorCancellation σ a ↔ IsEmpty ext(σ, a) := by
+  simpa only [exteriorCancellation, modulatedFourierMellin, relativeVerticalStrip,
+    Set.preimage_univ, Set.indicator_univ] using hasSum_exteriorZeros_iff_isEmpty σ hσ a
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The all-width omitted-zero cancellation is equivalent
+to one numerical threshold at the integer ordinates for each normalized
+character. Both sides use the actual divisor of the same completed function. -/
+theorem all_widths_iff_integer_mass (σ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hσ : Function.RightInverse σ (ideleClassNorm F)) :
+    (∀ a > 0, exteriorCancellation σ a) ↔
+      ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (σ u) = 1) →
+        ∀ k : ℤ, fullMass χ k - centralMass χ k ≤ 6 / 5 := by
+  constructor
+  · intro h χ hχ
+    apply (criticalLine_iff_integer_mass χ).mp
+    intro z
+    by_contra hz
+    have he := (exteriorCancellation_iff_empty σ hσ _).mp
+      (h |z.val.re - 1 / 2| (abs_pos.mpr (sub_ne_zero.mpr hz)))
+    exact he.false ⟨(⟨χ, hχ⟩, z.val), z.property, le_rfl⟩
+  · intro h a ha
+    apply (exteriorCancellation_iff_empty σ hσ a).mpr
+    refine ⟨fun z ↦ ?_⟩
+    have he := (criticalLine_iff_integer_mass z.val.1.val).mpr
+      (h z.val.1.val z.val.1.property) ⟨z.val.2, z.property.1⟩
+    change z.val.2.re = 1 / 2 at he
+    have := z.property.2
+    rw [he, sub_self, abs_zero] at this
+    exact (not_le_of_gt ha) this
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. With the translated explicit formula supplied, the all-width
+criterion compares the pole-cleared arithmetic logarithmic derivative with
+the complete central-line contribution at integer centers. -/
+theorem all_widths_iff_integer_logDerivative (σ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hσ : Function.RightInverse σ (ideleClassNorm F))
+    (hformula : ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (σ u) = 1) →
+      ∀ k : ℤ, HasSum (siteWeight (χ := χ) k) (normalizedLogDerivative χ k)) :
+    (∀ a > 0, exteriorCancellation σ a) ↔
+      ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (σ u) = 1) →
+        ∀ k : ℤ, normalizedLogDerivative χ k - centralMass χ k ≤ 6 / 5 := by
+  rw [all_widths_iff_integer_mass σ hσ]
+  constructor <;> intro h χ hχ k <;>
+    simpa only [fullMass, (hformula χ hχ k).tsum_eq] using h χ hχ k
+
+end PoissonCertificate
+
 /-- Paper: (12.5.1.4), p. 520. The kernel assertion for all tests vanishing on the
 norm-one classes is equivalent to testing any nonempty open set of log norms. In
 particular a fixed short interval, or an arbitrary far half-line, suffices. -/
@@ -332,5 +410,178 @@ theorem exists_projectiveKernel_stripTestAction_spectralProjection_iff_support_i
   simp at hx
 
 end KernelLocalization
+
+/-! ## Compact circle measurements of the exterior terms -/
+
+namespace CompactGreen
+
+open Filter HeckePoisson HeckeHalfPlaneJensen
+open scoped Topology
+
+local notation "U𝔽" => PontryaginDual C𝔽
+local notation "ord(" χ ", " z ")" =>
+  MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ z
+local notation "ext(" τ ", " a ")" =>
+  {p : {χ : U𝔽 // ∀ u : ℝ≥0ˣ, χ (τ u) = 1} × ℂ //
+    0 < ord(p.1.val, p.2) ∧ (a : ℝ) ≤ |p.2.re - 1/2|}
+local notation "allWidths(" τ ")" =>
+  ∀ a > (0 : ℝ), ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C₁, φ.val g = 0) →
+    HasSum (fun z : ext(τ, a) ↦ (ord(z.val.1.val, z.val.2) : ℂ) *
+      modulatedFourierMellin m𝔽 univ ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+        μ𝔽 φ.val (ideleClassNormTwist z.val.1.val (z.val.2 - 1/2))) 0
+
+private theorem allWidths_iff_critical (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : Function.RightInverse τ (ideleClassNorm F)) :
+    allWidths(τ) ↔ ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (τ u) = 1) → ∀ z : Site χ, z.val.re = 1/2 := by
+  have ha : allWidths(τ) ↔ (∀ a > 0, PoissonCertificate.exteriorCancellation τ a) := by
+    simp only [PoissonCertificate.exteriorCancellation,modulatedFourierMellin,relativeVerticalStrip,
+      Set.preimage_univ,Set.indicator_univ]
+  rw [ha,PoissonCertificate.all_widths_iff_integer_mass τ hτ]
+  constructor <;> intro h χ hχ
+  · exact (criticalLine_iff_integer_mass χ).mpr (h χ hχ)
+  · exact (criticalLine_iff_integer_mass χ).mp (h χ hχ)
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The claimed all-width exterior cancellation is
+equivalent to a nonpositive limit of the genuine corrected finite-Hecke circle means
+for every character normalized by the given norm section. -/
+theorem all_widths_iff_circleLimit_nonpos (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) :
+    allWidths(τ) ↔ ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (τ u) = 1) →
+      Filter.limUnder (𝓝[<] (1 : ℝ)) (correctedMean χ (finiteHeckeL_exists_continuation χ).choose) ≤ 0 := by
+  rw [allWidths_iff_critical τ hτ]
+  constructor <;> intro h χ hχ
+  · rw [(tendsto_corrected_circle_mean_rightGreenMass τ hτ χ hχ).2.limUnder_eq,
+      (rightGreenMass_eq_zero_iff χ).mpr (h χ hχ)]
+  · have hle := h χ hχ
+    rw [(tendsto_corrected_circle_mean_rightGreenMass τ hτ χ hχ).2.limUnder_eq] at hle
+    exact (rightGreenMass_eq_zero_iff χ).mp (le_antisymm hle (rightGreenMass_nonneg χ))
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The all-width cancellation is also equivalent
+to nonpositivity of each corrected compact mean, including circles passing through
+a zero or the possible principal pole. -/
+theorem all_widths_iff_compact_circleMeans_nonpos (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) :
+    allWidths(τ) ↔ ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (τ u) = 1) → ∀ r ∈ Ioo (0 : ℝ) 1,
+      correctedMean χ (finiteHeckeL_exists_continuation χ).choose r ≤ 0 := by
+  rw [all_widths_iff_circleLimit_nonpos τ hτ]
+  constructor
+  · intro h χ hχ r hr
+    have hle := h χ hχ
+    rw [(tendsto_corrected_circle_mean_rightGreenMass τ hτ χ hχ).2.limUnder_eq] at hle
+    exact (correctedMean_mem_Icc τ hτ χ hχ hr).2.trans hle
+  · intro h χ hχ
+    have ht := (tendsto_corrected_circle_mean_rightGreenMass τ hτ χ hχ).2
+    rw [ht.limUnder_eq]
+    apply le_of_tendsto ht
+    filter_upwards [Ioo_mem_nhdsLT (by norm_num : (0 : ℝ) < 1)] with r hr
+    exact h χ hχ r hr
+
+open HeckeBoundaryGreen
+
+private theorem criticalLogDifference_eq_mass (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : Function.RightInverse τ (ideleClassNorm F))
+    (χ : U𝔽) (hχ : ∀ u : ℝ≥0ˣ, χ (τ u) = 1) :
+    criticalLogDifference χ = rightGreenMass χ :=
+  (hasSum_green_criticalLogDifference τ hτ χ hχ).tsum_eq.symm
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520.
+Reconstruction: If all positive divisor points through height
+`H` are central, an upper bound for the full two-sided quadratic tail gives a bound
+for the corrected logarithmic integral on the critical line. -/
+theorem criticalLogDifference_mem_Icc_of_verified_height (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) (χ : U𝔽) (hχ : ∀ u : ℝ≥0ˣ, χ (τ u) = 1)
+    {H B : ℝ} (hH : 0 < H) (hc : ∀ z : Site χ, |z.val.im| ≤ H → z.val.re = 1 / 2)
+    (hB : inverseHeightTail χ H 2 ≤ B) :
+    criticalLogDifference χ ∈ Icc 0 (3 / 4 * B) := by
+  rw [criticalLogDifference_eq_mass τ hτ χ hχ]
+  exact ⟨rightGreenMass_nonneg χ, (rightGreenMass_le_inverseHeightTail χ hH hc).trans
+    (mul_le_mul_of_nonneg_left hB (by norm_num))⟩
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520.
+Reconstruction: For each compact test, character and `k ≥ 2`,
+one Mellin envelope times the full high-ordinate tail bounds the absolute omitted sum.
+The estimate holds at every positive strip half-width and includes both edges. -/
+theorem exists_hasSum_absolute_exterior_le_verified_height_tail (χ : U𝔽)
+    (φ : BruhatCompactSupport C𝔽) {k : ℕ} (hk : 2 ≤ k) :
+    ∃ W : ℝ, 0 ≤ W ∧ ∀ {H B : ℝ}, 0 < H →
+      (∀ z : Site χ, |z.val.im| ≤ H → z.val.re = 1 / 2) → inverseHeightTail χ H k ≤ B →
+      ∀ α : ℝ, 0 < α → ∃ A : ℝ,
+        HasSum (fun z : {p : ℂ // 0 < ord(χ, p) ∧ α ≤ |p.re - 1 / 2|} ↦
+          ‖(ord(χ, z.val) : ℂ) * modulatedFourierMellin m𝔽 univ
+            ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+            μ𝔽 φ.val (ideleClassNormTwist χ (z.val - 1 / 2))‖) A ∧ A ≤ W * B := by
+  obtain ⟨W, hW, hM⟩ := exists_centeredMellin_site_pow_envelope φ χ k
+  refine ⟨W, hW, fun {H B} hH hc hB α hα ↦ ?_⟩
+  let M (z : ℂ) := modulatedFourierMellin m𝔽 univ
+    ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+    μ𝔽 φ.val (ideleClassNormTwist χ (z - 1 / 2))
+  obtain ⟨hs, hb⟩ := absolute_exterior_le_inverseHeightTail χ M hk hH hW hc hM hα
+  exact ⟨_, hs, hb.trans (mul_le_mul_of_nonneg_left hB hW)⟩
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520.
+Reconstruction: A summable family of characterwise height-tail bounds controls the absolute
+exterior sum on the original joint index.
+The test envelopes are chosen before the verification heights and strip width. -/
+theorem exists_hasSum_joint_absolute_exterior_le_verified_height_tails
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (φ : BruhatCompactSupport C𝔽) {k : ℕ} (hk : 2 ≤ k) :
+    let X := {χ : U𝔽 // ∀ u : ℝ≥0ˣ, χ (τ u) = 1}
+    let M (χ : X) (s : ℂ) := modulatedFourierMellin m𝔽 univ
+      ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+      μ𝔽 φ.val (ideleClassNormTwist χ.val (s - 1 / 2))
+    ∃ W : X → ℝ, (∀ χ, 0 ≤ W χ) ∧
+      (∀ χ (z : Site χ.val), |z.val.im| ^ k * ‖M χ z.val‖ ≤ W χ) ∧
+      ∀ H B : X → ℝ, (∀ χ, 0 < H χ) →
+        (∀ χ (z : Site χ.val), |z.val.im| ≤ H χ → z.val.re = 1 / 2) →
+        (∀ χ, inverseHeightTail χ.val (H χ) k ≤ B χ) →
+        Summable (fun χ ↦ W χ * B χ) → ∀ α : ℝ, 0 < α → ∃ A : ℝ,
+          HasSum (fun z : ext(τ, α) ↦ ‖(ord(z.val.1.val, z.val.2) : ℂ) * M z.val.1 z.val.2‖) A ∧
+            A ≤ ∑' χ, W χ * B χ := by
+  intro X M
+  choose W hW hm using fun χ : X ↦ exists_centeredMellin_site_pow_envelope φ χ.val k
+  refine ⟨W, hW, hm, fun H B hH hc hB hsum α hα ↦ ?_⟩
+  let P (χ : X) (z : ℂ) := 0 < ord(χ.val, z) ∧ α ≤ |z.re - 1 / 2|
+  let g (χ : X) (z : Subtype (P χ)) := ‖(ord(χ.val, z.val) : ℂ) * M χ z.val‖
+  have hf (χ : X) : Summable (g χ) ∧ (∑' z, g χ z) ≤ W χ * B χ := by
+    obtain ⟨hs, hb⟩ := absolute_exterior_le_inverseHeightTail χ.val (M χ) hk
+      (hH χ) (hW χ) (hc χ) (hm χ) hα
+    exact ⟨hs.summable, hb.trans (mul_le_mul_of_nonneg_left (hB χ) (hW χ))⟩
+  have hout : Summable (fun χ ↦ ∑' z, g χ z) := Summable.of_nonneg_of_le
+    (fun χ ↦ tsum_nonneg fun _ ↦ norm_nonneg _) (fun χ ↦ (hf χ).2) hsum
+  have hσ : Summable (fun z : (χ : X) × Subtype (P χ) ↦ g z.1 z.2) :=
+    (summable_sigma_of_nonneg fun _ ↦ norm_nonneg _).2 ⟨fun χ ↦ (hf χ).1, hout⟩
+  refine ⟨_, ?_, hout.tsum_le_tsum (fun χ ↦ (hf χ).2) hsum⟩
+  exact (Equiv.subtypeProdEquivSigmaSubtype P).symm.hasSum_iff.mp
+    (hout.hasSum.sigma_of_hasSum (fun χ ↦ (hf χ).1.hasSum) hσ)
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. Reconstruction: the all-width exterior cancellation is
+equivalent to a single upper bound for the critical-line logarithmic integral of each normalized
+character. The principal-character reference includes its pole correction at one. -/
+theorem all_widths_iff_criticalLogDifference_nonpos (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) :
+    allWidths(τ) ↔ ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (τ u) = 1) → criticalLogDifference χ ≤ 0 := by
+  rw [allWidths_iff_critical τ hτ]
+  constructor
+  · intro h χ hχ
+    rw [criticalLogDifference_eq_mass τ hτ χ hχ, (rightGreenMass_eq_zero_iff χ).mpr (h χ hχ)]
+  · intro h χ hχ
+    have hh := h χ hχ
+    rw [criticalLogDifference_eq_mass τ hτ χ hχ] at hh
+    exact (rightGreenMass_eq_zero_iff χ).mp (le_antisymm hh (rightGreenMass_nonneg χ))
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. For each compact test and normalized character, the
+absolute omitted Mellin sum, including both edges of any positive strip, is bounded by the
+actual critical-line logarithmic difference times a test constant divided by the width. -/
+theorem exists_hasSum_absolute_exterior_le_criticalLogDifference (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : Function.RightInverse τ (ideleClassNorm F)) (χ : U𝔽)
+    (hχ : ∀ u : ℝ≥0ˣ, χ (τ u) = 1) (φ : BruhatCompactSupport C𝔽) :
+    ∃ W : ℝ, 0 ≤ W ∧ ∀ α : ℝ, 0 < α → ∃ A : ℝ,
+      HasSum (fun z : {p : ℂ // 0 < ord(χ, p) ∧ α ≤ |p.re-1/2|} ↦
+        ‖(ord(χ, z.val) : ℂ) *
+          modulatedFourierMellin m𝔽 univ ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+            μ𝔽 φ.val (ideleClassNormTwist χ (z.val - 1/2))‖) A ∧
+      A ≤ (3*W/(2*α)) * criticalLogDifference χ := by
+  rw [criticalLogDifference_eq_mass τ hτ χ hχ,
+    ← (tendsto_corrected_circle_mean_rightGreenMass τ hτ χ hχ).2.limUnder_eq]
+  exact exists_hasSum_absolute_exterior_le_circleLimit τ hτ χ hχ φ
+
+end CompactGreen
 
 end RiemannMasullo.Isolated
