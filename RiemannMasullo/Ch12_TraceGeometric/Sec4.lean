@@ -11,6 +11,8 @@ public import RiemannMasullo.ForMathlib.NumberTheory.NumberField.InfiniteAdeleRi
 public import RiemannMasullo.ForMathlib.Topology.Covering.AddCircle
 public import RiemannMasullo.AppB_AnalyticNT.Sec4b
 public import RiemannMasullo.Ch06_LocalGlobal.Sec1
+import RiemannMasullo.Ch12_TraceGeometric.Sec4_ArchimedeanProfile
+import RiemannMasullo.ForMathlib.Analysis.Fourier.IteratedTranslation
 import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec5
 import RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Count
@@ -3986,6 +3988,269 @@ local notation "places" => InfinitePlace F ⊕ S
 -- Use the sup norm on the product. The norm on InfiniteAdeleRing itself is the product modulus.
 local notation "Eₛ" => A∞ × A𝒻
 
+open Classical in
+/-- Insert a shift at one infinite place in the additive S-adele product. -/
+private def sLocalTrace_archShift (w : InfinitePlace F) : w.Completion →+ Eₛ where
+  toFun h := (Pi.single w h, 0)
+  map_zero' := Prod.ext (Pi.single_zero w) rfl
+  map_add' h k := Prod.ext (Pi.single_add w h k) (by simp)
+
+private theorem sLocalTrace_archShift_norm (w : InfinitePlace F) (h : w.Completion) :
+    ‖sLocalTrace_archShift (S := S) w h‖ = ‖h‖ := by
+  classical
+  change max ‖(Pi.single w h : A∞)‖ ‖(0 : A𝒻)‖ = ‖h‖
+  rw [norm_zero, max_eq_left (norm_nonneg _), Pi.norm_single]
+
+open Classical in
+/-- The product of all local modulus factors except the chosen infinite place. -/
+private def sLocalTrace_archRestModulus (x : Eₛ) (w : InfinitePlace F) : ℝ :=
+  (∏ u ∈ Finset.univ.erase w, ‖x.1 u‖ ^ u.mult) * ∏ v : S, ‖x.2 v‖
+
+/-- A translation in one infinite coordinate changes only that factor of the
+product modulus. -/
+private theorem sLocalTrace_modulus_add_archShift
+    (x : Eₛ) (w : InfinitePlace F) (h : w.Completion) :
+    modS(x + sLocalTrace_archShift (S := S) w h) =
+      sLocalTrace_archRestModulus x w * ‖x.1 w + h‖ ^ w.mult := by
+  classical
+  let y : Eₛ := x + sLocalTrace_archShift (S := S) w h
+  have hfix (u : InfinitePlace F) (hu : u ≠ w) : y.1 u = x.1 u := by
+    change x.1 u + Pi.single (M := fun v : InfinitePlace F ↦ v.Completion) w h u = x.1 u
+    rw [Pi.single_eq_of_ne hu, add_zero]
+  have hsame : y.1 w = x.1 w + h := by
+    change x.1 w + Pi.single (M := fun v : InfinitePlace F ↦ v.Completion) w h w = x.1 w + h
+    rw [Pi.single_eq_same]
+  have hprod : (∏ u ∈ Finset.univ.erase w, ‖y.1 u‖ ^ u.mult) =
+      ∏ u ∈ Finset.univ.erase w, ‖x.1 u‖ ^ u.mult := by
+    refine Finset.prod_congr rfl fun u hu ↦ ?_
+    rw [hfix u (Finset.ne_of_mem_erase hu)]
+  have harch : (∏ u : InfinitePlace F, ‖y.1 u‖ ^ u.mult) =
+      (∏ u ∈ Finset.univ.erase w, ‖x.1 u‖ ^ u.mult) * ‖x.1 w + h‖ ^ w.mult := by
+    rw [← Finset.prod_erase_mul Finset.univ (fun u : InfinitePlace F ↦ ‖y.1 u‖ ^ u.mult)
+      (Finset.mem_univ w), hprod, hsame]
+  have hfin : y.2 = x.2 := add_zero _
+  change (∏ u : InfinitePlace F, ‖y.1 u‖ ^ u.mult) * (∏ v : S, ‖y.2 v‖) = _
+  rw [harch, hfin]
+  dsimp only [sLocalTrace_archRestModulus]
+  ring
+
+private theorem sLocalTrace_modulus_add_archShift_div_equiv {K : Type*} [NormedRing K]
+    (x : Eₛ) (w : InfinitePlace F) (e : w.Completion ≃+* K) (he : Isometry e)
+    (u : K) (t : ℝ) :
+    let j := (sLocalTrace_archShift (S := S) w).comp e.symm.toAddEquiv.toAddMonoidHom
+    modS(x + j u) / t = (sLocalTrace_archRestModulus x w / t) * ‖e (x.1 w) + u‖ ^ w.mult := by
+  intro j
+  change modS(x + sLocalTrace_archShift (S := S) w (e.symm u)) / t = _
+  have hnorm : ‖x.1 w + e.symm u‖ = ‖e (x.1 w) + u‖ := by
+    simpa only [map_add, e.apply_symm_apply] using
+      (he.norm_map_of_map_zero (map_zero e) (x.1 w + e.symm u)).symm
+  rw [sLocalTrace_modulus_add_archShift, hnorm, div_mul_eq_mul_div]
+
+/-- The scaled modulus on a real coordinate line uses the usual absolute value. -/
+private theorem sLocalTrace_modulus_add_archShift_div_real
+    (x : Eₛ) (w : InfinitePlace F) (hw : w.IsReal) (u t : ℝ) :
+    let e := InfinitePlace.Completion.ringEquivRealOfIsReal hw
+    let j := (sLocalTrace_archShift (S := S) w).comp e.symm.toAddEquiv.toAddMonoidHom
+    modS(x + j u) / t = (sLocalTrace_archRestModulus x w / t) * |e (x.1 w) + u| := by
+  intro e j
+  have he : Isometry e := InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal hw
+  simpa only [hw.mult_eq_one, pow_one, Real.norm_eq_abs] using
+    sLocalTrace_modulus_add_archShift_div_equiv x w e he u t
+
+/-- The scaled modulus on a complex coordinate line uses the squared complex norm. -/
+private theorem sLocalTrace_modulus_add_archShift_div_complex
+    (x : Eₛ) (w : InfinitePlace F) (hw : w.IsComplex) (u : ℂ) (t : ℝ) :
+    let e := InfinitePlace.Completion.ringEquivComplexOfIsComplex hw
+    let j := (sLocalTrace_archShift (S := S) w).comp e.symm.toAddEquiv.toAddMonoidHom
+    modS(x + j u) / t = (sLocalTrace_archRestModulus x w / t) * ‖e (x.1 w) + u‖ ^ 2 := by
+  intro e j
+  have he : Isometry e := InfinitePlace.Completion.isometry_extensionEmbedding w
+  simpa only [hw.mult_eq_two] using sLocalTrace_modulus_add_archShift_div_equiv x w e he u t
+
+/-- The coefficient left after freezing all but one infinite place is
+nonnegative and has a polynomial bound uniform in that place and the scale. -/
+private theorem sLocalTrace_archRestModulus_div_bounds
+    (x : Eₛ) (w : InfinitePlace F) {δ t : ℝ} (hδ : 0 < δ) (ht : δ ≤ t) :
+    0 ≤ sLocalTrace_archRestModulus x w / t ∧
+      sLocalTrace_archRestModulus x w / t ≤
+        δ⁻¹ * (1 + ‖x‖) ^ ((∑ u : InfinitePlace F, u.mult) + Fintype.card S) := by
+  classical
+  let A := 1 + ‖x‖
+  have hA : 1 ≤ A := le_add_of_nonneg_right (norm_nonneg _)
+  have hcoord (u : InfinitePlace F) : ‖x.1 u‖ ≤ A :=
+    (norm_le_pi_norm (x.1 : A∞) u).trans ((norm_fst_le x).trans (le_add_of_nonneg_left zero_le_one))
+  have harch : (∏ u ∈ Finset.univ.erase w, ‖x.1 u‖ ^ u.mult) ≤
+      A ^ (∑ u : InfinitePlace F, u.mult) := by
+    calc
+      _ ≤ ∏ u ∈ Finset.univ.erase w, A ^ u.mult :=
+        Finset.prod_le_prod₀ (fun u _ ↦ pow_nonneg (norm_nonneg _) _) fun u _ ↦
+          pow_le_pow_left₀ (norm_nonneg _) (hcoord u) _
+      _ ≤ ∏ u : InfinitePlace F, A ^ u.mult :=
+        Finset.prod_le_prod_of_subset_of_one_le₀ (Finset.subset_univ _)
+          (fun _ _ ↦ by positivity) (fun _ _ _ ↦ one_le_pow₀ hA)
+      _ = _ := Finset.prod_pow_eq_pow_sum _ _ _
+  have hfin : (∏ v : S, ‖x.2 v‖) ≤ A ^ Fintype.card S := by
+    calc
+      _ ≤ ∏ _v : S, A := Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _) fun v _ ↦
+        (norm_le_pi_norm x.2 v).trans ((norm_snd_le x).trans (le_add_of_nonneg_left zero_le_one))
+      _ = _ := by rw [Finset.prod_const, Finset.card_univ]
+  have hrest₀ : 0 ≤ sLocalTrace_archRestModulus x w := by
+    dsimp only [sLocalTrace_archRestModulus]
+    positivity
+  have hrest : sLocalTrace_archRestModulus x w ≤
+      A ^ ((∑ u : InfinitePlace F, u.mult) + Fintype.card S) := by
+    rw [sLocalTrace_archRestModulus, pow_add]
+    exact mul_le_mul harch hfin (by positivity) (by positivity)
+  have ht₀ : 0 < t := hδ.trans_le ht
+  refine ⟨div_nonneg hrest₀ ht₀.le, ?_⟩
+  calc
+    _ ≤ A ^ ((∑ u : InfinitePlace F, u.mult) + Fintype.card S) / t :=
+      div_le_div_of_nonneg_right hrest ht₀.le
+    _ ≤ A ^ ((∑ u : InfinitePlace F, u.mult) + Fintype.card S) / δ :=
+      div_le_div_of_nonneg_left (by positivity) hδ ht
+    _ = _ := by rw [div_eq_mul_inv, mul_comm]
+
+/-- Forward differences on a real parameter line agree with differences
+along the corresponding shift in the additive group. -/
+private theorem sLocalTrace_fwdDiff_iter_pullback_at_zero {E L Y : Type*}
+    [AddCommMonoid E] [AddCommGroup L] [Module ℝ L] [AddCommGroup Y]
+    (i : L →+ E) (v : L) (j : ℕ) (p : E → Y) (x : E) :
+    ((fwdDiff (1 : ℝ))^[j] (fun s ↦ p (x + i (s • v)))) 0 =
+      ((fwdDiff (i v))^[j] p) x := by
+  have h := congrFun (fwdDiff_iter_along_addMonoidHom j i v p x) 0
+  simpa only [zero_smul, map_zero, add_zero] using h
+
+/-- Every order up to `n` satisfies the same polynomial envelope under a
+single small archimedean shift. The constants are uniform in the coordinate
+and in the frequency scale above the fixed positive floor. -/
+private theorem sLocalTrace_archProfile_fwdDiff_bound
+    (x : Eₛ) (w : InfinitePlace F) (h : w.Completion) (hh : ‖h‖ ≤ 1)
+    (n j : ℕ) (hj : j ≤ n) {δ t ε C : ℝ} (hδ : 0 < δ) (ht : δ ≤ t)
+    (b : ℝ → ℂ) (hb : ContDiff ℝ n b) (hε : 0 < ε)
+    (hplateau : Set.EqOn b (fun _ ↦ b 0) (Set.Icc 0 ε))
+    (hderiv : ∀ i ≤ n, ∀ y, 0 ≤ y → ‖iteratedDeriv i b y‖ ≤ C) :
+    let D := (∑ u : InfinitePlace F, u.mult) + Fintype.card S
+    let B := C * (n.factorial : ℝ) * (1 + 2 * ((n : ℝ) + 1) * δ⁻¹) ^ n
+    ‖((fwdDiff (sLocalTrace_archShift (S := S) w h))^[j]
+      (fun y : Eₛ ↦ b (modS(y) / t))) x‖ ≤ B * ‖h‖ ^ j * (1 + ‖x‖) ^ ((D + 1) * n) := by
+  intro D B
+  let a := sLocalTrace_archRestModulus x w / t
+  let A := 1 + ‖x‖
+  let K := 1 + 2 * ((n : ℝ) + 1) * δ⁻¹
+  let Y := K * A ^ (D + 1)
+  let p (y : Eₛ) := b (modS(y) / t)
+  change ‖((fwdDiff (sLocalTrace_archShift (S := S) w h))^[j] p) x‖ ≤
+    B * ‖h‖ ^ j * A ^ ((D + 1) * n)
+  have hA : 1 ≤ A := le_add_of_nonneg_right (norm_nonneg _)
+  have hK : 1 ≤ K := le_add_of_nonneg_right (by positivity)
+  have hY : 1 ≤ Y :=
+    calc
+      1 = (1 : ℝ) * 1 := by rw [mul_one]
+      _ ≤ K * A ^ (D + 1) :=
+        mul_le_mul hK (one_le_pow₀ hA) zero_le_one (zero_le_one.trans hK)
+  have hC : 0 ≤ C := (norm_nonneg (iteratedDeriv 0 b 0)).trans
+    (hderiv 0 (Nat.zero_le n) 0 le_rfl)
+  have hb' : ContDiff ℝ j b := hb.of_le (by exact_mod_cast hj)
+  obtain ⟨ha₀, ha⟩ := sLocalTrace_archRestModulus_div_bounds x w hδ ht
+  change 0 ≤ a at ha₀
+  change a ≤ δ⁻¹ * A ^ D at ha
+  have hscale (R : ℝ) (hR₀ : 0 ≤ R) (hR : R ≤ ‖x‖ + (n : ℝ)) :
+      1 + 2 * a * (1 + R) ≤ Y := by
+    have hR' : 1 + R ≤ ((n : ℝ) + 1) * A := by
+      calc
+        _ ≤ 1 + (‖x‖ + (n : ℝ)) := add_le_add (le_refl _) hR
+        _ ≤ _ := by
+          dsimp only [A]
+          nlinarith [mul_nonneg (Nat.cast_nonneg n) (norm_nonneg x)]
+    calc
+      _ ≤ 1 + 2 * (δ⁻¹ * A ^ D) * (((n : ℝ) + 1) * A) := by
+        exact add_le_add (le_refl _) (mul_le_mul (mul_le_mul_of_nonneg_left ha (by norm_num))
+          hR' (by positivity) (by positivity))
+      _ = 1 + (2 * ((n : ℝ) + 1) * δ⁻¹) * A ^ (D + 1) := by rw [pow_succ]; ring
+      _ ≤ A ^ (D + 1) + (2 * ((n : ℝ) + 1) * δ⁻¹) * A ^ (D + 1) :=
+        add_le_add (one_le_pow₀ hA) (le_refl _)
+      _ = _ := by dsimp only [Y, K]; ring
+  have hmajor (c : ℝ) (hc₀ : 0 ≤ c) (hc : c ≤ Y) :
+      (j.factorial : ℝ) * C * (c * ‖h‖) ^ j ≤ B * ‖h‖ ^ j * A ^ ((D + 1) * n) := by
+    have hpow : c ^ j ≤ Y ^ n :=
+      (pow_le_pow_left₀ hc₀ hc j).trans (pow_le_pow_right₀ hY hj)
+    have hfact : (j.factorial : ℝ) ≤ (n.factorial : ℝ) := by exact_mod_cast Nat.factorial_le hj
+    calc
+      _ = (j.factorial : ℝ) * C * c ^ j * ‖h‖ ^ j := by rw [mul_pow]; ring
+      _ ≤ (n.factorial : ℝ) * C * Y ^ n * ‖h‖ ^ j := by
+        exact mul_le_mul_of_nonneg_right (mul_le_mul (mul_le_mul_of_nonneg_right hfact hC)
+          hpow (by positivity) (by positivity)) (by positivity)
+      _ = (C * (n.factorial : ℝ) * K ^ n) * ‖h‖ ^ j * A ^ ((D + 1) * n) := by
+        dsimp only [Y]
+        rw [mul_pow, ← pow_mul]
+        ring
+  have hpull {L : Type} [Ring L] [Module ℝ L] (e : w.Completion ≃+* L) :
+      let i := (sLocalTrace_archShift (S := S) w).comp e.symm.toAddEquiv.toAddMonoidHom
+      ((fwdDiff (sLocalTrace_archShift (S := S) w h))^[j] p) x =
+        ((fwdDiff (1 : ℝ))^[j] (fun s ↦ p (x + i (s • e h)))) 0 := by
+    intro i
+    have hi : i (e h) = sLocalTrace_archShift (S := S) w h := by
+      change sLocalTrace_archShift (S := S) w (e.symm (e h)) = _
+      rw [e.symm_apply_apply]
+    simpa only [hi] using (sLocalTrace_fwdDiff_iter_pullback_at_zero i (e h) j p x).symm
+  by_cases hw : w.IsReal
+  · let e := InfinitePlace.Completion.ringEquivRealOfIsReal hw
+    let i := (sLocalTrace_archShift (S := S) w).comp e.symm.toAddEquiv.toAddMonoidHom
+    have he : Isometry e := InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal hw
+    have hv : |e h| = ‖h‖ := by
+      rw [← Real.norm_eq_abs]
+      exact he.norm_map_of_map_zero (map_zero e) h
+    have hcurve : (fun s : ℝ ↦ p (x + i (s • e h))) =
+        fun s ↦ b (a * |e (x.1 w) + s * e h|) := by
+      funext s
+      change b (modS(x + i (s • e h)) / t) = _
+      apply congrArg b
+      simpa only [smul_eq_mul] using sLocalTrace_modulus_add_archShift_div_real x w hw (s * e h) t
+    have hdiff := norm_fwdDiff_iter_realProfile_le j 0 (C := C) (a := a) hε hb'.contDiffOn hplateau
+      (fun y hy ↦ by simpa only [pow_zero, mul_one] using hderiv j hj y hy) ha₀ (e (x.1 w)) (e h)
+    simp only [pow_zero, mul_one, hv] at hdiff
+    have haY : a ≤ Y := (show a ≤ 1 + 2 * a * (1 + 0) by nlinarith only [ha₀]).trans
+      (hscale 0 le_rfl (by positivity))
+    have hjfact : 1 ≤ (j.factorial : ℝ) := by
+      exact_mod_cast Nat.succ_le_of_lt (Nat.factorial_pos j)
+    have hpull' := hpull e
+    change ((fwdDiff (sLocalTrace_archShift (S := S) w h))^[j] p) x =
+      ((fwdDiff (1 : ℝ))^[j] (fun s ↦ p (x + i (s • e h)))) 0 at hpull'
+    rw [hpull', hcurve]
+    refine hdiff.trans (le_trans ?_ (hmajor a ha₀ haY))
+    calc
+      _ ≤ (j.factorial : ℝ) * (C * (a * ‖h‖) ^ j) := le_mul_of_one_le_left (by positivity) hjfact
+      _ = _ := by ring
+  · have hw' : w.IsComplex := InfinitePlace.not_isReal_iff_isComplex.mp hw
+    let e := InfinitePlace.Completion.ringEquivComplexOfIsComplex hw'
+    let i := (sLocalTrace_archShift (S := S) w).comp e.symm.toAddEquiv.toAddMonoidHom
+    have he : Isometry e := InfinitePlace.Completion.isometry_extensionEmbedding w
+    have hv : ‖e h‖ = ‖h‖ := he.norm_map_of_map_zero (map_zero e) h
+    have hz : ‖e (x.1 w)‖ ≤ ‖x‖ :=
+      (he.norm_map_of_map_zero (map_zero e) (x.1 w)).le.trans
+        ((norm_le_pi_norm (x.1 : A∞) w).trans (norm_fst_le x))
+    let R := ‖e (x.1 w)‖ + (j : ℝ) * ‖e h‖
+    have hR₀ : 0 ≤ R := by dsimp only [R]; positivity
+    have hR : R ≤ ‖x‖ + (n : ℝ) := by
+      refine add_le_add hz ?_
+      rw [hv]
+      exact (mul_le_of_le_one_right (Nat.cast_nonneg j) hh).trans (by exact_mod_cast hj)
+    have hcurve : (fun s : ℝ ↦ p (x + i (s • e h))) =
+        fun s ↦ b (a * ‖e (x.1 w) + s • e h‖ ^ 2) := by
+      funext s
+      exact congrArg b (sLocalTrace_modulus_add_archShift_div_complex x w hw' (s • e h) t)
+    have hdiff := norm_fwdDiff_iter_normSqProfile_le j 0 (C := C) (a := a) hb' ha₀
+      (fun k hk y hy ↦ by simpa only [pow_zero, mul_one] using hderiv k (hk.trans hj) y hy)
+      (e (x.1 w)) (e h)
+    change _ ≤ (j.factorial : ℝ) * (C * (1 + a * R ^ 2) ^ (0 : ℕ)) *
+      ((1 + 2 * a * (1 + R)) * ‖e h‖) ^ j at hdiff
+    simp only [pow_zero, mul_one, hv] at hdiff
+    have hpull' := hpull e
+    change ((fwdDiff (sLocalTrace_archShift (S := S) w h))^[j] p) x =
+      ((fwdDiff (1 : ℝ))^[j] (fun s ↦ p (x + i (s • e h)))) 0 at hpull'
+    rw [hpull', hcurve]
+    exact hdiff.trans (hmajor _ (by positivity) (hscale R hR₀ hR))
+
 private def sLocalTrace_radii (x : Eₛ) : places → ℝ :=
   Sum.elim (fun w ↦ ‖x.1 w‖) (fun v ↦ ‖x.2 v‖)
 
@@ -4516,6 +4781,328 @@ private theorem sLocalTrace_frequency_step :
     · rw [hv, ← div_le_iff₀ hzz, one_div]
       have H := (le_add_of_nonneg_left (norm_nonneg (t v))).trans (hb v)
       linarith
+
+/-- A forward difference of the Fourier transform multiplies the integrand by
+the conjugate character of the shift minus one. Iterating gives the corresponding power. -/
+private theorem tamagawaFourier_iterated_fwdDiff_eq {E : Type*} [NormedCommRing E]
+    [MeasurableSpace E] [BorelSpace E] (μ : Measure E)
+    (χ : Multiplicative E →ₜ* Circle) (f : E → ℂ) (hf : Integrable f μ)
+    (h x : E) (n : ℕ) :
+    ((fwdDiff h)^[n] (tamagawaFourier μ (fun u ↦ χ (Multiplicative.ofAdd u)) f)) x =
+      ∫ u, f u * star (χ (Multiplicative.ofAdd (u * x)) : ℂ) *
+        (star (χ (Multiplicative.ofAdd (u * h)) : ℂ) - 1) ^ n ∂μ := by
+  let p (u r : E) : ℂ := star (χ (Multiplicative.ofAdd (u * r)) : ℂ)
+  let q (u : E) : ℂ := p u h - 1
+  let G (r : E) : ℂ := ∫ u, f u * p u r ∂μ
+  have hp (r : E) : Continuous (fun u ↦ p u r) :=
+    (continuous_subtype_val.comp
+      (χ.continuous.comp (continuous_ofAdd.comp (continuous_id.mul continuous_const)))).star
+  have hp1 (u r : E) : ‖p u r‖ = 1 := by simp only [p, norm_star, Circle.norm_coe]
+  have hpadd (u r s : E) : p u (r + s) = p u r * p u s := by
+    simp only [p, mul_add, ofAdd_add, map_mul, Circle.coe_mul, star_mul, mul_comm]
+  have hi (m : ℕ) (r : E) : Integrable (fun u ↦ f u * p u r * q u ^ m) μ := by
+    have hfr : Integrable (fun u ↦ f u * p u r) μ :=
+      hf.mul_bdd (hp r).aestronglyMeasurable (ae_of_all _ fun u ↦ (hp1 u r).le)
+    have hqc : Continuous (fun u ↦ q u ^ m) := ((hp h).sub continuous_const).pow m
+    refine hfr.mul_bdd hqc.aestronglyMeasurable (c := (2 : ℝ) ^ m) (ae_of_all _ fun u ↦ ?_)
+    rw [norm_pow]
+    refine pow_le_pow_left₀ (norm_nonneg _) ?_ _
+    calc
+      ‖q u‖ ≤ ‖p u h‖ + ‖(1 : ℂ)‖ := norm_sub_le _ _
+      _ = 2 := by rw [hp1, norm_one]; norm_num
+  change ((fwdDiff h)^[n] G) x = ∫ u, f u * p u x * q u ^ n ∂μ
+  induction n generalizing x with
+  | zero => simp [G]
+  | succ m ih =>
+      rw [Function.iterate_succ_apply']
+      change ((fwdDiff h)^[m] G) (x + h) - ((fwdDiff h)^[m] G) x = _
+      rw [ih (x + h), ih x, ← integral_sub (hi m (x + h)) (hi m x)]
+      apply integral_congr_ae
+      refine ae_of_all _ fun u ↦ ?_
+      change f u * p u (x + h) * q u ^ m - f u * p u x * q u ^ m =
+        f u * p u x * q u ^ (m + 1)
+      rw [hpadd, pow_succ]
+      dsimp only [q]
+      ring
+
+/-- For a continuous compactly supported input, the pointwise Fourier difference
+of order `n` is bounded by a constant times the `n`th power of the shift norm,
+uniformly over the Fourier variable. -/
+private theorem tamagawaFourier_iterated_fwdDiff_bound_of_hasCompactSupport {E : Type*}
+    [NormedCommRing E] [MeasurableSpace E] [BorelSpace E] (μ : Measure E)
+    [IsFiniteMeasureOnCompacts μ] (χ : Multiplicative E →ₜ* Circle) (f : E → ℂ)
+    (hf : Continuous f) (hs : HasCompactSupport f) (n : ℕ) :
+    ∃ A ≥ 0, ∀ x h : E,
+      ‖((fwdDiff h)^[n] (tamagawaFourier μ (fun u ↦ χ (Multiplicative.ofAdd u)) f)) x‖ ≤
+        A * ‖h‖ ^ n := by
+  obtain ⟨C, hC, hχ⟩ := exists_circleCharacter_norm_sub_one_le χ
+  let W (u : E) : ℝ := ‖f u‖ * ‖u‖ ^ n
+  have hW : Integrable W μ :=
+    (hf.norm.mul (continuous_norm.pow n)).integrable_of_hasCompactSupport hs.norm.mul_right
+  have hW0 : 0 ≤ ∫ u, W u ∂μ := integral_nonneg fun _ ↦ by dsimp [W]; positivity
+  refine ⟨C ^ n * (∫ u, W u ∂μ), mul_nonneg (pow_nonneg hC.le _) hW0, fun x h ↦ ?_⟩
+  rw [tamagawaFourier_iterated_fwdDiff_eq μ χ f (hf.integrable_of_hasCompactSupport hs) h x n]
+  calc
+    _ ≤ ∫ u, C ^ n * ‖h‖ ^ n * W u ∂μ := by
+      refine norm_integral_le_of_norm_le (hW.const_mul _) (ae_of_all _ fun u ↦ ?_)
+      have hpow : ‖star (χ (Multiplicative.ofAdd (u * h)) : ℂ) - 1‖ ≤ C * (‖u‖ * ‖h‖) := by
+        calc
+          _ = ‖(χ (Multiplicative.ofAdd (u * h)) : ℂ) - 1‖ := by
+            simpa only [star_sub, star_one] using
+              (norm_star ((χ (Multiplicative.ofAdd (u * h)) : ℂ) - 1))
+          _ ≤ C * ‖u * h‖ := hχ _
+          _ ≤ _ := mul_le_mul_of_nonneg_left (norm_mul_le _ _) hC.le
+      simp only [norm_mul, norm_star, Circle.norm_coe, mul_one, norm_pow]
+      calc
+        _ ≤ ‖f u‖ * (C * (‖u‖ * ‖h‖)) ^ n :=
+          mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (norm_nonneg _) hpow n) (norm_nonneg _)
+        _ = _ := by simp only [W, mul_pow]; ring
+    _ = _ := by rw [integral_const_mul]; ring
+
+/-- One constant bounds every pointwise forward difference through order `m`
+of the fixed Fourier amplitude of the S-local kernel. -/
+private theorem sLocalTrace_etaFourier_fwdDiff_bound
+    (f : BruhatCompactSupport Iₛ) (m : ℕ) :
+    ∃ A ≥ 0, ∀ j : ℕ, j ≤ m → ∀ w h : Eₛ,
+      ‖((fwdDiff h)^[j] (fourierₛ (sLocalTraceEta f 1))) w‖ ≤ A * ‖h‖ ^ j := by
+  classical
+  let : BorelSpace Eₛ := sAdeleRing_borelSpace
+  let : (νₛ).IsAddHaarMeasure := sLocalTrace_additiveHaar
+  obtain ⟨η, hη⟩ := SLocalTraceEta.eta_test f (1 : Hₛ)
+  have hc : Continuous (sLocalTraceEta f 1 : Eₛ → ℂ) :=
+    ((schwartzBruhat_continuous η).comp continuous_ofAdd).congr hη
+  let χ : Multiplicative Eₛ →ₜ* Circle :=
+    (sAdditiveTamagawaMeasure_selfDual F S).choose (Multiplicative.ofAdd (1 : Aₛ))
+  have hχ (w : Eₛ) : χ (Multiplicative.ofAdd w) = ψₛ w :=
+    ((sAdditiveTamagawaMeasure_selfDual F S).choose_spec.1 1 w).trans (congrArg ψₛ (one_mul _))
+  have heq : (fun w : Eₛ ↦ χ (Multiplicative.ofAdd w)) = ψₛ := funext hχ
+  have hone (j : ℕ) : ∃ A ≥ 0, ∀ w h : Eₛ,
+      ‖((fwdDiff h)^[j] (fourierₛ (sLocalTraceEta f 1))) w‖ ≤ A * ‖h‖ ^ j := by
+    simpa only [heq] using
+      tamagawaFourier_iterated_fwdDiff_bound_of_hasCompactSupport (E := Eₛ)
+        νₛ χ (sLocalTraceEta f 1) hc (SLocalTraceEta.eta_compact f 1) j
+  choose A hA hdiff using hone
+  let C := ∑ j ∈ Finset.range (m + 1), A j
+  have hC : 0 ≤ C := Finset.sum_nonneg (fun j _ ↦ hA j)
+  refine ⟨C, hC, fun j hj w h ↦ (hdiff j w h).trans ?_⟩
+  apply mul_le_mul_of_nonneg_right _ (pow_nonneg (norm_nonneg h) j)
+  exact Finset.single_le_sum (fun i _ ↦ hA i) (Finset.mem_range.mpr (Nat.lt_succ_of_le hj))
+
+open Classical in
+/-- The Fourier translation in one infinite coordinate is obtained by applying
+the existing frequency step to a frequency supported on that coordinate. -/
+private theorem sLocalTrace_frequency_step_arch :
+    ∃ C : ℝ, 1 ≤ C ∧ ∀ (r : Eₛ) (v : InfinitePlace F), 0 < ‖r.1 v‖ →
+      ∃ h : v.Completion, ‖h‖ ≤ C / ‖r.1 v‖ ∧
+        1 ≤ C * ‖(ψₛ (r * (Pi.single v h, 0)) : ℂ) - 1‖ := by
+  classical
+  obtain ⟨C, hC, hstep⟩ := sLocalTrace_frequency_step (F := F) (S := S)
+  refine ⟨C, hC, fun r v hv ↦ ?_⟩
+  let r₀ : Eₛ := (Pi.single v (r.1 v), 0)
+  have hr₀ : ‖r₀‖ = ‖r.1 v‖ := by
+    change max ‖(Pi.single v (r.1 v) : A∞)‖ ‖(0 : A𝒻)‖ = _
+    rw [norm_zero, max_eq_left (norm_nonneg _), Pi.norm_single]
+  have hr₀ne : r₀ ≠ 0 := norm_pos_iff.mp (by rw [hr₀]; exact hv)
+  obtain ⟨z, hz, hphase⟩ := hstep r₀ hr₀ne
+  rw [hr₀] at hz
+  let h := z.1 v
+  have hmul : r₀ * z = r * (Pi.single v h, 0) := by
+    apply Prod.ext
+    · funext w
+      change Pi.single (M := fun j : InfinitePlace F ↦ j.Completion) v (r.1 v) w * z.1 w =
+        r.1 w * Pi.single (M := fun j : InfinitePlace F ↦ j.Completion) v h w
+      by_cases hw : w = v
+      · subst w
+        simp [h]
+      · simp [Pi.single_eq_of_ne hw]
+    · change (0 : A𝒻) * z.2 = r.2 * 0
+      simp
+  refine ⟨h, (norm_le_pi_norm z.1 v).trans ((norm_fst_le z).trans hz), ?_⟩
+  rw [← hmul]
+  exact hphase
+
+open Classical in
+/-- An L¹ bound of order `n` for the `2 * n`th forward difference at one infinite
+place gives Fourier decay of order `n` when that place controls the frequency.
+The constant is uniform over the scales above the floor. -/
+private theorem sLocalTrace_archDominant_frequency_decay
+    (k : ℝ → Eₛ → ℂ) (n : ℕ) {δ ε A M : ℝ}
+    (hε : 0 < ε) (hA : 0 ≤ A) (hM : 0 ≤ M)
+    (hk : ∀ t : ℝ, δ ≤ t → Integrable (k t) νₛ ∧ (∫ x, ‖k t x‖ ∂νₛ) ≤ M)
+    (hd : ∀ (v : InfinitePlace F) (h : v.Completion), ‖h‖ < ε →
+      ∀ t : ℝ, δ ≤ t →
+        (∫ x : Eₛ, ‖((fwdDiff (Pi.single v h, 0))^[2 * n] (k t)) x‖ ∂νₛ) ≤
+          A * ‖h‖ ^ n) :
+    ∃ B ≥ 0, ∀ t : ℝ, δ ≤ t → ∀ (r : Eₛ) (v : InfinitePlace F), ‖r‖ ≤ 2 * ‖r.1 v‖ →
+      ‖∫ x : Eₛ, k t x * (ψₛ (x * r) : ℂ) ∂νₛ‖ ≤ B / (max 1 ‖r + 1‖) ^ n := by
+  classical
+  let : BorelSpace Eₛ := sAdeleRing_borelSpace
+  let : (νₛ).IsAddHaarMeasure := sLocalTrace_additiveHaar
+  let χ : Multiplicative Eₛ →ₜ* Circle :=
+    (sAdditiveTamagawaMeasure_selfDual F S).choose (Multiplicative.ofAdd (1 : Aₛ))
+  have hχ (x : Eₛ) : χ (Multiplicative.ofAdd x) = ψₛ x :=
+    ((sAdditiveTamagawaMeasure_selfDual F S).choose_spec.1 1 x).trans (congrArg ψₛ (one_mul _))
+  obtain ⟨C, hC, hstep⟩ := sLocalTrace_frequency_step_arch (F := F) (S := S)
+  have hC0 : 0 ≤ C := zero_le_one.trans hC
+  let L : ℝ := max 1 (2 * C / ε)
+  let D : ℝ := 1 + ‖(1 : Eₛ)‖
+  have hL : 1 ≤ L := le_max_left _ _
+  have hL0 : 0 ≤ L := zero_le_one.trans hL
+  have hD : 1 ≤ D := le_add_of_nonneg_right (norm_nonneg _)
+  have hD0 : 0 ≤ D := zero_le_one.trans hD
+  let B : ℝ := M * (L + D) ^ n + C ^ (2 * n) * A * (2 * C * D) ^ n
+  refine ⟨B, by dsimp only [B]; positivity, fun t ht r v hdom ↦ ?_⟩
+  obtain ⟨hi, hb⟩ := hk t ht
+  let I := ∫ x : Eₛ, k t x * (ψₛ (x * r) : ℂ) ∂νₛ
+  let U : ℝ := max 1 ‖r + 1‖
+  have hU : 1 ≤ U := le_max_left _ _
+  have hU0 : 0 < U := zero_lt_one.trans_le hU
+  change ‖I‖ ≤ B / U ^ n
+  rw [le_div_iff₀ (pow_pos hU0 n)]
+  by_cases hl : ‖r‖ ≤ L
+  · have hI : ‖I‖ ≤ M := (norm_integral_le_of_norm_le hi.norm (ae_of_all _ fun x ↦ by
+      simp only [norm_mul, Circle.norm_coe, mul_one, le_refl])).trans hb
+    have hUL : U ≤ L + D := by
+      refine max_le (by linarith) ((norm_add_le _ _).trans ?_)
+      dsimp only [D]
+      linarith
+    calc
+      _ ≤ M * (L + D) ^ n :=
+        mul_le_mul hI (pow_le_pow_left₀ hU0.le hUL n) (by positivity) hM
+      _ ≤ B := le_add_of_nonneg_right (by positivity)
+  · have hr1 : 1 ≤ ‖r‖ := hL.trans (le_of_not_ge hl)
+    have hv0 : 0 < ‖r.1 v‖ := by linarith
+    obtain ⟨h, hs, hphase⟩ := hstep r v hv0
+    have hlt : 2 * C / ε < 2 * ‖r.1 v‖ :=
+      ((show 2 * C / ε ≤ L from le_max_right _ _).trans_lt (lt_of_not_ge hl)).trans_le hdom
+    have hsmall : ‖h‖ < ε := hs.trans_lt ((div_lt_iff₀ hv0).2 (by
+      have hscaled := (div_lt_iff₀ hε).1 hlt
+      nlinarith only [hscaled]))
+    have hosc := (fourierIntegral_circleCharacter_iteratedTranslation_bound (E := Eₛ)
+      νₛ χ (k t) hi r (Pi.single v h, 0) (2 * n)).trans (hd v h hsmall t ht)
+    simp only [hχ] at hosc
+    let P := ‖(ψₛ (r * (Pi.single v h, 0)) : ℂ) - 1‖
+    change ‖I‖ * P ^ (2 * n) ≤ A * ‖h‖ ^ n at hosc
+    have hphasePow : 1 ≤ C ^ (2 * n) * P ^ (2 * n) := by
+      change 1 ≤ C * P at hphase
+      simpa only [mul_pow] using (one_le_pow₀ hphase (n := 2 * n))
+    have hmain : ‖I‖ ≤ C ^ (2 * n) * A * ‖h‖ ^ n := by
+      calc
+        ‖I‖ ≤ ‖I‖ * (C ^ (2 * n) * P ^ (2 * n)) := by
+          simpa only [mul_one] using mul_le_mul_of_nonneg_left hphasePow (norm_nonneg I)
+        _ = C ^ (2 * n) * (‖I‖ * P ^ (2 * n)) := by ring
+        _ ≤ C ^ (2 * n) * (A * ‖h‖ ^ n) :=
+          mul_le_mul_of_nonneg_left hosc (pow_nonneg hC0 _)
+        _ = _ := by ring
+    have hUR : U ≤ ‖r‖ * D := by
+      refine max_le (hr1.trans (le_mul_of_one_le_right (norm_nonneg _) hD)) ?_
+      refine (norm_add_le _ _).trans ?_
+      dsimp only [D]
+      nlinarith [mul_nonneg (sub_nonneg.mpr hr1) (norm_nonneg (1 : Eₛ))]
+    have hUV : U ≤ ‖r.1 v‖ * (2 * D) := by
+      calc
+        _ ≤ ‖r‖ * D := hUR
+        _ ≤ (2 * ‖r.1 v‖) * D := mul_le_mul_of_nonneg_right hdom hD0
+        _ = _ := by ring
+    have hhU : ‖h‖ * U ≤ 2 * C * D := by
+      calc
+        _ ≤ (C / ‖r.1 v‖) * (‖r.1 v‖ * (2 * D)) :=
+          mul_le_mul hs hUV hU0.le (by positivity)
+        _ = _ := by rw [← mul_assoc, div_mul_cancel₀ _ hv0.ne']; ring
+    calc
+      _ ≤ (C ^ (2 * n) * A * ‖h‖ ^ n) * U ^ n := mul_le_mul_of_nonneg_right hmain (by positivity)
+      _ = C ^ (2 * n) * A * (‖h‖ * U) ^ n := by rw [mul_pow]; ring
+      _ ≤ C ^ (2 * n) * A * (2 * C * D) ^ n :=
+        mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (by positivity) hhU n) (by positivity)
+      _ ≤ B := le_add_of_nonneg_left (by positivity)
+
+/-- Paper: Theorem 12.4.1.1, Step II, p. 517.
+Arbitrary fixed Fourier decay when an infinite coordinate controls the
+frequency. The scale is bounded below, and the fixed Fourier amplitude is
+handled with its square-root moments and pointwise differences.
+Deviation: This is an auxiliary fixed-profile estimate before quotient descent. -/
+theorem sLocalTrace_radialProfile_fourier_decay_arch
+    (f : BruhatCompactSupport Iₛ) (n : ℕ) (b : ℝ → ℂ)
+    (hb : ContDiff ℝ (2 * n : ℕ) b) {δ ε C : ℝ}
+    (hδ : 0 < δ) (hε : 0 < ε)
+    (hplateau : EqOn b (fun _ ↦ b 0) (Icc 0 ε))
+    (hderiv : ∀ j ≤ 2 * n, ∀ y, 0 ≤ y → ‖iteratedDeriv j b y‖ ≤ C) :
+    ∃ B ≥ 0, ∀ t : ℝ, δ ≤ t → ∀ (r : Eₛ) (v : InfinitePlace F), ‖r‖ ≤ 2 * ‖r.1 v‖ →
+      ‖∫ w : Eₛ, b (modS(w) / t) * fourierₛ (sLocalTraceEta f 1) w *
+        (ψₛ (w * r) : ℂ) ∂νₛ‖ ≤ B / (max 1 ‖r + 1‖) ^ n := by
+  classical
+  let : BorelSpace Eₛ := sAdeleRing_borelSpace
+  let : (νₛ).IsAddHaarMeasure := sLocalTrace_additiveHaar
+  let m := 2 * n
+  let D := (∑ u : InfinitePlace F, u.mult) + Fintype.card S
+  let d := (D + 1) * m
+  let W (w : Eₛ) : ℝ := (1 + ‖w‖) ^ d
+  let H : Set Eₛ := {h | ∃ (v : InfinitePlace F) (z : v.Completion),
+    sLocalTrace_archShift (S := S) v z = h}
+  let g (w : Eₛ) : ℂ := fourierₛ (sLocalTraceEta f 1) w
+  let q (t : ℝ) (w : Eₛ) : ℂ := b (modS(w) / t)
+  let k (t : ℝ) (w : Eₛ) : ℂ := g w * q t w
+  let B₀ := C * (m.factorial : ℝ) * (1 + 2 * ((m : ℝ) + 1) * δ⁻¹) ^ m
+  have hC : 0 ≤ C := (norm_nonneg (iteratedDeriv 0 b 0)).trans
+    (hderiv 0 (Nat.zero_le _) 0 le_rfl)
+  have hB₀ : 0 ≤ B₀ := by dsimp only [B₀]; positivity
+  have hWc : Continuous W := (continuous_const.add continuous_norm).pow d
+  have hW₁ (w : Eₛ) : 1 ≤ W w := one_le_pow₀ (le_add_of_nonneg_right (norm_nonneg w))
+  have hgI : Integrable g νₛ := sLocalTraceEta_fourier_integrable f 1
+  obtain ⟨η, hη⟩ := SLocalTraceEta.eta_test f (1 : Hₛ)
+  let s := sAdeleSchwartzFourier η
+  have htest (w : Eₛ) : g w = testAt(s, w) := by
+    change _ = fourierₛ (fun z ↦ η (Multiplicative.ofAdd z)) w
+    rw [funext hη]
+  have hgc : Continuous g :=
+    ((schwartzBruhat_continuous s).comp continuous_ofAdd).congr fun w ↦ (htest w).symm
+  have hWFull := sLocalTrace_weighted_moment s d
+  simp_rw [← htest] at hWFull
+  have hWg : Integrable (fun w : Eₛ ↦ W w * Real.sqrt ‖g w‖) νₛ :=
+    hWFull.mono_nonneg (hWc.mul (Real.continuous_sqrt.comp hgc.norm)).aestronglyMeasurable
+      (ae_of_all _ fun w ↦ mul_nonneg (zero_le_one.trans (hW₁ w)) (Real.sqrt_nonneg _))
+      (ae_of_all _ fun w ↦ mul_le_mul_of_nonneg_left
+        (le_add_of_nonneg_right (norm_nonneg (g w))) (zero_le_one.trans (hW₁ w)))
+  have hm : Continuous (fun w : Eₛ ↦ modS(w)) :=
+    (continuous_finsetProd _ fun v _ ↦ ((continuous_apply v).comp continuous_fst).norm.pow _).mul
+      (continuous_finsetProd _ fun v _ ↦ ((continuous_apply v).comp continuous_snd).norm)
+  have hq (t : ℝ) (_ : δ ≤ t) : AEStronglyMeasurable (q t) νₛ :=
+    (hb.continuous.comp (hm.div_const t)).aestronglyMeasurable
+  have hqbd (t : ℝ) (ht : δ ≤ t) (w : Eₛ) : ‖q t w‖ ≤ C := by
+    have h := hderiv 0 (Nat.zero_le _) (modS(w) / t) (by have := hδ.trans_le ht; positivity)
+    simpa only [q, iteratedDeriv_zero] using h
+  obtain ⟨A, hA, hgd⟩ := sLocalTrace_etaFourier_fwdDiff_bound f m
+  have hqd (t : ℝ) (ht : δ ≤ t) (h : Eₛ) (hH : h ∈ H) (hh : ‖h‖ ≤ 1)
+      (j : ℕ) (hj : j ≤ m) (w : Eₛ) :
+      ‖((fwdDiff h)^[j] (q t)) w‖ ≤ B₀ * ‖h‖ ^ j * W w := by
+    obtain ⟨v, z, rfl⟩ := hH
+    rw [sLocalTrace_archShift_norm] at hh ⊢
+    exact sLocalTrace_archProfile_fwdDiff_bound w v z hh m j hj hδ ht b hb hε hplateau hderiv
+  obtain ⟨K, hK, hInt⟩ := integral_norm_fwdDiff_iter_profileProduct_le (E := Eₛ)
+    νₛ n H W hWc hW₁ g hgI hWg q (δ := δ) (A := A) (B := B₀) (C := (2 : ℝ) ^ d) (M := C)
+    hA hB₀ (by positivity) hq hqbd
+    (fun h _ hh w ↦ one_add_norm_pow_shift_bounds d w h hh)
+    (fun h _ _ j hj w ↦ hgd j hj w h) hqd
+  have hsize : 0 ≤ C * ∫ w : Eₛ, ‖g w‖ ∂νₛ :=
+    mul_nonneg hC (integral_nonneg fun _ ↦ norm_nonneg _)
+  obtain ⟨L, hL, hdec⟩ := sLocalTrace_archDominant_frequency_decay k n (ε := 1)
+    zero_lt_one hK hsize (fun t ht ↦ ⟨(hInt t ht).1, (hInt t ht).2.1⟩) (by
+      intro v h hh t ht
+      have hshift : sLocalTrace_archShift (S := S) v h ∈ H := ⟨v, h, rfl⟩
+      have hn := sLocalTrace_archShift_norm (S := S) v h
+      have hDiff := (hInt t ht).2.2 _ hshift (hn.trans_le hh.le)
+      rw [hn] at hDiff
+      exact hDiff)
+  refine ⟨L, hL, fun t ht r v hv ↦ ?_⟩
+  have hI : (fun w : Eₛ ↦ k t w * (ψₛ (w * r) : ℂ)) =
+      (fun w : Eₛ ↦ b (modS(w) / t) * fourierₛ (sLocalTraceEta f 1) w *
+        (ψₛ (w * r) : ℂ)) := by
+    funext w
+    change g w * q t w * (ψₛ (w * r) : ℂ) = q t w * g w * (ψₛ (w * r) : ℂ)
+    rw [mul_comm (g w) (q t w)]
+  have h := hdec t ht r v hv
+  rw [hI] at h
+  exact h
 
 private theorem sLocalTrace_frequency_decay {E : Type*} [NormedCommRing E]
     [MeasurableSpace E] [BorelSpace E] (μ : Measure E) [μ.IsAddLeftInvariant]
