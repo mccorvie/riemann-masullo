@@ -1,7 +1,19 @@
 module
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4b
+public import RiemannMasullo.Ch10_TraceSpectral.Sec3_LineGaps
+public import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Trigonometric.ExponentialCardinalStencil
+public import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Trigonometric.HyperbolicCardinalEnergy
+import RiemannMasullo.AppB_AnalyticNT.Sec4b
+import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec5
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.Ch10_TraceSpectral.Sec3_LineWindows
+import RiemannMasullo.Ch10_TraceSpectral.Sec3_TraceClass
+import RiemannMasullo.ForMathlib.Analysis.Fourier.StripLaplace
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
+import Mathlib.Analysis.Calculus.ParametricIntegral
+import Mathlib.Order.Prod.Lex.Basic
+import Mathlib.Topology.ContinuousMap.SecondCountableSpace
 
 /-! # The geometric part of the projective kernel in Theorem 10.4.3.5 -/
 
@@ -750,6 +762,672 @@ private theorem spectralStripGeometricKernel_cauchy_of_blocks {W W' H Z J : Type
   change d (((f (i z m)).comp q).comp idW) ⊗ₜ[ℂ] v (i z m) = u (i z m) ⊗ₜ[ℂ] v (i z m)
   rw [ContinuousLinearMap.comp_id, hu]
 
+namespace LineTwo
+
+open Function GeometricHat LineGeometricFourier
+open scoped ENNReal InnerProductSpace
+
+variable {F : Type*} [Field F] [NumberField F]
+
+local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
+local notation "Ω" => PontryaginDual (ideleClassNorm F).ker
+local notation "μ𝔽" => ideleClassTamagawaMeasure F
+local notation "m𝔽" => continuousIdeleClassNorm F
+local notation "l𝔽" => logIdeleClassNorm F
+local notation "hm𝔽" => (⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ : IsModulation m𝔽)
+
+section FourierProbes
+
+local notation "hms𝔽" => (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.2.2.2.1
+local notation "lineI" => (show -(0 : ℝ) ≤ 0 by norm_num)
+local notation "W(" s ")" => CompactIntervalSobolev μ𝔽 l𝔽 (-0) 0 s
+local notation "A(" s ", " hs ", " φ ")" =>
+  hardySobolevTestAction μ𝔽 m𝔽 (-0) 0 s lineI (zero_le_one.trans (le_of_lt hs)) φ
+
+/-- Every zero-width Sobolev vector of degree greater than one has its own
+Haar-integrable representative, through the bounded inclusion with unchanged values. -/
+private theorem line_exists_L1 {s : ℝ} (hs : 1 < s) :
+    ∃ J : W(s) →L[ℂ] Lp ℂ 1 μ𝔽, Injective J ∧
+      ∀ u : W(s), Integrable (u : C𝔽 → ℂ) μ𝔽 ∧ (J u : C𝔽 → ℂ) =ᵐ[μ𝔽] (u : C𝔽 → ℂ) := by
+  let P (ν : Measure C𝔽) := ∃ J : Lp ℂ 2 ν →L[ℂ] Lp ℂ 1 μ𝔽, Injective J ∧
+    ∀ u : Lp ℂ 2 ν, Integrable (u : C𝔽 → ℂ) μ𝔽 ∧ (J u : C𝔽 → ℂ) =ᵐ[μ𝔽] (u : C𝔽 → ℂ)
+  change P ((μ𝔽).withDensity fun x ↦ ENNReal.ofReal (intervalSobolevDensity (-0) 0 s (l𝔽 x)))
+  rw [neg_zero]
+  rw [show ((μ𝔽).withDensity fun x ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (l𝔽 x))) =
+    sobolevMeasure μ𝔽 (modulatedSobolevWeight m𝔽) s from intervalSobolev_zero_eq_sobolevMeasure m𝔽 μ𝔽 s]
+  obtain ⟨J, _, hi, _, _, hrep⟩ := modulatedSobolev_toL1 m𝔽 μ𝔽 hm𝔽 hms𝔽 hs
+  exact ⟨J, hi, hrep⟩
+
+/-- Positive-character Fourier evaluations on the full unitary dual are bounded
+linear probes of the actual line Sobolev space. They separate points and
+diagonalize its genuine compact-test action. -/
+private theorem exists_line_fourier_probes {s : ℝ} (hs : 1 < s) :
+    ∃ E : PontryaginDual C𝔽 → StrongDual ℂ W(s),
+      (∀ ψ u, E ψ u = ∫ g, u g * (ψ g : ℂ) ∂μ𝔽) ∧
+      (∀ u, (∀ ψ, E ψ u = 0) → u = 0) ∧
+      ∀ (φ : BruhatCompactSupport C𝔽) ψ u,
+        E ψ (A(s, hs, φ) u) = (∫ g, φ.val g * (ψ g : ℂ) ∂μ𝔽) * E ψ u := by
+  obtain ⟨J, hiJ, hJ⟩ := line_exists_L1 (F := F) hs
+  obtain ⟨T, hT, hiT, hTnorm⟩ := lcaFourier_L1 μ𝔽
+  let evalₗ (ψ : PontryaginDual C𝔽) : W(s) →ₗ[ℂ] ℂ :=
+    { toFun := fun u ↦ T (J u) ψ⁻¹
+      map_add' := fun u v ↦ by simp
+      map_smul' := fun c u ↦ by simp }
+  let E (ψ : PontryaginDual C𝔽) : StrongDual ℂ W(s) :=
+    (evalₗ ψ).mkContinuous ‖J‖ fun u ↦
+      ((T (J u)).toBCF.norm_coe_le_norm ψ⁻¹).trans
+        ((hTnorm (J u)).trans (J.le_opNorm u))
+  have hstar (ψ : PontryaginDual C𝔽) (g : C𝔽) : star (ψ⁻¹ g : ℂ) = (ψ g : ℂ) := by
+    change star (((ψ g)⁻¹ : Circle) : ℂ) = _
+    rw [Circle.coe_inv_eq_conj, ← Complex.star_def, star_star]
+  have hF (ψ : PontryaginDual C𝔽) (u : W(s)) : E ψ u = lcaFourier μ𝔽 u ψ⁻¹ := by
+    change T (J u) ψ⁻¹ = _
+    rw [hT]
+    exact integral_congr_ae ((hJ u).2.mul EventuallyEq.rfl)
+  have hpos (u : C𝔽 → ℂ) (ψ : PontryaginDual C𝔽) :
+      lcaFourier μ𝔽 u ψ⁻¹ = ∫ g, u g * (ψ g : ℂ) ∂μ𝔽 := by simp only [lcaFourier, hstar]
+  refine ⟨E, fun ψ u ↦ (hF ψ u).trans (hpos u ψ), ?_, ?_⟩
+  · intro u hu
+    apply hiJ
+    apply hiT
+    apply ZeroAtInftyContinuousMap.ext
+    intro ψ
+    have he := hu ψ⁻¹
+    change T (J u) (ψ⁻¹)⁻¹ = 0 at he
+    simpa using he
+  · intro φ ψ u
+    have hφ : Integrable φ.val μ𝔽 :=
+      (continuous_of_bruhatSmooth ((mem_bruhatSmoothSubmodule_iff _).mp φ.property.1)).integrable_of_hasCompactSupport
+        φ.property.2
+    rw [hF, hF, ← hpos]
+    calc
+      _ = lcaFourier μ𝔽 (lcaConvolution μ𝔽 φ.val u) ψ⁻¹ :=
+        integral_congr_ae ((hardySobolevTestAction_apply μ𝔽 m𝔽 (-0) 0 s lineI _ φ u).mul EventuallyEq.rfl)
+      _ = _ := congrFun (lcaFourier_convolution μ𝔽 hφ (hJ u).1) ψ⁻¹
+
+end FourierProbes
+
+section Hilbert
+
+variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+
+/-- A candidate in the span of the pulled-back Riesz jets which interpolates
+all sites is exactly the quotient's isometric lift, even for an infinite family. -/
+private theorem quotientLift_eq_of_riesz_span {J : Type*}
+    (N : Submodule ℂ H) [IsClosed (N : Set H)]
+    (x : J → H ⧸ N) (f : J → StrongDual ℂ (H ⧸ N))
+    (hb : IsSpectralMarkushevichBasis x f) (j : J) (v : H)
+    (hspan : v ∈ Submodule.span ℂ (range fun i ↦ (InnerProductSpace.toDual ℂ H).symm ((f i).comp N.mkQL)))
+    (hval : ∀ i, f i (N.mkQL v) = f i (x j)) :
+    (N.quotientEquivOrthogonal (x j)).val = v := by
+  have horth : v ∈ Nᗮ := by
+    apply (Submodule.span_le.mpr ?_ : Submodule.span ℂ _ ≤ Nᗮ) hspan
+    rintro _ ⟨i, rfl⟩
+    apply (N.mem_orthogonal' _).mpr
+    intro w hw
+    rw [InnerProductSpace.toDual_symm_apply]
+    change f i (Submodule.Quotient.mk w) = 0
+    rw [(Submodule.Quotient.mk_eq_zero N).mpr hw, map_zero]
+  have hquot : N.mkQL v = x j := by
+    apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr
+    have hall : ContinuousLinearMap.apply ℂ ℂ (N.mkQL v) = ContinuousLinearMap.apply ℂ ℂ (x j) := by
+      apply ContinuousLinearMap.ext_on hb.2.2.2
+      rintro _ ⟨i, rfl⟩
+      exact hval i
+    exact fun ℓ ↦ DFunLike.congr_fun hall ℓ
+  rw [← hquot]
+  exact congrArg Subtype.val (N.quotientEquivOrthogonal_mk v horth)
+
+end Hilbert
+
+local notation "ν𝔽" => canonicalModulatedHaar m𝔽 hm𝔽
+local instance lineCanonicalHaar : (ν𝔽).IsHaarMeasure :=
+  (existsUnique_canonicalModulatedHaar m𝔽 hm𝔽).exists.choose_spec.1
+local notation "D" => ((Measure.haarScalarFactor μ𝔽 ν𝔽 : ℝ) * Real.pi)
+local notation "hI" => (show -(0 : ℝ) ≤ 0 by norm_num)
+local notation "hs" => (show (0 : ℝ) ≤ 2 by norm_num)
+local notation "W₂" => CompactIntervalSobolev μ𝔽 l𝔽 (-0) 0 2
+local notation "T" => (modulatedIntervalSobolev_dual m𝔽 hm𝔽 μ𝔽 (-0) 0 2 hI hs).exists.choose
+local notation "N(" a ")" => globalThetaSobolev F a hI hs
+local notation "J(" χ ", " a ")" => SpectralStripJetIndex (F := F) χ a 0 2
+local notation "uJet(" χ ", " j ")" =>
+  (spectralStripJet_memLp χ (le_refl (0 : ℝ)) hs j).toLp
+    (spectralZeroJet (F := F) (χ (j).val.1) (j).val.2.1 (j).val.2.2.1 (j).val.2.2.2)
+
+private theorem continuous_log_norm : Continuous l𝔽 :=
+  (NNReal.continuous_coe.comp (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)).log
+    (fun g ↦ NNReal.coe_ne_zero.mpr (ideleClassNorm F g).ne_zero)
+
+/-- The continuous physical Fourier evaluation in the actual Tamagawa-dual normalization. -/
+def waveEval (η : PontryaginDual C𝔽) (t : ℝ) : StrongDual ℂ W₂ :=
+  (T).symm (spectralLineTwoWave η t)
+
+/-- The wave functional is the positive Mellin sample of the physical representative. -/
+private theorem waveEval_apply (η : PontryaginDual C𝔽) (t : ℝ) (u : W₂) :
+    waveEval η t u = ∫ g, u g * spectralZeroJet η 0 t 0 g ∂μ𝔽 := by
+  let μ₂ := intervalSobolevMeasure μ𝔽 l𝔽 (-0) 0 2 true
+  have hm : Measurable (fun g : C𝔽 ↦ ((1 + (l𝔽 g) ^ 2)⁻¹ : ℝ)) :=
+    ((continuous_const.add ((continuous_log_norm (F := F)).pow 2)).inv₀
+      (fun g ↦ show 1 + (l𝔽 g) ^ 2 ≠ 0 from (by positivity : 0 < 1 + (l𝔽 g) ^ 2).ne')).measurable
+  have hbase : μ𝔽 ≪ μ₂ := by
+    have hμ₂ : μ₂ = (μ𝔽).withDensity (fun g ↦ ENNReal.ofReal ((1 + (l𝔽 g) ^ 2)⁻¹)) := by
+      simp [μ₂, intervalSobolevMeasure, intervalSobolevDensity]
+    rw [hμ₂]
+    exact withDensity_absolutelyContinuous' hm.ennreal_ofReal.aemeasurable
+      (.of_forall fun x ↦ (ENNReal.ofReal_pos.mpr (by positivity : 0 < (1 + (l𝔽 x) ^ 2)⁻¹)).ne')
+  have hp := (spectralSobolevPairing_dual hI hs (waveEval η t) u).2
+  change waveEval η t u = ∫ g, u g * T ((T).symm (spectralLineTwoWave η t)) g ∂μ𝔽 at hp
+  rw [(T).apply_symm_apply] at hp
+  exact hp.trans (integral_congr_ae (EventuallyEq.rfl.mul (hbase.ae_eq (spectralLineTwoWave_coeFn η t))))
+
+/-- Squared dual norm at every real frequency. The factor is the Tamagawa
+scalar times pi. -/
+private theorem waveEval_norm_sq (η : PontryaginDual C𝔽) (t : ℝ) : ‖waveEval η t‖ ^ 2 = D := by
+  change ‖(T).symm (spectralLineTwoWave η t)‖ ^ 2 = _
+  rw [(T).symm.norm_map]
+  have h := congrArg Complex.re (spectralLineTwoWave_inner η t t)
+  exact ((inner_self_eq_norm_sq (𝕜 := ℂ) _).symm.trans h).trans (by simp)
+
+/-- A retained quotient coordinate pulled back along the actual quotient projection
+is precisely the unrestricted physical evaluation at that site's ordinate. -/
+private theorem pulledCoordinate_eq_waveEval
+    (a : ℝ) (χ : PontryaginDual (ideleClassNorm F).ker → PontryaginDual C𝔽)
+    (j : SpectralStripJetIndex χ a 0 2)
+    (f : StrongDual ℂ (spectralSobolevQuotient F a hI hs))
+    (hf : spectralSobolevDualEmbedding F a hI hs f = uJet(χ, j)) :
+    f.comp (globalThetaSobolev F a hI hs).mkQL = waveEval (χ j.val.1) j.val.2.2.1 := by
+  apply (T).injective
+  exact (hf.trans (spectralStripJet_eq_wave_line_two χ j)).trans ((T).apply_symm_apply _).symm
+
+/-- The exact squared norm of the first factor in the geometric line-energy estimate. -/
+private theorem pulledCoordinate_norm_sq
+    (a : ℝ) (χ : PontryaginDual (ideleClassNorm F).ker → PontryaginDual C𝔽)
+    (j : SpectralStripJetIndex χ a 0 2)
+    (f : StrongDual ℂ (spectralSobolevQuotient F a hI hs))
+    (hf : spectralSobolevDualEmbedding F a hI hs f = uJet(χ, j)) :
+    ‖f.comp (globalThetaSobolev F a hI hs).mkQL‖ ^ 2 = D := by
+  rw [pulledCoordinate_eq_waveEval a χ j f hf, waveEval_norm_sq]
+
+/-- The chart of any chosen unitary basepoint recovers every real-frequency physical wave. -/
+private theorem jetCharacter_apply_of_chart (η : PontryaginDual C𝔽) (t : ℝ)
+    (e : Multiplicative ℝ ≃ₜ* lcaAnnihilator (ideleClassNorm F).ker)
+    (he : ∀ (v : ℝ) (g : C𝔽), (e (Multiplicative.ofAdd v)).val g = Circle.exp (v * l𝔽 g))
+    (g : C𝔽) :
+    ((η * (e (Multiplicative.ofAdd t)).val) g : ℂ) = spectralZeroJet η 0 t 0 g := by
+  have hp : (0 : ℝ) < ((ideleClassNorm F g).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  change ((η g * (e (Multiplicative.ofAdd t)).val g : Circle) : ℂ) =
+    ((η g : ℂ) * (((ideleClassNorm F g).val : ℝ) : ℂ) ^ ((0 : ℂ) + (t : ℂ) * Complex.I)) * _ ^ 0
+  rw [he, zero_add, pow_zero, mul_one, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hp.ne'),
+    ← Complex.ofReal_log hp.le, Circle.coe_mul, Circle.coe_exp, Complex.ofReal_mul]
+  congr 2
+  change (t : ℂ) * (l𝔽 g : ℂ) * Complex.I = (l𝔽 g : ℂ) * ((t : ℂ) * Complex.I)
+  ring
+
+/-- As an entire family, the actual real-frequency evaluations from any choice of
+angular basepoints separate the ambient Sobolev vectors. -/
+private theorem waveEval_separates (χ : PontryaginDual (ideleClassNorm F).ker → PontryaginDual C𝔽)
+    (hχ : IsSpectralBasepointChoice χ) (u : W₂)
+    (hu : ∀ ω t, waveEval (χ ω) t u = 0) : u = 0 := by
+  obtain ⟨E, hE, hsep, _⟩ := exists_line_fourier_probes (F := F) (s := 2) (by norm_num)
+  obtain ⟨e, he⟩ := exists_modulatedFrequencyLine m𝔽 hm𝔽
+    (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.2.2.2.1
+  apply hsep u
+  intro ψ
+  let ω : PontryaginDual (ideleClassNorm F).ker := ψ.comp
+    (⟨(ideleClassNorm F).ker.subtype, continuous_subtype_val⟩ : (ideleClassNorm F).ker →ₜ* C𝔽)
+  have hk : (χ ω)⁻¹ * ψ ∈ lcaAnnihilator (ideleClassNorm F).ker := by
+    rw [mem_lcaAnnihilator_iff]
+    intro k
+    have h := DFunLike.congr_fun (hχ ω) k
+    change χ ω k.val = ψ k.val at h
+    change (χ ω k.val)⁻¹ * ψ k.val = 1
+    rw [h, inv_mul_cancel]
+  let d : lcaAnnihilator (ideleClassNorm F).ker := ⟨_, hk⟩
+  obtain ⟨τ, hτ⟩ := e.surjective d
+  have ht : χ ω * (e τ).val = ψ := by
+    rw [hτ]
+    change χ ω * ((χ ω)⁻¹ * ψ) = ψ
+    group
+  have hphase (g : C𝔽) : (ψ g : ℂ) = spectralZeroJet (χ ω) 0 τ.toAdd 0 g := by
+    exact (congrArg (fun ρ : PontryaginDual C𝔽 ↦ (ρ g : ℂ)) ht.symm).trans
+      (jetCharacter_apply_of_chart (χ ω) τ.toAdd e he g)
+  rw [hE]
+  simpa only [waveEval_apply, hphase] using hu ω τ.toAdd
+
+/-- Each positive Mellin phase is a genuine member of the full unitary dual in
+the sign and angular-frequency normalization used by the paper. -/
+private theorem exists_jetCharacter (η : PontryaginDual C𝔽) (t : ℝ) :
+    ∃ ψ : PontryaginDual C𝔽, ∀ g : C𝔽, (ψ g : ℂ) = spectralZeroJet η 0 t 0 g := by
+  obtain ⟨e, he⟩ := exists_modulatedFrequencyLine m𝔽 hm𝔽
+    (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.2.2.2.1
+  exact ⟨_, jetCharacter_apply_of_chart η t e he⟩
+
+/-- At every frequency, the physical Mellin observation of the residual that
+occurs in the geometric one-jet bound factors as the difference of multipliers
+times the observed cardinal lift. This holds at every real frequency. -/
+private theorem waveEval_residual (η : PontryaginDual C𝔽) (t : ℝ)
+    (φ : BruhatCompactSupport C𝔽) (c : ℂ) (u : W₂) :
+    waveEval η t (hardySobolevTestAction μ𝔽 m𝔽 (-0) 0 2 hI hs φ u - c • u) =
+      ((∫ g, φ.val g * spectralZeroJet η 0 t 0 g ∂μ𝔽) - c) * waveEval η t u := by
+  obtain ⟨ψ, hψ⟩ := exists_jetCharacter η t
+  obtain ⟨E, hE, _, hA⟩ := exists_line_fourier_probes (F := F) (s := 2) (by norm_num)
+  have heq : E ψ = waveEval η t := ContinuousLinearMap.ext fun v ↦ by
+    rw [hE, waveEval_apply]
+    simp only [hψ]
+  have h := hA φ ψ u
+  rw [heq] at h
+  simp only [hψ] at h
+  rw [map_sub, map_smul, h, smul_eq_mul, sub_mul]
+
+/-- Reciprocal-space duality followed by the positive-space Riesz map conjugates
+the Gram of two actual Mellin waves. -/
+private theorem waveEval_riesz_conj (η θ : PontryaginDual C𝔽) (s t : ℝ) :
+    ⟪(InnerProductSpace.toDual ℂ W₂).symm (waveEval η s),
+      (InnerProductSpace.toDual ℂ W₂).symm (waveEval θ t)⟫_ℂ =
+      star ⟪spectralLineTwoWave η s, spectralLineTwoWave θ t⟫_ℂ := by
+  let R := Lp ℂ 2 (intervalSobolevMeasure μ𝔽 l𝔽 (-0) 0 2 true)
+  let U := (T).symm.trans (InnerProductSpace.toDual ℂ W₂).symm
+  let x := spectralLineTwoWave η s
+  let y := spectralLineTwoWave θ t
+  change ⟪U x, U y⟫_ℂ = star ⟪x, y⟫_ℂ
+  have hre (v w : R) : (⟪U v, U w⟫_ℂ).re = (⟪v, w⟫_ℂ).re := by
+    change RCLike.re (⟪U v, U w⟫_ℂ) = RCLike.re (⟪v, w⟫_ℂ)
+    rw [re_inner_eq_norm_add_mul_self_sub_norm_mul_self_sub_norm_mul_self_div_two,
+      re_inner_eq_norm_add_mul_self_sub_norm_mul_self_sub_norm_mul_self_div_two, ← U.map_add]
+    simp only [U.norm_map]
+  have hI' (v : R) : U (Complex.I • v) = -Complex.I • U v := by
+    rw [U.map_smulₛₗ]
+    rw [show (starRingEnd ℂ) Complex.I = -Complex.I from Complex.conj_I]
+  apply Complex.ext
+  · exact hre x y
+  · have him := hre x (Complex.I • y)
+    simp only [hI', inner_smul_right, neg_mul, Complex.neg_re, Complex.I_mul_re, neg_neg] at him
+    exact him
+
+/-- Exact positive-space Gram kernel for the Riesz vectors of unrestricted Mellin evaluations.
+The two conjugations from reciprocal-space duality cancel on the real exponential kernel. -/
+private theorem waveEval_riesz_inner (η : PontryaginDual C𝔽) (s t : ℝ) :
+    ⟪(InnerProductSpace.toDual ℂ W₂).symm (waveEval η s),
+      (InnerProductSpace.toDual ℂ W₂).symm (waveEval η t)⟫_ℂ =
+      ((D * Real.exp (-|s-t|) : ℝ) : ℂ) := by
+  rw [waveEval_riesz_conj, spectralLineTwoWave_inner]
+  exact Complex.conj_ofReal _
+
+/-- Actual physical Riesz probes of different angular characters are orthogonal
+even when neither frequency is a zero. -/
+private theorem waveEval_riesz_orthogonal (η θ : PontryaginDual C𝔽) (s t : ℝ)
+    (k : (ideleClassNorm F).ker) (hne : η k.val ≠ θ k.val) :
+    ⟪(InnerProductSpace.toDual ℂ W₂).symm (waveEval η s),
+      (InnerProductSpace.toDual ℂ W₂).symm (waveEval θ t)⟫_ℂ = 0 := by
+  rw [waveEval_riesz_conj, spectralLineTwoWave_inner_eq_zero η θ s t k hne, star_zero]
+
+local notation "r(" η ", " t ")" => (InnerProductSpace.toDual ℂ W₂).symm (waveEval η t)
+
+/-- The unrestricted scalar Mellin sample of the positive-space Riesz vector, on
+one angular line or between two distinct lines. -/
+private theorem waveEval_riesz_matrix (χ : Ω → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    [DecidableEq Ω] (ξ ζ : Ω) (s t : ℝ) :
+    waveEval (χ ξ) s r(χ ζ, t) = if ξ = ζ then ((D * Real.exp (-|s-t|) : ℝ) : ℂ) else 0 := by
+  rw [← InnerProductSpace.toDual_symm_apply]
+  split_ifs with h
+  · subst ζ
+    exact waveEval_riesz_inner (χ ξ) s t
+  · have hex : ∃ k : (ideleClassNorm F).ker, χ ξ k.val ≠ χ ζ k.val := by
+      by_contra! hall
+      apply h
+      apply PontryaginDual.ext
+      intro k
+      exact (DFunLike.congr_fun (hχ ξ) k).symm.trans
+        ((hall k).trans (DFunLike.congr_fun (hχ ζ) k))
+    obtain ⟨k, hk⟩ := hex
+    exact waveEval_riesz_orthogonal (χ ξ) (χ ζ) s t k hk
+
+/-- For every choice of angular charts, suppose the actual Mellin profile of a physical
+Sobolev vector is supported on one angular character. If its scalar time profile is the
+Volterra primitive of `g`, its squared physical norm is the ordinary energy divided
+by twice the Gram diagonal. -/
+private theorem physical_norm_eq_of_causal_data
+    (χ : Ω → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    (ω : Ω) (u : W₂) (g : ℝ → ℂ) (hg : MemLp g 2 volume)
+    (hown : ∀ t, waveEval (χ ω) t u = ∫ r in Iic t, (Real.exp (r-t) : ℂ) * g r)
+    (hoff : ∀ ξ, ξ ≠ ω → ∀ t, waveEval (χ ξ) t u = 0) :
+    (2 * D) * ‖u‖ ^ 2 = ∫ r, ‖g r‖ ^ 2 := by
+  classical
+  have hV : 0 < (Measure.haarScalarFactor μ𝔽 ν𝔽 : ℝ) := by
+    exact_mod_cast Measure.haarScalarFactor_pos_of_isHaarMeasure μ𝔽 ν𝔽
+  apply norm_of_causal_probes D (mul_pos hV Real.pi_pos) (fun ξ t ↦ waveEval (χ ξ) t)
+    ω u g hg (waveEval_separates χ hχ) _ hown hoff
+  intro ξ ζ s t
+  rw [InnerProductSpace.toDual_symm_apply]
+  exact waveEval_riesz_matrix χ hχ ξ ζ s t
+
+/-- A pulled quotient coordinate has squared norm `pi*V`, so its product with a
+physical single-line residual has squared norm exactly half the ordinary causal
+energy. Both Hilbert-space normalizations cancel. -/
+private theorem row_cost_eq_of_causal_data (a : ℝ)
+    (χ : Ω → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    (j : SpectralStripJetIndex χ a 0 2)
+    (f : StrongDual ℂ (spectralSobolevQuotient F a hI hs))
+    (hf : spectralSobolevDualEmbedding F a hI hs f = uJet(χ, j))
+    (r : W₂) (g : ℝ → ℂ) (hg : MemLp g 2 volume)
+    (hown : ∀ t, waveEval (χ j.val.1) t r = ∫ y in Iic t, (Real.exp (y-t) : ℂ) * g y)
+    (hoff : ∀ ξ, ξ ≠ j.val.1 → ∀ t, waveEval (χ ξ) t r = 0) :
+    (‖f.comp (globalThetaSobolev F a hI hs).mkQL‖ * ‖r‖) ^ 2 =
+      (1/2 : ℝ) * ∫ t, ‖g t‖ ^ 2 := by
+  have heq := physical_norm_eq_of_causal_data χ hχ j.val.1 r g hg hown hoff
+  rw [mul_pow, pulledCoordinate_norm_sq a χ j f hf]
+  linarith only [heq]
+
+/-- The exact Mellin function for the zero-width test action. -/
+def lineMultiplier (η : PontryaginDual C𝔽) (φ : BruhatCompactSupport C𝔽) (t : ℝ) : ℂ :=
+  ∫ g, φ.val g * spectralZeroJet η 0 t 0 g ∂μ𝔽
+
+/-- The scalar jet is the angular positive Fourier phase from any chosen basepoint. -/
+private theorem raw_phase (η : PontryaginDual C𝔽) (t : ℝ) (g : C𝔽) :
+    spectralZeroJet η 0 t 0 g = (η g : ℂ) * Complex.exp (((t * l𝔽 g : ℝ) : ℂ) * Complex.I) := by
+  have hp : (0 : ℝ) < ((ideleClassNorm F g).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  change ((η g : ℂ) * (((ideleClassNorm F g).val : ℝ) : ℂ) ^ (0 + (t : ℂ) * Complex.I)) * _ ^ 0 = _
+  rw [zero_add, pow_zero, mul_one, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hp.ne'),
+    ← Complex.ofReal_log hp.le, Complex.ofReal_mul]
+  congr 2
+  change (l𝔽 g : ℂ) * ((t : ℂ) * Complex.I) = (t : ℂ) * (l𝔽 g : ℂ) * Complex.I
+  ring
+
+/-- The multiplier in the geometric criterion uses the project's positive unitary
+norm twist, precisely at `it`. -/
+private theorem lineMultiplier_eq_twist (η : PontryaginDual C𝔽) (φ : BruhatCompactSupport C𝔽) (t : ℝ) :
+    lineMultiplier η φ t = ∫ g, φ.val g * ideleClassNormTwist η ((t : ℂ) * Complex.I) g ∂μ𝔽 := by
+  simp only [lineMultiplier, spectralZeroJet, Complex.ofReal_zero, zero_add, pow_zero, mul_one]
+
+/-- The compact-test first log moment gives a uniform bound for the derivative, and
+the zeroth moment bounds the function itself. The same two constants work for every
+base character. -/
+private theorem lineMultiplier_regular (η : PontryaginDual C𝔽) (φ : BruhatCompactSupport C𝔽) :
+    ContDiff ℝ 1 (lineMultiplier η φ) ∧
+      (∀ t, ‖lineMultiplier η φ t‖ ≤ ∫ g, ‖φ.val g‖ ∂μ𝔽) ∧
+      (∀ t, ‖deriv (lineMultiplier η φ) t‖ ≤ ∫ g, ‖φ.val g‖ * ‖l𝔽 g‖ ∂μ𝔽) := by
+  let A (t : ℝ) (g : C𝔽) := (φ.val g * (η g : ℂ)) * Complex.exp (((t * l𝔽 g : ℝ) : ℂ) * Complex.I)
+  let B (t : ℝ) (g : C𝔽) := A t g * ((l𝔽 g : ℂ) * Complex.I)
+  let C (g : C𝔽) := ‖φ.val g‖ * ‖l𝔽 g‖
+  have hφ : Continuous φ.val := continuous_of_bruhatSmooth ((mem_bruhatSmoothSubmodule_iff _).mp φ.property.1)
+  have hL : Continuous l𝔽 := continuous_log_norm
+  have hη : Continuous (fun g : C𝔽 ↦ (η g : ℂ)) := continuous_subtype_val.comp η.continuous
+  have hA (t : ℝ) : Continuous (A t) := by dsimp [A]; fun_prop
+  have hB (t : ℝ) : Continuous (B t) := by dsimp [B]; fun_prop
+  have hC : Integrable C μ𝔽 :=
+    (hφ.norm.mul hL.norm).integrable_of_hasCompactSupport
+      ((show HasCompactSupport φ.val from φ.property.2).norm.mul_right)
+  have hAabs (t : ℝ) (g : C𝔽) : ‖A t g‖ = ‖φ.val g‖ := by
+    simp only [A, norm_mul, Circle.norm_coe, Complex.norm_exp_ofReal_mul_I, mul_one]
+  have hBabs (t : ℝ) (g : C𝔽) : ‖B t g‖ = C g := by
+    simp only [B, C, norm_mul, hAabs, Complex.norm_real, Complex.norm_I, mul_one]
+  have hAe (t : ℝ) : Integrable (A t) μ𝔽 :=
+    (hA t).integrable_of_hasCompactSupport ((show HasCompactSupport φ.val from φ.property.2).mul_right.mul_right)
+  have htransform : lineMultiplier η φ = fun t ↦ ∫ g, A t g ∂μ𝔽 := by
+    funext t
+    exact integral_congr_ae (.of_forall fun g ↦
+      (congrArg (φ.val g * ·) (raw_phase η t g)).trans (mul_assoc _ _ _).symm)
+  have hd (t : ℝ) : HasDerivAt (lineMultiplier η φ) (∫ g, B t g ∂μ𝔽) t := by
+    rw [htransform]
+    apply (hasDerivAt_integral_of_dominated_loc_of_deriv_le (s := univ) univ_mem
+      (.of_forall fun t ↦ (hA t).aestronglyMeasurable) (hAe t) (hB t).aestronglyMeasurable
+      (.of_forall fun g t _ ↦ (hBabs t g).le) hC ?_).2
+    refine .of_forall fun g u _ ↦ ?_
+    have hd := (((hasDerivAt_id u).mul_const (l𝔽 g)).ofReal_comp.mul_const Complex.I).cexp
+    convert hd.const_mul (φ.val g * (η g : ℂ)) using 1
+    · simp [A]
+    · simp [A, B]
+      ring
+  have hd' : deriv (lineMultiplier η φ) = fun t ↦ ∫ g, B t g ∂μ𝔽 := funext fun t ↦ (hd t).deriv
+  refine ⟨contDiff_one_iff_deriv.mpr ⟨fun t ↦ (hd t).differentiableAt, ?_⟩, ?_, ?_⟩
+  · rw [hd']
+    exact continuous_of_dominated (fun t ↦ (hB t).aestronglyMeasurable)
+      (fun t ↦ .of_forall fun g ↦ (hBabs t g).le) hC (.of_forall fun g ↦ by dsimp [B, A]; fun_prop)
+  · intro t
+    rw [htransform]
+    exact (norm_integral_le_integral_norm _).trans_eq (integral_congr_ae (.of_forall (hAabs t)))
+  · intro t
+    rw [hd']
+    exact (norm_integral_le_integral_norm _).trans_eq (integral_congr_ae (.of_forall (hBabs t)))
+
+/-- The centered scalar symbol at an arbitrary site meets the ordinary C¹ boundedness
+hypotheses of the real-variable hat computation with character-independent constants. -/
+private theorem lineMultiplier_centered_regular (η : PontryaginDual C𝔽) (φ : BruhatCompactSupport C𝔽) (z : ℝ) :
+    let b := fun t ↦ lineMultiplier η φ t - lineMultiplier η φ z
+    ContDiff ℝ 1 b ∧ b z = 0 ∧
+      (∀ t, ‖b t‖ ≤ 2 * ∫ g, ‖φ.val g‖ ∂μ𝔽) ∧
+      (∀ t, ‖deriv b t‖ ≤ ∫ g, ‖φ.val g‖ * ‖l𝔽 g‖ ∂μ𝔽) ∧
+      (∀ t, deriv b t = deriv (lineMultiplier η φ) t) := by
+  obtain ⟨hd, hbound, hdbound⟩ := lineMultiplier_regular η φ
+  have hdiff (t : ℝ) : deriv (fun y ↦ lineMultiplier η φ y - lineMultiplier η φ z) t =
+      deriv (lineMultiplier η φ) t := (hd.differentiable_one t).hasDerivAt.sub_const _ |>.deriv
+  refine ⟨hd.sub contDiff_const, sub_self _, fun t ↦ ?_, fun t ↦ ?_, hdiff⟩
+  · exact (norm_sub_le _ _).trans ((add_le_add (hbound t) (hbound z)).trans_eq (two_mul _).symm)
+  · rw [hdiff]
+    exact hdbound t
+
+/-- The physical residual for an actual coordinate has its exact hat energy and
+the desired exponential majorant whenever the lift has that cardinal profile. -/
+private theorem row_energy_of_hat_samples (a : ℝ) (χ : Ω → PontryaginDual C𝔽)
+    (hχ : IsSpectralBasepointChoice χ) (j : J(χ, a))
+    (f : StrongDual ℂ (spectralSobolevQuotient F a hI hs))
+    (hf : spectralSobolevDualEmbedding F a hI hs f = uJet(χ, j))
+    (u : W₂) (φ : BruhatCompactSupport C𝔽) (left right : Option (Ioi (0 : ℝ)))
+    (hown : ∀ t, waveEval (χ j.val.1) t u = (twoSidedHat j.val.2.2.1 left right t : ℂ))
+    (hoff : ∀ ξ, ξ ≠ j.val.1 → ∀ t, waveEval (χ ξ) t u = 0) :
+    let lam := lineMultiplier (χ j.val.1) φ
+    let z := j.val.2.2.1
+    let cost := ‖f.comp (N(a)).mkQL‖ * ‖hardySobolevTestAction μ𝔽 m𝔽 (-0) 0 2 hI hs φ u - lam z • u‖
+    (cost ^ 2 = (1/2 : ℝ) * ∫ t, ‖deriv lam t‖ ^ 2 * (twoSidedHat z left right t) ^ 2) ∧
+      (cost ^ 2 ≤ (1/2 : ℝ) * ∫ t, ‖deriv lam t‖ ^ 2 * Real.exp (-2 * |t-z|)) := by
+  let z := j.val.2.2.1
+  let lam := lineMultiplier (χ j.val.1) φ
+  let b := fun t ↦ lam t - lam z
+  let h := twoSidedHat z left right
+  let p := fun t ↦ h t • b t
+  let g := cardinalCausal b h
+  let v := hardySobolevTestAction μ𝔽 m𝔽 (-0) 0 2 hI hs φ u - lam z • u
+  obtain ⟨hc, hz, hB, hL, hdb⟩ := lineMultiplier_centered_regular (χ j.val.1) φ z
+  obtain ⟨hp, hg, hd, hbot, heq, hle⟩ := twoSidedHat_causal_energy z left right b hc hz hB hL
+  have hsample (t : ℝ) : waveEval (χ j.val.1) t v = p t := by
+    change waveEval (χ j.val.1) t (hardySobolevTestAction μ𝔽 m𝔽 (-0) 0 2 hI hs φ u - lam z • u) = _
+    rw [waveEval_residual, hown]
+    change b t * (h t : ℂ) = h t • b t
+    rw [Complex.real_smul, mul_comm]
+  have hphys := row_cost_eq_of_causal_data a χ hχ j f hf v g hg
+    (fun t ↦ (hsample t).trans (causal_primitive_of_finite_joins p g (hatJoins z left right)
+      hp hg hd hbot t).symm)
+    (fun ξ hξ t ↦ by
+      change waveEval (χ ξ) t (hardySobolevTestAction μ𝔽 m𝔽 (-0) 0 2 hI hs φ u - lam z • u) = _
+      rw [waveEval_residual, hoff ξ hξ t, mul_zero])
+  change (‖f.comp (N(a)).mkQL‖ * ‖v‖) ^ 2 = (1/2 : ℝ) * _ ∧
+    (‖f.comp (N(a)).mkQL‖ * ‖v‖) ^ 2 ≤ (1/2 : ℝ) * _
+  change (∫ t, ‖g t‖ ^ 2) = ∫ t, ‖deriv b t‖ ^ 2 * h t ^ 2 at heq
+  change (∫ t, ‖g t‖ ^ 2) ≤ ∫ t, ‖deriv b t‖ ^ 2 * Real.exp (-2 * |t-z|) at hle
+  have hdb' (t : ℝ) : deriv b t = deriv lam t := hdb t
+  simp only [hdb'] at heq hle
+  exact ⟨hphys.trans (congrArg ((1/2 : ℝ) * ·) heq),
+    hphys.le.trans (mul_le_mul_of_nonneg_left hle (by norm_num))⟩
+
+private def unitWave (η : PontryaginDual C𝔽) (s : ℝ) : W₂ :=
+  ((D : ℝ) : ℂ)⁻¹ • (InnerProductSpace.toDual ℂ W₂).symm (waveEval η s)
+
+private theorem sample_unitWave (χ : Ω → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    [DecidableEq Ω] (ξ ω : Ω) (t s : ℝ) :
+    waveEval (χ ξ) t (unitWave (χ ω) s) = expKernel s t • (if ξ = ω then (1 : ℂ) else 0) := by
+  have hV : 0 < (Measure.haarScalarFactor μ𝔽 ν𝔽 : ℝ) := by
+    exact_mod_cast Measure.haarScalarFactor_pos_of_isHaarMeasure μ𝔽 ν𝔽
+  have hn : ((D : ℝ) : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (mul_pos hV Real.pi_pos).ne'
+  rw [unitWave, map_smul, waveEval_riesz_matrix χ hχ, smul_eq_mul, Complex.real_smul]
+  by_cases he : ξ = ω
+  · rw [ite_eq_left he, ite_eq_left he, mul_one, Complex.ofReal_mul D (Real.exp (-|t-s|)),
+      ← mul_assoc, inv_mul_cancel₀ hn, one_mul]
+    rfl
+  · simp only [ite_eq_right he, mul_zero]
+
+private theorem samples_stencil (χ : Ω → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    [DecidableEq Ω] (ξ ω : Ω) (z t : ℝ) (left right : Option (Ioi (0 : ℝ))) :
+    waveEval (χ ξ) t (cardinalStencil (unitWave (χ ω)) z left right) =
+      if ξ = ω then (cardinalHat z left right t : ℂ) else 0 := by
+  let L := ((waveEval (χ ξ) t).restrictScalars ℝ).toLinearMap
+  have he s : L (unitWave (χ ω) s) = expKernel s t • (if ξ = ω then (1 : ℂ) else 0) :=
+    sample_unitWave χ hχ ξ ω t s
+  have h := observe_cardinalStencil L (if ξ = ω then (1 : ℂ) else 0) (he z)
+    (left := left) (right := right) (fun d _ ↦ he (z-d.val)) (fun d _ ↦ he (z+d.val))
+  change waveEval (χ ξ) t (cardinalStencil (unitWave (χ ω)) z left right) =
+    cardinalHat z left right t • (if ξ = ω then (1 : ℂ) else 0) at h
+  by_cases e : ξ = ω
+  · simpa only [ite_eq_left e, Complex.real_smul, mul_one] using h
+  · simpa only [ite_eq_right e, smul_zero] using h
+
+private theorem cardinalHat_eq_twoSidedHat (z : ℝ) (left right : Option (Ioi (0 : ℝ))) :
+    cardinalHat z left right = twoSidedHat z left right := by
+  apply eq_twoSidedHat_of_sides
+  · intro r hr
+    rw [cardinalHat_left z left right hr]
+    cases left <;> rfl
+  · intro r hr
+    rw [cardinalHat_right z left right hr]
+    cases right <;> rfl
+
+/-- Scalar nearest-distance data determine the full continuous Mellin profile
+of the actual canonical isometric lift. The site set may be infinite. -/
+private theorem canonicalLift_hat_of_sites (a : ℝ) (χ : Ω → PontryaginDual C𝔽)
+    (hχ : IsSpectralBasepointChoice χ)
+    (x : J(χ, a) → spectralSobolevQuotient F a hI hs)
+    (f : J(χ, a) → StrongDual ℂ (spectralSobolevQuotient F a hI hs))
+    (hb : IsSpectralMarkushevichBasis x f)
+    (hf : ∀ i, spectralSobolevDualEmbedding F a hI hs (f i) = uJet(χ, i))
+    (j : J(χ, a)) (sites : Set ℝ) (left right : Option (Ioi (0 : ℝ)))
+    (hsite : ∀ i : J(χ, a), i.val.1 = j.val.1 → i.val.2.2.1 ∈ sites)
+    (hcover : ∀ s ∈ sites, ∃ i : J(χ, a), i.val.1 = j.val.1 ∧ i.val.2.2.1 = s)
+    (huniq : ∀ i : J(χ, a), i.val.1 = j.val.1 → i.val.2.2.1 = j.val.2.2.1 → i = j)
+    (hl : IsNearestGap {d | j.val.2.2.1 - d.val ∈ sites} left)
+    (hr : IsNearestGap {d | j.val.2.2.1 + d.val ∈ sites} right) :
+    let lift := ((N(a)).quotientEquivOrthogonal (x j)).val
+    (∀ t, waveEval (χ j.val.1) t lift = (twoSidedHat j.val.2.2.1 left right t : ℂ)) ∧
+      ∀ ξ, ξ ≠ j.val.1 → ∀ t, waveEval (χ ξ) t lift = 0 := by
+  classical
+  let z := j.val.2.2.1
+  let v : W₂ := cardinalStencil (unitWave (χ j.val.1)) z left right
+  let M := Submodule.span ℂ (range fun i ↦ (InnerProductSpace.toDual ℂ W₂).symm ((f i).comp (N(a)).mkQL))
+  have hv : v ∈ M := by
+    apply cardinalStencil_mem_of_sites (M.restrictScalars ℝ) (hsite j rfl) hl hr
+    intro s h
+    obtain ⟨i, hω, ht⟩ := hcover s h
+    have heq : (f i).comp (N(a)).mkQL = waveEval (χ j.val.1) s := by
+      rw [pulledCoordinate_eq_waveEval a χ i (f i) (hf i), hω, ht]
+    change ((D : ℝ) : ℂ)⁻¹ • (InnerProductSpace.toDual ℂ W₂).symm (waveEval (χ j.val.1) s) ∈ M
+    apply M.smul_mem
+    exact Submodule.subset_span ⟨i, congrArg _ heq⟩
+  have hsamp (ξ : Ω) (t : ℝ) : waveEval (χ ξ) t v =
+      if ξ = j.val.1 then (cardinalHat z left right t : ℂ) else 0 :=
+    samples_stencil χ hχ ξ j.val.1 z t left right
+  have hval (i : J(χ, a)) : f i ((N(a)).mkQL v) = f i (x j) := by
+    change ((f i).comp (N(a)).mkQL) v = _
+    rw [pulledCoordinate_eq_waveEval a χ i (f i) (hf i), hsamp]
+    by_cases hij : i = j
+    · subst i
+      rw [ite_eq_left rfl, hb.1]
+      exact_mod_cast cardinalHat_self z left right
+    · rw [hb.2.1 j i (Ne.symm hij)]
+      by_cases hω : i.val.1 = j.val.1
+      · have hne : i.val.2.2.1 ≠ z := fun h ↦ hij (huniq i hω h)
+        rw [ite_eq_left hω, cardinalHat_at_node hl hr (hsite i hω), ite_eq_right hne, Complex.ofReal_zero]
+      · rw [ite_eq_right hω]
+  have he := quotientLift_eq_of_riesz_span (N(a)) x f hb j v hv hval
+  dsimp only
+  rw [he]
+  constructor
+  · intro t
+    rw [hsamp, ite_eq_left rfl, cardinalHat_eq_twoSidedHat]
+  · intro ξ hξ t
+    rw [hsamp, ite_eq_right hξ]
+
+/-- A retained jet is determined by its angular component and ordinate. -/
+private theorem lineJet_ext_angular_height (χ : Ω → PontryaginDual C𝔽) (a : ℝ)
+    {i j : J(χ, a)} (hω : i.val.1 = j.val.1)
+    (ht : i.val.2.2.1 = j.val.2.2.1) : i = j := by
+  obtain ⟨hib, hik, -⟩ := spectralStripJet_data_line_two χ i
+  obtain ⟨hjb, hjk, -⟩ := spectralStripJet_data_line_two χ j
+  exact Subtype.ext (Prod.ext hω (Prod.ext (hib.trans hjb.symm) (Prod.ext ht (hik.trans hjk.symm))))
+
+/-- An ordered zero ordinate provides an actual retained index in the given angular component. -/
+private theorem exists_lineJet_of_ordinate (χ : Ω → PontryaginDual C𝔽) (a : ℝ) (ξ : Ω)
+    (p : spectralLineZeroOrdinates (χ ξ) a) :
+    ∃ i : SpectralStripJetIndex χ a 0 2, i.val.1 = ξ ∧ i.val.2.2.1 = p.val := by
+  refine ⟨⟨(ξ, 0, p.val, 0), ?_⟩, rfl, rfl⟩
+  change 0 < spectralStripMultiplicity 0 2 0
+    (meromorphicOrderAt (continuedCompletedHeckeL (χ ξ))
+      (((a + 0 : ℝ) : ℂ) + (p.val : ℂ) * Complex.I)).untop₀.toNat
+  rw [add_zero, spectralStripMultiplicity_boundary le_rfl (Or.inr rfl)]
+  exact (lt_spectralBoundaryMultiplicity _ _ _).mpr ⟨p.property, by norm_num⟩
+
+/-- Actual positive adjacent distances in the supplied angular chart. A minimal
+or maximal Hecke zero has no neighboring distance on its exterior side. -/
+def actualNeighborGaps (a : ℝ) (χ : Ω → PontryaginDual C𝔽) (j : J(χ, a)) :
+    Option (Ioi (0 : ℝ)) × Option (Ioi (0 : ℝ)) :=
+  let Z := spectralLineZeroOrdinates (χ j.val.1) a
+  let c : Z := ⟨j.val.2.2.1, (spectralStripJet_data_line_two χ j).2.2⟩
+  let y := fun s : Z ↦ s.val
+  let hy : StrictMono y := fun _ _ h ↦ h
+  (leftSiteGap y hy c, rightSiteGap y hy c)
+
+/-- At every admitted actual jet, the canonical physical lift has exactly its
+two-sided hat on its own angular line and zero at every other angular character. -/
+theorem actual_canonicalLift_hat (a : ℝ) (χ : Ω → PontryaginDual C𝔽)
+    (hχ : IsSpectralBasepointChoice χ)
+    (x : J(χ, a) → spectralSobolevQuotient F a hI hs)
+    (f : J(χ, a) → StrongDual ℂ (spectralSobolevQuotient F a hI hs))
+    (hb : IsSpectralMarkushevichBasis x f)
+    (hf : ∀ i, spectralSobolevDualEmbedding F a hI hs (f i) = uJet(χ, i))
+    (j : J(χ, a)) :
+    let lift := ((N(a)).quotientEquivOrthogonal (x j)).val
+    let gaps := actualNeighborGaps a χ j
+    (∀ t, waveEval (χ j.val.1) t lift = (twoSidedHat j.val.2.2.1 gaps.1 gaps.2 t : ℂ)) ∧
+      ∀ ξ, ξ ≠ j.val.1 → ∀ t, waveEval (χ ξ) t lift = 0 := by
+  let Z := spectralLineZeroOrdinates (χ j.val.1) a
+  let c : Z := ⟨j.val.2.2.1, (spectralStripJet_data_line_two χ j).2.2⟩
+  let y := fun s : Z ↦ s.val
+  have hy : StrictMono y := fun _ _ h ↦ h
+  apply canonicalLift_hat_of_sites a χ hχ x f hb hf j (range y)
+    (leftSiteGap y hy c) (rightSiteGap y hy c)
+  · intro i hi
+    refine ⟨⟨i.val.2.2.1, ?_⟩, rfl⟩
+    change i.val.2.2.1 ∈ spectralLineZeroOrdinates (χ j.val.1) a
+    rw [← hi]
+    exact (spectralStripJet_data_line_two χ i).2.2
+  · rintro t ⟨s, rfl⟩
+    exact exists_lineJet_of_ordinate χ a j.val.1 s
+  · exact fun _ h₁ h₂ ↦ lineJet_ext_angular_height χ a h₁ h₂
+  · exact leftSiteGap_isNearest y hy c
+  · exact rightSiteGap_isNearest y hy c
+
+/-- The exact physical squared rank-one cost and the exponential estimate on
+every degree-two line jet. The hypotheses are precisely the basis and coordinate
+embedding assumptions from the spectral criterion. The exponential majorant is uniform
+in the adjacent distances. -/
+theorem actual_geometric_row_energy (a : ℝ) (χ : Ω → PontryaginDual C𝔽)
+    (hχ : IsSpectralBasepointChoice χ)
+    (x : J(χ, a) → spectralSobolevQuotient F a hI hs)
+    (f : J(χ, a) → StrongDual ℂ (spectralSobolevQuotient F a hI hs))
+    (hb : IsSpectralMarkushevichBasis x f)
+    (hf : ∀ i, spectralSobolevDualEmbedding F a hI hs (f i) = uJet(χ, i))
+    (j : J(χ, a)) (φ : BruhatCompactSupport C𝔽) :
+    let u := ((N(a)).quotientEquivOrthogonal (x j)).val
+    let lam := lineMultiplier (χ j.val.1) φ
+    let z := j.val.2.2.1
+    let gaps := actualNeighborGaps a χ j
+    let cost := ‖(f j).comp (N(a)).mkQL‖ *
+      ‖hardySobolevTestAction μ𝔽 m𝔽 (-0) 0 2 hI hs φ u - lam z • u‖
+    (cost ^ 2 = (1/2 : ℝ) * ∫ t, ‖deriv lam t‖ ^ 2 * (twoSidedHat z gaps.1 gaps.2 t) ^ 2) ∧
+      cost ^ 2 ≤ (1/2 : ℝ) * ∫ t, ‖deriv lam t‖ ^ 2 * Real.exp (-2 * |t-z|) := by
+  obtain ⟨hown, hoff⟩ := actual_canonicalLift_hat a χ hχ x f hb hf j
+  exact row_energy_of_hat_samples a χ hχ j (f j) (hf j)
+    ((N(a)).quotientEquivOrthogonal (x j)).val φ _ _ hown hoff
+
+end LineTwo
+
 variable {F : Type*} [Field F] [NumberField F]
 variable (a : ℝ) {α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s)
   (φ : BruhatCompactSupport (IdeleClassGroup (𝓞 F) F)) (ha : 0 < a)
@@ -773,6 +1451,158 @@ local notation "zeros(" F ", " χ ", " a ", " α ")" => {z : PontryaginDual (ide
   z.2.1 ∈ Icc (-α) α ∧ 0 < order(χ, a, z)}
 local notation "jetCount(" z ")" => spectralStripMultiplicity α s (z).val.2.1 (order(χ, a, (z).val)).untop₀.toNat
 local notation "jets" => SpectralStripJetIndex (F := F) χ a α s
+
+section LineEnergy
+
+local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
+local notation "C₁" => (ideleClassNorm F).ker
+local notation "μ𝔽" => ideleClassTamagawaMeasure F
+local notation "m𝔽" => (continuousIdeleClassNorm F : C𝔽 →ₜ* ℝ≥0ˣ)
+local notation "unitChars(" τ ")" => {ψ : PontryaginDual C𝔽 // ∀ u : ℝ≥0ˣ, ψ (τ u) = 1}
+local notation "physicalZeros(" τ ")" => {z : unitChars(τ) × ℂ //
+  0 < MeromorphicOn.divisor (explicitFormulaCompletedHeckeL z.1.val) univ z.2}
+local notation "M(" f ", " ψ ", " s ")" =>
+  (∫ g : C𝔽, (f : BruhatCompactSupport C𝔽).val g * ideleClassNormTwist ψ s g ∂μ𝔽)
+local notation "ord(" ψ ", " w ")" => meromorphicOrderAt (continuedCompletedHeckeL ψ) w
+
+/-- Multiplication of the test by the log norm represents the first vertical derivative
+in every unitary character, with a factor of modulus one. -/
+private theorem geometricLineEnergy_logTest (f : BruhatCompactSupport C𝔽) :
+    ∃ q : BruhatCompactSupport C𝔽, ∀ (η : PontryaginDual C𝔽) (t : ℝ),
+      ‖deriv (fun u : ℝ ↦ M(f, η, ((u : ℂ) * Complex.I))) t‖ =
+        ‖M(q, η, ((t : ℂ) * Complex.I))‖ := by
+  let L := logIdeleClassNorm F
+  have hL : Continuous L :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)).log
+      (fun g ↦ NNReal.coe_ne_zero.2 (ideleClassNorm F g).ne_zero)
+  have hf : Continuous f.val := continuous_of_bruhatSmooth ((mem_bruhatSmoothSubmodule_iff _).mp f.property.1)
+  have hs : IsBruhatSmooth (fun g : C𝔽 ↦ (L g : ℂ)) :=
+    isBruhatSmooth_logProfile m𝔽 Complex.ofRealCLM.contDiff
+  let q : BruhatCompactSupport C𝔽 := ⟨fun g ↦ f.val g * (L g : ℂ),
+    (mem_bruhatSmoothSubmodule_iff _).mpr (fun p ↦ isBruhatContDiff_mul
+      ((mem_bruhatSmoothSubmodule_iff _).mp f.property.1 p) (hs p)), f.property.2.mul_right⟩
+  refine ⟨q, fun η t ↦ ?_⟩
+  have hpoly : Integrable (fun g : C𝔽 ↦ ‖f.val g‖ * (1 + |L g|) ^ ((2 : ℝ) / 2)) μ𝔽 := by
+    norm_num
+    exact (hf.norm.mul (continuous_const.add hL.abs)).integrable_of_hasCompactSupport f.property.2.norm.mul_right
+  have h := spectralLineWindowMultiplier_iteratedDeriv (s := 2) f.val hf.aemeasurable hpoly η t 1 (by norm_num)
+  have hm (u : ℝ) : spectralLineWindowMultiplier f.val η u = M(f, η, ((u : ℂ) * Complex.I)) := by
+    simp only [spectralLineWindowMultiplier, modulatedFourierMellin, relativeVerticalStrip,
+      preimage_univ, indicator_univ, Complex.ofReal_zero, zero_add]
+  simp only [iteratedDeriv_one, pow_one, funext hm] at h
+  rw [h, norm_mul, Complex.norm_I, one_mul]
+  apply congrArg norm
+  apply integral_congr_ae (.of_forall fun g ↦ ?_)
+  simp only [spectralZeroJet, Complex.ofReal_zero, zero_add, pow_one, q, L]
+  ring
+
+/-- Divide an arbitrary base character by its restriction to the norm section. This only
+translates the complex parameter by a purely imaginary constant on that component. -/
+private theorem geometricLineEnergy_recenter (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : Function.RightInverse τ (ideleClassNorm F))
+    (η : PontryaginDual C𝔽) :
+    ∃ (ψ : unitChars(τ)) (v : ℝ), (∀ u : C₁, ψ.val u.val = η u.val) ∧
+      ∀ s : ℂ, ideleClassNormTwist η s = ideleClassNormTwist ψ.val (s + (v : ℂ) * Complex.I) := by
+  let j : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  obtain ⟨a, ⟨ha, hpower⟩, _⟩ := existsUnique_unitaryComplexPower (j.comp (η.comp τ))
+    (fun u ↦ Circle.norm_coe _)
+  let θ : PontryaginDual C𝔽 := η.comp (τ.comp m𝔽)
+  let ψ : PontryaginDual C𝔽 := η / θ
+  have hψ (u : ℝ≥0ˣ) : ψ (τ u) = 1 := by
+    change η (τ u) / η (τ (ideleClassNorm F (τ u))) = 1
+    rw [hτ u, div_self']
+  have htw : ideleClassNormTwist η 0 = ideleClassNormTwist ψ a := by
+    ext1 g
+    change (η g : ℂ) * _ ^ (0 : ℂ) =
+      (((η g : Circle) / η (τ (ideleClassNorm F g)) : Circle) : ℂ) * _ ^ a
+    rw [Complex.cpow_zero, mul_one, Circle.coe_div]
+    have hp := hpower (ideleClassNorm F g)
+    change (η (τ (ideleClassNorm F g)) : ℂ) = _ at hp
+    rw [← hp, div_mul_cancel₀ _ (Circle.coe_ne_zero _)]
+  refine ⟨⟨ψ, hψ⟩, a.im, fun u ↦ ?_, fun s ↦ ?_⟩
+  · change η u.val / η (τ (ideleClassNorm F u.val)) = η u.val
+    rw [show ideleClassNorm F u.val = 1 from u.property, map_one, map_one, div_one]
+  · have hparam : (a.im : ℂ) * Complex.I = a := by apply Complex.ext <;> simp [ha]
+    simpa only [hparam, zero_add, add_comm s a] using ideleClassNormTwist_add_of_eq htw s
+
+/-- Translation of the norm chart carries a positive Hecke order to the counted positive
+divisor of the normalized character. The minimum of the theta orders is intrinsic to the
+quasi-character. -/
+private theorem geometricLineEnergy_divisor_pos (η ψ : PontryaginDual C𝔽) (v s : ℂ)
+    (hchart : ∀ w : ℂ, ideleClassNormTwist η w = ideleClassNormTwist ψ (w + v))
+    (hpos : 0 < ord(η, s)) :
+    0 < MeromorphicOn.divisor (explicitFormulaCompletedHeckeL ψ) univ (s + v) := by
+  have horders (f : adelePolarSubspace F) :
+      meromorphicOrderAt (fun w ↦ globalThetaMellinIntegral f.val (ideleClassNormTwist η w)) s =
+        meromorphicOrderAt (fun w ↦ globalThetaMellinIntegral f.val (ideleClassNormTwist ψ w)) (s + v) := by
+    simp_rw [hchart]
+    exact meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt (f := fun w ↦
+      globalThetaMellinIntegral f.val (ideleClassNormTwist ψ w)) (c := v) (x := s)
+  have hmin := isLeast_globalThetaMellinIntegral_orders η s
+  simp_rw [horders] at hmin
+  have he := hmin.unique (isLeast_globalThetaMellinIntegral_orders ψ (s + v))
+  have hp : 0 < ord(ψ, (s + v)) := (lt_max_iff.mp ((lt_max_of_lt_right hpos).trans_eq he)).resolve_left (lt_irrefl _)
+  obtain ⟨hL, hspec⟩ := continuedCompletedHeckeL_spec ψ
+  have hfin : ord(ψ, (s + v)) ≠ ⊤ := by
+    apply hL.meromorphicOn.meromorphicOrderAt_ne_top_of_isPreconnected isPreconnected_univ
+      (x := 2) (mem_univ _) (mem_univ _)
+    intro ht
+    have hp₂ : 0 < ord(ψ, (2 : ℂ)) := ht ▸ WithTop.coe_lt_top (0 : ℤ)
+    have hbad := completedHeckeL_continuation_zeros ψ _ hL hspec (by norm_num : 0 < (2 : ℂ).re) hp₂
+    norm_num at hbad
+  rw [MeromorphicOn.divisor_apply (explicitFormulaCompletedHeckeL_spec ψ).1.meromorphicOn (mem_univ _)]
+  change 0 < (ord(ψ, (s + v))).untop₀
+  cases h : ord(ψ, (s + v)) with
+  | top => exact (hfin h).elim
+  | coe n => simpa only [h, WithTop.untop₀_coe, ← WithTop.coe_zero, WithTop.coe_lt_coe] using hp
+
+
+/-- For any choice of unitary basepoints and every strip of zero sites, the unitary-line
+Mellin derivatives of a compact test have summable square-root exponential energies. The
+ordinate of the zero and the argument of the multiplier receive the same physical shift. -/
+theorem spectralStripGeometricKernel_summable_lineEnergy (f : BruhatCompactSupport C𝔽)
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    (a α : ℝ) :
+    Summable (fun z : zeros(F, χ, a, α) ↦ Real.sqrt ((1 / 2 : ℝ) * ∫ t : ℝ,
+      ‖deriv (fun u : ℝ ↦ M(f, (χ z.val.1), ((u : ℂ) * Complex.I))) t‖ ^ 2 *
+        Real.exp (-2 * |t - z.val.2.2|))) := by
+  classical
+  let π : IdeleGroup (𝓞 F) F →ₜ* C𝔽 := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
+  let τ := π.comp ⟨canonicalIdeleNormSection F, canonicalIdeleNormSection_continuous F⟩
+  have hτ : Function.RightInverse τ (ideleClassNorm F) := canonicalIdeleNormSection_rightInverse F
+  choose ψ v hres hchart using fun ω ↦ geometricLineEnergy_recenter τ hτ (χ ω)
+  let param (z : zeros(F, χ, a, α)) : ℂ := ((a + z.val.2.1 : ℝ) : ℂ) + (z.val.2.2 : ℂ) * Complex.I
+  let site (z : zeros(F, χ, a, α)) : physicalZeros(τ) :=
+    ⟨(ψ z.val.1, param z + (v z.val.1 : ℂ) * Complex.I),
+      geometricLineEnergy_divisor_pos (χ z.val.1) (ψ z.val.1).val _ _ (hchart z.val.1) z.property.2⟩
+  have hinj : Function.Injective site := by
+    intro x y he
+    have hψ : ψ x.val.1 = ψ y.val.1 := congrArg (fun z : physicalZeros(τ) ↦ z.val.1) he
+    have hω : x.val.1 = y.val.1 := by
+      ext u : 1
+      have hx : χ x.val.1 u.val = x.val.1 u := DFunLike.congr_fun (hχ x.val.1) u
+      have hy : χ y.val.1 u.val = y.val.1 u := DFunLike.congr_fun (hχ y.val.1) u
+      exact hx.symm.trans (((hres x.val.1 u).symm.trans
+        (congrArg (fun θ : unitChars(τ) ↦ θ.val u.val) hψ)).trans ((hres y.val.1 u).trans hy))
+    have hp : param x + (v x.val.1 : ℂ) * Complex.I = param y + (v y.val.1 : ℂ) * Complex.I :=
+      congrArg (fun z : physicalZeros(τ) ↦ z.val.2) he
+    rw [hω, add_left_inj] at hp
+    apply Subtype.ext
+    refine Prod.ext hω (Prod.ext ?_ ?_)
+    · simpa [param] using congrArg Complex.re hp
+    · simpa [param] using congrArg Complex.im hp
+  obtain ⟨q, hq⟩ := geometricLineEnergy_logTest f
+  obtain ⟨N, w, hw, _, hw₀, hbound⟩ := exists_summable_heckeZero_mellin_envelope τ hτ q 0
+  obtain ⟨C, _, hC⟩ := sqrt_integral_exp_sub_le_of_polynomial_envelope N
+  apply ((hw.comp_injective hinj).mul_left C).of_nonneg_of_le (fun _ ↦ Real.sqrt_nonneg _) (fun z ↦ ?_)
+  apply (hC _ z.val.2.2 (w (site z)) (hw₀ _) (aestronglyMeasurable_deriv _ volume).norm
+    (fun _ ↦ norm_nonneg _) ?_).2
+  intro t
+  rw [hq, hchart z.val.1]
+  let s := (t : ℂ) * Complex.I + (v z.val.1 : ℂ) * Complex.I
+  have hh := hbound (site z) s (by simp [s])
+  simpa [site, param, s, add_sub_add_right_eq_sub] using hh
+
+end LineEnergy
 
 variable (eχ : PontryaginDual (ideleClassNorm F).ker ↪ ℕ) (e : zeros(F, χ, a, α) ↪ ℕ × ℕ)
   (x : SpectralStripJetIndex χ a α s → H(F, a, hα, hs))
@@ -930,6 +1760,61 @@ theorem spectralStripGeometricKernel_blocks_bddAbove_of_lineEnergy
       simp only [Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul]
       exact mul_le_of_le_one_left (Real.sqrt_nonneg _) (by exact_mod_cast hcount)
 
+/-- Paper: Theorem 10.4.3.5(2), p. 472. On the line at Sobolev order two, the geometric
+blocks are bounded in trace norm whenever the geometric output satisfies the pointwise
+Mellin energy estimate. -/
+theorem spectralStripGeometricKernel_blocks_bddAbove_of_lineEnergy_bound
+    (hline : α = 0) (htwo : s = 2)
+    (henergy : ∀ (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z))),
+      (‖(f jet(z, m)).comp (Θ₀).mkQL‖ *
+        ‖Aφ (Sₐ(x jet(z, m))) - mellinAt(z) • Sₐ(x jet(z, m))‖) ^ 2 ≤ lineEnergy(z)) :
+    BddAbove (range fun K : Finset zeros(F, χ, a, α) ↦ traceNorm (∑ z ∈ K, geometricBlock(z))) :=
+  spectralStripGeometricKernel_blocks_bddAbove_of_lineEnergy a hα hs φ ha χ eχ e x f
+    hχ he horder hb hline htwo henergy (spectralStripGeometricKernel_summable_lineEnergy φ χ hχ a α)
+
+private theorem spectralStripGeometricKernel_residual_sq_le_lineEnergy (hline : α = 0) (htwo : s = 2)
+    (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z))) :
+    (‖(f jet(z, m)).comp (Θ₀).mkQL‖ *
+      ‖Aφ (Sₐ(x jet(z, m))) - mellinAt(z) • Sₐ(x jet(z, m))‖) ^ 2 ≤ lineEnergy(z) := by
+  subst α
+  subst s
+  let j : SpectralStripJetIndex χ a 0 2 := ⟨(z.val.1, z.val.2.1, z.val.2.2, m.val), m.isLt⟩
+  have hrow := (LineTwo.actual_geometric_row_energy a χ hχ x f hb.1 hb.2 j φ).2
+  have ht : z.val.2.1 = 0 := by simpa using z.property.1
+  let lam := LineTwo.lineMultiplier (χ z.val.1) φ
+  have hl : lam = fun t : ℝ ↦ ∫ g, φ.val g *
+      ideleClassNormTwist (χ z.val.1) ((t : ℂ) * Complex.I) g ∂ideleClassTamagawaMeasure F :=
+    funext fun t ↦ LineTwo.lineMultiplier_eq_twist (χ z.val.1) φ t
+  have hz : mellinAt(z) = lam z.val.2.2 := by
+    rw [ht, Complex.ofReal_zero, zero_add]
+    exact (LineTwo.lineMultiplier_eq_twist _ _ _).symm
+  rw [hz, ← hl]
+  exact hrow
+
+/-- The physical rank-one cost at each retained degree-two line jet is at most the
+square root of its Mellin-derivative energy, for the geometric projection of the
+convolved canonical lift. -/
+theorem spectralStripGeometricKernel_row_le_sqrt_lineEnergy (hline : α = 0) (htwo : s = 2)
+    (z : zeros(F, χ, a, α)) (m : Fin (jetCount(z))) :
+    ‖(f jet(z, m)).comp (Θ₀).mkQL‖ * ‖Gₐ (Aφ (Sₐ(x jet(z, m))))‖ ≤ Real.sqrt lineEnergy(z) := by
+  have hz : z.val.2.1 = -α := by linarith only [z.property.1.1, z.property.1.2, hline]
+  have hcount : jetCount(z) ≤ 1 := by
+    rw [spectralStripMultiplicity_boundary hα (Or.inl hz), spectralBoundaryMultiplicity]
+    exact (Nat.min_le_right _ _).trans (Nat.ceil_le.mpr (by norm_num [htwo]))
+  rw [spectralStripGeometricKernel_output_eq_sub_of_one_jet a hα hs φ ha χ eχ e x f hχ he horder hb z m hcount]
+  exact Real.le_sqrt_of_sq_le (spectralStripGeometricKernel_residual_sq_le_lineEnergy a hα hs φ ha χ eχ e x f
+    hχ he horder hb hline htwo z m)
+
+/-- Paper: Theorem 10.4.3.5(2), p. 472. At zero strip width and Sobolev degree two,
+the geometric blocks of every compact test are bounded in trace norm over arbitrary finite
+sets of Hecke zeros. The exact physical row energy equals the Mellin-derivative energy
+weighted by the square of the cardinal function at the site. -/
+theorem spectralStripGeometricKernel_blocks_bddAbove_line_two (hline : α = 0) (htwo : s = 2) :
+    BddAbove (range fun K : Finset zeros(F, χ, a, α) ↦ traceNorm (∑ z ∈ K, geometricBlock(z))) :=
+  spectralStripGeometricKernel_blocks_bddAbove_of_lineEnergy_bound a hα hs φ ha χ eχ e x f hχ he horder hb
+    hline htwo (spectralStripGeometricKernel_residual_sq_le_lineEnergy a hα hs φ ha χ eχ e x f
+      hχ he horder hb hline htwo)
+
 /-- Paper: Theorem 10.4.3.5(2), p. 472. For each zero `z` of the strip, let `R_z` be the
 finite-rank operator `v ↦ ∑ₘ f_{z,m}(q v) • P^geom_a(A(φ)(S_a x_{z,m}))` on the Sobolev space,
 summed over the jets kept at `z`; here `q` is the quotient map and `S_a` its isometric section.
@@ -944,11 +1829,22 @@ operator `U`, of `z ↦ ∑ₘ f_{z,m}(q(U(P^geom_a(A(φ)(S_a x_{z,m})))))`, by 
 Gap: No bound is known for the geometric output of convolution on the biorthogonal vectors,
 that is, for the part of `A(φ)(S_a x_{z,m})` outside the spectral subspace; the bound
 (10.4.2.34) on p. 464 does not give one. The statement implies that `P^geom_a ∘ A(φ) ∘ P^spec_a`
-is nuclear on the Sobolev space, which is not known either. Nothing in the Lean uses this statement, and it is not
-known how it connects with the rest of the proof in Lean; in the paper it is used on pp. 471–474. -/
+is nuclear on the Sobolev space by `spectralStripGeometricKernel_nuclear_of_blocks` below.
+The paper uses the geometric bound on pp. 471–474. -/
 theorem spectralStripGeometricKernel_blocks_bddAbove :
     BddAbove (range fun K : Finset zeros(F, χ, a, α) ↦ traceNorm (∑ z ∈ K, geometricBlock(z))) := by
   sorry
+
+omit ha hχ he horder hb in
+private theorem spectralStripGeometricKernel_cauchy_of_block_bound
+    (hblocks : BddAbove (range fun K : Finset zeros(F, χ, a, α) ↦
+      traceNorm (∑ z ∈ K, geometricBlock(z)))) :
+    Cauchy (Filter.map geometricRectangles atTop) :=
+  spectralStripGeometricKernel_cauchy_of_blocks
+    (modulatedIntervalSobolev_dual (continuousIdeleClassNorm F : IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ)
+      ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ (ideleClassTamagawaMeasure F)
+      (-α) α s hI hs₀).exists.choose.toContinuousLinearEquiv.toContinuousLinearMap
+    (Θ₀).mkQL e _ _ _ f _ (fun _ ↦ rfl) hblocks
 
 /-- Paper: Theorem 10.4.3.5(2), p. 472. At positive twist and Sobolev order above one, the
 geometric projections of the corrected ambient rectangles are Cauchy in the completed
@@ -964,12 +1860,42 @@ tending to zero for these projective tails. Nothing in the Lean outside this fil
 statement, and it is not known how it connects with the rest of the proof in Lean; in the
 paper it is used on pp. 471–474. -/
 theorem spectralStripGeometricKernel_cauchy : Cauchy (Filter.map geometricRectangles atTop) :=
-  spectralStripGeometricKernel_cauchy_of_blocks
-    (modulatedIntervalSobolev_dual (continuousIdeleClassNorm F : IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ)
-      ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ (ideleClassTamagawaMeasure F)
-      (-α) α s hI hs₀).exists.choose.toContinuousLinearEquiv.toContinuousLinearMap
-    (Θ₀).mkQL e _ _ _ f _ (fun _ ↦ rfl)
+  spectralStripGeometricKernel_cauchy_of_block_bound a hα hs φ χ e x f
     (spectralStripGeometricKernel_blocks_bddAbove a hα hs φ ha χ eχ e x f hχ he horder hb)
+
+omit hχ he horder hb in
+include e in
+/-- If the geometric finite block sums are bounded in trace norm, their projective
+rectangles converge to a tensor representing the geometric output of convolution on spectral
+inputs. At width zero and Sobolev order two,
+`spectralStripGeometricKernel_blocks_bddAbove_of_lineEnergy` supplies this bound from its two
+line-energy hypotheses. -/
+theorem spectralStripGeometricKernel_nuclear_of_blocks
+    (hbasis : IsSpectralMarkushevichBasis x f)
+    (hblocks : BddAbove (range fun K : Finset zeros(F, χ, a, α) ↦
+      traceNorm (∑ z ∈ K, geometricBlock(z)))) :
+    IsNuclearOperator ((Gₐ).comp ((Aφ).comp Pₐ)) := by
+  have hc := spectralStripGeometricKernel_cauchy_of_block_bound a hα hs φ χ e x f hblocks
+  obtain ⟨K, hK⟩ := cauchy_map_iff_exists_tendsto.mp hc
+  have he : sobolevProjectiveKernelOperator (F := F) hα hs₀ K = (Gₐ).comp ((Aφ).comp Pₐ) :=
+    spectralStripKernel_operator_of_output (F := F) a hα hs ha χ e x f hbasis ((Gₐ).comp Aφ) K hK
+  exact (existsUnique_sobolevProjectiveKernel_iff_nuclear hα hs₀ _).mp
+    ⟨K, he, fun L hL ↦ sobolevProjectiveKernelOperator_injective hα hs₀ (hL.trans he.symm)⟩
+
+omit hχ he horder hb in
+include e in
+attribute [local instance] instSpectralQuotientPolynormableSec3 in
+/-- Paper: Theorem 10.4.3.5, pp. 472–473. Under the geometric finite block bound,
+convolution after spectral projection has a representing projective kernel exactly
+when its action on the quotient is nuclear. -/
+theorem spectralStripKernel_exists_iff_quotient_nuclear_of_geometric_blocks
+    (hbasis : IsSpectralMarkushevichBasis x f)
+    (hblocks : BddAbove (range fun K : Finset zeros(F, χ, a, α) ↦
+      traceNorm (∑ z ∈ K, geometricBlock(z)))) :
+    (∃ K, sobolevProjectiveKernelOperator (F := F) hα hs₀ K = (Aφ).comp Pₐ) ↔
+      IsNuclearOperator (spectralConvolution (F := F) a hI hs₀ φ) :=
+  (spectralStripKernel_exists_iff_quotient_and_geometric_nuclear a hα hs₀ φ).trans
+    (and_iff_left (spectralStripGeometricKernel_nuclear_of_blocks a hα hs φ ha χ e x f hbasis hblocks))
 
 /-- Paper: Theorem 10.4.3.5(2)–(3), p. 472. The corrected ambient net converges to a kernel
 representing convolution after projection (p. 473) exactly when its geometric rectangles are Cauchy.
@@ -995,5 +1921,113 @@ theorem spectralStripAmbientKernel_exists :
       sobolevProjectiveKernelOperator (F := F) hα hs₀ K = (Aφ).comp Pₐ :=
   (spectralStripAmbientKernel_exists_iff_geometric_cauchy a hα hs φ ha χ eχ e x f hχ he horder hb).mpr
     (spectralStripGeometricKernel_cauchy a hα hs φ ha χ eχ e x f hχ he horder hb)
+
+omit ha hχ he horder hb
+
+section DegreeTwoKernel
+
+local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
+local notation "C₁" => (ideleClassNorm F).ker
+local notation "μ𝔽" => ideleClassTamagawaMeasure F
+local notation "m𝔽" => (continuousIdeleClassNorm F : C𝔽 →ₜ* ℝ≥0ˣ)
+local notation "Z₀(" χ ", " a ")" => zeros(F, χ, a, (0 : ℝ))
+local notation "h₀" => (le_refl (0 : ℝ))
+local notation "hs₂" => (zero_le_two : (0 : ℝ) ≤ 2)
+local notation "A₂(" φ ")" =>
+  hardySobolevTestAction μ𝔽 m𝔽 (-(0 : ℝ)) 0 2 ((neg_nonpos.mpr h₀).trans h₀) hs₂ φ
+local notation "W₂" => CompactIntervalSobolev μ𝔽 (logIdeleClassNorm F) (-(0 : ℝ)) 0 2
+
+private theorem spectralLineZeroOrdinates_finite_abs_le (η : PontryaginDual C𝔽) (a R : ℝ) :
+    {t : ℝ | t ∈ spectralLineZeroOrdinates η a ∧ |t| ≤ R}.Finite := by
+  let p (t : ℝ) := (a : ℂ) + (t : ℂ) * Complex.I
+  let L := continuedCompletedHeckeL η
+  let K := Icc (-R) R
+  have hp : Continuous p := continuous_const.add (Complex.continuous_ofReal.mul continuous_const)
+  have hi : Function.Injective p := fun x y h ↦ by simpa [p] using congrArg Complex.im h
+  have hL : MeromorphicOn L (p '' K) := fun z _ ↦ (continuedCompletedHeckeL_spec η).1.meromorphicOn z (mem_univ z)
+  refine Set.Finite.of_injOn (f := p) ?_ hi.injOn
+    ((MeromorphicOn.divisor L (p '' K)).finiteSupport (isCompact_Icc.image hp))
+  intro t ht
+  change MeromorphicOn.divisor L (p '' K) (p t) ≠ 0
+  rw [hL.divisor_apply ⟨t, abs_le.mp ht.2, rfl⟩]
+  have hpos : 0 < (meromorphicOrderAt L (p t)).untop₀.toNat := ht.1
+  exact fun he ↦ by rw [he] at hpos; simp at hpos
+
+/-- In each character, number the line sites by their absolute ordinate, breaking ties by signed ordinate. -/
+private theorem spectralLineKernel_orderedIndices (a : ℝ) (χ : PontryaginDual C₁ → PontryaginDual C𝔽) :
+    ∃ (r : PontryaginDual C₁ ↪ ℕ) (e : Z₀(χ, a) ↪ ℕ × ℕ), (∀ z, (e z).1 = r z.val.1) ∧
+      ∀ z z' : Z₀(χ, a), z.val.1 = z'.val.1 → (e z).2 ≤ (e z').2 → |z.val.2.2| ≤ |z'.val.2.2| := by
+  classical
+  have hK : IsCompact ((ideleClassNorm F).ker : Set C𝔽) := IsModulation.isCompact_ker (m := m𝔽)
+    ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+  let : CompactSpace C₁ := isCompact_iff_compactSpace.mp hK
+  let : LocallyCompactSpace C₁ := hK.isClosed.locallyCompactSpace
+  let : SecondCountableTopology C₁ := Topology.IsInducing.subtypeVal.secondCountableTopology
+  let : SecondCountableTopology Circle := inferInstanceAs (SecondCountableTopology (Metric.sphere (0 : ℂ) 1))
+  let : SecondCountableTopology (PontryaginDual C₁) :=
+    (ContinuousMonoidHom.isEmbedding_toContinuousMap C₁ Circle).secondCountableTopology
+  let : Countable (PontryaginDual C₁) := countable_of_Lindelof_of_discrete
+  obtain ⟨r⟩ := nonempty_embedding_nat (PontryaginDual C₁)
+  let key (t : ℝ) : ℝ ×ₗ ℝ := toLex (|t|, t)
+  let sites (ω : PontryaginDual C₁) := key '' spectralLineZeroOrdinates (χ ω) a
+  let rank (ω : PontryaginDual C₁) (k : ℝ ×ₗ ℝ) := (sites ω ∩ Iio k).ncard
+  have hmono (ω) : StrictMonoOn (rank ω) (sites ω) := by
+    intro k hk l _ hkl
+    apply Set.ncard_lt_ncard
+    · exact Set.ssubset_iff_exists.mpr ⟨fun _ hv ↦ ⟨hv.1, hv.2.trans hkl⟩, k, ⟨hk, hkl⟩, fun h ↦ lt_irrefl k h.2⟩
+    · apply ((spectralLineZeroOrdinates_finite_abs_le (χ ω) a (ofLex l).1).image key).subset
+      rintro _ ⟨⟨t, ht, rfl⟩, hl⟩
+      exact ⟨t, ⟨ht, Prod.Lex.monotone_fst (key t) l hl.le⟩, rfl⟩
+  have hmem (z : Z₀(χ, a)) : key z.val.2.2 ∈ sites z.val.1 :=
+    ⟨_, (spectralStripJet_data_line_two χ (spectralLineZeroJet χ z)).2.2, rfl⟩
+  let label (z : Z₀(χ, a)) := (r z.val.1, rank z.val.1 (key z.val.2.2))
+  have hinj : Function.Injective label := by
+    intro z u h
+    have hrow := r.injective (congrArg Prod.fst h)
+    have he : rank z.val.1 (key z.val.2.2) = rank u.val.1 (key u.val.2.2) := congrArg Prod.snd h
+    have hu := hmem u
+    rw [← hrow] at he hu
+    have ht := congrArg (fun v : ℝ ×ₗ ℝ ↦ (ofLex v).2) ((hmono z.val.1).injOn (hmem z) hu he)
+    have hz₀ : z.val.2.1 = 0 := by simpa using z.property.1
+    have hu₀ : u.val.2.1 = 0 := by simpa using u.property.1
+    exact Subtype.ext (Prod.ext hrow (Prod.ext (hz₀.trans hu₀.symm) ht))
+  refine ⟨r, ⟨label, hinj⟩, fun _ ↦ rfl, ?_⟩
+  intro z u hrow hle
+  change rank z.val.1 (key z.val.2.2) ≤ rank u.val.1 (key u.val.2.2) at hle
+  have hu := hmem u
+  rw [← hrow] at hu hle
+  exact le_of_not_gt fun h ↦ (not_lt_of_ge hle) (hmono _ hu (hmem z) (Prod.Lex.toLex_lt_toLex.mpr (Or.inl h)))
+
+/-- Paper: Theorem 10.4.3.5(3), p. 473. At zero strip width and Sobolev degree two,
+a unique projective Sobolev tensor represents convolution by any compact test after spectral
+projection at positive twist. This combines the geometric bound of #7537 with the criterion of #7532
+and Szymon Mikler's clustered quotient nuclearity from #7535. -/
+theorem existsUnique_spectralLineProjectiveKernel_two (a : ℝ) (ha : 0 < a) (φ : BruhatCompactSupport C𝔽) :
+    ∃! K, sobolevProjectiveKernelOperator (F := F) h₀ hs₂ K = (A₂(φ)).comp (spectralProjection (F := F) a h₀ hs₂) := by
+  refine (exists_spectralBasepointChoice F).elim fun χ hχ ↦ ?_
+  refine (spectralLineKernel_orderedIndices a χ).elim fun r hr ↦ hr.elim fun e he ↦ ?_
+  refine (spectralStripMarkushevichBasis (a := a) χ hχ h₀ hs₂).2.elim fun x hx ↦ hx.elim fun f hb ↦ ?_
+  have hblocks := spectralStripGeometricKernel_blocks_bddAbove_line_two (F := F) a h₀ one_lt_two φ ha χ r e x f
+    hχ he.1 he.2 hb rfl rfl
+  apply (sobolevProjectiveKernelOperator_injective (F := F) h₀ hs₂).existsUnique_iff_exists.mpr
+  exact (spectralStripKernel_exists_iff_quotient_nuclear_of_geometric_blocks (F := F) a h₀ one_lt_two φ ha χ e x f
+    hb.1 hblocks).mpr (spectralStripConvolution_nuclear_of_summable_clusterTraceNorms (F := F) a h₀ hs₂ φ)
+
+/-- Paper: Theorems 10.4.2.8 and 10.4.3.5, pp. 463 and 473. At degree two and zero strip
+width, the actual expanding spectral restrictions converge to convolution after spectral
+projection in trace norm, and their Hilbert traces converge to its trace.
+Deviation: The tensor gives trace-norm convergence for every compact test at this degree. -/
+theorem spectralLineRestriction_traceNorm_tendsto_two (a : ℝ) (ha : 0 < a) (φ : BruhatCompactSupport C𝔽)
+    (ε : ℝ → ℝ) (ρ : ℝ → C𝔽 → ℝ) (hε : Tendsto (fun R ↦ ε R * R) atTop (𝓝 0))
+    (hρ : ∀ᶠ R in atTop, IsModulatedCutoff m𝔽 R (ε R) (ρ R) ∧ 0 < R⁻¹ + ε R ∧ R⁻¹ + ε R < R - ε R) :
+    ∃ (T : nuclearEndomorphisms W₂) (D : ℝ → nuclearEndomorphisms W₂),
+      T.val = (A₂(φ)).comp (spectralProjection (F := F) a h₀ hs₂) ∧
+      (∀ R (hc : IsModulatedCutoff m𝔽 R (ε R) (ρ R)), (D R).val = spectralRestriction a h₀ hs₂ hc φ) ∧
+      Tendsto (fun R ↦ traceNorm (D R - T)) atTop (𝓝 0) ∧
+      Tendsto (fun R ↦ hilbertTrace (D R)) atTop (𝓝 (hilbertTrace T)) :=
+  spectralRestriction_traceNorm_tendsto_of_projectiveKernel a h₀ hs₂ φ
+    (existsUnique_spectralLineProjectiveKernel_two a ha φ).exists ε ρ hε hρ
+
+end DegreeTwoKernel
 
 end RiemannMasullo.Isolated
