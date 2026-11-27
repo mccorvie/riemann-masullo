@@ -38,10 +38,23 @@ local notation "N" => ClosedSubmodule.toSubmodule (fixedBoxDenominator X T hT p 
 instance fixedBoxDenominator_isClosed : IsClosed (N : Set E) :=
   (fixedBoxDenominator X T hT p hTp).isClosed
 
+/-- The preceding closed stage modulo its next closed stage, with the canonical quotient norm. -/
+@[expose] def FixedBoxQuotient : Type := E ⧸ N
+
 scoped notation "FixedBoxQuotient[" x "," t "," ht "," p "," hp "]" =>
-  (closedStageSubmodule x t ht) ⧸ (ClosedSubmodule.toSubmodule (fixedBoxDenominator x t ht p hp))
+  FixedBoxQuotient x t ht p hp
 
 local notation "Q" => FixedBoxQuotient[X,T,hT,p,hTp]
+
+instance instNormedAddCommGroupFixedBoxQuotient : NormedAddCommGroup Q :=
+  inferInstanceAs (NormedAddCommGroup (E ⧸ N))
+
+instance instInnerProductSpaceFixedBoxQuotient : InnerProductSpace ℂ Q :=
+  letI : CompleteSpace ↥N := (fixedBoxDenominator X T hT p hTp).isClosed.completeSpace_coe
+  inferInstanceAs (InnerProductSpace ℂ (E ⧸ N))
+
+instance instCompleteSpaceFixedBoxQuotient : CompleteSpace Q :=
+  inferInstanceAs (CompleteSpace (E ⧸ N))
 
 variable {X} (hX : 0 < X)
 
@@ -70,7 +83,8 @@ local notation "S" => fixedBoxForwardShift T hT p hTp hX
 /-- Representative computation for the quotient action. -/
 @[simp] theorem fixedBoxForwardShift_mk (h : ℝ≥0) (u : E) :
     S h ((N).mkQL u) = (N).mkQL (R h u) := by
-  simp [fixedBoxForwardShift]
+  change (N).liftQL ((N).mkQL.comp (R h)) _ (Submodule.Quotient.mk u) = _
+  erw [Submodule.liftQL_apply, Submodule.liftQ_apply]
 
 @[simp] theorem fixedBoxForwardShift_zero : S 0 = ContinuousLinearMap.id ℂ Q := by
   apply ContinuousLinearMap.ext

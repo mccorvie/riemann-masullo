@@ -46,9 +46,8 @@ theorem exists_fixedBox_period_lift (n : ℕ) (u : E) :
     rfl
   let v := closedStageForwardShift T hT hX t u
   refine ⟨v, ?_, ?_, ?_⟩
-  · calc
-      (N).mkQL v = S t ((N).mkQL u) := (fixedBoxForwardShift_mk T hT p hTp hX t u).symm
-      _ = (N).mkQL u := DFunLike.congr_fun (hid n) _
+  · have hclass := DFunLike.congr_fun (hid n) ((N).mkQL u : Q)
+    exact (fixedBoxForwardShift_mk T hT p hTp hX t u).symm.trans hclass
   · change ‖(closedStageForwardShift T hT hX t u : LogL2)‖ = _
     rw [closedStageForwardShift_apply, norm_halfShift, ht]
     rfl
