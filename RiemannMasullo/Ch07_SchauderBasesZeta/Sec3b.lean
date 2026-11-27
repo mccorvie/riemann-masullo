@@ -1796,6 +1796,30 @@ theorem sLocalInvariantPW_translate (hST : S ⊆ T) {Y : ℝ} (_hY : 0 < Y)
   exact sLocalInvariantPW_translate_bound hST Y Y D _hD ω g
     (le_mul_of_one_le_left _hY.le _hg) x _hx
 
+/-- Paper: Proposition 7.3.2.4(3), p. 356. Translation by an idele class of norm `r`
+carries the invariant level of radius `Y` onto the invariant level of radius `Y / r`,
+with or without the zero-moment constraint.
+Deviation: The paper states preservation for norms at least one. The exact change of
+radius follows by applying the Fourier support bound to a class and its inverse. -/
+theorem sLocalInvariantPW_translate_mem_iff (hST : S ⊆ T) (Y : ℝ)
+    (D : Submodule ℂ (B(T))) (hD : D = ⊤ ∨ D = Z₀(T))
+    (ω : PontryaginDual J₁(T)) (g : J(T)) (x : Θ(T, ω)) :
+    A(T, ω) g x ∈ sLocalInvariantPW hST (Y / ((m(T) g).val : ℝ)) D ω ↔
+      x ∈ sLocalInvariantPW hST Y D ω := by
+  constructor
+  · intro hx
+    have hbound : Y / ((m(T) g).val : ℝ) ≤ ((m(T) g⁻¹).val : ℝ) * Y := by
+      simp only [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv, inv_mul_eq_div, le_refl]
+    have h := sLocalInvariantPW_translate_bound hST _ Y D hD ω g⁻¹ hbound _ hx
+    let act := A(T, ω)
+    change (act g⁻¹ * act g) x ∈ sLocalInvariantPW hST Y D ω at h
+    rwa [← act.map_mul, inv_mul_cancel, act.map_one] at h
+  · intro hx
+    have hnorm : ((m(T) g).val : ℝ) ≠ 0 := by
+      exact_mod_cast Units.ne_zero (m(T) g)
+    exact sLocalInvariantPW_translate_bound hST Y _ D hD ω g
+      (le_of_eq (mul_div_cancel₀ Y hnorm).symm) x hx
+
 /-- Paper: Proposition 7.3.2.4(4), p. 356.
 The coordinate box bound implies the product bound with exponent the total number of places.
 Both the unrestricted and the zero-moment level use the same comparison. -/
