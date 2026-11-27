@@ -29,8 +29,8 @@ the change of variable `w = g⁻¹ ± 1` turns it into integrals of the sine mea
 Reconstruction: The paper does not state this for the model.
 
 Not treated here: a weight. The comparison of the finite part with the principal value of
-Connes and of (12.4.1.1). The value of the constant `sincLogConstant / π`, classically Euler's
-constant. -/
+Connes and of (12.4.1.1). The value of the constant `sincLogConstant / π` is Euler's constant,
+which `Sec4_RealPWSincLogConstant` proves. -/
 
 @[expose] public noncomputable section
 
@@ -358,7 +358,8 @@ in noncommutative geometry and the zeros of the Riemann zeta function*, §VII, T
 Deviation: The finite part is written with the comparison profile `logTermProfile`, and the
 constant `sincLogConstant / π` is defined by an integral. Connes writes the finite part as a
 principal value normalized by a Fourier transform. The two forms are not compared here.
-Classically `sincLogConstant / π` is Euler's constant, which is not proved here. -/
+The constant `sincLogConstant / π` is Euler's constant (`sincLogConstant_div_pi` in
+`Sec4_RealPWSincLogConstant`). -/
 theorem exists_realPWTestCutoff_trace_sub_log_limit (hY : 0 < Y) {a b : ℝ} (ha0 : 0 < a)
     (ψ : ℝ → ℂ) (hψc : Continuous ψ) (hψ0 : ∀ g ∉ Icc a b, ψ g = 0) {K : ℝ}
     (hK : ∀ g, ‖ψ g - ψ 1‖ ≤ K * |g - 1|) :

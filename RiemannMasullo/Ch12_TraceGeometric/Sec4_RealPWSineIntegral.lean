@@ -20,8 +20,8 @@ zeros of the Riemann zeta function*, §VII, Theorem 4, p. 31, for `k = ℚ`, `S 
 * `abs_sincInt_sub_le_two_div`. It is within `2 / T` of `π / 2`.
 * `sincMean t` is the integral of `sinc (t s)` over `s` in `[-1, 1]`, and `sincMeanInt` its
   integral over `[0, T]`. `tendsto_sincMeanInt_sub_log`: the latter is `π log T` plus the
-  constant `sincLogConstant` plus a term that tends to zero. Classically the constant is `π`
-  times Euler's constant. That value is not proved here. -/
+  constant `sincLogConstant` plus a term that tends to zero. The constant is `π` times Euler's
+  constant, which `Sec4_RealPWSincLogConstant` proves. -/
 
 @[expose] public noncomputable section
 
@@ -252,8 +252,8 @@ theorem integral_sinc_mul_eq_sincMean (c L : ℝ) :
 /-- The integral of the mean over `[0, T]`. -/
 def sincMeanInt (T : ℝ) : ℝ := ∫ t in (0 : ℝ)..T, sincMean t
 
-/-- The constant in the logarithmic growth of `sincMeanInt`. Classically it is `π` times
-Euler's constant. That value is not proved here. -/
+/-- The constant in the logarithmic growth of `sincMeanInt`. It is `π` times Euler's constant
+(`sincLogConstant_eq` in `Sec4_RealPWSincLogConstant`). -/
 def sincLogConstant : ℝ :=
   sincMeanInt 1 + 2 * ∫ t in Ioi (1 : ℝ), (sincInt t - π / 2) / t
 
