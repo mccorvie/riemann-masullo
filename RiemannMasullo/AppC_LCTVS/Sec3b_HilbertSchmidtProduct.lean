@@ -34,10 +34,57 @@ open MeasureTheory
 
 namespace RiemannMasullo
 
+/-- Parseval's identity for a Hilbert basis. -/
+theorem hasSum_norm_inner_sq_hilbertBasis {E ι : Type*} [NormedAddCommGroup E]
+    [InnerProductSpace ℂ E] (b : HilbertBasis ι ℂ E) (x : E) :
+    HasSum (fun i ↦ ‖inner ℂ (b i) x‖ ^ (2 : ℕ)) (‖x‖ ^ (2 : ℕ)) := by
+  simpa only [ENNReal.toReal_ofNat, Real.rpow_two, LinearIsometryEquiv.norm_map,
+    b.repr_apply_apply] using lp.hasSum_norm (p := 2) (by norm_num) (b.repr x)
+
+/-- The squared norms of an operator on one Hilbert basis are summable exactly when the squared
+norms of its adjoint on another Hilbert basis are: both sums add up `|⟪f j, T (b i)⟫|²`. -/
+theorem summable_sq_basis_iff_summable_sq_adjoint {E G ι κ : Type*}
+    [NormedAddCommGroup E] [InnerProductSpace ℂ E] [CompleteSpace E] [NormedAddCommGroup G]
+    [InnerProductSpace ℂ G] [CompleteSpace G] (b : HilbertBasis ι ℂ E)
+    (f : HilbertBasis κ ℂ G) (T : E →L[ℂ] G) :
+    Summable (fun i ↦ ‖T (b i)‖ ^ (2 : ℕ)) ↔
+      Summable (fun j ↦ ‖T.adjoint (f j)‖ ^ (2 : ℕ)) := by
+  let c (i : ι) (j : κ) : ℝ := ‖inner ℂ (f j) (T (b i))‖ ^ (2 : ℕ)
+  have hnn (i : ι) (j : κ) : 0 ≤ c i j := by positivity
+  have hrow (i : ι) : HasSum (c i) (‖T (b i)‖ ^ (2 : ℕ)) :=
+    hasSum_norm_inner_sq_hilbertBasis f (T (b i))
+  have hcol (j : κ) : HasSum (fun i ↦ c i j) (‖T.adjoint (f j)‖ ^ (2 : ℕ)) := by
+    have h := hasSum_norm_inner_sq_hilbertBasis b (T.adjoint (f j))
+    convert h using 2 with i
+    simp only [c]
+    rw [ContinuousLinearMap.adjoint_inner_right, norm_inner_symm]
+  have h1 : Summable (fun p : ι × κ ↦ c p.1 p.2) ↔ Summable (fun i ↦ ‖T (b i)‖ ^ (2 : ℕ)) := by
+    have htsum (i : ι) : (∑' j, c i j) = ‖T (b i)‖ ^ (2 : ℕ) := (hrow i).tsum_eq
+    rw [summable_prod_of_nonneg (fun p ↦ hnn p.1 p.2), and_iff_right (fun i ↦ (hrow i).summable)]
+    simp only [htsum]
+  have h2 : Summable (fun p : κ × ι ↦ c p.2 p.1) ↔
+      Summable (fun j ↦ ‖T.adjoint (f j)‖ ^ (2 : ℕ)) := by
+    have htsum (j : κ) : (∑' i, c i j) = ‖T.adjoint (f j)‖ ^ (2 : ℕ) := (hcol j).tsum_eq
+    rw [summable_prod_of_nonneg (fun p ↦ hnn p.2 p.1), and_iff_right (fun j ↦ (hcol j).summable)]
+    simp only [htsum]
+  have h3 : Summable (fun p : κ × ι ↦ c p.2 p.1) ↔ Summable (fun p : ι × κ ↦ c p.1 p.2) :=
+    (Equiv.prodComm κ ι).summable_iff (f := fun p : ι × κ ↦ c p.1 p.2)
+  exact h1.symm.trans (h3.symm.trans h2)
+
 variable {E F G : Type*}
     [NormedAddCommGroup E] [InnerProductSpace ℂ E] [CompleteSpace E]
     [NormedAddCommGroup F] [InnerProductSpace ℂ F] [CompleteSpace F]
     [NormedAddCommGroup G] [InnerProductSpace ℂ G] [CompleteSpace G]
+
+/-- The adjoint of a Hilbert–Schmidt operator is Hilbert–Schmidt. -/
+theorem mem_hilbertSchmidtOperators_adjoint {T : E →L[ℂ] F}
+    (hT : T ∈ hilbertSchmidtOperators E F) :
+    T.adjoint ∈ hilbertSchmidtOperators F E := by
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := E)).choose_spec.choose
+  let c := (exists_hilbertBasis (𝕜 := ℂ) (E := F)).choose_spec.choose
+  apply (mem_hilbertSchmidtOperators_iff_summable_basis c _).mpr
+  exact (summable_sq_basis_iff_summable_sq_adjoint b c T).mp
+    ((mem_hilbertSchmidtOperators_iff_summable_basis b T).mp hT)
 
 /-- The composite of two Hilbert–Schmidt operators is trace class (`S₂ · S₂ ⊆ S₁`). The proof
 bounds the approximation numbers, `a_{2n+1}(AB) ≤ a_n(A) a_n(B)` (`approximationNumber_comp_le`),
