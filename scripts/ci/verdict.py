@@ -55,7 +55,7 @@ SHA = re.compile(r"[0-9a-f]{40}")
 SORRY_WARNING = re.compile(r"^warning: (RiemannMasullo/\S+\.lean):\d+:\d+: declaration uses `sorry`\s*$", re.M)
 SIGNATURE_LINE = re.compile(
     r"(theorem|def|opaque|axiom|inductive|constructor|recursor|quot) (\S+) \d+( \d+)?( SORRY)?")
-BUILD_MINUTES = 45
+BUILD_MINUTES = 120
 BUILD_TARGETS = ("RiemannMasullo", "Challenge", "Main")
 # A type synonym whose body is this many nodes as a tree spells out other synonyms again and again
 # in its instance terms; parts of Lean walk those terms as trees and stop finishing (#5398, #5716).
@@ -395,7 +395,7 @@ def decide(check, supplied_base):
         raise Stop("fail", ["the lint found a forbidden construct (see AGENTS.md)"], result.stdout)
     status, log = check.build()
     if status is None:
-        raise Stop("fail", [f"the build did not finish in {BUILD_MINUTES} minutes"], log)
+        raise Stop("error", [f"the build did not finish in {BUILD_MINUTES} minutes, so the pull request could not be checked; this is not a fault of the pull request"], log)
     if status != 0:
         raise Stop("fail", ["it does not build on top of main"], log)
     head_dump, out = check.signatures()

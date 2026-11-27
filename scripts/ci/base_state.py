@@ -33,7 +33,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--work", required=True)
     parser.add_argument("--base", required=True)
-    parser.add_argument("--out", required=True)
+    parser.add_argument("--out", required=True); parser.add_argument("--sha-file")
     args = parser.parse_args()
     repo, repo_id = os.environ["GH_REPO"], int(os.environ["REPO_ID"])
     work, out = Path(args.work), Path(args.out)
@@ -75,8 +75,9 @@ def main():
     subprocess.run(["tar", "-C", str(work / ".lake"), "--no-same-owner", "-I", "zstd", "-xf",
                     str(out / "build.tar.zst")], check=True)
     (out / "build.tar.zst").unlink()
+    (out / "signatures.txt").rename(out / f"signatures-{sha}.txt")
+    if args.sha_file: Path(args.sha_file).write_text(sha + "\n", encoding="utf-8")
     if sha == args.base:
-        (out / "signatures.txt").rename(out / f"signatures-{sha}.txt")
         print(f"starting from the saved build and signatures of main at {sha[:12]}")
     else:
         print(f"starting from the saved build of main at {sha[:12]}, an ancestor of {args.base[:12]}")
