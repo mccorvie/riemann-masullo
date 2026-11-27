@@ -100,7 +100,7 @@ private theorem spectralStripConvolution_nuclear_of_clusters_opNorm
 /-- If the zeros are grouped into finite clusters whose blocks have summable trace norms, the
 cluster blocks sum to the operator in operator norm, by biorthogonality and totality of the
 coordinate functionals, and the operator is nuclear. No bound for a single zero is used. -/
-private theorem spectralStripConvolution_nuclear_of_clusters_abstract
+theorem spectralStripConvolution_nuclear_of_clusters_abstract
     {H J Z ι : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
     (A : H →L[ℂ] H) (x : J → H) (Λ : J → StrongDual ℂ H) (hb : IsSpectralMarkushevichBasis x Λ)
     (N : Z → ℕ) (jet : (z : Z) → Fin (N z) → J)
