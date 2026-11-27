@@ -339,8 +339,8 @@ private theorem continuousOn_realTermDensity {a b : ℝ} (ha : 1 < a) :
     ((continuousOn_const.mul (h1.add h2)).mul h3)
 
 /-- Paper: Theorem 12.4.1.1, pp. 514–517, and the proof of Theorem 12.5.1.1, p. 520. At strip
-half-width one half with `s > 1` the trace on the level converges, and its limit is the real term minus
-the integrals of `ψ g g ^ (-1/2)` and `ψ g g ^ (1/2)`. So the reconstruction
+half-width one half with `s > 1` the trace on the level converges, and its limit is the real
+term minus the integrals of `ψ g g ^ (-1/2)` and `ψ g g ^ (1/2)`. So the reconstruction
 `sLocalTrace_realPWIntegralLevelSharpComparison` fails for every nonnegative nonzero test. The
 two integrals have the form of the Mellin values that p. 520 subtracts from the diagonal
 integral. -/
@@ -396,8 +396,9 @@ the even band in `L²` of Lebesgue measure, and the level is the space of band v
 vanishing at the origin, which is the closure of the polar-free core (#7770). For `g < 1` the
 dilation does not preserve the band, and the operator is the compression of the cutoff of the
 dilation all the same.
-Deviation: The weight of the paper has `s ≥ 2 [F : ℚ]`, p. 487. For `g < 1` the limit with a
-weight is not computed. -/
+Deviation: The weight of the paper has `s ≥ 2 [F : ℚ]`, p. 487. For `g < 1` and a weight with
+`s = 0` the limit on the whole band is in `Sec4_RealPWWeightedLowerTrace`, where for a small
+bandwidth it is not the real term. -/
 def sLocalTrace_realPWLevelSharpComparison_below : Prop :=
   ∀ (Y : ℝ) (hs : (0 : ℝ) ≤ 0), 0 < Y → ∀ (a b : ℝ), 0 < a → b < 1 → ∀ ψ : ℝ → ℂ,
     Continuous ψ → (∀ g ∉ Icc a b, ψ g = 0) →

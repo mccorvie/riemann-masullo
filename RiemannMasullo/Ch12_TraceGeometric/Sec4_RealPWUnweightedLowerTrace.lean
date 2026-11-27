@@ -38,8 +38,9 @@ Reconstruction: The paper does not state this. The operator is the one of
 `Sec4_RealPWLevelTrace`.
 
 Not treated here: a weight with `α > 0` or `s > 0` for `g < 1`. There the change of variable
-puts the quotient of the weights at `u` and at `g u` into the diagonal integral, and the limit
-is not computed. Test functions whose support meets `g = 1`. -/
+puts the quotient of the weights at `u` and at `g u` into the diagonal integral
+(`Sec4_RealPWWeightedLowerTrace`, for `s = 0`). Test functions whose support meets `g = 1`
+(`Sec4_RealPWUnweightedTrace`). -/
 
 @[expose] public noncomputable section
 
