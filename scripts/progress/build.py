@@ -109,7 +109,7 @@ def fetch_issues():
         return sorted({i["number"]: i for i in listing}.values(), key=lambda i: i["number"])
 
     repo = gh_json(["repo", "view", "--json", "url,nameWithOwner,owner"])
-    return repo, get("section", 1000), get("proof", 20000)
+    return repo, get("section", 1000), get("proof", 20000), get("open-problem", 1000)
 
 
 def fetch_contributions(repo):
@@ -737,7 +737,91 @@ def transitive_reduction(nodes, deps):
 # Assembling the page data
 
 
-def build_model(repo, section_issues, proof_issues, rows, files, warnings, head):
+def main_targets(lib, notes):
+    """The library theorems `Main.lean` obtains the seven targets from (`... := RiemannMasullo.x`)."""
+    try:
+        text = (ROOT / "Main.lean").read_text(encoding="utf-8")
+    except OSError:
+        return []
+    text = re.sub(r"/-.*?-/|--[^\n]*", "", text, flags=re.S)        # not the names in comments
+    found = [n for n in dict.fromkeys(re.findall(rf":=\s*({LIB}\.[\w.'₀-₉]+)", text)) if n in lib.user]
+    if not found:
+        note(notes, "Main.lean names no declaration of the library; the main line cannot be computed.")
+    return found
+
+
+def group_for_page(groups, page, where=""):
+    """The section whose pages hold `page`; where two share it, the one the item number is in."""
+    if page is None:
+        return -1
+    hits = [(sum(b - a + 1 for a, b in g["pages"]), i) for i, g in enumerate(groups)
+            if g["id"] is not None and any(a <= page <= b for a, b in g["pages"])]
+    if len(hits) > 1:
+        item = NUMBER.search(where)
+        pre = lambda g: re.findall(NUMBER.pattern, g["num"]) + [b[0] for b in g.get("bands", [])]
+        named = [h for h in hits if item and any(item.group(0) == n or item.group(0).startswith(n + ".")
+                                                for n in pre(groups[h[1]]))]
+        hits = named or hits
+    return min(hits)[1] if hits else -1
+
+
+def whats_left(lib, decls, index, problem_issues, notes, groups=()):
+    """Where each open statement stands (AGENTS.md, "False statements and gaps"), read off the
+    Lean: on the main line when the targets of Main.lean reach it through statements or proofs;
+    otherwise a gap (label `gap`), isolated when its file is a `*_Isolated.lean`; classical input
+    (label `classical-input`); or an ordinary open proof. Then the steps with no Lean statement
+    (open issues labelled `open-problem` and `paper-gap`), and the printed statements refuted in
+    Lean with nothing open beneath them."""
+    targets = main_targets(lib, notes)
+    reach, stack = set(), list(targets)
+    while stack:
+        n = stack.pop()
+        if n in reach:
+            continue
+        reach.add(n)
+        stack += lib.user[n]["stmt"] + lib.user[n]["proof"]
+    out = dict(targets=[index[n] for n in targets if n in index], main=[], used=[], isolated=[],
+               classical=[], proofs=[], notStated=[], refuted=0)
+    for n, i in index.items():
+        d = decls[i]
+        if d["kind"] != "theorem" or d["supp"] or d["group"] in ("external", "later"):
+            continue
+        if d["state"] == "proved":
+            if (d["show"].startswith("Printed.") and d["show"].endswith("_false")
+                    and not d["open_below"] and not d["hidden_sorry"]):
+                out["refuted"] += 1
+            continue
+        if n in reach:
+            out["main"].append(i)
+        elif d["classical"]:
+            out["classical"].append(i)
+        elif d["path"].endswith("_Isolated.lean"):
+            out["isolated"].append(i)
+        elif d["gap"]:
+            out["used"].append(i)
+        else:
+            out["proofs"].append(i)
+    for iss in problem_issues:
+        labels = {l["name"] for l in iss["labels"]}
+        if iss["state"] == "OPEN" and "paper-gap" in labels and "proof" not in labels \
+                and "supplementary" not in labels:
+            title = re.sub(r"^Open problem:\s*", "", iss["title"])
+            m = re.search(r"\bpp?\.\s*(\d+)", title)
+            out["notStated"].append(dict(number=iss["number"], title=title,
+                                         group=group_for_page(groups, int(m.group(1)) if m else None, title)))
+    # The step of the paper each open statement belongs to, from its `Paper:` line: several
+    # issues can now state parts of one step (#7220, #7453 and #7485 are all of Proposition
+    # 10.2.2.2), and the page counts steps, so that a split does not look like a new problem.
+    out["step"] = {}
+    for k in ("main", "used", "isolated", "classical", "proofs"):
+        for i in out[k]:
+            p = decls[i]["paper"]
+            out["step"][str(i)] = [p["key"], p["label"]] if p else [decls[i]["show"], decls[i]["show"]]
+        out[k].sort(key=lambda i: (out["step"][str(i)][0], decls[i]["issue"] or 0))
+    return out
+
+
+def build_model(repo, section_issues, proof_issues, rows, files, warnings, head, problem_issues=()):
     notes = []
     lib = Library(rows, files, notes)
     lib.mark_sorries(warnings)
@@ -1044,8 +1128,10 @@ def build_model(repo, section_issues, proof_issues, rows, files, warnings, head)
     chapters = [dict(key=k, label=chapter_label(k) if k != "other" else "Other",
                      title=toc_chapters.get(k, {}).get("title", "")) for k in lanes]
     errata = errata_model(out_groups, out_decls, notes, later_pages)
+    left = whats_left(lib, decls, index, problem_issues, notes, out_groups)
     return dict(meta=meta, totals=totals, timeline=timeline, chapters=chapters, groups=out_groups,
-                waves=out_waves, files=file_list, decls=out_decls, notes=notes, errata=errata)
+                waves=out_waves, files=file_list, decls=out_decls, notes=notes, errata=errata,
+                left=left)
 
 
 ERRATA_ROW = re.compile(r"^\|\s*([FIMR]\d+)\s*\|")
@@ -1199,8 +1285,8 @@ def collect(args):
     if files_after != files:
         raise Retry("source files appeared or disappeared during the build")
     rows = lean_constants(sorted(files))
-    repo, section_issues, proof_issues = fetch_issues()
-    model = build_model(repo, section_issues, proof_issues, rows, files, warnings, head)
+    repo, section_issues, proof_issues, problem_issues = fetch_issues()
+    model = build_model(repo, section_issues, proof_issues, rows, files, warnings, head, problem_issues)
     model["merged"] = fetch_contributions(repo)
     if git_head() != head:
         raise Retry("HEAD moved during the run")

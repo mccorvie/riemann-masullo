@@ -1803,7 +1803,7 @@ private theorem primitiveDirichletL_infinite_criticalZeros_nonprincipal {N : ℕ
   have h3 := norm_sub_norm_le (∫ t in T..2 * T, (H t : ℂ)) (∫ t in T..2 * T, b * (E t * P t))
   linarith only [h1.trans hraw, h2.trans herrL, h3.trans herrH, hcomp, hphis, hT]
 
-/-- Classical input: every primitive Dirichlet character has infinitely many zeros on the
+/-- Every primitive Dirichlet character has infinitely many zeros on the
 critical line (Hardy 1914 for the Riemann zeta function; Bauer, Corollary 1, for Dirichlet
 characters). This classical theorem supplies the arithmetic input for the refutation of
 Theorem 10.4.3.1(2) as printed. -/

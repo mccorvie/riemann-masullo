@@ -4,9 +4,14 @@ Proofs or definitions in this library that were adapted from another project, ou
 vendored directories. One line per adaptation: what, where it came from (repository, commit,
 file), its license, and the pull request that brought it in.
 
-For a source under the MIT licence, its copyright and permission notice must stay with the
-adapted material: the notices are kept in [`licenses/`](licenses/), and the row here names the
-one that applies.
+For a source under the MIT licence or a BSD-style licence, its copyright and permission notice
+must stay with the adapted material: the notices are kept in [`licenses/`](licenses/), and the
+row here names the one that applies.
+
+The HOL Light `Baker/` development, from which the rows on linear forms in logarithms are
+ported, was added to HOL Light on 7 November 2026 in one commit by John Harrison
+([`078839e`](https://github.com/jrh13/hol-light/commit/078839ea84531bd6c6cec9a58ebf69ba37149e0e)),
+whose message says it was “produced by Claude”.
 
 | Declaration here | Adapted from | License | Pull request |
 |---|---|---|---|

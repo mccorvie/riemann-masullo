@@ -18,7 +18,7 @@
   --wip: #9a5800; --wip-fill: #f0a92b; --wip-soft: #fcefd3;
   --defn: #5a667d; --edge: #8a94a4; --hatch: rgba(21, 25, 34, .045);
   --series-filed: #2a78d6; --series-closed: #15803d;
-  --bad: #b42318; --bad-soft: #fde8e6; --fix: #2563eb; --fix-soft: #e3ecfd; --imp: #8b5cf6; --miss: #5a667d;
+  --off: #d97706; --bad: #b42318; --bad-soft: #fde8e6; --fix: #2563eb; --fix-soft: #e3ecfd; --imp: #8b5cf6; --miss: #5a667d;
   --shadow: 0 1px 2px rgba(21, 25, 34, .06), 0 6px 24px rgba(21, 25, 34, .08);
   --font-ui: Inter, "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
@@ -34,7 +34,7 @@
     --wip: #f0b648; --wip-fill: #d89614; --wip-soft: #3a2d0f;
     --defn: #9aa6ba; --edge: #5f6a7a; --hatch: rgba(232, 235, 240, .05);
     --series-filed: #3987e5; --series-closed: #2ea043;
-    --bad: #f47067; --bad-soft: #3d1a17; --fix: #6ea8fe; --fix-soft: #16264a; --imp: #b392f0; --miss: #9aa6ba;
+    --off: #f0a050; --bad: #f47067; --bad-soft: #3d1a17; --fix: #6ea8fe; --fix-soft: #16264a; --imp: #b392f0; --miss: #9aa6ba;
     --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 28px rgba(0, 0, 0, .45);
     color-scheme: dark;
   }
@@ -48,7 +48,7 @@
   --wip: #f0b648; --wip-fill: #d89614; --wip-soft: #3a2d0f;
   --defn: #9aa6ba; --edge: #5f6a7a; --hatch: rgba(232, 235, 240, .05);
   --series-filed: #3987e5; --series-closed: #2ea043;
-  --bad: #f47067; --bad-soft: #3d1a17; --fix: #6ea8fe; --fix-soft: #16264a; --imp: #b392f0; --miss: #9aa6ba;
+  --off: #f0a050; --bad: #f47067; --bad-soft: #3d1a17; --fix: #6ea8fe; --fix-soft: #16264a; --imp: #b392f0; --miss: #9aa6ba;
   --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 28px rgba(0, 0, 0, .45);
   color-scheme: dark;
 }
@@ -109,6 +109,8 @@ button { font: inherit; color: inherit; }
 .pulse { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px 36px; align-items: start; border-top: 1px solid var(--line); padding-top: 18px; }
 @media (max-width: 860px) { .pulse { grid-template-columns: minmax(0, 1fr); } }
 .pulse > div { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.people { border-top: 1px solid var(--line); padding-top: 18px; display: flex; flex-direction: column; gap: 12px; }
+.people .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 6px 48px; }
 .podium { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .podium li { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; }
 .podium .rank { font: 600 15px/1.2 var(--font-display); color: var(--ink-3); font-variant-numeric: tabular-nums; }
@@ -213,9 +215,14 @@ button { font: inherit; color: inherit; }
 .colorby-prob .sec .r3 { display: none; }
 .colorby-prob .sec .r4 { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ink-3); min-width: 0; white-space: nowrap; overflow: hidden; }
 .colorby-prob .sec, .colorby-prob .sec.complete, .colorby-prob .sec.blocked {
-  background: color-mix(in srgb, var(--fix) calc(var(--heat, 0) * 24%), var(--surface));
-  border-color: var(--line-2); border-style: solid; box-shadow: none; }
-.colorby-prob .sec.norepair { border-color: var(--bad); box-shadow: inset 0 0 0 1.5px var(--bad); }
+  background: var(--surface); border-color: var(--line); border-style: solid; box-shadow: none; }
+.colorby-prob .sec.left-main { border-color: var(--bad); box-shadow: inset 0 0 0 2px var(--bad); }
+.colorby-prob .sec.left-off { border-color: var(--off); box-shadow: inset 0 0 0 2px var(--off); }
+.colorby-prob .sec.left-cls { border-color: var(--imp); box-shadow: inset 0 0 0 2px var(--imp); }
+.colorby-prob .sec.left-ns { border-color: var(--miss); box-shadow: inset 0 0 0 2px var(--miss); }
+.pk.main b { background: var(--bad); } .pk.off b { background: var(--off); } .pk.cls b { background: var(--imp); } .pk.ns b { background: var(--miss); }
+.lbox { display: inline-block; width: 16px; height: 11px; border-radius: 3px; border: 2px solid; }
+.lbox.main { border-color: var(--bad); } .lbox.off { border-color: var(--off); } .lbox.cls { border-color: var(--imp); } .lbox.ns { border-color: var(--miss); }
 .colorby-prob .sec .n, .colorby-prob .sec .t { color: var(--ink); }
 .pk { display: inline-flex; align-items: baseline; gap: 2px; font-variant-numeric: tabular-nums; }
 .pk b { font: 700 10px/1 var(--font-ui); letter-spacing: .02em; padding: 2px 3px; border-radius: 3px; color: #fff; }
@@ -240,6 +247,14 @@ button { font: inherit; color: inherit; }
 .plist td.where { color: var(--ink-2); min-width: 9em; }
 .plist .st { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
 .plist .st.ok { color: var(--ok); } .plist .st.bad { color: var(--bad); }
+.left { border-top: 1px solid var(--line); padding-top: 18px; display: flex; flex-direction: column; gap: 12px; }
+.left .stats { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.left .stat .v.nr { color: var(--bad); } .left .stat .v.ok { color: var(--ok); } .left .stat .v.or { color: var(--off); }
+.plist tr.grp.nr th { color: var(--bad); } .plist tr.grp.or th { color: var(--off); } .plist tr.grp.I th { color: var(--imp); } .plist tr.grp.M th { color: var(--miss); }
+.left .stat .v.I { color: var(--imp); } .left .stat .v.M { color: var(--miss); }
+.plist tr.step td { padding-top: 8px; font-size: 12.5px; }
+.plist tr.sub td:first-child { padding-left: 26px; }
+.plist tr.grp th { text-align: left; font: 600 12.5px var(--font-ui); padding: 12px 8px 4px; border-top: none; }
 .ico { flex: none; display: block; }
 .word { font-weight: 600; letter-spacing: .02em; }
 .word.complete { color: var(--ok); }
@@ -810,10 +825,13 @@ function overview() {
       stat('Definitions', t.defs, null, delta('defs')),
       stat('Theorems', t.thms, t.paper + ' cite the paper, ' + (t.thms - t.paper) + ' are helper lemmas', delta('thms')),
       stat('Proved', t.proved, soft ? t.solid + ' rest on no sorry, ' + soft + ' use open lemmas' : 'none of them uses an open lemma', delta('proved')),
-      stat('Open', t.open, [
-        (t.gaps || t.classical) ? [plural(t.open - (t.gaps || 0) - (t.classical || 0), 'proof') + ' to do',
-          t.gaps ? ', ' + plural(t.gaps, 'gap') : '', t.classical ? ', ' + t.classical + ' classical input' : '', h('br'), ''] : '',
-        t.claimed + ' claimed' + (t.unfiled ? ' · ' + t.unfiled + ' without an issue' : '')], delta('open'))),
+      stat('Open', t.open, L ? [
+        [L.main.length ? plural(steps(L.main).length, 'gap') + ' below the main results' : null,
+         L.used.length + L.isolated.length ? steps(L.used.concat(L.isolated)).length + ' stated off it' : null,
+         L.classical.length ? steps(L.classical).length + ' classical input' : null,
+         L.proofs.length ? plural(L.proofs.length, 'proof') + ' to do' : null].filter(Boolean).join(', '),
+        L.notStated.length ? h('br') : null, L.notStated.length ? '+ ' + plural(L.notStated.length, 'step') + ' not stated in Lean' : null] :
+        t.claimed + ' claimed' + (t.unfiled ? ' · ' + t.unfiled + ' without an issue' : ''), delta('open'))),
     prev ? h('div', { class: 'since' },
       (['defs', 'proved', 'open'].some(k => t[k] !== prev[k]) || t.thms !== prev.stated ?
         'Changes are since the previous run, ' : 'These totals are the same as at the previous run, ') +
@@ -822,8 +840,8 @@ function overview() {
   const right = h('div', null);
   timeline(right);
   frag.push(h('section', { class: 'totals' }, left, right));
+  frag.push(leftPanel());
   frag.push(pulse());
-  frag.push(problemsPanel());
 
   /* map */
   const secs = D.groups.filter(g => g.id != null);
@@ -844,12 +862,12 @@ function overview() {
       g.defs ? h('span', { class: 'r3' }, plural(g.defs, 'definition')) :
       h('span', { class: 'r3' }, h('span', { class: 'word ' + g.state }, STATE_WORD[g.state]),
         g.state === 'digesting' ? null : h('span', { class: 'pp' }, fmtPages(g.pages))));
-    const gi = D.groups.indexOf(g), pl = probsByGroup[gi], gl = gapsByGroup[gi];
-    if (gl.length) el.classList.add('norepair');
-    el.style.setProperty('--heat', Math.sqrt(probWeight(pl) / heatMax).toFixed(3));
-    el.appendChild(h('span', { class: 'r4' }, pl.length || gl.length ? probBadges(pl, gl) : 'no problems listed'));
-    if (pl.length) el.title += '; ' + PROB_KINDS.filter(k => probCount(pl, k)).map(k => probCount(pl, k) + ' ' + KIND_WORD[k]).join(', ') +
-      (gl.length ? ', ' + plural(gl.length, 'place') + ' with no known repair' : '');
+    const gi = D.groups.indexOf(g), lk = leftKinds[gi];
+    const kind = LEFT_KINDS.find(k => lk[k]);
+    if (kind) el.classList.add('left-' + kind);
+    el.appendChild(h('span', { class: 'r4' }, kind ? LEFT_KINDS.map(k => lk[k] ?
+      h('span', { class: 'pk ' + k, title: lk[k] + ' ' + LEFT_WORD[k] }, h('b', null, LEFT_LETTER[k]), lk[k]) : null) : 'nothing open'));
+    if (kind) el.title += '; ' + LEFT_KINDS.filter(k => lk[k]).map(k => lk[k] + ' ' + LEFT_WORD[k]).join(', ');
     el.setAttribute('data-issue', g.id);
     el.addEventListener('mouseenter', () => dg.hover(g.id));
     el.addEventListener('mouseleave', () => dg.hover(null));
@@ -871,13 +889,10 @@ function overview() {
     h('span', null, h('span', { class: 'bar', style: 'width:38px;flex:none' }, h('i', { class: 'b-ok', style: 'width:40%' })), 'theorems proved / stated'),
     legendEdge(false, 'needs (arrow points at the section that waits)'));
   const legendProb = h('div', { class: 'legend prob' },
-    PROB_KINDS.slice(0, 3).map(k => h('span', null, h('span', { class: 'pk ' + k }, h('b', null, k)), KIND_WORD[k])),
-    h('span', null, h('span', { class: 'pk gap' }, h('b', null, '!')), 'no known repair'),
-    h('i', { class: 'sep' }),
-    h('span', null, h('span', { class: 'heatkey' }), 'more problems found in the section’s pages'),
-    h('span', null, h('span', { class: 'normark' }), 'has a place with no known repair'));
+    LEFT_KINDS.map(k => h('span', null, h('span', { class: 'lbox ' + k }), h('span', { class: 'pk ' + k }, h('b', null, LEFT_LETTER[k])), LEFT_WORD[k])),
+    h('span', { class: 'muted' }, 'A card is boxed in the color of the most serious kind it holds.'));
   const colorKey = 'progress-map-color';
-  const colorBtns = [['prog', 'Proof progress'], ['prob', 'Problems in the paper']].map(([m, label]) =>
+  const colorBtns = [['prog', 'Proof progress'], ['prob', 'What is left']].map(([m, label]) =>
     h('button', { type: 'button', 'data-mode': m, onclick: () => setColor(m) }, label));
   function setColor(m) {
     app.classList.toggle('colorby-prob', m === 'prob');
@@ -886,8 +901,8 @@ function overview() {
   }
   let colorMode = 'prog';
   try { colorMode = localStorage.getItem(colorKey) === 'prob' ? 'prob' : 'prog'; } catch (e) { /* default */ }
-  setColor(ER.entries.length ? colorMode : 'prog');
-  const colorBy = ER.entries.length ? h('div', { class: 'colorby' }, 'Color by', colorBtns) : null;
+  setColor(L ? colorMode : 'prog');
+  const colorBy = L ? h('div', { class: 'colorby' }, 'Color by', colorBtns) : null;
   frag.push(h('section', { class: 'section-head' },
     h('h2', null, 'Sections'),
     h('p', null, 'One card per section issue, in a lane per chapter. A section sits below everything it needs, so work flows downward. Select a card to see its items and declarations.'),
@@ -953,57 +968,87 @@ function overview() {
 // Rates are exponentially weighted counts of proof-issue events: an event `a` seconds before
 // the page was generated counts exp(-a / TAU), and the sum over TAU is a rate per second.
 const TAU = 2 * 3600;
-function pulse() {
-  const now = Date.parse(D.meta.generated) / 1000, t = D.totals;
-  const perHour = arr => arr.reduce((a, ts) => a + (ts <= now ? Math.exp((ts - now) / TAU) : 0), 0) / TAU * 3600;
-  const r1 = v => v >= 10 ? String(Math.round(v)) : (Math.round(v * 10) / 10).toString();
-  const closing = perHour(D.timeline.closed), filing = perHour(D.timeline.filed), net = closing - filing;
-  const open = t.issuesProofs != null ? t.issuesProofs : t.issuesOpen;
-  const stat = (k, v, d) => h('div', { class: 'stat' }, h('span', { class: 'k' }, k),
-    h('span', { class: 'v' }, v), d ? h('span', { class: 'd' }, d) : null);
-  let finish;
-  if (!open) finish = stat('Open issues closed in', '—', 'no proof issue is open');
-  else if (closing < 0.05) finish = stat('Open issues closed in', '—', 'no proof issue closed lately');
-  else {
-    const hrs = open / closing;
-    const span = hrs < 1 ? Math.max(1, Math.round(hrs * 60)) + ' min' : hrs < 48 ? Math.round(hrs) + ' h' : (hrs / 24).toFixed(1) + ' days';
-    finish = stat('Open issues closed in', '≈ ' + span, 'around ' + new Date((now + hrs * 3600) * 1000).toLocaleString(undefined,
-      { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }));
-  }
-  const pace = h('div', null,
-    h('h3', null, 'Pace'),
-    h('div', { class: 'stats' },
-      stat('Closing', r1(closing) + ' / h', 'proof issues closed'),
-      stat('Filed', r1(filing) + ' / h', 'new proof issues (new sorries)'),
-      stat('Open issues', open, (t.issuesProofs != null && t.issuesProofs !== t.issuesOpen ? 'proofs, without gaps and classical input; ' : '') +
-        'net ' + (net >= 0 ? '−' : '+') + r1(Math.abs(net)) + ' an hour'),
-      finish),
-    h('div', { class: 'since' }, 'Rates are averages of the proof issues closed and filed, weighted toward the last two hours ' +
-      '(an exponential average with a two-hour time constant). The estimate is deliberately optimistic: it is the time to close ' +
-      'the issues open now at the current closing rate, and counts none of the issues still to come, from proofs that split ' +
-      'into smaller lemmas or from the sections and waves not digested yet.'));
-
-  const M = D.merged;
-  if (!M) return h('section', { class: 'pulse' }, pace);
-  const tally = rows => {
-    const by = {};
-    rows.forEach(r => { const e = by[r[0]] || (by[r[0]] = { who: r[0], n: 0, last: 0 }); e.n++; e.last = Math.max(e.last, r[1]); });
-    return Object.values(by).sort((a, b) => b.n - a.n || b.last - a.last);
+/* ---------- what is left (AGENTS.md, "False statements and gaps") ---------- */
+const L = D.left || null;
+// Open statements are counted by the step of the paper they state (their `Paper:` item), so
+// that a step split into several smaller issues still counts once.
+const stepOf = i => (L && L.step && L.step[String(i)]) || [String(i), D.decls[i][N]];
+const steps = list => [...new Set(list.map(i => stepOf(i)[0]))];
+const LEFT_KINDS = ['main', 'off', 'cls', 'ns'];
+const LEFT_WORD = { main: 'gap below the main results', off: 'stated, off the main line', cls: 'classical input', ns: 'not stated in Lean' };
+const LEFT_LETTER = { main: '!', off: 'S', cls: 'C', ns: 'N' };
+const leftKinds = D.groups.map(() => ({ main: 0, off: 0, cls: 0, ns: 0 }));
+if (L) {
+  const tally = (list, k) => {
+    const seen = new Set();
+    list.forEach(i => { const g = D.decls[i][GROUP], key = g + '|' + stepOf(i)[0];
+      if (!seen.has(key)) { seen.add(key); leftKinds[g][k]++; } });
   };
-  const RECENT = 3;   // hours
-  const all = tally(M), hour = tally(M.filter(r => r[1] > now - RECENT * 3600 && r[1] <= now));
+  tally(L.main, 'main'); tally(L.used.concat(L.isolated), 'off'); tally(L.classical, 'cls');
+  L.notStated.forEach(p => { if (p.group >= 0) leftKinds[p.group].ns++; });
+}
+function leftPanel() {
+  if (!L) return null;
+  const stat = (k, v, cls, d) => h('div', { class: 'stat' }, h('span', { class: 'k' }, k),
+    h('span', { class: 'v ' + (cls || '') }, v), d ? h('span', { class: 'd' }, d) : null);
+  const row = (i, note, sub) => {
+    const d = D.decls[i];
+    return h('tr', { class: sub ? 'sub' : null },
+      h('td', null, h('span', { class: 'tag' }, h('i', { class: glyphClass(d) }), declLink(i))),
+      h('td', { class: 'where' }, d[PAPER] || ''),
+      h('td', { class: 'st' }, d[ISSUE] ? ext(issueUrl(d[ISSUE]), '#' + d[ISSUE]) : 'no issue'),
+      h('td', { class: 'muted' }, note || ''));
+  };
+  const group = (title, sub, rows, cls) => rows.length ? [
+    h('tr', { class: 'grp ' + (cls || '') }, h('th', { colspan: 4 }, title, sub ? h('span', { class: 'muted' }, ' — ' + sub) : null)), rows] : null;
+  // One row per step; a step stated by several issues gets a heading row with its issues under it.
+  const stepRows = list => {
+    const by = new Map();
+    list.forEach(i => { const k = stepOf(i)[0]; if (!by.has(k)) by.set(k, []); by.get(k).push(i); });
+    return [...by.values()].map(is => is.length === 1 ? row(is[0]) : [
+      h('tr', { class: 'step' }, h('td', { colspan: 4 }, h('b', null, stepOf(is[0])[1]),
+        h('span', { class: 'muted' }, ' \u2014 one step of the paper, stated in ' + is.length + ' parts'))),
+      is.map(i => row(i, null, true))]);
+  };
+  const issuesNote = list => { const n = steps(list).length; return n === list.length ? '' : ' (' + plural(list.length, 'open issue') + ')'; };
+  const off = L.used.concat(L.isolated);
+  return h('section', { class: 'left' },
+    h('div', { class: 'chart-head' }, h('h3', null, 'What is left'),
+      ext(repo + '/blob/' + sha + '/AGENTS.md#false-statements-and-gaps', 'how the kinds are defined')),
+    h('div', { class: 'stats' },
+      stat('Gaps below the main results', steps(L.main).length, L.main.length ? 'nr' : 'ok', 'the key theorem, equivalent to the headline results'),
+      stat('Stated, off the main line', steps(off).length, 'or', steps(L.used).length + ' used by other theorems, ' + steps(L.isolated).length +
+        ' isolated (used by nothing)' + issuesNote(off)),
+      stat('Not stated', L.notStated.length, 'M', 'proof steps the paper does not state precisely; no Lean statement yet'),
+      stat('Classical input', steps(L.classical).length, 'I', 'known theorems of the literature, stated and used, not proved here'),
+      L.proofs.length ? stat('Ordinary proofs', L.proofs.length, '', 'open proof issues') : null,
+      stat('Refuted in Lean', L.refuted, 'ok', 'printed statements proved false, with nothing open beneath')),
+    h('div', { class: 'since' }, 'Counted by steps of the paper: an open statement belongs to the step its Paper: line names, and a step that contributors have split into several smaller statements counts once. Whether an open statement is a gap below the main results (on the main line) or off the main line is computed at every refresh by walking the dependencies, in statements and proofs, of the theorems Main.lean obtains the targets from. Nothing here is assigned by hand except the labels gap, classical-input and open-problem.'),
+    h('div', { class: 'tbl' }, h('table', { class: 'plist' }, h('tbody', null,
+      group('Gaps below the main results', null, stepRows(L.main), 'nr'),
+      group('Stated, off the main line', 'used by other theorems of the paper', stepRows(L.used), 'or'),
+      group('Stated, off the main line', 'isolated: nothing uses it', stepRows(L.isolated), 'or'),
+      group('Not stated', 'no Lean statement; an errata row and an open-problem issue', L.notStated.map(p => h('tr', null,
+        h('td', { colspan: 2 }, p.title), h('td', { class: 'st' }, ext(issueUrl(p.number), '#' + p.number)), h('td', null, ''))), 'M'),
+      group('Classical input', 'not gaps of the paper', stepRows(L.classical), 'I'),
+      group('Open proofs', null, L.proofs.map(i => row(i)))))));
+}
+
+function pulse() {
+  const M = D.merged;
+  if (!M || !M.length) return null;
+  const by = {};
+  M.forEach(r => { const e = by[r[0]] || (by[r[0]] = { who: r[0], n: 0, last: 0 }); e.n++; e.last = Math.max(e.last, r[1]); });
+  const top = Object.values(by).sort((a, b) => b.n - a.n || b.last - a.last).slice(0, 10);
   const site = new URL(repo).origin;
   const person = who => ext(site + '/' + encodeURIComponent(who), who);
-  const prs = (who, n, since) => ext(repo + '/pulls?q=' + encodeURIComponent('is:pr is:merged author:' + who +
-    (since ? ' merged:>=' + new Date(since * 1000).toISOString().slice(0, 19) + 'Z' : '')), plural(n, 'merged PR'));
-  const podium = rows => h('ol', { class: 'podium' }, rows.slice(0, 3).map((e, i) => h('li', null,
-    h('span', { class: 'rank' }, i + 1), h('span', { class: 'who' }, person(e.who)), h('span', { class: 'n' }, prs(e.who, e.n, now - RECENT * 3600)))));
-  const people = h('div', null,
-    h('h3', null, 'Top contributors, last ' + RECENT + ' hours'),
-    hour.length ? podium(hour) : h('div', { class: 'muted' }, 'No contributor\u2019s pull request was merged in the ' + RECENT + ' hours before this page was made.'),
-    all.length ? h('div', { class: 'hour' }, h('span', { class: 'k' }, 'Top overall'), person(all[0].who), ' · ', prs(all[0].who, all[0].n)) : null,
-    h('div', { class: 'since' }, 'Counted by pull requests merged in the ' + RECENT + ' hours before this page was made. The repository owner\u2019s account, which the project\u2019s own agents push from, is left out.'));
-  return h('section', { class: 'pulse' }, pace, people);
+  const prs = (who, n) => ext(repo + '/pulls?q=' + encodeURIComponent('is:pr is:merged author:' + who), plural(n, 'merged PR'));
+  const col = (rows, from) => h('ol', { class: 'podium' }, rows.map((e, i) => h('li', null,
+    h('span', { class: 'rank' }, from + i), h('span', { class: 'who' }, person(e.who)), h('span', { class: 'n' }, prs(e.who, e.n)))));
+  return h('section', { class: 'people' },
+    h('h3', null, 'Top ' + top.length + ' contributors'),
+    h('div', { class: 'cols' }, col(top.slice(0, 5), 1), top.length > 5 ? col(top.slice(5), 6) : null),
+    h('div', { class: 'since' }, 'Counted by merged pull requests. The repository owner’s account, which the project’s own agents push from, is left out.'));
 }
 
 function notes() {
