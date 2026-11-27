@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 import RiemannMasullo.Ch10_TraceSpectral.Sec3
+import RiemannMasullo.Ch10_TraceSpectral.Sec2_Basepoint
 import RiemannMasullo.Ch03_IdelicZeta.Sec2
 import RiemannMasullo.Ch09_HardySobolev.Sec2
 import Mathlib.Analysis.SpecialFunctions.Pow.Asymptotics
@@ -199,5 +200,85 @@ theorem dense_thetaQuotientOrbitDecay_of_jet_offsets_lt (χ : Basepoints) (hχ :
     orbitCoefficient_tendsto_zero (χ j.val.1) j.val.2.1 j.val.2.2.1 α (hgap j)
       g hg (j.val.2.2.2 - i.val) (c i)
   simpa only [jetMoment_translate, Finset.mul_sum, c, mul_assoc, Finset.sum_const_zero] using hh
+
+local notation "extZeros(" τ ", " α ")" =>
+  {z : {ψ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, ψ (τ t) = 1} × ℂ //
+    0 < MeromorphicOn.divisor (continuedCompletedHeckeL z.1.val) univ z.2 ∧ α ≤ |z.2.re - 1 / 2|}
+
+private theorem spectralStripJet_abs_offset_lt_of_isEmpty_exteriorZeros
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) {α : ℝ} (h : IsEmpty extZeros(τ, α))
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : ∀ ω t, χ ω (τ t) = 1)
+    {w s : ℝ} (j : SpectralStripJetIndex χ (1 / 2) w s) : |j.val.2.1| < α := by
+  let ρ : ℂ := ((1 / 2 + j.val.2.1 : ℝ) : ℂ) + (j.val.2.2.1 : ℂ) * Complex.I
+  let ψ : PontryaginDual C𝔽 := χ j.val.1
+  have horder : 0 < (meromorphicOrderAt (continuedCompletedHeckeL ψ) ρ).untop₀.toNat := by
+    have hj : j.val.2.2.2 < spectralStripMultiplicity w s j.val.2.1
+        (meromorphicOrderAt (continuedCompletedHeckeL ψ) ρ).untop₀.toNat := j.property
+    unfold spectralStripMultiplicity spectralBoundaryMultiplicity at hj
+    split_ifs at hj <;> omega
+  have hdiv : 0 < MeromorphicOn.divisor (continuedCompletedHeckeL ψ) univ ρ := by
+    rw [MeromorphicOn.divisor_apply (continuedCompletedHeckeL_spec ψ).1.meromorphicOn (mem_univ ρ)]
+    omega
+  have hre : ρ.re - 1 / 2 = j.val.2.1 := by simp [ρ]
+  apply lt_of_not_ge
+  intro hb
+  exact h.false ⟨(⟨ψ, hχ j.val.1⟩, ρ), hdiv, hre ▸ hb⟩
+
+/-- Theorem 12.5.1.1, pp. 519–520. Emptiness of the exterior zero set for characters
+normalized on the given section gives full-sequence rescaled decay on a dense set. -/
+theorem dense_thetaQuotientOrbitDecay_of_isEmpty_exteriorZeros
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (g : C𝔽) (hg : logIdeleClassNorm F g = 1) {α : ℝ} (h : IsEmpty extZeros(τ, α)) :
+    Dense {x : W | Tendsto (fun n : ℕ ↦ Real.exp (-(α * n)) * ‖(Θ).mkQ (T (g ^ n) x)‖)
+      atTop (𝓝 0)} := by
+  obtain ⟨χ, hχ, hχτ, _⟩ := exists_spectralBasepointChoice_of_normSection τ hτ
+  exact dense_thetaQuotientOrbitDecay_of_jet_offsets_lt χ hχ g hg fun j ↦
+    (le_abs_self j.val.2.1).trans_lt (spectralStripJet_abs_offset_lt_of_isEmpty_exteriorZeros τ h χ hχτ j)
+
+private theorem orderZero_jet_offset_lt_half
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (j : SpectralStripJetIndex χ half half 0) :
+    j.val.2.1 < half := by
+  have hj := j.property
+  unfold spectralStripMultiplicity spectralBoundaryMultiplicity at hj
+  split_ifs at hj with hi he
+  · exact hi.2
+  · have hz : ⌈((0 : ℝ) - 1) / 2⌉₊ = 0 := Nat.ceil_eq_zero.mpr (by norm_num)
+    exact False.elim (Nat.not_lt_zero _ ((lt_min_iff.mp hj).2.trans_le hz.le))
+  · omega
+
+/-- At the full critical half-width the rescaled translates of every representative
+converge to zero modulo theta. Order-zero jets are strictly interior, and the
+rescaled translation operators are uniformly contractive. -/
+theorem thetaQuotientOrbitDecay_half (g : C𝔽) (hg : logIdeleClassNorm F g = 1) (x : W) :
+    Tendsto (fun n : ℕ ↦ Real.exp (-(half * n)) * ‖(Θ).mkQ (T (g ^ n) x)‖) atTop (𝓝 0) := by
+  obtain ⟨χ, hχ⟩ := exists_spectralBasepointChoice F
+  have hd := dense_thetaQuotientOrbitDecay_of_jet_offsets_lt χ hχ g hg (orderZero_jet_offset_lt_half χ)
+  have hnorm (n : ℕ) (v : W) :
+      Real.exp (-(half * n)) * ‖(Θ).mkQ (T (g ^ n) v)‖ ≤ ‖v‖ := by
+    have hlog : Real.log ((m𝔽 (g ^ n)).val : ℝ) = n := by
+      change Real.log ((m𝔽 g).val : ℝ) = 1 at hg
+      rw [map_pow, Units.val_pow_eq_pow_val, NNReal.coe_pow, Real.log_pow, hg, mul_one]
+    have hT := norm_hardySobolevTranslation_le μ𝔽 m𝔽 (-half) half 0 hI (le_refl 0) (g ^ n)
+    simp only [hlog, zero_div, Real.rpow_zero, mul_one] at hT
+    rw [max_eq_right (Real.exp_le_exp.mpr (by linarith [Nat.cast_nonneg (α := ℝ) n]))] at hT
+    have hq := (Submodule.Quotient.norm_mk_le (Θ) _).trans ((T (g ^ n)).le_opNorm v)
+    rw [Real.exp_neg, ← div_eq_inv_mul, div_le_iff₀ (Real.exp_pos _), mul_comm]
+    exact hq.trans (mul_le_mul_of_nonneg_right hT (norm_nonneg v))
+  apply Metric.tendsto_nhds.mpr
+  intro ε hε
+  obtain ⟨y, hy, hxy⟩ := Metric.mem_closure_iff.mp (hd x) (ε / 2) (half_pos hε)
+  rw [dist_eq_norm] at hxy
+  filter_upwards [hy.eventually_lt_const (half_pos hε)] with n hn
+  let Q := (Θ).mkQ.comp (T (g ^ n)).toLinearMap
+  have htri : ‖Q x‖ ≤ ‖Q (x - y)‖ + ‖Q y‖ := by
+    simpa only [← Q.map_add, sub_add_cancel] using norm_add_le (Q (x - y)) (Q y)
+  change Real.exp (-(half * n)) * ‖Q y‖ < ε / 2 at hn
+  rw [Real.dist_eq, sub_zero, abs_of_nonneg (mul_nonneg (Real.exp_nonneg _) (norm_nonneg _))]
+  calc
+    Real.exp (-(half * n)) * ‖Q x‖ ≤ _ :=
+      mul_le_mul_of_nonneg_left htri (Real.exp_nonneg _)
+    _ = _ := mul_add _ _ _
+    _ < ε / 2 + ε / 2 := add_lt_add ((hnorm n (x - y)).trans_lt hxy) hn
+    _ = ε := add_halves ε
 
 end RiemannMasullo.Isolated
