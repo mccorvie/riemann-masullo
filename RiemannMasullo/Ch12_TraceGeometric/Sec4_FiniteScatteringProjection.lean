@@ -137,7 +137,7 @@ theorem geometricProduct_preserves (E : Submodule ℂ H) (fs : List (H ≃L[ℂ]
     simp only [List.prod_cons]
     exact ⟨fun x hx => h₁ _ (h₃ x hx), fun x hx => h₄ _ (h₂ x hx)⟩
 
-abbrev LogFrequencyL2 := Lp ℂ 2 (volume : Measure ℝ)
+local notation "LogFrequencyL2" => Lp ℂ 2 (volume : Measure ℝ)
 
 /-- Pullback along a measure-preserving real translation. -/
 def shift (t : ℝ) : LogFrequencyL2 →ₗᵢ[ℂ] LogFrequencyL2 :=
