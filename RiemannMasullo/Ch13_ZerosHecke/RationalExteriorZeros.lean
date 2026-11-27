@@ -94,7 +94,7 @@ private theorem castHom_resMod {m d : ℕ} [NeZero m] [NeZero d] (hd : d ∣ m) 
   exact cast_redP hle _
 
 /-- **The idelic character is compatible with change of level.** -/
-private theorem ideleChar_changeLevel {m d : ℕ} [NeZero m] [NeZero d] (hd : d ∣ m)
+theorem ideleChar_changeLevel {m d : ℕ} [NeZero m] [NeZero d] (hd : d ∣ m)
     (χ : DirichletCharacter ℂ d) :
     ideleChar m (DirichletCharacter.changeLevel hd χ) = ideleChar d χ := by
   ext x
@@ -111,7 +111,7 @@ private theorem ideleChar_changeLevel {m d : ℕ} [NeZero m] [NeZero d] (hd : d 
 local notation "Cℚ" => IdeleClassGroup (𝓞 ℚ) ℚ
 
 /-- The residue map hits every unit modulo `N`. -/
-private theorem resMod_toHomUnits_surjective (N : ℕ) [NeZero N] :
+theorem resMod_toHomUnits_surjective (N : ℕ) [NeZero N] :
     Function.Surjective (resMod N).toHomUnits := by
   intro a
   let n := (a.val : ZMod N).val
