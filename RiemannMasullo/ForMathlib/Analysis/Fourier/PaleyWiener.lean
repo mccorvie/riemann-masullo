@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.ForMathlib.Analysis.Fourier.LpSpace
+import RiemannMasullo.ForMathlib.Analysis.Complex.LandauLemma
 import Mathlib.Analysis.Calculus.ParametricIntegral
 import Mathlib.Analysis.Complex.CauchyIntegral
 import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
@@ -563,5 +564,140 @@ theorem paleyWiener_interval (A : ℝ) (hA : 0 < A) (f : ℂ → ℂ) (hf : Diff
       · exact ofReal_ne_zero.mpr (dampingRate_pos n).ne'
     exact congrFun ((hf.differentiableOn.analyticOnNhd isOpen_univ).eq_of_frequently_eq (hdiff.differentiableOn.analyticOnNhd isOpen_univ)
       (hpt.frequently (.of_forall fun n ↦ (hreal (dampingRate n)).symm))) z
+
+section ZeroCounting
+
+open Function Metric
+
+private theorem finite_distinct_zero_count {f : ℂ → ℂ} (hf : Differentiable ℂ f) (c : ℂ)
+    (hc : f c ≠ 0) {r R B : ℝ} (hr : 0 < r) (hrR : r < R)
+    (hB : ∀ z ∈ closedBall c R, ‖f z / f c‖ ≤ B) (S : Finset ℂ)
+    (hS : ∀ z ∈ S, z ∈ closedBall c r ∧ f z = 0) :
+    (S.card : ℝ) ≤ Real.log B / Real.log (R / r) := by
+  classical
+  have ha : AnalyticOnNhd ℂ f univ := hf.differentiableOn.analyticOnNhd isOpen_univ
+  let W := {z : ℂ | z ∈ closedBall c r ∧ f z = 0}
+  have hW : W.Finite := finite_zeros_closedBall hr.le (ha.mono (subset_univ _)) hc
+  have hs : S ⊆ hW.toFinset := fun z hz ↦ hW.mem_toFinset.mpr (hS z hz)
+  have hc₀ : analyticOrderAt f c ≠ ⊤ := by
+    rw [(ha c trivial).analyticOrderAt_eq_zero.mpr hc]
+    simp
+  have hpos (z : ℂ) (hz : z ∈ S) : 1 ≤ analyticOrderNatAt f z := by
+    have hn := (ha z trivial).analyticOrderAt_ne_zero.mpr (hS z hz).2
+    have ht := ha.analyticOrderAt_ne_top_of_isPreconnected isPreconnected_univ
+      (by trivial : c ∈ univ) (by trivial : z ∈ univ) hc₀
+    rw [Nat.one_le_iff_ne_zero, ne_eq, analyticOrderNatAt, ENat.toNat_eq_zero]
+    tauto
+  have hfin : ∑ᶠ z ∈ closedBall c r, (analyticOrderNatAt f z : ℝ) =
+      ∑ z ∈ hW.toFinset, (analyticOrderNatAt f z : ℝ) := by
+    rw [← finsum_mem_coe_finset]
+    apply finsum_mem_inter_support_eq'
+    intro z hz
+    have hzero : f z = 0 := by
+      by_contra hne
+      exact hz (by simp [analyticOrderNatAt, analyticOrderAt_eq_zero.mpr (Or.inr hne)])
+    simp only [Set.Finite.coe_toFinset, W, Set.mem_ofPred_eq, hzero, and_true]
+  calc
+    (S.card : ℝ) = ∑ _z ∈ S, (1 : ℝ) := by simp
+    _ ≤ ∑ z ∈ S, (analyticOrderNatAt f z : ℝ) :=
+      Finset.sum_le_sum fun z hz ↦ by exact_mod_cast hpos z hz
+    _ ≤ ∑ z ∈ hW.toFinset, (analyticOrderNatAt f z : ℝ) :=
+      Finset.sum_le_sum_of_subset_of_nonneg hs (fun _ _ _ ↦ Nat.cast_nonneg _)
+    _ ≤ _ := hfin ▸ landau_sum_analyticOrderNatAt_le hr hrR (ha.mono (subset_univ _)) hc hB
+
+/-- The distinct zeros in a radius-`r` disk of the Fourier transform of an integrable
+interval profile satisfy a linear bound. The normalization at the center is explicit. -/
+theorem paleyWiener_interval_zero_count {A : ℝ} (hA : 0 ≤ A) {g : ℝ → ℂ}
+    (hg : IntegrableOn g (Ioo (-A) A)) {f : ℂ → ℂ}
+    (hf : ∀ z, f z = ∫ x in Ioo (-A) A, g x * exp (I * x * z))
+    (c : ℂ) (hc : f c ≠ 0) {r : ℝ} (hr : 0 < r) (S : Finset ℂ)
+    (hS : ∀ z ∈ S, z ∈ closedBall c r ∧ f z = 0) :
+    (S.card : ℝ) * Real.log 2 ≤
+      Real.log ((∫ x in Ioo (-A) A, ‖g x‖) / ‖f c‖) + A * ‖c‖ + 2 * A * r := by
+  have heq : f = intervalExtension A g := funext hf
+  have hdiff : Differentiable ℂ f := heq ▸ intervalExtension_diff hA hg
+  let C := ∫ x in Ioo (-A) A, ‖g x‖
+  have hgrowth (z : ℂ) : ‖f z‖ ≤ C * Real.exp (A * ‖z‖) := heq ▸ intervalExtension_bound hg z
+  have hC : 0 < C := pos_of_mul_pos_left ((norm_pos_iff.mpr hc).trans_le (hgrowth c)) (Real.exp_pos _).le
+  let D := C / ‖f c‖
+  have hD : 0 < D := div_pos hC (norm_pos_iff.mpr hc)
+  let B := D * Real.exp (A * (2 * r + ‖c‖))
+  have hb (z : ℂ) (hz : z ∈ closedBall c (2 * r)) : ‖f z / f c‖ ≤ B := by
+    have hdist := dist_triangle z c (0 : ℂ)
+    rw [dist_zero_right, dist_zero_right] at hdist
+    have hz' : ‖z‖ ≤ 2 * r + ‖c‖ := hdist.trans (add_le_add (mem_closedBall.mp hz) le_rfl)
+    rw [norm_div]
+    calc
+      ‖f z‖ / ‖f c‖ ≤ (C * Real.exp (A * (2 * r + ‖c‖))) / ‖f c‖ := by
+        apply div_le_div_of_nonneg_right _ (norm_nonneg _)
+        exact (hgrowth z).trans (mul_le_mul_of_nonneg_left
+          (Real.exp_le_exp.mpr (mul_le_mul_of_nonneg_left hz' hA)) hC.le)
+      _ = B := by dsimp [B, D]; ring
+  have h := finite_distinct_zero_count hdiff c hc hr (by linarith : r < 2 * r) hb S hS
+  rw [mul_div_cancel_right₀ _ hr.ne'] at h
+  have h' := (le_div_iff₀ (Real.log_pos (by norm_num : (1 : ℝ) < 2))).mp h
+  simp only [B, Real.log_mul hD.ne' (Real.exp_pos _).ne', Real.log_exp] at h'
+  change _ ≤ Real.log D + A * ‖c‖ + 2 * A * r
+  linarith
+
+/-- If a real set has arbitrarily many distinct points per unit height along a sequence
+of heights, a compact interval Fourier transform vanishing at all but finitely many of
+its points vanishes everywhere. The counting hypothesis has the form used in §10.3. -/
+theorem paleyWiener_eq_zero_of_superlinear_zeros {A : ℝ} (hA : 0 ≤ A) {g : ℝ → ℂ}
+    (hg : IntegrableOn g (Ioo (-A) A)) {f : ℂ → ℂ}
+    (hf : ∀ z, f z = ∫ x in Ioo (-A) A, g x * exp (I * x * z)) (Z : Set ℝ)
+    (hd : ∀ k : ℕ, ∃ T : ℕ, ∃ S : Finset ℝ, (k + 1) * (T + 1) < S.card ∧
+      ∀ t ∈ S, t ∈ Ioc (0 : ℝ) T ∧ t ∈ Z)
+    (exceptions : Finset ℝ) (hz : ∀ t ∈ Z, t ∉ exceptions → f (t : ℂ) = 0) : f = 0 := by
+  classical
+  funext c
+  change f c = 0
+  by_contra hc
+  let K := Real.log ((∫ x in Ioo (-A) A, ‖g x‖) / ‖f c‖) + A * ‖c‖
+  let B := |K| + 2 * A * (‖c‖ + 1) + 2 * A
+  have hlog : 0 < Real.log 2 := Real.log_pos (by norm_num)
+  obtain ⟨k, hk⟩ := exists_nat_ge (B / Real.log 2)
+  have hk' : B ≤ (k : ℝ) * Real.log 2 := (div_le_iff₀ hlog).mp hk
+  obtain ⟨T, S, hlarge, hS⟩ := hd (k + exceptions.card)
+  let good := S \ exceptions
+  let emb : ℝ ↪ ℂ := ⟨Complex.ofReal, Complex.ofReal_injective⟩
+  have hpt (z : ℂ) (hm : z ∈ good.map emb) : z ∈ closedBall c (T + ‖c‖ + 1) ∧ f z = 0 := by
+    obtain ⟨t, ht, rfl⟩ := Finset.mem_map.mp hm
+    obtain ⟨htS, htD⟩ := Finset.mem_sdiff.mp ht
+    obtain ⟨⟨hp, hT⟩, htZ⟩ := hS t htS
+    refine ⟨mem_closedBall.mpr ?_, hz t htZ htD⟩
+    change dist (t : ℂ) c ≤ _
+    have h := dist_triangle (t : ℂ) 0 c
+    rw [dist_zero_right, dist_zero_left, Complex.norm_real, Real.norm_of_nonneg hp.le] at h
+    linarith
+  have hr : 0 < (T : ℝ) + ‖c‖ + 1 := by positivity
+  have hcount := paleyWiener_interval_zero_count hA hg hf c hc hr _ hpt
+  rw [Finset.card_map] at hcount
+  have hB₁ : K + 2 * A * (‖c‖ + 1) ≤ B := by dsimp [B]; linarith [le_abs_self K]
+  have hB₂ : 2 * A ≤ B := by
+    dsimp [B]
+    linarith [abs_nonneg K, mul_nonneg (by positivity : 0 ≤ 2 * A) (by positivity : 0 ≤ ‖c‖ + 1)]
+  have hbound : (good.card : ℝ) * Real.log 2 ≤ ((k : ℝ) * ((T : ℝ) + 1)) * Real.log 2 := calc
+    _ ≤ K + 2 * A * ((T : ℝ) + ‖c‖ + 1) := hcount
+    _ = (K + 2 * A * (‖c‖ + 1)) + (2 * A) * (T : ℝ) := by ring
+    _ ≤ B + B * (T : ℝ) := add_le_add hB₁ (mul_le_mul_of_nonneg_right hB₂ (Nat.cast_nonneg _))
+    _ = B * ((T : ℝ) + 1) := by ring
+    _ ≤ ((k : ℝ) * Real.log 2) * ((T : ℝ) + 1) := mul_le_mul_of_nonneg_right hk' (by positivity)
+    _ = _ := by ring
+  have hgood : good.card ≤ k * (T + 1) := by
+    exact_mod_cast (le_of_mul_le_mul_right hbound hlog)
+  have hsub : S ⊆ good ∪ exceptions := by
+    intro t ht
+    by_cases h : t ∈ exceptions
+    · exact Finset.mem_union_right _ h
+    · exact Finset.mem_union_left _ (Finset.mem_sdiff.mpr ⟨ht, h⟩)
+  have hsize : S.card ≤ good.card + exceptions.card :=
+    (Finset.card_le_card hsub).trans (Finset.card_union_le _ _)
+  have hex : exceptions.card ≤ exceptions.card * (T + 1) := by simp [Nat.mul_succ]
+  have hle' : S.card ≤ (k + exceptions.card) * (T + 1) := by
+    simpa only [Nat.add_mul] using hsize.trans (add_le_add hgood hex)
+  exact (not_lt_of_ge (hle'.trans (Nat.mul_le_mul_right _ (Nat.le_succ _)))) hlarge
+
+end ZeroCounting
 
 end RiemannMasullo
