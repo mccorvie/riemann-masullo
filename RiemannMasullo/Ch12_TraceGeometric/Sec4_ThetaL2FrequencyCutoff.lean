@@ -67,8 +67,11 @@ local notation "FT" => sAdeleSchwartzFourier (F := F) (S := S)
 local notation "gen(" f ")" =>
   SLocalThetaL2.completionMap F S (Submodule.Quotient.mk (f : Tests))
 
-/-- Paper: (12.4.1.8), p. 517. Compress a quotient multiplier to the actual theta Hilbert space and
-conjugate it by the unitary Fourier transform. -/
+/-- Paper: (12.4.1.8), p. 517. Conjugate a quotient multiplier by the theta Fourier isometry.
+Deviation: The domain is the half-density, order-zero theta Hilbert completion. The symbol
+is a measurable real quotient function bounded in absolute value by one. Compression uses
+the isometric inclusion and its adjoint. The paper applies a product-norm multiplier on
+additive S-adelic tests. -/
 def sLocalThetaL2FourierCutoff (ρ : J → ℝ) (hm : Measurable ρ) (hb : ∀ x, |ρ x| ≤ 1) :
     H →L[ℂ] H :=
   (Uθ).symm.toLinearIsometry.toContinuousLinearMap.comp
@@ -123,9 +126,10 @@ private theorem adjoint_apply_isometry {E G : Type*}
   simpa only [ContinuousLinearMap.comp_apply, one_apply_eq_self,
     LinearIsometry.coe_toContinuousLinearMap] using DFunLike.congr_fun i.adjoint_comp_self u
 
-/-- Paper: (12.4.1.8), p. 517. The bounded cutoff agrees with every realized
-Schwartz–Bruhat cutoff on its theta class when the Fourier theta functions
-differ by the indicated quotient multiplier. -/
+/-- Paper: (12.4.1.8), p. 517. Identify the image of a test class under the bounded cutoff.
+Deviation: The conclusion is in the order-zero theta Hilbert completion. Agreement with the
+scalar cutoff on additive S-adelic tests uses a realized Schwartz–Bruhat output and assumes
+the Fourier theta multiplier identity `hθ` for the chosen quotient symbol. -/
 theorem sLocalThetaL2FourierCutoff_generator_of_theta
     (ρ : J → ℝ) (hm : Measurable ρ) (hb : ∀ x, |ρ x| ≤ 1) (f g : Tests)
     (hθ : ∀ x, sLocalAdelicThetaOnClasses F S (FT g) x =
