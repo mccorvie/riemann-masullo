@@ -21,7 +21,7 @@ theorem halfShift_mode_sub_mem_stageGenerators {X : ℝ} (hX : 0 < X)
     (f : 𝓢(ℝ, ℂ)) (hf : f 0 = 0) (h0 : (𝓕 f) 0 = 0)
     (he : ∀ r, (𝓕 f) (-r) = (𝓕 f) r)
     (hb : ∀ r, X / (∏ q ∈ T, (q : ℝ)) < |r| → (𝓕 f) r = 0)
-    (F : LogL2) (hF : F =ᵐ[volume] stage T f) (n : ℤ)
+    (F : ℝ →₂[volume] ℂ) (hF : F =ᵐ[volume] stage T f) (n : ℤ)
     (hrows : ∀ j : ℤ, j ≠ n → packetRow X T p j F = 0) {h : ℝ} (hh : 0 ≤ h) :
     halfShift h F - (Real.fourierChar (-h * ((n : ℝ) / Real.log p)) : ℂ) • F ∈
       stageGenerators X (insert p T) := by

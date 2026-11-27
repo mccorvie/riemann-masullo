@@ -105,6 +105,7 @@ private theorem exists_fixedBox_distinctPrime_fixed_line {X : ℝ} (hX : 0 < X)
 
 end RiemannMasullo.RationalPacket
 
+open MeasureTheory
 open scoped NNReal
 namespace RiemannMasullo.RationalPacket
 
@@ -137,19 +138,19 @@ private theorem twoPrimeDifference_injective : Function.Injective A := by
   exact (not_lt_of_ge hb) (mul_pos hc (norm_pos_iff.mpr (sub_ne_zero.mpr hn)))
 
 include hX hqTp in
-private theorem twoPrimeDifference_mem_deep_iff (u : LogL2) : A u ∈ D ↔ u ∈ P := by
-  change A u ∈ (D : Set LogL2) ↔ _
+private theorem twoPrimeDifference_mem_deep_iff (u : ℝ →₂[volume] ℂ) : A u ∈ D ↔ u ∈ P := by
+  change A u ∈ (D : Set (ℝ →₂[volume] ℂ)) ↔ _
   rw [← range_stagePeriodDifference_closedStage hX (insert p T) hTp hq.one_lt hqTp hTpq]
   constructor
   · rintro ⟨y, hy⟩
-    change A (y : LogL2) = A u at hy
+    change A (y : ℝ →₂[volume] ℂ) = A u at hy
     exact (twoPrimeDifference_injective q hq hy) ▸ y.property
   · intro hu
     exact ⟨⟨u, hu⟩, rfl⟩
 
 include hq in
 private theorem twoPrimeDifference_mem_p_iff (e : E) :
-    A (e : LogL2) ∈ P ↔ S ((N).mkQL e) = (N).mkQL e := by
+    A (e : ℝ →₂[volume] ℂ) ∈ P ↔ S ((N).mkQL e) = (N).mkQL e := by
   rw [fixedBoxForwardShift_mk]
   have hlog : 0 ≤ Real.log (q : ℝ) := Real.log_nonneg (by exact_mod_cast hq.one_le)
   change _ ↔ (Submodule.Quotient.mk (closedStageForwardShift T hT1 hX L e) : Q) =
@@ -158,8 +159,8 @@ private theorem twoPrimeDifference_mem_p_iff (e : E) :
   change _ ↔ closedStageForwardShift T hT1 hX L e - e ∈
     fixedBoxDenominator X T hT1 p hTp
   rw [mem_fixedBoxDenominator_iff X T hT1 p hTp]
-  have hcoe : ((closedStageForwardShift T hT1 hX L e - e : E) : LogL2) =
-      (closedStageForwardShift T hT1 hX L e : LogL2) - (e : LogL2) := rfl
+  have hcoe : ((closedStageForwardShift T hT1 hX L e - e : E) : ℝ →₂[volume] ℂ) =
+      (closedStageForwardShift T hT1 hX L e : ℝ →₂[volume] ℂ) - (e : ℝ →₂[volume] ℂ) := rfl
   rw [hcoe, closedStageForwardShift_apply]
   rw [Real.coe_toNNReal _ hlog]
   rfl
@@ -169,11 +170,12 @@ include hqTp
 /-- A normalized fixed packet class has an actual lift whose q-difference is in
 both one-prime ranges, but not in the two-prime range. -/
 private theorem exists_twoPrime_normalized_lift (v : Q) (hv : S v = v) (hv0 : R₀ v = 1) :
-    ∃ e : E, (N).mkQL e = v ∧ A (e : LogL2) ∈ P ∧ A (e : LogL2) ∈ B ∧ A (e : LogL2) ∉ D := by
+    ∃ e : E, (N).mkQL e = v ∧ A (e : ℝ →₂[volume] ℂ) ∈ P ∧ A (e : ℝ →₂[volume] ℂ) ∈ B ∧
+      A (e : ℝ →₂[volume] ℂ) ∉ D := by
   obtain ⟨e, he⟩ := (N).mkQ_surjective v
   change (N).mkQL e = v at he
   refine ⟨e, he, (twoPrimeDifference_mem_p_iff hX T hT1 p q hTp hq e).mpr (by rwa [he]), ?_, ?_⟩
-  · change A (e : LogL2) ∈ (B : Set LogL2)
+  · change A (e : ℝ →₂[volume] ℂ) ∈ (B : Set (ℝ →₂[volume] ℂ))
     rw [← range_stagePeriodDifference_closedStage hX T hT1 hq.one_lt
       (fun h ↦ hqTp (Finset.mem_insert_of_mem h)) hTq]
     exact ⟨e, rfl⟩
@@ -188,17 +190,18 @@ private theorem exists_twoPrime_normalized_lift (v : Q) (hv : S v = v) (hv0 : R�
 intersection has exactly one scalar remainder modulo the genuine deeper stage. -/
 private theorem existsUnique_twoPrime_intersection_scalar (v : Q) (hv0 : R₀ v = 1)
     (hfixed : ∀ x : Q, S x = x ↔ x = R₀ x • v) (e : E) (he : (N).mkQL e = v)
-    (z : LogL2) (hzp : z ∈ P) (hzq : z ∈ B) :
-    ∃! c : ℂ, z - c • A (e : LogL2) ∈ D := by
+    (z : ℝ →₂[volume] ℂ) (hzp : z ∈ P) (hzq : z ∈ B) :
+    ∃! c : ℂ, z - c • A (e : ℝ →₂[volume] ℂ) ∈ D := by
   obtain ⟨u, ⟨hu, huz, -⟩, -⟩ := existsUnique_stagePeriodDifference_preimage hX T hT1 hq.one_lt
     (fun h ↦ hqTp (Finset.mem_insert_of_mem h)) hTq hzq
   let f : E := ⟨u, hu⟩
-  have hf : A (f : LogL2) = z := huz
+  have hf : A (f : ℝ →₂[volume] ℂ) = z := huz
   have hclass : (N).mkQL f = R₀ ((N).mkQL f) • v := (hfixed _).mp
     ((twoPrimeDifference_mem_p_iff hX T hT1 p q hTp hq f).mp (hf.symm ▸ hzp))
-  have hrem (c : ℂ) : z - c • A (e : LogL2) ∈ D ↔ (N).mkQL f = c • v := by
+  have hrem (c : ℂ) : z - c • A (e : ℝ →₂[volume] ℂ) ∈ D ↔ (N).mkQL f = c • v := by
     rw [← hf, ← map_smul A, ← map_sub A, twoPrimeDifference_mem_deep_iff hX T p q hTp hTpq hq hqTp]
-    have hcoe : ((f - c • e : E) : LogL2) = (f : LogL2) - c • (e : LogL2) := rfl
+    have hcoe : ((f - c • e : E) : ℝ →₂[volume] ℂ) =
+        (f : ℝ →₂[volume] ℂ) - c • (e : ℝ →₂[volume] ℂ) := rfl
     rw [← hcoe, ← mem_fixedBoxDenominator_iff X T hT1 p hTp]
     change (f - c • e : E) ∈ N ↔ _
     have hzero : (f - c • e : E) ∈ N ↔ (N).mkQL (f - c • e) = 0 :=
@@ -214,8 +217,8 @@ include hX hT1 hT hp hpT in
 complex line modulo the genuine two-prime stage. The witness is the q-period
 difference of a representative of the normalized zero p-packet cardinal. -/
 theorem exists_fixedBox_twoPrime_intersection_line :
-    ∃ w : LogL2, w ∈ P ∧ w ∈ B ∧ w ∉ D ∧
-      ∀ z : LogL2, z ∈ P → z ∈ B → ∃! c : ℂ, z - c • w ∈ D := by
+    ∃ w : (ℝ →₂[volume] ℂ), w ∈ P ∧ w ∈ B ∧ w ∉ D ∧
+      ∀ z : (ℝ →₂[volume] ℂ), z ∈ P → z ∈ B → ∃! c : ℂ, z - c • w ∈ D := by
   have hne : q ≠ p := by
     intro he
     subst q
@@ -225,7 +228,7 @@ theorem exists_fixedBox_twoPrime_intersection_line :
   have hv : S v = v := (hfixed v).mpr (by rw [hzero, one_smul])
   obtain ⟨e, he, hep, heq, hen⟩ :=
     exists_twoPrime_normalized_lift hX T hT1 p q hTp hTq hTpq hT hp hpT hq hqTp v hv hzero
-  refine ⟨A (e : LogL2), hep, heq, hen, fun z hzp hzq ↦ ?_⟩
+  refine ⟨A (e : ℝ →₂[volume] ℂ), hep, heq, hen, fun z hzp hzq ↦ ?_⟩
   exact existsUnique_twoPrime_intersection_scalar hX T hT1 p q hTp hTq hTpq hT hp hpT hq hqTp
     v hzero hfixed e he z hzp hzq
 

@@ -27,7 +27,7 @@ include hX hp hmem in
 theorem exists_fixedBox_period_lift (n : ℕ) (u : E) :
     ∃ v : E, (N).mkQL v = (N).mkQL u ∧
       ‖v‖ = Real.exp ((n : ℝ) * Real.log p / 2) * ‖u‖ ∧
-      ∀ᵐ x ∂volume, x < -Real.log X + (n : ℝ) * Real.log p → (v : LogL2) x = 0 := by
+      ∀ᵐ x ∂volume, x < -Real.log X + (n : ℝ) * Real.log p → (v : ℝ →₂[volume] ℂ) x = 0 := by
   let L : ℝ≥0 := ⟨Real.log p, Real.log_nonneg (by exact_mod_cast hp.le)⟩
   let S := fixedBoxForwardShift T hT p hTp hX
   have hid (m : ℕ) : S (m • L) = ContinuousLinearMap.id ℂ Q := by
@@ -49,15 +49,15 @@ theorem exists_fixedBox_period_lift (n : ℕ) (u : E) :
   · calc
       (N).mkQL v = S t ((N).mkQL u) := (fixedBoxForwardShift_mk T hT p hTp hX t u).symm
       _ = (N).mkQL u := DFunLike.congr_fun (hid n) _
-  · change ‖(closedStageForwardShift T hT hX t u : LogL2)‖ = _
+  · change ‖(closedStageForwardShift T hT hX t u : ℝ →₂[volume] ℂ)‖ = _
     rw [closedStageForwardShift_apply, norm_halfShift, ht]
     rfl
   · dsimp only [v]
     rw [closedStageForwardShift_apply]
     have hs := (measurePreserving_add_right volume (-(t : ℝ))).quasiMeasurePreserving.ae
       (closedStageSubmodule_supported hX T hT u.property)
-    filter_upwards [halfShift_ae (t : ℝ) (u : LogL2), hs] with x hx hsx hcut
-    change x - (t : ℝ) < -Real.log X → (u : LogL2) (x - (t : ℝ)) = 0 at hsx
+    filter_upwards [halfShift_ae (t : ℝ) (u : ℝ →₂[volume] ℂ), hs] with x hx hsx hcut
+    change x - (t : ℝ) < -Real.log X → (u : ℝ →₂[volume] ℂ) (x - (t : ℝ)) = 0 at hsx
     rw [hx, hsx (by rw [ht]; linarith), mul_zero]
 
 include hp in
@@ -72,7 +72,7 @@ include hX hp hmem
 /-- Every quotient class has a representative vanishing on the entire given
 left half-line, including its endpoint. -/
 theorem exists_fixedBox_lift_past (b : ℝ) (z : Q) :
-    ∃ v : E, (N).mkQL v = z ∧ ∀ᵐ x ∂volume, x ≤ b → (v : LogL2) x = 0 := by
+    ∃ v : E, (N).mkQL v = z ∧ ∀ᵐ x ∂volume, x ≤ b → (v : ℝ →₂[volume] ℂ) x = 0 := by
   obtain ⟨u, rfl⟩ := (N).mkQ_surjective z
   obtain ⟨n, hn⟩ := exists_fixedBox_period_past (X := X) p hp b
   obtain ⟨v, hv, -, hfloor⟩ := exists_fixedBox_period_lift hX T hT p hTp hp hmem n u
@@ -83,7 +83,7 @@ variable {Y : Type*} [NormedAddCommGroup Y] [NormedSpace ℂ Y]
 
 /-- A bounded-right-input-window operator annihilating the actual denominator is zero. -/
 theorem fixedBox_window_eq_zero (B : E →L[ℂ] Y) (b : ℝ)
-    (hwindow : ∀ v : E, (∀ᵐ x ∂volume, x ≤ b → (v : LogL2) x = 0) → B v = 0)
+    (hwindow : ∀ v : E, (∀ᵐ x ∂volume, x ≤ b → (v : ℝ →₂[volume] ℂ) x = 0) → B v = 0)
     (hden : N ≤ LinearMap.ker B.toLinearMap) : B = 0 := by
   apply ContinuousLinearMap.ext
   intro u
@@ -96,7 +96,7 @@ theorem fixedBox_window_eq_zero (B : E →L[ℂ] Y) (b : ℝ)
 /-- Without exact descent there is quantitative leakage on the denominator.
 The estimate degenerates as the required number of periods grows. -/
 theorem fixedBox_window_leakage (B : E →L[ℂ] Y) (b : ℝ)
-    (hwindow : ∀ v : E, (∀ᵐ x ∂volume, x ≤ b → (v : LogL2) x = 0) → B v = 0)
+    (hwindow : ∀ v : E, (∀ᵐ x ∂volume, x ≤ b → (v : ℝ →₂[volume] ℂ) x = 0) → B v = 0)
     (n : ℕ) (hn : b < -Real.log X + (n : ℝ) * Real.log p) :
     ‖B‖ / (1 + Real.exp ((n : ℝ) * Real.log p / 2)) ≤ ‖B.comp (N).subtypeL‖ := by
   let c := Real.exp ((n : ℝ) * Real.log p / 2)

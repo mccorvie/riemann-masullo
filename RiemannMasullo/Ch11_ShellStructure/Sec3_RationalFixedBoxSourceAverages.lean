@@ -156,7 +156,7 @@ private theorem source_stage_memLp {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
 
 private def sourceStageLinearMap {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
     (hT : ∀ q ∈ T, 1 ≤ q) :
-    (fixedBoxEvenSources (X / (∏ q ∈ T, (q : ℝ)))).toSubmodule →ₗ[ℂ] LogL2 where
+    (fixedBoxEvenSources (X / (∏ q ∈ T, (q : ℝ)))).toSubmodule →ₗ[ℂ] (ℝ →₂[volume] ℂ) where
   toFun f := (source_stage_memLp hX T hT f).toLp (stage T f)
   map_add' f g := by
     apply Lp.ext
@@ -209,7 +209,7 @@ private theorem sourceStageLinearMap_bound {X : ℝ} (hX : 0 < X) (T : Finset �
 logarithmic Hilbert space is continuous and complex linear. -/
 def fixedBoxSourceStage {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
     (hT : ∀ q ∈ T, 1 ≤ q) :
-    (fixedBoxEvenSources (X / (∏ q ∈ T, (q : ℝ)))).toSubmodule →L[ℂ] LogL2 where
+    (fixedBoxEvenSources (X / (∏ q ∈ T, (q : ℝ)))).toSubmodule →L[ℂ] (ℝ →₂[volume] ℂ) where
   toLinearMap := sourceStageLinearMap hX T hT
   cont := by
     let B := (fixedBoxEvenSources (X / (∏ q ∈ T, (q : ℝ)))).toSubmodule
@@ -218,7 +218,8 @@ def fixedBoxSourceStage {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
     let q : Seminorm ℝ B := (SchwartzMap.seminorm ℝ 2 0).comp (B.subtype.restrictScalars ℝ)
     have hq : Continuous q :=
       ((schwartz_withSeminorms ℝ ℝ ℂ).continuous_seminorm (2,0)).comp continuous_subtype_val
-    apply (norm_withSeminorms ℝ LogL2).continuous_of_continuous_comp (A.restrictScalars ℝ)
+    apply (norm_withSeminorms ℝ (ℝ →₂[volume] ℂ)).continuous_of_continuous_comp
+      (A.restrictScalars ℝ)
     intro i
     let c : ℝ≥0 := ⟨C, hC⟩
     apply Seminorm.continuous_of_le (q := c • q) ?_ ?_

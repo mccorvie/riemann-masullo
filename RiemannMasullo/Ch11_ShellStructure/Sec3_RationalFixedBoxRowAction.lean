@@ -35,7 +35,7 @@ theorem fourier_dampedStage_dilate_exp (h : ℝ) (T : Finset ℕ) (f : 𝓢(ℝ,
 
 /-- Forward logarithmic translation of a stage is the stage of its physical source dilation. -/
 theorem halfShift_stage_ae (h : ℝ) (T : Finset ℕ) (f : 𝓢(ℝ, ℂ))
-    (F : LogL2) (hF : F =ᵐ[volume] stage T f) :
+    (F : ℝ →₂[volume] ℂ) (hF : F =ᵐ[volume] stage T f) :
     halfShift h F =ᵐ[volume] stage T (dilate (Real.exp (-h)) (Real.exp_pos _) f) := by
   have hs := (measurePreserving_add_right (volume : Measure ℝ) (-h)).quasiMeasurePreserving.ae_eq_comp hF
   filter_upwards [halfShift_ae h F, hs] with x hx hsx
@@ -47,7 +47,7 @@ theorem halfShift_stage_ae (h : ℝ) (T : Finset ℕ) (f : 𝓢(ℝ, ℂ))
 positive dilation character, including the top-jet normalized zero row. -/
 theorem packetRow_halfShift {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
     (hT : ∀ q ∈ T, q.Prime) {p : ℕ} (hp : p.Prime) (hpT : p ∉ T)
-    {h : ℝ} (hh : 0 ≤ h) {F : LogL2} (hF : F ∈ closure (stageGenerators X T)) (n : ℤ) :
+    {h : ℝ} (hh : 0 ≤ h) {F : (ℝ →₂[volume] ℂ)} (hF : F ∈ closure (stageGenerators X T)) (n : ℤ) :
     packetRow X T p n (halfShift h F) =
       (Real.fourierChar (-h * ((n : ℝ) / Real.log p)) : ℂ) * packetRow X T p n F := by
   apply closure_minimal (s := stageGenerators X T)
@@ -81,9 +81,9 @@ def fixedBoxPacketRow {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
   (fixedBoxDenominator X T hT1 p hTp1).toSubmodule.liftQL
     ((packetRow X T p n).comp (closedStageSubmodule X T hT1).toSubmodule.subtypeL) (by
       intro F hF
-      change packetRow X T p n (F : LogL2) = 0
+      change packetRow X T p n (F : ℝ →₂[volume] ℂ) = 0
       exact packetRow_eq_zero_of_mem_next hX T hT hp hpT
-        ((mem_closedStageSubmodule_iff X (insert p T) hTp1 (F : LogL2)).mp
+        ((mem_closedStageSubmodule_iff X (insert p T) hTp1 (F : ℝ →₂[volume] ℂ)).mp
           ((mem_fixedBoxDenominator_iff X T hT1 p hTp1 F).mp hF)) n)
 
 /-- Evaluation of a quotient coordinate on an actual representative. -/
@@ -93,7 +93,7 @@ theorem fixedBoxPacketRow_mk {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
     (u : closedStageSubmodule X T hT1) :
     fixedBoxPacketRow hX T hT1 p hTp1 hT hp hpT n
       ((fixedBoxDenominator X T hT1 p hTp1).toSubmodule.mkQL u) =
-        packetRow X T p n (u : LogL2) := by rfl
+        packetRow X T p n (u : ℝ →₂[volume] ℂ) := by rfl
 
 /-- The actual quotient coordinates intertwine every forward dilation. -/
 theorem fixedBoxPacketRow_forwardShift {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
@@ -109,10 +109,11 @@ theorem fixedBoxPacketRow_forwardShift {X : ℝ} (hX : 0 < X) (T : Finset ℕ)
     (fixedBoxForwardShift T hT1 p hTp1 hX h
       ((fixedBoxDenominator X T hT1 p hTp1).toSubmodule.mkQL v)) = _
   rw [fixedBoxForwardShift_mk, fixedBoxPacketRow_mk]
-  change packetRow X T p n (halfShift (h : ℝ) (v : LogL2)) =
-    (Real.fourierChar (-(h : ℝ) * ((n : ℝ) / Real.log p)) : ℂ) * packetRow X T p n (v : LogL2)
+  change packetRow X T p n (halfShift (h : ℝ) (v : ℝ →₂[volume] ℂ)) =
+    (Real.fourierChar (-(h : ℝ) * ((n : ℝ) / Real.log p)) : ℂ) *
+      packetRow X T p n (v : ℝ →₂[volume] ℂ)
   exact packetRow_halfShift hX T hT hp hpT h.property
-    ((mem_closedStageSubmodule_iff X T hT1 (v : LogL2)).mp v.property) n
+    ((mem_closedStageSubmodule_iff X T hT1 (v : ℝ →₂[volume] ℂ)).mp v.property) n
 
 private theorem dilation_character_eq_circle (p : ℕ) (n : ℤ) (h : ℝ) :
     (Real.fourierChar (-h * ((n : ℝ) / Real.log p)) : ℂ) =

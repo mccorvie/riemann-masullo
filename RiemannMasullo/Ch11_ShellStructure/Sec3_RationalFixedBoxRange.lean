@@ -21,12 +21,12 @@ open scoped ENNReal FourierTransform SchwartzMap Topology
 namespace RiemannMasullo.RationalPacket
 
 /-- Translation on logarithmic coordinates, including the half-density factor. -/
-def halfShift (h : ℝ) : LogL2 →L[ℂ] LogL2 :=
+def halfShift (h : ℝ) : (ℝ →₂[volume] ℂ) →L[ℂ] (ℝ →₂[volume] ℂ) :=
   (Real.exp (h / 2) : ℂ) •
     (Lp.compMeasurePreservingₗᵢ (E := ℂ) (p := 2) ℂ _
       (measurePreserving_add_right volume (-h))).toContinuousLinearMap
 
-theorem halfShift_ae (h : ℝ) (u : LogL2) :
+theorem halfShift_ae (h : ℝ) (u : ℝ →₂[volume] ℂ) :
     ⇑(halfShift h u) =ᵐ[volume] fun x ↦ (Real.exp (h / 2) : ℂ) * u (x - h) := by
   let t := Lp.compMeasurePreserving _ (measurePreserving_add_right volume (-h)) u
   change ⇑((Real.exp (h / 2) : ℂ) • t) =ᵐ[volume] _
@@ -36,14 +36,14 @@ theorem halfShift_ae (h : ℝ) (u : LogL2) :
   change _ = (Real.exp (h / 2) : ℂ) * t x at hs
   simpa only [ht, sub_eq_add_neg] using hs
 
-@[simp] theorem norm_halfShift (h : ℝ) (u : LogL2) :
+@[simp] theorem norm_halfShift (h : ℝ) (u : ℝ →₂[volume] ℂ) :
     ‖halfShift h u‖ = Real.exp (h / 2) * ‖u‖ := by
   change ‖(Real.exp (h / 2) : ℂ) • Lp.compMeasurePreserving _
     (measurePreserving_add_right volume (-h)) u‖ = _
   rw [norm_smul, Lp.norm_compMeasurePreserving, Complex.norm_real, Real.norm_eq_abs,
     abs_of_pos (Real.exp_pos _)]
 
-theorem halfShift_add (h k : ℝ) (u : LogL2) :
+theorem halfShift_add (h k : ℝ) (u : ℝ →₂[volume] ℂ) :
     halfShift (h + k) u = halfShift h (halfShift k u) := by
   apply Lp.ext
   filter_upwards [halfShift_ae (h + k) u, halfShift_ae h (halfShift k u),
@@ -52,12 +52,12 @@ theorem halfShift_add (h k : ℝ) (u : LogL2) :
   change halfShift k u (x - h) = (Real.exp (k / 2) : ℂ) * u (x - h - k) at hc
   rw [ha, hb, hc, add_div, Real.exp_add, Complex.ofReal_mul, mul_assoc, sub_add_eq_sub_sub]
 
-@[simp] theorem halfShift_zero (u : LogL2) : halfShift 0 u = u := by
+@[simp] theorem halfShift_zero (u : ℝ →₂[volume] ℂ) : halfShift 0 u = u := by
   apply Lp.ext
   simpa using halfShift_ae 0 u
 
 /-- Strong continuity of the half-shift group. -/
-theorem continuous_halfShift (u : LogL2) : Continuous fun h ↦ halfShift h u := by
+theorem continuous_halfShift (u : ℝ →₂[volume] ℂ) : Continuous fun h ↦ halfShift h u := by
   let g := (ContinuousMap.curry
     (⟨fun q : ℝ × ℝ ↦ q.2 + -q.1, continuous_snd.add continuous_fst.neg⟩ : C(ℝ × ℝ, ℝ)))
   have ht := continuous_const.compMeasurePreservingLp (f := fun _ : ℝ ↦ u) g.continuous
@@ -66,15 +66,15 @@ theorem continuous_halfShift (u : LogL2) : Continuous fun h ↦ halfShift h u :=
   exact hw.smul ht
 
 /-- The next stage is the image of the difference by one actual logarithmic period. -/
-@[expose] def stagePeriodDifference (p : ℝ) : LogL2 →L[ℂ] LogL2 :=
-  halfShift (Real.log p) - ContinuousLinearMap.id ℂ LogL2
+@[expose] def stagePeriodDifference (p : ℝ) : (ℝ →₂[volume] ℂ) →L[ℂ] (ℝ →₂[volume] ℂ) :=
+  halfShift (Real.log p) - ContinuousLinearMap.id ℂ (ℝ →₂[volume] ℂ)
 
 /-- Evaluation of the actual period-difference operator. -/
-theorem stagePeriodDifference_apply (p : ℝ) (u : LogL2) :
+theorem stagePeriodDifference_apply (p : ℝ) (u : ℝ →₂[volume] ℂ) :
     stagePeriodDifference p u = halfShift (Real.log p) u - u := rfl
 
 private theorem stagePeriodDifference_ae (T : Finset ℕ) {p : ℕ}
-    (hp : 0 < p) (hmem : p ∉ T) {F : LogL2} {f : 𝓢(ℝ, ℂ)}
+    (hp : 0 < p) (hmem : p ∉ T) {F : (ℝ →₂[volume] ℂ)} {f : 𝓢(ℝ, ℂ)}
     (hF : (F : ℝ → ℂ) =ᵐ[volume] stage T f) :
     (stagePeriodDifference p F : ℝ → ℂ) =ᵐ[volume]
       stage (insert p T) (dilate ((p : ℝ)⁻¹) (inv_pos.mpr (by exact_mod_cast hp)) f) := by
@@ -89,7 +89,7 @@ private theorem stagePeriodDifference_ae (T : Finset ℕ) {p : ℕ}
     rw [hg, add_sub_cancel_right, ← mul_assoc, ← Complex.ofReal_mul, ← Real.exp_add]
     simp [neg_div]
   have htrans := (measurePreserving_add_right volume (-L)).quasiMeasurePreserving.ae_eq_comp hF
-  change (halfShift L F - F : LogL2) =ᵐ[volume] stage (insert p T) g
+  change (halfShift L F - F : ℝ →₂[volume] ℂ) =ᵐ[volume] stage (insert p T) g
   filter_upwards [Lp.coeFn_sub (halfShift L F) F, halfShift_ae L F, htrans, hF] with x hsub hhalf htx hx
   rw [hsub, Pi.sub_apply, hhalf, hx, stage_insert T hp hmem g x]
   change (Real.exp (L/2) : ℂ) * F (x-L) - stage T f x = _
@@ -138,7 +138,7 @@ theorem stagePeriodDifference_image_generators {X : ℝ} (hX : 0 < X)
     exact H.trans hG.symm
 
 /-- The inverse of the period difference costs at most `(exp(log(p)/2)-1)⁻¹`. -/
-theorem mul_norm_le_stagePeriodDifference (p : ℝ) (u : LogL2) :
+theorem mul_norm_le_stagePeriodDifference (p : ℝ) (u : ℝ →₂[volume] ℂ) :
     (Real.exp (Real.log p / 2) - 1) * ‖u‖ ≤ ‖stagePeriodDifference p u‖ := by
   have h := norm_add_le (stagePeriodDifference p u) u
   rw [show stagePeriodDifference p u + u = halfShift (Real.log p) u by simp [stagePeriodDifference],
@@ -152,15 +152,15 @@ theorem range_stagePeriodDifference_closedStage {X : ℝ} (hX : 0 < X)
     (T : Finset ℕ) (hT : ∀ q ∈ T, 1 ≤ q) {p : ℕ} (hp : 1 < p) (hmem : p ∉ T)
     (hTp : ∀ q ∈ insert p T, 1 ≤ q) :
     range ((stagePeriodDifference p).comp (closedStageSubmodule X T hT).toSubmodule.subtypeL) =
-      (closedStageSubmodule X (insert p T) hTp : Set LogL2) := by
+      (closedStageSubmodule X (insert p T) hTp : Set (ℝ →₂[volume] ℂ)) := by
   let E := closedStageSubmodule X T hT
-  let A : E →L[ℂ] LogL2 := (stagePeriodDifference p).comp E.toSubmodule.subtypeL
+  let A : E →L[ℂ] (ℝ →₂[volume] ℂ) := (stagePeriodDifference p).comp E.toSubmodule.subtypeL
   let c := Real.exp (Real.log (p : ℝ) / 2) - 1
   have hpR : (1 : ℝ) < p := by exact_mod_cast hp
   have hc : 0 < c := sub_pos.mpr (Real.one_lt_exp_iff.mpr (half_pos (Real.log_pos hpR)))
   have hA : AntilipschitzWith ⟨c⁻¹, inv_nonneg.mpr hc.le⟩ A :=
     A.antilipschitz_of_bound fun u ↦ by
-      change ‖(u : LogL2)‖ ≤ c⁻¹ * ‖stagePeriodDifference p u‖
+      change ‖(u : ℝ →₂[volume] ℂ)‖ ≤ c⁻¹ * ‖stagePeriodDifference p u‖
       rw [← div_eq_inv_mul]
       exact (le_div_iff₀ hc).mpr (by simpa only [mul_comm] using (mul_norm_le_stagePeriodDifference p u))
   have hi := stagePeriodDifference_image_generators hX T hT hp hmem
@@ -182,34 +182,35 @@ theorem range_stagePeriodDifference_closedStage {X : ℝ} (hX : 0 < X)
 difference preimage, with an explicit bound in the unweighted Hilbert norm. -/
 theorem existsUnique_stagePeriodDifference_preimage {X : ℝ} (hX : 0 < X)
     (T : Finset ℕ) (hT : ∀ q ∈ T, 1 ≤ q) {p : ℕ} (hp : 1 < p) (hmem : p ∉ T)
-    (hTp : ∀ q ∈ insert p T, 1 ≤ q) {v : LogL2}
+    (hTp : ∀ q ∈ insert p T, 1 ≤ q) {v : (ℝ →₂[volume] ℂ)}
     (hv : v ∈ closedStageSubmodule X (insert p T) hTp) :
-    ∃! u : LogL2, u ∈ closedStageSubmodule X T hT ∧ stagePeriodDifference p u = v ∧
+    ∃! u : (ℝ →₂[volume] ℂ), u ∈ closedStageSubmodule X T hT ∧ stagePeriodDifference p u = v ∧
       ‖u‖ ≤ ‖v‖ / (Real.exp (Real.log (p : ℝ) / 2) - 1) := by
   have hh := range_stagePeriodDifference_closedStage hX T hT hp hmem hTp
   have hvr : v ∈ range ((stagePeriodDifference p).comp
       (closedStageSubmodule X T hT).toSubmodule.subtypeL) := hh.symm ▸ hv
   obtain ⟨u, hu⟩ := hvr
-  change stagePeriodDifference p (u : LogL2) = v at hu
+  change stagePeriodDifference p (u : ℝ →₂[volume] ℂ) = v at hu
   have hpR : (1 : ℝ) < p := by exact_mod_cast hp
   have hc : 0 < Real.exp (Real.log (p : ℝ) / 2) - 1 :=
     sub_pos.mpr (Real.one_lt_exp_iff.mpr (half_pos (Real.log_pos hpR)))
-  have hbound := mul_norm_le_stagePeriodDifference p (u : LogL2)
+  have hbound := mul_norm_le_stagePeriodDifference p (u : ℝ →₂[volume] ℂ)
   rw [hu, mul_comm] at hbound
-  refine ⟨(u : LogL2), ⟨u.property, hu, (le_div_iff₀ hc).mpr hbound⟩, ?_⟩
+  refine ⟨(u : ℝ →₂[volume] ℂ), ⟨u.property, hu, (le_div_iff₀ hc).mpr hbound⟩, ?_⟩
   rintro w ⟨-, hw, -⟩
-  have hz : stagePeriodDifference p (w - (u : LogL2)) = 0 := by
+  have hz : stagePeriodDifference p (w - (u : ℝ →₂[volume] ℂ)) = 0 := by
     rw [map_sub, hw, hu, sub_self]
-  have hb := mul_norm_le_stagePeriodDifference p (w - (u : LogL2))
+  have hb := mul_norm_le_stagePeriodDifference p (w - (u : ℝ →₂[volume] ℂ))
   rw [hz, norm_zero] at hb
-  have hnot : ¬ 0 < ‖w - (u : LogL2)‖ := fun h ↦ (not_lt_of_ge hb) (mul_pos hc h)
+  have hnot : ¬ 0 < ‖w - (u : ℝ →₂[volume] ℂ)‖ := fun h ↦ (not_lt_of_ge hb) (mul_pos hc h)
   exact sub_eq_zero.mp (norm_eq_zero.mp (le_antisymm (le_of_not_gt hnot) (norm_nonneg _)))
 
 /-- Forward translation dilates the Fourier witness by `exp (-h)`, so its
 band shrinks and the translated generator still belongs to the same box. -/
 theorem halfShift_mem_stageGenerators {X : ℝ} (hX : 0 < X)
     (T : Finset ℕ) (hT : ∀ q ∈ T, 1 ≤ q) {h : ℝ} (hh : 0 ≤ h)
-    {F : LogL2} (hF : F ∈ stageGenerators X T) : halfShift h F ∈ stageGenerators X T := by
+    {F : (ℝ →₂[volume] ℂ)} (hF : F ∈ stageGenerators X T) :
+    halfShift h F ∈ stageGenerators X T := by
   obtain ⟨f, hf0, hfF0, hband, hrep⟩ := (mem_stageGenerators_iff _ _ _).mp hF
   let r := Real.exp (-h)
   have hr : 0 < r := Real.exp_pos _
@@ -235,7 +236,7 @@ theorem halfShift_mem_stageGenerators {X : ℝ} (hX : 0 < X)
 /-- Forward half-shifts preserve the actual completed fixed-box stage. -/
 theorem halfShift_mem_closedStage {X : ℝ} (hX : 0 < X)
     (T : Finset ℕ) (hT : ∀ q ∈ T, 1 ≤ q) {h : ℝ} (hh : 0 ≤ h)
-    {F : LogL2} (hF : F ∈ closedStageSubmodule X T hT) :
+    {F : (ℝ →₂[volume] ℂ)} (hF : F ∈ closedStageSubmodule X T hT) :
     halfShift h F ∈ closedStageSubmodule X T hT := by
   have hm : MapsTo (halfShift h) (stageGenerators X T) (stageGenerators X T) :=
     fun _ hu ↦ halfShift_mem_stageGenerators hX T hT hh hu
