@@ -166,13 +166,13 @@ private theorem cutoffRadialSquareMajorant_bound {t u C : ℝ} (ht : 0 < t) (hu 
         rw [← Real.rpow_neg_one t, Real.rpow_def_of_pos ht, abs_of_nonneg (Real.log_nonneg h)]
         exact Real.exp_le_exp.mpr (by nlinarith [Real.log_nonneg h])
 
-/-- Paper: Theorem 12.4.1.1, Step II, pp. 516–517.
-The input-radius bounds on the raw quotient kernel imply that its
-half-density form is square integrable in the local order-`s` Sobolev measure.
-The normalization uses the factor in (12.4.1.17), p. 518, for conversion
-from additive input measure.
-Deviation: The output support is compact, as for a fixed positive annulus.
-The radial bounds enter as hypotheses. -/
+/-- An auxiliary analytic estimate for the quotient-kernel construction in
+Theorem 12.4.1.1, Step II, pp. 516–517. For compact output support, as in a fixed
+positive annulus, the two input-radius bounds imply square-integrability of the
+half-density kernel in the local order-`s` Sobolev measure.
+
+The normalization uses (12.4.1.17), p. 518, to convert the additive input measure.
+-/
 theorem sLocalTrace_halfDensityKernel_memLp_of_radial_bounds
     {Z : Set Jₛ} (hZ : IsCompact Z) {κ : Jₛ × Jₛ → ℂ} (hκ : Measurable κ)
     (hzero : ∀ p : Jₛ × Jₛ, p.1 ∉ Z → κ p = 0)
