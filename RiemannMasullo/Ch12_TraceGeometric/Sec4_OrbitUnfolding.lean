@@ -26,19 +26,23 @@ local notation "Hₛ" => sProjectedDiagonal F S
 local notation "μₛ" => sMultiplicativeTamagawaMeasure F S
 local notation "μJ" => sLocalQuotientTamagawaMeasure F S
 
-local instance (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
-local instance (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
-local instance : MeasurableSpace (InfiniteAdeleRing F) :=
+local instance instInfiniteCompletionMeasurableSpaceOrbitUnfolding
+    (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+local instance instFiniteCompletionMeasurableSpaceOrbitUnfolding
+    (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+local instance instInfiniteAdeleMeasurableSpaceOrbitUnfolding :
+    MeasurableSpace (InfiniteAdeleRing F) :=
   inferInstanceAs (MeasurableSpace ((w : InfinitePlace F) → w.Completion))
-local instance : MeasurableSpace Aₛ :=
+local instance instSAdeleMeasurableSpaceOrbitUnfolding : MeasurableSpace Aₛ :=
   inferInstanceAs (MeasurableSpace (InfiniteAdeleRing F × ((v : S) → v.val.adicCompletion F)))
-local instance : MeasurableSpace Jₛ := borel _
+local instance instSIdeleQuotientMeasurableSpaceOrbitUnfolding : MeasurableSpace Jₛ := borel _
 
-local instance : T2Space Iₛ := (sIdeleGroup_description F S).2.1
-local instance : LocallyCompactSpace Iₛ := (sIdeleGroup_description F S).2.2.1
-local instance : BorelSpace Iₛ := sIdeleGroup_borelSpace
+local instance instSIdeleT2OrbitUnfolding : T2Space Iₛ := (sIdeleGroup_description F S).2.1
+local instance instSIdeleLocallyCompactOrbitUnfolding : LocallyCompactSpace Iₛ :=
+  (sIdeleGroup_description F S).2.2.1
+local instance instSIdeleBorelSpaceOrbitUnfolding : BorelSpace Iₛ := sIdeleGroup_borelSpace
 
-local instance : SecondCountableTopology Iₛ := by
+local instance instSIdeleSecondCountableOrbitUnfolding : SecondCountableTopology Iₛ := by
   let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
   let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
     (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
@@ -46,12 +50,18 @@ local instance : SecondCountableTopology Iₛ := by
     (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
   exact (sIdeleGroup_description F S).1.secondCountableTopology
 
-local instance : (μₛ).IsHaarMeasure := sMultiplicativeTamagawaMeasure_isHaarMeasure
-local instance : (μₛ).Regular := sMultiplicativeTamagawaMeasure_regular
-local instance : DiscreteTopology Hₛ := discreteTopology_sProjectedDiagonal
-local instance : Countable Hₛ := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
-local instance : (Measure.count : Measure Hₛ).IsHaarMeasure := count_isHaarMeasure_of_discreteTopology
-local instance : (Measure.count : Measure Hₛ).Regular := count_regular_of_discreteTopology
+local instance instSIdeleIsHaarMeasureOrbitUnfolding : (μₛ).IsHaarMeasure :=
+  sMultiplicativeTamagawaMeasure_isHaarMeasure
+local instance instSIdeleMeasureRegularOrbitUnfolding : (μₛ).Regular :=
+  sMultiplicativeTamagawaMeasure_regular
+local instance instProjectedDiagonalDiscreteOrbitUnfolding : DiscreteTopology Hₛ :=
+  discreteTopology_sProjectedDiagonal
+local instance instProjectedDiagonalCountableOrbitUnfolding : Countable Hₛ :=
+  TopologicalSpace.separableSpace_iff_countable.mp inferInstance
+local instance instProjectedDiagonalCountHaarOrbitUnfolding :
+    (Measure.count : Measure Hₛ).IsHaarMeasure := count_isHaarMeasure_of_discreteTopology
+local instance instProjectedDiagonalCountRegularOrbitUnfolding :
+    (Measure.count : Measure Hₛ).Regular := count_regular_of_discreteTopology
 
 /-- An auxiliary form of Weil unfolding for the quotient kernel in
 Theorem 12.4.1.1, Steps II–III, pp. 516–518. A quotient function given by a
