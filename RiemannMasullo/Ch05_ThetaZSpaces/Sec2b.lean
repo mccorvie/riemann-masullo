@@ -1335,6 +1335,24 @@ private theorem sLocalThetaFourier_transition_union
     ((congrArg (_ * ·) (Finset.prod_congr rfl fun v _ ↦ hfix v)).trans
       (sLocalThetaFourier_transition_apply hD (sAdeleSchwartzFourier f) y.toAdd).symm)
 
+/-- Fourier transformation commutes with insertion of integer indicators at added places
+away from the different. This identity on test representatives underlies the quotient
+compatibility in Theorem 5.2.4.1(1), p. 239. -/
+theorem sAdeleSchwartzFourier_transition (hST : S ⊆ T)
+    (hgood : ∀ v : HeightOneSpectrum (𝓞 F),
+      v ∈ T → v ∉ S → ¬ v.asIdeal ∣ differentIdeal ℤ (𝓞 F)) (f : ℬₛ(S)) :
+    let i := sAdeleSchwartzTransition F hST
+    sAdeleSchwartzFourier (i f) = i (sAdeleSchwartzFourier f) := by
+  classical
+  let P (A : Finset (HeightOneSpectrum (𝓞 F))) := ∀ h : S ⊆ A,
+    let i := sAdeleSchwartzTransition F h
+    sAdeleSchwartzFourier (i f) = i (sAdeleSchwartzFourier f)
+  have hu : P (S ∪ (T \ S)) := fun _ ↦
+    sLocalThetaFourier_transition_union Finset.disjoint_sdiff
+      (fun v hv ↦ hgood v (Finset.mem_sdiff.mp hv).1 (Finset.mem_sdiff.mp hv).2) f
+  have hT : P T := (Finset.union_sdiff_of_subset hST) ▸ hu
+  exact hT hST
+
 /-- Paper: Theorem 5.2.4.1(1), p. 239.
 The S-local Fourier involutions commute with stage enlargement away from the different.
 Deviation: Every added place is required to have a Fourier-fixed integer indicator. -/
@@ -1350,17 +1368,11 @@ theorem sLocalThetaFourier_transition (hST : S ⊆ T)
   intro fourierS fourierT transition
   induction x using Submodule.Quotient.induction_on with
   | _ f =>
-    let P (A : Finset (HeightOneSpectrum (𝓞 F))) := ∀ h : S ⊆ A,
-      let i := sAdeleSchwartzTransition F h
-      sAdeleSchwartzFourier (i f) = i (sAdeleSchwartzFourier f)
-    have hu : P (S ∪ (T \ S)) := fun _ ↦
-      sLocalThetaFourier_transition_union Finset.disjoint_sdiff
-        (fun v hv ↦ hgood v (Finset.mem_sdiff.mp hv).1 (Finset.mem_sdiff.mp hv).2) f
-    have hT : P T := (Finset.union_sdiff_of_subset hST) ▸ hu
     exact ((existsUnique_sLocalThetaFourier (F := F) (S := T)).exists.choose_spec.2
       (sAdeleSchwartzTransition F hST f)).trans
-      ((congrArg (Kₛ(T)).mkQ (hT hST)).trans (congrArg transition
-        ((existsUnique_sLocalThetaFourier (F := F) (S := S)).exists.choose_spec.2 f).symm))
+      ((congrArg (Kₛ(T)).mkQ (sAdeleSchwartzFourier_transition hST hgood f)).trans
+        (congrArg transition
+          ((existsUnique_sLocalThetaFourier (F := F) (S := S)).exists.choose_spec.2 f).symm))
 
 set_option maxSynthPendingDepth 8 in
 /-- Paper: (5.2.4.4), p. 239.
