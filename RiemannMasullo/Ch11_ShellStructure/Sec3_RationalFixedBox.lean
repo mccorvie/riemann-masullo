@@ -451,7 +451,7 @@ private theorem ae_eq_zero_of_packet_fourier_samples {f : ℝ → ℂ}
   rw [show 𝓕 f = 0 from funext hzero, eLpNorm_zero] at h
   exact (eLpNorm_eq_zero_iff two_ne_zero).mp h.symm
 
-abbrev LogL2 := Lp ℂ 2 (volume : Measure ℝ)
+scoped notation "LogL2" => Lp ℂ 2 (volume : Measure ℝ)
 
 private def lowerSupport (a : ℝ) : Set LogL2 :=
   { f | ∀ᵐ x ∂volume, x < a → f x = 0 }
