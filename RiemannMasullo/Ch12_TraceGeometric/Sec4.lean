@@ -11,6 +11,7 @@ public import RiemannMasullo.ForMathlib.NumberTheory.NumberField.InfiniteAdeleRi
 public import RiemannMasullo.ForMathlib.Topology.Covering.AddCircle
 public import RiemannMasullo.AppB_AnalyticNT.Sec4b
 public import RiemannMasullo.Ch06_LocalGlobal.Sec1
+import RiemannMasullo.Ch12_TraceGeometric.Sec4_OrbitUnfolding
 import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec5
 import RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Count
@@ -1848,6 +1849,126 @@ private theorem sLocalTrace_nonunits_null :
       (Measure.pi (fun v : S ↦ finiteLocalAdditiveTamagawaMeasure F v.val))) (_ ×ˢ _) = 0
     rw [Measure.prod_prod, Measure.pi_eval_preimage_null
       (fun v : S ↦ finiteLocalAdditiveTamagawaMeasure F v.val) (i := v) (hv v), mul_zero]
+
+/-- Paper: (12.4.1.17), p. 518. The reciprocal Tamagawa density converts the
+weighted integral on the S-ideles back to the additive integral on the S-adeles.
+The nullity of nonunits also gives equivalence of the two integrability
+conditions. -/
+theorem sLocalTrace_integrals_idelic_additive_density
+    (f : Aₛ → ℂ) (hf : Measurable f) :
+    (Integrable f νₛ ↔ Integrable (fun y : Iₛ ↦
+      (normS(y) : ℂ) / (sLocalTraceMeasureFactor S : ℂ) * f y.val) μₛ) ∧
+      (∫ z, f z ∂νₛ) = ∫ y : Iₛ,
+        (normS(y) : ℂ) / (sLocalTraceMeasureFactor S : ℂ) * f y.val ∂μₛ := by
+  let : BorelSpace Aₛ := sAdeleRing_borelSpace
+  let : BorelSpace Iₛ := sIdeleGroup_borelSpace
+  let v : Iₛ → Aₛ := Units.val
+  let n (z : Aₛ) := modS(z)
+  let c := sLocalTraceMeasureFactor (F := F) S
+  let d (z : Aₛ) := ENNReal.ofReal (c / n z)
+  let g (z : Aₛ) := (n z : ℂ) / (c : ℂ) * f z
+  have hv : Measurable v := Units.continuous_val.measurable
+  have hn (y : Iₛ) : n y.val = normS(y) := by simp [n, sIdeleNorm, Units.coe_prod]
+  have hm : Continuous n :=
+    (continuous_finsetProd _ fun w _ ↦ ((continuous_apply w).comp continuous_fst).norm.pow _).mul
+      (continuous_finsetProd _ fun p _ ↦ ((continuous_apply p).comp continuous_snd).norm)
+  have hc : 0 < c := by
+    apply Finset.prod_pos
+    intro p _
+    have hp : (1 : ℝ) < p.asIdeal.absNorm := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm p
+    exact div_pos (zero_lt_one.trans hp) (sub_pos.mpr hp)
+  have hd : Measurable d := (measurable_const.div hm.measurable).ennreal_ofReal
+  have hfinite : ∀ᵐ z ∂νₛ, d z < ⊤ := ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top
+  have hg : Measurable g :=
+    ((Complex.continuous_ofReal.comp hm).measurable.div measurable_const).mul hf
+  have hcomp (y : Iₛ) :
+      g (v y) = (normS(y) : ℂ) / (sLocalTraceMeasureFactor S : ℂ) * f y.val := by
+    simp only [v, g, c, hn]
+  have hfull : ∀ᵐ z ∂νₛ, z ∈ range v :=
+    (measure_eq_zero_iff_ae_notMem.mp sLocalTrace_nonunits_null).mono fun _ hz ↦ not_not.mp hz
+  have hmap : (μₛ).map v = (νₛ).withDensity d := by
+    change (μₛ).map (Units.val : Iₛ → Aₛ) = _
+    rw [sLocalTrace_measure_density, Measure.restrict_eq_self_of_ae_mem hfull]
+  have hcancel : (fun z ↦ (d z).toReal • g z) =ᵐ[νₛ] f := by
+    filter_upwards [hfull] with z hz
+    obtain ⟨y, rfl⟩ := hz
+    have hpos : 0 < n y.val := by
+      rw [hn]
+      exact NNReal.coe_pos.mpr (Units.zero_lt (sIdeleNorm F S y))
+    change (ENNReal.ofReal (c / n y.val)).toReal • ((n y.val : ℂ) / (c : ℂ) * f y.val) = f y.val
+    rw [ENNReal.toReal_ofReal (div_nonneg hc.le hpos.le), Complex.real_smul, Complex.ofReal_div]
+    field_simp [Complex.ofReal_ne_zero.mpr hc.ne', Complex.ofReal_ne_zero.mpr hpos.ne']
+  constructor
+  · calc
+      Integrable f νₛ ↔ Integrable (fun z ↦ (d z).toReal • g z) νₛ :=
+        integrable_congr hcancel.symm
+      _ ↔ Integrable g ((νₛ).withDensity d) :=
+        (integrable_withDensity_iff_integrable_smul' hd hfinite).symm
+      _ ↔ Integrable g ((μₛ).map v) := by rw [hmap]
+      _ ↔ Integrable (g ∘ v) μₛ :=
+        integrable_map_measure hg.aestronglyMeasurable hv.aemeasurable
+      _ ↔ _ := integrable_congr (ae_of_all _ hcomp)
+  · calc
+      (∫ z, f z ∂νₛ) = ∫ z, (d z).toReal • g z ∂νₛ := integral_congr_ae hcancel.symm
+      _ = ∫ z, g z ∂((νₛ).withDensity d) :=
+        (integral_withDensity_eq_integral_toReal_smul hd hfinite g).symm
+      _ = ∫ z, g z ∂((μₛ).map v) := by rw [hmap]
+      _ = ∫ y, g (v y) ∂μₛ := integral_map hv.aemeasurable hg.aestronglyMeasurable
+      _ = _ := integral_congr_ae (ae_of_all _ hcomp)
+
+/-- Additive form of the output-orbit unfolding. The coefficient from
+(12.4.1.17), p. 518, converts each test pairing to multiplicative Haar
+before applying the quotient identity. -/
+theorem sLocalTrace_integral_outputOrbit_additive_theta
+    (f : testₛ) (K : Iₛ → Aₛ → ℂ) (x : Iₛ)
+    (hK : ∀ z : Iₛ, Measurable (K z))
+    (hcov : ∀ (ξ : Hₛ) (y : Iₛ), K (ξ.val * x) (ξ.val * y).val = K x y.val)
+    (κ : Jₛ → ℂ) (hκ : Measurable κ)
+    (hrep : ∀ y : Iₛ, κ (QuotientGroup.mk y) = ∑' ξ : Hₛ, K x (ξ.val * y).val)
+    (hsum : ∀ y : Iₛ, Summable fun ξ : Hₛ ↦ ‖K x (ξ.val * y).val‖)
+    {C : ℝ} (hC : 0 ≤ C)
+    (hsmall : ∀ y : Iₛ, normS(y) ≤ 1 →
+      (∑' ξ : Hₛ, ‖K x (ξ.val * y).val‖) ≤ C * (normS(y)) ^ (-(1 / 4 : ℝ)))
+    (hlarge : ∀ y : Iₛ, 1 ≤ normS(y) →
+      (∑' ξ : Hₛ, ‖K x (ξ.val * y).val‖) ≤ C * (normS(y))⁻¹) :
+    let N (q : Jₛ) : ℝ := (sIdeleQuotientNorm F S q).val
+    let c : ℂ := sLocalTraceMeasureFactor S
+    let G (q : Jₛ) := (N q : ℂ) / c * κ q * sLocalAdelicThetaOnClasses F S f q
+    Integrable G μJ ∧
+      (∑' ξ : Hₛ, ∫ y : Aₛ, K (ξ.val * x) y * testAt(f,y) ∂νₛ) = ∫ q, G q ∂μJ := by
+  intro N c G
+  let : BorelSpace Aₛ := sAdeleRing_borelSpace
+  let : BorelSpace Iₛ := sIdeleGroup_borelSpace
+  let KI (x y : Iₛ) := K x y.val
+  have hKI : Measurable (KI x) := (hK x).comp Units.continuous_val.measurable
+  obtain ⟨hG, hWeil⟩ := sLocalQuotient_integral_outputOrbit_radial_theta
+    f KI x hKI hcov κ hκ hrep hsum hC hsmall hlarge
+  let G₀ (q : Jₛ) := (N q : ℂ) * κ q * sLocalAdelicThetaOnClasses F S f q
+  have hG₀ (q : Jₛ) : c⁻¹ * G₀ q = G q := by
+    dsimp only [G₀, G]
+    rw [div_eq_mul_inv]
+    ring
+  have hf : Measurable (fun y : Aₛ ↦ testAt(f,y)) :=
+    ((continuous_schwartzBruhat_apply f).comp continuous_ofAdd).measurable
+  let T (ξ : Hₛ) (y : Iₛ) := (N (QuotientGroup.mk y) : ℂ) * KI (ξ.val * x) y * testAt(f,y.val)
+  have hchange (ξ : Hₛ) :
+      (∫ y : Aₛ, K (ξ.val * x) y * testAt(f,y) ∂νₛ) =
+        c⁻¹ * ∫ y : Iₛ, T ξ y ∂μₛ := by
+    rw [(sLocalTrace_integrals_idelic_additive_density
+      (fun y ↦ K (ξ.val * x) y * testAt(f,y)) ((hK _).mul hf)).2, ← integral_const_mul]
+    apply integral_congr_ae
+    exact ae_of_all _ fun y ↦ by
+      dsimp only [T, KI, N, c]
+      rw [sIdeleQuotientNorm_mk, div_eq_mul_inv]
+      ring
+  refine ⟨(hG.const_mul c⁻¹).congr (ae_of_all _ hG₀), ?_⟩
+  calc
+    _ = ∑' ξ : Hₛ, c⁻¹ * ∫ y : Iₛ, T ξ y ∂μₛ := tsum_congr hchange
+    _ = c⁻¹ * ∑' ξ : Hₛ, ∫ y : Iₛ, T ξ y ∂μₛ := tsum_mul_left
+    _ = c⁻¹ * ∫ q, G₀ q ∂μJ := congrArg (c⁻¹ * ·) hWeil
+    _ = ∫ q, G q ∂μJ := by
+      rw [← integral_const_mul]
+      exact integral_congr_ae (ae_of_all _ hG₀)
 
 /-- Paper: (12.4.1.22)–(12.4.1.23), p. 518. The change of variable w = xu by an S-idele
 scales additive Tamagawa measure by the S-idelic norm and the frequency band by the same
