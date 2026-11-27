@@ -3449,7 +3449,9 @@ private theorem stripJet_integrated_product_congr {G : Type*} [MeasurableSpace G
     (∫ x, u x * j x ∂μ) = ∫ x, v x * j x ∂μ :=
   integral_congr_ae (h.mono fun x hx ↦ congrArg (· * j x) hx)
 
-private theorem stripJet_all_translated_moments (η : PontryaginDual C𝔽) (b t : ℝ)
+/-- Paper: §10.2, p. 446. Left translation mixes the logarithmic moments at a fixed
+strip zero by the binomial formula. Only integrability through the chosen order is needed. -/
+theorem stripJet_all_translated_moments (η : PontryaginDual C𝔽) (b t : ℝ)
     (m : ℕ) (v : W(-α, α, s))
     (hint : ∀ i ≤ m, Integrable (fun x ↦ v x * spectralZeroJet (F := F) η b t i x) μ𝔽)
     (g : C𝔽) :
