@@ -3,7 +3,8 @@ module
 public import RiemannMasullo.Ch03_IdelicZeta.RatEmptyNormHaar
 public import RiemannMasullo.Ch11_ShellStructure.Sec2b_RatEmptyBandChart
 public import RiemannMasullo.Ch06_LocalGlobal.Sec2
-public import RiemannMasullo.Ch11_ShellStructure.Sec2b_Printed
+public import RiemannMasullo.Ch11_ShellStructure.Sec2b
+public import RiemannMasullo.Ch11_ShellStructure.Sec2b_RatEmptyQuotient
 public import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 public import Mathlib.MeasureTheory.Function.LpSpace.ContinuousCompMeasurePreserving
 
