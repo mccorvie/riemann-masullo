@@ -117,8 +117,11 @@ private theorem norm_fixedBoxTest_integral_le (w : 𝓢(ℝ, ℂ)) (u : Q) :
       norm_integral_le_of_norm_le (w.integrable.norm.mul_const _) hb
     _ = _ := by rw [integral_mul_const]; ring
 
-/-- The actual completed dilation action integrated against a logarithmic
-Schwartz test. This is defined by vector integrals, using strong continuity. -/
+/-- Paper: Example 1.8.1.1, p. 41. Integrating the dilation action against a
+test gives the convolution operator on the packet.
+Deviation: Use the completed rational fixed-box Hilbert quotient, with a
+Schwartz test supplied in logarithmic coordinates. Strong continuity gives
+the vector integrals defining the operator. -/
 def fixedBoxTestAction (hpT : p ∉ T) (w : 𝓢(ℝ, ℂ)) : Q →L[ℂ] Q := by
   let A : Q →ₗ[ℂ] Q := {
     toFun u := ∫ t : ℝ, w t • ρ (t : AddCircle L) u

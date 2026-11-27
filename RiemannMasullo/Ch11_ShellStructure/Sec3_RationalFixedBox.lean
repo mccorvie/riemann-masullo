@@ -34,8 +34,10 @@ open scoped ComplexConjugate FourierTransform InnerProductSpace SchwartzMap Topo
 
 namespace RiemannMasullo.RationalPacket
 
-/-- Rational theta sum for the integer-indicator finite test, on the positive norm ray.
-The integer zero contributes nothing on polar sources. -/
+/-- Paper: (2.2.3.1), p. 81. The rational theta sum for the finite integer
+indicator is restricted to the positive norm ray.
+Deviation: Use a real Schwartz test and sum over all integers. The term at
+zero vanishes on polar sources. -/
 def theta (f : 𝓢(ℝ, ℂ)) (r : ℝ) : ℂ := ∑' n : ℤ, f ((n : ℝ) * r)
 
 /-- Pull back an actual real Schwartz source by positive multiplicative dilation. -/
@@ -137,8 +139,10 @@ private theorem theta_dilate {p : ℝ} (hp : 0 < p) (f : 𝓢(ℝ, ℂ)) (r : �
   congr 1
   ring
 
-/-- The half-twisted rational theta profile after the finite principal-value
-product. Expand the product into its signed subset sum on the true log ray. -/
+/-- Paper: §11.3.1.1, pp. 493–494. The half-twisted theta profile after the
+finite principal-value product.
+Deviation: Use the rational positive log ray and expand the product as a
+signed subset sum. -/
 def stage (T : Finset ℕ) (f : 𝓢(ℝ, ℂ)) (x : ℝ) : ℂ :=
   (Real.exp (x/2) : ℂ) * ∑ U ∈ T.powerset,
     (-1 : ℂ) ^ U.card * theta f (Real.exp x * ∏ p ∈ U, (p : ℝ))
@@ -183,8 +187,10 @@ theorem stage_smul (T : Finset ℕ) (c : ℂ) (f : 𝓢(ℝ, ℂ)) (x : ℝ) :
 @[simp] theorem stage_zero (T : Finset ℕ) (x : ℝ) : stage T 0 x = 0 := by
   simp only [stage, theta, zero_apply, tsum_zero, mul_zero, Finset.sum_const_zero]
 
-/-- Adding a prime to the rational stage applies its actual principal-value
-dilation difference to the half-twisted profile. -/
+/-- Paper: §11.3.1.1, pp. 493–494. Adding a prime applies its principal-value
+factor to the previous theta stage.
+Deviation: Express the factor as a log dilation difference of the rational
+half-twisted profile. -/
 theorem stage_insert (T : Finset ℕ) {p : ℕ} (hp : 0 < p) (hmem : p ∉ T)
     (f : 𝓢(ℝ, ℂ)) (x : ℝ) :
     stage (insert p T) f x =
@@ -561,8 +567,11 @@ private theorem mellinSample_apply (a ξ : ℝ) (f : ℝ →₂[volume] ℂ) :
     -(↑(2 * Real.pi * (x*ξ)) * Complex.I) by push_cast; ring]
   ring
 
-/-- The genuine rational test family at the box `X / ∏ p`. The pair of polar
-conditions is imposed before applying the rational theta sum and the earlier factors. -/
+/-- Paper: (11.3.1.3), p. 494. The generators of the Fourier-supported stage
+are the half-twisted principal-value theta images of polar-free sources.
+Deviation: For the rational trivial-angular channel with integer finite
+tails, use real Schwartz sources at Fourier radius `X / ∏_{q∈T} q` and
+take their images as classes in unweighted logarithmic `L²`. -/
 def stageGenerators (X : ℝ) (T : Finset ℕ) : Set (ℝ →₂[volume] ℂ) :=
   { F | ∃ f : 𝓢(ℝ, ℂ), f 0 = 0 ∧ (𝓕 f) 0 = 0 ∧
       (∀ y : ℝ, X / (∏ p ∈ T, (p : ℝ)) < |y| → (𝓕 f) y = 0) ∧
@@ -576,7 +585,10 @@ theorem mem_stageGenerators_iff (X : ℝ) (T : Finset ℕ) (F : ℝ →₂[volum
         (∀ y : ℝ, X / (∏ p ∈ T, (p : ℝ)) < |y| → (𝓕 f) y = 0) ∧
         (F : ℝ → ℂ) =ᵐ[volume] stage T f := Iff.rfl
 
-/-- The polar generator family is already a linear subspace. -/
+/-- Paper: (11.3.1.3), p. 494. Package the Fourier-supported principal-value
+theta images as the linear subspace used to form the closed stage.
+Deviation: This is the subspace before closure for the rational trivial-angular
+channel in unweighted logarithmic `L²`. -/
 def stageSubmodule (X : ℝ) (T : Finset ℕ) (hT : ∀ q ∈ T, 1 ≤ q) : Submodule ℂ (ℝ →₂[volume] ℂ) where
   carrier := stageGenerators X T
   zero_mem' := by
@@ -596,7 +608,11 @@ def stageSubmodule (X : ℝ) (T : Finset ℕ) (hT : ∀ q ∈ T, 1 ≤ q) : Subm
     filter_upwards [hF, Lp.coeFn_smul c F] with x hx hy
     rw [hy, Pi.smul_apply, hx, stage_smul]
 
-/-- The actual closed Hilbert subspace at the Fourier radius `X / ∏_{q∈T} q`. -/
+/-- Paper: (11.3.1.3), p. 494. Close the Fourier-supported principal-value
+theta image to obtain the stage in the successive quotient.
+Deviation: Take the closure for the rational trivial-angular channel in
+unweighted logarithmic `L²`, using real Schwartz sources at Fourier radius
+`X / ∏_{q∈T} q`. -/
 def closedStageSubmodule (X : ℝ) (T : Finset ℕ) (hT : ∀ q ∈ T, 1 ≤ q) :
     ClosedSubmodule ℂ (ℝ →₂[volume] ℂ) where
   toSubmodule := (stageSubmodule X T hT).topologicalClosure
@@ -606,8 +622,10 @@ theorem mem_closedStageSubmodule_iff (X : ℝ) (T : Finset ℕ) (hT : ∀ q ∈ 
     (F : ℝ →₂[volume] ℂ) :
     F ∈ closedStageSubmodule X T hT ↔ F ∈ closure (stageGenerators X T) := Iff.rfl
 
-/-- Inserting a new finite factor preserves membership in the previous actual box:
-its input is realized by a Schwartz dilation difference in the wider box. -/
+/-- Paper: (11.3.1.3), p. 494. Inserting a finite factor preserves membership
+in the previous box, giving the nesting used by the successive quotients.
+Deviation: Use the rational fixed-box radius and realize the new input by a
+Schwartz dilation difference in the wider box. -/
 theorem stageGenerators_insert_subset {X : ℝ} (hX : 0 < X)
     (T : Finset ℕ) (hT : ∀ q ∈ T, 1 ≤ q) {p : ℕ} (hp : 1 ≤ p) :
     stageGenerators X (insert p T) ⊆ stageGenerators X T := by
