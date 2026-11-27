@@ -26,7 +26,7 @@ namespace RiemannMasullo.QuotientDiagonal
 
 variable {X : Type*} [MeasurableSpace X] {μ : Measure X}
 
-abbrev H (μ : Measure X) := Lp ℂ 2 μ
+local notation "H " μ:max => Lp ℂ 2 μ
 
 private theorem memLp_rankDiagonal (f g : H μ) :
     MemLp (fun x ↦ f x * conj (g x)) 1 μ := by
