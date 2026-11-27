@@ -112,9 +112,10 @@ private theorem P4641_lower (σ : ℝ) (hσ : σ ∈ Set.Icc (0 : ℝ) 1) :
   nlinarith
 
 /-- Paper: Proposition 3.3.1.5(3), (3.3.1.11), p. 132. Take F = ℚ(i), S consisting
-of the complex place, the trivial character, k = 0 and σ = 1. The factor is
-`(2π)^(1 - 2s) Γ(s) / Γ(1 - s)`, of modulus `|τ| / (2π)` for nonzero τ by the
-Gamma recurrence and conjugation. The printed bound would give `O(|τ|^(1/2))`. -/
+of the complex place, the trivial character, k = 0 and σ = 3/4. The factor is
+`Γℂ(s) / Γℂ(1 - s)`. Its modulus is bounded below by a positive constant times
+`|τ|^(1/2)` for large `|τ|`, while the printed bound would give `O(|τ|^(1/4))`.
+The choice σ = 3/4 lies in the critical strip required by `P4641_tate`. -/
 theorem Printed.sLocalRhoFactor_iteratedDeriv_isBigO_false :
     ¬ Printed.sLocalRhoFactor_iteratedDeriv_isBigO := by
   intro h
