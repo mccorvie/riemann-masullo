@@ -75,7 +75,21 @@ jobs:
           git worktree add --detach ../work "$base"
           echo "BASE_SHA=$base" >>"$GITHUB_ENV"
 
+      - name: Preflight check (non-library files, lint, merge conflicts)
+        id: preflight
+        run: |
+          python3 tools/scripts/ci/verdict.py --preflight --work work --base "$BASE_SHA" --head "$HEAD_SHA" \
+            --pr "$PR" --out verdict || true
+          if [ -f verdict/verdict.json ]; then
+            verdict=$(python3 -c 'import json; print(json.load(open("verdict/verdict.json"))["verdict"])')
+            case $verdict in merge|read|fail|error) ;; *) verdict=error ;; esac
+            echo "verdict=$verdict" >>"$GITHUB_OUTPUT"
+            cat verdict/summary.md >>"$GITHUB_STEP_SUMMARY"
+            echo "::notice title=Verdict::$verdict"
+          fi
+
       - name: Set up the sandbox
+        if: steps.preflight.outputs.verdict == ''
         run: |
           command -v bwrap >/dev/null || { sudo apt-get update -qq; sudo apt-get install -y -qq bubblewrap; }
           # Ubuntu 24.04 lets only programs with an AppArmor profile make user namespaces.
@@ -83,6 +97,7 @@ jobs:
           bwrap --unshare-all --ro-bind / / true
 
       - name: Install Lean
+        if: steps.preflight.outputs.verdict == ''
         run: |
           curl -sSfL --retry 3 https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o "$RUNNER_TEMP/elan-init.sh"
           sh "$RUNNER_TEMP/elan-init.sh" -y --default-toolchain none
@@ -90,10 +105,12 @@ jobs:
           cd work && "$HOME/.elan/bin/lake" --version
 
       - name: Fetch the dependencies and Mathlib's build
+        if: steps.preflight.outputs.verdict == ''
         working-directory: work
         run: lake exe cache get || { sleep 20; lake exe cache get; }
 
       - name: Start from main's saved build, if there is one
+        if: steps.preflight.outputs.verdict == ''
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -101,6 +118,7 @@ jobs:
         run: python3 tools/scripts/ci/base_state.py --work work --base "$BASE_SHA" --out base-state || echo "could not fetch it; main will be built here"
 
       - name: Check the pull request
+        if: steps.preflight.outputs.verdict == ''
         id: check
         run: |
           saved=()
@@ -114,17 +132,17 @@ jobs:
           echo "::notice title=Verdict::$verdict"
 
       - name: Publish the verdict
-        if: steps.check.outputs.verdict != ''
+        if: steps.preflight.outputs.verdict != '' || steps.check.outputs.verdict != ''
         uses: actions/upload-artifact@v4
         with:
-          name: verdict-${{ steps.check.outputs.verdict }}
+          name: verdict-${{ steps.preflight.outputs.verdict || steps.check.outputs.verdict }}
           path: verdict/verdict.json
           if-no-files-found: error
           overwrite: true
           retention-days: 3
 
       - name: Fail the check unless the verdict is merge or read
-        if: steps.check.outputs.verdict != 'merge' && steps.check.outputs.verdict != 'read'
+        if: (steps.preflight.outputs.verdict || steps.check.outputs.verdict) != 'merge' && (steps.preflight.outputs.verdict || steps.check.outputs.verdict) != 'read'
         run: |
           echo "See the summary of this run for the reasons."
           exit 1

@@ -2,7 +2,7 @@
 """Check a pull request against main and say what should happen to it.
 
     scripts/ci/verdict.py --work DIR --base SHA --head SHA [--pr N] [--out DIR]
-                          [--base-signatures FILE]
+                          [--base-signatures FILE] [--preflight]
 
 The verdict is the one scripts/triage_prs.sh computes on the merger's machine:
 
@@ -366,9 +366,9 @@ def names(items, limit=12):
     return ", ".join(items[:limit]) + (f" and {len(items) - limit} more" if len(items) > limit else "")
 
 
-def decide(check, supplied_base):
+def preflight(check):
+    """Pure git/text checks that need neither Lean nor a build of main."""
     entries = check.changed_files()
-    held = check.held_back(entries)
     check.lint_text(entries)
     # A conflict is reported before the long build of main, when git can tell without a work tree.
     probe = check.git("merge-tree", "--write-tree", "--no-messages", check.base, check.head, check=False)
@@ -378,6 +378,12 @@ def decide(check, supplied_base):
     candidate = probe.stdout.strip()
     if probe.returncode or not SHA.fullmatch(candidate):
         raise Stop("error", ["could not compute the candidate merge tree"], probe.stderr)
+    return entries, candidate
+
+
+def decide(check, supplied_base):
+    entries, candidate = preflight(check)
+    held = check.held_back(entries)
     imports = run(["lean", "--run", str(TOOLS / "scripts/CheckImportAll.lean"),
                    check.base, candidate], cwd=check.work, timeout=60)
     if imports.returncode == 3:
@@ -494,13 +500,19 @@ def main():
     parser.add_argument("--pr", type=int, default=0)
     parser.add_argument("--out")
     parser.add_argument("--base-signatures")
+    parser.add_argument("--preflight", action="store_true")
     args = parser.parse_args()
     args.out = args.out or str(Path(args.work) / ".agent/verdict")
     try:
         if not (SHA.fullmatch(args.base) and SHA.fullmatch(args.head)):
             raise Stop("error", ["--base and --head must be full commit ids"])
+        check = Check(args.work, args.base, args.head)
+        if args.preflight:
+            preflight(check)
+            print("preflight: ok")
+            return 0
         supplied = Path(args.base_signatures).read_text() if args.base_signatures else None
-        decide(Check(args.work, args.base, args.head), supplied)
+        decide(check, supplied)
     except Stop as stop:
         verdict, reasons, log = stop.verdict, stop.reasons, stop.log
     except Exception as problem:  # the check broke: never report that as the pull request's fault
