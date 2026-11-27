@@ -1,4 +1,6 @@
-import Mathlib
+module
+
+public import Mathlib
 
 /-!
 # Appendix C. Preparations on locally convex topological vector spaces

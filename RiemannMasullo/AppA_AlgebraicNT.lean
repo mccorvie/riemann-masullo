@@ -1,4 +1,6 @@
-import Mathlib
+module
+
+public import Mathlib
 
 /-!
 # Appendix A. Preparations from Algebraic Number Theory
