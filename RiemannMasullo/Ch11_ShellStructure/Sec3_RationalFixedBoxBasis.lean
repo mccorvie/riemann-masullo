@@ -19,9 +19,12 @@ open Set Function
 open scoped Topology
 namespace RiemannMasullo.RationalPacket
 
-/-- The actual completed rational packet has an unconditional integer-mode
-expansion in its original Hilbert norm; every finite coordinate sum has norm
-at most `p` times the input norm. The zero coordinate is included. -/
+/-- Paper: (11.3.1.3), p. 494. The completed packet expands in integer-mode
+cardinal eigenvectors with the prescribed coordinates, including frequency zero.
+Deviation: Work on the rational fixed-box quotient with trivial angular
+character in unweighted logarithmic `L²`. The expansion converges
+unconditionally and every finite coordinate sum has norm at most `p` times
+the input norm. -/
 theorem exists_fixedBox_unconditional_cardinals {X : ℝ} (hX : 0 < X)
     (T : Finset ℕ) (hT1 : ∀ q ∈ T, 1 ≤ q) (p : ℕ)
     (hTp1 : ∀ q ∈ insert p T, 1 ≤ q) (hT : ∀ q ∈ T, q.Prime)
@@ -56,8 +59,11 @@ theorem exists_fixedBox_unconditional_cardinals {X : ℝ} (hX : 0 < X)
   refine ⟨v, hrow, heigen, ?_, hs, hli⟩
   simpa only [Real.sq_sqrt (Nat.cast_nonneg p)] using hb
 
-/-- Every enumeration of the integer modes gives an unconditional Schauder
-basis of the actual completed rational packet with its prescribed row maps. -/
+/-- Paper: (11.3.1.3), p. 494. The integer modes form a Schauder basis of
+the completed packet with the prescribed row maps as coordinates.
+Deviation: Work on the rational fixed-box quotient with trivial angular
+character in unweighted logarithmic `L²`. Every enumeration of the modes
+gives an unconditional basis. -/
 theorem exists_fixedBox_unconditional_schauderBasis {X : ℝ} (hX : 0 < X)
     (T : Finset ℕ) (hT1 : ∀ q ∈ T, 1 ≤ q) (p : ℕ)
     (hTp1 : ∀ q ∈ insert p T, 1 ≤ q) (hT : ∀ q ∈ T, q.Prime)
