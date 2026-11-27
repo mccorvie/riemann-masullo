@@ -1001,9 +1001,10 @@ private theorem sLocalThetaPoleBound_printed_mellin_sequence_false_aux :
   omega
 
 /-- Paper: Remark 7.2.1.2, p. 335.
-Over ℚ with the real place and p, select p. At 2πi/log p on the trivial
-component the full and selected multiplicities both equal one. The last
-identification would take the zero-dimensional stalk to a one-dimensional one. -/
+Over ℚ with no finite places, select every place. At the trivial character,
+the selected multiplicity equals the positive full pole order, so the remaining
+divisor vanishes. The last identification would give a linear equivalence
+between a zero-dimensional stalk and one of positive dimension. -/
 theorem sLocalThetaPoleBound_printed_mellin_sequence_false :
     ¬ sLocalThetaPoleBound_printed_mellin_sequence :=
   sLocalThetaPoleBound_printed_mellin_sequence_false_aux
