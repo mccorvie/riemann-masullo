@@ -235,7 +235,11 @@ theorem exists_sLocalTrace_fixedAnnulus_smoothMass_difference_hasSum
   apply ((Equiv.inv H).hasSum_iff (f := M)).mp
   exact hAffineSum.congr_fun fun ξ ↦ (hterm ξ).symm
 
-/-- The raw annular diagonal integral is the difference of the smooth orbital masses, summed over the S-units. -/
+/-- Paper: (12.4.1.22)–(12.4.1.24), p. 518. The weighted raw diagonal
+integrates to the sum of the upper smoothed masses minus the smoothed
+spatial floor. Inversion of the S-unit index matches the skew diagonal.
+Deviation: The cutoff profiles come from positive radius laws, and the
+identity concerns the raw quotient diagonal. -/
 theorem exists_sLocalTrace_fixedAnnulus_smoothMass_difference
     (τ : ℝ≥0ˣ →ₜ* I) (hτ : RightInverse τ (sIdeleNorm F S))
     (f : BruhatCompactSupport I) (D : Set I) (hD : IsFundamentalDomain H D μI)

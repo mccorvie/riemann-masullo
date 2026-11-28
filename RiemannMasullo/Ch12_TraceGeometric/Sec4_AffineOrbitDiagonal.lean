@@ -293,7 +293,12 @@ theorem exists_sLocalTrace_fixedAnnulus_affineDiagonal_hasSum
     exact hsumU.hasSum
   exact ⟨κ, hRep, hDI, hDν, hHasSum.congr_fun fun ξ ↦ (hrad ξ).symm⟩
 
-/-- The integral of the weighted raw diagonal is the sum of its affine radial orbital integrals. -/
+/-- Paper: Theorem 12.4.1.1, Step III, pp. 517–518.
+The half-density quotient diagonal is integrable for the weighted measure.
+Cancelling the Sobolev density gives the absolutely unfolded sum of
+smooth affine orbital integrals at a fixed annulus.
+Deviation: This computes the raw diagonal and retains the smooth cutoff
+profiles in the orbital integrals. -/
 theorem exists_sLocalTrace_fixedAnnulus_affineDiagonal_integral
     (τ : ℝ≥0ˣ →ₜ* I) (hτ : RightInverse τ (sIdeleNorm F S))
     (f : BruhatCompactSupport I) (b : ℝ → ℂ) {Λ ερ εb Cb s : ℝ} {ρ : J → ℝ}
