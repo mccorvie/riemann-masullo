@@ -1907,6 +1907,47 @@ theorem sLocalTraceCutoffKernel_apply_test
     _ = ρ x * sLocalTraceDilationKernel f (sLocalTraceFourierCutoff σ v) x.val := by
       simp only [hcutoff, sLocalTraceDilationKernel, W]
 
+/-- An auxiliary continuity result for Theorem 12.4.1.1, Step II, p. 517.
+For a fixed S-idelic output, the dilation-first kernel is continuous in
+the additive input under a bounded measurable frequency symbol. The
+spatial multiplier enters through its value at that output. -/
+theorem sLocalTraceCutoffKernel_continuous_additive_row
+    (f : BruhatCompactSupport Iₛ) (ρ : Iₛ → ℂ) (σ : Aₛ → ℂ)
+    (hσ : Measurable σ) {B : ℝ} (hB : ∀ u, ‖σ u‖ ≤ B) (x : Iₛ) :
+    Continuous (sLocalTraceCutoffKernel f ρ σ x) := by
+  let : BorelSpace Aₛ := sAdeleRing_borelSpace
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let : SecondCountableTopology Aₛ := inferInstanceAs (SecondCountableTopology
+    (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+  obtain ⟨e, he, -⟩ := sAdditiveTamagawaMeasure_selfDual F S
+  let χ := e (Multiplicative.ofAdd (1 : Aₛ))
+  have hχ (z : Aₛ) : χ (Multiplicative.ofAdd z) = ψₛ z := by
+    simpa only [one_mul] using he 1 z
+  have hψ : Continuous fun z : Aₛ ↦ (ψₛ z : ℂ) :=
+    ((continuous_subtype_val.comp χ.continuous).comp continuous_ofAdd).congr
+      (fun z ↦ congrArg (fun w : Circle ↦ (w : ℂ)) (hχ z))
+  let G (u : Aₛ) := σ u * fourierₛ (sLocalTraceEta f 1) (-(x.val * u))
+  have hG : Integrable G νₛ := by
+    simpa only [G, Units.val_neg, neg_mul] using
+      sLocalTrace_integrable_symbol_dilate _ (sLocalTraceEta_fourier_integrable f 1) (-x) σ hσ B hB
+  let P (y u : Aₛ) : ℂ := ψₛ ((x.val - y) * u)
+  have hP (y : Aₛ) : Continuous (P y) :=
+    hψ.comp (continuous_const.mul continuous_id)
+  have hInt : Continuous (fun y : Aₛ ↦ ∫ u, G u * P y u ∂νₛ) := by
+    apply continuous_of_dominated (bound := fun u ↦ ‖G u‖)
+    · intro y
+      exact hG.aestronglyMeasurable.mul (hP y).aestronglyMeasurable
+    · intro y
+      exact ae_of_all _ fun u ↦ by
+        simp only [P, norm_mul, Circle.norm_coe, mul_one, le_refl]
+    · exact hG.norm
+    · exact ae_of_all _ fun u ↦
+        (hψ.comp ((continuous_const.sub continuous_id).mul_const u)).const_mul (G u)
+  exact (hInt.const_mul (ρ x * (sLocalTraceMeasureFactor S : ℂ))).congr fun y ↦
+    (sLocalTraceCutoffKernel_offDiagonal_fourier f ρ σ x y).symm
+
 /-- Paper: (12.4.1.24), p. 518. The sharp orbital mass of the zero lift vanishes
 at every radius. -/
 theorem sLocalTraceSharpMass_zero (ξ : Hₛ) (R : ℝ) :
