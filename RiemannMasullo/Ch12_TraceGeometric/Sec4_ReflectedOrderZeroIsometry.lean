@@ -29,6 +29,7 @@ local notation "ℓ" => logSIdeleQuotientNorm F S
 local notation "ν" => intervalSobolevMeasure μJ ℓ 0 0 0
 local notation "W₀" => CompactIntervalSobolev μJ ℓ 0 0 0
 local notation "Zₛ" => sAdelePolarSubspace F S
+local notation "Bₛ" => SchwartzBruhat (Multiplicative (SAdeleRing F S))
 local notation "FlatL2" => Lp ℂ 2 (volume : Measure ℝ)
 local notation "halfPos" => (show (0 : ℝ) < 1 / 2 by norm_num)
 local notation "expUnit" => fun x : ℝ ↦ Units.mk0 (Real.toNNReal (Real.exp x)) (by positivity)
@@ -50,8 +51,8 @@ its values on the norm section. -/
 private theorem sLocalHalfDensityTheta_eq_logSection
     (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
     (ω : PontryaginDual J₁) (χ : PontryaginDual Jₛ) (hχ : χ.comp include₁ = ω)
-    (hsec : ∀ t, χ (QuotientGroup.mk (τ t)) = 1) (f : Zₛ) (g : Jₛ) :
-    let θ := sLocalHomogeneousAdelicThetaLinearMap F S ω f.val
+    (hsec : ∀ t, χ (QuotientGroup.mk (τ t)) = 1) (f : Bₛ) (g : Jₛ) :
+    let θ := sLocalHomogeneousAdelicThetaLinearMap F S ω f
     modulationWeight (continuousSIdeleQuotientNorm F S) (1 / 2) θ g =
       (χ g : ℂ)⁻¹ * ((Real.exp (ℓ g / 2) : ℂ) *
         θ (QuotientGroup.mk (τ (expUnit (ℓ g))))) := by
@@ -80,7 +81,7 @@ private theorem sLocalHalfDensityTheta_eq_logSection
   have hθ : θ g = (χ g : ℂ)⁻¹ * θ q := by
     calc
       θ g = θ (h.val⁻¹ * q) := congrArg θ hg.symm
-      _ = (ω h : ℂ) * θ q := sLocalHomogeneousAdelicTheta_homogeneous F S η ω f.val h q
+      _ = (ω h : ℂ) * θ q := sLocalHomogeneousAdelicTheta_homogeneous F S η ω f h q
       _ = _ := congrArg (· * θ q) hphase
   have hpow : ((N g).val : ℝ) ^ (1 / 2 : ℝ) = Real.exp (ℓ g / 2) := by
     change ((N g).val : ℝ) ^ (1 / 2 : ℝ) = Real.exp (Real.log ((N g).val : ℝ) / 2)
@@ -90,19 +91,21 @@ private theorem sLocalHalfDensityTheta_eq_logSection
     (χ g : ℂ)⁻¹ * ((Real.exp (ℓ g / 2) : ℂ) * θ q)
   rw [hpow, hθ, mul_left_comm]
 
-/-- In order zero the normalized angular coefficient has an isometric left
-inverse on the closed invariant Paley–Wiener level. -/
-theorem exists_sLocalWeightedAngularLogCoefficient_leftInverse_on_level_zero
+/-- At order zero a single inverse-character isometry recovers each half-density
+quotient theta vector from its normalized logarithmic coefficient. -/
+theorem exists_sLocalWeightedLogCharacterLift_leftInverse_of_representatives_zero
     (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
     (ω : PontryaginDual J₁) (χ : PontryaginDual Jₛ) (hχ : χ.comp include₁ = ω)
-    (hsec : ∀ t, χ (QuotientGroup.mk (τ t)) = 1) (B : ℝ)
-    (Q : W₀ →L[ℂ] FlatL2)
-    (hQ : ∀ u, (Q u : ℝ → ℂ) =ᵐ[volume] fun x ↦
-      (Real.sqrt (Measure.real η univ) : ℂ)⁻¹ *
-        ∫ h : J₁, (ω h : ℂ) * u (h.val * QuotientGroup.mk (τ (expUnit x))) ∂η) :
+    (hsec : ∀ t, χ (QuotientGroup.mk (τ t)) = 1) :
     ∃ L : FlatL2 →ₗᵢ[ℂ] W₀,
-      ∀ (u : W₀), u ∈ sLocalInvariantPWSobolev (F := F) (S := S) (s := 0) le_rfl halfPos ω B →
-        L (Q u) = u := by
+      (∀ v, (L v : Jₛ → ℂ) =ᵐ[ν] fun q ↦ (Real.sqrt (Measure.real η univ) : ℂ)⁻¹ *
+        (χ q : ℂ)⁻¹ * v (ℓ q)) ∧
+      ∀ (f : Bₛ) (u : W₀) (v : FlatL2),
+      let θ := sLocalHomogeneousAdelicThetaLinearMap F S ω f
+      ((u : Jₛ → ℂ) =ᵐ[μJ] modulationWeight (continuousSIdeleQuotientNorm F S) (1 / 2) θ) →
+      ((v : ℝ → ℂ) =ᵐ[volume] fun t ↦ (Real.sqrt (Measure.real η univ) : ℂ) *
+        ((Real.exp (t / 2) : ℂ) * θ (QuotientGroup.mk (τ (expUnit t))))) →
+      L v = u := by
   let d : ℂ := Real.sqrt (Measure.real η univ)
   have hLift : ∃ L : FlatL2 →ₗᵢ[ℂ] W₀,
       ∀ v, (L v : Jₛ → ℂ) =ᵐ[ν] fun q ↦ d⁻¹ * (χ q : ℂ)⁻¹ * v (ℓ q) := by
@@ -130,24 +133,40 @@ theorem exists_sLocalWeightedAngularLogCoefficient_leftInverse_on_level_zero
   let : IsFiniteMeasure η := CompactSpace.isFiniteMeasure
   have hmass : 0 < Measure.real η univ := measureReal_univ_pos
   have hd : d ≠ 0 := Complex.ofReal_ne_zero.mpr (Real.sqrt_pos.mpr hmass).ne'
+  refine ⟨L, hL, ?_⟩
+  intro f u v θ hu hv
+  let profile (t : ℝ) : ℂ := (Real.exp (t / 2) : ℂ) * θ (QuotientGroup.mk (τ (expUnit t)))
+  have hPull := hlogMap.quasiMeasurePreserving.ae_eq_comp (Measure.ae_smul_measure hv (η univ))
+  apply Lp.ext
+  filter_upwards [hL v, hPull, hνμ.ae_eq hu] with g hLg hvg hug
+  change v (ℓ g) = d * profile (ℓ g) at hvg
+  have hpoint : modulationWeight (continuousSIdeleQuotientNorm F S) (1 / 2) θ g =
+      (χ g : ℂ)⁻¹ * profile (ℓ g) := sLocalHalfDensityTheta_eq_logSection τ hτ ω χ hχ hsec f g
+  rw [hLg, hvg, hug, hpoint]
+  calc
+    _ = (d⁻¹ * d) * ((χ g : ℂ)⁻¹ * profile (ℓ g)) := by ring
+    _ = _ := by rw [inv_mul_cancel₀ hd, one_mul]
+
+/-- In order zero the normalized angular coefficient has an isometric left
+inverse on the closed invariant Paley–Wiener level. -/
+theorem exists_sLocalWeightedAngularLogCoefficient_leftInverse_on_level_zero
+    (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
+    (ω : PontryaginDual J₁) (χ : PontryaginDual Jₛ) (hχ : χ.comp include₁ = ω)
+    (hsec : ∀ t, χ (QuotientGroup.mk (τ t)) = 1) (B : ℝ)
+    (Q : W₀ →L[ℂ] FlatL2)
+    (hQ : ∀ u, (Q u : ℝ → ℂ) =ᵐ[volume] fun x ↦
+      (Real.sqrt (Measure.real η univ) : ℂ)⁻¹ *
+        ∫ h : J₁, (ω h : ℂ) * u (h.val * QuotientGroup.mk (τ (expUnit x))) ∂η) :
+    ∃ L : FlatL2 →ₗᵢ[ℂ] W₀,
+      ∀ (u : W₀), u ∈ sLocalInvariantPWSobolev (F := F) (S := S) (s := 0) le_rfl halfPos ω B →
+        L (Q u) = u := by
+  obtain ⟨L, _, hLeft⟩ :=
+    exists_sLocalWeightedLogCharacterLift_leftInverse_of_representatives_zero τ hτ ω χ hχ hsec
   let gen (f : Zₛ) : W₀ := sLocalPWThetaSobolevMap (F := F) (S := S) (s := 0) halfPos ω f
-  have hGen (f : Zₛ) : L (Q (gen f)) = gen f := by
-    let θ := sLocalHomogeneousAdelicThetaLinearMap F S ω f.val
-    let v (t : ℝ) : ℂ := (Real.exp (t / 2) : ℂ) * θ (QuotientGroup.mk (τ (expUnit t)))
-    have hQgen : (Q (gen f) : ℝ → ℂ) =ᵐ[volume] fun t ↦ d * v t :=
-      sLocalWeightedAngularLogCoefficient_onTheta τ hτ ω Q hQ f
-    have hPull := hlogMap.quasiMeasurePreserving.ae_eq_comp (Measure.ae_smul_measure hQgen (η univ))
-    have hgen : (gen f : Jₛ → ℂ) =ᵐ[μJ] modulationWeight (continuousSIdeleQuotientNorm F S) (1 / 2) θ :=
-      sLocalPWThetaSobolevMap_apply (F := F) (S := S) (s := 0) halfPos ω f
-    apply Lp.ext
-    filter_upwards [hL (Q (gen f)), hPull, hνμ.ae_eq hgen] with g hLg hQg hgg
-    change Q (gen f) (ℓ g) = d * v (ℓ g) at hQg
-    have hpoint : modulationWeight (continuousSIdeleQuotientNorm F S) (1 / 2) θ g =
-        (χ g : ℂ)⁻¹ * v (ℓ g) := sLocalHalfDensityTheta_eq_logSection τ hτ ω χ hχ hsec f g
-    rw [hLg, hQg, hgg, hpoint]
-    calc
-      _ = (d⁻¹ * d) * ((χ g : ℂ)⁻¹ * v (ℓ g)) := by ring
-      _ = _ := by rw [inv_mul_cancel₀ hd, one_mul]
+  have hGen (f : Zₛ) : L (Q (gen f)) = gen f :=
+    hLeft f.val (gen f) (Q (gen f))
+      (sLocalPWThetaSobolevMap_apply (F := F) (S := S) (s := 0) halfPos ω f)
+      (sLocalWeightedAngularLogCoefficient_onTheta τ hτ ω Q hQ f)
   let D : W₀ →L[ℂ] W₀ := L.toContinuousLinearMap.comp Q - ContinuousLinearMap.id ℂ W₀
   have hker : sLocalInvariantPWSobolev (F := F) (S := S) (s := 0) le_rfl halfPos ω B ≤ D.ker := by
     unfold sLocalInvariantPWSobolev

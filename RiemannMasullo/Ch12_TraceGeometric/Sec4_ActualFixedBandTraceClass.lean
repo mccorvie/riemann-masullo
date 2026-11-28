@@ -4,6 +4,7 @@ public import RiemannMasullo.Ch12_TraceGeometric.Sec4_WeightedLogTransport
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_CriticalLineFourierPhase
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_UpperHalflineFactorization
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_QuotientLowerFloorTransport
+public import RiemannMasullo.Ch12_TraceGeometric.Sec4_LevelPolarComplement
 import Mathlib.MeasureTheory.Integral.DominatedConvergence
 import RiemannMasullo.Ch12_TraceGeometric.Sec4_GlobalRadialTestProfile
 import RiemannMasullo.AppD_SchwartzBruhat.Sec1a
@@ -15,6 +16,8 @@ import Mathlib.Analysis.SpecialFunctions.Pow.Complex
 import RiemannMasullo.ForMathlib.Analysis.Fourier.L2Phase
 import RiemannMasullo.Ch12_TraceGeometric.Sec4_ClosedLevelLogSupport
 import RiemannMasullo.Ch12_TraceGeometric.Sec4_ReflectedTrivialMoment
+import RiemannMasullo.Ch12_TraceGeometric.Sec4_LevelPolarTransport
+import RiemannMasullo.Ch12_TraceGeometric.Sec4_FullReflectedExactRange
 import RiemannMasullo.Ch12_TraceGeometric.Sec4_ReflectedOrderZeroIsometry
 import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3_FourierBandThetaSupport
 
@@ -99,33 +102,26 @@ private theorem realFourier_mul_const_left (d : ℂ) (f : ℝ → ℂ) (ξ : ℝ
   simp only [smul_eq_mul]
   ring
 
-/-- On a polar test and its S-adelic Fourier transform, the weighted logarithmic
-coefficients have integrable representatives satisfying the critical-line
-Tate phase identity after reflecting the inverse-character coefficient.
-Both representatives include the same square root of the norm-one mass. -/
-public theorem exists_sLocalWeightedTheta_reflectedFourierPhase {s : ℝ}
+/-- For an ordinary test, the normalized log coefficients of the test and its
+Fourier transform admit integrable representatives related by the Tate phase. -/
+private theorem exists_sLocalTheta_reflectedFourierPhase_of_coefficients
     (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
-    (ω : PontryaginDual J₁)
-    (Q : PontryaginDual J₁ → (W(s) →L[ℂ] FlatL2))
-    (hQ : ∀ (ω' : PontryaginDual J₁) (u : W(s)),
-      (Q ω' u : ℝ → ℂ) =ᵐ[volume] fun x ↦
-        (Real.sqrt (Measure.real η univ) : ℂ)⁻¹ *
-          ∫ h : J₁, (ω' h : ℂ) * u (h.val * QuotientGroup.mk (τ (expUnit x))) ∂η) :
+    (ω : PontryaginDual J₁) :
     ∃ χ : PontryaginDual Jₛ, χ.comp include₁ = ω ∧
       (∀ t : ℝ≥0ˣ, χ (QuotientGroup.mk (τ t)) = 1) ∧
       let m (ξ : ℝ) : ℂ :=
         sLocalRhoFactor (chart ((circleCoe).comp χ) (sLocalRadialThetaCriticalParameter ξ))
       AEStronglyMeasurable m volume ∧ (∀ ξ, ‖m ξ‖ = 1) ∧
-      ∀ f : Zₛ,
-        let fhat : Zₛ := ⟨sAdeleSchwartzFourier f.val, sAdelePolarSubspace_fourier f⟩
-        let v := Q ω (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s)
-          (a := 1 / 2) (by norm_num) ω f)
-        let w := Lp.compMeasurePreserving (fun x : ℝ ↦ -x) (Measure.measurePreserving_neg volume)
-          (Q ω⁻¹ (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s)
-            (a := 1 / 2) (by norm_num) ω⁻¹ fhat))
+      ∀ (f : Bₛ) (v w₀ : FlatL2),
         let d : ℂ := Real.sqrt (Measure.real η univ)
-        let p (x : ℝ) := d * sLocalRadialThetaHalfDensity τ χ f.val x
-        let r (x : ℝ) := d * sLocalRadialThetaHalfDensity τ χ⁻¹ fhat.val (-x)
+        let w := Lp.compMeasurePreserving (fun x : ℝ ↦ -x) (Measure.measurePreserving_neg volume) w₀
+        let p (x : ℝ) := d * sLocalRadialThetaHalfDensity τ χ f x
+        let r (x : ℝ) := d * sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f) (-x)
+        ((v : ℝ → ℂ) =ᵐ[volume] fun x ↦ d * ((Real.exp (x / 2) : ℂ) *
+          sLocalHomogeneousAdelicThetaLinearMap F S ω f (QuotientGroup.mk (τ (expUnit x))))) →
+        ((w₀ : ℝ → ℂ) =ᵐ[volume] fun x ↦ d * ((Real.exp (x / 2) : ℂ) *
+          sLocalHomogeneousAdelicThetaLinearMap F S ω⁻¹ (sAdeleSchwartzFourier f)
+            (QuotientGroup.mk (τ (expUnit x))))) →
         Integrable p ∧ Integrable r ∧ (v : ℝ → ℂ) =ᵐ[volume] p ∧
           (w : ℝ → ℂ) =ᵐ[volume] r ∧ ∀ ξ, 𝓕 p ξ = m ξ * 𝓕 r ξ := by
   let σ : ℝ≥0ˣ →ₜ* Jₛ :=
@@ -157,56 +153,145 @@ public theorem exists_sLocalWeightedTheta_reflectedFourierPhase {s : ℝ}
       (sLocalRhoFactor_analyticAt_criticalLine χ _ (hz ξ)).continuousAt
     exact hfactor.comp hzc.continuousAt
   refine ⟨hmc.aestronglyMeasurable, fun ξ ↦ sLocalRhoFactor_norm_criticalLine χ _ (hz ξ), ?_⟩
-  intro f fhat v w d p r
+  intro f v w₀ d w p r hv hw₀
   have hprofile (ψ : PontryaginDual Jₛ) (ω' : PontryaginDual J₁)
-      (hres : ψ.comp include₁ = ω') (hsec : ∀ t, ψ (σ t) = 1) (g : Zₛ) (x : ℝ) :
-      (Real.exp (x / 2) : ℂ) * sLocalHomogeneousAdelicThetaLinearMap F S ω' g.val
+      (hres : ψ.comp include₁ = ω') (hsec : ∀ t, ψ (σ t) = 1) (g : Bₛ) (x : ℝ) :
+      (Real.exp (x / 2) : ℂ) * sLocalHomogeneousAdelicThetaLinearMap F S ω' g
         (QuotientGroup.mk (τ (expUnit x))) =
-      sLocalRadialThetaHalfDensity τ ψ g.val x := by
+      sLocalRadialThetaHalfDensity τ ψ g x := by
     have hone : ψ (QuotientGroup.mk (τ (expUnit x))) = 1 := hsec (expUnit x)
     simp only [sLocalRadialThetaHalfDensity, hres, hone, Circle.coe_one, mul_one]
     exact mul_comm _ _
-  have hv : (v : ℝ → ℂ) =ᵐ[volume] p := by
-    refine (sLocalWeightedAngularLogCoefficient_onTheta τ hτ ω (Q ω) (hQ ω) f).trans
-      (ae_of_all _ fun x ↦ ?_)
-    exact congrArg (d * ·) (hprofile χ ω hχ.1 hχ.2 f x)
-  let w₀ := Q ω⁻¹ (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s)
-    (a := 1 / 2) (by norm_num) ω⁻¹ fhat)
-  have hw₀ : (w₀ : ℝ → ℂ) =ᵐ[volume] fun x ↦
-      d * sLocalRadialThetaHalfDensity τ χ⁻¹ fhat.val x := by
-    refine (sLocalWeightedAngularLogCoefficient_onTheta τ hτ ω⁻¹ (Q ω⁻¹) (hQ ω⁻¹) fhat).trans
-      (ae_of_all _ fun x ↦ ?_)
-    exact congrArg (d * ·) (hprofile χ⁻¹ ω⁻¹ hχinv hχσinv fhat x)
+  have hvProfile : (v : ℝ → ℂ) =ᵐ[volume] p :=
+    hv.trans (ae_of_all _ fun x ↦ congrArg (d * ·) (hprofile χ ω hχ.1 hχ.2 f x))
+  have hwProfile : (w₀ : ℝ → ℂ) =ᵐ[volume] fun x ↦
+      d * sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f) x :=
+    hw₀.trans (ae_of_all _ fun x ↦
+      congrArg (d * ·) (hprofile χ⁻¹ ω⁻¹ hχinv hχσinv (sAdeleSchwartzFourier f) x))
   have hn := Measure.measurePreserving_neg (volume : Measure ℝ)
   have hw : (w : ℝ → ℂ) =ᵐ[volume] r :=
-    (Lp.coeFn_compMeasurePreserving w₀ hn).trans (hn.quasiMeasurePreserving.ae_eq_comp hw₀)
-  have hp : Integrable p := (sLocalRadialThetaHalfDensity_integrable τ hτ χ f.val).const_mul d
-  have hr₀ : Integrable (fun x ↦ d * sLocalRadialThetaHalfDensity τ χ⁻¹ fhat.val x) :=
-    (sLocalRadialThetaHalfDensity_integrable τ hτ χ⁻¹ fhat.val).const_mul d
-  have hrMap : Integrable (fun x ↦ d * sLocalRadialThetaHalfDensity τ χ⁻¹ fhat.val x)
+    (Lp.coeFn_compMeasurePreserving w₀ hn).trans (hn.quasiMeasurePreserving.ae_eq_comp hwProfile)
+  have hp : Integrable p := (sLocalRadialThetaHalfDensity_integrable τ hτ χ f).const_mul d
+  have hr₀ : Integrable (fun x ↦ d * sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f) x) :=
+    (sLocalRadialThetaHalfDensity_integrable τ hτ χ⁻¹ (sAdeleSchwartzFourier f)).const_mul d
+  have hrMap : Integrable (fun x ↦ d * sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f) x)
       (Measure.map (fun x : ℝ ↦ -x) volume) := by
     rw [hn.map_eq]
     exact hr₀
   have hr : Integrable r := hrMap.comp_measurable hn.measurable
-  refine ⟨hp, hr, hv, hw, fun ξ ↦ ?_⟩
-  change 𝓕 (fun x ↦ d * sLocalRadialThetaHalfDensity τ χ f.val x) ξ =
+  refine ⟨hp, hr, hvProfile, hw, fun ξ ↦ ?_⟩
+  change 𝓕 (fun x ↦ d * sLocalRadialThetaHalfDensity τ χ f x) ξ =
     m ξ * 𝓕 (fun x ↦ d * sLocalRadialThetaHalfDensity τ χ⁻¹
-      (sAdeleSchwartzFourier f.val) (-x)) ξ
+      (sAdeleSchwartzFourier f) (-x)) ξ
   rw [realFourier_mul_const_left, realFourier_mul_const_left,
-    sLocalRadialThetaHalfDensity_fourier_reflected_phase τ hτ χ f.val ξ]
+    sLocalRadialThetaHalfDensity_fourier_reflected_phase τ hτ χ f ξ]
   change d * (m ξ * _) = m ξ * (d * _)
   exact mul_left_comm _ _ _
 
+
+/-- On a polar test and its S-adelic Fourier transform, the weighted logarithmic
+coefficients have integrable representatives satisfying the critical-line
+Tate phase identity after reflecting the inverse-character coefficient.
+Both representatives include the same square root of the norm-one mass. -/
+public theorem exists_sLocalWeightedTheta_reflectedFourierPhase {s : ℝ}
+    (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
+    (ω : PontryaginDual J₁)
+    (Q : PontryaginDual J₁ → (W(s) →L[ℂ] FlatL2))
+    (hQ : ∀ (ω' : PontryaginDual J₁) (u : W(s)),
+      (Q ω' u : ℝ → ℂ) =ᵐ[volume] fun x ↦
+        (Real.sqrt (Measure.real η univ) : ℂ)⁻¹ *
+          ∫ h : J₁, (ω' h : ℂ) * u (h.val * QuotientGroup.mk (τ (expUnit x))) ∂η) :
+    ∃ χ : PontryaginDual Jₛ, χ.comp include₁ = ω ∧
+      (∀ t : ℝ≥0ˣ, χ (QuotientGroup.mk (τ t)) = 1) ∧
+      let m (ξ : ℝ) : ℂ :=
+        sLocalRhoFactor (chart ((circleCoe).comp χ) (sLocalRadialThetaCriticalParameter ξ))
+      AEStronglyMeasurable m volume ∧ (∀ ξ, ‖m ξ‖ = 1) ∧
+      ∀ f : Zₛ,
+        let fhat : Zₛ := ⟨sAdeleSchwartzFourier f.val, sAdelePolarSubspace_fourier f⟩
+        let v := Q ω (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s)
+          (a := 1 / 2) (by norm_num) ω f)
+        let w := Lp.compMeasurePreserving (fun x : ℝ ↦ -x) (Measure.measurePreserving_neg volume)
+          (Q ω⁻¹ (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s)
+            (a := 1 / 2) (by norm_num) ω⁻¹ fhat))
+        let d : ℂ := Real.sqrt (Measure.real η univ)
+        let p (x : ℝ) := d * sLocalRadialThetaHalfDensity τ χ f.val x
+        let r (x : ℝ) := d * sLocalRadialThetaHalfDensity τ χ⁻¹ fhat.val (-x)
+        Integrable p ∧ Integrable r ∧ (v : ℝ → ℂ) =ᵐ[volume] p ∧
+          (w : ℝ → ℂ) =ᵐ[volume] r ∧ ∀ ξ, 𝓕 p ξ = m ξ * 𝓕 r ξ := by
+  obtain ⟨χ, hχ, hsec, hm, hunit, hphase⟩ :=
+    exists_sLocalTheta_reflectedFourierPhase_of_coefficients τ hτ ω
+  refine ⟨χ, hχ, hsec, hm, hunit, ?_⟩
+  intro f fhat v w d p r
+  exact hphase f.val v
+    (Q ω⁻¹ (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s)
+      (a := 1 / 2) (by norm_num) ω⁻¹ fhat))
+    (sLocalWeightedAngularLogCoefficient_onTheta τ hτ ω (Q ω) (hQ ω) f)
+    (sLocalWeightedAngularLogCoefficient_onTheta τ hτ ω⁻¹ (Q ω⁻¹) (hQ ω⁻¹) fhat)
+
+/-- The same phase-removal isometry gives the reflected generator formula on
+both the full band and its polar-free subspace. -/
+private theorem exists_sLocalFullWeightedTheta_reflectedLogInput_of_Q {s : ℝ}
+    (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
+    (ω : PontryaginDual J₁)
+    (Q : PontryaginDual J₁ → (W(s) →L[ℂ] FlatL2))
+    (hQ : ∀ (ω' : PontryaginDual J₁) (u : W(s)),
+      (Q ω' u : ℝ → ℂ) =ᵐ[volume] fun x ↦
+        (Real.sqrt (Measure.real η univ) : ℂ)⁻¹ *
+          ∫ h : J₁, (ω' h : ℂ) * u (h.val * QuotientGroup.mk (τ (expUnit x))) ∂η) :
+    ∃ (χ : PontryaginDual Jₛ) (U : FlatL2 ≃ₗᵢ[ℂ] FlatL2),
+      χ.comp include₁ = ω ∧ (∀ t : ℝ≥0ˣ, χ (QuotientGroup.mk (τ t)) = 1) ∧
+      let m (ξ : ℝ) : ℂ :=
+        sLocalRhoFactor (chart ((circleCoe).comp χ) (sLocalRadialThetaCriticalParameter ξ))
+      (∀ v, (Lp.fourierTransformₗᵢ ℝ ℂ (U v) : ℝ → ℂ) =ᵐ[volume] fun ξ ↦
+        star (m ξ) * (Lp.fourierTransformₗᵢ ℝ ℂ v : FlatL2) ξ) ∧
+      let T : W(s) →L[ℂ] FlatL2 := U.toLinearIsometry.toContinuousLinearMap.comp (Q ω)
+      (∀ f : Bₛ,
+        (T (Isolated.sLocalFullPWThetaSobolevMap (F := F) (S := S) (s := s)
+          (a := 1 / 2) (by norm_num) ω f) : ℝ → ℂ) =ᵐ[volume] fun x ↦
+          (Real.sqrt (Measure.real η univ) : ℂ) *
+            sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f) (-x)) ∧
+      (∀ f : Zₛ,
+        (T (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s)
+          (a := 1 / 2) (by norm_num) ω f) : ℝ → ℂ) =ᵐ[volume] fun x ↦
+          (Real.sqrt (Measure.real η univ) : ℂ) *
+            sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f.val) (-x)) := by
+  obtain ⟨χ, hχ, hsec, hm, hunit, hphase⟩ :=
+    exists_sLocalTheta_reflectedFourierPhase_of_coefficients τ hτ ω
+  let m (ξ : ℝ) : ℂ :=
+    sLocalRhoFactor (chart ((circleCoe).comp χ) (sLocalRadialThetaCriticalParameter ξ))
+  obtain ⟨U, hUFourier, _, hCancel⟩ := exists_L2FourierInversePhase m hm (ae_of_all _ hunit)
+  let T : W(s) →L[ℂ] FlatL2 := U.toLinearIsometry.toContinuousLinearMap.comp (Q ω)
+  have hFull (f : Bₛ) :
+      (T (Isolated.sLocalFullPWThetaSobolevMap (F := F) (S := S) (s := s)
+        (a := 1 / 2) (by norm_num) ω f) : ℝ → ℂ) =ᵐ[volume] fun x ↦
+        (Real.sqrt (Measure.real η univ) : ℂ) *
+          sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f) (-x) := by
+    let v : FlatL2 := Q ω (Isolated.sLocalFullPWThetaSobolevMap
+      (F := F) (S := S) (s := s) (a := 1 / 2) (by norm_num) ω f)
+    let w₀ : FlatL2 := Q ω⁻¹ (Isolated.sLocalFullPWThetaSobolevMap
+      (F := F) (S := S) (s := s) (a := 1 / 2) (by norm_num) ω⁻¹ (sAdeleSchwartzFourier f))
+    obtain ⟨hp, hr, hv, hw, hFourier⟩ := hphase f v w₀
+      (Isolated.sLocalWeightedAngularLogCoefficient_onFullTheta τ hτ ω (Q ω) (hQ ω) f)
+      (Isolated.sLocalWeightedAngularLogCoefficient_onFullTheta τ hτ ω⁻¹ (Q ω⁻¹) (hQ ω⁻¹)
+        (sAdeleSchwartzFourier f))
+    have hU := hCancel _ _ _ _ hp hr hv hw (ae_of_all _ hFourier)
+    change (U v : ℝ → ℂ) =ᵐ[volume] _
+    rw [hU]
+    exact hw
+  refine ⟨χ, U, hχ, hsec, hUFourier, hFull, fun f ↦ ?_⟩
+  simpa only [Isolated.sLocalFullPWThetaSobolevMap_polar] using hFull f.val
 
 local notation "band(" B ")" =>
   Subtype (fun f : Zₛ ↦ Subtype.val f ∈ sLocalPWTests (F := F) (S := S) (T := S) le_rfl
     (sLocalPWProductRegion S B))
 
-private theorem reflectedWeightedTheta_zero_lt
+private theorem reflectedWeightedTheta_zero_lt_of_band
     (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
-    (χ : PontryaginDual Jₛ) {B : ℝ} (hB : 0 < B) (f : band(B))
+    (χ : PontryaginDual Jₛ) {B : ℝ} (hB : 0 < B) (f : Bₛ)
+    (hf : f ∈ sLocalPWTests (F := F) (S := S) (T := S)
+      le_rfl (sLocalPWProductRegion S B))
     (x : ℝ) (hx : x < -Real.log B) :
-    sLocalRadialThetaHalfDensity τ χ (sAdeleSchwartzFourier f.val.val) (-x) = 0 := by
+    sLocalRadialThetaHalfDensity τ χ (sAdeleSchwartzFourier f) (-x) = 0 := by
   let σ : ℝ≥0ˣ →ₜ* Jₛ :=
     ⟨(QuotientGroup.mk' (sProjectedDiagonal F S)).comp τ.toMonoidHom,
       QuotientGroup.continuous_mk.comp τ.continuous⟩
@@ -214,13 +299,107 @@ private theorem reflectedWeightedTheta_zero_lt
     fun t ↦ (sIdeleQuotientNorm_mk F S (τ t)).trans (hτ t)
   let t : ℝ≥0ˣ := expUnit (-x)
   have hzero := sLocalPWTests_sameStage_fourierTheta_reflected_log_eq_zero
-    σ hσ (χ.comp include₁) f.val.val hB f.property x hx
+    σ hσ (χ.comp include₁) f hB hf x hx
   change sLocalHomogeneousAdelicThetaLinearMap F S (χ.comp include₁)
-    (sAdeleSchwartzFourier f.val.val) (σ t) = 0 at hzero
+    (sAdeleSchwartzFourier f) (σ t) = 0 at hzero
   change (sLocalHomogeneousAdelicThetaLinearMap F S (χ.comp include₁)
-    (sAdeleSchwartzFourier f.val.val) (σ t) * (χ (σ t) : ℂ)) *
+    (sAdeleSchwartzFourier f) (σ t) * (χ (σ t) : ℂ)) *
     (Real.exp ((-x) / 2) : ℂ) = 0
   rw [hzero, zero_mul, zero_mul]
+
+private theorem reflectedWeightedTheta_zero_lt
+    (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
+    (χ : PontryaginDual Jₛ) {B : ℝ} (hB : 0 < B) (f : band(B))
+    (x : ℝ) (hx : x < -Real.log B) :
+    sLocalRadialThetaHalfDensity τ χ (sAdeleSchwartzFourier f.val.val) (-x) = 0 :=
+  reflectedWeightedTheta_zero_lt_of_band τ hτ χ hB f.val.val f.property x hx
+
+/-- The reflected coordinate map on all ordinary order-zero generators. -/
+public def sLocalFullReflectedGenAE
+    (τ : ℝ≥0ˣ →ₜ* Iₛ) (ω : PontryaginDual J₁) (χ : PontryaginDual Jₛ)
+    (T : W(0) →L[ℂ] FlatL2) : Prop :=
+  ∀ f : Bₛ,
+    (T (Isolated.sLocalFullPWThetaSobolevMap (F := F) (S := S) (s := 0)
+      (a := 1 / 2) (by norm_num) ω f) : ℝ → ℂ) =ᵐ[volume] fun x ↦
+      (Real.sqrt (Measure.real η univ) : ℂ) *
+        sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f) (-x)
+
+/-- At Sobolev order zero the angular coefficient and inverse Tate phase
+act on every generator of the full band. Their composite has reflected
+half-line support, and the angular lift recovers each full-band vector. -/
+public theorem exists_sLocalFullReflectedCoordinates_orderZero
+    (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
+    (ω : PontryaginDual J₁) {B : ℝ} (hB : 0 < B) :
+    let V : Submodule ℂ W(0) := Isolated.sLocalFullPWSobolev (F := F) (S := S) (s := 0)
+      le_rfl (a := 1 / 2) (by norm_num) ω B
+    ∃ (χ : PontryaginDual Jₛ) (Q : W(0) →L[ℂ] FlatL2) (L : FlatL2 →ₗᵢ[ℂ] W(0))
+      (U : FlatL2 ≃ₗᵢ[ℂ] FlatL2),
+      χ.comp include₁ = ω ∧ (∀ t, χ (QuotientGroup.mk (τ t)) = 1) ∧ ‖Q‖ ≤ 1 ∧
+      (∀ u, (Q u : ℝ → ℂ) =ᵐ[volume] fun x ↦
+        (Real.sqrt (Measure.real η univ) : ℂ)⁻¹ *
+          ∫ h : J₁, (ω h : ℂ) * u (h.val * QuotientGroup.mk (τ (expUnit x))) ∂η) ∧
+      (∀ v, (L v : Jₛ → ℂ) =ᵐ[intervalSobolevMeasure μJ (logSIdeleQuotientNorm F S) 0 0 0]
+        fun q ↦ (Real.sqrt (Measure.real η univ) : ℂ)⁻¹ * (χ q : ℂ)⁻¹ *
+          v (logSIdeleQuotientNorm F S q)) ∧
+      (∀ u ∈ V, L (Q u) = u) ∧
+      let m (ξ : ℝ) : ℂ :=
+        sLocalRhoFactor (chart ((circleCoe).comp χ) (sLocalRadialThetaCriticalParameter ξ))
+      (∀ v, (Lp.fourierTransformₗᵢ ℝ ℂ (U v) : ℝ → ℂ) =ᵐ[volume] fun ξ ↦
+        star (m ξ) * (Lp.fourierTransformₗᵢ ℝ ℂ v : FlatL2) ξ) ∧
+      let T := U.toLinearIsometry.toContinuousLinearMap.comp Q
+      sLocalFullReflectedGenAE τ ω χ T ∧
+      (∀ u ∈ V, ∀ᵐ x : ℝ ∂volume, x < -Real.log B → T u x = 0) ∧
+      (Set.range (fun u : V ↦ T u.val) = {r : FlatL2 | ∀ᵐ x : ℝ ∂volume, x < -Real.log B → r x = 0}) ∧
+      Set.range (fun u : sLocalInvariantPWSobolev (F := F) (S := S) (s := 0) le_rfl
+        (show (0 : ℝ) < 1 / 2 by norm_num) ω B ↦ T u.val) =
+        {r : FlatL2 | (∀ᵐ x : ℝ ∂volume, x < -Real.log B → r x = 0) ∧
+          (ω = 1 → (∫ x, (Real.exp (-x / 2) : ℂ) * r x) = 0)} := by
+  classical
+  intro V
+  let Q (ω' : PontryaginDual J₁) :=
+    (exists_sLocalWeightedAngularLogCoefficient (s := 0) le_rfl τ hτ ω').choose
+  have hQ := fun ω' ↦ (exists_sLocalWeightedAngularLogCoefficient (s := 0) le_rfl τ hτ ω').choose_spec.2
+  have hQnorm : ‖Q ω‖ ≤ 1 :=
+    (exists_sLocalWeightedAngularLogCoefficient (s := 0) le_rfl τ hτ ω).choose_spec.1
+  obtain ⟨χ, U, hχ, hsec, hPhase, hFull, _⟩ :=
+    exists_sLocalFullWeightedTheta_reflectedLogInput_of_Q τ hτ ω Q hQ
+  obtain ⟨L, hLrep, hLeft⟩ :=
+    exists_sLocalWeightedLogCharacterLift_leftInverse_of_representatives_zero τ hτ ω χ hχ hsec
+  let gen : Bₛ →ₗ[ℂ] W(0) := Isolated.sLocalFullPWThetaSobolevMap
+    (F := F) (S := S) (s := 0) (a := 1 / 2) (by norm_num) ω
+  let P := (sLocalPWTests (F := F) (S := S) (T := S) le_rfl (sLocalPWProductRegion S B)).map gen
+  let D : W(0) →L[ℂ] W(0) := L.toContinuousLinearMap.comp (Q ω) - ContinuousLinearMap.id ℂ (W(0))
+  have hGen (f : Bₛ) : L (Q ω (gen f)) = gen f :=
+    hLeft f (gen f) (Q ω (gen f))
+      (Isolated.sLocalFullPWThetaSobolevMap_apply (F := F) (S := S) (s := 0)
+        (a := 1 / 2) (by norm_num) ω f)
+      (Isolated.sLocalWeightedAngularLogCoefficient_onFullTheta τ hτ ω (Q ω) (hQ ω) f)
+  have hker : V ≤ D.ker := by
+    change P.topologicalClosure ≤ D.ker
+    refine Submodule.topologicalClosure_minimal _ ?_ D.isClosed_ker
+    rintro _ ⟨f, _, rfl⟩
+    exact LinearMap.mem_ker.mpr (sub_eq_zero.mpr (hGen f))
+  have hRecover (u : W(0)) (hu : u ∈ V) : L (Q ω u) = u := by
+    have hz : D u = 0 := LinearMap.mem_ker.mp (hker hu)
+    change (L (Q ω u) : W(0)) - u = 0 at hz
+    exact sub_eq_zero.mp hz
+  let T := U.toLinearIsometry.toContinuousLinearMap.comp (Q ω)
+  have hSupport (u : W(0)) (hu : u ∈ V) :
+      ∀ᵐ x : ℝ ∂volume, x < -Real.log B → T u x = 0 := by
+    refine map_closedSpan_ae_eq_zero_lt_of_generators (P : Set (W(0))) (-Real.log B) T ?_ u ?_
+    · rintro _ ⟨f, hf, rfl⟩
+      filter_upwards [hFull f] with x hxEq
+      intro hx
+      rw [hxEq, reflectedWeightedTheta_zero_lt_of_band τ hτ χ⁻¹ hB f hf x hx, mul_zero]
+    · rw [Submodule.span_eq]
+      exact hu
+  have hIso (u : W(0)) (hu : u ∈ V) : ‖T u‖ = ‖u‖ := by
+    change ‖U (Q ω u)‖ = ‖u‖
+    rw [U.norm_map, ← L.norm_map (Q ω u), hRecover u hu]
+  obtain ⟨hFullRange, hPolarRange⟩ := sLocalFullAndPolarPWSobolev_reflectedRanges_orderZero_of_map
+    τ hτ ω χ hχ hsec hB T hFull hIso hSupport
+  exact ⟨χ, Q ω, L, U, hχ, hsec, hQnorm, hQ ω, hLrep, hRecover, hPhase, hFull,
+    hSupport, hFullRange, hPolarRange⟩
 
 private theorem exists_sLocalInvariantPW_reflectedLogInput_aux
     {s : ℝ} (hs : 0 ≤ s)
@@ -837,7 +1016,9 @@ local notation "expUnit" => fun x : ℝ ↦ Units.mk0 (Real.toNNReal (Real.exp x
 local instance instReflectedGeneratorComparisonNormOneMeasurable : MeasurableSpace J₁ :=
   borel _
 
-/-- One Schwartz kernel converts the real convolution for every polar test
+local notation "Bₛ" => SchwartzBruhat (Multiplicative (SAdeleRing F S))
+
+/-- One Schwartz kernel converts the real convolution for every S-adelic test
 into the convolution of its reflected Fourier-test profile. -/
 private theorem exists_sLocalCutoff_reflectedConvolution_pointwise
     (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
@@ -847,13 +1028,16 @@ private theorem exists_sLocalCutoff_reflectedConvolution_pointwise
     (hk : ∀ x : ℝ, k x =
       ∫ h : J₁, Φ.val (h.val * QuotientGroup.mk (τ (expLog x))) * (ω h : ℂ) ∂η)
     (ρ : ℝ → ℝ) :
-    ∃ q : 𝓢(ℝ, ℂ), ∀ f : Zₛ,
-      let u := modulationWeight modulus (1 / 2)
-        (sLocalHomogeneousAdelicThetaLinearMap F S ω f.val)
-      ∀ g : Jₛ, (ρ (ℓ g) : ℂ) * lcaConvolution μJ Φ.val u g =
-        d⁻¹ * (χ g : ℂ)⁻¹ * ((ρ (ℓ g) : ℂ) *
-          ∫ y, q (ℓ g - y) *
-            (d * sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f.val) (-y))) := by
+    ∃ q : 𝓢(ℝ, ℂ),
+      (∀ ξ : ℝ, 𝓕 (q : ℝ → ℂ) ξ =
+        sLocalRhoFactor (chart(χ) (sLocalRadialThetaCriticalParameter ξ)) * 𝓕 (k : ℝ → ℂ) ξ) ∧
+      ∀ f : Bₛ,
+        let u := modulationWeight modulus (1 / 2)
+          (sLocalHomogeneousAdelicThetaLinearMap F S ω f)
+        ∀ g : Jₛ, (ρ (ℓ g) : ℂ) * lcaConvolution μJ Φ.val u g =
+          d⁻¹ * (χ g : ℂ)⁻¹ * ((ρ (ℓ g) : ℂ) *
+            ∫ y, q (ℓ g - y) *
+              (d * sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f) (-y))) := by
   classical
   let phase (ξ : ℝ) : ℂ := sLocalRhoFactor (chart(χ) (sLocalRadialThetaCriticalParameter ξ))
   have hphase : phase.HasTemperateGrowth := by
@@ -891,19 +1075,19 @@ private theorem exists_sLocalCutoff_reflectedConvolution_pointwise
   let : IsFiniteMeasure η := CompactSpace.isFiniteMeasure
   have hd : d ≠ 0 :=
     Complex.ofReal_ne_zero.mpr (Real.sqrt_pos.mpr (measureReal_univ_pos (μ := η))).ne'
-  refine ⟨q, fun f ↦ ?_⟩
+  refine ⟨q, hq, fun f ↦ ?_⟩
   intro u
-  let p (x : ℝ) : ℂ := d * sLocalRadialThetaHalfDensity τ χ f.val x
+  let p (x : ℝ) : ℂ := d * sLocalRadialThetaHalfDensity τ χ f x
   let r (x : ℝ) : ℂ := d * sLocalRadialThetaHalfDensity τ χ⁻¹
-    (sAdeleSchwartzFourier f.val) (-x)
-  have hp : Integrable p := (sLocalRadialThetaHalfDensity_integrable τ hτ χ f.val).const_mul d
+    (sAdeleSchwartzFourier f) (-x)
+  have hp : Integrable p := (sLocalRadialThetaHalfDensity_integrable τ hτ χ f).const_mul d
   have hr : Integrable r :=
     (Measure.measurePreserving_neg (volume : Measure ℝ)).integrable_comp_of_integrable
-      ((sLocalRadialThetaHalfDensity_integrable τ hτ χ⁻¹ (sAdeleSchwartzFourier f.val)).const_mul d)
+      ((sLocalRadialThetaHalfDensity_integrable τ hτ χ⁻¹ (sAdeleSchwartzFourier f)).const_mul d)
   have hpr (ξ : ℝ) : 𝓕 p ξ = phase ξ * 𝓕 r ξ := by
     dsimp only [p, r]
     rw [realFourier_mul_const_left, realFourier_mul_const_left,
-      sLocalRadialThetaHalfDensity_fourier_reflected_phase τ hτ χ f.val ξ]
+      sLocalRadialThetaHalfDensity_fourier_reflected_phase τ hτ χ f ξ]
     change d * (phase ξ * _) = phase ξ * (d * _)
     exact mul_left_comm _ _ _
   have hTransfer :
@@ -925,9 +1109,9 @@ private theorem exists_sLocalCutoff_reflectedConvolution_pointwise
     have hc : χ (QuotientGroup.mk (τ (expLog x))) = 1 := hχτ (expLog x)
     simp only [sLocalRadialThetaHalfDensity, ← hexp x, hχ, hc, Circle.coe_one, mul_one]
     with_unfolding_all change
-      sLocalHomogeneousAdelicThetaLinearMap F S ω f.val (j x) * (Real.exp (x / 2) : ℂ) =
+      sLocalHomogeneousAdelicThetaLinearMap F S ω f (j x) * (Real.exp (x / 2) : ℂ) =
         (((((N (j x)).val : ℝ) ^ (1 / 2 : ℝ)) : ℝ) : ℂ) *
-          sLocalHomogeneousAdelicThetaLinearMap F S ω f.val (j x)
+          sLocalHomogeneousAdelicThetaLinearMap F S ω f (j x)
     rw [hn, Real.rpow_def_of_pos (Real.exp_pos x), Real.log_exp, mul_one_div, mul_comm]
   have hIntegral (x : ℝ) :
       (∫ y, k y * p (x - y)) = d * ∫ y, k y * u (j (x - y)) := by
@@ -942,7 +1126,7 @@ private theorem exists_sLocalCutoff_reflectedConvolution_pointwise
     let cr := ∫ y, q (ℓ z - y) * r y
     have hcov : lcaConvolution μJ Φ.val u z = (χ z : ℂ)⁻¹ * c :=
       sLocalTrace_homogeneousThetaHalfDensity_logConvolution_at
-        τ hτ Φ ω χ hχPoint hχτ f.val k hk z
+        τ hτ Φ ω χ hχPoint hχτ f k hk z
     have hc : cr = d * c := (hTransferRow (ℓ z)).symm.trans (hIntegral (ℓ z))
     change (ρ (ℓ z) : ℂ) * lcaConvolution μJ Φ.val u z =
       d⁻¹ * (χ z : ℂ)⁻¹ * ((ρ (ℓ z) : ℂ) * cr)
@@ -954,8 +1138,8 @@ private theorem exists_sLocalCutoff_reflectedConvolution_pointwise
       _ = _ := congrArg (fun w : ℂ ↦ d⁻¹ * (χ z : ℂ)⁻¹ * ((ρ (ℓ z) : ℂ) * w)) hc.symm
   exact hPoint
 
-private theorem exists_sLocalPWTheta_cutoff_testAction_reflectedConvolution_of_apply
-    {s : ℝ} (_hs : 0 ≤ s) (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
+private theorem exists_sLocalTheta_cutoff_testAction_reflectedConvolution_of_apply
+    {s : ℝ} (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
     (ω : PontryaginDual J₁) (χ : PontryaginDual Jₛ) (hχ : χ.comp include₁ = ω)
     (hχτ : ∀ t, χ (QuotientGroup.mk (τ t)) = 1)
     (Φ : BruhatCompactSupport Jₛ) (k : 𝓢(ℝ, ℂ))
@@ -964,19 +1148,19 @@ private theorem exists_sLocalPWTheta_cutoff_testAction_reflectedConvolution_of_a
     (ρ : ℝ → ℝ) (A M : W(s) →L[ℂ] W(s))
     (hA : ∀ v, (A v : Jₛ → ℂ) =ᵐ[μJ] lcaConvolution μJ Φ.val v)
     (hM : ∀ v, (M v : Jₛ → ℂ) =ᵐ[ν(s)] fun z ↦ (ρ (ℓ z) : ℂ) * v z) :
-    ∃ q : 𝓢(ℝ, ℂ), ∀ f : Zₛ,
-      let v := sLocalPWThetaSobolevMap (F := F) (S := S) (s := s) halfPos ω f
-      (M (A v) : Jₛ → ℂ) =ᵐ[ν(s)] fun g ↦
-        d⁻¹ * (χ g : ℂ)⁻¹ * ((ρ (ℓ g) : ℂ) *
-          ∫ y, q (ℓ g - y) *
-            (d * sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f.val) (-y))) := by
-  obtain ⟨q, hPoint⟩ := exists_sLocalCutoff_reflectedConvolution_pointwise τ hτ ω χ hχ hχτ Φ k hk ρ
-  refine ⟨q, fun f ↦ ?_⟩
-  intro v
-  let u := modulationWeight modulus (1 / 2)
-    (sLocalHomogeneousAdelicThetaLinearMap F S ω f.val)
-  have hv : (v : Jₛ → ℂ) =ᵐ[μJ] u :=
-    sLocalPWThetaSobolevMap_apply (F := F) (S := S) (s := s) halfPos ω f
+    ∃ q : 𝓢(ℝ, ℂ),
+      (∀ ξ : ℝ, 𝓕 (q : ℝ → ℂ) ξ =
+        sLocalRhoFactor (chart(χ) (sLocalRadialThetaCriticalParameter ξ)) * 𝓕 (k : ℝ → ℂ) ξ) ∧
+      ∀ (f : Bₛ) (v : W(s)),
+        ((v : Jₛ → ℂ) =ᵐ[μJ] modulationWeight modulus (1 / 2)
+          (sLocalHomogeneousAdelicThetaLinearMap F S ω f)) →
+        (M (A v) : Jₛ → ℂ) =ᵐ[ν(s)] fun g ↦
+          d⁻¹ * (χ g : ℂ)⁻¹ * ((ρ (ℓ g) : ℂ) *
+            ∫ y, q (ℓ g - y) *
+              (d * sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f) (-y))) := by
+  obtain ⟨q, hq, hPoint⟩ := exists_sLocalCutoff_reflectedConvolution_pointwise τ hτ ω χ hχ hχτ Φ k hk ρ
+  refine ⟨q, hq, fun f v hv ↦ ?_⟩
+  let u := modulationWeight modulus (1 / 2) (sLocalHomogeneousAdelicThetaLinearMap F S ω f)
   have hRep (z : Jₛ) : lcaConvolution μJ Φ.val v z = lcaConvolution μJ Φ.val u z := by
     unfold lcaConvolution
     have hShift : QuasiMeasurePreserving (fun y : Jₛ ↦ y⁻¹ * z) μJ μJ :=
@@ -1010,10 +1194,161 @@ public theorem exists_sLocalPWTheta_cutoff_testAction_reflectedConvolution
           ∫ y, q (ℓ g - y) *
             (d * sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f.val) (-y))) := by
   intro A M
-  exact exists_sLocalPWTheta_cutoff_testAction_reflectedConvolution_of_apply
-    hs τ hτ ω χ hχ hχτ Φ k hk ρ A M
+  obtain ⟨q, -, hCompare⟩ := exists_sLocalTheta_cutoff_testAction_reflectedConvolution_of_apply
+    τ hτ ω χ hχ hχτ Φ k hk ρ A M
     (hardySobolevTestAction_apply μJ modulus 0 0 s le_rfl hs Φ)
     (lpCutoffMultiplier_apply ν(s) (ρ ∘ ℓ) hρm (fun x ↦ hρ (ℓ x)))
+  refine ⟨q, fun f ↦ ?_⟩
+  intro v
+  exact hCompare f.val v
+    (sLocalPWThetaSobolevMap_apply (F := F) (S := S) (s := s) halfPos ω f)
+
+/-- The quotient test action followed by the radial cutoff has one reflected
+convolution kernel on every full-band generator. Its Fourier transform uses
+the critical-line phase of the supplied character. -/
+public theorem exists_sLocalFullPWTheta_cutoff_testAction_reflectedConvolution
+    {s : ℝ} (hs : 0 ≤ s) (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
+    (ω : PontryaginDual J₁) (χ : PontryaginDual Jₛ) (hχ : χ.comp include₁ = ω)
+    (hχτ : ∀ t, χ (QuotientGroup.mk (τ t)) = 1)
+    (Φ : BruhatCompactSupport Jₛ) (k : 𝓢(ℝ, ℂ))
+    (hk : ∀ x : ℝ, k x =
+      ∫ h : J₁, Φ.val (h.val * QuotientGroup.mk (τ (expLog x))) * (ω h : ℂ) ∂η)
+    (ρ : ℝ → ℝ) (hρm : Measurable (ρ ∘ ℓ)) (hρ : ∀ t, |ρ t| ≤ 1) :
+    let A : W(s) →L[ℂ] W(s) := hardySobolevTestAction μJ modulus 0 0 s le_rfl hs Φ
+    let M : W(s) →L[ℂ] W(s) := lpCutoffMultiplier ν(s) (ρ ∘ ℓ) hρm (fun x ↦ hρ (ℓ x))
+    ∃ q : 𝓢(ℝ, ℂ),
+      (∀ ξ : ℝ, 𝓕 (q : ℝ → ℂ) ξ =
+        sLocalRhoFactor (chart(χ) (sLocalRadialThetaCriticalParameter ξ)) * 𝓕 (k : ℝ → ℂ) ξ) ∧
+      ∀ f : Bₛ,
+        let v := Isolated.sLocalFullPWThetaSobolevMap (F := F) (S := S) (s := s) halfPos ω f
+        (M (A v) : Jₛ → ℂ) =ᵐ[ν(s)] fun g ↦
+          d⁻¹ * (χ g : ℂ)⁻¹ * ((ρ (ℓ g) : ℂ) *
+            ∫ y, q (ℓ g - y) *
+              (d * sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f) (-y))) := by
+  intro A M
+  obtain ⟨q, hq, hCompare⟩ := exists_sLocalTheta_cutoff_testAction_reflectedConvolution_of_apply
+    τ hτ ω χ hχ hχτ Φ k hk ρ A M
+    (hardySobolevTestAction_apply μJ modulus 0 0 s le_rfl hs Φ)
+    (lpCutoffMultiplier_apply ν(s) (ρ ∘ ℓ) hρm (fun x ↦ hρ (ℓ x)))
+  refine ⟨q, hq, fun f ↦ ?_⟩
+  intro v
+  exact hCompare f v
+    (Isolated.sLocalFullPWThetaSobolevMap_apply (F := F) (S := S) (s := s) halfPos ω f)
+
+local notation "FlatL2" => Lp ℂ 2 (volume : Measure ℝ)
+local notation "fullBand(" ω "," B ")" =>
+  Isolated.sLocalFullPWSobolev (F := F) (S := S) (s := 0) le_rfl halfPos ω B
+local notation "bandTests(" B ")" =>
+  sLocalPWTests (F := F) (S := S) (T := S) le_rfl (sLocalPWProductRegion S B)
+local notation "fullGen(" ω ")" =>
+  Isolated.sLocalFullPWThetaSobolevMap (F := F) (S := S) (s := 0) halfPos ω
+
+/-- At order zero the actual quotient upper cutoff on the full band factors
+through a rectangular trace-class real convolution using the same reflected
+input and physical output lift. -/
+public theorem exists_sLocalFullPW_upperCutoff_factor_orderZero
+    (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
+    (ω : PontryaginDual J₁) (χ : PontryaginDual Jₛ) (hχ : χ.comp include₁ = ω)
+    (hχτ : ∀ t, χ (QuotientGroup.mk (τ t)) = 1) (B : ℝ)
+    (T : W(0) →L[ℂ] FlatL2) (L : FlatL2 →ₗᵢ[ℂ] W(0))
+    (hTGen : sLocalFullReflectedGenAE τ ω χ T)
+    (hSupport : ∀ u ∈ fullBand(ω,B), ∀ᵐ y : ℝ ∂volume, y < -Real.log B → T u y = 0)
+    (hL : ∀ v, (L v : Jₛ → ℂ) =ᵐ[ν(0)] fun g ↦ d⁻¹ * (χ g : ℂ)⁻¹ * v (ℓ g))
+    (Φ : BruhatCompactSupport Jₛ) (Tmax : ℝ) (ρ : ℝ → ℝ) (hρm : Measurable ρ)
+    (hρ : ∀ x, |ρ x| ≤ 1) (hρT : ∀ x, Tmax < x → ρ x = 0) :
+    let V : Submodule ℂ (W(0)) := fullBand(ω,B)
+    letI : CompleteSpace V := (show IsClosed (V : Set (W(0))) from
+      Submodule.isClosed_topologicalClosure _).completeSpace_coe
+    let hρLog : Measurable (ρ ∘ ℓ) := hρm.comp (Real.measurable_log.comp
+      (NNReal.continuous_coe.comp
+        (Units.continuous_val.comp (continuousSIdeleQuotientNorm F S).continuous)).measurable)
+    let A : W(0) →L[ℂ] W(0) := hardySobolevTestAction μJ modulus 0 0 0 le_rfl le_rfl Φ
+    let M : W(0) →L[ℂ] W(0) := lpCutoffMultiplier ν(0) (ρ ∘ ℓ) hρLog (fun g ↦ hρ (ℓ g))
+    ∃ (k q : 𝓢(ℝ, ℂ)) (K : V →L[ℂ] FlatL2),
+      (∀ x : ℝ, k x =
+        ∫ h : J₁, Φ.val (h.val * QuotientGroup.mk (τ (expLog x))) * (ω h : ℂ) ∂η) ∧
+      (∀ ξ : ℝ, 𝓕 (q : ℝ → ℂ) ξ =
+        sLocalRhoFactor (chart(χ) (sLocalRadialThetaCriticalParameter ξ)) * 𝓕 (k : ℝ → ℂ) ξ) ∧
+      K ∈ traceClassOperators V FlatL2 ∧
+      M.comp (A.comp V.subtypeL) = L.toContinuousLinearMap.comp K ∧
+      ∀ v : V, ∀ᵐ x : ℝ ∂volume,
+        K v x = (ρ x : ℂ) * ∫ y, q (x - y) * T v.val y := by
+  intro V hρLog A M
+  let : CompleteSpace V := (show IsClosed (V : Set (W(0))) from
+    Submodule.isClosed_topologicalClosure _).completeSpace_coe
+  let quotient : Iₛ →ₜ* Jₛ :=
+    ⟨QuotientGroup.mk' (sProjectedDiagonal F S), QuotientGroup.continuous_mk⟩
+  let σ := quotient.comp τ
+  have hσ : RightInverse σ N := fun t ↦ (sIdeleQuotientNorm_mk F S (τ t)).trans (hτ t)
+  obtain ⟨k, _, hk⟩ := SLocalRadialAction.exists_normOneCharacterLogTest F S σ hσ Φ ω
+  obtain ⟨q, hq, hActual⟩ := exists_sLocalFullPWTheta_cutoff_testAction_reflectedConvolution
+    (s := 0) le_rfl τ hτ ω χ hχ hχτ Φ k hk ρ hρLog hρ
+  let J : V →L[ℂ] FlatL2 := T.comp V.subtypeL
+  have hJ (v : V) : ∀ᵐ y : ℝ ∂volume, y < -Real.log B → J v y = 0 :=
+    hSupport v.val v.property
+  have hνR : intervalSobolevMeasure (volume : Measure ℝ) id 0 0 0 = volume := by
+    have h (x : ℝ) : intervalSobolevDensity 0 0 0 x = 1 := by simp [intervalSobolevDensity]
+    change (volume : Measure ℝ).withDensity
+      (fun x ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 0 x)) = _
+    simp only [h, ENNReal.ofReal_one]
+    change (volume : Measure ℝ).withDensity (1 : ℝ → ℝ≥0∞) = volume
+    exact withDensity_one
+  let Factor (μ : Measure ℝ) : Prop := ∃ K : V →L[ℂ] Lp ℂ 2 μ,
+    K ∈ traceClassOperators V (Lp ℂ 2 μ) ∧
+    (∀ R : Lp ℂ 2 μ →L[ℂ] V, IsNuclearOperator (R.comp K)) ∧
+    ∀ v : V, ∀ᵐ x : ℝ ∂μ,
+      Integrable (fun y ↦ ((ρ x : ℂ) * q (x - y)) * J v y) volume ∧
+      K v x = (ρ x : ℂ) * ∫ y, q (x - y) * J v y
+  have transfer (μ : Measure ℝ) (hμ : μ = volume) (h : Factor μ) : Factor volume := by
+    subst μ
+    exact h
+  obtain ⟨K, hK, _, hKrow⟩ := transfer _ hνR
+    (exists_upperHalflineWeightedConvolutionOfSupportedInput 0 le_rfl (-Real.log B) Tmax
+      ρ hρm hρ hρT q J hJ)
+  let C : V →L[ℂ] W(0) := M.comp (A.comp V.subtypeL)
+  let Z : V →L[ℂ] W(0) := L.toContinuousLinearMap.comp K
+  let gen (f : Bₛ) (hf : f ∈ bandTests(B)) : V :=
+    ⟨fullGen(ω) f, Submodule.le_topologicalClosure _ (Submodule.mem_map.mpr ⟨f, hf, rfl⟩)⟩
+  have hlog : Measurable ℓ := Real.measurable_log.comp
+    (NNReal.continuous_coe.comp
+      (Units.continuous_val.comp (continuousSIdeleQuotientNorm F S).continuous)).measurable
+  have hLogMeasure : MeasurePreserving ℓ ν(0) ((η univ) • (volume : Measure ℝ)) :=
+    ⟨hlog, by simpa only [hνR] using sLocalLogNorm_map_intervalSobolevMeasure τ hτ 0 0 0⟩
+  have hGen (f : Bₛ) (hf : f ∈ bandTests(B)) : C (gen f hf) = Z (gen f hf) := by
+    let v := gen f hf
+    let r (y : ℝ) : ℂ := d * sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f) (-y)
+    have hJrep : (J v : ℝ → ℂ) =ᵐ[volume] r := hTGen f
+    have hKrep : (K v : ℝ → ℂ) =ᵐ[volume] fun x ↦ (ρ x : ℂ) * ∫ y, q (x - y) * r y := by
+      filter_upwards [hKrow v] with x hx
+      exact hx.2.trans (congrArg ((ρ x : ℂ) * ·)
+        (integral_congr_ae (hJrep.mono fun y hy ↦ congrArg (q (x - y) * ·) hy)))
+    have hPull := hLogMeasure.quasiMeasurePreserving.ae_eq_comp
+      (Measure.ae_smul_measure hKrep (η univ))
+    apply Lp.ext
+    filter_upwards [hActual f, hL (K v), hPull] with g hAg hLg hKg
+    change K v (ℓ g) = (ρ (ℓ g) : ℂ) * ∫ y, q (ℓ g - y) * r y at hKg
+    change M (A (fullGen(ω) f)) g = L (K v) g
+    rw [hAg, hLg, hKg]
+  let P : W(0) →L[ℂ] V := V.orthogonalProjectionOnto
+  let D : W(0) →L[ℂ] W(0) := (C - Z).comp P
+  have hKer : V ≤ D.ker := by
+    change ((bandTests(B)).map (fullGen(ω))).topologicalClosure ≤ D.ker
+    refine Submodule.topologicalClosure_minimal _ ?_ D.isClosed_ker
+    rintro _ ⟨f, hf, rfl⟩
+    have hv : P (fullGen(ω) f) = gen f hf :=
+      V.orthogonalProjectionOnto_mem_subspace_eq_self (gen f hf)
+    apply LinearMap.mem_ker.mpr
+    change (C - Z) (P (fullGen(ω) f)) = 0
+    rw [hv, ContinuousLinearMap.sub_apply, hGen f hf, sub_self]
+  have hEq : C = Z := by
+    apply ContinuousLinearMap.ext
+    intro v
+    have hv : D v.val = 0 := LinearMap.mem_ker.mp (hKer v.property)
+    change (C - Z) (P v.val) = 0 at hv
+    rw [show P v.val = v from V.orthogonalProjectionOnto_mem_subspace_eq_self v,
+      ContinuousLinearMap.sub_apply] at hv
+    exact sub_eq_zero.mp hv
+  exact ⟨k, q, K, hk, hq, hK, hEq, fun v ↦ (hKrow v).mono fun _ h ↦ h.2⟩
 
 end
 

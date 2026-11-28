@@ -25,16 +25,13 @@ local notation "Zₛ" => sAdelePolarSubspace F S
 local notation "W(" s ")" => Lp ℂ 2 (intervalSobolevMeasure μJ (logSIdeleQuotientNorm F S) 0 0 s)
 local notation "FlatL2" => Lp ℂ 2 (volume : Measure ℝ)
 
-/-- A continuous linear map whose images of the defining generators vanish on
-the left open half-line has the same vanishing on the closed invariant level. -/
-public theorem sLocalInvariantPWSobolev_map_ae_eq_zero_lt_of_generators
-    {s a : ℝ} (hs : 0 ≤ s) (ha : 0 < a) (ω : PontryaginDual J₁)
-    (B c : ℝ) (T : W(s) →L[ℂ] FlatL2)
-    (hgen : ∀ f : {g : Zₛ // g.val ∈ sLocalPWTests (F := F) (S := S) (T := S)
-        le_rfl (sLocalPWProductRegion S B)},
-      ∀ᵐ x : ℝ ∂volume, x < c →
-        T (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s) ha ω f.val) x = 0)
-    (u : W(s)) (hu : u ∈ sLocalInvariantPWSobolev (F := F) (S := S) hs ha ω B) :
+/-- Vanishing below a real cutoff is preserved under passage from a set of
+prototypes to its closed linear span. -/
+public theorem map_closedSpan_ae_eq_zero_lt_of_generators
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E]
+    (generators : Set E) (c : ℝ) (T : E →L[ℂ] FlatL2)
+    (hgen : ∀ v ∈ generators, ∀ᵐ x : ℝ ∂volume, x < c → T v x = 0)
+    (u : E) (hu : u ∈ (Submodule.span ℂ generators).topologicalClosure) :
     ∀ᵐ x : ℝ ∂volume, x < c → T u x = 0 := by
   classical
   let ρ : ℝ → ℂ := (Iio c).indicator (fun _ ↦ 1)
@@ -67,13 +64,27 @@ public theorem sLocalInvariantPWSobolev_map_ae_eq_zero_lt_of_generators
       by_cases hxc : x ∈ Iio c
       · rw [hw (show x < c from hxc), mul_zero]
       · simp [ρ, hxc]
-  have hker : sLocalInvariantPWSobolev (F := F) (S := S) hs ha ω B ≤ (M.comp T).ker := by
-    unfold sLocalInvariantPWSobolev
+  have hker : (Submodule.span ℂ generators).topologicalClosure ≤ (M.comp T).ker := by
     refine Submodule.topologicalClosure_minimal _ (Submodule.span_le.mpr ?_) (M.comp T).isClosed_ker
-    rintro _ ⟨f, rfl⟩
-    apply LinearMap.mem_ker.mpr
-    exact (hzero _).2 (hgen f)
+    intro v hv
+    exact LinearMap.mem_ker.mpr ((hzero _).2 (hgen v hv))
   exact (hzero _).1 (LinearMap.mem_ker.mp (hker hu))
+
+/-- A continuous linear map whose images of the defining generators vanish on
+the left open half-line has the same vanishing on the closed invariant level. -/
+public theorem sLocalInvariantPWSobolev_map_ae_eq_zero_lt_of_generators
+    {s a : ℝ} (hs : 0 ≤ s) (ha : 0 < a) (ω : PontryaginDual J₁)
+    (B c : ℝ) (T : W(s) →L[ℂ] FlatL2)
+    (hgen : ∀ f : {g : Zₛ // g.val ∈ sLocalPWTests (F := F) (S := S) (T := S)
+        le_rfl (sLocalPWProductRegion S B)},
+      ∀ᵐ x : ℝ ∂volume, x < c →
+        T (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s) ha ω f.val) x = 0)
+    (u : W(s)) (hu : u ∈ sLocalInvariantPWSobolev (F := F) (S := S) hs ha ω B) :
+    ∀ᵐ x : ℝ ∂volume, x < c → T u x = 0 := by
+  unfold sLocalInvariantPWSobolev at hu
+  refine map_closedSpan_ae_eq_zero_lt_of_generators _ c T ?_ u hu
+  rintro _ ⟨f, rfl⟩
+  exact hgen f
 
 end
 

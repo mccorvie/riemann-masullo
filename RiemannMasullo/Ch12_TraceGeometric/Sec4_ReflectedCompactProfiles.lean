@@ -165,18 +165,16 @@ private theorem sLocalTrace_trivialTheta_eq_zero_of_reflectedProfile
       ring
     _ = 0 := by rw [integral_const_mul, hχint, mul_zero]
 
-/-- Every compact smooth reflected profile inside the half-line is the
-reflected Fourier theta of a same-stage polar product-band test. The trivial
-norm-one character requires the exponential moment to vanish. -/
-theorem exists_sLocalPolarPW_reflectedSmoothGenerator
+private theorem exists_sLocalPW_reflectedSmoothGenerator_data
     (τ : ℝ≥0ˣ →ₜ* Aₛˣ) (hτ : RightInverse τ (sIdeleNorm F S))
-    (χ : PontryaginDual Jₛ) (hχτ : ∀ t, χ (QuotientGroup.mk (τ t)) = 1)
+    (χ : PontryaginDual Jₛ)
     (r : ℝ → ℂ) (hr : ContDiff ℝ (∞ : ℕ∞ω) r) (hrc : HasCompactSupport r)
-    {B : ℝ} (hB : 0 < B) (hrs : tsupport r ⊆ Ioi (-Real.log B))
-    (hmoment : χ.comp include₁ = 1 → (∫ y : ℝ, (Real.exp (-y / 2) : ℂ) * r y) = 0) :
+    {B : ℝ} (hB : 0 < B) (hrs : tsupport r ⊆ Ioi (-Real.log B)) :
     ∃ f : Bₛ,
-      f ∈ sAdelePolarSubspace F S ∧
       f ∈ sLocalPWTests (F := F) (S := S) (T := S) le_rfl (sLocalPWProductRegion S B) ∧
+      sAdeleSchwartzFourier f (Multiplicative.ofAdd (0 : Aₛ)) = 0 ∧
+      (∀ q : Jₛ, sLocalAdelicThetaOnClasses F S (sAdeleSchwartzFourier f) q = (χ q : ℂ) *
+        ((d₁ * (C₁ : ℂ))⁻¹ * (Real.exp (-ℓ q / 2) : ℂ) * r (-ℓ q))) ∧
       ∀ y : ℝ, d₁ * sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f) (-y) = r y := by
   obtain ⟨g, hgc, hgs, hgzero, hθ, hhom⟩ := exists_sLocalTrace_reflectedThetaCore χ r hr hrc hB hrs
   let f := sAdeleSchwartzFourier (sAdeleSchwartzFourier (sAdeleSchwartzFourier g))
@@ -196,6 +194,65 @@ theorem exists_sLocalPolarPW_reflectedSmoothGenerator
   have hscaled (y : ℝ) : d₁ * (sLocalHomogeneousAdelicThetaLinearMap F S
       (χ⁻¹.comp include₁) g (q y) * ((χ⁻¹) (q y) : ℂ)) = (Real.exp (y / 2) : ℂ) * r y := by
     simpa only [hq y, neg_neg] using hhom (q y)
+  have hfband : f ∈ sLocalPWTests (F := F) (S := S) (T := S) le_rfl (sLocalPWProductRegion S B) := by
+    have hself : sAdeleSchwartzTransition F (le_rfl (a := S)) f = f := by
+      classical
+      apply Subtype.ext
+      funext x
+      rw [← show Multiplicative.ofAdd x.toAdd = x from rfl, sAdeleSchwartzTransition_apply,
+        ite_eq_left (fun w hw ↦ (hw w.property).elim)]
+    refine (mem_sLocalPWTests (F := F) (S := S) (T := S) le_rfl (sLocalPWProductRegion S B) f).2
+      ⟨f, hself, ?_⟩
+    rw [hF]
+    let e : Multiplicative Aₛ ≃ₜ Aₛ := (Homeomorph.ofAdd : Aₛ ≃ₜ Multiplicative Aₛ).symm
+    have he : g.val = (fun x : Aₛ ↦ g (Multiplicative.ofAdd x)) ∘ e := rfl
+    refine ⟨hgc.comp_homeomorph e, ?_⟩
+    rw [he, tsupport_comp_eq_preimage]
+    exact preimage_mono hgs
+  refine ⟨f, hfband, by simpa only [hF] using hgzero, by simpa only [hF] using hθ, fun y ↦ ?_⟩
+  rw [hF]
+  change d₁ * ((sLocalHomogeneousAdelicThetaLinearMap F S (χ⁻¹.comp include₁) g (q y) *
+    ((χ⁻¹) (q y) : ℂ)) * (Real.exp (-y / 2) : ℂ)) = r y
+  have he : (Real.exp (y / 2) : ℂ) * (Real.exp (-y / 2) : ℂ) = 1 := by
+    rw [← Complex.ofReal_mul, ← Real.exp_add, show y / 2 + -y / 2 = 0 from by ring,
+      Real.exp_zero, Complex.ofReal_one]
+  rw [← mul_assoc, hscaled]
+  calc
+    _ = ((Real.exp (y / 2) : ℂ) * (Real.exp (-y / 2) : ℂ)) * r y := by ring
+    _ = _ := by rw [he, one_mul]
+
+/-- Every compact smooth profile supported inside the reflected half-line is
+realized by a same-stage product-band test. -/
+theorem exists_sLocalPW_reflectedSmoothGenerator
+    (τ : ℝ≥0ˣ →ₜ* Aₛˣ) (hτ : RightInverse τ (sIdeleNorm F S))
+    (χ : PontryaginDual Jₛ)
+    (r : ℝ → ℂ) (hr : ContDiff ℝ (∞ : ℕ∞ω) r) (hrc : HasCompactSupport r)
+    {B : ℝ} (hB : 0 < B) (hrs : tsupport r ⊆ Ioi (-Real.log B)) :
+    ∃ f : Bₛ,
+      f ∈ sLocalPWTests (F := F) (S := S) (T := S) le_rfl (sLocalPWProductRegion S B) ∧
+      ∀ y : ℝ, d₁ * sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f) (-y) = r y := by
+  obtain ⟨f, hfband, -, -, hprofile⟩ :=
+    exists_sLocalPW_reflectedSmoothGenerator_data τ hτ χ r hr hrc hB hrs
+  exact ⟨f, hfband, hprofile⟩
+
+/-- Every compact smooth reflected profile inside the half-line is the
+reflected Fourier theta of a same-stage polar product-band test. The trivial
+norm-one character requires the exponential moment to vanish. -/
+theorem exists_sLocalPolarPW_reflectedSmoothGenerator
+    (τ : ℝ≥0ˣ →ₜ* Aₛˣ) (hτ : RightInverse τ (sIdeleNorm F S))
+    (χ : PontryaginDual Jₛ) (hχτ : ∀ t, χ (QuotientGroup.mk (τ t)) = 1)
+    (r : ℝ → ℂ) (hr : ContDiff ℝ (∞ : ℕ∞ω) r) (hrc : HasCompactSupport r)
+    {B : ℝ} (hB : 0 < B) (hrs : tsupport r ⊆ Ioi (-Real.log B))
+    (hmoment : χ.comp include₁ = 1 → (∫ y : ℝ, (Real.exp (-y / 2) : ℂ) * r y) = 0) :
+    ∃ f : Bₛ,
+      f ∈ sAdelePolarSubspace F S ∧
+      f ∈ sLocalPWTests (F := F) (S := S) (T := S) le_rfl (sLocalPWProductRegion S B) ∧
+      ∀ y : ℝ, d₁ * sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f) (-y) = r y := by
+  obtain ⟨f, hfband, hFzero, hθ, hprofile⟩ :=
+    exists_sLocalPW_reflectedSmoothGenerator_data τ hτ χ r hr hrc hB hrs
+  let g := sAdeleSchwartzFourier f
+  let t (x : ℝ) : ℝ≥0ˣ := Units.mk0 (Real.exp x).toNNReal (by positivity)
+  let q (y : ℝ) : Jₛ := QuotientGroup.mk (τ (t (-y)))
   have hInt : (∫ y : ℝ, sLocalHomogeneousAdelicThetaLinearMap F S 1 g (q y) *
       (Real.exp (-y) : ℂ)) = 0 := by
     by_cases hχ : χ.comp include₁ = 1
@@ -214,21 +271,23 @@ theorem exists_sLocalPolarPW_reflectedSmoothGenerator
       have hchar (y : ℝ) : ((χ⁻¹) (q y) : ℂ) = 1 := by
         change (((χ (q y))⁻¹ : Circle) : ℂ) = 1
         rw [show χ (q y) = 1 from hχτ (t (-y)), inv_one, Circle.coe_one]
-      have hval (y : ℝ) : sLocalHomogeneousAdelicThetaLinearMap F S 1 g (q y) =
-          d₁⁻¹ * ((Real.exp (y / 2) : ℂ) * r y) := by
+      have hval (y : ℝ) : sLocalHomogeneousAdelicThetaLinearMap F S 1 g (q y) *
+          (Real.exp (-y / 2) : ℂ) = d₁⁻¹ * r y := by
         apply (eq_inv_mul_iff_mul_eq₀ hd).2
-        have hy := hscaled y
+        have hy := hprofile y
+        change d₁ * ((sLocalHomogeneousAdelicThetaLinearMap F S (χ⁻¹.comp include₁) g (q y) *
+          ((χ⁻¹) (q y) : ℂ)) * (Real.exp (-y / 2) : ℂ)) = r y at hy
         rw [hχinv, hchar y, mul_one] at hy
         exact hy
       calc
         _ = ∫ y : ℝ, d₁⁻¹ * ((Real.exp (-y / 2) : ℂ) * r y) := by
           apply integral_congr_ae (ae_of_all _ fun y ↦ ?_)
-          have he : (Real.exp (y / 2) : ℂ) * (Real.exp (-y) : ℂ) = (Real.exp (-y / 2) : ℂ) := by
-            rw [← Complex.ofReal_mul, ← Real.exp_add, show y / 2 + -y = -y / 2 from by ring]
-          rw [hval]
+          have he : (Real.exp (-y) : ℂ) = (Real.exp (-y / 2) : ℂ) * (Real.exp (-y / 2) : ℂ) := by
+            rw [← Complex.ofReal_mul, ← Real.exp_add, show -y / 2 + -y / 2 = -y from by ring]
           calc
-            _ = d₁⁻¹ * (((Real.exp (y / 2) : ℂ) * (Real.exp (-y) : ℂ)) * r y) := by ring
-            _ = _ := by rw [he]
+            _ = (sLocalHomogeneousAdelicThetaLinearMap F S 1 g (q y) *
+                (Real.exp (-y / 2) : ℂ)) * (Real.exp (-y / 2) : ℂ) := by rw [he, ← mul_assoc]
+            _ = _ := by rw [hval]; ring
         _ = 0 := by rw [integral_const_mul, hmoment hχ, mul_zero]
     · let p (v : Jₛ) := (d₁ * (C₁ : ℂ))⁻¹ * (Real.exp (-ℓ v / 2) : ℂ) * r (-ℓ v)
       have hp (v : Jₛ) (h : J₁) : p (v * h.val) = p v := by
@@ -246,38 +305,11 @@ theorem exists_sLocalPolarPW_reflectedSmoothGenerator
       have hv : (1 : ℝ) < v.asIdeal.absNorm := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
       exact div_pos (zero_lt_one.trans hv) (sub_pos.mpr hv)
     have h := sLocalTrace_reflectedFourier_exponentialMoment τ hτ f
-    change (∫ y : ℝ, sLocalHomogeneousAdelicThetaLinearMap F S 1 (sAdeleSchwartzFourier f)
+    change (∫ y : ℝ, sLocalHomogeneousAdelicThetaLinearMap F S 1 g
       (q y) * (Real.exp (-y) : ℂ)) = (sLocalTraceMeasureFactor S : ℂ) *
         f (Multiplicative.ofAdd (0 : Aₛ)) at h
-    rw [hF, hInt] at h
+    rw [hInt] at h
     exact (mul_eq_zero.mp h.symm).resolve_left (Complex.ofReal_ne_zero.mpr hfac.ne')
-  have hfpolar : f ∈ sAdelePolarSubspace F S :=
-    (mem_sAdelePolarSubspace f).2 ⟨hfzero, by simpa only [hF] using hgzero⟩
-  have hfband : f ∈ sLocalPWTests (F := F) (S := S) (T := S) le_rfl (sLocalPWProductRegion S B) := by
-    have hself : sAdeleSchwartzTransition F (le_rfl (a := S)) f = f := by
-      classical
-      apply Subtype.ext
-      funext x
-      rw [← show Multiplicative.ofAdd x.toAdd = x from rfl, sAdeleSchwartzTransition_apply,
-        ite_eq_left (fun w hw ↦ (hw w.property).elim)]
-    refine (mem_sLocalPWTests (F := F) (S := S) (T := S) le_rfl (sLocalPWProductRegion S B) f).2
-      ⟨f, hself, ?_⟩
-    rw [hF]
-    let e : Multiplicative Aₛ ≃ₜ Aₛ := (Homeomorph.ofAdd : Aₛ ≃ₜ Multiplicative Aₛ).symm
-    have he : g.val = (fun x : Aₛ ↦ g (Multiplicative.ofAdd x)) ∘ e := rfl
-    refine ⟨hgc.comp_homeomorph e, ?_⟩
-    rw [he, tsupport_comp_eq_preimage]
-    exact preimage_mono hgs
-  refine ⟨f, hfpolar, hfband, fun y ↦ ?_⟩
-  rw [hF]
-  change d₁ * ((sLocalHomogeneousAdelicThetaLinearMap F S (χ⁻¹.comp include₁) g (q y) *
-    ((χ⁻¹) (q y) : ℂ)) * (Real.exp (-y / 2) : ℂ)) = r y
-  have he : (Real.exp (y / 2) : ℂ) * (Real.exp (-y / 2) : ℂ) = 1 := by
-    rw [← Complex.ofReal_mul, ← Real.exp_add, show y / 2 + -y / 2 = 0 from by ring,
-      Real.exp_zero, Complex.ofReal_one]
-  rw [← mul_assoc, hscaled]
-  calc
-    _ = ((Real.exp (y / 2) : ℂ) * (Real.exp (-y / 2) : ℂ)) * r y := by ring
-    _ = _ := by rw [he, one_mul]
+  exact ⟨f, (mem_sAdelePolarSubspace f).2 ⟨hfzero, hFzero⟩, hfband, hprofile⟩
 
 end RiemannMasullo
