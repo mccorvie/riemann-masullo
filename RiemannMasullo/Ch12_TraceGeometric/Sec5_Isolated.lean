@@ -1,5 +1,10 @@
 module
 
+public import RiemannMasullo.Ch12_TraceGeometric.Sec5_FirstPrimeAbel
+public import RiemannMasullo.Ch12_TraceGeometric.Sec5_RationalPrimePairThreshold
+public import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.SignedAbelMean
+import Mathlib.Analysis.Calculus.ContDiff.RCLike
+public import RiemannMasullo.ForMathlib.Analysis.Fourier.QuadraticBoxProfile
 import Mathlib.Geometry.Manifold.PartitionOfUnity
 import RiemannMasullo.Ch10_TraceSpectral.Sec4b_ProjectedKernels
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
@@ -15,6 +20,271 @@ The second theorem specializes that formula to this kernel.
 -/
 
 @[expose] public noncomputable section
+
+/-! ## A physical zero criterion at a fixed positive threshold
+
+For the all-zero identity of Theorem B.4.4.7 (p. 623), the shifted first-prime
+observable detects the same genuine zeros whose omission is at issue in
+Theorem 12.5.1.1 (pp. 519–520). Its smallness at an unproved rate is an additional
+arithmetic assertion. The criterion below also detects a zero exactly on the line.
+-/
+
+namespace RiemannMasullo.Isolated
+
+open Classical Filter Function MeasureTheory NumberField Set
+open scoped ContDiff ENNReal NNReal Topology
+
+set_option quotPrecheck false
+
+/-- The common complex-valued profile for the degree-one prime test, supported in `[2,4]`. -/
+def thresholdProfile (x : ℝ) : ℂ := (exists_translatedGevreyPolarProfile.choose x : ℂ)
+
+/-- The detector has both polar moments zero and sees each point strictly right of the axis
+in the open centered strip, with the positive bilateral Laplace convention of §12.5. -/
+theorem thresholdProfile_spec :
+    ContDiff ℝ ∞ thresholdProfile ∧ tsupport thresholdProfile ⊆ Icc 2 4 ∧
+    (bilateralLaplace thresholdProfile (1 / 2) = 0 ∧ bilateralLaplace thresholdProfile (-(1 / 2)) = 0) ∧
+    ∀ s : ℂ, 0 < s.re → s.re < 1 / 2 → bilateralLaplace thresholdProfile s ≠ 0 := by
+  let g := exists_translatedGevreyPolarProfile.choose
+  obtain ⟨_, hg, hsupport, ⟨hneg, _, hpos⟩, hdetect, _⟩ := exists_translatedGevreyPolarProfile.choose_spec
+  have hs : Function.support thresholdProfile ⊆ Function.support g := fun x hx he ↦
+    hx (show (g x : ℂ) = 0 by simp [he])
+  refine ⟨Complex.ofRealCLM.contDiff.comp hg, (closure_mono hs).trans hsupport, ⟨hpos, hneg⟩, ?_⟩
+  intro s h h'
+  exact hdetect s (abs_pos_of_pos h) (by simpa only [abs_of_pos h] using h')
+
+variable {F : Type*} [Field F] [NumberField F]
+local notation "G" => IdeleClassGroup (𝓞 F) F
+local notation "U" => PontryaginDual G
+local notation "ord(" χ "," ρ ")" => MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ ρ
+local notation "sites(" χ ")" => {ρ : ℂ // 0 < ord(χ, ρ)}
+local notation "energy(" ψ "," c ")" =>
+  AbelEdge.weightedSquareAbelMean (fun y ↦ firstPrimeDegreeOneSum (ψ)⁻¹ thresholdProfile y 4) (c)
+
+/-- Every positive divisor site right of the central line has nonzero detector moment. -/
+theorem thresholdProfile_detects_right_zero (ψ : U) (ρ : sites(ψ⁻¹)) (hr : 1 / 2 < ρ.val.re) :
+    bilateralLaplace thresholdProfile (ρ.val - 1 / 2) ≠ 0 := by
+  obtain ⟨hL, heq⟩ := continuedCompletedHeckeL_spec (F := F) ψ⁻¹
+  have hz := ρ.property
+  rw [MeromorphicOn.divisor_apply hL.meromorphicOn (mem_univ _)] at hz
+  have ho : 0 < meromorphicOrderAt (continuedCompletedHeckeL ψ⁻¹) ρ.val := by
+    cases he : meromorphicOrderAt (continuedCompletedHeckeL ψ⁻¹) ρ.val with
+    | top => simp
+    | coe k => rw [he, WithTop.untop₀_coe] at hz; exact_mod_cast hz
+  have hlt := completedHeckeL_continuation_zeros ψ⁻¹ _ hL heq (by linarith : 0 < ρ.val.re) ho
+  apply thresholdProfile_spec.2.2.2 <;>
+    simp only [Complex.sub_re, Complex.div_ofNat_re, Complex.one_re] <;> linarith
+
+private theorem thresholdProfile_polarTerm (ψ : U) (y : ℝ) :
+    firstPrimePolarMoment ψ thresholdProfile y (1 / 2) = 0 := by
+  have h : (∫ x : ℝ, thresholdProfile x * Complex.exp ((1 / 2 : ℂ) * x)) = 0 :=
+    thresholdProfile_spec.2.2.1.1
+  rw [firstPrimePolarMoment, h, mul_zero, ite_self]
+
+variable (τ : ℝ≥0ˣ →ₜ* IdeleClassGroup (𝓞 F) F) (hτ : RightInverse τ (ideleClassNorm F))
+  (ψ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (hψ : ∀ t, ψ (τ t) = 1)
+include hτ hψ
+
+/-- One weighted square-integrability bound for the signed degree-one prime sum excludes
+every completed-divisor site strictly beyond its damping line. -/
+theorem firstPrime_zero_re_le_of_integrableOn_square {q : ℝ} (hq : 0 ≤ q)
+    (hL : IntegrableOn (fun y : ℝ ↦ ‖firstPrimeDegreeOneSum ψ⁻¹ thresholdProfile y 4‖ ^ 2 *
+      Real.exp (-(2 * q) * y)) (Ici 0)) :
+    ∀ ρ : ℂ, 0 < ord(ψ⁻¹, ρ) → ρ.re - 1 / 2 ≤ q := by
+  intro ρ hρ
+  apply le_of_not_gt
+  intro hgap
+  apply thresholdProfile_detects_right_zero ψ ⟨ρ, hρ⟩ (by change 1 / 2 < ρ.re; linarith)
+  apply firstPrime_moment_eq_zero_of_integrableOn_square τ hτ ψ hψ thresholdProfile thresholdProfile_spec.1
+    (by norm_num : (0 : ℝ) < 2) (by norm_num : (2 : ℝ) ≤ 4) thresholdProfile_spec.2.1 hq _ ρ hρ hgap
+  simpa only [thresholdProfile_polarTerm, sub_zero] using hL
+
+/-- A strictly exterior site makes the energy infinite throughout the explicit open
+damping interval. The offset may be zero. -/
+theorem firstPrime_weightedSquareAbelMean_eq_top_of_zero {c ε : ℝ} (hc : 0 ≤ c) (hε : 0 < ε)
+    {ρ : ℂ} (hρ : 0 < ord(ψ⁻¹, ρ)) (hgap : ε < 2 * (ρ.re - 1 / 2 - c)) : energy(ψ, c) ε = ⊤ := by
+  by_contra hQ
+  have hm := firstPrimeDegreeOneSum_measurable ψ⁻¹ thresholdProfile
+    thresholdProfile_spec.1.continuous.measurable 4
+  have hi := (AbelEdge.weightedSquareAbelMean_ne_top_iff_integrableOn_sq_mul_exp hm c hε).mp hQ
+  have h := firstPrime_zero_re_le_of_integrableOn_square τ hτ ψ hψ (q := c + ε / 2) (by linarith) hi ρ hρ
+  linarith
+
+/-- If all divisor sites lie on or left of the edge, the limit of the uncentered prime
+observable is the sum of the squared full-multiplicity coefficients on that edge. -/
+theorem firstPrime_tendsto_abelBoundaryMass {c : ℝ} (hc : 0 < c)
+    (hr : ∀ ρ : ℂ, 0 < ord(ψ⁻¹, ρ) → ρ.re - 1 / 2 ≤ c) :
+    Tendsto (energy(ψ, c)) (𝓝[>] 0)
+      (𝓝 (ENNReal.ofReal (firstPrimeBoundaryMass ψ⁻¹ thresholdProfile c))) := by
+  simpa only [thresholdProfile_polarTerm, sub_zero] using
+    firstPrime_centered_tendsto_abelBoundaryMass τ hτ ψ hψ thresholdProfile thresholdProfile_spec.1
+      (by norm_num : (0 : ℝ) < 2) (by norm_num : (2 : ℝ) ≤ 4) thresholdProfile_spec.2.1 hc hr
+
+/-- The energy always has an extended-real limit. A strictly exterior site gives infinity,
+and otherwise the limit is the full boundary mass. -/
+theorem firstPrime_abel_tendsto_dichotomy {c : ℝ} (hc : 0 < c) :
+    Tendsto (energy(ψ, c)) (𝓝[>] 0)
+      (𝓝 (if ∃ ρ : ℂ, 0 < ord(ψ⁻¹, ρ) ∧ c < ρ.re - 1 / 2 then (⊤ : ℝ≥0∞)
+        else ENNReal.ofReal (firstPrimeBoundaryMass ψ⁻¹ thresholdProfile c))) := by
+  split_ifs with he
+  · obtain ⟨ρ, hρ, hgap⟩ := he
+    apply tendsto_const_nhds.congr'
+    filter_upwards [Ioo_mem_nhdsGT (by linarith : 0 < 2 * (ρ.re - 1 / 2 - c))] with ε hε
+    exact (firstPrime_weightedSquareAbelMean_eq_top_of_zero τ hτ ψ hψ hc.le hε.1 hρ hε.2).symm
+  · exact firstPrime_tendsto_abelBoundaryMass τ hτ ψ hψ hc fun ρ hρ ↦
+      le_of_not_gt fun h ↦ he ⟨ρ, hρ, h⟩
+
+private theorem thresholdProfile_mass_zero_iff {c : ℝ} (hc : 0 < c) :
+    ENNReal.ofReal (firstPrimeBoundaryMass ψ⁻¹ thresholdProfile c) = 0 ↔
+      ∀ z : sites(ψ⁻¹), z.val.re - 1 / 2 ≠ c := by
+  let b (z : sites(ψ⁻¹)) := firstPrimeFullCoefficient ψ⁻¹ thresholdProfile z.val
+  let d (z : sites(ψ⁻¹)) := if z.val.re - 1 / 2 = c then ‖b z‖ ^ 2 else 0
+  have hb : Summable (fun z ↦ ‖b z‖) := (firstPrime_fullSeries_bounded_error τ hτ ψ hψ
+    thresholdProfile thresholdProfile_spec.1 (by norm_num : (0 : ℝ) < 2) (by norm_num : (2 : ℝ) ≤ 4)
+    thresholdProfile_spec.2.1).1
+  have hn (z) : 0 ≤ d z := by dsimp [d]; split_ifs <;> positivity
+  have hd : Summable d := (hb.mul_right (∑' z, ‖b z‖)).of_nonneg_of_le hn (fun z ↦ by
+    dsimp [d]
+    split_ifs
+    · rw [pow_two]
+      exact mul_le_mul_of_nonneg_left (hb.le_tsum z (fun j _ ↦ norm_nonneg _)) (norm_nonneg _)
+    · exact mul_nonneg (norm_nonneg _) (tsum_nonneg (fun z ↦ norm_nonneg (b z))))
+  rw [ENNReal.ofReal_eq_zero]
+  constructor
+  · intro hm z hz
+    change (∑' z, d z) ≤ 0 at hm
+    have hne : b z ≠ 0 := mul_ne_zero (by exact_mod_cast z.property.ne')
+      (thresholdProfile_detects_right_zero ψ z (by linarith))
+    have hp : 0 < d z := by simpa only [d, ite_eq_left hz] using sq_pos_of_pos (norm_pos_iff.mpr hne)
+    exact hp.not_ge ((hd.le_tsum z (fun j _ ↦ hn j)).trans hm)
+  · intro h
+    have hzero (z : sites(ψ⁻¹)) : d z = 0 := ite_eq_right (h z)
+    change (∑' z, d z) ≤ 0
+    simp only [hzero, tsum_zero, le_refl]
+
+/-- The energy of the fixed signed prime observable tends to zero exactly when the closed
+right half-plane at the given positive offset contains no divisor site.
+Reconstruction: This criterion for #5571 combines the translated §12.5 identity with the
+compact detector. Proving vanishing of the arithmetic energy remains open. -/
+theorem firstPrime_tendsto_zero_iff_no_closed_exterior {c : ℝ} (hc : 0 < c) :
+    Tendsto (energy(ψ, c)) (𝓝[>] 0) (𝓝 0) ↔ ∀ ρ : ℂ, 0 < ord(ψ⁻¹, ρ) → ρ.re < 1 / 2 + c := by
+  have hd := firstPrime_abel_tendsto_dichotomy τ hτ ψ hψ hc
+  have hz : Tendsto (energy(ψ, c)) (𝓝[>] 0) (𝓝 0) ↔ _ :=
+    ⟨fun h ↦ tendsto_nhds_unique hd h, fun h ↦ h ▸ hd⟩
+  rw [hz]
+  split_ifs with he
+  · obtain ⟨ρ, hρ, hgap⟩ := he
+    simp only [ENNReal.top_ne_zero, false_iff]
+    intro h
+    linarith [h ρ hρ]
+  · rw [thresholdProfile_mass_zero_iff τ hτ ψ hψ hc]
+    constructor
+    · intro hn ρ hρ
+      have hle : ρ.re - 1 / 2 ≤ c := le_of_not_gt fun h ↦ he ⟨ρ, hρ, h⟩
+      have hlt := lt_of_le_of_ne hle (hn ⟨ρ, hρ⟩)
+      linarith
+    · intro h z hz
+      linarith [h z.val z.property]
+
+/-- The same criterion follows from the lower limit of the energy. -/
+theorem firstPrime_liminf_zero_iff_no_closed_exterior {c : ℝ} (hc : 0 < c) :
+    Filter.liminf (energy(ψ, c)) (𝓝[>] 0) = 0 ↔ ∀ ρ : ℂ, 0 < ord(ψ⁻¹, ρ) → ρ.re < 1 / 2 + c := by
+  have hd := firstPrime_abel_tendsto_dichotomy τ hτ ψ hψ hc
+  rw [← firstPrime_tendsto_zero_iff_no_closed_exterior τ hτ ψ hψ hc, hd.liminf_eq]
+  exact ⟨fun h ↦ h ▸ hd, fun h ↦ tendsto_nhds_unique hd h⟩
+
+/-- Any prescribed approach from the right gives the same criterion. -/
+theorem firstPrime_sampled_abel_zero_iff_no_closed_exterior {c : ℝ} (hc : 0 < c)
+    {T : Type*} {l : Filter T} [l.NeBot] {e : T → ℝ} (he : Tendsto e l (𝓝[>] (0 : ℝ))) :
+    Tendsto (fun t ↦ energy(ψ, c) (e t)) l (𝓝 0) ↔ ∀ ρ : ℂ, 0 < ord(ψ⁻¹, ρ) → ρ.re < 1 / 2 + c := by
+  have hd := firstPrime_abel_tendsto_dichotomy τ hτ ψ hψ hc
+  rw [← firstPrime_tendsto_zero_iff_no_closed_exterior τ hτ ψ hψ hc]
+  exact ⟨fun h ↦ (tendsto_nhds_unique (hd.comp he) h) ▸ hd, fun h ↦ h.comp he⟩
+
+section AllCharacters
+
+omit hτ hψ
+
+attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorelSpaceSec1
+  instIdeleClassT2Sec1 instIdeleClassLocallyCompactSec1 instIdeleClassSecondCountableSec1
+  instIdeleClassHaarMeasureSec1
+
+local notation "C₁" => (ideleClassNorm F).ker
+local notation "μ𝔽" => ideleClassTamagawaMeasure F
+local notation "m𝔽" => (continuousIdeleClassNorm F : G →ₜ* ℝ≥0ˣ)
+local notation "hm𝔽" => (⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ : IsModulation m𝔽)
+local notation "exteriorZeros(" τ ", " c ")" =>
+  {z : {χ : U // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ //
+    0 < ord(z.1.val, z.2) ∧ c ≤ |z.2.re - 1 / 2|}
+local notation "zeroTerm(" φ ", " z ")" =>
+  (ord((z).val.1.val, (z).val.2) : ℂ) * modulatedFourierMellin m𝔽 univ hm𝔽 μ𝔽
+    (φ : BruhatCompactSupport G).val (ideleClassNormTwist (F := F) (z).val.1.val ((z).val.2 - 1 / 2))
+
+/-- The completed divisors agree at `z` and `1 - z` after character inversion.
+The proof follows Michael Lyle (mlyle), PR #7586. -/
+private theorem firstPrime_ord_reflection (χ : U) (z : ℂ) : ord(χ⁻¹, 1 - z) = ord(χ, z) := by
+  obtain ⟨hL, hl⟩ := continuedCompletedHeckeL_spec χ
+  obtain ⟨hD, hd⟩ := continuedCompletedHeckeL_spec χ⁻¹
+  obtain ⟨ε, hε, hne, hfe⟩ := completedHeckeL_continuation_functionalEquation χ _ _ hL hl hD hd
+  have he : meromorphicOrderAt (fun s ↦ continuedCompletedHeckeL χ⁻¹ (1 - s)) z =
+      meromorphicOrderAt (continuedCompletedHeckeL χ⁻¹) (1 - z) := by
+    simpa [Function.comp_def] using meromorphicOrderAt_comp_of_deriv_ne_zero
+      (f := continuedCompletedHeckeL χ⁻¹) (show AnalyticAt ℂ (fun s : ℂ ↦ 1 - s) z by fun_prop)
+      (show deriv (fun s : ℂ ↦ 1 - s) z ≠ 0 by simp)
+  rw [show (fun s ↦ continuedCompletedHeckeL χ⁻¹ (1 - s)) =
+      ε * continuedCompletedHeckeL χ from funext hfe,
+    meromorphicOrderAt_mul_of_ne_zero (hε.analyticAt z) (hne z)] at he
+  rw [MeromorphicOn.divisor_apply hD.meromorphicOn (mem_univ _),
+    MeromorphicOn.divisor_apply hL.meromorphicOn (mem_univ _), ← he]
+
+private theorem firstPrime_isEmpty_exterior_iff_all_right (τ : ℝ≥0ˣ →ₜ* G) (c : ℝ) :
+    IsEmpty exteriorZeros(τ, c) ↔ ∀ (ψ : U), (∀ t, ψ (τ t) = 1) →
+      ∀ ρ : ℂ, 0 < ord(ψ⁻¹, ρ) → ρ.re < 1 / 2 + c := by
+  have hinv (χ : U) (hχ : ∀ t, χ (τ t) = 1) (t : ℝ≥0ˣ) : χ⁻¹ (τ t) = 1 := by
+    change (χ (τ t))⁻¹ = 1
+    rw [hχ, inv_one]
+  constructor
+  · intro he ψ hψ ρ hρ
+    apply lt_of_not_ge
+    intro hr
+    apply he.false
+    exact ⟨(⟨ψ⁻¹, hinv ψ hψ⟩, ρ), hρ, le_trans (by linarith : c ≤ ρ.re - 1 / 2) (le_abs_self _)⟩
+  · intro h
+    refine ⟨fun z ↦ ?_⟩
+    obtain ⟨⟨⟨χ, hχ⟩, ρ⟩, hρ, hout⟩ := z
+    change 0 < ord(χ, ρ) at hρ
+    change c ≤ |ρ.re - 1 / 2| at hout
+    have hright := h χ⁻¹ (hinv χ hχ) ρ (by simpa only [inv_inv] using hρ)
+    have hleft := h χ hχ (1 - ρ) (by rwa [firstPrime_ord_reflection])
+    rw [Complex.sub_re, Complex.one_re] at hleft
+    exact (abs_lt.mpr ⟨by linarith, by linarith⟩).not_ge hout
+
+/-- The exterior zero sum of Theorem 12.5.1.1 (pp. 519–520) vanishes for every admissible
+Bruhat test at a given positive width exactly when the fixed first-prime test has squared
+Abel limit zero for every character trivial on the norm section. -/
+theorem hasSum_exteriorZeros_iff_all_firstPrime_abel (τ : ℝ≥0ˣ →ₜ* G)
+    (hτ : RightInverse τ (ideleClassNorm F)) {c : ℝ} (hc : 0 < c) :
+    (∀ φ : BruhatCompactSupport G, (∀ g : C₁, φ.val g = 0) →
+      HasSum (fun z : exteriorZeros(τ, c) ↦ zeroTerm(φ, z)) 0) ↔
+      ∀ (ψ : U), (∀ t, ψ (τ t) = 1) → Tendsto (energy(ψ, c)) (𝓝[>] 0) (𝓝 0) := by
+  rw [hasSum_exteriorZeros_iff_isEmpty τ hτ c, firstPrime_isEmpty_exterior_iff_all_right]
+  exact forall_congr' fun ψ ↦ forall_congr' fun hψ ↦
+    (firstPrime_tendsto_zero_iff_no_closed_exterior τ hτ ψ hψ hc).symm
+
+/-- The damping parameters can be prescribed once for all normalized characters. -/
+theorem hasSum_exteriorZeros_iff_all_firstPrime_sampled_abel (τ : ℝ≥0ˣ →ₜ* G)
+    (hτ : RightInverse τ (ideleClassNorm F)) {c : ℝ} (hc : 0 < c)
+    {T : Type*} {l : Filter T} [l.NeBot] {e : T → ℝ} (he : Tendsto e l (𝓝[>] (0 : ℝ))) :
+    (∀ φ : BruhatCompactSupport G, (∀ g : C₁, φ.val g = 0) →
+      HasSum (fun z : exteriorZeros(τ, c) ↦ zeroTerm(φ, z)) 0) ↔
+      ∀ (ψ : U), (∀ t, ψ (τ t) = 1) → Tendsto (fun t ↦ energy(ψ, c) (e t)) l (𝓝 0) := by
+  rw [hasSum_exteriorZeros_iff_isEmpty τ hτ c, firstPrime_isEmpty_exterior_iff_all_right]
+  exact forall_congr' fun ψ ↦ forall_congr' fun hψ ↦
+    (firstPrime_sampled_abel_zero_iff_no_closed_exterior τ hτ ψ hψ hc he).symm
+
+end AllCharacters
+
+end RiemannMasullo.Isolated
 
 open MeasureTheory NumberField Set
 open scoped NNReal
@@ -330,6 +600,192 @@ theorem exists_projectiveKernel_stripTestAction_spectralProjection_iff_support_i
   change 0 < Real.log ((ideleClassNorm F g.val).val : ℝ) at hx
   rw [g.property] at hx
   simp at hx
+
+/-! ## Ordered rational prime pairs in the fixed physical test -/
+
+section OrderedRationalPrimePairs
+
+open AbelEdge Filter MeasureTheory Set RationalPrimePairs
+open scoped BigOperators ENNReal NNReal Topology
+
+/-- The translated prime test has a positive uniform norm bound on its support window. -/
+private theorem thresholdProfile_norm_le_on_Icc :
+    ∃ M : ℝ, 0 < M ∧ ∀ x ∈ Icc (2 : ℝ) 4, ‖thresholdProfile x‖ ≤ M := by
+  obtain ⟨C, hC⟩ := isCompact_Icc.exists_bound_of_continuousOn
+    (thresholdProfile_spec.1.continuous.continuousOn (s := Icc (2 : ℝ) 4))
+  exact ⟨max C 1, lt_of_lt_of_le zero_lt_one (le_max_right _ _),
+    fun x hx ↦ (hC x hx).trans (le_max_left _ _)⟩
+
+/-- On the translated prime window the smooth test has a single Lipschitz constant. -/
+private theorem thresholdProfile_lipschitzOn_Icc :
+    ∃ L : ℝ≥0, LipschitzOnWith L thresholdProfile (Icc (2 : ℝ) 4) :=
+  thresholdProfile_spec.1.contDiffOn.exists_lipschitzOnWith (by simp) (convex_Icc 2 4) isCompact_Icc
+
+/-- The nonzero moment at one quarter gives a fixed interval of positive length on which
+the translated prime test is bounded away from zero. -/
+theorem thresholdProfile_exists_subinterval_norm_ge :
+    ∃ u v m : ℝ, 2 ≤ u ∧ u < v ∧ v ≤ 4 ∧ 0 < m ∧ ∀ x ∈ Icc u v, m ≤ ‖thresholdProfile x‖ := by
+  obtain ⟨u, hu⟩ : ∃ u : ℝ, thresholdProfile u ≠ 0 := by
+    by_contra! hz
+    apply thresholdProfile_spec.2.2.2 (1 / 4)
+      (by norm_num [Complex.div_ofNat_re]) (by norm_num [Complex.div_ofNat_re])
+    simp [bilateralLaplace, hz]
+  have hnorm := norm_pos_iff.mpr hu
+  let m := ‖thresholdProfile u‖ / 2
+  have hm : 0 < m := half_pos hnorm
+  have hnear : {x : ℝ | m < ‖thresholdProfile x‖} ∈ 𝓝 u :=
+    thresholdProfile_spec.1.continuous.norm.continuousAt.eventually_const_lt (half_lt_self hnorm)
+  obtain ⟨v, huv, hv⟩ := mem_nhdsGE_iff_exists_Icc_subset.mp (mem_nhdsWithin_of_mem_nhds hnear)
+  have hvm : m < ‖thresholdProfile v‖ := hv (right_mem_Icc.mpr huv.le)
+  have hus : u ∈ tsupport thresholdProfile := subset_tsupport _ hu
+  have hvs : v ∈ tsupport thresholdProfile := subset_tsupport _ (norm_pos_iff.mp (hm.trans hvm))
+  exact ⟨u, v, m, (thresholdProfile_spec.2.1 hus).1, huv, (thresholdProfile_spec.2.1 hvs).2,
+    hm, fun x hx ↦ (hv hx).le⟩
+
+/-- The public rational principal degree-one sum is exactly the finite sum on the common
+prime window, including its original endpoint at `y+4`. -/
+theorem firstPrimeDegreeOneSum_trivial_thresholdProfile (y : ℝ) :
+    firstPrimeDegreeOneSum (F := ℚ) 1 thresholdProfile y 4 =
+      ∑ p ∈ window y, weight thresholdProfile y p := by
+  apply (firstPrimeDegreeOneSum_trivial_rat thresholdProfile y 4).trans
+  apply sum_prime_cutoff_eq_window
+  intro x hx
+  by_contra hn
+  exact (not_le_of_gt hx) (thresholdProfile_spec.2.1 (subset_tsupport _ hn)).1
+
+/-- Hard near and far prime pairs sum to the squared public rational principal observable. -/
+theorem firstPrimeDegreeOneSum_trivial_sq_eq_near_add_far (y : ℝ) (D : ℕ) :
+    ‖firstPrimeDegreeOneSum (F := ℚ) 1 thresholdProfile y 4‖^2 =
+      nearReal thresholdProfile y D + farReal thresholdProfile y D := by
+  rw [firstPrimeDegreeOneSum_trivial_thresholdProfile, norm_sum_weight_sq_eq_nearReal_add_farReal]
+
+/-- Every exponent below `2*c` gives zero Abel mean for the absolute near-pair products
+of the rational threshold test. -/
+theorem thresholdProfile_tendsto_subcritical_pair_abel_zero {c θ : ℝ}
+    (hc : 0 < c) (hθ : θ < 2*c) :
+    Tendsto (fun ε : ℝ ↦ ENNReal.ofReal ε * ∫⁻ y in Ici (0 : ℝ), ENNReal.ofReal
+      (nearAbs thresholdProfile y ⌊Real.exp (θ*y)⌋₊ * Real.exp (-(ε+2*c)*y)))
+      (𝓝[>] 0) (𝓝 0) := by
+  obtain ⟨B,hB,hH⟩ := thresholdProfile_norm_le_on_Icc
+  exact tendsto_nearAbs_abel_zero thresholdProfile hc hθ hB.le hH
+
+/-- The signed near contribution of the rational threshold test is also negligible in
+absolute Abel mean below `2*c`. -/
+theorem thresholdProfile_tendsto_abs_subcritical_pair_abel_zero {c θ : ℝ}
+    (hc : 0 < c) (hθ : θ < 2*c) :
+    Tendsto (fun ε : ℝ ↦ ENNReal.ofReal ε * ∫⁻ y in Ici (0 : ℝ), ENNReal.ofReal
+      (|nearReal thresholdProfile y ⌊Real.exp (θ*y)⌋₊| * Real.exp (-(ε+2*c)*y)))
+      (𝓝[>] 0) (𝓝 0) := by
+  obtain ⟨B,hB,hH⟩ := thresholdProfile_norm_le_on_Icc
+  exact tendsto_abs_nearReal_abel_zero thresholdProfile hc hθ hB.le hH
+
+/-- For the fixed public threshold test there is one positive constant for which the hard
+signed near-prime sum eventually exceeds that constant times the critical pair radius. -/
+theorem thresholdProfile_exists_pos_eventually_critical_pair :
+    ∃ δ : ℝ, 0 < δ ∧ ∀ c : ℝ, 0 < c → c < 1/2 →
+      ∀ᶠ y : ℝ in atTop, δ * Real.exp (2*c*y) ≤
+        nearReal thresholdProfile y ⌊Real.exp (2*c*y)⌋₊ := by
+  obtain ⟨L,hL⟩ := thresholdProfile_lipschitzOn_Icc
+  obtain ⟨u,v,m,hu,huv,hv,hm,hgood⟩ := thresholdProfile_exists_subinterval_norm_ge
+  exact exists_pos_eventually_critical_nearReal _ hL hu huv hv hm hgood
+
+private theorem critical_abel_weight_mul (a c ε y : ℝ) :
+    a * Real.exp (-(2*c)*y) * Real.exp (-ε*y) = a * Real.exp (-(ε+2*c)*y) := by
+  rw [mul_assoc, ← Real.exp_add, show -(2*c)*y + -ε*y = -(ε+2*c)*y by ring]
+
+/-- At nonnegative damping, the real Abel mean of the normalized square is the
+real value of the project's extended nonnegative square mean. -/
+private theorem signedAbelMean_normSq_exp_eq_weightedSquareAbelMean_toReal
+    {f : ℝ → ℂ} (hf : Measurable f) (c : ℝ) {ε : ℝ} (hε : 0 ≤ ε) :
+    signedAbelMean (fun y ↦ ‖f y‖^2 * Real.exp (-(2*c)*y)) ε =
+      (AbelEdge.weightedSquareAbelMean f c ε).toReal := by
+  have hg : Measurable (fun y ↦ ‖f y‖^2 * Real.exp (-(ε+2*c)*y)) := by fun_prop
+  rw [signedAbelMean, AbelEdge.weightedSquareAbelMean, ENNReal.toReal_mul, ENNReal.toReal_ofReal hε]
+  simp only [critical_abel_weight_mul]
+  exact congrArg (ε * ·) (integral_eq_lintegral_of_nonneg_ae
+    (.of_forall fun y ↦ mul_nonneg (sq_nonneg ‖f y‖) (Real.exp_pos _).le) hg.aestronglyMeasurable)
+
+/-- At the critical cutoff, the signed near Abel lower limit is at least a fixed
+positive constant. If the public principal energy tends to zero, the strictly distant
+contribution is eventually integrable and its signed Abel upper limit is at most
+the negative of the same constant. One constant works for every `0 < c < 1/2`. -/
+theorem thresholdProfile_critical_pair_abel_bounds :
+    ∃ δ : ℝ, 0 < δ ∧ ∀ c : ℝ, 0 < c → c < 1/2 →
+      ((δ : EReal) ≤ liminf (fun ε : ℝ ↦ ((ε * ∫ y in Ici (0 : ℝ),
+        nearReal thresholdProfile y ⌊Real.exp (2*c*y)⌋₊ * Real.exp (-(ε+2*c)*y) : ℝ) : EReal))
+        (𝓝[>] 0)) ∧
+      (Tendsto (AbelEdge.weightedSquareAbelMean
+        (fun y ↦ firstPrimeDegreeOneSum (F := ℚ) 1 thresholdProfile y 4) c) (𝓝[>] 0) (𝓝 0) →
+      (∀ᶠ ε : ℝ in 𝓝[>] 0, IntegrableOn (fun y ↦
+        farReal thresholdProfile y ⌊Real.exp (2*c*y)⌋₊ * Real.exp (-(ε+2*c)*y)) (Ici 0)) ∧
+      limsup (fun ε : ℝ ↦ ((ε * ∫ y in Ici (0 : ℝ),
+        farReal thresholdProfile y ⌊Real.exp (2*c*y)⌋₊ * Real.exp (-(ε+2*c)*y) : ℝ) : EReal))
+        (𝓝[>] 0) ≤ ((-δ : ℝ) : EReal)) := by
+  obtain ⟨δ, hδ, hlower⟩ := thresholdProfile_exists_pos_eventually_critical_pair
+  refine ⟨δ, hδ, ?_⟩
+  intro c hc hc'
+  let P (y : ℝ) := firstPrimeDegreeOneSum (F := ℚ) 1 thresholdProfile y 4
+  let Q := AbelEdge.weightedSquareAbelMean P c
+  let D (y : ℝ) := ⌊Real.exp (2*c*y)⌋₊
+  let K (y : ℝ) := Real.exp (-(2*c)*y)
+  let t (y : ℝ) := ‖P y‖^2 * K y
+  let n (y : ℝ) := nearReal thresholdProfile y (D y) * K y
+  have hn (ε : ℝ) (hε : 0 < ε) : IntegrableOn (fun y ↦ n y * Real.exp (-ε*y)) (Ici 0) := by
+    simpa only [n, K, D, critical_abel_weight_mul] using
+      (integrableOn_nearReal_critical thresholdProfile_spec.1.continuous hc.le hε)
+  have hδn : ∀ᶠ y in atTop, δ ≤ n y := by
+    filter_upwards [hlower c hc hc'] with y hy
+    have hk : Real.exp (2*c*y) * K y = 1 := by
+      dsimp only [K]
+      rw [← Real.exp_add, show 2*c*y + -(2*c)*y = 0 by ring, Real.exp_zero]
+    calc
+      δ = (δ * Real.exp (2*c*y)) * K y := by rw [mul_assoc, hk, mul_one]
+      _ ≤ n y := mul_le_mul_of_nonneg_right hy (Real.exp_pos _).le
+  refine ⟨?_, ?_⟩
+  · have heq (ε : ℝ) : signedAbelMean n ε =
+        ε * ∫ y in Ici (0 : ℝ), nearReal thresholdProfile y ⌊Real.exp (2*c*y)⌋₊ *
+          Real.exp (-(ε+2*c)*y) := by
+      simp only [signedAbelMean, n, D, K, critical_abel_weight_mul]
+    simpa only [heq] using le_liminf_signedAbelMean hn
+      (fun d hd ↦ hδn.mono fun _ h ↦ hd.le.trans h)
+  · intro hzero
+    change Tendsto Q (𝓝[>] 0) (𝓝 0) at hzero
+    have hP : Measurable P := firstPrimeDegreeOneSum_measurable (F := ℚ) 1 thresholdProfile
+      thresholdProfile_spec.1.continuous.measurable 4
+    have hfinite : ∀ᶠ ε in 𝓝[>] (0 : ℝ), Q ε ≠ (⊤ : ℝ≥0∞) :=
+      (hzero.eventually_lt_const (show (0 : ℝ≥0∞) < 1 by exact zero_lt_one)).mono
+        fun _ h ↦ (h.trans_le le_top).ne
+    have htotal : ∀ᶠ ε in 𝓝[>] (0 : ℝ), IntegrableOn
+        (fun y ↦ ‖P y‖^2 * Real.exp (-(ε+2*c)*y)) (Ici 0) := by
+      filter_upwards [hfinite, self_mem_nhdsWithin] with ε hfin (hε : 0 < ε)
+      have hi := (AbelEdge.weightedSquareAbelMean_ne_top_iff_integrableOn_sq_mul_exp hP c hε).mp hfin
+      rwa [show 2*(c+ε/2) = ε+2*c by ring] at hi
+    have ht : ∀ᶠ ε in 𝓝[>] (0 : ℝ), IntegrableOn (fun y ↦ t y * Real.exp (-ε*y)) (Ici 0) := by
+      simpa only [t, K, critical_abel_weight_mul] using htotal
+    have hz : Tendsto (signedAbelMean t) (𝓝[>] 0) (𝓝 0) := by
+      have hreal : Tendsto (fun ε ↦ (Q ε).toReal) (𝓝[>] 0) (𝓝 0) := by
+        simpa only [Function.comp_def, ENNReal.toReal_zero] using
+          (ENNReal.tendsto_toReal ENNReal.zero_ne_top).comp hzero
+      refine hreal.congr' ?_
+      filter_upwards [self_mem_nhdsWithin] with ε (hε : 0 < ε)
+      exact (signedAbelMean_normSq_exp_eq_weightedSquareAbelMean_toReal hP c hε.le).symm
+    have hsplit (y : ℝ) : t y - n y = farReal thresholdProfile y (D y) * K y := by
+      dsimp only [t, n, P]
+      rw [← sub_mul, firstPrimeDegreeOneSum_trivial_sq_eq_near_add_far y (D y)]
+      ring
+    refine ⟨?_, ?_⟩
+    · filter_upwards [htotal, self_mem_nhdsWithin] with ε hi (hε : 0 < ε)
+      have hwin : IntegrableOn (fun y ↦ ‖∑ p ∈ window y, weight thresholdProfile y p‖^2 *
+          Real.exp (-(ε+2*c)*y)) (Ici 0) := by
+        simpa only [P, firstPrimeDegreeOneSum_trivial_thresholdProfile] using hi
+      exact (integrableOn_farReal_and_integral_split thresholdProfile_spec.1.continuous hc.le hε hwin).1
+    · have heq (ε : ℝ) : signedAbelMean (fun y ↦ t y - n y) ε =
+            ε * ∫ y in Ici (0 : ℝ), farReal thresholdProfile y ⌊Real.exp (2*c*y)⌋₊ *
+              Real.exp (-(ε+2*c)*y) := by
+        simp only [signedAbelMean, hsplit, D, K, critical_abel_weight_mul]
+      simpa only [heq] using limsup_signedAbelMean_sub_le hn hδn ht hz
+
+end OrderedRationalPrimePairs
 
 end KernelLocalization
 

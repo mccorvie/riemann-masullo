@@ -405,10 +405,10 @@ private theorem introTrace_characterTrace_volume :
 
 open Classical in
 
-/-- A norm-one translation annihilates the Mellin integral of the radial test
+/-- Paper: §1.4.1, p. 28. A norm-one translation annihilates the Mellin integral of the radial test
 against every other character trivial on the chosen norm section. In its own
 character the integral is the radial Mellin moment times the norm-one volume. -/
-private theorem introTrace_characterTrace_mellin (τ : ℝ≥0ˣ →ₜ* C𝔽)
+theorem introTraceTest_mellin_normalized (τ : ℝ≥0ˣ →ₜ* C𝔽)
     (hτ : RightInverse τ (ideleClassNorm F)) (χ η : U𝔽) (hχ : ∀ t, χ (τ t) = 1)
     (hη : ∀ t, η (τ t) = 1) (h : ℝ → ℂ) (φ : D𝔽)
     (hφ : ∀ g, φ.val g = introTraceTest χ h g) (s : ℂ) :
@@ -470,7 +470,7 @@ private theorem introTrace_characterTrace_isotype (τ : ℝ≥0ˣ →ₜ* C𝔽)
   let term (z : A) := (zeroOrder(z.val.1.val, z.val.2) : ℂ) * mom z.val.1.val (z.val.2 - 1 / 2)
   have hm (η : U𝔽) (hη : ∀ t, η (τ t) = 1) (s : ℂ) :
       mom η s = if η = χ then τVolume * introTraceMellin h s else 0 :=
-    introTrace_characterTrace_mellin τ hτ χ η hχ hη h φ hφ s
+    introTraceTest_mellin_normalized τ hτ χ η hχ hη h φ hφ s
   have hoff (z : A) (hz : z ∉ range ι) : term z = 0 := by
     have hne : z.val.1.val ≠ χ := by
       rintro he
@@ -762,11 +762,11 @@ private theorem introTrace_characterTrace_sqrt (q : ℝ) (hq : 0 < q) (m : ℕ) 
   push_cast
   ring
 
-/-- Decompose the finite local Connes–Weil integral into positive and negative
+/-- Paper: §1.4.1, p. 28. Decompose the finite local Connes–Weil integral into positive and negative
 valuation shells. The integral over units vanishes because the radial profile
 vanishes at one. At a ramified place, translation by a unit with nontrivial
 character annihilates the whole integral. -/
-private theorem introTrace_characterTrace_finite (χ : U𝔽) (h : ℝ → ℂ) (h1 : h 1 = 0)
+theorem finiteConnesWeilPrincipalValue_eq_introTracePrimePower_sum (χ : U𝔽) (h : ℝ → ℂ) (h1 : h 1 = 0)
     (v : V) [LocallyCompactSpace (v.adicCompletion F)ˣ] (b : BruhatCompactSupport (v.adicCompletion F)ˣ)
     (hb : ∀ x, b.val x = introTraceTest χ h (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v x)) :
     ((Real.log q(v) / ((finiteLocalMultiplicativeTamagawaMeasure F v)
@@ -6668,7 +6668,7 @@ private theorem introTrace_characterTrace_exterior_isotype (τ : ℝ≥0ˣ →�
   let term (z : A) := (zeroOrder(z.val.1.val, z.val.2) : ℂ) * mom z.val.1.val (z.val.2 - 1/2)
   have hm (η : U𝔽) (hη : ∀ t, η (τ t) = 1) (s : ℂ) :
       mom η s = if η = χ then τVolume * introTraceMellin h s else 0 :=
-    introTrace_characterTrace_mellin τ hτ χ η hχ hη h φ hφ s
+    introTraceTest_mellin_normalized τ hτ χ η hχ hη h φ hφ s
   have hoff (z : A) (hz : z ∉ range ι) : term z = 0 := by
     have hne : z.val.1.val ≠ χ := by
       rintro he
@@ -11936,8 +11936,8 @@ private theorem introTraceApprox_spectral_twistTrace (τ : ℝ≥0ˣ →ₜ* C�
     rw [hp'.tsum_prod, hp.tsum_prod]
     apply tsum_congr
     intro v
-    exact (introTrace_characterTrace_finite ψ g hg v (B v) (fun u ↦ (hB v u).trans (hφ' _))).symm.trans
-      (introTrace_characterTrace_finite χ f hf v (B v) (fun u ↦ (hB v u).trans (hφ _)))
+    exact (finiteConnesWeilPrincipalValue_eq_introTracePrimePower_sum ψ g hg v (B v) (fun u ↦ (hB v u).trans (hφ' _))).symm.trans
+      (finiteConnesWeilPrincipalValue_eq_introTracePrimePower_sum χ f hf v (B v) (fun u ↦ (hB v u).trans (hφ _)))
   have hM (s : ℂ) : introTraceMellin g s = introTraceMellin f (s-a) := by
     simpa only [introTraceMellin, g, smul_eq_mul, sub_eq_add_neg] using mellin_cpow_smul f s (-a)
   change introTraceSpectralSum ψ g 1 = _ at hS
@@ -14873,7 +14873,9 @@ private theorem introTrace_cutoff_integral_norm {X : Type*} [MeasurableSpace X]
       filter_upwards [introTrace_cutoff_pointwise b hs hx] with n hn
       simp [s, hn]
 
-private theorem introTrace_archimedean_test_kernel (w : InfinitePlace F)
+/-- Paper: Definition B.4.4.1(2) and Remark B.4.4.2, p. 620. If a local test vanishes at one, its
+archimedean principal value is the ordinary integrable kernel with its Tamagawa factor. -/
+theorem infiniteConnesWeilPrincipalValue_of_apply_one_zero (w : InfinitePlace F)
     (f : BruhatCompactSupport w.Completionˣ) (hf : f.val 1 = 0) :
     let K := fun u : w.Completionˣ ↦ f.val u * (Real.sqrt (‖u.val‖ ^ w.mult) : ℂ) /
       ((‖1 - u.val‖ ^ w.mult : ℝ) : ℂ)
@@ -14918,7 +14920,7 @@ theorem introTrace_cutoff_archimedean (φ : D𝔽) (hφ : ∀ g : (ideleClassNor
   have hPV (f : D𝔽) (hf : f.val 1 = 0) : Integrable (K f) μ ∧
       infiniteConnesWeilPrincipalValue w (R f) =
         (if w.IsReal then (1 / 2 : ℂ) else 1 / (2 * (Real.pi : ℂ))) * ∫ u, K f u ∂μ := by
-    simpa only [K, hR] using introTrace_archimedean_test_kernel w (R f) (by simp [hR, hf])
+    simpa only [K, hR] using infiniteConnesWeilPrincipalValue_of_apply_one_zero w (R f) (by simp [hR, hf])
   have hK1 (u : w.Completionˣ) (hu : Nw u = 1) : K φ u = 0 := by
     have hmem : ideleClassNorm F (archClass(w) u) = 1 := by
       apply Units.ext
