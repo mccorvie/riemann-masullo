@@ -131,6 +131,12 @@ def query(**params):
     return urllib.parse.urlencode(params)
 
 
+IMPORT_RE = re.compile(r"[ \t]*(?:public[ \t]+)?import[ \t]+(?:all[ \t]+)?(RiemannMasullo(?:\.[A-Za-z0-9_]+)*)")
+
+def imported_files(text, scanner):
+    code, _ = scanner.strip_comments(text.split("\n"))
+    return {m.group(1).replace(".", "/") + ".lean" for line in code if (m := IMPORT_RE.match(line))}
+
 def matters_to_everyone(path):
     """Whether a change to this file on main can change the result of any pull request's check."""
     if path in NON_BUILD_FILES:
@@ -237,8 +243,17 @@ class Merger:
             return None
         return ahead
 
+    def import_closure(self, base, paths):
+        tree, closure, queue = self.tree(base), set(paths), list(paths)
+        while queue:
+            e = tree.get(queue.pop())
+            if e and e[1] == "blob" and (raw := self.blob(e[2])) is not None:
+                for dep in imported_files(raw.decode("utf-8", "replace"), self.scanner):
+                    if dep not in closure: closure.add(dep); queue.append(dep)
+        return closure
+
     @staticmethod
-    def moved(ahead, paths):
+    def moved(ahead, paths, imported=None):
         """Why main has moved too far (see `since`) for a verdict about `paths`, or None."""
         if ahead["status"] == "identical":
             return None
@@ -253,6 +268,8 @@ class Merger:
                     continue
                 if name in paths:
                     return f"main has since changed {name}, which this pull request also changes"
+                if imported and name in imported:
+                    return f"main has since changed {name}, which this pull request imports"
                 if matters_to_everyone(name):
                     return f"main has since changed {name}, which affects every check"
         return None
@@ -370,7 +387,7 @@ class Merger:
         reasons, paths = self.rederive(base, sha)
         if reasons:
             return self.refuse(artifact, sha, "; ".join(reasons)[:400])
-        why = self.moved(ahead, set(paths))
+        why = self.moved(ahead, set(paths), self.import_closure(base, paths))
         if why:
             return self.check_again(run, artifact, sha, why)
         result = self.merge(number, sha)
@@ -478,7 +495,7 @@ def main(argv):
             print("  " + reason)
         ahead = merger.since(base)
         print("main since the base:", "the base is not a commit of main" if ahead is None
-              else merger.moved(ahead, set(paths)) or "nothing that matters")
+              else merger.moved(ahead, set(paths), merger.import_closure(base, paths)) or "nothing that matters")
         print(f"({api.calls} API calls)")
         return 0
     merger.drain()

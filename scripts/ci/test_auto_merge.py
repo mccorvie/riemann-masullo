@@ -348,6 +348,17 @@ class AutoMerge(unittest.TestCase):
         self.assertEqual(self.merged(), [])
 
 
+    def test_main_changed_an_imported_module(self):
+        dep = "RiemannMasullo/AppA/Base.lean"
+        mid = "RiemannMasullo/AppA/Mid.lean"
+        self.api.common[dep] = ("100644", "blob", self.api.blob_id("def helper := 1\n"))
+        self.api.common[mid] = ("100644", "blob", self.api.blob_id("import RiemannMasullo.AppA.Base\n"))
+        self.api.pull_request(7, {LEAN: ("import RiemannMasullo.AppA.Mid\n" + OLD, "import RiemannMasullo.AppA.Mid\n" + NEW)})
+        self.api.main_files = [dep]
+        self.assertIn("checking again", self.drain()[7])
+        self.assertEqual(self.merged(), [])
+
+
 class Verdict(unittest.TestCase):
     good = dict(schema=1, verdict="merge", pr=3, head_sha="1" * 40, base_sha="2" * 40)
 

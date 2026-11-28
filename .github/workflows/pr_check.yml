@@ -39,7 +39,7 @@ jobs:
   verdict:
     name: Verdict
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 240
     env:
       PR: ${{ github.event.pull_request.number }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -98,7 +98,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           REPO_ID: ${{ github.repository_id }}
-        run: python3 tools/scripts/ci/base_state.py --work work --base "$BASE_SHA" --out base-state || echo "could not fetch it; main will be built here"
+        run: |
+          if python3 tools/scripts/ci/base_state.py --work work --base "$BASE_SHA" --out base-state --sha-file base-state/sha.txt; then
+            saved_sha=$(tr -d "\r\n" < base-state/sha.txt 2>/dev/null || true)
+            if [[ "$saved_sha" =~ ^[0-9a-f]{40}$ ]] && [ "$saved_sha" != "$BASE_SHA" ]; then
+              git -C work checkout --detach "$saved_sha"
+              echo "BASE_SHA=$saved_sha" >>"$GITHUB_ENV"
+            fi
+          else
+            echo "could not fetch it; main will be built here"
+          fi
 
       - name: Check the pull request
         id: check
