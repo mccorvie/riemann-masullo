@@ -21,7 +21,7 @@ variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
   [MeasurableSpace G] [BorelSpace G]
   (H : Subgroup G) [discrete : DiscreteTopology H] (hH : IsClosed (H : Set G))
 
-local instance : MeasurableSpace (G ⧸ H) := borel _
+local instance instMeasurableSpaceLocalQuotient : MeasurableSpace (G ⧸ H) := borel _
 local notation "q" => QuotientGroup.mk' H
 
 variable {μ : Measure G} [haar : μ.IsHaarMeasure] [sigmaFinite : SigmaFinite μ] (hregular : μ.Regular)
@@ -151,8 +151,11 @@ section Ideles
 
 variable (F : Type*) [Field F] [NumberField F]
 
-local instance : MeasurableSpace (IdeleGroup (𝓞 F) F) := borel _
-local instance : MeasurableSpace (IdeleClassGroup (𝓞 F) F) := borel _
+local instance instIdeleMeasurableSpaceLocalQuotient :
+    MeasurableSpace (IdeleGroup (𝓞 F) F) := borel _
+local instance instIdeleClassMeasurableSpaceLocalQuotient :
+    MeasurableSpace (IdeleClassGroup (𝓞 F) F) := borel _
+
 /-- An open idelic D′-sequence gives an open D′-sequence for the
 counting-normalized Tamagawa measure on the idèle class group. -/
 theorem exists_open_DPrimeSequence_ideleClass_of_idele
