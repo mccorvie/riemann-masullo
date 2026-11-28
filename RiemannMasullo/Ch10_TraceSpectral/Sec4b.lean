@@ -1891,6 +1891,15 @@ private theorem spectralStripKernel_hilbertSchmidt_of_rows {α s : ℝ}
   exact spectralStripKernel_hilbertSchmidt_operator μ𝔽 ν wNN hw.measurable hp hν op k
     (Lp.stronglyMeasurable k) hk hrow
 
+/-- Paper: Theorem 10.4.3.6(2), p. 473. The mixed-weight Haar rows of a Sobolev
+operator give its Hilbert–Schmidt kernel after division by the input weight. -/
+theorem sobolevHilbertSchmidtKernel_of_haarRows {α s : ℝ} (op : W(α, s) →L[ℂ] W(α, s))
+    (k : Lp ℂ 2 ((ν(α, s)).prod (ν'(α, s))))
+    (hrow : ∀ u : W(α, s), ∀ᵐ x ∂μ𝔽, op u x = ∫ y, k (x, y) * u y ∂μ𝔽) :
+    IsSobolevHilbertSchmidtKernel (F := F) op
+      (fun p : C𝔽 × C𝔽 ↦ ((w(α, s) p.2)⁻¹ : ℝ) • k p) :=
+  spectralStripKernel_hilbertSchmidt_of_rows op k hrow
+
 end MixedWeightKernel
 
 /-- Paper: Theorem 10.4.3.6(2), p. 473, first formula. Dividing the global spectral
