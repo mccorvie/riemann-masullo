@@ -3843,6 +3843,42 @@ private theorem logBand_remainder {X : Type*} [MeasurableSpace X] (μ : Measure 
   rw [← integral_neg]
   exact integral_congr_ae (ae_of_all _ fun x ↦ neg_sub _ _)
 
+/-- A positive moment controls the logarithmic tail above any positive radius. -/
+private theorem logBand_tail_norm_le {X : Type*} [MeasurableSpace X] (μ : Measure X)
+    (g : X → ℂ) (m : X → ℝ) (hm : Measurable m) (hm₀ : ∀ x, 0 ≤ m x)
+    (n : ℕ) (hn : 0 < n) (hw : Integrable (fun x ↦ ‖g x‖ * m x ^ n) μ)
+    (R : ℝ) (hR : 0 < R) :
+    ‖∫ x in {x | R < m x}, g x * ((Real.log (m x) - Real.log R : ℝ) : ℂ) ∂μ‖ ≤
+      ((n : ℝ) * R ^ n)⁻¹ * ∫ x, ‖g x‖ * m x ^ n ∂μ := by
+  let s := {x | R < m x}
+  let c := ((n : ℝ) * R ^ n)⁻¹
+  have hc : 0 ≤ c := by positivity
+  have hs : MeasurableSet s := measurableSet_lt measurable_const hm
+  have hbound (x : X) (hx : x ∈ s) : Real.log (m x) - Real.log R ≤ c * m x ^ n := by
+    have hmR : R < m x := hx
+    have hu : 0 < m x / R := div_pos (hR.trans hmR) hR
+    have hn' : (0 : ℝ) < n := Nat.cast_pos.mpr hn
+    have hlog := Real.log_le_sub_one_of_pos (pow_pos hu n)
+    rw [Real.log_pow, Real.log_div (hR.trans hmR).ne' hR.ne', div_pow] at hlog
+    calc
+      Real.log (m x) - Real.log R ≤ (m x ^ n / R ^ n) / (n : ℝ) := by
+        apply (le_div_iff₀ hn').mpr
+        linarith
+      _ = c * m x ^ n := by
+        dsimp [c]
+        field_simp [hn'.ne', hR.ne']
+  calc
+    _ ≤ ∫ x in s, c * (‖g x‖ * m x ^ n) ∂μ := by
+      refine norm_integral_le_of_norm_le (hw.const_mul c).integrableOn ?_
+      refine (ae_restrict_mem hs).mono fun x hx ↦ ?_
+      have hlog := Real.log_le_log hR (show R < m x from hx).le
+      rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg (sub_nonneg.mpr hlog)]
+      rw [mul_left_comm]
+      exact mul_le_mul_of_nonneg_left (hbound x hx) (norm_nonneg _)
+    _ ≤ ∫ x, c * (‖g x‖ * m x ^ n) ∂μ :=
+      setIntegral_le_integral (hw.const_mul c) (ae_of_all _ fun x ↦ by positivity [hm₀ x])
+    _ = _ := integral_const_mul _ _
+
 /-- For one integrable Fourier transform the upper tail tends to zero by domination. -/
 private theorem logBand_remainder_tendsto {X : Type*} [MeasurableSpace X] (μ : Measure X)
     (g : X → ℂ) (m : X → ℝ) (hm : Measurable m) (hg : Integrable g μ)
@@ -3899,6 +3935,17 @@ private theorem sLocalTrace_remainder_eq (f : BruhatCompactSupport Iₛ) (ξ : H
     ← hv, ← mul_sub, ← sub_eq_add_neg]
   exact congrArg ((volume₁ : ℂ) * ·) (logBand_remainder νₛ _ m hm.measurable
     (sLocalTraceEta_fourier_integrable f ξ) (sLocalTrace_fourier_log_integrable f ξ) R)
+
+/-- Paper: (12.4.1.24)–(12.4.1.28), pp. 518–519. Subtracting the logarithmic and
+constant terms from one sharp orbital mass leaves its upper Fourier tail.
+Deviation: The identity is at a finite cutoff and for one orbit. -/
+theorem sLocalTraceSharpMass_sub_eq_fourierTail (f : BruhatCompactSupport Iₛ) (ξ : Hₛ) (R : ℝ) :
+    sLocalTraceSharpMass f ξ R - (volume₁ : ℂ) * (f.val ξ.val * (Real.log R : ℂ) +
+      -∫ w in range (Units.val : Iₛ → Aₛ), fourierₛ (sLocalTraceEta f ξ) w *
+        (Real.log (modS(w)) : ℂ) ∂νₛ) =
+    (volume₁ : ℂ) * ∫ w in {w : Aₛ | R < modS(w)}, fourierₛ (sLocalTraceEta f ξ) w *
+      ((Real.log (modS(w)) - Real.log R : ℝ) : ℂ) ∂νₛ :=
+  sLocalTrace_remainder_eq f ξ R
 
 private theorem sLocalTrace_unit_norm (ξ : Hₛ) : sIdeleNorm F S ξ.val = 1 := by
   obtain ⟨γ, hγ, he⟩ := Subgroup.mem_map.mp ξ.property
@@ -4328,6 +4375,59 @@ private theorem sLocalTrace_cut_translation {E : Type*} [NormedAddCommGroup E]
          _ ≤ _ := by dsimp [t] at *; nlinarith [mul_nonneg (mul_nonneg hC hwi) ht,
                    mul_nonneg (mul_nonneg hB hwi) ht]
 
+/-- The Fourier transform of one orbital test has every nonnegative integer modulus moment. -/
+theorem sLocalTraceEta_fourier_modulus_moment_integrable (f : BruhatCompactSupport Iₛ)
+    (ξ : Hₛ) (n : ℕ) :
+    Integrable (fun w : Aₛ ↦ ‖fourierₛ (sLocalTraceEta f ξ) w‖ * modS(w) ^ n) νₛ := by
+  let : BorelSpace Aₛ := sAdeleRing_borelSpace
+  obtain ⟨η, hη⟩ := SLocalTraceEta.eta_test f ξ
+  let s := sAdeleSchwartzFourier η
+  have hg (x : Eₛ) : fourierₛ (sLocalTraceEta f ξ) x = testAt(s, x) := by
+    change _ = fourierₛ (fun y ↦ η (Multiplicative.ofAdd y)) x
+    rw [funext hη]
+  have hm : Continuous (fun w : Eₛ ↦ modS(w)) :=
+    (continuous_finsetProd _ fun w _ ↦ (((continuous_apply w).comp continuous_fst).norm.pow _)).mul
+      (continuous_finsetProd _ fun v _ ↦ ((continuous_apply v).comp continuous_snd).norm)
+  have hm₀ (w : Eₛ) : 0 ≤ modS(w) := by positivity
+  obtain ⟨d, C, hC, hmod⟩ := sLocalTrace_modulus_translation_bound (F := F) (S := S)
+  change Integrable (fun w : Eₛ ↦ ‖fourierₛ (sLocalTraceEta f ξ) w‖ * modS(w) ^ n) νₛ
+  simp_rw [hg]
+  refine ((sLocalTrace_weighted_moment s (d * n)).const_mul (C ^ n)).mono' ?_ ?_
+  · exact (((schwartzBruhat_continuous s).comp continuous_ofAdd).norm.mul
+      (hm.pow n)).aestronglyMeasurable
+  · refine ae_of_all _ fun w ↦ ?_
+    rw [Real.norm_of_nonneg (by positivity [hm₀ w])]
+    calc
+      _ ≤ ‖testAt(s, w)‖ * (C * (1 + ‖w‖) ^ d) ^ n := by
+        exact mul_le_mul_of_nonneg_left
+          (pow_le_pow_left₀ (hm₀ w) (hmod w 0 (by simp)).1 n) (norm_nonneg _)
+      _ = C ^ n * ((1 + ‖w‖) ^ (d * n) * ‖testAt(s, w)‖) := by
+        rw [mul_pow, pow_mul]
+        ring
+      _ ≤ _ := by gcongr; exact le_add_of_nonneg_left (Real.sqrt_nonneg _)
+
+/-- Paper: (12.4.1.24)–(12.4.1.28), pp. 518–519. The remainder in one sharp
+orbital mass is bounded by an absolute Fourier moment divided by `n R ^ n`.
+Deviation: The paper gives a qualitative remainder after summing over the orbits.
+The bound here holds at every positive radius for one orbit. -/
+theorem sLocalTraceSharpMass_sub_norm_le_fourierMoment (f : BruhatCompactSupport Iₛ)
+    (ξ : Hₛ) (R : ℝ) (hR : 0 < R) (n : ℕ) (hn : 0 < n) :
+    ‖sLocalTraceSharpMass f ξ R - (volume₁ : ℂ) * (f.val ξ.val * (Real.log R : ℂ) +
+      -∫ w in range (Units.val : Iₛ → Aₛ), fourierₛ (sLocalTraceEta f ξ) w *
+        (Real.log (modS(w)) : ℂ) ∂νₛ)‖ ≤
+    volume₁ * (((n : ℝ) * R ^ n)⁻¹ * ∫ w : Aₛ, ‖fourierₛ (sLocalTraceEta f ξ) w‖ * modS(w) ^ n ∂νₛ) := by
+  let m : Aₛ → ℝ := fun w ↦ modS(w)
+  let : BorelSpace Aₛ := sAdeleRing_borelSpace
+  have hm : Continuous m :=
+    (continuous_finsetProd _ fun w _ ↦ (((continuous_apply w).comp continuous_fst).norm.pow _)).mul
+      (continuous_finsetProd _ fun v _ ↦ ((continuous_apply v).comp continuous_snd).norm)
+  have hm₀ (w : Aₛ) : 0 ≤ m w := by dsimp [m]; positivity
+  rw [sLocalTraceSharpMass_sub_eq_fourierTail, norm_mul, Complex.norm_real,
+    Real.norm_of_nonneg ENNReal.toReal_nonneg]
+  exact mul_le_mul_of_nonneg_left
+    (logBand_tail_norm_le νₛ _ m hm.measurable hm₀ n hn
+      (sLocalTraceEta_fourier_modulus_moment_integrable f ξ n) R hR) ENNReal.toReal_nonneg
+
 -- Properness and additivity of the S - logarithm, from Appendix A.2.4.
 private theorem sLocalTrace_log_proper : IsProperMap (sIdeleLog F S) := by
   let L (v : S) (u : (v.val.adicCompletion F)ˣ) := Real.log ‖u.val‖
@@ -4362,9 +4462,9 @@ private theorem sLocalTrace_log_mul (g h : Iₛ) :
     rw [norm_mul, Real.log_mul (norm_ne_zero_iff.mpr (p g).ne_zero) (norm_ne_zero_iff.mpr (p h).ne_zero)]
 
 /-- The maximum of the local absolute values bounds every logarithmic coordinate on the
-norm - one group. Its inverse square root is summable on the diagonal S - units. -/
-private theorem sLocalTrace_height_summable :
-    Summable fun ξ : Hₛ ↦ (Real.sqrt (max 1 ‖(show Eₛ from ξ.val.val)‖))⁻¹ := by
+norm-one group. Its inverse fourth root is summable on the diagonal S-units. -/
+private theorem sLocalTrace_height_quarter_summable :
+    Summable fun ξ : Hₛ ↦ (Real.sqrt (Real.sqrt (max 1 ‖(show Eₛ from ξ.val.val)‖)))⁻¹ := by
   classical
   let : DiscreteTopology Hₛ := discreteTopology_sProjectedDiagonal
   let : DiscreteTopology (Additive Hₛ) := inferInstanceAs (DiscreteTopology Hₛ)
@@ -4379,8 +4479,9 @@ private theorem sLocalTrace_height_summable :
   let n : ℝ := Fintype.card (InfinitePlace F ⊕ S) + 1
   have hn : 1 ≤ n := le_add_of_nonneg_left (Nat.cast_nonneg _)
   have hn0 : 0 < n := zero_lt_one.trans_le hn
-  have hsum := summable_exp_neg_mul_norm_of_isProperMap l hl (c := 1 / (4 * n)) (by positivity)
-  change Summable (fun ξ : Additive Hₛ ↦ (Real.sqrt (max 1 ‖(show Eₛ from ξ.toMul.val.val)‖))⁻¹)
+  have hsum := summable_exp_neg_mul_norm_of_isProperMap l hl (c := 1 / (8 * n)) (by positivity)
+  change Summable (fun ξ : Additive Hₛ ↦
+    (Real.sqrt (Real.sqrt (max 1 ‖(show Eₛ from ξ.toMul.val.val)‖)))⁻¹)
   apply hsum.of_nonneg_of_le (fun _ ↦ by positivity)
   intro ξ
   let a : Eₛ := ξ.toMul.val.val
@@ -4423,11 +4524,20 @@ private theorem sLocalTrace_height_summable :
     constructor
     · linarith [mul_le_mul_of_nonneg_right hcard (by positivity : 0 ≤ 2 * Real.log M)]
     · exact (hcoord i).trans (le_mul_of_one_le_left (by positivity) hn)
-  change (Real.sqrt M)⁻¹ ≤ Real.exp _
-  rw [← Real.exp_log (inv_pos.mpr (Real.sqrt_pos.mpr hM')), Real.exp_le_exp,
-    Real.log_inv, Real.log_sqrt hM'.le]
+  change (Real.sqrt (Real.sqrt M))⁻¹ ≤ Real.exp _
+  rw [← Real.exp_log (by positivity : 0 < (Real.sqrt (Real.sqrt M))⁻¹), Real.exp_le_exp,
+    Real.log_inv, Real.log_sqrt (Real.sqrt_nonneg M), Real.log_sqrt hM'.le]
   field_simp
   linarith
+
+/-- The inverse square root of the height is summable on the diagonal S-units. -/
+private theorem sLocalTrace_height_summable :
+    Summable fun ξ : Hₛ ↦ (Real.sqrt (max 1 ‖(show Eₛ from ξ.val.val)‖))⁻¹ := by
+  refine sLocalTrace_height_quarter_summable.of_nonneg_of_le (fun _ ↦ by positivity) fun ξ ↦ ?_
+  let M := max 1 ‖(show Eₛ from ξ.val.val)‖
+  have hM : 1 ≤ M := le_max_left _ _
+  have hs : 1 ≤ Real.sqrt M := by simpa only [Real.sqrt_one] using Real.sqrt_le_sqrt hM
+  exact inv_anti₀ (by positivity) (Real.sqrt_le_self_iff.mpr (Or.inr hs))
 
 private theorem sLocalTrace_character_nontrivial {K : Type*} [Field K] [TopologicalSpace K]
     [IsTopologicalRing K] [MeasurableSpace K] [BorelSpace K] (μ : Measure K) (ψ : K → Circle)
@@ -4582,6 +4692,19 @@ private theorem sLocalTrace_modulus_invariant (ξ : Hₛ) (x : Aₛ) :
   calc _ = modS(ξ.val.val) * modS(x) := by ring
        _ = _ := by rw [h, one_mul]
 
+/-- The norm-one affine change of variables preserves every absolute Fourier moment. -/
+theorem sLocalTraceEta_fourier_modulus_moment_eq (f : BruhatCompactSupport Iₛ)
+    (ξ : Hₛ) (n : ℕ) :
+    (∫ w : Aₛ, ‖fourierₛ (sLocalTraceEta f ξ) w‖ * modS(w) ^ n ∂νₛ) =
+      ∫ w : Aₛ, ‖fourierₛ (sLocalTraceEta f 1) w‖ * modS(w) ^ n ∂νₛ := by
+  let g (w : Aₛ) : ℝ := ‖fourierₛ (sLocalTraceEta f 1) w‖ * modS(w) ^ n
+  have h (w : Aₛ) : ‖fourierₛ (sLocalTraceEta f ξ) w‖ * modS(w) ^ n = g (ξ.val.val * w) := by
+    simp only [g, sLocalTrace_fourier_affine f ξ, norm_mul, Circle.norm_coe, mul_one,
+      sLocalTrace_modulus_invariant ξ]
+  simp_rw [h]
+  have hd := sLocalTrace_integral_dilate_unit ξ (fun w ↦ (g w : ℂ))
+  simpa only [integral_complex_ofReal, Complex.ofReal_inj] using hd
+
 /-- Every remainder is a Fourier coefficient of the same amplitude at the frequency ξ⁻¹ − 1. -/
 private theorem sLocalTrace_tail_coefficient (f : BruhatCompactSupport Iₛ) (ξ : Hₛ) (R : ℝ) :
     (∫ w in {w : Aₛ | R < modS(w)}, fourierₛ (sLocalTraceEta f ξ) w *
@@ -4726,6 +4849,69 @@ theorem sLocalTraceSharpMass_asymptotic
   obtain ⟨M, hM, hlim⟩ := sLocalTraceSharpMass_asymptotic_assemble
     (fun ξ R ↦ sLocalTraceSharpMass f ξ R) (fun ξ : Hₛ ↦ f.val ξ.val) _ _ _ _ T hy hκ hT hT0
   exact ⟨a, b, M, ha, hb, hM, hlim⟩
+
+/-- Paper: (12.4.1.24)–(12.4.1.28), pp. 518–519. The sum of the norms of the normalized
+sharp orbital remainders decays at every inverse integer power of the cutoff radius.
+Deviation: The paper gives an unquantified remainder. The constant here depends on
+the fixed lift and the power. The bound sums the norms of the individual orbit terms. -/
+theorem sLocalTraceSharpMass_sub_summable_norm_le (f : BruhatCompactSupport Iₛ)
+    (n : ℕ) (hn : 0 < n) : ∃ C ≥ (0 : ℝ), ∀ (R : ℝ), 1 ≤ R →
+    let q (ξ : Hₛ) := sLocalTraceSharpMass f ξ R - (volume₁ : ℂ) *
+      (f.val ξ.val * (Real.log R : ℂ) + -∫ w in range (Units.val : Iₛ → Aₛ),
+        fourierₛ (sLocalTraceEta f ξ) w * (Real.log (modS(w)) : ℂ) ∂νₛ)
+    Summable (fun ξ ↦ ‖q ξ‖) ∧ (∑' ξ, ‖q ξ‖) ≤ C / R ^ n := by
+  let E := ((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)
+  obtain ⟨B, hB, hb⟩ := sLocalTrace_tail_bound f
+  let A := volume₁ * ((↑(2 * n) : ℝ)⁻¹ *
+    ∫ w : Aₛ, ‖fourierₛ (sLocalTraceEta f 1) w‖ * modS(w) ^ (2 * n) ∂νₛ)
+  have hA : 0 ≤ A := by
+    dsimp [A]
+    exact mul_nonneg ENNReal.toReal_nonneg (mul_nonneg (by positivity)
+      (integral_nonneg fun w ↦ by positivity))
+  let D := volume₁ * B
+  have hD : 0 ≤ D := mul_nonneg ENNReal.toReal_nonneg hB
+  let d (ξ : Hₛ) := (Real.sqrt (Real.sqrt (max 1 ‖(show E from (ξ⁻¹).val.val)‖)))⁻¹
+  have hd : Summable d := sLocalTrace_height_quarter_summable.comp_injective inv_injective
+  have hd₀ (ξ : Hₛ) : 0 ≤ d ξ := by dsimp [d]; positivity
+  have hd₂ (ξ : Hₛ) : d ξ ^ 2 = (Real.sqrt (max 1 ‖(show E from (ξ⁻¹).val.val)‖))⁻¹ := by
+    dsimp [d]
+    rw [inv_pow, Real.sq_sqrt (Real.sqrt_nonneg _)]
+  let K := Real.sqrt (A * D)
+  refine ⟨K * ∑' ξ, d ξ, mul_nonneg (Real.sqrt_nonneg _) (tsum_nonneg hd₀), fun R hR ↦ ?_⟩
+  intro q
+  let r := (R ^ n)⁻¹
+  have hR₀ : 0 < R := zero_lt_one.trans_le hR
+  have hr : 0 ≤ r := by dsimp [r]; positivity
+  have h1 (ξ : Hₛ) : ‖q ξ‖ ≤ A * r ^ 2 := by
+    have h := sLocalTraceSharpMass_sub_norm_le_fourierMoment f ξ R hR₀ (2 * n) (by positivity)
+    rw [sLocalTraceEta_fourier_modulus_moment_eq f ξ] at h
+    refine h.trans_eq ?_
+    dsimp [A, r]
+    rw [show R ^ (2 * n) = (R ^ n) ^ 2 by rw [mul_comm 2 n, pow_mul]]
+    have hn' : (↑(2 * n) : ℝ) ≠ 0 := by positivity
+    field_simp [hn', hR₀.ne']
+  have h2 (ξ : Hₛ) : ‖q ξ‖ ≤ D * d ξ ^ 2 := by
+    let a : E := (ξ⁻¹).val.val
+    have h := hb R hR (a - 1)
+    rw [sub_add_cancel] at h
+    dsimp only [q]
+    rw [sLocalTraceSharpMass_sub_eq_fourierTail, norm_mul, Complex.norm_real,
+      Real.norm_of_nonneg ENNReal.toReal_nonneg, sLocalTrace_tail_coefficient, hd₂, mul_assoc]
+    exact mul_le_mul_of_nonneg_left h ENNReal.toReal_nonneg
+  have hbound (ξ : Hₛ) : ‖q ξ‖ ≤ (K * r) * d ξ := by
+    refine (sq_le_sq₀ (norm_nonneg _) (by positivity [Real.sqrt_nonneg (A * D), hd₀ ξ])).mp ?_
+    calc
+      ‖q ξ‖ ^ 2 = ‖q ξ‖ * ‖q ξ‖ := sq _
+      _ ≤ (A * r ^ 2) * (D * d ξ ^ 2) := mul_le_mul (h1 ξ) (h2 ξ) (norm_nonneg _) (by positivity)
+      _ = ((K * r) * d ξ) ^ 2 := by
+        simp only [K, mul_pow, Real.sq_sqrt (mul_nonneg hA hD)]
+        ring
+  have hs := hd.mul_left (K * r)
+  have hsq : Summable (fun ξ ↦ ‖q ξ‖) := hs.of_nonneg_of_le (fun _ ↦ norm_nonneg _) hbound
+  refine ⟨hsq, (hsq.tsum_le_tsum hbound hs).trans_eq ?_⟩
+  rw [tsum_mul_left, div_eq_mul_inv]
+  dsimp [r]
+  ring
 
 -- TODO(paper-gap): Theorem 12.4.1.1 needs the actual smoothed PW quotient kernel
 -- and a limit for its difference from the sharp orbital mass. Neither the cutoff
