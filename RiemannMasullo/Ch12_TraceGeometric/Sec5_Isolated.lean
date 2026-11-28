@@ -3,6 +3,7 @@ module
 import Mathlib.Analysis.Normed.Group.Tannery
 import Mathlib.Geometry.Manifold.PartitionOfUnity
 import RiemannMasullo.Ch12_TraceGeometric.Sec5_SharpOrbitalDiagonal
+public import RiemannMasullo.Ch10_TraceSpectral.Sec3_TraceClass
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4b_ProjectedKernels
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 
@@ -549,6 +550,118 @@ theorem traceFormula_exteriorZeros_of_orderZeroProjectiveGeometricTrace_tendsto
     exact hZero ▸ hSum
   apply (hasSum_exteriorZeros_iff_isEmpty τ hτ α).mpr _ φ hφ
   exact ⟨fun z ↦ @IsEmpty.false _ hOffLine ⟨z.val, z.property.1, hα.trans_le z.property.2⟩⟩
+
+local notation "stripOrderZero(" h ")" => (neg_nonpos.mpr h).trans h
+
+/-- The order-zero trace after the common convolution diagonal is subtracted.
+It is the negative spectral quotient trace, also for tests nonzero at the identity. -/
+def orderZeroRenormalizedTrace (φ : BruhatCompactSupport C𝔽) {α : ℝ} (hα : 0 ≤ α) : ℂ :=
+  -hilbertTrace
+    (⟨spectralConvolution (F := F) (1 / 2) (stripOrderZero(hα)) (le_rfl : (0 : ℝ) ≤ 0) φ,
+      spectralStripConvolution_nuclear_of_summable_clusterTraceNorms
+        (F := F) (1 / 2) hα (le_rfl : (0 : ℝ) ≤ 0) φ⟩ :
+      nuclearEndomorphisms (spectralSobolevQuotient F (1 / 2) (stripOrderZero(hα))
+        (le_rfl : (0 : ℝ) ≤ 0)))
+
+private theorem orderZeroRenormalizedTrace_hasSum_interior
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (φ : BruhatCompactSupport C𝔽) {α : ℝ} (hα : 0 < α) :
+    HasSum (fun z : {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ offset(z) < α} ↦
+      zeroTerm(φ, z.val)) (-orderZeroRenormalizedTrace φ hα.le) := by
+  rw [orderZeroRenormalizedTrace, neg_neg]
+  exact hasSum_interiorZeros_spectralStripTrace_of_le_one τ hτ hα le_rfl zero_le_one φ _ rfl
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The difference of the renormalized traces
+sums exactly the half-open shell, with full orders on the narrow edge.
+Deviation: The common convolution is subtracted before comparing the two widths. -/
+theorem hasSum_widthShell_orderZeroRenormalizedTrace
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (φ : BruhatCompactSupport C𝔽) {α β : ℝ} (hα : 0 < α) (hαβ : α ≤ β) :
+    HasSum (fun z : {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ α ≤ offset(z) ∧ offset(z) < β} ↦
+      zeroTerm(φ, z.val))
+      (orderZeroRenormalizedTrace φ hα.le -
+        orderZeroRenormalizedTrace φ (hα.le.trans hαβ)) := by
+  classical
+  let A : Set SectionCharacterPoint(τ) := {p | 0 < ord(p) ∧ offset(p) < β}
+  let B : Set SectionCharacterPoint(τ) := {p | 0 < ord(p) ∧ offset(p) < α}
+  let S : Set SectionCharacterPoint(τ) := {p | 0 < ord(p) ∧ α ≤ offset(p) ∧ offset(p) < β}
+  let term (p : SectionCharacterPoint(τ)) : ℂ := zeroTerm(φ, p)
+  have hBA : B ⊆ A := fun p hp ↦ ⟨hp.1, hp.2.trans_le hαβ⟩
+  have hS : S = A \ B := by
+    ext p
+    constructor
+    · intro hp
+      exact ⟨⟨hp.1, hp.2.2⟩, fun hb ↦ (not_lt_of_ge hp.2.1) hb.2⟩
+    · intro hp
+      exact ⟨hp.1.1, le_of_not_gt (fun h ↦ hp.2 ⟨hp.1.1, h⟩), hp.1.2⟩
+  refine (hasSum_subtype_iff_indicator (f := term) (s := S)).mpr ?_
+  rw [hS, Set.indicator_sdiff' hBA term]
+  have hw := orderZeroRenormalizedTrace_hasSum_interior τ hτ φ (hα.trans_le hαβ)
+  have hn := orderZeroRenormalizedTrace_hasSum_interior τ hτ φ hα
+  have hh := ((hasSum_subtype_iff_indicator (f := term) (s := A)).mp hw).sub
+    ((hasSum_subtype_iff_indicator (f := term) (s := B)).mp hn)
+  rw [neg_sub_neg] at hh
+  change HasSum (fun p ↦ A.indicator term p + -B.indicator term p) _
+  simpa only [sub_eq_add_neg] using hh
+
+open Filter in
+open scoped Topology in
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. For a probe whose real terms are
+nonnegative in the surrounding shell, the real term at a prescribed edge point is
+bounded by the limit of the renormalized width residual. -/
+theorem zeroTerm_re_le_of_orderZeroRenormalizedTrace_tendsto
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (φ : BruhatCompactSupport C𝔽) {α : ℝ} (hα : 0 < α)
+    (u : ℕ → ℝ) (hu : ∀ n, α < u n) (huWide : ∀ n, u n ≤ 1 / 2)
+    (hNonneg : ∀ p : SectionCharacterPoint(τ), 0 < ord(p) → α ≤ offset(p) →
+      offset(p) < 1 / 2 → 0 ≤ (zeroTerm(φ, p)).re)
+    (p : SectionCharacterPoint(τ)) (hp : 0 < ord(p)) (hpEdge : offset(p) = α)
+    {c : ℝ} (hlim : Tendsto (fun n ↦
+      (orderZeroRenormalizedTrace φ hα.le -
+        orderZeroRenormalizedTrace φ (hα.le.trans (hu n).le)).re) atTop (𝓝 c)) :
+    (zeroTerm(φ, p)).re ≤ c := by
+  apply le_of_tendsto_of_tendsto tendsto_const_nhds hlim
+  refine Eventually.of_forall fun n ↦ ?_
+  let z : {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ α ≤ offset(z) ∧ offset(z) < u n} :=
+    ⟨p, hp, hpEdge.ge, by simpa only [hpEdge] using hu n⟩
+  have hh := Complex.reCLM.hasSum (hasSum_widthShell_orderZeroRenormalizedTrace τ hτ φ hα (hu n).le)
+  have hsum := hh.summable.le_tsum z
+    (fun q _ ↦ hNonneg q.val q.property.1 q.property.2.1 (q.property.2.2.trans_le (huWide n)))
+  rw [hh.tsum_eq] at hsum
+  exact hsum
+
+open Filter in
+open scoped Topology in
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. A probe with a positive real term at each
+prescribed off-line zero candidate suffices for exterior cancellation provided its real
+shell terms are nonnegative and its renormalized width residual tends to a nonpositive limit.
+The probe and width sequence may depend on the candidate. -/
+theorem traceFormula_exteriorZeros_of_orderZeroRenormalizedTrace_tendsto_nonpos
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (hResidual : ∀ (p : SectionCharacterPoint(τ)), 0 < ord(p) →
+      ∀ (ha : 0 < offset(p)), offset(p) < 1 / 2 →
+      ∃ (ψ : BruhatCompactSupport C𝔽) (u : ℕ → ℝ) (hu : ∀ n, offset(p) < u n) (c : ℝ),
+        (∀ n, u n ≤ 1 / 2) ∧
+        (∀ q : SectionCharacterPoint(τ), 0 < ord(q) → offset(p) ≤ offset(q) →
+          offset(q) < 1 / 2 → 0 ≤ (zeroTerm(ψ, q)).re) ∧
+        0 < (zeroTerm(ψ, p)).re ∧ c ≤ 0 ∧
+        Tendsto (fun n ↦ (orderZeroRenormalizedTrace ψ ha.le -
+          orderZeroRenormalizedTrace ψ (ha.le.trans (hu n).le)).re) atTop (𝓝 c))
+    (φ : BruhatCompactSupport C𝔽) (hφ : ∀ g : C₁, φ.val g = 0) {α : ℝ} (hα : 0 < α) :
+    HasSum (fun z : {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ α ≤ offset(z)} ↦
+      zeroTerm(φ, z.val)) 0 := by
+  have hWide : IsEmpty {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ 1 / 2 ≤ offset(z)} :=
+    (hasSum_exteriorZeros_iff_isEmpty τ hτ (1 / 2 : ℝ)).mp
+      (fun ψ _ ↦ traceFormula_exteriorZeros_of_half_le τ ψ le_rfl)
+  apply (hasSum_exteriorZeros_iff_isEmpty τ hτ α).mpr _ φ hφ
+  refine ⟨fun p ↦ ?_⟩
+  have hEdge := hα.trans_le p.property.2
+  have hHalf : offset(p.val) < 1 / 2 :=
+    lt_of_not_ge fun h ↦ @IsEmpty.false _ hWide ⟨p.val, p.property.1, h⟩
+  obtain ⟨ψ, u, hu, c, huWide, hNonneg, hPos, hc, hlim⟩ := hResidual p.val p.property.1 hEdge hHalf
+  have hle := zeroTerm_re_le_of_orderZeroRenormalizedTrace_tendsto τ hτ ψ hEdge u hu huWide
+    hNonneg p.val p.property.1 rfl hlim
+  exact (not_lt_of_ge (hle.trans hc)) hPos
 
 end OrderZeroDiagonalComparison
 
