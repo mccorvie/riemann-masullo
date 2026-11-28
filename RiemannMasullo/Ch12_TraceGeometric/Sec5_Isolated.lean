@@ -663,6 +663,112 @@ theorem traceFormula_exteriorZeros_of_orderZeroRenormalizedTrace_tendsto_nonpos
     hNonneg p.val p.property.1 rfl hlim
   exact (not_lt_of_ge (hle.trans hc)) hPos
 
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. For `0 < α ≤ 1/2` the narrow-minus-wide
+order-zero geometric trace is the sum of the zero terms with `|Re s - 1/2| ≥ α`. No zero has
+`|Re s - 1/2| ≥ 1/2`, so the half-open shell of
+`hasSum_widthShell_orderZeroProjectiveGeometricTrace` with outer half-width one half is the
+whole exterior of the strip. -/
+theorem hasSum_exteriorZeros_orderZeroProjectiveGeometricTrace_sub_wide
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (φ : BruhatCompactSupport C𝔽) (hφ : φ.val 1 = 0) {α : ℝ} (hα : 0 < α) (hα₂ : α ≤ 1 / 2)
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    HasSum (fun z : {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ α ≤ offset(z)} ↦
+      zeroTerm(φ, z.val))
+      (orderZeroProjectiveGeometricTrace φ hα.le U -
+        orderZeroProjectiveGeometricTrace φ (by norm_num : (0 : ℝ) ≤ 1 / 2) U) := by
+  have hWideEmpty : IsEmpty {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ 1 / 2 ≤ offset(z)} :=
+    (hasSum_exteriorZeros_iff_isEmpty τ hτ (1 / 2 : ℝ)).mp
+      (fun ψ _ ↦ traceFormula_exteriorZeros_of_half_le τ ψ (le_refl (1 / 2 : ℝ)))
+  have hhalf (z : SectionCharacterPoint(τ)) (hz : 0 < ord(z)) : offset(z) < 1 / 2 :=
+    lt_of_not_ge fun h ↦ @IsEmpty.false _ hWideEmpty ⟨z, hz, h⟩
+  have h := hasSum_widthShell_orderZeroProjectiveGeometricTrace τ hτ φ hφ hα hα₂ U hU hBorel
+  let A : Set SectionCharacterPoint(τ) := {p | 0 < ord(p) ∧ α ≤ offset(p)}
+  let S : Set SectionCharacterPoint(τ) := {p | 0 < ord(p) ∧ α ≤ offset(p) ∧ offset(p) < 1 / 2}
+  let term (p : SectionCharacterPoint(τ)) : ℂ := zeroTerm(φ, p)
+  have hSA : S = A := by
+    ext p
+    exact ⟨fun hp ↦ ⟨hp.1, hp.2.1⟩, fun hp ↦ ⟨hp.1, hp.2, hhalf p hp.1⟩⟩
+  have h' := (hasSum_subtype_iff_indicator (f := term) (s := S)).mp h
+  rw [hSA] at h'
+  exact (hasSum_subtype_iff_indicator (f := term) (s := A)).mpr h'
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. For one test and `0 < α ≤ 1/2`, the comparison
+`hComparison` of `traceFormula_exteriorZeros_of_orderZeroDiagonalWidthComparison`, equality of
+the narrow and wide order-zero geometric traces, holds exactly when the exterior zero terms of the
+test sum to zero. So that comparison is equivalent to the exterior cancellation it is used to
+prove. -/
+theorem orderZeroProjectiveGeometricTrace_eq_wide_iff_hasSum_exteriorZeros
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (φ : BruhatCompactSupport C𝔽) (hφ : φ.val 1 = 0) {α : ℝ} (hα : 0 < α) (hα₂ : α ≤ 1 / 2)
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    orderZeroProjectiveGeometricTrace φ hα.le U =
+        orderZeroProjectiveGeometricTrace φ (by norm_num : (0 : ℝ) ≤ 1 / 2) U ↔
+      HasSum (fun z : {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ α ≤ offset(z)} ↦
+        zeroTerm(φ, z.val)) 0 := by
+  have h := hasSum_exteriorZeros_orderZeroProjectiveGeometricTrace_sub_wide τ hτ φ hφ hα hα₂ U
+    hU hBorel
+  constructor
+  · intro heq
+    rwa [heq, sub_self] at h
+  · intro h0
+    exact sub_eq_zero.mp (h.unique h0)
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520, and §12.3, p. 514. For `0 < α ≤ 1/2`, the narrow
+and wide order-zero geometric traces agree for every test vanishing on the norm-one classes
+exactly when no completed Hecke L-function of a character trivial on the norm section has a zero
+with `|Re s - 1/2| ≥ α`. The comparison assumed in
+`traceFormula_exteriorZeros_of_orderZeroDiagonalWidthComparison` is therefore as strong as the
+target: for all `α > 0` together it is GRH for these L-functions
+(`hasSum_exteriorZeros_iff_isEmpty`). -/
+theorem orderZeroDiagonalWidthComparison_iff_isEmpty_exteriorZeros
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F)) {α : ℝ} (hα : 0 < α)
+    (hα₂ : α ≤ 1 / 2)
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    (∀ φ : BruhatCompactSupport C𝔽, (∀ g : C₁, φ.val g = 0) →
+      orderZeroProjectiveGeometricTrace φ hα.le U =
+        orderZeroProjectiveGeometricTrace φ (by norm_num : (0 : ℝ) ≤ 1 / 2) U) ↔
+      IsEmpty {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ α ≤ offset(z)} := by
+  refine Iff.trans ?_ (hasSum_exteriorZeros_iff_isEmpty τ hτ α)
+  exact forall₂_congr fun φ hφ ↦
+    orderZeroProjectiveGeometricTrace_eq_wide_iff_hasSum_exteriorZeros τ hτ φ (hφ 1) hα hα₂ U
+      hU hBorel
+
+open Filter in
+open scoped Topology in
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The hypothesis of
+`traceFormula_exteriorZeros_of_orderZeroRenormalizedTrace_tendsto_nonpos` holds exactly when no
+completed Hecke L-function of a character trivial on the norm section has a zero off the critical
+line. At an actual off-line zero no probe can have a positive real term together with a nonpositive
+residual limit (`zeroTerm_re_le_of_orderZeroRenormalizedTrace_tendsto`), and with no such zero the
+hypothesis is empty. -/
+theorem orderZeroRenormalizedResidualCriterion_iff_isEmpty_offLineZeros
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F)) :
+    (∀ (p : SectionCharacterPoint(τ)), 0 < ord(p) →
+      ∀ (ha : 0 < offset(p)), offset(p) < 1 / 2 →
+      ∃ (ψ : BruhatCompactSupport C𝔽) (u : ℕ → ℝ) (hu : ∀ n, offset(p) < u n) (c : ℝ),
+        (∀ n, u n ≤ 1 / 2) ∧
+        (∀ q : SectionCharacterPoint(τ), 0 < ord(q) → offset(p) ≤ offset(q) →
+          offset(q) < 1 / 2 → 0 ≤ (zeroTerm(ψ, q)).re) ∧
+        0 < (zeroTerm(ψ, p)).re ∧ c ≤ 0 ∧
+        Tendsto (fun n ↦ (orderZeroRenormalizedTrace ψ ha.le -
+          orderZeroRenormalizedTrace ψ (ha.le.trans (hu n).le)).re) atTop (𝓝 c)) ↔
+      IsEmpty {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ 0 < offset(z)} := by
+  have hWideEmpty : IsEmpty {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ 1 / 2 ≤ offset(z)} :=
+    (hasSum_exteriorZeros_iff_isEmpty τ hτ (1 / 2 : ℝ)).mp
+      (fun ψ _ ↦ traceFormula_exteriorZeros_of_half_le τ ψ (le_refl (1 / 2 : ℝ)))
+  have hhalf (z : SectionCharacterPoint(τ)) (hz : 0 < ord(z)) : offset(z) < 1 / 2 :=
+    lt_of_not_ge fun h ↦ @IsEmpty.false _ hWideEmpty ⟨z, hz, h⟩
+  constructor
+  · intro h
+    refine ⟨fun z ↦ ?_⟩
+    obtain ⟨ψ, u, hu, c, hwide, hnonneg, hpos, hc, hlim⟩ :=
+      h z.val z.property.1 z.property.2 (hhalf z.val z.property.1)
+    have hle := zeroTerm_re_le_of_orderZeroRenormalizedTrace_tendsto τ hτ ψ z.property.2 u hu
+      hwide hnonneg z.val z.property.1 rfl hlim
+    linarith
+  · intro h p hp ha _
+    exact (h.false ⟨p, hp, ha⟩).elim
+
 end OrderZeroDiagonalComparison
 
 section WideSharpOrbitalTrace
