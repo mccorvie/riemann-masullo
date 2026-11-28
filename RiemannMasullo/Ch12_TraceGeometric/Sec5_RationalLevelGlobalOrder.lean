@@ -14,6 +14,8 @@ and transfers the local limit. This file combines the two, so the same failure h
 Sobolev order of the local level, in particular at the order the paper uses.
 
 * `ratMainLevelOrder_trace_tendsto_globalDiagonal`. The limit at order `s₀`.
+* `ratMainLevelOrder_trace_tendsto_globalDiagonal_of_one_le`. For a lift also supported on norms at
+  least one, the extra term is `volF / volS · M(f)(|·|^(1/2))`.
 * `ratMainLevelOrder_not_tendsto_globalDiagonal`. For a nonnegative lift, positive somewhere, the
   normalized traces at order `s₀` do not tend to the global diagonal.
 
@@ -73,12 +75,13 @@ local notation "diag(" hα "," hs "," φ "," hK "," U ")" =>
 variable {s₀ : ℝ}
 
 local notation "μs(" s ")" => realPWIntervalMeasure 0 s
-local notation "Vs(" Y ", " hs ")" => RealPWBand.space Y (volume_le_realPWIntervalMeasure 0 s₀ hs)
+local notation "Vs(" Y ", " hs ")" => RealPWBand.space Y (volume_le_realPWIntervalMeasure 0 _ hs)
 local notation "evs(" Y ", " hs ")" =>
-  RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure 0 s₀ hs)
+  RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure 0 _ hs)
 local notation "mainLevels(" Y ", " χ ", " hs ")" =>
   sLocalInvariantPWSobolev (F := ℚ) (S := Sq) hs (a := 1 / 2) (by norm_num) χ Y
 
+set_option maxHeartbeats 4000000 in
 /-- Paper: Theorem 12.4.1.1 and the proof of Theorem 12.5.1.1, step (c), p. 520, on `main`'s
 polar-free level for `ℚ` with no finite place, at twist `1/2`, every Sobolev order `s₀ ≥ 0` of the
 local level, and a width `α ≥ 1/2`.
@@ -117,6 +120,37 @@ theorem ratMainLevelOrder_trace_tendsto_globalDiagonal
     (apply_normOne_eq_zero_of_support hsupp) hOutside
     (apply_finiteClass_eq_zero_of_support hsupp) f hLift hα hs hK U hU hBorel hY _ hloc⟩
 
+set_option maxHeartbeats 4000000 in
+/-- Paper: Theorem 12.4.1.1, Theorem 11.3.2.1 (p. 495) and the proof of Theorem 12.5.1.1, step (c),
+p. 520, for `ℚ` with no finite place, at every Sobolev order `s₀ ≥ 0` of the local level and a width
+`α ≥ 1/2`.
+Reconstruction: when the S-idelic lift is also supported on norms at least one, as in the shell
+theorem, the limit of `ratMainLevelOrder_trace_tendsto_globalDiagonal` is the global diagonal plus
+`volF / volS` times `M(f)(|·|^(1/2))`. The level removes `M(f)(|·|^(-1/2))` and leaves
+`M(f)(|·|^(1/2))`, which p. 520 also subtracts.
+Deviation: The bandwidth `Y` is fixed while `L` tends to infinity. -/
+theorem ratMainLevelOrder_trace_tendsto_globalDiagonal_of_one_le
+    (φ : BruhatCompactSupport Cq) (hsupp : ∀ c, φ.val c ≠ 0 → normℚ(c) ∈ Ioo (1 : ℝ) 2)
+    (hOutside : ∀ (a : outsideIntegralIdeleUnits ℚ Sq) (c : Cq),
+      φ.val (QuotientGroup.mk a.val * c) = φ.val c)
+    (f : BruhatCompactSupport Iq) (hf : ∀ g, f.val g ≠ 0 → 1 ≤ normq(g)) {a b : ℝ} (ha1 : 1 < a)
+    (hfold : ∀ g ∉ Icc a b, ratFold f g = 0)
+    (hLift : ∀ g : Iq, HasSum (fun ξ : Hq ↦ f.val (ξ.val * g)) (φ.val (classAtS(g))))
+    {α s : ℝ} (hα : 1 / 2 ≤ α) (hs : 3 ≤ s)
+    (hK : stripK((one_half_pos.trans_le hα).le, hs, φ))
+    (U : ℕ → Set Cq) (hU : IsDPrimeSequence μℚ U) (hBorel : ∀ n, MeasurableSet (U n))
+    {Y : ℝ} (hY : 0 < Y) (hs₀ : 0 ≤ s₀) (χ : PontryaginDual (sIdeleQuotientNorm ℚ Sq).ker) :
+    ∃ T : ℝ → nuclearEndomorphisms Vs(Y, hs₀),
+      (∀ L x, (conjNuclear (ratLevelIsometryOrder Y hs₀) (T L)).val x ∈ mainLevels(Y, χ, hs₀)) ∧
+      Tendsto (fun L ↦ volF / volS * hilbertTrace (conjNuclear (ratLevelIsometryOrder Y hs₀) (T L)))
+        atTop (𝓝 ((∫ x, diag((one_half_pos.trans_le hα).le, hs, φ, hK, U) x ∂μℚ) +
+          volF / volS * mellin(f, 1 / 2))) := by
+  obtain ⟨T, -, hmem, hlim⟩ := ratMainLevelOrder_trace_tendsto_globalDiagonal φ hsupp hOutside f
+    ha1 hfold hLift hα hs hK U hU hBorel hY hs₀ χ
+  rw [← ratMainLevel_limit_eq_of_one_le f hf]
+  exact ⟨T, hmem, hlim⟩
+
+set_option maxHeartbeats 4000000 in
 /-- Paper: the proof of Theorem 12.5.1.1, step (c), p. 520, for `ℚ` with no finite place, at every
 Sobolev order `s₀ ≥ 0` of the local level and a width `α ≥ 1/2`.
 Reconstruction: for a lift with nonnegative real part, positive somewhere, whose folded form

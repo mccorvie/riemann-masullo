@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_RationalLevelIdentification
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_RealPWJetTrials
+import RiemannMasullo.ForMathlib.MeasureTheory.Function.L2Space
 
 /-!
 # Main's polar-free level for the rationals at every Sobolev order
@@ -49,16 +50,19 @@ theorem realPWIntervalWeight_zero_neg (s x : ℝ) :
     realPWIntervalWeight 0 s (-x) = realPWIntervalWeight 0 s x := by
   simp only [realPWIntervalWeight, abs_neg]
 
+theorem realPWIntervalWeight_nonneg (α s x : ℝ) : 0 ≤ realPWIntervalWeight α s x :=
+  mul_nonneg (le_max_of_le_left (Real.exp_pos _).le) (Real.exp_pos _).le
+
 theorem intervalSobolevDensity_zero_nonneg (s x : ℝ) : 0 ≤ intervalSobolevDensity 0 0 s x := by
   unfold intervalSobolevDensity
-  positivity
+  exact mul_nonneg (le_max_of_le_left (Real.exp_pos _).le) (Real.rpow_nonneg (by positivity) _)
 
 theorem continuous_intervalSobolevDensity_zero (s : ℝ) :
     Continuous (intervalSobolevDensity 0 0 s) := by
   unfold intervalSobolevDensity
   refine ((Real.continuous_exp.comp (continuous_const.mul continuous_id)).max
     (Real.continuous_exp.comp (continuous_const.mul continuous_id))).mul ?_
-  exact (continuous_const.add (continuous_pow 2)).rpow_const fun x ↦ Or.inl (by positivity)
+  exact Continuous.rpow_const (by fun_prop) fun x ↦ Or.inl (by positivity)
 
 end Weight
 
@@ -82,9 +86,9 @@ local notation "Bq" => SchwartzBruhat (Multiplicative (SAdeleRing ℚ Sq))
 local notation "volume₁" => ((sLocalNormOneQuotientMeasure ℚ Sq) univ).toReal
 local notation "mₛq" => (continuousSIdeleQuotientNorm ℚ Sq : SIdeleQuotient ℚ Sq →ₜ* ℝ≥0ˣ)
 local notation "μs(" s ")" => realPWIntervalMeasure 0 s
-local notation "Vs(" Y ", " hs ")" => RealPWBand.space Y (volume_le_realPWIntervalMeasure 0 s hs)
+local notation "Vs(" Y ", " hs ")" => RealPWBand.space Y (volume_le_realPWIntervalMeasure 0 _ hs)
 local notation "evs(" Y ", " hs ")" =>
-  RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure 0 s hs)
+  RealPWBand.evaluation Y (volume_le_realPWIntervalMeasure 0 _ hs)
 local notation "lwμs(" s ")" => (sLocalQuotientTamagawaMeasure ℚ Sq).withDensity
   (fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s ((fun g ↦ Real.log (((mₛq) g).val : ℝ)) g)))
 local notation "mainLevels(" Y ", " χ ", " hs ")" =>
@@ -96,8 +100,9 @@ variable {s : ℝ}
 
 theorem measurable_ratOrderDensity (s : ℝ) :
     Measurable fun g : Jq ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s
-      ((fun g ↦ Real.log (((mₛq) g).val : ℝ)) g)) :=
-  ENNReal.measurable_ofReal.comp ((continuous_intervalSobolevDensity_zero s).measurable.comp
+      ((fun g ↦ Real.log (((mₛq) g).val : ℝ)) g)) := by
+  have : BorelSpace Jq := ⟨rfl⟩
+  exact ENNReal.measurable_ofReal.comp ((continuous_intervalSobolevDensity_zero s).measurable.comp
     (Real.measurable_log.comp continuous_ratQuotNorm.measurable))
 
 /-- Reconstruction: a function of the norm is integrable for `main`'s weighted quotient measure at
@@ -128,6 +133,28 @@ theorem ratQuotNorm_integral_order {G : ℝ → ℝ} (hG : Measurable G) :
     G (ratQuotNorm c) = intervalSobolevDensity 0 0 s (Real.log (ratQuotNorm c)) * G (ratQuotNorm c)
   rw [ENNReal.toReal_ofReal (intervalSobolevDensity_zero_nonneg _ _), smul_eq_mul]
 
+/-- Integrability for the weighted model measure at base interval `{0}` is integrability of the
+weight times the function. -/
+theorem integrable_realPWIntervalMeasure_zero_iff (u : ℝ → ℝ) :
+    Integrable u μs(s) ↔ Integrable fun x ↦ realPWIntervalWeight 0 s x * u x := by
+  unfold realPWIntervalMeasure
+  rw [integrable_withDensity_iff_integrable_smul' (measurable_realPWIntervalWeight 0 s).ennreal_ofReal
+    (ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top)]
+  refine integrable_congr (ae_of_all _ fun x ↦ ?_)
+  simp only [smul_eq_mul]
+  rw [ENNReal.toReal_ofReal (realPWIntervalWeight_nonneg 0 s x)]
+
+/-- The integral for the weighted model measure at base interval `{0}` is the integral of the
+weight times the function. -/
+theorem integral_realPWIntervalMeasure_zero (u : ℝ → ℝ) :
+    ∫ x, u x ∂μs(s) = ∫ x, realPWIntervalWeight 0 s x * u x := by
+  unfold realPWIntervalMeasure
+  rw [integral_withDensity_eq_integral_toReal_smul
+    (measurable_realPWIntervalWeight 0 s).ennreal_ofReal (ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top)]
+  refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+  simp only [smul_eq_mul]
+  rw [ENNReal.toReal_ofReal (realPWIntervalWeight_nonneg 0 s x)]
+
 /-- The weighted square of a band vector's evaluation is integrable on the line. -/
 theorem ratBandOrder_integrable (Y : ℝ) (hs : 0 ≤ s) (v : Vs(Y, hs)) :
     Integrable fun x ↦ realPWIntervalWeight 0 s x * ‖evs(Y, hs) x v‖ ^ 2 := by
@@ -135,24 +162,13 @@ theorem ratBandOrder_integrable (Y : ℝ) (hs : 0 ≤ s) (v : Vs(Y, hs)) :
     (Lp.memLp (v.val : Lp ℂ 2 μs(s))).ae_eq (RealPWBand.evaluation_ae Y
       (volume_le_realPWIntervalMeasure 0 s hs) (realPWIntervalMeasure_absolutelyContinuous 0 s)
         v).symm
-  have hi := (memLp_two_iff_integrable_sq_norm hm.1).1 hm
-  rw [realPWIntervalMeasure, integrable_withDensity_iff_integrable_smul'
-    (ENNReal.measurable_ofReal.comp (measurable_realPWIntervalWeight 0 s))
-    (ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top)] at hi
-  refine hi.congr (ae_of_all _ fun x ↦ ?_)
-  simp only [smul_eq_mul]
-  rw [ENNReal.toReal_ofReal (zero_le_one.trans (one_le_realPWIntervalWeight 0 s hs x))]
+  exact (integrable_realPWIntervalMeasure_zero_iff _).1
+    ((memLp_two_iff_integrable_sq_norm hm.aestronglyMeasurable).1 hm)
 
 /-- The squared norm of a weighted band vector is the weighted integral of its evaluation. -/
 theorem ratBandOrder_norm_sq (Y : ℝ) (hs : 0 ≤ s) (v : Vs(Y, hs)) :
     ‖v‖ ^ 2 = ∫ x, realPWIntervalWeight 0 s x * ‖evs(Y, hs) x v‖ ^ 2 := by
-  rw [norm_sq_realPWBand_of_evaluation_eq hs v _ rfl, realPWIntervalMeasure,
-    integral_withDensity_eq_integral_toReal_smul
-      (ENNReal.measurable_ofReal.comp (measurable_realPWIntervalWeight 0 s))
-      (ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top)]
-  refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
-  simp only [smul_eq_mul]
-  rw [ENNReal.toReal_ofReal (zero_le_one.trans (one_le_realPWIntervalWeight 0 s hs x))]
+  rw [norm_sq_realPWBand_of_evaluation_eq hs v _ rfl, integral_realPWIntervalMeasure_zero]
 
 /-- The function on the S-idele quotient attached to a weighted band vector:
 `N ^ (1/2)` times twice its evaluation at the norm `N`. -/
@@ -202,7 +218,7 @@ theorem integral_ratLevelFunOrder_sq (Y : ℝ) (hs : 0 ≤ s) (v : Vs(Y, hs)) :
   change ∫ c, (fun t : ℝ ↦ ‖((t ^ (1 / 2 : ℝ) : ℝ) : ℂ) * (2 * evs(Y, hs) t v)‖ ^ 2)
     (ratQuotNorm c) ∂lwμs(s) = _
   rw [h, setIntegral_congr_fun measurableSet_Ioi (fun t ht ↦ ratLevelFunOrder_profile_eq Y hs v ht),
-    integral_const_mul, ratBandOrder_norm_sq,
+    integral_const_mul, ratBandOrder_norm_sq Y hs v,
     integral_eq_two_mul_integral_Ioi_of_even (ratBandOrder_integrable Y hs v)
       (fun x ↦ by rw [realPWIntervalWeight_zero_neg, RealPWBand.evaluation_even])]
   ring
