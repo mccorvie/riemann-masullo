@@ -1156,18 +1156,19 @@ private theorem grh_zero_re_le_one (χ : PontryaginDual C𝔽) {s : ℂ} (hs : 0
 private theorem grh_bump_mul_exp (b w : ℂ) : b * Complex.exp (-w) * Complex.exp w = b := by
   rw [mul_assoc, ← Complex.exp_add, neg_add_cancel, Complex.exp_zero, mul_one]
 
+local notation "selectedZeros(" τ ", " P ")" =>
+  {z : {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ //
+    0 < ord(z.1.val, z.2) ∧ (P) z.2}
+
 open Classical in
-/-- Paper: Theorem 12.5.1.1, pp. 519–520, and §1.4, p. 30. If, for one half-width α, the
-exterior zero terms of every test vanishing on the norm-one classes sum to zero, then no
-completed Hecke L-function of a character trivial on the norm section has a zero with
-|Re s − 1/2| ≥ α. The test χ̄₀ · h(log|·| − y) isolates one L-function and turns the hypothesis
-into the vanishing of an exponential sum on a half-line, whose coefficients must then vanish
-(`eq_zero_of_hasSum_exp_eq_zero`). -/
-theorem isEmpty_exteriorZeros_of_hasSum (τ : ℝ≥0ˣ →ₜ* C𝔽)
-    (hτ : RightInverse τ (ideleClassNorm F)) (α : ℝ)
+/-- Any selected subset of the completed Hecke zeros is detected by the compact Bruhat tests
+vanishing on the norm-one classes. The same translated tests and exponential-sum uniqueness
+apply to a subset selected by an arbitrary condition on the zero location. -/
+theorem isEmpty_selectedHeckeZeros_of_hasSum (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (P : ℂ → Prop)
     (hT : ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C₁, φ.val g = 0) →
-      HasSum (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z)) 0) :
-    IsEmpty exteriorZeros(τ, α) := by
+      HasSum (fun z : selectedZeros(τ, P) ↦ zeroTerm(φ, z)) 0) :
+    IsEmpty selectedZeros(τ, P) := by
   by_contra hne
   obtain ⟨z₀⟩ := not_isEmpty_iff.mp hne
   let χ₀ : PontryaginDual C𝔽 := z₀.val.1.val
@@ -1192,7 +1193,7 @@ theorem isEmpty_exteriorZeros_of_hasSum (τ : ℝ≥0ˣ →ₜ* C𝔽)
       zero_sub, hH₀neg _ (by linarith), mul_zero]
   let K : ℂ → ℂ := fun w ↦ ∫ x : ℝ, H₀ x * Complex.exp (w * x)
   -- the zero terms of the test `φ y`
-  have hzt (y : ℝ) (z : exteriorZeros(τ, α)) : zeroTerm(φ y, z) =
+  have hzt (y : ℝ) (z : selectedZeros(τ, P)) : zeroTerm(φ y, z) =
       if z.val.1.val = χ₀ then ((ord(z.val.1.val, z.val.2) : ℤ) : ℂ) *
         (classVolume * K (z.val.2 - 1 / 2)) * Complex.exp ((z.val.2 - 1 / 2) * y) else 0 := by
     rw [characterNormTest_mellin _ (hg y) (hgc y) χ₀⁻¹ (φ y) (hφ y)]
@@ -1204,20 +1205,20 @@ theorem isEmpty_exteriorZeros_of_hasSum (τ : ℝ≥0ˣ →ₜ* C𝔽)
       ring
     · rw [ite_eq_right hχ, ite_eq_right (fun h1 ↦ hχ (grh_character_eq τ hτ z.val.1.property
         z₀.val.1.property h1)), zero_mul, mul_zero]
-  let ι := {z : exteriorZeros(τ, α) // z.val.1.val = χ₀}
+  let ι := {z : selectedZeros(τ, P) // z.val.1.val = χ₀}
   let w : ι → ℂ := fun i ↦ i.val.val.2 - 1 / 2
   let b : ι → ℂ := fun i ↦
     ((ord(i.val.val.1.val, i.val.val.2) : ℤ) : ℂ) * (classVolume * K (w i))
   have hsum (y : ℝ) (hy : 0 ≤ y) : HasSum (fun i : ι ↦ b i * Complex.exp (w i * y)) 0 := by
     have h := hT (φ y) (hvan y hy)
-    have hsupp : Function.support (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ y, z)) ⊆
+    have hsupp : Function.support (fun z : selectedZeros(τ, P) ↦ zeroTerm(φ y, z)) ⊆
         {z | z.val.1.val = χ₀} := by
       intro z hz
       by_contra hχ
       exact hz ((hzt y z).trans (ite_eq_right hχ))
     have h' := (hasSum_subtype_iff_of_support_subset hsupp).mpr h
     have hf : (fun i : ι ↦ b i * Complex.exp (w i * y)) =
-        (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ y, z)) ∘ (Subtype.val : ι → _) := by
+        (fun z : selectedZeros(τ, P) ↦ zeroTerm(φ y, z)) ∘ (Subtype.val : ι → _) := by
       funext i
       rw [Function.comp_apply, hzt y i.val, ite_eq_left i.property]
     rw [hf]
@@ -1249,6 +1250,20 @@ theorem isEmpty_exteriorZeros_of_hasSum (τ : ℝ≥0ˣ →ₜ* C𝔽)
   have hKne : K w₀ ≠ 0 := by
     rw [hK]; exact Complex.ofReal_ne_zero.mpr β.integral_pos.ne'
   exact mul_ne_zero hord (mul_ne_zero grh_classVolume_ne_zero hKne) h0
+
+open Classical in
+/-- Paper: Theorem 12.5.1.1, pp. 519–520, and §1.4, p. 30. If, for one half-width α, the
+exterior zero terms of every test vanishing on the norm-one classes sum to zero, then no
+completed Hecke L-function of a character trivial on the norm section has a zero with
+|Re s − 1/2| ≥ α. The test χ̄₀ · h(log|·| − y) isolates one L-function and turns the hypothesis
+into the vanishing of an exponential sum on a half-line, whose coefficients must then vanish
+(`eq_zero_of_hasSum_exp_eq_zero`). -/
+theorem isEmpty_exteriorZeros_of_hasSum (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hτ : RightInverse τ (ideleClassNorm F)) (α : ℝ)
+    (hT : ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C₁, φ.val g = 0) →
+      HasSum (fun z : exteriorZeros(τ, α) ↦ zeroTerm(φ, z)) 0) :
+    IsEmpty exteriorZeros(τ, α) :=
+  isEmpty_selectedHeckeZeros_of_hasSum τ hτ (fun z ↦ α ≤ |z.re - 1 / 2|) hT
 
 /-- Paper: Theorem 12.5.1.1, pp. 519–520, and §1.4, p. 30. For each half-width α, the
 conclusion of `traceFormula_exteriorZeros` holds for every test vanishing on the norm-one classes

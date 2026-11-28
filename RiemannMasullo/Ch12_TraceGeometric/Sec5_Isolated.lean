@@ -1,5 +1,6 @@
 module
 
+import Mathlib.Analysis.Normed.Group.Tannery
 import Mathlib.Geometry.Manifold.PartitionOfUnity
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4b_ProjectedKernels
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
@@ -387,6 +388,166 @@ theorem traceFormula_exteriorZeros_of_orderZeroDiagonalWidthComparison
     at hComparison
   rw [hComparison, hz] at narrow
   exact narrow
+
+local notation "SectionCharacterPoint(" τ ")" =>
+  ({χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ)
+local notation "ord(" z ")" =>
+  MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) (z).1.val) univ (z).2
+local notation "offset(" z ")" => |(z).2.re - 1 / 2|
+local notation "zeroTerm(" φ ", " z ")" =>
+  (((ord(z) : ℤ) : ℂ) * modulatedFourierMellin m𝔽 univ
+    ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+    μ𝔽 (φ : BruhatCompactSupport C𝔽).val (ideleClassNormTwist (F := F) (z).1.val ((z).2 - 1 / 2)))
+
+/-- The Haar integral of the smoothed projective geometric diagonal at Sobolev order zero. -/
+def orderZeroProjectiveGeometricTrace (φ : BruhatCompactSupport C𝔽) {α : ℝ} (hα : 0 ≤ α)
+    (U : ℕ → Set C𝔽) : ℂ :=
+  ∫ x, dSequenceKernelSmoothening μ𝔽 U (orderZeroProjectiveGeometricKernel φ hα) (x, x) ∂μ𝔽
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The narrow-minus-wide order-zero
+geometric traces give the signed sum of the zeros between the two widths.
+The smaller boundary contributes in full, and the larger boundary does not contribute. -/
+theorem hasSum_widthShell_orderZeroProjectiveGeometricTrace
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (φ : BruhatCompactSupport C𝔽) (hφ : φ.val 1 = 0) {α β : ℝ} (hα : 0 < α)
+    (hαβ : α ≤ β) (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U)
+    (hBorel : ∀ n, MeasurableSet (U n)) :
+    HasSum (fun z : {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ α ≤ offset(z) ∧ offset(z) < β} ↦
+      zeroTerm(φ, z.val))
+      (orderZeroProjectiveGeometricTrace φ hα.le U -
+        orderZeroProjectiveGeometricTrace φ (hα.le.trans hαβ) U) := by
+  classical
+  have hβ : 0 < β := hα.trans_le hαβ
+  obtain ⟨a, b, ha, hb, _, _⟩ := traceFormula_of_half_le τ hτ φ (le_refl (1 / 2 : ℝ))
+  let hKα := stripTestAction_spectralProjection_has_projectiveKernel (F := F) (1 / 2)
+    hα.le (s := 0) le_rfl φ
+  let hKβ := stripTestAction_spectralProjection_has_projectiveKernel (F := F) (1 / 2)
+    hβ.le (s := 0) le_rfl φ
+  have narrow := (hasSum_exteriorZeros_localTerms_add_smoothenedProjectiveGeometricDiagonal_of_le_one
+    τ hτ hα le_rfl zero_le_one φ hφ a b ha hb hKα.choose hKα.choose_spec U hU hBorel).2
+  have wide := (hasSum_exteriorZeros_localTerms_add_smoothenedProjectiveGeometricDiagonal_of_le_one
+    τ hτ hβ le_rfl zero_le_one φ hφ a b ha hb hKβ.choose hKβ.choose_spec U hU hBorel).2
+  let A : Set SectionCharacterPoint(τ) := {p | 0 < ord(p) ∧ α ≤ offset(p)}
+  let B : Set SectionCharacterPoint(τ) := {p | 0 < ord(p) ∧ β ≤ offset(p)}
+  let S : Set SectionCharacterPoint(τ) := {p | 0 < ord(p) ∧ α ≤ offset(p) ∧ offset(p) < β}
+  let term (p : SectionCharacterPoint(τ)) : ℂ := zeroTerm(φ, p)
+  have hBA : B ⊆ A := fun p hp ↦ ⟨hp.1, hαβ.trans hp.2⟩
+  have hS : S = A \ B := by
+    ext p
+    constructor
+    · intro hp
+      exact ⟨⟨hp.1, hp.2.1⟩, fun hb' ↦ (not_le_of_gt hp.2.2) hb'.2⟩
+    · intro hp
+      exact ⟨hp.1.1, hp.1.2, lt_of_not_ge fun hb' ↦ hp.2 ⟨hp.1.1, hb'⟩⟩
+  refine (hasSum_subtype_iff_indicator (f := term) (s := S)).mpr ?_
+  rw [hS, Set.indicator_sdiff' hBA term]
+  have hA := (hasSum_subtype_iff_indicator (f := term) (s := A)).mp narrow
+  have hB := (hasSum_subtype_iff_indicator (f := term) (s := B)).mp wide
+  have h := hA.sub hB
+  rw [add_sub_add_left_eq_sub] at h
+  exact h
+
+open Filter in
+open scoped Topology in
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. Along any sequence of positive widths
+converging to zero, the narrow-minus-wide order-zero geometric trace converges to the
+full sum over the off-critical-line zeros for the test. -/
+theorem hasSum_offCriticalZeros_orderZeroProjectiveGeometricTrace_limit
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (u : ℕ → ℝ) (hu : ∀ n, 0 < u n) (hlim : Tendsto u atTop (𝓝 0))
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n))
+    (φ : BruhatCompactSupport C𝔽) (hφ : φ.val 1 = 0) :
+    ∃ S : ℂ, HasSum (fun z : {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ 0 < offset(z)} ↦
+      zeroTerm(φ, z.val)) S ∧
+      Tendsto (fun n ↦ orderZeroProjectiveGeometricTrace φ (hu n).le U -
+        orderZeroProjectiveGeometricTrace φ (by norm_num : (0 : ℝ) ≤ 1 / 2) U) atTop (𝓝 S) := by
+  classical
+  let Full := {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ offset(z) < 1 / 2}
+  let term (z : Full) : ℂ := zeroTerm(φ, z.val)
+  obtain ⟨_, _, _, _, _, hfull⟩ := traceFormula_of_half_le τ hτ φ (le_refl (1 / 2 : ℝ))
+  have hs : Summable term := hfull.summable
+  let truncatedTerm (n : ℕ) : Full → ℂ := fun z ↦ if u n ≤ offset(z.val) then term z else 0
+  let offLineTerm : Full → ℂ := fun z ↦ if 0 < offset(z.val) then term z else 0
+  have hterm (z : Full) : Tendsto (fun n ↦ truncatedTerm n z) atTop (𝓝 (offLineTerm z)) := by
+    by_cases hz : 0 < offset(z.val)
+    · have he : ∀ᶠ n in atTop, u n < offset(z.val) := hlim.eventually (Iio_mem_nhds hz)
+      change Tendsto (fun n ↦ truncatedTerm n z) atTop (𝓝 (if 0 < offset(z.val) then term z else 0))
+      rw [ite_eq_left hz]
+      apply tendsto_const_nhds.congr'
+      filter_upwards [he] with n hn
+      change term z = (if u n ≤ offset(z.val) then term z else 0)
+      rw [ite_eq_left hn.le]
+    · have hz' : offset(z.val) = 0 := le_antisymm (not_lt.mp hz) (abs_nonneg _)
+      have hoff : offLineTerm z = 0 := by
+        change (if 0 < offset(z.val) then term z else 0) = 0
+        exact ite_eq_right hz
+      rw [hoff]
+      apply tendsto_const_nhds.congr'
+      filter_upwards with n
+      change 0 = (if u n ≤ offset(z.val) then term z else 0)
+      rw [hz', ite_eq_right (not_le_of_gt (hu n))]
+  have hconv : Tendsto (fun n ↦ ∑' z, truncatedTerm n z) atTop (𝓝 (∑' z, offLineTerm z)) := by
+    refine tendsto_tsum_of_dominated_convergence hs.norm hterm (Eventually.of_forall fun n z ↦ ?_)
+    change ‖(if u n ≤ offset(z.val) then term z else 0)‖ ≤ ‖term z‖
+    split_ifs <;> simp
+  have htrace : (fun n ↦ ∑' z, truncatedTerm n z) =ᶠ[atTop]
+      (fun n ↦ orderZeroProjectiveGeometricTrace φ (hu n).le U -
+        orderZeroProjectiveGeometricTrace φ (by norm_num : (0 : ℝ) ≤ 1 / 2) U) := by
+    filter_upwards [hlim.eventually (Iio_mem_nhds (show (0 : ℝ) < 1 / 2 by norm_num))] with n hn
+    let A : Set Full := {z | u n ≤ offset(z.val)}
+    let Shell := {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ u n ≤ offset(z) ∧ offset(z) < 1 / 2}
+    let e : A ≃ Shell :=
+      ⟨fun z ↦ ⟨z.val.val, z.val.property.1, z.property, z.val.property.2⟩,
+        fun z ↦ ⟨⟨z.val, z.property.1, z.property.2.2⟩, z.property.2.1⟩,
+        fun _ ↦ rfl, fun _ ↦ rfl⟩
+    have h := hasSum_widthShell_orderZeroProjectiveGeometricTrace τ hτ φ hφ
+      (hu n) hn.le U hU hBorel
+    have h' := (e.hasSum_iff).mpr h
+    have h'' := (hasSum_subtype_iff_indicator (s := A) (f := term)).mp h'
+    change (∑' z, A.indicator term z) = _
+    exact h''.tsum_eq
+  let B : Set Full := {z | 0 < offset(z.val)}
+  have hSB : Summable (fun z : B ↦ term z.val) := hs.subtype (fun z ↦ z ∈ B)
+  have hSel : HasSum offLineTerm (∑' z : B, term z.val) :=
+    (hasSum_subtype_iff_indicator (s := B) (f := term)).mp hSB.hasSum
+  have hWideEmpty : IsEmpty {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ 1 / 2 ≤ offset(z)} :=
+    (hasSum_exteriorZeros_iff_isEmpty τ hτ (1 / 2 : ℝ)).mp
+      (fun ψ _ ↦ traceFormula_exteriorZeros_of_half_le τ ψ (le_refl (1 / 2 : ℝ)))
+  have hhalf (z : SectionCharacterPoint(τ)) (hz : 0 < ord(z)) : offset(z) < 1 / 2 :=
+    lt_of_not_ge fun h ↦ @IsEmpty.false _ hWideEmpty ⟨z, hz, h⟩
+  let e : B ≃ {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ 0 < offset(z)} :=
+    ⟨fun z ↦ ⟨z.val.val, z.val.property.1, z.property⟩,
+      fun z ↦ ⟨⟨z.val, z.property.1, hhalf z.val z.property.1⟩, z.property.2⟩,
+      fun _ ↦ rfl, fun _ ↦ rfl⟩
+  refine ⟨_, (e.hasSum_iff).mp hSB.hasSum, ?_⟩
+  rw [← hSel.tsum_eq]
+  exact hconv.congr' htrace
+
+open Filter in
+open scoped Topology in
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. Testwise convergence to zero of the
+order-zero geometric trace residuals along one sequence of positive widths implies
+the exterior zero cancellation for every positive width. -/
+theorem traceFormula_exteriorZeros_of_orderZeroProjectiveGeometricTrace_tendsto
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (u : ℕ → ℝ) (hu : ∀ n, 0 < u n) (hlim : Tendsto u atTop (𝓝 0))
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n))
+    (hResidual : ∀ φ : BruhatCompactSupport C𝔽, (∀ g : C₁, φ.val g = 0) →
+      Tendsto (fun n ↦ orderZeroProjectiveGeometricTrace φ (hu n).le U -
+        orderZeroProjectiveGeometricTrace φ (by norm_num : (0 : ℝ) ≤ 1 / 2) U) atTop (𝓝 0))
+    (φ : BruhatCompactSupport C𝔽) (hφ : ∀ g : C₁, φ.val g = 0) {α : ℝ} (hα : 0 < α) :
+    HasSum (fun z : {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ α ≤ offset(z)} ↦
+      zeroTerm(φ, z.val)) 0 := by
+  have hOffLine : IsEmpty {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ 0 < offset(z)} := by
+    apply isEmpty_selectedHeckeZeros_of_hasSum τ hτ (fun s ↦ 0 < |s.re - 1 / 2|)
+    intro ψ hψ
+    obtain ⟨S, hSum, hLimit⟩ :=
+      hasSum_offCriticalZeros_orderZeroProjectiveGeometricTrace_limit τ hτ u hu hlim U hU hBorel
+        ψ (hψ 1)
+    have hZero : S = 0 := tendsto_nhds_unique hLimit (hResidual ψ hψ)
+    exact hZero ▸ hSum
+  apply (hasSum_exteriorZeros_iff_isEmpty τ hτ α).mpr _ φ hφ
+  exact ⟨fun z ↦ @IsEmpty.false _ hOffLine ⟨z.val, z.property.1, hα.trans_le z.property.2⟩⟩
 
 end OrderZeroDiagonalComparison
 
