@@ -3710,6 +3710,73 @@ private theorem exists_spectralStripKernelOperator_all_jet_coefficients
           y i
       exact stripJet_scalar_integral μ𝔽 φ.val η (fun g ↦ (logNorm g : ℂ) ^ (m.val - i.val)) _ _
 
+open InnerProductSpace in
+open scoped InnerProductSpace in
+/-- Paper: Theorem 10.3.2.1(2), p. 454. At every nonnegative Sobolev order the
+nuclear convolution trace counts the jets admitted by the strip density.
+Deviation: The formula also includes Sobolev orders at most one, where the
+boundary retains no jets. -/
+theorem spectralStripConvolution_trace_nonnegativeOrder (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (_hχ : IsSpectralBasepointChoice (F := F) (fun ω ↦ χ ω))
+    (φ : BruhatCompactSupport C𝔽) :
+    let H := Q(a, hStrip(hα), hs)
+    let term (z : Z(χ, α)) := (N(χ, α, s, z) : ℂ) * M(φ, χ z.val.1, shift(z.val.2.1, z.val.2.2))
+    ∀ (T : nuclearEndomorphisms H),
+      T.val = spectralConvolution (F := F) a hStrip(hα) hs φ →
+      Summable (fun z ↦ ‖term z‖) ∧ HasSum term (hilbertTrace (H := H) T) := by
+  intro H term T hT
+  classical
+  obtain ⟨_, e, _⟩ := spectralLineConvolution_nuclear_indices χ
+    (fun z : Z(χ, α) ↦ z.val.1) (fun z ↦ shift(a + z.val.2.1, z.val.2.2)) (by
+      intro i j h
+      have hrow := congrArg Prod.fst h
+      have hre := congrArg (fun p ↦ (p.2 : ℂ).re) h
+      have him := congrArg (fun p ↦ (p.2 : ℂ).im) h
+      exact Subtype.ext (Prod.ext hrow
+        (Prod.ext (by simpa using hre) (by simpa using him)))) (fun z ↦ z.property.2)
+  let : Countable (Z(χ, α)) := e.injective.countable
+  let count (z : Z(χ, α)) := N(χ, α, s, z)
+  let jet (z : Z(χ, α)) (m : Fin (count z)) : SpectralStripJetIndex (F := F) (fun ω ↦ χ ω) a α s :=
+    ⟨(z.val.1, z.val.2.1, z.val.2.2, m.val), m.isLt⟩
+  let index (j : SpectralStripJetIndex (F := F) (fun ω ↦ χ ω) a α s) : (z : Z(χ, α)) × Fin (count z) :=
+    ⟨⟨(j.val.1, j.val.2.1, j.val.2.2.1), SpectralStripJetIndex.mem_strip_order_pos hα j⟩, ⟨j.val.2.2.2, j.property⟩⟩
+  let equiv : ((z : Z(χ, α)) × Fin (count z)) ≃ SpectralStripJetIndex (F := F) (fun ω ↦ χ ω) a α s :=
+    ⟨fun zm ↦ jet zm.1 zm.2, index, fun _ ↦ rfl, fun _ ↦ rfl⟩
+  obtain ⟨f, hf, hsep⟩ := stripDualTrace_separating a χ hα hs
+    (spectralStripJet_commonKernel (a := a) χ _hχ hα hs)
+  have hli : LinearIndependent ℂ f := LinearIndependent.of_comp D₀ (by
+    have eqw : D₀ ∘ f = _ := funext hf
+    rw [eqw]
+    exact spectralStripJet_toLp_linearIndependent χ _hχ a hα hs)
+  let u (z : Z(χ, α)) (m : Fin (count z)) := (toDual ℂ H).symm (f (jet z m))
+  have hu : LinearIndependent ℂ (fun i : (z : Z(χ, α)) × Fin (count z) ↦ u i.1 i.2) :=
+    (stripDualTrace_riesz_independent f hli).comp equiv equiv.injective
+  have heval (z : Z(χ, α)) (m : Fin (count z)) (v : H) :
+      ⟪u z m, v⟫_ℂ = f (jet z m) v := toDual_symm_apply
+  have htotal (v : H) (hv : ∀ z m, ⟪u z m, v⟫_ℂ = 0) : v = 0 := by
+    apply hsep v
+    intro i
+    obtain ⟨⟨z, m⟩, rfl⟩ := equiv.surjective i
+    exact (heval z m v).symm.trans (hv z m)
+  have ht : HasSum term (hilbertTrace T) := stripDualTrace_hasSum count u hu htotal T
+    (fun z ↦ M(φ, χ z.val.1, shift(z.val.2.1, z.val.2.2))) (by
+      intro z m v hlow
+      simp only [heval] at hlow ⊢
+      rw [hT]
+      rw [exists_spectralStripKernelOperator_all_jet_coefficients a hα hs χ f hf φ z m v]
+      let last : Fin (m.val + 1) := Fin.last m.val
+      rw [Finset.sum_eq_single last]
+      · simp only [last, Fin.val_last, Nat.choose_self, Nat.cast_one, tsub_self,
+          pow_zero, mul_one, one_mul]
+        rw [← (spectralConvolution_mellin_integrable φ (χ z.val.1)
+          (shift(z.val.2.1, z.val.2.2))).2]
+      · intro i _ hi
+        have him : i.val < m.val := lt_of_le_of_ne (Nat.le_of_lt_succ i.isLt)
+          (fun he ↦ hi (Fin.ext he))
+        rw [hlow ⟨i.val, him.trans m.isLt⟩ him, mul_zero]
+      · simp only [Finset.mem_univ, not_true_eq_false, IsEmpty.forall_iff])
+  exact ⟨ht.summable.norm, ht⟩
+
 /-- Paper: Definition 9.3.1.1, p. 419, and (10.3.2.2), p. 454. A kernel on the idele class
 group that is integrable against the bound for the norms of the translations acts on the strip
 quotient, with operator norm at most that integral. At a zero where its logarithmic Mellin
