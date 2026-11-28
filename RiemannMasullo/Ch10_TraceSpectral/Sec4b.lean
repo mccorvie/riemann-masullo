@@ -1891,6 +1891,18 @@ private theorem spectralStripKernel_hilbertSchmidt_of_rows {α s : ℝ}
   exact spectralStripKernel_hilbertSchmidt_operator μ𝔽 ν wNN hw.measurable hp hν op k
     (Lp.stronglyMeasurable k) hk hrow
 
+/-- A projective Sobolev kernel represents a Hilbert–Schmidt operator after
+conversion to the positive input density, at every nonnegative order. -/
+theorem sobolevProjectiveKernelClass_hilbertSchmidt (hs₀ : 0 ≤ s)
+    (K : Π(W'(α, s), W(α, s))) :
+    let k := sobolevProjectiveKernelClass (F := F) hα hs₀ K
+    IsSobolevHilbertSchmidtKernel (F := F) (sobolevProjectiveKernelOperator (F := F) hα hs₀ K)
+      (fun p : C𝔽 × C𝔽 ↦ ((w(α, s) p.2)⁻¹ : ℝ) • k p) := by
+  intro k
+  have hrow := (sobolevProjectiveKernelClass_spec (F := F) hα hs₀ K k).mpr rfl
+  exact spectralStripKernel_hilbertSchmidt_of_rows (F := F) _ k
+    (fun u ↦ (hrow u).mono fun _ hx ↦ hx.2)
+
 end MixedWeightKernel
 
 /-- Paper: Theorem 10.4.3.6(2), p. 473, first formula. Dividing the global spectral

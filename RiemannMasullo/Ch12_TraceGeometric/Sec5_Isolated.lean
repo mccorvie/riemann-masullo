@@ -1,7 +1,7 @@
 module
 
 import Mathlib.Geometry.Manifold.PartitionOfUnity
-import RiemannMasullo.Ch10_TraceSpectral.Sec4b_ProjectedKernels
+public import RiemannMasullo.Ch10_TraceSpectral.Sec4b_ProjectedKernels
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 
 /-! # Isolated statements of §12.5
@@ -332,5 +332,62 @@ theorem exists_projectiveKernel_stripTestAction_spectralProjection_iff_support_i
   simp at hx
 
 end KernelLocalization
+
+section OrderZeroDiagonalComparison
+
+open Function
+open scoped NumberField.AdeleRing
+
+/-- The Haar convolution kernel minus the projective spectral kernel at order zero. -/
+def orderZeroProjectiveGeometricKernel
+    (φ : BruhatCompactSupport C𝔽) {α : ℝ} (hα : 0 ≤ α) (p : C𝔽 × C𝔽) : ℂ :=
+  let hK := stripTestAction_spectralProjection_has_projectiveKernel (F := F) (1 / 2)
+    hα (s := 0) le_rfl φ
+  φ.val (p.1 * p.2⁻¹) - sobolevProjectiveKernelClass (F := F) hα le_rfl hK.choose p
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. A comparison between the narrow and
+wide order-zero geometric diagonals would prove the exact exterior cancellation
+for this test and width, including both edges.
+Gap: The signed global-to-local comparison in §12.3, p. 514, is needed to obtain
+the equality of the Haar integrals. The measurable D′-sequence is supplied as data. -/
+theorem traceFormula_exteriorZeros_of_orderZeroDiagonalWidthComparison
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (φ : BruhatCompactSupport C𝔽) (hφ : ∀ g : C₁, φ.val g = 0) {α : ℝ} (hα : 0 < α)
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n))
+    (hComparison : (∫ x, dSequenceKernelSmoothening μ𝔽 U
+        (orderZeroProjectiveGeometricKernel φ hα.le) (x, x) ∂μ𝔽) =
+      ∫ x, dSequenceKernelSmoothening μ𝔽 U
+        (orderZeroProjectiveGeometricKernel φ (by norm_num : (0 : ℝ) ≤ 1 / 2)) (x, x) ∂μ𝔽) :
+    let Z := {z : {χ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ //
+      0 < MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) z.1.val) univ z.2 ∧
+        α ≤ |z.2.re - 1 / 2|}
+    HasSum (fun z : Z ↦
+      ((MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) z.val.1.val) univ z.val.2 : ℤ) : ℂ) *
+        modulatedFourierMellin m𝔽 univ ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+          μ𝔽 φ.val (ideleClassNormTwist (F := F) z.val.1.val (z.val.2 - 1 / 2))) 0 := by
+  intro Z
+  have hwide : (0 : ℝ) < 1 / 2 := by norm_num
+  obtain ⟨a, b, ha, hb, _, _⟩ := traceFormula_of_half_le τ hτ φ (le_refl (1 / 2 : ℝ))
+  let hK := stripTestAction_spectralProjection_has_projectiveKernel (F := F) (1 / 2)
+    hα.le (s := 0) le_rfl φ
+  let hKwide := stripTestAction_spectralProjection_has_projectiveKernel (F := F) (1 / 2)
+    hwide.le (s := 0) le_rfl φ
+  have hφ1 : φ.val 1 = 0 := hφ 1
+  have narrow := (hasSum_exteriorZeros_localTerms_add_smoothenedProjectiveGeometricDiagonal_of_le_one
+    τ hτ hα le_rfl zero_le_one φ hφ1 a b ha hb hK.choose hK.choose_spec U hU hBorel).2
+  have wide := (hasSum_exteriorZeros_localTerms_add_smoothenedProjectiveGeometricDiagonal_of_le_one
+    τ hτ hwide le_rfl zero_le_one φ hφ1 a b ha hb hKwide.choose hKwide.choose_spec U hU hBorel).2
+  have hz := wide.unique (traceFormula_exteriorZeros_of_half_le τ φ (le_refl (1 / 2 : ℝ)))
+  change (∫ x, dSequenceKernelSmoothening μ𝔽 U
+      (fun p : C𝔽 × C𝔽 ↦ φ.val (p.1 * p.2⁻¹) -
+        sobolevProjectiveKernelClass (F := F) hα.le le_rfl hK.choose p) (x, x) ∂μ𝔽) =
+    (∫ x, dSequenceKernelSmoothening μ𝔽 U
+      (fun p : C𝔽 × C𝔽 ↦ φ.val (p.1 * p.2⁻¹) -
+        sobolevProjectiveKernelClass (F := F) hwide.le le_rfl hKwide.choose p) (x, x) ∂μ𝔽)
+    at hComparison
+  rw [hComparison, hz] at narrow
+  exact narrow
+
+end OrderZeroDiagonalComparison
 
 end RiemannMasullo.Isolated
