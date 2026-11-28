@@ -20,6 +20,8 @@ hypothesis; the project's own proof of the endpoint is not used.
   local conductor exponents, Euler's theorem, the decomposition `C_ℚ ≅ ℝ_{>0} × ∏ 𝒪_v^×`
   and
   density of finitely supported tuples in that product.
+  The equivalence `primitiveDirichletHeckeEquiv` identifies finite-order rational idèle-class
+  characters with primitive Dirichlet characters at their conductors.
 * **Order comparison.** Under Dirichlet GRH the completed Hecke L-function of such a character
   has no zero with `Re s > 1/2`; the left half follows from the functional equation for the
   inverse character (`introTrace_completedL_no_left_zeros`).
@@ -180,23 +182,22 @@ private theorem exists_dirichlet_of_ker (ψ : PontryaginDual Cℚ) (N : ℕ) [Ne
   rw [hU, hφ]
   simp [g]
 
-/-- An idelic Dirichlet character gives a primitive Dirichlet character with the same
-finite L-function. -/
+/-- An idelic Dirichlet character equals the lift of its primitive representative. -/
 private theorem exists_primitive_of_ideleChar (ψ : PontryaginDual Cℚ) (N : ℕ) [NeZero N]
     (χ : DirichletCharacter ℂ N)
     (h : ∀ x : IdQ, (ψ (QuotientGroup.mk x) : ℂ) = ((ideleChar N χ x : ℂˣ) : ℂ)) :
-    ∃ (M : ℕ) (_ : NeZero M) (χ' : DirichletCharacter ℂ M), χ'.IsPrimitive ∧
-      ∀ s : ℂ, ∀ hs : 1 < s.re, finiteHeckeL ψ ⟨s, hs⟩ = LSeries (χ' ·) s := by
-  have : NeZero χ.conductor := ⟨DirichletCharacter.conductor_ne_zero χ⟩
-  have hprim := χ.primitiveCharacter_isPrimitive
-  obtain ⟨ψ', -, hval, hL⟩ :=
-    DirichletCharacter.IsPrimitive.exists_finiteHeckeL_eq_with_values hprim
-  have hψ : ψ' = ψ := by
-    ext g
-    obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective g
-    rw [hval x, h x, ← ideleChar_changeLevel χ.conductor_dvd_level,
-      DirichletCharacter.changeLevel_primitiveCharacter]
-  exact ⟨χ.conductor, inferInstance, χ.primitiveCharacter, hprim, hψ ▸ hL⟩
+    ∃ (M : ℕ+) (φ : DirichletCharacter ℂ (M : ℕ)) (hφ : φ.IsPrimitive),
+      (DirichletCharacter.IsPrimitive.exists_finiteHeckeL_eq_with_values hφ).choose = ψ := by
+  have : NeZero χ.conductor := ⟨χ.conductor_ne_zero⟩
+  let M : ℕ+ := ⟨χ.conductor, Nat.pos_of_ne_zero χ.conductor_ne_zero⟩
+  refine ⟨M, χ.primitiveCharacter, χ.primitiveCharacter_isPrimitive, ?_⟩
+  have hval := (DirichletCharacter.IsPrimitive.exists_finiteHeckeL_eq_with_values
+    χ.primitiveCharacter_isPrimitive).choose_spec.2.1
+  ext g
+  obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective g
+  apply (hval x).trans
+  rw [h x, ← ideleChar_changeLevel χ.conductor_dvd_level,
+    DirichletCharacter.changeLevel_primitiveCharacter]
 
 /-! ### Characters trivial on a norm section are determined by finite levels -/
 
@@ -543,7 +544,9 @@ theorem exists_primitive_finiteHeckeL_eq_of_trivial_on_section (τ : ℝ≥0ˣ �
       ∀ s : ℂ, ∀ hs : 1 < s.re, finiteHeckeL ψ ⟨s, hs⟩ = LSeries (χ ·) s := by
   obtain ⟨N, _, hker⟩ := exists_level_of_trivial_on_section τ hτ ψ hψ
   obtain ⟨χ, hχ⟩ := exists_dirichlet_of_ker ψ N hker
-  exact exists_primitive_of_ideleChar ψ N χ hχ
+  obtain ⟨M, φ, hφ, h⟩ := exists_primitive_of_ideleChar ψ N χ hχ
+  exact ⟨M, inferInstance, φ, hφ,
+    h ▸ (DirichletCharacter.IsPrimitive.exists_finiteHeckeL_eq_with_values hφ).choose_spec.2.2⟩
 
 attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorelSpaceSec1
   instIdeleClassT2Sec1 instIdeleClassLocallyCompactSec1 instIdeleClassSecondCountableSec1
@@ -818,5 +821,60 @@ theorem traceFormula_exteriorZeros_rat_reciprocalWidths_iff_dirichletGRH
     have := dirichletEulerFactor_zero_re_eq_zero χ.primitiveCharacter
       (Nat.prime_of_mem_primeFactors hp) he
     linarith
+
+local notation "PrimitiveLabels" => (N : ℕ+) × {χ : DirichletCharacter ℂ (N : ℕ) // DirichletCharacter.IsPrimitive χ}
+local notation "FiniteOrderCharacters" => {ψ : PontryaginDual Cℚ // IsOfFinOrder ψ}
+
+private def primitiveDirichletLift (p : PrimitiveLabels) : FiniteOrderCharacters :=
+  let h := DirichletCharacter.IsPrimitive.exists_finiteHeckeL_eq_with_values p.2.property
+  ⟨h.choose, h.choose_spec.1⟩
+
+private theorem primitiveDirichletLift_apply (p : PrimitiveLabels) (x : IdQ) :
+    ((primitiveDirichletLift p).val (QuotientGroup.mk x) : ℂ) =
+      ((ideleChar p.1 p.2.val x : ℂˣ) : ℂ) :=
+  (DirichletCharacter.IsPrimitive.exists_finiteHeckeL_eq_with_values p.2.property).choose_spec.2.1 x
+
+private theorem primitiveDirichletLift_injective : Injective primitiveDirichletLift := by
+  rintro ⟨N, χ, hχ⟩ ⟨M, φ, hφ⟩ he
+  have hn : (N : ℕ) ∣ (N : ℕ) * M := Nat.dvd_mul_right _ _
+  have hm : (M : ℕ) ∣ (N : ℕ) * M := Nat.dvd_mul_left _ _
+  have hlevel : χ.changeLevel hn = φ.changeLevel hm := by
+    apply MulChar.ext
+    intro u
+    obtain ⟨x, hx⟩ := resMod_toHomUnits_surjective ((N : ℕ) * M) u
+    have h := congrArg (fun ψ : FiniteOrderCharacters ↦ (ψ.val (QuotientGroup.mk x) : ℂ)) he
+    change ((primitiveDirichletLift ⟨N, χ, hχ⟩).val (QuotientGroup.mk x) : ℂ) =
+      ((primitiveDirichletLift ⟨M, φ, hφ⟩).val (QuotientGroup.mk x) : ℂ) at h
+    rw [primitiveDirichletLift_apply, primitiveDirichletLift_apply,
+      ← ideleChar_changeLevel hn χ, ← ideleChar_changeLevel hm φ,
+      coe_ideleChar, coe_ideleChar, hx, inv_inj] at h
+    exact h
+  have hNM : N = M := Subtype.ext <| hχ.symm.trans <| (χ.conductor_changeLevel hn).symm.trans <|
+    (congrArg DirichletCharacter.conductor hlevel).trans <| (φ.conductor_changeLevel hm).trans hφ
+  subst M
+  obtain rfl := DirichletCharacter.changeLevel_injective hn hlevel
+  rfl
+
+private theorem primitiveDirichletLift_surjective : Surjective primitiveDirichletLift := by
+  rintro ⟨ψ, hψ⟩
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, ⟨s, hs, hr⟩, _⟩ := ideleGroup_quotient.{0, 0} ℚ
+  let τ : ℝ≥0ˣ →ₜ* Cℚ := ⟨s, hs⟩
+  obtain ⟨N, _, hker⟩ := exists_level_of_trivial_on_section τ hr ψ
+    (trivial_on_section_of_isOfFinOrder ψ hψ τ)
+  obtain ⟨χ, hχ⟩ := exists_dirichlet_of_ker ψ N hker
+  obtain ⟨M, φ, hφ, h⟩ := exists_primitive_of_ideleChar ψ N χ hχ
+  exact ⟨⟨M, φ, hφ⟩, Subtype.ext h⟩
+
+/-- Primitive Dirichlet characters at their actual positive conductors correspond bijectively
+to finite-order unitary characters of the rational idèle class group. -/
+@[no_expose] def primitiveDirichletHeckeEquiv : PrimitiveLabels ≃ FiniteOrderCharacters :=
+  Equiv.ofBijective primitiveDirichletLift
+    ⟨primitiveDirichletLift_injective, primitiveDirichletLift_surjective⟩
+
+/-- The correspondence evaluates on every rational idèle by the idelic Dirichlet character. -/
+theorem primitiveDirichletHeckeEquiv_apply (p : PrimitiveLabels) (x : IdQ) :
+    ((primitiveDirichletHeckeEquiv p).val (QuotientGroup.mk x) : ℂ) =
+      ((ideleChar p.1 p.2.val x : ℂˣ) : ℂ) :=
+  primitiveDirichletLift_apply p x
 
 end RiemannMasullo

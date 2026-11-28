@@ -1654,6 +1654,20 @@ private theorem spectralLineJet_memLp_false_cubicZeroCount
   obtain ⟨z, h₀, h₁, h⟩ := (cubicDedekindZeta_excessOrders_infinite K (b.finrank.trans _hd)).nonempty
   exact ⟨{z}, by simpa using And.intro h₀ h₁, by simpa using h⟩
 
+private theorem irreducible_X_cube_sub_two_rat :
+    Irreducible (Polynomial.X ^ 3 - Polynomial.C (2 : ℚ)) := by
+  apply irreducible_X_pow_sub_C_of_prime (by decide : Nat.Prime 3)
+  intro q hq
+  have h := congrArg (padicValRat 2) hq
+  rw [padicValRat.pow, show padicValRat 2 2 = 1 from padicValRat.self (by decide : 1 < 2)] at h
+  norm_num at h
+  omega
+
+/-- The splitting field of X³ − 2 over ℚ has Galois group S₃. -/
+theorem splittingField_X_cube_sub_two_galoisGroup :
+    Nonempty ((Polynomial.X ^ 3 - Polynomial.C (2 : ℚ)).Gal ≃* Equiv.Perm (Fin 3)) :=
+  spectralLineJet_memLp_false_cubicGalois _ rfl irreducible_X_cube_sub_two_rat
+
 /-- A cubic subfield of the splitting field of X³ − 2 detects double zeros:
 an excess over the rational zero order forces order at least two upstairs. -/
 private theorem cubicZeroCount_splittingField_comparison :
@@ -1665,15 +1679,8 @@ private theorem cubicZeroCount_splittingField_comparison :
   classical
   let P : Polynomial ℚ := Polynomial.X ^ 3 - Polynomial.C 2
   let Q : Polynomial ℚ := Polynomial.X ^ 2 + Polynomial.C 3
-  have : Fact (Irreducible P) := by
-    constructor
-    apply irreducible_X_pow_sub_C_of_prime (by decide : Nat.Prime 3)
-    intro q hq
-    have h := congrArg (padicValRat 2) hq
-    rw [padicValRat.pow, show padicValRat 2 2 = 1 from padicValRat.self (by decide : 1 < 2)] at h
-    norm_num at h
-    omega
-  have hirr : Irreducible P := (inferInstance : Fact (Irreducible P)).out
+  have hirr : Irreducible P := irreducible_X_cube_sub_two_rat
+  have : Fact (Irreducible P) := ⟨hirr⟩
   let K := AdjoinRoot P
   let L := P.SplittingField
   let k := Q.SplittingField
@@ -1687,7 +1694,7 @@ private theorem cubicZeroCount_splittingField_comparison :
     simpa only [P, Polynomial.eval₂_sub, Polynomial.eval₂_pow, Polynomial.eval₂_X,
       Polynomial.eval₂_C, Polynomial.eval₂_ofNat, map_ofNat, sub_eq_zero] using he
   have hd : b.dim = 3 := by rw [AdjoinRoot.powerBasis_dim, Polynomial.natDegree_X_pow_sub_C]
-  have hG := spectralLineJet_memLp_false_cubicGalois P rfl hirr
+  have hG := splittingField_X_cube_sub_two_galoisGroup
   obtain ⟨ιK, ιk, hk⟩ := spectralLineJet_memLp_false_subfields P rfl hirr
   have hprimes := spectralLineJet_memLp_false_primeCounts L k K hG ιk hk ιK (b.finrank.trans hd)
   refine ⟨K, inferInstance, inferInstance, b, hb, hd, fun z h₀ h₁ hx ↦ ?_⟩
