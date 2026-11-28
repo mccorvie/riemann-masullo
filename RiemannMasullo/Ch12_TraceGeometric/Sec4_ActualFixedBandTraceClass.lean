@@ -596,7 +596,7 @@ variable {E F G : Type*}
     [NormedAddCommGroup G] [InnerProductSpace ℂ G] [CompleteSpace G]
 
 /-- Bounded precomposition preserves rectangular trace class. -/
-theorem comp_right_mem_traceClass (U : F →L[ℂ] G) (hU : U ∈ traceClassOperators F G)
+public theorem comp_right_mem_traceClass (U : F →L[ℂ] G) (hU : U ∈ traceClassOperators F G)
     (P : E →L[ℂ] F) : U.comp P ∈ traceClassOperators E G := by
   have hSummable : Summable (approximationNumber U) := by
     simpa only [Real.rpow_one] using hU.2
@@ -609,7 +609,7 @@ theorem comp_right_mem_traceClass (U : F →L[ℂ] G) (hU : U ∈ traceClassOper
   · simpa only [Nat.add_zero] using approximationNumber_comp_le U P n 0
 
 /-- Bounded postcomposition preserves rectangular trace class. -/
-theorem comp_left_mem_traceClass (U : E →L[ℂ] F) (hU : U ∈ traceClassOperators E F)
+public theorem comp_left_mem_traceClass (U : E →L[ℂ] F) (hU : U ∈ traceClassOperators E F)
     (P : F →L[ℂ] G) : P.comp U ∈ traceClassOperators E G := by
   have hSummable : Summable (approximationNumber U) := by
     simpa only [Real.rpow_one] using hU.2

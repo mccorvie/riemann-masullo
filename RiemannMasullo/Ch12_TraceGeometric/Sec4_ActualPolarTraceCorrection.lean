@@ -2,7 +2,7 @@ module
 
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_ActualReflectedPolarComplement
 import RiemannMasullo.Ch12_TraceGeometric.Sec4_ActualPolarCutoffCoefficient
-import all RiemannMasullo.Ch12_TraceGeometric.Sec4_ActualFixedBandTraceClass
+import RiemannMasullo.Ch12_TraceGeometric.Sec4_ActualFixedBandTraceClass
 
 /-! # The polar correction to the actual fixed-cutoff trace -/
 
