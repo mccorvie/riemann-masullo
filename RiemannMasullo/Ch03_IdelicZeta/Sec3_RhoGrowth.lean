@@ -843,6 +843,120 @@ theorem sLocalRhoFactor_iteratedDeriv_isBigO (χ : PontryaginDual Jₛ) (k : ℕ
     abs_abs, abs_of_nonneg hlog, ← mul_assoc]
   exact hb t ht
 
+/-- Along the critical line `ξ ↦ 1/2 - 2π i ξ`, the real-variable derivatives of the correcting
+factor are the complex derivatives times powers of `-2π i`. -/
+private theorem iteratedDeriv_criticalPhase (χ : PontryaginDual Jₛ) (k : ℕ) :
+    iteratedDeriv k (fun ξ : ℝ ↦ sLocalRhoFactor (chartₛ(χ) ((1 / 2 : ℂ) - ((2 * Real.pi * ξ : ℝ) : ℂ) * I))) =
+      fun ξ : ℝ ↦ (-(2 * Real.pi : ℂ) * I) ^ k *
+        iteratedDeriv k (fun z ↦ sLocalRhoFactor (chartₛ(χ) z))
+          ((1 / 2 : ℂ) + (-(2 * Real.pi : ℂ) * I) * (ξ : ℂ)) := by
+  set c : ℂ := -(2 * Real.pi : ℂ) * I
+  let f : ℂ → ℂ := fun z ↦ sLocalRhoFactor (chartₛ(χ) z)
+  have hre (ξ : ℝ) : 0 < ((1 / 2 : ℂ) + c * (ξ : ℂ)).re := by simp [c]
+  have hstep (j : ℕ) (ξ : ℝ) :
+      HasDerivAt (fun y : ℝ ↦ c ^ j * iteratedDeriv j f ((1 / 2 : ℂ) + c * (y : ℂ)))
+        (c ^ (j + 1) * iteratedDeriv (j + 1) f ((1 / 2 : ℂ) + c * (ξ : ℂ))) ξ := by
+    have hA : AnalyticAt ℂ (iteratedDeriv j f) ((1 / 2 : ℂ) + c * (ξ : ℂ)) :=
+      sLocalRhoFactor_iteratedDeriv_analyticOn χ j _ (hre ξ)
+    have hd : HasDerivAt (iteratedDeriv j f) (iteratedDeriv (j + 1) f ((1 / 2 : ℂ) + c * (ξ : ℂ)))
+        ((1 / 2 : ℂ) + c * (ξ : ℂ)) := by
+      rw [iteratedDeriv_succ]
+      exact hA.differentiableAt.hasDerivAt
+    have hlin : HasDerivAt (fun w : ℂ ↦ (1 / 2 : ℂ) + c * w) c (ξ : ℂ) := by
+      simpa using ((hasDerivAt_id (ξ : ℂ)).const_mul c).const_add (1 / 2 : ℂ)
+    have hcomp := (hd.comp (ξ : ℂ) hlin).const_mul (c ^ j)
+    have hreal := hcomp.comp_ofReal
+    simp only [Function.comp_def] at hreal
+    convert hreal using 1
+    ring
+  induction k with
+  | zero =>
+    funext ξ
+    simp only [iteratedDeriv_zero, pow_zero, one_mul]
+    congr 2
+    simp only [c]
+    push_cast
+    ring
+  | succ j ih =>
+    rw [iteratedDeriv_succ, ih]
+    funext ξ
+    exact (hstep j ξ).deriv
+
+/-- Paper: Proposition 3.3.1.5(3), (3.3.1.11), p. 132, on the critical line, in the real variable
+`ξ` of the parameter `1/2 - 2π i ξ`. The `k`th derivative of the S-local correcting factor along
+the critical line is at most a constant times `(1 + log (2 + |ξ|)) ^ k`, for every real `ξ`. This
+is the bound on the derivatives of the Tate phase used for the reflected coordinates of
+Theorem 12.4.1.1. -/
+theorem exists_norm_iteratedDeriv_criticalPhase_le (χ : PontryaginDual Jₛ) (k : ℕ) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ ξ : ℝ,
+      ‖iteratedDeriv k (fun ξ : ℝ ↦
+          sLocalRhoFactor (chartₛ(χ) ((1 / 2 : ℂ) - ((2 * Real.pi * ξ : ℝ) : ℂ) * I))) ξ‖ ≤
+        C * (1 + Real.log (2 + |ξ|)) ^ k := by
+  obtain ⟨C₁, T, hC₁, hT, hb⟩ :=
+    exists_norm_iteratedDeriv_sLocalRhoFactor_criticalLine_le (S := S) χ k
+  set c : ℂ := -(2 * Real.pi : ℂ) * I with hc
+  let f : ℂ → ℂ := fun z ↦ sLocalRhoFactor (chartₛ(χ) z)
+  have hre (ξ : ℝ) : 0 < ((1 / 2 : ℂ) + c * (ξ : ℂ)).re := by simp [c]
+  let G : ℝ → ℂ := fun ξ ↦ c ^ k * iteratedDeriv k f ((1 / 2 : ℂ) + c * (ξ : ℂ))
+  have hG : Continuous G := by
+    refine continuous_const.mul ?_
+    exact (sLocalRhoFactor_iteratedDeriv_analyticOn χ k).continuousOn.comp_continuous
+      (by fun_prop) hre
+  have hpi : (0 : ℝ) < 2 * Real.pi := by positivity
+  obtain ⟨C₂, hC₂⟩ := (isCompact_Icc (a := -(T / (2 * Real.pi))) (b := T / (2 * Real.pi))
+    ).exists_bound_of_continuousOn hG.continuousOn
+  have hlog2pi : 0 ≤ Real.log (2 * Real.pi) := Real.log_nonneg (by linarith [Real.pi_gt_three])
+  refine ⟨(2 * Real.pi) ^ k * C₁ * (Real.log (2 * Real.pi) + 1) ^ k + max C₂ 0, by positivity,
+    fun ξ ↦ ?_⟩
+  rw [iteratedDeriv_criticalPhase]
+  change ‖G ξ‖ ≤ _
+  have hξ2 : (1 : ℝ) ≤ 2 + |ξ| := by linarith [abs_nonneg ξ]
+  have hlogξ : 0 ≤ Real.log (2 + |ξ|) := Real.log_nonneg hξ2
+  have hL1 : 1 ≤ (1 + Real.log (2 + |ξ|)) ^ k := one_le_pow₀ (by linarith)
+  have hnc : ‖c‖ = 2 * Real.pi := by
+    rw [hc, norm_mul, norm_neg, Complex.norm_I, mul_one]
+    exact_mod_cast Real.norm_of_nonneg hpi.le
+  by_cases hξ : T ≤ |-(2 * Real.pi * ξ)|
+  · have hpt : (1 / 2 : ℂ) + c * (ξ : ℂ) = (1 / 2 : ℂ) + ((-(2 * Real.pi * ξ) : ℝ) : ℂ) * I := by
+      rw [hc]; push_cast; ring
+    have h := hb (-(2 * Real.pi * ξ)) hξ
+    have hT1 : 1 ≤ |-(2 * Real.pi * ξ)| := by linarith
+    have habs : |-(2 * Real.pi * ξ)| = 2 * Real.pi * |ξ| := by
+      rw [abs_neg, abs_mul, abs_of_pos hpi]
+    have hlog0 : 0 ≤ Real.log |-(2 * Real.pi * ξ)| := Real.log_nonneg hT1
+    have hlogle : Real.log |-(2 * Real.pi * ξ)| ≤
+        (Real.log (2 * Real.pi) + 1) * (1 + Real.log (2 + |ξ|)) := by
+      have hξpos : 0 < |ξ| := by
+        rw [habs] at hT1
+        by_contra hne
+        have : |ξ| = 0 := le_antisymm (not_lt.mp hne) (abs_nonneg ξ)
+        rw [this, mul_zero] at hT1; linarith
+      rw [habs, Real.log_mul hpi.ne' hξpos.ne']
+      have : Real.log |ξ| ≤ Real.log (2 + |ξ|) := Real.log_le_log hξpos (by linarith)
+      nlinarith
+    calc ‖G ξ‖ = (2 * Real.pi) ^ k *
+          ‖iteratedDeriv k f ((1 / 2 : ℂ) + ((-(2 * Real.pi * ξ) : ℝ) : ℂ) * I)‖ := by
+          simp only [G]; rw [norm_mul, norm_pow, hnc, hpt]
+      _ ≤ (2 * Real.pi) ^ k * (C₁ * Real.log |-(2 * Real.pi * ξ)| ^ k) := by gcongr
+      _ ≤ (2 * Real.pi) ^ k * (C₁ * ((Real.log (2 * Real.pi) + 1) * (1 + Real.log (2 + |ξ|))) ^ k) := by
+          gcongr
+      _ = (2 * Real.pi) ^ k * C₁ * (Real.log (2 * Real.pi) + 1) ^ k *
+            (1 + Real.log (2 + |ξ|)) ^ k := by rw [mul_pow (Real.log (2 * Real.pi) + 1)]; ring
+      _ ≤ _ := by
+          have : 0 ≤ max C₂ 0 * (1 + Real.log (2 + |ξ|)) ^ k := by positivity
+          nlinarith
+  · have hmem : ξ ∈ Icc (-(T / (2 * Real.pi))) (T / (2 * Real.pi)) := by
+      rw [not_le, abs_neg, abs_mul, abs_of_pos hpi] at hξ
+      rw [mem_Icc, ← abs_le, le_div_iff₀ hpi]
+      linarith
+    have h := hC₂ ξ hmem
+    have h0 : 0 ≤ (2 * Real.pi) ^ k * C₁ * (Real.log (2 * Real.pi) + 1) ^ k *
+        (1 + Real.log (2 + |ξ|)) ^ k := by positivity
+    calc ‖G ξ‖ ≤ max C₂ 0 := h.trans (le_max_left _ _)
+      _ ≤ max C₂ 0 * (1 + Real.log (2 + |ξ|)) ^ k :=
+          le_mul_of_one_le_right (le_max_right _ _) hL1
+      _ ≤ _ := by nlinarith
+
 end LocalFactors
 
 end RiemannMasullo
