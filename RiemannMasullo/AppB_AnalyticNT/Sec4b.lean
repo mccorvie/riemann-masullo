@@ -10,6 +10,7 @@ public import RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import RiemannMasullo.ForMathlib.Analysis.Complex.LandauLemma
 import RiemannMasullo.ForMathlib.Analysis.Fourier.Log
+import RiemannMasullo.ForMathlib.Analysis.Meromorphic.VerticalStripZeros
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.WeightedIntegral
 import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
@@ -8909,8 +8910,7 @@ theorem explicitFormulaCompletedHeckeL_zero_re_mem (χ : U[F]) {s : ℂ}
 section ExplicitFormulaZeroCount
 
 /-! Copied from `RiemannMasullo/ForMathlib/Analysis/Meromorphic/VerticalStripZeros.lean`
-(Jensen's inequality on discs counts zeros in a vertical strip), which this file does not
-import. -/
+(Jensen's inequality on discs counts zeros in a vertical strip), with its original proof notation. -/
 
 open Metric
 open scoped Asymptotics
@@ -15785,6 +15785,341 @@ private theorem idelicExplicitFormula_summable_spectral_characters_discs (A : �
       _ ≤ (B * 72 ^ n * X ^ n) / c ^ 2 := div_le_div₀ (by positivity) hstrip (sq_pos_of_pos hc) hlow
       _ = _ := by ring
 
+/-- On the characters nontrivial on the norm-one classes, Jensen's disk bound gives a
+square-root estimate for each unit-height window before any summation over characters. -/
+private theorem explicitFormulaCompletedHeckeL_nontrivial_window_sqrt
+    (A : ℝ) :
+    ∃ B ≥ (0 : ℝ), ∀ (χ : U[F]) (X t : ℝ),
+      χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype ≠ 1 → 1 ≤ X → |t| ≤ X →
+      heckeLogDiscriminantConductor χ ≤ A →
+      (∀ w : InfinitePlace F, if hw : w.IsReal then
+        ‖(realHeckeCharacter_parameters χ w hw).exists.choose.1‖ ≤ X
+      else
+        let p := (complexHeckeCharacter_parameters χ w
+          (InfinitePlace.not_isReal_iff_isComplex.mp hw)).exists.choose
+        ‖p.1‖ ≤ X ∧ (p.2.natAbs : ℝ) ≤ X) →
+      ∀ P : Finset ℂ, (∀ s ∈ P, 0 < MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ) univ s ∧
+        |s.im - t| ≤ 1) →
+      ∑ s ∈ P, (MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ) univ s : ℝ) ≤ B * X ^ (1 / 2 : ℝ) := by
+  classical
+  obtain ⟨K, n, hK, hdisc⟩ := idelicExplicitFormula_summable_spectral_characters_discs (F := F) A
+  obtain ⟨B, hB, hlog⟩ := explicitZeroCount_log_bound K n (9 / 4) (5 / 2) hK
+    (Nat.cast_nonneg _) (by norm_num) (by norm_num)
+  refine ⟨B, hB, fun χ X t hχ hX ht hA harch P hP ↦ ?_⟩
+  obtain ⟨G, hG, hc, hcmp, hbound⟩ := hdisc χ X t hχ hX ht hA harch
+  let c : ℂ := ⟨2, t⟩
+  have hmem (s) (hs : s ∈ P) : s ∈ Metric.closedBall c (9 / 4) := by
+    obtain ⟨hr₁, hr₂⟩ := explicitFormulaCompletedHeckeL_zero_re_mem χ (hP s hs).1
+    have him := abs_le.mp (hP s hs).2
+    have hnorm := Complex.sq_norm_sub_sq_re (s - c)
+    change ‖s - c‖ ^ 2 - (s.re - 2) ^ 2 = (s.im - t) ^ 2 at hnorm
+    rw [Metric.mem_closedBall, dist_eq_norm]
+    nlinarith [mul_nonneg hr₁ (show 0 ≤ 4 - s.re by linarith),
+      mul_nonneg (sub_nonneg.mpr him.1) (sub_nonneg.mpr him.2)]
+  have ha : AnalyticOnNhd ℂ G (Metric.closedBall c (5 / 2)) := fun z _ ↦ hG.analyticAt z
+  calc
+    _ ≤ _ := sum_divisor_le_log_of_disk_bound
+      (explicitFormulaCompletedHeckeL_spec χ).1.meromorphicOn hcmp
+      (by norm_num : (0 : ℝ) < 9 / 4) (by norm_num : (9 / 4 : ℝ) < 5 / 2)
+      ha hc hbound P hmem
+    _ ≤ B * X ^ (1 / 2 : ℝ) := by simpa only [Real.rpow_natCast] using hlog X hX
+
+/-- Quantitative form of the zero count used for Lemma B.4.4.9, pp. 624–625.
+On a fixed Bruhat level the inverse-square
+ordinate moment of the full positive divisor is bounded by the square root of an
+angular frequency bound. Both the directions and the constant are uniform in the
+split-normalized character. -/
+theorem explicitFormulaCompletedHeckeL_tsum_divisor_div_sq_le
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F))
+    (k : Subgroup C[F]) (hk : IsBruhatGoodSubgroup k) :
+    ∃ (n : ℕ) (Y : Fin n → LCATopologicalLie (ideleClassNorm F).ker) (C : ℝ), 0 ≤ C ∧
+      ∀ (χ : chartChars(τ)) (M : ℝ), 1 ≤ M → (∀ u : k, χ.val u.val = 1) →
+        (∀ i, ‖bruhatDirectionalDeriv (Y i) (fun u ↦ (χ.val u.val : ℂ)) 1‖ ≤ M) →
+        (∑' s : {s : ℂ // 0 < MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ.val) univ s},
+          (MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ.val) univ s.val : ℝ) /
+            (1 + |s.val.im|) ^ 2) ≤ C * M ^ (1 / 2 : ℝ) := by
+  classical
+  obtain ⟨n, Y, hY⟩ := idelicExplicitFormula_summable_spectral_characters_archimedean τ hτ
+  obtain ⟨A, hA⟩ := idelicExplicitFormula_summable_spectral_characters_conductor k hk
+  obtain ⟨B, hB, hwindow⟩ := explicitFormulaCompletedHeckeL_nontrivial_window_sqrt (F := F) A
+  let K : ℝ := ∑' j : ℕ, 1 / ((j : ℝ) + 1) ^ (3 / 2 : ℝ)
+  have hK : 0 ≤ K := tsum_nonneg fun _ ↦ by positivity
+  let D (χ : U[F]) := MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ) univ
+  let T := ∑' s : {s : ℂ // 0 < D 1 s}, (D 1 s.val : ℝ) / (1 + |s.val.im|) ^ 2
+  have hC : 0 ≤ max T (2 * B * K) := (show 0 ≤ 2 * B * K by positivity).trans (le_max_right ..)
+  refine ⟨n, Y, max T (2 * B * K), hC, fun χ M hM hkχ hfreq ↦ ?_⟩
+  by_cases hχ : χ.val.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1
+  · have htriv : χ.val = 1 := congrArg Subtype.val (explicitFormula_chartChar_ext τ hτ χ
+        ⟨1, fun _ ↦ rfl⟩ (fun u ↦ DFunLike.congr_fun hχ u))
+    rw [htriv]
+    exact (le_max_left T _).trans (le_mul_of_one_le_right hC (Real.one_le_rpow hM (by norm_num)))
+  · let Z := {s : ℂ // 0 < D χ.val s}
+    let t (s : Z) := s.val.im
+    let m (s : Z) : ℝ := D χ.val s.val
+    have hm (s : Z) : 0 ≤ m s := by
+      change 0 ≤ (D χ.val s.val : ℝ)
+      exact_mod_cast s.property.le
+    have hcount (j : ℕ) (S : Finset Z) (hS : ∀ z ∈ S, ⌊|t z|⌋₊ = j) :
+        ∑ z ∈ S, m z ≤ (2 * B * M ^ (1 / 2 : ℝ)) * ((j : ℝ) + 1) ^ (1 / 2 : ℝ) := by
+      let X : ℝ := M * ((j : ℝ) + 1)
+      have hMX : M ≤ X := le_mul_of_one_le_right (by linarith) (by linarith [Nat.cast_nonneg (α := ℝ) j])
+      have hjX : (j : ℝ) ≤ X := (by linarith : (j : ℝ) ≤ j + 1).trans (le_mul_of_one_le_left (by positivity) hM)
+      have hbin (z : Z) (hz : z ∈ S) : (j : ℝ) ≤ |t z| ∧ |t z| < (j : ℝ) + 1 := by
+        rw [← hS z hz]
+        exact ⟨Nat.floor_le (abs_nonneg _), Nat.lt_floor_add_one _⟩
+      have hslice (v : ℝ) (hv : |v| ≤ X) (U : Finset Z) (hu : ∀ z ∈ U, |t z - v| ≤ 1) :
+          ∑ z ∈ U, m z ≤ B * X ^ (1 / 2 : ℝ) := by
+        let e : Z ↪ ℂ := ⟨Subtype.val, Subtype.val_injective⟩
+        have hw := hwindow χ.val X v hχ (hM.trans hMX) hv (hA χ.val hkχ)
+          (hY χ X (fun i ↦ (hfreq i).trans hMX)) (U.map e) (fun s hs ↦ by
+            obtain ⟨z, hz, rfl⟩ := Finset.mem_map.mp hs
+            exact ⟨z.property, hu z hz⟩)
+        simpa only [Finset.sum_map, e, Function.Embedding.coeFn_mk, Function.comp_apply, m, D] using hw
+      let pos (z : Z) := 0 ≤ t z
+      have hp := hslice j (by simpa using hjX) (S.filter pos) (fun z hz ↦ by
+        obtain ⟨hzS, hpos⟩ := Finset.mem_filter.mp hz
+        have ht := hbin z hzS
+        rw [abs_of_nonneg (show 0 ≤ t z from hpos)] at ht
+        exact abs_le.mpr ⟨by linarith [ht.1], by linarith [ht.2]⟩)
+      have hn := hslice (-(j : ℝ)) (by simpa using hjX) (S.filter (fun z ↦ ¬ pos z)) (fun z hz ↦ by
+        obtain ⟨hzS, hneg⟩ := Finset.mem_filter.mp hz
+        have ht := hbin z hzS
+        rw [abs_of_neg (lt_of_not_ge (show ¬ 0 ≤ t z from hneg))] at ht
+        exact abs_le.mpr ⟨by linarith [ht.2], by linarith [ht.1]⟩)
+      rw [← Finset.sum_filter_add_sum_filter_not S pos m]
+      calc
+        _ ≤ B * X ^ (1 / 2 : ℝ) + B * X ^ (1 / 2 : ℝ) := add_le_add hp hn
+        _ = _ := by dsimp only [X]; rw [Real.mul_rpow (by linarith) (by positivity)]; ring
+    have h := (tsum_zeroWeights_le_of_bins t m hm _ hcount).2
+    calc
+      _ ≤ (2 * B * M ^ (1 / 2 : ℝ)) * K := h
+      _ = (2 * B * K) * M ^ (1 / 2 : ℝ) := by ring
+      _ ≤ _ := mul_le_mul_of_nonneg_right (le_max_right ..) (Real.rpow_nonneg (by linarith) _)
+
+local notation "resolventZeros(" χ ", " P ")" =>
+  {z : ℂ // 0 < MeromorphicOn.divisor (explicitFormulaCompletedHeckeL (χ).val) univ z ∧ (P) z}
+local notation "resolventWeight(" χ ", " L ", " a ", " z ")" =>
+  (MeromorphicOn.divisor (explicitFormulaCompletedHeckeL (χ).val) univ (z : ℂ) : ℝ) *
+    ((((L : ℝ) : ℂ) - ((z : ℂ) - ((a : ℝ) : ℂ)))⁻¹).re
+
+/-- Arithmetic estimate for the resolvent approach to Theorem 10.4.2.1, p. 459. On a fixed Bruhat level, the real-resolvent
+sum over the full positive orders in any selected portion of the strip is bounded
+by the square root of the angular frequency bound. The constant is uniform in the
+real center of the strip and the choice of sites. -/
+theorem explicitFormulaCompletedHeckeL_tsum_strip_resolvent_le
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F))
+    (k : Subgroup C[F]) (hk : IsBruhatGoodSubgroup k) (α L : ℝ) (hα : 0 ≤ α) (hL : α < L) :
+    ∃ (n : ℕ) (Y : Fin n → LCATopologicalLie (ideleClassNorm F).ker) (C : ℝ), 0 ≤ C ∧
+      ∀ (χ : chartChars(τ)) (M : ℝ), 1 ≤ M → (∀ u : k, χ.val u.val = 1) →
+        (∀ i, ‖bruhatDirectionalDeriv (Y i) (fun u ↦ (χ.val u.val : ℂ)) 1‖ ≤ M) →
+        ∀ (a : ℝ) (P : ℂ → Prop), (∀ z, P z → |z.re - a| ≤ α) →
+        let R := fun z : resolventZeros(χ, P) ↦ resolventWeight(χ, L, a, z.val)
+        Summable R ∧ (∑' z, R z) ≤ C * M ^ (1 / 2 : ℝ) := by
+  classical
+  obtain ⟨n, Y, B, hB, hmoment⟩ := explicitFormulaCompletedHeckeL_tsum_divisor_div_sq_le τ hτ k hk
+  let K := L + α + 1 / (L - α)
+  have hK : 0 ≤ K := add_nonneg (add_nonneg (hα.trans hL.le) hα) (one_div_nonneg.mpr (sub_nonneg.mpr hL.le))
+  refine ⟨n, Y, K * B, mul_nonneg hK hB, fun χ M hM hχ hY a P hP ↦ ?_⟩
+  let D := MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ.val) univ
+  let Z := {z : ℂ // 0 < D z}
+  let w (z : Z) := (D z.val : ℝ) / (1 + |z.val.im|) ^ 2
+  let e : resolventZeros(χ, P) ↪ Z := ⟨fun z ↦ ⟨z.val, z.property.1⟩,
+    fun _ _ h ↦ Subtype.ext (congrArg (fun z : Z ↦ z.val) h)⟩
+  let R := fun z : resolventZeros(χ, P) ↦ resolventWeight(χ, L, a, z.val)
+  have hw : Summable w := explicitFormulaCompletedHeckeL_summable_divisor_div_sq χ.val
+  have hmajor := hw.mul_left K
+  have hw₀ (z : Z) : 0 ≤ K * w z := mul_nonneg hK (div_nonneg (by exact_mod_cast z.property.le) (sq_nonneg _))
+  have hcmp (z : resolventZeros(χ, P)) : 0 ≤ R z ∧ R z ≤ K * w (e z) := by
+    have h := re_resolvent_le_div_one_add_abs_im_sq hL a z.val (hP _ z.property.2)
+    have hz : 0 ≤ (D z.val : ℝ) := by exact_mod_cast z.property.1.le
+    refine ⟨mul_nonneg hz h.1, (mul_le_mul_of_nonneg_left h.2 hz).trans_eq ?_⟩
+    change (D z.val : ℝ) * (K / (1 + |z.val.im|) ^ 2) = K * ((D z.val : ℝ) / (1 + |z.val.im|) ^ 2)
+    ring
+  have hs : Summable R := Summable.of_nonneg_of_le (fun z ↦ (hcmp z).1) (fun z ↦ (hcmp z).2)
+    (hmajor.comp_injective e.injective)
+  refine ⟨hs, ?_⟩
+  calc
+    (∑' z, R z) ≤ ∑' z : Z, K * w z := hs.tsum_le_tsum_of_inj e e.injective
+      (fun z _ ↦ hw₀ z) (fun z ↦ (hcmp z).2) hmajor
+    _ = K * ∑' z : Z, w z := hw.tsum_mul_left K
+    _ ≤ K * (B * M ^ (1 / 2 : ℝ)) := mul_le_mul_of_nonneg_left (hmoment χ M hM hχ hY) hK
+    _ = _ := (mul_assoc ..).symm
+
+local notation "angularSize(" X ", " χ ")" =>
+  ∑ i, ‖bruhatDirectionalDeriv ((X) i)
+    (fun u : (ideleClassNorm F).ker ↦ ((χ).val (u : C[F]) : ℂ)) 1‖
+local notation "activeAt(" k ", " χ ")" =>
+  (∀ u : (k : Subgroup C[F]), (χ).val (u : C[F]) = 1)
+
+local notation "angularWeightDecay(" τ ", " k ", " K ")" =>
+  (∀ (Y : LCATopologicalLie (ideleClassNorm F).ker) (N : ℕ), ∃ B : ℝ, 0 ≤ B ∧
+    ∀ χ : chartChars(τ), activeAt(k, χ) →
+      ‖bruhatDirectionalDeriv Y (fun u ↦ (χ.val u.val : ℂ)) 1‖ ^ N * |(K) χ| ≤ B)
+
+/-- Coordinatewise decay of a mode envelope and a square-root bound on the positive row
+sums give summability over modes and sites. For angular counting degree `d`, only order `d+3` is used. -/
+private theorem explicitFormulaCompletedHeckeL_summable_angular_rows
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F))
+    (k : Subgroup C[F]) (hk : IsBruhatGoodSubgroup k)
+    {n : ℕ} (Y : Fin n → LCATopologicalLie (ideleClassNorm F).ker)
+    (K : chartChars(τ) → ℝ) {Z : chartChars(τ) → Type*} (w : (χ : chartChars(τ)) → Z χ → ℝ)
+    (hw : ∀ χ z, 0 ≤ w χ z) (A : ℝ) (hA : 0 ≤ A)
+    (hzero : ∀ χ, ¬ activeAt(k, χ) → K χ = 0)
+    (hrow : ∀ χ M, 1 ≤ M → activeAt(k, χ) →
+      (∀ i, ‖bruhatDirectionalDeriv (Y i) (fun u ↦ (χ.val u.val : ℂ)) 1‖ ≤ M) →
+      Summable (w χ) ∧ (∑' z, w χ z) ≤ A * M ^ (1 / 2 : ℝ))
+    (hdecay : angularWeightDecay(τ, k, K)) :
+    Summable (fun p : (Σ χ, Z χ) ↦ K p.1 ^ 2 * w p.1 p.2) := by
+  classical
+  let R (χ : chartChars(τ)) := ∑' z, w χ z
+  have hmoment (χ : chartChars(τ)) (hχ : activeAt(k, χ)) :
+      Summable (w χ) ∧ R χ ≤ A * (1 + angularSize(Y, χ)) := by
+    have hsum : 0 ≤ angularSize(Y, χ) := Finset.sum_nonneg fun _ _ ↦ norm_nonneg _
+    have h := hrow χ (1 + angularSize(Y, χ)) (by linarith) hχ (fun i ↦ ?_)
+    · exact ⟨h.1, h.2.trans (mul_le_mul_of_nonneg_left
+        (Real.rpow_le_self_of_one_le (by linarith) (by norm_num)) hA)⟩
+    · exact (Finset.single_le_sum (fun (j : Fin n) _ ↦
+        norm_nonneg (bruhatDirectionalDeriv (Y j) (fun u ↦ (χ.val u.val : ℂ)) 1))
+          (Finset.mem_univ i)).trans (by linarith)
+  suffices hang : Summable (fun χ ↦ K χ ^ 2 * R χ) by
+    apply (summable_sigma_of_nonneg (f := fun p : (Σ χ, Z χ) ↦ K p.1 ^ 2 * w p.1 p.2)
+      (fun p ↦ mul_nonneg (sq_nonneg _) (hw p.1 p.2))).2
+    refine ⟨fun χ ↦ ?_, ?_⟩
+    · change Summable fun z ↦ K χ ^ 2 * w χ z
+      by_cases hχ : activeAt(k, χ)
+      · exact (hmoment χ hχ).1.mul_left _
+      · simp [hzero χ hχ]
+    · change Summable (fun χ : chartChars(τ) ↦ ∑' z, K χ ^ 2 * w χ z)
+      simpa only [tsum_mul_left, R] using hang
+  obtain ⟨r, b, hb, C, d, hcount⟩ := idelicExplicitFormula_normOneFourier_count τ hτ k hk
+  let b' (i : Fin r) : LCATopologicalLie (ideleClassNorm F).ker :=
+    ⟨(b i).toMonoidHom.codRestrict _ (hb i), (b i).continuous.subtype_mk _⟩
+  let X : Fin (r + n) → LCATopologicalLie (ideleClassNorm F).ker := Fin.addCases b' Y
+  let S : Set chartChars(τ) := {χ | activeAt(k, χ)}
+  obtain ⟨B₀, hB₀, h₀⟩ := hdecay 1 0
+  have hbound (χ : S) : |K χ.val| ≤ B₀ := by simpa using h₀ χ.val χ.property
+  choose D₀ hD₀ hX using fun i ↦ hdecay (X i) (d + 3)
+  let q := ((r : ℝ) + (n : ℝ) + 1) ^ (d + 2)
+  have hq : 0 ≤ q := by dsimp only [q]; positivity
+  let D := B₀ * (q * (B₀ + ∑ i, D₀ i))
+  have hD : 0 ≤ D := mul_nonneg hB₀ (mul_nonneg hq (add_nonneg hB₀ (Finset.sum_nonneg fun i _ ↦ hD₀ i)))
+  have hKD (χ : S) : K χ.val ^ 2 * (1 + angularSize(X, χ.val)) ^ (d + 3) ≤ D := by
+    let v (i : Fin (r + n)) := ‖bruhatDirectionalDeriv (X i) (fun u ↦ (χ.val.val u.val : ℂ)) 1‖
+    let g : Option (Fin (r + n)) → ℝ := fun o ↦ o.elim 1 v
+    have hg : ∀ o ∈ (Finset.univ : Finset (Option (Fin (r + n)))), 0 ≤ g o := by
+      rintro (_ | i) _
+      · exact zero_le_one
+      · exact norm_nonneg _
+    have hpower := pow_sum_le_card_mul_sum_pow hg (d + 2)
+    simp only [Finset.card_univ, Fintype.card_option, Fintype.card_fin, Nat.cast_add, Nat.cast_one,
+      Fintype.sum_option, g, Option.elim, one_pow] at hpower
+    have hsum : (1 + ∑ i, v i ^ (d + 3)) * |K χ.val| ≤ B₀ + ∑ i, D₀ i := by
+      rw [add_mul, one_mul, Finset.sum_mul]
+      exact add_le_add (hbound χ) (Finset.sum_le_sum fun i _ ↦ hX i χ.val χ.property)
+    calc
+      _ = |K χ.val| * ((1 + ∑ i, v i) ^ (d + 3) * |K χ.val|) := by rw [← sq_abs]; ring
+      _ ≤ B₀ * ((q * (1 + ∑ i, v i ^ (d + 3))) * |K χ.val|) :=
+        mul_le_mul (hbound χ) (mul_le_mul_of_nonneg_right hpower (abs_nonneg _))
+          (mul_nonneg (pow_nonneg (by positivity) _) (abs_nonneg _)) hB₀
+      _ ≤ D := by rw [mul_assoc q]; exact mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_left hsum hq) hB₀
+  let m (χ : S) := angularSize(X, χ.val)
+  have hm (χ : S) : 0 ≤ m χ := Finset.sum_nonneg fun _ _ ↦ norm_nonneg _
+  have hsupport : ∀ χ ∉ Set.range ((↑) : S → chartChars(τ)), K χ ^ 2 * R χ = 0 := by
+    intro χ hχ
+    rw [hzero χ (fun h ↦ hχ ⟨⟨χ, h⟩, rfl⟩)]
+    simp
+  refine (Function.Injective.summable_iff Subtype.val_injective hsupport).mp ?_
+  apply summable_bruhatMellin_of_polynomialCount_of_polyCount_decay m hm C d (A * D)
+    (mul_nonneg hA hD)
+  · intro T
+    rw [← Subtype.val_injective.encard_image]
+    refine (Set.encard_mono ?_).trans (hcount T)
+    rintro _ ⟨χ, hχ, rfl⟩
+    refine ⟨fun u hu ↦ χ.property ⟨u.val, hu⟩, fun j ↦ ?_⟩
+    have h := Finset.single_le_sum (fun (i : Fin (r + n)) _ ↦
+      norm_nonneg (bruhatDirectionalDeriv (X i) (fun u ↦ (χ.val.val u.val : ℂ)) 1))
+      (Finset.mem_univ (Fin.castAdd n j))
+    have hbval (t : Multiplicative ℝ) : ((b' j) t : C[F]) = b j t := rfl
+    simpa only [bruhatDirectionalDeriv, one_mul, X, Fin.addCases_left, hbval] using h.trans hχ
+  · intro χ
+    have hy : angularSize(Y, χ.val) ≤ m χ := by
+      dsimp only [m, X]
+      rw [Fin.sum_univ_add]
+      simp only [Fin.addCases_left, Fin.addCases_right]
+      exact le_add_of_nonneg_left (Finset.sum_nonneg fun _ _ ↦ norm_nonneg _)
+    have hM : 0 < 1 + m χ := by linarith [hm χ]
+    have hR₀ : 0 ≤ R χ.val := tsum_nonneg (hw χ.val)
+    have hR := (hmoment χ.val χ.property).2
+    rw [Function.comp_apply, Real.norm_of_nonneg (mul_nonneg (sq_nonneg _) hR₀),
+      le_div_iff₀ (pow_pos hM _)]
+    have hR' : R χ.val ≤ A * (1 + m χ) :=
+      hR.trans (mul_le_mul_of_nonneg_left (add_le_add_right hy 1) hA)
+    calc
+      _ ≤ (K χ.val ^ 2 * (A * (1 + m χ))) * (1 + m χ) ^ (d + 2) :=
+        mul_le_mul_of_nonneg_right (mul_le_mul_of_nonneg_left hR' (sq_nonneg _))
+          (pow_nonneg hM.le _)
+      _ = A * (K χ.val ^ 2 * (1 + m χ) ^ (d + 3)) := by rw [pow_succ _ (d + 2)]; ring
+      _ ≤ _ := mul_le_mul_of_nonneg_left (hKD χ) hA
+
+local notation "fullOrderZeros(" χ ")" =>
+  {z : ℂ // 0 < MeromorphicOn.divisor (explicitFormulaCompletedHeckeL (χ).val) univ z}
+
+/-- Weighted zero-count estimate for Lemma B.4.4.9, pp. 624–625. An angular envelope supported on one Bruhat
+level and rapidly decreasing along every individual norm-one direction gives a
+summable inverse-square moment over all normalized characters and full zero orders. -/
+theorem explicitFormulaCompletedHeckeL_summable_angular_divisor_div_one_add_im_sq
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F))
+    (k : Subgroup C[F]) (hk : IsBruhatGoodSubgroup k) (K : chartChars(τ) → ℝ)
+    (hzero : ∀ χ, ¬ activeAt(k, χ) → K χ = 0) (hdecay : angularWeightDecay(τ, k, K)) :
+    Summable (fun p : (Σ χ : chartChars(τ), fullOrderZeros(χ)) ↦
+      K p.1 ^ 2 * ((MeromorphicOn.divisor (explicitFormulaCompletedHeckeL p.1.val) univ p.2.val : ℝ) /
+        (1 + p.2.val.im ^ 2))) := by
+  classical
+  obtain ⟨n, Y, C, hC, hbound⟩ := explicitFormulaCompletedHeckeL_tsum_divisor_div_sq_le τ hτ k hk
+  let w (χ : chartChars(τ)) (z : fullOrderZeros(χ)) :=
+    (MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ.val) univ z.val : ℝ) / (1 + |z.val.im|) ^ 2
+  have hw (χ : chartChars(τ)) : Summable (w χ) := explicitFormulaCompletedHeckeL_summable_divisor_div_sq χ.val
+  have hw₀ (χ : chartChars(τ)) (z : fullOrderZeros(χ)) : 0 ≤ w χ z :=
+    div_nonneg (by exact_mod_cast z.property.le) (sq_nonneg _)
+  have hfull := explicitFormulaCompletedHeckeL_summable_angular_rows τ hτ k hk Y K w hw₀ C hC hzero
+    (fun χ M hM hχ hY ↦ ⟨hw χ, hbound χ M hM hχ hY⟩) hdecay
+  apply Summable.of_nonneg_of_le (fun p ↦ mul_nonneg (sq_nonneg _)
+    (div_nonneg (by exact_mod_cast p.2.property.le) (by positivity))) (fun p ↦ ?_) (hfull.mul_left 2)
+  let m := (MeromorphicOn.divisor (explicitFormulaCompletedHeckeL p.1.val) univ p.2.val : ℝ)
+  let t := p.2.val.im
+  have hm : 0 ≤ m := by dsimp only [m]; exact_mod_cast p.2.property.le
+  change K p.1 ^ 2 * (m / (1 + t ^ 2)) ≤ 2 * (K p.1 ^ 2 * (m / (1 + |t|) ^ 2))
+  calc
+    _ ≤ K p.1 ^ 2 * (2 * (m / (1 + |t|) ^ 2)) := by
+      gcongr
+      rw [← mul_div_assoc, div_le_div_iff₀ (by positivity) (by positivity)]
+      calc
+        _ ≤ m * (2 * (1 + t ^ 2)) := mul_le_mul_of_nonneg_left (by nlinarith [sq_nonneg (|t| - 1), sq_abs t]) hm
+        _ = _ := by ring
+    _ = _ := by ring
+
+/-- Arithmetic estimate for the resolvent approach to Theorem 10.4.2.1, p. 459. A rapidly decreasing angular envelope on a fixed
+Bruhat level makes the full-order real-resolvent sum over normalized characters and strip
+zeros summable. The predicate may select different sites for each character. -/
+theorem explicitFormulaCompletedHeckeL_summable_angular_resolvent
+    (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F))
+    (k : Subgroup C[F]) (hk : IsBruhatGoodSubgroup k) (α L a : ℝ) (hα : 0 ≤ α) (hL : α < L)
+    (P : chartChars(τ) → ℂ → Prop) (hP : ∀ χ z, P χ z → |z.re - a| ≤ α)
+    (K : chartChars(τ) → ℝ) (hzero : ∀ χ, ¬ activeAt(k, χ) → K χ = 0)
+    (hdecay : angularWeightDecay(τ, k, K)) :
+    Summable (fun p : (Σ χ : chartChars(τ), resolventZeros(χ, P χ)) ↦
+      K p.1 ^ 2 * resolventWeight(p.1, L, a, p.2.val)) := by
+  classical
+  obtain ⟨n, Y, C, hC, hbound⟩ :=
+    explicitFormulaCompletedHeckeL_tsum_strip_resolvent_le τ hτ k hk α L hα hL
+  let R (χ : chartChars(τ)) (z : resolventZeros(χ, P χ)) := resolventWeight(χ, L, a, z.val)
+  have hR₀ (χ : chartChars(τ)) (z : resolventZeros(χ, P χ)) : 0 ≤ R χ z := by
+    have hz : 0 ≤ (MeromorphicOn.divisor (explicitFormulaCompletedHeckeL χ.val) univ z.val : ℝ) := by
+      exact_mod_cast z.property.1.le
+    exact mul_nonneg hz (re_resolvent_le_div_one_add_abs_im_sq hL a _ (hP χ _ z.property.2)).1
+  exact explicitFormulaCompletedHeckeL_summable_angular_rows τ hτ k hk Y K R hR₀ C hC hzero
+    (fun χ M hM hχ hY ↦ hbound χ M hM hχ hY a (P χ) (hP χ)) hdecay
+
 /-- A unit window of a chart character with bounded finite conductor and bounded
 archimedean parameters has polynomially bounded total multiplicity. Jensen gives
 the estimate for characters nontrivial on the norm-one classes. The remaining
@@ -15807,9 +16142,7 @@ private theorem idelicExplicitFormula_summable_spectral_characters_window
   let w (s : {s : ℂ // 0 < D s}) := (D s.val : ℝ) / (1 + |s.val.im|) ^ 2
   have hw : Summable w := explicitFormulaCompletedHeckeL_summable_divisor_div_sq 1
   have hw₀ (s) : 0 ≤ w s := div_nonneg (by exact_mod_cast s.property.le) (sq_nonneg _)
-  obtain ⟨K, n, hK, hdisc⟩ := idelicExplicitFormula_summable_spectral_characters_discs (F := F) A
-  obtain ⟨B, hB, hlog⟩ := explicitZeroCount_log_bound K n (9 / 4) (5 / 2) hK
-    (Nat.cast_nonneg _) (by norm_num) (by norm_num)
+  obtain ⟨B, hB, hsharp⟩ := explicitFormulaCompletedHeckeL_nontrivial_window_sqrt (F := F) A
   refine ⟨max (9 * ∑' s, w s) B, hB.trans (le_max_right _ _), fun χ X t hτχ hX ht hA harch P hP ↦ ?_⟩
   by_cases hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1
   · have htriv : χ = 1 := congrArg Subtype.val (explicitFormula_chartChar_ext τ hτ ⟨χ, hτχ⟩
@@ -15830,24 +16163,8 @@ private theorem idelicExplicitFormula_summable_spectral_characters_window
         rw [← Finset.sum_mul]; gcongr; exact hw.sum_le_tsum S (fun s _ ↦ hw₀ s)
       _ = (9 * ∑' s, w s) * X ^ 2 := by ring
       _ ≤ _ := mul_le_mul_of_nonneg_right (le_max_left _ _) (sq_nonneg _)
-  · obtain ⟨G, hG, hc, hcmp, hbound⟩ := hdisc χ X t hχ hX ht hA harch
-    let c : ℂ := ⟨2, t⟩
-    have hmem (s) (hs : s ∈ P) : s ∈ Metric.closedBall c (9 / 4) := by
-      obtain ⟨hr₁, hr₂⟩ := explicitFormulaCompletedHeckeL_zero_re_mem χ (hP s hs).1
-      have him := abs_le.mp (hP s hs).2
-      have hnorm := Complex.sq_norm_sub_sq_re (s - c)
-      change ‖s - c‖ ^ 2 - (s.re - 2) ^ 2 = (s.im - t) ^ 2 at hnorm
-      rw [Metric.mem_closedBall, dist_eq_norm]
-      nlinarith [mul_nonneg hr₁ (show 0 ≤ 4 - s.re by linarith),
-        mul_nonneg (sub_nonneg.mpr him.1) (sub_nonneg.mpr him.2)]
-    have ha : AnalyticOnNhd ℂ G (Metric.closedBall c (5 / 2)) := fun z _ ↦ hG.analyticAt z
-    calc
-      _ ≤ ∑ s ∈ P, (analyticOrderNatAt G s : ℝ) := Finset.sum_le_sum fun s hs ↦
-        explicitZeroCount_local_order (explicitFormulaCompletedHeckeL_spec χ).1.meromorphicOn
-          (by norm_num : (0 : ℝ) ≤ 5 / 2) ha hc hcmp (Metric.closedBall_subset_closedBall (by norm_num) (hmem s hs))
-      _ ≤ _ := explicitZeroCount_disk_sum (by norm_num : (0 : ℝ) < 9 / 4)
-        (by norm_num : (9 / 4 : ℝ) < 5 / 2) ha hc hbound P hmem
-      _ ≤ B * X ^ (1 / 2 : ℝ) := by simpa only [Real.rpow_natCast] using hlog X hX
+  · calc
+      _ ≤ B * X ^ (1 / 2 : ℝ) := hsharp χ X t hχ hX ht hA harch P hP
       _ ≤ max (9 * ∑' s, w s) B * X ^ 2 := by
         gcongr
         · exact le_max_right _ _
