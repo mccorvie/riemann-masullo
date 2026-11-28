@@ -327,6 +327,42 @@ private theorem exists_sLocalTraceCutoff
     rw [← Complex.ofReal_mul, mul_inv_cancel₀ (by linarith), Complex.ofReal_one]
   exact heq ▸ (hsum g).mul_right (n g)
 
+section QuotientTestLift
+
+attribute [local instance] instSIdeleQuotientT2Sec1 instSIdeleQuotientLocallyCompactSec1
+
+/-- An S-local quotient Bruhat test has a compact Bruhat lift whose
+periodization recovers the test, with support contained in the preimage
+of the quotient test's topological support. -/
+theorem exists_sLocalTraceQuotientTestLift (Φ : BruhatCompactSupport Jₛ) :
+    ∃ f : BruhatCompactSupport Iₛ,
+      tsupport f.val ⊆ (QuotientGroup.mk : Iₛ → Jₛ) ⁻¹' tsupport Φ.val ∧
+      ∀ g : Iₛ, HasSum (fun ξ : Hₛ ↦ f.val (ξ.val * g)) (Φ.val (QuotientGroup.mk g)) := by
+  let q : Iₛ →ₜ* Jₛ := ⟨QuotientGroup.mk' Hₛ, QuotientGroup.continuous_mk⟩
+  obtain ⟨w, hw⟩ := exists_sLocalTraceCutoff (tsupport Φ.val) Φ.property.2
+  let r : Iₛ → ℂ := Φ.val ∘ q
+  have hr : IsBruhatSmooth r :=
+    sLocalTrace_comp_bruhatSmooth q ((mem_bruhatSmoothSubmodule_iff _).mp Φ.property.1)
+  have hs : IsBruhatSmooth (w.val * r) := fun p ↦
+    isBruhatContDiff_mul ((mem_bruhatSmoothSubmodule_iff _).mp w.property.1 p) (hr p)
+  have hc : HasCompactSupport (w.val * r) :=
+    w.property.2.of_isClosed_subset isClosed_closure tsupport_mul_subset_left
+  refine ⟨⟨w.val * r, (mem_bruhatSmoothSubmodule_iff _).mpr hs, hc⟩, ?_, fun g ↦ ?_⟩
+  · change tsupport (w.val * r) ⊆ q ⁻¹' tsupport Φ.val
+    exact tsupport_mul_subset_right.trans (tsupport_comp_subset_preimage Φ.val q.continuous)
+  · change HasSum (fun ξ : Hₛ ↦ w.val (ξ.val * g) * r (ξ.val * g)) (r g)
+    have hEq (ξ : Hₛ) : r (ξ.val * g) = r g := by
+      change Φ.val (q (ξ.val * g)) = Φ.val (q g)
+      have hξ : q ξ.val = 1 := (QuotientGroup.eq_one_iff _).mpr ξ.property
+      rw [map_mul, hξ, one_mul]
+    simp_rw [hEq]
+    by_cases hg : r g = 0
+    · simp [hg]
+    have hmem : (QuotientGroup.mk g : Jₛ) ∈ tsupport Φ.val := subset_closure hg
+    simpa only [one_mul] using (hw g hmem).mul_right (r g)
+
+end QuotientTestLift
+
 /-- Paper: (12.4.1.4), p. 515. The restriction of an outside-unit-invariant test admits
 a compactly supported Bruhat lift whose S-unit periodization recovers the restriction.
 Deviation: The inserted S-idele evaluates the global test before taking the quotient. -/
@@ -1643,6 +1679,107 @@ theorem eta_test (f : BruhatCompactSupport Iₛ) (ξ : Hₛ) :
 
 end SLocalTraceEta
 
+/-- A compactly supported Bruhat test on the S-ideles extends by zero to an
+additive Schwartz–Bruhat test, with support controlled by the image of its
+idelic support. -/
+theorem exists_sLocalIdelicTest_zeroExtension (f : BruhatCompactSupport Iₛ) :
+    ∃ g : testₛ,
+      (∀ u : Iₛ, testAt(g, u.val) = f.val u) ∧
+      (∀ z : Aₛ, z ∉ range (Units.val : Iₛ → Aₛ) → testAt(g, z) = 0) ∧
+      tsupport (fun z : Aₛ ↦ testAt(g, z)) ⊆ (Units.val : Iₛ → Aₛ) '' tsupport f.val := by
+  let q : Iₛ →ₜ* Jₛ := ⟨QuotientGroup.mk' Hₛ, QuotientGroup.continuous_mk⟩
+  let m : Iₛ →ₜ* ℝ≥0ˣ := (continuousSIdeleQuotientNorm F S).comp q
+  let inv : Iₛ →ₜ* Iₛ := ContinuousMonoidHom.inv Iₛ
+  let w : Iₛ → ℂ := fun u ↦ (Real.sqrt (normS(u⁻¹)) : ℂ)
+  have hw : IsBruhatSmooth w := by
+    have hd : ContDiff ℝ (∞ : ℕ∞ω) (fun x : ℝ ↦ (Real.exp (x / 2) : ℂ)) :=
+      Complex.ofRealCLM.contDiff.comp (Real.contDiff_exp.comp (contDiff_id.div_const 2))
+    have he (u : Iₛ) : Real.sqrt (normS(u⁻¹)) = Real.exp (Real.log (normS(u⁻¹)) / 2) := by
+      have hp : 0 < normS(u⁻¹) := NNReal.coe_pos.mpr (Units.zero_lt _)
+      simp only [Real.sqrt_eq_rpow, Real.rpow_def_of_pos hp, div_eq_mul_inv, one_mul]
+    have h := isBruhatSmooth_logProfile (m.comp inv) hd
+    change IsBruhatSmooth (fun u : Iₛ ↦ (Real.exp (Real.log (normS(u⁻¹)) / 2) : ℂ)) at h
+    simpa only [w, he] using h
+  have hf : IsBruhatSmooth (f.val ∘ inv) :=
+    sLocalTrace_comp_bruhatSmooth inv ((mem_bruhatSmoothSubmodule_iff _).mp f.property.1)
+  have hc : HasCompactSupport (f.val ∘ inv) :=
+    f.property.2.comp_homeomorph (Homeomorph.inv Iₛ)
+  let a : BruhatCompactSupport Iₛ := ⟨w * (f.val ∘ inv),
+    (mem_bruhatSmoothSubmodule_iff _).mpr fun p ↦ isBruhatContDiff_mul (hw p) (hf p), hc.mul_left⟩
+  obtain ⟨η, hη⟩ := SLocalTraceEta.eta_test a (1 : Hₛ)
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let : T2Space Aₛ := inferInstanceAs (T2Space
+    (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let : T2Space (Multiplicative Aₛ) := ‹T2Space Aₛ›
+  let : LocallyCompactSpace (Multiplicative Aₛ) := inferInstanceAs (LocallyCompactSpace Aₛ)
+  let g : testₛ := schwartzBruhatTranslate (Multiplicative.ofAdd (1 : Aₛ)) η
+  have hg (z : Aₛ) : testAt(g, z) = sLocalTraceEta a 1 (z - 1) := by
+    change testAt(η, -(1 : Aₛ) + z) = _
+    rw [neg_add_eq_sub, hη]
+  have hshift (z : Aₛ) : 1 + (z - 1) = z := by abel
+  have hu (u : Iₛ) : testAt(g, u.val) = f.val u := by
+    rw [hg, sLocalTraceEta, hshift, Units.val_injective.extend_apply]
+    change a.val (((1 : Iₛ)⁻¹ * u)⁻¹) / (Real.sqrt (normS((1 : Iₛ)⁻¹ * u)) : ℂ) = _
+    simp only [inv_one, one_mul]
+    change (Real.sqrt (normS((u⁻¹)⁻¹)) : ℂ) * f.val ((u⁻¹)⁻¹) /
+      (Real.sqrt (normS(u)) : ℂ) = _
+    simp only [inv_inv]
+    exact mul_div_cancel_left₀ _ (Complex.ofReal_ne_zero.mpr
+      (Real.sqrt_pos.mpr (NNReal.coe_pos.mpr (Units.zero_lt _))).ne')
+  have hz (z : Aₛ) (hz : z ∉ range (Units.val : Iₛ → Aₛ)) : testAt(g, z) = 0 := by
+    rw [hg, sLocalTraceEta, hshift]
+    exact Function.extend_apply' _ _ _ hz
+  refine ⟨g, hu, hz, closure_minimal ?_ (f.property.2.image Units.continuous_val).isClosed⟩
+  intro z hz'
+  by_cases h : z ∈ range (Units.val : Iₛ → Aₛ)
+  · obtain ⟨u, rfl⟩ := h
+    refine ⟨u, subset_tsupport f.val ?_, rfl⟩
+    change f.val u ≠ 0
+    exact fun he ↦ hz' ((hu u).trans he)
+  · exact False.elim (hz' (hz z h))
+
+section AdditiveThetaLift
+
+attribute [local instance] instSIdeleQuotientT2Sec1 instSIdeleQuotientLocallyCompactSec1
+
+/-- A compact Bruhat test on the S-idèle quotient is an ordinary theta
+function of a compactly supported additive Schwartz–Bruhat test. Its support is
+contained in the image of the idelic preimage of the quotient support. -/
+theorem exists_sLocalTraceAdditiveThetaLift (Φ : BruhatCompactSupport Jₛ) :
+    ∃ g : testₛ,
+      HasCompactSupport (fun z : Aₛ ↦ testAt(g,z)) ∧
+      tsupport (fun z : Aₛ ↦ testAt(g,z)) ⊆
+        (Units.val : Iₛ → Aₛ) '' ((QuotientGroup.mk : Iₛ → Jₛ) ⁻¹' tsupport Φ.val) ∧
+      ∀ q : Jₛ, sLocalAdelicThetaOnClasses F S g q = Φ.val q := by
+  obtain ⟨f, hf, hperiod⟩ := exists_sLocalTraceQuotientTestLift Φ
+  obtain ⟨g, hg, _, hgs⟩ := exists_sLocalIdelicTest_zeroExtension f
+  have hgc : HasCompactSupport (fun z : Aₛ ↦ testAt(g,z)) :=
+    (f.property.2.image Units.continuous_val).of_isClosed_subset isClosed_closure hgs
+  refine ⟨g, hgc, hgs.trans (image_mono hf), fun q ↦ ?_⟩
+  obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective q
+  let U := (Set.integer (S : Set V) F)ˣ
+  let d : U →* Iₛ := (Units.map ((adeleProjection F S).comp
+    (integralAdelesOutside F S).subtype).toMonoidHom).comp
+      (Units.map (integralAdeleDiagonal F S).toMonoidHom)
+  have hd : Injective d := fun _ _ h ↦ Units.ext ((sAdele_additive_quotient F S).1
+    (congrArg Units.val h))
+  have hr : d.range = Hₛ := by
+    change _ = Subgroup.map _ _
+    rw [MonoidHom.map_range]
+  let e : U ≃ Hₛ := (MonoidHom.ofInjective hd).toEquiv.trans (MulEquiv.subgroupCongr hr).toEquiv
+  have he (u : U) : (e u : Iₛ) = sUnitEmbedding F S u := rfl
+  rw [sLocalAdelicThetaOnClasses_mk, sLocalAdelicTheta_apply]
+  calc
+    _ = ∑' u : U, f.val ((e u).val * x) := by
+      apply tsum_congr
+      intro u
+      change testAt(g, (sUnitEmbedding F S u * x).val) = f.val ((e u).val * x)
+      exact (hg (sUnitEmbedding F S u * x)).trans (congrArg (fun ξ : Iₛ ↦ f.val (ξ * x)) (he u).symm)
+    _ = ∑' ξ : Hₛ, f.val (ξ.val * x) := e.tsum_eq (fun ξ : Hₛ ↦ f.val (ξ.val * x))
+    _ = _ := (hperiod x).tsum_eq
+
+end AdditiveThetaLift
+
 /-- Paper: (12.4.1.21)–(12.4.1.22), p. 518. The additive Tamagawa Fourier transform
 of the translated, zero-extended S-idelic test is integrable.
 Deviation: Step III uses Fourier integration on p. 518. We state explicitly the
@@ -1848,6 +1985,83 @@ private theorem sLocalTrace_nonunits_null :
       (Measure.pi (fun v : S ↦ finiteLocalAdditiveTamagawaMeasure F v.val))) (_ ×ˢ _) = 0
     rw [Measure.prod_prod, Measure.pi_eval_preimage_null
       (fun v : S ↦ finiteLocalAdditiveTamagawaMeasure F v.val) (i := v) (hv v), mul_zero]
+
+/-- Paper: (12.4.1.17), p. 518. At exponent one, the idelic norm cancels
+the reciprocal density in multiplicative Tamagawa measure. The invertible
+locus has full additive measure. -/
+theorem sLocalTrace_integral_norm_eq_additive (a : Aₛ → ℂ) :
+    (∫ t : Iₛ, (normS(t) : ℂ) * a t.val ∂μₛ) =
+      (sLocalTraceMeasureFactor S : ℂ) * ∫ t, a t ∂νₛ := by
+  let U : Set Aₛ := range (Units.val : Iₛ → Aₛ)
+  have hU : ∀ᵐ t ∂νₛ, t ∈ U :=
+    (measure_eq_zero_iff_ae_notMem.mp sLocalTrace_nonunits_null).mono fun _ h ↦ not_not.mp h
+  have hcut := sLocalTrace_integral_units (U.indicator a)
+    (fun t ht ↦ indicator_of_notMem ht _)
+  calc
+    _ = ∫ t : Iₛ, (normS(t) : ℂ) * U.indicator a t.val ∂μₛ := by
+      apply integral_congr_ae (ae_of_all _ fun t ↦ ?_)
+      rw [indicator_of_mem (mem_range_self t : t.val ∈ U)]
+    _ = (sLocalTraceMeasureFactor S : ℂ) * ∫ t, U.indicator a t ∂νₛ := hcut
+    _ = _ := congrArg ((sLocalTraceMeasureFactor S : ℂ) * ·)
+      (integral_congr_ae (hU.mono fun _ ht ↦ indicator_of_mem ht _))
+
+/-- The trivial-character Mellin moment at exponent one is the additive
+Tamagawa integral with the conversion factor of (12.4.1.17), p. 518. -/
+theorem sLocalTrace_radialMellinIntegral_norm
+    (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S)) (f : testₛ) :
+    sLocalRadialMellinIntegral τ f 1 1 =
+      (sLocalTraceMeasureFactor S : ℂ) * ∫ x, testAt(f,x) ∂νₛ := by
+  have hz : 0 < (1 : ℂ).re := by norm_num
+  refine (sLocalRadialMellinIntegral_eq_theta τ hτ f 1 1 hz).trans ?_
+  refine (sLocalThetaMellinIntegral_eq_zeta f ⟨1, 1, hz, rfl⟩).trans ?_
+  rw [sLocalIdelicZetaIntegral_norm]
+  simp_rw [mul_comm (f _) (_ : ℂ)]
+  exact sLocalTrace_integral_norm_eq_additive _
+
+/-- For the trivial norm-one character, the reflected Fourier-test
+profile has an exponential moment given by the test's value at zero.
+This is the trivial polar moment for the fixed-band comparison in
+Theorem 12.4.1.1, Step III, pp. 516–518. -/
+theorem sLocalTrace_reflectedFourier_exponentialMoment
+    (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S)) (f : testₛ) :
+    let t (x : ℝ) : ℝ≥0ˣ := Units.mk0 (Real.exp x).toNNReal (by positivity)
+    (∫ y : ℝ, sLocalHomogeneousAdelicThetaLinearMap F S 1 (sAdeleSchwartzFourier f)
+        (QuotientGroup.mk (τ (t (-y)))) * (Real.exp (-y) : ℂ)) =
+      (sLocalTraceMeasureFactor S : ℂ) * testAt(f, 0) := by
+  intro t
+  let g := sAdeleSchwartzFourier f
+  let p (x : ℝ) : ℂ := sLocalHomogeneousAdelicThetaLinearMap F S 1 g
+    (QuotientGroup.mk (τ (t x))) * (Real.exp x : ℂ)
+  change (∫ y, p (-y)) = _
+  rw [integral_neg_eq_self p volume]
+  let e : ℝ ≃ₜ ℝ≥0ˣ :=
+    Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  have ht (x : ℝ) : e x = t x := by
+    apply Units.ext
+    exact NNReal.eq (Real.coe_toNNReal _ (Real.exp_pos x).le).symm
+  have hμ : positiveRealHaar = volume.map e := by
+    exact congrArg (fun j : ℝ → ℝ≥0ˣ ↦ volume.map j) (funext fun x ↦ (ht x).symm)
+  have hRadial : (∫ y, p y) = sLocalRadialMellinIntegral τ g 1 1 := by
+    rw [sLocalRadialMellinIntegral, hμ, e.measurableEmbedding.integral_map]
+    apply integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+    have hN : (((sIdeleQuotientNorm F S (QuotientGroup.mk (τ (e x)))).val : ℝ)) =
+        Real.exp x := by
+      rw [sIdeleQuotientNorm_mk, hτ, ht]
+      exact Real.coe_toNNReal _ (Real.exp_pos x).le
+    have hω : ((1 : PontryaginDual Jₛ).comp
+        (⟨Subgroup.subtype (sIdeleQuotientNorm F S).ker, continuous_subtype_val⟩ :
+          (sIdeleQuotientNorm F S).ker →ₜ* Jₛ)) = 1 := by ext; rfl
+    rw [hω]
+    change sLocalHomogeneousAdelicThetaLinearMap F S 1 g
+      (QuotientGroup.mk (τ (t x))) * (Real.exp x : ℂ) =
+      sLocalHomogeneousAdelicThetaLinearMap F S 1 g
+        (QuotientGroup.mk (τ (e x))) *
+          ((((1 : PontryaginDual Jₛ) (QuotientGroup.mk (τ (e x))) : Circle) : ℂ) *
+            ((((sIdeleQuotientNorm F S (QuotientGroup.mk (τ (e x)))).val : ℝ) : ℂ) ^ (1 : ℂ)))
+    rw [PontryaginDual.one_apply, Circle.coe_one, one_mul, Complex.cpow_one, hN, ht]
+  refine hRadial.trans ((sLocalTrace_radialMellinIntegral_norm τ hτ g).trans ?_)
+  rw [← sAdeleSchwartzFourier_apply_zero, sLocal_fourier_inversion, neg_zero]
 
 /-- Paper: (12.4.1.22)–(12.4.1.23), p. 518. The change of variable w = xu by an S-idele
 scales additive Tamagawa measure by the S-idelic norm and the frequency band by the same

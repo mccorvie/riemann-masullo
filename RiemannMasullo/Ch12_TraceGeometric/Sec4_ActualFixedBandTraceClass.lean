@@ -14,6 +14,8 @@ import RiemannMasullo.AppA_AlgebraicNT.Sec3
 import Mathlib.Analysis.SpecialFunctions.Pow.Complex
 import RiemannMasullo.ForMathlib.Analysis.Fourier.L2Phase
 import RiemannMasullo.Ch12_TraceGeometric.Sec4_ClosedLevelLogSupport
+import RiemannMasullo.Ch12_TraceGeometric.Sec4_ReflectedTrivialMoment
+import RiemannMasullo.Ch12_TraceGeometric.Sec4_ReflectedOrderZeroIsometry
 import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3_FourierBandThetaSupport
 
 /-! # Trace class and the lower-floor limit on the fixed S-local band -/
@@ -220,6 +222,67 @@ private theorem reflectedWeightedTheta_zero_lt
     (Real.exp ((-x) / 2) : ℂ) = 0
   rw [hzero, zero_mul, zero_mul]
 
+private theorem exists_sLocalInvariantPW_reflectedLogInput_aux
+    {s : ℝ} (hs : 0 ≤ s)
+    (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
+    (ω : PontryaginDual J₁) {B : ℝ} (hB : 0 < B) :
+    let level := sLocalInvariantPWSobolev (F := F) (S := S) hs
+      (show (0 : ℝ) < 1 / 2 by norm_num) ω B
+    ∃ (χ : PontryaginDual Jₛ) (T : W(s) →L[ℂ] FlatL2),
+      χ.comp include₁ = ω ∧ (∀ t, χ (QuotientGroup.mk (τ t)) = 1) ∧ ‖T‖ ≤ 1 ∧
+      (∀ f : Zₛ,
+        (T (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s)
+          (a := 1 / 2) (by norm_num) ω f) : ℝ → ℂ) =ᵐ[volume] fun x ↦
+          (Real.sqrt (Measure.real η univ) : ℂ) *
+            sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f.val) (-x)) ∧
+      (∀ u ∈ level, ∀ᵐ x : ℝ ∂volume, x < -Real.log B → T u x = 0) ∧
+      (s = 0 → ∀ u ∈ level, ‖T u‖ = ‖u‖) := by
+  classical
+  intro level
+  let Q (ω' : PontryaginDual J₁) :=
+    (exists_sLocalWeightedAngularLogCoefficient hs τ hτ ω').choose
+  have hQ := fun ω' ↦ (exists_sLocalWeightedAngularLogCoefficient hs τ hτ ω').choose_spec.2
+  have hQnorm : ‖Q ω‖ ≤ 1 :=
+    (exists_sLocalWeightedAngularLogCoefficient hs τ hτ ω).choose_spec.1
+  obtain ⟨χ, hχ, hsec, hm, hunit, hphase⟩ :=
+    exists_sLocalWeightedTheta_reflectedFourierPhase τ hτ ω Q hQ
+  let m (ξ : ℝ) : ℂ :=
+    sLocalRhoFactor (chart ((circleCoe).comp χ) (sLocalRadialThetaCriticalParameter ξ))
+  obtain ⟨U, _, _, hCancel⟩ := exists_L2FourierInversePhase m hm (ae_of_all _ hunit)
+  let T : W(s) →L[ℂ] FlatL2 := U.toLinearIsometry.toContinuousLinearMap.comp (Q ω)
+  have hTnorm : ‖T‖ ≤ 1 := by
+    apply ContinuousLinearMap.opNorm_le_bound T zero_le_one
+    intro u
+    change ‖U (Q ω u)‖ ≤ 1 * ‖u‖
+    rw [U.norm_map]
+    exact ((Q ω).le_opNorm u).trans (mul_le_mul_of_nonneg_right hQnorm (norm_nonneg u))
+  have hTisometry (hs₀ : s = 0) (u : W(s)) (hu : u ∈ level) : ‖T u‖ = ‖u‖ := by
+    subst s
+    obtain ⟨L, hLQ⟩ := exists_sLocalWeightedAngularLogCoefficient_leftInverse_on_level_zero
+      τ hτ ω χ hχ hsec B (Q ω) (hQ ω)
+    change ‖U (Q ω u)‖ = ‖u‖
+    calc
+      ‖U (Q ω u)‖ = ‖Q ω u‖ := U.norm_map (Q ω u)
+      _ = ‖L (Q ω u)‖ := (L.norm_map (Q ω u)).symm
+      _ = ‖u‖ := congrArg norm (hLQ u hu)
+  have hGen (f : Zₛ) :
+      (T (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s)
+        (a := 1 / 2) (by norm_num) ω f) : ℝ → ℂ) =ᵐ[volume]
+      fun x ↦ (Real.sqrt (Measure.real η univ) : ℂ) *
+        sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f.val) (-x) := by
+    obtain ⟨hp, hr, hv, hw, hFourier⟩ := hphase f
+    have hU := hCancel _ _ _ _ hp hr hv hw (ae_of_all _ hFourier)
+    change (U (Q ω (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s)
+      (a := 1 / 2) (by norm_num) ω f)) : ℝ → ℂ) =ᵐ[volume] _
+    rw [hU]
+    exact hw
+  refine ⟨χ, T, hχ, hsec, hTnorm, hGen, fun u hu ↦ ?_, hTisometry⟩
+  refine sLocalInvariantPWSobolev_map_ae_eq_zero_lt_of_generators hs
+    (show (0 : ℝ) < 1 / 2 by norm_num) ω B (-Real.log B) T (fun f ↦ ?_) u hu
+  filter_upwards [hGen f.val] with x hxEq
+  intro hx
+  rw [hxEq, reflectedWeightedTheta_zero_lt τ hτ χ⁻¹ hB f x hx, mul_zero]
+
 /-- For the Chapter 11 invariant level, undoing the critical-line Tate phase
 gives a contraction to flat functions supported on the reflected half-line.
 Its values on the defining theta generators are the inverse-character
@@ -238,41 +301,63 @@ theorem exists_sLocalInvariantPW_reflectedLogInput
       ∀ u ∈ sLocalInvariantPWSobolev (F := F) (S := S) hs
           (show (0 : ℝ) < 1 / 2 by norm_num) ω B,
         ∀ᵐ x : ℝ ∂volume, x < -Real.log B → T u x = 0 := by
-  classical
-  let Q (ω' : PontryaginDual J₁) :=
-    (exists_sLocalWeightedAngularLogCoefficient hs τ hτ ω').choose
-  have hQ := fun ω' ↦ (exists_sLocalWeightedAngularLogCoefficient hs τ hτ ω').choose_spec.2
-  have hQnorm : ‖Q ω‖ ≤ 1 :=
-    (exists_sLocalWeightedAngularLogCoefficient hs τ hτ ω).choose_spec.1
-  obtain ⟨χ, hχ, hsec, hm, hunit, hphase⟩ :=
-    exists_sLocalWeightedTheta_reflectedFourierPhase τ hτ ω Q hQ
-  let m (ξ : ℝ) : ℂ :=
-    sLocalRhoFactor (chart ((circleCoe).comp χ) (sLocalRadialThetaCriticalParameter ξ))
-  obtain ⟨U, _, _, hCancel⟩ := exists_L2FourierInversePhase m hm (ae_of_all _ hunit)
-  let T : W(s) →L[ℂ] FlatL2 := U.toLinearIsometry.toContinuousLinearMap.comp (Q ω)
-  have hTnorm : ‖T‖ ≤ 1 := by
-    apply ContinuousLinearMap.opNorm_le_bound T zero_le_one
-    intro u
-    change ‖U (Q ω u)‖ ≤ 1 * ‖u‖
-    rw [U.norm_map]
-    exact ((Q ω).le_opNorm u).trans (mul_le_mul_of_nonneg_right hQnorm (norm_nonneg u))
-  have hGen (f : Zₛ) :
-      (T (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s)
-        (a := 1 / 2) (by norm_num) ω f) : ℝ → ℂ) =ᵐ[volume]
-      fun x ↦ (Real.sqrt (Measure.real η univ) : ℂ) *
-        sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f.val) (-x) := by
-    obtain ⟨hp, hr, hv, hw, hFourier⟩ := hphase f
-    have hU := hCancel _ _ _ _ hp hr hv hw (ae_of_all _ hFourier)
-    change (U (Q ω (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s)
-      (a := 1 / 2) (by norm_num) ω f)) : ℝ → ℂ) =ᵐ[volume] _
-    rw [hU]
-    exact hw
-  refine ⟨χ, T, hχ, hsec, hTnorm, hGen, fun u hu ↦ ?_⟩
-  refine sLocalInvariantPWSobolev_map_ae_eq_zero_lt_of_generators hs
-    (show (0 : ℝ) < 1 / 2 by norm_num) ω B (-Real.log B) T (fun f ↦ ?_) u hu
-  filter_upwards [hGen f.val] with x hxEq
-  intro hx
-  rw [hxEq, reflectedWeightedTheta_zero_lt τ hτ χ⁻¹ hB f x hx, mul_zero]
+  obtain ⟨χ, T, hχ, hsec, hnorm, hGen, hSupport, _⟩ :=
+    exists_sLocalInvariantPW_reflectedLogInput_aux hs τ hτ ω hB
+  exact ⟨χ, T, hχ, hsec, hnorm, hGen, hSupport⟩
+
+/-- Paper: (11.2.1.6), p. 488, and Theorem 12.4.1.1, pp. 515–517.
+At order zero the reflected input is isometric on the actual half-density
+level. Its generator representatives retain the Tamagawa normalization,
+and for the trivial norm-one character the exponential moment vanishes. -/
+public theorem exists_sLocalInvariantPW_reflectedLogInput_orderZero
+    (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
+    (ω : PontryaginDual J₁) {B : ℝ} (hB : 0 < B) :
+    let level := sLocalInvariantPWSobolev (F := F) (S := S) (s := 0) le_rfl
+      (show (0 : ℝ) < 1 / 2 by norm_num) ω B
+    ∃ (χ : PontryaginDual Jₛ) (T : W(0) →L[ℂ] FlatL2),
+      χ.comp include₁ = ω ∧ (∀ t, χ (QuotientGroup.mk (τ t)) = 1) ∧ ‖T‖ ≤ 1 ∧
+      (∀ f : Zₛ,
+        (T (sLocalPWThetaSobolevMap (F := F) (S := S) (s := 0)
+          (a := 1 / 2) (by norm_num) ω f) : ℝ → ℂ) =ᵐ[volume] fun x ↦
+          (Real.sqrt (Measure.real η univ) : ℂ) *
+            sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f.val) (-x)) ∧
+      (∀ u ∈ level, ∀ᵐ x : ℝ ∂volume, x < -Real.log B → T u x = 0) ∧
+      (∀ u ∈ level, ‖T u‖ = ‖u‖) ∧
+      (ω = 1 → ∀ u ∈ level,
+        Integrable (fun x ↦ (Real.exp (-x / 2) : ℂ) * T u x) ∧
+          (∫ x, (Real.exp (-x / 2) : ℂ) * T u x) = 0) := by
+  intro level
+  obtain ⟨χ, T, hχ, hsec, hnorm, hGen, hSupport, hIso⟩ :=
+    exists_sLocalInvariantPW_reflectedLogInput_aux (s := 0) le_rfl τ hτ ω hB
+  refine ⟨χ, T, hχ, hsec, hnorm, hGen, hSupport, hIso rfl, ?_⟩
+  intro hω u hu
+  subst hω
+  exact sLocalInvariantPWSobolev_reflectedTrivialMoment_of_representatives
+    (s := 0) le_rfl τ hτ B χ T hχ hsec hGen hSupport u hu
+
+/-- The actual reflected operator on the closed level has vanishing
+exponential moment in the trivial norm-one type. -/
+public theorem exists_sLocalInvariantPW_reflectedLogInput_trivialMoment
+    {s : ℝ} (hs : 0 ≤ s)
+    (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
+    {B : ℝ} (hB : 0 < B) :
+    ∃ (χ : PontryaginDual Jₛ) (T : W(s) →L[ℂ] FlatL2),
+      χ.comp include₁ = 1 ∧ (∀ t, χ (QuotientGroup.mk (τ t)) = 1) ∧ ‖T‖ ≤ 1 ∧
+      (∀ f : Zₛ,
+        (T (sLocalPWThetaSobolevMap (F := F) (S := S) (s := s)
+          (a := 1 / 2) (by norm_num) 1 f) : ℝ → ℂ) =ᵐ[volume] fun x ↦
+          (Real.sqrt (Measure.real η univ) : ℂ) *
+            sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f.val) (-x)) ∧
+      ∀ u ∈ sLocalInvariantPWSobolev (F := F) (S := S) hs
+          (show (0 : ℝ) < 1 / 2 by norm_num) 1 B,
+        (∀ᵐ x : ℝ ∂volume, x < -Real.log B → T u x = 0) ∧
+        Integrable (fun x ↦ (Real.exp (-x / 2) : ℂ) * T u x) ∧
+        (∫ x, (Real.exp (-x / 2) : ℂ) * T u x) = 0 := by
+  obtain ⟨χ, T, hχ, hsec, hnorm, hgen, hsupport⟩ :=
+    exists_sLocalInvariantPW_reflectedLogInput hs τ hτ (1 : PontryaginDual J₁) hB
+  refine ⟨χ, T, hχ, hsec, hnorm, hgen, fun u hu ↦ ⟨hsupport u hu, ?_⟩⟩
+  exact sLocalInvariantPWSobolev_reflectedTrivialMoment_of_representatives
+    hs τ hτ B χ T hχ hsec hgen hsupport u hu
 
 end
 
