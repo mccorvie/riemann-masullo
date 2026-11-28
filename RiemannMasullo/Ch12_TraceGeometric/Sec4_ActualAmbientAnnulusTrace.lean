@@ -115,6 +115,7 @@ theorem exists_sLocalTrace_fixedAnnulus_reflectedProductCutoff_trace_atBand_orde
       χ.comp include₁ = angular ∧ (∀ t, χ (QuotientGroup.mk (τ t)) = 1) ∧
       sLocalFullReflectedGenAE τ angular χ T ∧
       (∀ r, (M r : ℝ → ℂ) =ᵐ[volume] fun x ↦ b (Real.exp (-x)) * r x) ∧
+      sLocalReflectedPolarLineData (F := F) (S := S) angular B T ∧
       (∀ x y : Iₛ, κ (QuotientGroup.mk x) (QuotientGroup.mk y) =
         ∑' ξ : Hₛ, sLocalTraceCutoffKernel (F := F) (S := S) fLift
           (fun a ↦ (ρ (QuotientGroup.mk a) : ℂ)) (fun w ↦ b (modS(w))) x (ξ.val * y).val) ∧
@@ -137,7 +138,7 @@ theorem exists_sLocalTrace_fixedAnnulus_reflectedProductCutoff_trace_atBand_orde
     @exists_sLocalTrace_fixedAnnulus_reflectedProductCutoff_eq_atBand_orderZero F _ _ S
       τ hτ fLift Φ hLift angular hΦ b Λ ερ εb Cb ρ hρ hb hbdd hε hplateau hderiv B hB
   obtain ⟨χ, T, M, κ, hData⟩ := hOperatorData
-  obtain ⟨hχ, hsec, hGen, hM, hInter, hRep, _, hK, hEq⟩ := hData
+  obtain ⟨hχ, hsec, hGen, hM, hInter, hPolar, hRep, _, hK, hEq⟩ := hData
   let K (p : Jₛ × Jₛ) := (Real.sqrt (N p.1 * N p.2) : ℂ) * κ p.1 p.2 /
     ((sLocalTraceMeasureFactor S : ℂ) * (intervalSobolevDensity 0 0 0 (ℓ p.2) : ℂ))
   let A : W₀ →L[ℂ] W₀ := hardySobolevTestAction μJ m 0 0 0 le_rfl le_rfl Φ
@@ -163,7 +164,7 @@ theorem exists_sLocalTrace_fixedAnnulus_reflectedProductCutoff_trace_atBand_orde
       (F := F) (S := S) (s := 0) le_rfl Φ hρ hBand D
   have hTrace := ambientAnnulus_trace_eq_of_kernel_representation (F := F) (S := S)
     K hK₂ C hC hOp hCont
-  refine ⟨χ, T, M, κ, hχ, hsec, hGen, hM, hRep, hC, hTrace.1, hTrace.2, ?_⟩
+  refine ⟨χ, T, M, κ, hχ, hsec, hGen, hM, hPolar, hRep, hC, hTrace.1, hTrace.2, ?_⟩
   intro hCap V
   let : CompleteSpace V :=
     (show IsClosed (V : Set W₀) from Submodule.isClosed_topologicalClosure _).completeSpace_coe
@@ -214,7 +215,7 @@ theorem exists_sLocalTrace_fixedAnnulus_reflectedProductCutoff_trace_orderZero
       τ hτ fLift Φ hLift angular hΦ b Λ ερ εb Cb ρ hρ hInner hρcont hb hbdd hε hplateau hderiv
       1 one_pos
   obtain ⟨χ, T, M, κ, hData⟩ := hAtBand
-  obtain ⟨hχ, hsec, hGen, hM, hRep, hCertificate⟩ := hData
+  obtain ⟨hχ, hsec, hGen, hM, _, hRep, hCertificate⟩ := hData
   obtain ⟨hC, hInt, hEq, _⟩ := hCertificate
   exact ⟨χ, T, M, κ, hχ, hsec, hGen, hM, hRep, hC, hInt, hEq⟩
 

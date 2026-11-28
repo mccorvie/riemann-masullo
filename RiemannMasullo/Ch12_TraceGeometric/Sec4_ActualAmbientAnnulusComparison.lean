@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_ReflectedAnnulusOrbitComparison
+public import RiemannMasullo.Ch12_TraceGeometric.Sec4_SameWitnessReflectedPolarLine
 import RiemannMasullo.Ch12_TraceGeometric.Sec4_RadialOrbitLiftIndependence
 import RiemannMasullo.Ch12_TraceGeometric.Sec4_CommonReflectedCutoffWitness
 import RiemannMasullo.Ch12_TraceGeometric.Sec4_AngularConjugatedRows
@@ -160,6 +161,7 @@ theorem exists_sLocalTrace_fixedAnnulus_reflectedProductCutoff_eq_atBand_orderZe
          (show IsClosed (V : Set W₀) from Submodule.isClosed_topologicalClosure _).completeSpace_coe
        (l2IndicatorMultiplier volume (Ici (-Real.log B)) measurableSet_Ici).comp T =
          T.comp V.starProjection) ∧
+      sLocalReflectedPolarLineData (F := F) (S := S) angular B T ∧
       OrbitRep(fLift,ρ,b,κ) ∧
       let K (p : Jₛ × Jₛ) := (Real.sqrt (N p.1 * N p.2) : ℂ) * κ p.1 p.2 /
         ((sLocalTraceMeasureFactor S : ℂ) * (intervalSobolevDensity 0 0 0 (ℓ p.2) : ℂ))
@@ -173,7 +175,7 @@ theorem exists_sLocalTrace_fixedAnnulus_reflectedProductCutoff_eq_atBand_orderZe
     @exists_sLocalFullReflectedProductCutoff_with_angularLift_atBand_orderZero F _ _ S
       τ hτ angular b hb hbdd εb hε hplateau B hB
   obtain ⟨χ, Q, L, U, M, hData⟩ := hCoordinates
-  obtain ⟨hχ, hχsec, hL, hQL, hQadj, hSpan, hM, hGen, hRealize, hInter⟩ := hData
+  obtain ⟨hχ, hχsec, hL, hQL, hQadj, hSpan, hM, hGen, hRealize, hInter, hPolar⟩ := hData
   have hbFin : ContDiff ℝ orbitOrder b := (contDiff_infty.mp hb) orbitOrder
   let T := U.toLinearIsometry.toContinuousLinearMap.comp Q
   have hClosed :=
@@ -222,7 +224,7 @@ theorem exists_sLocalTrace_fixedAnnulus_reflectedProductCutoff_eq_atBand_orderZe
   have hAmb : Kop = Reflected :=
     ambientAnnulus_kernel_eq_of_inputCovariance (F := F) (S := S) τ hτ angular χ hχ hχsec
       Q L U hL hQL hQadj K hKm hK₂ hKIn M C V hSpan hEqCore
-  refine ⟨χ, T, M, κ, hχ, hχsec, hGen, hM, hInter, hRep, ?_⟩
+  refine ⟨χ, T, M, κ, hχ, hχsec, hGen, hM, hInter, hPolar, hRep, ?_⟩
   exact ⟨hKm, ⟨hK₂, hAmb⟩⟩
 
 /-- Paper: Theorem 12.4.1.1, Step II, pp. 515–517.
@@ -261,7 +263,7 @@ theorem exists_sLocalTrace_fixedAnnulus_reflectedProductCutoff_eq_orderZero
     @exists_sLocalTrace_fixedAnnulus_reflectedProductCutoff_eq_atBand_orderZero F _ _ S
       τ hτ fLift Φ hLift angular hΦ b Λ ερ εb Cb ρ hρ hb hbdd hε hplateau hderiv 1 one_pos
   obtain ⟨χ, T, M, κ, hData⟩ := hAtBand
-  obtain ⟨hχ, hχsec, hGen, hM, _, hRep, hKernel⟩ := hData
+  obtain ⟨hχ, hχsec, hGen, hM, _, _, hRep, hKernel⟩ := hData
   exact ⟨χ, T, M, κ, hχ, hχsec, hGen, hM, hRep, hKernel⟩
 
 end RiemannMasullo

@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_CompactFourierAngularImage
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_ReflectedProductCutoff
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_SameWitnessProjectionIntertwining
+public import RiemannMasullo.Ch12_TraceGeometric.Sec4_SameWitnessReflectedPolarLine
 import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3_CompactFourierBand
 import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.Projection.Contraction
 import Mathlib.MeasureTheory.Function.Holder
@@ -72,7 +73,8 @@ theorem exists_sLocalFullReflectedProductCutoff_with_angularLift_atBand_orderZer
       letI : CompleteSpace V :=
         (show IsClosed (V : Set W₀) from Submodule.isClosed_topologicalClosure _).completeSpace_coe
       (l2IndicatorMultiplier volume (Ici (-Real.log B)) measurableSet_Ici).comp T =
-        T.comp V.starProjection := by
+        T.comp V.starProjection ∧
+      sLocalReflectedPolarLineData (F := F) (S := S) angular B T := by
   obtain ⟨χ, Q, L, U, hχ, hsec, hQ, _, hL, _, hGen, hBands⟩ :=
     exists_sLocalFullReflectedCoordinates_uniform_orderZero (F := F) (S := S) τ hτ angular
   let T := U.toLinearIsometry.toContinuousLinearMap.comp Q
@@ -138,7 +140,10 @@ theorem exists_sLocalFullReflectedProductCutoff_with_angularLift_atBand_orderZer
   have hInter :=
     @sLocalFullReflectedProjection_comp_eq_of_coordinates_orderZero F _ _ S
       angular B Q L U hT (hBands B hB).1 (hBands B hB).2.2.1
-  exact ⟨χ, Q, L, U, M, hχ, hsec, hL, hQL, hQadj, hC, hM, hGen, hRealize, hInter⟩
+  have hPolar :=
+    @sLocalFullReflectedPolarLine_of_coordinates_orderZero F _ _ S
+      angular B Q L U hQ (hBands B hB).1 (hBands B hB).2.2.1 (hBands B hB).2.2.2
+  exact ⟨χ, Q, L, U, M, hχ, hsec, hL, hQL, hQadj, hC, hM, hGen, hRealize, hInter, hPolar⟩
 
 /-- The angular lift, the coefficient map, and the reflected cutoff can
 be chosen together. In these coordinates the lift of the flat real space

@@ -2,13 +2,17 @@ module
 
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_ConcreteCofinalAnnularFamily
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_ActualAmbientAnnulusTrace
+public import RiemannMasullo.Ch12_TraceGeometric.Sec4_SmoothPolarTraceLimit
+import RiemannMasullo.Ch12_TraceGeometric.Sec4_ReciprocalAnnulusCenteredPlateau
+import RiemannMasullo.Ch12_TraceGeometric.Sec4_InverseRadiusLaw
+import RiemannMasullo.Ch12_TraceGeometric.Sec4_FixedAnnulusTracePrerequisites
 
 /-! # Sharp comparison for an order-zero cofinal family of compressed traces -/
 
 public noncomputable section
 
 open Filter Function IsDedekindDomain MeasureTheory NumberField Set
-open scoped BigOperators ContDiff ENNReal NNReal NumberField.AdeleRing Topology
+open scoped BigOperators ContDiff ENNReal NNReal NumberField.AdeleRing SchwartzMap Topology
 
 namespace RiemannMasullo
 
@@ -35,6 +39,7 @@ local notation "FlatL2" => Lp ℂ 2 (volume : Measure ℝ)
 local notation "include₁" => (ContinuousMonoidHom.mk
   (Subgroup.subtype (MonoidHom.ker (sIdeleQuotientNorm F S)))
   continuous_subtype_val : J₁ →ₜ* J)
+local notation "expLog" => fun x : ℝ ↦ positiveRealLogEquiv.symm (Multiplicative.ofAdd x)
 local notation "orbitOrder" =>
   (2 * (((∑ w : InfinitePlace F, InfinitePlace.mult w) + Fintype.card S) + 1) : ℕ)
 local notation "modS(" z ")" => ((∏ w : InfinitePlace F, ‖(z : A).1 w‖ ^ InfinitePlace.mult w) *
@@ -54,7 +59,8 @@ local instance instSIdeleT2CofinalCompressedTrace : T2Space I := (sIdeleGroup_de
 path, the actual order-zero full-band compressed traces of the smooth
 annular family agree asymptotically with the sharp orbital sum.
 Deviation: The test is a single angular type and the small-radius sharp bound
-is an explicit hypothesis. The limit retains the smooth frequency multiplier. -/
+is an explicit hypothesis. The limit retains the smooth frequency multiplier. In the trivial character
+the same operators have the order-zero polar trace correction. -/
 theorem exists_sLocalTrace_sqrtPath_compressedTrace_sub_sharpMass_tendsto_zero_orderZero
     (φ : BruhatCompactSupport C𝔽)
     (hPic : Subsingleton (CommRing.Pic ((S : Set V).integer F)))
@@ -96,6 +102,8 @@ theorem exists_sLocalTrace_sqrtPath_compressedTrace_sub_sharpMass_tendsto_zero_o
           χ.comp include₁ = angular ∧ (∀ t, χ (QuotientGroup.mk (τ t)) = 1) ∧
           sLocalFullReflectedGenAE τ angular χ T ∧
           (∀ r, (M r : ℝ → ℂ) =ᵐ[volume] fun x ↦ b (path L) (Real.exp (-x)) * r x) ∧
+          L⁻¹ + ε (path L) < L - ε (path L) ∧
+          sLocalReflectedPolarLineData (F := F) (S := S) angular (Real.sqrt L) T ∧
           let R : W₀ →L[ℂ] W₀ := lpCutoffMultiplier ν₀ (ρ (path L)) hρ.measurable hρ.abs_le_one
           let CΦ : W₀ →L[ℂ] W₀ := hardySobolevTestAction μJ Q 0 0 0 le_rfl le_rfl Φ
           Cn.val = (R.comp CΦ).comp (T.adjoint.comp (M.comp T))
@@ -104,8 +112,13 @@ theorem exists_sLocalTrace_sqrtPath_compressedTrace_sub_sharpMass_tendsto_zero_o
           (fun z ↦ b p (modS(z))) x (ξ.val * y).val) ∧
       (∀ᶠ L : ℝ in atTop, Actual L (C L) ∧ compressedTrace L (C L) =
         ∫ q, diag (path L) q ∂ν₀) ∧
-      Tendsto (fun L : ℝ ↦ compressedTrace L (C L) -
-        ∑' ξ : H, sLocalTraceSharpMass f ξ (L * Real.sqrt L)) atTop (𝓝 0) := by
+      (Tendsto (fun L : ℝ ↦ compressedTrace L (C L) -
+        ∑' ξ : H, sLocalTraceSharpMass f ξ (L * Real.sqrt L)) atTop (𝓝 0)) ∧
+      (angular = 1 → ∃ k : 𝓢(ℝ, ℂ),
+        (∀ x : ℝ, k x = ∫ h : J₁, Φ.val (h.val * QuotientGroup.mk (τ (expLog x)))
+          ∂(sLocalNormOneQuotientMeasure F S)) ∧
+        Tendsto (fun L : ℝ ↦ sLocalOrderZeroPolarTraceDifference (F := F) (S := S)
+          (Real.sqrt L) (C L)) atTop (𝓝 (∫ t, k t * (Real.exp (-|t| / 2) : ℂ)))) := by
   classical
   intro ε path N compressedTrace
   have hLiftGlobal (x : I) : HasSum (fun ξ : H ↦ f.val (ξ.val * x))
@@ -128,6 +141,8 @@ theorem exists_sLocalTrace_sqrtPath_compressedTrace_sub_sharpMass_tendsto_zero_o
       χ.comp include₁ = angular ∧ (∀ t, χ (QuotientGroup.mk (τ t)) = 1) ∧
       sLocalFullReflectedGenAE τ angular χ T ∧
       (∀ r, (M r : ℝ → ℂ) =ᵐ[volume] fun x ↦ b (path L) (Real.exp (-x)) * r x) ∧
+      L⁻¹ + ε (path L) < L - ε (path L) ∧
+      sLocalReflectedPolarLineData (F := F) (S := S) angular (Real.sqrt L) T ∧
       let R : W₀ →L[ℂ] W₀ := lpCutoffMultiplier ν₀ (ρ (path L)) hρ.measurable hρ.abs_le_one
       let CΦ : W₀ →L[ℂ] W₀ := hardySobolevTestAction μJ Q 0 0 0 le_rfl le_rfl Φ
       Cn.val = (R.comp CΦ).comp (T.adjoint.comp (M.comp T))
@@ -167,7 +182,7 @@ theorem exists_sLocalTrace_sqrtPath_compressedTrace_sub_sharpMass_tendsto_zero_o
         τ hτ f Φ hLift angular hΦ (b p) L (ε p) εb Cb (ρ p)
         hρ hInner hρAE hb hBdd hε hPlateau hDeriv B hB
     obtain ⟨χ, T, M, κ', hData⟩ := hBandTrace
-    obtain ⟨hχ, hsec, hGen, hM, hRep', hCertificate⟩ := hData
+    obtain ⟨hχ, hsec, hGen, hM, hLine, hRep', hCertificate⟩ := hData
     obtain ⟨hC, _, _, hCompressed⟩ := hCertificate
     have hκ : κ' = κ p := by
       funext q r
@@ -178,15 +193,128 @@ theorem exists_sLocalTrace_sqrtPath_compressedTrace_sub_sharpMass_tendsto_zero_o
     let R : W₀ →L[ℂ] W₀ := lpCutoffMultiplier ν₀ (ρ p) hρ.measurable hρ.abs_le_one
     let CΦ : W₀ →L[ℂ] W₀ := hardySobolevTestAction μJ Q 0 0 0 le_rfl le_rfl Φ
     let Cn : nuclearEndomorphisms W₀ := ⟨(R.comp CΦ).comp (T.adjoint.comp (M.comp T)), hC⟩
-    exact ⟨Cn, ⟨hρ, χ, T, M, hχ, hsec, hGen, hM, rfl⟩, hCompressed hCap⟩
+    exact ⟨Cn, ⟨hρ, χ, T, M, hχ, hsec, hGen, hM, hInner, hLine, rfl⟩, hCompressed hCap⟩
   let C (L : ℝ) : nuclearEndomorphisms W₀ :=
     if h : ∃ Cn, Good L Cn then Classical.choose h else 0
   have hC : ∀ᶠ L : ℝ in atTop, Good L (C L) := hGood.mono fun L h ↦ by
     rw [show C L = Classical.choose h by simp only [C, dite_eq_left h]]
     exact Classical.choose_spec h
-  refine ⟨σ, γ, κ, C, hLaw, hRep, hC, hLimit.congr' ?_⟩
-  filter_upwards [hC] with L hL
-  have hTrace : compressedTrace L (C L) = ∫ q, diag (path L) q ∂ν₀ := hL.2
-  rw [hTrace]
+  refine ⟨σ, γ, κ, C, hLaw, hRep, hC, hLimit.congr' ?_, ?_⟩
+  · filter_upwards [hC] with L hL
+    have hTrace : compressedTrace L (C L) = ∫ q, diag (path L) q ∂ν₀ := hL.2
+    rw [hTrace]
+  · intro hAngular
+    subst angular
+    let B (L : ℝ) := Real.sqrt (max 1 L)
+    let δ (L : ℝ) := ε (path L)
+    let radiusProfile (L t : ℝ) :=
+      Isolated.avgCutoff (σ (path L)) t -
+        Isolated.avgCutoff ((σ (path L)).map (Inv.inv : ℝ → ℝ)) t
+    let logMask (L : ℝ) : ℝ → ℝ :=
+      (Iic (Real.log L)).indicator (fun x ↦ radiusProfile L (Real.exp x))
+    have hB (L : ℝ) : 0 < B L :=
+      Real.sqrt_pos.mpr (zero_lt_one.trans_le (le_max_left _ _))
+    have hBeq : ∀ᶠ L : ℝ in atTop, B L = Real.sqrt L := by
+      filter_upwards [eventually_ge_atTop (1 : ℝ)] with L hL
+      simp only [B, max_eq_right hL]
+    have hWidth : Tendsto (fun L : ℝ ↦ Real.sqrt (δ L / B L)) atTop (𝓝 0) :=
+      tendsto_sqrt_reciprocalAnnulus_width_div_sqrt.congr'
+        (hBeq.mono fun L hL ↦ congrArg (fun d : ℝ ↦ Real.sqrt (δ L / d)) hL.symm)
+    have hLogMeas (L : ℝ) : Measurable (logMask L) := by
+      let : IsProbabilityMeasure (σ (path L)) := (hLaw (path L)).1
+      let : IsProbabilityMeasure ((σ (path L)).map (Inv.inv : ℝ → ℝ)) :=
+        inverseRadiusLaw_isProbabilityMeasure (σ (path L))
+      refine (Measurable.sub ?_ ?_).indicator measurableSet_Iic
+      · exact (Isolated.measurable_avgCutoff (σ (path L))).comp Real.continuous_exp.measurable
+      · exact (Isolated.measurable_avgCutoff ((σ (path L)).map (Inv.inv : ℝ → ℝ))).comp
+          Real.continuous_exp.measurable
+    have hLogBound (L x : ℝ) : |logMask L x| ≤ 1 := by
+      change |(Iic (Real.log L)).indicator (fun y ↦ radiusProfile L (Real.exp y)) x| ≤ 1
+      by_cases hx : x ∈ Iic (Real.log L)
+      · rw [indicator_of_mem hx]
+        let : IsProbabilityMeasure (σ (path L)) := (hLaw (path L)).1
+        let : IsProbabilityMeasure ((σ (path L)).map (Inv.inv : ℝ → ℝ)) :=
+          inverseRadiusLaw_isProbabilityMeasure (σ (path L))
+        apply abs_le.mpr
+        dsimp only [radiusProfile]
+        constructor
+        · linarith [Isolated.avgCutoff_nonneg (σ (path L)) (Real.exp x),
+            Isolated.avgCutoff_le_one ((σ (path L)).map (Inv.inv : ℝ → ℝ)) (Real.exp x)]
+        · linarith [Isolated.avgCutoff_le_one (σ (path L)) (Real.exp x),
+            Isolated.avgCutoff_nonneg ((σ (path L)).map (Inv.inv : ℝ → ℝ)) (Real.exp x)]
+      · rw [indicator_of_notMem hx, abs_zero]
+        exact zero_le_one
+    have hLogUpper (L x : ℝ) (hx : Real.log L < x) : logMask L x = 0 :=
+      indicator_of_notMem (not_le.mpr hx) _
+    have hExpLog (q : J) : Real.exp (ℓ q) = N q :=
+      Real.exp_log (NNReal.coe_pos.mpr (Units.zero_lt (Q q)))
+    have hLogEq (L : ℝ) (hMod : IsModulatedCutoff Q L (δ L) (ρ (path L))) :
+        logMask L ∘ ℓ = ρ (path L) := by
+      funext q
+      change (Iic (Real.log L)).indicator (fun x ↦ radiusProfile L (Real.exp x)) (ℓ q) =
+        ρ (path L) q
+      by_cases hq : ℓ q ∈ Iic (Real.log L)
+      · rw [indicator_of_mem hq, hExpLog]
+      · rw [indicator_of_notMem hq]
+        by_contra hne
+        have hMem : q ∈ tsupport (ρ (path L)) := subset_closure (mem_support.mpr (Ne.symm hne))
+        have hUpper : N q ≤ L := (hMod.support_subset hMem).2
+        exact hq (Real.log_le_log (NNReal.coe_pos.mpr (Units.zero_lt (Q q))) hUpper)
+    have hLogOne (z : ℝ) : ∀ᶠ L : ℝ in atTop, logMask L (z + -Real.log (B L)) = 1 := by
+      filter_upwards [hC, hBeq, eventually_mem_reciprocalAnnulus_centered_sqrt z] with L hGood hEq hz
+      obtain ⟨hMod, _, _, _, _⟩ := hGood.1
+      let x := z + -Real.log (B L)
+      let q : J := QuotientGroup.mk (τ (expLog x))
+      have hLog : ℓ q = x := by
+        have hn := (sIdeleQuotientNorm_mk F S (τ (expLog x))).trans (hτ (expLog x))
+        change Real.log ((sIdeleQuotientNorm F S q).val : ℝ) = x
+        rw [hn]
+        have h := congrArg Multiplicative.toAdd
+          (positiveRealLogEquiv.apply_symm_apply (Multiplicative.ofAdd x))
+        exact (positiveRealLogEquiv_apply _).symm.trans h
+      have hNorm : N q = Real.exp x := hLog ▸ (hExpLog q).symm
+      have hRad : Real.exp x = Real.exp z / Real.sqrt L := by
+        dsimp only [x]
+        rw [Real.exp_add, Real.exp_neg, Real.exp_log (hB L), hEq, div_eq_mul_inv]
+      change logMask L x = 1
+      rw [← hLog]
+      have he : logMask L (ℓ q) = ρ (path L) q := congrFun (hLogEq L hMod) q
+      rw [he]
+      apply hMod.eq_one
+      change N q ∈ Icc (L⁻¹ + δ L) (L - δ L)
+      rw [hNorm, hRad]
+      exact hz
+    have hPolar := @exists_sLocalSmoothPolarTraceDifference_tendsto_orderZero F _ _ S ℝ
+      atTop _ τ hτ Φ B (fun L ↦ Real.log L) δ hB logMask hLogMeas hLogBound hLogUpper
+      hLogOne hWidth C
+    have hActual : ∀ᶠ L : ℝ in atTop, Actual L (C L) := hC.mono fun _ h ↦ h.1
+    have hPlateauPos : ∀ᶠ L : ℝ in atTop, 0 < Real.sqrt L - δ L :=
+      hCut.mono fun _ h ↦ h.2.2.2.1
+    have hLimitPolar := hPolar (by
+      filter_upwards [hActual, hBeq, hPlateauPos] with L hAct hEq hδPos
+      obtain ⟨hMod, χ, T, M, hData⟩ := hAct
+      obtain ⟨_, _, _, hM, hInner, hLine, hOp⟩ := hData
+      let : IsProbabilityMeasure (γ (path L)) := (hLaw (path L)).2.1
+      have hδ : 0 ≤ δ L := by change 0 ≤ (1 + |L|)⁻¹; positivity
+      have hδB : δ L < B L := by
+        rw [hEq]
+        exact sub_pos.mp hδPos
+      have hNuc := isNuclearOperator_sLocalTrace_fixedAnnulus_testAction_comp
+        (F := F) (S := S) (s := 0) le_rfl Φ hMod
+        ⟨add_pos (inv_pos.mpr hMod.radius_pos) hMod.width_pos, hInner⟩
+        (ContinuousLinearMap.id ℂ W₀)
+      rw [ContinuousLinearMap.comp_id] at hNuc
+      have hR : logMask L ∘ ℓ = ρ (path L) := hLogEq L hMod
+      simp only [hR]
+      refine ⟨hNuc, hδ, hδB, T, M, Isolated.avgCutoff (γ (path L)), hM, ?_, ?_, ?_, hOp⟩
+      · intro r _
+        exact ⟨Isolated.avgCutoff_nonneg _ _, Isolated.avgCutoff_le_one _ _⟩
+      · intro r _ hr
+        rw [hEq] at hr
+        exact Isolated.avgCutoff_eq_one _ (hLaw (path L)).2.2.2 hr
+      · rw [hEq]
+        exact hLine)
+    obtain ⟨k, hk, hlim⟩ := hLimitPolar
+    exact ⟨k, hk, hlim.congr' (hBeq.mono fun L hL ↦ by rw [hL])⟩
 
 end RiemannMasullo
