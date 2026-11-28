@@ -63,6 +63,13 @@ private theorem upperProfile_derivatives_bounded {b : ℝ → ℂ} {n : ℕ} (hb
   let i : Fin (n + 1) := ⟨j, Nat.lt_succ_of_le hj⟩
   exact (hC i r hr).trans (Finset.single_le_sum (fun k _ ↦ hC₀ k) (Finset.mem_univ i))
 
+/-- A finite set of derivatives of a smooth profile vanishing above `B`
+is uniformly bounded on the nonnegative ray. -/
+theorem sLocalTrace_upperProfile_derivatives_bounded {b : ℝ → ℂ} {n : ℕ} (hb : ContDiff ℝ n b)
+    {B : ℝ} (hz : ∀ r, B < r → b r = 0) :
+    ∃ C : ℝ, ∀ j : ℕ, j ≤ n → ∀ r : ℝ, 0 ≤ r → ‖iteratedDeriv j b r‖ ≤ C :=
+  upperProfile_derivatives_bounded hb hz
+
 /-- Paper: Theorem 12.4.1.1, Steps II–III, pp. 515–519.
 For the given orbit kernel family, the integral of its weighted raw diagonal
 agrees asymptotically with the summed sharp masses as the upper cutoffs
