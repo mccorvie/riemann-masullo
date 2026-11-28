@@ -702,6 +702,59 @@ theorem exists_continuous_sLocalTraceOrbitSeries_of_localBounds
   obtain ⟨W, hW, hWbound⟩ := hmajor K L hK' hL
   exact ⟨W, hW, fun ξ p hp ↦ hWbound ξ p.1 hp.1 p.2 hp.2⟩
 
+private theorem sLocalTrace_modulus_mul_of_normOne
+    (a : I) (ha : sIdeleNorm F S a = 1) (z : A) : M(a.val * z) = M(z) := by
+  have hMa : M(a.val) = ((sIdeleNorm F S a).val : ℝ) := by
+    simp [sIdeleNorm, Units.coe_prod]
+  rw [ha] at hMa
+  change M(a.val) = 1 at hMa
+  change (∏ w : InfinitePlace F, ‖a.val.1 w * z.1 w‖ ^ w.mult) *
+    (∏ v : S, ‖a.val.2 v * z.2 v‖) = M(z)
+  simp only [norm_mul, mul_pow, Finset.prod_mul_distrib]
+  calc
+    _ = M(a.val) * M(z) := by ring
+    _ = _ := by rw [hMa, one_mul]
+
+/-- A smooth radial frequency profile gives a jointly continuous unmasked orbit
+kernel on the quotient. -/
+theorem exists_continuous_sLocalTraceOrbitSeries_radial
+    (f : BruhatCompactSupport I) (b : ℝ → ℂ) {ε C : ℝ}
+    (hb : ContDiff ℝ (2 : ℕ) b) (hε : 0 < ε)
+    (hplateau : EqOn b (fun _ ↦ b 0) (Icc 0 ε))
+    (hderiv : ∀ j ≤ (2 : ℕ), ∀ r, 0 ≤ r → ‖iteratedDeriv j b r‖ ≤ C) :
+    ∃ κ : J → J → ℂ, Continuous (Function.uncurry κ) ∧ ∀ x y : I,
+      κ (QuotientGroup.mk x) (QuotientGroup.mk y) =
+        ∑' ξ : H, sLocalTraceCutoffKernel f (fun _ ↦ 1)
+          (fun z ↦ b (M(z))) x (ξ.val * y).val := by
+  have hbound (r : ℝ) (hr : 0 ≤ r) : ‖b r‖ ≤ C := by
+    simpa only [iteratedDeriv_zero] using hderiv 0 (by decide) r hr
+  refine exists_continuous_sLocalTraceOrbitSeries_of_localBounds f (fun z ↦ b (M(z)))
+    (fun ξ z ↦ congrArg b (sLocalTrace_modulus_mul_of_normOne ξ.val
+      (sLocalTrace_unit_norm ξ) z))
+    (sLocalTraceCutoffKernel_continuous_radial f _ continuous_const b hb.continuous hbound) ?_
+  exact fun X Y hX hY ↦
+    sLocalTraceCutoffKernel_raw_radial_compact_majorant f b hb hε hplateau hderiv hX hY
+
+/-- A specified representative of the masked radial orbit series is the
+output mask times a jointly continuous unmasked representative. -/
+theorem exists_sLocalTrace_maskedRadialOrbitSeries_factor
+    (f : BruhatCompactSupport I) (b : ℝ → ℂ) (ρ : J → ℂ) (κ : J → J → ℂ)
+    {ε C : ℝ} (hb : ContDiff ℝ (2 : ℕ) b) (hε : 0 < ε)
+    (hplateau : EqOn b (fun _ ↦ b 0) (Icc 0 ε))
+    (hderiv : ∀ j ≤ (2 : ℕ), ∀ r, 0 ≤ r → ‖iteratedDeriv j b r‖ ≤ C)
+    (hRep : ∀ x y : I, κ (QuotientGroup.mk x) (QuotientGroup.mk y) =
+      ∑' ξ : H, sLocalTraceCutoffKernel f (fun z ↦ ρ (QuotientGroup.mk z))
+        (fun z ↦ b (M(z))) x (ξ.val * y).val) :
+    ∃ κ₀ : J → J → ℂ, Continuous (Function.uncurry κ₀) ∧
+      ∀ q y, κ q y = ρ q * κ₀ q y := by
+  obtain ⟨κ₀, hκ₀, hRep₀⟩ :=
+    exists_continuous_sLocalTraceOrbitSeries_radial f b hb hε hplateau hderiv
+  refine ⟨κ₀, hκ₀, fun q r ↦ ?_⟩
+  obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective q
+  obtain ⟨y, rfl⟩ := QuotientGroup.mk_surjective r
+  rw [hRep x y, hRep₀ x y, ← tsum_mul_left]
+  exact tsum_congr fun ξ ↦ by simp only [sLocalTraceCutoffKernel, one_mul]
+
 /-- A modulated cutoff acts on the output row of the continuous unmasked
 orbit kernel. The resulting kernel is measurable and vanishes off the
 compact output annulus, even for a cutoff with jumps. -/
@@ -808,18 +861,8 @@ public theorem exists_sLocalTrace_halfDensityOrbitKernel_fixed_annulus_data
   let π : I → J := QuotientGroup.mk
   let σ (z : A) := b (M(z))
   let ρI (x : I) : ℂ := ρ (π x)
-  have hσInv (a : I) (ha : sIdeleNorm F S a = 1) (z : A) : σ (a.val * z) = σ z := by
-    have hMa : M(a.val) = ((sIdeleNorm F S a).val : ℝ) := by
-      simp [sIdeleNorm, Units.coe_prod]
-    rw [ha] at hMa
-    change M(a.val) = 1 at hMa
-    apply congrArg b
-    change (∏ w : InfinitePlace F, ‖a.val.1 w * z.1 w‖ ^ w.mult) *
-      (∏ v : S, ‖a.val.2 v * z.2 v‖) = M(z)
-    simp only [norm_mul, mul_pow, Finset.prod_mul_distrib]
-    calc
-      _ = M(a.val) * M(z) := by ring
-      _ = _ := by rw [hMa, one_mul]
+  have hσInv (a : I) (ha : sIdeleNorm F S a = 1) (z : A) : σ (a.val * z) = σ z :=
+    congrArg b (sLocalTrace_modulus_mul_of_normOne a ha z)
   obtain ⟨p, _, hp, _⟩ := hρ.profile
   have hρInv (a : I) (ha : sIdeleNorm F S a = 1) (x : I) : ρI (a * x) = ρI x := by
     have hnorm : Q (π (a * x)) = Q (π x) := by
@@ -838,13 +881,8 @@ public theorem exists_sLocalTrace_halfDensityOrbitKernel_fixed_annulus_data
     omega
   have hb₂ : ContDiff ℝ (2 : ℕ) b := hb.of_le (by exact_mod_cast horder)
   have hderiv₂ (j : ℕ) (hj : j ≤ (2 : ℕ)) := hderiv j (hj.trans horder)
-  have hbound (r : ℝ) (hr : 0 ≤ r) : ‖b r‖ ≤ Cb := by
-    simpa only [iteratedDeriv_zero] using hderiv₂ 0 (by decide) r hr
-  obtain ⟨κ, hκ, hrep⟩ := exists_continuous_sLocalTraceOrbitSeries_of_localBounds
-    f σ (fun ξ z ↦ hσInv ξ.val (sLocalTrace_unit_norm ξ) z)
-    (sLocalTraceCutoffKernel_continuous_radial f _ continuous_const b hb.continuous hbound)
-    (fun X Y hX hY ↦ sLocalTraceCutoffKernel_raw_radial_compact_majorant
-      f b hb₂ hε hplateau hderiv₂ hX hY)
+  obtain ⟨κ, hκ, hrep⟩ :=
+    exists_continuous_sLocalTraceOrbitSeries_radial f b hb₂ hε hplateau hderiv₂
   obtain ⟨hZ, hK, hzero, hrepK⟩ :=
     sLocalTrace_maskedOrbitSeries_measurable_and_output_support f σ κ hκ hrep hρ
   let κρ (x y : J) := (ρ x : ℂ) * κ x y
