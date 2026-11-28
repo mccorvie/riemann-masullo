@@ -334,3 +334,206 @@ theorem exists_projectiveKernel_stripTestAction_spectralProjection_iff_support_i
 end KernelLocalization
 
 end RiemannMasullo.Isolated
+
+/-! ## Contractive transport between strip widths
+
+The narrowing map preserves the closed theta spaces. The resulting change of
+spectral projection energy splits into the weight change and an orthogonal loss.
+This is a global comparison for the strip projections in Theorem 12.5.1.1.
+-/
+
+namespace RiemannMasullo.Isolated
+
+open scoped InnerProductSpace
+
+section AbstractTransport
+
+variable {𝕜 H₀ H₁ : Type*} [RCLike 𝕜]
+  [NormedAddCommGroup H₀] [InnerProductSpace 𝕜 H₀]
+  [NormedAddCommGroup H₁] [InnerProductSpace 𝕜 H₁]
+  (Θ₀ : Submodule 𝕜 H₀) (Θ₁ : Submodule 𝕜 H₁)
+  [Θ₀.HasOrthogonalProjection] [Θ₁.HasOrthogonalProjection]
+  (J : H₁ →L[𝕜] H₀)
+
+/-- Transport that preserves the theta spaces can discard the wider theta
+component before taking the narrower complementary projection. -/
+private theorem starProjection_orthogonal_transport_apply (hJ : ∀ x ∈ Θ₁, J x ∈ Θ₀) (x : H₁) :
+    Θ₀ᗮ.starProjection (J x) = Θ₀ᗮ.starProjection (J (Θ₁ᗮ.starProjection x)) := by
+  have hx : x - Θ₁ᗮ.starProjection x ∈ Θ₁ := by
+    rw [Θ₁.starProjection_orthogonal_val, sub_sub_cancel]
+    exact (Θ₁.orthogonalProjectionOnto x).property
+  have hzero := Θ₀.starProjection_orthogonal_apply_eq_zero (hJ _ hx)
+  rw [map_sub, map_sub, sub_eq_zero] at hzero
+  exact hzero
+
+/-- The change of complementary projection energy splits into the norm change
+under transport and the squared part removed by the narrower projection. -/
+private theorem starProjection_orthogonal_transport_norm_sq_sub
+    (hJ : ∀ x ∈ Θ₁, J x ∈ Θ₀) (x : H₁) :
+    let P₀ := Θ₀ᗮ.starProjection
+    let P₁ := Θ₁ᗮ.starProjection
+    ‖P₁ x‖ ^ 2 - ‖P₀ (J x)‖ ^ 2 =
+      (‖P₁ x‖ ^ 2 - ‖J (P₁ x)‖ ^ 2) + ‖J (P₁ x) - P₀ (J (P₁ x))‖ ^ 2 := by
+  intro P₀ P₁
+  have heq : P₀ (J x) = P₀ (J (P₁ x)) :=
+    starProjection_orthogonal_transport_apply Θ₀ Θ₁ J hJ x
+  have hpyth := Θ₀ᗮ.norm_sq_eq_add_norm_sq_starProjection (J (P₁ x))
+  rw [Θ₀ᗮ.starProjection_orthogonal_val] at hpyth
+  change ‖J (P₁ x)‖ ^ 2 = ‖P₀ (J (P₁ x))‖ ^ 2 + ‖J (P₁ x) - P₀ (J (P₁ x))‖ ^ 2 at hpyth
+  rw [heq]
+  linarith
+
+/-- Under contractive transport, the orthogonal loss is a lower bound for the
+whole decrease in complementary projection energy. -/
+private theorem starProjection_orthogonal_transport_norm_sq_sub_ge
+    (hJ : ∀ x ∈ Θ₁, J x ∈ Θ₀) (hcontract : ‖J‖ ≤ 1) (x : H₁) :
+    let P₀ := Θ₀ᗮ.starProjection
+    let P₁ := Θ₁ᗮ.starProjection
+    ‖J (P₁ x) - P₀ (J (P₁ x))‖ ^ 2 ≤ ‖P₁ x‖ ^ 2 - ‖P₀ (J x)‖ ^ 2 := by
+  intro P₀ P₁
+  have hnorm : ‖J (P₁ x)‖ ≤ ‖P₁ x‖ :=
+    (J.le_opNorm _).trans (mul_le_of_le_one_left (norm_nonneg _) hcontract)
+  have hsquare := pow_le_pow_left₀ (norm_nonneg _) hnorm 2
+  rw [starProjection_orthogonal_transport_norm_sq_sub Θ₀ Θ₁ J hJ x]
+  linarith
+
+/-- A test vector from the narrower theta space gives a Cauchy–Schwarz lower
+bound for the compression loss, without division by its squared norm. -/
+private theorem starProjection_orthogonal_transport_inner_norm_sq_le
+    (hJ : ∀ x ∈ Θ₁, J x ∈ Θ₀) (hcontract : ‖J‖ ≤ 1) (x : H₁) {u : H₀} (hu : u ∈ Θ₀) :
+    let P₀ := Θ₀ᗮ.starProjection
+    let P₁ := Θ₁ᗮ.starProjection
+    ‖⟪u, J (P₁ x)⟫_𝕜‖ ^ 2 ≤ ‖u‖ ^ 2 * (‖P₁ x‖ ^ 2 - ‖P₀ (J x)‖ ^ 2) := by
+  intro P₀ P₁
+  let y := J (P₁ x)
+  have hz : ⟪u, P₀ y⟫_𝕜 = 0 :=
+    Submodule.inner_right_of_mem_orthogonal hu (Θ₀ᗮ.starProjection_apply_mem y)
+  have heq : ⟪u, y - P₀ y⟫_𝕜 = ⟪u, y⟫_𝕜 := by rw [inner_sub_right, hz, sub_zero]
+  calc
+    ‖⟪u, y⟫_𝕜‖ ^ 2 ≤ (‖u‖ * ‖y - P₀ y‖) ^ 2 := by
+      rw [← heq]
+      exact pow_le_pow_left₀ (norm_nonneg _) (norm_inner_le_norm _ _) 2
+    _ = ‖u‖ ^ 2 * ‖y - P₀ y‖ ^ 2 := mul_pow _ _ _
+    _ ≤ _ := mul_le_mul_of_nonneg_left
+      (starProjection_orthogonal_transport_norm_sq_sub_ge Θ₀ Θ₁ J hJ hcontract x)
+      (sq_nonneg _)
+
+end AbstractTransport
+
+section GlobalStripTransport
+
+open Filter MeasureTheory NumberField Set
+open scoped ENNReal
+
+attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorelSpaceSec1
+  instIdeleClassT2Sec1 instIdeleClassLocallyCompactSec1 instIdeleClassSecondCountableSec1
+  instIdeleClassHaarMeasureSec1
+
+variable {F : Type*} [Field F] [NumberField F]
+
+local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
+local notation "μ𝔽" => ideleClassTamagawaMeasure F
+local notation "W(" c ", " s ")" => CompactIntervalSobolev μ𝔽 (logIdeleClassNorm F) (-c) c s
+local notation "ν(" c ", " s ")" => intervalSobolevMeasure μ𝔽 (logIdeleClassNorm F) (-c) c s
+local notation "Θ(" a ", " hc ", " hs ")" => globalThetaSobolev F a (neg_le_self hc) hs
+
+private theorem intervalDensity_symmetric_mono {α β : ℝ} (hα : 0 ≤ α) (hαβ : α ≤ β) (s t : ℝ) :
+    intervalSobolevDensity (-α) α s t ≤ intervalSobolevDensity (-β) β s t := by
+  have hβ := hα.trans hαβ
+  unfold intervalSobolevDensity
+  apply mul_le_mul_of_nonneg_right _ (Real.rpow_nonneg (by positivity) _)
+  rcases le_total t 0 with ht | ht
+  · have hneg : 2 * (-α) * t ≤ 2 * (-β) * t :=
+      mul_le_mul_of_nonpos_right (mul_le_mul_of_nonneg_left (neg_le_neg hαβ) zero_le_two) ht
+    have hpos : 2 * α * t ≤ 2 * (-β) * t :=
+      mul_le_mul_of_nonpos_right (by linarith) ht
+    exact max_le ((Real.exp_le_exp.mpr hneg).trans (le_max_left _ _))
+      ((Real.exp_le_exp.mpr hpos).trans (le_max_left _ _))
+  · have hneg : 2 * (-α) * t ≤ 2 * β * t :=
+      mul_le_mul_of_nonneg_right (by linarith) ht
+    have hpos : 2 * α * t ≤ 2 * β * t :=
+      mul_le_mul_of_nonneg_right (mul_le_mul_of_nonneg_left hαβ zero_le_two) ht
+    exact max_le ((Real.exp_le_exp.mpr hneg).trans (le_max_right _ _))
+      ((Real.exp_le_exp.mpr hpos).trans (le_max_right _ _))
+
+/-- Narrowing the symmetric strip at fixed order and twist preserves the
+weighted theta generators of Definition 10.1.1.1(1), p. 434, and their closure. -/
+theorem exists_globalThetaSobolev_widthTransport (a : ℝ) {α β s : ℝ}
+    (hα : 0 ≤ α) (hαβ : α ≤ β) (hs : 0 ≤ s) :
+    ∃ J : W(β, s) →L[ℂ] W(α, s), ‖J‖ ≤ 1 ∧
+      (∀ x, (J x : C𝔽 → ℂ) =ᵐ[ν(α, s)] (x : C𝔽 → ℂ)) ∧
+      ∀ x ∈ Θ(a, hα.trans hαβ, hs), J x ∈ Θ(a, hα, hs) := by
+  have hβ := hα.trans hαβ
+  have hle : ν(α, s) ≤ ν(β, s) :=
+    withDensity_mono (ae_of_all _ fun g ↦ ENNReal.ofReal_le_ofReal
+      (intervalDensity_symmetric_mono hα hαβ s (logIdeleClassNorm F g)))
+  have hle' : ν(α, s) ≤ (1 : ℝ≥0∞) • ν(β, s) := by simpa only [one_smul] using hle
+  let L : W(β, s) →L[ℝ] W(α, s) :=
+    Lp.LpToLpOfMeasureLeSMul (E := ℂ) (p := 2) ENNReal.one_ne_top hle'
+  have hL (x : W(β, s)) : (L x : C𝔽 → ℂ) =ᵐ[ν(α, s)] (x : C𝔽 → ℂ) :=
+    Lp.coeFn_LpToLpOfMeasureLeSMul ENNReal.one_ne_top hle' x
+  let J : W(β, s) →L[ℂ] W(α, s) :=
+    { toFun := L
+      map_add' := L.map_add
+      map_smul' := fun c x ↦ Lp.ext <|
+        (hL (c • x)).trans (Filter.EventuallyEq.trans (ae_mono hle (Lp.coeFn_smul c x))
+          (((hL x).symm.fun_comp (c • ·)).trans (Lp.coeFn_smul c (L x)).symm))
+      cont := L.continuous }
+  have hJ (x : W(β, s)) : (J x : C𝔽 → ℂ) =ᵐ[ν(α, s)] (x : C𝔽 → ℂ) := hL x
+  refine ⟨J, ?_, hJ, ?_⟩
+  · rw [← ContinuousLinearMap.norm_restrictScalars (𝕜' := ℝ) J]
+    change ‖L‖ ≤ 1
+    simpa only [ENNReal.toReal_one, Real.one_rpow] using
+      Lp.norm_LpToLpOfMeasureLeSMul_le (E := ℂ) (p := 2) ENNReal.one_ne_top hle'
+  · let Eα := (existsUnique_globalThetaSobolevEmbedding (F := F) a (-α) α s
+      (neg_le_self hα) hs).exists.choose
+    let Eβ := (existsUnique_globalThetaSobolevEmbedding (F := F) a (-β) β s
+      (neg_le_self hβ) hs).exists.choose
+    have hgen (q) : J (Eβ q) = Eα q := by
+      induction q using Submodule.Quotient.induction_on with
+      | _ f =>
+        have hfα := (existsUnique_globalThetaSobolevEmbedding (F := F) a (-α) α s
+          (neg_le_self hα) hs).exists.choose_spec.2 f
+        have hfβ := (existsUnique_globalThetaSobolevEmbedding (F := F) a (-β) β s
+          (neg_le_self hβ) hs).exists.choose_spec.2 f
+        exact Lp.ext ((hJ _).trans ((withDensity_absolutelyContinuous _ _).ae_eq
+          (hfβ.trans hfα.symm)))
+    intro x hx
+    change x ∈ closure (Set.range Eβ) at hx
+    change J x ∈ closure (Set.range Eα)
+    have himage : J '' Set.range Eβ ⊆ Set.range Eα := by
+      rintro _ ⟨_, ⟨q, rfl⟩, rfl⟩
+      exact ⟨q, (hgen q).symm⟩
+    exact closure_mono himage
+      (image_closure_subset_closure_image J.continuous (Set.mem_image_of_mem J hx))
+
+/-- The spectral projections of Definition 10.4.1.1(2), p. 456, satisfy a
+two-term energy identity under the canonical narrowing transport. The orthogonal
+loss and the pairing with a narrower theta vector give lower bounds for the
+energy decrease. -/
+theorem exists_spectralProjection_widthTransport_norm_sq_sub (a : ℝ) {α β s : ℝ}
+    (hα : 0 ≤ α) (hαβ : α ≤ β) (hs : 0 ≤ s) :
+    ∃ J : W(β, s) →L[ℂ] W(α, s), ‖J‖ ≤ 1 ∧
+      (∀ x, (J x : C𝔽 → ℂ) =ᵐ[ν(α, s)] (x : C𝔽 → ℂ)) ∧
+      ∀ x, let Pα := spectralProjection (F := F) a hα hs
+           let Pβ := spectralProjection (F := F) a (hα.trans hαβ) hs
+           (‖Pβ x‖ ^ 2 - ‖Pα (J x)‖ ^ 2 =
+             (‖Pβ x‖ ^ 2 - ‖J (Pβ x)‖ ^ 2) + ‖J (Pβ x) - Pα (J (Pβ x))‖ ^ 2) ∧
+           ‖J (Pβ x) - Pα (J (Pβ x))‖ ^ 2 ≤ ‖Pβ x‖ ^ 2 - ‖Pα (J x)‖ ^ 2 ∧
+           ∀ u ∈ Θ(a, hα, hs),
+             ‖⟪u, J (Pβ x)⟫_ℂ‖ ^ 2 ≤ ‖u‖ ^ 2 * (‖Pβ x‖ ^ 2 - ‖Pα (J x)‖ ^ 2) := by
+  have hβ := hα.trans hαβ
+  obtain ⟨J, hJ, hrep, hmap⟩ := exists_globalThetaSobolev_widthTransport (F := F) a hα hαβ hs
+  let : CompleteSpace Θ(a, hα, hs) :=
+    (globalThetaSobolev_closed_complete_separable (F := F) a (neg_le_self hα) hs).2.1
+  let : CompleteSpace Θ(a, hβ, hs) :=
+    (globalThetaSobolev_closed_complete_separable (F := F) a (neg_le_self hβ) hs).2.1
+  exact ⟨J, hJ, hrep, fun x ↦ ⟨
+    starProjection_orthogonal_transport_norm_sq_sub Θ(a, hα, hs) Θ(a, hβ, hs) J hmap x,
+    starProjection_orthogonal_transport_norm_sq_sub_ge Θ(a, hα, hs) Θ(a, hβ, hs) J hmap hJ x,
+    fun _u hu ↦ starProjection_orthogonal_transport_inner_norm_sq_le
+      Θ(a, hα, hs) Θ(a, hβ, hs) J hmap hJ x hu⟩⟩
+
+end GlobalStripTransport
+
+end RiemannMasullo.Isolated
