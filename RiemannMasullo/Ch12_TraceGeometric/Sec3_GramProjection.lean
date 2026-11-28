@@ -1,7 +1,7 @@
 module
 
 public import RiemannMasullo.AppC_LCTVS.Sec3a
-public import Mathlib.LinearAlgebra.Trace
+public import Mathlib.Analysis.InnerProductSpace.Trace
 
 /-! # Gram correction for finite theta comparisons -/
 
@@ -76,5 +76,68 @@ theorem hilbertTrace_comp_gramProjection_comp {ι : Type*} [Fintype ι]
   simp_rw [htrace, term, hilbertTrace_smulRight]
   rw [LinearMap.trace_eq_matrix_trace ℂ b, Matrix.trace]
   simp [row, col, LinearMap.toMatrix_apply]
+
+/-- Paper: §12.3, p. 514 and (12.5.1.4), p. 520. In an orthonormal basis of the
+finite column space, the trace captured by an observation is the sum of the
+squared norms of the observed basis vectors.
+Deviation: this finite projection identity supports the comparison of the global diagonal. -/
+theorem hilbertTrace_comp_finiteProjection_comp_adjoint {ι : Type*} [Fintype ι]
+    (S : Submodule ℂ H) [S.HasOrthogonalProjection] (b : OrthonormalBasis ι ℂ S)
+    (A : H →L[ℂ] H) :
+    ∃ hN : IsNuclearOperator (A.comp (S.starProjection.comp A.adjoint)),
+      hilbertTrace ⟨_, hN⟩ = ∑ i, ((‖A (b i : H)‖ ^ 2 : ℝ) : ℂ) := by
+  classical
+  let : FiniteDimensional ℂ S := b.toBasis.finiteDimensional_of_finite
+  let : CompleteSpace S := FiniteDimensional.completeSpace ℂ S
+  have hRange : S.subtypeL.toLinearMap.range = S := S.range_subtype
+  let : S.subtypeL.toLinearMap.range.HasOrthogonalProjection :=
+    hRange.symm ▸ inferInstanceAs S.HasOrthogonalProjection
+  have hGram : (S.subtypeL.adjoint.comp S.subtypeL).comp (ContinuousLinearMap.id ℂ S) =
+      ContinuousLinearMap.id ℂ S := by
+    apply ContinuousLinearMap.ext
+    intro x
+    simpa only [ContinuousLinearMap.comp_apply, ContinuousLinearMap.id_apply,
+      S.adjoint_subtypeL, Submodule.subtypeL_apply] using
+      S.orthogonalProjectionOnto_mem_subspace_eq_self x
+  obtain ⟨hN, hTrace⟩ := hilbertTrace_comp_gramProjection_comp b.toBasis S.subtypeL
+    (ContinuousLinearMap.id ℂ S) hGram A A.adjoint
+  have hProjection : S.subtypeL.toLinearMap.range.starProjection = S.starProjection := by
+    rw [starProjection_range_eq_comp_gramInverse S.subtypeL _ hGram, S.adjoint_subtypeL]
+    rfl
+  have hMap := congrArg (fun P : H →L[ℂ] H ↦ A.comp (P.comp A.adjoint)) hProjection
+  have hN' : IsNuclearOperator (A.comp (S.starProjection.comp A.adjoint)) := hMap ▸ hN
+  have hSame : (⟨_, hN'⟩ : nuclearEndomorphisms H) = ⟨_, hN⟩ := Subtype.ext hMap.symm
+  refine ⟨hN', ?_⟩
+  rw [hSame, hTrace, LinearMap.trace_eq_sum_inner _ b]
+  apply Finset.sum_congr rfl
+  intro i _
+  change ⟪b i, S.subtypeL.adjoint (A.adjoint (A (S.subtypeL (b i))))⟫_ℂ = _
+  rw [S.subtypeL.adjoint_inner_right, A.adjoint_inner_right, inner_self_eq_norm_sq_to_K,
+    Complex.ofReal_pow]
+  rfl
+
+/-- Paper: §12.3, p. 514. A single unit vector in a finite column space gives a lower
+bound on the captured trace. The observation need only be evaluated on that vector.
+Deviation: this is a sufficient test for a finite projection in the comparison. -/
+theorem norm_sq_le_hilbertTrace_comp_finiteProjection_comp_adjoint
+    (S : Submodule ℂ H) [S.HasOrthogonalProjection] [FiniteDimensional ℂ S]
+    (v : S) (hv : ‖v‖ = 1) (A : H →L[ℂ] H) :
+    ∃ hN : IsNuclearOperator (A.comp (S.starProjection.comp A.adjoint)),
+      ‖A (v : H)‖ ^ 2 ≤ (hilbertTrace ⟨_, hN⟩).re := by
+  classical
+  have hOrthonormal : Orthonormal ℂ ((↑) : ({v} : Set S) → S) := by
+    rw [orthonormal_subsingleton_iff]
+    intro x
+    have hx : (x : S) = v := x.property
+    rw [hx, hv]
+  obtain ⟨u, b, hu, hb⟩ := hOrthonormal.exists_orthonormalBasis_extension
+  let i : u := ⟨v, hu (Set.mem_singleton v)⟩
+  obtain ⟨hN, hTrace⟩ := hilbertTrace_comp_finiteProjection_comp_adjoint S b A
+  refine ⟨hN, ?_⟩
+  rw [hTrace, Complex.re_sum]
+  simp only [Complex.ofReal_re]
+  have hi : b i = v := congrFun hb i
+  rw [← hi]
+  exact Finset.single_le_sum (fun j _ ↦ sq_nonneg ‖A (b j : H)‖) (Finset.mem_univ i)
 
 end RiemannMasullo
