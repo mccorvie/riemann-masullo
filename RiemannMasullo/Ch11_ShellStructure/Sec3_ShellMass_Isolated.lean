@@ -86,9 +86,11 @@ private theorem sum_prefixLoss_le_one (mass : ℕ → ℝ) (hm : Antitone mass)
     _ ≤ 1 := by rw [hzero]; exact sub_le_self _ (hpos N)
 
 /-- Paper: (11.3.1.4), p. 494, and Theorem 11.3.2.1, p. 495.
-With one normalized indentation from (12.2.2.2), p. 508, the sum of the absolute
-principal-orbit shell masses over any finite set of layers is bounded by the original
-quotient kernel value in norm. The successive prefix losses share one total mass. -/
+The sum of the absolute principal-orbit shell masses over any finite set of
+layers is bounded by the norm of the original quotient kernel value.
+Deviation: Replace the printed section weight (11.3.2.2) by a normalized
+indentation from (12.2.2.2), p. 508. The orbital Poisson equality requires
+a separate comparison. -/
 theorem sum_norm_divisorialKernelDifference_indentation_le (S : Finset V) (J : Finset ℕ)
     {b : I𝔽 → ℝ} (hb : IsIndentation H𝔽 Measure.count b)
     (K : (I𝔽 ⧸ H𝔽) × (I𝔽 ⧸ H𝔽) → ℂ) (x y : I𝔽) :
@@ -114,7 +116,10 @@ theorem sum_norm_divisorialKernelDifference_indentation_le (S : Finset V) (J : F
 
 /-- Paper: Theorem 11.3.2.1, p. 495. After any measured sampling of the two ideles,
 the integrated shell norms share the same absolute kernel integral as a bound. The
-pointwise estimate makes every measurable sampled shell integrable. -/
+pointwise estimate makes every measurable sampled shell integrable.
+Deviation: Integrate the bound for the normalized indentation (12.2.2.2), p. 508,
+in place of the printed section weight (11.3.2.2). The orbital Poisson equality
+requires a separate comparison. -/
 theorem sum_norm_integral_divisorialKernelDifference_indentation_le
     {Z : Type*} [MeasurableSpace Z] (μ : Measure Z) (S : Finset V) (J : Finset ℕ)
     {b : I𝔽 → ℝ} (hb : IsIndentation H𝔽 Measure.count b)
