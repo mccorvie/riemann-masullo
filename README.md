@@ -59,7 +59,9 @@ pull requests in all.
   paper; a step can stand in Lean as several smaller statements, each with its own issue, so
   the number of statements can rise when a step is narrowed.
 - **Five proof steps that the manuscript does not state precisely enough to formalize,** in
-  Chapters 7, 11 and 12. They have no Lean statement.
+  Chapters 7, 11 and 12. Sometimes we could not write the step in Lean without making a choice
+  that the paper does not specify. Sometimes the text is simply absent, as in a section that
+  reads only "Include section." They have no Lean statement.
 - **No classical input is left.** Six theorems of the literature were at first stated in Lean
   and used without proof. All are now proved there, the last on 27 November: Selberg's
   theorem on the zeros of ζ on the critical line, in the form the project uses.
