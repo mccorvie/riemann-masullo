@@ -2,6 +2,9 @@ module
 
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3
 public import RiemannMasullo.Ch10_TraceSpectral.Sec1
+public import RiemannMasullo.AppD_SchwartzBruhat.Sec3b
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1c
+import RiemannMasullo.Ch05_ThetaZSpaces.Sec4
 import RiemannMasullo.AppA_AlgebraicNT.Sec3
 import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import Mathlib.MeasureTheory.Integral.Bochner.Basic
@@ -169,6 +172,150 @@ public theorem exists_normOneAdditiveTest
   have hχc : HasCompactSupport χ :=
     (hφc.image (N).continuous).of_isClosed_subset (isClosed_tsupport χ) hχs
   exact exists_positiveAdditiveProfile χ hχ hχc
+
+end
+
+end RiemannMasullo.SLocalRadialAction
+
+namespace RiemannMasullo.SLocalRadialAction
+
+set_option quotPrecheck false
+
+open scoped ContDiff SchwartzMap
+
+noncomputable section
+
+attribute [local instance] instSIdeleQuotientMeasurableSpaceSec1
+  instSIdeleQuotientBorelSpaceSec1 instSIdeleQuotientT2Sec1
+  instSIdeleQuotientLocallyCompactSec1 instSIdeleQuotientSecondCountableSec1
+
+variable (F : Type*) [Field F] [NumberField F]
+  (S : Finset (HeightOneSpectrum (𝓞 F)))
+
+local notation "J" => SIdeleQuotient F S
+local notation "J₁" => (sIdeleQuotientNorm F S).ker
+local notation "N" => continuousSIdeleQuotientNorm F S
+
+/-- The norm-one character coefficient of a compactly supported Bruhat test on
+the S-idele quotient is a compactly supported Schwartz function in the logarithmic
+norm coordinate. The coefficient uses the supplied Haar measure. -/
+private theorem exists_normOneCharacterLogTest_of_haar
+    (τ : ℝ≥0ˣ →ₜ* J) (hτ : RightInverse τ (sIdeleQuotientNorm F S))
+    (φ : BruhatCompactSupport J) (character : PontryaginDual J₁)
+    (η : Measure J₁) [η.IsHaarMeasure] [η.Regular] :
+    ∃ k : 𝓢(ℝ, ℂ), HasCompactSupport (k : ℝ → ℂ) ∧ ∀ x : ℝ,
+      k x = ∫ h : J₁,
+        φ.val (h.val * τ (positiveRealLogEquiv.symm (Multiplicative.ofAdd x))) *
+          (character h : ℂ) ∂η := by
+  have hK : IsCompact (J₁ : Set J) :=
+    (isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1))
+  let : CompactSpace J₁ := isCompact_iff_compactSpace.mp hK
+  let : T1Space (J ⧸ J₁) := QuotientGroup.t1Space_iff.mpr hK.isClosed
+  have hτN : RightInverse τ N := hτ
+  have hm : IsModulation N := by
+    refine ⟨isProperMap_sIdeleQuotientNorm F S, ?_⟩
+    obtain ⟨t, ht⟩ := exists_ne (1 : ℝ≥0ˣ)
+    exact ⟨τ t, (hτN t).trans_ne ht⟩
+  have hf : φ.val ∈ schwartzBruhatSubmodule J := by
+    rw [← modulatedExponentialDecaySubmodule_singleton_zero N]
+    exact bruhatCompactSupport_le_modulatedExponentialDecay N {0} hm hτN.surjective
+      φ.property
+  let f : SchwartzBruhat J := ⟨φ.val, hf⟩
+  obtain ⟨χ, hχ, _⟩ := existsUnique_sLocalNormSectionCharacter τ hτ character
+  obtain ⟨M, hM⟩ := exists_schwartzBruhat_characterEquiv χ
+  let Q := schwartzBruhatCosetIntegral J₁ η hK.isClosed (M f)
+  let d : (J ⧸ J₁) ≃ₜ* ℝ≥0ˣ :=
+    { QuotientGroup.quotientKerEquivOfRightInverse (sIdeleQuotientNorm F S) τ hτ with
+      continuous_toFun :=
+        (QuotientGroup.isQuotientMap_mk J₁).continuous_iff.mpr (N).continuous
+      continuous_invFun := QuotientGroup.continuous_mk.comp τ.continuous }
+  let c := d.trans positiveRealLogEquiv
+  obtain ⟨E, hE⟩ := schwartzBruhat_realCoordinate_equiv c
+  let k := E.symm Q
+  let U (x : ℝ) := positiveRealLogEquiv.symm (Multiplicative.ofAdd x)
+  have hU (x : ℝ) : (positiveRealLogEquiv (U x)).toAdd = x := by
+    exact congrArg Multiplicative.toAdd
+      (positiveRealLogEquiv.apply_symm_apply (Multiplicative.ofAdd x))
+  have hcoord (x : ℝ) :
+      (c (QuotientGroup.mk (τ (U x)))).toAdd = x := by
+    change (positiveRealLogEquiv (N (τ (U x)))).toAdd = x
+    rw [hτN]
+    exact hU x
+  have hχker (h : J₁) : χ h.val = character h :=
+    congrArg (fun z : PontryaginDual J₁ ↦ z h) hχ.1
+  have hk (x : ℝ) :
+      k x = ∫ h : J₁, φ.val (h.val * τ (U x)) * (character h : ℂ) ∂η := by
+    calc
+      k x = E k (QuotientGroup.mk (τ (U x))) := by
+        rw [hE, hcoord]
+      _ = Q (QuotientGroup.mk (τ (U x))) := congrArg
+        (fun v : SchwartzBruhat (J ⧸ J₁) ↦ v (QuotientGroup.mk (τ (U x))))
+        (E.apply_symm_apply Q)
+      _ = ∫ h : J₁, M f (τ (U x) * h.val) ∂η :=
+        schwartzBruhatCosetIntegral_mk J₁ η hK.isClosed (M f) (τ (U x))
+      _ = _ := by
+        apply integral_congr_ae
+        apply Filter.Eventually.of_forall
+        intro h
+        have hφ : f (τ (U x) * h.val) = φ.val (h.val * τ (U x)) := by
+          change φ.val (τ (U x) * h.val) = _
+          rw [mul_comm]
+        change M f (τ (U x) * h.val) = φ.val (h.val * τ (U x)) * (character h : ℂ)
+        calc
+          _ = (χ (τ (U x) * h.val) : ℂ) * f (τ (U x) * h.val) := by
+            with_unfolding_all exact hM f (τ (U x) * h.val)
+          _ = _ := by rw [map_mul, hχ.2, one_mul, hχker, hφ, mul_comm]
+  let logN (z : J) : ℝ := (positiveRealLogEquiv (N z)).toAdd
+  have hlogN : Continuous logN :=
+    continuous_toAdd.comp (positiveRealLogEquiv.continuous.comp (N).continuous)
+  refine ⟨k, HasCompactSupport.intro (φ.property.2.image hlogN) ?_, hk⟩
+  intro x hx
+  have hvanish (h : J₁) : φ.val (h.val * τ (U x)) = 0 := by
+    apply image_eq_zero_of_notMem_tsupport
+    intro hh
+    apply hx
+    refine ⟨h.val * τ (U x), hh, ?_⟩
+    change (positiveRealLogEquiv (N (h.val * τ (U x)))).toAdd = x
+    rw [map_mul, show N h.val = 1 from h.property, one_mul, hτN]
+    exact hU x
+  rw [hk]
+  simp only [hvanish, zero_mul, integral_zero]
+
+/-- Equal measurable structures transport a Haar measure and preserve its integrals. -/
+private theorem exists_haarMeasure_changeMeasurableSpace {K : Type*} [Group K]
+    [TopologicalSpace K] {m₁ m₂ : MeasurableSpace K} (hm : m₁ = m₂)
+    (μ : @Measure K m₁) (hH : @Measure.IsHaarMeasure K _ _ m₁ μ)
+    (hR : @Measure.Regular K m₁ _ μ) :
+    ∃ ν : @Measure K m₂, (@Measure.IsHaarMeasure K _ _ m₂ ν) ∧
+      (@Measure.Regular K m₂ _ ν) ∧
+      ∀ f : K → ℂ, (∫ x, f x ∂ν) = ∫ x, f x ∂μ := by
+  subst m₂
+  exact ⟨μ, hH, hR, fun _ ↦ rfl⟩
+
+/-- Auxiliary result for Theorem 12.4.1.1, p. 514 n. 2. The norm-one
+character coefficient of a compact Bruhat quotient test gives a compactly
+supported real Schwartz function in logarithmic norm.
+The integral uses the full norm-one Tamagawa Haar measure. -/
+public theorem exists_normOneCharacterLogTest
+    (τ : ℝ≥0ˣ →ₜ* J) (hτ : RightInverse τ (sIdeleQuotientNorm F S))
+    (φ : BruhatCompactSupport J) (character : PontryaginDual J₁) :
+    ∃ k : 𝓢(ℝ, ℂ), HasCompactSupport (k : ℝ → ℂ) ∧ ∀ x : ℝ,
+      k x = ∫ h : J₁,
+        φ.val (h.val * τ (positiveRealLogEquiv.symm (Multiplicative.ofAdd x))) *
+          (character h : ℂ) ∂sLocalNormOneQuotientMeasure F S := by
+  have hspace : borel J₁ = (inferInstance : MeasurableSpace J₁) := by
+    change borel J₁ = (borel J).comap (Subtype.val : J₁ → J)
+    exact borel_comap
+  let μ : @Measure J₁ (borel J₁) := sLocalNormOneQuotientMeasure F S
+  have hh : @Measure.IsHaarMeasure J₁ _ _ (borel J₁) μ :=
+    (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  have hr : @Measure.Regular J₁ (borel J₁) _ μ :=
+    (sLocalNormOneQuotientMeasure_existsUnique (F := F) (S := S)).exists.choose_spec.2.1
+  obtain ⟨ν, hν, hνr, hInt⟩ := exists_haarMeasure_changeMeasurableSpace hspace μ hh hr
+  let : ν.IsHaarMeasure := hν
+  let : ν.Regular := hνr
+  obtain ⟨k, hc, hk⟩ := exists_normOneCharacterLogTest_of_haar F S τ hτ φ character ν
+  exact ⟨k, hc, fun x ↦ (hk x).trans (hInt _)⟩
 
 end
 
