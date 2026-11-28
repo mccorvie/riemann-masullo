@@ -168,6 +168,74 @@ integrates to the sum of the upper smoothed masses minus the smoothed
 spatial floor. Inversion of the S-unit index matches the skew diagonal.
 Deviation: The cutoff profiles come from positive radius laws, and the
 identity concerns the raw quotient diagonal. -/
+theorem exists_sLocalTrace_fixedAnnulus_smoothMass_difference_hasSum
+    (τ : ℝ≥0ˣ →ₜ* I) (hτ : RightInverse τ (sIdeleNorm F S))
+    (f : BruhatCompactSupport I) (D : Set I) (hD : IsFundamentalDomain H D μI)
+    (σTop σFloor γ : Measure ℝ)
+    [IsProbabilityMeasure σTop] [IsProbabilityMeasure σFloor] [IsProbabilityMeasure γ]
+    {lTop L lFloor A₀ c B : ℝ} (hTop : 0 < lTop) (hFloor : 0 < lFloor) (hc : 0 < c)
+    (hσTop : σTop (Icc lTop L)ᶜ = 0) (hσFloor : σFloor (Icc lFloor A₀)ᶜ = 0)
+    (hγ : γ (Icc c B)ᶜ = 0)
+    (b : ℝ → ℂ) {Λ ερ εb Cb s : ℝ} {ρ : J → ℝ}
+    (hρ : IsModulatedCutoff Q Λ ερ ρ) (hs : 0 ≤ s)
+    (hρLaw : ∀ q : J, ρ q = Isolated.avgCutoff σTop ((Q q).val : ℝ) -
+      Isolated.avgCutoff σFloor ((Q q).val : ℝ))
+    (hbLaw : ∀ r : ℝ, 0 ≤ r → b r = (Isolated.avgCutoff γ r : ℂ))
+    (hb : ContDiff ℝ (2 * (((∑ w : InfinitePlace F, w.mult) + Fintype.card S) + 1) : ℕ) b)
+    (hε : 0 < εb) (hplateau : EqOn b (fun _ ↦ b 0) (Icc 0 εb))
+    (hderiv : ∀ j ≤ 2 * (((∑ w : InfinitePlace F, w.mult) + Fintype.card S) + 1),
+      ∀ r, 0 ≤ r → ‖iteratedDeriv j b r‖ ≤ Cb) :
+    let N (q : J) : ℝ := (Q q).val
+    let ℓ := logSIdeleQuotientNorm F S
+    let ν := intervalSobolevMeasure μJ ℓ 0 0 s
+    ∃ κ : J → J → ℂ,
+      (∀ x y : I, κ (QuotientGroup.mk x) (QuotientGroup.mk y) =
+        ∑' ξ : H, sLocalTraceCutoffKernel f (fun x ↦ (ρ (QuotientGroup.mk x) : ℂ))
+          (fun z ↦ b (modS(z))) x (ξ.val * y).val) ∧
+      let diag (q : J) := (Real.sqrt (N q * N q) : ℂ) * κ q q /
+        ((sLocalTraceMeasureFactor S : ℂ) * (intervalSobolevDensity 0 0 s (ℓ q) : ℂ))
+      Integrable diag ν ∧
+      HasSum (fun ξ : H ↦ Isolated.sLocalSmoothMass f ξ D σTop γ L -
+        Isolated.sLocalSmoothMass f ξ D σFloor γ A₀) (∫ q, diag q ∂ν) := by
+  intro N ℓ ν
+  obtain ⟨κ, hRep, _, hDiag, hAffineSum⟩ :=
+    exists_sLocalTrace_fixedAnnulus_affineDiagonal_hasSum τ hτ f b hρ hs hb hε hplateau hderiv
+  refine ⟨κ, hRep, hDiag, ?_⟩
+  let d (ξ : H) (t : ℝ≥0ˣ) :=
+    (ρ (QuotientGroup.mk (τ t)) : ℂ) * annularAffineFrequency f ξ b t
+  let dTop (ξ : H) (t : ℝ≥0ˣ) :=
+    (Isolated.avgCutoff σTop (t.val : ℝ) : ℂ) *
+      annularAffineFrequency f ξ (fun u ↦ (Isolated.avgCutoff γ u : ℂ)) t
+  let dFloor (ξ : H) (t : ℝ≥0ˣ) :=
+    (Isolated.avgCutoff σFloor (t.val : ℝ) : ℂ) *
+      annularAffineFrequency f ξ (fun u ↦ (Isolated.avgCutoff γ u : ℂ)) t
+  let M (ξ : H) := Isolated.sLocalSmoothMass f ξ D σTop γ L -
+    Isolated.sLocalSmoothMass f ξ D σFloor γ A₀
+  have hterm (ξ : H) : vol₁ * (∫ t, d ξ t ∂positiveRealHaar) = M ξ⁻¹ := by
+    obtain ⟨hTopI, hTopE⟩ := smoothMass_eq_annularAffineProfile τ hτ f ξ D hD
+      σTop γ hTop hc hσTop hγ
+    obtain ⟨hFloorI, hFloorE⟩ := smoothMass_eq_annularAffineProfile τ hτ f ξ D hD
+      σFloor γ hFloor hc hσFloor hγ
+    have heq : d ξ = fun t ↦ dTop ξ t - dFloor ξ t := by
+      funext t
+      have hn : Q (QuotientGroup.mk (τ t)) = t :=
+        (sIdeleQuotientNorm_mk F S _).trans (hτ t)
+      have hbEq : annularAffineFrequency f ξ b t =
+          annularAffineFrequency f ξ (fun u ↦ (Isolated.avgCutoff γ u : ℂ)) t := by
+        apply integral_congr_ae
+        refine ae_of_all _ fun w ↦ ?_
+        let phase := tamagawaFourier νA ψ (sLocalTraceEta f 1) w *
+          (ψ (w * (ξ.val.val - 1)) : ℂ)
+        have hProfile := hbLaw (modS(w) / (t.val : ℝ))
+          (div_nonneg (by positivity) (NNReal.coe_nonneg _))
+        simpa only [mul_assoc, phase] using congrArg (fun z : ℂ ↦ z * phase) hProfile
+      simp only [d, dTop, dFloor, hρLaw, hn, Complex.ofReal_sub, hbEq, sub_mul]
+    rw [heq, integral_sub hTopI hFloorI, mul_sub, hTopE, hFloorE]
+  change HasSum M _
+  apply ((Equiv.inv H).hasSum_iff (f := M)).mp
+  exact hAffineSum.congr_fun fun ξ ↦ (hterm ξ).symm
+
+/-- The raw annular diagonal integral is the difference of the smooth orbital masses, summed over the S-units. -/
 theorem exists_sLocalTrace_fixedAnnulus_smoothMass_difference
     (τ : ℝ≥0ˣ →ₜ* I) (hτ : RightInverse τ (sIdeleNorm F S))
     (f : BruhatCompactSupport I) (D : Set I) (hD : IsFundamentalDomain H D μI)
@@ -199,42 +267,9 @@ theorem exists_sLocalTrace_fixedAnnulus_smoothMass_difference
         (Isolated.sLocalSmoothMass f ξ D σTop γ L -
           Isolated.sLocalSmoothMass f ξ D σFloor γ A₀) := by
   intro N ℓ ν
-  obtain ⟨κ, hRep, _, hDiag, hIntegral⟩ :=
-    exists_sLocalTrace_fixedAnnulus_affineDiagonal_integral τ hτ f b hρ hs hb hε hplateau hderiv
-  refine ⟨κ, hRep, hDiag, hIntegral.trans ?_⟩
-  let d (ξ : H) (t : ℝ≥0ˣ) :=
-    (ρ (QuotientGroup.mk (τ t)) : ℂ) * annularAffineFrequency f ξ b t
-  let dTop (ξ : H) (t : ℝ≥0ˣ) :=
-    (Isolated.avgCutoff σTop (t.val : ℝ) : ℂ) *
-      annularAffineFrequency f ξ (fun u ↦ (Isolated.avgCutoff γ u : ℂ)) t
-  let dFloor (ξ : H) (t : ℝ≥0ˣ) :=
-    (Isolated.avgCutoff σFloor (t.val : ℝ) : ℂ) *
-      annularAffineFrequency f ξ (fun u ↦ (Isolated.avgCutoff γ u : ℂ)) t
-  let M (ξ : H) := Isolated.sLocalSmoothMass f ξ D σTop γ L -
-    Isolated.sLocalSmoothMass f ξ D σFloor γ A₀
-  have hterm (ξ : H) : vol₁ * (∫ t, d ξ t ∂positiveRealHaar) = M ξ⁻¹ := by
-    obtain ⟨hTopI, hTopE⟩ := smoothMass_eq_annularAffineProfile τ hτ f ξ D hD
-      σTop γ hTop hc hσTop hγ
-    obtain ⟨hFloorI, hFloorE⟩ := smoothMass_eq_annularAffineProfile τ hτ f ξ D hD
-      σFloor γ hFloor hc hσFloor hγ
-    have heq : d ξ = fun t ↦ dTop ξ t - dFloor ξ t := by
-      funext t
-      have hn : Q (QuotientGroup.mk (τ t)) = t :=
-        (sIdeleQuotientNorm_mk F S _).trans (hτ t)
-      have hbEq : annularAffineFrequency f ξ b t =
-          annularAffineFrequency f ξ (fun u ↦ (Isolated.avgCutoff γ u : ℂ)) t := by
-        apply integral_congr_ae
-        refine ae_of_all _ fun w ↦ ?_
-        let phase := tamagawaFourier νA ψ (sLocalTraceEta f 1) w *
-          (ψ (w * (ξ.val.val - 1)) : ℂ)
-        have hProfile := hbLaw (modS(w) / (t.val : ℝ))
-          (div_nonneg (by positivity) (NNReal.coe_nonneg _))
-        simpa only [mul_assoc, phase] using congrArg (fun z : ℂ ↦ z * phase) hProfile
-      simp only [d, dTop, dFloor, hρLaw, hn, Complex.ofReal_sub, hbEq, sub_mul]
-    rw [heq, integral_sub hTopI hFloorI, mul_sub, hTopE, hFloorE]
-  change vol₁ * (∑' ξ, ∫ t, d ξ t ∂positiveRealHaar) = ∑' ξ, M ξ
-  rw [← tsum_mul_left]
-  simp_rw [hterm]
-  exact (Equiv.inv H).tsum_eq M
+  obtain ⟨κ, hRep, hDiag, hSum⟩ :=
+    exists_sLocalTrace_fixedAnnulus_smoothMass_difference_hasSum τ hτ f D hD σTop σFloor γ
+      hTop hFloor hc hσTop hσFloor hγ b hρ hs hρLaw hbLaw hb hε hplateau hderiv
+  exact ⟨κ, hRep, hDiag, hSum.tsum_eq.symm⟩
 
 end RiemannMasullo

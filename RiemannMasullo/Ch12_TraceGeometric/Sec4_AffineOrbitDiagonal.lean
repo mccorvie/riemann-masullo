@@ -45,7 +45,7 @@ Cancelling the Sobolev density gives the absolutely unfolded sum of
 smooth affine orbital integrals at a fixed annulus.
 Deviation: This computes the raw diagonal and retains the smooth cutoff
 profiles in the orbital integrals. -/
-theorem exists_sLocalTrace_fixedAnnulus_affineDiagonal_integral
+theorem exists_sLocalTrace_fixedAnnulus_affineDiagonal_hasSum
     (τ : ℝ≥0ˣ →ₜ* I) (hτ : RightInverse τ (sIdeleNorm F S))
     (f : BruhatCompactSupport I) (b : ℝ → ℂ) {Λ ερ εb Cb s : ℝ} {ρ : J → ℝ}
     (hρ : IsModulatedCutoff Q Λ ερ ρ) (hs : 0 ≤ s)
@@ -70,8 +70,8 @@ theorem exists_sLocalTrace_fixedAnnulus_affineDiagonal_integral
       let W (q : J) := intervalSobolevDensity 0 0 s (ℓ q)
       let Dν (q : J) := (Real.sqrt (N q * N q) : ℂ) * κ q q / (c * (W q : ℂ))
       Integrable D μ ∧ Integrable Dν ν ∧
-      (∫ q, Dν q ∂ν) = ((sLocalNormOneQuotientMeasure F S univ).toReal : ℂ) *
-        ∑' ξ : H, ∫ t, d ξ t ∂positiveRealHaar := by
+      HasSum (fun ξ : H ↦ ((sLocalNormOneQuotientMeasure F S univ).toReal : ℂ) *
+        ∫ t, d ξ t ∂positiveRealHaar) (∫ q, Dν q ∂ν) := by
   classical
   intro π N c K d
   let η := sLocalNormOneQuotientMeasure F S
@@ -274,11 +274,57 @@ theorem exists_sLocalTrace_fixedAnnulus_affineDiagonal_integral
     change (∫ q, Dν q ∂((μ).withDensity density)) = _
     rw [integral_withDensity_eq_integral_toReal_smul hDensityM hDensityFin]
     exact integral_congr_ae (ae_of_all _ hCancel)
-  refine ⟨κ, hRep, hDI, hDν, ?_⟩
-  calc
-    (∫ q, Dν q ∂ν) = ∫ q, D q ∂μ := hDensityIntegral
-    _ = ∫ q, ∑' ξ : H, U ξ q ∂μ := integral_congr_ae (ae_of_all _ hpoint)
-    _ = ∑' ξ : H, ∫ q, U ξ q ∂μ := integral_tsum (fun ξ ↦ (hU ξ).aestronglyMeasurable) hfin.ne
-    _ = _ := by simp_rw [hrad, tsum_mul_left, η]
+  have hsumU : Summable (fun ξ : H ↦ ∫ q, U ξ q ∂μ) := by
+    apply Summable.of_norm
+    apply (ENNReal.tsum_coe_ne_top_iff_summable_coe
+      (f := fun ξ : H ↦ ‖∫ q, U ξ q ∂μ‖₊)).mp
+    change (∑' ξ : H, ‖∫ q, U ξ q ∂μ‖ₑ) ≠ ⊤
+    have hle : (∑' ξ : H, ‖∫ q, U ξ q ∂μ‖ₑ) ≤ ∑' ξ : H, ∫⁻ q, ‖U ξ q‖ₑ ∂μ :=
+      tsum_le_tsum fun ξ ↦ eNorm_integral_le_lintegral_eNorm (U ξ)
+    exact (hle.trans_lt hfin).ne
+  have hHasSum : HasSum (fun ξ : H ↦ ∫ q, U ξ q ∂μ) (∫ q, Dν q ∂ν) := by
+    have hEq : (∫ q, Dν q ∂ν) = ∑' ξ : H, ∫ q, U ξ q ∂μ := by
+      calc
+        (∫ q, Dν q ∂ν) = ∫ q, D q ∂μ := hDensityIntegral
+        _ = ∫ q, ∑' ξ : H, U ξ q ∂μ := integral_congr_ae (ae_of_all _ hpoint)
+        _ = ∑' ξ : H, ∫ q, U ξ q ∂μ :=
+          integral_tsum (fun ξ ↦ (hU ξ).aestronglyMeasurable) hfin.ne
+    rw [hEq]
+    exact hsumU.hasSum
+  exact ⟨κ, hRep, hDI, hDν, hHasSum.congr_fun fun ξ ↦ (hrad ξ).symm⟩
+
+/-- The integral of the weighted raw diagonal is the sum of its affine radial orbital integrals. -/
+theorem exists_sLocalTrace_fixedAnnulus_affineDiagonal_integral
+    (τ : ℝ≥0ˣ →ₜ* I) (hτ : RightInverse τ (sIdeleNorm F S))
+    (f : BruhatCompactSupport I) (b : ℝ → ℂ) {Λ ερ εb Cb s : ℝ} {ρ : J → ℝ}
+    (hρ : IsModulatedCutoff Q Λ ερ ρ) (hs : 0 ≤ s)
+    (hb : ContDiff ℝ (2 * (((∑ w : InfinitePlace F, w.mult) + Fintype.card S) + 1) : ℕ) b)
+    (hε : 0 < εb) (hplateau : EqOn b (fun _ ↦ b 0) (Icc 0 εb))
+    (hderiv : ∀ j ≤ 2 * (((∑ w : InfinitePlace F, w.mult) + Fintype.card S) + 1),
+      ∀ r, 0 ≤ r → ‖iteratedDeriv j b r‖ ≤ Cb) :
+    let π (x : I) : J := QuotientGroup.mk x
+    let N (q : J) : ℝ := (Q q).val
+    let c : ℂ := sLocalTraceMeasureFactor S
+    let K : I → A → ℂ := sLocalTraceCutoffKernel f
+      (fun x ↦ (ρ (π x) : ℂ)) (fun z ↦ b (modS(z)))
+    let d (ξ : H) (t : ℝ≥0ˣ) : ℂ := (ρ (π (τ t)) : ℂ) *
+      ∫ w : A, b (modS(w) / (t.val : ℝ)) *
+        tamagawaFourier νA ψ (sLocalTraceEta f 1) w *
+        (ψ (w * (ξ.val.val - 1)) : ℂ) ∂νA
+    ∃ κ : J → J → ℂ,
+      (∀ x y : I, κ (π x) (π y) = ∑' ξ : H, K x (ξ.val * y).val) ∧
+      let D (q : J) := (N q : ℂ) / c * κ q q
+      let ℓ := logSIdeleQuotientNorm F S
+      let ν := intervalSobolevMeasure μ ℓ 0 0 s
+      let W (q : J) := intervalSobolevDensity 0 0 s (ℓ q)
+      let Dν (q : J) := (Real.sqrt (N q * N q) : ℂ) * κ q q / (c * (W q : ℂ))
+      Integrable D μ ∧ Integrable Dν ν ∧
+      (∫ q, Dν q ∂ν) = ((sLocalNormOneQuotientMeasure F S univ).toReal : ℂ) *
+        ∑' ξ : H, ∫ t, d ξ t ∂positiveRealHaar := by
+  intro π N c K d
+  obtain ⟨κ, hRep, hD, hDν, hSum⟩ :=
+    exists_sLocalTrace_fixedAnnulus_affineDiagonal_hasSum τ hτ f b hρ hs hb hε hplateau hderiv
+  refine ⟨κ, hRep, hD, hDν, ?_⟩
+  simpa only [tsum_mul_left] using hSum.tsum_eq.symm
 
 end RiemannMasullo
