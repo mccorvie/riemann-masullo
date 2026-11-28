@@ -43,7 +43,7 @@ local notation "phase(" χ "," ξ ")" => sLocalRhoFactor
     (ContinuousMonoidHom.comp circleCoe χ) (sLocalRadialThetaCriticalParameter ξ))
 local notation "expLog" => fun x : ℝ ↦ positiveRealLogEquiv.symm (Multiplicative.ofAdd x)
 
-local instance : MeasurableSpace J₁ := borel _
+local instance instNormOneMeasurableActualPolarTraceLimit : MeasurableSpace J₁ := borel _
 
 /-- An L² isometry described by a Fourier multiplier is determined by that
 multiplier up to almost-everywhere equality. -/

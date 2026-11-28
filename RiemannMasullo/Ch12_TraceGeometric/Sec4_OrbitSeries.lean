@@ -23,7 +23,7 @@ local notation "ν" => sAdditiveTamagawaMeasure F S
 
 attribute [local instance] instSAdeleMeasurableSpaceSec1 instSIdeleLocallyCompactSec1
 
-local instance : T2Space I := (sIdeleGroup_description F S).2.1
+local instance instSIdeleT2OrbitSeries : T2Space I := (sIdeleGroup_description F S).2.1
 
 /-- A norm-one S-idele preserves additive Tamagawa measure. Extend it by one
 outside S and transfer the global change of variables through the integral-tail projection. -/

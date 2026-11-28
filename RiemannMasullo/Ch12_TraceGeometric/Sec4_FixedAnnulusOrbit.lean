@@ -43,7 +43,7 @@ attribute [local instance] instSIdeleQuotientMeasurableSpaceSec1
   instSIdeleQuotientBorelSpaceSec1 instSIdeleQuotientT2Sec1 instSIdeleQuotientLocallyCompactSec1
   instSIdeleQuotientSecondCountableSec1 instSAdeleMeasurableSpaceSec1 instSIdeleLocallyCompactSec1
 
-local instance : T2Space Iₛ := (sIdeleGroup_description F S).2.1
+local instance instSIdeleT2FixedAnnulusOrbit : T2Space Iₛ := (sIdeleGroup_description F S).2.1
 
 /-- The S-idelic norm is continuous. -/
 private theorem sLocalTrace_sIdeleNorm_continuous : Continuous (sIdeleNorm F S) := by

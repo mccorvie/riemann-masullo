@@ -61,7 +61,7 @@ local notation "J₁" => MonoidHom.ker (sIdeleQuotientNorm F S)
 local notation "μJ" => sLocalQuotientTamagawaMeasure F S
 local notation "η" => sLocalNormOneQuotientMeasure F S
 local notation "Bₛ" => SchwartzBruhat (Multiplicative (SAdeleRing F S))
-local instance : MeasurableSpace J₁ := borel _
+local instance instNormOneMeasurableAngularConvolutionSupport : MeasurableSpace J₁ := borel _
 
 /-- Reindexing the norm-one average gives the inverse-character covariance
 of the S-local homogeneous theta function. -/

@@ -38,7 +38,7 @@ attribute [local instance] instSIdeleQuotientMeasurableSpaceSec1
   instNormOneSIdeleQuotientMeasurableSpaceSec1 instSAdeleMeasurableSpaceSec1
   instSIdeleLocallyCompactSec1
 
-local instance : T2Space Iₛ := (sIdeleGroup_description F S).2.1
+local instance instSIdeleT2RealizedOrbitRows : T2Space Iₛ := (sIdeleGroup_description F S).2.1
 
 private theorem sLocalTrace_unit_norm (ξ : Hₛ) : sIdeleNorm F S ξ.val = 1 := by
   obtain ⟨γ, hγ, he⟩ := Subgroup.mem_map.mp ξ.property

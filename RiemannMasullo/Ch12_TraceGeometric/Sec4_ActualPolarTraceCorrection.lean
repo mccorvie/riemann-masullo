@@ -42,7 +42,7 @@ local notation "phase(" χ "," ξ ")" => sLocalRhoFactor
     (ContinuousMonoidHom.comp circleCoe χ) (sLocalRadialThetaCriticalParameter ξ))
 local notation "expLog" => fun x : ℝ ↦ positiveRealLogEquiv.symm (Multiplicative.ofAdd x)
 
-local instance : MeasurableSpace J₁ := borel _
+local instance instNormOneMeasurableActualPolarTraceCorrection : MeasurableSpace J₁ := borel _
 
 private theorem exists_nuclearCompressions_trace_sub_of_line
     {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]

@@ -31,7 +31,7 @@ local notation "testₛ" => SchwartzBruhat (Multiplicative Aₛ)
 local notation "testAt(" f "," x ")" => (f : testₛ) (Multiplicative.ofAdd x)
 
 attribute [local instance] instSAdeleMeasurableSpaceSec1 instSIdeleLocallyCompactSec1
-local instance : T2Space Iₛ := (sIdeleGroup_description F S).2.1
+local instance instSIdeleT2RadialOrbitLinear : T2Space Iₛ := (sIdeleGroup_description F S).2.1
 
 section RadialKernelLiftLinearity
 

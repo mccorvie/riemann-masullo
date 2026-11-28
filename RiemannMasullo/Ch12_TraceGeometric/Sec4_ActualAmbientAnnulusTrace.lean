@@ -47,7 +47,7 @@ local notation "modS(" u ")" =>
 local notation "orbitOrder" =>
   (2 * (((∑ w : InfinitePlace F, w.mult) + Fintype.card S) + 1) : ℕ)
 
-local instance : T2Space Iₛ := (sIdeleGroup_description F S).2.1
+local instance instSIdeleT2AmbientAnnulusTrace : T2Space Iₛ := (sIdeleGroup_description F S).2.1
 
 private theorem annulusTrace_orderZeroMeasure_eq : (ν₀ : Measure Jₛ) = μJ := by
   have hzero (x : ℝ) : intervalSobolevDensity 0 0 0 x = 1 := by simp [intervalSobolevDensity]
@@ -55,11 +55,13 @@ private theorem annulusTrace_orderZeroMeasure_eq : (ν₀ : Measure Jₛ) = μJ 
   simp only [hzero, ENNReal.ofReal_one]
   exact withDensity_one
 
-local instance : IsFiniteMeasureOnCompacts (ν₀ : Measure Jₛ) := by
+local instance instOrderZeroFiniteOnCompactsAmbientAnnulusTrace :
+    IsFiniteMeasureOnCompacts (ν₀ : Measure Jₛ) := by
   rw [annulusTrace_orderZeroMeasure_eq]
   infer_instance
 
-local instance : Measure.InnerRegular (ν₀ : Measure Jₛ) := by
+local instance instOrderZeroInnerRegularAmbientAnnulusTrace :
+    Measure.InnerRegular (ν₀ : Measure Jₛ) := by
   rw [annulusTrace_orderZeroMeasure_eq]
   infer_instance
 

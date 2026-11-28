@@ -42,7 +42,8 @@ attribute [local instance] instSAdeleMeasurableSpaceSec1 instSIdeleLocallyCompac
   instSIdeleQuotientBorelSpaceSec1 instSIdeleQuotientT2Sec1 instSIdeleQuotientLocallyCompactSec1
   instSIdeleQuotientSecondCountableSec1
 
-local instance : T2Space Iₛ := (sIdeleGroup_description F S).2.1
+local instance instSIdeleT2RadialOrbitLiftIndependence : T2Space Iₛ :=
+  (sIdeleGroup_description F S).2.1
 
 private theorem exists_sLocalTrace_compactTranslate
     (a : Iₛ) (f : BruhatCompactSupport Iₛ) :

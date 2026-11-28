@@ -37,7 +37,7 @@ attribute [local instance] instSIdeleQuotientMeasurableSpaceSec1
   instSIdeleQuotientT2Sec1 instSIdeleQuotientLocallyCompactSec1
   instSIdeleQuotientSecondCountableSec1 instSIdeleLocallyCompactSec1
 
-local instance : T2Space I := (sIdeleGroup_description F S).2.1
+local instance instSIdeleT2AnnularSmoothMassBridge : T2Space I := (sIdeleGroup_description F S).2.1
 
 private theorem positiveRealHaar_integral_radial_of_vanish_above
     (p : ℝ → ℂ) (hp : Measurable p) {L : ℝ} (hz : ∀ r, L < r → p r = 0)

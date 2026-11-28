@@ -29,7 +29,7 @@ local notation "chart(" χ ")" =>
   quasiCharacterNormTwist (G := Jₛ) mₛ (isProperMap_sIdeleQuotientNorm F S).continuous
     ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ)
 
-local instance : MeasurableSpace Jₛ := borel _
+local instance instSIdeleQuotientMeasurableCriticalLineFourierPhase : MeasurableSpace Jₛ := borel _
 
 /-- Paper: (3.3.1.4), pp. 129–130.
 The quotient Fourier transform of the half-density theta function is the

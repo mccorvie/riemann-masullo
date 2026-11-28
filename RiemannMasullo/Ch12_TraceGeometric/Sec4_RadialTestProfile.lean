@@ -31,7 +31,8 @@ attribute [local instance] instSIdeleQuotientMeasurableSpaceSec1
   instSIdeleQuotientSecondCountableSec1 instSIdeleQuotientHaarMeasureSec1
 
 local notation "P" => ℝ≥0ˣ
-local instance : BorelSpace P := borelSpace_units_of_continuousInv₀ _
+local instance instNormUnitsBorelRadialTestProfile : BorelSpace P :=
+  borelSpace_units_of_continuousInv₀ _
 
 variable (F : Type*) [Field F] [NumberField F]
   (S : Finset (HeightOneSpectrum (𝓞 F)))
@@ -42,7 +43,7 @@ local notation "J₁" => MonoidHom.ker (sIdeleQuotientNorm F S)
 local notation "N" => continuousSIdeleQuotientNorm F S
 local notation "η" => sLocalNormOneQuotientMeasure F S
 
-local instance : MeasurableSpace J₁ := borel _
+local instance instNormOneMeasurableRadialTestProfile : MeasurableSpace J₁ := borel _
 
 /-- Paper: Theorem 3.3.1.1(3), p. 129. The norm-one fiber average of a compact
 quotient test is continuous, supported on the norm-image of the test support,

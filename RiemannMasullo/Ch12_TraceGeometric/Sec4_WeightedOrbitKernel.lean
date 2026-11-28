@@ -31,7 +31,7 @@ attribute [local instance] instSIdeleQuotientMeasurableSpaceSec1
   instNormOneSIdeleQuotientMeasurableSpaceSec1 instSIdeleQuotientT2Sec1
   instSIdeleQuotientLocallyCompactSec1 instSIdeleQuotientSecondCountableSec1
 
-local instance : BorelSpace Jₛ := ⟨rfl⟩
+local instance instSIdeleQuotientBorelWeightedOrbitKernel : BorelSpace Jₛ := ⟨rfl⟩
 
 /-- Exponential decay in both directions of the log norm is integrable for
 the S-local quotient Tamagawa measure. -/

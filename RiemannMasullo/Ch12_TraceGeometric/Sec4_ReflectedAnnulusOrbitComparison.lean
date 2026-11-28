@@ -27,7 +27,8 @@ local notation "Aₛ" => SAdeleRing F S
 local notation "Iₛ" => (SAdeleRing F S)ˣ
 local notation "Jₛ" => SIdeleQuotient F S
 
-local instance : T2Space Iₛ := (sIdeleGroup_description F S).2.1
+local instance instSIdeleT2ReflectedAnnulusOrbitComparison : T2Space Iₛ :=
+  (sIdeleGroup_description F S).2.1
 
 local notation "Hₛ" => sProjectedDiagonal F S
 set_option quotPrecheck false in

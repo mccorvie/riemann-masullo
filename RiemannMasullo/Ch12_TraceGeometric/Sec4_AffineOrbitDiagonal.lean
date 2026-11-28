@@ -37,7 +37,7 @@ attribute [local instance] instSIdeleQuotientMeasurableSpaceSec1
   instSIdeleQuotientSecondCountableSec1 instSAdeleMeasurableSpaceSec1
   instSIdeleLocallyCompactSec1
 
-local instance : T2Space I := (sIdeleGroup_description F S).2.1
+local instance instSIdeleT2AffineOrbitDiagonal : T2Space I := (sIdeleGroup_description F S).2.1
 
 /-- Paper: Theorem 12.4.1.1, Step III, pp. 517–518.
 The half-density quotient diagonal is integrable for the weighted measure.

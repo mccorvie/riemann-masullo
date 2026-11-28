@@ -30,7 +30,8 @@ local notation "Aₛ" => SAdeleRing F S
 local notation "Iₛ" => (SAdeleRing F S)ˣ
 local notation "Jₛ" => SIdeleQuotient F S
 local notation "Hₛ" => sProjectedDiagonal F S
-local instance : T2Space Iₛ := (sIdeleGroup_description F S).2.1
+local instance instSIdeleT2AmbientAnnulusComparison : T2Space Iₛ :=
+  (sIdeleGroup_description F S).2.1
 set_option quotPrecheck false
 local notation "J₁" => (sIdeleQuotientNorm F S).ker
 local notation "m" => continuousSIdeleQuotientNorm F S
@@ -59,11 +60,13 @@ private theorem ambientAnnulus_orderZeroMeasure_eq : (ν₀ : Measure Jₛ) = μ
   simp only [hzero, ENNReal.ofReal_one]
   exact withDensity_one
 
-local instance : IsFiniteMeasureOnCompacts (ν₀ : Measure Jₛ) := by
+local instance instOrderZeroFiniteOnCompactsAmbientAnnulusComparison :
+    IsFiniteMeasureOnCompacts (ν₀ : Measure Jₛ) := by
   rw [ambientAnnulus_orderZeroMeasure_eq]
   infer_instance
 
-local instance : Measure.InnerRegular (ν₀ : Measure Jₛ) := by
+local instance instOrderZeroInnerRegularAmbientAnnulusComparison :
+    Measure.InnerRegular (ν₀ : Measure Jₛ) := by
   rw [ambientAnnulus_orderZeroMeasure_eq]
   infer_instance
 
