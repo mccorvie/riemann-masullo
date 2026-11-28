@@ -2,6 +2,7 @@ module
 
 import Mathlib.Analysis.Normed.Group.Tannery
 import Mathlib.Geometry.Manifold.PartitionOfUnity
+import RiemannMasullo.Ch12_TraceGeometric.Sec5_SharpOrbitalDiagonal
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4b_ProjectedKernels
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 
@@ -550,5 +551,74 @@ theorem traceFormula_exteriorZeros_of_orderZeroProjectiveGeometricTrace_tendsto
   exact ⟨fun z ↦ @IsEmpty.false _ hOffLine ⟨z.val, z.property.1, hα.trans_le z.property.2⟩⟩
 
 end OrderZeroDiagonalComparison
+
+section WideSharpOrbitalTrace
+
+open Filter Function IsDedekindDomain
+open scoped NumberField.AdeleRing Topology
+
+attribute [local instance] instFiniteCompletionUnitsLocallyCompactSec4b
+  instSpectralQuotientPolynormableSec3 instSIdeleQuotientMeasurableSpaceSec1
+  instNormOneSIdeleQuotientMeasurableSpaceSec1 instSIdeleLocallyCompactSec1 instSIdeleT2Sec4
+
+variable {S : Finset (HeightOneSpectrum (𝓞 F))}
+
+local notation "Iₛ" => (SAdeleRing F S)ˣ
+local notation "μₛ" => sMultiplicativeTamagawaMeasure F S
+local notation "volS" => (((sLocalNormOneQuotientMeasure F S) univ).toReal : ℂ)
+local notation "volF" => (((normOneIdeleClassTamagawaMeasure F) univ).toReal : ℂ)
+local notation "normR(" g ")" => (((ideleClassNorm F g).val : ℝ))
+local notation "rootS(" g ")" => Real.sqrt (((sIdeleNorm F S g).val : ℝ))
+
+/-- Paper: (12.4.1.25)–(12.4.1.28), p. 519, and (12.5.1.4), p. 520. The
+corrected sharp orbital masses converge to the order-zero geometric trace on a
+strip whose half-width is at least one half. The normalization uses both local
+dilation moments and the ratio of the norm-one volumes. -/
+theorem sLocalTraceSharpMass_tendsto_orderZeroProjectiveGeometricTrace_of_half_le
+    (φ : BruhatCompactSupport C𝔽) (hφ : ∀ g : C₁, φ.val g = 0)
+    (hPic : Subsingleton (CommRing.Pic ((S : Set (HeightOneSpectrum (𝓞 F))).integer F)))
+    (hRam : ∀ v : HeightOneSpectrum (𝓞 F), differentIdeal ℤ (𝓞 F) ≤ v.asIdeal → v ∈ S)
+    (hOutside : ∀ (a : outsideIntegralIdeleUnits F S) (c : C𝔽),
+      φ.val (QuotientGroup.mk a.val * c) = φ.val c)
+    {B : ℝ} (hB : ∀ g ∈ tsupport φ.val, normR(g) < B ∧ (normR(g))⁻¹ < B)
+    (hS : ∀ v : HeightOneSpectrum (𝓞 F), v ∉ S → B ≤ (v.asIdeal.absNorm : ℝ))
+    (f : BruhatCompactSupport Iₛ)
+    (hLift : ∀ g : Iₛ, HasSum (fun ξ : sProjectedDiagonal F S ↦ f.val (ξ.val * g))
+      (φ.val (QuotientGroup.mk (sIdeleInsertion F S g))))
+    {α : ℝ} (hα : 1 / 2 ≤ α)
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    let polar := (∫ g : Iₛ, f.val g * rootS(g) ∂μₛ) + ∫ g : Iₛ, f.val g / rootS(g) ∂μₛ
+    Tendsto (fun R : ℝ ↦ volF / volS * ((∑' ξ : sProjectedDiagonal F S,
+      sLocalTraceSharpMass f ξ R) - polar)) atTop
+      (𝓝 (orderZeroProjectiveGeometricTrace φ (one_half_pos.trans_le hα).le U)) := by
+  classical
+  intro polar
+  have hWide : 0 < α := one_half_pos.trans_le hα
+  have hThree : (1 : ℝ) < 3 := by norm_num
+  let hK₃ := exists_projectiveKernel_stripTestAction_spectralProjection φ hφ hWide (s := 3) le_rfl
+  have hMass := (sLocalTraceSharpMass_tendsto_globalDiagonal_of_half_le
+    φ hφ hPic hRam hOutside hB hS f hLift hα le_rfl hK₃ U hU hBorel).2
+  let q : IdeleGroup (𝓞 F) F →ₜ* C𝔽 := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
+  let τ : ℝ≥0ˣ →ₜ* C𝔽 := q.comp
+    ⟨canonicalIdeleNormSection F, canonicalIdeleNormSection_continuous F⟩
+  have hτ : RightInverse τ (ideleClassNorm F) := canonicalIdeleNormSection_rightInverse F
+  obtain ⟨a, b, ha, hb, _, _⟩ := traceFormula_of_half_le τ hτ φ hα
+  let hK₀ := stripTestAction_spectralProjection_has_projectiveKernel (F := F) (1 / 2)
+    hWide.le (s := 0) le_rfl φ
+  have hExterior := (hasSum_exteriorZeros_localTerms_add_smoothenedProjectiveGeometricDiagonal_of_le_one
+    τ hτ hWide le_rfl zero_le_one φ (hφ 1) a b ha hb hK₀.choose hK₀.choose_spec U hU hBorel).2
+  have hZero := hExterior.unique (traceFormula_exteriorZeros_of_half_le τ φ hα)
+  change _ + orderZeroProjectiveGeometricTrace φ hWide.le U = 0 at hZero
+  obtain ⟨hn₃, _, hDiag₃⟩ := integral_smoothenedProjectiveGeometricKernel_diagonal
+    φ (hφ 1) hWide.le (zero_lt_one.trans hThree).le hK₃.choose hK₃.choose_spec U hU hBorel
+  have hTrace₃ := spectralStripTrace_eq_localTerms_of_half_le φ hα hThree a b ha hb ⟨_, hn₃⟩ rfl
+  change (∫ x, dSequenceKernelSmoothening μ𝔽 U
+    (globalStripGeometricKernel (F := F) (1 / 2) hWide.le hThree φ hK₃) (x, x) ∂μ𝔽) = _ at hDiag₃
+  rw [hTrace₃, ← eq_neg_of_add_eq_zero_right hZero] at hDiag₃
+  change Tendsto _ atTop (𝓝 (∫ x, dSequenceKernelSmoothening μ𝔽 U
+    (globalStripGeometricKernel (F := F) (1 / 2) hWide.le hThree φ hK₃) (x, x) ∂μ𝔽)) at hMass
+  exact hDiag₃ ▸ hMass
+
+end WideSharpOrbitalTrace
 
 end RiemannMasullo.Isolated
