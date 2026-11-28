@@ -33,64 +33,6 @@ not assume that it is wrong. Its result, whatever becomes of the main theorem, i
 machine-checked account of which parts of the paper hold, which hold after repair, and which do
 not.
 
-## Get involved
-
-**What is left is open to everyone at once.** The formalization is close to its end, and the
-work now is to find repairs for the last gaps in the proof. Each open step is an issue labelled
-[`open-problem`](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aopen-problem), and [What is left: the open problems](https://github.com/mccorvie/riemann-masullo/issues/7349) lists them all:
-the one statement on which the whole proof rests in Lean, further statements that are in Lean
-without a proof, and proof steps that the manuscript does not state precisely enough to formalize.
-
-These issues are **not claimed**. Nobody holds one, several people can work on the same one, and
-a partial result posted on the issue is a contribution: a sketch, a reference, a weaker
-statement that the later pages can use, a counterexample. So is a reduction of a step to a
-classical or known result, ideally with a citation, even without a proof of that result.
-Nobody here knows whether these steps
-can be repaired. That is what there is to find out.
-
-You need no special access. Give your coding agent (Codex, Claude Code or any agent that can run
-shell commands) this instruction, with the number of the issue you want it to work on:
-
-> Help repair a gap in a mathematics paper that has been formalized in Lean 4. Fork and clone
-> the repository with `gh repo fork mccorvie/riemann-masullo --clone`, run `lake exe cache get`
-> in it, then read `AGENTS.md`, `prompts/prover.md` and the section "Working efficiently" of
-> `CONTRIBUTING.md`. Work on issue #N, which is labelled `open-problem`. It is not claimed and
-> others may be working on it too: do not comment `Claiming`. Read the issue and all its
-> comments, the row of `ERRATA.md` it names, and the pages of the paper
-> (`scripts/paper.sh <first> <last>`), and find out what is already known: what has been tried,
-> and what the library proves around the step. Then try, in this order. If the issue has a Lean
-> statement, prove it as written. If that is out of reach, prove it from one or two smaller
-> precise statements, each written in Lean, so that it is plain what is still missing. (For
-> the one statement that the target theorems rest on, #5571, such a proof does not replace it:
-> put the new statements and the implication in the section's isolation file, as `AGENTS.md`
-> says.) A
-> reduction to a classical or known result is welcome even if you do not prove that result:
-> state it as a lemma of its own with `sorry`, begin its docstring with `Classical input:`, and
-> cite it, ideally with the item and page of the source. If the
-> step has no Lean statement, write the statement the later pages need and prove it. If the
-> step is false, give a counterexample, best of all as a Lean proof of the negation. Never
-> change a statement that is on `main`: propose the change on the issue. Use nothing from any
-> formalization of the Riemann hypothesis released in November 2026, and nothing derived from
-> one: this project tests the route of this paper, and such a pull request is not merged. While
-> you work, build only the file you are in (`lake build RiemannMasullo.<Chapter>.<File>`). At
-> the end run `lake build RiemannMasullo Challenge Main` and `scripts/lint.sh`. If you have
-> Lean to hand in, open a pull request against `main` and link it on the issue. If you have
-> mathematics and no Lean, post it on the issue: the paper item and page, what you claim, and
-> the argument or the reference. If you got nowhere, say on the issue what you tried and where
-> it stopped, so that the next person starts further on.
-
-Doing it by hand works the same way, and mathematics without Lean is welcome on the issues: a
-sketch is enough for others to work from. (A fork is needed because GitHub only lets
-collaborators push branches to this repository; your pull request comes from your copy.) Every
-pull request is built and checked automatically, and then read by the project before it
-merges: since 24 November 2026 nothing is merged automatically. [`CONTRIBUTING.md`](CONTRIBUTING.md) has the details, and what
-we have learned about doing this quickly.
-
-A few statements of the supplementary chapters are still open as ordinary
-[`proof` issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aproof+label%3Asupplementary+-label%3Aclaimed).
-Those are taken one person at a time: comment `Claiming` on one to take it, and `Releasing` to
-give it back.
-
 ## Status
 
 **Searching for repairs of the final gaps in the proof.** The paper's author, Alessandro
@@ -117,7 +59,9 @@ pull requests in all.
   paper; a step can stand in Lean as several smaller statements, each with its own issue, so
   the number of statements can rise when a step is narrowed.
 - **Five proof steps that the manuscript does not state precisely enough to formalize,** in
-  Chapters 7, 11 and 12. They have no Lean statement.
+  Chapters 7, 11 and 12. Sometimes we could not write the step in Lean without making a choice
+  that the paper does not specify. Sometimes the text is simply absent, as in a section that
+  reads only "Include section." They have no Lean statement.
 - **No classical input is left.** Six theorems of the literature were at first stated in Lean
   and used without proof. All are now proved there, the last on 27 November: Selberg's
   theorem on the zeros of ζ on the critical line, in the form the project uses.
@@ -179,6 +123,64 @@ the gap exactly. [`CONTRIBUTING.md`](CONTRIBUTING.md#when-the-paper-is-wrong) sa
 case is recorded. The prerequisites (adeles and ideles, Haar measures, locally convex and
 nuclear spaces, Schwartz–Bruhat functions) are standard mathematics worth having in Lean
 whatever becomes of the main theorem.
+
+## Get involved
+
+**What is left is open to everyone at once.** The formalization is close to its end, and the
+work now is to find repairs for the last gaps in the proof. Each open step is an issue labelled
+[`open-problem`](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aopen-problem), and [What is left: the open problems](https://github.com/mccorvie/riemann-masullo/issues/7349) lists them all:
+the one statement on which the whole proof rests in Lean, further statements that are in Lean
+without a proof, and proof steps that the manuscript does not state precisely enough to formalize.
+
+These issues are **not claimed**. Nobody holds one, several people can work on the same one, and
+a partial result posted on the issue is a contribution: a sketch, a reference, a weaker
+statement that the later pages can use, a counterexample. So is a reduction of a step to a
+classical or known result, ideally with a citation, even without a proof of that result.
+Nobody here knows whether these steps
+can be repaired. That is what there is to find out.
+
+You need no special access. Give your coding agent (Codex, Claude Code or any agent that can run
+shell commands) this instruction, with the number of the issue you want it to work on:
+
+> Help repair a gap in a mathematics paper that has been formalized in Lean 4. Fork and clone
+> the repository with `gh repo fork mccorvie/riemann-masullo --clone`, run `lake exe cache get`
+> in it, then read `AGENTS.md`, `prompts/prover.md` and the section "Working efficiently" of
+> `CONTRIBUTING.md`. Work on issue #N, which is labelled `open-problem`. It is not claimed and
+> others may be working on it too: do not comment `Claiming`. Read the issue and all its
+> comments, the row of `ERRATA.md` it names, and the pages of the paper
+> (`scripts/paper.sh <first> <last>`), and find out what is already known: what has been tried,
+> and what the library proves around the step. Then try, in this order. If the issue has a Lean
+> statement, prove it as written. If that is out of reach, prove it from one or two smaller
+> precise statements, each written in Lean, so that it is plain what is still missing. (For
+> the one statement that the target theorems rest on, #5571, such a proof does not replace it:
+> put the new statements and the implication in the section's isolation file, as `AGENTS.md`
+> says.) A
+> reduction to a classical or known result is welcome even if you do not prove that result:
+> state it as a lemma of its own with `sorry`, begin its docstring with `Classical input:`, and
+> cite it, ideally with the item and page of the source. If the
+> step has no Lean statement, write the statement the later pages need and prove it. If the
+> step is false, give a counterexample, best of all as a Lean proof of the negation. Never
+> change a statement that is on `main`: propose the change on the issue. Use nothing from any
+> formalization of the Riemann hypothesis released in November 2026, and nothing derived from
+> one: this project tests the route of this paper, and such a pull request is not merged. While
+> you work, build only the file you are in (`lake build RiemannMasullo.<Chapter>.<File>`). At
+> the end run `lake build RiemannMasullo Challenge Main` and `scripts/lint.sh`. If you have
+> Lean to hand in, open a pull request against `main` and link it on the issue. If you have
+> mathematics and no Lean, post it on the issue: the paper item and page, what you claim, and
+> the argument or the reference. If you got nowhere, say on the issue what you tried and where
+> it stopped, so that the next person starts further on.
+
+Doing it by hand works the same way, and mathematics without Lean is welcome on the issues: a
+sketch is enough for others to work from. (A fork is needed because GitHub only lets
+collaborators push branches to this repository; your pull request comes from your copy.) Every
+pull request is built and checked automatically, and then read by the project before it
+merges: since 24 November 2026 nothing is merged automatically. [`CONTRIBUTING.md`](CONTRIBUTING.md) has the details, and what
+we have learned about doing this quickly.
+
+A few statements of the supplementary chapters are still open as ordinary
+[`proof` issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aproof+label%3Asupplementary+-label%3Aclaimed).
+Those are taken one person at a time: comment `Claiming` on one to take it, and `Releasing` to
+give it back.
 
 ## The paper
 
