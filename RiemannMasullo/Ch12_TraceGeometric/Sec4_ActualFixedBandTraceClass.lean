@@ -315,7 +315,7 @@ private theorem reflectedWeightedTheta_zero_lt
   reflectedWeightedTheta_zero_lt_of_band τ hτ χ hB f.val.val f.property x hx
 
 /-- The reflected coordinate map on all ordinary order-zero generators. -/
-public def sLocalFullReflectedGenAE
+@[expose] public def sLocalFullReflectedGenAE
     (τ : ℝ≥0ˣ →ₜ* Iₛ) (ω : PontryaginDual J₁) (χ : PontryaginDual Jₛ)
     (T : W(0) →L[ℂ] FlatL2) : Prop :=
   ∀ f : Bₛ,
@@ -324,14 +324,12 @@ public def sLocalFullReflectedGenAE
       (Real.sqrt (Measure.real η univ) : ℂ) *
         sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f) (-x)
 
-/-- At Sobolev order zero the angular coefficient and inverse Tate phase
-act on every generator of the full band. Their composite has reflected
-half-line support, and the angular lift recovers each full-band vector. -/
-public theorem exists_sLocalFullReflectedCoordinates_orderZero
+/-- A single angular coefficient, lift, and inverse Tate phase give the
+order-zero reflected coordinates and exact ranges at every positive
+band radius. -/
+public theorem exists_sLocalFullReflectedCoordinates_uniform_orderZero
     (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
-    (ω : PontryaginDual J₁) {B : ℝ} (hB : 0 < B) :
-    let V : Submodule ℂ W(0) := Isolated.sLocalFullPWSobolev (F := F) (S := S) (s := 0)
-      le_rfl (a := 1 / 2) (by norm_num) ω B
+    (ω : PontryaginDual J₁) :
     ∃ (χ : PontryaginDual Jₛ) (Q : W(0) →L[ℂ] FlatL2) (L : FlatL2 →ₗᵢ[ℂ] W(0))
       (U : FlatL2 ≃ₗᵢ[ℂ] FlatL2),
       χ.comp include₁ = ω ∧ (∀ t, χ (QuotientGroup.mk (τ t)) = 1) ∧ ‖Q‖ ≤ 1 ∧
@@ -341,21 +339,23 @@ public theorem exists_sLocalFullReflectedCoordinates_orderZero
       (∀ v, (L v : Jₛ → ℂ) =ᵐ[intervalSobolevMeasure μJ (logSIdeleQuotientNorm F S) 0 0 0]
         fun q ↦ (Real.sqrt (Measure.real η univ) : ℂ)⁻¹ * (χ q : ℂ)⁻¹ *
           v (logSIdeleQuotientNorm F S q)) ∧
-      (∀ u ∈ V, L (Q u) = u) ∧
       let m (ξ : ℝ) : ℂ :=
         sLocalRhoFactor (chart ((circleCoe).comp χ) (sLocalRadialThetaCriticalParameter ξ))
       (∀ v, (Lp.fourierTransformₗᵢ ℝ ℂ (U v) : ℝ → ℂ) =ᵐ[volume] fun ξ ↦
         star (m ξ) * (Lp.fourierTransformₗᵢ ℝ ℂ v : FlatL2) ξ) ∧
       let T := U.toLinearIsometry.toContinuousLinearMap.comp Q
       sLocalFullReflectedGenAE τ ω χ T ∧
-      (∀ u ∈ V, ∀ᵐ x : ℝ ∂volume, x < -Real.log B → T u x = 0) ∧
-      (Set.range (fun u : V ↦ T u.val) = {r : FlatL2 | ∀ᵐ x : ℝ ∂volume, x < -Real.log B → r x = 0}) ∧
-      Set.range (fun u : sLocalInvariantPWSobolev (F := F) (S := S) (s := 0) le_rfl
-        (show (0 : ℝ) < 1 / 2 by norm_num) ω B ↦ T u.val) =
-        {r : FlatL2 | (∀ᵐ x : ℝ ∂volume, x < -Real.log B → r x = 0) ∧
-          (ω = 1 → (∫ x, (Real.exp (-x / 2) : ℂ) * r x) = 0)} := by
+      ∀ B : ℝ, 0 < B →
+        let V : Submodule ℂ W(0) := Isolated.sLocalFullPWSobolev (F := F) (S := S) (s := 0)
+          le_rfl (a := 1 / 2) (by norm_num) ω B
+        (∀ u ∈ V, L (Q u) = u) ∧
+        (∀ u ∈ V, ∀ᵐ x : ℝ ∂volume, x < -Real.log B → T u x = 0) ∧
+        (Set.range (fun u : V ↦ T u.val) = {r : FlatL2 | ∀ᵐ x : ℝ ∂volume, x < -Real.log B → r x = 0}) ∧
+        Set.range (fun u : sLocalInvariantPWSobolev (F := F) (S := S) (s := 0) le_rfl
+          (show (0 : ℝ) < 1 / 2 by norm_num) ω B ↦ T u.val) =
+          {r : FlatL2 | (∀ᵐ x : ℝ ∂volume, x < -Real.log B → r x = 0) ∧
+            (ω = 1 → (∫ x, (Real.exp (-x / 2) : ℂ) * r x) = 0)} := by
   classical
-  intro V
   let Q (ω' : PontryaginDual J₁) :=
     (exists_sLocalWeightedAngularLogCoefficient (s := 0) le_rfl τ hτ ω').choose
   have hQ := fun ω' ↦ (exists_sLocalWeightedAngularLogCoefficient (s := 0) le_rfl τ hτ ω').choose_spec.2
@@ -365,6 +365,8 @@ public theorem exists_sLocalFullReflectedCoordinates_orderZero
     exists_sLocalFullWeightedTheta_reflectedLogInput_of_Q τ hτ ω Q hQ
   obtain ⟨L, hLrep, hLeft⟩ :=
     exists_sLocalWeightedLogCharacterLift_leftInverse_of_representatives_zero τ hτ ω χ hχ hsec
+  refine ⟨χ, Q ω, L, U, hχ, hsec, hQnorm, hQ ω, hLrep, hPhase, hFull, ?_⟩
+  intro B hB V
   let gen : Bₛ →ₗ[ℂ] W(0) := Isolated.sLocalFullPWThetaSobolevMap
     (F := F) (S := S) (s := 0) (a := 1 / 2) (by norm_num) ω
   let P := (sLocalPWTests (F := F) (S := S) (T := S) le_rfl (sLocalPWProductRegion S B)).map gen
@@ -398,7 +400,43 @@ public theorem exists_sLocalFullReflectedCoordinates_orderZero
     rw [U.norm_map, ← L.norm_map (Q ω u), hRecover u hu]
   obtain ⟨hFullRange, hPolarRange⟩ := sLocalFullAndPolarPWSobolev_reflectedRanges_orderZero_of_map
     τ hτ ω χ hχ hsec hB T hFull hIso hSupport
-  exact ⟨χ, Q ω, L, U, hχ, hsec, hQnorm, hQ ω, hLrep, hRecover, hPhase, hFull,
+  exact ⟨hRecover, hSupport, hFullRange, hPolarRange⟩
+
+/-- At Sobolev order zero the angular coefficient and inverse Tate phase
+act on every generator of the full band. Their composite has reflected
+half-line support, and the angular lift recovers each full-band vector. -/
+public theorem exists_sLocalFullReflectedCoordinates_orderZero
+    (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
+    (ω : PontryaginDual J₁) {B : ℝ} (hB : 0 < B) :
+    let V : Submodule ℂ W(0) := Isolated.sLocalFullPWSobolev (F := F) (S := S) (s := 0)
+      le_rfl (a := 1 / 2) (by norm_num) ω B
+    ∃ (χ : PontryaginDual Jₛ) (Q : W(0) →L[ℂ] FlatL2) (L : FlatL2 →ₗᵢ[ℂ] W(0))
+      (U : FlatL2 ≃ₗᵢ[ℂ] FlatL2),
+      χ.comp include₁ = ω ∧ (∀ t, χ (QuotientGroup.mk (τ t)) = 1) ∧ ‖Q‖ ≤ 1 ∧
+      (∀ u, (Q u : ℝ → ℂ) =ᵐ[volume] fun x ↦
+        (Real.sqrt (Measure.real η univ) : ℂ)⁻¹ *
+          ∫ h : J₁, (ω h : ℂ) * u (h.val * QuotientGroup.mk (τ (expUnit x))) ∂η) ∧
+      (∀ v, (L v : Jₛ → ℂ) =ᵐ[intervalSobolevMeasure μJ (logSIdeleQuotientNorm F S) 0 0 0]
+        fun q ↦ (Real.sqrt (Measure.real η univ) : ℂ)⁻¹ * (χ q : ℂ)⁻¹ *
+          v (logSIdeleQuotientNorm F S q)) ∧
+      (∀ u ∈ V, L (Q u) = u) ∧
+      let m (ξ : ℝ) : ℂ :=
+        sLocalRhoFactor (chart ((circleCoe).comp χ) (sLocalRadialThetaCriticalParameter ξ))
+      (∀ v, (Lp.fourierTransformₗᵢ ℝ ℂ (U v) : ℝ → ℂ) =ᵐ[volume] fun ξ ↦
+        star (m ξ) * (Lp.fourierTransformₗᵢ ℝ ℂ v : FlatL2) ξ) ∧
+      let T := U.toLinearIsometry.toContinuousLinearMap.comp Q
+      sLocalFullReflectedGenAE τ ω χ T ∧
+      (∀ u ∈ V, ∀ᵐ x : ℝ ∂volume, x < -Real.log B → T u x = 0) ∧
+      (Set.range (fun u : V ↦ T u.val) = {r : FlatL2 | ∀ᵐ x : ℝ ∂volume, x < -Real.log B → r x = 0}) ∧
+      Set.range (fun u : sLocalInvariantPWSobolev (F := F) (S := S) (s := 0) le_rfl
+        (show (0 : ℝ) < 1 / 2 by norm_num) ω B ↦ T u.val) =
+        {r : FlatL2 | (∀ᵐ x : ℝ ∂volume, x < -Real.log B → r x = 0) ∧
+          (ω = 1 → (∫ x, (Real.exp (-x / 2) : ℂ) * r x) = 0)} := by
+  intro V
+  obtain ⟨χ, Q, L, U, hχ, hsec, hQnorm, hQ, hL, hPhase, hGen, hBands⟩ :=
+    exists_sLocalFullReflectedCoordinates_uniform_orderZero (F := F) (S := S) τ hτ ω
+  obtain ⟨hRecover, hSupport, hFullRange, hPolarRange⟩ := hBands B hB
+  exact ⟨χ, Q, L, U, hχ, hsec, hQnorm, hQ, hL, hRecover, hPhase, hGen,
     hSupport, hFullRange, hPolarRange⟩
 
 private theorem exists_sLocalInvariantPW_reflectedLogInput_aux
