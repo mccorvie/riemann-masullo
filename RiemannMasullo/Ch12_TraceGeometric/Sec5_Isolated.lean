@@ -4,6 +4,8 @@ import Mathlib.Geometry.Manifold.PartitionOfUnity
 import RiemannMasullo.Ch10_TraceSpectral.Sec4b_ProjectedKernels
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 
+public import RiemannMasullo.Ch01_Introduction.Sec4_PoissonCertificate
+
 /-! # Isolated statements of §12.5
 
 The projective strip kernel and its consequences for the smoothened geometric diagonal.
@@ -306,6 +308,79 @@ theorem stripTestAction_projectiveKernel_iff_support_in_open {α s : ℝ} (ha : 
   rw [hsum]
   exact kernelLocalization_sum ha hs P f fun i ↦
     (stripTestAction_projectiveKernel_translate_iff ha hs P (g i) (ψ i) (f i) (htr i)).mpr (h _ (hsup i))
+
+/-! ## Integer ordinates and translated Poisson mass
+
+The unit cells cover the full ordinate line. A single off-line site and its
+same-character reflection cost strictly more than six fifths in one of them.
+-/
+
+namespace PoissonCertificate
+
+open RiemannMasullo.HeckePoisson
+
+local notation "U𝔽" => PontryaginDual C𝔽
+local notation "ord(" χ ", " z ")" =>
+  MeromorphicOn.divisor (continuedCompletedHeckeL (F := F) χ) univ z
+
+local notation "ext(" σ ", " a ")" =>
+  {p : {η : U𝔽 // ∀ u : ℝ≥0ˣ, η (σ u) = 1} × ℂ //
+    0 < ord(p.1.val, p.2) ∧ (a : ℝ) ≤ |p.2.re - 1 / 2|}
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The omitted-zero cancellation at one half-width. -/
+def exteriorCancellation (σ : ℝ≥0ˣ →ₜ* C𝔽) (a : ℝ) : Prop :=
+  ∀ φ : BruhatCompactSupport C𝔽, (∀ g : (ideleClassNorm F).ker, φ.val g = 0) →
+    HasSum (fun z : ext(σ, a) ↦ (ord(z.val.1.val, z.val.2) : ℂ) *
+      ∫ g, φ.val g * ideleClassNormTwist z.val.1.val (z.val.2 - 1 / 2) g
+        ∂ideleClassTamagawaMeasure F) 0
+
+private theorem exteriorCancellation_iff_empty (σ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hσ : Function.RightInverse σ (ideleClassNorm F)) (a : ℝ) :
+    exteriorCancellation σ a ↔ IsEmpty ext(σ, a) := by
+  simpa only [exteriorCancellation, modulatedFourierMellin, relativeVerticalStrip,
+    Set.preimage_univ, Set.indicator_univ] using hasSum_exteriorZeros_iff_isEmpty σ hσ a
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The all-width omitted-zero cancellation is equivalent
+to one numerical threshold at the integer ordinates for each normalized
+character. Both sides use the actual divisor of the same completed function. -/
+theorem all_widths_iff_integer_mass (σ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hσ : Function.RightInverse σ (ideleClassNorm F)) :
+    (∀ a > 0, exteriorCancellation σ a) ↔
+      ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (σ u) = 1) →
+        ∀ k : ℤ, fullMass χ k - centralMass χ k ≤ 6 / 5 := by
+  constructor
+  · intro h χ hχ
+    apply (criticalLine_iff_integer_mass χ).mp
+    intro z
+    by_contra hz
+    have he := (exteriorCancellation_iff_empty σ hσ _).mp
+      (h |z.val.re - 1 / 2| (abs_pos.mpr (sub_ne_zero.mpr hz)))
+    exact he.false ⟨(⟨χ, hχ⟩, z.val), z.property, le_rfl⟩
+  · intro h a ha
+    apply (exteriorCancellation_iff_empty σ hσ a).mpr
+    refine ⟨fun z ↦ ?_⟩
+    have he := (criticalLine_iff_integer_mass z.val.1.val).mpr
+      (h z.val.1.val z.val.1.property) ⟨z.val.2, z.property.1⟩
+    change z.val.2.re = 1 / 2 at he
+    have := z.property.2
+    rw [he, sub_self, abs_zero] at this
+    exact (not_le_of_gt ha) this
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. With the translated explicit formula supplied, the all-width
+criterion compares the pole-cleared arithmetic logarithmic derivative with
+the complete central-line contribution at integer centers. -/
+theorem all_widths_iff_integer_logDerivative (σ : ℝ≥0ˣ →ₜ* C𝔽)
+    (hσ : Function.RightInverse σ (ideleClassNorm F))
+    (hformula : ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (σ u) = 1) →
+      ∀ k : ℤ, HasSum (siteWeight (χ := χ) k) (normalizedLogDerivative χ k)) :
+    (∀ a > 0, exteriorCancellation σ a) ↔
+      ∀ χ : U𝔽, (∀ u : ℝ≥0ˣ, χ (σ u) = 1) →
+        ∀ k : ℤ, normalizedLogDerivative χ k - centralMass χ k ≤ 6 / 5 := by
+  rw [all_widths_iff_integer_mass σ hσ]
+  constructor <;> intro h χ hχ k <;>
+    simpa only [fullMass, (hformula χ hχ k).tsum_eq] using h χ hχ k
+
+end PoissonCertificate
 
 /-- Paper: (12.5.1.4), p. 520. The kernel assertion for all tests vanishing on the
 norm-one classes is equivalent to testing any nonempty open set of log norms. In
