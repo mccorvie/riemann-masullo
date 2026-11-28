@@ -3,6 +3,9 @@ module
 public import RiemannMasullo.Ch11_ShellStructure.Sec3
 public import RiemannMasullo.Ch12_TraceGeometric.Sec2
 
+import RiemannMasullo.Ch11_ShellStructure.Sec3_Indentation
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1d
+
 /-! # Individual divisorial shell masses for normalized indentations -/
 
 @[expose] public noncomputable section
@@ -304,6 +307,68 @@ theorem normSection_divisorialKernelDifference_indentation_eq_zero_iff (S : Fins
     rw [shellVal_mul, hy, mul_one]
   simpa only [he] using divisorialKernelDifference_indentation_eq_zero_iff S k hb K
     (canonicalIdeleNormSection F t) y
+
+/-- Paper: Proposition 12.2.2.2(2), p. 508, and the diagonal decomposition on p. 520.
+Reconstruction: On the skew diagonal of (12.2.2.7), both ideles represent the same class.
+For norm-one representatives in a precompact set (such as `ideleFundamentalDomain`), one
+normalized indentation and one finite enlargement suffice for the whole norm axis. At every
+larger saturated base, the individual shell terms vanish and the sum of the base-restricted
+lift over the principal translates gives the full quotient diagonal at each sample.
+Deviation: This uses `(x, h * x)` from (1.3.1.12), p. 24, and p. 508, with `x = g * τ(t)`.
+The retained integral still requires comparison with the arithmetic operator of §12.4. -/
+theorem exists_indentation_skewDiagonal_hasSum_base
+    (E : Set (ideleNorm F).ker) (hE : IsCompact (closure E)) :
+    ∃ (b : I𝔽 → ℝ) (T : Finset V), IsIndentation H𝔽 Measure.count b ∧
+      ∀ (S : Finset V), T ⊆ S →
+        (∀ v ∈ S, ∀ w : V, w.under (𝓞 ℚ) = v.under (𝓞 ℚ) → w ∈ S) →
+        ∀ (K : (I𝔽 ⧸ H𝔽) × (I𝔽 ⧸ H𝔽) → ℂ) (g : (ideleNorm F).ker) (_ : g ∈ E) (t : ℝ≥0ˣ),
+          let x := g.val * canonicalIdeleNormSection F t
+          let L := diagonalIndentationLift H𝔽 Measure.count b K
+          (∀ (h : H𝔽) (k : ℕ), divisorialKernelDifference S k L (x, (h : I𝔽) * x) = 0) ∧
+          HasSum (fun h : H𝔽 ↦ (sLocalDivisorialStratum F S).indicator
+            (fun y ↦ L (x, y)) ((h : I𝔽) * x)) (K (π𝔽 x, π𝔽 x)) := by
+  obtain ⟨b, T, hb, htail⟩ := exists_indentation_divisorialKernelDifference_eq_zero F
+  obtain ⟨hmono, hcover⟩ := integralIdeleInsertion_exhaustive F
+  obtain ⟨T₀, hT₀⟩ := (hE.image continuous_subtype_val).elim_directed_cover
+    (fun U ↦ range (integralIdeleInsertion F U))
+    (fun U ↦ (integralIdeleInsertion_isOpenEmbedding F U).isOpen_range)
+    (fun x _ ↦ mem_iUnion.mpr (hcover x)) hmono.directed_le
+  refine ⟨b, T ∪ T₀, hb, fun S hTS hS K g hg t ↦ ?_⟩
+  dsimp only
+  let x := g.val * canonicalIdeleNormSection F t
+  let L := diagonalIndentationLift H𝔽 Measure.count b K
+  have hgS := hmono (Finset.subset_union_right.trans hTS) (hT₀ (mem_image_of_mem _ (subset_closure hg)))
+  have htS : canonicalIdeleNormSection F t ∈ sLocalDivisorialStratum F S := by
+    intro v _
+    rw [canonicalIdeleNormSection_finite]
+    exact map_one _
+  rw [sLocalDivisorialStratum_eq_range_integralIdeleInsertion] at htS
+  have hx : x ∈ sLocalDivisorialStratum F S := by
+    rw [sLocalDivisorialStratum_eq_range_integralIdeleInsertion]
+    exact (integralIdeleInsertion F S).range.mul_mem hgS htS
+  have hz (h : H𝔽) (k : ℕ) : divisorialKernelDifference S k L (x, (h : I𝔽) * x) = 0 := by
+    apply htail S (Finset.subset_union_left.trans hTS) hS k K _ _ hx
+    rw [map_mul (ideleNorm F) (h : I𝔽) x, (ideleNorm_spec F).2 h.property, one_mul]
+  refine ⟨hz, ?_⟩
+  have hcut (h : H𝔽) : (sLocalDivisorialStratum F S).indicator (fun y ↦ L (x, y))
+      ((h : I𝔽) * x) = L (x, (h : I𝔽) * x) := by
+    apply sub_eq_zero.mp
+    exact (hasSum_divisorialKernelDifference S hS L (x, (h : I𝔽) * x)).unique
+      (hasSum_zero.congr_fun (hz h))
+  have hs := hasSum_indentation_sheets H𝔽 hb x
+  have hprod := hs.mul hs
+    (hs.summable.mul_of_nonneg hs.summable (fun _ ↦ hb.2.1 _) (fun _ ↦ hb.2.1 _))
+  have hw := hasSum_indentation_overlap_mask H𝔽 hb Set.univ x x
+  have hw₁ : HasSum (fun h : H𝔽 ↦ diagonalIndentationWeight H𝔽 Measure.count b (x, (h : I𝔽) * x)) 1 := by
+    simpa only [mem_univ, ite_true, indicator_univ, hprod.tsum_eq, one_mul] using hw
+  have hsum := (Complex.hasSum_ofReal.mpr hw₁).mul_right (K (π𝔽 x, π𝔽 x))
+  rw [Complex.ofReal_one, one_mul] at hsum
+  apply hsum.congr_fun
+  intro h
+  change (sLocalDivisorialStratum F S).indicator (fun y ↦ L (x, y)) ((h : I𝔽) * x) = _
+  rw [hcut h]
+  have hπ : π𝔽 (h : I𝔽) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
+  simp only [L, diagonalIndentationLift, Prod.map_apply, map_mul, hπ, one_mul]
 
 end DivisorialShells
 
