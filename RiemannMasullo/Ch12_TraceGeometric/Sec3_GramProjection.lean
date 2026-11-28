@@ -140,4 +140,31 @@ theorem norm_sq_le_hilbertTrace_comp_finiteProjection_comp_adjoint
   rw [← hi]
   exact Finset.single_le_sum (fun j _ ↦ sq_nonneg ‖A (b j : H)‖) (Finset.mem_univ i)
 
+/-- Paper: §12.3, p. 514. A unit column bounds the observed complementary trace
+by the ambient trace minus the observed squared norm of the column.
+Deviation: this bound is a finite-column test for use in the comparison. -/
+theorem hilbertTrace_comp_orthogonalProjection_comp_adjoint_le
+    (S : Submodule ℂ H) [S.HasOrthogonalProjection] [FiniteDimensional ℂ S]
+    (v : S) (hv : ‖v‖ = 1) (A : H →L[ℂ] H)
+    (hTotal : IsNuclearOperator (A.comp A.adjoint)) :
+    ∃ hN : IsNuclearOperator (A.comp (Sᗮ.starProjection.comp A.adjoint)),
+      (hilbertTrace ⟨_, hN⟩).re ≤ (hilbertTrace ⟨_, hTotal⟩).re - ‖A (v : H)‖ ^ 2 := by
+  obtain ⟨hCaptured, hBound⟩ :=
+    norm_sq_le_hilbertTrace_comp_finiteProjection_comp_adjoint S v hv A
+  let total : nuclearEndomorphisms H := ⟨_, hTotal⟩
+  let captured : nuclearEndomorphisms H := ⟨_, hCaptured⟩
+  have hMap : (total - captured).val = A.comp (Sᗮ.starProjection.comp A.adjoint) := by
+    rw [Submodule.starProjection_orthogonal]
+    ext x
+    change A (A.adjoint x) - A (S.starProjection (A.adjoint x)) =
+      A (A.adjoint x - S.starProjection (A.adjoint x))
+    rw [map_sub]
+  have hN : IsNuclearOperator (A.comp (Sᗮ.starProjection.comp A.adjoint)) :=
+    hMap ▸ (total - captured).property
+  have hSame : (⟨_, hN⟩ : nuclearEndomorphisms H) = total - captured := Subtype.ext hMap.symm
+  obtain ⟨trace, htrace⟩ := hilbertTrace_linear (H := H)
+  refine ⟨hN, ?_⟩
+  rw [hSame, ← htrace, map_sub, htrace, htrace, Complex.sub_re]
+  exact sub_le_sub_left hBound _
+
 end RiemannMasullo
