@@ -40,6 +40,31 @@ theorem exists_gramInverse [FiniteDimensional ℂ E] (X : E →L[ℂ] H)
   let e := (LinearEquiv.ofInjectiveEndo G.toLinearMap hG).toContinuousLinearEquiv
   exact ⟨e.symm.toContinuousLinearMap, ContinuousLinearMap.ext e.apply_symm_apply⟩
 
+/-- The inverse Gram correction gives the least-energy vector with prescribed adjoint
+coordinates. The energy gap of any other feasible vector is its squared distance from
+this vector. -/
+theorem gramInverse_adjoint_fiber (X : E →L[ℂ] H) (Ginv : E →L[ℂ] E)
+    (hG : (X.adjoint.comp X).comp Ginv = ContinuousLinearMap.id ℂ E) (b : E) :
+    X.adjoint (X (Ginv b)) = b ∧
+      ∀ u : H, X.adjoint u = b →
+        ‖u‖ ^ 2 = (⟪Ginv b, b⟫_ℂ).re + ‖u - X (Ginv b)‖ ^ 2 := by
+  have hb : X.adjoint (X (Ginv b)) = b := DFunLike.congr_fun hG b
+  refine ⟨hb, fun u hu ↦ ?_⟩
+  have hOrth : ⟪u - X (Ginv b), X (Ginv b)⟫_ℂ = 0 := by
+    rw [← X.adjoint_inner_left, map_sub, hu, hb, sub_self, inner_zero_left]
+  have hEnergy : (⟪Ginv b, b⟫_ℂ).re = ‖X (Ginv b)‖ ^ 2 := by
+    calc
+      _ = (⟪Ginv b, X.adjoint (X (Ginv b))⟫_ℂ).re :=
+        congrArg (fun t : E ↦ (⟪Ginv b, t⟫_ℂ).re) hb.symm
+      _ = _ := by
+        rw [X.adjoint_inner_right]
+        exact inner_self_eq_norm_sq (𝕜 := ℂ) _
+  have hNorm := norm_add_sq_eq_norm_sq_add_norm_sq_of_inner_eq_zero
+    (u - X (Ginv b)) (X (Ginv b)) hOrth
+  rw [sub_add_cancel] at hNorm
+  rw [hEnergy, add_comm]
+  simpa only [pow_two] using hNorm
+
 /-- The trace of a finite range projection between two bounded operators is the trace
 on the coefficient space with its inverse Gram correction. This applies to the finite
 theta projections in a comparison of the cut-off diagonal in §12.3. -/
