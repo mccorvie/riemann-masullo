@@ -1,0 +1,204 @@
+\section{Theorem 5.2.1.1(3). Embedding a finite theta stage}
+
+The global theta space is built from finite stages. Each stage keeps its
+original topology inside the global space, as stated on
+\href{https://github.com/mccorvie/riemann-masullo/blob/ac7e1cde68ff1fac01ecbef3c0e9f48e46bc1f06/paper/the-music-of-the-primes.pdf#page=230}{p.~230 of the paper}.
+On p.~231 Masullo tries to recover the finite stage by projecting a global
+test function. Two tests with the same global theta function can have
+projections with different theta functions, so the result depends on the
+representative. We instead add one finite place at a time and recover the
+old theta function from two averages of the new one.
+
+Let \(F\) be a number field and \(S\) a finite set of places containing the
+archimedean places. Write \(B_S=\mathcal S(\mathbf A_{F,S})\) for the
+Schwartz--Bruhat test space. The \(S\)-units \(G_S=\mathcal O_{F,S}^{\times}\)
+are the elements of \(F^\times\) that are units at every place outside \(S\).
+For \(f\in B_S\) and \(x\in\mathbf A_{F,S}^{\times}\), put
+\[
+  \Phi_{F,S}(f)(x)=\sum_{a\in G_S} f(a_S x),
+\]
+where \(a_S\) denotes the components of \(a\) at the places in \(S\).
+Set \(Q_S=B_S/\ker\Phi_{F,S}\) and
+\(Q_F=\mathcal S(\mathbf A_F)/\ker\Phi_F\), both with their quotient
+topologies. These are the source and target of (5.2.1.3) on p.~230,
+where Masullo writes both spaces as \(\mathrm H_{0,\mathrm{cont}}\).
+The global theta operator \(\Phi_F\) sums over \(F^\times\).
+We also write \(\Phi_{F,S}(z)\) for the theta function of a class \(z\in Q_S\),
+since all representatives of \(z\) give the same values.
+
+On tests, the insertion \(\pi_S\) extends \(f\) by multiplying by the
+indicators \(1_{\mathcal O_w}\) at \(w\notin S\), where \(\mathcal O_w\) is
+the ring of integers in \(F_w\). We prove that the induced map
+\(\bar\pi_S\colon Q_S\to Q_F\) is a linear topological embedding.
+We check its equivariance at the end.
+
+\subsection{The projection on test functions}
+
+The kernel identity \(\pi_S^{-1}(\ker\Phi_F)=\ker\Phi_{F,S}\) gives an
+injective map of quotients. To get a continuous inverse on its image, the
+paper uses the projection \(\Pi_S\) onto the inserted tests from
+Lemma~2.1.4.3, p.~73. The claim on p.~231 is that \(\Pi_S\) preserves
+\(\ker\Phi_F\), which would let it act on theta classes. The counterexample in
+\href{https://github.com/mccorvie/riemann-masullo/blob/ac7e1cde68ff1fac01ecbef3c0e9f48e46bc1f06/ERRATA.md#L583}{erratum I123}
+shows that this fails for every choice of the functional in that construction.
+
+Take \(F=\mathbf Q\), \(S=\{\infty\}\), and \(e=1_{\widehat{\mathbf Z}}\).
+Choose an even smooth function \(\phi\) supported within \(1/4\) of \(\pm1\)
+with \(\phi(1)=\phi(-1)=1\). For \(f=\phi\otimes e\), the test
+\(f-f(\,\cdot\,/2)\) has zero global theta function, since division by \(2\)
+permutes \(\mathbf Q^\times\). The projection on the finite factor sends
+\(1_{2\widehat{\mathbf Z}}\) to \(c e\) for some \(c\in\mathbf C\) and fixes
+\(e\). The projected test is \(h\otimes e\), with \(h(y)=\phi(y)-c\phi(y/2)\).
+
+Evaluate its global theta function at the idele with real component \(x\)
+and all finite components \(1\). Only nonzero integers contribute because
+\(\mathbf Q\cap\widehat{\mathbf Z}=\mathbf Z\). At \(x=1\), the first term of
+\(h(ax)\) contributes at \(a=\pm1\) and the second at \(a=\pm2\), giving
+\(2(1-c)\). At \(x=2\), only the second term contributes, at \(a=\pm1\),
+giving \(-2c\). These two values cannot both vanish.
+
+\subsection{Recovering the old theta function}
+
+Let \(T=S\cup\{v\}\) for a finite place \(v\notin S\). Write
+\(U_v=\mathcal O_v^\times\), let \(\mu\) be Haar probability on \(U_v\), and choose a
+uniformizer \(\varpi\) with \(\operatorname{ord}_v(\varpi)=1\). For a class
+\(z\in Q_T\) and an \(S\)-idele \(x\), take the difference of two averages
+\begin{equation}
+  D_v(z)(x)=\int_{U_v}
+    \bigl(\Phi_{F,T}(z)(x,u)-\Phi_{F,T}(z)(x,\varpi^{-1}u)\bigr)
+    \,d\mu(u).
+  \label{5-2-1-1-3-theta-embedding:average}
+\end{equation}
+The formula uses only theta values, so it is well defined on \(Q_T\).
+The two orbits are compact, and for each fixed test the theta summands have
+a common summable bound on each orbit. This allows termwise integration.
+(\href{https://github.com/mccorvie/riemann-masullo/blob/ac7e1cde68ff1fac01ecbef3c0e9f48e46bc1f06/RiemannMasullo/Ch05_ThetaZSpaces/Sec2.lean#L3506-L3530}{Summation and integration in Lean}.)
+
+The insertion \(\bar\pi_{S,T}\colon Q_S\to Q_T\) sends \([f]\) to
+\([f\otimes 1_{\mathcal O_v}]\). On this test, a term indexed by
+\(a\in G_T\) has \(j=\operatorname{ord}_v(a)\). Its new factor in the first
+evaluation is \(1_{j\geq 0}\), and in the second it is \(1_{j\geq 1}\),
+because multiplication by \(\varpi^{-1}\) lowers the valuation by one.
+These factors are independent of \(u\in U_v\). As \(\mu(U_v)=1\), the
+coefficient of \(f(a_S x)\) in the difference is
+\[
+  1_{j\geq 0}-1_{j\geq 1}=1_{j=0}.
+\]
+An element of \(G_T\) with valuation zero at \(v\) is a unit outside \(S\),
+so the surviving indices are exactly \(G_S\). This gives
+\(D_v([f\otimes 1_{\mathcal O_v}])=\Phi_{F,S}(f)\).
+(\href{https://github.com/mccorvie/riemann-masullo/blob/ac7e1cde68ff1fac01ecbef3c0e9f48e46bc1f06/RiemannMasullo/Ch05_ThetaZSpaces/Sec2.lean#L3924-L3944}{Indicator calculation in Lean}.)
+
+\subsection{The left inverse on the larger space}
+
+To use \eqref{5-2-1-1-3-theta-embedding:average} as a left inverse, we need
+its output for every larger class to be a theta function from \(Q_S\). On a
+product test \(f\otimes g\), with \(g\in\mathcal S(F_v)\), the coefficient of
+\(f(a_S x)\) depends only on \(j=\operatorname{ord}_v(a)\). Write the
+\(v\)-component of \(a\) as \(\varpi^j u_a\) with \(u_a\in U_v\).
+The substitution \(u\mapsto u_a u\) preserves Haar measure, so the
+coefficient is
+\[
+  w_j(g)=\int_{U_v}
+    \bigl(g(\varpi^j u)-g(\varpi^{j-1}u)\bigr)\,d\mu(u).
+\]
+For sufficiently negative \(j\), both arguments lie outside the compact
+support of \(g\). For sufficiently positive \(j\), both lie in a
+neighborhood of zero where \(g\) is constant. Only finitely many
+coefficients are therefore nonzero.
+
+For each valuation \(j\) that occurs in \(G_T\), choose a representative
+\(a_j\in G_T\). The elements of valuation \(j\) are exactly \(a_j b\) for
+\(b\in G_S\), since \(G_S\) is the kernel of the valuation homomorphism.
+Their contribution is
+\[
+  w_j(g)\sum_{b\in G_S}f(b_S a_{j,S}x)
+      = w_j(g)\,\Phi_{F,S}(f)(a_{j,S}x).
+\]
+This is the theta function of the test \(w_j(g) f(a_{j,S}\,\cdot\,)\).
+The full difference is a finite sum of such theta functions, taken over the
+valuations that occur and have nonzero coefficient.
+(\href{https://github.com/mccorvie/riemann-masullo/blob/ac7e1cde68ff1fac01ecbef3c0e9f48e46bc1f06/RiemannMasullo/Ch05_ThetaZSpaces/Sec2.lean#L3827-L3846}{The calculation for product tests in Lean}.)
+
+Multiplication of tests identifies \(B_T\) with the algebraic tensor product
+of \(B_S\) and \(\mathcal S(F_v)\), endowed with the inductive tensor topology
+of Corollary~2.1.4.2, p.~72. Every test is a finite sum of product tests, so
+the calculation gives a class in \(Q_S\) for every \(z\in Q_T\). Its theta
+values \(D_v(z)\) determine the class uniquely. Since \(D_v\) is linear, so
+is the resulting map \(r_v\colon Q_T\to Q_S\).
+
+For fixed \(g\), the map \(f\mapsto r_v([f\otimes g])\) is a finite linear
+combination of continuous translations followed by the quotient map. For
+fixed \(f\), the map in \(g\) is linear and hence continuous because
+\(\mathcal S(F_v)\) has the finest locally convex topology
+(Proposition~2.1.2.8(1), p.~65). Separate continuity gives continuity on the
+inductive tensor product \(B_T\), and the quotient topology gives continuity
+of \(r_v\).
+(\href{https://github.com/mccorvie/riemann-masullo/blob/ac7e1cde68ff1fac01ecbef3c0e9f48e46bc1f06/RiemannMasullo/Ch05_ThetaZSpaces/Sec2.lean#L3198-L3228}{Continuity on the quotient in Lean}.)
+
+The indicator calculation gives \(r_v\bar\pi_{S,T}=\mathrm{id}_{Q_S}\).
+Restricting \(r_v\) to the image gives a continuous inverse for the
+insertion, so \(\bar\pi_{S,T}\) is a topological embedding.
+
+\subsection{The topology of the global union}
+
+Composing one-place embeddings gives all finite-stage embeddings. To recover
+the stage topology inside the union, we extend its continuous seminorms.
+By Proposition~2.1.4.1 every global test comes from a finite stage, so every
+class in \(Q_F\) has a finite-stage representative. The compatible injections
+thus identify \(Q_F\) with the union. A seminorm on \(Q_F\) is continuous
+exactly when its pullback to the global test space is continuous. By the
+final locally convex topology on tests, we can check this on each \(B_S\),
+and by the quotient topology on \(Q_S\), this amounts to continuity on each
+theta stage.
+(\href{https://github.com/mccorvie/riemann-masullo/blob/ac7e1cde68ff1fac01ecbef3c0e9f48e46bc1f06/RiemannMasullo/Ch05_ThetaZSpaces/Sec2.lean#L2458-L2499}{Exhaustion and final topology in Lean}.)
+
+Choose an increasing chain of finite stages starting at \(S\) and eventually
+containing each finite set of places. Such a chain exists because the places
+are countable. It gives the same final topology, since a seminorm continuous
+on the chain restricts continuously to any finite stage by passing through a
+chain stage containing it.
+
+Start with a continuous seminorm \(p\) on \(Q_S\) and extend it along the
+chain. At each step the old stage is a subspace \(M\) of the new stage.
+Because \(p\) is continuous on \(M\), a suitably scaled finite maximum
+\(P\) of continuous seminorms on the new stage has
+\(\{P<1\}\cap M\subseteq\{p<1\}\). By homogeneity, \(p\leq P|_M\). Set
+\[
+  \widetilde p(y)=\inf_{m\in M}\bigl(p(m)+P(y-m)\bigr).
+\]
+Adding and scaling the candidates in the infimum gives a seminorm. Taking
+\(m=0\) gives \(\widetilde p\leq P\), so it is continuous. For \(y\in M\) the triangle
+inequality gives \(p(y)\leq p(m)+P(y-m)\) for all \(m\in M\), and taking
+\(m=y\) gives equality in the infimum.
+(\href{https://github.com/mccorvie/riemann-masullo/blob/ac7e1cde68ff1fac01ecbef3c0e9f48e46bc1f06/RiemannMasullo/ForMathlib/Analysis/LocallyConvex/WithSeminorms.lean#L19-L46}{Seminorm extension in Lean}.)
+
+The extensions agree on overlaps and give a seminorm on the union, continuous
+by finality and equal to \(p\) on \(Q_S\). Every basic neighborhood
+\(\{p<1\}\) of zero in \(Q_S\) is therefore the restriction of a
+neighborhood in \(Q_F\). Together with continuity of \(\bar\pi_S\), this
+gives equality of the two topologies.
+(\href{https://github.com/mccorvie/riemann-masullo/blob/ac7e1cde68ff1fac01ecbef3c0e9f48e46bc1f06/RiemannMasullo/Ch05_ThetaZSpaces/Sec2.lean#L2504-L2591}{Passage to the global embedding in Lean}.)
+
+\paragraph{Scope and verification.}
+Translation by an idele that is a unit
+outside \(S\) fixes the outside integer indicators. Translating an inserted
+test therefore agrees with translating its \(S\)-factor and then inserting.
+The equality passes to theta classes.
+(\href{https://github.com/mccorvie/riemann-masullo/blob/ac7e1cde68ff1fac01ecbef3c0e9f48e46bc1f06/RiemannMasullo/Ch05_ThetaZSpaces/Sec2.lean#L3174-L3183}{Equivariance on representatives in Lean}.)
+
+Section~5.2.3, pp.~234--235, uses stage embeddings after passage to character
+isotypes, which requires an argument on the character quotients. For the
+ordinary theta spaces, Lean also proves that the image of \(Q_S\) in \(Q_F\)
+is closed, as used in Lemma~5.3.1.5. It uses the embedding above and
+completeness of \(Q_S\), obtained from the strict LF proof of part~(1).
+(\href{https://github.com/mccorvie/riemann-masullo/blob/ac7e1cde68ff1fac01ecbef3c0e9f48e46bc1f06/RiemannMasullo/Ch05_ThetaZSpaces/Sec2.lean#L4210-L4221}{Closed-range argument in Lean}.)
+
+The one-place repair comes from
+\href{https://github.com/mccorvie/riemann-masullo/pull/4511}{PR~\#4511}.
+The strict LF proof in
+\href{https://github.com/mccorvie/riemann-masullo/pull/7176}{PR~\#7176}
+reports an axiom check with no \texttt{sorryAx} in the
+\href{https://github.com/mccorvie/riemann-masullo/blob/ac7e1cde68ff1fac01ecbef3c0e9f48e46bc1f06/RiemannMasullo/Ch05_ThetaZSpaces/Sec2.lean#L4128-L4132}{one-place left inverse}
+or the
+\href{https://github.com/mccorvie/riemann-masullo/blob/ac7e1cde68ff1fac01ecbef3c0e9f48e46bc1f06/RiemannMasullo/Ch05_ThetaZSpaces/Sec2.lean#L4205-L4208}{global embedding}.
