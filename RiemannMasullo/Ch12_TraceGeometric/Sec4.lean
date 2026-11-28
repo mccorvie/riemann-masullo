@@ -327,6 +327,132 @@ private theorem exists_sLocalTraceCutoff
     rw [← Complex.ofReal_mul, mul_inv_cancel₀ (by linarith), Complex.ofReal_one]
   exact heq ▸ (hsum g).mul_right (n g)
 
+section CompactLiftPeriodization
+
+open scoped BigOperators Pointwise
+
+/-- Only finitely many translates by a closed discrete subgroup can make
+two fixed compactly supported factors nonzero at the same point. -/
+private theorem exists_finite_compactOrbitProducts
+    {G : Type*} [Group G] [TopologicalSpace G] [IsTopologicalGroup G]
+    (H : Subgroup G) (hH : IsClosed (H : Set G)) [DiscreteTopology H]
+    (f p : G → ℂ) (hf : HasCompactSupport f) (hp : HasCompactSupport p) :
+    ∃ s : Finset H, ∀ ξ ∉ s, ∀ x : G, f x * p (ξ.val * x) = 0 := by
+  classical
+  let overlap : Set H := (Subtype.val : H → G) ⁻¹' (tsupport p * (tsupport f)⁻¹)
+  have hfCompact : IsCompact (tsupport f) := hf
+  have hpCompact : IsCompact (tsupport p) := hp
+  have hCompact : IsCompact overlap :=
+    hH.isClosedEmbedding_subtypeVal.isCompact_preimage (hpCompact.mul hfCompact.inv)
+  have hFinite : overlap.Finite := hCompact.finite_of_discrete
+  refine ⟨hFinite.toFinset, fun ξ hξ x ↦ ?_⟩
+  by_contra hprod
+  have hx : x ∈ tsupport f := subset_tsupport f (mul_ne_zero_iff.mp hprod).1
+  have hξx : ξ.val * x ∈ tsupport p := subset_tsupport p (mul_ne_zero_iff.mp hprod).2
+  apply hξ
+  apply hFinite.mem_toFinset.mpr
+  change ξ.val ∈ tsupport p * (tsupport f)⁻¹
+  exact Set.mem_mul.mpr ⟨ξ.val * x, hξx, x⁻¹, inv_mem_inv.mpr hx,
+    by rw [mul_assoc, mul_inv_cancel, mul_one]⟩
+
+/-- A zero orbit sum gives a finite sum of translation differences after
+inserting a partition of unity on the support. -/
+private theorem orbitSum_zero_eq_finset_translate_sub
+    {G : Type*} [Group G] (H : Subgroup G) (s : Finset H) (f p : G → ℂ)
+    (hZero : ∀ x, (∑' ξ : H, f (ξ.val * x)) = 0)
+    (hOne : ∀ x, f x ≠ 0 → (∑' ξ : H, p (ξ.val * x)) = 1)
+    (hSupport : ∀ ξ ∉ s, ∀ x : G, f x * p (ξ.val * x) = 0)
+    (x : G) :
+    f x = ∑ ξ ∈ s, (f x * p (ξ.val * x) - f (ξ.val⁻¹ * x) * p x) := by
+  have hForward : (∑ ξ ∈ s, f x * p (ξ.val * x)) = f x := by
+    rw [← tsum_eq_sum (L := SummationFilter.unconditional H) (s := s) (fun ξ hξ ↦ hSupport ξ hξ x), tsum_mul_left]
+    by_cases hx : f x = 0
+    · rw [hx, zero_mul]
+    · rw [hOne x hx, mul_one]
+  have hReverseSupport (ξ : H) (hξ : ξ ∉ s) : f (ξ.val⁻¹ * x) * p x = 0 := by
+    simpa only [mul_inv_cancel_left] using hSupport ξ hξ (ξ.val⁻¹ * x)
+  have hInv : (∑' ξ : H, f (ξ.val⁻¹ * x)) = 0 :=
+    ((Equiv.inv H).tsum_eq (fun ξ : H ↦ f (ξ.val * x))).trans (hZero x)
+  have hReverse : (∑ ξ ∈ s, f (ξ.val⁻¹ * x) * p x) = 0 := by
+    rw [← tsum_eq_sum (L := SummationFilter.unconditional H) (s := s) hReverseSupport, tsum_mul_right, hInv, zero_mul]
+  rw [Finset.sum_sub_distrib, hForward, hReverse, sub_zero]
+
+private def compactBruhatTranslate
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [T2Space G] [LocallyCompactSpace G]
+    (a : G) (v : BruhatCompactSupport G) : BruhatCompactSupport G := by
+  refine ⟨fun x ↦ v.val (a⁻¹ * x), ?_, ?_⟩
+  · let v₀ : bruhatSmoothSubmodule (G := G) := ⟨v.val, v.property.1⟩
+    obtain ⟨w, hw, _⟩ := bruhatFirstOrder_translate (1 : LCATopologicalLie G) v₀ a
+    have he : w.val = fun x ↦ v.val (a⁻¹ * x) := funext hw
+    rw [← he]
+    exact w.property
+  · exact v.property.2.comp_homeomorph (Homeomorph.mulLeft a⁻¹)
+
+private theorem sLocalTraceLift_linearMap_eq_zero_of_orbitSum_zero
+    {E : Type*} [AddCommGroup E] [Module ℂ E]
+    (A : BruhatCompactSupport Iₛ →ₗ[ℂ] E)
+    (hTranslate : ∀ (ξ : Hₛ) (v w : BruhatCompactSupport Iₛ),
+      (∀ x : Iₛ, w.val x = v.val (ξ.val⁻¹ * x)) → A w = A v)
+    (f : BruhatCompactSupport Iₛ)
+    (hZero : ∀ x : Iₛ, (∑' ξ : Hₛ, f.val (ξ.val * x)) = 0) : A f = 0 := by
+  let π : Iₛ → Jₛ := QuotientGroup.mk
+  let K : Set Jₛ := π '' tsupport f.val
+  have hK : IsCompact K := f.property.2.image QuotientGroup.continuous_mk
+  obtain ⟨p, hp⟩ := exists_sLocalTraceCutoff K hK
+  let : DiscreteTopology Hₛ := discreteTopology_sProjectedDiagonal
+  have hClosed : IsClosed (Hₛ : Set Iₛ) := isClosed_sProjectedDiagonal
+  obtain ⟨s, hs⟩ := exists_finite_compactOrbitProducts Hₛ hClosed f.val p.val
+    f.property.2 p.property.2
+  have hOne (x : Iₛ) (hx : f.val x ≠ 0) : (∑' ξ : Hₛ, p.val (ξ.val * x)) = 1 :=
+    (hp x (Set.mem_image_of_mem π (subset_tsupport f.val hx))).tsum_eq
+  let piece (ξ : Hₛ) : BruhatCompactSupport Iₛ := by
+    let pξ := compactBruhatTranslate ξ.val⁻¹ p
+    refine ⟨f.val * pξ.val, ?_, f.property.2.mul_right⟩
+    exact (mem_bruhatSmoothSubmodule_iff _).mpr fun n ↦ isBruhatContDiff_mul
+      ((mem_bruhatSmoothSubmodule_iff _).mp f.property.1 n)
+      ((mem_bruhatSmoothSubmodule_iff _).mp pξ.property.1 n)
+  have hPiece (ξ : Hₛ) (x : Iₛ) : (piece ξ).val x = f.val x * p.val (ξ.val * x) := by
+    change f.val x * p.val ((ξ.val⁻¹)⁻¹ * x) = _
+    rw [inv_inv]
+  have hSplit : f = ∑ ξ ∈ s, (piece ξ - compactBruhatTranslate ξ.val (piece ξ)) := by
+    apply Subtype.ext
+    funext x
+    let ev : BruhatCompactSupport Iₛ →ₗ[ℂ] ℂ :=
+      { toFun := fun v ↦ v.val x, map_add' := fun _ _ ↦ rfl, map_smul' := fun _ _ ↦ rfl }
+    change ev f = ev (∑ ξ ∈ s, (piece ξ - compactBruhatTranslate ξ.val (piece ξ)))
+    rw [map_sum]
+    simp only [map_sub]
+    change f.val x = ∑ ξ ∈ s, ((piece ξ).val x - (piece ξ).val (ξ.val⁻¹ * x))
+    simpa only [hPiece, mul_inv_cancel_left] using
+      orbitSum_zero_eq_finset_translate_sub Hₛ s f.val p.val hZero hOne hs x
+  have hInvariant (ξ : Hₛ) : A (compactBruhatTranslate ξ.val (piece ξ)) = A (piece ξ) :=
+    hTranslate ξ (piece ξ) (compactBruhatTranslate ξ.val (piece ξ)) (fun _ ↦ rfl)
+  rw [hSplit, map_sum]
+  simp only [map_sub, hInvariant, sub_self, Finset.sum_const_zero]
+
+/-- Paper: (12.4.1.4), p. 515. A linear map on compact S-idelic Bruhat tests
+invariant under projected S-unit translations takes equal values on lifts
+of the same quotient test.
+Deviation: This gives a criterion for independence of the compact lift. -/
+theorem sLocalTraceLift_linearMap_eq_of_periodization_eq
+    {E : Type*} [AddCommGroup E] [Module ℂ E]
+    (A : BruhatCompactSupport Iₛ →ₗ[ℂ] E)
+    (hTranslate : ∀ (ξ : Hₛ) (v w : BruhatCompactSupport Iₛ),
+      (∀ x : Iₛ, w.val x = v.val (ξ.val⁻¹ * x)) → A w = A v)
+    {Φ : Jₛ → ℂ} (f g : BruhatCompactSupport Iₛ)
+    (hf : ∀ x : Iₛ, HasSum (fun ξ : Hₛ ↦ f.val (ξ.val * x)) (Φ (QuotientGroup.mk x)))
+    (hg : ∀ x : Iₛ, HasSum (fun ξ : Hₛ ↦ g.val (ξ.val * x)) (Φ (QuotientGroup.mk x))) :
+    A f = A g := by
+  have hZero (x : Iₛ) : (∑' ξ : Hₛ, (f - g).val (ξ.val * x)) = 0 := by
+    change (∑' ξ : Hₛ, (f.val (ξ.val * x) - g.val (ξ.val * x))) = 0
+    exact ((hf x).sub (hg x)).tsum_eq.trans (sub_self _)
+  have hDiff := sLocalTraceLift_linearMap_eq_zero_of_orbitSum_zero A hTranslate (f - g) hZero
+  rw [map_sub] at hDiff
+  exact sub_eq_zero.mp hDiff
+
+end CompactLiftPeriodization
+
 /-- Paper: (12.4.1.4), p. 515. The restriction of an outside-unit-invariant test admits
 a compactly supported Bruhat lift whose S-unit periodization recovers the restriction.
 Deviation: The inserted S-idele evaluates the global test before taking the quotient. -/
