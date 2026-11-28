@@ -4,6 +4,7 @@ public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3b
 public import Mathlib.Algebra.Exact.Basic
 public import Mathlib.MeasureTheory.Function.L2Space
 import Mathlib.Analysis.Normed.Operator.Extend
+import RiemannMasullo.ForMathlib.Analysis.Distribution.TemperateGrowth
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 import RiemannMasullo.Ch02_AdelicTheta.Sec3
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
@@ -644,6 +645,32 @@ private theorem existsUnique_sLocalZetaMatchingDifference_rhoGrowth (χ : Pontry
     exact (le_of_tendsto_of_tendsto (hc hz0).norm.continuousWithinAt
       ((continuous_const.mul (continuous_norm.pow n)).continuousAt.continuousWithinAt) hbound).trans
       (mul_le_mul_of_nonneg_right (le_max_left _ _) (pow_nonneg (norm_nonneg z) n))
+
+/-- Paper: Proposition 3.3.1.5(3), p. 132. For a fixed unitary character,
+the S-local correcting factor restricted to the critical line is a
+temperate multiplier in the real frequency variable.
+Deviation: Use the proved polynomial bound on a closed substrip for
+(3.3.1.11), erratum F16. Allow any fixed real frequency normalization. -/
+theorem sLocalRhoFactor_hasTemperateGrowth_criticalLine (χ : PontryaginDual Jₛ) (b : ℝ) :
+    Function.HasTemperateGrowth
+      (fun t : ℝ ↦ ρₛ(χ, (1 / 2 : ℂ) + (t : ℂ) * ((b : ℂ) * Complex.I))) := by
+  have hsub : Icc (1 / 4 : ℝ) (3 / 4) ⊆ overlapInterval := by
+    intro t ht
+    exact ⟨by linarith [ht.1], by linarith [ht.2]⟩
+  obtain ⟨C, hC, n, hbound⟩ :=
+    existsUnique_sLocalZetaMatchingDifference_rhoGrowth χ (1 / 4) (3 / 4) (by norm_num) hsub
+  have hstrip (z : ℂ) (hz : |z.re - 1 / 2| ≤ 1 / 4) : z.re ∈ Icc (1 / 4 : ℝ) (3 / 4) := by
+    obtain ⟨hl, hu⟩ := abs_le.mp hz
+    exact ⟨by linarith, by linarith⟩
+  have hρ := sLocalRhoFactor_iteratedDeriv_analyticOn χ 0
+  rw [iteratedDeriv_zero] at hρ
+  have hTem := hasTemperateGrowth_vertical_of_polynomial_strip
+    (f := fun z ↦ ρₛ(χ,z)) (a := 1 / 2) (δ := 1 / 4) (k := n) b (by norm_num) hC
+    (hρ.mono fun z hz ↦ (hsub (hstrip z hz)).1)
+    (fun z hz ↦ (hbound z (hstrip z hz)).trans
+      (mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (norm_nonneg z) (by linarith) n) hC))
+  with_unfolding_all
+    simpa only [Complex.ofReal_div, Complex.ofReal_one, Complex.ofReal_ofNat] using hTem
 
 /-- Paper: (5.4.1.3), p. 266.
 Subtracting the corrected second component from the first on the overlap is a
