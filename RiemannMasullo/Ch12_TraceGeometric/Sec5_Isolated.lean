@@ -606,6 +606,73 @@ theorem hasSum_widthShell_orderZeroRenormalizedTrace
 
 open Filter in
 open scoped Topology in
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. The right limit of the renormalized
+order-zero width residual is exactly the zero sum on the edge. The test may be
+nonzero at the identity, and the widths need not decrease monotonically. -/
+theorem hasSum_widthEdge_orderZeroRenormalizedTrace_rightLimit
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (φ : BruhatCompactSupport C𝔽) {α : ℝ} (hα : 0 < α)
+    (u : ℕ → ℝ) (hu : ∀ n, α < u n) (hlim : Tendsto u atTop (𝓝 α)) :
+    ∃ S : ℂ, HasSum (fun z : {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ offset(z) = α} ↦
+      zeroTerm(φ, z.val)) S ∧
+      Tendsto (fun n ↦ orderZeroRenormalizedTrace φ hα.le -
+        orderZeroRenormalizedTrace φ (hα.le.trans (hu n).le)) atTop (𝓝 S) := by
+  classical
+  have hwide : α < α + 1 := by linarith
+  let Full := {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ offset(z) < α + 1}
+  let term (z : Full) : ℂ := zeroTerm(φ, z.val)
+  have hs : Summable term :=
+    (orderZeroRenormalizedTrace_hasSum_interior τ hτ φ (hα.trans hwide)).summable
+  let shell (n : ℕ) : Set Full := {z | α ≤ offset(z.val) ∧ offset(z.val) < u n}
+  let edge : Set Full := {z | offset(z.val) = α}
+  have hterm (z : Full) : Tendsto (fun n ↦ (shell n).indicator term z)
+      atTop (𝓝 (edge.indicator term z)) := by
+    by_cases heq : offset(z.val) = α
+    · have hedge : z ∈ edge := heq
+      rw [Set.indicator_of_mem hedge]
+      apply tendsto_const_nhds.congr'
+      filter_upwards with n
+      have hz : z ∈ shell n := ⟨heq.ge, by simpa only [heq] using hu n⟩
+      exact (Set.indicator_of_mem hz _).symm
+    · have hedge : z ∉ edge := heq
+      rw [Set.indicator_of_notMem hedge]
+      apply tendsto_const_nhds.congr'
+      by_cases hle : α ≤ offset(z.val)
+      · have hlt := lt_of_le_of_ne hle (Ne.symm heq)
+        filter_upwards [hlim.eventually (Iio_mem_nhds hlt)] with n hn
+        have hz : z ∉ shell n := fun hm ↦ (not_lt_of_ge hn.le) hm.2
+        exact (Set.indicator_of_notMem hz _).symm
+      · filter_upwards with n
+        have hz : z ∉ shell n := fun hm ↦ hle hm.1
+        exact (Set.indicator_of_notMem hz _).symm
+  have hconv : Tendsto (fun n ↦ ∑' z, (shell n).indicator term z) atTop
+      (𝓝 (∑' z, edge.indicator term z)) := by
+    refine tendsto_tsum_of_dominated_convergence hs.norm hterm (Eventually.of_forall fun n z ↦ ?_)
+    by_cases hz : z ∈ shell n <;> simp [Set.indicator, hz]
+  have htrace : (fun n ↦ ∑' z, (shell n).indicator term z) =ᶠ[atTop]
+      (fun n ↦ orderZeroRenormalizedTrace φ hα.le -
+        orderZeroRenormalizedTrace φ (hα.le.trans (hu n).le)) := by
+    filter_upwards [hlim.eventually (Iio_mem_nhds hwide)] with n hn
+    let Shell := {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ α ≤ offset(z) ∧ offset(z) < u n}
+    let e : shell n ≃ Shell :=
+      ⟨fun z ↦ ⟨z.val.val, z.val.property.1, z.property⟩,
+        fun z ↦ ⟨⟨z.val, z.property.1, z.property.2.2.trans hn⟩, z.property.2⟩,
+        fun _ ↦ rfl, fun _ ↦ rfl⟩
+    have h := hasSum_widthShell_orderZeroRenormalizedTrace τ hτ φ hα (hu n).le
+    exact ((hasSum_subtype_iff_indicator (f := term) (s := shell n)).mp
+      ((e.hasSum_iff).mpr h)).tsum_eq
+  let e : edge ≃ {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ offset(z) = α} :=
+    ⟨fun z ↦ ⟨z.val.val, z.val.property.1, z.property⟩,
+      fun z ↦ ⟨⟨z.val, z.property.1, by simpa only [z.property.2] using hwide⟩, z.property.2⟩,
+      fun _ ↦ rfl, fun _ ↦ rfl⟩
+  have he := (hs.subtype (fun z ↦ z ∈ edge)).hasSum
+  have hei := (hasSum_subtype_iff_indicator (f := term) (s := edge)).mp he
+  refine ⟨_, (e.hasSum_iff).mp he, ?_⟩
+  rw [hei.tsum_eq] at hconv
+  exact hconv.congr' htrace
+
+open Filter in
+open scoped Topology in
 /-- Paper: Theorem 12.5.1.1, pp. 519–520. For a probe whose real terms are
 nonnegative in the surrounding shell, the real term at a prescribed edge point is
 bounded by the limit of the renormalized width residual. -/
@@ -662,6 +729,47 @@ theorem traceFormula_exteriorZeros_of_orderZeroRenormalizedTrace_tendsto_nonpos
   have hle := zeroTerm_re_le_of_orderZeroRenormalizedTrace_tendsto τ hτ ψ hEdge u hu huWide
     hNonneg p.val p.property.1 rfl hlim
   exact (not_lt_of_ge (hle.trans hc)) hPos
+
+open Filter in
+open scoped Topology in
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. An eventual nonpositive upper bound
+along a sequence approaching each candidate edge implies exterior cancellation.
+The probe need only have nonnegative real zero terms on the edge itself. -/
+theorem traceFormula_exteriorZeros_of_orderZeroRenormalizedTrace_rightLimit_nonpos
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : RightInverse τ (ideleClassNorm F))
+    (hResidual : ∀ (p : SectionCharacterPoint(τ)), 0 < ord(p) →
+      ∀ (ha : 0 < offset(p)), offset(p) < 1 / 2 →
+      ∃ (ψ : BruhatCompactSupport C𝔽) (u : ℕ → ℝ) (hu : ∀ n, offset(p) < u n),
+        Tendsto u atTop (𝓝 (offset(p))) ∧
+        (∀ q : SectionCharacterPoint(τ), 0 < ord(q) → offset(q) = offset(p) →
+          0 ≤ (zeroTerm(ψ, q)).re) ∧
+        0 < (zeroTerm(ψ, p)).re ∧
+        (∀ᶠ n in atTop, (orderZeroRenormalizedTrace ψ ha.le -
+          orderZeroRenormalizedTrace ψ (ha.le.trans (hu n).le)).re ≤ 0))
+    (φ : BruhatCompactSupport C𝔽) (hφ : ∀ g : C₁, φ.val g = 0) {α : ℝ} (hα : 0 < α) :
+    HasSum (fun z : {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ α ≤ offset(z)} ↦
+      zeroTerm(φ, z.val)) 0 := by
+  have hWide : IsEmpty {z : SectionCharacterPoint(τ) // 0 < ord(z) ∧ 1 / 2 ≤ offset(z)} :=
+    (hasSum_exteriorZeros_iff_isEmpty τ hτ (1 / 2 : ℝ)).mp
+      (fun ψ _ ↦ traceFormula_exteriorZeros_of_half_le τ ψ le_rfl)
+  apply (hasSum_exteriorZeros_iff_isEmpty τ hτ α).mpr _ φ hφ
+  refine ⟨fun p ↦ ?_⟩
+  have hEdge := hα.trans_le p.property.2
+  have hHalf : offset(p.val) < 1 / 2 :=
+    lt_of_not_ge fun h ↦ @IsEmpty.false _ hWide ⟨p.val, p.property.1, h⟩
+  obtain ⟨ψ, u, hu, huLim, hNonneg, hPos, hBound⟩ :=
+    hResidual p.val p.property.1 hEdge hHalf
+  obtain ⟨S, hSum, hLim⟩ :=
+    hasSum_widthEdge_orderZeroRenormalizedTrace_rightLimit τ hτ ψ hEdge u hu huLim
+  have hSle : S.re ≤ 0 := le_of_tendsto_of_tendsto
+    ((Complex.continuous_re.tendsto S).comp hLim) tendsto_const_nhds hBound
+  let z : {q : SectionCharacterPoint(τ) // 0 < ord(q) ∧ offset(q) = offset(p.val)} :=
+    ⟨p.val, p.property.1, rfl⟩
+  have hReal := Complex.reCLM.hasSum hSum
+  have hle := hReal.summable.le_tsum z
+    (fun q _ ↦ hNonneg q.val q.property.1 q.property.2)
+  rw [hReal.tsum_eq] at hle
+  exact (not_lt_of_ge (hle.trans hSle)) hPos
 
 end OrderZeroDiagonalComparison
 
