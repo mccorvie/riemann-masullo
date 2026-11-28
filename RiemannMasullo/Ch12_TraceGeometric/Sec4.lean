@@ -4582,6 +4582,28 @@ private theorem sLocalTrace_modulus_invariant (ξ : Hₛ) (x : Aₛ) :
   calc _ = modS(ξ.val.val) * modS(x) := by ring
        _ = _ := by rw [h, one_mul]
 
+/-- Paper: (12.4.1.20)–(12.4.1.23), p. 518. Dilation by a projected
+S-unit moves the Fourier transform of the affine orbital test to the
+identity test with phase at the inverse unit minus one.
+Deviation: The integrated identity allows an arbitrary radial multiplier. -/
+theorem sLocalTrace_integral_radial_fourier_affine
+    (f : BruhatCompactSupport Iₛ) (ξ : Hₛ) (a : ℝ → ℂ) :
+    (∫ w, a (modS(w)) * fourierₛ (sLocalTraceEta f ξ) w ∂νₛ) =
+      ∫ w, a (modS(w)) * (fourierₛ (sLocalTraceEta f 1) w *
+        (ψₛ (w * ((ξ⁻¹).val.val - 1)) : ℂ)) ∂νₛ := by
+  rw [← sLocalTrace_integral_dilate_unit ξ (fun w ↦ a (modS(w)) *
+    (fourierₛ (sLocalTraceEta f 1) w * (ψₛ (w * ((ξ⁻¹).val.val - 1)) : ℂ)))]
+  refine integral_congr_ae (ae_of_all _ fun w ↦ ?_)
+  have hphase : ξ.val.val * w * ((ξ⁻¹).val.val - 1) = (1 - ξ.val.val) * w := by
+    change ξ.val.val * w * ((ξ.val⁻¹).val - 1) = _
+    rw [mul_sub, mul_one,
+      show ξ.val.val * w * (ξ.val⁻¹).val = (ξ.val.val * (ξ.val⁻¹).val) * w by ring,
+      Units.mul_inv, one_mul, sub_mul, one_mul]
+  change a (modS(w)) * fourierₛ (sLocalTraceEta f ξ) w =
+    a (modS(ξ.val.val * w)) * (fourierₛ (sLocalTraceEta f 1) (ξ.val.val * w) *
+      (ψₛ (ξ.val.val * w * ((ξ⁻¹).val.val - 1)) : ℂ))
+  rw [sLocalTrace_modulus_invariant ξ w, sLocalTrace_fourier_affine f ξ w, hphase]
+
 /-- Every remainder is a Fourier coefficient of the same amplitude at the frequency ξ⁻¹ − 1. -/
 private theorem sLocalTrace_tail_coefficient (f : BruhatCompactSupport Iₛ) (ξ : Hₛ) (R : ℝ) :
     (∫ w in {w : Aₛ | R < modS(w)}, fourierₛ (sLocalTraceEta f ξ) w *
