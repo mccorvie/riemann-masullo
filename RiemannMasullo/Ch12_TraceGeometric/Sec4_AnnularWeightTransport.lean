@@ -9,7 +9,7 @@ import Mathlib.MeasureTheory.Measure.WithDensity
 public noncomputable section
 
 open Filter MeasureTheory Set
-open scoped ENNReal NNReal
+open scoped ENNReal InnerProductSpace NNReal
 
 namespace RiemannMasullo
 
@@ -39,6 +39,52 @@ theorem exists_l2Inclusion_of_measure_le {μ ν : Measure X} (hμν : μ ≤ ν)
   refine ⟨J, ?_, I.mkContinuous_norm_le zero_le_one hI, hJ⟩
   intro f g hfg
   exact Lp.ext (hνμ.ae_eq ((hJ f).symm.trans (hfg ▸ hJ g)))
+
+/-- The adjoint of the inclusion into flat L² divides representatives by the
+original density. -/
+theorem l2Inclusion_adjoint_withDensity_ae_eq
+    (μ : Measure X)
+    (w : X → ℝ≥0) (hw : Measurable w) (hw₁ : ∀ x, 1 ≤ w x)
+    (ν : Measure X) (hν : ν = μ.withDensity (fun x ↦ (w x : ℝ≥0∞)))
+    (J : Lp ℂ 2 ν →L[ℂ] Lp ℂ 2 μ)
+    (hJ : ∀ f, (J f : X → ℂ) =ᵐ[μ] (f : X → ℂ)) (g : Lp ℂ 2 μ) :
+    (J.adjoint g : X → ℂ) =ᵐ[ν] fun x ↦ g x / (w x : ℂ) := by
+  subst ν
+  let v : X → ℂ := fun x ↦ g x / (w x : ℂ)
+  have hreal : Measurable fun x ↦ (w x : ℝ) := measurable_coe_nnreal_real.comp hw
+  have hv : StronglyMeasurable v := (Lp.stronglyMeasurable g).div
+    (Complex.measurable_ofReal.comp hreal).stronglyMeasurable
+  have hpos (x : X) : 0 < (w x : ℝ) := by exact_mod_cast zero_lt_one.trans_le (hw₁ x)
+  have hmem : MemLp v 2 (μ.withDensity (fun x ↦ (w x : ℝ≥0∞))) := by
+    rw [memLp_two_iff_integrable_sq_norm hv.aestronglyMeasurable,
+      integrable_withDensity_iff_integrable_smul hw]
+    have hflat := (memLp_two_iff_integrable_sq_norm (Lp.aestronglyMeasurable g)).mp (Lp.memLp g)
+    refine hflat.mono' (hw.stronglyMeasurable.smul (hv.norm.pow 2)).aestronglyMeasurable
+      (ae_of_all _ fun x ↦ ?_)
+    simp only [v, NNReal.smul_def, smul_eq_mul, norm_mul, Real.norm_eq_abs,
+      NNReal.abs_eq, norm_div, Complex.norm_real, div_pow]
+    have hwR : (1 : ℝ) ≤ (w x : ℝ) := by exact_mod_cast hw₁ x
+    rw [abs_of_nonneg (sq_nonneg ‖g x‖), abs_of_nonneg (sq_nonneg (w x : ℝ))]
+    rw [show (w x : ℝ) * (‖g x‖ ^ 2 / (w x : ℝ) ^ 2) =
+      ‖g x‖ ^ 2 / (w x : ℝ) by field_simp]
+    exact div_le_self (sq_nonneg _) hwR
+  have hμ : μ ≪ μ.withDensity (fun x ↦ (w x : ℝ≥0∞)) :=
+    withDensity_absolutelyContinuous' hw.coe_nnreal_ennreal.aemeasurable
+      (ae_of_all _ fun x ↦ by exact_mod_cast (hpos x).ne')
+  have hmult (x : X) : (w x : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (hpos x).ne'
+  have heq : J.adjoint g = hmem.toLp v := by
+    apply ext_inner_right ℂ
+    intro f
+    rw [J.adjoint_inner_left, L2.inner_def, L2.inner_def,
+      integral_withDensity_eq_integral_smul hw]
+    apply integral_congr_ae
+    filter_upwards [hJ f, hμ.ae_eq hmem.coeFn_toLp] with x hx hrep
+    rw [hx, hrep]
+    simp only [v, NNReal.smul_def, RCLike.inner_apply, map_div₀, Complex.conj_ofReal,
+      Complex.real_smul]
+    field_simp [hmult x]
+  rw [heq]
+  exact hmem.coeFn_toLp
 
 /-- A region on which the density is bounded admits a bounded lift from
 unweighted functions to weighted functions restricted to that region. -/
