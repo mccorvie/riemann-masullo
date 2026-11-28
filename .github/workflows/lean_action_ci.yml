@@ -4,6 +4,14 @@ name: Lean Action CI
 # the lakefile, vendored code). `PR check` builds every pull request that changes only library
 # files, with the statement check on top, and `Main state` builds main, so running this as well
 # for those would only use up runners: the queue then delays everything, claims included.
+#
+# A pull request that changes only documentation (Markdown, paper/, transcription/) is not
+# built: nothing in the build reads those files, and the build here is from scratch, an hour
+# or more (#7004). That is decided from the list of changed files in the job `changes`, not by
+# narrowing `paths`. A pull request that changes a library file together with a document, such
+# as a proof with its line in ERRATA.md or in External/ATTRIBUTION.md, must still be built
+# here, because `PR check` builds nothing once a file outside the library is changed, and a
+# `paths` filter cannot tell that pull request from one that changes the document alone.
 on:
   pull_request:
     paths:
@@ -12,9 +20,55 @@ on:
       - 'RiemannMasullo/External/**'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+# A newer push to the same pull request replaces the run for the older one.
+concurrency:
+  group: lean-action-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      build: ${{ steps.decide.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Is there anything to build?
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          # On a pull request HEAD is GitHub's test merge into main, and its first parent is
+          # main. Anything unexpected (no parent, an empty list, a failing command) builds.
+          build=true
+          if [ "$EVENT" = pull_request ] \
+              && git diff --name-only -z --no-renames HEAD^1 HEAD >"$RUNNER_TEMP/changed" \
+              && [ -s "$RUNNER_TEMP/changed" ]; then
+            build=false
+            while IFS= read -r -d '' f; do
+              case "$f" in
+                *.md|paper/*|transcription/*) ;;
+                *) build=true; break ;;
+              esac
+            done <"$RUNNER_TEMP/changed"
+          fi
+          echo "build=$build" >>"$GITHUB_OUTPUT"
+          if [ "$build" = false ]; then
+            echo "Only documentation changed: nothing to build." >>"$GITHUB_STEP_SUMMARY"
+          fi
+
+  build:
+    needs: changes
+    # Skipped only on an explicit "no": if the job above fails, the build still runs.
+    if: ${{ !cancelled() && needs.changes.outputs.build != 'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
       - name: Lint
