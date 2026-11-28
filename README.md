@@ -177,6 +177,12 @@ pull request is built and checked automatically, and then read by the project be
 merges: since 24 November 2026 nothing is merged automatically. [`CONTRIBUTING.md`](CONTRIBUTING.md) has the details, and what
 we have learned about doing this quickly.
 
+**How we are merging at this stage.** We are prioritizing pull requests that close one of the
+open problems: one that proves an open statement, or that states a missing step and proves it.
+Partial results are welcome and we read all of them; for now they stay open as pull requests
+and are not merged. If your pull request closes a problem, please say so at the top of its
+description.
+
 A few statements of the supplementary chapters are still open as ordinary
 [`proof` issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aproof+label%3Asupplementary+-label%3Aclaimed).
 Those are taken one person at a time: comment `Claiming` on one to take it, and `Releasing` to
