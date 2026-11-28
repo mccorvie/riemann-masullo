@@ -16,8 +16,10 @@ difference of the sharp masses at the radii `λ λ'` and `λ' / λ''` (`sLocalAn
 When both radii tend to infinity, `sLocalTraceSharpMass_asymptotic` applies to both. The
 local principal values cancel, and the summed annular masses less `volume₁ φ(1) log (λ λ'')`
 tend to zero (`sLocalAnnularMass_asymptotic`). So the lower cutoff keeps the conclusion of
-Theorem 12.4.1.1 only if `λ' / λ''` does not tend to infinity. The case where `λ' / λ''` tends to
-zero needs the sharp masses at small radii, which `Sec4.lean` does not estimate.
+Theorem 12.4.1.1 only if `λ' / λ''` does not tend to infinity. When `λ' / λ''` tends to zero, the
+summed sharp masses at radius `λ' / λ''` tend to zero (`sLocalTraceSharpMass_tsum_tendsto_zero`),
+and the annular masses have the asymptotic of Theorem 12.4.1.1
+(`sLocalAnnularMass_asymptotic_of_tendsto_zero`).
 
 The fundamental domain is assumed measurable here.
 -/
@@ -190,6 +192,55 @@ theorem sLocalAnnularMass_asymptotic (φ : BruhatCompactSupport C𝔽)
   have hai : 0 < a i := hci.trans_le hcai
   rw [Real.log_div hai.ne' hci.ne', Real.log_mul hai.ne' hbi.ne', Real.log_mul hci.ne' hbi.ne']
   push_cast
+  ring
+
+/-- Paper: footnote 2, p. 514, with Theorem 12.4.1.1, pp. 514–519.
+Reconstruction: with the sharp annular spatial cutoff `c < |x| ≤ a` and the sharp frequency
+cutoff `|u| ≤ b`, suppose `a b` tends to infinity and `c b` tends to zero from above. In the
+notation of the footnote these are `λ λ'` and `λ' / λ''`. Then the summed annular masses less
+`volume₁ φ(1) log (a b)` tend to `volume₁` times the sum of the local principal values, the
+conclusion of Theorem 12.4.1.1. The annular masses are the sharp masses at radius `a b` less the
+sharp masses at radius `c b` (`sLocalAnnularMass_eq`), and the latter sum to something that tends
+to zero (`sLocalTraceSharpMass_tsum_tendsto_zero`). -/
+theorem sLocalAnnularMass_asymptotic_of_tendsto_zero (φ : BruhatCompactSupport C𝔽)
+    (_hPic : Subsingleton (CommRing.Pic ((S : Set V).integer F)))
+    (_hRamified : ∀ v : V, differentIdeal ℤ (𝓞 F) ≤ v.asIdeal → v ∈ S)
+    (_hOutside : ∀ (a : outsideIntegralIdeleUnits F S) (c : C𝔽),
+      φ.val (QuotientGroup.mk a.val * c) = φ.val c)
+    (f : BruhatCompactSupport Iₛ)
+    (_hLift : ∀ g : Iₛ, HasSum (fun ξ : Hₛ ↦ f.val (ξ.val * g)) (φ.val (classAtS(g))))
+    (D : Set Iₛ) (hD : IsFundamentalDomain Hₛ D μₛ) (hDm : MeasurableSet D)
+    {ι : Type*} {l : Filter ι} (a b c : ι → ℝ) (hc : ∀ᶠ i in l, 0 < c i)
+    (hca : ∀ᶠ i in l, c i ≤ a i) (hb : ∀ᶠ i in l, 0 < b i)
+    (hab : Tendsto (fun i ↦ a i * b i) l atTop) (hcb : Tendsto (fun i ↦ c i * b i) l (𝓝[>] 0)) :
+    ∃ (pa : archTest) (pb : finiteTest),
+      (∀ (w : InfinitePlace F) (u : w.Completionˣ), (pa w).val u = φ.val (archClass(w) u)) ∧
+      (∀ (v : S) (u : (v.val.adicCompletion F)ˣ),
+        (pb v).val u = φ.val (finiteClass(v.val) u)) ∧
+      Tendsto (fun i ↦ (∑' ξ : Hₛ, sLocalAnnularMass f ξ D (a i) (b i) (c i)) -
+        (volume₁ : ℂ) * φ.val 1 * (Real.log (a i * b i) : ℂ)) l
+        (𝓝 ((volume₁ : ℂ) * principalValues(pa, pb))) := by
+  obtain ⟨pa, pb, M, hpa, hpb, hsum, hlim⟩ := sLocalTraceSharpMass_asymptotic (F := F) (S := S) φ
+    _hPic _hRamified _hOutside f _hLift
+  refine ⟨pa, pb, hpa, hpb, ?_⟩
+  obtain ⟨B, -, hB⟩ := sLocalTraceSharpMass_norm_sum_le_rpow f (c := 1 / 2) (by norm_num)
+    (by norm_num)
+  have h0 := (sLocalTraceSharpMass_tsum_tendsto_zero f).comp hcb
+  have h := (hlim.comp hab).sub h0
+  rw [sub_zero] at h
+  refine h.congr' ?_
+  filter_upwards [hc, hca, hb, hab.eventually hsum,
+    (hcb.mono_right nhdsWithin_le_nhds).eventually (gt_mem_nhds (zero_lt_one' ℝ))]
+    with i hci hcai hbi hs1 hsmall
+  have hcbpos : 0 < c i * b i := mul_pos hci hbi
+  have hs2 : Summable fun ξ : Hₛ ↦ sLocalTraceSharpMass f ξ (c i * b i) :=
+    (hB hcbpos hsmall.le).1.of_norm
+  have hS : HasSum (fun ξ : Hₛ ↦ sLocalAnnularMass f ξ D (a i) (b i) (c i))
+      (M (a i * b i) - ∑' ξ : Hₛ, sLocalTraceSharpMass f ξ (c i * b i)) := by
+    refine (hs1.sub hs2.hasSum).congr_fun fun ξ ↦ ?_
+    exact sLocalAnnularMass_eq f ξ D hD hDm hci hcai hbi
+  simp only [Function.comp_apply]
+  rw [hS.tsum_eq]
   ring
 
 end RiemannMasullo.Isolated
