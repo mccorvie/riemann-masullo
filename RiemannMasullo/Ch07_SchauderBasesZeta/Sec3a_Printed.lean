@@ -2,7 +2,8 @@ module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3a
 
-import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
+import RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Algebra.Polynomial.SpecificDegree
 import Mathlib.GroupTheory.MonoidLocalization.UniqueFactorization
 import Mathlib.NumberTheory.RamificationInertia.Inertia
