@@ -11,7 +11,7 @@ finite place the normalized trace on `main`'s polar-free level misses the global
 `volF / volS · M(f)(|·|^(1/2))`, at every width at least one half. `Sec4_RationalLevelOrder`
 identifies `main`'s level at every Sobolev order `s₀ ≥ 0` with the level of the weighted model band
 and transfers the local limit. This file combines the two, so the same failure holds at every
-Sobolev order of the local level, in particular at the order the paper uses.
+Sobolev order `s₀ ≥ 0` of the local level.
 
 * `ratMainLevelOrder_trace_tendsto_globalDiagonal`. The limit at order `s₀`.
 * `ratMainLevelOrder_trace_tendsto_globalDiagonal_of_one_le`. For a lift also supported on norms at
