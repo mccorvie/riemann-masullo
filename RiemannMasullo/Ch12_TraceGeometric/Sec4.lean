@@ -4362,9 +4362,9 @@ private theorem sLocalTrace_log_mul (g h : Iₛ) :
     rw [norm_mul, Real.log_mul (norm_ne_zero_iff.mpr (p g).ne_zero) (norm_ne_zero_iff.mpr (p h).ne_zero)]
 
 /-- The maximum of the local absolute values bounds every logarithmic coordinate on the
-norm - one group. Its inverse square root is summable on the diagonal S - units. -/
-private theorem sLocalTrace_height_summable :
-    Summable fun ξ : Hₛ ↦ (Real.sqrt (max 1 ‖(show Eₛ from ξ.val.val)‖))⁻¹ := by
+norm - one group. Every positive inverse power is summable on the diagonal S-units. -/
+private theorem sLocalTrace_height_summable {q : ℝ} (hq : 0 < q) :
+    Summable fun ξ : Hₛ ↦ ((max 1 ‖(show Eₛ from ξ.val.val)‖) ^ q)⁻¹ := by
   classical
   let : DiscreteTopology Hₛ := discreteTopology_sProjectedDiagonal
   let : DiscreteTopology (Additive Hₛ) := inferInstanceAs (DiscreteTopology Hₛ)
@@ -4379,8 +4379,8 @@ private theorem sLocalTrace_height_summable :
   let n : ℝ := Fintype.card (InfinitePlace F ⊕ S) + 1
   have hn : 1 ≤ n := le_add_of_nonneg_left (Nat.cast_nonneg _)
   have hn0 : 0 < n := zero_lt_one.trans_le hn
-  have hsum := summable_exp_neg_mul_norm_of_isProperMap l hl (c := 1 / (4 * n)) (by positivity)
-  change Summable (fun ξ : Additive Hₛ ↦ (Real.sqrt (max 1 ‖(show Eₛ from ξ.toMul.val.val)‖))⁻¹)
+  have hsum := summable_exp_neg_mul_norm_of_isProperMap l hl (c := q / (2 * n)) (by positivity)
+  change Summable (fun ξ : Additive Hₛ ↦ ((max 1 ‖(show Eₛ from ξ.toMul.val.val)‖) ^ q)⁻¹)
   apply hsum.of_nonneg_of_le (fun _ ↦ by positivity)
   intro ξ
   let a : Eₛ := ξ.toMul.val.val
@@ -4423,11 +4423,14 @@ private theorem sLocalTrace_height_summable :
     constructor
     · linarith [mul_le_mul_of_nonneg_right hcard (by positivity : 0 ≤ 2 * Real.log M)]
     · exact (hcoord i).trans (le_mul_of_one_le_left (by positivity) hn)
-  change (Real.sqrt M)⁻¹ ≤ Real.exp _
-  rw [← Real.exp_log (inv_pos.mpr (Real.sqrt_pos.mpr hM')), Real.exp_le_exp,
-    Real.log_inv, Real.log_sqrt hM'.le]
-  field_simp
-  linarith
+  change (M ^ q)⁻¹ ≤ Real.exp _
+  rw [← Real.exp_log (inv_pos.mpr (Real.rpow_pos_of_pos hM' q)), Real.exp_le_exp,
+    Real.log_inv, Real.log_rpow hM']
+  calc
+    _ = -(q / (2 * n)) * (n * (2 * Real.log M)) := by field_simp
+    _ ≤ -(q / (2 * n)) * ‖l ξ‖ :=
+      mul_le_mul_of_nonpos_left hsize (neg_nonpos.mpr (by positivity))
+    _ = _ := neg_mul _ _
 
 private theorem sLocalTrace_character_nontrivial {K : Type*} [Field K] [TopologicalSpace K]
     [IsTopologicalRing K] [MeasurableSpace K] [BorelSpace K] (μ : Measure K) (ψ : K → Circle)
@@ -4517,39 +4520,40 @@ private theorem sLocalTrace_frequency_step :
       have H := (le_add_of_nonneg_left (norm_nonneg (t v))).trans (hb v)
       linarith
 
-private theorem sLocalTrace_frequency_decay {E : Type*} [NormedCommRing E]
+private theorem sLocalTrace_frequency_decay {ι E : Type*} [NormedCommRing E]
     [MeasurableSpace E] [BorelSpace E] (μ : Measure E) [μ.IsAddLeftInvariant]
     (χ : Multiplicative E →ₜ* Circle)
     (C : ℝ) (hC : 1 ≤ C)
     (hs : ∀ r : E, r ≠ 0 → ∃ h : E, ‖h‖ ≤ C / ‖r‖ ∧
       1 ≤ C * ‖(χ (Multiplicative.ofAdd (r * h)) : ℂ) - 1‖)
-    (k : ℝ → E → ℂ) (A : ℝ) (hA : 0 ≤ A)
-    (hk : ∀ R : ℝ, 1 ≤ R → Integrable (k R) μ ∧ (∫ x, ‖k R x‖ ∂μ) ≤ A ∧
-      ∀ h : E, ‖h‖ ≤ 1 → (∫ x, ‖k R (x + h) - k R x‖ ∂μ) ≤ A * Real.sqrt ‖h‖) :
-    ∃ B ≥ 0, ∀ R : ℝ, 1 ≤ R → ∀ r : E,
+    (k : ι → E → ℂ) (p : ι → Prop) (q : ℝ) (hq : 0 < q)
+    (A : ℝ) (hA : 0 ≤ A)
+    (hk : ∀ R, p R → Integrable (k R) μ ∧ (∫ x, ‖k R x‖ ∂μ) ≤ A ∧
+      ∀ h : E, ‖h‖ ≤ 1 → (∫ x, ‖k R (x + h) - k R x‖ ∂μ) ≤ A * ‖h‖ ^ q) :
+    ∃ B ≥ 0, ∀ R, p R → ∀ r : E,
       ‖∫ x, k R x * (χ (Multiplicative.ofAdd (x * r)) : ℂ) ∂μ‖ ≤
-        B * (Real.sqrt (max 1 ‖r + 1‖))⁻¹ := by
+        B * ((max 1 ‖r + 1‖) ^ q)⁻¹ := by
   have hC0 : 0 < C := zero_lt_one.trans_le hC
-  let B := A * Real.sqrt (1 + C + ‖(1 : E)‖) + C * A * Real.sqrt (C * (1 + ‖(1 : E)‖))
+  let B := A * (1 + C + ‖(1 : E)‖) ^ q + C * A * (C * (1 + ‖(1 : E)‖)) ^ q
   refine ⟨B, by dsimp [B]; positivity, fun R hR r ↦ ?_⟩
   let I := ∫ x, k R x * (χ (Multiplicative.ofAdd (x * r)) : ℂ) ∂μ
   let M := max 1 ‖r + 1‖
   have hM : 0 < M := zero_lt_one.trans_le (le_max_left _ _)
   obtain ⟨hi, hb, hd⟩ := hk R hR
-  change ‖I‖ ≤ B * (Real.sqrt M)⁻¹
-  rw [← div_eq_mul_inv, le_div_iff₀ (Real.sqrt_pos.mpr hM)]
+  change ‖I‖ ≤ B * (M ^ q)⁻¹
+  rw [← div_eq_mul_inv, le_div_iff₀ (Real.rpow_pos_of_pos hM q)]
   by_cases hr : ‖r‖ ≤ C
   · have hab : ‖I‖ ≤ A := (norm_integral_le_of_norm_le hi.norm (ae_of_all _ fun x ↦ by
       simp only [norm_mul, Circle.norm_coe, mul_one, le_refl])).trans hb
     have hM' : M ≤ 1 + C + ‖(1 : E)‖ := max_le (by linarith [norm_nonneg (1 : E)])
       ((norm_add_le _ _).trans (by linarith))
-    exact (mul_le_mul hab (Real.sqrt_le_sqrt hM') (Real.sqrt_nonneg _) hA).trans
+    exact (mul_le_mul hab (Real.rpow_le_rpow hM.le hM' hq.le) (Real.rpow_nonneg hM.le q) hA).trans
       (le_add_of_nonneg_right (by positivity))
   · have hr0 : 0 < ‖r‖ := hC0.trans (lt_of_not_ge hr)
     obtain ⟨h, hsmall, hphase⟩ := hs r (norm_pos_iff.mp hr0)
     have hh : ‖h‖ ≤ 1 := hsmall.trans ((div_le_one hr0).mpr (le_of_not_ge hr))
     have hosc := (fourierIntegral_circleCharacter_translation_bound μ χ (k R) hi r h).trans (hd h hh)
-    have hmain : ‖I‖ ≤ C * A * Real.sqrt ‖h‖ := by
+    have hmain : ‖I‖ ≤ C * A * ‖h‖ ^ q := by
       have hm := mul_le_mul_of_nonneg_left hphase (norm_nonneg I)
       have hm' := mul_le_mul_of_nonneg_left hosc hC0.le
       change C * (‖I‖ * _) ≤ _ at hm'
@@ -4563,9 +4567,9 @@ private theorem sLocalTrace_frequency_decay {E : Type*} [NormedCommRing E]
             nlinarith [mul_nonneg (sub_nonneg.mpr hr1) (norm_nonneg (1 : E))])
       calc _ ≤ C / ‖r‖ * (‖r‖ * (1 + ‖(1 : E)‖)) := mul_le_mul hsmall hM' hM.le (by positivity)
            _ = _ := by field_simp
-    calc _ ≤ (C * A * Real.sqrt ‖h‖) * Real.sqrt M := by gcongr
-         _ = C * A * Real.sqrt (‖h‖ * M) := by rw [Real.sqrt_mul (norm_nonneg _)]; ring
-         _ ≤ C * A * Real.sqrt (C * (1 + ‖(1 : E)‖)) := by gcongr
+    calc _ ≤ (C * A * ‖h‖ ^ q) * M ^ q := by gcongr
+         _ = C * A * (‖h‖ * M) ^ q := by rw [Real.mul_rpow (norm_nonneg _) hM.le]; ring
+         _ ≤ C * A * (C * (1 + ‖(1 : E)‖)) ^ q := by gcongr
          _ ≤ B := le_add_of_nonneg_left (by positivity)
 
 private def sLocalTrace_tail_amplitude (f : BruhatCompactSupport Iₛ) (R : ℝ) (x : Aₛ) : ℂ :=
@@ -4640,7 +4644,445 @@ private theorem sLocalTrace_tail_bound (f : BruhatCompactSupport Iₛ) :
   obtain ⟨A, hA, hcut⟩ := sLocalTrace_cut_translation (E := Eₛ) νₛ _ hm hm0 d C hC hmod g hgc K hK hLip hW
   obtain ⟨D, hD, hs⟩ := sLocalTrace_frequency_step (F := F) (S := S)
   simp_rw [← hχ] at hs ⊢
-  exact sLocalTrace_frequency_decay (E := Eₛ) νₛ χ D hD hs (sLocalTrace_tail_amplitude f) A hA hcut
+  simp_rw [Real.sqrt_eq_rpow] at hcut ⊢
+  exact sLocalTrace_frequency_decay (E := Eₛ) νₛ χ D hD hs (sLocalTrace_tail_amplitude f)
+    (1 ≤ ·) (1 / 2) (by norm_num) A hA hcut
+
+private theorem sLocalTrace_modulus_continuous :
+    Continuous (fun x : Aₛ ↦ modS(x)) :=
+  (continuous_finsetProd _ fun w _ ↦ (((continuous_apply w).comp continuous_fst).norm.pow _)).mul
+    (continuous_finsetProd _ fun v _ ↦ ((continuous_apply v).comp continuous_snd).norm)
+
+private theorem sLocalTrace_modulus_units (u : Iₛ) : modS(u.val) = normS(u) := by
+  simp [sIdeleNorm, Units.coe_prod]
+
+private theorem sLocalTrace_ae_modulus_pos : ∀ᵐ x : Aₛ ∂νₛ, 0 < modS(x) := by
+  filter_upwards [measure_eq_zero_iff_ae_notMem.mp sLocalTrace_nonunits_null] with x hx
+  obtain ⟨u, rfl⟩ := not_not.mp hx
+  rw [sLocalTrace_modulus_units u]
+  exact NNReal.coe_pos.mpr (Units.zero_lt _)
+
+/-- The positive-half-plane zeta bound, with the additive measure accounted for, gives
+the negative moments of the modulus against the absolute value of a Schwartz–Bruhat test. -/
+private theorem sLocalTrace_inverse_modulus_moment (s : testₛ) {a : ℝ} (ha : a < 1) :
+    Integrable (fun x : Aₛ ↦ ‖testAt(s, x)‖ * modS(x) ^ (-a)) νₛ := by
+  let : BorelSpace Aₛ := sAdeleRing_borelSpace
+  let : BorelSpace Iₛ := sIdeleGroup_borelSpace
+  let m := sIdeleQuotientNorm F S
+  let c := quasiCharacterNormTwist m (isProperMap_sIdeleQuotientNorm F S).continuous
+    ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp (1 : PontryaginDual Jₛ)) ((1 - a : ℝ) : ℂ)
+  have hz := sLocalIdelicZetaIntegral_integrable s c
+    ⟨1, ((1 - a : ℝ) : ℂ), by simpa using sub_pos.mpr ha, rfl⟩
+  let g (x : Aₛ) : ℝ := ‖testAt(s, x)‖ * modS(x) ^ (1 - a)
+  have hzg : Integrable (g ∘ (Units.val : Iₛ → Aₛ)) μₛ := by
+    refine hz.norm.congr (ae_of_all _ fun u ↦ ?_)
+    change ‖testAt(s, u.val) * c (QuotientGroup.mk u)‖ = g u.val
+    rw [norm_mul]
+    dsimp only [g, c]
+    congr 1
+    change ‖(((1 : PontryaginDual Jₛ) (QuotientGroup.mk u) : Circle) : ℂ) *
+      ((↑(((m (QuotientGroup.mk u)).val : ℝ)) : ℂ) ^ ((1 - a : ℝ) : ℂ))‖ = _
+    rw [norm_mul, Circle.norm_coe, one_mul, sIdeleQuotientNorm_mk,
+      Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _))]
+    simp only [Complex.ofReal_re, sLocalTrace_modulus_units]
+  have ho : Topology.IsOpenEmbedding (Units.val : Iₛ → Aₛ) :=
+    IsOpenUnits.isOpenEmbedding_unitsVal (M := ((w : InfinitePlace F) → w.Completion) ×
+      ((v : S) → v.val.adicCompletion F))
+  have hmap := ho.measurableEmbedding.integrable_map_iff.mpr hzg
+  rw [sLocalTrace_measure_density, Measure.restrict_eq_self_of_ae_mem
+    (measure_eq_zero_iff_ae_notMem.mp sLocalTrace_nonunits_null |>.mono fun _ h ↦ not_not.mp h)] at hmap
+  let C := sLocalTraceMeasureFactor (F := F) S
+  have hC : 0 < C := Finset.prod_pos fun v _ ↦ by
+    have hv : (1 : ℝ) < v.asIdeal.absNorm := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+    exact div_pos (zero_lt_one.trans hv) (sub_pos.mpr hv)
+  let d (x : Aₛ) := ENNReal.ofReal (C / modS(x))
+  have hd : Measurable d :=
+    (measurable_const.div (sLocalTrace_modulus_continuous (F := F) (S := S)).measurable).ennreal_ofReal
+  have hi := (integrable_withDensity_iff (g := g) hd (ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top)).mp hmap
+  refine (hi.const_mul C⁻¹).congr ?_
+  filter_upwards [sLocalTrace_ae_modulus_pos (F := F) (S := S)] with x hx
+  change C⁻¹ * (‖testAt(s, x)‖ * modS(x) ^ (1 - a) * (d x).toReal) = _
+  rw [show (d x).toReal = C / modS(x) from ENNReal.toReal_ofReal (div_nonneg hC.le hx.le),
+    show 1 - a = -a + 1 by ring, Real.rpow_add hx, Real.rpow_one]
+  generalize h : modS(x) = m₀ at hx ⊢
+  field_simp [hC.ne', hx.ne']
+
+private def sharpLowerLog (R m : ℝ) : ℝ := max 0 (Real.log R - Real.log m)
+
+private theorem sharpLowerLog_le_rpow {R m a : ℝ} (hR : 0 < R) (hm : 0 < m) (ha : 0 < a) :
+    sharpLowerLog R m ≤ (R ^ a / a) * m ^ (-a) := by
+  unfold sharpLowerLog
+  apply max_le (by positivity)
+  rw [← Real.log_div hR.ne' hm.ne']
+  calc
+    _ ≤ (R / m) ^ a / a := Real.log_le_rpow_div (div_nonneg hR.le hm.le) ha
+    _ = _ := by rw [Real.div_rpow hR.le hm.le, Real.rpow_neg hm.le]; ring
+
+private def sLocalTrace_sharp_amplitude (f : BruhatCompactSupport Iₛ) (R : ℝ) (x : Aₛ) : ℂ :=
+  fourierₛ (sLocalTraceEta f 1) x * (sharpLowerLog R (modS(x)) : ℂ)
+
+private theorem sLocalTrace_sharp_coefficient (f : BruhatCompactSupport Iₛ) (ξ : Hₛ)
+    {R : ℝ} (hR : 0 < R) :
+    sLocalTraceSharpMass f ξ R = (volume₁ : ℂ) *
+      ∫ x, sLocalTrace_sharp_amplitude f R x * (ψₛ (x * ((ξ⁻¹).val.val - 1)) : ℂ) ∂νₛ := by
+  let : BorelSpace Aₛ := sAdeleRing_borelSpace
+  have hband : MeasurableSet (band(R)) :=
+    measurableSet_le (sLocalTrace_modulus_continuous (F := F) (S := S)).measurable measurable_const
+  rw [sLocalTraceSharpMass, ← Measure.restrict_restrict hband, Measure.restrict_eq_self_of_ae_mem
+    (measure_eq_zero_iff_ae_notMem.mp sLocalTrace_nonunits_null |>.mono fun _ h ↦ not_not.mp h),
+    ← sLocalTrace_integral_dilate_unit ξ (fun x ↦ sLocalTrace_sharp_amplitude f R x * _),
+    ← integral_indicator hband]
+  congr 1
+  apply integral_congr_ae
+  filter_upwards [sLocalTrace_ae_modulus_pos (F := F) (S := S)] with w hw
+  dsimp only [sLocalTrace_sharp_amplitude]
+  rw [sLocalTrace_modulus_invariant, show ξ.val.val * w * ((ξ⁻¹).val.val - 1) = (1 - ξ.val.val) * w by
+    change ξ.val.val * w * ((ξ.val⁻¹).val - 1) = _
+    rw [mul_sub, mul_one, show ξ.val.val * w * ((ξ.val⁻¹).val) = (ξ.val.val * (ξ.val⁻¹).val) * w by ring,
+      Units.mul_inv, one_mul, sub_mul, one_mul]]
+  by_cases hh : modS(w) ≤ R
+  · rw [indicator_of_mem (show w ∈ band(R) from hh), sharpLowerLog,
+      max_eq_right (sub_nonneg.mpr (Real.log_le_log hw hh)), sLocalTrace_fourier_affine]
+    ring
+  · rw [indicator_of_notMem (show w ∉ band(R) from hh), sharpLowerLog,
+      max_eq_left (sub_nonpos.mpr (Real.log_le_log hR (lt_of_not_ge hh).le))]
+    simp
+
+private theorem sLocalTrace_sharp_amplitude_bound (f : BruhatCompactSupport Iₛ)
+    {a : ℝ} (ha : 0 < a) (ha' : a < 1) :
+    ∃ C ≥ 0, ∀ {R : ℝ}, 0 < R →
+      Integrable (sLocalTrace_sharp_amplitude f R) νₛ ∧
+        (∫ x, ‖sLocalTrace_sharp_amplitude f R x‖ ∂νₛ) ≤ C * R ^ a := by
+  let : BorelSpace Aₛ := sAdeleRing_borelSpace
+  obtain ⟨η, hη⟩ := SLocalTraceEta.eta_test f (1 : Hₛ)
+  let s := sAdeleSchwartzFourier η
+  let g := fourierₛ (sLocalTraceEta f 1)
+  have hg (x : Aₛ) : g x = testAt(s, x) := by
+    change _ = fourierₛ (fun y ↦ η (Multiplicative.ofAdd y)) x
+    rw [funext hη]
+  have hgc : Continuous g :=
+    ((schwartzBruhat_continuous s).comp continuous_ofAdd).congr fun x ↦ (hg x).symm
+  let W (x : Aₛ) := ‖g x‖ * modS(x) ^ (-a)
+  have hW : Integrable W νₛ := by
+    simpa only [W, hg] using sLocalTrace_inverse_modulus_moment s ha'
+  have hW0 : 0 ≤ ∫ x, W x ∂νₛ := integral_nonneg fun x ↦
+    mul_nonneg (norm_nonneg _) (Real.rpow_nonneg (by positivity) _)
+  refine ⟨(∫ x, W x ∂νₛ) / a, div_nonneg hW0 ha.le, fun {R} hR ↦ ?_⟩
+  have hk : AEStronglyMeasurable (sLocalTrace_sharp_amplitude f R) νₛ :=
+    (hgc.measurable.mul (Complex.continuous_ofReal.measurable.comp
+      (measurable_const.max (measurable_const.sub
+        (sLocalTrace_modulus_continuous (F := F) (S := S)).measurable.log)))).aestronglyMeasurable
+  have hbound : ∀ᵐ x ∂νₛ, ‖sLocalTrace_sharp_amplitude f R x‖ ≤ (R ^ a / a) * W x := by
+    filter_upwards [sLocalTrace_ae_modulus_pos (F := F) (S := S)] with x hx
+    rw [sLocalTrace_sharp_amplitude, norm_mul, Complex.norm_real, Real.norm_eq_abs,
+      abs_of_nonneg (show 0 ≤ sharpLowerLog R (modS(x)) from le_max_left _ _)]
+    calc
+      _ ≤ ‖g x‖ * ((R ^ a / a) * modS(x) ^ (-a)) :=
+        mul_le_mul_of_nonneg_left (sharpLowerLog_le_rpow hR hx ha) (norm_nonneg _)
+      _ = _ := by dsimp [W]; ring
+  have hmajor := hW.const_mul (R ^ a / a)
+  have hi := hmajor.mono' hk hbound
+  refine ⟨hi, (integral_mono_ae hi.norm hmajor hbound).trans_eq ?_⟩
+  rw [integral_const_mul]
+  ring
+
+/-- Paper: Theorem 12.4.1.1, footnote 2, p. 514, and (12.4.1.24), p. 518.
+The norm of the sharp additive orbital mass at product radius `R` is bounded by a constant
+times `R ^ a` for every `0 < a < 1`, with one constant for all diagonal S-units.
+Deviation: This is the bound on each orbital mass in the additive calculation. -/
+theorem sLocalTraceSharpMass_norm_le_rpow (f : BruhatCompactSupport Iₛ)
+    {a : ℝ} (ha : 0 < a) (ha' : a < 1) :
+    ∃ C ≥ 0, ∀ (ξ : Hₛ) {R : ℝ}, 0 < R → ‖sLocalTraceSharpMass f ξ R‖ ≤ C * R ^ a := by
+  obtain ⟨C, hC, hbound⟩ := sLocalTrace_sharp_amplitude_bound f ha ha'
+  refine ⟨‖(volume₁ : ℂ)‖ * C, mul_nonneg (norm_nonneg _) hC, fun ξ {R} hR ↦ ?_⟩
+  obtain ⟨hi, hb⟩ := hbound hR
+  rw [sLocalTrace_sharp_coefficient f ξ hR, norm_mul, mul_assoc]
+  refine mul_le_mul_of_nonneg_left ((norm_integral_le_of_norm_le hi.norm ?_).trans hb) (norm_nonneg _)
+  exact ae_of_all _ fun x ↦ by simp only [norm_mul, Circle.norm_coe, mul_one, le_refl]
+
+private theorem sharpLowerLog_lipschitz_in_log (R a b : ℝ) :
+    |sharpLowerLog R a - sharpLowerLog R b| ≤ |Real.log a - Real.log b| := by
+  rw [sharpLowerLog, sharpLowerLog, max_comm 0, max_comm 0]
+  convert abs_max_sub_max_le_abs (Real.log R - Real.log a) (Real.log R - Real.log b) 0 using 1
+  rw [show Real.log R - Real.log a - (Real.log R - Real.log b) =
+    Real.log b - Real.log a by ring, abs_sub_comm]
+
+private theorem sharpLowerLog_clamp_error {R ε m : ℝ} (hε : 0 < ε) (hm : 0 < m) :
+    |sharpLowerLog R m - sharpLowerLog R (max ε m)| ≤ sharpLowerLog ε m := by
+  refine (sharpLowerLog_lipschitz_in_log _ _ _).trans_eq ?_
+  rw [abs_of_nonpos (sub_nonpos.mpr (Real.log_le_log hm (le_max_right _ _))), neg_sub]
+  rcases le_total ε m with h | h
+  · rw [max_eq_right h, sharpLowerLog, max_eq_left (sub_nonpos.mpr (Real.log_le_log hε h)), sub_self]
+  · rw [max_eq_left h, sharpLowerLog, max_eq_right (sub_nonneg.mpr (Real.log_le_log hm h))]
+
+private theorem sharpLowerLog_clamp_le {R ε m : ℝ} (hR : 0 < R) (hR' : R ≤ 1) (hε : 0 < ε) :
+    sharpLowerLog R (max ε m) ≤ ε⁻¹ := by
+  unfold sharpLowerLog
+  refine max_le (inv_nonneg.mpr hε.le) ?_
+  have hr := Real.log_nonpos hR.le hR'
+  have he := Real.log_le_log hε (le_max_left ε m)
+  have hl := Real.log_le_sub_one_of_pos (inv_pos.mpr hε)
+  rw [Real.log_inv] at hl
+  linarith
+
+private theorem sharpLowerLog_clamp_lipschitz {R ε : ℝ} (hε : 0 < ε) (a b : ℝ) :
+    |sharpLowerLog R (max ε a) - sharpLowerLog R (max ε b)| ≤ |a - b| / ε := by
+  refine (sharpLowerLog_lipschitz_in_log _ _ _).trans ?_
+  have h := sLocalTrace_log_cut_lipschitz (R := 1) le_rfl (a / ε) (b / ε)
+  simp only [sLocalTrace_log_cut, Real.log_one, sub_zero] at h
+  rw [← div_self hε.ne', max_div_div_right hε.le, max_div_div_right hε.le,
+    Real.log_div (hε.trans_le (le_max_left ε a)).ne' hε.ne',
+    Real.log_div (hε.trans_le (le_max_left ε b)).ne' hε.ne',
+    sub_sub_sub_cancel_right, div_sub_div_same, abs_div, abs_of_pos hε] at h
+  exact h
+
+/-- Clamp the modulus below `ε` before estimating translations, then balance the
+clamping error against the Lipschitz estimate. -/
+private theorem sharpLowerLog_translation {E : Type*} [NormedAddCommGroup E]
+    [MeasurableSpace E] [BorelSpace E] (μ : Measure E) [μ.IsAddLeftInvariant]
+    (m : E → ℝ) (hmpos : ∀ᵐ x ∂μ, 0 < m x)
+    (d : ℕ) (C : ℝ) (hC : 0 ≤ C)
+    (hmod : ∀ x h : E, ‖h‖ ≤ 1 → |m (x + h) - m x| ≤ C * (1 + ‖x‖) ^ d * ‖h‖)
+    (g : E → ℂ) (K : ℝ) (hK : 0 ≤ K)
+    (hlip : ∀ x y, ‖g x - g y‖ ≤ K * ‖x - y‖)
+    (hW : Integrable (fun x ↦ (1 + ‖x‖) ^ d * (Real.sqrt ‖g x‖ + ‖g x‖)) μ)
+    (hV : Integrable (fun x ↦ ‖g x‖ * m x ^ (-(1 / 2) : ℝ)) μ) :
+    let k (R : ℝ) (x : E) := g x * (sharpLowerLog R (m x) : ℂ)
+    ∃ B ≥ 0, ∀ {R : ℝ}, 0 < R → R ≤ 1 → Integrable (k R) μ →
+      ∀ h : E, ‖h‖ ≤ 1 →
+        (∫ x, ‖k R (x + h) - k R x‖ ∂μ) ≤ B * ‖h‖ ^ (1 / 8 : ℝ) := by
+  intro k
+  let W (x : E) := (1 + ‖x‖) ^ d * (Real.sqrt ‖g x‖ + ‖g x‖)
+  let WInv (x : E) := ‖g x‖ * m x ^ (-(1 / 2) : ℝ)
+  change Integrable W μ at hW
+  change Integrable WInv μ at hV
+  have hW0 (x : E) : 0 ≤ W x := by dsimp [W]; positivity
+  have hV0 : ∀ᵐ x ∂μ, 0 ≤ WInv x := hmpos.mono fun x hx ↦
+    mul_nonneg (norm_nonneg _) (Real.rpow_nonneg hx.le _)
+  let A := Real.sqrt K + C
+  let U (x : E) := 2 * WInv x + A * W x
+  have hU : Integrable U μ := (hV.const_mul 2).add (hW.const_mul A)
+  have hU0 : ∀ᵐ x ∂μ, 0 ≤ U x := hV0.mono fun x hx ↦ by
+    dsimp [U, A]
+    positivity
+  refine ⟨2 * ∫ x, U x ∂μ, mul_nonneg (by norm_num) (integral_nonneg_of_ae hU0),
+    fun {R} hR hR' hi h hh ↦ ?_⟩
+  by_cases hh0 : h = 0
+  · simp [hh0]
+  have hhpos : 0 < ‖h‖ := norm_pos_iff.mpr hh0
+  let ε := ‖h‖ ^ (1 / 4 : ℝ)
+  have hε : 0 < ε := Real.rpow_pos_of_pos hhpos _
+  let t := ‖h‖ ^ (1 / 8 : ℝ)
+  have ht : 0 ≤ t := by dsimp [t]; positivity
+  have heq : ε ^ (1 / 2 : ℝ) = t := by
+    dsimp only [ε, t]
+    rw [← Real.rpow_mul (norm_nonneg h)]
+    norm_num
+  have hratio : Real.sqrt ‖h‖ / ε ≤ t := by
+    dsimp only [ε, t]
+    rw [Real.sqrt_eq_rpow, ← Real.rpow_sub hhpos]
+    exact Real.rpow_le_rpow_of_exponent_ge hhpos hh (by norm_num)
+  have hroot : ‖h‖ ≤ Real.sqrt ‖h‖ := by
+    calc
+      ‖h‖ = ‖h‖ ^ (1 : ℝ) := (Real.rpow_one _).symm
+      _ ≤ ‖h‖ ^ (1 / 2 : ℝ) := Real.rpow_le_rpow_of_exponent_ge hhpos hh (by norm_num)
+      _ = Real.sqrt ‖h‖ := (Real.sqrt_eq_rpow _).symm
+  let L (x : E) := sharpLowerLog R (max ε (m x))
+  let kε (x : E) := g x * (L x : ℂ)
+  have herr (x : E) (hx : 0 < m x) : ‖k R x - kε x‖ ≤ 2 * t * WInv x := by
+    change ‖g x * _ - g x * _‖ ≤ _
+    rw [← mul_sub, norm_mul, ← Complex.ofReal_sub, Complex.norm_real,
+      Real.norm_eq_abs]
+    calc
+      _ ≤ ‖g x‖ * sharpLowerLog ε (m x) :=
+        mul_le_mul_of_nonneg_left (sharpLowerLog_clamp_error hε hx) (norm_nonneg _)
+      _ ≤ ‖g x‖ * ((t / (1 / 2)) * m x ^ (-(1 / 2) : ℝ)) := by
+        rw [← heq]
+        exact mul_le_mul_of_nonneg_left (sharpLowerLog_le_rpow hε hx (by norm_num)) (norm_nonneg _)
+      _ = _ := by dsimp [WInv]; ring
+  have hW₁ (x : E) : Real.sqrt ‖g x‖ ≤ W x :=
+    (le_add_of_nonneg_right (norm_nonneg _)).trans (le_mul_of_one_le_left (by positivity)
+      (one_le_pow₀ (le_add_of_nonneg_right (norm_nonneg x))))
+  have hW₂ (x : E) : (1 + ‖x‖) ^ d * ‖g x‖ ≤ W x :=
+    mul_le_mul_of_nonneg_left (le_add_of_nonneg_left (Real.sqrt_nonneg _)) (by positivity)
+  have hreg (x : E) : ‖kε (x + h) - kε x‖ ≤ A * t * (W (x + h) + W x) := by
+    let y := x + h
+    have hdiff := sLocalTrace_sqrt_difference (g y) (g x) K ‖h‖ hK
+      (by simpa [y] using hlip (x + h) x)
+    have hΔ : |L y - L x| ≤ (C * (1 + ‖x‖) ^ d * ‖h‖) / ε :=
+      (sharpLowerLog_clamp_lipschitz (R := R) hε _ _).trans
+        (div_le_div_of_nonneg_right (hmod x h hh) hε.le)
+    have hL : |L y| ≤ ε⁻¹ := by
+      rw [abs_of_nonneg (show 0 ≤ L y from le_max_left _ _)]
+      exact sharpLowerLog_clamp_le hR hR' hε
+    change ‖g y * (L y : ℂ) - g x * (L x : ℂ)‖ ≤ _
+    rw [show g y * (L y : ℂ) - g x * (L x : ℂ) =
+      (g y - g x) * (L y : ℂ) + g x * ((L y - L x : ℝ) : ℂ) by push_cast; ring]
+    apply (norm_add_le _ _).trans
+    simp only [norm_mul, Complex.norm_real, Real.norm_eq_abs]
+    calc
+      _ ≤ (Real.sqrt K * Real.sqrt ‖h‖ * (Real.sqrt ‖g y‖ + Real.sqrt ‖g x‖)) * ε⁻¹ +
+            ‖g x‖ * ((C * (1 + ‖x‖) ^ d * ‖h‖) / ε) := by gcongr
+      _ ≤ (Real.sqrt K * Real.sqrt ‖h‖ * (W y + W x)) * ε⁻¹ +
+            ‖g x‖ * ((C * (1 + ‖x‖) ^ d * Real.sqrt ‖h‖) / ε) := by
+              gcongr
+              · exact hW₁ y
+              · exact hW₁ x
+      _ = Real.sqrt K * (Real.sqrt ‖h‖ / ε) * (W y + W x) +
+            C * (Real.sqrt ‖h‖ / ε) * ((1 + ‖x‖) ^ d * ‖g x‖) := by ring
+      _ ≤ Real.sqrt K * t * (W y + W x) + C * t * (W y + W x) := by
+        gcongr
+        exact (hW₂ x).trans (le_add_of_nonneg_left (hW0 y))
+      _ = _ := by dsimp [A, y]; ring
+  have hUshift : Integrable (fun x ↦ U (x + h)) μ :=
+    (measurePreserving_add_right μ h).integrable_comp_of_integrable hU
+  have hishift : Integrable (fun x ↦ k R (x + h)) μ :=
+    (measurePreserving_add_right μ h).integrable_comp_of_integrable hi
+  have hmshift := (measurePreserving_add_right μ h).quasiMeasurePreserving.ae hmpos
+  have hineq : ∀ᵐ x ∂μ, ‖k R (x + h) - k R x‖ ≤ t * (U (x + h) + U x) := by
+    filter_upwards [hmpos, hmshift] with x hx hy
+    calc
+      _ = ‖(k R (x + h) - kε (x + h)) + (kε (x + h) - kε x) - (k R x - kε x)‖ := by
+        congr 1
+        abel
+      _ ≤ ‖k R (x + h) - kε (x + h)‖ + ‖kε (x + h) - kε x‖ + ‖k R x - kε x‖ :=
+        (norm_sub_le _ _).trans (add_le_add (norm_add_le _ _) le_rfl)
+      _ ≤ 2 * t * WInv (x + h) + A * t * (W (x + h) + W x) + 2 * t * WInv x :=
+        add_le_add (add_le_add (herr _ hy) (hreg x)) (herr _ hx)
+      _ = _ := by dsimp only [U]; ring
+  refine (integral_mono_ae (hishift.sub hi).norm ((hUshift.add hU).const_mul t) hineq).trans_eq ?_
+  rw [integral_const_mul, integral_add' hUshift hU, integral_add_right_eq_self]
+  ring
+
+private theorem sLocalTrace_sharp_frequency_bound (f : BruhatCompactSupport Iₛ) :
+    ∃ B ≥ 0, ∀ {R : ℝ}, 0 < R → R ≤ 1 → ∀ r : Eₛ,
+      ‖∫ x : Eₛ, sLocalTrace_sharp_amplitude f R x * (ψₛ (x * r) : ℂ) ∂νₛ‖ ≤
+        B * ((max 1 ‖r + 1‖) ^ (1 / 8 : ℝ))⁻¹ := by
+  let : BorelSpace Eₛ := sAdeleRing_borelSpace
+  let : (νₛ).IsAddHaarMeasure := sLocalTrace_additiveHaar
+  let χ : Multiplicative Eₛ →ₜ* Circle :=
+    (sAdditiveTamagawaMeasure_selfDual F S).choose (Multiplicative.ofAdd (1 : Aₛ))
+  have hχ (x : Eₛ) : χ (Multiplicative.ofAdd x) = ψₛ x :=
+    ((sAdditiveTamagawaMeasure_selfDual F S).choose_spec.1 1 x).trans (congrArg ψₛ (one_mul _))
+  have he : (fun x : Eₛ ↦ χ (Multiplicative.ofAdd x)) = ψₛ := funext hχ
+  obtain ⟨η, hη⟩ := SLocalTraceEta.eta_test f (1 : Hₛ)
+  let s := sAdeleSchwartzFourier η
+  let g (x : Eₛ) := fourierₛ (sLocalTraceEta f 1) x
+  have hg (x : Eₛ) : g x = testAt(s, x) := by
+    change _ = fourierₛ (fun y ↦ η (Multiplicative.ofAdd y)) x
+    rw [funext hη]
+  have hc : Continuous (sLocalTraceEta f 1 : Eₛ → ℂ) :=
+    ((schwartzBruhat_continuous η).comp continuous_ofAdd).congr hη
+  obtain ⟨K, hK, hLip⟩ := sLocalTrace_fourier_lipschitz (E := Eₛ) νₛ χ _ hc
+    (SLocalTraceEta.eta_compact f 1)
+  rw [he] at hLip
+  obtain ⟨d, C, hC, hmod⟩ := sLocalTrace_modulus_translation_bound (F := F) (S := S)
+  have hW := sLocalTrace_weighted_moment s d
+  have hV := sLocalTrace_inverse_modulus_moment s (a := 1 / 2) (by norm_num)
+  simp_rw [← hg] at hW hV
+  obtain ⟨T, hT, htrans⟩ := sharpLowerLog_translation (E := Eₛ) νₛ (fun x : Eₛ ↦ modS(x))
+    (sLocalTrace_ae_modulus_pos (F := F) (S := S)) d C hC (fun x h hh ↦ (hmod x h hh).2)
+    g K hK hLip hW hV
+  obtain ⟨A, hA, hmass⟩ :=
+    sLocalTrace_sharp_amplitude_bound f (a := 1 / 2) (by norm_num) (by norm_num)
+  let k := sLocalTrace_sharp_amplitude f
+  have hk (R : ℝ) (hR : 0 < R ∧ R ≤ 1) :
+      Integrable (k R) νₛ ∧ (∫ x, ‖k R x‖ ∂νₛ) ≤ A + T ∧
+        ∀ h : Eₛ, ‖h‖ ≤ 1 →
+          (∫ x : Eₛ, ‖k R (x + h) - k R x‖ ∂νₛ) ≤ (A + T) * ‖h‖ ^ (1 / 8 : ℝ) := by
+    obtain ⟨hi, hb⟩ := hmass hR.1
+    refine ⟨hi, hb.trans ?_, fun h hh ↦ (htrans hR.1 hR.2 hi h hh).trans ?_⟩
+    · exact (mul_le_of_le_one_right hA
+        (Real.rpow_le_one hR.1.le hR.2 (by norm_num))).trans (le_add_of_nonneg_right hT)
+    · exact mul_le_mul_of_nonneg_right (le_add_of_nonneg_left hA) (by positivity)
+  obtain ⟨D, hD, hstep⟩ := sLocalTrace_frequency_step (F := F) (S := S)
+  simp_rw [← hχ] at hstep ⊢
+  obtain ⟨B, hB, hb⟩ := sLocalTrace_frequency_decay (E := Eₛ) νₛ χ D hD hstep
+    k (fun R ↦ 0 < R ∧ R ≤ 1) (1 / 8) (by norm_num) (A + T) (add_nonneg hA hT) hk
+  exact ⟨B, hB, fun {R} h0 h1 ↦ hb R ⟨h0, h1⟩⟩
+
+/-- Paper: Theorem 12.4.1.1, footnote 2, p. 514, and (12.4.1.24), p. 518.
+For every exponent between zero and one, the sum of absolute sharp additive orbital
+masses is bounded by a constant times that power of the product radius on (0, 1].
+Deviation: The estimate is for the additive orbital masses from (12.4.1.24).
+See also the argument on issue #7354 (comment 7151091039). -/
+theorem sLocalTraceSharpMass_norm_sum_le_rpow (f : BruhatCompactSupport Iₛ)
+    {c : ℝ} (hc : 0 < c) (hc' : c < 1) :
+    ∃ B ≥ 0, ∀ {R : ℝ}, 0 < R → R ≤ 1 →
+      Summable (fun ξ : Hₛ ↦ ‖sLocalTraceSharpMass f ξ R‖) ∧
+        (∑' ξ : Hₛ, ‖sLocalTraceSharpMass f ξ R‖) ≤ B * R ^ c := by
+  let a := (1 + c) / 2
+  have ha : 0 < a := by dsimp [a]; linarith
+  have hac : c < a := by dsimp [a]; linarith
+  have ha' : a < 1 := by dsimp [a]; linarith
+  let θ := c / a
+  have hθ : 0 < θ := div_pos hc ha
+  have hθ' : θ < 1 := (div_lt_one ha).mpr hac
+  have hθa : a * θ = c := by dsimp [θ]; field_simp
+  let q : ℝ := (1 / 8) * (1 - θ)
+  have hq : 0 < q := mul_pos (by norm_num) (sub_pos.mpr hθ')
+  obtain ⟨C, hC, hcR⟩ := sLocalTraceSharpMass_norm_le_rpow f ha ha'
+  obtain ⟨D, hD, hdR⟩ := sLocalTrace_sharp_frequency_bound f
+  let vBound := ‖(volume₁ : ℂ)‖ * D
+  have hV : 0 ≤ vBound := mul_nonneg (norm_nonneg _) hD
+  let H (ξ : Hₛ) := max 1 ‖(show Eₛ from (ξ⁻¹).val.val)‖
+  let w (ξ : Hₛ) := (H ξ ^ q)⁻¹
+  have hsum : Summable w := (sLocalTrace_height_summable (F := F) (S := S) hq).comp_injective
+    (inv_injective : Injective (Inv.inv : Hₛ → Hₛ))
+  let A := C ^ θ * vBound ^ (1 - θ)
+  have hA : 0 ≤ A := by dsimp [A]; positivity
+  refine ⟨A * ∑' ξ, w ξ, mul_nonneg hA (tsum_nonneg fun ξ ↦ by dsimp [w, H]; positivity),
+    fun {R} hR hR' ↦ ?_⟩
+  have hbound (ξ : Hₛ) : ‖sLocalTraceSharpMass f ξ R‖ ≤ (A * R ^ c) * w ξ := by
+    let u := ‖sLocalTraceSharpMass f ξ R‖
+    have hu : 0 ≤ u := norm_nonneg _
+    have hH : 0 < H ξ := one_pos.trans_le (le_max_left _ _)
+    have hfreq : u ≤ vBound * ((H ξ) ^ (1 / 8 : ℝ))⁻¹ := by
+      let z : Eₛ := (ξ⁻¹).val.val
+      let r : Eₛ := z - 1
+      have hr : r + 1 = z := sub_add_cancel _ _
+      have h := hdR hR hR' r
+      rw [hr] at h
+      dsimp only [u, vBound, H]
+      rw [sLocalTrace_sharp_coefficient f ξ hR, norm_mul, mul_assoc]
+      exact mul_le_mul_of_nonneg_left h (norm_nonneg (volume₁ : ℂ))
+    calc
+      u = u ^ θ * u ^ (1 - θ) := by rw [← Real.rpow_add_of_nonneg hu hθ.le
+        (sub_nonneg.mpr hθ'.le), show θ + (1 - θ) = 1 by ring, Real.rpow_one]
+      _ ≤ (C * R ^ a) ^ θ * (vBound * (((H ξ) ^ (1 / 8 : ℝ))⁻¹)) ^ (1 - θ) := by
+        exact mul_le_mul (Real.rpow_le_rpow hu (hcR ξ hR) hθ.le)
+          (Real.rpow_le_rpow hu hfreq (sub_nonneg.mpr hθ'.le)) (by positivity) (by positivity)
+      _ = (A * R ^ c) * w ξ := by
+        rw [Real.mul_rpow hC (Real.rpow_nonneg hR.le _), Real.mul_rpow hV (by positivity),
+          ← Real.rpow_mul hR.le, hθa, Real.inv_rpow (Real.rpow_nonneg hH.le _),
+          ← Real.rpow_mul hH.le]
+        dsimp only [A, w, q]
+        ring
+  have hmajor := hsum.mul_left (A * R ^ c)
+  have habs := hmajor.of_nonneg_of_le (fun _ ↦ norm_nonneg _) hbound
+  refine ⟨habs, (habs.tsum_le_tsum hbound hmajor).trans_eq ?_⟩
+  rw [tsum_mul_left]
+  ring
+
+/-- Paper: Theorem 12.4.1.1, footnote 2, p. 514. The additive correction from an
+independent lower spatial cutoff vanishes when its product with the upper frequency
+radius tends to zero from the right.
+Deviation: The limit concerns the sharp additive orbital formula. -/
+theorem sLocalTraceSharpMass_tsum_tendsto_zero (f : BruhatCompactSupport Iₛ) :
+    Tendsto (fun R : ℝ ↦ ∑' ξ : Hₛ, sLocalTraceSharpMass f ξ R) (𝓝[>] 0) (𝓝 0) := by
+  obtain ⟨B, hB, hb⟩ := sLocalTraceSharpMass_norm_sum_le_rpow f (c := 1 / 2)
+    (by norm_num) (by norm_num)
+  have hsmall : ∀ᶠ R : ℝ in 𝓝[>] 0, 0 < R ∧ R ≤ 1 := by
+    filter_upwards [self_mem_nhdsWithin, mem_nhdsWithin_of_mem_nhds (Iio_mem_nhds zero_lt_one)] with R hR h1
+    exact ⟨hR, h1.le⟩
+  have hlimit : Tendsto (fun R : ℝ ↦ B * R ^ (1 / 2 : ℝ)) (𝓝[>] 0) (𝓝 0) := by
+    have h := (Real.continuousAt_rpow_const 0 (1 / 2) (Or.inr (by norm_num))).tendsto
+    simpa [Real.zero_rpow (by norm_num : (1 / 2 : ℝ) ≠ 0)] using (h.mono_left nhdsWithin_le_nhds).const_mul B
+  apply tendsto_zero_iff_norm_tendsto_zero.mpr
+  refine squeeze_zero' (Eventually.of_forall fun _ ↦ norm_nonneg _) ?_ hlimit
+  filter_upwards [hsmall] with R hR
+  obtain ⟨hsum, hbound⟩ := hb hR.1 hR.2
+  exact (norm_tsum_le_tsum_norm hsum).trans hbound
 
 end SharpMassRemainder
 
@@ -4670,8 +5112,10 @@ private theorem sLocalTraceSharpMass_asymptotic_tail
   obtain ⟨B, hB, hb⟩ := sLocalTrace_tail_bound f
   let M (ξ : Hₛ) := max 1 ‖(show E from (ξ⁻¹).val.val)‖
   let b (ξ : Hₛ) := (‖V₁‖ * B) * (Real.sqrt (M ξ))⁻¹
-  have hsum : Summable b := ((sLocalTrace_height_summable (F := F) (S := S)).comp_injective
-    (inv_injective : Injective (Inv.inv : Hₛ → Hₛ))).mul_left _
+  have hsum : Summable b := by
+    simpa only [b, M, Real.sqrt_eq_rpow, Function.comp_apply] using
+      ((sLocalTrace_height_summable (F := F) (S := S) (q := 1 / 2) (by norm_num)).comp_injective
+        (inv_injective : Injective (Inv.inv : Hₛ → Hₛ))).mul_left (‖V₁‖ * B)
   have hbound (R : ℝ) (hR : 1 ≤ R) (ξ : Hₛ) : ‖q R ξ‖ ≤ b ξ := by
     let a : E := (ξ⁻¹).val.val
     let r := a - 1
