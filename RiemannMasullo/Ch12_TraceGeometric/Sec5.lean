@@ -497,37 +497,45 @@ local notation "spectralDiagonal(" hp ", " hs ", " φ ", " hK ", " U ")" =>
   (fun x : C𝔽 ↦ dSequenceKernelSmoothening μ𝔽 U (globalStripSpectralKernel (F := F)
     (1 / 2) hp hs₁(hs) φ hK) (x, x))
 
-/-- The projective tensor gives nuclearity and equal traces for the ambient and quotient actions. -/
-private theorem stripDiagonal_projective_trace (φ : BruhatCompactSupport C𝔽) {α s : ℝ}
-    (hα : 0 < α) (hs : 3 ≤ s)
-    (hK : stripTensorExists(hα.le, hs, φ)) :
-    ∃ (hn : IsNuclearOperator (AP(hα.le, hs, φ)))
-      (hq : IsNuclearOperator (spectralConvolution (F := F) (1 / 2) (hStrip(hα.le)) hs₀(hs) φ)),
-      hilbertTrace ⟨AP(hα.le, hs, φ), hn⟩ =
-        hilbertTrace ⟨spectralConvolution (F := F) (1 / 2) (hStrip(hα.le)) hs₀(hs) φ, hq⟩ := by
+local notation "sNonneg(" hs ")" => (le_of_lt (zero_lt_one.trans hs))
+local notation "stripProjectedAction(" hα ", " hs ", " φ ")" =>
+  (hardySobolevTestAction μ𝔽 m𝔽 _ _ _ (hStrip(hα)) sNonneg(hs) φ).comp
+    (spectralProjection (F := F) (1 / 2) hα sNonneg(hs))
+
+/-- Paper: (10.4.3.45), p. 473 and (12.5.1.4), p. 520. On every symmetric closed strip, a
+projective kernel for convolution after spectral projection gives nuclear ambient and quotient
+actions with equal Hilbert traces. -/
+private theorem stripDiagonal_projective_trace {α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s)
+    (φ : BruhatCompactSupport C𝔽)
+    (hK : ∃ K, sobolevProjectiveKernelOperator (F := F) hα sNonneg(hs) K =
+      stripProjectedAction(hα, hs, φ)) :
+    ∃ (hn : IsNuclearOperator (stripProjectedAction(hα, hs, φ)))
+      (hq : IsNuclearOperator (spectralConvolution (F := F) (1 / 2) (hStrip(hα)) sNonneg(hs) φ)),
+      hilbertTrace ⟨stripProjectedAction(hα, hs, φ), hn⟩ =
+        hilbertTrace ⟨spectralConvolution (F := F) (1 / 2) (hStrip(hα)) sNonneg(hs) φ, hq⟩ := by
   let W := CompactIntervalSobolev μ𝔽 logNorm (-α) α s
-  let A : W →L[ℂ] W := hardySobolevTestAction μ𝔽 m𝔽 (-α) α s (hStrip(hα.le)) hs₀(hs) φ
-  let P : W →L[ℂ] W := spectralProjection (F := F) (1 / 2) hα.le hs₀(hs)
-  let theta := globalThetaSobolev F (1 / 2) (hStrip(hα.le)) hs₀(hs)
+  let A : W →L[ℂ] W := hardySobolevTestAction μ𝔽 m𝔽 (-α) α s (hStrip(hα)) sNonneg(hs) φ
+  let P : W →L[ℂ] W := spectralProjection (F := F) (1 / 2) hα sNonneg(hs)
+  let theta := globalThetaSobolev F (1 / 2) (hStrip(hα)) sNonneg(hs)
   let q := theta.mkQL
   let j := theta.orthogonal.subtypeL.comp
     theta.quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
-  let B := spectralConvolution (F := F) (1 / 2) (hStrip(hα.le)) hs₀(hs) φ
+  let B := spectralConvolution (F := F) (1 / 2) (hStrip(hα)) sNonneg(hs) φ
   have hap : IsNuclearOperator (A * P) :=
     (congrArg (fun L : W →L[ℂ] W ↦ IsNuclearOperator L) hK.choose_spec).mp
-      (stripDiagonal_projective_nuclear (F := F) hα.le hs₀(hs) hK.choose)
+      (stripDiagonal_projective_nuclear (F := F) hα sNonneg(hs) hK.choose)
   have hqj : q.comp j = ContinuousLinearMap.id ℂ _ := by
     ext x
     exact theta.quotientEquivOrthogonal.symm_apply_apply x
   have hjq : j.comp q = P := by
     apply ContinuousLinearMap.ext
     intro x
-    exact (spectralQuotient_orthogonalRepresentative (F := F) (1 / 2) hα.le hs₀(hs)
+    exact (spectralQuotient_orthogonalRepresentative (F := F) (1 / 2) hα sNonneg(hs)
       (by norm_num) x).1
   have hqA : q.comp A = B.comp q := by
     apply ContinuousLinearMap.ext
     intro x
-    exact (spectralConvolution_mkQ (F := F) (1 / 2) (hStrip(hα.le)) hs₀(hs) φ x).symm
+    exact (spectralConvolution_mkQ (F := F) (1 / 2) (hStrip(hα)) sNonneg(hs) φ x).symm
   exact ⟨hap, stripDiagonal_quotientAction q j P A B hqj hjq hqA hap⟩
 
 /-- The weighted Hilbert–Schmidt representative recovers the Haar mass of the spectral diagonal. -/
@@ -562,7 +570,7 @@ private theorem stripDiagonal_spectral_integral (φ : BruhatCompactSupport C𝔽
       Integrable spectralDiagonal(hα.le, hs, φ, hK, U) μ𝔽 ∧
         (∫ x, spectralDiagonal(hα.le, hs, φ, hK, U) x ∂μ𝔽) =
           hilbertTrace ⟨stripQuotientAction(hα.le, hs, φ), hq⟩ := by
-  have h := stripDiagonal_projective_trace (F := F) (hone_lt_three := hone_lt_three) φ hα hs hK
+  have h := stripDiagonal_projective_trace hα.le hs₁(hs) φ hK
   have d := stripDiagonal_projective_integral (F := F) (hone_lt_three := hone_lt_three)
     φ hα hs hK h.choose U hU hBorel
   exact ⟨h.choose_spec.choose, d.1, d.2.trans h.choose_spec.choose_spec⟩
@@ -1229,32 +1237,44 @@ its orthogonal section, of the nuclear operator given by that kernel. Unlike
 theorem spectralStripConvolution_nuclear_of_projectiveKernel {α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s)
     (φ : BruhatCompactSupport C𝔽) (hK : stripTensorExists(hα, hs, φ)) :
     IsNuclearOperator stripConv(hα, hs, φ) := by
+  exact (stripDiagonal_projective_trace hα hs φ hK).choose_spec.choose
+
+/-- Paper: (12.5.1.4), p. 520, with Theorems 12.1.1.2–3, pp. 499–502. For every compact test,
+subtracting its value at the identity from the smoothed strip geometric diagonal gives a
+Haar-integrable function with integral minus the quotient trace.
+Deviation: The kernel is convolution after projection. The centering occurs inside the
+integral, and the tensor represents the actual projected convolution at Sobolev order s > 1. -/
+theorem integral_centered_smoothenedStripGeometricKernel_diagonal
+    {α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s) (φ : BruhatCompactSupport C𝔽)
+    (hK : stripTensorExists(hα, hs, φ))
+    (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
+    let D := fun x : C𝔽 ↦ dSequenceKernelSmoothening μ𝔽 U
+      (globalStripGeometricKernel (F := F) (1 / 2) hα hs φ hK) (x, x)
+    Integrable (fun x ↦ D x - φ.val 1) μ𝔽 ∧
+      (∫ x, D x - φ.val 1 ∂μ𝔽) =
+        -hilbertTrace (H := stripQuot(hα, hs)) ⟨stripConv(hα, hs, φ),
+          spectralStripConvolution_nuclear_of_projectiveKernel hα hs φ hK⟩ := by
+  intro D
   let W := CompactIntervalSobolev μ𝔽 (logIdeleClassNorm F) (-α) α s
-  let A : W →L[ℂ] W :=
-    hardySobolevTestAction μ𝔽 m𝔽 (-α) α s (hStrip(hα)) (zero_le_one.trans hs.le) φ
-  let P : W →L[ℂ] W := spectralProjection (F := F) (1 / 2) hα (zero_le_one.trans hs.le)
-  let theta := globalThetaSobolev F (1 / 2) (hStrip(hα)) (zero_le_one.trans hs.le)
-  let q := theta.mkQL
-  let j := theta.orthogonal.subtypeL.comp
-    theta.quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
-  let B := stripConv(hα, hs, φ)
-  have hap : IsNuclearOperator (A * P) :=
-    (congrArg (fun L : W →L[ℂ] W ↦ IsNuclearOperator L) hK.choose_spec).mp
-      (stripDiagonal_projective_nuclear (F := F) hα (zero_le_one.trans hs.le) hK.choose)
-  have hqj : q.comp j = ContinuousLinearMap.id ℂ _ := by
-    ext x
-    exact theta.quotientEquivOrthogonal.symm_apply_apply x
-  have hjq : j.comp q = P := by
-    apply ContinuousLinearMap.ext
-    intro x
-    exact (spectralQuotient_orthogonalRepresentative (F := F) (1 / 2) hα
-      (zero_le_one.trans hs.le) (by norm_num) x).1
-  have hqA : q.comp A = B.comp q := by
-    apply ContinuousLinearMap.ext
-    intro x
-    exact (spectralConvolution_mkQ (F := F) (1 / 2) (hStrip(hα)) (zero_le_one.trans hs.le)
-      φ x).symm
-  exact (stripDiagonal_quotientAction q j P A B hqj hjq hqA hap).choose
+  let T : W →L[ℂ] W :=
+    (hardySobolevTestAction μ𝔽 m𝔽 _ _ _ (hStrip(hα)) (zero_le_one.trans hs.le) φ).comp
+      (spectralProjection (F := F) (1 / 2) hα (zero_le_one.trans hs.le))
+  let w (x : C𝔽) := intervalSobolevDensity (-α) α s (logIdeleClassNorm F x)
+  let ν := (μ𝔽).withDensity (fun x ↦ ENNReal.ofReal (w x))
+  let K := (globalStripSpectralKernel (F := F) (1 / 2) hα hs φ hK : C𝔽 × C𝔽 → ℂ)
+  have hw : Continuous w :=
+    (continuous_intervalSobolevDensity (-α) α s).comp (continuous_logModule' m𝔽)
+  have hp (x : C𝔽) : 0 < w x := intervalSobolevDensity_pos' _ _ _ _
+  let wNN (x : C𝔽) : ℝ≥0 := ⟨w x, (hp x).le⟩
+  have hwNN : Continuous wNN := hw.subtype_mk _
+  have hν : ν = (μ𝔽).withDensity (fun x ↦ (wNN x : ENNReal)) :=
+    congrArg (μ𝔽).withDensity (funext fun x ↦ ENNReal.ofReal_eq_coe_nnreal (hp x).le)
+  let : IsLocallyFiniteMeasure ν := sobolevKernelWeight_locallyFinite (F := F) α s
+  obtain ⟨hn, hq, ht⟩ := stripDiagonal_projective_trace hα hs φ hK
+  have hHS := spectralStripKernel_hilbertSchmidt (F := F) (1 / 2) hα hs φ (by norm_num) hK
+  have h := integral_centered_convolution_sub_weightedKernel_diagonal hU hBorel φ
+    hwNN hp hν K T hn hHS
+  exact ⟨h.1, h.2.trans (congrArg Neg.neg ht)⟩
 
 local notation "three" => (show (1 : ℝ) < 3 by norm_num)
 
