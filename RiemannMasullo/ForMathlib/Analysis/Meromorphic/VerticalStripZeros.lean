@@ -79,6 +79,33 @@ theorem tsum_zeroWeights_le_of_bins {ι : Type*}
     _ ≤ ∑ n ∈ S.image b, u n := Finset.sum_le_sum (fun n _ ↦ hf n)
     _ ≤ ∑' n, u n := hu.sum_le_tsum _ fun _ _ ↦ div_nonneg hC (Real.rpow_nonneg (by positivity) _)
 
+/-- On a closed strip the real part of the resolvent is nonnegative and has uniform
+inverse-square decay in the ordinate. At horizontal distance u > 0, the factor
+for the weight 1 / (1 + |t|)² is u + 1 / u. -/
+theorem re_resolvent_le_div_one_add_abs_im_sq {α L : ℝ} (hL : α < L)
+    (a : ℝ) (z : ℂ) (hz : |z.re - a| ≤ α) :
+    0 ≤ (((L : ℂ) - (z - (a : ℂ)))⁻¹).re ∧
+      (((L : ℂ) - (z - (a : ℂ)))⁻¹).re ≤ (L + α + 1 / (L - α)) / (1 + |z.im|) ^ 2 := by
+  let u := L - (z.re - a)
+  have hu₁ : L - α ≤ u := sub_le_sub_left (abs_le.mp hz).2 _
+  have hu₂ : u ≤ L + α := by dsimp [u]; linarith [(abs_le.mp hz).1]
+  have hg : 0 < L - α := sub_pos.mpr hL
+  have hu : 0 < u := hg.trans_le hu₁
+  have he : (((L : ℂ) - (z - (a : ℂ)))⁻¹).re = u / (u ^ 2 + z.im ^ 2) := by
+    simp [Complex.inv_re, Complex.normSq_apply, sq, u]
+  rw [he]
+  refine ⟨div_nonneg hu.le (add_nonneg (sq_nonneg _) (sq_nonneg _)), ?_⟩
+  calc
+    u / (u ^ 2 + z.im ^ 2) ≤ (u + 1 / u) / (1 + |z.im|) ^ 2 := by
+      rw [← sq_abs z.im, div_le_div_iff₀ (by positivity) (by positivity)]
+      calc
+        u * (1 + |z.im|) ^ 2 ≤ ((u ^ 2 + 1) * (u ^ 2 + |z.im| ^ 2)) / u := by
+          apply (le_div_iff₀ hu).2
+          nlinarith only [sq_nonneg (u ^ 2 - |z.im|)]
+        _ = (u + 1 / u) * (u ^ 2 + |z.im| ^ 2) := by field_simp
+    _ ≤ _ := div_le_div_of_nonneg_right
+      (add_le_add hu₂ (one_div_le_one_div_of_le hg hu₁)) (sq_nonneg _)
+
 /-- A square-root bound on the total weight in each unit height range gives a summable inverse-
 square weight. -/
 private theorem summable_zeroWeights_of_bins {ι : Type*}
