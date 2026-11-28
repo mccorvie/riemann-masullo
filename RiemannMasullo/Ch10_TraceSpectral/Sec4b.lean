@@ -396,7 +396,7 @@ local notation "Order₀(" χ ", " e ")" => (∀ z z' : Z(χ), z.val.1 = z'.val.
 
 open scoped ComplexOrder in
 /-- The projective gauge of the unit pure tensors controls every zero-neighborhood. -/
-private theorem spectralLineQuotientKernel_tendsto_gauge {X Y : Type*}
+theorem spectralLineQuotientKernel_tendsto_gauge {X Y : Type*}
     [NormedAddCommGroup X] [NormedSpace ℂ X] [NormedAddCommGroup Y] [NormedSpace ℂ Y]
     (U : Set (ProjectiveTensor X Y)) (hU : U ∈ 𝓝 0) :
     ∃ ε : ℝ, 0 < ε ∧ ∀ z : ProjectiveTensor X Y,
