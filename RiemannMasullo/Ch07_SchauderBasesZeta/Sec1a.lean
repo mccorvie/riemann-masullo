@@ -1158,6 +1158,119 @@ end SLocal
 -- TODO(paper-gap): Footnote 1, p. 321, flags the missing growth control on the
 -- horizontal heights for the appeal to Theorem B.3.2.1.
 
+section BoundaryPole
+
+open Asymptotics
+
+/-- At a simple pole the vertical restriction dominates a constant times `1 / |t|`. -/
+private theorem sLocalIdelicZFunction_verticalIntegrable_neg_simplePole {Z : ℂ → ℂ} {σ : ℝ}
+    (hZ : MeromorphicAt Z (σ : ℂ)) (hp : meromorphicOrderAt Z (σ : ℂ) = -1) :
+    ¬ Complex.VerticalIntegrable Z σ := by
+  obtain ⟨g, hg, hg₀, he⟩ := (meromorphicOrderAt_eq_int_iff (n := -1) hZ).mp hp
+  let l (t : ℝ) : ℂ := σ + t * Complex.I
+  have hl : Tendsto l (𝓝 (0 : ℝ)) (𝓝 (σ : ℂ)) := by
+    have hc : Continuous l := by dsimp [l]; fun_prop
+    simpa [l] using hc.tendsto 0
+  have hle : Tendsto l (𝓝[≠] (0 : ℝ)) (𝓝[≠] (σ : ℂ)) := by
+    apply tendsto_nhdsWithin_iff.mpr
+    refine ⟨hl.mono_left nhdsWithin_le_nhds, ?_⟩
+    filter_upwards [self_mem_nhdsWithin (α := ℝ) (a := 0) (s := {0}ᶜ)] with t ht
+    simpa [l] using ht
+  have hpos : 0 < ‖g (σ : ℂ)‖ := norm_pos_iff.mpr hg₀
+  have hbound : ∀ᶠ t in 𝓝[≠] (0 : ℝ), ‖g (σ : ℂ)‖ / 2 < ‖g (l t)‖ :=
+    ((hg.continuousAt.norm.tendsto.comp hl).eventually
+      (lt_mem_nhds (half_lt_self hpos))).filter_mono nhdsWithin_le_nhds
+  have hO : (fun t : ℝ ↦ (t - 0)⁻¹) =O[𝓝[≠] 0] (fun t ↦ Z (l t)) := by
+    refine isBigO_iff''.mpr ⟨_, half_pos hpos, ?_⟩
+    filter_upwards [hbound, hle.eventually he] with t ht heq
+    simp only [heq, norm_smul, zpow_neg_one, norm_inv, show l t - (σ : ℂ) = t * Complex.I by simp [l],
+      norm_mul, Complex.norm_I, mul_one, Complex.norm_real, sub_zero]
+    rw [mul_comm (‖g (σ : ℂ)‖ / 2)]
+    exact mul_le_mul_of_nonneg_left ht.le (by positivity)
+  intro hi
+  exact not_intervalIntegrable_of_sub_inv_isBigO_punctured hO zero_ne_one left_mem_uIcc
+    (hi.intervalIntegrable (a := 0) (b := 1))
+
+variable (F)
+
+/-- Paper: Theorem 7.1.2.3, pp. 318, 322. For the trivial character, the empty set of finite
+places and a unique real place at infinity, each nonpositive even integer is a simple pole
+of some test's transform. The absolute integral on the corresponding vertical line diverges.
+Deviation: This is the single-real-place form of the boundary obstruction in ERRATA F90. -/
+theorem sLocalIdelicZFunction_exists_simplePole_neg_even [Unique (InfinitePlace F)]
+    (hw : (default : InfinitePlace F).IsReal) (n : ℕ) :
+    ∃ f : SchwartzBruhat (Multiplicative (SAdeleRing F ∅)),
+      let χ := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp
+        (1 : PontryaginDual (SIdeleQuotient F ∅))
+      let Z := fun s : ℂ ↦ sLocalIdelicZFunction f (quasiCharacterNormTwist (sIdeleQuotientNorm F ∅)
+        (isProperMap_sIdeleQuotientNorm F ∅).continuous χ s)
+      meromorphicOrderAt Z (-((2 * n : ℕ) : ℂ)) = -1 ∧
+        ¬ Complex.VerticalIntegrable Z (-((2 * n : ℕ) : ℝ)) := by
+  classical
+  let w := (default : InfinitePlace F)
+  let χ := (1 : PontryaginDual (SIdeleQuotient F ∅))
+  let coeCircle : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  let chart := quasiCharacterNormTwist (sIdeleQuotientNorm F ∅)
+    (isProperMap_sIdeleQuotientNorm F ∅).continuous (coeCircle.comp χ)
+  let localChart := quasiCharacterNormTwist (Units.map nnNormHom.toMonoidHom ^ w.mult)
+    (continuous_infiniteLocalModule w) (coeCircle.comp (1 : PontryaginDual w.Completionˣ))
+  obtain ⟨g, hgp⟩ := (infiniteLocalIdelicZFunction_real_poles w hw 1 0
+    (fun x ↦ by simp only [Fin.val_zero, pow_zero, Complex.cpow_zero, mul_one]; rfl)
+    (-((2 * n : ℕ) : ℂ))).2.mpr ⟨n, by simp⟩
+  let D := infiniteLocalIdelicZFunction w g ∘ localChart
+  let e : SAdeleRing F ∅ ≃ₜ w.Completion := (Homeomorph.prodUnique _ _).trans
+    (Homeomorph.piUnique fun v : InfinitePlace F ↦ v.Completion)
+  let E : Multiplicative (SAdeleRing F ∅) ≃ₜ* Multiplicative w.Completion :=
+    ContinuousMulEquiv.mk' e (fun _ _ ↦ rfl)
+  have : LocallyCompactSpace (Multiplicative w.Completion) :=
+    inferInstanceAs (LocallyCompactSpace w.Completion)
+  have : LocallyCompactSpace (Multiplicative (SAdeleRing F ∅)) :=
+    e.isOpenEmbedding.locallyCompactSpace
+  have : T2Space (Multiplicative (SAdeleRing F ∅)) := e.isEmbedding.t2Space
+  let f : SchwartzBruhat (Multiplicative (SAdeleRing F ∅)) :=
+    ⟨g.val ∘ E, schwartzBruhat_mem_comp_equiv E g.property⟩
+  let Z (s : ℂ) := sLocalIdelicZFunction f (chart s)
+  let a (v : InfinitePlace F) : SchwartzBruhat (Multiplicative v.Completion) :=
+    Subsingleton.elim w v ▸ g
+  let b (v : (∅ : Finset Primes)) : SchwartzBruhat (Multiplicative (v.val.adicCompletion F)) := 0
+  have hf (x : SAdeleRing F ∅) : f (Multiplicative.ofAdd x) =
+      (∏ v, a v (Multiplicative.ofAdd (x.1 v))) *
+        ∏ v : (∅ : Finset Primes), b v (Multiplicative.ofAdd (x.2 v)) := by
+    simp only [Finset.univ_eq_empty (α := (∅ : Finset Primes)), Finset.prod_empty, mul_one]
+    rw [Fintype.prod_subsingleton (fun v ↦ a v (Multiplicative.ofAdd (x.1 v))) w]
+    rfl
+  have hch (s : ℂ) : sLocalInfiniteRestriction w (chart s) = localChart s := by
+    ext1 x
+    rw [sLocalInfiniteRestriction_normTwist]
+    exact (one_mul _).symm
+  have heq (s : ℂ) (hs : 0 < s.re) : Z s = D s := by
+    have hc := sLocalIdelicZFunction_eq_integral f (x := chart s) ⟨χ, s, hs, rfl⟩
+    have ht := sLocalIdelicZetaIntegral_pureTensor (chart s) ⟨χ, s, hs, rfl⟩ f a b hf
+    simp only [Finset.univ_eq_empty (α := (∅ : Finset Primes)), Finset.prod_empty, mul_one] at ht
+    rw [Fintype.prod_subsingleton _ w, hch] at ht
+    exact hc.trans (ht.trans (infiniteLocalIdelicZFunction_eq_integral w g 1 hs).symm)
+  have hZ : MeromorphicNFOn Z univ := sLocalIdelicZFunction_meromorphic f χ
+  have hD : MeromorphicNFOn D univ :=
+    ((infiniteLocalIdelicZFunction_existsUnique w g).exists.choose_spec 1).1
+  have hZD : Z = D := by
+    funext s
+    have hnear : Z =ᶠ[𝓝[≠] (1 : ℂ)] D := by
+      have hpos : ∀ᶠ z : ℂ in 𝓝 (1 : ℂ), 0 < z.re :=
+        (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+      exact (hpos.filter_mono nhdsWithin_le_nhds).mono (fun z hz ↦ heq z hz)
+    have h0 := (hZ.meromorphicOn.sub hD.meromorphicOn).meromorphicOrderAt_eq_top_of_isPreconnected
+      isPreconnected_univ (mem_univ (1 : ℂ)) (mem_univ s)
+      (meromorphicOrderAt_eq_top_iff.mpr (hnear.mono fun _ hz ↦ sub_eq_zero.mpr hz))
+    have h1 : Z =ᶠ[𝓝[≠] s] D := (meromorphicOrderAt_eq_top_iff.mp h0).mono fun _ hz ↦ sub_eq_zero.mp hz
+    exact (((hZ (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds (hD (mem_univ s))).mp h1).self_of_nhds
+  have hp : meromorphicOrderAt Z (-((2 * n : ℕ) : ℂ)) = -1 := by
+    rw [hZD]
+    exact hgp
+  exact ⟨f, hp, sLocalIdelicZFunction_verticalIntegrable_neg_simplePole
+    (hZ (mem_univ _)).meromorphicAt (by simpa only [Complex.ofReal_neg, Complex.ofReal_natCast] using hp)⟩
+
+end BoundaryPole
+
 section Counterexample
 
 local notation "Jℚ" => SIdeleQuotient ℚ ∅
