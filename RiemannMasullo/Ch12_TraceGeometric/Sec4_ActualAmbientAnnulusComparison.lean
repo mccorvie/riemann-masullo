@@ -51,6 +51,8 @@ local notation "modS(" u ")" =>
     ∏ v : S, ‖(u : Aₛ).2 v‖
 local notation "gen(" angular ")" => Isolated.sLocalFullPWThetaSobolevMap
   (F := F) (S := S) (s := 0) halfPos angular
+local notation "fullBand(" angular "," B ")" =>
+  Isolated.sLocalFullPWSobolev (F := F) (S := S) (s := 0) le_rfl halfPos angular B
 local notation "orbitOrder" =>
   (2 * (((∑ w : InfinitePlace F, w.mult) + Fintype.card S) + 1) : ℕ)
 
@@ -131,11 +133,10 @@ private theorem ambientAnnulus_kernel_eq_of_inputCovariance
     ν₀ hK Q L U M C hQL hQadj V hSpan hRows hEq
 
 /-- Paper: Theorem 12.4.1.1, Step II, pp. 515–517.
-For a homogeneous quotient test the weighted orbital kernel represents the
-annular cutoff action on the whole order-zero quotient Hilbert space.
-The same reflected coordinates realize its frequency multiplier.
+The reflected coordinates representing the actual annular operator
+intertwine the full invariant-band projection at the given radius.
 Deviation: The comparison fixes the annulus and Sobolev order zero. -/
-theorem exists_sLocalTrace_fixedAnnulus_reflectedProductCutoff_eq_orderZero
+theorem exists_sLocalTrace_fixedAnnulus_reflectedProductCutoff_eq_atBand_orderZero
     (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
     (fLift : BruhatCompactSupport Iₛ) (Φ : BruhatCompactSupport Jₛ)
     (hLift : ∀ x : Iₛ, HasSum (fun ξ : Hₛ ↦ fLift.val (ξ.val * x))
@@ -146,13 +147,19 @@ theorem exists_sLocalTrace_fixedAnnulus_reflectedProductCutoff_eq_orderZero
     (hρ : IsModulatedCutoff m Λ ερ ρ)
     (hb : ContDiff ℝ (∞ : ℕ∞ω) b) (hbdd : ∀ t, 0 ≤ t → ‖b t‖ ≤ 1)
     (hε : 0 < εb) (hplateau : EqOn b (fun _ ↦ b 0) (Icc 0 εb))
-    (hderiv : ∀ j ≤ orbitOrder, ∀ r, 0 ≤ r → ‖iteratedDeriv j b r‖ ≤ Cb) :
+    (hderiv : ∀ j ≤ orbitOrder, ∀ r, 0 ≤ r → ‖iteratedDeriv j b r‖ ≤ Cb)
+    (B : ℝ) (hB : 0 < B) :
     let N (q : Jₛ) : ℝ := (m q).val
     ∃ (χ : PontryaginDual Jₛ) (T : W₀ →L[ℂ] FlatL2)
       (M : FlatL2 →L[ℂ] FlatL2) (κ : Jₛ → Jₛ → ℂ),
       χ.comp include₁ = angular ∧ (∀ t, χ (QuotientGroup.mk (τ t)) = 1) ∧
       sLocalFullReflectedGenAE τ angular χ T ∧
       (∀ r, (M r : ℝ → ℂ) =ᵐ[volume] fun x ↦ b (Real.exp (-x)) * r x) ∧
+      (let V : Submodule ℂ W₀ := fullBand(angular,B)
+       letI : CompleteSpace V :=
+         (show IsClosed (V : Set W₀) from Submodule.isClosed_topologicalClosure _).completeSpace_coe
+       (l2IndicatorMultiplier volume (Ici (-Real.log B)) measurableSet_Ici).comp T =
+         T.comp V.starProjection) ∧
       OrbitRep(fLift,ρ,b,κ) ∧
       let K (p : Jₛ × Jₛ) := (Real.sqrt (N p.1 * N p.2) : ℂ) * κ p.1 p.2 /
         ((sLocalTraceMeasureFactor S : ℂ) * (intervalSobolevDensity 0 0 0 (ℓ p.2) : ℂ))
@@ -163,10 +170,10 @@ theorem exists_sLocalTrace_fixedAnnulus_reflectedProductCutoff_eq_orderZero
         Kop = (R.comp A).comp (T.adjoint.comp (M.comp T)) := by
   intro N
   have hCoordinates :=
-    @exists_sLocalFullReflectedProductCutoff_with_angularLift_orderZero F _ _ S
-      τ hτ angular b hb hbdd εb hε hplateau
+    @exists_sLocalFullReflectedProductCutoff_with_angularLift_atBand_orderZero F _ _ S
+      τ hτ angular b hb hbdd εb hε hplateau B hB
   obtain ⟨χ, Q, L, U, M, hData⟩ := hCoordinates
-  obtain ⟨hχ, hχsec, hL, hQL, hQadj, hSpan, hM, hGen, hRealize⟩ := hData
+  obtain ⟨hχ, hχsec, hL, hQL, hQadj, hSpan, hM, hGen, hRealize, hInter⟩ := hData
   have hbFin : ContDiff ℝ orbitOrder b := (contDiff_infty.mp hb) orbitOrder
   let T := U.toLinearIsometry.toContinuousLinearMap.comp Q
   have hClosed :=
@@ -215,7 +222,46 @@ theorem exists_sLocalTrace_fixedAnnulus_reflectedProductCutoff_eq_orderZero
   have hAmb : Kop = Reflected :=
     ambientAnnulus_kernel_eq_of_inputCovariance (F := F) (S := S) τ hτ angular χ hχ hχsec
       Q L U hL hQL hQadj K hKm hK₂ hKIn M C V hSpan hEqCore
-  refine ⟨χ, T, M, κ, hχ, hχsec, hGen, hM, hRep, ?_⟩
+  refine ⟨χ, T, M, κ, hχ, hχsec, hGen, hM, hInter, hRep, ?_⟩
   exact ⟨hKm, ⟨hK₂, hAmb⟩⟩
+
+/-- Paper: Theorem 12.4.1.1, Step II, pp. 515–517.
+For a homogeneous quotient test the weighted orbital kernel represents the
+annular cutoff action on the whole order-zero quotient Hilbert space.
+The same reflected coordinates realize its frequency multiplier.
+Deviation: The comparison fixes the annulus and Sobolev order zero. -/
+theorem exists_sLocalTrace_fixedAnnulus_reflectedProductCutoff_eq_orderZero
+    (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
+    (fLift : BruhatCompactSupport Iₛ) (Φ : BruhatCompactSupport Jₛ)
+    (hLift : ∀ x : Iₛ, HasSum (fun ξ : Hₛ ↦ fLift.val (ξ.val * x))
+      (Φ.val (QuotientGroup.mk x)))
+    (angular : PontryaginDual J₁)
+    (hΦ : ∀ (q : Jₛ) (h : J₁), Φ.val (q * h.val) = (angular h : ℂ)⁻¹ * Φ.val q)
+    (b : ℝ → ℂ) {Λ ερ εb Cb : ℝ} {ρ : Jₛ → ℝ}
+    (hρ : IsModulatedCutoff m Λ ερ ρ)
+    (hb : ContDiff ℝ (∞ : ℕ∞ω) b) (hbdd : ∀ t, 0 ≤ t → ‖b t‖ ≤ 1)
+    (hε : 0 < εb) (hplateau : EqOn b (fun _ ↦ b 0) (Icc 0 εb))
+    (hderiv : ∀ j ≤ orbitOrder, ∀ r, 0 ≤ r → ‖iteratedDeriv j b r‖ ≤ Cb) :
+    let N (q : Jₛ) : ℝ := (m q).val
+    ∃ (χ : PontryaginDual Jₛ) (T : W₀ →L[ℂ] FlatL2)
+      (M : FlatL2 →L[ℂ] FlatL2) (κ : Jₛ → Jₛ → ℂ),
+      χ.comp include₁ = angular ∧ (∀ t, χ (QuotientGroup.mk (τ t)) = 1) ∧
+      sLocalFullReflectedGenAE τ angular χ T ∧
+      (∀ r, (M r : ℝ → ℂ) =ᵐ[volume] fun x ↦ b (Real.exp (-x)) * r x) ∧
+      OrbitRep(fLift,ρ,b,κ) ∧
+      let K (p : Jₛ × Jₛ) := (Real.sqrt (N p.1 * N p.2) : ℂ) * κ p.1 p.2 /
+        ((sLocalTraceMeasureFactor S : ℂ) * (intervalSobolevDensity 0 0 0 (ℓ p.2) : ℂ))
+      Measurable K ∧ ∃ hK : MemLp K 2 ((ν₀ : Measure Jₛ).prod ν₀),
+        let Kop : W₀ →L[ℂ] W₀ := (integralKernelOperator (X := Jₛ) ν₀ (hK.toLp K)).val
+        let A : W₀ →L[ℂ] W₀ := hardySobolevTestAction μJ m 0 0 0 le_rfl le_rfl Φ
+        let R : W₀ →L[ℂ] W₀ := lpCutoffMultiplier ν₀ ρ hρ.measurable hρ.abs_le_one
+        Kop = (R.comp A).comp (T.adjoint.comp (M.comp T)) := by
+  intro N
+  have hAtBand :=
+    @exists_sLocalTrace_fixedAnnulus_reflectedProductCutoff_eq_atBand_orderZero F _ _ S
+      τ hτ fLift Φ hLift angular hΦ b Λ ερ εb Cb ρ hρ hb hbdd hε hplateau hderiv 1 one_pos
+  obtain ⟨χ, T, M, κ, hData⟩ := hAtBand
+  obtain ⟨hχ, hχsec, hGen, hM, _, hRep, hKernel⟩ := hData
+  exact ⟨χ, T, M, κ, hχ, hχsec, hGen, hM, hRep, hKernel⟩
 
 end RiemannMasullo

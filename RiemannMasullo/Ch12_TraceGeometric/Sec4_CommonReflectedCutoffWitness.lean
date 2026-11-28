@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_CompactFourierAngularImage
 public import RiemannMasullo.Ch12_TraceGeometric.Sec4_ReflectedProductCutoff
+public import RiemannMasullo.Ch12_TraceGeometric.Sec4_SameWitnessProjectionIntertwining
 import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3_CompactFourierBand
 import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.Projection.Contraction
 import Mathlib.MeasureTheory.Function.Holder
@@ -43,14 +44,14 @@ local notation "fullGen(" angular ")" =>
 local notation "fullBand(" angular "," B ")" =>
   Isolated.sLocalFullPWSobolev (F := F) (S := S) (s := 0) le_rfl halfPos angular B
 
-/-- The angular lift, the coefficient map, and the reflected cutoff can
-be chosen together. In these coordinates the lift of the flat real space
-is the closed span of compact Fourier generators of this character. -/
-theorem exists_sLocalFullReflectedProductCutoff_with_angularLift_orderZero
+/-- The common reflected coordinates realize the frequency cutoff and
+intertwine the invariant-band projection at the specified upper radius. -/
+theorem exists_sLocalFullReflectedProductCutoff_with_angularLift_atBand_orderZero
     (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
     (angular : PontryaginDual J₁) (b : ℝ → ℂ)
     (hb : ContDiff ℝ (∞ : ℕ∞ω) b) (hbdd : ∀ t, 0 ≤ t → ‖b t‖ ≤ 1)
-    {δ : ℝ} (hδ : 0 < δ) (hplateau : EqOn b (fun _ ↦ b 0) (Icc 0 δ)) :
+    {δ : ℝ} (hδ : 0 < δ) (hplateau : EqOn b (fun _ ↦ b 0) (Icc 0 δ))
+    (B : ℝ) (hB : 0 < B) :
     ∃ (χ : PontryaginDual Jₛ) (Q : W₀ →L[ℂ] FlatL2) (L : FlatL2 →ₗᵢ[ℂ] W₀)
       (U : FlatL2 ≃ₗᵢ[ℂ] FlatL2) (M : FlatL2 →L[ℂ] FlatL2),
       χ.comp include₁ = angular ∧ (∀ t, χ (QuotientGroup.mk (τ t)) = 1) ∧
@@ -62,11 +63,16 @@ theorem exists_sLocalFullReflectedProductCutoff_with_angularLift_orderZero
       (∀ r, (M r : ℝ → ℂ) =ᵐ[volume] fun x ↦ b (Real.exp (-x)) * r x) ∧
       let T := U.toLinearIsometry.toContinuousLinearMap.comp Q
       sLocalFullReflectedGenAE τ angular χ T ∧
-      ∀ f : Bₛ, HasCompactSupport (sAdeleSchwartzFourier f).val →
+      (∀ f : Bₛ, HasCompactSupport (sAdeleSchwartzFourier f).val →
         ∃ g : Bₛ, HasCompactSupport (sAdeleSchwartzFourier g).val ∧
           sLocalTraceFourierCutoff (fun u : Aₛ ↦ b (prodNorm(u))) f =
             (fun u : Aₛ ↦ g (Multiplicative.ofAdd u)) ∧
-          fullGen(angular) g = T.adjoint (M (T (fullGen(angular) f))) := by
+          fullGen(angular) g = T.adjoint (M (T (fullGen(angular) f)))) ∧
+      let V : Submodule ℂ W₀ := fullBand(angular,B)
+      letI : CompleteSpace V :=
+        (show IsClosed (V : Set W₀) from Submodule.isClosed_topologicalClosure _).completeSpace_coe
+      (l2IndicatorMultiplier volume (Ici (-Real.log B)) measurableSet_Ici).comp T =
+        T.comp V.starProjection := by
   obtain ⟨χ, Q, L, U, hχ, hsec, hQ, _, hL, _, hGen, hBands⟩ :=
     exists_sLocalFullReflectedCoordinates_uniform_orderZero (F := F) (S := S) τ hτ angular
   let T := U.toLinearIsometry.toContinuousLinearMap.comp Q
@@ -129,6 +135,40 @@ theorem exists_sLocalFullReflectedProductCutoff_with_angularLift_orderZero
       rw [U.norm_map, ← L.norm_map (Q (fullGen(angular) g)), hRecover]
     have hFix := adjoint_apply_apply_eq_of_norm_preserved T hT (fullGen(angular) g) hIso
     exact ⟨g, hg, hCut, hFix.symm.trans (congrArg T.adjoint hMul)⟩
+  have hInter :=
+    @sLocalFullReflectedProjection_comp_eq_of_coordinates_orderZero F _ _ S
+      angular B Q L U hT (hBands B hB).1 (hBands B hB).2.2.1
+  exact ⟨χ, Q, L, U, M, hχ, hsec, hL, hQL, hQadj, hC, hM, hGen, hRealize, hInter⟩
+
+/-- The angular lift, the coefficient map, and the reflected cutoff can
+be chosen together. In these coordinates the lift of the flat real space
+is the closed span of compact Fourier generators of this character. -/
+theorem exists_sLocalFullReflectedProductCutoff_with_angularLift_orderZero
+    (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
+    (angular : PontryaginDual J₁) (b : ℝ → ℂ)
+    (hb : ContDiff ℝ (∞ : ℕ∞ω) b) (hbdd : ∀ t, 0 ≤ t → ‖b t‖ ≤ 1)
+    {δ : ℝ} (hδ : 0 < δ) (hplateau : EqOn b (fun _ ↦ b 0) (Icc 0 δ)) :
+    ∃ (χ : PontryaginDual Jₛ) (Q : W₀ →L[ℂ] FlatL2) (L : FlatL2 →ₗᵢ[ℂ] W₀)
+      (U : FlatL2 ≃ₗᵢ[ℂ] FlatL2) (M : FlatL2 →L[ℂ] FlatL2),
+      χ.comp include₁ = angular ∧ (∀ t, χ (QuotientGroup.mk (τ t)) = 1) ∧
+      (∀ v, (L v : Jₛ → ℂ) =ᵐ[ν₀] fun y ↦
+        (Real.sqrt (Measure.real η univ) : ℂ)⁻¹ * (χ y : ℂ)⁻¹ * v (ℓ y)) ∧
+      LeftInverse Q L ∧ Q.adjoint = L.toContinuousLinearMap ∧
+      (Submodule.span ℂ {u : W₀ | ∃ f : Bₛ, HasCompactSupport (sAdeleSchwartzFourier f).val ∧
+        fullGen(angular) f = u}).topologicalClosure = LinearMap.range L.toLinearMap ∧
+      (∀ r, (M r : ℝ → ℂ) =ᵐ[volume] fun x ↦ b (Real.exp (-x)) * r x) ∧
+      let T := U.toLinearIsometry.toContinuousLinearMap.comp Q
+      sLocalFullReflectedGenAE τ angular χ T ∧
+      ∀ f : Bₛ, HasCompactSupport (sAdeleSchwartzFourier f).val →
+        ∃ g : Bₛ, HasCompactSupport (sAdeleSchwartzFourier g).val ∧
+          sLocalTraceFourierCutoff (fun u : Aₛ ↦ b (prodNorm(u))) f =
+            (fun u : Aₛ ↦ g (Multiplicative.ofAdd u)) ∧
+          fullGen(angular) g = T.adjoint (M (T (fullGen(angular) f))) := by
+  have hData :=
+    @exists_sLocalFullReflectedProductCutoff_with_angularLift_atBand_orderZero F _ _ S
+      τ hτ angular b hb hbdd δ hδ hplateau 1 one_pos
+  obtain ⟨χ, Q, L, U, M, hCoordinates⟩ := hData
+  obtain ⟨hχ, hsec, hL, hQL, hQadj, hC, hM, hGen, hRealize, _⟩ := hCoordinates
   exact ⟨χ, Q, L, U, M, hχ, hsec, hL, hQL, hQadj, hC, hM, hGen, hRealize⟩
 
 end RiemannMasullo
