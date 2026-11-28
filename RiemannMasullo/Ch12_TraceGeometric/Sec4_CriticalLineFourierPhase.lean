@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec4
+public import Mathlib.Analysis.Fourier.FourierTransform
 
 /-! # The half-density Fourier phase on the S-local idèle class quotient -/
 
@@ -78,5 +79,108 @@ theorem sLocalThetaHalfDensity_fourier_phase (f : Bₛ) (χ : PontryaginDual J�
     _ = (sLocalRhoFactor (chart(χ) half))⁻¹ * sLocalIdelicZFunction f (chart(χ) half) :=
       (eq_inv_mul_iff_mul_eq₀ hρ).mpr hFE.symm
     _ = _ := congrArg ((sLocalRhoFactor (chart(χ) half))⁻¹ * ·) hinput.symm
+
+section RadialMellinFourier
+
+open Function
+open scoped FourierTransform
+
+local notation "Iₛ" => (SAdeleRing F S)ˣ
+local notation "J₁" => (mₛ).ker
+local notation "restrict₁(" χ ")" => (χ : PontryaginDual Jₛ).comp
+  (⟨(mₛ).ker.subtype, continuous_subtype_val⟩ : J₁ →ₜ* Jₛ)
+
+private def sLocalRadialThetaExpUnit (x : ℝ) : ℝ≥0ˣ :=
+  Units.mk0 (Real.exp x).toNNReal
+    (Real.toNNReal_eq_zero.not.mpr (not_le_of_gt (Real.exp_pos x)))
+
+/-- The homogeneous theta profile on a logarithmic norm section at twist
+one half. The unitary character on the section gives the Mellin chart for
+an arbitrary lift of the norm-one character. -/
+def sLocalRadialThetaHalfDensity (τ : ℝ≥0ˣ →ₜ* Iₛ) (χ : PontryaginDual Jₛ)
+    (f : Bₛ) (x : ℝ) : ℂ :=
+  let t : ℝ≥0ˣ := Units.mk0 (Real.exp x).toNNReal (by positivity)
+  let q : Jₛ := QuotientGroup.mk (τ t)
+  (sLocalHomogeneousAdelicThetaLinearMap F S (restrict₁(χ)) f q * (χ q : ℂ)) *
+    (Real.exp (x / 2) : ℂ)
+
+/-- The critical-line parameter corresponding to Mathlib's real Fourier
+kernel `exp(-2π i x ξ)`. -/
+def sLocalRadialThetaCriticalParameter (ξ : ℝ) : ℂ :=
+  (1 / 2 : ℂ) - ((2 * Real.pi * ξ : ℝ) : ℂ) * Complex.I
+
+/-- Paper: (3.3.1.5), p. 129. In logarithmic norm coordinates at twist one
+half, the real Fourier integral gives the S-local zeta value with the same
+unitary character and the critical-line parameter of the Fourier frequency. -/
+theorem sLocalRadialThetaHalfDensity_fourier
+    (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
+    (χ : PontryaginDual Jₛ) (f : Bₛ) (ξ : ℝ) :
+    𝓕 (sLocalRadialThetaHalfDensity τ χ f) ξ =
+      sLocalIdelicZFunction f (chart(χ) (sLocalRadialThetaCriticalParameter ξ)) := by
+  let z := sLocalRadialThetaCriticalParameter ξ
+  have hz : 0 < z.re := by
+    norm_num [z, sLocalRadialThetaCriticalParameter, Complex.sub_re, Complex.mul_re]
+  let q (t : ℝ≥0ˣ) : Jₛ := QuotientGroup.mk (τ t)
+  let θ := sLocalHomogeneousAdelicThetaLinearMap F S (restrict₁(χ)) f
+  let G (t : ℝ≥0ˣ) : ℂ := θ (q t) * chart(χ) z (q t)
+  have hG : Integrable G positiveRealHaar :=
+    sLocalRadialMellinIntegral_integrable τ hτ f χ z hz
+  have he : Measurable sLocalRadialThetaExpUnit :=
+    measurable_comap_iff.mpr (continuous_real_toNNReal.comp Real.continuous_exp).measurable
+  have hFourier : 𝓕 (sLocalRadialThetaHalfDensity τ χ f) ξ =
+      sLocalRadialMellinIntegral τ f χ z := by
+    change _ = ∫ t, G t ∂positiveRealHaar
+    rw [show positiveRealHaar = Measure.map sLocalRadialThetaExpUnit volume from rfl,
+      integral_map he.aemeasurable hG.aestronglyMeasurable, Real.fourier_real_eq_integral_exp_smul]
+    refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+    let a := q (sLocalRadialThetaExpUnit x)
+    have ha : ((mₛ a).val : ℝ) = Real.exp x := by
+      change ((mₛ (QuotientGroup.mk (τ (sLocalRadialThetaExpUnit x)))).val : ℝ) = Real.exp x
+      rw [sIdeleQuotientNorm_mk, hτ]
+      exact Real.coe_toNNReal _ (Real.exp_pos x).le
+    have hcpow : ((Real.exp x : ℝ) : ℂ) ^ z = Complex.exp (z * x) := by
+      rw [Complex.ofReal_exp, Complex.cpow_def_of_ne_zero (Complex.exp_ne_zero _),
+        Complex.log_exp (by simp [Real.pi_pos]) (by simp [Real.pi_pos.le]), mul_comm]
+    have hExponent : z * (x : ℂ) = ((x / 2 : ℝ) : ℂ) +
+        ((-2 * Real.pi * x * ξ : ℝ) : ℂ) * Complex.I := by
+      dsimp only [z, sLocalRadialThetaCriticalParameter]
+      push_cast
+      ring
+    simp only [smul_eq_mul, sLocalRadialThetaHalfDensity]
+    change Complex.exp (((-2 * Real.pi * x * ξ : ℝ) : ℂ) * Complex.I) *
+        ((θ a * (χ a : ℂ)) * (Real.exp (x / 2) : ℂ)) =
+      θ a * ((χ a : ℂ) * (((mₛ a).val : ℝ) : ℂ) ^ z)
+    rw [ha, hcpow, hExponent, Complex.exp_add, Complex.ofReal_exp]
+    ring
+  calc
+    _ = sLocalRadialMellinIntegral τ f χ z := hFourier
+    _ = sLocalThetaMellinIntegral f (chart(χ) z) :=
+      sLocalRadialMellinIntegral_eq_theta τ hτ f χ z hz
+    _ = sLocalIdelicZetaIntegral f (chart(χ) z) := sLocalThetaMellinIntegral_eq_zeta f ⟨χ, z, hz, rfl⟩
+    _ = _ := (sLocalIdelicZFunction_eq_integral f ⟨χ, z, hz, rfl⟩).symm
+
+/-- Paper: (3.3.1.2), p. 129. The real Fourier transform of the radial
+theta profile equals the Tate factor times the Fourier transform of the
+reflected radial profile of the S-adelic Fourier test. -/
+theorem sLocalRadialThetaHalfDensity_fourier_reflected_phase
+    (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
+    (χ : PontryaginDual Jₛ) (f : Bₛ) (ξ : ℝ) :
+    𝓕 (sLocalRadialThetaHalfDensity τ χ f) ξ =
+      sLocalRhoFactor (chart(χ) (sLocalRadialThetaCriticalParameter ξ)) *
+        𝓕 (fun x ↦ sLocalRadialThetaHalfDensity τ χ⁻¹ (sAdeleSchwartzFourier f) (-x)) ξ := by
+  let z := sLocalRadialThetaCriticalParameter ξ
+  have hz : z ∈ Complex.re ⁻¹' Ioo (0 : ℝ) 1 := by
+    change 0 < z.re ∧ z.re < 1
+    norm_num [z, sLocalRadialThetaCriticalParameter, Complex.sub_re, Complex.mul_re]
+  have hreflect : sLocalRadialThetaCriticalParameter (-ξ) = 1 - z := by
+    dsimp only [z, sLocalRadialThetaCriticalParameter]
+    push_cast
+    ring
+  rw [sLocalRadialThetaHalfDensity_fourier τ hτ χ f ξ, ← Real.fourierInv_eq_fourier_comp_neg,
+    Real.fourierInv_eq_fourier_neg,
+    sLocalRadialThetaHalfDensity_fourier τ hτ χ⁻¹ (sAdeleSchwartzFourier f) (-ξ), hreflect]
+  exact existsUnique_sLocalZetaPair_equation χ f z hz
+
+end RadialMellinFourier
 
 end RiemannMasullo
