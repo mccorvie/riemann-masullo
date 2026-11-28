@@ -82,10 +82,12 @@ private theorem integralKernelOperator_apply_representatives
     rw [hky, huy]
   exact ⟨hx.1.congr hrow, hx.2.trans (integral_congr_ae hrow)⟩
 
-/-- Paper: Theorem 12.4.1.1, Step II, pp. 515–517. The periodized annular
-kernel acts before compression as the realized product frequency cutoff
-followed by the quotient test action and the spatial mask, on one angular
-type's closed span of compact Fourier generators. -/
+/-- Paper: Theorem 12.4.1.1, Step II, pp. 515–517. The periodized orbit
+kernel acts before compression by frequency cutoff, quotient convolution,
+and spatial multiplication.
+Deviation: This comparison fixes a spatial annulus and Sobolev order zero.
+It assumes a cutoff realization on one angular type's compact Fourier
+generators and proves the identity on their closed span. -/
 theorem exists_sLocalTrace_fixedAnnulus_reflectedProductCutoff_eqOn_orderZero
     (fLift : BruhatCompactSupport Iₛ) (Φ : BruhatCompactSupport Jₛ)
     (hLift : ∀ g : Iₛ, HasSum (fun ξ : Hₛ ↦ fLift.val (ξ.val * g))
