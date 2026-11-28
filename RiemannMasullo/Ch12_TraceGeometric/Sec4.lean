@@ -1002,7 +1002,8 @@ theorem sLocalTraceEta_zero_neg_one (f : BruhatCompactSupport Iₛ) (ξ : Hₛ) 
 
 section
 
-private theorem sLocalTrace_additiveHaar : (νₛ).IsAddHaarMeasure := by
+/-- Additive Tamagawa measure on the S-adeles is an additive Haar measure. -/
+theorem sLocalTrace_additiveHaar : (νₛ).IsAddHaarMeasure := by
   let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
   let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
     (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
@@ -1838,7 +1839,7 @@ end AdditiveThetaLift
 of the translated, zero-extended S-idelic test is integrable.
 Deviation: Step III uses Fourier integration on p. 518. We state explicitly the
 absolute integrability required for the constant frequency symbol. -/
-private theorem sLocalTraceEta_fourier_integrable (f : BruhatCompactSupport Iₛ) (ξ : Hₛ) :
+theorem sLocalTraceEta_fourier_integrable (f : BruhatCompactSupport Iₛ) (ξ : Hₛ) :
     Integrable (fourierₛ (sLocalTraceEta f ξ)) νₛ := by
   obtain ⟨η, hη⟩ := SLocalTraceEta.eta_test f ξ
   let G := Multiplicative Aₛ
@@ -2206,7 +2207,7 @@ private theorem sLocalTrace_infinite_neBot (w : InfinitePlace F) :
   norm_num at hval
 
 /-- The S-adeles with a zero coordinate form a null set for additive Tamagawa measure. -/
-private theorem sLocalTrace_nonunits_null :
+theorem sLocalTrace_nonunits_null :
     νₛ (range (Units.val : Iₛ → Aₛ))ᶜ = 0 := by
   let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
   let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
@@ -2448,7 +2449,7 @@ theorem sLocalTrace_reflectedFourier_exponentialMoment
 /-- Paper: (12.4.1.22)–(12.4.1.23), p. 518. The change of variable w = xu by an S-idele
 scales additive Tamagawa measure by the S-idelic norm and the frequency band by the same
 factor. -/
-private theorem sLocalTrace_integral_band_dilate (g : Aₛ → ℂ) (x : Iₛ) (L' : ℝ) :
+theorem sLocalTrace_integral_band_dilate (g : Aₛ → ℂ) (x : Iₛ) (L' : ℝ) :
     ∫ u in band(L'), g (x.val * u) ∂νₛ =
       ((normS(x))⁻¹ : ℂ) * ∫ w in band(L' * normS(x)), g w ∂νₛ := by
   have : BorelSpace Aₛ := sAdeleRing_borelSpace
@@ -2524,7 +2525,7 @@ private theorem sLocalTrace_comap_sFinite :
 /-- Paper: (12.4.1.17) and (12.4.1.23), p. 518. On any set of S-ideles, additive
 Tamagawa measure weighted by the measure factor over the norm is multiplicative
 Tamagawa measure. -/
-private theorem sLocalTrace_setIntegral_comap_density (s : Set Iₛ) (H : Iₛ → ℂ)
+theorem sLocalTrace_setIntegral_comap_density (s : Set Iₛ) (H : Iₛ → ℂ)
     (hH : IntegrableOn H s μₛ) :
     IntegrableOn (fun x ↦ (sLocalTraceMeasureFactor S : ℂ) * ((normS(x))⁻¹ : ℂ) * H x) s
         ((νₛ).comap (Units.val : Iₛ → Aₛ)) ∧
@@ -2737,7 +2738,7 @@ private theorem sLocalTrace_exists_normSection :
 /-- Paper: (12.4.1.23)–(12.4.1.24), p. 518. On the part of an S-unit fundamental
 domain of norm at most L, a measurable function of the norm integrates to the norm-one
 volume times its integral against dt/t on (0, L]. -/
-private theorem sLocalTrace_fundamentalDomain_radial (D : Set Iₛ)
+theorem sLocalTrace_fundamentalDomain_radial (D : Set Iₛ)
     (hD : IsFundamentalDomain Hₛ D μₛ) (L : ℝ) (h : ℝ → ℂ) (hm : Measurable h)
     (hh : IntegrableOn (fun t ↦ h t / (t : ℂ)) (Ioc 0 L)) :
     IntegrableOn (fun x : Iₛ ↦ h (normS(x))) (D ∩ {x : Iₛ | normS(x) ≤ L}) μₛ ∧
@@ -2854,7 +2855,7 @@ end RadialSection
 
 /-- Paper: (12.4.1.24), p. 518. The integral of dt/t over the part of (0, L] above a
 positive level a is the logarithmic width of the interval. -/
-private theorem sLocalTrace_integral_inv_Ici (a L : ℝ) (ha : 0 < a) :
+theorem sLocalTrace_integral_inv_Ici (a L : ℝ) (ha : 0 < a) :
     ∫ t in Ioc 0 L, (Ici a).indicator (fun t : ℝ ↦ t⁻¹) t =
       if a ≤ L then Real.log L - Real.log a else 0 := by
   rw [integral_indicator measurableSet_Ici, Measure.restrict_restrict measurableSet_Ici]
@@ -3087,7 +3088,7 @@ private theorem sLocalTrace_fourier_product_bound (f : BruhatCompactSupport Iₛ
 /-- Paper: (12.4.1.24), p. 518. The Fourier transform of the translated test, weighted
 by the logarithm of the product norm, is integrable for additive Tamagawa measure.
 Deviation: The logarithm of zero is zero on the null locus with a zero coordinate. -/
-private theorem sLocalTrace_fourier_log_integrable (f : BruhatCompactSupport Iₛ) (ξ : Hₛ) :
+theorem sLocalTrace_fourier_log_integrable (f : BruhatCompactSupport Iₛ) (ξ : Hₛ) :
     Integrable (fun w ↦ fourierₛ (sLocalTraceEta f ξ) w * ((Real.log (modS(w)) : ℝ) : ℂ))
       νₛ := by
   classical
@@ -3195,7 +3196,7 @@ Fourier transform against dt/t on (0, L] gives the logarithmic width of the spat
 norm interval, by Fubini; the nonunit locus is null.
 Deviation: The integrability of the logarithmic weight against the transform over
 the band is part of the statement. -/
-private theorem sLocalTrace_band_log_fubini (f : BruhatCompactSupport Iₛ) (ξ : Hₛ)
+theorem sLocalTrace_band_log_fubini (f : BruhatCompactSupport Iₛ) (ξ : Hₛ)
     (L L' : ℝ) (hL : 0 < L) (hL' : 0 < L') :
     IntegrableOn (fun t ↦ (∫ w in band(L' * t), fourierₛ (sLocalTraceEta f ξ) w ∂νₛ) /
         (t : ℂ)) (Ioc 0 L) ∧
@@ -3368,7 +3369,7 @@ private theorem sLocalTrace_fundamentalDomain_slab_nullMeasurable (D : Set Iₛ)
 
 /-- The band integral of the Fourier transform of the translated test is measurable in
 the radius. -/
-private theorem sLocalTrace_band_integral_measurable (f : BruhatCompactSupport Iₛ) (ξ : Hₛ)
+theorem sLocalTrace_band_integral_measurable (f : BruhatCompactSupport Iₛ) (ξ : Hₛ)
     (L' : ℝ) :
     Measurable fun t : ℝ ↦ ∫ w in band(L' * t), fourierₛ (sLocalTraceEta f ξ) w ∂νₛ := by
   let : BorelSpace Aₛ := sAdeleRing_borelSpace
@@ -6549,6 +6550,58 @@ private theorem sLocalTraceSharpMass_asymptotic_tail
     simpa only [sLocalTrace_remainder_eq] using (hsum.of_norm_bounded (hbound R hR)).hasSum
   · simpa only [tsum_zero] using (tendsto_tsum_of_dominated_convergence hsum hlim
       ((eventually_ge_atTop (1 : ℝ)).mono hbound))
+
+/-- Paper: (12.4.1.25)–(12.4.1.27), p. 519. For each S-unit, the sharp orbital mass less
+the logarithmic term `f(ξ) log R` and the constant term is bounded for `R ≥ 1` by a summable
+function of the unit, and tends to zero.
+Deviation: This is the estimate inside `sLocalTraceSharpMass_asymptotic_tail`, stated for each
+unit, so that averages of sharp masses over several radii can be summed. -/
+theorem sLocalTraceSharpMass_remainder_bound
+    (_hRamified : ∀ v : V, differentIdeal ℤ (𝓞 F) ≤ v.asIdeal → v ∈ S)
+    (f : BruhatCompactSupport Iₛ) :
+    ∃ b : Hₛ → ℝ, Summable b ∧ ∀ ξ : Hₛ,
+      (∀ R : ℝ, 1 ≤ R → ‖sLocalTraceSharpMass f ξ R -
+        (volume₁ : ℂ) * (f.val ξ.val * (Real.log R : ℂ) +
+          -∫ w in range (Units.val : Iₛ → Aₛ),
+            fourierₛ (sLocalTraceEta f ξ) w * ((Real.log (modS(w)) : ℝ) : ℂ) ∂νₛ)‖ ≤ b ξ) ∧
+      Tendsto (fun R ↦ sLocalTraceSharpMass f ξ R -
+        (volume₁ : ℂ) * (f.val ξ.val * (Real.log R : ℂ) +
+          -∫ w in range (Units.val : Iₛ → Aₛ),
+            fourierₛ (sLocalTraceEta f ξ) w * ((Real.log (modS(w)) : ℝ) : ℂ) ∂νₛ))
+        atTop (𝓝 0) := by
+  classical
+  let : BorelSpace Aₛ := sAdeleRing_borelSpace
+  let m (x : Aₛ) := modS(x)
+  have hm : Continuous m :=
+    (continuous_finsetProd _ fun w _ ↦ (((continuous_apply w).comp continuous_fst).norm.pow _)).mul
+      (continuous_finsetProd _ fun v _ ↦ ((continuous_apply v).comp continuous_snd).norm)
+  let E := ((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)
+  let V₁ : ℂ := volume₁
+  let q (R : ℝ) (ξ : Hₛ) := V₁ * ∫ w in {w : Aₛ | R < m w}, fourierₛ (sLocalTraceEta f ξ) w *
+    ((Real.log (m w) - Real.log R : ℝ) : ℂ) ∂νₛ
+  obtain ⟨B, hB, hb⟩ := sLocalTrace_tail_bound f
+  let M (ξ : Hₛ) := max 1 ‖(show E from (ξ⁻¹).val.val)‖
+  let b (ξ : Hₛ) := (‖V₁‖ * B) * (Real.sqrt (M ξ))⁻¹
+  have hsum : Summable b := ((sLocalTrace_height_summable (F := F) (S := S)).comp_injective
+    (inv_injective : Injective (Inv.inv : Hₛ → Hₛ))).mul_left _
+  have hbound (R : ℝ) (hR : 1 ≤ R) (ξ : Hₛ) : ‖q R ξ‖ ≤ b ξ := by
+    let a : E := (ξ⁻¹).val.val
+    let r := a - 1
+    have he : r + 1 = a := sub_add_cancel _ _
+    have h := hb R hR r
+    rw [he] at h
+    change ‖V₁ * _‖ ≤ _
+    rw [norm_mul, sLocalTrace_tail_coefficient f ξ R]
+    change ‖V₁‖ * ‖∫ x : E, sLocalTrace_tail_amplitude f R x * (ψₛ (x * r) : ℂ) ∂νₛ‖ ≤
+      (‖V₁‖ * B) * (Real.sqrt (max 1 ‖a‖))⁻¹
+    rw [mul_assoc]
+    exact mul_le_mul_of_nonneg_left h (norm_nonneg V₁)
+  have hlim (ξ : Hₛ) : Tendsto (fun R ↦ q R ξ) atTop (𝓝 0) := by
+    simpa only [mul_zero] using (logBand_remainder_tendsto νₛ _ m hm.measurable
+      (sLocalTraceEta_fourier_integrable f ξ) (sLocalTrace_fourier_log_integrable f ξ)).const_mul V₁
+  refine ⟨b, hsum, fun ξ ↦ ⟨fun R hR ↦ ?_, ?_⟩⟩
+  · simpa only [sLocalTrace_remainder_eq] using hbound R hR ξ
+  · simpa only [sLocalTrace_remainder_eq] using hlim ξ
 
 /-- Paper: (12.4.1.25)–(12.4.1.28), p. 519. After subtraction of the logarithmic
 term the sum of sharp orbital masses tends to the norm-one volume times the local
