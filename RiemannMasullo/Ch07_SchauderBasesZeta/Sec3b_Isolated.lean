@@ -4218,4 +4218,480 @@ theorem quarticBenchmark_orbitalExample :
 
 end QuarticRealization
 
+/-! ## The estimate as a determinant of logarithms
+
+Let `L = log N(w) > 0` be the log-norm of a primary place `w` at which the unitary phase of a
+uniformizer is `b`, and `Q = log N(v)` that of an outside place `v` with phase `a`. The poles
+at `w` are the centers `s_n = (log b + 2πi n) / L`, and the outside value at `s_n` is
+`a · exp (-Q s_n)`. Its distance from one is comparable, up to fixed constants, to the smallest
+value over `k` of the determinant of logarithms
+
+`logDet L Q a b n k = L · (log a - 2πi k) - Q · (log b + 2πi n)`,
+
+the determinant of the matrix with rows `(L, Q)` and `(log b + 2πi n, log a - 2πi k)`. So on any
+set of poles, the inverse-polynomial bound that #7336 asks for is equivalent to an
+inverse-polynomial lower bound for these determinants. For algebraic phases and rationally
+independent logarithms of residue norms, a vanishing determinant with nonzero second row would
+give a rank-one matrix of logarithms with rationally independent rows and columns, the
+configuration of the Four Exponentials Conjecture. The estimate also asks how close a nonzero
+determinant can come to zero.
+
+`orbital_shiftMinima_conclusion_iff_logDet` constructs the two phases for the record set of
+#7336 from the unitary lift trivial on the norm section. The ℚ(ζ₈) benchmark has `L = log 49`,
+`Q = log 17` and `b = 1`. -/
+
+section FourExponentials
+
+/-- The centers `(log b + 2πi n) / L` of the poles of a primary place of log-norm `L` at which
+the unitary phase of a uniformizer is `b`: the solutions of `b · exp (-L s) = 1`. -/
+def latticePoleHeight (L : ℝ) (b : ℂ) (n : ℤ) : ℂ :=
+  (Complex.log b + n * (2 * Real.pi * Complex.I)) / (L : ℂ)
+
+/-- The determinant of logarithms `L · (log a - 2πi k) - Q · (log b + 2πi n)`, of the matrix with
+rows `(L, Q)` and `(log b + 2πi n, log a - 2πi k)`. -/
+def logDet (L Q : ℝ) (a b : ℂ) (n k : ℤ) : ℂ :=
+  (L : ℂ) * (Complex.log a - k * (2 * Real.pi * Complex.I)) -
+    (Q : ℂ) * (Complex.log b + n * (2 * Real.pi * Complex.I))
+
+/-- The offset, in turns, of the outside value at the `n`th pole from the winding `k`. -/
+private def latticeOffset (L Q : ℝ) (a b : ℂ) (n k : ℤ) : ℝ :=
+  Complex.arg a / (2 * Real.pi) - k - Q / L * (Complex.arg b / (2 * Real.pi) + n)
+
+private theorem log_of_norm_eq_one {a : ℂ} (ha : ‖a‖ = 1) :
+    Complex.log a = (Complex.arg a : ℂ) * Complex.I := by
+  apply Complex.ext
+  · simp [Complex.log_re, ha]
+  · simp [Complex.log_im]
+
+private theorem logDet_eq_offset {L : ℝ} (hL : 0 < L) (Q : ℝ) {a b : ℂ} (ha : ‖a‖ = 1)
+    (hb : ‖b‖ = 1) (n k : ℤ) :
+    logDet L Q a b n k =
+      (L : ℂ) * ((2 * Real.pi * Complex.I) * (latticeOffset L Q a b n k : ℂ)) := by
+  have hL' : (L : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr hL.ne'
+  have hπ : (Real.pi : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr Real.pi_ne_zero
+  rw [logDet, log_of_norm_eq_one ha, log_of_norm_eq_one hb, latticeOffset]
+  push_cast
+  field_simp
+
+private theorem norm_logDet {L : ℝ} (hL : 0 < L) (Q : ℝ) {a b : ℂ} (ha : ‖a‖ = 1)
+    (hb : ‖b‖ = 1) (n k : ℤ) :
+    ‖logDet L Q a b n k‖ = L * (2 * Real.pi * |latticeOffset L Q a b n k|) := by
+  rw [logDet_eq_offset hL Q ha hb, norm_mul, norm_mul, Complex.norm_real, Real.norm_eq_abs,
+    abs_of_pos hL, Complex.norm_real, Real.norm_eq_abs]
+  simp [abs_of_pos Real.pi_pos]
+
+private theorem lattice_value_eq_exp_offset {L : ℝ} (hL : 0 < L) (Q : ℝ) {a b : ℂ}
+    (ha : ‖a‖ = 1) (hb : ‖b‖ = 1) (n k : ℤ) :
+    a * Complex.exp (-(Q : ℂ) * latticePoleHeight L b n) =
+      Complex.exp ((2 * Real.pi * Complex.I) * (latticeOffset L Q a b n k : ℂ)) := by
+  have ha₀ : a ≠ 0 := norm_ne_zero_iff.mp (by rw [ha]; exact one_ne_zero)
+  have hL' : (L : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr hL.ne'
+  have hπ : (Real.pi : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr Real.pi_ne_zero
+  conv_lhs => rw [← Complex.exp_log ha₀]
+  rw [← Complex.exp_add, Complex.exp_eq_exp_iff_exists_int]
+  refine ⟨k, ?_⟩
+  rw [log_of_norm_eq_one ha, latticeOffset, latticePoleHeight, log_of_norm_eq_one hb]
+  push_cast
+  field_simp
+  ring
+
+/-- The distance of the outside value at the `n`th pole from one is at most the determinant of
+logarithms, at every winding, divided by `L`. -/
+theorem lattice_chord_le_logDet {L : ℝ} (hL : 0 < L) (Q : ℝ) {a b : ℂ} (ha : ‖a‖ = 1)
+    (hb : ‖b‖ = 1) (n k : ℤ) :
+    ‖1 - a * Complex.exp (-(Q : ℂ) * latticePoleHeight L b n)‖ ≤ ‖logDet L Q a b n k‖ / L := by
+  rw [lattice_value_eq_exp_offset hL Q ha hb n k, norm_logDet hL Q ha hb,
+    mul_div_cancel_left₀ _ hL.ne']
+  exact norm_one_sub_exp_turn_le _
+
+/-- At the nearest winding, the determinant of logarithms is at most `π/2 · L` times the
+distance of the outside value at the `n`th pole from one. -/
+theorem exists_logDet_le_lattice_chord {L : ℝ} (hL : 0 < L) (Q : ℝ) {a b : ℂ} (ha : ‖a‖ = 1)
+    (hb : ‖b‖ = 1) (n : ℤ) :
+    ∃ k : ℤ, ‖logDet L Q a b n k‖ ≤
+      Real.pi / 2 * L * ‖1 - a * Complex.exp (-(Q : ℂ) * latticePoleHeight L b n)‖ := by
+  set y : ℝ := Complex.arg a / (2 * Real.pi) - Q / L * (Complex.arg b / (2 * Real.pi) + n)
+  refine ⟨round y, ?_⟩
+  have hoff : latticeOffset L Q a b n (round y) = y - round y := by
+    simp only [latticeOffset, y]
+    ring
+  have hhalf : |latticeOffset L Q a b n (round y)| ≤ 1 / 2 := hoff ▸ abs_sub_round y
+  rw [lattice_value_eq_exp_offset hL Q ha hb n (round y), norm_one_sub_exp_turn_eq_sin_abs hhalf,
+    norm_logDet hL Q ha hb]
+  set x := |latticeOffset L Q a b n (round y)|
+  have hx : 0 ≤ x := abs_nonneg _
+  have hsin : 2 / Real.pi * (Real.pi * x) ≤ Real.sin (Real.pi * x) :=
+    Real.mul_le_sin (by positivity) (by nlinarith [Real.pi_pos])
+  have hlin : 2 / Real.pi * (Real.pi * x) = 2 * x := by
+    field_simp
+  have hc : 0 ≤ Real.pi / 2 * L := by positivity
+  have := mul_le_mul_of_nonneg_left
+    (show 2 * (2 * x) ≤ 2 * Real.sin (Real.pi * x) by linarith) hc
+  nlinarith [Real.pi_pos]
+
+/-- The outside value at the `n`th pole is exactly one if and only if the determinant of
+logarithms vanishes at some winding. -/
+theorem lattice_value_eq_one_iff {L : ℝ} (hL : 0 < L) (Q : ℝ) {a b : ℂ} (ha : ‖a‖ = 1)
+    (hb : ‖b‖ = 1) (n : ℤ) :
+    a * Complex.exp (-(Q : ℂ) * latticePoleHeight L b n) = 1 ↔
+      ∃ k : ℤ, logDet L Q a b n k = 0 := by
+  constructor
+  · intro h
+    obtain ⟨k, hk⟩ := exists_logDet_le_lattice_chord hL Q ha hb n
+    rw [h, sub_self, norm_zero, mul_zero] at hk
+    exact ⟨k, norm_le_zero_iff.mp hk⟩
+  · rintro ⟨k, hk⟩
+    have h := lattice_chord_le_logDet hL Q ha hb n k
+    rw [hk, norm_zero, zero_div] at h
+    exact (sub_eq_zero.mp (norm_le_zero_iff.mp h)).symm
+
+private theorem latticePoleHeight_eq {L : ℝ} (hL : 0 < L) {b : ℂ} (hb : ‖b‖ = 1) (n : ℤ) :
+    latticePoleHeight L b n =
+      (((Complex.arg b + 2 * Real.pi * n) / L : ℝ) : ℂ) * Complex.I := by
+  have hL' : (L : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr hL.ne'
+  rw [latticePoleHeight, log_of_norm_eq_one hb]
+  push_cast
+  field_simp
+
+private theorem norm_latticePoleHeight {L : ℝ} (hL : 0 < L) {b : ℂ} (hb : ‖b‖ = 1) (n : ℤ) :
+    ‖latticePoleHeight L b n‖ = |Complex.arg b + 2 * Real.pi * n| / L := by
+  rw [latticePoleHeight_eq hL hb, norm_mul, Complex.norm_I, mul_one, Complex.norm_real,
+    Real.norm_eq_abs, abs_div, abs_of_pos hL]
+
+private theorem latticePoleHeight_one_add_le {L : ℝ} (hL : 0 < L) {b : ℂ} (hb : ‖b‖ = 1)
+    (n : ℤ) :
+    1 + ‖latticePoleHeight L b n‖ ≤ (1 + 3 * Real.pi / L) * (1 + |(n : ℝ)|) := by
+  rw [norm_latticePoleHeight hL hb]
+  have harg := Complex.abs_arg_le_pi b
+  have hn := abs_nonneg (n : ℝ)
+  have htri : |Complex.arg b + 2 * Real.pi * n| ≤ Real.pi + 2 * Real.pi * |(n : ℝ)| := by
+    calc |Complex.arg b + 2 * Real.pi * n| ≤ |Complex.arg b| + |2 * Real.pi * (n : ℝ)| :=
+          abs_add_le _ _
+      _ = |Complex.arg b| + 2 * Real.pi * |(n : ℝ)| := by
+          rw [abs_mul, abs_of_pos (by positivity : (0 : ℝ) < 2 * Real.pi)]
+      _ ≤ _ := by linarith
+  have h1 : |Complex.arg b + 2 * Real.pi * n| / L ≤ (Real.pi + 2 * Real.pi * |(n : ℝ)|) / L :=
+    div_le_div_of_nonneg_right htri hL.le
+  have h2 : (Real.pi + 2 * Real.pi * |(n : ℝ)|) / L ≤ 3 * Real.pi / L * (1 + |(n : ℝ)|) := by
+    rw [div_mul_eq_mul_div]
+    exact div_le_div_of_nonneg_right (by nlinarith [Real.pi_pos]) hL.le
+  have h3 : (1 + 3 * Real.pi / L) * (1 + |(n : ℝ)|) =
+      (1 + |(n : ℝ)|) + 3 * Real.pi / L * (1 + |(n : ℝ)|) := by ring
+  linarith
+
+private theorem one_add_abs_le_latticePoleHeight {L : ℝ} (hL : 0 < L) {b : ℂ} (hb : ‖b‖ = 1)
+    (n : ℤ) :
+    1 + |(n : ℝ)| ≤ (3 / 2 + L / (2 * Real.pi)) * (1 + ‖latticePoleHeight L b n‖) := by
+  rw [norm_latticePoleHeight hL hb]
+  set Y := |Complex.arg b + 2 * Real.pi * n|
+  have harg := Complex.abs_arg_le_pi b
+  have hπ := Real.pi_pos
+  have htri : 2 * Real.pi * |(n : ℝ)| ≤ Y + Real.pi := by
+    have h : |2 * Real.pi * (n : ℝ)| ≤ Y + |Complex.arg b| := by
+      calc |2 * Real.pi * (n : ℝ)| = |(Complex.arg b + 2 * Real.pi * n) - Complex.arg b| := by
+            ring_nf
+        _ ≤ _ := abs_sub _ _
+    rw [abs_mul, abs_of_pos (by positivity : (0 : ℝ) < 2 * Real.pi)] at h
+    linarith
+  have hY : 0 ≤ Y / L := div_nonneg (abs_nonneg _) hL.le
+  have hn : |(n : ℝ)| ≤ Y / (2 * Real.pi) + 1 / 2 := by
+    rw [div_add' _ _ _ (by positivity), le_div_iff₀ (by positivity)]
+    linarith
+  have hexp : (3 / 2 + L / (2 * Real.pi)) * (1 + Y / L) =
+      3 / 2 + 3 / 2 * (Y / L) + L / (2 * Real.pi) + Y / (2 * Real.pi) := by
+    field_simp
+    ring
+  have hL2 : 0 ≤ L / (2 * Real.pi) := by positivity
+  linarith
+
+/-- On any family of poles of a primary place, the inverse-polynomial bound for the distance
+of the outside values from one holds if and only if the determinants of logarithms, at every
+winding, satisfy an inverse-polynomial lower bound of the same degree in the pole index. -/
+theorem lattice_polyBound_iff_logDet {L : ℝ} (hL : 0 < L) (Q : ℝ) {a b : ℂ} (ha : ‖a‖ = 1)
+    (hb : ‖b‖ = 1) {ι : Type*} (R : Set ι) (t z : ι → ℂ)
+    (hlat : ∀ i ∈ R, ∃ n : ℤ, t i = latticePoleHeight L b n)
+    (hz : ∀ i ∈ R, z i = a * Complex.exp (-(Q : ℂ) * t i)) (d : ℕ) :
+    (∃ C ≥ (0 : ℝ), ∀ i ∈ R, 1 ≤ C * (1 + ‖t i‖) ^ d * ‖1 - z i‖) ↔
+    (∃ C ≥ (0 : ℝ), ∀ i ∈ R, ∀ n k : ℤ, t i = latticePoleHeight L b n →
+      1 ≤ C * (1 + |(n : ℝ)|) ^ d * ‖logDet L Q a b n k‖) := by
+  constructor
+  · rintro ⟨C, hC, h⟩
+    have hK : 0 ≤ 1 + 3 * Real.pi / L := by positivity
+    refine ⟨C * (1 + 3 * Real.pi / L) ^ d / L,
+      div_nonneg (mul_nonneg hC (pow_nonneg hK d)) hL.le, fun i hi n k htn ↦ ?_⟩
+    have hi' := h i hi
+    rw [hz i hi, htn] at hi'
+    calc (1 : ℝ) ≤ C * (1 + ‖latticePoleHeight L b n‖) ^ d *
+          ‖1 - a * Complex.exp (-(Q : ℂ) * latticePoleHeight L b n)‖ := hi'
+      _ ≤ C * ((1 + 3 * Real.pi / L) * (1 + |(n : ℝ)|)) ^ d * (‖logDet L Q a b n k‖ / L) := by
+        gcongr
+        · exact latticePoleHeight_one_add_le hL hb n
+        · exact lattice_chord_le_logDet hL Q ha hb n k
+      _ = C * (1 + 3 * Real.pi / L) ^ d / L * (1 + |(n : ℝ)|) ^ d * ‖logDet L Q a b n k‖ := by
+        rw [mul_pow]
+        ring
+  · rintro ⟨C, hC, h⟩
+    have hK : 0 ≤ 3 / 2 + L / (2 * Real.pi) := by positivity
+    refine ⟨C * (3 / 2 + L / (2 * Real.pi)) ^ d * (Real.pi / 2 * L),
+      mul_nonneg (mul_nonneg hC (pow_nonneg hK d)) (by positivity), fun i hi ↦ ?_⟩
+    obtain ⟨n, htn⟩ := hlat i hi
+    obtain ⟨k, hk⟩ := exists_logDet_le_lattice_chord hL Q ha hb n
+    rw [hz i hi, htn]
+    calc (1 : ℝ) ≤ C * (1 + |(n : ℝ)|) ^ d * ‖logDet L Q a b n k‖ := h i hi n k htn
+      _ ≤ C * ((3 / 2 + L / (2 * Real.pi)) * (1 + ‖latticePoleHeight L b n‖)) ^ d *
+          (Real.pi / 2 * L * ‖1 - a * Complex.exp (-(Q : ℂ) * latticePoleHeight L b n)‖) := by
+        gcongr
+        exact one_add_abs_le_latticePoleHeight hL hb n
+      _ = C * (3 / 2 + L / (2 * Real.pi)) ^ d * (Real.pi / 2 * L) *
+          (1 + ‖latticePoleHeight L b n‖) ^ d *
+          ‖1 - a * Complex.exp (-(Q : ℂ) * latticePoleHeight L b n)‖ := by
+        rw [mul_pow]
+        ring
+
+/-! ### The ℚ(ζ₈) benchmark -/
+
+/-- The determinant of logarithms of the benchmark, for a phase `a`, a pole index `n` and a
+winding `m`: `log 49 · (log a - 2πi m) - log 17 · 2πi n`, the case `b = 1` of `logDet`. -/
+def quarticFourExpDet (a : ℂ) (n m : ℤ) : ℂ :=
+  logDet (Real.log 49) (Real.log 17) a 1 n m
+
+private theorem quarticPoleHeight_eq_lattice (n : ℤ) :
+    quarticPoleHeight n = latticePoleHeight (Real.log 49) 1 n := by
+  simp [quarticPoleHeight, latticePoleHeight, Complex.log_one]
+
+private theorem quarticPoleValue_eq_lattice (a : ℂ) (n : ℤ) :
+    quarticPoleValue a n =
+      a * Complex.exp (-((Real.log 17 : ℝ) : ℂ) * latticePoleHeight (Real.log 49) 1 n) := by
+  rw [quarticPoleValue_eq, quarticPoleHeight_eq_lattice]
+
+private theorem quartic_log49_pos : 0 < Real.log 49 := Real.log_pos (by norm_num)
+
+/-- At the nearest winding, the benchmark determinant of logarithms is at most `π/2 · log 49`
+times the outside Euler denominator at the `n`th pole. -/
+private theorem exists_quarticFourExpDet_le_chord {a : ℂ} (ha : ‖a‖ = 1) (n : ℤ) :
+    ∃ m : ℤ, ‖quarticFourExpDet a n m‖ ≤
+      Real.pi / 2 * Real.log 49 * ‖1 - quarticPoleValue a n‖ := by
+  simp only [quarticPoleValue_eq_lattice, quarticFourExpDet]
+  exact exists_logDet_le_lattice_chord quartic_log49_pos _ ha norm_one n
+
+/-- On any set of benchmark pole indices, the inverse-polynomial bound for the outside Euler
+denominators holds if and only if the determinants of logarithms, at every winding, satisfy an
+inverse-polynomial lower bound in `n`. -/
+private theorem quarticBenchmark_polyBound_iff_fourExpDet {a : ℂ} (ha : ‖a‖ = 1) (P : ℤ → Prop) (d : ℕ) :
+    (∃ C ≥ (0 : ℝ), ∀ n, P n →
+      1 ≤ C * (1 + ‖quarticPoleHeight n‖) ^ d * ‖1 - quarticPoleValue a n‖) ↔
+    (∃ C ≥ (0 : ℝ), ∀ n m : ℤ, P n →
+      1 ≤ C * (1 + |(n : ℝ)|) ^ d * ‖quarticFourExpDet a n m‖) := by
+  have key := lattice_polyBound_iff_logDet quartic_log49_pos (Real.log 17) ha norm_one
+    {n : ℤ | P n} quarticPoleHeight (quarticPoleValue a)
+    (fun n _ ↦ ⟨n, quarticPoleHeight_eq_lattice n⟩)
+    (fun n _ ↦ by rw [quarticPoleValue_eq_lattice, quarticPoleHeight_eq_lattice]) d
+  simp only [Set.mem_ofPred_eq] at key
+  refine key.trans ⟨fun ⟨C, hC, h⟩ ↦ ⟨C, hC, fun n m hn ↦ ?_⟩,
+    fun ⟨C, hC, h⟩ ↦ ⟨C, hC, fun i hi n k htn ↦ ?_⟩⟩
+  · rw [quarticFourExpDet]
+    exact h n hn n m (quarticPoleHeight_eq_lattice n)
+  · have hin : i = n :=
+      quarticPoleHeight_injective (htn.trans (quarticPoleHeight_eq_lattice n).symm)
+    subst hin
+    rw [← quarticFourExpDet]
+    exact h i k hi
+
+/-- The benchmark form of the estimate of #7336: an inverse-polynomial bound for the outside
+Euler denominators at the squared-height records holds if and only if the determinants of
+logarithms at the records satisfy an inverse-polynomial lower bound. -/
+theorem quarticBenchmark_recordBound_iff_fourExpDet {a : ℂ} (ha : ‖a‖ = 1) (d : ℕ) :
+    (∃ C ≥ (0 : ℝ), ∀ n, QuarticSquaredHeightRecord a n →
+      1 ≤ C * (1 + ‖quarticPoleHeight n‖) ^ d * ‖1 - quarticPoleValue a n‖) ↔
+    (∃ C ≥ (0 : ℝ), ∀ n m : ℤ, QuarticSquaredHeightRecord a n →
+      1 ≤ C * (1 + |(n : ℝ)|) ^ d * ‖quarticFourExpDet a n m‖) :=
+  quarticBenchmark_polyBound_iff_fourExpDet ha _ d
+
+/-- A benchmark pole value is exactly one if and only if the determinant of logarithms
+vanishes at some winding. -/
+private theorem quarticPoleValue_eq_one_iff {a : ℂ} (ha : ‖a‖ = 1) (n : ℤ) :
+    quarticPoleValue a n = 1 ↔ ∃ m : ℤ, quarticFourExpDet a n m = 0 := by
+  rw [quarticPoleValue_eq_lattice]
+  simp only [quarticFourExpDet]
+  exact lattice_value_eq_one_iff quartic_log49_pos _ ha norm_one n
+
+/-- For one of the two benchmark phases, no determinant of logarithms vanishes: this instance of
+the Four Exponentials Conjecture holds. -/
+theorem quarticBenchmark_fourExpDet_ne_zero :
+    ∃ a ∈ ({quarticPhasePlus, quarticPhaseMinus} : Set ℂ),
+      ∀ n m : ℤ, quarticFourExpDet a n m ≠ 0 := by
+  obtain ⟨a, ha, -, -, -, hne⟩ := quarticBenchmark_shiftedExample
+  have hnorm : ‖a‖ = 1 := by
+    rcases (show a = quarticPhasePlus ∨ a = quarticPhaseMinus by simpa using ha) with h | h
+    · rw [h]
+      exact norm_quarticPhasePlus
+    · rw [h]
+      exact norm_quarticPhaseMinus
+  exact ⟨a, ha, fun n m h ↦ hne n ((quarticPoleValue_eq_one_iff hnorm n).mpr ⟨m, h⟩)⟩
+
+/-- At a nonzero squared-height record of a benchmark phase with no clearing shift, the
+determinant of logarithms is smaller than `π/4 · (log 49)² / n²` at the nearest winding. So the
+estimate of #7336 at the benchmark asks for these determinants to lie between `n⁻ᵈ` and a
+constant times `n⁻²` along the records. -/
+theorem quarticSquaredHeightRecord_fourExpDet_lt {a : ℂ} (ha : ‖a‖ = 1)
+    (hclear : ¬ QuarticCommonShift a) (n : ℤ) (hn : n ≠ 0) (hr : QuarticSquaredHeightRecord a n) :
+    ∃ m : ℤ, ‖quarticFourExpDet a n m‖ < Real.pi / 4 * Real.log 49 ^ 2 / (n : ℝ) ^ 2 := by
+  have hlog : 0 < Real.log 49 := quartic_log49_pos
+  have hn2 : 0 < (n : ℝ) ^ 2 := by positivity
+  obtain ⟨m, hm⟩ := exists_quarticFourExpDet_le_chord ha n
+  refine ⟨m, hm.trans_lt ?_⟩
+  calc Real.pi / 2 * Real.log 49 * ‖1 - quarticPoleValue a n‖
+      < Real.pi / 2 * Real.log 49 * (Real.log 49 / (2 * (n : ℝ) ^ 2)) :=
+        mul_lt_mul_of_pos_left (quarticSquaredHeightRecord_bound a ha hclear n hn hr)
+          (by positivity)
+    _ = Real.pi / 4 * Real.log 49 ^ 2 / (n : ℝ) ^ 2 := by
+        field_simp
+        ring
+
+end FourExponentials
+
+/-! ### Characters with given local profiles -/
+
+section OrbitalFourExponentials
+
+open IsDedekindDomain
+
+variable {F : Type*} [Field F] [NumberField F]
+variable {T : Finset (IsDedekindDomain.HeightOneSpectrum (𝓞 F))}
+
+local notation "J" => SIdeleQuotient F T
+local notation "m" => sIdeleQuotientNorm F T
+set_option quotPrecheck false in
+local notation "shift" => quasiCharacterNormTwist m (isProperMap_sIdeleQuotientNorm F T).continuous
+set_option quotPrecheck false in
+local notation "E(" v ", " c ")" => finiteLocalEulerFactor (v).val (sLocalFiniteRestriction v c)
+
+/-- A quasi-character with the same norm-one restriction as `c` is the norm twist of `c` by its
+complex power on the section `τ`, when `c` is trivial on `τ`. -/
+private theorem orbital_eq_shift_of_normOneRestriction (c d : QuasiCharacter J) (τ : ℝ≥0ˣ →ₜ* J)
+    (hτ : Function.RightInverse τ m) (hcτ : ∀ x, c (τ x) = 1)
+    (hd : normOneRestriction m d = normOneRestriction m c) :
+    d = shift c (existsUnique_complexPower (d.comp τ)).exists.choose := by
+  have ht := (existsUnique_complexPower (d.comp τ)).exists.choose_spec
+  ext1 g
+  have hker : g * (τ (m g))⁻¹ ∈ (m).ker := by
+    rw [MonoidHom.mem_ker, map_mul, map_inv, hτ (m g), mul_inv_cancel]
+  have hdc : d (g * (τ (m g))⁻¹) = c (g * (τ (m g))⁻¹) :=
+    DFunLike.congr_fun hd ⟨_, hker⟩
+  have hdg : d g = d (g * (τ (m g))⁻¹) * d (τ (m g)) := by
+    rw [← map_mul, inv_mul_cancel_right]
+  have hcg : c g = c (g * (τ (m g))⁻¹) * c (τ (m g)) := by
+    rw [← map_mul, inv_mul_cancel_right]
+  change d g = c g * (((m g).val : ℝ) : ℂ) ^ (existsUnique_complexPower (d.comp τ)).exists.choose
+  rw [hdg, hcg, hcτ, mul_one, hdc]
+  congr 1
+  exact ht (m g)
+
+private theorem exists_latticePoleHeight_of_eq_one {L : ℝ} (hL : 0 < L) {b s : ℂ} (hb : b ≠ 0)
+    (h : b * Complex.exp (-(L : ℂ) * s) = 1) : ∃ n : ℤ, s = latticePoleHeight L b n := by
+  have hL' : (L : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr hL.ne'
+  rw [← Complex.exp_log hb, ← Complex.exp_add, Complex.exp_eq_one_iff] at h
+  obtain ⟨n, hn⟩ := h
+  refine ⟨-n, ?_⟩
+  rw [latticePoleHeight, eq_div_iff hL']
+  push_cast
+  linear_combination -hn
+
+private theorem orbital_restriction_shift_uniformizer (v : T) (c : QuasiCharacter J)
+    (u : (v.val.adicCompletion F)ˣ) (hu : ‖u.val‖ = (v.val.asIdeal.absNorm : ℝ)⁻¹) (s : ℂ) :
+    sLocalFiniteRestriction v (shift c s) u = sLocalFiniteRestriction v c u *
+      Complex.exp (-((Real.log (v.val.asIdeal.absNorm : ℝ) : ℝ) : ℂ) * s) := by
+  rw [orbital_finiteRestriction_shift,
+    Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr u.ne_zero)),
+    ← Complex.ofReal_log (norm_nonneg _), hu, Real.log_inv, Complex.ofReal_neg]
+
+/-- The norm-section lift gives fixed unit phases for both places. At every orbital index
+where `w` is a pole, its section coordinate is on the primary lattice and its outside value is
+the rotation of the outside phase by that coordinate. -/
+theorem orbital_poleLattice_phases
+    (P : Finset (HeightOneSpectrum (𝓞 F))) (χ : PontryaginDual (m).ker)
+    (τ : ℝ≥0ˣ →ₜ* J) (hτ : Function.RightInverse τ m) (w v : T)
+    (u : (v.val.adicCompletion F)ˣ) (hu : ‖u.val‖ = (v.val.asIdeal.absNorm : ℝ)⁻¹) :
+    let s (j : SLocalOrbitalIndex (S := T) P χ) :=
+      (existsUnique_complexPower (j.val.1.comp τ)).exists.choose
+    ∃ a b : Circle, ∀ j : SLocalOrbitalIndex (S := T) P χ, w ∈ sLocalFinitePolePlaces j.val.1 →
+      (∃ n : ℤ, s j = latticePoleHeight (Real.log (w.val.asIdeal.absNorm : ℝ)) b n) ∧
+      sLocalFiniteRestriction v j.val.1 u =
+        a * Complex.exp (-(Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ) * s j) := by
+  classical
+  intro s
+  obtain ⟨η, ⟨hη, hητ⟩, _⟩ := existsUnique_sLocalNormSectionCharacter τ hτ χ
+  let c := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η
+  have hres : normOneRestriction m c =
+      (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ := by
+    ext1 x
+    exact congrArg Subtype.val (DFunLike.congr_fun hη x)
+  have hcτ (x) : c (τ x) = 1 := by
+    change (η (τ x) : ℂ) = 1
+    rw [hητ, Circle.coe_one]
+  let π := (Valued.v : Valuation (w.val.adicCompletion F)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let t : (w.val.adicCompletion F)ˣ := Units.mk0 π.choose π.choose_spec.ne_zero
+  have ht : ‖t.val‖ = (w.val.asIdeal.absNorm : ℝ)⁻¹ :=
+    norm_uniformizer_adicCompletion w.val _ π.choose_spec
+  let phase (q : T) (x : (q.val.adicCompletion F)ˣ) : Circle :=
+    ⟨sLocalFiniteRestriction q c x, mem_sphere_zero_iff_norm.mpr (Circle.norm_coe (η _))⟩
+  refine ⟨phase v u, phase w t, fun j hj ↦ ?_⟩
+  have hshift : j.val.1 = shift c (s j) :=
+    orbital_eq_shift_of_normOneRestriction c j.val.1 τ hτ hcτ (j.property.1.trans hres.symm)
+  have hzero : E(w, j.val.1) = 0 := by
+    have hnf := (sLocalPrincipalPartCoeff_leading_formula_fin_factor j.val.1 w).1
+    have hp := (Finset.mem_filter.mp hj).2
+    have hz : shift j.val.1 0 = j.val.1 := by
+      ext1 x
+      exact (congrArg (j.val.1 x * ·) (Complex.cpow_zero _)).trans (mul_one _)
+    by_contra h
+    exact hp.ne (hnf.meromorphicOrderAt_eq_zero_iff.mpr (by simpa only [hz] using h))
+  have hone : sLocalFiniteRestriction w j.val.1 t = 1 := by
+    unfold finiteLocalEulerFactor at hzero
+    split at hzero
+    · exact (sub_eq_zero.mp (inv_eq_zero.mp hzero)).symm
+    · exact (one_ne_zero hzero).elim
+  rw [hshift, orbital_restriction_shift_uniformizer w c t ht] at hone
+  constructor
+  · exact exists_latticePoleHeight_of_eq_one
+      (Real.log_pos (by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm w.val))
+      (Circle.coe_ne_zero (phase w t)) hone
+  · rw [hshift, orbital_restriction_shift_uniformizer v c u hu]
+
+/-- Reconstruction: the single-place estimate required for Theorem 7.3.3.4 (pp. 360–363,
+with p. 349), expressed as a lower bound for determinants of logarithms. The two unit phases
+work on the whole eligible set. On its squared-height records the determinant bound is
+equivalent to the conclusion of #7336. -/
+theorem orbital_shiftMinima_conclusion_iff_logDet
+    (P : Finset (HeightOneSpectrum (𝓞 F))) (χ : PontryaginDual (m).ker)
+    (τ : ℝ≥0ˣ →ₜ* J) (hτ : Function.RightInverse τ m) (w v : T)
+    (u : (v.val.adicCompletion F)ˣ) (hu : ‖u.val‖ = (v.val.asIdeal.absNorm : ℝ)⁻¹) :
+    let s (j : SLocalOrbitalIndex (S := T) P χ) :=
+      (existsUnique_complexPower (j.val.1.comp τ)).exists.choose
+    let z (j : SLocalOrbitalIndex (S := T) P χ) := sLocalFiniteRestriction v j.val.1 u
+    let Ev (j : SLocalOrbitalIndex (S := T) P χ) :=
+      finiteLocalEulerFactor v.val (sLocalFiniteRestriction v j.val.1)
+    let A := {j : SLocalOrbitalIndex (S := T) P χ |
+      j.val.2 ≠ 0 ∧ w ∈ sLocalFinitePolePlaces j.val.1 ∧ 1 < ‖Ev j‖}
+    let H (j : SLocalOrbitalIndex (S := T) P χ) := 2 + ‖s j‖
+    let R := {j ∈ A | ∀ k ∈ A, k.val.1 ≠ j.val.1 → H k ≤ H j ^ 2 → ‖1 - z j‖ < ‖1 - z k‖}
+    ∃ a b : Circle,
+      (∀ j ∈ A, (∃ n : ℤ, s j = latticePoleHeight (Real.log (w.val.asIdeal.absNorm : ℝ)) b n) ∧
+        z j = a * Complex.exp (-(Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ) * s j)) ∧
+      ∀ d : ℕ, (∃ C ≥ (0 : ℝ), ∀ j ∈ R, 1 ≤ C * (1 + ‖s j‖) ^ d * ‖1 - z j‖) ↔
+       (∃ C ≥ (0 : ℝ), ∀ j ∈ R, ∀ n k : ℤ,
+         s j = latticePoleHeight (Real.log (w.val.asIdeal.absNorm : ℝ)) b n →
+         1 ≤ C * (1 + |(n : ℝ)|) ^ d * ‖logDet (Real.log (w.val.asIdeal.absNorm : ℝ))
+           (Real.log (v.val.asIdeal.absNorm : ℝ)) a b n k‖) := by
+  intro s z Ev A H R
+  obtain ⟨a, b, hab⟩ := orbital_poleLattice_phases P χ τ hτ w v u hu
+  refine ⟨a, b, fun j hj ↦ hab j hj.2.1, fun d ↦ ?_⟩
+  exact lattice_polyBound_iff_logDet
+    (Real.log_pos (by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm w.val)) _
+    (Circle.norm_coe a) (Circle.norm_coe b) R s z (fun j hj ↦ (hab j hj.1.2.1).1)
+    (fun j hj ↦ (hab j hj.1.2.1).2) d
+
+end OrbitalFourExponentials
+
 end RiemannMasullo.Isolated
