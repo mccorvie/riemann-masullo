@@ -3632,7 +3632,7 @@ moments, before passing to the kernel of the lower coordinates.
 This is `spectralStripConvolution_all_jet_coefficients` (above in this section) for `0 ≤ s`.
 That theorem is stated under the section hypothesis `1 < s`, but its proof uses only `0 ≤ s`;
 stating it for `0 ≤ s` in place would make this copy unnecessary. -/
-private theorem exists_spectralStripKernelOperator_all_jet_coefficients
+theorem exists_spectralStripKernelOperator_all_jet_coefficients
     (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
     (f : J(χ) → StrongDual ℂ Q(a, hStrip(hα), hs))
     (hj : ∀ j, D₀ (f j) = (spectralStripJet_memLp χ hα hs j).toLp (raw(χ, j)))
