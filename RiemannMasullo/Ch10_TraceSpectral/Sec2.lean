@@ -8444,7 +8444,10 @@ theorem spectralStripMarkushevichBasis (χ : PontryaginDual C₁ → PontryaginD
     (stripI(hα)) hs (stripU(χ, hα, hs))
     (spectralStripJet_commonKernel χ hχ hα hs) (spectralStripJet_denseInterpolants χ hχ hα hs)⟩
 
-private theorem spectralStripJet_norm_sq (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+/-- Paper: Proposition 10.2.2.2, p. 447. The squared norm of an admitted strip jet is its
+radial integral times the scalar relating Tamagawa measure to the canonical modulated Haar
+measure. -/
+theorem spectralStripJet_norm_sq (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
     {a α s : ℝ} (hα : 0 ≤ α) (hs : 0 ≤ s) (j : SpectralStripJetIndex χ a α s)
     (ν : Measure C𝔽) [ν.IsHaarMeasure] (hν : ν = canonicalModulatedHaar m𝔽 hm𝔽) :
     ‖(spectralStripJet_memLp χ hα hs j).toLp (stripJet(χ, j))‖ ^ 2 =
