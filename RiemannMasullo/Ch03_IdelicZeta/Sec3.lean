@@ -2332,7 +2332,7 @@ theorem sLocalIdelicZetaIntegral_eq_of_pureTensor (c : Xₛ) (hc : c ∈ positiv
 
 /-- Fourier transformation of a product test separates over the additive
 Tamagawa product measure. -/
-private theorem sLocal_fourier_prod (f : ℬ(Aₛ))
+theorem sLocal_fourier_prod (f : ℬ(Aₛ))
     (a : (w : InfinitePlace F) → w.Completion → ℂ) (b : (v : S) → v.val.adicCompletion F → ℂ)
     (hf : ∀ x : Aₛ, f (Multiplicative.ofAdd x) = (∏ w, a w (x.1 w)) * ∏ v, b v (x.2 v))
     (y : Aₛ) : sAdeleSchwartzFourier f (Multiplicative.ofAdd y) =
