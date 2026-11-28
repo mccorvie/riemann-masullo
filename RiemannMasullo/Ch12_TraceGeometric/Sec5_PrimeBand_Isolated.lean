@@ -27,6 +27,7 @@ private theorem bilateralLaplace_translate_tsum {ι : Type*} [Countable ι]
     (φ : ℝ → ℂ) (u : ι → ℝ) (c : ι → ℂ) (z : ℂ)
     (hφ : Integrable (fun t : ℝ ↦ φ t * exp (z * t)))
     (hc : Summable (fun n ↦ c n * exp (-z * u n))) :
+    Integrable (fun y : ℝ ↦ (∑' n, c n * φ (u n - y)) * exp (-z * (y : ℂ))) ∧
     bilateralLaplace (fun y ↦ ∑' n, c n * φ (u n - y)) (-z) =
       (∑' n, c n * exp (-z * u n)) * bilateralLaplace φ z := by
   let d (n : ι) := c n * exp (-z * u n)
@@ -46,11 +47,31 @@ private theorem bilateralLaplace_translate_tsum {ι : Type*} [Countable ι]
     exact congrArg (‖d n‖ * ·) (integral_sub_left_eq_self (fun t ↦ ‖p t‖) volume (u n))
   have hsum : Summable (fun n ↦ ∫ y, ‖g n y‖) := by
     simpa only [hnorm, d] using hc.norm.mul_right (∫ t, ‖p t‖)
+  have hgmeas (n : ι) : AEMeasurable (fun y ↦ ‖g n y‖ₑ) := (hi n).1.eNorm
+  have hmass : (∫⁻ y, ∑' n, ‖g n y‖ₑ) < ∞ := by
+    rw [lintegral_tsum hgmeas]
+    have hn (n : ι) : (∫⁻ y, ‖g n y‖ₑ) = ENNReal.ofReal (∫ y, ‖g n y‖) := by
+      rw [ofReal_integral_eq_lintegral_ofReal (hi n).norm (Filter.Eventually.of_forall
+        fun y ↦ norm_nonneg (g n y))]
+      simp only [ofReal_norm]
+    simp_rw [hn]
+    rw [← ENNReal.ofReal_tsum_of_nonneg (fun _ ↦ integral_nonneg fun _ ↦ norm_nonneg _) hsum]
+    exact ENNReal.ofReal_lt_top
+  have hInt : Integrable (fun y ↦ ∑' n, g n y) := by
+    refine ⟨aestronglyMeasurable_of_tendsto_ae (Filter.atTop : Filter (Finset ι))
+      (fun s ↦ (integrable_finsetSum s fun n _ ↦ hi n).1) ?_, ?_⟩
+    · exact (ae_lt_top' (AEMeasurable.tsum hgmeas) hmass.ne).mono fun y hy ↦
+        (tsum_eNorm_ne_top_iff_summable_norm.mp hy.ne).of_norm.hasSum
+    · rw [hasFiniteIntegral_iff_eNorm]
+      exact (lintegral_mono fun _ ↦ eNorm_tsum_le_tsum_eNorm).trans_lt hmass
+  have hseries (y : ℝ) : (∑' n, c n * φ (u n - y)) * exp (-z * (y : ℂ)) = ∑' n, g n y := by
+    simp_rw [← tsum_mul_right, hg]
+  refine ⟨hInt.congr (Filter.Eventually.of_forall fun y ↦ (hseries y).symm), ?_⟩
   have hval (n : ι) : ∫ y, g n y = d n * bilateralLaplace φ z := by
     simp only [g, integral_const_mul, bilateralLaplace]
     exact congrArg (d n * ·) (integral_sub_left_eq_self p volume (u n))
   rw [bilateralLaplace]
-  simp_rw [← tsum_mul_right, hg]
+  simp_rw [hseries]
   rw [← integral_tsum_of_summable_integral_norm hi hsum]
   simp_rw [hval, tsum_mul_right]
   rfl
@@ -60,10 +81,9 @@ def smoothedVonMangoldtBand (φ : ℝ → ℂ) (Y : ℝ) : ℂ :=
   ∑' n : ℕ, LSeries.term (fun m ↦ (ArithmeticFunction.vonMangoldt m : ℂ)) (1 / 2) n *
     φ (Real.log n - Y)
 
-/-- The Laplace transform in the translation parameter is the product of the profile's
-Mellin transform and the negative logarithmic derivative of the Riemann zeta function. -/
-theorem bilateralLaplace_smoothedVonMangoldtBand (φ : ℝ → ℂ) (z : ℂ)
+private theorem integrable_and_bilateralLaplace_smoothedVonMangoldtBand (φ : ℝ → ℂ) (z : ℂ)
     (hφ : Integrable (fun t : ℝ ↦ φ t * exp (z * t))) (hz : 1 / 2 < z.re) :
+    Integrable (fun y : ℝ ↦ smoothedVonMangoldtBand φ y * exp (-z * (y : ℂ))) ∧
     bilateralLaplace (smoothedVonMangoldtBand φ) (-z) =
       (-deriv riemannZeta (1 / 2 + z) / riemannZeta (1 / 2 + z)) * bilateralLaplace φ z := by
   let a (n : ℕ) := (ArithmeticFunction.vonMangoldt n : ℂ)
@@ -88,11 +108,27 @@ theorem bilateralLaplace_smoothedVonMangoldtBand (φ : ℝ → ℂ) (z : ℂ)
     simp_rw [hterm]
     exact ArithmeticFunction.LSeriesSummable_vonMangoldt hs
   unfold smoothedVonMangoldtBand
-  rw [bilateralLaplace_translate_tsum φ (fun n : ℕ ↦ Real.log n)
-    (LSeries.term a (1 / 2)) z hφ hc]
+  obtain ⟨hi, he⟩ := bilateralLaplace_translate_tsum φ (fun n : ℕ ↦ Real.log n)
+    (LSeries.term a (1 / 2)) z hφ hc
+  refine ⟨hi, he.trans ?_⟩
   simp_rw [hterm]
   exact congrArg (fun v ↦ v * bilateralLaplace φ z)
     (ArithmeticFunction.LSeries_vonMangoldt_eq_deriv_riemannZeta_div hs)
+
+/-- The Laplace-weighted smoothed von Mangoldt band is absolutely integrable in the
+half-plane of absolute convergence of the weighted prime-power series. -/
+theorem integrable_smoothedVonMangoldtBand (φ : ℝ → ℂ) (z : ℂ)
+    (hφ : Integrable (fun t : ℝ ↦ φ t * exp (z * t))) (hz : 1 / 2 < z.re) :
+    Integrable (fun y : ℝ ↦ smoothedVonMangoldtBand φ y * exp (-z * (y : ℂ))) :=
+  (integrable_and_bilateralLaplace_smoothedVonMangoldtBand φ z hφ hz).1
+
+/-- The Laplace transform in the translation parameter is the product of the profile's
+Mellin transform and the negative logarithmic derivative of the Riemann zeta function. -/
+theorem bilateralLaplace_smoothedVonMangoldtBand (φ : ℝ → ℂ) (z : ℂ)
+    (hφ : Integrable (fun t : ℝ ↦ φ t * exp (z * t))) (hz : 1 / 2 < z.re) :
+    bilateralLaplace (smoothedVonMangoldtBand φ) (-z) =
+      (-deriv riemannZeta (1 / 2 + z) / riemannZeta (1 / 2 + z)) * bilateralLaplace φ z :=
+  (integrable_and_bilateralLaplace_smoothedVonMangoldtBand φ z hφ hz).2
 
 private theorem bilateralLaplace_smoothedVonMangoldtBand_factored (φ : ℝ → ℂ)
     (z a : ℂ) (hφ : Integrable (fun t : ℝ ↦ φ t * exp (z * t))) (hz : 1 / 2 < z.re)
@@ -229,7 +265,7 @@ theorem riemannZeta_ne_zero_of_positivePrimeBandLaplace {X : Type*} [MeasurableS
 /-- A one-sided exponential bound on a real smoothed prime-power sum rules out
 the zeta zeros detected by its pole-canceled Mellin profile. The initial weighted
 integrability and the profile factorization are exposed as separate hypotheses. -/
-theorem riemannZeta_ne_zero_of_smoothedVonMangoldtBand_lower_bound
+private theorem riemannZeta_ne_zero_of_smoothedVonMangoldtBand_lower_bound_aux
     (φ : ℝ → ℂ) {P : ℝ → ℝ} (hP : Measurable P)
     (hBand : ∀ y, smoothedVonMangoldtBand φ y = (P y : ℂ))
     (hZero : ∀ y ≤ 0, P y = 0) {a b C : ℝ} (ha : 0 ≤ a) (hab : a < b) (hb : 1 / 2 ≤ b)
@@ -309,5 +345,86 @@ theorem riemannZeta_ne_zero_of_smoothedVonMangoldtBand_lower_bound
   congr 3
   push_cast
   ring
+
+/-- A one-sided exponential bound on a real smoothed von Mangoldt band rules out the
+zeta zeros detected by its pole-canceled Mellin profile. Integrability of the weighted
+profile on the initial half-plane gives the required weighted integrability of the band. -/
+theorem riemannZeta_ne_zero_of_smoothedVonMangoldtBand_lower_bound
+    (φ : ℝ → ℂ) {P : ℝ → ℝ} (hP : Measurable P)
+    (hBand : ∀ y, smoothedVonMangoldtBand φ y = (P y : ℂ))
+    (hZero : ∀ y ≤ 0, P y = 0) {a b C : ℝ} (ha : 0 ≤ a) (hab : a < b) (hb : 1 / 2 ≤ b)
+    (hLower : ∀ y > 0, 0 ≤ P y + C * Real.exp (a * y))
+    {A : ℂ → ℂ} (hA : AnalyticOnNhd ℂ A {w | a < w.re})
+    (hφ : ∀ w : ℂ, b < w.re → Integrable (fun t : ℝ ↦ φ t * exp (w * t)))
+    (hFactor : EqOn (bilateralLaplace φ) (fun w ↦ (w - 1 / 2) * A w) {w | b < w.re})
+    {z : ℂ} (hz : a < z.re) (hz₁ : z ≠ 1 / 2) (hzA : A z ≠ 0) :
+    riemannZeta (1 / 2 + z) ≠ 0 := by
+  let b' := b + 1
+  have hbb' : b < b' := lt_add_one _
+  have hInt : IntegrableOn (fun y ↦ P y * Real.exp (-b' * y)) (Ioi 0) := by
+    have h := integrable_smoothedVonMangoldtBand φ (b' : ℂ)
+      (hφ _ (by simpa only [ofReal_re] using hbb')) (by simpa only [ofReal_re] using hb.trans_lt hbb')
+    simpa only [hBand, ← ofReal_neg, ← ofReal_mul, ← ofReal_exp, RCLike.re_eq_complex_re, ofReal_re]
+      using h.re.integrableOn
+  exact riemannZeta_ne_zero_of_smoothedVonMangoldtBand_lower_bound_aux φ hP hBand hZero ha
+    (hab.trans hbb') (hb.trans hbb'.le) hLower hInt hA (fun w hw ↦ hφ w (hbb'.trans hw))
+    (fun w hw ↦ hFactor (hbb'.trans hw)) hz hz₁ hzA
+
+/-- The real prime-power criterion for a continuous profile vanishing outside
+the open log interval between norms one and two. -/
+theorem riemannZeta_ne_zero_of_real_compact_smoothedVonMangoldtBand_lower_bound
+    (f : ℝ → ℝ) (hf : Continuous f)
+    (hSupp : Function.support f ⊆ Ioo 0 (Real.log 2))
+    {a C : ℝ} (ha : 0 ≤ a) (ha' : a < 1 / 2)
+    (hLower : ∀ y > 0, 0 ≤ (smoothedVonMangoldtBand (fun t ↦ (f t : ℂ)) y).re +
+      C * Real.exp (a * y))
+    {A : ℂ → ℂ} (hA : AnalyticOnNhd ℂ A {w | a < w.re})
+    (hFactor : EqOn (bilateralLaplace (fun t ↦ (f t : ℂ)))
+      (fun w ↦ (w - 1 / 2) * A w) {w | 1 / 2 < w.re})
+    {z : ℂ} (hz : a < z.re) (hz₁ : z ≠ 1 / 2) (hzA : A z ≠ 0) :
+    riemannZeta (1 / 2 + z) ≠ 0 := by
+  let P (y : ℝ) : ℝ := ∑' n : ℕ, ArithmeticFunction.vonMangoldt n /
+    (n : ℝ) ^ (1 / 2 : ℝ) * f (Real.log n - y)
+  have hP : Measurable P := Measurable.tsum fun n ↦
+    measurable_const.mul (hf.measurable.comp (measurable_const.sub measurable_id))
+  have hBand (y : ℝ) : smoothedVonMangoldtBand (fun t ↦ (f t : ℂ)) y = (P y : ℂ) := by
+    unfold smoothedVonMangoldtBand P
+    rw [Complex.ofReal_tsum]
+    refine tsum_congr fun n ↦ ?_
+    by_cases hn : n = 0
+    · simp [hn]
+    rw [LSeries.term_of_ne_zero hn, Complex.ofReal_mul, Complex.ofReal_div,
+      Complex.ofReal_cpow (Nat.cast_nonneg n), Complex.ofReal_natCast]
+    norm_num
+  have hZero (y : ℝ) (hy : y ≤ 0) : P y = 0 := by
+    unfold P
+    trans ∑' _ : ℕ, (0 : ℝ)
+    · refine tsum_congr fun n ↦ ?_
+      by_cases hn : n < 2
+      · have h : n = 0 ∨ n = 1 := by omega
+        rcases h with rfl | rfl <;> simp [ArithmeticFunction.vonMangoldt_apply_one]
+      have hn' : (2 : ℝ) ≤ (n : ℝ) := by exact_mod_cast (show 2 ≤ n by omega)
+      have hlog := Real.log_le_log (by norm_num : (0 : ℝ) < 2) hn'
+      have h : f (Real.log n - y) = 0 := by
+        by_contra hne
+        have hlt := (hSupp (Function.mem_support.mpr hne)).2
+        linarith
+      simp [h]
+    · simp
+  have hφ (w : ℂ) : Integrable (fun t : ℝ ↦ (f t : ℂ) * exp (w * t)) := by
+    apply Continuous.integrable_of_hasCompactSupport (by fun_prop)
+    have hSub : Function.support (fun t : ℝ ↦ (f t : ℂ) * exp (w * t)) ⊆
+        Icc 0 (Real.log 2) := by
+      intro t ht
+      have ht' : f t ≠ 0 := by
+        intro he
+        exact (Function.mem_support.mp ht) (by simp [he])
+      have hi := hSupp (Function.mem_support.mpr ht')
+      exact ⟨hi.1.le, hi.2.le⟩
+    exact isCompact_Icc.of_isClosed_subset isClosed_closure (closure_minimal hSub isClosed_Icc)
+  exact riemannZeta_ne_zero_of_smoothedVonMangoldtBand_lower_bound (fun t ↦ (f t : ℂ))
+    hP hBand hZero ha ha' le_rfl
+    (fun y hy ↦ by simpa only [hBand, Complex.ofReal_re] using hLower y hy)
+    hA (fun w _ ↦ hφ w) hFactor hz hz₁ hzA
 
 end RiemannMasullo.Isolated
