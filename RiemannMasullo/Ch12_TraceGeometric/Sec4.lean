@@ -4993,6 +4993,92 @@ private theorem sLocalTraceLift_globalTestDescent
   obtain ⟨a, g, hc, hq⟩ := hrep c
   rw [hq, hJ, hc, hOutside]
 
+section SmoothGlobalTestDescent
+
+attribute [local instance] instSIdeleQuotientT2Sec1 instSIdeleQuotientLocallyCompactSec1
+
+/-- A descended compact global test is Bruhat smooth and compactly supported on
+the S-local quotient. The proof averages over the compact kernel with mass one,
+so the result has the values of the original descent. -/
+private theorem sLocalTraceLift_globalTestDescent_mem_bruhat
+    (q : C𝔽 →* Jₛ) (hq : IsOpenQuotientMap q)
+    (hn : ∀ c, sIdeleQuotientNorm F S (q c) = ideleClassNorm F c)
+    (φ : BruhatCompactSupport C𝔽) (φJ : Jₛ → ℂ)
+    (hdesc : ∀ c, φ.val c = φJ (q c)) :
+    φJ ∈ bruhatCompactSupportSubmodule Jₛ := by
+  let : BorelSpace C𝔽 := ⟨rfl⟩
+  let : SecondCountableTopology C𝔽 := instIdeleClassSecondCountableSec1
+  have hclosed : IsClosed (q.ker : Set C𝔽) :=
+    isClosed_singleton.preimage hq.continuous
+  have hcompact : IsCompact (q.ker : Set C𝔽) := by
+    refine ((isProperMap_ideleClassNorm F).isCompact_preimage
+      (isCompact_singleton (x := 1))).of_isClosed_subset hclosed ?_
+    intro x hx
+    change ideleClassNorm F x = 1
+    rw [← hn x, MonoidHom.mem_ker.mp hx, map_one]
+  let : CompactSpace q.ker := isCompact_iff_compactSpace.mp hcompact
+  let : T1Space (C𝔽 ⧸ q.ker) := QuotientGroup.t1Space_iff.mpr hclosed
+  let μ : Measure q.ker := Measure.haarMeasure ⊤
+  let : IsProbabilityMeasure μ := ⟨Measure.haarMeasure_self⟩
+  obtain ⟨m, _, hm, hms⟩ := exists_ideleClassModulation F
+  have hf : φ.val ∈ schwartzBruhatSubmodule C𝔽 := by
+    rw [← modulatedExponentialDecaySubmodule_singleton_zero m]
+    exact bruhatCompactSupport_le_modulatedExponentialDecay m {0} hm hms φ.property
+  let f : SchwartzBruhat C𝔽 := ⟨φ.val, hf⟩
+  let A := schwartzBruhatCosetIntegral q.ker μ hclosed f
+  have hA (x : C𝔽) : A (QuotientGroup.mk x) = φ.val x := by
+    calc
+      _ = ∫ u : q.ker, f (x * u.val) ∂μ :=
+        schwartzBruhatCosetIntegral_mk q.ker μ hclosed f x
+      _ = ∫ _ : q.ker, φ.val x ∂μ := by
+        apply integral_congr_ae
+        apply Filter.Eventually.of_forall
+        intro u
+        change φ.val (x * u.val) = φ.val x
+        rw [hdesc (x * u.val), hdesc x, map_mul, MonoidHom.mem_ker.mp u.property, mul_one]
+      _ = _ := (integral_const _).trans
+        ((congrArg (fun r : ℝ ↦ r • φ.val x) (probReal_univ (μ := μ))).trans (one_smul ℝ _))
+  let e₀ := QuotientGroup.quotientKerEquivOfSurjective q hq.surjective
+  let e : (C𝔽 ⧸ q.ker) ≃ₜ* Jₛ := e₀.toContinuousMulEquiv fun U ↦ by
+    rw [← (QuotientGroup.isQuotientMap_mk q.ker).isOpen_preimage]
+    exact hq.isQuotientMap.isOpen_preimage
+  have heq : A.val ∘ e.symm = φJ := by
+    funext z
+    obtain ⟨x, rfl⟩ := hq.surjective z
+    have he (x : C𝔽) : e (QuotientGroup.mk x) = q x := rfl
+    have hinv : e.symm (q x) = QuotientGroup.mk x :=
+      (congrArg (fun y : Jₛ ↦ e.symm y) (he x)).symm.trans (e.symm_apply_apply _)
+    change A (e.symm (q x)) = φJ (q x)
+    rw [hinv, hA, hdesc]
+  let back : Jₛ →ₜ* (C𝔽 ⧸ q.ker) :=
+    ⟨e.symm.toMulEquiv.toMonoidHom, e.symm.continuous⟩
+  have hsm : IsBruhatSmooth φJ := by
+    rw [← heq]
+    exact sLocalTrace_comp_bruhatSmooth back (schwartzBruhat_isBruhatSmooth A)
+  refine ⟨(mem_bruhatSmoothSubmodule_iff _).mpr hsm,
+    HasCompactSupport.intro (φ.property.2.image hq.continuous) ?_⟩
+  intro z hz
+  obtain ⟨x, rfl⟩ := hq.surjective z
+  rw [← hdesc x]
+  exact image_eq_zero_of_notMem_tsupport (fun hx ↦ hz ⟨x, hx, rfl⟩)
+
+/-- Paper: (12.4.1.4), p. 515. For trivial S-class group, the restriction of an
+outside-unit-invariant global test is a compact Bruhat test on the S-idele
+quotient, with the same values on the inserted S-ideles.
+Deviation: Bundle the descended function on the quotient. -/
+theorem exists_sLocalTraceBruhatQuotientTest
+    (hPic : Subsingleton (CommRing.Pic ((S : Set V).integer F)))
+    (φ : BruhatCompactSupport C𝔽)
+    (hOutside : ∀ (a : outsideIntegralIdeleUnits F S) (c : C𝔽),
+      φ.val (QuotientGroup.mk a.val * c) = φ.val c) :
+    ∃ φJ : BruhatCompactSupport Jₛ,
+      ∀ g : Iₛ, φJ.val (QuotientGroup.mk g) = φ.val (classAtS(g)) := by
+  obtain ⟨q, hq, hn, hrep⟩ := sLocalTraceLift_globalQuotient hPic
+  obtain ⟨φJ, hdesc, hJ⟩ := sLocalTraceLift_globalTestDescent φ hOutside q hrep
+  exact ⟨⟨φJ, sLocalTraceLift_globalTestDescent_mem_bruhat q hq hn φ φJ hdesc⟩, hJ⟩
+
+end SmoothGlobalTestDescent
+
 /-- A norm-compatible surjection pushes global class Haar measure to S-local
 quotient Haar measure with the ratio of the two norm-one masses. The norm interval from one to
 exp(1) has radial mass one and determines the Haar scalar. -/
