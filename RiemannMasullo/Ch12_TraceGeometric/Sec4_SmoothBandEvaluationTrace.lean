@@ -9,14 +9,10 @@ public noncomputable section
 
 namespace RiemannMasullo
 
-/-- Paper: Theorem 12.4.1.1, Steps II–III, pp. 515–519.
-Reconstruction: Let `N` be a nuclear operator whose image is fixed by a bounded frequency
-cutoff `T`. If `N` acts by the scalar `c` on the evaluation `e`, compressing
-`N * T` to the kernel of `e` subtracts just `c * e (T u)` from its trace.
-Here `P` is the projection along a vector `u` normalized by `e u = 1`.
-In the even rational band, `e` is evaluation at the origin and the image of
-`N` lies in the interior plateau of the cutoff because dilation shrinks the
-band and the smoothed spatial mask has small Fourier support. -/
+/-- If a bounded operator `T` fixes the image of a nuclear operator `N`, and a
+continuous linear functional `e` satisfies `e ∘ N = c • e`, the trace of `N * T`
+compressed to `ker e` is `hilbertTrace N - c * e (T u)`.
+The projection is taken along a vector `u` with `e u = 1`. -/
 theorem hilbertTrace_smoothBand_evaluationCompression
     {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
     (N : nuclearEndomorphisms H) (T : H →L[ℂ] H)
