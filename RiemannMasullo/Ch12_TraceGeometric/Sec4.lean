@@ -2138,6 +2138,76 @@ private theorem sLocalTrace_exists_normSection :
   let g := A.toSubmonoid.unitsEquivUnitsType ⟨s t, ht⟩
   exact ((sIdeleNorm_spec F S).1 g).symm.trans (singlePlaceIdeleNormSection_rightInverse F w t)
 
+/-- The quotient Tamagawa measure gives zero mass to the preimage of a countable
+set of real norm values. -/
+theorem ae_sLocalQuotientNorm_notMem_countable {E : Set ℝ} (hE : E.Countable) :
+    ∀ᵐ q : Jₛ ∂μJ, ((sIdeleQuotientNorm F S q).val : ℝ) ∉ E := by
+  let : BorelSpace Jₛ := ⟨rfl⟩
+  let : SecondCountableTopology Jₛ := instSIdeleQuotientSecondCountableSec1
+  let : BorelSpace (sIdeleQuotientNorm F S).ker := ⟨rfl⟩
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ _
+  let : SFinite positiveRealHaar := by unfold positiveRealHaar; infer_instance
+  let m := sIdeleQuotientNorm F S
+  let η := sLocalNormOneQuotientMeasure F S
+  have hm : Measurable m := (isProperMap_sIdeleQuotientNorm F S).continuous.measurable
+  have hmap : (μJ).map m = (η univ) • positiveRealHaar := by
+    obtain ⟨τ, hτ⟩ := sLocalTrace_exists_normSection (F := F) (S := S)
+    let j (p : m.ker × ℝ≥0ˣ) :=
+      p.1.val * (QuotientGroup.mk (τ p.2) : Jₛ)
+    have hπ : Continuous (QuotientGroup.mk : Iₛ → Jₛ) := QuotientGroup.continuous_mk
+    have hval : Measurable (Subtype.val : m.ker → Jₛ) :=
+      continuous_subtype_val.measurable
+    have hj : Measurable j :=
+      (hval.comp measurable_fst).mul
+        ((hπ.comp τ.continuous).measurable.comp measurable_snd)
+    have hjm : m ∘ j = Prod.snd := by
+      funext p
+      change m (p.1.val * QuotientGroup.mk (τ p.2)) = p.2
+      rw [map_mul, MonoidHom.mem_ker.mp p.1.property, one_mul]
+      exact (sIdeleQuotientNorm_mk F S (τ p.2)).trans (hτ p.2)
+    have hp : (η.prod positiveRealHaar).map j = μJ :=
+      (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).2 τ hτ
+    rw [← hp, Measure.map_map hm hj, hjm, Measure.map_snd_prod]
+  let r (t : ℝ≥0ˣ) : ℝ := (t.val : ℝ)
+  let expUnit (x : ℝ) := Units.mk0 (Real.exp x).toNNReal (by positivity)
+  have hr : Measurable r :=
+    NNReal.continuous_coe.measurable.comp MeasurableSpace.le_map_comap
+  have he : Measurable expUnit :=
+    measurable_comap_iff.mpr (continuous_real_toNNReal.comp Real.continuous_exp).measurable
+  have hEm : MeasurableSet (r ⁻¹' E) := hE.measurableSet.preimage hr
+  have hnull : positiveRealHaar (r ⁻¹' E) = 0 := by
+    have hpre : expUnit ⁻¹' (r ⁻¹' E) = Real.exp ⁻¹' E := by
+      ext x
+      change ((Real.exp x).toNNReal : ℝ) ∈ E ↔ Real.exp x ∈ E
+      rw [Real.coe_toNNReal _ (Real.exp_pos _).le]
+    change ((volume : Measure ℝ).map expUnit) (r ⁻¹' E) = 0
+    rw [Measure.map_apply he hEm, hpre]
+    exact (hE.preimage Real.exp_injective).measure_zero volume
+  refine (measure_eq_zero_iff_ae_notMem (s := m ⁻¹' (r ⁻¹' E))).mp ?_
+  rw [← Measure.map_apply hm hEm, hmap, smul_apply, hnull, smul_zero]
+
+/-- Paper: Proposition 12.2.2.2(2), p. 508, and Theorem 12.4.1.1,
+pp. 515–517. The modulated spatial mask is continuous at almost every
+point for quotient Tamagawa measure.
+Deviation: This supplies continuity for the spatial mask used in
+the descended kernel. -/
+theorem ae_continuousAt_sLocalModulatedCutoff {Λ ε : ℝ} {ρ : Jₛ → ℝ}
+    (hρ : IsModulatedCutoff (continuousSIdeleQuotientNorm F S) Λ ε ρ) :
+    ∀ᵐ x : Jₛ ∂μJ, ContinuousAt ρ x := by
+  obtain ⟨q, jumps, hfactor, _, hq, _⟩ := hρ.profile
+  let r (x : Jₛ) : ℝ := ((sIdeleQuotientNorm F S x).val : ℝ)
+  have hr : Continuous r := NNReal.continuous_coe.comp
+    (Units.continuous_val.comp (continuousSIdeleQuotientNorm F S).continuous)
+  have hEq : ρ = q ∘ r := funext hfactor
+  have hOpen : IsOpen (Ioi (0 : ℝ) \ (jumps : Set ℝ)) :=
+    isOpen_Ioi.sdiff jumps.finite_toSet.isClosed
+  filter_upwards [ae_sLocalQuotientNorm_notMem_countable (F := F) (S := S)
+    jumps.finite_toSet.countable] with x hx
+  have hmem : r x ∈ Ioi (0 : ℝ) \ (jumps : Set ℝ) :=
+    ⟨NNReal.coe_pos.mpr (Units.zero_lt _), hx⟩
+  rw [hEq]
+  exact (hq.continuousOn.continuousAt (hOpen.mem_nhds hmem)).comp hr.continuousAt
+
 /-- Paper: (12.4.1.23)–(12.4.1.24), p. 518. On the part of an S-unit fundamental
 domain of norm at most L, a measurable function of the norm integrates to the norm-one
 volume times its integral against dt/t on (0, L]. -/
