@@ -100,7 +100,7 @@ private theorem spectralStripConvolution_nuclear_of_clusters_opNorm
 /-- If the zeros are grouped into finite clusters whose blocks have summable trace norms, the
 cluster blocks sum to the operator in operator norm, by biorthogonality and totality of the
 coordinate functionals, and the operator is nuclear. No bound for a single zero is used. -/
-private theorem spectralStripConvolution_nuclear_of_clusters_abstract
+theorem spectralStripConvolution_nuclear_of_clusters_abstract
     {H J Z ι : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
     (A : H →L[ℂ] H) (x : J → H) (Λ : J → StrongDual ℂ H) (hb : IsSpectralMarkushevichBasis x Λ)
     (N : Z → ℕ) (jet : (z : Z) → Fin (N z) → J)
@@ -195,7 +195,7 @@ theorem spectralStripConvolution_nuclear_of_clusters
 /-- The trace norm of a nuclear endomorphism whose range has dimension at most `n` is at most
 `n` times its operator norm: its approximation numbers vanish from the index `n` on, and each
 is at most the operator norm. -/
-private theorem spectralStripConvolution_summable_clusterTraceNorms_of_summable_clusterNorms_rank
+theorem spectralStripConvolution_summable_clusterTraceNorms_of_summable_clusterNorms_rank
     {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
     (T : nuclearEndomorphisms H) (n : ℕ)
     (hrank : Module.rank ℂ T.val.toLinearMap.range ≤ (n : Cardinal)) :
@@ -222,7 +222,7 @@ private theorem spectralStripConvolution_summable_clusterTraceNorms_of_summable_
 
 /-- The range of a finite section lies in the span of the biorthogonal vectors of its jets, so
 its dimension is at most the number of these jets. -/
-private theorem spectralStripConvolution_summable_clusterTraceNorms_of_summable_clusterNorms_range
+theorem spectralStripConvolution_summable_clusterTraceNorms_of_summable_clusterNorms_range
     {H J Z : Type*} [NormedAddCommGroup H] [NormedSpace ℂ H]
     (A : H →L[ℂ] H) (x : J → H) (Λ : J → StrongDual ℂ H)
     (K : Finset Z) (N : Z → ℕ) (jet : (z : Z) → Fin (N z) → J) :
@@ -271,7 +271,7 @@ private theorem spectralStripConvolution_summable_clusterTraceNorms_of_summable_
 /-- An operator that acts on the jets of a finite set of zeros as the given operator does, and
 annihilates the jets of all the other zeros, is the block of that set: the two have the same
 coordinates, and the coordinate functionals are total. -/
-private theorem spectralStripConvolution_summable_clusterTraceNorms_of_kernels_block
+theorem spectralStripConvolution_summable_clusterTraceNorms_of_kernels_block
     {H J Z : Type*} [NormedAddCommGroup H] [NormedSpace ℂ H]
     (A : H →L[ℂ] H) (x : J → H) (Λ : J → StrongDual ℂ H) (hb : IsSpectralMarkushevichBasis x Λ)
     (N : Z → ℕ) (jet : (z : Z) → Fin (N z) → J)
@@ -384,7 +384,7 @@ theorem spectralStripConvolution_summable_clusterTraceNorms_of_kernels
 
 /-- The norm twist of a unitary character is the character times the exponential of the exponent
 times the logarithm of the norm. -/
-private theorem spectralStripConvolution_summable_clusterTraceNorms_of_scalarKernels_twist
+theorem spectralStripConvolution_summable_clusterTraceNorms_of_scalarKernels_twist
     (η : PontryaginDual C𝔽) (w : ℂ) (g : C𝔽) :
     ideleClassNormTwist (F := F) η w g =
       (η g : ℂ) * Complex.exp (w * (logIdeleClassNorm F g : ℂ)) := by
@@ -396,7 +396,7 @@ private theorem spectralStripConvolution_summable_clusterTraceNorms_of_scalarKer
 /-- Orthogonality of the angular components: the inverse of the basepoint character of one
 component times a function of the norm has vanishing integral against the norm twists of the
 basepoint character of any other component. -/
-private theorem spectralStripConvolution_summable_clusterTraceNorms_of_scalarKernels_orthogonal
+theorem spectralStripConvolution_summable_clusterTraceNorms_of_scalarKernels_orthogonal
     (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
     (hχ : IsSpectralBasepointChoice (F := F) (fun ω ↦ χ ω))
     {ω ω₀ : PontryaginDual C₁} (hne : ω ≠ ω₀) (w : ℂ) (H : ℝ → ℂ) :
@@ -575,7 +575,7 @@ measure, since the class norm is proper and surjective. This is a third private 
 lemma: the private `exists_map_logClassNorm_eq_smul_volume` of `AppB_AnalyticNT/Sec1` and the
 private `tate_exists_map_logClassNorm_eq_smul_volume` of `Ch03_IdelicZeta/Sec2`. It is copied
 here because those are private; this copy adds that the constant is not zero. -/
-private theorem spectralStripConvolution_summable_clusterTraceNorms_of_multipliers_map_logNorm :
+theorem spectralStripConvolution_summable_clusterTraceNorms_of_multipliers_map_logNorm :
     ∃ c : ℝ≥0, c ≠ 0 ∧ Measure.map (logIdeleClassNorm F) μ𝔽 = c • (volume : Measure ℝ) := by
   let μ := ideleClassTamagawaMeasure F
   let ν : Measure (Multiplicative ℝ) := (volume : Measure ℝ)
