@@ -1904,4 +1904,250 @@ theorem spectralRestriction_trace_tendsto_of_one_lt (_hs₁ : 1 < s) :
 
 end Limits
 
+section BlockSeries
+
+/-- Diagonal matrix coefficients of a family of operators determine all its matrix
+coefficients by complex polarization. -/
+private theorem blockSeries_matrixCoefficients {H Z : Type*}
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (B : Z → H →L[ℂ] H) (h : ∀ q : H, Summable (fun z ↦ inner ℂ q (B z q)))
+    (v : H) (f : StrongDual ℂ H) : Summable (fun z ↦ f (B z v)) := by
+  let u := (InnerProductSpace.toDual ℂ H).symm f
+  have hp := ((((h (u + v)).sub (h (u - v))).sub
+    ((h (u + Complex.I • v)).mul_left Complex.I)).add
+    ((h (u - Complex.I • v)).mul_left Complex.I)).div_const 4
+  refine hp.congr fun z ↦ ?_
+  simpa only [ContinuousLinearMap.coe_coe, ContinuousLinearMap.adjoint_inner_left,
+    u, InnerProductSpace.toDual_symm_apply] using
+    (inner_map_polarization' (B z).adjoint.toLinearMap u v).symm
+
+/-- Rotating each tested block by a scalar of norm at most one preserves the uniform
+operator norm bound for its finite sums. -/
+private theorem blockSeries_weightedSums_bound {H Z : Type*}
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (B : Z → H →L[ℂ] H) (h : ∀ q : H, Summable (fun z ↦ inner ℂ q (B z q))) :
+    ∃ C : ℝ, ∀ (K : Finset Z) (c : Z → ℂ), (∀ z, ‖c z‖ ≤ 1) → ‖∑ z ∈ K, c z • B z‖ ≤ C := by
+  let S (i : Finset Z × {c : Z → ℂ // ∀ z, ‖c z‖ ≤ 1}) := ∑ z ∈ i.1, i.2.val z • B z
+  obtain ⟨C, hC⟩ := banach_steinhaus (g := S) fun v ↦ by
+    let G (i) := NormedSpace.inclusionInDoubleDual ℂ H (S i v)
+    obtain ⟨R, hR⟩ := banach_steinhaus (g := G) fun f ↦ by
+      refine ⟨∑' z, ‖f (B z v)‖, fun i ↦ ?_⟩
+      change ‖f (S i v)‖ ≤ _
+      simp only [S, sum_apply, smul_apply, map_sum, map_smul, smul_eq_mul]
+      refine (norm_sum_le _ _).trans ((Finset.sum_le_sum fun z _ ↦ ?_).trans
+        ((blockSeries_matrixCoefficients B h v f).norm.sum_le_tsum i.1 fun _ _ ↦ norm_nonneg _))
+      rw [norm_mul]
+      exact mul_le_of_le_one_left (norm_nonneg _) (i.2.property z)
+    exact ⟨R, fun i ↦ ((NormedSpace.inclusionInDoubleDualLi ℂ).norm_map (S i v)).ge.trans (hR i)⟩
+  exact ⟨C, fun K c hc ↦ hC (K, ⟨c, hc⟩)⟩
+
+private theorem blockSeries_phase (t : ℂ) : ∃ c : ℂ, ‖c‖ ≤ 1 ∧ c * t = (‖t‖ : ℂ) := by
+  by_cases ht : t = 0
+  · exact ⟨0, by simp, by simp [ht]⟩
+  exact ⟨(‖t‖ : ℂ) / t, by simp [ht], div_mul_cancel₀ _ ht⟩
+
+/-- If the diagonal matrix coefficients are summable, tracing against a nuclear operator
+preserves summability. Uniform boundedness controls the phase-weighted finite sums in
+operator norm, and the trace ideal inequality then bounds the sum of the absolute traces. -/
+private theorem blockSeries_trace_nuclear {H Z : Type*}
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (B : Z → H →L[ℂ] H) (h : ∀ q : H, Summable (fun z ↦ inner ℂ q (B z q)))
+    (T : nuclearEndomorphisms H) :
+    Summable (fun z ↦ hilbertTrace ⟨B z * T.val, mul_mem_nuclearEndomorphisms_left _ T⟩) := by
+  classical
+  let D (z : Z) : nuclearEndomorphisms H := ⟨B z * T.val, mul_mem_nuclearEndomorphisms_left _ T⟩
+  choose c hc he using fun z ↦ blockSeries_phase (hilbertTrace (D z))
+  let S (K : Finset Z) := ∑ z ∈ K, c z • B z
+  obtain ⟨C, hC⟩ := blockSeries_weightedSums_bound B h
+  obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := H)
+  apply Summable.of_norm
+  refine summable_of_sum_le (c := C * traceNorm T) (fun _ ↦ norm_nonneg _) fun K ↦ ?_
+  let V : nuclearEndomorphisms H := ⟨S K * T.val, mul_mem_nuclearEndomorphisms_left _ T⟩
+  have hV : V = ∑ z ∈ K, c z • D z := by
+    apply Subtype.ext
+    simp [V, S, D, Finset.sum_mul]
+  have ht : tr V = ((∑ z ∈ K, ‖hilbertTrace (D z)‖ : ℝ) : ℂ) := by
+    rw [hV, map_sum, Complex.ofReal_sum]
+    exact Finset.sum_congr rfl fun z _ ↦ by rw [map_smul, smul_eq_mul, htr, he]
+  have hb := (norm_hilbertTrace_le V).trans ((traceNorm_mul_left_le (S K) T).trans
+    (mul_le_mul_of_nonneg_right (hC K c hc) ((norm_nonneg _).trans (norm_hilbertTrace_le T))))
+  rwa [← htr, ht, Complex.norm_real, Real.norm_of_nonneg (Finset.sum_nonneg fun _ _ ↦ norm_nonneg _)] at hb
+
+/-- The trace of a complete finite block against a nuclear operator is the sum of the
+inserted coordinates at that site. -/
+private theorem blockSeries_comp_nuclear {H Z : Type*}
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (N : Z → ℕ) (x : (z : Z) → Fin (N z) → H) (L : (z : Z) → Fin (N z) → StrongDual ℂ H)
+    (A : H →L[ℂ] H) (T : nuclearEndomorphisms H)
+    (h : ∀ q : H, Summable (fun z ↦ ∑ m, inner ℂ q (x z m) * L z m (A q))) :
+    Summable (fun z ↦ ∑ m, L z m (A (T.val (x z m)))) := by
+  let B (z : Z) := ∑ m, ((L z m).comp A).smulRight (x z m)
+  have hB (q : H) : Summable (fun z ↦ inner ℂ q (B z q)) := by
+    simpa only [B, sum_apply, ContinuousLinearMap.smulRight_apply,
+      ContinuousLinearMap.comp_apply, inner_sum, inner_smul_right, mul_comm] using h q
+  obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := H)
+  refine (blockSeries_trace_nuclear B hB T).congr fun z ↦ ?_
+  let D (m : Fin (N z)) : nuclearEndomorphisms H :=
+    ⟨(((L z m).comp A).comp T.val).smulRight (x z m), smulRight_mem_nuclearEndomorphisms _ _⟩
+  have heq : (⟨B z * T.val, mul_mem_nuclearEndomorphisms_left _ T⟩ : nuclearEndomorphisms H) =
+      ∑ m, D m := by
+    apply Subtype.ext
+    ext v
+    simp [B, D, sum_apply]
+  rw [← htr, heq, map_sum]
+  exact Finset.sum_congr rfl fun m _ ↦ (htr _).trans (hilbertTrace_smulRight _ _)
+
+/-- Inserting the rank-one map associated to a vector gives its diagonal coefficient. -/
+private theorem blockSeries_diagonal_of_compact {H Z : Type*}
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H]
+    (N : Z → ℕ) (x : (z : Z) → Fin (N z) → H) (L : (z : Z) → Fin (N z) → StrongDual ℂ H)
+    (A : H →L[ℂ] H) (h : ∀ U : compactOperator (RingHom.id ℂ) H H,
+      Summable (fun z ↦ ∑ m, L z m (A (U.val (x z m))))) (q : H) :
+    Summable (fun z ↦ ∑ m, inner ℂ q (x z m) * L z m (A q)) := by
+  let U : compactOperator (RingHom.id ℂ) H H := ⟨(innerSL ℂ q).smulRight q,
+    (isCompactOperator_of_locallyCompactSpace_rng (ContinuousLinearMap.toSpanSingleton ℂ q)).comp_clm
+      (innerSL ℂ q)⟩
+  simpa only [U, ContinuousLinearMap.smulRight_apply, innerSL_apply_apply, map_smul,
+    smul_eq_mul] using h U
+
+local notation "C₁" => (ideleClassNorm F).ker
+local notation "orderAtSite(" χ ", " z ")" => meromorphicOrderAt
+  (continuedCompletedHeckeL (F := F) ((χ) (z).1))
+  (((a + (z).2.1 : ℝ) : ℂ) + (((z).2.2 : ℝ) : ℂ) * Complex.I)
+
+/-- Paper: Theorem 10.3.2.1(1), pp. 453–455. The compact-insertion series of #7241 holds
+for every Bruhat test exactly when the diagonal matrix coefficients of its complete zero
+blocks are summable for every test and every single quotient vector.
+Reconstruction: In (10.3.2.1) keep all the jets at each zero together and test the block
+on the same vector on both sides. Polarization gives the other matrix coefficients.
+The Dixmier–Malliavin factorization uses the hypothesis for all tests, and
+`spectralStripConvolution_nuclear_of_summable_clusterTraceNorms` supplies the nuclear
+factor. Summability of the diagonal coefficients at the actual zeros remains open. -/
+theorem spectralStripConvolution_compact_block_series_iff_diagonal
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (x : SpectralStripJetIndex χ a α s → H₀)
+    (L : SpectralStripJetIndex χ a α s → StrongDual ℂ H₀) :
+    let Z := {z : PontryaginDual C₁ × ℝ × ℝ // z.2.1 ∈ Set.Icc (-α) α ∧ 0 < orderAtSite(χ, z)}
+    let N (z : Z) := spectralStripMultiplicity α s z.val.2.1 (orderAtSite(χ, z.val)).untop₀.toNat
+    let j (z : Z) (m : Fin (N z)) : SpectralStripJetIndex χ a α s :=
+      ⟨(z.val.1, z.val.2.1, z.val.2.2, m.val), m.isLt⟩
+    (∀ (φ : BruhatCompactSupport C𝔽) (U : compactOperator (RingHom.id ℂ) H₀ H₀),
+      Summable (fun z : Z ↦ ∑ m, L (j z m) (Aq(φ) (U.val (x (j z m)))))) ↔
+      ∀ (φ : BruhatCompactSupport C𝔽) (q : H₀),
+        Summable (fun z : Z ↦ ∑ m, inner ℂ q (x (j z m)) * L (j z m) (Aq(φ) q)) := by
+  intro Z N j
+  constructor
+  · intro h φ
+    exact blockSeries_diagonal_of_compact N (fun z m ↦ x (j z m)) (fun z m ↦ L (j z m)) (Aq(φ)) (h φ)
+  · intro h φ U
+    induction (bruhatCompactSupport_convolution_factorization φ) using
+      AddSubmonoid.closure_induction with
+    | mem θ hθ =>
+      obtain ⟨u, v, huv⟩ := hθ
+      rw [spectralConvolution_lcaConvolution a hα hs θ u v huv]
+      let V : nuclearEndomorphisms H₀ :=
+        ⟨Aq(v), spectralStripConvolution_nuclear_of_summable_clusterTraceNorms a hα hs v⟩
+      let T : nuclearEndomorphisms H₀ := ⟨V.val * U.val, mul_mem_nuclearEndomorphisms_right U.val V⟩
+      exact blockSeries_comp_nuclear N (fun z m ↦ x (j z m)) (fun z m ↦ L (j z m)) (Aq(u)) T (h u)
+    | zero =>
+      simp only [(spectralConvolution_isLinear (F := F) a hI hs).map_zero,
+        zero_apply, map_zero, Finset.sum_const_zero, summable_zero]
+    | add u v _ _ hu hv =>
+      simpa only [(spectralConvolution_isLinear (F := F) a hI hs).map_add,
+        add_apply, map_add, Finset.sum_add_distrib] using hu.add hv
+
+/-- A finite sum of jet functionals evaluates on the corresponding biorthogonal vector
+to its coefficient at that jet. -/
+private theorem blockSeries_combination_apply {H J : Type*}
+    [NormedAddCommGroup H] [NormedSpace ℂ H]
+    (x : J → H) (L : J → StrongDual ℂ H) (hb : IsSpectralMarkushevichBasis x L)
+    (c : J →₀ ℂ) (i : J) : Finsupp.linearCombination ℂ L c (x i) = c i := by
+  classical
+  rw [Finsupp.linearCombination_apply]
+  simp only [Finsupp.sum, sum_apply, smul_apply, smul_eq_mul]
+  rw [Finset.sum_eq_single i]
+  · rw [hb.1, mul_one]
+  · exact fun k _ hki ↦ by rw [hb.2.1 i k hki.symm, mul_zero]
+  · exact fun hi ↦ by rw [Finsupp.notMem_support_iff.mp hi, zero_mul]
+
+/-- A uniform quadratic bound on finitely supported jet coefficients is equivalent to
+summability on all diagonal vectors. Density is used only for a fixed finite sum. -/
+private theorem blockSeries_diagonal_iff_finite {H J Z : Type*}
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (x : J → H) (L : J → StrongDual ℂ H) (hb : IsSpectralMarkushevichBasis x L)
+    (A : H →L[ℂ] H) (N : Z → ℕ) (j : (z : Z) → Fin (N z) → J) :
+    (∀ q : H, Summable (fun z ↦ ∑ m, inner ℂ q (x (j z m)) * L (j z m) (A q))) ↔
+      ∃ C : ℝ, ∀ (c : J →₀ ℂ) (K : Finset Z),
+        let f := Finsupp.linearCombination ℂ L c
+        ∑ z ∈ K, ‖∑ m, c (j z m) * L (j z m) (A ((InnerProductSpace.toDual ℂ H).symm f))‖ ≤
+          C * ‖f‖ ^ 2 := by
+  let B (z : Z) := ∑ m, ((L (j z m)).comp A).smulRight (x (j z m))
+  have entry (q : H) (z : Z) : inner ℂ q (B z q) =
+      ∑ m, inner ℂ q (x (j z m)) * L (j z m) (A q) := by
+    simp only [B, sum_apply, ContinuousLinearMap.smulRight_apply, ContinuousLinearMap.comp_apply,
+      inner_sum, inner_smul_right, mul_comm]
+  constructor
+  · intro h
+    obtain ⟨C, hC⟩ := blockSeries_weightedSums_bound B fun q ↦ (h q).congr fun z ↦ (entry q z).symm
+    refine ⟨C, fun c K ↦ ?_⟩
+    let f := Finsupp.linearCombination ℂ L c
+    let q := (InnerProductSpace.toDual ℂ H).symm f
+    choose d hd he using fun z ↦ blockSeries_phase (inner ℂ q (B z q))
+    let S := ∑ z ∈ K, d z • B z
+    have heq : inner ℂ q (S q) = ((∑ z ∈ K, ‖inner ℂ q (B z q)‖ : ℝ) : ℂ) := by
+      simp only [S, sum_apply, smul_apply, inner_sum, inner_smul_right, he, Complex.ofReal_sum]
+    have hnorm : ‖inner ℂ q (S q)‖ ≤ C * ‖q‖ ^ 2 := calc
+      _ ≤ ‖q‖ * ‖S q‖ := norm_inner_le_norm _ _
+      _ ≤ ‖q‖ * (C * ‖q‖) := mul_le_mul_of_nonneg_left
+        ((S.le_opNorm q).trans (mul_le_mul_of_nonneg_right (hC K d hd) (norm_nonneg _))) (norm_nonneg _)
+      _ = _ := by ring
+    rw [heq, Complex.norm_real, Real.norm_of_nonneg (Finset.sum_nonneg fun _ _ ↦ norm_nonneg _)] at hnorm
+    simpa only [entry, q, f, InnerProductSpace.toDual_symm_apply, LinearIsometryEquiv.norm_map,
+      blockSeries_combination_apply x L hb] using hnorm
+  · rintro ⟨C, hC⟩ q
+    let value (f : StrongDual ℂ H) (z : Z) :=
+      ∑ m, f (x (j z m)) * L (j z m) (A ((InnerProductSpace.toDual ℂ H).symm f))
+    have bound (K : Finset Z) (f : StrongDual ℂ H) : ∑ z ∈ K, ‖value f z‖ ≤ C * ‖f‖ ^ 2 := by
+      apply hb.2.2.2.induction (P := fun g ↦ ∑ z ∈ K, ‖value g z‖ ≤ C * ‖g‖ ^ 2) _ _ f
+      · intro g hg
+        rw [← Finsupp.range_linearCombination] at hg
+        obtain ⟨c, rfl⟩ := hg
+        simpa only [value, blockSeries_combination_apply x L hb] using hC c K
+      · apply isClosed_le _ (by fun_prop)
+        dsimp only [value]
+        fun_prop
+    have hsum (f : StrongDual ℂ H) : Summable (value f) :=
+      Summable.of_norm (summable_of_sum_le (fun _ ↦ norm_nonneg _) (fun K ↦ bound K f))
+    simpa only [value, InnerProductSpace.toDual_apply_apply, LinearIsometryEquiv.symm_apply_apply]
+      using hsum (InnerProductSpace.toDual ℂ H q)
+
+/-- Paper: Theorem 10.3.2.1(1), pp. 453–455. For a Markushevich basis, the compact-insertion
+series for all tests is equivalent to a finite estimate involving only the jet functionals.
+Reconstruction: For each finitely supported coefficient family form the functional `f`
+obtained by summing the jets with these coefficients. Evaluate the convolved Riesz
+representative of `f` at the same jets. Multiply by the original coefficients and sum
+within each zero before taking absolute values. A bound by `C * ‖f‖²`, uniform over the
+coefficients and finite sets of zeros for each test, is precisely the remaining estimate. -/
+theorem spectralStripConvolution_compact_block_series_iff_finiteJetBound
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (x : SpectralStripJetIndex χ a α s → H₀)
+    (L : SpectralStripJetIndex χ a α s → StrongDual ℂ H₀)
+    (hb : IsSpectralMarkushevichBasis x L) :
+    let Z := {z : PontryaginDual C₁ × ℝ × ℝ // z.2.1 ∈ Set.Icc (-α) α ∧ 0 < orderAtSite(χ, z)}
+    let N (z : Z) := spectralStripMultiplicity α s z.val.2.1 (orderAtSite(χ, z.val)).untop₀.toNat
+    let j (z : Z) (m : Fin (N z)) : SpectralStripJetIndex χ a α s :=
+      ⟨(z.val.1, z.val.2.1, z.val.2.2, m.val), m.isLt⟩
+    (∀ (φ : BruhatCompactSupport C𝔽) (U : compactOperator (RingHom.id ℂ) H₀ H₀),
+      Summable (fun z : Z ↦ ∑ m, L (j z m) (Aq(φ) (U.val (x (j z m)))))) ↔
+      ∀ φ : BruhatCompactSupport C𝔽, ∃ C : ℝ,
+        ∀ (c : SpectralStripJetIndex χ a α s →₀ ℂ) (K : Finset Z),
+          let f := Finsupp.linearCombination ℂ L c
+          ∑ z ∈ K, ‖∑ m, c (j z m) * L (j z m) (Aq(φ) ((InnerProductSpace.toDual ℂ H₀).symm f))‖ ≤
+            C * ‖f‖ ^ 2 := by
+  intro Z N j
+  exact (spectralStripConvolution_compact_block_series_iff_diagonal a hα hs χ x L).trans
+    (forall_congr' fun φ ↦ blockSeries_diagonal_iff_finite x L hb (Aq(φ)) N j)
+
+end BlockSeries
+
 end RiemannMasullo.Isolated
