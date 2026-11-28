@@ -333,4 +333,177 @@ theorem exists_projectiveKernel_stripTestAction_spectralProjection_iff_support_i
 
 end KernelLocalization
 
+section QuotientReturns
+
+local notation "half" => (1 / 2 : ℝ)
+local notation "W" => CompactIntervalSobolev μ𝔽 (logIdeleClassNorm F) (-half) half 0
+local notation "hI" => (show -half ≤ half by norm_num)
+local notation "Θ" => globalThetaSobolev F (1 / 2) hI (le_refl (0 : ℝ))
+local notation "T" => hardySobolevTranslation μ𝔽 m𝔽 (-half) half 0 hI (le_refl (0 : ℝ))
+
+/-- Reconstruction: A sufficient approximation property for Theorem 12.5.1.1,
+pp. 519–520, using the degree-zero Mellin functionals of §10.2 on the critical
+strip. Representatives with arbitrarily small rescaled translates modulo theta
+span a dense subspace. The power can depend on the vector and tolerance. -/
+def TotalThetaQuotientReturns (g : C𝔽) (α : ℝ) : Prop :=
+  (Submodule.span ℂ {x : W | ∀ ε : ℝ, 0 < ε → ∃ n : ℕ,
+    ‖(Θ).mkQ (T (g ^ n) x)‖ < ε * Real.exp (α * n)}).topologicalClosure = ⊤
+
+/-- The order-zero jet of an interior zero gives a nonzero continuous Mellin
+functional on the critical strip that vanishes on theta. -/
+private theorem exteriorZero_mellinFunctional (ψ : PontryaginDual C𝔽) (b t : ℝ)
+    (hb : b ∈ Ioo (-half) half)
+    (hz : 0 < (meromorphicOrderAt (continuedCompletedHeckeL ψ)
+      ((1 / 2 + b : ℝ) + (t : ℂ) * Complex.I)).untop₀) :
+    ∃ L : W →L[ℂ] ℂ, L ≠ 0 ∧ Θ ≤ L.ker ∧ ∀ g x,
+      L (T g x) = ideleClassNormTwist ψ ((b : ℂ) + (t : ℂ) * Complex.I) g * L x := by
+  let χ : PontryaginDual C₁ → PontryaginDual C𝔽 := fun _ ↦ ψ
+  let j : SpectralStripJetIndex χ half half 0 :=
+    ⟨(1, b, t, 0), by
+      change 0 < spectralStripMultiplicity half 0 b _
+      rw [spectralStripMultiplicity_interior hb]
+      change 0 < (meromorphicOrderAt (continuedCompletedHeckeL ψ)
+        ((1 / 2 + b : ℝ) + (t : ℂ) * Complex.I)).untop₀.toNat
+      omega⟩
+  have hLp := spectralStripJet_memLp χ (show 0 ≤ half by norm_num) (le_refl 0) j
+  let u := hLp.toLp _
+  let D := (modulatedIntervalSobolev_dual m𝔽
+    ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ μ𝔽 (-half) half 0 hI (le_refl 0)).exists.choose
+  let L := D.symm u
+  have hp (x : W) : L x = spectralSobolevPairing x u :=
+    (spectralSobolevPairing_dual hI (le_refl 0) L x).2.trans
+      (congrArg (spectralSobolevPairing x) (D.apply_symm_apply u))
+  let c := ideleClassNormTwist ψ ((b : ℂ) + (t : ℂ) * Complex.I)
+  let w (g : C𝔽) := intervalSobolevDensity (-half) half 0 (logIdeleClassNorm F g)
+  have hw : Measurable w := by
+    have hD : Continuous (intervalSobolevDensity (-half) half 0) := by unfold intervalSobolevDensity; fun_prop
+    exact hD.measurable.comp ((NNReal.continuous_coe.comp
+      (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)).measurable.log)
+  have hac : μ𝔽 ≪ (μ𝔽).withDensity (fun g ↦ ENNReal.ofReal (w g)⁻¹) := by
+    refine withDensity_absolutelyContinuous' hw.inv.ennreal_ofReal.aemeasurable (.of_forall fun g ↦ ?_)
+    exact ENNReal.ofReal_ne_zero_iff.mpr (inv_pos.mpr
+      (mul_pos (lt_max_of_lt_left (Real.exp_pos _)) (Real.rpow_pos_of_pos (by positivity) _)))
+  have hu : (u : C𝔽 → ℂ) =ᵐ[μ𝔽] ⇑c := by
+    filter_upwards [hac.ae_le (MemLp.coeFn_toLp hLp)] with g hg
+    exact hg.trans (by simp [j, χ, spectralZeroJet, c])
+  have he (x : W) : L x = ∫ y, x y * c y ∂μ𝔽 :=
+    (hp x).trans (integral_congr_ae (hu.mono fun y hy ↦ congrArg (x y * ·) hy))
+  refine ⟨L, ?_, fun x hx ↦ (hp x).trans (spectralStripJet_commonKernel_forward χ
+    (by norm_num : 0 ≤ half) (le_refl 0) x hx j), fun g x ↦ ?_⟩
+  · intro h
+    have h0 : u = 0 := (D.apply_symm_apply u).symm.trans (by change D L = 0; rw [h, map_zero])
+    rw [h0] at hu
+    have hn : (fun _ : C𝔽 ↦ (0 : ℂ)) =ᵐ[μ𝔽] ⇑c := (hac.ae_eq (Lp.coeFn_zero ℂ 2 _).symm).trans hu
+    obtain ⟨y, hy⟩ := hn.exists
+    change 0 = c y at hy
+    have h1 := map_mul c y y⁻¹
+    simp [← hy] at h1
+  · let H (y : C𝔽) := x (g⁻¹ * y) * c y
+    calc
+      _ = ∫ y, H y ∂μ𝔽 := (he _).trans (integral_congr_ae
+        ((hardySobolevTranslation_apply μ𝔽 m𝔽 (-half) half 0 hI (le_refl 0) g x).mono
+          fun y hy ↦ congrArg (· * c y) hy))
+      _ = ∫ y, H (g * y) ∂μ𝔽 := (integral_mul_left_eq_self H g).symm
+      _ = c g * L x := by
+        rw [he, ← integral_const_mul]
+        simp only [H, inv_mul_cancel_left, map_mul]
+        exact integral_congr_ae (.of_forall fun _ ↦ mul_left_comm ..)
+
+private theorem norm_exteriorZero_twist (ψ : PontryaginDual C𝔽) (b t : ℝ) (g : C𝔽) :
+    ‖ideleClassNormTwist ψ ((b : ℂ) + (t : ℂ) * Complex.I) g‖ = Real.exp (b * logIdeleClassNorm F g) := by
+  have hg : 0 < ((ideleClassNorm F g).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  change ‖(ψ g : ℂ) * (((ideleClassNorm F g).val : ℝ) : ℂ) ^ ((b : ℂ) + (t : ℂ) * Complex.I)‖ = _
+  rw [norm_mul, Circle.norm_coe, one_mul, Complex.norm_cpow_eq_rpow_re_of_pos hg]
+  simp [Real.rpow_def_of_pos hg, logIdeleClassNorm, mul_comm]
+
+private theorem totalThetaQuotientReturns_excludes (g : C𝔽) {α : ℝ} (hd : TotalThetaQuotientReturns g α)
+    (L : W →L[ℂ] ℂ) (hk : Θ ≤ L.ker) (c : C𝔽 →ₜ* ℂ)
+    (he : ∀ h x, L (T h x) = c h * L x) (hg : Real.exp α ≤ ‖c g‖) : L = 0 := by
+  let E := (Θ).liftQL L hk
+  suffices hker : (⊤ : Submodule ℂ W) ≤ L.ker by
+    ext x
+    exact hker (Submodule.mem_top : x ∈ (⊤ : Submodule ℂ W))
+  rw [← hd]
+  apply Submodule.topologicalClosure_minimal _ _ L.isClosed_ker
+  apply Submodule.span_le.mpr
+  intro v hv
+  change L v = 0
+  by_contra h
+  have hK : 0 < ‖E‖ + 1 := by positivity
+  obtain ⟨n, hn⟩ := hv (‖L v‖ / (‖E‖ + 1)) (div_pos (norm_pos_iff.mpr h) hK)
+  have hpow : Real.exp (α * n) ≤ ‖c (g ^ n)‖ := by
+    rw [map_pow, norm_pow, mul_comm, Real.exp_nat_mul]
+    exact pow_le_pow_left₀ (Real.exp_pos _).le hg _
+  have hbound := E.le_opNorm ((Θ).mkQ (T (g ^ n) v))
+  change ‖L (T (g ^ n) v)‖ ≤ _ at hbound
+  rw [he, norm_mul] at hbound
+  apply lt_irrefl (Real.exp (α * n) * ‖L v‖)
+  calc
+    _ ≤ ‖c (g ^ n)‖ * ‖L v‖ := mul_le_mul_of_nonneg_right hpow (norm_nonneg _)
+    _ ≤ ‖E‖ * _ := hbound
+    _ ≤ (‖E‖ + 1) * _ := mul_le_mul_of_nonneg_right (le_add_of_nonneg_right zero_le_one) (norm_nonneg _)
+    _ < (‖E‖ + 1) * ((‖L v‖ / (‖E‖ + 1)) * Real.exp (α * n)) := mul_lt_mul_of_pos_left hn hK
+    _ = _ := by rw [← mul_assoc, mul_div_cancel₀ _ hK.ne', mul_comm]
+
+private theorem exteriorZero_order_reflect (ψ : PontryaginDual C𝔽) (ρ : ℂ) :
+    meromorphicOrderAt (continuedCompletedHeckeL ψ⁻¹) (1 - ρ) =
+      meromorphicOrderAt (continuedCompletedHeckeL ψ) ρ := by
+  obtain ⟨hL, hLh⟩ := continuedCompletedHeckeL_spec ψ
+  obtain ⟨hD, hDh⟩ := continuedCompletedHeckeL_spec ψ⁻¹
+  obtain ⟨ε, hε, hne, hfe⟩ := completedHeckeL_continuation_functionalEquation ψ _ _ hL hLh hD hDh
+  have hc : meromorphicOrderAt (fun s ↦ continuedCompletedHeckeL ψ⁻¹ (1 - s)) ρ =
+      meromorphicOrderAt (continuedCompletedHeckeL ψ⁻¹) (1 - ρ) := by
+    simpa [Function.comp_def] using
+      meromorphicOrderAt_comp_of_deriv_ne_zero (f := continuedCompletedHeckeL ψ⁻¹)
+        (show AnalyticAt ℂ (fun s : ℂ ↦ 1 - s) ρ by fun_prop)
+        (show deriv (fun s : ℂ ↦ 1 - s) ρ ≠ 0 by simp)
+  rw [← hc, show (fun s ↦ continuedCompletedHeckeL ψ⁻¹ (1 - s)) = ε * continuedCompletedHeckeL ψ
+    from funext hfe, meromorphicOrderAt_mul_of_ne_zero (hε.analyticAt ρ) (hne ρ)]
+
+local notation "extZeros(" τ ", " α ")" =>
+  {z : {ψ : PontryaginDual C𝔽 // ∀ t : ℝ≥0ˣ, ψ (τ t) = 1} × ℂ //
+    0 < MeromorphicOn.divisor (continuedCompletedHeckeL z.1.val) univ z.2 ∧ α ≤ |z.2.re - 1 / 2|}
+
+/-- Paper: Theorem 12.5.1.1, pp. 519–520. For a family with dense linear span, small
+rescaled returns modulo theta along positive powers of one dilation imply the
+exterior-zero identity at the target half-width. A right-hand zero, including an
+edge zero, puts every returning vector in the kernel of a nonzero functional.
+The functional equation handles the left edge. -/
+theorem traceFormula_exteriorZeros_of_totalThetaQuotientReturns
+    (τ : ℝ≥0ˣ →ₜ* C𝔽) (hτ : Function.RightInverse τ (ideleClassNorm F))
+    (g : C𝔽) (hg : logIdeleClassNorm F g = 1) {α : ℝ}
+    (hd : TotalThetaQuotientReturns g α) (φ : BruhatCompactSupport C𝔽) :
+    HasSum (fun z : extZeros(τ, α) ↦
+      ((MeromorphicOn.divisor (continuedCompletedHeckeL z.val.1.val) univ z.val.2 : ℤ) : ℂ) *
+        modulatedFourierMellin m𝔽 univ ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+          μ𝔽 φ.val (ideleClassNormTwist z.val.1.val (z.val.2 - 1 / 2))) 0 := by
+  have right (ψ : PontryaginDual C𝔽) (ρ : ℂ) (hb : ρ.re - 1 / 2 ∈ Ioo (-half) half)
+      (hz : 0 < (meromorphicOrderAt (continuedCompletedHeckeL ψ) ρ).untop₀)
+      (hα : α ≤ ρ.re - 1 / 2) : False := by
+    let b := ρ.re - 1 / 2
+    have hρ : ((1 / 2 + b : ℝ) : ℂ) + (ρ.im : ℂ) * Complex.I = ρ := by
+      rw [show (1 / 2 : ℝ) + b = ρ.re by dsimp [b]; ring, Complex.re_add_im]
+    obtain ⟨L, hL, hk, he⟩ := exteriorZero_mellinFunctional ψ b ρ.im hb (by rwa [hρ])
+    apply hL (totalThetaQuotientReturns_excludes g hd L hk _ he ?_)
+    rw [norm_exteriorZero_twist, hg, mul_one, Real.exp_le_exp]
+    exact hα
+  suffices hempty : IsEmpty extZeros(τ, α) by exact hasSum_empty
+  constructor
+  rintro ⟨⟨ψ, ρ⟩, hz, hα⟩
+  have hwide := (hasSum_exteriorZeros_iff_isEmpty τ hτ (1 / 2)).mp
+    (fun f _ ↦ traceFormula_exteriorZeros_of_half_le τ f le_rfl)
+  have hb : |ρ.re - 1 / 2| < 1 / 2 := lt_of_not_ge fun h ↦ hwide.false ⟨(ψ, ρ), hz, h⟩
+  rw [MeromorphicOn.divisor_apply (continuedCompletedHeckeL_spec ψ.val).1.meromorphicOn (mem_univ _)] at hz
+  rcases le_total 0 (ρ.re - 1 / 2) with h | h
+  · exact right ψ.val ρ (abs_lt.mp hb) hz (by rwa [abs_of_nonneg h] at hα)
+  · apply right ψ.val⁻¹ (1 - ρ)
+    · rw [Complex.sub_re, Complex.one_re]
+      exact ⟨by linarith [(abs_lt.mp hb).2], by linarith [(abs_lt.mp hb).1]⟩
+    · rwa [exteriorZero_order_reflect]
+    · rw [abs_of_nonpos h] at hα
+      rw [Complex.sub_re, Complex.one_re]
+      linarith
+
+end QuotientReturns
+
 end RiemannMasullo.Isolated
